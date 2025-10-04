@@ -98,22 +98,27 @@ export default class ExamplePlugin extends Plugin {
 	}
 
 	private cleanupClosedViews() {
-		const openMarkdownViews = new Set<MarkdownView>();
-		this.app.workspace.getLeavesOfType("markdown").forEach((leaf) => {
-			if (leaf.view instanceof MarkdownView) {
-				openMarkdownViews.add(leaf.view);
+		for (const [view, mountedList] of this.mountedComponents.entries()) {
+			if (
+				!this.app.workspace
+					.getLeavesOfType("markdown")
+					.some((leaf) => leaf.view === view)
+			) {
+				this.unmountViewComponents(view);
+				this.mountedComponents.delete(view);
 			}
-		});
+		}
+	}
 
-		for (const view of this.mountedComponents.keys()) {
-			if (!openMarkdownViews.has(view)) {
-				const mountedList = this.mountedComponents.get(view);
-				if (mountedList?.length) {
-					for (const mounted of mountedList) {
-						unmount(mounted.component);
-						mounted.container.remove();
-					}
-					this.mountedComponents.delete(view);
+	private unmountViewComponents(view: MarkdownView) {
+		const mountedList = this.mountedComponents.get(view);
+		if (mountedList?.length) {
+			for (const mounted of mountedList) {
+				try {
+					unmount(mounted.component);
+					mounted.container.remove();
+				} catch (error) {
+					console.error("Error unmounting component:", error);
 				}
 			}
 		}
