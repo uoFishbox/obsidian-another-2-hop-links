@@ -1,30 +1,32 @@
-import { MarkdownView, WorkspaceLeaf, TFile } from "obsidian";
+import { App, MarkdownView, WorkspaceLeaf, TFile } from "obsidian";
 
 export class ViewManager {
-	constructor(private app: any) {}
+	constructor(private app: App) {}
 
-	handleActiveLeafChange(leaf: WorkspaceLeaf | null): TFile | null {
+	getMarkdownViewFromLeaf(leaf: WorkspaceLeaf | null): MarkdownView | null {
 		if (!leaf) return null;
-
-		const view = leaf.view;
-
-		// いまのところMarkdownのみ
+		const { view } = leaf;
 		if (!(view instanceof MarkdownView)) {
 			return null;
 		}
-
-		const currentFile = view.file;
-		return currentFile || null;
+		return view;
 	}
 
-	getActiveMarkdownViews(): MarkdownView[] {
+	getFileFromLeaf(leaf: WorkspaceLeaf | null): TFile | null {
+		return this.getMarkdownViewFromLeaf(leaf)?.file ?? null;
+	}
+
+	getFileFromView(view: MarkdownView | null): TFile | null {
+		return view?.file ?? null;
+	}
+
+	getOpenMarkdownViews(): MarkdownView[] {
 		return this.app.workspace
 			.getLeavesOfType("markdown")
 			.map((leaf: WorkspaceLeaf) => leaf.view)
-			.filter((view: any) => view instanceof MarkdownView);
-	}
-
-	isViewActive(view: MarkdownView): boolean {
-		return this.getActiveMarkdownViews().includes(view);
+			.filter(
+				(view: WorkspaceLeaf["view"]): view is MarkdownView =>
+					view instanceof MarkdownView
+			);
 	}
 }

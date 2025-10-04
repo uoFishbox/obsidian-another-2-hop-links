@@ -7,13 +7,18 @@ interface MountedComponent {
 	component: Record<string, any>;
 	container: Element;
 	file: TFile;
+	filePath: string;
 }
 
 export class ComponentManager {
-	private mountedComponents: Map<MarkdownView, MountedComponent[]> =
-		new Map();
+	private mountedComponents: WeakMap<MarkdownView, MountedComponent[]> =
+		new WeakMap();
 
-	mountComponentsForView(view: MarkdownView, file: TFile): void {
+	mountComponentsForView(view: MarkdownView, file: TFile | null): void {
+		if (!file) {
+			this.unmountViewComponents(view);
+			return;
+		}
 		this.syncComponentsForView(view, file);
 	}
 
@@ -27,23 +32,6 @@ export class ComponentManager {
 		this.mountedComponents.delete(view);
 	}
 
-	cleanupAllComponents(): void {
-		for (const mountedList of this.mountedComponents.values()) {
-			for (const mounted of mountedList) {
-				this.unmountMountedComponent(mounted);
-			}
-		}
-		this.mountedComponents.clear();
-	}
-
-	cleanupClosedViews(activeViews: MarkdownView[]): void {
-		for (const [view, mountedList] of this.mountedComponents.entries()) {
-			if (!activeViews.includes(view)) {
-				this.unmountViewComponents(view);
-			}
-		}
-	}
-
 	private syncComponentsForView(view: MarkdownView, file: TFile): void {
 		const containers = getContainerElements(view);
 		const existing = this.mountedComponents.get(view) ?? [];
@@ -55,18 +43,18 @@ export class ComponentManager {
 		for (const container of containers) {
 			const mounted = containerToMount.get(container);
 			if (mounted) {
-				if (mounted.file !== file) {
+				if (this.shouldRemountComponent(mounted, file)) {
 					this.unmountMountedComponent(mounted, {
 						removeContainer: false,
 					});
 					nextMounted.push(this.mountComponent(container, file));
 				} else {
+					this.updateMountedComponent(mounted, file);
 					nextMounted.push(mounted);
 				}
-				continue;
+			} else {
+				nextMounted.push(this.mountComponent(container, file));
 			}
-
-			nextMounted.push(this.mountComponent(container, file));
 		}
 
 		if (nextMounted.length) {
@@ -79,8 +67,9 @@ export class ComponentManager {
 			nextMounted.map((mounted) => mounted.container)
 		);
 		for (const mounted of existing) {
-			if (reusedContainers.has(mounted.container)) continue;
-			this.unmountMountedComponent(mounted);
+			if (!reusedContainers.has(mounted.container)) {
+				this.unmountMountedComponent(mounted);
+			}
 		}
 	}
 
@@ -89,7 +78,25 @@ export class ComponentManager {
 			target: container,
 			props: { file },
 		});
-		return { component, container, file };
+		return { component, container, file, filePath: file.path };
+	}
+
+	private updateMountedComponent(
+		mounted: MountedComponent,
+		file: TFile
+	): void {
+		if (typeof mounted.component?.$set === "function") {
+			mounted.component.$set({ file });
+		}
+		mounted.file = file;
+		mounted.filePath = file.path;
+	}
+
+	private shouldRemountComponent(
+		mounted: MountedComponent,
+		file: TFile
+	): boolean {
+		return mounted.file !== file || mounted.filePath !== file.path;
 	}
 
 	private unmountMountedComponent(
