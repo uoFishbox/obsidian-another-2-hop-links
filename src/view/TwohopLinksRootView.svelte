@@ -5,12 +5,7 @@
 		file: TFile;
 	}
 
-	let { file: initialFile }: Props = $props();
-	let file = $state(initialFile);
-
-	export function updateView(newFile: TFile) {
-		file = newFile;
-	}
+	let { file }: Props = $props();
 </script>
 
 <div class="another-two-hop-links-root">

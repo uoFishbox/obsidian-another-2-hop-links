@@ -4,8 +4,9 @@ import TwohopLinksRootView from "./view/TwohopLinksRootView.svelte";
 import { getContainerElements } from "./domUtils";
 
 interface MountedComponent {
-	component: TwohopLinksRootView;
+	component: Record<string, any>;
 	container: Element;
+	file: TFile;
 }
 
 export class ComponentManager {
@@ -20,12 +21,7 @@ export class ComponentManager {
 		const mountedList = this.mountedComponents.get(view);
 		if (mountedList?.length) {
 			for (const mounted of mountedList) {
-				try {
-					unmount(mounted.component);
-					mounted.container.remove();
-				} catch (error) {
-					console.error("Error unmounting component:", error);
-				}
+				this.unmountMountedComponent(mounted);
 			}
 		}
 		this.mountedComponents.delete(view);
@@ -34,8 +30,7 @@ export class ComponentManager {
 	cleanupAllComponents(): void {
 		for (const mountedList of this.mountedComponents.values()) {
 			for (const mounted of mountedList) {
-				unmount(mounted.component);
-				mounted.container.remove();
+				this.unmountMountedComponent(mounted);
 			}
 		}
 		this.mountedComponents.clear();
@@ -60,18 +55,18 @@ export class ComponentManager {
 		for (const container of containers) {
 			const mounted = containerToMount.get(container);
 			if (mounted) {
-				mounted.component.updateView(file);
-				nextMounted.push(mounted);
+				if (mounted.file !== file) {
+					this.unmountMountedComponent(mounted, {
+						removeContainer: false,
+					});
+					nextMounted.push(this.mountComponent(container, file));
+				} else {
+					nextMounted.push(mounted);
+				}
 				continue;
 			}
 
-			const component = mount(TwohopLinksRootView, {
-				target: container,
-				props: {
-					file,
-				},
-			});
-			nextMounted.push({ component, container });
+			nextMounted.push(this.mountComponent(container, file));
 		}
 
 		if (nextMounted.length) {
@@ -80,11 +75,37 @@ export class ComponentManager {
 			this.mountedComponents.delete(view);
 		}
 
-		const reused = new Set(nextMounted);
+		const reusedContainers = new Set(
+			nextMounted.map((mounted) => mounted.container)
+		);
 		for (const mounted of existing) {
-			if (reused.has(mounted)) continue;
+			if (reusedContainers.has(mounted.container)) continue;
+			this.unmountMountedComponent(mounted);
+		}
+	}
+
+	private mountComponent(container: Element, file: TFile): MountedComponent {
+		const component = mount(TwohopLinksRootView, {
+			target: container,
+			props: { file },
+		});
+		return { component, container, file };
+	}
+
+	private unmountMountedComponent(
+		mounted: MountedComponent,
+		options?: { removeContainer?: boolean }
+	): void {
+		const removeContainer = options?.removeContainer ?? true;
+		try {
 			unmount(mounted.component);
+		} catch (error) {
+			console.error("Error unmounting component:", error);
+		}
+		if (removeContainer) {
 			mounted.container.remove();
+		} else {
+			mounted.container.innerHTML = "";
 		}
 	}
 }
