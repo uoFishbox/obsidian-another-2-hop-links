@@ -1,8 +1,17 @@
-/*
+/* Need to adjust location of twohop-links-container */
+.markdown-preview-sizer.markdown-preview-section {
+    padding-bottom: 25px !important;
+}
 
-This CSS file will be included with your plugin, and
-available in the app when your plugin is enabled.
+.cm-scroller {
+    flex-direction: column; 
+}
 
-If your plugin does not need CSS, delete this file.
+.cm-sizer {
+  flex: 0 0 auto;
+  min-height: 20% !important; 
+}
 
-*/
+.cm-content {
+  padding-bottom: 0 !important; 
+}
