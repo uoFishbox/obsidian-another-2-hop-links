@@ -1,136 +1,50 @@
 import { Plugin, MarkdownView, WorkspaceLeaf, TFile } from "obsidian";
-import { mount, unmount } from "svelte";
-import TwohopLinksRootView from "./view/TwohopLinksRootView.svelte";
-import { getContainerElements } from "./domUtils";
+import { ComponentManager } from "./ComponentManager";
+import { EventManager } from "./EventManager";
+import { ViewManager } from "./ViewManager";
 
-interface MountedComponent {
-	component: TwohopLinksRootView;
-	container: Element;
-}
-
-export default class ExamplePlugin extends Plugin {
-	private mountedComponents: Map<MarkdownView, MountedComponent[]> =
-		new Map();
+export default class AnotherTwoHopLinksPlugin extends Plugin {
+	private componentManager: ComponentManager = new ComponentManager();
+	private viewManager!: ViewManager;
+	private eventManager!: EventManager;
 
 	async onload() {
 		console.log("Loading Example Plugin");
 
-		// Obsidianのレイアウト準備完了後に、最初にアクティブなビューにマウント
-		this.app.workspace.onLayoutReady(() => {
-			this.handleActiveLeafChange(
-				this.app.workspace.getActiveViewOfType(MarkdownView)?.leaf ||
-					null
-			);
+		this.viewManager = new ViewManager(this.app);
+
+		this.eventManager = new EventManager(this, {
+			onLayoutReady: () => {
+				const leaf =
+					this.app.workspace.getActiveViewOfType(MarkdownView)
+						?.leaf || null;
+				const file = this.viewManager.handleActiveLeafChange(leaf);
+				if (leaf && file && leaf.view instanceof MarkdownView) {
+					this.componentManager.mountComponentsForView(
+						leaf.view as MarkdownView,
+						file
+					);
+				}
+			},
+			onActiveLeafChange: (leaf) => {
+				const file = this.viewManager.handleActiveLeafChange(leaf);
+				if (leaf && file && leaf.view instanceof MarkdownView) {
+					this.componentManager.mountComponentsForView(
+						leaf.view as MarkdownView,
+						file
+					);
+				}
+			},
+			onLayoutChange: () => {
+				const activeViews = this.viewManager.getActiveMarkdownViews();
+				this.componentManager.cleanupClosedViews(activeViews);
+			},
 		});
 
-		// アクティブなLeafが変更されたときにコンポーネントをマウント/更新
-		this.registerEvent(
-			this.app.workspace.on("active-leaf-change", (leaf) => {
-				this.handleActiveLeafChange(leaf);
-			})
-		);
-
-		this.registerEvent(
-			this.app.workspace.on("layout-change", () => {
-				this.cleanupClosedViews();
-			})
-		);
+		this.eventManager.registerEvents();
 	}
 
 	onunload() {
-		this.cleanupAllComponents();
-	}
-
-	private handleActiveLeafChange(leaf: WorkspaceLeaf | null) {
-		if (!leaf) return;
-
-		const view = leaf.view;
-
-		// いまのところMarkdownのみ
-		if (!(view instanceof MarkdownView)) {
-			return;
-		}
-
-		const currentFile = view.file;
-
-		if (!currentFile) return;
-
-		this.syncComponentsForView(view, currentFile);
-	}
-
-	private syncComponentsForView(view: MarkdownView, file: TFile) {
-		const containers = getContainerElements(view);
-		const existing = this.mountedComponents.get(view) ?? [];
-		const containerToMount = new Map(
-			existing.map((mounted) => [mounted.container, mounted])
-		);
-		const nextMounted: MountedComponent[] = [];
-
-		for (const container of containers) {
-			const mounted = containerToMount.get(container);
-			if (mounted) {
-				mounted.component.updateView(file);
-				nextMounted.push(mounted);
-				continue;
-			}
-
-			const component = mount(TwohopLinksRootView, {
-				target: container,
-				props: {
-					file,
-				},
-			});
-			nextMounted.push({ component, container });
-		}
-
-		if (nextMounted.length) {
-			this.mountedComponents.set(view, nextMounted);
-		} else {
-			this.mountedComponents.delete(view);
-		}
-
-		const reused = new Set(nextMounted);
-		for (const mounted of existing) {
-			if (reused.has(mounted)) continue;
-			unmount(mounted.component);
-			mounted.container.remove();
-		}
-	}
-
-	private cleanupClosedViews() {
-		for (const [view, mountedList] of this.mountedComponents.entries()) {
-			if (
-				!this.app.workspace
-					.getLeavesOfType("markdown")
-					.some((leaf) => leaf.view === view)
-			) {
-				this.unmountViewComponents(view);
-				this.mountedComponents.delete(view);
-			}
-		}
-	}
-
-	private unmountViewComponents(view: MarkdownView) {
-		const mountedList = this.mountedComponents.get(view);
-		if (mountedList?.length) {
-			for (const mounted of mountedList) {
-				try {
-					unmount(mounted.component);
-					mounted.container.remove();
-				} catch (error) {
-					console.error("Error unmounting component:", error);
-				}
-			}
-		}
-	}
-
-	private cleanupAllComponents() {
-		for (const mountedList of this.mountedComponents.values()) {
-			for (const mounted of mountedList) {
-				unmount(mounted.component);
-				mounted.container.remove();
-			}
-		}
-		this.mountedComponents.clear();
+		this.componentManager.cleanupAllComponents();
 	}
 }
