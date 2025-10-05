@@ -26,5 +26,8 @@
 		"svelte-preprocess": "^6.0.3",
 		"tslib": "^2.6.3",
 		"typescript": "5.7.2"
+	},
+	"dependencies": {
+		"ts-deepmerge": "^7.0.3"
 	}
 }
