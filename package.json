@@ -28,6 +28,7 @@
 		"typescript": "5.7.2"
 	},
 	"dependencies": {
+		"lucide-svelte": "^0.544.0",
 		"ts-deepmerge": "^7.0.3"
 	}
 }
