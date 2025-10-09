@@ -2,7 +2,7 @@
   "compilerOptions": {
     "verbatimModuleSyntax": true,
     "skipLibCheck": true,
-    "baseUrl": ".",
+    "baseUrl": "src",
     "inlineSourceMap": true,
     "inlineSources": true,
     "module": "ESNext",
