@@ -1,6 +1,7 @@
 {
   "compilerOptions": {
     "verbatimModuleSyntax": true,
+    "forceConsistentCasingInFileNames": true,
     "skipLibCheck": true,
     "baseUrl": "src",
     "inlineSourceMap": true,
