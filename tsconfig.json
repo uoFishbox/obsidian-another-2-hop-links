@@ -9,7 +9,8 @@
     "module": "ESNext",
     "target": "ES6",
     "types": [
-      "obsidian-typings"
+      "obsidian-typings",
+      "@types/bun"
     ],
     "allowJs": true,
     "noImplicitAny": true,
