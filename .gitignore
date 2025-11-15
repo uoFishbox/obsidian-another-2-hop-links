@@ -23,3 +23,9 @@ data.json
 
 
 package-lock.json
+
+# Test coverage output
+coverage/
+.nyc_output/
+coverage-final.json
+lcov.info
