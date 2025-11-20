@@ -3,6 +3,7 @@ import esbuild from "esbuild";
 import esbuildSvelte from 'esbuild-svelte';
 import process from "process";
 import { sveltePreprocess } from 'svelte-preprocess';
+import inlineWorkerPlugin from "esbuild-plugin-inline-worker";
 
 const banner =
 `/*
@@ -19,6 +20,7 @@ const context = await esbuild.context({
 	},
 	entryPoints: ["src/main.ts"],
 	bundle: true,
+	plugins: [inlineWorkerPlugin()],
 	external: [
 		"obsidian",
 		"electron",
