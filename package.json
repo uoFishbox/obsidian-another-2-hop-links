@@ -40,6 +40,7 @@
     "vitest": "^4.0.7"
   },
   "dependencies": {
+    "esbuild-plugin-inline-worker": "^0.1.1",
     "lucide-svelte": "^0.544.0",
     "monkey-around": "^3.0.0",
     "ts-deepmerge": "^7.0.3"
