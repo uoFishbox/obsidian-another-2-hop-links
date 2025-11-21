@@ -20,7 +20,6 @@ const context = await esbuild.context({
 	},
 	entryPoints: ["src/main.ts"],
 	bundle: true,
-	plugins: [inlineWorkerPlugin()],
 	external: [
 		"obsidian",
 		"electron",
@@ -36,12 +35,13 @@ const context = await esbuild.context({
 		"@lezer/highlight",
 		"@lezer/lr",
 		...builtins],
-		plugins: [
-			esbuildSvelte({
-			  compilerOptions: { css: 'injected' },
-			  preprocess: sveltePreprocess(),
-			}),
-		  ],
+	plugins: [
+		inlineWorkerPlugin(),
+		esbuildSvelte({
+			compilerOptions: { css: 'injected' },
+			preprocess: sveltePreprocess(),
+		}),
+	],
 	format: "cjs",
 	target: "es2018",
 	logLevel: "info",
