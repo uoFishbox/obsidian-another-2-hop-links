@@ -41,3 +41,6 @@ backup.bat
 tsconfig.tsbuildinfo
 vitest.config.js
 main.css
+
+copy-to-ftp.bat
+copy.bat
