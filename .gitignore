@@ -36,3 +36,8 @@ lcov.info
 
 bks/
 backup.bat
+
+# Build / generated artifacts
+tsconfig.tsbuildinfo
+vitest.config.js
+main.css
