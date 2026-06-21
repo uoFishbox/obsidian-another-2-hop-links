@@ -1,32 +1,25 @@
 {
-  "compilerOptions": {
-    "verbatimModuleSyntax": true,
-    "forceConsistentCasingInFileNames": true,
-    "skipLibCheck": true,
-    "baseUrl": "src",
-    "inlineSourceMap": true,
-    "inlineSources": true,
-    "module": "ESNext",
-    "target": "ES6",
-    "types": [
-      "obsidian-typings",
-      "@types/bun"
-    ],
-    "allowJs": true,
-    "noImplicitAny": true,
-    "moduleResolution": "node",
-    "importHelpers": true,
-    "isolatedModules": true,
-    "strict": true,
-    "lib": [
-      "DOM",
-      "ES5",
-      "ES6",
-      "ES7"
-    ]
-  },
-  "include": [
-    "**/*.ts",
-    "**/*.svelte"
-  ]
+	"compilerOptions": {
+		"verbatimModuleSyntax": true,
+		"forceConsistentCasingInFileNames": true,
+		"skipLibCheck": true,
+		"inlineSourceMap": true,
+		"inlineSources": true,
+		"module": "ESNext",
+		"target": "ES6",
+		"allowSyntheticDefaultImports": true,
+		"types": ["obsidian-typings", "@types/bun", "vitest/globals"],
+		"allowJs": true,
+		"noImplicitAny": true,
+		"moduleResolution": "bundler",
+		"paths": {
+			"*": ["./src/*"]
+		},
+		"importHelpers": true,
+		"isolatedModules": true,
+		"strict": true,
+		"lib": ["DOM", "DOM.Iterable", "ES5", "ES6", "ES7", "ES2021.WeakRef"]
+	},
+	"include": ["src/**/*.ts", "src/**/*.svelte"],
+	"exclude": ["bks", "coverage", "node_modules"]
 }
