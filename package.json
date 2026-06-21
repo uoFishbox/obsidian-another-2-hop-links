@@ -1,7 +1,7 @@
 {
 	"name": "obsidian-sample-plugin",
 	"version": "1.0.0",
-	"description": "Obsidian Cosense Card Links plugin",
+	"description": "Obsidian plugin for Cosense-style link preview cards and two-hop navigation.",
 	"main": "main.js",
 	"scripts": {
 		"dev": "bun run esbuild.config.mjs",

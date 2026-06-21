@@ -1,7 +1,7 @@
 {
 	"author": "uoFishbox",
 	"authorUrl": "https://github.com/uoFishbox/obsidian-cosense-style-card-links",
-	"description": "Demonstrates some of the capabilities of the Obsidian API.",
+	"description": "Render Obsidian links as Cosense-style preview cards with two-hop navigation.",
 	"id": "obsidian-cosense-style-card-links",
 	"isDesktopOnly": false,
 	"name": "Cosense-style card links",
