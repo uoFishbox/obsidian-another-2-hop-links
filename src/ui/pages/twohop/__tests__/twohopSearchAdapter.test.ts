@@ -1,0 +1,444 @@
+import { describe, expect, it, vi } from "vitest";
+import { createMockTFile } from "testing/__mocks__/testHelpers";
+import type { TFile } from "obsidian";
+import type {
+	TagGroup,
+	TaggedNote,
+	TwoHopIndexedLink,
+	TwoHopLinkBranch,
+} from "types/domain";
+import type { DisplayData } from "application/presenters/displayDataBuilder";
+import {
+	buildTwohopSearchDataset,
+	collectTwohopSearchableFiles,
+	filterTwohopDisplayData,
+} from "../twohopSearchAdapter";
+
+vi.mock("obsidian", () => {
+	class MockTFile {
+		path = "";
+		name = "";
+		basename = "";
+		extension = "md";
+		stat = { ctime: 0, mtime: 0, size: 0 };
+		parent: unknown = null;
+	}
+
+	return {
+		TFile: MockTFile,
+		normalizePath: vi.fn((path: string) => path.replace(/\\/g, "/")),
+	};
+});
+
+function createBacklink(sourceFile: TFile, rawText: string): TwoHopIndexedLink {
+	return {
+		sourceFile,
+		rawText,
+		path: sourceFile.path,
+		isUnresolved: false,
+		backlinkCount: 0,
+	};
+}
+
+function createBranch(
+	sourceFile: TFile,
+	targetPath: string | undefined,
+	rawText: string,
+	hop2: TwoHopIndexedLink[] = [],
+): TwoHopLinkBranch {
+	return {
+		hop1: {
+			sourceFile,
+			rawText,
+			path: targetPath,
+			isUnresolved: targetPath === undefined,
+		},
+		hop2,
+	};
+}
+
+function createTaggedNote(file: TFile, tag: string = "alpha"): TaggedNote {
+	return {
+		file,
+		commonTags: [tag],
+		path: file.path,
+	};
+}
+
+function createDisplayData(partial: Partial<DisplayData> = {}): DisplayData {
+	return {
+		outgoing: [],
+		backlinks: [],
+		mergedItems: [],
+		twoHopBranches: [],
+		tagGroups: [],
+		newLinks: [],
+		...partial,
+	};
+}
+
+function createAdapterOptions(displayData: DisplayData, sourceFile: TFile) {
+	const filesByPath = new Map<string, TFile>();
+	const metadataByPath = new Map<string, unknown>();
+
+	const addFile = (file: TFile | null | undefined) => {
+		if (file) {
+			filesByPath.set(file.path, file);
+		}
+	};
+
+	for (const branch of displayData.outgoing) {
+		if (branch.hop1.path) {
+			addFile(createMockTFile(branch.hop1.path));
+		}
+	}
+	for (const link of displayData.backlinks) {
+		addFile(link.sourceFile);
+	}
+	for (const item of displayData.mergedItems) {
+		if ("hop1" in item && item.hop1.path) {
+			addFile(createMockTFile(item.hop1.path));
+		}
+		if ("sourceFile" in item) {
+			addFile(item.sourceFile);
+		}
+	}
+	for (const branch of displayData.twoHopBranches) {
+		if (branch.hop1.path) {
+			addFile(createMockTFile(branch.hop1.path));
+		}
+		for (const link of branch.hop2) {
+			addFile(link.sourceFile);
+		}
+	}
+	for (const section of displayData.tagGroups) {
+		for (const note of section.notes) {
+			addFile(note.file);
+		}
+	}
+
+	return {
+		displayData,
+		resolveFile: vi.fn((path: string) => filesByPath.get(path) ?? null),
+		fileToLinktext: vi.fn((file: TFile) => `${file.basename} Link`),
+		sourcePath: sourceFile.path,
+		getMetadata: vi.fn(
+			(file: TFile) => (metadataByPath.get(file.path) ?? null) as never,
+		),
+		priorityFrontmatterKeyForTitle: "title",
+	};
+}
+
+describe("buildTwohopSearchDataset", () => {
+	it("builds snapshot from resolved outgoing branch with frontmatter title", () => {
+		const sourceFile = createMockTFile("notes/source.md");
+		const targetFile = createMockTFile("notes/outgoing-target.md");
+		const displayData = createDisplayData({
+			outgoing: [
+				createBranch(sourceFile, targetFile.path, "Outgoing Raw"),
+			],
+		});
+		const options = createAdapterOptions(displayData, sourceFile);
+
+		const snapshots = buildTwohopSearchDataset(options);
+		const outgoingSnapshot = snapshots.find((s) => s.key.startsWith("o"));
+
+		expect(outgoingSnapshot?.searchText).toContain("outgoing-target link");
+		expect(outgoingSnapshot?.searchText).toContain("outgoing raw");
+		expect(outgoingSnapshot?.targetFilePath).toBe(targetFile.path);
+	});
+
+	it("builds snapshots for merged branches and backlinks", () => {
+		const sourceFile = createMockTFile("notes/source.md");
+		const mergedTarget = createMockTFile("notes/merged-target.md");
+		const mergedBacklinkSource = createMockTFile(
+			"notes/merged-backlink.md",
+		);
+		const displayData = createDisplayData({
+			mergedItems: [
+				createBranch(
+					sourceFile,
+					mergedTarget.path,
+					"Merged Branch Raw",
+				),
+				createBacklink(mergedBacklinkSource, "Merged Backlink Raw"),
+			],
+		});
+		const options = createAdapterOptions(displayData, sourceFile);
+
+		const snapshots = buildTwohopSearchDataset(options);
+		const mergedBranchSnapshot = snapshots.find(
+			(s) =>
+				s.key.startsWith("m") &&
+				s.searchText.includes("merged branch raw"),
+		);
+		const mergedBacklinkSnapshot = snapshots.find(
+			(s) =>
+				s.key.startsWith("m") &&
+				s.searchText.includes("merged-backlink link"),
+		);
+
+		expect(mergedBranchSnapshot).toBeDefined();
+		expect(mergedBranchSnapshot?.targetFilePath).toBe(mergedTarget.path);
+		expect(mergedBacklinkSnapshot).toBeDefined();
+		expect(mergedBacklinkSnapshot?.targetFilePath).toBe(
+			mergedBacklinkSource.path,
+		);
+	});
+
+	it("builds snapshots for two-hop children", () => {
+		const sourceFile = createMockTFile("notes/source.md");
+		const targetFile = createMockTFile("notes/target.md");
+		const childSource = createMockTFile("notes/child-source.md");
+		const displayData = createDisplayData({
+			twoHopBranches: [
+				createBranch(sourceFile, targetFile.path, "Parent Raw", [
+					createBacklink(childSource, "Child Raw"),
+				]),
+			],
+		});
+		const options = createAdapterOptions(displayData, sourceFile);
+
+		const snapshots = buildTwohopSearchDataset(options);
+		const childSnapshot = snapshots.find((s) => s.key.startsWith("h"));
+
+		expect(childSnapshot?.searchText).toContain("child-source link");
+		expect(childSnapshot?.targetFilePath).toBe(childSource.path);
+	});
+
+	it("builds tag section snapshot with tag name", () => {
+		const sourceFile = createMockTFile("notes/source.md");
+		const taggedFile = createMockTFile("notes/tagged.md");
+		const displayData = createDisplayData({
+			tagGroups: [
+				{
+					tag: "alpha",
+					notes: [createTaggedNote(taggedFile)],
+				} satisfies TagGroup,
+			],
+		});
+		const options = createAdapterOptions(displayData, sourceFile);
+
+		const snapshots = buildTwohopSearchDataset(options);
+		const tagGroupSnapshot = snapshots.find((s) => s.key.startsWith("g"));
+
+		expect(tagGroupSnapshot?.searchText).toBe("#alpha");
+		expect(tagGroupSnapshot?.targetFilePath).toBeNull();
+	});
+});
+
+describe("filterTwohopDisplayData", () => {
+	it("returns original displayData when query is empty", () => {
+		const sourceFile = createMockTFile("notes/source.md");
+		const targetFile = createMockTFile("notes/target.md");
+		const displayData = createDisplayData({
+			outgoing: [createBranch(sourceFile, targetFile.path, "target")],
+		});
+
+		const result = filterTwohopDisplayData(displayData, "", new Set());
+
+		expect(result).toBe(displayData);
+	});
+
+	it("returns empty sections when matchedKeySet is null", () => {
+		const sourceFile = createMockTFile("notes/source.md");
+		const targetFile = createMockTFile("notes/target.md");
+		const displayData = createDisplayData({
+			outgoing: [createBranch(sourceFile, targetFile.path, "target")],
+			backlinks: [createBacklink(targetFile, "backlink")],
+		});
+
+		const result = filterTwohopDisplayData(displayData, "query", null);
+
+		expect(result.outgoing).toEqual([]);
+		expect(result.backlinks).toEqual([]);
+		expect(result.mergedItems).toEqual([]);
+		expect(result.twoHopBranches).toEqual([]);
+		expect(result.tagGroups).toEqual([]);
+		expect(result.newLinks).toEqual([]);
+	});
+
+	it("hides twohop branch when only parent matches", () => {
+		const sourceFile = createMockTFile("notes/source.md");
+		const targetFile = createMockTFile("notes/parent.md");
+		const childFile = createMockTFile("notes/child.md");
+		const displayData = createDisplayData({
+			twoHopBranches: [
+				createBranch(sourceFile, targetFile.path, "parent", [
+					createBacklink(childFile, "child"),
+				]),
+			],
+		});
+		const options = createAdapterOptions(displayData, sourceFile);
+		const snapshots = buildTwohopSearchDataset(options);
+		const parentKey = snapshots.find((s) => !s.key.startsWith("h"))?.key;
+
+		const result = filterTwohopDisplayData(
+			displayData,
+			"query",
+			new Set([parentKey ?? ""]),
+		);
+
+		expect(result.twoHopBranches).toHaveLength(0);
+	});
+
+	it("keeps twohop branch with only matched children when child matches", () => {
+		const sourceFile = createMockTFile("notes/source.md");
+		const targetFile = createMockTFile("notes/parent.md");
+		const alphaChild = createMockTFile("notes/alpha-child.md");
+		const betaChild = createMockTFile("notes/beta-child.md");
+		const displayData = createDisplayData({
+			twoHopBranches: [
+				createBranch(sourceFile, targetFile.path, "parent", [
+					createBacklink(alphaChild, "alpha-child"),
+					createBacklink(betaChild, "beta-child"),
+				]),
+			],
+		});
+		const options = createAdapterOptions(displayData, sourceFile);
+		const snapshots = buildTwohopSearchDataset(options);
+		const betaChildKey = snapshots.find((s) =>
+			s.key.includes("beta-child"),
+		)?.key;
+
+		const result = filterTwohopDisplayData(
+			displayData,
+			"query",
+			new Set([betaChildKey ?? ""]),
+		);
+
+		expect(result.twoHopBranches).toHaveLength(1);
+		expect(result.twoHopBranches[0].hop2).toHaveLength(1);
+	});
+
+	it("keeps tag section and notes when tag section name matches", () => {
+		const sourceFile = createMockTFile("notes/source.md");
+		const noteFile = createMockTFile("notes/note.md");
+		const displayData = createDisplayData({
+			tagGroups: [
+				{
+					tag: "alpha",
+					notes: [createTaggedNote(noteFile)],
+				} satisfies TagGroup,
+			],
+		});
+		const options = createAdapterOptions(displayData, sourceFile);
+		const snapshots = buildTwohopSearchDataset(options);
+		const tagGroupKey = snapshots.find((s) => s.key.startsWith("g"))?.key;
+
+		const result = filterTwohopDisplayData(
+			displayData,
+			"query",
+			new Set([tagGroupKey ?? ""]),
+		);
+
+		expect(result.tagGroups).toHaveLength(1);
+		expect(result.tagGroups[0].notes).toHaveLength(1);
+	});
+
+	it("keeps tag section with only matched notes when tag note matches", () => {
+		const sourceFile = createMockTFile("notes/source.md");
+		const alphaNote = createMockTFile("notes/alpha-note.md");
+		const betaNote = createMockTFile("notes/beta-note.md");
+		const displayData = createDisplayData({
+			tagGroups: [
+				{
+					tag: "section",
+					notes: [
+						createTaggedNote(alphaNote, "section"),
+						createTaggedNote(betaNote, "section"),
+					],
+				} satisfies TagGroup,
+			],
+		});
+		const options = createAdapterOptions(displayData, sourceFile);
+		const snapshots = buildTwohopSearchDataset(options);
+		const betaNoteKey = snapshots.find((s) =>
+			s.key.includes("beta-note"),
+		)?.key;
+
+		const result = filterTwohopDisplayData(
+			displayData,
+			"query",
+			new Set([betaNoteKey ?? ""]),
+		);
+
+		expect(result.tagGroups).toHaveLength(1);
+		expect(result.tagGroups[0].notes).toHaveLength(1);
+	});
+
+	it("hides newLinks when query is active", () => {
+		const sourceFile = createMockTFile("notes/source.md");
+		const displayData = createDisplayData({
+			newLinks: [
+				{
+					sourceFile,
+					rawText: "new-link",
+					path: undefined,
+					isUnresolved: true,
+					backlinkCount: 0,
+				} as TwoHopIndexedLink,
+			],
+		});
+
+		const result = filterTwohopDisplayData(displayData, "query", new Set());
+
+		expect(result.newLinks).toEqual([]);
+	});
+});
+
+describe("collectTwohopSearchableFiles", () => {
+	it("collects all files from displayData", () => {
+		const sourceFile = createMockTFile("notes/source.md");
+		const outgoingTarget = createMockTFile("notes/outgoing-target.md");
+		const backlinkSource = createMockTFile("notes/backlink-source.md");
+		const mergedTarget = createMockTFile("notes/merged-target.md");
+		const mergedBacklinkSource = createMockTFile(
+			"notes/merged-backlink.md",
+		);
+		const childSource = createMockTFile("notes/child-source.md");
+		const taggedFile = createMockTFile("notes/tagged.md");
+
+		const displayData: DisplayData = {
+			outgoing: [
+				createBranch(sourceFile, outgoingTarget.path, "Outgoing Raw"),
+			],
+			backlinks: [createBacklink(backlinkSource, "Backlink Raw")],
+			mergedItems: [
+				createBranch(
+					sourceFile,
+					mergedTarget.path,
+					"Merged Branch Raw",
+				),
+				createBacklink(mergedBacklinkSource, "Merged Backlink Raw"),
+			],
+			twoHopBranches: [
+				createBranch(sourceFile, mergedTarget.path, "Parent Raw", [
+					createBacklink(childSource, "Child Raw"),
+				]),
+			],
+			tagGroups: [
+				{
+					tag: "alpha",
+					notes: [createTaggedNote(taggedFile)],
+				} satisfies TagGroup,
+			],
+			newLinks: [],
+		};
+		const options = createAdapterOptions(displayData, sourceFile);
+
+		const files = collectTwohopSearchableFiles(options);
+		const filePaths = files.map((f) => f.path);
+
+		expect(filePaths).toEqual(
+			expect.arrayContaining([
+				outgoingTarget.path,
+				backlinkSource.path,
+				mergedTarget.path,
+				mergedBacklinkSource.path,
+				childSource.path,
+				taggedFile.path,
+			]),
+		);
+	});
+});

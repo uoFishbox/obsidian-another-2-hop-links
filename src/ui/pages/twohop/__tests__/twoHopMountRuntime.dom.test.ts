@@ -1,0 +1,126 @@
+import { describe, expect, it } from "vitest";
+import type { TwoHopSectionDescriptor } from "../twohopPageVirtualModel";
+import {
+	compileTwoHopViewPlan,
+	createTwoHopViewPlanRowModel,
+} from "../twoHopViewPlan";
+import { createTwoHopMountRuntime } from "../twoHopMountRuntime.svelte";
+
+const items = ["a", "b"].map((key) => ({
+	kind: "new-link" as const,
+	item: { type: "link" } as never,
+	searchKey: key,
+	virtualKey: key,
+}));
+
+const descriptor: TwoHopSectionDescriptor = {
+	section: {
+		kind: "new-links-section",
+		rawSectionId: "new-links",
+		sectionId: "new-links",
+		sectionKey: "new-links",
+		title: "New links",
+		getKey: () => "",
+	},
+	sectionKey: "new-links",
+	title: "New links",
+	sectionId: "new-links",
+	totalCount: items.length,
+	loadedCount: items.length,
+	getItems: () => items,
+	headerProps: {},
+};
+
+const rowModel = createTwoHopViewPlanRowModel(
+	compileTwoHopViewPlan({
+		sections: [descriptor],
+		sectionVisibleCounts: { "new-links": items.length },
+		layout: {
+			containerWidth: 100,
+			columns: 1,
+			cellWidth: 100,
+			rowHeight: 100,
+			gap: 0,
+			sectionMarginBottom: 0,
+		},
+		materialization: { kind: "eager" },
+		resolveInitialSectionVisibleCount: (section) => section.loadedCount,
+		clampVisibleCount: (section, count) =>
+			Math.min(section.loadedCount, count),
+	}),
+);
+
+describe("createTwoHopMountRuntime", () => {
+	it("owns mounted row reuse and preview visibility history", () => {
+		const runtime = createTwoHopMountRuntime();
+		const mounted = runtime.buildMountedRows({
+			rowModel,
+			rowRange: { start: 0, end: 3 },
+			ranges: {
+				mounted: { start: 0, end: 3 },
+				previewVisible: { start: 1, end: 2 },
+			},
+		});
+		const firstItem = mounted.rowSlices[1]?.cells[0];
+		if (!firstItem) throw new Error("Expected first mounted item.");
+
+		runtime.syncSnapshot(mounted, { start: 1, end: 2 });
+		const firstState = runtime.getOrCreateVisibilityState(
+			firstItem,
+			"visible",
+		);
+		runtime.syncSnapshot(mounted, { start: 2, end: 3 });
+		expect(firstState.visibility).toBe("mounted");
+
+		const scrolled = runtime.buildMountedRows({
+			rowModel,
+			rowRange: { start: 2, end: 3 },
+			ranges: {
+				mounted: { start: 2, end: 3 },
+				previewVisible: { start: 2, end: 3 },
+			},
+			previousBuild: mounted,
+		});
+		runtime.syncSnapshot(scrolled, { start: 2, end: 3 });
+
+		expect(scrolled.rowSlices[0]?.slotKey).toBe(mounted.rowSlices[2]?.slotKey);
+		expect(
+			runtime.getOrCreateVisibilityState(firstItem, "visible"),
+		).not.toBe(firstState);
+	});
+
+	it("supports preview range objects that are reused by the caller", () => {
+		const runtime = createTwoHopMountRuntime();
+		const mounted = runtime.buildMountedRows({
+			rowModel,
+			rowRange: { start: 0, end: 3 },
+			ranges: {
+				mounted: { start: 0, end: 3 },
+				previewVisible: { start: 1, end: 2 },
+			},
+		});
+		const firstItem = mounted.rowSlices[1]?.cells[0];
+		const secondItem = mounted.rowSlices[2]?.cells[0];
+		if (!firstItem || !secondItem) {
+			throw new Error("Expected mounted items.");
+		}
+
+		const reusedRange = { start: 1, end: 2 };
+		runtime.syncSnapshot(mounted, reusedRange);
+		const firstState = runtime.getOrCreateVisibilityState(
+			firstItem,
+			"visible",
+		);
+		const secondState = runtime.getOrCreateVisibilityState(
+			secondItem,
+			"mounted",
+		);
+
+		reusedRange.start = 2;
+		reusedRange.end = 3;
+		runtime.syncSnapshot(mounted, reusedRange);
+
+		expect(firstState.visibility).toBe("mounted");
+		expect(secondState.visibility).toBe("visible");
+	});
+});

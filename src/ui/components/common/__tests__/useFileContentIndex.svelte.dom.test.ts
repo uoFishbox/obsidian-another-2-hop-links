@@ -1,0 +1,358 @@
+import { cleanup, render, screen, waitFor } from "@testing-library/svelte";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { tick } from "svelte";
+import { TFile, type App } from "obsidian";
+import { createMockTFile } from "testing/__mocks__/testHelpers";
+import { BoundedQueryCache } from "features/search/useFileContentIndex.svelte";
+import UseFileContentIndexHarness from "./UseFileContentIndexHarness.svelte";
+
+vi.mock("obsidian", () => {
+	class MockComponent {
+		registerEvent(_eventRef: unknown) {}
+		load() {}
+		unload() {}
+	}
+
+	class MockTFile {
+		path = "";
+		name = "";
+		basename = "";
+		extension = "";
+		stat = { ctime: 0, mtime: 0, size: 0 };
+	}
+
+	return {
+		Component: MockComponent,
+		TFile: MockTFile,
+	};
+});
+
+type MockApp = {
+	vault: {
+		cachedRead: ReturnType<typeof vi.fn>;
+		on: ReturnType<typeof vi.fn>;
+	};
+};
+
+function createMockApp(fileContentsByPath: Record<string, string>): {
+	app: App;
+	cachedRead: ReturnType<typeof vi.fn>;
+	on: ReturnType<typeof vi.fn>;
+} {
+	const cachedRead = vi.fn(async (file: TFile) => {
+		return fileContentsByPath[file.path] ?? "";
+	});
+	const on = vi.fn(
+		(_eventName: string, _callback: (...args: any[]) => void) => {
+			return {};
+		},
+	);
+
+	return {
+		app: {
+			vault: {
+				cachedRead,
+				on,
+			},
+		} as unknown as App,
+		cachedRead,
+		on,
+	};
+}
+
+function createDeferred<T>() {
+	let resolve!: (value: T | PromiseLike<T>) => void;
+	let reject!: (reason?: unknown) => void;
+	const promise = new Promise<T>((res, rej) => {
+		resolve = res;
+		reject = rej;
+	});
+
+	return { promise, resolve, reject };
+}
+
+afterEach(() => {
+	cleanup();
+});
+
+describe("useFileContentIndex", () => {
+	it("builds and destroys index when enabled changes", async () => {
+		const file = createMockTFile("notes/alpha.md");
+		const query = "body-only-token";
+		const { app, cachedRead, on } = createMockApp({
+			[file.path]: `title-like text ${query} inside body`,
+		});
+
+		const view = render(UseFileContentIndexHarness, {
+			props: {
+				app,
+				files: [file],
+				targetFile: file,
+				query,
+				enabled: false,
+			},
+		});
+
+		// 無効時はインデックス構築しない
+		expect(screen.getByTestId("has-match").textContent).toBe("false");
+		expect(cachedRead).not.toHaveBeenCalled();
+		expect(on).not.toHaveBeenCalled();
+
+		// 有効化でインデックス構築
+		await view.rerender({
+			app,
+			files: [file],
+			targetFile: file,
+			query,
+			enabled: true,
+		});
+
+		await waitFor(() => {
+			expect(screen.getByTestId("has-match").textContent).toBe("true");
+		});
+		expect(cachedRead).toHaveBeenCalled();
+		expect(on).toHaveBeenCalledTimes(4);
+
+		// 無効化でインデックス破棄
+		await view.rerender({
+			app,
+			files: [file],
+			targetFile: file,
+			query,
+			enabled: false,
+		});
+
+		await waitFor(() => {
+			expect(screen.getByTestId("has-match").textContent).toBe("false");
+		});
+	});
+
+	it("can search body content with hasMatch", async () => {
+		const file = createMockTFile("notes/content.md");
+		const query = "content-only-token";
+		const { app } = createMockApp({
+			[file.path]: `This body contains ${query} and no title hint`,
+		});
+
+		render(UseFileContentIndexHarness, {
+			props: {
+				app,
+				files: [file],
+				targetFile: file,
+				query,
+				enabled: true,
+			},
+		});
+
+		await waitFor(() => {
+			expect(screen.getByTestId("has-match").textContent).toBe("true");
+		});
+	});
+
+	it("retains body snapshot as raw", async () => {
+		const file = createMockTFile("notes/raw-content.md");
+		const rawContent = "MiXeD Case Token";
+		const { app } = createMockApp({
+			[file.path]: rawContent,
+		});
+
+		render(UseFileContentIndexHarness, {
+			props: {
+				app,
+				files: [file],
+				targetFile: file,
+				query: "token",
+				enabled: true,
+			},
+		});
+
+		await waitFor(() => {
+			expect(screen.getByTestId("serialized-content").textContent).toBe(
+				rawContent,
+			);
+		});
+	});
+
+	it("treats space-separated search terms with AND condition", async () => {
+		const file = createMockTFile("notes/and-search.md");
+		const { app } = createMockApp({
+			[file.path]: "first token appears here and second token appears later",
+		});
+
+		const view = render(UseFileContentIndexHarness, {
+			props: {
+				app,
+				files: [file],
+				targetFile: file,
+				query: "first second",
+				enabled: true,
+			},
+		});
+
+		await waitFor(() => {
+			expect(screen.getByTestId("has-match").textContent).toBe("true");
+		});
+
+		await view.rerender({
+			app,
+			files: [file],
+			targetFile: file,
+			query: "first missing",
+			enabled: true,
+		});
+
+		await waitFor(() => {
+			expect(screen.getByTestId("has-match").textContent).toBe("false");
+		});
+	});
+
+	it("reflects body matches on each batch completion", async () => {
+		const files = Array.from({ length: 11 }, (_unused, index) =>
+			createMockTFile(`notes/${String(index).padStart(2, "0")}.md`),
+		);
+		const query = "batch-token";
+		const pendingLoad = createDeferred<string>();
+		const pendingPath = files[10].path;
+		const cachedRead = vi.fn(async (file: TFile) => {
+			if (file.path === pendingPath) {
+				return await pendingLoad.promise;
+			}
+
+			return file.path === files[0].path
+				? `contains ${query}`
+				: "no match";
+		});
+		const on = vi.fn(
+			(_eventName: string, _callback: (...args: any[]) => void) => {
+				return {};
+			},
+		);
+		const app = {
+			vault: {
+				cachedRead,
+				on,
+			},
+		} as unknown as App;
+
+		render(UseFileContentIndexHarness, {
+			props: {
+				app,
+				files,
+				targetFile: files[0],
+				query,
+				enabled: true,
+			},
+		});
+
+		await waitFor(() => {
+			expect(cachedRead).toHaveBeenCalledTimes(11);
+		});
+
+		await tick();
+		expect(screen.getByTestId("has-match").textContent).toBe("true");
+		expect(screen.getByTestId("is-loading").textContent).toBe("true");
+
+		pendingLoad.resolve("no match");
+
+		await waitFor(() => {
+			expect(screen.getByTestId("is-loading").textContent).toBe("false");
+		});
+	});
+
+
+	it("isLoading is true until loading completes", async () => {
+		const file = createMockTFile("notes/loading.md");
+		const query = "loading-token";
+		const pendingLoad = createDeferred<string>();
+		const cachedRead = vi.fn(async () => await pendingLoad.promise);
+		const on = vi.fn(
+			(_eventName: string, _callback: (...args: any[]) => void) => {
+				return {};
+			},
+		);
+		const app = {
+			vault: {
+				cachedRead,
+				on,
+			},
+		} as unknown as App;
+
+		render(UseFileContentIndexHarness, {
+			props: {
+				app,
+				files: [file],
+				targetFile: file,
+				query,
+				enabled: true,
+			},
+		});
+
+		await waitFor(() => {
+			expect(cachedRead).toHaveBeenCalledTimes(1);
+		});
+		await tick();
+		expect(screen.getByTestId("is-loading").textContent).toBe("true");
+
+		pendingLoad.resolve(`contains ${query}`);
+
+		await waitFor(() => {
+			expect(screen.getByTestId("is-loading").textContent).toBe("false");
+		});
+		expect(screen.getByTestId("has-match").textContent).toBe("true");
+	});
+
+	it("can get match position with getFirstMatchPosition", async () => {
+		const file = createMockTFile("notes/position.md");
+		const query = "targettoken";
+		const { app } = createMockApp({
+			[file.path]: "line0\nline1 targettoken here\nline2",
+		});
+
+		render(UseFileContentIndexHarness, {
+			props: {
+				app,
+				files: [file],
+				targetFile: file,
+				query,
+				enabled: true,
+			},
+		});
+
+		await waitFor(() => {
+			expect(screen.getByTestId("first-match-line").textContent).toBe(
+				"1",
+			);
+		});
+	});
+
+	it("BoundedQueryCache retains only recently used queries", () => {
+		const cache = new BoundedQueryCache<number | undefined>(4);
+
+		cache.set("a", 1);
+		cache.set("b", 2);
+		cache.set("c", 3);
+		cache.set("d", undefined);
+
+		expect(cache.size()).toBe(4);
+		expect(cache.has("d")).toBe(true);
+		expect(cache.get("d")).toBeUndefined();
+		expect(cache.has("d")).toBe(true);
+		expect(cache.keys()).toEqual(["a", "b", "c", "d"]);
+
+		cache.get("b");
+		expect(cache.keys()).toEqual(["a", "c", "d", "b"]);
+
+		cache.set("e", 5);
+		expect(cache.size()).toBe(4);
+		expect(cache.keys()).toEqual(["c", "d", "b", "e"]);
+
+		cache.set("f", 6);
+		expect(cache.keys()).toEqual(["d", "b", "e", "f"]);
+
+		cache.set("g", 7);
+		expect(cache.keys()).toEqual(["b", "e", "f", "g"]);
+		expect(cache.has("a")).toBe(false);
+		expect(cache.has("c")).toBe(false);
+		expect(cache.has("d")).toBe(false);
+	});
+});
