@@ -1,0 +1,99 @@
+import type { TFile } from "obsidian";
+import type { TwoHopIndexedLink } from "types";
+import type { PluginSettings } from "types/settings";
+import type { HighlightMode } from "../public-types";
+import { isAdvancedCanvasPosition } from "core/rules/fileRules";
+
+export const COSENSE_CARD_LINKS_HOVER_SOURCE_ID = "cosense-card-links";
+export const COSENSE_CARD_LINKS_HOVER_SOURCE_DISPLAY =
+	"Cosense Card Links";
+
+export interface HoverPopoverLinkSpec {
+	linktext: string;
+	sourcePath: string;
+	state: unknown;
+}
+
+function resolveHoverLinktext(
+	link: TwoHopIndexedLink,
+	targetFile: TFile,
+	isOutgoingLink: boolean,
+): string {
+	let linktext = targetFile.path;
+	if (!isOutgoingLink) {
+		return linktext;
+	}
+
+	const hashIndex = link.rawText.lastIndexOf("#");
+	if (hashIndex !== -1) {
+		linktext += link.rawText.substring(hashIndex);
+	}
+
+	return linktext;
+}
+
+function resolveHoverHighlightEnabled(
+	highlightMode: HighlightMode,
+	settings?: PluginSettings,
+): boolean {
+	if (highlightMode === "force") {
+		return true;
+	}
+	if (highlightMode === "suppress") {
+		return false;
+	}
+	return settings?.highlightInPreviewOnHover ?? false;
+}
+
+function resolveHoverState(
+	link: TwoHopIndexedLink,
+	targetFile: TFile,
+	settings: PluginSettings | undefined,
+	isOutgoingLink: boolean,
+	highlightMode: HighlightMode,
+): unknown {
+	const shouldHighlightPreview = resolveHoverHighlightEnabled(
+		highlightMode,
+		settings,
+	);
+
+	if (!shouldHighlightPreview || isOutgoingLink || !link.position) {
+		return undefined;
+	}
+
+	if (
+		targetFile.extension === "canvas" &&
+		isAdvancedCanvasPosition(link.position)
+	) {
+		return {
+			match: {
+				matches: [[0, link.position.end.offset]],
+			},
+		};
+	}
+
+	return {
+		line: link.position.start.line,
+		scroll: link.position.start.line,
+	};
+}
+
+export function buildHoverPopoverLinkSpec(
+	link: TwoHopIndexedLink,
+	targetFile: TFile,
+	settings?: PluginSettings,
+	isOutgoingLink = false,
+	highlightMode: HighlightMode = "auto",
+): HoverPopoverLinkSpec {
+	return {
+		linktext: resolveHoverLinktext(link, targetFile, isOutgoingLink),
+		sourcePath: link.sourceFile.path,
+		state: resolveHoverState(
+			link,
+			targetFile,
+			settings,
+			isOutgoingLink,
+			highlightMode,
+		),
+	};
+}
