@@ -17,18 +17,6 @@ Render Obsidian links as Cosense-style preview cards and explore your vault thro
 - **Canvas integration** — Follow selected canvas nodes and drop cards onto the canvas.
 - **Customizable appearance** — Adjust card size, gaps, columns, preview length, and more in settings.
 
-## Installation
-
-1. In Obsidian, open **Settings → Community plugins → Browse**.
-2. Search for **"Cosense-style Card Links"**.
-3. Install and enable the plugin.
-
-Or install manually by copying `main.js`, `styles.css`, and `manifest.json` to:
-
-```
-VaultFolder/.obsidian/plugins/obsidian-cosense-style-card-links/
-```
-
 ## Usage
 
 - Open the **Two Hop Links** view from the command palette or sidebar.
