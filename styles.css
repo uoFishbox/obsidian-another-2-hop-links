@@ -1,17 +1,501 @@
 /* Need to adjust location of twohop-links-container */
 .markdown-preview-sizer.markdown-preview-section {
-    padding-bottom: 25px !important;
+	padding-bottom: 25px !important;
 }
 
-.cm-scroller {
-    flex-direction: column; 
+/* Base Variables */
+:root {
+	--ccl-box-font-size: 1em;
+	--ccl-preview-font-size: 0.8em;
+	--ccl-box-padding: 10px;
+	--ccl-box-aspect: 1 / 1.1;
+	--ccl-container-margin-top: 40px;
+	--ccl-container-padding: 0px;
+	--ccl-code-font-size: 0.8em;
+	--ccl-code-padding: 2px 4px;
+	--ccl-code-radius: 3px;
 }
 
-.cm-sizer {
-  flex: 0 0 auto;
-  min-height: 20% !important; 
+/* Theme Variables */
+.theme-light {
+	--ccl-bg-box: var(--bases-cards-background);
+	--ccl-bg-box-top: var(--color-base-30);
+	--ccl-bg-header-twohop: var(--background-secondary);
+	--ccl-title-box: var(--text-normal);
+	--ccl-text-box: var(--color-base-30);
+	--ccl-box-text-content: var(--color-base-60);
+	--ccl-title-header-new-text: #000000;
+	--ccl-card-preview-code-background: var(--code-background);
+	--ccl-single-backlink-unresolved: hsl(
+		from var(--text-error) h calc(s * 0.8) l
+	);
+	--ccl-single-backlink-unresolved-hover: hsl(
+		from var(--text-error) h calc(s * 0.9) l
+	);
+	--ccl-box-radius: var(--radius-m);
 }
 
-.cm-content {
-  padding-bottom: 0 !important; 
+.theme-dark {
+	--ccl-bg-box: var(--bases-cards-background);
+	--ccl-bg-box-top: var(--color-base-30);
+	--ccl-bg-header-twohop: var(--background-secondary);
+	--ccl-title-box: var(--text-normal);
+	--ccl-text-box: var(--color-base-30);
+	--ccl-box-text-content: var(--color-base-60);
+	--ccl-title-header-new-text: #e0e0e0;
+	--ccl-card-preview-code-background: var(--code-background);
+	--ccl-single-backlink-unresolved: hsl(
+		from var(--text-error) h calc(s * 0.8) l
+	);
+	--ccl-single-backlink-unresolved-hover: hsl(
+		from var(--text-error) h calc(s * 0.9) l
+	);
+	--ccl-box-radius: var(--radius-m);
+}
+
+/* Layout Components */
+.cm-scroller.ccl-inline-card-host {
+	display: flex;
+	flex-wrap: wrap;
+	height: auto !important;
+}
+
+.cm-scroller.ccl-inline-card-host > .cm-sizer {
+	flex: 0 0 auto;
+	min-height: 0% !important;
+}
+
+.cm-scroller.ccl-inline-card-host .cm-content {
+	padding-bottom: 0 !important;
+}
+
+.cosense-card-links__virtual-grid-cell,
+.view-plan-virtual-list-cell {
+	contain: layout;
+}
+
+.view-plan-flow-content {
+	width: 100%;
+	contain: layout;
+}
+
+.view-plan-flow-row {
+	position: absolute;
+	top: 0;
+	left: 0;
+	width: 100%;
+	display: flex;
+	gap: var(--ccl-box-gap);
+	height: var(--ccl-box-height);
+	contain: layout paint;
+}
+
+.view-plan-flow-cell {
+	position: relative;
+	top: auto;
+	left: auto;
+	flex: 0 0 var(--ccl-cell-width);
+}
+
+/* Main Container */
+.cosense-card-links__container {
+	position: relative;
+	width: 100%; /* .cm-scrollerでflex-wrapしているため、100%にして強制的に.cm-sizerの下に配置されるようにする */
+	margin: var(--ccl-container-margin-top) auto 0 auto;
+	padding: var(--ccl-container-padding);
+	border: none;
+	flex: 0 0 auto;
+	justify-content: left;
+	user-select: none;
+	box-sizing: border-box;
+}
+
+.cosense-card-links__root {
+	margin: 0 auto;
+	max-width: calc(
+		(var(--ccl-box-size) + var(--ccl-box-gap)) * var(--ccl-box-cols-max)
+	);
+}
+
+.loading-container {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	gap: 12px;
+	width: 100%;
+	min-height: 220px;
+	padding: 24px 16px;
+	box-sizing: border-box;
+	color: var(--text-muted);
+	text-align: center;
+}
+
+.loading-spinner {
+	width: 28px;
+	height: 28px;
+	border-radius: 999px;
+	border: 3px solid var(--background-modifier-border);
+	border-top-color: var(--text-accent);
+	animation: ccl-loading-spin 0.8s linear infinite;
+	box-sizing: border-box;
+}
+
+.loading-message {
+	margin: 0;
+	font-size: 0.85em;
+	color: var(--text-muted);
+	text-align: center;
+}
+
+@keyframes ccl-loading-spin {
+	to {
+		transform: rotate(360deg);
+	}
+}
+
+/* Grid Layout */
+.cosense-card-links__section {
+	contain: layout style;
+	width: 100%;
+	margin: 0 0 var(--ccl-section-margin-bottom) 0;
+	padding: 0;
+	font-size: var(--ccl-box-font-size);
+}
+
+/* adjustments for the Minimal theme */
+.cosense-card-links__container,
+.cosense-card-links__temp-view .cosense-card-links__view-results {
+	max-width: var(--max-width);
+	padding-bottom: calc(
+		var(--navbar-bottom-offset) + var(--navbar-bottom-offset) -
+			var(--keyboard-height)
+	);
+}
+
+.cosense-card-links-pre-create__info p {
+	max-width: var(--max-width);
+	width: var(--line-width);
+	margin-inline: var(--content-margin) !important;
+}
+
+.canvas-node-content
+	.cosense-card-links__container
+	.cosense-card-links__box
+	img {
+	cursor: default;
+}
+
+body.ccl-card-dragging .cosense-card-links-desk__cell .cosense-card-links__box {
+	pointer-events: none !important;
+}
+
+.cosense-card-links__box {
+	position: relative;
+	box-sizing: border-box;
+	width: 100%;
+	height: var(--ccl-box-height);
+	min-width: 0;
+	min-height: var(--ccl-box-height);
+	display: flex;
+	flex-direction: column;
+	touch-action: manipulation;
+}
+
+.cosense-card-links__box-title-wrapper,
+.cosense-card-links__box-bookmark-bg {
+	pointer-events: none;
+}
+
+.cosense-card-links__box-preview mjx-container[jax="CHTML"][display="true"] {
+	margin: 0px 0;
+}
+
+.cosense-card-links__box-preview mjx-math[display="true"] {
+	font-size: 85%;
+}
+
+.workspace-leaf-content[data-type="cosense-card-links-view"] > .view-content {
+	padding: var(--size-4-3);
+	scrollbar-gutter: stable;
+}
+
+.workspace-leaf-content[data-type="cosense-card-links-tag-notes-view"]
+	> .view-content {
+	scrollbar-gutter: stable;
+}
+
+.workspace-leaf-content[data-type="cosense-card-links-pre-create-view"]
+	> .view-content {
+	scrollbar-gutter: stable;
+}
+
+/* pre-create ビューは view-content のパディングをリセットし、
+   cm-sizer 内のパディングに任せる（本物のエディタと同様） */
+.workspace-leaf-content[data-type="cosense-card-links-pre-create-view"]
+	> .view-content,
+.workspace-leaf-content[data-type="cosense-card-links-tag-notes-view"]
+	> .view-content {
+	padding: 0;
+	overflow: auto;
+}
+
+.workspace-leaf-content[data-type="empty"] > .view-content {
+	padding: 0;
+}
+
+.workspace-leaf-content[data-type="empty"]
+	> .view-content.cosense-card-links-empty-view-host {
+	overflow: auto;
+}
+
+.workspace-leaf-content[data-type="empty"]
+	> .view-content.cosense-card-links-empty-view-host
+	> :not(.cosense-card-links-empty-view-root) {
+	display: none;
+}
+
+.view-content.cosense-card-links-empty-view-host
+	.cosense-card-links-empty-view {
+	padding: var(--file-margins);
+}
+
+.cosense-card-links-empty-view-root {
+	min-height: 100%;
+}
+
+/* markdown-source-view ラッパー（.cosense-card-links-pre-create を兼用） */
+.cosense-card-links-pre-create {
+	height: 100%;
+}
+
+/* inline-title の placeholder 表示 */
+.cosense-card-links-pre-create .inline-title:empty::before {
+	content: attr(placeholder);
+	color: var(--text-faint);
+	pointer-events: none;
+}
+
+/* フォーカス時のアウトラインを除去（Obsidian 本来と同様） */
+.cosense-card-links-pre-create .inline-title:focus {
+	outline: none;
+}
+
+/* タイトルの透明度を薄くする */
+.cosense-card-links-pre-create .inline-title {
+	opacity: 0.6;
+}
+
+.cosense-card-links-tag-notes .inline-title {
+	opacity: 1;
+	display: flex;
+	align-items: center;
+	gap: 0.35em;
+}
+
+.cosense-card-links-tag-notes__title-icon {
+	display: inline-flex;
+	flex: 0 0 auto;
+}
+
+.cosense-card-links-tag-notes__title-text {
+	min-width: 0;
+}
+
+/* 説明文 + ボタンエリア（metadata-container 相当） */
+.cosense-card-links-pre-create__info {
+	display: flex;
+	flex-direction: column;
+	gap: 10px;
+}
+
+.cosense-card-links-pre-create__info p {
+	margin: 0;
+	color: var(--text-muted);
+}
+
+/* fake cm-content は選択・コピーのみ可（編集不可） */
+.cosense-card-links-pre-create .cm-content {
+	cursor: default;
+	user-select: text;
+}
+
+.cosense-card-links__root.ccl-kb-nav-active {
+	outline: none;
+}
+
+.cosense-card-links__root.ccl-kb-nav-active
+	.cosense-card-links__box[data-ccl-kb-row-selected="1"] {
+	position: relative;
+	border-color: var(--interactive-accent);
+	box-shadow: 0 0 0 1px
+		color-mix(in srgb, var(--interactive-accent) 55%, transparent);
+}
+
+.cosense-card-links__root.ccl-kb-nav-active
+	.cosense-card-links__box[data-ccl-kb-row-selected="1"]::before {
+	content: "";
+	position: absolute;
+	inset: 0;
+	background: linear-gradient(
+		180deg,
+		color-mix(in srgb, var(--interactive-accent) 10%, transparent),
+		transparent 55%
+	);
+	pointer-events: none;
+}
+
+.cosense-card-links__root.ccl-kb-nav-active
+	.cosense-card-links__box[data-ccl-kb-hint]::after {
+	content: attr(data-ccl-kb-hint);
+	position: absolute;
+	top: 8px;
+	right: 8px;
+	min-width: 1.6em;
+	padding: 2px 6px;
+	border-radius: 999px;
+	background: color-mix(in srgb, var(--interactive-accent) 92%, black 8%);
+	color: var(--text-on-accent);
+	font-size: 0.75em;
+	font-weight: 700;
+	line-height: 1.4;
+	text-align: center;
+	text-transform: lowercase;
+	letter-spacing: 0.02em;
+	pointer-events: none;
+	z-index: 1;
+}
+
+/* ---------------------------------------------------------------
+   pre-create バックリンクセクション
+   通常エディタの .cosense-card-links__container +
+   .cosense-card-links__root を模倣する
+   --------------------------------------------------------------- */
+
+/* container 相当: 上マージン・幅・パディング */
+.cosense-card-links__temp-view {
+	width: 100%;
+	margin: var(--ccl-container-margin-top) auto 0 auto;
+	padding: var(--ccl-container-padding);
+	border: none;
+	user-select: none;
+	box-sizing: border-box;
+}
+
+.cosense-card-links__temp-view > .twohop-header,
+.cosense-card-links__temp-view > .cosense-card-links__view-results,
+.cosense-card-links__temp-view
+	> .cosense-card-links__view-results
+	> .cosense-card-links__section,
+.cosense-card-links__temp-view > .cosense-card-links__section {
+	width: 100%;
+	max-width: calc(
+		(var(--ccl-box-size) + var(--ccl-box-gap)) * var(--ccl-box-cols-max)
+	);
+	margin-left: auto;
+	margin-right: auto;
+	box-sizing: border-box;
+}
+
+.cosense-card-links__temp-view .twohop-header {
+	border-top: none;
+}
+
+.cosense-card-links-pre-create__path {
+	display: block;
+	padding: 8px 10px;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: var(--radius-s);
+	background: var(--background-secondary);
+	word-break: break-word;
+}
+
+.cosense-card-links-pre-create__actions {
+	display: flex;
+	gap: 8px;
+}
+
+/* -----------------------------------------
+  backlinkが1つだけの未解決リンクのスタイル
+*/
+
+/* テキストの色*/
+span[data-twohop-link-state="special-unresolved"] > .is-unresolved,
+.markdown-rendered .internal-link.is-unresolved[data-twohop-link-state="special-unresolved"],
+/* property */
+.metadata-content > .metadata-properties > .metadata-link-inner.internal-link.is-unresolved[data-twohop-link-state="special-unresolved"],
+.internal-link.is-unresolved[data-twohop-link-state="special-unresolved"],
+.internal-link.is-unresolved[data-twohop-link-state="special-unresolved"]:hover,
+.multi-select-container .multi-select-pill.internal-link.is-unresolved .multi-select-pill-content[data-twohop-link-state="special-unresolved"],
+.multi-select-container .multi-select-pill.internal-link.is-unresolved[data-twohop-link-state="special-unresolved"],
+.metadata-link-inner.internal-link.is-unresolved[data-twohop-link-state="special-unresolved"],
+.multi-select-container .multi-select-pill-content.internal-link[data-twohop-link-state="special-unresolved"],
+.multi-select-pill-content[data-twohop-link-state="special-unresolved"] span, /* propertyのリンクをファイルを削除して未解決リンクになった時、エディタ内のプロパティだけ構造が変わって描画される問題に対処。(サイドバーのproperty viewでは問題は発生しない) */
+
+.cm-hmd-internal-link.cm-quote span[data-twohop-link-state="special-unresolved"],
+.cm-hmd-internal-link.cm-quote span[data-twohop-link-state="special-unresolved"] a,
+.cm-hmd-embed.cm-hmd-internal-link span[data-twohop-link-state="special-unresolved"] {
+	color: var(--ccl-single-backlink-unresolved);
+}
+
+/* リンクのpipe とエイリアス名の色 */
+.cm-content .cm-link-alias-pipe[data-twohop-link-state="special-unresolved"],
+.cm-content
+	.cm-link-alias-pipe[data-twohop-link-state="special-unresolved"]
+	> .is-unresolved,
+.cm-content
+	.cm-link-alias[data-twohop-link-state="special-unresolved"]
+	> .is-unresolved {
+	color: var(--ccl-single-backlink-unresolved);
+}
+
+/* 下線の色 */
+.markdown-rendered .cm-hmd-internal-link[data-twohop-link-state="special-unresolved"],
+.cm-content .cm-hmd-internal-link[data-twohop-link-state="special-unresolved"],
+.markdown-rendered .cm-string.cm-url[data-twohop-link-state="special-unresolved"],
+.markdown-rendered .internal-link.is-unresolved[data-twohop-link-state="special-unresolved"],
+.metadata-content .internal-link.is-unresolved[data-twohop-link-state="special-unresolved"],
+.metadata-property-value .internal-link.is-unresolved[data-twohop-link-state="special-unresolved"],
+.multi-select-pill.internal-link[data-twohop-link-state="special-unresolved"] /* propertyのリンクをファイルを削除して未解決リンクになった時、エディタ内のプロパティだけ構造が変わって描画される問題に対処 (サイドバーのproperty viewでは問題は発生しない) */ {
+	text-decoration-color: var(--ccl-single-backlink-unresolved);
+}
+
+.cm-hmd-internal-link
+	> span[data-twohop-link-state="special-unresolved"]
+	> .is-unresolved
+	.cm-underline,
+.cm-hmd-internal-link
+	> span[data-twohop-link-state="special-unresolved"]
+	> .is-unresolved,
+[data-twohop-link-state="special-unresolved"] > .is-unresolved > .cm-underline {
+	color: var(--ccl-single-backlink-unresolved);
+	text-decoration-color: unset;
+}
+
+.cm-hmd-internal-link
+	> span[data-twohop-link-state="special-unresolved"]
+	> .is-unresolved:hover {
+	color: var(--ccl-single-backlink-unresolved-hover);
+}
+
+.is-phone
+	.mod-root
+	.workspace-leaf-content[data-type="cosense-card-links-pre-create-view"]
+	.view-content,
+.is-phone
+	.mod-root
+	.workspace-leaf-content[data-type="cosense-card-links-tag-notes-view"]
+	.view-content {
+	margin-top: unset;
+}
+.preview-mount-slot,
+.cosense-card-links__box-preview,
+.cosense-card-links__box-preview * {
+	-webkit-user-drag: none !important;
+	pointer-events: none !important;
+}
+
+.workspace-leaf-content[data-type="cosense-card-links-desk-view"]
+	.view-content {
+	padding: var(--size-4-3) var(--size-4-3) 0px;
 }
