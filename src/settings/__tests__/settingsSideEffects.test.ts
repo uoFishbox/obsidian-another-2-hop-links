@@ -124,6 +124,21 @@ describe("applySettingsSideEffects", () => {
 		expect(handlers.refreshLayoutAffectedViews).not.toHaveBeenCalled();
 	});
 
+	it("does not reactivate display mode for full-text search toggle", () => {
+		const handlers = createHandlers();
+		applySettingsSideEffects(
+			["enableContentSearch"],
+			DEFAULT_SETTINGS,
+			handlers,
+		);
+
+		// The toggle only affects in-view filtering; it must not force-remount
+		// the inline Svelte components (which would discard the search input).
+		expect(handlers.handleDisplayModeSettingsChange).not.toHaveBeenCalled();
+		expect(handlers.refreshLayoutAffectedViews).not.toHaveBeenCalled();
+		expect(handlers.invalidateSortCache).toHaveBeenCalledTimes(1);
+	});
+
 	it("syncs tag feature state changes", () => {
 		const handlers = createHandlers();
 		applySettingsSideEffects(["enableTagFeatures"], DEFAULT_SETTINGS, handlers);
