@@ -2,8 +2,8 @@
 .vscode 
 
 # coding agent
-.codex/*
-.opencode/*
+.codex/
+.opencode/
 
 # Intellij
 *.iml
