@@ -6,7 +6,6 @@ import { CARD_RENDER_SHADOW_CSS } from "./cardRenderShadowStyles";
 
 const SHADOW_BASE_STYLE_ATTRIBUTE = "data-ccl-card-render-shadow-base-style";
 const SHADOW_SURFACE_ATTRIBUTE = "data-ccl-card-render-shadow-surface";
-const SHADOW_MOUNT_ATTRIBUTE = "data-ccl-card-render-shadow-mount";
 
 function resolveSectionContextClassName(host: HTMLElement): string {
 	const classNames = new Set<string>();
@@ -40,7 +39,6 @@ function syncSurfaceClassName(
 export interface CardRenderShadowSurfaceHandles {
 	shadowRoot: ShadowRoot;
 	surfaceEl: HTMLDivElement;
-	mountEl: HTMLDivElement;
 	dispose: () => void;
 }
 
@@ -76,15 +74,6 @@ export function ensureCardRenderShadowSurface(
 		shadowRoot.append(surfaceEl);
 	}
 
-	let mountEl = surfaceEl.querySelector<HTMLDivElement>(
-		`div[${SHADOW_MOUNT_ATTRIBUTE}]`,
-	);
-	if (!mountEl) {
-		mountEl = ownerDocument.createElement("div");
-		mountEl.setAttribute(SHADOW_MOUNT_ATTRIBUTE, "1");
-		surfaceEl.append(mountEl);
-	}
-
 	syncSurfaceClassName(host, surfaceEl);
 
 	let disposed = false;
@@ -92,7 +81,6 @@ export function ensureCardRenderShadowSurface(
 	return {
 		shadowRoot,
 		surfaceEl,
-		mountEl,
 		dispose: () => {
 			if (disposed) {
 				return;

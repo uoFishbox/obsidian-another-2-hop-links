@@ -1,9 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { syncMathJaxStylesForNode } from "ui/utils/mathJaxShadowStyles";
+import { installVirtualListShadowSurface } from "../virtual-list/svelte/VirtualSurfaceRuntime";
 import { ensureCardRenderShadowSurface } from "../cardRenderShadowSurface";
 
 describe("cardRenderShadowSurface", () => {
-	it("reuses the same shadow root, style element, and mount element", () => {
+	it("reuses the same shadow root, style element, and surface element", () => {
 		const sectionHost = document.createElement("div");
 		sectionHost.className = "cosense-card-links__section twohop-links-new-links";
 		const host = document.createElement("div");
@@ -17,7 +18,7 @@ describe("cardRenderShadowSurface", () => {
 		expect(first).not.toBeNull();
 		expect(second).not.toBeNull();
 		expect(second?.shadowRoot).toBe(first?.shadowRoot);
-		expect(second?.mountEl).toBe(first?.mountEl);
+		expect(second?.surfaceEl).toBe(first?.surfaceEl);
 		expect(host.shadowRoot).toBe(first?.shadowRoot);
 		expect(
 			host.shadowRoot?.querySelectorAll(
@@ -26,7 +27,7 @@ describe("cardRenderShadowSurface", () => {
 		).toHaveLength(1);
 		expect(
 			host.shadowRoot?.querySelectorAll(
-				"div[data-ccl-card-render-shadow-mount]",
+				"div[data-ccl-card-render-shadow-surface]",
 			),
 		).toHaveLength(1);
 		expect(first?.surfaceEl.className).toContain("cosense-card-links__virtual-grid");
@@ -74,6 +75,19 @@ describe("cardRenderShadowSurface", () => {
 		host.remove();
 	});
 
+	it("mounts virtual list content directly into the surface element", () => {
+		const host = document.createElement("div");
+		const content = document.createElement("div");
+
+		const handles = installVirtualListShadowSurface(host, content);
+
+		expect(content.parentElement).toBe(handles.surfaceEl);
+		expect(handles.surfaceEl.children).toHaveLength(1);
+		expect(handles.surfaceEl.firstElementChild).toBe(content);
+
+		handles.dispose();
+	});
+
 	it("creates shadow surface elements in the host document realm", () => {
 		const iframe = document.createElement("iframe");
 		document.body.append(iframe);
@@ -88,7 +102,6 @@ describe("cardRenderShadowSurface", () => {
 
 		expect(handles.shadowRoot.ownerDocument).toBe(iframeDocument);
 		expect(handles.surfaceEl.ownerDocument).toBe(iframeDocument);
-		expect(handles.mountEl.ownerDocument).toBe(iframeDocument);
 		expect(
 			handles.shadowRoot.querySelector(
 				"style[data-ccl-card-render-shadow-base-style]",

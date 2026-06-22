@@ -9,8 +9,8 @@ export const installVirtualListShadowSurface = (
 ): CardRenderShadowSurfaceHandles => {
 	const handles = ensureCardRenderShadowSurface(host);
 
-	if (content.parentNode !== handles.mountEl) {
-		handles.mountEl.append(content);
+	if (content.parentNode !== handles.surfaceEl) {
+		handles.surfaceEl.append(content);
 	}
 
 	return handles;
