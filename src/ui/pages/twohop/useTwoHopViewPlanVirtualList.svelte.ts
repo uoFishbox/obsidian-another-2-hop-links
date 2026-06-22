@@ -30,8 +30,9 @@ import { createTwoHopMountRuntime } from "./twoHopMountRuntime.svelte";
 
 const EMPTY_MOUNTED_CELLS: readonly [] = [];
 const EMPTY_MOUNTED_ROWS: readonly [] = [];
-const MATERIALIZATION_BATCH_SIZE = 10;
-const MATERIALIZATION_BATCH_CELL_LIMIT = 200;
+const INITIAL_MATERIALIZATION_SECTION_LIMIT = 10;
+const INITIAL_MATERIALIZATION_CELL_LIMIT = 200;
+const BACKGROUND_MATERIALIZATION_CELL_LIMIT = 200;
 
 export interface TwoHopViewPlanVirtualListProps {
 	readonly sections: readonly TwoHopSectionDescriptor[];
@@ -65,8 +66,13 @@ export function useTwoHopViewPlanVirtualList(
 	const layoutPlanCache = createTwoHopLayoutPlanCache({
 		materialization: {
 			kind: "batched",
-			initialSectionCount: MATERIALIZATION_BATCH_SIZE,
-			initialCellCount: MATERIALIZATION_BATCH_CELL_LIMIT,
+			initial: {
+				maxSectionCount: INITIAL_MATERIALIZATION_SECTION_LIMIT,
+				maxCellCount: INITIAL_MATERIALIZATION_CELL_LIMIT,
+			},
+			background: {
+				maxCellCountPerSlice: BACKGROUND_MATERIALIZATION_CELL_LIMIT,
+			},
 		},
 		getWindow: () => measurementState.rootEl?.ownerDocument.defaultView ?? null,
 		resolveInitialSectionVisibleCount:

@@ -80,6 +80,19 @@ export function createTwoHopLayoutPlanCache(params: {
 			if (materialization.kind !== "batched" || !ownerWindow) {
 				return cancelMaterialization;
 			}
+			const backgroundCellCount = Number.isFinite(
+				materialization.background.maxCellCountPerSlice,
+			)
+				? Math.max(
+						0,
+						Math.floor(
+							materialization.background.maxCellCountPerSlice,
+						),
+					)
+				: 0;
+			if (backgroundCellCount === 0) {
+				return cancelMaterialization;
+			}
 
 			const plan = rowModel.plan;
 			let cancelled = false;
@@ -113,8 +126,7 @@ export function createTwoHopLayoutPlanCache(params: {
 				}
 				if (
 					materializeNextTwoHopCellBatch(plan, {
-						maxCellCount:
-							materialization.initialCellCount ?? 128,
+						maxCellCount: backgroundCellCount,
 						shouldContinue: deadline
 							? () => deadline.timeRemaining() > 1
 							: undefined,

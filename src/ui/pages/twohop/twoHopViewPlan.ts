@@ -70,8 +70,13 @@ export type TwoHopViewPlanMaterialization =
 	| { readonly kind: "eager" }
 	| {
 			readonly kind: "batched";
-			readonly initialSectionCount?: number;
-			readonly initialCellCount?: number;
+			readonly initial: {
+				readonly maxSectionCount: number;
+				readonly maxCellCount: number;
+			};
+			readonly background: {
+				readonly maxCellCountPerSlice: number;
+			};
 	  };
 
 export interface CompileTwoHopViewPlanParams {
@@ -264,15 +269,17 @@ export function compileTwoHopViewPlan(
 		materializationRevision: 0,
 	};
 	if (params.materialization?.kind === "batched") {
+		const initialCellCount = Math.min(
+			Math.max(0, Math.floor(params.materialization.initial.maxCellCount)),
+			resolveInitialMaterializationCellCount(
+				plan,
+				params.materialization.initial.maxSectionCount,
+			),
+		);
 		materializeNextTwoHopCellBatch(
 			plan,
 			{
-				maxCellCount:
-					params.materialization.initialCellCount ??
-					resolveInitialMaterializationCellCount(
-						plan,
-						params.materialization.initialSectionCount,
-					),
+				maxCellCount: initialCellCount,
 			},
 		);
 	} else {
@@ -293,10 +300,10 @@ export function compileTwoHopViewPlan(
 
 function resolveInitialMaterializationCellCount(
 	plan: TwoHopViewPlan,
-	initialSectionCount: number | undefined,
+	maxSectionCount: number | undefined,
 ): number {
-	if (initialSectionCount === undefined) return 128;
-	const sectionCount = Math.max(0, Math.floor(initialSectionCount));
+	if (maxSectionCount === undefined) return 128;
+	const sectionCount = Math.max(0, Math.floor(maxSectionCount));
 	let cellCount = 0;
 	for (
 		let sectionIndex = 0;

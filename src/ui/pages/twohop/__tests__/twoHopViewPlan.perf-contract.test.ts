@@ -9,6 +9,7 @@ import type { SectionRenderDescriptor } from "ui/components/sections/types";
 import {
 	compileTwoHopViewPlan,
 	createTwoHopViewPlanRowModel,
+	type TwoHopViewPlanMaterialization,
 	type TwoHopViewPlanRowModel,
 } from "../twoHopViewPlan";
 import {
@@ -32,6 +33,21 @@ const LEADING_GUARD_ROWS = GUARD_ROWS / 2;
 const VIEWPORT_HEIGHT = 600;
 const MOUNTED_OVERSCAN_PX = 264;
 const SAME_ROW_WINDOW_SCROLL_TOP = 1_320;
+
+const createBatchedMaterialization = (
+	maxSectionCount: number,
+	maxCellCount: number,
+	backgroundCellCount = 200,
+): TwoHopViewPlanMaterialization => ({
+	kind: "batched",
+	initial: {
+		maxSectionCount,
+		maxCellCount,
+	},
+	background: {
+		maxCellCountPerSlice: backgroundCellCount,
+	},
+});
 
 const layout = {
 	containerWidth: 640,
@@ -95,7 +111,7 @@ const compilePlan = (
 		),
 		layout,
 		materialization: options?.batched
-			? { kind: "batched", initialSectionCount: 10 }
+			? createBatchedMaterialization(10, 200)
 			: { kind: "eager" },
 		resolveInitialSectionVisibleCount: (section) => section.loadedCount,
 		clampVisibleCount: (section, count) =>
@@ -352,5 +368,72 @@ describe("TwoHop view-plan performance contracts", () => {
 		expect(
 			getItemsBySection.map((getItems) => getItems.mock.calls.length),
 		).toEqual(new Array<number>(32).fill(0));
+	});
+
+	it("caps an oversized initial section by the initial cell budget", () => {
+		const plan = compileTwoHopViewPlan({
+			sections: [createDescriptor(LARGE_CARD_COUNT)],
+			sectionVisibleCounts: { "new-links": LARGE_CARD_COUNT },
+			layout,
+			materialization: createBatchedMaterialization(10, 200),
+			resolveInitialSectionVisibleCount: (section) => section.loadedCount,
+			clampVisibleCount: (section, count) =>
+				Math.min(section.loadedCount, count),
+		});
+
+		expect(plan.materializationStateBySectionIndex[0]).toEqual({
+			nextCellIndex: 200,
+			materializedCellCount: 200,
+		});
+		expect(plan.materializedSectionByIndex[0]).toBe(false);
+	});
+
+	it("materializes only the jumped-to mounted window during scrolling", () => {
+		const getItem = vi.fn((index: number) =>
+			index < LARGE_CARD_COUNT ? createItem(`lazy-item-${index}`) : undefined,
+		);
+		const section = {
+			kind: "new-links-section",
+			rawSectionId: "new-links",
+			sectionId: "new-links",
+			sectionKey: "new-links",
+			title: "New links",
+			getKey: () => "",
+		} satisfies TwoHopPageVirtualSection;
+		const descriptor: SectionRenderDescriptor<
+			TwoHopPageVirtualItem,
+			TwoHopPageVirtualSection
+		> = {
+			section,
+			sectionKey: section.sectionKey,
+			title: section.title,
+			sectionId: section.sectionId,
+			totalCount: LARGE_CARD_COUNT,
+			loadedCount: LARGE_CARD_COUNT,
+			getItems: () => {
+				throw new Error("Scrolling must use sparse item access.");
+			},
+			getItem,
+			headerProps: {},
+		};
+		const plan = compileTwoHopViewPlan({
+			sections: [descriptor],
+			sectionVisibleCounts: { "new-links": LARGE_CARD_COUNT },
+			layout,
+			materialization: createBatchedMaterialization(0, 0),
+			resolveInitialSectionVisibleCount: (current) => current.loadedCount,
+			clampVisibleCount: (current, count) =>
+				Math.min(current.loadedCount, count),
+		});
+		const rowModel = createTwoHopViewPlanRowModel(plan);
+
+		const mounted = buildMountedRows(
+			rowModel,
+			INITIAL_MOUNTED_ROW_START + 1_000,
+		);
+
+		expect(mounted.rowSlices).toHaveLength(MOUNTED_ROWS);
+		expect(getItem).toHaveBeenCalledTimes(MOUNTED_ROWS * COLUMNS);
+		expect(plan.materializationRevision).toBeGreaterThan(0);
 	});
 });

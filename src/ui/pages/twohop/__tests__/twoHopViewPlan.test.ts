@@ -15,6 +15,21 @@ import {
 } from "../twoHopViewPlan";
 import { buildTwoHopMountedRows } from "../twoHopMountedRowBuild";
 
+const createBatchedMaterialization = (
+	maxSectionCount: number,
+	maxCellCount = Number.MAX_SAFE_INTEGER,
+) =>
+	({
+		kind: "batched",
+		initial: {
+			maxSectionCount,
+			maxCellCount,
+		},
+		background: {
+			maxCellCountPerSlice: 200,
+		},
+	}) as const;
+
 const layout = {
 	containerWidth: 320,
 	columns: 2,
@@ -144,7 +159,7 @@ describe("compileTwoHopViewPlan", () => {
 			],
 			sectionVisibleCounts: {},
 			layout,
-			materialization: { kind: "batched", initialSectionCount: 0 },
+			materialization: createBatchedMaterialization(0),
 			resolveInitialSectionVisibleCount: () => 1,
 			clampVisibleCount: (_section, count) => count,
 		});
@@ -372,7 +387,7 @@ describe("compileTwoHopViewPlan", () => {
 			sections: descriptors,
 			sectionVisibleCounts: {},
 			layout,
-			materialization: { kind: "batched", initialSectionCount: 10 },
+			materialization: createBatchedMaterialization(10),
 			resolveInitialSectionVisibleCount: () => 1,
 			clampVisibleCount: (_section, count) => count,
 		});
@@ -450,7 +465,7 @@ describe("compileTwoHopViewPlan", () => {
 			],
 			sectionVisibleCounts: {},
 			layout,
-			materialization: { kind: "batched", initialSectionCount: 0 },
+			materialization: createBatchedMaterialization(0),
 			resolveInitialSectionVisibleCount: () => 1,
 			clampVisibleCount: (_section, count) => count,
 		});
@@ -471,11 +486,7 @@ describe("compileTwoHopViewPlan", () => {
 			],
 			sectionVisibleCounts: {},
 			layout,
-			materialization: {
-				kind: "batched",
-				initialSectionCount: 10,
-				initialCellCount: 3,
-			},
+			materialization: createBatchedMaterialization(10, 3),
 			resolveInitialSectionVisibleCount: () => 1,
 			clampVisibleCount: (_section, count) => count,
 		});
@@ -491,7 +502,7 @@ describe("compileTwoHopViewPlan", () => {
 			],
 			sectionVisibleCounts: {},
 			layout,
-			materialization: { kind: "batched", initialSectionCount: 0 },
+			materialization: createBatchedMaterialization(0),
 			resolveInitialSectionVisibleCount: () => 1,
 			clampVisibleCount: (_section, count) => count,
 		});
@@ -528,7 +539,7 @@ describe("compileTwoHopViewPlan", () => {
 			],
 			sectionVisibleCounts: {},
 			layout,
-			materialization: { kind: "batched", initialSectionCount: 0 },
+			materialization: createBatchedMaterialization(0),
 			resolveInitialSectionVisibleCount: (section) => section.loadedCount,
 			clampVisibleCount: (_section, count) => count,
 		});
@@ -665,7 +676,7 @@ describe("compileTwoHopViewPlan", () => {
 			],
 			sectionVisibleCounts: { "new-links": 3 },
 			layout,
-			materialization: { kind: "batched", initialSectionCount: 0 },
+			materialization: createBatchedMaterialization(0),
 			resolveInitialSectionVisibleCount: () => 3,
 			clampVisibleCount: (_section, count) => count,
 		});
