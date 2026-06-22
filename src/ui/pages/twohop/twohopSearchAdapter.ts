@@ -31,6 +31,23 @@ const TWOHOP_CHILD_SEARCH_PREFIX = "h";
 const TAG_GROUP_SEARCH_PREFIX = "g";
 const TAG_NOTE_SEARCH_PREFIX = "n";
 
+interface SearchKeyCache {
+	branchBaseKeys: WeakMap<TwoHopLinkBranch, string>;
+	backlinkBaseKeys: WeakMap<TwoHopIndexedLink, string>;
+	tagNoteBaseKeys: WeakMap<TaggedNote, string>;
+}
+
+export interface TwohopSearchAdapter {
+	buildDataset(
+		options: TwohopSearchAdapterOptions,
+	): SearchWorkerItemSnapshot[];
+	filterDisplayData(
+		displayData: DisplayData,
+		query: string,
+		matchedKeySet: Set<string> | null,
+	): DisplayData;
+}
+
 function filterWithReferenceReuse<T>(
 	items: readonly T[],
 	predicate: (item: T) => boolean,
@@ -56,6 +73,42 @@ export interface TwohopSearchAdapterOptions {
 	sourcePath: string;
 	getMetadata: (file: TFile) => CachedMetadata | null;
 	priorityFrontmatterKeyForTitle?: string;
+}
+
+/**
+ * Creates a page-scoped search adapter that reuses identity signatures while
+ * the same DisplayData snapshot is being filtered.
+ */
+export function createTwohopSearchAdapter(): TwohopSearchAdapter {
+	let currentDisplayData: DisplayData | null = null;
+	let searchKeyCache = createSearchKeyCache();
+
+	const getSearchKeyCache = (displayData: DisplayData): SearchKeyCache => {
+		if (displayData === currentDisplayData) {
+			return searchKeyCache;
+		}
+
+		currentDisplayData = displayData;
+		searchKeyCache = createSearchKeyCache();
+		return searchKeyCache;
+	};
+
+	return {
+		buildDataset(options) {
+			return buildTwohopSearchDatasetWithCache(
+				options,
+				getSearchKeyCache(options.displayData),
+			);
+		},
+		filterDisplayData(displayData, query, matchedKeySet) {
+			return filterTwohopDisplayDataWithCache(
+				displayData,
+				query,
+				matchedKeySet,
+				getSearchKeyCache(displayData),
+			);
+		},
+	};
 }
 
 export function collectTwohopSearchableFiles(
@@ -100,6 +153,13 @@ export function collectTwohopSearchableFiles(
 export function buildTwohopSearchDataset(
 	options: TwohopSearchAdapterOptions,
 ): SearchWorkerItemSnapshot[] {
+	return buildTwohopSearchDatasetWithCache(options);
+}
+
+function buildTwohopSearchDatasetWithCache(
+	options: TwohopSearchAdapterOptions,
+	searchKeyCache?: SearchKeyCache,
+): SearchWorkerItemSnapshot[] {
 	const snapshots: SearchWorkerItemSnapshot[] = [];
 	const { displayData, resolveFile } = options;
 
@@ -129,7 +189,7 @@ export function buildTwohopSearchDataset(
 	for (const branch of displayData.outgoing) {
 		snapshots.push(
 			buildSearchWorkerItemSnapshot(
-				getOutgoingSearchKey(branch),
+				createOutgoingSearchKey(branch, searchKeyCache),
 				getBranchTitleSearchText(branch),
 				getBranchTargetFile(branch, resolveFile)?.path ?? null,
 			),
@@ -139,7 +199,7 @@ export function buildTwohopSearchDataset(
 	for (const link of displayData.backlinks) {
 		snapshots.push(
 			buildSearchWorkerItemSnapshot(
-				getBacklinkSearchKey(link),
+				createBacklinkSearchKey(link, searchKeyCache),
 				getFileTitleSearchText(link.sourceFile),
 				link.sourceFile.path,
 			),
@@ -150,7 +210,7 @@ export function buildTwohopSearchDataset(
 		if (isBranchItem(item)) {
 			snapshots.push(
 				buildSearchWorkerItemSnapshot(
-					getMergedSearchKey(item),
+					createMergedSearchKey(item, searchKeyCache),
 					getBranchTitleSearchText(item),
 					getBranchTargetFile(item, resolveFile)?.path ?? null,
 				),
@@ -160,7 +220,7 @@ export function buildTwohopSearchDataset(
 
 		snapshots.push(
 			buildSearchWorkerItemSnapshot(
-				getMergedSearchKey(item),
+				createMergedSearchKey(item, searchKeyCache),
 				getFileTitleSearchText(item.sourceFile),
 				item.sourceFile.path,
 			),
@@ -168,13 +228,14 @@ export function buildTwohopSearchDataset(
 	}
 
 	for (const branch of displayData.twoHopBranches) {
-		const branchBaseKey = getTwohopBranchSearchBaseKey(branch);
+		const branchBaseKey = getBranchBaseKey(branch, searchKeyCache);
 		for (const link of branch.hop2) {
 			snapshots.push(
 				buildSearchWorkerItemSnapshot(
-					getTwohopChildSearchKeyFromBranchBaseKey(
+					createTwohopChildSearchKeyFromBranchBaseKey(
 						branchBaseKey,
 						link,
+						searchKeyCache,
 					),
 					getFileTitleSearchText(link.sourceFile),
 					link.sourceFile.path,
@@ -195,7 +256,11 @@ export function buildTwohopSearchDataset(
 		for (const note of section.notes) {
 			snapshots.push(
 				buildSearchWorkerItemSnapshot(
-					getTagNoteSearchKey(section, note),
+					createTagNoteSearchKey(
+						section,
+						note,
+						searchKeyCache,
+					),
 					getFileTitleSearchText(note.file),
 					note.file.path,
 				),
@@ -210,6 +275,19 @@ export function filterTwohopDisplayData(
 	displayData: DisplayData,
 	query: string,
 	matchedKeySet: Set<string> | null,
+): DisplayData {
+	return filterTwohopDisplayDataWithCache(
+		displayData,
+		query,
+		matchedKeySet,
+	);
+}
+
+function filterTwohopDisplayDataWithCache(
+	displayData: DisplayData,
+	query: string,
+	matchedKeySet: Set<string> | null,
+	searchKeyCache?: SearchKeyCache,
 ): DisplayData {
 	if (!query) {
 		return displayData;
@@ -229,14 +307,22 @@ export function filterTwohopDisplayData(
 
 	const twoHopBranches: TwoHopLinkBranch[] = [];
 	for (const branch of displayData.twoHopBranches) {
-		const filteredBranch = filterTwohopBranch(branch, matchedKeySet);
+		const filteredBranch = filterTwohopBranch(
+			branch,
+			matchedKeySet,
+			searchKeyCache,
+		);
 		if (filteredBranch) {
 			twoHopBranches.push(filteredBranch);
 		}
 	}
 	const tagGroups: TagGroup[] = [];
 	for (const section of displayData.tagGroups) {
-		const filteredSection = filterTagGroup(section, matchedKeySet);
+		const filteredSection = filterTagGroup(
+			section,
+			matchedKeySet,
+			searchKeyCache,
+		);
 		if (filteredSection) {
 			tagGroups.push(filteredSection);
 		}
@@ -245,13 +331,17 @@ export function filterTwohopDisplayData(
 	return {
 		...displayData,
 		outgoing: filterWithReferenceReuse(displayData.outgoing, (branch) =>
-			matchedKeySet.has(getOutgoingSearchKey(branch)),
+			matchedKeySet.has(
+				createOutgoingSearchKey(branch, searchKeyCache),
+			),
 		),
 		backlinks: filterWithReferenceReuse(displayData.backlinks, (link) =>
-			matchedKeySet.has(getBacklinkSearchKey(link)),
+			matchedKeySet.has(
+				createBacklinkSearchKey(link, searchKeyCache),
+			),
 		),
 		mergedItems: filterWithReferenceReuse(displayData.mergedItems, (item) =>
-			matchedKeySet.has(getMergedSearchKey(item)),
+			matchedKeySet.has(createMergedSearchKey(item, searchKeyCache)),
 		),
 		twoHopBranches,
 		tagGroups,
@@ -262,11 +352,16 @@ export function filterTwohopDisplayData(
 function filterTwohopBranch(
 	branch: TwoHopLinkBranch,
 	matchedKeySet: Set<string>,
+	searchKeyCache?: SearchKeyCache,
 ): TwoHopLinkBranch | null {
-	const branchBaseKey = getTwohopBranchSearchBaseKey(branch);
+	const branchBaseKey = getBranchBaseKey(branch, searchKeyCache);
 	const matchedHop2 = branch.hop2.filter((link) =>
 		matchedKeySet.has(
-			getTwohopChildSearchKeyFromBranchBaseKey(branchBaseKey, link),
+			createTwohopChildSearchKeyFromBranchBaseKey(
+				branchBaseKey,
+				link,
+				searchKeyCache,
+			),
 		),
 	);
 	if (matchedHop2.length === 0) {
@@ -282,13 +377,16 @@ function filterTwohopBranch(
 function filterTagGroup(
 	section: TagGroup,
 	matchedKeySet: Set<string>,
+	searchKeyCache?: SearchKeyCache,
 ): TagGroup | null {
 	if (matchedKeySet.has(getTagGroupSearchKey(section))) {
 		return section;
 	}
 
 	const matchedNotes = section.notes.filter((note) =>
-		matchedKeySet.has(getTagNoteSearchKey(section, note)),
+		matchedKeySet.has(
+			createTagNoteSearchKey(section, note, searchKeyCache),
+		),
 	);
 	if (matchedNotes.length === 0) {
 		return null;
@@ -301,17 +399,38 @@ function filterTagGroup(
 }
 
 export function getOutgoingSearchKey(branch: TwoHopLinkBranch): string {
-	return `${OUTGOING_SEARCH_PREFIX}${getBranchBaseKey(branch)}`;
+	return createOutgoingSearchKey(branch);
 }
 
 export function getBacklinkSearchKey(link: TwoHopIndexedLink): string {
-	return `${BACKLINK_SEARCH_PREFIX}${getBacklinkBaseKey(link)}`;
+	return createBacklinkSearchKey(link);
 }
 
 export function getMergedSearchKey(item: MergedLinkItem): string {
+	return createMergedSearchKey(item);
+}
+
+function createOutgoingSearchKey(
+	branch: TwoHopLinkBranch,
+	searchKeyCache?: SearchKeyCache,
+): string {
+	return `${OUTGOING_SEARCH_PREFIX}${getBranchBaseKey(branch, searchKeyCache)}`;
+}
+
+function createBacklinkSearchKey(
+	link: TwoHopIndexedLink,
+	searchKeyCache?: SearchKeyCache,
+): string {
+	return `${BACKLINK_SEARCH_PREFIX}${getBacklinkBaseKey(link, searchKeyCache)}`;
+}
+
+function createMergedSearchKey(
+	item: MergedLinkItem,
+	searchKeyCache?: SearchKeyCache,
+): string {
 	return isBranchItem(item)
-		? `${MERGED_SEARCH_PREFIX}${getBranchBaseKey(item)}`
-		: `${MERGED_SEARCH_PREFIX}${getBacklinkBaseKey(item)}`;
+		? `${MERGED_SEARCH_PREFIX}${getBranchBaseKey(item, searchKeyCache)}`
+		: `${MERGED_SEARCH_PREFIX}${getBacklinkBaseKey(item, searchKeyCache)}`;
 }
 
 export function getTwohopChildSearchKey(
@@ -332,7 +451,15 @@ export function getTwohopChildSearchKeyFromBranchBaseKey(
 	branchBaseKey: string,
 	link: TwoHopIndexedLink,
 ): string {
-	return `${TWOHOP_CHILD_SEARCH_PREFIX}${branchBaseKey}${SEARCH_KEY_SEPARATOR}${getBacklinkBaseKey(link)}`;
+	return createTwohopChildSearchKeyFromBranchBaseKey(branchBaseKey, link);
+}
+
+function createTwohopChildSearchKeyFromBranchBaseKey(
+	branchBaseKey: string,
+	link: TwoHopIndexedLink,
+	searchKeyCache?: SearchKeyCache,
+): string {
+	return `${TWOHOP_CHILD_SEARCH_PREFIX}${branchBaseKey}${SEARCH_KEY_SEPARATOR}${getBacklinkBaseKey(link, searchKeyCache)}`;
 }
 
 export function getTagGroupSearchKey(section: TagGroup): string {
@@ -343,23 +470,69 @@ export function getTagNoteSearchKey(
 	section: TagGroup,
 	note: TaggedNote,
 ): string {
-	return `${TAG_NOTE_SEARCH_PREFIX}${section.tag}${SEARCH_KEY_SEPARATOR}${getTagNoteBaseKey(note)}`;
+	return createTagNoteSearchKey(section, note);
 }
 
-function getBranchBaseKey(branch: TwoHopLinkBranch): string {
-	return createBranchIdentitySignature(branch);
+function createTagNoteSearchKey(
+	section: TagGroup,
+	note: TaggedNote,
+	searchKeyCache?: SearchKeyCache,
+): string {
+	return `${TAG_NOTE_SEARCH_PREFIX}${section.tag}${SEARCH_KEY_SEPARATOR}${getTagNoteBaseKey(note, searchKeyCache)}`;
 }
 
-function getBacklinkBaseKey(link: TwoHopIndexedLink): string {
-	return createBacklinkIdentitySignature(link);
+function getBranchBaseKey(
+	branch: TwoHopLinkBranch,
+	searchKeyCache?: SearchKeyCache,
+): string {
+	const cached = searchKeyCache?.branchBaseKeys.get(branch);
+	if (cached !== undefined) {
+		return cached;
+	}
+
+	const key = createBranchIdentitySignature(branch);
+	searchKeyCache?.branchBaseKeys.set(branch, key);
+	return key;
 }
 
-function getTagNoteBaseKey(note: TaggedNote): string {
-	return createLinkIdentitySignature(
+function getBacklinkBaseKey(
+	link: TwoHopIndexedLink,
+	searchKeyCache?: SearchKeyCache,
+): string {
+	const cached = searchKeyCache?.backlinkBaseKeys.get(link);
+	if (cached !== undefined) {
+		return cached;
+	}
+
+	const key = createBacklinkIdentitySignature(link);
+	searchKeyCache?.backlinkBaseKeys.set(link, key);
+	return key;
+}
+
+function getTagNoteBaseKey(
+	note: TaggedNote,
+	searchKeyCache?: SearchKeyCache,
+): string {
+	const cached = searchKeyCache?.tagNoteBaseKeys.get(note);
+	if (cached !== undefined) {
+		return cached;
+	}
+
+	const key = createLinkIdentitySignature(
 		note.path,
 		note.file.basename,
 		"tag-note",
 	);
+	searchKeyCache?.tagNoteBaseKeys.set(note, key);
+	return key;
+}
+
+function createSearchKeyCache(): SearchKeyCache {
+	return {
+		branchBaseKeys: new WeakMap(),
+		backlinkBaseKeys: new WeakMap(),
+		tagNoteBaseKeys: new WeakMap(),
+	};
 }
 
 function getBranchTargetFile(

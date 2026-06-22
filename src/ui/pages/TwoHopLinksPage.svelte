@@ -18,9 +18,8 @@
 	import type { ApplicationStore } from "ui/stores/ApplicationStore.svelte";
 	import { getCardLayoutCssText } from "ui/utils/cardLayoutCssVars";
 	import {
-		buildTwohopSearchDataset,
 		collectTwohopSearchableFiles,
-		filterTwohopDisplayData,
+		createTwohopSearchAdapter,
 	} from "./twohop/twohopSearchAdapter";
 	import { tick } from "svelte";
 	import { createTwoHopDataIdentityCache } from "./twohop/twoHopDataIdentityCache";
@@ -79,6 +78,7 @@
 	// フックを利用
 	const search = useSearchQuery();
 	const bookmarks = useBookmarks(app);
+	const searchAdapter = createTwohopSearchAdapter();
 	const getSearchAdapterOptions = () => ({
 		displayData,
 		resolveFile: linkContext.resolveFile,
@@ -98,7 +98,8 @@
 		progressiveSyncIntervalMs: 400,
 		getSearchableFiles: () =>
 			collectTwohopSearchableFiles(getSearchAdapterOptions()),
-		buildDataset: () => buildTwohopSearchDataset(getSearchAdapterOptions()),
+		buildDataset: () =>
+			searchAdapter.buildDataset(getSearchAdapterOptions()),
 		contentSearchBackend: () =>
 			currentSettings.enableRipgrepContentSearch ? "ripgrep" : "worker",
 		ripgrepExecutablePath: () =>
@@ -108,7 +109,7 @@
 	let matchedItemByKey = $derived(workerSearchSession.matchedItemByKey);
 
 	let filteredDisplayData = $derived.by(() => {
-		return filterTwohopDisplayData(
+		return searchAdapter.filterDisplayData(
 			displayData,
 			search.normalized,
 			workerSearchSession.matchedKeySet,

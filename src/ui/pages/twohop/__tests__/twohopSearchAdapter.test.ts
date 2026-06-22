@@ -11,6 +11,7 @@ import type { DisplayData } from "application/presenters/displayDataBuilder";
 import {
 	buildTwohopSearchDataset,
 	collectTwohopSearchableFiles,
+	createTwohopSearchAdapter,
 	filterTwohopDisplayData,
 } from "../twohopSearchAdapter";
 
@@ -384,6 +385,52 @@ describe("filterTwohopDisplayData", () => {
 		const result = filterTwohopDisplayData(displayData, "query", new Set());
 
 		expect(result.newLinks).toEqual([]);
+	});
+
+	it("reuses dataset identity keys while filtering the same display data", () => {
+		const sourceFile = createMockTFile("notes/source.md");
+		const targetFile = createMockTFile("notes/target.md");
+		const backlink = createBacklink(targetFile, "backlink");
+		const displayData = createDisplayData({
+			backlinks: [backlink],
+		});
+		const adapter = createTwohopSearchAdapter();
+		const snapshots = adapter.buildDataset(
+			createAdapterOptions(displayData, sourceFile),
+		);
+		const key = snapshots[0]?.key ?? "";
+
+		backlink.rawText = "changed-after-dataset-build";
+		const result = adapter.filterDisplayData(
+			displayData,
+			"query",
+			new Set([key]),
+		);
+
+		expect(result.backlinks).toEqual([backlink]);
+	});
+
+	it("invalidates cached identity keys for a new display data snapshot", () => {
+		const sourceFile = createMockTFile("notes/source.md");
+		const targetFile = createMockTFile("notes/target.md");
+		const backlink = createBacklink(targetFile, "backlink");
+		const firstDisplayData = createDisplayData({
+			backlinks: [backlink],
+		});
+		const adapter = createTwohopSearchAdapter();
+		const firstKey = adapter.buildDataset(
+			createAdapterOptions(firstDisplayData, sourceFile),
+		)[0]?.key;
+
+		backlink.rawText = "changed-for-next-display-data";
+		const nextDisplayData = createDisplayData({
+			backlinks: [backlink],
+		});
+		const nextKey = adapter.buildDataset(
+			createAdapterOptions(nextDisplayData, sourceFile),
+		)[0]?.key;
+
+		expect(nextKey).not.toBe(firstKey);
 	});
 });
 
