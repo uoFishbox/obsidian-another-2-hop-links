@@ -75,11 +75,16 @@ export class TwoHopBranchBuilder {
 					linkReference,
 				);
 				processedCount += 1;
-				lastYieldAt = await this.maybeYieldToMainThread(
-					processedCount,
-					lastYieldAt,
-					performanceSettings.enableProgressiveTwoHopBuild,
-				);
+				if (
+					this.shouldYieldToMainThread(
+						processedCount,
+						lastYieldAt,
+						performanceSettings.enableProgressiveTwoHopBuild,
+					)
+				) {
+					await this.yieldToMainThread();
+					lastYieldAt = this.getNowMs();
+				}
 				continue;
 			}
 
@@ -94,11 +99,16 @@ export class TwoHopBranchBuilder {
 			branches.push({ hop1, hop2: [] });
 
 			processedCount += 1;
-			lastYieldAt = await this.maybeYieldToMainThread(
-				processedCount,
-				lastYieldAt,
-				performanceSettings.enableProgressiveTwoHopBuild,
-			);
+			if (
+				this.shouldYieldToMainThread(
+					processedCount,
+					lastYieldAt,
+					performanceSettings.enableProgressiveTwoHopBuild,
+				)
+			) {
+				await this.yieldToMainThread();
+				lastYieldAt = this.getNowMs();
+			}
 		}
 
 		return branches;
@@ -131,11 +141,16 @@ export class TwoHopBranchBuilder {
 				) as TwoHopIndexedLink[],
 			};
 
-			lastYieldAt = await this.maybeYieldToMainThread(
-				index + 1,
-				lastYieldAt,
-				performanceSettings.enableProgressiveTwoHopBuild,
-			);
+			if (
+				this.shouldYieldToMainThread(
+					index + 1,
+					lastYieldAt,
+					performanceSettings.enableProgressiveTwoHopBuild,
+				)
+			) {
+				await this.yieldToMainThread();
+				lastYieldAt = this.getNowMs();
+			}
 		}
 
 		return populatedBranches;
@@ -249,23 +264,22 @@ export class TwoHopBranchBuilder {
 		);
 	}
 
-	private async maybeYieldToMainThread(
+	private shouldYieldToMainThread(
 		iteration: number,
 		lastYieldAt: number,
 		enableProgressiveTwoHopBuild: boolean,
-	): Promise<number> {
+	): boolean {
 		if (!enableProgressiveTwoHopBuild) {
-			return lastYieldAt;
+			return false;
 		}
 		if ((iteration & (BUILD_YIELD_CHECK_CADENCE - 1)) !== 0) {
-			return lastYieldAt;
+			return false;
 		}
 		const now = this.getNowMs();
 		if (now - lastYieldAt < BUILD_YIELD_INTERVAL_MS) {
-			return lastYieldAt;
+			return false;
 		}
-		await this.yieldToMainThread();
-		return this.getNowMs();
+		return true;
 	}
 
 	private async yieldToMainThread(): Promise<void> {
