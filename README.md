@@ -37,6 +37,15 @@ Run tests:
 bun run test
 ```
 
+Build and publish the version from `manifest.json` as a GitHub release:
+
+```bash
+bun run release
+```
+
+The command requires an authenticated GitHub CLI (`gh auth login`) and uploads
+`main.js`, `styles.css`, and `manifest.json`.
+
 ## License
 
 MIT

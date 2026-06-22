@@ -6,6 +6,7 @@
 	"scripts": {
 		"dev": "bun run esbuild.config.mjs",
 		"build": "bun run esbuild.config.mjs production",
+		"release": "bun run build && node release.mjs",
 		"test": "vitest run --project node --project dom-unit --project dom-svelte --project jsdom",
 		"test:unit": "vitest run --project node",
 		"test:dom-all": "vitest run --project dom-unit --project dom-svelte --project jsdom",
