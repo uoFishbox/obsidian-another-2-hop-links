@@ -1,6 +1,7 @@
 import type { TFile, MarkdownView, Pos, CachedMetadata } from "obsidian";
 import type {
 	BacklinksMap,
+	IndexedLinkQueryResult,
 	TaggedNote,
 	TwoHopLinkBranch,
 	TwoHopIndexedLink,
@@ -62,12 +63,12 @@ export interface IIndexingService {
 	getBacklinksMap(): BacklinksMap;
 	invalidateAll(): void;
 	getSourcePathsForLookupKeys(lookupKeys: Iterable<string>): Set<string>;
-	getBacklinksForLink(linkPath: string): TwoHopIndexedLink[];
+	getBacklinksForLink(linkPath: string): IndexedLinkQueryResult;
 	getUniqueBacklinkSourcesForLink(
 		linkPath: string,
 		excludePath?: string,
 		limit?: number,
-	): TwoHopIndexedLink[];
+	): IndexedLinkQueryResult;
 	getBacklinkCountForLink(linkPath: string): number;
 	getIndexVersion(): number;
 	peekNotesWithCommonTags(file: TFile): TaggedNote[];

@@ -3,6 +3,7 @@ import { resolveFileByPath } from "infrastructure/utils/vaultUtils";
 import type {
 	BacklinkBucket,
 	BacklinkSourceMap,
+	IndexedLinkQueryResult,
 	TwoHopIndexedLink,
 } from "types/domain";
 import type { IVault } from "types/obsidian";
@@ -17,11 +18,11 @@ interface LookupSourceView {
 export class IndexQueryEngine {
 	private readonly cachedIndexedLinks = new Map<
 		string,
-		readonly TwoHopIndexedLink[]
+		IndexedLinkQueryResult
 	>();
 	private readonly cachedUniqueIndexedLinks = new Map<
 		string,
-		Map<string, readonly TwoHopIndexedLink[]>
+		Map<string, IndexedLinkQueryResult>
 	>();
 	private readonly unresolvedMergedCache = new Map<
 		string,
@@ -34,26 +35,25 @@ export class IndexQueryEngine {
 	public getBacklinksForLink(
 		snapshot: IndexSnapshot,
 		linkPath: string,
-	): TwoHopIndexedLink[] {
+	): IndexedLinkQueryResult {
 		this.ensureSnapshotCacheScope(snapshot);
 		const cached = this.cachedIndexedLinks.get(linkPath);
 		if (cached) {
-			return this.cloneIndexedLinks(cached);
+			return cached;
 		}
 
 		const lookupView = this.getSourceMapForLookup(snapshot, linkPath);
 		if (!lookupView || lookupView.sourceMap.size === 0) {
-			this.cachedIndexedLinks.set(linkPath, []);
-			return [];
+			const links = this.freezeIndexedLinks([]);
+			this.cachedIndexedLinks.set(linkPath, links);
+			return links;
 		}
 
-		const links = this.collectIncomingIndexedLinks(
-			snapshot,
-			lookupView,
-			linkPath,
+		const links = this.freezeIndexedLinks(
+			this.collectIncomingIndexedLinks(snapshot, lookupView, linkPath),
 		);
 		this.cachedIndexedLinks.set(linkPath, links);
-		return this.cloneIndexedLinks(links);
+		return links;
 	}
 
 	public getUniqueBacklinkSourcesForLink(
@@ -61,7 +61,7 @@ export class IndexQueryEngine {
 		linkPath: string,
 		excludePath?: string,
 		limit?: number,
-	): TwoHopIndexedLink[] {
+	): IndexedLinkQueryResult {
 		this.ensureSnapshotCacheScope(snapshot);
 		const excludeKey = excludePath ?? "";
 		const limitKey =
@@ -69,38 +69,39 @@ export class IndexQueryEngine {
 		const cacheKey = `${excludeKey}\u0000${limitKey}`;
 		let cacheByExclude = this.cachedUniqueIndexedLinks.get(linkPath);
 		if (!cacheByExclude) {
-			cacheByExclude = new Map<string, readonly TwoHopIndexedLink[]>();
+			cacheByExclude = new Map<string, IndexedLinkQueryResult>();
 			this.cachedUniqueIndexedLinks.set(linkPath, cacheByExclude);
 		}
 
 		const cached = cacheByExclude.get(cacheKey);
 		if (cached) {
-			return this.cloneIndexedLinks(cached);
+			return cached;
 		}
 
 		const lookupView = this.getSourceMapForLookup(snapshot, linkPath);
 		if (!lookupView || lookupView.sourceMap.size === 0) {
-			cacheByExclude.set(cacheKey, []);
-			return [];
+			const links = this.freezeIndexedLinks([]);
+			cacheByExclude.set(cacheKey, links);
+			return links;
 		}
 
-		const links = this.collectIncomingIndexedLinks(
-			snapshot,
-			lookupView,
-			linkPath,
-			{
+		const links = this.freezeIndexedLinks(
+			this.collectIncomingIndexedLinks(snapshot, lookupView, linkPath, {
 				excludePath,
 				limit,
-			},
+			}),
 		);
 		cacheByExclude.set(cacheKey, links);
-		return this.cloneIndexedLinks(links);
+		return links;
 	}
 
-	private cloneIndexedLinks(
-		links: readonly TwoHopIndexedLink[],
-	): TwoHopIndexedLink[] {
-		return links.map((link) => ({ ...link }));
+	private freezeIndexedLinks(
+		links: TwoHopIndexedLink[],
+	): IndexedLinkQueryResult {
+		for (const link of links) {
+			Object.freeze(link);
+		}
+		return Object.freeze(links);
 	}
 
 	public getBacklinkCountForLink(

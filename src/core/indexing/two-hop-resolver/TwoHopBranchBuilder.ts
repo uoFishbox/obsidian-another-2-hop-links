@@ -122,11 +122,13 @@ export class TwoHopBranchBuilder {
 				branch.hop1.path ?? getLookupPathForLink(branch.hop1);
 			populatedBranches[index] = {
 				hop1: branch.hop1,
+				// Query results are immutable at runtime. The branch model remains
+				// mutable for legacy consumers, which only read these indexed links.
 				hop2: this.indexingService.getUniqueBacklinkSourcesForLink(
 					lookupPath,
 					targetFile.path,
 					maxHop2,
-				),
+				) as TwoHopIndexedLink[],
 			};
 
 			lastYieldAt = await this.maybeYieldToMainThread(

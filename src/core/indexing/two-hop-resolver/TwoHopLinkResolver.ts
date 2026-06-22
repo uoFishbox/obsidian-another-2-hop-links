@@ -382,7 +382,7 @@ export class TwoHopLinkResolver {
 	}
 
 	private logCanvasBacklinks(
-		uniqueBacklinks: TwoHopIndexedLink[],
+		uniqueBacklinks: readonly Readonly<TwoHopIndexedLink>[],
 		enableCanvasBacklinkDebug: boolean,
 	): void {
 		if (!enableCanvasBacklinkDebug) {

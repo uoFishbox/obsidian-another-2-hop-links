@@ -33,6 +33,8 @@ export interface TwoHopIndexedLink {
 	key?: string;
 }
 
+export type IndexedLinkQueryResult = readonly Readonly<TwoHopIndexedLink>[];
+
 export interface BacklinkBucket {
 	count: number;
 	length: number;

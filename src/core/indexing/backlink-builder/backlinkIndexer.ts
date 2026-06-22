@@ -61,7 +61,7 @@ type MutableBacklinksBuildArtifacts = BacklinksBuildArtifacts;
 export interface ChunkedBacklinksBuildOptions extends RebuildOptions {}
 
 export function dedupeBySourceFile(
-	links: TwoHopIndexedLink[],
+	links: readonly Readonly<TwoHopIndexedLink>[],
 	excludePath?: string,
 ): TwoHopIndexedLink[] {
 	const sourcePathsSeen = new Set<string>();

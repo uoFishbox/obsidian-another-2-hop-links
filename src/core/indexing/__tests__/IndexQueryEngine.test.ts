@@ -74,7 +74,7 @@ describe("IndexQueryEngine", () => {
 			expect(backlinks[0].sourceFile.path).toBe("resolved-source.md");
 		});
 
-		test("cached backlinks are isolated from caller mutations", async () => {
+		test("cached backlinks reuse an immutable result", async () => {
 			const env = createQueryEnvironment([
 				{ path: "source.md", links: ["target"] },
 				{ path: "target.md" },
@@ -82,14 +82,13 @@ describe("IndexQueryEngine", () => {
 
 			const snapshot = await env.snapshotBuilder.buildAsync();
 			const first = env.engine.getBacklinksForLink(snapshot, "target.md");
-			first[0].backlinkCount = 999;
-			first.push(first[0]);
-
 			const second = env.engine.getBacklinksForLink(snapshot, "target.md");
 
+			expect(Object.isFrozen(first)).toBe(true);
+			expect(Object.isFrozen(first[0])).toBe(true);
+			expect(second).toBe(first);
 			expect(second).toHaveLength(1);
 			expect(second[0].backlinkCount).toBe(1);
-			expect(second[0]).not.toBe(first[0]);
 		});
 	});
 
@@ -470,7 +469,7 @@ describe("IndexQueryEngine", () => {
 			).toBe(2);
 		});
 
-		test("cached unique backlinks are isolated from caller mutations", async () => {
+		test("cached unique backlinks reuse an immutable result", async () => {
 			const env = createQueryEnvironment([
 				{ path: "source.md", links: ["target"] },
 				{ path: "target.md" },
@@ -481,14 +480,14 @@ describe("IndexQueryEngine", () => {
 				snapshot,
 				"target.md",
 			);
-			first[0].backlinkCount = 999;
-			first.length = 0;
-
 			const second = env.engine.getUniqueBacklinkSourcesForLink(
 				snapshot,
 				"target.md",
 			);
 
+			expect(Object.isFrozen(first)).toBe(true);
+			expect(Object.isFrozen(first[0])).toBe(true);
+			expect(second).toBe(first);
 			expect(second).toHaveLength(1);
 			expect(second[0].backlinkCount).toBe(1);
 		});
