@@ -3,14 +3,83 @@ import type { TFile } from "obsidian";
 import type { LinkReference, LinkResolution } from "types/domain";
 import type { TwoHopIndexedLink } from "types";
 import type { IMetadataCache, IVault } from "types/obsidian";
+import { LINK_NORMALIZATION_CACHE_MAX_ENTRIES } from "appConstants";
+import {
+	createBoundedGenerationalCache,
+	type BoundedGenerationalCache,
+} from "utils/boundedGenerationalCache";
 import { hasSourceDependentRawLinkPath } from "./sourceDependentLinks";
 
 // 拡張子チェック用正規表現（モジュールスコープで一度だけコンパイル）
 const HAS_EXTENSION_RE = /\.[a-z0-9]+$/i;
-// 高頻度で同じリンク文字列・パスが渡るため、正規化結果を使い回す
-const CASE_INSENSITIVE_LOOKUP_KEY_CACHE = new Map<string, string>();
-const RAW_LINKPATH_TO_MARKDOWN_PATH_CACHE = new Map<string, string>();
-const LINK_TEXT_TO_MARKDOWN_PATH_CACHE = new Map<string, string>();
+// 高頻度で同じリンク文字列・パスが渡るため、正規化結果を使い回す。
+// 無制限 Map だと削除済みファイルや過去のリンク文字列が old generation に
+// 残留し major GC / retained heap に悪影響が出るため、上限付き2世代キャッシュ
+// で保持量を制限する。正規化は安価なので LRU の per-call delete/set ではなく
+// 世代到達時の一括切り替えで追い出す。
+const CASE_INSENSITIVE_LOOKUP_KEY_CACHE: BoundedGenerationalCache<string, string> =
+	createBoundedGenerationalCache(
+		"caseInsensitiveLookupKey",
+		LINK_NORMALIZATION_CACHE_MAX_ENTRIES,
+	);
+const RAW_LINKPATH_TO_MARKDOWN_PATH_CACHE: BoundedGenerationalCache<
+	string,
+	string
+> = createBoundedGenerationalCache(
+	"rawLinkpathToMarkdownPath",
+	LINK_NORMALIZATION_CACHE_MAX_ENTRIES,
+);
+const LINK_TEXT_TO_MARKDOWN_PATH_CACHE: BoundedGenerationalCache<
+	string,
+	string
+> = createBoundedGenerationalCache(
+	"linkTextToMarkdownPath",
+	LINK_NORMALIZATION_CACHE_MAX_ENTRIES,
+);
+
+/** Names of the bounded normalization caches, for stats grouping. */
+export type LinkNormalizationCacheName =
+	| "caseInsensitiveLookupKey"
+	| "rawLinkpathToMarkdownPath"
+	| "linkTextToMarkdownPath";
+
+export interface LinkNormalizationCacheStats {
+	name: LinkNormalizationCacheName;
+	maxEntries: number;
+	currentSize: number;
+	previousSize: number;
+	hits: number;
+	misses: number;
+	promotions: number;
+	generations: number;
+	clears: number;
+}
+
+const NORMALIZATION_CACHES = [
+	CASE_INSENSITIVE_LOOKUP_KEY_CACHE,
+	RAW_LINKPATH_TO_MARKDOWN_PATH_CACHE,
+	LINK_TEXT_TO_MARKDOWN_PATH_CACHE,
+] as const;
+
+/**
+ * Returns current stats for every normalization cache, for debug measurement.
+ */
+export function getLinkNormalizationCacheStats(): LinkNormalizationCacheStats[] {
+	return NORMALIZATION_CACHES.map((cache) =>
+		cache.getStats() as LinkNormalizationCacheStats,
+	);
+}
+
+/**
+ * Clears all link normalization caches. Intended for benchmarks to separate
+ * cold-cache from warm-cache runs; not needed during normal operation because
+ * the bounded generational caches self-trim.
+ */
+export function clearLinkNormalizationCaches(): void {
+	for (const cache of NORMALIZATION_CACHES) {
+		cache.clear();
+	}
+}
 
 export interface ResolvedLinkInfo {
 	destinationPath: string;

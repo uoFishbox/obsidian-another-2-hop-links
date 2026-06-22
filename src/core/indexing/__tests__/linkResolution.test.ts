@@ -209,4 +209,49 @@ describe("linkResolution", () => {
 		detector.renamePath("alpha/Bar.md", "gamma/Bar.md");
 		expect(detector.isAmbiguous("Bar")).toBe(false);
 	});
+
+	test("getLinkNormalizationCacheStats reports per-cache stats with the expected names", async () => {
+		const {
+			getLinkNormalizationCacheStats,
+			toCaseInsensitiveLookupKey,
+			normalizeRawLinkpathToMarkdownPath,
+			normalizeLinkToMarkdownPath,
+		} = await import("../link-resolution/linkResolution");
+
+		toCaseInsensitiveLookupKey("Foo.md");
+		toCaseInsensitiveLookupKey("Foo.md");
+		normalizeRawLinkpathToMarkdownPath("Folder\\Note");
+		normalizeLinkToMarkdownPath("[[Note]]");
+
+		const stats = getLinkNormalizationCacheStats();
+		const names = stats.map((entry) => entry.name);
+
+		expect(names).toEqual([
+			"caseInsensitiveLookupKey",
+			"rawLinkpathToMarkdownPath",
+			"linkTextToMarkdownPath",
+		]);
+		expect(stats[0].hits).toBeGreaterThanOrEqual(1);
+		expect(stats[0].maxEntries).toBeGreaterThan(0);
+	});
+
+	test("clearLinkNormalizationCaches resets retained entries and counts a clear", async () => {
+		const {
+			clearLinkNormalizationCaches,
+			getLinkNormalizationCacheStats,
+			toCaseInsensitiveLookupKey,
+		} = await import("../link-resolution/linkResolution");
+
+		toCaseInsensitiveLookupKey("Before.md");
+		toCaseInsensitiveLookupKey("Before.md");
+
+		clearLinkNormalizationCaches();
+
+		const stats = getLinkNormalizationCacheStats();
+		// All three caches should report a clear and no retained entries.
+		for (const entry of stats) {
+			expect(entry.clears).toBeGreaterThanOrEqual(1);
+			expect(entry.currentSize + entry.previousSize).toBe(0);
+		}
+	});
 });

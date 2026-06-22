@@ -8,6 +8,11 @@ export const INDEXING_REBUILD_YIELD_INTERVAL_MS = 16;
 // インデックス再構築時のyield間隔（ms）- 16msは約1フレーム（60fps）
 // ファイル数ではなく経過時間でyieldすることで、速度と応答性の両立を図る
 export const INDEXING_YIELD_INTERVAL_MS = 16;
+// リンク正規化キャッシュの1世代あたりの最大エントリ数。
+// 2世代キャッシュのため、保持エントリは概ね maxEntries * 2 に上限制御される。
+// 正規化自体が安価なため、LRUの per-call delete/set ではなく
+// 世代交代による一括切り替えで古いエントリを追い出す。
+export const LINK_NORMALIZATION_CACHE_MAX_ENTRIES = 8192;
 export const INDEX_LINK_CAPABLE_EXTENSIONS = new Set(["md", "canvas"]);
 export const ATTACHMENT_EXCLUDED_EXTENSIONS = new Set(["md", "canvas", "base"]);
 export const CONTAINER_CLASS = "cosense-card-links__container";

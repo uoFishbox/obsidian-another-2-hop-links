@@ -3,6 +3,11 @@ import {
 	INDEX_LINK_CAPABLE_EXTENSIONS,
 } from "../../../appConstants";
 import type { IMetadataCache, IVault } from "types/obsidian";
+import {
+	clearLinkNormalizationCaches,
+	getLinkNormalizationCacheStats,
+	type LinkNormalizationCacheStats,
+} from "../link-resolution/linkResolution";
 import { IndexingService } from "./IndexingService";
 
 export interface IndexingBenchmarkIterationResult {
@@ -23,6 +28,12 @@ export interface IndexingBenchmarkResult {
 	lastBacklinksEntryCount: number;
 	lastTagFileCount: number;
 	iterationResults: IndexingBenchmarkIterationResult[];
+	/**
+	 * Final link normalization cache stats for the last iteration. Only
+	 * populated when `clearCachesBetweenIterations` is false so warm-cache
+	 * behavior can be inspected.
+	 */
+	linkNormalizationCacheStats?: LinkNormalizationCacheStats[];
 }
 
 interface BenchmarkIndexingService {
@@ -39,6 +50,12 @@ export interface RunIndexingBenchmarkOptions {
 		vault: IVault,
 		metadataCache: IMetadataCache,
 	) => BenchmarkIndexingService;
+	/**
+	 * When true, clears the module-scoped link normalization caches before
+	 * every iteration so each run starts from a cold cache. Defaults to
+	 * false (warm cache), which matches the previous behavior.
+	 */
+	clearCachesBetweenIterations?: boolean;
 }
 
 /**
@@ -57,14 +74,21 @@ export async function runIndexingBenchmark(
 		options.createIndexingService ??
 		((vault, metadataCache) =>
 			new IndexingService(vault, metadataCache, () => true));
+	const clearCachesBetweenIterations =
+		options.clearCachesBetweenIterations ?? false;
 	const allFiles = vault.getFiles();
 	const linkCapableFiles = allFiles.filter((file) =>
 		INDEX_LINK_CAPABLE_EXTENSIONS.has(file.extension.toLowerCase()),
 	).length;
 	const service = createIndexingService(vault, metadataCache);
 	const iterationResults: IndexingBenchmarkIterationResult[] = [];
+	let finalCacheStats: LinkNormalizationCacheStats[] | undefined;
 
 	for (let iteration = 1; iteration <= iterations; iteration++) {
+		if (clearCachesBetweenIterations) {
+			clearLinkNormalizationCaches();
+		}
+
 		const startTime = now();
 		await service.rebuildBacklinksMapChunked(yieldIntervalMs);
 		const durationMs = now() - startTime;
@@ -74,6 +98,10 @@ export async function runIndexingBenchmark(
 			backlinksEntries: service.getBacklinksMap().size,
 			tagFiles: service.getTagIndexFileCount(),
 		});
+	}
+
+	if (!clearCachesBetweenIterations) {
+		finalCacheStats = getLinkNormalizationCacheStats();
 	}
 
 	const durationsMs = iterationResults.map((result) => result.durationMs);
@@ -90,6 +118,7 @@ export async function runIndexingBenchmark(
 		lastBacklinksEntryCount: lastResult?.backlinksEntries ?? 0,
 		lastTagFileCount: lastResult?.tagFiles ?? 0,
 		iterationResults,
+		linkNormalizationCacheStats: finalCacheStats,
 	};
 }
 

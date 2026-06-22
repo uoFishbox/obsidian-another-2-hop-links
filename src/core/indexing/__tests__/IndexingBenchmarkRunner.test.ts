@@ -141,4 +141,43 @@ describe("runIndexingBenchmark", () => {
 		expect(service.getBacklinksMap).toHaveBeenCalledTimes(2);
 		expect(service.getTagIndexFileCount).toHaveBeenCalledTimes(2);
 	});
+
+	test("exposes link normalization cache stats on a warm-cache run", async () => {
+		const mockVault = createMockVault(["md"]);
+		const metadataCache = createMockMetadataCache();
+		const service = createBenchmarkService([
+			{ backlinksEntries: 1, tagFiles: 0 },
+		]);
+		const createIndexingService = vi.fn(() => service);
+		const now = vi.fn().mockReturnValueOnce(0).mockReturnValueOnce(5);
+
+		const result = await runIndexingBenchmark(mockVault, metadataCache, {
+			iterations: 1,
+			now,
+			createIndexingService,
+			clearCachesBetweenIterations: false,
+		});
+
+		expect(result.linkNormalizationCacheStats).toBeDefined();
+		expect(result.linkNormalizationCacheStats?.length).toBe(3);
+	});
+
+	test("omits link normalization cache stats on a cold-cache run", async () => {
+		const mockVault = createMockVault(["md"]);
+		const metadataCache = createMockMetadataCache();
+		const service = createBenchmarkService([
+			{ backlinksEntries: 1, tagFiles: 0 },
+		]);
+		const createIndexingService = vi.fn(() => service);
+		const now = vi.fn().mockReturnValueOnce(0).mockReturnValueOnce(5);
+
+		const result = await runIndexingBenchmark(mockVault, metadataCache, {
+			iterations: 1,
+			now,
+			createIndexingService,
+			clearCachesBetweenIterations: true,
+		});
+
+		expect(result.linkNormalizationCacheStats).toBeUndefined();
+	});
 });
