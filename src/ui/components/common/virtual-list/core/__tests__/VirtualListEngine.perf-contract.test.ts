@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { createFlatLogicalCellSource } from "../../flatLogicalCellSource";
 import { computeVirtualGridLayout } from "../../layout/flatGridLayout";
 import type { VirtualListLogicalCell } from "../../logicalCell";
@@ -162,6 +162,36 @@ describe("VirtualListEngine performance contracts", () => {
 				fastPathReuses: NO_OP_MEASUREMENTS,
 				uniqueRenderSlots: 27,
 			})),
+		);
+	});
+
+	it("resolves only the entering flat-grid row across sustained scrolling", () => {
+		const rowModel = createRowModel(10_000);
+		const resolveCellAtIndex = vi.spyOn(
+			rowModel,
+			"resolveCellAtIndex",
+		);
+		let mounted = buildMountedVirtualGridCellsFromRowModel({
+			rowModel,
+			rowRange: { start: 10, end: 19 },
+		});
+		const mountedRows = mounted.rowSlices.length;
+		const columns = rowModel.layout.columns;
+
+		for (let frame = 1; frame <= NO_OP_MEASUREMENTS; frame += 1) {
+			mounted = buildMountedVirtualGridCellsFromRowModel({
+				rowModel,
+				rowRange: {
+					start: 10 + frame,
+					end: 19 + frame,
+				},
+				previousBuild: mounted,
+			});
+		}
+
+		expect(mounted.rowSlices).toHaveLength(mountedRows);
+		expect(resolveCellAtIndex).toHaveBeenCalledTimes(
+			mountedRows * columns + NO_OP_MEASUREMENTS * columns,
 		);
 	});
 });

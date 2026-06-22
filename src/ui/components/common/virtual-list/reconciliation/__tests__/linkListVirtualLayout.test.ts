@@ -358,6 +358,41 @@ describe("linkListVirtualLayout", () => {
 		expectUniqueRenderSlots(shifted.cells);
 	});
 
+	it("reuses retained row slices when scrolling with the same cell source", () => {
+		const items = createItems(9);
+		const logicalCells = buildLogicalCells({
+			header: false,
+			items,
+			visibleCount: items.length,
+			showLoadMore: false,
+			getKey: (item) => item.id,
+			sectionId: "section-0",
+		});
+		const initial = buildMountedVirtualGridCells({
+			logicalCells,
+			visibleWindow: { start: 0, end: 6 },
+			columns: 3,
+			cellWidth: 100,
+			rowHeight: 120,
+			gap: 10,
+		});
+		const shifted = buildMountedVirtualGridCells({
+			logicalCells,
+			visibleWindow: { start: 3, end: 9 },
+			columns: 3,
+			cellWidth: 100,
+			rowHeight: 120,
+			gap: 10,
+			previousBuild: initial,
+		});
+
+		expect(shifted.rowSlices[0]).toBe(initial.rowSlices[1]);
+		expect(shifted.rowSlices[0].cells).toBe(initial.rowSlices[1].cells);
+		expect(shifted.rowSlices[1].slotIndex).toBe(
+			initial.rowSlices[0].slotIndex,
+		);
+	});
+
 	it("keeps item body keys stable when item render revisions are stable", () => {
 		const initialItems: TestItem[] = [
 			{

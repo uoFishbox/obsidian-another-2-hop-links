@@ -361,6 +361,38 @@ const hasCompatibleMountedVirtualGridRowSlots = <T>(
 	previousBuild.rowHeight === params.rowHeight &&
 	previousBuild.gap === params.gap;
 
+const getPreviousMountedVirtualGridRow = <T>(
+	previousBuild: MountedVirtualGridCellsBuildResult<T> | undefined,
+	rowIndex: number,
+): MountedVirtualGridRowSlice<T> | undefined => {
+	const previousRows = previousBuild?.rowSlices;
+	if (!previousRows || previousRows.length === 0) {
+		return undefined;
+	}
+
+	const firstRowIndex = previousRows[0].rowIndex;
+	const previousRow = previousRows[rowIndex - firstRowIndex];
+	return previousRow?.rowIndex === rowIndex ? previousRow : undefined;
+};
+
+const canReuseMountedVirtualGridRow = <T>(
+	row: MountedVirtualGridRowSlice<T> | undefined,
+	rowStartIndex: number,
+	rowEndIndex: number,
+): row is MountedVirtualGridRowSlice<T> => {
+	if (!row || row.cells.length !== rowEndIndex - rowStartIndex) {
+		return false;
+	}
+	if (row.cells.length === 0) {
+		return true;
+	}
+
+	return (
+		row.cells[0].cellIndex === rowStartIndex &&
+		row.cells[row.cells.length - 1].cellIndex === rowEndIndex - 1
+	);
+};
+
 const assertMountedVirtualGridBuildInvariants = <T>(
 	build: MountedVirtualGridCellsBuildResult<T>,
 ): void => {
@@ -527,6 +559,24 @@ function buildMountedVirtualGridCellsFromResolver<T>(params: {
 			(rowIndex + 1) * columns,
 		);
 		const rowSlot = acquireRowSlot(rowIndex);
+		const previousRow = hasCompatiblePreviousBuild
+			? getPreviousMountedVirtualGridRow(previousBuild, rowIndex)
+			: undefined;
+		if (
+			canReuseMountedVirtualGridRow(
+				previousRow,
+				rowStartIndex,
+				rowEndIndex,
+			) &&
+			previousRow.slotIndex === rowSlot.slotIndex
+		) {
+			rowSlices.push(previousRow);
+			for (const mountedCell of previousRow.cells) {
+				cells.push(mountedCell);
+				reusableCellsByKey.set(mountedCell.key, mountedCell);
+			}
+			continue;
+		}
 		const rowCells: MountedVirtualGridCell<T>[] = [];
 
 		for (

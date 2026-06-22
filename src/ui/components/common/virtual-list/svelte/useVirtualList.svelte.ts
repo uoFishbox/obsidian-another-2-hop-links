@@ -57,6 +57,10 @@ type VirtualListRuntimeState<
 	  };
 
 const hasSameRefs = <T>(current: readonly T[], next: readonly T[]): boolean => {
+	if (current === next) {
+		return true;
+	}
+
 	if (current.length !== next.length) {
 		return false;
 	}

@@ -151,14 +151,29 @@ export function useFlatVirtualGridList<T>(props: FlatVirtualGridListProps<T>) {
 	let visibilityMountedRows:
 		| readonly MountedVirtualGridRowSlice<T>[]
 		| readonly [] = EMPTY_MOUNTED_ROWS;
+	let visibilityMountedRange: RowRange = { start: 0, end: 0 };
+	let visibilityRowModel: object | null = null;
 	let visibilityPreviewRange: RowRange | null = null;
 	const syncVisibilityStates = (
 		mountedRows: readonly MountedVirtualGridRowSlice<T>[] | readonly [],
+		nextMountedRange: RowRange,
 		nextPreviewRange: RowRange,
+		nextRowModel: object,
 	): void => {
-		if (!visibilityPreviewRange || mountedRows !== visibilityMountedRows) {
+		if (
+			!visibilityPreviewRange ||
+			nextRowModel !== visibilityRowModel
+		) {
 			visibilityStates.syncMountedRows({
 				mountedRows,
+				previewRange: nextPreviewRange,
+			});
+		} else if (mountedRows !== visibilityMountedRows) {
+			visibilityStates.syncMountedRowRangeDelta({
+				previousRows: visibilityMountedRows,
+				nextRows: mountedRows,
+				previousRowRange: visibilityMountedRange,
+				nextRowRange: nextMountedRange,
 				previewRange: nextPreviewRange,
 			});
 		} else {
@@ -170,6 +185,8 @@ export function useFlatVirtualGridList<T>(props: FlatVirtualGridListProps<T>) {
 		}
 
 		visibilityMountedRows = mountedRows;
+		visibilityMountedRange = nextMountedRange;
+		visibilityRowModel = nextRowModel;
 		visibilityPreviewRange = nextPreviewRange;
 	};
 
@@ -273,7 +290,9 @@ export function useFlatVirtualGridList<T>(props: FlatVirtualGridListProps<T>) {
 			syncVisibilityStates(
 				reconciliationState.mountedBuild?.rowSlices ??
 					EMPTY_MOUNTED_ROWS,
+				snapshot.ranges.mounted,
 				snapshot.ranges.previewVisible,
+				snapshot.rowModel,
 			);
 		},
 	});
@@ -288,52 +307,9 @@ export function useFlatVirtualGridList<T>(props: FlatVirtualGridListProps<T>) {
 		() => {
 			const rowSlices =
 				virtualList.getReconciliationState().mountedBuild?.rowSlices;
-			if (!rowSlices || rowSlices.length === 0) {
-				return EMPTY_MOUNTED_ROWS;
-			}
-
-			const mountedCellsByKey = virtualListSnapshot?.mountedCellsByKey;
-			if (!mountedCellsByKey) {
-				return rowSlices;
-			}
-
-			let nextRows: MountedVirtualGridRowSlice<T>[] | null = null;
-
-			for (let rowIndex = 0; rowIndex < rowSlices.length; rowIndex += 1) {
-				const row = rowSlices[rowIndex];
-				let nextCells: MountedVirtualGridCell<T>[] | null = null;
-
-				for (
-					let cellIndex = 0;
-					cellIndex < row.cells.length;
-					cellIndex += 1
-				) {
-					const cell = row.cells[cellIndex];
-					const mountedCell = mountedCellsByKey.get(cell.key) ?? cell;
-
-					if (mountedCell !== cell && nextCells === null) {
-						nextCells = row.cells.slice(0, cellIndex);
-					}
-
-					if (nextCells) {
-						nextCells.push(mountedCell);
-					}
-				}
-
-				if (nextCells) {
-					if (nextRows === null) {
-						nextRows = rowSlices.slice(0, rowIndex);
-					}
-					nextRows.push({
-						...row,
-						cells: nextCells,
-					});
-				} else if (nextRows) {
-					nextRows.push(row);
-				}
-			}
-
-			return nextRows ?? rowSlices;
+			return rowSlices && rowSlices.length > 0
+				? rowSlices
+				: EMPTY_MOUNTED_ROWS;
 		},
 	);
 	const mountedCellsForChange = $derived<
