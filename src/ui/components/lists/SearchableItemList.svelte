@@ -329,38 +329,53 @@
 	style:min-height={resultsMinHeight}
 >
 	{#if filteredItems.length}
-		<div class="cosense-card-links__section twohop-links-back-links">
-			{#snippet sectionHeader()}
-				<LinkSectionHeader
-					title={config.sectionHeaderTitle ?? config.title}
-					totalCount={filteredItems.length}
-				/>
-			{/snippet}
+		{#snippet sectionHeader()}
+			<LinkSectionHeader
+				title={config.sectionHeaderTitle ?? config.title}
+				totalCount={filteredItems.length}
+			/>
+		{/snippet}
 
-			<LinkList
-				items={filteredItems}
-				getKey={getViewItemKey}
-				sectionId={searchScopedSectionId}
-				{applicationStore}
-				{initialVisibleCount}
-				{loadMoreIncrement}
-				paginationMode={config.paginationMode ?? "button"}
-				onMountedCellsChange={handleMountedCellsChange}
-				header={config.showSectionHeader ? sectionHeader : undefined}
-			>
-				{#snippet item({
-					item,
-					observerRoot,
-					visibility,
-					visibilityState,
-				})}
-					{@const ItemComponent = config.itemComponent}
-					{@const previewRefreshToken =
-						previewRefreshTokens[config.getItemKey(item)] ?? 0}
-					{@const renderedItemKey = config.getItemKey(item)}
-					{@const matchedItem =
-						matchedItemByKey?.get(renderedItemKey) ?? null}
-					{#if shouldPassVisibilityProp}
+		<LinkList
+			className="cosense-card-links__section twohop-links-back-links"
+			items={filteredItems}
+			getKey={getViewItemKey}
+			sectionId={searchScopedSectionId}
+			{applicationStore}
+			{initialVisibleCount}
+			{loadMoreIncrement}
+			paginationMode={config.paginationMode ?? "button"}
+			onMountedCellsChange={handleMountedCellsChange}
+			header={config.showSectionHeader ? sectionHeader : undefined}
+		>
+			{#snippet item({
+				item,
+				observerRoot,
+				visibility,
+				visibilityState,
+			})}
+				{@const ItemComponent = config.itemComponent}
+				{@const previewRefreshToken =
+					previewRefreshTokens[config.getItemKey(item)] ?? 0}
+				{@const renderedItemKey = config.getItemKey(item)}
+				{@const matchedItem =
+					matchedItemByKey?.get(renderedItemKey) ?? null}
+				{#if shouldPassVisibilityProp}
+					<ItemComponent
+						{...config.getItemProps(item)}
+						searchQuery={search.normalized}
+						searchScope={allowContentSearch &&
+						contentSearchEnabled &&
+						(matchedItem?.contentMatched ?? true)
+							? "title-and-content"
+							: "title-only"}
+						contentPreview={matchedItem?.contentPreview}
+						{observerRoot}
+						{visibility}
+						{previewRefreshToken}
+					/>
+				{:else}
+					<PreviewVisibilityProvider {visibilityState}>
 						<ItemComponent
 							{...config.getItemProps(item)}
 							searchQuery={search.normalized}
@@ -371,28 +386,12 @@
 								: "title-only"}
 							contentPreview={matchedItem?.contentPreview}
 							{observerRoot}
-							{visibility}
 							{previewRefreshToken}
 						/>
-					{:else}
-						<PreviewVisibilityProvider {visibilityState}>
-							<ItemComponent
-								{...config.getItemProps(item)}
-								searchQuery={search.normalized}
-								searchScope={allowContentSearch &&
-								contentSearchEnabled &&
-								(matchedItem?.contentMatched ?? true)
-									? "title-and-content"
-									: "title-only"}
-								contentPreview={matchedItem?.contentPreview}
-								{observerRoot}
-								{previewRefreshToken}
-							/>
-						</PreviewVisibilityProvider>
-					{/if}
-				{/snippet}
-			</LinkList>
-		</div>
+					</PreviewVisibilityProvider>
+				{/if}
+			{/snippet}
+		</LinkList>
 	{:else}
 		<div class="modal-empty">
 			{#if searchEnabled && search.normalized}
