@@ -64,7 +64,7 @@ src/
   appConstants.ts               # Shared constants
   application/               # Presentation layer: presenters
   core/                      # Domain logic: indexing, sorting, deduplication, grouping, rules, signatures
-  features/                  # Feature modules: desk, display-mode, export, keyboard-navigation, preview, search
+  features/                  # Feature modules: display-mode, export, keyboard-navigation, preview, search
   infrastructure/            # Obsidian integration: patchers, lifecycle, markdown, observers, workspace
   ui/                        # Svelte views, components, stores, context, actions, hooks
   settings/                  # Settings manager, side-effects, setting tab
@@ -73,7 +73,7 @@ src/
   testing/                   # Test setup + mocks
 ```
 
-- Custom views: `TwoHopLinksPage`, `PreCreationView`, `TagNotesView`, `DeskView`.
+- Custom views: `TwoHopLinksPage`, `PreCreationView`, `TagNotesView`.
 - Search worker: `src/features/search/searchFilter.worker.ts` (inlined at build time).
 
 ## Code style

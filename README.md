@@ -8,7 +8,6 @@ Render Obsidian links as Cosense-style preview cards and explore your vault thro
 - **Two-hop links** — Discover notes that are two links away from the current note.
 - **Backlinks & outgoing links** — Browse incoming and outgoing references in a unified card layout.
 - **Tag notes view** — Open any tag as a card grid of matching notes.
-- **Desk view** — A dedicated workspace for browsing and searching your cards.
 - **Display modes** — Choose between a separate view, inline below the editor, or a hybrid layout.
 - **Search & filter** — Quickly filter cards by keyword.
 - **Keyboard navigation** — Move through cards without leaving the keyboard.

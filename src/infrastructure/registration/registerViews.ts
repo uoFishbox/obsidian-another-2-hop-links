@@ -8,7 +8,6 @@ import {
 	VIEW_TYPE_PRE_CREATE,
 } from "ui/views/PreCreationView";
 import { TagNotesView, VIEW_TYPE_TAG_NOTES } from "ui/views/TagNotesView";
-import { DeskView, VIEW_TYPE_DESK } from "ui/views/DeskView";
 import {
 	COSENSE_CARD_LINKS_HOVER_SOURCE_DISPLAY,
 	COSENSE_CARD_LINKS_HOVER_SOURCE_ID,
@@ -29,10 +28,6 @@ export function registerViews(plugin: PluginHost): void {
 	plugin.registerView(
 		VIEW_TYPE_TAG_NOTES,
 		(leaf) => new TagNotesView(leaf, plugin),
-	);
-	plugin.registerView(
-		VIEW_TYPE_DESK,
-		(leaf) => new DeskView(leaf, plugin),
 	);
 	plugin.registerHoverLinkSource(COSENSE_CARD_LINKS_HOVER_SOURCE_ID, {
 		display: COSENSE_CARD_LINKS_HOVER_SOURCE_DISPLAY,

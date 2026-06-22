@@ -1,10 +1,7 @@
 import type { PluginHost } from "types/pluginHost";
-import { z } from "zod";
 import {
 	CARD_LAYOUT_SETTING_KEYS,
 	DEFAULT_SETTINGS,
-	type DeskCardRecord,
-	type DeskState,
 	type PluginSettings,
 } from "types/settings";
 
@@ -49,78 +46,16 @@ const normalizeNonNegativeIntegerSetting = (
 	return Math.floor(value);
 };
 
-const deskGridPositionSchema = z.object({
-	column: z
-		.number()
-		.finite()
-		.nonnegative()
-		.transform((n) => Math.floor(n)),
-	row: z
-		.number()
-		.finite()
-		.nonnegative()
-		.transform((n) => Math.floor(n)),
-});
-
-const deskCardRawSchema = z.object({
-	path: z.string().min(1),
-	addedAt: z.number().optional(),
-	updatedAt: z.number().optional(),
-	gridPosition: z.unknown().optional(),
-});
-
-const deskStateSchema = z.object({
-	cards: z.array(z.unknown()).optional(),
-});
-
-export function normalizeDeskState(value: unknown): DeskState {
-	const parsed = deskStateSchema.safeParse(value);
-	if (!parsed.success) {
-		return { version: 1, cards: [] };
-	}
-
-	const now = Date.now();
-	const seen = new Set<string>();
-	const normalizedCards: DeskCardRecord[] = [];
-
-	for (const card of parsed.data.cards ?? []) {
-		const cardResult = deskCardRawSchema.safeParse(card);
-		if (!cardResult.success) {
-			continue;
-		}
-
-		const { path, addedAt, updatedAt, gridPosition } = cardResult.data;
-		if (seen.has(path)) {
-			continue;
-		}
-
-		const gridPositionResult =
-			deskGridPositionSchema.safeParse(gridPosition);
-		const normalizedGridPosition = gridPositionResult.success
-			? gridPositionResult.data
-			: undefined;
-
-		seen.add(path);
-		normalizedCards.push({
-			path,
-			addedAt: addedAt ?? now,
-			updatedAt: updatedAt ?? now,
-			...(normalizedGridPosition ? { gridPosition: normalizedGridPosition } : {}),
-		});
-	}
-
-	return {
-		version: 1,
-		cards: normalizedCards,
-	};
-}
-
 function mergeSettings(raw: RawSettings): PluginSettings {
-	const settings = Object.assign(createDefaultSettings(), raw);
+	const settings = createDefaultSettings();
+	for (const key of Object.keys(settings) as Array<keyof PluginSettings>) {
+		if (key in raw) {
+			Object.assign(settings, { [key]: raw[key] });
+		}
+	}
 
 	normalizeCardLayoutSettings(settings);
 
-	settings.desk = normalizeDeskState(raw.desk);
 	settings.previewMaxChars = normalizeNonNegativeIntegerSetting(
 		settings.previewMaxChars,
 		DEFAULT_SETTINGS.previewMaxChars,
@@ -141,7 +76,7 @@ function mergeSettings(raw: RawSettings): PluginSettings {
 	return settings as PluginSettings;
 }
 
-function normalizeCardLayoutSettings(settings: Record<string, unknown>): void {
+function normalizeCardLayoutSettings(settings: PluginSettings): void {
 	for (const key of CARD_LAYOUT_SETTING_KEYS) {
 		if (key === "cardHeightRatio") {
 			settings[key] = normalizePositiveNumberSetting(
@@ -266,23 +201,10 @@ export class SettingsManager {
 	}
 }
 
-export function cloneDeskState(state: DeskState): DeskState {
-	return {
-		version: 1,
-		cards: state.cards.map((card) => ({
-			...card,
-			...(card.gridPosition
-				? { gridPosition: { ...card.gridPosition } }
-				: {}),
-		})),
-	};
-}
-
 function clonePluginSettings(settings: PluginSettings): PluginSettings {
 	return {
 		...settings,
 		renderCodeBlockTypes: [...settings.renderCodeBlockTypes],
-		desk: cloneDeskState(settings.desk),
 	};
 }
 

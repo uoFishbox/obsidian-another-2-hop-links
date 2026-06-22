@@ -186,10 +186,6 @@
 	cursor: default;
 }
 
-body.ccl-card-dragging .cosense-card-links-desk__cell .cosense-card-links__box {
-	pointer-events: none !important;
-}
-
 .cosense-card-links__box {
 	position: relative;
 	box-sizing: border-box;
@@ -497,9 +493,4 @@ span[data-twohop-link-state="special-unresolved"] > .is-unresolved,
 .cosense-card-links__box-preview img,
 .cosense-card-links__box-preview [draggable="true"] {
 	-webkit-user-drag: none !important;
-}
-
-.workspace-leaf-content[data-type="cosense-card-links-desk-view"]
-	.view-content {
-	padding: var(--size-4-3) var(--size-4-3) 0px;
 }

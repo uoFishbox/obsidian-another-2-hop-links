@@ -1,6 +1,5 @@
 import { MarkdownView } from "obsidian";
 import type { PluginHost } from "types/pluginHost";
-import { openDeskView } from "ui/views/DeskView";
 import type { ScrollManager } from "infrastructure/workspace/ScrollHistoryState";
 import type { KeyboardCardNavigator } from "features/keyboard-navigation/KeyboardCardNavigator";
 
@@ -10,7 +9,7 @@ export interface RegisterCommandsDeps {
 }
 
 /**
- * Registers user-invokable commands (scroll, keyboard navigation, desk).
+ * Registers user-invokable commands (scroll and keyboard navigation).
  * The benchmark command is registered separately via registerBenchmarkCommand.
  */
 export function registerCommands(
@@ -43,14 +42,6 @@ export function registerCommands(
 		name: "Activate keyboard card navigation",
 		callback: () => {
 			deps.keyboardCardNavigator.toggle();
-		},
-	});
-
-	plugin.addCommand({
-		id: "open-desk-view",
-		name: "Open Desk",
-		callback: () => {
-			void openDeskView(plugin);
 		},
 	});
 }

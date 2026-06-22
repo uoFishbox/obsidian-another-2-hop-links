@@ -20,23 +20,6 @@ export type MobileLongPressAction = "preview" | "menu";
 
 export type Language = "en" | "ja";
 
-export interface DeskGridPosition {
-	column: number;
-	row: number;
-}
-
-export interface DeskCardRecord {
-	path: string;
-	addedAt: number;
-	updatedAt: number;
-	gridPosition?: DeskGridPosition;
-}
-
-export interface DeskState {
-	version: 1;
-	cards: DeskCardRecord[];
-}
-
 export const DEFAULT_CARD_WIDTH_PX = 140;
 export const DEFAULT_CARD_HEIGHT_PX = 154;
 export const DEFAULT_CARD_HEIGHT_RATIO =
@@ -102,7 +85,6 @@ export interface PluginSettings {
 	priorityFrontmatterKeyForTitle?: string;
 	maxOutgoingToProcess?: number;
 	maxHop2PerBranch?: number;
-	desk: DeskState;
 }
 
 export const DEFAULT_SETTINGS: PluginSettings = {
@@ -152,10 +134,6 @@ export const DEFAULT_SETTINGS: PluginSettings = {
 	ripgrepExecutablePath: "",
 	maxOutgoingToProcess: 0,
 	maxHop2PerBranch: 0,
-	desk: {
-		version: 1,
-		cards: [],
-	},
 };
 
 export function areTagFeaturesEnabled(

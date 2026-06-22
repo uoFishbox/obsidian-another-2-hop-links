@@ -5,11 +5,7 @@ import type { SortService } from "core/sorting/SortService";
 import type { DisplayDataBuilder } from "application/presenters/displayDataBuilder";
 import type { LinkContext } from "ui/context/linkContext";
 import type { ApplicationStore } from "ui/stores/ApplicationStore.svelte";
-import type {
-	DeskGridPosition,
-	DeskState,
-	PluginSettings,
-} from "types/settings";
+import type { PluginSettings } from "types/settings";
 import type { ResolveProgress, TwoHopLinkResult } from "types/domain";
 import type { ResolveOptions } from "core/indexing/two-hop-resolver/TwoHopLinkResolver";
 import type { ResolveTwoHopLinks } from "ui/stores/application/TwoHopLinksLoader";
@@ -55,24 +51,6 @@ export interface PluginComponentController {
 }
 
 /**
- * DeskStore のうち、PluginHost 経由で外部から参照されるメンバー。
- */
-export interface PluginDeskStore {
-	getSnapshot(): DeskState;
-	subscribe(listener: (state: DeskState) => void): () => void;
-	placePath(path: string, gridPosition: DeskGridPosition): Promise<void>;
-	placePathAndMoveOccupant(
-		path: string,
-		gridPosition: DeskGridPosition,
-		occupantPath: string,
-		occupantGridPosition: DeskGridPosition,
-	): Promise<void>;
-	removePath(path: string): Promise<void>;
-	clear(): Promise<void>;
-	handleRename(oldPath: string, newPath: string): Promise<void>;
-}
-
-/**
  * プラグインの外部公開サーフェス。
  *
  * 実装は `main.ts` の `CosenseCardLinksPlugin` クラス。
@@ -84,15 +62,14 @@ export interface PluginDeskStore {
  * `registerHoverLinkSource`, `loadData`, `saveData` など）は
  * `extends Plugin` により再定義不要。
  *
- * なお `settingsManager`, `indexUpdateQueue`, `componentController`,
- * `deskStore` は具象クラスではなく構造的インターフェースで型付けしている。
+ * なお `settingsManager`, `indexUpdateQueue`, `componentController` は
+ * 具象クラスではなく構造的インターフェースで型付けしている。
  * これらの具象クラスは本インターフェースを import するため、
  * 逆方向の import（本ファイル → 各クラス）を行うと型のみの循環が再発する。
  */
 export interface PluginHost extends Plugin {
 	settings: PluginSettings;
 	settingsManager: PluginSettingsManager;
-	deskStore: PluginDeskStore;
 	indexingService: IndexingService;
 	sortService: SortService;
 	indexUpdateQueue: PluginIndexUpdateQueue;

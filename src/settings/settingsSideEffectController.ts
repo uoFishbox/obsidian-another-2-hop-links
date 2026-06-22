@@ -14,7 +14,6 @@ import {
 } from "ui/views/TwoHopLinksView";
 import { VIEW_TYPE_TAG_NOTES } from "ui/views/TagNotesView";
 import { VIEW_TYPE_PRE_CREATE } from "ui/views/PreCreationView";
-import { VIEW_TYPE_DESK } from "ui/views/DeskView";
 
 /**
  * View types whose layouts are affected by LAYOUT_AFFECTING_SETTINGS.
@@ -24,7 +23,6 @@ const LAYOUT_REFRESHABLE_VIEW_TYPES: ReadonlyArray<string> = [
 	TWO_HOP_LINKS_VIEW_TYPE,
 	VIEW_TYPE_TAG_NOTES,
 	VIEW_TYPE_PRE_CREATE,
-	VIEW_TYPE_DESK,
 ];
 
 interface RefreshableFromSettings {

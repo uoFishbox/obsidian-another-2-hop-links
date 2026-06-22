@@ -1,4 +1,4 @@
-import { TFile, type Vault, type Workspace } from "obsidian";
+import type { Workspace } from "obsidian";
 import type { PluginHost } from "types/pluginHost";
 import type { FrameScheduler } from "infrastructure/lifecycle/frameScheduler";
 import type { DOMMutationObserver } from "infrastructure/observers/DOMMutationObserver";
@@ -7,11 +7,9 @@ import type { PropertyWidgetStyler } from "features/link-decoration/propertyWidg
 import type { DisplayModeController } from "features/display-mode/DisplayModeController";
 import type { ViewUpdateOrchestrator } from "infrastructure/lifecycle/viewUpdateOrchestrator";
 import type { ScrollManager } from "infrastructure/workspace/ScrollHistoryState";
-import type { DeskStore } from "features/desk/DeskStore";
 
 export interface WorkspaceEventBootstrapDeps {
 	readonly workspace: Workspace;
-	readonly vault: Vault;
 	readonly frameScheduler: FrameScheduler;
 	readonly domMutationObserver: DOMMutationObserver;
 	readonly emptyViewController: EmptyViewController;
@@ -19,13 +17,12 @@ export interface WorkspaceEventBootstrapDeps {
 	readonly displayModeManager: DisplayModeController;
 	readonly viewUpdateOrchestrator: ViewUpdateOrchestrator;
 	readonly scrollManager: ScrollManager;
-	readonly deskStore: DeskStore;
 	readonly isUnloaded: () => boolean;
 }
 
 /**
  * Wires up the workspace/vault event handlers that drive view refreshes,
- * decoration updates, scroll-history cleanup, and desk-store sync.
+ * decoration updates and scroll-history cleanup.
  *
  * The coalescing schedulers (decoration refresh, post-paint work, layout
  * change) are local to this function so their queue flags stay enclosed and
@@ -109,22 +106,6 @@ export function setupWorkspaceEventHandlers(
 			const activeLeaf = deps.workspace.getLeaf(false);
 			if (activeLeaf) {
 				deps.scrollManager.clearHistory(activeLeaf.id);
-			}
-		}),
-	);
-
-	plugin.registerEvent(
-		deps.vault.on("rename", (file, oldPath) => {
-			if (file instanceof TFile) {
-				void deps.deskStore.handleRename(oldPath, file.path);
-			}
-		}),
-	);
-
-	plugin.registerEvent(
-		deps.vault.on("delete", (file) => {
-			if (file instanceof TFile) {
-				void deps.deskStore.removePath(file.path);
 			}
 		}),
 	);

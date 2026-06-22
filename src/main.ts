@@ -70,7 +70,6 @@ import {
 	type DisposablePreviewService,
 } from "features/preview/core/createPreviewService";
 import { clearCardPreviewSharedCaches } from "ui/components/common/cardPreviewSharedCache";
-import { DeskStore } from "features/desk/DeskStore";
 import { installCCLDebugExposure } from "infrastructure/debug/CCLDebugExposure";
 import { registerBenchmarkCommand } from "infrastructure/debug/benchmarkCommandController";
 import { registerCardDragStateCleanup } from "ui/interactions/cardDragState";
@@ -87,7 +86,6 @@ import type { PluginHost } from "types/pluginHost";
 export default class CosenseCardLinksPlugin extends Plugin implements PluginHost {
 	public settings: PluginSettings = { ...DEFAULT_SETTINGS };
 	public settingsManager!: SettingsManager;
-	public deskStore!: DeskStore;
 	private readonly patchRegistry = new PatchRegistry();
 
 	// Core services
@@ -186,7 +184,6 @@ export default class CosenseCardLinksPlugin extends Plugin implements PluginHost
 			this.emptyViewController.sync();
 			setupWorkspaceEventHandlers(this, {
 				workspace: this.app.workspace,
-				vault: this.app.vault,
 				frameScheduler: this.frameScheduler,
 				domMutationObserver: this.domMutationObserver,
 				emptyViewController: this.emptyViewController,
@@ -194,7 +191,6 @@ export default class CosenseCardLinksPlugin extends Plugin implements PluginHost
 				displayModeManager: this.displayModeManager,
 				viewUpdateOrchestrator: this.viewUpdateOrchestrator,
 				scrollManager: this.scrollManager,
-				deskStore: this.deskStore,
 				isUnloaded: () => this.isUnloaded,
 			});
 
@@ -289,7 +285,6 @@ export default class CosenseCardLinksPlugin extends Plugin implements PluginHost
 	}
 
 	private initializeServices(): void {
-		this.deskStore = new DeskStore(this);
 		this.frameScheduler = createFrameScheduler(() => this.isUnloaded);
 		this.previewService = createPreviewService({
 			vault: this.app.vault,
