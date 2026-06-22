@@ -252,13 +252,16 @@ export const CARD_RENDER_SHADOW_CSS = String.raw`
 
 
 .preview-mount-slot,
-.cosense-card-links__box-preview,
-.cosense-card-links__box-preview * {
+.cosense-card-links__box-preview {
 	pointer-events: none !important;
+}
+
+.cosense-card-links__box-preview a,
+.cosense-card-links__box-preview img,
+.cosense-card-links__box-preview [draggable="true"] {
 	-webkit-user-drag: none !important;
 	user-drag: none !important;
 }
-
 
 .cosense-card-links__box-preview--text {
 	padding: 0px var(--ccl-box-padding) 0px var(--ccl-box-padding);
@@ -290,12 +293,6 @@ export const CARD_RENDER_SHADOW_CSS = String.raw`
 
 .cosense-card-links__box-preview.hidden {
 	display: none;
-}
-
-.cosense-card-links__box-preview,
-.cosense-card-links__box-preview * {
-	-webkit-user-drag: none !important;
-	pointer-events: none !important;
 }
 
 .cosense-card-links__box-preview .cosense-card-links__wikilink,

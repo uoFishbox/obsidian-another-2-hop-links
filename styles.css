@@ -489,10 +489,14 @@ span[data-twohop-link-state="special-unresolved"] > .is-unresolved,
 	margin-top: unset;
 }
 .preview-mount-slot,
-.cosense-card-links__box-preview,
-.cosense-card-links__box-preview * {
-	-webkit-user-drag: none !important;
+.cosense-card-links__box-preview {
 	pointer-events: none !important;
+}
+
+.cosense-card-links__box-preview a,
+.cosense-card-links__box-preview img,
+.cosense-card-links__box-preview [draggable="true"] {
+	-webkit-user-drag: none !important;
 }
 
 .workspace-leaf-content[data-type="cosense-card-links-desk-view"]
