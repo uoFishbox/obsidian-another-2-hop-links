@@ -106,6 +106,13 @@ const createVirtualGridRowSlot = (slotIndex: number): VirtualGridRowSlot => ({
 	slotKey: slotIndex,
 });
 
+// Module-level comparator avoids allocating a fresh closure on every scroll
+// frame when sorting the free row-slot pool in-place.
+const compareVirtualGridRowSlotByIndex = (
+	left: VirtualGridRowSlot,
+	right: VirtualGridRowSlot,
+): number => left.slotIndex - right.slotIndex;
+
 const createMountedVirtualGridCellBodyKey = <T>(
 	cell: VirtualListLogicalCell<T>,
 	fallbackPolicy?: RenderRevisionFallbackPolicy,
@@ -493,16 +500,14 @@ function buildMountedVirtualGridCellsFromResolver<T>(params: {
 		},
 	);
 
-	const rowSlotByLogicalRowIndex = new Map<number, VirtualGridRowSlot>();
-	const nextLogicalRows = new Set<number>();
-	for (
-		let rowIndex = visibleRows.start;
-		rowIndex < visibleRows.end;
-		rowIndex += 1
-	) {
-		nextLogicalRows.add(rowIndex);
-	}
+	// nextLogicalRows was previously a Set populated with the contiguous range
+	// [visibleRows.start, visibleRows.end). Since row indexes are integers and
+	// the range is contiguous, a pair of bound checks is equivalent and avoids
+	// allocating a Set on every scroll frame.
+	const visibleRowStart = visibleRows.start;
+	const visibleRowEnd = visibleRows.end;
 
+	const rowSlotByLogicalRowIndex = new Map<number, VirtualGridRowSlot>();
 	const freeRowSlots: VirtualGridRowSlot[] = [];
 	let nextRowSlotIndex = 0;
 	if (previousBuild && hasCompatiblePreviousRowSlots) {
@@ -515,14 +520,17 @@ function buildMountedVirtualGridCellsFromResolver<T>(params: {
 				slotIndex: previousRow.slotIndex,
 				slotKey: previousRow.slotKey,
 			};
-			if (nextLogicalRows.has(previousRow.rowIndex)) {
+			if (
+				previousRow.rowIndex >= visibleRowStart &&
+				previousRow.rowIndex < visibleRowEnd
+			) {
 				rowSlotByLogicalRowIndex.set(previousRow.rowIndex, slot);
 			} else {
 				freeRowSlots.push(slot);
 			}
 		}
 	}
-	freeRowSlots.sort((left, right) => left.slotIndex - right.slotIndex);
+	freeRowSlots.sort(compareVirtualGridRowSlotByIndex);
 
 	const acquireRowSlot = (rowIndex: number): VirtualGridRowSlot => {
 		const retained = rowSlotByLogicalRowIndex.get(rowIndex);
