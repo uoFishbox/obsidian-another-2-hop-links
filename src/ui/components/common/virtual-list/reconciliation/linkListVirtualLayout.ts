@@ -240,15 +240,6 @@ function updateMountedVirtualGridCell<T>(
 	renderRevisionFallbackPolicy?: RenderRevisionFallbackPolicy,
 	cellSlotKey?: number,
 ): MountedVirtualGridCell<T> {
-	const position = {
-		row: rowIndex,
-		column: columnIndex,
-		top,
-		left,
-		width,
-		height,
-	};
-	const cellMetadataKey = [cell.key, top, left, width, height];
 	const renderBodyKey = resolveMountedVirtualGridCellBodyKey({
 		previous,
 		cell,
@@ -261,18 +252,27 @@ function updateMountedVirtualGridCell<T>(
 		previous.cellIndex === cellIndex &&
 		previous.rowIndex === rowIndex &&
 		previous.columnIndex === columnIndex &&
-		previous.position.row === position.row &&
-		previous.position.column === position.column &&
-		previous.position.top === position.top &&
-		previous.position.left === position.left &&
-		previous.position.width === position.width &&
-		previous.position.height === position.height &&
+		previous.position.row === rowIndex &&
+		previous.position.column === columnIndex &&
+		previous.position.top === top &&
+		previous.position.left === left &&
+		previous.position.width === width &&
+		previous.position.height === height &&
 		previous.renderSlotIndex === renderSlotIndex &&
 		previous.renderBodyKey === renderBodyKey
 	) {
 		return previous;
 	}
 
+	const position = {
+		row: rowIndex,
+		column: columnIndex,
+		top,
+		left,
+		width,
+		height,
+	};
+	const cellMetadataKey = [cell.key, top, left, width, height];
 	return {
 		...previous,
 		key: logicalKey,
