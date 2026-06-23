@@ -23,11 +23,7 @@ export async function finalizePhaseTwoArtifactsChunked(
 	yieldScheduler: YieldScheduler,
 ): Promise<void> {
 	await drainYieldSteps(
-		finalizePhaseTwoArtifacts(
-			artifacts,
-			destinationBuildStates,
-			yieldScheduler,
-		),
+		finalizePhaseTwoArtifacts(artifacts, destinationBuildStates, yieldScheduler),
 	);
 }
 
@@ -80,10 +76,7 @@ function* finalizeUnresolvedLookupArtifacts(
 ): YieldStepGenerator {
 	let lookupKeyCount = 0;
 	for (const [lookupKey, sources] of artifacts.lookupKeyToSources) {
-		if (
-			(artifacts.lookupKeyDirectResolvedPathCount.get(lookupKey) ?? 0) ===
-			0
-		) {
+		if ((artifacts.lookupKeyDirectResolvedPathCount.get(lookupKey) ?? 0) === 0) {
 			artifacts.unresolvedLookupToSources.set(lookupKey, sources);
 		}
 

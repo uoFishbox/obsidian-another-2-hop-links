@@ -27,10 +27,7 @@ export type MaterializedVirtualListMode = Exclude<
 	{ kind: "uninitialized" }
 >;
 
-export type VirtualListMeasurementKind =
-	| "stable"
-	| "bootstrapped"
-	| "skipped";
+export type VirtualListMeasurementKind = "stable" | "bootstrapped" | "skipped";
 
 export const getMeasurementKindForMode = (
 	mode: MaterializedVirtualListMode,

@@ -2,7 +2,7 @@ import type { PluginSettings } from "types/settings";
 
 export function shouldHighlight(
 	_event: MouseEvent | KeyboardEvent,
-	settings: PluginSettings
+	settings: PluginSettings,
 ): boolean {
 	switch (settings.highlightOnOpen) {
 		case "always":
@@ -12,7 +12,3 @@ export function shouldHighlight(
 			return false;
 	}
 }
-
-
-
-

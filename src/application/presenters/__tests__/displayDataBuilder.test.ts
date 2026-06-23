@@ -7,10 +7,7 @@ import {
 	preprocessDisplayData,
 	sortAndAssembleDisplayData,
 } from "../displayDataBuilder";
-import type {
-	DisplayData,
-	PreprocessedDisplayData,
-} from "../displayDataBuilder";
+import type { DisplayData, PreprocessedDisplayData } from "../displayDataBuilder";
 import type {
 	TaggedNote,
 	TwoHopIndexedLink,
@@ -42,9 +39,7 @@ const mockSortService: ISortService = {
 interface LegacyDeduplicationService {
 	collectUniqueBranches(branches: TwoHopLinkBranch[]): TwoHopLinkBranch[];
 	collectUniqueBacklinks(backlinks: TwoHopIndexedLink[]): TwoHopIndexedLink[];
-	buildFilteredTwoHopBranches(
-		branches: TwoHopLinkBranch[],
-	): TwoHopLinkBranch[];
+	buildFilteredTwoHopBranches(branches: TwoHopLinkBranch[]): TwoHopLinkBranch[];
 	collectUniqueTaggedNotes(taggedNotes: TaggedNote[]): TaggedNote[];
 }
 
@@ -83,12 +78,7 @@ function buildDisplayData(
 		settings,
 		deduplicationService,
 	);
-	return sortAndAssembleDisplayData(
-		preprocessed,
-		settings,
-		sortOption,
-		sortService,
-	);
+	return sortAndAssembleDisplayData(preprocessed, settings, sortOption, sortService);
 }
 
 function createReorderingSortService() {
@@ -128,9 +118,7 @@ function createReorderingSortService() {
 			if (option.endsWith("reverse")) {
 				copy.reverse();
 			}
-			return copy.every((item, index) => item === items[index])
-				? items
-				: copy;
+			return copy.every((item, index) => item === items[index]) ? items : copy;
 		}),
 	} satisfies ISortService;
 }
@@ -396,9 +384,7 @@ describe("DisplayDataBuilder - buildDisplayData", () => {
 			);
 
 			expect(result.newLinks).toHaveLength(1);
-			expect(result.newLinks[0].lookupPath).toBe(
-				"folder/missing-note.md",
-			);
+			expect(result.newLinks[0].lookupPath).toBe("folder/missing-note.md");
 		});
 	});
 
@@ -609,9 +595,9 @@ describe("DisplayDataBuilder - buildDisplayData", () => {
 
 			// Assert
 			// mock関数が呼ばれたことを確認
-			expect(
-				mockDeduplicationService.collectUniqueBranches,
-			).toHaveBeenCalledWith([branch1, branch2]);
+			expect(mockDeduplicationService.collectUniqueBranches).toHaveBeenCalledWith(
+				[branch1, branch2],
+			);
 			expect(
 				mockDeduplicationService.collectUniqueBacklinks,
 			).toHaveBeenCalledWith([backlink]);
@@ -640,10 +626,7 @@ describe("DisplayDataBuilder - buildDisplayData", () => {
 					rawText: "image-branch",
 					path: "folder.with.dots/image.v1.png",
 					isUnresolved: false,
-					sourceFile: createMockTFile(
-						"folder.with.dots/image.v1.png",
-						"png",
-					),
+					sourceFile: createMockTFile("folder.with.dots/image.v1.png", "png"),
 				},
 				hop2: [],
 			};
@@ -653,10 +636,7 @@ describe("DisplayDataBuilder - buildDisplayData", () => {
 					rawText: "note-branch",
 					path: "folder.with.dots/note.v1.md",
 					isUnresolved: false,
-					sourceFile: createMockTFile(
-						"folder.with.dots/note.v1.md",
-						"md",
-					),
+					sourceFile: createMockTFile("folder.with.dots/note.v1.md", "md"),
 				},
 				hop2: [],
 			};
@@ -736,9 +716,9 @@ describe("DisplayDataBuilder - buildDisplayData", () => {
 				adaptDeduplicationService(mockDeduplicationService),
 			);
 
-			expect(
-				mockDeduplicationService.collectUniqueBranches,
-			).toHaveBeenCalledWith(branches);
+			expect(mockDeduplicationService.collectUniqueBranches).toHaveBeenCalledWith(
+				branches,
+			);
 			expect(
 				mockDeduplicationService.collectUniqueBacklinks,
 			).toHaveBeenCalledWith(backlinks);
@@ -1059,12 +1039,7 @@ describe("DisplayDataBuilder - buildDisplayData", () => {
 			};
 
 			// Act
-			buildDisplayData(
-				linkResult,
-				defaultSettings,
-				"alphabetical",
-				sortService,
-			);
+			buildDisplayData(linkResult, defaultSettings, "alphabetical", sortService);
 
 			// Assert
 			expect(sortService.sort).not.toHaveBeenCalled();
@@ -1105,10 +1080,7 @@ describe("DisplayDataBuilder - buildDisplayData", () => {
 			);
 
 			expect(sortService.sort).toHaveBeenCalledTimes(1);
-			expect(sortService.sort).toHaveBeenCalledWith(
-				sharedHop2,
-				"alphabetical",
-			);
+			expect(sortService.sort).toHaveBeenCalledWith(sharedHop2, "alphabetical");
 			expect(second).toBe(first);
 		});
 
@@ -1143,10 +1115,7 @@ describe("DisplayDataBuilder - buildDisplayData", () => {
 			);
 
 			expect(result).toBe(sharedHop2);
-			expect(sortService.sort).toHaveBeenCalledWith(
-				sharedHop2,
-				"alphabetical",
-			);
+			expect(sortService.sort).toHaveBeenCalledWith(sharedHop2, "alphabetical");
 			expect(sortService.sortWithResult).not.toHaveBeenCalled();
 		});
 
@@ -1187,10 +1156,7 @@ describe("DisplayDataBuilder - buildDisplayData", () => {
 			expect(first).not.toBe(sharedHop2);
 			expect(second).not.toBe(sharedHop2);
 			expect(second).not.toBe(first);
-			expect(second.map((item) => item.rawText)).toEqual([
-				"hop2-a",
-				"hop2-b",
-			]);
+			expect(second.map((item) => item.rawText)).toEqual(["hop2-a", "hop2-b"]);
 		});
 
 		test("when sort context version changes, builder cache is regenerated", () => {
@@ -1278,24 +1244,15 @@ describe("DisplayDataBuilder - buildDisplayData", () => {
 				},
 			];
 
-			const first = builder.getSortedTagGroupItems(
-				taggedNotes,
-				"alphabetical",
-			);
+			const first = builder.getSortedTagGroupItems(taggedNotes, "alphabetical");
 			const sortCallsAfterFirst = sortService.sort.mock.calls.length;
-			const second = builder.getSortedTagGroupItems(
-				taggedNotes,
-				"alphabetical",
-			);
+			const second = builder.getSortedTagGroupItems(taggedNotes, "alphabetical");
 
 			expect(second).toBe(first);
 			expect(sortService.sort).toHaveBeenCalledTimes(sortCallsAfterFirst);
 
 			sortContextVersion = 2;
-			const third = builder.getSortedTagGroupItems(
-				taggedNotes,
-				"alphabetical",
-			);
+			const third = builder.getSortedTagGroupItems(taggedNotes, "alphabetical");
 
 			expect(third).not.toBe(first);
 			expect(sortService.sort.mock.calls.length).toBeGreaterThan(
@@ -1382,10 +1339,8 @@ describe("DisplayDataBuilder - buildDisplayData", () => {
 				sort: vi.fn((items) => {
 					const copy = [...items];
 					copy.sort((a, b) => {
-						const left =
-							("hop1" in a ? a.hop1.rawText : a.rawText) ?? "";
-						const right =
-							("hop1" in b ? b.hop1.rawText : b.rawText) ?? "";
+						const left = ("hop1" in a ? a.hop1.rawText : a.rawText) ?? "";
+						const right = ("hop1" in b ? b.hop1.rawText : b.rawText) ?? "";
 						return left.localeCompare(right);
 					});
 					return copy.every((item, index) => item === items[index])
@@ -1409,10 +1364,7 @@ describe("DisplayDataBuilder - buildDisplayData", () => {
 			);
 
 			expect(reordered).not.toBe(needsReorder);
-			expect(reordered.map((link) => link.rawText)).toEqual([
-				"alpha",
-				"zeta",
-			]);
+			expect(reordered.map((link) => link.rawText)).toEqual(["alpha", "zeta"]);
 			expect(unchanged).toBe(alreadySorted);
 		});
 
@@ -1522,10 +1474,7 @@ describe("DisplayDataBuilder - buildDisplayData", () => {
 		test.each(DISPLAY_ASSEMBLY_SETTING_DEPENDENCIES)(
 			"invalidates the declared $key assembly dependency",
 			(dependency) => {
-				const preprocessed = preprocessDisplayData(
-					undefined,
-					defaultSettings,
-				);
+				const preprocessed = preprocessDisplayData(undefined, defaultSettings);
 				const displayAssemblyCache = createDisplayAssemblyCache();
 				const first = sortAndAssembleDisplayData(
 					preprocessed,
@@ -1803,9 +1752,7 @@ describe("DisplayDataBuilder - buildDisplayData", () => {
 			);
 
 			expect(second).not.toBe(first);
-			expect(sortService.sort).toHaveBeenCalledTimes(
-				sortCallsAfterFirst + 1,
-			);
+			expect(sortService.sort).toHaveBeenCalledTimes(sortCallsAfterFirst + 1);
 		});
 
 		test("even on A -> B -> A revisit, tag grouping is determined in preprocessing only", () => {
@@ -1886,10 +1833,8 @@ describe("DisplayDataBuilder - buildDisplayData", () => {
 				hop2SortCache,
 				displayAssemblyCache,
 			);
-			const sortCallsAfterAlphabetical =
-				sortService.sort.mock.calls.length;
-			const groupCallsAfterAlphabetical =
-				groupNotesByTagSpy.mock.calls.length;
+			const sortCallsAfterAlphabetical = sortService.sort.mock.calls.length;
+			const groupCallsAfterAlphabetical = groupNotesByTagSpy.mock.calls.length;
 
 			sortAndAssembleDisplayData(
 				preprocessed,
@@ -1912,15 +1857,11 @@ describe("DisplayDataBuilder - buildDisplayData", () => {
 			);
 
 			expect(alphabeticalAgain).toBe(alphabetical);
-			expect(sortService.sort).toHaveBeenCalledTimes(
-				sortCallsAfterReverse,
-			);
+			expect(sortService.sort).toHaveBeenCalledTimes(sortCallsAfterReverse);
 			expect(groupNotesByTagSpy).toHaveBeenCalledTimes(
 				groupCallsAfterAlphabetical,
 			);
-			expect(sortCallsAfterReverse).toBeGreaterThan(
-				sortCallsAfterAlphabetical,
-			);
+			expect(sortCallsAfterReverse).toBeGreaterThan(sortCallsAfterAlphabetical);
 			expect(groupCallsAfterAlphabetical).toBe(1);
 			expect(groupCallsAfterReverse).toBe(1);
 		});
@@ -2081,17 +2022,11 @@ describe("DisplayDataBuilder - buildDisplayData", () => {
 			};
 			const dedupedBranch = {
 				hop1: duplicateBranchLarge.hop1,
-				hop2: [
-					...duplicateBranchLarge.hop2,
-					...duplicateBranchSmall.hop2,
-				],
+				hop2: [...duplicateBranchLarge.hop2, ...duplicateBranchSmall.hop2],
 			};
 			const filteredTwoHopBranches = [dedupedBranch, distinctBranch];
 			const mockDeduplicationService: LegacyDeduplicationService = {
-				collectUniqueBranches: vi.fn(() => [
-					dedupedBranch,
-					distinctBranch,
-				]),
+				collectUniqueBranches: vi.fn(() => [dedupedBranch, distinctBranch]),
 				collectUniqueBacklinks: vi.fn(() => []),
 				buildFilteredTwoHopBranches: vi.fn((branches) => {
 					expect(branches).toEqual([
@@ -2182,17 +2117,12 @@ describe("DisplayDataBuilder - buildDisplayData", () => {
 				},
 			];
 			const mockDeduplicationService: LegacyDeduplicationService = {
-				collectUniqueBranches: vi.fn(() => [
-					resolvedBranch,
-					unresolvedBranch,
-				]),
+				collectUniqueBranches: vi.fn(() => [resolvedBranch, unresolvedBranch]),
 				collectUniqueBacklinks: vi.fn(() => [
 					resolvedBacklink,
 					unresolvedBacklink,
 				]),
-				buildFilteredTwoHopBranches: vi.fn(
-					() => filteredTwoHopBranches,
-				),
+				buildFilteredTwoHopBranches: vi.fn(() => filteredTwoHopBranches),
 				collectUniqueTaggedNotes: vi.fn(() => []),
 			};
 
@@ -2221,9 +2151,7 @@ describe("DisplayDataBuilder - buildDisplayData", () => {
 				unresolvedBacklink,
 			]);
 			expect(preprocessed.twoHopBranches).toBe(filteredTwoHopBranches);
-			expect(preprocessed.nonEmptyTwoHopBranches).toBe(
-				filteredTwoHopBranches,
-			);
+			expect(preprocessed.nonEmptyTwoHopBranches).toBe(filteredTwoHopBranches);
 		});
 
 		test("nonEmptyTwoHopBranches and mergedBaseItems are determined in preprocessing", () => {
@@ -2269,9 +2197,7 @@ describe("DisplayDataBuilder - buildDisplayData", () => {
 				defaultSettings,
 			);
 
-			expect(preprocessed.nonEmptyTwoHopBranches).toEqual([
-				branchWithHop2,
-			]);
+			expect(preprocessed.nonEmptyTwoHopBranches).toEqual([branchWithHop2]);
 			expect(preprocessed.nonEmptyTwoHopBranches[0]).toBe(branchWithHop2);
 			expect(preprocessed.mergedBaseItems).toEqual([
 				branchWithHop2,
@@ -2358,14 +2284,10 @@ describe("DisplayDataBuilder - buildDisplayData", () => {
 			// newLinks には未解決リンクが含まれる
 			expect(result.newLinks).toHaveLength(2);
 			expect(
-				result.newLinks.some(
-					(l) => l.rawText === "unresolved-outgoing",
-				),
+				result.newLinks.some((l) => l.rawText === "unresolved-outgoing"),
 			).toBe(true);
 			expect(
-				result.newLinks.some(
-					(l) => l.rawText === "unresolved-backlink",
-				),
+				result.newLinks.some((l) => l.rawText === "unresolved-backlink"),
 			).toBe(true);
 
 			// mergedItems には解決済みのリンクのみが含まれる
@@ -2377,9 +2299,7 @@ describe("DisplayDataBuilder - buildDisplayData", () => {
 
 			// twoHopBranches には hop2 を持つブランチのみ
 			expect(result.twoHopBranches).toHaveLength(1);
-			expect(result.twoHopBranches[0].hop1.rawText).toBe(
-				"resolved-outgoing",
-			);
+			expect(result.twoHopBranches[0].hop1.rawText).toBe("resolved-outgoing");
 
 			// tagGroups が生成される
 			expect(result.tagGroups).toHaveLength(1);

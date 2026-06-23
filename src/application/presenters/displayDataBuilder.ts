@@ -88,10 +88,7 @@ export interface DisplayDataBuilder {
 		items: TwoHopIndexedLink[],
 		sortOption: SortOption,
 	): TwoHopIndexedLink[];
-	getSortedTagGroupItems(
-		items: TaggedNote[],
-		sortOption: SortOption,
-	): TaggedNote[];
+	getSortedTagGroupItems(items: TaggedNote[], sortOption: SortOption): TaggedNote[];
 	getSortContextVersion(): number;
 }
 
@@ -156,9 +153,7 @@ function getNewLinkTargetKey(link: TwoHopIndexedLink): string {
 }
 
 function createNewLinkKey(link: TwoHopIndexedLink): string {
-	return (
-		getNewLinkTargetKey(link) + NEW_LINK_KEY_SEPARATOR + (link.path ?? "")
-	);
+	return getNewLinkTargetKey(link) + NEW_LINK_KEY_SEPARATOR + (link.path ?? "");
 }
 
 function collectNewLink(
@@ -309,19 +304,13 @@ function sortTwoHopBranchesIfNeeded(
 	branches: TwoHopLinkBranch[],
 	settings: LinkDisplayPreprocessSettings,
 ): TwoHopLinkBranch[] {
-	if (
-		settings.twoHopHeaderSortOrder !== "hop2-count-asc" ||
-		branches.length < 2
-	) {
+	if (settings.twoHopHeaderSortOrder !== "hop2-count-asc" || branches.length < 2) {
 		return branches;
 	}
 
 	for (let index = 1; index < branches.length; index += 1) {
 		if (
-			compareTwoHopBranchesByHop2Count(
-				branches[index - 1],
-				branches[index],
-			) > 0
+			compareTwoHopBranchesByHop2Count(branches[index - 1], branches[index]) > 0
 		) {
 			return [...branches].sort(compareTwoHopBranchesByHop2Count);
 		}
@@ -347,8 +336,7 @@ function preprocessLinkData(
 		settings,
 		LINK_DISPLAY_PREPROCESS_SETTING_DEPENDENCIES,
 	);
-	let { branches: originalBranches, backlinks: originalBacklinks } =
-		linkResult;
+	let { branches: originalBranches, backlinks: originalBacklinks } = linkResult;
 
 	if (preprocessSettings.excludeAttachments) {
 		originalBacklinks = filterWithReferenceReuse(
@@ -550,19 +538,14 @@ export function getSortedItemsWithCache<T extends SortableItem>(
 	}
 
 	const sortCacheKey = createSortCacheKey(sortOption, sortContextVersion);
-	const cachedSortedItemsByOption =
-		itemSortCache.get(sortCacheKey) ?? new WeakMap();
+	const cachedSortedItemsByOption = itemSortCache.get(sortCacheKey) ?? new WeakMap();
 	if (!itemSortCache.has(sortCacheKey)) {
 		itemSortCache.set(sortCacheKey, cachedSortedItemsByOption);
 	}
 
 	let sortedItems = cachedSortedItemsByOption.get(items) as T[] | undefined;
 	if (!sortedItems) {
-		sortedItems = sortWithOriginalOrderReuse(
-			items,
-			sortService,
-			sortOption,
-		);
+		sortedItems = sortWithOriginalOrderReuse(items, sortService, sortOption);
 		cachedSortedItemsByOption.set(items, sortedItems);
 	}
 
@@ -617,9 +600,7 @@ export function sortAndAssembleDisplayData(
 		sortOption,
 		sortContextVersion,
 	);
-	const cachedDisplayData = displayAssemblyCache
-		.get(preprocessed)
-		?.get(assemblyKey);
+	const cachedDisplayData = displayAssemblyCache.get(preprocessed)?.get(assemblyKey);
 	if (cachedDisplayData) {
 		return cachedDisplayData;
 	}
@@ -675,8 +656,7 @@ export function sortAndAssembleDisplayData(
 		newLinks: sortedNewLinks,
 	};
 
-	const cachedDisplayDataByKey =
-		displayAssemblyCache.get(preprocessed) ?? new Map();
+	const cachedDisplayDataByKey = displayAssemblyCache.get(preprocessed) ?? new Map();
 	if (!displayAssemblyCache.has(preprocessed)) {
 		displayAssemblyCache.set(preprocessed, cachedDisplayDataByKey);
 	}
@@ -693,8 +673,7 @@ export function createDisplayDataBuilder(
 	let displayAssemblyCache = createDisplayAssemblyCache();
 	let hop2SortCache = createHop2SortCache();
 	let tagItemSortCache = createTagItemSortCache();
-	const resolveSortContextVersion = (): number =>
-		getSortContextVersion?.() ?? 0;
+	const resolveSortContextVersion = (): number => getSortContextVersion?.() ?? 0;
 	let lastSortContextVersion = resolveSortContextVersion();
 	const syncSortContextCaches = (): number => {
 		const currentSortContextVersion = resolveSortContextVersion();
@@ -710,8 +689,7 @@ export function createDisplayDataBuilder(
 	};
 	const resolveDeduplicationService = (
 		settings: PluginSettings,
-	): IDeduplicationService | undefined =>
-		createDeduplicationService?.(settings);
+	): IDeduplicationService | undefined => createDeduplicationService?.(settings);
 
 	const preprocessDisplayStage = (
 		linkResult: TwoHopLinkResult | undefined,

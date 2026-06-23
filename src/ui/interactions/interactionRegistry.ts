@@ -39,10 +39,7 @@ export interface InteractionRegistry {
 
 export function createInteractionTokenAllocator(
 	defaultPrefix: InteractionTokenPrefix = "i",
-): (
-	semanticKey: string,
-	prefix?: InteractionTokenPrefix,
-) => string {
+): (semanticKey: string, prefix?: InteractionTokenPrefix) => string {
 	const tokenByKey = new Map<string, string>();
 	const nextIdByPrefix = new Map<InteractionTokenPrefix, number>();
 
@@ -100,8 +97,7 @@ export function createInteractionRegistry(): InteractionRegistry {
 		interactionId: string,
 	): InteractionDescriptor | undefined => {
 		for (const provider of scopedResolverProviders.values()) {
-			const descriptor =
-				provider.resolveInteractionDescriptor(interactionId);
+			const descriptor = provider.resolveInteractionDescriptor(interactionId);
 			if (descriptor) return descriptor;
 		}
 		return undefined;
@@ -130,10 +126,7 @@ export function createInteractionRegistry(): InteractionRegistry {
 		},
 		syncInteractionDescriptors: (scopeId, nextDescriptors) => {
 			const previousDescriptors = scopedDescriptors.get(scopeId);
-			const nextDescriptorsById = new Map<
-				string,
-				InteractionDescriptor
-			>();
+			const nextDescriptorsById = new Map<string, InteractionDescriptor>();
 			for (const descriptor of nextDescriptors) {
 				nextDescriptorsById.set(descriptor.interactionId, descriptor);
 			}
@@ -153,10 +146,7 @@ export function createInteractionRegistry(): InteractionRegistry {
 		syncInteractionDescriptorResolvers: (scopeId, nextResolvers) => {
 			const previousResolvers = scopedResolvers.get(scopeId);
 			scopedResolverProviders.delete(scopeId);
-			const nextResolversById = new Map<
-				string,
-				InteractionDescriptorResolver
-			>();
+			const nextResolversById = new Map<string, InteractionDescriptorResolver>();
 			for (const resolver of nextResolvers) {
 				nextResolversById.set(resolver.interactionId, resolver);
 			}

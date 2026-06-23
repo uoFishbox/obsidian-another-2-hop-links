@@ -18,10 +18,7 @@ const INLINE_CODE_REGEX = /`[^`\n]*`/g;
 const NEWLINE_CHAR_CODE = 10;
 
 export function stripCodeSegmentsForEmbedDetection(content: string): string {
-	return replaceFencedCodeBlocks(content, () => "").replace(
-		INLINE_CODE_REGEX,
-		"",
-	);
+	return replaceFencedCodeBlocks(content, () => "").replace(INLINE_CODE_REGEX, "");
 }
 
 function extractWikiTarget(rawTarget: string): string {
@@ -31,11 +28,7 @@ function extractWikiTarget(rawTarget: string): string {
 
 function stripAngleBrackets(text: string): string {
 	const trimmed = text.trim();
-	if (
-		trimmed.startsWith("<") &&
-		trimmed.endsWith(">") &&
-		trimmed.length >= 2
-	) {
+	if (trimmed.startsWith("<") && trimmed.endsWith(">") && trimmed.length >= 2) {
 		return trimmed.slice(1, -1).trim();
 	}
 	return trimmed;
@@ -144,9 +137,7 @@ export function parseEmbeddedMedia(
 			};
 		}
 
-		const markdownMatch = normalizedOriginal.match(
-			/^!\[[^\]]*?\]\(([\s\S]+?)\)$/,
-		);
+		const markdownMatch = normalizedOriginal.match(/^!\[[^\]]*?\]\(([\s\S]+?)\)$/);
 		if (markdownMatch?.[1]) {
 			return {
 				syntax: "markdown",
@@ -173,61 +164,58 @@ export function extractFirstEmbeddedMedia(
 
 	let i = 0;
 	let atLineStart = true;
-	const scanEnd = Math.min(
-		content.length,
-		options.maxScanChars ?? content.length,
-	);
+	const scanEnd = Math.min(content.length, options.maxScanChars ?? content.length);
 	const yieldEveryChars = options.yieldEveryChars ?? 20_000;
 	let lastYieldIndex = 0;
 
 	return (async () => {
-	while (i < scanEnd) {
-		if (options.signal?.aborted) {
-			return undefined;
-		}
-		if (options.yieldToMainThread && i - lastYieldIndex >= yieldEveryChars) {
-			await options.yieldToMainThread();
-			lastYieldIndex = i;
+		while (i < scanEnd) {
 			if (options.signal?.aborted) {
 				return undefined;
 			}
-		}
+			if (options.yieldToMainThread && i - lastYieldIndex >= yieldEveryChars) {
+				await options.yieldToMainThread();
+				lastYieldIndex = i;
+				if (options.signal?.aborted) {
+					return undefined;
+				}
+			}
 
-		if (atLineStart && detectFenceStart(content, i)) {
-			i = await skipFencedCodeBlockAsync(content, i, options);
-			atLineStart = true;
-			continue;
-		}
+			if (atLineStart && detectFenceStart(content, i)) {
+				i = await skipFencedCodeBlockAsync(content, i, options);
+				atLineStart = true;
+				continue;
+			}
 
-		const charCode = content.charCodeAt(i);
-		if (charCode === NEWLINE_CHAR_CODE) {
+			const charCode = content.charCodeAt(i);
+			if (charCode === NEWLINE_CHAR_CODE) {
+				i++;
+				atLineStart = true;
+				continue;
+			}
+
+			atLineStart = false;
+
+			if (content[i] === "`") {
+				i = skipInlineCode(content, i);
+				continue;
+			}
+
+			if (content[i] === "!") {
+				const wikiEmbed = parseWikiEmbedAt(content, i);
+				if (wikiEmbed) {
+					return wikiEmbed;
+				}
+
+				const markdownEmbed = parseMarkdownEmbedAt(content, i);
+				if (markdownEmbed) {
+					return markdownEmbed;
+				}
+			}
+
 			i++;
-			atLineStart = true;
-			continue;
 		}
 
-		atLineStart = false;
-
-		if (content[i] === "`") {
-			i = skipInlineCode(content, i);
-			continue;
-		}
-
-		if (content[i] === "!") {
-			const wikiEmbed = parseWikiEmbedAt(content, i);
-			if (wikiEmbed) {
-				return wikiEmbed;
-			}
-
-			const markdownEmbed = parseMarkdownEmbedAt(content, i);
-			if (markdownEmbed) {
-				return markdownEmbed;
-			}
-		}
-
-		i++;
-	}
-
-	return undefined;
+		return undefined;
 	})();
 }

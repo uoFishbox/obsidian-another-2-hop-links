@@ -86,9 +86,7 @@ export function publishVirtualListDebugSnapshot<
 	}
 
 	target.virtualLists ??= {};
-	target.virtualLists[params.name] = createVirtualListDebugSnapshot(
-		params.snapshot,
-	);
+	target.virtualLists[params.name] = createVirtualListDebugSnapshot(params.snapshot);
 }
 
 const getCellPosition = (
@@ -179,10 +177,7 @@ export function createVirtualListMountedCellsParity<
 	snapshot: VirtualListSnapshot<TCell, TMountedCell, TMountedBuild>,
 	renderedCells: readonly TMountedCell[],
 ): VirtualListMountedCellsParity {
-	const maxLength = Math.max(
-		snapshot.mountedCells.length,
-		renderedCells.length,
-	);
+	const maxLength = Math.max(snapshot.mountedCells.length, renderedCells.length);
 	for (let index = 0; index < maxLength; index += 1) {
 		const snapshotCell = snapshot.mountedCells[index];
 		const renderedCell = renderedCells[index];

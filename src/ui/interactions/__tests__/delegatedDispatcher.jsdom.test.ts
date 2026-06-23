@@ -36,9 +36,7 @@ function createLinkContext() {
 		fileToLinktext: vi.fn(),
 		sourceFile: createMockTFile("notes/source.md"),
 		getMetadata: vi.fn(() => null),
-		getPreview: vi.fn(
-			async () => ({ type: "empty", content: "" }) as const,
-		),
+		getPreview: vi.fn(async () => ({ type: "empty", content: "" }) as const),
 	} satisfies LinkContext;
 }
 
@@ -64,47 +62,17 @@ function attachDispatcher(
 	dispatcher: ReturnType<typeof createDelegatedInteractionDispatcher>,
 ) {
 	root.addEventListener("click", dispatcher.handleClick as EventListener);
-	root.addEventListener(
-		"mousedown",
-		dispatcher.handleMouseDown as EventListener,
-	);
-	root.addEventListener(
-		"contextmenu",
-		dispatcher.handleContextMenu as EventListener,
-	);
-	root.addEventListener(
-		"mouseover",
-		dispatcher.handleMouseOver as EventListener,
-	);
-	root.addEventListener(
-		"mouseout",
-		dispatcher.handleMouseOut as EventListener,
-	);
-	root.addEventListener(
-		"mouseleave",
-		dispatcher.handleMouseLeave as EventListener,
-	);
+	root.addEventListener("mousedown", dispatcher.handleMouseDown as EventListener);
+	root.addEventListener("contextmenu", dispatcher.handleContextMenu as EventListener);
+	root.addEventListener("mouseover", dispatcher.handleMouseOver as EventListener);
+	root.addEventListener("mouseout", dispatcher.handleMouseOut as EventListener);
+	root.addEventListener("mouseleave", dispatcher.handleMouseLeave as EventListener);
 	root.addEventListener("keydown", dispatcher.handleKeyDown as EventListener);
-	root.addEventListener(
-		"dragstart",
-		dispatcher.handleDragStart as EventListener,
-	);
-	root.addEventListener(
-		"touchstart",
-		dispatcher.handleTouchStart as EventListener,
-	);
-	root.addEventListener(
-		"touchmove",
-		dispatcher.handleTouchMove as EventListener,
-	);
-	root.addEventListener(
-		"touchend",
-		dispatcher.handleTouchEnd as EventListener,
-	);
-	root.addEventListener(
-		"touchcancel",
-		dispatcher.handleTouchEnd as EventListener,
-	);
+	root.addEventListener("dragstart", dispatcher.handleDragStart as EventListener);
+	root.addEventListener("touchstart", dispatcher.handleTouchStart as EventListener);
+	root.addEventListener("touchmove", dispatcher.handleTouchMove as EventListener);
+	root.addEventListener("touchend", dispatcher.handleTouchEnd as EventListener);
+	root.addEventListener("touchcancel", dispatcher.handleTouchEnd as EventListener);
 }
 
 function createTouchEvent(
@@ -122,10 +90,7 @@ function createTouchEvent(
 	return event;
 }
 
-function createItemDescriptor(
-	item: ViewItem,
-	file: TFile,
-): ItemInteractionDescriptor {
+function createItemDescriptor(item: ViewItem, file: TFile): ItemInteractionDescriptor {
 	return {
 		interactionId: "item:file:notes/alpha.md",
 		kind: "item",
@@ -299,8 +264,7 @@ describe("delegated interaction dispatcher", () => {
 		element.dispatchEvent(new MouseEvent("mouseover", { bubbles: true }));
 
 		expect(linkContext.onLinkHover).toHaveBeenCalledTimes(1);
-		const firstHoverEvent = vi.mocked(linkContext.onLinkHover).mock
-			.calls[0]?.[0];
+		const firstHoverEvent = vi.mocked(linkContext.onLinkHover).mock.calls[0]?.[0];
 		expect(firstHoverEvent.currentTarget).toBe(element);
 		expect(firstHoverEvent.target).toBe(element);
 
@@ -316,10 +280,7 @@ describe("delegated interaction dispatcher", () => {
 		const registry = createInteractionRegistry();
 		const file = createMockTFile("notes/alpha.md");
 		const descriptor = {
-			...createItemDescriptor(
-				{ type: "file", data: file } as ViewItem,
-				file,
-			),
+			...createItemDescriptor({ type: "file", data: file } as ViewItem, file),
 			hoverPreviewEnabled: false,
 		} satisfies ItemInteractionDescriptor;
 		registry.register(descriptor);
@@ -516,10 +477,7 @@ describe("delegated interaction dispatcher", () => {
 			expect.any(MouseEvent),
 			file,
 		);
-		expect(dataTransfer.setData).toHaveBeenCalledWith(
-			"text/plain",
-			"[[alpha]]",
-		);
+		expect(dataTransfer.setData).toHaveBeenCalledWith("text/plain", "[[alpha]]");
 		expect(dataTransfer.setData).toHaveBeenCalledWith(
 			CANVAS_NOTE_DRAG_FORMAT,
 			file.path,
@@ -560,10 +518,7 @@ describe("delegated interaction dispatcher", () => {
 
 		expect(linkContext.buildWikiLink).toHaveBeenCalledTimes(1);
 		expect(linkContext.buildWikiLink).toHaveBeenCalledWith(file, "alpha");
-		expect(dataTransfer.setData).toHaveBeenCalledWith(
-			"text/plain",
-			"[[alpha]]",
-		);
+		expect(dataTransfer.setData).toHaveBeenCalledWith("text/plain", "[[alpha]]");
 	});
 
 	it("resolves interaction targets from composed paths inside a shadow root", () => {
@@ -591,9 +546,7 @@ describe("delegated interaction dispatcher", () => {
 		interactionElement.append(child);
 		shadowRoot.append(interactionElement);
 
-		child.dispatchEvent(
-			new MouseEvent("click", { bubbles: true, composed: true }),
-		);
+		child.dispatchEvent(new MouseEvent("click", { bubbles: true, composed: true }));
 
 		expect(linkContext.onOpenFile).toHaveBeenCalledTimes(1);
 	});
@@ -700,9 +653,7 @@ describe("delegated interaction dispatcher", () => {
 		const [dragImage] = dataTransfer.setDragImage.mock.calls[0];
 		expect((dragImage as HTMLElement).ownerDocument).toBe(foreignDocument);
 		expect(
-			foreignDocument.body.querySelector(
-				".ccl-native-drag-selection-shim",
-			),
+			foreignDocument.body.querySelector(".ccl-native-drag-selection-shim"),
 		).toBeTruthy();
 	});
 
@@ -750,8 +701,7 @@ describe("delegated interaction dispatcher", () => {
 		setLightweightCardDragImage(event, element, descriptor);
 
 		expect(dataTransfer.setDragImage).toHaveBeenCalledTimes(1);
-		const [dragImage, offsetX, offsetY] =
-			dataTransfer.setDragImage.mock.calls[0];
+		const [dragImage, offsetX, offsetY] = dataTransfer.setDragImage.mock.calls[0];
 		expect(dragImage).toBeInstanceOf(HTMLElement);
 		expect((dragImage as HTMLElement).textContent).toBe("Visible title");
 		expect((dragImage as HTMLElement).textContent).not.toContain("Preview");

@@ -40,7 +40,10 @@ describe("PreviewService queue behavior", () => {
 	});
 
 	test("queue metrics report active and queued visible previews", async () => {
-		const deferredByPath = new Map<string, ReturnType<typeof createDeferred<PreviewData>>>();
+		const deferredByPath = new Map<
+			string,
+			ReturnType<typeof createDeferred<PreviewData>>
+		>();
 		const strategy: PreviewStrategy = {
 			canHandle: () => true,
 			generate: vi.fn((file) => {
@@ -222,10 +225,7 @@ describe("PreviewService queue behavior", () => {
 				return new Promise<PreviewData>((_, reject) => {
 					const onAbort = () => {
 						reject(
-							new DOMException(
-								"Preview request aborted",
-								"AbortError",
-							),
+							new DOMException("Preview request aborted", "AbortError"),
 						);
 					};
 					if (signal?.aborted) {
@@ -239,11 +239,7 @@ describe("PreviewService queue behavior", () => {
 		const service = new PreviewServiceClass([strategy]);
 		const file = createMockTFileAsPlainObject("visible.md");
 
-		const request = service.getPreview(
-			file,
-			vault,
-			metadataCache,
-		);
+		const request = service.getPreview(file, vault, metadataCache);
 
 		await Promise.resolve();
 		expect(strategy.generate).toHaveBeenCalledTimes(1);

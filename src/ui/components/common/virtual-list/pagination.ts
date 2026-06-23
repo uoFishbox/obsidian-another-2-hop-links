@@ -1,9 +1,6 @@
 import type { ApplicationStore } from "ui/stores/ApplicationStore.svelte";
 import type { SectionRenderDescriptor } from "../../sections/types";
-import {
-	computeInitialVisibleCount,
-	normalizeIncrement,
-} from "../listPagination";
+import { computeInitialVisibleCount, normalizeIncrement } from "../listPagination";
 
 export interface SectionPaginationState {
 	getVisibleCount(sectionId: string, totalLoadedCount: number): number;
@@ -38,17 +35,9 @@ export interface SectionVisibleCountsController<T, G> {
 	resolveForInput(
 		sections: readonly SectionRenderDescriptor<T, G>[],
 	): SectionVisibleCountsUpdate;
-	resolveInitialSectionVisibleCount(
-		section: SectionRenderDescriptor<T, G>,
-	): number;
-	clampVisibleCount(
-		section: SectionRenderDescriptor<T, G>,
-		count: number,
-	): number;
-	loadMore(
-		sectionId: string,
-		loadedCount: number,
-	): SectionVisibleCountsUpdate;
+	resolveInitialSectionVisibleCount(section: SectionRenderDescriptor<T, G>): number;
+	clampVisibleCount(section: SectionRenderDescriptor<T, G>, count: number): number;
+	loadMore(sectionId: string, loadedCount: number): SectionVisibleCountsUpdate;
 }
 
 export interface CreateSectionVisibleCountsControllerParams {
@@ -130,9 +119,7 @@ export function createSectionVisibleCountsController<T, G>({
 		sectionId: string,
 		totalLoadedCount: number,
 	): number => {
-		if (
-			typeof applicationStore?.getDefaultSectionVisibleLimit === "function"
-		) {
+		if (typeof applicationStore?.getDefaultSectionVisibleLimit === "function") {
 			return applicationStore.getDefaultSectionVisibleLimit();
 		}
 
@@ -145,9 +132,7 @@ export function createSectionVisibleCountsController<T, G>({
 			return localExpandedLimit;
 		}
 
-		if (
-			typeof applicationStore?.getSectionExpandedLimit === "function"
-		) {
+		if (typeof applicationStore?.getSectionExpandedLimit === "function") {
 			return applicationStore.getSectionExpandedLimit(sectionId);
 		}
 
@@ -158,15 +143,9 @@ export function createSectionVisibleCountsController<T, G>({
 		sectionId: string,
 		totalLoadedCount: number,
 	): number => {
-		const defaultLimit = resolveDefaultVisibleLimit(
-			sectionId,
-			totalLoadedCount,
-		);
+		const defaultLimit = resolveDefaultVisibleLimit(sectionId, totalLoadedCount);
 		const expandedLimit = resolveExpandedLimit(sectionId) ?? 0;
-		return Math.min(
-			totalLoadedCount,
-			Math.max(defaultLimit, expandedLimit),
-		);
+		return Math.min(totalLoadedCount, Math.max(defaultLimit, expandedLimit));
 	};
 
 	const commitSnapshot = (
@@ -195,17 +174,13 @@ export function createSectionVisibleCountsController<T, G>({
 		section: SectionRenderDescriptor<T, G>,
 	): number =>
 		normalizeStoredVisibleCount(
-			resolveVisibleCount(
-				getSectionPaginationKey(section),
-				section.loadedCount,
-			),
+			resolveVisibleCount(getSectionPaginationKey(section), section.loadedCount),
 		);
 
 	const clampVisibleCount = (
 		section: SectionRenderDescriptor<T, G>,
 		count: number,
-	): number =>
-		Math.min(section.loadedCount, normalizeStoredVisibleCount(count));
+	): number => Math.min(section.loadedCount, normalizeStoredVisibleCount(count));
 
 	return {
 		getSnapshot() {
@@ -227,7 +202,8 @@ export function createSectionVisibleCountsController<T, G>({
 				if (expandedLimit !== undefined) {
 					activeExpandedLimits[paginationKey] = expandedLimit;
 				}
-				visibleCounts[paginationKey] = resolveInitialSectionVisibleCount(section);
+				visibleCounts[paginationKey] =
+					resolveInitialSectionVisibleCount(section);
 			}
 
 			const update = commitSnapshot(
@@ -284,10 +260,7 @@ export function createSectionVisibleCountsController<T, G>({
 				nextSnapshot.changed &&
 				typeof applicationStore?.setSectionExpandedLimit === "function"
 			) {
-				applicationStore.setSectionExpandedLimit(
-					sectionId,
-					nextExpandedLimit,
-				);
+				applicationStore.setSectionExpandedLimit(sectionId, nextExpandedLimit);
 			}
 			return nextSnapshot;
 		},
@@ -305,9 +278,7 @@ export function createSectionPaginationState({
 		sectionId: string,
 		totalLoadedCount: number,
 	): number => {
-		if (
-			typeof applicationStore?.getDefaultSectionVisibleLimit === "function"
-		) {
+		if (typeof applicationStore?.getDefaultSectionVisibleLimit === "function") {
 			return applicationStore.getDefaultSectionVisibleLimit();
 		}
 
@@ -320,23 +291,15 @@ export function createSectionPaginationState({
 			return localExpandedLimit;
 		}
 
-		if (
-			typeof applicationStore?.getSectionExpandedLimit === "function"
-		) {
+		if (typeof applicationStore?.getSectionExpandedLimit === "function") {
 			return applicationStore.getSectionExpandedLimit(sectionId);
 		}
 
 		return getExpandedLimits()[sectionId];
 	};
 
-	const getVisibleCount = (
-		sectionId: string,
-		totalLoadedCount: number,
-	): number => {
-		const defaultLimit = resolveDefaultVisibleLimit(
-			sectionId,
-			totalLoadedCount,
-		);
+	const getVisibleCount = (sectionId: string, totalLoadedCount: number): number => {
+		const defaultLimit = resolveDefaultVisibleLimit(sectionId, totalLoadedCount);
 		const expandedLimit = getExpandedLimit(sectionId) ?? 0;
 		return Math.min(
 			totalLoadedCount,
@@ -394,8 +357,7 @@ export function createSectionPaginationState({
 
 			for (const sectionId in expandedLimits) {
 				if (sectionIds.has(sectionId)) {
-					nextExpandedLimits[sectionId] =
-						expandedLimits[sectionId];
+					nextExpandedLimits[sectionId] = expandedLimits[sectionId];
 				}
 			}
 

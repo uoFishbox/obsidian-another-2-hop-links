@@ -4,9 +4,7 @@ import {
 	getContentSnippetAsync,
 	highlightSearchMatchesInHtmlAsync,
 } from "../previewTextProcessingAsync";
-import {
-	PREVIEW_TEXT_WORKER_MIN_CONTENT_LENGTH,
-} from "../previewTextWorkerTypes";
+import { PREVIEW_TEXT_WORKER_MIN_CONTENT_LENGTH } from "../previewTextWorkerTypes";
 
 const state = vi.hoisted(() => ({
 	runPreviewTextWorker: vi.fn(),
@@ -34,9 +32,7 @@ describe("preview text processing async wrappers", () => {
 		state.runPreviewTextWorker.mockResolvedValue("worker-result");
 		const content = "x".repeat(PREVIEW_TEXT_WORKER_MIN_CONTENT_LENGTH + 1);
 
-		await expect(getContentSnippetAsync(content)).resolves.toBe(
-			"worker-result",
-		);
+		await expect(getContentSnippetAsync(content)).resolves.toBe("worker-result");
 		expect(state.runPreviewTextWorker).toHaveBeenCalledWith(
 			expect.objectContaining({
 				type: "get-content-snippet",
@@ -49,8 +45,7 @@ describe("preview text processing async wrappers", () => {
 	test("falls back to synchronous implementation when worker is unavailable", async () => {
 		state.runPreviewTextWorker.mockReturnValue(undefined);
 		const content =
-			"Hello [[World]]" +
-			"x".repeat(PREVIEW_TEXT_WORKER_MIN_CONTENT_LENGTH + 1);
+			"Hello [[World]]" + "x".repeat(PREVIEW_TEXT_WORKER_MIN_CONTENT_LENGTH + 1);
 
 		await expect(getContentSnippetAsync(content)).resolves.toContain(
 			'Hello <span class="cosense-card-links__wikilink">World</span>',
@@ -62,9 +57,9 @@ describe("preview text processing async wrappers", () => {
 		state.runPreviewTextWorker.mockRejectedValue(error);
 		const content = "x".repeat(PREVIEW_TEXT_WORKER_MIN_CONTENT_LENGTH + 1);
 
-		await expect(
-			highlightSearchMatchesInHtmlAsync(content, "x"),
-		).rejects.toBe(error);
+		await expect(highlightSearchMatchesInHtmlAsync(content, "x")).rejects.toBe(
+			error,
+		);
 	});
 
 	test("reuses normalized allowed block type arrays for worker requests", async () => {

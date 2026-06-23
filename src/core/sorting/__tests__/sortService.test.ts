@@ -1,11 +1,7 @@
 import { describe, expect, beforeEach, vi, type MockedObject } from "vitest";
 import { SortService } from "../SortService";
 import { TFile } from "obsidian";
-import type {
-	TwoHopLinkBranch,
-	TwoHopIndexedLink,
-	TaggedNote,
-} from "types/domain";
+import type { TwoHopLinkBranch, TwoHopIndexedLink, TaggedNote } from "types/domain";
 import type { IMetricProvider } from "types/services";
 import type { SortOption } from "types/settings";
 import type { SortableItem } from "../types";
@@ -79,22 +75,12 @@ describe("SortService", () => {
 
 	describe("unknown sort option", () => {
 		test("warns and preserves original order", () => {
-			const consoleSpy = vi
-				.spyOn(console, "warn")
-				.mockImplementation(() => {});
-			const items = [
-				createBranch("C"),
-				createBranch("A"),
-				createBranch("B"),
-			];
+			const consoleSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+			const items = [createBranch("C"), createBranch("A"), createBranch("B")];
 
 			const result = sortService.sort(items, "unknown" as SortOption);
 
-			expect(result.map((item) => item.hop1.rawText)).toEqual([
-				"C",
-				"A",
-				"B",
-			]);
+			expect(result.map((item) => item.hop1.rawText)).toEqual(["C", "A", "B"]);
 			expect(consoleSpy).toHaveBeenCalledWith(
 				"Unknown sort option: unknown, using default",
 			);
@@ -125,7 +111,11 @@ describe("SortService", () => {
 
 		test("created-date ascending", () => {
 			mockMetricProvider.getCreatedTime.mockImplementation((item: any) => {
-				const order: Record<string, number> = { Zebra: 3000, Apple: 1000, Banana: 2000 };
+				const order: Record<string, number> = {
+					Zebra: 3000,
+					Apple: 1000,
+					Banana: 2000,
+				};
 				return order[item.hop1.rawText] ?? 0;
 			});
 
@@ -152,16 +142,16 @@ describe("SortService", () => {
 				"modified-date-reverse",
 			);
 
-			expect(result.map((item) => item.hop1.rawText)).toEqual([
-				"A",
-				"B",
-				"C",
-			]);
+			expect(result.map((item) => item.hop1.rawText)).toEqual(["A", "B", "C"]);
 		});
 
 		test("backlink-count descending", () => {
 			mockMetricProvider.getBacklinkCount.mockImplementation((item: any) => {
-				const order: Record<string, number> = { Rare: 10, Popular: 100, Normal: 50 };
+				const order: Record<string, number> = {
+					Rare: 10,
+					Popular: 100,
+					Normal: 50,
+				};
 				return order[item.hop1.rawText] ?? 0;
 			});
 
@@ -179,7 +169,11 @@ describe("SortService", () => {
 
 		test("file-size ascending", () => {
 			mockMetricProvider.getFileSize.mockImplementation((item: any) => {
-				const order: Record<string, number> = { Large: 9000, Small: 100, Medium: 500 };
+				const order: Record<string, number> = {
+					Large: 9000,
+					Small: 100,
+					Medium: 500,
+				};
 				return order[item.hop1.rawText] ?? 0;
 			});
 
@@ -198,11 +192,7 @@ describe("SortService", () => {
 
 	describe("Immutability", () => {
 		test("original array is not mutated", () => {
-			const items = [
-				createBranch("C"),
-				createBranch("A"),
-				createBranch("B"),
-			];
+			const items = [createBranch("C"), createBranch("A"), createBranch("B")];
 			const originalOrder = items.map((item) => item.hop1.rawText);
 
 			sortService.sort(items, "alphabetical");
@@ -211,11 +201,7 @@ describe("SortService", () => {
 		});
 
 		test("sortWithResult returns original array if order unchanged", () => {
-			const items = [
-				createBranch("A"),
-				createBranch("B"),
-				createBranch("C"),
-			];
+			const items = [createBranch("A"), createBranch("B"), createBranch("C")];
 
 			const result = sortService.sortWithResult(items, "alphabetical");
 
@@ -224,11 +210,7 @@ describe("SortService", () => {
 		});
 
 		test("sortWithResult includes order change in result", () => {
-			const items = [
-				createBranch("C"),
-				createBranch("A"),
-				createBranch("B"),
-			];
+			const items = [createBranch("C"), createBranch("A"), createBranch("B")];
 
 			const result = sortService.sortWithResult(items, "alphabetical");
 
@@ -246,17 +228,31 @@ describe("SortService", () => {
 		it.each([
 			{
 				name: "TwoHopLinkBranch",
-				items: [createBranch("Zebra"), createBranch("Apple"), createBranch("Banana")] as SortableItem[],
-				getName: (item: SortableItem) => (item as TwoHopLinkBranch).hop1.rawText,
+				items: [
+					createBranch("Zebra"),
+					createBranch("Apple"),
+					createBranch("Banana"),
+				] as SortableItem[],
+				getName: (item: SortableItem) =>
+					(item as TwoHopLinkBranch).hop1.rawText,
 			},
 			{
 				name: "TwoHopIndexedLink",
-				items: [createBacklink("Zebra"), createBacklink("Apple"), createBacklink("Banana")] as SortableItem[],
-				getName: (item: SortableItem) => (item as TwoHopIndexedLink).sourceFile.basename,
+				items: [
+					createBacklink("Zebra"),
+					createBacklink("Apple"),
+					createBacklink("Banana"),
+				] as SortableItem[],
+				getName: (item: SortableItem) =>
+					(item as TwoHopIndexedLink).sourceFile.basename,
 			},
 			{
 				name: "TaggedNote",
-				items: [createTaggedNote("Zebra"), createTaggedNote("Apple"), createTaggedNote("Banana")] as SortableItem[],
+				items: [
+					createTaggedNote("Zebra"),
+					createTaggedNote("Apple"),
+					createTaggedNote("Banana"),
+				] as SortableItem[],
 				getName: (item: SortableItem) => (item as TaggedNote).file.basename,
 			},
 		])("sorting $name", ({ items, getName }) => {
@@ -275,37 +271,42 @@ describe("SortService", () => {
 			"backlink-count-reverse",
 			"file-size",
 			"file-size-reverse",
-		] as SortOption[])(
-			"%s stable sort by displayName on tie",
-			(sortOption) => {
-				const alphaTitleItem = createBranch("zzz-note");
-				const zuluTitleItem = createBranch("aaa-note");
-				mockMetricProvider.getDisplayName.mockImplementation(
-					(item: SortableItem) =>
-						item === alphaTitleItem ? "Alpha Title" : "Zulu Title",
-				);
-				mockMetricProvider.getCreatedTime.mockReturnValue(1000);
-				mockMetricProvider.getModifiedTime.mockReturnValue(1000);
-				mockMetricProvider.getBacklinkCount.mockReturnValue(10);
-				mockMetricProvider.getFileSize.mockReturnValue(20);
+		] as SortOption[])("%s stable sort by displayName on tie", (sortOption) => {
+			const alphaTitleItem = createBranch("zzz-note");
+			const zuluTitleItem = createBranch("aaa-note");
+			mockMetricProvider.getDisplayName.mockImplementation(
+				(item: SortableItem) =>
+					item === alphaTitleItem ? "Alpha Title" : "Zulu Title",
+			);
+			mockMetricProvider.getCreatedTime.mockReturnValue(1000);
+			mockMetricProvider.getModifiedTime.mockReturnValue(1000);
+			mockMetricProvider.getBacklinkCount.mockReturnValue(10);
+			mockMetricProvider.getFileSize.mockReturnValue(20);
 
-				const result = sortService.sort(
-					[zuluTitleItem, alphaTitleItem],
-					sortOption,
-				);
+			const result = sortService.sort(
+				[zuluTitleItem, alphaTitleItem],
+				sortOption,
+			);
 
-				expect(result.map((item) => item.hop1.rawText)).toEqual([
-					"zzz-note",
-					"aaa-note",
-				]);
-			},
-		);
+			expect(result.map((item) => item.hop1.rawText)).toEqual([
+				"zzz-note",
+				"aaa-note",
+			]);
+		});
 	});
 
 	describe("displayName equivalent to frontmatter title", () => {
 		it.each([
-			{ name: "alphabetical sorts by displayName", sortOption: "alphabetical" as SortOption, expected: ["zzz-note", "aaa-note"] },
-			{ name: "alphabetical-reverse sorts in reverse by displayName", sortOption: "alphabetical-reverse" as SortOption, expected: ["aaa-note", "zzz-note"] },
+			{
+				name: "alphabetical sorts by displayName",
+				sortOption: "alphabetical" as SortOption,
+				expected: ["zzz-note", "aaa-note"],
+			},
+			{
+				name: "alphabetical-reverse sorts in reverse by displayName",
+				sortOption: "alphabetical-reverse" as SortOption,
+				expected: ["aaa-note", "zzz-note"],
+			},
 		])("$name", ({ sortOption, expected }) => {
 			const alphaTitleItem = createBranch("zzz-note");
 			const zuluTitleItem = createBranch("aaa-note");
@@ -325,11 +326,7 @@ describe("SortService", () => {
 
 	describe("cache invalidation", () => {
 		test("same results after invalidateCache", () => {
-			const items = [
-				createBranch("C"),
-				createBranch("A"),
-				createBranch("B"),
-			];
+			const items = [createBranch("C"), createBranch("A"), createBranch("B")];
 
 			const result1 = sortService.sort(items, "alphabetical");
 			sortService.invalidateCache();

@@ -1,12 +1,4 @@
-import {
-	afterEach,
-	describe,
-	test,
-	expect,
-	vi,
-	beforeEach,
-	type Mock,
-} from "vitest";
+import { afterEach, describe, test, expect, vi, beforeEach, type Mock } from "vitest";
 import { MarkdownRenderer } from "obsidian";
 import { PreviewService as PreviewServiceClass } from "../core/createPreviewService";
 import { generateVideoPreview } from "../renderers/videoPreviewRenderer";
@@ -32,7 +24,10 @@ vi.mock("../renderers/canvasPreviewRenderer", () => ({
 vi.mock("obsidian", () => ({
 	renderMath: vi.fn(),
 	finishRenderMath: vi.fn(),
-	Component: class { load() {} unload() {} },
+	Component: class {
+		load() {}
+		unload() {}
+	},
 	MarkdownRenderer: { render: vi.fn().mockResolvedValue(undefined) },
 }));
 
@@ -123,11 +118,7 @@ describe("PreviewService.getPreview", () => {
 			});
 			(vault.cachedRead as Mock).mockResolvedValue("");
 
-			const result = await previewService.getPreview(
-				file,
-				vault,
-				metadataCache,
-			);
+			const result = await previewService.getPreview(file, vault, metadataCache);
 			expect(result.type).toBe("image");
 			expect(result.content).toBe(imageUrl);
 		});
@@ -141,11 +132,7 @@ describe("PreviewService.getPreview", () => {
 			(metadataCache.getFirstLinkpathDest as Mock).mockReturnValue(imageFile);
 			(vault.cachedRead as Mock).mockResolvedValue("");
 
-			const result = await previewService.getPreview(
-				file,
-				vault,
-				metadataCache,
-			);
+			const result = await previewService.getPreview(file, vault, metadataCache);
 			expect(result.type).toBe("image");
 			expect(result.content).toBe(`app://local/${imageFile.path}`);
 		});
@@ -159,11 +146,7 @@ describe("PreviewService.getPreview", () => {
 			(metadataCache.getFirstLinkpathDest as Mock).mockReturnValue(undefined);
 			(vault.cachedRead as Mock).mockResolvedValue(`![](${imageUrl})`);
 
-			const result = await previewService.getPreview(
-				file,
-				vault,
-				metadataCache,
-			);
+			const result = await previewService.getPreview(file, vault, metadataCache);
 			expect(result).toEqual({ type: "image", content: imageUrl });
 			expect(MarkdownRenderer.render).not.toHaveBeenCalled();
 		});
@@ -293,27 +276,15 @@ describe("PreviewService.getPreview", () => {
 		const service = new PreviewServiceClass([strategy]);
 		const file = createMockTFileAsPlainObject("note.md");
 
-		const first = await service.getPreview(
-			file,
-			vault,
-			metadataCache,
-			undefined,
-			{ previewMaxChars: 100 } as any,
-		);
-		const second = await service.getPreview(
-			file,
-			vault,
-			metadataCache,
-			undefined,
-			{ previewMaxChars: 200 } as any,
-		);
-		const third = await service.getPreview(
-			file,
-			vault,
-			metadataCache,
-			undefined,
-			{ previewMaxChars: 200 } as any,
-		);
+		const first = await service.getPreview(file, vault, metadataCache, undefined, {
+			previewMaxChars: 100,
+		} as any);
+		const second = await service.getPreview(file, vault, metadataCache, undefined, {
+			previewMaxChars: 200,
+		} as any);
+		const third = await service.getPreview(file, vault, metadataCache, undefined, {
+			previewMaxChars: 200,
+		} as any);
 
 		expect(first).toEqual({ type: "text", content: "100" });
 		expect(second).toEqual({ type: "text", content: "200" });
@@ -341,10 +312,7 @@ describe("PreviewService.getPreview", () => {
 
 		try {
 			for (let index = 0; index < 81; index++) {
-				const file = createMockTFileAsPlainObject(
-					`video-${index}.mp4`,
-					"mp4",
-				);
+				const file = createMockTFileAsPlainObject(`video-${index}.mp4`, "mp4");
 				await service.getPreview(file, vault, metadataCache);
 			}
 

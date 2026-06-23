@@ -167,10 +167,7 @@ describe("VirtualListEngine performance contracts", () => {
 
 	it("resolves only the entering flat-grid row across sustained scrolling", () => {
 		const rowModel = createRowModel(10_000);
-		const resolveCellAtIndex = vi.spyOn(
-			rowModel,
-			"resolveCellAtIndex",
-		);
+		const resolveCellAtIndex = vi.spyOn(rowModel, "resolveCellAtIndex");
 		let mounted = buildMountedVirtualGridCellsFromRowModel({
 			rowModel,
 			rowRange: { start: 10, end: 19 },

@@ -1,22 +1,57 @@
 import { describe, test, expect } from "vitest";
-import {
-	formatLinkText,
-	generateLinkKey,
-	qualifyDuplicateKey,
-} from "../textUtils";
+import { formatLinkText, generateLinkKey, qualifyDuplicateKey } from "../textUtils";
 
 describe("formatLinkText", () => {
 	test.each([
-		{ desc: "unresolved with alias", rawText: "note|alias", isUnresolved: true, expected: "note" },
-		{ desc: "unresolved without alias", rawText: "note", isUnresolved: true, expected: "note" },
-		{ desc: "resolved with displayText", rawText: "raw", displayText: "  Display  ", expected: "Display" },
-		{ desc: "resolved without displayText", rawText: "raw text", expected: "raw text" },
-		{ desc: "resolved with empty displayText", rawText: "raw", displayText: "", expected: "raw" },
-		{ desc: "unresolved with hash", rawText: "note#section", isUnresolved: true, expected: "note" },
-		{ desc: "unresolved with hash before alias", rawText: "note#section|alias", isUnresolved: true, expected: "note" },
-	])("returns $expected for $desc", ({ rawText, displayText, isUnresolved, expected }) => {
-		expect(formatLinkText({ rawText, displayText, isUnresolved })).toBe(expected);
-	});
+		{
+			desc: "unresolved with alias",
+			rawText: "note|alias",
+			isUnresolved: true,
+			expected: "note",
+		},
+		{
+			desc: "unresolved without alias",
+			rawText: "note",
+			isUnresolved: true,
+			expected: "note",
+		},
+		{
+			desc: "resolved with displayText",
+			rawText: "raw",
+			displayText: "  Display  ",
+			expected: "Display",
+		},
+		{
+			desc: "resolved without displayText",
+			rawText: "raw text",
+			expected: "raw text",
+		},
+		{
+			desc: "resolved with empty displayText",
+			rawText: "raw",
+			displayText: "",
+			expected: "raw",
+		},
+		{
+			desc: "unresolved with hash",
+			rawText: "note#section",
+			isUnresolved: true,
+			expected: "note",
+		},
+		{
+			desc: "unresolved with hash before alias",
+			rawText: "note#section|alias",
+			isUnresolved: true,
+			expected: "note",
+		},
+	])(
+		"returns $expected for $desc",
+		({ rawText, displayText, isUnresolved, expected }) => {
+			expect(formatLinkText({ rawText, displayText, isUnresolved })).toBe(
+				expected,
+			);
+		},
+	);
 });
 
 describe("generateLinkKey", () => {

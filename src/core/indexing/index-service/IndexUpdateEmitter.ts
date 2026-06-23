@@ -64,9 +64,10 @@ export class IndexUpdateEmitter {
 			sourceContentChanged: context.sourceContentChanged,
 		};
 
-		if (enableLogging) logger(
-			`[IndexingService] Notifying ${this.dataUpdateListeners.size} data update listeners`,
-		);
+		if (enableLogging)
+			logger(
+				`[IndexingService] Notifying ${this.dataUpdateListeners.size} data update listeners`,
+			);
 		this.dataUpdateListeners.forEach((listener) => {
 			try {
 				listener(payload);

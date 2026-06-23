@@ -46,11 +46,12 @@ export class IndexUpdateQueue {
 			INDEXING_DEBOUNCE_DELAY,
 			true,
 		);
-		this.unsubscribeIndexIdleWaiter =
-			this.indexingService.registerIdleWaiter(async () => {
+		this.unsubscribeIndexIdleWaiter = this.indexingService.registerIdleWaiter(
+			async () => {
 				await this.awaitQueueIdle();
 				await this.initialFullScanReady;
-			});
+			},
+		);
 		this.unsubscribeIndexDataUpdate = this.indexingService.onDataUpdate(
 			(context) => {
 				this.notifyDataUpdate(context);
@@ -152,9 +153,10 @@ export class IndexUpdateQueue {
 					return;
 				}
 				if (file instanceof TFile && file.extension === "canvas") {
-					if (enableLogging) logger(
-						`[EventManager] Canvas ${file.path}: Link structure changed, queueing index update`,
-					);
+					if (enableLogging)
+						logger(
+							`[EventManager] Canvas ${file.path}: Link structure changed, queueing index update`,
+						);
 					this.changeQueue.recordChange({
 						type: "modify",
 						path: file.path,
@@ -170,7 +172,8 @@ export class IndexUpdateQueue {
 		if (this.destroyed) {
 			return;
 		}
-		if (enableLogging) logger("[EventManager] Registering vault file system listeners");
+		if (enableLogging)
+			logger("[EventManager] Registering vault file system listeners");
 
 		this.plugin.registerEvent(
 			this.plugin.app.vault.on("rename", (file, oldPath) => {
@@ -184,16 +187,18 @@ export class IndexUpdateQueue {
 					return;
 				}
 				if (file instanceof TFolder) {
-					if (enableLogging) logger(
-						`[EventManager] Folder renamed: ${oldPath} -> ${file.path}, queueing descendant rename events`,
-					);
+					if (enableLogging)
+						logger(
+							`[EventManager] Folder renamed: ${oldPath} -> ${file.path}, queueing descendant rename events`,
+						);
 					this.queueFolderRename(file, oldPath);
 					return;
 				}
 
-				if (enableLogging) logger(
-					`[EventManager] File renamed: ${oldPath} -> ${file.path}, queueing rename event`,
-				);
+				if (enableLogging)
+					logger(
+						`[EventManager] File renamed: ${oldPath} -> ${file.path}, queueing rename event`,
+					);
 				this.changeQueue.recordChange({
 					type: "rename",
 					oldPath,
@@ -212,9 +217,10 @@ export class IndexUpdateQueue {
 				if (!(file instanceof TFile)) {
 					return;
 				}
-				if (enableLogging) logger(
-					`[EventManager] File created: ${file.path}, queueing create event`,
-				);
+				if (enableLogging)
+					logger(
+						`[EventManager] File created: ${file.path}, queueing create event`,
+					);
 				this.changeQueue.recordChange({
 					type: "create",
 					path: file.path,
@@ -249,11 +255,7 @@ export class IndexUpdateQueue {
 				if (!(file instanceof TFile)) {
 					return;
 				}
-				if (
-					!INDEX_LINK_CAPABLE_EXTENSIONS.has(
-						file.extension.toLowerCase(),
-					)
-				) {
+				if (!INDEX_LINK_CAPABLE_EXTENSIONS.has(file.extension.toLowerCase())) {
 					return;
 				}
 				this.changeQueue.recordChange({
@@ -268,9 +270,7 @@ export class IndexUpdateQueue {
 
 	private queueFolderRename(folder: TFolder, oldFolderPath: string): void {
 		const normalizedFolderPath =
-			folder.path.indexOf("\\") === -1
-				? folder.path
-				: normalizePath(folder.path);
+			folder.path.indexOf("\\") === -1 ? folder.path : normalizePath(folder.path);
 		const normalizedOldFolderPath =
 			oldFolderPath.indexOf("\\") === -1
 				? oldFolderPath
@@ -278,16 +278,12 @@ export class IndexUpdateQueue {
 		const newPrefix =
 			normalizedFolderPath.length > 0 ? `${normalizedFolderPath}/` : "";
 		const oldPrefix =
-			normalizedOldFolderPath.length > 0
-				? `${normalizedOldFolderPath}/`
-				: "";
+			normalizedOldFolderPath.length > 0 ? `${normalizedOldFolderPath}/` : "";
 		const newPrefixLength = newPrefix.length;
 
 		for (const currentFile of this.plugin.app.vault.getFiles()) {
 			if (
-				!INDEX_LINK_CAPABLE_EXTENSIONS.has(
-					currentFile.extension.toLowerCase(),
-				)
+				!INDEX_LINK_CAPABLE_EXTENSIONS.has(currentFile.extension.toLowerCase())
 			) {
 				continue;
 			}
@@ -318,7 +314,8 @@ export class IndexUpdateQueue {
 			if (this.destroyed) {
 				return;
 			}
-			if (enableLogging) logger(`${PLUGIN_NAME}: Detailed backlinks map built (Initial)`);
+			if (enableLogging)
+				logger(`${PLUGIN_NAME}: Detailed backlinks map built (Initial)`);
 			this.registerVaultListeners();
 		} finally {
 			this.resolveInitialFullScanReady?.();
@@ -358,17 +355,14 @@ export class IndexUpdateQueue {
 					this.changeQueue.drain();
 				this.syncMetadataResolveGate();
 
-				const needsFullRebuild =
-					requiresBacklinkRebuild || requiresTagRebuild;
+				const needsFullRebuild = requiresBacklinkRebuild || requiresTagRebuild;
 
 				if (needsFullRebuild) {
 					await this.indexingService.rebuildIndexesTimeSliced();
 				}
 
 				if (changes.length > 0 && !needsFullRebuild) {
-					await this.indexingService.applyFileChangesTimeSliced(
-						changes,
-					);
+					await this.indexingService.applyFileChangesTimeSliced(changes);
 				}
 			}
 		} finally {
@@ -403,9 +397,7 @@ export class IndexUpdateQueue {
 	}
 
 	private isQueueIdle(): boolean {
-		return (
-			!this.isProcessingPendingChanges && !this.changeQueue.hasPending()
-		);
+		return !this.isProcessingPendingChanges && !this.changeQueue.hasPending();
 	}
 
 	private notifyQueueIdleWaitersIfIdle(): void {

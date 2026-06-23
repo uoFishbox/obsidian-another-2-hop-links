@@ -18,10 +18,7 @@ export async function generateCanvasPreview(
 			},
 		});
 	} catch (error) {
-		console.warn(
-			`Could not render canvas preview for ${file.path}:`,
-			error,
-		);
+		console.warn(`Could not render canvas preview for ${file.path}:`, error);
 	}
 	return undefined;
 }

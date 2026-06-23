@@ -42,11 +42,9 @@ function createMockApp(fileContentsByPath: Record<string, string>): {
 	const cachedRead = vi.fn(async (file: TFile) => {
 		return fileContentsByPath[file.path] ?? "";
 	});
-	const on = vi.fn(
-		(_eventName: string, _callback: (...args: any[]) => void) => {
-			return {};
-		},
-	);
+	const on = vi.fn((_eventName: string, _callback: (...args: any[]) => void) => {
+		return {};
+	});
 
 	return {
 		app: {
@@ -218,15 +216,11 @@ describe("useFileContentIndex", () => {
 				return await pendingLoad.promise;
 			}
 
-			return file.path === files[0].path
-				? `contains ${query}`
-				: "no match";
+			return file.path === files[0].path ? `contains ${query}` : "no match";
 		});
-		const on = vi.fn(
-			(_eventName: string, _callback: (...args: any[]) => void) => {
-				return {};
-			},
-		);
+		const on = vi.fn((_eventName: string, _callback: (...args: any[]) => void) => {
+			return {};
+		});
 		const app = {
 			vault: {
 				cachedRead,
@@ -259,17 +253,14 @@ describe("useFileContentIndex", () => {
 		});
 	});
 
-
 	it("isLoading is true until loading completes", async () => {
 		const file = createMockTFile("notes/loading.md");
 		const query = "loading-token";
 		const pendingLoad = createDeferred<string>();
 		const cachedRead = vi.fn(async () => await pendingLoad.promise);
-		const on = vi.fn(
-			(_eventName: string, _callback: (...args: any[]) => void) => {
-				return {};
-			},
-		);
+		const on = vi.fn((_eventName: string, _callback: (...args: any[]) => void) => {
+			return {};
+		});
 		const app = {
 			vault: {
 				cachedRead,
@@ -319,9 +310,7 @@ describe("useFileContentIndex", () => {
 		});
 
 		await waitFor(() => {
-			expect(screen.getByTestId("first-match-line").textContent).toBe(
-				"1",
-			);
+			expect(screen.getByTestId("first-match-line").textContent).toBe("1");
 		});
 	});
 

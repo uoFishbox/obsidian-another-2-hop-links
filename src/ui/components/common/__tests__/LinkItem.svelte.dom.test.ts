@@ -45,9 +45,9 @@ describe("LinkItem", () => {
 		const highlight = container.querySelector(".ccl-search-highlight");
 		expect(highlight).not.toBeNull();
 		expect(highlight).toHaveTextContent("Search");
-		expect(
-			screen.getByRole("button", { name: "search result" }),
-		).toHaveTextContent("Notebook Search Result");
+		expect(screen.getByRole("button", { name: "search result" })).toHaveTextContent(
+			"Notebook Search Result",
+		);
 	});
 
 	it("renders extension text", () => {
@@ -78,9 +78,7 @@ describe("LinkItem", () => {
 			},
 		});
 
-		const card = container.querySelector<HTMLElement>(
-			".cosense-card-links__box",
-		);
+		const card = container.querySelector<HTMLElement>(".cosense-card-links__box");
 
 		expect(card).toHaveAttribute("draggable", "true");
 	});
@@ -97,8 +95,9 @@ describe("LinkItem", () => {
 			},
 		});
 
-		expect(
-			container.querySelector(".cosense-card-links__box"),
-		).toHaveAttribute("draggable", "false");
+		expect(container.querySelector(".cosense-card-links__box")).toHaveAttribute(
+			"draggable",
+			"false",
+		);
 	});
 });

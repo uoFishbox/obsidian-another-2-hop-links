@@ -74,10 +74,7 @@ export interface HoverSessionOpenPopover {
 	hoverParent: HoverParentLike | null;
 }
 
-export type HoverSessionCloseReason =
-	| "manual"
-	| "handoff-timeout"
-	| "destroy";
+export type HoverSessionCloseReason = "manual" | "handoff-timeout" | "destroy";
 
 export type HoverSessionState =
 	| { type: "idle"; requestSeq: number }

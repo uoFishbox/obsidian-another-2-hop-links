@@ -9,9 +9,7 @@ import {
 	type PluginSettings,
 } from "types/settings";
 
-export type CardLayoutSettings = Partial<
-	Pick<PluginSettings, CardLayoutSettingKey>
->;
+export type CardLayoutSettings = Partial<Pick<PluginSettings, CardLayoutSettingKey>>;
 
 export interface ResolvedCardLayoutSettings {
 	cardWidthPx: number;
@@ -67,21 +65,13 @@ export function resolveCardLayoutSettings(
 	settings?: CardLayoutSettings,
 ): ResolvedCardLayoutSettings {
 	const cardWidthPx = normalizeCardWidthPx(settings?.cardWidthPx);
-	const cardHeightRatio = normalizeCardHeightRatio(
-		settings?.cardHeightRatio,
-	);
+	const cardHeightRatio = normalizeCardHeightRatio(settings?.cardHeightRatio);
 
 	return {
 		cardWidthPx,
 		cardHeightRatio,
-		cardHeightPx: computeCardHeightPxFromWidth(
-			cardWidthPx,
-			cardHeightRatio,
-		),
-		cardGapPx: normalizePositiveInteger(
-			settings?.cardGapPx,
-			DEFAULT_CARD_GAP_PX,
-		),
+		cardHeightPx: computeCardHeightPxFromWidth(cardWidthPx, cardHeightRatio),
+		cardGapPx: normalizePositiveInteger(settings?.cardGapPx, DEFAULT_CARD_GAP_PX),
 		cardMaxColumns: normalizePositiveInteger(
 			settings?.cardMaxColumns,
 			DEFAULT_CARD_MAX_COLUMNS,
@@ -111,10 +101,7 @@ export function applyCardLayoutCssVars(
 ): void {
 	const layout = resolveCardLayoutSettings(settings);
 	element.style.setProperty("--ccl-box-size", `${layout.cardWidthPx}px`);
-	element.style.setProperty(
-		"--ccl-box-height-ratio",
-		`${layout.cardHeightRatio}`,
-	);
+	element.style.setProperty("--ccl-box-height-ratio", `${layout.cardHeightRatio}`);
 	element.style.setProperty("--ccl-box-height", `${layout.cardHeightPx}px`);
 	element.style.setProperty("--ccl-box-gap", `${layout.cardGapPx}px`);
 	element.style.setProperty("--ccl-box-cols-max", `${layout.cardMaxColumns}`);

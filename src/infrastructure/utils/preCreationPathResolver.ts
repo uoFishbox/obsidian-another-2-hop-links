@@ -10,10 +10,7 @@ export function resolveExpectedPath(
 ): string {
 	const { path: linkPath } = parseLinktext(linktext);
 
-	const existingFile = app.metadataCache.getFirstLinkpathDest(
-		linkPath,
-		sourcePath,
-	);
+	const existingFile = app.metadataCache.getFirstLinkpathDest(linkPath, sourcePath);
 	if (existingFile) {
 		return existingFile.path;
 	}
@@ -29,10 +26,7 @@ export function resolveExpectedPath(
 	} else {
 		// ディレクトリがない場合、getNewFileParentを使用
 		fileName = linkPath;
-		const parentFolder = app.fileManager.getNewFileParent(
-			sourcePath,
-			linkPath,
-		);
+		const parentFolder = app.fileManager.getNewFileParent(sourcePath, linkPath);
 		dirPath = parentFolder.isRoot() ? "" : parentFolder.path;
 	}
 

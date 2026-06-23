@@ -47,11 +47,15 @@ function* iterableFromEntries(
 
 describe("shouldSyncWorkerFileContents", () => {
 	it("does not sync when disabled", () => {
-		expect(shouldSyncWorkerFileContents(makeState({ sessionEnabled: false }))).toBe(false);
+		expect(shouldSyncWorkerFileContents(makeState({ sessionEnabled: false }))).toBe(
+			false,
+		);
 	});
 
 	it("does not sync body when title-only", () => {
-		expect(shouldSyncWorkerFileContents(makeState({ matchScope: "title-only" }))).toBe(false);
+		expect(
+			shouldSyncWorkerFileContents(makeState({ matchScope: "title-only" })),
+		).toBe(false);
 	});
 
 	it("syncs even while loading in eager mode", () => {
@@ -65,7 +69,10 @@ describe("shouldSyncWorkerFileContents", () => {
 	it("does not sync while loading in when-idle mode", () => {
 		expect(
 			shouldSyncWorkerFileContents(
-				makeState({ contentSyncMode: "when-idle", contentIndexIsLoading: true }),
+				makeState({
+					contentSyncMode: "when-idle",
+					contentIndexIsLoading: true,
+				}),
 			),
 		).toBe(false);
 	});
@@ -73,7 +80,10 @@ describe("shouldSyncWorkerFileContents", () => {
 	it("syncs after loading completes in when-idle mode", () => {
 		expect(
 			shouldSyncWorkerFileContents(
-				makeState({ contentSyncMode: "when-idle", contentIndexIsLoading: false }),
+				makeState({
+					contentSyncMode: "when-idle",
+					contentIndexIsLoading: false,
+				}),
 			),
 		).toBe(true);
 	});
@@ -239,10 +249,10 @@ describe("diffSearchWorkerFileContents", () => {
 });
 
 describe("diffSearchWorkerFileContentsFromVisitor", () => {
-	function visitorFromEntries(
-		entries: Record<string, SearchContentIndexEntry>,
-	) {
-		return (visitor: (path: string, entry: Readonly<SearchContentIndexEntry>) => void) => {
+	function visitorFromEntries(entries: Record<string, SearchContentIndexEntry>) {
+		return (
+			visitor: (path: string, entry: Readonly<SearchContentIndexEntry>) => void,
+		) => {
 			for (const [path, entry] of Object.entries(entries)) {
 				visitor(path, entry);
 			}
@@ -271,7 +281,9 @@ describe("diffSearchWorkerFileContentsFromVisitor", () => {
 
 	it("upserts new entries via visitor", () => {
 		const result = diffSearchWorkerFileContentsFromVisitor(
-			visitorFromEntries({ "new.md": makeEntry({ content: "new body", mtime: 10 }) }),
+			visitorFromEntries({
+				"new.md": makeEntry({ content: "new body", mtime: 10 }),
+			}),
 			new Map(),
 			true,
 		);

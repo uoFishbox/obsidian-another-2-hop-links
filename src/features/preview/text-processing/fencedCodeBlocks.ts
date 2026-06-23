@@ -69,9 +69,7 @@ export function detectFenceStart(
 		fenceLength,
 		fenceStart: i,
 		lineEnd,
-		infoString: stripTrailingCarriageReturn(
-			content.slice(fenceEnd, lineEnd),
-		),
+		infoString: stripTrailingCarriageReturn(content.slice(fenceEnd, lineEnd)),
 	};
 }
 
@@ -170,10 +168,7 @@ export async function findFencedCodeBlockAtLineStartAsync(
 		return undefined;
 	}
 
-	const scanEnd = Math.min(
-		content.length,
-		options.maxScanChars ?? content.length,
-	);
+	const scanEnd = Math.min(content.length, options.maxScanChars ?? content.length);
 	const yieldEveryChars = options.yieldEveryChars ?? DEFAULT_YIELD_EVERY_CHARS;
 	let lastYieldIndex = lineStartIndex;
 
@@ -221,18 +216,13 @@ export async function findFencedCodeBlockAtLineStartAsync(
 	return undefined;
 }
 
-export function skipFencedCodeBlock(
-	content: string,
-	lineStartIndex: number,
-): number {
+export function skipFencedCodeBlock(content: string, lineStartIndex: number): number {
 	const block = findFencedCodeBlockAtLineStart(content, lineStartIndex);
 	if (block) {
 		return block.blockEnd;
 	}
 
-	return detectFenceStart(content, lineStartIndex)
-		? content.length
-		: lineStartIndex;
+	return detectFenceStart(content, lineStartIndex) ? content.length : lineStartIndex;
 }
 
 export async function skipFencedCodeBlockAsync(
@@ -263,10 +253,7 @@ export function findEnclosingFencedCodeBlockRange(
 	while (lineStart < content.length) {
 		const block = findFencedCodeBlockAtLineStart(content, lineStart);
 		if (block) {
-			if (
-				matchIndex >= block.contentStart &&
-				matchIndex <= block.contentEnd
-			) {
+			if (matchIndex >= block.contentStart && matchIndex <= block.contentEnd) {
 				return block;
 			}
 			if (block.blockStart > matchIndex) {
@@ -292,48 +279,45 @@ export function findFirstAllowedFencedCodeBlock(
 	options: CooperativeScanOptions = {},
 ): Promise<FencedCodeBlockRange | undefined> {
 	let lineStart = 0;
-	const scanEnd = Math.min(
-		content.length,
-		options.maxScanChars ?? content.length,
-	);
+	const scanEnd = Math.min(content.length, options.maxScanChars ?? content.length);
 	const yieldEveryChars = options.yieldEveryChars ?? DEFAULT_YIELD_EVERY_CHARS;
 	let lastYieldIndex = 0;
 
 	return (async () => {
-	while (lineStart < scanEnd) {
-		if (options.signal?.aborted) {
-			return undefined;
-		}
-		if (
-			options.yieldToMainThread &&
-			lineStart - lastYieldIndex >= yieldEveryChars
-		) {
-			await options.yieldToMainThread();
-			lastYieldIndex = lineStart;
+		while (lineStart < scanEnd) {
 			if (options.signal?.aborted) {
 				return undefined;
 			}
-		}
-
-		const block = await findFencedCodeBlockAtLineStartAsync(
-			content,
-			lineStart,
-			options,
-		);
-		if (block) {
-			const lang = block.infoString.trim().toLowerCase();
-			if (allowedTypes.has(lang)) {
-				return block;
+			if (
+				options.yieldToMainThread &&
+				lineStart - lastYieldIndex >= yieldEveryChars
+			) {
+				await options.yieldToMainThread();
+				lastYieldIndex = lineStart;
+				if (options.signal?.aborted) {
+					return undefined;
+				}
 			}
-			lineStart = block.blockEnd;
-			continue;
+
+			const block = await findFencedCodeBlockAtLineStartAsync(
+				content,
+				lineStart,
+				options,
+			);
+			if (block) {
+				const lang = block.infoString.trim().toLowerCase();
+				if (allowedTypes.has(lang)) {
+					return block;
+				}
+				lineStart = block.blockEnd;
+				continue;
+			}
+
+			const lineEnd = getLineEnd(content, lineStart);
+			lineStart = getNextLineStart(content, lineEnd);
 		}
 
-		const lineEnd = getLineEnd(content, lineStart);
-		lineStart = getNextLineStart(content, lineEnd);
-	}
-
-	return undefined;
+		return undefined;
 	})();
 }
 

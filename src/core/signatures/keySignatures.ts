@@ -29,9 +29,7 @@ export function getNormalizedTextSignature(
 	return normalizeTextSignature(trimmed);
 }
 
-export function createLengthPrefixedSignature(
-	parts: readonly string[],
-): string {
+export function createLengthPrefixedSignature(parts: readonly string[]): string {
 	let signature = "";
 	for (let index = 0; index < parts.length; index += 1) {
 		const part = parts[index];
@@ -157,9 +155,7 @@ export function createBranchCardIdentitySignature(
 	);
 }
 
-export function createBranchUsageSignature(
-	branch: TwoHopLinkBranch,
-): UsageSignature {
+export function createBranchUsageSignature(branch: TwoHopLinkBranch): UsageSignature {
 	if (!branch.hop1.isUnresolved && branch.hop1.path) {
 		return {
 			kind: "file",
@@ -194,9 +190,7 @@ export function createIndexedLinkUsageSignature(
 		};
 	}
 
-	const textValue = getNormalizedTextSignature(
-		link.displayText ?? link.rawText,
-	);
+	const textValue = getNormalizedTextSignature(link.displayText ?? link.rawText);
 	if (textValue) {
 		return { kind: "text", value: textValue };
 	}

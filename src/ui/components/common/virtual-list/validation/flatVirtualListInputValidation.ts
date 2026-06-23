@@ -1,8 +1,5 @@
 import type { VirtualGridDataSource } from "../types";
-import type {
-	Result,
-	VirtualListInputError,
-} from "./virtualListValidationError";
+import type { Result, VirtualListInputError } from "./virtualListValidationError";
 
 export interface FlatLogicalCellSourceInput<T> {
 	readonly items?: readonly T[];
@@ -23,10 +20,7 @@ export type ValidatedFlatLogicalCellSourceInput<T> =
 
 export function validateFlatLogicalCellSourceInput<T>(
 	input: FlatLogicalCellSourceInput<T>,
-): Result<
-	ValidatedFlatLogicalCellSourceInput<T>,
-	VirtualListInputError<T, unknown>
-> {
+): Result<ValidatedFlatLogicalCellSourceInput<T>, VirtualListInputError<T, unknown>> {
 	if (input.dataSource) {
 		return {
 			ok: true,

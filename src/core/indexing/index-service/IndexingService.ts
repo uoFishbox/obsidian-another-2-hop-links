@@ -101,9 +101,7 @@ export class IndexingService implements IIndexingService {
 		return this.snapshot.backlinksMap;
 	}
 
-	public getSourcePathsForLookupKeys(
-		lookupKeys: Iterable<string>,
-	): Set<string> {
+	public getSourcePathsForLookupKeys(lookupKeys: Iterable<string>): Set<string> {
 		const result = new Set<string>();
 
 		for (const lookupKey of lookupKeys) {
@@ -157,10 +155,7 @@ export class IndexingService implements IIndexingService {
 	}
 
 	public getBacklinkCountForLink(linkPath: string): number {
-		return this.queryEngine.getBacklinkCountForLink(
-			this.snapshot,
-			linkPath,
-		);
+		return this.queryEngine.getBacklinkCountForLink(this.snapshot, linkPath);
 	}
 
 	public hasAtLeastUniqueBacklinkSources(
@@ -203,8 +198,7 @@ export class IndexingService implements IIndexingService {
 		const tagIndex = this.tagIndexStore.getSnapshot();
 		const indexedEntry = tagIndex.fileEntries.get(file.path);
 		const tagRefs: readonly TagReference[] =
-			indexedEntry?.tags ??
-			extractTags(this.metadataCache.getFileCache(file));
+			indexedEntry?.tags ?? extractTags(this.metadataCache.getFileCache(file));
 
 		const targetTagsKey = createTagRefsCacheKey(tagRefs);
 		const indexVersion = this.getIndexVersion();
@@ -248,11 +242,7 @@ export class IndexingService implements IIndexingService {
 			return [];
 		}
 
-		return getNotesWithTag(
-			this.vault,
-			this.tagIndexStore.getSnapshot(),
-			tag,
-		);
+		return getNotesWithTag(this.vault, this.tagIndexStore.getSnapshot(), tag);
 	}
 
 	public async getNotesWithTag(
@@ -284,9 +274,7 @@ export class IndexingService implements IIndexingService {
 		await this.rebuildIndexesTimeSliced({ yieldIntervalMs });
 	}
 
-	public async rebuildIndexesTimeSliced(
-		options: RebuildOptions = {},
-	): Promise<void> {
+	public async rebuildIndexesTimeSliced(options: RebuildOptions = {}): Promise<void> {
 		if (enableLogging)
 			logger(
 				"[IndexingService.rebuildBacklinksMapChunked] Starting backlinks map rebuild",
@@ -349,8 +337,7 @@ export class IndexingService implements IIndexingService {
 		try {
 			const timeSlicingOptions = {
 				yieldFn: options.yieldFn ?? defaultYieldToMainThread,
-				yieldIntervalMs:
-					options.yieldIntervalMs ?? INDEXING_YIELD_INTERVAL_MS,
+				yieldIntervalMs: options.yieldIntervalMs ?? INDEXING_YIELD_INTERVAL_MS,
 			};
 			const result = await this.incrementalUpdater.applyAsync(
 				this.snapshot,

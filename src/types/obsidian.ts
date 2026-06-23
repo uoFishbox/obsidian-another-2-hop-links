@@ -1,9 +1,4 @@
-import type {
-	TFile,
-	CachedMetadata,
-	TAbstractFile,
-	WorkspaceLeaf,
-} from "obsidian";
+import type { TFile, CachedMetadata, TAbstractFile, WorkspaceLeaf } from "obsidian";
 
 import { type CanvasViewCanvas } from "obsidian-typings";
 
@@ -46,11 +41,7 @@ export interface CustomArrayDict<T> {
 export interface IMetadataCache {
 	getFileCache(file: TFile): CachedMetadata | null;
 	getFirstLinkpathDest(linkpath: string, sourcePath: string): TFile | null;
-	fileToLinktext(
-		file: TFile,
-		sourcePath: string,
-		omitMdExtension?: boolean,
-	): string;
+	fileToLinktext(file: TFile, sourcePath: string, omitMdExtension?: boolean): string;
 	getBacklinksForFile(file: TFile): CustomArrayDict<any>;
 	resolvedLinks: ObsidianLinkMap;
 	unresolvedLinks: ObsidianLinkMap;

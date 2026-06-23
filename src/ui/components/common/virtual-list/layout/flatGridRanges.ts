@@ -1,8 +1,4 @@
-import {
-	EMPTY_ROW_RANGE,
-	isEmptyRange,
-	type RowRange,
-} from "../rowRange";
+import { EMPTY_ROW_RANGE, isEmptyRange, type RowRange } from "../rowRange";
 
 export type VisibleCellWindow = RowRange;
 
@@ -34,17 +30,12 @@ export function computeVisibleRowRange(params: {
 		return EMPTY_ROW_RANGE;
 	}
 
-	const firstVisibleRow = Math.floor(
-		Math.max(0, sectionViewportTop) / rowStride,
-	);
+	const firstVisibleRow = Math.floor(Math.max(0, sectionViewportTop) / rowStride);
 	const lastVisibleRow = Math.floor(
 		Math.max(0, sectionViewportBottom - 1) / rowStride,
 	);
 	const start = Math.max(0, firstVisibleRow - params.overscanRows);
-	const end = Math.min(
-		params.rowCount,
-		lastVisibleRow + params.overscanRows + 1,
-	);
+	const end = Math.min(params.rowCount, lastVisibleRow + params.overscanRows + 1);
 
 	return { start, end };
 }
@@ -54,19 +45,12 @@ export function computeVisibleCellWindow(params: {
 	columns: number;
 	rowRange: RowRange;
 }): VisibleCellWindow {
-	if (
-		params.cellCount <= 0 ||
-		params.columns <= 0 ||
-		isEmptyRange(params.rowRange)
-	) {
+	if (params.cellCount <= 0 || params.columns <= 0 || isEmptyRange(params.rowRange)) {
 		return EMPTY_ROW_RANGE;
 	}
 
 	const start = params.rowRange.start * params.columns;
-	const end = Math.min(
-		params.cellCount,
-		params.rowRange.end * params.columns,
-	);
+	const end = Math.min(params.cellCount, params.rowRange.end * params.columns);
 
 	return { start, end };
 }

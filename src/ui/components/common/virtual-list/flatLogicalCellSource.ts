@@ -15,9 +15,7 @@ import {
 } from "./validation/virtualListValidationError";
 
 export interface LogicalCellItemKeyResolver<T> {
-	resolveLogicalCellKeyAtItemIndex: (
-		itemIndex: number,
-	) => LogicalCellKey | null;
+	resolveLogicalCellKeyAtItemIndex: (itemIndex: number) => LogicalCellKey | null;
 	resolveSourceKeyAtItemIndex: (itemIndex: number) => SourceKey | null;
 }
 
@@ -37,10 +35,7 @@ export function createArrayVirtualGridDataSource<T>(params: {
 	getKey: (item: T, index: number) => string;
 	revision?: unknown;
 	keyRevision?: unknown;
-	getItemRenderRevision?: (
-		item: T,
-		index: number,
-	) => RenderRevision | undefined;
+	getItemRenderRevision?: (item: T, index: number) => RenderRevision | undefined;
 }): VirtualGridDataSource<T> {
 	return {
 		count: params.items.length,
@@ -115,15 +110,14 @@ export function tryCreateFlatLogicalCellSource<T>(params: {
 				key: logicalCellKey(`${keyPrefix}::__load-more`),
 			}
 		: null;
-	const revision =
-		params.revision ?? {
-			data: dataSource.revision,
-			key: dataSource.keyRevision,
-			visibleCount,
-			hasHeader,
-			showLoadMore: params.showLoadMore,
-			sectionId: params.sectionId,
-		};
+	const revision = params.revision ?? {
+		data: dataSource.revision,
+		key: dataSource.keyRevision,
+		visibleCount,
+		hasHeader,
+		showLoadMore: params.showLoadMore,
+		sectionId: params.sectionId,
+	};
 
 	return {
 		ok: true,
@@ -204,10 +198,10 @@ export function createArrayBackedFlatLogicalCellSource<T>(
 	cells: readonly VirtualListLogicalCell<T>[],
 ): FlatLogicalCellSource<T> {
 	let visibleCount = 0;
-	let cellsByItemIndex: Map<number, Extract<
-		VirtualListLogicalCell<T>,
-		{ kind: "item" }
-	>> | null = null;
+	let cellsByItemIndex: Map<
+		number,
+		Extract<VirtualListLogicalCell<T>, { kind: "item" }>
+	> | null = null;
 
 	for (const cell of cells) {
 		if (cell.kind === "item") {
@@ -265,14 +259,15 @@ export function createArrayBackedFlatLogicalCellSource<T>(
 	};
 }
 
-export function createLogicalCellItemKeyResolver<T>(params:
-	| {
-			items: readonly T[];
-			getKey: (item: T, index: number) => string;
-	  }
-	| {
-			dataSource: VirtualGridDataSource<T>;
-	  },
+export function createLogicalCellItemKeyResolver<T>(
+	params:
+		| {
+				items: readonly T[];
+				getKey: (item: T, index: number) => string;
+		  }
+		| {
+				dataSource: VirtualGridDataSource<T>;
+		  },
 ): LogicalCellItemKeyResolver<T> {
 	const dataSource =
 		"dataSource" in params

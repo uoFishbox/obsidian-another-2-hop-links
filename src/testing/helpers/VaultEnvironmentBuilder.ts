@@ -188,12 +188,10 @@ export class VaultEnvironmentBuilder {
 
 				if (this.files.has(targetPath)) {
 					// 解決済み
-					sourceResolved[targetPath] =
-						(sourceResolved[targetPath] || 0) + 1;
+					sourceResolved[targetPath] = (sourceResolved[targetPath] || 0) + 1;
 				} else {
 					// 未解決
-					sourceUnresolved[linkText] =
-						(sourceUnresolved[linkText] || 0) + 1;
+					sourceUnresolved[linkText] = (sourceUnresolved[linkText] || 0) + 1;
 				}
 			}
 
@@ -219,10 +217,10 @@ export class VaultEnvironmentBuilder {
 		}
 		return (
 			await buildDetailedBacklinksArtifactsChunked(
-			this.mockVault!,
-			this.mockMetadataCache!,
-			{},
-		)
+				this.mockVault!,
+				this.mockMetadataCache!,
+				{},
+			)
 		).detailedMap;
 	}
 }

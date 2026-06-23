@@ -9,17 +9,15 @@ interface MockObserverRecord {
 }
 
 const observerRecords: MockObserverRecord[] = [];
-let originalIntersectionObserver:
-	| typeof globalThis.IntersectionObserver
-	| undefined;
+let originalIntersectionObserver: typeof globalThis.IntersectionObserver | undefined;
 
 describe("IntersectionObserverRegistry", () => {
 	beforeEach(() => {
 		observerRecords.length = 0;
 		originalIntersectionObserver = globalThis.IntersectionObserver;
 
-			class MockIntersectionObserver {
-				root: IntersectionObserver["root"] = null;
+		class MockIntersectionObserver {
+			root: IntersectionObserver["root"] = null;
 			rootMargin = "";
 			thresholds: ReadonlyArray<number> = [];
 			observe = vi.fn();

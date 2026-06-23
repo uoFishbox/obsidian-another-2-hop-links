@@ -104,11 +104,9 @@ describe("SectionWrapper virtual grid integration", () => {
 			getSectionExpandedLimit: vi.fn((sectionId: string) =>
 				expandedLimits.get(sectionId),
 			),
-			setSectionExpandedLimit: vi.fn(
-				(sectionId: string, limit: number) => {
-					expandedLimits.set(sectionId, limit);
-				},
-			),
+			setSectionExpandedLimit: vi.fn((sectionId: string, limit: number) => {
+				expandedLimits.set(sectionId, limit);
+			}),
 		} as unknown as ApplicationStore;
 
 		const { container } = render(SectionWrapperHarness, {
@@ -133,8 +131,9 @@ describe("SectionWrapper virtual grid integration", () => {
 		await flushFrames();
 
 		expect(getVisibleItemCount()).toBe(6);
-		expect(
-			applicationStore.setSectionExpandedLimit,
-		).toHaveBeenLastCalledWith("section-under-test", 6);
+		expect(applicationStore.setSectionExpandedLimit).toHaveBeenLastCalledWith(
+			"section-under-test",
+			6,
+		);
 	});
 });

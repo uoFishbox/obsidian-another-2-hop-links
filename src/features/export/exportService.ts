@@ -9,7 +9,7 @@ interface ExportPageData {
 
 export async function exportToClipboard(
 	app: App,
-	result: TwoHopLinkResult
+	result: TwoHopLinkResult,
 ): Promise<void> {
 	try {
 		const content = await generateExportContent(app, result);
@@ -17,15 +17,13 @@ export async function exportToClipboard(
 		new Notice("2-hop links exported to clipboard!");
 	} catch (error) {
 		console.error("Failed to export 2-hop links:", error);
-		new Notice(
-			"Failed to export 2-hop links. Check console for details."
-		);
+		new Notice("Failed to export 2-hop links. Check console for details.");
 	}
 }
 
 export async function downloadAsFile(
 	app: App,
-	result: TwoHopLinkResult
+	result: TwoHopLinkResult,
 ): Promise<void> {
 	try {
 		const content = await generateExportContent(app, result);
@@ -53,7 +51,7 @@ export async function downloadAsFile(
 
 async function generateExportContent(
 	app: App,
-	result: TwoHopLinkResult
+	result: TwoHopLinkResult,
 ): Promise<string> {
 	const pagesMap = new Map<string, ExportPageData>();
 
@@ -72,11 +70,7 @@ async function generateExportContent(
 		const path = branch.hop1.path;
 		if (path && !branch.hop1.isUnresolved) {
 			const file = resolveFileByPath(app.vault, path);
-			if (
-				file &&
-				file.extension === "md" &&
-				!pagesMap.has(path)
-			) {
+			if (file && file.extension === "md" && !pagesMap.has(path)) {
 				pagesMap.set(path, { file, type: "1hopLink" });
 			}
 		}
@@ -117,7 +111,7 @@ async function generateExportContent(
 	const mainPageMsg = hasMainPage ? "main page + " : "";
 
 	lines.push(
-		`Total pages included: ${pagesMap.size} (${mainPageMsg}${count1Hop} directly linked + ${count2Hop} indirectly linked pages).`
+		`Total pages included: ${pagesMap.size} (${mainPageMsg}${count1Hop} directly linked + ${count2Hop} indirectly linked pages).`,
 	);
 	lines.push("");
 	lines.push("<PageList>");
@@ -136,7 +130,7 @@ async function generateExportContent(
 		const title = file.basename;
 
 		lines.push(
-			`<Page title="${title}" path="${file.path}" updated="${updated}" created="${created}" type="${type}">`
+			`<Page title="${title}" path="${file.path}" updated="${updated}" created="${created}" type="${type}">`,
 		);
 		lines.push(content.trim());
 		lines.push("</Page>");

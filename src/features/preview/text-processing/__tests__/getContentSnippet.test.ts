@@ -41,10 +41,7 @@ Actual content.`;
 		});
 
 		test("returns empty when only frontmatter exists", () => {
-			const result = getContentSnippet(
-				"---\ntitle: X\n---",
-				defaultSettings,
-			);
+			const result = getContentSnippet("---\ntitle: X\n---", defaultSettings);
 			expect(result).toBe("");
 		});
 
@@ -93,8 +90,7 @@ Actual content.`;
 		});
 
 		test("preserves multiple code blocks", () => {
-			const content =
-				"```python\nprint(1)\n```\n\n```js\nconst x = 1;\n```";
+			const content = "```python\nprint(1)\n```\n\n```js\nconst x = 1;\n```";
 			const result = getContentSnippet(content, defaultSettings);
 			expect(
 				result.match(/class="cosense-card-links__code-block"/g),
@@ -104,19 +100,13 @@ Actual content.`;
 
 	describe("wiki link transformation", () => {
 		test("converts [[Note]] to styled span", () => {
-			const result = getContentSnippet(
-				"See [[Note Name]].",
-				defaultSettings,
-			);
+			const result = getContentSnippet("See [[Note Name]].", defaultSettings);
 			expect(result).toContain('class="cosense-card-links__wikilink');
 			expect(result).toContain("Note Name");
 		});
 
 		test("displays alias for [[Note|Alias]]", () => {
-			const result = getContentSnippet(
-				"[[Actual|Display]]",
-				defaultSettings,
-			);
+			const result = getContentSnippet("[[Actual|Display]]", defaultSettings);
 			expect(result).toContain("Display");
 			expect(result).not.toContain("Actual");
 		});
@@ -149,9 +139,7 @@ Actual content.`;
 			"converts $label Markdown/bare links to external-link span",
 			({ input, expectText, notContain }) => {
 				const result = getContentSnippet(input, defaultSettings);
-				expect(result).toContain(
-					'class="cosense-card-links__external-link"',
-				);
+				expect(result).toContain('class="cosense-card-links__external-link"');
 				expect(result).toContain(expectText);
 				if (notContain) expect(result).not.toContain(notContain);
 			},
@@ -160,9 +148,7 @@ Actual content.`;
 		test("treats .md and extensionless links as internal (wikilink)", () => {
 			const md = getContentSnippet("[Note](note.md)", defaultSettings);
 			expect(md).toContain('class="cosense-card-links__wikilink"');
-			expect(md).not.toContain(
-				'class="cosense-card-links__external-link"',
-			);
+			expect(md).not.toContain('class="cosense-card-links__external-link"');
 
 			const noExt = getContentSnippet("[Note](note)", defaultSettings);
 			expect(noExt).toContain('class="cosense-card-links__wikilink"');
@@ -277,9 +263,7 @@ Plain text`;
 				previewVisualLineSafetyMargin: 2,
 			});
 
-			expect(withMargin.length).toBeGreaterThanOrEqual(
-				withoutMargin.length,
-			);
+			expect(withMargin.length).toBeGreaterThanOrEqual(withoutMargin.length);
 		});
 
 		test("no truncation when both limits are 0", () => {
@@ -319,8 +303,7 @@ Plain text`;
 		});
 
 		test("keeps block math $$...$$ balanced when truncated", () => {
-			const content =
-				"Text $$\n\\frac{1}{2}\n" + "x".repeat(500) + "\n$$";
+			const content = "Text $$\n\\frac{1}{2}\n" + "x".repeat(500) + "\n$$";
 			const result = getContentSnippet(content, {
 				...defaultSettings,
 				previewMaxChars: 50,
@@ -342,13 +325,10 @@ Plain text`;
 		});
 
 		test("rewinds past unclosed code fence when truncated", () => {
-			const result = getContentSnippet(
-				"Text\n```\n" + "code\n".repeat(100),
-				{
-					...defaultSettings,
-					previewMaxChars: 30,
-				},
-			);
+			const result = getContentSnippet("Text\n```\n" + "code\n".repeat(100), {
+				...defaultSettings,
+				previewMaxChars: 30,
+			});
 			// Code blocks are transformed to spans before truncation,
 			// so we verify balanced span tags instead of raw fences.
 			const opens = (result.match(/<span/g) || []).length;
@@ -373,9 +353,7 @@ Plain text`;
 
 	describe("edge cases", () => {
 		test("collapses consecutive newlines and spaces", () => {
-			expect(getContentSnippet("A\n\n\n\nB", defaultSettings)).toBe(
-				"A\nB",
-			);
+			expect(getContentSnippet("A\n\n\n\nB", defaultSettings)).toBe("A\nB");
 			expect(getContentSnippet("A     B", defaultSettings)).toBe("A B");
 		});
 
@@ -431,22 +409,15 @@ End.`;
 			expect(result).not.toContain("![");
 			expect(result).not.toContain("![[");
 			expect(result).toContain('class="cosense-card-links__wikilink');
-			expect(result).toContain(
-				'class="cosense-card-links__external-link"',
-			);
+			expect(result).toContain('class="cosense-card-links__external-link"');
 		});
 	});
 });
 
 describe("getContentSnippet with search query", () => {
 	test("seeks to hit location and adds ellipsis on both sides", () => {
-		const content =
-			"A".repeat(1800) + "\nTarget phrase here.\n" + "B".repeat(1000);
-		const result = getContentSnippet(
-			content,
-			defaultSettings,
-			"target phrase",
-		);
+		const content = "A".repeat(1800) + "\nTarget phrase here.\n" + "B".repeat(1000);
+		const result = getContentSnippet(content, defaultSettings, "target phrase");
 		expect(result).toContain("Target phrase here.");
 		expect(result.startsWith("...")).toBe(true);
 		expect(result.endsWith("...")).toBe(true);
@@ -473,20 +444,12 @@ describe("getContentSnippet with search query", () => {
 		const withOpt = getContentSnippet(content, defaultSettings, "target", {
 			firstMatchIndex,
 		});
-		const withoutOpt = getContentSnippet(
-			content,
-			defaultSettings,
-			"target",
-		);
+		const withoutOpt = getContentSnippet(content, defaultSettings, "target");
 		expect(withOpt).toBe(withoutOpt);
 	});
 
 	test("literal search with regex metacharacters", () => {
-		const result = getContentSnippet(
-			"prefix C++ suffix",
-			defaultSettings,
-			"c++",
-		);
+		const result = getContentSnippet("prefix C++ suffix", defaultSettings, "c++");
 		expect(result).toContain("C++");
 	});
 
@@ -505,19 +468,13 @@ describe("getContentSnippet with search query", () => {
 	});
 
 	test("preserves fenced code block when search hits inside it", () => {
-		const prelude = Array.from({ length: 40 }, (_, i) => `line_${i}`).join(
-			"\n",
-		);
+		const prelude = Array.from({ length: 40 }, (_, i) => `line_${i}`).join("\n");
 		const content =
 			"prefix\n".repeat(80) +
 			"```python\n" +
 			prelude +
 			"\n# target_hit\nprint(1)\n```\n";
-		const result = getContentSnippet(
-			content,
-			defaultSettings,
-			"target_hit",
-		);
+		const result = getContentSnippet(content, defaultSettings, "target_hit");
 		expect(result).toContain('class="cosense-card-links__code-block"');
 		expect(result).toContain("# target_hit");
 		expect(result).not.toContain("\n```");
@@ -525,11 +482,7 @@ describe("getContentSnippet with search query", () => {
 
 	test("keeps headings when searching (searchSnippet context)", () => {
 		const content = `# Overview\nIntro\n\n## target heading\ndetails`;
-		const result = getContentSnippet(
-			content,
-			defaultSettings,
-			"target heading",
-		);
+		const result = getContentSnippet(content, defaultSettings, "target heading");
 		expect(result).toContain("## target heading");
 		expect(result).toContain("details");
 	});

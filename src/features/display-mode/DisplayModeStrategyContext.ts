@@ -21,7 +21,7 @@ export interface DisplayModeStrategyContext {
 	updateSidebarForCanvasSelectionView(view: unknown): void;
 	updateSidebarForCanvasSelectionEvent(
 		canvas: CanvasViewCanvas,
-		selectedNodes: CanvasNodeData[]
+		selectedNodes: CanvasNodeData[],
 	): void;
 	isCanvasSingleFileSelected(view: unknown): boolean;
 	isMarkdownView(view: unknown): boolean;

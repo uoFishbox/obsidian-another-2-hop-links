@@ -189,12 +189,9 @@ export class FileChangeQueue {
 		}
 	}
 
-	private findDeletedTrackByInitialPath(
-		path: string,
-	): QueuedFileTrack | undefined {
+	private findDeletedTrackByInitialPath(path: string): QueuedFileTrack | undefined {
 		return this.tracks.find(
-			(track) =>
-				track.initialPath === path && track.currentPath === undefined,
+			(track) => track.initialPath === path && track.currentPath === undefined,
 		);
 	}
 
@@ -242,9 +239,7 @@ export class FileChangeQueue {
 		return result;
 	}
 
-	private materializeTrack(
-		track: QueuedFileTrack,
-	): IncrementalFileChange | null {
+	private materializeTrack(track: QueuedFileTrack): IncrementalFileChange | null {
 		if (track.currentPath === undefined) {
 			return track.initialPath
 				? { type: "delete", path: track.initialPath }

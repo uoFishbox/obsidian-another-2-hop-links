@@ -15,10 +15,7 @@ import {
 	visitResolvedBacklinkRefsUnorderedAsync,
 } from "../backlink-builder/backlinkReferenceSequence";
 import { createLinkResolutionAmbiguityDetector } from "../link-resolution/linkResolution";
-import {
-	HEAVY_YIELD_CHECK_INTERVAL,
-	type YieldScheduler,
-} from "../timeSlicing";
+import { HEAVY_YIELD_CHECK_INTERVAL, type YieldScheduler } from "../timeSlicing";
 
 function tfile(path: string): TFile {
 	const extension = path.split(".").pop() ?? "";
@@ -82,10 +79,7 @@ describe("dedupeBySourceFile", () => {
 		const result = dedupeBySourceFile(links, "note2.md");
 
 		expect(result).toHaveLength(2);
-		expect(result.map((l) => l.sourceFile.path)).toEqual([
-			"note1.md",
-			"note3.md",
-		]);
+		expect(result.map((l) => l.sourceFile.path)).toEqual(["note1.md", "note3.md"]);
 	});
 
 	test("returns an empty array for empty input", () => {
@@ -96,48 +90,34 @@ describe("dedupeBySourceFile", () => {
 
 describe("buildDetailedBacklinksArtifactsChunked", () => {
 	test("builds resolved backlink buckets by destination and source", async () => {
-		const { mockVault, mockMetadataCache, files } =
-			new VaultEnvironmentBuilder([
-				{ path: "source.md" },
-				{ path: "target.md" },
-			]).build();
+		const { mockVault, mockMetadataCache, files } = new VaultEnvironmentBuilder([
+			{ path: "source.md" },
+			{ path: "target.md" },
+		]).build();
 
-		(mockMetadataCache.getFileCache as any).mockImplementation(
-			(file: TFile) => {
-				if (file.path === "source.md") {
-					return {
-						links: [
-							{
-								link: "target",
-								original: "[[target|late]]",
-								displayText: "late",
-								position: {
-									start: { line: 0, col: 0, offset: 120 },
-									end: { line: 0, col: 14, offset: 134 },
-								},
-							},
-							{
-								link: "target",
-								original: "[[target|early]]",
-								displayText: "early",
-								position: {
-									start: { line: 0, col: 0, offset: 10 },
-									end: { line: 0, col: 15, offset: 25 },
-								},
-							},
-						],
-						embeds: [],
-						headings: [],
-						sections: [],
-						tags: [],
-						frontmatter: undefined,
-						frontmatterPosition: undefined,
-						frontmatterLinks: undefined,
-					} as CachedMetadata;
-				}
-
+		(mockMetadataCache.getFileCache as any).mockImplementation((file: TFile) => {
+			if (file.path === "source.md") {
 				return {
-					links: [],
+					links: [
+						{
+							link: "target",
+							original: "[[target|late]]",
+							displayText: "late",
+							position: {
+								start: { line: 0, col: 0, offset: 120 },
+								end: { line: 0, col: 14, offset: 134 },
+							},
+						},
+						{
+							link: "target",
+							original: "[[target|early]]",
+							displayText: "early",
+							position: {
+								start: { line: 0, col: 0, offset: 10 },
+								end: { line: 0, col: 15, offset: 25 },
+							},
+						},
+					],
 					embeds: [],
 					headings: [],
 					sections: [],
@@ -146,8 +126,19 @@ describe("buildDetailedBacklinksArtifactsChunked", () => {
 					frontmatterPosition: undefined,
 					frontmatterLinks: undefined,
 				} as CachedMetadata;
-			},
-		);
+			}
+
+			return {
+				links: [],
+				embeds: [],
+				headings: [],
+				sections: [],
+				tags: [],
+				frontmatter: undefined,
+				frontmatterPosition: undefined,
+				frontmatterLinks: undefined,
+			} as CachedMetadata;
+		});
 		(mockMetadataCache.getFirstLinkpathDest as any).mockImplementation(
 			(linkText: string) => {
 				if (linkText === "target") {
@@ -162,9 +153,7 @@ describe("buildDetailedBacklinksArtifactsChunked", () => {
 			mockMetadataCache,
 			{},
 		);
-		const collection = artifacts.detailedMap
-			.get("target.md")
-			?.get("source.md");
+		const collection = artifacts.detailedMap.get("target.md")?.get("source.md");
 
 		expect(collection).toBeDefined();
 		expect(getBacklinkCollectionCount(collection!)).toBe(2);
@@ -172,65 +161,62 @@ describe("buildDetailedBacklinksArtifactsChunked", () => {
 	});
 
 	test("indexes links, embeds, and frontmatter links", async () => {
-		const { mockVault, mockMetadataCache, files } =
-			new VaultEnvironmentBuilder([
-				{ path: "source.md" },
-				{ path: "target-link.md" },
-				{ path: "target-embed.md" },
-				{ path: "target-frontmatter.md" },
-			]).build();
+		const { mockVault, mockMetadataCache, files } = new VaultEnvironmentBuilder([
+			{ path: "source.md" },
+			{ path: "target-link.md" },
+			{ path: "target-embed.md" },
+			{ path: "target-frontmatter.md" },
+		]).build();
 
-		(mockMetadataCache.getFileCache as any).mockImplementation(
-			(file: TFile) => {
-				if (file.path === "source.md") {
-					return {
-						links: [
-							{
-								link: "target-link",
-								original: "[[target-link]]",
-								position: {
-									start: { line: 0, col: 0, offset: 10 },
-									end: { line: 0, col: 15, offset: 25 },
-								},
-							},
-						],
-						embeds: [
-							{
-								link: "target-embed",
-								original: "![[target-embed]]",
-								position: {
-									start: { line: 1, col: 0, offset: 30 },
-									end: { line: 1, col: 17, offset: 47 },
-								},
-							},
-						],
-						headings: [],
-						sections: [],
-						tags: [],
-						frontmatter: undefined,
-						frontmatterPosition: undefined,
-						frontmatterLinks: [
-							{
-								key: "related",
-								link: "target-frontmatter",
-								original: "target-frontmatter",
-							},
-						],
-					} as CachedMetadata;
-				}
-
+		(mockMetadataCache.getFileCache as any).mockImplementation((file: TFile) => {
+			if (file.path === "source.md") {
 				return {
-					links: [],
-					embeds: [],
+					links: [
+						{
+							link: "target-link",
+							original: "[[target-link]]",
+							position: {
+								start: { line: 0, col: 0, offset: 10 },
+								end: { line: 0, col: 15, offset: 25 },
+							},
+						},
+					],
+					embeds: [
+						{
+							link: "target-embed",
+							original: "![[target-embed]]",
+							position: {
+								start: { line: 1, col: 0, offset: 30 },
+								end: { line: 1, col: 17, offset: 47 },
+							},
+						},
+					],
 					headings: [],
 					sections: [],
 					tags: [],
 					frontmatter: undefined,
 					frontmatterPosition: undefined,
-					frontmatterLinks: undefined,
+					frontmatterLinks: [
+						{
+							key: "related",
+							link: "target-frontmatter",
+							original: "target-frontmatter",
+						},
+					],
 				} as CachedMetadata;
-			},
-		);
+			}
+
+			return {
+				links: [],
+				embeds: [],
+				headings: [],
+				sections: [],
+				tags: [],
+				frontmatter: undefined,
+				frontmatterPosition: undefined,
+				frontmatterLinks: undefined,
+			} as CachedMetadata;
+		});
 		(mockMetadataCache.getFirstLinkpathDest as any).mockImplementation(
 			(linkText: string) => {
 				if (linkText === "target-link") {
@@ -252,16 +238,14 @@ describe("buildDetailedBacklinksArtifactsChunked", () => {
 			{},
 		);
 
+		expect(artifacts.detailedMap.get("target-link.md")?.has("source.md")).toBe(
+			true,
+		);
+		expect(artifacts.detailedMap.get("target-embed.md")?.has("source.md")).toBe(
+			true,
+		);
 		expect(
-			artifacts.detailedMap.get("target-link.md")?.has("source.md"),
-		).toBe(true);
-		expect(
-			artifacts.detailedMap.get("target-embed.md")?.has("source.md"),
-		).toBe(true);
-		expect(
-			artifacts.detailedMap
-				.get("target-frontmatter.md")
-				?.has("source.md"),
+			artifacts.detailedMap.get("target-frontmatter.md")?.has("source.md"),
 		).toBe(true);
 		expect(
 			new Set(
@@ -270,20 +254,15 @@ describe("buildDetailedBacklinksArtifactsChunked", () => {
 					?.firstRefIndexByLookupKey.keys(),
 			),
 		).toEqual(
-			new Set([
-				"target-link.md",
-				"target-embed.md",
-				"target-frontmatter.md",
-			]),
+			new Set(["target-link.md", "target-embed.md", "target-frontmatter.md"]),
 		);
 	});
 
 	test("normalizes resolved lookup keys from destination paths", async () => {
-		const { mockVault, mockMetadataCache, files } =
-			new VaultEnvironmentBuilder([
-				{ path: "source.md", links: ["note"] },
-				{ path: "Note.md" },
-			]).build();
+		const { mockVault, mockMetadataCache, files } = new VaultEnvironmentBuilder([
+			{ path: "source.md", links: ["note"] },
+			{ path: "Note.md" },
+		]).build();
 		(mockMetadataCache.getFirstLinkpathDest as any).mockImplementation(
 			(linkText: string) => {
 				if (linkText === "note") {
@@ -308,11 +287,10 @@ describe("buildDetailedBacklinksArtifactsChunked", () => {
 	});
 
 	test("deduplicates duplicate raw lookup keys within the same source", async () => {
-		const { mockVault, mockMetadataCache, files } =
-			new VaultEnvironmentBuilder([
-				{ path: "source.md", links: ["target", "target", "target"] },
-				{ path: "target.md" },
-			]).build();
+		const { mockVault, mockMetadataCache, files } = new VaultEnvironmentBuilder([
+			{ path: "source.md", links: ["target", "target", "target"] },
+			{ path: "target.md" },
+		]).build();
 
 		const artifacts = await buildDetailedBacklinksArtifactsChunked(
 			mockVault,
@@ -322,9 +300,7 @@ describe("buildDetailedBacklinksArtifactsChunked", () => {
 
 		expect(
 			Array.from(
-				artifacts.sourceSummaries
-					.get("source.md")
-					?.destinations.keys() ?? [],
+				artifacts.sourceSummaries.get("source.md")?.destinations.keys() ?? [],
 			),
 		).toEqual(["target.md"]);
 		expect(artifacts.lookupKeyToLookupPaths.get("target.md")).toEqual(
@@ -354,11 +330,10 @@ describe("buildDetailedBacklinksArtifactsChunked", () => {
 	});
 
 	test("does not index unresolved entries when the same lookup key is resolved", async () => {
-		const { mockVault, mockMetadataCache, files } =
-			new VaultEnvironmentBuilder([
-				{ path: "source.md", links: ["Note", "note.md", "note.md"] },
-				{ path: "Note.md" },
-			]).build();
+		const { mockVault, mockMetadataCache, files } = new VaultEnvironmentBuilder([
+			{ path: "source.md", links: ["Note", "note.md", "note.md"] },
+			{ path: "Note.md" },
+		]).build();
 
 		(mockMetadataCache.getFirstLinkpathDest as any).mockImplementation(
 			(linkText: string) => {
@@ -382,13 +357,12 @@ describe("buildDetailedBacklinksArtifactsChunked", () => {
 	});
 
 	test("keeps source-dependent ambiguous links resolved per source path", async () => {
-		const { mockVault, mockMetadataCache, files } =
-			new VaultEnvironmentBuilder([
-				{ path: "team-a/index.md", links: ["Dashboard"] },
-				{ path: "team-b/index.md", links: ["Dashboard"] },
-				{ path: "team-a/Dashboard.md" },
-				{ path: "team-b/Dashboard.md" },
-			]).build();
+		const { mockVault, mockMetadataCache, files } = new VaultEnvironmentBuilder([
+			{ path: "team-a/index.md", links: ["Dashboard"] },
+			{ path: "team-b/index.md", links: ["Dashboard"] },
+			{ path: "team-a/Dashboard.md" },
+			{ path: "team-b/Dashboard.md" },
+		]).build();
 
 		(mockMetadataCache.getFirstLinkpathDest as any).mockImplementation(
 			(_linkText: string, sourcePath: string) => {
@@ -409,14 +383,10 @@ describe("buildDetailedBacklinksArtifactsChunked", () => {
 		);
 
 		expect(
-			artifacts.detailedMap
-				.get("team-a/Dashboard.md")
-				?.has("team-a/index.md"),
+			artifacts.detailedMap.get("team-a/Dashboard.md")?.has("team-a/index.md"),
 		).toBe(true);
 		expect(
-			artifacts.detailedMap
-				.get("team-b/Dashboard.md")
-				?.has("team-b/index.md"),
+			artifacts.detailedMap.get("team-b/Dashboard.md")?.has("team-b/index.md"),
 		).toBe(true);
 	});
 
@@ -463,15 +433,9 @@ describe("buildDetailedBacklinksArtifactsChunked", () => {
 			{},
 		);
 
-		expect(artifacts.detailedMap.get("target.md")?.has("source.md")).toBe(
-			true,
-		);
-		expect(
-			artifacts.detailedMap.get("target.md")?.has("board.canvas"),
-		).toBe(true);
-		expect(artifacts.detailedMap.get("target.md")?.has("asset.png")).toBe(
-			false,
-		);
+		expect(artifacts.detailedMap.get("target.md")?.has("source.md")).toBe(true);
+		expect(artifacts.detailedMap.get("target.md")?.has("board.canvas")).toBe(true);
+		expect(artifacts.detailedMap.get("target.md")?.has("asset.png")).toBe(false);
 		expect(artifacts.tagIndex.fileEntries.has("asset.png")).toBe(false);
 		expect(artifacts.tagIndex.tagToFilePaths.get("tag/root")).toEqual(
 			new Set(["source.md"]),
@@ -482,10 +446,7 @@ describe("buildDetailedBacklinksArtifactsChunked", () => {
 		const { mockVault, mockMetadataCache } = new VaultEnvironmentBuilder([
 			{
 				path: "source.md",
-				links: Array.from(
-					{ length: 256 },
-					(_, index) => `missing-${index}`,
-				),
+				links: Array.from({ length: 256 }, (_, index) => `missing-${index}`),
 			},
 		]).build();
 		let yieldCount = 0;
@@ -537,8 +498,7 @@ describe("buildDetailedBacklinksArtifactsChunked", () => {
 		const sourceFile = mockVault.getFiles()[0];
 		const cache = mockMetadataCache.getFileCache(sourceFile);
 		const resolvedMemo = createResolvedLinkMemo();
-		const ambiguityDetector =
-			createLinkResolutionAmbiguityDetector(mockVault);
+		const ambiguityDetector = createLinkResolutionAmbiguityDetector(mockVault);
 
 		const visitPromise = visitResolvedBacklinkRefsUnorderedAsync(
 			mockMetadataCache,

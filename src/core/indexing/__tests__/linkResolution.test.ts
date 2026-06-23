@@ -48,14 +48,11 @@ describe("linkResolution", () => {
 
 	test("toCaseInsensitiveLookupKey globally caches the same input", async () => {
 		const lowerSpy = vi.spyOn(String.prototype, "toLowerCase");
-		const { toCaseInsensitiveLookupKey } = await import("../link-resolution/linkResolution");
+		const { toCaseInsensitiveLookupKey } =
+			await import("../link-resolution/linkResolution");
 
-		expect(toCaseInsensitiveLookupKey("Folder\\Note.MD")).toBe(
-			"folder/note.md",
-		);
-		expect(toCaseInsensitiveLookupKey("Folder\\Note.MD")).toBe(
-			"folder/note.md",
-		);
+		expect(toCaseInsensitiveLookupKey("Folder\\Note.MD")).toBe("folder/note.md");
+		expect(toCaseInsensitiveLookupKey("Folder\\Note.MD")).toBe("folder/note.md");
 
 		expect(normalizePathMock).toHaveBeenCalledTimes(1);
 		expect(lowerSpy).toHaveBeenCalledTimes(1);
@@ -64,23 +61,19 @@ describe("linkResolution", () => {
 	});
 
 	test("normalizeLinkToMarkdownPath reuses normalization for the same link string", async () => {
-		const { normalizeLinkToMarkdownPath } = await import("../link-resolution/linkResolution");
+		const { normalizeLinkToMarkdownPath } =
+			await import("../link-resolution/linkResolution");
 
-		expect(normalizeLinkToMarkdownPath("[[Folder\\Note]]")).toBe(
-			"Folder/Note.md",
-		);
-		expect(normalizeLinkToMarkdownPath("[[Folder\\Note]]")).toBe(
-			"Folder/Note.md",
-		);
+		expect(normalizeLinkToMarkdownPath("[[Folder\\Note]]")).toBe("Folder/Note.md");
+		expect(normalizeLinkToMarkdownPath("[[Folder\\Note]]")).toBe("Folder/Note.md");
 
 		expect(getLinkpathMock).toHaveBeenCalledTimes(1);
 		expect(normalizePathMock).toHaveBeenCalledTimes(1);
 	});
 
 	test("normalizeRawLinkpathToMarkdownPath reuses normalization for the same rawPath", async () => {
-		const { normalizeRawLinkpathToMarkdownPath } = await import(
-			"../link-resolution/linkResolution"
-		);
+		const { normalizeRawLinkpathToMarkdownPath } =
+			await import("../link-resolution/linkResolution");
 
 		expect(normalizeRawLinkpathToMarkdownPath("Folder\\Note")).toBe(
 			"Folder/Note.md",
@@ -191,9 +184,8 @@ describe("linkResolution", () => {
 	});
 
 	test("LinkResolutionAmbiguityDetector updates counts on create/delete/rename", async () => {
-		const { createLinkResolutionAmbiguityDetector } = await import(
-			"../link-resolution/linkResolution"
-		);
+		const { createLinkResolutionAmbiguityDetector } =
+			await import("../link-resolution/linkResolution");
 		const detector = createLinkResolutionAmbiguityDetector(
 			createMockVault(["alpha/Foo.md", "beta/Foo.md", "alpha/Bar.md"]),
 		);

@@ -4,10 +4,7 @@ import type {
 	HoverPopoverLike,
 	ShadowHoverSession,
 } from "./internal-types";
-import {
-	getSessionAnchor,
-	getSessionPopover,
-} from "./state-machine";
+import { getSessionAnchor, getSessionPopover } from "./state-machine";
 
 const MAX_DEBUG_LOGS = 200;
 
@@ -33,9 +30,7 @@ export function summarizePopover(
 	};
 }
 
-export function summarizeSession(
-	session: ShadowHoverSession,
-): Record<string, unknown> {
+export function summarizeSession(session: ShadowHoverSession): Record<string, unknown> {
 	const activeAnchor = getSessionAnchor(session.state);
 	const popover = getSessionPopover(session.state);
 	const handoff = session.state.type === "handoff" ? session.state : null;
@@ -45,8 +40,7 @@ export function summarizeSession(
 		overPopover: session.interaction.overPopover,
 		allowClose: session.allowClose,
 		destroyed: session.state.type === "destroyed",
-		pendingOutsideInteractionUntil:
-			session.interaction.outsideInteractionUntil,
+		pendingOutsideInteractionUntil: session.interaction.outsideInteractionUntil,
 		activeAnchorTag: activeAnchor?.proxyEl.tagName ?? null,
 		activeAnchorClass: activeAnchor?.proxyEl.className ?? null,
 		activeActualTag: activeAnchor?.actualEl.tagName ?? null,
@@ -82,8 +76,7 @@ export function debugLog(
 	if (typeof session.logSeq !== "number" || !Array.isArray(session.logs)) {
 		return;
 	}
-	const resolvedDetail =
-		typeof detail === "function" ? detail() : detail;
+	const resolvedDetail = typeof detail === "function" ? detail() : detail;
 	const entry: DebugLogEntry = {
 		index: session.logSeq++,
 		at: Date.now(),

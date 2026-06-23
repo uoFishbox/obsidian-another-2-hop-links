@@ -78,9 +78,7 @@
 	}
 
 	const isAttachmentFile = $derived(isAttachment(extension));
-	const extensionClass = $derived(
-		extension ? `ext-${extension.toLowerCase()}` : "",
-	);
+	const extensionClass = $derived(extension ? `ext-${extension.toLowerCase()}` : "");
 	const hasSearchQuery = $derived(searchQuery.trim().length > 0);
 	const bookmarkedPathSet = appContext?.bookmarks.filePaths;
 	const showBookmarkIcon = $derived(
@@ -185,13 +183,7 @@
 	{@render children?.()}
 	{#if showBookmarkIcon}
 		<div class="cosense-card-links__box-bookmark-bg">
-			<svg
-				{...svgAttrs}
-				width="22"
-				height="22"
-				fill="currentColor"
-				stroke="none"
-			>
+			<svg {...svgAttrs} width="22" height="22" fill="currentColor" stroke="none">
 				{@html ICON_PATHS.Bookmark}
 			</svg>
 		</div>
@@ -207,8 +199,7 @@
 		color: var(--color-base-50);
 	}
 
-	.cosense-card-links__section.twohop-links-new-links
-		.cosense-card-links__box-title {
+	.cosense-card-links__section.twohop-links-new-links .cosense-card-links__box-title {
 		color: var(--color-base-50);
 	}
 </style>

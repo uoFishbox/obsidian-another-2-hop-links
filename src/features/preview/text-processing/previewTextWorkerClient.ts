@@ -13,9 +13,7 @@ type PendingRequest = {
 	onAbort?: () => void;
 };
 
-type DistributiveOmit<T, K extends keyof any> = T extends unknown
-	? Omit<T, K>
-	: never;
+type DistributiveOmit<T, K extends keyof any> = T extends unknown ? Omit<T, K> : never;
 
 type RunnablePreviewTextWorkerRequest = DistributiveOmit<
 	PreviewTextWorkerRequest,

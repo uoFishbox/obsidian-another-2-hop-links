@@ -32,9 +32,7 @@
 		mountedRows?: readonly VirtualSurfaceMountedRow<TMountedCell>[];
 		contentEl?: HTMLDivElement | null;
 		observerRoot?: HTMLElement | null;
-		getCellPosition?: (
-			cell: TMountedCell,
-		) => VirtualSurfaceCellPosition;
+		getCellPosition?: (cell: TMountedCell) => VirtualSurfaceCellPosition;
 		getCellClassName?: (cell: TMountedCell) => string | undefined;
 		getCellDataTestId?: (cell: TMountedCell) => string | undefined;
 		getRowRenderKey?: (rowIndex: number) => RowKey | undefined;
@@ -121,20 +119,15 @@
 		`height:${contentHeight}px; position:relative; --ccl-box-height:${rowHeight}px; --ccl-cell-width:${cellWidth ?? 0}px; --ccl-columns:${Math.max(1, Math.floor(columns))}${gap !== undefined ? `; --ccl-box-gap:${gap}px` : ""}`,
 	);
 
-	const resolveRowSlotKey = (
-		row: VirtualSurfaceMountedRow<TMountedCell>,
-	): number => row.slotKey ?? row.key;
+	const resolveRowSlotKey = (row: VirtualSurfaceMountedRow<TMountedCell>): number =>
+		row.slotKey ?? row.key;
 	const resolveCellSlotKey = (
 		_row: VirtualSurfaceMountedRow<TMountedCell>,
 		cell: TMountedCell,
 	): number => cell.cellSlotKey ?? cell.renderSlotIndex;
 </script>
 
-<div
-	class={contentClassName}
-	bind:this={contentEl}
-	style={contentStyle}
->
+<div class={contentClassName} bind:this={contentEl} style={contentStyle}>
 	{#each renderedRows as row (resolveRowSlotKey(row))}
 		<div
 			class={rowClassName}
@@ -143,12 +136,12 @@
 			style:transform={`translateY(${row.top}px)`}
 			{...row.attributes}
 		>
-		{#each row.cells as mountedCell (resolveCellSlotKey(row, mountedCell))}
-			<VirtualListCellMount
-				logicalKey={mountedCell.key}
-				className={resolveCellClassName(mountedCell)}
-				dataTestId={getCellDataTestId?.(mountedCell)}
-				cellSlotKey={resolveCellSlotKey(row, mountedCell)}
+			{#each row.cells as mountedCell (resolveCellSlotKey(row, mountedCell))}
+				<VirtualListCellMount
+					logicalKey={mountedCell.key}
+					className={resolveCellClassName(mountedCell)}
+					dataTestId={getCellDataTestId?.(mountedCell)}
+					cellSlotKey={resolveCellSlotKey(row, mountedCell)}
 					rowIndex={mountedCell.rowIndex}
 					columnIndex={mountedCell.columnIndex}
 					{mountedCell}

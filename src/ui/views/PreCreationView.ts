@@ -34,14 +34,8 @@ type PreCreationBootstrapState = {
 	expectedPath: string;
 };
 
-const pendingBootstrapStateByLeafId = new Map<
-	string,
-	PreCreationBootstrapState
->();
-const persistedBootstrapStateByLeafId = new Map<
-	string,
-	PreCreationBootstrapState
->();
+const pendingBootstrapStateByLeafId = new Map<string, PreCreationBootstrapState>();
+const persistedBootstrapStateByLeafId = new Map<string, PreCreationBootstrapState>();
 
 function getPathBasename(path: string): string {
 	const slash = path.lastIndexOf("/");
@@ -160,13 +154,9 @@ export class PreCreationView extends AbstractSvelteListView<TwoHopIndexedLink> {
 		const linktext =
 			typeof candidate?.linktext === "string" ? candidate.linktext : "";
 		const sourcePath =
-			typeof candidate?.sourcePath === "string"
-				? candidate.sourcePath
-				: "";
+			typeof candidate?.sourcePath === "string" ? candidate.sourcePath : "";
 		const expectedPath =
-			typeof candidate?.expectedPath === "string"
-				? candidate.expectedPath
-				: "";
+			typeof candidate?.expectedPath === "string" ? candidate.expectedPath : "";
 		return { linktext, sourcePath, expectedPath };
 	}
 
@@ -299,13 +289,9 @@ export class PreCreationView extends AbstractSvelteListView<TwoHopIndexedLink> {
 		const linktext =
 			typeof candidate.linktext === "string" ? candidate.linktext : "";
 		const sourcePath =
-			typeof candidate.sourcePath === "string"
-				? candidate.sourcePath
-				: "";
+			typeof candidate.sourcePath === "string" ? candidate.sourcePath : "";
 		const expectedPath =
-			typeof candidate.expectedPath === "string"
-				? candidate.expectedPath
-				: "";
+			typeof candidate.expectedPath === "string" ? candidate.expectedPath : "";
 		return { linktext, sourcePath, expectedPath };
 	}
 
@@ -342,8 +328,7 @@ export class PreCreationView extends AbstractSvelteListView<TwoHopIndexedLink> {
 		}
 		const rawLinkPath = getLinkpath(this.linktext);
 		const lookupPath = normalizeLinkToMarkdownPath(rawLinkPath);
-		const backlinks =
-			this.plugin.indexingService.getBacklinksForLink(lookupPath);
+		const backlinks = this.plugin.indexingService.getBacklinksForLink(lookupPath);
 		return dedupeBySourceFile(backlinks);
 	}
 
@@ -379,9 +364,7 @@ export class PreCreationView extends AbstractSvelteListView<TwoHopIndexedLink> {
 		if (!currentLookupKey) {
 			return false;
 		}
-		return affectedLookupKeys.some(
-			(lookupKey) => lookupKey === currentLookupKey,
-		);
+		return affectedLookupKeys.some((lookupKey) => lookupKey === currentLookupKey);
 	}
 
 	/** ソースファイルを解決する（LinkContext 用）。見つからない場合は null */
@@ -432,8 +415,7 @@ export class PreCreationView extends AbstractSvelteListView<TwoHopIndexedLink> {
 			const newName = this.inlineTitleEl?.textContent?.trim() ?? "";
 			this.updateLinktextFromTitle(newName);
 			if (this.createButtonEl) {
-				this.createButtonEl.disabled =
-					!this.expectedPath || this.isCreating;
+				this.createButtonEl.disabled = !this.expectedPath || this.isCreating;
 			}
 		});
 
@@ -529,8 +511,7 @@ export class PreCreationView extends AbstractSvelteListView<TwoHopIndexedLink> {
 			}),
 			getItemKey: getViewItemKey,
 			sectionId: "pre-create-backlinks",
-			emptyMessage:
-				"他のノートからの未解決バックリンクは見つかりませんでした。",
+			emptyMessage: "他のノートからの未解決バックリンクは見つかりませんでした。",
 		};
 
 		this.mountListSection({

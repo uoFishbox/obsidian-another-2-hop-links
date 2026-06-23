@@ -38,10 +38,7 @@ const scrollElementIntoVirtualViewport = (params: {
 	targetTop: number;
 	targetHeight: number;
 }): void => {
-	const scrollMetrics = getScrollMetrics(
-		params.rootEl,
-		params.scrollContainerEl,
-	);
+	const scrollMetrics = getScrollMetrics(params.rootEl, params.scrollContainerEl);
 	const absoluteTargetTop = scrollMetrics.sectionTop + params.targetTop;
 	const absoluteTargetBottom = absoluteTargetTop + params.targetHeight;
 	const viewportTop = scrollMetrics.scrollTop;
@@ -136,8 +133,7 @@ export const createVirtualSurfaceNavigation = (options: {
 		}
 		invalidateNearestScrollContainerCache(rootEl);
 		const scrollContainerEl =
-			options.getScrollContainerEl() ??
-			findNearestScrollContainer(rootEl);
+			options.getScrollContainerEl() ?? findNearestScrollContainer(rootEl);
 
 		scrollElementIntoVirtualViewport({
 			rootEl,
@@ -147,10 +143,7 @@ export const createVirtualSurfaceNavigation = (options: {
 		});
 
 		await waitForNextAnimationFrame();
-		options.flushVirtualScrollMeasurement?.(
-			scrollContainerEl,
-			target.rowTop,
-		);
+		options.flushVirtualScrollMeasurement?.(scrollContainerEl, target.rowTop);
 		await options.flushMountedState();
 
 		return focusCellTarget(getMountedCellElement(target.key));
@@ -174,14 +167,10 @@ export const createVirtualSurfaceNavigation = (options: {
 			return false;
 		}
 
-		const target = options.resolveNavigationTarget?.(
-			currentKey,
-			direction,
-			{
-				rowIndex,
-				columnIndex,
-			},
-		);
+		const target = options.resolveNavigationTarget?.(currentKey, direction, {
+			rowIndex,
+			columnIndex,
+		});
 		if (!target) {
 			return false;
 		}
@@ -209,15 +198,10 @@ export const createVirtualSurfaceNavigation = (options: {
 					rootEl: options.getRootEl(),
 					scrollContainerEl: options.getScrollContainerEl(),
 					getMountedElementByKey: (key) =>
-						findMountedCellElementByKey(
-							options.getContentEl(),
-							key,
-						),
+						findMountedCellElementByKey(options.getContentEl(), key),
 					hasMountedElement: (key) =>
-						findMountedCellElementByKey(
-							options.getContentEl(),
-							key,
-						) !== null,
+						findMountedCellElementByKey(options.getContentEl(), key) !==
+						null,
 					flushMountedState: options.flushMountedState,
 				})) ?? false
 			);

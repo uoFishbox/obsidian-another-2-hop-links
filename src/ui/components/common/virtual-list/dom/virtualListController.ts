@@ -58,9 +58,7 @@ const createBootstrapMeasurementSuppression = (
 		const ownerWindow = getWindow();
 		if (ownerWindow) {
 			if (typeof ownerWindow.cancelAnimationFrame === "function") {
-				ownerWindow.cancelAnimationFrame(
-					observedLayoutSuppressionHandle,
-				);
+				ownerWindow.cancelAnimationFrame(observedLayoutSuppressionHandle);
 			} else {
 				ownerWindow.clearTimeout(observedLayoutSuppressionHandle);
 			}
@@ -79,10 +77,11 @@ const createBootstrapMeasurementSuppression = (
 			cancel();
 			suppressObservedLayoutMeasurement = true;
 			if (typeof ownerWindow.requestAnimationFrame === "function") {
-				observedLayoutSuppressionHandle =
-					ownerWindow.requestAnimationFrame(() => {
+				observedLayoutSuppressionHandle = ownerWindow.requestAnimationFrame(
+					() => {
 						release();
-					});
+					},
+				);
 				return;
 			}
 
@@ -133,11 +132,7 @@ export interface VirtualListLayoutMeasurement<TLayout, TContent> {
 	hasStableLayout: boolean;
 }
 
-export interface CreateVirtualListControllerOptions<
-	TLayout,
-	TContent,
-	TCachedOptions,
-> {
+export interface CreateVirtualListControllerOptions<TLayout, TContent, TCachedOptions> {
 	getRootEl: () => HTMLElement | null;
 	measurement: VirtualListMeasurementStateHandle;
 	getLayout: () => TLayout;
@@ -175,12 +170,8 @@ export interface CreateVirtualListControllerOptions<
 	onLayoutMeasurementApplied?: (
 		measurement: VirtualListLayoutMeasurement<TLayout, TContent>,
 	) => void;
-	onStableLayoutMeasurement?: (
-		context: VirtualListStableMeasurementContext,
-	) => void;
-	onStableScrollMeasurement?: (
-		context: VirtualListStableMeasurementContext,
-	) => void;
+	onStableLayoutMeasurement?: (context: VirtualListStableMeasurementContext) => void;
+	onStableScrollMeasurement?: (context: VirtualListStableMeasurementContext) => void;
 	maxUnstableMeasurementRetries: number;
 }
 
@@ -209,10 +200,8 @@ export function createVirtualListController<
 	onStableScrollMeasurement,
 	maxUnstableMeasurementRetries,
 }: CreateVirtualListControllerOptions<TLayout, TContent, TCachedOptions>) {
-	let lastLiveMeasurementContext: VirtualListStableMeasurementContext | null =
-		null;
-	let lastCachedMeasurementContext: VirtualListStableMeasurementContext | null =
-		null;
+	let lastLiveMeasurementContext: VirtualListStableMeasurementContext | null = null;
+	let lastCachedMeasurementContext: VirtualListStableMeasurementContext | null = null;
 	let lastScrollWindow: LastScrollWindow | null = null;
 	let cachedRangeMeasurementContext: VirtualListRangeMeasurementContext<
 		TLayout,
@@ -233,11 +222,8 @@ export function createVirtualListController<
 		if (
 			process.env.NODE_ENV === "production" ||
 			typeof window === "undefined" ||
-			!(
-				window.__CCL_DEBUG__ as
-					| VirtualListControllerDebugState
-					| undefined
-			)?.logActiveScrollWindows
+			!(window.__CCL_DEBUG__ as VirtualListControllerDebugState | undefined)
+				?.logActiveScrollWindows
 		) {
 			return;
 		}
@@ -267,14 +253,13 @@ export function createVirtualListController<
 			return null;
 		}
 
-		const mountedScrollWindowMeasurement =
-			resolveMountedScrollWindowMeasurement(
-				scrollTop,
-				viewportHeight,
-				sectionTop,
-				content,
-				layout,
-			);
+		const mountedScrollWindowMeasurement = resolveMountedScrollWindowMeasurement(
+			scrollTop,
+			viewportHeight,
+			sectionTop,
+			content,
+			layout,
+		);
 		if (!mountedScrollWindowMeasurement) {
 			return null;
 		}
@@ -286,10 +271,7 @@ export function createVirtualListController<
 	};
 
 	const primeLastScrollWindow = (
-		measurementContext: VirtualListRangeMeasurementContext<
-			TLayout,
-			TContent
-		>,
+		measurementContext: VirtualListRangeMeasurementContext<TLayout, TContent>,
 	): void => {
 		if (!measurementContext.isStableMeasurement) {
 			lastScrollWindow = null;
@@ -320,8 +302,7 @@ export function createVirtualListController<
 			return { kind: "skipped", reason: "no-window" };
 		}
 
-		const resolvedSectionRect =
-			sectionRect ?? rootEl.getBoundingClientRect();
+		const resolvedSectionRect = sectionRect ?? rootEl.getBoundingClientRect();
 		const scrollMetrics = getScrollMetrics(
 			rootEl,
 			measurement.scrollContainerEl,
@@ -403,19 +384,15 @@ export function createVirtualListController<
 		}
 
 		const localSectionTop = measurement.sectionTop;
-		const isStableMeasurement =
-			isStableCachedVirtualListMeasurementFromMetrics(
-				hasRenderableContent(content),
-				measurement.hasStableScrollMetrics,
-				measurement.viewportHeight,
-				localScrollTop,
-				localViewportHeight,
-				localSectionTop,
-			);
-		if (
-			!isStableMeasurement &&
-			shouldSkipUnstableCachedMeasurement?.(options)
-		) {
+		const isStableMeasurement = isStableCachedVirtualListMeasurementFromMetrics(
+			hasRenderableContent(content),
+			measurement.hasStableScrollMetrics,
+			measurement.viewportHeight,
+			localScrollTop,
+			localViewportHeight,
+			localSectionTop,
+		);
+		if (!isStableMeasurement && shouldSkipUnstableCachedMeasurement?.(options)) {
 			lastScrollWindow = null;
 			return { kind: "skipped", reason: "unstable" };
 		}
@@ -457,8 +434,7 @@ export function createVirtualListController<
 						layout,
 					);
 				if (mountedScrollWindowMeasurement) {
-					precomputedMountedRange =
-						mountedScrollWindowMeasurement.mounted;
+					precomputedMountedRange = mountedScrollWindowMeasurement.mounted;
 					maybeLogActiveScrollWindow(
 						lastScrollWindow,
 						mountedScrollWindowMeasurement.identity,
@@ -617,10 +593,7 @@ export function createVirtualListController<
 			if (!measurementContext.isScrollActive) {
 				primeLastScrollWindow(measurementContext);
 			}
-		} else if (
-			lastScrollWindow === null &&
-			pendingMountedScrollWindowMeasurement
-		) {
+		} else if (lastScrollWindow === null && pendingMountedScrollWindowMeasurement) {
 			// The full range measurement did not stabilize yet (e.g. the visible
 			// range is still bootstrapping on the first scroll frame), but the
 			// mounted window itself is a sound estimate. Prime the gate with a
@@ -646,10 +619,7 @@ export function createVirtualListController<
 
 		const rootRect = rootEl.getBoundingClientRect();
 		const layoutMeasurement = resolveLayoutMeasurement(rootEl, rootRect);
-		const layoutChanged = !isSameLayout(
-			getLayout(),
-			layoutMeasurement.layout,
-		);
+		const layoutChanged = !isSameLayout(getLayout(), layoutMeasurement.layout);
 		const visibleRangeResult = updateFromLiveMeasurement(
 			layoutMeasurement.content,
 			layoutMeasurement.layout,
@@ -715,11 +685,10 @@ export function createVirtualListController<
 		maxUnstableMeasurementRetries,
 		getWindow: () => getOptionalOwnerWindow(getRootEl()),
 	});
-	const bootstrapMeasurementSuppression =
-		createBootstrapMeasurementSuppression(
-			scheduleLayoutMeasurement,
-			() => getOptionalOwnerWindow(getRootEl()),
-		);
+	const bootstrapMeasurementSuppression = createBootstrapMeasurementSuppression(
+		scheduleLayoutMeasurement,
+		() => getOptionalOwnerWindow(getRootEl()),
+	);
 
 	const INITIAL_STABILIZATION_MAX_PASSES = 2;
 	let initialStabilizationPassCount = 0;
@@ -744,10 +713,7 @@ export function createVirtualListController<
 
 		runLayoutMeasurement();
 
-		if (
-			measurement.hasStableScrollMetrics &&
-			measurement.hasStableVisibleRange
-		) {
+		if (measurement.hasStableScrollMetrics && measurement.hasStableVisibleRange) {
 			initialStabilizationCompleted = true;
 			return;
 		}
@@ -757,9 +723,13 @@ export function createVirtualListController<
 		}
 	};
 
-	const initialStabilizationTask = createPostPaintVirtualListTask(() => {
-		runInitialStabilizationMeasurement();
-	}, 2, () => getOptionalOwnerWindow(getRootEl()));
+	const initialStabilizationTask = createPostPaintVirtualListTask(
+		() => {
+			runInitialStabilizationMeasurement();
+		},
+		2,
+		() => getOptionalOwnerWindow(getRootEl()),
+	);
 
 	const scheduleInitialStabilizationMeasurement = () => {
 		if (
@@ -779,10 +749,7 @@ export function createVirtualListController<
 		// scheduled follow-up pass has not run yet. Treat it as completed so
 		// the warmed scroll-window gate (primeLastScrollWindow) is preserved
 		// instead of being invalidated by the scroll-start cancellation.
-		if (
-			measurement.hasStableScrollMetrics &&
-			measurement.hasStableVisibleRange
-		) {
+		if (measurement.hasStableScrollMetrics && measurement.hasStableVisibleRange) {
 			initialStabilizationCompleted = true;
 			initialStabilizationTask.cancel();
 			return;

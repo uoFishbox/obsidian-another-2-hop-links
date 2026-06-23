@@ -34,9 +34,9 @@ function focusInlineSearchInputFromEditor(
 
 	const root =
 		view.dom.querySelector<HTMLElement>(INLINE_SURFACE_SELECTOR) ??
-		view.dom.closest(".markdown-source-view")?.querySelector<HTMLElement>(
-			INLINE_SURFACE_SELECTOR,
-		) ??
+		view.dom
+			.closest(".markdown-source-view")
+			?.querySelector<HTMLElement>(INLINE_SURFACE_SELECTOR) ??
 		null;
 
 	if (!isVisible(root)) {
@@ -63,9 +63,7 @@ function focusInlineSearchInputFromEditor(
 	return true;
 }
 
-export function buildEditorInlineFocusBridgeExtension(
-	plugin: PluginHost,
-) {
+export function buildEditorInlineFocusBridgeExtension(plugin: PluginHost) {
 	return Prec.highest(
 		keymap.of([
 			{
@@ -73,9 +71,7 @@ export function buildEditorInlineFocusBridgeExtension(
 				run(view) {
 					return focusInlineSearchInputFromEditor(
 						view,
-						() =>
-							plugin.settings
-								.enableEditorArrowDownToSearchInput,
+						() => plugin.settings.enableEditorArrowDownToSearchInput,
 					);
 				},
 			},

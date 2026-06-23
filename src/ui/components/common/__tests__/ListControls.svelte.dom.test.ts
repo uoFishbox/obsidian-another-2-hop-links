@@ -115,7 +115,9 @@ describe("ListControls", () => {
 			},
 		});
 
-		expect(screen.getByPlaceholderText("Search note titles...")).toBeInTheDocument();
+		expect(
+			screen.getByPlaceholderText("Search note titles..."),
+		).toBeInTheDocument();
 		expect(
 			screen.queryByRole("button", { name: "Enable full-text search" }),
 		).not.toBeInTheDocument();

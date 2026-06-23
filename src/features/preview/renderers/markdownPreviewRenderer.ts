@@ -1,10 +1,5 @@
 import type { TFile, App } from "obsidian";
-import {
-	renderMath,
-	finishRenderMath,
-	Component,
-	MarkdownRenderer,
-} from "obsidian";
+import { renderMath, finishRenderMath, Component, MarkdownRenderer } from "obsidian";
 import { transformContentForPreview } from "../text-processing/textTransformUtils";
 import { createProtectedSegmentRestorer } from "../text-processing/protectedHtml";
 import {
@@ -45,8 +40,7 @@ export async function processPreviewContent(
 	}
 
 	const enableMathRendering = options?.enableMathRendering ?? true;
-	const syncShadowRootMathStyles =
-		options?.syncShadowRootMathStyles ?? true;
+	const syncShadowRootMathStyles = options?.syncShadowRootMathStyles ?? true;
 	const analysis =
 		options?.analysis ??
 		(enableMathRendering || content.includes("$")
@@ -106,19 +100,13 @@ export async function processPreviewContent(
 
 			const matchedString = match[0];
 			// ... existing MathJax rendering logic ...
-			if (
-				matchedString.startsWith("$$") &&
-				matchedString.endsWith("$$")
-			) {
+			if (matchedString.startsWith("$$") && matchedString.endsWith("$$")) {
 				const mathContent = matchedString.substring(
 					2,
 					matchedString.length - 2,
 				);
 				containerEl.appendChild(renderMath(mathContent, true));
-			} else if (
-				matchedString.startsWith("$") &&
-				matchedString.endsWith("$")
-			) {
+			} else if (matchedString.startsWith("$") && matchedString.endsWith("$")) {
 				const mathContent = matchedString.substring(
 					1,
 					matchedString.length - 1,

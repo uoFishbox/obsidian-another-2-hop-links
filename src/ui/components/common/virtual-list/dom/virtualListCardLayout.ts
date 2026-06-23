@@ -75,43 +75,28 @@ const createCssCardLayoutSnapshot = (
 		"--ccl-box-height-ratio",
 	);
 	const cardGapCssValue = computedStyle.getPropertyValue("--ccl-box-gap");
-	const cardMaxColumnsCssValue = computedStyle.getPropertyValue(
-		"--ccl-box-cols-max",
-	);
-	const includeSectionMarginBottom =
-		options?.includeSectionMarginBottom !== false;
+	const cardMaxColumnsCssValue = computedStyle.getPropertyValue("--ccl-box-cols-max");
+	const includeSectionMarginBottom = options?.includeSectionMarginBottom !== false;
 	const sectionMarginBottomCssValue = includeSectionMarginBottom
 		? computedStyle.getPropertyValue("--ccl-section-margin-bottom")
 		: "";
-	const cardWidthPx = parseCssNumber(
-		cardWidthCssValue,
-		defaults.cardWidthPx,
-	);
+	const cardWidthPx = parseCssNumber(cardWidthCssValue, defaults.cardWidthPx);
 	const fallbackCardHeightPx = parseCssNumber(
 		fallbackCardHeightCssValue,
 		defaults.cardHeightPx,
 	);
 	const cardHeightRatio = normalizeCardHeightRatio(
-		parseCssNumber(
-			cardHeightRatioCssValue,
-			fallbackCardHeightPx / cardWidthPx,
-		),
+		parseCssNumber(cardHeightRatioCssValue, fallbackCardHeightPx / cardWidthPx),
 	);
 	const sectionMarginBottomPx = includeSectionMarginBottom
-		? parseCssNumber(
-				sectionMarginBottomCssValue,
-				defaults.sectionMarginBottomPx,
-			)
+		? parseCssNumber(sectionMarginBottomCssValue, defaults.sectionMarginBottomPx)
 		: defaults.sectionMarginBottomPx;
 	const layout: ResolvedCardLayoutSettings = {
 		cardWidthPx,
 		cardHeightRatio,
 		cardHeightPx: computeCardHeightPxFromWidth(cardWidthPx, cardHeightRatio),
 		cardGapPx: parseCssNumber(cardGapCssValue, defaults.cardGapPx),
-		cardMaxColumns: parseCssNumber(
-			cardMaxColumnsCssValue,
-			defaults.cardMaxColumns,
-		),
+		cardMaxColumns: parseCssNumber(cardMaxColumnsCssValue, defaults.cardMaxColumns),
 		sectionMarginBottomPx,
 	};
 	const signature = [
@@ -156,8 +141,7 @@ export function resolveCachedCardGridLayoutBase({
 	configuredLayout,
 	includeSectionMarginBottom,
 }: ResolveCachedCardGridLayoutBaseOptions): CachedCardGridLayoutBase {
-	const shouldIncludeSectionMarginBottom =
-		includeSectionMarginBottom !== false;
+	const shouldIncludeSectionMarginBottom = includeSectionMarginBottom !== false;
 	const layoutSnapshot = configuredLayout
 		? {
 				signature: createConfiguredCardLayoutSignature(
@@ -177,11 +161,9 @@ export function resolveCachedCardGridLayoutBase({
 		cardLayout.cardWidthPx,
 	);
 	const cacheRoot = resolveSharedLayoutCacheRoot(rootEl, scrollContainerEl);
-	const cacheKey = [
-		listKind,
-		containerWidth,
-		layoutSnapshot.signature,
-	].join("\u001e");
+	const cacheKey = [listKind, containerWidth, layoutSnapshot.signature].join(
+		"\u001e",
+	);
 	let cacheForRoot = sharedCardGridLayoutCache.get(cacheRoot);
 	if (!cacheForRoot) {
 		cacheForRoot = new Map<string, CachedCardGridLayoutBase>();
@@ -234,8 +216,7 @@ export function computeContainerWidth(
 	rootEl: HTMLElement,
 	minCellWidth: number,
 ): number {
-	const rawContainerWidth =
-		measuredWidth ?? rootRect.width ?? rootEl.clientWidth;
+	const rawContainerWidth = measuredWidth ?? rootRect.width ?? rootEl.clientWidth;
 	if (rawContainerWidth > 0) {
 		return rawContainerWidth;
 	}

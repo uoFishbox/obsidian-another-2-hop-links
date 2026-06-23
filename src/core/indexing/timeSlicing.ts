@@ -41,17 +41,14 @@ function schedulePause(resolve: () => void, maxDelayMs: number): void {
 		}, maxDelayMs);
 
 		idleRequestOptions.timeout = maxDelayMs;
-		idleId = window.requestIdleCallback(
-			() => {
-				if (finished) {
-					return;
-				}
-				finished = true;
-				window.clearTimeout(timeoutId);
-				resolve();
-			},
-			idleRequestOptions,
-		);
+		idleId = window.requestIdleCallback(() => {
+			if (finished) {
+				return;
+			}
+			finished = true;
+			window.clearTimeout(timeoutId);
+			resolve();
+		}, idleRequestOptions);
 		return;
 	}
 
@@ -125,9 +122,7 @@ export function maybeYield(
 	return yieldScheduler.checkpoint(iteration, cadence);
 }
 
-export async function drainYieldSteps(
-	steps: YieldStepGenerator,
-): Promise<void> {
+export async function drainYieldSteps(steps: YieldStepGenerator): Promise<void> {
 	for (const pendingYield of steps) {
 		await pendingYield;
 	}

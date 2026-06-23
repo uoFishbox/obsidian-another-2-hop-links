@@ -9,9 +9,7 @@ export class CanvasDropManager {
 
 	constructor(private app: App) {}
 
-	public registerCanvasDropHandler(
-		registerEvent: (callback: any) => void,
-	): void {
+	public registerCanvasDropHandler(registerEvent: (callback: any) => void): void {
 		this.syncCanvasDropHandlers();
 
 		registerEvent(
@@ -94,9 +92,7 @@ export class CanvasDropManager {
 		};
 	}
 
-	private createDropHandler(
-		canvas: CanvasViewCanvas,
-	): (event: DragEvent) => void {
+	private createDropHandler(canvas: CanvasViewCanvas): (event: DragEvent) => void {
 		return async (event: DragEvent) => {
 			await this.handleDrop(canvas, event);
 		};
@@ -121,9 +117,9 @@ export class CanvasDropManager {
 
 		const pos = canvas.posFromEvt(event);
 
-		const capability = new ObsidianInternalFacade(
-			this.app,
-		).getCanvasCreateFileNode(canvas);
+		const capability = new ObsidianInternalFacade(this.app).getCanvasCreateFileNode(
+			canvas,
+		);
 		if (!capability.ok) {
 			return;
 		}

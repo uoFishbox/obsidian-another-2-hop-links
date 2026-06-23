@@ -36,8 +36,7 @@ class IntersectionObserverRegistry {
 
 	static getInstance(): IntersectionObserverRegistry {
 		if (!IntersectionObserverRegistry.instance) {
-			IntersectionObserverRegistry.instance =
-				new IntersectionObserverRegistry();
+			IntersectionObserverRegistry.instance = new IntersectionObserverRegistry();
 		}
 		return IntersectionObserverRegistry.instance;
 	}
@@ -54,10 +53,7 @@ class IntersectionObserverRegistry {
 		once = true,
 	): RegistrationToken {
 		// IntersectionObserver が利用できない環境では即座に実行
-		if (
-			typeof window === "undefined" ||
-			!("IntersectionObserver" in window)
-		) {
+		if (typeof window === "undefined" || !("IntersectionObserver" in window)) {
 			callback();
 			// ダミートークンを返す（unobserve は no-op になる）
 			return Symbol();

@@ -166,8 +166,7 @@ export function createDeduplicationService(): IDeduplicationService {
 		for (let index = 0; index < taggedNotes.length; index += 1) {
 			const taggedNote = taggedNotes[index];
 			const usageKey =
-				taggedNote.usageKey ??
-				keyGenerator.getTaggedNoteKey(taggedNote);
+				taggedNote.usageKey ?? keyGenerator.getTaggedNoteKey(taggedNote);
 			if (!tracker.tryMarkUsed(usageKey)) {
 				filteredItems ??= taggedNotes.slice(0, index);
 				continue;

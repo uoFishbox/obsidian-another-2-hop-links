@@ -16,9 +16,9 @@ describe("scrollContainerDependencies", () => {
 		sizer.append(rootEl);
 		document.body.append(scrollContainer);
 
-		expect(
-			collectPositionDependencyElements(rootEl, scrollContainer),
-		).toEqual([sizer]);
+		expect(collectPositionDependencyElements(rootEl, scrollContainer)).toEqual([
+			sizer,
+		]);
 	});
 
 	it("collects parent, shadow root, and scroll container structure dependencies", () => {
@@ -30,8 +30,9 @@ describe("scrollContainerDependencies", () => {
 		document.body.append(host, scrollContainer);
 		shadowRoot.append(rootEl);
 
-		expect(
-			collectStructureDependencyTargets(rootEl, scrollContainer),
-		).toEqual([shadowRoot, scrollContainer]);
+		expect(collectStructureDependencyTargets(rootEl, scrollContainer)).toEqual([
+			shadowRoot,
+			scrollContainer,
+		]);
 	});
 });

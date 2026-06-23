@@ -27,10 +27,7 @@ import {
 } from "./sharedScrollMetrics";
 import { hasRelevantStructureMutation } from "./structureMutationObserver";
 import { applyScrollerViewportScrollPhase } from "./scrollerViewportScrollPhase";
-import {
-	getOptionalOwnerWindow,
-	isHTMLElementLike,
-} from "ui/utils/realmSafeDom";
+import { getOptionalOwnerWindow, isHTMLElementLike } from "ui/utils/realmSafeDom";
 
 export type { VirtualListSharedScrollMetrics } from "./sharedScrollMetrics";
 
@@ -54,9 +51,10 @@ export interface ObserveVirtualListViewportOptions {
 
 const ROOT_RESIZE_EPSILON_PX = 0.5;
 
-interface VirtualListViewportSubscriber
-	extends
-		Omit<ObserveVirtualListViewportOptions, "rootEl"> {
+interface VirtualListViewportSubscriber extends Omit<
+	ObserveVirtualListViewportOptions,
+	"rootEl"
+> {
 	rootEl: HTMLElement;
 	entry: ScrollerViewportEntry;
 	lastObservedWidth: number | null;
@@ -95,15 +93,10 @@ interface ScrollerViewportEntry {
 	unsubscribeWindowResize: (() => void) | null;
 	layoutMeasurementTask: ReturnType<typeof createScheduledVirtualListTask>;
 	scrollMeasurementTask: ReturnType<typeof createScheduledVirtualListTask>;
-	refreshDependencyObserversTask: ReturnType<
-		typeof createScheduledVirtualListTask
-	>;
+	refreshDependencyObserversTask: ReturnType<typeof createScheduledVirtualListTask>;
 }
 
-const scrollerViewportEntries = new WeakMap<
-	HTMLElement,
-	ScrollerViewportEntry
->();
+const scrollerViewportEntries = new WeakMap<HTMLElement, ScrollerViewportEntry>();
 let scrollMeasurementFrameId = 0;
 
 type SharedRootResizeObserver =
@@ -117,26 +110,17 @@ type WindowObserverConstructors = Window & {
 	MutationObserver?: typeof MutationObserver;
 };
 
-const sharedRootResizeObservers = new WeakMap<
-	Window,
-	SharedRootResizeObserver
->();
+const sharedRootResizeObservers = new WeakMap<Window, SharedRootResizeObserver>();
 const sharedLayoutDependencyResizeObservers = new WeakMap<
 	Window,
 	SharedLayoutDependencyResizeObserver
 >();
 
-const getResizeObserverConstructor = (
-	ownerWindow: Window,
-): typeof ResizeObserver =>
-	(ownerWindow as WindowObserverConstructors).ResizeObserver ??
-	ResizeObserver;
+const getResizeObserverConstructor = (ownerWindow: Window): typeof ResizeObserver =>
+	(ownerWindow as WindowObserverConstructors).ResizeObserver ?? ResizeObserver;
 
-const getMutationObserverConstructor = (
-	ownerWindow: Window,
-): typeof MutationObserver =>
-	(ownerWindow as WindowObserverConstructors).MutationObserver ??
-	MutationObserver;
+const getMutationObserverConstructor = (ownerWindow: Window): typeof MutationObserver =>
+	(ownerWindow as WindowObserverConstructors).MutationObserver ?? MutationObserver;
 
 const getActiveSubscriber = (
 	entry: ScrollerViewportEntry,
@@ -149,9 +133,7 @@ const getActiveSubscriber = (
 	return subscriber;
 };
 
-const scheduleLayoutMeasurement = (
-	entry: ScrollerViewportEntry,
-): void => {
+const scheduleLayoutMeasurement = (entry: ScrollerViewportEntry): void => {
 	const subscriber = getActiveSubscriber(entry);
 	if (!subscriber) {
 		return;
@@ -161,9 +143,7 @@ const scheduleLayoutMeasurement = (
 	entry.layoutMeasurementTask.schedule();
 };
 
-const scheduleScrollMeasurement = (
-	entry: ScrollerViewportEntry,
-): void => {
+const scheduleScrollMeasurement = (entry: ScrollerViewportEntry): void => {
 	const subscriber = getActiveSubscriber(entry);
 	if (!subscriber) {
 		return;
@@ -213,9 +193,7 @@ const connectStructureObserver = (entry: ScrollerViewportEntry): void => {
 	entry.structureObserverConnected = true;
 };
 
-const scheduleLayoutMeasurementWhenIdle = (
-	entry: ScrollerViewportEntry,
-): void => {
+const scheduleLayoutMeasurementWhenIdle = (entry: ScrollerViewportEntry): void => {
 	if (entry.isScrollActive) {
 		entry.needsLayoutMeasurementAfterScroll = true;
 		return;
@@ -251,9 +229,7 @@ const scheduleLayoutMeasurementForResizeEntries = (
 	}
 };
 
-const getSharedRootResizeObserver = (
-	ownerWindow: Window,
-): SharedRootResizeObserver => {
+const getSharedRootResizeObserver = (ownerWindow: Window): SharedRootResizeObserver => {
 	const existing = sharedRootResizeObservers.get(ownerWindow);
 	if (existing) {
 		return existing;
@@ -279,47 +255,32 @@ const getSharedRootResizeObserver = (
 				}
 			}
 		}),
-		subscribersByTarget: new Map<
-			HTMLElement,
-			Set<VirtualListViewportSubscriber>
-		>(),
+		subscribersByTarget: new Map<HTMLElement, Set<VirtualListViewportSubscriber>>(),
 	};
 	sharedRootResizeObservers.set(ownerWindow, sharedObserver);
 	return sharedObserver;
 };
 
-const getSharedLayoutDependencyResizeObserver =
-	(ownerWindow: Window): SharedLayoutDependencyResizeObserver => {
-		const existing = sharedLayoutDependencyResizeObservers.get(ownerWindow);
-		if (existing) {
-			return existing;
-		}
+const getSharedLayoutDependencyResizeObserver = (
+	ownerWindow: Window,
+): SharedLayoutDependencyResizeObserver => {
+	const existing = sharedLayoutDependencyResizeObservers.get(ownerWindow);
+	if (existing) {
+		return existing;
+	}
 
-		const ResizeObserverCtor = getResizeObserverConstructor(ownerWindow);
-		const sharedObserver: SharedLayoutDependencyResizeObserver = {
-			observer: new ResizeObserverCtor(
-				(entries: ResizeObserverEntry[]) => {
-					scheduleLayoutMeasurementForResizeEntries(
-						sharedObserver,
-						entries,
-					);
-				},
-			),
-			subscribersByTarget: new Map<
-				HTMLElement,
-				Set<ScrollerViewportEntry>
-			>(),
-		};
-		sharedLayoutDependencyResizeObservers.set(
-			ownerWindow,
-			sharedObserver,
-		);
-		return sharedObserver;
+	const ResizeObserverCtor = getResizeObserverConstructor(ownerWindow);
+	const sharedObserver: SharedLayoutDependencyResizeObserver = {
+		observer: new ResizeObserverCtor((entries: ResizeObserverEntry[]) => {
+			scheduleLayoutMeasurementForResizeEntries(sharedObserver, entries);
+		}),
+		subscribersByTarget: new Map<HTMLElement, Set<ScrollerViewportEntry>>(),
 	};
+	sharedLayoutDependencyResizeObservers.set(ownerWindow, sharedObserver);
+	return sharedObserver;
+};
 
-const observeRootResizeTarget = (
-	subscriber: VirtualListViewportSubscriber,
-): void => {
+const observeRootResizeTarget = (subscriber: VirtualListViewportSubscriber): void => {
 	const ownerWindow = getOptionalOwnerWindow(subscriber.rootEl);
 	if (!ownerWindow) {
 		return;
@@ -329,23 +290,16 @@ const observeRootResizeTarget = (
 	observeSharedResizeTarget(sharedObserver, subscriber.rootEl, subscriber);
 };
 
-const unobserveRootResizeTarget = (
-	subscriber: VirtualListViewportSubscriber,
-): void => {
+const unobserveRootResizeTarget = (subscriber: VirtualListViewportSubscriber): void => {
 	const ownerWindow = getOptionalOwnerWindow(subscriber.rootEl);
 	const sharedObserver = ownerWindow
-		? sharedRootResizeObservers.get(ownerWindow) ?? null
+		? (sharedRootResizeObservers.get(ownerWindow) ?? null)
 		: null;
-	unobserveSharedResizeTarget(
-		sharedObserver,
-		subscriber.rootEl,
-		subscriber,
-		() => {
-			if (ownerWindow) {
-				sharedRootResizeObservers.delete(ownerWindow);
-			}
-		},
-	);
+	unobserveSharedResizeTarget(sharedObserver, subscriber.rootEl, subscriber, () => {
+		if (ownerWindow) {
+			sharedRootResizeObservers.delete(ownerWindow);
+		}
+	});
 };
 
 const observeLayoutDependencyTarget = (
@@ -367,23 +321,16 @@ const unobserveLayoutDependencyTarget = (
 ): void => {
 	const ownerWindow = getOptionalOwnerWindow(target);
 	const sharedObserver = ownerWindow
-		? sharedLayoutDependencyResizeObservers.get(ownerWindow) ?? null
+		? (sharedLayoutDependencyResizeObservers.get(ownerWindow) ?? null)
 		: null;
-	unobserveSharedResizeTarget(
-		sharedObserver,
-		target,
-		entry,
-		() => {
-			if (ownerWindow) {
-				sharedLayoutDependencyResizeObservers.delete(ownerWindow);
-			}
-		},
-	);
+	unobserveSharedResizeTarget(sharedObserver, target, entry, () => {
+		if (ownerWindow) {
+			sharedLayoutDependencyResizeObservers.delete(ownerWindow);
+		}
+	});
 };
 
-const unobservePositionDependencyTargets = (
-	entry: ScrollerViewportEntry,
-): void => {
+const unobservePositionDependencyTargets = (entry: ScrollerViewportEntry): void => {
 	for (const element of entry.positionDependencyElements) {
 		unobserveLayoutDependencyTarget(entry, element);
 	}
@@ -425,8 +372,7 @@ const observeDependencyTargets = (entry: ScrollerViewportEntry): void => {
 	entry.positionDependencyElements = nextPosition;
 
 	// Structure dependencies: full reconnect only when changed
-	let structureChanged =
-		entry.structureDependencyTargets.size !== nextStructure.size;
+	let structureChanged = entry.structureDependencyTargets.size !== nextStructure.size;
 	if (!structureChanged) {
 		for (const target of entry.structureDependencyTargets) {
 			if (!nextStructure.has(target)) {
@@ -496,12 +442,10 @@ const handleRootResizeEntry = (
 	const { width, height } = contentRect;
 	const widthChanged =
 		subscriber.lastObservedWidth === null ||
-		Math.abs(width - subscriber.lastObservedWidth) >=
-			ROOT_RESIZE_EPSILON_PX;
+		Math.abs(width - subscriber.lastObservedWidth) >= ROOT_RESIZE_EPSILON_PX;
 	const heightChanged =
 		subscriber.lastObservedHeight === null ||
-		Math.abs(height - subscriber.lastObservedHeight) >=
-			ROOT_RESIZE_EPSILON_PX;
+		Math.abs(height - subscriber.lastObservedHeight) >= ROOT_RESIZE_EPSILON_PX;
 	if (!widthChanged && !heightChanged) {
 		return;
 	}
@@ -520,10 +464,7 @@ const handleRootResizeEntry = (
 	}
 };
 
-const handleScrollPhase = (
-	entry: ScrollerViewportEntry,
-	phase: ScrollPhase,
-): void => {
+const handleScrollPhase = (entry: ScrollerViewportEntry, phase: ScrollPhase): void => {
 	applyScrollerViewportScrollPhase(entry, phase);
 
 	if (entry.becameActive) {
@@ -557,10 +498,7 @@ const handleStructureMutations = (
 ): void => {
 	let anyRelevant = false;
 	for (const mutation of mutations) {
-		if (
-			mutation.type === "childList" &&
-			hasRelevantStructureMutation(mutation)
-		) {
+		if (mutation.type === "childList" && hasRelevantStructureMutation(mutation)) {
 			anyRelevant = true;
 			break;
 		}
@@ -643,34 +581,36 @@ const getScrollerViewportEntry = (
 		},
 		() => getOptionalOwnerWindow(entry.registryKey),
 	);
-	entry.layoutMeasurementTask = createScheduledVirtualListTask(() => {
-		if (!entry.hasPendingLayoutMeasurement) {
-			return;
-		}
-
-		entry.hasPendingLayoutMeasurement = false;
-		getActiveSubscriber(entry)?.scheduleLayoutMeasurement();
-	}, () => getOptionalOwnerWindow(entry.registryKey));
-	entry.scrollMeasurementTask = createScheduledVirtualListTask(() => {
-		if (!entry.hasPendingScrollMeasurement) {
-			return;
-		}
-
-		entry.hasPendingScrollMeasurement = false;
-		getActiveSubscriber(entry)?.runScrollMeasurement(
-			readSharedScrollMetrics(entry),
-		);
-	}, () => getOptionalOwnerWindow(entry.registryKey));
-	entry.unsubscribeScrollTarget = subscribeScrollTarget(
-		entry.scrollTarget,
-		(phase) => handleScrollPhase(entry, phase),
-	);
-	entry.unsubscribeWindowResize = subscribeWindowResize(
+	entry.layoutMeasurementTask = createScheduledVirtualListTask(
 		() => {
-			scheduleLayoutMeasurementWhenIdle(entry);
+			if (!entry.hasPendingLayoutMeasurement) {
+				return;
+			}
+
+			entry.hasPendingLayoutMeasurement = false;
+			getActiveSubscriber(entry)?.scheduleLayoutMeasurement();
 		},
-		ownerWindow,
+		() => getOptionalOwnerWindow(entry.registryKey),
 	);
+	entry.scrollMeasurementTask = createScheduledVirtualListTask(
+		() => {
+			if (!entry.hasPendingScrollMeasurement) {
+				return;
+			}
+
+			entry.hasPendingScrollMeasurement = false;
+			getActiveSubscriber(entry)?.runScrollMeasurement(
+				readSharedScrollMetrics(entry),
+			);
+		},
+		() => getOptionalOwnerWindow(entry.registryKey),
+	);
+	entry.unsubscribeScrollTarget = subscribeScrollTarget(entry.scrollTarget, (phase) =>
+		handleScrollPhase(entry, phase),
+	);
+	entry.unsubscribeWindowResize = subscribeWindowResize(() => {
+		scheduleLayoutMeasurementWhenIdle(entry);
+	}, ownerWindow);
 
 	if (scroller) {
 		observeLayoutDependencyTarget(entry, scroller);
@@ -699,9 +639,7 @@ const registerSubscriber = (
 	observeDependencyTargets(entry);
 };
 
-const unregisterSubscriber = (
-	subscriber: VirtualListViewportSubscriber,
-): void => {
+const unregisterSubscriber = (subscriber: VirtualListViewportSubscriber): void => {
 	const { entry } = subscriber;
 	unobserveRootResizeTarget(subscriber);
 

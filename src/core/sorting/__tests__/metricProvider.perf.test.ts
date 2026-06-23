@@ -1,10 +1,7 @@
 import { describe, expect, beforeEach, vi, type MockedObject } from "vitest";
 import { MetricProvider } from "../MetricProvider";
 import { TFile } from "obsidian";
-import type {
-	TwoHopLinkBranch,
-	CachedMetadataWithLinkReferences,
-} from "types/domain";
+import type { TwoHopLinkBranch, CachedMetadataWithLinkReferences } from "types/domain";
 import type { IIndexingService } from "types/services";
 import type { IMetadataCache, IVault } from "types/obsidian";
 import { DEFAULT_SETTINGS, type PluginSettings } from "types/settings";
@@ -27,12 +24,10 @@ describe("MetricProvider Performance", () => {
 	};
 
 	const createProvider = (overrides: Partial<PluginSettings> = {}) =>
-		new MetricProvider(
-			mockMetadataCache,
-			mockVault,
-			mockIndexingService,
-			() => ({ ...DEFAULT_SETTINGS, ...overrides }),
-		);
+		new MetricProvider(mockMetadataCache, mockVault, mockIndexingService, () => ({
+			...DEFAULT_SETTINGS,
+			...overrides,
+		}));
 
 	beforeEach(() => {
 		mockMetadataCache = { getFileCache: vi.fn() } as any;
@@ -62,9 +57,7 @@ describe("MetricProvider Performance", () => {
 			provider.getOutgoingLinkCount(branch);
 
 			expect(mockVault.getAbstractFileByPath).toHaveBeenCalledTimes(1);
-			expect(mockVault.getAbstractFileByPath).toHaveBeenCalledWith(
-				"note.md",
-			);
+			expect(mockVault.getAbstractFileByPath).toHaveBeenCalledWith("note.md");
 		});
 
 		test("Branch does not call vault.getAbstractFileByPath if path is undefined", () => {
@@ -102,9 +95,7 @@ describe("MetricProvider Performance", () => {
 
 			provider.getBacklinkCount(branch);
 
-			expect(
-				mockIndexingService.getBacklinkCountForLink,
-			).not.toHaveBeenCalled();
+			expect(mockIndexingService.getBacklinkCountForLink).not.toHaveBeenCalled();
 		});
 	});
 
@@ -150,9 +141,7 @@ describe("MetricProvider Performance", () => {
 			const displayName = provider.getDisplayName(branch);
 
 			expect(mockVault.getAbstractFileByPath).toHaveBeenCalledTimes(1);
-			expect(mockVault.getAbstractFileByPath).toHaveBeenCalledWith(
-				"note.md",
-			);
+			expect(mockVault.getAbstractFileByPath).toHaveBeenCalledWith("note.md");
 			expect(displayName).toBe("Note Title");
 		});
 	});

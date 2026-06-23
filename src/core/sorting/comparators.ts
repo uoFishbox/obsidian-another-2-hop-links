@@ -13,10 +13,8 @@ export interface SortPlan {
 	primaryOrder: "asc" | "desc";
 }
 
-const getDisplayName = (
-	metricProvider: IMetricProvider,
-	item: SortableItem,
-): string => metricProvider.getDisplayName(item);
+const getDisplayName = (metricProvider: IMetricProvider, item: SortableItem): string =>
+	metricProvider.getDisplayName(item);
 
 const createDateKeyGetter = (
 	order: "asc" | "desc",
@@ -138,9 +136,6 @@ export const getComparator = (
 			return primaryCompare * primaryDirection;
 		}
 
-		return collator.compare(
-			sortPlan.getTieBreaker(a),
-			sortPlan.getTieBreaker(b),
-		);
+		return collator.compare(sortPlan.getTieBreaker(a), sortPlan.getTieBreaker(b));
 	};
 };

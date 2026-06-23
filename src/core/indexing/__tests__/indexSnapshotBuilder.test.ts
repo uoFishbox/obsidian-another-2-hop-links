@@ -25,14 +25,8 @@ describe("index snapshot builders", () => {
 			{ path: "asset.png", tags: ["#ignored"] },
 		]).build();
 
-		const syncResult = await buildIndexesAsync(
-			mockVault,
-			mockMetadataCache,
-		);
-		const asyncResult = await buildIndexesAsync(
-			mockVault,
-			mockMetadataCache,
-		);
+		const syncResult = await buildIndexesAsync(mockVault, mockMetadataCache);
+		const asyncResult = await buildIndexesAsync(mockVault, mockMetadataCache);
 
 		expect(serializeSnapshot(asyncResult.snapshot)).toEqual(
 			serializeSnapshot(syncResult.snapshot),
@@ -48,17 +42,14 @@ describe("index snapshot builders", () => {
 			{ path: "target.md" },
 		]).build();
 
-		const snapshot = await buildIndexSnapshotAsync(
-			mockVault,
-			mockMetadataCache,
-		);
+		const snapshot = await buildIndexSnapshotAsync(mockVault, mockMetadataCache);
 
-		expect(
-			snapshot.backlinksMap.get("target.md")?.get("origin.md")?.length,
-		).toBe(2);
-		expect(
-			getDestinationPaths(snapshot.sourceSummaries.get("origin.md")),
-		).toEqual(["target.md"]);
+		expect(snapshot.backlinksMap.get("target.md")?.get("origin.md")?.length).toBe(
+			2,
+		);
+		expect(getDestinationPaths(snapshot.sourceSummaries.get("origin.md"))).toEqual([
+			"target.md",
+		]);
 		expect(
 			new Set(
 				snapshot.sourceSummaries
@@ -88,9 +79,9 @@ describe("index snapshot builders", () => {
 		expect(
 			syncSnapshot.sourceSummaries.get("origin.md")?.unresolvedLookupKeys,
 		).toEqual(new Set(["missing.md"]));
-		expect(
-			syncSnapshot.unresolvedLinkLookupToSources.get("missing.md"),
-		).toEqual(new Set(["origin.md", "peer.md"]));
+		expect(syncSnapshot.unresolvedLinkLookupToSources.get("missing.md")).toEqual(
+			new Set(["origin.md", "peer.md"]),
+		);
 		expect(serializeSnapshot(asyncSnapshot)).toEqual(
 			serializeSnapshot(syncSnapshot),
 		);

@@ -64,9 +64,7 @@ describe("renderBodyRevision", () => {
 			kind: "render",
 			revision: null,
 		});
-		expect(() =>
-			resolveItemRenderRevisionToken(cell, "required"),
-		).toThrow(
+		expect(() => resolveItemRenderRevisionToken(cell, "required")).toThrow(
 			'Missing item render revision for sourceKey="item-0" cellKey="item-0::item:0".',
 		);
 		expect(tryResolveItemRenderRevisionToken(cell, "required")).toEqual({

@@ -52,8 +52,7 @@ export function buildTwoHopMountedRows(params: {
 		reusableRowSlotsScratch: params.reusableRowSlotsScratch,
 		findSectionIndexByRow: findTwoHopSectionIndexByRow,
 		resolveRowInSection: resolveTwoHopRowInSection,
-		ensureSectionCellRangeMaterialized:
-			ensureTwoHopSectionCellRangeMaterialized,
+		ensureSectionCellRangeMaterialized: ensureTwoHopSectionCellRangeMaterialized,
 		readLogicalCellInSection: readTwoHopLogicalCellInSection,
 	});
 }

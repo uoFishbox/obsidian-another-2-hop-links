@@ -58,9 +58,7 @@ describe("BacklinkMapUpdater", () => {
 
 	test("removeBacklinksBySource notifies delete mutations", async () => {
 		const backlinksMap = await builder.buildBacklinksMapAsync();
-		const sourceFile = env.mockVault.getAbstractFileByPath(
-			"source1.md",
-		) as TFile;
+		const sourceFile = env.mockVault.getAbstractFileByPath("source1.md") as TFile;
 		const sourceSummary = await updater.buildSourceSummaryForFileAsync(
 			sourceFile,
 			undefined,
@@ -81,13 +79,7 @@ describe("BacklinkMapUpdater", () => {
 			sourceSummary,
 			createImmediateYieldScheduler(),
 			affected,
-			(
-				lookupPath,
-				lookupKey,
-				sourcePath,
-				hadResolved,
-				isLookupPathEmptyAfter,
-			) =>
+			(lookupPath, lookupKey, sourcePath, hadResolved, isLookupPathEmptyAfter) =>
 				mutations.push({
 					lookupPath,
 					lookupKey,
@@ -118,9 +110,7 @@ describe("BacklinkMapUpdater", () => {
 
 	test("reconcileBacklinksBySource does not reapply unchanged destinations", async () => {
 		const backlinksMap = await builder.buildBacklinksMapAsync();
-		const sourceFile = env.mockVault.getAbstractFileByPath(
-			"source1.md",
-		) as TFile;
+		const sourceFile = env.mockVault.getAbstractFileByPath("source1.md") as TFile;
 		const previousSummary = await updater.buildSourceSummaryForFileAsync(
 			sourceFile,
 			undefined,
@@ -162,9 +152,7 @@ describe("BacklinkMapUpdater", () => {
 
 	test("reconcileBacklinksBySource streams effects into an external sink", async () => {
 		const backlinksMap = await builder.buildBacklinksMapAsync();
-		const sourceFile = env.mockVault.getAbstractFileByPath(
-			"source1.md",
-		) as TFile;
+		const sourceFile = env.mockVault.getAbstractFileByPath("source1.md") as TFile;
 		const previousSummary = await updater.buildSourceSummaryForFileAsync(
 			sourceFile,
 			undefined,
@@ -204,9 +192,7 @@ describe("BacklinkMapUpdater", () => {
 		);
 
 		expect(changed).toBe(true);
-		expect(affectedDestinations).toEqual(
-			new Set(["target2.md", "target3.md"]),
-		);
+		expect(affectedDestinations).toEqual(new Set(["target2.md", "target3.md"]));
 		expect(representativeChangedLookupKeys).toEqual(new Set());
 	});
 
@@ -216,61 +202,51 @@ describe("BacklinkMapUpdater", () => {
 			{ path: "target.md" },
 		]);
 		const { mockVault, mockMetadataCache } = customBuilder.build();
-		const localUpdater = createBacklinkUpdater(
-			mockVault,
-			mockMetadataCache,
-		);
-		const sourceFile = mockVault.getAbstractFileByPath(
-			"source.md",
-		) as TFile;
+		const localUpdater = createBacklinkUpdater(mockVault, mockMetadataCache);
+		const sourceFile = mockVault.getAbstractFileByPath("source.md") as TFile;
 
-		(mockMetadataCache.getFileCache as any).mockImplementation(
-			(file: TFile) => {
-				if (file.path === "source.md") {
-					return createCachedMetadata([
-						{ link: "target", displayText: "alpha", offset: 10 },
-					]);
-				}
-				return {
-					links: [],
-					embeds: [],
-					headings: [],
-					sections: [],
-					tags: [],
-					frontmatter: undefined,
-					frontmatterPosition: undefined,
-					frontmatterLinks: undefined,
-				} as CachedMetadata;
-			},
-		);
+		(mockMetadataCache.getFileCache as any).mockImplementation((file: TFile) => {
+			if (file.path === "source.md") {
+				return createCachedMetadata([
+					{ link: "target", displayText: "alpha", offset: 10 },
+				]);
+			}
+			return {
+				links: [],
+				embeds: [],
+				headings: [],
+				sections: [],
+				tags: [],
+				frontmatter: undefined,
+				frontmatterPosition: undefined,
+				frontmatterLinks: undefined,
+			} as CachedMetadata;
+		});
 
 		const backlinksMap = await customBuilder.buildBacklinksMapAsync();
-		const previousSummary =
-			await localUpdater.buildSourceSummaryForFileAsync(
-				sourceFile,
-				undefined,
-				createImmediateYieldScheduler(),
-			);
-
-		(mockMetadataCache.getFileCache as any).mockImplementation(
-			(file: TFile) => {
-				if (file.path === "source.md") {
-					return createCachedMetadata([
-						{ link: "target", displayText: "alpha", offset: 90 },
-					]);
-				}
-				return {
-					links: [],
-					embeds: [],
-					headings: [],
-					sections: [],
-					tags: [],
-					frontmatter: undefined,
-					frontmatterPosition: undefined,
-					frontmatterLinks: undefined,
-				} as CachedMetadata;
-			},
+		const previousSummary = await localUpdater.buildSourceSummaryForFileAsync(
+			sourceFile,
+			undefined,
+			createImmediateYieldScheduler(),
 		);
+
+		(mockMetadataCache.getFileCache as any).mockImplementation((file: TFile) => {
+			if (file.path === "source.md") {
+				return createCachedMetadata([
+					{ link: "target", displayText: "alpha", offset: 90 },
+				]);
+			}
+			return {
+				links: [],
+				embeds: [],
+				headings: [],
+				sections: [],
+				tags: [],
+				frontmatter: undefined,
+				frontmatterPosition: undefined,
+				frontmatterLinks: undefined,
+			} as CachedMetadata;
+		});
 
 		const nextSummary = await localUpdater.buildSourceSummaryForFileAsync(
 			sourceFile,
@@ -307,63 +283,53 @@ describe("BacklinkMapUpdater", () => {
 			{ path: "target.md" },
 		]);
 		const { mockVault, mockMetadataCache } = customBuilder.build();
-		const localUpdater = createBacklinkUpdater(
-			mockVault,
-			mockMetadataCache,
-		);
-		const sourceFile = mockVault.getAbstractFileByPath(
-			"source.md",
-		) as TFile;
+		const localUpdater = createBacklinkUpdater(mockVault, mockMetadataCache);
+		const sourceFile = mockVault.getAbstractFileByPath("source.md") as TFile;
 
-		(mockMetadataCache.getFileCache as any).mockImplementation(
-			(file: TFile) => {
-				if (file.path === "source.md") {
-					return createCachedMetadata([
-						{ link: "target", displayText: "late", offset: 120 },
-						{ link: "target", displayText: "early", offset: 10 },
-					]);
-				}
-				return {
-					links: [],
-					embeds: [],
-					headings: [],
-					sections: [],
-					tags: [],
-					frontmatter: undefined,
-					frontmatterPosition: undefined,
-					frontmatterLinks: undefined,
-				} as CachedMetadata;
-			},
-		);
+		(mockMetadataCache.getFileCache as any).mockImplementation((file: TFile) => {
+			if (file.path === "source.md") {
+				return createCachedMetadata([
+					{ link: "target", displayText: "late", offset: 120 },
+					{ link: "target", displayText: "early", offset: 10 },
+				]);
+			}
+			return {
+				links: [],
+				embeds: [],
+				headings: [],
+				sections: [],
+				tags: [],
+				frontmatter: undefined,
+				frontmatterPosition: undefined,
+				frontmatterLinks: undefined,
+			} as CachedMetadata;
+		});
 
 		const backlinksMap = await customBuilder.buildBacklinksMapAsync();
-		const previousSummary =
-			await localUpdater.buildSourceSummaryForFileAsync(
-				sourceFile,
-				undefined,
-				createImmediateYieldScheduler(),
-			);
-
-		(mockMetadataCache.getFileCache as any).mockImplementation(
-			(file: TFile) => {
-				if (file.path === "source.md") {
-					return createCachedMetadata([
-						{ link: "target", displayText: "late", offset: 5 },
-						{ link: "target", displayText: "early", offset: 200 },
-					]);
-				}
-				return {
-					links: [],
-					embeds: [],
-					headings: [],
-					sections: [],
-					tags: [],
-					frontmatter: undefined,
-					frontmatterPosition: undefined,
-					frontmatterLinks: undefined,
-				} as CachedMetadata;
-			},
+		const previousSummary = await localUpdater.buildSourceSummaryForFileAsync(
+			sourceFile,
+			undefined,
+			createImmediateYieldScheduler(),
 		);
+
+		(mockMetadataCache.getFileCache as any).mockImplementation((file: TFile) => {
+			if (file.path === "source.md") {
+				return createCachedMetadata([
+					{ link: "target", displayText: "late", offset: 5 },
+					{ link: "target", displayText: "early", offset: 200 },
+				]);
+			}
+			return {
+				links: [],
+				embeds: [],
+				headings: [],
+				sections: [],
+				tags: [],
+				frontmatter: undefined,
+				frontmatterPosition: undefined,
+				frontmatterLinks: undefined,
+			} as CachedMetadata;
+		});
 
 		const nextSummary = await localUpdater.buildSourceSummaryForFileAsync(
 			sourceFile,
@@ -384,9 +350,7 @@ describe("BacklinkMapUpdater", () => {
 		);
 
 		expect(result.affectedDestinations).toEqual(new Set(["target.md"]));
-		expect(result.representativeChangedLookupKeys).toEqual(
-			new Set(["target.md"]),
-		);
+		expect(result.representativeChangedLookupKeys).toEqual(new Set(["target.md"]));
 		expect(removals).toEqual([]);
 		expect(additions).toEqual([]);
 		expect(
@@ -397,69 +361,57 @@ describe("BacklinkMapUpdater", () => {
 	});
 
 	test("reconcileBacklinksBySource detects representative changes across sibling lookupPaths by lookupKey", async () => {
-		const customBuilder = new VaultEnvironmentBuilder([
-			{ path: "source.md" },
-		]);
+		const customBuilder = new VaultEnvironmentBuilder([{ path: "source.md" }]);
 		const { mockVault, mockMetadataCache } = customBuilder.build();
-		const localUpdater = createBacklinkUpdater(
-			mockVault,
-			mockMetadataCache,
-		);
-		const sourceFile = mockVault.getAbstractFileByPath(
-			"source.md",
-		) as TFile;
+		const localUpdater = createBacklinkUpdater(mockVault, mockMetadataCache);
+		const sourceFile = mockVault.getAbstractFileByPath("source.md") as TFile;
 
-		(mockMetadataCache.getFileCache as any).mockImplementation(
-			(file: TFile) => {
-				if (file.path === "source.md") {
-					return createCachedMetadata([
-						{ link: "Foo", offset: 10 },
-						{ link: "foo", offset: 20 },
-					]);
-				}
-				return {
-					links: [],
-					embeds: [],
-					headings: [],
-					sections: [],
-					tags: [],
-					frontmatter: undefined,
-					frontmatterPosition: undefined,
-					frontmatterLinks: undefined,
-				} as CachedMetadata;
-			},
-		);
+		(mockMetadataCache.getFileCache as any).mockImplementation((file: TFile) => {
+			if (file.path === "source.md") {
+				return createCachedMetadata([
+					{ link: "Foo", offset: 10 },
+					{ link: "foo", offset: 20 },
+				]);
+			}
+			return {
+				links: [],
+				embeds: [],
+				headings: [],
+				sections: [],
+				tags: [],
+				frontmatter: undefined,
+				frontmatterPosition: undefined,
+				frontmatterLinks: undefined,
+			} as CachedMetadata;
+		});
 
 		const backlinksMap = await customBuilder.buildBacklinksMapAsync();
-		const previousSummary =
-			await localUpdater.buildSourceSummaryForFileAsync(
-				sourceFile,
-				undefined,
-				createImmediateYieldScheduler(),
-			);
+		const previousSummary = await localUpdater.buildSourceSummaryForFileAsync(
+			sourceFile,
+			undefined,
+			createImmediateYieldScheduler(),
+		);
 		const removals: string[] = [];
 		const additions: string[] = [];
 
-		(mockMetadataCache.getFileCache as any).mockImplementation(
-			(file: TFile) => {
-				if (file.path === "source.md") {
-					return createCachedMetadata([
-						{ link: "foo", offset: 10 },
-						{ link: "Foo", offset: 20 },
-					]);
-				}
-				return {
-					links: [],
-					embeds: [],
-					headings: [],
-					sections: [],
-					tags: [],
-					frontmatter: undefined,
-					frontmatterPosition: undefined,
-					frontmatterLinks: undefined,
-				} as CachedMetadata;
-			},
-		);
+		(mockMetadataCache.getFileCache as any).mockImplementation((file: TFile) => {
+			if (file.path === "source.md") {
+				return createCachedMetadata([
+					{ link: "foo", offset: 10 },
+					{ link: "Foo", offset: 20 },
+				]);
+			}
+			return {
+				links: [],
+				embeds: [],
+				headings: [],
+				sections: [],
+				tags: [],
+				frontmatter: undefined,
+				frontmatterPosition: undefined,
+				frontmatterLinks: undefined,
+			} as CachedMetadata;
+		});
 
 		const nextSummary = await localUpdater.buildSourceSummaryForFileAsync(
 			sourceFile,
@@ -477,9 +429,7 @@ describe("BacklinkMapUpdater", () => {
 		);
 
 		expect(result.affectedDestinations).toEqual(new Set());
-		expect(result.representativeChangedLookupKeys).toEqual(
-			new Set(["foo.md"]),
-		);
+		expect(result.representativeChangedLookupKeys).toEqual(new Set(["foo.md"]));
 		expect(removals).toEqual([]);
 		expect(additions).toEqual([]);
 	});
@@ -544,10 +494,7 @@ describe("BacklinkMapUpdater yield behavior", () => {
 			{ path: "target.md" },
 		]);
 		const { mockVault, mockMetadataCache } = customBuilder.build();
-		const localUpdater = createBacklinkUpdater(
-			mockVault,
-			mockMetadataCache,
-		);
+		const localUpdater = createBacklinkUpdater(mockVault, mockMetadataCache);
 
 		const lookupKeyCount = 256;
 		const lookupKeys: string[] = [];
@@ -623,8 +570,6 @@ describe("BacklinkMapUpdater yield behavior", () => {
 		);
 
 		expect(countingScheduler.yieldCalls).toBeGreaterThan(0);
-		expect(result.representativeChangedLookupKeys.has("lookup-0.md")).toBe(
-			true,
-		);
+		expect(result.representativeChangedLookupKeys.has("lookup-0.md")).toBe(true);
 	});
 });

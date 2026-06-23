@@ -61,24 +61,15 @@ export function createPreprocessedDisplayDataCache(): PreprocessedDisplayDataCac
 }
 
 function createPreprocessSettingsKey(settings: PluginSettings): string {
-	return createSettingsCacheKey(
-		settings,
-		PREPROCESS_CACHE_SETTING_DEPENDENCIES,
-	);
+	return createSettingsCacheKey(settings, PREPROCESS_CACHE_SETTING_DEPENDENCIES);
 }
 
 function createLinkPreprocessSettingsKey(settings: PluginSettings): string {
-	return createSettingsCacheKey(
-		settings,
-		LINK_PREPROCESS_CACHE_SETTING_DEPENDENCIES,
-	);
+	return createSettingsCacheKey(settings, LINK_PREPROCESS_CACHE_SETTING_DEPENDENCIES);
 }
 
 function createTagPreprocessSettingsKey(settings: PluginSettings): string {
-	return createSettingsCacheKey(
-		settings,
-		TAG_PREPROCESS_CACHE_SETTING_DEPENDENCIES,
-	);
+	return createSettingsCacheKey(settings, TAG_PREPROCESS_CACHE_SETTING_DEPENDENCIES);
 }
 
 function getLinkPreprocessedDisplayData(
@@ -170,10 +161,7 @@ function getDedupePreprocessedDisplayData(
 		return cached.preprocessed;
 	}
 
-	const preprocessed = displayDataBuilder.preprocessDisplayData(
-		linkResult,
-		settings,
-	);
+	const preprocessed = displayDataBuilder.preprocessDisplayData(linkResult, settings);
 
 	cache.combinedEntry = {
 		branchesRef,
@@ -294,8 +282,7 @@ function hasDisplayableItems(
 		displayData.outgoing.length > 0 ||
 		displayData.backlinks.length > 0 ||
 		displayData.twoHopBranches.length > 0 ||
-		((settings?.showTagsSection ?? true) &&
-			displayData.tagGroups.length > 0) ||
+		((settings?.showTagsSection ?? true) && displayData.tagGroups.length > 0) ||
 		displayData.newLinks.length > 0
 	);
 }

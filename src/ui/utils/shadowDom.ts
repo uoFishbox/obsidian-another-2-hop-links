@@ -1,10 +1,6 @@
 export type QueryRoot = ParentNode | ShadowRoot | DocumentFragment;
 
-import {
-	isElementLike,
-	isHTMLElementLike,
-	isShadowRootLike,
-} from "./realmSafeDom";
+import { isElementLike, isHTMLElementLike, isShadowRootLike } from "./realmSafeDom";
 
 function isShadowHost(
 	value: unknown,
@@ -14,9 +10,7 @@ function isShadowHost(
 
 function getRootHost(node: Node | null): HTMLElement | null {
 	const root = node?.getRootNode?.();
-	return isShadowRootLike(root) && isHTMLElementLike(root.host)
-		? root.host
-		: null;
+	return isShadowRootLike(root) && isHTMLElementLike(root.host) ? root.host : null;
 }
 
 export function findClosestComposed(
@@ -62,9 +56,10 @@ export function findMatchingElementInComposedPath(
 	return findClosestComposed(event.target, selector);
 }
 
-export function querySelectorAllIncludingShadow<
-	T extends HTMLElement = HTMLElement,
->(root: QueryRoot | null | undefined, selector: string): T[] {
+export function querySelectorAllIncludingShadow<T extends HTMLElement = HTMLElement>(
+	root: QueryRoot | null | undefined,
+	selector: string,
+): T[] {
 	if (!root) {
 		return [];
 	}

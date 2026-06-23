@@ -24,17 +24,20 @@ function createLinkContext(params: {
 	sourceFile: TFile;
 	resolveMap: Map<string, TFile>;
 	metadataMap: Map<string, unknown>;
-	fileToLinktext?: (file: TFile, sourcePath: string, omitMdExtension?: boolean) => string;
+	fileToLinktext?: (
+		file: TFile,
+		sourcePath: string,
+		omitMdExtension?: boolean,
+	) => string;
 }): LinkContext {
 	const fileToLinktext =
-		params.fileToLinktext ??
-		((file: TFile) => `Link:${file.basename}`);
+		params.fileToLinktext ?? ((file: TFile) => `Link:${file.basename}`);
 
 	return {
 		resolveFile: vi.fn((path: string) => params.resolveMap.get(path) ?? null),
 		fileToLinktext,
 		buildWikiLink: vi.fn(() => "[[link]]"),
-		getPreview: vi.fn(async () => ({ type: "empty", content: "" } as const)),
+		getPreview: vi.fn(async () => ({ type: "empty", content: "" }) as const),
 		sourceFile: params.sourceFile,
 		getMetadata: vi.fn(
 			(file: TFile) => (params.metadataMap.get(file.path) ?? null) as never,
@@ -146,10 +149,7 @@ describe("getItemSearchText", () => {
 			sourceFile,
 			resolveMap: new Map([[branchTarget.path, branchTarget]]),
 			metadataMap: new Map([
-				[
-					branchTarget.path,
-					{ frontmatter: { title: "Branch Title" } },
-				],
+				[branchTarget.path, { frontmatter: { title: "Branch Title" } }],
 			]),
 			fileToLinktext: vi.fn(() => "Branch Link"),
 		});

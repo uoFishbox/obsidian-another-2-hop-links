@@ -22,9 +22,7 @@ export function getSectionExpandedLimit(
 	return expandedLimit;
 }
 
-export function getDefaultSectionVisibleLimit(
-	settings: PluginSettings,
-): number {
+export function getDefaultSectionVisibleLimit(settings: PluginSettings): number {
 	return normalizeExpandedLimit(settings.defaultVisibleLinkCount);
 }
 
@@ -57,10 +55,7 @@ export function clearSectionExpandedLimit(
 	return nextLimits;
 }
 
-export function resolveSortOption(
-	current: SortOption,
-	next: SortOption,
-): SortOption {
+export function resolveSortOption(current: SortOption, next: SortOption): SortOption {
 	return current === next ? current : next;
 }
 

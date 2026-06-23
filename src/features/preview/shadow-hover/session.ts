@@ -27,19 +27,13 @@ import {
 	transitionHoverSession,
 	transitionHoverSessionInteraction,
 } from "./state-machine";
-import {
-	isElementLike,
-	isHTMLElementLike,
-	isNodeLike,
-} from "ui/utils/realmSafeDom";
+import { isElementLike, isHTMLElementLike, isNodeLike } from "ui/utils/realmSafeDom";
 
 const patchedPopovers = new WeakMap<HoverPopoverLike, PopoverPatchState>();
 
 type PopoverMethodName = keyof PopoverPatchState["originals"];
 
-export function closePopoverUnsafe(
-	popover: HoverPopoverLike | null | undefined,
-): void {
+export function closePopoverUnsafe(popover: HoverPopoverLike | null | undefined): void {
 	if (!popover) {
 		return;
 	}
@@ -152,9 +146,7 @@ function isActiveElementWithinPopover(popover: HoverPopoverLike): boolean {
 		return false;
 	}
 	const activeElement = hoverEl.ownerDocument?.activeElement;
-	return isElementLike(activeElement)
-		? hoverEl.contains(activeElement)
-		: false;
+	return isElementLike(activeElement) ? hoverEl.contains(activeElement) : false;
 }
 
 function syncShadowTargetState(
@@ -175,11 +167,7 @@ function syncShadowTargetState(
 			? session.anchorRegistry.isHovered(proxyAnchorEl)
 			: false;
 	if (proxyAnchorEl) {
-		bindPopoverAnchor(
-			popover,
-			proxyAnchorEl,
-			actualAnchorEl ?? proxyAnchorEl,
-		);
+		bindPopoverAnchor(popover, proxyAnchorEl, actualAnchorEl ?? proxyAnchorEl);
 	}
 
 	const changed =
@@ -265,11 +253,8 @@ function restoreShownState(
 	}
 	syncShadowTargetState(popover, session, reason);
 	if (enableLogging) {
-		debugLog(
-			session,
-			"keepalive-hold",
-			`Popover hold asserted (${reason})`,
-			() => summarizePopover(popover),
+		debugLog(session, "keepalive-hold", `Popover hold asserted (${reason})`, () =>
+			summarizePopover(popover),
 		);
 	}
 }
@@ -283,10 +268,7 @@ function releasePopoverControl(
 	transitionSessionInteraction(session, { type: "interaction-reset" });
 }
 
-function patchCloseMethods(
-	popover: HoverPopoverLike,
-	state: PopoverPatchState,
-): void {
+function patchCloseMethods(popover: HoverPopoverLike, state: PopoverPatchState): void {
 	const { originals, ownerSession: session } = state;
 
 	const wrapClose = (
@@ -352,10 +334,7 @@ function patchCloseMethods(
 	}
 }
 
-function patchDetect(
-	popover: HoverPopoverLike,
-	state: PopoverPatchState,
-): void {
+function patchDetect(popover: HoverPopoverLike, state: PopoverPatchState): void {
 	const { originals, ownerSession: session } = state;
 	const patchedDetect = function patchedDetect(
 		this: HoverPopoverLike,
@@ -377,10 +356,7 @@ function patchDetect(
 	);
 }
 
-function patchTransition(
-	popover: HoverPopoverLike,
-	state: PopoverPatchState,
-): void {
+function patchTransition(popover: HoverPopoverLike, state: PopoverPatchState): void {
 	const { originals, ownerSession: session } = state;
 	if (typeof originals.transition !== "function") {
 		return;
@@ -570,11 +546,7 @@ export function createRequestHoverParent(
 			if (session.shownStateValue == null) {
 				session.shownStateValue = nextPopover.state ?? 1;
 			}
-			bindPopoverAnchor(
-				nextPopover,
-				requestAnchorEl,
-				requestActualAnchorEl,
-			);
+			bindPopoverAnchor(nextPopover, requestAnchorEl, requestActualAnchorEl);
 			patchPopoverInstance(
 				nextPopover,
 				session,
@@ -708,18 +680,11 @@ function ensurePopoverPatchState(
 	const originals: PopoverPatchState["originals"] = {
 		hide: typeof popover.hide === "function" ? popover.hide : undefined,
 		close: typeof popover.close === "function" ? popover.close : undefined,
-		unload:
-			typeof popover.unload === "function" ? popover.unload : undefined,
-		position:
-			typeof popover.position === "function"
-				? popover.position
-				: undefined,
-		detect:
-			typeof popover.detect === "function" ? popover.detect : undefined,
+		unload: typeof popover.unload === "function" ? popover.unload : undefined,
+		position: typeof popover.position === "function" ? popover.position : undefined,
+		detect: typeof popover.detect === "function" ? popover.detect : undefined,
 		transition:
-			typeof popover.transition === "function"
-				? popover.transition
-				: undefined,
+			typeof popover.transition === "function" ? popover.transition : undefined,
 	};
 	const state: PopoverPatchState = {
 		ownerSession: session,
@@ -734,10 +699,7 @@ function ensurePopoverPatchState(
 	return state;
 }
 
-function patchPosition(
-	popover: HoverPopoverLike,
-	state: PopoverPatchState,
-): void {
+function patchPosition(popover: HoverPopoverLike, state: PopoverPatchState): void {
 	const { originals, ownerSession: session } = state;
 	if (typeof originals.position !== "function") {
 		return;
@@ -754,17 +716,12 @@ function patchPosition(
 			this.targetEl = proxyAnchorEl;
 		}
 		if (enableLogging) {
-			debugLog(
-				session,
-				"popover-position",
-				"Popover position() invoked",
-				() => ({
-					argsCount: args.length,
-					anchorRect: proxyAnchorEl
-						? rectToObject(proxyAnchorEl.getBoundingClientRect())
-						: null,
-				}),
-			);
+			debugLog(session, "popover-position", "Popover position() invoked", () => ({
+				argsCount: args.length,
+				anchorRect: proxyAnchorEl
+					? rectToObject(proxyAnchorEl.getBoundingClientRect())
+					: null,
+			}));
 		}
 		const next = originals.position;
 		if (typeof next === "function") {
@@ -824,9 +781,7 @@ function attachOutsideInteractionListeners(
 		if (enableLogging) {
 			debugLog(
 				session,
-				outsideOrClose
-					? "interaction-outside-or-close"
-					: "interaction-inside",
+				outsideOrClose ? "interaction-outside-or-close" : "interaction-inside",
 				`Observed ${event.type} interaction`,
 				() => ({
 					outsideOrClose,
@@ -888,8 +843,7 @@ export function scheduleAttachPopoverHoverListeners(
 		transitionSessionInteraction(session, {
 			type: "popover-hover-sync",
 			overPopover:
-				Boolean(popover.onHover) ||
-				isActiveElementWithinPopover(popover),
+				Boolean(popover.onHover) || isActiveElementWithinPopover(popover),
 		});
 		if (enableLogging) {
 			debugLog(session, "popover-sync", `Popover sync from ${type}`, () =>

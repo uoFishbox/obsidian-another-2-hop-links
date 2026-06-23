@@ -34,9 +34,7 @@ describe("useWorkerSearchSession fallback", () => {
 			});
 
 			await waitFor(() => {
-				expect(screen.getByTestId("matched-state")).toHaveTextContent(
-					"alpha",
-				);
+				expect(screen.getByTestId("matched-state")).toHaveTextContent("alpha");
 			});
 		} finally {
 			Reflect.set(globalThis, "Worker", originalWorker);

@@ -1,9 +1,5 @@
 import { EMPTY_ROW_RANGE, isEmptyRange, type RowRange } from "./rowRange";
-import type {
-	BootstrapReason,
-	EmptyReason,
-	SkipReason,
-} from "./core/VirtualListMode";
+import type { BootstrapReason, EmptyReason, SkipReason } from "./core/VirtualListMode";
 import type { VirtualRanges, VirtualRowModel } from "./types";
 
 export function createBootstrapVirtualRowRange(
@@ -130,43 +126,39 @@ export function computeVirtualRanges<TCell>(params: {
 	}
 
 	const relativeScrollTop = params.scrollTop - params.sectionTop;
-	const measuredRanges: VirtualRanges =
-		params.precomputedRanges
-			? copyVirtualRanges(params.precomputedRanges)
-			: (params.rowModel.findVisibleRanges?.({
+	const measuredRanges: VirtualRanges = params.precomputedRanges
+		? copyVirtualRanges(params.precomputedRanges)
+		: (params.rowModel.findVisibleRanges?.({
 				scrollTop: relativeScrollTop,
 				viewportHeight: params.viewportHeight,
 				mountedOverscanPx: params.mountedOverscanPx,
 				previewOverscanPx: params.previewOverscanPx,
 			}) ??
-				(() => {
-					const mountedOverscanPx = Math.max(
-						0,
-						params.mountedOverscanPx,
-					);
-					const previewOverscanPx = Math.min(
-						mountedOverscanPx,
-						Math.max(0, params.previewOverscanPx ?? 0),
-					);
-					const previewVisible = params.rowModel.findVisibleRange({
-						scrollTop: relativeScrollTop,
-						viewportHeight: params.viewportHeight,
-						overscanPx: previewOverscanPx,
-					});
-					const mounted =
-						mountedOverscanPx <= 0
-							? previewVisible
-							: params.rowModel.findVisibleRange({
-									scrollTop: relativeScrollTop,
-									viewportHeight: params.viewportHeight,
-									overscanPx: mountedOverscanPx,
-								});
+			(() => {
+				const mountedOverscanPx = Math.max(0, params.mountedOverscanPx);
+				const previewOverscanPx = Math.min(
+					mountedOverscanPx,
+					Math.max(0, params.previewOverscanPx ?? 0),
+				);
+				const previewVisible = params.rowModel.findVisibleRange({
+					scrollTop: relativeScrollTop,
+					viewportHeight: params.viewportHeight,
+					overscanPx: previewOverscanPx,
+				});
+				const mounted =
+					mountedOverscanPx <= 0
+						? previewVisible
+						: params.rowModel.findVisibleRange({
+								scrollTop: relativeScrollTop,
+								viewportHeight: params.viewportHeight,
+								overscanPx: mountedOverscanPx,
+							});
 
-					return {
-						mounted,
-						previewVisible,
-					};
-				})());
+				return {
+					mounted,
+					previewVisible,
+				};
+			})());
 	return {
 		mode: { kind: "stable", scrolling: Boolean(params.isScrollActive) },
 		ranges: measuredRanges,

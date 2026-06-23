@@ -29,9 +29,7 @@ export type RangedScrollWindowMeasurement = {
 	stablePreviewScrollTopBand?: StablePreviewScrollTopBand;
 };
 
-export type ActiveScrollWindowComparison =
-	| "visible-and-mounted"
-	| "mounted-only";
+export type ActiveScrollWindowComparison = "visible-and-mounted" | "mounted-only";
 
 const INVALID_STABLE_PREVIEW_SCROLL_TOP_MIN = Number.POSITIVE_INFINITY;
 const INVALID_STABLE_PREVIEW_SCROLL_TOP_MAX = Number.NEGATIVE_INFINITY;
@@ -47,11 +45,9 @@ export const createScrollWindow = (
 	visibleStart: ranges.previewVisible.start,
 	visibleEnd: ranges.previewVisible.end,
 	stablePreviewScrollTopMin:
-		stablePreviewScrollTopBand?.min ??
-		INVALID_STABLE_PREVIEW_SCROLL_TOP_MIN,
+		stablePreviewScrollTopBand?.min ?? INVALID_STABLE_PREVIEW_SCROLL_TOP_MIN,
 	stablePreviewScrollTopMax:
-		stablePreviewScrollTopBand?.max ??
-		INVALID_STABLE_PREVIEW_SCROLL_TOP_MAX,
+		stablePreviewScrollTopBand?.max ?? INVALID_STABLE_PREVIEW_SCROLL_TOP_MAX,
 });
 
 export const createMountedScrollWindow = (
@@ -83,11 +79,9 @@ export const updateScrollWindow = (
 	previous.visibleStart = ranges.previewVisible.start;
 	previous.visibleEnd = ranges.previewVisible.end;
 	previous.stablePreviewScrollTopMin =
-		stablePreviewScrollTopBand?.min ??
-		INVALID_STABLE_PREVIEW_SCROLL_TOP_MIN;
+		stablePreviewScrollTopBand?.min ?? INVALID_STABLE_PREVIEW_SCROLL_TOP_MIN;
 	previous.stablePreviewScrollTopMax =
-		stablePreviewScrollTopBand?.max ??
-		INVALID_STABLE_PREVIEW_SCROLL_TOP_MAX;
+		stablePreviewScrollTopBand?.max ?? INVALID_STABLE_PREVIEW_SCROLL_TOP_MAX;
 	return previous;
 };
 
@@ -105,10 +99,8 @@ export const updateMountedScrollWindow = (
 	previous.mountedEnd = mounted.end;
 	previous.visibleStart = 0;
 	previous.visibleEnd = 0;
-	previous.stablePreviewScrollTopMin =
-		INVALID_STABLE_PREVIEW_SCROLL_TOP_MIN;
-	previous.stablePreviewScrollTopMax =
-		INVALID_STABLE_PREVIEW_SCROLL_TOP_MAX;
+	previous.stablePreviewScrollTopMin = INVALID_STABLE_PREVIEW_SCROLL_TOP_MIN;
+	previous.stablePreviewScrollTopMax = INVALID_STABLE_PREVIEW_SCROLL_TOP_MAX;
 	return previous;
 };
 

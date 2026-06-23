@@ -1,7 +1,5 @@
 import type { ItemInteractionDescriptor } from "ui/interactions/interactionTypes";
-import type {
-	InteractionDescriptorResolverProvider,
-} from "ui/interactions/interactionRegistry";
+import type { InteractionDescriptorResolverProvider } from "ui/interactions/interactionRegistry";
 import type { MountedFlatItemCell } from "ui/components/common/virtual-list/reconciliation/viewPlanMountedCells";
 import type { MountedFlatRowSlice } from "ui/components/common/virtual-list/reconciliation/viewPlanRenderRows";
 import { createItemInteractionKey } from "ui/interactions/interactionTypes";
@@ -60,10 +58,7 @@ export function createTwoHopInteractionResolverProvider({
 				cached &&
 				cached.itemRevision === item &&
 				Object.is(cached.renderBodyRevision, itemCell.renderBodyKey) &&
-				Object.is(
-					cached.resolveDescriptorRevision,
-					resolveDescriptor,
-				)
+				Object.is(cached.resolveDescriptorRevision, resolveDescriptor)
 			) {
 				return cached.descriptor;
 			}

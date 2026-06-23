@@ -11,10 +11,7 @@ export function initFilePatcher(
 	patchViewLifecycle(plugin, patchRegistry);
 }
 
-function patchViewLifecycle(
-	plugin: PluginHost,
-	patchRegistry: PatchRegistry,
-) {
+function patchViewLifecycle(plugin: PluginHost, patchRegistry: PatchRegistry) {
 	const ensureInlineContainers = (view: MarkdownView): void => {
 		if (
 			plugin.settings.displayMode !== "editor-inline" &&

@@ -13,10 +13,7 @@ function createPosition(offset: number) {
 	};
 }
 
-function forEachParentTag(
-	tag: string,
-	visitor: (parentTag: string) => void,
-): void {
+function forEachParentTag(tag: string, visitor: (parentTag: string) => void): void {
 	let slash = tag.indexOf("/");
 	while (slash !== -1) {
 		visitor(tag.slice(0, slash));
@@ -84,10 +81,7 @@ describe("getNotesWithTag", () => {
 	]);
 
 	const files = new Map<string, TFile>(
-		Array.from(fileTags.keys()).map((path) => [
-			path,
-			createMockTFile(path),
-		]),
+		Array.from(fileTags.keys()).map((path) => [path, createMockTFile(path)]),
 	);
 
 	const tagIndex = buildTagIndex(fileTags);
@@ -95,9 +89,9 @@ describe("getNotesWithTag", () => {
 
 	test("returns notes with common tags and cached usageKey", async () => {
 		const localTagIndex = buildTagIndex(
-			new Map<string, TagReference[]>([[
-				"note.md", [{ tag: "tag1", position: positions.exact }],
-			]]),
+			new Map<string, TagReference[]>([
+				["note.md", [{ tag: "tag1", position: positions.exact }]],
+			]),
 		);
 		const localVault = buildVault(
 			new Map<string, TFile>([
@@ -106,12 +100,9 @@ describe("getNotesWithTag", () => {
 			]),
 		);
 		const targetFile = createMockTFile("target.md");
-		const result = getNotesWithCommonTags(
-			localVault,
-			localTagIndex,
-			targetFile,
-			["tag1"],
-		);
+		const result = getNotesWithCommonTags(localVault, localTagIndex, targetFile, [
+			"tag1",
+		]);
 
 		expect(result).toHaveLength(1);
 		expect(result[0]).toMatchObject({
@@ -125,9 +116,7 @@ describe("getNotesWithTag", () => {
 		const paths = toSortedPaths(result);
 
 		expect(paths).toEqual(["deep.md", "exact.md", "nested.md"]);
-		expect(result.every((note) => note.commonTags[0] === "tag1")).toBe(
-			true,
-		);
+		expect(result.every((note) => note.commonTags[0] === "tag1")).toBe(true);
 		expect(
 			result.every((note) => note.usageKey === `f:${note.path.toLowerCase()}`),
 		).toBe(true);

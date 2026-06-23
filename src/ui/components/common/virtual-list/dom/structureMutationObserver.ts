@@ -34,9 +34,7 @@ export const shouldIgnoreStructureMutationNode = (node: Node): boolean => {
 	);
 };
 
-export const hasRelevantStructureMutation = (
-	mutation: MutationRecord,
-): boolean => {
+export const hasRelevantStructureMutation = (mutation: MutationRecord): boolean => {
 	if (shouldIgnoreStructureMutationNode(mutation.target)) {
 		return false;
 	}

@@ -28,9 +28,7 @@ export function formatVirtualListInputError<T, G>(
 	switch (error.type) {
 		case "duplicate-section-id":
 			return (
-				`ViewPlan: duplicate sectionId ${JSON.stringify(
-					error.sectionId,
-				)}. ` +
+				`ViewPlan: duplicate sectionId ${JSON.stringify(error.sectionId)}. ` +
 				`first index=${error.firstIndex}, first sectionKey=${JSON.stringify(
 					error.firstSection.sectionKey,
 				)}; ` +

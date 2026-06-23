@@ -1,18 +1,9 @@
-import {
-	TFile,
-	type MetadataCache,
-	type Vault,
-	type Workspace,
-} from "obsidian";
+import { TFile, type MetadataCache, type Vault, type Workspace } from "obsidian";
 import type { App } from "obsidian";
 import type { EventHandlers } from "types/services";
 import type { IPreviewService } from "types/services";
 import type { CachedMetadataWithLinkReferences, IIndexingService } from "types";
-import type {
-	HighlightMode,
-	LinkContext,
-	LinkInteractionOptions,
-} from "./linkContext";
+import type { HighlightMode, LinkContext, LinkInteractionOptions } from "./linkContext";
 import type { PluginSettings } from "types/settings";
 import { triggerHoverPopover } from "features/preview/interactions/mobilePopover";
 import type { PluginHost } from "types/pluginHost";
@@ -79,8 +70,7 @@ export function createLinkContextFactory(
 		const linkContext: Partial<LinkContext> = {
 			getPreview: (fileToLoad, signal, options) =>
 				previewService.getPreview(fileToLoad, signal, options),
-			getVisiblePreviewQueueSize: () =>
-				previewService.getVisibleQueueSize(),
+			getVisiblePreviewQueueSize: () => previewService.getVisibleQueueSize(),
 			resolveFile: eventHandlers.handleResolveFile,
 			buildWikiLink: (targetFile: TFile | null, fallback: string) =>
 				targetFile ? dragLinkFormat(targetFile) : `[[${fallback}]]`,
@@ -138,11 +128,7 @@ export function createLinkContextFactory(
 		linkContext.onHop1Click = (event, link, options) => {
 			if (link.isUnresolved) {
 				const newLeaf = getNewLeafOption(event);
-				void app.workspace.openLinkText(
-					link.rawText,
-					file.path,
-					newLeaf,
-				);
+				void app.workspace.openLinkText(link.rawText, file.path, newLeaf);
 				return;
 			}
 
@@ -167,25 +153,15 @@ export function createLinkContextFactory(
 			if (!highlight) {
 				const hashIndex = linkToOpen.rawText.indexOf("#");
 				if (hashIndex !== -1) {
-					linkToOpen.rawText = linkToOpen.rawText.substring(
-						0,
-						hashIndex,
-					);
+					linkToOpen.rawText = linkToOpen.rawText.substring(0, hashIndex);
 				}
 				const caretIndex = linkToOpen.rawText.indexOf("^");
 				if (caretIndex !== -1) {
-					linkToOpen.rawText = linkToOpen.rawText.substring(
-						0,
-						caretIndex,
-					);
+					linkToOpen.rawText = linkToOpen.rawText.substring(0, caretIndex);
 				}
 			}
 
-			eventHandlers.handleOpenLinkDestination(
-				linkToOpen,
-				file,
-				newLeafOption,
-			);
+			eventHandlers.handleOpenLinkDestination(linkToOpen, file, newLeafOption);
 		};
 
 		linkContext.onTagClick = (tag: string) =>

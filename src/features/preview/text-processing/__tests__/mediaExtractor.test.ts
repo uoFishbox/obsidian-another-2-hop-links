@@ -47,12 +47,12 @@ describe("extractFirstEmbeddedMedia", () => {
 
 	test("parses markdown image embeds", async () => {
 		const embed = await extractFirstEmbeddedMedia(
-			"cover ![Alt text](<assets/cover image.png> \"Title\")",
+			'cover ![Alt text](<assets/cover image.png> "Title")',
 		);
 
 		expect(embed).toEqual({
 			syntax: "markdown",
-			original: "![Alt text](<assets/cover image.png> \"Title\")",
+			original: '![Alt text](<assets/cover image.png> "Title")',
 			target: "assets/cover image.png",
 		});
 	});

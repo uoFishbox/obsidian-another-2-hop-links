@@ -1,9 +1,6 @@
 import type { AppContext, LinkContext } from "ui/context/linkContext";
 import type { InteractionRegistry } from "./interactionRegistry";
-import {
-	INTERACTION_SELECTOR,
-	getInteractionIdFromElement,
-} from "./interactionTypes";
+import { INTERACTION_SELECTOR, getInteractionIdFromElement } from "./interactionTypes";
 import { buildShadowHoverLinkSpec } from "./shadowHoverLinkSpec";
 import {
 	findClosestComposed,
@@ -56,13 +53,8 @@ function resolveInteractionElementFromEvent(
 	shadowRoot: ShadowRoot,
 	event: Event,
 ): HTMLElement | null {
-	const element = findMatchingElementInComposedPath(
-		event,
-		INTERACTION_SELECTOR,
-	);
-	return isInteractionElementWithinShadowRoot(shadowRoot, element)
-		? element
-		: null;
+	const element = findMatchingElementInComposedPath(event, INTERACTION_SELECTOR);
+	return isInteractionElementWithinShadowRoot(shadowRoot, element) ? element : null;
 }
 
 function resolveInteractionElementFromRelatedTarget(
@@ -70,14 +62,10 @@ function resolveInteractionElementFromRelatedTarget(
 	target: EventTarget | null,
 ): HTMLElement | null {
 	const element = findClosestComposed(target, INTERACTION_SELECTOR);
-	return isInteractionElementWithinShadowRoot(shadowRoot, element)
-		? element
-		: null;
+	return isInteractionElementWithinShadowRoot(shadowRoot, element) ? element : null;
 }
 
-function getModifierState(
-	event: MouseEvent | PointerEvent | KeyboardEvent,
-): boolean {
+function getModifierState(event: MouseEvent | PointerEvent | KeyboardEvent): boolean {
 	return Boolean(event.ctrlKey || event.metaKey);
 }
 
@@ -118,29 +106,19 @@ function handleModifierStateChange(
 		return;
 	}
 
-	if (
-		!activeAnchorEl.isConnected ||
-		!handle.shadowRoot.contains(activeAnchorEl)
-	) {
+	if (!activeAnchorEl.isConnected || !handle.shadowRoot.contains(activeAnchorEl)) {
 		leaveActiveAnchor(handle);
 		return;
 	}
 
-	handle.controller.handleDelegatedModifierKey(
-		activeAnchorEl,
-		interactionId,
-		event,
-	);
+	handle.controller.handleDelegatedModifierKey(activeAnchorEl, interactionId, event);
 }
 
 function handleMouseOver(
 	handle: SharedShadowHoverBridgeHandle,
 	event: MouseEvent,
 ): void {
-	const nextAnchorEl = resolveInteractionElementFromEvent(
-		handle.shadowRoot,
-		event,
-	);
+	const nextAnchorEl = resolveInteractionElementFromEvent(handle.shadowRoot, event);
 	if (!nextAnchorEl) {
 		return;
 	}
@@ -195,11 +173,7 @@ function handleMouseOver(
 	handle.activeAnchorEl = nextAnchorEl;
 	handle.activeInteractionId = nextInteractionId;
 	handle.lastPointerModState = getModifierState(event);
-	handle.controller.handleDelegatedEnter(
-		nextAnchorEl,
-		nextInteractionId,
-		event,
-	);
+	handle.controller.handleDelegatedEnter(nextAnchorEl, nextInteractionId, event);
 }
 
 function handleMouseOut(
@@ -231,8 +205,7 @@ function handleMouseOut(
 	if (
 		nextAnchorEl === currentAnchorEl ||
 		nextAnchorEl === handle.activeAnchorEl ||
-		(nextInteractionId !== null &&
-			nextInteractionId === handle.activeInteractionId)
+		(nextInteractionId !== null && nextInteractionId === handle.activeInteractionId)
 	) {
 		return;
 	}
@@ -267,20 +240,13 @@ function handlePointerMove(
 	}
 
 	if (!isEventTargetWithinAnchor(activeAnchorEl, event.target)) {
-		const anchorEl = resolveInteractionElementFromEvent(
-			handle.shadowRoot,
-			event,
-		);
+		const anchorEl = resolveInteractionElementFromEvent(handle.shadowRoot, event);
 		if (anchorEl !== activeAnchorEl) {
 			return;
 		}
 	}
 
-	handle.controller.handleDelegatedPointerMove(
-		activeAnchorEl,
-		interactionId,
-		event,
-	);
+	handle.controller.handleDelegatedPointerMove(activeAnchorEl, interactionId, event);
 }
 
 function disposeHandle(handle: SharedShadowHoverBridgeHandle): void {
@@ -301,12 +267,10 @@ function createHandle({
 }: ShadowHoverPopoverBridgeOptions): SharedShadowHoverBridgeHandle | null {
 	const app = appContext?.app;
 	if (!app) {
-		if (enableLogging) logger(
-			"[ShadowHoverBridge] Bridge install skipped: app context missing.",
-			{
+		if (enableLogging)
+			logger("[ShadowHoverBridge] Bridge install skipped: app context missing.", {
 				host: shadowRoot.host.tagName,
-			},
-		);
+			});
 		return null;
 	}
 
@@ -317,10 +281,7 @@ function createHandle({
 			handle.appContext,
 		);
 	const controller = new ShadowHoverControllerImpl(
-		new WorkspaceTriggerPopoverLauncher(
-			app,
-			COSENSE_CARD_LINKS_HOVER_SOURCE_ID,
-		),
+		new WorkspaceTriggerPopoverLauncher(app, COSENSE_CARD_LINKS_HOVER_SOURCE_ID),
 		resolveLink,
 	);
 	handle = {

@@ -88,9 +88,7 @@ export function registerBenchmarkCommand(
 }
 
 function logBenchmarkResult(result: IndexingBenchmarkResult): void {
-	console.group(
-		"[Cosense card links] rebuildBacklinksMapChunked benchmark",
-	);
+	console.group("[Cosense card links] rebuildBacklinksMapChunked benchmark");
 	console.log("Summary", {
 		iterations: result.iterations,
 		averageMs: Number(result.averageMs.toFixed(2)),

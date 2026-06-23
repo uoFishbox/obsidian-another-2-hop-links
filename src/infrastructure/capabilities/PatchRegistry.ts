@@ -22,7 +22,10 @@ export class PatchRegistry {
 	private uninstallers: Array<() => void> = [];
 	private active = new Set<string>();
 
-	apply<T extends object, M extends MethodKeys<T>>(plugin: Plugin, spec: PatchSpec<T, M>): boolean {
+	apply<T extends object, M extends MethodKeys<T>>(
+		plugin: Plugin,
+		spec: PatchSpec<T, M>,
+	): boolean {
 		if (!spec.enabled) {
 			return false;
 		}

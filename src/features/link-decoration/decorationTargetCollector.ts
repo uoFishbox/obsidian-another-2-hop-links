@@ -1,8 +1,4 @@
-export type DecorationTargetMode =
-	| "rendered"
-	| "codemirror"
-	| "properties"
-	| "bases";
+export type DecorationTargetMode = "rendered" | "codemirror" | "properties" | "bases";
 
 export interface DecorationTargetCollectionOptions {
 	mode?: DecorationTargetMode;
@@ -19,10 +15,7 @@ export function collectDecorationTargets(
 	const mode = options.mode ?? "rendered";
 	const targetSelectors = options.targetSelectors ?? [];
 
-	if (
-		targetSelectors.length === 0 &&
-		(mode === "rendered" || mode === "bases")
-	) {
+	if (targetSelectors.length === 0 && (mode === "rendered" || mode === "bases")) {
 		return null;
 	}
 
@@ -48,10 +41,7 @@ export function collectDecorationTargets(
 	return targets;
 }
 
-function collectCodeMirrorTargets(
-	linkEl: HTMLElement,
-	targets: HTMLElement[],
-): void {
+function collectCodeMirrorTargets(linkEl: HTMLElement, targets: HTMLElement[]): void {
 	const cmWrapper =
 		linkEl.closest<HTMLElement>(".cm-hmd-internal-link") ??
 		linkEl.closest<HTMLElement>(".cm-string.cm-url");
@@ -79,10 +69,7 @@ function collectCodeMirrorTargets(
 	}
 }
 
-function collectPropertyTargets(
-	linkEl: HTMLElement,
-	targets: HTMLElement[],
-): void {
+function collectPropertyTargets(linkEl: HTMLElement, targets: HTMLElement[]): void {
 	const multiSelectPill = linkEl.closest<HTMLElement>(
 		".multi-select-pill.internal-link",
 	);

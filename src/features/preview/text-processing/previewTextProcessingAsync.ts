@@ -4,14 +4,8 @@ import {
 	type CooperativeScanOptions,
 	type FencedCodeBlockRange,
 } from "./fencedCodeBlocks";
-import {
-	extractFirstEmbeddedMedia,
-	type ParsedEmbed,
-} from "./mediaExtractor";
-import {
-	getContentSnippet,
-	type GetContentSnippetOptions,
-} from "./snippetExtractor";
+import { extractFirstEmbeddedMedia, type ParsedEmbed } from "./mediaExtractor";
+import { getContentSnippet, type GetContentSnippetOptions } from "./snippetExtractor";
 import { highlightSearchMatchesInHtml } from "./searchHighlighter";
 import { transformContentForPreview } from "./textTransformUtils";
 import type { TransformContentForPreviewOptions } from "./types";
@@ -172,11 +166,7 @@ export async function findFirstAllowedFencedCodeBlockAsync(
 	allowedTypesArray: readonly string[],
 ): Promise<FencedCodeBlockRange | undefined> {
 	if (!shouldUsePreviewTextWorker(content)) {
-		return await findFirstAllowedFencedCodeBlock(
-			content,
-			allowedTypes,
-			options,
-		);
+		return await findFirstAllowedFencedCodeBlock(content, allowedTypes, options);
 	}
 
 	return await runWithFallback<FencedCodeBlockRange | undefined>(

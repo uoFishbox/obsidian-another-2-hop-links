@@ -1,19 +1,11 @@
 import type { App, TFile } from "obsidian";
-import type {
-	TwoHopLinkBranch,
-	TwoHopIndexedLink,
-	TaggedNote,
-} from "types/domain";
+import type { TwoHopLinkBranch, TwoHopIndexedLink, TaggedNote } from "types/domain";
 import type { SortOption } from "types/settings";
 
 /**
  * ソート可能なアイテムの型
  */
-export type SortableItem =
-	| TwoHopLinkBranch
-	| TwoHopIndexedLink
-	| TaggedNote
-	| TFile;
+export type SortableItem = TwoHopLinkBranch | TwoHopIndexedLink | TaggedNote | TFile;
 
 /**
  * ソート処理に必要なコンテキスト

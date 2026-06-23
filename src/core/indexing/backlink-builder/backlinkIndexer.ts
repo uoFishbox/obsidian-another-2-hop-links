@@ -13,19 +13,12 @@ import type {
 } from "types/domain";
 import type { IVault, IMetadataCache } from "types/obsidian";
 import { logger } from "utils/logger";
-import {
-	extractTags,
-	countLinkReferences,
-} from "../metadata/metadataExtractor";
+import { extractTags, countLinkReferences } from "../metadata/metadataExtractor";
 import {
 	INDEXING_YIELD_INTERVAL_MS,
 	INDEX_LINK_CAPABLE_EXTENSIONS,
 } from "../../../appConstants";
-import type {
-	RebuildOptions,
-	SourceSummary,
-	TagIndex,
-} from "../types/IndexTypes";
+import type { RebuildOptions, SourceSummary, TagIndex } from "../types/IndexTypes";
 import {
 	addFileTagsToTagIndex,
 	createEmptyTagIndex,
@@ -272,8 +265,7 @@ function* createBacklinksBuildSteps(
 ): YieldStepGenerator {
 	const resolvedMemo = createResolvedLinkMemo();
 	const localScratch = createFileLocalAggregation();
-	const detector =
-		ambiguityDetector ?? createLinkResolutionAmbiguityDetector(vault);
+	const detector = ambiguityDetector ?? createLinkResolutionAmbiguityDetector(vault);
 	let currentSourcePath = "";
 
 	function recordIntoScratch(
@@ -330,10 +322,7 @@ function* createBacklinksBuildSteps(
 				visitDestinationForCurrentSource,
 			);
 		}
-		const pendingYield = yieldScheduler.checkpoint(
-			i + 1,
-			YIELD_CHECK_INTERVAL,
-		);
+		const pendingYield = yieldScheduler.checkpoint(i + 1, YIELD_CHECK_INTERVAL);
 		if (pendingYield) {
 			yield pendingYield;
 		}
@@ -349,8 +338,7 @@ export async function buildDetailedBacklinksArtifactsChunked(
 ): Promise<BacklinksBuildArtifacts> {
 	const allFiles = vault.getFiles();
 	const yieldFn = options.yieldFn ?? defaultYieldToMainThread;
-	const yieldIntervalMs =
-		options.yieldIntervalMs ?? INDEXING_YIELD_INTERVAL_MS;
+	const yieldIntervalMs = options.yieldIntervalMs ?? INDEXING_YIELD_INTERVAL_MS;
 	const yieldScheduler = createYieldScheduler(yieldFn, yieldIntervalMs);
 	const execution = createBacklinksBuildExecution(
 		vault,

@@ -33,9 +33,7 @@ export function filterSearchWorkerDatasetWithMatchDetails(
 ): SearchWorkerMatchedItem[] {
 	const queryTerms = getSearchQueryTerms(query);
 	if (queryTerms.length === 0) {
-		const matchedItems = new Array<SearchWorkerMatchedItem>(
-			dataset.items.length,
-		);
+		const matchedItems = new Array<SearchWorkerMatchedItem>(dataset.items.length);
 		for (let index = 0; index < dataset.items.length; index += 1) {
 			matchedItems[index] = {
 				key: dataset.items[index].key,
@@ -47,8 +45,7 @@ export function filterSearchWorkerDatasetWithMatchDetails(
 	}
 
 	const contentByPath =
-		cachedContentByPath ??
-		buildSearchWorkerContentMap(dataset.fileContents);
+		cachedContentByPath ?? buildSearchWorkerContentMap(dataset.fileContents);
 	const maxLen = dataset.items.length;
 	const matchedItems = new Array<SearchWorkerMatchedItem>(maxLen);
 	let matchCount = 0;

@@ -89,10 +89,7 @@ export class ScrollManager {
 		this.history.delete(leafId);
 	}
 
-	private restoreSourceModePosition(
-		view: MarkdownView,
-		state: ScrollState,
-	): void {
+	private restoreSourceModePosition(view: MarkdownView, state: ScrollState): void {
 		// setCursor/focusでスクロールが再調整されるため、最後にscrollTopを適用する
 		view.editor.focus();
 		if (state.cursor) {

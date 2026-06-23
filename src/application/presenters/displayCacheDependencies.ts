@@ -1,10 +1,7 @@
 import type { PluginSettings } from "types/settings";
 import { areTagFeaturesEnabled } from "types/settings";
 
-export interface SettingsCacheDependency<
-	Key extends string = string,
-	Value = unknown,
-> {
+export interface SettingsCacheDependency<Key extends string = string, Value = unknown> {
 	key: Key;
 	select: (settings: PluginSettings) => Value;
 }
@@ -47,8 +44,7 @@ function mergeSettingsCacheDependencies<
 	return [...dependenciesByKey.values()];
 }
 
-const EXCLUDE_ATTACHMENTS_DEPENDENCY =
-	createSettingDependency("excludeAttachments");
+const EXCLUDE_ATTACHMENTS_DEPENDENCY = createSettingDependency("excludeAttachments");
 const TWO_HOP_HEADER_SORT_ORDER_DEPENDENCY = createSettingDependency(
 	"twoHopHeaderSortOrder",
 );
@@ -57,8 +53,7 @@ const TAG_FEATURES_ENABLED_DEPENDENCY = createDerivedSettingDependency(
 	"tagFeaturesEnabled",
 	areTagFeaturesEnabled,
 );
-const SHOW_TAGS_SECTION_DEPENDENCY =
-	createSettingDependency("showTagsSection");
+const SHOW_TAGS_SECTION_DEPENDENCY = createSettingDependency("showTagsSection");
 const USE_MERGED_LINKS_SECTION_DEPENDENCY = createSettingDependency(
 	"useMergedLinksSection",
 );
@@ -92,28 +87,25 @@ export const DISPLAY_ASSEMBLY_SETTING_DEPENDENCIES = [
  * Link preprocessing cache dependencies, including orchestration settings.
  */
 export const LINK_PREPROCESS_CACHE_SETTING_DEPENDENCIES =
-	mergeSettingsCacheDependencies(
-		LINK_DISPLAY_PREPROCESS_SETTING_DEPENDENCIES,
-		[DEDUPE_CARDS_DEPENDENCY],
-	);
+	mergeSettingsCacheDependencies(LINK_DISPLAY_PREPROCESS_SETTING_DEPENDENCIES, [
+		DEDUPE_CARDS_DEPENDENCY,
+	]);
 
 /**
  * Tag preprocessing cache dependencies, including orchestration settings.
  */
-export const TAG_PREPROCESS_CACHE_SETTING_DEPENDENCIES =
-	mergeSettingsCacheDependencies(
-		TAG_DISPLAY_PREPROCESS_SETTING_DEPENDENCIES,
-		[DEDUPE_CARDS_DEPENDENCY],
-	);
+export const TAG_PREPROCESS_CACHE_SETTING_DEPENDENCIES = mergeSettingsCacheDependencies(
+	TAG_DISPLAY_PREPROCESS_SETTING_DEPENDENCIES,
+	[DEDUPE_CARDS_DEPENDENCY],
+);
 
 /**
  * Combined preprocessing cache dependencies.
  */
-export const PREPROCESS_CACHE_SETTING_DEPENDENCIES =
-	mergeSettingsCacheDependencies(
-		LINK_PREPROCESS_CACHE_SETTING_DEPENDENCIES,
-		TAG_PREPROCESS_CACHE_SETTING_DEPENDENCIES,
-	);
+export const PREPROCESS_CACHE_SETTING_DEPENDENCIES = mergeSettingsCacheDependencies(
+	LINK_PREPROCESS_CACHE_SETTING_DEPENDENCIES,
+	TAG_PREPROCESS_CACHE_SETTING_DEPENDENCIES,
+);
 
 /**
  * Selects the declared settings into a stable structured object.
@@ -147,7 +139,5 @@ export function createSettingsCacheKey(
 	settings: PluginSettings,
 	dependencies: readonly SettingsCacheDependency[],
 ): string {
-	return createStructuredCacheKey(
-		selectSettingsDependencies(settings, dependencies),
-	);
+	return createStructuredCacheKey(selectSettingsDependencies(settings, dependencies));
 }

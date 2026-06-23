@@ -1,10 +1,4 @@
-import {
-	App,
-	MarkdownView,
-	TFile,
-	WorkspaceLeaf,
-	MarkdownRenderChild,
-} from "obsidian";
+import { App, MarkdownView, TFile, WorkspaceLeaf, MarkdownRenderChild } from "obsidian";
 import { unmount } from "svelte";
 import { getContainerElements } from "ui/utils/domUtils";
 import { getLeafId } from "infrastructure/utils/workspaceUtils";
@@ -18,9 +12,7 @@ import { IndexingService } from "core/indexing/index-service/IndexingService";
 import { ApplicationStore } from "ui/stores/ApplicationStore.svelte";
 import type { PluginHost } from "types/pluginHost";
 import type { ResolveTwoHopLinks } from "ui/stores/application/TwoHopLinksLoader";
-import {
-	mountTwoHopLinksRootView,
-} from "ui/views/shared/viewFactories";
+import { mountTwoHopLinksRootView } from "ui/views/shared/viewFactories";
 import type { SvelteComponentInstance } from "ui/views/shared/svelteLifecycle";
 
 export type ComponentInstance = SvelteComponentInstance;
@@ -41,10 +33,7 @@ export class ComponentController implements IComponentManager {
 		MarkdownView,
 		MountedComponent[]
 	>();
-	private readonly lazyLoaderCaches = new WeakMap<
-		MarkdownView,
-		Set<string>
-	>();
+	private readonly lazyLoaderCaches = new WeakMap<MarkdownView, Set<string>>();
 
 	private readonly applicationStores = new Map<string, ApplicationStore>();
 	private readonly applicationStoreRefCounts = new Map<string, number>();
@@ -81,10 +70,7 @@ export class ComponentController implements IComponentManager {
 	}
 
 	private touchApplicationStore(key: string): void {
-		this.applicationStoreLastAccess.set(
-			key,
-			++this.applicationStoreAccessSequence,
-		);
+		this.applicationStoreLastAccess.set(key, ++this.applicationStoreAccessSequence);
 	}
 
 	private getOrCreateDisplayDataBuilder(leafId: string): DisplayDataBuilder {
@@ -133,8 +119,7 @@ export class ComponentController implements IComponentManager {
 
 		const existingComponents = this.mountedComponents.get(view);
 		const previousFilePath = existingComponents?.[0]?.filePath;
-		const isSameFileMounted =
-			!!previousFilePath && previousFilePath === file.path;
+		const isSameFileMounted = !!previousFilePath && previousFilePath === file.path;
 
 		if (isSameFileMounted && options?.skipIfMounted) {
 			return;
@@ -284,9 +269,7 @@ export class ComponentController implements IComponentManager {
 
 	private trimIdleApplicationStores(): void {
 		const idleEntries = Array.from(this.applicationStores.entries())
-			.filter(
-				([key]) => (this.applicationStoreRefCounts.get(key) ?? 0) === 0,
-			)
+			.filter(([key]) => (this.applicationStoreRefCounts.get(key) ?? 0) === 0)
 			.map(([key, store]) => ({
 				key,
 				store,
@@ -298,17 +281,14 @@ export class ComponentController implements IComponentManager {
 		}
 
 		idleEntries.sort((left, right) => left.lastAccess - right.lastAccess);
-		const evictionCount =
-			idleEntries.length - RECENT_APPLICATION_STORE_LIMIT;
+		const evictionCount = idleEntries.length - RECENT_APPLICATION_STORE_LIMIT;
 
 		for (const { key, store } of idleEntries.slice(0, evictionCount)) {
 			store.destroy();
 			this.deleteApplicationStoreEntry(key);
 			const separatorIndex = key.indexOf(":");
 			if (separatorIndex !== -1) {
-				this.maybeReleaseDisplayDataBuilder(
-					key.slice(0, separatorIndex),
-				);
+				this.maybeReleaseDisplayDataBuilder(key.slice(0, separatorIndex));
 			}
 		}
 	}
@@ -394,9 +374,7 @@ export class ComponentController implements IComponentManager {
 			// --- ライフサイクル管理 ---
 			// MarkdownRenderChildを使って、Viewが破棄されたとき(タブ閉じ等)に
 			// 自動的にクリーンアップ処理が走るようにする
-			const lifecycleManager = new MarkdownRenderChild(
-				container as HTMLElement,
-			);
+			const lifecycleManager = new MarkdownRenderChild(container as HTMLElement);
 
 			// 既にクリーンアップされたかを追跡するフラグ（二重解放防止）
 			let isCleanedUp = false;
@@ -436,9 +414,7 @@ export class ComponentController implements IComponentManager {
 	/**
 	 * Svelteコンポーネント単体のアンマウント処理
 	 */
-	private unmountComponent(
-		component: SvelteComponentInstance | undefined,
-	): void {
+	private unmountComponent(component: SvelteComponentInstance | undefined): void {
 		if (!component) {
 			return;
 		}

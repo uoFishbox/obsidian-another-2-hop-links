@@ -44,12 +44,12 @@
 
 	const label =
 		item.type === "backlink"
-			? item.data.sourceFile?.basename ?? "backlink"
+			? (item.data.sourceFile?.basename ?? "backlink")
 			: item.type === "taggedNote"
-				? item.data.file?.basename ?? "taggedNote"
+				? (item.data.file?.basename ?? "taggedNote")
 				: item.type === "newLink"
-					? item.data.rawText ?? "newLink"
-					: item.data.hop1?.rawText ?? item.type;
+					? (item.data.rawText ?? "newLink")
+					: (item.data.hop1?.rawText ?? item.type);
 </script>
 
 <!-- svelte-ignore a11y_no_noninteractive_tabindex -->

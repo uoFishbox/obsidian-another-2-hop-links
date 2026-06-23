@@ -21,13 +21,15 @@
 		loadMoreIncrement?: number;
 		headerIcon?: Snippet;
 		itemRenderer: Snippet<
-			[{
-				item: T;
-				index: number;
-				observerRoot: HTMLElement | null;
-				visibility: VirtualizedItemVisibility;
-				visibilityState: VirtualizedItemVisibilityState;
-			}]
+			[
+				{
+					item: T;
+					index: number;
+					observerRoot: HTMLElement | null;
+					visibility: VirtualizedItemVisibility;
+					visibilityState: VirtualizedItemVisibilityState;
+				},
+			]
 		>;
 	}
 

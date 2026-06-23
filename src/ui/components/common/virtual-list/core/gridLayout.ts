@@ -9,9 +9,7 @@ export function computeColumnCount(params: {
 	const maxColumns = Math.max(1, Math.floor(params.maxColumns));
 	const containerWidth =
 		params.containerWidth > 0 ? params.containerWidth : minCellWidth;
-	const autoFillColumns = Math.floor(
-		(containerWidth + gap) / (minCellWidth + gap),
-	);
+	const autoFillColumns = Math.floor((containerWidth + gap) / (minCellWidth + gap));
 
 	return Math.max(1, Math.min(maxColumns, autoFillColumns || 1));
 }

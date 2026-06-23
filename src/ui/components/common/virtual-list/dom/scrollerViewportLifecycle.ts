@@ -35,8 +35,7 @@ export function resolveScrollerViewportLifecycle(
 		return {
 			type: "scrolling",
 			pendingAfterScroll: {
-				reconnectStructureObserver:
-					flags.needsObserverReconnectAfterScroll,
+				reconnectStructureObserver: flags.needsObserverReconnectAfterScroll,
 				refreshDependencies: flags.needsDependencyRefreshAfterScroll,
 				measureLayout: flags.needsLayoutMeasurementAfterScroll,
 			},

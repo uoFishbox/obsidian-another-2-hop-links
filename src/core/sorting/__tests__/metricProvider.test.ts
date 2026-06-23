@@ -1,10 +1,5 @@
 import { describe, expect, beforeEach, vi, type MockedObject } from "vitest";
-import {
-	MetricProvider,
-	isBranch,
-	isBacklink,
-	isTaggedNote,
-} from "../MetricProvider";
+import { MetricProvider, isBranch, isBacklink, isTaggedNote } from "../MetricProvider";
 import { TFile } from "obsidian";
 import type {
 	TwoHopLinkBranch,
@@ -39,15 +34,10 @@ describe("ObsidianMetricProvider", () => {
 	};
 
 	const createProvider = (overrides: Partial<PluginSettings> = {}) =>
-		new MetricProvider(
-			mockMetadataCache,
-			mockVault,
-			mockIndexingService,
-			() => ({
-				...DEFAULT_SETTINGS,
-				...overrides,
-			}),
-		);
+		new MetricProvider(mockMetadataCache, mockVault, mockIndexingService, () => ({
+			...DEFAULT_SETTINGS,
+			...overrides,
+		}));
 
 	const makeBranch = (
 		hop1Path: string,
@@ -164,9 +154,7 @@ describe("ObsidianMetricProvider", () => {
 			},
 		])("$name", ({ item, targetPath }) => {
 			const expected = "FM Title";
-			const targetFile = targetPath
-				? createMockFile(targetPath, "base")
-				: null;
+			const targetFile = targetPath ? createMockFile(targetPath, "base") : null;
 
 			if (targetFile) {
 				mockVault.getAbstractFileByPath.mockReturnValue(targetFile);
@@ -177,11 +165,13 @@ describe("ObsidianMetricProvider", () => {
 					return null;
 				});
 			} else {
-				const file = ("sourceFile" in item && !("hop1" in item)
-					? item.sourceFile
-					: "file" in item && "commonTags" in item
-						? item.file
-						: item) as TFile;
+				const file = (
+					"sourceFile" in item && !("hop1" in item)
+						? item.sourceFile
+						: "file" in item && "commonTags" in item
+							? item.file
+							: item
+				) as TFile;
 				mockMetadataCache.getFileCache.mockImplementation((f) => {
 					if (f === file) {
 						return { frontmatter: { title: expected } } as never;
@@ -240,9 +230,7 @@ describe("ObsidianMetricProvider", () => {
 			},
 		])("$name", ({ item, targetPath, links, expected }) => {
 			const provider = createProvider();
-			const file = targetPath
-				? createMockFile(targetPath, "base")
-				: null;
+			const file = targetPath ? createMockFile(targetPath, "base") : null;
 
 			if (file) {
 				mockVault.getAbstractFileByPath.mockReturnValue(file);
@@ -262,7 +250,10 @@ describe("ObsidianMetricProvider", () => {
 		});
 
 		it.each([
-			{ name: "returns 0 if path undefined", item: makeBranch("") as SortableItem },
+			{
+				name: "returns 0 if path undefined",
+				item: makeBranch("") as SortableItem,
+			},
 			{
 				name: "returns 0 if no cache",
 				item: makeBacklink("source") as SortableItem,
@@ -297,60 +288,60 @@ describe("ObsidianMetricProvider", () => {
 				mtime: 67890,
 				expected: 67890,
 			},
-		{
-			name: "Backlink - sourceFile ctime",
-			method: "getCreatedTime" as const,
-			item: {
-				rawText: "link",
-				path: "note.md",
-				isUnresolved: false,
-				sourceFile: createMockFile("source.md", "source", 99999, 0),
-			} as TwoHopIndexedLink,
-			targetPath: null,
-			ctime: 99999,
-			mtime: 0,
-			expected: 99999,
-		},
-		{
-			name: "Backlink - sourceFile mtime",
-			method: "getModifiedTime" as const,
-			item: {
-				rawText: "link",
-				path: "note.md",
-				isUnresolved: false,
-				sourceFile: createMockFile("source.md", "source", 0, 88888),
-			} as TwoHopIndexedLink,
-			targetPath: null,
-			ctime: 0,
-			mtime: 88888,
-			expected: 88888,
-		},
-		{
-			name: "TaggedNote - file ctime",
-			method: "getCreatedTime" as const,
-			item: {
-				file: createMockFile("note.md", "note", 55555, 0),
-				commonTags: ["tag1"],
-				path: "note.md",
-			} as TaggedNote,
-			targetPath: null,
-			ctime: 55555,
-			mtime: 0,
-			expected: 55555,
-		},
-		{
-			name: "TaggedNote - file mtime",
-			method: "getModifiedTime" as const,
-			item: {
-				file: createMockFile("note.md", "note", 0, 77777),
-				commonTags: ["tag1"],
-				path: "note.md",
-			} as TaggedNote,
-			targetPath: null,
-			ctime: 0,
-			mtime: 77777,
-			expected: 77777,
-		},
+			{
+				name: "Backlink - sourceFile ctime",
+				method: "getCreatedTime" as const,
+				item: {
+					rawText: "link",
+					path: "note.md",
+					isUnresolved: false,
+					sourceFile: createMockFile("source.md", "source", 99999, 0),
+				} as TwoHopIndexedLink,
+				targetPath: null,
+				ctime: 99999,
+				mtime: 0,
+				expected: 99999,
+			},
+			{
+				name: "Backlink - sourceFile mtime",
+				method: "getModifiedTime" as const,
+				item: {
+					rawText: "link",
+					path: "note.md",
+					isUnresolved: false,
+					sourceFile: createMockFile("source.md", "source", 0, 88888),
+				} as TwoHopIndexedLink,
+				targetPath: null,
+				ctime: 0,
+				mtime: 88888,
+				expected: 88888,
+			},
+			{
+				name: "TaggedNote - file ctime",
+				method: "getCreatedTime" as const,
+				item: {
+					file: createMockFile("note.md", "note", 55555, 0),
+					commonTags: ["tag1"],
+					path: "note.md",
+				} as TaggedNote,
+				targetPath: null,
+				ctime: 55555,
+				mtime: 0,
+				expected: 55555,
+			},
+			{
+				name: "TaggedNote - file mtime",
+				method: "getModifiedTime" as const,
+				item: {
+					file: createMockFile("note.md", "note", 0, 77777),
+					commonTags: ["tag1"],
+					path: "note.md",
+				} as TaggedNote,
+				targetPath: null,
+				ctime: 0,
+				mtime: 77777,
+				expected: 77777,
+			},
 			{
 				name: "TFile - stat.ctime",
 				method: "getCreatedTime" as const,
@@ -576,9 +567,7 @@ describe("ObsidianMetricProvider", () => {
 			});
 			const file = createMockFile("note.md", "note", 1000, 2345);
 
-			expect(provider.getMetricCacheIdentity("createdTime", file)).toBe(
-				file,
-			);
+			expect(provider.getMetricCacheIdentity("createdTime", file)).toBe(file);
 		});
 
 		test("branch displayName does not cache per-file to preserve aliases", () => {
@@ -588,10 +577,7 @@ describe("ObsidianMetricProvider", () => {
 			);
 
 			expect(
-				provider.getMetricCacheIdentity(
-					"displayName",
-					makeBranch("note.md"),
-				),
+				provider.getMetricCacheIdentity("displayName", makeBranch("note.md")),
 			).toBeUndefined();
 		});
 
@@ -601,10 +587,7 @@ describe("ObsidianMetricProvider", () => {
 			mockVault.getAbstractFileByPath.mockReturnValue(file);
 
 			expect(
-				provider.getMetricCacheIdentity(
-					"backlinkCount",
-					makeBranch("note.md"),
-				),
+				provider.getMetricCacheIdentity("backlinkCount", makeBranch("note.md")),
 			).toBe(file);
 		});
 	});

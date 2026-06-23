@@ -94,7 +94,9 @@ describe("createBoundedGenerationalCache", () => {
 	});
 
 	test("throws when maxEntries is not positive", () => {
-		expect(() => createBoundedGenerationalCache<string, string>("test", 0)).toThrow();
+		expect(() =>
+			createBoundedGenerationalCache<string, string>("test", 0),
+		).toThrow();
 		expect(() =>
 			createBoundedGenerationalCache<string, string>("test", -1),
 		).toThrow();

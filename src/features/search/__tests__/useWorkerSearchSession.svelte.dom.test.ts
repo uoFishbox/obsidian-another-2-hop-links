@@ -34,19 +34,21 @@ const workerHarness = vi.hoisted(() => {
 		syncItems: vi.fn(),
 		upsertFileContents: vi.fn(),
 		removeFileContents: vi.fn(),
-		filter: vi.fn((request: {
-			requestId: number;
-			datasetVersion: number;
-			query: string;
-			matchScope?: string;
-		}) => {
-			pendingSearches.push({
-				query: request.query,
-				matchScope: request.matchScope,
-				requestId: request.requestId,
-				datasetVersion: request.datasetVersion,
-			});
-		}),
+		filter: vi.fn(
+			(request: {
+				requestId: number;
+				datasetVersion: number;
+				query: string;
+				matchScope?: string;
+			}) => {
+				pendingSearches.push({
+					query: request.query,
+					matchScope: request.matchScope,
+					requestId: request.requestId,
+					datasetVersion: request.datasetVersion,
+				});
+			},
+		),
 		terminate: vi.fn(),
 	};
 
@@ -142,9 +144,7 @@ vi.mock("../useFileContentIndex.svelte.js", () => ({
 				});
 			}
 		}),
-		getSerializableEntries: vi.fn(
-			() => fileContentIndexHarness.state.entries,
-		),
+		getSerializableEntries: vi.fn(() => fileContentIndexHarness.state.entries),
 	}),
 }));
 

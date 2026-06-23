@@ -16,18 +16,12 @@ interface LookupSourceView {
 }
 
 export class IndexQueryEngine {
-	private readonly cachedIndexedLinks = new Map<
-		string,
-		IndexedLinkQueryResult
-	>();
+	private readonly cachedIndexedLinks = new Map<string, IndexedLinkQueryResult>();
 	private readonly cachedUniqueIndexedLinks = new Map<
 		string,
 		Map<string, IndexedLinkQueryResult>
 	>();
-	private readonly unresolvedMergedCache = new Map<
-		string,
-		BacklinkSourceMap
-	>();
+	private readonly unresolvedMergedCache = new Map<string, BacklinkSourceMap>();
 	private lastSnapshotReference: IndexSnapshot | undefined;
 
 	constructor(private readonly vault: IVault) {}
@@ -64,8 +58,7 @@ export class IndexQueryEngine {
 	): IndexedLinkQueryResult {
 		this.ensureSnapshotCacheScope(snapshot);
 		const excludeKey = excludePath ?? "";
-		const limitKey =
-			typeof limit === "number" && limit > 0 ? String(limit) : "all";
+		const limitKey = typeof limit === "number" && limit > 0 ? String(limit) : "all";
 		const cacheKey = `${excludeKey}\u0000${limitKey}`;
 		let cacheByExclude = this.cachedUniqueIndexedLinks.get(linkPath);
 		if (!cacheByExclude) {
@@ -95,25 +88,17 @@ export class IndexQueryEngine {
 		return links;
 	}
 
-	private freezeIndexedLinks(
-		links: TwoHopIndexedLink[],
-	): IndexedLinkQueryResult {
+	private freezeIndexedLinks(links: TwoHopIndexedLink[]): IndexedLinkQueryResult {
 		for (const link of links) {
 			Object.freeze(link);
 		}
 		return Object.freeze(links);
 	}
 
-	public getBacklinkCountForLink(
-		snapshot: IndexSnapshot,
-		linkPath: string,
-	): number {
+	public getBacklinkCountForLink(snapshot: IndexSnapshot, linkPath: string): number {
 		this.ensureSnapshotCacheScope(snapshot);
 		const directSourceMap = snapshot.backlinksMap.get(linkPath);
-		if (
-			directSourceMap &&
-			this.hasDirectResolvedEntries(snapshot, linkPath)
-		) {
+		if (directSourceMap && this.hasDirectResolvedEntries(snapshot, linkPath)) {
 			return directSourceMap.size;
 		}
 
@@ -141,10 +126,7 @@ export class IndexQueryEngine {
 		const directSourceMap = snapshot.backlinksMap.get(linkPath);
 
 		// Prefer direct resolved entries when available — no Set allocation needed.
-		if (
-			directSourceMap &&
-			this.hasDirectResolvedEntries(snapshot, linkPath)
-		) {
+		if (directSourceMap && this.hasDirectResolvedEntries(snapshot, linkPath)) {
 			return this.hasAtLeastFromSourcePaths(
 				directSourceMap.keys(),
 				minCount,
@@ -156,11 +138,7 @@ export class IndexQueryEngine {
 			toCaseInsensitiveLookupKey(linkPath),
 		);
 		if (unresolvedSources && unresolvedSources.size > 0) {
-			return this.hasAtLeastFromSourcePaths(
-				unresolvedSources,
-				minCount,
-				options,
-			);
+			return this.hasAtLeastFromSourcePaths(unresolvedSources, minCount, options);
 		}
 
 		if (!directSourceMap || directSourceMap.size === 0) {
@@ -188,9 +166,10 @@ export class IndexQueryEngine {
 		lookupPaths: string[],
 	): Map<string, boolean> {
 		this.ensureSnapshotCacheScope(snapshot);
-		if (enableLogging) logger(
-			`[IndexingService.isUnresolvedWithSingleBacklinkBatch] Batch checking ${lookupPaths.length} paths`,
-		);
+		if (enableLogging)
+			logger(
+				`[IndexingService.isUnresolvedWithSingleBacklinkBatch] Batch checking ${lookupPaths.length} paths`,
+			);
 
 		const results = new Map<string, boolean>();
 		let resolvedCount = 0;
@@ -202,9 +181,10 @@ export class IndexQueryEngine {
 			}
 		}
 
-		if (enableLogging) logger(
-			`[IndexingService.isUnresolvedWithSingleBacklinkBatch] Found ${resolvedCount}/${lookupPaths.length} unresolved links with single backlink`,
-		);
+		if (enableLogging)
+			logger(
+				`[IndexingService.isUnresolvedWithSingleBacklinkBatch] Found ${resolvedCount}/${lookupPaths.length} unresolved links with single backlink`,
+			);
 		return results;
 	}
 
@@ -264,8 +244,7 @@ export class IndexQueryEngine {
 		},
 	): TwoHopIndexedLink[] {
 		const links: TwoHopIndexedLink[] = [];
-		const hasLimit =
-			typeof options?.limit === "number" && options.limit > 0;
+		const hasLimit = typeof options?.limit === "number" && options.limit > 0;
 
 		for (const [sourcePath, bucket] of lookupView.sourceMap.entries()) {
 			if (options?.excludePath && sourcePath === options.excludePath) {
@@ -383,10 +362,7 @@ export class IndexQueryEngine {
 		linkPath: string,
 	): LookupSourceView | undefined {
 		const directSourceMap = snapshot.backlinksMap.get(linkPath);
-		if (
-			directSourceMap &&
-			this.hasDirectResolvedEntries(snapshot, linkPath)
-		) {
+		if (directSourceMap && this.hasDirectResolvedEntries(snapshot, linkPath)) {
 			return {
 				sourceMap: directSourceMap,
 			};
@@ -414,9 +390,7 @@ export class IndexQueryEngine {
 		snapshot: IndexSnapshot,
 		lookupPath: string,
 	): boolean {
-		return (
-			(snapshot.lookupPathResolvedSourceCount.get(lookupPath) ?? 0) > 0
-		);
+		return (snapshot.lookupPathResolvedSourceCount.get(lookupPath) ?? 0) > 0;
 	}
 
 	private getOrBuildUnresolvedMergedSourceMap(
@@ -475,10 +449,7 @@ export class IndexQueryEngine {
 		lookupPaths: Iterable<string>,
 	): boolean {
 		for (const lookupPath of lookupPaths) {
-			if (
-				(snapshot.lookupPathResolvedSourceCount.get(lookupPath) ?? 0) >
-				0
-			) {
+			if ((snapshot.lookupPathResolvedSourceCount.get(lookupPath) ?? 0) > 0) {
 				return true;
 			}
 		}
@@ -509,8 +480,7 @@ export class IndexQueryEngine {
 					target.set(sourcePath, {
 						count,
 						length: count,
-						hasResolved:
-							existing.hasResolved || infoCollection.hasResolved,
+						hasResolved: existing.hasResolved || infoCollection.hasResolved,
 					});
 					sharedKeys.delete(sourcePath);
 				} else {

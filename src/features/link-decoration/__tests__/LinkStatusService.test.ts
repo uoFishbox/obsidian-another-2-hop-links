@@ -12,9 +12,7 @@ type IndexingServiceLike = Pick<
 	| "onDataUpdate"
 >;
 
-function createIndexingService(
-	batchResults: Map<string, boolean> = new Map(),
-): {
+function createIndexingService(batchResults: Map<string, boolean> = new Map()): {
 	service: IndexingServiceLike;
 	emitDataUpdate: () => void;
 } {
@@ -42,9 +40,7 @@ function createIndexingService(
 	};
 }
 
-function createSettings(
-	enableUnresolvedLinkDecoration: boolean,
-): PluginSettings {
+function createSettings(enableUnresolvedLinkDecoration: boolean): PluginSettings {
 	return {
 		...DEFAULT_SETTINGS,
 		enableUnresolvedLinkDecoration,
@@ -61,9 +57,7 @@ describe("LinkStatusService", () => {
 			() => createSettings(false),
 		);
 
-		const result = linkStatusService.shouldDecorateLinkBatch([
-			"missing.md",
-		]);
+		const result = linkStatusService.shouldDecorateLinkBatch(["missing.md"]);
 
 		expect(result.size).toBe(0);
 		expect(
@@ -86,9 +80,7 @@ describe("LinkStatusService", () => {
 		decorationEnabled = false;
 
 		expect(linkStatusService.shouldDecorateLink("missing.md")).toBe(false);
-		expect(
-			indexingService.isUnresolvedWithSingleBacklink,
-		).toHaveBeenCalledTimes(1);
+		expect(indexingService.isUnresolvedWithSingleBacklink).toHaveBeenCalledTimes(1);
 	});
 
 	it("clears cached results when index data updates", () => {
@@ -105,9 +97,7 @@ describe("LinkStatusService", () => {
 		emitDataUpdate();
 
 		expect(linkStatusService.shouldDecorateLink("missing.md")).toBe(false);
-		expect(
-			indexingService.isUnresolvedWithSingleBacklink,
-		).toHaveBeenCalledTimes(2);
+		expect(indexingService.isUnresolvedWithSingleBacklink).toHaveBeenCalledTimes(2);
 	});
 
 	it("queries only uncached paths during batch decoration checks", () => {

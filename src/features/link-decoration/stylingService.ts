@@ -6,17 +6,11 @@ import {
 	type LinkHrefExtractor,
 } from "./linkDecorationReconciler";
 
-const PROPERTY_LINK_SELECTORS = [
-	".multi-select-pill-content",
-	".metadata-link-inner",
-];
+const PROPERTY_LINK_SELECTORS = [".multi-select-pill-content", ".metadata-link-inner"];
 
 export interface StylingService {
 	isDecorationEnabled(): boolean;
-	decorateLinksInContainer(
-		containerEl: HTMLElement,
-		sourcePath: string,
-	): void;
+	decorateLinksInContainer(containerEl: HTMLElement, sourcePath: string): void;
 	decoratePropertiesPane(propertiesEl: HTMLElement, sourceFile?: TFile): void;
 	reconcileLinkElementsInContainer(
 		containerEl: HTMLElement,
@@ -100,10 +94,7 @@ export function createStylingService(
 	/**
 	 * Clear specific attribute from container.
 	 */
-	function clearContainerAttribute(
-		container: HTMLElement,
-		attrName: string,
-	): void {
+	function clearContainerAttribute(container: HTMLElement, attrName: string): void {
 		reconciler.clearAttributeFromContainer(container, attrName);
 	}
 

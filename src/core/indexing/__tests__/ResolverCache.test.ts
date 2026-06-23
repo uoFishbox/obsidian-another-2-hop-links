@@ -99,11 +99,9 @@ describe("ResolverCache", () => {
 			result,
 		);
 
-		const cached = cache.get(
-			"origin.md",
-			defaultPerformanceSettings(),
-			{ includeTaggedNotes: false },
-		);
+		const cached = cache.get("origin.md", defaultPerformanceSettings(), {
+			includeTaggedNotes: false,
+		});
 
 		expect(cached).toBeUndefined();
 	});
@@ -283,7 +281,11 @@ describe("ResolverCache", () => {
 		});
 
 		expect(
-			cache.get("origin.md", defaultPerformanceSettings(), defaultResolveSettings()),
+			cache.get(
+				"origin.md",
+				defaultPerformanceSettings(),
+				defaultResolveSettings(),
+			),
 		).toBeUndefined();
 	});
 
@@ -303,7 +305,11 @@ describe("ResolverCache", () => {
 		cache.invalidate();
 
 		expect(
-			cache.get("origin.md", defaultPerformanceSettings(), defaultResolveSettings()),
+			cache.get(
+				"origin.md",
+				defaultPerformanceSettings(),
+				defaultResolveSettings(),
+			),
 		).toBeUndefined();
 	});
 
@@ -328,7 +334,11 @@ describe("ResolverCache", () => {
 		});
 
 		expect(
-			cache.get("origin.md", defaultPerformanceSettings(), defaultResolveSettings()),
+			cache.get(
+				"origin.md",
+				defaultPerformanceSettings(),
+				defaultResolveSettings(),
+			),
 		).toBeUndefined();
 	});
 
@@ -381,7 +391,11 @@ describe("ResolverCache", () => {
 			affectedPaths: ["note1.md"],
 		});
 		expect(
-			cache.get("origin.md", defaultPerformanceSettings(), defaultResolveSettings()),
+			cache.get(
+				"origin.md",
+				defaultPerformanceSettings(),
+				defaultResolveSettings(),
+			),
 		).toBeUndefined();
 	});
 });

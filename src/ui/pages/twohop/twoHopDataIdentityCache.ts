@@ -100,7 +100,9 @@ interface ResolveTwoHopDataIdentityParams {
 }
 
 export interface TwoHopDataIdentityCache {
-	resolve(params: ResolveTwoHopDataIdentityParams): readonly TwoHopSectionDescriptor[];
+	resolve(
+		params: ResolveTwoHopDataIdentityParams,
+	): readonly TwoHopSectionDescriptor[];
 }
 
 interface BranchEntry {
@@ -158,10 +160,7 @@ interface CachedVirtualItemAccessors {
 const isBranchItem = (item: MergedLinkItem): item is TwoHopLinkBranch =>
 	"hop1" in item && "hop2" in item;
 
-const hasSameMergedItem = (
-	current: MergedLinkItem,
-	next: MergedLinkItem,
-): boolean =>
+const hasSameMergedItem = (current: MergedLinkItem, next: MergedLinkItem): boolean =>
 	isBranchItem(current)
 		? isBranchItem(next) && hasSameTwoHopBranchCard(current, next)
 		: !isBranchItem(next) && hasSameBacklinkIndexedLink(current, next);
@@ -184,10 +183,7 @@ const createDescriptor = (
 		sectionKey: immutableSection.sectionKey,
 		title: immutableSection.title,
 		sectionId: immutableSection.rawSectionId,
-		paginationKey: buildScopedSectionId(
-			immutableSection.rawSectionId,
-			searchQuery,
-		),
+		paginationKey: buildScopedSectionId(immutableSection.rawSectionId, searchQuery),
 		totalCount,
 		loadedCount: totalCount,
 		getItems,
@@ -209,9 +205,7 @@ function hasDenseItemsCache(
 
 function createSparseVirtualItemAccessors(params: {
 	readonly getLength: () => number;
-	readonly createItem: (
-		index: number,
-	) => TwoHopPageVirtualItem | undefined;
+	readonly createItem: (index: number) => TwoHopPageVirtualItem | undefined;
 }): CachedVirtualItemAccessors {
 	let itemsCache: TwoHopPageVirtualItem[] | undefined;
 	const getItem = (index: number): TwoHopPageVirtualItem | undefined => {
@@ -290,18 +284,16 @@ const hasSameDescriptorRefs = (
 };
 
 export function createTwoHopDataIdentityCache(): TwoHopDataIdentityCache {
-	const outgoingItemsReconciler =
-		createStableViewItemReconciler<TwoHopLinkBranch>({
-			getKey: (item, index) => outgoingLinksSectionConfig.getKey(item, index),
-			toViewItem: (item) => ({ type: "branch", data: item }),
-			canReuseSource: hasSameTwoHopBranchCard,
-		});
-	const backlinksItemsReconciler =
-		createStableViewItemReconciler<TwoHopIndexedLink>({
-			getKey: (item, index) => backlinksSectionConfig.getKey(item, index),
-			toViewItem: (item) => ({ type: "backlink", data: item }),
-			canReuseSource: hasSameBacklinkIndexedLink,
-		});
+	const outgoingItemsReconciler = createStableViewItemReconciler<TwoHopLinkBranch>({
+		getKey: (item, index) => outgoingLinksSectionConfig.getKey(item, index),
+		toViewItem: (item) => ({ type: "branch", data: item }),
+		canReuseSource: hasSameTwoHopBranchCard,
+	});
+	const backlinksItemsReconciler = createStableViewItemReconciler<TwoHopIndexedLink>({
+		getKey: (item, index) => backlinksSectionConfig.getKey(item, index),
+		toViewItem: (item) => ({ type: "backlink", data: item }),
+		canReuseSource: hasSameBacklinkIndexedLink,
+	});
 	const mergedItemsReconciler = createStableViewItemReconciler<MergedLinkItem>({
 		getKey: (item, index) => mergedLinksSectionConfig.getKey(item, index),
 		toViewItem: (item) =>
@@ -310,12 +302,11 @@ export function createTwoHopDataIdentityCache(): TwoHopDataIdentityCache {
 				: { type: "backlink", data: item },
 		canReuseSource: hasSameMergedItem,
 	});
-	const newLinksItemsReconciler =
-		createStableViewItemReconciler<TwoHopIndexedLink>({
-			getKey: (item, index) => newLinksSectionConfig.getKey(item, index),
-			toViewItem: (item) => ({ type: "newLink", data: item }),
-			canReuseSource: hasSameTwoHopIndexedLink,
-		});
+	const newLinksItemsReconciler = createStableViewItemReconciler<TwoHopIndexedLink>({
+		getKey: (item, index) => newLinksSectionConfig.getKey(item, index),
+		toViewItem: (item) => ({ type: "newLink", data: item }),
+		canReuseSource: hasSameTwoHopIndexedLink,
+	});
 
 	const branchEntries = new Map<string, BranchEntry>();
 	const tagEntries = new Map<string, TagEntry>();
@@ -371,9 +362,7 @@ export function createTwoHopDataIdentityCache(): TwoHopDataIdentityCache {
 		}
 
 		const sections: PrimaryLinkSection[] = [];
-		const outgoing = outgoingItemsReconciler.reconcile(
-			params.displayData.outgoing,
-		);
+		const outgoing = outgoingItemsReconciler.reconcile(params.displayData.outgoing);
 		const backlinks = backlinksItemsReconciler.reconcile(
 			params.displayData.backlinks,
 		);
@@ -544,8 +533,7 @@ export function createTwoHopDataIdentityCache(): TwoHopDataIdentityCache {
 					hop2: branch.hop2,
 					sortOption: params.currentSort,
 					updateVersion: params.applicationStore.updateVersion,
-					getSortedTwoHopItems:
-						params.applicationStore.getSortedTwoHopItems,
+					getSortedTwoHopItems: params.applicationStore.getSortedTwoHopItems,
 				};
 				let entry = branchEntries.get(rawSectionId);
 				if (!entry) {
@@ -562,16 +550,16 @@ export function createTwoHopDataIdentityCache(): TwoHopDataIdentityCache {
 					created.itemsAccessors = createDenseVirtualItemAccessors({
 						getLength: () => created.branch.hop2.length,
 						createItems: () => {
-							const sorted =
-								created.itemsDeps.getSortedTwoHopItems.call(
-									created.applicationStore,
-									created.branch.hop2,
-								);
+							const sorted = created.itemsDeps.getSortedTwoHopItems.call(
+								created.applicationStore,
+								created.branch.hop2,
+							);
 							const reconciled =
 								created.itemsReconciler.reconcile(sorted);
 							const reconciledKeys = created.itemsReconciler.getKeys();
-							const branchBaseKey =
-								getTwohopBranchSearchBaseKey(created.branch);
+							const branchBaseKey = getTwohopBranchSearchBaseKey(
+								created.branch,
+							);
 							return reconciled.map((item, index) => ({
 								kind: "two-hop-link" as const,
 								item,
@@ -588,8 +576,7 @@ export function createTwoHopDataIdentityCache(): TwoHopDataIdentityCache {
 					created.getItems = created.itemsAccessors.getItems;
 					created.getItem = created.itemsAccessors.getItem;
 					created.headerSnapshot = nextHeaderSnapshot;
-					created.headerInteractionSnapshot =
-						nextHeaderInteractionSnapshot;
+					created.headerInteractionSnapshot = nextHeaderInteractionSnapshot;
 					created.headerInteractionDescriptor =
 						createHeaderInteractionDescriptor(
 							rawSectionId,
@@ -604,8 +591,7 @@ export function createTwoHopDataIdentityCache(): TwoHopDataIdentityCache {
 						interactionId:
 							created.headerInteractionDescriptor.interactionId,
 						interactionKind: "sectionHeader",
-						interactionDescriptor:
-							created.headerInteractionDescriptor,
+						interactionDescriptor: created.headerInteractionDescriptor,
 					};
 					created.descriptor = createDescriptor(
 						{
@@ -626,8 +612,10 @@ export function createTwoHopDataIdentityCache(): TwoHopDataIdentityCache {
 					entry = created;
 					branchEntries.set(rawSectionId, entry);
 				} else {
-					const itemsChanged =
-						!hasSameTwoHopItemsDeps(entry.itemsDeps, nextItemsDeps);
+					const itemsChanged = !hasSameTwoHopItemsDeps(
+						entry.itemsDeps,
+						nextItemsDeps,
+					);
 					const headerChanged = !hasSameHeaderSnapshot(
 						entry.headerSnapshot,
 						nextHeaderSnapshot,
@@ -641,8 +629,7 @@ export function createTwoHopDataIdentityCache(): TwoHopDataIdentityCache {
 					entry.itemsDeps = nextItemsDeps;
 					if (itemsChanged) entry.itemsAccessors.reset();
 					if (interactionChanged) {
-						entry.headerInteractionSnapshot =
-							nextHeaderInteractionSnapshot;
+						entry.headerInteractionSnapshot = nextHeaderInteractionSnapshot;
 						entry.headerInteractionDescriptor =
 							createHeaderInteractionDescriptor(
 								rawSectionId,
@@ -660,8 +647,7 @@ export function createTwoHopDataIdentityCache(): TwoHopDataIdentityCache {
 							interactionId:
 								entry.headerInteractionDescriptor.interactionId,
 							interactionKind: "sectionHeader",
-							interactionDescriptor:
-								entry.headerInteractionDescriptor,
+							interactionDescriptor: entry.headerInteractionDescriptor,
 						};
 					}
 					if (
@@ -788,8 +774,7 @@ export function createTwoHopDataIdentityCache(): TwoHopDataIdentityCache {
 							entry.itemsDeps,
 							nextItemsDeps,
 						);
-						const callbackChanged =
-							entry.onTagClick !== params.onTagClick;
+						const callbackChanged = entry.onTagClick !== params.onTagClick;
 						entry.applicationStore = params.applicationStore;
 						entry.source = source;
 						entry.itemsDeps = nextItemsDeps;
@@ -800,10 +785,7 @@ export function createTwoHopDataIdentityCache(): TwoHopDataIdentityCache {
 							itemsChanged ||
 							callbackChanged ||
 							entry.descriptor.paginationKey !==
-								buildScopedSectionId(
-									rawSectionId,
-									params.searchQuery,
-								)
+								buildScopedSectionId(rawSectionId, params.searchQuery)
 						) {
 							entry.descriptor = createDescriptor(
 								{

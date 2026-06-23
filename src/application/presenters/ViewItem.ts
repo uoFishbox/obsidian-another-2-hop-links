@@ -1,10 +1,6 @@
 import { TFile } from "obsidian";
 import type { SortableItem } from "core/sorting";
-import type {
-	TwoHopIndexedLink,
-	TwoHopLinkBranch,
-	TaggedNote,
-} from "types/domain";
+import type { TwoHopIndexedLink, TwoHopLinkBranch, TaggedNote } from "types/domain";
 
 export type ViewItem =
 	| {

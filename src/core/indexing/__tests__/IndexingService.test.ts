@@ -11,9 +11,7 @@ function createLinkCache(
 ): LinkCache {
 	return {
 		link: linkText,
-		original: displayText
-			? `[[${linkText}|${displayText}]]`
-			: `[[${linkText}]]`,
+		original: displayText ? `[[${linkText}|${displayText}]]` : `[[${linkText}]]`,
 		displayText,
 		position: {
 			start: { line: 0, col: 0, offset },
@@ -65,14 +63,9 @@ describe("IndexingService", () => {
 
 			await service.rebuildIndexesTimeSliced();
 
-			const sourcePaths = service.getSourcePathsForLookupKeys([
-				"note3.md",
-			]);
+			const sourcePaths = service.getSourcePathsForLookupKeys(["note3.md"]);
 
-			expect(Array.from(sourcePaths).sort()).toEqual([
-				"note1.md",
-				"note2.md",
-			]);
+			expect(Array.from(sourcePaths).sort()).toEqual(["note1.md", "note2.md"]);
 		});
 	});
 
@@ -195,7 +188,9 @@ describe("IndexingService", () => {
 			).toEqual(["file1.md"]);
 
 			env.builder.addFile({ path: "file2.md", tags: ["#tag1"] });
-			await env.service.applyFileChangesTimeSliced([{ type: "create", path: "file2.md" }]);
+			await env.service.applyFileChangesTimeSliced([
+				{ type: "create", path: "file2.md" },
+			]);
 
 			expect(
 				env.service.peekNotesWithTag("tag1").map((note) => note.path),
@@ -214,7 +209,9 @@ describe("IndexingService", () => {
 
 			env.builder.addFile({ path: "file1.md", tags: ["#tag2/sub"] });
 
-			await env.service.applyFileChangesTimeSliced([{ type: "modify", path: "file1.md" }]);
+			await env.service.applyFileChangesTimeSliced([
+				{ type: "modify", path: "file1.md" },
+			]);
 
 			expect(await env.service.getNotesWithTag("tag1")).toEqual([]);
 			expect(
@@ -329,9 +326,7 @@ describe("IndexingService", () => {
 			await service.rebuildIndexesTimeSliced();
 
 			let backlinks = service.getBacklinksForLink("file2.md");
-			expect(
-				backlinks.some((b) => b.sourceFile.path === "file1.md"),
-			).toBe(false);
+			expect(backlinks.some((b) => b.sourceFile.path === "file1.md")).toBe(false);
 
 			(mockMetadataCache.getFileCache as any).mockImplementation(
 				(file: TFile) => {
@@ -349,9 +344,7 @@ describe("IndexingService", () => {
 			await service.applyFileChangesTimeSliced(changes);
 
 			backlinks = service.getBacklinksForLink("file2.md");
-			expect(
-				backlinks.some((b) => b.sourceFile.path === "file1.md"),
-			).toBe(true);
+			expect(backlinks.some((b) => b.sourceFile.path === "file1.md")).toBe(true);
 		});
 
 		test("delete: deleting a file should remove all its backlinks", async () => {
@@ -363,12 +356,8 @@ describe("IndexingService", () => {
 			const { service } = builder.build();
 			await service.rebuildIndexesTimeSliced();
 
-			expect(
-				service.getBacklinksForLink("file2.md").length,
-			).toBeGreaterThan(0);
-			expect(
-				service.getBacklinksForLink("file3.md").length,
-			).toBeGreaterThan(0);
+			expect(service.getBacklinksForLink("file2.md").length).toBeGreaterThan(0);
+			expect(service.getBacklinksForLink("file3.md").length).toBeGreaterThan(0);
 
 			const changes: IncrementalFileChange[] = [
 				{ type: "delete", path: "file1.md" },
@@ -379,12 +368,12 @@ describe("IndexingService", () => {
 			const backlinksFile2 = service.getBacklinksForLink("file2.md");
 			const backlinksFile3 = service.getBacklinksForLink("file3.md");
 
-			expect(
-				backlinksFile2.some((b) => b.sourceFile.path === "file1.md"),
-			).toBe(false);
-			expect(
-				backlinksFile3.some((b) => b.sourceFile.path === "file1.md"),
-			).toBe(false);
+			expect(backlinksFile2.some((b) => b.sourceFile.path === "file1.md")).toBe(
+				false,
+			);
+			expect(backlinksFile3.some((b) => b.sourceFile.path === "file1.md")).toBe(
+				false,
+			);
 		});
 
 		test("modify: changing links should update the backlinks map", async () => {
@@ -439,27 +428,19 @@ describe("IndexingService", () => {
 			await service.rebuildIndexesTimeSliced();
 
 			expect(
-				service
-					.getBacklinksForLink("target.md")
-					.map((b) => b.sourceFile.path),
+				service.getBacklinksForLink("target.md").map((b) => b.sourceFile.path),
 			).toContain("file1.md");
 			expect(
-				service
-					.getBacklinksForLink("target.md")
-					.map((b) => b.sourceFile.path),
+				service.getBacklinksForLink("target.md").map((b) => b.sourceFile.path),
 			).not.toContain("file2.md");
 
 			(mockMetadataCache.getFileCache as any).mockImplementation(
 				(file: TFile) => {
 					if (file.path === "file2.md") {
-						return createCachedMetadata([
-							createLinkCache("target"),
-						]);
+						return createCachedMetadata([createLinkCache("target")]);
 					}
 					if (file.path === "file1.md") {
-						return createCachedMetadata([
-							createLinkCache("target"),
-						]);
+						return createCachedMetadata([createLinkCache("target")]);
 					}
 					return null;
 				},
@@ -524,24 +505,20 @@ describe("IndexingService", () => {
 				(mockMetadataCache.getFirstLinkpathDest as any).mockImplementation(
 					(linkText: string) => {
 						if (linkText === "note") {
-							const shadowed = mockVault.getAbstractFileByPath(
-								"src/note.md",
-							);
+							const shadowed =
+								mockVault.getAbstractFileByPath("src/note.md");
 							if (shadowed instanceof TFile) {
 								return shadowed;
 							}
-							const fallback = mockVault.getAbstractFileByPath(
-								"folderA/note.md",
-							);
+							const fallback =
+								mockVault.getAbstractFileByPath("folderA/note.md");
 							return fallback instanceof TFile ? fallback : null;
 						}
 
 						const directPath = linkText.endsWith(".md")
 							? linkText
 							: `${linkText}.md`;
-						const direct = mockVault.getAbstractFileByPath(
-							directPath,
-						);
+						const direct = mockVault.getAbstractFileByPath(directPath);
 						return direct instanceof TFile ? direct : null;
 					},
 				);
@@ -559,7 +536,9 @@ describe("IndexingService", () => {
 			builder.addFile({ path: "src/note.md" });
 			applyShadowingResolver();
 
-			await service.applyFileChangesTimeSliced([{ type: "create", path: "src/note.md" }]);
+			await service.applyFileChangesTimeSliced([
+				{ type: "create", path: "src/note.md" },
+			]);
 
 			expect(
 				service
@@ -584,24 +563,20 @@ describe("IndexingService", () => {
 				(mockMetadataCache.getFirstLinkpathDest as any).mockImplementation(
 					(linkText: string) => {
 						if (linkText === "note") {
-							const preferred = mockVault.getAbstractFileByPath(
-								"src/note.md",
-							);
+							const preferred =
+								mockVault.getAbstractFileByPath("src/note.md");
 							if (preferred instanceof TFile) {
 								return preferred;
 							}
-							const fallback = mockVault.getAbstractFileByPath(
-								"folderA/note.md",
-							);
+							const fallback =
+								mockVault.getAbstractFileByPath("folderA/note.md");
 							return fallback instanceof TFile ? fallback : null;
 						}
 
 						const directPath = linkText.endsWith(".md")
 							? linkText
 							: `${linkText}.md`;
-						const direct = mockVault.getAbstractFileByPath(
-							directPath,
-						);
+						const direct = mockVault.getAbstractFileByPath(directPath);
 						return direct instanceof TFile ? direct : null;
 					},
 				);
@@ -610,12 +585,16 @@ describe("IndexingService", () => {
 			applyShadowingResolver();
 			await service.rebuildIndexesTimeSliced();
 
-			await service.applyFileChangesTimeSliced([{ type: "modify", path: "src/source.md" }]);
+			await service.applyFileChangesTimeSliced([
+				{ type: "modify", path: "src/source.md" },
+			]);
 
 			builder.addFile({ path: "src/note.md" });
 			applyShadowingResolver();
 
-			await service.applyFileChangesTimeSliced([{ type: "create", path: "src/note.md" }]);
+			await service.applyFileChangesTimeSliced([
+				{ type: "create", path: "src/note.md" },
+			]);
 
 			expect(
 				service

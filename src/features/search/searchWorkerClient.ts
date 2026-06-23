@@ -34,9 +34,7 @@ export function createSearchWorkerClient(
 	try {
 		if (typeof Worker !== "undefined") {
 			const nextWorker = createSearchFilterWorker();
-			nextWorker.onmessage = (
-				event: MessageEvent<SearchWorkerToMainMessage>,
-			) => {
+			nextWorker.onmessage = (event: MessageEvent<SearchWorkerToMainMessage>) => {
 				onMessage(event.data);
 			};
 			nextWorker.onerror = (event: ErrorEvent) => {
@@ -71,10 +69,7 @@ export function createSearchWorkerClient(
 			latestDatasetVersion = update.datasetVersion;
 			if (latestContentByPath) {
 				for (const entry of update.entries) {
-					latestContentByPath.set(
-						entry.path,
-						entry.content.toLowerCase(),
-					);
+					latestContentByPath.set(entry.path, entry.content.toLowerCase());
 				}
 			}
 
@@ -116,13 +111,12 @@ export function createSearchWorkerClient(
 					fileContents: [],
 				};
 				queueMicrotask(() => {
-					const matchedItems =
-						filterSearchWorkerDatasetWithMatchDetails(
-							snapshot,
-							request.query,
-							request.matchScope,
-							latestContentByPath ?? undefined,
-						);
+					const matchedItems = filterSearchWorkerDatasetWithMatchDetails(
+						snapshot,
+						request.query,
+						request.matchScope,
+						latestContentByPath ?? undefined,
+					);
 					onMessage({
 						type: "filter-result",
 						requestId: request.requestId,

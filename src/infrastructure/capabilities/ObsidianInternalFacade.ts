@@ -1,8 +1,5 @@
 import type { App, TFile, WorkspaceLeaf } from "obsidian";
-import type {
-	CanvasViewCanvas,
-	GlobalSearchPluginInstance,
-} from "obsidian-typings";
+import type { CanvasViewCanvas, GlobalSearchPluginInstance } from "obsidian-typings";
 import type { CanvasNodeData } from "types/obsidian";
 
 export type InternalCapability =
@@ -59,10 +56,7 @@ export type LeafWithInternalHistory = WorkspaceLeaf & {
 	trigger?: (name: string, ...data: unknown[]) => unknown;
 };
 
-export type CanvasWithSelectionData = Omit<
-	CanvasViewCanvas,
-	"getSelectionData"
-> & {
+export type CanvasWithSelectionData = Omit<CanvasViewCanvas, "getSelectionData"> & {
 	getSelectionData?: () => { nodes?: CanvasNodeData[] };
 };
 
@@ -146,9 +140,7 @@ export class ObsidianInternalFacade {
 		};
 	}
 
-	getLeafHistory(
-		leaf: WorkspaceLeaf,
-	): CapabilityResult<{
+	getLeafHistory(leaf: WorkspaceLeaf): CapabilityResult<{
 		leaf: LeafWithInternalHistory;
 		history: LeafHistoryInternal;
 	}> {
@@ -203,9 +195,7 @@ export class ObsidianInternalFacade {
 		};
 	}
 
-	getPropertyWidgetRenderSave(
-		widget: unknown,
-	): CapabilityResult<PropertyWidgetLike> {
+	getPropertyWidgetRenderSave(widget: unknown): CapabilityResult<PropertyWidgetLike> {
 		if (!isRecord(widget) || typeof widget.render !== "function") {
 			return {
 				ok: false,
@@ -302,7 +292,10 @@ function hasOptionalFunction<K extends PropertyKey>(
 	value: unknown,
 	key: K,
 ): value is Record<K, (...args: unknown[]) => unknown> {
-	return isRecord(value) && (value[key] === undefined || typeof value[key] === "function");
+	return (
+		isRecord(value) &&
+		(value[key] === undefined || typeof value[key] === "function")
+	);
 }
 
 function isTFileLike(value: unknown): boolean {

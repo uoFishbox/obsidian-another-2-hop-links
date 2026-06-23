@@ -90,9 +90,7 @@ vi.mock("ui/utils/mathJaxShadowStyles", () => ({
 	syncMathJaxStylesForNode: state.syncMathJaxStylesForNode,
 }));
 
-function createSettings(
-	overrides: Partial<PluginSettings> = {},
-): PluginSettings {
+function createSettings(overrides: Partial<PluginSettings> = {}): PluginSettings {
 	return {
 		...DEFAULT_SETTINGS,
 		...overrides,
@@ -134,11 +132,9 @@ describe("CardPreview", () => {
 		state.disableRenderedPreviewCache = false;
 
 		state.processPreviewContent.mockReset();
-		state.processPreviewContent.mockImplementation(
-			async (element, content) => {
-				element.innerHTML = `<p>rendered:${content}</p>`;
-			},
-		);
+		state.processPreviewContent.mockImplementation(async (element, content) => {
+			element.innerHTML = `<p>rendered:${content}</p>`;
+		});
 
 		state.enqueueMathRender.mockReset();
 		state.enqueueMathRender.mockImplementation(async (task) => {
@@ -162,14 +158,12 @@ describe("CardPreview", () => {
 
 		state.findCaseInsensitiveIndex.mockReset();
 		state.findCaseInsensitiveIndex.mockImplementation(
-			(content: string, query: string) =>
-				content.toLowerCase().indexOf(query),
+			(content: string, query: string) => content.toLowerCase().indexOf(query),
 		);
 
 		state.htmlVisibleTextContainsCaseInsensitive.mockReset();
 		state.htmlVisibleTextContainsCaseInsensitive.mockImplementation(
-			(content: string, query: string) =>
-				content.toLowerCase().includes(query),
+			(content: string, query: string) => content.toLowerCase().includes(query),
 		);
 
 		state.getFileContent.mockReset();
@@ -200,8 +194,7 @@ describe("CardPreview", () => {
 
 		await waitFor(() => {
 			expect(
-				document.querySelector(".cosense-card-links__box-preview")
-					?.textContent,
+				document.querySelector(".cosense-card-links__box-preview")?.textContent,
 			).toContain("rendered:preview text");
 		});
 		expect(getPreview).toHaveBeenCalledTimes(1);
@@ -220,8 +213,7 @@ describe("CardPreview", () => {
 
 		await waitFor(() => {
 			expect(
-				document.querySelector(".cosense-card-links__box-preview")
-					?.textContent,
+				document.querySelector(".cosense-card-links__box-preview")?.textContent,
 			).toContain("rendered:preview text");
 		});
 
@@ -233,8 +225,7 @@ describe("CardPreview", () => {
 
 		await waitFor(() => {
 			expect(
-				document.querySelector(".cosense-card-links__box-preview")
-					?.textContent,
+				document.querySelector(".cosense-card-links__box-preview")?.textContent,
 			).toContain("rendered:preview text");
 		});
 		expect(state.processPreviewContent).toHaveBeenCalledTimes(1);
@@ -253,8 +244,7 @@ describe("CardPreview", () => {
 
 		await waitFor(() => {
 			expect(
-				document.querySelector(".cosense-card-links__box-preview")
-					?.textContent,
+				document.querySelector(".cosense-card-links__box-preview")?.textContent,
 			).toContain("before alpha after");
 		});
 
@@ -368,9 +358,8 @@ describe("CardPreview", () => {
 
 		await waitFor(() => {
 			expect(
-				rendered.container.querySelector(
-					".cosense-card-links__box-preview",
-				)?.textContent,
+				rendered.container.querySelector(".cosense-card-links__box-preview")
+					?.textContent,
 			).toBe("first dom");
 		});
 
@@ -388,9 +377,8 @@ describe("CardPreview", () => {
 
 		await waitFor(() => {
 			expect(
-				rendered.container.querySelector(
-					".cosense-card-links__box-preview",
-				)?.textContent,
+				rendered.container.querySelector(".cosense-card-links__box-preview")
+					?.textContent,
 			).toBe("second dom");
 		});
 		expect(domRender).toHaveBeenCalledTimes(2);
@@ -425,8 +413,7 @@ describe("CardPreview", () => {
 
 		await waitFor(() => {
 			expect(
-				document.querySelector(".cosense-card-links__box-preview")
-					?.textContent,
+				document.querySelector(".cosense-card-links__box-preview")?.textContent,
 			).toContain("rendered:first preview");
 		});
 
@@ -439,26 +426,15 @@ describe("CardPreview", () => {
 
 		await waitFor(() => {
 			expect(
-				document.querySelector(".cosense-card-links__box-preview")
-					?.textContent,
+				document.querySelector(".cosense-card-links__box-preview")?.textContent,
 			).toContain("rendered:updated preview");
 		});
-		expect(getPreview).toHaveBeenNthCalledWith(
-			1,
-			file,
-			expect.any(AbortSignal),
-			{
-				cacheRevision: "0:0:0",
-			},
-		);
-		expect(getPreview).toHaveBeenNthCalledWith(
-			2,
-			file,
-			expect.any(AbortSignal),
-			{
-				cacheRevision: "0:1:0",
-			},
-		);
+		expect(getPreview).toHaveBeenNthCalledWith(1, file, expect.any(AbortSignal), {
+			cacheRevision: "0:0:0",
+		});
+		expect(getPreview).toHaveBeenNthCalledWith(2, file, expect.any(AbortSignal), {
+			cacheRevision: "0:1:0",
+		});
 	});
 
 	it("renders an empty preview when the debug flag is enabled", async () => {
@@ -482,8 +458,6 @@ describe("CardPreview", () => {
 			expect(domRender).not.toHaveBeenCalled();
 		});
 
-		expect(
-			document.querySelector(".cosense-card-links__box-preview"),
-		).toBeNull();
+		expect(document.querySelector(".cosense-card-links__box-preview")).toBeNull();
 	});
 });

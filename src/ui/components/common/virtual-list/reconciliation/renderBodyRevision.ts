@@ -11,14 +11,8 @@ import {
 	type VirtualListInputError,
 } from "../validation/virtualListValidationError";
 
-type HeaderLogicalCell<T> = Extract<
-	VirtualListLogicalCell<T>,
-	{ kind: "header" }
->;
-type ItemLogicalCell<T> = Extract<
-	VirtualListLogicalCell<T>,
-	{ kind: "item" }
->;
+type HeaderLogicalCell<T> = Extract<VirtualListLogicalCell<T>, { kind: "header" }>;
+type ItemLogicalCell<T> = Extract<VirtualListLogicalCell<T>, { kind: "item" }>;
 
 export interface MountedRenderBodyIdentity {
 	readonly renderBodyKind: "item" | "header" | "load-more";
@@ -28,16 +22,14 @@ export interface MountedRenderBodyIdentity {
 	readonly renderBodyRevision?: RenderRevision;
 }
 
-export type ResolvedItemRenderRevisionToken =
-	| {
-			readonly kind: "render";
-			readonly revision: RenderRevision;
-	  };
-export type ResolvedHeaderRenderRevisionToken =
-	| {
-			readonly kind: "render";
-			readonly revision: RenderRevision;
-	  };
+export type ResolvedItemRenderRevisionToken = {
+	readonly kind: "render";
+	readonly revision: RenderRevision;
+};
+export type ResolvedHeaderRenderRevisionToken = {
+	readonly kind: "render";
+	readonly revision: RenderRevision;
+};
 
 const DEFAULT_RENDER_REVISION_FALLBACK_POLICY: RenderRevisionFallbackPolicy =
 	"source-key-only";
@@ -83,8 +75,7 @@ function encodeResolvedHeaderRenderRevisionToken(
 
 export function resolveItemRenderRevisionToken<T>(
 	cell: ItemLogicalCell<T>,
-	fallbackPolicy: RenderRevisionFallbackPolicy =
-		DEFAULT_RENDER_REVISION_FALLBACK_POLICY,
+	fallbackPolicy: RenderRevisionFallbackPolicy = DEFAULT_RENDER_REVISION_FALLBACK_POLICY,
 ): ResolvedItemRenderRevisionToken {
 	const result = tryResolveItemRenderRevisionToken(cell, fallbackPolicy);
 	if (!result.ok) {
@@ -96,12 +87,8 @@ export function resolveItemRenderRevisionToken<T>(
 
 export function tryResolveItemRenderRevisionToken<T>(
 	cell: ItemLogicalCell<T>,
-	fallbackPolicy: RenderRevisionFallbackPolicy =
-		DEFAULT_RENDER_REVISION_FALLBACK_POLICY,
-): Result<
-	ResolvedItemRenderRevisionToken,
-	VirtualListInputError<T, unknown>
-> {
+	fallbackPolicy: RenderRevisionFallbackPolicy = DEFAULT_RENDER_REVISION_FALLBACK_POLICY,
+): Result<ResolvedItemRenderRevisionToken, VirtualListInputError<T, unknown>> {
 	if (cell.itemRenderRevision !== undefined) {
 		return {
 			ok: true,
@@ -205,10 +192,8 @@ export function getViewPlanRenderBodyIdentityFields<T, G>(
 				renderBodyKind: "item",
 				renderBodySectionId: descriptor.sectionId,
 				renderBodySourceKey: String(cell.sourceKey ?? cell.key),
-				renderBodyRevision: resolveItemRenderRevisionToken(
-					cell,
-					fallbackPolicy,
-				).revision,
+				renderBodyRevision: resolveItemRenderRevisionToken(cell, fallbackPolicy)
+					.revision,
 			};
 		case "header":
 			return {
@@ -253,8 +238,7 @@ export function canReuseViewPlanRenderBodyKey<T, G>(
 			);
 		}
 		case "header": {
-			const revision =
-				resolveHeaderRenderRevisionToken(descriptor).revision;
+			const revision = resolveHeaderRenderRevisionToken(descriptor).revision;
 
 			return (
 				previous.renderBodyKind === "header" &&
@@ -274,9 +258,9 @@ export function canReuseViewPlanRenderBodyKey<T, G>(
 
 export function resolveStableViewPlanRenderBodyKey<T, G>(params: {
 	previous:
-		| {
+		| ({
 				readonly renderBodyKey?: RenderBodyKey;
-		  } & Partial<MountedRenderBodyIdentity>
+		  } & Partial<MountedRenderBodyIdentity>)
 		| undefined;
 	previousCells?:
 		| readonly ({
@@ -324,10 +308,7 @@ export function resolveStableViewPlanRenderBodyKey<T, G>(params: {
 	);
 }
 
-export function hasSameReusableCellKey(
-	previous: unknown,
-	next: unknown,
-): boolean {
+export function hasSameReusableCellKey(previous: unknown, next: unknown): boolean {
 	if (Object.is(previous, next)) {
 		return true;
 	}

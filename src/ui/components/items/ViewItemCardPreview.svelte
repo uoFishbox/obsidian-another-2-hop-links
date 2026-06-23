@@ -2,10 +2,7 @@
 	import { getContext, onDestroy } from "svelte";
 	import type { TFile } from "obsidian";
 	import CardPreview from "ui/components/common/CardPreview.svelte";
-	import {
-		lazyRender,
-		type LazyRenderActionParams,
-	} from "ui/actions/useLazyRender";
+	import { lazyRender, type LazyRenderActionParams } from "ui/actions/useLazyRender";
 	import {
 		useAppContext,
 		useLazyLoaderCache,
@@ -51,16 +48,15 @@
 	}: Props = $props();
 
 	const context = useLinkContext();
-	const getVisiblePreviewQueueSize =
-		context.getVisiblePreviewQueueSize ?? (() => 0);
+	const getVisiblePreviewQueueSize = context.getVisiblePreviewQueueSize ?? (() => 0);
 	const { applicationStore } = useAppContext();
 	const intersectedCache = useLazyLoaderCache();
-	const previewVisibilityContext = getContext<
-		PreviewVisibilityContext | undefined
-	>(PREVIEW_VISIBILITY_CONTEXT_KEY);
-	const previewActivationScope = getContext<
-		PreviewActivationScope | undefined
-	>(PREVIEW_ACTIVATION_SCOPE_CONTEXT_KEY);
+	const previewVisibilityContext = getContext<PreviewVisibilityContext | undefined>(
+		PREVIEW_VISIBILITY_CONTEXT_KEY,
+	);
+	const previewActivationScope = getContext<PreviewActivationScope | undefined>(
+		PREVIEW_ACTIVATION_SCOPE_CONTEXT_KEY,
+	);
 	const previewMinHeight = 80;
 
 	const visibility = $derived(previewVisibilityContext?.visibility);
@@ -71,20 +67,14 @@
 	);
 	const settings = $derived(applicationStore.settings);
 	const previewRenderVersion = $derived(
-		file
-			? (applicationStore.getPreviewRenderVersion?.(file.path) ?? "0:0")
-			: "0:0",
+		file ? (applicationStore.getPreviewRenderVersion?.(file.path) ?? "0:0") : "0:0",
 	);
 	const effectivePreviewCacheRevision = $derived(
 		`${previewRenderVersion}:${previewRefreshToken}`,
 	);
 	const previewCacheKey = $derived(
 		file
-			? buildPreviewGenerationKey(
-					file,
-					settings,
-					effectivePreviewCacheRevision,
-				)
+			? buildPreviewGenerationKey(file, settings, effectivePreviewCacheRevision)
 			: undefined,
 	);
 	const effectiveVisibilityMode = $derived(
@@ -96,9 +86,7 @@
 	);
 	const previewIdentity = $derived(previewCacheKey);
 	const isPreviewCached = $derived(
-		previewCacheKey
-			? (intersectedCache?.has(previewCacheKey) ?? false)
-			: false,
+		previewCacheKey ? (intersectedCache?.has(previewCacheKey) ?? false) : false,
 	);
 	let visiblePreviewIdentity = $state<string | undefined>(undefined);
 	let activatedPreviewIdentity = $state<string | undefined>(undefined);
@@ -132,9 +120,7 @@
 		pendingPreviewIdentity = undefined;
 	}
 
-	function resetPreviewActivationForIdentity(
-		nextIdentity: string | undefined,
-	): void {
+	function resetPreviewActivationForIdentity(nextIdentity: string | undefined): void {
 		if (nextIdentity === lastPreviewIdentity) {
 			return;
 		}
@@ -288,9 +274,7 @@
 				<CardPreview
 					{file}
 					getPreview={context.getPreview}
-					searchQuery={searchScope === "title-only"
-						? ""
-						: searchQuery}
+					searchQuery={searchScope === "title-only" ? "" : searchQuery}
 					{previewRefreshToken}
 					{previewOverride}
 				/>
@@ -317,7 +301,8 @@
 		min-height: 61px;
 		margin: 10px var(--ccl-box-padding) 0;
 		border-radius: 2px;
-		background-image: linear-gradient(var(--bar-color), var(--bar-color)),
+		background-image:
+			linear-gradient(var(--bar-color), var(--bar-color)),
 			linear-gradient(var(--bar-color), var(--bar-color)),
 			linear-gradient(var(--bar-color), var(--bar-color)),
 			linear-gradient(var(--bar-color), var(--bar-color)),

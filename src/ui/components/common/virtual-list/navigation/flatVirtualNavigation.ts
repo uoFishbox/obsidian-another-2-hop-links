@@ -1,9 +1,6 @@
 import type { ResultNavigationDirection } from "features/keyboard-navigation/resultFocus";
 import type { VirtualListLogicalCell } from "../logicalCell";
-import type {
-	VirtualNavigationTarget,
-	VirtualRowModel,
-} from "../types";
+import type { VirtualNavigationTarget, VirtualRowModel } from "../types";
 
 export function resolveFlatVirtualNavigationTarget<T>(params: {
 	rowModel: VirtualRowModel<VirtualListLogicalCell<T>>;
@@ -18,8 +15,7 @@ export function resolveFlatVirtualNavigationTarget<T>(params: {
 }): VirtualNavigationTarget | null {
 	const columns = Math.max(1, params.rowModel.layout.columns);
 	const currentIndex =
-		params.currentPosition.rowIndex * columns +
-		params.currentPosition.columnIndex;
+		params.currentPosition.rowIndex * columns + params.currentPosition.columnIndex;
 	const currentCell = params.resolveCellAtIndex(currentIndex);
 	if (!currentCell || currentCell.key !== params.currentKey) {
 		return null;
@@ -30,14 +26,13 @@ export function resolveFlatVirtualNavigationTarget<T>(params: {
 
 	switch (params.direction) {
 		case "up":
-			targetIndex = currentIndex - columns >= 0
-				? currentIndex - columns
-				: null;
+			targetIndex = currentIndex - columns >= 0 ? currentIndex - columns : null;
 			break;
 		case "down":
-			targetIndex = currentIndex + columns < params.cellCount
-				? currentIndex + columns
-				: null;
+			targetIndex =
+				currentIndex + columns < params.cellCount
+					? currentIndex + columns
+					: null;
 			break;
 		case "left":
 			targetIndex =

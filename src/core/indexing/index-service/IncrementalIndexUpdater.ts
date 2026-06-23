@@ -85,10 +85,7 @@ export class IncrementalIndexUpdater {
 		),
 	) {
 		this.backlinkUpdater = createBacklinkUpdater(vault, metadataCache);
-		this.createChangePlanner = createCreateChangePlanner(
-			vault,
-			metadataCache,
-		);
+		this.createChangePlanner = createCreateChangePlanner(vault, metadataCache);
 	}
 
 	public async applyAsync(
@@ -193,11 +190,7 @@ export class IncrementalIndexUpdater {
 			}
 
 			phaseChangeCount++;
-			const pendingYield = maybeYield(
-				run.yieldScheduler,
-				phaseChangeCount,
-				8,
-			);
+			const pendingYield = maybeYield(run.yieldScheduler, phaseChangeCount, 8);
 			if (pendingYield) {
 				await pendingYield;
 			}
@@ -217,9 +210,7 @@ export class IncrementalIndexUpdater {
 		}
 	}
 
-	private async applyDeletesAsync(
-		run: IncrementalUpdateRunState,
-	): Promise<void> {
+	private async applyDeletesAsync(run: IncrementalUpdateRunState): Promise<void> {
 		let deleteCount = 0;
 		for (const path of run.pathsToDelete) {
 			const incomingSourceMap = run.snapshot.backlinksMap.get(path);
@@ -295,9 +286,7 @@ export class IncrementalIndexUpdater {
 		}
 	}
 
-	private async applyFastRenamesAsync(
-		run: IncrementalUpdateRunState,
-	): Promise<void> {
+	private async applyFastRenamesAsync(run: IncrementalUpdateRunState): Promise<void> {
 		let fastRenameCount = 0;
 		for (const fastRenamePlan of run.fastRenamePlans) {
 			await this.backlinkUpdater.reconcileBacklinksBySourceAsync(
@@ -340,11 +329,7 @@ export class IncrementalIndexUpdater {
 			run.affectedLinkSourcePaths.add(fastRenamePlan.change.newPath);
 
 			fastRenameCount++;
-			const pendingYield = maybeYield(
-				run.yieldScheduler,
-				fastRenameCount,
-				1,
-			);
+			const pendingYield = maybeYield(run.yieldScheduler, fastRenameCount, 1);
 			if (pendingYield) {
 				await pendingYield;
 			}
@@ -483,10 +468,7 @@ export class IncrementalIndexUpdater {
 		yieldScheduler: YieldScheduler,
 	): Promise<RenameFastPathPlan | undefined> {
 		const previousSummary = snapshot.sourceSummaries.get(change.oldPath);
-		if (
-			!this.canUseRenameFastPath(change, previousSummary) ||
-			!previousSummary
-		) {
+		if (!this.canUseRenameFastPath(change, previousSummary) || !previousSummary) {
 			return undefined;
 		}
 
@@ -508,20 +490,14 @@ export class IncrementalIndexUpdater {
 		if (!summary) {
 			return false;
 		}
-		if (
-			getPathBasename(change.oldPath) !== getPathBasename(change.newPath)
-		) {
+		if (getPathBasename(change.oldPath) !== getPathBasename(change.newPath)) {
 			return false;
 		}
 		if (summary.hasSourceDependentLinks) {
 			return false;
 		}
 		if (
-			this.hasRenamePathSensitiveLookup(
-				summary,
-				change.oldPath,
-				change.newPath,
-			)
+			this.hasRenamePathSensitiveLookup(summary, change.oldPath, change.newPath)
 		) {
 			return false;
 		}
@@ -554,10 +530,7 @@ export class IncrementalIndexUpdater {
 		let destinations: Map<string, SourceDestinationSummary> | undefined;
 
 		let destinationCount = 0;
-		for (const [
-			destinationPath,
-			destinationSummary,
-		] of summary.destinations) {
+		for (const [destinationPath, destinationSummary] of summary.destinations) {
 			if (destinationPath !== oldPath) {
 				if (destinations) {
 					destinations.set(destinationPath, destinationSummary);
@@ -611,8 +584,7 @@ export class IncrementalIndexUpdater {
 			}
 		}
 
-		const nextOrderedReferences =
-			orderedReferences ?? summary.orderedReferences;
+		const nextOrderedReferences = orderedReferences ?? summary.orderedReferences;
 
 		return {
 			destinations: nextDestinations,

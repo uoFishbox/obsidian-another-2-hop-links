@@ -2,10 +2,7 @@ import { describe, expect, test, vi, type Mock } from "vitest";
 import { createEmbeddedMediaStrategy } from "../strategies/EmbeddedMediaStrategy";
 import { createFrontmatterImageStrategy } from "../strategies/FrontmatterImageStrategy";
 import { canvasToSearchText } from "../text-processing/canvasText";
-import {
-	analyzePreviewContent,
-	readPreviewContent,
-} from "../utils/previewUtils";
+import { analyzePreviewContent, readPreviewContent } from "../utils/previewUtils";
 import {
 	createMockTFileAsPlainObject,
 	createMockVault,
@@ -56,9 +53,7 @@ describe("readPreviewContent", () => {
 		(vault.cachedRead as Mock).mockResolvedValue("vault-content");
 		const context = { vault } as any;
 
-		await expect(readPreviewContent(file, context)).resolves.toBe(
-			"vault-content",
-		);
+		await expect(readPreviewContent(file, context)).resolves.toBe("vault-content");
 		expect(vault.cachedRead).toHaveBeenCalledTimes(1);
 	});
 
@@ -99,8 +94,7 @@ describe("analyzePreviewContent", () => {
 	});
 
 	test("does not treat dollar signs inside code blocks as math", () => {
-		const content =
-			'<span class="cosense-card-links__code-block">$test$</span>';
+		const content = '<span class="cosense-card-links__code-block">$test$</span>';
 		const analysis = analyzePreviewContent(content);
 
 		expect(analysis.hasDollar).toBe(true);
@@ -173,10 +167,9 @@ describe("preview strategy canHandle", () => {
 
 		expect(strategy.canHandle(file, { metadataCache } as any)).toBe(false);
 		expect(
-			strategy.canHandle(
-				createMockTFileAsPlainObject("image.png", "png"),
-				{ metadataCache } as any,
-			),
+			strategy.canHandle(createMockTFileAsPlainObject("image.png", "png"), {
+				metadataCache,
+			} as any),
 		).toBe(false);
 	});
 });

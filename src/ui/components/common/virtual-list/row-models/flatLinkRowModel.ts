@@ -20,9 +20,7 @@ export interface FlatLinkRowModelInput<T> {
 	layout: FlatGridLayoutMetrics;
 }
 
-export interface FlatLinkVirtualRow<T> extends VirtualRow<
-	VirtualListLogicalCell<T>
-> {
+export interface FlatLinkVirtualRow<T> extends VirtualRow<VirtualListLogicalCell<T>> {
 	startCellIndex: number;
 }
 
@@ -52,8 +50,7 @@ export function createFlatLinkRowModel<T>(
 	const rowStride = input.layout.rowHeight + input.layout.gap;
 	const totalHeight =
 		rowCount > 0
-			? rowCount * input.layout.rowHeight +
-				(rowCount - 1) * input.layout.gap
+			? rowCount * input.layout.rowHeight + (rowCount - 1) * input.layout.gap
 			: 0;
 
 	for (let rowIndex = 0; rowIndex < rowCount; rowIndex += 1) {
@@ -66,18 +63,15 @@ export function createFlatLinkRowModel<T>(
 
 	const getCellIndex = (rowIndex: number, columnIndex: number): number =>
 		rowIndex * columns + columnIndex;
-	const resolveCellAtIndex = (
-		index: number,
-	): VirtualListLogicalCell<T> | null => cellSource.resolveCellAtIndex(index);
+	const resolveCellAtIndex = (index: number): VirtualListLogicalCell<T> | null =>
+		cellSource.resolveCellAtIndex(index);
 	const findVisibleRange = (params: {
 		scrollTop: number;
 		viewportHeight: number;
 		overscanPx: number;
 	}): RowRange => {
 		const overscanRows =
-			rowStride > 0
-				? Math.ceil(Math.max(0, params.overscanPx) / rowStride)
-				: 0;
+			rowStride > 0 ? Math.ceil(Math.max(0, params.overscanPx) / rowStride) : 0;
 
 		return computeVisibleRowRange({
 			scrollTop: params.scrollTop,

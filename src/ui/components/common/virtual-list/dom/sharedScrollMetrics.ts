@@ -39,13 +39,10 @@ export function readVirtualListSharedScrollMetrics(params: {
 	frameId: number;
 }): VirtualListSharedScrollMetrics {
 	if (params.scroller) {
-		const cachedViewportHeight = resolveCachedViewportHeight(
-			params.subscriber,
-		);
+		const cachedViewportHeight = resolveCachedViewportHeight(params.subscriber);
 		return {
 			scrollTop: params.scroller.scrollTop,
-			viewportHeight:
-				cachedViewportHeight ?? params.scroller.clientHeight,
+			viewportHeight: cachedViewportHeight ?? params.scroller.clientHeight,
 			frameId: params.frameId,
 			isScrollActive: params.isScrollActive,
 		};

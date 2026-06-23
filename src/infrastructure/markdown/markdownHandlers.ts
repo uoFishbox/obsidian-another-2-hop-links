@@ -21,12 +21,9 @@ export async function markdownPostProcessor(
 
 	if (enableLogging) {
 		const renderedText = el.innerText;
-		logger(
-			`[Cosense card links] Post-processing markdown for: ${ctx.sourcePath}`,
-			{
-				text: renderedText,
-			},
-		);
+		logger(`[Cosense card links] Post-processing markdown for: ${ctx.sourcePath}`, {
+			text: renderedText,
+		});
 	}
 	await indexingService.awaitIdle();
 

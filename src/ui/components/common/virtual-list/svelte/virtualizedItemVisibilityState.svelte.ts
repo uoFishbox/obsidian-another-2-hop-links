@@ -16,8 +16,7 @@ interface VisibilityRow<TCell extends VisibilityCell> {
 	readonly cells: readonly TCell[];
 }
 
-export interface VirtualizedItemResolvedVisibilityState
-	extends VirtualizedItemVisibilityState {
+export interface VirtualizedItemResolvedVisibilityState extends VirtualizedItemVisibilityState {
 	visibility: VirtualizedItemVisibility;
 }
 
@@ -149,41 +148,22 @@ export function createVirtualizedItemVisibilityStateController<
 		}
 	};
 
-	const syncPreviewVisibleDelta = (
-		oldRange: RowRange,
-		newRange: RowRange,
-	): void => {
+	const syncPreviewVisibleDelta = (oldRange: RowRange, newRange: RowRange): void => {
 		const { start: oldStart, end: oldEnd } = oldRange;
 		const { start: newStart, end: newEnd } = newRange;
 
 		if (oldStart < newStart) {
-			applyVisibilityToRowRange(
-				oldStart,
-				Math.min(oldEnd, newStart),
-				"mounted",
-			);
+			applyVisibilityToRowRange(oldStart, Math.min(oldEnd, newStart), "mounted");
 		}
 		if (newEnd < oldEnd) {
-			applyVisibilityToRowRange(
-				Math.max(oldStart, newEnd),
-				oldEnd,
-				"mounted",
-			);
+			applyVisibilityToRowRange(Math.max(oldStart, newEnd), oldEnd, "mounted");
 		}
 
 		if (newStart < oldStart) {
-			applyVisibilityToRowRange(
-				newStart,
-				Math.min(newEnd, oldStart),
-				"visible",
-			);
+			applyVisibilityToRowRange(newStart, Math.min(newEnd, oldStart), "visible");
 		}
 		if (oldEnd < newEnd) {
-			applyVisibilityToRowRange(
-				Math.max(newStart, oldEnd),
-				newEnd,
-				"visible",
-			);
+			applyVisibilityToRowRange(Math.max(newStart, oldEnd), newEnd, "visible");
 		}
 	};
 
@@ -193,11 +173,10 @@ export function createVirtualizedItemVisibilityStateController<
 	): void => {
 		mountedItemKeyCounts.clear();
 		for (const row of rowSlices) {
-			const nextVisibility =
-				resolveVirtualizedItemVisibilityForPreviewRange(
-					row.rowIndex,
-					previewVisible,
-				);
+			const nextVisibility = resolveVirtualizedItemVisibilityForPreviewRange(
+				row.rowIndex,
+				previewVisible,
+			);
 
 			for (const cell of row.cells) {
 				if (cell.cell.kind !== "item") {
@@ -205,10 +184,7 @@ export function createVirtualizedItemVisibilityStateController<
 				}
 
 				const key = cell.key;
-				mountedItemKeyCounts.set(
-					key,
-					(mountedItemKeyCounts.get(key) ?? 0) + 1,
-				);
+				mountedItemKeyCounts.set(key, (mountedItemKeyCounts.get(key) ?? 0) + 1);
 				const tracked = states.get(key);
 				if (!tracked) {
 					continue;
@@ -243,18 +219,12 @@ export function createVirtualizedItemVisibilityStateController<
 		pruneUnmountedRowState(row);
 	};
 
-	const addMountedRow = (
-		row: VisibilityRow<TCell>,
-		previewRange: RowRange,
-	): void => {
+	const addMountedRow = (row: VisibilityRow<TCell>, previewRange: RowRange): void => {
 		rowsByIndex.set(row.rowIndex, row);
 		updateMountedItemKeyCount(row, 1);
 		applyVisibilityToRow(
 			row,
-			resolveVirtualizedItemVisibilityForPreviewRange(
-				row.rowIndex,
-				previewRange,
-			),
+			resolveVirtualizedItemVisibilityForPreviewRange(row.rowIndex, previewRange),
 		);
 	};
 
@@ -264,10 +234,7 @@ export function createVirtualizedItemVisibilityStateController<
 		start: number,
 		end: number,
 		previewRange: RowRange,
-		visitRow?: (
-			row: VisibilityRow<TCell>,
-			previewRange: RowRange,
-		) => void,
+		visitRow?: (row: VisibilityRow<TCell>, previewRange: RowRange) => void,
 	): boolean => {
 		for (let rowIndex = start; rowIndex < end; rowIndex += 1) {
 			const row = getRow(rows, rowRange, rowIndex);
@@ -308,17 +275,9 @@ export function createVirtualizedItemVisibilityStateController<
 		nextRowRange: RowRange;
 		previewRange: RowRange;
 	}): void => {
-		const {
-			previousRows,
-			nextRows,
-			previousRowRange,
-			nextRowRange,
-			previewRange,
-		} = params;
-		if (
-			previousRows !== previousRowSlices ||
-			!hasPreviousPreviewVisible
-		) {
+		const { previousRows, nextRows, previousRowRange, nextRowRange, previewRange } =
+			params;
+		if (previousRows !== previousRowSlices || !hasPreviousPreviewVisible) {
 			syncMountedRows({
 				mountedRows: nextRows,
 				previewRange,
@@ -326,22 +285,10 @@ export function createVirtualizedItemVisibilityStateController<
 			return;
 		}
 
-		const removedLeadingEnd = Math.min(
-			previousRowRange.end,
-			nextRowRange.start,
-		);
-		const removedTrailingStart = Math.max(
-			previousRowRange.start,
-			nextRowRange.end,
-		);
-		const addedLeadingEnd = Math.min(
-			nextRowRange.end,
-			previousRowRange.start,
-		);
-		const addedTrailingStart = Math.max(
-			nextRowRange.start,
-			previousRowRange.end,
-		);
+		const removedLeadingEnd = Math.min(previousRowRange.end, nextRowRange.start);
+		const removedTrailingStart = Math.max(previousRowRange.start, nextRowRange.end);
+		const addedLeadingEnd = Math.min(nextRowRange.end, previousRowRange.start);
+		const addedTrailingStart = Math.max(nextRowRange.start, previousRowRange.end);
 		// Validate every range before mutating so fallback starts from intact state.
 		const hasAllDeltaRows =
 			forEachDeltaRow(
@@ -420,11 +367,7 @@ export function createVirtualizedItemVisibilityStateController<
 		nextPreviewRange: RowRange;
 		mountedRows: readonly VisibilityRow<TCell>[];
 	}): void => {
-		const {
-			previousPreviewRange,
-			nextPreviewRange,
-			mountedRows,
-		} = params;
+		const { previousPreviewRange, nextPreviewRange, mountedRows } = params;
 
 		if (
 			mountedRows !== previousRowSlices ||

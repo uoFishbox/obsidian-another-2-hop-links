@@ -3,11 +3,7 @@ import type { TFile } from "obsidian";
 import type { DisplayData } from "application/presenters/displayDataBuilder";
 import type { ApplicationStore } from "ui/stores/ApplicationStore.svelte";
 import { DEFAULT_SETTINGS } from "types/settings";
-import type {
-	TaggedNote,
-	TwoHopIndexedLink,
-	TwoHopLinkBranch,
-} from "types/domain";
+import type { TaggedNote, TwoHopIndexedLink, TwoHopLinkBranch } from "types/domain";
 import { createTwoHopDataIdentityCache } from "../twoHopDataIdentityCache";
 
 const sourceFile = { path: "source.md" } as TFile;
@@ -29,10 +25,7 @@ const createLink = (path: string): TwoHopIndexedLink => ({
 	sourceFile,
 });
 
-const createBranch = (
-	path: string,
-	hop2: TwoHopIndexedLink[],
-): TwoHopLinkBranch => ({
+const createBranch = (path: string, hop2: TwoHopIndexedLink[]): TwoHopLinkBranch => ({
 	hop1: createLink(path),
 	hop2,
 });
@@ -122,10 +115,7 @@ describe("createTwoHopDataIdentityCache", () => {
 		});
 		const changedBeta = {
 			tag: "beta",
-			notes: [
-				...beta.notes,
-				createNote("beta-2.md", "beta"),
-			],
+			notes: [...beta.notes, createNote("beta-2.md", "beta")],
 		};
 		const changed = cache.resolve({
 			...baseParams,

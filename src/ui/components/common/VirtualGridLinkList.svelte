@@ -54,12 +54,7 @@
 					aria-label={ARIA_LABELS.LOAD_MORE}
 					onclick={list.loadNextPage}
 				>
-					<svg
-						{...svgAttrs}
-						width="28"
-						height="28"
-						stroke="currentColor"
-					>
+					<svg {...svgAttrs} width="28" height="28" stroke="currentColor">
 						{@html ICON_PATHS.Ellipsis}
 					</svg>
 				</button>

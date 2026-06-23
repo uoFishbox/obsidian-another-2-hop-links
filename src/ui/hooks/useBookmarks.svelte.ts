@@ -119,7 +119,8 @@ class BookmarksStore {
 			if (!exists) {
 				this.filePaths.clear();
 				this.orderedFilePaths = [];
-				if (enableLogging) logger(`[Bookmarks] file not found. Cleared bookmark state.`);
+				if (enableLogging)
+					logger(`[Bookmarks] file not found. Cleared bookmark state.`);
 				return;
 			}
 
@@ -134,7 +135,8 @@ class BookmarksStore {
 				this.filePaths.add(path);
 			}
 			this.orderedFilePaths = parsed.orderedFilePaths;
-			if (enableLogging) logger(`[Bookmarks] reloaded ${this.filePaths.size} bookmarks.`);
+			if (enableLogging)
+				logger(`[Bookmarks] reloaded ${this.filePaths.size} bookmarks.`);
 		} catch (error) {
 			if (loadRequestId !== this.loadRequestId) {
 				return;

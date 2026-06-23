@@ -242,12 +242,7 @@ export async function generateVideoPreview(
 	try {
 		if (signal?.aborted) return undefined;
 		// maxWidthを指定して呼び出し
-		const thumbnail = await generateVideoThumbnail(
-			file,
-			0.1,
-			320,
-			signal,
-		);
+		const thumbnail = await generateVideoThumbnail(file, 0.1, 320, signal);
 		if (thumbnail) {
 			return {
 				type: "image",

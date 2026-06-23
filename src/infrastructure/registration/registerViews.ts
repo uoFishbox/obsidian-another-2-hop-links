@@ -1,12 +1,6 @@
 import type { PluginHost } from "types/pluginHost";
-import {
-	TwoHopLinksView,
-	TWO_HOP_LINKS_VIEW_TYPE,
-} from "ui/views/TwoHopLinksView";
-import {
-	PreCreationView,
-	VIEW_TYPE_PRE_CREATE,
-} from "ui/views/PreCreationView";
+import { TwoHopLinksView, TWO_HOP_LINKS_VIEW_TYPE } from "ui/views/TwoHopLinksView";
+import { PreCreationView, VIEW_TYPE_PRE_CREATE } from "ui/views/PreCreationView";
 import { TagNotesView, VIEW_TYPE_TAG_NOTES } from "ui/views/TagNotesView";
 import {
 	COSENSE_CARD_LINKS_HOVER_SOURCE_DISPLAY,
@@ -25,10 +19,7 @@ export function registerViews(plugin: PluginHost): void {
 		VIEW_TYPE_PRE_CREATE,
 		(leaf) => new PreCreationView(leaf, plugin),
 	);
-	plugin.registerView(
-		VIEW_TYPE_TAG_NOTES,
-		(leaf) => new TagNotesView(leaf, plugin),
-	);
+	plugin.registerView(VIEW_TYPE_TAG_NOTES, (leaf) => new TagNotesView(leaf, plugin));
 	plugin.registerHoverLinkSource(COSENSE_CARD_LINKS_HOVER_SOURCE_ID, {
 		display: COSENSE_CARD_LINKS_HOVER_SOURCE_DISPLAY,
 		defaultMod: true,

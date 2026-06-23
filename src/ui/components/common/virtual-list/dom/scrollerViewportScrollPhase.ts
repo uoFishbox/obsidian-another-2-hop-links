@@ -55,8 +55,7 @@ export function applyScrollerViewportScrollPhase(
 				state.needsDependencyRefreshAfterScroll ||
 				state.needsObserverReconnectAfterScroll;
 			const shouldMeasureLayout = state.needsLayoutMeasurementAfterScroll;
-			const shouldReconnectObserver =
-				state.needsObserverReconnectAfterScroll;
+			const shouldReconnectObserver = state.needsObserverReconnectAfterScroll;
 
 			state.isScrollActive = false;
 			state.needsObserverReconnectAfterScroll = false;

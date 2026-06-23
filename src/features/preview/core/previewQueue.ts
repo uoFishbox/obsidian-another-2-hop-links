@@ -118,11 +118,7 @@ export function createPreviewQueue(): PreviewQueue {
 				task.resolve(result);
 			})
 			.catch((error) => {
-				if (
-					task.cancelled ||
-					task.signal?.aborted ||
-					isAbortError(error)
-				) {
+				if (task.cancelled || task.signal?.aborted || isAbortError(error)) {
 					task.reject(createAbortError());
 					return;
 				}

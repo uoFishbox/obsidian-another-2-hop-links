@@ -13,12 +13,8 @@ export function serializeSnapshot(snapshot: IndexSnapshot) {
 		unresolvedLinkLookupToSources: serializeSetMap(
 			snapshot.unresolvedLinkLookupToSources,
 		),
-		lookupKeyToLookupPaths: serializeSetMap(
-			snapshot.lookupKeyToLookupPaths,
-		),
-		unresolvedLookupToSources: serializeSetMap(
-			snapshot.unresolvedLookupToSources,
-		),
+		lookupKeyToLookupPaths: serializeSetMap(snapshot.lookupKeyToLookupPaths),
+		unresolvedLookupToSources: serializeSetMap(snapshot.unresolvedLookupToSources),
 		lookupPathResolvedSourceCount: serializeNumberMap(
 			snapshot.lookupPathResolvedSourceCount,
 		),
@@ -29,9 +25,7 @@ export function serializeSnapshot(snapshot: IndexSnapshot) {
 	};
 }
 
-export function serializeSourceSummaryMap(
-	map: IndexSnapshot["sourceSummaries"],
-) {
+export function serializeSourceSummaryMap(map: IndexSnapshot["sourceSummaries"]) {
 	return Array.from(map.entries())
 		.map(
 			([sourcePath, summary]) =>
@@ -45,26 +39,20 @@ export function serializeSourceSummaryMap(
 										destinationPath,
 										{
 											count: destination.count,
-											hasResolved:
-												destination.hasResolved,
-											firstRefIndex:
-												destination.firstRefIndex,
+											hasResolved: destination.hasResolved,
+											firstRefIndex: destination.firstRefIndex,
 										},
 									] as const,
 							)
-							.sort(([left], [right]) =>
-								left.localeCompare(right),
-							),
-						orderedReferences: summary.orderedReferences.map(
-							(ref) => ({
-								destinationPath: ref.destinationPath,
-								rawLookupKey: ref.rawLookupKey,
-								isUnresolved: ref.isUnresolved,
-								rawText: ref.rawText,
-								displayText: ref.displayText,
-								key: ref.key,
-							}),
-						),
+							.sort(([left], [right]) => left.localeCompare(right)),
+						orderedReferences: summary.orderedReferences.map((ref) => ({
+							destinationPath: ref.destinationPath,
+							rawLookupKey: ref.rawLookupKey,
+							isUnresolved: ref.isUnresolved,
+							rawText: ref.rawText,
+							displayText: ref.displayText,
+							key: ref.key,
+						})),
 						firstRefIndexByLookupKey: Array.from(
 							summary.firstRefIndexByLookupKey.entries(),
 						).sort(([left], [right]) => left.localeCompare(right)),
@@ -84,14 +72,11 @@ export function serializeSourceSummaryMap(
 										).sort(),
 									] as const,
 							)
-							.sort(([left], [right]) =>
-								left.localeCompare(right),
-							),
+							.sort(([left], [right]) => left.localeCompare(right)),
 						unresolvedLookupKeys: Array.from(
 							summary.unresolvedLookupKeys,
 						).sort(),
-						hasSourceDependentLinks:
-							summary.hasSourceDependentLinks,
+						hasSourceDependentLinks: summary.hasSourceDependentLinks,
 					},
 				] as const,
 		)

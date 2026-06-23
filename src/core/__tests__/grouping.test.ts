@@ -38,10 +38,6 @@ describe("groupNotesByTag", () => {
 
 		const result = groupNotesByTag([note1, note2, note3]);
 
-		expect(result.map((group) => group.tag)).toEqual([
-			"#alpha",
-			"#beta",
-			"#zeta",
-		]);
+		expect(result.map((group) => group.tag)).toEqual(["#alpha", "#beta", "#zeta"]);
 	});
 });

@@ -36,10 +36,7 @@ export interface FileContentIndexResult {
 		targetFile: TFile | null | undefined,
 	): Pos | undefined;
 	forEachEntry(
-		visitor: (
-			path: string,
-			entry: Readonly<SearchContentIndexEntry>,
-		) => void,
+		visitor: (path: string, entry: Readonly<SearchContentIndexEntry>) => void,
 	): void;
 	getSerializableEntries(): SearchWorkerFileContentSnapshot[];
 }
@@ -93,9 +90,7 @@ export class BoundedQueryCache<T> {
 
 	private evictIfNeeded(): void {
 		while (this.entries.size > this.limit) {
-			const oldestKey = this.entries.keys().next().value as
-				| string
-				| undefined;
+			const oldestKey = this.entries.keys().next().value as string | undefined;
 			if (oldestKey === undefined) {
 				break;
 			}
@@ -131,10 +126,7 @@ export function useFileContentIndex(
 		SearchContentIndexEntry,
 		BoundedQueryCache<Pos | undefined>
 	>();
-	const normalizedContentByEntry = new WeakMap<
-		SearchContentIndexEntry,
-		string
-	>();
+	const normalizedContentByEntry = new WeakMap<SearchContentIndexEntry, string>();
 	const getNormalizedContent = (entry: SearchContentIndexEntry): string => {
 		const cachedContent = normalizedContentByEntry.get(entry);
 		if (cachedContent !== undefined) {
@@ -167,10 +159,7 @@ export function useFileContentIndex(
 
 		const searchableFiles = getSearchableFiles();
 		const { nextIndex, filesToLoad, activePaths } = untrack(() =>
-			reconcileFileContentIndex(
-				searchableFiles,
-				fileContentIndex,
-			),
+			reconcileFileContentIndex(searchableFiles, fileContentIndex),
 		);
 
 		replaceFileContentIndex(fileContentIndex, nextIndex);
@@ -191,16 +180,13 @@ export function useFileContentIndex(
 				i < filesToLoad.length && !canceled;
 				i += CONTENT_LOAD_BATCH_SIZE
 			) {
-				const promises: Array<Promise<{ path: string; entry: SearchContentIndexEntry }>> = [];
-				const end = Math.min(
-					i + CONTENT_LOAD_BATCH_SIZE,
-					filesToLoad.length,
-				);
+				const promises: Array<
+					Promise<{ path: string; entry: SearchContentIndexEntry }>
+				> = [];
+				const end = Math.min(i + CONTENT_LOAD_BATCH_SIZE, filesToLoad.length);
 
 				for (let j = i; j < end; j += 1) {
-					promises.push(
-						loadFileContentEntry(filesToLoad[j], app.vault),
-					);
+					promises.push(loadFileContentEntry(filesToLoad[j], app.vault));
 				}
 
 				const batchResults = await Promise.all(promises);
@@ -327,10 +313,7 @@ export function useFileContentIndex(
 			return position;
 		},
 		forEachEntry(
-			visitor: (
-				path: string,
-				entry: Readonly<SearchContentIndexEntry>,
-			) => void,
+			visitor: (path: string, entry: Readonly<SearchContentIndexEntry>) => void,
 		): void {
 			for (const [path, entry] of fileContentIndex) {
 				visitor(path, entry);
@@ -356,10 +339,7 @@ function replaceFileContentIndex(
 	}
 }
 
-function replaceActivePaths(
-	target: SvelteSet<string>,
-	next: Set<string>,
-): void {
+function replaceActivePaths(target: SvelteSet<string>, next: Set<string>): void {
 	target.clear();
 	for (const path of next) {
 		target.add(path);

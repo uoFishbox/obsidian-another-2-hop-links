@@ -83,10 +83,7 @@ export interface PluginHost extends Plugin {
 		onProgress?: (progress: ResolveProgress) => void,
 		options?: ResolveOptions,
 	): Promise<TwoHopLinkResult>;
-	getLinkContextFactory(): (
-		file: TFile,
-		settings: PluginSettings,
-	) => LinkContext;
+	getLinkContextFactory(): (file: TFile, settings: PluginSettings) => LinkContext;
 	createApplicationStore(
 		settings: PluginSettings,
 		displayDataBuilder: DisplayDataBuilder,

@@ -30,9 +30,8 @@ type TwoHopMountedCell = MountedFlatCell<
 export function createTwoHopMountRuntime() {
 	const visibilityStates =
 		createVirtualizedItemVisibilityStateController<TwoHopMountedCell>();
-	let visibilityMountedRows:
-		| TwoHopMountedRowsBuild["rowSlices"]
-		| readonly [] = EMPTY_MOUNTED_ROWS;
+	let visibilityMountedRows: TwoHopMountedRowsBuild["rowSlices"] | readonly [] =
+		EMPTY_MOUNTED_ROWS;
 	let visibilityMountedRowRange: RowRange = EMPTY_ROW_RANGE;
 	let visibilityMountedPlan: TwoHopMountedRowsBuild["plan"] | null = null;
 	const visibilityPreviewRange: RowRange = { start: 0, end: 0 };

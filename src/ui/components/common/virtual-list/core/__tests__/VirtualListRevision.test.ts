@@ -11,12 +11,10 @@ describe("VirtualListRevision", () => {
 	it("compares array revision tokens shallowly with Object.is semantics", () => {
 		const sharedObject = { id: "shared" };
 
-		expect(
-			sameRevisionToken([sharedObject, 1, NaN], [sharedObject, 1, NaN]),
-		).toBe(true);
-		expect(
-			sameRevisionToken([sharedObject, 1], [{ id: "shared" }, 1]),
-		).toBe(false);
+		expect(sameRevisionToken([sharedObject, 1, NaN], [sharedObject, 1, NaN])).toBe(
+			true,
+		);
+		expect(sameRevisionToken([sharedObject, 1], [{ id: "shared" }, 1])).toBe(false);
 	});
 
 	it("creates stable layout tokens from numeric layout dependencies", () => {

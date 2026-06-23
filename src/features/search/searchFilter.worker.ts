@@ -1,6 +1,4 @@
-import {
-	filterSearchWorkerDatasetWithMatchDetails,
-} from "./searchWorkerFilter";
+import { filterSearchWorkerDatasetWithMatchDetails } from "./searchWorkerFilter";
 import type {
 	MainToSearchWorkerMessage,
 	SearchWorkerDatasetSnapshot,
@@ -16,9 +14,7 @@ let currentDataset: SearchWorkerDatasetSnapshot = {
 };
 let currentContentByPath = new Map<string, string>();
 
-self.onmessage = (
-	event: MessageEvent<MainToSearchWorkerMessage>,
-): void => {
+self.onmessage = (event: MessageEvent<MainToSearchWorkerMessage>): void => {
 	const message = event.data;
 
 	if (message.type === "sync-items") {
@@ -33,10 +29,7 @@ self.onmessage = (
 	if (message.type === "upsert-file-contents") {
 		currentDataset.datasetVersion = message.datasetVersion;
 		for (const entry of message.entries) {
-			currentContentByPath.set(
-				entry.path,
-				entry.content.toLowerCase(),
-			);
+			currentContentByPath.set(entry.path, entry.content.toLowerCase());
 		}
 		return;
 	}

@@ -38,9 +38,7 @@ export interface CachedResolveResult {
 export class ResolverCache {
 	private readonly cache = new Map<string, CachedResolveResult>();
 
-	constructor(
-		private readonly maxCacheSize: number = MAX_RESOLVE_CACHE_SIZE,
-	) {}
+	constructor(private readonly maxCacheSize: number = MAX_RESOLVE_CACHE_SIZE) {}
 
 	/**
 	 * キャッシュから結果を取得する
@@ -60,8 +58,7 @@ export class ResolverCache {
 		if (
 			cached.enableProgressiveTwoHopBuild !==
 				performanceSettings.enableProgressiveTwoHopBuild ||
-			cached.maxOutgoingToProcess !==
-				performanceSettings.maxOutgoingToProcess ||
+			cached.maxOutgoingToProcess !== performanceSettings.maxOutgoingToProcess ||
 			cached.maxHop2PerBranch !== performanceSettings.maxHop2PerBranch ||
 			cached.includeTaggedNotes !== resolveSettings.includeTaggedNotes
 		) {
@@ -137,10 +134,7 @@ export class ResolverCache {
 
 		for (const [filePath, cached] of this.cache.entries()) {
 			if (
-				this.intersects(
-					cached.dependencyLookupKeys,
-					affectedLookupKeySet,
-				) ||
+				this.intersects(cached.dependencyLookupKeys, affectedLookupKeySet) ||
 				this.intersects(cached.dependencyPaths, affectedPathSet) ||
 				this.intersects(cached.dependencyTags, affectedTagSet)
 			) {
@@ -167,11 +161,7 @@ export class ResolverCache {
 		cachedValues: ReadonlySet<string>,
 		affectedValues: ReadonlySet<string> | undefined,
 	): boolean {
-		if (
-			!affectedValues ||
-			cachedValues.size === 0 ||
-			affectedValues.size === 0
-		) {
+		if (!affectedValues || cachedValues.size === 0 || affectedValues.size === 0) {
 			return false;
 		}
 		// 小さい方のセットをイテレートして効率化

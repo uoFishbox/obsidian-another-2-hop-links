@@ -160,17 +160,12 @@ describe("dataUpdateReloadDecider", () => {
 		};
 
 		expect(decider.shouldReloadForUpdate(input)).toBe(true);
-		expect(decider.getPreviewInvalidation(input)).toEqual(
-			new Set(["target.md"]),
-		);
+		expect(decider.getPreviewInvalidation(input)).toEqual(new Set(["target.md"]));
 	});
 
 	it("reloads when a displayed backlink source path changes", () => {
 		const currentFile = createMockTFile("current.md");
-		const data = createLinkResultWithBacklink(
-			currentFile.path,
-			"src-current.md",
-		);
+		const data = createLinkResultWithBacklink(currentFile.path, "src-current.md");
 
 		expect(
 			decider.shouldReloadForUpdate({
@@ -188,11 +183,9 @@ describe("dataUpdateReloadDecider", () => {
 	describe("decide()", () => {
 		it("returns preview-only for displayed hop2 card body change", () => {
 			const currentFile = createMockTFile("current.md");
-			const data = createLinkResultWithBranch(
-				currentFile.path,
-				"target.md",
-				["hop2.md"],
-			);
+			const data = createLinkResultWithBranch(currentFile.path, "target.md", [
+				"hop2.md",
+			]);
 
 			const action = decider.decide({
 				currentFile,
@@ -210,10 +203,7 @@ describe("dataUpdateReloadDecider", () => {
 
 		it("returns preview-only for displayed hop1 card body change", () => {
 			const currentFile = createMockTFile("current.md");
-			const data = createLinkResultWithBranch(
-				currentFile.path,
-				"target.md",
-			);
+			const data = createLinkResultWithBranch(currentFile.path, "target.md");
 
 			const action = decider.decide({
 				currentFile,
@@ -231,10 +221,7 @@ describe("dataUpdateReloadDecider", () => {
 
 		it("returns reload for displayed hop1 card outgoing links change", () => {
 			const currentFile = createMockTFile("current.md");
-			const data = createLinkResultWithBranch(
-				currentFile.path,
-				"target.md",
-			);
+			const data = createLinkResultWithBranch(currentFile.path, "target.md");
 
 			const action = decider.decide({
 				currentFile,
@@ -269,9 +256,7 @@ describe("dataUpdateReloadDecider", () => {
 			});
 
 			expect(action.kind).toBe("preview-only");
-			expect(action.previewInvalidation).toEqual(
-				new Set(["backlink-source.md"]),
-			);
+			expect(action.previewInvalidation).toEqual(new Set(["backlink-source.md"]));
 		});
 
 		it("returns reload for backlink source link relation change", () => {
@@ -296,10 +281,7 @@ describe("dataUpdateReloadDecider", () => {
 
 		it("returns none for unrelated file body change", () => {
 			const currentFile = createMockTFile("current.md");
-			const data = createLinkResultWithBranch(
-				currentFile.path,
-				"target.md",
-			);
+			const data = createLinkResultWithBranch(currentFile.path, "target.md");
 
 			const action = decider.decide({
 				currentFile,
@@ -316,10 +298,7 @@ describe("dataUpdateReloadDecider", () => {
 
 		it("returns reload when affectedLookupKeys matches relevant lookup key", () => {
 			const currentFile = createMockTFile("current.md");
-			const data = createLinkResultWithBranch(
-				currentFile.path,
-				"target.md",
-			);
+			const data = createLinkResultWithBranch(currentFile.path, "target.md");
 
 			const action = decider.decide({
 				currentFile,
@@ -336,10 +315,7 @@ describe("dataUpdateReloadDecider", () => {
 
 		it("returns reload for backward compatibility when context is old format", () => {
 			const currentFile = createMockTFile("current.md");
-			const data = createLinkResultWithBranch(
-				currentFile.path,
-				"target.md",
-			);
+			const data = createLinkResultWithBranch(currentFile.path, "target.md");
 
 			const action = decider.decide({
 				currentFile,
@@ -358,10 +334,7 @@ describe("dataUpdateReloadDecider", () => {
 
 		it("returns reload when currentFile outgoing links change", () => {
 			const currentFile = createMockTFile("current.md");
-			const data = createLinkResultWithBranch(
-				currentFile.path,
-				"target.md",
-			);
+			const data = createLinkResultWithBranch(currentFile.path, "target.md");
 
 			const action = decider.decide({
 				currentFile,
@@ -480,10 +453,7 @@ describe("dataUpdateReloadDecider", () => {
 
 		it("returns none when tagSourcePaths does not intersect relevant paths", () => {
 			const currentFile = createMockTFile("current.md");
-			const data = createLinkResultWithBranch(
-				currentFile.path,
-				"target.md",
-			);
+			const data = createLinkResultWithBranch(currentFile.path, "target.md");
 
 			const action = decider.decide({
 				currentFile,
@@ -522,10 +492,7 @@ describe("dataUpdateReloadDecider", () => {
 
 		it("returns none when renamed file is not in relevant paths", () => {
 			const currentFile = createMockTFile("current.md");
-			const data = createLinkResultWithBranch(
-				currentFile.path,
-				"target.md",
-			);
+			const data = createLinkResultWithBranch(currentFile.path, "target.md");
 
 			const action = decider.decide({
 				currentFile,

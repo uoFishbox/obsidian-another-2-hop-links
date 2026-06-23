@@ -240,8 +240,8 @@ describe("observeVirtualListViewport", () => {
 		expect(firstScheduleLayoutMeasurement).toHaveBeenCalledTimes(1);
 		expect(secondScheduleLayoutMeasurement).not.toHaveBeenCalled();
 
-		const secondStructureObserver = mutationObserverRecords.find(
-			(record) => record.elements.has(secondScroller),
+		const secondStructureObserver = mutationObserverRecords.find((record) =>
+			record.elements.has(secondScroller),
 		);
 		expect(secondStructureObserver).toBeDefined();
 		secondStructureObserver?.callback(
@@ -290,9 +290,9 @@ describe("observeVirtualListViewport", () => {
 		expect(
 			resizeObserverRecords.some((record) => record.elements.has(rootEl)),
 		).toBe(true);
-		expect(
-			resizeObserverRecords.some((record) => record.elements.has(sizer)),
-		).toBe(true);
+		expect(resizeObserverRecords.some((record) => record.elements.has(sizer))).toBe(
+			true,
+		);
 		expect(
 			resizeObserverRecords.some((record) =>
 				record.elements.has(scrollContainer),
@@ -306,9 +306,7 @@ describe("observeVirtualListViewport", () => {
 			resizeObserverRecords.every((record) => record.elements.size === 0),
 		).toBe(true);
 		expect(
-			mutationObserverRecords.every(
-				(record) => record.elements.size === 0,
-			),
+			mutationObserverRecords.every((record) => record.elements.size === 0),
 		).toBe(true);
 	});
 
@@ -355,14 +353,8 @@ describe("observeVirtualListViewport", () => {
 
 		await vi.runOnlyPendingTimersAsync();
 
-		expect(onScrollContainerChange).toHaveBeenNthCalledWith(
-			1,
-			firstScroller,
-		);
-		expect(onScrollContainerChange).toHaveBeenNthCalledWith(
-			2,
-			secondScroller,
-		);
+		expect(onScrollContainerChange).toHaveBeenNthCalledWith(1, firstScroller);
+		expect(onScrollContainerChange).toHaveBeenNthCalledWith(2, secondScroller);
 		expect(scheduleLayoutMeasurement).toHaveBeenCalledTimes(1);
 
 		stopObserving();

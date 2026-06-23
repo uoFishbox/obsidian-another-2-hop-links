@@ -157,14 +157,12 @@ export function createCreateChangePlanner(
 		createEventEvaluationCache: CreateEventEvaluationCache,
 		yieldScheduler: YieldScheduler,
 	): Promise<boolean> {
-		const normalizedNewFilePathKey =
-			toCaseInsensitiveLookupKey(newFilePath);
-		const lookupKeyToRawLinkPaths =
-			getSourceLookupKeyToRawLinkPathsForCreateEvent(
-				snapshot,
-				sourcePath,
-				createEventEvaluationCache,
-			);
+		const normalizedNewFilePathKey = toCaseInsensitiveLookupKey(newFilePath);
+		const lookupKeyToRawLinkPaths = getSourceLookupKeyToRawLinkPathsForCreateEvent(
+			snapshot,
+			sourcePath,
+			createEventEvaluationCache,
+		);
 		if (lookupKeyToRawLinkPaths.size === 0) {
 			return false;
 		}
@@ -203,11 +201,7 @@ export function createCreateChangePlanner(
 			if (found) return true;
 
 			rawLinkPathCount++;
-			const pendingYield = maybeYield(
-				yieldScheduler,
-				rawLinkPathCount,
-				16,
-			);
+			const pendingYield = maybeYield(yieldScheduler, rawLinkPathCount, 16);
 			if (pendingYield) {
 				await pendingYield;
 			}
@@ -229,8 +223,7 @@ export function createCreateChangePlanner(
 		);
 		return (
 			resolvedPath !== null &&
-			toCaseInsensitiveLookupKey(resolvedPath) ===
-				normalizedNewFilePathKey
+			toCaseInsensitiveLookupKey(resolvedPath) === normalizedNewFilePathKey
 		);
 	}
 
@@ -240,9 +233,7 @@ export function createCreateChangePlanner(
 		createEventEvaluationCache: CreateEventEvaluationCache,
 	): ReadonlyMap<string, string | readonly string[]> {
 		const cached =
-			createEventEvaluationCache.sourceLookupKeyToRawLinkPaths.get(
-				sourcePath,
-			);
+			createEventEvaluationCache.sourceLookupKeyToRawLinkPaths.get(sourcePath);
 		if (cached) {
 			return cached;
 		}
@@ -258,8 +249,7 @@ export function createCreateChangePlanner(
 
 		const sourceFile = resolveFileByPath(vault, sourcePath);
 		if (!sourceFile) {
-			const empty: ReadonlyMap<string, string | readonly string[]> =
-				new Map();
+			const empty: ReadonlyMap<string, string | readonly string[]> = new Map();
 			createEventEvaluationCache.sourceLookupKeyToRawLinkPaths.set(
 				sourcePath,
 				empty,
@@ -306,9 +296,7 @@ export function createCreateChangePlanner(
 	): string | null {
 		const sourceDirectory = getParentDirectoryPath(sourcePath);
 		let resolvedByRawLinkPath =
-			createEventEvaluationCache.resolvedDestinations.get(
-				sourceDirectory,
-			);
+			createEventEvaluationCache.resolvedDestinations.get(sourceDirectory);
 		if (!resolvedByRawLinkPath) {
 			resolvedByRawLinkPath = new Map<string, string | null>();
 			createEventEvaluationCache.resolvedDestinations.set(
@@ -320,10 +308,7 @@ export function createCreateChangePlanner(
 			return resolvedByRawLinkPath.get(rawLinkPath)!;
 		}
 
-		const dest = metadataCache.getFirstLinkpathDest(
-			rawLinkPath,
-			sourcePath,
-		);
+		const dest = metadataCache.getFirstLinkpathDest(rawLinkPath, sourcePath);
 		const resolvedPath = dest?.path ?? null;
 		resolvedByRawLinkPath.set(rawLinkPath, resolvedPath);
 		return resolvedPath;

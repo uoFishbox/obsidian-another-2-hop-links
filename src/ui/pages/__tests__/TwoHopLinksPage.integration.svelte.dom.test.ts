@@ -44,10 +44,7 @@ vi.mock("features/search/searchWorkerClient", async () => {
 						datasetVersion: update.datasetVersion,
 					};
 					for (const entry of update.entries) {
-						contentByPath.set(
-							entry.path,
-							entry.content.toLowerCase(),
-						);
+						contentByPath.set(entry.path, entry.content.toLowerCase());
 					}
 				},
 				removeFileContents: (update: {
@@ -119,9 +116,9 @@ vi.mock("features/search/useFileContentIndex.svelte", () => ({
 }));
 
 vi.mock("ui/context/linkContext", async () => {
-	const actual = await vi.importActual<
-		typeof import("ui/context/linkContext")
-	>("ui/context/linkContext");
+	const actual = await vi.importActual<typeof import("ui/context/linkContext")>(
+		"ui/context/linkContext",
+	);
 
 	return {
 		...actual,
@@ -220,10 +217,7 @@ function createApplicationStore(
 	};
 }
 
-function collectFiles(
-	originFile: TFile,
-	displayData: DisplayData,
-): Map<string, TFile> {
+function collectFiles(originFile: TFile, displayData: DisplayData): Map<string, TFile> {
 	const files = new Map<string, TFile>([[originFile.path, originFile]]);
 	const addFile = (file: TFile | null | undefined) => {
 		if (file) {
@@ -270,11 +264,7 @@ function createRootProps(
 	originFile: TFile,
 ): ComponentProps<typeof TwoHopLinksPage> {
 	const filesByPath = collectFiles(originFile, displayData);
-	const applicationStore = createApplicationStore(
-		displayData,
-		settings,
-		originFile,
-	);
+	const applicationStore = createApplicationStore(displayData, settings, originFile);
 	const linkContext = {
 		resolveFile: vi.fn((path: string) => filesByPath.get(path) ?? null),
 		fileToLinktext: vi.fn((target: TFile) => target.basename),
@@ -352,9 +342,7 @@ describe("TwoHopLinksPage descriptor plumbing", () => {
 
 		await flushAsyncUi();
 
-		expect(
-			container.querySelectorAll(".view-plan-virtual-list"),
-		).toHaveLength(1);
+		expect(container.querySelectorAll(".view-plan-virtual-list")).toHaveLength(1);
 		expect(screen.getByText("outgoing-parent")).toBeInTheDocument();
 		expect(screen.getByText("backlink-note")).toBeInTheDocument();
 		expect(screen.getByText("tagged-note")).toBeInTheDocument();
@@ -374,11 +362,7 @@ describe("TwoHopLinksPage descriptor plumbing", () => {
 			...createDisplayData(),
 			outgoing: [createBranch(file, parentFile, [], "outgoing-parent")],
 		};
-		const { container, rerender } = renderRoot(
-			displayDataV1,
-			settings,
-			file,
-		);
+		const { container, rerender } = renderRoot(displayDataV1, settings, file);
 		await flushAsyncUi();
 
 		const items = () =>

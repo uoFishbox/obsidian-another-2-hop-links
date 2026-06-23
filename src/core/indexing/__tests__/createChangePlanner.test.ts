@@ -17,10 +17,7 @@ describe("CreateChangePlanner", () => {
 			env.mockVault,
 			env.mockMetadataCache,
 		);
-		const planner = createCreateChangePlanner(
-			env.mockVault,
-			env.mockMetadataCache,
-		);
+		const planner = createCreateChangePlanner(env.mockVault, env.mockMetadataCache);
 
 		env.builder.addFile({ path: "src/note.md" });
 		installShadowingResolver(env.mockVault, env.mockMetadataCache);
@@ -35,11 +32,7 @@ describe("CreateChangePlanner", () => {
 		);
 
 		expect(pathsToUpdate).toEqual(
-			new Set([
-				"src/note.md",
-				"src/origin.md",
-				"other/unresolved-source.md",
-			]),
+			new Set(["src/note.md", "src/origin.md", "other/unresolved-source.md"]),
 		);
 	});
 
@@ -52,19 +45,15 @@ describe("CreateChangePlanner", () => {
 			env.mockVault,
 			env.mockMetadataCache,
 		);
-		const planner = createCreateChangePlanner(
-			env.mockVault,
-			env.mockMetadataCache,
-		);
+		const planner = createCreateChangePlanner(env.mockVault, env.mockMetadataCache);
 		const sourceSummary = snapshot.sourceSummaries.get("src/origin.md");
 
 		expect(sourceSummary?.lookupKeyToRawLinkPaths).toEqual(
 			new Map([["note.md", "note"]]),
 		);
 		if (sourceSummary) {
-			(
-				sourceSummary as unknown as { orderedReferences: [] }
-			).orderedReferences = [];
+			(sourceSummary as unknown as { orderedReferences: [] }).orderedReferences =
+				[];
 		}
 
 		env.builder.addFile({ path: "src/note.md" });
@@ -80,9 +69,7 @@ describe("CreateChangePlanner", () => {
 			createImmediateYieldScheduler(),
 		);
 
-		expect(pathsToUpdate).toEqual(
-			new Set(["src/note.md", "src/origin.md"]),
-		);
+		expect(pathsToUpdate).toEqual(new Set(["src/note.md", "src/origin.md"]));
 		expect(env.mockMetadataCache.getFileCache).not.toHaveBeenCalled();
 	});
 
@@ -97,10 +84,7 @@ describe("CreateChangePlanner", () => {
 			env.mockVault,
 			env.mockMetadataCache,
 		);
-		const planner = createCreateChangePlanner(
-			env.mockVault,
-			env.mockMetadataCache,
-		);
+		const planner = createCreateChangePlanner(env.mockVault, env.mockMetadataCache);
 		const cache = createCreateEventEvaluationCache();
 
 		env.builder.addFile({ path: "team-a/Dashboard.md" });
@@ -113,14 +97,10 @@ describe("CreateChangePlanner", () => {
 				}
 
 				if (sourcePath.startsWith("team-a/")) {
-					return env.mockVault.getAbstractFileByPath(
-						"team-a/Dashboard.md",
-					);
+					return env.mockVault.getAbstractFileByPath("team-a/Dashboard.md");
 				}
 
-				return env.mockVault.getAbstractFileByPath(
-					"team-b/Dashboard.md",
-				);
+				return env.mockVault.getAbstractFileByPath("team-b/Dashboard.md");
 			},
 		);
 		env.mockMetadataCache.getFirstLinkpathDest.mockClear();
@@ -155,9 +135,7 @@ describe("CreateChangePlanner", () => {
 			),
 		).toBe(true);
 
-		expect(
-			env.mockMetadataCache.getFirstLinkpathDest,
-		).toHaveBeenCalledTimes(2);
+		expect(env.mockMetadataCache.getFirstLinkpathDest).toHaveBeenCalledTimes(2);
 		expect(cache.resolvedDestinations.size).toBe(2);
 		expect(cache.resolvedDestinations.get("team-a")?.get("Dashboard")).toBe(
 			"team-a/Dashboard.md",
@@ -168,10 +146,7 @@ describe("CreateChangePlanner", () => {
 	});
 });
 
-function installShadowingResolver(
-	mockVault: any,
-	mockMetadataCache: any,
-): void {
+function installShadowingResolver(mockVault: any, mockMetadataCache: any): void {
 	(mockMetadataCache.getFirstLinkpathDest as any).mockImplementation(
 		(linkText: string, sourcePath: string) => {
 			if (sourcePath === "src/origin.md" && linkText === "note") {
@@ -181,9 +156,7 @@ function installShadowingResolver(
 				);
 			}
 
-			const normalized = linkText.endsWith(".md")
-				? linkText
-				: `${linkText}.md`;
+			const normalized = linkText.endsWith(".md") ? linkText : `${linkText}.md`;
 			return mockVault.getAbstractFileByPath(normalized);
 		},
 	);

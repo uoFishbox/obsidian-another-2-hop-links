@@ -17,13 +17,10 @@ export function createSearchableListStore(
 		sortOption: "alphabetical",
 		initialVisibleCount: 10,
 		loadMoreIncrement: 10,
-		settings: {
-		},
+		settings: {},
 		setSortOption: vi.fn(),
 		getDefaultSectionVisibleLimit: vi.fn(() => 10),
-		getSectionExpandedLimit: vi.fn((sectionId) =>
-			expandedLimits.get(sectionId),
-		),
+		getSectionExpandedLimit: vi.fn((sectionId) => expandedLimits.get(sectionId)),
 		setSectionExpandedLimit: vi.fn((sectionId, limit) => {
 			expandedLimits.set(sectionId, limit);
 		}),
@@ -75,13 +72,17 @@ export function createTaggedNoteItemFromData(data: ViewItem["data"]): ViewItem {
 
 export function createLinkContext(
 	sourceFile: TFile,
-	fileToLinktext: (file: TFile, sourcePath: string, omitMdExtension?: boolean) => string = (file) => file.basename,
+	fileToLinktext: (
+		file: TFile,
+		sourcePath: string,
+		omitMdExtension?: boolean,
+	) => string = (file) => file.basename,
 ): LinkContext {
 	return {
 		resolveFile: vi.fn(() => null),
 		fileToLinktext,
 		buildWikiLink: vi.fn(() => "[[alpha]]"),
-		getPreview: vi.fn(async () => ({ type: "empty", content: "" } as const)),
+		getPreview: vi.fn(async () => ({ type: "empty", content: "" }) as const),
 		sourceFile,
 		getMetadata: vi.fn(() => null),
 		onOpenFile: vi.fn(),
@@ -114,7 +115,10 @@ export function createConfig(): ListConfig<ViewItem> {
 				case "branch":
 					return item.data.hop1.path ?? item.data.hop1.rawText;
 				case "newLink":
-					return item.data.path ?? `${item.data.sourceFile.path}:${item.data.rawText}`;
+					return (
+						item.data.path ??
+						`${item.data.sourceFile.path}:${item.data.rawText}`
+					);
 				default:
 					return "";
 			}

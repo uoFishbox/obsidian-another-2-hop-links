@@ -24,45 +24,47 @@ vi.mock("obsidian", () => {
 
 describe("frontmatterCardTitle", () => {
 	it("normalizes primitive and structured frontmatter values", () => {
-		expect(frontmatterValueToCardTitle("  Custom Title  ")).toBe(
-			"Custom Title",
-		);
+		expect(frontmatterValueToCardTitle("  Custom Title  ")).toBe("Custom Title");
 		expect(frontmatterValueToCardTitle("   ")).toBeNull();
 		expect(frontmatterValueToCardTitle(null)).toBeNull();
 		expect(frontmatterValueToCardTitle(undefined)).toBeNull();
 		expect(frontmatterValueToCardTitle(0)).toBe("0");
 		expect(frontmatterValueToCardTitle(false)).toBe("false");
-		expect(frontmatterValueToCardTitle(["a", 2, false])).toBe(
-			"a, 2, false",
-		);
-		expect(frontmatterValueToCardTitle({ a: 1 })).toBe(
-			JSON.stringify({ a: 1 }),
-		);
+		expect(frontmatterValueToCardTitle(["a", 2, false])).toBe("a, 2, false");
+		expect(frontmatterValueToCardTitle({ a: 1 })).toBe(JSON.stringify({ a: 1 }));
 	});
 
 	it("resolves a priority frontmatter card title only when the key exists and the value is non-empty", () => {
 		const file = createMockTFile("notes/example.md");
-		const getMetadata = vi.fn(() => ({
-			frontmatter: {
-				title: " Custom Title ",
-				empty: "   ",
-				count: 0,
-			},
-		} as never));
+		const getMetadata = vi.fn(
+			() =>
+				({
+					frontmatter: {
+						title: " Custom Title ",
+						empty: "   ",
+						count: 0,
+					},
+				}) as never,
+		);
 
+		expect(getPriorityFrontmatterCardTitle(file, " title ", getMetadata)).toBe(
+			"Custom Title",
+		);
 		expect(
-			getPriorityFrontmatterCardTitle(file, " title ", getMetadata),
-		).toBe("Custom Title");
-		expect(getPriorityFrontmatterCardTitle(file, "missing", getMetadata)).toBeNull();
+			getPriorityFrontmatterCardTitle(file, "missing", getMetadata),
+		).toBeNull();
 		expect(getPriorityFrontmatterCardTitle(file, "empty", getMetadata)).toBeNull();
 		expect(getPriorityFrontmatterCardTitle(file, "", getMetadata)).toBeNull();
 	});
 
 	it("falls back to fileToLinktext when no priority frontmatter title is available", () => {
 		const file = createMockTFile("notes/example.md");
-		const getMetadata = vi.fn(() => ({
-			frontmatter: {},
-		} as never));
+		const getMetadata = vi.fn(
+			() =>
+				({
+					frontmatter: {},
+				}) as never,
+		);
 		const fileToLinktext = vi.fn(() => "Example Link");
 
 		expect(
@@ -73,20 +75,19 @@ describe("frontmatterCardTitle", () => {
 				priorityFrontmatterKeyForTitle: "title",
 			}),
 		).toBe("Example Link");
-		expect(fileToLinktext).toHaveBeenCalledWith(
-			file,
-			"notes/source.md",
-			true,
-		);
+		expect(fileToLinktext).toHaveBeenCalledWith(file, "notes/source.md", true);
 	});
 
 	it("builds search text from the resolved title, linktext, basename, and path", () => {
 		const file = createMockTFile("notes/example.md");
-		const getMetadata = vi.fn(() => ({
-			frontmatter: {
-				title: "Custom Title",
-			},
-		} as never));
+		const getMetadata = vi.fn(
+			() =>
+				({
+					frontmatter: {
+						title: "Custom Title",
+					},
+				}) as never,
+		);
 		const fileToLinktext = vi.fn(() => "Example Link");
 
 		const searchText = getFileCardTitleSearchText(file, {

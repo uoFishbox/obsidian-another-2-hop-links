@@ -50,11 +50,7 @@ export const createEventHandlers = (
 			}
 			return await vault.cachedRead(file);
 		} catch (error) {
-			ErrorHandler.handleFileOperationError(
-				error,
-				"cachedRead",
-				file.path,
-			);
+			ErrorHandler.handleFileOperationError(error, "cachedRead", file.path);
 			return "";
 		}
 	};
@@ -86,11 +82,7 @@ export const createEventHandlers = (
 			workspace.trigger("file-menu", menu, file);
 			menu.showAtMouseEvent(event);
 		} catch (error) {
-			ErrorHandler.handleFileOperationError(
-				error,
-				"showFileMenu",
-				file.path,
-			);
+			ErrorHandler.handleFileOperationError(error, "showFileMenu", file.path);
 		}
 	};
 

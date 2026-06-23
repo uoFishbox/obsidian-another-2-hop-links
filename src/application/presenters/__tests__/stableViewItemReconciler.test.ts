@@ -1,8 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import {
-	createStableViewItemReconciler,
-	type ViewItem,
-} from "application/presenters";
+import { createStableViewItemReconciler, type ViewItem } from "application/presenters";
 
 interface RawItem {
 	id?: string;
@@ -127,9 +124,7 @@ describe("createStableViewItemReconciler", () => {
 				}) as ViewItem,
 			canReuseSource: (previous, next) => previous.id === next.id,
 		});
-		const first = reconciler.reconcile([
-			{ id: "a", key: "alpha", label: "Alpha" },
-		]);
+		const first = reconciler.reconcile([{ id: "a", key: "alpha", label: "Alpha" }]);
 		const second = reconciler.reconcile([
 			{ id: "a", key: "alpha", label: "Alpha updated" },
 		]);

@@ -38,9 +38,7 @@ interface SearchKeyCache {
 }
 
 export interface TwohopSearchAdapter {
-	buildDataset(
-		options: TwohopSearchAdapterOptions,
-	): SearchWorkerItemSnapshot[];
+	buildDataset(options: TwohopSearchAdapterOptions): SearchWorkerItemSnapshot[];
 	filterDisplayData(
 		displayData: DisplayData,
 		query: string,
@@ -168,8 +166,7 @@ function buildTwohopSearchDatasetWithCache(
 			sourcePath: options.sourcePath,
 			fileToLinktext: options.fileToLinktext,
 			getMetadata: options.getMetadata,
-			priorityFrontmatterKeyForTitle:
-				options.priorityFrontmatterKeyForTitle,
+			priorityFrontmatterKeyForTitle: options.priorityFrontmatterKeyForTitle,
 		});
 
 	const getBranchTitleSearchText = (branch: TwoHopLinkBranch): string => {
@@ -178,10 +175,7 @@ function buildTwohopSearchDatasetWithCache(
 			return getBranchSearchText(branch.hop1);
 		}
 
-		return [
-			getFileTitleSearchText(targetFile),
-			getBranchSearchText(branch.hop1),
-		]
+		return [getFileTitleSearchText(targetFile), getBranchSearchText(branch.hop1)]
 			.filter(Boolean)
 			.join(" ");
 	};
@@ -256,11 +250,7 @@ function buildTwohopSearchDatasetWithCache(
 		for (const note of section.notes) {
 			snapshots.push(
 				buildSearchWorkerItemSnapshot(
-					createTagNoteSearchKey(
-						section,
-						note,
-						searchKeyCache,
-					),
+					createTagNoteSearchKey(section, note, searchKeyCache),
 					getFileTitleSearchText(note.file),
 					note.file.path,
 				),
@@ -276,11 +266,7 @@ export function filterTwohopDisplayData(
 	query: string,
 	matchedKeySet: Set<string> | null,
 ): DisplayData {
-	return filterTwohopDisplayDataWithCache(
-		displayData,
-		query,
-		matchedKeySet,
-	);
+	return filterTwohopDisplayDataWithCache(displayData, query, matchedKeySet);
 }
 
 function filterTwohopDisplayDataWithCache(
@@ -318,11 +304,7 @@ function filterTwohopDisplayDataWithCache(
 	}
 	const tagGroups: TagGroup[] = [];
 	for (const section of displayData.tagGroups) {
-		const filteredSection = filterTagGroup(
-			section,
-			matchedKeySet,
-			searchKeyCache,
-		);
+		const filteredSection = filterTagGroup(section, matchedKeySet, searchKeyCache);
 		if (filteredSection) {
 			tagGroups.push(filteredSection);
 		}
@@ -331,14 +313,10 @@ function filterTwohopDisplayDataWithCache(
 	return {
 		...displayData,
 		outgoing: filterWithReferenceReuse(displayData.outgoing, (branch) =>
-			matchedKeySet.has(
-				createOutgoingSearchKey(branch, searchKeyCache),
-			),
+			matchedKeySet.has(createOutgoingSearchKey(branch, searchKeyCache)),
 		),
 		backlinks: filterWithReferenceReuse(displayData.backlinks, (link) =>
-			matchedKeySet.has(
-				createBacklinkSearchKey(link, searchKeyCache),
-			),
+			matchedKeySet.has(createBacklinkSearchKey(link, searchKeyCache)),
 		),
 		mergedItems: filterWithReferenceReuse(displayData.mergedItems, (item) =>
 			matchedKeySet.has(createMergedSearchKey(item, searchKeyCache)),
@@ -384,9 +362,7 @@ function filterTagGroup(
 	}
 
 	const matchedNotes = section.notes.filter((note) =>
-		matchedKeySet.has(
-			createTagNoteSearchKey(section, note, searchKeyCache),
-		),
+		matchedKeySet.has(createTagNoteSearchKey(section, note, searchKeyCache)),
 	);
 	if (matchedNotes.length === 0) {
 		return null;
@@ -466,10 +442,7 @@ export function getTagGroupSearchKey(section: TagGroup): string {
 	return `${TAG_GROUP_SEARCH_PREFIX}${section.tag}`;
 }
 
-export function getTagNoteSearchKey(
-	section: TagGroup,
-	note: TaggedNote,
-): string {
+export function getTagNoteSearchKey(section: TagGroup, note: TaggedNote): string {
 	return createTagNoteSearchKey(section, note);
 }
 
@@ -509,20 +482,13 @@ function getBacklinkBaseKey(
 	return key;
 }
 
-function getTagNoteBaseKey(
-	note: TaggedNote,
-	searchKeyCache?: SearchKeyCache,
-): string {
+function getTagNoteBaseKey(note: TaggedNote, searchKeyCache?: SearchKeyCache): string {
 	const cached = searchKeyCache?.tagNoteBaseKeys.get(note);
 	if (cached !== undefined) {
 		return cached;
 	}
 
-	const key = createLinkIdentitySignature(
-		note.path,
-		note.file.basename,
-		"tag-note",
-	);
+	const key = createLinkIdentitySignature(note.path, note.file.basename, "tag-note");
 	searchKeyCache?.tagNoteBaseKeys.set(note, key);
 	return key;
 }

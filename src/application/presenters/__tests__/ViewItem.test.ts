@@ -1,14 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { TFile } from "obsidian";
-import type {
-	TaggedNote,
-	TwoHopIndexedLink,
-	TwoHopLinkBranch,
-} from "types/domain";
-import {
-	getViewItemKey,
-	type ViewItem,
-} from "application/presenters";
+import type { TaggedNote, TwoHopIndexedLink, TwoHopLinkBranch } from "types/domain";
+import { getViewItemKey, type ViewItem } from "application/presenters";
 
 describe("getViewItemKey", () => {
 	it("returns the tagged note path", () => {
@@ -110,7 +103,4 @@ describe("getViewItemKey", () => {
 
 		expect(getViewItemKey(item)).toBe("notes/missing.md");
 	});
-
-
-
 });

@@ -2,7 +2,9 @@ import { describe, expect, it } from "vitest";
 import { createViewPlanCardVirtualListPolicyResolver } from "../viewPlanPolicy";
 import type { ViewPlanLayoutMetrics } from "../viewPlanLayout";
 
-const layout = (overrides: Partial<ViewPlanLayoutMetrics> = {}): ViewPlanLayoutMetrics => ({
+const layout = (
+	overrides: Partial<ViewPlanLayoutMetrics> = {},
+): ViewPlanLayoutMetrics => ({
 	containerWidth: 800,
 	columns: 3,
 	cellWidth: 256,

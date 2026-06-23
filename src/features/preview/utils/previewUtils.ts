@@ -34,10 +34,7 @@ export interface PreviewContentAnalysis {
 	protectedSegments: ProtectedSegment[];
 }
 
-export async function getFileContent(
-	file: TFile,
-	vault: IVault,
-): Promise<string> {
+export async function getFileContent(file: TFile, vault: IVault): Promise<string> {
 	if (isCanvas(file)) {
 		const content = await vault.cachedRead(file);
 		const { canvasToSearchTextAsync } =
@@ -70,18 +67,14 @@ export async function readPreviewContent(
 	return content;
 }
 
-export function resolveFile(
-	path: string,
-	metadataCache: IMetadataCache,
-): TFile | null {
+export function resolveFile(path: string, metadataCache: IMetadataCache): TFile | null {
 	return metadataCache.getFirstLinkpathDest(path, "");
 }
 
 const PROTECTED_HTML_CLASS_PATTERN =
 	"cosense-card-links__code-block|cosense-card-links__inline-code|twohop-render-block";
 
-const MATH_EXPRESSION_PATTERN =
-	/(^|[^\\])\$\$[\s\S]+?\$\$|(^|[^\\])\$[^$\n]+?\$/;
+const MATH_EXPRESSION_PATTERN = /(^|[^\\])\$\$[\s\S]+?\$\$|(^|[^\\])\$[^$\n]+?\$/;
 
 const PROTECTED_SEGMENT_REGEX = new RegExp(
 	`<(?:span|div)\\b[^>]*class="[^"]*?\\b(?:${PROTECTED_HTML_CLASS_PATTERN})\\b[^"]*"[^>]*>[\\s\\S]*?<\/(?:span|div)>`,

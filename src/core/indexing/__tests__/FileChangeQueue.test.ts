@@ -26,9 +26,7 @@ const normalizationCases: NormalizationCase[] = [
 	},
 	{
 		name: "single rename",
-		changes: [
-			{ type: "rename", oldPath: "notes/old.md", newPath: "notes/new.md" },
-		],
+		changes: [{ type: "rename", oldPath: "notes/old.md", newPath: "notes/new.md" }],
 		expected: [
 			{ type: "rename", oldPath: "notes/old.md", newPath: "notes/new.md" },
 		],
@@ -53,7 +51,11 @@ const normalizationCases: NormalizationCase[] = [
 		name: "create -> rename becomes create at newPath",
 		changes: [
 			{ type: "create", path: "notes/original.md" },
-			{ type: "rename", oldPath: "notes/original.md", newPath: "notes/renamed.md" },
+			{
+				type: "rename",
+				oldPath: "notes/original.md",
+				newPath: "notes/renamed.md",
+			},
 		],
 		expected: [{ type: "create", path: "notes/renamed.md" }],
 	},
@@ -170,9 +172,7 @@ const normalizationCases: NormalizationCase[] = [
 			{ type: "rename", oldPath: "notes/a.md", newPath: "notes/b.md" },
 			{ type: "rename", oldPath: "notes/b.md", newPath: "notes/c.md" },
 		],
-		expected: [
-			{ type: "rename", oldPath: "notes/a.md", newPath: "notes/c.md" },
-		],
+		expected: [{ type: "rename", oldPath: "notes/a.md", newPath: "notes/c.md" }],
 	},
 	{
 		name: "modify -> rename becomes rename",

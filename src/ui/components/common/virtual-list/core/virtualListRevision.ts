@@ -28,9 +28,7 @@ export const VIRTUAL_LIST_CONTENT_LAYOUT_PAGINATION_DEPENDENCY = {
 } as const satisfies VirtualListRevisionDependency;
 
 const EMPTY_TOKEN = Symbol("virtual-list-empty-revision-token");
-const VIRTUAL_LIST_LAYOUT_REVISION_TOKEN = Symbol(
-	"virtual-list-layout-revision-token",
-);
+const VIRTUAL_LIST_LAYOUT_REVISION_TOKEN = Symbol("virtual-list-layout-revision-token");
 
 export interface VirtualListLayoutRevisionToken {
 	readonly kind: typeof VIRTUAL_LIST_LAYOUT_REVISION_TOKEN;
@@ -128,10 +126,7 @@ export function hasSameVirtualListRevisionDependency(
 	) {
 		return false;
 	}
-	if (
-		"layout" in dependency &&
-		!hasSameRevisionValue(current.layout, next.layout)
-	) {
+	if ("layout" in dependency && !hasSameRevisionValue(current.layout, next.layout)) {
 		return false;
 	}
 	if (

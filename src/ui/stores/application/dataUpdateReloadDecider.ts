@@ -57,10 +57,7 @@ export function shouldReloadForUpdate(input: ReloadDecisionInput): boolean {
 		return true;
 	}
 
-	const relevantLookupKeys = collectRelevantLookupKeys(
-		currentFile,
-		data,
-	);
+	const relevantLookupKeys = collectRelevantLookupKeys(currentFile, data);
 	for (const lookupKey of affectedLookupKeys) {
 		if (relevantLookupKeys.has(lookupKey)) {
 			return true;
@@ -70,7 +67,7 @@ export function shouldReloadForUpdate(input: ReloadDecisionInput): boolean {
 }
 
 export function getPreviewInvalidation(
-input: ReloadDecisionInput,
+	input: ReloadDecisionInput,
 ): PreviewInvalidation {
 	const { currentFile, data, context } = input;
 	if (!currentFile) {
@@ -117,10 +114,7 @@ function collectRelevantSets(
 	return {
 		paths: collectRelevantPaths(currentFile, data),
 		lookupKeys: collectRelevantLookupKeys(currentFile, data),
-		structuralSourcePaths: collectStructuralSourcePaths(
-			currentFile,
-			data,
-		),
+		structuralSourcePaths: collectStructuralSourcePaths(currentFile, data),
 		tags: collectRelevantTags(data),
 	};
 }
@@ -173,8 +167,7 @@ function collectRelevantLookupKeys(
 
 	for (const branch of data.branches) {
 		const lookupPath =
-			branch.hop1.path ??
-			normalizeLinkToMarkdownPath(branch.hop1.rawText);
+			branch.hop1.path ?? normalizeLinkToMarkdownPath(branch.hop1.rawText);
 		keys.add(toCaseInsensitiveLookupKey(lookupPath));
 	}
 
@@ -187,9 +180,7 @@ function collectRelevantLookupKeys(
  * - preview-only: 表示中カードの本文/ frontmatter のみ変更
  * - none: 無関係な変更
  */
-export function decideDataUpdateAction(
-input: ReloadDecisionInput,
-): DataUpdateAction {
+export function decideDataUpdateAction(input: ReloadDecisionInput): DataUpdateAction {
 	const { currentFile, data, context } = input;
 
 	if (!currentFile) {
@@ -229,12 +220,7 @@ input: ReloadDecisionInput,
 		};
 	}
 
-	if (
-		hasRelevantLinkSourceChange(
-			context,
-			relevantSets.structuralSourcePaths,
-		)
-	) {
+	if (hasRelevantLinkSourceChange(context, relevantSets.structuralSourcePaths)) {
 		return {
 			kind: "reload",
 			previewInvalidation,
@@ -255,10 +241,7 @@ input: ReloadDecisionInput,
 		};
 	}
 
-	if (
-		previewInvalidation instanceof Set &&
-		previewInvalidation.size > 0
-	) {
+	if (previewInvalidation instanceof Set && previewInvalidation.size > 0) {
 		return {
 			kind: "preview-only",
 			previewInvalidation,

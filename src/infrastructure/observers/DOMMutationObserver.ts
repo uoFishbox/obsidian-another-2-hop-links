@@ -31,13 +31,11 @@ export class DOMMutationObserver {
 	) {}
 
 	public initialize(): void {
-		if (enableLogging)
-			logger("[ObserverManager] Initializing all observers");
+		if (enableLogging) logger("[ObserverManager] Initializing all observers");
 		this.destroyed = false;
 		this.initObservers();
 		this.startBasesDiscoveryObserver();
-		if (enableLogging)
-			logger("[ObserverManager] All observers initialized");
+		if (enableLogging) logger("[ObserverManager] All observers initialized");
 	}
 
 	public destroy(): void {
@@ -109,22 +107,16 @@ export class DOMMutationObserver {
 		const containersToWatch = new Set<HTMLElement>();
 
 		this.plugin.app.workspace.getLeavesOfType("bases").forEach((leaf) => {
-			for (const el of this.collectBasesViewContainers(
-				leaf.view.containerEl,
-			)) {
+			for (const el of this.collectBasesViewContainers(leaf.view.containerEl)) {
 				containersToWatch.add(el);
 			}
 		});
 
-		this.plugin.app.workspace
-			.getLeavesOfType("markdown")
-			.forEach((leaf) => {
-				for (const el of this.collectBasesViewContainers(
-					leaf.view.containerEl,
-				)) {
-					containersToWatch.add(el);
-				}
-			});
+		this.plugin.app.workspace.getLeavesOfType("markdown").forEach((leaf) => {
+			for (const el of this.collectBasesViewContainers(leaf.view.containerEl)) {
+				containersToWatch.add(el);
+			}
+		});
 
 		// Bases can also be embedded or internally re-mounted without a workspace
 		// leaf transition. Use the visible DOM as a fallback source of truth.
@@ -132,10 +124,8 @@ export class DOMMutationObserver {
 			containersToWatch.add(el);
 		});
 
-		this.updateObservers(
-			this.basesObservers,
-			containersToWatch,
-			(container) => this.watchBasesContainer(container),
+		this.updateObservers(this.basesObservers, containersToWatch, (container) =>
+			this.watchBasesContainer(container),
 		);
 	}
 
@@ -162,10 +152,7 @@ export class DOMMutationObserver {
 		for (const mutation of mutations) {
 			if (mutation.type === "attributes") {
 				const target = mutation.target;
-				if (
-					target instanceof HTMLElement &&
-					target.matches(".bases-view")
-				) {
+				if (target instanceof HTMLElement && target.matches(".bases-view")) {
 					return true;
 				}
 				continue;
@@ -196,9 +183,7 @@ export class DOMMutationObserver {
 			return false;
 		}
 
-		return (
-			node.matches(".bases-view") || !!node.querySelector(".bases-view")
-		);
+		return node.matches(".bases-view") || !!node.querySelector(".bases-view");
 	}
 
 	private shouldIgnoreBasesDiscoveryNode(node: Node): boolean {
@@ -283,8 +268,7 @@ export class DOMMutationObserver {
 
 	private processExistingLinksInBases(container: HTMLElement): void {
 		if (enableLogging) {
-			const existingCount =
-				container.querySelectorAll(".internal-link").length;
+			const existingCount = container.querySelectorAll(".internal-link").length;
 			logger(
 				`[ObserverManager.processExistingLinksInBases] Processing ${existingCount} existing links`,
 			);

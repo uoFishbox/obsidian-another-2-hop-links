@@ -70,8 +70,7 @@ describe("VirtualListDomObserver performance contracts", () => {
 					rootEl,
 					onWidthChange: vi.fn(),
 					onScrollContainerChange: vi.fn(),
-					scheduleLayoutMeasurement:
-						scheduleLayoutMeasurements[index],
+					scheduleLayoutMeasurement: scheduleLayoutMeasurements[index],
 					scheduleScrollMeasurement: vi.fn(),
 					runScrollMeasurement: vi.fn(),
 					runInitialLayoutMeasurement: vi.fn(),

@@ -1,12 +1,7 @@
 import { escapeHtml } from "./protectedHtml";
 import type { TextTransformContext } from "./types";
 
-const NON_PARSED_EMBED_HOSTS = [
-	"x.com",
-	"twitter.com",
-	"youtube.com",
-	"youtu.be",
-];
+const NON_PARSED_EMBED_HOSTS = ["x.com", "twitter.com", "youtube.com", "youtu.be"];
 
 function isNonParsedEmbedHost(hostname: string): boolean {
 	const normalized = hostname.toLowerCase();
@@ -54,10 +49,7 @@ function shouldKeepEmbedLiteral(
 	markdownEmbedTarget: string | undefined,
 	wikiEmbedTarget: string | undefined,
 ): boolean {
-	const candidate = extractEmbedUrlCandidate(
-		markdownEmbedTarget,
-		wikiEmbedTarget,
-	);
+	const candidate = extractEmbedUrlCandidate(markdownEmbedTarget, wikiEmbedTarget);
 	if (!candidate) {
 		return false;
 	}
@@ -121,11 +113,13 @@ function buildCommonRules(
 ): TextTransformRule[] {
 	const headingRules: TextTransformRule[] = preserveHeadings
 		? []
-		: [{
-				regex: REGEX.headings,
-				replacement: "",
-				skipIfAbsent: (content: string) => !content.includes("#"),
-			}];
+		: [
+				{
+					regex: REGEX.headings,
+					replacement: "",
+					skipIfAbsent: (content: string) => !content.includes("#"),
+				},
+			];
 
 	return [
 		...(skipFrontmatterRemoval
@@ -143,7 +137,7 @@ function buildCommonRules(
 				match: string,
 				markdownEmbedTarget: string | undefined,
 				wikiEmbedTarget: string | undefined,
-		) =>
+			) =>
 				shouldKeepEmbedLiteral(markdownEmbedTarget, wikiEmbedTarget)
 					? match
 					: "",

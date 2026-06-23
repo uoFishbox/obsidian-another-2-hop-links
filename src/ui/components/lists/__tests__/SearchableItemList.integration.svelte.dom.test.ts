@@ -1,10 +1,4 @@
-import {
-	fireEvent,
-	render,
-	screen,
-	waitFor,
-	within,
-} from "@testing-library/svelte";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/svelte";
 import { tick } from "svelte";
 import { TFile } from "obsidian";
 import { createMockTFile } from "testing/__mocks__/testHelpers";
@@ -18,9 +12,8 @@ import type { ApplicationStore } from "ui/stores/ApplicationStore.svelte";
 import type { ISortService } from "types/services";
 
 vi.mock("features/search/searchWorkerClient", async () => {
-	const { filterSearchWorkerDataset } = await import(
-		"features/search/searchWorkerFilter"
-	);
+	const { filterSearchWorkerDataset } =
+		await import("features/search/searchWorkerFilter");
 
 	return {
 		createSearchWorkerClient: (onMessage: (message: unknown) => void) => {
@@ -134,7 +127,7 @@ function createLinkContext(sourceFile: TFile): LinkContext {
 		resolveFile: vi.fn(() => null),
 		fileToLinktext: vi.fn((file: TFile) => file.basename),
 		buildWikiLink: vi.fn(() => "[[alpha]]"),
-			getPreview: vi.fn(async () => ({ type: "empty", content: "" } as const)),
+		getPreview: vi.fn(async () => ({ type: "empty", content: "" }) as const),
 		sourceFile,
 		getMetadata: vi.fn(() => null),
 		onOpenFile: vi.fn(),
@@ -149,8 +142,7 @@ function createConfig(): ListConfig<ViewItem> {
 		title: "Searchable",
 		itemComponent: SearchableItemListItemStub,
 		getItemProps: (item) => ({
-			label:
-				item.type === "taggedNote" ? item.data.file.basename : "unknown",
+			label: item.type === "taggedNote" ? item.data.file.basename : "unknown",
 		}),
 		getItemKey: (item: ViewItem) => {
 			switch (item.type) {
@@ -163,7 +155,10 @@ function createConfig(): ListConfig<ViewItem> {
 				case "branch":
 					return item.data.hop1.path ?? item.data.hop1.rawText;
 				case "newLink":
-					return item.data.path ?? `${item.data.sourceFile.path}:${item.data.rawText}`;
+					return (
+						item.data.path ??
+						`${item.data.sourceFile.path}:${item.data.rawText}`
+					);
 				default:
 					return "";
 			}
@@ -201,9 +196,9 @@ function queryAllByTestIdIncludingShadow(testId: string): HTMLElement[] {
 	const elements = screen.queryAllByTestId(testId) as HTMLElement[];
 	for (const shadowRoot of collectOpenShadowRoots()) {
 		elements.push(
-			...(within(
-				shadowRoot as unknown as HTMLElement,
-			).queryAllByTestId(testId) as HTMLElement[]),
+			...(within(shadowRoot as unknown as HTMLElement).queryAllByTestId(
+				testId,
+			) as HTMLElement[]),
 		);
 	}
 	return elements;
@@ -224,9 +219,9 @@ function queryByTextIncludingShadow(text: string): HTMLElement | null {
 	}
 
 	for (const shadowRoot of collectOpenShadowRoots()) {
-		const shadowElement = within(
-			shadowRoot as unknown as HTMLElement,
-		).queryByText(text) as HTMLElement | null;
+		const shadowElement = within(shadowRoot as unknown as HTMLElement).queryByText(
+			text,
+		) as HTMLElement | null;
 		if (shadowElement) {
 			return shadowElement;
 		}
@@ -269,12 +264,11 @@ describe("SearchableItemList integration", () => {
 			sortOption: "alphabetical",
 			initialVisibleCount: 10,
 			loadMoreIncrement: 10,
-			settings: {
-			},
+			settings: {},
 			setSortOption: vi.fn(),
 			getDefaultSectionVisibleLimit: vi.fn(() => 10),
-			getSectionExpandedLimit: vi.fn(
-				(sectionId: string) => expandedLimits.get(sectionId),
+			getSectionExpandedLimit: vi.fn((sectionId: string) =>
+				expandedLimits.get(sectionId),
 			),
 			setSectionExpandedLimit: vi.fn((sectionId: string, limit: number) => {
 				expandedLimits.set(sectionId, limit);
@@ -305,9 +299,7 @@ describe("SearchableItemList integration", () => {
 		await vi.advanceTimersByTimeAsync(200);
 		await flushAsyncUi();
 
-		await waitFor(() =>
-			expect(getAllSearchableItems()).toHaveLength(1),
-		);
+		await waitFor(() => expect(getAllSearchableItems()).toHaveLength(1));
 		expect(getByTextIncludingShadow("alpha-note")).toBeInTheDocument();
 		expect(queryByTextIncludingShadow("beta-note")).not.toBeInTheDocument();
 	});
@@ -323,12 +315,11 @@ describe("SearchableItemList integration", () => {
 			sortOption: "alphabetical",
 			initialVisibleCount: 10,
 			loadMoreIncrement: 10,
-			settings: {
-			},
+			settings: {},
 			setSortOption: vi.fn(),
 			getDefaultSectionVisibleLimit: vi.fn(() => 10),
-			getSectionExpandedLimit: vi.fn(
-				(sectionId: string) => expandedLimits.get(sectionId),
+			getSectionExpandedLimit: vi.fn((sectionId: string) =>
+				expandedLimits.get(sectionId),
 			),
 			setSectionExpandedLimit: vi.fn((sectionId: string, limit: number) => {
 				expandedLimits.set(sectionId, limit);
@@ -352,9 +343,7 @@ describe("SearchableItemList integration", () => {
 		});
 
 		await flushAsyncUi();
-		await waitFor(() =>
-			expect(getAllSearchableItems()).toHaveLength(2),
-		);
+		await waitFor(() => expect(getAllSearchableItems()).toHaveLength(2));
 		const input = screen.getByRole("searchbox");
 		await fireEvent.keyDown(input, { key: "ArrowDown" });
 		await flushAsyncUi();
@@ -372,5 +361,4 @@ describe("SearchableItemList integration", () => {
 		await flushAsyncUi();
 		expect(input).toHaveFocus();
 	});
-
 });

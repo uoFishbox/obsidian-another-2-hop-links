@@ -1,9 +1,6 @@
 import type { App } from "obsidian";
 import { REQUEST_SEQ_STATE_KEY } from "./internal-constants";
-import type {
-	HoverLinkPayloadLike,
-	ShadowHoverSession,
-} from "./internal-types";
+import type { HoverLinkPayloadLike, ShadowHoverSession } from "./internal-types";
 import { createRequestHoverParent } from "./session";
 import type { ShadowHoverLinkSpec } from "./public-types";
 import { debugLog } from "./debug";
@@ -23,9 +20,7 @@ export interface ShadowPopoverLauncher {
 	launch(request: ShadowPopoverLaunchRequest): void;
 }
 
-export class WorkspaceTriggerPopoverLauncher
-	implements ShadowPopoverLauncher
-{
+export class WorkspaceTriggerPopoverLauncher implements ShadowPopoverLauncher {
 	constructor(
 		private readonly app: App,
 		private readonly sourceId: string,

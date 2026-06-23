@@ -95,7 +95,6 @@ type TranslationKey =
 	| "appearance"
 	| "linkCountAscending"
 	| "always"
-
 	| "never"
 	| "showPreview"
 	| "showMenu"
@@ -119,20 +118,17 @@ const translations: Record<Language, Record<TranslationKey, string>> = {
 		loadMoreLinkIncrementDesc:
 			"The number of additional links to load when clicking 'Load more'.",
 		cardWidth: "Card width (px)",
-		cardWidthDesc:
-			"Set the card width used by the responsive grid layout.",
+		cardWidthDesc: "Set the card width used by the responsive grid layout.",
 		cardHeightRatio: "Card height ratio",
 		cardHeightRatioDesc:
 			"Set card height as a ratio of the actual rendered card width. Example: 1.1 means height = width x 1.1.",
 		cardGap: "Card gap (px)",
-		cardGapDesc:
-			"Set the spacing between cards in the responsive grid layout.",
+		cardGapDesc: "Set the spacing between cards in the responsive grid layout.",
 		cardMaxColumns: "Maximum card columns",
 		cardMaxColumnsDesc:
 			"Set the upper limit for the number of columns in the responsive grid layout.",
 		sectionMarginBottom: "Section bottom margin (px)",
-		sectionMarginBottomDesc:
-			"Set the bottom spacing between sections.",
+		sectionMarginBottomDesc: "Set the bottom spacing between sections.",
 		mergeBacklinkOutgoing: "Merge Backlink and Outgoing link sections",
 		mergeBacklinkOutgoingDesc:
 			'Merge Backlink and Outgoing link into a single "Links" section.',
@@ -151,12 +147,10 @@ const translations: Record<Language, Record<TranslationKey, string>> = {
 		hideAttachments: "Hide attachments",
 		hideAttachmentsDesc:
 			"Exclude attachment files from results such as Backlinks and related links.",
-		followSelectedCanvasFileNode:
-			"Show 2-hop links for the selected file node",
+		followSelectedCanvasFileNode: "Show 2-hop links for the selected file node",
 		followSelectedCanvasFileNodeDesc:
 			"When a file node is selected on Canvas, show its 2-hop links.",
-		highlightUnresolvedLinks:
-			"Highlight unresolved links with single Backlink",
+		highlightUnresolvedLinks: "Highlight unresolved links with single Backlink",
 		highlightUnresolvedLinksDesc:
 			"Change the appearance of unresolved links that have only one Backlink.",
 		preview: "Preview",
@@ -181,8 +175,7 @@ const translations: Record<Language, Record<TranslationKey, string>> = {
 		priorityFrontmatterKeyForPreview: "Priority frontmatter key for preview",
 		priorityFrontmatterKeyForPreviewDesc:
 			"If specified, the value of this property will be displayed as plain text in the preview instead of the file content.",
-		priorityFrontmatterKeyForTitle:
-			"Priority frontmatter key for card title",
+		priorityFrontmatterKeyForTitle: "Priority frontmatter key for card title",
 		priorityFrontmatterKeyForTitleDesc:
 			"If specified, the value of this property will be displayed as the card title when it exists.",
 		interaction: "Interaction",
@@ -195,12 +188,9 @@ const translations: Record<Language, Record<TranslationKey, string>> = {
 		longPressActionMobile: "Long press action on cards in mobile",
 		longPressActionMobileDesc:
 			"Action when long pressing a card on a mobile device.",
-		openTagSearchDedicatedView:
-			"Open tag search results in a dedicated view",
-		openTagSearchDedicatedViewDesc:
-			"Open the tag list in a dedicated tag view.",
-		openUnresolvedNoteView:
-			"Check Backlinks when creating unresolved links",
+		openTagSearchDedicatedView: "Open tag search results in a dedicated view",
+		openTagSearchDedicatedViewDesc: "Open the tag list in a dedicated tag view.",
+		openUnresolvedNoteView: "Check Backlinks when creating unresolved links",
 		openUnresolvedNoteViewDesc:
 			"When clicking on an unresolved link with two or more Backlinks, open a temporary pre-creation view before creating a new file.",
 		emptyViewAllNotesSection: "New Tab",
@@ -214,16 +204,13 @@ const translations: Record<Language, Record<TranslationKey, string>> = {
 		frontmatterKeyCreationDate: "Frontmatter key to use for creation date",
 		frontmatterKeyCreationDateDesc:
 			"If specified, use the value of this key instead of the file's creation date (e.g., created). If empty, use the file's creation date.",
-		frontmatterKeyModificationDate:
-			"Frontmatter key to use for modification date",
+		frontmatterKeyModificationDate: "Frontmatter key to use for modification date",
 		frontmatterKeyModificationDateDesc:
 			"If specified, use the value of this key instead of the file's modification date (e.g., updated). If empty, use the file's modification date.",
 		integrationAdvancedSettings: "Integration and Advanced Settings",
 		enableLogging: "Enable logging",
-		enableLoggingDesc:
-			"Output debug logs to the console. May affect performance.",
-		enableSearchArrowUpToEditorBottom:
-			"ArrowUp from search moves to editor bottom",
+		enableLoggingDesc: "Output debug logs to the console. May affect performance.",
+		enableSearchArrowUpToEditorBottom: "ArrowUp from search moves to editor bottom",
 		enableSearchArrowUpToEditorBottomDesc:
 			"When enabled, pressing ArrowUp in the search bar focuses the bottom of the inline editor. If that is not available, nothing happens.",
 		enableEditorArrowDownToSearchInput:
@@ -237,8 +224,7 @@ const translations: Record<Language, Record<TranslationKey, string>> = {
 		enableRipgrepContentSearchDesc:
 			"Use ripgrep for content search on the desktop app. Falls back to the built-in search when unavailable.",
 		ripgrepExecutablePath: "ripgrep executable path",
-		ripgrepExecutablePathDesc:
-			"Optional. Leave empty to use rg from PATH.",
+		ripgrepExecutablePathDesc: "Optional. Leave empty to use rg from PATH.",
 		belowEditor: "Below editor",
 		sidebar: "Sidebar",
 		hybrid: "Hybrid",
@@ -268,22 +254,17 @@ const translations: Record<Language, Record<TranslationKey, string>> = {
 		loadMoreLinkIncrementDesc:
 			"「もっと読み込む」をクリックした際に追加で読み込むリンク数を設定します。",
 		cardWidth: "カード幅（px）",
-		cardWidthDesc:
-			"レスポンシブグリッドで使用するカード幅を設定します。",
+		cardWidthDesc: "レスポンシブグリッドで使用するカード幅を設定します。",
 		cardHeightRatio: "カード高さ比率",
 		cardHeightRatioDesc:
 			"実際に描画されるカード幅に対する高さの比率を設定します。例: 1.1 は 高さ = 幅 x 1.1 です。",
 		cardGap: "カード間隔（px）",
-		cardGapDesc:
-			"レスポンシブグリッドでカード間の間隔を設定します。",
+		cardGapDesc: "レスポンシブグリッドでカード間の間隔を設定します。",
 		cardMaxColumns: "カードの最大列数",
-		cardMaxColumnsDesc:
-			"レスポンシブグリッドで使用する列数の上限を設定します。",
+		cardMaxColumnsDesc: "レスポンシブグリッドで使用する列数の上限を設定します。",
 		sectionMarginBottom: "セクション下余白（px）",
-		sectionMarginBottomDesc:
-			"セクション間の下余白を設定します。",
-		mergeBacklinkOutgoing:
-			"バックリンクとアウトゴーイングリンクのセクションを統合",
+		sectionMarginBottomDesc: "セクション間の下余白を設定します。",
+		mergeBacklinkOutgoing: "バックリンクとアウトゴーイングリンクのセクションを統合",
 		mergeBacklinkOutgoingDesc:
 			"バックリンクとアウトゴーイングリンクを単一の「リンク」セクションに統合します。",
 		twoHopHeaderSortOrder: "2ホップリンクヘッダーの並び順",
@@ -300,12 +281,10 @@ const translations: Record<Language, Record<TranslationKey, string>> = {
 		hideAttachments: "添付ファイルを非表示",
 		hideAttachmentsDesc:
 			"バックリンクや関連リンクなどの結果から添付ファイルを除外します。",
-		followSelectedCanvasFileNode:
-			"選択したファイルノードの 2 hop link を表示する",
+		followSelectedCanvasFileNode: "選択したファイルノードの 2 hop link を表示する",
 		followSelectedCanvasFileNodeDesc:
 			"Canvas上でファイルノードが選択されたとき、その2ホップリンクを表示します。",
-		highlightUnresolvedLinks:
-			"バックリンクが1つのみの未解決リンクをハイライト",
+		highlightUnresolvedLinks: "バックリンクが1つのみの未解決リンクをハイライト",
 		highlightUnresolvedLinksDesc:
 			"バックリンクが1つのみの未解決リンクの外観を変更します。",
 		preview: "プレビュー",
@@ -327,8 +306,7 @@ const translations: Record<Language, Record<TranslationKey, string>> = {
 		codeBlocksToRender: "プレビューでレンダリングするコードブロック",
 		codeBlocksToRenderDesc:
 			"プレビューカードでレンダリングするコードブロックの言語をカンマ区切りで指定します（例: dataview, mermaid）。重い処理はパフォーマンスに影響する可能性があります。",
-		priorityFrontmatterKeyForPreview:
-			"プレビュー優先フロントマターキー",
+		priorityFrontmatterKeyForPreview: "プレビュー優先フロントマターキー",
 		priorityFrontmatterKeyForPreviewDesc:
 			"指定した場合、このプロパティの値がファイルコンテンツの代わりにプレビューにプレーンテキストとして表示されます。",
 		priorityFrontmatterKeyForTitle:
@@ -346,8 +324,7 @@ const translations: Record<Language, Record<TranslationKey, string>> = {
 		longPressActionMobileDesc:
 			"モバイルデバイスでカードを長押しした際のアクションを設定します。",
 		openTagSearchDedicatedView: "タグの検索結果を専用ビューで開く",
-		openTagSearchDedicatedViewDesc:
-			"タグの一覧をタグ専用ビューで開きます。",
+		openTagSearchDedicatedViewDesc: "タグの一覧をタグ専用ビューで開きます。",
 		openUnresolvedNoteView: "未解決リンク作成時にバックリンクを確認",
 		openUnresolvedNoteViewDesc:
 			"2つ以上のバックリンクを持つ未解決リンクをクリックした際、新しいファイルを作成する前に一時的な作成前ビューを開きます。",
@@ -369,12 +346,10 @@ const translations: Record<Language, Record<TranslationKey, string>> = {
 		enableLogging: "ログを有効化",
 		enableLoggingDesc:
 			"デバッグログをコンソールに出力します。パフォーマンスに影響する可能性があります。",
-		enableSearchArrowUpToEditorBottom:
-			"検索欄のArrowUpでエディタ最下行へ移動",
+		enableSearchArrowUpToEditorBottom: "検索欄のArrowUpでエディタ最下行へ移動",
 		enableSearchArrowUpToEditorBottomDesc:
 			"有効にすると、検索欄でArrowUpを押したときにインラインエディタの最下行へフォーカスします。利用可能なエディタがない場合は何もしません。",
-		enableEditorArrowDownToSearchInput:
-			"エディタ最下行のArrowDownで検索欄へ移動",
+		enableEditorArrowDownToSearchInput: "エディタ最下行のArrowDownで検索欄へ移動",
 		enableEditorArrowDownToSearchInputDesc:
 			"有効にすると、インラインエディタの最下行でArrowDownを押したときにカーソルを下げる代わりに検索欄へフォーカスします。",
 		enableAdvancedCanvasIntegration: "Advanced Canvas 連携",
@@ -384,8 +359,7 @@ const translations: Record<Language, Record<TranslationKey, string>> = {
 		enableRipgrepContentSearchDesc:
 			"デスクトップ版で content 検索に ripgrep を使用します。利用できない場合は内蔵検索にフォールバックします。",
 		ripgrepExecutablePath: "ripgrep 実行ファイルのパス",
-		ripgrepExecutablePathDesc:
-			"任意です。空の場合は PATH 上の rg を使用します。",
+		ripgrepExecutablePathDesc: "任意です。空の場合は PATH 上の rg を使用します。",
 		belowEditor: "エディタの下",
 		sidebar: "サイドバー",
 		hybrid: "ハイブリッド",
@@ -443,25 +417,25 @@ interface BaseSettingDefinition<K extends keyof PluginSettings> {
 	desktopOnly?: boolean;
 }
 
-interface ToggleSettingDefinition<K extends keyof PluginSettings>
-	extends BaseSettingDefinition<K> {
+interface ToggleSettingDefinition<
+	K extends keyof PluginSettings,
+> extends BaseSettingDefinition<K> {
 	controlType: "toggle";
 }
 
-interface DropdownSettingDefinition<K extends keyof PluginSettings>
-	extends BaseSettingDefinition<K> {
+interface DropdownSettingDefinition<
+	K extends keyof PluginSettings,
+> extends BaseSettingDefinition<K> {
 	controlType: "dropdown";
 	options: ReadonlyArray<SelectOption>;
 }
 
-interface TextSettingDefinition<K extends keyof PluginSettings>
-	extends BaseSettingDefinition<K> {
+interface TextSettingDefinition<
+	K extends keyof PluginSettings,
+> extends BaseSettingDefinition<K> {
 	controlType: "text" | "textarea";
 	placeholder?: string;
-	parse: (
-		value: string,
-		settings: PluginSettings,
-	) => PluginSettings[K] | undefined;
+	parse: (value: string, settings: PluginSettings) => PluginSettings[K] | undefined;
 	format?: (value: PluginSettings[K]) => string;
 }
 
@@ -527,9 +501,8 @@ const parseCommaOrLineSeparatedList = (value: string): string[] =>
 		.map((entry) => entry.trim())
 		.filter(Boolean);
 
-const formatStringArray = (
-	value: PluginSettings[keyof PluginSettings],
-): string => (Array.isArray(value) ? value.join(", ") : "");
+const formatStringArray = (value: PluginSettings[keyof PluginSettings]): string =>
+	Array.isArray(value) ? value.join(", ") : "";
 
 const SETTING_DEFINITIONS: ReadonlyArray<SettingDefinition> = [
 	{
@@ -951,48 +924,41 @@ export class CosenseCardLinksSettingTab extends PluginSettingTab {
 		switch (definition.controlType) {
 			case "toggle":
 				setting.addToggle((toggle) =>
-					toggle
-						.setValue(Boolean(currentValue))
-						.onChange((value) => {
-							void updatePluginSetting(
-								this.pluginInstance,
-								definition.settingKey,
-								value as PluginSettings[typeof definition.settingKey],
-								definition.immediate,
-							)
-								.then(() => {
-									if (definition.settingKey === "language") {
-										this.display();
-									}
-								})
-								.catch(reportSettingUpdateError);
-						}),
+					toggle.setValue(Boolean(currentValue)).onChange((value) => {
+						void updatePluginSetting(
+							this.pluginInstance,
+							definition.settingKey,
+							value as PluginSettings[typeof definition.settingKey],
+							definition.immediate,
+						)
+							.then(() => {
+								if (definition.settingKey === "language") {
+									this.display();
+								}
+							})
+							.catch(reportSettingUpdateError);
+					}),
 				);
 				return;
 			case "dropdown":
 				setting.addDropdown((dropdown) => {
 					for (const option of definition.options) {
-						dropdown.addOption(
-							option.value,
-							getOptionLabel(option, lang),
-						);
+						dropdown.addOption(option.value, getOptionLabel(option, lang));
 					}
-					dropdown
-						.setValue(String(currentValue))
-						.onChange((value) => {
-							void updatePluginSetting(
-								this.pluginInstance,
-								definition.settingKey,
-								value as PluginSettings[typeof definition.settingKey],
-								definition.immediate,
-							)
-								.then(() => {
-									if (definition.settingKey === "language") {
-										this.display();
-									}
-								})
-								.catch(reportSettingUpdateError);
-						});
+					dropdown.setValue(String(currentValue)).onChange((value) => {
+						void updatePluginSetting(
+							this.pluginInstance,
+							definition.settingKey,
+							value as PluginSettings[typeof definition.settingKey],
+							definition.immediate,
+						)
+							.then(() => {
+								if (definition.settingKey === "language") {
+									this.display();
+								}
+							})
+							.catch(reportSettingUpdateError);
+					});
 				});
 				return;
 			case "text":

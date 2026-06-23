@@ -52,11 +52,7 @@ describe("RenderedMdElementsRegistry", () => {
 		const disconnectedEl = document.createElement("div");
 
 		registry.registerElement("notes/example.md", connectedEl, connectedCtx);
-		registry.registerElement(
-			"notes/example.md",
-			disconnectedEl,
-			disconnectedCtx,
-		);
+		registry.registerElement("notes/example.md", disconnectedEl, disconnectedCtx);
 
 		registry.reprocessDecorations("notes/example.md");
 
@@ -67,7 +63,9 @@ describe("RenderedMdElementsRegistry", () => {
 		);
 
 		expect(registry.isTrackedElement("notes/example.md", connectedEl)).toBe(true);
-		expect(registry.isTrackedElement("notes/example.md", disconnectedEl)).toBe(false);
+		expect(registry.isTrackedElement("notes/example.md", disconnectedEl)).toBe(
+			false,
+		);
 	});
 
 	it("removes registered elements when MarkdownRenderChild unloads", () => {

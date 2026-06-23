@@ -54,9 +54,7 @@ describe("virtual-list cache performance contracts", () => {
 
 		invalidateNearestScrollContainerCache(root);
 		expect(findNearestScrollContainerCached(root)).toBe(scrollContainer);
-		expect(getComputedStyle.mock.calls.length).toBeGreaterThan(
-			readsAfterMiss,
-		);
+		expect(getComputedStyle.mock.calls.length).toBeGreaterThan(readsAfterMiss);
 	});
 
 	it("finds a scroll container in another document realm", () => {
@@ -74,10 +72,7 @@ describe("virtual-list cache performance contracts", () => {
 		scrollContainer.append(root);
 		iframeDocument.body.append(scrollContainer);
 		const mainGetComputedStyle = vi.spyOn(window, "getComputedStyle");
-		const iframeGetComputedStyle = vi.spyOn(
-			iframeWindow,
-			"getComputedStyle",
-		);
+		const iframeGetComputedStyle = vi.spyOn(iframeWindow, "getComputedStyle");
 
 		expect(findNearestScrollContainerCached(root)).toBe(scrollContainer);
 		expect(iframeGetComputedStyle).toHaveBeenCalled();

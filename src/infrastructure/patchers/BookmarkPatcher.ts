@@ -15,9 +15,7 @@ export function initBookmarkPatcher(
 	plugin: PluginHost,
 	patchRegistry: PatchRegistry,
 ): void {
-	const bookmarksPath = normalizePath(
-		`${plugin.app.vault.configDir}/bookmarks.json`,
-	);
+	const bookmarksPath = normalizePath(`${plugin.app.vault.configDir}/bookmarks.json`);
 
 	const applied = patchRegistry.apply(plugin, {
 		id: "vault-adapter:write-bookmarks",
@@ -36,7 +34,10 @@ export function initBookmarkPatcher(
 
 				// ブックマークファイルが更新された場合、カスタムイベントを発火
 				if (normalizedPath === bookmarksPath) {
-					if (enableLogging) logger(`[BookmarkPatcher] Bookmarks updated, triggering event.`);
+					if (enableLogging)
+						logger(
+							`[BookmarkPatcher] Bookmarks updated, triggering event.`,
+						);
 					plugin.app.workspace.trigger(
 						"cosense-card-links:bookmarks-updated" as any,
 					);
@@ -47,6 +48,7 @@ export function initBookmarkPatcher(
 	});
 
 	if (applied) {
-		if (enableLogging) logger("[BookmarkPatcher] Vault adapter patched for bookmarks.");
+		if (enableLogging)
+			logger("[BookmarkPatcher] Vault adapter patched for bookmarks.");
 	}
 }

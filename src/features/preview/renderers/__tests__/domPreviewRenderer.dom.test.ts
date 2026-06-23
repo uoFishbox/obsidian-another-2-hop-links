@@ -19,11 +19,7 @@ describe("createMarkdownDomPreview", () => {
 	test("renders directly to the target element using MarkdownRenderer", async () => {
 		const app = {} as any;
 		const component = {} as any;
-		const preview = createMarkdownDomPreview(
-			app,
-			"note.md",
-			"**hello**",
-		);
+		const preview = createMarkdownDomPreview(app, "note.md", "**hello**");
 		const container = document.createElement("div");
 
 		expect(preview.type).toBe("dom");
@@ -92,11 +88,7 @@ describe("createMarkdownDomPreview", () => {
 		const app = {} as any;
 		const component = {} as any;
 		const controller = new AbortController();
-		const preview = createMarkdownDomPreview(
-			app,
-			"note.md",
-			"**hello**",
-		);
+		const preview = createMarkdownDomPreview(app, "note.md", "**hello**");
 		const container = document.createElement("div");
 		container.innerHTML = "<p>existing</p>";
 		controller.abort();
@@ -121,12 +113,9 @@ describe("createMarkdownDomPreview", () => {
 				controller.abort();
 			},
 		);
-		const preview = createMarkdownDomPreview(
-			app,
-			"note.md",
-			"**hello**",
-			{ fallbackHtml: "<p>fallback</p>" },
-		);
+		const preview = createMarkdownDomPreview(app, "note.md", "**hello**", {
+			fallbackHtml: "<p>fallback</p>",
+		});
 		const container = document.createElement("div");
 
 		if (preview.type !== "dom") {

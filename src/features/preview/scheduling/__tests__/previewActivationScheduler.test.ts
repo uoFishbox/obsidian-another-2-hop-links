@@ -74,9 +74,7 @@ describe("preview activation scheduler", () => {
 		state.disableCardDomPreview = true;
 		const getDisabledVisibleQueueSize = vi.fn(() => 1);
 
-		expect(canActivatePreviewImmediately(getDisabledVisibleQueueSize)).toBe(
-			false,
-		);
+		expect(canActivatePreviewImmediately(getDisabledVisibleQueueSize)).toBe(false);
 
 		const onSettled = vi.fn();
 		const activation = requestPreviewActivation(
@@ -120,11 +118,8 @@ describe("preview activation scheduler", () => {
 		await expect(warmup.result).resolves.toBe(true);
 
 		const activated: boolean[] = [];
-		requestPreviewActivation(
-			"preview-a",
-			getVisibleQueueSize,
-			undefined,
-			(value) => activated.push(value),
+		requestPreviewActivation("preview-a", getVisibleQueueSize, undefined, (value) =>
+			activated.push(value),
 		);
 		expect(activated).toEqual([true]);
 	});
@@ -197,10 +192,7 @@ describe("preview activation scheduler", () => {
 		visibleQueueSize = 1;
 		const results: boolean[] = [];
 
-		const activation = requestActivationResult(
-			"preview-a",
-			getVisibleQueueSize,
-		);
+		const activation = requestActivationResult("preview-a", getVisibleQueueSize);
 		activation.result.then((activated) => results.push(activated));
 
 		await flushAnimationFrame();
@@ -216,14 +208,8 @@ describe("preview activation scheduler", () => {
 	it("resolves replaced requests as not activated", async () => {
 		markScrollActivityActive(scrollSource);
 
-		const original = requestActivationResult(
-			"preview-a",
-			getVisibleQueueSize,
-		);
-		const replacement = requestActivationResult(
-			"preview-a",
-			getVisibleQueueSize,
-		);
+		const original = requestActivationResult("preview-a", getVisibleQueueSize);
+		const replacement = requestActivationResult("preview-a", getVisibleQueueSize);
 
 		await expect(original.result).resolves.toBe(false);
 
@@ -234,10 +220,7 @@ describe("preview activation scheduler", () => {
 	it("resolves cancelled requests as not activated", async () => {
 		markScrollActivityActive(scrollSource);
 
-		const activation = requestActivationResult(
-			"preview-a",
-			getVisibleQueueSize,
-		);
+		const activation = requestActivationResult("preview-a", getVisibleQueueSize);
 		cancelPreviewActivation("preview-a");
 
 		await expect(activation.result).resolves.toBe(false);
@@ -246,10 +229,7 @@ describe("preview activation scheduler", () => {
 	it("handle cancel resolves only its own request as not activated", async () => {
 		markScrollActivityActive(scrollSource);
 
-		const activation = requestActivationResult(
-			"preview-a",
-			getVisibleQueueSize,
-		);
+		const activation = requestActivationResult("preview-a", getVisibleQueueSize);
 		activation.handle.cancel();
 
 		await expect(activation.result).resolves.toBe(false);
@@ -271,10 +251,7 @@ describe("preview activation scheduler", () => {
 
 	it("shares the cancel function across queued and settled handles", async () => {
 		markScrollActivityActive(scrollSource);
-		const queued = requestPreviewActivation(
-			"preview-queued",
-			getVisibleQueueSize,
-		);
+		const queued = requestPreviewActivation("preview-queued", getVisibleQueueSize);
 
 		markScrollActivityIdle(scrollSource);
 		await flushAnimationFrame();
@@ -345,11 +322,11 @@ describe("preview activation scheduler", () => {
 		await flushAnimationFrame();
 		await expect(firstWarmup.result).resolves.toBe(true);
 
-		expect(
-			canActivatePreviewImmediately(getVisibleQueueSize, firstScope),
-		).toBe(true);
-		expect(
-			canActivatePreviewImmediately(getVisibleQueueSize, secondScope),
-		).toBe(false);
+		expect(canActivatePreviewImmediately(getVisibleQueueSize, firstScope)).toBe(
+			true,
+		);
+		expect(canActivatePreviewImmediately(getVisibleQueueSize, secondScope)).toBe(
+			false,
+		);
 	});
 });

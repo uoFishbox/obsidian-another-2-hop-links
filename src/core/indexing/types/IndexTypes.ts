@@ -1,10 +1,6 @@
 import type { BacklinksMap, TagReference } from "types/domain";
 
-export type IncrementalFileChangeType =
-	| "create"
-	| "modify"
-	| "delete"
-	| "rename";
+export type IncrementalFileChangeType = "create" | "modify" | "delete" | "rename";
 
 export type IncrementalFileChange =
 	| {
@@ -66,10 +62,7 @@ export interface SourceDestinationSummary {
 }
 
 export interface SourceSummary {
-	readonly destinations: ReadonlyMap<
-		string,
-		Readonly<SourceDestinationSummary>
-	>;
+	readonly destinations: ReadonlyMap<string, Readonly<SourceDestinationSummary>>;
 	/**
 	 * Compact representative refs indexed by destinations.firstRefIndex and
 	 * firstRefIndexByLookupKey. This is not a full ordered occurrence list.
@@ -81,10 +74,7 @@ export interface SourceSummary {
 	 * must go through this map. There is no separate lookupKeys set.
 	 */
 	readonly firstRefIndexByLookupKey: ReadonlyMap<string, number>;
-	readonly lookupKeyToRawLinkPaths: ReadonlyMap<
-		string,
-		string | readonly string[]
-	>;
+	readonly lookupKeyToRawLinkPaths: ReadonlyMap<string, string | readonly string[]>;
 	readonly unresolvedLookupKeys: ReadonlySet<string>;
 	readonly hasSourceDependentLinks: boolean;
 }

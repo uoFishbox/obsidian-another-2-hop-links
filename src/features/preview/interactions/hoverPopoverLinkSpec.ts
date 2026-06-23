@@ -5,8 +5,7 @@ import type { HighlightMode } from "../public-types";
 import { isAdvancedCanvasPosition } from "core/rules/fileRules";
 
 export const COSENSE_CARD_LINKS_HOVER_SOURCE_ID = "cosense-card-links";
-export const COSENSE_CARD_LINKS_HOVER_SOURCE_DISPLAY =
-	"Cosense Card Links";
+export const COSENSE_CARD_LINKS_HOVER_SOURCE_DISPLAY = "Cosense Card Links";
 
 export interface HoverPopoverLinkSpec {
 	linktext: string;
@@ -61,10 +60,7 @@ function resolveHoverState(
 		return undefined;
 	}
 
-	if (
-		targetFile.extension === "canvas" &&
-		isAdvancedCanvasPosition(link.position)
-	) {
+	if (targetFile.extension === "canvas" && isAdvancedCanvasPosition(link.position)) {
 		return {
 			match: {
 				matches: [[0, link.position.end.offset]],

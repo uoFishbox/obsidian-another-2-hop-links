@@ -1,9 +1,6 @@
 import type { RowRange } from "../rowRange";
 import type { VirtualListLogicalCell } from "../logicalCell";
-import type {
-	FlatRow,
-	SectionLayout,
-} from "../layout/viewPlanRowTypes";
+import type { FlatRow, SectionLayout } from "../layout/viewPlanRowTypes";
 import {
 	canReuseMountedFlatCellContent,
 	createMountedFlatCell,
@@ -24,7 +21,11 @@ export interface SectionedGridSectionPlan<T, G> {
 	readonly mountedLayout: SectionLayout<T, G>;
 }
 
-export interface SectionedGridPlan<T, G, TSection extends SectionedGridSectionPlan<T, G>> {
+export interface SectionedGridPlan<
+	T,
+	G,
+	TSection extends SectionedGridSectionPlan<T, G>,
+> {
 	readonly sections: readonly TSection[];
 	readonly rowCount: number;
 	readonly columns: number;
@@ -60,10 +61,7 @@ export interface BuildSectionedGridMountedRowsParams<
 	readonly rowRange: RowRange;
 	readonly previousBuild?: SectionedGridMountedRowsBuild<T, G, TPlan>;
 	readonly reusableRowSlotsScratch?: number[];
-	findSectionIndexByRow(
-		sections: readonly TSection[],
-		rowIndex: number,
-	): number;
+	findSectionIndexByRow(sections: readonly TSection[], rowIndex: number): number;
 	resolveRowInSection(
 		plan: TPlan,
 		sectionPlan: TSection,
@@ -84,8 +82,7 @@ export interface BuildSectionedGridMountedRowsParams<
 
 type SectionedGridMountedCell<T, G> = MountedFlatCell<T, G>;
 
-const EMPTY_PREVIOUS_CELLS: ReadonlyMap<string, never> =
-	new Map<string, never>();
+const EMPTY_PREVIOUS_CELLS: ReadonlyMap<string, never> = new Map<string, never>();
 
 const flattenMountedRowCells = <T, G>(
 	rowSlices: readonly MountedFlatRowSlice<T, G>[],
@@ -112,10 +109,7 @@ export function buildSectionedGridMountedRows<
 	let flattenedCells: SectionedGridMountedCell<T, G>[] | undefined;
 	let mountedCellCount = 0;
 	let reusableCellsByKey: Map<string, SectionedGridMountedCell<T, G>> | undefined;
-	const getReusableCellsByKey = (): Map<
-		string,
-		SectionedGridMountedCell<T, G>
-	> => {
+	const getReusableCellsByKey = (): Map<string, SectionedGridMountedCell<T, G>> => {
 		if (!reusableCellsByKey) {
 			reusableCellsByKey = new Map();
 			for (const rowSlice of rowSlices) {
@@ -184,11 +178,7 @@ export function buildSectionedGridMountedRows<
 		}
 		const sectionPlan = plan.sections[sectionIndex];
 		if (!sectionPlan) break;
-		const resolvedRow = params.resolveRowInSection(
-			plan,
-			sectionPlan,
-			rowIndex,
-		);
+		const resolvedRow = params.resolveRowInSection(plan, sectionPlan, rowIndex);
 		if (!resolvedRow) continue;
 		const {
 			rowIndexInSection,

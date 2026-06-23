@@ -34,10 +34,7 @@ describe("interactionRegistry", () => {
 		const staleSecond = createDescriptor("item:second", "[[stale]]");
 		const freshSecond = createDescriptor("item:second", "[[fresh]]");
 
-		registry.syncInteractionDescriptors("mounted-items", [
-			first,
-			staleSecond,
-		]);
+		registry.syncInteractionDescriptors("mounted-items", [first, staleSecond]);
 		registry.syncInteractionDescriptors("mounted-items", [freshSecond]);
 
 		expect(registry.resolve("item:first")).toBeUndefined();
@@ -94,9 +91,7 @@ describe("interactionRegistry", () => {
 		const resolve = vi.fn(() => descriptor);
 		const resolver = { interactionId: descriptor.interactionId, resolve };
 
-		registry.syncInteractionDescriptorResolvers("mounted-items", [
-			resolver,
-		]);
+		registry.syncInteractionDescriptorResolvers("mounted-items", [resolver]);
 		expect(registry.resolve(descriptor.interactionId)).toBe(descriptor);
 
 		registry.syncInteractionDescriptorResolvers("mounted-items", [
@@ -118,10 +113,9 @@ describe("interactionRegistry", () => {
 		let descriptor = stale;
 		const resolveInteractionDescriptor = vi.fn(() => descriptor);
 
-		registry.syncInteractionDescriptorResolverProvider(
-			"mounted-items",
-			{ resolveInteractionDescriptor },
-		);
+		registry.syncInteractionDescriptorResolverProvider("mounted-items", {
+			resolveInteractionDescriptor,
+		});
 
 		expect(resolveInteractionDescriptor).not.toHaveBeenCalled();
 		expect(registry.resolve(stale.interactionId)).toBe(stale);
@@ -142,10 +136,9 @@ describe("interactionRegistry", () => {
 		]);
 		expect(registry.resolve(stale.interactionId)).toBe(stale);
 
-		registry.syncInteractionDescriptorResolverProvider(
-			"mounted-items",
-			{ resolveInteractionDescriptor: () => fresh },
-		);
+		registry.syncInteractionDescriptorResolverProvider("mounted-items", {
+			resolveInteractionDescriptor: () => fresh,
+		});
 
 		expect(registry.resolve(fresh.interactionId)).toBe(fresh);
 	});

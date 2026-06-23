@@ -29,10 +29,7 @@
 		type ViewItem,
 		toViewItem,
 	} from "application/presenters";
-	import {
-		createItemSearchTextCache,
-		getItemSearchText,
-	} from "./itemSearchText";
+	import { createItemSearchTextCache, getItemSearchText } from "./itemSearchText";
 	import { buildSearchWorkerItemSnapshot } from "features/search/searchSnapshotBuilders";
 	import type { SearchWorkerItemSnapshot } from "features/search/searchWorkerTypes";
 	import {
@@ -150,8 +147,8 @@
 				? config.getSearchText(item, linkContext)
 				: getItemSearchText(item, linkContext, {
 						priorityFrontmatterKeyForTitle:
-							applicationStore.settings
-								?.priorityFrontmatterKeyForTitle ?? "",
+							applicationStore.settings?.priorityFrontmatterKeyForTitle ??
+							"",
 					})
 			).toLowerCase(),
 		);
@@ -170,9 +167,7 @@
 		);
 
 	const buildWorkerDataset = (): SearchWorkerItemSnapshot[] => {
-		const nextDataset = new Array<SearchWorkerItemSnapshot>(
-			reconciledItems.length,
-		);
+		const nextDataset = new Array<SearchWorkerItemSnapshot>(reconciledItems.length);
 		for (let index = 0; index < reconciledItems.length; index += 1) {
 			const item = reconciledItems[index];
 			const targetFile = getItemTargetFile(item);
@@ -286,9 +281,7 @@
 	let preserveResultsHeightOnSearch = $derived(
 		config.preserveResultsHeightOnSearch ?? true,
 	);
-	let shouldPassVisibilityProp = $derived(
-		config.itemComponent !== ViewItemCard,
-	);
+	let shouldPassVisibilityProp = $derived(config.itemComponent !== ViewItemCard);
 
 	let resultsContainerEl = $state<HTMLDivElement | null>(null);
 	let resultsMinHeight = $derived(
@@ -348,18 +341,12 @@
 			onMountedCellsChange={handleMountedCellsChange}
 			header={config.showSectionHeader ? sectionHeader : undefined}
 		>
-			{#snippet item({
-				item,
-				observerRoot,
-				visibility,
-				visibilityState,
-			})}
+			{#snippet item({ item, observerRoot, visibility, visibilityState })}
 				{@const ItemComponent = config.itemComponent}
 				{@const previewRefreshToken =
 					previewRefreshTokens[config.getItemKey(item)] ?? 0}
 				{@const renderedItemKey = config.getItemKey(item)}
-				{@const matchedItem =
-					matchedItemByKey?.get(renderedItemKey) ?? null}
+				{@const matchedItem = matchedItemByKey?.get(renderedItemKey) ?? null}
 				{#if shouldPassVisibilityProp}
 					<ItemComponent
 						{...config.getItemProps(item)}

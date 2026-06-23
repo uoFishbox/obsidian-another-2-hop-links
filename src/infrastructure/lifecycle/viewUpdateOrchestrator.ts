@@ -32,18 +32,11 @@ export interface ViewUpdateOrchestratorDeps {
 export function createViewUpdateOrchestrator(
 	deps: ViewUpdateOrchestratorDeps,
 ): ViewUpdateOrchestrator {
-	const {
-		app,
-		plugin,
-		stylingService,
-		markdownRenderManager,
-		propertyStyleManager,
-	} = deps;
+	const { app, plugin, stylingService, markdownRenderManager, propertyStyleManager } =
+		deps;
 
 	function updateAllViews(): void {
-		reprocessTrackedMarkdownDecorations(
-			collectTrackedMarkdownSourcePaths(),
-		);
+		reprocessTrackedMarkdownDecorations(collectTrackedMarkdownSourcePaths());
 		updateMarkdownSourceViews();
 		updateMarkdownReadingViews();
 		updateCanvasViews();
@@ -64,8 +57,7 @@ export function createViewUpdateOrchestrator(
 		const hasPathOrLookupImpact =
 			affectedPaths.length > 0 || affectedLookupKeys.length > 0;
 
-		const hasOnlyTagImpact =
-			!hasPathOrLookupImpact && affectedTags.length > 0;
+		const hasOnlyTagImpact = !hasPathOrLookupImpact && affectedTags.length > 0;
 
 		if (hasOnlyTagImpact) {
 			return;
@@ -118,20 +110,13 @@ export function createViewUpdateOrchestrator(
 
 		if (activeView.getMode() === "preview") {
 			markdownRenderManager.reprocessDecorations(sourcePath);
-			const previewContainer =
-				getPreviewContainerForReadingView(activeView);
+			const previewContainer = getPreviewContainerForReadingView(activeView);
 			if (
 				previewContainer &&
 				previewContainer.isConnected &&
-				!markdownRenderManager.isTrackedElement(
-					sourcePath,
-					previewContainer,
-				)
+				!markdownRenderManager.isTrackedElement(sourcePath, previewContainer)
 			) {
-				stylingService.decorateLinksInContainer(
-					previewContainer,
-					sourcePath,
-				);
+				stylingService.decorateLinksInContainer(previewContainer, sourcePath);
 			}
 		}
 	}
@@ -198,9 +183,7 @@ export function createViewUpdateOrchestrator(
 				}
 
 				// 起動直後などで postProcessor 登録対象外だった既存プレビュー要素にも適用する
-				const previewContainer = getPreviewContainerForReadingView(
-					leaf.view,
-				);
+				const previewContainer = getPreviewContainerForReadingView(leaf.view);
 				if (
 					previewContainer &&
 					previewContainer.isConnected &&
@@ -264,8 +247,7 @@ export function createViewUpdateOrchestrator(
 				const previewEl = anyNode.child?.previewMode?.containerEl;
 				const targetEl = previewEl || anyNode.contentEl;
 
-				const matchesPath =
-					!affectedPaths || affectedPaths.has(sourcePath);
+				const matchesPath = !affectedPaths || affectedPaths.has(sourcePath);
 				const matchesLookupKey =
 					!matchesPath &&
 					!!affectedLookupKeys &&
@@ -294,10 +276,7 @@ export function createViewUpdateOrchestrator(
 				}
 
 				if (targetEl) {
-					plugin.processUnresolvedLinksInElement(
-						targetEl,
-						canvasFile.path,
-					);
+					plugin.processUnresolvedLinksInElement(targetEl, canvasFile.path);
 				}
 			}
 		});
@@ -334,9 +313,7 @@ export function createViewUpdateOrchestrator(
 		return sourcePaths;
 	}
 
-	function reprocessTrackedMarkdownDecorations(
-		sourcePaths: Iterable<string>,
-	): void {
+	function reprocessTrackedMarkdownDecorations(sourcePaths: Iterable<string>): void {
 		for (const sourcePath of sourcePaths) {
 			markdownRenderManager.reprocessDecorations(sourcePath);
 		}
@@ -347,14 +324,10 @@ export function createViewUpdateOrchestrator(
 			return;
 		}
 
-		const basesPanes =
-			document.querySelectorAll<HTMLElement>(".bases-view");
+		const basesPanes = document.querySelectorAll<HTMLElement>(".bases-view");
 		basesPanes.forEach((pane) => {
 			if (affectedLookupKeys) {
-				const links = collectBasesLinksIfAffected(
-					pane,
-					affectedLookupKeys,
-				);
+				const links = collectBasesLinksIfAffected(pane, affectedLookupKeys);
 				if (links === null) return;
 				processBasesPane(pane as HTMLElement, stylingService, links);
 			} else {
@@ -386,9 +359,7 @@ function getInternalLinkLookupKey(linkEl: HTMLElement): string | undefined {
 	return toCaseInsensitiveLookupKey(normalizedPath);
 }
 
-function getPreviewContainerForReadingView(
-	view: MarkdownView,
-): HTMLElement | null {
+function getPreviewContainerForReadingView(view: MarkdownView): HTMLElement | null {
 	const previewMode = view.previewMode as
 		| {
 				containerEl?: HTMLElement;
@@ -407,9 +378,7 @@ function collectBasesLinksIfAffected(
 	pane: HTMLElement,
 	affectedLookupKeys: Set<string>,
 ): HTMLElement[] | null {
-	const links = Array.from(
-		pane.querySelectorAll<HTMLElement>(".internal-link"),
-	);
+	const links = Array.from(pane.querySelectorAll<HTMLElement>(".internal-link"));
 
 	for (const link of links) {
 		const lookupKey = getBasesLinkLookupKey(link);

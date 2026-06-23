@@ -111,10 +111,7 @@ function scheduleWarmupCountdown(scope: PreviewActivationScope): void {
 	activeWarmupScopes.add(scope);
 	scope.warmupFrameHandle = globalThis.requestAnimationFrame(() => {
 		scope.warmupFrameHandle = null;
-		scope.warmupRemainingFrames = Math.max(
-			0,
-			scope.warmupRemainingFrames - 1,
-		);
+		scope.warmupRemainingFrames = Math.max(0, scope.warmupRemainingFrames - 1);
 		if (scope.warmupRemainingFrames > 0) {
 			scheduleWarmupCountdown(scope);
 			return;
@@ -135,10 +132,7 @@ function hasVisiblePreviewBacklog(getVisibleQueueSize: () => number): boolean {
 	return getVisibleQueueSize() > 0;
 }
 
-function settleRequest(
-	request: PreviewActivationRequest,
-	activated: boolean,
-): void {
+function settleRequest(request: PreviewActivationRequest, activated: boolean): void {
 	if (request.settled) return;
 
 	request.settled = true;
@@ -287,10 +281,7 @@ export function resetPreviewActivationSchedulerForTests(): void {
 	}
 	queuesByScope.clear();
 
-	if (
-		frameHandle !== null &&
-		typeof globalThis.cancelAnimationFrame === "function"
-	) {
+	if (frameHandle !== null && typeof globalThis.cancelAnimationFrame === "function") {
 		globalThis.cancelAnimationFrame(frameHandle);
 	}
 	frameHandle = null;

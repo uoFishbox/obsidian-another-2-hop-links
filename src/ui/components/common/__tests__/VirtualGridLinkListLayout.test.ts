@@ -146,10 +146,7 @@ describe("linkListLayout", () => {
 		it("does not prefix scan when resolving key for far index", () => {
 			const getKey = vi.fn((item: string) => item);
 			const resolver = createLogicalCellItemKeyResolver({
-				items: Array.from(
-					{ length: 100_000 },
-					(_, index) => `item-${index}`,
-				),
+				items: Array.from({ length: 100_000 }, (_, index) => `item-${index}`),
 				getKey,
 			});
 

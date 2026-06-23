@@ -71,7 +71,9 @@ function dumpProtoChain(obj: unknown): Array<{
 	return rows;
 }
 
-function serializeDataset(el: HTMLElement | null | undefined): Record<string, string> | null {
+function serializeDataset(
+	el: HTMLElement | null | undefined,
+): Record<string, string> | null {
 	if (!el) {
 		return null;
 	}
@@ -112,7 +114,9 @@ export function snapshotPopoverForDebug(
 		return null;
 	}
 
-	const typedPopover = popover as PopoverLikeForDebug & { constructor?: { name?: string } };
+	const typedPopover = popover as PopoverLikeForDebug & {
+		constructor?: { name?: string };
+	};
 	const ctor = (typedPopover as { constructor?: unknown }).constructor;
 	const targetEl = typedPopover.targetEl ?? null;
 	const hoverEl = typedPopover.hoverEl ?? null;
@@ -180,13 +184,25 @@ export function freezePopoverForDebug(
 			: null;
 
 	typedPopover.hide = (...args: unknown[]): void => {
-		console.info("[CCLDebug] blocked popover.hide()", { reason, args, popover: typedPopover });
+		console.info("[CCLDebug] blocked popover.hide()", {
+			reason,
+			args,
+			popover: typedPopover,
+		});
 	};
 	typedPopover.close = (...args: unknown[]): void => {
-		console.info("[CCLDebug] blocked popover.close()", { reason, args, popover: typedPopover });
+		console.info("[CCLDebug] blocked popover.close()", {
+			reason,
+			args,
+			popover: typedPopover,
+		});
 	};
 	typedPopover.unload = (...args: unknown[]): void => {
-		console.info("[CCLDebug] blocked popover.unload()", { reason, args, popover: typedPopover });
+		console.info("[CCLDebug] blocked popover.unload()", {
+			reason,
+			args,
+			popover: typedPopover,
+		});
 	};
 	typedPopover.__cclDebugHideBlocked = true;
 	typedPopover.__cclDebugCloseBlocked = true;

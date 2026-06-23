@@ -23,8 +23,7 @@ export async function collectCacheInvalidationPathsAsync(
 	let pathCount = 0;
 
 	for (const lookupKey of affectedLookupKeys) {
-		const siblingLookupPaths =
-			snapshot.lookupKeyToLookupPaths.get(lookupKey);
+		const siblingLookupPaths = snapshot.lookupKeyToLookupPaths.get(lookupKey);
 		if (!siblingLookupPaths) {
 			continue;
 		}
@@ -108,15 +107,11 @@ export function onAddEdge(
 	if (!hadResolved && hasResolved) {
 		const resolvedSourceCount =
 			(snapshot.lookupPathResolvedSourceCount.get(lookupPath) ?? 0) + 1;
-		snapshot.lookupPathResolvedSourceCount.set(
-			lookupPath,
-			resolvedSourceCount,
-		);
+		snapshot.lookupPathResolvedSourceCount.set(lookupPath, resolvedSourceCount);
 
 		if (resolvedSourceCount === 1) {
 			const directResolvedPathCount =
-				(snapshot.lookupKeyDirectResolvedPathCount.get(lookupKey) ??
-					0) + 1;
+				(snapshot.lookupKeyDirectResolvedPathCount.get(lookupKey) ?? 0) + 1;
 			snapshot.lookupKeyDirectResolvedPathCount.set(
 				lookupKey,
 				directResolvedPathCount,
@@ -145,8 +140,7 @@ export function onRemoveSourceFromLookupPath(
 		if (nextResolvedSourceCount <= 0) {
 			snapshot.lookupPathResolvedSourceCount.delete(lookupPath);
 			const nextDirectResolvedPathCount =
-				(snapshot.lookupKeyDirectResolvedPathCount.get(lookupKey) ??
-					1) - 1;
+				(snapshot.lookupKeyDirectResolvedPathCount.get(lookupKey) ?? 1) - 1;
 			if (nextDirectResolvedPathCount <= 0) {
 				snapshot.lookupKeyDirectResolvedPathCount.delete(lookupKey);
 			} else {

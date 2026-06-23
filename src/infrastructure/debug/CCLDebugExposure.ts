@@ -38,7 +38,10 @@ interface CCLDebugApi {
 		ctor: string | undefined;
 		ownKeys: string[];
 	}>;
-	findPrototypeOwner(obj: unknown, key: string): {
+	findPrototypeOwner(
+		obj: unknown,
+		key: string,
+	): {
 		level: number;
 		owner: object;
 		descriptor: PropertyDescriptor | undefined;
@@ -151,9 +154,7 @@ function listOwnKeys(obj: unknown): string[] {
 	return Object.getOwnPropertyNames(target);
 }
 
-export function installCCLDebugExposure(
-	plugin: PluginHost,
-): void {
+export function installCCLDebugExposure(plugin: PluginHost): void {
 	const api: CCLDebugApi = {
 		get autoFreeze() {
 			return getCCLDebugAutoFreeze();
@@ -180,9 +181,11 @@ export function installCCLDebugExposure(
 			return getShadowDesktopHoverParentForDebug();
 		},
 		get popover() {
-			return getShadowDesktopHoverParentForDebug()?.hoverPopover
-				?? getCCLDebugFrozenPopover()
-				?? getLastAssignedShadowDesktopPopoverForDebug();
+			return (
+				getShadowDesktopHoverParentForDebug()?.hoverPopover ??
+				getCCLDebugFrozenPopover() ??
+				getLastAssignedShadowDesktopPopoverForDebug()
+			);
 		},
 		get shadowState() {
 			return getShadowDesktopHoverDebugState();
@@ -191,22 +194,33 @@ export function installCCLDebugExposure(
 			return getShadowDesktopExperimentalKeepAlive();
 		},
 		get activeTargetEl() {
-			return (getShadowDesktopHoverParentForDebug()?.hoverPopover as
-				| { targetEl?: HTMLElement | null }
-				| undefined)?.targetEl ?? null;
+			return (
+				(
+					getShadowDesktopHoverParentForDebug()?.hoverPopover as
+						| { targetEl?: HTMLElement | null }
+						| undefined
+				)?.targetEl ?? null
+			);
 		},
 		getPagePreviewPrototype() {
 			const instance = getPagePreviewInstance(plugin);
-			if (!instance || (typeof instance !== "object" && typeof instance !== "function")) {
+			if (
+				!instance ||
+				(typeof instance !== "object" && typeof instance !== "function")
+			) {
 				return null;
 			}
 			return Object.getPrototypeOf(instance);
 		},
 		getPopoverPrototype() {
-			const popover = getShadowDesktopHoverParentForDebug()?.hoverPopover
-				?? getCCLDebugFrozenPopover()
-				?? getLastAssignedShadowDesktopPopoverForDebug();
-			if (!popover || (typeof popover !== "object" && typeof popover !== "function")) {
+			const popover =
+				getShadowDesktopHoverParentForDebug()?.hoverPopover ??
+				getCCLDebugFrozenPopover() ??
+				getLastAssignedShadowDesktopPopoverForDebug();
+			if (
+				!popover ||
+				(typeof popover !== "object" && typeof popover !== "function")
+			) {
 				return null;
 			}
 			return Object.getPrototypeOf(popover);
@@ -226,9 +240,9 @@ export function installCCLDebugExposure(
 		},
 		freezeCurrentPopover(reason = "debug-freeze-current") {
 			return freezePopoverForDebug(
-				getShadowDesktopHoverParentForDebug()?.hoverPopover
-				?? getCCLDebugFrozenPopover()
-				?? getLastAssignedShadowDesktopPopoverForDebug(),
+				getShadowDesktopHoverParentForDebug()?.hoverPopover ??
+					getCCLDebugFrozenPopover() ??
+					getLastAssignedShadowDesktopPopoverForDebug(),
 				reason,
 			);
 		},
@@ -237,9 +251,9 @@ export function installCCLDebugExposure(
 		},
 		snapshotCurrentPopover(reason = "debug-snapshot-current") {
 			return snapshotPopoverForDebug(
-				getShadowDesktopHoverParentForDebug()?.hoverPopover
-				?? getCCLDebugFrozenPopover()
-				?? getLastAssignedShadowDesktopPopoverForDebug(),
+				getShadowDesktopHoverParentForDebug()?.hoverPopover ??
+					getCCLDebugFrozenPopover() ??
+					getLastAssignedShadowDesktopPopoverForDebug(),
 				reason,
 			);
 		},

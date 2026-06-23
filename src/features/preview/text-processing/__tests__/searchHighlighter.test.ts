@@ -7,26 +7,20 @@ import {
 describe("highlightTextForSearch", () => {
 	test("wraps matching text in ccl-search-highlight span", () => {
 		const result = highlightTextForSearch("Notebook Search Result", "search");
-		expect(result).toContain(
-			'<span class="ccl-search-highlight">Search</span>',
-		);
+		expect(result).toContain('<span class="ccl-search-highlight">Search</span>');
 		expect(result).toContain("Notebook ");
 		expect(result).toContain(" Result");
 	});
 
 	test("handles regex metacharacters literally", () => {
 		const result = highlightTextForSearch("Use C++ here", "c++");
-		expect(result).toContain(
-			'<span class="ccl-search-highlight">C++</span>',
-		);
+		expect(result).toContain('<span class="ccl-search-highlight">C++</span>');
 	});
 
 	test("escapes HTML in non-matching text", () => {
 		const result = highlightTextForSearch("<script>alert(1)</script>", "alert");
 		expect(result).toContain("&lt;script&gt;");
-		expect(result).toContain(
-			'<span class="ccl-search-highlight">alert</span>',
-		);
+		expect(result).toContain('<span class="ccl-search-highlight">alert</span>');
 	});
 
 	test("returns unchanged text when no query", () => {
@@ -65,8 +59,7 @@ describe("highlightSearchMatchesInHtml", () => {
 	});
 
 	test("returns cleaned content when no query", () => {
-		const html =
-			'before <span class="ccl-search-highlight">Old</span> after';
+		const html = 'before <span class="ccl-search-highlight">Old</span> after';
 		const result = highlightSearchMatchesInHtml(html);
 		expect(result).toBe("before Old after");
 	});

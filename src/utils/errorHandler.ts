@@ -13,10 +13,7 @@ export function handleAsyncError(error: unknown, context?: string): void {
 	logError("Async operation failed", error, context);
 }
 
-export function handleComponentError(
-	error: unknown,
-	componentName?: string,
-): void {
+export function handleComponentError(error: unknown, componentName?: string): void {
 	const component = componentName ? ` in ${componentName}` : "";
 	logError(`Component error${component}`, error);
 }
@@ -40,10 +37,7 @@ export function handleFileOperationError(
 	logError(`File operation failed: ${operation}${file}`, error);
 }
 
-export function handleLinkResolutionError(
-	error: unknown,
-	linkPath?: string,
-): void {
+export function handleLinkResolutionError(error: unknown, linkPath?: string): void {
 	const link = linkPath ? ` for link: ${linkPath}` : "";
 	logError(`Link resolution failed${link}`, error);
 }

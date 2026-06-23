@@ -13,9 +13,7 @@ import type {
 import type { TwoHopIndexedLink } from "types";
 import type { PluginSettings } from "types/settings";
 import { getItemStrategy } from "application/presenters";
-import {
-	findClosestComposed,
-} from "ui/utils/shadowDom";
+import { findClosestComposed } from "ui/utils/shadowDom";
 import {
 	createOwnerMouseEvent,
 	isElementLike,
@@ -46,14 +44,12 @@ interface BaseInteractionDescriptor {
 	searchQuery?: string;
 }
 
-export interface ItemInteractionDescriptor
-	extends BaseInteractionDescriptor {
+export interface ItemInteractionDescriptor extends BaseInteractionDescriptor {
 	kind: "item";
 	item: ViewItem;
 }
 
-export interface SectionHeaderInteractionDescriptor
-	extends BaseInteractionDescriptor {
+export interface SectionHeaderInteractionDescriptor extends BaseInteractionDescriptor {
 	kind: "sectionHeader";
 	link: TwoHopIndexedLink;
 	isOutgoingLink: boolean;
@@ -130,15 +126,13 @@ export function createSectionHeaderInteractionKey(sectionId: string): string {
 	return `section:${sectionId}`;
 }
 
-export const createSectionHeaderInteractionId =
-	createSectionHeaderInteractionKey;
+export const createSectionHeaderInteractionId = createSectionHeaderInteractionKey;
 
 export function resolveDescriptorInteractionOptions(
 	descriptor: InteractionDescriptor,
 	appContext: AppContext | undefined,
 ): LinkInteractionOptions {
-	const normalizedSearchQuery =
-		descriptor.searchQuery?.trim().toLowerCase() ?? "";
+	const normalizedSearchQuery = descriptor.searchQuery?.trim().toLowerCase() ?? "";
 
 	if (!normalizedSearchQuery) {
 		return { highlightMode: "auto" };
@@ -217,9 +211,7 @@ function findInteractionElementInEvent(event: Event): HTMLElement | null {
 	);
 }
 
-export function getAttachedInteractionHoverTarget(
-	event: Event,
-): HTMLElement | null {
+export function getAttachedInteractionHoverTarget(event: Event): HTMLElement | null {
 	return getInteractionElement(event);
 }
 
@@ -244,9 +236,7 @@ export function markInteractionTouched(
 	element.dataset[LAST_TOUCH_AT_DATASET_KEY] = String(timestamp);
 }
 
-export function getInteractionLastTouchAt(
-	element: HTMLElement,
-): number | null {
+export function getInteractionLastTouchAt(element: HTMLElement): number | null {
 	const raw = element.dataset[LAST_TOUCH_AT_DATASET_KEY];
 	if (!raw) {
 		return null;
@@ -289,9 +279,7 @@ export function dispatchSyntheticMouseOver(
 	element.dispatchEvent(event);
 }
 
-export function isSyntheticInteractionHoverEvent(
-	event: MouseEvent,
-): boolean {
+export function isSyntheticInteractionHoverEvent(event: MouseEvent): boolean {
 	return (
 		(
 			event as MouseEvent & {

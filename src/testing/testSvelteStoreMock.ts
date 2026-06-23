@@ -10,9 +10,7 @@ export interface Writable<T> extends Readable<T> {
 	update(updater: (value: T) => T): void;
 }
 
-function toStoreArray<T>(
-	stores: Readable<T> | Readable<T>[],
-): Readable<T>[] {
+function toStoreArray<T>(stores: Readable<T> | Readable<T>[]): Readable<T>[] {
 	return Array.isArray(stores) ? stores : [stores];
 }
 

@@ -1,9 +1,6 @@
 import type { SectionRenderDescriptor } from "../../../sections/types";
 import type { VirtualListLogicalCell } from "../logicalCell";
-import type {
-	RenderBodyKey,
-	RenderRevisionFallbackPolicy,
-} from "../renderRevision";
+import type { RenderBodyKey, RenderRevisionFallbackPolicy } from "../renderRevision";
 import {
 	logicalCellKey,
 	renderSlotKey,
@@ -18,15 +15,9 @@ import {
 import type { FlatRow, SectionLayout } from "../layout/viewPlanRowTypes";
 
 type HeaderProps<T, G> = SectionRenderDescriptor<T, G>["headerProps"];
-type HeaderLogicalCell<T> = Extract<
-	VirtualListLogicalCell<T>,
-	{ kind: "header" }
->;
+type HeaderLogicalCell<T> = Extract<VirtualListLogicalCell<T>, { kind: "header" }>;
 type ItemLogicalCell<T> = Extract<VirtualListLogicalCell<T>, { kind: "item" }>;
-type LoadMoreLogicalCell<T> = Extract<
-	VirtualListLogicalCell<T>,
-	{ kind: "load-more" }
->;
+type LoadMoreLogicalCell<T> = Extract<VirtualListLogicalCell<T>, { kind: "load-more" }>;
 
 export interface MountedFlatCellPosition {
 	readonly row: number;
@@ -123,10 +114,7 @@ export function canReuseMountedFlatCellContent<T, G>(
 		return (
 			previous.cell.itemIndex === cell.itemIndex &&
 			previous.cell.item === cell.item &&
-			Object.is(
-				previous.cell.itemRenderRevision,
-				cell.itemRenderRevision,
-			) &&
+			Object.is(previous.cell.itemRenderRevision, cell.itemRenderRevision) &&
 			itemCell.section === section.descriptor.section
 		);
 	}
@@ -177,8 +165,7 @@ export function updateMountedFlatCell<T, G>(params: {
 	renderSlotIndex?: number;
 	cellSlotKey?: number;
 }): MountedFlatCell<T, G> {
-	const renderSlotIndex =
-		params.renderSlotIndex ?? params.previous.renderSlotIndex;
+	const renderSlotIndex = params.renderSlotIndex ?? params.previous.renderSlotIndex;
 	const renderBodyKey = resolveStableViewPlanRenderBodyKey({
 		previous: params.previous,
 		cell: params.cell,
@@ -192,10 +179,7 @@ export function updateMountedFlatCell<T, G>(params: {
 		params.previous.rowTop === params.row.top &&
 		params.previous.renderSlotIndex === renderSlotIndex &&
 		params.previous.position === undefined;
-	if (
-		hasSameLayoutMetadata &&
-		params.previous.renderBodyKey === renderBodyKey
-	) {
+	if (hasSameLayoutMetadata && params.previous.renderBodyKey === renderBodyKey) {
 		return params.previous;
 	}
 

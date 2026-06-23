@@ -12,9 +12,7 @@
 		height: number;
 	}
 
-	export interface VirtualSurfaceMountedRow<
-		TMountedCell extends MountedVirtualCell,
-	> {
+	export interface VirtualSurfaceMountedRow<TMountedCell extends MountedVirtualCell> {
 		key: RowKey;
 		rowIndex: number;
 		top: number;
@@ -38,9 +36,7 @@
 		mountedRows?: readonly VirtualSurfaceMountedRow<TMountedCell>[];
 		contentEl?: HTMLDivElement | null;
 		observerRoot?: HTMLElement | null;
-		getCellPosition?: (
-			cell: TMountedCell,
-		) => VirtualSurfaceCellPosition;
+		getCellPosition?: (cell: TMountedCell) => VirtualSurfaceCellPosition;
 		getCellClassName?: (cell: TMountedCell) => string | undefined;
 		getCellDataTestId?: (cell: TMountedCell) => string | undefined;
 		getRowRenderKey?: (rowIndex: number) => RowKey | undefined;

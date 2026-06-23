@@ -1,10 +1,7 @@
 <script lang="ts">
 	import { Component } from "obsidian";
 	import type { TFile } from "obsidian";
-	import type {
-		PreviewData,
-		PreviewRequestOptions,
-	} from "ui/context/linkContext";
+	import type { PreviewData, PreviewRequestOptions } from "ui/context/linkContext";
 	import { useAppContext } from "ui/context/linkContext";
 	import { DEBUG_DISABLE_CARD_DOM_PREVIEW } from "../../../appConstants";
 	import { processPreviewContent } from "../../../features/preview/renderers/markdownPreviewRenderer";
@@ -58,8 +55,7 @@
 		previewOverride = null,
 	}: Props = $props();
 	let container = $state<HTMLDivElement | undefined>(undefined);
-	const { app, applicationStore, resolveSearchMatchPosition } =
-		useAppContext();
+	const { app, applicationStore, resolveSearchMatchPosition } = useAppContext();
 	let settings = $derived(applicationStore.settings);
 
 	// 最後にレンダリングしたキーを保持
@@ -94,9 +90,7 @@
 		return nextId;
 	}
 
-	function createPreviewOverrideIdentity(
-		preview: PreviewData | null,
-	): string {
+	function createPreviewOverrideIdentity(preview: PreviewData | null): string {
 		if (!preview) {
 			return "none";
 		}
@@ -121,37 +115,33 @@
 			: "",
 	);
 
-	const previewRenderRequest = $derived.by(
-		(): PreviewRenderRequest | null => {
-			if (!file) {
-				return null;
-			}
+	const previewRenderRequest = $derived.by((): PreviewRenderRequest | null => {
+		if (!file) {
+			return null;
+		}
 
-			const previewRenderVersion =
-				applicationStore.getPreviewRenderVersion?.(file.path) ?? "0:0";
-			const effectivePreviewRenderVersion = `${previewRenderVersion}:${previewRefreshToken}`;
-			const previewOverrideIdentity =
-				createPreviewOverrideIdentity(previewOverride);
-			const renderVersionIdentity = `${effectivePreviewRenderVersion}:${previewOverrideIdentity}`;
-			const { previewContentIdentityKey, renderCacheKey } =
-				buildPreviewRenderKeys(
-					file,
-					searchQuery,
-					settings,
-					renderVersionIdentity,
-				);
+		const previewRenderVersion =
+			applicationStore.getPreviewRenderVersion?.(file.path) ?? "0:0";
+		const effectivePreviewRenderVersion = `${previewRenderVersion}:${previewRefreshToken}`;
+		const previewOverrideIdentity = createPreviewOverrideIdentity(previewOverride);
+		const renderVersionIdentity = `${effectivePreviewRenderVersion}:${previewOverrideIdentity}`;
+		const { previewContentIdentityKey, renderCacheKey } = buildPreviewRenderKeys(
+			file,
+			searchQuery,
+			settings,
+			renderVersionIdentity,
+		);
 
-			return {
-				file,
-				previewCacheRevision: effectivePreviewRenderVersion,
-				previewContentIdentityKey,
-				renderCacheKey,
-				previewOverride,
-				refreshToken: previewRefreshToken,
-				searchQuery,
-			};
-		},
-	);
+		return {
+			file,
+			previewCacheRevision: effectivePreviewRenderVersion,
+			previewContentIdentityKey,
+			renderCacheKey,
+			previewOverride,
+			refreshToken: previewRefreshToken,
+			searchQuery,
+		};
+	});
 
 	function shouldSkipRenderRequest(request: PreviewRenderRequest): boolean {
 		if (request.previewOverride?.type === "dom") {
@@ -329,10 +319,7 @@
 				normalizePreviewQuery(queryForRender).length === 0;
 			const previewAnalysis =
 				enableMathRendering && previewForRender.type === "text"
-					? getPreviewAnalysis(
-							renderCacheKey,
-							previewForRender.content,
-						)
+					? getPreviewAnalysis(renderCacheKey, previewForRender.content)
 					: undefined;
 			const shouldDelayMathCardRendering =
 				previewForRender.type === "text" &&
@@ -348,8 +335,8 @@
 					isMathRendering = false;
 
 					if (canShareRenderedTextPreview(previewForRender.content)) {
-						const renderedEntry =
-							await getOrCreateRenderedTextPreviewEntry({
+						const renderedEntry = await getOrCreateRenderedTextPreviewEntry(
+							{
 								cacheKey: renderCacheKey,
 								content: previewForRender.content,
 								app,
@@ -357,7 +344,8 @@
 								enableMathRendering,
 								analysis: previewAnalysis,
 								signal,
-							});
+							},
+						);
 
 						if (isRenderStale(signal, renderToken)) return false;
 						if (!container) return false;
@@ -401,8 +389,7 @@
 				if (previewForRender.type === "image") {
 					isMathRendering = false;
 					await nextAnimationFrame();
-					if (isRenderStale(signal, renderToken) || !container)
-						return false;
+					if (isRenderStale(signal, renderToken) || !container) return false;
 
 					const img = document.createElement("img");
 					img.alt = `preview for ${targetFile.basename}`;
@@ -454,11 +441,7 @@
 					}
 
 					if (previewForRender.type === "text") {
-						if (
-							canShareRenderedTextPreview(
-								previewForRender.content,
-							)
-						) {
+						if (canShareRenderedTextPreview(previewForRender.content)) {
 							const renderedEntry =
 								await getOrCreateRenderedTextPreviewEntry({
 									cacheKey: renderCacheKey,
@@ -563,8 +546,7 @@
 			previewContentIdentityKey,
 			targetFile,
 			normalizedQuery,
-			searchContext: () =>
-				buildPreviewSearchContext(queryForRender, targetFile),
+			searchContext: () => buildPreviewSearchContext(queryForRender, targetFile),
 			settings,
 			vault: app.vault,
 			signal,
@@ -626,9 +608,7 @@
 			return true;
 		}
 
-		return (
-			candidate.type === "dom" && typeof candidate.render === "function"
-		);
+		return candidate.type === "dom" && typeof candidate.render === "function";
 	}
 
 	async function renderPreviewContent(

@@ -3,11 +3,7 @@ import { enableLogging, logger } from "utils/logger";
 import type { PatchRegistry } from "infrastructure/capabilities/PatchRegistry";
 
 type MetadataCacheWithAdvancedCanvas = {
-	registerInternalLinkAC: (
-		canvasName: string,
-		from: string,
-		to: string,
-	) => unknown;
+	registerInternalLinkAC: (canvasName: string, from: string, to: string) => unknown;
 };
 
 export function initAdvancedCanvasPatcher(
@@ -24,27 +20,26 @@ export function initAdvancedCanvasPatcher(
 	});
 }
 
-function patchAdvancedCanvas(
-	plugin: PluginHost,
-	patchRegistry: PatchRegistry,
-): void {
+function patchAdvancedCanvas(plugin: PluginHost, patchRegistry: PatchRegistry): void {
 	if (!plugin.settings.enableAdvancedCanvasIntegration) {
-		if (enableLogging) logger(
-			"[AdvancedCanvasPatcher] Integration is disabled in settings. Skipping patch.",
-		);
+		if (enableLogging)
+			logger(
+				"[AdvancedCanvasPatcher] Integration is disabled in settings. Skipping patch.",
+			);
 		return;
 	}
 
 	const advancedCanvasPlugin = plugin.app.plugins.plugins["advanced-canvas"];
 	if (!advancedCanvasPlugin) {
-		if (enableLogging) logger(
-			"[AdvancedCanvasPatcher] Advanced Canvas plugin not found. Skipping patch.",
-		);
+		if (enableLogging)
+			logger(
+				"[AdvancedCanvasPatcher] Advanced Canvas plugin not found. Skipping patch.",
+			);
 		return;
 	}
 
-	const metadataCache =
-		plugin.app.metadataCache as unknown as MetadataCacheWithAdvancedCanvas;
+	const metadataCache = plugin.app
+		.metadataCache as unknown as MetadataCacheWithAdvancedCanvas;
 	if (typeof metadataCache.registerInternalLinkAC !== "function") {
 		console.warn(
 			"[AdvancedCanvasPatcher] `registerInternalLinkAC` function not found on metadataCache. Patching aborted.",
@@ -71,11 +66,12 @@ function patchAdvancedCanvas(
 
 				// 2. TwoHopプラグインのEventManagerに更新を通知
 				if (typeof from === "string") {
-if (enableLogging) logger(
-						`[AdvancedCanvasPatcher] Detected link creation: ${from} -> ${String(
-							to,
-						)}. Requesting index update.`,
-					);
+					if (enableLogging)
+						logger(
+							`[AdvancedCanvasPatcher] Detected link creation: ${from} -> ${String(
+								to,
+							)}. Requesting index update.`,
+						);
 					indexUpdateQueue.requestIndexUpdateForFile(from);
 				}
 
@@ -85,8 +81,9 @@ if (enableLogging) logger(
 	});
 
 	if (applied) {
-if (enableLogging) logger(
-			"[AdvancedCanvasPatcher] Successfully patched `registerInternalLinkAC` for TwoHop link indexing.",
-		);
+		if (enableLogging)
+			logger(
+				"[AdvancedCanvasPatcher] Successfully patched `registerInternalLinkAC` for TwoHop link indexing.",
+			);
 	}
 }

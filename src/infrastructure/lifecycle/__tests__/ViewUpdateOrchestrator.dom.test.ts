@@ -161,9 +161,7 @@ function createCanvasLeaf() {
 	};
 }
 
-function createMocks(overrides?: {
-	indexingService?: Record<string, unknown>;
-}) {
+function createMocks(overrides?: { indexingService?: Record<string, unknown> }) {
 	const app = {
 		workspace: {
 			iterateAllLeaves: vi.fn(),
@@ -213,9 +211,7 @@ function createOrchestrator(mockDeps: ReturnType<typeof createMocks>) {
 }
 
 function expectUpdateForPathsCalledWith(
-	propertyStyleManager: ReturnType<
-		typeof createMocks
-	>["propertyStyleManager"],
+	propertyStyleManager: ReturnType<typeof createMocks>["propertyStyleManager"],
 	expectedPaths: string[],
 ) {
 	expect(propertyStyleManager.updateForPaths).toHaveBeenCalledTimes(1);
@@ -248,8 +244,7 @@ describe("ViewUpdateOrchestrator", () => {
 		];
 		const mocks = createMocks();
 		mocks.app.workspace.iterateAllLeaves.mockImplementation(
-			(callback: (leaf: { view: unknown }) => void) =>
-				leaves.forEach(callback),
+			(callback: (leaf: { view: unknown }) => void) => leaves.forEach(callback),
 		);
 
 		const orchestrator = createOrchestrator(mocks);
@@ -260,26 +255,27 @@ describe("ViewUpdateOrchestrator", () => {
 			affectedLookupKeys: [],
 		});
 
-		expect(
-			mocks.markdownRenderManager.reprocessDecorations,
-		).toHaveBeenCalledTimes(1);
-		expect(
-			mocks.markdownRenderManager.reprocessDecorations,
-		).toHaveBeenCalledWith("notes/match.md");
+		expect(mocks.markdownRenderManager.reprocessDecorations).toHaveBeenCalledTimes(
+			1,
+		);
+		expect(mocks.markdownRenderManager.reprocessDecorations).toHaveBeenCalledWith(
+			"notes/match.md",
+		);
 		expect(sourceMatch.dispatch).toHaveBeenCalledTimes(1);
 		expect(sourceOther.dispatch).not.toHaveBeenCalled();
-		expect(
-			mocks.stylingService.decorateLinksInContainer,
-		).toHaveBeenCalledWith(sourceMatch.sourceContainer, "notes/match.md");
-		expect(
-			mocks.stylingService.decorateLinksInContainer,
-		).toHaveBeenCalledWith(previewMatch.previewContainer, "notes/match.md");
-		expect(
-			mocks.stylingService.decorateLinksInContainer,
-		).not.toHaveBeenCalledWith(expect.anything(), "notes/other.md");
-		expectUpdateForPathsCalledWith(mocks.propertyStyleManager, [
+		expect(mocks.stylingService.decorateLinksInContainer).toHaveBeenCalledWith(
+			sourceMatch.sourceContainer,
 			"notes/match.md",
-		]);
+		);
+		expect(mocks.stylingService.decorateLinksInContainer).toHaveBeenCalledWith(
+			previewMatch.previewContainer,
+			"notes/match.md",
+		);
+		expect(mocks.stylingService.decorateLinksInContainer).not.toHaveBeenCalledWith(
+			expect.anything(),
+			"notes/other.md",
+		);
+		expectUpdateForPathsCalledWith(mocks.propertyStyleManager, ["notes/match.md"]);
 		expect(processBasesPaneSpy).not.toHaveBeenCalled();
 	});
 
@@ -289,8 +285,7 @@ describe("ViewUpdateOrchestrator", () => {
 		const leaves = [source.leaf, preview.leaf];
 		const mocks = createMocks();
 		mocks.app.workspace.iterateAllLeaves.mockImplementation(
-			(callback: (leaf: { view: unknown }) => void) =>
-				leaves.forEach(callback),
+			(callback: (leaf: { view: unknown }) => void) => leaves.forEach(callback),
 		);
 
 		const orchestrator = createOrchestrator(mocks);
@@ -299,19 +294,21 @@ describe("ViewUpdateOrchestrator", () => {
 			indexVersion: 1,
 		});
 
-		expect(
-			mocks.markdownRenderManager.reprocessDecorations,
-		).toHaveBeenCalledWith("notes/source.md");
-		expect(
-			mocks.markdownRenderManager.reprocessDecorations,
-		).toHaveBeenCalledWith("notes/preview.md");
+		expect(mocks.markdownRenderManager.reprocessDecorations).toHaveBeenCalledWith(
+			"notes/source.md",
+		);
+		expect(mocks.markdownRenderManager.reprocessDecorations).toHaveBeenCalledWith(
+			"notes/preview.md",
+		);
 		expect(source.dispatch).toHaveBeenCalledTimes(1);
-		expect(
-			mocks.stylingService.decorateLinksInContainer,
-		).toHaveBeenCalledWith(source.sourceContainer, "notes/source.md");
-		expect(
-			mocks.stylingService.decorateLinksInContainer,
-		).toHaveBeenCalledWith(preview.previewContainer, "notes/preview.md");
+		expect(mocks.stylingService.decorateLinksInContainer).toHaveBeenCalledWith(
+			source.sourceContainer,
+			"notes/source.md",
+		);
+		expect(mocks.stylingService.decorateLinksInContainer).toHaveBeenCalledWith(
+			preview.previewContainer,
+			"notes/preview.md",
+		);
 		expect(mocks.propertyStyleManager.updateAll).toHaveBeenCalledTimes(1);
 	});
 
@@ -319,8 +316,7 @@ describe("ViewUpdateOrchestrator", () => {
 		const canvasLeaf = createCanvasLeaf();
 		const mocks = createMocks();
 		mocks.app.workspace.iterateAllLeaves.mockImplementation(
-			(callback: (leaf: { view: unknown }) => void) =>
-				callback(canvasLeaf.leaf),
+			(callback: (leaf: { view: unknown }) => void) => callback(canvasLeaf.leaf),
 		);
 
 		const orchestrator = createOrchestrator(mocks);
@@ -333,15 +329,15 @@ describe("ViewUpdateOrchestrator", () => {
 
 		expect(canvasLeaf.matchedEditDispatch).toHaveBeenCalledTimes(1);
 		expect(canvasLeaf.otherEditDispatch).not.toHaveBeenCalled();
-		expect(
-			mocks.plugin.processUnresolvedLinksInElement,
-		).toHaveBeenCalledWith(canvasLeaf.matchedPreviewEl, "notes/match.md");
-		expect(
-			mocks.plugin.processUnresolvedLinksInElement,
-		).toHaveBeenCalledWith(canvasLeaf.textPreviewEl, "boards/board.canvas");
-		expect(
-			mocks.plugin.processUnresolvedLinksInElement,
-		).toHaveBeenCalledTimes(2);
+		expect(mocks.plugin.processUnresolvedLinksInElement).toHaveBeenCalledWith(
+			canvasLeaf.matchedPreviewEl,
+			"notes/match.md",
+		);
+		expect(mocks.plugin.processUnresolvedLinksInElement).toHaveBeenCalledWith(
+			canvasLeaf.textPreviewEl,
+			"boards/board.canvas",
+		);
+		expect(mocks.plugin.processUnresolvedLinksInElement).toHaveBeenCalledTimes(2);
 	});
 
 	it("updates markdown views and property widgets for lookup-key-only changes", () => {
@@ -361,8 +357,7 @@ describe("ViewUpdateOrchestrator", () => {
 			indexingService: { getSourcePathsForLookupKeys },
 		});
 		mocks.app.workspace.iterateAllLeaves.mockImplementation(
-			(callback: (leaf: { view: unknown }) => void) =>
-				leaves.forEach(callback),
+			(callback: (leaf: { view: unknown }) => void) => leaves.forEach(callback),
 		);
 
 		const orchestrator = createOrchestrator(mocks);
@@ -374,26 +369,23 @@ describe("ViewUpdateOrchestrator", () => {
 		});
 
 		expect(getSourcePathsForLookupKeys).toHaveBeenCalledTimes(1);
-		expect(
-			mocks.markdownRenderManager.reprocessDecorations,
-		).toHaveBeenCalledTimes(1);
-		expect(
-			mocks.markdownRenderManager.reprocessDecorations,
-		).toHaveBeenCalledWith("notes/source.md");
+		expect(mocks.markdownRenderManager.reprocessDecorations).toHaveBeenCalledTimes(
+			1,
+		);
+		expect(mocks.markdownRenderManager.reprocessDecorations).toHaveBeenCalledWith(
+			"notes/source.md",
+		);
 		expect(sourceMatch.dispatch).toHaveBeenCalledTimes(1);
 		expect(sourceOther.dispatch).not.toHaveBeenCalled();
-		expect(
-			mocks.stylingService.decorateLinksInContainer,
-		).toHaveBeenCalledWith(sourceMatch.sourceContainer, "notes/source.md");
-		expect(
-			mocks.stylingService.decorateLinksInContainer,
-		).toHaveBeenCalledWith(
+		expect(mocks.stylingService.decorateLinksInContainer).toHaveBeenCalledWith(
+			sourceMatch.sourceContainer,
+			"notes/source.md",
+		);
+		expect(mocks.stylingService.decorateLinksInContainer).toHaveBeenCalledWith(
 			previewMatch.previewContainer,
 			"notes/source.md",
 		);
-		expectUpdateForPathsCalledWith(mocks.propertyStyleManager, [
-			"notes/source.md",
-		]);
+		expectUpdateForPathsCalledWith(mocks.propertyStyleManager, ["notes/source.md"]);
 	});
 
 	it("updates canvas text nodes when only affected lookup keys match", () => {
@@ -405,8 +397,7 @@ describe("ViewUpdateOrchestrator", () => {
 
 		const mocks = createMocks();
 		mocks.app.workspace.iterateAllLeaves.mockImplementation(
-			(callback: (leaf: { view: unknown }) => void) =>
-				callback(canvasLeaf.leaf),
+			(callback: (leaf: { view: unknown }) => void) => callback(canvasLeaf.leaf),
 		);
 
 		const orchestrator = createOrchestrator(mocks);
@@ -417,12 +408,11 @@ describe("ViewUpdateOrchestrator", () => {
 			affectedLookupKeys: ["match.md"],
 		});
 
-		expect(
-			mocks.plugin.processUnresolvedLinksInElement,
-		).toHaveBeenCalledTimes(1);
-		expect(
-			mocks.plugin.processUnresolvedLinksInElement,
-		).toHaveBeenCalledWith(canvasLeaf.textPreviewEl, "boards/board.canvas");
+		expect(mocks.plugin.processUnresolvedLinksInElement).toHaveBeenCalledTimes(1);
+		expect(mocks.plugin.processUnresolvedLinksInElement).toHaveBeenCalledWith(
+			canvasLeaf.textPreviewEl,
+			"boards/board.canvas",
+		);
 		expect(canvasLeaf.matchedEditDispatch).not.toHaveBeenCalled();
 		expect(canvasLeaf.otherEditDispatch).not.toHaveBeenCalled();
 	});
@@ -461,9 +451,7 @@ describe("ViewUpdateOrchestrator", () => {
 			expect.any(Object),
 			expect.any(Array),
 		);
-		expect(
-			mocks.propertyStyleManager.updateForPaths,
-		).not.toHaveBeenCalled();
+		expect(mocks.propertyStyleManager.updateForPaths).not.toHaveBeenCalled();
 	});
 
 	it("skips update when only affected tags are present", () => {
@@ -472,8 +460,7 @@ describe("ViewUpdateOrchestrator", () => {
 		const leaves = [sourceMatch.leaf, previewMatch.leaf];
 		const mocks = createMocks();
 		mocks.app.workspace.iterateAllLeaves.mockImplementation(
-			(callback: (leaf: { view: unknown }) => void) =>
-				leaves.forEach(callback),
+			(callback: (leaf: { view: unknown }) => void) => leaves.forEach(callback),
 		);
 
 		const orchestrator = createOrchestrator(mocks);
@@ -485,16 +472,10 @@ describe("ViewUpdateOrchestrator", () => {
 			affectedTags: ["#tag1", "#tag2"],
 		});
 
-		expect(
-			mocks.markdownRenderManager.reprocessDecorations,
-		).not.toHaveBeenCalled();
+		expect(mocks.markdownRenderManager.reprocessDecorations).not.toHaveBeenCalled();
 		expect(sourceMatch.dispatch).not.toHaveBeenCalled();
-		expect(
-			mocks.stylingService.decorateLinksInContainer,
-		).not.toHaveBeenCalled();
+		expect(mocks.stylingService.decorateLinksInContainer).not.toHaveBeenCalled();
 		expect(mocks.propertyStyleManager.updateAll).not.toHaveBeenCalled();
-		expect(
-			mocks.propertyStyleManager.updateForPaths,
-		).not.toHaveBeenCalled();
+		expect(mocks.propertyStyleManager.updateForPaths).not.toHaveBeenCalled();
 	});
 });

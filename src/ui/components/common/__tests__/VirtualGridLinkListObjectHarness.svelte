@@ -32,7 +32,6 @@
 		onMountedCellsChange,
 		useItemRenderRevision = false,
 	}: Props = $props();
-
 </script>
 
 <div

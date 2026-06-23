@@ -230,9 +230,7 @@ export function installMathJaxShadowPatch(): void {
 	queueMathJaxShadowStylesSync();
 }
 
-export function syncMathJaxStylesToShadowRoot(
-	shadowRoot: ShadowRoot,
-): boolean {
+export function syncMathJaxStylesToShadowRoot(shadowRoot: ShadowRoot): boolean {
 	registerMathJaxShadowRoot(shadowRoot);
 
 	const source = getMathJaxStylesheetSource();

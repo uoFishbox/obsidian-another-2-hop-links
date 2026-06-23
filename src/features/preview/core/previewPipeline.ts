@@ -2,10 +2,7 @@ import type { TFile } from "obsidian";
 import type { PreviewData } from "../public-types";
 import type { PreviewContext, PreviewStrategy } from "./PreviewStrategy";
 import type { PreviewGenerationCache } from "./previewCache";
-import {
-	disposePreviewData,
-	getPreviewDataSize,
-} from "./previewCache";
+import { disposePreviewData, getPreviewDataSize } from "./previewCache";
 import { createAbortError, isAbortError } from "./previewAbort";
 
 export async function runPreviewPipeline(
@@ -37,11 +34,8 @@ export async function runPreviewPipeline(
 				continue;
 			}
 
-			cache.set(
-				cacheKey,
-				result,
-				getPreviewDataSize(result),
-				() => disposePreviewData(result),
+			cache.set(cacheKey, result, getPreviewDataSize(result), () =>
+				disposePreviewData(result),
 			);
 			return result;
 		} catch (error) {

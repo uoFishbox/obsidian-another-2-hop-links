@@ -79,10 +79,7 @@ function collectOrderedBookmarkedFilePaths(
 	}
 
 	const bookmarkNode = node as BookmarkNodeLike;
-	if (
-		bookmarkNode.type === "file" &&
-		typeof bookmarkNode.path === "string"
-	) {
+	if (bookmarkNode.type === "file" && typeof bookmarkNode.path === "string") {
 		const normalized = normalizePath(bookmarkNode.path);
 		if (!seen.has(normalized)) {
 			seen.add(normalized);

@@ -1,8 +1,5 @@
 import type { TFile, Pos } from "obsidian";
-import type {
-	LinkContext,
-	LinkInteractionOptions,
-} from "ui/context/linkContext";
+import type { LinkContext, LinkInteractionOptions } from "ui/context/linkContext";
 
 export function createViewLinkContext(
 	originalLinkContext: LinkContext,

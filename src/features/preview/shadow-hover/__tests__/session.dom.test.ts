@@ -75,16 +75,12 @@ describe("createRequestHoverParent", () => {
 
 		hoverParentB.hoverPopover = popoverB;
 		expect(getActiveSessionPopover(session)).toBe(popoverB);
-		expect(getSessionOpenPopover(session.state)?.hoverParent).toBe(
-			hoverParentB,
-		);
+		expect(getSessionOpenPopover(session.state)?.hoverParent).toBe(hoverParentB);
 
 		hoverParentA.hoverPopover = null;
 
 		expect(getActiveSessionPopover(session)).toBe(popoverB);
-		expect(getSessionOpenPopover(session.state)?.hoverParent).toBe(
-			hoverParentB,
-		);
+		expect(getSessionOpenPopover(session.state)?.hoverParent).toBe(hoverParentB);
 	});
 
 	it("keeps popover ownership bound to the original actual anchor when another proxy is synced", () => {
@@ -151,20 +147,15 @@ describe("createRequestHoverParent", () => {
 
 		beginRequest(session, actualAnchorA, proxyAnchorA, 1);
 		registry.setHovered(actualAnchorA, true);
-		createRequestHoverParent(
-			session,
-			1,
-			proxyAnchorA,
-			actualAnchorA,
-		).hoverPopover = popoverA;
+		createRequestHoverParent(session, 1, proxyAnchorA, actualAnchorA).hoverPopover =
+			popoverA;
 
 		syncSessionAnchor(session, actualAnchorB, proxyAnchorB);
 		registry.setHovered(actualAnchorB, true);
 		transitionSession(session, {
 			type: "handoff-start",
 			fromPopover: popoverA,
-			fromHoverParent: getSessionOpenPopover(session.state)?.hoverParent ??
-				null,
+			fromHoverParent: getSessionOpenPopover(session.state)?.hoverParent ?? null,
 			fromAnchor: { actualEl: actualAnchorA, proxyEl: proxyAnchorA },
 			toAnchor: { actualEl: actualAnchorB, proxyEl: proxyAnchorB },
 			requestSeq: 2,
@@ -173,12 +164,8 @@ describe("createRequestHoverParent", () => {
 
 		expect(hideA).not.toHaveBeenCalled();
 
-		createRequestHoverParent(
-			session,
-			2,
-			proxyAnchorB,
-			actualAnchorB,
-		).hoverPopover = popoverB;
+		createRequestHoverParent(session, 2, proxyAnchorB, actualAnchorB).hoverPopover =
+			popoverB;
 
 		expect(hideA).toHaveBeenCalledTimes(1);
 		expect(hideB).not.toHaveBeenCalled();
@@ -220,12 +207,8 @@ describe("createRequestHoverParent", () => {
 		};
 		document.body.append(popover.hoverEl);
 
-		createRequestHoverParent(
-			session,
-			1,
-			proxyAnchor,
-			actualAnchor,
-		).hoverPopover = popover;
+		createRequestHoverParent(session, 1, proxyAnchor, actualAnchor).hoverPopover =
+			popover;
 
 		actualAnchor.remove();
 		popover.hide();

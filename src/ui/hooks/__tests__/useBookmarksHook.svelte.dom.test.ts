@@ -173,12 +173,8 @@ describe("useBookmarks", () => {
 			},
 		});
 		await waitFor(() => {
-			expect(screen.getByTestId("first-is-bookmarked").textContent).toBe(
-				"true",
-			);
-			expect(screen.getByTestId("second-is-bookmarked").textContent).toBe(
-				"true",
-			);
+			expect(screen.getByTestId("first-is-bookmarked").textContent).toBe("true");
+			expect(screen.getByTestId("second-is-bookmarked").textContent).toBe("true");
 		});
 
 		const readMock = mockApp.app.vault.adapter.read as unknown as {
@@ -189,12 +185,8 @@ describe("useBookmarks", () => {
 		};
 		const initialReadCount = readMock.mock.calls.length;
 		const initialWorkspaceOnCount = workspaceOnMock.mock.calls.length;
-		expect(readMock.mock.calls.length).toBe(
-			initialReadCount,
-		);
-		expect(workspaceOnMock.mock.calls.length).toBe(
-			initialWorkspaceOnCount,
-		);
+		expect(readMock.mock.calls.length).toBe(initialReadCount);
+		expect(workspaceOnMock.mock.calls.length).toBe(initialWorkspaceOnCount);
 
 		mockApp.setContent(
 			JSON.stringify({
@@ -205,19 +197,11 @@ describe("useBookmarks", () => {
 		await vi.advanceTimersByTimeAsync(120);
 
 		await waitFor(() => {
-			expect(screen.getByTestId("first-is-bookmarked").textContent).toBe(
-				"false",
-			);
-			expect(screen.getByTestId("second-is-bookmarked").textContent).toBe(
-				"true",
-			);
+			expect(screen.getByTestId("first-is-bookmarked").textContent).toBe("false");
+			expect(screen.getByTestId("second-is-bookmarked").textContent).toBe("true");
 		});
-		expect(readMock.mock.calls.length).toBe(
-			initialReadCount + 1,
-		);
-		expect(workspaceOnMock.mock.calls.length).toBe(
-			initialWorkspaceOnCount,
-		);
+		expect(readMock.mock.calls.length).toBe(initialReadCount + 1);
+		expect(workspaceOnMock.mock.calls.length).toBe(initialWorkspaceOnCount);
 	});
 
 	it("falls back to empty set when bookmarks file is missing", async () => {

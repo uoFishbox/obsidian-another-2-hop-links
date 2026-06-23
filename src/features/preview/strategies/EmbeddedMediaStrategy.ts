@@ -10,19 +10,12 @@ import { isImage, isVideo, readPreviewContent } from "../utils/previewUtils";
 import { isFileUrlImage, toObsidianResourceUrl } from "../utils/externalFileImage";
 import { generateVideoPreview } from "../renderers/videoPreviewRenderer";
 
-const TEXT_PREVIEW_EMBED_HOSTS = [
-	"x.com",
-	"twitter.com",
-	"youtube.com",
-	"youtu.be",
-];
+const TEXT_PREVIEW_EMBED_HOSTS = ["x.com", "twitter.com", "youtube.com", "youtu.be"];
 
 function parseHttpUrl(target: string): URL | undefined {
 	try {
 		const url = new URL(target);
-		return url.protocol === "http:" || url.protocol === "https:"
-			? url
-			: undefined;
+		return url.protocol === "http:" || url.protocol === "https:" ? url : undefined;
 	} catch {
 		return undefined;
 	}
@@ -65,10 +58,7 @@ async function resolveFirstEmbed(
 		const cache = context.metadataCache.getFileCache(file);
 		const firstEmbed = cache?.embeds?.[0];
 		if (firstEmbed) {
-			return parseEmbeddedMedia(
-				firstEmbed.original,
-				firstEmbed.link ?? "",
-			);
+			return parseEmbeddedMedia(firstEmbed.original, firstEmbed.link ?? "");
 		}
 	}
 
@@ -129,7 +119,6 @@ async function resolveEmbeddedMedia(
 	return undefined;
 }
 
-export const embeddedMediaStrategy: PreviewStrategy =
-	createEmbeddedMediaStrategy();
+export const embeddedMediaStrategy: PreviewStrategy = createEmbeddedMediaStrategy();
 
 export default createEmbeddedMediaStrategy;

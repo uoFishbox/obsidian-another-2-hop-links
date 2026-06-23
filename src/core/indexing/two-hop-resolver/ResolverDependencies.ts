@@ -19,9 +19,7 @@ export function collectResolverDependencies(
 	const dependencyTags = new Set<string>();
 
 	dependencyPaths.add(result.originFile.path);
-	dependencyLookupKeys.add(
-		toCaseInsensitiveLookupKey(result.originFile.path),
-	);
+	dependencyLookupKeys.add(toCaseInsensitiveLookupKey(result.originFile.path));
 	const originCache = metadataCache.getFileCache(result.originFile);
 	for (const tag of extractTags(originCache)) {
 		dependencyTags.add(tag.tag);

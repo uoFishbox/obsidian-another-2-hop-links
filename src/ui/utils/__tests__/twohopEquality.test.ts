@@ -11,11 +11,7 @@ import {
 	hasSameViewItemSource,
 } from "ui/utils/twohopEquality";
 import type { ViewItem } from "application/presenters";
-import type {
-	TaggedNote,
-	TwoHopIndexedLink,
-	TwoHopLinkBranch,
-} from "types/domain";
+import type { TaggedNote, TwoHopIndexedLink, TwoHopLinkBranch } from "types/domain";
 
 function createLink(overrides: Partial<TwoHopIndexedLink> = {}): TwoHopIndexedLink {
 	return {
@@ -44,9 +40,7 @@ function createBranch(
 	} as TwoHopLinkBranch;
 }
 
-function createTaggedNote(
-	overrides: Partial<TaggedNote> = {},
-): TaggedNote {
+function createTaggedNote(overrides: Partial<TaggedNote> = {}): TaggedNote {
 	return {
 		file: createMockTFile("notes/tagged.md"),
 		commonTags: ["alpha", "beta"],
@@ -199,20 +193,26 @@ describe("twohopEquality", () => {
 
 	it("treats branch cards with moved hop1 positions as equal", () => {
 		const sourceFile = createMockTFile("source.md");
-		const current = createBranch({}, {
-			sourceFile,
-			position: {
-				start: { line: 0, col: 0, offset: 10 },
-				end: { line: 0, col: 9, offset: 19 },
+		const current = createBranch(
+			{},
+			{
+				sourceFile,
+				position: {
+					start: { line: 0, col: 0, offset: 10 },
+					end: { line: 0, col: 9, offset: 19 },
+				},
 			},
-		});
-		const next = createBranch({}, {
-			sourceFile,
-			position: {
-				start: { line: 2, col: 0, offset: 40 },
-				end: { line: 2, col: 9, offset: 49 },
+		);
+		const next = createBranch(
+			{},
+			{
+				sourceFile,
+				position: {
+					start: { line: 2, col: 0, offset: 40 },
+					end: { line: 2, col: 9, offset: 49 },
+				},
 			},
-		});
+		);
 
 		expect(hasSameTwoHopBranchCard(current, next)).toBe(true);
 	});
@@ -225,14 +225,20 @@ describe("twohopEquality", () => {
 	});
 
 	it("treats omitted branch card fields like their serialized defaults", () => {
-		const current = createBranch({}, {
-			key: undefined,
-			isUnresolved: undefined,
-		});
-		const next = createBranch({}, {
-			key: "",
-			isUnresolved: false,
-		});
+		const current = createBranch(
+			{},
+			{
+				key: undefined,
+				isUnresolved: undefined,
+			},
+		);
+		const next = createBranch(
+			{},
+			{
+				key: "",
+				isUnresolved: false,
+			},
+		);
 
 		expect(hasSameTwoHopBranchCard(current, next)).toBe(true);
 	});
@@ -249,10 +255,7 @@ describe("twohopEquality", () => {
 		const current = createTaggedNote();
 
 		expect(
-			hasSameTaggedNote(
-				current,
-				createTaggedNote({ usageKey: "tag:beta" }),
-			),
+			hasSameTaggedNote(current, createTaggedNote({ usageKey: "tag:beta" })),
 		).toBe(false);
 		expect(
 			hasSameTaggedNote(

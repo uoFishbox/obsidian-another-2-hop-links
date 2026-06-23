@@ -64,8 +64,7 @@ export function createLinkStatusService(
 			return cached;
 		}
 
-		const result =
-			indexingService.isUnresolvedWithSingleBacklink(lookupPath);
+		const result = indexingService.isUnresolvedWithSingleBacklink(lookupPath);
 		decorationCache.set(lookupPath, result);
 		return result;
 	}

@@ -45,9 +45,7 @@ const createItem = (index: number): TwoHopPageVirtualItem => ({
 const createDescriptor = (
 	cardCount: number,
 ): SectionRenderDescriptor<TwoHopPageVirtualItem, TwoHopPageVirtualSection> => {
-	const items = Array.from({ length: cardCount }, (_, index) =>
-		createItem(index),
-	);
+	const items = Array.from({ length: cardCount }, (_, index) => createItem(index));
 	const section = {
 		kind: "new-links-section",
 		rawSectionId: "new-links",
@@ -86,15 +84,12 @@ describe("TwoHopViewPlanVirtualList DOM performance contracts", () => {
 	it.each(CARD_COUNTS)(
 		"bounds Shadow DOM cells for %i logical items",
 		async (cardCount) => {
-			const { container } = render(
-				TwoHopViewPlanVirtualListPerfHarness,
-				{
-					props: {
-						sections: [createDescriptor(cardCount)],
-						applicationStore,
-					},
+			const { container } = render(TwoHopViewPlanVirtualListPerfHarness, {
+				props: {
+					sections: [createDescriptor(cardCount)],
+					applicationStore,
 				},
-			);
+			});
 			const scrollRoot = container.querySelector<HTMLElement>(
 				"[data-testid='scroll-root']",
 			);
@@ -120,13 +115,11 @@ describe("TwoHopViewPlanVirtualList DOM performance contracts", () => {
 
 			const shadowRoot = virtualListRoot.shadowRoot;
 			const renderedItems =
-				shadowRoot?.querySelectorAll(
-					"[data-testid='twohop-item-cell']",
-				).length ?? 0;
+				shadowRoot?.querySelectorAll("[data-testid='twohop-item-cell']")
+					.length ?? 0;
 			expect(shadowRoot).not.toBeNull();
 			expect(
-				shadowRoot?.querySelectorAll(".view-plan-virtual-list-cell")
-					.length,
+				shadowRoot?.querySelectorAll(".view-plan-virtual-list-cell").length,
 			).toBeLessThanOrEqual(6);
 			expect(renderedItems).toBeGreaterThan(0);
 			expect(renderedItems).toBeLessThan(cardCount);
@@ -230,10 +223,9 @@ describe("TwoHopViewPlanVirtualList DOM performance contracts", () => {
 		await flushFrames();
 		await flushFrames();
 
-		const cardAfterScroll =
-			virtualListRoot.shadowRoot?.querySelector<HTMLElement>(
-				`[data-testid='twohop-item-cell'][data-index="${retainedIndex}"]`,
-			);
+		const cardAfterScroll = virtualListRoot.shadowRoot?.querySelector<HTMLElement>(
+			`[data-testid='twohop-item-cell'][data-index="${retainedIndex}"]`,
+		);
 		expect(cardAfterScroll).toBeTruthy();
 		if (!cardAfterScroll) return;
 

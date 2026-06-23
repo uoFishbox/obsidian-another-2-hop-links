@@ -185,11 +185,7 @@ export function createPropertyWidgetStyler(
 
 			const propertiesEl = getMetadataEditorContentEl(view);
 			const file = getViewFile(view);
-			if (
-				propertiesEl &&
-				file &&
-				registerAndStyleNewWidget(propertiesEl, file)
-			) {
+			if (propertiesEl && file && registerAndStyleNewWidget(propertiesEl, file)) {
 				count++;
 			}
 
@@ -212,14 +208,10 @@ export function createPropertyWidgetStyler(
 					if (!nodeData || !nodeData.file) continue;
 
 					const file = nodeData.file;
-					const propertiesEl = nodeEl.querySelector<HTMLElement>(
-						".metadata-container",
-					);
+					const propertiesEl =
+						nodeEl.querySelector<HTMLElement>(".metadata-container");
 
-					if (
-						propertiesEl &&
-						registerAndStyleNewWidget(propertiesEl, file)
-					) {
+					if (propertiesEl && registerAndStyleNewWidget(propertiesEl, file)) {
 						count++;
 					}
 				}

@@ -10,9 +10,7 @@ export interface SizedLRUCache<K, V> {
 	clear(): void;
 }
 
-export function createSizedLRUCache<K, V>(
-	maxSize: number,
-): SizedLRUCache<K, V> {
+export function createSizedLRUCache<K, V>(maxSize: number): SizedLRUCache<K, V> {
 	const map = new Map<K, SizedEntry<V>>();
 	let totalSize = 0;
 

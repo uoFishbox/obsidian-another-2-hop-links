@@ -3,9 +3,7 @@ import type { PluginSettings } from "types/settings";
 import { getFileCardTitleSearchText } from "core/frontmatterCardTitle";
 import type { ViewItem } from "application/presenters";
 import type { LinkContext } from "ui/context/linkContext";
-import {
-	getBranchSearchText,
-} from "features/search/searchSnapshotBuilders";
+import { getBranchSearchText } from "features/search/searchSnapshotBuilders";
 
 export function createItemSearchTextCache() {
 	const cache = new Map<string, string>();
@@ -35,8 +33,7 @@ export const getItemSearchText = (
 			sourcePath: linkContext.sourceFile.path,
 			fileToLinktext: linkContext.fileToLinktext,
 			getMetadata: linkContext.getMetadata,
-			priorityFrontmatterKeyForTitle:
-				settings?.priorityFrontmatterKeyForTitle,
+			priorityFrontmatterKeyForTitle: settings?.priorityFrontmatterKeyForTitle,
 		});
 
 	switch (item.type) {
@@ -56,10 +53,7 @@ export const getItemSearchText = (
 				return getBranchSearchText(item.data.hop1).toLowerCase();
 			}
 
-			return [
-				getFileText(targetFile),
-				getBranchSearchText(item.data.hop1),
-			]
+			return [getFileText(targetFile), getBranchSearchText(item.data.hop1)]
 				.filter(Boolean)
 				.join(" ")
 				.toLowerCase();

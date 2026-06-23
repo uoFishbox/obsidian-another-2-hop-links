@@ -6,10 +6,7 @@ import {
 import type { VirtualGridDataSource } from "../types";
 import type { FlatGridLayoutMetrics } from "../layoutMetrics";
 import type { RenderRevision } from "../renderRevision";
-import {
-	createFlatLinkRowModel,
-	type FlatLinkRowModel,
-} from "./flatLinkRowModel";
+import { createFlatLinkRowModel, type FlatLinkRowModel } from "./flatLinkRowModel";
 import { resolveVirtualListKeyRevision } from "./virtualListKeyRevision";
 
 export interface FlatListContentRevision {
@@ -122,8 +119,7 @@ export function createFlatVirtualGridRuntimeModel<T>() {
 				revision: {
 					data: params.itemsRevision ?? params.items,
 					itemRenderRevisionResolver:
-						params.itemRenderRevisionToken ??
-						params.getItemRenderRevision,
+						params.itemRenderRevisionToken ?? params.getItemRenderRevision,
 				},
 				keyRevision,
 				getItemRenderRevision: params.getItemRenderRevision,
@@ -146,10 +142,7 @@ export function createFlatVirtualGridRuntimeModel<T>() {
 				sectionId: params.sectionId,
 			});
 			const memo = logicalCellSourceMemo;
-			if (
-				memo &&
-				hasSameFlatListContentRevision(memo.revision, revision)
-			) {
+			if (memo && hasSameFlatListContentRevision(memo.revision, revision)) {
 				return memo.source;
 			}
 
@@ -177,10 +170,7 @@ export function createFlatVirtualGridRuntimeModel<T>() {
 			if (
 				memo &&
 				Object.is(memo.cellSourceRevision, params.cellSource.revision) &&
-				hasSameFlatGridLayoutMemoKey(
-					memo.layoutMemoKey,
-					layoutMemoKey,
-				)
+				hasSameFlatGridLayoutMemoKey(memo.layoutMemoKey, layoutMemoKey)
 			) {
 				return memo.rowModel;
 			}

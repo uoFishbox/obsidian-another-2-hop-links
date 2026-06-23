@@ -68,9 +68,7 @@ export function getOwnerWindow(node: Node | null | undefined): Window {
 	return node?.ownerDocument?.defaultView ?? window;
 }
 
-export function getOptionalOwnerWindow(
-	node: Node | null | undefined,
-): Window | null {
+export function getOptionalOwnerWindow(node: Node | null | undefined): Window | null {
 	return (
 		node?.ownerDocument?.defaultView ??
 		(typeof window === "undefined" ? null : window)
@@ -83,9 +81,7 @@ type WindowEventConstructors = Window & {
 	FocusEvent: typeof FocusEvent;
 };
 
-export function getWindowEventConstructors(
-	win: Window,
-): WindowEventConstructors {
+export function getWindowEventConstructors(win: Window): WindowEventConstructors {
 	return win as WindowEventConstructors;
 }
 

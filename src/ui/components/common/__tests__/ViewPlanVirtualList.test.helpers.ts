@@ -1,7 +1,4 @@
-import {
-	screen as domScreen,
-	within,
-} from "@testing-library/svelte";
+import { screen as domScreen, within } from "@testing-library/svelte";
 import type { SectionRenderDescriptor } from "ui/components/sections/types";
 import {
 	setElementRect,
@@ -23,9 +20,7 @@ export function withItemsState<T, G>(
 
 export type TextMatcher = Parameters<typeof domScreen.queryAllByText>[0];
 
-export function collectOpenShadowRoots(
-	root: ParentNode = document.body,
-): ShadowRoot[] {
+export function collectOpenShadowRoots(root: ParentNode = document.body): ShadowRoot[] {
 	const shadowRoots: ShadowRoot[] = [];
 
 	for (const element of Array.from(root.querySelectorAll("*"))) {
@@ -149,10 +144,7 @@ export function createDeepScreen() {
 			return elements.length > 0 ? elements[0] : null;
 		},
 		getByText(text: TextMatcher): HTMLElement {
-			return getSingleMatch(
-				queryAllByTextDeep(text),
-				`text: ${String(text)}`,
-			);
+			return getSingleMatch(queryAllByTextDeep(text), `text: ${String(text)}`);
 		},
 		queryByText(text: TextMatcher): HTMLElement | null {
 			const elements = queryAllByTextDeep(text);
@@ -251,9 +243,7 @@ export function prepareVirtualListLayout(
 	const scrollRoot = container.querySelector<HTMLElement>(
 		"[data-testid='scroll-root']",
 	);
-	const virtualList = container.querySelector<HTMLElement>(
-		".view-plan-virtual-list",
-	);
+	const virtualList = container.querySelector<HTMLElement>(".view-plan-virtual-list");
 
 	if (!scrollRoot || !virtualList) {
 		throw new Error("Required elements not found");

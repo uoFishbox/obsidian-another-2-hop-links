@@ -1,9 +1,6 @@
 import { getLinkpath, type Pos, type TFile } from "obsidian";
 
-import type {
-	CachedMetadataWithLinkReferences,
-	LinkReference,
-} from "types/domain";
+import type { CachedMetadataWithLinkReferences, LinkReference } from "types/domain";
 import type { IMetadataCache } from "types/obsidian";
 import type { OrderedBacklinkRef } from "../types/IndexTypes";
 import {

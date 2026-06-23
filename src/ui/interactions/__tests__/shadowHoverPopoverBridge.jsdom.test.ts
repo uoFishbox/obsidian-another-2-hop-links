@@ -16,9 +16,7 @@ const {
 	handleDelegatedLeaveMock: vi.fn(),
 	handleDelegatedPointerMoveMock: vi.fn(),
 	destroyMock: vi.fn(),
-	buildShadowHoverLinkSpecMock: vi.fn((descriptor?: {
-		interactionId?: string;
-	}) =>
+	buildShadowHoverLinkSpecMock: vi.fn((descriptor?: { interactionId?: string }) =>
 		descriptor?.interactionId
 			? {
 					linktext: descriptor.interactionId,
@@ -292,8 +290,9 @@ function createRegistryStub(
 		syncInteractionDescriptors: vi.fn(),
 		syncInteractionDescriptorResolvers: vi.fn(),
 		syncInteractionDescriptorResolverProvider: vi.fn(),
-		resolve: vi.fn((interactionId: string) =>
-			(descriptors[interactionId] ?? { interactionId }) as any,
+		resolve: vi.fn(
+			(interactionId: string) =>
+				(descriptors[interactionId] ?? { interactionId }) as any,
 		),
 		clear: vi.fn(),
 	};

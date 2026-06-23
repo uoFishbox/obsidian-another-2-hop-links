@@ -1,9 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { TwoHopSectionDescriptor } from "../twohopPageVirtualModel";
-import {
-	compileTwoHopViewPlan,
-	createTwoHopViewPlanRowModel,
-} from "../twoHopViewPlan";
+import { compileTwoHopViewPlan, createTwoHopViewPlanRowModel } from "../twoHopViewPlan";
 import { createTwoHopMountRuntime } from "../twoHopMountRuntime.svelte";
 
 const items = ["a", "b"].map((key) => ({
@@ -45,8 +42,7 @@ const rowModel = createTwoHopViewPlanRowModel(
 		},
 		materialization: { kind: "eager" },
 		resolveInitialSectionVisibleCount: (section) => section.loadedCount,
-		clampVisibleCount: (section, count) =>
-			Math.min(section.loadedCount, count),
+		clampVisibleCount: (section, count) => Math.min(section.loadedCount, count),
 	}),
 );
 
@@ -65,10 +61,7 @@ describe("createTwoHopMountRuntime", () => {
 		if (!firstItem) throw new Error("Expected first mounted item.");
 
 		runtime.syncSnapshot(mounted, { start: 1, end: 2 });
-		const firstState = runtime.getOrCreateVisibilityState(
-			firstItem,
-			"visible",
-		);
+		const firstState = runtime.getOrCreateVisibilityState(firstItem, "visible");
 		runtime.syncSnapshot(mounted, { start: 2, end: 3 });
 		expect(firstState.visibility).toBe("mounted");
 
@@ -84,9 +77,9 @@ describe("createTwoHopMountRuntime", () => {
 		runtime.syncSnapshot(scrolled, { start: 2, end: 3 });
 
 		expect(scrolled.rowSlices[0]?.slotKey).toBe(mounted.rowSlices[2]?.slotKey);
-		expect(
-			runtime.getOrCreateVisibilityState(firstItem, "visible"),
-		).not.toBe(firstState);
+		expect(runtime.getOrCreateVisibilityState(firstItem, "visible")).not.toBe(
+			firstState,
+		);
 	});
 
 	it("supports preview range objects that are reused by the caller", () => {
@@ -107,14 +100,8 @@ describe("createTwoHopMountRuntime", () => {
 
 		const reusedRange = { start: 1, end: 2 };
 		runtime.syncSnapshot(mounted, reusedRange);
-		const firstState = runtime.getOrCreateVisibilityState(
-			firstItem,
-			"visible",
-		);
-		const secondState = runtime.getOrCreateVisibilityState(
-			secondItem,
-			"mounted",
-		);
+		const firstState = runtime.getOrCreateVisibilityState(firstItem, "visible");
+		const secondState = runtime.getOrCreateVisibilityState(secondItem, "mounted");
 
 		reusedRange.start = 2;
 		reusedRange.end = 3;

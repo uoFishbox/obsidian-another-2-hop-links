@@ -1,11 +1,7 @@
 import type { TFile } from "obsidian";
 import type { IIndexingService } from "types/services";
 import type { IMetadataCache } from "types/obsidian";
-import type {
-	LinkReference,
-	TwoHopIndexedLink,
-	TwoHopLinkBranch,
-} from "types/domain";
+import type { LinkReference, TwoHopIndexedLink, TwoHopLinkBranch } from "types/domain";
 import { defaultYieldToMainThread } from "../timeSlicing";
 import { getLookupPathForLink } from "../link-resolution/linkResolution";
 import { resolveLinkDestination } from "../link-resolution/linkResolution";
@@ -128,8 +124,7 @@ export class TwoHopBranchBuilder {
 
 		for (let index = 0; index < branches.length; index += 1) {
 			const branch = branches[index];
-			const lookupPath =
-				branch.hop1.path ?? getLookupPathForLink(branch.hop1);
+			const lookupPath = branch.hop1.path ?? getLookupPathForLink(branch.hop1);
 			populatedBranches[index] = {
 				hop1: branch.hop1,
 				// Query results are immutable at runtime. The branch model remains

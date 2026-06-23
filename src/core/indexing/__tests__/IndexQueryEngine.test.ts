@@ -28,10 +28,7 @@ describe("IndexQueryEngine", () => {
 			]);
 
 			const snapshot = await env.snapshotBuilder.buildAsync();
-			const backlinks = env.engine.getBacklinksForLink(
-				snapshot,
-				"target.md",
-			);
+			const backlinks = env.engine.getBacklinksForLink(snapshot, "target.md");
 
 			expect(backlinks).toHaveLength(2);
 			const sourcePaths = backlinks.map((link) => link.sourceFile.path);
@@ -46,10 +43,7 @@ describe("IndexQueryEngine", () => {
 			]);
 
 			const snapshot = await env.snapshotBuilder.buildAsync();
-			const backlinks = env.engine.getBacklinksForLink(
-				snapshot,
-				"foo.md",
-			);
+			const backlinks = env.engine.getBacklinksForLink(snapshot, "foo.md");
 
 			expect(backlinks).toHaveLength(2);
 			const sourcePaths = backlinks.map((link) => link.sourceFile.path);
@@ -65,10 +59,7 @@ describe("IndexQueryEngine", () => {
 			]);
 
 			const snapshot = await env.snapshotBuilder.buildAsync();
-			const backlinks = env.engine.getBacklinksForLink(
-				snapshot,
-				"Note.md",
-			);
+			const backlinks = env.engine.getBacklinksForLink(snapshot, "Note.md");
 
 			expect(backlinks).toHaveLength(1);
 			expect(backlinks[0].sourceFile.path).toBe("resolved-source.md");
@@ -101,10 +92,7 @@ describe("IndexQueryEngine", () => {
 			]);
 
 			const snapshot = await env.snapshotBuilder.buildAsync();
-			const count = env.engine.getBacklinkCountForLink(
-				snapshot,
-				"target.md",
-			);
+			const count = env.engine.getBacklinkCountForLink(snapshot, "target.md");
 
 			expect(count).toBe(2);
 		});
@@ -116,10 +104,7 @@ describe("IndexQueryEngine", () => {
 			]);
 
 			const snapshot = await env.snapshotBuilder.buildAsync();
-			const count = env.engine.getBacklinkCountForLink(
-				snapshot,
-				"Foo.md",
-			);
+			const count = env.engine.getBacklinkCountForLink(snapshot, "Foo.md");
 
 			expect(count).toBe(2);
 		});
@@ -132,10 +117,7 @@ describe("IndexQueryEngine", () => {
 			]);
 
 			const snapshot = await env.snapshotBuilder.buildAsync();
-			const count = env.engine.getBacklinkCountForLink(
-				snapshot,
-				"Note.md",
-			);
+			const count = env.engine.getBacklinkCountForLink(snapshot, "Note.md");
 
 			expect(count).toBe(1);
 		});
@@ -152,18 +134,10 @@ describe("IndexQueryEngine", () => {
 			const snapshot = await env.snapshotBuilder.buildAsync();
 
 			expect(
-				env.engine.hasAtLeastUniqueBacklinkSources(
-					snapshot,
-					"target.md",
-					2,
-				),
+				env.engine.hasAtLeastUniqueBacklinkSources(snapshot, "target.md", 2),
 			).toBe(true);
 			expect(
-				env.engine.hasAtLeastUniqueBacklinkSources(
-					snapshot,
-					"target.md",
-					3,
-				),
+				env.engine.hasAtLeastUniqueBacklinkSources(snapshot, "target.md", 3),
 			).toBe(false);
 		});
 
@@ -194,34 +168,22 @@ describe("IndexQueryEngine", () => {
 			]);
 
 			const snapshot = await env.snapshotBuilder.buildAsync();
-			env.mockVault.getAbstractFileByPath.mockImplementation(
-				(path: string) => {
-					if (path === "file2.md") {
-						return null;
-					}
-					return env.files[path] ?? null;
-				},
-			);
+			env.mockVault.getAbstractFileByPath.mockImplementation((path: string) => {
+				if (path === "file2.md") {
+					return null;
+				}
+				return env.files[path] ?? null;
+			});
 
 			expect(
-				env.engine.hasAtLeastUniqueBacklinkSources(
-					snapshot,
-					"target.md",
-					3,
-					{
-						requireExistingSourceFile: true,
-					},
-				),
+				env.engine.hasAtLeastUniqueBacklinkSources(snapshot, "target.md", 3, {
+					requireExistingSourceFile: true,
+				}),
 			).toBe(false);
 			expect(
-				env.engine.hasAtLeastUniqueBacklinkSources(
-					snapshot,
-					"target.md",
-					2,
-					{
-						requireExistingSourceFile: true,
-					},
-				),
+				env.engine.hasAtLeastUniqueBacklinkSources(snapshot, "target.md", 2, {
+					requireExistingSourceFile: true,
+				}),
 			).toBe(true);
 		});
 
@@ -235,24 +197,14 @@ describe("IndexQueryEngine", () => {
 			const snapshot = await env.snapshotBuilder.buildAsync();
 
 			expect(
-				env.engine.hasAtLeastUniqueBacklinkSources(
-					snapshot,
-					"target.md",
-					2,
-					{
-						excludePath: "file1.md",
-					},
-				),
+				env.engine.hasAtLeastUniqueBacklinkSources(snapshot, "target.md", 2, {
+					excludePath: "file1.md",
+				}),
 			).toBe(false);
 			expect(
-				env.engine.hasAtLeastUniqueBacklinkSources(
-					snapshot,
-					"target.md",
-					1,
-					{
-						excludePath: "file1.md",
-					},
-				),
+				env.engine.hasAtLeastUniqueBacklinkSources(snapshot, "target.md", 1, {
+					excludePath: "file1.md",
+				}),
 			).toBe(true);
 		});
 
@@ -265,24 +217,14 @@ describe("IndexQueryEngine", () => {
 			const snapshot = await env.snapshotBuilder.buildAsync();
 
 			expect(
-				env.engine.hasAtLeastUniqueBacklinkSources(
-					snapshot,
-					"foo.md",
-					2,
-					{
-						requireExistingSourceFile: true,
-					},
-				),
+				env.engine.hasAtLeastUniqueBacklinkSources(snapshot, "foo.md", 2, {
+					requireExistingSourceFile: true,
+				}),
 			).toBe(true);
 			expect(
-				env.engine.hasAtLeastUniqueBacklinkSources(
-					snapshot,
-					"Foo.md",
-					2,
-					{
-						requireExistingSourceFile: true,
-					},
-				),
+				env.engine.hasAtLeastUniqueBacklinkSources(snapshot, "Foo.md", 2, {
+					requireExistingSourceFile: true,
+				}),
 			).toBe(true);
 		});
 
@@ -296,42 +238,30 @@ describe("IndexQueryEngine", () => {
 			const snapshot = await env.snapshotBuilder.buildAsync();
 
 			expect(
-				env.engine.hasAtLeastUniqueBacklinkSources(
-					snapshot,
-					"Note.md",
-					1,
-					{
-						requireExistingSourceFile: true,
-					},
-				),
+				env.engine.hasAtLeastUniqueBacklinkSources(snapshot, "Note.md", 1, {
+					requireExistingSourceFile: true,
+				}),
 			).toBe(true);
 			expect(
-				env.engine.hasAtLeastUniqueBacklinkSources(
-					snapshot,
-					"Note.md",
-					2,
-					{
-						requireExistingSourceFile: true,
-					},
-				),
+				env.engine.hasAtLeastUniqueBacklinkSources(snapshot, "Note.md", 2, {
+					requireExistingSourceFile: true,
+				}),
 			).toBe(false);
 		});
 	});
 
 	describe("isUnresolvedWithSingleBacklink", () => {
 		test("returns true when unresolved link has a single source", async () => {
-			const env = createQueryEnvironment([
-				{ path: "A.md", links: ["Foo"] },
-			]);
+			const env = createQueryEnvironment([{ path: "A.md", links: ["Foo"] }]);
 
 			const snapshot = await env.snapshotBuilder.buildAsync();
 
-			expect(
-				env.engine.isUnresolvedWithSingleBacklink(snapshot, "foo.md"),
-			).toBe(true);
-			expect(
-				env.engine.isUnresolvedWithSingleBacklink(snapshot, "Foo.md"),
-			).toBe(true);
+			expect(env.engine.isUnresolvedWithSingleBacklink(snapshot, "foo.md")).toBe(
+				true,
+			);
+			expect(env.engine.isUnresolvedWithSingleBacklink(snapshot, "Foo.md")).toBe(
+				true,
+			);
 		});
 
 		test("unresolved links aggregate case differences for single backlink determination", async () => {
@@ -342,12 +272,12 @@ describe("IndexQueryEngine", () => {
 
 			const snapshot = await env.snapshotBuilder.buildAsync();
 
-			expect(
-				env.engine.isUnresolvedWithSingleBacklink(snapshot, "foo.md"),
-			).toBe(false);
-			expect(
-				env.engine.isUnresolvedWithSingleBacklink(snapshot, "Foo.md"),
-			).toBe(false);
+			expect(env.engine.isUnresolvedWithSingleBacklink(snapshot, "foo.md")).toBe(
+				false,
+			);
+			expect(env.engine.isUnresolvedWithSingleBacklink(snapshot, "Foo.md")).toBe(
+				false,
+			);
 		});
 
 		test("updates query cache even on representative change of sibling lookupPaths", async () => {
@@ -390,12 +320,12 @@ describe("IndexQueryEngine", () => {
 
 			const snapshot = await env.snapshotBuilder.buildAsync();
 
-			expect(
-				env.engine.getBacklinksForLink(snapshot, "Foo.md"),
-			).toMatchObject([{ rawText: "Foo" }]);
-			expect(
-				env.engine.getBacklinksForLink(snapshot, "foo.md"),
-			).toMatchObject([{ rawText: "Foo" }]);
+			expect(env.engine.getBacklinksForLink(snapshot, "Foo.md")).toMatchObject([
+				{ rawText: "Foo" },
+			]);
+			expect(env.engine.getBacklinksForLink(snapshot, "foo.md")).toMatchObject([
+				{ rawText: "Foo" },
+			]);
 
 			(env.mockMetadataCache.getFileCache as any).mockImplementation(
 				(file: TFile) => {
@@ -434,12 +364,12 @@ describe("IndexQueryEngine", () => {
 
 			const snapshot2 = await env.snapshotBuilder.buildAsync();
 
-			expect(
-				env.engine.getBacklinksForLink(snapshot2, "Foo.md"),
-			).toMatchObject([{ rawText: "foo" }]);
-			expect(
-				env.engine.getBacklinksForLink(snapshot2, "foo.md"),
-			).toMatchObject([{ rawText: "foo" }]);
+			expect(env.engine.getBacklinksForLink(snapshot2, "Foo.md")).toMatchObject([
+				{ rawText: "foo" },
+			]);
+			expect(env.engine.getBacklinksForLink(snapshot2, "foo.md")).toMatchObject([
+				{ rawText: "foo" },
+			]);
 		});
 	});
 
@@ -453,8 +383,7 @@ describe("IndexQueryEngine", () => {
 			]);
 
 			const snapshot = await env.snapshotBuilder.buildAsync();
-			const callsBefore =
-				env.mockVault.getAbstractFileByPath.mock.calls.length;
+			const callsBefore = env.mockVault.getAbstractFileByPath.mock.calls.length;
 			const links = env.engine.getUniqueBacklinkSourcesForLink(
 				snapshot,
 				"target.md",
@@ -464,8 +393,7 @@ describe("IndexQueryEngine", () => {
 
 			expect(links).toHaveLength(2);
 			expect(
-				env.mockVault.getAbstractFileByPath.mock.calls.length -
-					callsBefore,
+				env.mockVault.getAbstractFileByPath.mock.calls.length - callsBefore,
 			).toBe(2);
 		});
 
@@ -544,10 +472,7 @@ describe("IndexQueryEngine", () => {
 			);
 
 			const snapshot = await env.snapshotBuilder.buildAsync();
-			const backlinks = env.engine.getBacklinksForLink(
-				snapshot,
-				"target.md",
-			);
+			const backlinks = env.engine.getBacklinksForLink(snapshot, "target.md");
 
 			expect(backlinks).toHaveLength(1);
 			expect(backlinks[0]).toMatchObject({
@@ -563,10 +488,7 @@ describe("IndexQueryEngine", () => {
 			]);
 
 			const snapshot = await env.snapshotBuilder.buildAsync();
-			const backlinks = env.engine.getBacklinksForLink(
-				snapshot,
-				"foo.md",
-			);
+			const backlinks = env.engine.getBacklinksForLink(snapshot, "foo.md");
 
 			expect(backlinks).toHaveLength(1);
 			expect(backlinks[0]).toMatchObject({

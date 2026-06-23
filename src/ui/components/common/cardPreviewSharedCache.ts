@@ -49,10 +49,9 @@ type SharedInFlightRequest<T> = {
 	promise: Promise<T>;
 };
 
-const renderedPreviewCache = createSizedLRUCache<
-	string,
-	RenderedPreviewCacheEntry
->(RENDERED_PREVIEW_CACHE_MAX_BYTES);
+const renderedPreviewCache = createSizedLRUCache<string, RenderedPreviewCacheEntry>(
+	RENDERED_PREVIEW_CACHE_MAX_BYTES,
+);
 const renderedPreviewInFlight = new Map<
 	string,
 	SharedInFlightRequest<RenderedPreviewCacheEntry>
@@ -60,18 +59,12 @@ const renderedPreviewInFlight = new Map<
 const searchContextPreviewCache = createSizedLRUCache<string, string>(
 	SEARCH_CONTEXT_CACHE_MAX_BYTES,
 );
-const searchContextPreviewInFlight = new Map<
-	string,
-	SharedInFlightRequest<string>
->();
-const previewAnalysisCache = createSizedLRUCache<
-	string,
-	PreviewContentAnalysis
->(PREVIEW_ANALYSIS_CACHE_MAX_BYTES);
+const searchContextPreviewInFlight = new Map<string, SharedInFlightRequest<string>>();
+const previewAnalysisCache = createSizedLRUCache<string, PreviewContentAnalysis>(
+	PREVIEW_ANALYSIS_CACHE_MAX_BYTES,
+);
 
-export function buildPreviewContentSettingsSignature(
-	settings: PluginSettings,
-): string {
+export function buildPreviewContentSettingsSignature(settings: PluginSettings): string {
 	const renderCodeBlockTypes = settings.renderCodeBlockTypes ?? [];
 	return [
 		settings.priorityFrontmatterKeyForPreview ?? "",
@@ -83,9 +76,7 @@ export function buildPreviewContentSettingsSignature(
 	].join(SIGNATURE_SEP);
 }
 
-export function buildSearchContextSettingsSignature(
-	settings: PluginSettings,
-): string {
+export function buildSearchContextSettingsSignature(settings: PluginSettings): string {
 	return [
 		settings.previewMaxChars,
 		settings.previewMaxLines,
@@ -171,20 +162,14 @@ function previewContentHasVisibleQuery(
 		return false;
 	}
 
-	return htmlVisibleTextContainsCaseInsensitive(
-		previewContent,
-		normalizedQuery,
-	);
+	return htmlVisibleTextContainsCaseInsensitive(previewContent, normalizedQuery);
 }
 
 function createAbortError(message: string): DOMException {
 	return new DOMException(message, "AbortError");
 }
 
-function throwIfAborted(
-	signal: AbortSignal | undefined,
-	message: string,
-): void {
+function throwIfAborted(signal: AbortSignal | undefined, message: string): void {
 	if (signal?.aborted) {
 		throw createAbortError(message);
 	}
@@ -249,18 +234,14 @@ function attachCallerToSharedRequest<T>(
 	});
 }
 
-function releaseSharedRequestCaller<T>(
-	request: SharedInFlightRequest<T>,
-): void {
+function releaseSharedRequestCaller<T>(request: SharedInFlightRequest<T>): void {
 	request.callerCount = Math.max(request.callerCount - 1, 0);
 	if (request.callerCount === 0) {
 		request.controller.abort();
 	}
 }
 
-function abortSharedRequests<T>(
-	requests: Map<string, SharedInFlightRequest<T>>,
-): void {
+function abortSharedRequests<T>(requests: Map<string, SharedInFlightRequest<T>>): void {
 	for (const request of requests.values()) {
 		request.controller.abort();
 	}
@@ -316,9 +297,7 @@ export async function applySharedSearchContextToTextPreview(params: {
 	previewContentIdentityKey: string;
 	targetFile: TFile;
 	normalizedQuery: string;
-	searchContext?:
-		| PreviewSearchContext
-		| (() => PreviewSearchContext | undefined);
+	searchContext?: PreviewSearchContext | (() => PreviewSearchContext | undefined);
 	settings: PluginSettings;
 	vault: Vault;
 	signal?: AbortSignal;
@@ -366,17 +345,11 @@ export async function applySharedSearchContextToTextPreview(params: {
 		throwIfAborted(sharedSignal, "Preview request aborted");
 		let contentForRender = previewContent;
 		if (!previewContentHasVisibleQuery(previewContent, normalizedQuery)) {
-			const rawContent = await readRawContent(
-				targetFile,
-				vault,
-				sharedSignal,
-			);
+			const rawContent = await readRawContent(targetFile, vault, sharedSignal);
 			throwIfAborted(sharedSignal, "Preview request aborted");
 
 			const resolvedSearchContext =
-				typeof searchContext === "function"
-					? searchContext()
-					: searchContext;
+				typeof searchContext === "function" ? searchContext() : searchContext;
 			const firstMatchIndex = resolveFirstMatchIndex(
 				rawContent,
 				normalizedQuery,
@@ -421,11 +394,7 @@ export async function applySharedSearchContextToTextPreview(params: {
 		() => searchContextPreviewInFlight.delete(cacheKey),
 	);
 
-	return attachCallerToSharedRequest(
-		request,
-		signal,
-		"Preview request aborted",
-	);
+	return attachCallerToSharedRequest(request, signal, "Preview request aborted");
 }
 
 export async function getOrCreateRenderedTextPreviewEntry(params: {
@@ -513,11 +482,7 @@ export async function getOrCreateRenderedTextPreviewEntry(params: {
 		() => renderedPreviewInFlight.delete(cacheKey),
 	);
 
-	return attachCallerToSharedRequest(
-		request,
-		signal,
-		"Preview render aborted",
-	);
+	return attachCallerToSharedRequest(request, signal, "Preview render aborted");
 }
 
 function renderTextPreviewEntry(params: {
@@ -528,8 +493,7 @@ function renderTextPreviewEntry(params: {
 	analysis?: PreviewContentAnalysis;
 	signal?: AbortSignal;
 }): Promise<RenderedPreviewCacheEntry> {
-	const { content, app, sourcePath, enableMathRendering, analysis, signal } =
-		params;
+	const { content, app, sourcePath, enableMathRendering, analysis, signal } = params;
 
 	return enqueuePreviewRender(async () => {
 		const tempContainer = document.createElement("div");
@@ -560,8 +524,7 @@ function renderTextPreviewEntry(params: {
 
 			return {
 				kind: "text",
-				hasMath:
-					enableMathRendering && analysis?.hasMathExpression === true,
+				hasMath: enableMathRendering && analysis?.hasMathExpression === true,
 				template,
 			};
 		} finally {
@@ -580,11 +543,7 @@ export function getSharedPreviewAnalysis(
 	}
 
 	const analysis = analyzePreviewContent(content);
-	previewAnalysisCache.set(
-		cacheKey,
-		analysis,
-		estimatePreviewAnalysisSize(analysis),
-	);
+	previewAnalysisCache.set(cacheKey, analysis, estimatePreviewAnalysisSize(analysis));
 	return analysis;
 }
 

@@ -97,9 +97,7 @@
 	}
 
 	const contentSearchAriaLabel = $derived(
-		contentSearchEnabled
-			? "Disable full-text search"
-			: "Enable full-text search",
+		contentSearchEnabled ? "Disable full-text search" : "Enable full-text search",
 	);
 </script>
 

@@ -93,8 +93,7 @@ describe("createTwoHopLayoutPlanCache in a DOM runtime", () => {
 		const cache = createTwoHopLayoutPlanCache({
 			materialization: { kind: "eager" },
 			resolveInitialSectionVisibleCount: (section) => section.loadedCount,
-			clampVisibleCount: (section, count) =>
-				Math.min(section.loadedCount, count),
+			clampVisibleCount: (section, count) => Math.min(section.loadedCount, count),
 		});
 		const sections = [descriptor];
 		const visibleCounts = { "new-links": 1 };
@@ -102,12 +101,8 @@ describe("createTwoHopLayoutPlanCache in a DOM runtime", () => {
 
 		expect(cache.resolve(sections, visibleCounts, layout)).toBe(first);
 		expect(cache.resolve([...sections], visibleCounts, layout)).not.toBe(first);
-		expect(cache.resolve(sections, { ...visibleCounts }, layout)).not.toBe(
-			first,
-		);
-		expect(cache.resolve(sections, visibleCounts, { ...layout })).not.toBe(
-			first,
-		);
+		expect(cache.resolve(sections, { ...visibleCounts }, layout)).not.toBe(first);
+		expect(cache.resolve(sections, visibleCounts, { ...layout })).not.toBe(first);
 		expect(first.revision).toEqual({ kind: "opaque", token: first.plan });
 	});
 
@@ -116,8 +111,7 @@ describe("createTwoHopLayoutPlanCache in a DOM runtime", () => {
 		const cache = createTwoHopLayoutPlanCache({
 			materialization: createBatchedMaterialization(1),
 			resolveInitialSectionVisibleCount: (section) => section.loadedCount,
-			clampVisibleCount: (section, count) =>
-				Math.min(section.loadedCount, count),
+			clampVisibleCount: (section, count) => Math.min(section.loadedCount, count),
 		});
 		const sections = [descriptor];
 		const first = cache.resolve(sections, {}, layout);
@@ -142,8 +136,7 @@ describe("createTwoHopLayoutPlanCache in a DOM runtime", () => {
 		const cache = createTwoHopLayoutPlanCache({
 			materialization: createBatchedMaterialization(1),
 			resolveInitialSectionVisibleCount: (section) => section.loadedCount,
-			clampVisibleCount: (section, count) =>
-				Math.min(section.loadedCount, count),
+			clampVisibleCount: (section, count) => Math.min(section.loadedCount, count),
 		});
 		const rowModel = cache.resolve([descriptor], {}, layout);
 
@@ -168,8 +161,7 @@ describe("createTwoHopLayoutPlanCache in a DOM runtime", () => {
 		const cache = createTwoHopLayoutPlanCache({
 			materialization: createBatchedMaterialization(1),
 			resolveInitialSectionVisibleCount: (section) => section.loadedCount,
-			clampVisibleCount: (section, count) =>
-				Math.min(section.loadedCount, count),
+			clampVisibleCount: (section, count) => Math.min(section.loadedCount, count),
 		});
 		const rowModel = cache.resolve([descriptor], {}, layout);
 		const scrollSource = {};
@@ -180,8 +172,7 @@ describe("createTwoHopLayoutPlanCache in a DOM runtime", () => {
 
 		expect(rowModel.plan.materializationRevision).toBe(0);
 		expect(
-			rowModel.plan.materializationStateBySectionIndex[0]
-				?.materializedCellCount,
+			rowModel.plan.materializationStateBySectionIndex[0]?.materializedCellCount,
 		).toBe(0);
 		expect(onMaterialized).not.toHaveBeenCalled();
 		expect(idle.requestIdleCallback).toHaveBeenCalledTimes(2);

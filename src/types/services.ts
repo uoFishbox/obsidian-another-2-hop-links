@@ -9,10 +9,7 @@ import type {
 import type { DedupResult, DedupState } from "./deduplication";
 import type { SortOption } from "./settings";
 import type { SortableItem } from "core/sorting/types";
-import type {
-	PreviewData,
-	PreviewRequestOptions,
-} from "features/preview/public-types";
+import type { PreviewData, PreviewRequestOptions } from "features/preview/public-types";
 import type { DataUpdateContext } from "core/indexing/index-service/IndexEvents";
 
 /**
@@ -77,9 +74,7 @@ export interface IIndexingService {
 	peekNotesWithTag?(tag: string, sourcePath?: string): TaggedNote[];
 	awaitIdle(): Promise<void>;
 	isUnresolvedWithSingleBacklink(lookupPath: string): boolean;
-	isUnresolvedWithSingleBacklinkBatch(
-		lookupPaths: string[],
-	): Map<string, boolean>;
+	isUnresolvedWithSingleBacklinkBatch(lookupPaths: string[]): Map<string, boolean>;
 	onDataUpdate?(listener: (context: DataUpdateContext) => void): () => void;
 }
 

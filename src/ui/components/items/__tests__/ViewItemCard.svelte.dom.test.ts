@@ -139,9 +139,7 @@ describe("ViewItemCard", () => {
 		});
 
 		expect(screen.queryByTestId("card-preview-probe")).toBeNull();
-		expect(
-			document.querySelector(".unresolved-preview-placeholder"),
-		).toBeTruthy();
+		expect(document.querySelector(".unresolved-preview-placeholder")).toBeTruthy();
 		expect(document.querySelector(".preview-mount-slot")).toBeNull();
 		expect(linkContext.getPreview).not.toHaveBeenCalled();
 	});
@@ -311,5 +309,4 @@ describe("ViewItemCard", () => {
 
 		expect(screen.queryByTestId("card-preview-probe")).toBeNull();
 	});
-
 });

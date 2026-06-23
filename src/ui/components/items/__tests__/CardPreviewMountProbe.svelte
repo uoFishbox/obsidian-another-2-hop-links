@@ -4,10 +4,7 @@
 
 <script lang="ts">
 	import type { TFile } from "obsidian";
-	import type {
-		PreviewData,
-		PreviewRequestOptions,
-	} from "ui/context/linkContext";
+	import type { PreviewData, PreviewRequestOptions } from "ui/context/linkContext";
 
 	interface Props {
 		file: TFile | undefined;

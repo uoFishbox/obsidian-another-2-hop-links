@@ -34,9 +34,7 @@ export class TwoHopLinksLoader {
 	private loadRequestSequence = 0;
 	private currentFile: TFile | undefined = undefined;
 
-	constructor(
-		private readonly resolveTwoHopLinks: ResolveTwoHopLinks,
-	) {}
+	constructor(private readonly resolveTwoHopLinks: ResolveTwoHopLinks) {}
 
 	getCurrentFile(): TFile | undefined {
 		return this.currentFile;
@@ -55,8 +53,7 @@ export class TwoHopLinksLoader {
 			};
 		}
 
-		const isBackgroundRefresh =
-			!!options.force && isSameFile && hasExistingData;
+		const isBackgroundRefresh = !!options.force && isSameFile && hasExistingData;
 		this.currentFile = file;
 
 		return {

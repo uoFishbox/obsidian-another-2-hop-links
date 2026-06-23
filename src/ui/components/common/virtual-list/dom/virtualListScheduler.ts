@@ -14,9 +14,8 @@ export interface ScheduledVirtualListTask {
 const getDefaultWindow = (): Window | null =>
 	typeof window === "undefined" ? null : window;
 
-const resolveScheduledTaskWindow = (
-	getWindow?: () => Window | null,
-): Window | null => getWindow?.() ?? getDefaultWindow();
+const resolveScheduledTaskWindow = (getWindow?: () => Window | null): Window | null =>
+	getWindow?.() ?? getDefaultWindow();
 
 export const createScheduledVirtualListTask = (
 	callback: () => void,
@@ -169,15 +168,9 @@ export const createVirtualListMeasurementScheduler = ({
 	getWindow,
 }: VirtualListMeasurementSchedulerOptions) => {
 	let unstableMeasurementRetryCount = 0;
-	const layoutTask = createScheduledVirtualListTask(
-		runLayoutMeasurement,
-		getWindow,
-	);
+	const layoutTask = createScheduledVirtualListTask(runLayoutMeasurement, getWindow);
 	// Frame-align scroll measurements so wheel/scroll bursts coalesce before work runs.
-	const scrollTask = createScheduledVirtualListTask(
-		runScrollMeasurement,
-		getWindow,
-	);
+	const scrollTask = createScheduledVirtualListTask(runScrollMeasurement, getWindow);
 	const retryTask = createScheduledVirtualListTask(() => {
 		unstableMeasurementRetryCount += 1;
 		runLayoutMeasurement();
@@ -209,10 +202,7 @@ export const createVirtualListMeasurementScheduler = ({
 			scrollTask.schedule();
 		},
 		scheduleUnstableMeasurementRetry() {
-			if (
-				!resolveScheduledTaskWindow(getWindow) ||
-				retryTask.isScheduled()
-			) {
+			if (!resolveScheduledTaskWindow(getWindow) || retryTask.isScheduled()) {
 				return;
 			}
 

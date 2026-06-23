@@ -1,10 +1,6 @@
 import type { TFile } from "obsidian";
 import type { ViewItem } from "application/presenters";
-import type {
-	TaggedNote,
-	TwoHopIndexedLink,
-	TwoHopLinkBranch,
-} from "types/domain";
+import type { TaggedNote, TwoHopIndexedLink, TwoHopLinkBranch } from "types/domain";
 import { sameArrayBy, samePrimitiveArray } from "utils/arrayEquality";
 
 export const hasSameTwoHopIndexedLink = (
@@ -21,8 +17,7 @@ export const hasSameTwoHopIndexedLink = (
 		current.sourceFile.path === next.sourceFile.path &&
 		(current.position?.start.offset ?? -1) ===
 			(next.position?.start.offset ?? -1) &&
-		(current.position?.end.offset ?? -1) ===
-			(next.position?.end.offset ?? -1) &&
+		(current.position?.end.offset ?? -1) === (next.position?.end.offset ?? -1) &&
 		(current.backlinkCount ?? -1) === (next.backlinkCount ?? -1) &&
 		current.isUnresolved === next.isUnresolved
 	);
@@ -78,10 +73,7 @@ export const hasSameTwoHopBranchCard = (
 	);
 };
 
-export const hasSameTaggedNote = (
-	current: TaggedNote,
-	next: TaggedNote,
-): boolean => {
+export const hasSameTaggedNote = (current: TaggedNote, next: TaggedNote): boolean => {
 	if (current === next) return true;
 
 	return (
@@ -113,10 +105,7 @@ export const hasSameViewItemSource = (
 
 	switch (previousSource.type) {
 		case "branch": {
-			const prev = previousSource as Extract<
-				ViewItem,
-				{ type: "branch" }
-			>;
+			const prev = previousSource as Extract<ViewItem, { type: "branch" }>;
 			const next = nextSource as Extract<ViewItem, { type: "branch" }>;
 			return (
 				hasSameTwoHopIndexedLink(prev.data.hop1, next.data.hop1) &&
@@ -124,30 +113,18 @@ export const hasSameViewItemSource = (
 			);
 		}
 		case "backlink": {
-			const prev = previousSource as Extract<
-				ViewItem,
-				{ type: "backlink" }
-			>;
+			const prev = previousSource as Extract<ViewItem, { type: "backlink" }>;
 			const next = nextSource as Extract<ViewItem, { type: "backlink" }>;
 			return hasSameBacklinkIndexedLink(prev.data, next.data);
 		}
 		case "newLink": {
-			const prev = previousSource as Extract<
-				ViewItem,
-				{ type: "newLink" }
-			>;
+			const prev = previousSource as Extract<ViewItem, { type: "newLink" }>;
 			const next = nextSource as Extract<ViewItem, { type: "newLink" }>;
 			return hasSameTwoHopIndexedLink(prev.data, next.data);
 		}
 		case "taggedNote": {
-			const prev = previousSource as Extract<
-				ViewItem,
-				{ type: "taggedNote" }
-			>;
-			const next = nextSource as Extract<
-				ViewItem,
-				{ type: "taggedNote" }
-			>;
+			const prev = previousSource as Extract<ViewItem, { type: "taggedNote" }>;
+			const next = nextSource as Extract<ViewItem, { type: "taggedNote" }>;
 			return hasSameTaggedNote(prev.data, next.data);
 		}
 		case "file": {

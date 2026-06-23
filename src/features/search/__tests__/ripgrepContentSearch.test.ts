@@ -28,10 +28,7 @@ const items: SearchWorkerItemSnapshot[] = [
 describe("filterSearchDatasetWithRipgrepMatches", () => {
 	it("keeps worker search AND semantics across title and content matches", () => {
 		const matchesByTerm = new Map<string, ReadonlySet<string>>([
-			[
-				"beta",
-				new Set(["notes/title-and-content.md", "notes/content-only.md"]),
-			],
+			["beta", new Set(["notes/title-and-content.md", "notes/content-only.md"])],
 		]);
 
 		const matchedItems = filterSearchDatasetWithRipgrepMatches(

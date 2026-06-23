@@ -88,8 +88,19 @@ describe("markdownPostProcessor", () => {
 		expect(console.log).toHaveBeenCalled();
 		const calls = (console.log as any).mock.calls as unknown[][];
 		const allArgs = calls.flat();
-		expect(allArgs.some((arg) => typeof arg === "string" && arg.includes("notes/private.md"))).toBe(true);
-		expect(allArgs.some((arg) => typeof arg === "object" && arg !== null && (arg as any).text === "private note body")).toBe(true);
+		expect(
+			allArgs.some(
+				(arg) => typeof arg === "string" && arg.includes("notes/private.md"),
+			),
+		).toBe(true);
+		expect(
+			allArgs.some(
+				(arg) =>
+					typeof arg === "object" &&
+					arg !== null &&
+					(arg as any).text === "private note body",
+			),
+		).toBe(true);
 		assertCoreEffects(el, deps);
 	});
 });

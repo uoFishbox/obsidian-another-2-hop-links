@@ -48,9 +48,7 @@ function describeHoverEvent(event: Event | undefined): Record<string, unknown> {
 
 	return {
 		eventType: event.type,
-		target: describeTargetEl(
-			event.target as HTMLElement | ShadowRoot | null,
-		),
+		target: describeTargetEl(event.target as HTMLElement | ShadowRoot | null),
 		currentTarget: describeTargetEl(
 			event.currentTarget as HTMLElement | ShadowRoot | null,
 		),
@@ -89,8 +87,7 @@ function describeHoverLinkPayload(payload: unknown): Record<string, unknown> {
 		state?: unknown;
 		hoverParent?: unknown;
 	};
-	const event =
-		hoverPayload?.event instanceof Event ? hoverPayload.event : undefined;
+	const event = hoverPayload?.event instanceof Event ? hoverPayload.event : undefined;
 	return {
 		source: hoverPayload?.source ?? null,
 		linktext: hoverPayload?.linktext ?? null,
@@ -133,9 +130,10 @@ function patchPagePreviewInstance(
 		plugin.app,
 	).getPagePreviewOnLinkHover();
 	if (!capability.ok) {
-		if (enableLogging) logger(
-			`[PagePreviewShadowDomPatcher] Skipped page-preview patch: ${capability.reason}.`,
-		);
+		if (enableLogging)
+			logger(
+				`[PagePreviewShadowDomPatcher] Skipped page-preview patch: ${capability.reason}.`,
+			);
 		return;
 	}
 
@@ -160,33 +158,31 @@ function patchPagePreviewInstance(
 					(entry): entry is Event => entry instanceof Event,
 				);
 
-				if (enableLogging) logger(
-					"[PagePreviewShadowDomPatcher] onLinkHover intercepted",
-					{
+				if (enableLogging)
+					logger("[PagePreviewShadowDomPatcher] onLinkHover intercepted", {
 						callId,
 						sourcePath,
 						linkText,
 						incomingTargetEl: describeTargetEl(targetEl),
 						stack: describeShortStack(),
 						...describeHoverEvent(eventArg),
-					},
-				);
+					});
 				const normalizedTargetEl = normalizeHoverPopoverTargetEl(
 					targetEl,
 					eventArg,
 				);
-				if (enableLogging) logger(
-					"[PagePreviewShadowDomPatcher] onLinkHover normalized target",
-					{
-						callId,
-						sourcePath,
-						linkText,
-						incomingTargetEl: describeTargetEl(targetEl),
-						normalizedTargetEl:
-							describeTargetEl(normalizedTargetEl),
-						targetChanged: normalizedTargetEl !== targetEl,
-					},
-				);
+				if (enableLogging)
+					logger(
+						"[PagePreviewShadowDomPatcher] onLinkHover normalized target",
+						{
+							callId,
+							sourcePath,
+							linkText,
+							incomingTargetEl: describeTargetEl(targetEl),
+							normalizedTargetEl: describeTargetEl(normalizedTargetEl),
+							targetChanged: normalizedTargetEl !== targetEl,
+						},
+					);
 				return next.call(
 					this,
 					parent,
@@ -200,9 +196,10 @@ function patchPagePreviewInstance(
 	});
 
 	if (applied) {
-		if (enableLogging) logger(
-			"[PagePreviewShadowDomPatcher] Patched page-preview onLinkHover for Shadow DOM anchors.",
-		);
+		if (enableLogging)
+			logger(
+				"[PagePreviewShadowDomPatcher] Patched page-preview onLinkHover for Shadow DOM anchors.",
+			);
 	}
 }
 
@@ -212,9 +209,10 @@ function patchWorkspaceHoverLinkTrigger(
 ): void {
 	const workspace = plugin.app.workspace as WorkspaceLike;
 	if (typeof workspace.trigger !== "function") {
-		if (enableLogging) logger(
-			"[PagePreviewShadowDomPatcher] Skipped workspace hover-link patch: workspace.trigger unavailable.",
-		);
+		if (enableLogging)
+			logger(
+				"[PagePreviewShadowDomPatcher] Skipped workspace hover-link patch: workspace.trigger unavailable.",
+			);
 		return;
 	}
 	const applied = patchRegistry.apply(plugin, {
@@ -227,22 +225,24 @@ function patchWorkspaceHoverLinkTrigger(
 			function (this: WorkspaceLike, name: string, ...args: unknown[]) {
 				if (name === "hover-link") {
 					const triggerId = ++hoverTriggerSequence;
-					if (enableLogging) logger(
-						"[PagePreviewShadowDomPatcher] workspace.trigger('hover-link')",
-						{
-							triggerId,
-							stack: describeShortStack(),
-							...describeHoverLinkPayload(args[0]),
-						},
-					);
+					if (enableLogging)
+						logger(
+							"[PagePreviewShadowDomPatcher] workspace.trigger('hover-link')",
+							{
+								triggerId,
+								stack: describeShortStack(),
+								...describeHoverLinkPayload(args[0]),
+							},
+						);
 				}
 				return next.call(this, name, ...args);
 			},
 	});
 
 	if (applied) {
-		if (enableLogging) logger(
-			"[PagePreviewShadowDomPatcher] Patched workspace.trigger for hover-link diagnostics.",
-		);
+		if (enableLogging)
+			logger(
+				"[PagePreviewShadowDomPatcher] Patched workspace.trigger for hover-link diagnostics.",
+			);
 	}
 }

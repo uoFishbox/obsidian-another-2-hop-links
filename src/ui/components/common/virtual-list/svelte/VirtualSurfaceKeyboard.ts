@@ -45,8 +45,7 @@ export const moveFocusToAdjacentVirtualListSection = async (params: {
 			".cosense-card-links__search-result-container",
 		) ?? null;
 	const currentSection =
-		params.rootEl?.closest<HTMLElement>(".cosense-card-links__section") ??
-		null;
+		params.rootEl?.closest<HTMLElement>(".cosense-card-links__section") ?? null;
 	const targetSection = findAdjacentResultSection(
 		resultsContainer,
 		currentSection,
@@ -93,14 +92,14 @@ export const createVirtualListKeyboardHandler = (options: {
 					rootEl?.closest<HTMLElement>(
 						".cosense-card-links__search-result-container",
 					) ?? rootEl;
-				const surfaceRoot =
-					isHTMLElementLike(resultsContainer?.parentElement)
-						? resultsContainer.parentElement
-						: resultsContainer;
-				const searchInputContainer =
-					isHTMLElementLike(resultsContainer?.previousElementSibling)
-						? resultsContainer.previousElementSibling
-						: surfaceRoot;
+				const surfaceRoot = isHTMLElementLike(resultsContainer?.parentElement)
+					? resultsContainer.parentElement
+					: resultsContainer;
+				const searchInputContainer = isHTMLElementLike(
+					resultsContainer?.previousElementSibling,
+				)
+					? resultsContainer.previousElementSibling
+					: surfaceRoot;
 				event.preventDefault();
 				event.stopPropagation();
 
@@ -114,9 +113,7 @@ export const createVirtualListKeyboardHandler = (options: {
 					return;
 				}
 
-				if (
-					await options.moveFocusWithinList(currentTarget, direction)
-				) {
+				if (await options.moveFocusWithinList(currentTarget, direction)) {
 					return;
 				}
 

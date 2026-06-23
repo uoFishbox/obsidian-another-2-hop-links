@@ -44,10 +44,7 @@ function createUpdaterEnvironment(
 			buildAsync: () =>
 				buildIndexSnapshotAsync(env.mockVault, env.mockMetadataCache),
 		},
-		updater: new IncrementalIndexUpdater(
-			env.mockVault,
-			env.mockMetadataCache,
-		),
+		updater: new IncrementalIndexUpdater(env.mockVault, env.mockMetadataCache),
 	};
 }
 
@@ -119,9 +116,9 @@ describe("IncrementalIndexUpdater", () => {
 			{ type: "create", path: "src/note.md" },
 		]);
 
-		expect(
-			snapshot.backlinksMap.get("src/note.md")?.has("src/origin.md"),
-		).toBe(true);
+		expect(snapshot.backlinksMap.get("src/note.md")?.has("src/origin.md")).toBe(
+			true,
+		);
 		expect(snapshot.backlinksMap.get("archive/note.md")).toBeUndefined();
 		expect(serializeSnapshot(snapshot)).toEqual(
 			serializeSnapshot(await final.snapshotBuilder.buildAsync()),
@@ -173,19 +170,13 @@ describe("IncrementalIndexUpdater", () => {
 		]);
 
 		expect(result.affectedPaths).toEqual(
-			new Set([
-				"src/note.md",
-				"src/origin.md",
-				"other/unresolved-source.md",
-			]),
+			new Set(["src/note.md", "src/origin.md", "other/unresolved-source.md"]),
+		);
+		expect(snapshot.backlinksMap.get("src/note.md")?.has("src/origin.md")).toBe(
+			true,
 		);
 		expect(
-			snapshot.backlinksMap.get("src/note.md")?.has("src/origin.md"),
-		).toBe(true);
-		expect(
-			snapshot.backlinksMap
-				.get("src/note.md")
-				?.has("other/unresolved-source.md"),
+			snapshot.backlinksMap.get("src/note.md")?.has("other/unresolved-source.md"),
 		).toBe(true);
 		expect(serializeSnapshot(snapshot)).toEqual(
 			serializeSnapshot(await final.snapshotBuilder.buildAsync()),
@@ -221,9 +212,9 @@ describe("IncrementalIndexUpdater", () => {
 		expect(result.affectedPaths).toEqual(
 			new Set(["folderA/note.md", "src/note.md", "src/origin.md"]),
 		);
-		expect(
-			snapshot.backlinksMap.get("src/note.md")?.has("src/origin.md"),
-		).toBe(true);
+		expect(snapshot.backlinksMap.get("src/note.md")?.has("src/origin.md")).toBe(
+			true,
+		);
 		expect(snapshot.backlinksMap.get("folderA/note.md")).toBeUndefined();
 		expect(serializeSnapshot(snapshot)).toEqual(
 			serializeSnapshot(await final.snapshotBuilder.buildAsync()),
@@ -242,19 +233,13 @@ describe("IncrementalIndexUpdater", () => {
 			{ path: "src/peer.md" },
 		]);
 
-		installRelativeRenameResolver(
-			initial.mockVault,
-			initial.mockMetadataCache,
-		);
+		installRelativeRenameResolver(initial.mockVault, initial.mockMetadataCache);
 		installRelativeRenameResolver(final.mockVault, final.mockMetadataCache);
 
 		const snapshot = await initial.snapshotBuilder.buildAsync();
 		initial.builder.removeFile("folderA/note.md");
 		initial.builder.addFile({ path: "src/note.md", links: ["./peer"] });
-		installRelativeRenameResolver(
-			initial.mockVault,
-			initial.mockMetadataCache,
-		);
+		installRelativeRenameResolver(initial.mockVault, initial.mockMetadataCache);
 
 		const result = await initial.updater.applyAsync(snapshot, [
 			{
@@ -268,9 +253,7 @@ describe("IncrementalIndexUpdater", () => {
 			new Set(["folderA/note.md", "src/note.md"]),
 		);
 		expect(snapshot.backlinksMap.get("folderA/peer.md")).toBeUndefined();
-		expect(
-			snapshot.backlinksMap.get("src/peer.md")?.has("src/note.md"),
-		).toBe(true);
+		expect(snapshot.backlinksMap.get("src/peer.md")?.has("src/note.md")).toBe(true);
 		expect(serializeSnapshot(snapshot)).toEqual(
 			serializeSnapshot(await final.snapshotBuilder.buildAsync()),
 		);
@@ -288,19 +271,13 @@ describe("IncrementalIndexUpdater", () => {
 			{ path: "src/peer.md" },
 		]);
 
-		installRelativeRenameResolver(
-			initial.mockVault,
-			initial.mockMetadataCache,
-		);
+		installRelativeRenameResolver(initial.mockVault, initial.mockMetadataCache);
 		installRelativeRenameResolver(final.mockVault, final.mockMetadataCache);
 
 		const snapshot = await initial.snapshotBuilder.buildAsync();
 		initial.builder.removeFile("folderA/note.md");
 		initial.builder.addFile({ path: "src/note.md", links: [".\\peer"] });
-		installRelativeRenameResolver(
-			initial.mockVault,
-			initial.mockMetadataCache,
-		);
+		installRelativeRenameResolver(initial.mockVault, initial.mockMetadataCache);
 
 		await initial.updater.applyAsync(snapshot, [
 			{
@@ -311,9 +288,7 @@ describe("IncrementalIndexUpdater", () => {
 		]);
 
 		expect(snapshot.backlinksMap.get("folderA/peer.md")).toBeUndefined();
-		expect(
-			snapshot.backlinksMap.get("src/peer.md")?.has("src/note.md"),
-		).toBe(true);
+		expect(snapshot.backlinksMap.get("src/peer.md")?.has("src/note.md")).toBe(true);
 		expect(serializeSnapshot(snapshot)).toEqual(
 			serializeSnapshot(await final.snapshotBuilder.buildAsync()),
 		);
@@ -335,19 +310,13 @@ describe("IncrementalIndexUpdater", () => {
 			{ path: "archive/new-name.md" },
 		]);
 
-		installRenamedNoteResolver(
-			initial.mockVault,
-			initial.mockMetadataCache,
-		);
+		installRenamedNoteResolver(initial.mockVault, initial.mockMetadataCache);
 		installRenamedNoteResolver(final.mockVault, final.mockMetadataCache);
 
 		const snapshot = await initial.snapshotBuilder.buildAsync();
 		initial.builder.removeFile("old-name.md");
 		initial.builder.addFile({ path: "src/new-name.md" });
-		installRenamedNoteResolver(
-			initial.mockVault,
-			initial.mockMetadataCache,
-		);
+		installRenamedNoteResolver(initial.mockVault, initial.mockMetadataCache);
 
 		const result = await initial.updater.applyAsync(snapshot, [
 			{
@@ -367,21 +336,15 @@ describe("IncrementalIndexUpdater", () => {
 			]),
 		);
 		expect(
-			snapshot.backlinksMap
-				.get("src/new-name.md")
-				?.has("unresolved-source.md"),
+			snapshot.backlinksMap.get("src/new-name.md")?.has("unresolved-source.md"),
 		).toBe(true);
 		expect(
-			snapshot.backlinksMap
-				.get("src/new-name.md")
-				?.has("shadow-source.md"),
+			snapshot.backlinksMap.get("src/new-name.md")?.has("shadow-source.md"),
 		).toBe(true);
-		expect(
-			snapshot.backlinksMap.get("archive/new-name.md"),
-		).toBeUndefined();
-		expect(
-			snapshot.unresolvedLinkLookupToSources.get("old-name.md"),
-		).toEqual(new Set(["old-source.md"]));
+		expect(snapshot.backlinksMap.get("archive/new-name.md")).toBeUndefined();
+		expect(snapshot.unresolvedLinkLookupToSources.get("old-name.md")).toEqual(
+			new Set(["old-source.md"]),
+		);
 		expect(serializeSnapshot(snapshot)).toEqual(
 			serializeSnapshot(await final.snapshotBuilder.buildAsync()),
 		);
@@ -395,14 +358,8 @@ describe("IncrementalIndexUpdater", () => {
 			{ path: "src/note.md", links: ["folderA/note"] },
 		]);
 
-		installOldPathReferenceResolver(
-			initial.mockVault,
-			initial.mockMetadataCache,
-		);
-		installOldPathReferenceResolver(
-			final.mockVault,
-			final.mockMetadataCache,
-		);
+		installOldPathReferenceResolver(initial.mockVault, initial.mockMetadataCache);
+		installOldPathReferenceResolver(final.mockVault, final.mockMetadataCache);
 
 		const snapshot = await initial.snapshotBuilder.buildAsync();
 		initial.builder.removeFile("folderA/note.md");
@@ -410,10 +367,7 @@ describe("IncrementalIndexUpdater", () => {
 			path: "src/note.md",
 			links: ["folderA/note"],
 		});
-		installOldPathReferenceResolver(
-			initial.mockVault,
-			initial.mockMetadataCache,
-		);
+		installOldPathReferenceResolver(initial.mockVault, initial.mockMetadataCache);
 
 		const result = await initial.updater.applyAsync(snapshot, [
 			{
@@ -427,9 +381,9 @@ describe("IncrementalIndexUpdater", () => {
 			new Set(["folderA/note.md", "src/note.md"]),
 		);
 		expect(snapshot.backlinksMap.get("src/note.md")).toBeUndefined();
-		expect(
-			snapshot.unresolvedLinkLookupToSources.get("foldera/note.md"),
-		).toEqual(new Set(["src/note.md"]));
+		expect(snapshot.unresolvedLinkLookupToSources.get("foldera/note.md")).toEqual(
+			new Set(["src/note.md"]),
+		);
 
 		expect(serializeSnapshot(snapshot)).toEqual(
 			serializeSnapshot(await final.snapshotBuilder.buildAsync()),
@@ -444,22 +398,13 @@ describe("IncrementalIndexUpdater", () => {
 			{ path: "src/note.md", links: ["src/note"] },
 		]);
 
-		installNewPathReferenceResolver(
-			initial.mockVault,
-			initial.mockMetadataCache,
-		);
-		installNewPathReferenceResolver(
-			final.mockVault,
-			final.mockMetadataCache,
-		);
+		installNewPathReferenceResolver(initial.mockVault, initial.mockMetadataCache);
+		installNewPathReferenceResolver(final.mockVault, final.mockMetadataCache);
 
 		const snapshot = await initial.snapshotBuilder.buildAsync();
 		initial.builder.removeFile("folderA/note.md");
 		initial.builder.addFile({ path: "src/note.md", links: ["src/note"] });
-		installNewPathReferenceResolver(
-			initial.mockVault,
-			initial.mockMetadataCache,
-		);
+		installNewPathReferenceResolver(initial.mockVault, initial.mockMetadataCache);
 
 		const result = await initial.updater.applyAsync(snapshot, [
 			{
@@ -472,9 +417,7 @@ describe("IncrementalIndexUpdater", () => {
 		expect(result.affectedPaths).toEqual(
 			new Set(["folderA/note.md", "src/note.md"]),
 		);
-		expect(
-			snapshot.backlinksMap.get("src/note.md")?.has("src/note.md"),
-		).toBe(true);
+		expect(snapshot.backlinksMap.get("src/note.md")?.has("src/note.md")).toBe(true);
 		expect(
 			snapshot.sourceSummaries
 				.get("src/note.md")
@@ -541,10 +484,7 @@ describe("IncrementalIndexUpdater", () => {
 		]);
 
 		expect(result.affectedLookupKeys).toEqual(new Set(["foo.md"]));
-		expect([...result.cacheInvalidationPaths].sort()).toEqual([
-			"Foo.md",
-			"foo.md",
-		]);
+		expect([...result.cacheInvalidationPaths].sort()).toEqual(["Foo.md", "foo.md"]);
 	});
 
 	test("modify updates unresolved reverse index to resolved state", async () => {
@@ -554,25 +494,20 @@ describe("IncrementalIndexUpdater", () => {
 		]);
 		const snapshot = await env.snapshotBuilder.buildAsync();
 
-		expect(
-			snapshot.sourceSummaries.get("origin.md")?.unresolvedLookupKeys,
-		).toEqual(new Set(["missing.md"]));
-		expect(
-			snapshot.unresolvedLinkLookupToSources.get("missing.md"),
-		).toEqual(new Set(["origin.md"]));
+		expect(snapshot.sourceSummaries.get("origin.md")?.unresolvedLookupKeys).toEqual(
+			new Set(["missing.md"]),
+		);
+		expect(snapshot.unresolvedLinkLookupToSources.get("missing.md")).toEqual(
+			new Set(["origin.md"]),
+		);
 
 		env.builder.addFile({ path: "origin.md", links: ["target"] });
-		await env.updater.applyAsync(snapshot, [
-			{ type: "modify", path: "origin.md" },
-		]);
+		await env.updater.applyAsync(snapshot, [{ type: "modify", path: "origin.md" }]);
 
 		expect(
-			snapshot.sourceSummaries.get("origin.md")?.unresolvedLookupKeys
-				.size ?? 0,
+			snapshot.sourceSummaries.get("origin.md")?.unresolvedLookupKeys.size ?? 0,
 		).toBe(0);
-		expect(snapshot.unresolvedLinkLookupToSources.has("missing.md")).toBe(
-			false,
-		);
+		expect(snapshot.unresolvedLinkLookupToSources.has("missing.md")).toBe(false);
 	});
 
 	test("delete removes source from unresolved reverse index", async () => {
@@ -581,9 +516,9 @@ describe("IncrementalIndexUpdater", () => {
 		]);
 		const snapshot = await env.snapshotBuilder.buildAsync();
 
-		expect(
-			snapshot.sourceSummaries.get("origin.md")?.unresolvedLookupKeys,
-		).toEqual(new Set(["missing.md"]));
+		expect(snapshot.sourceSummaries.get("origin.md")?.unresolvedLookupKeys).toEqual(
+			new Set(["missing.md"]),
+		);
 
 		const result = await env.updater.applyAsync(snapshot, [
 			{ type: "delete", path: "origin.md" },
@@ -593,16 +528,11 @@ describe("IncrementalIndexUpdater", () => {
 			new Set(["origin.md", "missing.md"]),
 		);
 		expect(snapshot.sourceSummaries.has("origin.md")).toBe(false);
-		expect(snapshot.unresolvedLinkLookupToSources.has("missing.md")).toBe(
-			false,
-		);
+		expect(snapshot.unresolvedLinkLookupToSources.has("missing.md")).toBe(false);
 	});
 });
 
-function installShadowingResolver(
-	mockVault: any,
-	mockMetadataCache: any,
-): void {
+function installShadowingResolver(mockVault: any, mockMetadataCache: any): void {
 	(mockMetadataCache.getFirstLinkpathDest as any).mockImplementation(
 		(linkText: string, sourcePath: string) => {
 			if (sourcePath === "src/origin.md" && linkText === "note") {
@@ -612,18 +542,13 @@ function installShadowingResolver(
 				);
 			}
 
-			const normalized = linkText.endsWith(".md")
-				? linkText
-				: `${linkText}.md`;
+			const normalized = linkText.endsWith(".md") ? linkText : `${linkText}.md`;
 			return mockVault.getAbstractFileByPath(normalized);
 		},
 	);
 }
 
-function installMovedNoteResolver(
-	mockVault: any,
-	mockMetadataCache: any,
-): void {
+function installMovedNoteResolver(mockVault: any, mockMetadataCache: any): void {
 	(mockMetadataCache.getFirstLinkpathDest as any).mockImplementation(
 		(linkText: string, sourcePath: string) => {
 			if (sourcePath === "src/origin.md" && linkText === "note") {
@@ -633,18 +558,13 @@ function installMovedNoteResolver(
 				);
 			}
 
-			const normalized = linkText.endsWith(".md")
-				? linkText
-				: `${linkText}.md`;
+			const normalized = linkText.endsWith(".md") ? linkText : `${linkText}.md`;
 			return mockVault.getAbstractFileByPath(normalized);
 		},
 	);
 }
 
-function installRelativeRenameResolver(
-	mockVault: any,
-	mockMetadataCache: any,
-): void {
+function installRelativeRenameResolver(mockVault: any, mockMetadataCache: any): void {
 	(mockMetadataCache.getFirstLinkpathDest as any).mockImplementation(
 		(linkText: string, sourcePath: string) => {
 			if (linkText === "./peer" || linkText === ".\\peer") {
@@ -656,18 +576,13 @@ function installRelativeRenameResolver(
 				}
 			}
 
-			const normalized = linkText.endsWith(".md")
-				? linkText
-				: `${linkText}.md`;
+			const normalized = linkText.endsWith(".md") ? linkText : `${linkText}.md`;
 			return mockVault.getAbstractFileByPath(normalized);
 		},
 	);
 }
 
-function installRenamedNoteResolver(
-	mockVault: any,
-	mockMetadataCache: any,
-): void {
+function installRenamedNoteResolver(mockVault: any, mockMetadataCache: any): void {
 	(mockMetadataCache.getFirstLinkpathDest as any).mockImplementation(
 		(linkText: string, sourcePath: string) => {
 			if (linkText === "new-name") {
@@ -682,45 +597,33 @@ function installRenamedNoteResolver(
 				}
 			}
 
-			const normalized = linkText.endsWith(".md")
-				? linkText
-				: `${linkText}.md`;
+			const normalized = linkText.endsWith(".md") ? linkText : `${linkText}.md`;
 			return mockVault.getAbstractFileByPath(normalized);
 		},
 	);
 }
 
-function installOldPathReferenceResolver(
-	mockVault: any,
-	mockMetadataCache: any,
-): void {
+function installOldPathReferenceResolver(mockVault: any, mockMetadataCache: any): void {
 	(mockMetadataCache.getFirstLinkpathDest as any).mockImplementation(
 		(linkText: string, sourcePath: string) => {
 			if (linkText === "folderA/note") {
 				return mockVault.getAbstractFileByPath("folderA/note.md");
 			}
 
-			const normalized = linkText.endsWith(".md")
-				? linkText
-				: `${linkText}.md`;
+			const normalized = linkText.endsWith(".md") ? linkText : `${linkText}.md`;
 			return mockVault.getAbstractFileByPath(normalized);
 		},
 	);
 }
 
-function installNewPathReferenceResolver(
-	mockVault: any,
-	mockMetadataCache: any,
-): void {
+function installNewPathReferenceResolver(mockVault: any, mockMetadataCache: any): void {
 	(mockMetadataCache.getFirstLinkpathDest as any).mockImplementation(
 		(linkText: string, sourcePath: string) => {
 			if (linkText === "src/note") {
 				return mockVault.getAbstractFileByPath("src/note.md");
 			}
 
-			const normalized = linkText.endsWith(".md")
-				? linkText
-				: `${linkText}.md`;
+			const normalized = linkText.endsWith(".md") ? linkText : `${linkText}.md`;
 			return mockVault.getAbstractFileByPath(normalized);
 		},
 	);
@@ -737,26 +640,22 @@ describe("IncrementalIndexUpdater - unresolved link correctness", () => {
 		const snapshot = await snapshotBuilder.buildAsync();
 		expect(checkUnresolvedSingle(snapshot, "foo.md")).toBe(true);
 
-		(mockMetadataCache.getFileCache as any).mockImplementation(
-			(file: TFile) => {
-				if (file.path === "B.md") {
-					return createCachedMetadata([{ link: "foo", offset: 0 }]);
-				}
-				return null;
-			},
-		);
+		(mockMetadataCache.getFileCache as any).mockImplementation((file: TFile) => {
+			if (file.path === "B.md") {
+				return createCachedMetadata([{ link: "foo", offset: 0 }]);
+			}
+			return null;
+		});
 		await updater.applyAsync(snapshot, [{ type: "modify", path: "B.md" }]);
 		expect(checkUnresolvedSingle(snapshot, "foo.md")).toBe(false);
 		expect(checkUnresolvedSingle(snapshot, "Foo.md")).toBe(false);
 
-		(mockMetadataCache.getFileCache as any).mockImplementation(
-			(file: TFile) => {
-				if (file.path === "B.md") {
-					return createCachedMetadata([]);
-				}
-				return null;
-			},
-		);
+		(mockMetadataCache.getFileCache as any).mockImplementation((file: TFile) => {
+			if (file.path === "B.md") {
+				return createCachedMetadata([]);
+			}
+			return null;
+		});
 		await updater.applyAsync(snapshot, [{ type: "modify", path: "B.md" }]);
 		expect(checkUnresolvedSingle(snapshot, "foo.md")).toBe(true);
 		expect(checkUnresolvedSingle(snapshot, "Foo.md")).toBe(true);
@@ -775,16 +674,12 @@ describe("IncrementalIndexUpdater - unresolved link correctness", () => {
 		expect(checkUnresolvedSingle(snapshot, "foo.md")).toBe(true);
 		expect(checkUnresolvedSingle(snapshot, "bar.md")).toBe(true);
 
-		(mockMetadataCache.getFileCache as any).mockImplementation(
-			(file: TFile) => {
-				if (file.path === "D.md") {
-					return createCachedMetadata([
-						{ link: "target", offset: 0 },
-					]);
-				}
-				return null;
-			},
-		);
+		(mockMetadataCache.getFileCache as any).mockImplementation((file: TFile) => {
+			if (file.path === "D.md") {
+				return createCachedMetadata([{ link: "target", offset: 0 }]);
+			}
+			return null;
+		});
 		await updater.applyAsync(snapshot, [{ type: "modify", path: "D.md" }]);
 
 		expect(checkUnresolvedSingle(snapshot, "foo.md")).toBe(true);
@@ -792,8 +687,7 @@ describe("IncrementalIndexUpdater - unresolved link correctness", () => {
 	});
 
 	test("after incremental update, unresolved links with case differences can still be merged and retrieved", async () => {
-		const { IndexQueryEngine } =
-			await import("../index-service/IndexQueryEngine");
+		const { IndexQueryEngine } = await import("../index-service/IndexQueryEngine");
 		const env = createUpdaterEnvironment([
 			{ path: "A.md", links: ["Foo"] },
 			{ path: "B.md", links: [] },
@@ -802,14 +696,12 @@ describe("IncrementalIndexUpdater - unresolved link correctness", () => {
 
 		const snapshot = await snapshotBuilder.buildAsync();
 
-		(mockMetadataCache.getFileCache as any).mockImplementation(
-			(file: TFile) => {
-				if (file.path === "B.md") {
-					return createCachedMetadata([{ link: "foo", offset: 0 }]);
-				}
-				return null;
-			},
-		);
+		(mockMetadataCache.getFileCache as any).mockImplementation((file: TFile) => {
+			if (file.path === "B.md") {
+				return createCachedMetadata([{ link: "foo", offset: 0 }]);
+			}
+			return null;
+		});
 		await updater.applyAsync(snapshot, [{ type: "modify", path: "B.md" }]);
 
 		const merged = new IndexQueryEngine(mockVault).getBacklinksForLink(

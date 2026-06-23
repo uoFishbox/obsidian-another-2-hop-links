@@ -51,10 +51,7 @@ export const OutgoingStrategy: ItemStrategy<TwoHopLinkBranch> = {
 		return undefined;
 	},
 
-	getTargetFile(
-		item: TwoHopLinkBranch,
-		context: LinkUtilitiesContext,
-	): TFile | null {
+	getTargetFile(item: TwoHopLinkBranch, context: LinkUtilitiesContext): TFile | null {
 		if (item.hop1.path) {
 			return context.resolveFile(item.hop1.path);
 		}

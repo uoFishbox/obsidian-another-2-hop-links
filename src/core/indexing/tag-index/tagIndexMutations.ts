@@ -19,19 +19,11 @@ export function addFileTagsToTagIndex(
 
 	tagIndex.fileEntries.set(path, { tags });
 	for (const tagRef of tags) {
-		forEachParentTag(
-			tagRef.tag,
-			tagIndex.tagToFilePaths,
-			path,
-			addPathToTagIndex,
-		);
+		forEachParentTag(tagRef.tag, tagIndex.tagToFilePaths, path, addPathToTagIndex);
 	}
 }
 
-export function removeFileTagsFromTagIndex(
-	tagIndex: TagIndex,
-	path: string,
-): void {
+export function removeFileTagsFromTagIndex(tagIndex: TagIndex, path: string): void {
 	const existing = tagIndex.fileEntries.get(path);
 	if (!existing) {
 		return;

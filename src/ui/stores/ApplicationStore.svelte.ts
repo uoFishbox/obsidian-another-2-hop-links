@@ -97,12 +97,8 @@ function getChangedSettingKeys(
 	);
 }
 
-function shouldRefreshDisplayData(
-	changedKeys: Array<keyof PluginSettings>,
-): boolean {
-	return changedKeys.some(
-		(key) => !DISPLAY_REFRESH_EXCLUDED_SETTINGS.has(key),
-	);
+function shouldRefreshDisplayData(changedKeys: Array<keyof PluginSettings>): boolean {
+	return changedKeys.some((key) => !DISPLAY_REFRESH_EXCLUDED_SETTINGS.has(key));
 }
 
 function areArraysEqualByRef<T>(
@@ -140,8 +136,7 @@ function resolveNextDisplaySource(
 	const previousDisplayVersions = previousDisplaySource.displayVersions;
 	const nextDisplayVersions = nextData.displayVersions;
 	if (previousDisplayVersions && nextDisplayVersions) {
-		const sameLinks =
-			previousDisplayVersions.links === nextDisplayVersions.links;
+		const sameLinks = previousDisplayVersions.links === nextDisplayVersions.links;
 		if (!sameLinks) {
 			return nextData;
 		}
@@ -258,14 +253,11 @@ export class ApplicationStore {
 		displayDataBuilder: DisplayDataBuilder,
 		resolveTwoHopLinks: ResolveTwoHopLinks,
 		private readonly onSortChange: (newSortOption: SortOption) => void,
-		private readonly onUpdateContentSearch: (
-			enabled: boolean,
-		) => void = () => {},
+		private readonly onUpdateContentSearch: (enabled: boolean) => void = () => {},
 	) {
 		this.displayDataBuilder = displayDataBuilder;
 		this.loader = new TwoHopLinksLoader(resolveTwoHopLinks);
-		this.preprocessedDisplayDataCache =
-			createPreprocessedDisplayDataCache();
+		this.preprocessedDisplayDataCache = createPreprocessedDisplayDataCache();
 
 		// 大きなオブジェクトは深いプロキシを避け、union 全体の再代入だけで更新する
 		this.mutableLoadState = $state.raw<ApplicationLoadState>({
@@ -280,9 +272,7 @@ export class ApplicationStore {
 			getLoadedApplicationData(this.loadState)?.displaySourceData,
 		);
 		this.error = $derived(getLoadError(this.loadState));
-		this.sortOption = $state<SortOption>(
-			initialSettings.lastUsedSortOption,
-		);
+		this.sortOption = $state<SortOption>(initialSettings.lastUsedSortOption);
 		this.settings = $state.raw<PluginSettings>(initialSettings);
 		this.sectionExpandedLimits = $state<SectionExpansionLimits>({});
 		this.updateVersion = $state(0);
@@ -312,12 +302,8 @@ export class ApplicationStore {
 		);
 		this.displayState = $derived(this.computedDisplayData);
 		this.displayData = $derived(this.displayState.displayData);
-		this.hasDisplayableItems = $derived(
-			this.displayState.hasDisplayableItems,
-		);
-		this.initialVisibleCount = $derived(
-			this.settings.defaultVisibleLinkCount,
-		);
+		this.hasDisplayableItems = $derived(this.displayState.hasDisplayableItems);
+		this.initialVisibleCount = $derived(this.settings.defaultVisibleLinkCount);
 		this.loadMoreIncrement = $derived(this.settings.loadMoreLinkIncrement);
 	}
 
@@ -401,9 +387,7 @@ export class ApplicationStore {
 			};
 		} else if (this.error) {
 			// 背景更新では既存データを維持したまま、前回のエラー表示だけクリアする
-			const previousData = getLoadedApplicationData(
-				this.mutableLoadState,
-			);
+			const previousData = getLoadedApplicationData(this.mutableLoadState);
 			if (previousData) {
 				this.mutableLoadState = {
 					type: "loaded",
@@ -430,9 +414,7 @@ export class ApplicationStore {
 		}
 
 		if (result.isBackgroundRefresh) {
-			const previousData = getLoadedApplicationData(
-				this.mutableLoadState,
-			);
+			const previousData = getLoadedApplicationData(this.mutableLoadState);
 			this.mutableLoadState = {
 				type: "error",
 				error: result.error,
@@ -468,10 +450,7 @@ export class ApplicationStore {
 	}
 
 	clearSectionExpandedLimit(sectionId: string): void {
-		const next = clearSectionExpandedLimit(
-			this.sectionExpandedLimits,
-			sectionId,
-		);
+		const next = clearSectionExpandedLimit(this.sectionExpandedLimits, sectionId);
 
 		if (next !== this.sectionExpandedLimits) {
 			this.sectionExpandedLimits = next;
@@ -487,17 +466,11 @@ export class ApplicationStore {
 	}
 
 	getSortedTwoHopItems(items: TwoHopIndexedLink[]): TwoHopIndexedLink[] {
-		return this.displayDataBuilder.getSortedTwoHopItems(
-			items,
-			this.sortOption,
-		);
+		return this.displayDataBuilder.getSortedTwoHopItems(items, this.sortOption);
 	}
 
 	getSortedTagGroupItems(items: TaggedNote[]): TaggedNote[] {
-		return this.displayDataBuilder.getSortedTagGroupItems(
-			items,
-			this.sortOption,
-		);
+		return this.displayDataBuilder.getSortedTagGroupItems(items, this.sortOption);
 	}
 
 	setSortOption(sortOption: SortOption): void {
@@ -560,8 +533,7 @@ export class ApplicationStore {
 
 		const nextPreviewPathVersions = { ...this.previewPathVersions };
 		for (const path of previewInvalidation) {
-			nextPreviewPathVersions[path] =
-				(nextPreviewPathVersions[path] ?? 0) + 1;
+			nextPreviewPathVersions[path] = (nextPreviewPathVersions[path] ?? 0) + 1;
 		}
 		this.previewPathVersions = nextPreviewPathVersions;
 	}
@@ -571,13 +543,8 @@ export class ApplicationStore {
 		this.applyResolvedData(progress.data, nextPhase);
 	}
 
-	private applyResolvedData(
-		data: TwoHopLinkResult,
-		loadingPhase: LoadedPhase,
-	): void {
-		const previousLoadedData = getLoadedApplicationData(
-			this.mutableLoadState,
-		);
+	private applyResolvedData(data: TwoHopLinkResult, loadingPhase: LoadedPhase): void {
+		const previousLoadedData = getLoadedApplicationData(this.mutableLoadState);
 		const previousDisplaySource = previousLoadedData?.displaySourceData;
 		const nextDisplaySource = resolveNextDisplaySource(
 			previousDisplaySource,
@@ -606,8 +573,7 @@ export class ApplicationStore {
 			type: "loaded",
 			phase: loadingPhase,
 			data,
-			displaySourceData:
-				nextDisplaySource ?? previousDisplaySource ?? data,
+			displaySourceData: nextDisplaySource ?? previousDisplaySource ?? data,
 		};
 		if (nextDisplaySource) {
 			this.updateVersion += 1;

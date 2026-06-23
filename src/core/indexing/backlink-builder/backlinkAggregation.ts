@@ -130,8 +130,7 @@ export function recordFileLocalReference(
 	destination.hasResolved ||= !resolved.isUnresolved;
 	if (offset < destination.firstRef.offset) {
 		destination.firstRef.ref =
-			representativeRef ??
-			createOrderedBacklinkRef(linkReference, resolved);
+			representativeRef ?? createOrderedBacklinkRef(linkReference, resolved);
 		destination.firstRef.offset = offset;
 	}
 }
@@ -173,34 +172,22 @@ export function createSourceSummaryFromAggregation(
 
 	const destinations = new Map<string, SourceDestinationSummary>();
 	const orderedReferences: OrderedBacklinkRef[] = [];
-	for (const [
-		destinationPath,
-		aggregate,
-	] of localAggregation.destinationBuckets) {
+	for (const [destinationPath, aggregate] of localAggregation.destinationBuckets) {
 		destinations.set(destinationPath, {
 			count: aggregate.count,
 			hasResolved: aggregate.hasResolved,
-			firstRefIndex: addRepresentativeRef(
-				orderedReferences,
-				aggregate.firstRef,
-			),
+			firstRefIndex: addRepresentativeRef(orderedReferences, aggregate.firstRef),
 		});
 	}
 	const firstRefIndexByLookupKey = new Map<string, number>();
-	for (const [
-		lookupKey,
-		representative,
-	] of localAggregation.firstRefByLookupKey) {
+	for (const [lookupKey, representative] of localAggregation.firstRefByLookupKey) {
 		firstRefIndexByLookupKey.set(
 			lookupKey,
 			addRepresentativeRef(orderedReferences, representative),
 		);
 	}
 	const lookupKeyToRawLinkPaths = new Map<string, string | string[]>();
-	for (const [
-		lookupKey,
-		rawLinkPaths,
-	] of localAggregation.lookupKeyToRawLinkPaths) {
+	for (const [lookupKey, rawLinkPaths] of localAggregation.lookupKeyToRawLinkPaths) {
 		if (typeof rawLinkPaths === "string") {
 			lookupKeyToRawLinkPaths.set(lookupKey, rawLinkPaths);
 		} else {
@@ -235,17 +222,11 @@ export function* createSourceSummaryFromAggregationChunked(
 	const orderedReferences: OrderedBacklinkRef[] = [];
 	let operationCount = 0;
 
-	for (const [
-		destinationPath,
-		aggregate,
-	] of localAggregation.destinationBuckets) {
+	for (const [destinationPath, aggregate] of localAggregation.destinationBuckets) {
 		destinations.set(destinationPath, {
 			count: aggregate.count,
 			hasResolved: aggregate.hasResolved,
-			firstRefIndex: addRepresentativeRef(
-				orderedReferences,
-				aggregate.firstRef,
-			),
+			firstRefIndex: addRepresentativeRef(orderedReferences, aggregate.firstRef),
 		});
 		visitDestination?.(destinationPath, aggregate);
 
@@ -260,10 +241,7 @@ export function* createSourceSummaryFromAggregationChunked(
 	}
 
 	const firstRefIndexByLookupKey = new Map<string, number>();
-	for (const [
-		lookupKey,
-		representative,
-	] of localAggregation.firstRefByLookupKey) {
+	for (const [lookupKey, representative] of localAggregation.firstRefByLookupKey) {
 		firstRefIndexByLookupKey.set(
 			lookupKey,
 			addRepresentativeRef(orderedReferences, representative),
@@ -280,10 +258,7 @@ export function* createSourceSummaryFromAggregationChunked(
 	}
 
 	const lookupKeyToRawLinkPaths = new Map<string, string | string[]>();
-	for (const [
-		lookupKey,
-		rawLinkPaths,
-	] of localAggregation.lookupKeyToRawLinkPaths) {
+	for (const [lookupKey, rawLinkPaths] of localAggregation.lookupKeyToRawLinkPaths) {
 		if (typeof rawLinkPaths === "string") {
 			lookupKeyToRawLinkPaths.set(lookupKey, rawLinkPaths);
 		} else {

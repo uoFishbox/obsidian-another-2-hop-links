@@ -108,9 +108,9 @@ function buildCells(params: {
 	});
 }
 
-function slotsByKey(
-	build: { cells: ReadonlyArray<{ key: string; renderSlotKey: number }> },
-): Map<string, number> {
+function slotsByKey(build: {
+	cells: ReadonlyArray<{ key: string; renderSlotKey: number }>;
+}): Map<string, number> {
 	return new Map(build.cells.map((cell) => [cell.key, cell.renderSlotKey]));
 }
 
@@ -227,18 +227,14 @@ describe("linkListVirtualLayout", () => {
 			itemKey(5),
 		]);
 
-		expectSameSlotsForKeys(
-			initial,
-			resized,
-			[
-				itemKey(0),
-				itemKey(1),
-				itemKey(2),
-				itemKey(3),
-				itemKey(4),
-				itemKey(5),
-			],
-		);
+		expectSameSlotsForKeys(initial, resized, [
+			itemKey(0),
+			itemKey(1),
+			itemKey(2),
+			itemKey(3),
+			itemKey(4),
+			itemKey(5),
+		]);
 		expectUniqueRenderSlots(resized.cells);
 
 		expect(resized.cells[0].position).toEqual({
@@ -306,21 +302,15 @@ describe("linkListVirtualLayout", () => {
 		});
 
 		expect(build.rowSlices).toHaveLength(2);
-		expect(build.rowSlices.map((row) => row.key)).toEqual([
-			0,
-			1,
-		]);
-		expect(build.rowSlices.map((row) => row.slotKey)).toEqual([
-			0,
-			1,
-		]);
+		expect(build.rowSlices.map((row) => row.key)).toEqual([0, 1]);
+		expect(build.rowSlices.map((row) => row.slotKey)).toEqual([0, 1]);
 		expect(build.rowSlices.map((row) => row.top)).toEqual([0, 130]);
-		expect(
-			build.rowSlices.map((row) => row.cells.map((cell) => cell.key)),
-		).toEqual([
-			[itemKey(0), itemKey(1), itemKey(2)],
-			[itemKey(3), itemKey(4), itemKey(5)],
-		]);
+		expect(build.rowSlices.map((row) => row.cells.map((cell) => cell.key))).toEqual(
+			[
+				[itemKey(0), itemKey(1), itemKey(2)],
+				[itemKey(3), itemKey(4), itemKey(5)],
+			],
+		);
 	});
 
 	it("renders a shifted visible window in visual row order", () => {
@@ -348,11 +338,7 @@ describe("linkListVirtualLayout", () => {
 			itemKey(8),
 		]);
 
-		expectSameSlotsForKeys(initial, shifted, [
-			itemKey(3),
-			itemKey(4),
-			itemKey(5),
-		]);
+		expectSameSlotsForKeys(initial, shifted, [itemKey(3), itemKey(4), itemKey(5)]);
 		expect(shifted.rowSlices.map((row) => row.rowIndex)).toEqual([1, 2]);
 		expect(shifted.rowSlices.map((row) => row.slotIndex)).toEqual([1, 0]);
 		expectUniqueRenderSlots(shifted.cells);
@@ -388,9 +374,7 @@ describe("linkListVirtualLayout", () => {
 
 		expect(shifted.rowSlices[0]).toBe(initial.rowSlices[1]);
 		expect(shifted.rowSlices[0].cells).toBe(initial.rowSlices[1].cells);
-		expect(shifted.rowSlices[1].slotIndex).toBe(
-			initial.rowSlices[0].slotIndex,
-		);
+		expect(shifted.rowSlices[1].slotIndex).toBe(initial.rowSlices[0].slotIndex);
 	});
 
 	it("keeps item body keys stable when item render revisions are stable", () => {
@@ -419,9 +403,7 @@ describe("linkListVirtualLayout", () => {
 			getItemRenderRevision: (item) => item.renderVersion,
 		});
 
-		expect(updated.cells[0].renderBodyKey).toBe(
-			initial.cells[0].renderBodyKey,
-		);
+		expect(updated.cells[0].renderBodyKey).toBe(initial.cells[0].renderBodyKey);
 		expect(updated.cells[0].cell).not.toBe(initial.cells[0].cell);
 	});
 
@@ -443,18 +425,12 @@ describe("linkListVirtualLayout", () => {
 			getItemRenderRevision: (item) => item.renderVersion,
 		});
 
-		expect(updated.cells[0].renderBodyKey).not.toBe(
-			initial.cells[0].renderBodyKey,
-		);
+		expect(updated.cells[0].renderBodyKey).not.toBe(initial.cells[0].renderBodyKey);
 	});
 
 	it("keeps item body keys stable with source-key-only fallback", () => {
-		const initialItems: TestItem[] = [
-			{ id: "item-0", label: "Initial" },
-		];
-		const updatedItems: TestItem[] = [
-			{ id: "item-0", label: "Updated" },
-		];
+		const initialItems: TestItem[] = [{ id: "item-0", label: "Initial" }];
+		const updatedItems: TestItem[] = [{ id: "item-0", label: "Updated" }];
 
 		const initial = buildCells({
 			items: initialItems,
@@ -466,9 +442,7 @@ describe("linkListVirtualLayout", () => {
 			renderRevisionFallbackPolicy: "source-key-only",
 		});
 
-		expect(updated.cells[0].renderBodyKey).toBe(
-			initial.cells[0].renderBodyKey,
-		);
+		expect(updated.cells[0].renderBodyKey).toBe(initial.cells[0].renderBodyKey);
 	});
 
 	it("throws for missing item render revisions when fallback policy is required", () => {

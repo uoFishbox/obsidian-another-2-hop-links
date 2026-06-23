@@ -35,9 +35,7 @@ type TextMatcher = Parameters<typeof domScreen.queryAllByText>[0];
 
 const MAX_REASONABLE_MOUNTED_CELLS = 12;
 
-function collectOpenShadowRoots(
-	root: ParentNode = document.body,
-): ShadowRoot[] {
+function collectOpenShadowRoots(root: ParentNode = document.body): ShadowRoot[] {
 	const shadowRoots: ShadowRoot[] = [];
 
 	for (const element of Array.from(root.querySelectorAll("*"))) {
@@ -127,10 +125,7 @@ function queryAllByLabelTextDeep(text: TextMatcher): HTMLElement[] {
 	return results;
 }
 
-function getSingleMatch<T extends HTMLElement>(
-	elements: T[],
-	description: string,
-): T {
+function getSingleMatch<T extends HTMLElement>(elements: T[], description: string): T {
 	if (elements.length === 1) {
 		return elements[0];
 	}
@@ -147,9 +142,7 @@ const screen = {
 	getAllByTestId(testId: string): HTMLElement[] {
 		const elements = queryAllByTestIdDeep(testId);
 		if (elements.length === 0) {
-			throw new Error(
-				`Unable to find an element by: [data-testid="${testId}"]`,
-			);
+			throw new Error(`Unable to find an element by: [data-testid="${testId}"]`);
 		}
 		return elements;
 	},
@@ -167,10 +160,7 @@ const screen = {
 		return elements.length > 0 ? elements[0] : null;
 	},
 	getByText(text: TextMatcher): HTMLElement {
-		return getSingleMatch(
-			queryAllByTextDeep(text),
-			`text: ${String(text)}`,
-		);
+		return getSingleMatch(queryAllByTextDeep(text), `text: ${String(text)}`);
 	},
 	queryByText(text: TextMatcher): HTMLElement | null {
 		const elements = queryAllByTextDeep(text);
@@ -200,17 +190,13 @@ function getRenderedItemIndexes(): number[] {
 		.sort((left, right) => left - right);
 }
 
-function getRenderedItemIndexesInShadowRoot(
-	host: HTMLElement | null,
-): number[] {
+function getRenderedItemIndexesInShadowRoot(host: HTMLElement | null): number[] {
 	if (!host?.shadowRoot) {
 		return [];
 	}
 
 	return Array.from(
-		host.shadowRoot.querySelectorAll<HTMLElement>(
-			"[data-testid='item-cell']",
-		),
+		host.shadowRoot.querySelectorAll<HTMLElement>("[data-testid='item-cell']"),
 	)
 		.map((element) => Number(element.getAttribute("data-index")))
 		.filter((n) => !Number.isNaN(n))
@@ -282,11 +268,7 @@ export interface VirtualGridListDriver {
 
 	intersectSentinel(): void;
 	setTopSpacerHeight(height: number): void;
-	setGridRect(options: {
-		sectionTop: number;
-		width: number;
-		height: number;
-	}): void;
+	setGridRect(options: { sectionTop: number; width: number; height: number }): void;
 	resizeGrid(options: { width: number; height: number }): Promise<void>;
 }
 
@@ -382,8 +364,7 @@ export function renderVirtualGridList(
 		gridRoot,
 
 		async setViewport(viewportOptions) {
-			const { rootHeight, width, sectionTop, scrollTop } =
-				viewportOptions;
+			const { rootHeight, width, sectionTop, scrollTop } = viewportOptions;
 			setNumericProperty(scrollRoot, "clientHeight", rootHeight);
 			setNumericProperty(scrollRoot, "scrollTop", scrollTop ?? 0);
 			scrollRoot.style.overflow = "auto";
@@ -629,8 +610,7 @@ export function renderVirtualGridListObject(
 		gridRoot,
 
 		async setViewport(viewportOptions) {
-			const { rootHeight, width, sectionTop, scrollTop } =
-				viewportOptions;
+			const { rootHeight, width, sectionTop, scrollTop } = viewportOptions;
 			setNumericProperty(scrollRoot, "clientHeight", rootHeight);
 			setNumericProperty(scrollRoot, "scrollTop", scrollTop ?? 0);
 			scrollRoot.style.overflow = "auto";
@@ -657,26 +637,21 @@ export function renderVirtualGridListObject(
 			await view.rerender({
 				items: rerenderOptions.items,
 				itemsRevision: rerenderOptions.itemsRevision,
-				itemRenderRevisionToken:
-					rerenderOptions.itemRenderRevisionToken,
+				itemRenderRevisionToken: rerenderOptions.itemRenderRevisionToken,
 				renderRevisionFallbackPolicy:
 					rerenderOptions.renderRevisionFallbackPolicy ??
 					renderRevisionFallbackPolicy,
 				initialVisibleCount,
 				loadMoreIncrement,
 				useItemRenderRevision:
-					rerenderOptions.useItemRenderRevision ??
-					useItemRenderRevision,
+					rerenderOptions.useItemRenderRevision ?? useItemRenderRevision,
 			});
 			await flushFrames();
 		},
 
 		getCellByItemId(id: string) {
 			const cells = queryAllByTestIdDeep("object-item-cell");
-			return (
-				cells.find((el) => el.getAttribute("data-item-id") === id) ??
-				null
-			);
+			return cells.find((el) => el.getAttribute("data-item-id") === id) ?? null;
 		},
 
 		queryByText(text: string) {

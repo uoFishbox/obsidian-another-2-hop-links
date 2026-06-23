@@ -1,10 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { computeVirtualRanges } from "../virtualRanges";
-import type {
-	VirtualRanges,
-	VirtualRowModel,
-	VirtualRowModelRevision,
-} from "../types";
+import type { VirtualRanges, VirtualRowModel, VirtualRowModelRevision } from "../types";
 
 function createMockRowModel(
 	rowCount: number,
@@ -35,15 +31,8 @@ function createMockRowModel(
 						cellCount: 1,
 						getCell: () => null,
 					},
-		findVisibleRange: ({
-			scrollTop,
-			viewportHeight,
-			overscanPx,
-		}) => {
-			const start = Math.max(
-				0,
-				Math.floor((scrollTop - overscanPx) / rowHeight),
-			);
+		findVisibleRange: ({ scrollTop, viewportHeight, overscanPx }) => {
+			const start = Math.max(0, Math.floor((scrollTop - overscanPx) / rowHeight));
 			const end = Math.min(
 				rowCount,
 				Math.ceil((scrollTop + viewportHeight + overscanPx) / rowHeight),

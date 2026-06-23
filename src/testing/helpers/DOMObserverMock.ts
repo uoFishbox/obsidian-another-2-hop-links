@@ -21,16 +21,10 @@ export const intersectionObserverRecords: IntersectionObserverRecord[] = [];
 export const mutationObserverRecords: MutationObserverRecord[] = [];
 
 let originalResizeObserver: typeof globalThis.ResizeObserver | undefined;
-let originalIntersectionObserver:
-	| typeof globalThis.IntersectionObserver
-	| undefined;
+let originalIntersectionObserver: typeof globalThis.IntersectionObserver | undefined;
 let originalMutationObserver: typeof globalThis.MutationObserver | undefined;
-let originalRequestAnimationFrame:
-	| typeof globalThis.requestAnimationFrame
-	| undefined;
-let originalCancelAnimationFrame:
-	| typeof globalThis.cancelAnimationFrame
-	| undefined;
+let originalRequestAnimationFrame: typeof globalThis.requestAnimationFrame | undefined;
+let originalCancelAnimationFrame: typeof globalThis.cancelAnimationFrame | undefined;
 
 export function createDomRect(params: {
 	top: number;
@@ -70,11 +64,7 @@ export function setElementRect(
 	});
 }
 
-export function setNumericProperty(
-	target: object,
-	key: string,
-	value: number,
-): void {
+export function setNumericProperty(target: object, key: string, value: number): void {
 	Object.defineProperty(target, key, {
 		configurable: true,
 		writable: true,
@@ -82,14 +72,8 @@ export function setNumericProperty(
 	});
 }
 
-export function triggerResize(
-	target: Element,
-	width: number,
-	height = 0,
-): void {
-	const record = resizeObserverRecords.find((entry) =>
-		entry.elements.has(target),
-	);
+export function triggerResize(target: Element, width: number, height = 0): void {
+	const record = resizeObserverRecords.find((entry) => entry.elements.has(target));
 	if (!record) {
 		throw new Error("ResizeObserver target not found");
 	}
@@ -179,8 +163,7 @@ export function installResizeObserverMock(): void {
 		}
 	}
 
-	globalThis.ResizeObserver =
-		MockResizeObserver as unknown as typeof ResizeObserver;
+	globalThis.ResizeObserver = MockResizeObserver as unknown as typeof ResizeObserver;
 }
 
 export function installIntersectionObserverMock(): void {
@@ -216,9 +199,7 @@ export function installIntersectionObserverMock(): void {
 			intersectionObserverRecords.push(record);
 			this.rootMargin = options?.rootMargin ?? "";
 			const threshold = options?.threshold ?? 0;
-			this.thresholds = Array.isArray(threshold)
-				? threshold
-				: [threshold];
+			this.thresholds = Array.isArray(threshold) ? threshold : [threshold];
 		}
 	}
 
@@ -257,10 +238,11 @@ export function installAnimationFrameMock(): void {
 	originalRequestAnimationFrame = globalThis.requestAnimationFrame;
 	originalCancelAnimationFrame = globalThis.cancelAnimationFrame;
 
-	globalThis.requestAnimationFrame = ((
-		callback: FrameRequestCallback,
-	) =>
-		setTimeout(() => callback(Date.now()), 0)) as unknown as typeof requestAnimationFrame;
+	globalThis.requestAnimationFrame = ((callback: FrameRequestCallback) =>
+		setTimeout(
+			() => callback(Date.now()),
+			0,
+		)) as unknown as typeof requestAnimationFrame;
 
 	globalThis.cancelAnimationFrame = ((handle: number) => {
 		clearTimeout(handle);

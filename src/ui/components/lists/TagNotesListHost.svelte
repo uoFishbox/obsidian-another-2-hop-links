@@ -58,13 +58,13 @@
 	}
 </script>
 
-	<SearchableItemList
-		items={currentItems}
-		{config}
-		{linkContext}
-		{applicationStore}
-		{sortService}
-		{app}
-		{autofocus}
-		previewRefreshTokens={currentPreviewRefreshTokens}
-	/>
+<SearchableItemList
+	items={currentItems}
+	{config}
+	{linkContext}
+	{applicationStore}
+	{sortService}
+	{app}
+	{autofocus}
+	previewRefreshTokens={currentPreviewRefreshTokens}
+/>

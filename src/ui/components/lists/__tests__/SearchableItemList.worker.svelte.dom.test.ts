@@ -1,10 +1,4 @@
-import {
-	fireEvent,
-	render,
-	screen,
-	waitFor,
-	within,
-} from "@testing-library/svelte";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/svelte";
 import { tick } from "svelte";
 import { TFile } from "obsidian";
 import { createMockTFile } from "testing/__mocks__/testHelpers";
@@ -54,9 +48,7 @@ const workerHarness = vi.hoisted(() => {
 		shouldAutoReleaseFilters() {
 			return autoReleaseFilters;
 		},
-		attach(
-			nextHandler: (message: WorkerMessage) => void,
-		) {
+		attach(nextHandler: (message: WorkerMessage) => void) {
 			handler = nextHandler;
 		},
 		emit(message: WorkerMessage) {
@@ -120,9 +112,8 @@ const fileContentIndexHarness = vi.hoisted(() => {
 });
 
 vi.mock("features/search/searchWorkerClient", async () => {
-	const { filterSearchWorkerDataset } = await import(
-		"features/search/searchWorkerFilter"
-	);
+	const { filterSearchWorkerDataset } =
+		await import("features/search/searchWorkerFilter");
 
 	return {
 		createSearchWorkerClient: (onMessage: (message: unknown) => void) => {
@@ -168,7 +159,7 @@ vi.mock("features/search/searchWorkerClient", async () => {
 					snapshot = {
 						...snapshot,
 						datasetVersion: update.datasetVersion,
-					}
+					};
 					for (const path of update.paths) {
 						contentByPath.delete(path);
 					}
@@ -227,9 +218,7 @@ vi.mock("features/search/useFileContentIndex.svelte", () => ({
 				});
 			}
 		}),
-		getSerializableEntries: vi.fn(
-			() => fileContentIndexHarness.state.entries,
-		),
+		getSerializableEntries: vi.fn(() => fileContentIndexHarness.state.entries),
 	}),
 }));
 
@@ -267,7 +256,7 @@ function createLinkContext(sourceFile: TFile): LinkContext {
 		resolveFile: vi.fn(() => null),
 		fileToLinktext: vi.fn((file: TFile) => file.basename),
 		buildWikiLink: vi.fn(() => "[[alpha]]"),
-			getPreview: vi.fn(async () => ({ type: "empty", content: "" } as const)),
+		getPreview: vi.fn(async () => ({ type: "empty", content: "" }) as const),
 		sourceFile,
 		getMetadata: vi.fn(() => null),
 		onOpenFile: vi.fn(),
@@ -282,8 +271,7 @@ function createConfig(): ListConfig<ViewItem> {
 		title: "Searchable",
 		itemComponent: SearchableItemListItemStub,
 		getItemProps: (item) => ({
-			label:
-				item.type === "taggedNote" ? item.data.file.basename : "unknown",
+			label: item.type === "taggedNote" ? item.data.file.basename : "unknown",
 		}),
 		getItemKey: (item: ViewItem) => {
 			switch (item.type) {
@@ -296,7 +284,10 @@ function createConfig(): ListConfig<ViewItem> {
 				case "branch":
 					return item.data.hop1.path ?? item.data.hop1.rawText;
 				case "newLink":
-					return item.data.path ?? `${item.data.sourceFile.path}:${item.data.rawText}`;
+					return (
+						item.data.path ??
+						`${item.data.sourceFile.path}:${item.data.rawText}`
+					);
 				default:
 					return "";
 			}
@@ -329,9 +320,9 @@ function queryAllByTestIdIncludingShadow(testId: string): HTMLElement[] {
 	const elements = screen.queryAllByTestId(testId) as HTMLElement[];
 	for (const shadowRoot of collectOpenShadowRoots()) {
 		elements.push(
-			...(within(
-				shadowRoot as unknown as HTMLElement,
-			).queryAllByTestId(testId) as HTMLElement[]),
+			...(within(shadowRoot as unknown as HTMLElement).queryAllByTestId(
+				testId,
+			) as HTMLElement[]),
 		);
 	}
 	return elements;
@@ -352,9 +343,9 @@ function queryByTextIncludingShadow(text: string): HTMLElement | null {
 	}
 
 	for (const shadowRoot of collectOpenShadowRoots()) {
-		const shadowElement = within(
-			shadowRoot as unknown as HTMLElement,
-		).queryByText(text) as HTMLElement | null;
+		const shadowElement = within(shadowRoot as unknown as HTMLElement).queryByText(
+			text,
+		) as HTMLElement | null;
 		if (shadowElement) {
 			return shadowElement;
 		}
@@ -370,10 +361,7 @@ function getByTextIncludingShadow(text: string): HTMLElement {
 	return element;
 }
 
-function createTestProps(overrides?: {
-	items?: ViewItem[];
-	sourceFile?: TFile;
-}) {
+function createTestProps(overrides?: { items?: ViewItem[]; sourceFile?: TFile }) {
 	const sourceFile = overrides?.sourceFile ?? createMockTFile("notes/source.md");
 	const items = overrides?.items ?? [
 		createTaggedNoteItem(createMockTFile("notes/alpha-note.md")),
@@ -392,8 +380,8 @@ function createTestProps(overrides?: {
 			applicationStore.settings.enableContentSearch = enabled;
 		}),
 		getDefaultSectionVisibleLimit: vi.fn(() => 10),
-		getSectionExpandedLimit: vi.fn(
-			(sectionId: string) => expandedLimits.get(sectionId),
+		getSectionExpandedLimit: vi.fn((sectionId: string) =>
+			expandedLimits.get(sectionId),
 		),
 		setSectionExpandedLimit: vi.fn((sectionId: string, limit: number) => {
 			expandedLimits.set(sectionId, limit);
@@ -454,9 +442,7 @@ describe("SearchableItemList worker integration", () => {
 		await fireEvent.click(toggle);
 		await tick();
 
-		await waitFor(() =>
-			expect(getAllSearchableItems()).toHaveLength(1),
-		);
+		await waitFor(() => expect(getAllSearchableItems()).toHaveLength(1));
 		expect(getByTextIncludingShadow("beta-note")).toBeInTheDocument();
 
 		const activeToggle = screen.getByRole("button", {

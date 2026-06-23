@@ -55,14 +55,10 @@ describe("getScrollSnapshot", () => {
 
 		setNumericProperty(window, "scrollY", 96);
 		setNumericProperty(window, "innerHeight", 720);
-		Object.defineProperty(
-			document.documentElement,
-			"getBoundingClientRect",
-			{
-				configurable: true,
-				value: rectSpy,
-			},
-		);
+		Object.defineProperty(document.documentElement, "getBoundingClientRect", {
+			configurable: true,
+			value: rectSpy,
+		});
 
 		expect(getScrollSnapshot(null)).toEqual({
 			scrollTop: 96,

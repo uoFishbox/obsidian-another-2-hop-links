@@ -11,9 +11,7 @@ export function normalizeTag(tag: string): string {
 		return "";
 	}
 
-	const withoutHash = trimmed.startsWith("#")
-		? trimmed.substring(1)
-		: trimmed;
+	const withoutHash = trimmed.startsWith("#") ? trimmed.substring(1) : trimmed;
 	return withoutHash.toLowerCase();
 }
 

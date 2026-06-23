@@ -11,9 +11,7 @@ describe("findMountedCellElementByKey", () => {
 		container.append(first, second);
 
 		expect(findMountedCellElementByKey(container, "a")).toBe(first);
-		expect(findMountedCellElementByKey(container, "b:quoted/path")).toBe(
-			second,
-		);
+		expect(findMountedCellElementByKey(container, "b:quoted/path")).toBe(second);
 		expect(findMountedCellElementByKey(container, "missing")).toBeNull();
 	});
 

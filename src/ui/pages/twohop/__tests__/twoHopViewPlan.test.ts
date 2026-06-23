@@ -113,17 +113,20 @@ describe("compileTwoHopViewPlan", () => {
 			top: 110,
 			cellCount: 2,
 		});
-		expect(rowModel.findVisibleRange({
-			scrollTop: 105,
-			viewportHeight: 10,
-			overscanPx: 0,
-		})).toEqual({ start: 1, end: 2 });
+		expect(
+			rowModel.findVisibleRange({
+				scrollTop: 105,
+				viewportHeight: 10,
+				overscanPx: 0,
+			}),
+		).toEqual({ start: 1, end: 2 });
 		expect(getItems).toHaveBeenCalledTimes(1);
-		expect(rowModel.resolveNavigationTarget?.(
-			"",
-			"down",
-			{ rowIndex: 0, columnIndex: 1 },
-		)).toEqual({
+		expect(
+			rowModel.resolveNavigationTarget?.("", "down", {
+				rowIndex: 0,
+				columnIndex: 1,
+			}),
+		).toEqual({
 			key: plan.sections[0].logicalCells[3]?.key,
 			rowTop: 110,
 		});
@@ -166,8 +169,7 @@ describe("compileTwoHopViewPlan", () => {
 
 		expect(plan.materializedSectionByIndex).toEqual([false, false]);
 		expect(plan.sections.map((section) => section.logicalCells.length)).toEqual([
-			2,
-			2,
+			2, 2,
 		]);
 		expect(resolveTwoHopLogicalCellInSection(plan, 1, 1)).toMatchObject({
 			kind: "item",
@@ -184,11 +186,9 @@ describe("compileTwoHopViewPlan", () => {
 
 	it("reuses the mounted range when preview overscan matches mounted overscan", () => {
 		const plan = compileTwoHopViewPlan({
-			sections: [createDescriptor([
-				createItem("a"),
-				createItem("b"),
-				createItem("c"),
-			])],
+			sections: [
+				createDescriptor([createItem("a"), createItem("b"), createItem("c")]),
+			],
 			sectionVisibleCounts: { "new-links": 3 },
 			layout,
 			resolveInitialSectionVisibleCount: () => 3,
@@ -220,11 +220,9 @@ describe("compileTwoHopViewPlan", () => {
 
 	it("measures preview visibility separately when preview overscan is smaller", () => {
 		const plan = compileTwoHopViewPlan({
-			sections: [createDescriptor([
-				createItem("a"),
-				createItem("b"),
-				createItem("c"),
-			])],
+			sections: [
+				createDescriptor([createItem("a"), createItem("b"), createItem("c")]),
+			],
 			sectionVisibleCounts: { "new-links": 3 },
 			layout,
 			resolveInitialSectionVisibleCount: () => 3,
@@ -232,13 +230,15 @@ describe("compileTwoHopViewPlan", () => {
 		});
 		const rowModel = createTwoHopViewPlanRowModel(plan);
 
-		expect(rowModel.findVisibleRangesFromMounted({
-			scrollTop: 0,
-			viewportHeight: 10,
-			mounted: { start: 1, end: 2 },
-			mountedOverscanPx: 110,
-			previewOverscanPx: 0,
-		})).toEqual({
+		expect(
+			rowModel.findVisibleRangesFromMounted({
+				scrollTop: 0,
+				viewportHeight: 10,
+				mounted: { start: 1, end: 2 },
+				mountedOverscanPx: 110,
+				previewOverscanPx: 0,
+			}),
+		).toEqual({
 			mounted: { start: 1, end: 2 },
 			previewVisible: { start: 0, end: 1 },
 		});
@@ -246,11 +246,9 @@ describe("compileTwoHopViewPlan", () => {
 
 	it("writes visible ranges into caller-owned scratch objects", () => {
 		const plan = compileTwoHopViewPlan({
-			sections: [createDescriptor([
-				createItem("a"),
-				createItem("b"),
-				createItem("c"),
-			])],
+			sections: [
+				createDescriptor([createItem("a"), createItem("b"), createItem("c")]),
+			],
 			sectionVisibleCounts: { "new-links": 3 },
 			layout,
 			resolveInitialSectionVisibleCount: () => 3,
@@ -296,11 +294,9 @@ describe("compileTwoHopViewPlan", () => {
 
 	it("resolves the stable preview scroll band for a preview range", () => {
 		const plan = compileTwoHopViewPlan({
-			sections: [createDescriptor([
-				createItem("a"),
-				createItem("b"),
-				createItem("c"),
-			])],
+			sections: [
+				createDescriptor([createItem("a"), createItem("b"), createItem("c")]),
+			],
 			sectionVisibleCounts: { "new-links": 3 },
 			layout,
 			resolveInitialSectionVisibleCount: () => 3,
@@ -324,18 +320,22 @@ describe("compileTwoHopViewPlan", () => {
 		});
 
 		expect(band).toEqual({ min: -10, max: 100 });
-		expect(rowModel.findVisibleRanges({
-			scrollTop: 1,
-			viewportHeight: 10,
-			mountedOverscanPx: 110,
-			previewOverscanPx: 0,
-		}).previewVisible).toEqual(ranges.previewVisible);
-		expect(rowModel.findVisibleRanges({
-			scrollTop: 100,
-			viewportHeight: 10,
-			mountedOverscanPx: 110,
-			previewOverscanPx: 0,
-		}).previewVisible).not.toEqual(ranges.previewVisible);
+		expect(
+			rowModel.findVisibleRanges({
+				scrollTop: 1,
+				viewportHeight: 10,
+				mountedOverscanPx: 110,
+				previewOverscanPx: 0,
+			}).previewVisible,
+		).toEqual(ranges.previewVisible);
+		expect(
+			rowModel.findVisibleRanges({
+				scrollTop: 100,
+				viewportHeight: 10,
+				mountedOverscanPx: 110,
+				previewOverscanPx: 0,
+			}).previewVisible,
+		).not.toEqual(ranges.previewVisible);
 	});
 
 	it("resolves adjacent row tops for a preview band across section boundaries", () => {
@@ -375,11 +375,7 @@ describe("compileTwoHopViewPlan", () => {
 			vi.fn(() => [createItem(`item-${sectionIndex}`)]),
 		);
 		const descriptors = getItemsBySection.map((getItems, sectionIndex) =>
-			createDescriptor(
-				getItems(),
-				getItems,
-				`section-${sectionIndex}`,
-			),
+			createDescriptor(getItems(), getItems, `section-${sectionIndex}`),
 		);
 		for (const getItems of getItemsBySection) getItems.mockClear();
 
@@ -399,8 +395,9 @@ describe("compileTwoHopViewPlan", () => {
 			clampVisibleCount: (_section, count) => count,
 		});
 
-		expect(getItemsBySection.map((getItems) => getItems.mock.calls.length))
-			.toEqual(new Array<number>(12).fill(1));
+		expect(getItemsBySection.map((getItems) => getItems.mock.calls.length)).toEqual(
+			new Array<number>(12).fill(1),
+		);
 		expect(batchedPlan.totalHeight).toBe(eagerPlan.totalHeight);
 		expect(batchedPlan.rowCount).toBe(eagerPlan.rowCount);
 		expect(batchedPlan.cellCount).toBe(eagerPlan.cellCount);
@@ -439,17 +436,21 @@ describe("compileTwoHopViewPlan", () => {
 		expect(batchedPlan.nextUnmaterializedSectionIndex).toBe(10);
 		expect(batchedPlan.remainingUnmaterializedSectionCount).toBe(2);
 		expect(batchedPlan.remainingUnmaterializedCellCount).toBe(4);
-		expect(getItemsBySection.map((getItems) => getItems.mock.calls.length))
-			.toEqual(new Array<number>(12).fill(1));
+		expect(getItemsBySection.map((getItems) => getItems.mock.calls.length)).toEqual(
+			new Array<number>(12).fill(1),
+		);
 
-		expect(materializeNextTwoHopSectionBatch(batchedPlan, {
-			maxSectionCount: 10,
-		})).toBe(true);
+		expect(
+			materializeNextTwoHopSectionBatch(batchedPlan, {
+				maxSectionCount: 10,
+			}),
+		).toBe(true);
 		expect(batchedPlan.materializedSectionByIndex).toEqual(
 			new Array<boolean>(12).fill(true),
 		);
-		expect(getItemsBySection.map((getItems) => getItems.mock.calls.length))
-			.toEqual(new Array<number>(12).fill(1));
+		expect(getItemsBySection.map((getItems) => getItems.mock.calls.length)).toEqual(
+			new Array<number>(12).fill(1),
+		);
 		expect(batchedPlan.nextUnmaterializedSectionIndex).toBe(12);
 		expect(batchedPlan.remainingUnmaterializedSectionCount).toBe(0);
 		expect(batchedPlan.remainingUnmaterializedCellCount).toBe(0);
@@ -470,10 +471,12 @@ describe("compileTwoHopViewPlan", () => {
 			clampVisibleCount: (_section, count) => count,
 		});
 
-		expect(materializeNextTwoHopSectionBatch(plan, {
-			maxSectionCount: 10,
-			maxCellCount: 3,
-		})).toBe(true);
+		expect(
+			materializeNextTwoHopSectionBatch(plan, {
+				maxSectionCount: 10,
+				maxCellCount: 3,
+			}),
+		).toBe(true);
 		expect(plan.materializedSectionByIndex).toEqual([true, false, false]);
 	});
 
@@ -506,15 +509,18 @@ describe("compileTwoHopViewPlan", () => {
 			resolveInitialSectionVisibleCount: () => 1,
 			clampVisibleCount: (_section, count) => count,
 		});
-		const shouldContinue = vi.fn()
+		const shouldContinue = vi
+			.fn()
 			.mockReturnValueOnce(true)
 			.mockReturnValueOnce(false);
 
-		expect(materializeNextTwoHopSectionBatch(plan, {
-			maxSectionCount: 10,
-			maxCellCount: 100,
-			shouldContinue,
-		})).toBe(true);
+		expect(
+			materializeNextTwoHopSectionBatch(plan, {
+				maxSectionCount: 10,
+				maxCellCount: 100,
+				shouldContinue,
+			}),
+		).toBe(true);
 		expect(plan.materializedSectionByIndex).toEqual([false, false]);
 		expect(plan.materializationStateBySectionIndex[0]).toEqual({
 			nextCellIndex: 1,
@@ -527,11 +533,7 @@ describe("compileTwoHopViewPlan", () => {
 		const plan = compileTwoHopViewPlan({
 			sections: [
 				createDescriptor(
-					[
-						createItem("a"),
-						createItem("b"),
-						createItem("c"),
-					],
+					[createItem("a"), createItem("b"), createItem("c")],
 					undefined,
 					"oversized",
 				),
@@ -544,10 +546,12 @@ describe("compileTwoHopViewPlan", () => {
 			clampVisibleCount: (_section, count) => count,
 		});
 
-		expect(materializeNextTwoHopSectionBatch(plan, {
-			maxSectionCount: 10,
-			maxCellCount: 2,
-		})).toBe(true);
+		expect(
+			materializeNextTwoHopSectionBatch(plan, {
+				maxSectionCount: 10,
+				maxCellCount: 2,
+			}),
+		).toBe(true);
 		expect(plan.materializedSectionByIndex).toEqual([false, false]);
 		expect(plan.materializationStateBySectionIndex[0]).toEqual({
 			nextCellIndex: 2,
@@ -574,8 +578,9 @@ describe("compileTwoHopViewPlan", () => {
 		});
 
 		expect(mounted.rowSlices).toHaveLength(2);
-		expect(Object.getOwnPropertyDescriptor(mounted, "cells")?.get)
-			.toBeTypeOf("function");
+		expect(Object.getOwnPropertyDescriptor(mounted, "cells")?.get).toBeTypeOf(
+			"function",
+		);
 		expect(mounted.cells).toBe(mounted.cells);
 		expect(mounted.mountedCellCount).toBe(3);
 		expect(mounted.cells.map(({ cell }) => cell.kind)).toEqual([
@@ -631,16 +636,11 @@ describe("compileTwoHopViewPlan", () => {
 			mounted,
 			"reusableCellsByKey",
 		);
-		const cellsDescriptor = Object.getOwnPropertyDescriptor(
-			mounted,
-			"cells",
-		);
+		const cellsDescriptor = Object.getOwnPropertyDescriptor(mounted, "cells");
 		const readReusableCellsByKey = vi.fn(() =>
 			reusableCellsByKeyDescriptor?.get?.call(mounted),
 		);
-		const readCells = vi.fn(() =>
-			cellsDescriptor?.get?.call(mounted),
-		);
+		const readCells = vi.fn(() => cellsDescriptor?.get?.call(mounted));
 		Object.defineProperty(mounted, "reusableCellsByKey", {
 			get: readReusableCellsByKey,
 		});
@@ -668,11 +668,7 @@ describe("compileTwoHopViewPlan", () => {
 	it("rebuilds same-plan mounted rows after materialization changes", () => {
 		const plan = compileTwoHopViewPlan({
 			sections: [
-				createDescriptor([
-					createItem("a"),
-					createItem("b"),
-					createItem("c"),
-				]),
+				createDescriptor([createItem("a"), createItem("b"), createItem("c")]),
 			],
 			sectionVisibleCounts: { "new-links": 3 },
 			layout,
@@ -691,12 +687,12 @@ describe("compileTwoHopViewPlan", () => {
 		});
 		const mountedRevision = mounted.materializationRevision;
 
-		expect(materializeNextTwoHopSectionBatch(plan, {
-			maxCellCount: 3,
-		})).toBe(true);
-		expect(plan.materializationRevision).toBeGreaterThan(
-			mountedRevision ?? -1,
-		);
+		expect(
+			materializeNextTwoHopSectionBatch(plan, {
+				maxCellCount: 3,
+			}),
+		).toBe(true);
+		expect(plan.materializationRevision).toBeGreaterThan(mountedRevision ?? -1);
 
 		const rebuilt = buildTwoHopMountedRows({
 			rowModel,
@@ -756,19 +752,19 @@ describe("compileTwoHopViewPlan", () => {
 });
 
 describe("findTwoHopRowsByOffset", () => {
-	const sections = [
-		{ top: 0, firstRowIndex: 0, rowCount: 3 },
-	] as never;
+	const sections = [{ top: 0, firstRowIndex: 0, rowCount: 3 }] as never;
 
 	it("calculates the row index within a section", () => {
-		expect(findTwoHopRowsByOffset({
-			sections,
-			rowHeight: 50,
-			rowGap: 10,
-			scrollTop: 55,
-			viewportHeight: 60,
-			overscanPx: 0,
-		})).toEqual({ start: 1, end: 2 });
+		expect(
+			findTwoHopRowsByOffset({
+				sections,
+				rowHeight: 50,
+				rowGap: 10,
+				scrollTop: 55,
+				viewportHeight: 60,
+				overscanPx: 0,
+			}),
+		).toEqual({ start: 1, end: 2 });
 	});
 
 	it("writes into the provided row range", () => {
@@ -787,55 +783,63 @@ describe("findTwoHopRowsByOffset", () => {
 	});
 
 	it("excludes rows that only touch the viewport boundaries", () => {
-		expect(findTwoHopRowsByOffset({
-			sections,
-			rowHeight: 50,
-			rowGap: 10,
-			scrollTop: 50,
-			viewportHeight: 70,
-			overscanPx: 0,
-		})).toEqual({ start: 1, end: 2 });
+		expect(
+			findTwoHopRowsByOffset({
+				sections,
+				rowHeight: 50,
+				rowGap: 10,
+				scrollTop: 50,
+				viewportHeight: 70,
+				overscanPx: 0,
+			}),
+		).toEqual({ start: 1, end: 2 });
 	});
 
 	it("finds sections across section margins", () => {
-		expect(findTwoHopRowsByOffset({
-			sections: [
-				{ top: 0, firstRowIndex: 0, rowCount: 2 },
-				{ top: 200, firstRowIndex: 2, rowCount: 2 },
-			] as never,
-			rowHeight: 50,
-			rowGap: 10,
-			scrollTop: 170,
-			viewportHeight: 40,
-			overscanPx: 0,
-		})).toEqual({ start: 2, end: 3 });
+		expect(
+			findTwoHopRowsByOffset({
+				sections: [
+					{ top: 0, firstRowIndex: 0, rowCount: 2 },
+					{ top: 200, firstRowIndex: 2, rowCount: 2 },
+				] as never,
+				rowHeight: 50,
+				rowGap: 10,
+				scrollTop: 170,
+				viewportHeight: 40,
+				overscanPx: 0,
+			}),
+		).toEqual({ start: 2, end: 3 });
 	});
 
 	it("excludes the next section when the viewport end matches its top", () => {
-		expect(findTwoHopRowsByOffset({
-			sections: [
-				{ top: 0, firstRowIndex: 0, rowCount: 2 },
-				{ top: 200, firstRowIndex: 2, rowCount: 2 },
-			] as never,
-			rowHeight: 50,
-			rowGap: 10,
-			scrollTop: 60,
-			viewportHeight: 140,
-			overscanPx: 0,
-		})).toEqual({ start: 1, end: 2 });
+		expect(
+			findTwoHopRowsByOffset({
+				sections: [
+					{ top: 0, firstRowIndex: 0, rowCount: 2 },
+					{ top: 200, firstRowIndex: 2, rowCount: 2 },
+				] as never,
+				rowHeight: 50,
+				rowGap: 10,
+				scrollTop: 60,
+				viewportHeight: 140,
+				overscanPx: 0,
+			}),
+		).toEqual({ start: 1, end: 2 });
 	});
 
 	it("returns no rows for zero-height sections", () => {
-		expect(findTwoHopRowsByOffset({
-			sections: [
-				{ top: 0, firstRowIndex: 0, rowCount: 1 },
-				{ top: 0, firstRowIndex: 1, rowCount: 1 },
-			] as never,
-			rowHeight: 0,
-			rowGap: 0,
-			scrollTop: 0,
-			viewportHeight: 10,
-			overscanPx: 0,
-		})).toEqual({ start: 0, end: 0 });
+		expect(
+			findTwoHopRowsByOffset({
+				sections: [
+					{ top: 0, firstRowIndex: 0, rowCount: 1 },
+					{ top: 0, firstRowIndex: 1, rowCount: 1 },
+				] as never,
+				rowHeight: 0,
+				rowGap: 0,
+				scrollTop: 0,
+				viewportHeight: 10,
+				overscanPx: 0,
+			}),
+		).toEqual({ start: 0, end: 0 });
 	});
 });

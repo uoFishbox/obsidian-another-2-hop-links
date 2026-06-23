@@ -13,10 +13,7 @@ interface UpdateOptions {
 
 type RawSettings = Record<string, unknown>;
 
-const normalizePositiveIntegerSetting = (
-	value: unknown,
-	fallback: number,
-): number => {
+const normalizePositiveIntegerSetting = (value: unknown, fallback: number): number => {
 	if (typeof value !== "number" || !Number.isFinite(value) || value <= 0) {
 		return fallback;
 	}
@@ -24,10 +21,7 @@ const normalizePositiveIntegerSetting = (
 	return Math.floor(value);
 };
 
-const normalizePositiveNumberSetting = (
-	value: unknown,
-	fallback: number,
-): number => {
+const normalizePositiveNumberSetting = (value: unknown, fallback: number): number => {
 	if (typeof value !== "number" || !Number.isFinite(value) || value <= 0) {
 		return fallback;
 	}

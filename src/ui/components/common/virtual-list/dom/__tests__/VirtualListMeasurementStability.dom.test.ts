@@ -4,10 +4,7 @@ import {
 	isStableVirtualListMeasurement,
 	resolveVirtualListLayoutStability,
 } from "../virtualListMeasurementStability";
-import {
-	createDomRect,
-	setNumericProperty,
-} from "testing/helpers/DOMObserverMock";
+import { createDomRect, setNumericProperty } from "testing/helpers/DOMObserverMock";
 
 describe("virtual list measurement stability", () => {
 	it("treats empty content as stable without requiring layout metrics", () => {

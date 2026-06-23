@@ -1,8 +1,5 @@
 import type { SectionRenderDescriptor } from "../../../sections/types";
-import type {
-	Result,
-	VirtualListInputError,
-} from "./virtualListValidationError";
+import type { Result, VirtualListInputError } from "./virtualListValidationError";
 
 export interface ViewPlanInput<T, G> {
 	readonly sections: readonly SectionRenderDescriptor<T, G>[];
@@ -15,10 +12,7 @@ export interface ValidatedViewPlanInput<T, G> {
 
 export function validateViewPlanInput<T, G>(
 	input: ViewPlanInput<T, G>,
-): Result<
-	ValidatedViewPlanInput<T, G>,
-	VirtualListInputError<T, G>
-> {
+): Result<ValidatedViewPlanInput<T, G>, VirtualListInputError<T, G>> {
 	const sectionsBySectionId = new Map<string, SectionRenderDescriptor<T, G>>();
 	const firstBySectionId = new Map<
 		string,

@@ -2,9 +2,16 @@ import { describe, test, expect, vi } from "vitest";
 import { TwoHopLinkResolver } from "../two-hop-resolver/TwoHopLinkResolver";
 import { IndexingService } from "../index-service/IndexingService";
 import { VaultEnvironmentBuilder } from "testing/helpers/VaultEnvironmentBuilder";
-import type { ResolveProgress, TwoHopLinkResult, TwoHopIndexedLink } from "types/domain";
+import type {
+	ResolveProgress,
+	TwoHopLinkResult,
+	TwoHopIndexedLink,
+} from "types/domain";
 import type { IIndexingService } from "types/services";
-import type { ResolverDebugPolicy, ResolverPerformanceSettings } from "../two-hop-resolver/ResolverTypes";
+import type {
+	ResolverDebugPolicy,
+	ResolverPerformanceSettings,
+} from "../two-hop-resolver/ResolverTypes";
 
 type ResolverEnvironment = ReturnType<VaultEnvironmentBuilder["build"]>;
 
@@ -35,7 +42,9 @@ function createResolver(
 	);
 }
 
-async function buildResolvedEnvironment(definitions: ConstructorParameters<typeof VaultEnvironmentBuilder>[0]) {
+async function buildResolvedEnvironment(
+	definitions: ConstructorParameters<typeof VaultEnvironmentBuilder>[0],
+) {
 	const env = new VaultEnvironmentBuilder(definitions).build();
 	await env.service.rebuildIndexesTimeSliced();
 	return {
@@ -63,7 +72,8 @@ function createIndexingServiceWithoutSubscription(
 		getBacklinksForLink: (linkPath) => service.getBacklinksForLink(linkPath),
 		getUniqueBacklinkSourcesForLink: (linkPath, excludePath, limit) =>
 			service.getUniqueBacklinkSourcesForLink(linkPath, excludePath, limit),
-		getBacklinkCountForLink: (linkPath) => service.getBacklinkCountForLink(linkPath),
+		getBacklinkCountForLink: (linkPath) =>
+			service.getBacklinkCountForLink(linkPath),
 		getIndexVersion: () => service.getIndexVersion(),
 		peekNotesWithCommonTags: (file) => service.peekNotesWithCommonTags(file),
 		getNotesWithCommonTags: (file) => service.getNotesWithCommonTags(file),
@@ -109,9 +119,7 @@ describe("TwoHopLinkResolver", () => {
 
 			const result = await resolver.resolve(files["origin.md"]);
 
-			const backlinkPaths = result.backlinks.map(
-				(link) => link.sourceFile.path,
-			);
+			const backlinkPaths = result.backlinks.map((link) => link.sourceFile.path);
 			expect(backlinkPaths).toContain("backlink1.md");
 			expect(backlinkPaths).toContain("backlink2.md");
 		});
@@ -139,10 +147,14 @@ describe("TwoHopLinkResolver", () => {
 
 			const result = await resolver.resolve(files["origin.md"]);
 
-			expect(result.branches.find((b) => b.hop1.path === "origin.md")).toBeUndefined();
+			expect(
+				result.branches.find((b) => b.hop1.path === "origin.md"),
+			).toBeUndefined();
 			expect(result.branches).toHaveLength(1);
 			expect(result.branches[0].hop1.path).toBe("other.md");
-			expect(result.branches[0].hop2.map((l) => l.sourceFile.path)).not.toContain("origin.md");
+			expect(result.branches[0].hop2.map((l) => l.sourceFile.path)).not.toContain(
+				"origin.md",
+			);
 		});
 
 		test("duplicate hop1 is merged into one branch", async () => {
@@ -329,13 +341,17 @@ describe("TwoHopLinkResolver", () => {
 				{ path: "note1.md" },
 			]);
 
-			const indexingService = createIndexingServiceWithoutSubscription(env.service);
+			const indexingService = createIndexingServiceWithoutSubscription(
+				env.service,
+			);
 			const resolver = createResolver(env, indexingService);
 
 			const firstResult = await resolver.resolve(env.files["origin.md"]);
 
 			const idleDeferred = createDeferred<void>();
-			vi.spyOn(indexingService, "awaitIdle").mockReturnValueOnce(idleDeferred.promise);
+			vi.spyOn(indexingService, "awaitIdle").mockReturnValueOnce(
+				idleDeferred.promise,
+			);
 
 			const secondResultPromise = resolver.resolve(env.files["origin.md"]);
 
@@ -367,7 +383,9 @@ describe("TwoHopLinkResolver", () => {
 			expect(initial.taggedNotes.map((note) => note.path)).toEqual(["tagged.md"]);
 
 			builder.addFile({ path: "unrelated.md", tags: ["tag1"] });
-			await env.service.applyFileChangesTimeSliced([{ type: "modify", path: "unrelated.md" }]);
+			await env.service.applyFileChangesTimeSliced([
+				{ type: "modify", path: "unrelated.md" },
+			]);
 
 			const updated = await resolver.resolve(env.files["origin.md"]);
 			expect(updated.taggedNotes.map((note) => note.path).sort()).toEqual([
@@ -384,9 +402,13 @@ describe("TwoHopLinkResolver", () => {
 
 			const resolver = createResolver(env);
 
-			const hiddenResult = await resolver.resolve(env.files["origin.md"], undefined, {
-				includeTaggedNotes: false,
-			});
+			const hiddenResult = await resolver.resolve(
+				env.files["origin.md"],
+				undefined,
+				{
+					includeTaggedNotes: false,
+				},
+			);
 			expect(hiddenResult.taggedNotes).toEqual([]);
 
 			const visibleResult = await resolver.resolve(

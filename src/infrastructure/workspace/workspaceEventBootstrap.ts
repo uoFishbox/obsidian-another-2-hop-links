@@ -93,13 +93,9 @@ export function setupWorkspaceEventHandlers(
 		}),
 	);
 
-	plugin.registerEvent(
-		deps.workspace.on("active-leaf-change", scheduleLayoutChange),
-	);
+	plugin.registerEvent(deps.workspace.on("active-leaf-change", scheduleLayoutChange));
 
-	plugin.registerEvent(
-		deps.workspace.on("file-open", scheduleLayoutChange),
-	);
+	plugin.registerEvent(deps.workspace.on("file-open", scheduleLayoutChange));
 
 	plugin.registerEvent(
 		deps.workspace.on("file-open", () => {

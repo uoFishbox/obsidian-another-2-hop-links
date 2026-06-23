@@ -116,13 +116,7 @@ export class ShadowAnchorRegistry {
 			return entry.proxy;
 		}
 
-		this.applyProxyRect(
-			entry,
-			rect.left,
-			rect.top,
-			rect.width,
-			rect.height,
-		);
+		this.applyProxyRect(entry, rect.left, rect.top, rect.width, rect.height);
 		return entry.proxy;
 	}
 

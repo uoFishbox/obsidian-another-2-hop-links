@@ -16,7 +16,5 @@ export function registerEditorExtensions(
 	deps: RegisterEditorExtensionsDeps,
 ): void {
 	plugin.registerEditorExtension(buildLivePreviewPlugin(deps.linkStatusService));
-	plugin.registerEditorExtension(
-		buildEditorInlineFocusBridgeExtension(plugin),
-	);
+	plugin.registerEditorExtension(buildEditorInlineFocusBridgeExtension(plugin));
 }

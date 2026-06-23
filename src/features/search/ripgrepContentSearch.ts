@@ -37,9 +37,7 @@ function forEachLine(text: string, visitor: (line: string) => void): void {
 		if (charCode !== 10) continue;
 
 		const end =
-			index > start && text.charCodeAt(index - 1) === 13
-				? index - 1
-				: index;
+			index > start && text.charCodeAt(index - 1) === 13 ? index - 1 : index;
 
 		if (end > start) {
 			visitor(text.slice(start, end));
@@ -113,9 +111,7 @@ function getExecFile(): ExecFile | null {
 
 	try {
 		const req = (0, eval)("require") as (id: string) => unknown;
-		const childProcess = req(
-			"child_process",
-		) as typeof import("child_process");
+		const childProcess = req("child_process") as typeof import("child_process");
 		return childProcess.execFile;
 	} catch {
 		return null;
@@ -242,10 +238,7 @@ function buildRipgrepMatchPosition(match: {
 	submatchEnd: number;
 }): Pos {
 	const line = Math.max(0, match.lineNumber - 1);
-	const startCol = byteOffsetToStringIndex(
-		match.lineText,
-		match.submatchStart,
-	);
+	const startCol = byteOffsetToStringIndex(match.lineText, match.submatchStart);
 	const endCol = Math.max(
 		startCol + 1,
 		byteOffsetToStringIndex(match.lineText, match.submatchEnd),
@@ -390,9 +383,7 @@ async function runLimited<T>(
 		}
 	};
 
-	await Promise.all(
-		Array.from({ length: Math.min(limit, items.length) }, runNext),
-	);
+	await Promise.all(Array.from({ length: Math.min(limit, items.length) }, runNext));
 }
 
 export async function searchRipgrepContentByTerm(
@@ -522,8 +513,7 @@ export function filterSearchDatasetWithRipgrepMatches(
 			const termTitleMatched = item.searchText.includes(term);
 			const termContentMatched =
 				!!item.targetFilePath &&
-				(contentMatchesByTerm.get(term)?.has(item.targetFilePath) ??
-					false);
+				(contentMatchesByTerm.get(term)?.has(item.targetFilePath) ?? false);
 
 			if (!termTitleMatched && !termContentMatched) {
 				matched = false;

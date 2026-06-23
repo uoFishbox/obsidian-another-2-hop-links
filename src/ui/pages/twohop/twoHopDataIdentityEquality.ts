@@ -69,20 +69,14 @@ export function hasSamePrimaryItemsDeps(
 	current: PrimarySectionItemsDeps,
 	next: PrimarySectionItemsDeps,
 ): boolean {
-	return (
-		current.items === next.items &&
-		current.updateVersion === next.updateVersion
-	);
+	return current.items === next.items && current.updateVersion === next.updateVersion;
 }
 
 export function hasSameNewLinksItemsDeps(
 	current: NewLinksSectionItemsDeps,
 	next: NewLinksSectionItemsDeps,
 ): boolean {
-	return (
-		current.items === next.items &&
-		current.updateVersion === next.updateVersion
-	);
+	return current.items === next.items && current.updateVersion === next.updateVersion;
 }
 
 export function createHeaderInteractionDescriptor(

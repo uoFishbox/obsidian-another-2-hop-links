@@ -12,12 +12,8 @@
 
 	const firstBookmarks = useBookmarks(app);
 	const secondBookmarks = useBookmarks(app);
-	const firstIsBookmarked = $derived(
-		firstBookmarks.isBookmarked(firstPath),
-	);
-	const secondIsBookmarked = $derived(
-		secondBookmarks.isBookmarked(secondPath),
-	);
+	const firstIsBookmarked = $derived(firstBookmarks.isBookmarked(firstPath));
+	const secondIsBookmarked = $derived(secondBookmarks.isBookmarked(secondPath));
 	const firstBookmarkCount = $derived(firstBookmarks.filePaths.size);
 	const secondBookmarkCount = $derived(secondBookmarks.filePaths.size);
 </script>

@@ -37,10 +37,7 @@ export function generateLinkKey(
 	return createLinkIdentitySignature(filePath, linkText, suffix);
 }
 
-export function qualifyDuplicateKey(
-	baseKey: string,
-	occurrenceIndex: number,
-): string {
+export function qualifyDuplicateKey(baseKey: string, occurrenceIndex: number): string {
 	return occurrenceIndex <= 0 ? baseKey : `${baseKey}::dup:${occurrenceIndex}`;
 }
 
@@ -54,12 +51,7 @@ export function generatePositionedLinkKey(
 	position?: Pos,
 	suffix = "",
 ): string {
-	return createPositionedLinkIdentitySignature(
-		filePath,
-		linkText,
-		position,
-		suffix,
-	);
+	return createPositionedLinkIdentitySignature(filePath, linkText, position, suffix);
 }
 
 export function generateIndexedLinkKey(

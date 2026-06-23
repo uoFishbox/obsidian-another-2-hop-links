@@ -135,9 +135,7 @@ describe("buildTwohopSearchDataset", () => {
 		const sourceFile = createMockTFile("notes/source.md");
 		const targetFile = createMockTFile("notes/outgoing-target.md");
 		const displayData = createDisplayData({
-			outgoing: [
-				createBranch(sourceFile, targetFile.path, "Outgoing Raw"),
-			],
+			outgoing: [createBranch(sourceFile, targetFile.path, "Outgoing Raw")],
 		});
 		const options = createAdapterOptions(displayData, sourceFile);
 
@@ -152,16 +150,10 @@ describe("buildTwohopSearchDataset", () => {
 	it("builds snapshots for merged branches and backlinks", () => {
 		const sourceFile = createMockTFile("notes/source.md");
 		const mergedTarget = createMockTFile("notes/merged-target.md");
-		const mergedBacklinkSource = createMockTFile(
-			"notes/merged-backlink.md",
-		);
+		const mergedBacklinkSource = createMockTFile("notes/merged-backlink.md");
 		const displayData = createDisplayData({
 			mergedItems: [
-				createBranch(
-					sourceFile,
-					mergedTarget.path,
-					"Merged Branch Raw",
-				),
+				createBranch(sourceFile, mergedTarget.path, "Merged Branch Raw"),
 				createBacklink(mergedBacklinkSource, "Merged Backlink Raw"),
 			],
 		});
@@ -169,22 +161,17 @@ describe("buildTwohopSearchDataset", () => {
 
 		const snapshots = buildTwohopSearchDataset(options);
 		const mergedBranchSnapshot = snapshots.find(
-			(s) =>
-				s.key.startsWith("m") &&
-				s.searchText.includes("merged branch raw"),
+			(s) => s.key.startsWith("m") && s.searchText.includes("merged branch raw"),
 		);
 		const mergedBacklinkSnapshot = snapshots.find(
 			(s) =>
-				s.key.startsWith("m") &&
-				s.searchText.includes("merged-backlink link"),
+				s.key.startsWith("m") && s.searchText.includes("merged-backlink link"),
 		);
 
 		expect(mergedBranchSnapshot).toBeDefined();
 		expect(mergedBranchSnapshot?.targetFilePath).toBe(mergedTarget.path);
 		expect(mergedBacklinkSnapshot).toBeDefined();
-		expect(mergedBacklinkSnapshot?.targetFilePath).toBe(
-			mergedBacklinkSource.path,
-		);
+		expect(mergedBacklinkSnapshot?.targetFilePath).toBe(mergedBacklinkSource.path);
 	});
 
 	it("builds snapshots for two-hop children", () => {
@@ -298,9 +285,7 @@ describe("filterTwohopDisplayData", () => {
 		});
 		const options = createAdapterOptions(displayData, sourceFile);
 		const snapshots = buildTwohopSearchDataset(options);
-		const betaChildKey = snapshots.find((s) =>
-			s.key.includes("beta-child"),
-		)?.key;
+		const betaChildKey = snapshots.find((s) => s.key.includes("beta-child"))?.key;
 
 		const result = filterTwohopDisplayData(
 			displayData,
@@ -354,9 +339,7 @@ describe("filterTwohopDisplayData", () => {
 		});
 		const options = createAdapterOptions(displayData, sourceFile);
 		const snapshots = buildTwohopSearchDataset(options);
-		const betaNoteKey = snapshots.find((s) =>
-			s.key.includes("beta-note"),
-		)?.key;
+		const betaNoteKey = snapshots.find((s) => s.key.includes("beta-note"))?.key;
 
 		const result = filterTwohopDisplayData(
 			displayData,
@@ -401,11 +384,7 @@ describe("filterTwohopDisplayData", () => {
 		const key = snapshots[0]?.key ?? "";
 
 		backlink.rawText = "changed-after-dataset-build";
-		const result = adapter.filterDisplayData(
-			displayData,
-			"query",
-			new Set([key]),
-		);
+		const result = adapter.filterDisplayData(displayData, "query", new Set([key]));
 
 		expect(result.backlinks).toEqual([backlink]);
 	});
@@ -440,23 +419,15 @@ describe("collectTwohopSearchableFiles", () => {
 		const outgoingTarget = createMockTFile("notes/outgoing-target.md");
 		const backlinkSource = createMockTFile("notes/backlink-source.md");
 		const mergedTarget = createMockTFile("notes/merged-target.md");
-		const mergedBacklinkSource = createMockTFile(
-			"notes/merged-backlink.md",
-		);
+		const mergedBacklinkSource = createMockTFile("notes/merged-backlink.md");
 		const childSource = createMockTFile("notes/child-source.md");
 		const taggedFile = createMockTFile("notes/tagged.md");
 
 		const displayData: DisplayData = {
-			outgoing: [
-				createBranch(sourceFile, outgoingTarget.path, "Outgoing Raw"),
-			],
+			outgoing: [createBranch(sourceFile, outgoingTarget.path, "Outgoing Raw")],
 			backlinks: [createBacklink(backlinkSource, "Backlink Raw")],
 			mergedItems: [
-				createBranch(
-					sourceFile,
-					mergedTarget.path,
-					"Merged Branch Raw",
-				),
+				createBranch(sourceFile, mergedTarget.path, "Merged Branch Raw"),
 				createBacklink(mergedBacklinkSource, "Merged Backlink Raw"),
 			],
 			twoHopBranches: [

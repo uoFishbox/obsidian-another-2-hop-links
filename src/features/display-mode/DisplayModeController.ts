@@ -8,10 +8,7 @@ import type { WorkspaceViewQueries } from "infrastructure/workspace/workspaceVie
 import type { DisplayModeStrategy } from "features/display-mode/createDisplayModeStrategy";
 import type { DisplayModeStrategyContext } from "features/display-mode/DisplayModeStrategyContext";
 import { createDisplayModeStrategy } from "features/display-mode/createDisplayModeStrategy";
-import {
-	TwoHopLinksView,
-	TWO_HOP_LINKS_VIEW_TYPE,
-} from "ui/views/TwoHopLinksView";
+import { TwoHopLinksView, TWO_HOP_LINKS_VIEW_TYPE } from "ui/views/TwoHopLinksView";
 import {
 	getCanvasFile,
 	getFileNodePath,
@@ -55,12 +52,8 @@ export class DisplayModeController {
 			updateSidebarForCanvasSelectionView: (view) =>
 				this.updateSidebarForCanvasSelectionView(view),
 			updateSidebarForCanvasSelectionEvent: (canvas, selectedNodes) =>
-				this.updateSidebarForCanvasSelectionEvent(
-					canvas,
-					selectedNodes,
-				),
-			isCanvasSingleFileSelected: (view) =>
-				this.isCanvasSingleFileSelected(view),
+				this.updateSidebarForCanvasSelectionEvent(canvas, selectedNodes),
+			isCanvasSingleFileSelected: (view) => this.isCanvasSingleFileSelected(view),
 			isMarkdownView: (view) => this.isMarkdownView(view),
 			isCanvasView: (view) => this.isCanvasView(view),
 			isBaseView: (view) => this.isBaseView(view),
@@ -98,9 +91,7 @@ export class DisplayModeController {
 		this.currentStrategy.handleCanvasSelectionChange(canvas, selectedNodes);
 	}
 
-	public mountInlineComponents(
-		options: { forceRemount?: boolean } = {},
-	): void {
+	public mountInlineComponents(options: { forceRemount?: boolean } = {}): void {
 		if (
 			!["editor-inline", "hybrid"].includes(
 				this.settingsManager.settings.displayMode,
@@ -143,9 +134,7 @@ export class DisplayModeController {
 	}
 
 	private async activateSidebarView(): Promise<void> {
-		const existing = this.app.workspace.getLeavesOfType(
-			TWO_HOP_LINKS_VIEW_TYPE,
-		);
+		const existing = this.app.workspace.getLeavesOfType(TWO_HOP_LINKS_VIEW_TYPE);
 		if (existing.length > 0) return;
 
 		const leaf = this.app.workspace.getRightLeaf(false);
@@ -162,9 +151,7 @@ export class DisplayModeController {
 	}
 
 	private clearSidebarViewContent(): void {
-		const leaves = this.app.workspace.getLeavesOfType(
-			TWO_HOP_LINKS_VIEW_TYPE,
-		);
+		const leaves = this.app.workspace.getLeavesOfType(TWO_HOP_LINKS_VIEW_TYPE);
 		leaves.forEach((leaf) => {
 			if (leaf.view instanceof TwoHopLinksView) {
 				leaf.view.clearContent();
@@ -262,10 +249,7 @@ export class DisplayModeController {
 			requestAnimationFrame(() => {
 				// rAF待機中にアクティブファイルが変わった場合は旧ファイル描画を抑止
 				const latestActiveFile = this.getActiveFile?.();
-				if (
-					!latestActiveFile ||
-					latestActiveFile.path !== capturedPath
-				) {
+				if (!latestActiveFile || latestActiveFile.path !== capturedPath) {
 					return;
 				}
 				if (this.updateSidebarView) {
@@ -281,8 +265,7 @@ export class DisplayModeController {
 	private isCanvasSingleFileSelected(view: unknown): boolean {
 		if (
 			!view ||
-			typeof (view as { getViewType?: () => string }).getViewType !==
-				"function"
+			typeof (view as { getViewType?: () => string }).getViewType !== "function"
 		) {
 			return false;
 		}
@@ -297,9 +280,9 @@ export class DisplayModeController {
 		const canvas = (view as { canvas?: CanvasViewCanvas }).canvas;
 		if (!canvas) return false;
 
-		const capability = new ObsidianInternalFacade(
-			this.app,
-		).getCanvasSelectionData(canvas);
+		const capability = new ObsidianInternalFacade(this.app).getCanvasSelectionData(
+			canvas,
+		);
 		const nodes: CanvasNodeData[] = capability.ok
 			? (capability.value.getSelectionData?.()?.nodes ?? [])
 			: [];
@@ -309,8 +292,7 @@ export class DisplayModeController {
 
 	private shouldFollowSelectedCanvasFileNode(): boolean {
 		return (
-			this.settingsManager.settings.showTwoHopForSelectedCanvasFileNode ??
-			true
+			this.settingsManager.settings.showTwoHopForSelectedCanvasFileNode ?? true
 		);
 	}
 
@@ -321,8 +303,7 @@ export class DisplayModeController {
 	private isCanvasView(view: unknown): boolean {
 		if (
 			!view ||
-			typeof (view as { getViewType?: () => string }).getViewType !==
-				"function"
+			typeof (view as { getViewType?: () => string }).getViewType !== "function"
 		) {
 			return false;
 		}
@@ -336,22 +317,18 @@ export class DisplayModeController {
 	private isBaseView(view: unknown): boolean {
 		if (
 			!view ||
-			typeof (view as { getViewType?: () => string }).getViewType !==
-				"function"
+			typeof (view as { getViewType?: () => string }).getViewType !== "function"
 		) {
 			return false;
 		}
 
-		return (
-			(view as { getViewType: () => string }).getViewType() === "bases"
-		);
+		return (view as { getViewType: () => string }).getViewType() === "bases";
 	}
 
 	private isMediaOrPdfView(view: unknown): boolean {
 		if (
 			!view ||
-			typeof (view as { getViewType?: () => string }).getViewType !==
-				"function"
+			typeof (view as { getViewType?: () => string }).getViewType !== "function"
 		) {
 			return false;
 		}

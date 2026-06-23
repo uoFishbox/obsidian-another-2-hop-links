@@ -10,18 +10,9 @@ describe("LookupGraphMutator", () => {
 	test("refreshUnresolvedLookupForKey aggregates sources of sibling lookupPaths", async () => {
 		const snapshot = createEmptyIndexSnapshot();
 
-		snapshot.lookupKeyToLookupPaths.set(
-			"foo.md",
-			new Set(["Foo.md", "foo.md"]),
-		);
-		snapshot.backlinksMap.set(
-			"Foo.md",
-			new Map([["source-a.md", [] as any]]),
-		);
-		snapshot.backlinksMap.set(
-			"foo.md",
-			new Map([["source-b.md", [] as any]]),
-		);
+		snapshot.lookupKeyToLookupPaths.set("foo.md", new Set(["Foo.md", "foo.md"]));
+		snapshot.backlinksMap.set("Foo.md", new Map([["source-a.md", [] as any]]));
+		snapshot.backlinksMap.set("foo.md", new Map([["source-b.md", [] as any]]));
 
 		await refreshUnresolvedLookupForKeyAsync(
 			snapshot,
@@ -41,10 +32,7 @@ describe("LookupGraphMutator", () => {
 		const snapshot = createEmptyIndexSnapshot();
 
 		snapshot.lookupKeyToLookupPaths.set("foo.md", new Set(["foo.md"]));
-		snapshot.backlinksMap.set(
-			"foo.md",
-			new Map([["source-a.md", [] as any]]),
-		);
+		snapshot.backlinksMap.set("foo.md", new Map([["source-a.md", [] as any]]));
 		snapshot.lookupKeyDirectResolvedPathCount.set("foo.md", 1);
 
 		await refreshUnresolvedLookupForKeyAsync(
@@ -91,12 +79,8 @@ describe("LookupGraphMutator", () => {
 
 		expect(countingScheduler.yieldCalls).toBeGreaterThan(0);
 		expect(snapshot.sourceSummaries.has(sourcePath)).toBe(false);
-		expect(snapshot.linkLookupToSources.has("prev-lookup-0.md")).toBe(
-			false,
-		);
-		expect(snapshot.linkLookupToSources.has("prev-lookup-255.md")).toBe(
-			false,
-		);
+		expect(snapshot.linkLookupToSources.has("prev-lookup-0.md")).toBe(false);
+		expect(snapshot.linkLookupToSources.has("prev-lookup-255.md")).toBe(false);
 	});
 
 	test("replaceSourceSummaryAsync yields during next key addition", async () => {
@@ -129,14 +113,10 @@ describe("LookupGraphMutator", () => {
 		expect(countingScheduler.yieldCalls).toBeGreaterThan(0);
 		expect(snapshot.sourceSummaries.get(sourcePath)).toBe(nextSummary);
 		expect(
-			snapshot.linkLookupToSources
-				.get("next-lookup-0.md")
-				?.has(sourcePath),
+			snapshot.linkLookupToSources.get("next-lookup-0.md")?.has(sourcePath),
 		).toBe(true);
 		expect(
-			snapshot.linkLookupToSources
-				.get("next-lookup-255.md")
-				?.has(sourcePath),
+			snapshot.linkLookupToSources.get("next-lookup-255.md")?.has(sourcePath),
 		).toBe(true);
 	});
 });

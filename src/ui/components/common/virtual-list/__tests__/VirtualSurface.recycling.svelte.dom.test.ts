@@ -6,11 +6,7 @@ import {
 	teardownAnimationFrameMock,
 } from "testing/helpers/DOMObserverMock";
 import VirtualSurfaceRecyclingHarness from "./VirtualSurfaceRecyclingHarness.svelte";
-import type {
-	MountedVirtualCell,
-	LogicalCellKey,
-	RenderSlotKey,
-} from "../types";
+import type { MountedVirtualCell, LogicalCellKey, RenderSlotKey } from "../types";
 import type { ViewItem } from "application/presenters";
 import type { ItemInteractionDescriptor } from "ui/interactions/interactionTypes";
 
@@ -31,10 +27,7 @@ interface TestMountedRow {
 	cells: TestMountedCell[];
 }
 
-function createCells(
-	keys: string[],
-	slotOffset: number = 0,
-): TestMountedCell[] {
+function createCells(keys: string[], slotOffset: number = 0): TestMountedCell[] {
 	return keys.map((key, index) => ({
 		key: key as LogicalCellKey,
 		renderSlotKey: (slotOffset + index) as RenderSlotKey,
@@ -81,16 +74,13 @@ describe("VirtualSurface recycling", () => {
 
 	it("shows correct visible items after scrolling", async () => {
 		const cells1 = createCells(["A", "B", "C", "D"]);
-		const { container, rerender } = render(
-			VirtualSurfaceRecyclingHarness,
-			{
-				props: {
-					mountedCells: cells1,
-					contentHeight: 200,
-					rowHeight: 50,
-				},
+		const { container, rerender } = render(VirtualSurfaceRecyclingHarness, {
+			props: {
+				mountedCells: cells1,
+				contentHeight: 200,
+				rowHeight: 50,
 			},
-		);
+		});
 		await flushFrames();
 
 		const cells2 = createCells(["E", "F"]);
@@ -117,16 +107,13 @@ describe("VirtualSurface recycling", () => {
 
 	it("keeps mounted cell count bounded by unmounting cells that leave the viewport", async () => {
 		const cells4 = createCells(["A", "B", "C", "D"]);
-		const { container, rerender } = render(
-			VirtualSurfaceRecyclingHarness,
-			{
-				props: {
-					mountedCells: cells4,
-					contentHeight: 200,
-					rowHeight: 50,
-				},
+		const { container, rerender } = render(VirtualSurfaceRecyclingHarness, {
+			props: {
+				mountedCells: cells4,
+				contentHeight: 200,
+				rowHeight: 50,
 			},
-		);
+		});
 		await flushFrames();
 
 		const host = container.querySelector(
@@ -136,10 +123,9 @@ describe("VirtualSurface recycling", () => {
 		expect(shadowRoot).toBeTruthy();
 		if (!shadowRoot) return;
 
-		expect(
-			shadowRoot.querySelectorAll('[data-testid="probe-cell"]')
-				.length,
-		).toBe(4);
+		expect(shadowRoot.querySelectorAll('[data-testid="probe-cell"]').length).toBe(
+			4,
+		);
 
 		const cells2 = createCells(["E", "F"]);
 		await rerender({
@@ -149,10 +135,9 @@ describe("VirtualSurface recycling", () => {
 		});
 		await flushFrames();
 
-		expect(
-			shadowRoot.querySelectorAll('[data-testid="probe-cell"]')
-				.length,
-		).toBe(2);
+		expect(shadowRoot.querySelectorAll('[data-testid="probe-cell"]').length).toBe(
+			2,
+		);
 	});
 
 	it("does not remount existing visible items on a noop rerender", async () => {
@@ -192,25 +177,20 @@ describe("VirtualSurface recycling", () => {
 		const resolve = vi.fn(() => descriptor);
 		const resolver = { interactionId, resolve };
 		const cells = createCells(["A"]);
-		const { container, rerender } = render(
-			VirtualSurfaceRecyclingHarness,
-			{
-				props: {
-					mountedCells: cells,
-					contentHeight: 100,
-					rowHeight: 50,
-					interactionId,
-					interactionDescriptorResolvers: [resolver],
-				},
+		const { container, rerender } = render(VirtualSurfaceRecyclingHarness, {
+			props: {
+				mountedCells: cells,
+				contentHeight: 100,
+				rowHeight: 50,
+				interactionId,
+				interactionDescriptorResolvers: [resolver],
 			},
-		);
+		});
 		await flushFrames();
 
 		const probe = container
 			.querySelector<HTMLElement>(".recycling-test-root")
-			?.shadowRoot?.querySelector<HTMLElement>(
-				'[data-testid="probe-cell"]',
-			);
+			?.shadowRoot?.querySelector<HTMLElement>('[data-testid="probe-cell"]');
 		expect(probe).toBeTruthy();
 		if (!probe) return;
 
@@ -306,19 +286,16 @@ describe("VirtualSurface recycling", () => {
 			...cell,
 			renderBodyKey: "body:A:1",
 		}));
-		const { container, rerender } = render(
-			VirtualSurfaceRecyclingHarness,
-			{
-				props: {
-					mountedCells: cells,
-					mountedRows: createRows(cells),
-					contentHeight: 100,
-					rowHeight: 50,
-					layoutMode: "grid-rows",
-					onCellMount: (key: string) => mountedKeys.push(key),
-				},
+		const { container, rerender } = render(VirtualSurfaceRecyclingHarness, {
+			props: {
+				mountedCells: cells,
+				mountedRows: createRows(cells),
+				contentHeight: 100,
+				rowHeight: 50,
+				layoutMode: "grid-rows",
+				onCellMount: (key: string) => mountedKeys.push(key),
 			},
-		);
+		});
 		await flushFrames();
 		expect(mountedKeys).toStrictEqual(["A"]);
 
@@ -343,9 +320,9 @@ describe("VirtualSurface recycling", () => {
 		const shadowRoot = host?.shadowRoot;
 		expect(shadowRoot).toBeTruthy();
 		expect(
-			shadowRoot?.querySelector('[data-testid="probe-cell"]')?.getAttribute(
-				"data-key",
-			),
+			shadowRoot
+				?.querySelector('[data-testid="probe-cell"]')
+				?.getAttribute("data-key"),
 		).toBe("A");
 		expect(mountedKeys).toStrictEqual(["A"]);
 	});
@@ -356,23 +333,20 @@ describe("VirtualSurface recycling", () => {
 			rowIndex: 0,
 			columnIndex: 0,
 		}));
-		const { container, rerender } = render(
-			VirtualSurfaceRecyclingHarness,
-			{
-				props: {
-					mountedCells: cells,
-					mountedRows: createRows(cells, {
-						key: 0,
-						rowIndex: 0,
-						slotIndex: 0,
-						slotKey: 0,
-					}),
-					contentHeight: 100,
-					rowHeight: 50,
-					layoutMode: "grid-rows",
-				},
+		const { container, rerender } = render(VirtualSurfaceRecyclingHarness, {
+			props: {
+				mountedCells: cells,
+				mountedRows: createRows(cells, {
+					key: 0,
+					rowIndex: 0,
+					slotIndex: 0,
+					slotKey: 0,
+				}),
+				contentHeight: 100,
+				rowHeight: 50,
+				layoutMode: "grid-rows",
 			},
-		);
+		});
 		await flushFrames();
 
 		const host = container.querySelector(
@@ -407,15 +381,9 @@ describe("VirtualSurface recycling", () => {
 		});
 		await flushFrames();
 
-		expect(shadowRoot.querySelector("[data-ccl-row-slot='0']")).toBe(
-			rowShell,
-		);
-		expect(shadowRoot.querySelector("[data-ccl-cell-slot]")).toBe(
-			cellShell,
-		);
-		expect(
-			(cellShell as HTMLElement | null)?.dataset.cclLogicalKey,
-		).toBe("B");
+		expect(shadowRoot.querySelector("[data-ccl-row-slot='0']")).toBe(rowShell);
+		expect(shadowRoot.querySelector("[data-ccl-cell-slot]")).toBe(cellShell);
+		expect((cellShell as HTMLElement | null)?.dataset.cclLogicalKey).toBe("B");
 		expect(
 			cellShell
 				?.querySelector('[data-testid="probe-cell"]')

@@ -25,23 +25,29 @@ interface MeasuredViewPlanRowModel {
 		viewportHeight: number;
 		overscanPx: number;
 	}): RowRange;
-	findVisibleRangeInto(out: RowRange, params: {
-		scrollTop: number;
-		viewportHeight: number;
-		overscanPx: number;
-	}): void;
+	findVisibleRangeInto(
+		out: RowRange,
+		params: {
+			scrollTop: number;
+			viewportHeight: number;
+			overscanPx: number;
+		},
+	): void;
 	findVisibleRanges(params: {
 		scrollTop: number;
 		viewportHeight: number;
 		mountedOverscanPx: number;
 		previewOverscanPx?: number;
 	}): VirtualRanges;
-	findVisibleRangesInto(out: VirtualRanges, params: {
-		scrollTop: number;
-		viewportHeight: number;
-		mountedOverscanPx: number;
-		previewOverscanPx?: number;
-	}): void;
+	findVisibleRangesInto(
+		out: VirtualRanges,
+		params: {
+			scrollTop: number;
+			viewportHeight: number;
+			mountedOverscanPx: number;
+			previewOverscanPx?: number;
+		},
+	): void;
 	findVisibleRangesFromMounted(params: {
 		scrollTop: number;
 		viewportHeight: number;
@@ -49,13 +55,16 @@ interface MeasuredViewPlanRowModel {
 		mountedOverscanPx: number;
 		previewOverscanPx?: number;
 	}): VirtualRanges;
-	findVisibleRangesFromMountedInto(out: VirtualRanges, params: {
-		scrollTop: number;
-		viewportHeight: number;
-		mounted: RowRange;
-		mountedOverscanPx: number;
-		previewOverscanPx?: number;
-	}): void;
+	findVisibleRangesFromMountedInto(
+		out: VirtualRanges,
+		params: {
+			scrollTop: number;
+			viewportHeight: number;
+			mounted: RowRange;
+			mountedOverscanPx: number;
+			previewOverscanPx?: number;
+		},
+	): void;
 	findStablePreviewScrollTopBandInto(
 		out: StablePreviewScrollTopBandMutable,
 		params: {
@@ -72,11 +81,7 @@ type StablePreviewScrollTopBandMutable = {
 	-readonly [K in keyof StablePreviewScrollTopBand]: StablePreviewScrollTopBand[K];
 };
 
-interface MeasuredViewPlanRuntime<
-	T,
-	G,
-	TRowModel extends MeasuredViewPlanRowModel,
-> {
+interface MeasuredViewPlanRuntime<T, G, TRowModel extends MeasuredViewPlanRowModel> {
 	readonly rowModel: TRowModel;
 	readonly virtualList: {
 		applyMeasurement(params: {
@@ -91,9 +96,7 @@ interface MeasuredViewPlanRuntime<
 			visibilityPolicy: ReturnType<
 				ViewPlanCardVirtualListPolicyResolver["resolve"]
 			>;
-		}): import("../dom/virtualListMeasurementAdapter").MeasurementUpdateResult<
-			RowRange
-		>;
+		}): import("../dom/virtualListMeasurementAdapter").MeasurementUpdateResult<RowRange>;
 	};
 	resolveRowModel(layout: ViewPlanLayoutMetrics): TRowModel;
 	syncPreviewVisibleRange(start: number, end: number): void;
@@ -137,11 +140,8 @@ export function createViewPlanMeasurementRuntime<
 }) {
 	let hasObservedInitialLayout = $state(false);
 	let hasConsumedInitialCardLayoutEffect = false;
-	let initialObservedCardLayout: ConfiguredCardLayout | null | undefined =
-		undefined;
-	const mountedRangeParams: Parameters<
-		TRowModel["findVisibleRange"]
-	>[0] = {
+	let initialObservedCardLayout: ConfiguredCardLayout | null | undefined = undefined;
+	const mountedRangeParams: Parameters<TRowModel["findVisibleRange"]>[0] = {
 		scrollTop: 0,
 		viewportHeight: 0,
 		overscanPx: 0,
@@ -198,13 +198,9 @@ export function createViewPlanMeasurementRuntime<
 			sectionTop,
 			isStableMeasurement,
 			isScrollActive,
-			hasStableVisibleRange:
-				params.state.measurement.hasStableVisibleRange,
+			hasStableVisibleRange: params.state.measurement.hasStableVisibleRange,
 			precomputedRanges,
-			visibilityPolicy: params.policyResolver.resolve(
-				nextLayout,
-				isScrollActive,
-			),
+			visibilityPolicy: params.policyResolver.resolve(nextLayout, isScrollActive),
 		});
 	};
 	const updateStablePreviewScrollTopBand = (
@@ -257,8 +253,7 @@ export function createViewPlanMeasurementRuntime<
 				),
 			};
 			const nextRowModel = params.runtime.resolveRowModel(nextLayout);
-			const hasRenderableSections =
-				params.getValidatedSections().length > 0;
+			const hasRenderableSections = params.getValidatedSections().length > 0;
 			const layoutStability = resolveVirtualListLayoutStability({
 				rootEl: sectionEl,
 				rootRect,
@@ -302,14 +297,10 @@ export function createViewPlanMeasurementRuntime<
 			measurementRowModel,
 			nextLayout,
 		) => {
-			const visibilityPolicy = params.policyResolver.resolve(
-				nextLayout,
-				true,
-			);
+			const visibilityPolicy = params.policyResolver.resolve(nextLayout, true);
 			mountedRangeParams.scrollTop = scrollTop - sectionTop;
 			mountedRangeParams.viewportHeight = viewportHeight;
-			mountedRangeParams.overscanPx =
-				visibilityPolicy.mountedOverscanPx;
+			mountedRangeParams.overscanPx = visibilityPolicy.mountedOverscanPx;
 			mountedScrollWindowMeasurement.identity = measurementRowModel;
 			measurementRowModel.findVisibleRangeInto(
 				mountedScrollWindowMeasurement.mounted,
@@ -326,16 +317,11 @@ export function createViewPlanMeasurementRuntime<
 			precomputedMountedRange,
 			hasMountedWindowChanged,
 		) => {
-			const visibilityPolicy = params.policyResolver.resolve(
-				nextLayout,
-				true,
-			);
+			const visibilityPolicy = params.policyResolver.resolve(nextLayout, true);
 			rangeParams.scrollTop = scrollTop - sectionTop;
 			rangeParams.viewportHeight = viewportHeight;
-			rangeParams.mountedOverscanPx =
-				visibilityPolicy.mountedOverscanPx;
-			rangeParams.previewOverscanPx =
-				visibilityPolicy.previewOverscanPx;
+			rangeParams.mountedOverscanPx = visibilityPolicy.mountedOverscanPx;
+			rangeParams.previewOverscanPx = visibilityPolicy.previewOverscanPx;
 			if (!precomputedMountedRange || hasMountedWindowChanged) {
 				committedScrollWindowMeasurement.identity = measurementRowModel;
 				measurementRowModel.findVisibleRangesInto(
@@ -343,8 +329,7 @@ export function createViewPlanMeasurementRuntime<
 					rangeParams,
 				);
 				updateStablePreviewScrollTopBand(
-					committedScrollWindowMeasurement
-						.stablePreviewScrollTopBand,
+					committedScrollWindowMeasurement.stablePreviewScrollTopBand,
 					measurementRowModel,
 					sectionTop,
 					rangeParams,
@@ -355,13 +340,10 @@ export function createViewPlanMeasurementRuntime<
 
 			scrollWindowMeasurement.identity = measurementRowModel;
 			rangesFromMountedParams.scrollTop = rangeParams.scrollTop;
-			rangesFromMountedParams.viewportHeight =
-				rangeParams.viewportHeight;
+			rangesFromMountedParams.viewportHeight = rangeParams.viewportHeight;
 			rangesFromMountedParams.mounted = precomputedMountedRange;
-			rangesFromMountedParams.mountedOverscanPx =
-				rangeParams.mountedOverscanPx;
-			rangesFromMountedParams.previewOverscanPx =
-				rangeParams.previewOverscanPx;
+			rangesFromMountedParams.mountedOverscanPx = rangeParams.mountedOverscanPx;
+			rangesFromMountedParams.previewOverscanPx = rangeParams.previewOverscanPx;
 			measurementRowModel.findVisibleRangesFromMountedInto(
 				scrollWindowMeasurement.ranges,
 				rangesFromMountedParams,

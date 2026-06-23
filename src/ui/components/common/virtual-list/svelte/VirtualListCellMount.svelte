@@ -100,10 +100,7 @@
 			onDestroyCell?.(previousCell);
 		}
 
-		if (
-			mountedCell !== undefined &&
-			previousLogicalKey !== nextLogicalKey
-		) {
+		if (mountedCell !== undefined && previousLogicalKey !== nextLogicalKey) {
 			onMountCell?.(mountedCell);
 		}
 

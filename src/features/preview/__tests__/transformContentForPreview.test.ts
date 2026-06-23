@@ -118,9 +118,7 @@ Body`;
 	});
 
 	test("removes embeds normally but preserves permitted hosts", () => {
-		const removed = transformContentForPreview(
-			"Before ![[image.png]] After",
-		);
+		const removed = transformContentForPreview("Before ![[image.png]] After");
 		const kept = transformContentForPreview(
 			"Before ![](https://youtube.com/watch?v=1) After",
 		);

@@ -12,9 +12,7 @@ vi.mock("ui/views/TagNotesView", () => ({
 import { initGlobalSearchPatcher } from "../GlobalSearchPatcher";
 import { PatchRegistry } from "infrastructure/capabilities/PatchRegistry";
 
-function createPlugin(
-	getNotesWithTag: (tag: string) => Promise<TaggedNote[]>,
-) {
+function createPlugin(getNotesWithTag: (tag: string) => Promise<TaggedNote[]>) {
 	const originalOpenGlobalSearch = vi.fn();
 	const instance = {
 		openGlobalSearch: originalOpenGlobalSearch,
@@ -60,13 +58,12 @@ describe("GlobalSearchPatcher", () => {
 
 	test("tag: search opens TagNotesView after async tag index check", async () => {
 		let resolveNotes: ((notes: TaggedNote[]) => void) | undefined;
-		const { instance, originalOpenGlobalSearch, indexingService } =
-			createPlugin(
-				() =>
-					new Promise<TaggedNote[]>((resolve) => {
-						resolveNotes = resolve;
-					}),
-			);
+		const { instance, originalOpenGlobalSearch, indexingService } = createPlugin(
+			() =>
+				new Promise<TaggedNote[]>((resolve) => {
+					resolveNotes = resolve;
+				}),
+		);
 
 		instance.openGlobalSearch("tag:shared");
 
@@ -86,8 +83,9 @@ describe("GlobalSearchPatcher", () => {
 	});
 
 	test("tag: falls back to original Global Search when tag results are empty", async () => {
-		const { instance, originalOpenGlobalSearch, indexingService } =
-			createPlugin(async () => []);
+		const { instance, originalOpenGlobalSearch, indexingService } = createPlugin(
+			async () => [],
+		);
 
 		instance.openGlobalSearch("tag:missing");
 		await flushAsyncTasks();

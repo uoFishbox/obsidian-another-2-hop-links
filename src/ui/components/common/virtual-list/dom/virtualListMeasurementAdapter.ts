@@ -35,8 +35,7 @@ export function readScrollSnapshot(
 
 	if (scrollContainer) {
 		out.scrollTop = scrollContainer.scrollTop;
-		out.viewportHeight =
-			viewportHeightOverride ?? scrollContainer.clientHeight;
+		out.viewportHeight = viewportHeightOverride ?? scrollContainer.clientHeight;
 		return out;
 	}
 
@@ -75,8 +74,7 @@ export const getScrollMetrics = (
 			sectionRect,
 			scrollTop: scrollSnapshot.scrollTop,
 			viewportHeight: scrollSnapshot.viewportHeight,
-			sectionTop:
-				sectionRect.top - rootRect.top + scrollSnapshot.scrollTop,
+			sectionTop: sectionRect.top - rootRect.top + scrollSnapshot.scrollTop,
 		};
 	}
 

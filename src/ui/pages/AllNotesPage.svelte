@@ -20,8 +20,7 @@
 		applicationStore: ApplicationStore;
 	}
 
-	let { app, settings, sortService, linkContext, applicationStore }: Props =
-		$props();
+	let { app, settings, sortService, linkContext, applicationStore }: Props = $props();
 
 	let notesVersion = $state(0);
 	let cardLayoutCssText = $derived(getCardLayoutCssText(settings));
@@ -94,8 +93,7 @@
 				sourcePath: ctx.sourceFile.path,
 				fileToLinktext: ctx.fileToLinktext,
 				getMetadata: ctx.getMetadata,
-				priorityFrontmatterKeyForTitle:
-					settings.priorityFrontmatterKeyForTitle,
+				priorityFrontmatterKeyForTitle: settings.priorityFrontmatterKeyForTitle,
 			});
 		},
 		getItemProps: (item: ViewItem) => ({
@@ -157,11 +155,7 @@
 				const wasNote =
 					oldPath.toLowerCase().endsWith(".md") ||
 					oldPath.toLowerCase().endsWith(".canvas");
-				if (
-					file.extension === "md" ||
-					file.extension === "canvas" ||
-					wasNote
-				) {
+				if (file.extension === "md" || file.extension === "canvas" || wasNote) {
 					notesVersion += 1;
 				}
 			}),

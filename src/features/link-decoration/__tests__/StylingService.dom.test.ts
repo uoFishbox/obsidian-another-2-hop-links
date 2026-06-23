@@ -50,22 +50,14 @@ describe("StylingService", () => {
 		const service = createStylingService(linkStatusService as never);
 		const linkEl = document.querySelector<HTMLElement>(".internal-link");
 
-		service.reconcileLinkElementsInContainer(linkEl!.parentElement!, [
-			linkEl!,
-		]);
+		service.reconcileLinkElementsInContainer(linkEl!.parentElement!, [linkEl!]);
 
-		expect(getDecoratedState(linkEl)).toBe(
-			UNRESOLVED_LINK_ATTRIBUTE.VALUE_SPECIAL,
-		);
+		expect(getDecoratedState(linkEl)).toBe(UNRESOLVED_LINK_ATTRIBUTE.VALUE_SPECIAL);
 
 		unresolved = false;
-		service.reconcileLinkElementsInContainer(linkEl!.parentElement!, [
-			linkEl!,
-		]);
+		service.reconcileLinkElementsInContainer(linkEl!.parentElement!, [linkEl!]);
 
-		expect(linkEl?.hasAttribute(UNRESOLVED_LINK_ATTRIBUTE.NAME)).toBe(
-			false,
-		);
+		expect(linkEl?.hasAttribute(UNRESOLVED_LINK_ATTRIBUTE.NAME)).toBe(false);
 	});
 
 	it("keeps metadata wrapper decoration when decorating metadata links", () => {
@@ -84,9 +76,8 @@ describe("StylingService", () => {
 			}),
 		});
 		const service = createStylingService(linkStatusService as never);
-		const metadataLink = document.querySelector<HTMLElement>(
-			".metadata-link-inner",
-		);
+		const metadataLink =
+			document.querySelector<HTMLElement>(".metadata-link-inner");
 
 		service.reconcileLinkElementsInContainer(
 			metadataLink!.parentElement!,
@@ -120,9 +111,7 @@ describe("StylingService", () => {
 				?.querySelector(".cm-link-alias-pipe")
 				?.hasAttribute(UNRESOLVED_LINK_ATTRIBUTE.NAME),
 		).toBe(true);
-		expect(
-			linkStatusService.shouldDecorateLinkBatch,
-		).not.toHaveBeenCalled();
+		expect(linkStatusService.shouldDecorateLinkBatch).not.toHaveBeenCalled();
 	});
 
 	it("removes stale attributes only from the current link targets", () => {

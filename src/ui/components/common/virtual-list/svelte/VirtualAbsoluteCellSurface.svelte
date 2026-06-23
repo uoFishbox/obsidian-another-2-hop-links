@@ -13,9 +13,7 @@
 		mountedCells: readonly TMountedCell[];
 		contentEl?: HTMLDivElement | null;
 		observerRoot?: HTMLElement | null;
-		getCellPosition?: (
-			cell: TMountedCell,
-		) => VirtualSurfaceCellPosition;
+		getCellPosition?: (cell: TMountedCell) => VirtualSurfaceCellPosition;
 		getCellClassName?: (cell: TMountedCell) => string | undefined;
 		getCellDataTestId?: (cell: TMountedCell) => string | undefined;
 		onCellMount?: (cell: TMountedCell) => void;
@@ -64,11 +62,7 @@
 	});
 </script>
 
-<div
-	class={contentClassName}
-	bind:this={contentEl}
-	style={contentStyle}
->
+<div class={contentClassName} bind:this={contentEl} style={contentStyle}>
 	{#each mountedCells as mountedCell (mountedCell.renderSlotKey)}
 		{@const position = getCellPosition?.(mountedCell) ?? defaultPosition}
 		<VirtualListCellMount

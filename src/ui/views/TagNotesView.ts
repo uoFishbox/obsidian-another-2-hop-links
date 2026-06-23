@@ -125,13 +125,9 @@ export class TagNotesView extends AbstractSvelteListView<TaggedNote> {
 	} {
 		const candidate = state as TagNotesViewState | null;
 		const tag =
-			typeof candidate?.tag === "string"
-				? normalizeTag(candidate.tag)
-				: "";
+			typeof candidate?.tag === "string" ? normalizeTag(candidate.tag) : "";
 		const sourcePath =
-			typeof candidate?.sourcePath === "string"
-				? candidate.sourcePath
-				: "";
+			typeof candidate?.sourcePath === "string" ? candidate.sourcePath : "";
 		return { tag, sourcePath };
 	}
 
@@ -308,11 +304,7 @@ export class TagNotesView extends AbstractSvelteListView<TaggedNote> {
 			return;
 		}
 
-		const notes = peekNotesWithTag.call(
-			indexingService,
-			this.tag,
-			this.sourcePath,
-		);
+		const notes = peekNotesWithTag.call(indexingService, this.tag, this.sourcePath);
 
 		this.notes = notes;
 		this.hasLoadedNotes = true;
@@ -337,10 +329,7 @@ export class TagNotesView extends AbstractSvelteListView<TaggedNote> {
 		return TagNotesListHost;
 	}
 
-	private mountTagNotesSection(
-		parentEl: HTMLElement,
-		autofocus: boolean,
-	): void {
+	private mountTagNotesSection(parentEl: HTMLElement, autofocus: boolean): void {
 		const sourceFile = this.resolveSourceFile() ?? ({ path: "" } as TFile);
 
 		const config: ListConfig<ViewItem> = {

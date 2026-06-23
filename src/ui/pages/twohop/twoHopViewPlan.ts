@@ -148,19 +148,12 @@ export function compileTwoHopViewPlan(
 	const cellCounts = new Uint32Array(sectionCount);
 	const rowCounts = new Uint32Array(sectionCount);
 	const showLoadMoreBySection = new Uint8Array(sectionCount);
-	const eagerItemsBySection: (
-		| readonly TwoHopPageVirtualItem[]
-		| undefined
-	)[] = [];
+	const eagerItemsBySection: (readonly TwoHopPageVirtualItem[] | undefined)[] = [];
 	const batchedMaterialization = params.materialization?.kind === "batched";
 	let totalRowCount = 0;
 	let totalCellCount = 0;
 
-	for (
-		let sectionIndex = 0;
-		sectionIndex < sectionCount;
-		sectionIndex += 1
-	) {
+	for (let sectionIndex = 0; sectionIndex < sectionCount; sectionIndex += 1) {
 		const descriptor = params.sections[sectionIndex];
 		const paginationKey = getSectionPaginationKey(descriptor);
 		const visibleCount = params.clampVisibleCount(
@@ -194,11 +187,7 @@ export function compileTwoHopViewPlan(
 	let nextCellIndex = 0;
 	let nextRowIndex = 0;
 
-	for (
-		let sectionIndex = 0;
-		sectionIndex < sectionCount;
-		sectionIndex += 1
-	) {
+	for (let sectionIndex = 0; sectionIndex < sectionCount; sectionIndex += 1) {
 		const descriptor = params.sections[sectionIndex];
 		const visibleCount = visibleCounts[sectionIndex];
 		const cellCount = cellCounts[sectionIndex];
@@ -260,9 +249,7 @@ export function compileTwoHopViewPlan(
 			nextCellIndex: 0,
 			materializedCellCount: 0,
 		})),
-		materializedSectionByIndex: new Array<boolean>(sections.length).fill(
-			false,
-		),
+		materializedSectionByIndex: new Array<boolean>(sections.length).fill(false),
 		nextUnmaterializedSectionIndex: 0,
 		remainingUnmaterializedCellCount: totalCellCount,
 		remainingUnmaterializedSectionCount: sections.length,
@@ -276,18 +263,11 @@ export function compileTwoHopViewPlan(
 				params.materialization.initial.maxSectionCount,
 			),
 		);
-		materializeNextTwoHopCellBatch(
-			plan,
-			{
-				maxCellCount: initialCellCount,
-			},
-		);
+		materializeNextTwoHopCellBatch(plan, {
+			maxCellCount: initialCellCount,
+		});
 	} else {
-		for (
-			let sectionIndex = 0;
-			sectionIndex < sections.length;
-			sectionIndex += 1
-		) {
+		for (let sectionIndex = 0; sectionIndex < sections.length; sectionIndex += 1) {
 			materializeTwoHopSectionCells(
 				plan,
 				sectionIndex,
@@ -354,11 +334,7 @@ function createTwoHopLogicalCellAt(
 	const itemIndex = cellIndex - 1;
 	if (itemIndex < 0 || itemIndex >= visibleCount) return undefined;
 
-	const item = resolveTwoHopDescriptorItem(
-		descriptor,
-		itemIndex,
-		resolvedItems,
-	);
+	const item = resolveTwoHopDescriptorItem(descriptor, itemIndex, resolvedItems);
 	if (!item) return undefined;
 
 	const sourceRawKey = `${descriptor.sectionId}::${getTwoHopPageItemKey(
@@ -381,11 +357,7 @@ function ensureTwoHopSectionCellMaterialized(
 	resolvedItems?: readonly TwoHopPageVirtualItem[],
 ): boolean {
 	if (sectionPlan.logicalCells[cellIndex]) return false;
-	const cell = createTwoHopLogicalCellAt(
-		sectionPlan,
-		cellIndex,
-		resolvedItems,
-	);
+	const cell = createTwoHopLogicalCellAt(sectionPlan, cellIndex, resolvedItems);
 	if (!cell) return false;
 	sectionPlan.logicalCells[cellIndex] = cell;
 	return true;
@@ -411,11 +383,7 @@ export function materializeTwoHopSectionCells(
 		return false;
 	}
 	let changed = false;
-	for (
-		let cellIndex = 0;
-		cellIndex < sectionPlan.cellCount;
-		cellIndex += 1
-	) {
+	for (let cellIndex = 0; cellIndex < sectionPlan.cellCount; cellIndex += 1) {
 		changed =
 			ensureTwoHopSectionCellMaterialized(
 				sectionPlan,
@@ -464,14 +432,8 @@ export function materializeNextTwoHopCellBatch(
 	plan: TwoHopViewPlan,
 	options: MaterializeNextTwoHopCellBatchOptions = {},
 ): boolean {
-	let remainingCellBudget = Math.max(
-		0,
-		Math.floor(options.maxCellCount ?? 128),
-	);
-	if (
-		remainingCellBudget === 0 ||
-		plan.remainingUnmaterializedCellCount === 0
-	) {
+	let remainingCellBudget = Math.max(0, Math.floor(options.maxCellCount ?? 128));
+	if (remainingCellBudget === 0 || plan.remainingUnmaterializedCellCount === 0) {
 		return false;
 	}
 	let materialized = false;
@@ -493,10 +455,8 @@ export function materializeNextTwoHopCellBatch(
 			continue;
 		}
 		materialized =
-			ensureTwoHopSectionCellMaterialized(
-				sectionPlan,
-				state.nextCellIndex,
-			) || materialized;
+			ensureTwoHopSectionCellMaterialized(sectionPlan, state.nextCellIndex) ||
+			materialized;
 		state.nextCellIndex += 1;
 		state.materializedCellCount += 1;
 		plan.remainingUnmaterializedCellCount = Math.max(
@@ -515,8 +475,7 @@ export function materializeNextTwoHopCellBatch(
 	return materialized;
 }
 
-export interface MaterializeNextTwoHopSectionBatchOptions
-	extends MaterializeNextTwoHopCellBatchOptions {
+export interface MaterializeNextTwoHopSectionBatchOptions extends MaterializeNextTwoHopCellBatchOptions {
 	readonly maxSectionCount?: number;
 }
 
@@ -527,10 +486,7 @@ export function materializeNextTwoHopSectionBatch(
 	return materializeNextTwoHopCellBatch(plan, {
 		maxCellCount:
 			options.maxCellCount ??
-			resolveInitialMaterializationCellCount(
-				plan,
-				options.maxSectionCount,
-			),
+			resolveInitialMaterializationCellCount(plan, options.maxSectionCount),
 		shouldContinue: options.shouldContinue,
 	});
 }
@@ -555,8 +511,7 @@ export function ensureTwoHopSectionCellRangeMaterialized(
 	const end = Math.min(sectionPlan.cellCount, endCellIndex);
 	for (let cellIndex = start; cellIndex < end; cellIndex += 1) {
 		changed =
-			ensureTwoHopSectionCellMaterialized(sectionPlan, cellIndex) ||
-			changed;
+			ensureTwoHopSectionCellMaterialized(sectionPlan, cellIndex) || changed;
 	}
 	if (changed) {
 		markTwoHopMaterializationChanged(plan);
@@ -624,10 +579,7 @@ export function findTwoHopSectionIndexByRow(
 	}
 	const sectionIndex = low - 1;
 	const section = sections[sectionIndex];
-	if (
-		!section ||
-		rowIndex >= section.firstRowIndex + section.rowCount
-	) {
+	if (!section || rowIndex >= section.firstRowIndex + section.rowCount) {
 		return -1;
 	}
 	return sectionIndex;
@@ -639,10 +591,7 @@ export function resolveTwoHopRowInSection(
 	rowIndex: number,
 ): TwoHopResolvedRow | null {
 	const rowIndexInSection = rowIndex - sectionPlan.firstRowIndex;
-	if (
-		rowIndexInSection < 0 ||
-		rowIndexInSection >= sectionPlan.rowCount
-	) {
+	if (rowIndexInSection < 0 || rowIndexInSection >= sectionPlan.rowCount) {
 		return null;
 	}
 	const sectionCellStartIndex = rowIndexInSection * plan.columns;
@@ -665,10 +614,7 @@ export function resolveTwoHopRow(
 	rowIndex: number,
 ): TwoHopResolvedRow | null {
 	if (rowIndex < 0 || rowIndex >= plan.rowCount) return null;
-	const sectionIndex = findTwoHopSectionIndexByRow(
-		plan.sections,
-		rowIndex,
-	);
+	const sectionIndex = findTwoHopSectionIndexByRow(plan.sections, rowIndex);
 	const sectionPlan = plan.sections[sectionIndex];
 	if (!sectionPlan) return null;
 	return resolveTwoHopRowInSection(plan, sectionPlan, rowIndex);
@@ -680,17 +626,12 @@ function resolveTwoHopRowTopInSection(
 	rowIndex: number,
 ): TwoHopResolvedRowTop | null {
 	const rowIndexInSection = rowIndex - sectionPlan.firstRowIndex;
-	if (
-		rowIndexInSection < 0 ||
-		rowIndexInSection >= sectionPlan.rowCount
-	) {
+	if (rowIndexInSection < 0 || rowIndexInSection >= sectionPlan.rowCount) {
 		return null;
 	}
 	return {
 		sectionIndex: sectionPlan.sectionIndex,
-		top:
-			sectionPlan.top +
-			rowIndexInSection * (plan.rowHeight + plan.rowGap),
+		top: sectionPlan.top + rowIndexInSection * (plan.rowHeight + plan.rowGap),
 	};
 }
 
@@ -723,10 +664,7 @@ function resolveTwoHopRowTopBySearch(
 	rowIndex: number,
 ): TwoHopResolvedRowTop | null {
 	if (rowIndex < 0 || rowIndex >= plan.rowCount) return null;
-	const sectionIndex = findTwoHopSectionIndexByRow(
-		plan.sections,
-		rowIndex,
-	);
+	const sectionIndex = findTwoHopSectionIndexByRow(plan.sections, rowIndex);
 	const sectionPlan = plan.sections[sectionIndex];
 	if (!sectionPlan) return null;
 	return resolveTwoHopRowTopInSection(plan, sectionPlan, rowIndex);
@@ -743,10 +681,7 @@ export function resolveTwoHopRowTopsForBandInto(
 	out.currentEndRowTop = null;
 	if (params.startRow >= params.endRow) return;
 
-	const currentStart = resolveTwoHopRowTopBySearch(
-		plan,
-		params.startRow,
-	);
+	const currentStart = resolveTwoHopRowTopBySearch(plan, params.startRow);
 	if (!currentStart) return;
 
 	const previousStart = resolveTwoHopRowTopNearSection(
@@ -759,14 +694,9 @@ export function resolveTwoHopRowTopsForBandInto(
 			plan,
 			params.endRow - 1,
 			currentStart.sectionIndex,
-		) ??
-		resolveTwoHopRowTopBySearch(plan, params.endRow - 1);
+		) ?? resolveTwoHopRowTopBySearch(plan, params.endRow - 1);
 	const currentEnd = previousEnd
-		? resolveTwoHopRowTopNearSection(
-				plan,
-				params.endRow,
-				previousEnd.sectionIndex,
-			)
+		? resolveTwoHopRowTopNearSection(plan, params.endRow, previousEnd.sectionIndex)
 		: resolveTwoHopRowTopBySearch(plan, params.endRow);
 
 	out.previousStartRowTop = previousStart?.top ?? null;
@@ -948,12 +878,7 @@ function writeTwoHopRowsByOffset(
 					startResolution.sectionIndex,
 					rowCount,
 				).rowIndex
-			: resolveFirstTwoHopRowByTop(
-					sections,
-					rowStride,
-					endTarget,
-					true,
-				).rowIndex;
+			: resolveFirstTwoHopRowByTop(sections, rowStride, endTarget, true).rowIndex;
 	const start = startResolution.rowIndex;
 	out.start = start < end ? start : 0;
 	out.end = start < end ? end : 0;
@@ -974,9 +899,7 @@ export function findTwoHopRowsByOffsetInto(
 	);
 }
 
-export function findTwoHopRowsByOffset(
-	params: FindTwoHopRowsByOffsetParams,
-): RowRange {
+export function findTwoHopRowsByOffset(params: FindTwoHopRowsByOffsetParams): RowRange {
 	const range = { start: 0, end: 0 };
 	findTwoHopRowsByOffsetInto(range, params);
 	return range;
@@ -1015,10 +938,7 @@ function writeTwoHopStablePreviewScrollTopBand(
 		startRow: range.start,
 		endRow: range.end,
 	});
-	if (
-		rowTops.currentStartRowTop === null ||
-		rowTops.previousEndRowTop === null
-	) {
+	if (rowTops.currentStartRowTop === null || rowTops.previousEndRowTop === null) {
 		writeInvalidStablePreviewScrollTopBand(out);
 		return;
 	}
@@ -1027,21 +947,15 @@ function writeTwoHopStablePreviewScrollTopBand(
 	const minForStart =
 		rowTops.previousStartRowTop === null
 			? Number.NEGATIVE_INFINITY
-			: rowTops.previousStartRowTop +
-				plan.rowHeight +
-				normalizedOverscanPx;
+			: rowTops.previousStartRowTop + plan.rowHeight + normalizedOverscanPx;
 	const maxForStart =
 		rowTops.currentStartRowTop + plan.rowHeight + normalizedOverscanPx;
 	const minForEnd =
-		rowTops.previousEndRowTop -
-		params.viewportHeight -
-		normalizedOverscanPx;
+		rowTops.previousEndRowTop - params.viewportHeight - normalizedOverscanPx;
 	const maxForEnd =
 		rowTops.currentEndRowTop === null
 			? Number.POSITIVE_INFINITY
-			: rowTops.currentEndRowTop -
-				params.viewportHeight -
-				normalizedOverscanPx;
+			: rowTops.currentEndRowTop - params.viewportHeight - normalizedOverscanPx;
 
 	out.min = Math.max(minForStart, minForEnd);
 	out.max = Math.min(maxForStart, maxForEnd);
@@ -1060,17 +974,23 @@ export interface TwoHopViewPlanRowModel extends VirtualRowModel<
 		mountedOverscanPx: number;
 		previewOverscanPx?: number;
 	}): VirtualRanges;
-	findVisibleRangeInto(out: RowRange, params: {
-		scrollTop: number;
-		viewportHeight: number;
-		overscanPx: number;
-	}): void;
-	findVisibleRangesInto(out: VirtualRanges, params: {
-		scrollTop: number;
-		viewportHeight: number;
-		mountedOverscanPx: number;
-		previewOverscanPx?: number;
-	}): void;
+	findVisibleRangeInto(
+		out: RowRange,
+		params: {
+			scrollTop: number;
+			viewportHeight: number;
+			overscanPx: number;
+		},
+	): void;
+	findVisibleRangesInto(
+		out: VirtualRanges,
+		params: {
+			scrollTop: number;
+			viewportHeight: number;
+			mountedOverscanPx: number;
+			previewOverscanPx?: number;
+		},
+	): void;
 	findVisibleRangesFromMounted(params: {
 		scrollTop: number;
 		viewportHeight: number;
@@ -1078,13 +998,16 @@ export interface TwoHopViewPlanRowModel extends VirtualRowModel<
 		mountedOverscanPx: number;
 		previewOverscanPx?: number;
 	}): VirtualRanges;
-	findVisibleRangesFromMountedInto(out: VirtualRanges, params: {
-		scrollTop: number;
-		viewportHeight: number;
-		mounted: RowRange;
-		mountedOverscanPx: number;
-		previewOverscanPx?: number;
-	}): void;
+	findVisibleRangesFromMountedInto(
+		out: VirtualRanges,
+		params: {
+			scrollTop: number;
+			viewportHeight: number;
+			mounted: RowRange;
+			mountedOverscanPx: number;
+			previewOverscanPx?: number;
+		},
+	): void;
 	findStablePreviewScrollTopBandInto(
 		out: StablePreviewScrollTopBandMutable,
 		params: {
@@ -1368,8 +1291,7 @@ export function createTwoHopViewPlanRowModel(
 				},
 			};
 		},
-		getRowCellCount: (rowIndex) =>
-			resolveTwoHopRow(plan, rowIndex)?.cellCount ?? 0,
+		getRowCellCount: (rowIndex) => resolveTwoHopRow(plan, rowIndex)?.cellCount ?? 0,
 		getRowTop: (rowIndex) => resolveTwoHopRow(plan, rowIndex)?.top ?? 0,
 		getRowEnd: (rowIndex) => {
 			const top = resolveTwoHopRow(plan, rowIndex)?.top;

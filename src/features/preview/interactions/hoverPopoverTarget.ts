@@ -26,8 +26,7 @@ function describeElement(element: HTMLElement | null | undefined): string {
 	const tag = element.tagName.toLowerCase();
 	const id = element.id ? `#${element.id}` : "";
 	const className =
-		typeof element.className === "string" &&
-		element.className.trim().length > 0
+		typeof element.className === "string" && element.className.trim().length > 0
 			? `.${element.className.trim().replace(/\s+/g, ".")}`
 			: "";
 	const interactionId = element.dataset.cclInteractionId
@@ -53,9 +52,7 @@ function describeHoverEvent(event: Event | undefined): Record<string, unknown> {
 		currentTarget: describeEventTarget(event.currentTarget),
 		relatedTarget:
 			"relatedTarget" in event
-				? describeEventTarget(
-						(event as MouseEvent | FocusEvent).relatedTarget,
-					)
+				? describeEventTarget((event as MouseEvent | FocusEvent).relatedTarget)
 				: undefined,
 		ctrlKey: isMouseEventLike(event) ? event.ctrlKey : undefined,
 		metaKey: isMouseEventLike(event) ? event.metaKey : undefined,

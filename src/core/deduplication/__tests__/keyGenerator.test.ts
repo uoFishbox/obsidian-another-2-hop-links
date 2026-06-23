@@ -5,11 +5,7 @@ import {
 	getTaggedNoteKey,
 	getBranchDisplayKey,
 } from "../keyGenerator";
-import type {
-	TwoHopLinkBranch,
-	TwoHopIndexedLink,
-	TaggedNote,
-} from "types/domain";
+import type { TwoHopLinkBranch, TwoHopIndexedLink, TaggedNote } from "types/domain";
 import { type TFile } from "obsidian";
 
 vi.mock("obsidian", () => ({
@@ -118,9 +114,7 @@ describe("keyGenerator", () => {
 				path: "Folder\\SubFolder\\Note.MD",
 			};
 
-			expect(getTaggedNoteKey(taggedNote)).toBe(
-				"f:folder/subfolder/note.md",
-			);
+			expect(getTaggedNoteKey(taggedNote)).toBe("f:folder/subfolder/note.md");
 		});
 	});
 

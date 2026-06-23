@@ -69,12 +69,10 @@
 
 	const resolveItemContentPreview = (
 		row: TwoHopPageVirtualItem,
-	): string | undefined =>
-		matchedItemByKey?.get(row.searchKey)?.contentPreview;
+	): string | undefined => matchedItemByKey?.get(row.searchKey)?.contentPreview;
 
-	const getCellClassName = (
-		section: TwoHopPageVirtualSection,
-	): string | undefined => section.className;
+	const getCellClassName = (section: TwoHopPageVirtualSection): string | undefined =>
+		section.className;
 
 	const getItemInteractionDescriptor = (row: TwoHopPageVirtualItem) =>
 		linkContext
@@ -86,8 +84,7 @@
 					{
 						interactionId: row.interactionId,
 						interactionKey:
-							row.interactionKey ??
-							createItemInteractionKey(row.item),
+							row.interactionKey ?? createItemInteractionKey(row.item),
 					},
 				)
 			: null;
@@ -111,13 +108,7 @@
 		{getCellClassName}
 		{getItemInteractionDescriptor}
 	>
-		{#snippet renderHeader({
-			section,
-			title,
-			totalCount,
-			sectionId,
-			headerProps,
-		})}
+		{#snippet renderHeader({ section, title, totalCount, sectionId, headerProps })}
 			{#if section.kind === "primary-section"}
 				<LinkSectionHeader {title} {totalCount} />
 			{:else if section.kind === "new-links-section"}
@@ -140,8 +131,7 @@
 					count={totalCount}
 					{...headerProps}
 					interactionId={headerProps.interactionId ?? sectionId}
-					interactionKind={headerProps.interactionKind ??
-						"sectionHeader"}
+					interactionKind={headerProps.interactionKind ?? "sectionHeader"}
 				>
 					{#snippet icon()}
 						<svg
@@ -161,8 +151,7 @@
 					count={totalCount}
 					{...headerProps}
 					interactionId={headerProps.interactionId ?? sectionId}
-					interactionKind={headerProps.interactionKind ??
-						"sectionHeader"}
+					interactionKind={headerProps.interactionKind ?? "sectionHeader"}
 				>
 					{#snippet icon()}
 						<svg
@@ -183,9 +172,7 @@
 			{@const row = args?.item}
 
 			{#if row}
-				<PreviewVisibilityProvider
-					visibilityState={args?.visibilityState}
-				>
+				<PreviewVisibilityProvider visibilityState={args?.visibilityState}>
 					<ViewItemCard
 						item={row.item}
 						settings={currentSettings}

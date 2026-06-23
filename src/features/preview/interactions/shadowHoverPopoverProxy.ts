@@ -53,8 +53,10 @@ function getProxyMap(
 	documentRef: ShadowHoverProxyDocument,
 ): WeakMap<HTMLElement, ShadowHoverPopoverProxyEl> {
 	if (!documentRef[SHADOW_PROXY_MAP_PROPERTY]) {
-		documentRef[SHADOW_PROXY_MAP_PROPERTY] =
-			new WeakMap<HTMLElement, ShadowHoverPopoverProxyEl>();
+		documentRef[SHADOW_PROXY_MAP_PROPERTY] = new WeakMap<
+			HTMLElement,
+			ShadowHoverPopoverProxyEl
+		>();
 	}
 
 	return documentRef[SHADOW_PROXY_MAP_PROPERTY] as WeakMap<
@@ -67,8 +69,7 @@ function getProxySet(
 	documentRef: ShadowHoverProxyDocument,
 ): Set<ShadowHoverPopoverProxyEl> {
 	if (!documentRef[SHADOW_PROXY_SET_PROPERTY]) {
-		documentRef[SHADOW_PROXY_SET_PROPERTY] =
-			new Set<ShadowHoverPopoverProxyEl>();
+		documentRef[SHADOW_PROXY_SET_PROPERTY] = new Set<ShadowHoverPopoverProxyEl>();
 	}
 
 	return documentRef[SHADOW_PROXY_SET_PROPERTY] as Set<ShadowHoverPopoverProxyEl>;
@@ -116,9 +117,7 @@ function createSourceRef(sourceEl: HTMLElement): ShadowHoverPopoverSourceRef {
 	};
 }
 
-function getProxySource(
-	proxyEl: ShadowHoverPopoverProxyEl,
-): HTMLElement | null {
+function getProxySource(proxyEl: ShadowHoverPopoverProxyEl): HTMLElement | null {
 	return proxyEl[SHADOW_PROXY_SOURCE_PROPERTY]?.deref() ?? null;
 }
 
@@ -277,31 +276,23 @@ function buildSyntheticLeaveEvent(
 	};
 
 	if (type === "mouseout" || type === "mouseleave" || type === "mouseover") {
-		return createOwnerMouseEvent(
-			originalEvent?.target as Node | null,
-			type,
-			{
-				...commonInit,
-				clientX: isMouseEventLike(originalEvent) ? originalEvent.clientX : 0,
-				clientY: isMouseEventLike(originalEvent) ? originalEvent.clientY : 0,
-				screenX: isMouseEventLike(originalEvent) ? originalEvent.screenX : 0,
-				screenY: isMouseEventLike(originalEvent) ? originalEvent.screenY : 0,
-			},
-		);
+		return createOwnerMouseEvent(originalEvent?.target as Node | null, type, {
+			...commonInit,
+			clientX: isMouseEventLike(originalEvent) ? originalEvent.clientX : 0,
+			clientY: isMouseEventLike(originalEvent) ? originalEvent.clientY : 0,
+			screenX: isMouseEventLike(originalEvent) ? originalEvent.screenX : 0,
+			screenY: isMouseEventLike(originalEvent) ? originalEvent.screenY : 0,
+		});
 	}
 
 	if (type === "pointerout" || type === "pointerleave") {
-		return createOwnerPointerEvent(
-			originalEvent?.target as Node | null,
-			type,
-			{
-				...commonInit,
-				clientX: isMouseEventLike(originalEvent) ? originalEvent.clientX : 0,
-				clientY: isMouseEventLike(originalEvent) ? originalEvent.clientY : 0,
-				screenX: isMouseEventLike(originalEvent) ? originalEvent.screenX : 0,
-				screenY: isMouseEventLike(originalEvent) ? originalEvent.screenY : 0,
-			},
-		);
+		return createOwnerPointerEvent(originalEvent?.target as Node | null, type, {
+			...commonInit,
+			clientX: isMouseEventLike(originalEvent) ? originalEvent.clientX : 0,
+			clientY: isMouseEventLike(originalEvent) ? originalEvent.clientY : 0,
+			screenX: isMouseEventLike(originalEvent) ? originalEvent.screenX : 0,
+			screenY: isMouseEventLike(originalEvent) ? originalEvent.screenY : 0,
+		});
 	}
 
 	return createOwnerFocusEvent(originalEvent?.target as Node | null, type, {
@@ -402,7 +393,9 @@ export function disposeShadowHoverPopoverProxies(
 			removeProxyElement(typedDocument, proxyEl as ShadowHoverPopoverProxyEl),
 		);
 
-	typedDocument[SHADOW_PROXY_MAP_PROPERTY] =
-		new WeakMap<HTMLElement, ShadowHoverPopoverProxyEl>();
+	typedDocument[SHADOW_PROXY_MAP_PROPERTY] = new WeakMap<
+		HTMLElement,
+		ShadowHoverPopoverProxyEl
+	>();
 	typedDocument[SHADOW_PROXY_SET_PROPERTY] = new Set<ShadowHoverPopoverProxyEl>();
 }

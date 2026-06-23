@@ -61,14 +61,10 @@ describe("createLinkContextFactory", () => {
 		} as any);
 
 		const link = createBaseLink(sourceFile);
-		context.onHop2Click(
-			new MouseEvent("click"),
-			link,
-			{
-				highlightMode: "force",
-				preferredPosition: createPosition(9),
-			},
-		);
+		context.onHop2Click(new MouseEvent("click"), link, {
+			highlightMode: "force",
+			preferredPosition: createPosition(9),
+		});
 
 		expect(handleOpenFile).toHaveBeenCalledWith(
 			sourceFile,
@@ -119,14 +115,10 @@ describe("createLinkContextFactory", () => {
 			...createBaseLink(targetFile),
 			path: targetFile.path,
 		};
-		context.onHop1Click(
-			new MouseEvent("click"),
-			link,
-			{
-				highlightMode: "force",
-				preferredPosition: createPosition(6),
-			},
-		);
+		context.onHop1Click(new MouseEvent("click"), link, {
+			highlightMode: "force",
+			preferredPosition: createPosition(6),
+		});
 
 		expect(handleOpenFile).toHaveBeenCalledWith(
 			targetFile,

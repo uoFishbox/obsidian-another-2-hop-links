@@ -43,9 +43,7 @@ export type VirtualCellVisibilityMetadataPolicy =
 	| { readonly type: "engine-managed" }
 	| { readonly type: "caller-managed" };
 
-export interface MountedVirtualCellsBuild<
-	TMountedCell extends MountedVirtualCell,
-> {
+export interface MountedVirtualCellsBuild<TMountedCell extends MountedVirtualCell> {
 	/**
 	 * Builders may mutate this array while constructing the result. Treat it as
 	 * immutable after returning the build to the engine.
@@ -147,10 +145,9 @@ const MOUNTED_CELL_ROW_MODEL_REVISION_DEPENDENCY = {
 	pagination: true,
 } as const satisfies VirtualListRevisionDependency;
 
-const DEFAULT_VISIBILITY_METADATA_POLICY: VirtualCellVisibilityMetadataPolicy =
-	{
-		type: "engine-managed",
-	};
+const DEFAULT_VISIBILITY_METADATA_POLICY: VirtualCellVisibilityMetadataPolicy = {
+	type: "engine-managed",
+};
 
 const shouldApplyVisibilityMetadata = (
 	policy: VirtualCellVisibilityMetadataPolicy = DEFAULT_VISIBILITY_METADATA_POLICY,
@@ -344,10 +341,11 @@ const cloneSnapshotWithOverrides = <
 			writable: true,
 		};
 	}
-	return Object.defineProperties(
-		{},
-		descriptors,
-	) as VirtualListSnapshot<TCell, TMountedCell, TMountedBuild>;
+	return Object.defineProperties({}, descriptors) as VirtualListSnapshot<
+		TCell,
+		TMountedCell,
+		TMountedBuild
+	>;
 };
 
 const createCallerManagedReuseSnapshot = <
@@ -385,13 +383,9 @@ const didMountedRangeChange = (
 const didPreviewVisibleRangeChange = (
 	previous: VirtualRanges | undefined,
 	next: VirtualRanges,
-): boolean =>
-	!previous || !sameRange(previous.previewVisible, next.previewVisible);
+): boolean => !previous || !sameRange(previous.previewVisible, next.previewVisible);
 
-const clampVirtualRanges = (
-	ranges: VirtualRanges,
-	rowCount: number,
-): VirtualRanges => {
+const clampVirtualRanges = (ranges: VirtualRanges, rowCount: number): VirtualRanges => {
 	const mounted = clampRange(ranges.mounted, rowCount);
 	const previewVisible = clampRange(ranges.previewVisible, rowCount);
 
@@ -564,10 +558,7 @@ export function computeVirtualListSnapshotWithState<
 	if (rangesResult.mode.kind === "skipped") {
 		if (
 			previous &&
-			hasSameMountedCellRowModelRevision(
-				previous.rowModel,
-				input.rowModel,
-			) &&
+			hasSameMountedCellRowModelRevision(previous.rowModel, input.rowModel) &&
 			previous.totalHeight === input.rowModel.totalHeight
 		) {
 			const snapshot = withFastPathReuseSnapshot(previous, {
@@ -781,10 +772,7 @@ export function recomputeVirtualListSnapshotWithState<
 	}
 
 	const previousMountedBuild = input.previousState?.mountedBuild ?? null;
-	const ranges = clampVirtualRanges(
-		input.previous.ranges,
-		input.rowModel.rowCount,
-	);
+	const ranges = clampVirtualRanges(input.previous.ranges, input.rowModel.rowCount);
 	const rangeChanged = didRangesChange(input.previous.ranges, ranges);
 	const callerManagesVisibilityMetadata = !shouldApplyVisibilityMetadata(
 		input.visibilityMetadataPolicy,

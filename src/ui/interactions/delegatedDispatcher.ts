@@ -1,9 +1,6 @@
 import { Platform } from "obsidian";
 import { CANVAS_NOTE_DRAG_FORMAT } from "../../appConstants";
-import {
-	dispatchItemClick,
-	dispatchItemHover,
-} from "ui/handlers/linkItemHandlers";
+import { dispatchItemClick, dispatchItemHover } from "ui/handlers/linkItemHandlers";
 import type { AppContext, LinkContext } from "ui/context/linkContext";
 import { handleKeyboardActivation } from "ui/utils/keyboard";
 import { createHoverPreviewMouseEvent } from "features/preview/interactions/hoverPopoverTarget";
@@ -43,10 +40,7 @@ function resolveDragData(
 		return null;
 	}
 
-	return linkContext.buildWikiLink(
-		descriptor.targetFile,
-		descriptor.dragRawText,
-	);
+	return linkContext.buildWikiLink(descriptor.targetFile, descriptor.dragRawText);
 }
 
 function resolveInteractionDescriptor(
@@ -96,10 +90,7 @@ function dispatchHover(
 	}
 
 	const options = resolveDescriptorInteractionOptions(descriptor, appContext);
-	const interactionEvent = createHoverPreviewMouseEvent(
-		element,
-		originalEvent,
-	);
+	const interactionEvent = createHoverPreviewMouseEvent(element, originalEvent);
 
 	if (descriptor.kind === "item") {
 		if (!descriptor.targetFile) {
@@ -239,12 +230,7 @@ export function createDelegatedInteractionDispatcher({
 				return;
 			}
 
-			dispatchActivation(
-				event,
-				descriptor,
-				resolvedLinkContext,
-				appContext,
-			);
+			dispatchActivation(event, descriptor, resolvedLinkContext, appContext);
 		},
 
 		handleMouseDown(event: MouseEvent): void {
@@ -269,12 +255,7 @@ export function createDelegatedInteractionDispatcher({
 				return;
 			}
 
-			dispatchActivation(
-				event,
-				descriptor,
-				resolvedLinkContext,
-				appContext,
-			);
+			dispatchActivation(event, descriptor, resolvedLinkContext, appContext);
 		},
 
 		handleContextMenu(event: MouseEvent): void {
@@ -291,10 +272,7 @@ export function createDelegatedInteractionDispatcher({
 				return;
 			}
 
-			if (
-				isMobile &&
-				descriptor.settings?.mobileLongPressAction === "preview"
-			) {
+			if (isMobile && descriptor.settings?.mobileLongPressAction === "preview") {
 				event.preventDefault();
 				event.stopPropagation();
 				return;
@@ -321,18 +299,14 @@ export function createDelegatedInteractionDispatcher({
 				const lastTouchAt = getInteractionLastTouchAt(element);
 				if (
 					lastTouchAt !== null &&
-					Date.now() - lastTouchAt <
-						MOBILE_TOUCH_MOUSEOVER_SUPPRESSION_MS
+					Date.now() - lastTouchAt < MOBILE_TOUCH_MOUSEOVER_SUPPRESSION_MS
 				) {
 					return;
 				}
 			}
 
-			const relatedElement = getInteractionElement(
-				event.relatedTarget,
-			);
-			const relatedInteractionId =
-				getInteractionIdFromElement(relatedElement);
+			const relatedElement = getInteractionElement(event.relatedTarget);
+			const relatedInteractionId = getInteractionIdFromElement(relatedElement);
 			if (
 				relatedInteractionId &&
 				relatedInteractionId === descriptor.interactionId
@@ -368,11 +342,8 @@ export function createDelegatedInteractionDispatcher({
 				return;
 			}
 
-			const relatedElement = getInteractionElement(
-				event.relatedTarget,
-			);
-			const relatedInteractionId =
-				getInteractionIdFromElement(relatedElement);
+			const relatedElement = getInteractionElement(event.relatedTarget);
+			const relatedInteractionId = getInteractionIdFromElement(relatedElement);
 			if (
 				relatedInteractionId &&
 				relatedInteractionId === descriptor.interactionId
@@ -420,10 +391,7 @@ export function createDelegatedInteractionDispatcher({
 			}
 
 			const descriptor = resolveInteractionDescriptor(registry, element);
-			if (
-				!descriptor ||
-				descriptor.settings?.mobileLongPressAction === "menu"
-			) {
+			if (!descriptor || descriptor.settings?.mobileLongPressAction === "menu") {
 				return;
 			}
 
@@ -479,13 +447,9 @@ export function createDelegatedInteractionDispatcher({
 		handleTouchEnd(event: TouchEvent): void {
 			clearLongPressTimer();
 
-			const targetElement =
-				longPressElement ?? getInteractionElement(event);
+			const targetElement = longPressElement ?? getInteractionElement(event);
 			longPressElement = null;
-			if (
-				!targetElement ||
-				targetElement.dataset.cclLongPressed !== "1"
-			) {
+			if (!targetElement || targetElement.dataset.cclLongPressed !== "1") {
 				return;
 			}
 
@@ -508,11 +472,7 @@ export function createDelegatedInteractionDispatcher({
 			const dragData = resolveDragData(descriptor, resolvedLinkContext);
 			installNativeDragSelectionShim(element.ownerDocument);
 
-			setLightweightCardDragImage(
-				event,
-				element,
-				descriptor,
-			);
+			setLightweightCardDragImage(event, element, descriptor);
 
 			if (dragData) {
 				event.dataTransfer.setData("text/plain", dragData);

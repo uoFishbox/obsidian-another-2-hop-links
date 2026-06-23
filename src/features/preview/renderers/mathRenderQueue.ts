@@ -79,10 +79,7 @@ function cleanupKeyMapping(task: QueueTask): void {
 }
 
 function processQueue(): void {
-	while (
-		activeMathRenders < MAX_CONCURRENT_MATH_RENDERS &&
-		pendingTasks.length > 0
-	) {
+	while (activeMathRenders < MAX_CONCURRENT_MATH_RENDERS && pendingTasks.length > 0) {
 		const nextTask = pendingTasks.shift();
 		if (!nextTask) {
 			return;

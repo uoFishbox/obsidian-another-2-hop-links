@@ -16,13 +16,17 @@ describe("arrayEquality", () => {
 		const different = [{ id: "a" }, { id: "c" }];
 
 		expect(
-			sameArrayBy(current, next, (currentItem, nextItem) =>
-				currentItem.id === nextItem.id
+			sameArrayBy(
+				current,
+				next,
+				(currentItem, nextItem) => currentItem.id === nextItem.id,
 			),
 		).toBe(true);
 		expect(
-			sameArrayBy(current, different, (currentItem, nextItem) =>
-				currentItem.id === nextItem.id
+			sameArrayBy(
+				current,
+				different,
+				(currentItem, nextItem) => currentItem.id === nextItem.id,
 			),
 		).toBe(false);
 	});

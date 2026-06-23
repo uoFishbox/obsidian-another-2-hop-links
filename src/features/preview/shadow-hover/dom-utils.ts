@@ -13,15 +13,12 @@ export function rectToObject(rect: DOMRect): Record<string, number> {
 	};
 }
 
-export function summarizeNode(
-	node: unknown,
-): Record<string, unknown> | null {
+export function summarizeNode(node: unknown): Record<string, unknown> | null {
 	if (!isNodeLike(node)) {
 		return node == null ? null : { type: typeof node, value: String(node) };
 	}
 
-	const root =
-		typeof node.getRootNode === "function" ? node.getRootNode() : null;
+	const root = typeof node.getRootNode === "function" ? node.getRootNode() : null;
 	if (isElementLike(node)) {
 		return {
 			nodeType: node.nodeType,

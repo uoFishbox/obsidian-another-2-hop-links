@@ -9,8 +9,7 @@
 		visibility?: VirtualizedItemVisibility;
 	}
 
-	let { label, searchQuery = "", item, visibility = undefined }: Props =
-		$props();
+	let { label, searchQuery = "", item, visibility = undefined }: Props = $props();
 </script>
 
 <!-- svelte-ignore a11y_no_noninteractive_tabindex -->

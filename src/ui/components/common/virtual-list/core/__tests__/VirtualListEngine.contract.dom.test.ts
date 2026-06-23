@@ -249,9 +249,7 @@ describe("VirtualListEngine contract", () => {
 		expect(resolveVirtualizedItemVisibility(1, ranges)).toBe("visible");
 		expect(resolveVirtualizedItemVisibility(2, ranges)).toBe("mounted");
 		expect(resolveVirtualizedItemVisibility(4, ranges)).toBe("mounted");
-		expect(resolveVirtualizedItemVisibility(undefined, ranges)).toBe(
-			"mounted",
-		);
+		expect(resolveVirtualizedItemVisibility(undefined, ranges)).toBe("mounted");
 	});
 
 	it("can skip visibility metadata while preserving render slot metadata", () => {
@@ -354,20 +352,14 @@ describe("VirtualListEngine contract", () => {
 		expect(initial.ranges.mounted).toEqual({ start: 0, end: 4 });
 		expect(initial.ranges.previewVisible).toEqual({ start: 0, end: 1 });
 		expect(activeScroll.snapshot).not.toBe(initial);
-		expect(activeScroll.snapshot.ranges.mounted).toEqual(
-			initial.ranges.mounted,
-		);
+		expect(activeScroll.snapshot.ranges.mounted).toEqual(initial.ranges.mounted);
 		expect(activeScroll.snapshot.ranges.previewVisible).toEqual({
 			start: 0,
 			end: 2,
 		});
 		expect(activeScroll.snapshot.mountedCells).toBe(initial.mountedCells);
-		expect(activeScroll.snapshot.mountedCellsByKey).toBe(
-			initial.mountedCellsByKey,
-		);
-		expect(activeScroll.reconciliationState).toBe(
-			stateBySnapshot.get(initial),
-		);
+		expect(activeScroll.snapshot.mountedCellsByKey).toBe(initial.mountedCellsByKey);
+		expect(activeScroll.reconciliationState).toBe(stateBySnapshot.get(initial));
 
 		const repeatedActiveScroll = computeSnapshot({
 			rowModel,
@@ -486,8 +478,8 @@ describe("VirtualListEngine contract", () => {
 		expect(empty.reconciliationState.mountedBuild).toBeNull();
 		expect(restored.snapshot.mode.kind).toBe("stable");
 		expect(restored.snapshot.mountedCells[0]?.renderSlotIndex).toBe(0);
-		expect(
-			restored.reconciliationState.mountedBuild?.nextRenderSlotIndex,
-		).toBe(stateBySnapshot.get(initial)?.mountedBuild?.nextRenderSlotIndex);
+		expect(restored.reconciliationState.mountedBuild?.nextRenderSlotIndex).toBe(
+			stateBySnapshot.get(initial)?.mountedBuild?.nextRenderSlotIndex,
+		);
 	});
 });

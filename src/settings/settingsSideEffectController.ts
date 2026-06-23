@@ -9,9 +9,7 @@ import type { SortService } from "core/sorting/SortService";
 import type { DisplayModeController } from "features/display-mode/DisplayModeController";
 import type { EmptyViewController } from "infrastructure/lifecycle/emptyViewController";
 import type { ViewUpdateOrchestrator } from "infrastructure/lifecycle/viewUpdateOrchestrator";
-import {
-	TWO_HOP_LINKS_VIEW_TYPE,
-} from "ui/views/TwoHopLinksView";
+import { TWO_HOP_LINKS_VIEW_TYPE } from "ui/views/TwoHopLinksView";
 import { VIEW_TYPE_TAG_NOTES } from "ui/views/TagNotesView";
 import { VIEW_TYPE_PRE_CREATE } from "ui/views/PreCreationView";
 
@@ -29,13 +27,11 @@ interface RefreshableFromSettings {
 	refreshFromSettings(): void;
 }
 
-function isRefreshableFromSettings(
-	view: unknown,
-): view is RefreshableFromSettings {
+function isRefreshableFromSettings(view: unknown): view is RefreshableFromSettings {
 	if (typeof view !== "object" || view === null) return false;
 	return (
-		typeof (view as { refreshFromSettings?: unknown })
-			.refreshFromSettings === "function"
+		typeof (view as { refreshFromSettings?: unknown }).refreshFromSettings ===
+		"function"
 	);
 }
 
@@ -52,10 +48,7 @@ export interface SettingsSideEffectControllerDeps {
 }
 
 export interface SettingsSideEffectController {
-	apply(
-		changedKeys: Iterable<keyof PluginSettings>,
-		settings: PluginSettings,
-	): void;
+	apply(changedKeys: Iterable<keyof PluginSettings>, settings: PluginSettings): void;
 	refreshLayoutAffectedViews(): void;
 }
 

@@ -10,9 +10,7 @@ export interface FrameScheduler {
 	destroy(): void;
 }
 
-export function createFrameScheduler(
-	isUnloaded: () => boolean,
-): FrameScheduler {
+export function createFrameScheduler(isUnloaded: () => boolean): FrameScheduler {
 	const animationFrameIds = new Set<number>();
 	const idleCallbackIds = new Set<number>();
 	const timeoutIds = new Set<number>();
@@ -29,10 +27,7 @@ export function createFrameScheduler(
 		callback();
 	}
 
-	function scheduleTimeout(
-		callback: FrameSchedulerCallback,
-		timeout: number,
-	): void {
+	function scheduleTimeout(callback: FrameSchedulerCallback, timeout: number): void {
 		let timeoutId = 0;
 		timeoutId = window.setTimeout(() => {
 			timeoutIds.delete(timeoutId);

@@ -1,17 +1,13 @@
 import { MarkdownView, WorkspaceLeaf, TFile, type Workspace } from "obsidian";
 
 export interface WorkspaceViewQueries {
-	getMarkdownViewFromLeaf(
-		leaf: WorkspaceLeaf | undefined,
-	): MarkdownView | undefined;
+	getMarkdownViewFromLeaf(leaf: WorkspaceLeaf | undefined): MarkdownView | undefined;
 	getFileFromLeaf(leaf: WorkspaceLeaf | undefined): TFile | undefined;
 	getFileFromView(view: MarkdownView | undefined): TFile | undefined;
 	getOpenMarkdownViews(): MarkdownView[];
 }
 
-export function createWorkspaceViewQueries(
-	workspace: Workspace,
-): WorkspaceViewQueries {
+export function createWorkspaceViewQueries(workspace: Workspace): WorkspaceViewQueries {
 	return {
 		getMarkdownViewFromLeaf,
 		getFileFromLeaf,

@@ -50,10 +50,7 @@ vi.mock("features/search/searchWorkerClient", async () => {
 						datasetVersion: update.datasetVersion,
 					};
 					for (const entry of update.entries) {
-						contentByPath.set(
-							entry.path,
-							entry.content.toLowerCase(),
-						);
+						contentByPath.set(entry.path, entry.content.toLowerCase());
 					}
 				},
 				removeFileContents: (update: {
@@ -154,9 +151,7 @@ describe("TwoHopLinksPage", () => {
 			resolveFile: vi.fn(() => null),
 			fileToLinktext: vi.fn(() => "target"),
 			buildWikiLink: vi.fn(() => "[[target]]"),
-			getPreview: vi.fn(
-				async () => ({ type: "empty", content: "" }) as const,
-			),
+			getPreview: vi.fn(async () => ({ type: "empty", content: "" }) as const),
 			sourceFile: file,
 			getMetadata: vi.fn(() => null),
 			onOpenFile: vi.fn(),
@@ -224,9 +219,7 @@ describe("TwoHopLinksPage", () => {
 			resolveFile: vi.fn(() => null),
 			fileToLinktext: vi.fn(() => "target"),
 			buildWikiLink: vi.fn(() => "[[target]]"),
-			getPreview: vi.fn(
-				async () => ({ type: "empty", content: "" }) as const,
-			),
+			getPreview: vi.fn(async () => ({ type: "empty", content: "" }) as const),
 			sourceFile: file,
 			getMetadata: vi.fn(() => null),
 			onOpenFile: vi.fn(),
@@ -254,9 +247,7 @@ describe("TwoHopLinksPage", () => {
 		expect(resultsContainer).not.toBeNull();
 		expect(resultsContainer?.contains(loadingStatus)).toBe(true);
 		expect(
-			screen.getByText(
-				"Waiting for the initial index to finish building.",
-			),
+			screen.getByText("Waiting for the initial index to finish building."),
 		).toBeInTheDocument();
 	});
 
@@ -306,9 +297,7 @@ describe("TwoHopLinksPage", () => {
 			resolveFile: vi.fn(() => null),
 			fileToLinktext: vi.fn(() => "target"),
 			buildWikiLink: vi.fn(() => "[[target]]"),
-			getPreview: vi.fn(
-				async () => ({ type: "empty", content: "" }) as const,
-			),
+			getPreview: vi.fn(async () => ({ type: "empty", content: "" }) as const),
 			sourceFile: file,
 			getMetadata: vi.fn(() => null),
 			onOpenFile: vi.fn(),
@@ -328,8 +317,6 @@ describe("TwoHopLinksPage", () => {
 			} as any,
 		});
 
-		expect(
-			screen.getByText("Loading two-hop links..."),
-		).toBeInTheDocument();
+		expect(screen.getByText("Loading two-hop links...")).toBeInTheDocument();
 	});
 });

@@ -23,11 +23,7 @@ const compatModules = new Set(
 	].map((fileName) => normalize(join(commonRoot, fileName))),
 );
 
-const sourceExtensions = [
-	".ts",
-	".svelte",
-	".svelte.ts",
-];
+const sourceExtensions = [".ts", ".svelte", ".svelte.ts"];
 
 const importSpecifierPattern =
 	/(?:import|export)\s+(?:type\s+)?(?:[\s\S]*?\s+from\s+)?["']([^"']+)["']/g;
@@ -52,10 +48,7 @@ const collectSourceFiles = (directory: string): string[] => {
 	return files;
 };
 
-const resolveImportSpecifier = (
-	importer: string,
-	specifier: string,
-): string | null => {
+const resolveImportSpecifier = (importer: string, specifier: string): string | null => {
 	if (specifier.startsWith(".")) {
 		return resolveWithExtensions(resolve(dirname(importer), specifier));
 	}
@@ -104,14 +97,8 @@ describe("virtual list compatibility imports", () => {
 
 			const source = readFileSync(sourceFile, "utf8");
 			for (const match of source.matchAll(importSpecifierPattern)) {
-				const resolvedSpecifier = resolveImportSpecifier(
-					sourceFile,
-					match[1],
-				);
-				if (
-					resolvedSpecifier &&
-					compatModules.has(resolvedSpecifier)
-				) {
+				const resolvedSpecifier = resolveImportSpecifier(sourceFile, match[1]);
+				if (resolvedSpecifier && compatModules.has(resolvedSpecifier)) {
 					violations.push(
 						`${relative(sourceRoot, sourceFile)} -> ${relative(
 							sourceRoot,

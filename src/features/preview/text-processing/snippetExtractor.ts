@@ -54,8 +54,7 @@ function resolvePreviewVisualMetrics(settings: PluginSettings): {
 			? Math.floor(settings.cardWidthPx)
 			: 140;
 	const cardHeightRatio =
-		Number.isFinite(settings.cardHeightRatio) &&
-		settings.cardHeightRatio > 0
+		Number.isFinite(settings.cardHeightRatio) && settings.cardHeightRatio > 0
 			? settings.cardHeightRatio
 			: 1.1;
 	const cardHeightPx = Math.max(1, Math.round(cardWidthPx * cardHeightRatio));
@@ -131,11 +130,7 @@ interface ScanState {
 	currentLineCells: number;
 }
 
-function addCells(
-	state: ScanState,
-	cells: number,
-	columns: number,
-): void {
+function addCells(state: ScanState, cells: number, columns: number): void {
 	if (cells <= 0) return;
 
 	if (state.currentLineCells + cells <= columns) {
@@ -293,10 +288,7 @@ function scanAndTruncate(
 								def.multiline,
 							)
 						: -1;
-					if (
-						def.requiresClosingDelimiter &&
-						closingDelimiterIndex === -1
-					) {
+					if (def.requiresClosingDelimiter && closingDelimiterIndex === -1) {
 						continue;
 					}
 
@@ -392,17 +384,11 @@ function scanAndTruncate(
 
 						if (isClosing) {
 							const lastIdx = tagStackNames.length - 1;
-							if (
-								lastIdx >= 0 &&
-								tagStackNames[lastIdx] === tagName
-							) {
+							if (lastIdx >= 0 && tagStackNames[lastIdx] === tagName) {
 								tagStackNames.pop();
 								tagStackStarts.pop();
 							}
-						} else if (
-							!isSelfClosing &&
-							!VOID_ELEMENTS.has(tagName)
-						) {
+						} else if (!isSelfClosing && !VOID_ELEMENTS.has(tagName)) {
 							tagStackNames.push(tagName);
 							tagStackStarts.push(i);
 						}
@@ -433,8 +419,7 @@ function applyTruncation(
 	content: string,
 	settings: PluginSettings,
 ): { result: string; wasTruncated: boolean } {
-	const maxChars =
-		settings.previewMaxChars > 0 ? settings.previewMaxChars : Infinity;
+	const maxChars = settings.previewMaxChars > 0 ? settings.previewMaxChars : Infinity;
 	const visualMetrics = resolvePreviewVisualMetrics(settings);
 
 	if (visualMetrics.maxVisualLines === Infinity && maxChars === Infinity) {
@@ -464,11 +449,10 @@ function buildFallbackSnippetFromRawContent(
 		};
 	}
 
-	const transformedFallback = transformContentForPreview(
-		rawResult,
-		settings,
-		{ context, skipFrontmatterRemoval: true },
-	)
+	const transformedFallback = transformContentForPreview(rawResult, settings, {
+		context,
+		skipFrontmatterRemoval: true,
+	})
 		.replace(/^\n+/, "")
 		.trim();
 
@@ -565,8 +549,7 @@ function buildFencedBlockSliceAroundMatch(
 	return {
 		contentToProcess: `${header}${slicedCodeBody}${footer}`,
 		hasLeadingOmission: block.blockStart > 0 || leadingOmission,
-		hasTrailingOmission:
-			block.blockEnd < content.length || trailingOmission,
+		hasTrailingOmission: block.blockEnd < content.length || trailingOmission,
 	};
 }
 
@@ -583,8 +566,7 @@ function getContentSliceForSearch(
 } {
 	const hasSafeLimitOverflow = content.length > safeLimit;
 	const hasPreviewTruncationLimit =
-		(settings?.previewMaxChars ?? 0) > 0 ||
-		(settings?.previewMaxLines ?? 0) > 0;
+		(settings?.previewMaxChars ?? 0) > 0 || (settings?.previewMaxLines ?? 0) > 0;
 
 	if (!normalizedSearchQuery) {
 		return {
@@ -609,16 +591,11 @@ function getContentSliceForSearch(
 		};
 	}
 
-	const searchSeekThresholdChars =
-		resolveSearchPreviewSeekThresholdChars(settings);
+	const searchSeekThresholdChars = resolveSearchPreviewSeekThresholdChars(settings);
 	const searchSeekBufferChars = resolveSearchPreviewSeekBufferChars(settings);
 	const shouldSeekByThreshold = firstMatchIndex > searchSeekThresholdChars;
 
-	if (
-		!hasSafeLimitOverflow &&
-		!hasPreviewTruncationLimit &&
-		!shouldSeekByThreshold
-	) {
+	if (!hasSafeLimitOverflow && !hasPreviewTruncationLimit && !shouldSeekByThreshold) {
 		return {
 			contentToProcess: content,
 			hasLeadingOmission: false,
@@ -652,10 +629,7 @@ function getContentSliceForSearch(
 			}
 			lineBreakCount++;
 			if (lineBreakCount > maxLeadingLines) {
-				maxLeadingChars = Math.min(
-					maxLeadingChars,
-					firstMatchIndex - (i + 1),
-				);
+				maxLeadingChars = Math.min(maxLeadingChars, firstMatchIndex - (i + 1));
 				break;
 			}
 		}
@@ -669,10 +643,7 @@ function getContentSliceForSearch(
 	let sliceStart = Math.max(0, firstMatchIndex - sidePadding);
 	let sliceEnd = Math.min(content.length, sliceStart + windowSize);
 
-	const enclosingFencedBlock = findEnclosingFencedCodeBlock(
-		content,
-		firstMatchIndex,
-	);
+	const enclosingFencedBlock = findEnclosingFencedCodeBlock(content, firstMatchIndex);
 	if (enclosingFencedBlock) {
 		const cutsFenceBoundary =
 			sliceStart > enclosingFencedBlock.blockStart ||
@@ -729,24 +700,17 @@ export function getContentSnippet(
 	);
 	const contentToProcess = contentSlice.contentToProcess;
 
-	let processedContent = transformContentForPreview(
-		contentToProcess,
-		settings,
-		{ context, skipFrontmatterRemoval: true },
-	);
+	let processedContent = transformContentForPreview(contentToProcess, settings, {
+		context,
+		skipFrontmatterRemoval: true,
+	});
 	processedContent = processedContent.replace(/^[\r\n]+/, "");
 
-	if (
-		!settings ||
-		(settings.previewMaxLines <= 0 && settings.previewMaxChars <= 0)
-	) {
+	if (!settings || (settings.previewMaxLines <= 0 && settings.previewMaxChars <= 0)) {
 		return processedContent;
 	}
 
-	const { result, wasTruncated } = applyTruncation(
-		processedContent,
-		settings,
-	);
+	const { result, wasTruncated } = applyTruncation(processedContent, settings);
 
 	let trimmedResult = result.trim();
 	let effectiveWasTruncated = wasTruncated;

@@ -21,15 +21,14 @@ export type VirtualListMeasurementPhase =
 			readonly visibleRangeStable: boolean;
 	  };
 
-export type VirtualListMeasurementStateHandle =
-	VirtualListMeasurementState & {
-		invalidateViewport(): void;
-		updateFromLiveMetrics(
-			metrics: { sectionTop: number; viewportHeight: number },
-			isStable: boolean,
-		): void;
-		resolvePhase(): VirtualListMeasurementPhase;
-	};
+export type VirtualListMeasurementStateHandle = VirtualListMeasurementState & {
+	invalidateViewport(): void;
+	updateFromLiveMetrics(
+		metrics: { sectionTop: number; viewportHeight: number },
+		isStable: boolean,
+	): void;
+	resolvePhase(): VirtualListMeasurementPhase;
+};
 
 export function resolveVirtualListMeasurementPhase(
 	state: VirtualListMeasurementState,

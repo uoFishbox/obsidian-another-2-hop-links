@@ -7,10 +7,7 @@ function createOriginDefinitions(linkCount: number) {
 	return [
 		{
 			path: "origin.md",
-			links: Array.from(
-				{ length: linkCount },
-				(_, index) => `note${index}`,
-			),
+			links: Array.from({ length: linkCount }, (_, index) => `note${index}`),
 		},
 		...Array.from({ length: linkCount }, (_, index) => ({
 			path: `note${index}.md`,
@@ -27,10 +24,7 @@ describe("TwoHopBranchBuilder", () => {
 
 		await service.rebuildIndexesTimeSliced();
 
-		const builder = new TwoHopBranchBuilder(
-			service["metadataCache"],
-			service,
-		);
+		const builder = new TwoHopBranchBuilder(service["metadataCache"], service);
 
 		const branches = await builder.buildHop1OnlyBranches(
 			files["origin.md"],

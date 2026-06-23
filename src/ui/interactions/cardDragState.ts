@@ -81,12 +81,15 @@ export function installNativeDragSelectionShim(doc: Document = document): void {
 	input.setSelectionRange(0, 8);
 
 	if (!isNativeDragSelectionShimActive(input)) {
-		console.warn("[Cosense card links] Native drag selection shim was not active before drag", {
-			activeElement: doc.activeElement,
-			selectionStart: input.selectionStart,
-			selectionEnd: input.selectionEnd,
-			isConnected: input.isConnected,
-		});
+		console.warn(
+			"[Cosense card links] Native drag selection shim was not active before drag",
+			{
+				activeElement: doc.activeElement,
+				selectionStart: input.selectionStart,
+				selectionEnd: input.selectionEnd,
+				isConnected: input.isConnected,
+			},
+		);
 	}
 }
 

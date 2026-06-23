@@ -35,8 +35,7 @@ export class PreviewService {
 		this.ensureStarted();
 	}
 
-	public ensureStarted(): void {
-	}
+	public ensureStarted(): void {}
 
 	public dispose(): void {
 		this.shutdown();
@@ -292,8 +291,7 @@ export function createPreviewService(
 				requestOptions,
 			),
 		getVisibleQueueSize: () => service.getVisibleQueueSize(),
-		getActiveVisiblePreviewCount: () =>
-			service.getActiveVisiblePreviewCount(),
+		getActiveVisiblePreviewCount: () => service.getActiveVisiblePreviewCount(),
 		clearCache: () => service.clearCache(),
 		dispose: () => service.dispose(),
 	};

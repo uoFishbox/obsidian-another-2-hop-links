@@ -29,9 +29,7 @@ export function isStableVirtualListMeasurement({
 		Number.isFinite(scrollTop) &&
 		Number.isFinite(viewportHeight) &&
 		Number.isFinite(sectionTop);
-	return (
-		hasStableViewportHeight && hasStableRootRect && hasStableScrollMetrics
-	);
+	return hasStableViewportHeight && hasStableRootRect && hasStableScrollMetrics;
 }
 
 export interface ResolveVirtualListLayoutStabilityParams {
@@ -54,21 +52,18 @@ export function resolveVirtualListLayoutStability({
 	measuredWidth,
 	hasRenderableContent,
 }: ResolveVirtualListLayoutStabilityParams): VirtualListLayoutStability {
-	const rawContainerWidth =
-		measuredWidth ?? rootRect.width ?? rootEl.clientWidth;
+	const rawContainerWidth = measuredWidth ?? rootRect.width ?? rootEl.clientWidth;
 	const hasStableWidth =
 		Number.isFinite(rawContainerWidth) &&
 		(rawContainerWidth > 0 || rootEl.clientWidth > 0);
 	const hasStableRootRect =
-		isFiniteRect(rootRect) &&
-		(!hasRenderableContent || rootRect.height > 0);
+		isFiniteRect(rootRect) && (!hasRenderableContent || rootRect.height > 0);
 
 	return {
 		rawContainerWidth,
 		hasStableWidth,
 		hasStableRootRect,
-		isStable:
-			!hasRenderableContent || (hasStableWidth && hasStableRootRect),
+		isStable: !hasRenderableContent || (hasStableWidth && hasStableRootRect),
 	};
 }
 

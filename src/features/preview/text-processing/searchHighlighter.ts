@@ -25,9 +25,11 @@ function wrapMatchesWithHighlight(
 		const prefix = text.substring(cursor, matchIndex);
 
 		parts.push(escapeSegments ? escapeHtml(prefix) : prefix);
-		parts.push(`<span class="ccl-search-highlight">${
-			escapeSegments ? escapeHtml(matchText) : matchText
-		}</span>`);
+		parts.push(
+			`<span class="ccl-search-highlight">${
+				escapeSegments ? escapeHtml(matchText) : matchText
+			}</span>`,
+		);
 
 		cursor = matchIndex + matchText.length;
 		match = searchPattern.exec(text);
@@ -95,10 +97,7 @@ function highlightTextSegmentsInHtmlByVisibleRange(
 	return parts.join("");
 }
 
-function highlightTextSegmentsInHtml(
-	content: string,
-	searchPattern: RegExp,
-): string {
+function highlightTextSegmentsInHtml(content: string, searchPattern: RegExp): string {
 	// A literal "<" can cross an HTML boundary when matching against the
 	// original string. Keep that rare case scoped to each visible range.
 	if (searchPattern.source.includes("<")) {
@@ -166,10 +165,7 @@ function highlightTextSegmentsInHtml(
 	return parts.join("");
 }
 
-export function highlightTextForSearch(
-	text: string,
-	searchQuery?: string,
-): string {
+export function highlightTextForSearch(text: string, searchQuery?: string): string {
 	const searchPattern = createCaseInsensitiveRegExp(searchQuery, true);
 	return wrapMatchesWithHighlight(text, searchPattern, true);
 }

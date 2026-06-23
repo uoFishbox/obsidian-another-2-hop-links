@@ -5,9 +5,7 @@ import {
 	cleanupSvelteAndStore,
 	type SvelteComponentInstance,
 } from "ui/views/shared/svelteLifecycle";
-import {
-	mountTwoHopLinksRootView,
-} from "ui/views/shared/viewFactories";
+import { mountTwoHopLinksRootView } from "ui/views/shared/viewFactories";
 
 export const TWO_HOP_LINKS_VIEW_TYPE = "cosense-card-links-view";
 
@@ -52,10 +50,7 @@ export class TwoHopLinksView extends ItemView {
 		this.renderFile(this.currentFile, { force: true });
 	}
 
-	private renderFile(
-		file: TFile,
-		options: { force: boolean },
-	): void {
+	private renderFile(file: TFile, options: { force: boolean }): void {
 		const isFileTransition = this.currentFile?.path !== file.path;
 
 		// ファイルが同じ場合は再レンダリングをスキップ
@@ -82,20 +77,18 @@ export class TwoHopLinksView extends ItemView {
 			this.resetSidebarScrollPosition();
 		}
 
-		({
-			component: this.component,
-			applicationStore: this.applicationStore,
-		} = mountTwoHopLinksRootView({
-			target: container,
-			plugin: this.plugin,
-			file,
-			settings: this.plugin.settings,
-			lazyLoaderCache: this.lazyLoaderCache,
-			isSidebar: true,
-			wrapForView: false,
-			updateSetting: (key, value) =>
-				this.plugin.updateSetting(key as any, value),
-		}));
+		({ component: this.component, applicationStore: this.applicationStore } =
+			mountTwoHopLinksRootView({
+				target: container,
+				plugin: this.plugin,
+				file,
+				settings: this.plugin.settings,
+				lazyLoaderCache: this.lazyLoaderCache,
+				isSidebar: true,
+				wrapForView: false,
+				updateSetting: (key, value) =>
+					this.plugin.updateSetting(key as any, value),
+			}));
 	}
 
 	/**

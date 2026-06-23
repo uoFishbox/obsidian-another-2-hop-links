@@ -22,11 +22,7 @@ function getLineBreakLength(text: string, index: number): number {
 	return 0;
 }
 
-function isFrontmatterDelimiterLine(
-	text: string,
-	start: number,
-	end: number,
-): boolean {
+function isFrontmatterDelimiterLine(text: string, start: number, end: number): boolean {
 	const contentEnd = end > start && text[end - 1] === "\r" ? end - 1 : end;
 	return (
 		contentEnd - start === 3 &&

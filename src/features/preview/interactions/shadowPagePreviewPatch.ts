@@ -28,9 +28,7 @@ function normalizeShadowPopoverTarget(
 	targetEl: unknown,
 	event?: Event,
 ): HTMLElement | undefined {
-	const annotated = event
-		? getAttachedInteractionHoverTarget(event)
-		: null;
+	const annotated = event ? getAttachedInteractionHoverTarget(event) : null;
 	if (annotated) {
 		return annotated;
 	}

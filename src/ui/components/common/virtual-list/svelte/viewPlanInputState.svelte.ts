@@ -45,7 +45,9 @@ export function createViewPlanInputState<T, G>({
 			: new Map<string, SectionRenderDescriptor<T, G>>(),
 	);
 	const validatedSections = $derived.by(() =>
-		viewPlanInputValidation.ok ? viewPlanInputValidation.value.sections : EMPTY_SECTIONS,
+		viewPlanInputValidation.ok
+			? viewPlanInputValidation.value.sections
+			: EMPTY_SECTIONS,
 	);
 
 	const visibleCountsController = createSectionVisibleCountsController<T, G>({
@@ -68,9 +70,7 @@ export function createViewPlanInputState<T, G>({
 			visibleCountsController.resolveForInput(validatedSections).snapshot,
 		);
 	};
-	const sectionVisibleCounts = $derived(
-		visibleCountsSnapshot.visibleCounts,
-	);
+	const sectionVisibleCounts = $derived(visibleCountsSnapshot.visibleCounts);
 	const validationError = $derived.by(() =>
 		viewPlanInputValidation.ok ? null : viewPlanInputValidation.error,
 	);
@@ -102,8 +102,7 @@ export function createViewPlanInputState<T, G>({
 				section,
 				visibleCountsController.getSnapshot().visibleCounts[
 					getSectionPaginationKey(section)
-				] ??
-					visibleCountsController.resolveInitialSectionVisibleCount(section),
+				] ?? visibleCountsController.resolveInitialSectionVisibleCount(section),
 			);
 			const showLoadMore = visibleCount < section.loadedCount;
 			if (!showLoadMore) {

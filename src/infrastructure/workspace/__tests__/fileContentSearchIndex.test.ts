@@ -12,10 +12,7 @@ const createMockFile = (path: string, mtime: number): TFile =>
 		stat: { mtime },
 	}) as unknown as TFile;
 
-const createEntry = (
-	content: string,
-	mtime: number,
-): SearchContentIndexEntry => ({
+const createEntry = (content: string, mtime: number): SearchContentIndexEntry => ({
 	content,
 	mtime,
 });
@@ -77,11 +74,7 @@ describe("applyLoadedFileContentEntry", () => {
 	test("sets new entry when path is missing", () => {
 		const index = new Map<string, SearchContentIndexEntry>();
 
-		applyLoadedFileContentEntry(
-			index,
-			"notes/a.md",
-			createEntry("first", 100),
-		);
+		applyLoadedFileContentEntry(index, "notes/a.md", createEntry("first", 100));
 
 		expect(index.get("notes/a.md")).toEqual(createEntry("first", 100));
 	});
@@ -91,11 +84,7 @@ describe("applyLoadedFileContentEntry", () => {
 			["notes/a.md", createEntry("newest", 200)],
 		]);
 
-		applyLoadedFileContentEntry(
-			index,
-			"notes/a.md",
-			createEntry("older", 100),
-		);
+		applyLoadedFileContentEntry(index, "notes/a.md", createEntry("older", 100));
 
 		expect(index.get("notes/a.md")).toEqual(createEntry("newest", 200));
 	});
@@ -105,11 +94,7 @@ describe("applyLoadedFileContentEntry", () => {
 			["notes/a.md", createEntry("old", 100)],
 		]);
 
-		applyLoadedFileContentEntry(
-			index,
-			"notes/a.md",
-			createEntry("newer", 200),
-		);
+		applyLoadedFileContentEntry(index, "notes/a.md", createEntry("newer", 200));
 		expect(index.get("notes/a.md")).toEqual(createEntry("newer", 200));
 
 		applyLoadedFileContentEntry(
@@ -117,8 +102,6 @@ describe("applyLoadedFileContentEntry", () => {
 			"notes/a.md",
 			createEntry("same-mtime-update", 200),
 		);
-		expect(index.get("notes/a.md")).toEqual(
-			createEntry("same-mtime-update", 200),
-		);
+		expect(index.get("notes/a.md")).toEqual(createEntry("same-mtime-update", 200));
 	});
 });

@@ -17,11 +17,7 @@ import type {
 	MaterializedVirtualListMode,
 	VirtualListMode,
 } from "../core/VirtualListMode";
-import type {
-	MountedVirtualCell,
-	VirtualRanges,
-	VirtualRowModel,
-} from "../types";
+import type { MountedVirtualCell, VirtualRanges, VirtualRowModel } from "../types";
 
 interface ApplyVirtualListMeasurementParams<
 	TCell,
@@ -103,16 +99,10 @@ export function useVirtualList<
 	TRowModel extends VirtualRowModel<TCell>,
 	TMountedCell extends MountedVirtualCell,
 	TMountedBuild extends MountedVirtualCellsBuild<TMountedCell>,
->(
-	options: UseVirtualListOptions<
-		TCell,
-		TRowModel,
-		TMountedCell,
-		TMountedBuild
-	>,
-) {
-	const initialReconciliationState: VirtualListReconciliationState<TMountedBuild> =
-		{ mountedBuild: null };
+>(options: UseVirtualListOptions<TCell, TRowModel, TMountedCell, TMountedBuild>) {
+	const initialReconciliationState: VirtualListReconciliationState<TMountedBuild> = {
+		mountedBuild: null,
+	};
 	let runtimeState = $state.raw<
 		VirtualListRuntimeState<TCell, TMountedCell, TMountedBuild>
 	>({
@@ -184,8 +174,7 @@ export function useVirtualList<
 	): MeasurementUpdateResult<RowRange> => {
 		const previousRuntimeState = untrack(() => runtimeState);
 		const previousSnapshot = previousRuntimeState.snapshot;
-		const previousReconciliationState =
-			previousRuntimeState.reconciliationState;
+		const previousReconciliationState = previousRuntimeState.reconciliationState;
 		const result = computeVirtualListSnapshotWithState({
 			rowModel: params.rowModel,
 			measurement: {
@@ -245,10 +234,7 @@ export function useVirtualList<
 		commitComputation(result);
 	};
 
-	const setEmpty = (params: {
-		rowModel: TRowModel;
-		reason?: EmptyReason;
-	}): void => {
+	const setEmpty = (params: { rowModel: TRowModel; reason?: EmptyReason }): void => {
 		const previousRuntimeState = untrack(() => runtimeState);
 		const result = createEmptyVirtualListComputation<
 			TCell,

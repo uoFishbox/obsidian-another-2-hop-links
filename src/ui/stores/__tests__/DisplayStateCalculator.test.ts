@@ -6,19 +6,13 @@ import type {
 	LinkPreprocessedDisplayData,
 	TagPreprocessedDisplayData,
 } from "application/presenters/displayDataBuilder";
-import type {
-	TaggedNote,
-	TwoHopIndexedLink,
-	TwoHopLinkResult,
-} from "types/domain";
+import type { TaggedNote, TwoHopIndexedLink, TwoHopLinkResult } from "types/domain";
 import { DEFAULT_SETTINGS, type PluginSettings } from "types/settings";
 import {
 	computePreprocessedDisplayDataState,
 	createPreprocessedDisplayDataCache,
 } from "ui/stores/application/DisplayStateCalculator";
-import {
-	PREPROCESS_CACHE_SETTING_DEPENDENCIES,
-} from "application/presenters/displayCacheDependencies";
+import { PREPROCESS_CACHE_SETTING_DEPENDENCIES } from "application/presenters/displayCacheDependencies";
 
 function createBacklink(path: string): TwoHopIndexedLink {
 	return {
@@ -53,10 +47,7 @@ function createFullDedupeBuilder() {
 	const preprocessLinkDisplayData = vi.fn();
 	const preprocessTagDisplayData = vi.fn();
 	const preprocessDisplayData = vi.fn(
-		(
-			linkResult: TwoHopLinkResult | undefined,
-			settings: PluginSettings,
-		) => {
+		(linkResult: TwoHopLinkResult | undefined, settings: PluginSettings) => {
 			const usedKeys = new Set<string>();
 			const resolvedBacklinks =
 				linkResult?.backlinks.filter((backlink) => {
@@ -176,9 +167,7 @@ describe("DisplayStateCalculator", () => {
 			dedupeCards: true,
 			showTagsSection: true,
 		};
-		const linkResult = createLinkResult(backlinks, [
-			createTaggedNote("shared.md"),
-		]);
+		const linkResult = createLinkResult(backlinks, [createTaggedNote("shared.md")]);
 
 		const first = computePreprocessedDisplayDataState(
 			builder,
@@ -209,19 +198,16 @@ describe("DisplayStateCalculator", () => {
 		);
 
 		expect(preprocessDisplayData).toHaveBeenCalledTimes(2);
-		expect(next.preprocessed?.taggedNotes.map((note) => note.path)).toEqual(
-			["unique.md"],
-		);
+		expect(next.preprocessed?.taggedNotes.map((note) => note.path)).toEqual([
+			"unique.md",
+		]);
 	});
 
 	it.each(PREPROCESS_CACHE_SETTING_DEPENDENCIES)(
 		"invalidates the declared $key preprocessing dependency",
 		(dependency) => {
-			const {
-				builder,
-				preprocessLinkDisplayData,
-				preprocessTagDisplayData,
-			} = createCacheProbeBuilder();
+			const { builder, preprocessLinkDisplayData, preprocessTagDisplayData } =
+				createCacheProbeBuilder();
 			const cache = createPreprocessedDisplayDataCache();
 			const linkResult = createLinkResult([], []);
 			const first = computePreprocessedDisplayDataState(
@@ -238,9 +224,7 @@ describe("DisplayStateCalculator", () => {
 				linkResult,
 				{
 					...DEFAULT_SETTINGS,
-					...PREPROCESS_DEPENDENCY_SETTING_OVERRIDES[
-						dependency.key
-					],
+					...PREPROCESS_DEPENDENCY_SETTING_OVERRIDES[dependency.key],
 				},
 				cache,
 			);

@@ -17,11 +17,7 @@ import type {
 	TwoHopLinkBranch,
 	TwoHopLinkResult,
 } from "types/domain";
-import {
-	DEFAULT_SETTINGS,
-	type PluginSettings,
-	type SortOption,
-} from "types/settings";
+import { DEFAULT_SETTINGS, type PluginSettings, type SortOption } from "types/settings";
 
 function createEmptyDisplayData(): DisplayData {
 	return {
@@ -133,10 +129,8 @@ function createStagedBuildDisplayDataMock() {
 			preprocessDisplayData(linkResult, settings),
 		),
 		preprocessTagDisplayData: vi.fn((linkResult, settings) => ({
-			taggedNotes: preprocessDisplayData(linkResult, settings)
-				.taggedNotes,
-			rawTagGroups: preprocessDisplayData(linkResult, settings)
-				.rawTagGroups,
+			taggedNotes: preprocessDisplayData(linkResult, settings).taggedNotes,
+			rawTagGroups: preprocessDisplayData(linkResult, settings).rawTagGroups,
 		})),
 		sortAndAssembleDisplayData,
 		getSortedTwoHopItems: vi.fn((items) => items),
@@ -153,10 +147,7 @@ function createStagedBuildDisplayDataMock() {
 
 function createSplitStagedBuildDisplayDataMock() {
 	const preprocessLinkDisplayData = vi.fn(
-		(
-			linkResult: TwoHopLinkResult | undefined,
-			_settings: PluginSettings,
-		) => {
+		(linkResult: TwoHopLinkResult | undefined, _settings: PluginSettings) => {
 			const resolvedBranches = linkResult?.branches ?? [];
 			const resolvedBacklinks = linkResult?.backlinks ?? [];
 			return {
@@ -173,14 +164,9 @@ function createSplitStagedBuildDisplayDataMock() {
 	);
 
 	const preprocessTagDisplayData = vi.fn(
-		(
-			linkResult: TwoHopLinkResult | undefined,
-			settings: PluginSettings,
-		) => {
+		(linkResult: TwoHopLinkResult | undefined, settings: PluginSettings) => {
 			const taggedNotes =
-				settings.showTagsSection && linkResult
-					? linkResult.taggedNotes
-					: [];
+				settings.showTagsSection && linkResult ? linkResult.taggedNotes : [];
 			return {
 				taggedNotes,
 				rawTagGroups: taggedNotes.length
@@ -215,9 +201,7 @@ function createSplitStagedBuildDisplayDataMock() {
 			sortCache.set(sortCacheKey, cachedSortedItemsByOption);
 		}
 
-		const cachedSortedItems = cachedSortedItemsByOption.get(
-			items as object,
-		);
+		const cachedSortedItems = cachedSortedItemsByOption.get(items as object);
 		if (cachedSortedItems) {
 			return cachedSortedItems as T[];
 		}
@@ -265,13 +249,9 @@ function createSplitStagedBuildDisplayDataMock() {
 			const tagGroups = settings.showTagsSection
 				? preprocessed.rawTagGroups.map((section) => ({
 						...section,
-						notes: getSortedWithCache(
-							section.notes,
-							sortOption,
-							() => {
-								tagSortCalls += 1;
-							},
-						),
+						notes: getSortedWithCache(section.notes, sortOption, () => {
+							tagSortCalls += 1;
+						}),
 					}))
 				: [];
 
@@ -281,23 +261,16 @@ function createSplitStagedBuildDisplayDataMock() {
 				mergedItems,
 				twoHopBranches: preprocessed.nonEmptyTwoHopBranches,
 				tagGroups,
-				newLinks: getSortedWithCache(
-					preprocessed.newLinks,
-					sortOption,
-					() => {
-						linkSortCalls += 1;
-					},
-				),
+				newLinks: getSortedWithCache(preprocessed.newLinks, sortOption, () => {
+					linkSortCalls += 1;
+				}),
 			};
 		},
 	);
 
 	const builder: DisplayDataBuilder = {
 		preprocessDisplayData: vi.fn(
-			(
-				linkResult: TwoHopLinkResult | undefined,
-				settings: PluginSettings,
-			) => ({
+			(linkResult: TwoHopLinkResult | undefined, settings: PluginSettings) => ({
 				...preprocessLinkDisplayData(linkResult, settings),
 				...preprocessTagDisplayData(linkResult, settings),
 			}),
@@ -865,9 +838,7 @@ describe("ApplicationStore (Runes)", () => {
 		const file = createMockTFile("current.md");
 		const resolveTwoHopLinks = vi
 			.fn<ResolveTwoHopLinks>()
-			.mockResolvedValue(
-				createLinkResultWithBranch(file.path, "target.md"),
-			);
+			.mockResolvedValue(createLinkResultWithBranch(file.path, "target.md"));
 		const { store } = createStore({ resolveTwoHopLinks });
 
 		await store.load(file);
@@ -889,9 +860,7 @@ describe("ApplicationStore (Runes)", () => {
 		const file = createMockTFile("current.md");
 		const resolveTwoHopLinks = vi
 			.fn<ResolveTwoHopLinks>()
-			.mockResolvedValue(
-				createLinkResultWithBranch(file.path, "target.md"),
-			);
+			.mockResolvedValue(createLinkResultWithBranch(file.path, "target.md"));
 		const { store } = createStore({ resolveTwoHopLinks });
 
 		await store.load(file);
@@ -909,14 +878,11 @@ describe("ApplicationStore (Runes)", () => {
 		const file = createMockTFile("current.md");
 		const resolveTwoHopLinks = vi
 			.fn<ResolveTwoHopLinks>()
-			.mockResolvedValue(
-				createLinkResultWithBranch(file.path, "target.md"),
-			);
+			.mockResolvedValue(createLinkResultWithBranch(file.path, "target.md"));
 		const { store } = createStore({ resolveTwoHopLinks });
 
 		await store.load(file);
-		const previousPreviewVersion =
-			store.getPreviewRenderVersion("target.md");
+		const previousPreviewVersion = store.getPreviewRenderVersion("target.md");
 
 		await store.handleDataUpdate({
 			indexVersion: 6,
@@ -938,9 +904,7 @@ describe("ApplicationStore (Runes)", () => {
 		const file = createMockTFile("current.md");
 		const resolveTwoHopLinks = vi
 			.fn<ResolveTwoHopLinks>()
-			.mockResolvedValue(
-				createLinkResultWithBranch(file.path, "target.md"),
-			);
+			.mockResolvedValue(createLinkResultWithBranch(file.path, "target.md"));
 		const { store } = createStore({ resolveTwoHopLinks });
 
 		await store.load(file);
@@ -961,14 +925,11 @@ describe("ApplicationStore (Runes)", () => {
 		const file = createMockTFile("current.md");
 		const resolveTwoHopLinks = vi
 			.fn<ResolveTwoHopLinks>()
-			.mockResolvedValue(
-				createLinkResultWithBranch(file.path, "target.md"),
-			);
+			.mockResolvedValue(createLinkResultWithBranch(file.path, "target.md"));
 		const { store } = createStore({ resolveTwoHopLinks });
 
 		await store.load(file);
-		const previousPreviewVersion =
-			store.getPreviewRenderVersion("target.md");
+		const previousPreviewVersion = store.getPreviewRenderVersion("target.md");
 
 		await store.handleDataUpdate({
 			indexVersion: 8,

@@ -1,8 +1,7 @@
 export function hasSourceDependentRawLinkPath(rawLinkPath: string): boolean {
 	let segmentStart = 0;
 	for (let index = 0; index <= rawLinkPath.length; index++) {
-		const ch =
-			index < rawLinkPath.length ? rawLinkPath.charCodeAt(index) : -1;
+		const ch = index < rawLinkPath.length ? rawLinkPath.charCodeAt(index) : -1;
 		if (ch !== 0x2f /* / */ && ch !== 0x5c /* \ */ && ch !== -1) {
 			continue;
 		}

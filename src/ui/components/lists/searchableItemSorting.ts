@@ -113,12 +113,7 @@ export function getSortedViewItemsWithCache(
 		return cached;
 	}
 
-	const sortedItems = sortViewItems(
-		viewItems,
-		option,
-		sortService,
-		fallbackFactory,
-	);
+	const sortedItems = sortViewItems(viewItems, option, sortService, fallbackFactory);
 	cachedSortedItemsByKey.set(viewItems, sortedItems);
 	return sortedItems;
 }

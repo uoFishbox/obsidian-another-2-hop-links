@@ -4,17 +4,9 @@ import {
 } from "../layout/flatGridLayout";
 import { createArrayBackedFlatLogicalCellSource } from "../flatLogicalCellSource";
 import type { VirtualListLogicalCell } from "../logicalCell";
-import {
-	clampRange,
-	isEmptyRange,
-	sameRange,
-	type RowRange,
-} from "../rowRange";
+import { clampRange, isEmptyRange, sameRange, type RowRange } from "../rowRange";
 import type { FlatLinkRowModel } from "../row-models/flatLinkRowModel";
-import type {
-	RenderBodyKey,
-	RenderRevisionFallbackPolicy,
-} from "../renderRevision";
+import type { RenderBodyKey, RenderRevisionFallbackPolicy } from "../renderRevision";
 import {
 	encodeResolvedItemRenderRevisionToken,
 	encodeRenderRevisionToken,
@@ -31,7 +23,6 @@ import {
 	assertVirtualListInvariant,
 	shouldAssertVirtualListInvariants,
 } from "./invariants";
-
 
 export interface MountedVirtualGridCellPosition {
 	readonly row: number;
@@ -175,10 +166,7 @@ function isSameLogicalCellForMountedReuse<T>(
 		return (
 			previous.itemIndex === next.itemIndex &&
 			previous.item === next.item &&
-			Object.is(
-				previous.itemRenderRevision,
-				next.itemRenderRevision,
-			)
+			Object.is(previous.itemRenderRevision, next.itemRenderRevision)
 		);
 	}
 
@@ -439,8 +427,7 @@ function buildMountedVirtualGridCellsFromResolver<T>(params: {
 }): MountedVirtualGridCellsBuildResult<T> {
 	const columns = Math.max(1, params.columns);
 	const previousBuild = params.previousBuild;
-	const previousBuildState =
-		getMountedVirtualGridCellsBuildState(previousBuild);
+	const previousBuildState = getMountedVirtualGridCellsBuildState(previousBuild);
 	const visibleWindow = clampVisibleWindow(
 		params.visibleWindow,
 		params.cellResolver.cellCount,
@@ -512,11 +499,7 @@ function buildMountedVirtualGridCellsFromResolver<T>(params: {
 	const rowSlices: MountedVirtualGridRowSlice<T>[] = [];
 	const cells: MountedVirtualGridCell<T>[] = [];
 
-	for (
-		let rowIndex = visibleRows.start;
-		rowIndex < visibleRows.end;
-		rowIndex += 1
-	) {
+	for (let rowIndex = visibleRows.start; rowIndex < visibleRows.end; rowIndex += 1) {
 		const rowStartIndex = Math.max(visibleWindow.start, rowIndex * columns);
 		const rowEndIndex = Math.min(
 			visibleWindow.end,
@@ -541,11 +524,7 @@ function buildMountedVirtualGridCellsFromResolver<T>(params: {
 			? previousRowWithCompatibleSlot
 			: undefined;
 		if (
-			canReuseMountedVirtualGridRow(
-				previousRow,
-				rowStartIndex,
-				rowEndIndex,
-			) &&
+			canReuseMountedVirtualGridRow(previousRow, rowStartIndex, rowEndIndex) &&
 			previousRow.slotIndex === rowSlotIndex
 		) {
 			rowSlices.push(previousRow);
@@ -557,11 +536,7 @@ function buildMountedVirtualGridCellsFromResolver<T>(params: {
 		}
 		const rowCells: MountedVirtualGridCell<T>[] = [];
 
-		for (
-			let cellIndex = rowStartIndex;
-			cellIndex < rowEndIndex;
-			cellIndex += 1
-		) {
+		for (let cellIndex = rowStartIndex; cellIndex < rowEndIndex; cellIndex += 1) {
 			const cell = params.cellResolver.resolveCellAtIndex(cellIndex);
 			if (!cell || cellIndex >= visibleWindow.end) {
 				continue;

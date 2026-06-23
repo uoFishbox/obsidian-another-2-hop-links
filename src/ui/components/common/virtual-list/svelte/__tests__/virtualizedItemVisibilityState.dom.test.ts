@@ -29,9 +29,7 @@ const row = (rowIndex: number, cells: TestCell[]) => ({
 const range = (start: number, end: number): RowRange => ({ start, end });
 
 const getStateForPreviewRange = (
-	ctrl: ReturnType<
-		typeof createVirtualizedItemVisibilityStateController<TestCell>
-	>,
+	ctrl: ReturnType<typeof createVirtualizedItemVisibilityStateController<TestCell>>,
 	cell: TestCell,
 	rowIndex: number,
 	previewVisible: RowRange,
@@ -43,15 +41,15 @@ const getStateForPreviewRange = (
 
 describe("resolveVirtualizedItemVisibilityForPreviewRange", () => {
 	it("returns visible when rowIndex is within preview range", () => {
-		expect(
-			resolveVirtualizedItemVisibilityForPreviewRange(2, range(1, 5)),
-		).toBe("visible");
+		expect(resolveVirtualizedItemVisibilityForPreviewRange(2, range(1, 5))).toBe(
+			"visible",
+		);
 	});
 
 	it("returns mounted when rowIndex is outside preview range", () => {
-		expect(
-			resolveVirtualizedItemVisibilityForPreviewRange(0, range(1, 5)),
-		).toBe("mounted");
+		expect(resolveVirtualizedItemVisibilityForPreviewRange(0, range(1, 5))).toBe(
+			"mounted",
+		);
 	});
 
 	it("returns mounted when rowIndex is undefined", () => {
@@ -61,9 +59,9 @@ describe("resolveVirtualizedItemVisibilityForPreviewRange", () => {
 	});
 
 	it("returns mounted when rowIndex equals range end (exclusive)", () => {
-		expect(
-			resolveVirtualizedItemVisibilityForPreviewRange(5, range(1, 5)),
-		).toBe("mounted");
+		expect(resolveVirtualizedItemVisibilityForPreviewRange(5, range(1, 5))).toBe(
+			"mounted",
+		);
 	});
 });
 
@@ -238,12 +236,7 @@ describe("createVirtualizedItemVisibilityStateController", () => {
 			mountedRows: previousRows,
 			previewRange: range(0, 1),
 		});
-		const state = getStateForPreviewRange(
-			ctrl,
-			previousCell,
-			0,
-			range(0, 1),
-		);
+		const state = getStateForPreviewRange(ctrl, previousCell, 0, range(0, 1));
 
 		ctrl.syncMountedRowRangeDelta({
 			previousRows,
@@ -269,12 +262,7 @@ describe("createVirtualizedItemVisibilityStateController", () => {
 			mountedRows: previousRows,
 			previewRange: range(0, 1),
 		});
-		const state = getStateForPreviewRange(
-			ctrl,
-			previousCell,
-			0,
-			range(0, 1),
-		);
+		const state = getStateForPreviewRange(ctrl, previousCell, 0, range(0, 1));
 
 		ctrl.syncMountedRowRangeDelta({
 			previousRows,
@@ -317,19 +305,13 @@ describe("createVirtualizedItemVisibilityStateController", () => {
 		const ctrl = createVirtualizedItemVisibilityStateController<TestCell>();
 
 		const cells1 = [item("a"), item("b")];
-		ctrl.sync(
-			[row(0, cells1)],
-			range(0, 1),
-	);
+		ctrl.sync([row(0, cells1)], range(0, 1));
 
 		const stateA = getStateForPreviewRange(ctrl, cells1[0], 0, range(0, 1));
 		expect(stateA.visibility).toBe("visible");
 
 		const cells2 = [item("c")];
-		ctrl.sync(
-			[row(0, cells2)],
-			range(0, 1),
-	);
+		ctrl.sync([row(0, cells2)], range(0, 1));
 
 		const stateC = getStateForPreviewRange(ctrl, cells2[0], 0, range(0, 1));
 		expect(stateC.visibility).toBe("visible");
@@ -376,16 +358,14 @@ describe("createVirtualizedItemVisibilityStateController", () => {
 
 	it("path 2: handles non-overlapping forward preview jumps", () => {
 		const ctrl = createVirtualizedItemVisibilityStateController<TestCell>();
-		const cells = Array.from({ length: 30 }, (_, index) =>
-			item(String(index)),
-	);
+		const cells = Array.from({ length: 30 }, (_, index) => item(String(index)));
 		const rows = cells.map((cell, index) => row(index, [cell]));
 
 		ctrl.sync(rows, range(0, 10));
 
 		const states = cells.map((cell, index) =>
 			getStateForPreviewRange(ctrl, cell, index, range(0, 10)),
-	);
+		);
 
 		ctrl.sync(rows, range(20, 30));
 
@@ -399,16 +379,14 @@ describe("createVirtualizedItemVisibilityStateController", () => {
 
 	it("path 2: handles non-overlapping backward preview jumps", () => {
 		const ctrl = createVirtualizedItemVisibilityStateController<TestCell>();
-		const cells = Array.from({ length: 30 }, (_, index) =>
-			item(String(index)),
-	);
+		const cells = Array.from({ length: 30 }, (_, index) => item(String(index)));
 		const rows = cells.map((cell, index) => row(index, [cell]));
 
 		ctrl.sync(rows, range(20, 30));
 
 		const states = cells.map((cell, index) =>
 			getStateForPreviewRange(ctrl, cell, index, range(20, 30)),
-	);
+		);
 
 		ctrl.sync(rows, range(0, 10));
 
@@ -422,16 +400,14 @@ describe("createVirtualizedItemVisibilityStateController", () => {
 
 	it("path 2: shrinks range from both ends", () => {
 		const ctrl = createVirtualizedItemVisibilityStateController<TestCell>();
-		const cells = Array.from({ length: 20 }, (_, index) =>
-			item(String(index)),
-	);
+		const cells = Array.from({ length: 20 }, (_, index) => item(String(index)));
 		const rows = cells.map((cell, index) => row(index, [cell]));
 
 		ctrl.sync(rows, range(0, 20));
 
 		const states = cells.map((cell, index) =>
 			getStateForPreviewRange(ctrl, cell, index, range(0, 20)),
-	);
+		);
 
 		ctrl.sync(rows, range(5, 15));
 
@@ -448,16 +424,14 @@ describe("createVirtualizedItemVisibilityStateController", () => {
 
 	it("path 2: partial overlap on both sides", () => {
 		const ctrl = createVirtualizedItemVisibilityStateController<TestCell>();
-		const cells = Array.from({ length: 30 }, (_, index) =>
-			item(String(index)),
-	);
+		const cells = Array.from({ length: 30 }, (_, index) => item(String(index)));
 		const rows = cells.map((cell, index) => row(index, [cell]));
 
 		ctrl.sync(rows, range(5, 25));
 
 		const states = cells.map((cell, index) =>
 			getStateForPreviewRange(ctrl, cell, index, range(5, 25)),
-	);
+		);
 
 		ctrl.sync(rows, range(10, 30));
 

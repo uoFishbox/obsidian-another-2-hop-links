@@ -91,9 +91,7 @@ describe("viewPlanMountedCells", () => {
 
 	it("reuses compatible mounted item content and updates changed row layout", () => {
 		const mounted = createMountedItem();
-		expect(canReuseMountedFlatCellContent(mounted, itemCell, section)).toBe(
-			true,
-		);
+		expect(canReuseMountedFlatCellContent(mounted, itemCell, section)).toBe(true);
 
 		const updated = updateMountedFlatCell({
 			previous: mounted,
@@ -164,8 +162,6 @@ describe("viewPlanMountedCells", () => {
 			},
 		};
 
-		expect(
-			canReuseMountedFlatCellContent(mounted, cell, nextSection),
-		).toBe(false);
+		expect(canReuseMountedFlatCellContent(mounted, cell, nextSection)).toBe(false);
 	});
 });

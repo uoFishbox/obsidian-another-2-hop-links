@@ -55,9 +55,7 @@ describe("VirtualGridLinkList pagination", () => {
 		driver.intersectSentinel();
 
 		await waitFor(() => {
-			expect(driver.renderedIndexes()).toEqual([
-				0, 1, 2, 3, 4, 5, 6, 7, 8, 9,
-			]);
+			expect(driver.renderedIndexes()).toEqual([0, 1, 2, 3, 4, 5, 6, 7, 8, 9]);
 		});
 	});
 
@@ -76,9 +74,9 @@ describe("VirtualGridLinkList pagination", () => {
 
 		expect(driver.getSentinel()).not.toBeNull();
 		expect(
-			driver.getShadowRoot()?.querySelector(
-				".cosense-card-links__infinite-scroll-sentinel",
-			),
+			driver
+				.getShadowRoot()
+				?.querySelector(".cosense-card-links__infinite-scroll-sentinel"),
 		).toBeNull();
 	});
 

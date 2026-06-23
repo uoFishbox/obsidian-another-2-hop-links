@@ -46,10 +46,7 @@ import {
 	createVirtualizedItemVisibilityStateController,
 	resolveVirtualizedItemVisibilityForPreviewRange,
 } from "./virtualizedItemVisibilityState.svelte";
-import type {
-	RenderRevision,
-	RenderRevisionFallbackPolicy,
-} from "../renderRevision";
+import type { RenderRevision, RenderRevisionFallbackPolicy } from "../renderRevision";
 import type { VirtualNavigationTarget, VirtualRanges } from "../types";
 
 export interface FlatVirtualGridListProps<T> {
@@ -66,10 +63,7 @@ export interface FlatVirtualGridListProps<T> {
 	 */
 	keyRevision?: unknown;
 	itemRenderRevisionToken?: RenderRevision;
-	getItemRenderRevision?: (
-		item: T,
-		index: number,
-	) => RenderRevision | undefined;
+	getItemRenderRevision?: (item: T, index: number) => RenderRevision | undefined;
 	renderRevisionFallbackPolicy?: RenderRevisionFallbackPolicy;
 	header?: Snippet;
 	item?: Snippet<
@@ -91,9 +85,7 @@ export interface FlatVirtualGridListProps<T> {
 	className?: string;
 	paginationMode?: "button" | "infinite-scroll";
 	infiniteScrollRootMargin?: string;
-	onMountedCellsChange?: (
-		cells: readonly MountedVirtualGridCell<T>[],
-	) => void;
+	onMountedCellsChange?: (cells: readonly MountedVirtualGridCell<T>[]) => void;
 }
 
 const MAX_CHAINED_INFINITE_SCROLL_LOADS = 2;
@@ -113,10 +105,7 @@ type FlatMountedItemCell<T> = MountedVirtualGridCell<T> & {
 	readonly cell: Extract<VirtualListLogicalCell<T>, { kind: "item" }>;
 };
 
-const isSameLayout = (
-	current: VirtualGridLayout,
-	next: VirtualGridLayout,
-): boolean =>
+const isSameLayout = (current: VirtualGridLayout, next: VirtualGridLayout): boolean =>
 	current.containerWidth === next.containerWidth &&
 	current.columns === next.columns &&
 	current.cellWidth === next.cellWidth &&
@@ -145,12 +134,9 @@ export function useFlatVirtualGridList<T>(props: FlatVirtualGridListProps<T>) {
 		typeof window !== "undefined" && "IntersectionObserver" in window;
 	const lazyLoadManager = getLazyLoadManager();
 	const visibilityStates =
-		createVirtualizedItemVisibilityStateController<
-			MountedVirtualGridCell<T>
-		>();
-	let visibilityMountedRows:
-		| readonly MountedVirtualGridRowSlice<T>[]
-		| readonly [] = EMPTY_MOUNTED_ROWS;
+		createVirtualizedItemVisibilityStateController<MountedVirtualGridCell<T>>();
+	let visibilityMountedRows: readonly MountedVirtualGridRowSlice<T>[] | readonly [] =
+		EMPTY_MOUNTED_ROWS;
 	let visibilityMountedRange: RowRange = { start: 0, end: 0 };
 	let visibilityRowModel: object | null = null;
 	let visibilityPreviewRange: RowRange | null = null;
@@ -161,10 +147,7 @@ export function useFlatVirtualGridList<T>(props: FlatVirtualGridListProps<T>) {
 		nextPreviewRange: RowRange,
 		nextRowModel: object,
 	): void => {
-		if (
-			!visibilityPreviewRange ||
-			nextRowModel !== visibilityRowModel
-		) {
+		if (!visibilityPreviewRange || nextRowModel !== visibilityRowModel) {
 			visibilityStates.syncMountedRows({
 				mountedRows,
 				previewRange: nextPreviewRange,
@@ -230,9 +213,7 @@ export function useFlatVirtualGridList<T>(props: FlatVirtualGridListProps<T>) {
 	const shouldUseInfiniteScroll = $derived(
 		paginationMode === "infinite-scroll" && supportsIntersectionObserver,
 	);
-	const showLoadMoreButton = $derived(
-		canLoadMore && !shouldUseInfiniteScroll,
-	);
+	const showLoadMoreButton = $derived(canLoadMore && !shouldUseInfiniteScroll);
 	const flatGridModel = createFlatVirtualGridRuntimeModel<T>();
 	const dataSource = $derived(
 		flatGridModel.createDataSource({
@@ -279,8 +260,7 @@ export function useFlatVirtualGridList<T>(props: FlatVirtualGridListProps<T>) {
 				rowRange,
 				previousBuild,
 				previousCellsByKey,
-				renderRevisionFallbackPolicy:
-					props.renderRevisionFallbackPolicy,
+				renderRevisionFallbackPolicy: props.renderRevisionFallbackPolicy,
 				reusableRowSlotsScratch,
 			}),
 		onStableVisibleRange: () => {
@@ -290,8 +270,7 @@ export function useFlatVirtualGridList<T>(props: FlatVirtualGridListProps<T>) {
 		visibilityMetadataPolicy: { type: "caller-managed" },
 		onSnapshotUpdated: (snapshot, reconciliationState) => {
 			syncVisibilityStates(
-				reconciliationState.mountedBuild?.rowSlices ??
-					EMPTY_MOUNTED_ROWS,
+				reconciliationState.mountedBuild?.rowSlices ?? EMPTY_MOUNTED_ROWS,
 				snapshot.ranges.mounted,
 				snapshot.ranges.previewVisible,
 				snapshot.rowModel,
@@ -299,24 +278,17 @@ export function useFlatVirtualGridList<T>(props: FlatVirtualGridListProps<T>) {
 		},
 	});
 	const virtualListSnapshot = $derived(virtualList.getSnapshot());
-	const contentHeight = $derived(
-		virtualList.getTotalHeight(layout.contentHeight),
-	);
+	const contentHeight = $derived(virtualList.getTotalHeight(layout.contentHeight));
 	const mountedCells = $derived<readonly MountedVirtualGridCell<T>[]>(
 		virtualList.getMountedCells(),
 	);
-	const mountedRows = $derived.by<readonly MountedVirtualGridRowSlice<T>[]>(
-		() => {
-			const rowSlices =
-				virtualList.getReconciliationState().mountedBuild?.rowSlices;
-			return rowSlices && rowSlices.length > 0
-				? rowSlices
-				: EMPTY_MOUNTED_ROWS;
-		},
+	const mountedRows = $derived.by<readonly MountedVirtualGridRowSlice<T>[]>(() => {
+		const rowSlices = virtualList.getReconciliationState().mountedBuild?.rowSlices;
+		return rowSlices && rowSlices.length > 0 ? rowSlices : EMPTY_MOUNTED_ROWS;
+	});
+	const mountedCellsForChange = $derived<readonly MountedVirtualGridCell<T>[]>(
+		virtualList.getMountedCellsForChange(),
 	);
-	const mountedCellsForChange = $derived<
-		readonly MountedVirtualGridCell<T>[]
-	>(virtualList.getMountedCellsForChange());
 	let lastEmptyMountedCellsNotification: unknown = null;
 	const updateVirtualRangesFromMeasurement = (
 		scrollTop: number,
@@ -536,11 +508,7 @@ export function useFlatVirtualGridList<T>(props: FlatVirtualGridListProps<T>) {
 	};
 
 	const observeInfiniteScrollWhenReady = (): (() => void) | undefined => {
-		if (
-			!shouldUseInfiniteScroll ||
-			!canLoadMore ||
-			!infiniteScrollSentinelEl
-		) {
+		if (!shouldUseInfiniteScroll || !canLoadMore || !infiniteScrollSentinelEl) {
 			return;
 		}
 
@@ -597,8 +565,7 @@ export function useFlatVirtualGridList<T>(props: FlatVirtualGridListProps<T>) {
 
 			const preloadMetrics = getCurrentPreloadMetrics();
 			if (
-				chainedInfiniteScrollLoads <
-					MAX_CHAINED_INFINITE_SCROLL_LOADS &&
+				chainedInfiniteScrollLoads < MAX_CHAINED_INFINITE_SCROLL_LOADS &&
 				preloadMetrics &&
 				isContentBottomInPreloadRangeFromMetrics({
 					contentHeight: layout.contentHeight,
@@ -684,11 +651,8 @@ export function useFlatVirtualGridList<T>(props: FlatVirtualGridListProps<T>) {
 			columnIndex: number;
 		},
 	): VirtualNavigationTarget | null =>
-		rowModel.resolveNavigationTarget?.(
-			currentKey,
-			direction,
-			currentPosition,
-		) ?? null;
+		rowModel.resolveNavigationTarget?.(currentKey, direction, currentPosition) ??
+		null;
 
 	const createItemRenderArgs = (
 		mountedCell: MountedVirtualGridCell<T>,
@@ -698,8 +662,7 @@ export function useFlatVirtualGridList<T>(props: FlatVirtualGridListProps<T>) {
 		const visibilityState = visibilityStates.getOrCreateState(
 			itemCell,
 			untrack(() => {
-				const previewVisible =
-					virtualList.getSnapshot()?.ranges.previewVisible;
+				const previewVisible = virtualList.getSnapshot()?.ranges.previewVisible;
 				return previewVisible
 					? resolveVirtualizedItemVisibilityForPreviewRange(
 							itemCell.rowIndex,

@@ -129,10 +129,7 @@ describe("ShadowHoverControllerImpl", () => {
 				linktext: "note",
 				sourcePath: "note.md",
 			}));
-			const controller = new ShadowHoverControllerImpl(
-				{ launch },
-				resolveLink,
-			);
+			const controller = new ShadowHoverControllerImpl({ launch }, resolveLink);
 			const anchorEl = createAnchor();
 
 			controller.handleDelegatedEnter(
@@ -240,10 +237,7 @@ describe("ShadowHoverControllerImpl", () => {
 				linktext: "note",
 				sourcePath: "note.md",
 			}));
-			const controller = new ShadowHoverControllerImpl(
-				{ launch },
-				resolveLink,
-			);
+			const controller = new ShadowHoverControllerImpl({ launch }, resolveLink);
 			const firstAnchorEl = createAnchor(10);
 			const secondAnchorEl = createAnchor(80);
 

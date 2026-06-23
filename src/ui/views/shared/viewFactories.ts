@@ -38,10 +38,7 @@ export function createLinkContextForView(
 	if (!wrapForView) {
 		return baseLinkContext;
 	}
-	return createViewLinkContext(
-		baseLinkContext,
-		options?.closeView ?? (() => {}),
-	);
+	return createViewLinkContext(baseLinkContext, options?.closeView ?? (() => {}));
 }
 
 interface MountTwoHopLinksRootViewOptions {
@@ -56,9 +53,7 @@ interface MountTwoHopLinksRootViewOptions {
 	updateSetting?: <K extends string>(key: K, value: unknown) => Promise<void>;
 }
 
-export function mountTwoHopLinksRootView(
-	options: MountTwoHopLinksRootViewOptions,
-): {
+export function mountTwoHopLinksRootView(options: MountTwoHopLinksRootViewOptions): {
 	component: SvelteComponentInstance;
 	applicationStore: ApplicationStore;
 } {
@@ -74,8 +69,7 @@ export function mountTwoHopLinksRootView(
 		updateSetting,
 	} = options;
 	const applicationStore =
-		getApplicationStore?.() ??
-		createDefaultApplicationStore(plugin, settings);
+		getApplicationStore?.() ?? createDefaultApplicationStore(plugin, settings);
 	applicationStore.setSettings(settings);
 	const linkContext = createLinkContextForView(plugin, file, settings, {
 		wrapForView,

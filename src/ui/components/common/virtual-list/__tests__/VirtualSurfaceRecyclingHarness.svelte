@@ -53,9 +53,7 @@
 	{contentHeight}
 	{rowHeight}
 	{layoutMode}
-	interactionDescriptorScopeId={interactionId
-		? "recycling-test-items"
-		: undefined}
+	interactionDescriptorScopeId={interactionId ? "recycling-test-items" : undefined}
 	{interactionDescriptorResolvers}
 	getCellPosition={(cell) => ({
 		top: cell.top,

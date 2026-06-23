@@ -14,9 +14,7 @@ function resolveSectionContextClassName(host: HTMLElement): string {
 		classNames.add(className);
 	}
 
-	const sectionHost = host.closest<HTMLElement>(
-		".cosense-card-links__section",
-	);
+	const sectionHost = host.closest<HTMLElement>(".cosense-card-links__section");
 	if (sectionHost) {
 		for (const className of Array.from(sectionHost.classList)) {
 			classNames.add(className);
@@ -26,10 +24,7 @@ function resolveSectionContextClassName(host: HTMLElement): string {
 	return Array.from(classNames).join(" ");
 }
 
-function syncSurfaceClassName(
-	host: HTMLElement,
-	surfaceEl: HTMLDivElement,
-): void {
+function syncSurfaceClassName(host: HTMLElement, surfaceEl: HTMLDivElement): void {
 	const nextClassName = resolveSectionContextClassName(host);
 	if (surfaceEl.className !== nextClassName) {
 		surfaceEl.className = nextClassName;

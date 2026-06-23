@@ -65,9 +65,7 @@ export class TagIndexStore {
 
 		for (const change of changes) {
 			if (change.type === "rename") {
-				const newPathIsMd = change.newPath
-					.toLowerCase()
-					.endsWith(".md");
+				const newPathIsMd = change.newPath.toLowerCase().endsWith(".md");
 				const previousTags = this.tagIndex.fileEntries.get(
 					change.oldPath,
 				)?.tags;
@@ -78,10 +76,7 @@ export class TagIndexStore {
 				);
 				if (movedTags) {
 					if (!newPathIsMd) {
-						removeFileTagsFromTagIndex(
-							this.tagIndex,
-							change.newPath,
-						);
+						removeFileTagsFromTagIndex(this.tagIndex, change.newPath);
 						collectExpandedTagNames(affectedTags, movedTags);
 						affectedTagSourcePaths.add(change.oldPath);
 					} else {
@@ -94,10 +89,7 @@ export class TagIndexStore {
 					if (file && newPathIsMd) {
 						const cache = this.metadataCache.getFileCache(file);
 						const tags = extractTags(cache);
-						const tagSetChanged = hasTagSetChanged(
-							previousTags,
-							tags,
-						);
+						const tagSetChanged = hasTagSetChanged(previousTags, tags);
 						if (tagSetChanged) {
 							collectExpandedTagNames(affectedTags, previousTags);
 							collectExpandedTagNames(affectedTags, tags);
@@ -111,9 +103,7 @@ export class TagIndexStore {
 					}
 				}
 			} else {
-				const previousTags = this.tagIndex.fileEntries.get(
-					change.path,
-				)?.tags;
+				const previousTags = this.tagIndex.fileEntries.get(change.path)?.tags;
 
 				if (change.type === "delete") {
 					removeFileTagsFromTagIndex(this.tagIndex, change.path);
@@ -127,19 +117,12 @@ export class TagIndexStore {
 					if (file && pathIsMd) {
 						const cache = this.metadataCache.getFileCache(file);
 						const tags = extractTags(cache);
-						const tagSetChanged = hasTagSetChanged(
-							previousTags,
-							tags,
-						);
+						const tagSetChanged = hasTagSetChanged(previousTags, tags);
 						if (tagSetChanged) {
 							collectExpandedTagNames(affectedTags, previousTags);
 							collectExpandedTagNames(affectedTags, tags);
 							affectedTagSourcePaths.add(change.path);
-							replaceFileTagsInTagIndex(
-								this.tagIndex,
-								change.path,
-								tags,
-							);
+							replaceFileTagsInTagIndex(this.tagIndex, change.path, tags);
 						}
 					}
 				}
@@ -155,8 +138,7 @@ export class TagIndexStore {
 		return {
 			affectedTags,
 			affectedTagSourcePaths,
-			tagIndexChanged:
-				affectedTags.size > 0 || affectedTagSourcePaths.size > 0,
+			tagIndexChanged: affectedTags.size > 0 || affectedTagSourcePaths.size > 0,
 		};
 	}
 }

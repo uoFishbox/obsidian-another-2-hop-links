@@ -104,9 +104,7 @@ export function useWorkerSearchSession(
 
 	let workerDataset = $derived.by(buildWorkerDataset);
 	let matchedKeySet = $state<Set<string> | null>(null);
-	let matchedItemByKey = $state<Map<string, SearchWorkerMatchedItem> | null>(
-		null,
-	);
+	let matchedItemByKey = $state<Map<string, SearchWorkerMatchedItem> | null>(null);
 	let ripgrepPositionByPath = $state<Map<string, Pos>>(
 		EMPTY_RIPGREP_POSITION_BY_PATH,
 	);
@@ -139,9 +137,7 @@ export function useWorkerSearchSession(
 		let matchedItems = message.matchedItems;
 		if (!matchedItems) {
 			const matchedKeys = message.matchedKeys ?? [];
-			matchedItems = new Array<SearchWorkerMatchedItem>(
-				matchedKeys.length,
-			);
+			matchedItems = new Array<SearchWorkerMatchedItem>(matchedKeys.length);
 			for (let index = 0; index < matchedKeys.length; index += 1) {
 				matchedItems[index] = {
 					key: matchedKeys[index],
@@ -151,10 +147,7 @@ export function useWorkerSearchSession(
 			}
 		}
 		const nextMatchedKeySet = new Set<string>();
-		const nextMatchedItemByKey = new Map<
-			string,
-			SearchWorkerMatchedItem
-		>();
+		const nextMatchedItemByKey = new Map<string, SearchWorkerMatchedItem>();
 		for (const item of matchedItems) {
 			nextMatchedKeySet.add(item.key);
 			nextMatchedItemByKey.set(item.key, item);
@@ -216,9 +209,7 @@ export function useWorkerSearchSession(
 		}
 
 		const normalizedQuery =
-			sessionEnabled && currentMatchScope === "title-and-content"
-				? query()
-				: "";
+			sessionEnabled && currentMatchScope === "title-and-content" ? query() : "";
 		if (normalizedQuery === lastProgressiveQuerySignature) {
 			return;
 		}
@@ -304,8 +295,7 @@ export function useWorkerSearchSession(
 			});
 		}
 		if (contentDiff.changed) {
-			lastSyncedFileContentsByPath =
-				contentDiff.nextEntriesByPath ?? new Map();
+			lastSyncedFileContentsByPath = contentDiff.nextEntriesByPath ?? new Map();
 		}
 	});
 
@@ -358,7 +348,8 @@ export function useWorkerSearchSession(
 			void (async () => {
 				try {
 					const nextWorkerDataset = workerDataset;
-				const targetFilePaths = collectUniqueTargetFilePaths(nextWorkerDataset);
+					const targetFilePaths =
+						collectUniqueTargetFilePaths(nextWorkerDataset);
 					const ripgrepResult = await searchRipgrepContentByTerm(
 						app,
 						normalizedQuery,

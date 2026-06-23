@@ -43,9 +43,7 @@ vi.mock("features/preview/utils/previewUtils", () => ({
 	analyzePreviewContent: state.analyzePreviewContent,
 }));
 
-function createSettings(
-	overrides: Partial<PluginSettings> = {},
-): PluginSettings {
+function createSettings(overrides: Partial<PluginSettings> = {}): PluginSettings {
 	return {
 		...DEFAULT_SETTINGS,
 		...overrides,
@@ -84,8 +82,7 @@ describe("cardPreviewSharedCache search context", () => {
 
 		state.findCaseInsensitiveIndex.mockReset();
 		state.findCaseInsensitiveIndex.mockImplementation(
-			(content: string, query: string) =>
-				content.toLowerCase().indexOf(query),
+			(content: string, query: string) => content.toLowerCase().indexOf(query),
 		);
 
 		state.getFileContent.mockReset();

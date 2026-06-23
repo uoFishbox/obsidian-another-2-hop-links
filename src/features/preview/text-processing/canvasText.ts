@@ -31,8 +31,7 @@ function pickCanvasEntry(n: unknown): CanvasEntry | null {
 			id,
 			type,
 			value: cleanCanvasText(
-				node.file +
-					(typeof node.subpath === "string" ? node.subpath : ""),
+				node.file + (typeof node.subpath === "string" ? node.subpath : ""),
 			),
 		};
 	if (type === "link" && typeof node.url === "string")
@@ -47,11 +46,8 @@ export function canvasToSearchText(input: string | unknown): {
 	entries: CanvasEntry[];
 	searchableText: string;
 } {
-	const data: unknown =
-		typeof input === "string" ? safeJsonParse(input) : input;
-	const nodes: unknown[] = Array.isArray(
-		(data as Record<string, unknown>)?.nodes,
-	)
+	const data: unknown = typeof input === "string" ? safeJsonParse(input) : input;
+	const nodes: unknown[] = Array.isArray((data as Record<string, unknown>)?.nodes)
 		? ((data as Record<string, unknown>).nodes as unknown[])
 		: [];
 

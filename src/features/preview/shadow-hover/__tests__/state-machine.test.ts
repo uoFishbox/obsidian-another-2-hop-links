@@ -88,10 +88,9 @@ describe("transitionHoverSession", () => {
 	});
 
 	it("does not leave destroyed state", () => {
-		const destroyed = transitionHoverSession(
-			createInitialHoverSessionState(),
-			{ type: "destroy" },
-		);
+		const destroyed = transitionHoverSession(createInitialHoverSessionState(), {
+			type: "destroy",
+		});
 		const next = transitionHoverSession(destroyed, {
 			type: "anchor-sync",
 			anchor: createAnchor(),

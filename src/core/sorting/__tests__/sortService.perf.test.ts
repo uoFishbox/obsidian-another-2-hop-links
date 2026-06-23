@@ -164,25 +164,15 @@ describe("SortService Performance", () => {
 			sortService.sort([tiedLeft, tiedRight, unique], "file-size");
 
 			expect(mockMetricProvider.getDisplayName).toHaveBeenCalledTimes(2);
-			expect(mockMetricProvider.getDisplayName).toHaveBeenCalledWith(
-				tiedLeft,
-			);
-			expect(mockMetricProvider.getDisplayName).toHaveBeenCalledWith(
-				tiedRight,
-			);
-			expect(mockMetricProvider.getDisplayName).not.toHaveBeenCalledWith(
-				unique,
-			);
+			expect(mockMetricProvider.getDisplayName).toHaveBeenCalledWith(tiedLeft);
+			expect(mockMetricProvider.getDisplayName).toHaveBeenCalledWith(tiedRight);
+			expect(mockMetricProvider.getDisplayName).not.toHaveBeenCalledWith(unique);
 		});
 	});
 
 	describe("memoization", () => {
 		test("reuses metric cache for consecutive sorts of same items", () => {
-			const items = [
-				createBranch("C"),
-				createBranch("A"),
-				createBranch("B"),
-			];
+			const items = [createBranch("C"), createBranch("A"), createBranch("B")];
 
 			sortService.sort(items, "alphabetical");
 			sortService.sort(items, "alphabetical");
@@ -191,18 +181,12 @@ describe("SortService Performance", () => {
 		});
 
 		test("reuses per-file cache for different items referencing same target file", () => {
-			const items = [
-				createBranch("C"),
-				createBranch("A"),
-				createBranch("B"),
-			];
+			const items = [createBranch("C"), createBranch("A"), createBranch("B")];
 			items.forEach((item) => {
 				item.hop1.path = "shared.md";
 			});
 			const sharedFileIdentity = {};
-			mockMetricProvider.getMetricCacheIdentity = vi.fn(
-				() => sharedFileIdentity,
-			);
+			mockMetricProvider.getMetricCacheIdentity = vi.fn(() => sharedFileIdentity);
 
 			sortService.invalidateCache();
 			sortService.sort(items, "backlink-count");
@@ -212,11 +196,7 @@ describe("SortService Performance", () => {
 		});
 
 		test("recomputes metrics after invalidateCache", () => {
-			const items = [
-				createBranch("C"),
-				createBranch("A"),
-				createBranch("B"),
-			];
+			const items = [createBranch("C"), createBranch("A"), createBranch("B")];
 
 			sortService.sort(items, "alphabetical");
 			sortService.invalidateCache();

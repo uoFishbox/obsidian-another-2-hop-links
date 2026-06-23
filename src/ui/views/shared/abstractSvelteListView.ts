@@ -60,12 +60,11 @@ export abstract class AbstractSvelteListView<
 	private previewRefreshTokens: Record<string, number> = {};
 	private unsubscribeFromIndex: (() => void) | undefined = undefined;
 
-	private readonly guardedIndexUpdateHandler =
-		createGuardedIndexUpdateHandler({
-			isReady: () => this.isViewReady(),
-			shouldRefresh: (context) => this.shouldRefreshForContext(context),
-			refresh: (context) => this.refreshItemsForContext(context),
-		});
+	private readonly guardedIndexUpdateHandler = createGuardedIndexUpdateHandler({
+		isReady: () => this.isViewReady(),
+		shouldRefresh: (context) => this.shouldRefreshForContext(context),
+		refresh: (context) => this.refreshItemsForContext(context),
+	});
 
 	constructor(
 		leaf: WorkspaceLeaf,
@@ -140,9 +139,7 @@ export abstract class AbstractSvelteListView<
 		this.applyItemsDiff(this.getItems(), context);
 	}
 
-	protected getChangedKeys(
-		context?: DataUpdateContext,
-	): Set<string> | undefined {
+	protected getChangedKeys(context?: DataUpdateContext): Set<string> | undefined {
 		const affectedPaths = context?.affectedPaths;
 		if (!affectedPaths || affectedPaths.length === 0) {
 			return undefined;
@@ -187,25 +184,18 @@ export abstract class AbstractSvelteListView<
 		}) as ListHostComponent;
 	}
 
-	protected applyItemsDiff(
-		nextItems: TItem[],
-		context?: DataUpdateContext,
-	): void {
+	protected applyItemsDiff(nextItems: TItem[], context?: DataUpdateContext): void {
 		if (!this.listHostComponent) {
 			return;
 		}
 
 		const previousItems = this.currentItems;
 		const changedKeys = this.getChangedKeys(context);
-		const mergedItems = mergeItemsPreservingUnchanged(
-			previousItems,
-			nextItems,
-			{
-				getKey: (item) => this.getItemKey(item),
-				getVersion: (item) => this.getItemVersion(item),
-				changedKeys,
-			},
-		);
+		const mergedItems = mergeItemsPreservingUnchanged(previousItems, nextItems, {
+			getKey: (item) => this.getItemKey(item),
+			getVersion: (item) => this.getItemVersion(item),
+			changedKeys,
+		});
 
 		if (hasSameItemReferences(this.currentItems, mergedItems)) {
 			return;
@@ -222,10 +212,7 @@ export abstract class AbstractSvelteListView<
 		this.applicationStore?.triggerUpdate?.();
 	}
 
-	private getReplacedItemKeys(
-		previousItems: TItem[],
-		nextItems: TItem[],
-	): string[] {
+	private getReplacedItemKeys(previousItems: TItem[], nextItems: TItem[]): string[] {
 		const previousByKey = new Map<string, TItem>();
 		for (const item of previousItems) {
 			previousByKey.set(this.getItemKey(item), item);
@@ -267,9 +254,7 @@ export abstract class AbstractSvelteListView<
 
 	protected abstract render(): void;
 	protected abstract getItems(): TItem[];
-	protected abstract shouldRefreshForContext(
-		context?: DataUpdateContext,
-	): boolean;
+	protected abstract shouldRefreshForContext(context?: DataUpdateContext): boolean;
 	protected abstract getItemKey(item: TItem): string;
 	protected abstract getItemVersion(item: TItem): number | string;
 	protected abstract getListHostComponent(): Component<any>;

@@ -1,8 +1,5 @@
 import { describe, expect, test, vi } from "vitest";
-import {
-	extractTags,
-	collectLinkReferences,
-} from "../metadata/metadataExtractor";
+import { extractTags, collectLinkReferences } from "../metadata/metadataExtractor";
 import type { CachedMetadataWithLinkReferences } from "types/domain";
 import type { CachedMetadata } from "obsidian";
 
@@ -31,13 +28,15 @@ describe("extractTags", () => {
 
 	test("returns shared empty array when a single body tag normalizes to empty", () => {
 		const cache = {
-			tags: [{
-				tag: "#",
-				position: {
-					start: { line: 0, col: 0, offset: 0 },
-					end: { line: 0, col: 1, offset: 1 },
+			tags: [
+				{
+					tag: "#",
+					position: {
+						start: { line: 0, col: 0, offset: 0 },
+						end: { line: 0, col: 1, offset: 1 },
+					},
 				},
-			}],
+			],
 		} as unknown as CachedMetadata;
 
 		expect(extractTags(cache)).toBe(extractTags(null));

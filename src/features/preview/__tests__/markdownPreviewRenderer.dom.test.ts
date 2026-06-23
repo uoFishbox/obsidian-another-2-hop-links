@@ -58,13 +58,7 @@ describe("processPreviewContent DOM rendering", () => {
 
 	test("renders math through Obsidian math APIs", async () => {
 		const content = "Inline $x^2$ and block $$y^2$$";
-		await processPreviewContent(
-			containerEl,
-			content,
-			mockApp,
-			"",
-			mockComponent,
-		);
+		await processPreviewContent(containerEl, content, mockApp, "", mockComponent);
 
 		expect(renderMath).toHaveBeenCalledWith("x^2", false);
 		expect(renderMath).toHaveBeenCalledWith("y^2", true);
@@ -78,14 +72,9 @@ describe("processPreviewContent DOM rendering", () => {
 	test("renders preview content without math APIs when math rendering is disabled", async () => {
 		const content = "Text before $$\\frac{1}{2} + target$$ text after";
 
-		await processPreviewContent(
-			containerEl,
-			content,
-			mockApp,
-			"",
-			mockComponent,
-			{ enableMathRendering: false },
-		);
+		await processPreviewContent(containerEl, content, mockApp, "", mockComponent, {
+			enableMathRendering: false,
+		});
 
 		expect(renderMath).not.toHaveBeenCalled();
 		expect(containerEl.textContent).toContain("$$\\frac{1}{2} + target$$");

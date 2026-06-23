@@ -53,8 +53,7 @@
 				sourcePath: context.sourceFile.path,
 				fileToLinktext: context.fileToLinktext,
 				getMetadata: context.getMetadata,
-				priorityFrontmatterKeyForTitle:
-					settings.priorityFrontmatterKeyForTitle,
+				priorityFrontmatterKeyForTitle: settings.priorityFrontmatterKeyForTitle,
 			});
 		}
 
@@ -82,9 +81,7 @@
 	const extension = $derived(targetFile?.extension ?? null);
 	const directory = $derived(targetFile?.parent?.path ?? null);
 	const interactionKey = $derived(
-		item
-			? (providedInteractionKey ?? createItemInteractionKey(item))
-			: undefined,
+		item ? (providedInteractionKey ?? createItemInteractionKey(item)) : undefined,
 	);
 	const interactionId = $derived.by(() => {
 		if (!interactionKey) return providedInteractionId;
@@ -94,17 +91,13 @@
 			interactionKey
 		);
 	});
-	const interactionDescriptor = $derived.by(
-		(): ItemInteractionDescriptor | null =>
-			item && interactionId && interactionKey
-				? createItemInteractionDescriptor(
-						item,
-						settings,
-						searchQuery,
-						context,
-						{ interactionId, interactionKey },
-					)
-				: null,
+	const interactionDescriptor = $derived.by((): ItemInteractionDescriptor | null =>
+		item && interactionId && interactionKey
+			? createItemInteractionDescriptor(item, settings, searchQuery, context, {
+					interactionId,
+					interactionKey,
+				})
+			: null,
 	);
 
 	function registerInteractionDescriptor(): (() => void) | undefined {

@@ -113,10 +113,7 @@ export default class CosenseCardLinksPlugin extends Plugin implements PluginHost
 	private linkStatusService!: LinkStatusService;
 	private stylingService!: StylingService;
 	private propertyWidgetStyler!: PropertyWidgetStyler;
-	private linkContextFactory!: (
-		file: TFile,
-		settings: PluginSettings,
-	) => LinkContext;
+	private linkContextFactory!: (file: TFile, settings: PluginSettings) => LinkContext;
 
 	public readonly forceRedrawEffect = forceRedrawEffect;
 	private sortContextVersion = 0;
@@ -129,9 +126,7 @@ export default class CosenseCardLinksPlugin extends Plugin implements PluginHost
 		try {
 			await this.settingsManager.load();
 		} catch (error) {
-			console.error(
-				"設定の初期化に失敗しました。デフォルト設定を使用します。",
-			);
+			console.error("設定の初期化に失敗しました。デフォルト設定を使用します。");
 		}
 
 		setEnableLogging(this.settings.enableLogging);
@@ -210,9 +205,7 @@ export default class CosenseCardLinksPlugin extends Plugin implements PluginHost
 			sortService: this.sortService,
 			createDeduplicationService: (settings: PluginSettings) => {
 				const dedupeEnabled = settings?.dedupeCards ?? true;
-				return dedupeEnabled
-					? createDeduplicationService()
-					: undefined;
+				return dedupeEnabled ? createDeduplicationService() : undefined;
 			},
 			getSortContextVersion: () => this.getSortContextVersion(),
 		});
@@ -227,9 +220,7 @@ export default class CosenseCardLinksPlugin extends Plugin implements PluginHost
 	}
 
 	private updateSidebarView(file: TFile): void {
-		const leaves = this.app.workspace.getLeavesOfType(
-			TWO_HOP_LINKS_VIEW_TYPE,
-		);
+		const leaves = this.app.workspace.getLeavesOfType(TWO_HOP_LINKS_VIEW_TYPE);
 		leaves.forEach((leaf) => {
 			if (leaf.view instanceof TwoHopLinksView) {
 				leaf.view.renderForFile(file);
@@ -338,17 +329,13 @@ export default class CosenseCardLinksPlugin extends Plugin implements PluginHost
 		this.stylingService = createStylingService(this.linkStatusService);
 
 		// PropertyWidgetStylerをStylingServiceの直後に初期化
-		this.propertyWidgetStyler = createPropertyWidgetStyler(
-			this.stylingService,
-		);
+		this.propertyWidgetStyler = createPropertyWidgetStyler(this.stylingService);
 
 		this.renderedMdElementsRegistry = new RenderedMdElementsRegistry(
 			this.stylingService,
 		);
 
-		this.workspaceViewQueries = createWorkspaceViewQueries(
-			this.app.workspace,
-		);
+		this.workspaceViewQueries = createWorkspaceViewQueries(this.app.workspace);
 
 		this.linkContextFactory = createLinkContextFactory(
 			this.app.metadataCache,
@@ -368,11 +355,9 @@ export default class CosenseCardLinksPlugin extends Plugin implements PluginHost
 			() => this.settingsManager.getSnapshot(),
 			this.indexingService,
 			(option: SortOption) => {
-				void this.updateSetting("lastUsedSortOption", option).catch(
-					(error) => {
-						console.error("設定の更新に失敗しました:", error);
-					},
-				);
+				void this.updateSetting("lastUsedSortOption", option).catch((error) => {
+					console.error("設定の更新に失敗しました:", error);
+				});
 			},
 			(enabled: boolean) => {
 				void this.updateSetting("enableContentSearch", enabled).catch(
@@ -383,15 +368,9 @@ export default class CosenseCardLinksPlugin extends Plugin implements PluginHost
 			},
 		);
 
-		this.domMutationObserver = new DOMMutationObserver(
-			this,
-			this.stylingService,
-		);
+		this.domMutationObserver = new DOMMutationObserver(this, this.stylingService);
 
-		this.indexUpdateQueue = new IndexUpdateQueue(
-			this,
-			this.indexingService,
-		);
+		this.indexUpdateQueue = new IndexUpdateQueue(this, this.indexingService);
 
 		this.displayModeManager = new DisplayModeController(
 			this.app,
@@ -450,10 +429,7 @@ export default class CosenseCardLinksPlugin extends Plugin implements PluginHost
 		options: { immediate?: boolean } = {},
 	): Promise<void> {
 		const updatePromise = this.settingsManager.update(key, value, options);
-		this.sideEffectController.apply(
-			[key],
-			this.settingsManager.getSnapshot(),
-		);
+		this.sideEffectController.apply([key], this.settingsManager.getSnapshot());
 		await updatePromise;
 	}
 
@@ -461,10 +437,7 @@ export default class CosenseCardLinksPlugin extends Plugin implements PluginHost
 		updates: Partial<PluginSettings>,
 		options: { immediate?: boolean } = {},
 	): Promise<void> {
-		const updatePromise = this.settingsManager.updateBatch(
-			updates,
-			options,
-		);
+		const updatePromise = this.settingsManager.updateBatch(updates, options);
 		this.sideEffectController.apply(
 			Object.keys(updates) as Array<keyof PluginSettings>,
 			this.settingsManager.getSnapshot(),
@@ -480,10 +453,7 @@ export default class CosenseCardLinksPlugin extends Plugin implements PluginHost
 		return this.twoHopLinkResolver.resolve(file, onProgress, options);
 	}
 
-	public processUnresolvedLinksInElement(
-		el: HTMLElement,
-		sourcePath: string,
-	): void {
+	public processUnresolvedLinksInElement(el: HTMLElement, sourcePath: string): void {
 		this.stylingService.decorateLinksInContainer(el, sourcePath);
 	}
 

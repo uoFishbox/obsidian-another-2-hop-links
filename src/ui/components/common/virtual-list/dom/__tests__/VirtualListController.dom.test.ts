@@ -347,8 +347,7 @@ describe("createVirtualListController initial stabilization", () => {
 
 	it("schedules post-paint stabilization after observeRoot", () => {
 		const rootEl = document.createElement("div");
-		const { controller, resolveLayoutMeasurement } =
-			createStableController(rootEl);
+		const { controller, resolveLayoutMeasurement } = createStableController(rootEl);
 		const runWithoutTracking = vi.fn((cb) => cb());
 
 		const cleanup = controller.observeRoot(rootEl, runWithoutTracking);
@@ -375,16 +374,14 @@ describe("createVirtualListController initial stabilization", () => {
 
 	it("does not schedule additional passes when already completed", async () => {
 		const rootEl = document.createElement("div");
-		const { controller, resolveLayoutMeasurement } =
-			createStableController(rootEl);
+		const { controller, resolveLayoutMeasurement } = createStableController(rootEl);
 		const runWithoutTracking = vi.fn((cb) => cb());
 
 		const cleanup = controller.observeRoot(rootEl, runWithoutTracking);
 
 		await vi.runAllTimersAsync();
 
-		const callCountAfterStabilization =
-			resolveLayoutMeasurement.mock.calls.length;
+		const callCountAfterStabilization = resolveLayoutMeasurement.mock.calls.length;
 
 		await vi.runAllTimersAsync();
 
@@ -397,8 +394,7 @@ describe("createVirtualListController initial stabilization", () => {
 
 	it("cancels stabilization on cleanup before post-paint pass", async () => {
 		const rootEl = document.createElement("div");
-		const { controller, resolveLayoutMeasurement } =
-			createStableController(rootEl);
+		const { controller, resolveLayoutMeasurement } = createStableController(rootEl);
 		const runWithoutTracking = vi.fn((cb) => cb());
 
 		const cleanup = controller.observeRoot(rootEl, runWithoutTracking);

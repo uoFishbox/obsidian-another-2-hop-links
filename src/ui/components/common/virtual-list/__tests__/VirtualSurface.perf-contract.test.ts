@@ -6,11 +6,7 @@ import {
 	teardownAnimationFrameMock,
 } from "testing/helpers/DOMObserverMock";
 import VirtualSurfaceRecyclingHarness from "./VirtualSurfaceRecyclingHarness.svelte";
-import type {
-	MountedVirtualCell,
-	LogicalCellKey,
-	RenderSlotKey,
-} from "../types";
+import type { MountedVirtualCell, LogicalCellKey, RenderSlotKey } from "../types";
 
 interface TestMountedCell extends MountedVirtualCell {
 	columnIndex: number;
@@ -20,10 +16,7 @@ interface TestMountedCell extends MountedVirtualCell {
 	height: number;
 }
 
-function createCells(
-	keys: string[],
-	slotOffset: number = 0,
-): TestMountedCell[] {
+function createCells(keys: string[], slotOffset: number = 0): TestMountedCell[] {
 	return keys.map((key, index) => ({
 		key: key as LogicalCellKey,
 		renderSlotKey: (slotOffset + index) as RenderSlotKey,
@@ -69,16 +62,13 @@ describe("VirtualSurface performance contracts", () => {
 
 	it("reuses DOM nodes when render slots are reassigned to different logical keys", async () => {
 		const cells1 = createCells(["A", "B"]);
-		const { container, rerender } = render(
-			VirtualSurfaceRecyclingHarness,
-			{
-				props: {
-					mountedCells: cells1,
-					contentHeight: 100,
-					rowHeight: 50,
-				},
+		const { container, rerender } = render(VirtualSurfaceRecyclingHarness, {
+			props: {
+				mountedCells: cells1,
+				contentHeight: 100,
+				rowHeight: 50,
 			},
-		);
+		});
 		await flushFrames();
 
 		const host = container.querySelector(
@@ -94,8 +84,7 @@ describe("VirtualSurface performance contracts", () => {
 
 		await waitFor(() => {
 			expect(
-				shadowRoot.querySelectorAll('[data-testid="probe-cell"]')
-					.length,
+				shadowRoot.querySelectorAll('[data-testid="probe-cell"]').length,
 			).toBe(2);
 		});
 
@@ -186,16 +175,13 @@ describe("VirtualSurface performance contracts", () => {
 		// The engine contract mounts five visible rows plus four overscan rows.
 		const mountedRows = 9;
 		const mountedCells = createMountedGridCells(mountedRows, columns);
-		const { container, rerender } = render(
-			VirtualSurfaceRecyclingHarness,
-			{
-				props: {
-					mountedCells,
-					contentHeight: Math.ceil(cardCounts[0] / columns) * 50,
-					rowHeight: 50,
-				},
+		const { container, rerender } = render(VirtualSurfaceRecyclingHarness, {
+			props: {
+				mountedCells,
+				contentHeight: Math.ceil(cardCounts[0] / columns) * 50,
+				rowHeight: 50,
 			},
-		);
+		});
 		await flushFrames();
 
 		const host = container.querySelector(

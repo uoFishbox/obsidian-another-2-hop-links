@@ -52,11 +52,7 @@ function takeReusableEntry<T>(
 			continue;
 		}
 
-		for (
-			let shiftIndex = index + 1;
-			shiftIndex < entries.length;
-			shiftIndex += 1
-		) {
+		for (let shiftIndex = index + 1; shiftIndex < entries.length; shiftIndex += 1) {
 			entries[shiftIndex - 1] = entries[shiftIndex];
 		}
 		entries.pop();
@@ -66,8 +62,7 @@ function takeReusableEntry<T>(
 	return undefined;
 }
 
-const hasSameReference = <T>(current: T, next: T): boolean =>
-	current === next;
+const hasSameReference = <T>(current: T, next: T): boolean => current === next;
 
 const hasSameArrayContents = (
 	nextKeys: readonly string[],
@@ -79,10 +74,7 @@ const hasSameArrayContents = (
 	sameArrayBy(nextItems, previousItems, hasSameReference);
 
 const isViewItem = (item: unknown): item is ViewItem =>
-	typeof item === "object" &&
-	item !== null &&
-	"type" in item &&
-	"data" in item;
+	typeof item === "object" && item !== null && "type" in item && "data" in item;
 
 function refreshViewItemData<T>(
 	previousViewItem: ViewItem,
@@ -133,17 +125,15 @@ export function createStableViewItemReconciler<T>(
 					item,
 					options,
 				);
-				const baseViewItem =
-					previousEntry
-						? refreshViewItemData(
-								previousEntry.viewItem,
-								previousEntry.source,
-								item,
-								options,
-							)
-						: options.toViewItem(item);
-				const nextEntriesForKey =
-					nextEntriesByBaseKey.get(baseKey) ?? [];
+				const baseViewItem = previousEntry
+					? refreshViewItemData(
+							previousEntry.viewItem,
+							previousEntry.source,
+							item,
+							options,
+						)
+					: options.toViewItem(item);
+				const nextEntriesForKey = nextEntriesByBaseKey.get(baseKey) ?? [];
 
 				nextKeys[index] = baseKey;
 				nextArray[index] = baseViewItem;

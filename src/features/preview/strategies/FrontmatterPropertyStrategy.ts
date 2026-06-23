@@ -11,7 +11,7 @@ export function createFrontmatterPropertyStrategy(): PreviewStrategy {
 			// Markdownファイルで、設定でプロパティキーが指定されている場合のみ処理
 			if (file.extension !== "md") return false;
 			if (!context?.settings?.priorityFrontmatterKeyForPreview) return false;
-			
+
 			const key = context.settings.priorityFrontmatterKeyForPreview.trim();
 			if (!key) return false;
 

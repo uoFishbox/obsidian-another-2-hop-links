@@ -24,10 +24,7 @@ interface NormalizedCodeBlockTypes {
 	set: ReadonlySet<string>;
 }
 
-const NORMALIZED_CODE_BLOCK_TYPES_CACHE = new Map<
-	string,
-	NormalizedCodeBlockTypes
->();
+const NORMALIZED_CODE_BLOCK_TYPES_CACHE = new Map<string, NormalizedCodeBlockTypes>();
 const NORMALIZED_CODE_BLOCK_TYPES_WEAK_CACHE = new WeakMap<
 	readonly string[],
 	NormalizedCodeBlockTypes
@@ -40,9 +37,7 @@ export function getNormalizedCodeBlockTypes(
 		return undefined;
 	}
 
-	const weakCached = NORMALIZED_CODE_BLOCK_TYPES_WEAK_CACHE.get(
-		renderCodeBlockTypes,
-	);
+	const weakCached = NORMALIZED_CODE_BLOCK_TYPES_WEAK_CACHE.get(renderCodeBlockTypes);
 	if (weakCached) {
 		return weakCached;
 	}
@@ -133,9 +128,7 @@ export function transformContentForPreview(
 	const preserveHeadings =
 		options?.preserveHeadings ?? strategy.defaultPreserveHeadings;
 
-	const allowedBlockTypes = getAllowedBlockTypes(
-		settings?.renderCodeBlockTypes,
-	);
+	const allowedBlockTypes = getAllowedBlockTypes(settings?.renderCodeBlockTypes);
 	const protectedSegments = tokeniseProtectedSegments(
 		transformedContent,
 		allowedBlockTypes,
@@ -151,19 +144,13 @@ export function transformContentForPreview(
 		if (skipIfAbsent && skipIfAbsent(transformedContent)) {
 			continue;
 		}
-		transformedContent = transformedContent.replace(
-			regex,
-			replacement as any,
-		);
+		transformedContent = transformedContent.replace(regex, replacement as any);
 	}
 
 	const restoredContent =
 		protectedSegments.segments.length === 0
 			? transformedContent
-			: restoreProtectedSegments(
-					transformedContent,
-					protectedSegments.segments,
-				);
+			: restoreProtectedSegments(transformedContent, protectedSegments.segments);
 
 	return restoredContent.trim();
 }

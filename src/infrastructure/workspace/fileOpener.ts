@@ -27,8 +27,7 @@ function getPropertyFocusCandidates(rawKey: string): string[] {
 	pushUnique(rawKey);
 
 	const hasIndexNotation =
-		/\[\d+\]/.test(rawKey) ||
-		rawKey.split(".").some((seg) => /^\d+$/.test(seg));
+		/\[\d+\]/.test(rawKey) || rawKey.split(".").some((seg) => /^\d+$/.test(seg));
 	if (!hasIndexNotation) {
 		return candidates;
 	}

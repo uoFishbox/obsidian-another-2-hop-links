@@ -31,10 +31,7 @@
 		app: App;
 		lazyLoaderCache: Set<string>;
 		isSidebar?: boolean;
-		updateSetting?: <K extends string>(
-			key: K,
-			value: unknown,
-		) => Promise<void>;
+		updateSetting?: <K extends string>(key: K, value: unknown) => Promise<void>;
 	}
 
 	let {
@@ -85,25 +82,21 @@
 		fileToLinktext: linkContext.fileToLinktext,
 		sourcePath: file.path,
 		getMetadata: linkContext.getMetadata,
-		priorityFrontmatterKeyForTitle:
-			currentSettings.priorityFrontmatterKeyForTitle,
+		priorityFrontmatterKeyForTitle: currentSettings.priorityFrontmatterKeyForTitle,
 	});
 	const workerSearchSession = useWorkerSearchSession({
 		app,
 		query: () => search.normalized,
 		enabled: () => !!search.normalized,
-		matchScope: () =>
-			contentSearchEnabled ? "title-and-content" : "title-only",
+		matchScope: () => (contentSearchEnabled ? "title-and-content" : "title-only"),
 		contentSyncMode: "progressive",
 		progressiveSyncIntervalMs: 400,
 		getSearchableFiles: () =>
 			collectTwohopSearchableFiles(getSearchAdapterOptions()),
-		buildDataset: () =>
-			searchAdapter.buildDataset(getSearchAdapterOptions()),
+		buildDataset: () => searchAdapter.buildDataset(getSearchAdapterOptions()),
 		contentSearchBackend: () =>
 			currentSettings.enableRipgrepContentSearch ? "ripgrep" : "worker",
-		ripgrepExecutablePath: () =>
-			currentSettings.ripgrepExecutablePath || undefined,
+		ripgrepExecutablePath: () => currentSettings.ripgrepExecutablePath || undefined,
 	});
 	let isSearchLoading = $derived(workerSearchSession.isLoading);
 	let matchedItemByKey = $derived(workerSearchSession.matchedItemByKey);
@@ -225,9 +218,8 @@
 >
 	{#if isSidebar}
 		<div class="cosense-card-links__sidebar-header">
-			<span
-				class="cosense-card-links__sidebar-header-filename"
-				title={file.path}>{file.basename}</span
+			<span class="cosense-card-links__sidebar-header-filename" title={file.path}
+				>{file.basename}</span
 			>
 			{#if file.extension !== "md"}
 				<span
@@ -259,9 +251,7 @@
 		style:min-height={resultsMinHeight}
 	>
 		{#if loading}
-			<LoadingState
-				message="Waiting for the initial index to finish building."
-			/>
+			<LoadingState message="Waiting for the initial index to finish building." />
 		{:else if linkResult}
 			{#if twoHopPageVirtualSections.length}
 				<TwoHopPageVirtualList

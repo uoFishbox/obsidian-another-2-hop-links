@@ -1,10 +1,7 @@
 import type { Pos } from "obsidian";
 
 import { buildRuntimeOrderedBacklinkRefs } from "core/indexing/backlink-builder/backlinkReferenceSequence";
-import type {
-	CachedMetadataWithLinkReferences,
-	TwoHopIndexedLink,
-} from "types";
+import type { CachedMetadataWithLinkReferences, TwoHopIndexedLink } from "types";
 
 export function resolveRuntimeBacklinkPosition(
 	cache: CachedMetadataWithLinkReferences | null,

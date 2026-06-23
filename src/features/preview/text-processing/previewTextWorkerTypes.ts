@@ -1,9 +1,6 @@
 import type { FencedCodeBlockRange } from "./fencedCodeBlocks";
 import type { GetContentSnippetOptions } from "./snippetExtractor";
-import type {
-	TextTransformContext,
-	TransformContentForPreviewOptions,
-} from "./types";
+import type { TextTransformContext, TransformContentForPreviewOptions } from "./types";
 import type { ParsedEmbed } from "./mediaExtractor";
 import type { PluginSettings } from "types/settings";
 
@@ -88,10 +85,7 @@ export interface PreviewTextWorkerRunRequestMap {
 		PreviewTextWorkerRequest,
 		{ type: "transform-content" }
 	>;
-	"highlight-html": Extract<
-		PreviewTextWorkerRequest,
-		{ type: "highlight-html" }
-	>;
+	"highlight-html": Extract<PreviewTextWorkerRequest, { type: "highlight-html" }>;
 	"extract-first-embedded-media": Extract<
 		PreviewTextWorkerRequest,
 		{ type: "extract-first-embedded-media" }

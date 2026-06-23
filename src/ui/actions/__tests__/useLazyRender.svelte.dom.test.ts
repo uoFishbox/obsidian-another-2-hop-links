@@ -12,9 +12,7 @@ interface MockObserverRecord {
 }
 
 const observerRecords: MockObserverRecord[] = [];
-let originalIntersectionObserver:
-	| typeof globalThis.IntersectionObserver
-	| undefined;
+let originalIntersectionObserver: typeof globalThis.IntersectionObserver | undefined;
 
 function createIntersectionEntry(target: Element): IntersectionObserverEntry {
 	return {
@@ -45,10 +43,7 @@ function triggerIntersecting(rootMargin: string, target: Element): void {
 		throw new Error(`Observer not found for rootMargin: ${rootMargin}`);
 	}
 
-	record.callback(
-		[createIntersectionEntry(target)],
-		{} as IntersectionObserver,
-	);
+	record.callback([createIntersectionEntry(target)], {} as IntersectionObserver);
 }
 
 describe("lazyRender action", () => {

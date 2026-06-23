@@ -1,9 +1,6 @@
 import type { TFile } from "obsidian";
 import type { ViewItem } from "application/presenters";
-import type {
-	LinkContext,
-	LinkInteractionOptions,
-} from "ui/context/linkContext";
+import type { LinkContext, LinkInteractionOptions } from "ui/context/linkContext";
 
 export type LinkHandlerOptionsInput =
 	| LinkInteractionOptions
@@ -96,8 +93,7 @@ export function dispatchItemHover(
 		case "branch": {
 			const preferredPosition = interactionOptions.preferredPosition;
 			const preferSearchMatch =
-				interactionOptions.highlightMode === "force" &&
-				!!preferredPosition;
+				interactionOptions.highlightMode === "force" && !!preferredPosition;
 			const linkData = preferSearchMatch
 				? {
 						...item.data.hop1,

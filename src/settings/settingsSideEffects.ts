@@ -1,7 +1,4 @@
-import {
-	CARD_LAYOUT_SETTING_KEYS,
-	type PluginSettings,
-} from "types/settings";
+import { CARD_LAYOUT_SETTING_KEYS, type PluginSettings } from "types/settings";
 
 export const LAYOUT_AFFECTING_SETTINGS = new Set<keyof PluginSettings>([
 	...CARD_LAYOUT_SETTING_KEYS,
@@ -15,9 +12,9 @@ export const LAYOUT_AFFECTING_SETTINGS = new Set<keyof PluginSettings>([
  * (e.g. the search input value held by `useSearchQuery`). The full-text search
  * toggle only affects in-view filtering, so it must be excluded here.
  */
-const DISPLAY_MODE_REACTIVATION_EXCLUDED_SETTINGS = new Set<
-	keyof PluginSettings
->(["enableContentSearch"]);
+const DISPLAY_MODE_REACTIVATION_EXCLUDED_SETTINGS = new Set<keyof PluginSettings>([
+	"enableContentSearch",
+]);
 
 export interface SettingsSideEffectHandlers {
 	setLoggingEnabled(enabled: boolean): void;

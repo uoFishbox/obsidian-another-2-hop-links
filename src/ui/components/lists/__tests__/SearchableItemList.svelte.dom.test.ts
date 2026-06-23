@@ -26,9 +26,8 @@ vi.mock("obsidian", () => {
 });
 
 vi.mock("features/search/searchWorkerClient", async () => {
-	const { filterSearchWorkerDataset } = await import(
-		"features/search/searchWorkerFilter"
-	);
+	const { filterSearchWorkerDataset } =
+		await import("features/search/searchWorkerFilter");
 
 	return {
 		createSearchWorkerClient: (onMessage: (message: unknown) => void) => {
@@ -111,8 +110,8 @@ const mockBookmarksState = vi.hoisted(() => {
 	return {
 		filePaths,
 		orderedFilePaths,
-		isBookmarked: vi.fn((path: string | null | undefined) =>
-			!!path && filePaths.has(path),
+		isBookmarked: vi.fn(
+			(path: string | null | undefined) => !!path && filePaths.has(path),
 		),
 	};
 });
@@ -139,13 +138,17 @@ vi.mock("ui/context/linkContext", () => ({
 
 function createLinkContext(
 	sourceFile: TFile,
-	fileToLinktext: (file: TFile, sourcePath: string, omitMdExtension?: boolean) => string,
+	fileToLinktext: (
+		file: TFile,
+		sourcePath: string,
+		omitMdExtension?: boolean,
+	) => string,
 ): LinkContext {
 	return {
 		resolveFile: vi.fn(() => null),
 		fileToLinktext,
 		buildWikiLink: vi.fn(() => "[[alpha]]"),
-			getPreview: vi.fn(async () => ({ type: "empty", content: "" } as const)),
+		getPreview: vi.fn(async () => ({ type: "empty", content: "" }) as const),
 		sourceFile,
 		getMetadata: vi.fn(() => null),
 		onOpenFile: vi.fn(),
@@ -178,7 +181,10 @@ function createConfig(): ListConfig<ViewItem> {
 				case "branch":
 					return item.data.hop1.path ?? item.data.hop1.rawText;
 				case "newLink":
-					return item.data.path ?? `${item.data.sourceFile.path}:${item.data.rawText}`;
+					return (
+						item.data.path ??
+						`${item.data.sourceFile.path}:${item.data.rawText}`
+					);
 				default:
 					return "";
 			}
@@ -194,7 +200,6 @@ describe("SearchableItemList", () => {
 		mockBookmarksState.filePaths.clear();
 		mockBookmarksState.orderedFilePaths.length = 0;
 	});
-
 
 	it("renders filtered items in the order provided by list sorting", async () => {
 		const sourceFile = createMockTFile("notes/source.md");
@@ -214,8 +219,7 @@ describe("SearchableItemList", () => {
 			sortOption: "alphabetical",
 			initialVisibleCount: 10,
 			loadMoreIncrement: 10,
-			settings: {
-			},
+			settings: {},
 			setSortOption: vi.fn(),
 			updateVersion: 0,
 		} as unknown as ApplicationStore;

@@ -85,12 +85,9 @@ export interface AppContext {
 	updateSetting?: <K extends string>(key: K, value: unknown) => Promise<void>;
 }
 
-export const [useAppContext, setAppContext] =
-	createContext<AppContext>();
-export const [useLinkContext, setLinkContext] =
-	createContext<LinkContext>();
-const [getLazyLoaderCache, setLazyLoaderCache] =
-	createContext<Set<string>>();
+export const [useAppContext, setAppContext] = createContext<AppContext>();
+export const [useLinkContext, setLinkContext] = createContext<LinkContext>();
+const [getLazyLoaderCache, setLazyLoaderCache] = createContext<Set<string>>();
 export { setLazyLoaderCache };
 
 export function useLazyLoaderCache(): Set<string> | undefined {

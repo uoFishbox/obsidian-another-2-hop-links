@@ -8,9 +8,7 @@ import type {
 const EMPTY_TAGS: readonly TagReference[] = [];
 const EMPTY_LINK_REFERENCES: readonly LinkReference[] = [];
 
-export function extractTags(
-	cache: CachedMetadata | null,
-): readonly TagReference[] {
+export function extractTags(cache: CachedMetadata | null): readonly TagReference[] {
 	if (!cache) {
 		return EMPTY_TAGS;
 	}

@@ -24,8 +24,7 @@ const Token = {
 
 const unresolvedLinkDecoration = Decoration.mark({
 	attributes: {
-		[UNRESOLVED_LINK_ATTRIBUTE.NAME]:
-			UNRESOLVED_LINK_ATTRIBUTE.VALUE_SPECIAL,
+		[UNRESOLVED_LINK_ATTRIBUTE.NAME]: UNRESOLVED_LINK_ATTRIBUTE.VALUE_SPECIAL,
 	},
 });
 
@@ -50,10 +49,7 @@ export function buildLivePreviewPlugin(linkStatusService: LinkStatusService) {
 	return ViewPlugin.fromClass(
 		class LinkDecoratorPlugin {
 			decorations: DecorationSet;
-			private readonly tokenClassCache = new WeakMap<
-				NodeType,
-				Set<string>
-			>();
+			private readonly tokenClassCache = new WeakMap<NodeType, Set<string>>();
 
 			constructor(view: EditorView) {
 				this.decorations = this.buildDecorations(view);
@@ -143,18 +139,13 @@ export function buildLivePreviewPlugin(linkStatusService: LinkStatusService) {
 				let shouldDecorate = resolutionCache.get(lookupPath);
 				if (shouldDecorate === undefined) {
 					// LinkStatusServiceを使って装飾すべきか判断
-					shouldDecorate =
-						linkStatusService.shouldDecorateLink(lookupPath);
+					shouldDecorate = linkStatusService.shouldDecorateLink(lookupPath);
 					resolutionCache.set(lookupPath, shouldDecorate);
 				}
 
 				if (shouldDecorate) {
 					for (const range of decorableLink.ranges) {
-						builder.add(
-							range.from,
-							range.to,
-							unresolvedLinkDecoration,
-						);
+						builder.add(range.from, range.to, unresolvedLinkDecoration);
 					}
 				}
 			}
@@ -182,10 +173,7 @@ export function buildLivePreviewPlugin(linkStatusService: LinkStatusService) {
 
 				// Check for an alias and add its range if it exists.
 				const pipeNode = node.nextSibling;
-				if (
-					pipeNode &&
-					this.hasTokenClass(pipeNode, Token.WikiLinkPipe)
-				) {
+				if (pipeNode && this.hasTokenClass(pipeNode, Token.WikiLinkPipe)) {
 					const aliasNode = pipeNode.nextSibling;
 					if (
 						aliasNode &&
@@ -213,10 +201,7 @@ export function buildLivePreviewPlugin(linkStatusService: LinkStatusService) {
 					linkParent.cursor().iterate((child) => {
 						if (
 							child.node !== node &&
-							this.hasTokenClass(
-								child.node,
-								Token.MarkdownLinkText,
-							)
+							this.hasTokenClass(child.node, Token.MarkdownLinkText)
 						) {
 							ranges.push({ from: child.from, to: child.to });
 							return false;

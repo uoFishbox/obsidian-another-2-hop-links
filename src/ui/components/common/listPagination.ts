@@ -19,13 +19,11 @@ export function normalizeIncrement(value: number | undefined): number {
 	return normalized;
 }
 
-
 const SECTION_ID_PREFIX = "s:";
 const FNV1A32_OFFSET = 0x811c9dc5;
 const FNV1A32_PRIME = 0x01000193;
 
-export const SHOULD_VALIDATE_SECTION_IDS =
-	process.env.NODE_ENV !== "production";
+export const SHOULD_VALIDATE_SECTION_IDS = process.env.NODE_ENV !== "production";
 
 function updateFnv1a32(hash: number, value: string): number {
 	for (let i = 0; i < value.length; i++) {

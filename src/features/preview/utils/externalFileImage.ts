@@ -25,16 +25,12 @@ export function toObsidianResourceUrl(fileUrl: string): string {
 	if (!Platform.isDesktopApp) return fileUrl;
 
 	if (fileUrl.startsWith("file:///")) {
-		return (
-			Platform.resourcePathPrefix + fileUrl.substring("file:///".length)
-		);
+		return Platform.resourcePathPrefix + fileUrl.substring("file:///".length);
 	}
 
 	if (fileUrl.startsWith("file://")) {
 		return (
-			Platform.resourcePathPrefix +
-			"%5C%5C" +
-			fileUrl.substring("file://".length)
+			Platform.resourcePathPrefix + "%5C%5C" + fileUrl.substring("file://".length)
 		);
 	}
 

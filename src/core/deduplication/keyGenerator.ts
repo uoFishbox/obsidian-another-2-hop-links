@@ -24,9 +24,7 @@ export function getBranchUsageKey(branch: TwoHopLinkBranch): string {
 		return formatFileUsageKey(normalizePathSignature(link.path));
 	}
 
-	const textValue = getNormalizedTextSignature(
-		link.lookupPath ?? link.rawText,
-	);
+	const textValue = getNormalizedTextSignature(link.lookupPath ?? link.rawText);
 	if (textValue) {
 		return formatTextUsageKey(textValue);
 	}
@@ -43,9 +41,7 @@ export function getLinkUsageKey(link: TwoHopIndexedLink): string {
 		return formatFileUsageKey(normalizePathSignature(link.sourceFile.path));
 	}
 
-	const textValue = getNormalizedTextSignature(
-		link.displayText ?? link.rawText,
-	);
+	const textValue = getNormalizedTextSignature(link.displayText ?? link.rawText);
 	if (textValue) {
 		return formatTextUsageKey(textValue);
 	}

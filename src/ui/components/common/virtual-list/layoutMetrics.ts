@@ -12,7 +12,6 @@ export interface FlatGridLayoutMetrics extends VirtualRowLayoutMetrics {
 	rowStride: number;
 }
 
-export interface ViewPlanRowLayoutMetrics
-	extends VirtualRowLayoutMetrics {
+export interface ViewPlanRowLayoutMetrics extends VirtualRowLayoutMetrics {
 	sectionMarginBottom: number;
 }

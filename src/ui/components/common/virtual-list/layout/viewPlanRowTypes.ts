@@ -34,4 +34,3 @@ export interface ResolvedSection<T, G> extends SectionStructure {
 }
 
 export type SectionLayout<T, G> = ResolvedSection<T, G>;
-

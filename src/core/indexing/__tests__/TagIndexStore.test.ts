@@ -35,9 +35,7 @@ describe("TagIndexStore", () => {
 		);
 
 		env.builder.addFile({ path: "file1.md", tags: ["#tag2/sub"] });
-		await store.applyFileChangesAsync([
-			{ type: "modify", path: "file1.md" },
-		]);
+		await store.applyFileChangesAsync([{ type: "modify", path: "file1.md" }]);
 
 		expect(store.getSnapshot().tagToFilePaths.has("tag1")).toBe(false);
 		expect(store.getSnapshot().tagToFilePaths.get("tag2")).toEqual(
@@ -47,9 +45,7 @@ describe("TagIndexStore", () => {
 			new Set(["file1.md"]),
 		);
 
-		await store.applyFileChangesAsync([
-			{ type: "delete", path: "file1.md" },
-		]);
+		await store.applyFileChangesAsync([{ type: "delete", path: "file1.md" }]);
 		expect(store.getSnapshot().fileEntries.has("file1.md")).toBe(false);
 		expect(store.getSnapshot().tagToFilePaths.has("tag2")).toBe(false);
 	});
@@ -79,9 +75,7 @@ describe("TagIndexStore", () => {
 			},
 		]);
 
-		expect(store.getSnapshot().fileEntries.has("notes/old-name.md")).toBe(
-			false,
-		);
+		expect(store.getSnapshot().fileEntries.has("notes/old-name.md")).toBe(false);
 		expect(
 			store
 				.getSnapshot()

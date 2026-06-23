@@ -54,8 +54,7 @@ export const lazyRender: Action<HTMLElement, LazyRenderActionParams> = (
 
 	const resolveObserverRootCacheAnchor = (): HTMLElement | null => {
 		const rootNode = node.getRootNode?.();
-		return rootNode instanceof ShadowRoot &&
-			rootNode.host instanceof HTMLElement
+		return rootNode instanceof ShadowRoot && rootNode.host instanceof HTMLElement
 			? rootNode.host
 			: node.parentElement;
 	};

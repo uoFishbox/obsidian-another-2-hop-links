@@ -22,9 +22,7 @@ function canUseAdvancedCanvasNavigation(file: TFile, position: Pos): boolean {
 	return file.extension === "canvas" && isAdvancedCanvasPosition(position);
 }
 
-function buildAdvancedCanvasNavigationState(
-	position: Pos,
-): FileNavigationState {
+function buildAdvancedCanvasNavigationState(position: Pos): FileNavigationState {
 	return {
 		match: {
 			matches: [[0, position.end.offset]],

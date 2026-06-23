@@ -25,9 +25,8 @@ describe("VirtualGridLinkList regression", () => {
 			const shadowRoot = driver.getShadowRoot();
 			expect(shadowRoot).not.toBeNull();
 			expect(
-				shadowRoot?.querySelectorAll(
-					".cosense-card-links__virtual-grid-row",
-				).length,
+				shadowRoot?.querySelectorAll(".cosense-card-links__virtual-grid-row")
+					.length,
 			).toBe(2);
 		});
 
@@ -42,9 +41,7 @@ describe("VirtualGridLinkList regression", () => {
 		expect(content?.style.getPropertyValue("--ccl-cell-width")).toBe(
 			"103.33333333333333px",
 		);
-		expect(content?.style.getPropertyValue("--ccl-box-height")).toBe(
-			"124px",
-		);
+		expect(content?.style.getPropertyValue("--ccl-box-height")).toBe("124px");
 
 		const rows = Array.from(
 			shadowRoot.querySelectorAll<HTMLElement>(

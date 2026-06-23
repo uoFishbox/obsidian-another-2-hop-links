@@ -55,9 +55,7 @@
 				{infiniteScrollRootMargin}
 			>
 				{#snippet header()}
-					<div class="test-cell" data-testid="header-cell">
-						Header
-					</div>
+					<div class="test-cell" data-testid="header-cell">Header</div>
 				{/snippet}
 
 				{#snippet item({ item, index, visibility })}

@@ -14,15 +14,13 @@ export function initGlobalSearchPatcher(
 	});
 }
 
-function patchGlobalSearch(
-	plugin: PluginHost,
-	patchRegistry: PatchRegistry,
-): void {
+function patchGlobalSearch(plugin: PluginHost, patchRegistry: PatchRegistry): void {
 	const capability = new ObsidianInternalFacade(
 		plugin.app,
 	).getGlobalSearchOpenGlobalSearch();
 	if (!capability.ok) {
-		if (enableLogging) logger(`[GlobalSearchPatcher] Skipped patch: ${capability.reason}.`);
+		if (enableLogging)
+			logger(`[GlobalSearchPatcher] Skipped patch: ${capability.reason}.`);
 		return;
 	}
 
@@ -52,21 +50,15 @@ function patchGlobalSearch(
 
 					if (indexingService) {
 						void (async () => {
-							const notes =
-								await indexingService.getNotesWithTag(tag);
+							const notes = await indexingService.getNotesWithTag(tag);
 							if (notes.length > 0) {
-if (enableLogging) logger(
-								`[GlobalSearchPatcher] Intercepting tag search: "${tag}". Found ${notes.length} notes.`,
-							);
+								if (enableLogging)
+									logger(
+										`[GlobalSearchPatcher] Intercepting tag search: "${tag}". Found ${notes.length} notes.`,
+									);
 								const sourcePath =
-									plugin.app.workspace.getActiveFile()?.path ??
-									"";
-								void openTagNotesView(
-									plugin,
-									tag,
-									sourcePath,
-									false,
-								);
+									plugin.app.workspace.getActiveFile()?.path ?? "";
+								void openTagNotesView(plugin, tag, sourcePath, false);
 								return;
 							}
 
@@ -83,6 +75,7 @@ if (enableLogging) logger(
 	});
 
 	if (applied) {
-		if (enableLogging) logger("[GlobalSearchPatcher] Successfully patched openGlobalSearch.");
+		if (enableLogging)
+			logger("[GlobalSearchPatcher] Successfully patched openGlobalSearch.");
 	}
 }

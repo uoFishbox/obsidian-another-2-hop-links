@@ -17,9 +17,7 @@ import { resolveVirtualizedItemVisibilityForPreviewRange } from "ui/components/c
 import type { VirtualizedItemVisibilityState } from "ui/components/common/virtualizedItemVisibility";
 import type { VirtualizedItemVisibility } from "ui/components/common/virtual-list/types";
 import type { TwoHopMountedRowsBuild } from "./twoHopMountedRowBuild";
-import {
-	type TwoHopViewPlanRowModel,
-} from "./twoHopViewPlan";
+import { type TwoHopViewPlanRowModel } from "./twoHopViewPlan";
 import type {
 	TwoHopPageVirtualSection,
 	TwoHopPageVirtualItem,
@@ -41,9 +39,7 @@ export interface TwoHopViewPlanVirtualListProps {
 	readonly loadMoreIncrement?: number;
 }
 
-export function useTwoHopViewPlanVirtualList(
-	props: TwoHopViewPlanVirtualListProps,
-) {
+export function useTwoHopViewPlanVirtualList(props: TwoHopViewPlanVirtualListProps) {
 	let applicationStore = props.applicationStore;
 	if (!applicationStore) {
 		applicationStore = getContext<ApplicationStore>("applicationStore");
@@ -75,8 +71,7 @@ export function useTwoHopViewPlanVirtualList(
 			},
 		},
 		getWindow: () => measurementState.rootEl?.ownerDocument.defaultView ?? null,
-		resolveInitialSectionVisibleCount:
-			inputState.resolveInitialSectionVisibleCount,
+		resolveInitialSectionVisibleCount: inputState.resolveInitialSectionVisibleCount,
 		clampVisibleCount: inputState.clampVisibleCount,
 	});
 	const resolveRowModel = (
@@ -144,20 +139,14 @@ export function useTwoHopViewPlanVirtualList(
 		getValidatedSections: () => inputState.validatedSections,
 		policyResolver,
 	});
-	const mountedBuild = $derived(
-		virtualList.getReconciliationState().mountedBuild,
-	);
-	const contentHeight = $derived(
-		virtualList.getTotalHeight(rowModel.totalHeight),
-	);
+	const mountedBuild = $derived(virtualList.getReconciliationState().mountedBuild);
+	const contentHeight = $derived(virtualList.getTotalHeight(rowModel.totalHeight));
 
 	$effect(() => {
 		inputState.syncVisibleCountsForInput();
 	});
 	$effect(() => {
-		measurementRuntime.scheduleLayoutMeasurementForCardLayout(
-			configuredCardLayout,
-		);
+		measurementRuntime.scheduleLayoutMeasurementForCardLayout(configuredCardLayout);
 	});
 	$effect(() => {
 		void inputState.validatedSections;
@@ -189,8 +178,7 @@ export function useTwoHopViewPlanVirtualList(
 		const visibilityState = mountRuntime.getOrCreateVisibilityState(
 			renderedCell,
 			untrack(() => {
-				const previewVisible =
-					virtualList.getSnapshot()?.ranges.previewVisible;
+				const previewVisible = virtualList.getSnapshot()?.ranges.previewVisible;
 				return previewVisible
 					? resolveVirtualizedItemVisibilityForPreviewRange(
 							renderedCell.rowIndex,
@@ -256,7 +244,6 @@ export function useTwoHopViewPlanVirtualList(
 				direction,
 				currentPosition,
 			) ?? null,
-		flushVirtualScrollMeasurement:
-			measurementRuntime.flushVirtualScrollMeasurement,
+		flushVirtualScrollMeasurement: measurementRuntime.flushVirtualScrollMeasurement,
 	};
 }

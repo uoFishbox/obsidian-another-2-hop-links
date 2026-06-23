@@ -5,9 +5,7 @@ import {
 
 export type { PreviewActivationScope };
 
-export const PREVIEW_ACTIVATION_SCOPE_CONTEXT_KEY = Symbol(
-	"preview-activation-scope",
-);
+export const PREVIEW_ACTIVATION_SCOPE_CONTEXT_KEY = Symbol("preview-activation-scope");
 
 /**
  * Creates preview scheduling state isolated to one rendered card surface.

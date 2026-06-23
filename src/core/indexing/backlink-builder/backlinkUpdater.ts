@@ -118,14 +118,8 @@ function areDestinationRepresentativeRefsEqual(
 	rightSummary: SourceSummary,
 	destinationPath: string,
 ): boolean {
-	const left = getRepresentativeRefByDestination(
-		leftSummary,
-		destinationPath,
-	);
-	const right = getRepresentativeRefByDestination(
-		rightSummary,
-		destinationPath,
-	);
+	const left = getRepresentativeRefByDestination(leftSummary, destinationPath);
+	const right = getRepresentativeRefByDestination(rightSummary, destinationPath);
 
 	return areOrderedBacklinkRefsEqual(left, right);
 }
@@ -409,9 +403,7 @@ export function createBacklinkUpdater(
 		onAddition?: BacklinkAdditionMutationCallback,
 		externalSink?: BacklinkReconcileSink,
 	): Promise<BacklinkReconcileResult | boolean> {
-		const affectedDestinations = externalSink
-			? undefined
-			: new Set<string>();
+		const affectedDestinations = externalSink ? undefined : new Set<string>();
 		const representativeChangedLookupKeys = externalSink
 			? undefined
 			: new Set<string>();
@@ -421,30 +413,23 @@ export function createBacklinkUpdater(
 				affectedDestinations!,
 				representativeChangedLookupKeys!,
 			);
-		const representativeChanged =
-			await visitRepresentativeChangedLookupKeysAsync(
-				previousSummary,
-				nextSummary,
-				yieldScheduler,
-				sink,
-			);
+		const representativeChanged = await visitRepresentativeChangedLookupKeysAsync(
+			previousSummary,
+			nextSummary,
+			yieldScheduler,
+			sink,
+		);
 		const previousDestinations = previousSummary?.destinations;
 		const nextDestinations = nextSummary?.destinations;
 		let destinationChanged = false;
 
 		let previousCount = 0;
 		if (previousDestinations) {
-			for (const [
-				destinationPath,
-				previousDestination,
-			] of previousDestinations) {
+			for (const [destinationPath, previousDestination] of previousDestinations) {
 				const nextDestination = nextDestinations?.get(destinationPath);
 				if (
 					nextDestination &&
-					areSourceDestinationsEqual(
-						previousDestination,
-						nextDestination,
-					)
+					areSourceDestinationsEqual(previousDestination, nextDestination)
 				) {
 					if (
 						previousSummary &&
@@ -485,14 +470,10 @@ export function createBacklinkUpdater(
 		let nextCount = 0;
 		if (nextDestinations) {
 			for (const [destinationPath, nextDestination] of nextDestinations) {
-				const previousDestination =
-					previousDestinations?.get(destinationPath);
+				const previousDestination = previousDestinations?.get(destinationPath);
 				if (
 					!previousDestination ||
-					!areSourceDestinationsEqual(
-						previousDestination,
-						nextDestination,
-					)
+					!areSourceDestinationsEqual(previousDestination, nextDestination)
 				) {
 					if (
 						addDestinationForSource(
@@ -520,8 +501,7 @@ export function createBacklinkUpdater(
 			}
 		}
 
-		const sourceSummaryChanged =
-			destinationChanged || representativeChanged;
+		const sourceSummaryChanged = destinationChanged || representativeChanged;
 
 		if (externalSink) {
 			return sourceSummaryChanged;

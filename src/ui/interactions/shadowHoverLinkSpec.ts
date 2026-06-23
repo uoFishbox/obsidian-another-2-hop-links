@@ -1,8 +1,6 @@
 import type { CachedMetadataWithLinkReferences } from "types";
 import type { AppContext } from "ui/context/linkContext";
-import type {
-	InteractionDescriptor,
-} from "./interactionTypes";
+import type { InteractionDescriptor } from "./interactionTypes";
 import { resolveDescriptorInteractionOptions } from "./interactionTypes";
 import {
 	buildHoverPopoverLinkSpec,
@@ -48,8 +46,7 @@ export function buildShadowHoverLinkSpec(
 				highlightMode,
 			);
 		case "branch": {
-			const preferSearchMatch =
-				highlightMode === "force" && !!preferredPosition;
+			const preferSearchMatch = highlightMode === "force" && !!preferredPosition;
 			return buildHoverPopoverLinkSpec(
 				preferSearchMatch
 					? {
@@ -71,9 +68,9 @@ export function buildShadowHoverLinkSpec(
 							position: preferredPosition,
 						}
 					: hydrateRuntimeBacklinkLink(
-							((appContext?.linkContext.getMetadata(
+							(appContext?.linkContext.getMetadata(
 								descriptor.item.data.sourceFile,
-							) as CachedMetadataWithLinkReferences | null) ?? null),
+							) as CachedMetadataWithLinkReferences | null) ?? null,
 							descriptor.item.data,
 						),
 				descriptor.targetFile,

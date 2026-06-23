@@ -2,11 +2,7 @@ import { describe, test, expect, beforeEach } from "vitest";
 import { createDeduplicationService } from "../deduplicationService";
 import { createDedupState } from "../usageTracker";
 import type { DedupState } from "types/deduplication";
-import type {
-	TwoHopLinkBranch,
-	TwoHopIndexedLink,
-	TaggedNote,
-} from "types/domain";
+import type { TwoHopLinkBranch, TwoHopIndexedLink, TaggedNote } from "types/domain";
 import { type TFile } from "obsidian";
 
 vi.mock("obsidian", () => ({
@@ -417,11 +413,10 @@ describe("DeduplicationService", () => {
 				initialState,
 				backlinks,
 			);
-			const transitionedBacklinks =
-				explicitService.collectUniqueBacklinks(
-					branchResult.state,
-					backlinks,
-				);
+			const transitionedBacklinks = explicitService.collectUniqueBacklinks(
+				branchResult.state,
+				backlinks,
+			);
 
 			expect(independentBacklinks.items).toHaveLength(1);
 			expect(transitionedBacklinks.items).toHaveLength(0);
@@ -492,8 +487,7 @@ describe("DeduplicationService", () => {
 				},
 			];
 
-			const filteredBranches =
-				service.buildFilteredTwoHopBranches(branches);
+			const filteredBranches = service.buildFilteredTwoHopBranches(branches);
 			expect(filteredBranches).toHaveLength(1);
 
 			const uniqueBacklinks = service.collectUniqueBacklinks(backlinks);
@@ -567,16 +561,14 @@ describe("DeduplicationService", () => {
 			const uniqueBranches = service.collectUniqueBranches(branches);
 			expect(uniqueBranches).toHaveLength(2);
 
-			const filteredBranches =
-				service.buildFilteredTwoHopBranches(branches);
+			const filteredBranches = service.buildFilteredTwoHopBranches(branches);
 			expect(filteredBranches).toHaveLength(1);
 
 			const uniqueBacklinks = service.collectUniqueBacklinks(backlinks);
 			expect(uniqueBacklinks).toHaveLength(1);
 			expect(uniqueBacklinks[0].sourceFile.path).toBe("source4.md");
 
-			const uniqueTaggedNotes =
-				service.collectUniqueTaggedNotes(taggedNotes);
+			const uniqueTaggedNotes = service.collectUniqueTaggedNotes(taggedNotes);
 			expect(uniqueTaggedNotes).toHaveLength(1);
 			expect(uniqueTaggedNotes[0].path).toBe("note3.md");
 		});
@@ -597,20 +589,12 @@ function createScopedDeduplicationService() {
 
 	return {
 		collectUniqueBranches: (branches: TwoHopLinkBranch[]) =>
-			apply((current) =>
-				service.collectUniqueBranches(current, branches),
-			),
+			apply((current) => service.collectUniqueBranches(current, branches)),
 		collectUniqueBacklinks: (backlinks: TwoHopIndexedLink[]) =>
-			apply((current) =>
-				service.collectUniqueBacklinks(current, backlinks),
-			),
+			apply((current) => service.collectUniqueBacklinks(current, backlinks)),
 		buildFilteredTwoHopBranches: (branches: TwoHopLinkBranch[]) =>
-			apply((current) =>
-				service.buildFilteredTwoHopBranches(current, branches),
-			),
+			apply((current) => service.buildFilteredTwoHopBranches(current, branches)),
 		collectUniqueTaggedNotes: (taggedNotes: TaggedNote[]) =>
-			apply((current) =>
-				service.collectUniqueTaggedNotes(current, taggedNotes),
-			),
+			apply((current) => service.collectUniqueTaggedNotes(current, taggedNotes)),
 	};
 }

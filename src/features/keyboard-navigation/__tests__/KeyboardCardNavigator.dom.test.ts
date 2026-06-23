@@ -89,8 +89,7 @@ function createCard(id: string, rect: RectInit): HTMLElement {
 function createLoadMoreButton(rect: RectInit): HTMLButtonElement {
 	const button = document.createElement("button");
 	button.type = "button";
-	button.className =
-		"cosense-card-links__load-more-button cosense-card-links__box";
+	button.className = "cosense-card-links__load-more-button cosense-card-links__box";
 	button.setAttribute("aria-label", "Load more");
 	setVisibleRect(button, rect);
 	return button;
@@ -102,9 +101,7 @@ function createSurface(
 ): HTMLElement {
 	const surface = document.createElement("div");
 	surface.className =
-		host === "empty"
-			? "cosense-card-links-empty-view"
-			: "cosense-card-links__root";
+		host === "empty" ? "cosense-card-links-empty-view" : "cosense-card-links__root";
 	surface.dataset.cclCardSurface = host;
 	surface.tabIndex = -1;
 	setVisibleRect(surface, { top: 0, left: 0, width: 600, height: 400 });
@@ -120,17 +117,13 @@ function createWorkspace(options: {
 	emptyViewContainers?: HTMLElement[];
 }) {
 	return {
-		activeLeaf: options.activeView
-			? { view: options.activeView }
-			: undefined,
+		activeLeaf: options.activeView ? { view: options.activeView } : undefined,
 		getActiveViewOfType: vi.fn((type: new (...args: any[]) => unknown) => {
 			if (!options.activeView) {
 				return null;
 			}
 
-			return options.activeView instanceof type
-				? options.activeView
-				: null;
+			return options.activeView instanceof type ? options.activeView : null;
 		}),
 		getLeavesOfType: vi.fn(() =>
 			(options.sidebarContainers ?? []).map((contentEl) => ({
@@ -292,12 +285,14 @@ describe("KeyboardCardNavigator", () => {
 			const rows = navigator.collectVisibleRows(root);
 
 			expect(rows).toHaveLength(2);
-			expect(
-				rows[0].cards.map((card) => card.dataset.cclInteractionId),
-			).toEqual(["row-1-a", "row-1-b"]);
-			expect(
-				rows[1].cards.map((card) => card.dataset.cclInteractionId),
-			).toEqual(["row-2-a", "row-2-b"]);
+			expect(rows[0].cards.map((card) => card.dataset.cclInteractionId)).toEqual([
+				"row-1-a",
+				"row-1-b",
+			]);
+			expect(rows[1].cards.map((card) => card.dataset.cclInteractionId)).toEqual([
+				"row-2-a",
+				"row-2-b",
+			]);
 		});
 
 		it("collects visible rows from cards rendered inside shadow roots", () => {
@@ -317,12 +312,13 @@ describe("KeyboardCardNavigator", () => {
 			const rows = navigator.collectVisibleRows(root);
 
 			expect(rows).toHaveLength(2);
-			expect(
-				rows[0].cards.map((card) => card.dataset.cclInteractionId),
-			).toEqual(["row-1-a", "row-1-b"]);
-			expect(
-				rows[1].cards.map((card) => card.dataset.cclInteractionId),
-			).toEqual(["row-2-a"]);
+			expect(rows[0].cards.map((card) => card.dataset.cclInteractionId)).toEqual([
+				"row-1-a",
+				"row-1-b",
+			]);
+			expect(rows[1].cards.map((card) => card.dataset.cclInteractionId)).toEqual([
+				"row-2-a",
+			]);
 		});
 	});
 
@@ -343,9 +339,7 @@ describe("KeyboardCardNavigator", () => {
 			navigator.activate(root, "inline");
 
 			expect(root.classList.contains("ccl-kb-nav-active")).toBe(true);
-			expect(getSelectedCard(root)?.dataset.cclInteractionId).toBe(
-				"row-1-a",
-			);
+			expect(getSelectedCard(root)?.dataset.cclInteractionId).toBe("row-1-a");
 			expect(hasAnyHints(root)).toBe(true);
 		});
 
@@ -363,9 +357,7 @@ describe("KeyboardCardNavigator", () => {
 
 			dispatchKey("ArrowDown");
 
-			expect(getSelectedCard(root)?.dataset.cclInteractionId).toBe(
-				"row-2-a",
-			);
+			expect(getSelectedCard(root)?.dataset.cclInteractionId).toBe("row-2-a");
 		});
 
 		it("moves selection up with ArrowUp", () => {
@@ -383,9 +375,7 @@ describe("KeyboardCardNavigator", () => {
 
 			dispatchKey("ArrowUp");
 
-			expect(getSelectedCard(root)?.dataset.cclInteractionId).toBe(
-				"row-1-a",
-			);
+			expect(getSelectedCard(root)?.dataset.cclInteractionId).toBe("row-1-a");
 		});
 
 		it("exits navigation mode on Escape", () => {
@@ -422,9 +412,7 @@ describe("KeyboardCardNavigator", () => {
 
 			dispatchKey("ArrowDown", { target: input });
 
-			expect(getSelectedCard(root)?.dataset.cclInteractionId).toBe(
-				"row-1-a",
-			);
+			expect(getSelectedCard(root)?.dataset.cclInteractionId).toBe("row-1-a");
 		});
 
 		it("ignores keys when modifiers are pressed", () => {
@@ -447,9 +435,7 @@ describe("KeyboardCardNavigator", () => {
 			});
 			document.dispatchEvent(event);
 
-			expect(getSelectedCard(root)?.dataset.cclInteractionId).toBe(
-				"row-1-a",
-			);
+			expect(getSelectedCard(root)?.dataset.cclInteractionId).toBe("row-1-a");
 		});
 	});
 
@@ -513,10 +499,7 @@ describe("KeyboardCardNavigator", () => {
 
 			const firstRowCard = createCard("row-1-a", { top: 46, left: 20 });
 			const loadMoreButton = createLoadMoreButton({ top: 126, left: 20 });
-			const root = createSurface("inline", [
-				firstRowCard,
-				loadMoreButton,
-			]);
+			const root = createSurface("inline", [firstRowCard, loadMoreButton]);
 			scrollContainer.append(root);
 			document.body.append(scrollContainer);
 

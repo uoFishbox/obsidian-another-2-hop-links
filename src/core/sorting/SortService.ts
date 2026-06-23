@@ -5,10 +5,7 @@ import { getSortPlan, type SortPlan } from "./comparators";
 
 export class SortService implements ISortService {
 	private memoizedMetricProvider: IMetricProvider;
-	private readonly sortPlanCache = new Map<
-		SortOption,
-		SortPlan | undefined
-	>();
+	private readonly sortPlanCache = new Map<SortOption, SortPlan | undefined>();
 	private readonly collator = new Intl.Collator(undefined, {
 		numeric: true,
 		sensitivity: "base",
@@ -33,10 +30,7 @@ export class SortService implements ISortService {
 		};
 	}
 
-	private sortItems<T extends SortableItem>(
-		items: T[],
-		sortOption: SortOption,
-	): T[] {
+	private sortItems<T extends SortableItem>(items: T[], sortOption: SortOption): T[] {
 		if (items.length <= 1) {
 			return items;
 		}
@@ -54,10 +48,7 @@ export class SortService implements ISortService {
 		return this.sortIndexed(items, sortPlan);
 	}
 
-	private sortPair<T extends SortableItem>(
-		items: T[],
-		sortPlan: SortPlan,
-	): T[] {
+	private sortPair<T extends SortableItem>(items: T[], sortPlan: SortPlan): T[] {
 		const left = items[0];
 		const right = items[1];
 
@@ -104,15 +95,11 @@ export class SortService implements ISortService {
 		return sortPlan;
 	}
 
-	private sortIndexed<T extends SortableItem>(
-		items: T[],
-		sortPlan: SortPlan,
-	): T[] {
+	private sortIndexed<T extends SortableItem>(items: T[], sortPlan: SortPlan): T[] {
 		const itemCount = items.length;
 		const indices = new Array<number>(itemCount);
 		const primaryKeys = new Array<SortKey>(itemCount);
-		const hasTieBreaker =
-			sortPlan.getPrimaryKey !== sortPlan.getTieBreaker;
+		const hasTieBreaker = sortPlan.getPrimaryKey !== sortPlan.getTieBreaker;
 		let tieBreakerKeys: Array<string | undefined> | undefined;
 
 		for (let index = 0; index < itemCount; index += 1) {
@@ -165,13 +152,8 @@ export class SortService implements ISortService {
 			if (indices[index] !== index) {
 				const sortedItems = new Array<T>(itemCount);
 
-				for (
-					let sortedIndex = 0;
-					sortedIndex < itemCount;
-					sortedIndex += 1
-				) {
-					sortedItems[sortedIndex] =
-						items[indices[sortedIndex]];
+				for (let sortedIndex = 0; sortedIndex < itemCount; sortedIndex += 1) {
+					sortedItems[sortedIndex] = items[indices[sortedIndex]];
 				}
 
 				return sortedItems;
@@ -216,11 +198,10 @@ export class SortService implements ISortService {
 					return cached;
 				}
 
-				const cacheIdentity =
-					this.metricProvider.getMetricCacheIdentity?.(
-						metricKind,
-						item,
-					);
+				const cacheIdentity = this.metricProvider.getMetricCacheIdentity?.(
+					metricKind,
+					item,
+				);
 				const sharedCached =
 					cacheIdentity === undefined
 						? undefined
@@ -251,15 +232,11 @@ export class SortService implements ISortService {
 			getCreatedTime: memoize("createdTime", createdTimeCache, (item) =>
 				this.metricProvider.getCreatedTime(item),
 			),
-			getModifiedTime: memoize(
-				"modifiedTime",
-				modifiedTimeCache,
-				(item) => this.metricProvider.getModifiedTime(item),
+			getModifiedTime: memoize("modifiedTime", modifiedTimeCache, (item) =>
+				this.metricProvider.getModifiedTime(item),
 			),
-			getBacklinkCount: memoize(
-				"backlinkCount",
-				backlinkCountCache,
-				(item) => this.metricProvider.getBacklinkCount(item),
+			getBacklinkCount: memoize("backlinkCount", backlinkCountCache, (item) =>
+				this.metricProvider.getBacklinkCount(item),
 			),
 			getFileSize: memoize("fileSize", fileSizeCache, (item) =>
 				this.metricProvider.getFileSize(item),

@@ -2,10 +2,7 @@ import type { FlatGridLayoutMetrics } from "../layoutMetrics";
 import { computeColumnCount } from "../core/gridLayout";
 
 export { computeColumnCount } from "../core/gridLayout";
-export {
-	computeVisibleCellWindow,
-	computeVisibleRowRange,
-} from "./flatGridRanges";
+export { computeVisibleCellWindow, computeVisibleRowRange } from "./flatGridRanges";
 export { computeCellPosition } from "./flatGridPosition";
 export type { VisibleCellWindow } from "./flatGridRanges";
 
@@ -34,8 +31,7 @@ export function computeVirtualGridLayout(
 		0,
 		Math.floor(input.resolveRowHeight?.(cellWidth) ?? input.rowHeight),
 	);
-	const rowCount =
-		input.cellCount > 0 ? Math.ceil(input.cellCount / columns) : 0;
+	const rowCount = input.cellCount > 0 ? Math.ceil(input.cellCount / columns) : 0;
 	const rowStride = rowHeight + gap;
 	const contentHeight =
 		rowCount > 0 ? rowCount * rowHeight + (rowCount - 1) * gap : 0;

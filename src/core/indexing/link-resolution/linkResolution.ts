@@ -22,20 +22,16 @@ const CASE_INSENSITIVE_LOOKUP_KEY_CACHE: BoundedGenerationalCache<string, string
 		"caseInsensitiveLookupKey",
 		LINK_NORMALIZATION_CACHE_MAX_ENTRIES,
 	);
-const RAW_LINKPATH_TO_MARKDOWN_PATH_CACHE: BoundedGenerationalCache<
-	string,
-	string
-> = createBoundedGenerationalCache(
-	"rawLinkpathToMarkdownPath",
-	LINK_NORMALIZATION_CACHE_MAX_ENTRIES,
-);
-const LINK_TEXT_TO_MARKDOWN_PATH_CACHE: BoundedGenerationalCache<
-	string,
-	string
-> = createBoundedGenerationalCache(
-	"linkTextToMarkdownPath",
-	LINK_NORMALIZATION_CACHE_MAX_ENTRIES,
-);
+const RAW_LINKPATH_TO_MARKDOWN_PATH_CACHE: BoundedGenerationalCache<string, string> =
+	createBoundedGenerationalCache(
+		"rawLinkpathToMarkdownPath",
+		LINK_NORMALIZATION_CACHE_MAX_ENTRIES,
+	);
+const LINK_TEXT_TO_MARKDOWN_PATH_CACHE: BoundedGenerationalCache<string, string> =
+	createBoundedGenerationalCache(
+		"linkTextToMarkdownPath",
+		LINK_NORMALIZATION_CACHE_MAX_ENTRIES,
+	);
 
 /** Names of the bounded normalization caches, for stats grouping. */
 export type LinkNormalizationCacheName =
@@ -65,8 +61,8 @@ const NORMALIZATION_CACHES = [
  * Returns current stats for every normalization cache, for debug measurement.
  */
 export function getLinkNormalizationCacheStats(): LinkNormalizationCacheStats[] {
-	return NORMALIZATION_CACHES.map((cache) =>
-		cache.getStats() as LinkNormalizationCacheStats,
+	return NORMALIZATION_CACHES.map(
+		(cache) => cache.getStats() as LinkNormalizationCacheStats,
 	);
 }
 
@@ -165,27 +161,15 @@ class MutableLinkResolutionAmbiguityDetectorImpl implements MutableLinkResolutio
 	public addPath(path: string): void {
 		const fileName = getFileNameFromPath(path);
 		const baseName = getBaseNameFromFileName(fileName);
-		incrementCachedCount(
-			this.fileNameCounts,
-			toCaseInsensitiveLookupKey(fileName),
-		);
-		incrementCachedCount(
-			this.baseNameCounts,
-			toCaseInsensitiveLookupKey(baseName),
-		);
+		incrementCachedCount(this.fileNameCounts, toCaseInsensitiveLookupKey(fileName));
+		incrementCachedCount(this.baseNameCounts, toCaseInsensitiveLookupKey(baseName));
 	}
 
 	public removePath(path: string): void {
 		const fileName = getFileNameFromPath(path);
 		const baseName = getBaseNameFromFileName(fileName);
-		decrementCachedCount(
-			this.fileNameCounts,
-			toCaseInsensitiveLookupKey(fileName),
-		);
-		decrementCachedCount(
-			this.baseNameCounts,
-			toCaseInsensitiveLookupKey(baseName),
-		);
+		decrementCachedCount(this.fileNameCounts, toCaseInsensitiveLookupKey(fileName));
+		decrementCachedCount(this.baseNameCounts, toCaseInsensitiveLookupKey(baseName));
 	}
 
 	public renamePath(oldPath: string, newPath: string): void {
@@ -228,9 +212,7 @@ function* filePaths(files: readonly TFile[]): Iterable<string> {
 export function createLinkResolutionAmbiguityDetector(
 	vault: IVault,
 ): MutableLinkResolutionAmbiguityDetector {
-	return new MutableLinkResolutionAmbiguityDetectorImpl(
-		filePaths(vault.getFiles()),
-	);
+	return new MutableLinkResolutionAmbiguityDetectorImpl(filePaths(vault.getFiles()));
 }
 
 export function toCaseInsensitiveLookupKey(path: string): string {

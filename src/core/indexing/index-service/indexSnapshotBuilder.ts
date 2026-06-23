@@ -1,9 +1,5 @@
-import {
-	type BacklinksBuildArtifacts,
-} from "core/indexing/backlink-builder/backlinkBuildArtifacts";
-import {
-	buildDetailedBacklinksArtifactsChunked,
-} from "core/indexing/backlink-builder/backlinkIndexer";
+import { type BacklinksBuildArtifacts } from "core/indexing/backlink-builder/backlinkBuildArtifacts";
+import { buildDetailedBacklinksArtifactsChunked } from "core/indexing/backlink-builder/backlinkIndexer";
 import {
 	createLinkResolutionAmbiguityDetector,
 	type MutableLinkResolutionAmbiguityDetector,
@@ -80,8 +76,7 @@ function createSnapshot(artifacts: BacklinksBuildArtifacts): IndexSnapshot {
 		lookupKeyToLookupPaths: artifacts.lookupKeyToLookupPaths,
 		unresolvedLookupToSources: artifacts.unresolvedLookupToSources,
 		lookupPathResolvedSourceCount: artifacts.lookupPathResolvedSourceCount,
-		lookupKeyDirectResolvedPathCount:
-			artifacts.lookupKeyDirectResolvedPathCount,
+		lookupKeyDirectResolvedPathCount: artifacts.lookupKeyDirectResolvedPathCount,
 		lookupKeyToSources: artifacts.lookupKeyToSources,
 	};
 }

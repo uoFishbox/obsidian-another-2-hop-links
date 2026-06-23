@@ -159,14 +159,10 @@ describe("VirtualGridLinkList viewport", () => {
 		const cells = Array.from(
 			driver
 				.getShadowRoot()
-				?.querySelectorAll<HTMLElement>("[data-testid='item-cell']") ??
-				[],
+				?.querySelectorAll<HTMLElement>("[data-testid='item-cell']") ?? [],
 		);
 		const visibilityByIndex = new Map(
-			cells.map((cell) => [
-				Number(cell.dataset.index),
-				cell.dataset.visibility,
-			]),
+			cells.map((cell) => [Number(cell.dataset.index), cell.dataset.visibility]),
 		);
 
 		expect(visibilityByIndex.get(0)).toBe("visible");

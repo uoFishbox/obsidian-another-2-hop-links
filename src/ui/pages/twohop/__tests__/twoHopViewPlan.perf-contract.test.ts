@@ -114,8 +114,7 @@ const compilePlan = (
 			? createBatchedMaterialization(10, 200)
 			: { kind: "eager" },
 		resolveInitialSectionVisibleCount: (section) => section.loadedCount,
-		clampVisibleCount: (section, count) =>
-			Math.min(section.loadedCount, count),
+		clampVisibleCount: (section, count) => Math.min(section.loadedCount, count),
 	});
 
 type TwoHopVirtualListComputation = VirtualListComputation<
@@ -205,14 +204,8 @@ describe("TwoHop view-plan performance contracts", () => {
 			for (let frame = 1; frame <= SCROLL_FRAMES; frame += 1) {
 				const start = 1 + frame;
 				mounted = buildMountedRows(rowModel, start, mounted);
-				maxMountedRows = Math.max(
-					maxMountedRows,
-					mounted.rowSlices.length,
-				);
-				maxMountedCells = Math.max(
-					maxMountedCells,
-					mounted.cells.length,
-				);
+				maxMountedRows = Math.max(maxMountedRows, mounted.rowSlices.length);
+				maxMountedCells = Math.max(maxMountedCells, mounted.cells.length);
 				maxAllocatedRowSlots = Math.max(
 					maxAllocatedRowSlots,
 					getAllocatedRowSlotCount(mounted),
@@ -335,13 +328,9 @@ describe("TwoHop view-plan performance contracts", () => {
 		expect(getRangeLength(initial.snapshot.ranges.previewVisible)).toBe(
 			VIEWPORT_ROWS,
 		);
-		expect(getRangeLength(initial.snapshot.ranges.mounted)).toBe(
-			MOUNTED_ROWS,
-		);
+		expect(getRangeLength(initial.snapshot.ranges.mounted)).toBe(MOUNTED_ROWS);
 		expect(pixelScrolled.snapshot.ranges).toEqual(initial.snapshot.ranges);
-		expect(pixelScrolled.snapshot.mountedCells).toBe(
-			initial.snapshot.mountedCells,
-		);
+		expect(pixelScrolled.snapshot.mountedCells).toBe(initial.snapshot.mountedCells);
 		expect(pixelScrolled.reconciliationState.mountedBuild).toBe(
 			initial.reconciliationState.mountedBuild,
 		);
@@ -365,9 +354,9 @@ describe("TwoHop view-plan performance contracts", () => {
 			...new Array<boolean>(10).fill(true),
 			...new Array<boolean>(22).fill(false),
 		]);
-		expect(
-			getItemsBySection.map((getItems) => getItems.mock.calls.length),
-		).toEqual(new Array<number>(32).fill(0));
+		expect(getItemsBySection.map((getItems) => getItems.mock.calls.length)).toEqual(
+			new Array<number>(32).fill(0),
+		);
 	});
 
 	it("caps an oversized initial section by the initial cell budget", () => {
@@ -377,8 +366,7 @@ describe("TwoHop view-plan performance contracts", () => {
 			layout,
 			materialization: createBatchedMaterialization(10, 200),
 			resolveInitialSectionVisibleCount: (section) => section.loadedCount,
-			clampVisibleCount: (section, count) =>
-				Math.min(section.loadedCount, count),
+			clampVisibleCount: (section, count) => Math.min(section.loadedCount, count),
 		});
 
 		expect(plan.materializationStateBySectionIndex[0]).toEqual({
@@ -422,15 +410,11 @@ describe("TwoHop view-plan performance contracts", () => {
 			layout,
 			materialization: createBatchedMaterialization(0, 0),
 			resolveInitialSectionVisibleCount: (current) => current.loadedCount,
-			clampVisibleCount: (current, count) =>
-				Math.min(current.loadedCount, count),
+			clampVisibleCount: (current, count) => Math.min(current.loadedCount, count),
 		});
 		const rowModel = createTwoHopViewPlanRowModel(plan);
 
-		const mounted = buildMountedRows(
-			rowModel,
-			INITIAL_MOUNTED_ROW_START + 1_000,
-		);
+		const mounted = buildMountedRows(rowModel, INITIAL_MOUNTED_ROW_START + 1_000);
 
 		expect(mounted.rowSlices).toHaveLength(MOUNTED_ROWS);
 		expect(getItem).toHaveBeenCalledTimes(MOUNTED_ROWS * COLUMNS);

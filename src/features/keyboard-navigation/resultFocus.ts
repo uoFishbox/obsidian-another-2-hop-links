@@ -4,10 +4,7 @@ import {
 } from "ui/utils/shadowDom";
 import { isElementVisible } from "ui/utils/domUtils";
 export type ResultFocusDirection = "up" | "down";
-export type ResultNavigationDirection =
-	| ResultFocusDirection
-	| "left"
-	| "right";
+export type ResultNavigationDirection = ResultFocusDirection | "left" | "right";
 
 export const CARD_SELECTOR = ".cosense-card-links__box[data-ccl-interaction-id]";
 export const LOAD_MORE_SELECTOR =
@@ -40,21 +37,16 @@ interface NavigationTarget {
 const NAVIGATION_ROOT_SELECTOR =
 	".cosense-card-links__virtual-grid, .view-plan-virtual-list";
 
-function collectResultTargets(
-	container: HTMLElement | null,
-): HTMLElement[] {
+function collectResultTargets(container: HTMLElement | null): HTMLElement[] {
 	return querySelectorAllIncludingShadow<HTMLElement>(
 		container,
 		RESULT_FOCUS_SELECTOR,
 	).filter(
-		(element) =>
-			!element.hasAttribute("disabled") && isElementVisible(element),
+		(element) => !element.hasAttribute("disabled") && isElementVisible(element),
 	);
 }
 
-function collectResultSections(
-	container: HTMLElement | null,
-): HTMLElement[] {
+function collectResultSections(container: HTMLElement | null): HTMLElement[] {
 	if (!container) {
 		return [];
 	}
@@ -70,9 +62,7 @@ function getTargetIdentity(element: HTMLElement): string | null {
 	return element.dataset.cclInteractionId ?? null;
 }
 
-function parseStyleNumber(
-	value: string | null | undefined,
-): number | null {
+function parseStyleNumber(value: string | null | undefined): number | null {
 	if (!value) {
 		return null;
 	}
@@ -117,9 +107,7 @@ function parseTransformTranslate(
 	return null;
 }
 
-function buildRectFromPositionedCell(
-	element: HTMLElement,
-): NavigationRect | null {
+function buildRectFromPositionedCell(element: HTMLElement): NavigationRect | null {
 	const cell = findClosestComposed(element, NAVIGATION_CELL_SELECTOR);
 	if (!cell) {
 		return null;
@@ -142,14 +130,10 @@ function buildRectFromPositionedCell(
 	};
 }
 
-function getNavigationRect(
-	element: HTMLElement,
-):
-	| {
-			rect: NavigationRect;
-			source: "boundingRect" | "positionedCell";
-	  }
-	| null {
+function getNavigationRect(element: HTMLElement): {
+	rect: NavigationRect;
+	source: "boundingRect" | "positionedCell";
+} | null {
 	const rect = element.getBoundingClientRect();
 	if (rect.width > 0 && rect.height > 0) {
 		return {
@@ -176,9 +160,7 @@ function getNavigationRect(
 	};
 }
 
-function buildNavigationTargets(
-	container: HTMLElement | null,
-): NavigationTarget[] {
+function buildNavigationTargets(container: HTMLElement | null): NavigationTarget[] {
 	const targets: NavigationTarget[] = [];
 	for (const element of collectResultTargets(container)) {
 		const navigationRect = getNavigationRect(element);
@@ -198,9 +180,7 @@ function buildNavigationTargets(
 	return targets;
 }
 
-function focusResultTarget(
-	target: HTMLElement,
-): HTMLElement {
+function focusResultTarget(target: HTMLElement): HTMLElement {
 	target.focus({ preventScroll: true });
 	target.scrollIntoView({ block: "nearest", inline: "nearest" });
 	return target;
@@ -210,14 +190,12 @@ function scoreNavigationCandidate(
 	current: NavigationTarget,
 	candidate: NavigationTarget,
 	direction: ResultNavigationDirection,
-):
-	| {
-			axisPriority: number;
-			primaryDistance: number;
-			secondaryDistance: number;
-			fallbackDistance: number;
-		}
-	| null {
+): {
+	axisPriority: number;
+	primaryDistance: number;
+	secondaryDistance: number;
+	fallbackDistance: number;
+} | null {
 	const horizontalOverlap =
 		Math.min(current.rect.right, candidate.rect.right) -
 		Math.max(current.rect.left, candidate.rect.left);
@@ -298,14 +276,12 @@ function resolveNavigationTarget(
 	}
 
 	let bestCandidate: NavigationTarget | null = null;
-	let bestScore:
-		| {
-				axisPriority: number;
-				primaryDistance: number;
-				secondaryDistance: number;
-				fallbackDistance: number;
-		  }
-		| null = null;
+	let bestScore: {
+		axisPriority: number;
+		primaryDistance: number;
+		secondaryDistance: number;
+		fallbackDistance: number;
+	} | null = null;
 
 	for (const candidate of targets) {
 		if (candidate.element === current.element) {
@@ -404,7 +380,10 @@ export function getFocusableResultTarget(
 	target: EventTarget | Event | null,
 ): HTMLElement | null {
 	if (target instanceof Event) {
-		return findClosestComposed(target.composedPath()[0] ?? target.target, RESULT_FOCUS_SELECTOR);
+		return findClosestComposed(
+			target.composedPath()[0] ?? target.target,
+			RESULT_FOCUS_SELECTOR,
+		);
 	}
 
 	return findClosestComposed(target, RESULT_FOCUS_SELECTOR);
@@ -413,9 +392,7 @@ export function getFocusableResultTarget(
 export function focusSearchInput(
 	container: HTMLElement | null,
 ): HTMLInputElement | null {
-	const input = container?.querySelector<HTMLInputElement>(
-		SEARCH_INPUT_SELECTOR,
-	);
+	const input = container?.querySelector<HTMLInputElement>(SEARCH_INPUT_SELECTOR);
 	if (!input) {
 		return null;
 	}
@@ -448,15 +425,12 @@ export function findAdjacentResultSection(
 		return null;
 	}
 
-	const currentIndex = sections.findIndex(
-		(section) => section === currentSection,
-	);
+	const currentIndex = sections.findIndex((section) => section === currentSection);
 	if (currentIndex < 0) {
 		return null;
 	}
 
-	const nextIndex =
-		direction === "down" ? currentIndex + 1 : currentIndex - 1;
+	const nextIndex = direction === "down" ? currentIndex + 1 : currentIndex - 1;
 	return sections[nextIndex] ?? null;
 }
 
@@ -477,8 +451,7 @@ export function scrollSectionIntoViewForFocus(
 		const rootRect = scrollContainer.getBoundingClientRect();
 		const viewportHeight = scrollContainer.clientHeight;
 		const currentScrollTop = scrollContainer.scrollTop;
-		const sectionTop =
-			sectionRect.top - rootRect.top + currentScrollTop;
+		const sectionTop = sectionRect.top - rootRect.top + currentScrollTop;
 		const sectionBottom = sectionTop + sectionHeight;
 		const viewportTop = currentScrollTop;
 		const viewportBottom = viewportTop + viewportHeight;

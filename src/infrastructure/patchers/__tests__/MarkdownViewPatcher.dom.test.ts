@@ -122,9 +122,9 @@ describe("MarkdownViewPatcher", () => {
 			expect(
 				plugin.componentController.unmountViewComponents,
 			).toHaveBeenCalledTimes(1);
-			expect(plugin.componentController.unmountViewComponents).toHaveBeenCalledWith(
-				view,
-			);
+			expect(
+				plugin.componentController.unmountViewComponents,
+			).toHaveBeenCalledWith(view);
 		} finally {
 			cleanup();
 		}

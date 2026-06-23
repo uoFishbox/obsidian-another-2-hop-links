@@ -30,7 +30,9 @@ describe("cardRenderShadowSurface", () => {
 				"div[data-ccl-card-render-shadow-surface]",
 			),
 		).toHaveLength(1);
-		expect(first?.surfaceEl.className).toContain("cosense-card-links__virtual-grid");
+		expect(first?.surfaceEl.className).toContain(
+			"cosense-card-links__virtual-grid",
+		);
 		expect(first?.surfaceEl.className).toContain("cosense-card-links__section");
 		expect(first?.surfaceEl.className).toContain("twohop-links-new-links");
 		expect(

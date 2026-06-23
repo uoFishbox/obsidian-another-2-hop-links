@@ -31,9 +31,7 @@ export function markScrollActivityIdle(source: object): void {
 	}
 }
 
-export function subscribeScrollActivity(
-	listener: ScrollActivityListener,
-): () => void {
+export function subscribeScrollActivity(listener: ScrollActivityListener): () => void {
 	listeners.add(listener);
 	return () => {
 		listeners.delete(listener);

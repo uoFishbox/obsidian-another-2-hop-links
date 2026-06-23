@@ -16,10 +16,7 @@ import { enableLogging, logger } from "utils/logger";
 import { ResolverCache } from "./ResolverCache";
 import { collectResolverDependencies } from "./ResolverDependencies";
 import { TwoHopBranchBuilder } from "./TwoHopBranchBuilder";
-import type {
-	ResolverDebugPolicy,
-	ResolverPerformanceSettings,
-} from "./ResolverTypes";
+import type { ResolverDebugPolicy, ResolverPerformanceSettings } from "./ResolverTypes";
 
 export interface ResolveOptions {
 	includeTaggedNotes?: boolean;
@@ -48,18 +45,13 @@ export class TwoHopLinkResolver {
 		private readonly getDebugPolicy?: () => ResolverDebugPolicy,
 	) {
 		this.cache = new ResolverCache();
-		this.branchBuilder = new TwoHopBranchBuilder(
-			metadataCache,
-			indexingService,
-		);
+		this.branchBuilder = new TwoHopBranchBuilder(metadataCache, indexingService);
 
 		if (typeof indexingService.onDataUpdate === "function") {
 			this.supportsDataUpdateSubscription = true;
-			this.unsubscribeDataUpdate = indexingService.onDataUpdate(
-				(context) => {
-					this.cache.invalidate(context);
-				},
-			);
+			this.unsubscribeDataUpdate = indexingService.onDataUpdate((context) => {
+				this.cache.invalidate(context);
+			});
 		} else {
 			this.supportsDataUpdateSubscription = false;
 			this.unsubscribeDataUpdate = undefined;
@@ -125,10 +117,7 @@ export class TwoHopLinkResolver {
 		try {
 			return await resolvePromise;
 		} finally {
-			if (
-				this.inFlightResolves.get(requestKey)?.promise ===
-				resolvePromise
-			) {
+			if (this.inFlightResolves.get(requestKey)?.promise === resolvePromise) {
 				this.inFlightResolves.delete(requestKey);
 			}
 		}
@@ -208,10 +197,7 @@ export class TwoHopLinkResolver {
 				branches: baseBranches,
 				backlinks: uniqueBacklinks,
 				taggedNotes: [],
-				displayVersions: this.createDisplayVersions(
-					indexVersion,
-					"base",
-				),
+				displayVersions: this.createDisplayVersions(indexVersion, "base"),
 			};
 			onProgress?.({
 				phase: "base",
@@ -229,10 +215,7 @@ export class TwoHopLinkResolver {
 				branches: twoHopBranches,
 				backlinks: uniqueBacklinks,
 				taggedNotes: [],
-				displayVersions: this.createDisplayVersions(
-					indexVersion,
-					"twohop",
-				),
+				displayVersions: this.createDisplayVersions(indexVersion, "twohop"),
 			};
 			onProgress?.({
 				phase: "twohop",
@@ -283,9 +266,7 @@ export class TwoHopLinkResolver {
 	private addBacklinkCounts(
 		backlinks: readonly TwoHopIndexedLink[],
 	): TwoHopIndexedLink[] {
-		const linksWithBacklinkCounts = new Array<TwoHopIndexedLink>(
-			backlinks.length,
-		);
+		const linksWithBacklinkCounts = new Array<TwoHopIndexedLink>(backlinks.length);
 		for (let index = 0; index < backlinks.length; index++) {
 			const backlink = backlinks[index];
 			if (!backlink.isUnresolved) {
@@ -296,8 +277,7 @@ export class TwoHopLinkResolver {
 			const lookupPath = getLookupPathForLink(backlink);
 			linksWithBacklinkCounts[index] = {
 				...backlink,
-				backlinkCount:
-					this.indexingService.getBacklinkCountForLink(lookupPath),
+				backlinkCount: this.indexingService.getBacklinkCountForLink(lookupPath),
 			};
 		}
 		return linksWithBacklinkCounts;
@@ -312,16 +292,11 @@ export class TwoHopLinkResolver {
 				0,
 				Math.floor(override?.maxOutgoingToProcess ?? 0),
 			),
-			maxHop2PerBranch: Math.max(
-				0,
-				Math.floor(override?.maxHop2PerBranch ?? 0),
-			),
+			maxHop2PerBranch: Math.max(0, Math.floor(override?.maxHop2PerBranch ?? 0)),
 		};
 	}
 
-	private getResolveSettings(
-		options?: ResolveOptions,
-	): Required<ResolveOptions> {
+	private getResolveSettings(options?: ResolveOptions): Required<ResolveOptions> {
 		return {
 			includeTaggedNotes: options?.includeTaggedNotes ?? true,
 		};

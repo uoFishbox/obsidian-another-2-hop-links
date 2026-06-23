@@ -1,14 +1,10 @@
 import type { BacklinkBucket } from "types/domain";
 
-export function getBacklinkCollectionCount(
-	collection: BacklinkBucket,
-): number {
+export function getBacklinkCollectionCount(collection: BacklinkBucket): number {
 	return collection.count;
 }
 
-export function hasResolvedBacklink(
-	collection: BacklinkBucket,
-): boolean {
+export function hasResolvedBacklink(collection: BacklinkBucket): boolean {
 	return collection.hasResolved;
 }
 
@@ -26,8 +22,6 @@ export function mergeBacklinkCollections(
 	return left;
 }
 
-export function cloneBacklinkCollection(
-	collection: BacklinkBucket,
-): BacklinkBucket {
+export function cloneBacklinkCollection(collection: BacklinkBucket): BacklinkBucket {
 	return { ...collection };
 }

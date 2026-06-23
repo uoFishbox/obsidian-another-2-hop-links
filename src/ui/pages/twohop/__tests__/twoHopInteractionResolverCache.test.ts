@@ -4,9 +4,7 @@ import type { ViewItem } from "application/presenters";
 import type { ItemInteractionDescriptor } from "ui/interactions/interactionTypes";
 import type { MountedFlatItemCell } from "ui/components/common/virtual-list/reconciliation/viewPlanMountedCells";
 import type { MountedFlatRowSlice } from "ui/components/common/virtual-list/reconciliation/viewPlanRenderRows";
-import {
-	createTwoHopInteractionResolverProvider,
-} from "../twoHopInteractionResolverCache";
+import { createTwoHopInteractionResolverProvider } from "../twoHopInteractionResolverCache";
 import type {
 	TwoHopPageVirtualItem,
 	TwoHopPageVirtualSection,
@@ -59,9 +57,7 @@ function createMountedRows(params: {
 	];
 }
 
-function createDescriptor(
-	item: TwoHopPageVirtualItem,
-): ItemInteractionDescriptor {
+function createDescriptor(item: TwoHopPageVirtualItem): ItemInteractionDescriptor {
 	return {
 		interactionId: item.interactionId ?? "",
 		kind: "item",
@@ -89,18 +85,16 @@ describe("twoHopInteractionResolverCache", () => {
 
 		mountedRows = createMountedRows({ item: firstItem });
 
-		expect(
-			provider.resolveInteractionDescriptor("item:file:alpha.md"),
-		).toBe(firstDescriptor);
+		expect(provider.resolveInteractionDescriptor("item:file:alpha.md")).toBe(
+			firstDescriptor,
+		);
 
 		mountedRows = createMountedRows({ item: secondItem });
 
-		expect(
-			provider.resolveInteractionDescriptor("item:file:alpha.md"),
-		).toBeNull();
-		expect(
-			provider.resolveInteractionDescriptor("item:file:beta.md"),
-		).toBe(secondDescriptor);
+		expect(provider.resolveInteractionDescriptor("item:file:alpha.md")).toBeNull();
+		expect(provider.resolveInteractionDescriptor("item:file:beta.md")).toBe(
+			secondDescriptor,
+		);
 	});
 
 	it("provider reuses descriptors while item and render body revisions are unchanged", () => {
@@ -116,12 +110,12 @@ describe("twoHopInteractionResolverCache", () => {
 			resolveDescriptor,
 		});
 
-		expect(
-			provider.resolveInteractionDescriptor("item:file:alpha.md"),
-		).toBe(descriptor);
-		expect(
-			provider.resolveInteractionDescriptor("item:file:alpha.md"),
-		).toBe(descriptor);
+		expect(provider.resolveInteractionDescriptor("item:file:alpha.md")).toBe(
+			descriptor,
+		);
+		expect(provider.resolveInteractionDescriptor("item:file:alpha.md")).toBe(
+			descriptor,
+		);
 		expect(resolveDescriptor).toHaveBeenCalledTimes(1);
 	});
 });

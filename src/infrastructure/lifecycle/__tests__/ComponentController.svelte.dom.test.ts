@@ -9,13 +9,13 @@ const {
 	mountSpy,
 	unmountSpy,
 } = vi.hoisted(() => ({
-		getContainerElementsSpy: vi.fn(),
-		getLeafIdSpy: vi.fn(),
-		handleMountErrorSpy: vi.fn(),
-		handleUnmountErrorSpy: vi.fn(),
-		mountSpy: vi.fn(),
-		unmountSpy: vi.fn(),
-	}));
+	getContainerElementsSpy: vi.fn(),
+	getLeafIdSpy: vi.fn(),
+	handleMountErrorSpy: vi.fn(),
+	handleUnmountErrorSpy: vi.fn(),
+	mountSpy: vi.fn(),
+	unmountSpy: vi.fn(),
+}));
 
 vi.mock("ui/utils/domUtils", () => ({
 	getContainerElements: getContainerElementsSpy,
@@ -151,7 +151,9 @@ function createController() {
 function getStoresFromMountCalls(): unknown[] {
 	const stores: unknown[] = [];
 	for (const call of mountSpy.mock.calls) {
-		const options = call[1] as { props?: { applicationStore?: unknown } } | undefined;
+		const options = call[1] as
+			| { props?: { applicationStore?: unknown } }
+			| undefined;
 		if (options?.props?.applicationStore) {
 			stores.push(options.props.applicationStore);
 		}
@@ -162,7 +164,9 @@ function getStoresFromMountCalls(): unknown[] {
 function getLazyCachesFromMountCalls(): Set<unknown>[] {
 	const caches: Set<unknown>[] = [];
 	for (const call of mountSpy.mock.calls) {
-		const options = call[1] as { props?: { lazyLoaderCache?: Set<unknown> } } | undefined;
+		const options = call[1] as
+			| { props?: { lazyLoaderCache?: Set<unknown> } }
+			| undefined;
 		if (options?.props?.lazyLoaderCache) {
 			caches.push(options.props.lazyLoaderCache);
 		}
@@ -283,7 +287,9 @@ describe("ComponentController mountComponentsForView", () => {
 		expect(resolveTwoHopLinks).toHaveBeenCalledTimes(2);
 
 		const allStores = getStoresFromMountCalls();
-		const finalAlphaStore = allStores[allStores.length - 1] as { destroy: () => void };
+		const finalAlphaStore = allStores[allStores.length - 1] as {
+			destroy: () => void;
+		};
 		expect(finalAlphaStore).toBe(alphaStore);
 		expect(alphaDestroySpy).not.toHaveBeenCalled();
 	});

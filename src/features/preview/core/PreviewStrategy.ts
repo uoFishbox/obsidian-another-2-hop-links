@@ -22,6 +22,6 @@ export interface PreviewStrategy {
 	generate(
 		file: TFile,
 		context: PreviewContext,
-		signal?: AbortSignal
+		signal?: AbortSignal,
 	): Promise<PreviewData | undefined>;
 }

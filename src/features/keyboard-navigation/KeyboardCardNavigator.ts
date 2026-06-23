@@ -66,8 +66,7 @@ export class KeyboardCardNavigator {
 	private selectedRowIndex = -1;
 	private scrollFrameId: number | null = null;
 	private cachedScrollContainer: HTMLElement | null = null;
-	private readonly handleDocumentKeydownBound =
-		this.handleDocumentKeydown.bind(this);
+	private readonly handleDocumentKeydownBound = this.handleDocumentKeydown.bind(this);
 
 	constructor(
 		private readonly app: AppLike,
@@ -98,11 +97,7 @@ export class KeyboardCardNavigator {
 		this.rootEl.classList.add("ccl-kb-nav-active");
 		this.rootEl.dataset.cclKbNavHost = host;
 
-		document.addEventListener(
-			"keydown",
-			this.handleDocumentKeydownBound,
-			true,
-		);
+		document.addEventListener("keydown", this.handleDocumentKeydownBound, true);
 
 		this.rootEl.focus({ preventScroll: true });
 
@@ -113,11 +108,7 @@ export class KeyboardCardNavigator {
 	}
 
 	public deactivate(): void {
-		document.removeEventListener(
-			"keydown",
-			this.handleDocumentKeydownBound,
-			true,
-		);
+		document.removeEventListener("keydown", this.handleDocumentKeydownBound, true);
 
 		if (this.scrollFrameId !== null) {
 			cancelAnimationFrame(this.scrollFrameId);
@@ -169,10 +160,7 @@ export class KeyboardCardNavigator {
 				continue;
 			}
 
-			const sidebarSurface = this.findVisibleSurfaceRoot(
-				container,
-				"sidebar",
-			);
+			const sidebarSurface = this.findVisibleSurfaceRoot(container, "sidebar");
 			if (sidebarSurface) {
 				candidates.push({
 					rootEl: sidebarSurface,
@@ -204,8 +192,7 @@ export class KeyboardCardNavigator {
 				return;
 			}
 
-			const host: CardSurfaceHost =
-				viewType === "empty" ? "empty" : "inline";
+			const host: CardSurfaceHost = viewType === "empty" ? "empty" : "inline";
 			const emptySurface = this.findVisibleSurfaceRoot(container, host);
 			if (emptySurface) {
 				candidates.push({
@@ -217,8 +204,7 @@ export class KeyboardCardNavigator {
 
 		return (
 			candidates.find(
-				(candidate) =>
-					this.collectVisibleRows(candidate.rootEl).length > 0,
+				(candidate) => this.collectVisibleRows(candidate.rootEl).length > 0,
 			) ?? null
 		);
 	}
@@ -231,11 +217,7 @@ export class KeyboardCardNavigator {
 		const rowElements: VisibleRowEntry[] = [];
 		for (const element of elements) {
 			const rect = element.getBoundingClientRect();
-			if (
-				!isElementVisible(element) ||
-				rect.width <= 0 ||
-				rect.height <= 0
-			) {
+			if (!isElementVisible(element) || rect.width <= 0 || rect.height <= 0) {
 				continue;
 			}
 
@@ -257,10 +239,7 @@ export class KeyboardCardNavigator {
 		const rows: KeyboardNavigationRow[] = [];
 		for (const entry of rowElements) {
 			const lastRow = rows.at(-1);
-			if (
-				lastRow &&
-				Math.abs(lastRow.top - entry.top) <= ROW_TOP_TOLERANCE_PX
-			) {
+			if (lastRow && Math.abs(lastRow.top - entry.top) <= ROW_TOP_TOLERANCE_PX) {
 				lastRow.elements.push(entry.element);
 				if (entry.isHintTarget) {
 					lastRow.cards.push(entry.element);
@@ -420,9 +399,7 @@ export class KeyboardCardNavigator {
 		}
 
 		const preservedIndex = this.rows.findIndex((row) =>
-			row.elements.some((element) =>
-				previousSelectedElements.has(element),
-			),
+			row.elements.some((element) => previousSelectedElements.has(element)),
 		);
 		const nextIndex =
 			preservedIndex >= 0
@@ -511,15 +488,11 @@ export class KeyboardCardNavigator {
 				const nextIndex =
 					delta > 0
 						? this.rows.findIndex(
-								(row) =>
-									row.top >
-									anchorTop + ROW_TOP_TOLERANCE_PX / 2,
+								(row) => row.top > anchorTop + ROW_TOP_TOLERANCE_PX / 2,
 							)
 						: this.findLastIndex(
 								this.rows,
-								(row) =>
-									row.top <
-									anchorTop - ROW_TOP_TOLERANCE_PX / 2,
+								(row) => row.top < anchorTop - ROW_TOP_TOLERANCE_PX / 2,
 							);
 
 				if (nextIndex >= 0) {
@@ -580,10 +553,7 @@ export class KeyboardCardNavigator {
 		return this.cachedScrollContainer ?? window;
 	}
 
-	private setScrollTop(
-		scrollContainer: HTMLElement,
-		nextScrollTop: number,
-	): boolean {
+	private setScrollTop(scrollContainer: HTMLElement, nextScrollTop: number): boolean {
 		const clamped = Math.max(0, nextScrollTop);
 		const previous = scrollContainer.scrollTop;
 
@@ -598,10 +568,7 @@ export class KeyboardCardNavigator {
 	}
 
 	private scrollBy(scrollContainer: HTMLElement, delta: number): boolean {
-		return this.setScrollTop(
-			scrollContainer,
-			scrollContainer.scrollTop + delta,
-		);
+		return this.setScrollTop(scrollContainer, scrollContainer.scrollTop + delta);
 	}
 
 	private activateLoadMoreByHint(
@@ -654,9 +621,7 @@ export class KeyboardCardNavigator {
 
 	private getHintKeysForRow(cardCount: number): string[] {
 		const keys =
-			cardCount <= SHORT_HINT_KEYS.length
-				? SHORT_HINT_KEYS
-				: LONG_HINT_KEYS;
+			cardCount <= SHORT_HINT_KEYS.length ? SHORT_HINT_KEYS : LONG_HINT_KEYS;
 		return keys.slice(0, cardCount);
 	}
 
@@ -693,9 +658,7 @@ export class KeyboardCardNavigator {
 		return element.matches(CARD_SELECTOR);
 	}
 
-	private isLoadMoreButton(
-		element: HTMLElement,
-	): element is HTMLButtonElement {
+	private isLoadMoreButton(element: HTMLElement): element is HTMLButtonElement {
 		return element.matches(LOAD_MORE_SELECTOR);
 	}
 
@@ -712,10 +675,7 @@ export class KeyboardCardNavigator {
 		);
 	}
 
-	private findLastIndex<T>(
-		items: T[],
-		predicate: (value: T) => boolean,
-	): number {
+	private findLastIndex<T>(items: T[], predicate: (value: T) => boolean): number {
 		for (let index = items.length - 1; index >= 0; index -= 1) {
 			if (predicate(items[index])) {
 				return index;

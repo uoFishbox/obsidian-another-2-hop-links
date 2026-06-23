@@ -43,10 +43,7 @@ export interface SearchWorkerFileContentDiff {
 }
 
 export type FileContentEntryVisitor = (
-	visitor: (
-		path: string,
-		entry: Readonly<SearchContentIndexEntry>,
-	) => void,
+	visitor: (path: string, entry: Readonly<SearchContentIndexEntry>) => void,
 ) => void;
 
 export function diffSearchWorkerFileContentsFromVisitor(
@@ -75,10 +72,7 @@ export function diffSearchWorkerFileContentsFromVisitor(
 	const seenPaths = new Set<string>();
 	const upserts: SearchWorkerFileContentSnapshot[] = [];
 	const removals: string[] = [];
-	let nextEntriesByPath: Map<
-		string,
-		Readonly<SearchContentIndexEntry>
-	> | null = null;
+	let nextEntriesByPath: Map<string, Readonly<SearchContentIndexEntry>> | null = null;
 	const ensureNextEntriesByPath = (): Map<
 		string,
 		Readonly<SearchContentIndexEntry>
@@ -129,7 +123,7 @@ export function diffSearchWorkerFileContentsFromVisitor(
 		removals,
 		nextEntriesByPath: nextEntriesByPath ?? new Map(),
 	};
-	}
+}
 
 export function diffSearchWorkerFileContents(
 	currentEntries: Iterable<readonly [string, Readonly<SearchContentIndexEntry>]>,
@@ -157,10 +151,7 @@ export function diffSearchWorkerFileContents(
 	const seenPaths = new Set<string>();
 	const upserts: SearchWorkerFileContentSnapshot[] = [];
 	const removals: string[] = [];
-	let nextEntriesByPath: Map<
-		string,
-		Readonly<SearchContentIndexEntry>
-	> | null = null;
+	let nextEntriesByPath: Map<string, Readonly<SearchContentIndexEntry>> | null = null;
 	const ensureNextEntriesByPath = (): Map<
 		string,
 		Readonly<SearchContentIndexEntry>

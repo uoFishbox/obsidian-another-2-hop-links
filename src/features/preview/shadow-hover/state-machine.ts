@@ -82,10 +82,7 @@ export function transitionHoverSession(
 				previous: getSessionOpenPopover(state),
 			};
 		case "request-cancel":
-			if (
-				state.type !== "opening" ||
-				state.requestSeq !== event.requestSeq
-			) {
+			if (state.type !== "opening" || state.requestSeq !== event.requestSeq) {
 				return state;
 			}
 			return state.previous
@@ -130,10 +127,7 @@ export function transitionHoverSession(
 		case "popover-cleared":
 			return clearAssignedPopover(state, event.popover, event.hoverParent);
 		case "handoff-timeout":
-			if (
-				state.type !== "handoff" ||
-				state.requestSeq !== event.requestSeq
-			) {
+			if (state.type !== "handoff" || state.requestSeq !== event.requestSeq) {
 				return state;
 			}
 			return {
@@ -188,9 +182,7 @@ export function transitionHoverSession(
 	}
 }
 
-export function getSessionAnchor(
-	state: HoverSessionState,
-): HoverAnchorTarget | null {
+export function getSessionAnchor(state: HoverSessionState): HoverAnchorTarget | null {
 	switch (state.type) {
 		case "hovering-anchor":
 		case "opening":

@@ -1,9 +1,6 @@
 import { Component, TFile, type App } from "obsidian";
 
-export type VaultContentChangeListener = (
-	changedFile: TFile,
-	oldPath?: string,
-) => void;
+export type VaultContentChangeListener = (changedFile: TFile, oldPath?: string) => void;
 
 class FileContentVaultEventHub {
 	private component: Component | null = null;
@@ -72,9 +69,7 @@ class FileContentVaultEventHub {
 
 const hubByApp = new WeakMap<App, FileContentVaultEventHub>();
 
-export function getFileContentVaultEventHub(
-	app: App,
-): FileContentVaultEventHub {
+export function getFileContentVaultEventHub(app: App): FileContentVaultEventHub {
 	let hub = hubByApp.get(app);
 
 	if (!hub) {

@@ -50,10 +50,15 @@ describe("CanvasDropManager", () => {
 		const workspace = {
 			iterateAllLeaves: (callback: (leaf: { view: unknown }) => void) =>
 				leaves.forEach(callback),
-			on: vi.fn((event: string, callback: (leaf?: { view: unknown } | null) => void) => {
-				eventHandlers.set(event, callback);
-				return { event, callback };
-			}),
+			on: vi.fn(
+				(
+					event: string,
+					callback: (leaf?: { view: unknown } | null) => void,
+				) => {
+					eventHandlers.set(event, callback);
+					return { event, callback };
+				},
+			),
 		};
 		const app = {
 			workspace,
@@ -82,10 +87,15 @@ describe("CanvasDropManager", () => {
 		const workspace = {
 			iterateAllLeaves: (callback: (leaf: { view: unknown }) => void) =>
 				leaves.forEach(callback),
-			on: vi.fn((event: string, callback: (leaf?: { view: unknown } | null) => void) => {
-				eventHandlers.set(event, callback);
-				return { event, callback };
-			}),
+			on: vi.fn(
+				(
+					event: string,
+					callback: (leaf?: { view: unknown } | null) => void,
+				) => {
+					eventHandlers.set(event, callback);
+					return { event, callback };
+				},
+			),
 		};
 		const app = {
 			workspace,

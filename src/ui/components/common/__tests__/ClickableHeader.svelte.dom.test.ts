@@ -14,9 +14,7 @@ vi.mock("obsidian", async () => {
 	};
 });
 
-function createDescriptor(
-	interactionId: string,
-): SectionHeaderInteractionDescriptor {
+function createDescriptor(interactionId: string): SectionHeaderInteractionDescriptor {
 	return {
 		interactionId,
 		kind: "sectionHeader",

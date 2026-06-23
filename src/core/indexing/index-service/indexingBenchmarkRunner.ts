@@ -74,8 +74,7 @@ export async function runIndexingBenchmark(
 		options.createIndexingService ??
 		((vault, metadataCache) =>
 			new IndexingService(vault, metadataCache, () => true));
-	const clearCachesBetweenIterations =
-		options.clearCachesBetweenIterations ?? false;
+	const clearCachesBetweenIterations = options.clearCachesBetweenIterations ?? false;
 	const allFiles = vault.getFiles();
 	const linkCapableFiles = allFiles.filter((file) =>
 		INDEX_LINK_CAPABLE_EXTENSIONS.has(file.extension.toLowerCase()),

@@ -38,9 +38,7 @@ function patchPropertyWidgets(
 	const widgets = plugin.app.metadataTypeManager.registeredTypeWidgets;
 
 	if (enableLogging)
-		logger(
-			"[PropertyPatcher] Patching built-in property widgets for styling...",
-		);
+		logger("[PropertyPatcher] Patching built-in property widgets for styling...");
 
 	// 再描画フレームでの再スタイリングが重複しないように、
 	// 要素単位でスケジュールを管理するWeakSetを関数スコープに配置
@@ -52,9 +50,7 @@ function patchPropertyWidgets(
 		).getPropertyWidgetRenderSave(widget);
 		if (!capability.ok) {
 			if (enableLogging)
-				logger(
-					`[PropertyPatcher] Skipped widget: ${capability.reason}.`,
-				);
+				logger(`[PropertyPatcher] Skipped widget: ${capability.reason}.`);
 			continue;
 		}
 
@@ -86,10 +82,7 @@ function patchPropertyWidgets(
 					) as PropertyWidgetComponentLike;
 
 					// 描画された要素内のリンクを装飾する
-					if (
-						!(el instanceof HTMLElement) ||
-						!isPropertyContext(ctx)
-					) {
+					if (!(el instanceof HTMLElement) || !isPropertyContext(ctx)) {
 						return component;
 					}
 
@@ -141,10 +134,7 @@ function patchPropertyWidgets(
 
 					if (!el || !sourcePath) return result;
 
-					const sourceFile = resolveFileByPath(
-						plugin.app.vault,
-						sourcePath,
-					);
+					const sourceFile = resolveFileByPath(plugin.app.vault, sourcePath);
 					if (!sourceFile) return result;
 
 					// 値が変更された後、レンダリングサイクルの完了を待って再スタイリング
@@ -160,10 +150,7 @@ function patchPropertyWidgets(
 						schedule(() => {
 							scheduledElements.delete(el);
 							if (el.isConnected) {
-								propertyStyleManager.styleElement(
-									el,
-									sourceFile,
-								);
+								propertyStyleManager.styleElement(el, sourceFile);
 							}
 						});
 					}
@@ -175,9 +162,7 @@ function patchPropertyWidgets(
 	}
 
 	if (enableLogging)
-		logger(
-			"[PropertyPatcher] Finished patching property widgets for styling.",
-		);
+		logger("[PropertyPatcher] Finished patching property widgets for styling.");
 }
 
 function isPropertyContext(value: unknown): value is { sourcePath: string } {
@@ -199,8 +184,6 @@ function asWidgetInstance(
 	return {
 		el: candidate.el instanceof HTMLElement ? candidate.el : undefined,
 		sourcePath:
-			typeof candidate.sourcePath === "string"
-				? candidate.sourcePath
-				: undefined,
+			typeof candidate.sourcePath === "string" ? candidate.sourcePath : undefined,
 	};
 }

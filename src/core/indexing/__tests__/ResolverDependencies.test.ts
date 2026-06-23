@@ -65,13 +65,7 @@ describe("collectResolverDependencies", () => {
 		});
 
 		expect(dependencies.dependencyPaths).toEqual(
-			new Set([
-				"origin.md",
-				"target.md",
-				"hop2.md",
-				"backlink.md",
-				"tagged.md",
-			]),
+			new Set(["origin.md", "target.md", "hop2.md", "backlink.md", "tagged.md"]),
 		);
 		expect(dependencies.dependencyLookupKeys).toEqual(
 			new Set(["origin.md", "target.md", "missing.md"]),

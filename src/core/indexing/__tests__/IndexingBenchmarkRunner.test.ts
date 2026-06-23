@@ -84,14 +84,8 @@ describe("runIndexingBenchmark", () => {
 
 		expect(createIndexingService).toHaveBeenCalledTimes(1);
 		expect(service.rebuildBacklinksMapChunked).toHaveBeenCalledTimes(5);
-		expect(service.rebuildBacklinksMapChunked).toHaveBeenNthCalledWith(
-			1,
-			42,
-		);
-		expect(service.rebuildBacklinksMapChunked).toHaveBeenNthCalledWith(
-			5,
-			42,
-		);
+		expect(service.rebuildBacklinksMapChunked).toHaveBeenNthCalledWith(1, 42);
+		expect(service.rebuildBacklinksMapChunked).toHaveBeenNthCalledWith(5, 42);
 		expect(result.iterations).toBe(5);
 		expect(result.durationsMs).toEqual([10, 15, 20, 25, 30]);
 		expect(result.averageMs).toBe(20);
@@ -145,9 +139,7 @@ describe("runIndexingBenchmark", () => {
 	test("exposes link normalization cache stats on a warm-cache run", async () => {
 		const mockVault = createMockVault(["md"]);
 		const metadataCache = createMockMetadataCache();
-		const service = createBenchmarkService([
-			{ backlinksEntries: 1, tagFiles: 0 },
-		]);
+		const service = createBenchmarkService([{ backlinksEntries: 1, tagFiles: 0 }]);
 		const createIndexingService = vi.fn(() => service);
 		const now = vi.fn().mockReturnValueOnce(0).mockReturnValueOnce(5);
 
@@ -165,9 +157,7 @@ describe("runIndexingBenchmark", () => {
 	test("omits link normalization cache stats on a cold-cache run", async () => {
 		const mockVault = createMockVault(["md"]);
 		const metadataCache = createMockMetadataCache();
-		const service = createBenchmarkService([
-			{ backlinksEntries: 1, tagFiles: 0 },
-		]);
+		const service = createBenchmarkService([{ backlinksEntries: 1, tagFiles: 0 }]);
 		const createIndexingService = vi.fn(() => service);
 		const now = vi.fn().mockReturnValueOnce(0).mockReturnValueOnce(5);
 

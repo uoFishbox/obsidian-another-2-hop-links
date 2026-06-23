@@ -34,9 +34,7 @@
 		applicationStore?: ApplicationStore;
 		initialVisibleCount?: number;
 		loadMoreIncrement?: number;
-		getCellClassName?: (
-			section: TwoHopPageVirtualSection,
-		) => string | undefined;
+		getCellClassName?: (section: TwoHopPageVirtualSection) => string | undefined;
 		getItemInteractionDescriptor: (
 			item: TwoHopPageVirtualItem,
 		) => ItemInteractionDescriptor | null;
@@ -69,32 +67,24 @@
 	}
 
 	const props: Props = $props();
-	setContext(
-		PREVIEW_ACTIVATION_SCOPE_CONTEXT_KEY,
-		createPreviewActivationScope(),
-	);
+	setContext(PREVIEW_ACTIVATION_SCOPE_CONTEXT_KEY, createPreviewActivationScope());
 	const list = useTwoHopViewPlanVirtualList(props);
 	const interactionDescriptorResolverProvider =
 		createTwoHopInteractionResolverProvider({
 			getMountedRows: () => list.mountedRows,
-			resolveDescriptor: (item) =>
-				props.getItemInteractionDescriptor(item),
+			resolveDescriptor: (item) => props.getItemInteractionDescriptor(item),
 		});
 	const getMountedCellClassName = (
 		cell: MountedFlatCell<TwoHopPageVirtualItem, TwoHopPageVirtualSection>,
 	): string | undefined => props.getCellClassName?.(cell.section);
 	const isHeaderCell = (
 		cell: MountedFlatCell<TwoHopPageVirtualItem, TwoHopPageVirtualSection>,
-	): cell is MountedFlatHeaderCell<
-		TwoHopPageVirtualItem,
-		TwoHopPageVirtualSection
-	> => cell.cell.kind === "header";
+	): cell is MountedFlatHeaderCell<TwoHopPageVirtualItem, TwoHopPageVirtualSection> =>
+		cell.cell.kind === "header";
 	const isItemCell = (
 		cell: MountedFlatCell<TwoHopPageVirtualItem, TwoHopPageVirtualSection>,
-	): cell is MountedFlatItemCell<
-		TwoHopPageVirtualItem,
-		TwoHopPageVirtualSection
-	> => cell.cell.kind === "item";
+	): cell is MountedFlatItemCell<TwoHopPageVirtualItem, TwoHopPageVirtualSection> =>
+		cell.cell.kind === "item";
 </script>
 
 <VirtualSurface

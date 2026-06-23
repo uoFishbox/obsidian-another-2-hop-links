@@ -21,19 +21,18 @@ function createHandlers() {
 
 function summarizeHandlers(handlers: SettingsSideEffectHandlers) {
 	return {
-		setLoggingEnabled: (handlers.setLoggingEnabled as ReturnType<typeof vi.fn>)
-			.mock.calls,
+		setLoggingEnabled: (handlers.setLoggingEnabled as ReturnType<typeof vi.fn>).mock
+			.calls,
 		updateDecoratedViews: (
 			handlers.updateDecoratedViews as ReturnType<typeof vi.fn>
 		).mock.calls.length,
-		syncEmptyView: (handlers.syncEmptyView as ReturnType<typeof vi.fn>).mock
-			.calls.length,
+		syncEmptyView: (handlers.syncEmptyView as ReturnType<typeof vi.fn>).mock.calls
+			.length,
 		syncTagFeatureSettings: (
 			handlers.syncTagFeatureSettings as ReturnType<typeof vi.fn>
 		).mock.calls.length,
-		invalidateSortCache: (
-			handlers.invalidateSortCache as ReturnType<typeof vi.fn>
-		).mock.calls.length,
+		invalidateSortCache: (handlers.invalidateSortCache as ReturnType<typeof vi.fn>)
+			.mock.calls.length,
 		handleDisplayModeSettingsChange: (
 			handlers.handleDisplayModeSettingsChange as ReturnType<typeof vi.fn>
 		).mock.calls.length,
@@ -82,9 +81,7 @@ describe("applySettingsSideEffects", () => {
 
 		expect(handlers.updateDecoratedViews).toHaveBeenCalledTimes(1);
 		expect(handlers.invalidateSortCache).toHaveBeenCalledTimes(1);
-		expect(handlers.handleDisplayModeSettingsChange).toHaveBeenCalledTimes(
-			1,
-		);
+		expect(handlers.handleDisplayModeSettingsChange).toHaveBeenCalledTimes(1);
 	});
 
 	it("syncs the empty view toggle update", () => {
@@ -109,11 +106,7 @@ describe("applySettingsSideEffects", () => {
 
 	it("skips global refresh work for last used sort option updates", () => {
 		const handlers = createHandlers();
-		applySettingsSideEffects(
-			["lastUsedSortOption"],
-			DEFAULT_SETTINGS,
-			handlers,
-		);
+		applySettingsSideEffects(["lastUsedSortOption"], DEFAULT_SETTINGS, handlers);
 
 		expect(handlers.setLoggingEnabled).not.toHaveBeenCalled();
 		expect(handlers.updateDecoratedViews).not.toHaveBeenCalled();
@@ -126,11 +119,7 @@ describe("applySettingsSideEffects", () => {
 
 	it("does not reactivate display mode for full-text search toggle", () => {
 		const handlers = createHandlers();
-		applySettingsSideEffects(
-			["enableContentSearch"],
-			DEFAULT_SETTINGS,
-			handlers,
-		);
+		applySettingsSideEffects(["enableContentSearch"], DEFAULT_SETTINGS, handlers);
 
 		// The toggle only affects in-view filtering; it must not force-remount
 		// the inline Svelte components (which would discard the search input).

@@ -25,11 +25,7 @@
 		onMountedCellsChange?: (cells: readonly MountedItemCell[]) => void;
 	}
 
-	let {
-		items = [],
-		item,
-		onMountedCellsChange,
-	}: Props<T> = $props();
+	let { items = [], item, onMountedCellsChange }: Props<T> = $props();
 
 	$effect(() => {
 		onMountedCellsChange?.(

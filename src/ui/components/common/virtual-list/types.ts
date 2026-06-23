@@ -2,10 +2,7 @@ import type { RowRange } from "./rowRange";
 import type { ResultNavigationDirection } from "features/keyboard-navigation/resultFocus";
 import type { RowNumberLookup } from "./layout/viewPlanRowTypes";
 import type { VirtualRowLayoutMetrics } from "./layoutMetrics";
-import type {
-	RenderBodyKey,
-	RenderRevision,
-} from "./renderRevision";
+import type { RenderBodyKey, RenderRevision } from "./renderRevision";
 import type { RowKey } from "./rowKey";
 
 export type VirtualizedItemVisibility = "visible" | "mounted";
@@ -22,11 +19,9 @@ export type SourceKey = Brand<string, "SourceKey">;
 export const logicalCellKey = (value: string): LogicalCellKey =>
 	value as LogicalCellKey;
 
-export const renderSlotKey = (value: number): RenderSlotKey =>
-	value as RenderSlotKey;
+export const renderSlotKey = (value: number): RenderSlotKey => value as RenderSlotKey;
 
-export const sourceKey = (value: string): SourceKey =>
-	value as SourceKey;
+export const sourceKey = (value: string): SourceKey => value as SourceKey;
 
 export interface VirtualRow<TCell> {
 	key: RowKey;

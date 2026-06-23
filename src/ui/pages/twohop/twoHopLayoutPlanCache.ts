@@ -27,10 +27,7 @@ export function createTwoHopLayoutPlanCache(params: {
 	readonly materialization: TwoHopViewPlanMaterialization;
 	getWindow?: () => Window | null;
 	resolveInitialSectionVisibleCount(section: TwoHopSectionDescriptor): number;
-	clampVisibleCount(
-		section: TwoHopSectionDescriptor,
-		count: number,
-	): number;
+	clampVisibleCount(section: TwoHopSectionDescriptor, count: number): number;
 }): TwoHopLayoutPlanCache {
 	let previousSections: readonly TwoHopSectionDescriptor[] | undefined;
 	let previousVisibleCounts: Readonly<Record<string, number>> | undefined;
@@ -75,8 +72,8 @@ export function createTwoHopLayoutPlanCache(params: {
 		scheduleMaterialization(rowModel, onMaterialized) {
 			cancelMaterialization();
 			const materialization = params.materialization;
-			const ownerWindow = params.getWindow?.() ??
-				(typeof window === "undefined" ? null : window);
+			const ownerWindow =
+				params.getWindow?.() ?? (typeof window === "undefined" ? null : window);
 			if (materialization.kind !== "batched" || !ownerWindow) {
 				return cancelMaterialization;
 			}
@@ -85,9 +82,7 @@ export function createTwoHopLayoutPlanCache(params: {
 			)
 				? Math.max(
 						0,
-						Math.floor(
-							materialization.background.maxCellCountPerSlice,
-						),
+						Math.floor(materialization.background.maxCellCountPerSlice),
 					)
 				: 0;
 			if (backgroundCellCount === 0) {
@@ -102,12 +97,10 @@ export function createTwoHopLayoutPlanCache(params: {
 			const scheduleNextBatch = (): void => {
 				if (cancelled || !hasUnmaterializedTwoHopSections(plan)) return;
 				if (typeof ownerWindow.requestIdleCallback === "function") {
-					idleCallbackId = ownerWindow.requestIdleCallback(
-						(deadline) => {
-							idleCallbackId = null;
-							materializeNextBatch(deadline);
-						},
-					);
+					idleCallbackId = ownerWindow.requestIdleCallback((deadline) => {
+						idleCallbackId = null;
+						materializeNextBatch(deadline);
+					});
 					return;
 				}
 				animationFrameId = ownerWindow.requestAnimationFrame(() => {

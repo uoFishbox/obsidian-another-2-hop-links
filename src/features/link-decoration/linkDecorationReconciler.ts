@@ -67,8 +67,7 @@ export function createLinkDecorationReconciler(
 
 	function reconcile(request: LinkDecorationRequest): void {
 		const mode = request.mode ?? "rendered";
-		const targetSelectors =
-			request.targetSelectors ?? EMPTY_TARGET_SELECTORS;
+		const targetSelectors = request.targetSelectors ?? EMPTY_TARGET_SELECTORS;
 		const clearRemoved = request.clearRemoved ?? true;
 		const shouldLogCanvas = request.shouldLogCanvas ?? false;
 
@@ -96,18 +95,11 @@ export function createLinkDecorationReconciler(
 		);
 
 		logCanvasLookupPaths(shouldLogCanvas, lookupPaths);
-		const resolutionResults = resolveLookupPaths(
-			linkStatusService,
-			lookupPaths,
-		);
+		const resolutionResults = resolveLookupPaths(linkStatusService, lookupPaths);
 		logCanvasResolutionResults(shouldLogCanvas, resolutionResults);
 
 		if (clearRemoved) {
-			clearRemovedLinkStates(
-				request.containerEl,
-				nextStates,
-				containerState,
-			);
+			clearRemovedLinkStates(request.containerEl, nextStates, containerState);
 		}
 
 		const appliedCount = applyNextStates(
@@ -121,10 +113,7 @@ export function createLinkDecorationReconciler(
 		}
 	}
 
-	function clearContainerAttribute(
-		container: HTMLElement,
-		attrName: string,
-	): void {
+	function clearContainerAttribute(container: HTMLElement, attrName: string): void {
 		clearAttributeFromContainer(container, attrName);
 	}
 
@@ -136,9 +125,7 @@ export function createLinkDecorationReconciler(
 
 function buildNextStates(
 	linkStatusService: LinkStatusService,
-	request: Required<
-		Pick<LinkDecorationRequest, "containerEl" | "linkElements">
-	> &
+	request: Required<Pick<LinkDecorationRequest, "containerEl" | "linkElements">> &
 		Pick<LinkDecorationRequest, "hrefExtractor" | "sourceFile">,
 	targetCollectionOptions: DecorationTargetCollectionOptions,
 	containerState: ContainerState,
@@ -177,14 +164,9 @@ function reconcileNextState(
 	const href = request.hrefExtractor
 		? request.hrefExtractor(linkEl)
 		: linkStatusService.extractHref(linkEl);
-	const normalizedPath = href
-		? linkStatusService.normalizeHref(href)
-		: undefined;
+	const normalizedPath = href ? linkStatusService.normalizeHref(href) : undefined;
 	const lookupPath = normalizedPath
-		? linkStatusService.generateLookupPath(
-				normalizedPath,
-				request.sourceFile,
-			)
+		? linkStatusService.generateLookupPath(normalizedPath, request.sourceFile)
 		: undefined;
 
 	// 描画モード・セレクタなしの場合、targets は常に linkEl 自身なので、
@@ -342,11 +324,7 @@ function applyLinkState(
 		}
 	}
 
-	applyUnresolvedLinkAttribute(
-		linkEl,
-		nextState.targets,
-		nextState.shouldDecorate,
-	);
+	applyUnresolvedLinkAttribute(linkEl, nextState.targets, nextState.shouldDecorate);
 
 	if (!nextState.shouldDecorate && prevState) {
 		const addedTargets = collectMissingTargets(
@@ -428,11 +406,7 @@ function haveSameTargets(
 		return true;
 	}
 	if (left === null) {
-		return (
-			right !== null &&
-			right.length === 1 &&
-			right[0] === linkEl
-		);
+		return right !== null && right.length === 1 && right[0] === linkEl;
 	}
 	if (right === null) {
 		return left.length === 1 && left[0] === linkEl;

@@ -12,8 +12,10 @@ interface CachedScrollContainerResolution {
 	scroller: HTMLElement | null;
 }
 
-const nearestScrollContainerCache =
-	new WeakMap<HTMLElement, CachedScrollContainerResolution>();
+const nearestScrollContainerCache = new WeakMap<
+	HTMLElement,
+	CachedScrollContainerResolution
+>();
 
 export function getComposedParentElement(node: Node | null): HTMLElement | null {
 	if (!node) {

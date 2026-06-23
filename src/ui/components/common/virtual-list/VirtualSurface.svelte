@@ -21,10 +21,7 @@
 		createVirtualSurfaceNavigation,
 		type VirtualSurfaceNavigationContext,
 	} from "./svelte/VirtualSurfaceNavigation";
-	import type {
-		MountedVirtualCell,
-		VirtualNavigationTarget,
-	} from "./types";
+	import type { MountedVirtualCell, VirtualNavigationTarget } from "./types";
 	import type { RowKey } from "./rowKey";
 
 	interface Props<TMountedCell extends MountedVirtualCell> {
@@ -58,9 +55,7 @@
 		contentEl?: HTMLDivElement | null;
 		interactionShadowRoot?: ShadowRoot | null;
 		observerRoot?: HTMLElement | null;
-		getCellPosition?: (
-			cell: TMountedCell,
-		) => VirtualSurfaceCellPosition;
+		getCellPosition?: (cell: TMountedCell) => VirtualSurfaceCellPosition;
 		getCellClassName?: (cell: TMountedCell) => string | undefined;
 		getCellDataTestId?: (cell: TMountedCell) => string | undefined;
 		getRowRenderKey?: (rowIndex: number) => RowKey | undefined;
@@ -192,9 +187,7 @@
 	});
 
 	let syncedInteractionDescriptorScopeId: string | undefined;
-	let syncedInteractionDescriptorResolverProviderScopeId:
-		| string
-		| undefined;
+	let syncedInteractionDescriptorResolverProviderScopeId: string | undefined;
 
 	function clearInteractionDescriptorScope(scopeId: string): void {
 		interactionRegistry.syncInteractionDescriptors(scopeId, []);
@@ -210,9 +203,7 @@
 			syncedInteractionDescriptorScopeId &&
 			syncedInteractionDescriptorScopeId !== interactionDescriptorScopeId
 		) {
-			clearInteractionDescriptorScope(
-				syncedInteractionDescriptorScopeId,
-			);
+			clearInteractionDescriptorScope(syncedInteractionDescriptorScopeId);
 		}
 		if (
 			syncedInteractionDescriptorResolverProviderScopeId &&
@@ -268,7 +259,7 @@
 	ontouchend={delegatedInteractions.handleTouchEnd}
 	ontouchcancel={delegatedInteractions.handleTouchEnd}
 >
-		<VirtualSurfaceCells
+	<VirtualSurfaceCells
 		{contentClassName}
 		{rowClassName}
 		{cellClassName}

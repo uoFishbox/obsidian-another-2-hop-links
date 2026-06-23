@@ -48,10 +48,14 @@ describe("activeScrollWindowGate", () => {
 			}),
 		).toBe(false);
 		expect(
-			isSameMountedScrollWindow(previous, {}, {
-				start: 1,
-				end: 5,
-			}),
+			isSameMountedScrollWindow(
+				previous,
+				{},
+				{
+					start: 1,
+					end: 5,
+				},
+			),
 		).toBe(false);
 		expect(
 			isSameMountedScrollWindow(null, identity, {
@@ -113,10 +117,13 @@ describe("activeScrollWindowGate", () => {
 	});
 
 	it("updates an existing ranged scroll window in place", () => {
-		const previous = createScrollWindow({}, {
-			mounted: { start: 1, end: 5 },
-			previewVisible: { start: 2, end: 4 },
-		});
+		const previous = createScrollWindow(
+			{},
+			{
+				mounted: { start: 1, end: 5 },
+				previewVisible: { start: 2, end: 4 },
+			},
+		);
 		const identity = {};
 
 		const updated = updateScrollWindow(previous, identity, {
@@ -137,10 +144,13 @@ describe("activeScrollWindowGate", () => {
 	});
 
 	it("updates stable preview scroll bands for ranged windows", () => {
-		const previous = createScrollWindow({}, {
-			mounted: { start: 1, end: 5 },
-			previewVisible: { start: 2, end: 4 },
-		});
+		const previous = createScrollWindow(
+			{},
+			{
+				mounted: { start: 1, end: 5 },
+				previewVisible: { start: 2, end: 4 },
+			},
+		);
 		const identity = {};
 
 		const updated = updateScrollWindow(
@@ -175,10 +185,13 @@ describe("activeScrollWindowGate", () => {
 	});
 
 	it("updates an existing mounted scroll window in place", () => {
-		const previous = createScrollWindow({}, {
-			mounted: { start: 1, end: 5 },
-			previewVisible: { start: 2, end: 4 },
-		});
+		const previous = createScrollWindow(
+			{},
+			{
+				mounted: { start: 1, end: 5 },
+				previewVisible: { start: 2, end: 4 },
+			},
+		);
 		const identity = {};
 
 		const updated = updateMountedScrollWindow(previous, identity, {

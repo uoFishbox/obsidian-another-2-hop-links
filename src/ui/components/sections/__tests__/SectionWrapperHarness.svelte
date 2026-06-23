@@ -1,4 +1,4 @@
-	<script lang="ts">
+<script lang="ts">
 	import { setContext } from "svelte";
 	import SectionWrapper from "../SectionWrapper.svelte";
 	import { setAppContext } from "ui/context/linkContext";

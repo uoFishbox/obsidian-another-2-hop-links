@@ -1,7 +1,5 @@
 export function shouldAssertVirtualListInvariants(): boolean {
-	return (
-		typeof process !== "undefined" && process.env?.NODE_ENV !== "production"
-	);
+	return typeof process !== "undefined" && process.env?.NODE_ENV !== "production";
 }
 
 export function assertVirtualListInvariant(

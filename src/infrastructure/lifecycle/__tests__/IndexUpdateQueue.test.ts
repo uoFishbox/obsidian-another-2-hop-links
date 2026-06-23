@@ -112,18 +112,13 @@ function createHarness(): Harness {
 			},
 		),
 		registerIdleWaiter: vi.fn(() => vi.fn()),
-		onDataUpdate: vi.fn(
-			(listener: (context: DataUpdateContext) => void) => {
-				dataUpdateListener = listener;
-				return vi.fn();
-			},
-		),
+		onDataUpdate: vi.fn((listener: (context: DataUpdateContext) => void) => {
+			dataUpdateListener = listener;
+			return vi.fn();
+		}),
 	};
 
-	const queue = new IndexUpdateQueue(
-		plugin as never,
-		indexingService as never,
-	);
+	const queue = new IndexUpdateQueue(plugin as never, indexingService as never);
 
 	return {
 		queue,
@@ -193,9 +188,9 @@ describe("IndexUpdateQueue", () => {
 		expect(
 			harness.indexingService.applyFileChangesTimeSliced,
 		).toHaveBeenCalledTimes(1);
-		expect(
-			harness.indexingService.applyFileChangesTimeSliced,
-		).toHaveBeenCalledWith([{ type: "create", path: "notes/new-note.md" }]);
+		expect(harness.indexingService.applyFileChangesTimeSliced).toHaveBeenCalledWith(
+			[{ type: "create", path: "notes/new-note.md" }],
+		);
 	});
 
 	test("modify is processed immediately without waiting for metadata", async () => {
@@ -208,9 +203,9 @@ describe("IndexUpdateQueue", () => {
 		expect(
 			harness.indexingService.applyFileChangesTimeSliced,
 		).toHaveBeenCalledTimes(1);
-		expect(
-			harness.indexingService.applyFileChangesTimeSliced,
-		).toHaveBeenCalledWith([{ type: "modify", path: "notes/existing.md" }]);
+		expect(harness.indexingService.applyFileChangesTimeSliced).toHaveBeenCalledWith(
+			[{ type: "modify", path: "notes/existing.md" }],
+		);
 	});
 
 	test("delete is processed immediately without waiting for metadata", async () => {
@@ -223,9 +218,9 @@ describe("IndexUpdateQueue", () => {
 		expect(
 			harness.indexingService.applyFileChangesTimeSliced,
 		).toHaveBeenCalledTimes(1);
-		expect(
-			harness.indexingService.applyFileChangesTimeSliced,
-		).toHaveBeenCalledWith([{ type: "delete", path: "notes/old.md" }]);
+		expect(harness.indexingService.applyFileChangesTimeSliced).toHaveBeenCalledWith(
+			[{ type: "delete", path: "notes/old.md" }],
+		);
 	});
 
 	test("data update context is forwarded to listeners", async () => {

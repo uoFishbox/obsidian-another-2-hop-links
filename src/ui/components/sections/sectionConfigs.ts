@@ -1,7 +1,4 @@
-import type {
-	TwoHopIndexedLink,
-	TwoHopLinkBranch,
-} from "types/domain";
+import type { TwoHopIndexedLink, TwoHopLinkBranch } from "types/domain";
 import type { MergedLinkItem } from "application/presenters/displayDataBuilder";
 import {
 	generateBranchCardKey,

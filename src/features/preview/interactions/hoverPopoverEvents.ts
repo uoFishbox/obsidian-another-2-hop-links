@@ -29,12 +29,12 @@ export function describeHoverEventTarget(
 ): string {
 	return isHTMLElementLike(target)
 		? [
-			target.tagName.toLowerCase(),
-			target.id ? `#${target.id}` : "",
-			target.dataset.cclInteractionId
-				? `[${target.dataset.cclInteractionId}]`
-				: "",
-		].join("")
+				target.tagName.toLowerCase(),
+				target.id ? `#${target.id}` : "",
+				target.dataset.cclInteractionId
+					? `[${target.dataset.cclInteractionId}]`
+					: "",
+			].join("")
 		: isShadowRootLike(target)
 			? `<shadow-root:${target.host.tagName.toLowerCase()}>`
 			: isDocumentLike(target)
@@ -46,7 +46,9 @@ export function createHoverPreviewMouseEvent(
 	element: HTMLElement,
 	originalEvent?: MouseEvent,
 ): HoverTargetAugmentedMouseEvent {
-	const interactionEvent = new (getWindowEventConstructors(getOwnerWindow(element)).MouseEvent)("mouseover", {
+	const interactionEvent = new (getWindowEventConstructors(
+		getOwnerWindow(element),
+	).MouseEvent)("mouseover", {
 		bubbles: true,
 		cancelable: true,
 		composed: true,
@@ -64,11 +66,7 @@ export function createHoverPreviewMouseEvent(
 
 	defineReadonlyEventProperty(interactionEvent, "target", element);
 	defineReadonlyEventProperty(interactionEvent, "currentTarget", element);
-	defineReadonlyEventProperty(
-		interactionEvent,
-		HOVER_TARGET_EVENT_PROPERTY,
-		element,
-	);
+	defineReadonlyEventProperty(interactionEvent, HOVER_TARGET_EVENT_PROPERTY, element);
 
 	if (originalEvent?.composedPath) {
 		const originalPath = originalEvent.composedPath();

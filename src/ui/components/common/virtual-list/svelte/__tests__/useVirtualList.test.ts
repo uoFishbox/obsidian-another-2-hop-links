@@ -1,7 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import {
-	computeVirtualGridLayout,
-} from "../../layout/flatGridLayout";
+import { computeVirtualGridLayout } from "../../layout/flatGridLayout";
 import { createFlatLogicalCellSource } from "../../flatLogicalCellSource";
 import type { VirtualListLogicalCell } from "../../logicalCell";
 import {
@@ -13,10 +11,7 @@ import {
 	type MountedVirtualGridCell,
 	type MountedVirtualGridCellsBuildResult,
 } from "../../reconciliation/linkListVirtualLayout";
-import {
-	useVirtualList,
-	type UseVirtualListOptions,
-} from "../useVirtualList.svelte";
+import { useVirtualList, type UseVirtualListOptions } from "../useVirtualList.svelte";
 
 type TestItem = { id: string; label?: string };
 
@@ -61,12 +56,13 @@ const createVirtualList = (
 	>["onSnapshotUpdated"],
 	buildMountedCells: (params: {
 		rowModel: FlatLinkRowModel<TestItem>;
-		rowRange: Parameters<typeof buildMountedVirtualGridCellsFromRowModel>[0]["rowRange"];
+		rowRange: Parameters<
+			typeof buildMountedVirtualGridCellsFromRowModel
+		>[0]["rowRange"];
 		previousBuild?: MountedVirtualGridCellsBuildResult<TestItem>;
 		previousCells?: readonly MountedVirtualGridCell<TestItem>[];
 		previousCellsByKey?: ReadonlyMap<string, MountedVirtualGridCell<TestItem>>;
-	}) => MountedVirtualGridCellsBuildResult<TestItem> =
-		buildMountedVirtualGridCellsFromRowModel,
+	}) => MountedVirtualGridCellsBuildResult<TestItem> = buildMountedVirtualGridCellsFromRowModel,
 ) =>
 	useVirtualList<
 		VirtualListLogicalCell<TestItem>,
@@ -91,7 +87,7 @@ const createVirtualList = (
 		onSnapshotUpdated,
 	});
 
-	describe("useVirtualList", () => {
+describe("useVirtualList", () => {
 	it("starts uninitialized", () => {
 		const virtualList = createVirtualList();
 
@@ -139,9 +135,7 @@ const createVirtualList = (
 			"mounted",
 			"mounted",
 		]);
-		expect(virtualList.getMountedCellsForChange()).toEqual(
-			snapshot?.mountedCells,
-		);
+		expect(virtualList.getMountedCellsForChange()).toEqual(snapshot?.mountedCells);
 	});
 
 	it("reflects active scrolling in stable mode", () => {
@@ -194,9 +188,7 @@ const createVirtualList = (
 			hasStableVisibleRange: true,
 		});
 
-		expect(virtualList.getSnapshot()?.mountedCells).toBe(
-			initial?.mountedCells,
-		);
+		expect(virtualList.getSnapshot()?.mountedCells).toBe(initial?.mountedCells);
 		expect(buildMountedCells).toHaveBeenCalledTimes(1);
 	});
 
@@ -307,9 +299,7 @@ const createVirtualList = (
 			hasStableVisibleRange: true,
 		});
 
-		expect(virtualList.getSnapshot()?.mountedCells).toBe(
-			initial?.mountedCells,
-		);
+		expect(virtualList.getSnapshot()?.mountedCells).toBe(initial?.mountedCells);
 		expect(onSnapshotUpdated).toHaveBeenCalledTimes(1);
 	});
 
@@ -341,9 +331,7 @@ const createVirtualList = (
 
 		expect(result).toEqual({ kind: "skipped", reason: "unstable" });
 		expect(virtualList.getSnapshot()).not.toBe(initial);
-		expect(virtualList.getSnapshot()?.mountedCells).toBe(
-			initial?.mountedCells,
-		);
+		expect(virtualList.getSnapshot()?.mountedCells).toBe(initial?.mountedCells);
 		expect(virtualList.getMode().kind).toBe("skipped");
 		expect(onSnapshotUpdated).toHaveBeenCalledTimes(2);
 	});

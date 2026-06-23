@@ -6,18 +6,13 @@ export const collectPositionDependencyElements = (
 ): HTMLElement[] => {
 	const observedElements = new Set<HTMLElement>();
 
-	const inlineHost = scrollContainer?.classList.contains(
-		"ccl-inline-card-host",
-	)
+	const inlineHost = scrollContainer?.classList.contains("ccl-inline-card-host")
 		? scrollContainer
 		: rootEl.closest<HTMLElement>(".cm-scroller.ccl-inline-card-host");
 
 	if (inlineHost) {
 		for (const child of Array.from(inlineHost.children)) {
-			if (
-				isHTMLElementLike(child) &&
-				child.classList.contains("cm-sizer")
-			) {
+			if (isHTMLElementLike(child) && child.classList.contains("cm-sizer")) {
 				observedElements.add(child);
 				break;
 			}
