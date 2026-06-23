@@ -5,7 +5,7 @@ import type {
 import { sameRange, type RowRange } from "../rowRange";
 
 interface VisibilityCell {
-	readonly key: unknown;
+	readonly key: string;
 	readonly cell: {
 		readonly kind: string;
 	};
@@ -74,7 +74,7 @@ export function createVirtualizedItemVisibilityStateController<
 				continue;
 			}
 
-			const key = String(cell.key);
+			const key = cell.key;
 			const nextCount = (mountedItemKeyCounts.get(key) ?? 0) + delta;
 			if (nextCount > 0) {
 				mountedItemKeyCounts.set(key, nextCount);
@@ -90,7 +90,7 @@ export function createVirtualizedItemVisibilityStateController<
 				continue;
 			}
 
-			const key = String(cell.key);
+			const key = cell.key;
 			if (!mountedItemKeyCounts.has(key)) {
 				states.delete(key);
 			}
@@ -101,7 +101,7 @@ export function createVirtualizedItemVisibilityStateController<
 		cell: TCell,
 		initialVisibility: VirtualizedItemVisibility,
 	): VirtualizedItemResolvedVisibilityState => {
-		const key = String(cell.key);
+		const key = cell.key;
 		const existing = states.get(key);
 		if (existing) {
 			return existing.state;
@@ -124,7 +124,7 @@ export function createVirtualizedItemVisibilityStateController<
 				continue;
 			}
 
-			const key = String(cell.key);
+			const key = cell.key;
 			const tracked = states.get(key);
 			if (!tracked) {
 				continue;
@@ -204,7 +204,7 @@ export function createVirtualizedItemVisibilityStateController<
 					continue;
 				}
 
-				const key = String(cell.key);
+				const key = cell.key;
 				mountedItemKeyCounts.set(
 					key,
 					(mountedItemKeyCounts.get(key) ?? 0) + 1,
