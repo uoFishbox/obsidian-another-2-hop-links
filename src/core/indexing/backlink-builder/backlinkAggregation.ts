@@ -213,9 +213,7 @@ export function createSourceSummaryFromAggregation(
 		orderedReferences,
 		firstRefIndexByLookupKey,
 		lookupKeyToRawLinkPaths,
-		unresolvedLookupKeys: createUnresolvedLookupKeysSnapshot(
-			localAggregation.unresolvedLookupKeys,
-		),
+		unresolvedLookupKeys: takeUnresolvedLookupKeys(localAggregation),
 		hasSourceDependentLinks: localAggregation.hasSourceDependentLinks,
 	};
 }
@@ -307,19 +305,19 @@ export function* createSourceSummaryFromAggregationChunked(
 		orderedReferences,
 		firstRefIndexByLookupKey,
 		lookupKeyToRawLinkPaths,
-		unresolvedLookupKeys: createUnresolvedLookupKeysSnapshot(
-			localAggregation.unresolvedLookupKeys,
-		),
+		unresolvedLookupKeys: takeUnresolvedLookupKeys(localAggregation),
 		hasSourceDependentLinks: localAggregation.hasSourceDependentLinks,
 	};
 }
 
-function createUnresolvedLookupKeysSnapshot(
-	unresolvedLookupKeys: ReadonlySet<string>,
+function takeUnresolvedLookupKeys(
+	localAggregation: FileLocalAggregation,
 ): ReadonlySet<string> {
-	if (unresolvedLookupKeys.size === 0) {
+	if (localAggregation.unresolvedLookupKeys.size === 0) {
 		return EMPTY_UNRESOLVED_LOOKUP_KEYS;
 	}
 
-	return new Set(unresolvedLookupKeys);
+	const snapshot = localAggregation.unresolvedLookupKeys;
+	localAggregation.unresolvedLookupKeys = new Set<string>();
+	return snapshot;
 }

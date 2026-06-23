@@ -4,9 +4,11 @@ import {
 	createLinkResolutionAmbiguityDetector,
 	toCaseInsensitiveLookupKey,
 	type LinkResolutionAmbiguityDetector,
+	type ResolvedLinkInfo,
 } from "../link-resolution/linkResolution";
 import type {
 	CachedMetadataWithLinkReferences,
+	LinkReference,
 	TwoHopIndexedLink,
 } from "types/domain";
 import type { IVault, IMetadataCache } from "types/obsidian";
@@ -53,6 +55,7 @@ import {
 	recordFileLocalReference,
 	resetFileLocalAggregation,
 	type FileLocalAggregation,
+	type FileLocalDestinationAggregate,
 } from "./backlinkAggregation";
 import type { BacklinksBuildArtifacts } from "./backlinkBuildArtifacts";
 
@@ -172,6 +175,16 @@ function* indexFileIntoArtifactsPhaseOne(
 	localScratch: FileLocalAggregation,
 	ambiguityDetector: LinkResolutionAmbiguityDetector,
 	yieldScheduler: YieldScheduler,
+	recordReference: (
+		linkReference: LinkReference,
+		resolved: ResolvedLinkInfo,
+		offset: number,
+		rawLinkPath: string,
+	) => void,
+	visitDestination: (
+		destinationPath: string,
+		aggregate: FileLocalDestinationAggregate,
+	) => void,
 ): YieldStepGenerator {
 	const sourcePath = sourceFile.path;
 	const cache = metadataCache.getFileCache(
@@ -195,15 +208,7 @@ function* indexFileIntoArtifactsPhaseOne(
 		ambiguityDetector,
 		resolvedMemo,
 		yieldScheduler,
-		(linkReference, resolved, offset, rawLinkPath) => {
-			recordFileLocalReference(
-				localScratch,
-				linkReference,
-				resolved,
-				offset,
-				rawLinkPath,
-			);
-		},
+		recordReference,
 		HEAVY_YIELD_CHECK_INTERVAL,
 	);
 
@@ -215,21 +220,7 @@ function* indexFileIntoArtifactsPhaseOne(
 	const sourceSummary = yield* createSourceSummaryFromAggregationChunked(
 		localScratch,
 		yieldScheduler,
-		(destinationPath, aggregate) => {
-			const destinationState = getOrCreateDestinationBuildState(
-				artifacts,
-				destinationBuildStates,
-				destinationPath,
-			);
-			destinationState.sourceMap.set(
-				sourcePath,
-				createBacklinkBucketForSource(aggregate),
-			);
-			destinationState.lookupSources.add(sourcePath);
-			if (aggregate.hasResolved) {
-				destinationState.resolvedSourceCount++;
-			}
-		},
+		visitDestination,
 	);
 	if (sourceSummary) {
 		artifacts.sourceSummaries.set(sourcePath, sourceSummary);
@@ -283,9 +274,45 @@ function* createBacklinksBuildSteps(
 	const localScratch = createFileLocalAggregation();
 	const detector =
 		ambiguityDetector ?? createLinkResolutionAmbiguityDetector(vault);
+	let currentSourcePath = "";
+
+	function recordIntoScratch(
+		linkReference: LinkReference,
+		resolved: ResolvedLinkInfo,
+		offset: number,
+		rawLinkPath: string,
+	): void {
+		recordFileLocalReference(
+			localScratch,
+			linkReference,
+			resolved,
+			offset,
+			rawLinkPath,
+		);
+	}
+
+	function visitDestinationForCurrentSource(
+		destinationPath: string,
+		aggregate: FileLocalDestinationAggregate,
+	): void {
+		const destinationState = getOrCreateDestinationBuildState(
+			artifacts,
+			destinationBuildStates,
+			destinationPath,
+		);
+		destinationState.sourceMap.set(
+			currentSourcePath,
+			createBacklinkBucketForSource(aggregate),
+		);
+		destinationState.lookupSources.add(currentSourcePath);
+		if (aggregate.hasResolved) {
+			destinationState.resolvedSourceCount++;
+		}
+	}
 
 	for (let i = 0; i < allFiles.length; i++) {
 		const sourceFile = allFiles[i];
+		currentSourcePath = sourceFile.path;
 		const normalizedExtension = sourceFile.extension.toLowerCase();
 		if (INDEX_LINK_CAPABLE_EXTENSIONS.has(normalizedExtension)) {
 			yield* indexFileIntoArtifactsPhaseOne(
@@ -299,6 +326,8 @@ function* createBacklinksBuildSteps(
 				localScratch,
 				detector,
 				yieldScheduler,
+				recordIntoScratch,
+				visitDestinationForCurrentSource,
 			);
 		}
 		const pendingYield = yieldScheduler.checkpoint(
