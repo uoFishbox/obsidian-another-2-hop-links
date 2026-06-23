@@ -51,7 +51,6 @@ export interface MountedVirtualGridCell<T> {
 	readonly visibility?: VirtualizedItemVisibility;
 	readonly cell: VirtualListLogicalCell<T>;
 	readonly cellIndex: number;
-	readonly cellMetadataKey?: unknown;
 	readonly renderBodyKey?: RenderBodyKey;
 	readonly position: MountedVirtualGridCellPosition;
 	readonly cellSlotKey?: number;
@@ -156,13 +155,6 @@ const createMountedVirtualGridCell = <T>(params: {
 	cell: params.cell,
 	cellIndex: params.cellIndex,
 	position: params.position,
-	cellMetadataKey: [
-		params.cell.key,
-		params.position.top,
-		params.position.left,
-		params.position.width,
-		params.position.height,
-	],
 	renderBodyKey: resolveMountedVirtualGridCellBodyKey({
 		previous: params.previous,
 		cell: params.cell,
@@ -267,7 +259,6 @@ function updateMountedVirtualGridCell<T>(
 		width,
 		height,
 	};
-	const cellMetadataKey = [cell.key, top, left, width, height];
 	return {
 		...previous,
 		key: logicalKey,
@@ -278,7 +269,6 @@ function updateMountedVirtualGridCell<T>(
 		renderSlotIndex,
 		renderSlotKey: renderSlotKey(renderSlotIndex),
 		position,
-		cellMetadataKey,
 		renderBodyKey,
 		cellSlotKey,
 	};
