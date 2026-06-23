@@ -30,9 +30,9 @@ import { createTwoHopMountRuntime } from "./twoHopMountRuntime.svelte";
 
 const EMPTY_MOUNTED_CELLS: readonly [] = [];
 const EMPTY_MOUNTED_ROWS: readonly [] = [];
-const INITIAL_MATERIALIZATION_SECTION_LIMIT = 10;
-const INITIAL_MATERIALIZATION_CELL_LIMIT = 200;
-const BACKGROUND_MATERIALIZATION_CELL_LIMIT = 200;
+const INITIAL_MATERIALIZATION_SECTION_LIMIT = 8;
+const INITIAL_MATERIALIZATION_CELL_LIMIT = 60;
+const BACKGROUND_MATERIALIZATION_CELL_LIMIT = 100;
 
 export interface TwoHopViewPlanVirtualListProps {
 	readonly sections: readonly TwoHopSectionDescriptor[];
