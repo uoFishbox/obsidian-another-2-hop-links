@@ -1,7 +1,10 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { collectDecorationTargets } from "../decorationTargetCollector";
 
-function classNames(elements: HTMLElement[]): string[] {
+function classNames(elements: HTMLElement[] | null): string[] {
+	if (elements === null) {
+		return [];
+	}
 	return elements.map((el) => el.className.trim());
 }
 
@@ -10,7 +13,7 @@ describe("collectDecorationTargets", () => {
 		document.body.innerHTML = "";
 	});
 
-	it("returns only the link for rendered mode without selectors", () => {
+	it("returns null (self-only) for rendered mode without selectors", () => {
 		document.body.innerHTML = `
 			<a class="internal-link" data-href="missing.md">
 				<span class="label">Missing</span>
@@ -20,10 +23,10 @@ describe("collectDecorationTargets", () => {
 
 		const targets = collectDecorationTargets(linkEl!, { mode: "rendered" });
 
-		expect(targets).toEqual([linkEl]);
+		expect(targets).toBeNull();
 	});
 
-	it("returns only the link for bases mode without selectors", () => {
+	it("returns null (self-only) for bases mode without selectors", () => {
 		document.body.innerHTML = `
 			<div class="internal-link" data-path="missing.md">
 				<span class="label">Missing</span>
@@ -33,7 +36,7 @@ describe("collectDecorationTargets", () => {
 
 		const targets = collectDecorationTargets(linkEl!, { mode: "bases" });
 
-		expect(targets).toEqual([linkEl]);
+		expect(targets).toBeNull();
 	});
 
 	it("collects alias-related CodeMirror targets", () => {

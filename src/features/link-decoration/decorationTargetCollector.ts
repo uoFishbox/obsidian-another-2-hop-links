@@ -12,7 +12,7 @@ export interface DecorationTargetCollectionOptions {
 export function collectDecorationTargets(
 	linkEl: HTMLElement,
 	optionsOrSelectors: DecorationTargetCollectionOptions | string[] = {},
-): HTMLElement[] {
+): HTMLElement[] | null {
 	const options = Array.isArray(optionsOrSelectors)
 		? { targetSelectors: optionsOrSelectors }
 		: optionsOrSelectors;
@@ -23,7 +23,7 @@ export function collectDecorationTargets(
 		targetSelectors.length === 0 &&
 		(mode === "rendered" || mode === "bases")
 	) {
-		return [linkEl];
+		return null;
 	}
 
 	const targets = [linkEl];

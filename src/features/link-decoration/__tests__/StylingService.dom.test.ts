@@ -7,7 +7,7 @@ type LinkStatusServiceLike = {
 	normalizeHref: (href: string) => string;
 	generateLookupPath: (href: string) => string;
 	shouldDecorateLink: (path: string) => boolean;
-	shouldDecorateLinkBatch: (paths: string[]) => Map<string, boolean>;
+	shouldDecorateLinkBatch: (paths: Iterable<string>) => Map<string, boolean>;
 	isDecorationEnabled: () => boolean;
 };
 
@@ -21,9 +21,10 @@ function createLinkStatusService(
 		normalizeHref: vi.fn((href: string) => href),
 		generateLookupPath: vi.fn((href: string) => href),
 		shouldDecorateLink: vi.fn(() => false),
-		shouldDecorateLinkBatch: vi.fn(
-			(paths: string[]) => new Map(paths.map((path) => [path, false])),
-		),
+		shouldDecorateLinkBatch: vi.fn((paths: Iterable<string>) => {
+			const arr = Array.from(paths);
+			return new Map(arr.map((path) => [path, false]));
+		}),
 		isDecorationEnabled: vi.fn(() => true),
 		...overrides,
 	};
@@ -41,10 +42,10 @@ describe("StylingService", () => {
 
 		let unresolved = true;
 		const linkStatusService = createLinkStatusService({
-			shouldDecorateLinkBatch: vi.fn(
-				(paths: string[]) =>
-					new Map(paths.map((path) => [path, unresolved])),
-			),
+			shouldDecorateLinkBatch: vi.fn((paths: Iterable<string>) => {
+				const arr = Array.from(paths);
+				return new Map(arr.map((path) => [path, unresolved]));
+			}),
 		});
 		const service = createStylingService(linkStatusService as never);
 		const linkEl = document.querySelector<HTMLElement>(".internal-link");
@@ -77,9 +78,10 @@ describe("StylingService", () => {
 		`;
 
 		const linkStatusService = createLinkStatusService({
-			shouldDecorateLinkBatch: vi.fn(
-				(paths: string[]) => new Map(paths.map((path) => [path, true])),
-			),
+			shouldDecorateLinkBatch: vi.fn((paths: Iterable<string>) => {
+				const arr = Array.from(paths);
+				return new Map(arr.map((path) => [path, true]));
+			}),
 		});
 		const service = createStylingService(linkStatusService as never);
 		const metadataLink = document.querySelector<HTMLElement>(
@@ -132,10 +134,10 @@ describe("StylingService", () => {
 		`;
 
 		const linkStatusService = createLinkStatusService({
-			shouldDecorateLinkBatch: vi.fn(
-				(paths: string[]) =>
-					new Map(paths.map((path) => [path, false])),
-			),
+			shouldDecorateLinkBatch: vi.fn((paths: Iterable<string>) => {
+				const arr = Array.from(paths);
+				return new Map(arr.map((path) => [path, false]));
+			}),
 		});
 		const service = createStylingService(linkStatusService as never);
 		const container = document.querySelector<HTMLElement>("#container");

@@ -45,7 +45,7 @@ export interface ILinkStatusService {
 	/**
 	 * 複数のlookupPathをバッチで判定
 	 */
-	shouldDecorateLinkBatch(lookupPaths: string[]): Map<string, boolean>;
+	shouldDecorateLinkBatch(lookupPaths: Iterable<string>): Map<string, boolean>;
 
 	/**
 	 * 指定されたlookupPathが未解決リンクかつシングルバックリンクかを判定

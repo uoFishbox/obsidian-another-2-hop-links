@@ -14,7 +14,7 @@ export interface LinkStatusService {
 	extractHref(linkEl: HTMLElement): string | undefined;
 	isDecorationEnabled(): boolean;
 	shouldDecorateLink(lookupPath: string): boolean;
-	shouldDecorateLinkBatch(lookupPaths: string[]): Map<string, boolean>;
+	shouldDecorateLinkBatch(lookupPaths: Iterable<string>): Map<string, boolean>;
 	isUnresolvedWithSingleBacklink(lookupPath: string): boolean;
 }
 
@@ -71,14 +71,17 @@ export function createLinkStatusService(
 	}
 
 	function shouldDecorateLinkBatch(
-		lookupPaths: string[],
+		lookupPaths: Iterable<string>,
 	): Map<string, boolean> {
 		if (!refreshCacheForCurrentSetting()) {
 			return new Map();
 		}
 
 		const results = new Map<string, boolean>();
-		const uncachedPaths = collectUncachedPaths(lookupPaths, results);
+		const { uncachedPaths, totalCount } = collectUncachedPaths(
+			lookupPaths,
+			results,
+		);
 
 		if (uncachedPaths.length > 0) {
 			cacheBatchResults(uncachedPaths, results);
@@ -86,8 +89,8 @@ export function createLinkStatusService(
 
 		if (enableLogging) {
 			logger(
-				`[LinkStatusService] Batch check: ${lookupPaths.length} total, ${
-					lookupPaths.length - uncachedPaths.length
+				`[LinkStatusService] Batch check: ${totalCount} total, ${
+					totalCount - uncachedPaths.length
 				} cached, ${uncachedPaths.length} queried`,
 			);
 		}
@@ -110,11 +113,13 @@ export function createLinkStatusService(
 	}
 
 	function collectUncachedPaths(
-		lookupPaths: string[],
+		lookupPaths: Iterable<string>,
 		results: Map<string, boolean>,
-	): string[] {
+	): { uncachedPaths: string[]; totalCount: number } {
 		const uncachedPaths: string[] = [];
+		let totalCount = 0;
 		for (const path of lookupPaths) {
+			totalCount++;
 			const cached = decorationCache.get(path);
 			if (cached !== undefined) {
 				results.set(path, cached);
@@ -124,7 +129,7 @@ export function createLinkStatusService(
 			uncachedPaths.push(path);
 		}
 
-		return uncachedPaths;
+		return { uncachedPaths, totalCount };
 	}
 
 	function cacheBatchResults(

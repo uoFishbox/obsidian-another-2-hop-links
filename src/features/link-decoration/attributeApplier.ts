@@ -8,6 +8,18 @@ export interface AttributeOperationOptions extends AttributeApplierOptions {
 	shouldApply: boolean;
 }
 
+export function applyAttributeToElement(
+	element: HTMLElement,
+	options: AttributeOperationOptions,
+): void {
+	if (options.shouldApply) {
+		addAttributeToElement(element, options);
+		return;
+	}
+
+	removeAttributeFromElement(element, options);
+}
+
 export function applyAttributeToElements(
 	elements: Iterable<HTMLElement>,
 	options: AttributeOperationOptions,
@@ -32,16 +44,34 @@ export function clearAttributeFromContainer(
 	});
 }
 
+function addAttributeToElement(
+	element: HTMLElement,
+	options: AttributeOperationOptions,
+): void {
+	if (element.getAttribute(options.attrName) === options.attrValue) {
+		return;
+	}
+
+	element.setAttribute(options.attrName, options.attrValue);
+}
+
+function removeAttributeFromElement(
+	element: HTMLElement,
+	options: Pick<AttributeOperationOptions, "attrName" | "enableDebugLog">,
+): void {
+	if (!element.hasAttribute(options.attrName)) {
+		return;
+	}
+
+	element.removeAttribute(options.attrName);
+}
+
 function addAttributeToElements(
 	elements: Iterable<HTMLElement>,
 	options: AttributeOperationOptions,
 ): void {
 	for (const el of elements) {
-		if (el.getAttribute(options.attrName) === options.attrValue) {
-			continue;
-		}
-
-		el.setAttribute(options.attrName, options.attrValue);
+		addAttributeToElement(el, options);
 	}
 }
 
@@ -50,10 +80,6 @@ function removeAttributeFromElements(
 	options: Pick<AttributeOperationOptions, "attrName" | "enableDebugLog">,
 ): void {
 	for (const el of elements) {
-		if (!el.hasAttribute(options.attrName)) {
-			continue;
-		}
-
-		el.removeAttribute(options.attrName);
+		removeAttributeFromElement(el, options);
 	}
 }
