@@ -190,17 +190,15 @@
 
 		cancelPendingActivation();
 
-		const request = requestPreviewActivation(
-			identity,
-			getVisiblePreviewQueueSize,
-			previewActivationScope,
-		);
 		const sequence = ++activationSequence;
+		let request: PreviewActivationHandle | null = null;
+		let synchronousResult: boolean | undefined;
+		const onSettled = (activated: boolean): void => {
+			if (!request) {
+				synchronousResult = activated;
+				return;
+			}
 
-		activationRequest = request;
-		pendingPreviewIdentity = identity;
-
-		request.promise.then((activated) => {
 			if (activationRequest === request) {
 				activationRequest = null;
 				pendingPreviewIdentity = undefined;
@@ -229,7 +227,21 @@
 			) {
 				intersectedCache.add(previewCacheKey);
 			}
-		});
+		};
+
+		request = requestPreviewActivation(
+			identity,
+			getVisiblePreviewQueueSize,
+			previewActivationScope,
+			onSettled,
+		);
+
+		activationRequest = request;
+		pendingPreviewIdentity = identity;
+
+		if (synchronousResult !== undefined) {
+			onSettled(synchronousResult);
+		}
 	}
 
 	const previewLazyParams = $derived.by(

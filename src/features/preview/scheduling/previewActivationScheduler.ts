@@ -21,14 +21,20 @@ interface PreviewActivationRequest {
 	key: string;
 	scope: PreviewActivationScope;
 	getVisibleQueueSize: () => number;
-	resolve: (activated: boolean) => void;
+	onSettled: ((activated: boolean) => void) | undefined;
 	settled: boolean;
 }
 
 export interface PreviewActivationHandle {
 	key: string;
-	promise: Promise<boolean>;
+	/** Cancels this activation request if it is still pending. */
 	cancel(): void;
+}
+
+const ACTIVATION_REQUEST = Symbol("preview-activation-request");
+
+interface PreviewActivationHandleInternal extends PreviewActivationHandle {
+	[ACTIVATION_REQUEST]: PreviewActivationRequest | undefined;
 }
 
 const defaultScope = createPreviewActivationScope();
@@ -39,6 +45,36 @@ const queuesByScope = new Map<
 const activeWarmupScopes = new Set<PreviewActivationScope>();
 let frameHandle: number | null = null;
 let unsubscribeScrollActivity: (() => void) | undefined;
+
+function cancelHandle(this: PreviewActivationHandleInternal): void {
+	const request = this[ACTIVATION_REQUEST];
+	if (request) {
+		settleRequest(request, false);
+	}
+}
+
+function createActivationHandle(
+	key: string,
+	request: PreviewActivationRequest | undefined,
+): PreviewActivationHandle {
+	const handle: PreviewActivationHandleInternal = {
+		key,
+		[ACTIVATION_REQUEST]: request,
+		cancel: cancelHandle,
+	};
+	return handle;
+}
+
+function invokeSettlementCallback(
+	onSettled: ((activated: boolean) => void) | undefined,
+	activated: boolean,
+): void {
+	try {
+		onSettled?.(activated);
+	} catch (error) {
+		console.error("Preview activation callback failed", error);
+	}
+}
 
 export function createPreviewActivationScope(): PreviewActivationScope {
 	return {
@@ -113,7 +149,7 @@ function settleRequest(
 			queuesByScope.delete(request.scope);
 		}
 	}
-	request.resolve(activated);
+	invokeSettlementCallback(request.onSettled, activated);
 }
 
 function ensureSubscription(): void {
@@ -166,12 +202,11 @@ function drainFrame(): void {
 function createSettledActivationHandle(
 	key: string,
 	activated: boolean,
+	onSettled: ((activated: boolean) => void) | undefined,
 ): PreviewActivationHandle {
-	return {
-		key,
-		promise: Promise.resolve(activated),
-		cancel: () => {},
-	};
+	const handle = createActivationHandle(key, undefined);
+	invokeSettlementCallback(onSettled, activated);
+	return handle;
 }
 
 export function canActivatePreviewImmediately(
@@ -188,13 +223,20 @@ export function canActivatePreviewImmediately(
 	);
 }
 
+/**
+ * Requests activation and reports the result exactly once.
+ *
+ * `onSettled` can run before this function returns when the result is already
+ * known, so callers must not assume the returned handle has been assigned.
+ */
 export function requestPreviewActivation(
 	key: string,
 	getVisibleQueueSize: () => number,
 	scope: PreviewActivationScope = defaultScope,
+	onSettled?: (activated: boolean) => void,
 ): PreviewActivationHandle {
 	if (DEBUG_DISABLE_CARD_DOM_PREVIEW) {
-		return createSettledActivationHandle(key, false);
+		return createSettledActivationHandle(key, false, onSettled);
 	}
 
 	ensureSubscription();
@@ -205,7 +247,7 @@ export function requestPreviewActivation(
 		!isScrollActivityActive() &&
 		!hasVisiblePreviewBacklog(getVisibleQueueSize)
 	) {
-		return createSettledActivationHandle(key, true);
+		return createSettledActivationHandle(key, true, onSettled);
 	}
 
 	const queue = getScopeQueue(scope);
@@ -217,26 +259,17 @@ export function requestPreviewActivation(
 		queuesByScope.set(scope, queue);
 	}
 
-	let request: PreviewActivationRequest;
-	const promise = new Promise<boolean>((resolve) => {
-		request = {
-			key,
-			scope,
-			getVisibleQueueSize,
-			resolve,
-			settled: false,
-		};
-		queue.set(key, request);
-		scheduleFrameDrain();
-	});
-
-	return {
+	const request: PreviewActivationRequest = {
 		key,
-		promise,
-		cancel: () => {
-			settleRequest(request, false);
-		},
+		scope,
+		getVisibleQueueSize,
+		onSettled,
+		settled: false,
 	};
+	queue.set(key, request);
+	scheduleFrameDrain();
+
+	return createActivationHandle(key, request);
 }
 
 export function cancelPreviewActivation(key: string): void {
