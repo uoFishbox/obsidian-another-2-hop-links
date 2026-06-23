@@ -350,7 +350,7 @@ describe("TwoHop view-plan performance contracts", () => {
 
 		const plan = compilePlan(sections, { batched: true });
 
-		expect(plan.materializedSectionByIndex).toEqual([
+		expect(plan.cellStore.materializedSectionByIndex).toEqual([
 			...new Array<boolean>(10).fill(true),
 			...new Array<boolean>(22).fill(false),
 		]);
@@ -369,11 +369,11 @@ describe("TwoHop view-plan performance contracts", () => {
 			clampVisibleCount: (section, count) => Math.min(section.loadedCount, count),
 		});
 
-		expect(plan.materializationStateBySectionIndex[0]).toEqual({
+		expect(plan.cellStore.materializationStateBySectionIndex[0]).toEqual({
 			nextCellIndex: 200,
 			materializedCellCount: 200,
 		});
-		expect(plan.materializedSectionByIndex[0]).toBe(false);
+		expect(plan.cellStore.materializedSectionByIndex[0]).toBe(false);
 	});
 
 	it("materializes only the jumped-to mounted window during scrolling", () => {
@@ -418,6 +418,6 @@ describe("TwoHop view-plan performance contracts", () => {
 
 		expect(mounted.rowSlices).toHaveLength(MOUNTED_ROWS);
 		expect(getItem).toHaveBeenCalledTimes(MOUNTED_ROWS * COLUMNS);
-		expect(plan.materializationRevision).toBeGreaterThan(0);
+		expect(plan.cellStore.revision).toBeGreaterThan(0);
 	});
 });

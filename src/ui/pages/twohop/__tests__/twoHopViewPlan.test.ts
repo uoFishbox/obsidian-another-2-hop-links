@@ -90,17 +90,29 @@ describe("compileTwoHopViewPlan", () => {
 		});
 
 		expect(getItems).toHaveBeenCalledTimes(1);
-		expect(plan.sections[0].logicalCells.map((cell) => cell?.kind)).toEqual([
+		expect(plan.cellStore.logicalCellsBySectionIndex[0].map((cell) => cell?.kind)).toEqual([
 			"header",
 			"item",
 			"item",
 			"item",
 		]);
-		expect(plan.sections[0].logicalCells[1]).toMatchObject({
+		expect(plan.cellStore.logicalCellsBySectionIndex[0][1]).toMatchObject({
 			key: "new-links::item:0",
 			sourceKey: "new-links::a",
 		});
-		expect(plan).not.toHaveProperty("rows");
+		expect(plan.rows).toHaveLength(plan.rowCount);
+		expect(plan.rows[0]).toMatchObject({
+			sectionIndex: 0,
+			rowIndexInSection: 0,
+			sectionCellStartIndex: 0,
+			cellCount: 2,
+			top: 0,
+		});
+		expect(plan.rows[1]).toMatchObject({
+			sectionIndex: 0,
+			rowIndexInSection: 1,
+			top: 110,
+		});
 		expect(plan).not.toHaveProperty("cells");
 
 		const rowModel = createTwoHopViewPlanRowModel(plan);
@@ -127,7 +139,7 @@ describe("compileTwoHopViewPlan", () => {
 				columnIndex: 1,
 			}),
 		).toEqual({
-			key: plan.sections[0].logicalCells[3]?.key,
+			key: plan.cellStore.logicalCellsBySectionIndex[0][3]?.key,
 			rowTop: 110,
 		});
 	});
@@ -146,7 +158,7 @@ describe("compileTwoHopViewPlan", () => {
 			clampVisibleCount: (_section, count) => count,
 		});
 
-		expect(plan.sections[0].logicalCells.map((cell) => cell?.kind)).toEqual([
+		expect(plan.cellStore.logicalCellsBySectionIndex[0].map((cell) => cell?.kind)).toEqual([
 			"header",
 			"item",
 			"load-more",
@@ -167,16 +179,16 @@ describe("compileTwoHopViewPlan", () => {
 			clampVisibleCount: (_section, count) => count,
 		});
 
-		expect(plan.materializedSectionByIndex).toEqual([false, false]);
-		expect(plan.sections.map((section) => section.logicalCells.length)).toEqual([
+		expect(plan.cellStore.materializedSectionByIndex).toEqual([false, false]);
+		expect(plan.cellStore.logicalCellsBySectionIndex.map((logicalCells) => logicalCells.length)).toEqual([
 			2, 2,
 		]);
 		expect(resolveTwoHopLogicalCellInSection(plan, 1, 1)).toMatchObject({
 			kind: "item",
 			sourceKey: "section-b::b",
 		});
-		expect(plan.materializedSectionByIndex).toEqual([false, false]);
-		expect(plan.sections[1].logicalCells.map((cell) => cell?.kind)).toEqual([
+		expect(plan.cellStore.materializedSectionByIndex).toEqual([false, false]);
+		expect(plan.cellStore.logicalCellsBySectionIndex[1].map((cell) => cell?.kind)).toEqual([
 			undefined,
 			"item",
 		]);
@@ -412,7 +424,7 @@ describe("compileTwoHopViewPlan", () => {
 				eagerRowModel.getRowTop?.(rowIndex),
 			),
 		);
-		expect(batchedPlan.materializedSectionByIndex).toEqual([
+		expect(batchedPlan.cellStore.materializedSectionByIndex).toEqual([
 			true,
 			true,
 			true,
@@ -426,16 +438,16 @@ describe("compileTwoHopViewPlan", () => {
 			false,
 			false,
 		]);
-		expect(batchedPlan.nextUnmaterializedSectionIndex).toBe(10);
-		expect(batchedPlan.remainingUnmaterializedSectionCount).toBe(2);
-		expect(batchedPlan.remainingUnmaterializedCellCount).toBe(4);
+		expect(batchedPlan.cellStore.nextUnmaterializedSectionIndex).toBe(10);
+		expect(batchedPlan.cellStore.remainingUnmaterializedSectionCount).toBe(2);
+		expect(batchedPlan.cellStore.remainingUnmaterializedCellCount).toBe(4);
 		expect(hasUnmaterializedTwoHopSections(batchedPlan)).toBe(true);
 
 		expect(batchedRowModel.getRow(11)?.getCell(1)?.kind).toBe("item");
-		expect(batchedPlan.materializedSectionByIndex[11]).toBe(false);
-		expect(batchedPlan.nextUnmaterializedSectionIndex).toBe(10);
-		expect(batchedPlan.remainingUnmaterializedSectionCount).toBe(2);
-		expect(batchedPlan.remainingUnmaterializedCellCount).toBe(4);
+		expect(batchedPlan.cellStore.materializedSectionByIndex[11]).toBe(false);
+		expect(batchedPlan.cellStore.nextUnmaterializedSectionIndex).toBe(10);
+		expect(batchedPlan.cellStore.remainingUnmaterializedSectionCount).toBe(2);
+		expect(batchedPlan.cellStore.remainingUnmaterializedCellCount).toBe(4);
 		expect(getItemsBySection.map((getItems) => getItems.mock.calls.length)).toEqual(
 			new Array<number>(12).fill(1),
 		);
@@ -445,15 +457,15 @@ describe("compileTwoHopViewPlan", () => {
 				maxSectionCount: 10,
 			}),
 		).toBe(true);
-		expect(batchedPlan.materializedSectionByIndex).toEqual(
+		expect(batchedPlan.cellStore.materializedSectionByIndex).toEqual(
 			new Array<boolean>(12).fill(true),
 		);
 		expect(getItemsBySection.map((getItems) => getItems.mock.calls.length)).toEqual(
 			new Array<number>(12).fill(1),
 		);
-		expect(batchedPlan.nextUnmaterializedSectionIndex).toBe(12);
-		expect(batchedPlan.remainingUnmaterializedSectionCount).toBe(0);
-		expect(batchedPlan.remainingUnmaterializedCellCount).toBe(0);
+		expect(batchedPlan.cellStore.nextUnmaterializedSectionIndex).toBe(12);
+		expect(batchedPlan.cellStore.remainingUnmaterializedSectionCount).toBe(0);
+		expect(batchedPlan.cellStore.remainingUnmaterializedCellCount).toBe(0);
 		expect(hasUnmaterializedTwoHopSections(batchedPlan)).toBe(false);
 	});
 
@@ -477,7 +489,7 @@ describe("compileTwoHopViewPlan", () => {
 				maxCellCount: 3,
 			}),
 		).toBe(true);
-		expect(plan.materializedSectionByIndex).toEqual([true, false, false]);
+		expect(plan.cellStore.materializedSectionByIndex).toEqual([true, false, false]);
 	});
 
 	it("bounds initial materialization by cell count", () => {
@@ -494,7 +506,7 @@ describe("compileTwoHopViewPlan", () => {
 			clampVisibleCount: (_section, count) => count,
 		});
 
-		expect(plan.materializedSectionByIndex).toEqual([true, false, false]);
+		expect(plan.cellStore.materializedSectionByIndex).toEqual([true, false, false]);
 	});
 
 	it("stops deferred materialization when its time budget is exhausted", () => {
@@ -521,8 +533,8 @@ describe("compileTwoHopViewPlan", () => {
 				shouldContinue,
 			}),
 		).toBe(true);
-		expect(plan.materializedSectionByIndex).toEqual([false, false]);
-		expect(plan.materializationStateBySectionIndex[0]).toEqual({
+		expect(plan.cellStore.materializedSectionByIndex).toEqual([false, false]);
+		expect(plan.cellStore.materializationStateBySectionIndex[0]).toEqual({
 			nextCellIndex: 1,
 			materializedCellCount: 1,
 		});
@@ -552,8 +564,8 @@ describe("compileTwoHopViewPlan", () => {
 				maxCellCount: 2,
 			}),
 		).toBe(true);
-		expect(plan.materializedSectionByIndex).toEqual([false, false]);
-		expect(plan.materializationStateBySectionIndex[0]).toEqual({
+		expect(plan.cellStore.materializedSectionByIndex).toEqual([false, false]);
+		expect(plan.cellStore.materializationStateBySectionIndex[0]).toEqual({
 			nextCellIndex: 2,
 			materializedCellCount: 2,
 		});
@@ -588,7 +600,7 @@ describe("compileTwoHopViewPlan", () => {
 			"item",
 			"item",
 		]);
-		expect(mounted.cells[0].cell).toBe(plan.sections[0].logicalCells[0]);
+		expect(mounted.cells[0].cell).toBe(plan.cellStore.logicalCellsBySectionIndex[0][0]);
 		expect(mounted.rowSlices[0].slotKey).toBe(0);
 		expect(mounted.rowSlices[1].slotKey).toBe(1);
 		expect(mounted.rowSlices.map(({ key }) => key)).toEqual([0, 1]);
@@ -665,7 +677,7 @@ describe("compileTwoHopViewPlan", () => {
 		expect(scrolled.reusableCellsByKey.size).toBe(scrolled.cells.length);
 	});
 
-	it("rebuilds same-plan mounted rows after materialization changes", () => {
+	it("reuses same-plan row slices after materialization changes", () => {
 		const plan = compileTwoHopViewPlan({
 			sections: [
 				createDescriptor([createItem("a"), createItem("b"), createItem("c")]),
@@ -685,14 +697,14 @@ describe("compileTwoHopViewPlan", () => {
 				previewVisible: { start: 0, end: 1 },
 			},
 		});
-		const mountedRevision = mounted.materializationRevision;
+		const mountedRevision = plan.cellStore.revision;
 
 		expect(
 			materializeNextTwoHopSectionBatch(plan, {
 				maxCellCount: 3,
 			}),
 		).toBe(true);
-		expect(plan.materializationRevision).toBeGreaterThan(mountedRevision ?? -1);
+		expect(plan.cellStore.revision).toBeGreaterThan(mountedRevision ?? -1);
 
 		const rebuilt = buildTwoHopMountedRows({
 			rowModel,
@@ -704,7 +716,9 @@ describe("compileTwoHopViewPlan", () => {
 			previousBuild: mounted,
 		});
 
-		expect(rebuilt.rowSlices[0]).not.toBe(mounted.rowSlices[0]);
+		// The scroll hot path must stay unaffected by background materialization:
+		// revising the plan in place must not invalidate row-slice reuse.
+		expect(rebuilt.rowSlices[0]).toBe(mounted.rowSlices[0]);
 		expect(rebuilt.cells[0]).toBe(mounted.cells[0]);
 	});
 

@@ -140,7 +140,7 @@ describe("createTwoHopLayoutPlanCache in a DOM runtime", () => {
 		});
 		const rowModel = cache.resolve([descriptor], {}, layout);
 
-		expect(rowModel.plan.materializationStateBySectionIndex[0]).toEqual({
+		expect(rowModel.plan.cellStore.materializationStateBySectionIndex[0]).toEqual({
 			nextCellIndex: 0,
 			materializedCellCount: 0,
 		});
@@ -148,7 +148,7 @@ describe("createTwoHopLayoutPlanCache in a DOM runtime", () => {
 		cache.scheduleMaterialization(rowModel, onMaterialized);
 		idle.idleCallbacks.get(idle.latestCallbackId)?.(idleDeadline);
 
-		expect(rowModel.plan.materializationStateBySectionIndex[0]).toEqual({
+		expect(rowModel.plan.cellStore.materializationStateBySectionIndex[0]).toEqual({
 			nextCellIndex: 1,
 			materializedCellCount: 1,
 		});
@@ -170,9 +170,9 @@ describe("createTwoHopLayoutPlanCache in a DOM runtime", () => {
 		markScrollActivityActive(scrollSource);
 		idle.idleCallbacks.get(idle.latestCallbackId)?.(idleDeadline);
 
-		expect(rowModel.plan.materializationRevision).toBe(0);
+		expect(rowModel.plan.cellStore.revision).toBe(0);
 		expect(
-			rowModel.plan.materializationStateBySectionIndex[0]?.materializedCellCount,
+			rowModel.plan.cellStore.materializationStateBySectionIndex[0]?.materializedCellCount,
 		).toBe(0);
 		expect(onMaterialized).not.toHaveBeenCalled();
 		expect(idle.requestIdleCallback).toHaveBeenCalledTimes(2);

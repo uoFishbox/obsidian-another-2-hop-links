@@ -30,7 +30,6 @@ export interface SectionedGridPlan<
 	readonly rowCount: number;
 	readonly columns: number;
 	readonly rowGap: number;
-	readonly materializationRevision?: number;
 }
 
 export interface SectionedGridResolvedRow {
@@ -48,7 +47,6 @@ export interface SectionedGridMountedRowsBuild<T, G, TPlan> {
 	readonly nextRenderSlotIndex: number;
 	readonly rowRange: RowRange;
 	readonly plan: TPlan;
-	readonly materializationRevision: number | undefined;
 }
 
 export interface BuildSectionedGridMountedRowsParams<
@@ -124,11 +122,14 @@ export function buildSectionedGridMountedRows<
 		string,
 		SectionedGridMountedCell<T, G>
 	> => params.previousBuild?.reusableCellsByKey ?? EMPTY_PREVIOUS_CELLS;
+	// Cell-level reuse across the previous build is only useful when the plan
+	// object changes (same data re-compiled). Within a single plan object,
+	// materialization mutates logical cells in place, so reused rows carry
+	// stable cell references via the slice-reuse fast path below, and rows
+	// newly entering the range never had cells in the previous build.
 	const canReusePreviousCellsByKey =
 		params.previousBuild !== undefined &&
-		(params.previousBuild.plan !== plan ||
-			params.previousBuild.materializationRevision !==
-				plan.materializationRevision);
+		params.previousBuild.plan !== plan;
 	const previousRows = params.previousBuild?.rowSlices;
 	const previousRowStart = params.previousBuild?.rowRange.start ?? 0;
 	const previousRowEnd = params.previousBuild?.rowRange.end ?? 0;
@@ -188,12 +189,7 @@ export function buildSectionedGridMountedRows<
 		} = resolvedRow;
 		const rowKey = rowIndex;
 		const previousRow = getPreviousRow(rowIndex);
-		if (
-			params.previousBuild?.plan === plan &&
-			params.previousBuild.materializationRevision ===
-				plan.materializationRevision &&
-			previousRow
-		) {
+		if (params.previousBuild?.plan === plan && previousRow) {
 			rowSlices.push(previousRow);
 			mountedCellCount += previousRow.cells.length;
 			continue;
@@ -294,6 +290,5 @@ export function buildSectionedGridMountedRows<
 		nextRenderSlotIndex: nextRowSlotIndex * plan.columns,
 		rowRange: { start, end },
 		plan,
-		materializationRevision: plan.materializationRevision,
 	};
 }
