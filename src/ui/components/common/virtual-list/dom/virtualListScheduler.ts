@@ -26,6 +26,14 @@ export const createScheduledVirtualListTask = (
 	let handle = 0;
 	let usesAnimationFrame = false;
 
+	// Stable fire handler: avoids allocating a new closure on every schedule().
+	// `callback` is fixed at task creation, so a single shared handler is safe.
+	const fire = (): void => {
+		handle = 0;
+		scheduled = false;
+		callback();
+	};
+
 	return {
 		schedule() {
 			const ownerWindow = resolveScheduledTaskWindow(getWindow);
@@ -37,18 +45,12 @@ export const createScheduledVirtualListTask = (
 
 			if (typeof ownerWindow.requestAnimationFrame === "function") {
 				usesAnimationFrame = true;
-				handle = ownerWindow.requestAnimationFrame(() => {
-					scheduled = false;
-					callback();
-				});
+				handle = ownerWindow.requestAnimationFrame(fire);
 				return true;
 			}
 
 			usesAnimationFrame = false;
-			handle = ownerWindow.setTimeout(() => {
-				scheduled = false;
-				callback();
-			}, 0);
+			handle = ownerWindow.setTimeout(fire, 0);
 			return true;
 		},
 		cancel() {

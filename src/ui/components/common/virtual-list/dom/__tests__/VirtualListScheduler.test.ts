@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
 	createPostPaintVirtualListTask,
+	createScheduledVirtualListTask,
 	createVirtualListMeasurementScheduler,
 } from "../virtualListScheduler";
 
@@ -145,5 +146,117 @@ describe("createPostPaintVirtualListTask", () => {
 
 		expect(callback).not.toHaveBeenCalled();
 		expect(task.isScheduled()).toBe(false);
+	});
+});
+
+describe("createScheduledVirtualListTask", () => {
+	afterEach(() => {
+		vi.unstubAllGlobals();
+	});
+
+	it("schedules callback via requestAnimationFrame when available", () => {
+		const handlers: Array<() => void> = [];
+		vi.stubGlobal("window", {
+			requestAnimationFrame: (handler: () => void) => {
+				handlers.push(handler);
+				return handlers.length;
+			},
+			cancelAnimationFrame: vi.fn(),
+			setTimeout,
+			clearTimeout,
+		});
+
+		const callback = vi.fn();
+		const task = createScheduledVirtualListTask(callback);
+
+		expect(task.schedule()).toBe(true);
+		expect(task.isScheduled()).toBe(true);
+
+		handlers[0]();
+
+		expect(callback).toHaveBeenCalledTimes(1);
+		expect(task.isScheduled()).toBe(false);
+	});
+
+	it("falls back to setTimeout when requestAnimationFrame is unavailable", () => {
+		const handlers: Array<() => void> = [];
+		vi.stubGlobal("window", {
+			setTimeout: (handler: () => void, _delay: number) => {
+				handlers.push(handler);
+				return handlers.length;
+			},
+			clearTimeout: vi.fn(),
+		});
+
+		const callback = vi.fn();
+		const task = createScheduledVirtualListTask(callback);
+
+		expect(task.schedule()).toBe(true);
+
+		handlers[0]();
+
+		expect(callback).toHaveBeenCalledTimes(1);
+		expect(task.isScheduled()).toBe(false);
+	});
+
+	it("does not schedule if already scheduled", () => {
+		vi.stubGlobal("window", {
+			requestAnimationFrame: vi.fn(() => 1),
+			cancelAnimationFrame: vi.fn(),
+			setTimeout,
+			clearTimeout,
+		});
+
+		const task = createScheduledVirtualListTask(vi.fn());
+
+		expect(task.schedule()).toBe(true);
+		expect(task.schedule()).toBe(false);
+		expect(task.isScheduled()).toBe(true);
+	});
+
+	it("cancels pending task", () => {
+		const cancelAnimationFrame = vi.fn();
+		vi.stubGlobal("window", {
+			requestAnimationFrame: vi.fn(() => 42),
+			cancelAnimationFrame,
+			setTimeout,
+			clearTimeout,
+		});
+
+		const callback = vi.fn();
+		const task = createScheduledVirtualListTask(callback);
+
+		task.schedule();
+		task.cancel();
+
+		expect(task.isScheduled()).toBe(false);
+		expect(cancelAnimationFrame).toHaveBeenCalledWith(42);
+	});
+
+	it("reuses the same handler closure across schedule() calls", () => {
+		const handlers: Array<() => void> = [];
+		vi.stubGlobal("window", {
+			requestAnimationFrame: (handler: () => void) => {
+				handlers.push(handler);
+				return handlers.length;
+			},
+			cancelAnimationFrame: vi.fn(),
+			setTimeout,
+			clearTimeout,
+		});
+
+		const callback = vi.fn();
+		const task = createScheduledVirtualListTask(callback);
+
+		task.schedule();
+		const firstHandler = handlers[0];
+		firstHandler();
+
+		task.schedule();
+		const secondHandler = handlers[1];
+
+		expect(secondHandler).toBe(firstHandler);
+		secondHandler();
+		expect(callback).toHaveBeenCalledTimes(2);
 	});
 });
