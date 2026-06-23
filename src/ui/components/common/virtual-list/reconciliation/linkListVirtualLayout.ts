@@ -96,22 +96,10 @@ interface VirtualGridCellResolver<T> {
 	resolveCellAtIndex(index: number): VirtualListLogicalCell<T> | null;
 }
 
-interface VirtualGridRowSlot {
-	readonly slotIndex: number;
-	readonly slotKey: number;
-}
-
-const createVirtualGridRowSlot = (slotIndex: number): VirtualGridRowSlot => ({
-	slotIndex,
-	slotKey: slotIndex,
-});
-
 // Module-level comparator avoids allocating a fresh closure on every scroll
 // frame when sorting the free row-slot pool in-place.
-const compareVirtualGridRowSlotByIndex = (
-	left: VirtualGridRowSlot,
-	right: VirtualGridRowSlot,
-): number => left.slotIndex - right.slotIndex;
+const compareVirtualGridRowSlotIndex = (left: number, right: number): number =>
+	left - right;
 
 const createMountedVirtualGridCellBodyKey = <T>(
 	cell: VirtualListLogicalCell<T>,
@@ -457,6 +445,7 @@ function buildMountedVirtualGridCellsFromResolver<T>(params: {
 	previousBuild?: MountedVirtualGridCellsBuildResult<T>;
 	previousCellsByKey?: ReadonlyMap<string, MountedVirtualGridCell<T>>;
 	renderRevisionFallbackPolicy?: RenderRevisionFallbackPolicy;
+	reusableRowSlotsScratch?: number[];
 }): MountedVirtualGridCellsBuildResult<T> {
 	const columns = Math.max(1, params.columns);
 	const previousBuild = params.previousBuild;
@@ -507,45 +496,23 @@ function buildMountedVirtualGridCellsFromResolver<T>(params: {
 	const visibleRowStart = visibleRows.start;
 	const visibleRowEnd = visibleRows.end;
 
-	const rowSlotByLogicalRowIndex = new Map<number, VirtualGridRowSlot>();
-	const freeRowSlots: VirtualGridRowSlot[] = [];
+	const reusableRowSlots = params.reusableRowSlotsScratch ?? [];
+	reusableRowSlots.length = 0;
 	let nextRowSlotIndex = 0;
 	if (previousBuild && hasCompatiblePreviousRowSlots) {
 		for (const previousRow of previousBuild.rowSlices) {
-			nextRowSlotIndex = Math.max(
-				nextRowSlotIndex,
-				previousRow.slotIndex + 1,
-			);
-			const slot = {
-				slotIndex: previousRow.slotIndex,
-				slotKey: previousRow.slotKey,
-			};
+			const slotIndex = previousRow.slotIndex;
+			nextRowSlotIndex = Math.max(nextRowSlotIndex, slotIndex + 1);
 			if (
-				previousRow.rowIndex >= visibleRowStart &&
-				previousRow.rowIndex < visibleRowEnd
+				previousRow.rowIndex < visibleRowStart ||
+				previousRow.rowIndex >= visibleRowEnd
 			) {
-				rowSlotByLogicalRowIndex.set(previousRow.rowIndex, slot);
-			} else {
-				freeRowSlots.push(slot);
+				reusableRowSlots.push(slotIndex);
 			}
 		}
 	}
-	freeRowSlots.sort(compareVirtualGridRowSlotByIndex);
-
-	const acquireRowSlot = (rowIndex: number): VirtualGridRowSlot => {
-		const retained = rowSlotByLogicalRowIndex.get(rowIndex);
-		if (retained) {
-			return retained;
-		}
-
-		const slot =
-			freeRowSlots.shift() ?? createVirtualGridRowSlot(nextRowSlotIndex);
-		if (slot.slotIndex >= nextRowSlotIndex) {
-			nextRowSlotIndex = slot.slotIndex + 1;
-		}
-		rowSlotByLogicalRowIndex.set(rowIndex, slot);
-		return slot;
-	};
+	reusableRowSlots.sort(compareVirtualGridRowSlotIndex);
+	let reusableRowSlotOffset = 0;
 
 	const previousCellsByKey =
 		previousBuild?.reusableCellsByKey ??
@@ -566,9 +533,22 @@ function buildMountedVirtualGridCellsFromResolver<T>(params: {
 			params.cellResolver.cellCount,
 			(rowIndex + 1) * columns,
 		);
-		const rowSlot = acquireRowSlot(rowIndex);
-		const previousRow = hasCompatiblePreviousBuild
+		const previousRowWithCompatibleSlot = hasCompatiblePreviousRowSlots
 			? getPreviousMountedVirtualGridRow(previousBuild, rowIndex)
+			: undefined;
+		let rowSlotIndex = previousRowWithCompatibleSlot?.slotIndex;
+		if (rowSlotIndex === undefined) {
+			const reusableRowSlot = reusableRowSlots[reusableRowSlotOffset];
+			if (reusableRowSlot !== undefined) {
+				reusableRowSlotOffset += 1;
+				rowSlotIndex = reusableRowSlot;
+			} else {
+				rowSlotIndex = nextRowSlotIndex;
+				nextRowSlotIndex += 1;
+			}
+		}
+		const previousRow = hasCompatiblePreviousBuild
+			? previousRowWithCompatibleSlot
 			: undefined;
 		if (
 			canReuseMountedVirtualGridRow(
@@ -576,7 +556,7 @@ function buildMountedVirtualGridCellsFromResolver<T>(params: {
 				rowStartIndex,
 				rowEndIndex,
 			) &&
-			previousRow.slotIndex === rowSlot.slotIndex
+			previousRow.slotIndex === rowSlotIndex
 		) {
 			rowSlices.push(previousRow);
 			for (const mountedCell of previousRow.cells) {
@@ -597,7 +577,7 @@ function buildMountedVirtualGridCellsFromResolver<T>(params: {
 				continue;
 			}
 			const columnIndex = cellIndex % columns;
-			const renderSlotIndex = rowSlot.slotIndex * columns + columnIndex;
+			const renderSlotIndex = rowSlotIndex * columns + columnIndex;
 			const cellSlotKey = renderSlotIndex;
 			const key = logicalCellKey(cell.key);
 			const top = rowIndex * rowStep;
@@ -665,8 +645,8 @@ function buildMountedVirtualGridCellsFromResolver<T>(params: {
 
 		rowSlices.push({
 			key: rowIndex,
-			slotIndex: rowSlot.slotIndex,
-			slotKey: rowSlot.slotKey,
+			slotIndex: rowSlotIndex,
+			slotKey: rowSlotIndex,
 			rowIndex,
 			top: rowIndex * rowStep,
 			cells: rowCells,
@@ -699,6 +679,7 @@ export function buildMountedVirtualGridCells<T>(params: {
 	previousBuild?: MountedVirtualGridCellsBuildResult<T>;
 	previousCellsByKey?: ReadonlyMap<string, MountedVirtualGridCell<T>>;
 	renderRevisionFallbackPolicy?: RenderRevisionFallbackPolicy;
+	reusableRowSlotsScratch?: number[];
 }): MountedVirtualGridCellsBuildResult<T> {
 	return buildMountedVirtualGridCellsFromResolver({
 		cellResolver: createArrayBackedFlatLogicalCellSource(params.logicalCells),
@@ -710,6 +691,7 @@ export function buildMountedVirtualGridCells<T>(params: {
 		previousBuild: params.previousBuild,
 		previousCellsByKey: params.previousCellsByKey,
 		renderRevisionFallbackPolicy: params.renderRevisionFallbackPolicy,
+		reusableRowSlotsScratch: params.reusableRowSlotsScratch,
 	});
 }
 
@@ -719,6 +701,7 @@ export function buildMountedVirtualGridCellsFromRowModel<T>(params: {
 	previousBuild?: MountedVirtualGridCellsBuildResult<T>;
 	previousCellsByKey?: ReadonlyMap<string, MountedVirtualGridCell<T>>;
 	renderRevisionFallbackPolicy?: RenderRevisionFallbackPolicy;
+	reusableRowSlotsScratch?: number[];
 }): MountedVirtualGridCellsBuildResult<T> {
 	const { rowModel } = params;
 	return buildMountedVirtualGridCellsFromResolver({
@@ -739,5 +722,6 @@ export function buildMountedVirtualGridCellsFromRowModel<T>(params: {
 		previousBuild: params.previousBuild,
 		previousCellsByKey: params.previousCellsByKey,
 		renderRevisionFallbackPolicy: params.renderRevisionFallbackPolicy,
+		reusableRowSlotsScratch: params.reusableRowSlotsScratch,
 	});
 }

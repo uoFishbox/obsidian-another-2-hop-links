@@ -154,6 +154,7 @@ export function useFlatVirtualGridList<T>(props: FlatVirtualGridListProps<T>) {
 	let visibilityMountedRange: RowRange = { start: 0, end: 0 };
 	let visibilityRowModel: object | null = null;
 	let visibilityPreviewRange: RowRange | null = null;
+	const reusableRowSlotsScratch: number[] = [];
 	const syncVisibilityStates = (
 		mountedRows: readonly MountedVirtualGridRowSlice<T>[] | readonly [],
 		nextMountedRange: RowRange,
@@ -280,6 +281,7 @@ export function useFlatVirtualGridList<T>(props: FlatVirtualGridListProps<T>) {
 				previousCellsByKey,
 				renderRevisionFallbackPolicy:
 					props.renderRevisionFallbackPolicy,
+				reusableRowSlotsScratch,
 			}),
 		onStableVisibleRange: () => {
 			measurement.hasStableVisibleRange = true;

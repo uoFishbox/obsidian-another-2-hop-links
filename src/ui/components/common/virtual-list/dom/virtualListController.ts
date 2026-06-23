@@ -110,8 +110,8 @@ export interface VirtualListRangeMeasurementContext<TLayout, TContent> {
 	isScrollActive: boolean;
 	content: TContent;
 	layout: TLayout;
-	precomputedMountedRange?: RowRange;
-	precomputedRanges?: VirtualRanges;
+	precomputedMountedRange: RowRange | undefined;
+	precomputedRanges: VirtualRanges | undefined;
 }
 
 export interface VirtualListStableMeasurementContext {
@@ -360,6 +360,8 @@ export function createVirtualListController<
 			isScrollActive: false,
 			content,
 			layout,
+			precomputedMountedRange: undefined,
+			precomputedRanges: undefined,
 		};
 		const result = applyRangeMeasurement(measurementContext);
 		if (result.kind === "stable") {
@@ -576,6 +578,8 @@ export function createVirtualListController<
 				isScrollActive: localIsScrollActive,
 				content,
 				layout,
+				precomputedMountedRange: undefined,
+				precomputedRanges: undefined,
 			};
 			if (!onStableScrollMeasurement) {
 				cachedRangeMeasurementContext = measurementContext;
@@ -588,16 +592,9 @@ export function createVirtualListController<
 			measurementContext.isScrollActive = localIsScrollActive;
 			measurementContext.content = content;
 			measurementContext.layout = layout;
-			delete measurementContext.precomputedMountedRange;
-			delete measurementContext.precomputedRanges;
 		}
-		if (precomputedMountedRange) {
-			measurementContext.precomputedMountedRange =
-				precomputedMountedRange;
-		}
-		if (precomputedRanges) {
-			measurementContext.precomputedRanges = precomputedRanges;
-		}
+		measurementContext.precomputedMountedRange = precomputedMountedRange;
+		measurementContext.precomputedRanges = precomputedRanges;
 
 		const result = applyRangeMeasurement(measurementContext);
 		if (result.kind === "stable") {
