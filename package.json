@@ -18,6 +18,7 @@
 		"test:coverage": "vitest --coverage",
 		"check": "tsc --noEmit && echo tsc passed && svelte-check --tsconfig ./tsconfig.json",
 		"check:circular": "madge --circular --extensions ts --ts-config tsconfig.json src",
+		"format:staged": "pretty-quick --staged",
 		"version": "node version-bump.mjs && git add manifest.json versions.json"
 	},
 	"keywords": [],
@@ -45,6 +46,7 @@
 		"obsidian-typings": "^6.13.0",
 		"prettier": "^3.8.4",
 		"prettier-plugin-svelte": "^4.1.1",
+		"pretty-quick": "^4.2.2",
 		"svelte": "5.40.2",
 		"svelte-check": "^4.4.8",
 		"svelte-preprocess": "^6.0.5",
