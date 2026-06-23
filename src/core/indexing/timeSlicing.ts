@@ -16,10 +16,12 @@ function hasWindow(): boolean {
 	return typeof window !== "undefined";
 }
 
-function schedulePause(
-	resolve: () => void,
-	maxDelayMs: number,
-): { cancel: () => void } {
+// Reused across yield calls to avoid allocating a fresh IdleRequestOptions
+// object on every pause. requestIdleCallback reads `timeout` synchronously
+// before returning, so mutation immediately before the call is safe.
+const idleRequestOptions: IdleRequestOptions = { timeout: 0 };
+
+function schedulePause(resolve: () => void, maxDelayMs: number): void {
 	if (
 		hasWindow() &&
 		maxDelayMs > 0 &&
@@ -38,6 +40,7 @@ function schedulePause(
 			resolve();
 		}, maxDelayMs);
 
+		idleRequestOptions.timeout = maxDelayMs;
 		idleId = window.requestIdleCallback(
 			() => {
 				if (finished) {
@@ -47,28 +50,14 @@ function schedulePause(
 				window.clearTimeout(timeoutId);
 				resolve();
 			},
-			{ timeout: maxDelayMs },
+			idleRequestOptions,
 		);
-
-		return {
-			cancel: () => {
-				if (finished) {
-					return;
-				}
-				finished = true;
-				if (idleId !== undefined) {
-					window.cancelIdleCallback(idleId);
-				}
-				window.clearTimeout(timeoutId);
-			},
-		};
+		return;
 	}
 
 	if (hasWindow() && typeof window.requestAnimationFrame === "function") {
-		const frameId = window.requestAnimationFrame(() => resolve());
-		return {
-			cancel: () => window.cancelAnimationFrame(frameId),
-		};
+		window.requestAnimationFrame(() => resolve());
+		return;
 	}
 
 	if (typeof MessageChannel === "function") {
@@ -84,20 +73,10 @@ function schedulePause(
 			resolve();
 		};
 		channel.port2.postMessage(null);
-		return {
-			cancel: () => {
-				if (finished) {
-					return;
-				}
-				finished = true;
-				channel.port1.close();
-				channel.port2.close();
-			},
-		};
+		return;
 	}
 
 	queueMicrotask(resolve);
-	return { cancel: () => undefined };
 }
 
 export function yieldToMainThreadIdleAware(
