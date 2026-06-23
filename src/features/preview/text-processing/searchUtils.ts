@@ -2,10 +2,33 @@ import { getSearchQueryTerms } from "features/search/searchQueryTerms";
 
 const REGEXP_ESCAPE_PATTERN = /[.*+?^${}()|[\]\\]/g;
 const REGEXP_SOURCE_CACHE_MAX_SIZE = 64;
+const REGEXP_OBJECT_CACHE_MAX_SIZE = 64;
 const regexpSourceCache = new Map<string, string | null>();
+const regexpObjectCache = new Map<string, RegExp>();
 
 export function escapeRegExp(value: string): string {
 	return value.replace(REGEXP_ESCAPE_PATTERN, "\\$&");
+}
+
+function getCachedRegExpObject(source: string): RegExp {
+	const cached = regexpObjectCache.get(source);
+	if (cached) {
+		regexpObjectCache.delete(source);
+		cached.lastIndex = 0;
+		regexpObjectCache.set(source, cached);
+		return cached;
+	}
+
+	const pattern = new RegExp(source, "i");
+	regexpObjectCache.set(source, pattern);
+	if (regexpObjectCache.size > REGEXP_OBJECT_CACHE_MAX_SIZE) {
+		const oldestKey = regexpObjectCache.keys().next().value;
+		if (oldestKey !== undefined) {
+			regexpObjectCache.delete(oldestKey);
+		}
+	}
+
+	return pattern;
 }
 
 export function createCaseInsensitiveRegExp(
@@ -17,7 +40,11 @@ export function createCaseInsensitiveRegExp(
 		return null;
 	}
 
-	return new RegExp(source, global ? "gi" : "i");
+	if (global) {
+		return new RegExp(source, "gi");
+	}
+
+	return getCachedRegExpObject(source);
 }
 
 function getCachedRegExpSource(query: string | undefined): string | null {

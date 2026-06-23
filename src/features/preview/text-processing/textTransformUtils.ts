@@ -28,6 +28,10 @@ const NORMALIZED_CODE_BLOCK_TYPES_CACHE = new Map<
 	string,
 	NormalizedCodeBlockTypes
 >();
+const NORMALIZED_CODE_BLOCK_TYPES_WEAK_CACHE = new WeakMap<
+	readonly string[],
+	NormalizedCodeBlockTypes
+>();
 
 export function getNormalizedCodeBlockTypes(
 	renderCodeBlockTypes: readonly string[] | undefined,
@@ -36,9 +40,17 @@ export function getNormalizedCodeBlockTypes(
 		return undefined;
 	}
 
+	const weakCached = NORMALIZED_CODE_BLOCK_TYPES_WEAK_CACHE.get(
+		renderCodeBlockTypes,
+	);
+	if (weakCached) {
+		return weakCached;
+	}
+
 	const cacheKey = renderCodeBlockTypes.join("\u0000");
 	const cached = NORMALIZED_CODE_BLOCK_TYPES_CACHE.get(cacheKey);
 	if (cached) {
+		NORMALIZED_CODE_BLOCK_TYPES_WEAK_CACHE.set(renderCodeBlockTypes, cached);
 		return cached;
 	}
 
@@ -56,6 +68,7 @@ export function getNormalizedCodeBlockTypes(
 	};
 
 	NORMALIZED_CODE_BLOCK_TYPES_CACHE.set(cacheKey, result);
+	NORMALIZED_CODE_BLOCK_TYPES_WEAK_CACHE.set(renderCodeBlockTypes, result);
 	return result;
 }
 
@@ -134,7 +147,10 @@ export function transformContentForPreview(
 		skipFrontmatterRemoval: options?.skipFrontmatterRemoval,
 	});
 
-	for (const { regex, replacement } of transformations) {
+	for (const { regex, replacement, skipIfAbsent } of transformations) {
+		if (skipIfAbsent && skipIfAbsent(transformedContent)) {
+			continue;
+		}
 		transformedContent = transformedContent.replace(
 			regex,
 			replacement as any,

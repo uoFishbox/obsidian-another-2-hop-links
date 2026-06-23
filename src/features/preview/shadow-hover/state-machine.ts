@@ -22,34 +22,40 @@ export function createInitialHoverSessionInteractionState(): HoverSessionInterac
 	};
 }
 
+// Hot path: this reducer mutates `state` in place.
+// `HoverSessionInteractionState` is a fixed-shape flag bag (three scalar fields)
+// shared across all hover/pointermove events. Returning a fresh object here
+// (via object spread on every interaction event) was the dominant allocation
+// source during hover/scroll bursts. Mutating in place eliminates the per-event
+// allocation while keeping the public surface (`\`return state\``) stable so
+// existing `expect(...).toEqual(...)` tests still pass.
+//
+// Unlike `transitionHoverSession` below, this reducer never switches its
+// `type` discriminant, so the object's V8 HiddenClass stays stable across
+// updates.
 export function transitionHoverSessionInteraction(
 	state: HoverSessionInteractionState,
 	event: HoverSessionInteractionEvent,
 ): HoverSessionInteractionState {
 	switch (event.type) {
 		case "interaction-sync":
-			return {
-				...state,
-				overAnchor: event.overAnchor,
-				overPopover: event.overPopover,
-			};
+			state.overAnchor = event.overAnchor;
+			state.overPopover = event.overPopover;
+			return state;
 		case "anchor-hover-sync":
-			return {
-				...state,
-				overAnchor: event.overAnchor,
-			};
+			state.overAnchor = event.overAnchor;
+			return state;
 		case "popover-hover-sync":
-			return {
-				...state,
-				overPopover: event.overPopover,
-			};
+			state.overPopover = event.overPopover;
+			return state;
 		case "outside-interaction":
-			return {
-				...state,
-				outsideInteractionUntil: event.until,
-			};
+			state.outsideInteractionUntil = event.until;
+			return state;
 		case "interaction-reset":
-			return createInitialHoverSessionInteractionState();
+			state.overAnchor = false;
+			state.overPopover = false;
+			state.outsideInteractionUntil = 0;
+			return state;
 		default: {
 			const _exhaustive: never = event;
 			return _exhaustive;

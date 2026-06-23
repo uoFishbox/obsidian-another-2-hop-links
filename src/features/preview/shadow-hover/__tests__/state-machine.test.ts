@@ -102,29 +102,38 @@ describe("transitionHoverSession", () => {
 });
 
 describe("transitionHoverSessionInteraction", () => {
+	// `transitionHoverSessionInteraction` mutates its `state` argument in place
+	// and returns the same object reference (allocation-free hot path for
+	// hover/pointermove events). Verify each transition by inspecting the
+	// shared state after every event rather than holding independent snapshots.
 	it("tracks hover and outside interaction state independently", () => {
-		const hovered = transitionHoverSessionInteraction(
-			createInitialHoverSessionInteractionState(),
-			{
-				type: "interaction-sync",
-				overAnchor: true,
-				overPopover: false,
-			},
-		);
-		const outside = transitionHoverSessionInteraction(hovered, {
+		const state = createInitialHoverSessionInteractionState();
+
+		transitionHoverSessionInteraction(state, {
+			type: "interaction-sync",
+			overAnchor: true,
+			overPopover: false,
+		});
+		expect(state).toEqual({
+			overAnchor: true,
+			overPopover: false,
+			outsideInteractionUntil: 0,
+		});
+
+		transitionHoverSessionInteraction(state, {
 			type: "outside-interaction",
 			until: 120,
 		});
-		const reset = transitionHoverSessionInteraction(outside, {
-			type: "interaction-reset",
-		});
-
-		expect(outside).toEqual({
+		expect(state).toEqual({
 			overAnchor: true,
 			overPopover: false,
 			outsideInteractionUntil: 120,
 		});
-		expect(reset).toEqual(createInitialHoverSessionInteractionState());
+
+		transitionHoverSessionInteraction(state, {
+			type: "interaction-reset",
+		});
+		expect(state).toEqual(createInitialHoverSessionInteractionState());
 	});
 });
 

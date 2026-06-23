@@ -89,6 +89,19 @@ export type TextTransformReplacement =
 export interface TextTransformRule {
 	regex: RegExp;
 	replacement: TextTransformReplacement;
+	/**
+	 * Optional fast-path guard. Returns `true` when the rule is provably
+	 * unmatchable against `content`, in which case `transformContentForPreview`
+	 * skips the `String.prototype.replace` call entirely.
+	 *
+	 * This avoids both the regex scan and any intermediate string allocation for
+	 * rules that cannot match (e.g. a ``wikilinks`` rule on a content with no
+	 * `[[`). Different rules need different absence logic (OR vs AND of
+	 * candidate substrings), so a predicate keeps the semantics explicit per
+	 * rule. The predicate must be conservative: returning `true` only when the
+	 * regex truly cannot match.
+	 */
+	skipIfAbsent?: (content: string) => boolean;
 }
 
 interface TextTransformBuildOptions {
@@ -106,14 +119,24 @@ function buildCommonRules(
 	preserveHeadings: boolean,
 	skipFrontmatterRemoval?: boolean,
 ): TextTransformRule[] {
-	const headingRules = preserveHeadings
+	const headingRules: TextTransformRule[] = preserveHeadings
 		? []
-		: [{ regex: REGEX.headings, replacement: "" }];
+		: [{
+				regex: REGEX.headings,
+				replacement: "",
+				skipIfAbsent: (content: string) => !content.includes("#"),
+			}];
 
 	return [
 		...(skipFrontmatterRemoval
 			? []
-			: [{ regex: REGEX.frontmatter, replacement: "" }]),
+			: [
+					{
+						regex: REGEX.frontmatter,
+						replacement: "",
+						skipIfAbsent: (content: string) => !content.includes("---"),
+					},
+				]),
 		{
 			regex: REGEX.embededContent,
 			replacement: (
@@ -124,14 +147,30 @@ function buildCommonRules(
 				shouldKeepEmbedLiteral(markdownEmbedTarget, wikiEmbedTarget)
 					? match
 					: "",
+			skipIfAbsent: (content: string) => !content.includes("!["),
 		},
 		...headingRules,
-		{ regex: REGEX.horizontalRules, replacement: "" },
-		{ regex: REGEX.listMarkers, replacement: "" },
-		{ regex: /^\s*[\r\n]/gm, replacement: "" },
+		{
+			regex: REGEX.horizontalRules,
+			replacement: "",
+			skipIfAbsent: (content: string) => !content.includes("---"),
+		},
+		{
+			regex: REGEX.listMarkers,
+			replacement: "",
+			skipIfAbsent: (content: string) =>
+				!content.includes("-") && !content.includes("*"),
+		},
+		{
+			regex: /^\s*[\r\n]/gm,
+			replacement: "",
+			skipIfAbsent: (content: string) =>
+				!content.includes("\n") && !content.includes("\r"),
+		},
 		{
 			regex: REGEX.highlight,
 			replacement: (_: string, p1: string) => p1,
+			skipIfAbsent: (content: string) => !content.includes("=="),
 		},
 		{
 			regex: REGEX.wikilinks,
@@ -139,6 +178,7 @@ function buildCommonRules(
 				`<span class="cosense-card-links__wikilink">${escapeHtml(
 					alias || title,
 				)}</span>`,
+			skipIfAbsent: (content: string) => !content.includes("[["),
 		},
 		{
 			regex: REGEX.externalLinks,
@@ -152,6 +192,7 @@ function buildCommonRules(
 					text,
 				)}</span>`;
 			},
+			skipIfAbsent: (content: string) => !content.includes("]("),
 		},
 		{
 			regex: REGEX.rawUrls,
@@ -159,9 +200,19 @@ function buildCommonRules(
 				`<span class="cosense-card-links__external-link">${escapeHtml(
 					url,
 				)}</span>`,
+			skipIfAbsent: (content: string) => !content.includes("http"),
 		},
-		{ regex: /\n{3,}/g, replacement: "\n\n" },
-		{ regex: /[ \t]{2,}/g, replacement: " " },
+		{
+			regex: /\n{3,}/g,
+			replacement: "\n\n",
+			skipIfAbsent: (content: string) => !content.includes("\n\n\n"),
+		},
+		{
+			regex: /[ \t]{2,}/g,
+			replacement: " ",
+			skipIfAbsent: (content: string) =>
+				!content.includes("  ") && !content.includes("\t\t"),
+		},
 	];
 }
 
@@ -173,22 +224,40 @@ export function stripClosedIframes(input: string): string {
 	return input.replace(/<iframe\b[\s\S]*?<\/iframe>/gi, "");
 }
 
-const RULE_CACHE = new Map<string, TextTransformRule[]>();
+const RULES_BY_COMBO: Record<
+	TextTransformContext,
+	Record<"0" | "1", Record<"0" | "1", TextTransformRule[]>>
+> = {
+	preview: {
+		"0": {
+			"0": buildCommonRules(false, false),
+			"1": buildCommonRules(false, true),
+		},
+		"1": {
+			"0": buildCommonRules(true, false),
+			"1": buildCommonRules(true, true),
+		},
+	},
+	searchSnippet: {
+		"0": {
+			"0": buildCommonRules(false, false),
+			"1": buildCommonRules(false, true),
+		},
+		"1": {
+			"0": buildCommonRules(true, false),
+			"1": buildCommonRules(true, true),
+		},
+	},
+};
 
 function getCachedRules(
 	context: TextTransformContext,
 	preserveHeadings: boolean,
 	skipFrontmatterRemoval?: boolean,
 ): TextTransformRule[] {
-	const cacheKey = `${context}:${preserveHeadings ? "1" : "0"}:${skipFrontmatterRemoval ? "1" : "0"}`;
-	const cachedRules = RULE_CACHE.get(cacheKey);
-	if (cachedRules) {
-		return cachedRules;
-	}
-
-	const rules = buildCommonRules(preserveHeadings, skipFrontmatterRemoval);
-	RULE_CACHE.set(cacheKey, rules);
-	return rules;
+	return RULES_BY_COMBO[context][preserveHeadings ? "1" : "0"][
+		skipFrontmatterRemoval ? "1" : "0"
+	];
 }
 
 const PREVIEW_TEXT_TRANSFORM_STRATEGY: TextTransformStrategy = {

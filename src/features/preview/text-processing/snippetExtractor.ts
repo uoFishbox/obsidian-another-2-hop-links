@@ -126,16 +126,60 @@ function findClosingDelimiterIndex(
 	return -1;
 }
 
+interface ScanState {
+	visualLines: number;
+	currentLineCells: number;
+}
+
+function addCells(
+	state: ScanState,
+	cells: number,
+	columns: number,
+): void {
+	if (cells <= 0) return;
+
+	if (state.currentLineCells + cells <= columns) {
+		state.currentLineCells += cells;
+		return;
+	}
+
+	const remaining = Math.max(columns - state.currentLineCells, 0);
+	cells -= remaining;
+	state.visualLines++;
+	state.currentLineCells = 0;
+
+	if (cells > columns) {
+		const fullLines = Math.floor(cells / columns);
+		state.visualLines += fullLines;
+		state.currentLineCells = cells % columns;
+		return;
+	}
+
+	state.currentLineCells = cells;
+}
+
+function addHardNewline(state: ScanState): void {
+	state.visualLines++;
+	state.currentLineCells = 0;
+}
+
+function addDisplayMathLine(state: ScanState): void {
+	if (state.currentLineCells > 0) {
+		addHardNewline(state);
+	}
+	state.visualLines++;
+	state.currentLineCells = 0;
+}
+
 function scanAndTruncate(
 	text: string,
 	metrics: VisualTruncateMetrics,
 ): { result: string; wasTruncated: boolean } {
 	let i = 0;
 	let weight = 0;
-	let visualLines = 1;
-	let currentLineCells = 0;
 
 	// State
+	const state: ScanState = { visualLines: 1, currentLineCells: 0 };
 	let inBlock = false;
 	let currentBlockEnd = "";
 	let isBlockMultiline = true;
@@ -150,47 +194,11 @@ function scanAndTruncate(
 
 	const len = text.length;
 
-	const addCells = (cells: number) => {
-		if (cells <= 0) return;
-
-		if (currentLineCells + cells <= metrics.columns) {
-			currentLineCells += cells;
-			return;
-		}
-
-		const remaining = Math.max(metrics.columns - currentLineCells, 0);
-		cells -= remaining;
-		visualLines++;
-		currentLineCells = 0;
-
-		if (cells > metrics.columns) {
-			const fullLines = Math.floor(cells / metrics.columns);
-			visualLines += fullLines;
-			currentLineCells = cells % metrics.columns;
-			return;
-		}
-
-		currentLineCells = cells;
-	};
-
-	const addHardNewline = () => {
-		visualLines++;
-		currentLineCells = 0;
-	};
-
-	const addDisplayMathLine = () => {
-		if (currentLineCells > 0) {
-			addHardNewline();
-		}
-		visualLines++;
-		currentLineCells = 0;
-	};
-
 	while (i < len) {
 		if (!limitReached) {
 			if (
 				weight >= metrics.maxWeight ||
-				visualLines > metrics.maxVisualLines
+				state.visualLines > metrics.maxVisualLines
 			) {
 				limitReached = true;
 
@@ -230,7 +238,7 @@ function scanAndTruncate(
 
 		// Handle Newlines for visual line counting
 		if (char === "\n") {
-			addHardNewline();
+			addHardNewline(state);
 			if (inBlock && !isBlockMultiline) {
 				// Inline block broken by newline
 				inBlock = false;
@@ -241,9 +249,9 @@ function scanAndTruncate(
 		// Handle Escapes
 		if (char === "\\") {
 			// Skip next char
-			addCells(getDisplayCellWidth(char));
+			addCells(state, getDisplayCellWidth(char), metrics.columns);
 			if (i + 1 < len) {
-				addCells(getDisplayCellWidth(text[i + 1]));
+				addCells(state, getDisplayCellWidth(text[i + 1]), metrics.columns);
 			}
 			i += 2;
 			weight += getCharWeightFromCode(92); // '\\' charCode
@@ -293,7 +301,7 @@ function scanAndTruncate(
 					}
 
 					if (def.start === "$$") {
-						addDisplayMathLine();
+						addDisplayMathLine(state);
 						i = closingDelimiterIndex + def.end.length;
 						weight += 5;
 						blockFound = true;
@@ -301,7 +309,7 @@ function scanAndTruncate(
 					}
 
 					if (def.start === "$") {
-						addCells(metrics.inlineMathCells);
+						addCells(state, metrics.inlineMathCells, metrics.columns);
 						i = closingDelimiterIndex + def.end.length;
 						weight += metrics.inlineMathCells;
 						blockFound = true;
@@ -408,7 +416,7 @@ function scanAndTruncate(
 		}
 
 		if (char !== "\n" && !skipVisibleWidth) {
-			addCells(getDisplayCellWidth(char));
+			addCells(state, getDisplayCellWidth(char), metrics.columns);
 		}
 		weight += getCharWeightFromCode(charCode);
 		i++;

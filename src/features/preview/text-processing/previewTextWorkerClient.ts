@@ -22,6 +22,61 @@ type RunnablePreviewTextWorkerRequest = DistributiveOmit<
 	"requestId"
 >;
 
+function buildWorkerRequest(
+	request: RunnablePreviewTextWorkerRequest,
+	requestId: number,
+): PreviewTextWorkerRequest {
+	switch (request.type) {
+		case "get-content-snippet":
+			return {
+				type: "get-content-snippet",
+				requestId,
+				content: request.content,
+				settings: request.settings,
+				searchQuery: request.searchQuery,
+				searchOptions: request.searchOptions,
+			};
+		case "transform-content":
+			return {
+				type: "transform-content",
+				requestId,
+				content: request.content,
+				settings: request.settings,
+				options: request.options,
+			};
+		case "highlight-html":
+			return {
+				type: "highlight-html",
+				requestId,
+				content: request.content,
+				searchQuery: request.searchQuery,
+			};
+		case "extract-first-embedded-media":
+			return {
+				type: "extract-first-embedded-media",
+				requestId,
+				content: request.content,
+				maxScanChars: request.maxScanChars,
+			};
+		case "canvas-to-search-text":
+			return {
+				type: "canvas-to-search-text",
+				requestId,
+				input: request.input,
+			};
+		case "find-first-allowed-fenced-code-block":
+			return {
+				type: "find-first-allowed-fenced-code-block",
+				requestId,
+				content: request.content,
+				allowedTypes: request.allowedTypes,
+				maxScanChars: request.maxScanChars,
+			};
+		case "dispose":
+			return { type: "dispose" };
+	}
+}
+
 let worker: Worker | null | undefined;
 let nextRequestId = 1;
 const pendingRequests = new Map<number, PendingRequest>();
@@ -107,7 +162,7 @@ export function runPreviewTextWorker(
 	}
 
 	const requestId = nextRequestId++;
-	const message = { ...request, requestId } as PreviewTextWorkerRequest;
+	const message = buildWorkerRequest(request, requestId);
 
 	return new Promise((resolve, reject) => {
 		const pending: PendingRequest = { resolve, reject, signal };

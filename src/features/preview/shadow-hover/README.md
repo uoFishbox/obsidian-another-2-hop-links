@@ -12,7 +12,7 @@ Hover popover implementation that bridges Shadow DOM anchors to Obsidian's light
 | `controller.ts`         | Event delegation, lifecycle event dispatch, and side-effect orchestration.               |
 | `launcher.ts`           | Triggers Obsidian's `hover-link` workspace event via a proxy `HoverParent`.              |
 | `registry.ts`           | Maintains 1:1 mapping between Shadow DOM anchors and invisible light-DOM proxy elements. |
-| `state-machine.ts`      | Pure lifecycle and interaction reducers plus state selectors.                            |
+| `state-machine.ts`      | Pure lifecycle reducer (`transitionHoverSession`) plus an in-place interaction reducer (`transitionHoverSessionInteraction`) and state selectors. |
 | `session.ts`            | Reducer adapters, popover patching, keep-alive logic, and side-effect resources.         |
 | `internal-constants.ts` | Patch markers and symbol keys for popover monkey-patching.                               |
 | `internal-types.ts`     | Duck-typed Obsidian interfaces and discriminated session state/event types.              |
@@ -30,11 +30,11 @@ Hover popover implementation that bridges Shadow DOM anchors to Obsidian's light
 - **Handoff**: When moving to a new anchor, the old popover is kept alive briefly to allow smooth transitions.
 - **Stale detection**: Each launch carries a monotonically increasing sequence number. Stale popover assignments are discarded.
 - **Lifecycle state machine**: `HoverSessionState` is a discriminated union: `idle`, `hovering-anchor`, `opening`, `open`, `handoff`, `closing`, or `destroyed`. Route lifecycle changes through `transitionSession()` rather than adding mutable lifecycle flags.
-- **Interaction state machine**: Anchor hover, popover hover, and recent outside interaction state are kept separately in `HoverSessionInteractionState`. Route changes through `transitionSessionInteraction()`.
+- **Interaction state machine**: Anchor hover, popover hover, and recent outside interaction state are kept separately in `HoverSessionInteractionState`. Route changes through `transitionSessionInteraction()`. The interaction reducer mutates the shared `HoverSessionInteractionState` in place (no object spread per event) to keep the hover/pointermove hot path allocation-free; this is the one intentional exception to the "pure reducers" rule below.
 - **Side-effect boundary**: WeakMap patch ownership, listener teardown callbacks, timer handles, and Obsidian method calls remain imperative resources in `session.ts`. Reducers in `state-machine.ts` must stay pure.
 
 ## Invariants
 
-- `state-machine.ts` の reducer は純粋に保つこと。副作用（パッチ所有権・リスナーの teardown・タイマー・Obsidian 呼び出し）は `session.ts` に閉じ込めること。
+- `transitionHoverSession`（lifecycle reducer）は純粋に保つこと。副作用（パッチ所有権・リスナーの teardown・タイマー・Obsidian 呼び出し）は `session.ts` に閉じ込めること。`transitionHoverSessionInteraction`（interaction reducer）は `HoverSessionInteractionState` を in-place で mutate して同一オブジェクトを返す演出上の例外（hover/pointermove の hot path allocation を削減するため）。3 つの固定スカラーフィールドのみで shape が安定するため HiddenClass 遷移は起きない。
 - 状態遷移はすべて reducer (`transitionSession()` / `transitionSessionInteraction()`) 経由で行うこと。state machine と並行する mutable な lifecycle/interaction フラグ（active popover, active anchor, pending handoff, request sequence, destroyed 等）を再導入しないこと。
 - 状態や遷移を追加・改名する場合は、`internal-types.ts` の判別ユニオンと reducer を正として更新し、このドキュメントの列挙も合わせること。

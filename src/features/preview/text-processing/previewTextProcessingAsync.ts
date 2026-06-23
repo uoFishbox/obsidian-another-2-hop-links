@@ -169,7 +169,7 @@ export async function findFirstAllowedFencedCodeBlockAsync(
 	content: string,
 	allowedTypes: ReadonlySet<string>,
 	options: CooperativeScanOptions = {},
-	allowedTypesArray?: readonly string[],
+	allowedTypesArray: readonly string[],
 ): Promise<FencedCodeBlockRange | undefined> {
 	if (!shouldUsePreviewTextWorker(content)) {
 		return await findFirstAllowedFencedCodeBlock(
@@ -184,7 +184,7 @@ export async function findFirstAllowedFencedCodeBlockAsync(
 			{
 				type: "find-first-allowed-fenced-code-block",
 				content,
-				allowedTypes: allowedTypesArray ?? [...allowedTypes],
+				allowedTypes: allowedTypesArray,
 				maxScanChars: options.maxScanChars,
 			},
 			options.signal,

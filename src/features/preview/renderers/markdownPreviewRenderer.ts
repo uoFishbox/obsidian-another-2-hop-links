@@ -18,6 +18,12 @@ import {
 
 export { transformContentForPreview };
 
+// Hot-path optimization: avoid re-allocating this RegExp object on every
+// preview render in the MathJax split loop. Module-level `g` flag regexes are
+// reused across calls by resetting `lastIndex` before each scan, mirroring the
+// pattern already used in `searchHighlighter.ts`.
+const MATH_SPLIT_REGEX = /(\$\$[\s\S]*?\$\$|\$[^$\n]+?\$|\\\$)/g;
+
 interface ProcessPreviewContentOptions {
 	enableMathRendering?: boolean;
 	analysis?: PreviewContentAnalysis;
@@ -76,7 +82,7 @@ export async function processPreviewContent(
 		// `[^$\n]+?` = 改行を含まず最低1文字のみマッチ。
 		// [\s\S]*? を使うと `$a` と数行後の `$b` が誤ってペアになる可能性があった。
 		// $$...$$ は複数行を許容するため [\s\S]*? を維持する。
-		const regex = /(\$\$[\s\S]*?\$\$|\$[^$\n]+?\$|\\\$)/g;
+		MATH_SPLIT_REGEX.lastIndex = 0;
 		let lastIndex = 0;
 		const { contentForMathParsing } = analysis;
 
@@ -85,7 +91,7 @@ export async function processPreviewContent(
 				return;
 			}
 
-			const match = regex.exec(contentForMathParsing);
+			const match = MATH_SPLIT_REGEX.exec(contentForMathParsing);
 			if (!match) break;
 
 			if (match.index > lastIndex) {
@@ -122,7 +128,7 @@ export async function processPreviewContent(
 				containerEl.appendChild(document.createTextNode("$"));
 			}
 
-			lastIndex = regex.lastIndex;
+			lastIndex = MATH_SPLIT_REGEX.lastIndex;
 		}
 
 		if (lastIndex < contentForMathParsing.length) {

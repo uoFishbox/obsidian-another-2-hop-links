@@ -441,10 +441,9 @@ export function transitionSessionInteraction(
 	session: ShadowHoverSession,
 	event: HoverSessionInteractionEvent,
 ): void {
-	session.interaction = transitionHoverSessionInteraction(
-		session.interaction,
-		event,
-	);
+	// transitionHoverSessionInteraction mutates `session.interaction` in place to
+	// avoid per-event allocation on the hover/pointermove hot path.
+	transitionHoverSessionInteraction(session.interaction, event);
 }
 
 export function syncSessionAnchor(
