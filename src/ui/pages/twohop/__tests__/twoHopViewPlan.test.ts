@@ -10,6 +10,7 @@ import {
 	findTwoHopRowsByOffset,
 	findTwoHopRowsByOffsetInto,
 	hasUnmaterializedTwoHopSections,
+	materializeNextTwoHopCellBatch,
 	materializeNextTwoHopSectionBatch,
 	resolveTwoHopLogicalCellInSection,
 } from "../twoHopViewPlan";
@@ -855,5 +856,78 @@ describe("findTwoHopRowsByOffset", () => {
 				overscanPx: 0,
 			}),
 		).toEqual({ start: 0, end: 0 });
+	});
+});
+
+describe("materializeNextTwoHopCellBatch affected row range", () => {
+	it("reports null when nothing is materialized", () => {
+		const plan = compileTwoHopViewPlan({
+			sections: [createDescriptor([createItem("a")], undefined, "section-a")],
+			sectionVisibleCounts: {},
+			layout,
+			materialization: createBatchedMaterialization(0),
+			resolveInitialSectionVisibleCount: (section) => section.loadedCount,
+			clampVisibleCount: (_section, count) => count,
+		});
+		expect(materializeNextTwoHopCellBatch(plan, { maxCellCount: 0 })).toEqual({
+			changed: false,
+			affectedRowRange: null,
+		});
+	});
+
+	it("reports the row range that gained cells across one section", () => {
+		// columns = 2: header loads on row 0; the two items share row 0 with it.
+		const items = [createItem("a"), createItem("b")];
+		const plan = compileTwoHopViewPlan({
+			sections: [createDescriptor(items, undefined, "section-a")],
+			sectionVisibleCounts: { "section-a": 2 },
+			layout,
+			materialization: createBatchedMaterialization(0),
+			resolveInitialSectionVisibleCount: () => 2,
+			clampVisibleCount: (_section, count) => count,
+		});
+
+		// columns = 2; header + 2 items -> cellCount 3 -> rows 0 (header, item0)
+		// and 1 (item1). First batch materializes only the header (row 0).
+		expect(
+			materializeNextTwoHopCellBatch(plan, { maxCellCount: 1 }),
+		).toEqual({
+			changed: true,
+			affectedRowRange: { start: 0, end: 1 },
+		});
+		// Next two cells are the items; item0 is on row 0, item1 on row 1.
+		expect(
+			materializeNextTwoHopCellBatch(plan, { maxCellCount: 5 }),
+		).toEqual({
+			changed: true,
+			affectedRowRange: { start: 0, end: 2 },
+		});
+	});
+
+	it("extends the affected range across rows and sections", () => {
+		// columns = 2; each section is header(row0) + 3 items => rows 0-1.
+		const plan = compileTwoHopViewPlan({
+			sections: [
+				createDescriptor(
+					[createItem("a"), createItem("b"), createItem("c")],
+					undefined,
+					"section-a",
+				),
+				createDescriptor([createItem("d")], undefined, "section-b"),
+			],
+			sectionVisibleCounts: {},
+			layout,
+			materialization: createBatchedMaterialization(0),
+			resolveInitialSectionVisibleCount: (section) => section.loadedCount,
+			clampVisibleCount: (_section, count) => count,
+		});
+		// section-a spans rows 0-1 (cells 0..3), section-b header starts row 2.
+		// Materialize everything in one batch: rows 0..2 (exclusive 3).
+		expect(
+			materializeNextTwoHopCellBatch(plan, { maxCellCount: 128 }),
+		).toEqual({
+			changed: true,
+			affectedRowRange: { start: 0, end: 3 },
+		});
 	});
 });

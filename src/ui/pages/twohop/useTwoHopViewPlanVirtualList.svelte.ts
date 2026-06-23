@@ -18,6 +18,7 @@ import type { VirtualizedItemVisibilityState } from "ui/components/common/virtua
 import type { VirtualizedItemVisibility } from "ui/components/common/virtual-list/types";
 import type { TwoHopMountedRowsBuild } from "./twoHopMountedRowBuild";
 import { type TwoHopViewPlanRowModel } from "./twoHopViewPlan";
+import { rangeOverlap, type RowRange } from "ui/components/common/virtual-list/rowRange";
 import type {
 	TwoHopPageVirtualSection,
 	TwoHopPageVirtualItem,
@@ -28,6 +29,24 @@ import { createTwoHopMountRuntime } from "./twoHopMountRuntime.svelte";
 
 const EMPTY_MOUNTED_CELLS: readonly [] = [];
 const EMPTY_MOUNTED_ROWS: readonly [] = [];
+
+/**
+ * Whether a background materialization step needs a synchronous mounted-rows
+ * recompute. When the snapshot has no mounted range yet we default to
+ * recompute so the initial mounted build reflects the freshly materialized
+ * cells; once a range exists we only recompute when it actually overlaps the
+ * affected rows.
+ */
+function affectsMountedRows(
+	mounted: RowRange | undefined,
+	affectedRowRange: RowRange | null,
+): boolean {
+	if (affectedRowRange === null) return false;
+	if (mounted === undefined) return true;
+	const overlap = rangeOverlap(mounted, affectedRowRange);
+	return overlap.start < overlap.end;
+}
+
 const INITIAL_MATERIALIZATION_SECTION_LIMIT = 8;
 const INITIAL_MATERIALIZATION_CELL_LIMIT = 60;
 const BACKGROUND_MATERIALIZATION_CELL_LIMIT = 100;
@@ -155,7 +174,14 @@ export function useTwoHopViewPlanVirtualList(props: TwoHopViewPlanVirtualListPro
 	});
 	$effect(() => {
 		const activeRowModel = rowModel;
-		return layoutPlanCache.scheduleMaterialization(activeRowModel, () => {
+		return layoutPlanCache.scheduleMaterialization(activeRowModel, (affectedRowRange) => {
+			// Background materialization mostly builds cells for rows that are not
+			// currently mounted. Skip the synchronous recompute when the affected
+			// row range falls entirely outside the mounted range: the next scroll /
+			// mounted-range recompute will pick up the freshly materialized cells.
+			if (!affectsMountedRows(virtualList.getSnapshot()?.ranges.mounted, affectedRowRange)) {
+				return;
+			}
 			virtualList.recompute({ rowModel: activeRowModel });
 		});
 	});

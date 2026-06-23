@@ -1,3 +1,4 @@
+import type { RowRange } from "ui/components/common/virtual-list/rowRange";
 import type { ViewPlanLayoutMetrics } from "ui/components/common/virtual-list/svelte/viewPlanLayout";
 import { isScrollActivityActive } from "infrastructure/scroll/scrollActivity";
 import type { TwoHopSectionDescriptor } from "./twohopPageVirtualModel";
@@ -18,7 +19,13 @@ export interface TwoHopLayoutPlanCache {
 	): TwoHopViewPlanRowModel;
 	scheduleMaterialization(
 		rowModel: TwoHopViewPlanRowModel,
-		onMaterialized: () => void,
+		/**
+		 * Invoked with the global row range that gained newly materialized
+		 * cells (or `null` when no rows changed). Callers can short-circuit a
+		 * synchronous recompute when the affected range does not intersect the
+		 * currently mounted rows.
+		 */
+		onMaterialized: (affectedRowRange: RowRange | null) => void,
 	): () => void;
 	cancelMaterialization(): void;
 }
@@ -117,15 +124,14 @@ export function createTwoHopLayoutPlanCache(params: {
 					scheduleNextBatch();
 					return;
 				}
-				if (
-					materializeNextTwoHopCellBatch(plan, {
-						maxCellCount: backgroundCellCount,
-						shouldContinue: deadline
-							? () => deadline.timeRemaining() > 1
-							: undefined,
-					})
-				) {
-					onMaterialized();
+				const result = materializeNextTwoHopCellBatch(plan, {
+					maxCellCount: backgroundCellCount,
+					shouldContinue: deadline
+						? () => deadline.timeRemaining() > 1
+						: undefined,
+				});
+				if (result.changed) {
+					onMaterialized(result.affectedRowRange);
 				}
 				scheduleNextBatch();
 			};

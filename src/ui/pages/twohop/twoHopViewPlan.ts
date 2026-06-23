@@ -66,16 +66,36 @@ export interface TwoHopRowPlan {
 	readonly top: number;
 }
 
+/**
+ * Struct-of-typed-arrays storage for compiled per-row metadata.
+ *
+ * Backing the row table with typed arrays keeps recompiles (layout changes,
+ * search updates, fold/unfold) off the major-GC sweep path: each recompile
+ * allocates a handful of contiguous ArrayBuffers instead of one heap object
+ * per row. Hot-path readers below access these arrays directly rather than
+ * going through the `plan.rows` facade.
+ */
+export interface TwoHopRowTable {
+	readonly rowCount: number;
+	readonly sectionIndexByRow: Int32Array;
+	readonly rowIndexInSectionByRow: Int32Array;
+	readonly sectionCellStartByRow: Int32Array;
+	readonly cellCountByRow: Uint16Array;
+	readonly topByRow: Float64Array;
+}
+
 export interface TwoHopViewPlan {
 	readonly sections: readonly TwoHopSectionPlan[];
 	/**
-	 * Compiled per-row metadata indexed by the global row index.
+	 * Compiled per-row metadata, indexed by the global row index.
 	 *
-	 * Removes the need to binary-search sections on the scroll hot path:
-	 * `plan.rows[rowIndex]` yields section index, in-section offset, cell
-	 * range, and top directly.
+	 * This is a lazy facade over {@link TwoHopViewPlan.rowTable}: each index
+	 * access materializes a fresh `TwoHopRowPlan` snapshot. It is retained for
+	 * external/test ergonomics; the scroll hot path reads `rowTable` directly
+	 * to avoid per-access allocation.
 	 */
 	readonly rows: readonly TwoHopRowPlan[];
+	readonly rowTable: TwoHopRowTable;
 	readonly rowCount: number;
 	readonly cellCount: number;
 	readonly columns: number;
@@ -84,6 +104,42 @@ export interface TwoHopViewPlan {
 	readonly totalHeight: number;
 	readonly layout: ViewPlanLayoutMetrics;
 	readonly cellStore: TwoHopCellStore;
+}
+
+/**
+ * Reads a row-table entry as a `TwoHopRowPlan` snapshot, or null when the
+ * row index is out of range.
+ */
+function readTwoHopRowTableAt(
+	table: TwoHopRowTable,
+	rowIndex: number,
+): TwoHopRowPlan | null {
+	if (rowIndex < 0 || rowIndex >= table.rowCount) return null;
+	return {
+		sectionIndex: table.sectionIndexByRow[rowIndex],
+		rowIndexInSection: table.rowIndexInSectionByRow[rowIndex],
+		sectionCellStartIndex: table.sectionCellStartByRow[rowIndex],
+		cellCount: table.cellCountByRow[rowIndex],
+		top: table.topByRow[rowIndex],
+	};
+}
+
+/**
+ * Builds the `plan.rows` facade: a read-only, index-access-only view over a
+ * row table that materializes `TwoHopRowPlan` snapshots on demand.
+ */
+function createTwoHopRowPlanFacade(
+	table: TwoHopRowTable,
+): readonly TwoHopRowPlan[] {
+	return new Proxy([] as TwoHopRowPlan[], {
+		get(_target, prop): unknown {
+			if (prop === "length") return table.rowCount;
+			if (typeof prop === "string" && /^[0-9]+$/.test(prop)) {
+				return readTwoHopRowTableAt(table, Number(prop));
+			}
+			return undefined;
+		},
+	});
 }
 
 export type TwoHopViewPlanMaterialization =
@@ -138,8 +194,7 @@ export function readTwoHopRowPlan(
 	plan: TwoHopViewPlan,
 	rowIndex: number,
 ): TwoHopRowPlan | null {
-	if (rowIndex < 0 || rowIndex >= plan.rowCount) return null;
-	return plan.rows[rowIndex] ?? null;
+	return readTwoHopRowTableAt(plan.rowTable, rowIndex);
 }
 
 export interface TwoHopBandRowTops {
@@ -217,7 +272,11 @@ export function compileTwoHopViewPlan(
 	let top = 0;
 	let nextCellIndex = 0;
 	let nextRowIndex = 0;
-	const rows: TwoHopRowPlan[] = new Array(totalRowCount);
+	const sectionIndexByRow = new Int32Array(totalRowCount);
+	const rowIndexInSectionByRow = new Int32Array(totalRowCount);
+	const sectionCellStartByRow = new Int32Array(totalRowCount);
+	const cellCountByRow = new Uint16Array(totalRowCount);
+	const topByRow = new Float64Array(totalRowCount);
 	const logicalCellsBySectionIndex: TwoHopCellStore["logicalCellsBySectionIndex"] = [];
 	const rowStride = rowHeight + gap;
 
@@ -242,13 +301,12 @@ export function compileTwoHopViewPlan(
 			rowIndexInSection += 1
 		) {
 			const sectionCellStartIndex = rowIndexInSection * columns;
-			rows[firstRowIndex + rowIndexInSection] = {
-				sectionIndex,
-				rowIndexInSection,
-				sectionCellStartIndex,
-				cellCount: Math.min(columns, cellCount - sectionCellStartIndex),
-				top: top + rowIndexInSection * rowStride,
-			};
+			const writeIndex = firstRowIndex + rowIndexInSection;
+			sectionIndexByRow[writeIndex] = sectionIndex;
+			rowIndexInSectionByRow[writeIndex] = rowIndexInSection;
+			sectionCellStartByRow[writeIndex] = sectionCellStartIndex;
+			cellCountByRow[writeIndex] = Math.min(columns, cellCount - sectionCellStartIndex);
+			topByRow[writeIndex] = top + rowIndexInSection * rowStride;
 		}
 		const mountedLayout: SectionLayout<
 			TwoHopPageVirtualItem,
@@ -297,9 +355,18 @@ export function compileTwoHopViewPlan(
 		remainingUnmaterializedSectionCount: sections.length,
 		revision: 0,
 	};
+	const rowTable: TwoHopRowTable = {
+		rowCount: totalRowCount,
+		sectionIndexByRow,
+		rowIndexInSectionByRow,
+		sectionCellStartByRow,
+		cellCountByRow,
+		topByRow,
+	};
 	const plan: TwoHopViewPlan = {
 		sections,
-		rows,
+		rows: createTwoHopRowPlanFacade(rowTable),
+		rowTable,
 		rowCount: totalRowCount,
 		cellCount: totalCellCount,
 		columns,
@@ -488,19 +555,40 @@ export interface MaterializeNextTwoHopCellBatchOptions {
 	shouldContinue?(): boolean;
 }
 
+/**
+ * Result of materializing the next cell batch.
+ *
+ * `affectedRowRange` is the inclusive-start, exclusive-end range of global
+ * row indices that actually gained a newly materialized cell this call. It is
+ * only meaningful when `changed` is true; callers that only need a boolean can
+ * use `materializeNextTwoHopSectionBatch` instead.
+ */
+export interface MaterializeNextTwoHopCellBatchResult {
+	readonly changed: boolean;
+	readonly affectedRowRange: RowRange | null;
+}
+
 export function materializeNextTwoHopCellBatch(
 	plan: TwoHopViewPlan,
 	options: MaterializeNextTwoHopCellBatchOptions = {},
-): boolean {
+): MaterializeNextTwoHopCellBatchResult {
 	const cellStore = plan.cellStore;
 	let remainingCellBudget = Math.max(0, Math.floor(options.maxCellCount ?? 128));
 	if (
 		remainingCellBudget === 0 ||
 		cellStore.remainingUnmaterializedCellCount === 0
 	) {
-		return false;
+		return { changed: false, affectedRowRange: null };
 	}
+	// Rows aggregate `columns` cells each, so a section-local cell index maps to
+	// row index `floor(sectionCellIndex / columns)`. Materialization walks
+	// sections in display order and cells left-to-right, so newly materialized
+	// cells always form a contiguous prefix; tracking the min/max global row
+	// covers any cells spanning multiple sections.
+	const columns = Math.max(1, plan.columns);
 	let materialized = false;
+	let minAffectedRowIndex = Infinity;
+	let maxAffectedRowIndex = -Infinity;
 	while (
 		cellStore.nextUnmaterializedSectionIndex < plan.sections.length &&
 		remainingCellBudget > 0
@@ -518,12 +606,22 @@ export function materializeNextTwoHopCellBatch(
 			cellStore.nextUnmaterializedSectionIndex += 1;
 			continue;
 		}
-		materialized =
-			ensureTwoHopSectionCellMaterialized(
-				plan,
-				sectionPlan,
-				state.nextCellIndex,
-			) || materialized;
+		const newlyMaterialized = ensureTwoHopSectionCellMaterialized(
+			plan,
+			sectionPlan,
+			state.nextCellIndex,
+		);
+		if (newlyMaterialized) {
+			materialized = true;
+			const rowIndexInSection = Math.floor(state.nextCellIndex / columns);
+			const globalRowIndex = sectionPlan.firstRowIndex + rowIndexInSection;
+			if (globalRowIndex < minAffectedRowIndex) {
+				minAffectedRowIndex = globalRowIndex;
+			}
+			if (globalRowIndex > maxAffectedRowIndex) {
+				maxAffectedRowIndex = globalRowIndex;
+			}
+		}
 		state.nextCellIndex += 1;
 		state.materializedCellCount += 1;
 		cellStore.remainingUnmaterializedCellCount = Math.max(
@@ -536,16 +634,27 @@ export function materializeNextTwoHopCellBatch(
 			cellStore.nextUnmaterializedSectionIndex += 1;
 		}
 	}
-	if (materialized) {
-		markTwoHopMaterializationChanged(plan);
+	if (!materialized) {
+		return { changed: false, affectedRowRange: null };
 	}
-	return materialized;
+	markTwoHopMaterializationChanged(plan);
+	return {
+		changed: true,
+		affectedRowRange: {
+			start: minAffectedRowIndex,
+			end: maxAffectedRowIndex + 1,
+		},
+	};
 }
 
 export interface MaterializeNextTwoHopSectionBatchOptions extends MaterializeNextTwoHopCellBatchOptions {
 	readonly maxSectionCount?: number;
 }
 
+/**
+ * Convenience wrapper returning just whether anything changed. Retained as a
+ * boolean for callers/tests that do not need the affected row range.
+ */
 export function materializeNextTwoHopSectionBatch(
 	plan: TwoHopViewPlan,
 	options: MaterializeNextTwoHopSectionBatchOptions = {},
@@ -555,7 +664,7 @@ export function materializeNextTwoHopSectionBatch(
 			options.maxCellCount ??
 			resolveInitialMaterializationCellCount(plan, options.maxSectionCount),
 		shouldContinue: options.shouldContinue,
-	});
+	}).changed;
 }
 
 /**
@@ -662,15 +771,19 @@ export function resolveTwoHopRowInSection(
 	sectionPlan: TwoHopSectionPlan,
 	rowIndex: number,
 ): TwoHopResolvedRow | null {
-	const row = plan.rows[rowIndex];
-	if (!row || row.sectionIndex !== sectionPlan.sectionIndex) return null;
+	const table = plan.rowTable;
+	if (rowIndex < 0 || rowIndex >= table.rowCount) return null;
+	const sectionIndex = table.sectionIndexByRow[rowIndex];
+	if (sectionIndex !== sectionPlan.sectionIndex) return null;
+	const rowIndexInSection = table.rowIndexInSectionByRow[rowIndex];
+	const sectionCellStartIndex = table.sectionCellStartByRow[rowIndex];
 	return {
-		sectionIndex: row.sectionIndex,
-		rowIndexInSection: row.rowIndexInSection,
-		firstCellIndex: sectionPlan.firstCellIndex + row.sectionCellStartIndex,
-		sectionCellStartIndex: row.sectionCellStartIndex,
-		cellCount: row.cellCount,
-		top: row.top,
+		sectionIndex,
+		rowIndexInSection,
+		firstCellIndex: sectionPlan.firstCellIndex + sectionCellStartIndex,
+		sectionCellStartIndex,
+		cellCount: table.cellCountByRow[rowIndex],
+		top: table.topByRow[rowIndex],
 	};
 }
 
@@ -678,16 +791,19 @@ export function resolveTwoHopRow(
 	plan: TwoHopViewPlan,
 	rowIndex: number,
 ): TwoHopResolvedRow | null {
-	const row = readTwoHopRowPlan(plan, rowIndex);
-	if (!row) return null;
-	const sectionPlan = plan.sections[row.sectionIndex];
+	const table = plan.rowTable;
+	if (rowIndex < 0 || rowIndex >= table.rowCount) return null;
+	const sectionIndex = table.sectionIndexByRow[rowIndex];
+	const sectionPlan = plan.sections[sectionIndex];
+	const rowIndexInSection = table.rowIndexInSectionByRow[rowIndex];
+	const sectionCellStartIndex = table.sectionCellStartByRow[rowIndex];
 	return {
-		sectionIndex: row.sectionIndex,
-		rowIndexInSection: row.rowIndexInSection,
-		firstCellIndex: sectionPlan.firstCellIndex + row.sectionCellStartIndex,
-		sectionCellStartIndex: row.sectionCellStartIndex,
-		cellCount: row.cellCount,
-		top: row.top,
+		sectionIndex,
+		rowIndexInSection,
+		firstCellIndex: sectionPlan.firstCellIndex + sectionCellStartIndex,
+		sectionCellStartIndex,
+		cellCount: table.cellCountByRow[rowIndex],
+		top: table.topByRow[rowIndex],
 	};
 }
 
@@ -695,9 +811,12 @@ function resolveTwoHopRowTop(
 	plan: TwoHopViewPlan,
 	rowIndex: number,
 ): TwoHopResolvedRowTop | null {
-	const row = plan.rows[rowIndex];
-	if (!row) return null;
-	return { sectionIndex: row.sectionIndex, top: row.top };
+	const table = plan.rowTable;
+	if (rowIndex < 0 || rowIndex >= table.rowCount) return null;
+	return {
+		sectionIndex: table.sectionIndexByRow[rowIndex],
+		top: table.topByRow[rowIndex],
+	};
 }
 
 export function resolveTwoHopRowTopsForBandInto(
@@ -1237,18 +1356,22 @@ export function createTwoHopViewPlanRowModel(
 	): void => {
 		resolveTwoHopRowTopsForBandInto(out, plan, params);
 	};
+	const table = plan.rowTable;
+	const getRowCellCountAt = (rowIndex: number): number =>
+		rowIndex < 0 || rowIndex >= table.rowCount ? 0 : table.cellCountByRow[rowIndex];
+	const getRowTopAt = (rowIndex: number): number =>
+		rowIndex < 0 || rowIndex >= table.rowCount ? 0 : table.topByRow[rowIndex];
 	const resolveCell = (
 		rowIndex: number,
 		columnIndex: number,
 	): VirtualListLogicalCell<TwoHopPageVirtualItem> | null => {
-		const row = plan.rows[rowIndex];
-		if (!row || columnIndex < 0 || columnIndex >= row.cellCount) {
-			return null;
-		}
+		if (rowIndex < 0 || rowIndex >= table.rowCount) return null;
+		const cellCount = table.cellCountByRow[rowIndex];
+		if (columnIndex < 0 || columnIndex >= cellCount) return null;
 		return resolveTwoHopLogicalCellInSection(
 			plan,
-			row.sectionIndex,
-			row.sectionCellStartIndex + columnIndex,
+			table.sectionIndexByRow[rowIndex],
+			table.sectionCellStartByRow[rowIndex] + columnIndex,
 		);
 	};
 	const resolveNavigationTarget = (
@@ -1264,11 +1387,10 @@ export function createTwoHopViewPlanRowModel(
 		if (direction === "right") columnIndex += 1;
 		if (columnIndex < 0) {
 			rowIndex -= 1;
-			columnIndex = (plan.rows[rowIndex]?.cellCount ?? 0) - 1;
+			columnIndex = getRowCellCountAt(rowIndex) - 1;
 		}
-		const currentRow = plan.rows[rowIndex];
-		if (!currentRow) return null;
-		const currentRowCellCount = currentRow.cellCount;
+		const currentRowCellCount = getRowCellCountAt(rowIndex);
+		if (currentRowCellCount <= 0) return null;
 		if (columnIndex >= currentRowCellCount) {
 			if (direction !== "right") columnIndex = currentRowCellCount - 1;
 			else {
@@ -1280,7 +1402,7 @@ export function createTwoHopViewPlanRowModel(
 		if (!cell) return null;
 		return {
 			key: cell.key,
-			rowTop: plan.rows[rowIndex]?.top ?? 0,
+			rowTop: getRowTopAt(rowIndex),
 		};
 	};
 
@@ -1293,25 +1415,24 @@ export function createTwoHopViewPlanRowModel(
 		getRow(
 			rowIndex,
 		): VirtualRow<VirtualListLogicalCell<TwoHopPageVirtualItem>> | null {
-			const row = plan.rows[rowIndex];
-			if (!row) return null;
+			if (rowIndex < 0 || rowIndex >= table.rowCount) return null;
 			return {
 				key: rowIndex,
 				index: rowIndex,
-				top: row.top,
+				top: table.topByRow[rowIndex],
 				height: plan.rowHeight,
 				bottomSpacing: plan.rowGap,
-				cellCount: row.cellCount,
+				cellCount: table.cellCountByRow[rowIndex],
 				getCell(columnIndex) {
 					return resolveCell(rowIndex, columnIndex);
 				},
 			};
 		},
-		getRowCellCount: (rowIndex) => plan.rows[rowIndex]?.cellCount ?? 0,
-		getRowTop: (rowIndex) => plan.rows[rowIndex]?.top ?? 0,
+		getRowCellCount: getRowCellCountAt,
+		getRowTop: getRowTopAt,
 		getRowEnd: (rowIndex) => {
-			const top = plan.rows[rowIndex]?.top;
-			return top === undefined ? 0 : top + plan.rowHeight;
+			if (rowIndex < 0 || rowIndex >= table.rowCount) return 0;
+			return table.topByRow[rowIndex] + plan.rowHeight;
 		},
 		findVisibleRange: findRange,
 		findVisibleRangeInto: (out, params) => {
