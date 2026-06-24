@@ -6,6 +6,11 @@ import type { TaggedNote, TagGroup } from "types/domain";
  * @param taggedNotes - グループ化するタグ付きノートの配列
  * @returns タググループの配列(ノート数の降順でソート済み)
  */
+function compareTagGroups(a: TagGroup, b: TagGroup): number {
+	const diff = b.notes.length - a.notes.length;
+	return diff !== 0 ? diff : a.tag.localeCompare(b.tag);
+}
+
 export function groupNotesByTag(taggedNotes: TaggedNote[]): TagGroup[] {
 	if (taggedNotes.length === 0) return [];
 
@@ -23,15 +28,13 @@ export function groupNotesByTag(taggedNotes: TaggedNote[]): TagGroup[] {
 		}
 	}
 
-	const groups: TagGroup[] = [];
-	tagMap.forEach((notes, tag) => {
-		groups.push({ tag, notes });
-	});
+	const groups: TagGroup[] = new Array(tagMap.size);
+	let i = 0;
+	for (const [tag, notes] of tagMap) {
+		groups[i++] = { tag, notes };
+	}
 
-	groups.sort((a, b) => {
-		const noteCountDiff = b.notes.length - a.notes.length;
-		return noteCountDiff !== 0 ? noteCountDiff : a.tag.localeCompare(b.tag);
-	});
+	groups.sort(compareTagGroups);
 
 	return groups;
 }
