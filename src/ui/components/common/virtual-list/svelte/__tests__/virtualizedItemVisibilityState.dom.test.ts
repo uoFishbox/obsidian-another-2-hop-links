@@ -442,4 +442,36 @@ describe("createVirtualizedItemVisibilityStateController", () => {
 			expect(states[i].visibility).toBe("visible");
 		}
 	});
+
+	it("does not clear retained rows during a full mounted-rows sync", () => {
+		const clearedRows: number[] = [];
+		const visibilityChanges: Array<[number, string]> = [];
+
+		const ctrl = createVirtualizedItemVisibilityStateController<TestCell>({
+			onRowCleared: (rowIndex) => {
+				clearedRows.push(rowIndex);
+			},
+			onRowVisibilityChanged: (rowIndex, visibility) => {
+				visibilityChanges.push([rowIndex, visibility]);
+			},
+		});
+
+		const firstCell = item("a");
+		const firstRows = [row(0, [firstCell])];
+
+		ctrl.syncMountedRows({
+			mountedRows: firstRows,
+			previewRange: range(0, 1),
+		});
+
+		const secondCell = item("a");
+		const secondRows = [row(0, [secondCell])];
+
+		ctrl.syncMountedRows({
+			mountedRows: secondRows,
+			previewRange: range(0, 1),
+		});
+
+		expect(clearedRows).toEqual([]);
+	});
 });

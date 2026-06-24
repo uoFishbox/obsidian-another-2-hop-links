@@ -1,4 +1,5 @@
 <script lang="ts" generics="T">
+	import { setContext } from "svelte";
 	import { ARIA_LABELS } from "../../../appConstants";
 	import { svgAttrs, ICON_PATHS } from "ui/utils/icons";
 	import VirtualSurface from "./virtual-list/VirtualSurface.svelte";
@@ -6,8 +7,22 @@
 		useFlatVirtualGridList,
 		type FlatVirtualGridListProps,
 	} from "./virtual-list/svelte/useFlatVirtualGridList.svelte";
+	import {
+		createPreviewActivationScope,
+		PREVIEW_ACTIVATION_SCOPE_CONTEXT_KEY,
+	} from "features/preview/scheduling/previewActivationScope";
+	import {
+		createRowPreviewActivationRuntime,
+		PREVIEW_ROW_ACTIVATION_CONTEXT_KEY,
+	} from "features/preview/scheduling/rowPreviewActivationRuntime";
 
 	const props: FlatVirtualGridListProps<T> = $props();
+	const previewActivationScope = createPreviewActivationScope();
+	const rowPreviewActivationRuntime = createRowPreviewActivationRuntime({
+		scope: previewActivationScope,
+	});
+	setContext(PREVIEW_ACTIVATION_SCOPE_CONTEXT_KEY, previewActivationScope);
+	setContext(PREVIEW_ROW_ACTIVATION_CONTEXT_KEY, rowPreviewActivationRuntime);
 	const list = useFlatVirtualGridList(props);
 </script>
 

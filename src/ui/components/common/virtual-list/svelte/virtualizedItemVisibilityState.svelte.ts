@@ -35,9 +35,17 @@ export const resolveVirtualizedItemVisibilityForPreviewRange = (
 	return "mounted";
 };
 
+export interface VirtualizedItemVisibilityStateControllerOptions {
+	readonly onRowVisibilityChanged?: (
+		rowIndex: number,
+		visibility: VirtualizedItemVisibility,
+	) => void;
+	readonly onRowCleared?: (rowIndex: number) => void;
+}
+
 export function createVirtualizedItemVisibilityStateController<
 	TCell extends VisibilityCell,
->() {
+>(options: VirtualizedItemVisibilityStateControllerOptions = {}) {
 	interface TrackedState {
 		readonly state: VirtualizedItemResolvedVisibilityState;
 		seenEpoch: number;
@@ -133,6 +141,8 @@ export function createVirtualizedItemVisibilityStateController<
 				tracked.state.visibility = nextVisibility;
 			}
 		}
+
+		options.onRowVisibilityChanged?.(row.rowIndex, nextVisibility);
 	};
 
 	const applyVisibilityToRowRange = (
@@ -171,6 +181,17 @@ export function createVirtualizedItemVisibilityStateController<
 		rowSlices: readonly VisibilityRow<TCell>[],
 		previewVisible: RowRange,
 	): void => {
+		const nextRowIndices = new Set<number>();
+		for (const row of rowSlices) {
+			nextRowIndices.add(row.rowIndex);
+		}
+
+		for (const rowIndex of rowsByIndex.keys()) {
+			if (!nextRowIndices.has(rowIndex)) {
+				options.onRowCleared?.(rowIndex);
+			}
+		}
+
 		mountedItemKeyCounts.clear();
 		for (const row of rowSlices) {
 			const nextVisibility = resolveVirtualizedItemVisibilityForPreviewRange(
@@ -195,6 +216,7 @@ export function createVirtualizedItemVisibilityStateController<
 					tracked.state.visibility = nextVisibility;
 				}
 			}
+			options.onRowVisibilityChanged?.(row.rowIndex, nextVisibility);
 		}
 
 		for (const [key, tracked] of states) {
@@ -217,6 +239,7 @@ export function createVirtualizedItemVisibilityStateController<
 		rowsByIndex.delete(row.rowIndex);
 		updateMountedItemKeyCount(row, -1);
 		pruneUnmountedRowState(row);
+		options.onRowCleared?.(row.rowIndex);
 	};
 
 	const addMountedRow = (row: VisibilityRow<TCell>, previewRange: RowRange): void => {

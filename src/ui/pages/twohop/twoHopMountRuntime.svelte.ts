@@ -19,6 +19,7 @@ import type {
 	TwoHopPageVirtualSection,
 } from "./twohopPageVirtualModel";
 import type { TwoHopViewPlanRowModel } from "./twoHopViewPlan";
+import type { RowPreviewActivationRuntime } from "features/preview/scheduling/rowPreviewActivationRuntime";
 
 const EMPTY_MOUNTED_ROWS: readonly [] = [];
 
@@ -27,9 +28,27 @@ type TwoHopMountedCell = MountedFlatCell<
 	TwoHopPageVirtualSection
 >;
 
-export function createTwoHopMountRuntime() {
+interface TwoHopVisibilitySyncBuild {
+	readonly rowSlices: TwoHopMountedRowsBuild["rowSlices"] | readonly [];
+	readonly rowRange: RowRange;
+	readonly plan: TwoHopMountedRowsBuild["plan"] | null;
+}
+
+export function createTwoHopMountRuntime(params: {
+	rowPreviewActivationRuntime?: RowPreviewActivationRuntime;
+} = {}) {
 	const visibilityStates =
-		createVirtualizedItemVisibilityStateController<TwoHopMountedCell>();
+		createVirtualizedItemVisibilityStateController<TwoHopMountedCell>({
+			onRowVisibilityChanged: (rowIndex, visibility) => {
+				params.rowPreviewActivationRuntime?.setRowVisibility(
+					rowIndex,
+					visibility,
+				);
+			},
+			onRowCleared: (rowIndex) => {
+				params.rowPreviewActivationRuntime?.clearRow(rowIndex);
+			},
+		});
 	let visibilityMountedRows: TwoHopMountedRowsBuild["rowSlices"] | readonly [] =
 		EMPTY_MOUNTED_ROWS;
 	let visibilityMountedRowRange: RowRange = EMPTY_ROW_RANGE;
@@ -42,7 +61,7 @@ export function createTwoHopMountRuntime() {
 	const reusableRowSlotsScratch: number[] = [];
 
 	const syncVisibilityStates = (
-		mountedBuild: TwoHopMountedRowsBuild | null | undefined,
+		mountedBuild: TwoHopVisibilitySyncBuild | null | undefined,
 		nextPreviewRange: RowRange,
 	): void => {
 		const mountedRows = mountedBuild?.rowSlices ?? EMPTY_MOUNTED_ROWS;
@@ -78,7 +97,11 @@ export function createTwoHopMountRuntime() {
 	};
 
 	const previewVisibleSyncTask = createScheduledVirtualListTask(() => {
-		const build = pendingBuild;
+		const build = pendingBuild ?? {
+			rowSlices: visibilityMountedRows,
+			rowRange: visibilityMountedRowRange,
+			plan: visibilityMountedPlan,
+		};
 		pendingBuild = null;
 		if (!hasPendingPreviewRange) return;
 		hasPendingPreviewRange = false;

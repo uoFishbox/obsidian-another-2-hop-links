@@ -26,6 +26,10 @@ import type {
 } from "./twohopPageVirtualModel";
 import { createTwoHopLayoutPlanCache } from "./twoHopLayoutPlanCache";
 import { createTwoHopMountRuntime } from "./twoHopMountRuntime.svelte";
+import {
+	PREVIEW_ROW_ACTIVATION_CONTEXT_KEY,
+	type RowPreviewActivationRuntime,
+} from "features/preview/scheduling/rowPreviewActivationRuntime";
 
 const EMPTY_MOUNTED_CELLS: readonly [] = [];
 const EMPTY_MOUNTED_ROWS: readonly [] = [];
@@ -102,7 +106,12 @@ export function useTwoHopViewPlanVirtualList(props: TwoHopViewPlanVirtualListPro
 			layout,
 		);
 	const rowModel = $derived(resolveRowModel());
-	const mountRuntime = createTwoHopMountRuntime();
+	const rowPreviewActivationRuntime = getContext<
+		RowPreviewActivationRuntime | undefined
+	>(PREVIEW_ROW_ACTIVATION_CONTEXT_KEY);
+	const mountRuntime = createTwoHopMountRuntime({
+		rowPreviewActivationRuntime,
+	});
 	const virtualList = useVirtualList<
 		import("ui/components/common/virtual-list/logicalCell").VirtualListLogicalCell<TwoHopPageVirtualItem>,
 		TwoHopViewPlanRowModel,
@@ -197,6 +206,7 @@ export function useTwoHopViewPlanVirtualList(props: TwoHopViewPlanVirtualListPro
 		item: TwoHopPageVirtualItem;
 		section: TwoHopPageVirtualSection;
 		index: number;
+		rowIndex: number;
 		observerRoot: HTMLElement | null;
 		visibilityState: VirtualizedItemVisibilityState;
 		readonly visibility: VirtualizedItemVisibility;
@@ -217,6 +227,7 @@ export function useTwoHopViewPlanVirtualList(props: TwoHopViewPlanVirtualListPro
 			item: renderedCell.cell.item,
 			section: renderedCell.section,
 			index: renderedCell.cell.itemIndex,
+			rowIndex: renderedCell.rowIndex,
 			observerRoot,
 			visibilityState,
 			get visibility() {

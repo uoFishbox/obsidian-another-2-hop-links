@@ -341,7 +341,7 @@
 			onMountedCellsChange={handleMountedCellsChange}
 			header={config.showSectionHeader ? sectionHeader : undefined}
 		>
-			{#snippet item({ item, observerRoot, visibility, visibilityState })}
+			{#snippet item({ item, observerRoot, visibility, visibilityState, rowIndex })}
 				{@const ItemComponent = config.itemComponent}
 				{@const previewRefreshToken =
 					previewRefreshTokens[config.getItemKey(item)] ?? 0}
@@ -360,6 +360,7 @@
 						{observerRoot}
 						{visibility}
 						{previewRefreshToken}
+						{rowIndex}
 					/>
 				{:else}
 					<PreviewVisibilityProvider {visibilityState}>
@@ -374,6 +375,7 @@
 							contentPreview={matchedItem?.contentPreview}
 							{observerRoot}
 							{previewRefreshToken}
+							{rowIndex}
 						/>
 					</PreviewVisibilityProvider>
 				{/if}

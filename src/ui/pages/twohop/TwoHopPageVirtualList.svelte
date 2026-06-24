@@ -93,6 +93,7 @@
 		item: TwoHopPageVirtualItem;
 		section: TwoHopPageVirtualSection;
 		index: number;
+		rowIndex: number;
 		observerRoot: HTMLElement | null;
 		visibilityState: VirtualizedItemVisibilityState;
 		visibility: VirtualizedItemVisibility;
@@ -180,6 +181,7 @@
 						searchScope={resolveItemSearchScope(row)}
 						contentPreview={resolveItemContentPreview(row)}
 						observerRoot={args?.observerRoot ?? null}
+						rowIndex={args?.rowIndex}
 						interactionRegistration="snapshot"
 						interactionId={row.interactionId}
 						interactionKey={row.interactionKey}

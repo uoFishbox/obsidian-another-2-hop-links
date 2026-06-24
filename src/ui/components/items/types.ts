@@ -16,4 +16,5 @@ export interface ItemProps {
 	interactionRegistration?: "self" | "snapshot";
 	interactionId?: string;
 	interactionKey?: string;
+	rowIndex?: number;
 }

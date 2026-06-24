@@ -25,6 +25,7 @@
 				{
 					item: T;
 					index: number;
+					rowIndex: number;
 					observerRoot: HTMLElement | null;
 					visibility: VirtualizedItemVisibility;
 					visibilityState: VirtualizedItemVisibilityState;

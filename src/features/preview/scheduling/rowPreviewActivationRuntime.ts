@@ -39,7 +39,6 @@ export const PREVIEW_ROW_ACTIVATION_CONTEXT_KEY = Symbol("preview-row-activation
 interface RowActivationState {
 	visibility: "visible" | "mounted";
 	candidates: Map<string, RowPreviewActivationCandidate>;
-	pendingByActivationKey: Map<string, PreviewActivationHandle>;
 }
 
 export interface CreateRowPreviewActivationRuntimeOptions {
@@ -51,6 +50,7 @@ export function createRowPreviewActivationRuntime(
 ): RowPreviewActivationRuntime {
 	const scope = options.scope ?? createPreviewActivationScope();
 	const rows = new Map<number, RowActivationState>();
+	const pendingByActivationKey = new Map<string, PreviewActivationHandle>();
 
 	function getOrCreateRowState(rowIndex: number): RowActivationState {
 		const existing = rows.get(rowIndex);
@@ -61,49 +61,80 @@ export function createRowPreviewActivationRuntime(
 		const state: RowActivationState = {
 			visibility: "mounted",
 			candidates: new Map<string, RowPreviewActivationCandidate>(),
-			pendingByActivationKey: new Map<string, PreviewActivationHandle>(),
 		};
 		rows.set(rowIndex, state);
 		return state;
 	}
 
-	function hasCandidateWithKey(
-		state: RowActivationState,
-		activationKey: string,
-	): boolean {
-		for (const candidate of state.candidates.values()) {
-			if (candidate.activationKey === activationKey) {
-				return true;
+	function hasCandidateWithKey(activationKey: string): boolean {
+		for (const state of rows.values()) {
+			for (const candidate of state.candidates.values()) {
+				if (candidate.activationKey === activationKey) {
+					return true;
+				}
 			}
 		}
 
 		return false;
 	}
 
-	function cancelPendingByKey(
-		state: RowActivationState,
-		activationKey: string,
-	): void {
-		const handle = state.pendingByActivationKey.get(activationKey);
+	function hasVisibleCandidateWithKey(activationKey: string): boolean {
+		for (const state of rows.values()) {
+			if (state.visibility !== "visible") {
+				continue;
+			}
+
+			for (const candidate of state.candidates.values()) {
+				if (candidate.activationKey === activationKey) {
+					return true;
+				}
+			}
+		}
+
+		return false;
+	}
+
+	function cancelPendingByKey(activationKey: string): void {
+		const handle = pendingByActivationKey.get(activationKey);
 		if (handle) {
 			handle.cancel();
-			state.pendingByActivationKey.delete(activationKey);
+			pendingByActivationKey.delete(activationKey);
 		}
 	}
 
-	function cancelAllPending(state: RowActivationState): void {
-		for (const handle of state.pendingByActivationKey.values()) {
-			handle.cancel();
+	function cancelPendingUnlessVisibleElsewhere(activationKey: string): void {
+		if (hasVisibleCandidateWithKey(activationKey)) {
+			return;
 		}
-		state.pendingByActivationKey.clear();
+
+		cancelPendingByKey(activationKey);
+	}
+
+	function notifyVisibleCandidates(activationKey: string): void {
+		for (const state of rows.values()) {
+			if (state.visibility !== "visible") {
+				continue;
+			}
+
+			for (const candidate of state.candidates.values()) {
+				if (candidate.activationKey !== activationKey) {
+					continue;
+				}
+
+				try {
+					candidate.onActivated(activationKey);
+				} catch (error) {
+					console.error("Row preview activation callback failed", error);
+				}
+			}
+		}
 	}
 
 	function enqueueActivationForKey(
-		state: RowActivationState,
 		activationKey: string,
 		getVisibleQueueSize: () => number,
 	): void {
-		if (state.pendingByActivationKey.has(activationKey)) {
+		if (pendingByActivationKey.has(activationKey)) {
 			return;
 		}
 
@@ -112,27 +143,16 @@ export function createRowPreviewActivationRuntime(
 			getVisibleQueueSize,
 			scope,
 			(activated) => {
-				state.pendingByActivationKey.delete(activationKey);
+				pendingByActivationKey.delete(activationKey);
 				if (!activated) {
 					return;
 				}
 
-				for (const candidate of state.candidates.values()) {
-					if (candidate.activationKey === activationKey) {
-						try {
-							candidate.onActivated(activationKey);
-						} catch (error) {
-							console.error(
-								"Row preview activation callback failed",
-								error,
-							);
-						}
-					}
-				}
+				notifyVisibleCandidates(activationKey);
 			},
 		);
 
-		state.pendingByActivationKey.set(activationKey, handle);
+		pendingByActivationKey.set(activationKey, handle);
 	}
 
 	function enqueueRowCandidates(rowIndex: number): void {
@@ -149,11 +169,7 @@ export function createRowPreviewActivationRuntime(
 			}
 			queuedKeys.add(activationKey);
 
-			enqueueActivationForKey(
-				state,
-				activationKey,
-				candidate.getVisibleQueueSize,
-			);
+			enqueueActivationForKey(activationKey, candidate.getVisibleQueueSize);
 		}
 	}
 
@@ -165,10 +181,11 @@ export function createRowPreviewActivationRuntime(
 
 		// Remove any previous registration with the same id so the cleanup
 		// contract stays tied to the current component lifetime.
-		if (state.candidates.has(id)) {
+		const previousCandidate = state.candidates.get(id);
+		if (previousCandidate) {
 			state.candidates.delete(id);
-			if (!hasCandidateWithKey(state, activationKey)) {
-				cancelPendingByKey(state, activationKey);
+			if (!hasCandidateWithKey(previousCandidate.activationKey)) {
+				cancelPendingByKey(previousCandidate.activationKey);
 			}
 		}
 
@@ -189,8 +206,8 @@ export function createRowPreviewActivationRuntime(
 				return;
 			}
 
-			if (!hasCandidateWithKey(currentState, activationKey)) {
-				cancelPendingByKey(currentState, activationKey);
+			if (!hasCandidateWithKey(activationKey)) {
+				cancelPendingByKey(activationKey);
 			}
 		};
 	}
@@ -204,8 +221,18 @@ export function createRowPreviewActivationRuntime(
 
 		if (visibility === "visible") {
 			enqueueRowCandidates(rowIndex);
-		} else {
-			cancelAllPending(state);
+			return;
+		}
+
+		const queuedKeys = new Set<string>();
+		for (const candidate of state.candidates.values()) {
+			const { activationKey } = candidate;
+			if (queuedKeys.has(activationKey)) {
+				continue;
+			}
+			queuedKeys.add(activationKey);
+
+			cancelPendingUnlessVisibleElsewhere(activationKey);
 		}
 	}
 
@@ -215,7 +242,17 @@ export function createRowPreviewActivationRuntime(
 			return;
 		}
 
-		cancelAllPending(state);
+		const queuedKeys = new Set<string>();
+		for (const candidate of state.candidates.values()) {
+			const { activationKey } = candidate;
+			if (queuedKeys.has(activationKey)) {
+				continue;
+			}
+			queuedKeys.add(activationKey);
+
+			cancelPendingUnlessVisibleElsewhere(activationKey);
+		}
+
 		rows.delete(rowIndex);
 	}
 

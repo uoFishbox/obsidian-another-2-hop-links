@@ -206,4 +206,65 @@ describe("rowPreviewActivationRuntime", () => {
 		expect(onActivatedA).not.toHaveBeenCalled();
 		expect(onActivatedB).toHaveBeenCalledWith("key-b");
 	});
+
+	it("notifies all visible candidates sharing the same activation key", async () => {
+		const runtime = createRowPreviewActivationRuntime();
+		const onActivatedA = vi.fn();
+		const onActivatedB = vi.fn();
+
+		runtime.setRowVisibility(1, "visible");
+		runtime.setRowVisibility(5, "visible");
+		runtime.registerCandidate(
+			createTestCandidate({
+				id: "c1",
+				rowIndex: 1,
+				activationKey: "shared-key",
+				onActivated: onActivatedA,
+			}),
+		);
+		runtime.registerCandidate(
+			createTestCandidate({
+				id: "c2",
+				rowIndex: 5,
+				activationKey: "shared-key",
+				onActivated: onActivatedB,
+			}),
+		);
+		await flushAnimationFrame();
+		await flushAnimationFrame();
+
+		expect(onActivatedA).toHaveBeenCalledWith("shared-key");
+		expect(onActivatedB).toHaveBeenCalledWith("shared-key");
+	});
+
+	it("keeps pending activation when another visible row shares the same key", async () => {
+		const runtime = createRowPreviewActivationRuntime();
+		const onActivatedA = vi.fn();
+		const onActivatedB = vi.fn();
+
+		runtime.setRowVisibility(1, "visible");
+		runtime.setRowVisibility(5, "visible");
+		runtime.registerCandidate(
+			createTestCandidate({
+				id: "c1",
+				rowIndex: 1,
+				activationKey: "shared-key",
+				onActivated: onActivatedA,
+			}),
+		);
+		runtime.registerCandidate(
+			createTestCandidate({
+				id: "c2",
+				rowIndex: 5,
+				activationKey: "shared-key",
+				onActivated: onActivatedB,
+			}),
+		);
+		runtime.setRowVisibility(1, "mounted");
+		await flushAnimationFrame();
+		await flushAnimationFrame();
+
+		expect(onActivatedA).not.toHaveBeenCalled();
+		expect(onActivatedB).toHaveBeenCalledWith("shared-key");
+	});
 });

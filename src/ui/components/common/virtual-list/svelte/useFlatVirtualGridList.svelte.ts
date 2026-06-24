@@ -48,6 +48,10 @@ import {
 } from "./virtualizedItemVisibilityState.svelte";
 import type { RenderRevision, RenderRevisionFallbackPolicy } from "../renderRevision";
 import type { VirtualNavigationTarget, VirtualRanges } from "../types";
+import {
+	PREVIEW_ROW_ACTIVATION_CONTEXT_KEY,
+	type RowPreviewActivationRuntime,
+} from "features/preview/scheduling/rowPreviewActivationRuntime";
 
 export interface FlatVirtualGridListProps<T> {
 	items?: readonly T[];
@@ -74,6 +78,7 @@ export interface FlatVirtualGridListProps<T> {
 				observerRoot: HTMLElement | null;
 				visibility: VirtualizedItemVisibility;
 				visibilityState: VirtualizedItemVisibilityState;
+				rowIndex: number;
 			},
 		]
 	>;
@@ -133,8 +138,18 @@ export function useFlatVirtualGridList<T>(props: FlatVirtualGridListProps<T>) {
 	const supportsIntersectionObserver =
 		typeof window !== "undefined" && "IntersectionObserver" in window;
 	const lazyLoadManager = getLazyLoadManager();
+	const rowPreviewActivationRuntime = getContext<
+		RowPreviewActivationRuntime | undefined
+	>(PREVIEW_ROW_ACTIVATION_CONTEXT_KEY);
 	const visibilityStates =
-		createVirtualizedItemVisibilityStateController<MountedVirtualGridCell<T>>();
+		createVirtualizedItemVisibilityStateController<MountedVirtualGridCell<T>>({
+			onRowVisibilityChanged: (rowIndex, visibility) => {
+				rowPreviewActivationRuntime?.setRowVisibility(rowIndex, visibility);
+			},
+			onRowCleared: (rowIndex) => {
+				rowPreviewActivationRuntime?.clearRow(rowIndex);
+			},
+		});
 	let visibilityMountedRows: readonly MountedVirtualGridRowSlice<T>[] | readonly [] =
 		EMPTY_MOUNTED_ROWS;
 	let visibilityMountedRange: RowRange = { start: 0, end: 0 };
@@ -677,6 +692,7 @@ export function useFlatVirtualGridList<T>(props: FlatVirtualGridListProps<T>) {
 			index: itemCell.cell.itemIndex,
 			observerRoot,
 			visibilityState,
+			rowIndex: itemCell.rowIndex,
 			get visibility() {
 				return visibilityState.visibility;
 			},

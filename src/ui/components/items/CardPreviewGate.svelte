@@ -10,14 +10,15 @@
 	} from "ui/context/linkContext";
 	import { buildPreviewGenerationKey } from "features/preview/core/previewCache";
 	import {
-		canActivatePreviewImmediately,
-		requestPreviewActivation,
-		type PreviewActivationHandle,
-	} from "features/preview/scheduling/previewActivationScheduler";
-	import {
 		PREVIEW_ACTIVATION_SCOPE_CONTEXT_KEY,
 		type PreviewActivationScope,
 	} from "features/preview/scheduling/previewActivationScope";
+	import {
+		PREVIEW_ROW_ACTIVATION_CONTEXT_KEY,
+		type RowPreviewActivationRuntime,
+	} from "features/preview/scheduling/rowPreviewActivationRuntime";
+	import { requestPreviewActivation, type PreviewActivationHandle } from "features/preview/scheduling/previewActivationScheduler";
+	import { buildCardPreviewActivationIdentity } from "features/preview/core/cardPreviewActivationIdentity";
 	import { DEBUG_DISABLE_CARD_DOM_PREVIEW } from "../../../appConstants";
 	import type { PreviewVisibilityMode } from "./types";
 	import {
@@ -34,6 +35,7 @@
 		previewVisibilityMode?: PreviewVisibilityMode;
 		previewRefreshToken?: number;
 		contentPreview?: string;
+		rowIndex?: number;
 	}
 
 	let {
@@ -45,6 +47,7 @@
 		previewVisibilityMode = undefined,
 		previewRefreshToken = 0,
 		contentPreview = undefined,
+		rowIndex = undefined,
 	}: Props = $props();
 
 	const context = useLinkContext();
@@ -57,6 +60,9 @@
 	const previewActivationScope = getContext<PreviewActivationScope | undefined>(
 		PREVIEW_ACTIVATION_SCOPE_CONTEXT_KEY,
 	);
+	const rowPreviewActivationRuntime = getContext<
+		RowPreviewActivationRuntime | undefined
+	>(PREVIEW_ROW_ACTIVATION_CONTEXT_KEY);
 	const previewMinHeight = 80;
 
 	const visibility = $derived(previewVisibilityContext?.visibility);
@@ -84,7 +90,19 @@
 	const virtualizedVisibility = $derived(
 		effectiveVisibilityMode === "controlled" ? visibility : undefined,
 	);
-	const previewIdentity = $derived(previewCacheKey);
+	const previewIdentity = $derived(
+		file
+			? buildCardPreviewActivationIdentity({
+					file,
+					settings,
+					searchQuery,
+					searchScope,
+					previewRenderVersion,
+					previewRefreshToken,
+					previewOverride,
+				})
+			: undefined,
+	);
 	const isPreviewCached = $derived(
 		previewCacheKey ? (intersectedCache?.has(previewCacheKey) ?? false) : false,
 	);
@@ -94,6 +112,8 @@
 	let pendingPreviewIdentity: string | undefined = undefined;
 	let activationRequest: PreviewActivationHandle | null = null;
 	let activationSequence = 0;
+	let unregisterRowActivationCandidate: (() => void) | undefined = undefined;
+	let registeredRowActivationCandidateId: string | undefined = undefined;
 	const shouldRenderPreview = $derived.by(() => {
 		if (DEBUG_DISABLE_CARD_DOM_PREVIEW) return false;
 		if (previewIdentity === undefined) return false;
@@ -131,7 +151,58 @@
 		lastPreviewIdentity = nextIdentity;
 	}
 
+	function clearRegisteredRowActivationCandidate(): void {
+		unregisterRowActivationCandidate?.();
+		unregisterRowActivationCandidate = undefined;
+		registeredRowActivationCandidateId = undefined;
+	}
+
+	function registerVisibleRowActivationCandidate(): void {
+		if (effectiveVisibilityMode !== "controlled") {
+			clearRegisteredRowActivationCandidate();
+			return;
+		}
+		if (!rowPreviewActivationRuntime || rowIndex === undefined || !previewIdentity) {
+			clearRegisteredRowActivationCandidate();
+			return;
+		}
+
+		const candidateId = `${rowIndex}\0${previewIdentity}`;
+		if (registeredRowActivationCandidateId === candidateId) {
+			return;
+		}
+
+		clearRegisteredRowActivationCandidate();
+		registeredRowActivationCandidateId = candidateId;
+		unregisterRowActivationCandidate =
+			rowPreviewActivationRuntime.registerCandidate({
+				id: candidateId,
+				rowIndex,
+				activationKey: previewIdentity,
+				getVisibleQueueSize: getVisiblePreviewQueueSize,
+				onActivated: (activationKey) => {
+					if (
+						activationKey !== previewIdentity ||
+						virtualizedVisibility !== "visible"
+					) {
+						return;
+					}
+					activatedPreviewIdentity = activationKey;
+					visiblePreviewIdentity = activationKey;
+				},
+			});
+	}
+
 	function activateVisibleVirtualPreview(): void {
+		if (
+			effectiveVisibilityMode === "controlled" &&
+			rowPreviewActivationRuntime &&
+			rowIndex !== undefined
+		) {
+			cancelPendingActivation();
+			return;
+		}
+
 		if (DEBUG_DISABLE_CARD_DOM_PREVIEW) {
 			cancelPendingActivation();
 			return;
@@ -153,26 +224,6 @@
 		}
 
 		const identity = previewIdentity;
-
-		if (
-			canActivatePreviewImmediately(
-				getVisiblePreviewQueueSize,
-				previewActivationScope,
-			)
-		) {
-			cancelPendingActivation();
-			activatedPreviewIdentity = identity;
-			visiblePreviewIdentity = identity;
-
-			if (
-				effectiveVisibilityMode !== "controlled" &&
-				previewCacheKey &&
-				intersectedCache
-			) {
-				intersectedCache.add(previewCacheKey);
-			}
-			return;
-		}
 
 		cancelPendingActivation();
 
@@ -246,10 +297,15 @@
 	});
 
 	$effect(() => {
+		registerVisibleRowActivationCandidate();
+	});
+
+	$effect(() => {
 		activateVisibleVirtualPreview();
 	});
 
 	onDestroy(() => {
+		clearRegisteredRowActivationCandidate();
 		cancelPendingActivation();
 	});
 </script>

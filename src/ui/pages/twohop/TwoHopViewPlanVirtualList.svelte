@@ -25,6 +25,10 @@
 		createPreviewActivationScope,
 		PREVIEW_ACTIVATION_SCOPE_CONTEXT_KEY,
 	} from "features/preview/scheduling/previewActivationScope";
+	import {
+		createRowPreviewActivationRuntime,
+		PREVIEW_ROW_ACTIVATION_CONTEXT_KEY,
+	} from "features/preview/scheduling/rowPreviewActivationRuntime";
 
 	interface Props {
 		sections: readonly SectionRenderDescriptor<
@@ -58,6 +62,7 @@
 					item: TwoHopPageVirtualItem;
 					section: TwoHopPageVirtualSection;
 					index: number;
+					rowIndex: number;
 					observerRoot: HTMLElement | null;
 					visibility: VirtualizedItemVisibility;
 					visibilityState: VirtualizedItemVisibilityState;
@@ -67,7 +72,12 @@
 	}
 
 	const props: Props = $props();
-	setContext(PREVIEW_ACTIVATION_SCOPE_CONTEXT_KEY, createPreviewActivationScope());
+	const previewActivationScope = createPreviewActivationScope();
+	const rowPreviewActivationRuntime = createRowPreviewActivationRuntime({
+		scope: previewActivationScope,
+	});
+	setContext(PREVIEW_ACTIVATION_SCOPE_CONTEXT_KEY, previewActivationScope);
+	setContext(PREVIEW_ROW_ACTIVATION_CONTEXT_KEY, rowPreviewActivationRuntime);
 	const list = useTwoHopViewPlanVirtualList(props);
 	const interactionDescriptorResolverProvider =
 		createTwoHopInteractionResolverProvider({

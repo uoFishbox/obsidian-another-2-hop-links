@@ -27,6 +27,7 @@
 		interactionRegistration = "self",
 		interactionId: providedInteractionId = undefined,
 		interactionKey: providedInteractionKey = undefined,
+		rowIndex = undefined,
 	}: ItemProps = $props();
 
 	const context = useLinkContext();
@@ -144,6 +145,7 @@
 				{previewVisibilityMode}
 				{previewRefreshToken}
 				{contentPreview}
+				{rowIndex}
 			/>
 		{/snippet}
 	</LinkItem>
