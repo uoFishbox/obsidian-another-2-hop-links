@@ -35,9 +35,5 @@ export function buildCardPreviewActivationIdentity(
 		renderVersionIdentity,
 	);
 
-	return [
-		renderCacheKey,
-		input.searchScope,
-		input.file.extension,
-	].join("\0");
+	return [renderCacheKey, input.file.extension].join("\0");
 }
