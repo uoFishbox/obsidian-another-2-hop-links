@@ -448,7 +448,15 @@ describe("compileTwoHopViewPlan", () => {
 		expect(batchedPlan.cellStore.materializedSectionByIndex[11]).toBe(false);
 		expect(batchedPlan.cellStore.nextUnmaterializedSectionIndex).toBe(10);
 		expect(batchedPlan.cellStore.remainingUnmaterializedSectionCount).toBe(2);
-		expect(batchedPlan.cellStore.remainingUnmaterializedCellCount).toBe(4);
+		// Synchronous scroll-style materialization must keep the progress
+		// bookkeeping in sync with the cache: section 11's item cell was just
+		// filled out-of-band, so one fewer cell remains for the background
+		// materializer to process.
+		expect(batchedPlan.cellStore.materializationStateBySectionIndex[11]).toEqual({
+			nextCellIndex: 0,
+			materializedCellCount: 1,
+		});
+		expect(batchedPlan.cellStore.remainingUnmaterializedCellCount).toBe(3);
 		expect(getItemsBySection.map((getItems) => getItems.mock.calls.length)).toEqual(
 			new Array<number>(12).fill(1),
 		);
@@ -929,5 +937,71 @@ describe("materializeNextTwoHopCellBatch affected row range", () => {
 			changed: true,
 			affectedRowRange: { start: 0, end: 3 },
 		});
+	});
+});
+
+describe("scroll-driven materialization keeps bookkeeping in sync", () => {
+	it("does not double-count cells materialized by the scroll path", () => {
+		// columns = 2; one section with header + 6 items => cellCount 7 over
+		// rows 0 (cells 0,1), 1 (cells 2,3), 2 (cells 4,5), 3 (cell 6).
+		const items = [
+			createItem("a"),
+			createItem("b"),
+			createItem("c"),
+			createItem("d"),
+			createItem("e"),
+			createItem("f"),
+		];
+		const plan = compileTwoHopViewPlan({
+			sections: [createDescriptor(items, undefined, "section-a")],
+			sectionVisibleCounts: {},
+			layout,
+			materialization: createBatchedMaterialization(0),
+			resolveInitialSectionVisibleCount: (section) => section.loadedCount,
+			clampVisibleCount: (_section, count) => count,
+		});
+		const rowModel = createTwoHopViewPlanRowModel(plan);
+		const state = plan.cellStore.materializationStateBySectionIndex[0];
+
+		expect(plan.cellStore.remainingUnmaterializedCellCount).toBe(7);
+		expect(state).toEqual({ nextCellIndex: 0, materializedCellCount: 0 });
+
+		// Simulate a deep scroll: the mounted-row builder synchronously
+		// materializes cells for late rows before the idle/background task
+		// reaches them.
+		const lateRowRange = { start: 2, end: 4 };
+		buildTwoHopMountedRows({
+			rowModel,
+			rowRange: lateRowRange,
+			ranges: { mounted: lateRowRange, previewVisible: lateRowRange },
+		});
+
+		const lateCells = plan.cellStore.logicalCellsBySectionIndex[0];
+		const scrollCell4 = lateCells[4];
+		const scrollCell6 = lateCells[6];
+		expect(scrollCell4?.kind).toBe("item");
+		expect(scrollCell6?.kind).toBe("item");
+		// Rows 2-3 cover cells 4,5,6; the bookkeeping counts exactly those.
+		expect(state).toEqual({ nextCellIndex: 0, materializedCellCount: 3 });
+		expect(plan.cellStore.remainingUnmaterializedCellCount).toBe(4);
+		expect(plan.cellStore.materializedSectionByIndex).toEqual([false]);
+
+		// The background materializer walks the remaining prefix (cells 0-3)
+		// and must fast-forward past the scroll-materialized tail without
+		// re-counting them, so the sync cells are not overwritten.
+		const result = materializeNextTwoHopCellBatch(plan, { maxCellCount: 7 });
+		expect(result).toEqual({ changed: true, affectedRowRange: { start: 0, end: 2 } });
+		expect(state).toEqual({ nextCellIndex: 4, materializedCellCount: 7 });
+		expect(plan.cellStore.remainingUnmaterializedCellCount).toBe(0);
+		expect(plan.cellStore.materializedSectionByIndex).toEqual([true]);
+		expect(plan.cellStore.nextUnmaterializedSectionIndex).toBe(1);
+		// The scroll-materialized cells were not re-created by the background.
+		expect(plan.cellStore.logicalCellsBySectionIndex[0][4]).toBe(scrollCell4);
+		expect(plan.cellStore.logicalCellsBySectionIndex[0][6]).toBe(scrollCell6);
+
+		expect(hasUnmaterializedTwoHopSections(plan)).toBe(false);
+		expect(
+			materializeNextTwoHopCellBatch(plan, { maxCellCount: 7 }),
+		).toEqual({ changed: false, affectedRowRange: null });
 	});
 });

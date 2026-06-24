@@ -41,6 +41,20 @@ export interface TwoHopSectionPlan {
 	>;
 }
 
+/**
+ * Per-section progress for background materialization.
+ *
+ * `nextCellIndex` is the background walk cursor: the next section-local cell
+ * the background materializer will inspect. It only advances and never
+ * reflects cells filled out-of-band.
+ *
+ * `materializedCellCount` is the number of cells in this section that are
+ * currently materialized (cache filled) by *anyone* — synchronous
+ * scroll-driven materialization or the background materializer alike. It is
+ * updated at the single transition point where a cell goes from empty to
+ * filled, so both paths share one source of truth and the background loop
+ * never re-counts cells already filled by the scroll path.
+ */
 export interface TwoHopSectionMaterializationState {
 	nextCellIndex: number;
 	materializedCellCount: number;
@@ -546,6 +560,34 @@ function markTwoHopSectionMaterialized(
 }
 
 /**
+ * Records that one previously-empty cell in `sectionIndex` has just been
+ * materialized, regardless of which path filled it.
+ *
+ * This is the single transition point that advances per-section and global
+ * bookkeeping. Callers must invoke it exactly once for every cell that
+ * transitions from empty to filled; calling it on an already-filled cell
+ * would double-count. Section completion is surfaced to the caller via the
+ * returned flag so each path can run its own section-advancement logic
+ * (the background loop advances its section cursor; the scroll path only
+ * marks the section).
+ */
+function recordTwoHopCellFilled(
+	plan: TwoHopViewPlan,
+	sectionIndex: number,
+): boolean {
+	const cellStore = plan.cellStore;
+	const state = cellStore.materializationStateBySectionIndex[sectionIndex];
+	const sectionPlan = plan.sections[sectionIndex];
+	if (!state || !sectionPlan) return false;
+	state.materializedCellCount += 1;
+	cellStore.remainingUnmaterializedCellCount = Math.max(
+		0,
+		cellStore.remainingUnmaterializedCellCount - 1,
+	);
+	return state.materializedCellCount >= sectionPlan.cellCount;
+}
+
+/**
  * Materializes the next cells in display order.
  */
 export interface MaterializeNextTwoHopCellBatchOptions {
@@ -604,14 +646,35 @@ export function materializeNextTwoHopCellBatch(
 			cellStore.nextUnmaterializedSectionIndex += 1;
 			continue;
 		}
+		// Fast-forward past cells that were already materialized out-of-band
+		// (e.g. by synchronous scroll-driven materialization). They were
+		// accounted for at their fill point, so re-walking them here would
+		// double-count progress and waste the slice budget; skip them for free.
+		const logicalCells = cellStore.logicalCellsBySectionIndex[sectionIndex];
+		while (
+			state.nextCellIndex < sectionPlan.cellCount &&
+			logicalCells?.[state.nextCellIndex] !== undefined
+		) {
+			state.nextCellIndex += 1;
+		}
+		if (state.nextCellIndex >= sectionPlan.cellCount) {
+			// Every remaining cell in this section is already materialized.
+			if (state.materializedCellCount >= sectionPlan.cellCount) {
+				markTwoHopSectionMaterialized(plan, sectionIndex);
+			}
+			cellStore.nextUnmaterializedSectionIndex += 1;
+			continue;
+		}
+		const cellIndex = state.nextCellIndex;
 		const newlyMaterialized = ensureTwoHopSectionCellMaterialized(
 			plan,
 			sectionPlan,
-			state.nextCellIndex,
+			cellIndex,
 		);
 		if (newlyMaterialized) {
 			materialized = true;
-			const rowIndexInSection = Math.floor(state.nextCellIndex / columns);
+			const sectionCompleted = recordTwoHopCellFilled(plan, sectionIndex);
+			const rowIndexInSection = Math.floor(cellIndex / columns);
 			const globalRowIndex = sectionPlan.firstRowIndex + rowIndexInSection;
 			if (globalRowIndex < minAffectedRowIndex) {
 				minAffectedRowIndex = globalRowIndex;
@@ -619,17 +682,22 @@ export function materializeNextTwoHopCellBatch(
 			if (globalRowIndex > maxAffectedRowIndex) {
 				maxAffectedRowIndex = globalRowIndex;
 			}
-		}
-		state.nextCellIndex += 1;
-		state.materializedCellCount += 1;
-		cellStore.remainingUnmaterializedCellCount = Math.max(
-			0,
-			cellStore.remainingUnmaterializedCellCount - 1,
-		);
-		remainingCellBudget -= 1;
-		if (state.materializedCellCount >= sectionPlan.cellCount) {
-			markTwoHopSectionMaterialized(plan, sectionIndex);
-			cellStore.nextUnmaterializedSectionIndex += 1;
+			state.nextCellIndex += 1;
+			remainingCellBudget -= 1;
+			if (sectionCompleted) {
+				markTwoHopSectionMaterialized(plan, sectionIndex);
+				cellStore.nextUnmaterializedSectionIndex += 1;
+			}
+		} else {
+			// The cell could not be created (e.g. no backing item). Treat it as
+			// permanently resolved so background materialization can terminate
+			// without revisiting it, without claiming it as materialized.
+			cellStore.remainingUnmaterializedCellCount = Math.max(
+				0,
+				cellStore.remainingUnmaterializedCellCount - 1,
+			);
+			state.nextCellIndex += 1;
+			remainingCellBudget -= 1;
 		}
 	}
 	if (!materialized) {
@@ -681,12 +749,19 @@ export function ensureTwoHopSectionCellRangeMaterialized(
 	const sectionPlan = plan.sections[sectionIndex];
 	if (!sectionPlan) return false;
 	let changed = false;
+	let sectionCompleted = false;
 	const start = Math.max(0, startCellIndex);
 	const end = Math.min(sectionPlan.cellCount, endCellIndex);
 	for (let cellIndex = start; cellIndex < end; cellIndex += 1) {
-		changed =
-			ensureTwoHopSectionCellMaterialized(plan, sectionPlan, cellIndex) ||
-			changed;
+		if (!ensureTwoHopSectionCellMaterialized(plan, sectionPlan, cellIndex)) {
+			continue;
+		}
+		changed = true;
+		sectionCompleted =
+			recordTwoHopCellFilled(plan, sectionIndex) || sectionCompleted;
+	}
+	if (sectionCompleted) {
+		markTwoHopSectionMaterialized(plan, sectionIndex);
 	}
 	if (changed) {
 		markTwoHopMaterializationChanged(plan);
