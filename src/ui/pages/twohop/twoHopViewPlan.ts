@@ -424,11 +424,9 @@ function resolveTwoHopDescriptorItem(
 	itemIndex: number,
 	resolvedItems?: readonly TwoHopPageVirtualItem[],
 ): TwoHopPageVirtualItem | undefined {
-	return (
-		resolvedItems?.[itemIndex] ??
-		descriptor.getItem?.(itemIndex) ??
-		descriptor.getItems()[itemIndex]
-	);
+	if (resolvedItems) return resolvedItems[itemIndex];
+	if (descriptor.getItem) return descriptor.getItem(itemIndex);
+	return descriptor.getItems()[itemIndex];
 }
 
 function createTwoHopLogicalCellAt(
