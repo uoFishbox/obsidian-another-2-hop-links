@@ -17,7 +17,11 @@
 		PREVIEW_ROW_ACTIVATION_CONTEXT_KEY,
 		type RowPreviewActivationRuntime,
 	} from "features/preview/scheduling/rowPreviewActivationRuntime";
-	import { requestPreviewActivation, type PreviewActivationHandle } from "features/preview/scheduling/previewActivationScheduler";
+	import {
+		requestPreviewActivation,
+		requestQueuedPreviewActivation,
+		type PreviewActivationHandle,
+	} from "features/preview/scheduling/previewActivationScheduler";
 	import { buildCardPreviewActivationIdentity } from "features/preview/core/cardPreviewActivationIdentity";
 	import { DEBUG_DISABLE_CARD_DOM_PREVIEW } from "../../../appConstants";
 	import type { PreviewVisibilityMode } from "./types";
@@ -25,6 +29,8 @@
 		PREVIEW_VISIBILITY_CONTEXT_KEY,
 		type PreviewVisibilityContext,
 	} from "./previewVisibilityContext";
+
+	let nextCardPreviewGateId = 0;
 
 	interface Props {
 		file: TFile | null;
@@ -36,6 +42,7 @@
 		previewRefreshToken?: number;
 		contentPreview?: string;
 		rowIndex?: number;
+		activationCandidateId?: string;
 	}
 
 	let {
@@ -48,6 +55,7 @@
 		previewRefreshToken = 0,
 		contentPreview = undefined,
 		rowIndex = undefined,
+		activationCandidateId = undefined,
 	}: Props = $props();
 
 	const context = useLinkContext();
@@ -114,6 +122,7 @@
 	let activationSequence = 0;
 	let unregisterRowActivationCandidate: (() => void) | undefined = undefined;
 	let registeredRowActivationCandidateId: string | undefined = undefined;
+	const fallbackCandidateId = `card-preview-gate:${++nextCardPreviewGateId}`;
 	const shouldRenderPreview = $derived.by(() => {
 		if (DEBUG_DISABLE_CARD_DOM_PREVIEW) return false;
 		if (previewIdentity === undefined) return false;
@@ -167,7 +176,7 @@
 			return;
 		}
 
-		const candidateId = `${rowIndex}\0${previewIdentity}`;
+		const candidateId = activationCandidateId ?? fallbackCandidateId;
 		if (registeredRowActivationCandidateId === candidateId) {
 			return;
 		}
@@ -266,7 +275,12 @@
 			}
 		};
 
-		request = requestPreviewActivation(
+		const requestActivation =
+			effectiveVisibilityMode === "controlled"
+				? requestQueuedPreviewActivation
+				: requestPreviewActivation;
+
+		request = requestActivation(
 			identity,
 			getVisiblePreviewQueueSize,
 			previewActivationScope,

@@ -210,6 +210,7 @@ export function useTwoHopViewPlanVirtualList(props: TwoHopViewPlanVirtualListPro
 		observerRoot: HTMLElement | null;
 		visibilityState: VirtualizedItemVisibilityState;
 		readonly visibility: VirtualizedItemVisibility;
+		activationCandidateId: string;
 	} => {
 		const visibilityState = mountRuntime.getOrCreateVisibilityState(
 			renderedCell,
@@ -230,6 +231,7 @@ export function useTwoHopViewPlanVirtualList(props: TwoHopViewPlanVirtualListPro
 			rowIndex: renderedCell.rowIndex,
 			observerRoot,
 			visibilityState,
+			activationCandidateId: renderedCell.key,
 			get visibility() {
 				return visibilityState.visibility;
 			},

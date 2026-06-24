@@ -58,6 +58,7 @@ export function createVirtualizedItemVisibilityStateController<
 	let hasPreviousPreviewVisible = false;
 	let rowsByIndex = new Map<number, VisibilityRow<TCell>>();
 	const mountedItemKeyCounts = new Map<string, number>();
+	const rowVisibilityByIndex = new Map<number, VirtualizedItemVisibility>();
 
 	const rememberPreviousPreviewVisible = (previewRange: RowRange): void => {
 		previousPreviewVisible.start = previewRange.start;
@@ -122,6 +123,19 @@ export function createVirtualizedItemVisibilityStateController<
 		return state;
 	};
 
+	const notifyRowVisibilityIfChanged = (
+		rowIndex: number,
+		nextVisibility: VirtualizedItemVisibility,
+	): void => {
+		const previous = rowVisibilityByIndex.get(rowIndex);
+		if (previous === nextVisibility) {
+			return;
+		}
+
+		rowVisibilityByIndex.set(rowIndex, nextVisibility);
+		options.onRowVisibilityChanged?.(rowIndex, nextVisibility);
+	};
+
 	const applyVisibilityToRow = (
 		row: VisibilityRow<TCell>,
 		nextVisibility: VirtualizedItemVisibility,
@@ -142,7 +156,7 @@ export function createVirtualizedItemVisibilityStateController<
 			}
 		}
 
-		options.onRowVisibilityChanged?.(row.rowIndex, nextVisibility);
+		notifyRowVisibilityIfChanged(row.rowIndex, nextVisibility);
 	};
 
 	const applyVisibilityToRowRange = (
@@ -188,6 +202,7 @@ export function createVirtualizedItemVisibilityStateController<
 
 		for (const rowIndex of rowsByIndex.keys()) {
 			if (!nextRowIndices.has(rowIndex)) {
+				rowVisibilityByIndex.delete(rowIndex);
 				options.onRowCleared?.(rowIndex);
 			}
 		}
@@ -216,7 +231,7 @@ export function createVirtualizedItemVisibilityStateController<
 					tracked.state.visibility = nextVisibility;
 				}
 			}
-			options.onRowVisibilityChanged?.(row.rowIndex, nextVisibility);
+			notifyRowVisibilityIfChanged(row.rowIndex, nextVisibility);
 		}
 
 		for (const [key, tracked] of states) {
@@ -239,6 +254,7 @@ export function createVirtualizedItemVisibilityStateController<
 		rowsByIndex.delete(row.rowIndex);
 		updateMountedItemKeyCount(row, -1);
 		pruneUnmountedRowState(row);
+		rowVisibilityByIndex.delete(row.rowIndex);
 		options.onRowCleared?.(row.rowIndex);
 	};
 

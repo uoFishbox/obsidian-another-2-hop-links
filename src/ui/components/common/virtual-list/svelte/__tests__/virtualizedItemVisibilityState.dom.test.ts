@@ -443,6 +443,31 @@ describe("createVirtualizedItemVisibilityStateController", () => {
 		}
 	});
 
+	it("only emits onRowVisibilityChanged when row visibility transitions", () => {
+		const visibilityChanges: Array<[number, string]> = [];
+
+		const ctrl = createVirtualizedItemVisibilityStateController<TestCell>({
+			onRowVisibilityChanged: (rowIndex, visibility) => {
+				visibilityChanges.push([rowIndex, visibility]);
+			},
+		});
+
+		const cells = [item("a")];
+		const rows = [row(0, cells)];
+
+		ctrl.sync(rows, range(0, 1));
+		expect(visibilityChanges).toEqual([[0, "visible"]]);
+
+		ctrl.sync(rows, range(0, 1));
+		expect(visibilityChanges).toEqual([[0, "visible"]]);
+
+		ctrl.sync(rows, range(1, 2));
+		expect(visibilityChanges).toEqual([
+			[0, "visible"],
+			[0, "mounted"],
+		]);
+	});
+
 	it("does not clear retained rows during a full mounted-rows sync", () => {
 		const clearedRows: number[] = [];
 		const visibilityChanges: Array<[number, string]> = [];

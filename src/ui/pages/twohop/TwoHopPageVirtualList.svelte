@@ -97,6 +97,7 @@
 		observerRoot: HTMLElement | null;
 		visibilityState: VirtualizedItemVisibilityState;
 		visibility: VirtualizedItemVisibility;
+		activationCandidateId: string;
 	};
 </script>
 
@@ -182,6 +183,7 @@
 						contentPreview={resolveItemContentPreview(row)}
 						observerRoot={args?.observerRoot ?? null}
 						rowIndex={args?.rowIndex}
+						activationCandidateId={args?.activationCandidateId}
 						interactionRegistration="snapshot"
 						interactionId={row.interactionId}
 						interactionKey={row.interactionKey}

@@ -66,6 +66,7 @@
 					observerRoot: HTMLElement | null;
 					visibility: VirtualizedItemVisibility;
 					visibilityState: VirtualizedItemVisibilityState;
+					activationCandidateId: string;
 				},
 			]
 		>;

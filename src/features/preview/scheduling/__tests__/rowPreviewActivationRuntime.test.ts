@@ -237,6 +237,66 @@ describe("rowPreviewActivationRuntime", () => {
 		expect(onActivatedB).toHaveBeenCalledWith("shared-key");
 	});
 
+	it("cancels pending activation when clearing the only visible row for a key", async () => {
+		const runtime = createRowPreviewActivationRuntime();
+		const onActivated = vi.fn();
+
+		runtime.setRowVisibility(0, "visible");
+		runtime.registerCandidate({
+			id: "old",
+			rowIndex: 0,
+			activationKey: "shared-key",
+			getVisibleQueueSize: () => 1,
+			onActivated: vi.fn(),
+		});
+
+		runtime.clearRow(0);
+
+		runtime.setRowVisibility(1, "visible");
+		runtime.registerCandidate({
+			id: "new",
+			rowIndex: 1,
+			activationKey: "shared-key",
+			getVisibleQueueSize: () => 0,
+			onActivated,
+		});
+
+		await flushAnimationFrame();
+		await flushAnimationFrame();
+
+		expect(onActivated).toHaveBeenCalledWith("shared-key");
+	});
+
+	it("notifies duplicate candidates with the same activation key in the same row", async () => {
+		const runtime = createRowPreviewActivationRuntime();
+		const onActivatedA = vi.fn();
+		const onActivatedB = vi.fn();
+
+		runtime.setRowVisibility(1, "visible");
+
+		runtime.registerCandidate(
+			createTestCandidate({
+				id: "c1",
+				rowIndex: 1,
+				activationKey: "shared-key",
+				onActivated: onActivatedA,
+			}),
+		);
+		runtime.registerCandidate(
+			createTestCandidate({
+				id: "c2",
+				rowIndex: 1,
+				activationKey: "shared-key",
+				onActivated: onActivatedB,
+			}),
+		);
+
+		await flushAnimationFrame();
+
+		expect(onActivatedA).toHaveBeenCalledWith("shared-key");
+		expect(onActivatedB).toHaveBeenCalledWith("shared-key");
+	});
+
 	it("keeps pending activation when another visible row shares the same key", async () => {
 		const runtime = createRowPreviewActivationRuntime();
 		const onActivatedA = vi.fn();

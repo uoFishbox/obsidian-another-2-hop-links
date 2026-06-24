@@ -79,6 +79,7 @@ export interface FlatVirtualGridListProps<T> {
 				visibility: VirtualizedItemVisibility;
 				visibilityState: VirtualizedItemVisibilityState;
 				rowIndex: number;
+				activationCandidateId: string;
 			},
 		]
 	>;
@@ -693,6 +694,7 @@ export function useFlatVirtualGridList<T>(props: FlatVirtualGridListProps<T>) {
 			observerRoot,
 			visibilityState,
 			rowIndex: itemCell.rowIndex,
+			activationCandidateId: itemCell.key,
 			get visibility() {
 				return visibilityState.visibility;
 			},

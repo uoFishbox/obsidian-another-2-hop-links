@@ -19,6 +19,15 @@ import {
 	type PreviewContentAnalysis,
 } from "features/preview/utils/previewUtils";
 import { readRawContent } from "features/preview/core/rawContentReader";
+import {
+	buildPreviewContentSettingsSignature,
+	buildPreviewContentIdentityKey,
+	buildRenderCacheKey,
+	buildPreviewRenderKeys,
+	normalizePreviewQuery,
+	CACHE_KEY_SEPARATOR,
+	buildSearchContextSettingsSignature,
+} from "features/preview/core/previewRenderKeys";
 import { DEBUG_DISABLE_RENDERED_PREVIEW_CACHE } from "../../../appConstants";
 import type { PluginSettings } from "types/settings";
 import { createSizedLRUCache, stringBytes } from "utils/sizedLRUCache";
@@ -39,14 +48,20 @@ export type PreviewSearchContext = {
 const RENDERED_PREVIEW_CACHE_MAX_BYTES = 8 * 1024 * 1024;
 const SEARCH_CONTEXT_CACHE_MAX_BYTES = 4 * 1024 * 1024;
 const PREVIEW_ANALYSIS_CACHE_MAX_BYTES = 2 * 1024 * 1024;
-const CACHE_KEY_SEPARATOR = "\0";
-const SIGNATURE_SEP = "\u001f";
 
 type SharedInFlightRequest<T> = {
 	cacheKey: string;
 	callerCount: number;
 	controller: AbortController;
 	promise: Promise<T>;
+};
+
+export {
+	buildPreviewContentSettingsSignature,
+	buildPreviewContentIdentityKey,
+	buildRenderCacheKey,
+	buildPreviewRenderKeys,
+	normalizePreviewQuery,
 };
 
 const renderedPreviewCache = createSizedLRUCache<string, RenderedPreviewCacheEntry>(
@@ -64,28 +79,6 @@ const previewAnalysisCache = createSizedLRUCache<string, PreviewContentAnalysis>
 	PREVIEW_ANALYSIS_CACHE_MAX_BYTES,
 );
 
-export function buildPreviewContentSettingsSignature(settings: PluginSettings): string {
-	const renderCodeBlockTypes = settings.renderCodeBlockTypes ?? [];
-	return [
-		settings.priorityFrontmatterKeyForPreview ?? "",
-		settings.previewMaxChars,
-		settings.previewMaxLines,
-		settings.previewVisualLineSafetyMargin,
-		renderCodeBlockTypes.length,
-		...renderCodeBlockTypes,
-	].join(SIGNATURE_SEP);
-}
-
-export function buildSearchContextSettingsSignature(settings: PluginSettings): string {
-	return [
-		settings.previewMaxChars,
-		settings.previewMaxLines,
-		settings.previewVisualLineSafetyMargin,
-		settings.searchPreviewSeekThresholdChars,
-		settings.searchPreviewSeekBufferChars,
-	].join(SIGNATURE_SEP);
-}
-
 function estimateRenderedPreviewSizeFromContent(content: string): number {
 	return 1024 + stringBytes(content) * 4;
 }
@@ -102,56 +95,12 @@ function estimatePreviewAnalysisSize(analysis: PreviewContentAnalysis): number {
 	);
 }
 
-export function normalizePreviewQuery(query: string): string {
-	return query.trim().toLowerCase();
-}
-
-export function buildPreviewContentIdentityKey(
-	file: TFile,
-	settings: PluginSettings,
-	previewRenderVersion: string,
-): string {
-	return `${file.path}${CACHE_KEY_SEPARATOR}${file.stat.mtime}${CACHE_KEY_SEPARATOR}${previewRenderVersion}${CACHE_KEY_SEPARATOR}${buildPreviewContentSettingsSignature(settings)}`;
-}
-
-export function buildRenderCacheKey(
-	file: TFile,
-	query: string,
-	settings: PluginSettings,
-	previewRenderVersion: string,
-): string {
-	return `${buildPreviewContentIdentityKey(file, settings, previewRenderVersion)}${CACHE_KEY_SEPARATOR}${normalizePreviewQuery(query)}${CACHE_KEY_SEPARATOR}${buildSearchContextSettingsSignature(settings)}`;
-}
-
 function buildSearchContextCacheKey(
 	previewContentIdentityKey: string,
 	normalizedQuery: string,
 	settings: PluginSettings,
 ): string {
 	return `${previewContentIdentityKey}${CACHE_KEY_SEPARATOR}${normalizedQuery}${CACHE_KEY_SEPARATOR}${buildSearchContextSettingsSignature(settings)}`;
-}
-
-export function buildPreviewRenderKeys(
-	file: TFile,
-	query: string,
-	settings: PluginSettings,
-	previewRenderVersion: string,
-): {
-	previewContentIdentityKey: string;
-	renderCacheKey: string;
-	normalizedQuery: string;
-} {
-	const contentSignature = buildPreviewContentSettingsSignature(settings);
-	const searchSignature = buildSearchContextSettingsSignature(settings);
-	const normalizedQuery = normalizePreviewQuery(query);
-
-	const previewContentIdentityKey = `${file.path}${CACHE_KEY_SEPARATOR}${file.stat.mtime}${CACHE_KEY_SEPARATOR}${previewRenderVersion}${CACHE_KEY_SEPARATOR}${contentSignature}`;
-
-	return {
-		previewContentIdentityKey,
-		renderCacheKey: `${previewContentIdentityKey}${CACHE_KEY_SEPARATOR}${normalizedQuery}${CACHE_KEY_SEPARATOR}${searchSignature}`,
-		normalizedQuery,
-	};
 }
 
 function previewContentHasVisibleQuery(

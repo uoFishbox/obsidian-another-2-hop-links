@@ -28,6 +28,7 @@
 		interactionId: providedInteractionId = undefined,
 		interactionKey: providedInteractionKey = undefined,
 		rowIndex = undefined,
+		activationCandidateId = undefined,
 	}: ItemProps = $props();
 
 	const context = useLinkContext();
@@ -146,6 +147,7 @@
 				{previewRefreshToken}
 				{contentPreview}
 				{rowIndex}
+				{activationCandidateId}
 			/>
 		{/snippet}
 	</LinkItem>

@@ -242,18 +242,16 @@ export function createRowPreviewActivationRuntime(
 			return;
 		}
 
-		const queuedKeys = new Set<string>();
+		const activationKeys = new Set<string>();
 		for (const candidate of state.candidates.values()) {
-			const { activationKey } = candidate;
-			if (queuedKeys.has(activationKey)) {
-				continue;
-			}
-			queuedKeys.add(activationKey);
-
-			cancelPendingUnlessVisibleElsewhere(activationKey);
+			activationKeys.add(candidate.activationKey);
 		}
 
 		rows.delete(rowIndex);
+
+		for (const activationKey of activationKeys) {
+			cancelPendingUnlessVisibleElsewhere(activationKey);
+		}
 	}
 
 	return {

@@ -17,4 +17,5 @@ export interface ItemProps {
 	interactionId?: string;
 	interactionKey?: string;
 	rowIndex?: number;
+	activationCandidateId?: string;
 }
