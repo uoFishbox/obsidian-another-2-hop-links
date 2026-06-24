@@ -2,7 +2,7 @@
 	import type { ItemProps } from "./types";
 	import { useLinkContext } from "ui/context/linkContext";
 	import LinkItem from "ui/components/common/LinkItem.svelte";
-	import ViewItemCardPreview from "./ViewItemCardPreview.svelte";
+	import CardPreviewGate from "./CardPreviewGate.svelte";
 	import { ARIA_LABELS } from "../../../appConstants";
 	import { formatLinkText } from "features/preview/text-processing/textUtils";
 	import { getItemStrategy } from "application/presenters";
@@ -135,7 +135,7 @@
 		{searchQuery}
 	>
 		{#snippet children()}
-			<ViewItemCardPreview
+			<CardPreviewGate
 				file={targetFile}
 				isUnresolvedNewLink={item.type === "newLink"}
 				{searchQuery}
