@@ -110,4 +110,62 @@ describe("createTwoHopMountRuntime", () => {
 		expect(firstState.visibility).toBe("mounted");
 		expect(secondState.visibility).toBe("visible");
 	});
+
+	it("returns the previous build by identity on same-plan, same-range recompute", () => {
+		const runtime = createTwoHopMountRuntime();
+		const range = { start: 0, end: 2 };
+		const ranges = {
+			mounted: range,
+			previewVisible: range,
+		};
+		const mounted = runtime.buildMountedRows({
+			rowModel,
+			rowRange: range,
+			ranges,
+		});
+
+		const recomputed = runtime.buildMountedRows({
+			rowModel,
+			rowRange: range,
+			ranges,
+			previousBuild: mounted,
+		});
+
+		// Same plan object + same clamped mounted range must short-circuit to
+		// the previous build reference, preserving rowSlices array identity.
+		expect(recomputed).toBe(mounted);
+		expect(recomputed.rowSlices).toBe(mounted.rowSlices);
+		expect(recomputed.cells).toBe(mounted.cells);
+		expect(recomputed.reusableCellsByKey).toBe(mounted.reusableCellsByKey);
+		expect(recomputed.mountedCellCount).toBe(mounted.mountedCellCount);
+		expect(recomputed.nextRenderSlotIndex).toBe(mounted.nextRenderSlotIndex);
+	});
+
+	it("does not reuse the previous build when the clamped range differs", () => {
+		const runtime = createTwoHopMountRuntime();
+		const ranges = {
+			mounted: { start: 0, end: 2 },
+			previewVisible: { start: 0, end: 2 },
+		};
+		const mounted = runtime.buildMountedRows({
+			rowModel,
+			rowRange: { start: 0, end: 2 },
+			ranges,
+		});
+
+		const scrolled = runtime.buildMountedRows({
+			rowModel,
+			rowRange: { start: 1, end: 2 },
+			ranges: {
+				mounted: { start: 1, end: 2 },
+				previewVisible: { start: 1, end: 2 },
+			},
+			previousBuild: mounted,
+		});
+
+		expect(scrolled).not.toBe(mounted);
+		expect(scrolled.rowSlices).not.toBe(mounted.rowSlices);
+		// The surviving row slice is still reused by reference.
+		expect(scrolled.rowSlices[0]).toBe(mounted.rowSlices[1]);
+	});
 });

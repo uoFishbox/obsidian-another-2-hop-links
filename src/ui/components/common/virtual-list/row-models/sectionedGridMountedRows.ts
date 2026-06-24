@@ -107,6 +107,29 @@ export function buildSectionedGridMountedRows<
 	const { plan } = params;
 	const start = Math.max(0, params.rowRange.start);
 	const end = Math.min(plan.rowCount, params.rowRange.end);
+	// Same-plan, same-clamped-range fast path: when the plan object and the
+	// clamped mounted range are identical to the previous build, the per-row
+	// reuse branch below would push every previous row slice verbatim, so the
+	// resulting rowSlices array would carry identical element references and
+	// identical derived fields (mountedCellCount, nextRenderSlotIndex, lazy
+	// cells / reusableCellsByKey). Return the previous build directly to
+	// preserve rowSlices array identity, which lets the engine skip
+	// applyVirtualCellMetadata / indexMountedCells and lets Svelte #each
+	// blocks skip re-rendering keyed rows. Logical cells are mutated in place
+	// within a single plan object, so reused mounted cells already observe the
+	// latest cell state and no rebuild is required.
+	const previousBuild = params.previousBuild;
+	if (
+		previousBuild !== undefined &&
+		previousBuild.plan === plan &&
+		previousBuild.rowRange.start === start &&
+		previousBuild.rowRange.end === end
+	) {
+		if (params.reusableRowSlotsScratch) {
+			params.reusableRowSlotsScratch.length = 0;
+		}
+		return previousBuild;
+	}
 	const rowSlices: MountedFlatRowSlice<T, G>[] = [];
 	let flattenedCells: SectionedGridMountedCell<T, G>[] | undefined;
 	let mountedCellCount = 0;
