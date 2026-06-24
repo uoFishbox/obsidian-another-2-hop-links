@@ -11,7 +11,7 @@ import type {
 	TwoHopPageVirtualSection,
 } from "./twohopPageVirtualModel";
 import {
-	ensureTwoHopSectionCellRangeMaterialized,
+	ensureTwoHopMountedRangeMaterialized,
 	findTwoHopSectionIndexByRow,
 	readTwoHopLogicalCellInSection,
 	resolveTwoHopRowInSection,
@@ -45,6 +45,10 @@ export function buildTwoHopMountedRows(params: {
 	readonly previousBuild?: TwoHopMountedRowsBuild;
 	readonly reusableRowSlotsScratch?: number[];
 }): TwoHopMountedRowsBuild {
+	// Materialize the cells for the mounted range before the pure builder
+	// reads them, so the generic builder has a single responsibility: convert
+	// a row range into mounted rows.
+	ensureTwoHopMountedRangeMaterialized(params.rowModel.plan, params.rowRange);
 	return buildSectionedGridMountedRows({
 		plan: params.rowModel.plan,
 		rowRange: params.rowRange,
@@ -52,7 +56,6 @@ export function buildTwoHopMountedRows(params: {
 		reusableRowSlotsScratch: params.reusableRowSlotsScratch,
 		findSectionIndexByRow: findTwoHopSectionIndexByRow,
 		resolveRowInSection: resolveTwoHopRowInSection,
-		ensureSectionCellRangeMaterialized: ensureTwoHopSectionCellRangeMaterialized,
 		readLogicalCellInSection: readTwoHopLogicalCellInSection,
 	});
 }

@@ -65,18 +65,22 @@ export interface BuildSectionedGridMountedRowsParams<
 		sectionPlan: TSection,
 		rowIndex: number,
 	): SectionedGridResolvedRow | null;
-	ensureSectionCellRangeMaterialized(
-		plan: TPlan,
-		sectionIndex: number,
-		startCellIndex: number,
-		endCellIndex: number,
-	): boolean;
 	readLogicalCellInSection(
 		plan: TPlan,
 		sectionIndex: number,
 		sectionCellIndex: number,
 	): VirtualListLogicalCell<T> | null;
 }
+
+/**
+ * The builder is a pure "row range → mounted rows" transform: it reads every
+ * cell through {@link readLogicalCellInSection}. Callers must ensure the cells
+ * for {@link BuildSectionedGridMountedRowsParams.rowRange} are materialized
+ * before invoking the builder (e.g. via an equivalent of
+ * `ensureMountedRangeMaterialized(rowRange)` on the cell store). Carrying the
+ * materialization side effect inside the builder would blur its single
+ * responsibility of converting a mounted row range into mounted rows.
+ */
 
 type SectionedGridMountedCell<T, G> = MountedFlatCell<T, G>;
 
@@ -194,12 +198,6 @@ export function buildSectionedGridMountedRows<
 			mountedCellCount += previousRow.cells.length;
 			continue;
 		}
-		params.ensureSectionCellRangeMaterialized(
-			plan,
-			sectionIndex,
-			firstSectionCellIndex,
-			firstSectionCellIndex + rowCellCount,
-		);
 		if (sectionIndex !== lastSectionIndex) {
 			lastSectionIndex = sectionIndex;
 			sectionLayout = sectionPlan.mountedLayout;

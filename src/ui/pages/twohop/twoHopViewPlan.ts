@@ -697,6 +697,49 @@ export function ensureTwoHopSectionCellRangeMaterialized(
 }
 
 /**
+ * Ensures every cell needed to render `rowRange` has been materialized.
+ *
+ * The mounted-row builder is a pure reader of already-materialized logical
+ * cells; this function runs the row-to-cell resolution upfront so the builder
+ * never triggers materialization itself. Walking the range mirrors the
+ * builder's own row/section traversal so identical cells are touched, and
+ * materialization is idempotent, so rows already satisfied (including those
+ * reused from the previous build) cost only a cached-presence check.
+ */
+export function ensureTwoHopMountedRangeMaterialized(
+	plan: TwoHopViewPlan,
+	range: RowRange,
+): boolean {
+	const start = Math.max(0, range.start);
+	const end = Math.min(plan.rowCount, range.end);
+	if (start >= end) return false;
+	let changed = false;
+	let sectionIndex = findTwoHopSectionIndexByRow(plan.sections, start);
+	for (let rowIndex = start; rowIndex < end; rowIndex += 1) {
+		while (
+			sectionIndex >= 0 &&
+			rowIndex >=
+				(plan.sections[sectionIndex]?.firstRowIndex ?? 0) +
+					(plan.sections[sectionIndex]?.rowCount ?? 0)
+		) {
+			sectionIndex += 1;
+		}
+		const sectionPlan = plan.sections[sectionIndex];
+		if (!sectionPlan) break;
+		const resolvedRow = resolveTwoHopRowInSection(plan, sectionPlan, rowIndex);
+		if (!resolvedRow) continue;
+		changed =
+			ensureTwoHopSectionCellRangeMaterialized(
+				plan,
+				sectionIndex,
+				resolvedRow.sectionCellStartIndex,
+				resolvedRow.sectionCellStartIndex + resolvedRow.cellCount,
+			) || changed;
+	}
+	return changed;
+}
+
+/**
  * Reads an already-materialized section-local cell.
  */
 export function readTwoHopLogicalCellInSection(
