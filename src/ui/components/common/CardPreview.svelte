@@ -46,7 +46,6 @@
 		searchQuery: string;
 	}
 
-
 	let {
 		file,
 		getPreview,
@@ -65,6 +64,8 @@
 
 	// 数式レンダリング中かどうかの状態（スケルトン表示用）
 	let isMathRendering = $state(false);
+	let hasRenderedContent = $state(false);
+	const shouldShowInitialSkeleton = $derived(isMathRendering && !hasRenderedContent);
 	let previewContentType = $state<PreviewData["type"] | undefined>(undefined);
 	const previewTypeClass = $derived(
 		previewContentType
@@ -145,6 +146,7 @@
 				!abortController.signal.aborted &&
 				renderToken === renderSequence
 			) {
+				hasRenderedContent = true;
 				lastRenderedCacheKey = request.renderCacheKey;
 				lastRenderedRefreshToken = request.refreshToken;
 			}
@@ -633,12 +635,12 @@
 </script>
 
 {#if !DEBUG_DISABLE_CARD_DOM_PREVIEW}
-	{#if isMathRendering}
+	{#if shouldShowInitialSkeleton}
 		<SkeletonPreview />
 	{/if}
 	<div
 		class="cosense-card-links__box-preview {previewTypeClass}"
 		bind:this={container}
-		class:hidden={isMathRendering}
+		class:hidden={shouldShowInitialSkeleton}
 	></div>
 {/if}

@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { getContext, onDestroy } from "svelte";
 	import type { TFile } from "obsidian";
+	import type { PreviewData } from "ui/context/linkContext";
 	import CardPreview from "ui/components/common/CardPreview.svelte";
 	import { lazyRender, type LazyRenderActionParams } from "ui/actions/useLazyRender";
 	import {
@@ -31,6 +32,14 @@
 	} from "./previewVisibilityContext";
 
 	let nextCardPreviewGateId = 0;
+
+	interface RenderedPreviewSnapshot {
+		readonly identity: string;
+		readonly file: TFile;
+		readonly searchQuery: string;
+		readonly previewRefreshToken: number;
+		readonly previewOverride: PreviewData | null;
+	}
 
 	interface Props {
 		file: TFile | null;
@@ -74,7 +83,7 @@
 	const previewMinHeight = 80;
 
 	const visibility = $derived(previewVisibilityContext?.visibility);
-	const previewOverride = $derived(
+	const previewOverride: PreviewData | null = $derived(
 		file && file.extension !== "md" && contentPreview
 			? ({ type: "text", content: contentPreview } as const)
 			: null,
@@ -124,18 +133,36 @@
 	let registeredRowActivationCandidateId: string | undefined = undefined;
 	let registeredRowActivationCandidateSignature: string | undefined = undefined;
 	const fallbackCandidateId = `card-preview-gate:${++nextCardPreviewGateId}`;
+
+	let renderedPreviewSnapshot = $state<RenderedPreviewSnapshot | undefined>(
+		undefined,
+	);
+
+	const currentPreviewSnapshot = $derived.by(
+		(): RenderedPreviewSnapshot | undefined => {
+			if (!file || !previewIdentity) {
+				return undefined;
+			}
+
+			return {
+				identity: previewIdentity,
+				file,
+				searchQuery: searchScope === "title-only" ? "" : searchQuery,
+				previewRefreshToken,
+				previewOverride,
+			};
+		},
+	);
+
 	const shouldRenderPreview = $derived.by(() => {
 		if (DEBUG_DISABLE_CARD_DOM_PREVIEW) return false;
-		if (previewIdentity === undefined) return false;
+		if (!renderedPreviewSnapshot) return false;
 
 		if (effectiveVisibilityMode === "controlled") {
-			return (
-				activatedPreviewIdentity === previewIdentity &&
-				virtualizedVisibility === "visible"
-			);
+			return virtualizedVisibility === "visible";
 		}
 
-		return isPreviewCached || visiblePreviewIdentity === previewIdentity;
+		return true;
 	});
 
 	function handlePreviewVisible() {
@@ -150,14 +177,52 @@
 		pendingPreviewIdentity = undefined;
 	}
 
-	function resetPreviewActivationForIdentity(nextIdentity: string | undefined): void {
+	function canKeepRenderedPreviewForNextSnapshot(
+		nextSnapshot: RenderedPreviewSnapshot | undefined,
+	): boolean {
+		if (!renderedPreviewSnapshot || !nextSnapshot) {
+			return false;
+		}
+
+		return (
+			renderedPreviewSnapshot.file.path === nextSnapshot.file.path &&
+			renderedPreviewSnapshot.file.extension === nextSnapshot.file.extension
+		);
+	}
+
+	function commitRenderedPreviewSnapshot(snapshot: RenderedPreviewSnapshot): void {
+		renderedPreviewSnapshot = snapshot;
+		activatedPreviewIdentity = snapshot.identity;
+		visiblePreviewIdentity = snapshot.identity;
+
+		if (
+			effectiveVisibilityMode !== "controlled" &&
+			previewCacheKey &&
+			intersectedCache
+		) {
+			intersectedCache.add(previewCacheKey);
+		}
+	}
+
+	function resetPreviewActivationForSnapshot(
+		nextSnapshot: RenderedPreviewSnapshot | undefined,
+	): void {
+		const nextIdentity = nextSnapshot?.identity;
+
 		if (nextIdentity === lastPreviewIdentity) {
 			return;
 		}
 
 		cancelPendingActivation();
-		visiblePreviewIdentity = undefined;
-		activatedPreviewIdentity = undefined;
+
+		// ファイル自体が変わった場合は、旧previewを見せ続けると誤表示になるので消す。
+		if (!canKeepRenderedPreviewForNextSnapshot(nextSnapshot)) {
+			renderedPreviewSnapshot = undefined;
+			visiblePreviewIdentity = undefined;
+			activatedPreviewIdentity = undefined;
+		}
+
+		// 同じファイルなら renderedPreviewSnapshot は残す。
 		lastPreviewIdentity = nextIdentity;
 	}
 
@@ -173,7 +238,11 @@
 			clearRegisteredRowActivationCandidate();
 			return;
 		}
-		if (!rowPreviewActivationRuntime || rowIndex === undefined || !previewIdentity) {
+		if (
+			!rowPreviewActivationRuntime ||
+			rowIndex === undefined ||
+			!previewIdentity
+		) {
 			clearRegisteredRowActivationCandidate();
 			return;
 		}
@@ -196,14 +265,17 @@
 				activationKey: previewIdentity,
 				getVisibleQueueSize: getVisiblePreviewQueueSize,
 				onActivated: (activationKey) => {
+					const snapshot = currentPreviewSnapshot;
+
 					if (
-						activationKey !== previewIdentity ||
+						!snapshot ||
+						activationKey !== snapshot.identity ||
 						virtualizedVisibility !== "visible"
 					) {
 						return;
 					}
-					activatedPreviewIdentity = activationKey;
-					visiblePreviewIdentity = activationKey;
+
+					commitRenderedPreviewSnapshot(snapshot);
 				},
 			});
 	}
@@ -223,28 +295,31 @@
 			return;
 		}
 
-		if (virtualizedVisibility !== "visible" || !previewIdentity) {
+		const snapshot = currentPreviewSnapshot;
+
+		if (virtualizedVisibility !== "visible" || !snapshot) {
 			if (pendingPreviewIdentity) {
 				cancelPendingActivation();
 			}
 			return;
 		}
 
-		if (activatedPreviewIdentity === previewIdentity) {
+		if (activatedPreviewIdentity === snapshot.identity) {
 			return;
 		}
 
-		if (pendingPreviewIdentity === previewIdentity) {
+		if (pendingPreviewIdentity === snapshot.identity) {
 			return;
 		}
 
-		const identity = previewIdentity;
+		const identity = snapshot.identity;
 
 		cancelPendingActivation();
 
 		const sequence = ++activationSequence;
 		let request: PreviewActivationHandle | null = null;
 		let synchronousResult: boolean | undefined;
+
 		const onSettled = (activated: boolean): void => {
 			if (!request) {
 				synchronousResult = activated;
@@ -256,29 +331,12 @@
 				pendingPreviewIdentity = undefined;
 			}
 
-			if (!activated) {
-				return;
-			}
-			if (activationSequence !== sequence) {
-				return;
-			}
-			if (previewIdentity !== identity) {
-				return;
-			}
-			if (virtualizedVisibility !== "visible") {
-				return;
-			}
+			if (!activated) return;
+			if (activationSequence !== sequence) return;
+			if (currentPreviewSnapshot?.identity !== identity) return;
+			if (virtualizedVisibility !== "visible") return;
 
-			activatedPreviewIdentity = identity;
-			visiblePreviewIdentity = identity;
-
-			if (
-				effectiveVisibilityMode !== "controlled" &&
-				previewCacheKey &&
-				intersectedCache
-			) {
-				intersectedCache.add(previewCacheKey);
-			}
+			commitRenderedPreviewSnapshot(currentPreviewSnapshot);
 		};
 
 		const requestActivation =
@@ -313,7 +371,7 @@
 	);
 
 	$effect(() => {
-		resetPreviewActivationForIdentity(previewIdentity);
+		resetPreviewActivationForSnapshot(currentPreviewSnapshot);
 	});
 
 	$effect(() => {
@@ -346,25 +404,25 @@
 			style:min-height={`${previewMinHeight}px`}
 			aria-hidden="true"
 		>
-			{#if shouldRenderPreview}
+			{#if shouldRenderPreview && renderedPreviewSnapshot}
 				<CardPreview
-					{file}
+					file={renderedPreviewSnapshot.file}
 					getPreview={context.getPreview}
-					searchQuery={searchScope === "title-only" ? "" : searchQuery}
-					{previewRefreshToken}
-					{previewOverride}
+					searchQuery={renderedPreviewSnapshot.searchQuery}
+					previewRefreshToken={renderedPreviewSnapshot.previewRefreshToken}
+					previewOverride={renderedPreviewSnapshot.previewOverride}
 				/>
 			{:else}
 				<div class="lazy-placeholder"></div>
 			{/if}
 		</div>
-	{:else if shouldRenderPreview}
+	{:else if shouldRenderPreview && renderedPreviewSnapshot}
 		<CardPreview
-			{file}
+			file={renderedPreviewSnapshot.file}
 			getPreview={context.getPreview}
-			searchQuery={searchScope === "title-only" ? "" : searchQuery}
-			{previewRefreshToken}
-			{previewOverride}
+			searchQuery={renderedPreviewSnapshot.searchQuery}
+			previewRefreshToken={renderedPreviewSnapshot.previewRefreshToken}
+			previewOverride={renderedPreviewSnapshot.previewOverride}
 		/>
 	{/if}
 {/if}
