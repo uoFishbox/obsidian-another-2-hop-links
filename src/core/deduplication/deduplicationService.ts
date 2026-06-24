@@ -2,11 +2,7 @@ import type { TwoHopLinkBranch, TwoHopIndexedLink } from "types/domain";
 import type { TaggedNote } from "types/domain";
 import type { IDeduplicationService } from "types";
 import * as keyGenerator from "./keyGenerator";
-import {
-	type Hop2Entry,
-	type MergedBranchEntry,
-	filterMergedBranchHop2,
-} from "./branchMerge";
+import { type MergedBranchEntry, filterMergedBranchHop2 } from "./branchMerge";
 import { createUsageTracker } from "./usageTracker";
 import type { DedupResult, DedupState } from "types/deduplication";
 
@@ -21,11 +17,8 @@ export function createDeduplicationService(): IDeduplicationService {
 		const branchMap = new Map<string, MergedBranchEntry>();
 		for (let index = 0; index < branches.length; index += 1) {
 			const branch = branches[index];
-			mergeBranchIntoMap(
-				branchMap,
-				branch,
-				keyGenerator.getBranchDisplayKey(branch),
-			);
+			const keys = keyGenerator.getBranchKeys(branch);
+			mergeBranchIntoMap(branchMap, branch, keys.displayKey);
 		}
 		return branchMap;
 	}
@@ -37,39 +30,35 @@ export function createDeduplicationService(): IDeduplicationService {
 	): void {
 		const existing = branchMap.get(displayKey);
 		if (existing) {
-			existing.hop2Keys = appendUniqueHop2(
-				existing.hop2,
-				existing.hop2Keys,
-				branch.hop2,
-			);
+			appendUniqueHop2(existing.hop2, existing.hop2UsageKeys, branch.hop2);
 			return;
 		}
 
-		const hop2: Hop2Entry[] = [];
-		const hop2Keys = appendUniqueHop2(hop2, undefined, branch.hop2);
+		const hop2: TwoHopIndexedLink[] = [];
+		const hop2UsageKeys: string[] = [];
+		appendUniqueHop2(hop2, hop2UsageKeys, branch.hop2);
 		branchMap.set(displayKey, {
 			hop1: branch.hop1,
 			hop2,
-			hop2Keys,
+			hop2UsageKeys,
 		});
 	}
 
 	function appendUniqueHop2(
-		entries: Hop2Entry[],
-		usageKeys: Set<string> | undefined,
+		entries: TwoHopIndexedLink[],
+		usageKeys: string[],
 		links: TwoHopIndexedLink[],
-	): Set<string> | undefined {
-		if (links.length === 0) return usageKeys;
+	): void {
+		if (links.length === 0) return;
 
-		const nextUsageKeys = usageKeys ?? new Set<string>();
+		const seen = new Set(usageKeys);
 		for (const link of links) {
 			const usageKey = keyGenerator.getLinkUsageKey(link);
-			if (nextUsageKeys.has(usageKey)) continue;
-			nextUsageKeys.add(usageKey);
-			entries.push({ link, usageKey });
+			if (seen.has(usageKey)) continue;
+			seen.add(usageKey);
+			entries.push(link);
+			usageKeys.push(usageKey);
 		}
-
-		return nextUsageKeys;
 	}
 
 	function collectUniqueBranches(
@@ -86,19 +75,18 @@ export function createDeduplicationService(): IDeduplicationService {
 
 		for (let index = 0; index < branches.length; index += 1) {
 			const branch = branches[index];
-			const displayKey = keyGenerator.getBranchDisplayKey(branch);
-			if (seenDisplayKeys.has(displayKey)) {
+			const keys = keyGenerator.getBranchKeys(branch);
+			if (seenDisplayKeys.has(keys.displayKey)) {
 				filteredItems ??= branches.slice(0, index);
 				continue;
 			}
 
-			const usageKey = keyGenerator.getBranchUsageKey(branch);
-			if (!tracker.tryMarkUsed(usageKey)) {
+			if (!tracker.tryMarkUsed(keys.usageKey)) {
 				filteredItems ??= branches.slice(0, index);
 				continue;
 			}
 
-			seenDisplayKeys.add(displayKey);
+			seenDisplayKeys.add(keys.displayKey);
 			filteredItems?.push(branch);
 		}
 

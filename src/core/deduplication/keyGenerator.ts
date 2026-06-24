@@ -4,7 +4,6 @@ import {
 	getNormalizedTextSignature,
 	isNormalizedPathSignature,
 	normalizePathSignature,
-	normalizeTextSignature,
 } from "core/signatures/keySignatures";
 
 const FILE_USAGE_KEY_PREFIX = "f:";
@@ -19,21 +18,7 @@ function formatTextUsageKey(value: string): string {
 }
 
 export function getBranchUsageKey(branch: TwoHopLinkBranch): string {
-	const link = branch.hop1;
-	if (!link.isUnresolved && link.path) {
-		return formatFileUsageKey(normalizePathSignature(link.path));
-	}
-
-	const textValue = getNormalizedTextSignature(link.lookupPath ?? link.rawText);
-	if (textValue) {
-		return formatTextUsageKey(textValue);
-	}
-
-	if (link.sourceFile?.path) {
-		return formatFileUsageKey(normalizePathSignature(link.sourceFile.path));
-	}
-
-	return formatTextUsageKey("");
+	return getBranchKeys(branch).usageKey;
 }
 
 export function getLinkUsageKey(link: TwoHopIndexedLink): string {
@@ -58,10 +43,59 @@ export function getTaggedNoteKey(taggedNote: TaggedNote): string {
 }
 
 export function getBranchDisplayKey(branch: TwoHopLinkBranch): string {
-	if (branch.hop1.path) {
-		return isNormalizedPathSignature(branch.hop1.path)
-			? branch.hop1.path
-			: normalizePathSignature(branch.hop1.path);
+	return getBranchKeys(branch).displayKey;
+}
+
+export interface BranchKeys {
+	displayKey: string;
+	usageKey: string;
+}
+
+/**
+ * Computes both displayKey and usageKey for a branch in a single pass,
+ * avoiding duplicate normalizePathSignature calls.
+ */
+export function getBranchKeys(branch: TwoHopLinkBranch): BranchKeys {
+	const link = branch.hop1;
+
+	if (link.path) {
+		const alreadyNormalized = isNormalizedPathSignature(link.path);
+		const normalizedPath = alreadyNormalized
+			? link.path
+			: normalizePathSignature(link.path);
+
+		if (!link.isUnresolved) {
+			return {
+				displayKey: normalizedPath,
+				usageKey: formatFileUsageKey(normalizedPath),
+			};
+		}
+
+		return {
+			displayKey: normalizedPath,
+			usageKey: formatTextUsageKey(normalizedPath),
+		};
 	}
-	return normalizeTextSignature(branch.hop1.lookupPath ?? branch.hop1.rawText);
+
+	const textValue = getNormalizedTextSignature(link.lookupPath ?? link.rawText) ?? "";
+
+	if (textValue) {
+		return {
+			displayKey: textValue,
+			usageKey: formatTextUsageKey(textValue),
+		};
+	}
+
+	if (link.sourceFile?.path) {
+		const normalizedPath = normalizePathSignature(link.sourceFile.path);
+		return {
+			displayKey: normalizedPath,
+			usageKey: formatFileUsageKey(normalizedPath),
+		};
+	}
+
+	return {
+		displayKey: "",
+		usageKey: formatTextUsageKey(""),
+	};
 }

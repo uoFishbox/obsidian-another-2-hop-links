@@ -1,14 +1,9 @@
 import type { TwoHopLinkBranch, TwoHopIndexedLink } from "types/domain";
 
-export interface Hop2Entry {
-	link: TwoHopIndexedLink;
-	usageKey: string;
-}
-
 export interface MergedBranchEntry {
 	hop1: TwoHopIndexedLink;
-	hop2: Hop2Entry[];
-	hop2Keys?: Set<string>;
+	hop2: TwoHopIndexedLink[];
+	hop2UsageKeys: string[];
 }
 
 export function filterMergedBranchHop2(
@@ -24,10 +19,9 @@ export function filterMergedBranchHop2(
 		let filteredHop2: TwoHopIndexedLink[] | undefined;
 		let writeIdx = 0;
 		for (let index = 0; index < maxLen; index += 1) {
-			const hop2Entry = entry.hop2[index];
-			if (tryMarkUsed(hop2Entry.usageKey)) {
+			if (tryMarkUsed(entry.hop2UsageKeys[index])) {
 				filteredHop2 ??= new Array(maxLen);
-				filteredHop2[writeIdx] = hop2Entry.link;
+				filteredHop2[writeIdx] = entry.hop2[index];
 				writeIdx += 1;
 			}
 		}
