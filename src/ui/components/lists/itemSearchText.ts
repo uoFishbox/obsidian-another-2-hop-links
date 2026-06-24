@@ -28,22 +28,27 @@ export const getItemSearchText = (
 	linkContext: LinkContext,
 	settings?: Pick<PluginSettings, "priorityFrontmatterKeyForTitle">,
 ): string => {
+	const sourcePath = linkContext.sourceFile.path;
+	const fileToLinktext = linkContext.fileToLinktext;
+	const getMetadata = linkContext.getMetadata;
+	const frontmatterKey = settings?.priorityFrontmatterKeyForTitle;
+
 	const getFileText = (file: TFile): string =>
-		getFileCardTitleSearchText(file, {
-			sourcePath: linkContext.sourceFile.path,
-			fileToLinktext: linkContext.fileToLinktext,
-			getMetadata: linkContext.getMetadata,
-			priorityFrontmatterKeyForTitle: settings?.priorityFrontmatterKeyForTitle,
-		});
+		getFileCardTitleSearchText(
+			file,
+			sourcePath,
+			fileToLinktext,
+			getMetadata,
+			frontmatterKey,
+		);
 
 	switch (item.type) {
 		case "backlink":
 			return getFileText(item.data.sourceFile).toLowerCase();
 		case "taggedNote":
 			return getFileText(item.data.file).toLowerCase();
-		case "file": {
+		case "file":
 			return getFileText(item.data).toLowerCase();
-		}
 		case "branch": {
 			const targetFile = item.data.hop1.path
 				? linkContext.resolveFile(item.data.hop1.path)
@@ -53,10 +58,13 @@ export const getItemSearchText = (
 				return getBranchSearchText(item.data.hop1).toLowerCase();
 			}
 
-			return [getFileText(targetFile), getBranchSearchText(item.data.hop1)]
-				.filter(Boolean)
-				.join(" ")
-				.toLowerCase();
+			const titleText = getFileText(targetFile);
+			const branchText = getBranchSearchText(item.data.hop1);
+			return (
+				titleText && branchText
+					? `${titleText} ${branchText}`
+					: titleText || branchText
+			).toLowerCase();
 		}
 		default:
 			return "";

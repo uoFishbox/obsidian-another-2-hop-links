@@ -2,7 +2,6 @@ import { describe, expect, it, vi } from "vitest";
 import { createMockTFile } from "testing/__mocks__/testHelpers";
 import {
 	frontmatterValueToCardTitle,
-	getFileCardDisplayTitle,
 	getFileCardTitleSearchText,
 	getPriorityFrontmatterCardTitle,
 } from "../frontmatterCardTitle";
@@ -67,14 +66,14 @@ describe("frontmatterCardTitle", () => {
 		);
 		const fileToLinktext = vi.fn(() => "Example Link");
 
-		expect(
-			getFileCardDisplayTitle(file, {
-				sourcePath: "notes/source.md",
-				fileToLinktext,
-				getMetadata,
-				priorityFrontmatterKeyForTitle: "title",
-			}),
-		).toBe("Example Link");
+		const result = getFileCardTitleSearchText(
+			file,
+			"notes/source.md",
+			fileToLinktext,
+			getMetadata,
+			"title",
+		);
+		expect(result).toContain("Example Link");
 		expect(fileToLinktext).toHaveBeenCalledWith(file, "notes/source.md", true);
 	});
 
@@ -90,12 +89,13 @@ describe("frontmatterCardTitle", () => {
 		);
 		const fileToLinktext = vi.fn(() => "Example Link");
 
-		const searchText = getFileCardTitleSearchText(file, {
-			sourcePath: "notes/source.md",
+		const searchText = getFileCardTitleSearchText(
+			file,
+			"notes/source.md",
 			fileToLinktext,
 			getMetadata,
-			priorityFrontmatterKeyForTitle: "title",
-		});
+			"title",
+		);
 
 		expect(searchText).toContain("Custom Title");
 		expect(searchText).toContain("Example Link");

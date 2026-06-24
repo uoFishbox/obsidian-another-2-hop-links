@@ -162,12 +162,13 @@ function buildTwohopSearchDatasetWithCache(
 	const { displayData, resolveFile } = options;
 
 	const getFileTitleSearchText = (file: TFile): string =>
-		getFileCardTitleSearchText(file, {
-			sourcePath: options.sourcePath,
-			fileToLinktext: options.fileToLinktext,
-			getMetadata: options.getMetadata,
-			priorityFrontmatterKeyForTitle: options.priorityFrontmatterKeyForTitle,
-		});
+		getFileCardTitleSearchText(
+			file,
+			options.sourcePath,
+			options.fileToLinktext,
+			options.getMetadata,
+			options.priorityFrontmatterKeyForTitle,
+		);
 
 	const getBranchTitleSearchText = (branch: TwoHopLinkBranch): string => {
 		const targetFile = getBranchTargetFile(branch, resolveFile);
@@ -175,9 +176,11 @@ function buildTwohopSearchDatasetWithCache(
 			return getBranchSearchText(branch.hop1);
 		}
 
-		return [getFileTitleSearchText(targetFile), getBranchSearchText(branch.hop1)]
-			.filter(Boolean)
-			.join(" ");
+		const titleText = getFileTitleSearchText(targetFile);
+		const branchText = getBranchSearchText(branch.hop1);
+		return titleText && branchText
+			? `${titleText} ${branchText}`
+			: titleText || branchText;
 	};
 
 	for (const branch of displayData.outgoing) {

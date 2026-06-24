@@ -51,35 +51,20 @@ export function getPriorityFrontmatterCardTitle(
 	return frontmatterValueToCardTitle(frontmatter[key]);
 }
 
-export function getFileCardDisplayTitle(
-	file: TFile,
-	options: {
-		sourcePath: string;
-		fileToLinktext: FileToLinktext;
-		getMetadata: GetFileMetadata;
-		priorityFrontmatterKeyForTitle?: string;
-	},
-): string {
-	return (
-		getPriorityFrontmatterCardTitle(
-			file,
-			options.priorityFrontmatterKeyForTitle,
-			options.getMetadata,
-		) ?? options.fileToLinktext(file, options.sourcePath, true)
-	);
-}
-
 export function getFileCardTitleSearchText(
 	file: TFile,
-	options: {
-		sourcePath: string;
-		fileToLinktext: FileToLinktext;
-		getMetadata: GetFileMetadata;
-		priorityFrontmatterKeyForTitle?: string;
-	},
+	sourcePath: string,
+	fileToLinktext: FileToLinktext,
+	getMetadata: GetFileMetadata,
+	priorityFrontmatterKeyForTitle: string | undefined,
 ): string {
-	const displayTitle = getFileCardDisplayTitle(file, options);
-	const linkText = options.fileToLinktext(file, options.sourcePath, true);
+	const linkText = fileToLinktext(file, sourcePath, true);
+	const displayTitle =
+		getPriorityFrontmatterCardTitle(
+			file,
+			priorityFrontmatterKeyForTitle,
+			getMetadata,
+		) ?? linkText;
 
 	return `${displayTitle} ${linkText} ${file.basename} ${file.path}`;
 }

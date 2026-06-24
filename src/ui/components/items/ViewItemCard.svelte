@@ -6,7 +6,7 @@
 	import { ARIA_LABELS } from "../../../appConstants";
 	import { formatLinkText } from "features/preview/text-processing/textUtils";
 	import { getItemStrategy } from "application/presenters";
-	import { getFileCardDisplayTitle } from "core/frontmatterCardTitle";
+	import { getPriorityFrontmatterCardTitle } from "core/frontmatterCardTitle";
 	import {
 		createItemInteractionDescriptor,
 		createItemInteractionKey,
@@ -51,12 +51,13 @@
 		}
 
 		if (targetFile) {
-			return getFileCardDisplayTitle(targetFile, {
-				sourcePath: context.sourceFile.path,
-				fileToLinktext: context.fileToLinktext,
-				getMetadata: context.getMetadata,
-				priorityFrontmatterKeyForTitle: settings.priorityFrontmatterKeyForTitle,
-			});
+			return (
+				getPriorityFrontmatterCardTitle(
+					targetFile,
+					settings.priorityFrontmatterKeyForTitle,
+					context.getMetadata,
+				) ?? context.fileToLinktext(targetFile, context.sourceFile.path, true)
+			);
 		}
 
 		switch (item.type) {

@@ -89,12 +89,13 @@
 		itemComponent: ViewItemCard,
 		getSearchText: (item: ViewItem, ctx) => {
 			if (item.type !== "file") return "";
-			return getFileCardTitleSearchText(item.data, {
-				sourcePath: ctx.sourceFile.path,
-				fileToLinktext: ctx.fileToLinktext,
-				getMetadata: ctx.getMetadata,
-				priorityFrontmatterKeyForTitle: settings.priorityFrontmatterKeyForTitle,
-			});
+			return getFileCardTitleSearchText(
+				item.data,
+				ctx.sourceFile.path,
+				ctx.fileToLinktext,
+				ctx.getMetadata,
+				settings.priorityFrontmatterKeyForTitle,
+			);
 		},
 		getItemProps: (item: ViewItem) => ({
 			item,
