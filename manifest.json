@@ -4,6 +4,7 @@
 	"description": "Render Obsidian links as Cosense-style preview cards with two-hop navigation.",
 	"id": "obsidian-cosense-style-card-links",
 	"isDesktopOnly": false,
+	"minAppVersion": "0.15.0",
 	"name": "Cosense-style card links",
-	"version": "1.0.0"
+	"version": "1.0.1"
 }
