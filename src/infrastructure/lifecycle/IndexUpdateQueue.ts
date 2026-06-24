@@ -405,8 +405,9 @@ export class IndexUpdateQueue {
 			return;
 		}
 
-		const waiters = Array.from(this.queueIdleWaiters);
+		for (const resolve of this.queueIdleWaiters) {
+			resolve();
+		}
 		this.queueIdleWaiters.clear();
-		waiters.forEach((resolve) => resolve());
 	}
 }

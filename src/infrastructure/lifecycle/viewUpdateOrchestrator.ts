@@ -378,12 +378,12 @@ function collectBasesLinksIfAffected(
 	pane: HTMLElement,
 	affectedLookupKeys: Set<string>,
 ): HTMLElement[] | null {
-	const links = Array.from(pane.querySelectorAll<HTMLElement>(".internal-link"));
+	const links = pane.querySelectorAll<HTMLElement>(".internal-link");
 
-	for (const link of links) {
-		const lookupKey = getBasesLinkLookupKey(link);
+	for (let i = 0; i < links.length; i++) {
+		const lookupKey = getBasesLinkLookupKey(links[i]);
 		if (lookupKey && affectedLookupKeys.has(lookupKey)) {
-			return links;
+			return Array.from(links);
 		}
 	}
 

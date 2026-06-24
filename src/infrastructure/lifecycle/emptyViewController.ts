@@ -165,7 +165,7 @@ export function createEmptyViewController(
 	}
 
 	function destroy(): void {
-		for (const leafId of Array.from(mountedByLeafId.keys())) {
+		for (const leafId of mountedByLeafId.keys()) {
 			unmountLeaf(leafId);
 		}
 	}
