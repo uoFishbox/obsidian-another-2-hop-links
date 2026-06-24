@@ -122,6 +122,7 @@
 	let activationSequence = 0;
 	let unregisterRowActivationCandidate: (() => void) | undefined = undefined;
 	let registeredRowActivationCandidateId: string | undefined = undefined;
+	let registeredRowActivationCandidateSignature: string | undefined = undefined;
 	const fallbackCandidateId = `card-preview-gate:${++nextCardPreviewGateId}`;
 	const shouldRenderPreview = $derived.by(() => {
 		if (DEBUG_DISABLE_CARD_DOM_PREVIEW) return false;
@@ -164,6 +165,7 @@
 		unregisterRowActivationCandidate?.();
 		unregisterRowActivationCandidate = undefined;
 		registeredRowActivationCandidateId = undefined;
+		registeredRowActivationCandidateSignature = undefined;
 	}
 
 	function registerVisibleRowActivationCandidate(): void {
@@ -177,12 +179,16 @@
 		}
 
 		const candidateId = activationCandidateId ?? fallbackCandidateId;
-		if (registeredRowActivationCandidateId === candidateId) {
+		const signature = `${candidateId}\0${rowIndex}\0${previewIdentity}`;
+
+		if (registeredRowActivationCandidateSignature === signature) {
 			return;
 		}
 
 		clearRegisteredRowActivationCandidate();
+
 		registeredRowActivationCandidateId = candidateId;
+		registeredRowActivationCandidateSignature = signature;
 		unregisterRowActivationCandidate =
 			rowPreviewActivationRuntime.registerCandidate({
 				id: candidateId,
