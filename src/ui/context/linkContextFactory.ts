@@ -2,7 +2,11 @@ import { TFile, type MetadataCache, type Vault, type Workspace } from "obsidian"
 import type { App } from "obsidian";
 import type { EventHandlers } from "types/services";
 import type { IPreviewService } from "types/services";
-import type { CachedMetadataWithLinkReferences, IIndexingService } from "types";
+import type {
+	CachedMetadataWithLinkReferences,
+	IIndexingService,
+	TwoHopIndexedLink,
+} from "types";
 import type { HighlightMode, LinkContext, LinkInteractionOptions } from "./linkContext";
 import type { PluginSettings } from "types/settings";
 import { triggerHoverPopover } from "features/preview/interactions/mobilePopover";
@@ -148,9 +152,13 @@ export function createLinkContextFactory(
 				}
 			}
 
-			let linkToOpen = { ...link };
+			let linkToOpen: TwoHopIndexedLink = link;
 
-			if (!highlight) {
+			if (
+				!highlight &&
+				(link.rawText.includes("#") || link.rawText.includes("^"))
+			) {
+				linkToOpen = { ...link };
 				const hashIndex = linkToOpen.rawText.indexOf("#");
 				if (hashIndex !== -1) {
 					linkToOpen.rawText = linkToOpen.rawText.substring(0, hashIndex);

@@ -2,56 +2,33 @@ import type { TFile } from "obsidian";
 import type { ViewItem } from "application/presenters";
 import type { LinkContext, LinkInteractionOptions } from "ui/context/linkContext";
 
-export type LinkHandlerOptionsInput =
-	| LinkInteractionOptions
-	| (() => LinkInteractionOptions | undefined)
-	| undefined;
-
-function resolveHandlerOptions(
-	options?: LinkHandlerOptionsInput,
-): LinkInteractionOptions {
-	const resolved = typeof options === "function" ? options() : options;
-	return {
-		highlightMode: resolved?.highlightMode ?? "auto",
-		preferredPosition: resolved?.preferredPosition,
-	};
-}
-
 export function dispatchItemClick(
 	item: ViewItem,
 	context: LinkContext,
 	event: MouseEvent | KeyboardEvent,
-	options?: LinkHandlerOptionsInput,
+	options?: LinkInteractionOptions,
 ): void {
-	const interactionOptions = resolveHandlerOptions(options);
-
 	switch (item.type) {
 		case "taggedNote": {
-			const preferredPosition = interactionOptions.preferredPosition;
 			context.onOpenFile(
 				event,
 				item.data.file,
-				preferredPosition ?? item.data.position,
-				interactionOptions,
+				options?.preferredPosition ?? item.data.position,
+				options,
 			);
 			return;
 		}
 		case "backlink":
-			context.onHop2Click(event, item.data, interactionOptions);
+			context.onHop2Click(event, item.data, options);
 			return;
 		case "newLink":
-			context.onHop1Click(event, item.data, interactionOptions);
+			context.onHop1Click(event, item.data, options);
 			return;
 		case "branch":
-			context.onHop1Click(event, item.data.hop1, interactionOptions);
+			context.onHop1Click(event, item.data.hop1, options);
 			return;
 		case "file":
-			context.onOpenFile(
-				event,
-				item.data,
-				interactionOptions.preferredPosition,
-				interactionOptions,
-			);
+			context.onOpenFile(event, item.data, options?.preferredPosition, options);
 			return;
 		default:
 			return;
@@ -63,86 +40,62 @@ export function dispatchItemHover(
 	context: LinkContext,
 	targetFile: TFile | null,
 	event: MouseEvent,
-	options?: LinkHandlerOptionsInput,
+	options?: LinkInteractionOptions,
 ): void {
 	if (!targetFile) {
 		return;
 	}
 
-	const interactionOptions = resolveHandlerOptions(options);
-
 	switch (item.type) {
 		case "taggedNote": {
-			const preferredPosition = interactionOptions.preferredPosition;
-			const linkData = {
-				rawText: item.data.file.basename,
-				path: item.data.path,
-				sourceFile: item.data.file,
-				isUnresolved: false,
-				position: preferredPosition ?? item.data.position,
-			};
 			context.onLinkHover?.(
 				event,
-				linkData,
+				{
+					rawText: item.data.file.basename,
+					path: item.data.path,
+					sourceFile: item.data.file,
+					isUnresolved: false,
+					position: options?.preferredPosition ?? item.data.position,
+				},
 				targetFile,
 				false,
-				interactionOptions,
+				options,
 			);
 			return;
 		}
 		case "branch": {
-			const preferredPosition = interactionOptions.preferredPosition;
+			// handler manages preferredPosition spread; pass hop1 directly
 			const preferSearchMatch =
-				interactionOptions.highlightMode === "force" && !!preferredPosition;
-			const linkData = preferSearchMatch
-				? {
-						...item.data.hop1,
-						position: preferredPosition,
-					}
-				: item.data.hop1;
+				options?.highlightMode === "force" && !!options?.preferredPosition;
 			context.onLinkHover?.(
 				event,
-				linkData,
+				item.data.hop1,
 				targetFile,
 				preferSearchMatch ? false : true,
-				interactionOptions,
+				options,
 			);
 			return;
 		}
 		case "backlink": {
-			const preferredPosition = interactionOptions.preferredPosition;
-			const linkData = preferredPosition
-				? {
-						...item.data,
-						position: preferredPosition,
-					}
-				: item.data;
-			context.onLinkHover?.(
-				event,
-				linkData,
-				targetFile,
-				false,
-				interactionOptions,
-			);
+			// handler manages preferredPosition spread; pass item.data directly
+			context.onLinkHover?.(event, item.data, targetFile, false, options);
 			return;
 		}
 		case "newLink":
 			return;
 		case "file": {
-			const preferredPosition = interactionOptions.preferredPosition;
-			const linkData = {
-				rawText: item.data.basename,
-				path: item.data.path,
-				sourceFile: item.data,
-				isUnresolved: false,
-				position: preferredPosition,
-			};
 			context.onLinkHover?.(
 				event,
-				linkData,
+				{
+					rawText: item.data.basename,
+					path: item.data.path,
+					sourceFile: item.data,
+					isUnresolved: false,
+					position: options?.preferredPosition,
+				},
 				targetFile,
 				false,
-				interactionOptions,
+				options,
 			);
 			return;
 		}

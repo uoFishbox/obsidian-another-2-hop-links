@@ -5,16 +5,15 @@ export function createViewLinkContext(
 	originalLinkContext: LinkContext,
 	closeView: () => void,
 ): LinkContext {
-	return {
-		...originalLinkContext,
-		onOpenFile: (
-			event: MouseEvent | KeyboardEvent,
-			file: TFile,
-			position?: Pos,
-			options?: LinkInteractionOptions,
-		) => {
-			originalLinkContext.onOpenFile(event, file, position, options);
-			closeView();
-		},
+	const originalOnOpenFile = originalLinkContext.onOpenFile;
+	originalLinkContext.onOpenFile = (
+		event: MouseEvent | KeyboardEvent,
+		file: TFile,
+		position?: Pos,
+		options?: LinkInteractionOptions,
+	) => {
+		originalOnOpenFile(event, file, position, options);
+		closeView();
 	};
+	return originalLinkContext;
 }

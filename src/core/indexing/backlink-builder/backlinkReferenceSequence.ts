@@ -346,15 +346,16 @@ export function buildRuntimeOrderedBacklinkRefs(
 	const refs = new Array<RuntimeOrderedBacklinkRef>(orderedReferences.length);
 	for (let index = 0; index < orderedReferences.length; index += 1) {
 		const link = orderedReferences[index];
-		refs[index] = {
+		const ref: RuntimeOrderedBacklinkRef = {
 			destinationPath: "",
 			rawLookupKey: "",
 			isUnresolved: false,
 			rawText: link.link,
-			displayText: "displayText" in link ? link.displayText : undefined,
-			key: "key" in link ? link.key : undefined,
-			position: "position" in link ? link.position : undefined,
+			displayText: link.displayText ?? undefined,
 		};
+		if ("key" in link) ref.key = link.key ?? undefined;
+		if ("position" in link) ref.position = link.position ?? undefined;
+		refs[index] = ref;
 	}
 	return refs;
 }
