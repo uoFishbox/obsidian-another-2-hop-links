@@ -223,26 +223,14 @@ export function canActivatePreviewImmediately(
  * `onSettled` can run before this function returns when the result is already
  * known, so callers must not assume the returned handle has been assigned.
  */
-export function requestPreviewActivation(
+function enqueuePreviewActivationRequest(
 	key: string,
 	getVisibleQueueSize: () => number,
-	scope: PreviewActivationScope = defaultScope,
-	onSettled?: (activated: boolean) => void,
+	scope: PreviewActivationScope,
+	onSettled: ((activated: boolean) => void) | undefined,
 ): PreviewActivationHandle {
-	if (DEBUG_DISABLE_CARD_DOM_PREVIEW) {
-		return createSettledActivationHandle(key, false, onSettled);
-	}
-
 	ensureSubscription();
 	ensureWarmupStarted(scope);
-
-	if (
-		!isWarmupActive(scope) &&
-		!isScrollActivityActive() &&
-		!hasVisiblePreviewBacklog(getVisibleQueueSize)
-	) {
-		return createSettledActivationHandle(key, true, onSettled);
-	}
 
 	const queue = getScopeQueue(scope);
 	const existing = queue.get(key);
@@ -264,6 +252,65 @@ export function requestPreviewActivation(
 	scheduleFrameDrain();
 
 	return createActivationHandle(key, request);
+}
+
+/**
+ * Requests activation and reports the result exactly once.
+ *
+ * `onSettled` can run before this function returns when the result is already
+ * known, so callers must not assume the returned handle has been assigned.
+ */
+export function requestPreviewActivation(
+	key: string,
+	getVisibleQueueSize: () => number,
+	scope: PreviewActivationScope = defaultScope,
+	onSettled?: (activated: boolean) => void,
+): PreviewActivationHandle {
+	if (DEBUG_DISABLE_CARD_DOM_PREVIEW) {
+		return createSettledActivationHandle(key, false, onSettled);
+	}
+
+	ensureWarmupStarted(scope);
+	if (
+		!isWarmupActive(scope) &&
+		!isScrollActivityActive() &&
+		!hasVisiblePreviewBacklog(getVisibleQueueSize)
+	) {
+		return createSettledActivationHandle(key, true, onSettled);
+	}
+
+	return enqueuePreviewActivationRequest(
+		key,
+		getVisibleQueueSize,
+		scope,
+		onSettled,
+	);
+}
+
+/**
+ * Requests activation strictly through the frame-budgeted queue.
+ *
+ * Unlike {@link requestPreviewActivation}, this never activates synchronously,
+ * even when the scheduler is idle and warmed up. This is intended for bulk
+ * row-visible activations where multiple cards become visible at once and
+ * must be spread across frames.
+ */
+export function requestQueuedPreviewActivation(
+	key: string,
+	getVisibleQueueSize: () => number,
+	scope: PreviewActivationScope = defaultScope,
+	onSettled?: (activated: boolean) => void,
+): PreviewActivationHandle {
+	if (DEBUG_DISABLE_CARD_DOM_PREVIEW) {
+		return createSettledActivationHandle(key, false, onSettled);
+	}
+
+	return enqueuePreviewActivationRequest(
+		key,
+		getVisibleQueueSize,
+		scope,
+		onSettled,
+	);
 }
 
 export function cancelPreviewActivation(key: string): void {

@@ -7,6 +7,7 @@
 	import { processPreviewContent } from "../../../features/preview/renderers/markdownPreviewRenderer";
 	import { toPreviewImageSrc } from "../../../features/preview/utils/externalFileImage";
 	import { enqueueMathRender } from "features/preview/renderers/mathRenderQueue";
+	import { createPreviewOverrideIdentity } from "features/preview/core/previewRenderIdentity";
 	import type { PreviewContentAnalysis } from "features/preview/utils/previewUtils";
 	import SkeletonPreview from "./SkeletonPreview.svelte";
 	import {
@@ -45,7 +46,6 @@
 		searchQuery: string;
 	}
 
-	type PreviewDomRenderer = Extract<PreviewData, { type: "dom" }>["render"];
 
 	let {
 		file,
@@ -62,49 +62,6 @@
 	let lastRenderedCacheKey = "";
 	let lastRenderedRefreshToken = -1;
 	let renderSequence = 0;
-
-	const FNV1A32_OFFSET = 0x811c9dc5;
-	const FNV1A32_PRIME = 0x01000193;
-	const domPreviewOverrideIds = new WeakMap<PreviewDomRenderer, number>();
-	let nextDomPreviewOverrideId = 1;
-
-	function hashString(content: string): string {
-		let hash = FNV1A32_OFFSET;
-		for (let i = 0; i < content.length; i += 1) {
-			hash ^= content.charCodeAt(i);
-			hash = Math.imul(hash, FNV1A32_PRIME);
-		}
-
-		return `${content.length}:${(hash >>> 0).toString(36)}`;
-	}
-
-	function getDomPreviewOverrideId(render: PreviewDomRenderer): number {
-		const existing = domPreviewOverrideIds.get(render);
-		if (existing !== undefined) {
-			return existing;
-		}
-
-		const nextId = nextDomPreviewOverrideId;
-		nextDomPreviewOverrideId += 1;
-		domPreviewOverrideIds.set(render, nextId);
-		return nextId;
-	}
-
-	function createPreviewOverrideIdentity(preview: PreviewData | null): string {
-		if (!preview) {
-			return "none";
-		}
-
-		if (
-			preview.type === "text" ||
-			preview.type === "image" ||
-			preview.type === "empty"
-		) {
-			return `${preview.type}:${hashString(preview.content)}`;
-		}
-
-		return `${preview.type}:${getDomPreviewOverrideId(preview.render)}`;
-	}
 
 	// 数式レンダリング中かどうかの状態（スケルトン表示用）
 	let isMathRendering = $state(false);

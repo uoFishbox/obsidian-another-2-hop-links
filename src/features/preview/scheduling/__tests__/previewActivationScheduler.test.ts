@@ -20,6 +20,7 @@ import {
 	cancelPreviewActivation,
 	createPreviewActivationScope,
 	requestPreviewActivation,
+	requestQueuedPreviewActivation,
 	resetPreviewActivationSchedulerForTests,
 	type PreviewActivationHandle,
 	type PreviewActivationScope,
@@ -37,6 +38,18 @@ function requestActivationResult(
 	let handle!: PreviewActivationHandle;
 	const result = new Promise<boolean>((resolve) => {
 		handle = requestPreviewActivation(key, getQueueSize, scope, resolve);
+	});
+	return { handle, result };
+}
+
+function requestQueuedActivationResult(
+	key: string,
+	getQueueSize: () => number = getVisibleQueueSize,
+	scope?: PreviewActivationScope,
+): { handle: PreviewActivationHandle; result: Promise<boolean> } {
+	let handle!: PreviewActivationHandle;
+	const result = new Promise<boolean>((resolve) => {
+		handle = requestQueuedPreviewActivation(key, getQueueSize, scope, resolve);
 	});
 	return { handle, result };
 }
@@ -328,5 +341,110 @@ describe("preview activation scheduler", () => {
 		expect(canActivatePreviewImmediately(getVisibleQueueSize, secondScope)).toBe(
 			false,
 		);
+	});
+
+	describe("requestQueuedPreviewActivation", () => {
+		it("does not activate synchronously even after warmup", async () => {
+			const warmup = requestActivationResult(
+				"preview-warmup",
+				getVisibleQueueSize,
+			);
+			await flushAnimationFrame();
+			await flushAnimationFrame();
+			await expect(warmup.result).resolves.toBe(true);
+
+			const results: boolean[] = [];
+			requestQueuedPreviewActivation(
+				"preview-queued-idle",
+				getVisibleQueueSize,
+				undefined,
+				(activated) => results.push(activated),
+			);
+
+			expect(results).toEqual([]);
+			await flushAnimationFrame();
+			expect(results).toEqual([true]);
+		});
+
+		it("limits idle activations to two previews per animation frame", async () => {
+			const warmup = requestActivationResult(
+				"preview-warmup",
+				getVisibleQueueSize,
+			);
+			await flushAnimationFrame();
+			await flushAnimationFrame();
+			await warmup.result;
+
+			const results: boolean[] = [];
+			requestQueuedPreviewActivation(
+				"preview-a",
+				getVisibleQueueSize,
+				undefined,
+				(activated) => results.push(activated),
+			);
+			requestQueuedPreviewActivation(
+				"preview-b",
+				getVisibleQueueSize,
+				undefined,
+				(activated) => results.push(activated),
+			);
+			requestQueuedPreviewActivation(
+				"preview-c",
+				getVisibleQueueSize,
+				undefined,
+				(activated) => results.push(activated),
+			);
+
+			expect(results).toEqual([]);
+			await flushAnimationFrame();
+			expect(results).toEqual([true, true]);
+
+			await flushAnimationFrame();
+			expect(results).toEqual([true, true, true]);
+		});
+
+		it("does not drain while a visible preview backlog exists", async () => {
+			const warmup = requestActivationResult(
+				"preview-warmup",
+				getVisibleQueueSize,
+			);
+			await flushAnimationFrame();
+			await flushAnimationFrame();
+			await warmup.result;
+
+			visibleQueueSize = 1;
+			const results: boolean[] = [];
+			const activation = requestActivationResult(
+				"preview-a",
+				getVisibleQueueSize,
+			);
+			activation.result.then((activated) => results.push(activated));
+
+			await flushAnimationFrame();
+			expect(results).toEqual([]);
+
+			visibleQueueSize = 0;
+			await flushAnimationFrame();
+			await expect(activation.result).resolves.toBe(true);
+			expect(results).toEqual([true]);
+		});
+
+		it("replaces requests with the same key", async () => {
+			const warmup = requestActivationResult(
+				"preview-warmup",
+				getVisibleQueueSize,
+			);
+			await flushAnimationFrame();
+			await flushAnimationFrame();
+			await warmup.result;
+
+			const original = requestQueuedActivationResult("preview-a");
+			const replacement = requestQueuedActivationResult("preview-a");
+
+			await expect(original.result).resolves.toBe(false);
+
+			await flushAnimationFrame();
+			await expect(replacement.result).resolves.toBe(true);
+		});
 	});
 });
