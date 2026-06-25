@@ -18,7 +18,7 @@ import type {
 	TwoHopPageVirtualSection,
 	TwoHopPageVirtualItem,
 } from "./twohopPageVirtualModel";
-import { getTwoHopPageItemKey } from "./twohopPageVirtualModel";
+
 import type { SectionedGridResolvedRowScratch } from "ui/components/common/virtual-list/row-models/sectionedGridMountedRows";
 
 export interface TwoHopSectionPlan {
@@ -28,6 +28,7 @@ export interface TwoHopSectionPlan {
 	>;
 	readonly sectionIndex: number;
 	readonly sectionId: string;
+	readonly sectionIdPrefix: string;
 	readonly top: number;
 	readonly height: number;
 	readonly firstRowIndex: number;
@@ -347,6 +348,7 @@ export function compileTwoHopViewPlan(
 			descriptor,
 			sectionIndex,
 			sectionId: descriptor.sectionId,
+			sectionIdPrefix: `${descriptor.sectionId}::`,
 			top,
 			height,
 			firstRowIndex,
@@ -456,14 +458,14 @@ function createTwoHopLogicalCellAt(
 	if (cellIndex === 0) {
 		return {
 			kind: "header",
-			key: logicalCellKey(`${descriptor.sectionId}::__header`),
+			key: logicalCellKey(`${sectionPlan.sectionIdPrefix}__header`),
 		};
 	}
 
 	if (showLoadMore && cellIndex === cellCount - 1) {
 		return {
 			kind: "load-more",
-			key: logicalCellKey(`${descriptor.sectionId}::__load-more`),
+			key: logicalCellKey(`${sectionPlan.sectionIdPrefix}__load-more`),
 		};
 	}
 
@@ -473,14 +475,10 @@ function createTwoHopLogicalCellAt(
 	const item = resolveTwoHopDescriptorItem(descriptor, itemIndex, resolvedItems);
 	if (!item) return undefined;
 
-	const sourceRawKey = `${descriptor.sectionId}::${getTwoHopPageItemKey(
-		item,
-		itemIndex,
-		descriptor.section,
-	)}`;
+	const sourceRawKey = `${sectionPlan.sectionIdPrefix}${item.virtualKey}`;
 	return {
 		kind: "item",
-		key: logicalCellKey(`${descriptor.sectionId}::item:${itemIndex}`),
+		key: logicalCellKey(`${sectionPlan.sectionIdPrefix}item:${itemIndex}`),
 		sourceKey: sourceKey(sourceRawKey),
 		item,
 		itemIndex,
