@@ -76,7 +76,7 @@ import {
 	getOutgoingSearchKey,
 	getTagNoteSearchKeyFromBaseKey,
 	getTwohopBranchSearchBaseKey,
-	getTwohopChildSearchKeyFromBranchBaseKey,
+	createTwohopChildSearchKeyFromBaseKeys,
 } from "./twohopSearchAdapter";
 
 const EMPTY_HEADER_PROPS: ClickableHeaderExtraProps = {};
@@ -565,9 +565,9 @@ export function createTwoHopDataIdentityCache(): TwoHopDataIdentityCache {
 								item,
 								...createItemInteractionIdentity(item),
 								branch: created.branch,
-								searchKey: getTwohopChildSearchKeyFromBranchBaseKey(
+								searchKey: createTwohopChildSearchKeyFromBaseKeys(
 									branchBaseKey,
-									item.data as TwoHopIndexedLink,
+									reconciledKeys[index],
 								),
 								virtualKey: reconciledKeys[index],
 							}));

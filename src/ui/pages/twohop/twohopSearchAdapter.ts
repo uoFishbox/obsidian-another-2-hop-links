@@ -438,7 +438,17 @@ function createTwohopChildSearchKeyFromBranchBaseKey(
 	link: TwoHopIndexedLink,
 	searchKeyCache?: SearchKeyCache,
 ): string {
-	return `${TWOHOP_CHILD_SEARCH_PREFIX}${branchBaseKey}${SEARCH_KEY_SEPARATOR}${getBacklinkBaseKey(link, searchKeyCache)}`;
+	return createTwohopChildSearchKeyFromBaseKeys(
+		branchBaseKey,
+		getBacklinkBaseKey(link, searchKeyCache),
+	);
+}
+
+export function createTwohopChildSearchKeyFromBaseKeys(
+	branchBaseKey: string,
+	backlinkBaseKey: string,
+): string {
+	return `${TWOHOP_CHILD_SEARCH_PREFIX}${branchBaseKey}${SEARCH_KEY_SEPARATOR}${backlinkBaseKey}`;
 }
 
 export function getTagGroupSearchKey(section: TagGroup): string {
