@@ -27,6 +27,8 @@ interface StableViewItemEntry<T> {
 	viewItem: ViewItem;
 }
 
+type EntryBucket<T> = StableViewItemEntry<T> | StableViewItemEntry<T>[];
+
 function canReuseEntrySource<T>(
 	options: StableViewItemReconcilerOptions<T>,
 	previousSource: T,
@@ -38,25 +40,41 @@ function canReuseEntrySource<T>(
 }
 
 function takeReusableEntry<T>(
-	entries: StableViewItemEntry<T>[] | undefined,
+	bucket: EntryBucket<T> | undefined,
 	item: T,
 	options: StableViewItemReconcilerOptions<T>,
-): StableViewItemEntry<T> | undefined {
-	if (!entries || entries.length === 0) {
+): { entry: StableViewItemEntry<T>; consumed: boolean } | undefined {
+	if (bucket === undefined) {
 		return undefined;
 	}
 
-	for (let index = 0; index < entries.length; index += 1) {
-		const candidate = entries[index];
-		if (!canReuseEntrySource(options, candidate.source, item)) {
-			continue;
+	if (Array.isArray(bucket)) {
+		if (bucket.length === 0) {
+			return undefined;
 		}
 
-		for (let shiftIndex = index + 1; shiftIndex < entries.length; shiftIndex += 1) {
-			entries[shiftIndex - 1] = entries[shiftIndex];
+		for (let index = 0; index < bucket.length; index += 1) {
+			const candidate = bucket[index];
+			if (!canReuseEntrySource(options, candidate.source, item)) {
+				continue;
+			}
+
+			for (
+				let shiftIndex = index + 1;
+				shiftIndex < bucket.length;
+				shiftIndex += 1
+			) {
+				bucket[shiftIndex - 1] = bucket[shiftIndex];
+			}
+			bucket.pop();
+			return { entry: candidate, consumed: bucket.length === 0 };
 		}
-		entries.pop();
-		return candidate;
+
+		return undefined;
+	}
+
+	if (canReuseEntrySource(options, bucket.source, item)) {
+		return { entry: bucket, consumed: true };
 	}
 
 	return undefined;
@@ -102,7 +120,7 @@ function refreshViewItemData<T>(
 export function createStableViewItemReconciler<T>(
 	options: StableViewItemReconcilerOptions<T>,
 ): StableViewItemReconciler<T> {
-	let previousEntriesByBaseKey = new Map<string, StableViewItemEntry<T>[]>();
+	let previousEntriesByBaseKey = new Map<string, EntryBucket<T>>();
 	let previousArray: ViewItem[] = [];
 	let previousKeys: string[] = [];
 	let previousSourceArray: readonly T[] | undefined;
@@ -113,18 +131,19 @@ export function createStableViewItemReconciler<T>(
 				return previousArray;
 			}
 
-			const nextEntriesByBaseKey = new Map<string, StableViewItemEntry<T>[]>();
+			const nextEntriesByBaseKey = new Map<string, EntryBucket<T>>();
 			const nextArray = new Array<ViewItem>(items.length);
 			const nextKeys = new Array<string>(items.length);
 
 			for (let index = 0; index < items.length; index += 1) {
 				const item = items[index];
 				const baseKey = options.getKey(item, index);
-				const previousEntry = takeReusableEntry(
+				const reusable = takeReusableEntry(
 					previousEntriesByBaseKey.get(baseKey),
 					item,
 					options,
 				);
+				const previousEntry = reusable?.entry;
 				const baseViewItem = previousEntry
 					? refreshViewItemData(
 							previousEntry.viewItem,
@@ -133,22 +152,23 @@ export function createStableViewItemReconciler<T>(
 							options,
 						)
 					: options.toViewItem(item);
-				const nextEntriesForKey = nextEntriesByBaseKey.get(baseKey) ?? [];
 
 				nextKeys[index] = baseKey;
 				nextArray[index] = baseViewItem;
-				if (previousEntry) {
-					previousEntry.source = item;
-					previousEntry.viewItem = baseViewItem;
-					nextEntriesForKey.push(previousEntry);
+
+				const entry: StableViewItemEntry<T> = previousEntry
+					? ((previousEntry.source = item),
+						(previousEntry.viewItem = baseViewItem),
+						previousEntry)
+					: { source: item, viewItem: baseViewItem };
+
+				const existingBucket = nextEntriesByBaseKey.get(baseKey);
+				if (existingBucket === undefined) {
+					nextEntriesByBaseKey.set(baseKey, entry);
+				} else if (Array.isArray(existingBucket)) {
+					existingBucket.push(entry);
 				} else {
-					nextEntriesForKey.push({
-						source: item,
-						viewItem: baseViewItem,
-					});
-				}
-				if (!nextEntriesByBaseKey.has(baseKey)) {
-					nextEntriesByBaseKey.set(baseKey, nextEntriesForKey);
+					nextEntriesByBaseKey.set(baseKey, [existingBucket, entry]);
 				}
 			}
 
