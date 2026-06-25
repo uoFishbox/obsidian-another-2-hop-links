@@ -69,7 +69,7 @@ export function buildInteractionDataAttributes(
 	};
 }
 
-export function createItemInteractionKey(item: ViewItem): string {
+export function createItemInteractionKey(item: ViewItem, virtualKey?: string): string {
 	switch (item.type) {
 		case "file":
 			return `item:file:${item.data.path}`;
@@ -78,9 +78,13 @@ export function createItemInteractionKey(item: ViewItem): string {
 		case "branch":
 			return `item:branch:${generateBranchKey(item.data, "interaction")}`;
 		case "backlink":
-			return `item:backlink:${generateBacklinkKey(item.data, "interaction")}`;
+			return virtualKey
+				? `item:backlink:${virtualKey}:interaction`
+				: `item:backlink:${generateBacklinkKey(item.data, "interaction")}`;
 		case "newLink":
-			return `item:newLink:${generateIndexedLinkKey(item.data, "interaction")}`;
+			return virtualKey
+				? `item:newLink:${virtualKey}:interaction`
+				: `item:newLink:${generateIndexedLinkKey(item.data, "interaction")}`;
 		default:
 			return "";
 	}

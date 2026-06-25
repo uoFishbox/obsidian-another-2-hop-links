@@ -318,8 +318,9 @@ export function createTwoHopDataIdentityCache(): TwoHopDataIdentityCache {
 
 	const createItemInteractionIdentity = (
 		item: ViewItem,
+		virtualKey?: string,
 	): { interactionId: string; interactionKey: string } => {
-		const interactionKey = createItemInteractionKey(item);
+		const interactionKey = createItemInteractionKey(item, virtualKey);
 		return {
 			interactionId: createItemInteractionToken(interactionKey),
 			interactionKey,
@@ -440,13 +441,14 @@ export function createTwoHopDataIdentityCache(): TwoHopDataIdentityCache {
 						createItem: (index) => {
 							const item = created.source.items[index];
 							if (!item) return undefined;
+							const virtualKey = created.source.getKey(item, index);
 							return {
 								kind: "primary-link" as const,
 								item,
-								...createItemInteractionIdentity(item),
+								...createItemInteractionIdentity(item, virtualKey),
 								sourceSectionId: created.source.sectionId,
 								searchKey: created.source.getSearchKey(item),
-								virtualKey: created.source.getKey(item, index),
+								virtualKey,
 							};
 						},
 					});
@@ -560,17 +562,20 @@ export function createTwoHopDataIdentityCache(): TwoHopDataIdentityCache {
 							const branchBaseKey = getTwohopBranchSearchBaseKey(
 								created.branch,
 							);
-							return reconciled.map((item, index) => ({
-								kind: "two-hop-link" as const,
-								item,
-								...createItemInteractionIdentity(item),
-								branch: created.branch,
-								searchKey: createTwohopChildSearchKeyFromBaseKeys(
-									branchBaseKey,
-									reconciledKeys[index],
-								),
-								virtualKey: reconciledKeys[index],
-							}));
+							return reconciled.map((item, index) => {
+								const virtualKey = reconciledKeys[index];
+								return {
+									kind: "two-hop-link" as const,
+									item,
+									...createItemInteractionIdentity(item, virtualKey),
+									branch: created.branch,
+									searchKey: createTwohopChildSearchKeyFromBaseKeys(
+										branchBaseKey,
+										virtualKey,
+									),
+									virtualKey,
+								};
+							});
 						},
 					});
 					created.getItems = created.itemsAccessors.getItems;
@@ -731,7 +736,8 @@ export function createTwoHopDataIdentityCache(): TwoHopDataIdentityCache {
 									);
 								const reconciled =
 									created.itemsReconciler.reconcile(sorted);
-								const reconciledKeys = created.itemsReconciler.getKeys();
+								const reconciledKeys =
+									created.itemsReconciler.getKeys();
 								return reconciled.map((item, index) => ({
 									kind: "tag-link" as const,
 									item,
@@ -834,7 +840,7 @@ export function createTwoHopDataIdentityCache(): TwoHopDataIdentityCache {
 							return {
 								kind: "new-link" as const,
 								item,
-								...createItemInteractionIdentity(item),
+								...createItemInteractionIdentity(item, key),
 								searchKey: key,
 								virtualKey: key,
 							};
