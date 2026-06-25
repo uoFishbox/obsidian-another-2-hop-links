@@ -1,6 +1,6 @@
 import type { TFile } from "obsidian";
 import type { TaggedNote, TagReference } from "types/domain";
-import { resolveFileByPath } from "infrastructure/utils/vaultUtils";
+import { resolveFileByPath } from "core/utils/resolveFileByPath";
 import type { TagIndex } from "../types/IndexTypes";
 import type { IVault } from "types/obsidian";
 import { getTaggedNoteUsageKey } from "core/deduplication/keyGenerator";

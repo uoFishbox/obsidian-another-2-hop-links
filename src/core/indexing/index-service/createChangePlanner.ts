@@ -1,6 +1,6 @@
 import { getLinkpath } from "obsidian";
 import { forEachLinkReferenceUnordered } from "../metadata/metadataExtractor";
-import { resolveFileByPath } from "infrastructure/utils/vaultUtils";
+import { resolveFileByPath } from "core/utils/resolveFileByPath";
 import {
 	normalizeLinkToMarkdownPath,
 	toCaseInsensitiveLookupKey,

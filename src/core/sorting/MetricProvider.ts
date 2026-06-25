@@ -8,7 +8,7 @@ import type {
 import type { SortableItem } from "./types";
 import type { IMetricProvider, SortMetricKind } from "types/services";
 import { countLinkReferences } from "core/indexing/metadata/metadataExtractor";
-import { resolveFileByPath } from "infrastructure/utils/vaultUtils";
+import { resolveFileByPath } from "core/utils/resolveFileByPath";
 import type { IIndexingService } from "types/services";
 import type { IMetadataCache, IVault } from "types/obsidian";
 import type { PluginSettings } from "types/settings";

@@ -1,5 +1,5 @@
 import { toCaseInsensitiveLookupKey } from "core/indexing/link-resolution/linkResolution";
-import { resolveFileByPath } from "infrastructure/utils/vaultUtils";
+import { resolveFileByPath } from "core/utils/resolveFileByPath";
 import type {
 	BacklinkBucket,
 	BacklinkSourceMap,

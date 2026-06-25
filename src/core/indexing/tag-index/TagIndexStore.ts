@@ -1,6 +1,6 @@
 import { INDEXING_YIELD_INTERVAL_MS } from "../../../appConstants";
 import { extractTags } from "core/indexing/metadata/metadataExtractor";
-import { resolveFileByPath } from "infrastructure/utils/vaultUtils";
+import { resolveFileByPath } from "core/utils/resolveFileByPath";
 import type { TagReference } from "types/domain";
 import type { IncrementalFileChange, TagIndex } from "../types/IndexTypes";
 import type { IMetadataCache, IVault } from "types/obsidian";
