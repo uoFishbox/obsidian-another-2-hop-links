@@ -7,6 +7,7 @@ export {
 
 export {
 	type ItemStrategy,
+	type ViewItemData,
 	BacklinkStrategy,
 	NewLinkStrategy,
 	OutgoingStrategy,

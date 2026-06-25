@@ -3,14 +3,16 @@ import type { TwoHopIndexedLink, TwoHopLinkBranch, TaggedNote } from "types";
 import type { LinkUtilitiesContext } from "ui/context/linkContext";
 import type { ViewItem } from "./ViewItem";
 
-export interface ItemStrategy<T = any> {
-	getFile(item: T): TFile | undefined;
-	getTargetFile(item: T, context: LinkUtilitiesContext): TFile | null;
-	getRawText(item: T): string;
-	getClassName(item: T): string | null;
+export type ViewItemData = TwoHopIndexedLink | TwoHopLinkBranch | TaggedNote | TFile;
+
+export interface ItemStrategy {
+	getFile(item: ViewItemData): TFile | undefined;
+	getTargetFile(item: ViewItemData, context: LinkUtilitiesContext): TFile | null;
+	getRawText(item: ViewItemData): string;
+	getClassName(item: ViewItemData): string | null;
 }
 
-export const BacklinkStrategy: ItemStrategy<TwoHopIndexedLink> = {
+export const BacklinkStrategy: ItemStrategy = {
 	getFile(item: TwoHopIndexedLink): TFile | undefined {
 		return item.sourceFile;
 	},
@@ -28,7 +30,7 @@ export const BacklinkStrategy: ItemStrategy<TwoHopIndexedLink> = {
 	},
 };
 
-export const NewLinkStrategy: ItemStrategy<TwoHopIndexedLink> = {
+export const NewLinkStrategy: ItemStrategy = {
 	getFile(): TFile | undefined {
 		return undefined;
 	},
@@ -46,7 +48,7 @@ export const NewLinkStrategy: ItemStrategy<TwoHopIndexedLink> = {
 	},
 };
 
-export const OutgoingStrategy: ItemStrategy<TwoHopLinkBranch> = {
+export const OutgoingStrategy: ItemStrategy = {
 	getFile(): TFile | undefined {
 		return undefined;
 	},
@@ -69,7 +71,7 @@ export const OutgoingStrategy: ItemStrategy<TwoHopLinkBranch> = {
 	},
 };
 
-export const NonMdStrategy: ItemStrategy<TFile> = {
+export const NonMdStrategy: ItemStrategy = {
 	getFile(item: TFile): TFile | undefined {
 		return item;
 	},
@@ -87,7 +89,7 @@ export const NonMdStrategy: ItemStrategy<TFile> = {
 	},
 };
 
-export const TaggedNoteStrategy: ItemStrategy<TaggedNote> = {
+export const TaggedNoteStrategy: ItemStrategy = {
 	getFile(item: TaggedNote): TFile | undefined {
 		return item.file;
 	},
