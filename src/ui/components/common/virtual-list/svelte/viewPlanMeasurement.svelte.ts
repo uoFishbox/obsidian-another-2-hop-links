@@ -161,9 +161,16 @@ export function createViewPlanMeasurementRuntime<
 		mountedOverscanPx: 0,
 		previewOverscanPx: 0,
 	};
+	const mountedScrollWindowBandStable: StablePreviewScrollTopBandMutable = {
+		min: 0,
+		max: 0,
+	};
 	const mountedScrollWindowMeasurement = {
 		identity: params.runtime.rowModel,
 		mounted: { start: 0, end: 0 },
+		stableMountedScrollTopBand: undefined as
+			| import("../dom/activeScrollWindowGate").StableScrollTopBand
+			| undefined,
 	};
 	const scrollWindowMeasurement = {
 		identity: params.runtime.rowModel,
@@ -306,6 +313,25 @@ export function createViewPlanMeasurementRuntime<
 				mountedScrollWindowMeasurement.mounted,
 				mountedRangeParams,
 			);
+			const mounted = mountedScrollWindowMeasurement.mounted;
+			if (mounted.start >= mounted.end) {
+				mountedScrollWindowMeasurement.stableMountedScrollTopBand = undefined;
+			} else {
+				measurementRowModel.findStablePreviewScrollTopBandInto(
+					mountedScrollWindowBandStable,
+					{
+						scrollTop: mountedRangeParams.scrollTop,
+						viewportHeight,
+						mountedOverscanPx: visibilityPolicy.mountedOverscanPx,
+						previewOverscanPx: visibilityPolicy.mountedOverscanPx,
+						previewVisible: mounted,
+					},
+				);
+				mountedScrollWindowBandStable.min += sectionTop;
+				mountedScrollWindowBandStable.max += sectionTop;
+				mountedScrollWindowMeasurement.stableMountedScrollTopBand =
+					mountedScrollWindowBandStable;
+			}
 			return mountedScrollWindowMeasurement;
 		},
 		resolveScrollWindowMeasurement: (

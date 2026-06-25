@@ -11,11 +11,19 @@ export type LastScrollWindow = {
 	visibleEnd: number;
 	stablePreviewScrollTopMin: number;
 	stablePreviewScrollTopMax: number;
+	stableMountedScrollTopMin: number;
+	stableMountedScrollTopMax: number;
 };
 
 export type MountedScrollWindowMeasurement = {
 	identity: ScrollWindowIdentity;
 	mounted: RowRange;
+	stableMountedScrollTopBand?: StableScrollTopBand;
+};
+
+export type StableScrollTopBand = {
+	readonly min: number;
+	readonly max: number;
 };
 
 export type StablePreviewScrollTopBand = {
@@ -33,6 +41,8 @@ export type ActiveScrollWindowComparison = "visible-and-mounted" | "mounted-only
 
 const INVALID_STABLE_PREVIEW_SCROLL_TOP_MIN = Number.POSITIVE_INFINITY;
 const INVALID_STABLE_PREVIEW_SCROLL_TOP_MAX = Number.NEGATIVE_INFINITY;
+const INVALID_STABLE_MOUNTED_SCROLL_TOP_MIN = Number.POSITIVE_INFINITY;
+const INVALID_STABLE_MOUNTED_SCROLL_TOP_MAX = Number.NEGATIVE_INFINITY;
 
 export const createScrollWindow = (
 	identity: ScrollWindowIdentity,
@@ -48,11 +58,14 @@ export const createScrollWindow = (
 		stablePreviewScrollTopBand?.min ?? INVALID_STABLE_PREVIEW_SCROLL_TOP_MIN,
 	stablePreviewScrollTopMax:
 		stablePreviewScrollTopBand?.max ?? INVALID_STABLE_PREVIEW_SCROLL_TOP_MAX,
+	stableMountedScrollTopMin: INVALID_STABLE_MOUNTED_SCROLL_TOP_MIN,
+	stableMountedScrollTopMax: INVALID_STABLE_MOUNTED_SCROLL_TOP_MAX,
 });
 
 export const createMountedScrollWindow = (
 	identity: ScrollWindowIdentity,
 	mounted: RowRange,
+	stableMountedScrollTopBand?: StableScrollTopBand,
 ): LastScrollWindow => ({
 	identity,
 	mountedStart: mounted.start,
@@ -61,6 +74,10 @@ export const createMountedScrollWindow = (
 	visibleEnd: 0,
 	stablePreviewScrollTopMin: INVALID_STABLE_PREVIEW_SCROLL_TOP_MIN,
 	stablePreviewScrollTopMax: INVALID_STABLE_PREVIEW_SCROLL_TOP_MAX,
+	stableMountedScrollTopMin:
+		stableMountedScrollTopBand?.min ?? INVALID_STABLE_MOUNTED_SCROLL_TOP_MIN,
+	stableMountedScrollTopMax:
+		stableMountedScrollTopBand?.max ?? INVALID_STABLE_MOUNTED_SCROLL_TOP_MAX,
 });
 
 export const updateScrollWindow = (
@@ -82,6 +99,8 @@ export const updateScrollWindow = (
 		stablePreviewScrollTopBand?.min ?? INVALID_STABLE_PREVIEW_SCROLL_TOP_MIN;
 	previous.stablePreviewScrollTopMax =
 		stablePreviewScrollTopBand?.max ?? INVALID_STABLE_PREVIEW_SCROLL_TOP_MAX;
+	previous.stableMountedScrollTopMin = INVALID_STABLE_MOUNTED_SCROLL_TOP_MIN;
+	previous.stableMountedScrollTopMax = INVALID_STABLE_MOUNTED_SCROLL_TOP_MAX;
 	return previous;
 };
 
@@ -89,9 +108,10 @@ export const updateMountedScrollWindow = (
 	previous: LastScrollWindow | null,
 	identity: ScrollWindowIdentity,
 	mounted: RowRange,
+	stableMountedScrollTopBand?: StableScrollTopBand,
 ): LastScrollWindow => {
 	if (!previous) {
-		return createMountedScrollWindow(identity, mounted);
+		return createMountedScrollWindow(identity, mounted, stableMountedScrollTopBand);
 	}
 
 	previous.identity = identity;
@@ -101,6 +121,10 @@ export const updateMountedScrollWindow = (
 	previous.visibleEnd = 0;
 	previous.stablePreviewScrollTopMin = INVALID_STABLE_PREVIEW_SCROLL_TOP_MIN;
 	previous.stablePreviewScrollTopMax = INVALID_STABLE_PREVIEW_SCROLL_TOP_MAX;
+	previous.stableMountedScrollTopMin =
+		stableMountedScrollTopBand?.min ?? INVALID_STABLE_MOUNTED_SCROLL_TOP_MIN;
+	previous.stableMountedScrollTopMax =
+		stableMountedScrollTopBand?.max ?? INVALID_STABLE_MOUNTED_SCROLL_TOP_MAX;
 	return previous;
 };
 
@@ -127,6 +151,17 @@ export const isSameRangedScrollWindow = (
 	(comparison === "mounted-only" ||
 		(previous.visibleStart === ranges.previewVisible.start &&
 			previous.visibleEnd === ranges.previewVisible.end));
+
+export const isWithinStableMountedScrollWindow = (
+	previous: LastScrollWindow | null,
+	identity: ScrollWindowIdentity,
+	mounted: RowRange,
+	scrollTop: number,
+): boolean =>
+	previous !== null &&
+	isSameMountedScrollWindow(previous, identity, mounted) &&
+	scrollTop > previous.stableMountedScrollTopMin &&
+	scrollTop < previous.stableMountedScrollTopMax;
 
 export const isWithinStablePreviewScrollWindow = (
 	previous: LastScrollWindow | null,

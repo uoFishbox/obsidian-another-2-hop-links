@@ -2,6 +2,7 @@ import type { RowRange } from "../rowRange";
 import type { VirtualRanges } from "../types";
 import {
 	createMountedScrollWindow,
+	isWithinStableMountedScrollWindow,
 	isWithinStablePreviewScrollWindow,
 	isSameMountedScrollWindow,
 	isSameRangedScrollWindow,
@@ -267,6 +268,7 @@ export function createVirtualListController<
 		return createMountedScrollWindow(
 			mountedScrollWindowMeasurement.identity,
 			mountedScrollWindowMeasurement.mounted,
+			mountedScrollWindowMeasurement.stableMountedScrollTopBand,
 		);
 	};
 
@@ -455,6 +457,19 @@ export function createVirtualListController<
 							};
 						}
 						if (
+							isWithinStableMountedScrollWindow(
+								lastScrollWindow,
+								mountedScrollWindowMeasurement.identity,
+								mountedScrollWindowMeasurement.mounted,
+								localScrollTop,
+							)
+						) {
+							return {
+								kind: "stable",
+								range: mountedScrollWindowMeasurement.mounted,
+							};
+						}
+						if (
 							isWithinStablePreviewScrollWindow(
 								lastScrollWindow,
 								mountedScrollWindowMeasurement.identity,
@@ -598,12 +613,11 @@ export function createVirtualListController<
 			// range is still bootstrapping on the first scroll frame), but the
 			// mounted window itself is a sound estimate. Prime the gate with a
 			// mounted-only window so the next frame can short-circuit via
-			// isSameMountedScrollWindow instead of recomputing ranges. The band
-			// is left invalid, so isWithinStablePreviewScrollWindow stays false
-			// until a stable ranged measurement populates it.
+			// isSameMountedScrollWindow instead of recomputing ranges.
 			lastScrollWindow = createMountedScrollWindow(
 				pendingMountedScrollWindowMeasurement.identity,
 				pendingMountedScrollWindowMeasurement.mounted,
+				pendingMountedScrollWindowMeasurement.stableMountedScrollTopBand,
 			);
 		} else {
 			lastScrollWindow = null;

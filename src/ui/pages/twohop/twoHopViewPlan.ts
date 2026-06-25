@@ -143,9 +143,7 @@ function readTwoHopRowTableAt(
  * Builds the `plan.rows` facade: a read-only, index-access-only view over a
  * row table that materializes `TwoHopRowPlan` snapshots on demand.
  */
-function createTwoHopRowPlanFacade(
-	table: TwoHopRowTable,
-): readonly TwoHopRowPlan[] {
+function createTwoHopRowPlanFacade(table: TwoHopRowTable): readonly TwoHopRowPlan[] {
 	return new Proxy([] as TwoHopRowPlan[], {
 		get(_target, prop): unknown {
 			if (prop === "length") return table.rowCount;
@@ -292,7 +290,8 @@ export function compileTwoHopViewPlan(
 	const sectionCellStartByRow = new Int32Array(totalRowCount);
 	const cellCountByRow = new Uint16Array(totalRowCount);
 	const topByRow = new Float64Array(totalRowCount);
-	const logicalCellsBySectionIndex: TwoHopCellStore["logicalCellsBySectionIndex"] = [];
+	const logicalCellsBySectionIndex: TwoHopCellStore["logicalCellsBySectionIndex"] =
+		[];
 	const rowStride = rowHeight + gap;
 
 	for (let sectionIndex = 0; sectionIndex < sectionCount; sectionIndex += 1) {
@@ -320,7 +319,10 @@ export function compileTwoHopViewPlan(
 			sectionIndexByRow[writeIndex] = sectionIndex;
 			rowIndexInSectionByRow[writeIndex] = rowIndexInSection;
 			sectionCellStartByRow[writeIndex] = sectionCellStartIndex;
-			cellCountByRow[writeIndex] = Math.min(columns, cellCount - sectionCellStartIndex);
+			cellCountByRow[writeIndex] = Math.min(
+				columns,
+				cellCount - sectionCellStartIndex,
+			);
 			topByRow[writeIndex] = top + rowIndexInSection * rowStride;
 		}
 		const mountedLayout: SectionLayout<
@@ -572,10 +574,7 @@ function markTwoHopSectionMaterialized(
  * (the background loop advances its section cursor; the scroll path only
  * marks the section).
  */
-function recordTwoHopCellFilled(
-	plan: TwoHopViewPlan,
-	sectionIndex: number,
-): boolean {
+function recordTwoHopCellFilled(plan: TwoHopViewPlan, sectionIndex: number): boolean {
 	const cellStore = plan.cellStore;
 	const state = cellStore.materializationStateBySectionIndex[sectionIndex];
 	const sectionPlan = plan.sections[sectionIndex];
@@ -615,10 +614,7 @@ export function materializeNextTwoHopCellBatch(
 ): MaterializeNextTwoHopCellBatchResult {
 	const cellStore = plan.cellStore;
 	let remainingCellBudget = Math.max(0, Math.floor(options.maxCellCount ?? 128));
-	if (
-		remainingCellBudget === 0 ||
-		cellStore.remainingUnmaterializedCellCount === 0
-	) {
+	if (remainingCellBudget === 0 || cellStore.remainingUnmaterializedCellCount === 0) {
 		return { changed: false, affectedRowRange: null };
 	}
 	// Rows aggregate `columns` cells each, so a section-local cell index maps to
@@ -741,7 +737,12 @@ export function hasUnmaterializedTwoHopSections(plan: TwoHopViewPlan): boolean {
 	return plan.cellStore.remainingUnmaterializedCellCount > 0;
 }
 
-export function ensureTwoHopSectionCellRangeMaterialized(
+/**
+ * Core cell-range materialization without revision bump.
+ * Callers that batch multiple ranges should call this directly and bump
+ * `cellStore.revision` once at the end.
+ */
+function materializeSectionCellRange(
 	plan: TwoHopViewPlan,
 	sectionIndex: number,
 	startCellIndex: number,
@@ -764,6 +765,21 @@ export function ensureTwoHopSectionCellRangeMaterialized(
 	if (sectionCompleted) {
 		markTwoHopSectionMaterialized(plan, sectionIndex);
 	}
+	return changed;
+}
+
+export function ensureTwoHopSectionCellRangeMaterialized(
+	plan: TwoHopViewPlan,
+	sectionIndex: number,
+	startCellIndex: number,
+	endCellIndex: number,
+): boolean {
+	const changed = materializeSectionCellRange(
+		plan,
+		sectionIndex,
+		startCellIndex,
+		endCellIndex,
+	);
 	if (changed) {
 		markTwoHopMaterializationChanged(plan);
 	}
@@ -773,42 +789,35 @@ export function ensureTwoHopSectionCellRangeMaterialized(
 /**
  * Ensures every cell needed to render `rowRange` has been materialized.
  *
- * The mounted-row builder is a pure reader of already-materialized logical
- * cells; this function runs the row-to-cell resolution upfront so the builder
- * never triggers materialization itself. Walking the range mirrors the
- * builder's own row/section traversal so identical cells are touched, and
- * materialization is idempotent, so rows already satisfied (including those
- * reused from the previous build) cost only a cached-presence check.
+ * Reads cell ranges directly from `rowTable` typed arrays to avoid
+ * allocating per-row resolved-row objects. Bumps `cellStore.revision`
+ * once at the end instead of per row.
  */
 export function ensureTwoHopMountedRangeMaterialized(
 	plan: TwoHopViewPlan,
 	range: RowRange,
 ): boolean {
+	const table = plan.rowTable;
 	const start = Math.max(0, range.start);
-	const end = Math.min(plan.rowCount, range.end);
+	const end = Math.min(table.rowCount, range.end);
 	if (start >= end) return false;
 	let changed = false;
-	let sectionIndex = findTwoHopSectionIndexByRow(plan.sections, start);
 	for (let rowIndex = start; rowIndex < end; rowIndex += 1) {
-		while (
-			sectionIndex >= 0 &&
-			rowIndex >=
-				(plan.sections[sectionIndex]?.firstRowIndex ?? 0) +
-					(plan.sections[sectionIndex]?.rowCount ?? 0)
-		) {
-			sectionIndex += 1;
-		}
-		const sectionPlan = plan.sections[sectionIndex];
-		if (!sectionPlan) break;
-		const resolvedRow = resolveTwoHopRowInSection(plan, sectionPlan, rowIndex);
-		if (!resolvedRow) continue;
+		const sectionIndex = table.sectionIndexByRow[rowIndex];
+		if (sectionIndex < 0) continue;
+		const startCell = table.sectionCellStartByRow[rowIndex];
+		const cellCount = table.cellCountByRow[rowIndex];
+		if (cellCount === 0) continue;
 		changed =
-			ensureTwoHopSectionCellRangeMaterialized(
+			materializeSectionCellRange(
 				plan,
 				sectionIndex,
-				resolvedRow.sectionCellStartIndex,
-				resolvedRow.sectionCellStartIndex + resolvedRow.cellCount,
+				startCell,
+				startCell + cellCount,
 			) || changed;
+	}
+	if (changed) {
+		markTwoHopMaterializationChanged(plan);
 	}
 	return changed;
 }
@@ -949,10 +958,7 @@ export function resolveTwoHopRow(
  * Reads the top offset for a row, or null when the row index is out of range.
  * Returns a scalar to avoid allocating a tiny object.
  */
-function readTwoHopRowTop(
-	plan: TwoHopViewPlan,
-	rowIndex: number,
-): number | null {
+function readTwoHopRowTop(plan: TwoHopViewPlan, rowIndex: number): number | null {
 	const table = plan.rowTable;
 	if (rowIndex < 0 || rowIndex >= table.rowCount) return null;
 	return table.topByRow[rowIndex];
@@ -974,7 +980,8 @@ export function resolveTwoHopRowTopsForBandInto(
 
 	const previousStartTop = readTwoHopRowTop(plan, params.startRow - 1);
 	const previousEndTop = readTwoHopRowTop(plan, params.endRow - 1);
-	const currentEndTop = previousEndTop !== null ? readTwoHopRowTop(plan, params.endRow) : null;
+	const currentEndTop =
+		previousEndTop !== null ? readTwoHopRowTop(plan, params.endRow) : null;
 
 	out.previousStartRowTop = previousStartTop;
 	out.currentStartRowTop = currentStartTop;
@@ -1100,7 +1107,10 @@ function resolveFirstTwoHopRowByTop(
 			: { rowIndex: rowCount, sectionIndex: sections.length };
 	}
 	const sectionIndex = Math.max(0, boundaryIndex - 1);
-	const scratch: FirstTwoHopRowByTopResolutionScratch = { rowIndex: 0, sectionIndex: 0 };
+	const scratch: FirstTwoHopRowByTopResolutionScratch = {
+		rowIndex: 0,
+		sectionIndex: 0,
+	};
 	writeFirstTwoHopRowByTopFromSection(
 		scratch,
 		sections,
@@ -1174,8 +1184,15 @@ type FindTwoHopRowsByOffsetParams = {
 	readonly overscanPx: number;
 };
 
-function writeTwoHopRowsByOffset(
+/**
+ * Core implementation of row-range resolution by scroll offset.
+ *
+ * Writes into `out` and reuses `resolutionScratch` across calls to avoid
+ * per-call allocation. Prefer this variant on hot scroll paths.
+ */
+function writeTwoHopRowsByOffsetIntoScratch(
 	out: RowRange,
+	resolutionScratch: FirstTwoHopRowByTopResolutionScratch,
 	sections: readonly TwoHopSectionPlan[],
 	rowHeight: number,
 	rowGap: number,
@@ -1194,11 +1211,6 @@ function writeTwoHopRowsByOffset(
 	const rowStride = rowHeight + rowGap;
 	const startTarget = startOffset - rowHeight;
 	const endTarget = endOffset;
-	// Reusable scratch to avoid allocating resolution objects per call.
-	const resolutionScratch: FirstTwoHopRowByTopResolutionScratch = {
-		rowIndex: 0,
-		sectionIndex: 0,
-	};
 	writeFirstTwoHopRowByTop(
 		resolutionScratch,
 		sections,
@@ -1242,6 +1254,31 @@ function writeTwoHopRowsByOffset(
 	}
 	out.start = start < endRow ? start : 0;
 	out.end = start < endRow ? endRow : 0;
+}
+
+function writeTwoHopRowsByOffset(
+	out: RowRange,
+	sections: readonly TwoHopSectionPlan[],
+	rowHeight: number,
+	rowGap: number,
+	scrollTop: number,
+	viewportHeight: number,
+	overscanPx: number,
+): void {
+	const resolutionScratch: FirstTwoHopRowByTopResolutionScratch = {
+		rowIndex: 0,
+		sectionIndex: 0,
+	};
+	writeTwoHopRowsByOffsetIntoScratch(
+		out,
+		resolutionScratch,
+		sections,
+		rowHeight,
+		rowGap,
+		scrollTop,
+		viewportHeight,
+		overscanPx,
+	);
 }
 
 export function findTwoHopRowsByOffsetInto(
@@ -1398,14 +1435,21 @@ export function createTwoHopViewPlanRowModel(
 		previousEndRowTop: null,
 		currentEndRowTop: null,
 	};
+	// Reusable scratch for row-range resolution, held for the lifetime of
+	// this row model to avoid per-scroll-frame allocation.
+	const resolutionScratch: FirstTwoHopRowByTopResolutionScratch = {
+		rowIndex: 0,
+		sectionIndex: 0,
+	};
 	const writeVisibleRange = (
 		out: RowRange,
 		scrollTop: number,
 		viewportHeight: number,
 		overscanPx: number,
 	): void => {
-		writeTwoHopRowsByOffset(
+		writeTwoHopRowsByOffsetIntoScratch(
 			out,
+			resolutionScratch,
 			plan.sections,
 			plan.rowHeight,
 			plan.rowGap,

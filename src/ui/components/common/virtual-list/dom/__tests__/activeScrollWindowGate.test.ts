@@ -25,6 +25,8 @@ describe("activeScrollWindowGate", () => {
 			visibleEnd: 4,
 			stablePreviewScrollTopMin: Number.POSITIVE_INFINITY,
 			stablePreviewScrollTopMax: Number.NEGATIVE_INFINITY,
+			stableMountedScrollTopMin: Number.POSITIVE_INFINITY,
+			stableMountedScrollTopMax: Number.NEGATIVE_INFINITY,
 		});
 	});
 
@@ -140,6 +142,8 @@ describe("activeScrollWindowGate", () => {
 			visibleEnd: 7,
 			stablePreviewScrollTopMin: Number.POSITIVE_INFINITY,
 			stablePreviewScrollTopMax: Number.NEGATIVE_INFINITY,
+			stableMountedScrollTopMin: Number.POSITIVE_INFINITY,
+			stableMountedScrollTopMax: Number.NEGATIVE_INFINITY,
 		});
 	});
 
@@ -208,6 +212,8 @@ describe("activeScrollWindowGate", () => {
 			visibleEnd: 0,
 			stablePreviewScrollTopMin: Number.POSITIVE_INFINITY,
 			stablePreviewScrollTopMax: Number.NEGATIVE_INFINITY,
+			stableMountedScrollTopMin: Number.POSITIVE_INFINITY,
+			stableMountedScrollTopMax: Number.NEGATIVE_INFINITY,
 		});
 	});
 });
