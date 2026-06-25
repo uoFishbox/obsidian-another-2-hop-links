@@ -19,6 +19,7 @@ import type {
 	TwoHopPageVirtualItem,
 } from "./twohopPageVirtualModel";
 import { getTwoHopPageItemKey } from "./twohopPageVirtualModel";
+import type { SectionedGridResolvedRowScratch } from "ui/components/common/virtual-list/row-models/sectionedGridMountedRows";
 
 export interface TwoHopSectionPlan {
 	readonly descriptor: SectionRenderDescriptor<
@@ -903,6 +904,27 @@ export function resolveTwoHopRowInSection(
 	};
 }
 
+/**
+ * Into-style variant of {@link resolveTwoHopRowInSection} that writes into a
+ * reusable scratch object instead of allocating a new object per call.
+ * Only writes the 4 fields required by {@link SectionedGridResolvedRow}.
+ */
+export function resolveTwoHopRowInSectionInto(
+	out: SectionedGridResolvedRowScratch,
+	plan: TwoHopViewPlan,
+	sectionPlan: TwoHopSectionPlan,
+	rowIndex: number,
+): boolean {
+	const table = plan.rowTable;
+	if (rowIndex < 0 || rowIndex >= table.rowCount) return false;
+	if (table.sectionIndexByRow[rowIndex] !== sectionPlan.sectionIndex) return false;
+	out.rowIndexInSection = table.rowIndexInSectionByRow[rowIndex];
+	out.sectionCellStartIndex = table.sectionCellStartByRow[rowIndex];
+	out.cellCount = table.cellCountByRow[rowIndex];
+	out.top = table.topByRow[rowIndex];
+	return true;
+}
+
 export function resolveTwoHopRow(
 	plan: TwoHopViewPlan,
 	rowIndex: number,
@@ -923,16 +945,17 @@ export function resolveTwoHopRow(
 	};
 }
 
-function resolveTwoHopRowTop(
+/**
+ * Reads the top offset for a row, or null when the row index is out of range.
+ * Returns a scalar to avoid allocating a tiny object.
+ */
+function readTwoHopRowTop(
 	plan: TwoHopViewPlan,
 	rowIndex: number,
-): TwoHopResolvedRowTop | null {
+): number | null {
 	const table = plan.rowTable;
 	if (rowIndex < 0 || rowIndex >= table.rowCount) return null;
-	return {
-		sectionIndex: table.sectionIndexByRow[rowIndex],
-		top: table.topByRow[rowIndex],
-	};
+	return table.topByRow[rowIndex];
 }
 
 export function resolveTwoHopRowTopsForBandInto(
@@ -946,17 +969,17 @@ export function resolveTwoHopRowTopsForBandInto(
 	out.currentEndRowTop = null;
 	if (params.startRow >= params.endRow) return;
 
-	const currentStart = resolveTwoHopRowTop(plan, params.startRow);
-	if (!currentStart) return;
+	const currentStartTop = readTwoHopRowTop(plan, params.startRow);
+	if (currentStartTop === null) return;
 
-	const previousStart = resolveTwoHopRowTop(plan, params.startRow - 1);
-	const previousEnd = resolveTwoHopRowTop(plan, params.endRow - 1);
-	const currentEnd = previousEnd ? resolveTwoHopRowTop(plan, params.endRow) : null;
+	const previousStartTop = readTwoHopRowTop(plan, params.startRow - 1);
+	const previousEndTop = readTwoHopRowTop(plan, params.endRow - 1);
+	const currentEndTop = previousEndTop !== null ? readTwoHopRowTop(plan, params.endRow) : null;
 
-	out.previousStartRowTop = previousStart?.top ?? null;
-	out.currentStartRowTop = currentStart.top;
-	out.previousEndRowTop = previousEnd?.top ?? null;
-	out.currentEndRowTop = currentEnd?.top ?? null;
+	out.previousStartRowTop = previousStartTop;
+	out.currentStartRowTop = currentStartTop;
+	out.previousEndRowTop = previousEndTop;
+	out.currentEndRowTop = currentEndTop;
 }
 
 function upperBoundSectionTop(
@@ -992,17 +1015,25 @@ interface FirstTwoHopRowByTopResolution {
 	readonly sectionIndex: number;
 }
 
-function resolveFirstTwoHopRowByTopFromSection(
+interface FirstTwoHopRowByTopResolutionScratch {
+	rowIndex: number;
+	sectionIndex: number;
+}
+
+function writeFirstTwoHopRowByTopFromSection(
+	out: FirstTwoHopRowByTopResolutionScratch,
 	sections: readonly TwoHopSectionPlan[],
 	rowStride: number,
 	target: number,
 	inclusive: boolean,
 	sectionIndex: number,
 	rowCount: number,
-): FirstTwoHopRowByTopResolution {
+): void {
 	const section = sections[sectionIndex];
 	if (!section) {
-		return { rowIndex: rowCount, sectionIndex: sections.length };
+		out.rowIndex = rowCount;
+		out.sectionIndex = sections.length;
+		return;
 	}
 	const relativeTarget = target - section.top;
 	const rowIndexInSection = inclusive
@@ -1010,19 +1041,19 @@ function resolveFirstTwoHopRowByTopFromSection(
 		: Math.floor(relativeTarget / rowStride) + 1;
 	const firstMatchingRowIndex = Math.max(0, rowIndexInSection);
 	if (firstMatchingRowIndex < section.rowCount) {
-		return {
-			rowIndex: section.firstRowIndex + firstMatchingRowIndex,
-			sectionIndex,
-		};
+		out.rowIndex = section.firstRowIndex + firstMatchingRowIndex;
+		out.sectionIndex = sectionIndex;
+		return;
 	}
 	const nextSectionIndex = sectionIndex + 1;
 	const nextSection = sections[nextSectionIndex];
-	return nextSection
-		? {
-				rowIndex: nextSection.firstRowIndex,
-				sectionIndex: nextSectionIndex,
-			}
-		: { rowIndex: rowCount, sectionIndex: sections.length };
+	if (nextSection) {
+		out.rowIndex = nextSection.firstRowIndex;
+		out.sectionIndex = nextSectionIndex;
+	} else {
+		out.rowIndex = rowCount;
+		out.sectionIndex = sections.length;
+	}
 }
 
 function canResolveFirstTwoHopRowByTopFromSection(
@@ -1069,7 +1100,62 @@ function resolveFirstTwoHopRowByTop(
 			: { rowIndex: rowCount, sectionIndex: sections.length };
 	}
 	const sectionIndex = Math.max(0, boundaryIndex - 1);
-	return resolveFirstTwoHopRowByTopFromSection(
+	const scratch: FirstTwoHopRowByTopResolutionScratch = { rowIndex: 0, sectionIndex: 0 };
+	writeFirstTwoHopRowByTopFromSection(
+		scratch,
+		sections,
+		rowStride,
+		target,
+		inclusive,
+		sectionIndex,
+		rowCount,
+	);
+	return { rowIndex: scratch.rowIndex, sectionIndex: scratch.sectionIndex };
+}
+
+/**
+ * Into-style variant of {@link resolveFirstTwoHopRowByTop}.
+ * Writes into a reusable scratch object instead of allocating.
+ */
+function writeFirstTwoHopRowByTop(
+	out: FirstTwoHopRowByTopResolutionScratch,
+	sections: readonly TwoHopSectionPlan[],
+	rowStride: number,
+	target: number,
+	inclusive: boolean,
+): void {
+	if (sections.length === 0) {
+		out.rowIndex = 0;
+		out.sectionIndex = 0;
+		return;
+	}
+	const lastSection = sections[sections.length - 1];
+	const rowCount = lastSection.firstRowIndex + lastSection.rowCount;
+	const boundaryIndex = inclusive
+		? lowerBoundSectionTop(sections, target)
+		: upperBoundSectionTop(sections, target);
+	if (inclusive) {
+		const matchingSection = sections[boundaryIndex];
+		if (matchingSection?.top === target) {
+			out.rowIndex = matchingSection.firstRowIndex;
+			out.sectionIndex = boundaryIndex;
+			return;
+		}
+	}
+	if (rowStride <= 0) {
+		const matchingSection = sections[boundaryIndex];
+		if (matchingSection) {
+			out.rowIndex = matchingSection.firstRowIndex;
+			out.sectionIndex = boundaryIndex;
+		} else {
+			out.rowIndex = rowCount;
+			out.sectionIndex = sections.length;
+		}
+		return;
+	}
+	const sectionIndex = Math.max(0, boundaryIndex - 1);
+	writeFirstTwoHopRowByTopFromSection(
+		out,
 		sections,
 		rowStride,
 		target,
@@ -1108,7 +1194,13 @@ function writeTwoHopRowsByOffset(
 	const rowStride = rowHeight + rowGap;
 	const startTarget = startOffset - rowHeight;
 	const endTarget = endOffset;
-	const startResolution = resolveFirstTwoHopRowByTop(
+	// Reusable scratch to avoid allocating resolution objects per call.
+	const resolutionScratch: FirstTwoHopRowByTopResolutionScratch = {
+		rowIndex: 0,
+		sectionIndex: 0,
+	};
+	writeFirstTwoHopRowByTop(
+		resolutionScratch,
 		sections,
 		rowStride,
 		startTarget,
@@ -1116,26 +1208,40 @@ function writeTwoHopRowsByOffset(
 	);
 	const lastSection = sections[sections.length - 1];
 	const rowCount = lastSection.firstRowIndex + lastSection.rowCount;
-	const end =
+	const start = resolutionScratch.rowIndex;
+	const startSectionIndex = resolutionScratch.sectionIndex;
+	let endRow: number;
+	if (
 		rowStride > 0 &&
 		canResolveFirstTwoHopRowByTopFromSection(
 			sections,
 			endTarget,
 			true,
-			startResolution.sectionIndex,
+			startSectionIndex,
 		)
-			? resolveFirstTwoHopRowByTopFromSection(
-					sections,
-					rowStride,
-					endTarget,
-					true,
-					startResolution.sectionIndex,
-					rowCount,
-				).rowIndex
-			: resolveFirstTwoHopRowByTop(sections, rowStride, endTarget, true).rowIndex;
-	const start = startResolution.rowIndex;
-	out.start = start < end ? start : 0;
-	out.end = start < end ? end : 0;
+	) {
+		writeFirstTwoHopRowByTopFromSection(
+			resolutionScratch,
+			sections,
+			rowStride,
+			endTarget,
+			true,
+			startSectionIndex,
+			rowCount,
+		);
+		endRow = resolutionScratch.rowIndex;
+	} else {
+		writeFirstTwoHopRowByTop(
+			resolutionScratch,
+			sections,
+			rowStride,
+			endTarget,
+			true,
+		);
+		endRow = resolutionScratch.rowIndex;
+	}
+	out.start = start < endRow ? start : 0;
+	out.end = start < endRow ? endRow : 0;
 }
 
 export function findTwoHopRowsByOffsetInto(

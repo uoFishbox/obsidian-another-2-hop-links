@@ -80,12 +80,6 @@ interface MountedVirtualGridCellsBuildState<
 	gap: number;
 }
 
-interface VirtualGridCellResolver<T> {
-	readonly revision: unknown;
-	readonly cellCount: number;
-	resolveCellAtIndex(index: number): VirtualListLogicalCell<T> | null;
-}
-
 // Module-level comparator avoids allocating a fresh closure on every scroll
 // frame when sorting the free row-slot pool in-place.
 const compareVirtualGridRowSlotIndex = (left: number, right: number): number =>
@@ -413,8 +407,10 @@ const assertMountedVirtualGridBuildInvariants = <T>(
 	}
 };
 
-function buildMountedVirtualGridCellsFromResolver<T>(params: {
-	cellResolver: VirtualGridCellResolver<T>;
+function buildMountedVirtualGridCellsFromCore<T>(params: {
+	cellCount: number;
+	cellSourceRevision: unknown;
+	resolveCellAtIndex: (index: number) => VirtualListLogicalCell<T> | null;
 	visibleWindow: VisibleCellWindow;
 	columns: number;
 	cellWidth: number;
@@ -430,7 +426,7 @@ function buildMountedVirtualGridCellsFromResolver<T>(params: {
 	const previousBuildState = getMountedVirtualGridCellsBuildState(previousBuild);
 	const visibleWindow = clampVisibleWindow(
 		params.visibleWindow,
-		params.cellResolver.cellCount,
+		params.cellCount,
 	);
 	const visibleRows = resolveVisibleRowWindow(visibleWindow, columns);
 	const rowStep = params.rowHeight + params.gap;
@@ -440,7 +436,7 @@ function buildMountedVirtualGridCellsFromResolver<T>(params: {
 		previousBuild,
 		previousBuildState,
 		{
-			cellSourceRevision: params.cellResolver.revision,
+			cellSourceRevision: params.cellSourceRevision,
 			columns,
 			cellWidth: params.cellWidth,
 			rowHeight: params.rowHeight,
@@ -503,7 +499,7 @@ function buildMountedVirtualGridCellsFromResolver<T>(params: {
 		const rowStartIndex = Math.max(visibleWindow.start, rowIndex * columns);
 		const rowEndIndex = Math.min(
 			visibleWindow.end,
-			params.cellResolver.cellCount,
+			params.cellCount,
 			(rowIndex + 1) * columns,
 		);
 		const previousRowWithCompatibleSlot = hasCompatiblePreviousRowSlots
@@ -537,7 +533,7 @@ function buildMountedVirtualGridCellsFromResolver<T>(params: {
 		const rowCells: MountedVirtualGridCell<T>[] = [];
 
 		for (let cellIndex = rowStartIndex; cellIndex < rowEndIndex; cellIndex += 1) {
-			const cell = params.cellResolver.resolveCellAtIndex(cellIndex);
+			const cell = params.resolveCellAtIndex(cellIndex);
 			if (!cell || cellIndex >= visibleWindow.end) {
 				continue;
 			}
@@ -624,7 +620,7 @@ function buildMountedVirtualGridCellsFromResolver<T>(params: {
 		reusableCellsByKey,
 		nextRenderSlotIndex: nextRowSlotIndex * columns,
 		visibleWindow,
-		cellSourceRevision: params.cellResolver.revision,
+		cellSourceRevision: params.cellSourceRevision,
 		columns,
 		cellWidth: params.cellWidth,
 		rowHeight: params.rowHeight,
@@ -646,8 +642,11 @@ export function buildMountedVirtualGridCells<T>(params: {
 	renderRevisionFallbackPolicy?: RenderRevisionFallbackPolicy;
 	reusableRowSlotsScratch?: number[];
 }): MountedVirtualGridCellsBuildResult<T> {
-	return buildMountedVirtualGridCellsFromResolver({
-		cellResolver: createArrayBackedFlatLogicalCellSource(params.logicalCells),
+	const resolver = createArrayBackedFlatLogicalCellSource(params.logicalCells);
+	return buildMountedVirtualGridCellsFromCore({
+		cellCount: resolver.cellCount,
+		cellSourceRevision: resolver.revision,
+		resolveCellAtIndex: (index) => resolver.resolveCellAtIndex(index),
 		visibleWindow: params.visibleWindow,
 		columns: params.columns,
 		cellWidth: params.cellWidth,
@@ -669,12 +668,12 @@ export function buildMountedVirtualGridCellsFromRowModel<T>(params: {
 	reusableRowSlotsScratch?: number[];
 }): MountedVirtualGridCellsBuildResult<T> {
 	const { rowModel } = params;
-	return buildMountedVirtualGridCellsFromResolver({
-		cellResolver: {
-			revision: rowModel.cellSource.revision,
-			cellCount: rowModel.cellCount,
-			resolveCellAtIndex: (index) => rowModel.resolveCellAtIndex(index),
-		},
+	// Pass rowModel fields directly to avoid allocating a resolver object
+	// and closure on every scroll frame.
+	return buildMountedVirtualGridCellsFromCore({
+		cellCount: rowModel.cellCount,
+		cellSourceRevision: rowModel.cellSource.revision,
+		resolveCellAtIndex: (index) => rowModel.resolveCellAtIndex(index),
 		visibleWindow: computeVisibleCellWindow({
 			cellCount: rowModel.cellCount,
 			columns: rowModel.layout.columns,

@@ -39,6 +39,18 @@ export interface SectionedGridResolvedRow {
 	readonly top: number;
 }
 
+/**
+ * Mutable scratch object for {@link resolveRowInSectionInto} callbacks.
+ * Callers must read scalar values immediately after the callback returns
+ * because the same object is reused across iterations.
+ */
+export interface SectionedGridResolvedRowScratch {
+	rowIndexInSection: number;
+	sectionCellStartIndex: number;
+	cellCount: number;
+	top: number;
+}
+
 export interface SectionedGridMountedRowsBuild<T, G, TPlan> {
 	readonly cells: MountedFlatCell<T, G>[];
 	readonly rowSlices: MountedFlatRowSlice<T, G>[];
@@ -65,6 +77,17 @@ export interface BuildSectionedGridMountedRowsParams<
 		sectionPlan: TSection,
 		rowIndex: number,
 	): SectionedGridResolvedRow | null;
+	/**
+	 * Optional Into-style resolver that writes into a reusable scratch object
+	 * instead of allocating a new object per call. When provided, the builder
+	 * prefers this over {@link resolveRowInSection}.
+	 */
+	resolveRowInSectionInto?(
+		out: SectionedGridResolvedRowScratch,
+		plan: TPlan,
+		sectionPlan: TSection,
+		rowIndex: number,
+	): boolean;
 	readLogicalCellInSection(
 		plan: TPlan,
 		sectionIndex: number,
@@ -195,6 +218,16 @@ export function buildSectionedGridMountedRows<
 	let lastSectionIndex = -1;
 	let sectionLayout: SectionLayout<T, G> | null = null;
 
+	// Module-level scratch for Into-style resolution. Scalar values are read
+	// immediately per iteration, so reuse is safe.
+	const resolvedScratch: SectionedGridResolvedRowScratch = {
+		rowIndexInSection: 0,
+		sectionCellStartIndex: 0,
+		cellCount: 0,
+		top: 0,
+	};
+	const useInto = params.resolveRowInSectionInto !== undefined;
+
 	for (let rowIndex = start; rowIndex < end; rowIndex += 1) {
 		while (
 			sectionIndex >= 0 &&
@@ -206,7 +239,11 @@ export function buildSectionedGridMountedRows<
 		}
 		const sectionPlan = plan.sections[sectionIndex];
 		if (!sectionPlan) break;
-		const resolvedRow = params.resolveRowInSection(plan, sectionPlan, rowIndex);
+		const resolvedRow = useInto
+			? params.resolveRowInSectionInto!(resolvedScratch, plan, sectionPlan, rowIndex)
+				? resolvedScratch
+				: null
+			: params.resolveRowInSection(plan, sectionPlan, rowIndex);
 		if (!resolvedRow) continue;
 		const {
 			rowIndexInSection,

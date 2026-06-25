@@ -15,6 +15,7 @@ import {
 	findTwoHopSectionIndexByRow,
 	readTwoHopLogicalCellInSection,
 	resolveTwoHopRowInSection,
+	resolveTwoHopRowInSectionInto,
 	type TwoHopViewPlan,
 	type TwoHopViewPlanRowModel,
 } from "./twoHopViewPlan";
@@ -56,6 +57,7 @@ export function buildTwoHopMountedRows(params: {
 		reusableRowSlotsScratch: params.reusableRowSlotsScratch,
 		findSectionIndexByRow: findTwoHopSectionIndexByRow,
 		resolveRowInSection: resolveTwoHopRowInSection,
+		resolveRowInSectionInto: resolveTwoHopRowInSectionInto,
 		readLogicalCellInSection: readTwoHopLogicalCellInSection,
 	});
 }
