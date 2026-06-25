@@ -341,7 +341,14 @@
 			onMountedCellsChange={handleMountedCellsChange}
 			header={config.showSectionHeader ? sectionHeader : undefined}
 		>
-			{#snippet item({ item, observerRoot, visibility, visibilityState, rowIndex, activationCandidateId })}
+			{#snippet item({
+				item,
+				observerRoot,
+				visibility,
+				visibilityState,
+				rowIndex,
+				activationCandidateId,
+			})}
 				{@const ItemComponent = config.itemComponent}
 				{@const previewRefreshToken =
 					previewRefreshTokens[config.getItemKey(item)] ?? 0}
