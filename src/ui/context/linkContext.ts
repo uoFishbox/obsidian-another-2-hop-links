@@ -13,6 +13,8 @@ export type {
 	PreviewDomRenderer,
 	PreviewRequestOptions,
 } from "features/preview/public-types";
+export type { LinkUtilitiesContext } from "types/linkContext";
+import type { LinkUtilitiesContext } from "types/linkContext";
 
 export interface BookmarksState {
 	filePaths: Set<string>;
@@ -23,25 +25,6 @@ export interface BookmarksState {
 export interface LinkInteractionOptions {
 	highlightMode?: HighlightMode;
 	preferredPosition?: Pos;
-}
-
-export interface LinkUtilitiesContext {
-	getPreview: (
-		file: TFile,
-		signal?: AbortSignal,
-		options?: PreviewRequestOptions,
-	) => Promise<PreviewData>;
-	getVisiblePreviewQueueSize?: () => number;
-	resolveFile: (path: string) => TFile | null;
-	buildWikiLink: (targetFile: TFile | null, fallback: string) => string;
-	fileToLinktext: (
-		targetFile: TFile,
-		sourcePath: string,
-		omitMdExtension?: boolean,
-	) => string;
-	sourceFile: TFile;
-	getMetadata: (file: TFile) => CachedMetadata | null;
-	onShowFileMenu?: (event: MouseEvent, file: TFile) => void;
 }
 
 export interface LinkInteractionContext {

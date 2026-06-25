@@ -5,7 +5,7 @@ import type { DataUpdateContext } from "core/indexing/index-service/IndexEvents"
 import type { StylingService } from "features/link-decoration/stylingService";
 import type { RenderedMdElementsRegistry } from "../markdown/RenderedMdElementsRegistry";
 import type { PropertyWidgetStyler } from "../../features/link-decoration/propertyWidgetStyler";
-import type { PluginHost } from "types/pluginHost";
+import type { PluginHostUi } from "types/pluginHostUi";
 import {
 	getBasesLinkLookupKey,
 	processBasesPane,
@@ -23,7 +23,7 @@ export interface ViewUpdateOrchestrator {
 
 export interface ViewUpdateOrchestratorDeps {
 	app: App;
-	plugin: PluginHost;
+	plugin: PluginHostUi;
 	stylingService: StylingService;
 	markdownRenderManager: RenderedMdElementsRegistry;
 	propertyStyleManager: PropertyWidgetStyler;

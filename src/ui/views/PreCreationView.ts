@@ -18,7 +18,7 @@ import { dedupeBySourceFile } from "core/indexing/backlink-builder/backlinkIndex
 import TagNotesListHost from "ui/components/lists/TagNotesListHost.svelte";
 import ViewItemCard from "ui/components/items/ViewItemCard.svelte";
 import type { ListConfig } from "ui/components/lists/types";
-import type { PluginHost } from "types/pluginHost";
+import type { PluginHostUi } from "types/pluginHostUi";
 import type { TwoHopIndexedLink } from "types/domain";
 import type { DataUpdateContext } from "core/indexing/index-service/IndexEvents";
 import { AbstractSvelteListView } from "ui/views/shared/abstractSvelteListView";
@@ -87,7 +87,7 @@ export class PreCreationView extends AbstractSvelteListView<TwoHopIndexedLink> {
 	private titleCancelled = false;
 	private originalTitleText = "";
 
-	constructor(leaf: WorkspaceLeaf, plugin: PluginHost) {
+	constructor(leaf: WorkspaceLeaf, plugin: PluginHostUi) {
 		super(leaf, plugin);
 		this.hydrateFromPersistedBootstrapState();
 		this.hydrateFromPendingBootstrapState();

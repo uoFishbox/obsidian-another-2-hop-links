@@ -1,6 +1,6 @@
 import type { TFile } from "obsidian";
 import type { TwoHopIndexedLink, TwoHopLinkBranch, TaggedNote } from "types";
-import type { LinkUtilitiesContext } from "ui/context/linkContext";
+import type { LinkUtilitiesContext } from "types/linkContext";
 import type { ViewItem } from "./ViewItem";
 
 export type ViewItemData = TwoHopIndexedLink | TwoHopLinkBranch | TaggedNote | TFile;

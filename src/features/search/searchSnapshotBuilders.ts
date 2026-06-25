@@ -1,12 +1,8 @@
 import type { TFile } from "obsidian";
 import type { TwoHopIndexedLink } from "types/domain";
 import type { SearchWorkerItemSnapshot } from "./searchWorkerTypes";
-
-export type FileToLinktext = (
-	file: TFile,
-	sourcePath: string,
-	omitMdExtension?: boolean,
-) => string;
+import type { FileToLinktext } from "types/obsidian";
+export type { FileToLinktext };
 
 export function buildSearchWorkerItemSnapshot(
 	key: string,

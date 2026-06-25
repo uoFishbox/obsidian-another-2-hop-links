@@ -4,7 +4,7 @@ import type { DataUpdateContext } from "core/indexing/index-service/IndexEvents"
 import type { SortableItem } from "core/sorting";
 import { toViewItems, type ViewItem } from "application/presenters";
 import type { ComponentInstance } from "infrastructure/lifecycle/ComponentController";
-import type { PluginHost } from "types/pluginHost";
+import type { PluginHostUi } from "types/pluginHostUi";
 import type { ListConfig } from "ui/components/lists/types";
 import type { ApplicationStore } from "ui/stores/ApplicationStore.svelte";
 import { createGuardedIndexUpdateHandler } from "ui/views/shared/indexUpdateLifecycle";
@@ -68,7 +68,7 @@ export abstract class AbstractSvelteListView<
 
 	constructor(
 		leaf: WorkspaceLeaf,
-		protected readonly plugin: PluginHost,
+		protected readonly plugin: PluginHostUi,
 	) {
 		super(leaf);
 		this.navigation = true;

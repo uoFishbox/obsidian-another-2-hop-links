@@ -10,7 +10,7 @@ import type { TwoHopLinkResult } from "types/domain";
 import type { DisplayDataBuilder } from "ui/stores/ApplicationStore.svelte";
 import { IndexingService } from "core/indexing/index-service/IndexingService";
 import { ApplicationStore } from "ui/stores/ApplicationStore.svelte";
-import type { PluginHost } from "types/pluginHost";
+import type { PluginHostUi } from "types/pluginHostUi";
 import type { ResolveTwoHopLinks } from "ui/stores/application/TwoHopLinksLoader";
 import { mountTwoHopLinksRootView } from "ui/views/shared/viewFactories";
 import type { SvelteComponentInstance } from "ui/views/shared/svelteLifecycle";
@@ -43,7 +43,7 @@ export class ComponentController implements IComponentManager {
 
 	constructor(
 		private readonly app: App,
-		private readonly plugin: PluginHost,
+		private readonly plugin: PluginHostUi,
 		private readonly getSettings: () => PluginSettings,
 		private readonly indexingService: IndexingService,
 		private readonly updateSortOption: (option: SortOption) => void,

@@ -1,14 +1,9 @@
 import type { MarkdownView, Plugin, TFile } from "obsidian";
-import type { StateEffectType } from "@codemirror/state";
 import type { IndexingService } from "core/indexing/index-service/IndexingService";
 import type { SortService } from "core/sorting/SortService";
-import type { DisplayDataBuilder } from "application/presenters/displayDataBuilder";
-import type { LinkContext } from "ui/context/linkContext";
-import type { ApplicationStore } from "ui/stores/ApplicationStore.svelte";
 import type { PluginSettings } from "types/settings";
 import type { ResolveProgress, TwoHopLinkResult } from "types/domain";
 import type { ResolveOptions } from "core/indexing/two-hop-resolver/TwoHopLinkResolver";
-import type { ResolveTwoHopLinks } from "ui/stores/application/TwoHopLinksLoader";
 
 /**
  * SettingsManager のうち、PluginHost 経由で外部から参照されるメンバー。
@@ -74,28 +69,13 @@ export interface PluginHost extends Plugin {
 	sortService: SortService;
 	indexUpdateQueue: PluginIndexUpdateQueue;
 	componentController: PluginComponentController;
-	readonly forceRedrawEffect: StateEffectType<undefined>;
 
-	createDisplayDataBuilder(): DisplayDataBuilder;
 	getSortContextVersion(): number;
 	getTwoHopLinkResult(
 		file: TFile,
 		onProgress?: (progress: ResolveProgress) => void,
 		options?: ResolveOptions,
 	): Promise<TwoHopLinkResult>;
-	getLinkContextFactory(): (file: TFile, settings: PluginSettings) => LinkContext;
-	createApplicationStore(
-		settings: PluginSettings,
-		displayDataBuilder: DisplayDataBuilder,
-		resolveTwoHopLinks: ResolveTwoHopLinks,
-	): ApplicationStore;
-	getOrCreateApplicationStore(
-		leafId: string,
-		filePath: string,
-		settings: PluginSettings,
-		displayDataBuilder: DisplayDataBuilder,
-		resolveTwoHopLinks: ResolveTwoHopLinks,
-	): ApplicationStore;
 	clearStore(leafId: string, filePath: string): void;
 	processUnresolvedLinksInElement(el: HTMLElement, sourcePath: string): void;
 	updateSetting<K extends keyof PluginSettings>(

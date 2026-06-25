@@ -1,4 +1,4 @@
-import type { PluginHost } from "types/pluginHost";
+import type { PluginHostUi } from "types/pluginHostUi";
 import type { TFile } from "obsidian";
 import { createViewLinkContext } from "ui/pages/utils";
 import type { LinkContext } from "ui/context/linkContext";
@@ -10,7 +10,7 @@ import TwoHopLinksPage from "ui/pages/TwoHopLinksPage.svelte";
 import type { SvelteComponentInstance } from "ui/views/shared/svelteLifecycle";
 
 export function createDefaultApplicationStore(
-	plugin: PluginHost,
+	plugin: PluginHostUi,
 	settings: PluginSettings = plugin.settings,
 ): ApplicationStore {
 	const displayDataBuilder = plugin.createDisplayDataBuilder();
@@ -27,7 +27,7 @@ export function createDefaultApplicationStore(
 }
 
 export function createLinkContextForView(
-	plugin: PluginHost,
+	plugin: PluginHostUi,
 	sourceFile: TFile,
 	settings: PluginSettings = plugin.settings,
 	options?: { wrapForView?: boolean; closeView?: () => void },
@@ -43,7 +43,7 @@ export function createLinkContextForView(
 
 interface MountTwoHopLinksRootViewOptions {
 	target: Element;
-	plugin: PluginHost;
+	plugin: PluginHostUi;
 	file: TFile;
 	settings: PluginSettings;
 	lazyLoaderCache: Set<string>;

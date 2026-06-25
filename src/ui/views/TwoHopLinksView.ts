@@ -1,5 +1,5 @@
 import { ItemView, WorkspaceLeaf, TFile, type IconName } from "obsidian";
-import type { PluginHost } from "types/pluginHost";
+import type { PluginHostUi } from "types/pluginHostUi";
 import type { ApplicationStore } from "ui/stores/ApplicationStore.svelte";
 import {
 	cleanupSvelteAndStore,
@@ -17,7 +17,7 @@ export class TwoHopLinksView extends ItemView {
 
 	constructor(
 		leaf: WorkspaceLeaf,
-		private plugin: PluginHost,
+		private plugin: PluginHostUi,
 	) {
 		super(leaf);
 	}

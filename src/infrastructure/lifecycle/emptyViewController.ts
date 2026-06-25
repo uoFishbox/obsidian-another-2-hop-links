@@ -1,6 +1,6 @@
 import { TFile, type App, type WorkspaceLeaf } from "obsidian";
 import { mount, unmount } from "svelte";
-import type { PluginHost } from "types/pluginHost";
+import type { PluginHostUi } from "types/pluginHostUi";
 import type { ApplicationStore } from "ui/stores/ApplicationStore.svelte";
 import type { ComponentInstance } from "infrastructure/lifecycle/ComponentController";
 import AllNotesPage from "ui/pages/AllNotesPage.svelte";
@@ -22,7 +22,7 @@ export interface EmptyViewController {
 
 export function createEmptyViewController(
 	app: App,
-	plugin: PluginHost,
+	plugin: PluginHostUi,
 ): EmptyViewController {
 	const mountedByLeafId = new Map<string, MountedEmptyView>();
 

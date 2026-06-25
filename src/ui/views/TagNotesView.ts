@@ -13,6 +13,7 @@ import TagNotesListHost from "ui/components/lists/TagNotesListHost.svelte";
 import ViewItemCard from "ui/components/items/ViewItemCard.svelte";
 import type { ListConfig } from "ui/components/lists/types";
 import type { PluginHost } from "types/pluginHost";
+import type { PluginHostUi } from "types/pluginHostUi";
 import type { TaggedNote } from "types/domain";
 import { areTagFeaturesEnabled } from "types/settings";
 import type { DataUpdateContext } from "core/indexing/index-service/IndexEvents";
@@ -66,7 +67,7 @@ export class TagNotesView extends AbstractSvelteListView<TaggedNote> {
 	private autofocusNextRender = true;
 	private infoTextEl: HTMLParagraphElement | undefined = undefined;
 
-	constructor(leaf: WorkspaceLeaf, plugin: PluginHost) {
+	constructor(leaf: WorkspaceLeaf, plugin: PluginHostUi) {
 		super(leaf, plugin);
 	}
 

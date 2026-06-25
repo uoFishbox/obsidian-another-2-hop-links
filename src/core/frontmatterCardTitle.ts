@@ -1,5 +1,5 @@
 import type { CachedMetadata, TFile } from "obsidian";
-import type { FileToLinktext } from "features/search/searchSnapshotBuilders";
+import type { FileToLinktext } from "types/obsidian";
 
 export type GetFileMetadata = (file: TFile) => CachedMetadata | null;
 

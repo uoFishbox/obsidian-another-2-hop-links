@@ -54,3 +54,9 @@ export interface IVault {
 	cachedRead(file: TFile): Promise<string>;
 	getResourcePath(file: TFile): string;
 }
+
+export type FileToLinktext = (
+	file: TFile,
+	sourcePath: string,
+	omitMdExtension?: boolean,
+) => string;

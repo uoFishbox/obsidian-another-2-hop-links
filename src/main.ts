@@ -81,9 +81,9 @@ import { registerFileMenu } from "infrastructure/registration/registerFileMenu";
 import { installAllPatchers } from "infrastructure/patchers/installAllPatchers";
 import { setupWorkspaceEventHandlers } from "infrastructure/workspace/workspaceEventBootstrap";
 import { PatchRegistry } from "infrastructure/capabilities/PatchRegistry";
-import type { PluginHost } from "types/pluginHost";
+import type { PluginHostUi } from "types/pluginHostUi";
 
-export default class CosenseCardLinksPlugin extends Plugin implements PluginHost {
+export default class CosenseCardLinksPlugin extends Plugin implements PluginHostUi {
 	public settings: PluginSettings = { ...DEFAULT_SETTINGS };
 	public settingsManager!: SettingsManager;
 	private readonly patchRegistry = new PatchRegistry();
