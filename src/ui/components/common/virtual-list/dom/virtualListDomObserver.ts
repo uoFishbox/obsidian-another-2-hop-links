@@ -471,8 +471,9 @@ const handleScrollPhase = (entry: ScrollerViewportEntry, phase: ScrollPhase): vo
 		markScrollActivityActive(entry.scrollActivitySource);
 		disconnectStructureObserver(entry);
 
-		getActiveSubscriber(entry)?.cancelInitialStabilizationMeasurement?.();
-		getActiveSubscriber(entry)?.onScrollStart?.();
+		const subscriber = getActiveSubscriber(entry);
+		subscriber?.cancelInitialStabilizationMeasurement?.();
+		subscriber?.onScrollStart?.();
 	}
 
 	if (entry.becameIdle) {
