@@ -1415,6 +1415,23 @@ export interface TwoHopViewPlanRowModel extends VirtualRowModel<
 			previewVisible: RowRange;
 		},
 	): void;
+	/**
+	 * Computes the scrollTop band within which the mounted range is guaranteed
+	 * not to change. Used as a pre-check before the expensive
+	 * {@link findVisibleRangeInto} call on the active scroll path.
+	 *
+	 * Unlike {@link findStablePreviewScrollTopBandInto} which can return an
+	 * infinite band when `previewOverscanPx >= mountedOverscanPx`, this method
+	 * always computes a finite band from the actual mounted range boundaries.
+	 */
+	findStableMountedScrollTopBandInto(
+		out: StablePreviewScrollTopBandMutable,
+		params: {
+			mountedOverscanPx: number;
+			viewportHeight: number;
+			mounted: RowRange;
+		},
+	): void;
 	resolveRowTopsForBandInto(
 		out: TwoHopBandRowTopsMutable,
 		params: ResolveTwoHopRowTopsForBandParams,
@@ -1616,6 +1633,21 @@ export function createTwoHopViewPlanRowModel(
 			overscanPx: previewOverscanPx,
 		});
 	};
+	const findStableMountedScrollTopBandInto = (
+		out: StablePreviewScrollTopBandMutable,
+		params: {
+			mountedOverscanPx: number;
+			viewportHeight: number;
+			mounted: RowRange;
+		},
+	): void => {
+		const mountedOverscanPx = Math.max(0, params.mountedOverscanPx);
+		writeTwoHopStablePreviewScrollTopBand(out, stablePreviewRowTops, plan, {
+			previewVisible: params.mounted,
+			viewportHeight: params.viewportHeight,
+			overscanPx: mountedOverscanPx,
+		});
+	};
 	const resolveRowTopsForBandInto = (
 		out: TwoHopBandRowTopsMutable,
 		params: ResolveTwoHopRowTopsForBandParams,
@@ -1714,6 +1746,7 @@ export function createTwoHopViewPlanRowModel(
 		findVisibleRangesFromMounted: findRangesFromMounted,
 		findVisibleRangesFromMountedInto: findRangesFromMountedInto,
 		findStablePreviewScrollTopBandInto,
+		findStableMountedScrollTopBandInto,
 		resolveRowTopsForBandInto,
 		resolveNavigationTarget,
 	};

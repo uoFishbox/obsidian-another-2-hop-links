@@ -78,6 +78,14 @@ interface MeasuredViewPlanRowModel {
 			previewVisible: RowRange;
 		},
 	): void;
+	findStableMountedScrollTopBandInto(
+		out: StablePreviewScrollTopBandMutable,
+		params: {
+			mountedOverscanPx: number;
+			viewportHeight: number;
+			mounted: RowRange;
+		},
+	): void;
 }
 
 type StablePreviewScrollTopBandMutable = {
@@ -164,10 +172,6 @@ export function createViewPlanMeasurementRuntime<
 		mountedOverscanPx: 0,
 		previewOverscanPx: 0,
 	};
-	const mountedScrollWindowBandStable: StablePreviewScrollTopBandMutable = {
-		min: 0,
-		max: 0,
-	};
 	let lastResolvedActiveScrollPolicyLayout: ViewPlanLayoutMetrics | undefined;
 	let lastResolvedActiveScrollPolicy: ViewPlanCardVirtualListPolicy | undefined;
 
@@ -177,6 +181,10 @@ export function createViewPlanMeasurementRuntime<
 		stableMountedScrollTopBand: undefined as
 			| import("../dom/activeScrollWindowGate").StableScrollTopBand
 			| undefined,
+	};
+	const mountedStableBandScratch: StablePreviewScrollTopBandMutable = {
+		min: 0,
+		max: 0,
 	};
 	const scrollWindowMeasurement = {
 		identity: params.runtime.rowModel,
@@ -229,6 +237,27 @@ export function createViewPlanMeasurementRuntime<
 			mountedOverscanPx: rangeParams.mountedOverscanPx,
 			previewOverscanPx: rangeParams.previewOverscanPx,
 			previewVisible,
+		});
+		out.min += sectionTop;
+		out.max += sectionTop;
+	};
+	const updateStableMountedScrollTopBand = (
+		out: StablePreviewScrollTopBandMutable,
+		measurementRowModel: TRowModel,
+		sectionTop: number,
+		mountedOverscanPx: number,
+		viewportHeight: number,
+		mounted: RowRange,
+	): void => {
+		if (mounted.start >= mounted.end) {
+			out.min = Number.POSITIVE_INFINITY;
+			out.max = Number.NEGATIVE_INFINITY;
+			return;
+		}
+		measurementRowModel.findStableMountedScrollTopBandInto(out, {
+			mountedOverscanPx,
+			viewportHeight,
+			mounted,
 		});
 		out.min += sectionTop;
 		out.max += sectionTop;
@@ -318,9 +347,26 @@ export function createViewPlanMeasurementRuntime<
 				);
 			}
 			const visibilityPolicy = lastResolvedActiveScrollPolicy!;
-			mountedRangeParams.scrollTop = scrollTop - sectionTop;
+			const localScrollTop = scrollTop - sectionTop;
+			const mountedOverscanPx = visibilityPolicy.mountedOverscanPx;
+
+			// Pre-check: if the current scrollTop falls within the previously
+			// computed stable band for the mounted range, the mounted range is
+			// guaranteed not to change. Skip the expensive findVisibleRangeInto()
+			// binary search entirely.
+			const prevBand = mountedScrollWindowMeasurement.stableMountedScrollTopBand;
+			if (
+				prevBand !== undefined &&
+				scrollTop > prevBand.min &&
+				scrollTop < prevBand.max &&
+				mountedScrollWindowMeasurement.identity === measurementRowModel
+			) {
+				return mountedScrollWindowMeasurement;
+			}
+
+			mountedRangeParams.scrollTop = localScrollTop;
 			mountedRangeParams.viewportHeight = viewportHeight;
-			mountedRangeParams.overscanPx = visibilityPolicy.mountedOverscanPx;
+			mountedRangeParams.overscanPx = mountedOverscanPx;
 			mountedScrollWindowMeasurement.identity = measurementRowModel;
 			measurementRowModel.findVisibleRangeInto(
 				mountedScrollWindowMeasurement.mounted,
@@ -330,20 +376,16 @@ export function createViewPlanMeasurementRuntime<
 			if (mounted.start >= mounted.end) {
 				mountedScrollWindowMeasurement.stableMountedScrollTopBand = undefined;
 			} else {
-				measurementRowModel.findStablePreviewScrollTopBandInto(
-					mountedScrollWindowBandStable,
-					{
-						scrollTop: mountedRangeParams.scrollTop,
-						viewportHeight,
-						mountedOverscanPx: visibilityPolicy.mountedOverscanPx,
-						previewOverscanPx: visibilityPolicy.mountedOverscanPx,
-						previewVisible: mounted,
-					},
+				updateStableMountedScrollTopBand(
+					mountedStableBandScratch,
+					measurementRowModel,
+					sectionTop,
+					mountedOverscanPx,
+					viewportHeight,
+					mounted,
 				);
-				mountedScrollWindowBandStable.min += sectionTop;
-				mountedScrollWindowBandStable.max += sectionTop;
 				mountedScrollWindowMeasurement.stableMountedScrollTopBand =
-					mountedScrollWindowBandStable;
+					mountedStableBandScratch;
 			}
 			return mountedScrollWindowMeasurement;
 		},

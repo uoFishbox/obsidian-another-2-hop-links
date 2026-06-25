@@ -348,6 +348,57 @@ describe("compileTwoHopViewPlan", () => {
 		).not.toEqual(ranges.previewVisible);
 	});
 
+	it("resolves a finite stable mounted scroll band", () => {
+		const plan = compileTwoHopViewPlan({
+			sections: [
+				createDescriptor([createItem("a"), createItem("b"), createItem("c")]),
+			],
+			sectionVisibleCounts: { "new-links": 3 },
+			layout,
+			resolveInitialSectionVisibleCount: () => 3,
+			clampVisibleCount: (_section, count) => count,
+		});
+		const rowModel = createTwoHopViewPlanRowModel(plan);
+
+		// Resolve the mounted range for scrollTop=0.
+		const mounted = { start: 0, end: 0 };
+		rowModel.findVisibleRangeInto(mounted, {
+			scrollTop: 0,
+			viewportHeight: 10,
+			overscanPx: 110,
+		});
+
+		const band = { min: Number.NaN, max: Number.NaN };
+		rowModel.findStableMountedScrollTopBandInto(band, {
+			mountedOverscanPx: 110,
+			viewportHeight: 10,
+			mounted,
+		});
+
+		// The band must be finite so the pre-check can actually gate.
+		expect(Number.isFinite(band.min)).toBe(true);
+		expect(Number.isFinite(band.max)).toBe(true);
+		expect(band.min).toBeLessThan(band.max);
+
+		// A scrollTop just inside the band must produce the same mounted range.
+		const inside = { start: 0, end: 0 };
+		rowModel.findVisibleRangeInto(inside, {
+			scrollTop: (band.min + band.max) / 2,
+			viewportHeight: 10,
+			overscanPx: 110,
+		});
+		expect(inside).toEqual(mounted);
+
+		// A scrollTop beyond the band must produce a different mounted range.
+		const beyond = { start: 0, end: 0 };
+		rowModel.findVisibleRangeInto(beyond, {
+			scrollTop: band.max + 200,
+			viewportHeight: 10,
+			overscanPx: 110,
+		});
+		expect(beyond).not.toEqual(mounted);
+	});
+
 	it("resolves adjacent row tops for a preview band across section boundaries", () => {
 		const plan = compileTwoHopViewPlan({
 			sections: [
