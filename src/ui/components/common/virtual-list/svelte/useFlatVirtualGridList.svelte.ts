@@ -142,15 +142,16 @@ export function useFlatVirtualGridList<T>(props: FlatVirtualGridListProps<T>) {
 	const rowPreviewActivationRuntime = getContext<
 		RowPreviewActivationRuntime | undefined
 	>(PREVIEW_ROW_ACTIVATION_CONTEXT_KEY);
-	const visibilityStates =
-		createVirtualizedItemVisibilityStateController<MountedVirtualGridCell<T>>({
-			onRowVisibilityChanged: (rowIndex, visibility) => {
-				rowPreviewActivationRuntime?.setRowVisibility(rowIndex, visibility);
-			},
-			onRowCleared: (rowIndex) => {
-				rowPreviewActivationRuntime?.clearRow(rowIndex);
-			},
-		});
+	const visibilityStates = createVirtualizedItemVisibilityStateController<
+		MountedVirtualGridCell<T>
+	>({
+		onRowVisibilityChanged: (rowIndex, visibility) => {
+			rowPreviewActivationRuntime?.setRowVisibility(rowIndex, visibility);
+		},
+		onRowCleared: (rowIndex) => {
+			rowPreviewActivationRuntime?.clearRow(rowIndex);
+		},
+	});
 	let visibilityMountedRows: readonly MountedVirtualGridRowSlice<T>[] | readonly [] =
 		EMPTY_MOUNTED_ROWS;
 	let visibilityMountedRange: RowRange = { start: 0, end: 0 };

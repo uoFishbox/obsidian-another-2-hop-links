@@ -6,11 +6,7 @@ import {
 	teardownAnimationFrameMock,
 } from "testing/helpers/DOMObserverMock";
 import VirtualSurfaceRecyclingHarness from "./VirtualSurfaceRecyclingHarness.svelte";
-import type {
-	MountedVirtualCell,
-	LogicalCellKey,
-	RenderSlotKey,
-} from "../types";
+import type { MountedVirtualCell, LogicalCellKey, RenderSlotKey } from "../types";
 
 // ---------------------------------------------------------------------------
 // Test model: grid cells over a fixed row stride
@@ -81,10 +77,7 @@ function buildRowCellsWithSlotReuse(
 	if (previousRows) {
 		for (const row of previousRows) {
 			allPreviousSlots.add(row.slotIndex);
-			if (
-				row.rowIndex >= rowStart &&
-				row.rowIndex < rowStart + mountedRows
-			) {
+			if (row.rowIndex >= rowStart && row.rowIndex < rowStart + mountedRows) {
 				retainedSlots.add(row.slotIndex);
 			}
 		}
@@ -161,9 +154,7 @@ function getProbeElements(shadowRoot: ShadowRoot): HTMLElement[] {
 }
 
 function getProbeKeys(shadowRoot: ShadowRoot): string[] {
-	return getProbeElements(shadowRoot).map(
-		(el) => el.getAttribute("data-key") ?? "",
-	);
+	return getProbeElements(shadowRoot).map((el) => el.getAttribute("data-key") ?? "");
 }
 
 // ---------------------------------------------------------------------------
@@ -201,9 +192,7 @@ describe("VirtualSurface DOM remount contracts", () => {
 		if (!shadowRoot) return;
 
 		await waitFor(() => {
-			expect(getProbeElements(shadowRoot).length).toBe(
-				MOUNTED_ROWS * COLUMNS,
-			);
+			expect(getProbeElements(shadowRoot).length).toBe(MOUNTED_ROWS * COLUMNS);
 		});
 
 		// Scroll forward by one row
@@ -293,9 +282,7 @@ describe("VirtualSurface DOM remount contracts", () => {
 		if (!shadowRoot) return;
 
 		await waitFor(() => {
-			expect(getProbeElements(shadowRoot).length).toBe(
-				MOUNTED_ROWS * COLUMNS,
-			);
+			expect(getProbeElements(shadowRoot).length).toBe(MOUNTED_ROWS * COLUMNS);
 		});
 
 		// Snapshot the DOM element identity for a retained logical item (row 15, col 1 → item 46)
@@ -356,7 +343,9 @@ describe("VirtualSurface DOM remount contracts", () => {
 		expect(mountedKeys.length).toBe(COLUMNS);
 
 		// All visible probes should reflect the new keys
-		const host2 = container.querySelector(".recycling-test-root") as HTMLElement | null;
+		const host2 = container.querySelector(
+			".recycling-test-root",
+		) as HTMLElement | null;
 		const shadowRoot = host2?.shadowRoot;
 		expect(shadowRoot).toBeTruthy();
 		if (!shadowRoot) return;
@@ -395,14 +384,12 @@ describe("VirtualSurface DOM remount contracts", () => {
 		if (!shadowRoot) return;
 
 		await waitFor(() => {
-			expect(getProbeElements(shadowRoot).length).toBe(
-				MOUNTED_ROWS * COLUMNS,
-			);
+			expect(getProbeElements(shadowRoot).length).toBe(MOUNTED_ROWS * COLUMNS);
 		});
 
 		// Snapshot the number of probe elements that carry the interaction id attribute
 		const interactionProbesBefore = shadowRoot.querySelectorAll(
-			'[data-ccl-interaction-id]',
+			"[data-ccl-interaction-id]",
 		).length;
 
 		// Shift mounted range by one row
@@ -418,7 +405,7 @@ describe("VirtualSurface DOM remount contracts", () => {
 
 		// The count of interaction-attributed probes should remain bounded
 		const interactionProbesAfter = shadowRoot.querySelectorAll(
-			'[data-ccl-interaction-id]',
+			"[data-ccl-interaction-id]",
 		).length;
 		expect(interactionProbesAfter).toBe(interactionProbesBefore);
 		expect(interactionProbesAfter).toBe(MOUNTED_ROWS * COLUMNS);

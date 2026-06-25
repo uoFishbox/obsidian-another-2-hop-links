@@ -279,12 +279,7 @@ export function requestPreviewActivation(
 		return createSettledActivationHandle(key, true, onSettled);
 	}
 
-	return enqueuePreviewActivationRequest(
-		key,
-		getVisibleQueueSize,
-		scope,
-		onSettled,
-	);
+	return enqueuePreviewActivationRequest(key, getVisibleQueueSize, scope, onSettled);
 }
 
 /**
@@ -305,12 +300,7 @@ export function requestQueuedPreviewActivation(
 		return createSettledActivationHandle(key, false, onSettled);
 	}
 
-	return enqueuePreviewActivationRequest(
-		key,
-		getVisibleQueueSize,
-		scope,
-		onSettled,
-	);
+	return enqueuePreviewActivationRequest(key, getVisibleQueueSize, scope, onSettled);
 }
 
 export function cancelPreviewActivation(key: string): void {

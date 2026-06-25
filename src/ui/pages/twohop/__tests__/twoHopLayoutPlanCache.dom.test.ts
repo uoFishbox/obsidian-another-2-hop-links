@@ -172,7 +172,8 @@ describe("createTwoHopLayoutPlanCache in a DOM runtime", () => {
 
 		expect(rowModel.plan.cellStore.revision).toBe(0);
 		expect(
-			rowModel.plan.cellStore.materializationStateBySectionIndex[0]?.materializedCellCount,
+			rowModel.plan.cellStore.materializationStateBySectionIndex[0]
+				?.materializedCellCount,
 		).toBe(0);
 		expect(onMaterialized).not.toHaveBeenCalled();
 		// No re-scheduled idle callback while scroll is active.

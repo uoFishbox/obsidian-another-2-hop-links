@@ -424,10 +424,7 @@ function buildMountedVirtualGridCellsFromCore<T>(params: {
 	const columns = Math.max(1, params.columns);
 	const previousBuild = params.previousBuild;
 	const previousBuildState = getMountedVirtualGridCellsBuildState(previousBuild);
-	const visibleWindow = clampVisibleWindow(
-		params.visibleWindow,
-		params.cellCount,
-	);
+	const visibleWindow = clampVisibleWindow(params.visibleWindow, params.cellCount);
 	const visibleRows = resolveVisibleRowWindow(visibleWindow, columns);
 	const rowStep = params.rowHeight + params.gap;
 	const colStep = params.cellWidth + params.gap;

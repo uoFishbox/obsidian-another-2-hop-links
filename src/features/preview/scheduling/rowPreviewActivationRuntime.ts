@@ -173,9 +173,7 @@ export function createRowPreviewActivationRuntime(
 		}
 	}
 
-	function registerCandidate(
-		candidate: RowPreviewActivationCandidate,
-	): () => void {
+	function registerCandidate(candidate: RowPreviewActivationCandidate): () => void {
 		const { id, rowIndex, activationKey } = candidate;
 		const state = getOrCreateRowState(rowIndex);
 

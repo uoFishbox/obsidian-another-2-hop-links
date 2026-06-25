@@ -34,9 +34,11 @@ interface TwoHopVisibilitySyncBuild {
 	readonly plan: TwoHopMountedRowsBuild["plan"] | null;
 }
 
-export function createTwoHopMountRuntime(params: {
-	rowPreviewActivationRuntime?: RowPreviewActivationRuntime;
-} = {}) {
+export function createTwoHopMountRuntime(
+	params: {
+		rowPreviewActivationRuntime?: RowPreviewActivationRuntime;
+	} = {},
+) {
 	const visibilityStates =
 		createVirtualizedItemVisibilityStateController<TwoHopMountedCell>({
 			onRowVisibilityChanged: (rowIndex, visibility) => {

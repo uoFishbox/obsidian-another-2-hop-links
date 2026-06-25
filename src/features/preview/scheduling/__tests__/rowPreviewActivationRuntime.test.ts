@@ -4,9 +4,7 @@ import {
 	type RowPreviewActivationCandidate,
 	type RowPreviewActivationRuntime,
 } from "../rowPreviewActivationRuntime";
-import {
-	resetPreviewActivationSchedulerForTests,
-} from "../previewActivationScheduler";
+import { resetPreviewActivationSchedulerForTests } from "../previewActivationScheduler";
 
 interface TestCandidateOptions {
 	readonly id: string;
@@ -110,12 +108,7 @@ describe("rowPreviewActivationRuntime", () => {
 		expect(activatedKeys).toEqual(["key-0", "key-1"]);
 
 		await flushAnimationFrame();
-		expect(activatedKeys).toEqual([
-			"key-0",
-			"key-1",
-			"key-2",
-			"key-3",
-		]);
+		expect(activatedKeys).toEqual(["key-0", "key-1", "key-2", "key-3"]);
 	});
 
 	it("cancels pending activations when a row returns to mounted", async () => {

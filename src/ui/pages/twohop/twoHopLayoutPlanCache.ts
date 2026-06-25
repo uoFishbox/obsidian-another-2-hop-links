@@ -1,6 +1,9 @@
 import type { RowRange } from "ui/components/common/virtual-list/rowRange";
 import type { ViewPlanLayoutMetrics } from "ui/components/common/virtual-list/svelte/viewPlanLayout";
-import { isScrollActivityActive, subscribeScrollActivity } from "infrastructure/scroll/scrollActivity";
+import {
+	isScrollActivityActive,
+	subscribeScrollActivity,
+} from "infrastructure/scroll/scrollActivity";
 import type { TwoHopSectionDescriptor } from "./twohopPageVirtualModel";
 import {
 	compileTwoHopViewPlan,

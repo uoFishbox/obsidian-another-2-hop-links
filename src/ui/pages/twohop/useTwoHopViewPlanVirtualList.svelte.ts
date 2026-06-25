@@ -18,7 +18,10 @@ import type { VirtualizedItemVisibilityState } from "ui/components/common/virtua
 import type { VirtualizedItemVisibility } from "ui/components/common/virtual-list/types";
 import type { TwoHopMountedRowsBuild } from "./twoHopMountedRowBuild";
 import { type TwoHopViewPlanRowModel } from "./twoHopViewPlan";
-import { rangeOverlap, type RowRange } from "ui/components/common/virtual-list/rowRange";
+import {
+	rangeOverlap,
+	type RowRange,
+} from "ui/components/common/virtual-list/rowRange";
 import type {
 	TwoHopPageVirtualSection,
 	TwoHopPageVirtualItem,
@@ -183,16 +186,24 @@ export function useTwoHopViewPlanVirtualList(props: TwoHopViewPlanVirtualListPro
 	});
 	$effect(() => {
 		const activeRowModel = rowModel;
-		return layoutPlanCache.scheduleMaterialization(activeRowModel, (affectedRowRange) => {
-			// Background materialization mostly builds cells for rows that are not
-			// currently mounted. Skip the synchronous recompute when the affected
-			// row range falls entirely outside the mounted range: the next scroll /
-			// mounted-range recompute will pick up the freshly materialized cells.
-			if (!affectsMountedRows(virtualList.getSnapshot()?.ranges.mounted, affectedRowRange)) {
-				return;
-			}
-			virtualList.recompute({ rowModel: activeRowModel });
-		});
+		return layoutPlanCache.scheduleMaterialization(
+			activeRowModel,
+			(affectedRowRange) => {
+				// Background materialization mostly builds cells for rows that are not
+				// currently mounted. Skip the synchronous recompute when the affected
+				// row range falls entirely outside the mounted range: the next scroll /
+				// mounted-range recompute will pick up the freshly materialized cells.
+				if (
+					!affectsMountedRows(
+						virtualList.getSnapshot()?.ranges.mounted,
+						affectedRowRange,
+					)
+				) {
+					return;
+				}
+				virtualList.recompute({ rowModel: activeRowModel });
+			},
+		);
 	});
 	$effect(() => measurementRuntime.observeRootElement());
 

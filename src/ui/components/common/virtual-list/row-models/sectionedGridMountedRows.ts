@@ -178,8 +178,7 @@ export function buildSectionedGridMountedRows<
 	// stable cell references via the slice-reuse fast path below, and rows
 	// newly entering the range never had cells in the previous build.
 	const canReusePreviousCellsByKey =
-		params.previousBuild !== undefined &&
-		params.previousBuild.plan !== plan;
+		params.previousBuild !== undefined && params.previousBuild.plan !== plan;
 	const previousRows = params.previousBuild?.rowSlices;
 	const previousRowStart = params.previousBuild?.rowRange.start ?? 0;
 	const previousRowEnd = params.previousBuild?.rowRange.end ?? 0;
@@ -240,7 +239,12 @@ export function buildSectionedGridMountedRows<
 		const sectionPlan = plan.sections[sectionIndex];
 		if (!sectionPlan) break;
 		const resolvedRow = useInto
-			? params.resolveRowInSectionInto!(resolvedScratch, plan, sectionPlan, rowIndex)
+			? params.resolveRowInSectionInto!(
+					resolvedScratch,
+					plan,
+					sectionPlan,
+					rowIndex,
+				)
 				? resolvedScratch
 				: null
 			: params.resolveRowInSection(plan, sectionPlan, rowIndex);

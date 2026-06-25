@@ -468,13 +468,13 @@ function createTagNoteSearchKey(
 	note: TaggedNote,
 	searchKeyCache?: SearchKeyCache,
 ): string {
-	return createTagNoteSearchKeyFromBaseKey(section.tag, getTagNoteBaseKey(note, searchKeyCache));
+	return createTagNoteSearchKeyFromBaseKey(
+		section.tag,
+		getTagNoteBaseKey(note, searchKeyCache),
+	);
 }
 
-function createTagNoteSearchKeyFromBaseKey(
-	tag: string,
-	baseKey: string,
-): string {
+function createTagNoteSearchKeyFromBaseKey(tag: string, baseKey: string): string {
 	return `${TAG_NOTE_SEARCH_PREFIX}${tag}${SEARCH_KEY_SEPARATOR}${baseKey}`;
 }
 
