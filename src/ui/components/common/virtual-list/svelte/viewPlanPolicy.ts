@@ -1,7 +1,9 @@
 import { createCardVirtualListPolicy } from "../cardVirtualListPolicy";
 import type { ViewPlanLayoutMetrics } from "./viewPlanLayout";
 
-type ViewPlanCardVirtualListPolicy = ReturnType<typeof createCardVirtualListPolicy>;
+export type ViewPlanCardVirtualListPolicy = ReturnType<
+	typeof createCardVirtualListPolicy
+>;
 
 export interface ViewPlanCardVirtualListPolicyResolver {
 	resolve(

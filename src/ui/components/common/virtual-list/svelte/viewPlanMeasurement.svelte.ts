@@ -9,7 +9,10 @@ import type { RowRange } from "../rowRange";
 import type { VirtualRanges } from "../types";
 import type { StablePreviewScrollTopBand } from "../dom/activeScrollWindowGate";
 import { resolveCardLayoutSettings } from "ui/utils/cardLayoutCssVars";
-import type { ViewPlanCardVirtualListPolicyResolver } from "./viewPlanPolicy";
+import type {
+	ViewPlanCardVirtualListPolicy,
+	ViewPlanCardVirtualListPolicyResolver,
+} from "./viewPlanPolicy";
 import {
 	DEFAULT_VIEW_PLAN_CARD_LAYOUT,
 	DEFAULT_VIEW_PLAN_LAYOUT,
@@ -165,6 +168,9 @@ export function createViewPlanMeasurementRuntime<
 		min: 0,
 		max: 0,
 	};
+	let lastResolvedActiveScrollPolicyLayout: ViewPlanLayoutMetrics | undefined;
+	let lastResolvedActiveScrollPolicy: ViewPlanCardVirtualListPolicy | undefined;
+
 	const mountedScrollWindowMeasurement = {
 		identity: params.runtime.rowModel,
 		mounted: { start: 0, end: 0 },
@@ -304,7 +310,14 @@ export function createViewPlanMeasurementRuntime<
 			measurementRowModel,
 			nextLayout,
 		) => {
-			const visibilityPolicy = params.policyResolver.resolve(nextLayout, true);
+			if (lastResolvedActiveScrollPolicyLayout !== nextLayout) {
+				lastResolvedActiveScrollPolicyLayout = nextLayout;
+				lastResolvedActiveScrollPolicy = params.policyResolver.resolve(
+					nextLayout,
+					true,
+				);
+			}
+			const visibilityPolicy = lastResolvedActiveScrollPolicy!;
 			mountedRangeParams.scrollTop = scrollTop - sectionTop;
 			mountedRangeParams.viewportHeight = viewportHeight;
 			mountedRangeParams.overscanPx = visibilityPolicy.mountedOverscanPx;
@@ -342,7 +355,14 @@ export function createViewPlanMeasurementRuntime<
 			nextLayout,
 			precomputedMountedRange,
 		) => {
-			const visibilityPolicy = params.policyResolver.resolve(nextLayout, true);
+			if (lastResolvedActiveScrollPolicyLayout !== nextLayout) {
+				lastResolvedActiveScrollPolicyLayout = nextLayout;
+				lastResolvedActiveScrollPolicy = params.policyResolver.resolve(
+					nextLayout,
+					true,
+				);
+			}
+			const visibilityPolicy = lastResolvedActiveScrollPolicy!;
 			rangeParams.scrollTop = scrollTop - sectionTop;
 			rangeParams.viewportHeight = viewportHeight;
 			rangeParams.mountedOverscanPx = visibilityPolicy.mountedOverscanPx;
