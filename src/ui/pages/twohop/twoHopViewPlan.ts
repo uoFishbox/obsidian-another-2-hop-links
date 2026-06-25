@@ -746,6 +746,7 @@ function materializeSectionCellRange(
 	startCellIndex: number,
 	endCellIndex: number,
 ): boolean {
+	if (plan.cellStore.materializedSectionByIndex[sectionIndex]) return false;
 	const sectionPlan = plan.sections[sectionIndex];
 	if (!sectionPlan) return false;
 	let changed = false;
@@ -796,16 +797,47 @@ export function ensureTwoHopMountedRangeMaterialized(
 	range: RowRange,
 ): boolean {
 	const table = plan.rowTable;
+	const cellStore = plan.cellStore;
 	const start = Math.max(0, range.start);
 	const end = Math.min(table.rowCount, range.end);
 	if (start >= end) return false;
 	let changed = false;
-	for (let rowIndex = start; rowIndex < end; rowIndex += 1) {
+	for (let rowIndex = start; rowIndex < end; ) {
 		const sectionIndex = table.sectionIndexByRow[rowIndex];
-		if (sectionIndex < 0) continue;
+		if (sectionIndex < 0) {
+			rowIndex += 1;
+			continue;
+		}
+		// Skip entire section if already materialized.
+		if (cellStore.materializedSectionByIndex[sectionIndex]) {
+			let nextRow = rowIndex + 1;
+			while (nextRow < end && table.sectionIndexByRow[nextRow] === sectionIndex) {
+				nextRow += 1;
+			}
+			rowIndex = nextRow;
+			continue;
+		}
 		const startCell = table.sectionCellStartByRow[rowIndex];
 		const cellCount = table.cellCountByRow[rowIndex];
-		if (cellCount === 0) continue;
+		if (cellCount === 0) {
+			rowIndex += 1;
+			continue;
+		}
+		const cells = cellStore.logicalCellsBySectionIndex[sectionIndex];
+		const endCell = startCell + cellCount;
+		let rowFullyMaterialized = cells != null;
+		if (rowFullyMaterialized) {
+			for (let c = startCell; c < endCell; c += 1) {
+				if (cells[c] === undefined) {
+					rowFullyMaterialized = false;
+					break;
+				}
+			}
+		}
+		if (rowFullyMaterialized) {
+			rowIndex += 1;
+			continue;
+		}
 		changed =
 			materializeSectionCellRange(
 				plan,
@@ -813,6 +845,7 @@ export function ensureTwoHopMountedRangeMaterialized(
 				startCell,
 				startCell + cellCount,
 			) || changed;
+		rowIndex += 1;
 	}
 	if (changed) {
 		markTwoHopMaterializationChanged(plan);
