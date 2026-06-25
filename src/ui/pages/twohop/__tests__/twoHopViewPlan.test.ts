@@ -4,6 +4,7 @@ import type {
 	TwoHopPageVirtualSection,
 	TwoHopPageVirtualItem,
 } from "../twohopPageVirtualModel";
+import * as viewPlanModule from "../twoHopViewPlan";
 import {
 	compileTwoHopViewPlan,
 	createTwoHopViewPlanRowModel,
@@ -91,12 +92,9 @@ describe("compileTwoHopViewPlan", () => {
 		});
 
 		expect(getItems).toHaveBeenCalledTimes(1);
-		expect(plan.cellStore.logicalCellsBySectionIndex[0].map((cell) => cell?.kind)).toEqual([
-			"header",
-			"item",
-			"item",
-			"item",
-		]);
+		expect(
+			plan.cellStore.logicalCellsBySectionIndex[0].map((cell) => cell?.kind),
+		).toEqual(["header", "item", "item", "item"]);
 		expect(plan.cellStore.logicalCellsBySectionIndex[0][1]).toMatchObject({
 			key: "new-links::item:0",
 			sourceKey: "new-links::a",
@@ -159,11 +157,9 @@ describe("compileTwoHopViewPlan", () => {
 			clampVisibleCount: (_section, count) => count,
 		});
 
-		expect(plan.cellStore.logicalCellsBySectionIndex[0].map((cell) => cell?.kind)).toEqual([
-			"header",
-			"item",
-			"load-more",
-		]);
+		expect(
+			plan.cellStore.logicalCellsBySectionIndex[0].map((cell) => cell?.kind),
+		).toEqual(["header", "item", "load-more"]);
 		expect(plan.sections[0].showLoadMore).toBe(true);
 	});
 
@@ -181,18 +177,19 @@ describe("compileTwoHopViewPlan", () => {
 		});
 
 		expect(plan.cellStore.materializedSectionByIndex).toEqual([false, false]);
-		expect(plan.cellStore.logicalCellsBySectionIndex.map((logicalCells) => logicalCells.length)).toEqual([
-			2, 2,
-		]);
+		expect(
+			plan.cellStore.logicalCellsBySectionIndex.map(
+				(logicalCells) => logicalCells.length,
+			),
+		).toEqual([2, 2]);
 		expect(resolveTwoHopLogicalCellInSection(plan, 1, 1)).toMatchObject({
 			kind: "item",
 			sourceKey: "section-b::b",
 		});
 		expect(plan.cellStore.materializedSectionByIndex).toEqual([false, false]);
-		expect(plan.cellStore.logicalCellsBySectionIndex[1].map((cell) => cell?.kind)).toEqual([
-			undefined,
-			"item",
-		]);
+		expect(
+			plan.cellStore.logicalCellsBySectionIndex[1].map((cell) => cell?.kind),
+		).toEqual([undefined, "item"]);
 		expect(resolveTwoHopLogicalCellInSection(plan, 1, 2)).toBeNull();
 		expect(plan).not.toHaveProperty("cells");
 	});
@@ -609,7 +606,9 @@ describe("compileTwoHopViewPlan", () => {
 			"item",
 			"item",
 		]);
-		expect(mounted.cells[0].cell).toBe(plan.cellStore.logicalCellsBySectionIndex[0][0]);
+		expect(mounted.cells[0].cell).toBe(
+			plan.cellStore.logicalCellsBySectionIndex[0][0],
+		);
 		expect(mounted.rowSlices[0].slotKey).toBe(0);
 		expect(mounted.rowSlices[1].slotKey).toBe(1);
 		expect(mounted.rowSlices.map(({ key }) => key)).toEqual([0, 1]);
@@ -897,16 +896,12 @@ describe("materializeNextTwoHopCellBatch affected row range", () => {
 
 		// columns = 2; header + 2 items -> cellCount 3 -> rows 0 (header, item0)
 		// and 1 (item1). First batch materializes only the header (row 0).
-		expect(
-			materializeNextTwoHopCellBatch(plan, { maxCellCount: 1 }),
-		).toEqual({
+		expect(materializeNextTwoHopCellBatch(plan, { maxCellCount: 1 })).toEqual({
 			changed: true,
 			affectedRowRange: { start: 0, end: 1 },
 		});
 		// Next two cells are the items; item0 is on row 0, item1 on row 1.
-		expect(
-			materializeNextTwoHopCellBatch(plan, { maxCellCount: 5 }),
-		).toEqual({
+		expect(materializeNextTwoHopCellBatch(plan, { maxCellCount: 5 })).toEqual({
 			changed: true,
 			affectedRowRange: { start: 0, end: 2 },
 		});
@@ -931,9 +926,7 @@ describe("materializeNextTwoHopCellBatch affected row range", () => {
 		});
 		// section-a spans rows 0-1 (cells 0..3), section-b header starts row 2.
 		// Materialize everything in one batch: rows 0..2 (exclusive 3).
-		expect(
-			materializeNextTwoHopCellBatch(plan, { maxCellCount: 128 }),
-		).toEqual({
+		expect(materializeNextTwoHopCellBatch(plan, { maxCellCount: 128 })).toEqual({
 			changed: true,
 			affectedRowRange: { start: 0, end: 3 },
 		});
@@ -990,7 +983,10 @@ describe("scroll-driven materialization keeps bookkeeping in sync", () => {
 		// and must fast-forward past the scroll-materialized tail without
 		// re-counting them, so the sync cells are not overwritten.
 		const result = materializeNextTwoHopCellBatch(plan, { maxCellCount: 7 });
-		expect(result).toEqual({ changed: true, affectedRowRange: { start: 0, end: 2 } });
+		expect(result).toEqual({
+			changed: true,
+			affectedRowRange: { start: 0, end: 2 },
+		});
 		expect(state).toEqual({ nextCellIndex: 4, materializedCellCount: 7 });
 		expect(plan.cellStore.remainingUnmaterializedCellCount).toBe(0);
 		expect(plan.cellStore.materializedSectionByIndex).toEqual([true]);
@@ -1000,8 +996,223 @@ describe("scroll-driven materialization keeps bookkeeping in sync", () => {
 		expect(plan.cellStore.logicalCellsBySectionIndex[0][6]).toBe(scrollCell6);
 
 		expect(hasUnmaterializedTwoHopSections(plan)).toBe(false);
-		expect(
-			materializeNextTwoHopCellBatch(plan, { maxCellCount: 7 }),
-		).toEqual({ changed: false, affectedRowRange: null });
+		expect(materializeNextTwoHopCellBatch(plan, { maxCellCount: 7 })).toEqual({
+			changed: false,
+			affectedRowRange: null,
+		});
+	});
+});
+
+describe("buildTwoHopMountedRows diff materialization", () => {
+	const createLargePlan = () => {
+		const items = Array.from({ length: 40 }, (_, i) => createItem(`item-${i}`));
+		return compileTwoHopViewPlan({
+			sections: [createDescriptor(items, undefined, "section-a")],
+			sectionVisibleCounts: {},
+			layout,
+			materialization: createBatchedMaterialization(0),
+			resolveInitialSectionVisibleCount: (section) => section.loadedCount,
+			clampVisibleCount: (_section, count) => count,
+		});
+	};
+
+	it("materializes only the trailing tail on forward scroll", () => {
+		const plan = createLargePlan();
+		const rowModel = createTwoHopViewPlanRowModel(plan);
+		const ensureSpy = vi.spyOn(
+			viewPlanModule,
+			"ensureTwoHopMountedRangeMaterialized",
+		);
+
+		const first = buildTwoHopMountedRows({
+			rowModel,
+			rowRange: { start: 0, end: 10 },
+			ranges: {
+				mounted: { start: 0, end: 10 },
+				previewVisible: { start: 0, end: 10 },
+			},
+		});
+		ensureSpy.mockClear();
+
+		buildTwoHopMountedRows({
+			rowModel,
+			rowRange: { start: 1, end: 11 },
+			ranges: {
+				mounted: { start: 1, end: 11 },
+				previewVisible: { start: 1, end: 11 },
+			},
+			previousBuild: first,
+		});
+
+		expect(ensureSpy).toHaveBeenCalledTimes(1);
+		expect(ensureSpy).toHaveBeenCalledWith(plan, { start: 10, end: 11 });
+		ensureSpy.mockRestore();
+	});
+
+	it("materializes only the leading tail on backward scroll", () => {
+		const plan = createLargePlan();
+		const rowModel = createTwoHopViewPlanRowModel(plan);
+		const ensureSpy = vi.spyOn(
+			viewPlanModule,
+			"ensureTwoHopMountedRangeMaterialized",
+		);
+
+		const first = buildTwoHopMountedRows({
+			rowModel,
+			rowRange: { start: 1, end: 11 },
+			ranges: {
+				mounted: { start: 1, end: 11 },
+				previewVisible: { start: 1, end: 11 },
+			},
+		});
+		ensureSpy.mockClear();
+
+		buildTwoHopMountedRows({
+			rowModel,
+			rowRange: { start: 0, end: 10 },
+			ranges: {
+				mounted: { start: 0, end: 10 },
+				previewVisible: { start: 0, end: 10 },
+			},
+			previousBuild: first,
+		});
+
+		expect(ensureSpy).toHaveBeenCalledTimes(1);
+		expect(ensureSpy).toHaveBeenCalledWith(plan, { start: 0, end: 1 });
+		ensureSpy.mockRestore();
+	});
+
+	it("falls back to full materialization on non-contiguous jump", () => {
+		const plan = createLargePlan();
+		const rowModel = createTwoHopViewPlanRowModel(plan);
+		const ensureSpy = vi.spyOn(
+			viewPlanModule,
+			"ensureTwoHopMountedRangeMaterialized",
+		);
+
+		const first = buildTwoHopMountedRows({
+			rowModel,
+			rowRange: { start: 0, end: 5 },
+			ranges: {
+				mounted: { start: 0, end: 5 },
+				previewVisible: { start: 0, end: 5 },
+			},
+		});
+		ensureSpy.mockClear();
+
+		buildTwoHopMountedRows({
+			rowModel,
+			rowRange: { start: 10, end: 15 },
+			ranges: {
+				mounted: { start: 10, end: 15 },
+				previewVisible: { start: 10, end: 15 },
+			},
+			previousBuild: first,
+		});
+
+		expect(ensureSpy).toHaveBeenCalledTimes(1);
+		expect(ensureSpy).toHaveBeenCalledWith(plan, { start: 10, end: 15 });
+		ensureSpy.mockRestore();
+	});
+
+	it("skips materialization when the range is unchanged", () => {
+		const plan = createLargePlan();
+		const rowModel = createTwoHopViewPlanRowModel(plan);
+		const ensureSpy = vi.spyOn(
+			viewPlanModule,
+			"ensureTwoHopMountedRangeMaterialized",
+		);
+
+		const first = buildTwoHopMountedRows({
+			rowModel,
+			rowRange: { start: 0, end: 10 },
+			ranges: {
+				mounted: { start: 0, end: 10 },
+				previewVisible: { start: 0, end: 10 },
+			},
+		});
+		ensureSpy.mockClear();
+
+		buildTwoHopMountedRows({
+			rowModel,
+			rowRange: { start: 0, end: 10 },
+			ranges: {
+				mounted: { start: 0, end: 10 },
+				previewVisible: { start: 0, end: 10 },
+			},
+			previousBuild: first,
+		});
+
+		expect(ensureSpy).not.toHaveBeenCalled();
+		ensureSpy.mockRestore();
+	});
+
+	it("materializes both tails when range expands on both sides", () => {
+		const plan = createLargePlan();
+		const rowModel = createTwoHopViewPlanRowModel(plan);
+		const ensureSpy = vi.spyOn(
+			viewPlanModule,
+			"ensureTwoHopMountedRangeMaterialized",
+		);
+
+		const first = buildTwoHopMountedRows({
+			rowModel,
+			rowRange: { start: 5, end: 10 },
+			ranges: {
+				mounted: { start: 5, end: 10 },
+				previewVisible: { start: 5, end: 10 },
+			},
+		});
+		ensureSpy.mockClear();
+
+		buildTwoHopMountedRows({
+			rowModel,
+			rowRange: { start: 3, end: 12 },
+			ranges: {
+				mounted: { start: 3, end: 12 },
+				previewVisible: { start: 3, end: 12 },
+			},
+			previousBuild: first,
+		});
+
+		expect(ensureSpy).toHaveBeenCalledTimes(2);
+		expect(ensureSpy).toHaveBeenCalledWith(plan, { start: 10, end: 12 });
+		expect(ensureSpy).toHaveBeenCalledWith(plan, { start: 3, end: 5 });
+		ensureSpy.mockRestore();
+	});
+
+	it("falls back to full materialization when plan changes", () => {
+		const plan = createLargePlan();
+		const rowModel = createTwoHopViewPlanRowModel(plan);
+		const ensureSpy = vi.spyOn(
+			viewPlanModule,
+			"ensureTwoHopMountedRangeMaterialized",
+		);
+
+		const first = buildTwoHopMountedRows({
+			rowModel,
+			rowRange: { start: 0, end: 10 },
+			ranges: {
+				mounted: { start: 0, end: 10 },
+				previewVisible: { start: 0, end: 10 },
+			},
+		});
+		ensureSpy.mockClear();
+
+		const newPlan = createLargePlan();
+		const newRowModel = createTwoHopViewPlanRowModel(newPlan);
+		buildTwoHopMountedRows({
+			rowModel: newRowModel,
+			rowRange: { start: 0, end: 10 },
+			ranges: {
+				mounted: { start: 0, end: 10 },
+				previewVisible: { start: 0, end: 10 },
+			},
+			previousBuild: first,
+		});
+
+		expect(ensureSpy).toHaveBeenCalledTimes(1);
+		expect(ensureSpy).toHaveBeenCalledWith(newPlan, { start: 0, end: 10 });
+		ensureSpy.mockRestore();
 	});
 });
