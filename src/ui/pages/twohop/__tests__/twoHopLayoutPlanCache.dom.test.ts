@@ -175,6 +175,31 @@ describe("createTwoHopLayoutPlanCache in a DOM runtime", () => {
 			rowModel.plan.cellStore.materializationStateBySectionIndex[0]?.materializedCellCount,
 		).toBe(0);
 		expect(onMaterialized).not.toHaveBeenCalled();
-		expect(idle.requestIdleCallback).toHaveBeenCalledTimes(2);
+		// No re-scheduled idle callback while scroll is active.
+		expect(idle.requestIdleCallback).toHaveBeenCalledTimes(1);
+	});
+
+	it("resumes background materialization when scroll becomes idle", () => {
+		const idle = installIdleCallbackHarness();
+		const onMaterialized = vi.fn();
+		const cache = createTwoHopLayoutPlanCache({
+			materialization: createBatchedMaterialization(1),
+			resolveInitialSectionVisibleCount: (section) => section.loadedCount,
+			clampVisibleCount: (section, count) => Math.min(section.loadedCount, count),
+		});
+		const rowModel = cache.resolve([descriptor], {}, layout);
+		const scrollSource = {};
+
+		cache.scheduleMaterialization(rowModel, onMaterialized);
+		markScrollActivityActive(scrollSource);
+		idle.idleCallbacks.get(idle.latestCallbackId)?.(idleDeadline);
+
+		expect(onMaterialized).not.toHaveBeenCalled();
+
+		// Scroll becomes idle — materialization should resume.
+		resetScrollActivityForTests();
+		idle.idleCallbacks.get(idle.latestCallbackId)?.(idleDeadline);
+
+		expect(onMaterialized).toHaveBeenCalledTimes(1);
 	});
 });

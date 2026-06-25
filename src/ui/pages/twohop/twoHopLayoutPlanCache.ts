@@ -1,6 +1,6 @@
 import type { RowRange } from "ui/components/common/virtual-list/rowRange";
 import type { ViewPlanLayoutMetrics } from "ui/components/common/virtual-list/svelte/viewPlanLayout";
-import { isScrollActivityActive } from "infrastructure/scroll/scrollActivity";
+import { isScrollActivityActive, subscribeScrollActivity } from "infrastructure/scroll/scrollActivity";
 import type { TwoHopSectionDescriptor } from "./twohopPageVirtualModel";
 import {
 	compileTwoHopViewPlan,
@@ -101,6 +101,7 @@ export function createTwoHopLayoutPlanCache(params: {
 			let idleCallbackId: number | null = null;
 			let animationFrameId: number | null = null;
 			let timeoutId: number | null = null;
+			let unsubScrollActivity: (() => void) | undefined;
 			const scheduleNextBatch = (): void => {
 				if (cancelled || !hasUnmaterializedTwoHopSections(plan)) return;
 				if (typeof ownerWindow.requestIdleCallback === "function") {
@@ -118,10 +119,20 @@ export function createTwoHopLayoutPlanCache(params: {
 					}, 0);
 				});
 			};
+			const pauseForScrollActivity = (): void => {
+				if (unsubScrollActivity) return;
+				unsubScrollActivity = subscribeScrollActivity((isActive) => {
+					if (!isActive) {
+						unsubScrollActivity?.();
+						unsubScrollActivity = undefined;
+						scheduleNextBatch();
+					}
+				});
+			};
 			const materializeNextBatch = (deadline?: IdleDeadline): void => {
 				if (cancelled) return;
 				if (isScrollActivityActive()) {
-					scheduleNextBatch();
+					pauseForScrollActivity();
 					return;
 				}
 				const result = materializeNextTwoHopCellBatch(plan, {
@@ -137,6 +148,8 @@ export function createTwoHopLayoutPlanCache(params: {
 			};
 			const cancel = (): void => {
 				cancelled = true;
+				unsubScrollActivity?.();
+				unsubScrollActivity = undefined;
 				if (idleCallbackId !== null) {
 					ownerWindow.cancelIdleCallback(idleCallbackId);
 				}
