@@ -341,14 +341,13 @@ export function createViewPlanMeasurementRuntime<
 			measurementRowModel,
 			nextLayout,
 			precomputedMountedRange,
-			hasMountedWindowChanged,
 		) => {
 			const visibilityPolicy = params.policyResolver.resolve(nextLayout, true);
 			rangeParams.scrollTop = scrollTop - sectionTop;
 			rangeParams.viewportHeight = viewportHeight;
 			rangeParams.mountedOverscanPx = visibilityPolicy.mountedOverscanPx;
 			rangeParams.previewOverscanPx = visibilityPolicy.previewOverscanPx;
-			if (!precomputedMountedRange || hasMountedWindowChanged) {
+			if (!precomputedMountedRange) {
 				committedScrollWindowMeasurement.identity = measurementRowModel;
 				measurementRowModel.findVisibleRangesInto(
 					committedScrollWindowMeasurement.ranges,

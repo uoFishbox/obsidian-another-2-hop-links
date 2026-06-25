@@ -162,7 +162,6 @@ export interface CreateVirtualListControllerOptions<TLayout, TContent, TCachedOp
 		content: TContent,
 		layout: TLayout,
 		precomputedMountedRange: RowRange | undefined,
-		hasMountedWindowChanged: boolean,
 	) => RangedScrollWindowMeasurement | null;
 	onActiveScrollPreviewRangeMeasurement?: (ranges: VirtualRanges) => void;
 	shouldSkipUnstableCachedMeasurement?: (options: TCachedOptions) => boolean;
@@ -496,7 +495,6 @@ export function createVirtualListController<
 					content,
 					layout,
 					precomputedMountedRange,
-					hasMountedWindowChanged,
 				) ?? null;
 			if (scrollWindowMeasurement) {
 				precomputedRanges = scrollWindowMeasurement.ranges;
