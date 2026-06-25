@@ -74,7 +74,7 @@ import {
 	getBacklinkSearchKey,
 	getMergedSearchKey,
 	getOutgoingSearchKey,
-	getTagNoteSearchKey,
+	getTagNoteSearchKeyFromBaseKey,
 	getTwohopBranchSearchBaseKey,
 	getTwohopChildSearchKeyFromBranchBaseKey,
 } from "./twohopSearchAdapter";
@@ -731,14 +731,15 @@ export function createTwoHopDataIdentityCache(): TwoHopDataIdentityCache {
 									);
 								const reconciled =
 									created.itemsReconciler.reconcile(sorted);
+								const reconciledKeys = created.itemsReconciler.getKeys();
 								return reconciled.map((item, index) => ({
 									kind: "tag-link" as const,
 									item,
 									...createItemInteractionIdentity(item),
 									tag: created.tag,
-									searchKey: getTagNoteSearchKey(
-										{ tag: created.tag, notes: [] },
-										item.data as TaggedNote,
+									searchKey: getTagNoteSearchKeyFromBaseKey(
+										created.tag,
+										reconciledKeys[index],
 									),
 									virtualKey: createTaggedNoteSectionItemKey(
 										item,
