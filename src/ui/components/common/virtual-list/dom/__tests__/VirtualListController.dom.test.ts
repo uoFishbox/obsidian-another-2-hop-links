@@ -211,8 +211,12 @@ describe("createVirtualListController", () => {
 		expect(resolveMountedScrollWindowMeasurement).toHaveBeenCalledTimes(4);
 		expect(resolveScrollWindowMeasurement).toHaveBeenCalledTimes(3);
 		expect(
-			resolveScrollWindowMeasurement.mock.calls.map((call) => call[6]),
-		).toEqual([false, false, true]);
+			resolveScrollWindowMeasurement.mock.calls.map((call) => call[5]),
+		).toEqual([
+			{ start: 1, end: 4 },
+			{ start: 1, end: 4 },
+			{ start: 2, end: 5 },
+		]);
 		expect(onActiveScrollPreviewRangeMeasurement).toHaveBeenCalledTimes(1);
 		expect(onActiveScrollPreviewRangeMeasurement).toHaveBeenCalledWith({
 			mounted: { start: 1, end: 4 },
