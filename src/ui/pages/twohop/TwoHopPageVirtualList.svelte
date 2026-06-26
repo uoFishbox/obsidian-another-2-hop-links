@@ -183,7 +183,6 @@
 						contentPreview={row
 							? resolveItemContentPreview(row)
 							: undefined}
-						observerRoot={args?.observerRoot ?? null}
 						rowIndex={args?.rowIndex}
 						activationCandidateId={args?.activationCandidateId}
 						interactionRegistration="snapshot"

@@ -1,10 +1,6 @@
 <script lang="ts">
 	import type { ItemProps } from "./types";
-	import {
-		useAppContext,
-		useLazyLoaderCache,
-		useLinkContext,
-	} from "ui/context/linkContext";
+	import { useAppContext, useLinkContext } from "ui/context/linkContext";
 	import LinkItem from "ui/components/common/LinkItem.svelte";
 	import CardPreviewGate from "./CardPreviewGate.svelte";
 	import UnresolvedPreviewPlaceholder from "./UnresolvedPreviewPlaceholder.svelte";
@@ -24,8 +20,6 @@
 		settings,
 		searchQuery = "",
 		searchScope = "title-and-content",
-		observerRoot = undefined,
-		previewVisibilityMode = undefined,
 		draggable = true,
 		previewRefreshToken = 0,
 		contentPreview = undefined,
@@ -38,7 +32,6 @@
 
 	const context = useLinkContext();
 	const { applicationStore } = useAppContext();
-	const intersectedCache = useLazyLoaderCache();
 	const interactionRegistry = useInteractionRegistry();
 
 	// Strategyパターンを使用してアイテムタイプに応じた処理を取得
@@ -153,11 +146,8 @@
 					getPreview={context.getPreview}
 					getVisiblePreviewQueueSize={context.getVisiblePreviewQueueSize}
 					{applicationStore}
-					{intersectedCache}
 					{searchQuery}
 					{searchScope}
-					{observerRoot}
-					{previewVisibilityMode}
 					{previewRefreshToken}
 					{contentPreview}
 					{rowIndex}

@@ -147,7 +147,6 @@ describe("ViewItemCard", () => {
 	it("virtualizer visibility visible renders preview immediately", async () => {
 		const file = createMockTFile("notes/alpha.md");
 		const item = { type: "file", data: file } as ViewItem;
-		const lazyLoaderCache = new Set<string>();
 		const linkContext = {
 			getPreview: vi.fn(async () => ({
 				type: "text",
@@ -173,7 +172,6 @@ describe("ViewItemCard", () => {
 				applicationStore: { updateVersion: 0 } as any,
 				sourceFile: file,
 				visibility: "visible",
-				lazyLoaderCache,
 			},
 		});
 		await waitFor(() => {
@@ -181,7 +179,6 @@ describe("ViewItemCard", () => {
 		});
 		expect(document.querySelector(".preview-mount-slot")).toBeNull();
 		expect(document.querySelector(".lazy-placeholder")).toBeNull();
-		expect(lazyLoaderCache.size).toBe(0);
 	});
 
 	it("virtualizer visibility mounted does not execute preview", async () => {
@@ -219,46 +216,6 @@ describe("ViewItemCard", () => {
 		expect(screen.queryByTestId("card-preview-probe")).toBeNull();
 		expect(document.querySelector(".preview-mount-slot")).toBeNull();
 		expect(document.querySelector(".lazy-placeholder")).toBeNull();
-		expect(linkContext.getPreview).not.toHaveBeenCalled();
-	});
-
-	it("self-observed mode keeps a preview mount slot before lazy render", async () => {
-		const file = createMockTFile("notes/alpha.md");
-		const item = { type: "file", data: file } as ViewItem;
-		const linkContext = {
-			getPreview: vi.fn(async () => ({
-				type: "text",
-				content: "preview",
-			})),
-			resolveFile: vi.fn(),
-			buildWikiLink: vi.fn(() => "[[alpha]]"),
-			fileToLinktext: vi.fn((targetFile: TFile) => targetFile.basename),
-			sourceFile: file,
-			getMetadata: vi.fn(() => null),
-			onOpenFile: vi.fn(),
-			onHop1Click: vi.fn(),
-			onHop2Click: vi.fn(),
-			onTagClick: vi.fn(),
-		};
-
-		render(ViewItemCardHarness, {
-			props: {
-				item,
-				settings: DEFAULT_SETTINGS,
-				searchQuery: "",
-				linkContext: linkContext as any,
-				applicationStore: { updateVersion: 0 } as any,
-				sourceFile: file,
-				previewVisibilityMode: "self-observed",
-			},
-		});
-		await Promise.resolve();
-
-		const slot = document.querySelector(".preview-mount-slot");
-		expect(slot).toBeTruthy();
-		expect(slot).toHaveAttribute("data-ccl-vlist-ignore-structure");
-		expect(document.querySelector(".lazy-placeholder")).toBeTruthy();
-		expect(screen.queryByTestId("card-preview-probe")).toBeNull();
 		expect(linkContext.getPreview).not.toHaveBeenCalled();
 	});
 

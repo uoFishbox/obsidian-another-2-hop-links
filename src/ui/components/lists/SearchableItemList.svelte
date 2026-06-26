@@ -381,7 +381,6 @@
 								? "title-and-content"
 								: "title-only"}
 							contentPreview={matchedItem?.contentPreview}
-							{observerRoot}
 							{previewRefreshToken}
 							{rowIndex}
 							{activationCandidateId}

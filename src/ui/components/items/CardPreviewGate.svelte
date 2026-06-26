@@ -3,9 +3,7 @@
 	import type { TFile } from "obsidian";
 	import type { PreviewData, PreviewRequestOptions } from "ui/context/linkContext";
 	import CardPreview from "ui/components/common/CardPreview.svelte";
-	import { lazyRender, type LazyRenderActionParams } from "ui/actions/useLazyRender";
 	import type { ApplicationStore } from "ui/stores/ApplicationStore.svelte";
-	import { buildPreviewGenerationKey } from "features/preview/core/previewCache";
 	import {
 		PREVIEW_ACTIVATION_SCOPE_CONTEXT_KEY,
 		type PreviewActivationScope,
@@ -15,13 +13,11 @@
 		type RowPreviewActivationRuntime,
 	} from "features/preview/scheduling/rowPreviewActivationRuntime";
 	import {
-		requestPreviewActivation,
 		requestQueuedPreviewActivation,
 		type PreviewActivationHandle,
 	} from "features/preview/scheduling/previewActivationScheduler";
 	import { buildCardPreviewActivationIdentity } from "features/preview/core/cardPreviewActivationIdentity";
 	import { DEBUG_DISABLE_CARD_DOM_PREVIEW } from "../../../appConstants";
-	import type { PreviewVisibilityMode } from "./types";
 	import {
 		PREVIEW_VISIBILITY_CONTEXT_KEY,
 		type PreviewVisibilityContext,
@@ -46,11 +42,8 @@
 		) => Promise<PreviewData>;
 		getVisiblePreviewQueueSize?: () => number;
 		applicationStore: ApplicationStore;
-		intersectedCache?: Set<string>;
 		searchQuery?: string;
 		searchScope?: "title-only" | "title-and-content";
-		observerRoot?: HTMLElement | null;
-		previewVisibilityMode?: PreviewVisibilityMode;
 		previewRefreshToken?: number;
 		contentPreview?: string;
 		rowIndex?: number;
@@ -62,11 +55,8 @@
 		getPreview,
 		getVisiblePreviewQueueSize: providedGetVisiblePreviewQueueSize,
 		applicationStore,
-		intersectedCache,
 		searchQuery = "",
 		searchScope = "title-and-content",
-		observerRoot = undefined,
-		previewVisibilityMode = undefined,
 		previewRefreshToken = 0,
 		contentPreview = undefined,
 		rowIndex = undefined,
@@ -83,8 +73,6 @@
 	const rowPreviewActivationRuntime = getContext<
 		RowPreviewActivationRuntime | undefined
 	>(PREVIEW_ROW_ACTIVATION_CONTEXT_KEY);
-	const previewMinHeight = 80;
-
 	const visibility = $derived(previewVisibilityContext?.visibility);
 	const previewOverride: PreviewData | null = $derived(
 		file && file.extension !== "md" && contentPreview
@@ -95,21 +83,7 @@
 	const previewRenderVersion = $derived(
 		file ? (applicationStore.getPreviewRenderVersion?.(file.path) ?? "0:0") : "0:0",
 	);
-	const effectivePreviewCacheRevision = $derived(
-		`${previewRenderVersion}:${previewRefreshToken}`,
-	);
-	const previewCacheKey = $derived(
-		file
-			? buildPreviewGenerationKey(file, settings, effectivePreviewCacheRevision)
-			: undefined,
-	);
-	const effectiveVisibilityMode = $derived(
-		previewVisibilityMode ??
-			(visibility === undefined ? "self-observed" : "controlled"),
-	);
-	const virtualizedVisibility = $derived(
-		effectiveVisibilityMode === "controlled" ? visibility : undefined,
-	);
+	const virtualizedVisibility = $derived(visibility);
 	const previewIdentity = $derived(
 		file
 			? buildCardPreviewActivationIdentity({
@@ -123,7 +97,6 @@
 				})
 			: undefined,
 	);
-	let visiblePreviewIdentity = $state<string | undefined>(undefined);
 	let activatedPreviewIdentity = $state<string | undefined>(undefined);
 	let lastPreviewIdentity: string | undefined = undefined;
 	let pendingPreviewIdentity: string | undefined = undefined;
@@ -157,18 +130,8 @@
 	const shouldRenderPreview = $derived.by(() => {
 		if (DEBUG_DISABLE_CARD_DOM_PREVIEW) return false;
 		if (!renderedPreviewSnapshot) return false;
-
-		if (effectiveVisibilityMode === "controlled") {
-			return virtualizedVisibility === "visible";
-		}
-
-		return true;
+		return virtualizedVisibility === "visible";
 	});
-
-	function handlePreviewVisible() {
-		if (!previewIdentity) return;
-		visiblePreviewIdentity = previewIdentity;
-	}
 
 	function cancelPendingActivation(): void {
 		activationSequence += 1;
@@ -193,15 +156,6 @@
 	function commitRenderedPreviewSnapshot(snapshot: RenderedPreviewSnapshot): void {
 		renderedPreviewSnapshot = snapshot;
 		activatedPreviewIdentity = snapshot.identity;
-		visiblePreviewIdentity = snapshot.identity;
-
-		if (
-			effectiveVisibilityMode !== "controlled" &&
-			previewCacheKey &&
-			intersectedCache
-		) {
-			intersectedCache.add(previewCacheKey);
-		}
 	}
 
 	function resetPreviewActivationForSnapshot(
@@ -218,7 +172,6 @@
 		// ファイル自体が変わった場合は、旧previewを見せ続けると誤表示になるので消す。
 		if (!canKeepRenderedPreviewForNextSnapshot(nextSnapshot)) {
 			renderedPreviewSnapshot = undefined;
-			visiblePreviewIdentity = undefined;
 			activatedPreviewIdentity = undefined;
 		}
 
@@ -234,10 +187,6 @@
 	}
 
 	function registerVisibleRowActivationCandidate(): void {
-		if (effectiveVisibilityMode !== "controlled") {
-			clearRegisteredRowActivationCandidate();
-			return;
-		}
 		if (
 			!rowPreviewActivationRuntime ||
 			rowIndex === undefined ||
@@ -281,11 +230,7 @@
 	}
 
 	function activateVisibleVirtualPreview(): void {
-		if (
-			effectiveVisibilityMode === "controlled" &&
-			rowPreviewActivationRuntime &&
-			rowIndex !== undefined
-		) {
+		if (rowPreviewActivationRuntime && rowIndex !== undefined) {
 			cancelPendingActivation();
 			return;
 		}
@@ -339,12 +284,7 @@
 			commitRenderedPreviewSnapshot(currentPreviewSnapshot);
 		};
 
-		const requestActivation =
-			effectiveVisibilityMode === "controlled"
-				? requestQueuedPreviewActivation
-				: requestPreviewActivation;
-
-		request = requestActivation(
+		request = requestQueuedPreviewActivation(
 			identity,
 			getVisiblePreviewQueueSize,
 			previewActivationScope,
@@ -358,17 +298,6 @@
 			onSettled(synchronousResult);
 		}
 	}
-
-	const previewLazyParams = $derived.by(
-		(): LazyRenderActionParams => ({
-			cacheKey: previewCacheKey,
-			rootMargin: "50px",
-			threshold: 0,
-			intersectedCache,
-			observerRoot,
-			onVisible: handlePreviewVisible,
-		}),
-	);
 
 	$effect(() => {
 		resetPreviewActivationForSnapshot(currentPreviewSnapshot);
@@ -389,27 +318,7 @@
 </script>
 
 {#if !DEBUG_DISABLE_CARD_DOM_PREVIEW && file}
-	{#if effectiveVisibilityMode === "self-observed"}
-		<div
-			use:lazyRender={previewLazyParams}
-			class="preview-mount-slot"
-			data-ccl-vlist-ignore-structure
-			style:min-height={`${previewMinHeight}px`}
-			aria-hidden="true"
-		>
-			{#if shouldRenderPreview && renderedPreviewSnapshot}
-				<CardPreview
-					file={renderedPreviewSnapshot.file}
-					{getPreview}
-					searchQuery={renderedPreviewSnapshot.searchQuery}
-					previewRefreshToken={renderedPreviewSnapshot.previewRefreshToken}
-					previewOverride={renderedPreviewSnapshot.previewOverride}
-				/>
-			{:else}
-				<div class="lazy-placeholder"></div>
-			{/if}
-		</div>
-	{:else if shouldRenderPreview && renderedPreviewSnapshot}
+	{#if shouldRenderPreview && renderedPreviewSnapshot}
 		<CardPreview
 			file={renderedPreviewSnapshot.file}
 			{getPreview}
