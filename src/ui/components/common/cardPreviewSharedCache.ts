@@ -26,7 +26,7 @@ import {
 	buildPreviewRenderKeys,
 	normalizePreviewQuery,
 	CACHE_KEY_SEPARATOR,
-	buildSearchContextSettingsSignature,
+	getPreviewSettingsSignatures,
 } from "features/preview/core/previewRenderKeys";
 import { DEBUG_DISABLE_RENDERED_PREVIEW_CACHE } from "../../../appConstants";
 import type { PluginSettings } from "types/settings";
@@ -100,7 +100,8 @@ function buildSearchContextCacheKey(
 	normalizedQuery: string,
 	settings: PluginSettings,
 ): string {
-	return `${previewContentIdentityKey}${CACHE_KEY_SEPARATOR}${normalizedQuery}${CACHE_KEY_SEPARATOR}${buildSearchContextSettingsSignature(settings)}`;
+	const { searchSignature } = getPreviewSettingsSignatures(settings);
+	return `${previewContentIdentityKey}${CACHE_KEY_SEPARATOR}${normalizedQuery}${CACHE_KEY_SEPARATOR}${searchSignature}`;
 }
 
 function previewContentHasVisibleQuery(

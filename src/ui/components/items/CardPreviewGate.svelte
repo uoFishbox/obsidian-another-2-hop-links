@@ -17,6 +17,7 @@
 		type PreviewActivationHandle,
 	} from "features/preview/scheduling/previewActivationScheduler";
 	import { buildCardPreviewActivationIdentity } from "features/preview/core/cardPreviewActivationIdentity";
+	import { normalizePreviewQuery } from "features/preview/core/previewRenderKeys";
 	import { DEBUG_DISABLE_CARD_DOM_PREVIEW } from "../../../appConstants";
 	import {
 		PREVIEW_VISIBILITY_CONTEXT_KEY,
@@ -84,17 +85,20 @@
 		file ? (applicationStore.getPreviewRenderVersion?.(file.path) ?? "0:0") : "0:0",
 	);
 	const virtualizedVisibility = $derived(visibility);
+	const effectiveSearchQuery = $derived(
+		searchScope === "title-only" ? "" : searchQuery,
+	);
+	const normalizedSearchQuery = $derived(normalizePreviewQuery(effectiveSearchQuery));
 	const previewIdentity = $derived(
 		file
-			? buildCardPreviewActivationIdentity({
+			? buildCardPreviewActivationIdentity(
 					file,
 					settings,
-					searchQuery,
-					searchScope,
+					normalizedSearchQuery,
 					previewRenderVersion,
 					previewRefreshToken,
 					previewOverride,
-				})
+				)
 			: undefined,
 	);
 	let activatedPreviewIdentity = $state<string | undefined>(undefined);
@@ -120,7 +124,7 @@
 			return {
 				identity: previewIdentity,
 				file,
-				searchQuery: searchScope === "title-only" ? "" : searchQuery,
+				searchQuery: effectiveSearchQuery,
 				previewRefreshToken,
 				previewOverride,
 			};
