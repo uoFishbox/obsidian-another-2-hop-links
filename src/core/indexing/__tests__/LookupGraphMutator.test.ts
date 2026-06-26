@@ -4,6 +4,7 @@ import {
 	replaceSourceSummaryAsync,
 } from "../backlink-builder/lookupGraphMutator";
 import { createEmptyIndexSnapshot } from "../types/IndexTypes";
+import type { BacklinkBucket } from "types/domain";
 import type { SourceSummary } from "../types/IndexTypes";
 
 describe("LookupGraphMutator", () => {
@@ -11,8 +12,8 @@ describe("LookupGraphMutator", () => {
 		const snapshot = createEmptyIndexSnapshot();
 
 		snapshot.lookupKeyToLookupPaths.set("foo.md", new Set(["Foo.md", "foo.md"]));
-		snapshot.backlinksMap.set("Foo.md", new Map([["source-a.md", [] as any]]));
-		snapshot.backlinksMap.set("foo.md", new Map([["source-b.md", [] as any]]));
+		snapshot.backlinksMap.set("Foo.md", new Map([["source-a.md", bucket()]]));
+		snapshot.backlinksMap.set("foo.md", new Map([["source-b.md", bucket()]]));
 
 		await refreshUnresolvedLookupForKeyAsync(
 			snapshot,
@@ -28,11 +29,31 @@ describe("LookupGraphMutator", () => {
 		);
 	});
 
+	test("refreshUnresolvedLookupForKey reuses existing lookup source set", async () => {
+		const snapshot = createEmptyIndexSnapshot();
+		const sources = new Set(["stale-source.md"]);
+
+		snapshot.lookupKeyToSources.set("foo.md", sources);
+		snapshot.unresolvedLookupToSources.set("foo.md", sources);
+		snapshot.lookupKeyToLookupPaths.set("foo.md", new Set(["foo.md"]));
+		snapshot.backlinksMap.set("foo.md", new Map([["source-a.md", bucket()]]));
+
+		await refreshUnresolvedLookupForKeyAsync(
+			snapshot,
+			"foo.md",
+			createImmediateYieldScheduler(),
+		);
+
+		expect(snapshot.lookupKeyToSources.get("foo.md")).toBe(sources);
+		expect(snapshot.unresolvedLookupToSources.get("foo.md")).toBe(sources);
+		expect(sources).toEqual(new Set(["source-a.md"]));
+	});
+
 	test("lookupKeys with resolved paths are not left in the unresolved reverse index", async () => {
 		const snapshot = createEmptyIndexSnapshot();
 
 		snapshot.lookupKeyToLookupPaths.set("foo.md", new Set(["foo.md"]));
-		snapshot.backlinksMap.set("foo.md", new Map([["source-a.md", [] as any]]));
+		snapshot.backlinksMap.set("foo.md", new Map([["source-a.md", bucket()]]));
 		snapshot.lookupKeyDirectResolvedPathCount.set("foo.md", 1);
 
 		await refreshUnresolvedLookupForKeyAsync(
@@ -120,6 +141,14 @@ describe("LookupGraphMutator", () => {
 		).toBe(true);
 	});
 });
+
+function bucket(): BacklinkBucket {
+	return {
+		count: 1,
+		length: 1,
+		hasResolved: false,
+	};
+}
 
 function createImmediateYieldScheduler() {
 	return {

@@ -214,12 +214,11 @@ export async function refreshUnresolvedLookupForKeyAsync(
 	lookupKey: string,
 	yieldScheduler: YieldScheduler,
 ): Promise<void> {
-	const sources = await collectLookupKeySourcesAsync(
-		snapshot,
-		lookupKey,
-		yieldScheduler,
-	);
-	if (!sources || sources.size === 0) {
+	const sources = snapshot.lookupKeyToSources.get(lookupKey) ?? new Set<string>();
+	sources.clear();
+
+	await collectLookupKeySourcesAsync(snapshot, lookupKey, sources, yieldScheduler);
+	if (sources.size === 0) {
 		snapshot.lookupKeyToSources.delete(lookupKey);
 		snapshot.unresolvedLookupToSources.delete(lookupKey);
 		return;
@@ -265,14 +264,14 @@ function removeLookupPathRegistration(
 async function collectLookupKeySourcesAsync(
 	snapshot: IndexSnapshot,
 	lookupKey: string,
+	sources: Set<string>,
 	yieldScheduler: YieldScheduler,
-): Promise<Set<string> | undefined> {
+): Promise<void> {
 	const lookupPaths = snapshot.lookupKeyToLookupPaths.get(lookupKey);
 	if (!lookupPaths || lookupPaths.size === 0) {
-		return undefined;
+		return;
 	}
 
-	const sources = new Set<string>();
 	let sourceCount = 0;
 	for (const lookupPath of lookupPaths) {
 		const sourceMap = snapshot.backlinksMap.get(lookupPath);
@@ -293,7 +292,6 @@ async function collectLookupKeySourcesAsync(
 			}
 		}
 	}
-	return sources;
 }
 
 async function syncLookupIndexForSourceAsync(
