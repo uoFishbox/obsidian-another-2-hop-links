@@ -176,18 +176,16 @@
 			{#if row}
 				<PreviewVisibilityProvider visibilityState={args?.visibilityState}>
 					<ViewItemCard
-						item={row?.item}
+						item={row.item}
 						settings={currentSettings}
 						{searchQuery}
-						searchScope={row ? resolveItemSearchScope(row) : searchScope}
-						contentPreview={row
-							? resolveItemContentPreview(row)
-							: undefined}
+						searchScope={resolveItemSearchScope(row)}
+						contentPreview={resolveItemContentPreview(row)}
 						rowIndex={args?.rowIndex}
 						activationCandidateId={args?.activationCandidateId}
 						interactionRegistration="snapshot"
-						interactionId={row?.interactionId}
-						interactionKey={row?.interactionKey}
+						interactionId={row.interactionId}
+						interactionKey={row.interactionKey}
 					/>
 				</PreviewVisibilityProvider>
 			{/if}
