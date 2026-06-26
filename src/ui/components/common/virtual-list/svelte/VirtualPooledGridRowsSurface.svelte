@@ -78,7 +78,9 @@
 
 	const resolveCellClassName = (mountedCell: TMountedCell): string => {
 		const extraClassName = getCellClassName?.(mountedCell);
-		return `${cellClassName} ${extraClassName ?? ""}`.trim();
+		if (!extraClassName) return cellClassName;
+		if (!cellClassName) return extraClassName;
+		return `${cellClassName} ${extraClassName}`;
 	};
 
 	const mountedRows = $derived.by(() => {

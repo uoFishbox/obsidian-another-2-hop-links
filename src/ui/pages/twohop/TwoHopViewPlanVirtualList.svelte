@@ -72,6 +72,8 @@
 		>;
 	}
 
+	const TWO_HOP_CELL_CLASS_NAME = "view-plan-virtual-list-cell view-plan-flow-cell";
+
 	const props: Props = $props();
 	const previewActivationScope = createPreviewActivationScope();
 	const rowPreviewActivationRuntime = createRowPreviewActivationRuntime({
@@ -85,9 +87,22 @@
 			getMountedRows: () => list.mountedRows,
 			resolveDescriptor: (item) => props.getItemInteractionDescriptor(item),
 		});
+	const resolvedCellClassNameBySectionClassName = new Map<string, string>();
+	const resolveSectionCellClassName = (
+		sectionClassName: string | undefined,
+	): string => {
+		if (!sectionClassName) return TWO_HOP_CELL_CLASS_NAME;
+
+		let resolved = resolvedCellClassNameBySectionClassName.get(sectionClassName);
+		if (resolved !== undefined) return resolved;
+
+		resolved = `${TWO_HOP_CELL_CLASS_NAME} ${sectionClassName}`;
+		resolvedCellClassNameBySectionClassName.set(sectionClassName, resolved);
+		return resolved;
+	};
 	const getMountedCellClassName = (
 		cell: MountedFlatCell<TwoHopPageVirtualItem, TwoHopPageVirtualSection>,
-	): string | undefined => props.getCellClassName?.(cell.section);
+	): string => resolveSectionCellClassName(props.getCellClassName?.(cell.section));
 	const isHeaderCell = (
 		cell: MountedFlatCell<TwoHopPageVirtualItem, TwoHopPageVirtualSection>,
 	): cell is MountedFlatHeaderCell<TwoHopPageVirtualItem, TwoHopPageVirtualSection> =>
@@ -102,7 +117,7 @@
 	className="cosense-card-links__section view-plan-virtual-list twohop-page-virtual-list"
 	contentClassName="view-plan-virtual-list-content view-plan-flow-content"
 	rowClassName="view-plan-flow-row"
-	cellClassName="view-plan-virtual-list-cell view-plan-flow-cell"
+	cellClassName=""
 	contentHeight={list.contentHeight}
 	mountedCells={list.mountedCellsForSurface}
 	mountedRows={list.mountedRows}
