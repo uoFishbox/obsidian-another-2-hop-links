@@ -97,20 +97,18 @@ export const createTaggedNoteSectionItemKey = (
 	item: ViewItem,
 	tag: string,
 	index: number,
-): string =>
-	item.type === "taggedNote"
-		? generateLinkKey(
-				item.data.path,
-				item.data.file.basename,
-				[
-					"tag-note",
-					tag,
-					item.data.usageKey ?? "",
-					item.data.position?.start.offset ?? "",
-					item.data.position?.end.offset ?? "",
-				].join(":"),
-			)
-		: `tag-item-${tag}-${index}`;
+): string => {
+	if (item.type !== "taggedNote") {
+		return `tag-item-${tag}-${index}`;
+	}
+
+	const data = item.data;
+	const startOffset = data.position?.start.offset ?? "";
+	const endOffset = data.position?.end.offset ?? "";
+	const suffix = `tag-note:${tag}:${data.usageKey ?? ""}:${startOffset}:${endOffset}`;
+
+	return generateLinkKey(data.path, data.file.basename, suffix);
+};
 
 export const resolveTwoHopPageItemSearchScope = (
 	row: TwoHopPageVirtualItem,
