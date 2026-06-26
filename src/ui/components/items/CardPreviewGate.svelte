@@ -1,14 +1,10 @@
 <script lang="ts">
 	import { getContext, onDestroy } from "svelte";
 	import type { TFile } from "obsidian";
-	import type { PreviewData } from "ui/context/linkContext";
+	import type { PreviewData, PreviewRequestOptions } from "ui/context/linkContext";
 	import CardPreview from "ui/components/common/CardPreview.svelte";
 	import { lazyRender, type LazyRenderActionParams } from "ui/actions/useLazyRender";
-	import {
-		useAppContext,
-		useLazyLoaderCache,
-		useLinkContext,
-	} from "ui/context/linkContext";
+	import type { ApplicationStore } from "ui/stores/ApplicationStore.svelte";
 	import { buildPreviewGenerationKey } from "features/preview/core/previewCache";
 	import {
 		PREVIEW_ACTIVATION_SCOPE_CONTEXT_KEY,
@@ -43,7 +39,14 @@
 
 	interface Props {
 		file: TFile | null;
-		isUnresolvedNewLink?: boolean;
+		getPreview: (
+			file: TFile,
+			signal?: AbortSignal,
+			options?: PreviewRequestOptions,
+		) => Promise<PreviewData>;
+		getVisiblePreviewQueueSize?: () => number;
+		applicationStore: ApplicationStore;
+		intersectedCache?: Set<string>;
 		searchQuery?: string;
 		searchScope?: "title-only" | "title-and-content";
 		observerRoot?: HTMLElement | null;
@@ -56,7 +59,10 @@
 
 	let {
 		file,
-		isUnresolvedNewLink = false,
+		getPreview,
+		getVisiblePreviewQueueSize: providedGetVisiblePreviewQueueSize,
+		applicationStore,
+		intersectedCache,
 		searchQuery = "",
 		searchScope = "title-and-content",
 		observerRoot = undefined,
@@ -67,10 +73,7 @@
 		activationCandidateId = undefined,
 	}: Props = $props();
 
-	const context = useLinkContext();
-	const getVisiblePreviewQueueSize = context.getVisiblePreviewQueueSize ?? (() => 0);
-	const { applicationStore } = useAppContext();
-	const intersectedCache = useLazyLoaderCache();
+	const getVisiblePreviewQueueSize = providedGetVisiblePreviewQueueSize ?? (() => 0);
 	const previewVisibilityContext = getContext<PreviewVisibilityContext | undefined>(
 		PREVIEW_VISIBILITY_CONTEXT_KEY,
 	);
@@ -119,9 +122,6 @@
 					previewOverride,
 				})
 			: undefined,
-	);
-	const isPreviewCached = $derived(
-		previewCacheKey ? (intersectedCache?.has(previewCacheKey) ?? false) : false,
 	);
 	let visiblePreviewIdentity = $state<string | undefined>(undefined);
 	let activatedPreviewIdentity = $state<string | undefined>(undefined);
@@ -388,14 +388,7 @@
 	});
 </script>
 
-{#if !DEBUG_DISABLE_CARD_DOM_PREVIEW && isUnresolvedNewLink && !file}
-	<div
-		class="unresolved-preview-placeholder"
-		data-ccl-vlist-ignore-structure
-		inert
-		aria-hidden="true"
-	></div>
-{:else if !DEBUG_DISABLE_CARD_DOM_PREVIEW && file}
+{#if !DEBUG_DISABLE_CARD_DOM_PREVIEW && file}
 	{#if effectiveVisibilityMode === "self-observed"}
 		<div
 			use:lazyRender={previewLazyParams}
@@ -407,7 +400,7 @@
 			{#if shouldRenderPreview && renderedPreviewSnapshot}
 				<CardPreview
 					file={renderedPreviewSnapshot.file}
-					getPreview={context.getPreview}
+					{getPreview}
 					searchQuery={renderedPreviewSnapshot.searchQuery}
 					previewRefreshToken={renderedPreviewSnapshot.previewRefreshToken}
 					previewOverride={renderedPreviewSnapshot.previewOverride}
@@ -419,41 +412,10 @@
 	{:else if shouldRenderPreview && renderedPreviewSnapshot}
 		<CardPreview
 			file={renderedPreviewSnapshot.file}
-			getPreview={context.getPreview}
+			{getPreview}
 			searchQuery={renderedPreviewSnapshot.searchQuery}
 			previewRefreshToken={renderedPreviewSnapshot.previewRefreshToken}
 			previewOverride={renderedPreviewSnapshot.previewOverride}
 		/>
 	{/if}
 {/if}
-
-<style>
-	.unresolved-preview-placeholder {
-		--bar-color: var(--color-base-20);
-		flex: 1 1 auto;
-		height: 61px;
-		min-height: 61px;
-		margin: 10px var(--ccl-box-padding) 0;
-		border-radius: 2px;
-		background-image:
-			linear-gradient(var(--bar-color), var(--bar-color)),
-			linear-gradient(var(--bar-color), var(--bar-color)),
-			linear-gradient(var(--bar-color), var(--bar-color)),
-			linear-gradient(var(--bar-color), var(--bar-color)),
-			linear-gradient(var(--bar-color), var(--bar-color));
-		background-repeat: no-repeat;
-		background-size:
-			100% 5px,
-			100% 5px,
-			100% 5px,
-			100% 5px,
-			70% 5px;
-		background-position:
-			0 0,
-			0 14px,
-			0 28px,
-			0 42px,
-			0 56px;
-		opacity: 0.55;
-	}
-</style>

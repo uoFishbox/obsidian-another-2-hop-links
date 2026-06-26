@@ -1,9 +1,14 @@
 <script lang="ts">
 	import type { ItemProps } from "./types";
-	import { useLinkContext } from "ui/context/linkContext";
+	import {
+		useAppContext,
+		useLazyLoaderCache,
+		useLinkContext,
+	} from "ui/context/linkContext";
 	import LinkItem from "ui/components/common/LinkItem.svelte";
 	import CardPreviewGate from "./CardPreviewGate.svelte";
-	import { ARIA_LABELS } from "../../../appConstants";
+	import UnresolvedPreviewPlaceholder from "./UnresolvedPreviewPlaceholder.svelte";
+	import { ARIA_LABELS, DEBUG_DISABLE_CARD_DOM_PREVIEW } from "../../../appConstants";
 	import { formatLinkText } from "features/preview/text-processing/textUtils";
 	import { getItemStrategy } from "application/presenters";
 	import { getPriorityFrontmatterCardTitle } from "core/frontmatterCardTitle";
@@ -32,6 +37,8 @@
 	}: ItemProps = $props();
 
 	const context = useLinkContext();
+	const { applicationStore } = useAppContext();
+	const intersectedCache = useLazyLoaderCache();
 	const interactionRegistry = useInteractionRegistry();
 
 	// Strategyパターンを使用してアイテムタイプに応じた処理を取得
@@ -138,18 +145,25 @@
 		{searchQuery}
 	>
 		{#snippet children()}
-			<CardPreviewGate
-				file={targetFile}
-				isUnresolvedNewLink={item.type === "newLink"}
-				{searchQuery}
-				{searchScope}
-				{observerRoot}
-				{previewVisibilityMode}
-				{previewRefreshToken}
-				{contentPreview}
-				{rowIndex}
-				{activationCandidateId}
-			/>
+			{#if !DEBUG_DISABLE_CARD_DOM_PREVIEW && item.type === "newLink" && !targetFile}
+				<UnresolvedPreviewPlaceholder />
+			{:else if !DEBUG_DISABLE_CARD_DOM_PREVIEW}
+				<CardPreviewGate
+					file={targetFile}
+					getPreview={context.getPreview}
+					getVisiblePreviewQueueSize={context.getVisiblePreviewQueueSize}
+					{applicationStore}
+					{intersectedCache}
+					{searchQuery}
+					{searchScope}
+					{observerRoot}
+					{previewVisibilityMode}
+					{previewRefreshToken}
+					{contentPreview}
+					{rowIndex}
+					{activationCandidateId}
+				/>
+			{/if}
 		{/snippet}
 	</LinkItem>
 {/if}
