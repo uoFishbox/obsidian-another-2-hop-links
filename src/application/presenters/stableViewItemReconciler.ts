@@ -25,9 +25,12 @@ export interface StableViewItemReconciler<T> {
 interface StableViewItemEntry<T> {
 	source: T;
 	viewItem: ViewItem;
+	seenGeneration: number;
 }
 
 type EntryBucket<T> = StableViewItemEntry<T> | StableViewItemEntry<T>[];
+
+const PENDING_NEW_ENTRY = Symbol("pending-new-entry");
 
 function canReuseEntrySource<T>(
 	options: StableViewItemReconcilerOptions<T>,
@@ -120,10 +123,78 @@ function refreshViewItemData<T>(
 export function createStableViewItemReconciler<T>(
 	options: StableViewItemReconcilerOptions<T>,
 ): StableViewItemReconciler<T> {
-	let previousEntriesByBaseKey = new Map<string, EntryBucket<T>>();
+	let previousEntriesByBaseKey = new Map<
+		string,
+		EntryBucket<T> | typeof PENDING_NEW_ENTRY
+	>();
 	let previousArray: ViewItem[] = [];
 	let previousKeys: string[] = [];
 	let previousSourceArray: readonly T[] | undefined;
+	let hasDuplicateKeys = false;
+	let seenGeneration = 0;
+
+	const reconcileWithDuplicateBuckets = (items: readonly T[]): ViewItem[] => {
+		const nextEntriesByBaseKey = new Map<string, EntryBucket<T>>();
+		const nextArray = new Array<ViewItem>(items.length);
+		const nextKeys = new Array<string>(items.length);
+		let nextHasDuplicateKeys = false;
+
+		for (let index = 0; index < items.length; index += 1) {
+			const item = items[index];
+			const baseKey = options.getKey(item, index);
+			const previousBucket = previousEntriesByBaseKey.get(baseKey);
+			const reusable =
+				previousBucket === PENDING_NEW_ENTRY
+					? undefined
+					: takeReusableEntry(previousBucket, item, options);
+			const previousEntry = reusable?.entry;
+			const baseViewItem = previousEntry
+				? refreshViewItemData(
+						previousEntry.viewItem,
+						previousEntry.source,
+						item,
+						options,
+					)
+				: options.toViewItem(item);
+
+			nextKeys[index] = baseKey;
+			nextArray[index] = baseViewItem;
+
+			const entry: StableViewItemEntry<T> = previousEntry
+				? ((previousEntry.source = item),
+					(previousEntry.viewItem = baseViewItem),
+					previousEntry)
+				: { source: item, viewItem: baseViewItem, seenGeneration: 0 };
+
+			const existingBucket = nextEntriesByBaseKey.get(baseKey);
+			if (existingBucket === undefined) {
+				nextEntriesByBaseKey.set(baseKey, entry);
+			} else if (Array.isArray(existingBucket)) {
+				nextHasDuplicateKeys = true;
+				existingBucket.push(entry);
+			} else {
+				nextHasDuplicateKeys = true;
+				nextEntriesByBaseKey.set(baseKey, [existingBucket, entry]);
+			}
+		}
+
+		const result = hasSameArrayContents(
+			nextKeys,
+			nextArray,
+			previousKeys,
+			previousArray,
+		)
+			? previousArray
+			: nextArray;
+
+		previousEntriesByBaseKey = nextEntriesByBaseKey;
+		previousKeys = nextKeys;
+		previousArray = result;
+		previousSourceArray = items;
+		hasDuplicateKeys = nextHasDuplicateKeys;
+
+		return result;
+	};
 
 	return {
 		reconcile(items) {
@@ -131,44 +202,45 @@ export function createStableViewItemReconciler<T>(
 				return previousArray;
 			}
 
-			const nextEntriesByBaseKey = new Map<string, EntryBucket<T>>();
+			if (hasDuplicateKeys) {
+				return reconcileWithDuplicateBuckets(items);
+			}
+
 			const nextArray = new Array<ViewItem>(items.length);
 			const nextKeys = new Array<string>(items.length);
+			const generation = seenGeneration + 1;
+			seenGeneration = generation;
 
 			for (let index = 0; index < items.length; index += 1) {
 				const item = items[index];
 				const baseKey = options.getKey(item, index);
-				const reusable = takeReusableEntry(
-					previousEntriesByBaseKey.get(baseKey),
-					item,
-					options,
-				);
-				const previousEntry = reusable?.entry;
+				const previousBucket = previousEntriesByBaseKey.get(baseKey);
+				if (
+					previousBucket === PENDING_NEW_ENTRY ||
+					Array.isArray(previousBucket) ||
+					previousBucket?.seenGeneration === generation
+				) {
+					return reconcileWithDuplicateBuckets(items);
+				}
+
+				const previousEntry = previousBucket;
 				const baseViewItem = previousEntry
-					? refreshViewItemData(
+					? canReuseEntrySource(options, previousEntry.source, item)
+						? refreshViewItemData(
 							previousEntry.viewItem,
 							previousEntry.source,
 							item,
 							options,
 						)
+						: options.toViewItem(item)
 					: options.toViewItem(item);
 
 				nextKeys[index] = baseKey;
 				nextArray[index] = baseViewItem;
-
-				const entry: StableViewItemEntry<T> = previousEntry
-					? ((previousEntry.source = item),
-						(previousEntry.viewItem = baseViewItem),
-						previousEntry)
-					: { source: item, viewItem: baseViewItem };
-
-				const existingBucket = nextEntriesByBaseKey.get(baseKey);
-				if (existingBucket === undefined) {
-					nextEntriesByBaseKey.set(baseKey, entry);
-				} else if (Array.isArray(existingBucket)) {
-					existingBucket.push(entry);
+				if (previousEntry) {
+					previousEntry.seenGeneration = generation;
 				} else {
-					nextEntriesByBaseKey.set(baseKey, [existingBucket, entry]);
+					previousEntriesByBaseKey.set(baseKey, PENDING_NEW_ENTRY);
 				}
 			}
 
@@ -181,10 +253,33 @@ export function createStableViewItemReconciler<T>(
 				? previousArray
 				: nextArray;
 
-			previousEntriesByBaseKey = nextEntriesByBaseKey;
+			for (const [baseKey, entry] of previousEntriesByBaseKey) {
+				if (entry === PENDING_NEW_ENTRY) continue;
+				if (Array.isArray(entry) || entry.seenGeneration !== generation) {
+					previousEntriesByBaseKey.delete(baseKey);
+				}
+			}
+			for (let index = 0; index < items.length; index += 1) {
+				const item = items[index];
+				const baseKey = nextKeys[index];
+				const viewItem = nextArray[index];
+				const entry = previousEntriesByBaseKey.get(baseKey);
+				if (entry === PENDING_NEW_ENTRY || entry === undefined) {
+					previousEntriesByBaseKey.set(baseKey, {
+						source: item,
+						viewItem,
+						seenGeneration: generation,
+					});
+					continue;
+				}
+				if (Array.isArray(entry)) continue;
+				entry.source = item;
+				entry.viewItem = viewItem;
+			}
 			previousKeys = nextKeys;
 			previousArray = result;
 			previousSourceArray = items;
+			hasDuplicateKeys = false;
 
 			return result;
 		},
@@ -196,6 +291,7 @@ export function createStableViewItemReconciler<T>(
 			previousArray = [];
 			previousKeys = [];
 			previousSourceArray = undefined;
+			hasDuplicateKeys = false;
 		},
 	};
 }
