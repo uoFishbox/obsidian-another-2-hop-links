@@ -1105,59 +1105,6 @@ function canResolveFirstTwoHopRowByTopFromSection(
 	return target < nextSection.top || (inclusive && target === nextSection.top);
 }
 
-function resolveFirstTwoHopRowByTop(
-	sections: readonly TwoHopSectionPlan[],
-	rowStride: number,
-	target: number,
-	inclusive: boolean,
-): FirstTwoHopRowByTopResolution {
-	if (sections.length === 0) {
-		return { rowIndex: 0, sectionIndex: 0 };
-	}
-	const lastSection = sections[sections.length - 1];
-	const rowCount = lastSection.firstRowIndex + lastSection.rowCount;
-	const boundaryIndex = inclusive
-		? lowerBoundSectionTop(sections, target)
-		: upperBoundSectionTop(sections, target);
-	if (inclusive) {
-		const matchingSection = sections[boundaryIndex];
-		if (matchingSection?.top === target) {
-			return {
-				rowIndex: matchingSection.firstRowIndex,
-				sectionIndex: boundaryIndex,
-			};
-		}
-	}
-	if (rowStride <= 0) {
-		const matchingSection = sections[boundaryIndex];
-		return matchingSection
-			? {
-					rowIndex: matchingSection.firstRowIndex,
-					sectionIndex: boundaryIndex,
-				}
-			: { rowIndex: rowCount, sectionIndex: sections.length };
-	}
-	const sectionIndex = Math.max(0, boundaryIndex - 1);
-	const scratch: FirstTwoHopRowByTopResolutionScratch = {
-		rowIndex: 0,
-		sectionIndex: 0,
-	};
-	writeFirstTwoHopRowByTopFromSection(
-		scratch,
-		sections,
-		rowStride,
-		target,
-		inclusive,
-		sectionIndex,
-		rowCount,
-	);
-	return { rowIndex: scratch.rowIndex, sectionIndex: scratch.sectionIndex };
-}
-
-/**
- * Into-style variant of {@link resolveFirstTwoHopRowByTop}.
- * Writes into a reusable scratch object instead of allocating.
- */
 function writeFirstTwoHopRowByTop(
 	out: FirstTwoHopRowByTopResolutionScratch,
 	sections: readonly TwoHopSectionPlan[],
