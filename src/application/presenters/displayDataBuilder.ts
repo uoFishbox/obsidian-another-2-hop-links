@@ -100,7 +100,12 @@ export interface DisplayDataBuilderDependencies {
 	getSortContextVersion?: () => number;
 }
 
-type ItemSortCache = Map<string, WeakMap<SortableItem[], SortableItem[]>>;
+type SortItemsFunction = ISortService["sort"];
+
+type ItemSortCache = WeakMap<
+	SortItemsFunction,
+	Map<string, WeakMap<SortableItem[], SortableItem[]>>
+>;
 
 interface DeduplicationStageResult<T> {
 	data: T;
@@ -135,11 +140,11 @@ export function createEmptyTagPreprocessedDisplayData(): TagPreprocessedDisplayD
 }
 
 export function createHop2SortCache(): Hop2SortCache {
-	return new Map();
+	return new WeakMap();
 }
 
 export function createTagItemSortCache(): TagItemSortCache {
-	return new Map();
+	return new WeakMap();
 }
 
 export function createDisplayAssemblyCache(): DisplayAssemblyCache {
@@ -537,10 +542,18 @@ export function getSortedItemsWithCache<T extends SortableItem>(
 		return items;
 	}
 
+	const sortItems = sortService.sort;
+	let itemSortCacheByKey = itemSortCache.get(sortItems);
+	if (!itemSortCacheByKey) {
+		itemSortCacheByKey = new Map();
+		itemSortCache.set(sortItems, itemSortCacheByKey);
+	}
+
 	const sortCacheKey = createSortCacheKey(sortOption, sortContextVersion);
-	const cachedSortedItemsByOption = itemSortCache.get(sortCacheKey) ?? new WeakMap();
-	if (!itemSortCache.has(sortCacheKey)) {
-		itemSortCache.set(sortCacheKey, cachedSortedItemsByOption);
+	let cachedSortedItemsByOption = itemSortCacheByKey.get(sortCacheKey);
+	if (!cachedSortedItemsByOption) {
+		cachedSortedItemsByOption = new WeakMap();
+		itemSortCacheByKey.set(sortCacheKey, cachedSortedItemsByOption);
 	}
 
 	let sortedItems = cachedSortedItemsByOption.get(items) as T[] | undefined;

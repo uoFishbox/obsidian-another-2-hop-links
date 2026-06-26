@@ -16,6 +16,7 @@ import type {
 } from "types/domain";
 import type { PluginSettings, SortOption } from "types/settings";
 import type { ISortService, IDeduplicationService } from "types/services";
+import type { SortableItem } from "core/sorting";
 import { createMockTFile } from "testing/__mocks__/testHelpers";
 import { DEFAULT_SETTINGS } from "types/settings";
 import * as grouping from "core/grouping";
@@ -1082,6 +1083,71 @@ describe("DisplayDataBuilder - buildDisplayData", () => {
 			expect(sortService.sort).toHaveBeenCalledTimes(1);
 			expect(sortService.sort).toHaveBeenCalledWith(sharedHop2, "alphabetical");
 			expect(second).toBe(first);
+		});
+
+		test("shared source arrays do not reuse cached sort results across sorter identities", () => {
+			const sharedHop2: TwoHopIndexedLink[] = [
+				{
+					rawText: "hop2-b",
+					path: "hop2-b.md",
+					isUnresolved: false,
+					sourceFile: createMockTFile("source-b.md"),
+				},
+				{
+					rawText: "hop2-a",
+					path: "hop2-a.md",
+					isUnresolved: false,
+					sourceFile: createMockTFile("source-a.md"),
+				},
+				{
+					rawText: "hop2-c",
+					path: "hop2-c.md",
+					isUnresolved: false,
+					sourceFile: createMockTFile("source-c.md"),
+				},
+			];
+			const firstSorted = [sharedHop2[1], sharedHop2[0], sharedHop2[2]];
+			const secondSorted = [sharedHop2[2], sharedHop2[1], sharedHop2[0]];
+			let firstSortCallCount = 0;
+			let secondSortCallCount = 0;
+			const firstSortService: ISortService = {
+				sort: <T extends SortableItem>(): T[] => {
+					firstSortCallCount += 1;
+					return firstSorted as T[];
+				},
+			};
+			const secondSortService: ISortService = {
+				sort: <T extends SortableItem>(): T[] => {
+					secondSortCallCount += 1;
+					return secondSorted as T[];
+				},
+			};
+			const hop2SortCache = createHop2SortCache();
+
+			const first = getSortedItemsWithCache(
+				sharedHop2,
+				firstSortService,
+				"alphabetical",
+				hop2SortCache,
+			);
+			const second = getSortedItemsWithCache(
+				sharedHop2,
+				secondSortService,
+				"alphabetical",
+				hop2SortCache,
+			);
+			const secondAgain = getSortedItemsWithCache(
+				sharedHop2,
+				secondSortService,
+				"alphabetical",
+				hop2SortCache,
+			);
+
+			expect(first).toBe(firstSorted);
+			expect(second).toBe(secondSorted);
+			expect(secondAgain).toBe(second);
+			expect(firstSortCallCount).toBe(1);
+			expect(secondSortCallCount).toBe(1);
 		});
 
 		test("sort helper avoids allocating through sortWithResult", () => {
