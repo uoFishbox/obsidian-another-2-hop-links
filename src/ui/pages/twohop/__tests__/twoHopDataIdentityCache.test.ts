@@ -162,6 +162,25 @@ describe("createTwoHopDataIdentityCache", () => {
 		expect(getSortedTagGroupItems).toHaveBeenCalledTimes(1);
 	});
 
+	it("materializes tag wrappers only for requested indexes", () => {
+		const cache = createTwoHopDataIdentityCache();
+		const { baseParams } = createHarness();
+		const alpha = {
+			tag: "alpha",
+			notes: [
+				createNote("alpha-1.md", "alpha"),
+				createNote("alpha-2.md", "alpha"),
+			],
+		};
+		const [section] = cache.resolve({
+			...baseParams,
+			displayData: createDisplayData([alpha]),
+		});
+
+		expect(section?.getItem?.(1)?.interactionId).toBe("i0");
+		expect(section?.getItem?.(0)?.interactionId).toBe("i1");
+	});
+
 	it("resolves branch getItem through the shared sorted item cache", () => {
 		const cache = createTwoHopDataIdentityCache();
 		const { baseParams, getSortedTwoHopItems } = createHarness();
@@ -178,6 +197,22 @@ describe("createTwoHopDataIdentityCache", () => {
 		expect(section?.getItem?.(1)?.virtualKey).toBeTruthy();
 		expect(section?.getItems()).toHaveLength(2);
 		expect(getSortedTwoHopItems).toHaveBeenCalledTimes(1);
+	});
+
+	it("materializes branch wrappers only for requested indexes", () => {
+		const cache = createTwoHopDataIdentityCache();
+		const { baseParams } = createHarness();
+		const branch = createBranch("parent.md", [
+			createLink("child-1.md"),
+			createLink("child-2.md"),
+		]);
+		const [section] = cache.resolve({
+			...baseParams,
+			displayData: createDisplayData([], [branch]),
+		});
+
+		expect(section?.getItem?.(1)?.interactionId).toBe("i0");
+		expect(section?.getItem?.(0)?.interactionId).toBe("i1");
 	});
 
 	it("keeps descriptor identity for equivalent section values", () => {

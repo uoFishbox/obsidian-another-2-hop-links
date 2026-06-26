@@ -192,17 +192,6 @@ const createDescriptor = (
 	});
 };
 
-function hasDenseItemsCache(
-	itemsCache: readonly (TwoHopPageVirtualItem | undefined)[] | undefined,
-	length: number,
-): itemsCache is readonly TwoHopPageVirtualItem[] {
-	if (!itemsCache || itemsCache.length !== length) return false;
-	for (let index = 0; index < length; index += 1) {
-		if (!itemsCache[index]) return false;
-	}
-	return true;
-}
-
 function createSparseVirtualItemAccessors(params: {
 	readonly getLength: () => number;
 	readonly createItem: (index: number) => TwoHopPageVirtualItem | undefined;
@@ -238,34 +227,6 @@ function createSparseVirtualItemAccessors(params: {
 	return {
 		getItems,
 		getItem,
-		reset() {
-			itemsCache = undefined;
-		},
-	};
-}
-
-function createDenseVirtualItemAccessors(params: {
-	readonly getLength: () => number;
-	readonly createItems: () => readonly TwoHopPageVirtualItem[];
-}): CachedVirtualItemAccessors {
-	let itemsCache: TwoHopPageVirtualItem[] | undefined;
-	const getItems = (): readonly TwoHopPageVirtualItem[] => {
-		const length = params.getLength();
-		if (hasDenseItemsCache(itemsCache, length)) {
-			return itemsCache;
-		}
-
-		itemsCache = [...params.createItems()];
-		return itemsCache;
-	};
-
-	return {
-		getItems,
-		getItem(index) {
-			const length = params.getLength();
-			if (index < 0 || index >= length) return undefined;
-			return getItems()[index];
-		},
 		reset() {
 			itemsCache = undefined;
 		},
@@ -549,35 +510,51 @@ export function createTwoHopDataIdentityCache(): TwoHopDataIdentityCache {
 							toViewItem: (item) => ({ type: "backlink", data: item }),
 							canReuseSource: hasSameBacklinkIndexedLink,
 						});
-					created.itemsAccessors = createDenseVirtualItemAccessors({
+					let reconciledItems: readonly ViewItem[] | undefined;
+					let reconciledKeys: readonly string[] | undefined;
+					const ensureReconciled = (): void => {
+						if (reconciledItems && reconciledKeys) return;
+
+						const sorted = created.itemsDeps.getSortedTwoHopItems.call(
+							created.applicationStore,
+							created.branch.hop2,
+						);
+						reconciledItems = created.itemsReconciler.reconcile(sorted);
+						reconciledKeys = created.itemsReconciler.getKeys();
+					};
+					created.itemsAccessors = createSparseVirtualItemAccessors({
 						getLength: () => created.branch.hop2.length,
-						createItems: () => {
-							const sorted = created.itemsDeps.getSortedTwoHopItems.call(
-								created.applicationStore,
-								created.branch.hop2,
-							);
-							const reconciled =
-								created.itemsReconciler.reconcile(sorted);
-							const reconciledKeys = created.itemsReconciler.getKeys();
+						createItem: (index) => {
+							ensureReconciled();
+							const item = reconciledItems?.[index];
+							const virtualKey = reconciledKeys?.[index];
+							if (!item || !virtualKey) return undefined;
+
 							const branchBaseKey = getTwohopBranchSearchBaseKey(
 								created.branch,
 							);
-							return reconciled.map((item, index) => {
-								const virtualKey = reconciledKeys[index];
-								return {
-									kind: "two-hop-link" as const,
-									item,
-									...createItemInteractionIdentity(item, virtualKey),
-									branch: created.branch,
-									searchKey: createTwohopChildSearchKeyFromBaseKeys(
-										branchBaseKey,
-										virtualKey,
-									),
+							return {
+								kind: "two-hop-link" as const,
+								item,
+								...createItemInteractionIdentity(item, virtualKey),
+								branch: created.branch,
+								searchKey: createTwohopChildSearchKeyFromBaseKeys(
+									branchBaseKey,
 									virtualKey,
-								};
-							});
+								),
+								virtualKey,
+							};
 						},
 					});
+					const resetItemsAccessors = created.itemsAccessors.reset;
+					created.itemsAccessors = {
+						...created.itemsAccessors,
+						reset() {
+							reconciledItems = undefined;
+							reconciledKeys = undefined;
+							resetItemsAccessors();
+						},
+					};
 					created.getItems = created.itemsAccessors.getItems;
 					created.getItem = created.itemsAccessors.getItem;
 					created.headerSnapshot = nextHeaderSnapshot;
@@ -726,35 +703,53 @@ export function createTwoHopDataIdentityCache(): TwoHopDataIdentityCache {
 							interactionKind: "sectionHeader",
 							onClick: () => created.onTagClick(created.tag),
 						};
-						created.itemsAccessors = createDenseVirtualItemAccessors({
+						let reconciledItems: readonly ViewItem[] | undefined;
+						let reconciledKeys: readonly string[] | undefined;
+						const ensureReconciled = (): void => {
+							if (reconciledItems && reconciledKeys) return;
+
+							const sorted =
+								created.itemsDeps.getSortedTagGroupItems.call(
+									created.applicationStore,
+									created.source.notes,
+								);
+							reconciledItems = created.itemsReconciler.reconcile(sorted);
+							reconciledKeys = created.itemsReconciler.getKeys();
+						};
+						created.itemsAccessors = createSparseVirtualItemAccessors({
 							getLength: () => created.source.notes.length,
-							createItems: () => {
-								const sorted =
-									created.itemsDeps.getSortedTagGroupItems.call(
-										created.applicationStore,
-										created.source.notes,
-									);
-								const reconciled =
-									created.itemsReconciler.reconcile(sorted);
-								const reconciledKeys =
-									created.itemsReconciler.getKeys();
-								return reconciled.map((item, index) => ({
+							createItem: (index) => {
+								ensureReconciled();
+								const item = reconciledItems?.[index];
+								const baseKey = reconciledKeys?.[index];
+								if (!item || !baseKey) return undefined;
+
+								return {
 									kind: "tag-link" as const,
 									item,
 									...createItemInteractionIdentity(item),
 									tag: created.tag,
 									searchKey: getTagNoteSearchKeyFromBaseKey(
 										created.tag,
-										reconciledKeys[index],
+										baseKey,
 									),
 									virtualKey: createTaggedNoteSectionItemKey(
 										item,
 										created.tag,
 										index,
 									),
-								}));
+								};
 							},
 						});
+						const resetItemsAccessors = created.itemsAccessors.reset;
+						created.itemsAccessors = {
+							...created.itemsAccessors,
+							reset() {
+								reconciledItems = undefined;
+								reconciledKeys = undefined;
+								resetItemsAccessors();
+							},
+						};
 						created.getItems = created.itemsAccessors.getItems;
 						created.getItem = created.itemsAccessors.getItem;
 						created.descriptor = createDescriptor(
