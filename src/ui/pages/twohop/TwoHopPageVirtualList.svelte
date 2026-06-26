@@ -27,7 +27,7 @@
 
 	interface Props {
 		sections: readonly TwoHopSectionDescriptor[];
-		applicationStore?: ApplicationStore;
+		applicationStore: ApplicationStore;
 		searchQuery?: string;
 		searchScope?: SearchWorkerMatchScope;
 		matchedItemByKey?: Map<string, SearchWorkerMatchedItem> | null;
