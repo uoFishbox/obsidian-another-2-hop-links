@@ -1421,6 +1421,23 @@ function copyRowRangeInto(out: RowRange, range: RowRange): void {
 	out.end = range.end;
 }
 
+interface ResolveTwoHopVisibleRangesParams {
+	scrollTop: number;
+	viewportHeight: number;
+	mountedOverscanPx: number;
+	previewOverscanPx?: number;
+	mounted?: RowRange;
+	reuseMountedReference?: boolean;
+}
+
+function normalizePreviewOverscan(
+	value: number | undefined,
+	mountedOverscanPx: number,
+): number {
+	if (value === undefined || !Number.isFinite(value) || value <= 0) return 0;
+	return Math.min(mountedOverscanPx, value);
+}
+
 export function createTwoHopViewPlanRowModel(
 	plan: TwoHopViewPlan,
 ): TwoHopViewPlanRowModel {
@@ -1473,33 +1490,51 @@ export function createTwoHopViewPlanRowModel(
 		mountedOverscanPx: number;
 		previewOverscanPx?: number;
 	}): VirtualRanges => {
+		const ranges = {
+			mounted: { start: 0, end: 0 },
+			previewVisible: { start: 0, end: 0 },
+		};
+		return resolveMountedAndPreviewRangesInto(ranges, {
+			...params,
+			reuseMountedReference: true,
+		});
+	};
+	const resolveMountedAndPreviewRangesInto = (
+		out: VirtualRanges,
+		params: ResolveTwoHopVisibleRangesParams,
+	): VirtualRanges => {
 		const mountedOverscanPx = Math.max(0, params.mountedOverscanPx);
-		const previewOverscanPx = Math.min(
-			mountedOverscanPx,
-			Math.max(0, params.previewOverscanPx ?? 0),
-		);
-		const mounted = { start: 0, end: 0 };
-		writeVisibleRange(
-			mounted,
-			params.scrollTop,
-			params.viewportHeight,
+		const previewOverscanPx = normalizePreviewOverscan(
+			params.previewOverscanPx,
 			mountedOverscanPx,
 		);
-		let previewVisible = mounted;
-		if (previewOverscanPx < mountedOverscanPx) {
-			previewVisible = { start: 0, end: 0 };
+		if (params.mounted === undefined) {
 			writeVisibleRange(
-				previewVisible,
+				out.mounted,
 				params.scrollTop,
 				params.viewportHeight,
-				previewOverscanPx,
+				mountedOverscanPx,
 			);
+		} else if (params.reuseMountedReference === true) {
+			out.mounted = params.mounted;
+		} else {
+			copyRowRangeInto(out.mounted, params.mounted);
 		}
-
-		return {
-			mounted,
-			previewVisible,
-		};
+		if (previewOverscanPx >= mountedOverscanPx) {
+			if (params.reuseMountedReference === true) {
+				out.previewVisible = out.mounted;
+				return out;
+			}
+			copyRowRangeInto(out.previewVisible, out.mounted);
+			return out;
+		}
+		writeVisibleRange(
+			out.previewVisible,
+			params.scrollTop,
+			params.viewportHeight,
+			previewOverscanPx,
+		);
+		return out;
 	};
 	const findRangesInto = (
 		out: VirtualRanges,
@@ -1510,27 +1545,7 @@ export function createTwoHopViewPlanRowModel(
 			previewOverscanPx?: number;
 		},
 	): void => {
-		const mountedOverscanPx = Math.max(0, params.mountedOverscanPx);
-		const previewOverscanPx = Math.min(
-			mountedOverscanPx,
-			Math.max(0, params.previewOverscanPx ?? 0),
-		);
-		writeVisibleRange(
-			out.mounted,
-			params.scrollTop,
-			params.viewportHeight,
-			mountedOverscanPx,
-		);
-		if (previewOverscanPx >= mountedOverscanPx) {
-			copyRowRangeInto(out.previewVisible, out.mounted);
-			return;
-		}
-		writeVisibleRange(
-			out.previewVisible,
-			params.scrollTop,
-			params.viewportHeight,
-			previewOverscanPx,
-		);
+		resolveMountedAndPreviewRangesInto(out, params);
 	};
 	const findRangesFromMounted = (params: {
 		scrollTop: number;
@@ -1539,25 +1554,14 @@ export function createTwoHopViewPlanRowModel(
 		mountedOverscanPx: number;
 		previewOverscanPx?: number;
 	}): VirtualRanges => {
-		const mountedOverscanPx = Math.max(0, params.mountedOverscanPx);
-		const previewOverscanPx = Math.min(
-			mountedOverscanPx,
-			Math.max(0, params.previewOverscanPx ?? 0),
-		);
-		let previewVisible = params.mounted;
-		if (previewOverscanPx < mountedOverscanPx) {
-			previewVisible = { start: 0, end: 0 };
-			writeVisibleRange(
-				previewVisible,
-				params.scrollTop,
-				params.viewportHeight,
-				previewOverscanPx,
-			);
-		}
-		return {
-			mounted: params.mounted,
-			previewVisible,
+		const ranges = {
+			mounted: { start: 0, end: 0 },
+			previewVisible: { start: 0, end: 0 },
 		};
+		return resolveMountedAndPreviewRangesInto(ranges, {
+			...params,
+			reuseMountedReference: true,
+		});
 	};
 	const findRangesFromMountedInto = (
 		out: VirtualRanges,
@@ -1569,22 +1573,7 @@ export function createTwoHopViewPlanRowModel(
 			previewOverscanPx?: number;
 		},
 	): void => {
-		const mountedOverscanPx = Math.max(0, params.mountedOverscanPx);
-		const previewOverscanPx = Math.min(
-			mountedOverscanPx,
-			Math.max(0, params.previewOverscanPx ?? 0),
-		);
-		copyRowRangeInto(out.mounted, params.mounted);
-		if (previewOverscanPx >= mountedOverscanPx) {
-			copyRowRangeInto(out.previewVisible, out.mounted);
-			return;
-		}
-		writeVisibleRange(
-			out.previewVisible,
-			params.scrollTop,
-			params.viewportHeight,
-			previewOverscanPx,
-		);
+		resolveMountedAndPreviewRangesInto(out, params);
 	};
 	const findStablePreviewScrollTopBandInto = (
 		out: StablePreviewScrollTopBandMutable,
