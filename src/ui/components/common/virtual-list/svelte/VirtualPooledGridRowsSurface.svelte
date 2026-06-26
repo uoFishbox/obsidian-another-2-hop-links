@@ -1,7 +1,7 @@
 <script lang="ts" generics="TMountedCell extends MountedVirtualCell">
 	import { IS_PROD } from "../../../../../appConstants";
 	import type { Snippet } from "svelte";
-	import type { MountedVirtualCell } from "../types";
+	import type { LogicalCellKey, MountedVirtualCell } from "../types";
 	import type { RowKey } from "../rowKey";
 	import VirtualListCellMount from "./VirtualListCellMount.svelte";
 	import type {
@@ -30,6 +30,7 @@
 		gap?: number;
 		mountedCells: readonly TMountedCell[];
 		mountedRows?: readonly VirtualSurfaceMountedRow<TMountedCell>[];
+		mountedRowsVersion?: number;
 		contentEl?: HTMLDivElement | null;
 		observerRoot?: HTMLElement | null;
 		getCellPosition?: (cell: TMountedCell) => VirtualSurfaceCellPosition;
@@ -62,6 +63,7 @@
 		gap = undefined,
 		mountedCells,
 		mountedRows: directMountedRows = undefined,
+		mountedRowsVersion = undefined,
 		contentEl = $bindable<HTMLDivElement | null>(null),
 		observerRoot = null,
 		getCellPosition,
@@ -125,6 +127,28 @@
 		_row: VirtualSurfaceMountedRow<TMountedCell>,
 		cell: TMountedCell,
 	): number => cell.cellSlotKey ?? cell.renderSlotIndex;
+
+	/**
+	 * Helper functions that take `mountedRowsVersion` as a parameter to ensure
+	 * Svelte re-reads mutated row/cell properties when the version changes.
+	 *
+	 * Without passing version into the expression, Svelte's compiler may skip
+	 * re-evaluation because the object identity has not changed.
+	 */
+	const resolveRowTransform = (
+		row: VirtualSurfaceMountedRow<TMountedCell>,
+		_version: number | undefined,
+	): string => `translateY(${row.top}px)`;
+
+	const resolveMountedCellLogicalKey = (
+		cell: TMountedCell,
+		_version: number | undefined,
+	): LogicalCellKey => cell.key;
+
+	const resolveMountedCellBodyKey = (
+		cell: TMountedCell,
+		_version: number | undefined,
+	): unknown => cell.renderBodyKey ?? cell.cellMetadataKey ?? cell.key;
 </script>
 
 <div class={contentClassName} bind:this={contentEl} style={contentStyle}>
@@ -133,12 +157,15 @@
 			class={rowClassName}
 			data-ccl-row-slot={!IS_PROD ? row.slotIndex : undefined}
 			data-ccl-row-index={!IS_PROD ? row.rowIndex : undefined}
-			style:transform={`translateY(${row.top}px)`}
+			style:transform={resolveRowTransform(row, mountedRowsVersion)}
 			{...row.attributes}
 		>
 			{#each row.cells as mountedCell (resolveCellSlotKey(row, mountedCell))}
 				<VirtualListCellMount
-					logicalKey={mountedCell.key}
+					logicalKey={resolveMountedCellLogicalKey(
+						mountedCell,
+						mountedRowsVersion,
+					)}
 					className={resolveCellClassName(mountedCell)}
 					dataTestId={getCellDataTestId?.(mountedCell)}
 					cellSlotKey={resolveCellSlotKey(row, mountedCell)}
@@ -149,7 +176,7 @@
 					onMountCell={onLogicalCellAttach}
 					onDestroyCell={onLogicalCellDetach}
 				>
-					{#key mountedCell.renderBodyKey ?? mountedCell.cellMetadataKey ?? mountedCell.key}
+					{#key resolveMountedCellBodyKey(mountedCell, mountedRowsVersion)}
 						{@render renderCell({
 							mountedCell,
 							observerRoot,

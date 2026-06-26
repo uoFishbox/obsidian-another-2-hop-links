@@ -34,6 +34,7 @@
 		layoutMode?: "absolute-cells" | "grid-rows";
 		mountedCells: readonly TMountedCell[];
 		mountedRows?: readonly VirtualSurfaceMountedRow<TMountedCell>[];
+		mountedRowsVersion?: number;
 		contentEl?: HTMLDivElement | null;
 		observerRoot?: HTMLElement | null;
 		getCellPosition?: (cell: TMountedCell) => VirtualSurfaceCellPosition;
@@ -67,6 +68,7 @@
 		layoutMode = "absolute-cells",
 		mountedCells,
 		mountedRows = undefined,
+		mountedRowsVersion = undefined,
 		contentEl = $bindable<HTMLDivElement | null>(null),
 		observerRoot = null,
 		getCellPosition,
@@ -92,6 +94,7 @@
 		{gap}
 		{mountedCells}
 		{mountedRows}
+		{mountedRowsVersion}
 		bind:contentEl
 		{observerRoot}
 		{getCellPosition}

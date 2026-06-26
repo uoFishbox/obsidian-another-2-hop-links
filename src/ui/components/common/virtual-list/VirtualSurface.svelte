@@ -37,6 +37,7 @@
 		layoutMode?: "absolute-cells" | "grid-rows";
 		mountedCells: readonly TMountedCell[];
 		mountedRows?: readonly VirtualSurfaceMountedRow<TMountedCell>[];
+		mountedRowsVersion?: number;
 		mountedCellsForChange?: readonly TMountedCell[];
 		interactionDescriptorScopeId?: string;
 		interactionDescriptors?: readonly InteractionDescriptor[];
@@ -97,6 +98,7 @@
 		layoutMode = "absolute-cells",
 		mountedCells,
 		mountedRows = undefined,
+		mountedRowsVersion = undefined,
 		mountedCellsForChange,
 		interactionDescriptorScopeId,
 		interactionDescriptors = [],
@@ -271,6 +273,7 @@
 		{layoutMode}
 		{mountedCells}
 		{mountedRows}
+		{mountedRowsVersion}
 		bind:contentEl
 		{observerRoot}
 		{getCellPosition}

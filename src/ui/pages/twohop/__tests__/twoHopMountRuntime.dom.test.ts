@@ -3,7 +3,7 @@ import type { TwoHopSectionDescriptor } from "../twohopPageVirtualModel";
 import { compileTwoHopViewPlan, createTwoHopViewPlanRowModel } from "../twoHopViewPlan";
 import { createTwoHopMountRuntime } from "../twoHopMountRuntime.svelte";
 
-const items = ["a", "b"].map((key) => ({
+const items = ["a", "b", "c", "d"].map((key) => ({
 	kind: "new-link" as const,
 	item: { type: "link" } as never,
 	searchKey: key,
@@ -167,5 +167,112 @@ describe("createTwoHopMountRuntime", () => {
 		expect(scrolled.rowSlices).not.toBe(mounted.rowSlices);
 		// The surviving row slice is still reused by reference.
 		expect(scrolled.rowSlices[0]).toBe(mounted.rowSlices[1]);
+	});
+
+	it("syncs mounted range changes without scanning kept rows", () => {
+		const runtime = createTwoHopMountRuntime();
+		const mounted = runtime.buildMountedRows({
+			rowModel,
+			rowRange: { start: 0, end: 3 },
+			ranges: {
+				mounted: { start: 0, end: 3 },
+				previewVisible: { start: 1, end: 3 },
+			},
+		});
+		runtime.syncSnapshot(mounted, { start: 1, end: 3 });
+
+		const scrolled = runtime.buildMountedRows({
+			rowModel,
+			rowRange: { start: 1, end: 4 },
+			ranges: {
+				mounted: { start: 1, end: 4 },
+				previewVisible: { start: 1, end: 3 },
+			},
+			previousBuild: mounted,
+		});
+		const keptRows = scrolled.rowSlices.filter(
+			(row) => row.rowIndex === 1 || row.rowIndex === 2,
+		);
+		expect(keptRows).toHaveLength(2);
+
+		for (const keptRow of keptRows) {
+			Object.defineProperty(keptRow, "cells", {
+				get(): never {
+					throw new Error("Kept mounted row was scanned.");
+				},
+			});
+		}
+
+		expect(() => {
+			runtime.syncSnapshot(scrolled, { start: 1, end: 3 });
+		}).not.toThrow();
+	});
+
+	it("consumeMountedRowsChange returns false on same range recompute", () => {
+		const runtime = createTwoHopMountRuntime();
+		const range = { start: 0, end: 2 };
+		runtime.buildMountedRows({
+			rowModel,
+			rowRange: range,
+			ranges: { mounted: range, previewVisible: range },
+		});
+		// First build triggers change.
+		expect(runtime.consumeMountedRowsChange()).toBe(true);
+
+		// Same range recompute should not trigger change.
+		runtime.buildMountedRows({
+			rowModel,
+			rowRange: range,
+			ranges: { mounted: range, previewVisible: range },
+		});
+		expect(runtime.consumeMountedRowsChange()).toBe(false);
+	});
+
+	it("consumeMountedRowsChange returns true on range change", () => {
+		const runtime = createTwoHopMountRuntime();
+		const range = { start: 0, end: 2 };
+		runtime.buildMountedRows({
+			rowModel,
+			rowRange: range,
+			ranges: { mounted: range, previewVisible: range },
+		});
+		runtime.consumeMountedRowsChange();
+
+		// Range change should trigger change.
+		runtime.buildMountedRows({
+			rowModel,
+			rowRange: { start: 1, end: 3 },
+			ranges: {
+				mounted: { start: 1, end: 3 },
+				previewVisible: { start: 1, end: 3 },
+			},
+		});
+		expect(runtime.consumeMountedRowsChange()).toBe(true);
+	});
+
+	it("consumeMountedRowsChange returns true only once", () => {
+		const runtime = createTwoHopMountRuntime();
+		const range = { start: 0, end: 2 };
+		runtime.buildMountedRows({
+			rowModel,
+			rowRange: range,
+			ranges: { mounted: range, previewVisible: range },
+		});
+		expect(runtime.consumeMountedRowsChange()).toBe(true);
+		// Second consume returns false.
+		expect(runtime.consumeMountedRowsChange()).toBe(false);
+	});
+
+	it("getMountedRows returns the current row slices", () => {
+		const runtime = createTwoHopMountRuntime();
+		expect(runtime.getMountedRows()).toEqual([]);
+
+		const range = { start: 0, end: 2 };
+		const build = runtime.buildMountedRows({
+			rowModel,
+			rowRange: range,
+			ranges: { mounted: range, previewVisible: range },
+		});
+		expect(runtime.getMountedRows()).toBe(build.rowSlices);
 	});
 });

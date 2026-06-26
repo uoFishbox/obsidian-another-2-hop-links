@@ -132,6 +132,9 @@ export function useTwoHopViewPlanVirtualList(props: TwoHopViewPlanVirtualListPro
 				reconciliationState.mountedBuild,
 				snapshot.ranges.previewVisible,
 			);
+			if (mountRuntime.consumeMountedRowsChange()) {
+				mountedRowsVersion += 1;
+			}
 		},
 	});
 	const runtime = {
@@ -172,6 +175,18 @@ export function useTwoHopViewPlanVirtualList(props: TwoHopViewPlanVirtualListPro
 	});
 	const mountedBuild = $derived(virtualList.getReconciliationState().mountedBuild);
 	const contentHeight = $derived(virtualList.getTotalHeight(rowModel.totalHeight));
+	let mountedRowsVersion = $state.raw(0);
+
+	const mountedRowsForSurface = $derived.by(() => {
+		const build = mountedBuild;
+		void mountedRowsVersion;
+
+		if (!build) {
+			return EMPTY_MOUNTED_ROWS;
+		}
+
+		return mountRuntime.getMountedRows();
+	});
 
 	$effect(() => {
 		inputState.syncVisibleCountsForInput();
@@ -269,7 +284,10 @@ export function useTwoHopViewPlanVirtualList(props: TwoHopViewPlanVirtualListPro
 			return EMPTY_MOUNTED_CELLS;
 		},
 		get mountedRows() {
-			return mountedBuild?.rowSlices ?? EMPTY_MOUNTED_ROWS;
+			return mountedRowsForSurface;
+		},
+		get mountedRowsVersion() {
+			return mountedRowsVersion;
 		},
 		getCellDataTestId: !IS_PROD
 			? (

@@ -14,6 +14,7 @@ import {
 	buildTwoHopMountedRows,
 	type TwoHopMountedRowsBuild,
 } from "./twoHopMountedRowBuild";
+import { createTwoHopMountedRowWindow } from "./twoHopMountedRowWindow";
 import type {
 	TwoHopPageVirtualItem,
 	TwoHopPageVirtualSection,
@@ -60,7 +61,39 @@ export function createTwoHopMountRuntime(
 	let pendingBuild: TwoHopMountedRowsBuild | null = null;
 	const pendingPreviewRange: RowRange = { start: 0, end: 0 };
 	let hasPendingPreviewRange = false;
-	const reusableRowSlotsScratch: number[] = [];
+	const rowWindow = createTwoHopMountedRowWindow();
+	let hasPendingMountedRowsChange = false;
+	const mountedRowsSyncParams: Parameters<
+		typeof visibilityStates.syncMountedRows
+	>[0] = {
+		mountedRows: EMPTY_MOUNTED_ROWS,
+		previewRange: EMPTY_ROW_RANGE,
+	};
+	const mountedRowRangeDeltaSyncParams: Parameters<
+		typeof visibilityStates.syncMountedRowRangeDelta
+	>[0] = {
+		previousRows: EMPTY_MOUNTED_ROWS,
+		nextRows: EMPTY_MOUNTED_ROWS,
+		previousRowRange: EMPTY_ROW_RANGE,
+		nextRowRange: EMPTY_ROW_RANGE,
+		previewRange: EMPTY_ROW_RANGE,
+	};
+	const previewRangeDeltaSyncParams: Parameters<
+		typeof visibilityStates.syncPreviewRangeDelta
+	>[0] = {
+		previousPreviewRange: EMPTY_ROW_RANGE,
+		nextPreviewRange: EMPTY_ROW_RANGE,
+		mountedRows: EMPTY_MOUNTED_ROWS,
+	};
+	const visibilitySyncBuildScratch: {
+		rowSlices: TwoHopMountedRowsBuild["rowSlices"] | readonly [];
+		rowRange: RowRange;
+		plan: TwoHopMountedRowsBuild["plan"] | null;
+	} = {
+		rowSlices: EMPTY_MOUNTED_ROWS,
+		rowRange: EMPTY_ROW_RANGE,
+		plan: null,
+	};
 
 	const syncVisibilityStates = (
 		mountedBuild: TwoHopVisibilitySyncBuild | null | undefined,
@@ -69,25 +102,25 @@ export function createTwoHopMountRuntime(
 		const mountedRows = mountedBuild?.rowSlices ?? EMPTY_MOUNTED_ROWS;
 		const mountedRowRange = mountedBuild?.rowRange ?? EMPTY_ROW_RANGE;
 		const mountedPlan = mountedBuild?.plan ?? null;
+		const mountedRangeChanged =
+			mountedRowRange.start !== visibilityMountedRowRange.start ||
+			mountedRowRange.end !== visibilityMountedRowRange.end;
 		if (!hasVisibilityPreviewRange || mountedPlan !== visibilityMountedPlan) {
-			visibilityStates.syncMountedRows({
-				mountedRows,
-				previewRange: nextPreviewRange,
-			});
-		} else if (mountedRows !== visibilityMountedRows) {
-			visibilityStates.syncMountedRowRangeDelta({
-				previousRows: visibilityMountedRows,
-				nextRows: mountedRows,
-				previousRowRange: visibilityMountedRowRange,
-				nextRowRange: mountedRowRange,
-				previewRange: nextPreviewRange,
-			});
+			mountedRowsSyncParams.mountedRows = mountedRows;
+			mountedRowsSyncParams.previewRange = nextPreviewRange;
+			visibilityStates.syncMountedRows(mountedRowsSyncParams);
+		} else if (mountedRangeChanged) {
+			mountedRowRangeDeltaSyncParams.previousRows = visibilityMountedRows;
+			mountedRowRangeDeltaSyncParams.nextRows = mountedRows;
+			mountedRowRangeDeltaSyncParams.previousRowRange = visibilityMountedRowRange;
+			mountedRowRangeDeltaSyncParams.nextRowRange = mountedRowRange;
+			mountedRowRangeDeltaSyncParams.previewRange = nextPreviewRange;
+			visibilityStates.syncMountedRowRangeDelta(mountedRowRangeDeltaSyncParams);
 		} else {
-			visibilityStates.syncPreviewRangeDelta({
-				previousPreviewRange: visibilityPreviewRange,
-				nextPreviewRange,
-				mountedRows,
-			});
+			previewRangeDeltaSyncParams.previousPreviewRange = visibilityPreviewRange;
+			previewRangeDeltaSyncParams.nextPreviewRange = nextPreviewRange;
+			previewRangeDeltaSyncParams.mountedRows = mountedRows;
+			visibilityStates.syncPreviewRangeDelta(previewRangeDeltaSyncParams);
 		}
 
 		visibilityMountedRows = mountedRows;
@@ -99,11 +132,15 @@ export function createTwoHopMountRuntime(
 	};
 
 	const previewVisibleSyncTask = createScheduledVirtualListTask(() => {
-		const build = pendingBuild ?? {
-			rowSlices: visibilityMountedRows,
-			rowRange: visibilityMountedRowRange,
-			plan: visibilityMountedPlan,
-		};
+		let build: TwoHopVisibilitySyncBuild;
+		if (pendingBuild) {
+			build = pendingBuild;
+		} else {
+			visibilitySyncBuildScratch.rowSlices = visibilityMountedRows;
+			visibilitySyncBuildScratch.rowRange = visibilityMountedRowRange;
+			visibilitySyncBuildScratch.plan = visibilityMountedPlan;
+			build = visibilitySyncBuildScratch;
+		}
 		pendingBuild = null;
 		if (!hasPendingPreviewRange) return;
 		hasPendingPreviewRange = false;
@@ -117,13 +154,16 @@ export function createTwoHopMountRuntime(
 			ranges: VirtualRanges;
 			previousBuild?: TwoHopMountedRowsBuild;
 		}): TwoHopMountedRowsBuild {
-			return buildTwoHopMountedRows({
-				rowModel: params.rowModel,
-				rowRange: params.rowRange,
-				ranges: params.ranges,
-				previousBuild: params.previousBuild,
-				reusableRowSlotsScratch,
-			});
+			const build = rowWindow.apply(params);
+			if (rowWindow.lastApplyChanged) {
+				hasPendingMountedRowsChange = true;
+			}
+			return build;
+		},
+		consumeMountedRowsChange(): boolean {
+			if (!hasPendingMountedRowsChange) return false;
+			hasPendingMountedRowsChange = false;
+			return true;
 		},
 		syncSnapshot(
 			mountedBuild: TwoHopMountedRowsBuild | null | undefined,
@@ -146,6 +186,9 @@ export function createTwoHopMountRuntime(
 			pendingBuild = null;
 			hasPendingPreviewRange = false;
 			previewVisibleSyncTask.cancel();
+		},
+		getMountedRows(): TwoHopMountedRowsBuild["rowSlices"] | readonly [] {
+			return rowWindow.build?.rowSlices ?? EMPTY_MOUNTED_ROWS;
 		},
 		getOrCreateVisibilityState(
 			cell: TwoHopMountedCell,

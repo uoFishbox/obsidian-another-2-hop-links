@@ -106,6 +106,7 @@
 	contentHeight={list.contentHeight}
 	mountedCells={list.mountedCellsForSurface}
 	mountedRows={list.mountedRows}
+	mountedRowsVersion={list.mountedRowsVersion}
 	cellWidth={list.layout.cellWidth}
 	rowHeight={list.layout.rowHeight}
 	columns={list.layout.columns}

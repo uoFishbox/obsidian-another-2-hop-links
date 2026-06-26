@@ -59,6 +59,7 @@ export function createVirtualizedItemVisibilityStateController<
 	let rowsByIndex = new Map<number, VisibilityRow<TCell>>();
 	const mountedItemKeyCounts = new Map<string, number>();
 	const rowVisibilityByIndex = new Map<number, VirtualizedItemVisibility>();
+	const nextRowIndicesScratch = new Set<number>();
 
 	const rememberPreviousPreviewVisible = (previewRange: RowRange): void => {
 		previousPreviewVisible.start = previewRange.start;
@@ -195,17 +196,18 @@ export function createVirtualizedItemVisibilityStateController<
 		rowSlices: readonly VisibilityRow<TCell>[],
 		previewVisible: RowRange,
 	): void => {
-		const nextRowIndices = new Set<number>();
+		nextRowIndicesScratch.clear();
 		for (const row of rowSlices) {
-			nextRowIndices.add(row.rowIndex);
+			nextRowIndicesScratch.add(row.rowIndex);
 		}
 
 		for (const rowIndex of rowsByIndex.keys()) {
-			if (!nextRowIndices.has(rowIndex)) {
+			if (!nextRowIndicesScratch.has(rowIndex)) {
 				rowVisibilityByIndex.delete(rowIndex);
 				options.onRowCleared?.(rowIndex);
 			}
 		}
+		nextRowIndicesScratch.clear();
 
 		mountedItemKeyCounts.clear();
 		for (const row of rowSlices) {
