@@ -157,6 +157,17 @@ interface CachedVirtualItemAccessors {
 	readonly reset: () => void;
 }
 
+interface ReconciledVirtualItemAccessorsParams<T> {
+	readonly getLength: () => number;
+	readonly getSortedItems: () => readonly T[];
+	readonly itemsReconciler: StableViewItemReconciler<T>;
+	readonly createItem: (
+		item: ViewItem,
+		key: string,
+		index: number,
+	) => TwoHopPageVirtualItem | undefined;
+}
+
 const isBranchItem = (item: MergedLinkItem): item is TwoHopLinkBranch =>
 	"hop1" in item && "hop2" in item;
 
@@ -231,6 +242,49 @@ function createSparseVirtualItemAccessors(params: {
 			itemsCache = undefined;
 		},
 	};
+}
+
+function createReconciledVirtualItemAccessors<T>(
+	params: ReconciledVirtualItemAccessorsParams<T>,
+): CachedVirtualItemAccessors {
+	let reconciledItems: readonly ViewItem[] | undefined;
+	let reconciledKeys: readonly string[] | undefined;
+	const ensureReconciled = (): void => {
+		if (reconciledItems && reconciledKeys) return;
+
+		reconciledItems = params.itemsReconciler.reconcile(params.getSortedItems());
+		reconciledKeys = params.itemsReconciler.getKeys();
+	};
+	const accessors = createSparseVirtualItemAccessors({
+		getLength: params.getLength,
+		createItem: (index) => {
+			ensureReconciled();
+			const item = reconciledItems?.[index];
+			const key = reconciledKeys?.[index];
+			if (!item || !key) return undefined;
+			return params.createItem(item, key, index);
+		},
+	});
+	const resetSparseAccessors = accessors.reset;
+
+	return {
+		getItems: accessors.getItems,
+		getItem: accessors.getItem,
+		reset() {
+			reconciledItems = undefined;
+			reconciledKeys = undefined;
+			resetSparseAccessors();
+		},
+	};
+}
+
+function pruneInactiveEntries<T>(
+	entries: Map<string, T>,
+	activeIds: Set<string>,
+): void {
+	for (const key of entries.keys()) {
+		if (!activeIds.has(key)) entries.delete(key);
+	}
 }
 
 const hasSameDescriptorRefs = (
@@ -507,26 +561,15 @@ export function createTwoHopDataIdentityCache(): TwoHopDataIdentityCache {
 							toViewItem: (item) => ({ type: "backlink", data: item }),
 							canReuseSource: hasSameBacklinkIndexedLink,
 						});
-					let reconciledItems: readonly ViewItem[] | undefined;
-					let reconciledKeys: readonly string[] | undefined;
-					const ensureReconciled = (): void => {
-						if (reconciledItems && reconciledKeys) return;
-
-						const sorted = created.itemsDeps.getSortedTwoHopItems.call(
-							created.applicationStore,
-							created.branch.hop2,
-						);
-						reconciledItems = created.itemsReconciler.reconcile(sorted);
-						reconciledKeys = created.itemsReconciler.getKeys();
-					};
-					created.itemsAccessors = createSparseVirtualItemAccessors({
+					created.itemsAccessors = createReconciledVirtualItemAccessors({
 						getLength: () => created.branch.hop2.length,
-						createItem: (index) => {
-							ensureReconciled();
-							const item = reconciledItems?.[index];
-							const virtualKey = reconciledKeys?.[index];
-							if (!item || !virtualKey) return undefined;
-
+						getSortedItems: () =>
+							created.itemsDeps.getSortedTwoHopItems.call(
+								created.applicationStore,
+								created.branch.hop2,
+							),
+						itemsReconciler: created.itemsReconciler,
+						createItem: (item, virtualKey) => {
 							const branchBaseKey = getTwohopBranchSearchBaseKey(
 								created.branch,
 							);
@@ -550,15 +593,6 @@ export function createTwoHopDataIdentityCache(): TwoHopDataIdentityCache {
 							};
 						},
 					});
-					const resetItemsAccessors = created.itemsAccessors.reset;
-					created.itemsAccessors = {
-						...created.itemsAccessors,
-						reset() {
-							reconciledItems = undefined;
-							reconciledKeys = undefined;
-							resetItemsAccessors();
-						},
-					};
 					created.getItems = created.itemsAccessors.getItems;
 					created.getItem = created.itemsAccessors.getItem;
 					created.headerSnapshot = nextHeaderSnapshot;
@@ -707,27 +741,15 @@ export function createTwoHopDataIdentityCache(): TwoHopDataIdentityCache {
 							interactionKind: "sectionHeader",
 							onClick: () => created.onTagClick(created.tag),
 						};
-						let reconciledItems: readonly ViewItem[] | undefined;
-						let reconciledKeys: readonly string[] | undefined;
-						const ensureReconciled = (): void => {
-							if (reconciledItems && reconciledKeys) return;
-
-							const sorted =
+						created.itemsAccessors = createReconciledVirtualItemAccessors({
+							getLength: () => created.source.notes.length,
+							getSortedItems: () =>
 								created.itemsDeps.getSortedTagGroupItems.call(
 									created.applicationStore,
 									created.source.notes,
-								);
-							reconciledItems = created.itemsReconciler.reconcile(sorted);
-							reconciledKeys = created.itemsReconciler.getKeys();
-						};
-						created.itemsAccessors = createSparseVirtualItemAccessors({
-							getLength: () => created.source.notes.length,
-							createItem: (index) => {
-								ensureReconciled();
-								const item = reconciledItems?.[index];
-								const baseKey = reconciledKeys?.[index];
-								if (!item || !baseKey) return undefined;
-
+								),
+							itemsReconciler: created.itemsReconciler,
+							createItem: (item, baseKey, index) => {
 								const virtualKey = createTaggedNoteSectionItemKey(
 									item,
 									created.tag,
@@ -753,15 +775,6 @@ export function createTwoHopDataIdentityCache(): TwoHopDataIdentityCache {
 								};
 							},
 						});
-						const resetItemsAccessors = created.itemsAccessors.reset;
-						created.itemsAccessors = {
-							...created.itemsAccessors,
-							reset() {
-								reconciledItems = undefined;
-								reconciledKeys = undefined;
-								resetItemsAccessors();
-							},
-						};
 						created.getItems = created.itemsAccessors.getItems;
 						created.getItem = created.itemsAccessors.getItem;
 						created.descriptor = createDescriptor(
@@ -908,18 +921,10 @@ export function createTwoHopDataIdentityCache(): TwoHopDataIdentityCache {
 				appendDescriptor(entry.descriptor);
 			}
 
-			for (const key of branchEntries.keys()) {
-				if (!activeBranchIds.has(key)) branchEntries.delete(key);
-			}
-			for (const key of tagEntries.keys()) {
-				if (!activeTagIds.has(key)) tagEntries.delete(key);
-			}
-			for (const key of primaryEntries.keys()) {
-				if (!activePrimaryIds.has(key)) primaryEntries.delete(key);
-			}
-			for (const key of newLinksEntries.keys()) {
-				if (!activeNewLinksIds.has(key)) newLinksEntries.delete(key);
-			}
+			pruneInactiveEntries(branchEntries, activeBranchIds);
+			pruneInactiveEntries(tagEntries, activeTagIds);
+			pruneInactiveEntries(primaryEntries, activePrimaryIds);
+			pruneInactiveEntries(newLinksEntries, activeNewLinksIds);
 
 			if (hasSameDescriptorRefs(previousDescriptors, descriptors)) {
 				return previousDescriptors;
