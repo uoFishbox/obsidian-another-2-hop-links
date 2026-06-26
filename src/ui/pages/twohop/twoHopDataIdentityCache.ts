@@ -277,16 +277,6 @@ export function createTwoHopDataIdentityCache(): TwoHopDataIdentityCache {
 	const createHeaderInteractionToken = createInteractionTokenAllocator("h");
 	let previousDescriptors: readonly TwoHopSectionDescriptor[] = [];
 
-	const createItemInteractionIdentity = (
-		item: ViewItem,
-		virtualKey?: string,
-	): { interactionId: string; interactionKey: string } => {
-		const interactionKey = createItemInteractionKey(item, virtualKey);
-		return {
-			interactionId: createItemInteractionToken(interactionKey),
-			interactionKey,
-		};
-	};
 	const createHeaderInteractionIdentity = (
 		sectionId: string,
 	): { interactionId: string; interactionKey: string } => {
@@ -403,10 +393,17 @@ export function createTwoHopDataIdentityCache(): TwoHopDataIdentityCache {
 							const item = created.source.items[index];
 							if (!item) return undefined;
 							const virtualKey = created.source.getKey(item, index);
+							const interactionKey = createItemInteractionKey(
+								item,
+								virtualKey,
+							);
+							const interactionId =
+								createItemInteractionToken(interactionKey);
 							return {
 								kind: "primary-link" as const,
 								item,
-								...createItemInteractionIdentity(item, virtualKey),
+								interactionId,
+								interactionKey,
 								sourceSectionId: created.source.sectionId,
 								searchKey: created.source.getSearchKey(item),
 								virtualKey,
@@ -533,10 +530,17 @@ export function createTwoHopDataIdentityCache(): TwoHopDataIdentityCache {
 							const branchBaseKey = getTwohopBranchSearchBaseKey(
 								created.branch,
 							);
+							const interactionKey = createItemInteractionKey(
+								item,
+								virtualKey,
+							);
+							const interactionId =
+								createItemInteractionToken(interactionKey);
 							return {
 								kind: "two-hop-link" as const,
 								item,
-								...createItemInteractionIdentity(item, virtualKey),
+								interactionId,
+								interactionKey,
 								branch: created.branch,
 								searchKey: createTwohopChildSearchKeyFromBaseKeys(
 									branchBaseKey,
@@ -724,20 +728,28 @@ export function createTwoHopDataIdentityCache(): TwoHopDataIdentityCache {
 								const baseKey = reconciledKeys?.[index];
 								if (!item || !baseKey) return undefined;
 
+								const virtualKey = createTaggedNoteSectionItemKey(
+									item,
+									created.tag,
+									index,
+								);
+								const interactionKey = createItemInteractionKey(
+									item,
+									virtualKey,
+								);
+								const interactionId =
+									createItemInteractionToken(interactionKey);
 								return {
 									kind: "tag-link" as const,
 									item,
-									...createItemInteractionIdentity(item),
+									interactionId,
+									interactionKey,
 									tag: created.tag,
 									searchKey: getTagNoteSearchKeyFromBaseKey(
 										created.tag,
 										baseKey,
 									),
-									virtualKey: createTaggedNoteSectionItemKey(
-										item,
-										created.tag,
-										index,
-									),
+									virtualKey,
 								};
 							},
 						});
@@ -832,10 +844,14 @@ export function createTwoHopDataIdentityCache(): TwoHopDataIdentityCache {
 							const item = created.itemsDeps.items[index];
 							if (!item) return undefined;
 							const key = getNewLinkViewItemKey(item, index);
+							const interactionKey = createItemInteractionKey(item, key);
+							const interactionId =
+								createItemInteractionToken(interactionKey);
 							return {
 								kind: "new-link" as const,
 								item,
-								...createItemInteractionIdentity(item, key),
+								interactionId,
+								interactionKey,
 								searchKey: key,
 								virtualKey: key,
 							};
