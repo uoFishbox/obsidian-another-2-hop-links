@@ -18,7 +18,11 @@ export async function collectCacheInvalidationPathsAsync(
 	affectedLookupPaths: Set<string>,
 	affectedLookupKeys: Set<string>,
 	yieldScheduler: YieldScheduler,
-): Promise<Set<string>> {
+): Promise<Iterable<string>> {
+	if (affectedLookupKeys.size === 0) {
+		return affectedLookupPaths;
+	}
+
 	const pathsToInvalidate = new Set<string>(affectedLookupPaths);
 	let pathCount = 0;
 
