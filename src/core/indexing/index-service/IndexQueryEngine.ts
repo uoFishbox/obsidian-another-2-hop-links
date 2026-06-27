@@ -197,9 +197,29 @@ export class IndexQueryEngine {
 		}
 
 		for (const path of paths) {
-			this.cachedIndexedLinks.delete(path);
-			this.cachedUniqueIndexedLinks.delete(path);
-			this.unresolvedMergedCache.delete(path);
+			this.deleteQueryCacheEntriesForPath(path);
+		}
+	}
+
+	private deleteQueryCacheEntriesForPath(path: string): void {
+		const lookupKey = toCaseInsensitiveLookupKey(path);
+		this.deleteCaseInsensitiveKey(this.cachedIndexedLinks, path, lookupKey);
+		this.deleteCaseInsensitiveKey(this.cachedUniqueIndexedLinks, path, lookupKey);
+		this.unresolvedMergedCache.delete(lookupKey);
+	}
+
+	private deleteCaseInsensitiveKey<T>(
+		cache: Map<string, T>,
+		path: string,
+		lookupKey: string,
+	): void {
+		cache.delete(path);
+		cache.delete(lookupKey);
+
+		for (const key of cache.keys()) {
+			if (toCaseInsensitiveLookupKey(key) === lookupKey) {
+				cache.delete(key);
+			}
 		}
 	}
 

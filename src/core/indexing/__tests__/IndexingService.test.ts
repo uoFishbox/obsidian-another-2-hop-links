@@ -607,5 +607,29 @@ describe("IndexingService", () => {
 					.some((b) => b.sourceFile.path === "src/source.md"),
 			).toBe(false);
 		});
+
+		test("incremental update invalidates query cache case-insensitively for unresolved links", async () => {
+			const builder = new VaultEnvironmentBuilder([
+				{ path: "A.md", links: ["Foo"] },
+			]);
+			const { service } = builder.build();
+			await service.rebuildIndexesTimeSliced();
+
+			expect(service.getBacklinkCountForLink("foo.md")).toBe(1);
+
+			builder.addFile({ path: "B.md", links: ["Foo"] });
+			await service.applyFileChangesTimeSliced([
+				{ type: "create", path: "B.md" },
+			]);
+
+			expect(service.getBacklinkCountForLink("foo.md")).toBe(2);
+
+			builder.removeFile("B.md");
+			await service.applyFileChangesTimeSliced([
+				{ type: "delete", path: "B.md" },
+			]);
+
+			expect(service.getBacklinkCountForLink("foo.md")).toBe(1);
+		});
 	});
 });
