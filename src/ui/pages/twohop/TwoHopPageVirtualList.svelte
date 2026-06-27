@@ -2,7 +2,7 @@
 	import { getContext } from "svelte";
 	import { svgAttrs, ICON_PATHS } from "ui/utils/icons";
 	import TwoHopViewPlanVirtualList from "./TwoHopViewPlanVirtualList.svelte";
-	import ClickableHeader from "ui/components/common/ClickableHeader.svelte";
+	import TwoHopSectionHeader from "./TwoHopSectionHeader.svelte";
 	import LinkSectionHeader from "ui/components/common/LinkSectionHeader.svelte";
 	import ViewItemCard from "ui/components/items/ViewItemCard.svelte";
 	import PreviewVisibilityProvider from "ui/components/items/PreviewVisibilityProvider.svelte";
@@ -128,45 +128,21 @@
 					{/snippet}
 				</LinkSectionHeader>
 			{:else if section.kind === "two-hop-branch"}
-				<ClickableHeader
+				<TwoHopSectionHeader
+					kind={section.kind}
 					title={section.title}
 					count={totalCount}
-					{...headerProps}
-					interactionId={headerProps.interactionId ?? sectionId}
-					interactionKind={headerProps.interactionKind ?? "sectionHeader"}
-				>
-					{#snippet icon()}
-						<svg
-							{...svgAttrs}
-							width="26"
-							height="26"
-							stroke="currentColor"
-							class="twohop-links-icon"
-						>
-							{@html ICON_PATHS.Link}
-						</svg>
-					{/snippet}
-				</ClickableHeader>
+					{sectionId}
+					header={headerProps}
+				/>
 			{:else if section.kind === "tag-section"}
-				<ClickableHeader
+				<TwoHopSectionHeader
+					kind={section.kind}
 					title={section.title}
 					count={totalCount}
-					{...headerProps}
-					interactionId={headerProps.interactionId ?? sectionId}
-					interactionKind={headerProps.interactionKind ?? "sectionHeader"}
-				>
-					{#snippet icon()}
-						<svg
-							{...svgAttrs}
-							width="26"
-							height="26"
-							stroke="currentColor"
-							class="twohop-links-icon"
-						>
-							{@html ICON_PATHS.Tag}
-						</svg>
-					{/snippet}
-				</ClickableHeader>
+					{sectionId}
+					header={headerProps}
+				/>
 			{/if}
 		{/snippet}
 
