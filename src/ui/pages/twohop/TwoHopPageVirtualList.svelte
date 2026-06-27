@@ -1,11 +1,8 @@
 <script lang="ts">
 	import { getContext } from "svelte";
-	import { svgAttrs, ICON_PATHS } from "ui/utils/icons";
 	import TwoHopViewPlanVirtualList from "./TwoHopViewPlanVirtualList.svelte";
-	import TwoHopSectionHeader from "./TwoHopSectionHeader.svelte";
-	import LinkSectionHeader from "ui/components/common/LinkSectionHeader.svelte";
-	import ViewItemCard from "ui/components/items/ViewItemCard.svelte";
-	import PreviewVisibilityProvider from "ui/components/items/PreviewVisibilityProvider.svelte";
+	import TwoHopSectionHeaderRenderer from "./TwoHopSectionHeaderRenderer.svelte";
+	import TwoHopVirtualItemCard from "./TwoHopVirtualItemCard.svelte";
 	import type { ApplicationStore } from "ui/stores/ApplicationStore.svelte";
 	import type {
 		SearchWorkerMatchedItem,
@@ -18,12 +15,11 @@
 		TwoHopPageVirtualItem,
 		TwoHopSectionDescriptor,
 	} from "./twohopPageVirtualModel";
-	import { resolveTwoHopPageItemSearchScope } from "./twohopPageVirtualModel";
 	import { useLinkContext } from "ui/context/linkContext";
 	import {
-		createItemInteractionDescriptor,
-		createItemInteractionKey,
-	} from "ui/interactions/interactionTypes";
+		createTwoHopInteractionDescriptorRevision,
+		resolveTwoHopItemInteractionDescriptor,
+	} from "./twoHopInteractionDescriptorRevision";
 
 	interface Props {
 		sections: readonly TwoHopSectionDescriptor[];
@@ -58,41 +54,18 @@
 	}
 	const renderableDescriptors = $derived(sections);
 
-	const resolveItemSearchScope = (
-		row: TwoHopPageVirtualItem,
-	): SearchWorkerMatchScope =>
-		resolveTwoHopPageItemSearchScope(
-			row,
-			searchScope,
-			matchedItemByKey?.get(row.searchKey)?.contentMatched,
-		);
-
-	const resolveItemContentPreview = (
-		row: TwoHopPageVirtualItem,
-	): string | undefined => matchedItemByKey?.get(row.searchKey)?.contentPreview;
-
 	const getCellClassName = (section: TwoHopPageVirtualSection): string | undefined =>
 		section.className;
 
 	const getItemInteractionDescriptor = (row: TwoHopPageVirtualItem) =>
-		linkContext
-			? createItemInteractionDescriptor(
-					row.item,
-					currentSettings,
-					searchQuery,
-					linkContext,
-					{
-						interactionId: row.interactionId,
-						interactionKey:
-							row.interactionKey ?? createItemInteractionKey(row.item),
-					},
-				)
-			: null;
-	const interactionDescriptorRevision = $derived({
-		settings: currentSettings,
-		searchQuery,
-		linkContext,
-	});
+		resolveTwoHopItemInteractionDescriptor(row, interactionDescriptorRevision);
+	const interactionDescriptorRevision = $derived(
+		createTwoHopInteractionDescriptorRevision({
+			settings: currentSettings,
+			searchQuery,
+			linkContext,
+		}),
+	);
 
 	type RenderItemArgs = {
 		item: TwoHopPageVirtualItem;
@@ -117,59 +90,29 @@
 		{interactionDescriptorRevision}
 	>
 		{#snippet renderHeader({ section, title, totalCount, sectionId, headerProps })}
-			{#if section.kind === "primary-section"}
-				<LinkSectionHeader {title} {totalCount} />
-			{:else if section.kind === "new-links-section"}
-				<LinkSectionHeader {title} {totalCount}>
-					{#snippet icon()}
-						<svg
-							{...svgAttrs}
-							width="26"
-							height="26"
-							stroke="currentColor"
-							class="twohop-links-icon"
-						>
-							{@html ICON_PATHS.Unlink}
-						</svg>
-					{/snippet}
-				</LinkSectionHeader>
-			{:else if section.kind === "two-hop-branch"}
-				<TwoHopSectionHeader
-					kind={section.kind}
-					title={section.title}
-					count={totalCount}
-					{sectionId}
-					header={headerProps}
-				/>
-			{:else if section.kind === "tag-section"}
-				<TwoHopSectionHeader
-					kind={section.kind}
-					title={section.title}
-					count={totalCount}
-					{sectionId}
-					header={headerProps}
-				/>
-			{/if}
+			<TwoHopSectionHeaderRenderer
+				{section}
+				{title}
+				{totalCount}
+				{sectionId}
+				{headerProps}
+			/>
 		{/snippet}
 
 		{#snippet renderItem(args: RenderItemArgs)}
 			{@const row = args?.item}
 
 			{#if row}
-				<PreviewVisibilityProvider visibilityState={args?.visibilityState}>
-					<ViewItemCard
-						item={row.item}
-						settings={currentSettings}
-						{searchQuery}
-						searchScope={resolveItemSearchScope(row)}
-						contentPreview={resolveItemContentPreview(row)}
-						rowIndex={args?.rowIndex}
-						activationCandidateId={args?.activationCandidateId}
-						interactionRegistration="snapshot"
-						interactionId={row.interactionId}
-						interactionKey={row.interactionKey}
-					/>
-				</PreviewVisibilityProvider>
+				<TwoHopVirtualItemCard
+					{row}
+					settings={currentSettings}
+					{searchQuery}
+					{searchScope}
+					{matchedItemByKey}
+					rowIndex={args?.rowIndex}
+					visibilityState={args?.visibilityState}
+					activationCandidateId={args?.activationCandidateId}
+				/>
 			{/if}
 		{/snippet}
 	</TwoHopViewPlanVirtualList>
