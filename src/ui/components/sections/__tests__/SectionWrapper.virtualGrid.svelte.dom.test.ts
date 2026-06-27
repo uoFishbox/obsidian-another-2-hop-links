@@ -12,6 +12,7 @@ import {
 	setupDOMObserverMocks,
 	teardownDOMObserverMocks,
 } from "testing/helpers/DOMObserverMock";
+import { queryAllByTestIdDeep } from "testing/helpers/shadowDomQueries";
 
 const TEST_LAYOUT_SETTINGS = {
 	...DEFAULT_SETTINGS,
@@ -23,25 +24,6 @@ const TEST_LAYOUT_SETTINGS = {
 
 function createItems(count: number): string[] {
 	return Array.from({ length: count }, (_, index) => `Item ${index}`);
-}
-
-function queryAllByTestIdDeep(testId: string): HTMLElement[] {
-	const results: HTMLElement[] = [];
-	for (const el of screen.queryAllByTestId(testId)) {
-		results.push(el);
-	}
-	for (const host of document.querySelectorAll<HTMLElement>("*")) {
-		if (host.shadowRoot) {
-			for (const el of host.shadowRoot.querySelectorAll<HTMLElement>(
-				`[data-testid="${testId}"]`,
-			)) {
-				if (!results.includes(el)) {
-					results.push(el);
-				}
-			}
-		}
-	}
-	return results;
 }
 
 function queryByLabelTextDeep(text: string): HTMLElement | null {
