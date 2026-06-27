@@ -54,15 +54,18 @@ function affectsMountedRows(
 	return overlap.start < overlap.end;
 }
 
-const INITIAL_MATERIALIZATION_SECTION_LIMIT = 8;
-const INITIAL_MATERIALIZATION_CELL_LIMIT = 60;
-const BACKGROUND_MATERIALIZATION_CELL_LIMIT = 100;
+import {
+	DEFAULT_TWO_HOP_VIRTUAL_LIST_TUNING,
+	resolveMaterializationFromTuning,
+	type TwoHopVirtualListTuning,
+} from "./twoHopVirtualListTuning";
 
 export interface TwoHopViewPlanVirtualListProps {
 	readonly sections: readonly TwoHopSectionDescriptor[];
 	readonly applicationStore?: ApplicationStore;
 	readonly initialVisibleCount?: number;
 	readonly loadMoreIncrement?: number;
+	readonly tuning?: TwoHopVirtualListTuning;
 }
 
 export function useTwoHopViewPlanVirtualList(props: TwoHopViewPlanVirtualListProps) {
@@ -86,16 +89,9 @@ export function useTwoHopViewPlanVirtualList(props: TwoHopViewPlanVirtualListPro
 	});
 	const measurementState = createViewPlanMeasurementState();
 	const layoutPlanCache = createTwoHopLayoutPlanCache({
-		materialization: {
-			kind: "batched",
-			initial: {
-				maxSectionCount: INITIAL_MATERIALIZATION_SECTION_LIMIT,
-				maxCellCount: INITIAL_MATERIALIZATION_CELL_LIMIT,
-			},
-			background: {
-				maxCellCountPerSlice: BACKGROUND_MATERIALIZATION_CELL_LIMIT,
-			},
-		},
+		materialization: resolveMaterializationFromTuning(
+			props.tuning ?? DEFAULT_TWO_HOP_VIRTUAL_LIST_TUNING,
+		),
 		getWindow: () => measurementState.rootEl?.ownerDocument.defaultView ?? null,
 		resolveInitialSectionVisibleCount: inputState.resolveInitialSectionVisibleCount,
 		clampVisibleCount: inputState.clampVisibleCount,

@@ -15,6 +15,7 @@
 		TwoHopPageVirtualItem,
 	} from "./twohopPageVirtualModel";
 	import { useTwoHopViewPlanVirtualList } from "./useTwoHopViewPlanVirtualList.svelte";
+	import type { TwoHopVirtualListTuning } from "./twoHopVirtualListTuning";
 	import type {
 		VirtualizedItemVisibility,
 		VirtualizedItemVisibilityState,
@@ -38,6 +39,7 @@
 		applicationStore?: ApplicationStore;
 		initialVisibleCount?: number;
 		loadMoreIncrement?: number;
+		tuning?: TwoHopVirtualListTuning;
 		getCellClassName?: (section: TwoHopPageVirtualSection) => string | undefined;
 		getItemInteractionDescriptor: (
 			item: TwoHopPageVirtualItem,
