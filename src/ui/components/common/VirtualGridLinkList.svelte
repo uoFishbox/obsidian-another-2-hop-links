@@ -39,7 +39,6 @@
 		rowHeight={list.layout.rowHeight}
 		columns={list.layout.columns}
 		layoutMode="grid-rows"
-		mountedCells={list.mountedCells}
 		mountedRows={list.mountedRows}
 		mountedCellsForChange={list.mountedCellsForChange}
 		bind:rootEl={list.sectionRootEl}

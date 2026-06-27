@@ -14,7 +14,7 @@
 	} from "ui/interactions/interactionRegistry";
 	import VirtualSurfaceCells, {
 		type VirtualSurfaceCellPosition,
-		type VirtualSurfaceMountedRow,
+		type VirtualSurfaceRenderInput,
 	} from "./svelte/VirtualSurfaceCells.svelte";
 	import { installVirtualListInteractions } from "./svelte/VirtualListInteractions.svelte";
 	import {
@@ -22,9 +22,8 @@
 		type VirtualSurfaceNavigationContext,
 	} from "./svelte/VirtualSurfaceNavigation";
 	import type { MountedVirtualCell, VirtualNavigationTarget } from "./types";
-	import type { RowKey } from "./rowKey";
 
-	interface Props<TMountedCell extends MountedVirtualCell> {
+	interface CommonProps<TMountedCell extends MountedVirtualCell> {
 		className?: string;
 		contentClassName?: string;
 		rowClassName?: string;
@@ -34,10 +33,6 @@
 		rowHeight: number;
 		columns?: number;
 		gap?: number;
-		layoutMode?: "absolute-cells" | "grid-rows";
-		mountedCells: readonly TMountedCell[];
-		mountedRows?: readonly VirtualSurfaceMountedRow<TMountedCell>[];
-		mountedRowsVersion?: number;
 		mountedCellsForChange?: readonly TMountedCell[];
 		interactionDescriptorScopeId?: string;
 		interactionDescriptors?: readonly InteractionDescriptor[];
@@ -59,10 +54,6 @@
 		getCellPosition?: (cell: TMountedCell) => VirtualSurfaceCellPosition;
 		getCellClassName?: (cell: TMountedCell) => string | undefined;
 		getCellDataTestId?: (cell: TMountedCell) => string | undefined;
-		getRowRenderKey?: (rowIndex: number) => RowKey | undefined;
-		getRowDataAttributes?: (
-			rowIndex: number,
-		) => Record<string, string | number | undefined> | undefined;
 		onCellMount?: (cell: TMountedCell) => void;
 		onCellDestroy?: (cell: TMountedCell) => void;
 		onMountedCellsChange?: (cells: readonly TMountedCell[]) => void;
@@ -85,6 +76,9 @@
 		) => void;
 	}
 
+	type Props<TMountedCell extends MountedVirtualCell> = CommonProps<TMountedCell> &
+		VirtualSurfaceRenderInput<TMountedCell>;
+
 	let {
 		className = "",
 		contentClassName = "",
@@ -96,7 +90,7 @@
 		columns = 1,
 		gap = undefined,
 		layoutMode = "absolute-cells",
-		mountedCells,
+		mountedCells = undefined,
 		mountedRows = undefined,
 		mountedRowsVersion = undefined,
 		mountedCellsForChange,
@@ -113,8 +107,6 @@
 		getCellPosition,
 		getCellClassName,
 		getCellDataTestId,
-		getRowRenderKey,
-		getRowDataAttributes,
 		onCellMount,
 		onCellDestroy,
 		onMountedCellsChange,
@@ -178,7 +170,10 @@
 
 	function notifyMountedCellsChange(): void {
 		if (!onMountedCellsChange) return;
-		const cells = mountedCellsForChange ?? mountedCells;
+		const cells =
+			mountedCellsForChange ??
+			(layoutMode === "grid-rows" ? undefined : mountedCells);
+		if (!cells) return;
 		if (cells === lastNotifiedCells) return;
 		lastNotifiedCells = cells;
 		untrack(() => onMountedCellsChange?.(cells));
@@ -261,29 +256,49 @@
 	ontouchend={delegatedInteractions.handleTouchEnd}
 	ontouchcancel={delegatedInteractions.handleTouchEnd}
 >
-	<VirtualSurfaceCells
-		{contentClassName}
-		{rowClassName}
-		{cellClassName}
-		{contentHeight}
-		{cellWidth}
-		{rowHeight}
-		{columns}
-		{gap}
-		{layoutMode}
-		{mountedCells}
-		{mountedRows}
-		{mountedRowsVersion}
-		bind:contentEl
-		{observerRoot}
-		{getCellPosition}
-		{getCellClassName}
-		{getCellDataTestId}
-		{getRowRenderKey}
-		{getRowDataAttributes}
-		{onCellMount}
-		{onCellDestroy}
-		{renderCell}
-	/>
+	{#if layoutMode === "grid-rows"}
+		<VirtualSurfaceCells
+			{contentClassName}
+			{rowClassName}
+			{cellClassName}
+			{contentHeight}
+			{cellWidth}
+			{rowHeight}
+			{columns}
+			{gap}
+			layoutMode="grid-rows"
+			mountedRows={mountedRows ?? []}
+			{mountedRowsVersion}
+			bind:contentEl
+			{observerRoot}
+			{getCellPosition}
+			{getCellClassName}
+			{getCellDataTestId}
+			{onCellMount}
+			{onCellDestroy}
+			{renderCell}
+		/>
+	{:else}
+		<VirtualSurfaceCells
+			{contentClassName}
+			{rowClassName}
+			{cellClassName}
+			{contentHeight}
+			{cellWidth}
+			{rowHeight}
+			{columns}
+			{gap}
+			layoutMode="absolute-cells"
+			mountedCells={mountedCells ?? []}
+			bind:contentEl
+			{observerRoot}
+			{getCellPosition}
+			{getCellClassName}
+			{getCellDataTestId}
+			{onCellMount}
+			{onCellDestroy}
+			{renderCell}
+		/>
+	{/if}
 	{@render afterContent?.()}
 </div>

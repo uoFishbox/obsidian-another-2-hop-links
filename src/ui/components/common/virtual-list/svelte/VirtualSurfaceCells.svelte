@@ -22,7 +22,21 @@
 		cells: readonly TMountedCell[];
 	}
 
-	interface Props<TMountedCell extends MountedVirtualCell> {
+	export type VirtualSurfaceRenderInput<TMountedCell extends MountedVirtualCell> =
+		| {
+				layoutMode?: "absolute-cells";
+				mountedCells: readonly TMountedCell[];
+				mountedRows?: never;
+				mountedRowsVersion?: never;
+		  }
+		| {
+				layoutMode: "grid-rows";
+				mountedCells?: never;
+				mountedRows: readonly VirtualSurfaceMountedRow<TMountedCell>[];
+				mountedRowsVersion?: number;
+		  };
+
+	interface CommonProps<TMountedCell extends MountedVirtualCell> {
 		contentClassName?: string;
 		rowClassName?: string;
 		cellClassName?: string;
@@ -31,19 +45,11 @@
 		rowHeight: number;
 		columns?: number;
 		gap?: number;
-		layoutMode?: "absolute-cells" | "grid-rows";
-		mountedCells: readonly TMountedCell[];
-		mountedRows?: readonly VirtualSurfaceMountedRow<TMountedCell>[];
-		mountedRowsVersion?: number;
 		contentEl?: HTMLDivElement | null;
 		observerRoot?: HTMLElement | null;
 		getCellPosition?: (cell: TMountedCell) => VirtualSurfaceCellPosition;
 		getCellClassName?: (cell: TMountedCell) => string | undefined;
 		getCellDataTestId?: (cell: TMountedCell) => string | undefined;
-		getRowRenderKey?: (rowIndex: number) => RowKey | undefined;
-		getRowDataAttributes?: (
-			rowIndex: number,
-		) => Record<string, string | number | undefined> | undefined;
 		onCellMount?: (cell: TMountedCell) => void;
 		onCellDestroy?: (cell: TMountedCell) => void;
 		renderCell: Snippet<
@@ -56,6 +62,9 @@
 		>;
 	}
 
+	type Props<TMountedCell extends MountedVirtualCell> = CommonProps<TMountedCell> &
+		VirtualSurfaceRenderInput<TMountedCell>;
+
 	let {
 		contentClassName = "",
 		rowClassName = "",
@@ -66,7 +75,7 @@
 		columns = 1,
 		gap = undefined,
 		layoutMode = "absolute-cells",
-		mountedCells,
+		mountedCells = undefined,
 		mountedRows = undefined,
 		mountedRowsVersion = undefined,
 		contentEl = $bindable<HTMLDivElement | null>(null),
@@ -74,8 +83,6 @@
 		getCellPosition,
 		getCellClassName,
 		getCellDataTestId,
-		getRowRenderKey,
-		getRowDataAttributes,
 		onCellMount,
 		onCellDestroy,
 		renderCell,
@@ -92,16 +99,12 @@
 		{rowHeight}
 		{columns}
 		{gap}
-		{mountedCells}
-		{mountedRows}
+		mountedRows={mountedRows ?? []}
 		{mountedRowsVersion}
 		bind:contentEl
 		{observerRoot}
-		{getCellPosition}
 		{getCellClassName}
 		{getCellDataTestId}
-		{getRowRenderKey}
-		{getRowDataAttributes}
 		onLogicalCellAttach={onCellMount}
 		onLogicalCellDetach={onCellDestroy}
 		{renderCell}
@@ -113,7 +116,7 @@
 		{contentHeight}
 		{cellWidth}
 		{rowHeight}
-		{mountedCells}
+		mountedCells={mountedCells ?? []}
 		bind:contentEl
 		{observerRoot}
 		{getCellPosition}

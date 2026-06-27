@@ -34,7 +34,6 @@ import {
 	type RowPreviewActivationRuntime,
 } from "features/preview/scheduling/rowPreviewActivationRuntime";
 
-const EMPTY_MOUNTED_CELLS: readonly [] = [];
 const EMPTY_MOUNTED_ROWS: readonly [] = [];
 
 /**
@@ -275,10 +274,6 @@ export function useTwoHopViewPlanVirtualList(props: TwoHopViewPlanVirtualListPro
 		},
 		get layout() {
 			return measurementState.layout;
-		},
-		// Direct row rendering path; VirtualSurface does not consume mountedCells here.
-		get directRowsModeMountedCells() {
-			return EMPTY_MOUNTED_CELLS;
 		},
 		get mountedRows() {
 			return mountedRowsForSurface;

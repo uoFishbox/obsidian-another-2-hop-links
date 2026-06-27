@@ -28,7 +28,6 @@
 	cellClassName="test-cell"
 	contentHeight={1000}
 	rowHeight={50}
-	mountedCells={[]}
 	{mountedRows}
 	{mountedRowsVersion}
 >

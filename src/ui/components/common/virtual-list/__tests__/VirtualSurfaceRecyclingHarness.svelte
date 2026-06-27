@@ -44,30 +44,62 @@
 	}: Props = $props();
 </script>
 
-<VirtualSurface
-	className="recycling-test-root"
-	contentClassName="recycling-test-content"
-	cellClassName="recycling-test-cell"
-	{mountedCells}
-	{mountedRows}
-	{contentHeight}
-	{rowHeight}
-	{layoutMode}
-	interactionDescriptorScopeId={interactionId ? "recycling-test-items" : undefined}
-	{interactionDescriptorResolvers}
-	getCellPosition={(cell) => ({
-		top: cell.top,
-		left: cell.left,
-		width: cell.width,
-		height: cell.height,
-	})}
->
-	{#snippet renderCell({ mountedCell })}
-		<VirtualSurfaceRecyclingProbe
-			key={mountedCell.key}
-			{interactionId}
-			{onCellMount}
-			{onCellUpdate}
-		/>
-	{/snippet}
-</VirtualSurface>
+{#if layoutMode === "grid-rows"}
+	<VirtualSurface
+		className="recycling-test-root"
+		contentClassName="recycling-test-content"
+		cellClassName="recycling-test-cell"
+		mountedRows={mountedRows ?? []}
+		{contentHeight}
+		{rowHeight}
+		layoutMode="grid-rows"
+		interactionDescriptorScopeId={interactionId
+			? "recycling-test-items"
+			: undefined}
+		{interactionDescriptorResolvers}
+		getCellPosition={(cell) => ({
+			top: cell.top,
+			left: cell.left,
+			width: cell.width,
+			height: cell.height,
+		})}
+	>
+		{#snippet renderCell({ mountedCell })}
+			<VirtualSurfaceRecyclingProbe
+				key={mountedCell.key}
+				{interactionId}
+				{onCellMount}
+				{onCellUpdate}
+			/>
+		{/snippet}
+	</VirtualSurface>
+{:else}
+	<VirtualSurface
+		className="recycling-test-root"
+		contentClassName="recycling-test-content"
+		cellClassName="recycling-test-cell"
+		{mountedCells}
+		{contentHeight}
+		{rowHeight}
+		layoutMode="absolute-cells"
+		interactionDescriptorScopeId={interactionId
+			? "recycling-test-items"
+			: undefined}
+		{interactionDescriptorResolvers}
+		getCellPosition={(cell) => ({
+			top: cell.top,
+			left: cell.left,
+			width: cell.width,
+			height: cell.height,
+		})}
+	>
+		{#snippet renderCell({ mountedCell })}
+			<VirtualSurfaceRecyclingProbe
+				key={mountedCell.key}
+				{interactionId}
+				{onCellMount}
+				{onCellUpdate}
+			/>
+		{/snippet}
+	</VirtualSurface>
+{/if}
