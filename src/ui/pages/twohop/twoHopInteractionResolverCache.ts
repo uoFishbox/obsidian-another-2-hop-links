@@ -17,6 +17,7 @@ interface ProviderCacheEntry {
 	itemRevision: TwoHopPageVirtualItem;
 	renderBodyRevision: unknown;
 	resolveDescriptorRevision: unknown;
+	descriptorRevision: unknown;
 	descriptor: ItemInteractionDescriptor;
 }
 
@@ -28,6 +29,7 @@ export interface TwoHopInteractionResolverProviderParams {
 	resolveDescriptor: (
 		item: TwoHopPageVirtualItem,
 	) => ItemInteractionDescriptor | null;
+	getDescriptorRevision?: () => unknown;
 }
 
 /**
@@ -38,6 +40,7 @@ export interface TwoHopInteractionResolverProviderParams {
 export function createTwoHopInteractionResolverProvider({
 	getMountedRows,
 	resolveDescriptor,
+	getDescriptorRevision,
 }: TwoHopInteractionResolverProviderParams): InteractionDescriptorResolverProvider {
 	const descriptorsByInteractionId = new Map<string, ProviderCacheEntry>();
 
@@ -54,11 +57,13 @@ export function createTwoHopInteractionResolverProvider({
 
 			const item = itemCell.cell.item;
 			const cached = descriptorsByInteractionId.get(interactionId);
+			const descriptorRevision = getDescriptorRevision?.();
 			if (
 				cached &&
 				cached.itemRevision === item &&
 				Object.is(cached.renderBodyRevision, itemCell.renderBodyKey) &&
-				Object.is(cached.resolveDescriptorRevision, resolveDescriptor)
+				Object.is(cached.resolveDescriptorRevision, resolveDescriptor) &&
+				Object.is(cached.descriptorRevision, descriptorRevision)
 			) {
 				return cached.descriptor;
 			}
@@ -72,6 +77,7 @@ export function createTwoHopInteractionResolverProvider({
 				itemRevision: item,
 				renderBodyRevision: itemCell.renderBodyKey,
 				resolveDescriptorRevision: resolveDescriptor,
+				descriptorRevision,
 				descriptor,
 			});
 			return descriptor;

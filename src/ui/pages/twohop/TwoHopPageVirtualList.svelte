@@ -88,6 +88,11 @@
 					},
 				)
 			: null;
+	const interactionDescriptorRevision = $derived({
+		settings: currentSettings,
+		searchQuery,
+		linkContext,
+	});
 
 	type RenderItemArgs = {
 		item: TwoHopPageVirtualItem;
@@ -109,6 +114,7 @@
 		{loadMoreIncrement}
 		{getCellClassName}
 		{getItemInteractionDescriptor}
+		{interactionDescriptorRevision}
 	>
 		{#snippet renderHeader({ section, title, totalCount, sectionId, headerProps })}
 			{#if section.kind === "primary-section"}

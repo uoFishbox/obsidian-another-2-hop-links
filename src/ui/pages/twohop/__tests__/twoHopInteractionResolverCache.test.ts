@@ -118,4 +118,35 @@ describe("twoHopInteractionResolverCache", () => {
 		);
 		expect(resolveDescriptor).toHaveBeenCalledTimes(1);
 	});
+
+	it("provider reruns descriptor resolution when descriptor revision changes", () => {
+		const item = createItem("alpha.md");
+		const firstDescriptor = createDescriptor(item);
+		const secondDescriptor = createDescriptor(item);
+		let descriptorRevision: unknown = { searchQuery: "alpha" };
+		const resolveDescriptor = vi
+			.fn()
+			.mockReturnValueOnce(firstDescriptor)
+			.mockReturnValueOnce(secondDescriptor);
+		const provider = createTwoHopInteractionResolverProvider({
+			getMountedRows: () =>
+				createMountedRows({
+					item,
+					renderBodyKey: "item:alpha:1",
+				}),
+			resolveDescriptor,
+			getDescriptorRevision: () => descriptorRevision,
+		});
+
+		expect(provider.resolveInteractionDescriptor("item:file:alpha.md")).toBe(
+			firstDescriptor,
+		);
+
+		descriptorRevision = { searchQuery: "beta" };
+
+		expect(provider.resolveInteractionDescriptor("item:file:alpha.md")).toBe(
+			secondDescriptor,
+		);
+		expect(resolveDescriptor).toHaveBeenCalledTimes(2);
+	});
 });

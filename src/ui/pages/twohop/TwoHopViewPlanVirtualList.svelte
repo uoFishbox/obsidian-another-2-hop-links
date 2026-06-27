@@ -44,6 +44,7 @@
 		getItemInteractionDescriptor: (
 			item: TwoHopPageVirtualItem,
 		) => ItemInteractionDescriptor | null;
+		interactionDescriptorRevision?: unknown;
 		renderHeader: Snippet<
 			[
 				{
@@ -88,6 +89,7 @@
 		createTwoHopInteractionResolverProvider({
 			getMountedRows: () => list.mountedRows,
 			resolveDescriptor: (item) => props.getItemInteractionDescriptor(item),
+			getDescriptorRevision: () => props.interactionDescriptorRevision,
 		});
 	const resolvedCellClassNameBySectionClassName = new Map<string, string>();
 	const resolveSectionCellClassName = (
