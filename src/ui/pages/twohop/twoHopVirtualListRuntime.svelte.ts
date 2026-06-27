@@ -9,6 +9,7 @@ import type {
 	TwoHopSectionDescriptor,
 } from "./twohopPageVirtualModel";
 import { createTwoHopLayoutPlanCache } from "./twoHopLayoutPlanCache";
+import { createTwoHopMaterializationScheduler } from "./twoHopMaterializationScheduler";
 import { type TwoHopViewPlanRowModel } from "./twoHopViewPlan";
 import {
 	DEFAULT_TWO_HOP_VIRTUAL_LIST_TUNING,
@@ -50,14 +51,18 @@ export function createTwoHopVirtualListRuntime(params: {
 		initialVisibleCount: params.props.initialVisibleCount,
 		loadMoreIncrement: params.props.loadMoreIncrement,
 	});
+	const materialization = resolveMaterializationFromTuning(
+		params.props.tuning ?? DEFAULT_TWO_HOP_VIRTUAL_LIST_TUNING,
+	);
 	const layoutPlanCache = createTwoHopLayoutPlanCache({
-		materialization: resolveMaterializationFromTuning(
-			params.props.tuning ?? DEFAULT_TWO_HOP_VIRTUAL_LIST_TUNING,
-		),
-		getWindow: () =>
-			params.measurementState.rootEl?.ownerDocument.defaultView ?? null,
+		materialization,
 		resolveInitialSectionVisibleCount: inputState.resolveInitialSectionVisibleCount,
 		clampVisibleCount: inputState.clampVisibleCount,
+	});
+	const materializationScheduler = createTwoHopMaterializationScheduler({
+		materialization,
+		getWindow: () =>
+			params.measurementState.rootEl?.ownerDocument.defaultView ?? null,
 	});
 	const resolveRowModel = (
 		layout: ViewPlanLayoutMetrics = params.measurementState.layout,
@@ -73,6 +78,7 @@ export function createTwoHopVirtualListRuntime(params: {
 		applicationStore,
 		inputState,
 		layoutPlanCache,
+		materializationScheduler,
 		get configuredCardLayout() {
 			return configuredCardLayout;
 		},

@@ -51,7 +51,7 @@ export function useTwoHopViewPlanVirtualList(props: TwoHopViewPlanVirtualListPro
 	});
 	$effect(() => {
 		const activeRowModel = inputRuntime.rowModel;
-		return inputRuntime.layoutPlanCache.scheduleMaterialization(
+		return inputRuntime.materializationScheduler.schedule(
 			activeRowModel,
 			(affectedRowRange) => {
 				// Background materialization mostly builds cells for rows that are not

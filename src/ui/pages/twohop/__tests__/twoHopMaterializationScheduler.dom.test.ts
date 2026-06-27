@@ -5,6 +5,7 @@ import {
 } from "infrastructure/scroll/scrollActivity";
 import type { TwoHopSectionDescriptor } from "../twohopPageVirtualModel";
 import { createTwoHopLayoutPlanCache } from "../twoHopLayoutPlanCache";
+import { createTwoHopMaterializationScheduler } from "../twoHopMaterializationScheduler";
 
 const layout = {
 	containerWidth: 320,
@@ -78,54 +79,47 @@ function installIdleCallbackHarness() {
 	};
 }
 
+function createDeferredRowModel() {
+	const materialization = createBatchedMaterialization(1);
+	const cache = createTwoHopLayoutPlanCache({
+		materialization,
+		resolveInitialSectionVisibleCount: (section) => section.loadedCount,
+		clampVisibleCount: (section, count) => Math.min(section.loadedCount, count),
+	});
+	return {
+		materialization,
+		rowModel: cache.resolve([descriptor], {}, layout),
+	};
+}
+
 const idleDeadline = {
 	didTimeout: false,
 	timeRemaining: () => 50,
 } satisfies IdleDeadline;
 
-describe("createTwoHopLayoutPlanCache in a DOM runtime", () => {
+describe("createTwoHopMaterializationScheduler in a DOM runtime", () => {
 	afterEach(() => {
 		resetScrollActivityForTests();
 		vi.restoreAllMocks();
 	});
 
-	it("reuses only the exact descriptor, pagination, and layout inputs", () => {
-		const cache = createTwoHopLayoutPlanCache({
-			materialization: { kind: "eager" },
-			resolveInitialSectionVisibleCount: (section) => section.loadedCount,
-			clampVisibleCount: (section, count) => Math.min(section.loadedCount, count),
-		});
-		const sections = [descriptor];
-		const visibleCounts = { "new-links": 1 };
-		const first = cache.resolve(sections, visibleCounts, layout);
-
-		expect(cache.resolve(sections, visibleCounts, layout)).toBe(first);
-		expect(cache.resolve([...sections], visibleCounts, layout)).not.toBe(first);
-		expect(cache.resolve(sections, { ...visibleCounts }, layout)).not.toBe(first);
-		expect(cache.resolve(sections, visibleCounts, { ...layout })).not.toBe(first);
-		expect(first.revision).toEqual({ kind: "opaque", token: first.plan });
-	});
-
 	it("cancels the previous deferred materialization task", () => {
 		const idle = installIdleCallbackHarness();
-		const cache = createTwoHopLayoutPlanCache({
-			materialization: createBatchedMaterialization(1),
-			resolveInitialSectionVisibleCount: (section) => section.loadedCount,
-			clampVisibleCount: (section, count) => Math.min(section.loadedCount, count),
+		const first = createDeferredRowModel();
+		const second = createDeferredRowModel();
+		const scheduler = createTwoHopMaterializationScheduler({
+			materialization: first.materialization,
 		});
-		const sections = [descriptor];
-		const first = cache.resolve(sections, {}, layout);
-		cache.scheduleMaterialization(first, vi.fn());
+
+		scheduler.schedule(first.rowModel, vi.fn());
 		const firstCallbackId = idle.latestCallbackId;
 		expect(idle.idleCallbacks.has(firstCallbackId)).toBe(true);
 
-		const second = cache.resolve([...sections], {}, layout);
-		expect(idle.cancelIdleCallback).toHaveBeenCalledWith(firstCallbackId);
-		expect(idle.idleCallbacks.has(firstCallbackId)).toBe(false);
-
-		cache.scheduleMaterialization(second, vi.fn());
+		scheduler.schedule(second.rowModel, vi.fn());
 		const secondCallbackId = idle.latestCallbackId;
 
+		expect(idle.cancelIdleCallback).toHaveBeenCalledWith(firstCallbackId);
+		expect(idle.idleCallbacks.has(firstCallbackId)).toBe(false);
 		expect(idle.idleCallbacks.has(secondCallbackId)).toBe(true);
 		expect(idle.requestIdleCallback).toHaveBeenCalledTimes(2);
 	});
@@ -133,19 +127,15 @@ describe("createTwoHopLayoutPlanCache in a DOM runtime", () => {
 	it("uses the background cell budget independently from the initial budget", () => {
 		const idle = installIdleCallbackHarness();
 		const onMaterialized = vi.fn();
-		const cache = createTwoHopLayoutPlanCache({
-			materialization: createBatchedMaterialization(1),
-			resolveInitialSectionVisibleCount: (section) => section.loadedCount,
-			clampVisibleCount: (section, count) => Math.min(section.loadedCount, count),
-		});
-		const rowModel = cache.resolve([descriptor], {}, layout);
+		const { materialization, rowModel } = createDeferredRowModel();
+		const scheduler = createTwoHopMaterializationScheduler({ materialization });
 
 		expect(rowModel.plan.cellStore.materializationStateBySectionIndex[0]).toEqual({
 			nextCellIndex: 0,
 			materializedCellCount: 0,
 		});
 
-		cache.scheduleMaterialization(rowModel, onMaterialized);
+		scheduler.schedule(rowModel, onMaterialized);
 		idle.idleCallbacks.get(idle.latestCallbackId)?.(idleDeadline);
 
 		expect(rowModel.plan.cellStore.materializationStateBySectionIndex[0]).toEqual({
@@ -158,15 +148,11 @@ describe("createTwoHopLayoutPlanCache in a DOM runtime", () => {
 	it("does not run background materialization while scrolling", () => {
 		const idle = installIdleCallbackHarness();
 		const onMaterialized = vi.fn();
-		const cache = createTwoHopLayoutPlanCache({
-			materialization: createBatchedMaterialization(1),
-			resolveInitialSectionVisibleCount: (section) => section.loadedCount,
-			clampVisibleCount: (section, count) => Math.min(section.loadedCount, count),
-		});
-		const rowModel = cache.resolve([descriptor], {}, layout);
+		const { materialization, rowModel } = createDeferredRowModel();
+		const scheduler = createTwoHopMaterializationScheduler({ materialization });
 		const scrollSource = {};
 
-		cache.scheduleMaterialization(rowModel, onMaterialized);
+		scheduler.schedule(rowModel, onMaterialized);
 		markScrollActivityActive(scrollSource);
 		idle.idleCallbacks.get(idle.latestCallbackId)?.(idleDeadline);
 
@@ -183,21 +169,17 @@ describe("createTwoHopLayoutPlanCache in a DOM runtime", () => {
 	it("resumes background materialization when scroll becomes idle", () => {
 		const idle = installIdleCallbackHarness();
 		const onMaterialized = vi.fn();
-		const cache = createTwoHopLayoutPlanCache({
-			materialization: createBatchedMaterialization(1),
-			resolveInitialSectionVisibleCount: (section) => section.loadedCount,
-			clampVisibleCount: (section, count) => Math.min(section.loadedCount, count),
-		});
-		const rowModel = cache.resolve([descriptor], {}, layout);
+		const { materialization, rowModel } = createDeferredRowModel();
+		const scheduler = createTwoHopMaterializationScheduler({ materialization });
 		const scrollSource = {};
 
-		cache.scheduleMaterialization(rowModel, onMaterialized);
+		scheduler.schedule(rowModel, onMaterialized);
 		markScrollActivityActive(scrollSource);
 		idle.idleCallbacks.get(idle.latestCallbackId)?.(idleDeadline);
 
 		expect(onMaterialized).not.toHaveBeenCalled();
 
-		// Scroll becomes idle — materialization should resume.
+		// Scroll becomes idle; materialization should resume.
 		resetScrollActivityForTests();
 		idle.idleCallbacks.get(idle.latestCallbackId)?.(idleDeadline);
 
