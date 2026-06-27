@@ -49,7 +49,7 @@ const cloneRanges = (ranges: VirtualRanges): VirtualRanges => ({
 	previewVisible: cloneRange(ranges.previewVisible),
 });
 
-export function createVirtualListDebugSnapshot<
+function createVirtualListDebugSnapshot<
 	TCell,
 	TMountedCell extends MountedVirtualCell,
 	TMountedBuild extends MountedVirtualCellsBuild<TMountedCell>,
@@ -169,7 +169,7 @@ const compareMountedCell = (
 	return undefined;
 };
 
-export function createVirtualListMountedCellsParity<
+function createVirtualListMountedCellsParity<
 	TCell,
 	TMountedCell extends MountedVirtualCell,
 	TMountedBuild extends MountedVirtualCellsBuild<TMountedCell>,

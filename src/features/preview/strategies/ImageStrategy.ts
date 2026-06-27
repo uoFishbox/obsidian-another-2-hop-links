@@ -21,6 +21,4 @@ export function createImagePreviewStrategy(): PreviewStrategy {
 	};
 }
 
-export const imagePreviewStrategy: PreviewStrategy = createImagePreviewStrategy();
-
 export default createImagePreviewStrategy;

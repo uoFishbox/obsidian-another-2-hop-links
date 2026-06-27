@@ -6,7 +6,7 @@ import type {
 	TwoHopSectionDescriptor,
 } from "../twohopPageVirtualModel";
 
-export const EMPTY_HEADER_PROPS: ClickableHeaderExtraProps = {};
+const EMPTY_HEADER_PROPS: ClickableHeaderExtraProps = {};
 
 export interface CachedVirtualItemAccessors {
 	readonly getItems: () => readonly TwoHopPageVirtualItem[];

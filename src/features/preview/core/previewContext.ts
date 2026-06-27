@@ -7,7 +7,7 @@ import { defaultYieldToMainThread } from "core/indexing/timeSlicing";
 import { extractFirstEmbeddedMediaAsync } from "../text-processing/previewTextProcessingAsync";
 import { readRawContent } from "./rawContentReader";
 
-export const VISIBLE_PREVIEW_SCAN_BUDGET_CHARS = 200_000;
+const VISIBLE_PREVIEW_SCAN_BUDGET_CHARS = 200_000;
 
 export function createPreviewContext(
 	file: TFile,

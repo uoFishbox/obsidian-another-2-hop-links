@@ -119,6 +119,4 @@ async function resolveEmbeddedMedia(
 	return undefined;
 }
 
-export const embeddedMediaStrategy: PreviewStrategy = createEmbeddedMediaStrategy();
-
 export default createEmbeddedMediaStrategy;

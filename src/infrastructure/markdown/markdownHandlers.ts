@@ -32,18 +32,6 @@ export async function markdownPostProcessor(
 }
 
 // ============================================================================
-// Properties pane processing
-// ============================================================================
-
-export function processPropertiesPane(
-	propertiesEl: HTMLElement,
-	stylingService: StylingService,
-	sourceFile?: TFile,
-): void {
-	stylingService.decoratePropertiesPane(propertiesEl, sourceFile);
-}
-
-// ============================================================================
 // Bases view processing
 // ============================================================================
 

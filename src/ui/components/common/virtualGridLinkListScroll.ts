@@ -17,7 +17,7 @@ const nearestScrollContainerCache = new WeakMap<
 	CachedScrollContainerResolution
 >();
 
-export function getComposedParentElement(node: Node | null): HTMLElement | null {
+function getComposedParentElement(node: Node | null): HTMLElement | null {
 	if (!node) {
 		return null;
 	}

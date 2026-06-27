@@ -12,7 +12,7 @@ export interface HarnessSection {
 	revision?: number;
 }
 
-export function withItemsState<T, G>(
+function withItemsState<T, G>(
 	descriptor: SectionRenderDescriptor<T, G>,
 ): SectionRenderDescriptor<T, G> {
 	return descriptor;
@@ -20,7 +20,7 @@ export function withItemsState<T, G>(
 
 export type TextMatcher = Parameters<typeof domScreen.queryAllByText>[0];
 
-export function collectOpenShadowRoots(root: ParentNode = document.body): ShadowRoot[] {
+function collectOpenShadowRoots(root: ParentNode = document.body): ShadowRoot[] {
 	const shadowRoots: ShadowRoot[] = [];
 
 	for (const element of Array.from(root.querySelectorAll("*"))) {
@@ -118,41 +118,6 @@ export function expectFocused(element: HTMLElement): void {
 	expect(element).toHaveFocus();
 }
 
-export function createDeepScreen() {
-	return {
-		...domScreen,
-		getAllByTestId(testId: string): HTMLElement[] {
-			const elements = queryAllByTestIdDeep(testId);
-			if (elements.length === 0) {
-				throw new Error(
-					`Unable to find an element by: [data-testid="${testId}"]`,
-				);
-			}
-			return elements;
-		},
-		queryAllByTestId(testId: string): HTMLElement[] {
-			return queryAllByTestIdDeep(testId);
-		},
-		getByTestId(testId: string): HTMLElement {
-			return getSingleMatch(
-				queryAllByTestIdDeep(testId),
-				`[data-testid="${testId}"]`,
-			);
-		},
-		queryByTestId(testId: string): HTMLElement | null {
-			const elements = queryAllByTestIdDeep(testId);
-			return elements.length > 0 ? elements[0] : null;
-		},
-		getByText(text: TextMatcher): HTMLElement {
-			return getSingleMatch(queryAllByTextDeep(text), `text: ${String(text)}`);
-		},
-		queryByText(text: TextMatcher): HTMLElement | null {
-			const elements = queryAllByTextDeep(text);
-			return elements.length > 0 ? elements[0] : null;
-		},
-	};
-}
-
 export function createSections(
 	sectionCount: number,
 	itemsPerSection: number,
@@ -171,29 +136,6 @@ export function createSections(
 			totalCount: itemsPerSection,
 			loadedCount: itemsPerSection,
 			getItems: () => items,
-			headerProps: {},
-		});
-	});
-}
-
-export function createSpiedSections(
-	sectionCount: number,
-	itemsPerSection: number,
-): SectionRenderDescriptor<string, HarnessSection>[] {
-	return Array.from({ length: sectionCount }, (_, sectionIndex) => {
-		const sectionKey = `section-${sectionIndex}`;
-		const items = Array.from(
-			{ length: itemsPerSection },
-			(_, itemIndex) => `${sectionKey}-item-${itemIndex}`,
-		);
-		return withItemsState({
-			section: { key: sectionKey },
-			sectionKey,
-			title: `Section ${sectionIndex}`,
-			sectionId: `section-${sectionIndex}`,
-			totalCount: itemsPerSection,
-			loadedCount: itemsPerSection,
-			getItems: vi.fn(() => items),
 			headerProps: {},
 		});
 	});

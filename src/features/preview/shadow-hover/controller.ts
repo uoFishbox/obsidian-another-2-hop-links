@@ -466,7 +466,7 @@ export class ShadowHoverControllerImpl implements ShadowHoverController {
 	}
 }
 
-export function getShadowHoverControllerDebugState(
+function getShadowHoverControllerDebugState(
 	controller: ShadowHoverController,
 ): ShadowHoverSession | null {
 	return controller instanceof ShadowHoverControllerImpl

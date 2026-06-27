@@ -185,27 +185,3 @@ export function runPreviewTextWorker(
 		}
 	});
 }
-
-export function terminatePreviewTextWorker(): void {
-	const activeWorker = worker;
-	worker = undefined;
-
-	for (const [requestId, pending] of pendingRequests) {
-		pendingRequests.delete(requestId);
-		if (pending.signal && pending.onAbort) {
-			pending.signal.removeEventListener("abort", pending.onAbort);
-		}
-		pending.reject(createAbortError());
-	}
-
-	if (!activeWorker) {
-		return;
-	}
-
-	try {
-		activeWorker.postMessage({ type: "dispose" });
-	} catch {
-		// Worker shutdown is best effort.
-	}
-	activeWorker.terminate();
-}

@@ -23,7 +23,7 @@ export function buildPreviewContentSettingsSignature(settings: PluginSettings): 
 	].join(SIGNATURE_SEP);
 }
 
-export function buildSearchContextSettingsSignature(settings: PluginSettings): string {
+function buildSearchContextSettingsSignature(settings: PluginSettings): string {
 	return [
 		settings.previewMaxChars,
 		settings.previewMaxLines,

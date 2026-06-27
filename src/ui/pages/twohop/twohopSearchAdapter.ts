@@ -452,25 +452,8 @@ function createMergedSearchKey(
 		: `${MERGED_SEARCH_PREFIX}${getBacklinkBaseKey(item, searchKeyCache)}`;
 }
 
-export function getTwohopChildSearchKey(
-	branch: TwoHopLinkBranch,
-	link: TwoHopIndexedLink,
-): string {
-	return getTwohopChildSearchKeyFromBranchBaseKey(
-		getTwohopBranchSearchBaseKey(branch),
-		link,
-	);
-}
-
 export function getTwohopBranchSearchBaseKey(branch: TwoHopLinkBranch): string {
 	return getBranchBaseKey(branch);
-}
-
-export function getTwohopChildSearchKeyFromBranchBaseKey(
-	branchBaseKey: string,
-	link: TwoHopIndexedLink,
-): string {
-	return createTwohopChildSearchKeyFromBranchBaseKey(branchBaseKey, link);
 }
 
 function createTwohopChildSearchKeyFromBranchBaseKey(
@@ -491,7 +474,7 @@ export function createTwohopChildSearchKeyFromBaseKeys(
 	return `${TWOHOP_CHILD_SEARCH_PREFIX}${branchBaseKey}${SEARCH_KEY_SEPARATOR}${backlinkBaseKey}`;
 }
 
-export function getTagGroupSearchKey(section: TagGroup): string {
+function getTagGroupSearchKey(section: TagGroup): string {
 	return `${TAG_GROUP_SEARCH_PREFIX}${section.tag}`;
 }
 

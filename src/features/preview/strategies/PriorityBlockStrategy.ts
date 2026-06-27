@@ -63,6 +63,4 @@ export function createCustomBlockStrategy(): PreviewStrategy {
 	};
 }
 
-export const customBlockStrategy: PreviewStrategy = createCustomBlockStrategy();
-
 export default createCustomBlockStrategy;

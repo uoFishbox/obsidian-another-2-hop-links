@@ -33,7 +33,7 @@ const patchedPopovers = new WeakMap<HoverPopoverLike, PopoverPatchState>();
 
 type PopoverMethodName = keyof PopoverPatchState["originals"];
 
-export function closePopoverUnsafe(popover: HoverPopoverLike | null | undefined): void {
+function closePopoverUnsafe(popover: HoverPopoverLike | null | undefined): void {
 	if (!popover) {
 		return;
 	}
@@ -581,7 +581,7 @@ export function createRequestHoverParent(
 	return hoverParent;
 }
 
-export function bindPopoverAnchor(
+function bindPopoverAnchor(
 	popover: HoverPopoverLike,
 	proxyAnchorEl: HTMLElement,
 	actualAnchorEl = proxyAnchorEl,
@@ -937,7 +937,7 @@ export function reallyClosePopover(
 	}
 }
 
-export function closeReplacedPopover(
+function closeReplacedPopover(
 	popover: HoverPopoverLike,
 	session: ShadowHoverSession,
 ): void {

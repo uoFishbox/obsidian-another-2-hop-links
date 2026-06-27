@@ -21,6 +21,4 @@ export function createVideoPreviewStrategy(): PreviewStrategy {
 	};
 }
 
-export const videoPreviewStrategy: PreviewStrategy = createVideoPreviewStrategy();
-
 export default createVideoPreviewStrategy;

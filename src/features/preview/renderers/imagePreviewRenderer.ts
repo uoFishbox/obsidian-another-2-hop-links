@@ -4,7 +4,7 @@ import type { IMetadataCache, IVault } from "types/obsidian";
 import { resolveFile } from "../utils/previewUtils";
 import { isFileUrlImage, toObsidianResourceUrl } from "../utils/externalFileImage";
 
-export function getMetadata(
+function getMetadata(
 	file: TFile,
 	metadataCache: IMetadataCache,
 ): CachedMetadata | null {

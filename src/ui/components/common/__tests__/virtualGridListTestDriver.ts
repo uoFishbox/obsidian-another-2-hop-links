@@ -33,8 +33,6 @@ import type {
 
 type TextMatcher = Parameters<typeof domScreen.queryAllByText>[0];
 
-const MAX_REASONABLE_MOUNTED_CELLS = 12;
-
 function collectOpenShadowRoots(root: ParentNode = document.body): ShadowRoot[] {
 	const shadowRoots: ShadowRoot[] = [];
 

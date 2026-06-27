@@ -17,7 +17,7 @@ export function isNormalizedPathSignature(path: string): boolean {
 	return path.indexOf("\\") === -1 && path === path.toLowerCase();
 }
 
-export function normalizeTextSignature(value: string): string {
+function normalizeTextSignature(value: string): string {
 	return value.toLowerCase();
 }
 

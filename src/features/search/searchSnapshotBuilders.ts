@@ -25,10 +25,6 @@ export function getBacklinkSearchText(
 	return `${title} ${sourceFile.path}`;
 }
 
-export function getTaggedNoteSearchText(file: TFile): string {
-	return `${file.basename} ${file.path}`;
-}
-
 export function getFileSearchText(
 	file: TFile,
 	sourcePath: string,

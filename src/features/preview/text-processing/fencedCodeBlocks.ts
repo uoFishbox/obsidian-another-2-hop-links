@@ -118,7 +118,7 @@ function getContentEndBeforeClosingLine(
 	return contentEnd;
 }
 
-export function findFencedCodeBlockAtLineStart(
+function findFencedCodeBlockAtLineStart(
 	content: string,
 	lineStartIndex: number,
 ): FencedCodeBlockRange | undefined {
@@ -154,7 +154,7 @@ export function findFencedCodeBlockAtLineStart(
 	return undefined;
 }
 
-export async function findFencedCodeBlockAtLineStartAsync(
+async function findFencedCodeBlockAtLineStartAsync(
 	content: string,
 	lineStartIndex: number,
 	options: CooperativeScanOptions = {},

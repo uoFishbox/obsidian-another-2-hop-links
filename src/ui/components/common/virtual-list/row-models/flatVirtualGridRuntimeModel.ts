@@ -37,7 +37,7 @@ interface FlatLinkRowModelMemoEntry<T> {
 	readonly rowModel: FlatLinkRowModel<T>;
 }
 
-export function createFlatListContentRevision(params: {
+function createFlatListContentRevision(params: {
 	dataRevision: unknown;
 	keyRevision: unknown;
 	visibleCount: number;
@@ -55,7 +55,7 @@ export function createFlatListContentRevision(params: {
 	};
 }
 
-export function hasSameFlatListContentRevision(
+function hasSameFlatListContentRevision(
 	current: FlatListContentRevision,
 	next: FlatListContentRevision,
 ): boolean {
@@ -69,7 +69,7 @@ export function hasSameFlatListContentRevision(
 	);
 }
 
-export function createFlatGridLayoutMemoKey(
+function createFlatGridLayoutMemoKey(
 	layout: FlatGridLayoutMetrics,
 ): FlatGridLayoutMemoKey {
 	return [

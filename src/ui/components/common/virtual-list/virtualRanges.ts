@@ -2,7 +2,7 @@ import { EMPTY_ROW_RANGE, isEmptyRange, type RowRange } from "./rowRange";
 import type { BootstrapReason, EmptyReason, SkipReason } from "./core/VirtualListMode";
 import type { VirtualRanges, VirtualRowModel } from "./types";
 
-export function createBootstrapVirtualRowRange(
+function createBootstrapVirtualRowRange(
 	rowCount: number,
 	bootstrapRows: number,
 ): RowRange {

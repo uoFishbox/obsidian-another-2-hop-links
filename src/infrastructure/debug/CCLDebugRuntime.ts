@@ -240,13 +240,3 @@ export function unfreezePopoverForDebug(): boolean {
 	frozenPopoverOriginalUnload = null;
 	return true;
 }
-
-export function handlePopoverOpenedForDebug(
-	popover: unknown,
-	reason = "popover-opened",
-): void {
-	snapshotPopoverForDebug(popover, reason);
-	if (autoFreezeEnabled) {
-		freezePopoverForDebug(popover, `${reason}:autofreeze`);
-	}
-}

@@ -11,8 +11,6 @@ import {
 	syncMathJaxStylesForNode,
 } from "ui/utils/mathJaxShadowStyles";
 
-export { transformContentForPreview };
-
 // Hot-path optimization: avoid re-allocating this RegExp object on every
 // preview render in the MathJax split loop. Module-level `g` flag regexes are
 // reused across calls by resetting `lastIndex` before each scan, mirroring the

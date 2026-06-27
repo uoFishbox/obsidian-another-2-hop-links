@@ -109,10 +109,6 @@ export interface MountedVirtualCell {
 	readonly cellSlotKey?: number;
 }
 
-export const getMountedVirtualCellRenderSlotKey = (
-	cell: MountedVirtualCell,
-): RenderSlotKey => cell.renderSlotKey;
-
 export interface VirtualGridDataSource<T> {
 	readonly count: number;
 	readonly revision: unknown;

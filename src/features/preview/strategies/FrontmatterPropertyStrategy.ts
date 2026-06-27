@@ -67,7 +67,4 @@ export function createFrontmatterPropertyStrategy(): PreviewStrategy {
 	};
 }
 
-export const frontmatterPropertyStrategy: PreviewStrategy =
-	createFrontmatterPropertyStrategy();
-
 export default createFrontmatterPropertyStrategy;

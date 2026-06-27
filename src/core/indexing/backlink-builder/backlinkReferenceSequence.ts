@@ -137,40 +137,6 @@ function getLinkReferenceOffset(link: LinkReference): number {
 	return "position" in link ? (link.position?.start.offset ?? -1) : -1;
 }
 
-export function visitResolvedBacklinkRefsUnordered(
-	metadataCache: IMetadataCache,
-	sourceFile: TFile,
-	cache: CachedMetadataWithLinkReferences | null,
-	ambiguityDetector: LinkResolutionAmbiguityDetector,
-	resolvedMemo: ResolvedLinkMemo,
-	visit: (
-		linkReference: LinkReference,
-		resolved: ResolvedLinkInfo,
-		offset: number,
-		rawLinkPath: string,
-	) => void,
-): void {
-	clearFileLocalResolvedMemo(resolvedMemo);
-
-	forEachLinkReferenceUnordered(cache, (linkReference) => {
-		const rawLinkPath = getLinkpath(linkReference.link);
-		const resolved = resolveLinkReferenceForSourceRaw(
-			metadataCache,
-			sourceFile.path,
-			linkReference,
-			rawLinkPath,
-			resolvedMemo,
-			ambiguityDetector,
-		);
-		visit(
-			linkReference,
-			resolved,
-			getLinkReferenceOffset(linkReference),
-			rawLinkPath,
-		);
-	});
-}
-
 function* visitReferencesChunked(
 	metadataCache: IMetadataCache,
 	sourcePath: string,
@@ -307,36 +273,6 @@ export async function visitResolvedBacklinkRefsUnorderedAsync(
 	)) {
 		await step;
 	}
-}
-
-export function buildOrderedBacklinkRefs(
-	metadataCache: IMetadataCache,
-	sourceFile: TFile,
-	cache: CachedMetadataWithLinkReferences | null,
-	ambiguityDetector: LinkResolutionAmbiguityDetector,
-	resolvedMemo: ResolvedLinkMemo = createResolvedLinkMemo(),
-): OrderedBacklinkRef[] {
-	clearFileLocalResolvedMemo(resolvedMemo);
-
-	const orderedReferences = collectLinkReferences(cache);
-	const refs = new Array<OrderedBacklinkRef>(orderedReferences.length);
-
-	for (let index = 0; index < orderedReferences.length; index += 1) {
-		const link = orderedReferences[index];
-		const resolvedRef = resolveBacklinkRefForSource(
-			metadataCache,
-			sourceFile.path,
-			link,
-			resolvedMemo,
-			ambiguityDetector,
-		);
-		refs[index] = createOrderedBacklinkRef(
-			resolvedRef.linkReference,
-			resolvedRef.resolved,
-		);
-	}
-
-	return refs;
 }
 
 export function buildRuntimeOrderedBacklinkRefs(

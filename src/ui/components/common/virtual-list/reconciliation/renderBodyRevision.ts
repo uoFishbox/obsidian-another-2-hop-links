@@ -152,7 +152,7 @@ function createViewPlanHeaderRenderBodyKey<T, G>(
 	);
 }
 
-export function createViewPlanRenderBodyKey<T, G>(
+function createViewPlanRenderBodyKey<T, G>(
 	cell: VirtualListLogicalCell<T>,
 	descriptor: SectionRenderDescriptor<T, G>,
 	fallbackPolicy?: RenderRevisionFallbackPolicy,
@@ -212,7 +212,7 @@ export function getViewPlanRenderBodyIdentityFields<T, G>(
 	}
 }
 
-export function canReuseViewPlanRenderBodyKey<T, G>(
+function canReuseViewPlanRenderBodyKey<T, G>(
 	previous: Partial<MountedRenderBodyIdentity> | undefined,
 	cell: VirtualListLogicalCell<T>,
 	descriptor: SectionRenderDescriptor<T, G>,

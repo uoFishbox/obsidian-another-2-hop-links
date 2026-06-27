@@ -13,7 +13,7 @@ function applyFallback(container: HTMLElement, fallbackHtml: string | undefined)
 	}
 }
 
-export function createMarkdownDomRenderer(
+function createMarkdownDomRenderer(
 	app: App,
 	sourcePath: string,
 	markdown: string,

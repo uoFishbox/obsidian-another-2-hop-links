@@ -121,7 +121,7 @@ export type DisplayAssemblyCache = WeakMap<
 	Map<string, DisplayData>
 >;
 
-export function createEmptyLinkPreprocessedDisplayData(): LinkPreprocessedDisplayData {
+function createEmptyLinkPreprocessedDisplayData(): LinkPreprocessedDisplayData {
 	return {
 		resolvedBranches: [],
 		resolvedBacklinks: [],
@@ -132,7 +132,7 @@ export function createEmptyLinkPreprocessedDisplayData(): LinkPreprocessedDispla
 	};
 }
 
-export function createEmptyTagPreprocessedDisplayData(): TagPreprocessedDisplayData {
+function createEmptyTagPreprocessedDisplayData(): TagPreprocessedDisplayData {
 	return {
 		taggedNotes: [],
 		rawTagGroups: [],
@@ -143,7 +143,7 @@ export function createHop2SortCache(): Hop2SortCache {
 	return new WeakMap();
 }
 
-export function createTagItemSortCache(): TagItemSortCache {
+function createTagItemSortCache(): TagItemSortCache {
 	return new WeakMap();
 }
 
@@ -453,7 +453,7 @@ function preprocessTagData(
 	};
 }
 
-export function preprocessLinkDisplayData(
+function preprocessLinkDisplayData(
 	linkResult: TwoHopLinkResult | undefined,
 	settings: PluginSettings,
 	deduplicationService?: IDeduplicationService,
@@ -461,7 +461,7 @@ export function preprocessLinkDisplayData(
 	return preprocessLinkData(linkResult, settings, deduplicationService).data;
 }
 
-export function preprocessTagDisplayData(
+function preprocessTagDisplayData(
 	linkResult: TwoHopLinkResult | undefined,
 	settings: PluginSettings,
 	deduplicationService?: IDeduplicationService,

@@ -7,17 +7,13 @@ import {
 	isShadowRootLike,
 } from "ui/utils/realmSafeDom";
 
-export const HOVER_TARGET_EVENT_PROPERTY = "__cclHoverTargetEl";
+const HOVER_TARGET_EVENT_PROPERTY = "__cclHoverTargetEl";
 
 export type HoverTargetAugmentedMouseEvent = MouseEvent & {
 	[HOVER_TARGET_EVENT_PROPERTY]?: HTMLElement;
 };
 
-export function defineReadonlyEventProperty<T>(
-	event: Event,
-	key: string,
-	value: T,
-): void {
+function defineReadonlyEventProperty<T>(event: Event, key: string, value: T): void {
 	Object.defineProperty(event, key, {
 		value,
 		configurable: true,

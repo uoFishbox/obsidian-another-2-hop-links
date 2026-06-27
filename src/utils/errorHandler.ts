@@ -5,19 +5,6 @@ function logError(message: string, error: unknown, context?: string): void {
 	console.error(`${PLUGIN_NAME}: ${message}${contextStr}`, error);
 }
 
-export function handleError(error: unknown, context?: string): void {
-	logError("An error occurred", error, context);
-}
-
-export function handleAsyncError(error: unknown, context?: string): void {
-	logError("Async operation failed", error, context);
-}
-
-export function handleComponentError(error: unknown, componentName?: string): void {
-	const component = componentName ? ` in ${componentName}` : "";
-	logError(`Component error${component}`, error);
-}
-
 export function handleMountError(error: unknown, filePath?: string): void {
 	const file = filePath ? ` for file: ${filePath}` : "";
 	logError(`Failed to mount component${file}`, error);

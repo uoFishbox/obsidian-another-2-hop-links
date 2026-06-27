@@ -27,7 +27,4 @@ export function createFrontmatterImageStrategy(): PreviewStrategy {
 	};
 }
 
-export const frontmatterImageStrategy: PreviewStrategy =
-	createFrontmatterImageStrategy();
-
 export default createFrontmatterImageStrategy;

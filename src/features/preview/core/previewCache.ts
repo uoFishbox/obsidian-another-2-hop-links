@@ -8,7 +8,7 @@ const VIDEO_THUMBNAIL_CACHE_MAX_COUNT = 80;
 const CACHE_KEY_SEPARATOR = "\0";
 const SIGNATURE_SEP = "\u001f";
 
-export const PREVIEW_GENERATION_CACHE_MAX_BYTES = 2 * 1024 * 1024;
+const PREVIEW_GENERATION_CACHE_MAX_BYTES = 2 * 1024 * 1024;
 
 const MIN_BLOB_IMAGE_CACHE_CHARGE_BYTES = Math.max(
 	1,
@@ -21,9 +21,7 @@ export function createPreviewGenerationCache(): PreviewGenerationCache {
 	return createSizedLRUCache<string, PreviewData>(PREVIEW_GENERATION_CACHE_MAX_BYTES);
 }
 
-export function buildPreviewContentSettingsSignature(
-	settings?: PluginSettings,
-): string {
+function buildPreviewContentSettingsSignature(settings?: PluginSettings): string {
 	if (!settings) {
 		return "";
 	}

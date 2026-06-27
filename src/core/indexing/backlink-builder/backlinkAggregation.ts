@@ -56,7 +56,7 @@ export function resetFileLocalAggregation(scratch: FileLocalAggregation): void {
 	scratch.hasSourceDependentLinks = false;
 }
 
-export function recordLookupKeyRawLinkPath(
+function recordLookupKeyRawLinkPath(
 	lookupKeyToRawLinkPaths: Map<string, RawLinkPathAccumulator>,
 	lookupKey: string,
 	rawLinkPath: string,
@@ -145,7 +145,7 @@ export function createBacklinkBucketForSource(
 	};
 }
 
-export function addRepresentativeRef(
+function addRepresentativeRef(
 	orderedReferences: OrderedBacklinkRef[],
 	representative: RepresentativeRef,
 ): number {

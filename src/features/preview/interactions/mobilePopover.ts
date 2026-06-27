@@ -188,7 +188,7 @@ function getPagePreviewInstance(app: App): typeof pagePreviewInstance {
 	return pagePreviewInstance;
 }
 
-export function triggerMobilePagePreview(
+function triggerMobilePagePreview(
 	app: App,
 	targetEl: HTMLElement,
 	linktext: string,

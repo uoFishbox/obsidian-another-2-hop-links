@@ -3,7 +3,7 @@ import type { TwoHopRowPlan, TwoHopRowTable, TwoHopViewPlan } from "./types";
  * Reads a row-table entry as a `TwoHopRowPlan` snapshot, or null when the
  * row index is out of range.
  */
-export function readTwoHopRowTableAt(
+function readTwoHopRowTableAt(
 	table: TwoHopRowTable,
 	rowIndex: number,
 ): TwoHopRowPlan | null {

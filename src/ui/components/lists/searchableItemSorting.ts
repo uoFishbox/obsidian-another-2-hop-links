@@ -40,7 +40,7 @@ export function createViewItemSortCache(): ViewItemSortCache {
 	return new Map();
 }
 
-export function sortViewItems(
+function sortViewItems(
 	viewItems: ViewItem[],
 	option: SortOption,
 	sortService: ISortService,

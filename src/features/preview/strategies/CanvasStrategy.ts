@@ -21,6 +21,4 @@ export function createCanvasPreviewStrategy(): PreviewStrategy {
 	};
 }
 
-export const canvasPreviewStrategy: PreviewStrategy = createCanvasPreviewStrategy();
-
 export default createCanvasPreviewStrategy;

@@ -30,6 +30,4 @@ export function createTextSnippetStrategy(): PreviewStrategy {
 	};
 }
 
-export const textSnippetStrategy: PreviewStrategy = createTextSnippetStrategy();
-
 export default createTextSnippetStrategy;

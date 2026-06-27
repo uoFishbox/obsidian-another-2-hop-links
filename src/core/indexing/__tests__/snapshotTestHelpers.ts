@@ -25,7 +25,7 @@ export function serializeSnapshot(snapshot: IndexSnapshot) {
 	};
 }
 
-export function serializeSourceSummaryMap(map: IndexSnapshot["sourceSummaries"]) {
+function serializeSourceSummaryMap(map: IndexSnapshot["sourceSummaries"]) {
 	return Array.from(map.entries())
 		.map(
 			([sourcePath, summary]) =>
@@ -83,13 +83,13 @@ export function serializeSourceSummaryMap(map: IndexSnapshot["sourceSummaries"])
 		.sort(([left], [right]) => left.localeCompare(right));
 }
 
-export function serializeSetMap(map: Map<string, Iterable<string>>) {
+function serializeSetMap(map: Map<string, Iterable<string>>) {
 	return Array.from(map.entries())
 		.map(([key, values]) => [key, Array.from(values).sort()] as const)
 		.sort(([left], [right]) => left.localeCompare(right));
 }
 
-export function serializeNumberMap(map: Map<string, number>) {
+function serializeNumberMap(map: Map<string, number>) {
 	return Array.from(map.entries()).sort(([left], [right]) =>
 		left.localeCompare(right),
 	);

@@ -11,7 +11,6 @@ export const LOAD_MORE_SELECTOR =
 	"button.cosense-card-links__load-more-button.cosense-card-links__box";
 export const RESULT_FOCUS_SELECTOR = `${CARD_SELECTOR}, ${LOAD_MORE_SELECTOR}`;
 export const SEARCH_INPUT_SELECTOR = ".twohop-search-input";
-export const RESULT_SECTION_SELECTOR = ".cosense-card-links__section";
 const NAVIGATION_CELL_SELECTOR =
 	".cosense-card-links__virtual-grid-cell, .view-plan-virtual-list-cell";
 const NAVIGATION_EPSILON_PX = 1;
@@ -389,9 +388,7 @@ export function getFocusableResultTarget(
 	return findClosestComposed(target, RESULT_FOCUS_SELECTOR);
 }
 
-export function focusSearchInput(
-	container: HTMLElement | null,
-): HTMLInputElement | null {
+function focusSearchInput(container: HTMLElement | null): HTMLInputElement | null {
 	const input = container?.querySelector<HTMLInputElement>(SEARCH_INPUT_SELECTOR);
 	if (!input) {
 		return null;

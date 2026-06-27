@@ -82,7 +82,7 @@ export function clearVideoPreviewQueue(): void {
 	activeGenerations = 0;
 }
 
-export async function generateVideoThumbnail(
+async function generateVideoThumbnail(
 	file: TFile,
 	seekTo = 0.0,
 	maxThumbnailWidth = 150, // サムネイル用の幅制限。これを指定すると劇的に速くなる。

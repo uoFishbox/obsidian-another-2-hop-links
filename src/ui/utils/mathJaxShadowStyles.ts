@@ -155,7 +155,7 @@ export function unregisterMathJaxShadowRoot(shadowRoot: ShadowRoot): void {
 	registeredShadowRoots.delete(shadowRoot);
 }
 
-export function syncRegisteredMathJaxShadowRoots(): boolean {
+function syncRegisteredMathJaxShadowRoots(): boolean {
 	pruneDisconnectedShadowRoots();
 
 	const source = getMathJaxStylesheetSource();

@@ -41,7 +41,7 @@ const normalizePositiveNumber = (
 	return value;
 };
 
-export function normalizeCardWidthPx(value: number | undefined): number {
+function normalizeCardWidthPx(value: number | undefined): number {
 	return normalizePositiveInteger(value, DEFAULT_CARD_WIDTH_PX);
 }
 

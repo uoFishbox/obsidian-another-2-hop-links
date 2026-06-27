@@ -6,7 +6,7 @@ const REGEXP_OBJECT_CACHE_MAX_SIZE = 64;
 const regexpSourceCache = new Map<string, string | null>();
 const regexpObjectCache = new Map<string, RegExp>();
 
-export function escapeRegExp(value: string): string {
+function escapeRegExp(value: string): string {
 	return value.replace(REGEXP_ESCAPE_PATTERN, "\\$&");
 }
 
