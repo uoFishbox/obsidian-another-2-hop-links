@@ -1,16 +1,16 @@
 import type { ClickableHeaderExtraProps } from "ui/components/sections/types";
 import { buildScopedSectionId } from "ui/components/common/listPagination";
 import type {
-	TwoHopPageVirtualItem,
-	TwoHopPageVirtualSection,
-	TwoHopSectionDescriptor,
-} from "../twohopPageVirtualModel";
+	TwoHopVirtualListItem,
+	TwoHopVirtualListSection,
+	TwoHopVirtualSectionDescriptor,
+} from "../twoHopVirtualListModel";
 
 const EMPTY_HEADER_PROPS: ClickableHeaderExtraProps = {};
 
 export interface CachedVirtualItemAccessors {
-	readonly getItems: () => readonly TwoHopPageVirtualItem[];
-	readonly getItem: (index: number) => TwoHopPageVirtualItem | undefined;
+	readonly getItems: () => readonly TwoHopVirtualListItem[];
+	readonly getItem: (index: number) => TwoHopVirtualListItem | undefined;
 	readonly reset: () => void;
 }
 
@@ -25,18 +25,18 @@ export interface ReconciledVirtualItemAccessorsParams<T, TViewItem> {
 		item: TViewItem,
 		key: string,
 		index: number,
-	) => TwoHopPageVirtualItem | undefined;
+	) => TwoHopVirtualListItem | undefined;
 }
 
 export function createDescriptor(
-	section: TwoHopPageVirtualSection,
+	section: TwoHopVirtualListSection,
 	searchQuery: string,
 	totalCount: number,
-	getItems: () => readonly TwoHopPageVirtualItem[],
-	getItem: (index: number) => TwoHopPageVirtualItem | undefined = (index) =>
+	getItems: () => readonly TwoHopVirtualListItem[],
+	getItem: (index: number) => TwoHopVirtualListItem | undefined = (index) =>
 		getItems()[index],
 	headerProps: ClickableHeaderExtraProps = EMPTY_HEADER_PROPS,
-): TwoHopSectionDescriptor {
+): TwoHopVirtualSectionDescriptor {
 	const immutableSection = Object.freeze(section);
 	return Object.freeze({
 		section: immutableSection,
@@ -54,10 +54,10 @@ export function createDescriptor(
 
 export function createSparseVirtualItemAccessors(params: {
 	readonly getLength: () => number;
-	readonly createItem: (index: number) => TwoHopPageVirtualItem | undefined;
+	readonly createItem: (index: number) => TwoHopVirtualListItem | undefined;
 }): CachedVirtualItemAccessors {
-	let itemsCache: TwoHopPageVirtualItem[] | undefined;
-	const getItem = (index: number): TwoHopPageVirtualItem | undefined => {
+	let itemsCache: TwoHopVirtualListItem[] | undefined;
+	const getItem = (index: number): TwoHopVirtualListItem | undefined => {
 		const length = params.getLength();
 		if (index < 0 || index >= length) return undefined;
 		const cached = itemsCache?.[index];
@@ -65,16 +65,16 @@ export function createSparseVirtualItemAccessors(params: {
 
 		const item = params.createItem(index);
 		if (!item) return undefined;
-		itemsCache ??= new Array<TwoHopPageVirtualItem>(length);
+		itemsCache ??= new Array<TwoHopVirtualListItem>(length);
 		itemsCache[index] = item;
 		return item;
 	};
-	const getItems = (): readonly TwoHopPageVirtualItem[] => {
+	const getItems = (): readonly TwoHopVirtualListItem[] => {
 		const length = params.getLength();
 		const cache =
 			itemsCache && itemsCache.length === length
 				? itemsCache
-				: new Array<TwoHopPageVirtualItem>(length);
+				: new Array<TwoHopVirtualListItem>(length);
 		itemsCache = cache;
 		for (let index = 0; index < length; index += 1) {
 			if (cache[index]) continue;
@@ -137,8 +137,8 @@ export function pruneInactiveEntries<T>(
 }
 
 export function hasSameDescriptorRefs(
-	current: readonly TwoHopSectionDescriptor[],
-	next: readonly TwoHopSectionDescriptor[],
+	current: readonly TwoHopVirtualSectionDescriptor[],
+	next: readonly TwoHopVirtualSectionDescriptor[],
 ): boolean {
 	if (current.length !== next.length) return false;
 	for (let index = 0; index < current.length; index += 1) {

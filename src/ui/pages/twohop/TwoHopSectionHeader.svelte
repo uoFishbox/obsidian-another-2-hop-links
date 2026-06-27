@@ -2,10 +2,10 @@
 	import { svgAttrs, ICON_PATHS } from "ui/utils/icons";
 	import ClickableHeader from "ui/components/common/ClickableHeader.svelte";
 	import type { ClickableHeaderExtraProps } from "ui/components/sections/types";
-	import type { TwoHopPageVirtualSection } from "./twohopPageVirtualModel";
+	import type { TwoHopVirtualListSection } from "./twoHopVirtualListModel";
 
 	type HeaderSection = Extract<
-		TwoHopPageVirtualSection,
+		TwoHopVirtualListSection,
 		{ kind: "two-hop-branch" | "tag-section" }
 	>;
 

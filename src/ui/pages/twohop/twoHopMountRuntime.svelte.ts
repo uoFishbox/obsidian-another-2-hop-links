@@ -16,17 +16,17 @@ import {
 } from "./twoHopMountedRowBuild";
 import { createTwoHopMountedRowWindow } from "./twoHopMountedRowWindow";
 import type {
-	TwoHopPageVirtualItem,
-	TwoHopPageVirtualSection,
-} from "./twohopPageVirtualModel";
+	TwoHopVirtualListItem,
+	TwoHopVirtualListSection,
+} from "./twoHopVirtualListModel";
 import type { TwoHopViewPlanRowModel } from "./twoHopViewPlan";
 import type { RowPreviewActivationRuntime } from "features/preview/scheduling/rowPreviewActivationRuntime";
 
 const EMPTY_MOUNTED_ROWS: readonly [] = [];
 
 type TwoHopMountedCell = MountedFlatCell<
-	TwoHopPageVirtualItem,
-	TwoHopPageVirtualSection
+	TwoHopVirtualListItem,
+	TwoHopVirtualListSection
 >;
 
 interface TwoHopVisibilitySyncBuild {

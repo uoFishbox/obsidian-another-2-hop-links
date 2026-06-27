@@ -11,13 +11,13 @@ import type {
 import type { RowRange } from "ui/components/common/virtual-list/rowRange";
 import type { SectionLayout } from "ui/components/common/virtual-list/layout/viewPlanRowTypes";
 import type {
-	TwoHopPageVirtualSection,
-	TwoHopPageVirtualItem,
-} from "../twohopPageVirtualModel";
+	TwoHopVirtualListSection,
+	TwoHopVirtualListItem,
+} from "../twoHopVirtualListModel";
 export interface TwoHopSectionPlan {
 	readonly descriptor: SectionRenderDescriptor<
-		TwoHopPageVirtualItem,
-		TwoHopPageVirtualSection
+		TwoHopVirtualListItem,
+		TwoHopVirtualListSection
 	>;
 	readonly sectionIndex: number;
 	readonly sectionId: string;
@@ -31,8 +31,8 @@ export interface TwoHopSectionPlan {
 	readonly visibleCount: number;
 	readonly showLoadMore: boolean;
 	readonly mountedLayout: SectionLayout<
-		TwoHopPageVirtualItem,
-		TwoHopPageVirtualSection
+		TwoHopVirtualListItem,
+		TwoHopVirtualListSection
 	>;
 }
 
@@ -57,7 +57,7 @@ export interface TwoHopSectionMaterializationState {
 
 export interface TwoHopCellStore {
 	readonly logicalCellsBySectionIndex: Array<
-		Array<VirtualListLogicalCell<TwoHopPageVirtualItem> | undefined>
+		Array<VirtualListLogicalCell<TwoHopVirtualListItem> | undefined>
 	>;
 	readonly materializationStateBySectionIndex: TwoHopSectionMaterializationState[];
 	readonly materializedSectionByIndex: boolean[];
@@ -130,22 +130,22 @@ export type TwoHopViewPlanMaterialization =
 
 export interface CompileTwoHopViewPlanParams {
 	readonly sections: readonly SectionRenderDescriptor<
-		TwoHopPageVirtualItem,
-		TwoHopPageVirtualSection
+		TwoHopVirtualListItem,
+		TwoHopVirtualListSection
 	>[];
 	readonly sectionVisibleCounts: Readonly<Record<string, number>>;
 	readonly layout: ViewPlanLayoutMetrics;
 	readonly materialization?: TwoHopViewPlanMaterialization;
 	resolveInitialSectionVisibleCount(
 		section: SectionRenderDescriptor<
-			TwoHopPageVirtualItem,
-			TwoHopPageVirtualSection
+			TwoHopVirtualListItem,
+			TwoHopVirtualListSection
 		>,
 	): number;
 	clampVisibleCount(
 		section: SectionRenderDescriptor<
-			TwoHopPageVirtualItem,
-			TwoHopPageVirtualSection
+			TwoHopVirtualListItem,
+			TwoHopVirtualListSection
 		>,
 		count: number,
 	): number;
@@ -191,7 +191,7 @@ export interface FirstTwoHopRowByTopResolutionScratch {
 	sectionIndex: number;
 }
 export interface TwoHopViewPlanRowModel extends VirtualRowModel<
-	VirtualListLogicalCell<TwoHopPageVirtualItem>
+	VirtualListLogicalCell<TwoHopVirtualListItem>
 > {
 	readonly plan: TwoHopViewPlan;
 	findVisibleRanges(params: {

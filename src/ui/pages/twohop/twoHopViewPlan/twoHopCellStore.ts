@@ -1,10 +1,10 @@
 import type { VirtualListLogicalCell } from "ui/components/common/virtual-list/logicalCell";
-import type { TwoHopPageVirtualItem } from "../twohopPageVirtualModel";
+import type { TwoHopVirtualListItem } from "../twoHopVirtualListModel";
 import type { TwoHopCellStore, TwoHopViewPlan } from "./types";
 
 export function createTwoHopCellStore(
 	logicalCellsBySectionIndex: Array<
-		Array<VirtualListLogicalCell<TwoHopPageVirtualItem> | undefined>
+		Array<VirtualListLogicalCell<TwoHopVirtualListItem> | undefined>
 	>,
 	sectionCount: number,
 	totalCellCount: number,

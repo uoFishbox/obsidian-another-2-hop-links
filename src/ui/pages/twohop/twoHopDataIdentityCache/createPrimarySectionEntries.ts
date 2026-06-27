@@ -6,8 +6,8 @@ import {
 	type CachedVirtualItemAccessors,
 } from "./descriptorIdentity";
 import { hasSamePrimaryItemsDeps } from "../twoHopDataIdentityEquality";
-import type { PrimaryLinkSection, PrimarySectionItemsDeps } from "../twohopPageTypes";
-import type { TwoHopSectionDescriptor } from "../twohopPageVirtualModel";
+import type { PrimaryLinkSection, PrimarySectionItemsDeps } from "../twoHopPageTypes";
+import type { TwoHopVirtualSectionDescriptor } from "../twoHopVirtualListModel";
 
 export interface PrimaryEntry {
 	source: PrimaryLinkSection;
@@ -15,7 +15,7 @@ export interface PrimaryEntry {
 	itemsAccessors: CachedVirtualItemAccessors;
 	getItems: CachedVirtualItemAccessors["getItems"];
 	getItem: CachedVirtualItemAccessors["getItem"];
-	descriptor: TwoHopSectionDescriptor;
+	descriptor: TwoHopVirtualSectionDescriptor;
 }
 
 export interface ResolvePrimarySectionEntryParams {
@@ -108,7 +108,7 @@ function createPrimaryDescriptor(params: {
 	readonly searchQuery: string;
 	readonly getItems: CachedVirtualItemAccessors["getItems"];
 	readonly getItem: CachedVirtualItemAccessors["getItem"];
-}): TwoHopSectionDescriptor {
+}): TwoHopVirtualSectionDescriptor {
 	return createDescriptor(
 		{
 			kind: "primary-section",

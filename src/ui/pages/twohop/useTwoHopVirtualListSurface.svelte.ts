@@ -6,20 +6,20 @@ import {
 } from "./twoHopMeasurementBridge.svelte";
 import { createTwoHopMountedSurfaceRuntime } from "./twoHopMountedSurfaceRuntime.svelte";
 import {
-	createTwoHopVirtualListRuntime,
-	type TwoHopViewPlanVirtualListProps,
-} from "./twoHopVirtualListRuntime.svelte";
+	createTwoHopVirtualListPlanRuntime,
+	type TwoHopVirtualListSurfaceProps,
+} from "./twoHopVirtualListPlanRuntime.svelte";
 import type {
-	TwoHopPageVirtualItem,
-	TwoHopPageVirtualSection,
-} from "./twohopPageVirtualModel";
+	TwoHopVirtualListItem,
+	TwoHopVirtualListSection,
+} from "./twoHopVirtualListModel";
 import { affectsMountedRows } from "./twoHopMaterializationRecomputePolicy";
 
-export type { TwoHopViewPlanVirtualListProps };
+export type { TwoHopVirtualListSurfaceProps as TwoHopViewPlanVirtualListProps };
 
-export function useTwoHopViewPlanVirtualList(props: TwoHopViewPlanVirtualListProps) {
+export function useTwoHopViewPlanVirtualList(props: TwoHopVirtualListSurfaceProps) {
 	const measurementState = createTwoHopMeasurementState();
-	const inputRuntime = createTwoHopVirtualListRuntime({
+	const inputRuntime = createTwoHopVirtualListPlanRuntime({
 		props,
 		measurementState,
 	});
@@ -97,8 +97,8 @@ export function useTwoHopViewPlanVirtualList(props: TwoHopViewPlanVirtualListPro
 		getCellDataTestId: !IS_PROD
 			? (
 					cell: MountedFlatCell<
-						TwoHopPageVirtualItem,
-						TwoHopPageVirtualSection
+						TwoHopVirtualListItem,
+						TwoHopVirtualListSection
 					>,
 				) =>
 					cell.cell.kind === "header"

@@ -14,7 +14,7 @@ import {
 	createTwohopSearchAdapter,
 	filterTwohopDisplayData,
 	type TwohopSearchRenderMode,
-} from "../twohopSearchAdapter";
+} from "../twoHopSearchAdapter";
 
 vi.mock("obsidian", () => {
 	class MockTFile {

@@ -11,10 +11,10 @@
 	import type { ApplicationStore } from "ui/stores/ApplicationStore.svelte";
 	import type { SectionRenderDescriptor } from "ui/components/sections/types";
 	import type {
-		TwoHopPageVirtualSection,
-		TwoHopPageVirtualItem,
-	} from "./twohopPageVirtualModel";
-	import { useTwoHopViewPlanVirtualList } from "./useTwoHopViewPlanVirtualList.svelte";
+		TwoHopVirtualListSection,
+		TwoHopVirtualListItem,
+	} from "./twoHopVirtualListModel";
+	import { useTwoHopViewPlanVirtualList } from "./useTwoHopVirtualListSurface.svelte";
 	import type { TwoHopVirtualListTuning } from "./twoHopVirtualListTuning";
 	import type {
 		VirtualizedItemVisibility,
@@ -33,28 +33,28 @@
 
 	interface Props {
 		sections: readonly SectionRenderDescriptor<
-			TwoHopPageVirtualItem,
-			TwoHopPageVirtualSection
+			TwoHopVirtualListItem,
+			TwoHopVirtualListSection
 		>[];
 		applicationStore?: ApplicationStore;
 		initialVisibleCount?: number;
 		loadMoreIncrement?: number;
 		tuning?: TwoHopVirtualListTuning;
-		getCellClassName?: (section: TwoHopPageVirtualSection) => string | undefined;
+		getCellClassName?: (section: TwoHopVirtualListSection) => string | undefined;
 		getItemInteractionDescriptor: (
-			item: TwoHopPageVirtualItem,
+			item: TwoHopVirtualListItem,
 		) => ItemInteractionDescriptor | null;
 		interactionDescriptorRevision?: unknown;
 		renderHeader: Snippet<
 			[
 				{
-					section: TwoHopPageVirtualSection;
+					section: TwoHopVirtualListSection;
 					title: string;
 					totalCount: number;
 					sectionId: string;
 					headerProps: SectionRenderDescriptor<
-						TwoHopPageVirtualItem,
-						TwoHopPageVirtualSection
+						TwoHopVirtualListItem,
+						TwoHopVirtualListSection
 					>["headerProps"];
 				},
 			]
@@ -62,8 +62,8 @@
 		renderItem: Snippet<
 			[
 				{
-					item: TwoHopPageVirtualItem;
-					section: TwoHopPageVirtualSection;
+					item: TwoHopVirtualListItem;
+					section: TwoHopVirtualListSection;
 					index: number;
 					rowIndex: number;
 					observerRoot: HTMLElement | null;
@@ -105,15 +105,15 @@
 		return resolved;
 	};
 	const getMountedCellClassName = (
-		cell: MountedFlatCell<TwoHopPageVirtualItem, TwoHopPageVirtualSection>,
+		cell: MountedFlatCell<TwoHopVirtualListItem, TwoHopVirtualListSection>,
 	): string => resolveSectionCellClassName(props.getCellClassName?.(cell.section));
 	const isHeaderCell = (
-		cell: MountedFlatCell<TwoHopPageVirtualItem, TwoHopPageVirtualSection>,
-	): cell is MountedFlatHeaderCell<TwoHopPageVirtualItem, TwoHopPageVirtualSection> =>
+		cell: MountedFlatCell<TwoHopVirtualListItem, TwoHopVirtualListSection>,
+	): cell is MountedFlatHeaderCell<TwoHopVirtualListItem, TwoHopVirtualListSection> =>
 		cell.cell.kind === "header";
 	const isItemCell = (
-		cell: MountedFlatCell<TwoHopPageVirtualItem, TwoHopPageVirtualSection>,
-	): cell is MountedFlatItemCell<TwoHopPageVirtualItem, TwoHopPageVirtualSection> =>
+		cell: MountedFlatCell<TwoHopVirtualListItem, TwoHopVirtualListSection>,
+	): cell is MountedFlatItemCell<TwoHopVirtualListItem, TwoHopVirtualListSection> =>
 		cell.cell.kind === "item";
 </script>
 

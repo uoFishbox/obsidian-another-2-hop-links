@@ -25,7 +25,7 @@ interface TwoHopPageVirtualSectionBase {
 	className?: string;
 }
 
-export type TwoHopPageVirtualSection =
+export type TwoHopVirtualListSection =
 	| (TwoHopPageVirtualSectionBase & {
 			kind: "primary-section";
 			source: PrimarySectionSource;
@@ -45,7 +45,7 @@ export type TwoHopPageVirtualSection =
 			getKey: (item: ViewItem, index: number) => string;
 	  });
 
-export type TwoHopPageVirtualItem =
+export type TwoHopVirtualListItem =
 	| {
 			kind: "primary-link";
 			item: ViewItem;
@@ -82,15 +82,15 @@ export type TwoHopPageVirtualItem =
 			virtualKey: string;
 	  };
 
-export type TwoHopSectionDescriptor = SectionRenderDescriptor<
-	TwoHopPageVirtualItem,
-	TwoHopPageVirtualSection
+export type TwoHopVirtualSectionDescriptor = SectionRenderDescriptor<
+	TwoHopVirtualListItem,
+	TwoHopVirtualListSection
 >;
 
 export const getTwoHopPageItemKey = (
-	row: TwoHopPageVirtualItem,
+	row: TwoHopVirtualListItem,
 	_index: number,
-	_section: TwoHopPageVirtualSection,
+	_section: TwoHopVirtualListSection,
 ): string => row.virtualKey;
 
 export const createTaggedNoteSectionItemKey = (
@@ -111,7 +111,7 @@ export const createTaggedNoteSectionItemKey = (
 };
 
 export const resolveTwoHopPageItemSearchScope = (
-	row: TwoHopPageVirtualItem,
+	row: TwoHopVirtualListItem,
 	searchScope: SearchWorkerMatchScope,
 	contentMatched: boolean | undefined,
 ): SearchWorkerMatchScope =>

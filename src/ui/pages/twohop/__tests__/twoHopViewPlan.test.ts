@@ -1,9 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
 import type { SectionRenderDescriptor } from "ui/components/sections/types";
 import type {
-	TwoHopPageVirtualSection,
-	TwoHopPageVirtualItem,
-} from "../twohopPageVirtualModel";
+	TwoHopVirtualListSection,
+	TwoHopVirtualListItem,
+} from "../twoHopVirtualListModel";
 import * as viewPlanModule from "../twoHopViewPlan";
 import {
 	compileTwoHopViewPlan,
@@ -41,18 +41,18 @@ const layout = {
 	sectionMarginBottom: 20,
 };
 
-const createItem = (virtualKey: string): TwoHopPageVirtualItem => ({
+const createItem = (virtualKey: string): TwoHopVirtualListItem => ({
 	kind: "new-link",
-	item: { type: "link" } as unknown as TwoHopPageVirtualItem["item"],
+	item: { type: "link" } as unknown as TwoHopVirtualListItem["item"],
 	searchKey: virtualKey,
 	virtualKey,
 });
 
 const createDescriptor = (
-	items: readonly TwoHopPageVirtualItem[],
+	items: readonly TwoHopVirtualListItem[],
 	getItems = vi.fn(() => items),
 	sectionId = "new-links",
-): SectionRenderDescriptor<TwoHopPageVirtualItem, TwoHopPageVirtualSection> => {
+): SectionRenderDescriptor<TwoHopVirtualListItem, TwoHopVirtualListSection> => {
 	const section = {
 		kind: "new-links-section",
 		rawSectionId: sectionId,
@@ -60,7 +60,7 @@ const createDescriptor = (
 		sectionKey: sectionId,
 		title: "New links",
 		getKey: () => "",
-	} satisfies TwoHopPageVirtualSection;
+	} satisfies TwoHopVirtualListSection;
 	return {
 		section,
 		sectionKey: section.sectionKey,

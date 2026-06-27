@@ -2,9 +2,9 @@ import type { VirtualListLogicalCell } from "ui/components/common/virtual-list/l
 import type { SectionLayout } from "ui/components/common/virtual-list/layout/viewPlanRowTypes";
 import { getSectionPaginationKey } from "ui/components/common/virtual-list/pagination";
 import type {
-	TwoHopPageVirtualItem,
-	TwoHopPageVirtualSection,
-} from "../twohopPageVirtualModel";
+	TwoHopVirtualListItem,
+	TwoHopVirtualListSection,
+} from "../twoHopVirtualListModel";
 import type {
 	CompileTwoHopViewPlanParams,
 	TwoHopCellStore,
@@ -35,7 +35,7 @@ export function compileTwoHopViewPlan(
 	const cellCounts = new Uint32Array(sectionCount);
 	const rowCounts = new Uint32Array(sectionCount);
 	const showLoadMoreBySection = new Uint8Array(sectionCount);
-	const eagerItemsBySection: (readonly TwoHopPageVirtualItem[] | undefined)[] = [];
+	const eagerItemsBySection: (readonly TwoHopVirtualListItem[] | undefined)[] = [];
 	const batchedMaterialization = params.materialization?.kind === "batched";
 	let totalRowCount = 0;
 	let totalCellCount = 0;
@@ -114,8 +114,8 @@ export function compileTwoHopViewPlan(
 			topByRow[writeIndex] = top + rowIndexInSection * rowStride;
 		}
 		const mountedLayout: SectionLayout<
-			TwoHopPageVirtualItem,
-			TwoHopPageVirtualSection
+			TwoHopVirtualListItem,
+			TwoHopVirtualListSection
 		> = {
 			descriptor,
 			sectionIndex,
@@ -129,7 +129,7 @@ export function compileTwoHopViewPlan(
 			sectionTop: top,
 		};
 		logicalCellsBySectionIndex[sectionIndex] = new Array<
-			VirtualListLogicalCell<TwoHopPageVirtualItem> | undefined
+			VirtualListLogicalCell<TwoHopVirtualListItem> | undefined
 		>(cellCount);
 		sections.push({
 			descriptor,

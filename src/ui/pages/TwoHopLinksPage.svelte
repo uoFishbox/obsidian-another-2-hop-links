@@ -3,7 +3,7 @@
 	import { setContext } from "svelte";
 	import LoadingState from "ui/components/common/LoadingState.svelte";
 	import ListControls from "ui/components/common/ListControls.svelte";
-	import TwoHopPageVirtualList from "./twohop/TwoHopPageVirtualList.svelte";
+	import TwoHopPageVirtualList from "./twohop/TwoHopLinksVirtualList.svelte";
 	import { useSearchQuery } from "ui/hooks/useSearchQuery.svelte";
 	import { useBookmarks } from "ui/hooks/useBookmarks.svelte";
 	import { useWorkerSearchSession } from "features/search/useWorkerSearchSession.svelte";
@@ -20,7 +20,7 @@
 	import {
 		collectTwohopSearchableFiles,
 		createTwohopSearchAdapter,
-	} from "./twohop/twohopSearchAdapter";
+	} from "./twohop/twoHopSearchAdapter";
 	import { tick } from "svelte";
 	import { createTwoHopDataIdentityCache } from "./twohop/twoHopDataIdentityCache";
 
@@ -118,7 +118,7 @@
 	const fileToLinktext = linkContext.fileToLinktext;
 	const onTagClick = linkContext.onTagClick;
 	const dataIdentityCache = createTwoHopDataIdentityCache();
-	const twoHopPageVirtualSections = $derived.by(() =>
+	const twoHopVirtualListSections = $derived.by(() =>
 		dataIdentityCache.resolve({
 			displayData: filteredDisplayData,
 			searchQuery: search.normalized,
@@ -259,9 +259,9 @@
 		{#if loading}
 			<LoadingState message="Waiting for the initial index to finish building." />
 		{:else if linkResult}
-			{#if twoHopPageVirtualSections.length}
+			{#if twoHopVirtualListSections.length}
 				<TwoHopPageVirtualList
-					sections={twoHopPageVirtualSections}
+					sections={twoHopVirtualListSections}
 					{applicationStore}
 					searchQuery={search.normalized}
 					{searchScope}

@@ -27,18 +27,18 @@ import {
 	hasSameTwoHopBranchCard,
 	hasSameTwoHopIndexedLink,
 } from "ui/utils/twohopEquality";
-import type { TwoHopSectionDescriptor } from "./twohopPageVirtualModel";
+import type { TwoHopVirtualSectionDescriptor } from "./twoHopVirtualListModel";
 import type {
 	NewLinksSectionItemsDeps,
 	PrimaryLinkSection,
 	PrimarySectionItemsDeps,
 	TagSectionItemsDeps,
-} from "./twohopPageTypes";
+} from "./twoHopPageTypes";
 import {
 	getBacklinkSearchKey,
 	getMergedSearchKey,
 	getOutgoingSearchKey,
-} from "./twohopSearchAdapter";
+} from "./twoHopSearchAdapter";
 import {
 	hasSameDescriptorRefs,
 	pruneInactiveEntries,
@@ -85,7 +85,7 @@ interface ResolveTwoHopDataIdentityParams {
 export interface TwoHopDataIdentityCache {
 	resolve(
 		params: ResolveTwoHopDataIdentityParams,
-	): readonly TwoHopSectionDescriptor[];
+	): readonly TwoHopVirtualSectionDescriptor[];
 }
 
 interface PrimarySectionFactoryParams {
@@ -168,9 +168,9 @@ function createPrimarySections(
 }
 
 function appendDescriptor(
-	descriptors: TwoHopSectionDescriptor[],
+	descriptors: TwoHopVirtualSectionDescriptor[],
 	seenFinalIds: Map<string, number> | null,
-	descriptor: TwoHopSectionDescriptor,
+	descriptor: TwoHopVirtualSectionDescriptor,
 ): void {
 	if (descriptor.totalCount <= 0) return;
 	const previousIndex = seenFinalIds?.get(descriptor.sectionId);
@@ -216,7 +216,7 @@ function createReconcilers(): PrimarySectionReconcilers & {
 }
 
 function appendPrimarySections(params: {
-	readonly descriptors: TwoHopSectionDescriptor[];
+	readonly descriptors: TwoHopVirtualSectionDescriptor[];
 	readonly seenFinalIds: Map<string, number> | null;
 	readonly activePrimaryIds: Set<string>;
 	readonly primaryEntries: Map<string, PrimaryEntry>;
@@ -248,7 +248,7 @@ function appendPrimarySections(params: {
 }
 
 function appendBranchSections(params: {
-	readonly descriptors: TwoHopSectionDescriptor[];
+	readonly descriptors: TwoHopVirtualSectionDescriptor[];
 	readonly seenFinalIds: Map<string, number> | null;
 	readonly activeBranchIds: Set<string>;
 	readonly branchEntries: Map<string, BranchEntry>;
@@ -279,7 +279,7 @@ function appendBranchSections(params: {
 }
 
 function appendTagSections(params: {
-	readonly descriptors: TwoHopSectionDescriptor[];
+	readonly descriptors: TwoHopVirtualSectionDescriptor[];
 	readonly seenFinalIds: Map<string, number> | null;
 	readonly activeTagIds: Set<string>;
 	readonly tagEntries: Map<string, TagEntry>;
@@ -314,7 +314,7 @@ function appendTagSections(params: {
 }
 
 function appendNewLinksSection(params: {
-	readonly descriptors: TwoHopSectionDescriptor[];
+	readonly descriptors: TwoHopVirtualSectionDescriptor[];
 	readonly seenFinalIds: Map<string, number> | null;
 	readonly activeNewLinksIds: Set<string>;
 	readonly newLinksEntries: Map<string, NewLinksEntry>;
@@ -351,11 +351,11 @@ export function createTwoHopDataIdentityCache(): TwoHopDataIdentityCache {
 	const primaryEntries = new Map<string, PrimaryEntry>();
 	const newLinksEntries = new Map<string, NewLinksEntry>();
 	const tokens = createTwoHopInteractionTokenAllocator();
-	let previousDescriptors: readonly TwoHopSectionDescriptor[] = [];
+	let previousDescriptors: readonly TwoHopVirtualSectionDescriptor[] = [];
 
 	return {
 		resolve(params) {
-			const descriptors: TwoHopSectionDescriptor[] = [];
+			const descriptors: TwoHopVirtualSectionDescriptor[] = [];
 			const activeBranchIds = new Set<string>();
 			const activeTagIds = new Set<string>();
 			const activePrimaryIds = new Set<string>();

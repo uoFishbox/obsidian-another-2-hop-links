@@ -14,11 +14,11 @@ import {
 	teardownResizeObserverMock,
 	triggerResize,
 } from "testing/helpers/DOMObserverMock";
-import TwoHopViewPlanVirtualListPerfHarness from "./TwoHopViewPlanVirtualListPerfHarness.svelte";
+import TwoHopViewPlanVirtualListPerfHarness from "./TwoHopVirtualListSurfacePerfHarness.svelte";
 import type {
-	TwoHopPageVirtualItem,
-	TwoHopPageVirtualSection,
-} from "../twohopPageVirtualModel";
+	TwoHopVirtualListItem,
+	TwoHopVirtualListSection,
+} from "../twoHopVirtualListModel";
 import type { ItemInteractionDescriptor } from "ui/interactions/interactionTypes";
 
 const CARD_COUNTS = [100, 1_000, 10_000] as const;
@@ -34,9 +34,9 @@ const applicationStore = {
 	},
 } as unknown as ApplicationStore;
 
-const createItem = (index: number): TwoHopPageVirtualItem => ({
+const createItem = (index: number): TwoHopVirtualListItem => ({
 	kind: "new-link",
-	item: { type: "link" } as unknown as TwoHopPageVirtualItem["item"],
+	item: { type: "link" } as unknown as TwoHopVirtualListItem["item"],
 	interactionId: `item:test:${index}`,
 	searchKey: `item-${index}`,
 	virtualKey: `item-${index}`,
@@ -44,7 +44,7 @@ const createItem = (index: number): TwoHopPageVirtualItem => ({
 
 const createDescriptor = (
 	cardCount: number,
-): SectionRenderDescriptor<TwoHopPageVirtualItem, TwoHopPageVirtualSection> => {
+): SectionRenderDescriptor<TwoHopVirtualListItem, TwoHopVirtualListSection> => {
 	const items = Array.from({ length: cardCount }, (_, index) => createItem(index));
 	const section = {
 		kind: "new-links-section",
@@ -53,7 +53,7 @@ const createDescriptor = (
 		sectionKey: "new-links",
 		title: "New links",
 		getKey: () => "",
-	} satisfies TwoHopPageVirtualSection;
+	} satisfies TwoHopVirtualListSection;
 
 	return {
 		section,
@@ -167,7 +167,7 @@ describe("TwoHopViewPlanVirtualList DOM performance contracts", () => {
 
 	it("keeps a resolved descriptor cached for a retained cell while scrolling", async () => {
 		const getItemInteractionDescriptor = vi.fn(
-			(item: TwoHopPageVirtualItem): ItemInteractionDescriptor => ({
+			(item: TwoHopVirtualListItem): ItemInteractionDescriptor => ({
 				interactionId: item.interactionId ?? "",
 				kind: "item",
 				item: item.item,

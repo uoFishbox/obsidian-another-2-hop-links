@@ -32,12 +32,12 @@ import type {
 	TwoHopHeaderInteractionSnapshot,
 	TwoHopHeaderSnapshot,
 	TwoHopItemsDeps,
-} from "../twohopPageTypes";
-import type { TwoHopSectionDescriptor } from "../twohopPageVirtualModel";
+} from "../twoHopPageTypes";
+import type { TwoHopVirtualSectionDescriptor } from "../twoHopVirtualListModel";
 import {
 	createTwohopChildSearchKeyFromBaseKeys,
 	getTwohopBranchSearchBaseKey,
-} from "../twohopSearchAdapter";
+} from "../twoHopSearchAdapter";
 
 export interface BranchEntry {
 	applicationStore: ApplicationStore;
@@ -51,7 +51,7 @@ export interface BranchEntry {
 	headerInteractionSnapshot: TwoHopHeaderInteractionSnapshot;
 	headerProps: ClickableHeaderExtraProps;
 	headerInteractionDescriptor: SectionHeaderInteractionDescriptor;
-	descriptor: TwoHopSectionDescriptor;
+	descriptor: TwoHopVirtualSectionDescriptor;
 }
 
 export interface ResolveBranchSectionEntryParams {
@@ -285,7 +285,7 @@ function createBranchDescriptor(params: {
 	readonly getItems: CachedVirtualItemAccessors["getItems"];
 	readonly getItem: CachedVirtualItemAccessors["getItem"];
 	readonly headerProps: ClickableHeaderExtraProps;
-}): TwoHopSectionDescriptor {
+}): TwoHopVirtualSectionDescriptor {
 	return createDescriptor(
 		{
 			kind: "two-hop-branch",

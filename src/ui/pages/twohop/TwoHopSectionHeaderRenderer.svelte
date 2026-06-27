@@ -3,19 +3,19 @@
 	import LinkSectionHeader from "ui/components/common/LinkSectionHeader.svelte";
 	import TwoHopSectionHeader from "./TwoHopSectionHeader.svelte";
 	import type {
-		TwoHopPageVirtualItem,
-		TwoHopPageVirtualSection,
-	} from "./twohopPageVirtualModel";
+		TwoHopVirtualListItem,
+		TwoHopVirtualListSection,
+	} from "./twoHopVirtualListModel";
 	import type { SectionRenderDescriptor } from "ui/components/sections/types";
 
 	interface Props {
-		section: TwoHopPageVirtualSection;
+		section: TwoHopVirtualListSection;
 		title: string;
 		totalCount: number;
 		sectionId: string;
 		headerProps: SectionRenderDescriptor<
-			TwoHopPageVirtualItem,
-			TwoHopPageVirtualSection
+			TwoHopVirtualListItem,
+			TwoHopVirtualListSection
 		>["headerProps"];
 	}
 

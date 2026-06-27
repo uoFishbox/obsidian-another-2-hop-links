@@ -3,8 +3,8 @@ import {
 	markScrollActivityActive,
 	resetScrollActivityForTests,
 } from "infrastructure/scroll/scrollActivity";
-import type { TwoHopSectionDescriptor } from "../twohopPageVirtualModel";
-import { createTwoHopLayoutPlanCache } from "../twoHopLayoutPlanCache";
+import type { TwoHopVirtualSectionDescriptor } from "../twoHopVirtualListModel";
+import { createTwoHopRowModelCache } from "../twoHopRowModelCache";
 import { createTwoHopMaterializationScheduler } from "../twoHopMaterializationScheduler";
 
 const layout = {
@@ -16,7 +16,7 @@ const layout = {
 	sectionMarginBottom: 20,
 };
 
-const descriptor: TwoHopSectionDescriptor = {
+const descriptor: TwoHopVirtualSectionDescriptor = {
 	section: {
 		kind: "new-links-section",
 		rawSectionId: "new-links",
@@ -81,7 +81,7 @@ function installIdleCallbackHarness() {
 
 function createDeferredRowModel() {
 	const materialization = createBatchedMaterialization(1);
-	const cache = createTwoHopLayoutPlanCache({
+	const cache = createTwoHopRowModelCache({
 		materialization,
 		resolveInitialSectionVisibleCount: (section) => section.loadedCount,
 		clampVisibleCount: (section, count) => Math.min(section.loadedCount, count),

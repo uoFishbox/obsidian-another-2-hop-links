@@ -12,7 +12,7 @@ import type {
 	TagSectionItemsDeps,
 	PrimarySectionItemsDeps,
 	NewLinksSectionItemsDeps,
-} from "./twohopPageTypes";
+} from "./twoHopPageTypes";
 
 export function hasSameTwoHopItemsDeps(
 	current: TwoHopItemsDeps,

@@ -4,17 +4,17 @@ import type { MountedFlatItemCell } from "ui/components/common/virtual-list/reco
 import type { MountedFlatRowSlice } from "ui/components/common/virtual-list/reconciliation/viewPlanRenderRows";
 import { createItemInteractionKey } from "ui/interactions/interactionTypes";
 import type {
-	TwoHopPageVirtualItem,
-	TwoHopPageVirtualSection,
-} from "./twohopPageVirtualModel";
+	TwoHopVirtualListItem,
+	TwoHopVirtualListSection,
+} from "./twoHopVirtualListModel";
 
 type TwoHopMountedItemCell = MountedFlatItemCell<
-	TwoHopPageVirtualItem,
-	TwoHopPageVirtualSection
+	TwoHopVirtualListItem,
+	TwoHopVirtualListSection
 >;
 
 interface ProviderCacheEntry {
-	itemRevision: TwoHopPageVirtualItem;
+	itemRevision: TwoHopVirtualListItem;
 	renderBodyRevision: unknown;
 	resolveDescriptorRevision: unknown;
 	descriptorRevision: unknown;
@@ -23,11 +23,11 @@ interface ProviderCacheEntry {
 
 export interface TwoHopInteractionResolverProviderParams {
 	getMountedRows: () => readonly MountedFlatRowSlice<
-		TwoHopPageVirtualItem,
-		TwoHopPageVirtualSection
+		TwoHopVirtualListItem,
+		TwoHopVirtualListSection
 	>[];
 	resolveDescriptor: (
-		item: TwoHopPageVirtualItem,
+		item: TwoHopVirtualListItem,
 	) => ItemInteractionDescriptor | null;
 	getDescriptorRevision?: () => unknown;
 }
@@ -87,8 +87,8 @@ export function createTwoHopInteractionResolverProvider({
 
 function findMountedItemCellByInteractionId(params: {
 	mountedRows: readonly MountedFlatRowSlice<
-		TwoHopPageVirtualItem,
-		TwoHopPageVirtualSection
+		TwoHopVirtualListItem,
+		TwoHopVirtualListSection
 	>[];
 	interactionId: string;
 }): TwoHopMountedItemCell | null {

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import type { TwoHopSectionDescriptor } from "../twohopPageVirtualModel";
-import { createTwoHopLayoutPlanCache } from "../twoHopLayoutPlanCache";
+import type { TwoHopVirtualSectionDescriptor } from "../twoHopVirtualListModel";
+import { createTwoHopRowModelCache } from "../twoHopRowModelCache";
 
 const layout = {
 	containerWidth: 320,
@@ -11,7 +11,7 @@ const layout = {
 	sectionMarginBottom: 20,
 };
 
-const descriptor: TwoHopSectionDescriptor = {
+const descriptor: TwoHopVirtualSectionDescriptor = {
 	section: {
 		kind: "new-links-section",
 		rawSectionId: "new-links",
@@ -36,9 +36,9 @@ const descriptor: TwoHopSectionDescriptor = {
 	headerProps: {},
 };
 
-describe("createTwoHopLayoutPlanCache in a DOM runtime", () => {
+describe("createTwoHopRowModelCache in a DOM runtime", () => {
 	it("reuses only the exact descriptor, pagination, and layout inputs", () => {
-		const cache = createTwoHopLayoutPlanCache({
+		const cache = createTwoHopRowModelCache({
 			materialization: { kind: "eager" },
 			resolveInitialSectionVisibleCount: (section) => section.loadedCount,
 			clampVisibleCount: (section, count) => Math.min(section.loadedCount, count),

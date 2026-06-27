@@ -1,21 +1,21 @@
 <script lang="ts">
 	import type { ApplicationStore } from "ui/stores/ApplicationStore.svelte";
 	import type { SectionRenderDescriptor } from "ui/components/sections/types";
-	import TwoHopViewPlanVirtualList from "../TwoHopViewPlanVirtualList.svelte";
+	import TwoHopViewPlanVirtualList from "../TwoHopVirtualListSurface.svelte";
 	import type {
-		TwoHopPageVirtualItem,
-		TwoHopPageVirtualSection,
-	} from "../twohopPageVirtualModel";
+		TwoHopVirtualListItem,
+		TwoHopVirtualListSection,
+	} from "../twoHopVirtualListModel";
 	import type { ItemInteractionDescriptor } from "ui/interactions/interactionTypes";
 
 	interface Props {
 		sections: readonly SectionRenderDescriptor<
-			TwoHopPageVirtualItem,
-			TwoHopPageVirtualSection
+			TwoHopVirtualListItem,
+			TwoHopVirtualListSection
 		>[];
 		applicationStore: ApplicationStore;
 		getItemInteractionDescriptor?: (
-			item: TwoHopPageVirtualItem,
+			item: TwoHopVirtualListItem,
 		) => ItemInteractionDescriptor | null;
 	}
 

@@ -3,9 +3,9 @@ import type { VirtualListLogicalCell } from "ui/components/common/virtual-list/l
 import type { RowRange } from "ui/components/common/virtual-list/rowRange";
 import type { SectionRenderDescriptor } from "ui/components/sections/types";
 import type {
-	TwoHopPageVirtualItem,
-	TwoHopPageVirtualSection,
-} from "../twohopPageVirtualModel";
+	TwoHopVirtualListItem,
+	TwoHopVirtualListSection,
+} from "../twoHopVirtualListModel";
 import type { TwoHopSectionPlan, TwoHopViewPlan } from "./types";
 import {
 	markTwoHopMaterializationChanged,
@@ -31,12 +31,12 @@ export function resolveInitialMaterializationCellCount(
 
 function resolveTwoHopDescriptorItem(
 	descriptor: SectionRenderDescriptor<
-		TwoHopPageVirtualItem,
-		TwoHopPageVirtualSection
+		TwoHopVirtualListItem,
+		TwoHopVirtualListSection
 	>,
 	itemIndex: number,
-	resolvedItems?: readonly TwoHopPageVirtualItem[],
-): TwoHopPageVirtualItem | undefined {
+	resolvedItems?: readonly TwoHopVirtualListItem[],
+): TwoHopVirtualListItem | undefined {
 	if (resolvedItems) return resolvedItems[itemIndex];
 	if (descriptor.getItem) return descriptor.getItem(itemIndex);
 	return descriptor.getItems()[itemIndex];
@@ -45,8 +45,8 @@ function resolveTwoHopDescriptorItem(
 function createTwoHopLogicalCellAt(
 	sectionPlan: TwoHopSectionPlan,
 	cellIndex: number,
-	resolvedItems?: readonly TwoHopPageVirtualItem[],
-): VirtualListLogicalCell<TwoHopPageVirtualItem> | undefined {
+	resolvedItems?: readonly TwoHopVirtualListItem[],
+): VirtualListLogicalCell<TwoHopVirtualListItem> | undefined {
 	const { descriptor, visibleCount, showLoadMore, cellCount } = sectionPlan;
 
 	if (cellIndex === 0) {
@@ -83,7 +83,7 @@ function ensureTwoHopSectionCellMaterialized(
 	plan: TwoHopViewPlan,
 	sectionPlan: TwoHopSectionPlan,
 	cellIndex: number,
-	resolvedItems?: readonly TwoHopPageVirtualItem[],
+	resolvedItems?: readonly TwoHopVirtualListItem[],
 ): boolean {
 	const logicalCells =
 		plan.cellStore.logicalCellsBySectionIndex[sectionPlan.sectionIndex];
@@ -103,7 +103,7 @@ function ensureTwoHopSectionCellMaterialized(
 export function materializeTwoHopSectionCells(
 	plan: TwoHopViewPlan,
 	sectionIndex: number,
-	resolvedItems?: readonly TwoHopPageVirtualItem[],
+	resolvedItems?: readonly TwoHopVirtualListItem[],
 ): boolean {
 	const sectionPlan = plan.sections[sectionIndex];
 	const cellStore = plan.cellStore;
@@ -415,7 +415,7 @@ export function readTwoHopLogicalCellInSection(
 	plan: TwoHopViewPlan,
 	sectionIndex: number,
 	sectionCellIndex: number,
-): VirtualListLogicalCell<TwoHopPageVirtualItem> | null {
+): VirtualListLogicalCell<TwoHopVirtualListItem> | null {
 	const sectionPlan = plan.sections[sectionIndex];
 	if (
 		!sectionPlan ||
@@ -437,7 +437,7 @@ export function resolveTwoHopLogicalCellInSection(
 	plan: TwoHopViewPlan,
 	sectionIndex: number,
 	sectionCellIndex: number,
-): VirtualListLogicalCell<TwoHopPageVirtualItem> | null {
+): VirtualListLogicalCell<TwoHopVirtualListItem> | null {
 	const sectionPlan = plan.sections[sectionIndex];
 	if (
 		!sectionPlan ||

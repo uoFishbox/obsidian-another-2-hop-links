@@ -5,7 +5,7 @@ import {
 	createItemInteractionDescriptor,
 	createItemInteractionKey,
 } from "ui/interactions/interactionTypes";
-import type { TwoHopPageVirtualItem } from "./twohopPageVirtualModel";
+import type { TwoHopVirtualListItem } from "./twoHopVirtualListModel";
 
 export interface TwoHopInteractionDescriptorRevision {
 	settings: PluginSettings;
@@ -26,7 +26,7 @@ export function createTwoHopInteractionDescriptorRevision(params: {
 }
 
 export function resolveTwoHopItemInteractionDescriptor(
-	row: TwoHopPageVirtualItem,
+	row: TwoHopVirtualListItem,
 	revision: TwoHopInteractionDescriptorRevision,
 ): ItemInteractionDescriptor | null {
 	if (!revision.linkContext) return null;

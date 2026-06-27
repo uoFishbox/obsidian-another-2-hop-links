@@ -5,11 +5,11 @@
 	import type { SearchWorkerMatchedItem } from "features/search/searchWorkerTypes";
 	import type { SearchWorkerMatchScope } from "features/search/searchWorkerTypes";
 	import type { VirtualizedItemVisibilityState } from "ui/components/common/virtualizedItemVisibility";
-	import type { TwoHopPageVirtualItem } from "./twohopPageVirtualModel";
-	import { resolveTwoHopPageItemSearchScope } from "./twohopPageVirtualModel";
+	import type { TwoHopVirtualListItem } from "./twoHopVirtualListModel";
+	import { resolveTwoHopPageItemSearchScope } from "./twoHopVirtualListModel";
 
 	interface Props {
-		row: TwoHopPageVirtualItem;
+		row: TwoHopVirtualListItem;
 		settings: PluginSettings;
 		searchQuery: string;
 		searchScope: SearchWorkerMatchScope;

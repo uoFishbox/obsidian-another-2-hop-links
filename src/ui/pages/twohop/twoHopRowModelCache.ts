@@ -1,5 +1,5 @@
 import type { ViewPlanLayoutMetrics } from "ui/components/common/virtual-list/svelte/viewPlanLayout";
-import type { TwoHopSectionDescriptor } from "./twohopPageVirtualModel";
+import type { TwoHopVirtualSectionDescriptor } from "./twoHopVirtualListModel";
 import {
 	compileTwoHopViewPlan,
 	createTwoHopViewPlanRowModel,
@@ -7,20 +7,20 @@ import {
 	type TwoHopViewPlanRowModel,
 } from "./twoHopViewPlan";
 
-export interface TwoHopLayoutPlanCache {
+export interface TwoHopRowModelCache {
 	resolve(
-		sections: readonly TwoHopSectionDescriptor[],
+		sections: readonly TwoHopVirtualSectionDescriptor[],
 		sectionVisibleCounts: Readonly<Record<string, number>>,
 		layout: ViewPlanLayoutMetrics,
 	): TwoHopViewPlanRowModel;
 }
 
-export function createTwoHopLayoutPlanCache(params: {
+export function createTwoHopRowModelCache(params: {
 	readonly materialization: TwoHopViewPlanMaterialization;
-	resolveInitialSectionVisibleCount(section: TwoHopSectionDescriptor): number;
-	clampVisibleCount(section: TwoHopSectionDescriptor, count: number): number;
-}): TwoHopLayoutPlanCache {
-	let previousSections: readonly TwoHopSectionDescriptor[] | undefined;
+	resolveInitialSectionVisibleCount(section: TwoHopVirtualSectionDescriptor): number;
+	clampVisibleCount(section: TwoHopVirtualSectionDescriptor, count: number): number;
+}): TwoHopRowModelCache {
+	let previousSections: readonly TwoHopVirtualSectionDescriptor[] | undefined;
 	let previousVisibleCounts: Readonly<Record<string, number>> | undefined;
 	let previousLayout: ViewPlanLayoutMetrics | undefined;
 	let previousRowModel: TwoHopViewPlanRowModel | undefined;

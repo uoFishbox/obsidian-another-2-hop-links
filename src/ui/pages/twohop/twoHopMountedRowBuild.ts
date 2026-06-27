@@ -7,9 +7,9 @@ import {
 	type SectionedGridMountedRowsBuild,
 } from "ui/components/common/virtual-list/row-models/sectionedGridMountedRows";
 import type {
-	TwoHopPageVirtualItem,
-	TwoHopPageVirtualSection,
-} from "./twohopPageVirtualModel";
+	TwoHopVirtualListItem,
+	TwoHopVirtualListSection,
+} from "./twoHopVirtualListModel";
 import {
 	ensureTwoHopMountedRangeMaterialized,
 	findTwoHopSectionIndexByRow,
@@ -56,19 +56,19 @@ function materializeDiffRows(
 }
 
 export type TwoHopMountedRowsBuild = SectionedGridMountedRowsBuild<
-	TwoHopPageVirtualItem,
-	TwoHopPageVirtualSection,
+	TwoHopVirtualListItem,
+	TwoHopVirtualListSection,
 	TwoHopViewPlan
 >;
 
 export type TwoHopMountedCell = MountedFlatCell<
-	TwoHopPageVirtualItem,
-	TwoHopPageVirtualSection
+	TwoHopVirtualListItem,
+	TwoHopVirtualListSection
 >;
 
 export type TwoHopMountedRowSlice = MountedFlatRowSlice<
-	TwoHopPageVirtualItem,
-	TwoHopPageVirtualSection
+	TwoHopVirtualListItem,
+	TwoHopVirtualListSection
 >;
 
 /**

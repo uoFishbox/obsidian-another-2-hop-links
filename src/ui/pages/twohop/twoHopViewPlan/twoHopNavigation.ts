@@ -1,7 +1,7 @@
 import type { ResultNavigationDirection } from "features/keyboard-navigation/resultFocus";
 import type { VirtualListLogicalCell } from "ui/components/common/virtual-list/logicalCell";
 import type { VirtualNavigationTarget } from "ui/components/common/virtual-list/types";
-import type { TwoHopPageVirtualItem } from "../twohopPageVirtualModel";
+import type { TwoHopVirtualListItem } from "../twoHopVirtualListModel";
 
 export interface ResolveTwoHopNavigationTargetParams {
 	readonly direction: ResultNavigationDirection;
@@ -11,7 +11,7 @@ export interface ResolveTwoHopNavigationTargetParams {
 	resolveCell(
 		rowIndex: number,
 		columnIndex: number,
-	): VirtualListLogicalCell<TwoHopPageVirtualItem> | null;
+	): VirtualListLogicalCell<TwoHopVirtualListItem> | null;
 }
 
 export function resolveTwoHopNavigationTarget(

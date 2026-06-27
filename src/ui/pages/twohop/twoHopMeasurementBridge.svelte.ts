@@ -4,12 +4,12 @@ import {
 } from "ui/components/common/virtual-list/svelte/viewPlanMeasurement.svelte";
 import { createViewPlanCardVirtualListPolicyResolver } from "ui/components/common/virtual-list/svelte/viewPlanPolicy";
 import type { TwoHopMountedSurfaceRuntime } from "./twoHopMountedSurfaceRuntime.svelte";
-import type { TwoHopVirtualListRuntime } from "./twoHopVirtualListRuntime.svelte";
+import type { TwoHopVirtualListPlanRuntime } from "./twoHopVirtualListPlanRuntime.svelte";
 
 export { createViewPlanMeasurementState as createTwoHopMeasurementState };
 
 export function createTwoHopMeasurementBridge(params: {
-	readonly inputRuntime: TwoHopVirtualListRuntime;
+	readonly inputRuntime: TwoHopVirtualListPlanRuntime;
 	readonly surfaceRuntime: TwoHopMountedSurfaceRuntime;
 	readonly measurementState: ReturnType<typeof createViewPlanMeasurementState>;
 }) {

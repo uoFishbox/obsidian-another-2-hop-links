@@ -6,7 +6,7 @@ import type {
 	VirtualRow,
 } from "ui/components/common/virtual-list/types";
 import type { RowRange } from "ui/components/common/virtual-list/rowRange";
-import type { TwoHopPageVirtualItem } from "../twohopPageVirtualModel";
+import type { TwoHopVirtualListItem } from "../twoHopVirtualListModel";
 import type {
 	FirstTwoHopRowByTopResolutionScratch,
 	ResolveTwoHopRowTopsForBandParams,
@@ -235,7 +235,7 @@ export function createTwoHopViewPlanRowModel(
 	const resolveCell = (
 		rowIndex: number,
 		columnIndex: number,
-	): VirtualListLogicalCell<TwoHopPageVirtualItem> | null => {
+	): VirtualListLogicalCell<TwoHopVirtualListItem> | null => {
 		if (rowIndex < 0 || rowIndex >= table.rowCount) return null;
 		const cellCount = table.cellCountByRow[rowIndex];
 		if (columnIndex < 0 || columnIndex >= cellCount) return null;
@@ -267,7 +267,7 @@ export function createTwoHopViewPlanRowModel(
 		layout: { ...plan.layout, contentHeight: plan.totalHeight },
 		getRow(
 			rowIndex,
-		): VirtualRow<VirtualListLogicalCell<TwoHopPageVirtualItem>> | null {
+		): VirtualRow<VirtualListLogicalCell<TwoHopVirtualListItem>> | null {
 			if (rowIndex < 0 || rowIndex >= table.rowCount) return null;
 			return {
 				key: rowIndex,

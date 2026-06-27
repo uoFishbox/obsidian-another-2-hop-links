@@ -19,10 +19,10 @@ import type { TwoHopInteractionTokenAllocator } from "./interactionTokenAllocato
 import { hasSameTagSectionItemsDeps } from "../twoHopDataIdentityEquality";
 import {
 	createTaggedNoteSectionItemKey,
-	type TwoHopSectionDescriptor,
-} from "../twohopPageVirtualModel";
-import type { TagSectionItemsDeps } from "../twohopPageTypes";
-import { getTagNoteSearchKeyFromBaseKey } from "../twohopSearchAdapter";
+	type TwoHopVirtualSectionDescriptor,
+} from "../twoHopVirtualListModel";
+import type { TagSectionItemsDeps } from "../twoHopPageTypes";
+import { getTagNoteSearchKeyFromBaseKey } from "../twoHopSearchAdapter";
 
 export interface TagEntry {
 	applicationStore: ApplicationStore;
@@ -35,7 +35,7 @@ export interface TagEntry {
 	tag: string;
 	onTagClick: (tag: string) => void;
 	headerProps: ClickableHeaderExtraProps;
-	descriptor: TwoHopSectionDescriptor;
+	descriptor: TwoHopVirtualSectionDescriptor;
 }
 
 export interface ResolveTagSectionEntryParams {
@@ -180,7 +180,7 @@ function createTagDescriptor(params: {
 	readonly getItems: CachedVirtualItemAccessors["getItems"];
 	readonly getItem: CachedVirtualItemAccessors["getItem"];
 	readonly headerProps: ClickableHeaderExtraProps;
-}): TwoHopSectionDescriptor {
+}): TwoHopVirtualSectionDescriptor {
 	return createDescriptor(
 		{
 			kind: "tag-section",

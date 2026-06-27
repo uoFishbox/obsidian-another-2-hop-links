@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { getContext } from "svelte";
-	import TwoHopViewPlanVirtualList from "./TwoHopViewPlanVirtualList.svelte";
+	import TwoHopViewPlanVirtualList from "./TwoHopVirtualListSurface.svelte";
 	import TwoHopSectionHeaderRenderer from "./TwoHopSectionHeaderRenderer.svelte";
 	import TwoHopVirtualItemCard from "./TwoHopVirtualItemCard.svelte";
 	import type { ApplicationStore } from "ui/stores/ApplicationStore.svelte";
@@ -11,10 +11,10 @@
 	import type { VirtualizedItemVisibilityState } from "ui/components/common/virtualizedItemVisibility";
 	import type { VirtualizedItemVisibility } from "ui/components/common/virtual-list/types";
 	import type {
-		TwoHopPageVirtualSection,
-		TwoHopPageVirtualItem,
-		TwoHopSectionDescriptor,
-	} from "./twohopPageVirtualModel";
+		TwoHopVirtualListSection,
+		TwoHopVirtualListItem,
+		TwoHopVirtualSectionDescriptor,
+	} from "./twoHopVirtualListModel";
 	import { useLinkContext } from "ui/context/linkContext";
 	import {
 		createTwoHopInteractionDescriptorRevision,
@@ -22,7 +22,7 @@
 	} from "./twoHopInteractionDescriptorRevision";
 
 	interface Props {
-		sections: readonly TwoHopSectionDescriptor[];
+		sections: readonly TwoHopVirtualSectionDescriptor[];
 		applicationStore: ApplicationStore;
 		searchQuery?: string;
 		searchScope?: SearchWorkerMatchScope;
@@ -54,10 +54,10 @@
 	}
 	const renderableDescriptors = $derived(sections);
 
-	const getCellClassName = (section: TwoHopPageVirtualSection): string | undefined =>
+	const getCellClassName = (section: TwoHopVirtualListSection): string | undefined =>
 		section.className;
 
-	const getItemInteractionDescriptor = (row: TwoHopPageVirtualItem) =>
+	const getItemInteractionDescriptor = (row: TwoHopVirtualListItem) =>
 		resolveTwoHopItemInteractionDescriptor(row, interactionDescriptorRevision);
 	const interactionDescriptorRevision = $derived(
 		createTwoHopInteractionDescriptorRevision({
@@ -68,8 +68,8 @@
 	);
 
 	type RenderItemArgs = {
-		item: TwoHopPageVirtualItem;
-		section: TwoHopPageVirtualSection;
+		item: TwoHopVirtualListItem;
+		section: TwoHopVirtualListSection;
 		index: number;
 		rowIndex: number;
 		observerRoot: HTMLElement | null;

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { TwoHopSectionDescriptor } from "../twohopPageVirtualModel";
+import type { TwoHopVirtualSectionDescriptor } from "../twoHopVirtualListModel";
 import { compileTwoHopViewPlan, createTwoHopViewPlanRowModel } from "../twoHopViewPlan";
 import { createTwoHopMountedRowWindow } from "../twoHopMountedRowWindow";
 
@@ -10,7 +10,7 @@ const items = ["a", "b", "c", "d"].map((key) => ({
 	virtualKey: key,
 }));
 
-const descriptor: TwoHopSectionDescriptor = {
+const descriptor: TwoHopVirtualSectionDescriptor = {
 	section: {
 		kind: "new-links-section",
 		rawSectionId: "new-links",
@@ -160,7 +160,7 @@ describe("createTwoHopMountedRowWindow", () => {
 			searchKey: key,
 			virtualKey: key,
 		}));
-		const newDescriptor: TwoHopSectionDescriptor = {
+		const newDescriptor: TwoHopVirtualSectionDescriptor = {
 			...descriptor,
 			totalCount: newItems.length,
 			loadedCount: newItems.length,

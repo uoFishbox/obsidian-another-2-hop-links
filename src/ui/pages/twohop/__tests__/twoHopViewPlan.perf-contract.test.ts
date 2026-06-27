@@ -17,9 +17,9 @@ import {
 	type TwoHopMountedRowsBuild,
 } from "../twoHopMountedRowBuild";
 import type {
-	TwoHopPageVirtualItem,
-	TwoHopPageVirtualSection,
-} from "../twohopPageVirtualModel";
+	TwoHopVirtualListItem,
+	TwoHopVirtualListSection,
+} from "../twoHopVirtualListModel";
 
 const CARD_COUNTS = [100, 1_000, 10_000] as const;
 const LARGE_CARD_COUNT = 10_000;
@@ -58,9 +58,9 @@ const layout = {
 	sectionMarginBottom: 20,
 };
 
-const createItem = (key: string): TwoHopPageVirtualItem => ({
+const createItem = (key: string): TwoHopVirtualListItem => ({
 	kind: "new-link",
-	item: { type: "link" } as unknown as TwoHopPageVirtualItem["item"],
+	item: { type: "link" } as unknown as TwoHopVirtualListItem["item"],
 	searchKey: key,
 	virtualKey: key,
 });
@@ -73,7 +73,7 @@ const createDescriptor = (
 			createItem(`${sectionId}-item-${index}`),
 		),
 	),
-): SectionRenderDescriptor<TwoHopPageVirtualItem, TwoHopPageVirtualSection> => {
+): SectionRenderDescriptor<TwoHopVirtualListItem, TwoHopVirtualListSection> => {
 	const items = getItems();
 	const section = {
 		kind: "new-links-section",
@@ -82,7 +82,7 @@ const createDescriptor = (
 		sectionKey: sectionId,
 		title: "New links",
 		getKey: () => "",
-	} satisfies TwoHopPageVirtualSection;
+	} satisfies TwoHopVirtualListSection;
 
 	return {
 		section,
@@ -99,8 +99,8 @@ const createDescriptor = (
 
 const compilePlan = (
 	sections: readonly SectionRenderDescriptor<
-		TwoHopPageVirtualItem,
-		TwoHopPageVirtualSection
+		TwoHopVirtualListItem,
+		TwoHopVirtualListSection
 	>[],
 	options?: { batched?: boolean },
 ) =>
@@ -118,8 +118,8 @@ const compilePlan = (
 	});
 
 type TwoHopVirtualListComputation = VirtualListComputation<
-	VirtualListLogicalCell<TwoHopPageVirtualItem>,
-	MountedFlatCell<TwoHopPageVirtualItem, TwoHopPageVirtualSection>,
+	VirtualListLogicalCell<TwoHopVirtualListItem>,
+	MountedFlatCell<TwoHopVirtualListItem, TwoHopVirtualListSection>,
 	TwoHopMountedRowsBuild
 >;
 
@@ -164,8 +164,8 @@ const applyPixelScrollMeasurement = (params: {
 	buildMountedCells: typeof buildTwoHopMountedRows;
 }): TwoHopVirtualListComputation =>
 	computeVirtualListSnapshotWithState<
-		VirtualListLogicalCell<TwoHopPageVirtualItem>,
-		MountedFlatCell<TwoHopPageVirtualItem, TwoHopPageVirtualSection>,
+		VirtualListLogicalCell<TwoHopVirtualListItem>,
+		MountedFlatCell<TwoHopVirtualListItem, TwoHopVirtualListSection>,
 		TwoHopMountedRowsBuild
 	>({
 		rowModel: params.rowModel,
@@ -387,10 +387,10 @@ describe("TwoHop view-plan performance contracts", () => {
 			sectionKey: "new-links",
 			title: "New links",
 			getKey: () => "",
-		} satisfies TwoHopPageVirtualSection;
+		} satisfies TwoHopVirtualListSection;
 		const descriptor: SectionRenderDescriptor<
-			TwoHopPageVirtualItem,
-			TwoHopPageVirtualSection
+			TwoHopVirtualListItem,
+			TwoHopVirtualListSection
 		> = {
 			section,
 			sectionKey: section.sectionKey,

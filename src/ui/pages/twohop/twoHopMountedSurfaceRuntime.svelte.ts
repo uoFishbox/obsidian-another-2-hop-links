@@ -10,11 +10,11 @@ import type { VirtualizedItemVisibility } from "ui/components/common/virtual-lis
 import type { TwoHopMountedRowsBuild } from "./twoHopMountedRowBuild";
 import type { TwoHopViewPlanRowModel } from "./twoHopViewPlan";
 import type {
-	TwoHopPageVirtualItem,
-	TwoHopPageVirtualSection,
-} from "./twohopPageVirtualModel";
+	TwoHopVirtualListItem,
+	TwoHopVirtualListSection,
+} from "./twoHopVirtualListModel";
 import { createTwoHopMountRuntime } from "./twoHopMountRuntime.svelte";
-import type { TwoHopVirtualListRuntime } from "./twoHopVirtualListRuntime.svelte";
+import type { TwoHopVirtualListPlanRuntime } from "./twoHopVirtualListPlanRuntime.svelte";
 import {
 	PREVIEW_ROW_ACTIVATION_CONTEXT_KEY,
 	type RowPreviewActivationRuntime,
@@ -23,7 +23,7 @@ import {
 const EMPTY_MOUNTED_ROWS: readonly [] = [];
 
 export function createTwoHopMountedSurfaceRuntime(params: {
-	readonly inputRuntime: TwoHopVirtualListRuntime;
+	readonly inputRuntime: TwoHopVirtualListPlanRuntime;
 	onStableVisibleRange(): void;
 }) {
 	const rowPreviewActivationRuntime = getContext<
@@ -33,9 +33,9 @@ export function createTwoHopMountedSurfaceRuntime(params: {
 		rowPreviewActivationRuntime,
 	});
 	const virtualList = useVirtualList<
-		import("ui/components/common/virtual-list/logicalCell").VirtualListLogicalCell<TwoHopPageVirtualItem>,
+		import("ui/components/common/virtual-list/logicalCell").VirtualListLogicalCell<TwoHopVirtualListItem>,
 		TwoHopViewPlanRowModel,
-		MountedFlatCell<TwoHopPageVirtualItem, TwoHopPageVirtualSection>,
+		MountedFlatCell<TwoHopVirtualListItem, TwoHopVirtualListSection>,
 		TwoHopMountedRowsBuild
 	>({
 		buildMountedCells: (buildParams) => mountRuntime.buildMountedRows(buildParams),
@@ -70,13 +70,13 @@ export function createTwoHopMountedSurfaceRuntime(params: {
 
 	const createItemRenderArgs = (
 		renderedCell: MountedFlatItemCell<
-			TwoHopPageVirtualItem,
-			TwoHopPageVirtualSection
+			TwoHopVirtualListItem,
+			TwoHopVirtualListSection
 		>,
 		observerRoot: HTMLElement | null,
 	): {
-		item: TwoHopPageVirtualItem;
-		section: TwoHopPageVirtualSection;
+		item: TwoHopVirtualListItem;
+		section: TwoHopVirtualListSection;
 		index: number;
 		rowIndex: number;
 		observerRoot: HTMLElement | null;

@@ -4,11 +4,11 @@ import { createViewPlanInputState } from "ui/components/common/virtual-list/svel
 import type { ViewPlanLayoutMetrics } from "ui/components/common/virtual-list/svelte/viewPlanLayout";
 import { resolveCardLayoutSettings } from "ui/utils/cardLayoutCssVars";
 import type {
-	TwoHopPageVirtualItem,
-	TwoHopPageVirtualSection,
-	TwoHopSectionDescriptor,
-} from "./twohopPageVirtualModel";
-import { createTwoHopLayoutPlanCache } from "./twoHopLayoutPlanCache";
+	TwoHopVirtualListItem,
+	TwoHopVirtualListSection,
+	TwoHopVirtualSectionDescriptor,
+} from "./twoHopVirtualListModel";
+import { createTwoHopRowModelCache } from "./twoHopRowModelCache";
 import { createTwoHopMaterializationScheduler } from "./twoHopMaterializationScheduler";
 import { type TwoHopViewPlanRowModel } from "./twoHopViewPlan";
 import {
@@ -21,16 +21,16 @@ type ViewPlanMeasurementState = ReturnType<
 	typeof import("ui/components/common/virtual-list/svelte/viewPlanMeasurement.svelte").createViewPlanMeasurementState
 >;
 
-export interface TwoHopViewPlanVirtualListProps {
-	readonly sections: readonly TwoHopSectionDescriptor[];
+export interface TwoHopVirtualListSurfaceProps {
+	readonly sections: readonly TwoHopVirtualSectionDescriptor[];
 	readonly applicationStore?: ApplicationStore;
 	readonly initialVisibleCount?: number;
 	readonly loadMoreIncrement?: number;
 	readonly tuning?: TwoHopVirtualListTuning;
 }
 
-export function createTwoHopVirtualListRuntime(params: {
-	readonly props: TwoHopViewPlanVirtualListProps;
+export function createTwoHopVirtualListPlanRuntime(params: {
+	readonly props: TwoHopVirtualListSurfaceProps;
 	readonly measurementState: ViewPlanMeasurementState;
 }) {
 	let applicationStore = params.props.applicationStore;
@@ -43,8 +43,8 @@ export function createTwoHopVirtualListRuntime(params: {
 			: null,
 	);
 	const inputState = createViewPlanInputState<
-		TwoHopPageVirtualItem,
-		TwoHopPageVirtualSection
+		TwoHopVirtualListItem,
+		TwoHopVirtualListSection
 	>({
 		getSections: () => params.props.sections,
 		applicationStore,
@@ -54,7 +54,7 @@ export function createTwoHopVirtualListRuntime(params: {
 	const materialization = resolveMaterializationFromTuning(
 		params.props.tuning ?? DEFAULT_TWO_HOP_VIRTUAL_LIST_TUNING,
 	);
-	const layoutPlanCache = createTwoHopLayoutPlanCache({
+	const layoutPlanCache = createTwoHopRowModelCache({
 		materialization,
 		resolveInitialSectionVisibleCount: inputState.resolveInitialSectionVisibleCount,
 		clampVisibleCount: inputState.clampVisibleCount,
@@ -109,6 +109,6 @@ export function createTwoHopVirtualListRuntime(params: {
 	};
 }
 
-export type TwoHopVirtualListRuntime = ReturnType<
-	typeof createTwoHopVirtualListRuntime
+export type TwoHopVirtualListPlanRuntime = ReturnType<
+	typeof createTwoHopVirtualListPlanRuntime
 >;

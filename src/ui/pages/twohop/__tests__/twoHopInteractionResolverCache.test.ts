@@ -6,20 +6,20 @@ import type { MountedFlatItemCell } from "ui/components/common/virtual-list/reco
 import type { MountedFlatRowSlice } from "ui/components/common/virtual-list/reconciliation/viewPlanRenderRows";
 import { createTwoHopInteractionResolverProvider } from "../twoHopInteractionResolverCache";
 import type {
-	TwoHopPageVirtualItem,
-	TwoHopPageVirtualSection,
-} from "../twohopPageVirtualModel";
+	TwoHopVirtualListItem,
+	TwoHopVirtualListSection,
+} from "../twoHopVirtualListModel";
 
 type TwoHopMountedItemCell = MountedFlatItemCell<
-	TwoHopPageVirtualItem,
-	TwoHopPageVirtualSection
+	TwoHopVirtualListItem,
+	TwoHopVirtualListSection
 >;
 type TwoHopMountedRow = MountedFlatRowSlice<
-	TwoHopPageVirtualItem,
-	TwoHopPageVirtualSection
+	TwoHopVirtualListItem,
+	TwoHopVirtualListSection
 >;
 
-function createItem(path: string): TwoHopPageVirtualItem {
+function createItem(path: string): TwoHopVirtualListItem {
 	const file = { path, basename: path } as TFile;
 	return {
 		kind: "primary-link",
@@ -32,7 +32,7 @@ function createItem(path: string): TwoHopPageVirtualItem {
 }
 
 function createMountedRows(params: {
-	item: TwoHopPageVirtualItem;
+	item: TwoHopVirtualListItem;
 	cellSlotKey?: number;
 	renderBodyKey?: string;
 }): readonly TwoHopMountedRow[] {
@@ -57,7 +57,7 @@ function createMountedRows(params: {
 	];
 }
 
-function createDescriptor(item: TwoHopPageVirtualItem): ItemInteractionDescriptor {
+function createDescriptor(item: TwoHopVirtualListItem): ItemInteractionDescriptor {
 	return {
 		interactionId: item.interactionId ?? "",
 		kind: "item",
@@ -73,7 +73,7 @@ describe("twoHopInteractionResolverCache", () => {
 		const secondItem = createItem("beta.md");
 		const firstDescriptor = createDescriptor(firstItem);
 		const secondDescriptor = createDescriptor(secondItem);
-		const resolveDescriptor = vi.fn((item: TwoHopPageVirtualItem) => {
+		const resolveDescriptor = vi.fn((item: TwoHopVirtualListItem) => {
 			if (item === firstItem) return firstDescriptor;
 			if (item === secondItem) return secondDescriptor;
 			return null;

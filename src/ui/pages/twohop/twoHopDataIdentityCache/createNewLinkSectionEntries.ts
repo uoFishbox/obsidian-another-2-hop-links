@@ -9,15 +9,15 @@ import {
 	type CachedVirtualItemAccessors,
 } from "./descriptorIdentity";
 import { hasSameNewLinksItemsDeps } from "../twoHopDataIdentityEquality";
-import type { NewLinksSectionItemsDeps } from "../twohopPageTypes";
-import type { TwoHopSectionDescriptor } from "../twohopPageVirtualModel";
+import type { NewLinksSectionItemsDeps } from "../twoHopPageTypes";
+import type { TwoHopVirtualSectionDescriptor } from "../twoHopVirtualListModel";
 
 export interface NewLinksEntry {
 	itemsDeps: NewLinksSectionItemsDeps;
 	itemsAccessors: CachedVirtualItemAccessors;
 	getItems: CachedVirtualItemAccessors["getItems"];
 	getItem: CachedVirtualItemAccessors["getItem"];
-	descriptor: TwoHopSectionDescriptor;
+	descriptor: TwoHopVirtualSectionDescriptor;
 }
 
 export interface ResolveNewLinkSectionEntryParams {
@@ -107,7 +107,7 @@ function createNewLinkDescriptor(params: {
 	readonly totalCount: number;
 	readonly getItems: CachedVirtualItemAccessors["getItems"];
 	readonly getItem: CachedVirtualItemAccessors["getItem"];
-}): TwoHopSectionDescriptor {
+}): TwoHopVirtualSectionDescriptor {
 	return createDescriptor(
 		{
 			kind: "new-links-section",
