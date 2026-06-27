@@ -8,6 +8,10 @@ interface MockObserverRecord {
 	disconnect: ReturnType<typeof vi.fn>;
 }
 
+type WindowWithIntersectionObserver = Window & {
+	IntersectionObserver?: typeof IntersectionObserver;
+};
+
 const observerRecords: MockObserverRecord[] = [];
 let originalIntersectionObserver: typeof globalThis.IntersectionObserver | undefined;
 
@@ -97,5 +101,106 @@ describe("IntersectionObserverRegistry", () => {
 
 		expect(observerRecords[0]?.unobserve).toHaveBeenCalledWith(secondElement);
 		expect(observerRecords[0]?.disconnect).toHaveBeenCalledTimes(1);
+	});
+
+	it("uses the observed element owner window IntersectionObserver", () => {
+		const registry = getLazyLoadManager();
+		const frame = document.createElement("iframe");
+		document.body.append(frame);
+		const frameDocument = frame.contentDocument;
+		const frameWindow =
+			frame.contentWindow as WindowWithIntersectionObserver | null;
+		expect(frameDocument).toBeTruthy();
+		expect(frameWindow).toBeTruthy();
+		if (!frameDocument || !frameWindow) {
+			return;
+		}
+
+		const foreignRecords: MockObserverRecord[] = [];
+		class ForeignIntersectionObserver {
+			root: IntersectionObserver["root"] = null;
+			rootMargin = "";
+			thresholds: ReadonlyArray<number> = [];
+			observe = vi.fn();
+			unobserve = vi.fn();
+			disconnect = vi.fn();
+			takeRecords = () => [];
+
+			constructor(
+				_callback: IntersectionObserverCallback,
+				options?: IntersectionObserverInit,
+			) {
+				foreignRecords.push({
+					options,
+					observe: this.observe,
+					unobserve: this.unobserve,
+					disconnect: this.disconnect,
+				});
+			}
+		}
+		frameWindow.IntersectionObserver =
+			ForeignIntersectionObserver as unknown as typeof IntersectionObserver;
+
+		const element = frameDocument.createElement("div");
+		registry.observe(element, vi.fn(), {
+			root: null,
+			rootMargin: "10px",
+			threshold: 0,
+		});
+
+		expect(observerRecords).toHaveLength(0);
+		expect(foreignRecords).toHaveLength(1);
+		expect(foreignRecords[0]?.observe).toHaveBeenCalledWith(element);
+	});
+
+	it("keeps shared observers separate across owner windows", () => {
+		const registry = getLazyLoadManager();
+		const frame = document.createElement("iframe");
+		document.body.append(frame);
+		const frameDocument = frame.contentDocument;
+		const frameWindow =
+			frame.contentWindow as WindowWithIntersectionObserver | null;
+		expect(frameDocument).toBeTruthy();
+		expect(frameWindow).toBeTruthy();
+		if (!frameDocument || !frameWindow) {
+			return;
+		}
+
+		const foreignRecords: MockObserverRecord[] = [];
+		class ForeignIntersectionObserver {
+			root: IntersectionObserver["root"] = null;
+			rootMargin = "";
+			thresholds: ReadonlyArray<number> = [];
+			observe = vi.fn();
+			unobserve = vi.fn();
+			disconnect = vi.fn();
+			takeRecords = () => [];
+
+			constructor(
+				_callback: IntersectionObserverCallback,
+				options?: IntersectionObserverInit,
+			) {
+				foreignRecords.push({
+					options,
+					observe: this.observe,
+					unobserve: this.unobserve,
+					disconnect: this.disconnect,
+				});
+			}
+		}
+		frameWindow.IntersectionObserver =
+			ForeignIntersectionObserver as unknown as typeof IntersectionObserver;
+
+		const config = { root: null, rootMargin: "10px", threshold: 0 };
+		const mainElement = document.createElement("div");
+		const foreignElement = frameDocument.createElement("div");
+
+		registry.observe(mainElement, vi.fn(), config);
+		registry.observe(foreignElement, vi.fn(), config);
+
+		expect(observerRecords).toHaveLength(1);
+		expect(foreignRecords).toHaveLength(1);
+		expect(observerRecords[0]?.observe).toHaveBeenCalledWith(mainElement);
+		expect(foreignRecords[0]?.observe).toHaveBeenCalledWith(foreignElement);
 	});
 });

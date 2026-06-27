@@ -1,4 +1,10 @@
+import { isDocumentLike } from "ui/utils/realmSafeDom";
+
 export type RegistrationToken = symbol;
+
+type WindowWithIntersectionObserver = Window & {
+	IntersectionObserver?: typeof IntersectionObserver;
+};
 
 interface ObserverConfig {
 	root?: Element | Document | null;
@@ -52,19 +58,22 @@ class IntersectionObserverRegistry {
 		config: ObserverConfig = { rootMargin: "50px", threshold: 0 },
 		once = true,
 	): RegistrationToken {
+		const ownerWindow = this.getObserverOwnerWindow(element, config.root ?? null);
+		const IntersectionObserverCtor = ownerWindow?.IntersectionObserver;
+
 		// IntersectionObserver が利用できない環境では即座に実行
-		if (typeof window === "undefined" || !("IntersectionObserver" in window)) {
+		if (!IntersectionObserverCtor) {
 			callback();
 			// ダミートークンを返す（unobserve は no-op になる）
 			return Symbol();
 		}
 
-		const configKey = this.getConfigKey(config);
+		const configKey = this.getConfigKey(config, ownerWindow);
 		let observer = this.observers.get(configKey);
 
 		if (!observer) {
 			// クロージャで observer 参照を束縛し、handleIntersection に渡す
-			const newObserver = new IntersectionObserver(
+			const newObserver = new IntersectionObserverCtor(
 				(entries) => this.handleIntersection(newObserver, entries),
 				{
 					root: config.root ?? null,
@@ -176,9 +185,10 @@ class IntersectionObserverRegistry {
 		}
 	}
 
-	private getConfigKey(config: ObserverConfig): string {
+	private getConfigKey(config: ObserverConfig, ownerWindow: Window): string {
+		const windowKey = this.getObjectKey(ownerWindow);
 		const rootKey = this.getRootKey(config.root ?? null);
-		return `${rootKey}|${config.rootMargin}|${config.threshold}`;
+		return `${windowKey}|${rootKey}|${config.rootMargin}|${config.threshold}`;
 	}
 
 	private getRootKey(root: Element | Document | null): string {
@@ -186,14 +196,31 @@ class IntersectionObserverRegistry {
 			return "null";
 		}
 
-		const existingId = this.rootIds.get(root);
+		return this.getObjectKey(root);
+	}
+
+	private getObjectKey(value: object): string {
+		const existingId = this.rootIds.get(value);
 		if (existingId !== undefined) {
 			return String(existingId);
 		}
 
 		const nextId = ++this.rootIdCounter;
-		this.rootIds.set(root, nextId);
+		this.rootIds.set(value, nextId);
 		return String(nextId);
+	}
+
+	private getObserverOwnerWindow(
+		element: Element,
+		root: Element | Document | null,
+	): WindowWithIntersectionObserver | null {
+		if (isDocumentLike(root)) {
+			return root.defaultView as WindowWithIntersectionObserver | null;
+		}
+
+		const ownerWindow =
+			root?.ownerDocument?.defaultView ?? element.ownerDocument?.defaultView;
+		return ownerWindow as WindowWithIntersectionObserver | null;
 	}
 }
 

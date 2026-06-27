@@ -6,6 +6,11 @@ import { VIEW_TYPE_TAG_NOTES } from "ui/views/TagNotesView";
 import { CARD_SELECTOR, LOAD_MORE_SELECTOR } from "./resultFocus";
 import { querySelectorAllIncludingShadow } from "ui/utils/shadowDom";
 import { isElementVisible } from "ui/utils/domUtils";
+import {
+	createOwnerMouseEvent,
+	getOptionalOwnerWindow,
+	isHTMLElementLike,
+} from "ui/utils/realmSafeDom";
 
 const INLINE_SURFACE_SELECTOR =
 	'.cosense-card-links__root[data-ccl-card-surface="inline"]';
@@ -18,6 +23,10 @@ const MIN_SCROLL_STEP_PX = 24;
 const SHORT_HINT_KEYS = ["d", "f", "j", "k"] as const;
 const LONG_HINT_KEYS = ["a", "s", "d", "f", "j", "k", "l", ";"] as const;
 const HANDLED_HINT_KEYS = new Set<string>(LONG_HINT_KEYS);
+
+type WindowWithEventConstructor = Window & {
+	Event: typeof Event;
+};
 
 type CardSurfaceHost = "inline" | "sidebar" | "empty";
 
@@ -65,6 +74,8 @@ export class KeyboardCardNavigator {
 	private rows: KeyboardNavigationRow[] = [];
 	private selectedRowIndex = -1;
 	private scrollFrameId: number | null = null;
+	private scrollFrameWindow: Window | null = null;
+	private keydownDocument: Document | null = null;
 	private cachedScrollContainer: HTMLElement | null = null;
 	private readonly handleDocumentKeydownBound = this.handleDocumentKeydown.bind(this);
 
@@ -97,7 +108,12 @@ export class KeyboardCardNavigator {
 		this.rootEl.classList.add("ccl-kb-nav-active");
 		this.rootEl.dataset.cclKbNavHost = host;
 
-		document.addEventListener("keydown", this.handleDocumentKeydownBound, true);
+		this.keydownDocument = this.rootEl.ownerDocument;
+		this.keydownDocument.addEventListener(
+			"keydown",
+			this.handleDocumentKeydownBound,
+			true,
+		);
 
 		this.rootEl.focus({ preventScroll: true });
 
@@ -108,12 +124,18 @@ export class KeyboardCardNavigator {
 	}
 
 	public deactivate(): void {
-		document.removeEventListener("keydown", this.handleDocumentKeydownBound, true);
+		this.keydownDocument?.removeEventListener(
+			"keydown",
+			this.handleDocumentKeydownBound,
+			true,
+		);
+		this.keydownDocument = null;
 
 		if (this.scrollFrameId !== null) {
-			cancelAnimationFrame(this.scrollFrameId);
+			this.scrollFrameWindow?.cancelAnimationFrame(this.scrollFrameId);
 			this.scrollFrameId = null;
 		}
+		this.scrollFrameWindow = null;
 
 		this.clearSelectionState();
 
@@ -136,7 +158,7 @@ export class KeyboardCardNavigator {
 			MarkdownView,
 		) as MarkdownView | null;
 
-		if (activeMarkdownView?.containerEl instanceof HTMLElement) {
+		if (isHTMLElementLike(activeMarkdownView?.containerEl)) {
 			const inlineSurface = this.findVisibleSurfaceRoot(
 				activeMarkdownView.containerEl,
 				"inline",
@@ -152,11 +174,10 @@ export class KeyboardCardNavigator {
 		for (const leaf of this.app.workspace.getLeavesOfType(
 			TWO_HOP_LINKS_VIEW_TYPE,
 		)) {
-			const container =
-				leaf.view?.contentEl instanceof HTMLElement
-					? leaf.view.contentEl
-					: leaf.view?.containerEl;
-			if (!(container instanceof HTMLElement)) {
+			const container = isHTMLElementLike(leaf.view?.contentEl)
+				? leaf.view.contentEl
+				: leaf.view?.containerEl;
+			if (!isHTMLElementLike(container)) {
 				continue;
 			}
 
@@ -184,11 +205,10 @@ export class KeyboardCardNavigator {
 				return;
 			}
 
-			const container =
-				view?.contentEl instanceof HTMLElement
-					? view.contentEl
-					: view?.containerEl;
-			if (!(container instanceof HTMLElement)) {
+			const container = isHTMLElementLike(view?.contentEl)
+				? view.contentEl
+				: view?.containerEl;
+			if (!isHTMLElementLike(container)) {
 				return;
 			}
 
@@ -308,7 +328,7 @@ export class KeyboardCardNavigator {
 
 		this.deactivate();
 		targetElement.dispatchEvent(
-			new MouseEvent("click", {
+			createOwnerMouseEvent(targetElement, "click", {
 				bubbles: true,
 				cancelable: true,
 				composed: true,
@@ -463,7 +483,7 @@ export class KeyboardCardNavigator {
 		}
 
 		const scrollContainer = this.resolveScrollTarget();
-		if (!(scrollContainer instanceof HTMLElement)) {
+		if (!isHTMLElementLike(scrollContainer)) {
 			return;
 		}
 
@@ -471,9 +491,16 @@ export class KeyboardCardNavigator {
 		const anchorTop = currentRow.top;
 		this.scrollBy(scrollContainer, delta * scrollStep);
 
-		this.scrollFrameId = requestAnimationFrame(() => {
-			this.scrollFrameId = requestAnimationFrame(() => {
+		const ownerWindow = getOptionalOwnerWindow(this.rootEl);
+		if (!ownerWindow) {
+			return;
+		}
+
+		this.scrollFrameWindow = ownerWindow;
+		this.scrollFrameId = ownerWindow.requestAnimationFrame(() => {
+			this.scrollFrameId = ownerWindow.requestAnimationFrame(() => {
 				this.scrollFrameId = null;
+				this.scrollFrameWindow = null;
 
 				if (!this.rootEl) {
 					return;
@@ -507,13 +534,13 @@ export class KeyboardCardNavigator {
 
 	private centerRow(row: KeyboardNavigationRow): void {
 		const target = this.resolveScrollTarget();
-		if (!target || typeof window === "undefined") {
+		if (!target) {
 			return;
 		}
 
 		const rowCenter = (row.top + row.bottom) / 2;
 
-		if (target instanceof HTMLElement) {
+		if (isHTMLElementLike(target)) {
 			const rect = target.getBoundingClientRect();
 			const viewportCenter = rect.top + target.clientHeight / 2;
 			const delta = rowCenter - viewportCenter;
@@ -524,14 +551,14 @@ export class KeyboardCardNavigator {
 			return;
 		}
 
-		const viewportCenter = window.innerHeight / 2;
+		const viewportCenter = target.innerHeight / 2;
 		const delta = rowCenter - viewportCenter;
 
 		if (Math.abs(delta) >= 1) {
-			window.scrollTo({
-				top: Math.max(0, window.scrollY + delta),
+			target.scrollTo({
+				top: Math.max(0, target.scrollY + delta),
 			});
-			window.dispatchEvent(new Event("scroll"));
+			target.dispatchEvent(this.createOwnerEvent(target, "scroll"));
 		}
 	}
 
@@ -550,7 +577,7 @@ export class KeyboardCardNavigator {
 		}
 
 		this.cachedScrollContainer = findNearestScrollContainer(rootEl);
-		return this.cachedScrollContainer ?? window;
+		return this.cachedScrollContainer ?? getOptionalOwnerWindow(rootEl);
 	}
 
 	private setScrollTop(scrollContainer: HTMLElement, nextScrollTop: number): boolean {
@@ -560,7 +587,9 @@ export class KeyboardCardNavigator {
 		scrollContainer.scrollTop = clamped;
 
 		if (scrollContainer.scrollTop !== previous) {
-			scrollContainer.dispatchEvent(new Event("scroll"));
+			scrollContainer.dispatchEvent(
+				this.createOwnerEvent(scrollContainer, "scroll"),
+			);
 			return true;
 		}
 
@@ -576,14 +605,22 @@ export class KeyboardCardNavigator {
 		rowIndex: number,
 	): void {
 		if (this.scrollFrameId !== null) {
-			cancelAnimationFrame(this.scrollFrameId);
+			this.scrollFrameWindow?.cancelAnimationFrame(this.scrollFrameId);
 			this.scrollFrameId = null;
 		}
+		this.scrollFrameWindow = null;
 
 		loadMoreButton.click();
 
-		this.scrollFrameId = requestAnimationFrame(() => {
+		const ownerWindow = getOptionalOwnerWindow(loadMoreButton);
+		if (!ownerWindow) {
+			return;
+		}
+
+		this.scrollFrameWindow = ownerWindow;
+		this.scrollFrameId = ownerWindow.requestAnimationFrame(() => {
 			this.scrollFrameId = null;
+			this.scrollFrameWindow = null;
 
 			if (!this.rootEl) {
 				return;
@@ -663,16 +700,24 @@ export class KeyboardCardNavigator {
 	}
 
 	private isEditableTarget(target: EventTarget | null): boolean {
-		if (!(target instanceof HTMLElement)) {
+		if (!isHTMLElementLike(target)) {
 			return false;
 		}
 
+		const tagName = target.tagName.toUpperCase();
 		return (
-			target instanceof HTMLInputElement ||
-			target instanceof HTMLTextAreaElement ||
-			target instanceof HTMLSelectElement ||
+			tagName === "INPUT" ||
+			tagName === "TEXTAREA" ||
+			tagName === "SELECT" ||
 			target.isContentEditable
 		);
+	}
+
+	private createOwnerEvent(target: Node | Window, type: string): Event {
+		const ownerWindow = (
+			"document" in target ? target : getOptionalOwnerWindow(target)
+		) as WindowWithEventConstructor | null;
+		return ownerWindow ? new ownerWindow.Event(type) : new Event(type);
 	}
 
 	private findLastIndex<T>(items: T[], predicate: (value: T) => boolean): number {

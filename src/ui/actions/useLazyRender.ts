@@ -7,6 +7,7 @@ import {
 	findNearestScrollContainer,
 	isWithinComposedTree,
 } from "ui/components/common/virtualGridLinkListScroll";
+import { isHTMLElementLike, isShadowRootLike } from "ui/utils/realmSafeDom";
 
 export interface LazyRenderActionParams {
 	cacheKey?: string;
@@ -54,7 +55,7 @@ export const lazyRender: Action<HTMLElement, LazyRenderActionParams> = (
 
 	const resolveObserverRootCacheAnchor = (): HTMLElement | null => {
 		const rootNode = node.getRootNode?.();
-		return rootNode instanceof ShadowRoot && rootNode.host instanceof HTMLElement
+		return isShadowRootLike(rootNode) && isHTMLElementLike(rootNode.host)
 			? rootNode.host
 			: node.parentElement;
 	};

@@ -1,5 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { moveFocusBetweenResults } from "../resultFocus";
+import { getFocusableResultTarget, moveFocusBetweenResults } from "../resultFocus";
+
+type WindowWithKeyboardEventConstructor = Window & {
+	KeyboardEvent: typeof KeyboardEvent;
+};
 
 function createZeroRect(): DOMRect {
 	return {
@@ -120,5 +124,40 @@ describe("moveFocusBetweenResults", () => {
 			block: "nearest",
 			inline: "nearest",
 		});
+	});
+
+	it("resolves a focus target from a foreign-window keyboard event", () => {
+		const frame = document.createElement("iframe");
+		document.body.append(frame);
+		const frameDocument = frame.contentDocument;
+		const frameWindow = frame.contentWindow;
+		expect(frameDocument).toBeTruthy();
+		expect(frameWindow).toBeTruthy();
+		if (!frameDocument || !frameWindow) {
+			return;
+		}
+
+		const card = frameDocument.createElement("div");
+		card.className = "cosense-card-links__box";
+		card.dataset.cclInteractionId = "foreign-card";
+		frameDocument.body.append(card);
+
+		const event = new (
+			frameWindow as WindowWithKeyboardEventConstructor
+		).KeyboardEvent("keydown", {
+			key: "ArrowDown",
+			bubbles: true,
+			composed: true,
+		});
+		Object.defineProperty(event, "target", {
+			configurable: true,
+			value: card,
+		});
+		Object.defineProperty(event, "composedPath", {
+			configurable: true,
+			value: () => [card, frameDocument.body, frameDocument, frameWindow],
+		});
+
+		expect(getFocusableResultTarget(event)).toBe(card);
 	});
 });

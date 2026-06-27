@@ -3,6 +3,11 @@ import {
 	querySelectorAllIncludingShadow,
 } from "ui/utils/shadowDom";
 import { isElementVisible } from "ui/utils/domUtils";
+import {
+	getOptionalOwnerWindow,
+	isEventLike,
+	isHTMLElementLike,
+} from "ui/utils/realmSafeDom";
 export type ResultFocusDirection = "up" | "down";
 export type ResultNavigationDirection = ResultFocusDirection | "left" | "right";
 
@@ -36,6 +41,17 @@ interface NavigationTarget {
 const NAVIGATION_ROOT_SELECTOR =
 	".cosense-card-links__virtual-grid, .view-plan-virtual-list";
 
+type WindowWithEventConstructor = Window & {
+	Event: typeof Event;
+};
+
+function createOwnerEvent(target: Node | Window, type: string): Event {
+	const ownerWindow = (
+		"document" in target ? target : getOptionalOwnerWindow(target)
+	) as WindowWithEventConstructor | null;
+	return ownerWindow ? new ownerWindow.Event(type) : new Event(type);
+}
+
 function collectResultTargets(container: HTMLElement | null): HTMLElement[] {
 	return querySelectorAllIncludingShadow<HTMLElement>(
 		container,
@@ -52,7 +68,7 @@ function collectResultSections(container: HTMLElement | null): HTMLElement[] {
 
 	return Array.from(container.children).filter(
 		(element): element is HTMLElement =>
-			element instanceof HTMLElement &&
+			isHTMLElementLike(element) &&
 			element.classList.contains("cosense-card-links__section"),
 	);
 }
@@ -378,7 +394,7 @@ function moveFocusLinearly(
 export function getFocusableResultTarget(
 	target: EventTarget | Event | null,
 ): HTMLElement | null {
-	if (target instanceof Event) {
+	if (isEventLike(target)) {
 		return findClosestComposed(
 			target.composedPath()[0] ?? target.target,
 			RESULT_FOCUS_SELECTOR,
@@ -462,16 +478,17 @@ export function scrollSectionIntoViewForFocus(
 					: currentScrollTop;
 
 		scrollContainer.scrollTop = Math.max(0, nextScrollTop);
-		scrollContainer.dispatchEvent(new Event("scroll"));
+		scrollContainer.dispatchEvent(createOwnerEvent(scrollContainer, "scroll"));
 		return;
 	}
 
-	if (typeof window === "undefined") {
+	const ownerWindow = getOptionalOwnerWindow(section);
+	if (!ownerWindow) {
 		return;
 	}
 
-	const currentScrollTop = window.scrollY || window.pageYOffset || 0;
-	const viewportHeight = window.innerHeight;
+	const currentScrollTop = ownerWindow.scrollY || ownerWindow.pageYOffset || 0;
+	const viewportHeight = ownerWindow.innerHeight;
 	const sectionTop = sectionRect.top + currentScrollTop;
 	const sectionBottom = sectionTop + sectionHeight;
 	const viewportTop = currentScrollTop;
@@ -485,10 +502,10 @@ export function scrollSectionIntoViewForFocus(
 				? Math.max(0, sectionBottom - 1)
 				: currentScrollTop;
 
-	window.scrollTo({
+	ownerWindow.scrollTo({
 		top: Math.max(0, nextScrollTop),
 	});
-	window.dispatchEvent(new Event("scroll"));
+	ownerWindow.dispatchEvent(createOwnerEvent(ownerWindow, "scroll"));
 }
 
 export function moveFocusBetweenResults(
