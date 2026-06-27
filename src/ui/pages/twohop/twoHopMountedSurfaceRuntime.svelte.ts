@@ -53,9 +53,20 @@ export function createTwoHopMountedSurfaceRuntime(params: {
 		},
 	});
 	const mountedBuild = $derived(virtualList.getReconciliationState().mountedBuild);
-	const contentHeight = $derived(
-		virtualList.getTotalHeight(params.inputRuntime.rowModel.totalHeight),
-	);
+	const contentHeight = $derived.by(() => {
+		const activeRowModel = params.inputRuntime.rowModel;
+		const snapshot = virtualList.getSnapshot();
+
+		if (!snapshot) {
+			return activeRowModel.totalHeight;
+		}
+
+		if (snapshot.rowModel !== activeRowModel) {
+			return Math.max(snapshot.totalHeight, activeRowModel.totalHeight);
+		}
+
+		return snapshot.totalHeight;
+	});
 	let mountedRowsVersion = $state.raw(0);
 	const mountedRowsForSurface = $derived.by(() => {
 		const build = mountedBuild;
