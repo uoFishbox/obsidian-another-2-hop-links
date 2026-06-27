@@ -22,7 +22,7 @@ import {
 	type SharedResizeObserverRegistry,
 } from "./sharedResizeObservers";
 import {
-	readVirtualListSharedScrollMetrics,
+	readVirtualListSharedScrollMetricsInto,
 	type VirtualListSharedScrollMetrics,
 } from "./sharedScrollMetrics";
 import { hasRelevantStructureMutation } from "./structureMutationObserver";
@@ -77,6 +77,7 @@ interface ScrollerViewportEntry {
 	structureDependencyTargets: Set<Node>;
 	positionDependencyElements: Set<HTMLElement>;
 	scrollActivitySource: object;
+	sharedScrollMetricsScratch: VirtualListSharedScrollMetrics;
 	scrollTarget: Window | HTMLElement;
 	isScrollActive: boolean;
 	structureObserverConnected: boolean;
@@ -161,7 +162,7 @@ const readSharedScrollMetrics = (
 	entry: ScrollerViewportEntry,
 ): VirtualListSharedScrollMetrics => {
 	const subscriber = getActiveSubscriber(entry);
-	return readVirtualListSharedScrollMetrics({
+	return readVirtualListSharedScrollMetricsInto(entry.sharedScrollMetricsScratch, {
 		scroller: entry.scroller,
 		subscriber,
 		ownerElement: subscriber?.rootEl ?? entry.registryKey,
@@ -545,6 +546,12 @@ const getScrollerViewportEntry = (
 		structureDependencyTargets: new Set<Node>(),
 		positionDependencyElements: new Set<HTMLElement>(),
 		scrollActivitySource: {},
+		sharedScrollMetricsScratch: {
+			scrollTop: 0,
+			viewportHeight: 0,
+			frameId: 0,
+			isScrollActive: false,
+		},
 		scrollTarget: scroller ?? ownerWindow,
 		isScrollActive: false,
 		structureObserverConnected: false,

@@ -1,4 +1,4 @@
-import type { RowRange } from "../rowRange";
+import { EMPTY_ROW_RANGE, type RowRange } from "../rowRange";
 import type { VirtualRanges } from "../types";
 import {
 	createMountedScrollWindow,
@@ -171,6 +171,19 @@ export interface CreateVirtualListControllerOptions<TLayout, TContent, TCachedOp
 	maxUnstableMeasurementRetries: number;
 }
 
+const SKIPPED_NO_ROOT: MeasurementUpdateResult<RowRange> = {
+	kind: "skipped",
+	reason: "no-root",
+};
+const SKIPPED_NO_WINDOW: MeasurementUpdateResult<RowRange> = {
+	kind: "skipped",
+	reason: "no-window",
+};
+const SKIPPED_UNSTABLE: MeasurementUpdateResult<RowRange> = {
+	kind: "skipped",
+	reason: "unstable",
+};
+
 export function createVirtualListController<
 	TLayout,
 	TContent,
@@ -206,6 +219,15 @@ export function createVirtualListController<
 	const cachedScrollSnapshot: VirtualListScrollSnapshot = {
 		scrollTop: 0,
 		viewportHeight: 0,
+	};
+	const stableResult: MeasurementUpdateResult<RowRange> = {
+		kind: "stable",
+		range: EMPTY_ROW_RANGE,
+	};
+
+	const returnStable = (range: RowRange): MeasurementUpdateResult<RowRange> => {
+		stableResult.range = range;
+		return stableResult;
 	};
 
 	const resolveMountedComparableScrollWindow = (
@@ -266,10 +288,10 @@ export function createVirtualListController<
 		lastLiveMeasurementContext = null;
 		lastScrollWindow = null;
 		if (!rootEl) {
-			return { kind: "skipped", reason: "no-root" };
+			return SKIPPED_NO_ROOT;
 		}
 		if (!getOptionalOwnerWindow(rootEl)) {
-			return { kind: "skipped", reason: "no-window" };
+			return SKIPPED_NO_WINDOW;
 		}
 
 		const resolvedSectionRect = sectionRect ?? rootEl.getBoundingClientRect();
@@ -330,7 +352,7 @@ export function createVirtualListController<
 		const rootEl = getRootEl();
 		if (!getOptionalOwnerWindow(rootEl ?? measurement.scrollContainerEl)) {
 			lastScrollWindow = null;
-			return { kind: "skipped", reason: "no-window" };
+			return SKIPPED_NO_WINDOW;
 		}
 
 		// Scalar locals — defer object allocation past early-return paths
@@ -364,7 +386,7 @@ export function createVirtualListController<
 		);
 		if (!isStableMeasurement && shouldSkipUnstableCachedMeasurement?.(options)) {
 			lastScrollWindow = null;
-			return { kind: "skipped", reason: "unstable" };
+			return SKIPPED_UNSTABLE;
 		}
 
 		// Allocate lastCachedMeasurementContext only when a consumer exists
@@ -374,7 +396,9 @@ export function createVirtualListController<
 				viewportHeight: localViewportHeight,
 				sectionTop: localSectionTop,
 				isScrollActive: localIsScrollActive,
-				...(sharedScrollMetrics ? { sharedScrollMetrics } : {}),
+				...(sharedScrollMetrics
+					? { sharedScrollMetrics: { ...sharedScrollMetrics } }
+					: {}),
 			};
 		}
 
@@ -412,10 +436,7 @@ export function createVirtualListController<
 					);
 					if (!hasMountedWindowChanged) {
 						if (!resolveScrollWindowMeasurement) {
-							return {
-								kind: "stable",
-								range: mountedScrollWindowMeasurement.mounted,
-							};
+							return returnStable(mountedScrollWindowMeasurement.mounted);
 						}
 						if (
 							isWithinStableMountedScrollWindow(
@@ -425,10 +446,7 @@ export function createVirtualListController<
 								localScrollTop,
 							)
 						) {
-							return {
-								kind: "stable",
-								range: mountedScrollWindowMeasurement.mounted,
-							};
+							return returnStable(mountedScrollWindowMeasurement.mounted);
 						}
 						if (
 							isWithinStablePreviewScrollWindow(
@@ -438,10 +456,7 @@ export function createVirtualListController<
 								localScrollTop,
 							)
 						) {
-							return {
-								kind: "stable",
-								range: mountedScrollWindowMeasurement.mounted,
-							};
+							return returnStable(mountedScrollWindowMeasurement.mounted);
 						}
 					}
 					pendingMountedScrollWindowMeasurement =
@@ -468,10 +483,7 @@ export function createVirtualListController<
 						"visible-and-mounted",
 					)
 				) {
-					return {
-						kind: "stable",
-						range: scrollWindowMeasurement.ranges.mounted,
-					};
+					return returnStable(scrollWindowMeasurement.ranges.mounted);
 				}
 				if (
 					activeScrollWindowComparison === "mounted-only" &&
@@ -491,10 +503,7 @@ export function createVirtualListController<
 						scrollWindowMeasurement.ranges,
 						scrollWindowMeasurement.stablePreviewScrollTopBand,
 					);
-					return {
-						kind: "stable",
-						range: scrollWindowMeasurement.ranges.mounted,
-					};
+					return returnStable(scrollWindowMeasurement.ranges.mounted);
 				}
 				nextScrollWindowIdentity = scrollWindowMeasurement.identity;
 				nextScrollWindowRanges = scrollWindowMeasurement.ranges;

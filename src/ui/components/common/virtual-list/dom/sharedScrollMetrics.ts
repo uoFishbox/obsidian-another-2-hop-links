@@ -12,6 +12,14 @@ export interface SharedScrollMetricsSubscriber {
 	getCachedViewportHeight?: () => number | undefined;
 }
 
+export interface ReadVirtualListSharedScrollMetricsParams {
+	scroller: HTMLElement | null;
+	subscriber?: SharedScrollMetricsSubscriber | null;
+	ownerElement?: HTMLElement | null;
+	isScrollActive: boolean;
+	frameId: number;
+}
+
 export function resolveCachedViewportHeight(
 	subscriber: SharedScrollMetricsSubscriber | null | undefined,
 ): number | null {
@@ -31,30 +39,39 @@ export function resolveCachedViewportHeight(
 	return viewportHeight;
 }
 
-export function readVirtualListSharedScrollMetrics(params: {
-	scroller: HTMLElement | null;
-	subscriber?: SharedScrollMetricsSubscriber | null;
-	ownerElement?: HTMLElement | null;
-	isScrollActive: boolean;
-	frameId: number;
-}): VirtualListSharedScrollMetrics {
+export function readVirtualListSharedScrollMetricsInto(
+	out: VirtualListSharedScrollMetrics,
+	params: ReadVirtualListSharedScrollMetricsParams,
+): VirtualListSharedScrollMetrics {
 	if (params.scroller) {
 		const cachedViewportHeight = resolveCachedViewportHeight(params.subscriber);
-		return {
-			scrollTop: params.scroller.scrollTop,
-			viewportHeight: cachedViewportHeight ?? params.scroller.clientHeight,
-			frameId: params.frameId,
-			isScrollActive: params.isScrollActive,
-		};
+		out.scrollTop = params.scroller.scrollTop;
+		out.viewportHeight = cachedViewportHeight ?? params.scroller.clientHeight;
+		out.frameId = params.frameId;
+		out.isScrollActive = params.isScrollActive;
+		return out;
 	}
 
 	const ownerWindow = getOptionalOwnerWindow(params.ownerElement);
-	return {
-		scrollTop: ownerWindow
-			? ownerWindow.scrollY || ownerWindow.pageYOffset || 0
-			: 0,
-		viewportHeight: ownerWindow?.innerHeight ?? 0,
-		frameId: params.frameId,
-		isScrollActive: params.isScrollActive,
-	};
+	out.scrollTop = ownerWindow
+		? ownerWindow.scrollY || ownerWindow.pageYOffset || 0
+		: 0;
+	out.viewportHeight = ownerWindow?.innerHeight ?? 0;
+	out.frameId = params.frameId;
+	out.isScrollActive = params.isScrollActive;
+	return out;
+}
+
+export function readVirtualListSharedScrollMetrics(
+	params: ReadVirtualListSharedScrollMetricsParams,
+): VirtualListSharedScrollMetrics {
+	return readVirtualListSharedScrollMetricsInto(
+		{
+			scrollTop: 0,
+			viewportHeight: 0,
+			frameId: 0,
+			isScrollActive: false,
+		},
+		params,
+	);
 }

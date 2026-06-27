@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
 	readVirtualListSharedScrollMetrics,
+	readVirtualListSharedScrollMetricsInto,
 	resolveCachedViewportHeight,
 } from "../sharedScrollMetrics";
 
@@ -52,6 +53,39 @@ describe("sharedScrollMetrics", () => {
 			scrollTop: 120,
 			viewportHeight: 240,
 			frameId: 7,
+			isScrollActive: true,
+		});
+	});
+
+	it("reads metrics into the provided output object", () => {
+		const scroller = document.createElement("div");
+		Object.defineProperty(scroller, "scrollTop", {
+			value: 180,
+			configurable: true,
+		});
+		Object.defineProperty(scroller, "clientHeight", {
+			value: 360,
+			configurable: true,
+		});
+		const out = {
+			scrollTop: 0,
+			viewportHeight: 0,
+			frameId: 0,
+			isScrollActive: false,
+		};
+
+		const result = readVirtualListSharedScrollMetricsInto(out, {
+			scroller,
+			subscriber: null,
+			isScrollActive: true,
+			frameId: 8,
+		});
+
+		expect(result).toBe(out);
+		expect(out).toEqual({
+			scrollTop: 180,
+			viewportHeight: 360,
+			frameId: 8,
 			isScrollActive: true,
 		});
 	});
