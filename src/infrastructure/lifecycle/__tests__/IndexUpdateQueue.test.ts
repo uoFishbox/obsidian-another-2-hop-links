@@ -49,6 +49,8 @@ interface Harness {
 		rebuildIndexesTimeSliced: ReturnType<typeof vi.fn>;
 		applyFileChangesTimeSliced: ReturnType<typeof vi.fn>;
 	};
+	setVaultFile: (file: TFile) => void;
+	removeVaultFile: (path: string) => void;
 	triggerLayoutReady: () => void;
 	emitVaultEvent: (event: string, ...args: unknown[]) => void;
 	emitMetadataEvent: (event: string, ...args: unknown[]) => void;
@@ -58,6 +60,7 @@ function createHarness(): Harness {
 	const vaultHandlers = new Map<string, EventCallback[]>();
 	const metadataHandlers = new Map<string, EventCallback[]>();
 	const layoutReadyCallbacks: Array<() => void> = [];
+	const vaultFiles = new Map<string, TFile>();
 
 	const plugin = {
 		app: {
@@ -79,7 +82,10 @@ function createHarness(): Harness {
 					handlers.push(callback);
 					vaultHandlers.set(event, handlers);
 				}),
-				getFiles: vi.fn(() => [] as TFile[]),
+				getFiles: vi.fn(() => [...vaultFiles.values()]),
+				getAbstractFileByPath: vi.fn(
+					(path: string) => vaultFiles.get(path) ?? null,
+				),
 			},
 		},
 		registerEvent: vi.fn((eventRef: unknown) => eventRef),
@@ -123,6 +129,12 @@ function createHarness(): Harness {
 	return {
 		queue,
 		indexingService,
+		setVaultFile: (file: TFile) => {
+			vaultFiles.set(file.path, file);
+		},
+		removeVaultFile: (path: string) => {
+			vaultFiles.delete(path);
+		},
 		triggerLayoutReady: () => {
 			for (const callback of layoutReadyCallbacks) {
 				callback();
@@ -155,6 +167,12 @@ async function initializeQueue(harness: Harness): Promise<void> {
 	await flushAsyncTasks();
 	harness.indexingService.rebuildIndexesTimeSliced.mockClear();
 	harness.indexingService.applyFileChangesTimeSliced.mockClear();
+}
+
+function startInitialScan(harness: Harness): void {
+	harness.queue.setupEventListeners();
+	harness.triggerLayoutReady();
+	vi.advanceTimersByTime(100);
 }
 
 describe("IndexUpdateQueue", () => {
@@ -238,6 +256,63 @@ describe("IndexUpdateQueue", () => {
 				affectedPaths: ["notes/target.md"],
 				affectedLookupKeys: ["notes/target.md"],
 			}),
+		);
+	});
+
+	test("initial catch-up applies delete for a file created and deleted during initial scan", async () => {
+		const harness = createHarness();
+		const temp = createMockTFile("notes/temp.md");
+
+		startInitialScan(harness);
+		harness.emitVaultEvent("create", temp);
+		harness.emitVaultEvent("delete", temp);
+		harness.removeVaultFile(temp.path);
+		await flushAsyncTasks();
+
+		expect(
+			harness.indexingService.applyFileChangesTimeSliced,
+		).toHaveBeenCalledTimes(1);
+		expect(harness.indexingService.applyFileChangesTimeSliced).toHaveBeenCalledWith(
+			[{ type: "delete", path: "notes/temp.md" }],
+		);
+	});
+
+	test("initial catch-up ignores events observed before initial full scan starts", async () => {
+		const harness = createHarness();
+		const preScanFile = createMockTFile("notes/pre-scan.md");
+
+		harness.queue.setupEventListeners();
+		harness.emitVaultEvent("modify", preScanFile);
+		harness.triggerLayoutReady();
+		vi.advanceTimersByTime(100);
+		await flushAsyncTasks();
+
+		expect(
+			harness.indexingService.applyFileChangesTimeSliced,
+		).not.toHaveBeenCalled();
+	});
+
+	test("initial catch-up waits for metadata resolved when created file still exists", async () => {
+		const harness = createHarness();
+		const created = createMockTFile("notes/new-note.md");
+
+		startInitialScan(harness);
+		harness.setVaultFile(created);
+		harness.emitVaultEvent("create", created);
+		await flushAsyncTasks();
+
+		expect(
+			harness.indexingService.applyFileChangesTimeSliced,
+		).not.toHaveBeenCalled();
+
+		harness.emitMetadataEvent("resolved");
+		await flushAsyncTasks();
+
+		expect(
+			harness.indexingService.applyFileChangesTimeSliced,
+		).toHaveBeenCalledTimes(1);
+		expect(harness.indexingService.applyFileChangesTimeSliced).toHaveBeenCalledWith(
+			[{ type: "create", path: "notes/new-note.md" }],
 		);
 	});
 });

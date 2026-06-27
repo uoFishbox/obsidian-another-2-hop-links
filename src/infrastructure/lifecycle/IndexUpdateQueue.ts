@@ -10,6 +10,7 @@ import { FileChangeQueue } from "core/indexing/index-service/FileChangeQueue";
 import type { IndexingService } from "core/indexing/index-service/IndexingService";
 import type { PluginHost } from "types/pluginHost";
 import { enableLogging, logger } from "utils/logger";
+import { InitialScanChangeRecorder } from "./InitialScanChangeRecorder";
 
 export type DataUpdateListener = (context: DataUpdateContext) => void;
 
@@ -17,14 +18,19 @@ export class IndexUpdateQueue {
 	private dataUpdateListeners: Set<DataUpdateListener> = new Set();
 	private debouncedProcessPending: () => void;
 	private readonly changeQueue = new FileChangeQueue();
+	private readonly initialChangeRecorder = new InitialScanChangeRecorder();
 	private readonly queueIdleWaiters: Set<() => void> = new Set();
+	private readonly metadataResolveWaiters: Set<() => void> = new Set();
 	private readonly initialFullScanReady: Promise<void>;
 	private resolveInitialFullScanReady: (() => void) | undefined;
 	private initialFullScanTimer: number | undefined;
 	private unsubscribeIndexIdleWaiter: (() => void) | undefined;
 	private unsubscribeIndexDataUpdate: (() => void) | undefined;
 	private isProcessingPendingChanges = false;
+	private hasInitialFullScanCompleted = false;
+	private isCapturingInitialChanges = false;
 	private waitsForMetadataResolve = false;
+	private metadataResolveGeneration = 0;
 	private destroyed = false;
 
 	constructor(
@@ -73,6 +79,8 @@ export class IndexUpdateQueue {
 		this.dataUpdateListeners.clear();
 		this.queueIdleWaiters.forEach((resolve) => resolve());
 		this.queueIdleWaiters.clear();
+		this.metadataResolveWaiters.forEach((resolve) => resolve());
+		this.metadataResolveWaiters.clear();
 		this.resolveInitialFullScanReady?.();
 		this.resolveInitialFullScanReady = undefined;
 	}
@@ -113,12 +121,12 @@ export class IndexUpdateQueue {
 			return;
 		}
 		if (enableLogging) logger(`[EventManager] Index update requested for: ${path}`);
-		this.changeQueue.recordChange({ type: "modify", path });
-		this.syncMetadataResolveGate();
-		this.schedulePendingProcessing();
+		this.recordObservedChange({ type: "modify", path });
 	}
 
 	setupEventListeners(): void {
+		this.registerVaultListeners();
+
 		this.plugin.app.workspace.onLayoutReady(() => {
 			if (this.destroyed) {
 				return;
@@ -139,11 +147,7 @@ export class IndexUpdateQueue {
 
 		this.plugin.registerEvent(
 			this.plugin.app.metadataCache.on("resolved", () => {
-				if (this.destroyed) {
-					return;
-				}
-				this.waitsForMetadataResolve = false;
-				this.debouncedProcessPending();
+				this.handleMetadataResolved();
 			}),
 		);
 
@@ -157,12 +161,10 @@ export class IndexUpdateQueue {
 						logger(
 							`[EventManager] Canvas ${file.path}: Link structure changed, queueing index update`,
 						);
-					this.changeQueue.recordChange({
+					this.recordObservedChange({
 						type: "modify",
 						path: file.path,
 					});
-					this.syncMetadataResolveGate();
-					this.schedulePendingProcessing();
 				}
 			}),
 		);
@@ -199,13 +201,11 @@ export class IndexUpdateQueue {
 					logger(
 						`[EventManager] File renamed: ${oldPath} -> ${file.path}, queueing rename event`,
 					);
-				this.changeQueue.recordChange({
+				this.recordObservedChange({
 					type: "rename",
 					oldPath,
 					newPath: file.path,
 				});
-				this.waitsForMetadataResolve = true;
-				this.syncMetadataResolveGate();
 			}),
 		);
 
@@ -221,12 +221,10 @@ export class IndexUpdateQueue {
 					logger(
 						`[EventManager] File created: ${file.path}, queueing create event`,
 					);
-				this.changeQueue.recordChange({
+				this.recordObservedChange({
 					type: "create",
 					path: file.path,
 				});
-				this.waitsForMetadataResolve = true;
-				this.syncMetadataResolveGate();
 			}),
 		);
 
@@ -238,12 +236,10 @@ export class IndexUpdateQueue {
 				if (!(file instanceof TFile)) {
 					return;
 				}
-				this.changeQueue.recordChange({
+				this.recordObservedChange({
 					type: "delete",
 					path: file.path,
 				});
-				this.syncMetadataResolveGate();
-				this.schedulePendingProcessing();
 			}),
 		);
 
@@ -258,14 +254,41 @@ export class IndexUpdateQueue {
 				if (!INDEX_LINK_CAPABLE_EXTENSIONS.has(file.extension.toLowerCase())) {
 					return;
 				}
-				this.changeQueue.recordChange({
+				this.recordObservedChange({
 					type: "modify",
 					path: file.path,
 				});
-				this.syncMetadataResolveGate();
-				this.schedulePendingProcessing();
 			}),
 		);
+	}
+
+	private recordObservedChange(change: IncrementalFileChange): void {
+		if (this.destroyed) {
+			return;
+		}
+
+		if (this.isCapturingInitialChanges) {
+			this.initialChangeRecorder.record(change, this.metadataResolveGeneration);
+			return;
+		}
+
+		if (!this.hasInitialFullScanCompleted) {
+			return;
+		}
+
+		this.changeQueue.recordChange(change);
+
+		if (change.type === "create" || change.type === "rename") {
+			this.waitsForMetadataResolve = true;
+		}
+
+		this.syncMetadataResolveGate();
+
+		if (change.type === "create" || change.type === "rename") {
+			return;
+		}
+
+		this.schedulePendingProcessing();
 	}
 
 	private queueFolderRename(folder: TFolder, oldFolderPath: string): void {
@@ -294,15 +317,12 @@ export class IndexUpdateQueue {
 			}
 
 			const oldFilePath = `${oldPrefix}${newFilePath.slice(newPrefixLength)}`;
-			this.changeQueue.recordChange({
+			this.recordObservedChange({
 				type: "rename",
 				oldPath: oldFilePath,
 				newPath: newFilePath,
 			});
 		}
-
-		this.waitsForMetadataResolve = true;
-		this.syncMetadataResolveGate();
 	}
 
 	private async runInitialFullScan(): Promise<void> {
@@ -310,17 +330,81 @@ export class IndexUpdateQueue {
 			if (this.destroyed) {
 				return;
 			}
+			this.isCapturingInitialChanges = true;
 			await this.indexingService.rebuildIndexesTimeSliced();
+			if (this.destroyed) {
+				return;
+			}
+			await this.applyInitialCatchUpChanges();
 			if (this.destroyed) {
 				return;
 			}
 			if (enableLogging)
 				logger(`${PLUGIN_NAME}: Detailed backlinks map built (Initial)`);
-			this.registerVaultListeners();
 		} finally {
 			this.resolveInitialFullScanReady?.();
 			this.resolveInitialFullScanReady = undefined;
+			if (this.isCapturingInitialChanges) {
+				this.initialChangeRecorder.clear();
+				this.isCapturingInitialChanges = false;
+			}
+			this.notifyQueueIdleWaitersIfIdle();
 		}
+	}
+
+	private async applyInitialCatchUpChanges(): Promise<void> {
+		if (!this.initialChangeRecorder.hasPending()) {
+			if (enableLogging) {
+				logger(
+					"[IndexUpdateQueue] Initial catch-up: no changes after full scan",
+				);
+			}
+			this.isCapturingInitialChanges = false;
+			this.hasInitialFullScanCompleted = true;
+			return;
+		}
+
+		while (
+			this.initialChangeRecorder.needsMetadataResolve(
+				this.metadataResolveGeneration,
+				(path) => this.fileExists(path),
+			)
+		) {
+			await this.waitForNextMetadataResolve();
+
+			if (this.destroyed) {
+				return;
+			}
+		}
+
+		const changes = this.initialChangeRecorder.drainToFinalStateChanges(
+			(path) => this.fileExists(path),
+			(path) => this.shouldIndexPath(path),
+		);
+
+		if (enableLogging) {
+			logger(
+				`[IndexUpdateQueue] Initial catch-up: applying ${changes.length} changes after full scan`,
+			);
+		}
+
+		this.isProcessingPendingChanges = true;
+		this.isCapturingInitialChanges = false;
+		this.hasInitialFullScanCompleted = true;
+
+		try {
+			if (changes.length > 0) {
+				await this.indexingService.applyFileChangesTimeSliced(changes);
+			}
+			if (enableLogging) {
+				logger("[IndexUpdateQueue] Initial catch-up: complete");
+			}
+		} finally {
+			this.isProcessingPendingChanges = false;
+			this.notifyQueueIdleWaitersIfIdle();
+		}
+
+		this.schedulePendingProcessing();
 	}
 
 	private async processPendingChanges(): Promise<void> {
@@ -397,7 +481,11 @@ export class IndexUpdateQueue {
 	}
 
 	private isQueueIdle(): boolean {
-		return !this.isProcessingPendingChanges && !this.changeQueue.hasPending();
+		return (
+			!this.isProcessingPendingChanges &&
+			!this.changeQueue.hasPending() &&
+			!this.initialChangeRecorder.hasPending()
+		);
 	}
 
 	private notifyQueueIdleWaitersIfIdle(): void {
@@ -409,5 +497,39 @@ export class IndexUpdateQueue {
 			resolve();
 		}
 		this.queueIdleWaiters.clear();
+	}
+
+	private handleMetadataResolved(): void {
+		this.metadataResolveGeneration++;
+
+		for (const resolve of this.metadataResolveWaiters) {
+			resolve();
+		}
+		this.metadataResolveWaiters.clear();
+
+		if (this.destroyed) {
+			return;
+		}
+
+		this.waitsForMetadataResolve = false;
+		this.debouncedProcessPending();
+	}
+
+	private waitForNextMetadataResolve(): Promise<void> {
+		return new Promise((resolve) => {
+			this.metadataResolveWaiters.add(resolve);
+		});
+	}
+
+	private fileExists(path: string): boolean {
+		return this.plugin.app.vault.getAbstractFileByPath(path) instanceof TFile;
+	}
+
+	private shouldIndexPath(path: string): boolean {
+		const file = this.plugin.app.vault.getAbstractFileByPath(path);
+		return (
+			file instanceof TFile &&
+			INDEX_LINK_CAPABLE_EXTENSIONS.has(file.extension.toLowerCase())
+		);
 	}
 }
