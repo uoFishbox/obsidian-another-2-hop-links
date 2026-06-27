@@ -280,7 +280,8 @@ export function useTwoHopViewPlanVirtualList(props: TwoHopViewPlanVirtualListPro
 		get layout() {
 			return measurementState.layout;
 		},
-		get mountedCellsForSurface() {
+		// Direct row rendering path; VirtualSurface does not consume mountedCells here.
+		get directRowsModeMountedCells() {
 			return EMPTY_MOUNTED_CELLS;
 		},
 		get mountedRows() {
