@@ -39,7 +39,6 @@ function patchGlobalSearch(plugin: PluginHost, patchRegistry: PatchRegistry): vo
 					return next.call(this, query);
 				}
 
-				// クエリが "tag:" から始まる場合、カスタム処理を試みる
 				if (typeof query === "string" && query.startsWith("tag:")) {
 					const tagRaw = query.substring(4).trim();
 					const tag = tagRaw.startsWith("#")

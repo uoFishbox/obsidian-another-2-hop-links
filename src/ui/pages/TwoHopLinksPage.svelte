@@ -134,7 +134,6 @@
 		}),
 	);
 
-	// トップレベルで context を設定（$effect の外で）
 	setAppContext({
 		linkContext,
 		applicationStore,

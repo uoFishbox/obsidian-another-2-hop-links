@@ -56,7 +56,6 @@ async function generateExportContent(
 	const pagesMap = new Map<string, ExportPageData>();
 
 	// Main Page
-	// Markdownファイルのみ対象とする
 	if (result.originFile.extension === "md") {
 		pagesMap.set(result.originFile.path, {
 			file: result.originFile,

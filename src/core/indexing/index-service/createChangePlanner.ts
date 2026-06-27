@@ -48,9 +48,6 @@ export interface CreateChangePlanner {
 	): Promise<boolean>;
 }
 
-/**
- * Creates a planner for the source files affected when a new file appears.
- */
 export function createCreateChangePlanner(
 	vault: IVault,
 	metadataCache: IMetadataCache,

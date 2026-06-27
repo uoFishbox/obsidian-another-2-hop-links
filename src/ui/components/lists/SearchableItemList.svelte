@@ -91,7 +91,6 @@
 		_cells: readonly MountedVirtualGridCell<ViewItem>[],
 	): void => {};
 
-	// フックを利用
 	const search = useSearchQuery();
 	let contentSearchEnabled = $state(false);
 	const contentSearchEnabledSetting = $derived(
@@ -232,7 +231,6 @@
 	let matchedItemByKey = $derived(workerSearchSession.matchedItemByKey);
 	let isSearchLoading = $derived(workerSearchSession.isLoading);
 
-	// ソートは検索語ではなく items / sortOption の変化だけで再実行する
 	let sortedItems = $derived(
 		getSortedViewItemsWithCache(
 			reconciledItems,

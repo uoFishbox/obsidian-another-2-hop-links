@@ -1,11 +1,5 @@
 import type { TaggedNote, TagGroup } from "types/domain";
 
-/**
- * タグ付きノートをタグごとにグループ化
- *
- * @param taggedNotes - グループ化するタグ付きノートの配列
- * @returns タググループの配列(ノート数の降順でソート済み)
- */
 function compareTagGroups(a: TagGroup, b: TagGroup): number {
 	const diff = b.notes.length - a.notes.length;
 	return diff !== 0 ? diff : a.tag.localeCompare(b.tag);

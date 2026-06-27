@@ -16,7 +16,6 @@ import {
 } from "infrastructure/capabilities/ObsidianInternalFacade";
 
 export class DisplayModeController {
-	// マジック文字列の定数化
 	private readonly VIEW_TYPES = {
 		CANVAS: "canvas",
 		AUDIO: "audio",
@@ -66,7 +65,6 @@ export class DisplayModeController {
 			() => this.app.workspace.activeLeaf?.view,
 		);
 
-		// Canvas選択変更イベントのリスナーを登録
 		this.plugin.registerEvent(
 			this.app.workspace.on(
 				"cosense-card-links:canvas-selection-changed" as never,
@@ -81,9 +79,6 @@ export class DisplayModeController {
 		this.deactivateSidebarView();
 	}
 
-	/**
-	 * Canvas選択変更イベントハンドラ (main.tsから移動)
-	 */
 	private handleCanvasSelectionChange(
 		canvas: CanvasViewCanvas,
 		selectedNodes: CanvasNodeData[],
@@ -159,10 +154,6 @@ export class DisplayModeController {
 		});
 	}
 
-	/**
-	 * すべてのMarkdownビューを反復処理
-	 * ファイルが有効な場合のみコールバックを実行
-	 */
 	private forEachMarkdownView(
 		callback: (view: MarkdownView, file: TFile) => void,
 	): void {
@@ -239,9 +230,6 @@ export class DisplayModeController {
 		return false;
 	}
 
-	/**
-	 * アクティブファイルのサイドバーを更新
-	 */
 	private updateSidebarForActiveFile(): void {
 		const activeFile = this.getActiveFile?.();
 		if (activeFile && this.updateSidebarView) {
@@ -259,9 +247,6 @@ export class DisplayModeController {
 		}
 	}
 
-	/**
-	 * Canvasビューで単一ファイルノードが選択されているかチェック
-	 */
 	private isCanvasSingleFileSelected(view: unknown): boolean {
 		if (
 			!view ||

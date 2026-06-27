@@ -88,13 +88,11 @@ export default class CosenseCardLinksPlugin extends Plugin implements PluginHost
 	public settingsManager!: SettingsManager;
 	private readonly patchRegistry = new PatchRegistry();
 
-	// Core services
 	public indexingService!: IndexingService;
 	private twoHopLinkResolver!: TwoHopLinkResolver;
 	public sortService!: SortService;
 	private previewService!: DisposablePreviewService;
 
-	// Managers
 	private workspaceViewQueries!: WorkspaceViewQueries;
 	public indexUpdateQueue!: IndexUpdateQueue;
 	private displayModeManager!: DisplayModeController;
@@ -109,7 +107,6 @@ export default class CosenseCardLinksPlugin extends Plugin implements PluginHost
 	private frameScheduler!: FrameScheduler;
 	private sideEffectController!: SettingsSideEffectController;
 
-	// UI services
 	private linkStatusService!: LinkStatusService;
 	private stylingService!: StylingService;
 	private propertyWidgetStyler!: PropertyWidgetStyler;
@@ -189,8 +186,6 @@ export default class CosenseCardLinksPlugin extends Plugin implements PluginHost
 				isUnloaded: () => this.isUnloaded,
 			});
 
-			// 起動時のpropertyスキャン
-			// インデックスを待ってから実行
 			await this.indexingService.awaitIdle();
 			if (this.isUnloaded) {
 				return;
@@ -199,7 +194,6 @@ export default class CosenseCardLinksPlugin extends Plugin implements PluginHost
 		});
 	}
 
-	// DisplayDataBuilder factory
 	public createDisplayDataBuilder(): DisplayDataBuilder {
 		return createDisplayDataBuilder({
 			sortService: this.sortService,
@@ -318,14 +312,11 @@ export default class CosenseCardLinksPlugin extends Plugin implements PluginHost
 			this.app.workspace,
 		);
 
-		// 2. UIサービスとファクトリをインスタンス化
-		// LinkStatusService を先に初期化（純粋な判定ロジックを提供）
 		this.linkStatusService = createLinkStatusService(
 			this.indexingService,
 			() => this.settings,
 		);
 
-		// StylingService は LinkStatusService に依存
 		this.stylingService = createStylingService(this.linkStatusService);
 
 		// PropertyWidgetStylerをStylingServiceの直後に初期化
@@ -348,7 +339,6 @@ export default class CosenseCardLinksPlugin extends Plugin implements PluginHost
 			this.previewService,
 		);
 
-		// 3. マネージャ層をインスタンス化（直接依存を注入）
 		this.componentController = new ComponentController(
 			this.app,
 			this,

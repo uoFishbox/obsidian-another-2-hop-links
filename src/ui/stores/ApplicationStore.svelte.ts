@@ -65,19 +65,15 @@ export type ApplicationLoadState =
 	| { type: "error"; error: Error; previousData?: LoadedApplicationData };
 
 export interface ApplicationSnapshot {
-	// Links data
 	loadState: ApplicationLoadState;
 	loading: boolean;
 	loadingPhase: LoadingPhase;
 	error: Error | undefined;
 	data: TwoHopLinkResult | undefined;
-	// Display state
 	displayData: DisplayData;
-	// UI state
 	sortOption: SortOption;
 	sectionExpandedLimits: SectionExpansionLimits;
 	hasDisplayableItems: boolean;
-	// Settings
 	initialVisibleCount: number;
 	loadMoreIncrement: number;
 	settings: PluginSettings;
@@ -428,7 +424,6 @@ export class ApplicationStore {
 		}
 	}
 
-	// UI state management
 	getSectionExpandedLimit(sectionId: string): number | undefined {
 		return getSectionExpandedLimit(
 			this.sectionExpandedLimits,

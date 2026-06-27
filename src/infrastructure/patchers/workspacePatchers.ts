@@ -101,11 +101,8 @@ function patchWorkspaceOpenLinkText(
 						const indexingService = plugin.indexingService;
 
 						if (indexingService) {
-							// 2. インデックスからバックリンク情報を取得
-							// #anchorなどを除去してパスを正規化
 							const lookupPath = normalizeLinkToMarkdownPath(rawLinkPath);
 
-							// 3. ユニークなソースファイル数が2以上かチェック
 							const hasMultipleBacklinks =
 								indexingService.hasAtLeastUniqueBacklinkSources(
 									lookupPath,

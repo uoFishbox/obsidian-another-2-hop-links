@@ -57,12 +57,10 @@
 	const { app, applicationStore, resolveSearchMatchPosition } = useAppContext();
 	let settings = $derived(applicationStore.settings);
 
-	// 最後にレンダリングしたキーを保持
 	let lastRenderedCacheKey = "";
 	let lastRenderedRefreshToken = -1;
 	let renderSequence = 0;
 
-	// 数式レンダリング中かどうかの状態（スケルトン表示用）
 	let isMathRendering = $state(false);
 	let hasRenderedContent = $state(false);
 	const shouldShowInitialSkeleton = $derived(isMathRendering && !hasRenderedContent);

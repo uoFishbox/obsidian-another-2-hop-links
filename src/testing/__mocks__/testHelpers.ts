@@ -2,7 +2,6 @@ import { TFile } from "obsidian";
 import type { IVault } from "../../types/obsidian";
 import { vi } from "vitest";
 
-// TFileのmockを作成する（TFileクラスのコンストラクタを使用）
 let __mockFileCounter = 0;
 
 function getPathBasename(path: string): string {
@@ -28,7 +27,6 @@ export function createMockTFile(
 	return file as any;
 }
 
-// TFileのmockをプレーンオブジェクトとして作成する
 export function createMockTFileAsPlainObject(
 	path: string,
 	extension: string = "md",

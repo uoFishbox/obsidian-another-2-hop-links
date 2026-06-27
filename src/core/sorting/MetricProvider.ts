@@ -84,7 +84,6 @@ export class MetricProvider implements IMetricProvider {
 		const file = this.getTargetFile(item);
 		if (!file) return 0;
 
-		// ▼ 修正: Frontmatterの値を優先確認
 		const settings = this.getSettings();
 		if (settings.frontmatterKeyCreatedDate) {
 			const fmDate = this.getDateFromFrontmatter(
@@ -101,7 +100,6 @@ export class MetricProvider implements IMetricProvider {
 		const file = this.getTargetFile(item);
 		if (!file) return 0;
 
-		// ▼ 修正: Frontmatterの値を優先確認
 		const settings = this.getSettings();
 		if (settings.frontmatterKeyModifiedDate) {
 			const fmDate = this.getDateFromFrontmatter(

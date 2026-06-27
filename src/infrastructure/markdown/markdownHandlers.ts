@@ -27,7 +27,6 @@ export async function markdownPostProcessor(
 	}
 	await indexingService.awaitIdle();
 
-	// Execute decoration on initial render
 	stylingService.decorateLinksInContainer(el, ctx.sourcePath);
 }
 

@@ -321,7 +321,6 @@ export class PreCreationView extends AbstractSvelteListView<TwoHopIndexedLink> {
 		});
 	}
 
-	/** 被リンク一覧を取得して返す */
 	protected getItems(): TwoHopIndexedLink[] {
 		if (!this.linktext || !this.plugin.indexingService) {
 			return [];
@@ -406,7 +405,6 @@ export class PreCreationView extends AbstractSvelteListView<TwoHopIndexedLink> {
 		this.inlineTitleEl.setAttribute("placeholder", "Untitled");
 		this.inlineTitleEl.textContent = titleText;
 
-		// 編集開始時の元のタイトルを保存
 		this.originalTitleText = titleText;
 		this.titleCancelled = false;
 
@@ -419,13 +417,11 @@ export class PreCreationView extends AbstractSvelteListView<TwoHopIndexedLink> {
 			}
 		});
 
-		// Enter で確定（フォーカスを外す）
 		this.inlineTitleEl.addEventListener("keydown", (e: KeyboardEvent) => {
 			if (e.key === "Enter") {
 				e.preventDefault();
 				this.inlineTitleEl?.blur();
 			} else if (e.key === "Escape") {
-				// Escape で編集をキャンセルして元のテキストに戻す
 				this.titleCancelled = true;
 				if (this.inlineTitleEl) {
 					this.inlineTitleEl.textContent = titleText;
@@ -434,14 +430,11 @@ export class PreCreationView extends AbstractSvelteListView<TwoHopIndexedLink> {
 			}
 		});
 
-		// blur 時: タイトルが変更されていればファイルを作成
 		this.inlineTitleEl.addEventListener("blur", () => {
-			// キャンセルされた場合は何もしない
 			if (this.titleCancelled) {
 				this.titleCancelled = false;
 				return;
 			}
-			// タイトルが変更されていない場合は何もしない
 			const currentTitle = this.inlineTitleEl?.textContent?.trim() ?? "";
 			if (currentTitle === this.originalTitleText) {
 				return;
@@ -488,7 +481,6 @@ export class PreCreationView extends AbstractSvelteListView<TwoHopIndexedLink> {
 		this.mountBacklinksSection(scrollerEl);
 	}
 
-	/** 被リンク一覧の Svelte コンポーネントをマウントする */
 	private mountBacklinksSection(parentEl: HTMLElement): void {
 		const backlinks = this.getItems();
 		this.setCurrentItems(backlinks);

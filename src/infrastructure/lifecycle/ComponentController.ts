@@ -139,11 +139,7 @@ export class ComponentController implements IComponentManager {
 		}
 
 		for (const mounted of mountedList) {
-			// MarkdownRenderChildのunloadを呼び出すことで、
-			// mountComponent内で定義したクリーンアップ処理（ストア破棄など）を実行させる
 			mounted.lifecycleManager.unload();
-
-			// ビューのレジストリから削除する
 			view.removeChild(mounted.lifecycleManager);
 		}
 		this.mountedComponents.delete(view);
@@ -156,8 +152,6 @@ export class ComponentController implements IComponentManager {
 		const leaves = this.app.workspace.getLeavesOfType("markdown");
 		return leaves.find((leaf) => leaf.view === view) ?? undefined;
 	}
-
-	// ========== Store Management (main.tsから移動) ==========
 
 	/**
 	 * ApplicationStoreを作成
@@ -383,10 +377,8 @@ export class ComponentController implements IComponentManager {
 				if (isCleanedUp) return;
 				isCleanedUp = true;
 
-				// 1. Svelteコンポーネントのアンマウント
 				this.unmountComponent(component);
 
-				// 2. 共有ストアの参照を解放する
 				this.releaseApplicationStore(leafId, file.path);
 			};
 

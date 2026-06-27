@@ -8,16 +8,11 @@ export interface RegisterCommandsDeps {
 	readonly keyboardCardNavigator: KeyboardCardNavigator;
 }
 
-/**
- * Registers user-invokable commands (scroll and keyboard navigation).
- * The benchmark command is registered separately via registerBenchmarkCommand.
- */
 export function registerCommands(plugin: PluginHost, deps: RegisterCommandsDeps): void {
 	plugin.addCommand({
 		id: "toggle-scroll-to-two-hop-links",
 		name: "Scroll to Two Hop Links and focus search",
 		checkCallback: (checking: boolean) => {
-			// MarkdownViewがアクティブかつ、UIが表示モード(editor-inline or hybrid)の場合のみ有効
 			const activeView = plugin.app.workspace.getActiveViewOfType(MarkdownView);
 			const isInlineMode =
 				plugin.settings.displayMode === "editor-inline" ||

@@ -7,9 +7,6 @@ import {
 	COSENSE_CARD_LINKS_HOVER_SOURCE_ID,
 } from "features/preview/interactions/hoverPopoverLinkSpec";
 
-/**
- * Registers all custom view types and the hover link source with the plugin.
- */
 export function registerViews(plugin: PluginHostUi): void {
 	plugin.registerView(
 		TWO_HOP_LINKS_VIEW_TYPE,

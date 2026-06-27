@@ -5,13 +5,6 @@ import type { PluginSettings } from "types/settings";
 import type { ResolveProgress, TwoHopLinkResult } from "types/domain";
 import type { ResolveOptions } from "core/indexing/two-hop-resolver/TwoHopLinkResolver";
 
-/**
- * SettingsManager のうち、PluginHost 経由で外部から参照されるメンバー。
- *
- * 具象クラスを import すると `SettingsManager` ↔ `PluginHost` の型循環が
- * 再発するため、構造的インターフェースで参照する。
- * `SettingsManager` はこの形状を構造的に満たす。
- */
 export interface PluginSettingsManager {
 	readonly settings: PluginSettings;
 	update<K extends keyof PluginSettings>(

@@ -34,7 +34,6 @@
 	const { applicationStore } = useAppContext();
 	const interactionRegistry = useInteractionRegistry();
 
-	// Strategyパターンを使用してアイテムタイプに応じた処理を取得
 	const strategy = $derived(item ? getItemStrategy(item) : null);
 
 	// 各プロパティをStrategyを通じて算出

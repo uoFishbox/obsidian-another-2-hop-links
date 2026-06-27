@@ -146,20 +146,17 @@ async function generateVideoThumbnailInternal(
 			signal.addEventListener("abort", onAbort);
 		}
 
-		// 重要な設定: メタデータのみ読み込む
 		video.preload = "metadata";
 		video.src = videoUrl;
 		video.crossOrigin = "anonymous";
 		video.muted = true;
 		video.playsInline = true;
 
-		// エラーハンドリング
 		video.addEventListener("error", () => {
 			// エラー時は reject せず undefined で解決し、UI側でフォールバックさせる
 			finish(undefined);
 		});
 
-		// メタデータ読み込み完了時
 		video.addEventListener("loadedmetadata", () => {
 			if (settled || signal?.aborted) {
 				return;
@@ -173,7 +170,6 @@ async function generateVideoThumbnailInternal(
 			}
 		});
 
-		// シーク完了時（描画可能状態）
 		video.addEventListener("seeked", () => {
 			if (settled || signal?.aborted) {
 				finish(undefined);
@@ -224,14 +220,10 @@ async function generateVideoThumbnailInternal(
 			}
 		});
 
-		// タイムアウト処理 (3秒に短縮)
 		timeoutId = window.setTimeout(() => {
 			console.warn(`Thumbnail generation timed out for ${file.path}`);
 			finish(undefined);
 		}, 3000);
-
-		// 読み込み開始（load()を明示的に呼ぶ必要がある場合がある）
-		// video.load(); // preload="metadata" と src 設定だけで基本は動く
 	});
 }
 

@@ -81,7 +81,6 @@ function patchPropertyWidgets(
 						ctx,
 					) as PropertyWidgetComponentLike;
 
-					// 描画された要素内のリンクを装飾する
 					if (!(el instanceof HTMLElement) || !isPropertyContext(ctx)) {
 						return component;
 					}
@@ -98,7 +97,6 @@ function patchPropertyWidgets(
 					propertyStyleManager.register(el, sourceFile);
 					propertyStyleManager.styleElement(el, sourceFile);
 
-					// コンポーネント破棄時に登録解除
 					const originalOnunload = component.onunload;
 					component.onunload = () => {
 						propertyStyleManager.unregister(el);
@@ -107,7 +105,6 @@ function patchPropertyWidgets(
 						}
 					};
 
-					// 3. 元のrenderメソッドの返り値をそのまま返す
 					return component;
 				};
 			},
@@ -137,8 +134,6 @@ function patchPropertyWidgets(
 					const sourceFile = resolveFileByPath(plugin.app.vault, sourcePath);
 					if (!sourceFile) return result;
 
-					// 値が変更された後、レンダリングサイクルの完了を待って再スタイリング
-					// requestAnimationFrameが利用可能ならそれを使い、なければsetTimeout(0)でフォールバック
 					if (!scheduledElements.has(el)) {
 						scheduledElements.add(el);
 						const schedule =

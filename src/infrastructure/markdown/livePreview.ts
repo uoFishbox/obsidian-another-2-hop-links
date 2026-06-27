@@ -33,7 +33,6 @@ interface DecorableLink {
 	ranges: { from: number; to: number }[];
 }
 
-// Canvasの型定義（最小限）
 interface CanvasNode {
 	canvas: {
 		view: {

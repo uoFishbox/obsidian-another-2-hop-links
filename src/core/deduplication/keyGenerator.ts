@@ -51,10 +51,6 @@ export interface BranchKeys {
 	usageKey: string;
 }
 
-/**
- * Computes both displayKey and usageKey for a branch in a single pass,
- * avoiding duplicate normalizePathSignature calls.
- */
 export function getBranchKeys(branch: TwoHopLinkBranch): BranchKeys {
 	const link = branch.hop1;
 

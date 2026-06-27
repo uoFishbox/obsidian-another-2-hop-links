@@ -12,10 +12,6 @@ export interface RegisterMarkdownProcessorsDeps {
 	readonly renderedMdElementsRegistry: RenderedMdElementsRegistry;
 }
 
-/**
- * Registers the markdown post processor that decorates links and tracks
- * rendered elements for later cleanup.
- */
 export function registerMarkdownProcessors(
 	plugin: PluginHost,
 	deps: RegisterMarkdownProcessorsDeps,

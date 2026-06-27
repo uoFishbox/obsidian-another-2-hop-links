@@ -10,13 +10,9 @@ export function initCanvasPatcher(
 	plugin: PluginHost,
 	patchRegistry: PatchRegistry,
 ): void {
-	// これから新しく開かれるCanvasビューへのパッチ
 	waitForViewRequest<CanvasView>(plugin, patchRegistry, "canvas", (view) =>
 		patchCanvasView(plugin, patchRegistry, view),
 	);
-	// 既に開かれているCanvasビューへのパッチ
-	// onLayoutReadyの時点で既にロードされているビューに対して適用する
-	// 起動速度への影響を最小限にするため、setTimeoutでカレントの実行スタックから逃がす
 	setTimeout(() => {
 		const leaves = plugin.app.workspace.getLeavesOfType("canvas");
 		for (const leaf of leaves) {

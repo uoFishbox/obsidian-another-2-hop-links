@@ -16,9 +16,6 @@ function hasWindow(): boolean {
 	return typeof window !== "undefined";
 }
 
-// Reused across yield calls to avoid allocating a fresh IdleRequestOptions
-// object on every pause. requestIdleCallback reads `timeout` synchronously
-// before returning, so mutation immediately before the call is safe.
 const idleRequestOptions: IdleRequestOptions = { timeout: 0 };
 
 function schedulePause(resolve: () => void, maxDelayMs: number): void {

@@ -145,9 +145,7 @@ export function useFileContentIndex(
 	$effect(() => {
 		const enabledNow = isEnabled();
 
-		// 無効時はインデックス構築をスキップ
 		if (!enabledNow) {
-			// 旧検索状態を残さないため、無効化時にインデックスを破棄する
 			isLoading = false;
 			fileContentIndex.clear();
 			indexedContentActivePaths.clear();

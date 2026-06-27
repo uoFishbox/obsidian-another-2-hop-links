@@ -5,17 +5,6 @@ import {
 } from "core/indexing/index-service/indexingBenchmarkRunner";
 import type { IndexingService } from "core/indexing/index-service/IndexingService";
 
-/**
- * Manages the "Benchmark rebuildBacklinksMapChunked" command lifecycle.
- * Keeps the running-benchmark guard state out of the plugin entry point.
- *
- * Two variants are registered:
- * - Warm cache: matches the previous behavior. Module-scoped normalization
- *   caches stay hot across iterations, so later iterations reflect cache hits.
- * - Cold cache: clears the normalization caches before every iteration so
- *   each run rebuilds them from scratch. Comparing the two reveals how much
- *   the unbounded caches used to retain and how much warm caches save.
- */
 export function registerBenchmarkCommand(
 	plugin: Plugin,
 	indexingService: IndexingService,

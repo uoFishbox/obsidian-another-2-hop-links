@@ -4,10 +4,6 @@ import type { PluginSettings, SortOption } from "types/settings";
 import type { ViewItem } from "application/presenters";
 import type { ApplicationStore } from "ui/stores/ApplicationStore.svelte";
 
-// ---------------------------------------------------------------------------
-// Primary link section
-// ---------------------------------------------------------------------------
-
 export interface PrimaryLinkSection {
 	title: string;
 	sectionId: string;
@@ -16,10 +12,6 @@ export interface PrimaryLinkSection {
 	getKey: (item: ViewItem, index: number) => string;
 	getSearchKey: (item: ViewItem) => string;
 }
-
-// ---------------------------------------------------------------------------
-// Two-hop branch header snapshots
-// ---------------------------------------------------------------------------
 
 export interface TwoHopHeaderSnapshot {
 	file: TFile | null;
@@ -34,10 +26,6 @@ export interface TwoHopHeaderInteractionSnapshot {
 	directory: string | null;
 	settings: PluginSettings;
 }
-
-// ---------------------------------------------------------------------------
-// Data identity dependency snapshots
-// ---------------------------------------------------------------------------
 
 export interface TwoHopItemsDeps {
 	hop2: TwoHopLinkBranch["hop2"];

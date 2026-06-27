@@ -20,8 +20,6 @@ function patchViewLifecycle(plugin: PluginHost, patchRegistry: PatchRegistry) {
 			return;
 		}
 
-		// 実マウントは DisplayModeController 側に一本化し、
-		// ここではコンテナ準備だけを担当する。
 		getContainerElements(view);
 	};
 

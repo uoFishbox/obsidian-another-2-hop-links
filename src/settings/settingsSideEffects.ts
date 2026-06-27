@@ -5,13 +5,6 @@ export const LAYOUT_AFFECTING_SETTINGS = new Set<keyof PluginSettings>([
 	"enableTagFeatures",
 ]);
 
-/**
- * Settings whose changes are scoped to an already-mounted view and must not
- * trigger a display-mode reactivation. Reactivating the display mode strategy
- * force-remounts inline Svelte components, which destroys their local state
- * (e.g. the search input value held by `useSearchQuery`). The full-text search
- * toggle only affects in-view filtering, so it must be excluded here.
- */
 const DISPLAY_MODE_REACTIVATION_EXCLUDED_SETTINGS = new Set<keyof PluginSettings>([
 	"enableContentSearch",
 ]);

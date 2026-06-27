@@ -169,9 +169,6 @@ function reconcileNextState(
 		? linkStatusService.generateLookupPath(normalizedPath, request.sourceFile)
 		: undefined;
 
-	// 描画モード・セレクタなしの場合、targets は常に linkEl 自身なので、
-	// href/lookupPath が変わっていなければ state オブジェクトを再利用する。
-	// shouldDecorate は applyNextStates で上書きされるため、ここでは変更しない。
 	if (
 		prevState &&
 		prevState.href === href &&

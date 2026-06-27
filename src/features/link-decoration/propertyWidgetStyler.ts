@@ -189,7 +189,6 @@ export function createPropertyWidgetStyler(
 				count++;
 			}
 
-			// Canvasビュー内のファイルノードも探索してプロパティ要素を登録する
 			if (view.getViewType() === "canvas") {
 				const canvasView = view as CanvasView;
 				if (!canvasView.canvas?.nodes) return;

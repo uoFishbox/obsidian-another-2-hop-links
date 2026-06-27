@@ -71,7 +71,6 @@ class BookmarksStore {
 		if (enableLogging) logger(`[Bookmarks] watcher initialized`);
 		void this.loadBookmarks();
 
-		// パッチャーから発火されるカスタムイベントをリッスンするだけにする
 		component.registerEvent(
 			this.app.workspace.on("cosense-card-links:bookmarks-updated" as any, () => {
 				this.scheduleReload("workspace-event");

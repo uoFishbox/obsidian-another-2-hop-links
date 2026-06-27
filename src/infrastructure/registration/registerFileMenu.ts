@@ -13,9 +13,6 @@ export interface RegisterFileMenuDeps {
 	) => Promise<TwoHopLinkResult>;
 }
 
-/**
- * Registers the file-menu items for copying/exporting 2-hop links.
- */
 export function registerFileMenu(plugin: PluginHost, deps: RegisterFileMenuDeps): void {
 	plugin.registerEvent(
 		deps.app.workspace.on("file-menu", (menu, file) => {

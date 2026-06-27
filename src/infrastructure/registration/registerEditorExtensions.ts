@@ -7,10 +7,6 @@ export interface RegisterEditorExtensionsDeps {
 	readonly linkStatusService: LinkStatusService;
 }
 
-/**
- * Registers CodeMirror 6 editor extensions (live preview decoration and
- * inline focus bridge) with the plugin.
- */
 export function registerEditorExtensions(
 	plugin: PluginHost,
 	deps: RegisterEditorExtensionsDeps,

@@ -1,8 +1,6 @@
 <div class="skeleton-loader"></div>
 
 <style>
-	/* Render 5 stacked bars with a single element using multiple backgrounds.
-	   Bars: 5px tall, 9px gap, last bar 70% width. Total height = 5*5 + 4*9 = 61px. */
 	.skeleton-loader {
 		padding-top: 10px;
 		padding-left: var(--ccl-box-padding);

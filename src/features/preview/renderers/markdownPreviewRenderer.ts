@@ -70,10 +70,6 @@ export async function processPreviewContent(
 		);
 	} else {
 		containerEl.innerHTML = "";
-		// 案B: インライン数式 `$...$` のパターンを hasMathExpression と統一。
-		// `[^$\n]+?` = 改行を含まず最低1文字のみマッチ。
-		// [\s\S]*? を使うと `$a` と数行後の `$b` が誤ってペアになる可能性があった。
-		// $$...$$ は複数行を許容するため [\s\S]*? を維持する。
 		MATH_SPLIT_REGEX.lastIndex = 0;
 		let lastIndex = 0;
 		const { contentForMathParsing } = analysis;
@@ -97,7 +93,6 @@ export async function processPreviewContent(
 			}
 
 			const matchedString = match[0];
-			// ... existing MathJax rendering logic ...
 			if (matchedString.startsWith("$$") && matchedString.endsWith("$$")) {
 				const mathContent = matchedString.substring(
 					2,

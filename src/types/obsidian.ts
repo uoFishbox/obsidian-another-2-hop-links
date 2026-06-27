@@ -4,10 +4,6 @@ import { type CanvasViewCanvas } from "obsidian-typings";
 
 export type { CachedMetadata };
 
-/**
- * Obsidian の resolvedLinks/unresolvedLinks 形式
- * Record<SourcePath, Record<TargetPath, number>>
- */
 export type ObsidianLinkMap = Record<string, Record<string, number>>;
 
 export interface CanvasNodeData {

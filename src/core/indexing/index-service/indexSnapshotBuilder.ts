@@ -12,9 +12,6 @@ export interface BuiltIndexesResult {
 	tagIndex: TagIndex;
 }
 
-/**
- * Builds the link index snapshot for the supplied vault.
- */
 export async function buildIndexSnapshotAsync(
 	vault: IVault,
 	metadataCache: IMetadataCache,
@@ -35,9 +32,6 @@ export async function buildIndexSnapshotAsync(
 	).snapshot;
 }
 
-/**
- * Builds the link index snapshot and its associated tag index.
- */
 export async function buildIndexesAsync(
 	vault: IVault,
 	metadataCache: IMetadataCache,

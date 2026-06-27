@@ -280,7 +280,6 @@ export class IndexingService implements IIndexingService {
 				"[IndexingService.rebuildBacklinksMapChunked] Starting backlinks map rebuild",
 			);
 		this.beginIndexing();
-		// full rebuild 前に古い cache を捨ててピーク heap を下げる
 		this.queryEngine.invalidate();
 		this.commonTagsCache = undefined;
 		const startTime = performance.now();

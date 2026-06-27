@@ -42,12 +42,6 @@ interface ResolveCachedCardGridLayoutBaseOptions {
 	includeSectionMarginBottom?: boolean;
 }
 
-/**
- * Keeps derived grid geometry and stable object identity across repeated list
- * layout measurements. CSS-backed resolution still reads computed style before
- * lookup; this cache only avoids repeated derived layout work. Keep the key and
- * bounded eviction policy in sync with PERFORMANCE.md.
- */
 const sharedCardGridLayoutCache = new WeakMap<
 	HTMLElement,
 	Map<string, CachedCardGridLayoutBase>

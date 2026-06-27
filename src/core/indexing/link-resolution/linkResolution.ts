@@ -10,7 +10,6 @@ import {
 } from "utils/boundedGenerationalCache";
 import { hasSourceDependentRawLinkPath } from "./sourceDependentLinks";
 
-// 拡張子チェック用正規表現（モジュールスコープで一度だけコンパイル）
 const HAS_EXTENSION_RE = /\.[a-z0-9]+$/i;
 // 高頻度で同じリンク文字列・パスが渡るため、正規化結果を使い回す。
 // 無制限 Map だと削除済みファイルや過去のリンク文字列が old generation に
@@ -221,7 +220,6 @@ export function toCaseInsensitiveLookupKey(path: string): string {
 		return cached;
 	}
 
-	// TFile.pathはすでに正規化済み。バックスラッシュがなければnormalizePath不要
 	const normalized = path.indexOf("\\") === -1 ? path : normalizePath(path);
 	const lookupKey = normalized.toLowerCase();
 	CASE_INSENSITIVE_LOOKUP_KEY_CACHE.set(path, lookupKey);

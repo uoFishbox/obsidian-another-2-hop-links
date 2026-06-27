@@ -7,10 +7,6 @@ import type { ResolveTwoHopLinks } from "ui/stores/application/TwoHopLinksLoader
 import type { PluginHost } from "types/pluginHost";
 import type { PluginSettings } from "types/settings";
 
-/**
- * PluginHost の UI 層向け拡張。
- * UI 表示や Svelte store の生成に必要なファサードを基本ホスト型から分離する。
- */
 export interface PluginHostUi extends PluginHost {
 	readonly forceRedrawEffect: StateEffectType<undefined>;
 	createDisplayDataBuilder(): DisplayDataBuilder;

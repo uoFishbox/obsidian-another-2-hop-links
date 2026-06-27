@@ -8,7 +8,6 @@ interface ScrollState {
 }
 
 export class ScrollManager {
-	// Leaf IDごとのスクロール状態を保持
 	private history = new Map<string, ScrollState>();
 
 	/**
@@ -21,8 +20,6 @@ export class ScrollManager {
 
 	/**
 	 * スクロール位置をトグルする
-	 * 1. Two Hop Linksコンテナへスクロール
-	 * 2. 元の位置へスクロール
 	 */
 	public toggleScroll(view: MarkdownView): void {
 		const leafId = view.leaf.id;

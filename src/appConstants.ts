@@ -1,5 +1,4 @@
 export const PLUGIN_NAME = "Cosense card links";
-// process.env.NODE_ENVが"production"の場合はtrue、それ以外はfalse
 export const IS_PROD = process.env.NODE_ENV === "production";
 
 export const INDEXING_DEBOUNCE_DELAY = 300;
@@ -97,7 +96,6 @@ export const SOURCE_EXTENSIONS = new Set([
 export const CANVAS_EXTENSION = "canvas";
 
 export const DEBUG_DISABLE_CARD_DOM_PREVIEW = false;
-// デバッグ用: render 済み preview の共有キャッシュを一時的に無効化する
 export const DEBUG_DISABLE_RENDERED_PREVIEW_CACHE = false;
 export const UNRESOLVED_LINK_ATTRIBUTE = {
 	NAME: "data-twohop-link-state",
