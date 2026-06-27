@@ -43,6 +43,7 @@ export interface TwohopSearchAdapter {
 		displayData: DisplayData,
 		query: string,
 		matchedKeySet: Set<string> | null,
+		renderMode: TwohopSearchRenderMode,
 	): DisplayData;
 }
 
@@ -66,11 +67,17 @@ function filterWithReferenceReuse<T>(
 
 export interface TwohopSearchAdapterOptions {
 	displayData: DisplayData;
+	renderMode: TwohopSearchRenderMode;
 	resolveFile: (path: string) => TFile | null;
 	fileToLinktext: FileToLinktext;
 	sourcePath: string;
 	getMetadata: (file: TFile) => CachedMetadata | null;
 	priorityFrontmatterKeyForTitle?: string;
+}
+
+export interface TwohopSearchRenderMode {
+	readonly useMergedLinks: boolean;
+	readonly showTags: boolean;
 }
 
 /**
@@ -98,11 +105,12 @@ export function createTwohopSearchAdapter(): TwohopSearchAdapter {
 				getSearchKeyCache(options.displayData),
 			);
 		},
-		filterDisplayData(displayData, query, matchedKeySet) {
+		filterDisplayData(displayData, query, matchedKeySet, renderMode) {
 			return filterTwohopDisplayDataWithCache(
 				displayData,
 				query,
 				matchedKeySet,
+				renderMode,
 				getSearchKeyCache(displayData),
 			);
 		},
@@ -120,17 +128,20 @@ export function collectTwohopSearchableFiles(
 		filesByPath.set(targetFile.path, targetFile);
 	};
 
-	for (const branch of options.displayData.outgoing) {
-		addFile(getBranchTargetFile(branch, options.resolveFile));
-	}
-	for (const link of options.displayData.backlinks) {
-		addFile(link.sourceFile);
-	}
-	for (const item of options.displayData.mergedItems) {
-		if (isBranchItem(item)) {
-			addFile(getBranchTargetFile(item, options.resolveFile));
-		} else {
-			addFile(item.sourceFile);
+	if (options.renderMode.useMergedLinks) {
+		for (const item of options.displayData.mergedItems) {
+			if (isBranchItem(item)) {
+				addFile(getBranchTargetFile(item, options.resolveFile));
+			} else {
+				addFile(item.sourceFile);
+			}
+		}
+	} else {
+		for (const branch of options.displayData.outgoing) {
+			addFile(getBranchTargetFile(branch, options.resolveFile));
+		}
+		for (const link of options.displayData.backlinks) {
+			addFile(link.sourceFile);
 		}
 	}
 	for (const branch of options.displayData.twoHopBranches) {
@@ -139,9 +150,11 @@ export function collectTwohopSearchableFiles(
 			addFile(link.sourceFile);
 		}
 	}
-	for (const section of options.displayData.tagGroups) {
-		for (const note of section.notes) {
-			addFile(note.file);
+	if (options.renderMode.showTags) {
+		for (const section of options.displayData.tagGroups) {
+			for (const note of section.notes) {
+				addFile(note.file);
+			}
 		}
 	}
 
@@ -183,45 +196,47 @@ function buildTwohopSearchDatasetWithCache(
 			: titleText || branchText;
 	};
 
-	for (const branch of displayData.outgoing) {
-		snapshots.push(
-			buildSearchWorkerItemSnapshot(
-				createOutgoingSearchKey(branch, searchKeyCache),
-				getBranchTitleSearchText(branch),
-				getBranchTargetFile(branch, resolveFile)?.path ?? null,
-			),
-		);
-	}
+	if (options.renderMode.useMergedLinks) {
+		for (const item of displayData.mergedItems) {
+			if (isBranchItem(item)) {
+				snapshots.push(
+					buildSearchWorkerItemSnapshot(
+						createMergedSearchKey(item, searchKeyCache),
+						getBranchTitleSearchText(item),
+						getBranchTargetFile(item, resolveFile)?.path ?? null,
+					),
+				);
+				continue;
+			}
 
-	for (const link of displayData.backlinks) {
-		snapshots.push(
-			buildSearchWorkerItemSnapshot(
-				createBacklinkSearchKey(link, searchKeyCache),
-				getFileTitleSearchText(link.sourceFile),
-				link.sourceFile.path,
-			),
-		);
-	}
-
-	for (const item of displayData.mergedItems) {
-		if (isBranchItem(item)) {
 			snapshots.push(
 				buildSearchWorkerItemSnapshot(
 					createMergedSearchKey(item, searchKeyCache),
-					getBranchTitleSearchText(item),
-					getBranchTargetFile(item, resolveFile)?.path ?? null,
+					getFileTitleSearchText(item.sourceFile),
+					item.sourceFile.path,
 				),
 			);
-			continue;
+		}
+	} else {
+		for (const branch of displayData.outgoing) {
+			snapshots.push(
+				buildSearchWorkerItemSnapshot(
+					createOutgoingSearchKey(branch, searchKeyCache),
+					getBranchTitleSearchText(branch),
+					getBranchTargetFile(branch, resolveFile)?.path ?? null,
+				),
+			);
 		}
 
-		snapshots.push(
-			buildSearchWorkerItemSnapshot(
-				createMergedSearchKey(item, searchKeyCache),
-				getFileTitleSearchText(item.sourceFile),
-				item.sourceFile.path,
-			),
-		);
+		for (const link of displayData.backlinks) {
+			snapshots.push(
+				buildSearchWorkerItemSnapshot(
+					createBacklinkSearchKey(link, searchKeyCache),
+					getFileTitleSearchText(link.sourceFile),
+					link.sourceFile.path,
+				),
+			);
+		}
 	}
 
 	for (const branch of displayData.twoHopBranches) {
@@ -241,23 +256,25 @@ function buildTwohopSearchDatasetWithCache(
 		}
 	}
 
-	for (const section of displayData.tagGroups) {
-		snapshots.push(
-			buildSearchWorkerItemSnapshot(
-				getTagGroupSearchKey(section),
-				getTagGroupSearchText(section.tag),
-				null,
-			),
-		);
-
-		for (const note of section.notes) {
+	if (options.renderMode.showTags) {
+		for (const section of displayData.tagGroups) {
 			snapshots.push(
 				buildSearchWorkerItemSnapshot(
-					createTagNoteSearchKey(section, note, searchKeyCache),
-					getFileTitleSearchText(note.file),
-					note.file.path,
+					getTagGroupSearchKey(section),
+					getTagGroupSearchText(section.tag),
+					null,
 				),
 			);
+
+			for (const note of section.notes) {
+				snapshots.push(
+					buildSearchWorkerItemSnapshot(
+						createTagNoteSearchKey(section, note, searchKeyCache),
+						getFileTitleSearchText(note.file),
+						note.file.path,
+					),
+				);
+			}
 		}
 	}
 
@@ -268,14 +285,21 @@ export function filterTwohopDisplayData(
 	displayData: DisplayData,
 	query: string,
 	matchedKeySet: Set<string> | null,
+	renderMode: TwohopSearchRenderMode,
 ): DisplayData {
-	return filterTwohopDisplayDataWithCache(displayData, query, matchedKeySet);
+	return filterTwohopDisplayDataWithCache(
+		displayData,
+		query,
+		matchedKeySet,
+		renderMode,
+	);
 }
 
 function filterTwohopDisplayDataWithCache(
 	displayData: DisplayData,
 	query: string,
 	matchedKeySet: Set<string> | null,
+	renderMode: TwohopSearchRenderMode,
 	searchKeyCache?: SearchKeyCache,
 ): DisplayData {
 	if (!query) {
@@ -294,6 +318,22 @@ function filterTwohopDisplayDataWithCache(
 		};
 	}
 
+	const outgoing = renderMode.useMergedLinks
+		? []
+		: filterWithReferenceReuse(displayData.outgoing, (branch) =>
+				matchedKeySet.has(createOutgoingSearchKey(branch, searchKeyCache)),
+			);
+	const backlinks = renderMode.useMergedLinks
+		? []
+		: filterWithReferenceReuse(displayData.backlinks, (link) =>
+				matchedKeySet.has(createBacklinkSearchKey(link, searchKeyCache)),
+			);
+	const mergedItems = renderMode.useMergedLinks
+		? filterWithReferenceReuse(displayData.mergedItems, (item) =>
+				matchedKeySet.has(createMergedSearchKey(item, searchKeyCache)),
+			)
+		: [];
+
 	const twoHopBranches: TwoHopLinkBranch[] = [];
 	for (const branch of displayData.twoHopBranches) {
 		const filteredBranch = filterTwohopBranch(
@@ -306,24 +346,24 @@ function filterTwohopDisplayDataWithCache(
 		}
 	}
 	const tagGroups: TagGroup[] = [];
-	for (const section of displayData.tagGroups) {
-		const filteredSection = filterTagGroup(section, matchedKeySet, searchKeyCache);
-		if (filteredSection) {
-			tagGroups.push(filteredSection);
+	if (renderMode.showTags) {
+		for (const section of displayData.tagGroups) {
+			const filteredSection = filterTagGroup(
+				section,
+				matchedKeySet,
+				searchKeyCache,
+			);
+			if (filteredSection) {
+				tagGroups.push(filteredSection);
+			}
 		}
 	}
 
 	return {
 		...displayData,
-		outgoing: filterWithReferenceReuse(displayData.outgoing, (branch) =>
-			matchedKeySet.has(createOutgoingSearchKey(branch, searchKeyCache)),
-		),
-		backlinks: filterWithReferenceReuse(displayData.backlinks, (link) =>
-			matchedKeySet.has(createBacklinkSearchKey(link, searchKeyCache)),
-		),
-		mergedItems: filterWithReferenceReuse(displayData.mergedItems, (item) =>
-			matchedKeySet.has(createMergedSearchKey(item, searchKeyCache)),
-		),
+		outgoing,
+		backlinks,
+		mergedItems,
 		twoHopBranches,
 		tagGroups,
 		newLinks: [],

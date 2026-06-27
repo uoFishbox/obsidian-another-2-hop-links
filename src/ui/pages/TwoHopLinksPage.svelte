@@ -76,8 +76,13 @@
 	const search = useSearchQuery();
 	const bookmarks = useBookmarks(app);
 	const searchAdapter = createTwohopSearchAdapter();
+	const getSearchRenderMode = () => ({
+		useMergedLinks,
+		showTags,
+	});
 	const getSearchAdapterOptions = () => ({
 		displayData,
+		renderMode: getSearchRenderMode(),
 		resolveFile: linkContext.resolveFile,
 		fileToLinktext: linkContext.fileToLinktext,
 		sourcePath: file.path,
@@ -106,6 +111,7 @@
 			displayData,
 			search.normalized,
 			workerSearchSession.matchedKeySet,
+			getSearchRenderMode(),
 		);
 	});
 	const sourceFile = linkContext.sourceFile;
