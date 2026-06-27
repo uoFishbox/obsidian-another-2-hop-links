@@ -11,7 +11,6 @@ import {
 	type VirtualListSnapshot,
 	type VirtualVisibilityPolicy,
 } from "../core/virtualListEngine";
-import { publishVirtualListDebugSnapshot } from "../core/virtualListDebug";
 import type {
 	EmptyReason,
 	MaterializedVirtualListMode,
@@ -89,7 +88,6 @@ export interface UseVirtualListOptions<
 		reconciliationState: VirtualListReconciliationState<TMountedBuild>,
 	) => void;
 	onStableVisibleRange?: () => void;
-	debugName?: string;
 	visibilityMetadataPolicy?: VirtualCellVisibilityMetadataPolicy;
 	trackMountedCellsForChange?: boolean;
 }
@@ -121,17 +119,6 @@ export function useVirtualList<
 			return nextCells;
 		}
 		return previousCellsForChange;
-	};
-
-	const publishSnapshotUpdate = (
-		nextSnapshot: VirtualListSnapshot<TCell, TMountedCell, TMountedBuild>,
-		nextReconciliationState: VirtualListReconciliationState<TMountedBuild>,
-	): void => {
-		options.onSnapshotUpdated?.(nextSnapshot, nextReconciliationState);
-		publishVirtualListDebugSnapshot({
-			name: options.debugName,
-			snapshot: nextSnapshot,
-		});
 	};
 
 	const commitComputation = (
@@ -166,7 +153,7 @@ export function useVirtualList<
 						)
 					: previousState.mountedCellsForChange,
 		};
-		publishSnapshotUpdate(nextSnapshot, nextReconciliationState);
+		options.onSnapshotUpdated?.(nextSnapshot, nextReconciliationState);
 	};
 
 	const applyMeasurement = (

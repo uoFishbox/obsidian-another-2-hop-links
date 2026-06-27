@@ -122,10 +122,6 @@ export interface VirtualListStableMeasurementContext {
 	sharedScrollMetrics?: VirtualListSharedScrollMetrics;
 }
 
-type VirtualListControllerDebugState = {
-	logActiveScrollWindows?: boolean;
-};
-
 export interface VirtualListLayoutMeasurement<TLayout, TContent> {
 	layout: TLayout;
 	content: TContent;
@@ -210,33 +206,6 @@ export function createVirtualListController<
 	const cachedScrollSnapshot: VirtualListScrollSnapshot = {
 		scrollTop: 0,
 		viewportHeight: 0,
-	};
-
-	const maybeLogActiveScrollWindow = (
-		previous: LastScrollWindow | null,
-		identity: ScrollWindowIdentity,
-		mountedStart: number,
-		mountedEnd: number,
-		activeScroll: boolean,
-	): void => {
-		if (
-			process.env.NODE_ENV === "production" ||
-			typeof window === "undefined" ||
-			!(window.__CCL_DEBUG__ as VirtualListControllerDebugState | undefined)
-				?.logActiveScrollWindows
-		) {
-			return;
-		}
-
-		const sameMountedWindow =
-			previous !== null &&
-			previous.mountedStart === mountedStart &&
-			previous.mountedEnd === mountedEnd;
-		console.log({
-			identityStable: previous?.identity === identity,
-			sameMountedWindow,
-			activeScroll,
-		});
 	};
 
 	const resolveMountedComparableScrollWindow = (
@@ -436,13 +405,6 @@ export function createVirtualListController<
 					);
 				if (mountedScrollWindowMeasurement) {
 					precomputedMountedRange = mountedScrollWindowMeasurement.mounted;
-					maybeLogActiveScrollWindow(
-						lastScrollWindow,
-						mountedScrollWindowMeasurement.identity,
-						mountedScrollWindowMeasurement.mounted.start,
-						mountedScrollWindowMeasurement.mounted.end,
-						localIsScrollActive,
-					);
 					hasMountedWindowChanged = !isSameMountedScrollWindow(
 						lastScrollWindow,
 						mountedScrollWindowMeasurement.identity,
@@ -498,13 +460,6 @@ export function createVirtualListController<
 				) ?? null;
 			if (scrollWindowMeasurement) {
 				precomputedRanges = scrollWindowMeasurement.ranges;
-				maybeLogActiveScrollWindow(
-					lastScrollWindow,
-					scrollWindowMeasurement.identity,
-					scrollWindowMeasurement.ranges.mounted.start,
-					scrollWindowMeasurement.ranges.mounted.end,
-					localIsScrollActive,
-				);
 				if (
 					isSameRangedScrollWindow(
 						lastScrollWindow,

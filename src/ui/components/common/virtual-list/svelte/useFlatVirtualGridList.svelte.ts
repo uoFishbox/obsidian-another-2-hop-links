@@ -32,10 +32,6 @@ import { resolveCardLayoutSettings } from "ui/utils/cardLayoutCssVars";
 import { getOptionalOwnerWindow } from "ui/utils/realmSafeDom";
 import { scheduleAnimationFrame } from "ui/utils/frame";
 import { createSectionPaginationState } from "../pagination";
-import {
-	isVirtualListDebugEnabled,
-	publishVirtualListMountedCellsParity,
-} from "../core/virtualListDebug";
 import { useVirtualList } from "./useVirtualList.svelte";
 import type { VirtualListLogicalCell } from "../logicalCell";
 import type {
@@ -283,7 +279,6 @@ export function useFlatVirtualGridList<T>(props: FlatVirtualGridListProps<T>) {
 		onStableVisibleRange: () => {
 			measurement.hasStableVisibleRange = true;
 		},
-		debugName: "flat-link-list",
 		visibilityMetadataPolicy: { type: "caller-managed" },
 		onSnapshotUpdated: (snapshot, reconciliationState) => {
 			syncVisibilityStates(
@@ -513,17 +508,6 @@ export function useFlatVirtualGridList<T>(props: FlatVirtualGridListProps<T>) {
 		});
 	};
 
-	const publishMountedCellsDebugParity = (): void => {
-		if (!isVirtualListDebugEnabled()) {
-			return;
-		}
-		publishVirtualListMountedCellsParity({
-			name: "flat-link-list",
-			snapshot: virtualListSnapshot,
-			renderedCells: mountedCells,
-		});
-	};
-
 	const observeInfiniteScrollWhenReady = (): (() => void) | undefined => {
 		if (!shouldUseInfiniteScroll || !canLoadMore || !infiniteScrollSentinelEl) {
 			return;
@@ -550,10 +534,6 @@ export function useFlatVirtualGridList<T>(props: FlatVirtualGridListProps<T>) {
 
 	$effect(() => {
 		recomputeVirtualListForRowModel(logicalCellCount, rowModel);
-	});
-
-	$effect(() => {
-		publishMountedCellsDebugParity();
 	});
 
 	const loadNextPage = () => {

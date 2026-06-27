@@ -20,7 +20,6 @@ import {
 	type VirtualListComputation,
 	type VirtualCellVisibilityMetadataPolicy,
 } from "../virtualListEngine";
-import type { VirtualListDebugState } from "../virtualListDebug";
 
 type TestItem = { id: string; label?: string };
 type TestSnapshot = VirtualListSnapshot<
@@ -37,7 +36,6 @@ type TestComputation = VirtualListComputation<
 	MountedVirtualGridCellsBuildResult<TestItem>
 >;
 const stateBySnapshot = new WeakMap<TestSnapshot, TestReconciliationState>();
-let previousDebugState: VirtualListDebugState | undefined;
 
 const createRowModel = (
 	input: number | readonly TestItem[],
@@ -145,16 +143,6 @@ const expectUniqueRenderSlots = (
 };
 
 describe("VirtualListEngine contract", () => {
-	beforeEach(() => {
-		previousDebugState = window.__CCL_DEBUG__;
-		window.__CCL_DEBUG__ = {};
-	});
-
-	afterEach(() => {
-		window.__CCL_DEBUG__ = previousDebugState;
-		previousDebugState = undefined;
-	});
-
 	it("preserves DOM slots while logical cells scroll through them", () => {
 		const rowModel = createRowModel(12);
 		const initial = computeSnapshot({ rowModel, scrollTop: 0 });

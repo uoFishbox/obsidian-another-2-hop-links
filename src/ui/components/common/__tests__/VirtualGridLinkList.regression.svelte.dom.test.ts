@@ -152,49 +152,37 @@ describe("VirtualGridLinkList regression", () => {
 	});
 
 	it("updates rendered content when an item object changes without changing its key", async () => {
-		const previousDebug = window.__CCL_DEBUG__;
-		window.__CCL_DEBUG__ = {};
-		try {
-			const initialItems = Array.from({ length: 4 }, (_, index) => ({
-				id: `item-${index}`,
-				label: `Initial ${index}`,
-			}));
+		const initialItems = Array.from({ length: 4 }, (_, index) => ({
+			id: `item-${index}`,
+			label: `Initial ${index}`,
+		}));
 
-			const driver = renderVirtualGridListObject({
-				items: initialItems,
-				initialVisibleCount: 2,
-				loadMoreIncrement: 2,
-			});
+		const driver = renderVirtualGridListObject({
+			items: initialItems,
+			initialVisibleCount: 2,
+			loadMoreIncrement: 2,
+		});
 
-			await driver.setViewport({
-				rootHeight: 4000,
-				width: 330,
-			});
+		await driver.setViewport({
+			rootHeight: 4000,
+			width: 330,
+		});
 
-			await waitFor(() => {
-				expect(driver.queryByText("Initial 0")).not.toBeNull();
-			});
-			await waitFor(() => {
-				expect(
-					window.__CCL_DEBUG__?.virtualLists?.["flat-link-list"]
-						?.mountedCellsParity?.ok,
-				).toBe(true);
-			});
+		await waitFor(() => {
+			expect(driver.queryByText("Initial 0")).not.toBeNull();
+		});
 
-			const updatedItems = initialItems.map((item, index) => ({
-				id: item.id,
-				label: `Updated ${index}`,
-			}));
+		const updatedItems = initialItems.map((item, index) => ({
+			id: item.id,
+			label: `Updated ${index}`,
+		}));
 
-			await driver.rerender({ items: updatedItems });
+		await driver.rerender({ items: updatedItems });
 
-			await waitFor(() => {
-				expect(driver.queryByText("Updated 0")).not.toBeNull();
-			});
-			expect(driver.queryByText("Initial 0")).toBeNull();
-		} finally {
-			window.__CCL_DEBUG__ = previousDebug;
-		}
+		await waitFor(() => {
+			expect(driver.queryByText("Updated 0")).not.toBeNull();
+		});
+		expect(driver.queryByText("Initial 0")).toBeNull();
 	});
 
 	it("updates rendered content after in-place array element replacement when itemsRevision changes", async () => {
