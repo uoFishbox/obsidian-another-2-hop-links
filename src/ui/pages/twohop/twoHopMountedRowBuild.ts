@@ -5,6 +5,7 @@ import type { MountedFlatRowSlice } from "ui/components/common/virtual-list/reco
 import {
 	buildSectionedGridMountedRows,
 	type SectionedGridMountedRowsBuild,
+	type SectionedGridResolvedRowScratch,
 } from "ui/components/common/virtual-list/row-models/sectionedGridMountedRows";
 import type {
 	TwoHopVirtualListItem,
@@ -86,6 +87,7 @@ export function buildTwoHopMountedRows(params: {
 	readonly ranges: VirtualRanges;
 	readonly previousBuild?: TwoHopMountedRowsBuild;
 	readonly reusableRowSlotsScratch?: number[];
+	readonly resolvedRowScratch?: SectionedGridResolvedRowScratch;
 }): TwoHopMountedRowsBuild {
 	const plan = params.rowModel.plan;
 	const range = params.rowRange;
@@ -122,6 +124,7 @@ export function buildTwoHopMountedRows(params: {
 		rowRange: range,
 		previousBuild: previous,
 		reusableRowSlotsScratch: params.reusableRowSlotsScratch,
+		resolvedRowScratch: params.resolvedRowScratch,
 		findSectionIndexByRow: findTwoHopSectionIndexByRow,
 		resolveRowInSection: resolveTwoHopRowInSection,
 		resolveRowInSectionInto: resolveTwoHopRowInSectionInto,

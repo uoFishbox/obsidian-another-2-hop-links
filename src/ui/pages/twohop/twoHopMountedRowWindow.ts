@@ -1,5 +1,6 @@
 import type { RowRange } from "ui/components/common/virtual-list/rowRange";
 import type { VirtualRanges } from "ui/components/common/virtual-list/types";
+import type { SectionedGridResolvedRowScratch } from "ui/components/common/virtual-list/row-models/sectionedGridMountedRows";
 import {
 	buildTwoHopMountedRows,
 	type TwoHopMountedRowsBuild,
@@ -69,6 +70,13 @@ function setClampedRange(out: RowRange, range: RowRange, rowCount: number): void
  * recycling via `reusableRowSlotsScratch`.
  */
 export function createTwoHopMountedRowWindow(): TwoHopMountedRowWindow {
+	const reusableRowSlotsScratch: number[] = [];
+	const resolvedRowScratch: SectionedGridResolvedRowScratch = {
+		rowIndexInSection: 0,
+		sectionCellStartIndex: 0,
+		cellCount: 0,
+		top: 0,
+	};
 	const state: TwoHopMountedRowWindowState = {
 		build: undefined,
 		plan: undefined,
@@ -102,6 +110,8 @@ export function createTwoHopMountedRowWindow(): TwoHopMountedRowWindow {
 			rowRange,
 			ranges,
 			previousBuild: previousBuild ?? state.build,
+			reusableRowSlotsScratch,
+			resolvedRowScratch,
 		});
 
 		state.build = build;

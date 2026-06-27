@@ -71,6 +71,7 @@ export interface BuildSectionedGridMountedRowsParams<
 	readonly rowRange: RowRange;
 	readonly previousBuild?: SectionedGridMountedRowsBuild<T, G, TPlan>;
 	readonly reusableRowSlotsScratch?: number[];
+	readonly resolvedRowScratch?: SectionedGridResolvedRowScratch;
 	findSectionIndexByRow(sections: readonly TSection[], rowIndex: number): number;
 	resolveRowInSection(
 		plan: TPlan,
@@ -217,14 +218,15 @@ export function buildSectionedGridMountedRows<
 	let lastSectionIndex = -1;
 	let sectionLayout: SectionLayout<T, G> | null = null;
 
-	// Module-level scratch for Into-style resolution. Scalar values are read
-	// immediately per iteration, so reuse is safe.
-	const resolvedScratch: SectionedGridResolvedRowScratch = {
+	const localResolvedScratch: SectionedGridResolvedRowScratch = {
 		rowIndexInSection: 0,
 		sectionCellStartIndex: 0,
 		cellCount: 0,
 		top: 0,
 	};
+	// Scalar values are read immediately per iteration, so caller-provided
+	// scratch reuse is safe.
+	const resolvedScratch = params.resolvedRowScratch ?? localResolvedScratch;
 	const useInto = params.resolveRowInSectionInto !== undefined;
 
 	for (let rowIndex = start; rowIndex < end; rowIndex += 1) {
