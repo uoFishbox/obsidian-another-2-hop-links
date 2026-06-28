@@ -130,7 +130,7 @@
 	columns={list.layout.columns}
 	gap={list.layout.gap}
 	layoutMode="grid-rows"
-	interactionDescriptorScopeId="twohop-mounted-items"
+	interactionDescriptorScopeId="twohop-mounted-cells"
 	{interactionDescriptorResolverProvider}
 	bind:rootEl={list.rootEl}
 	observerRoot={list.observerRoot}

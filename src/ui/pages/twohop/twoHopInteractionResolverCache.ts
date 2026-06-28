@@ -1,6 +1,13 @@
-import type { ItemInteractionDescriptor } from "ui/interactions/interactionTypes";
+import type {
+	InteractionDescriptor,
+	ItemInteractionDescriptor,
+	SectionHeaderInteractionDescriptor,
+} from "ui/interactions/interactionTypes";
 import type { InteractionDescriptorResolverProvider } from "ui/interactions/interactionRegistry";
-import type { MountedFlatItemCell } from "ui/components/common/virtual-list/reconciliation/viewPlanMountedCells";
+import type {
+	MountedFlatHeaderCell,
+	MountedFlatItemCell,
+} from "ui/components/common/virtual-list/reconciliation/viewPlanMountedCells";
 import type { MountedFlatRowSlice } from "ui/components/common/virtual-list/reconciliation/viewPlanRenderRows";
 import { createItemInteractionKey } from "ui/interactions/interactionTypes";
 import type {
@@ -12,14 +19,28 @@ type TwoHopMountedItemCell = MountedFlatItemCell<
 	TwoHopVirtualListItem,
 	TwoHopVirtualListSection
 >;
+type TwoHopMountedHeaderCell = MountedFlatHeaderCell<
+	TwoHopVirtualListItem,
+	TwoHopVirtualListSection
+>;
 
-interface ProviderCacheEntry {
+interface ItemProviderCacheEntry {
+	kind: "item";
 	itemRevision: TwoHopVirtualListItem;
 	renderBodyRevision: unknown;
 	resolveDescriptorRevision: unknown;
 	descriptorRevision: unknown;
 	descriptor: ItemInteractionDescriptor;
 }
+
+interface SectionHeaderProviderCacheEntry {
+	kind: "sectionHeader";
+	headerPropsRevision: unknown;
+	renderBodyRevision: unknown;
+	descriptor: SectionHeaderInteractionDescriptor;
+}
+
+type ProviderCacheEntry = ItemProviderCacheEntry | SectionHeaderProviderCacheEntry;
 
 export interface TwoHopInteractionResolverProviderParams {
 	getMountedRows: () => readonly MountedFlatRowSlice<
@@ -46,8 +67,18 @@ export function createTwoHopInteractionResolverProvider({
 
 	return {
 		resolveInteractionDescriptor: (interactionId) => {
+			const mountedRows = getMountedRows();
+			const headerDescriptor = resolveMountedSectionHeaderDescriptor({
+				mountedRows,
+				interactionId,
+				descriptorsByInteractionId,
+			});
+			if (headerDescriptor) {
+				return headerDescriptor;
+			}
+
 			const itemCell = findMountedItemCellByInteractionId({
-				mountedRows: getMountedRows(),
+				mountedRows,
 				interactionId,
 			});
 			if (!itemCell) {
@@ -60,6 +91,7 @@ export function createTwoHopInteractionResolverProvider({
 			const descriptorRevision = getDescriptorRevision?.();
 			if (
 				cached &&
+				cached.kind === "item" &&
 				cached.itemRevision === item &&
 				Object.is(cached.renderBodyRevision, itemCell.renderBodyKey) &&
 				Object.is(cached.resolveDescriptorRevision, resolveDescriptor) &&
@@ -74,6 +106,7 @@ export function createTwoHopInteractionResolverProvider({
 				return null;
 			}
 			descriptorsByInteractionId.set(interactionId, {
+				kind: "item",
 				itemRevision: item,
 				renderBodyRevision: itemCell.renderBodyKey,
 				resolveDescriptorRevision: resolveDescriptor,
@@ -83,6 +116,65 @@ export function createTwoHopInteractionResolverProvider({
 			return descriptor;
 		},
 	};
+}
+
+function resolveMountedSectionHeaderDescriptor(params: {
+	mountedRows: readonly MountedFlatRowSlice<
+		TwoHopVirtualListItem,
+		TwoHopVirtualListSection
+	>[];
+	interactionId: string;
+	descriptorsByInteractionId: Map<string, ProviderCacheEntry>;
+}): InteractionDescriptor | null {
+	const headerCell = findMountedHeaderCellByInteractionId({
+		mountedRows: params.mountedRows,
+		interactionId: params.interactionId,
+	});
+	if (!headerCell) return null;
+
+	const descriptor = headerCell.headerProps.interactionDescriptor;
+	if (!descriptor) return null;
+
+	const cached = params.descriptorsByInteractionId.get(params.interactionId);
+	if (
+		cached &&
+		cached.kind === "sectionHeader" &&
+		cached.headerPropsRevision === headerCell.headerProps &&
+		Object.is(cached.renderBodyRevision, headerCell.renderBodyKey)
+	) {
+		return cached.descriptor;
+	}
+
+	params.descriptorsByInteractionId.set(params.interactionId, {
+		kind: "sectionHeader",
+		headerPropsRevision: headerCell.headerProps,
+		renderBodyRevision: headerCell.renderBodyKey,
+		descriptor,
+	});
+	return descriptor;
+}
+
+function findMountedHeaderCellByInteractionId(params: {
+	mountedRows: readonly MountedFlatRowSlice<
+		TwoHopVirtualListItem,
+		TwoHopVirtualListSection
+	>[];
+	interactionId: string;
+}): TwoHopMountedHeaderCell | null {
+	for (const row of params.mountedRows) {
+		for (const cell of row.cells) {
+			if (cell.cell.kind !== "header") continue;
+
+			const headerCell = cell as TwoHopMountedHeaderCell;
+			const headerInteractionId =
+				headerCell.headerProps.interactionId ?? headerCell.sectionId;
+			if (headerInteractionId === params.interactionId) {
+				return headerCell;
+			}
+		}
+	}
+
+	return null;
 }
 
 function findMountedItemCellByInteractionId(params: {

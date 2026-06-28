@@ -1,9 +1,16 @@
 import { describe, expect, it, vi } from "vitest";
 import type { TFile } from "obsidian";
 import type { ViewItem } from "application/presenters";
-import type { ItemInteractionDescriptor } from "ui/interactions/interactionTypes";
-import type { MountedFlatItemCell } from "ui/components/common/virtual-list/reconciliation/viewPlanMountedCells";
+import type {
+	ItemInteractionDescriptor,
+	SectionHeaderInteractionDescriptor,
+} from "ui/interactions/interactionTypes";
+import type {
+	MountedFlatHeaderCell,
+	MountedFlatItemCell,
+} from "ui/components/common/virtual-list/reconciliation/viewPlanMountedCells";
 import type { MountedFlatRowSlice } from "ui/components/common/virtual-list/reconciliation/viewPlanRenderRows";
+import type { TwoHopIndexedLink } from "types/domain";
 import { createTwoHopInteractionResolverProvider } from "../twoHopInteractionResolverCache";
 import type {
 	TwoHopVirtualListItem,
@@ -11,6 +18,10 @@ import type {
 } from "../twoHopVirtualListModel";
 
 type TwoHopMountedItemCell = MountedFlatItemCell<
+	TwoHopVirtualListItem,
+	TwoHopVirtualListSection
+>;
+type TwoHopMountedHeaderCell = MountedFlatHeaderCell<
 	TwoHopVirtualListItem,
 	TwoHopVirtualListSection
 >;
@@ -28,6 +39,21 @@ function createItem(path: string): TwoHopVirtualListItem {
 		sourceSectionId: "primary",
 		searchKey: path,
 		virtualKey: path,
+	};
+}
+
+function createHeaderDescriptor(
+	interactionId: string,
+): SectionHeaderInteractionDescriptor {
+	return {
+		interactionId,
+		kind: "sectionHeader",
+		link: {
+			path: "branch.md",
+			displayText: "branch",
+		} as unknown as TwoHopIndexedLink,
+		isOutgoingLink: true,
+		targetFile: null,
 	};
 }
 
@@ -53,6 +79,39 @@ function createMountedRows(params: {
 			key: 0,
 			top: 0,
 			cells: [cell],
+		},
+	];
+}
+
+function createMountedHeaderRows(params: {
+	interactionId?: string;
+	sectionId?: string;
+	descriptor?: SectionHeaderInteractionDescriptor;
+	renderBodyKey?: string;
+}): readonly TwoHopMountedRow[] {
+	const sectionId = params.sectionId ?? "branch-alpha";
+	const headerCell = {
+		cellSlotKey: 0,
+		renderSlotIndex: 0,
+		renderBodyKey: params.renderBodyKey ?? `header:${sectionId}`,
+		sectionId,
+		cell: {
+			kind: "header",
+		},
+		headerProps: {
+			interactionId: params.interactionId,
+			interactionKind: "sectionHeader",
+			interactionDescriptor: params.descriptor,
+		},
+	} as unknown as TwoHopMountedHeaderCell;
+
+	return [
+		{
+			rowIndex: 0,
+			rowKey: 0,
+			key: 0,
+			top: 0,
+			cells: [headerCell],
 		},
 	];
 }
@@ -148,5 +207,46 @@ describe("twoHopInteractionResolverCache", () => {
 			secondDescriptor,
 		);
 		expect(resolveDescriptor).toHaveBeenCalledTimes(2);
+	});
+
+	it("provider resolves mounted section header descriptors without item resolution", () => {
+		const descriptor = createHeaderDescriptor("h0");
+		const resolveDescriptor = vi.fn();
+		const provider = createTwoHopInteractionResolverProvider({
+			getMountedRows: () =>
+				createMountedHeaderRows({
+					interactionId: "h0",
+					descriptor,
+				}),
+			resolveDescriptor,
+		});
+
+		expect(provider.resolveInteractionDescriptor("h0")).toBe(descriptor);
+		expect(resolveDescriptor).not.toHaveBeenCalled();
+	});
+
+	it("provider resolves section header ids against the current mounted rows", () => {
+		let mountedRows: readonly TwoHopMountedRow[] = [];
+		const firstDescriptor = createHeaderDescriptor("h0");
+		const secondDescriptor = createHeaderDescriptor("h1");
+		const provider = createTwoHopInteractionResolverProvider({
+			getMountedRows: () => mountedRows,
+			resolveDescriptor: vi.fn(() => null),
+		});
+
+		mountedRows = createMountedHeaderRows({
+			interactionId: "h0",
+			descriptor: firstDescriptor,
+		});
+
+		expect(provider.resolveInteractionDescriptor("h0")).toBe(firstDescriptor);
+
+		mountedRows = createMountedHeaderRows({
+			interactionId: "h1",
+			descriptor: secondDescriptor,
+		});
+
+		expect(provider.resolveInteractionDescriptor("h0")).toBeNull();
+		expect(provider.resolveInteractionDescriptor("h1")).toBe(secondDescriptor);
 	});
 });

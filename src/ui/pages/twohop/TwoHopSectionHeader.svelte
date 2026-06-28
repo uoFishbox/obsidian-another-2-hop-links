@@ -22,12 +22,17 @@
 	const iconPath = $derived(
 		kind === "tag-section" ? ICON_PATHS.Tag : ICON_PATHS.Link,
 	);
+	const clickableHeaderProps = $derived.by(() => {
+		const rest: ClickableHeaderExtraProps = { ...header };
+		delete rest.interactionDescriptor;
+		return rest;
+	});
 </script>
 
 <ClickableHeader
 	{title}
 	{count}
-	{...header}
+	{...clickableHeaderProps}
 	interactionId={header.interactionId ?? sectionId}
 	interactionKind={header.interactionKind ?? "sectionHeader"}
 >
