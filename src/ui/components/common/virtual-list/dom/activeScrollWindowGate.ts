@@ -128,6 +128,38 @@ export const updateMountedScrollWindow = (
 	return previous;
 };
 
+export const updateMountedAndPreviewScrollWindow = (
+	previous: LastScrollWindow | null,
+	identity: ScrollWindowIdentity,
+	ranges: VirtualRanges,
+	stablePreviewScrollTopBand?: StablePreviewScrollTopBand,
+	stableMountedScrollTopBand?: StableScrollTopBand,
+): LastScrollWindow => {
+	if (!previous) {
+		const next = createScrollWindow(identity, ranges, stablePreviewScrollTopBand);
+		next.stableMountedScrollTopMin =
+			stableMountedScrollTopBand?.min ?? INVALID_STABLE_MOUNTED_SCROLL_TOP_MIN;
+		next.stableMountedScrollTopMax =
+			stableMountedScrollTopBand?.max ?? INVALID_STABLE_MOUNTED_SCROLL_TOP_MAX;
+		return next;
+	}
+
+	previous.identity = identity;
+	previous.mountedStart = ranges.mounted.start;
+	previous.mountedEnd = ranges.mounted.end;
+	previous.visibleStart = ranges.previewVisible.start;
+	previous.visibleEnd = ranges.previewVisible.end;
+	previous.stablePreviewScrollTopMin =
+		stablePreviewScrollTopBand?.min ?? INVALID_STABLE_PREVIEW_SCROLL_TOP_MIN;
+	previous.stablePreviewScrollTopMax =
+		stablePreviewScrollTopBand?.max ?? INVALID_STABLE_PREVIEW_SCROLL_TOP_MAX;
+	previous.stableMountedScrollTopMin =
+		stableMountedScrollTopBand?.min ?? INVALID_STABLE_MOUNTED_SCROLL_TOP_MIN;
+	previous.stableMountedScrollTopMax =
+		stableMountedScrollTopBand?.max ?? INVALID_STABLE_MOUNTED_SCROLL_TOP_MAX;
+	return previous;
+};
+
 export const isSameMountedScrollWindow = (
 	previous: LastScrollWindow | null,
 	identity: ScrollWindowIdentity,

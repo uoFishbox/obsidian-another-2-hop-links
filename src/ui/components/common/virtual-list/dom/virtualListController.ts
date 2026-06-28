@@ -11,8 +11,8 @@ import {
 	type MountedScrollWindowMeasurement,
 	type RangedScrollWindowMeasurement,
 	type ScrollWindowIdentity,
+	updateMountedAndPreviewScrollWindow,
 	updateMountedScrollWindow,
-	updateScrollWindow,
 } from "./activeScrollWindowGate";
 export type {
 	ActiveScrollWindowComparison,
@@ -408,6 +408,9 @@ export function createVirtualListController<
 		let nextStablePreviewScrollTopBand:
 			| RangedScrollWindowMeasurement["stablePreviewScrollTopBand"]
 			| undefined;
+		let nextStableMountedScrollTopBand:
+			| MountedScrollWindowMeasurement["stableMountedScrollTopBand"]
+			| undefined;
 		let nextMountedScrollWindowRange: RowRange | null = null;
 		let pendingMountedScrollWindowMeasurement: MountedScrollWindowMeasurement | null =
 			null;
@@ -497,11 +500,12 @@ export function createVirtualListController<
 					onActiveScrollPreviewRangeMeasurement?.(
 						scrollWindowMeasurement.ranges,
 					);
-					lastScrollWindow = updateScrollWindow(
+					lastScrollWindow = updateMountedAndPreviewScrollWindow(
 						lastScrollWindow,
 						scrollWindowMeasurement.identity,
 						scrollWindowMeasurement.ranges,
 						scrollWindowMeasurement.stablePreviewScrollTopBand,
+						pendingMountedScrollWindowMeasurement.stableMountedScrollTopBand,
 					);
 					return returnStable(scrollWindowMeasurement.ranges.mounted);
 				}
@@ -509,11 +513,25 @@ export function createVirtualListController<
 				nextScrollWindowRanges = scrollWindowMeasurement.ranges;
 				nextStablePreviewScrollTopBand =
 					scrollWindowMeasurement.stablePreviewScrollTopBand;
+				if (
+					pendingMountedScrollWindowMeasurement &&
+					pendingMountedScrollWindowMeasurement.identity ===
+						scrollWindowMeasurement.identity &&
+					pendingMountedScrollWindowMeasurement.mounted.start ===
+						scrollWindowMeasurement.ranges.mounted.start &&
+					pendingMountedScrollWindowMeasurement.mounted.end ===
+						scrollWindowMeasurement.ranges.mounted.end
+				) {
+					nextStableMountedScrollTopBand =
+						pendingMountedScrollWindowMeasurement.stableMountedScrollTopBand;
+				}
 			} else if (pendingMountedScrollWindowMeasurement) {
 				nextScrollWindowIdentity =
 					pendingMountedScrollWindowMeasurement.identity;
 				nextMountedScrollWindowRange =
 					pendingMountedScrollWindowMeasurement.mounted;
+				nextStableMountedScrollTopBand =
+					pendingMountedScrollWindowMeasurement.stableMountedScrollTopBand;
 			} else {
 				lastScrollWindow = null;
 			}
@@ -554,17 +572,19 @@ export function createVirtualListController<
 			if (nextScrollWindowIdentity === null) {
 				lastScrollWindow = null;
 			} else if (nextScrollWindowRanges) {
-				lastScrollWindow = updateScrollWindow(
+				lastScrollWindow = updateMountedAndPreviewScrollWindow(
 					lastScrollWindow,
 					nextScrollWindowIdentity,
 					nextScrollWindowRanges,
 					nextStablePreviewScrollTopBand,
+					nextStableMountedScrollTopBand,
 				);
 			} else if (nextMountedScrollWindowRange) {
 				lastScrollWindow = updateMountedScrollWindow(
 					lastScrollWindow,
 					nextScrollWindowIdentity,
 					nextMountedScrollWindowRange,
+					nextStableMountedScrollTopBand,
 				);
 			}
 			if (!measurementContext.isScrollActive) {

@@ -299,6 +299,83 @@ describe("createVirtualListController", () => {
 		expect(resolveScrollWindowMeasurement).toHaveBeenCalledTimes(1);
 		expect(applyRangeMeasurement).toHaveBeenCalledTimes(1);
 	});
+
+	it("keeps the mounted stable band after mounted-only preview sync", () => {
+		const rootEl = document.createElement("div");
+		rootEl.getBoundingClientRect = () =>
+			({
+				top: 0,
+				left: 0,
+				right: 320,
+				bottom: 240,
+				width: 320,
+				height: 240,
+				x: 0,
+				y: 0,
+				toJSON: () => ({}),
+			}) as DOMRect;
+
+		const measurement = createVirtualListMeasurementState();
+		const rowModel = {};
+		const mountedRange = { start: 1, end: 4 };
+		const applyRangeMeasurement = vi.fn(() => ({
+			kind: "stable" as const,
+			range: mountedRange,
+		}));
+		const resolveMountedScrollWindowMeasurement = vi.fn((scrollTop: number) => ({
+			identity: rowModel,
+			mounted: mountedRange,
+			stableMountedScrollTopBand:
+				scrollTop === 0 ? undefined : { min: 100, max: 200 },
+		}));
+		const resolveScrollWindowMeasurement = vi.fn(() => ({
+			identity: rowModel,
+			ranges: {
+				mounted: mountedRange,
+				previewVisible: { start: 2, end: 3 },
+			},
+			stablePreviewScrollTopBand: { min: 101, max: 102 },
+		}));
+
+		const controller = createVirtualListController({
+			getRootEl: () => rootEl,
+			measurement,
+			getLayout: () => ({}),
+			setLayout: vi.fn(),
+			isSameLayout: () => true,
+			resolveLayoutMeasurement: () => ({
+				layout: {},
+				content: {},
+				hasRenderableContent: true,
+				hasStableLayout: true,
+			}),
+			getCachedContent: () => ({}),
+			hasRenderableContent: () => true,
+			applyRangeMeasurement,
+			resolveMountedScrollWindowMeasurement,
+			resolveScrollWindowMeasurement,
+			activeScrollWindowComparison: "mounted-only",
+			maxUnstableMeasurementRetries: 1,
+		});
+
+		controller.updateFromLiveMeasurement({}, {});
+		controller.runScrollMeasurement({
+			scrollTop: 101,
+			viewportHeight: 200,
+			frameId: 1,
+			isScrollActive: true,
+		});
+		controller.runScrollMeasurement({
+			scrollTop: 150,
+			viewportHeight: 200,
+			frameId: 2,
+			isScrollActive: true,
+		});
+
+		expect(resolveMountedScrollWindowMeasurement).toHaveBeenCalledTimes(3);
+		expect(resolveScrollWindowMeasurement).toHaveBeenCalledTimes(1);
+		expect(applyRangeMeasurement).toHaveBeenCalledTimes(1);
+	});
 });
 
 describe("createVirtualListController initial stabilization", () => {

@@ -4,7 +4,9 @@ import {
 	createScrollWindow,
 	isSameMountedScrollWindow,
 	isSameRangedScrollWindow,
+	isWithinStableMountedScrollWindow,
 	isWithinStablePreviewScrollWindow,
+	updateMountedAndPreviewScrollWindow,
 	updateMountedScrollWindow,
 	updateScrollWindow,
 } from "../activeScrollWindowGate";
@@ -215,5 +217,43 @@ describe("activeScrollWindowGate", () => {
 			stableMountedScrollTopMin: Number.POSITIVE_INFINITY,
 			stableMountedScrollTopMax: Number.NEGATIVE_INFINITY,
 		});
+	});
+
+	it("updates mounted and preview stable scroll bands together", () => {
+		const previous = createMountedScrollWindow(
+			{},
+			{ start: 1, end: 5 },
+			{ min: 0, max: 100 },
+		);
+		const identity = {};
+
+		const updated = updateMountedAndPreviewScrollWindow(
+			previous,
+			identity,
+			{
+				mounted: { start: 3, end: 8 },
+				previewVisible: { start: 4, end: 7 },
+			},
+			{ min: 30, max: 40 },
+			{ min: 20, max: 80 },
+		);
+
+		expect(updated).toBe(previous);
+		expect(
+			isWithinStablePreviewScrollWindow(
+				updated,
+				identity,
+				{ start: 3, end: 8 },
+				35,
+			),
+		).toBe(true);
+		expect(
+			isWithinStableMountedScrollWindow(
+				updated,
+				identity,
+				{ start: 3, end: 8 },
+				50,
+			),
+		).toBe(true);
 	});
 });
