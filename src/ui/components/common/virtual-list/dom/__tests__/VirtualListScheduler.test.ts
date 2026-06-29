@@ -2,8 +2,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
 	createPostPaintVirtualListTask,
 	createScheduledVirtualListTask,
-	createVirtualListMeasurementScheduler,
 } from "../virtualListScheduler";
+import { createVirtualListMeasurementScheduler } from "../virtualListMeasurementScheduler";
 
 describe("createVirtualListMeasurementScheduler", () => {
 	beforeEach(() => {

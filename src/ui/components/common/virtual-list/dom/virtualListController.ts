@@ -19,23 +19,17 @@ export type {
 	LastScrollWindow,
 	ScrollWindowIdentity,
 } from "./activeScrollWindowGate";
-import {
-	isStableCachedVirtualListMeasurementFromMetrics,
-	isStableVirtualListMeasurement,
-} from "./virtualListMeasurementStability";
 import { observeVirtualListViewport } from "./virtualListDomObserver";
 import type { VirtualListSharedScrollMetrics } from "./virtualListDomObserver";
 import {
-	getScrollMetrics,
-	readScrollSnapshot,
 	type MeasurementUpdateResult,
 	type VirtualListScrollSnapshot,
 } from "./virtualListMeasurementAdapter";
 import type { VirtualListMeasurementStateHandle } from "./virtualListMeasurementState";
-import {
-	createPostPaintVirtualListTask,
-	createVirtualListMeasurementScheduler,
-} from "./virtualListScheduler";
+import { createInitialVirtualListStabilization } from "./initialVirtualListStabilization";
+import { createVirtualListMeasurementScheduler } from "./virtualListMeasurementScheduler";
+import { readVirtualListCachedMeasurement } from "./virtualListCachedMeasurement";
+import { readVirtualListLiveMeasurement } from "./virtualListLiveMeasurement";
 import { getOptionalOwnerWindow } from "ui/utils/realmSafeDom";
 
 const createBootstrapMeasurementSuppression = (
@@ -294,42 +288,35 @@ export function createVirtualListController<
 			return SKIPPED_NO_WINDOW;
 		}
 
-		const resolvedSectionRect = sectionRect ?? rootEl.getBoundingClientRect();
-		const scrollMetrics = getScrollMetrics(
+		const liveMeasurement = readVirtualListLiveMeasurement({
 			rootEl,
-			measurement.scrollContainerEl,
-			resolvedSectionRect,
-		);
+			scrollContainerEl: measurement.scrollContainerEl,
+			sectionRect,
+			hasRenderableContent: hasRenderableContent(content),
+		});
 		lastLiveMeasurementContext = {
-			scrollTop: scrollMetrics.scrollTop,
-			viewportHeight: scrollMetrics.viewportHeight,
-			sectionTop: scrollMetrics.sectionTop,
+			scrollTop: liveMeasurement.scrollTop,
+			viewportHeight: liveMeasurement.viewportHeight,
+			sectionTop: liveMeasurement.sectionTop,
 			isScrollActive: false,
 		};
-		const isStableMeasurement = isStableVirtualListMeasurement({
-			hasRenderableContent: hasRenderableContent(content),
-			rootRect: resolvedSectionRect,
-			viewportHeight: scrollMetrics.viewportHeight,
-			scrollTop: scrollMetrics.scrollTop,
-			sectionTop: scrollMetrics.sectionTop,
-		});
 
 		measurement.updateFromLiveMetrics(
 			{
-				sectionTop: scrollMetrics.sectionTop,
-				viewportHeight: scrollMetrics.viewportHeight,
+				sectionTop: liveMeasurement.sectionTop,
+				viewportHeight: liveMeasurement.viewportHeight,
 			},
-			isStableMeasurement,
+			liveMeasurement.isStableMeasurement,
 		);
 
 		const measurementContext: VirtualListRangeMeasurementContext<
 			TLayout,
 			TContent
 		> = {
-			scrollTop: scrollMetrics.scrollTop,
-			viewportHeight: scrollMetrics.viewportHeight,
-			sectionTop: scrollMetrics.sectionTop,
-			isStableMeasurement,
+			scrollTop: liveMeasurement.scrollTop,
+			viewportHeight: liveMeasurement.viewportHeight,
+			sectionTop: liveMeasurement.sectionTop,
+			isStableMeasurement: liveMeasurement.isStableMeasurement,
 			isScrollActive: false,
 			content,
 			layout,
@@ -355,35 +342,21 @@ export function createVirtualListController<
 			return SKIPPED_NO_WINDOW;
 		}
 
-		// Scalar locals — defer object allocation past early-return paths
-		let localScrollTop: number;
-		let localViewportHeight: number;
-		const localIsScrollActive: boolean =
-			sharedScrollMetrics?.isScrollActive ?? false;
-
-		if (sharedScrollMetrics) {
-			localScrollTop = sharedScrollMetrics.scrollTop;
-			localViewportHeight = sharedScrollMetrics.viewportHeight;
-		} else {
-			const snapshot = readScrollSnapshot(
-				measurement.scrollContainerEl,
-				measurement.viewportHeight,
-				cachedScrollSnapshot,
-				rootEl,
-			);
-			localScrollTop = snapshot.scrollTop;
-			localViewportHeight = snapshot.viewportHeight;
-		}
-
-		const localSectionTop = measurement.sectionTop;
-		const isStableMeasurement = isStableCachedVirtualListMeasurementFromMetrics(
-			hasRenderableContent(content),
-			measurement.hasStableScrollMetrics,
-			measurement.viewportHeight,
-			localScrollTop,
-			localViewportHeight,
-			localSectionTop,
-		);
+		const cachedMeasurement = readVirtualListCachedMeasurement({
+			rootEl,
+			scrollContainerEl: measurement.scrollContainerEl,
+			viewportHeight: measurement.viewportHeight,
+			sectionTop: measurement.sectionTop,
+			hasStableScrollMetrics: measurement.hasStableScrollMetrics,
+			hasRenderableContent: hasRenderableContent(content),
+			cachedScrollSnapshot,
+			sharedScrollMetrics,
+		});
+		const localScrollTop = cachedMeasurement.scrollTop;
+		const localViewportHeight = cachedMeasurement.viewportHeight;
+		const localSectionTop = cachedMeasurement.sectionTop;
+		const localIsScrollActive = cachedMeasurement.isScrollActive;
+		const isStableMeasurement = cachedMeasurement.isStableMeasurement;
 		if (!isStableMeasurement && shouldSkipUnstableCachedMeasurement?.(options)) {
 			lastScrollWindow = null;
 			return SKIPPED_UNSTABLE;
@@ -396,8 +369,8 @@ export function createVirtualListController<
 				viewportHeight: localViewportHeight,
 				sectionTop: localSectionTop,
 				isScrollActive: localIsScrollActive,
-				...(sharedScrollMetrics
-					? { sharedScrollMetrics: { ...sharedScrollMetrics } }
+				...(cachedMeasurement.sharedScrollMetrics
+					? { sharedScrollMetrics: cachedMeasurement.sharedScrollMetrics }
 					: {}),
 			};
 		}
@@ -686,74 +659,12 @@ export function createVirtualListController<
 		() => getOptionalOwnerWindow(getRootEl()),
 	);
 
-	const INITIAL_STABILIZATION_MAX_PASSES = 2;
-	let initialStabilizationPassCount = 0;
-	let initialStabilizationCompleted = false;
-	let initialStabilizationCancelledByScroll = false;
-
-	const runInitialStabilizationMeasurement = () => {
-		if (initialStabilizationCompleted) {
-			return;
-		}
-
-		if (initialStabilizationCancelledByScroll) {
-			return;
-		}
-
-		const rootEl = getRootEl();
-		if (!rootEl || !getOptionalOwnerWindow(rootEl)) {
-			return;
-		}
-
-		initialStabilizationPassCount += 1;
-
-		runLayoutMeasurement();
-
-		if (measurement.hasStableScrollMetrics && measurement.hasStableVisibleRange) {
-			initialStabilizationCompleted = true;
-			return;
-		}
-
-		if (initialStabilizationPassCount < INITIAL_STABILIZATION_MAX_PASSES) {
-			initialStabilizationTask.schedule();
-		}
-	};
-
-	const initialStabilizationTask = createPostPaintVirtualListTask(
-		() => {
-			runInitialStabilizationMeasurement();
-		},
-		2,
-		() => getOptionalOwnerWindow(getRootEl()),
-	);
-
-	const scheduleInitialStabilizationMeasurement = () => {
-		if (
-			initialStabilizationCompleted ||
-			initialStabilizationCancelledByScroll ||
-			initialStabilizationTask.isScheduled()
-		) {
-			return;
-		}
-
-		initialStabilizationTask.schedule();
-	};
-
-	const cancelInitialStabilizationMeasurement = () => {
-		// If scroll metrics and the visible range are already stable, the
-		// post-paint stabilization has effectively succeeded even if the
-		// scheduled follow-up pass has not run yet. Treat it as completed so
-		// the warmed scroll-window gate (primeLastScrollWindow) is preserved
-		// instead of being invalidated by the scroll-start cancellation.
-		if (measurement.hasStableScrollMetrics && measurement.hasStableVisibleRange) {
-			initialStabilizationCompleted = true;
-			initialStabilizationTask.cancel();
-			return;
-		}
-
-		initialStabilizationCancelledByScroll = true;
-		initialStabilizationTask.cancel();
-	};
+	const initialStabilization = createInitialVirtualListStabilization({
+		measurement,
+		runLayoutMeasurement,
+		getRootEl,
+		getWindow: () => getOptionalOwnerWindow(getRootEl()),
+	});
 
 	const observeRoot = (
 		rootEl: HTMLElement,
@@ -778,10 +689,11 @@ export function createVirtualListController<
 				runWithoutTracking(() => {
 					bootstrapMeasurementSuppression.suppressForBootstrap();
 					runLayoutMeasurement();
-					scheduleInitialStabilizationMeasurement();
+					initialStabilization.schedule();
 				});
 			},
-			cancelInitialStabilizationMeasurement,
+			cancelInitialStabilizationMeasurement:
+				initialStabilization.cancelBecauseScrollStarted,
 			onScrollStart: () => {
 				// When the first scroll gesture begins before scroll metrics have
 				// stabilized, the cached scroll-measurement path would skip
@@ -796,7 +708,7 @@ export function createVirtualListController<
 
 		return () => {
 			bootstrapMeasurementSuppression.cancel();
-			initialStabilizationTask.cancel();
+			initialStabilization.cancel();
 			cancelAll();
 			stopObserving();
 		};

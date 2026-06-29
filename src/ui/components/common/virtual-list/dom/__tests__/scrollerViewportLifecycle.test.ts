@@ -5,11 +5,8 @@ describe("resolveScrollerViewportLifecycle", () => {
 	it("represents idle observer connection state", () => {
 		expect(
 			resolveScrollerViewportLifecycle({
-				isScrollActive: false,
+				scrollPhaseState: { type: "idle" },
 				structureObserverConnected: true,
-				needsObserverReconnectAfterScroll: false,
-				needsDependencyRefreshAfterScroll: false,
-				needsLayoutMeasurementAfterScroll: false,
 			}),
 		).toEqual({
 			type: "idle",
@@ -20,11 +17,15 @@ describe("resolveScrollerViewportLifecycle", () => {
 	it("scopes pending flags to the scrolling state", () => {
 		expect(
 			resolveScrollerViewportLifecycle({
-				isScrollActive: true,
+				scrollPhaseState: {
+					type: "scrolling",
+					pendingAfterScroll: {
+						reconnectObserver: true,
+						refreshDependencies: true,
+						measureLayout: false,
+					},
+				},
 				structureObserverConnected: false,
-				needsObserverReconnectAfterScroll: true,
-				needsDependencyRefreshAfterScroll: true,
-				needsLayoutMeasurementAfterScroll: false,
 			}),
 		).toEqual({
 			type: "scrolling",
@@ -40,11 +41,8 @@ describe("resolveScrollerViewportLifecycle", () => {
 		expect(
 			resolveScrollerViewportLifecycle({
 				isDisposed: true,
-				isScrollActive: false,
+				scrollPhaseState: { type: "idle" },
 				structureObserverConnected: false,
-				needsObserverReconnectAfterScroll: false,
-				needsDependencyRefreshAfterScroll: false,
-				needsLayoutMeasurementAfterScroll: false,
 			}),
 		).toEqual({ type: "disposed" });
 	});

@@ -1,3 +1,5 @@
+import type { ScrollerViewportScrollPhaseState } from "./scrollerViewportScrollPhase";
+
 export interface ScrollerViewportPendingAfterScroll {
 	readonly reconnectStructureObserver: boolean;
 	readonly refreshDependencies: boolean;
@@ -17,11 +19,8 @@ export type ScrollerViewportLifecycle =
 
 export interface ScrollerViewportLifecycleFlags {
 	readonly isDisposed?: boolean;
-	readonly isScrollActive: boolean;
+	readonly scrollPhaseState: ScrollerViewportScrollPhaseState;
 	readonly structureObserverConnected: boolean;
-	readonly needsObserverReconnectAfterScroll: boolean;
-	readonly needsDependencyRefreshAfterScroll: boolean;
-	readonly needsLayoutMeasurementAfterScroll: boolean;
 }
 
 export function resolveScrollerViewportLifecycle(
@@ -31,13 +30,15 @@ export function resolveScrollerViewportLifecycle(
 		return { type: "disposed" };
 	}
 
-	if (flags.isScrollActive) {
+	if (flags.scrollPhaseState.type === "scrolling") {
 		return {
 			type: "scrolling",
 			pendingAfterScroll: {
-				reconnectStructureObserver: flags.needsObserverReconnectAfterScroll,
-				refreshDependencies: flags.needsDependencyRefreshAfterScroll,
-				measureLayout: flags.needsLayoutMeasurementAfterScroll,
+				reconnectStructureObserver:
+					flags.scrollPhaseState.pendingAfterScroll.reconnectObserver,
+				refreshDependencies:
+					flags.scrollPhaseState.pendingAfterScroll.refreshDependencies,
+				measureLayout: flags.scrollPhaseState.pendingAfterScroll.measureLayout,
 			},
 		};
 	}

@@ -1,73 +1,133 @@
 import type { ScrollPhase } from "infrastructure/scroll/scrollTargetListeners";
 
-export function applyScrollerViewportScrollPhase(
-	state: {
-		isScrollActive: boolean;
-		needsObserverReconnectAfterScroll: boolean;
-		needsDependencyRefreshAfterScroll: boolean;
-		needsLayoutMeasurementAfterScroll: boolean;
-		becameActive: boolean;
-		becameIdle: boolean;
-		shouldRefreshDependencies: boolean;
-		shouldMeasureLayout: boolean;
-		shouldMeasureScroll: boolean;
-		shouldReconnectObserver: boolean;
-	},
+export interface ScrollerViewportScrollPendingAfterScroll {
+	readonly reconnectObserver: boolean;
+	readonly refreshDependencies: boolean;
+	readonly measureLayout: boolean;
+}
+
+export type ScrollerViewportScrollPhaseState =
+	| { readonly type: "idle" }
+	| {
+			readonly type: "scrolling";
+			readonly pendingAfterScroll: ScrollerViewportScrollPendingAfterScroll;
+	  };
+
+export type ScrollPhaseEffect =
+	| { readonly type: "none" }
+	| { readonly type: "scroll-start" }
+	| { readonly type: "scroll-frame"; readonly measureScroll: true }
+	| {
+			readonly type: "scroll-idle";
+			readonly refreshDependencies: boolean;
+			readonly measureLayout: boolean;
+			readonly measureScroll: boolean;
+			readonly reconnectObserver: boolean;
+	  };
+
+export interface ScrollerViewportScrollPhaseTransition {
+	readonly state: ScrollerViewportScrollPhaseState;
+	readonly effect: ScrollPhaseEffect;
+}
+
+const NO_PENDING_AFTER_SCROLL: ScrollerViewportScrollPendingAfterScroll = {
+	reconnectObserver: false,
+	refreshDependencies: false,
+	measureLayout: false,
+};
+
+export const INITIAL_SCROLLER_VIEWPORT_SCROLL_PHASE_STATE: ScrollerViewportScrollPhaseState =
+	{
+		type: "idle",
+	};
+
+export function reduceScrollerViewportPhase(
+	state: ScrollerViewportScrollPhaseState,
 	phase: ScrollPhase,
-): void {
+): ScrollerViewportScrollPhaseTransition {
 	switch (phase) {
 		case "start": {
-			const wasActive = state.isScrollActive;
-			state.isScrollActive = true;
-			state.needsObserverReconnectAfterScroll = false;
-			state.needsDependencyRefreshAfterScroll = false;
-			state.needsLayoutMeasurementAfterScroll = false;
-			state.becameActive = !wasActive;
-			state.becameIdle = false;
-			state.shouldRefreshDependencies = false;
-			state.shouldMeasureLayout = false;
-			state.shouldMeasureScroll = false;
-			state.shouldReconnectObserver = false;
-			break;
+			return {
+				state: {
+					type: "scrolling",
+					pendingAfterScroll: NO_PENDING_AFTER_SCROLL,
+				},
+				effect:
+					state.type === "idle" ? { type: "scroll-start" } : { type: "none" },
+			};
 		}
 		case "scroll": {
-			state.needsObserverReconnectAfterScroll = true;
-			state.becameActive = false;
-			state.becameIdle = false;
-			state.shouldRefreshDependencies = false;
-			state.shouldMeasureLayout = false;
-			state.shouldMeasureScroll = true;
-			state.shouldReconnectObserver = false;
-			break;
+			return {
+				state: {
+					type: "scrolling",
+					pendingAfterScroll: {
+						reconnectObserver: true,
+						refreshDependencies:
+							state.type === "scrolling"
+								? state.pendingAfterScroll.refreshDependencies
+								: false,
+						measureLayout:
+							state.type === "scrolling"
+								? state.pendingAfterScroll.measureLayout
+								: false,
+					},
+				},
+				effect: { type: "scroll-frame", measureScroll: true },
+			};
 		}
 		case "idle": {
-			if (!state.isScrollActive) {
-				state.becameActive = false;
-				state.becameIdle = false;
-				state.shouldRefreshDependencies = false;
-				state.shouldMeasureLayout = false;
-				state.shouldMeasureScroll = false;
-				state.shouldReconnectObserver = false;
-				break;
+			if (state.type === "idle") {
+				return {
+					state,
+					effect: { type: "none" },
+				};
 			}
 
-			const shouldRefreshDependencies =
-				state.needsDependencyRefreshAfterScroll ||
-				state.needsObserverReconnectAfterScroll;
-			const shouldMeasureLayout = state.needsLayoutMeasurementAfterScroll;
-			const shouldReconnectObserver = state.needsObserverReconnectAfterScroll;
-
-			state.isScrollActive = false;
-			state.needsObserverReconnectAfterScroll = false;
-			state.needsDependencyRefreshAfterScroll = false;
-			state.needsLayoutMeasurementAfterScroll = false;
-			state.becameActive = false;
-			state.becameIdle = true;
-			state.shouldRefreshDependencies = shouldRefreshDependencies;
-			state.shouldMeasureLayout = shouldMeasureLayout;
-			state.shouldMeasureScroll = !shouldMeasureLayout;
-			state.shouldReconnectObserver = shouldReconnectObserver;
-			break;
+			const { pendingAfterScroll } = state;
+			return {
+				state: { type: "idle" },
+				effect: {
+					type: "scroll-idle",
+					refreshDependencies:
+						pendingAfterScroll.refreshDependencies ||
+						pendingAfterScroll.reconnectObserver,
+					measureLayout: pendingAfterScroll.measureLayout,
+					measureScroll: !pendingAfterScroll.measureLayout,
+					reconnectObserver: pendingAfterScroll.reconnectObserver,
+				},
+			};
 		}
 	}
+}
+
+export function markScrollerViewportDependencyRefreshAfterScroll(
+	state: ScrollerViewportScrollPhaseState,
+): ScrollerViewportScrollPhaseState {
+	if (state.type === "idle") {
+		return state;
+	}
+
+	return {
+		type: "scrolling",
+		pendingAfterScroll: {
+			...state.pendingAfterScroll,
+			refreshDependencies: true,
+		},
+	};
+}
+
+export function markScrollerViewportLayoutMeasurementAfterScroll(
+	state: ScrollerViewportScrollPhaseState,
+): ScrollerViewportScrollPhaseState {
+	if (state.type === "idle") {
+		return state;
+	}
+
+	return {
+		type: "scrolling",
+		pendingAfterScroll: {
+			...state.pendingAfterScroll,
+			measureLayout: true,
+		},
+	};
 }

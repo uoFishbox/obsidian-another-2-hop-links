@@ -6,10 +6,8 @@ import { waitForNextAnimationFrame } from "ui/utils/frame";
 import type { VirtualNavigationTarget } from "../types";
 import { getScrollMetrics } from "../dom/virtualListMeasurementAdapter";
 import { createVirtualListKeyboardHandler } from "./VirtualSurfaceKeyboard";
-import {
-	findNearestScrollContainer,
-	invalidateNearestScrollContainerCache,
-} from "../../virtualGridLinkListScroll";
+import { findNearestScrollContainer } from "../../virtualGridLinkListScroll";
+import { invalidateScrollGeometry } from "../dom/virtualListScrollGeometryInvalidation";
 
 const LOGICAL_CELL_SELECTOR = "[data-ccl-logical-key]";
 
@@ -131,7 +129,7 @@ export const createVirtualSurfaceNavigation = (options: {
 		if (!rootEl) {
 			return false;
 		}
-		invalidateNearestScrollContainerCache(rootEl);
+		invalidateScrollGeometry(rootEl, "navigation-scroll");
 		const scrollContainerEl =
 			options.getScrollContainerEl() ?? findNearestScrollContainer(rootEl);
 

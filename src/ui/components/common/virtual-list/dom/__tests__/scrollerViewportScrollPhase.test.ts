@@ -1,71 +1,113 @@
 import { describe, expect, it } from "vitest";
-import { applyScrollerViewportScrollPhase } from "../scrollerViewportScrollPhase";
+import {
+	markScrollerViewportDependencyRefreshAfterScroll,
+	markScrollerViewportLayoutMeasurementAfterScroll,
+	reduceScrollerViewportPhase,
+} from "../scrollerViewportScrollPhase";
 
-function createState() {
-	return {
-		isScrollActive: false,
-		needsObserverReconnectAfterScroll: false,
-		needsDependencyRefreshAfterScroll: false,
-		needsLayoutMeasurementAfterScroll: false,
-		becameActive: false,
-		becameIdle: false,
-		shouldRefreshDependencies: false,
-		shouldMeasureLayout: false,
-		shouldMeasureScroll: false,
-		shouldReconnectObserver: false,
-	};
-}
-
-describe("applyScrollerViewportScrollPhase", () => {
+describe("reduceScrollerViewportPhase", () => {
 	it("marks scroll start as active once", () => {
-		const state = createState();
+		const start = reduceScrollerViewportPhase({ type: "idle" }, "start");
 
-		applyScrollerViewportScrollPhase(state, "start");
+		expect(start).toEqual({
+			state: {
+				type: "scrolling",
+				pendingAfterScroll: {
+					reconnectObserver: false,
+					refreshDependencies: false,
+					measureLayout: false,
+				},
+			},
+			effect: { type: "scroll-start" },
+		});
 
-		expect(state.isScrollActive).toBe(true);
-		expect(state.becameActive).toBe(true);
-		expect(state.becameIdle).toBe(false);
-		expect(state.shouldRefreshDependencies).toBe(false);
-		expect(state.shouldMeasureLayout).toBe(false);
-		expect(state.shouldMeasureScroll).toBe(false);
-		expect(state.shouldReconnectObserver).toBe(false);
-
-		state.becameActive = false;
-		applyScrollerViewportScrollPhase(state, "start");
-		expect(state.becameActive).toBe(false);
+		expect(reduceScrollerViewportPhase(start.state, "start")).toEqual({
+			state: {
+				type: "scrolling",
+				pendingAfterScroll: {
+					reconnectObserver: false,
+					refreshDependencies: false,
+					measureLayout: false,
+				},
+			},
+			effect: { type: "none" },
+		});
 	});
 
 	it("records observer reconnect work during scroll", () => {
-		const state = createState();
-		state.isScrollActive = true;
+		const transition = reduceScrollerViewportPhase(
+			{
+				type: "scrolling",
+				pendingAfterScroll: {
+					reconnectObserver: false,
+					refreshDependencies: false,
+					measureLayout: false,
+				},
+			},
+			"scroll",
+		);
 
-		applyScrollerViewportScrollPhase(state, "scroll");
-
-		expect(state.isScrollActive).toBe(true);
-		expect(state.needsObserverReconnectAfterScroll).toBe(true);
-		expect(state.shouldMeasureScroll).toBe(true);
-		expect(state.becameActive).toBe(false);
-		expect(state.becameIdle).toBe(false);
+		expect(transition).toEqual({
+			state: {
+				type: "scrolling",
+				pendingAfterScroll: {
+					reconnectObserver: true,
+					refreshDependencies: false,
+					measureLayout: false,
+				},
+			},
+			effect: { type: "scroll-frame", measureScroll: true },
+		});
 	});
 
 	it("flushes pending work on idle", () => {
-		const state = createState();
-		state.isScrollActive = true;
-		state.needsObserverReconnectAfterScroll = true;
-		state.needsDependencyRefreshAfterScroll = false;
-		state.needsLayoutMeasurementAfterScroll = true;
+		const transition = reduceScrollerViewportPhase(
+			{
+				type: "scrolling",
+				pendingAfterScroll: {
+					reconnectObserver: true,
+					refreshDependencies: false,
+					measureLayout: true,
+				},
+			},
+			"idle",
+		);
 
-		applyScrollerViewportScrollPhase(state, "idle");
+		expect(transition).toEqual({
+			state: { type: "idle" },
+			effect: {
+				type: "scroll-idle",
+				refreshDependencies: true,
+				measureLayout: true,
+				measureScroll: false,
+				reconnectObserver: true,
+			},
+		});
+	});
 
-		expect(state.isScrollActive).toBe(false);
-		expect(state.needsObserverReconnectAfterScroll).toBe(false);
-		expect(state.needsDependencyRefreshAfterScroll).toBe(false);
-		expect(state.needsLayoutMeasurementAfterScroll).toBe(false);
-		expect(state.becameActive).toBe(false);
-		expect(state.becameIdle).toBe(true);
-		expect(state.shouldRefreshDependencies).toBe(true);
-		expect(state.shouldMeasureLayout).toBe(true);
-		expect(state.shouldMeasureScroll).toBe(false);
-		expect(state.shouldReconnectObserver).toBe(true);
+	it("marks after-scroll dependency and layout work only while scrolling", () => {
+		expect(
+			markScrollerViewportDependencyRefreshAfterScroll({ type: "idle" }),
+		).toEqual({ type: "idle" });
+
+		const state = markScrollerViewportLayoutMeasurementAfterScroll(
+			markScrollerViewportDependencyRefreshAfterScroll({
+				type: "scrolling",
+				pendingAfterScroll: {
+					reconnectObserver: false,
+					refreshDependencies: false,
+					measureLayout: false,
+				},
+			}),
+		);
+
+		expect(state).toEqual({
+			type: "scrolling",
+			pendingAfterScroll: {
+				reconnectObserver: false,
+				refreshDependencies: true,
+				measureLayout: true,
+			},
+		});
 	});
 });
