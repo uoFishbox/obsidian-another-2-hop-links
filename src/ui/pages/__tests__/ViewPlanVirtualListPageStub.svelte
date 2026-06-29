@@ -1,7 +1,10 @@
 <script lang="ts">
 	import type { Snippet } from "svelte";
 	import type { SectionRenderDescriptor } from "ui/components/sections/types";
-	import type { VirtualizedItemVisibility } from "ui/components/common/virtualizedItemVisibility";
+	import type {
+		VirtualizedItemVisibility,
+		VirtualizedItemVisibilityState,
+	} from "ui/components/common/virtualizedItemVisibility";
 
 	interface Props {
 		sections: SectionRenderDescriptor<unknown, unknown>[];
@@ -26,8 +29,11 @@
 					item: unknown;
 					section: unknown;
 					index: number;
+					rowIndex: number;
 					observerRoot: HTMLElement | null;
+					visibilityState: VirtualizedItemVisibilityState;
 					visibility: VirtualizedItemVisibility;
+					activationCandidateId: string;
 				},
 			]
 		>;
@@ -53,8 +59,13 @@
 					item,
 					section: descriptor.section,
 					index,
+					rowIndex: index,
 					observerRoot: null,
+					visibilityState: {
+						visibility: "visible",
+					},
 					visibility: "visible",
+					activationCandidateId: `test-${descriptor.sectionId}-${index}`,
 				})}
 			{/each}
 		</section>
