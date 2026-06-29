@@ -78,6 +78,8 @@ const searchContextPreviewInFlight = new Map<string, SharedInFlightRequest<strin
 const previewAnalysisCache = createSizedLRUCache<string, PreviewContentAnalysis>(
 	PREVIEW_ANALYSIS_CACHE_MAX_BYTES,
 );
+const EMPTY_PREVIEW_PROTECTED_SEGMENTS: PreviewContentAnalysis["protectedSegments"] =
+	[];
 
 function estimateRenderedPreviewSizeFromContent(content: string): number {
 	return 1024 + stringBytes(content) * 4;
@@ -487,6 +489,15 @@ export function getSharedPreviewAnalysis(
 	cacheKey: string,
 	content: string,
 ): PreviewContentAnalysis {
+	if (!content.includes("$")) {
+		return {
+			hasDollar: false,
+			hasMathExpression: false,
+			contentForMathParsing: content,
+			protectedSegments: EMPTY_PREVIEW_PROTECTED_SEGMENTS,
+		};
+	}
+
 	const cached = previewAnalysisCache.get(cacheKey);
 	if (cached) {
 		return cached;

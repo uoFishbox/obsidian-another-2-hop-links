@@ -31,7 +31,7 @@ export interface PreviewContentAnalysis {
 	hasDollar: boolean;
 	hasMathExpression: boolean;
 	contentForMathParsing: string;
-	protectedSegments: ProtectedSegment[];
+	protectedSegments: readonly ProtectedSegment[];
 }
 
 export async function getFileContent(file: TFile, vault: IVault): Promise<string> {
@@ -80,6 +80,7 @@ const PROTECTED_SEGMENT_REGEX = new RegExp(
 	`<(?:span|div)\\b[^>]*class="[^"]*?\\b(?:${PROTECTED_HTML_CLASS_PATTERN})\\b[^"]*"[^>]*>[\\s\\S]*?<\/(?:span|div)>`,
 	"g",
 );
+const EMPTY_PROTECTED_SEGMENTS: readonly ProtectedSegment[] = [];
 
 export function analyzePreviewContent(content: string): PreviewContentAnalysis {
 	if (!content.includes("$")) {
@@ -87,7 +88,7 @@ export function analyzePreviewContent(content: string): PreviewContentAnalysis {
 			hasDollar: false,
 			hasMathExpression: false,
 			contentForMathParsing: content,
-			protectedSegments: [],
+			protectedSegments: EMPTY_PROTECTED_SEGMENTS,
 		};
 	}
 

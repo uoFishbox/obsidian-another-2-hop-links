@@ -275,7 +275,9 @@
 			const enableMathRendering =
 				normalizePreviewQuery(queryForRender).length === 0;
 			const previewAnalysis =
-				enableMathRendering && previewForRender.type === "text"
+				enableMathRendering &&
+				previewForRender.type === "text" &&
+				previewForRender.content.includes("$")
 					? getPreviewAnalysis(renderCacheKey, previewForRender.content)
 					: undefined;
 			const shouldDelayMathCardRendering =

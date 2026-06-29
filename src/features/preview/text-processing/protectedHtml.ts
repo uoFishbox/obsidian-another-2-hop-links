@@ -27,7 +27,7 @@ export function restoreProtectedSegments(
 }
 
 export function createProtectedSegmentRestorer(
-	segments: ProtectedSegment[],
+	segments: readonly ProtectedSegment[],
 ): (content: string) => string {
 	if (segments.length === 0) {
 		return IDENTITY_RESTORER;

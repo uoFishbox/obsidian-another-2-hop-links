@@ -39,93 +39,90 @@ export async function processPreviewContent(
 
 	const enableMathRendering = options?.enableMathRendering ?? true;
 	const syncShadowRootMathStyles = options?.syncShadowRootMathStyles ?? true;
-	const analysis =
-		options?.analysis ??
-		(enableMathRendering || content.includes("$")
-			? analyzePreviewContent(content)
-			: {
-					hasDollar: false,
-					hasMathExpression: false,
-					contentForMathParsing: content,
-					protectedSegments: [],
-				});
-	const restoreProtectedSegments = createProtectedSegmentRestorer(
-		analysis.protectedSegments,
-	);
+	const hasDollar = content.includes("$");
+	let analysis: PreviewContentAnalysis | undefined;
 
 	if (signal?.aborted) {
 		return;
 	}
 
 	// MathJaxの処理 (既存ロジック)
-	if (!enableMathRendering || !analysis.hasDollar) {
-		containerEl.innerHTML = analysis.hasDollar
-			? restoreProtectedSegments(analysis.contentForMathParsing)
-			: content;
-	} else if (!analysis.hasMathExpression) {
-		// 数式が無く、保護済みセグメント内の `$` だけが残っている場合は
-		// MathJax のパースを回さず、そのまま復元する。
-		containerEl.innerHTML = restoreProtectedSegments(
-			analysis.contentForMathParsing.replace(/\\\$/g, "$"),
-		);
+	if (!enableMathRendering || !hasDollar) {
+		containerEl.innerHTML = content;
 	} else {
-		containerEl.innerHTML = "";
-		MATH_SPLIT_REGEX.lastIndex = 0;
-		let lastIndex = 0;
-		const { contentForMathParsing } = analysis;
+		analysis = options?.analysis ?? analyzePreviewContent(content);
+		const restoreProtectedSegments = createProtectedSegmentRestorer(
+			analysis.protectedSegments,
+		);
 
-		while (true) {
-			if (signal?.aborted) {
-				return;
+		if (!analysis.hasMathExpression) {
+			// 数式が無く、保護済みセグメント内の `$` だけが残っている場合は
+			// MathJax のパースを回さず、そのまま復元する。
+			containerEl.innerHTML = restoreProtectedSegments(
+				analysis.contentForMathParsing.replace(/\\\$/g, "$"),
+			);
+		} else {
+			containerEl.innerHTML = "";
+			MATH_SPLIT_REGEX.lastIndex = 0;
+			let lastIndex = 0;
+			const { contentForMathParsing } = analysis;
+
+			while (true) {
+				if (signal?.aborted) {
+					return;
+				}
+
+				const match = MATH_SPLIT_REGEX.exec(contentForMathParsing);
+				if (!match) break;
+
+				if (match.index > lastIndex) {
+					const textPart = contentForMathParsing.substring(
+						lastIndex,
+						match.index,
+					);
+					// ここではinnerHTMLを使うため、HTMLタグ（twohop-render-blockなど）も維持される
+					const span = containerEl.createSpan();
+					span.innerHTML = restoreProtectedSegments(textPart);
+				}
+
+				const matchedString = match[0];
+				if (matchedString.startsWith("$$") && matchedString.endsWith("$$")) {
+					const mathContent = matchedString.substring(
+						2,
+						matchedString.length - 2,
+					);
+					containerEl.appendChild(renderMath(mathContent, true));
+				} else if (
+					matchedString.startsWith("$") &&
+					matchedString.endsWith("$")
+				) {
+					const mathContent = matchedString.substring(
+						1,
+						matchedString.length - 1,
+					);
+					containerEl.appendChild(renderMath(mathContent, false));
+				} else if (matchedString === "\\$") {
+					containerEl.appendChild(document.createTextNode("$"));
+				}
+
+				lastIndex = MATH_SPLIT_REGEX.lastIndex;
 			}
 
-			const match = MATH_SPLIT_REGEX.exec(contentForMathParsing);
-			if (!match) break;
-
-			if (match.index > lastIndex) {
-				const textPart = contentForMathParsing.substring(
-					lastIndex,
-					match.index,
-				);
-				// ここではinnerHTMLを使うため、HTMLタグ（twohop-render-blockなど）も維持される
+			if (lastIndex < contentForMathParsing.length) {
+				const textPart = contentForMathParsing.substring(lastIndex);
 				const span = containerEl.createSpan();
 				span.innerHTML = restoreProtectedSegments(textPart);
 			}
 
-			const matchedString = match[0];
-			if (matchedString.startsWith("$$") && matchedString.endsWith("$$")) {
-				const mathContent = matchedString.substring(
-					2,
-					matchedString.length - 2,
-				);
-				containerEl.appendChild(renderMath(mathContent, true));
-			} else if (matchedString.startsWith("$") && matchedString.endsWith("$")) {
-				const mathContent = matchedString.substring(
-					1,
-					matchedString.length - 1,
-				);
-				containerEl.appendChild(renderMath(mathContent, false));
-			} else if (matchedString === "\\$") {
-				containerEl.appendChild(document.createTextNode("$"));
+			if (signal?.aborted) {
+				return;
 			}
 
-			lastIndex = MATH_SPLIT_REGEX.lastIndex;
-		}
+			await finishRenderMath();
 
-		if (lastIndex < contentForMathParsing.length) {
-			const textPart = contentForMathParsing.substring(lastIndex);
-			const span = containerEl.createSpan();
-			span.innerHTML = restoreProtectedSegments(textPart);
-		}
-
-		if (signal?.aborted) {
-			return;
-		}
-
-		await finishRenderMath();
-
-		if (signal?.aborted) {
-			return;
+			if (signal?.aborted) {
+				return;
+			}
 		}
 	}
 
@@ -184,7 +181,7 @@ export async function processPreviewContent(
 		return;
 	}
 
-	if (analysis.hasMathExpression && syncShadowRootMathStyles) {
+	if (analysis?.hasMathExpression && syncShadowRootMathStyles) {
 		syncMathJaxStylesForNode(containerEl);
 		queueMathJaxShadowStylesSync();
 	}
