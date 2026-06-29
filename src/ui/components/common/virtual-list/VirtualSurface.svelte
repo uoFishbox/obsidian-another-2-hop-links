@@ -57,6 +57,7 @@
 		onCellMount?: (cell: TMountedCell) => void;
 		onCellDestroy?: (cell: TMountedCell) => void;
 		onMountedCellsChange?: (cells: readonly TMountedCell[]) => void;
+		remountCellBodyOnKeyChange?: boolean;
 		resolveNavigationTarget?: (
 			currentKey: string,
 			direction: ResultNavigationDirection,
@@ -110,6 +111,7 @@
 		onCellMount,
 		onCellDestroy,
 		onMountedCellsChange,
+		remountCellBodyOnKeyChange = true,
 		resolveNavigationTarget,
 		moveFocusWithinList,
 		flushVirtualScrollMeasurement,
@@ -276,6 +278,7 @@
 			{getCellDataTestId}
 			{onCellMount}
 			{onCellDestroy}
+			{remountCellBodyOnKeyChange}
 			{renderCell}
 		/>
 	{:else}
@@ -297,6 +300,7 @@
 			{getCellDataTestId}
 			{onCellMount}
 			{onCellDestroy}
+			{remountCellBodyOnKeyChange}
 			{renderCell}
 		/>
 	{/if}

@@ -25,6 +25,7 @@
 		contentHeight: number;
 		rowHeight: number;
 		layoutMode?: "absolute-cells" | "grid-rows";
+		remountCellBodyOnKeyChange?: boolean;
 		interactionDescriptorResolvers?: readonly InteractionDescriptorResolver[];
 		interactionId?: string;
 		onCellMount?: (key: string) => void;
@@ -37,6 +38,7 @@
 		contentHeight,
 		rowHeight,
 		layoutMode = "absolute-cells",
+		remountCellBodyOnKeyChange = true,
 		interactionDescriptorResolvers = [],
 		interactionId,
 		onCellMount,
@@ -53,6 +55,7 @@
 		{contentHeight}
 		{rowHeight}
 		layoutMode="grid-rows"
+		{remountCellBodyOnKeyChange}
 		interactionDescriptorScopeId={interactionId
 			? "recycling-test-items"
 			: undefined}

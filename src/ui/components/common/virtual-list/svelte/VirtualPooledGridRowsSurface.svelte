@@ -22,6 +22,7 @@
 		getCellDataTestId?: (cell: TMountedCell) => string | undefined;
 		onLogicalCellAttach?: (cell: TMountedCell) => void;
 		onLogicalCellDetach?: (cell: TMountedCell) => void;
+		remountCellBodyOnKeyChange?: boolean;
 		renderCell: Snippet<
 			[
 				{
@@ -49,6 +50,7 @@
 		getCellDataTestId,
 		onLogicalCellAttach,
 		onLogicalCellDetach,
+		remountCellBodyOnKeyChange = true,
 		renderCell,
 	}: Props<TMountedCell> = $props();
 
@@ -118,12 +120,19 @@
 					onMountCell={onLogicalCellAttach}
 					onDestroyCell={onLogicalCellDetach}
 				>
-					{#key resolveMountedCellBodyKey(mountedCell, mountedRowsVersion)}
+					{#if remountCellBodyOnKeyChange}
+						{#key resolveMountedCellBodyKey(mountedCell, mountedRowsVersion)}
+							{@render renderCell({
+								mountedCell,
+								observerRoot,
+							})}
+						{/key}
+					{:else}
 						{@render renderCell({
 							mountedCell,
 							observerRoot,
 						})}
-					{/key}
+					{/if}
 				</VirtualListCellMount>
 			{/each}
 		</div>

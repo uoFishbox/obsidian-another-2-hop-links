@@ -390,4 +390,67 @@ describe("VirtualSurface recycling", () => {
 				?.getAttribute("data-key"),
 		).toBe("B");
 	});
+
+	it("can reuse a grid-row body when the same physical slot receives another logical item", async () => {
+		const mountedKeys: string[] = [];
+		const updatedKeys: string[] = [];
+		const cells = createCells(["A"]).map((cell) => ({
+			...cell,
+			renderBodyKey: "body:A",
+			rowIndex: 0,
+			columnIndex: 0,
+		}));
+		const { container, rerender } = render(VirtualSurfaceRecyclingHarness, {
+			props: {
+				mountedCells: cells,
+				mountedRows: createRows(cells, {
+					key: 0,
+					rowIndex: 0,
+					slotIndex: 0,
+					slotKey: 0,
+				}),
+				contentHeight: 100,
+				rowHeight: 50,
+				layoutMode: "grid-rows",
+				remountCellBodyOnKeyChange: false,
+				onCellMount: (key: string) => mountedKeys.push(key),
+				onCellUpdate: (key: string) => updatedKeys.push(key),
+			},
+		});
+		await flushFrames();
+		expect(mountedKeys).toStrictEqual(["A"]);
+
+		updatedKeys.length = 0;
+		const updatedCells = createCells(["B"]).map((cell) => ({
+			...cell,
+			renderBodyKey: "body:B",
+			rowIndex: 12,
+			columnIndex: 0,
+		}));
+		await rerender({
+			mountedCells: updatedCells,
+			mountedRows: createRows(updatedCells, {
+				key: 12,
+				rowIndex: 12,
+				top: 600,
+				slotIndex: 0,
+				slotKey: 0,
+			}),
+			contentHeight: 1000,
+			rowHeight: 50,
+			layoutMode: "grid-rows",
+			remountCellBodyOnKeyChange: false,
+			onCellMount: (key: string) => mountedKeys.push(key),
+			onCellUpdate: (key: string) => updatedKeys.push(key),
+		});
+		await flushFrames();
+
+		const host = container.querySelector(
+			".recycling-test-root",
+		) as HTMLElement | null;
+		const probe = host?.shadowRoot?.querySelector('[data-testid="probe-cell"]');
+		expect(probe?.getAttribute("data-key")).toBe("B");
+		expect(mountedKeys).toStrictEqual(["A"]);
+		expect(updatedKeys).toStrictEqual(["B"]);
+	});
 });

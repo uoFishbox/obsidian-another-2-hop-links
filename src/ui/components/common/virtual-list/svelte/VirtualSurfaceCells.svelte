@@ -52,6 +52,7 @@
 		getCellDataTestId?: (cell: TMountedCell) => string | undefined;
 		onCellMount?: (cell: TMountedCell) => void;
 		onCellDestroy?: (cell: TMountedCell) => void;
+		remountCellBodyOnKeyChange?: boolean;
 		renderCell: Snippet<
 			[
 				{
@@ -85,6 +86,7 @@
 		getCellDataTestId,
 		onCellMount,
 		onCellDestroy,
+		remountCellBodyOnKeyChange = true,
 		renderCell,
 	}: Props<TMountedCell> = $props();
 </script>
@@ -107,6 +109,7 @@
 		{getCellDataTestId}
 		onLogicalCellAttach={onCellMount}
 		onLogicalCellDetach={onCellDestroy}
+		{remountCellBodyOnKeyChange}
 		{renderCell}
 	/>
 {:else}

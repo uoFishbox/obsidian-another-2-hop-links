@@ -21,25 +21,28 @@
 		children,
 	}: Props = $props();
 
-	const context: PreviewVisibilityContext = visibilityState ?? createOwnedContext();
+	let ownedVisibility = $state<VirtualizedItemVisibility | undefined>(visibility);
+	const providedVisibilityState = $derived(visibilityState);
+
+	const context: PreviewVisibilityContext = {
+		get visibility() {
+			return providedVisibilityState?.visibility ?? ownedVisibility;
+		},
+		set visibility(next: VirtualizedItemVisibility | undefined) {
+			if (providedVisibilityState) {
+				providedVisibilityState.visibility = next;
+				return;
+			}
+
+			ownedVisibility = next;
+		},
+	};
 
 	setContext(PREVIEW_VISIBILITY_CONTEXT_KEY, context);
 
-	function createOwnedContext(): PreviewVisibilityContext {
-		let vis = $state(visibility);
-		return {
-			get visibility() {
-				return vis;
-			},
-			set visibility(v: VirtualizedItemVisibility | undefined) {
-				vis = v;
-			},
-		};
-	}
-
 	$effect.pre(() => {
-		if (!visibilityState) {
-			context.visibility = visibility;
+		if (!providedVisibilityState) {
+			ownedVisibility = visibility;
 		}
 	});
 </script>
