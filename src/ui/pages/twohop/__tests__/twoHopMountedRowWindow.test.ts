@@ -51,6 +51,35 @@ const ranges = {
 	previewVisible: { start: 0, end: 2 },
 };
 
+function createBatchedRowModel() {
+	return createTwoHopViewPlanRowModel(
+		compileTwoHopViewPlan({
+			sections: [descriptor],
+			sectionVisibleCounts: { "new-links": items.length },
+			layout: {
+				containerWidth: 100,
+				columns: 1,
+				cellWidth: 100,
+				rowHeight: 100,
+				gap: 0,
+				sectionMarginBottom: 0,
+			},
+			materialization: {
+				kind: "batched",
+				initial: {
+					maxSectionCount: 0,
+					maxCellCount: 0,
+				},
+				background: {
+					maxCellCountPerSlice: 128,
+				},
+			},
+			resolveInitialSectionVisibleCount: (section) => section.loadedCount,
+			clampVisibleCount: (section, count) => Math.min(section.loadedCount, count),
+		}),
+	);
+}
+
 describe("createTwoHopMountedRowWindow", () => {
 	it("returns changed on first apply", () => {
 		const window = createTwoHopMountedRowWindow();
@@ -80,6 +109,32 @@ describe("createTwoHopMountedRowWindow", () => {
 			rowRange: { start: 0, end: 2 },
 			ranges,
 		});
+		expect(window.lastApplyChanged).toBe(false);
+		expect(second).toBe(first);
+	});
+
+	it("returns unchanged after build materializes the same batched range", () => {
+		const batchedRowModel = createBatchedRowModel();
+		const window = createTwoHopMountedRowWindow();
+		const revisionBeforeApply = batchedRowModel.plan.cellStore.revision;
+
+		const first = window.apply({
+			rowModel: batchedRowModel,
+			rowRange: { start: 0, end: 2 },
+			ranges,
+		});
+
+		expect(window.lastApplyChanged).toBe(true);
+		expect(batchedRowModel.plan.cellStore.revision).toBeGreaterThan(
+			revisionBeforeApply,
+		);
+
+		const second = window.apply({
+			rowModel: batchedRowModel,
+			rowRange: { start: 0, end: 2 },
+			ranges,
+		});
+
 		expect(window.lastApplyChanged).toBe(false);
 		expect(second).toBe(first);
 	});

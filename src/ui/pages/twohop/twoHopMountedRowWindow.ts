@@ -88,7 +88,7 @@ export function createTwoHopMountedRowWindow(): TwoHopMountedRowWindow {
 	function apply(params: TwoHopMountedRowWindowApplyParams): TwoHopMountedRowsBuild {
 		const { rowModel, rowRange, ranges, previousBuild } = params;
 		const plan = rowModel.plan;
-		const cellStoreRevision = plan.cellStore.revision;
+		const cellStoreRevisionBeforeBuild = plan.cellStore.revision;
 		const clampedStart = resolveClampedRangeStart(rowRange);
 		const clampedEnd = resolveClampedRangeEnd(rowRange, plan.rowCount);
 
@@ -98,7 +98,7 @@ export function createTwoHopMountedRowWindow(): TwoHopMountedRowWindow {
 			state.plan === plan &&
 			state.rowRange.start === clampedStart &&
 			state.rowRange.end === clampedEnd &&
-			state.cellStoreRevision === cellStoreRevision
+			state.cellStoreRevision === cellStoreRevisionBeforeBuild
 		) {
 			state.lastApplyChanged = false;
 			return state.build;
@@ -117,7 +117,7 @@ export function createTwoHopMountedRowWindow(): TwoHopMountedRowWindow {
 		state.build = build;
 		state.plan = plan;
 		setClampedRange(state.rowRange, build.rowRange, plan.rowCount);
-		state.cellStoreRevision = cellStoreRevision;
+		state.cellStoreRevision = plan.cellStore.revision;
 		state.lastApplyChanged = true;
 
 		return build;
