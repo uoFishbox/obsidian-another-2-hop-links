@@ -8,6 +8,7 @@
 		applicationStore?: ApplicationStore;
 		initialVisibleCount?: number;
 		loadMoreIncrement?: number;
+		remountCellBodyOnKeyChange?: boolean;
 		onItemMount?: (id: string) => void;
 		onItemUpdate?: (id: string) => void;
 	}
@@ -17,6 +18,7 @@
 		applicationStore,
 		initialVisibleCount = items.length,
 		loadMoreIncrement = items.length,
+		remountCellBodyOnKeyChange = true,
 		onItemMount,
 		onItemUpdate,
 	}: Props = $props();
@@ -38,6 +40,7 @@
 			{initialVisibleCount}
 			{loadMoreIncrement}
 			{applicationStore}
+			{remountCellBodyOnKeyChange}
 		>
 			{#snippet item({ item, index })}
 				<VirtualGridLinkListItemRenderProbe

@@ -87,6 +87,7 @@ export interface FlatVirtualGridListProps<T> {
 	className?: string;
 	paginationMode?: "button" | "infinite-scroll";
 	infiniteScrollRootMargin?: string;
+	remountCellBodyOnKeyChange?: boolean;
 	onMountedCellsChange?: (cells: readonly MountedVirtualGridCell<T>[]) => void;
 }
 

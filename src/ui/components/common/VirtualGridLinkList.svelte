@@ -47,6 +47,7 @@
 		observerRoot={list.observerRoot}
 		getCellPosition={list.getCellPosition}
 		onMountedCellsChange={props.onMountedCellsChange}
+		remountCellBodyOnKeyChange={props.remountCellBodyOnKeyChange}
 		resolveNavigationTarget={list.resolveNavigationTarget}
 		flushVirtualScrollMeasurement={list.flushVirtualScrollMeasurement}
 	>

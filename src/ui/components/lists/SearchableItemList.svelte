@@ -337,6 +337,7 @@
 			{loadMoreIncrement}
 			paginationMode={config.paginationMode ?? "button"}
 			onMountedCellsChange={handleMountedCellsChange}
+			remountCellBodyOnKeyChange={config.itemComponent !== ViewItemCard}
 			header={config.showSectionHeader ? sectionHeader : undefined}
 		>
 			{#snippet item({
