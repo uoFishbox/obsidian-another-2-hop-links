@@ -1,12 +1,12 @@
 import {
 	computeVisibleCellWindow,
 	type VisibleCellWindow,
-} from "../layout/flatGridLayout";
-import { createArrayBackedFlatLogicalCellSource } from "../flatLogicalCellSource";
-import type { VirtualListLogicalCell } from "../logicalCell";
-import { clampRange, isEmptyRange, sameRange, type RowRange } from "../rowRange";
-import type { FlatLinkRowModel } from "../row-models/flatLinkRowModel";
-import type { RenderBodyKey, RenderRevisionFallbackPolicy } from "../renderRevision";
+} from "../../layout/flatGridLayout";
+import { createArrayBackedFlatLogicalCellSource } from "../../flatLogicalCellSource";
+import type { VirtualListLogicalCell } from "../../logicalCell";
+import { clampRange, isEmptyRange, sameRange, type RowRange } from "../../rowRange";
+import type { FlatLinkRowModel } from "../../row-models/flatLinkRowModel";
+import type { RenderBodyKey, RenderRevisionFallbackPolicy } from "../../renderRevision";
 import {
 	encodeResolvedItemRenderRevisionToken,
 	encodeRenderRevisionToken,
@@ -17,8 +17,8 @@ import {
 	renderSlotKey,
 	type LogicalCellKey,
 	type RenderSlotKey,
-} from "../types";
-import type { VirtualizedItemVisibility } from "../../virtualizedItemVisibility";
+	type VirtualizedItemVisibility,
+} from "../../types";
 import {
 	assertVirtualListInvariant,
 	shouldAssertVirtualListInvariants,

@@ -1,4 +1,4 @@
-import { invalidateNearestScrollContainerCache } from "../../virtualGridLinkListScroll";
+import { invalidateNearestScrollContainerCache } from "./scrollContainer";
 
 export type ScrollGeometryInvalidationReason =
 	| "root-resize"

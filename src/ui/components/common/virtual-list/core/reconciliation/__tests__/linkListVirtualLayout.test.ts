@@ -2,12 +2,12 @@ import { describe, expect, it } from "vitest";
 import {
 	createArrayVirtualGridDataSource,
 	createFlatLogicalCellSource,
-} from "../../flatLogicalCellSource";
-import type { VirtualListLogicalCell } from "../../logicalCell";
+} from "../../../flatLogicalCellSource";
+import type { VirtualListLogicalCell } from "../../../logicalCell";
 import type {
 	RenderRevision,
 	RenderRevisionFallbackPolicy,
-} from "../../renderRevision";
+} from "../../../renderRevision";
 import {
 	buildMountedVirtualGridCells,
 	type MountedVirtualGridCellsBuildResult,
@@ -15,7 +15,7 @@ import {
 import {
 	expectKeys,
 	expectUniqueRenderSlots,
-} from "../../../__tests__/virtualLayoutTestHelpers";
+} from "../../../../__tests__/virtualLayoutTestHelpers";
 
 type TestItem = {
 	id: string;

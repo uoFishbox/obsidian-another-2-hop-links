@@ -2,7 +2,7 @@ import type { FlatLogicalCellSource } from "../flatLogicalCellSource";
 import type { VirtualListLogicalCell } from "../logicalCell";
 import type { RowRange } from "../rowRange";
 import type { FlatGridLayoutMetrics } from "../layoutMetrics";
-import type { StablePreviewScrollTopBand } from "../dom/activeScrollWindowGate";
+import type { StablePreviewScrollTopBand } from "../core/scrollWindowGate";
 import type {
 	VirtualNavigationTarget,
 	VirtualRanges,

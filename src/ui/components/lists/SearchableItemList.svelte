@@ -5,7 +5,7 @@
 	import ListControls from "ui/components/common/ListControls.svelte";
 	import LinkList from "ui/components/common/VirtualGridLinkList.svelte";
 	import LinkSectionHeader from "ui/components/common/LinkSectionHeader.svelte";
-	import type { MountedVirtualGridCell } from "ui/components/common/virtual-list/reconciliation/linkListVirtualLayout";
+	import type { MountedVirtualGridCell } from "ui/components/common/virtual-list/core/reconciliation/linkListVirtualLayout";
 	import { buildScopedSectionId } from "ui/components/common/listPagination";
 	import { useSearchQuery } from "ui/hooks/useSearchQuery.svelte";
 	import { useBookmarks } from "ui/hooks/useBookmarks.svelte";

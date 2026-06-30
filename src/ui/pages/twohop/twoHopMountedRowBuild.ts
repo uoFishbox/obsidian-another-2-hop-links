@@ -1,7 +1,7 @@
 import type { RowRange } from "ui/components/common/virtual-list/rowRange";
 import type { VirtualRanges } from "ui/components/common/virtual-list/types";
-import type { MountedFlatCell } from "ui/components/common/virtual-list/reconciliation/viewPlanMountedCells";
-import type { MountedFlatRowSlice } from "ui/components/common/virtual-list/reconciliation/viewPlanRenderRows";
+import type { MountedFlatCell } from "ui/components/common/virtual-list/core/reconciliation/viewPlanMountedCells";
+import type { MountedFlatRowSlice } from "ui/components/common/virtual-list/core/reconciliation/viewPlanRenderRows";
 import {
 	buildSectionedGridMountedRows,
 	type SectionedGridMountedRowsBuild,

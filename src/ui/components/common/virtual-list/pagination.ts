@@ -1,6 +1,11 @@
-import type { ApplicationStore } from "ui/stores/ApplicationStore.svelte";
 import type { SectionRenderDescriptor } from "../../sections/types";
 import { computeInitialVisibleCount, normalizeIncrement } from "../listPagination";
+
+export interface SectionPaginationApplicationStore {
+	getDefaultSectionVisibleLimit?(): number;
+	getSectionExpandedLimit?(sectionId: string): number | undefined;
+	setSectionExpandedLimit?(sectionId: string, limit: number): void;
+}
 
 export interface SectionPaginationState {
 	getVisibleCount(sectionId: string, totalLoadedCount: number): number;
@@ -13,7 +18,7 @@ export interface SectionPaginationState {
 export interface CreateSectionPaginationStateParams {
 	getExpandedLimits(): Readonly<Record<string, number>>;
 	setExpandedLimits(expandedLimits: Record<string, number>): void;
-	applicationStore?: ApplicationStore;
+	applicationStore?: SectionPaginationApplicationStore;
 	initialVisibleCount?: number;
 	loadMoreIncrement?: number;
 }
@@ -41,7 +46,7 @@ export interface SectionVisibleCountsController<T, G> {
 }
 
 export interface CreateSectionVisibleCountsControllerParams {
-	applicationStore?: ApplicationStore;
+	applicationStore?: SectionPaginationApplicationStore;
 	initialVisibleCount?: number;
 	loadMoreIncrement?: number;
 }

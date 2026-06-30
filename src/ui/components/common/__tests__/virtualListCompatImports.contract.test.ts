@@ -8,7 +8,6 @@ const commonRoot = join(sourceRoot, "ui", "components", "common");
 const compatModules = new Set(
 	[
 		"VirtualListCellMount.svelte",
-		"virtualListController.ts",
 		"virtualListHelpers.svelte.ts",
 		"virtualListKeyboard.ts",
 		"virtualListMeasurement.ts",

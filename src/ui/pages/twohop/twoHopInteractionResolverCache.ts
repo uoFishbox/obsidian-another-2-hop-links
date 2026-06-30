@@ -7,8 +7,8 @@ import type { InteractionDescriptorResolverProvider } from "ui/interactions/inte
 import type {
 	MountedFlatHeaderCell,
 	MountedFlatItemCell,
-} from "ui/components/common/virtual-list/reconciliation/viewPlanMountedCells";
-import type { MountedFlatRowSlice } from "ui/components/common/virtual-list/reconciliation/viewPlanRenderRows";
+} from "ui/components/common/virtual-list/core/reconciliation/viewPlanMountedCells";
+import type { MountedFlatRowSlice } from "ui/components/common/virtual-list/core/reconciliation/viewPlanRenderRows";
 import { createItemInteractionKey } from "ui/interactions/interactionTypes";
 import type {
 	TwoHopVirtualListItem,

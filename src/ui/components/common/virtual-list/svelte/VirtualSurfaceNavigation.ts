@@ -6,7 +6,7 @@ import { waitForNextAnimationFrame } from "ui/utils/frame";
 import type { VirtualNavigationTarget } from "../types";
 import { getScrollMetrics } from "../dom/virtualListMeasurementAdapter";
 import { createVirtualListKeyboardHandler } from "./VirtualSurfaceKeyboard";
-import { findNearestScrollContainer } from "../../virtualGridLinkListScroll";
+import { findNearestScrollContainer } from "../dom/scrollContainer";
 import { invalidateScrollGeometry } from "../dom/virtualListScrollGeometryInvalidation";
 
 const LOGICAL_CELL_SELECTOR = "[data-ccl-logical-key]";

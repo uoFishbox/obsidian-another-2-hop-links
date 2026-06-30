@@ -59,8 +59,6 @@ export function readVirtualListCachedMeasurement({
 			resolvedViewportHeight,
 			sectionTop,
 		),
-		...(sharedScrollMetrics
-			? { sharedScrollMetrics: { ...sharedScrollMetrics } }
-			: {}),
+		...(sharedScrollMetrics ? { sharedScrollMetrics } : {}),
 	};
 }

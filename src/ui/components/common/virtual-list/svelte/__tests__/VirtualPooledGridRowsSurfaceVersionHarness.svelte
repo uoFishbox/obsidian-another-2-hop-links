@@ -8,7 +8,7 @@
 		type RenderSlotKey,
 	} from "../../types";
 	import VirtualPooledGridRowsSurface from "../VirtualPooledGridRowsSurface.svelte";
-	import type { VirtualSurfaceMountedRow } from "../VirtualSurfaceCells.svelte";
+	import type { VirtualSurfaceMountedRow } from "../VirtualSurfaceTypes";
 
 	interface TestCell extends MountedVirtualCell {
 		bodyContent: string;

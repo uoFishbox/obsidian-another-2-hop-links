@@ -1,55 +1,58 @@
 import { tick, untrack, getContext, type Snippet } from "svelte";
 import type { ResultNavigationDirection } from "features/keyboard-navigation/resultFocus";
-import type { ApplicationStore } from "ui/stores/ApplicationStore.svelte";
 import {
 	getLazyLoadManager,
 	type RegistrationToken,
 } from "infrastructure/observers/IntersectionObserverRegistry";
-import { computeVirtualGridLayout } from "../../virtualGridLinkListLayout";
-import type { RowRange } from "../rowRange";
 import {
 	buildMountedVirtualGridCellsFromRowModel,
 	type MountedVirtualGridCell,
 	type MountedVirtualGridCellsBuildResult,
 	type MountedVirtualGridRowSlice,
-} from "../reconciliation/linkListVirtualLayout";
+} from "../core/reconciliation/linkListVirtualLayout";
 import type { FlatLinkRowModel } from "../row-models/flatLinkRowModel";
 import { createFlatVirtualGridRuntimeModel } from "../row-models/flatVirtualGridRuntimeModel";
-import { isContentBottomInPreloadRangeFromMetrics } from "../../virtualGridLinkListScroll";
-import type { MeasurementUpdateResult } from "../dom/virtualListMeasurementAdapter";
-import {
-	createVirtualListController,
-	type VirtualListStableMeasurementContext,
-} from "../dom/virtualListController";
-import type { StablePreviewScrollTopBand } from "../dom/activeScrollWindowGate";
+import { isContentBottomInPreloadRangeFromMetrics } from "../core/preloadRange";
+import type { VirtualListStableMeasurementContext } from "../dom/virtualMeasurementController";
 import { createVirtualListMeasurementState } from "../dom/virtualListMeasurementState";
-import { resolveVirtualListLayoutStability } from "../dom/virtualListMeasurementStability";
-import { resolveCachedCardGridLayoutBase } from "../dom/virtualListCardLayout";
+import { createCardVirtualListPolicy } from "../cardVirtualListPolicy";
 import {
-	CARD_VIRTUAL_LIST_MAX_UNSTABLE_MEASUREMENT_RETRIES,
-	createCardVirtualListPolicy,
-} from "../cardVirtualListPolicy";
-import { resolveCardLayoutSettings } from "ui/utils/cardLayoutCssVars";
+	resolveCardLayoutSettings,
+	type CardLayoutSettings,
+} from "ui/utils/cardLayoutCssVars";
 import { getOptionalOwnerWindow } from "ui/utils/realmSafeDom";
 import { scheduleAnimationFrame } from "ui/utils/frame";
-import { createSectionPaginationState } from "../pagination";
+import {
+	createSectionPaginationState,
+	type SectionPaginationApplicationStore,
+} from "../pagination";
 import { useVirtualList } from "./useVirtualList.svelte";
 import type { VirtualListLogicalCell } from "../logicalCell";
-import {
-	createVirtualizedItemVisibilityStateController,
-	resolveVirtualizedItemVisibilityForPreviewRange,
-} from "./virtualizedItemVisibilityState.svelte";
+import { resolveVirtualizedItemVisibilityForPreviewRange } from "./virtualizedItemVisibilityState.svelte";
 import type { RenderRevision, RenderRevisionFallbackPolicy } from "../renderRevision";
-import type {
-	VirtualListItemRenderArgs,
-	VirtualNavigationTarget,
-	VirtualRanges,
-} from "../types";
+import type { VirtualNavigationTarget } from "../types";
+import type { VirtualListItemRenderArgs } from "./renderArgs";
 import {
 	PREVIEW_ROW_ACTIVATION_CONTEXT_KEY,
 	type RowPreviewActivationRuntime,
 } from "features/preview/scheduling/rowPreviewActivationRuntime";
 import { flushVirtualScrollMeasurement as flushCachedVirtualScrollMeasurement } from "../dom/flushVirtualScrollMeasurement";
+import { createFlatGridMeasurementAdapter } from "./flatGridMeasurementAdapter";
+import {
+	DEFAULT_FLAT_GRID_LAYOUT,
+	type ConfiguredCardLayout,
+	type VirtualGridLayout,
+} from "../dom/flatGridLayoutMeasurement";
+import { createFlatGridVisibilityAdapter } from "./flatGridVisibilityAdapter";
+import { createFlatGridControllerAdapter } from "./flatGridControllerAdapter";
+
+interface FlatVirtualGridApplicationSettings extends CardLayoutSettings {
+	previewActivationAheadRows?: number;
+}
+
+interface FlatVirtualGridApplicationStore extends SectionPaginationApplicationStore {
+	settings?: FlatVirtualGridApplicationSettings;
+}
 
 export interface FlatVirtualGridListProps<T> {
 	items?: readonly T[];
@@ -73,7 +76,7 @@ export interface FlatVirtualGridListProps<T> {
 	initialVisibleCount?: number | undefined;
 	loadMoreIncrement?: number;
 	sectionId?: string;
-	applicationStore?: ApplicationStore;
+	applicationStore?: FlatVirtualGridApplicationStore;
 	className?: string;
 	paginationMode?: "button" | "infinite-scroll";
 	infiniteScrollRootMargin?: string;
@@ -83,39 +86,16 @@ export interface FlatVirtualGridListProps<T> {
 
 const MAX_CHAINED_INFINITE_SCROLL_LOADS = 2;
 const EMPTY_MOUNTED_ROWS: readonly MountedVirtualGridRowSlice<never>[] = [];
-const DEFAULT_CARD_LAYOUT = resolveCardLayoutSettings();
-const DEFAULT_LAYOUT = computeVirtualGridLayout({
-	containerWidth: DEFAULT_CARD_LAYOUT.cardWidthPx,
-	minCellWidth: DEFAULT_CARD_LAYOUT.cardWidthPx,
-	gap: DEFAULT_CARD_LAYOUT.cardGapPx,
-	maxColumns: DEFAULT_CARD_LAYOUT.cardMaxColumns,
-	rowHeight: DEFAULT_CARD_LAYOUT.cardHeightPx,
-	cellCount: 0,
-});
-type VirtualGridLayout = typeof DEFAULT_LAYOUT;
-type ConfiguredCardLayout = ReturnType<typeof resolveCardLayoutSettings>;
 type FlatMountedItemCell<T> = MountedVirtualGridCell<T> & {
 	readonly cell: Extract<VirtualListLogicalCell<T>, { kind: "item" }>;
 };
-type StableScrollTopBandMutable = {
-	-readonly [K in keyof StablePreviewScrollTopBand]: StablePreviewScrollTopBand[K];
-};
-
-const isSameLayout = (current: VirtualGridLayout, next: VirtualGridLayout): boolean =>
-	current.containerWidth === next.containerWidth &&
-	current.columns === next.columns &&
-	current.cellWidth === next.cellWidth &&
-	current.gap === next.gap &&
-	current.rowHeight === next.rowHeight &&
-	current.rowCount === next.rowCount &&
-	current.rowStride === next.rowStride &&
-	current.contentHeight === next.contentHeight;
 
 export function useFlatVirtualGridList<T>(props: FlatVirtualGridListProps<T>) {
 	let applicationStore = props.applicationStore;
 	if (!applicationStore) {
 		try {
-			applicationStore = getContext<ApplicationStore>("applicationStore");
+			applicationStore =
+				getContext<FlatVirtualGridApplicationStore>("applicationStore");
 		} catch {}
 	}
 
@@ -132,9 +112,7 @@ export function useFlatVirtualGridList<T>(props: FlatVirtualGridListProps<T>) {
 	const rowPreviewActivationRuntime = getContext<
 		RowPreviewActivationRuntime | undefined
 	>(PREVIEW_ROW_ACTIVATION_CONTEXT_KEY);
-	const visibilityStates = createVirtualizedItemVisibilityStateController<
-		MountedVirtualGridCell<T>
-	>({
+	const visibilityAdapter = createFlatGridVisibilityAdapter<T>({
 		onRowVisibilityChanged: (rowIndex, visibility) => {
 			rowPreviewActivationRuntime?.setRowVisibility(rowIndex, visibility);
 		},
@@ -142,58 +120,11 @@ export function useFlatVirtualGridList<T>(props: FlatVirtualGridListProps<T>) {
 			rowPreviewActivationRuntime?.clearRow(rowIndex);
 		},
 	});
-	let visibilityMountedRows: readonly MountedVirtualGridRowSlice<T>[] | readonly [] =
-		EMPTY_MOUNTED_ROWS;
-	const visibilityMountedRange: RowRange = { start: 0, end: 0 };
-	let visibilityRowModel: object | null = null;
-	const visibilityPreviewRange: RowRange = { start: 0, end: 0 };
-	let hasVisibilityPreviewRange = false;
 	const reusableRowSlotsScratch: number[] = [];
-	const mountedRangeParams: Parameters<FlatLinkRowModel<T>["findVisibleRange"]>[0] = {
-		scrollTop: 0,
-		viewportHeight: 0,
-		overscanPx: 0,
-	};
-	const rangeParams: Parameters<FlatLinkRowModel<T>["findVisibleRanges"]>[0] = {
-		scrollTop: 0,
-		viewportHeight: 0,
-		mountedOverscanPx: 0,
-		previewOverscanPx: 0,
-	};
-	const rangesFromMountedParams: Parameters<
-		FlatLinkRowModel<T>["findVisibleRangesFromMounted"]
-	>[0] = {
-		scrollTop: 0,
-		viewportHeight: 0,
-		mounted: { start: 0, end: 0 },
-		mountedOverscanPx: 0,
-		previewOverscanPx: 0,
-	};
 	let lastResolvedActiveScrollPolicyLayout: VirtualGridLayout | undefined;
 	let lastResolvedActiveScrollPolicy:
 		| ReturnType<typeof createCardVirtualListPolicy>
 		| undefined;
-	const mountedScrollWindowMeasurement = {
-		identity: {} as object,
-		mounted: { start: 0, end: 0 },
-		stableMountedScrollTopBand: undefined,
-	};
-	const scrollWindowMeasurement = {
-		identity: {} as object,
-		ranges: {
-			mounted: { start: 0, end: 0 },
-			previewVisible: { start: 0, end: 0 },
-		},
-		stablePreviewScrollTopBand: { min: 0, max: 0 },
-	};
-	const committedScrollWindowMeasurement = {
-		identity: {} as object,
-		ranges: {
-			mounted: { start: 0, end: 0 },
-			previewVisible: { start: 0, end: 0 },
-		},
-		stablePreviewScrollTopBand: { min: 0, max: 0 },
-	};
 	const resolveActiveScrollPolicy = (
 		nextLayout: VirtualGridLayout,
 	): ReturnType<typeof createCardVirtualListPolicy> => {
@@ -206,58 +137,6 @@ export function useFlatVirtualGridList<T>(props: FlatVirtualGridListProps<T>) {
 		}
 		return lastResolvedActiveScrollPolicy!;
 	};
-	const updateStablePreviewScrollTopBand = (
-		out: StableScrollTopBandMutable,
-		measurementRowModel: FlatLinkRowModel<T>,
-		sectionTop: number,
-		params: Parameters<FlatLinkRowModel<T>["findVisibleRanges"]>[0],
-		previewVisible: RowRange,
-	): void => {
-		measurementRowModel.findStablePreviewScrollTopBandInto(out, {
-			viewportHeight: params.viewportHeight,
-			mountedOverscanPx: params.mountedOverscanPx,
-			previewOverscanPx: params.previewOverscanPx,
-			previewVisible,
-		});
-		out.min += sectionTop;
-		out.max += sectionTop;
-	};
-	const syncVisibilityStates = (
-		mountedRows: readonly MountedVirtualGridRowSlice<T>[] | readonly [],
-		nextMountedRange: RowRange,
-		nextPreviewRange: RowRange,
-		nextRowModel: object,
-	): void => {
-		if (!hasVisibilityPreviewRange || nextRowModel !== visibilityRowModel) {
-			visibilityStates.syncMountedRows({
-				mountedRows,
-				previewRange: nextPreviewRange,
-			});
-		} else if (mountedRows !== visibilityMountedRows) {
-			visibilityStates.syncMountedRowRangeDelta({
-				previousRows: visibilityMountedRows,
-				nextRows: mountedRows,
-				previousRowRange: visibilityMountedRange,
-				nextRowRange: nextMountedRange,
-				previewRange: nextPreviewRange,
-			});
-		} else {
-			visibilityStates.syncPreviewRangeDelta({
-				previousPreviewRange: visibilityPreviewRange,
-				nextPreviewRange,
-				mountedRows,
-			});
-		}
-
-		visibilityMountedRows = mountedRows;
-		visibilityMountedRange.start = nextMountedRange.start;
-		visibilityMountedRange.end = nextMountedRange.end;
-		visibilityRowModel = nextRowModel;
-		visibilityPreviewRange.start = nextPreviewRange.start;
-		visibilityPreviewRange.end = nextPreviewRange.end;
-		hasVisibilityPreviewRange = true;
-	};
-
 	let sectionExpandedLimits = $state.raw<Record<string, number>>({});
 	let sectionRootEl = $state<HTMLDivElement | null>(null);
 	let contentEl = $state<HTMLDivElement | null>(null);
@@ -266,7 +145,7 @@ export function useFlatVirtualGridList<T>(props: FlatVirtualGridListProps<T>) {
 	let measurement = $state(createVirtualListMeasurementState());
 	let loadScheduled = $state(false);
 	let chainedInfiniteScrollLoads = $state(0);
-	let layout = $state.raw(DEFAULT_LAYOUT);
+	let layout = $state.raw(DEFAULT_FLAT_GRID_LAYOUT);
 	const configuredCardLayout = $derived.by(() =>
 		applicationStore?.settings
 			? resolveCardLayoutSettings(applicationStore.settings)
@@ -352,12 +231,13 @@ export function useFlatVirtualGridList<T>(props: FlatVirtualGridListProps<T>) {
 		},
 		visibilityMetadataPolicy: { type: "caller-managed" },
 		onSnapshotUpdated: (snapshot, reconciliationState) => {
-			syncVisibilityStates(
-				reconciliationState.mountedBuild?.rowSlices ?? EMPTY_MOUNTED_ROWS,
-				snapshot.ranges.mounted,
-				snapshot.ranges.previewVisible,
-				snapshot.rowModel,
-			);
+			visibilityAdapter.syncVisibilityStates({
+				mountedRows:
+					reconciliationState.mountedBuild?.rowSlices ?? EMPTY_MOUNTED_ROWS,
+				mountedRange: snapshot.ranges.mounted,
+				previewRange: snapshot.ranges.previewVisible,
+				rowModel: snapshot.rowModel,
+			});
 		},
 	});
 	const virtualListSnapshot = $derived(virtualList.getSnapshot());
@@ -373,189 +253,59 @@ export function useFlatVirtualGridList<T>(props: FlatVirtualGridListProps<T>) {
 		virtualList.getMountedCellsForChange(),
 	);
 	let lastEmptyMountedCellsNotification: unknown = null;
-	const updateVirtualRangesFromMeasurement = (
-		scrollTop: number,
-		viewportHeight: number,
-		sectionTop: number,
-		isStableMeasurement: boolean,
-		isScrollActive: boolean,
-		nextLayout = layout,
-		precomputedRanges?: VirtualRanges,
-	): MeasurementUpdateResult<RowRange> => {
-		const measurementRowModel = resolveFlatLinkRowModel(nextLayout);
-		return virtualList.applyMeasurement({
-			rowModel: measurementRowModel,
+	const flatGridMeasurementAdapter = createFlatGridMeasurementAdapter<
+		T,
+		VirtualGridLayout
+	>({
+		resolveRowModel: resolveFlatLinkRowModel,
+		resolveVisibilityPolicy: resolveActiveScrollPolicy,
+		applyMeasurement: ({
+			rowModel,
 			scrollTop,
 			viewportHeight,
 			sectionTop,
 			isStableMeasurement,
 			isScrollActive,
-			hasStableVisibleRange: measurement.hasStableVisibleRange,
 			precomputedRanges,
-			visibilityPolicy: createCardVirtualListPolicy({
-				layout: nextLayout,
-				previewActivationAheadRows,
+			visibilityPolicy,
+		}) =>
+			virtualList.applyMeasurement({
+				rowModel,
+				scrollTop,
+				viewportHeight,
+				sectionTop,
+				isStableMeasurement,
+				isScrollActive,
+				hasStableVisibleRange: measurement.hasStableVisibleRange,
+				precomputedRanges,
+				visibilityPolicy,
 			}),
-		});
-	};
+		getActiveVisibilityRowModel: () =>
+			visibilityAdapter.getActiveRowModel() ??
+			virtualList.getSnapshot()?.rowModel ??
+			null,
+		syncActiveScrollPreviewRange: ({ previewVisible, rowModel }) => {
+			visibilityAdapter.syncVisibilityStates({
+				mountedRows: visibilityAdapter.getMountedRows(),
+				mountedRange: visibilityAdapter.getMountedRange(),
+				previewRange: previewVisible,
+				rowModel,
+			});
+		},
+	});
 
-	const virtualListController = createVirtualListController({
+	const virtualListController = createFlatGridControllerAdapter<T>({
 		getRootEl: () => sectionRootEl,
 		measurement,
 		getLayout: () => layout,
 		setLayout: (nextLayout) => {
 			layout = nextLayout;
 		},
-		isSameLayout,
-		resolveLayoutMeasurement: (rootEl, rootRect) => {
-			const layoutBase = resolveCachedCardGridLayoutBase({
-				rootEl,
-				rootRect,
-				measuredWidth: measurement.measuredWidth,
-				defaults: DEFAULT_CARD_LAYOUT,
-				listKind: "flat",
-				scrollContainerEl: measurement.scrollContainerEl,
-				configuredLayout: configuredCardLayout,
-				includeSectionMarginBottom: false,
-			});
-			const nextLayout = computeVirtualGridLayout({
-				containerWidth: layoutBase.containerWidth,
-				minCellWidth: layoutBase.cardLayout.cardWidthPx,
-				gap: layoutBase.gap,
-				maxColumns: layoutBase.columns,
-				rowHeight: layoutBase.rowHeight,
-				cellCount: logicalCellCount,
-			});
-			const hasRenderableItems = itemCount > 0;
-			const layoutStability = resolveVirtualListLayoutStability({
-				rootEl,
-				rootRect,
-				measuredWidth: measurement.measuredWidth,
-				hasRenderableContent: hasRenderableItems,
-			});
-
-			return {
-				layout: nextLayout,
-				content: logicalCellSource,
-				hasRenderableContent: hasRenderableItems,
-				hasStableLayout: layoutStability.isStable,
-			};
-		},
-		getCachedContent: () => logicalCellSource,
-		hasRenderableContent: () => itemCount > 0,
-		applyRangeMeasurement: ({
-			scrollTop,
-			viewportHeight,
-			sectionTop,
-			isStableMeasurement,
-			isScrollActive,
-			layout: nextLayout,
-			precomputedRanges,
-		}) =>
-			updateVirtualRangesFromMeasurement(
-				scrollTop,
-				viewportHeight,
-				sectionTop,
-				isStableMeasurement,
-				isScrollActive,
-				nextLayout,
-				precomputedRanges,
-			),
-		resolveMountedScrollWindowMeasurement: (
-			scrollTop,
-			viewportHeight,
-			sectionTop,
-			_content,
-			nextLayout,
-		) => {
-			const measurementRowModel = resolveFlatLinkRowModel(nextLayout);
-			const visibilityPolicy = resolveActiveScrollPolicy(nextLayout);
-			const localScrollTop = scrollTop - sectionTop;
-			const mountedOverscanPx = visibilityPolicy.mountedOverscanPx;
-
-			mountedRangeParams.scrollTop = localScrollTop;
-			mountedRangeParams.viewportHeight = viewportHeight;
-			mountedRangeParams.overscanPx = mountedOverscanPx;
-			mountedScrollWindowMeasurement.identity = measurementRowModel;
-			measurementRowModel.findVisibleRangeInto(
-				mountedScrollWindowMeasurement.mounted,
-				mountedRangeParams,
-			);
-			mountedScrollWindowMeasurement.stableMountedScrollTopBand = undefined;
-			return mountedScrollWindowMeasurement;
-		},
-		resolveScrollWindowMeasurement: (
-			scrollTop,
-			viewportHeight,
-			sectionTop,
-			_content,
-			nextLayout,
-			precomputedMountedRange,
-		) => {
-			const measurementRowModel = resolveFlatLinkRowModel(nextLayout);
-			const visibilityPolicy = resolveActiveScrollPolicy(nextLayout);
-			rangeParams.scrollTop = scrollTop - sectionTop;
-			rangeParams.viewportHeight = viewportHeight;
-			rangeParams.mountedOverscanPx = visibilityPolicy.mountedOverscanPx;
-			rangeParams.previewOverscanPx = visibilityPolicy.previewOverscanPx;
-			if (!precomputedMountedRange) {
-				committedScrollWindowMeasurement.identity = measurementRowModel;
-				measurementRowModel.findVisibleRangesInto(
-					committedScrollWindowMeasurement.ranges,
-					rangeParams,
-				);
-				updateStablePreviewScrollTopBand(
-					committedScrollWindowMeasurement.stablePreviewScrollTopBand,
-					measurementRowModel,
-					sectionTop,
-					rangeParams,
-					committedScrollWindowMeasurement.ranges.previewVisible,
-				);
-				return committedScrollWindowMeasurement;
-			}
-
-			scrollWindowMeasurement.identity = measurementRowModel;
-			rangesFromMountedParams.scrollTop = rangeParams.scrollTop;
-			rangesFromMountedParams.viewportHeight = rangeParams.viewportHeight;
-			rangesFromMountedParams.mounted = precomputedMountedRange;
-			rangesFromMountedParams.mountedOverscanPx = rangeParams.mountedOverscanPx;
-			rangesFromMountedParams.previewOverscanPx = rangeParams.previewOverscanPx;
-			measurementRowModel.findVisibleRangesFromMountedInto(
-				scrollWindowMeasurement.ranges,
-				rangesFromMountedParams,
-			);
-			updateStablePreviewScrollTopBand(
-				scrollWindowMeasurement.stablePreviewScrollTopBand,
-				measurementRowModel,
-				sectionTop,
-				rangeParams,
-				scrollWindowMeasurement.ranges.previewVisible,
-			);
-			return scrollWindowMeasurement;
-		},
-		onActiveScrollPreviewRangeMeasurement: (ranges) => {
-			const activeRowModel =
-				visibilityRowModel ?? virtualList.getSnapshot()?.rowModel ?? null;
-			if (!activeRowModel) {
-				return;
-			}
-
-			syncVisibilityStates(
-				visibilityMountedRows,
-				visibilityMountedRange,
-				ranges.previewVisible,
-				activeRowModel,
-			);
-		},
-		activeScrollWindowComparison: "mounted-only",
-		onStableLayoutMeasurement: (context) => {
-			maybeScheduleInfiniteScrollLoad(context);
-		},
-		onStableScrollMeasurement: (context) => {
-			maybeScheduleInfiniteScrollLoad(context);
-		},
-		maxUnstableMeasurementRetries:
-			CARD_VIRTUAL_LIST_MAX_UNSTABLE_MEASUREMENT_RETRIES,
+		getConfiguredCardLayout: () => configuredCardLayout,
+		getLogicalCellCount: () => logicalCellCount,
+		getItemCount: () => itemCount,
+		measurementAdapter: flatGridMeasurementAdapter,
+		onStableMeasurement: maybeScheduleInfiniteScrollLoad,
 	});
 
 	const scheduleLayoutMeasurementForCardLayout = (
@@ -787,7 +537,7 @@ export function useFlatVirtualGridList<T>(props: FlatVirtualGridListProps<T>) {
 		observerRoot: HTMLElement | null,
 	): VirtualListItemRenderArgs<T> => {
 		const itemCell = mountedCell as FlatMountedItemCell<T>;
-		const visibilityState = visibilityStates.getOrCreateState(
+		const visibilityState = visibilityAdapter.visibilityStates.getOrCreateState(
 			itemCell,
 			untrack(() => {
 				const previewVisible = virtualList.getSnapshot()?.ranges.previewVisible;

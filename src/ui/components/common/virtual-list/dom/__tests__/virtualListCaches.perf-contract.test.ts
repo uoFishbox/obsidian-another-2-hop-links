@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
 	findNearestScrollContainerCached,
 	invalidateNearestScrollContainerCache,
-} from "../../../virtualGridLinkListScroll";
+} from "../scrollContainer";
 import {
 	resolveCachedCardGridLayoutBase,
 	type CachedCardGridLayoutBase,

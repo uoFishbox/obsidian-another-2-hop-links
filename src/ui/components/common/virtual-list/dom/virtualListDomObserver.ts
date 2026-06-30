@@ -1,4 +1,4 @@
-import { findNearestScrollContainerCached } from "../../virtualGridLinkListScroll";
+import { findNearestScrollContainerCached } from "./scrollContainer";
 import {
 	markScrollActivityActive,
 	markScrollActivityIdle,

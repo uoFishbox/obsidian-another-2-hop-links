@@ -6,7 +6,7 @@ import {
 import {
 	findNearestScrollContainer,
 	isWithinComposedTree,
-} from "ui/components/common/virtualGridLinkListScroll";
+} from "ui/components/common/virtual-list/dom/scrollContainer";
 import { isHTMLElementLike, isShadowRootLike } from "ui/utils/realmSafeDom";
 
 export interface LazyRenderActionParams {

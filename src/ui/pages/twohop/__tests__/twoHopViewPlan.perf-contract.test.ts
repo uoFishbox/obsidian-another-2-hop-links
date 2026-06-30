@@ -4,7 +4,7 @@ import {
 	computeVirtualListSnapshotWithState,
 	type VirtualListComputation,
 } from "ui/components/common/virtual-list/core/virtualListEngine";
-import type { MountedFlatCell } from "ui/components/common/virtual-list/reconciliation/viewPlanMountedCells";
+import type { MountedFlatCell } from "ui/components/common/virtual-list/core/reconciliation/viewPlanMountedCells";
 import type { SectionRenderDescriptor } from "ui/components/sections/types";
 import {
 	compileTwoHopViewPlan,

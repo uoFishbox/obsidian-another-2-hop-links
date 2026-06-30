@@ -6,7 +6,7 @@ import {
 	buildMountedVirtualGridCellsFromRowModel,
 	type MountedVirtualGridCell,
 	type MountedVirtualGridCellsBuildResult,
-} from "../../reconciliation/linkListVirtualLayout";
+} from "../reconciliation/linkListVirtualLayout";
 import {
 	createFlatLinkRowModel,
 	type FlatLinkRowModel,

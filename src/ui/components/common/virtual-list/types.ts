@@ -1,5 +1,4 @@
 import type { RowRange } from "./rowRange";
-import type { ResultNavigationDirection } from "features/keyboard-navigation/resultFocus";
 import type { RowNumberLookup } from "./layout/viewPlanRowTypes";
 import type { VirtualRowLayoutMetrics } from "./layoutMetrics";
 import type { RenderBodyKey, RenderRevision } from "./renderRevision";
@@ -9,29 +8,6 @@ export type VirtualizedItemVisibility = "visible" | "mounted";
 
 export interface VirtualizedItemVisibilityState {
 	visibility: VirtualizedItemVisibility | undefined;
-}
-
-/**
- * Props passed to flat virtual list item render snippets.
- */
-export interface VirtualListItemRenderArgs<T> {
-	item: T;
-	index: number;
-	observerRoot: HTMLElement | null;
-	readonly visibility: VirtualizedItemVisibility;
-	visibilityState: VirtualizedItemVisibilityState;
-	rowIndex: number;
-	activationCandidateId: string;
-}
-
-/**
- * Props passed to sectioned virtual list item render snippets.
- */
-export interface SectionedVirtualListItemRenderArgs<
-	T,
-	G,
-> extends VirtualListItemRenderArgs<T> {
-	section: G;
 }
 
 declare const brand: unique symbol;
@@ -106,13 +82,15 @@ export interface VirtualRowModel<TCell> {
 
 	resolveNavigationTarget?: (
 		currentKey: string,
-		direction: ResultNavigationDirection,
+		direction: VirtualNavigationDirection,
 		currentPosition: {
 			rowIndex: number;
 			columnIndex: number;
 		},
 	) => VirtualNavigationTarget | null;
 }
+
+export type VirtualNavigationDirection = "up" | "down" | "left" | "right";
 
 export interface VirtualNavigationTarget {
 	key: string;

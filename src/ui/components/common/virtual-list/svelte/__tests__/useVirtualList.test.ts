@@ -10,7 +10,7 @@ import {
 	buildMountedVirtualGridCellsFromRowModel,
 	type MountedVirtualGridCell,
 	type MountedVirtualGridCellsBuildResult,
-} from "../../reconciliation/linkListVirtualLayout";
+} from "../../core/reconciliation/linkListVirtualLayout";
 import { useVirtualList, type UseVirtualListOptions } from "../useVirtualList.svelte";
 
 type TestItem = { id: string; label?: string };
@@ -119,6 +119,7 @@ describe("useVirtualList", () => {
 		expect(result).toEqual({
 			kind: "stable",
 			range: { start: 0, end: 3 },
+			updateKind: "recomputed",
 		});
 		expect(snapshot?.ranges.mounted).toEqual({ start: 0, end: 3 });
 		expect(snapshot?.mode.kind).toBe("stable");
@@ -181,13 +182,15 @@ describe("useVirtualList", () => {
 			},
 		};
 
-		virtualList.applyMeasurement(measurement);
+		const initialResult = virtualList.applyMeasurement(measurement);
 		const initial = virtualList.getSnapshot();
-		virtualList.applyMeasurement({
+		const reusedResult = virtualList.applyMeasurement({
 			...measurement,
 			hasStableVisibleRange: true,
 		});
 
+		expect(initialResult.updateKind).toBe("recomputed");
+		expect(reusedResult.updateKind).toBe("reused");
 		expect(virtualList.getSnapshot()?.mountedCells).toBe(initial?.mountedCells);
 		expect(buildMountedCells).toHaveBeenCalledTimes(1);
 	});
@@ -329,7 +332,11 @@ describe("useVirtualList", () => {
 			hasStableVisibleRange: true,
 		});
 
-		expect(result).toEqual({ kind: "skipped", reason: "unstable" });
+		expect(result).toEqual({
+			kind: "skipped",
+			reason: "unstable",
+			updateKind: "skipped",
+		});
 		expect(virtualList.getSnapshot()).not.toBe(initial);
 		expect(virtualList.getSnapshot()?.mountedCells).toBe(initial?.mountedCells);
 		expect(virtualList.getMode().kind).toBe("skipped");

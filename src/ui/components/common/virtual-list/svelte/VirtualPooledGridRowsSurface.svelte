@@ -3,7 +3,7 @@
 	import type { Snippet } from "svelte";
 	import type { LogicalCellKey, MountedVirtualCell } from "../types";
 	import VirtualListCellMount from "./VirtualListCellMount.svelte";
-	import type { VirtualSurfaceMountedRow } from "./VirtualSurfaceCells.svelte";
+	import type { VirtualSurfaceMountedRow } from "./VirtualSurfaceTypes";
 
 	interface Props<TMountedCell extends MountedVirtualCell> {
 		contentClassName?: string;

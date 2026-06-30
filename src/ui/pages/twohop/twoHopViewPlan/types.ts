@@ -2,7 +2,7 @@ import type { ResultNavigationDirection } from "features/keyboard-navigation/res
 import type { SectionRenderDescriptor } from "ui/components/sections/types";
 import type { VirtualListLogicalCell } from "ui/components/common/virtual-list/logicalCell";
 import type { ViewPlanLayoutMetrics } from "ui/components/common/virtual-list/svelte/viewPlanLayout";
-import type { StablePreviewScrollTopBand } from "ui/components/common/virtual-list/dom/activeScrollWindowGate";
+import type { StablePreviewScrollTopBand } from "ui/components/common/virtual-list/core/scrollWindowGate";
 import type {
 	VirtualNavigationTarget,
 	VirtualRanges,

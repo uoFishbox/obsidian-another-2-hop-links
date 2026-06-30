@@ -3,12 +3,12 @@
 	import { providePreviewActivationContexts } from "features/preview/scheduling/previewActivationContexts";
 	import VirtualSurface from "ui/components/common/virtual-list/VirtualSurface.svelte";
 	import VirtualListLoadMoreButton from "ui/components/common/virtual-list/VirtualListLoadMoreButton.svelte";
-	import type { SectionedVirtualListItemRenderArgs } from "ui/components/common/virtual-list/types";
+	import type { SectionedVirtualListItemRenderArgs } from "ui/components/common/virtual-list/svelte/renderArgs";
 	import type {
 		MountedFlatCell,
 		MountedFlatHeaderCell,
 		MountedFlatItemCell,
-	} from "ui/components/common/virtual-list/reconciliation/viewPlanMountedCells";
+	} from "ui/components/common/virtual-list/core/reconciliation/viewPlanMountedCells";
 	import type { Snippet } from "svelte";
 	import type { ApplicationStore } from "ui/stores/ApplicationStore.svelte";
 	import type { SectionRenderDescriptor } from "ui/components/sections/types";

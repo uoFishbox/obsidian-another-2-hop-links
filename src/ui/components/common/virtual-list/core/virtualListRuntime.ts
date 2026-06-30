@@ -1,0 +1,296 @@
+import type { RowRange } from "../rowRange";
+import {
+	computeVirtualListSnapshotWithState,
+	createEmptyVirtualListComputation,
+	recomputeVirtualListSnapshotWithState,
+	type MountedVirtualCellsBuild,
+	type VirtualCellVisibilityMetadataPolicy,
+	type VirtualListComputation,
+	type VirtualListReconciliationState,
+	type VirtualListSnapshot,
+	type VirtualVisibilityPolicy,
+} from "./virtualListEngine";
+import type {
+	EmptyReason,
+	MaterializedVirtualListMode,
+	VirtualListMode,
+} from "./VirtualListMode";
+import type { MountedVirtualCell, VirtualRanges, VirtualRowModel } from "../types";
+
+export interface ApplyVirtualListMeasurementParams<
+	TCell,
+	TRowModel extends VirtualRowModel<TCell>,
+> {
+	rowModel: TRowModel;
+	scrollTop: number;
+	viewportHeight: number;
+	sectionTop: number;
+	isStableMeasurement: boolean;
+	hasStableVisibleRange: boolean;
+	isScrollActive?: boolean;
+	precomputedRanges?: VirtualRanges;
+	visibilityPolicy: VirtualVisibilityPolicy;
+}
+
+export type VirtualListMeasurementUpdateKind = "skipped" | "reused" | "recomputed";
+
+export type VirtualListMeasurementUpdateResult<TRange> =
+	| { kind: "skipped"; reason: "unstable"; updateKind: "skipped" }
+	| {
+			kind: "bootstrapped";
+			range: TRange;
+			updateKind: Exclude<VirtualListMeasurementUpdateKind, "skipped">;
+	  }
+	| {
+			kind: "stable";
+			range: TRange;
+			updateKind: Exclude<VirtualListMeasurementUpdateKind, "skipped">;
+	  };
+
+export type VirtualListRuntimeState<
+	TCell,
+	TMountedCell extends MountedVirtualCell,
+	TMountedBuild extends MountedVirtualCellsBuild<TMountedCell>,
+> =
+	| {
+			mode: { kind: "uninitialized" };
+			snapshot: null;
+			reconciliationState: VirtualListReconciliationState<TMountedBuild>;
+			mountedCellsForChange: readonly TMountedCell[];
+	  }
+	| {
+			mode: MaterializedVirtualListMode;
+			snapshot: VirtualListSnapshot<TCell, TMountedCell, TMountedBuild>;
+			reconciliationState: VirtualListReconciliationState<TMountedBuild>;
+			mountedCellsForChange: readonly TMountedCell[];
+	  };
+
+export interface CreateVirtualListRuntimeOptions<
+	TCell,
+	TRowModel extends VirtualRowModel<TCell>,
+	TMountedCell extends MountedVirtualCell,
+	TMountedBuild extends MountedVirtualCellsBuild<TMountedCell>,
+> {
+	buildMountedCells(params: {
+		rowModel: TRowModel;
+		rowRange: RowRange;
+		ranges: VirtualRanges;
+		previousBuild?: TMountedBuild;
+		previousCells?: readonly TMountedCell[];
+		previousCellsByKey?: ReadonlyMap<string, TMountedCell>;
+	}): TMountedBuild;
+	onSnapshotUpdated?: (
+		snapshot: VirtualListSnapshot<TCell, TMountedCell, TMountedBuild>,
+		reconciliationState: VirtualListReconciliationState<TMountedBuild>,
+	) => void;
+	onStableVisibleRange?: () => void;
+	onStateChanged?: (
+		state: VirtualListRuntimeState<TCell, TMountedCell, TMountedBuild>,
+	) => void;
+	visibilityMetadataPolicy?: VirtualCellVisibilityMetadataPolicy;
+	trackMountedCellsForChange?: boolean;
+}
+
+const hasSameRefs = <T>(current: readonly T[], next: readonly T[]): boolean => {
+	if (current === next) {
+		return true;
+	}
+
+	if (current.length !== next.length) {
+		return false;
+	}
+
+	for (let index = 0; index < current.length; index += 1) {
+		if (current[index] !== next[index]) {
+			return false;
+		}
+	}
+
+	return true;
+};
+
+export function createVirtualListRuntime<
+	TCell,
+	TRowModel extends VirtualRowModel<TCell>,
+	TMountedCell extends MountedVirtualCell,
+	TMountedBuild extends MountedVirtualCellsBuild<TMountedCell>,
+>(
+	options: CreateVirtualListRuntimeOptions<
+		TCell,
+		TRowModel,
+		TMountedCell,
+		TMountedBuild
+	>,
+) {
+	const initialReconciliationState: VirtualListReconciliationState<TMountedBuild> = {
+		mountedBuild: null,
+	};
+	let runtimeState: VirtualListRuntimeState<TCell, TMountedCell, TMountedBuild> = {
+		mode: { kind: "uninitialized" },
+		snapshot: null,
+		reconciliationState: initialReconciliationState,
+		mountedCellsForChange: [],
+	};
+
+	const updateMountedCellsForChange = (
+		nextSnapshot: VirtualListSnapshot<TCell, TMountedCell, TMountedBuild>,
+		previousCellsForChange: readonly TMountedCell[],
+	): readonly TMountedCell[] => {
+		const nextCells = nextSnapshot.mountedCells;
+		if (!hasSameRefs(previousCellsForChange, nextCells)) {
+			return nextCells;
+		}
+		return previousCellsForChange;
+	};
+
+	const commitComputation = (
+		result: VirtualListComputation<TCell, TMountedCell, TMountedBuild>,
+	): void => {
+		const previousState = runtimeState;
+		const nextSnapshot = result.snapshot;
+		const nextReconciliationState = result.reconciliationState;
+		const snapshotChanged = previousState.snapshot !== nextSnapshot;
+		const stateChanged =
+			previousState.reconciliationState !== nextReconciliationState;
+
+		if (!snapshotChanged && !stateChanged) {
+			return;
+		}
+
+		runtimeState = {
+			mode: nextSnapshot.mode,
+			snapshot: nextSnapshot,
+			reconciliationState: nextReconciliationState,
+			mountedCellsForChange:
+				snapshotChanged && options.trackMountedCellsForChange !== false
+					? updateMountedCellsForChange(
+							nextSnapshot,
+							previousState.mountedCellsForChange,
+						)
+					: previousState.mountedCellsForChange,
+		};
+		options.onSnapshotUpdated?.(nextSnapshot, nextReconciliationState);
+		options.onStateChanged?.(runtimeState);
+	};
+
+	const applyMeasurement = (
+		params: ApplyVirtualListMeasurementParams<TCell, TRowModel>,
+	): VirtualListMeasurementUpdateResult<RowRange> => {
+		const previousSnapshot = runtimeState.snapshot;
+		const previousReconciliationState = runtimeState.reconciliationState;
+		const previousMountedBuild = previousReconciliationState.mountedBuild;
+		const result = computeVirtualListSnapshotWithState({
+			rowModel: params.rowModel,
+			measurement: {
+				scrollTop: params.scrollTop,
+				viewportHeight: params.viewportHeight,
+				sectionTop: params.sectionTop,
+				isStableMeasurement: params.isStableMeasurement,
+				hasStableVisibleRange: params.hasStableVisibleRange,
+				isScrollActive: params.isScrollActive,
+				precomputedRanges: params.precomputedRanges,
+				currentMountedRange: previousSnapshot?.ranges.mounted ?? {
+					start: 0,
+					end: 0,
+				},
+			},
+			visibilityPolicy: params.visibilityPolicy,
+			previous: previousSnapshot,
+			previousState: previousReconciliationState,
+			visibilityMetadataPolicy: options.visibilityMetadataPolicy,
+			buildMountedCells: options.buildMountedCells,
+		});
+		const nextSnapshot = result.snapshot;
+		commitComputation(result);
+
+		if (result.measurementKind === "skipped") {
+			return {
+				kind: "skipped",
+				reason: "unstable",
+				updateKind: "skipped",
+			};
+		}
+
+		const updateKind =
+			result.reconciliationState.mountedBuild === previousMountedBuild
+				? "reused"
+				: "recomputed";
+
+		if (result.measurementKind === "bootstrapped") {
+			return {
+				kind: "bootstrapped",
+				range: nextSnapshot.ranges.mounted,
+				updateKind,
+			};
+		}
+
+		options.onStableVisibleRange?.();
+		return {
+			kind: "stable",
+			range: nextSnapshot.ranges.mounted,
+			updateKind,
+		};
+	};
+
+	const recompute = (params: { rowModel: TRowModel }): void => {
+		const previousSnapshot = runtimeState.snapshot;
+		if (!previousSnapshot) {
+			return;
+		}
+
+		const result = recomputeVirtualListSnapshotWithState({
+			rowModel: params.rowModel,
+			previous: previousSnapshot,
+			previousState: runtimeState.reconciliationState,
+			visibilityMetadataPolicy: options.visibilityMetadataPolicy,
+			buildMountedCells: options.buildMountedCells,
+		});
+		commitComputation(result);
+	};
+
+	const setEmpty = (params: { rowModel: TRowModel; reason?: EmptyReason }): void => {
+		const result = createEmptyVirtualListComputation<
+			TCell,
+			TMountedCell,
+			TMountedBuild
+		>({
+			rowModel: params.rowModel,
+			previous: runtimeState.snapshot,
+			mode: {
+				kind: "empty",
+				reason: params.reason ?? "no-renderable-content",
+			},
+		});
+		commitComputation(result);
+	};
+
+	return {
+		getState() {
+			return runtimeState;
+		},
+		getSnapshot() {
+			return runtimeState.snapshot;
+		},
+		getMode(): VirtualListMode {
+			return runtimeState.mode;
+		},
+		getMountedCells() {
+			return runtimeState.mode.kind === "empty" ||
+				runtimeState.mode.kind === "uninitialized"
+				? []
+				: (runtimeState.snapshot?.mountedCells ?? []);
+		},
+		getMountedCellsForChange() {
+			return runtimeState.mountedCellsForChange;
+		},
+		getReconciliationState() {
+			return runtimeState.reconciliationState;
+		},
+		getTotalHeight(fallback: number) {
+			return runtimeState.snapshot?.totalHeight ?? fallback;
+		},
+		applyMeasurement,
+		recompute,
+		setEmpty,
+	};
+}

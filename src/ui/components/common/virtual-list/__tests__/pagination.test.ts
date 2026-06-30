@@ -1,7 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
 import type { SectionRenderDescriptor } from "ui/components/sections/types";
-import type { ApplicationStore } from "ui/stores/ApplicationStore.svelte";
-import { createSectionVisibleCountsController } from "../pagination";
+import {
+	createSectionVisibleCountsController,
+	type SectionPaginationApplicationStore,
+} from "../pagination";
 
 interface HarnessSection {
 	key: string;
@@ -35,7 +37,7 @@ describe("createSectionVisibleCountsController", () => {
 					getSectionExpandedLimit: (sectionId: string) =>
 						expandedLimits.get(sectionId),
 					setSectionExpandedLimit,
-				} as unknown as ApplicationStore,
+				} satisfies SectionPaginationApplicationStore,
 				initialVisibleCount: 1,
 				loadMoreIncrement: 2,
 			},
@@ -69,7 +71,7 @@ describe("createSectionVisibleCountsController", () => {
 					getSectionExpandedLimit: (sectionId: string) =>
 						expandedLimits.get(sectionId),
 					setSectionExpandedLimit,
-				} as unknown as ApplicationStore,
+				} satisfies SectionPaginationApplicationStore,
 				loadMoreIncrement: 2,
 			},
 		);
@@ -92,7 +94,7 @@ describe("createSectionVisibleCountsController", () => {
 					getDefaultSectionVisibleLimit: () => 22,
 					getSectionExpandedLimit: () => undefined,
 					setSectionExpandedLimit,
-				} as unknown as ApplicationStore,
+				} satisfies SectionPaginationApplicationStore,
 				loadMoreIncrement: 22,
 			},
 		);

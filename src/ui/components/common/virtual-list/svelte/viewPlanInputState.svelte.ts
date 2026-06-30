@@ -1,8 +1,8 @@
-import type { ApplicationStore } from "ui/stores/ApplicationStore.svelte";
 import type { SectionRenderDescriptor } from "../../../sections/types";
 import {
 	createSectionVisibleCountsController,
 	getSectionPaginationKey,
+	type SectionPaginationApplicationStore,
 	type SectionVisibleCountsSnapshot,
 } from "../pagination";
 import { validateViewPlanInput } from "../validation/viewPlanInputValidation";
@@ -12,7 +12,7 @@ const EMPTY_SECTIONS: readonly never[] = [];
 
 export interface ViewPlanInputStateParams<T, G> {
 	getSections(): readonly SectionRenderDescriptor<T, G>[];
-	applicationStore?: ApplicationStore;
+	applicationStore?: SectionPaginationApplicationStore;
 	initialVisibleCount?: number;
 	loadMoreIncrement?: number;
 }

@@ -36,7 +36,7 @@ Vault全体のベンチマークは、インデックス作成レイヤーやE2E
 
 ### 直近のスクロールコンテナ（Nearest Scroll Container）
 
-場所: `../virtualGridLinkListScroll.ts`
+場所: `dom/scrollContainer.ts`
 
 - **目的:** 繰り返しのDOMツリー走査や `getComputedStyle()` の呼び出しを防ぐ。
 - **スコープ:** virtual listのルート要素ごとに1つの `WeakMap` エントリ。

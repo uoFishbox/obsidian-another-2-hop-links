@@ -1,15 +1,15 @@
-import type { SectionRenderDescriptor } from "../../../sections/types";
-import type { VirtualListLogicalCell } from "../logicalCell";
+import type { SectionRenderDescriptor } from "../../../../sections/types";
+import type { VirtualListLogicalCell } from "../../logicalCell";
 import type {
 	RenderBodyKey,
 	RenderRevision,
 	RenderRevisionFallbackPolicy,
-} from "../renderRevision";
+} from "../../renderRevision";
 import {
 	formatVirtualListInputError,
 	type Result,
 	type VirtualListInputError,
-} from "../validation/virtualListValidationError";
+} from "../../validation/virtualListValidationError";
 
 type HeaderLogicalCell<T> = Extract<VirtualListLogicalCell<T>, { kind: "header" }>;
 type ItemLogicalCell<T> = Extract<VirtualListLogicalCell<T>, { kind: "item" }>;

@@ -1,5 +1,5 @@
 import { IS_PROD } from "../../../appConstants";
-import type { MountedFlatCell } from "ui/components/common/virtual-list/reconciliation/viewPlanMountedCells";
+import type { MountedFlatCell } from "ui/components/common/virtual-list/core/reconciliation/viewPlanMountedCells";
 import {
 	createTwoHopMeasurementBridge,
 	createTwoHopMeasurementState,

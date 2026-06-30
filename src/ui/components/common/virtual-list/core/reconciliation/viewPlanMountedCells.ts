@@ -1,18 +1,18 @@
-import type { SectionRenderDescriptor } from "../../../sections/types";
-import type { VirtualListLogicalCell } from "../logicalCell";
-import type { RenderBodyKey, RenderRevisionFallbackPolicy } from "../renderRevision";
+import type { SectionRenderDescriptor } from "../../../../sections/types";
+import type { VirtualListLogicalCell } from "../../logicalCell";
+import type { RenderBodyKey, RenderRevisionFallbackPolicy } from "../../renderRevision";
 import {
 	logicalCellKey,
 	renderSlotKey,
 	type LogicalCellKey,
 	type RenderSlotKey,
-} from "../types";
+} from "../../types";
 import {
 	getViewPlanRenderBodyIdentityFields,
 	resolveStableViewPlanRenderBodyKey,
 	type MountedRenderBodyIdentity,
 } from "./renderBodyRevision";
-import type { FlatRow, SectionLayout } from "../layout/viewPlanRowTypes";
+import type { FlatRow, SectionLayout } from "../../layout/viewPlanRowTypes";
 
 type HeaderProps<T, G> = SectionRenderDescriptor<T, G>["headerProps"];
 type HeaderLogicalCell<T> = Extract<VirtualListLogicalCell<T>, { kind: "header" }>;

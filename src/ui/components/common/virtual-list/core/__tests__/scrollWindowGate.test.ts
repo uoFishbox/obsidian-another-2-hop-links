@@ -9,9 +9,9 @@ import {
 	updateMountedAndPreviewScrollWindow,
 	updateMountedScrollWindow,
 	updateScrollWindow,
-} from "../activeScrollWindowGate";
+} from "../scrollWindowGate";
 
-describe("activeScrollWindowGate", () => {
+describe("scrollWindowGate", () => {
 	it("creates a comparable scroll window from mounted and visible ranges", () => {
 		const identity = {};
 		const scrollWindow = createScrollWindow(identity, {

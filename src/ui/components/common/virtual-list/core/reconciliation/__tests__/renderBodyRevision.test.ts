@@ -6,7 +6,7 @@ import {
 	resolveItemRenderRevisionToken,
 	tryResolveItemRenderRevisionToken,
 } from "../renderBodyRevision";
-import { logicalCellKey, sourceKey } from "../../types";
+import { logicalCellKey, sourceKey } from "../../../types";
 
 describe("renderBodyRevision", () => {
 	it("encodes primitive render revisions without collisions", () => {

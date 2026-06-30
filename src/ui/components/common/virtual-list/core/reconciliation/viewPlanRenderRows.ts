@@ -1,5 +1,5 @@
 import type { MountedFlatCell } from "./viewPlanMountedCells";
-import type { RowKey } from "../rowKey";
+import type { RowKey } from "../../rowKey";
 
 export interface MountedFlatRowSlice<T, G> {
 	slotIndex?: number;

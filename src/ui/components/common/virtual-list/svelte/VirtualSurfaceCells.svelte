@@ -1,40 +1,12 @@
 <script lang="ts" generics="TMountedCell extends MountedVirtualCell">
 	import type { Snippet } from "svelte";
 	import type { MountedVirtualCell } from "../types";
-	import type { RowKey } from "../rowKey";
 	import VirtualAbsoluteCellSurface from "./VirtualAbsoluteCellSurface.svelte";
 	import VirtualPooledGridRowsSurface from "./VirtualPooledGridRowsSurface.svelte";
-
-	export interface VirtualSurfaceCellPosition {
-		top: number;
-		left: number;
-		width: number;
-		height: number;
-	}
-
-	export interface VirtualSurfaceMountedRow<TMountedCell extends MountedVirtualCell> {
-		key: RowKey;
-		rowIndex: number;
-		top: number;
-		slotIndex?: number;
-		slotKey?: number;
-		attributes?: Record<string, string | number | undefined>;
-		cells: readonly TMountedCell[];
-	}
-
-	export type VirtualSurfaceRenderInput<TMountedCell extends MountedVirtualCell> =
-		| {
-				layoutMode?: "absolute-cells";
-				mountedCells: readonly TMountedCell[];
-				mountedRows?: never;
-				mountedRowsVersion?: never;
-		  }
-		| {
-				layoutMode: "grid-rows";
-				mountedCells?: never;
-				mountedRows: readonly VirtualSurfaceMountedRow<TMountedCell>[];
-				mountedRowsVersion?: number;
-		  };
+	import type {
+		VirtualSurfaceCellPosition,
+		VirtualSurfaceRenderInput,
+	} from "./VirtualSurfaceTypes";
 
 	interface CommonProps<TMountedCell extends MountedVirtualCell> {
 		contentClassName?: string;

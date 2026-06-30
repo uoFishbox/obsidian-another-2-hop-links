@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { SectionRenderDescriptor } from "ui/components/sections/types";
-import { logicalCellKey, sourceKey } from "../../types";
-import type { FlatRow, SectionLayout } from "../../layout/viewPlanRowTypes";
+import { logicalCellKey, sourceKey } from "../../../types";
+import type { FlatRow, SectionLayout } from "../../../layout/viewPlanRowTypes";
 import {
 	canReuseMountedFlatCellContent,
 	createMountedFlatCell,

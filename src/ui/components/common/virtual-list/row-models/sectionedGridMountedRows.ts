@@ -6,12 +6,12 @@ import {
 	createMountedFlatCell,
 	updateMountedFlatCell,
 	type MountedFlatCell,
-} from "../reconciliation/viewPlanMountedCells";
-import type { MountedFlatRowSlice } from "../reconciliation/viewPlanRenderRows";
+} from "../core/reconciliation/viewPlanMountedCells";
+import type { MountedFlatRowSlice } from "../core/reconciliation/viewPlanRenderRows";
 import {
 	getViewPlanRenderBodyIdentityFields,
 	resolveStableViewPlanRenderBodyKey,
-} from "../reconciliation/renderBodyRevision";
+} from "../core/reconciliation/renderBodyRevision";
 
 export interface SectionedGridSectionPlan<T, G> {
 	readonly sectionIndex: number;

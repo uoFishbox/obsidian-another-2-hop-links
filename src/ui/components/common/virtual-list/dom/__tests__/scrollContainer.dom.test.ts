@@ -1,8 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-	findNearestScrollContainer,
-	isContentBottomInPreloadRangeFromMetrics,
-} from "../virtualGridLinkListScroll";
+import { findNearestScrollContainer } from "../scrollContainer";
 
 describe("findNearestScrollContainer", () => {
 	it("finds the nearest scroll container through regular ancestors", () => {
@@ -50,29 +47,5 @@ describe("findNearestScrollContainer", () => {
 		document.body.append(scrollContainer);
 
 		expect(findNearestScrollContainer(child)).toBe(scrollContainer);
-	});
-});
-
-describe("isContentBottomInPreloadRangeFromMetrics", () => {
-	it("uses shared scroll metrics without requiring DOM reads", () => {
-		expect(
-			isContentBottomInPreloadRangeFromMetrics({
-				contentHeight: 400,
-				rootMargin: "0px 0px 100px 0px",
-				scrollTop: 200,
-				viewportHeight: 500,
-				sectionTop: 350,
-			}),
-		).toBe(true);
-
-		expect(
-			isContentBottomInPreloadRangeFromMetrics({
-				contentHeight: 401,
-				rootMargin: "0px 0px 100px 0px",
-				scrollTop: 200,
-				viewportHeight: 500,
-				sectionTop: 400,
-			}),
-		).toBe(false);
 	});
 });

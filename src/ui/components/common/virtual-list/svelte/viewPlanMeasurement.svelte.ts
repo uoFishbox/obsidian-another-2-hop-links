@@ -1,14 +1,33 @@
 import { untrack } from "svelte";
 import type { SectionRenderDescriptor } from "../../../sections/types";
 import { CARD_VIRTUAL_LIST_MAX_UNSTABLE_MEASUREMENT_RETRIES } from "../cardVirtualListPolicy";
-import { createVirtualListController } from "../dom/virtualListController";
+import {
+	createVirtualMeasurementController,
+	type VirtualMeasurement,
+	type VirtualMeasurementApplicationResult,
+} from "../dom/virtualMeasurementController";
 import { flushVirtualScrollMeasurement as flushCachedVirtualScrollMeasurement } from "../dom/flushVirtualScrollMeasurement";
 import { resolveCachedCardGridLayoutBase } from "../dom/virtualListCardLayout";
 import { createVirtualListMeasurementState } from "../dom/virtualListMeasurementState";
 import { resolveVirtualListLayoutStability } from "../dom/virtualListMeasurementStability";
+import type { MeasurementUpdateResult } from "../dom/virtualListMeasurementAdapter";
 import type { RowRange } from "../rowRange";
 import type { VirtualRanges } from "../types";
-import type { StablePreviewScrollTopBand } from "../dom/activeScrollWindowGate";
+import {
+	createMountedScrollWindow,
+	isSameMountedScrollWindow,
+	isSameRangedScrollWindow,
+	isWithinStableMountedScrollWindow,
+	isWithinStablePreviewScrollWindow,
+	type LastScrollWindow,
+	type MountedScrollWindowMeasurement,
+	type RangedScrollWindowMeasurement,
+	updateMountedAndPreviewScrollWindow,
+} from "../core/scrollWindowGate";
+import {
+	createVirtualScrollWindowRangeResolver,
+	type VirtualScrollWindowRangeRowModel,
+} from "../core/scrollWindowMeasurement";
 import { resolveCardLayoutSettings } from "ui/utils/cardLayoutCssVars";
 import type {
 	ViewPlanCardVirtualListPolicy,
@@ -22,78 +41,12 @@ import {
 } from "./viewPlanLayout";
 
 type ConfiguredCardLayout = ReturnType<typeof resolveCardLayoutSettings>;
-interface MeasuredViewPlanRowModel {
-	readonly rowCount: number;
-	findVisibleRange(params: {
-		scrollTop: number;
-		viewportHeight: number;
-		overscanPx: number;
-	}): RowRange;
-	findVisibleRangeInto(
-		out: RowRange,
-		params: {
-			scrollTop: number;
-			viewportHeight: number;
-			overscanPx: number;
-		},
-	): void;
-	findVisibleRanges(params: {
-		scrollTop: number;
-		viewportHeight: number;
-		mountedOverscanPx: number;
-		previewOverscanPx?: number;
-	}): VirtualRanges;
-	findVisibleRangesInto(
-		out: VirtualRanges,
-		params: {
-			scrollTop: number;
-			viewportHeight: number;
-			mountedOverscanPx: number;
-			previewOverscanPx?: number;
-		},
-	): void;
-	findVisibleRangesFromMounted(params: {
-		scrollTop: number;
-		viewportHeight: number;
-		mounted: RowRange;
-		mountedOverscanPx: number;
-		previewOverscanPx?: number;
-	}): VirtualRanges;
-	findVisibleRangesFromMountedInto(
-		out: VirtualRanges,
-		params: {
-			scrollTop: number;
-			viewportHeight: number;
-			mounted: RowRange;
-			mountedOverscanPx: number;
-			previewOverscanPx?: number;
-		},
-	): void;
-	findStablePreviewScrollTopBandInto(
-		out: StablePreviewScrollTopBandMutable,
-		params: {
-			scrollTop: number;
-			viewportHeight: number;
-			mountedOverscanPx: number;
-			previewOverscanPx?: number;
-			previewVisible: RowRange;
-		},
-	): void;
-	findStableMountedScrollTopBandInto(
-		out: StablePreviewScrollTopBandMutable,
-		params: {
-			mountedOverscanPx: number;
-			viewportHeight: number;
-			mounted: RowRange;
-		},
-	): void;
-}
 
-type StablePreviewScrollTopBandMutable = {
-	-readonly [K in keyof StablePreviewScrollTopBand]: StablePreviewScrollTopBand[K];
-};
-
-interface MeasuredViewPlanRuntime<T, G, TRowModel extends MeasuredViewPlanRowModel> {
+interface MeasuredViewPlanRuntime<
+	T,
+	G,
+	TRowModel extends VirtualScrollWindowRangeRowModel,
+> {
 	readonly rowModel: TRowModel;
 	readonly virtualList: {
 		applyMeasurement(params: {
@@ -142,7 +95,7 @@ export function createViewPlanMeasurementState() {
 export function createViewPlanMeasurementRuntime<
 	T,
 	G,
-	TRowModel extends MeasuredViewPlanRowModel,
+	TRowModel extends VirtualScrollWindowRangeRowModel,
 >(params: {
 	state: ReturnType<typeof createViewPlanMeasurementState>;
 	runtime: MeasuredViewPlanRuntime<T, G, TRowModel>;
@@ -153,56 +106,8 @@ export function createViewPlanMeasurementRuntime<
 	let hasObservedInitialLayout = $state(false);
 	let hasConsumedInitialCardLayoutEffect = false;
 	let initialObservedCardLayout: ConfiguredCardLayout | null | undefined = undefined;
-	const mountedRangeParams: Parameters<TRowModel["findVisibleRange"]>[0] = {
-		scrollTop: 0,
-		viewportHeight: 0,
-		overscanPx: 0,
-	};
-	const rangeParams: Parameters<TRowModel["findVisibleRanges"]>[0] = {
-		scrollTop: 0,
-		viewportHeight: 0,
-		mountedOverscanPx: 0,
-		previewOverscanPx: 0,
-	};
-	const rangesFromMountedParams: Parameters<
-		TRowModel["findVisibleRangesFromMounted"]
-	>[0] = {
-		scrollTop: 0,
-		viewportHeight: 0,
-		mounted: { start: 0, end: 0 },
-		mountedOverscanPx: 0,
-		previewOverscanPx: 0,
-	};
 	let lastResolvedActiveScrollPolicyLayout: ViewPlanLayoutMetrics | undefined;
 	let lastResolvedActiveScrollPolicy: ViewPlanCardVirtualListPolicy | undefined;
-
-	const mountedScrollWindowMeasurement = {
-		identity: params.runtime.rowModel,
-		mounted: { start: 0, end: 0 },
-		stableMountedScrollTopBand: undefined as
-			| import("../dom/activeScrollWindowGate").StableScrollTopBand
-			| undefined,
-	};
-	const mountedStableBandScratch: StablePreviewScrollTopBandMutable = {
-		min: 0,
-		max: 0,
-	};
-	const scrollWindowMeasurement = {
-		identity: params.runtime.rowModel,
-		ranges: {
-			mounted: { start: 0, end: 0 },
-			previewVisible: { start: 0, end: 0 },
-		},
-		stablePreviewScrollTopBand: { min: 0, max: 0 },
-	};
-	const committedScrollWindowMeasurement = {
-		identity: params.runtime.rowModel,
-		ranges: {
-			mounted: { start: 0, end: 0 },
-			previewVisible: { start: 0, end: 0 },
-		},
-		stablePreviewScrollTopBand: { min: 0, max: 0 },
-	};
 	const updateVisibleFlatRowRangeFromMeasurement = (
 		scrollTop: number,
 		viewportHeight: number,
@@ -225,235 +130,327 @@ export function createViewPlanMeasurementRuntime<
 			visibilityPolicy: params.policyResolver.resolve(nextLayout, isScrollActive),
 		});
 	};
-	const updateStablePreviewScrollTopBand = (
-		out: StablePreviewScrollTopBandMutable,
-		measurementRowModel: TRowModel,
-		sectionTop: number,
-		rangeParams: Parameters<TRowModel["findVisibleRanges"]>[0],
-		previewVisible: RowRange,
-	): void => {
-		measurementRowModel.findStablePreviewScrollTopBandInto(out, {
-			scrollTop: rangeParams.scrollTop,
-			viewportHeight: rangeParams.viewportHeight,
-			mountedOverscanPx: rangeParams.mountedOverscanPx,
-			previewOverscanPx: rangeParams.previewOverscanPx,
-			previewVisible,
-		});
-		out.min += sectionTop;
-		out.max += sectionTop;
-	};
-	const updateStableMountedScrollTopBand = (
-		out: StablePreviewScrollTopBandMutable,
-		measurementRowModel: TRowModel,
-		sectionTop: number,
-		mountedOverscanPx: number,
-		viewportHeight: number,
-		mounted: RowRange,
-	): void => {
-		if (mounted.start >= mounted.end) {
-			out.min = Number.POSITIVE_INFINITY;
-			out.max = Number.NEGATIVE_INFINITY;
-			return;
-		}
-		measurementRowModel.findStableMountedScrollTopBandInto(out, {
-			mountedOverscanPx,
-			viewportHeight,
-			mounted,
-		});
-		out.min += sectionTop;
-		out.max += sectionTop;
-	};
 
-	const virtualListController = createVirtualListController<
-		ViewPlanLayoutMetrics,
-		TRowModel,
-		{ allowUnstableBootstrap?: boolean } | undefined
-	>({
-		getRootEl: () => params.state.rootEl,
-		measurement: params.state.measurement,
-		getLayout: () => params.state.layout,
-		setLayout: params.state.setLayout,
-		isSameLayout: isSameViewPlanLayout,
-		resolveLayoutMeasurement: (sectionEl, rootRect) => {
-			const layoutBase = resolveCachedCardGridLayoutBase({
-				rootEl: sectionEl,
-				rootRect,
-				measuredWidth: params.state.measurement.measuredWidth,
-				defaults: DEFAULT_VIEW_PLAN_CARD_LAYOUT,
-				listKind: "view-plan",
-				scrollContainerEl: params.state.measurement.scrollContainerEl,
-				configuredLayout: params.getConfiguredCardLayout(),
-			});
-			const nextLayout: ViewPlanLayoutMetrics = {
-				containerWidth: layoutBase.containerWidth,
-				columns: layoutBase.columns,
-				cellWidth: layoutBase.cellWidth,
-				rowHeight: layoutBase.rowHeight,
-				gap: layoutBase.gap,
-				sectionMarginBottom: Math.max(
-					0,
-					layoutBase.cardLayout.sectionMarginBottomPx,
-				),
-			};
-			const nextRowModel = params.runtime.resolveRowModel(nextLayout);
-			const hasRenderableSections = params.getValidatedSections().length > 0;
-			const layoutStability = resolveVirtualListLayoutStability({
-				rootEl: sectionEl,
-				rootRect,
-				measuredWidth: params.state.measurement.measuredWidth,
-				hasRenderableContent: hasRenderableSections,
-			});
+	let lastScrollWindow: LastScrollWindow | null = null;
+	let cachedRowModelOverride: TRowModel | null = null;
 
-			return {
-				layout: nextLayout,
-				content: nextRowModel,
-				hasRenderableContent: nextRowModel.rowCount > 0,
-				hasStableLayout: layoutStability.isStable,
-			};
-		},
-		getCachedContent: () => params.runtime.rowModel,
-		hasRenderableContent: (nextRowModel) => nextRowModel.rowCount > 0,
-		applyRangeMeasurement: ({
-			scrollTop,
-			viewportHeight,
-			sectionTop,
-			isStableMeasurement,
-			isScrollActive,
-			content: nextRowModel,
-			layout: nextLayout,
-			precomputedRanges,
-		}) =>
-			updateVisibleFlatRowRangeFromMeasurement(
-				scrollTop,
-				viewportHeight,
-				sectionTop,
-				isStableMeasurement,
-				isScrollActive,
-				nextRowModel,
+	const toApplicationResult = (
+		result: MeasurementUpdateResult<RowRange>,
+	): VirtualMeasurementApplicationResult =>
+		result.kind === "stable" ? "stable" : "unstable";
+
+	const resolveActiveScrollPolicy = (
+		nextLayout: ViewPlanLayoutMetrics,
+	): ViewPlanCardVirtualListPolicy => {
+		if (lastResolvedActiveScrollPolicyLayout !== nextLayout) {
+			lastResolvedActiveScrollPolicyLayout = nextLayout;
+			lastResolvedActiveScrollPolicy = params.policyResolver.resolve(
 				nextLayout,
-				precomputedRanges,
-			),
-		resolveMountedScrollWindowMeasurement: (
-			scrollTop,
-			viewportHeight,
-			sectionTop,
-			measurementRowModel,
-			nextLayout,
-		) => {
-			if (lastResolvedActiveScrollPolicyLayout !== nextLayout) {
-				lastResolvedActiveScrollPolicyLayout = nextLayout;
-				lastResolvedActiveScrollPolicy = params.policyResolver.resolve(
-					nextLayout,
-					true,
-				);
-			}
-			const visibilityPolicy = lastResolvedActiveScrollPolicy!;
-			const localScrollTop = scrollTop - sectionTop;
-			const mountedOverscanPx = visibilityPolicy.mountedOverscanPx;
-
-			// Pre-check: if the current scrollTop falls within the previously
-			// computed stable band for the mounted range, the mounted range is
-			// guaranteed not to change. Skip the expensive findVisibleRangeInto()
-			// binary search entirely.
-			const prevBand = mountedScrollWindowMeasurement.stableMountedScrollTopBand;
-			if (
-				prevBand !== undefined &&
-				scrollTop > prevBand.min &&
-				scrollTop < prevBand.max &&
-				mountedScrollWindowMeasurement.identity === measurementRowModel
-			) {
-				return mountedScrollWindowMeasurement;
-			}
-
-			mountedRangeParams.scrollTop = localScrollTop;
-			mountedRangeParams.viewportHeight = viewportHeight;
-			mountedRangeParams.overscanPx = mountedOverscanPx;
-			mountedScrollWindowMeasurement.identity = measurementRowModel;
-			measurementRowModel.findVisibleRangeInto(
-				mountedScrollWindowMeasurement.mounted,
-				mountedRangeParams,
+				true,
 			);
-			const mounted = mountedScrollWindowMeasurement.mounted;
-			if (mounted.start >= mounted.end) {
-				mountedScrollWindowMeasurement.stableMountedScrollTopBand = undefined;
-			} else {
-				updateStableMountedScrollTopBand(
-					mountedStableBandScratch,
-					measurementRowModel,
-					sectionTop,
-					mountedOverscanPx,
-					viewportHeight,
-					mounted,
-				);
-				mountedScrollWindowMeasurement.stableMountedScrollTopBand =
-					mountedStableBandScratch;
-			}
-			return mountedScrollWindowMeasurement;
-		},
-		resolveScrollWindowMeasurement: (
+		}
+		return lastResolvedActiveScrollPolicy!;
+	};
+	const rangeResolver = createVirtualScrollWindowRangeResolver<
+		TRowModel,
+		ViewPlanLayoutMetrics
+	>({
+		resolveRowModel: params.runtime.resolveRowModel,
+		resolveVisibilityPolicy: resolveActiveScrollPolicy,
+		resolveStableMountedScrollTopBand: true,
+	});
+
+	const resolveMountedScrollWindowMeasurement = (
+		scrollTop: number,
+		viewportHeight: number,
+		sectionTop: number,
+		measurementRowModel: TRowModel,
+		nextLayout: ViewPlanLayoutMetrics,
+	): MountedScrollWindowMeasurement => {
+		return rangeResolver.resolveMountedScrollWindowMeasurement(
 			scrollTop,
 			viewportHeight,
 			sectionTop,
+			nextLayout,
 			measurementRowModel,
+		);
+	};
+
+	const resolveScrollWindowMeasurement = (
+		scrollTop: number,
+		viewportHeight: number,
+		sectionTop: number,
+		measurementRowModel: TRowModel,
+		nextLayout: ViewPlanLayoutMetrics,
+		precomputedMountedRange: RowRange | undefined,
+	): RangedScrollWindowMeasurement => {
+		return rangeResolver.resolveScrollWindowMeasurement(
+			scrollTop,
+			viewportHeight,
+			sectionTop,
 			nextLayout,
 			precomputedMountedRange,
-		) => {
-			if (lastResolvedActiveScrollPolicyLayout !== nextLayout) {
-				lastResolvedActiveScrollPolicyLayout = nextLayout;
-				lastResolvedActiveScrollPolicy = params.policyResolver.resolve(
-					nextLayout,
-					true,
-				);
+			measurementRowModel,
+		);
+	};
+
+	const primeLastScrollWindow = (
+		measurement: VirtualMeasurement,
+		nextRowModel: TRowModel,
+		nextLayout: ViewPlanLayoutMetrics,
+	): void => {
+		if (!measurement.isStableMeasurement) {
+			lastScrollWindow = null;
+			return;
+		}
+
+		const mountedScrollWindow = resolveMountedScrollWindowMeasurement(
+			measurement.scrollTop,
+			measurement.viewportHeight,
+			measurement.sectionTop,
+			nextRowModel,
+			nextLayout,
+		);
+		lastScrollWindow = createMountedScrollWindow(
+			mountedScrollWindow.identity,
+			mountedScrollWindow.mounted,
+			mountedScrollWindow.stableMountedScrollTopBand,
+		);
+	};
+
+	const applyLayoutMeasurement = (
+		nextMeasurement: VirtualMeasurement,
+	): VirtualMeasurementApplicationResult => {
+		const sectionEl = params.state.rootEl;
+		if (!sectionEl || !nextMeasurement.sectionRect) {
+			lastScrollWindow = null;
+			return "skipped";
+		}
+
+		const layoutBase = resolveCachedCardGridLayoutBase({
+			rootEl: sectionEl,
+			rootRect: nextMeasurement.sectionRect,
+			measuredWidth: params.state.measurement.measuredWidth,
+			defaults: DEFAULT_VIEW_PLAN_CARD_LAYOUT,
+			listKind: "view-plan",
+			scrollContainerEl: params.state.measurement.scrollContainerEl,
+			configuredLayout: params.getConfiguredCardLayout(),
+		});
+		const nextLayout: ViewPlanLayoutMetrics = {
+			containerWidth: layoutBase.containerWidth,
+			columns: layoutBase.columns,
+			cellWidth: layoutBase.cellWidth,
+			rowHeight: layoutBase.rowHeight,
+			gap: layoutBase.gap,
+			sectionMarginBottom: Math.max(
+				0,
+				layoutBase.cardLayout.sectionMarginBottomPx,
+			),
+		};
+		const nextRowModel = params.runtime.resolveRowModel(nextLayout);
+		const hasRenderableSections = params.getValidatedSections().length > 0;
+		const layoutStability = resolveVirtualListLayoutStability({
+			rootEl: sectionEl,
+			rootRect: nextMeasurement.sectionRect,
+			measuredWidth: params.state.measurement.measuredWidth,
+			hasRenderableContent: hasRenderableSections,
+		});
+		if (!isSameViewPlanLayout(params.state.layout, nextLayout)) {
+			params.state.setLayout(nextLayout);
+		}
+
+		const result = updateVisibleFlatRowRangeFromMeasurement(
+			nextMeasurement.scrollTop,
+			nextMeasurement.viewportHeight,
+			nextMeasurement.sectionTop,
+			nextMeasurement.isStableMeasurement,
+			false,
+			nextRowModel,
+			nextLayout,
+		);
+		if (result.kind !== "stable" || !layoutStability.isStable) {
+			lastScrollWindow = null;
+			return "unstable";
+		}
+
+		primeLastScrollWindow(nextMeasurement, nextRowModel, nextLayout);
+		measurementController.scheduleScrollMeasurement();
+		return "stable";
+	};
+
+	const returnStableScrollMeasurement = (): VirtualMeasurementApplicationResult =>
+		"stable";
+
+	const applyScrollMeasurement = (
+		nextMeasurement: VirtualMeasurement,
+	): VirtualMeasurementApplicationResult => {
+		if (!nextMeasurement.isStableMeasurement) {
+			lastScrollWindow = null;
+			return "unstable";
+		}
+
+		const nextLayout = params.state.layout;
+		const nextRowModel = cachedRowModelOverride ?? params.runtime.rowModel;
+		let pendingMountedScrollWindowMeasurement: MountedScrollWindowMeasurement | null =
+			null;
+		let nextScrollWindowIdentity: RangedScrollWindowMeasurement["identity"] | null =
+			null;
+		let nextScrollWindowRanges: RangedScrollWindowMeasurement["ranges"] | null =
+			null;
+		let nextStablePreviewScrollTopBand:
+			| RangedScrollWindowMeasurement["stablePreviewScrollTopBand"]
+			| undefined;
+		let nextStableMountedScrollTopBand:
+			| MountedScrollWindowMeasurement["stableMountedScrollTopBand"]
+			| undefined;
+		let precomputedMountedRange: RowRange | undefined;
+		let precomputedRanges: VirtualRanges | undefined;
+
+		if (nextMeasurement.isScrollActive) {
+			const mountedScrollWindow = resolveMountedScrollWindowMeasurement(
+				nextMeasurement.scrollTop,
+				nextMeasurement.viewportHeight,
+				nextMeasurement.sectionTop,
+				nextRowModel,
+				nextLayout,
+			);
+			precomputedMountedRange = mountedScrollWindow.mounted;
+			if (
+				isSameMountedScrollWindow(
+					lastScrollWindow,
+					mountedScrollWindow.identity,
+					mountedScrollWindow.mounted,
+				) &&
+				(isWithinStableMountedScrollWindow(
+					lastScrollWindow,
+					mountedScrollWindow.identity,
+					mountedScrollWindow.mounted,
+					nextMeasurement.scrollTop,
+				) ||
+					isWithinStablePreviewScrollWindow(
+						lastScrollWindow,
+						mountedScrollWindow.identity,
+						mountedScrollWindow.mounted,
+						nextMeasurement.scrollTop,
+					))
+			) {
+				return returnStableScrollMeasurement();
 			}
-			const visibilityPolicy = lastResolvedActiveScrollPolicy!;
-			rangeParams.scrollTop = scrollTop - sectionTop;
-			rangeParams.viewportHeight = viewportHeight;
-			rangeParams.mountedOverscanPx = visibilityPolicy.mountedOverscanPx;
-			rangeParams.previewOverscanPx = visibilityPolicy.previewOverscanPx;
-			if (!precomputedMountedRange) {
-				committedScrollWindowMeasurement.identity = measurementRowModel;
-				measurementRowModel.findVisibleRangesInto(
-					committedScrollWindowMeasurement.ranges,
-					rangeParams,
+			pendingMountedScrollWindowMeasurement = mountedScrollWindow;
+
+			const scrollWindow = resolveScrollWindowMeasurement(
+				nextMeasurement.scrollTop,
+				nextMeasurement.viewportHeight,
+				nextMeasurement.sectionTop,
+				nextRowModel,
+				nextLayout,
+				precomputedMountedRange,
+			);
+			precomputedRanges = scrollWindow.ranges;
+			if (
+				isSameRangedScrollWindow(
+					lastScrollWindow,
+					scrollWindow.identity,
+					scrollWindow.ranges,
+					"visible-and-mounted",
+				)
+			) {
+				return returnStableScrollMeasurement();
+			}
+			if (
+				isSameMountedScrollWindow(
+					lastScrollWindow,
+					scrollWindow.identity,
+					scrollWindow.ranges.mounted,
+				)
+			) {
+				params.runtime.syncPreviewVisibleRange(
+					scrollWindow.ranges.previewVisible.start,
+					scrollWindow.ranges.previewVisible.end,
 				);
-				updateStablePreviewScrollTopBand(
-					committedScrollWindowMeasurement.stablePreviewScrollTopBand,
-					measurementRowModel,
-					sectionTop,
-					rangeParams,
-					committedScrollWindowMeasurement.ranges.previewVisible,
+				lastScrollWindow = updateMountedAndPreviewScrollWindow(
+					lastScrollWindow,
+					scrollWindow.identity,
+					scrollWindow.ranges,
+					scrollWindow.stablePreviewScrollTopBand,
+					pendingMountedScrollWindowMeasurement.stableMountedScrollTopBand,
 				);
-				return committedScrollWindowMeasurement;
+				return returnStableScrollMeasurement();
 			}
 
-			scrollWindowMeasurement.identity = measurementRowModel;
-			rangesFromMountedParams.scrollTop = rangeParams.scrollTop;
-			rangesFromMountedParams.viewportHeight = rangeParams.viewportHeight;
-			rangesFromMountedParams.mounted = precomputedMountedRange;
-			rangesFromMountedParams.mountedOverscanPx = rangeParams.mountedOverscanPx;
-			rangesFromMountedParams.previewOverscanPx = rangeParams.previewOverscanPx;
-			measurementRowModel.findVisibleRangesFromMountedInto(
-				scrollWindowMeasurement.ranges,
-				rangesFromMountedParams,
+			nextScrollWindowIdentity = scrollWindow.identity;
+			nextScrollWindowRanges = scrollWindow.ranges;
+			nextStablePreviewScrollTopBand = scrollWindow.stablePreviewScrollTopBand;
+			if (
+				pendingMountedScrollWindowMeasurement.identity ===
+					scrollWindow.identity &&
+				pendingMountedScrollWindowMeasurement.mounted.start ===
+					scrollWindow.ranges.mounted.start &&
+				pendingMountedScrollWindowMeasurement.mounted.end ===
+					scrollWindow.ranges.mounted.end
+			) {
+				nextStableMountedScrollTopBand =
+					pendingMountedScrollWindowMeasurement.stableMountedScrollTopBand;
+			}
+		} else {
+			lastScrollWindow = null;
+		}
+
+		const result = updateVisibleFlatRowRangeFromMeasurement(
+			nextMeasurement.scrollTop,
+			nextMeasurement.viewportHeight,
+			nextMeasurement.sectionTop,
+			nextMeasurement.isStableMeasurement,
+			nextMeasurement.isScrollActive,
+			nextRowModel,
+			nextLayout,
+			precomputedRanges,
+		);
+		if (result.kind !== "stable") {
+			if (lastScrollWindow === null && pendingMountedScrollWindowMeasurement) {
+				lastScrollWindow = createMountedScrollWindow(
+					pendingMountedScrollWindowMeasurement.identity,
+					pendingMountedScrollWindowMeasurement.mounted,
+					pendingMountedScrollWindowMeasurement.stableMountedScrollTopBand,
+				);
+			} else {
+				lastScrollWindow = null;
+			}
+			return toApplicationResult(result);
+		}
+
+		if (nextScrollWindowIdentity === null) {
+			lastScrollWindow = null;
+		} else if (nextScrollWindowRanges) {
+			lastScrollWindow = updateMountedAndPreviewScrollWindow(
+				lastScrollWindow,
+				nextScrollWindowIdentity,
+				nextScrollWindowRanges,
+				nextStablePreviewScrollTopBand,
+				nextStableMountedScrollTopBand,
 			);
-			updateStablePreviewScrollTopBand(
-				scrollWindowMeasurement.stablePreviewScrollTopBand,
-				measurementRowModel,
-				sectionTop,
-				rangeParams,
-				scrollWindowMeasurement.ranges.previewVisible,
-			);
-			return scrollWindowMeasurement;
-		},
-		onActiveScrollPreviewRangeMeasurement: (ranges) => {
-			params.runtime.syncPreviewVisibleRange(
-				ranges.previewVisible.start,
-				ranges.previewVisible.end,
-			);
-		},
-		activeScrollWindowComparison: "mounted-only",
-		shouldSkipUnstableCachedMeasurement: (options) =>
-			!options?.allowUnstableBootstrap,
+		}
+		if (!nextMeasurement.isScrollActive) {
+			primeLastScrollWindow(nextMeasurement, nextRowModel, nextLayout);
+		}
+		return "stable";
+	};
+
+	const applyMeasurement = (
+		nextMeasurement: VirtualMeasurement,
+	): VirtualMeasurementApplicationResult =>
+		nextMeasurement.source === "layout"
+			? applyLayoutMeasurement(nextMeasurement)
+			: applyScrollMeasurement(nextMeasurement);
+
+	const measurementController = createVirtualMeasurementController({
+		getRootEl: () => params.state.rootEl,
+		measurement: params.state.measurement,
+		hasRenderableContent: () => params.runtime.rowModel.rowCount > 0,
+		onMeasurement: applyMeasurement,
+		enableBootstrapMeasurementSuppression: true,
+		enableInitialStabilization: true,
+		primeUnstableScrollStart: true,
 		maxUnstableMeasurementRetries:
 			CARD_VIRTUAL_LIST_MAX_UNSTABLE_MEASUREMENT_RETRIES,
 	});
@@ -472,19 +469,22 @@ export function createViewPlanMeasurementRuntime<
 			}
 		}
 
-		virtualListController.scheduleLayoutMeasurement();
+		measurementController.scheduleLayoutMeasurement();
 	};
 
 	const updateCachedMeasurementForDataChange = (): void => {
 		const nextLayout = untrack(() => params.state.layout);
-		if (virtualListController.hasPendingLayoutMeasurement()) {
+		if (measurementController.hasPendingLayoutMeasurement()) {
 			return;
 		}
 
 		const nextRowModel = params.runtime.resolveRowModel(nextLayout);
-		virtualListController.updateFromCachedMeasurement(nextRowModel, {
-			allowUnstableBootstrap: false,
-		});
+		cachedRowModelOverride = nextRowModel;
+		try {
+			measurementController.runScrollMeasurement();
+		} finally {
+			cachedRowModelOverride = null;
+		}
 	};
 
 	const observeRootElement = (): (() => void) | undefined => {
@@ -496,7 +496,7 @@ export function createViewPlanMeasurementRuntime<
 		hasConsumedInitialCardLayoutEffect = false;
 		initialObservedCardLayout = untrack(params.getConfiguredCardLayout);
 
-		const stopObserving = virtualListController.observeRoot(
+		const stopObserving = measurementController.observeRoot(
 			params.state.rootEl,
 			(callback) => {
 				untrack(callback);
@@ -522,7 +522,7 @@ export function createViewPlanMeasurementRuntime<
 			scrollContainerEl,
 			targetTop,
 			updateFromCachedMeasurement: () =>
-				virtualListController.updateFromCachedMeasurement(),
+				measurementController.runScrollMeasurement(),
 		});
 	};
 

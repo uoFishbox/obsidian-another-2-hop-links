@@ -8,7 +8,7 @@ import {
 	createVirtualizedItemVisibilityStateController,
 	type VirtualizedItemResolvedVisibilityState,
 } from "ui/components/common/virtual-list/svelte/virtualizedItemVisibilityState.svelte";
-import type { MountedFlatCell } from "ui/components/common/virtual-list/reconciliation/viewPlanMountedCells";
+import type { MountedFlatCell } from "ui/components/common/virtual-list/core/reconciliation/viewPlanMountedCells";
 import type { VirtualizedItemVisibility } from "ui/components/common/virtualizedItemVisibility";
 import {
 	buildTwoHopMountedRows,

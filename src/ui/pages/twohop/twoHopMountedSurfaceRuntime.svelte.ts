@@ -2,10 +2,10 @@ import { getContext, untrack } from "svelte";
 import type {
 	MountedFlatCell,
 	MountedFlatItemCell,
-} from "ui/components/common/virtual-list/reconciliation/viewPlanMountedCells";
+} from "ui/components/common/virtual-list/core/reconciliation/viewPlanMountedCells";
 import { useVirtualList } from "ui/components/common/virtual-list/svelte/useVirtualList.svelte";
 import { resolveVirtualizedItemVisibilityForPreviewRange } from "ui/components/common/virtual-list/svelte/virtualizedItemVisibilityState.svelte";
-import type { SectionedVirtualListItemRenderArgs } from "ui/components/common/virtual-list/types";
+import type { SectionedVirtualListItemRenderArgs } from "ui/components/common/virtual-list/svelte/renderArgs";
 import type { TwoHopMountedRowsBuild } from "./twoHopMountedRowBuild";
 import type { TwoHopViewPlanRowModel } from "./twoHopViewPlan";
 import type {
