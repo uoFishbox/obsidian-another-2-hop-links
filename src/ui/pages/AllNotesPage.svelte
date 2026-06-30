@@ -84,7 +84,7 @@
 		paginationMode: "infinite-scroll",
 		preserveResultsHeightOnSearch: false,
 		searchEnabled: true,
-		allowContentSearch: false,
+		allowContentSearch: true,
 		searchPlaceholder: "Search note titles...",
 		itemComponent: ViewItemCard,
 		getSearchText: (item: ViewItem, ctx) => {
