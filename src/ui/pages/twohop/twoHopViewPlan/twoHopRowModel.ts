@@ -1,5 +1,15 @@
 import type { ResultNavigationDirection } from "features/keyboard-navigation/resultFocus";
 import type { VirtualListLogicalCell } from "ui/components/common/virtual-list/logicalCell";
+import {
+	createMutableVirtualRanges,
+	normalizePreviewOverscan,
+	resolveVirtualRangesInto,
+	resolveVisibleRange,
+} from "ui/components/common/virtual-list/virtualRanges";
+import type {
+	FindVisibleRangeParams,
+	ResolveVirtualRangesParams,
+} from "ui/components/common/virtual-list/virtualRanges";
 import type {
 	VirtualNavigationTarget,
 	VirtualRanges,
@@ -22,27 +32,6 @@ import {
 	writeTwoHopStablePreviewScrollTopBand,
 } from "./twoHopRowRangeResolver";
 import { resolveTwoHopNavigationTarget } from "./twoHopNavigation";
-function copyRowRangeInto(out: RowRange, range: RowRange): void {
-	out.start = range.start;
-	out.end = range.end;
-}
-
-interface ResolveTwoHopVisibleRangesParams {
-	scrollTop: number;
-	viewportHeight: number;
-	mountedOverscanPx: number;
-	previewOverscanPx?: number;
-	mounted?: RowRange;
-	reuseMountedReference?: boolean;
-}
-
-function normalizePreviewOverscan(
-	value: number | undefined,
-	mountedOverscanPx: number,
-): number {
-	if (value === undefined || !Number.isFinite(value) || value <= 0) return 0;
-	return Math.min(mountedOverscanPx, value);
-}
 
 export function createTwoHopViewPlanRowModel(
 	plan: TwoHopViewPlan,
@@ -76,19 +65,8 @@ export function createTwoHopViewPlanRowModel(
 			overscanPx,
 		);
 	};
-	const findRange = (params: {
-		scrollTop: number;
-		viewportHeight: number;
-		overscanPx: number;
-	}): RowRange => {
-		const range = { start: 0, end: 0 };
-		writeVisibleRange(
-			range,
-			params.scrollTop,
-			params.viewportHeight,
-			params.overscanPx,
-		);
-		return range;
+	const findRange = (params: FindVisibleRangeParams): RowRange => {
+		return resolveVisibleRange(writeVisibleRange, params);
 	};
 	const findRanges = (params: {
 		scrollTop: number;
@@ -96,10 +74,7 @@ export function createTwoHopViewPlanRowModel(
 		mountedOverscanPx: number;
 		previewOverscanPx?: number;
 	}): VirtualRanges => {
-		const ranges = {
-			mounted: { start: 0, end: 0 },
-			previewVisible: { start: 0, end: 0 },
-		};
+		const ranges = createMutableVirtualRanges();
 		return resolveMountedAndPreviewRangesInto(ranges, {
 			...params,
 			reuseMountedReference: true,
@@ -107,40 +82,9 @@ export function createTwoHopViewPlanRowModel(
 	};
 	const resolveMountedAndPreviewRangesInto = (
 		out: VirtualRanges,
-		params: ResolveTwoHopVisibleRangesParams,
+		params: ResolveVirtualRangesParams,
 	): VirtualRanges => {
-		const mountedOverscanPx = Math.max(0, params.mountedOverscanPx);
-		const previewOverscanPx = normalizePreviewOverscan(
-			params.previewOverscanPx,
-			mountedOverscanPx,
-		);
-		if (params.mounted === undefined) {
-			writeVisibleRange(
-				out.mounted,
-				params.scrollTop,
-				params.viewportHeight,
-				mountedOverscanPx,
-			);
-		} else if (params.reuseMountedReference === true) {
-			out.mounted = params.mounted;
-		} else {
-			copyRowRangeInto(out.mounted, params.mounted);
-		}
-		if (previewOverscanPx >= mountedOverscanPx) {
-			if (params.reuseMountedReference === true) {
-				out.previewVisible = out.mounted;
-				return out;
-			}
-			copyRowRangeInto(out.previewVisible, out.mounted);
-			return out;
-		}
-		writeVisibleRange(
-			out.previewVisible,
-			params.scrollTop,
-			params.viewportHeight,
-			previewOverscanPx,
-		);
-		return out;
+		return resolveVirtualRangesInto(out, params, writeVisibleRange);
 	};
 	const findRangesInto = (
 		out: VirtualRanges,
@@ -160,10 +104,7 @@ export function createTwoHopViewPlanRowModel(
 		mountedOverscanPx: number;
 		previewOverscanPx?: number;
 	}): VirtualRanges => {
-		const ranges = {
-			mounted: { start: 0, end: 0 },
-			previewVisible: { start: 0, end: 0 },
-		};
+		const ranges = createMutableVirtualRanges();
 		return resolveMountedAndPreviewRangesInto(ranges, {
 			...params,
 			reuseMountedReference: true,
@@ -191,9 +132,9 @@ export function createTwoHopViewPlanRowModel(
 		},
 	): void => {
 		const mountedOverscanPx = Math.max(0, params.mountedOverscanPx);
-		const previewOverscanPx = Math.min(
+		const previewOverscanPx = normalizePreviewOverscan(
+			params.previewOverscanPx,
 			mountedOverscanPx,
-			Math.max(0, params.previewOverscanPx ?? 0),
 		);
 		if (previewOverscanPx >= mountedOverscanPx) {
 			out.min = Number.NEGATIVE_INFINITY;

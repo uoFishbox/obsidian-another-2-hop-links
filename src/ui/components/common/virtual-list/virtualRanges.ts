@@ -2,6 +2,38 @@ import { EMPTY_ROW_RANGE, isEmptyRange, type RowRange } from "./rowRange";
 import type { BootstrapReason, EmptyReason, SkipReason } from "./core/VirtualListMode";
 import type { VirtualRanges, VirtualRowModel } from "./types";
 
+/**
+ * Scroll window used by row models to resolve a single visible row range.
+ */
+export interface FindVisibleRangeParams {
+	scrollTop: number;
+	viewportHeight: number;
+	overscanPx: number;
+}
+
+/**
+ * Scroll window used by row models to resolve mounted and preview-visible
+ * ranges with a shared row-range writer.
+ */
+export interface ResolveVirtualRangesParams {
+	scrollTop: number;
+	viewportHeight: number;
+	mountedOverscanPx: number;
+	previewOverscanPx?: number;
+	mounted?: RowRange;
+	reuseMountedReference?: boolean;
+}
+
+/**
+ * Writes the rows intersecting a scroll window into caller-owned storage.
+ */
+export type WriteVisibleRangeInto = (
+	out: RowRange,
+	scrollTop: number,
+	viewportHeight: number,
+	overscanPx: number,
+) => void;
+
 function createBootstrapVirtualRowRange(
 	rowCount: number,
 	bootstrapRows: number,
@@ -49,6 +81,92 @@ function copyVirtualRanges(ranges: VirtualRanges): VirtualRanges {
 			end: ranges.previewVisible.end,
 		},
 	};
+}
+
+/**
+ * Creates mutable range storage for row models that expose allocated range APIs.
+ */
+export function createMutableVirtualRanges(): VirtualRanges {
+	return {
+		mounted: { start: 0, end: 0 },
+		previewVisible: { start: 0, end: 0 },
+	};
+}
+
+function copyRowRangeInto(out: RowRange, range: RowRange): void {
+	out.start = range.start;
+	out.end = range.end;
+}
+
+/**
+ * Normalizes preview overscan so it remains inside the mounted overscan band.
+ */
+export function normalizePreviewOverscan(
+	value: number | undefined,
+	mountedOverscanPx: number,
+): number {
+	if (value === undefined || !Number.isFinite(value) || value <= 0) return 0;
+	return Math.min(mountedOverscanPx, value);
+}
+
+/**
+ * Allocates and resolves a visible range through a row-model-specific writer.
+ */
+export function resolveVisibleRange(
+	writeVisibleRangeInto: WriteVisibleRangeInto,
+	params: FindVisibleRangeParams,
+): RowRange {
+	const range = { start: 0, end: 0 };
+	writeVisibleRangeInto(
+		range,
+		params.scrollTop,
+		params.viewportHeight,
+		params.overscanPx,
+	);
+	return range;
+}
+
+/**
+ * Resolves mounted and preview-visible ranges while preserving the existing
+ * reference-reuse behavior of allocation-free row model paths.
+ */
+export function resolveVirtualRangesInto(
+	out: VirtualRanges,
+	params: ResolveVirtualRangesParams,
+	writeVisibleRangeInto: WriteVisibleRangeInto,
+): VirtualRanges {
+	const mountedOverscanPx = Math.max(0, params.mountedOverscanPx);
+	const previewOverscanPx = normalizePreviewOverscan(
+		params.previewOverscanPx,
+		mountedOverscanPx,
+	);
+	if (params.mounted === undefined) {
+		writeVisibleRangeInto(
+			out.mounted,
+			params.scrollTop,
+			params.viewportHeight,
+			mountedOverscanPx,
+		);
+	} else if (params.reuseMountedReference === true) {
+		out.mounted = params.mounted;
+	} else {
+		copyRowRangeInto(out.mounted, params.mounted);
+	}
+	if (previewOverscanPx >= mountedOverscanPx) {
+		if (params.reuseMountedReference === true) {
+			out.previewVisible = out.mounted;
+			return out;
+		}
+		copyRowRangeInto(out.previewVisible, out.mounted);
+		return out;
+	}
+	writeVisibleRangeInto(
+		out.previewVisible,
+		params.scrollTop,
+		params.viewportHeight,
+		previewOverscanPx,
+	);
+	return out;
 }
 
 const resolveBootstrapReason = (params: {

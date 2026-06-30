@@ -10,6 +10,16 @@ import type {
 	VirtualRowModel,
 } from "../types";
 import {
+	createMutableVirtualRanges,
+	normalizePreviewOverscan,
+	resolveVirtualRangesInto,
+	resolveVisibleRange,
+} from "../virtualRanges";
+import type {
+	FindVisibleRangeParams,
+	ResolveVirtualRangesParams,
+} from "../virtualRanges";
+import {
 	createVirtualListLayoutRevisionToken,
 	createVirtualListRevision,
 } from "../core/virtualListRevision";
@@ -94,19 +104,6 @@ export interface FlatLinkRowModel<T> extends VirtualRowModel<
 	): void;
 }
 
-function copyRowRangeInto(out: RowRange, range: RowRange): void {
-	out.start = range.start;
-	out.end = range.end;
-}
-
-function normalizePreviewOverscan(
-	value: number | undefined,
-	mountedOverscanPx: number,
-): number {
-	if (value === undefined || !Number.isFinite(value) || value <= 0) return 0;
-	return Math.min(mountedOverscanPx, value);
-}
-
 export function createFlatLinkRowModel<T>(
 	input: FlatLinkRowModelInput<T>,
 ): FlatLinkRowModel<T> {
@@ -168,63 +165,14 @@ export function createFlatLinkRowModel<T>(
 		out.start = Math.max(0, firstVisibleRow - overscanRows);
 		out.end = Math.min(rowCount, lastVisibleRow + overscanRows + 1);
 	};
-	const findVisibleRange = (params: {
-		scrollTop: number;
-		viewportHeight: number;
-		overscanPx: number;
-	}): RowRange => {
-		const range = { start: 0, end: 0 };
-		writeVisibleRange(
-			range,
-			params.scrollTop,
-			params.viewportHeight,
-			params.overscanPx,
-		);
-		return range;
+	const findVisibleRange = (params: FindVisibleRangeParams): RowRange => {
+		return resolveVisibleRange(writeVisibleRange, params);
 	};
 	const resolveMountedAndPreviewRangesInto = (
 		out: VirtualRanges,
-		params: {
-			scrollTop: number;
-			viewportHeight: number;
-			mountedOverscanPx: number;
-			previewOverscanPx?: number;
-			mounted?: RowRange;
-			reuseMountedReference?: boolean;
-		},
+		params: ResolveVirtualRangesParams,
 	): VirtualRanges => {
-		const mountedOverscanPx = Math.max(0, params.mountedOverscanPx);
-		const previewOverscanPx = normalizePreviewOverscan(
-			params.previewOverscanPx,
-			mountedOverscanPx,
-		);
-		if (params.mounted === undefined) {
-			writeVisibleRange(
-				out.mounted,
-				params.scrollTop,
-				params.viewportHeight,
-				mountedOverscanPx,
-			);
-		} else if (params.reuseMountedReference === true) {
-			out.mounted = params.mounted;
-		} else {
-			copyRowRangeInto(out.mounted, params.mounted);
-		}
-		if (previewOverscanPx >= mountedOverscanPx) {
-			if (params.reuseMountedReference === true) {
-				out.previewVisible = out.mounted;
-				return out;
-			}
-			copyRowRangeInto(out.previewVisible, out.mounted);
-			return out;
-		}
-		writeVisibleRange(
-			out.previewVisible,
-			params.scrollTop,
-			params.viewportHeight,
-			previewOverscanPx,
-		);
-		return out;
+		return resolveVirtualRangesInto(out, params, writeVisibleRange);
 	};
 	const findVisibleRanges = (params: {
 		scrollTop: number;
@@ -232,10 +180,7 @@ export function createFlatLinkRowModel<T>(
 		mountedOverscanPx: number;
 		previewOverscanPx?: number;
 	}): VirtualRanges => {
-		const ranges = {
-			mounted: { start: 0, end: 0 },
-			previewVisible: { start: 0, end: 0 },
-		};
+		const ranges = createMutableVirtualRanges();
 		return resolveMountedAndPreviewRangesInto(ranges, {
 			...params,
 			reuseMountedReference: true,
@@ -259,10 +204,7 @@ export function createFlatLinkRowModel<T>(
 		mountedOverscanPx: number;
 		previewOverscanPx?: number;
 	}): VirtualRanges => {
-		const ranges = {
-			mounted: { start: 0, end: 0 },
-			previewVisible: { start: 0, end: 0 },
-		};
+		const ranges = createMutableVirtualRanges();
 		return resolveMountedAndPreviewRangesInto(ranges, {
 			...params,
 			reuseMountedReference: true,
