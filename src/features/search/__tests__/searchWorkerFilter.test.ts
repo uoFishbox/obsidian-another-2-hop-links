@@ -1,8 +1,9 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
 	buildSearchWorkerContentMap,
 	filterSearchWorkerDataset,
 	filterSearchWorkerDatasetWithMatchDetails,
+	filterSearchWorkerDatasetWithMatchDetailsTimeSliced,
 } from "../searchWorkerFilter";
 
 describe("filterSearchWorkerDataset", () => {
@@ -213,6 +214,65 @@ describe("filterSearchWorkerDataset", () => {
 				titleMatched: false,
 				contentMatched: true,
 			},
+		]);
+	});
+
+	it("yields while filtering large datasets in chunks", async () => {
+		const yieldToMainThread = vi.fn(async () => {});
+		let now = 0;
+		const performanceSpy = vi.spyOn(performance, "now").mockImplementation(() => {
+			now += 6;
+			return now;
+		});
+		const matchedItems: Array<{ key: string }> = [];
+
+		try {
+			await filterSearchWorkerDatasetWithMatchDetailsTimeSliced({
+				dataset: {
+					datasetVersion: 1,
+					items: Array.from({ length: 260 }, (_unused, index) => ({
+						key: `item-${index}`,
+						searchText: "alpha note",
+						targetFilePath: null,
+					})),
+					fileContents: [],
+				},
+				query: "alpha",
+				onMatch: (item) => matchedItems.push(item),
+				yieldToMainThread,
+			});
+		} finally {
+			performanceSpy.mockRestore();
+		}
+
+		expect(matchedItems).toHaveLength(260);
+		expect(yieldToMainThread).toHaveBeenCalledTimes(2);
+	});
+
+	it("stops time-sliced filtering when cancelled", async () => {
+		let cancelled = false;
+		const matchedItems: Array<{ key: string }> = [];
+
+		await filterSearchWorkerDatasetWithMatchDetailsTimeSliced({
+			dataset: {
+				datasetVersion: 1,
+				items: Array.from({ length: 3 }, (_unused, index) => ({
+					key: `item-${index}`,
+					searchText: "alpha note",
+					targetFilePath: null,
+				})),
+				fileContents: [],
+			},
+			query: "alpha",
+			onMatch: (item) => {
+				matchedItems.push(item);
+				cancelled = true;
+			},
+			isCancelled: () => cancelled,
+		});
+
+		expect(matchedItems).toEqual([
+			{ key: "item-0", titleMatched: true, contentMatched: false },
 		]);
 	});
 });

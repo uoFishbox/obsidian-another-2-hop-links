@@ -1,6 +1,6 @@
 // @ts-expect-error esbuild-plugin-inline-worker provides this default factory at bundle time.
 import createSearchFilterWorker from "./searchFilter.worker";
-import { filterSearchWorkerDatasetWithMatchDetails } from "./searchWorkerFilter";
+import { filterSearchWorkerDatasetWithMatchDetailsTimeSliced } from "./searchWorkerFilter";
 import type {
 	SearchWorkerFilterRequest,
 	SearchWorkerToMainMessage,
@@ -9,6 +9,7 @@ import type {
 	SearchWorkerFileContentsUpsert,
 	SearchWorkerFileContentsRemoval,
 	SearchWorkerDatasetSnapshot,
+	SearchWorkerMatchedItem,
 } from "./searchWorkerTypes";
 
 export interface SearchWorkerClient {
@@ -30,6 +31,7 @@ export function createSearchWorkerClient(
 		items: [],
 	};
 	let latestDatasetVersion = 0;
+	let fallbackFilterSerial = 0;
 
 	try {
 		if (typeof Worker !== "undefined") {
@@ -105,25 +107,35 @@ export function createSearchWorkerClient(
 		},
 		filter(request: SearchWorkerFilterRequest): void {
 			if (!worker) {
-				const snapshot: SearchWorkerDatasetSnapshot = {
-					datasetVersion: latestDatasetVersion,
-					items: latestItems.items,
-					fileContents: [],
-				};
-				queueMicrotask(() => {
-					const matchedItems = filterSearchWorkerDatasetWithMatchDetails(
-						snapshot,
-						request.query,
-						request.matchScope,
-						latestContentByPath ?? undefined,
-					);
+				const serial = ++fallbackFilterSerial;
+				const matchedItems: SearchWorkerMatchedItem[] = [];
+
+				void (async () => {
+					const snapshot: SearchWorkerDatasetSnapshot = {
+						datasetVersion: latestDatasetVersion,
+						items: latestItems.items,
+						fileContents: [],
+					};
+					await filterSearchWorkerDatasetWithMatchDetailsTimeSliced({
+						dataset: snapshot,
+						query: request.query,
+						matchScope: request.matchScope,
+						cachedContentByPath: latestContentByPath ?? undefined,
+						onMatch: (item) => matchedItems.push(item),
+						isCancelled: () => serial !== fallbackFilterSerial,
+					});
+
+					if (serial !== fallbackFilterSerial) {
+						return;
+					}
+
 					onMessage({
 						type: "filter-result",
 						requestId: request.requestId,
 						datasetVersion: request.datasetVersion,
 						matchedItems,
 					});
-				});
+				})();
 				return;
 			}
 

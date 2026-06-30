@@ -11,6 +11,7 @@
 	import { useBookmarks } from "ui/hooks/useBookmarks.svelte";
 	import { useWorkerSearchSession } from "features/search/useWorkerSearchSession.svelte";
 	import { focusResultEdge } from "features/keyboard-navigation/resultFocus";
+	import { yieldToMainThreadIdleAware } from "core/indexing/timeSlicing";
 	import type { ListConfig } from "ui/components/lists/types";
 	import { hasSameViewItemSource } from "ui/utils/twohopEquality";
 	import { sameArrayBy } from "utils/arrayEquality";
@@ -103,6 +104,7 @@
 
 	const searchTextCache = createItemSearchTextCache();
 	let previousWorkerDataset: SearchWorkerItemSnapshot[] = [];
+	const workerSnapshotByKey = new Map<string, SearchWorkerItemSnapshot>();
 
 	function clearSearchTextCacheForInputChange(): void {
 		void reconciledItems;
@@ -167,15 +169,40 @@
 
 	const buildWorkerDataset = (): SearchWorkerItemSnapshot[] => {
 		const nextDataset = new Array<SearchWorkerItemSnapshot>(reconciledItems.length);
+		const nextKeys = new Set<string>();
 		for (let index = 0; index < reconciledItems.length; index += 1) {
 			const item = reconciledItems[index];
+			const key = config.getItemKey(item);
 			const targetFile = getItemTargetFile(item);
-			nextDataset[index] = buildSearchWorkerItemSnapshot(
-				config.getItemKey(item),
-				getCachedItemSearchText(item),
-				targetFile?.path ?? null,
+			const targetFilePath = targetFile?.path ?? null;
+			const searchText = getCachedItemSearchText(item);
+			const previous = workerSnapshotByKey.get(key);
+			nextKeys.add(key);
+
+			if (
+				previous &&
+				previous.searchText === searchText &&
+				previous.targetFilePath === targetFilePath
+			) {
+				nextDataset[index] = previous;
+				continue;
+			}
+
+			const snapshot = buildSearchWorkerItemSnapshot(
+				key,
+				searchText,
+				targetFilePath,
 			);
+			workerSnapshotByKey.set(key, snapshot);
+			nextDataset[index] = snapshot;
 		}
+
+		for (const key of workerSnapshotByKey.keys()) {
+			if (!nextKeys.has(key)) {
+				workerSnapshotByKey.delete(key);
+			}
+		}
+
 		if (hasSameWorkerDataset(nextDataset, previousWorkerDataset)) {
 			return previousWorkerDataset;
 		}
@@ -242,33 +269,66 @@
 		),
 	);
 
-	let filteredItems = $derived.by(() => {
-		let result: ViewItem[];
-		if (!searchEnabled) {
-			result = sortedItems;
-		} else {
-			const query = search.normalized;
-			if (!query) {
-				result = sortedItems;
-			} else if (!matchedKeySet) {
-				result = [];
-			} else {
-				const nextItems: ViewItem[] = [];
-				for (const item of sortedItems) {
-					const key = config.getItemKey(item);
-					if (matchedKeySet.has(key)) {
-						nextItems.push(item);
-					}
-				}
-				result = nextItems;
+	let filteredItems = $state<ViewItem[]>([]);
+	let filterRunSerial = 0;
+
+	$effect(() => {
+		const serial = ++filterRunSerial;
+		const sourceItems = sortedItems;
+		const query = search.normalized;
+		const keySet = matchedKeySet;
+		const shouldPin = config.pinBookmarkedToTop;
+		void bookmarks.filePaths.size;
+		void bookmarks.orderedFilePaths;
+
+		void (async () => {
+			if (!searchEnabled || !query) {
+				filteredItems = shouldPin
+					? pinBookmarkedViewItems(sourceItems, bookmarks)
+					: sourceItems;
+				return;
 			}
-		}
 
-		if (config.pinBookmarkedToTop) {
-			result = pinBookmarkedViewItems(result, bookmarks);
-		}
+			if (!keySet) {
+				filteredItems = [];
+				return;
+			}
 
-		return result;
+			const nextItems: ViewItem[] = [];
+			let lastPublish = performance.now();
+
+			for (let index = 0; index < sourceItems.length; index += 1) {
+				if (serial !== filterRunSerial) {
+					return;
+				}
+
+				const item = sourceItems[index];
+				if (keySet.has(config.getItemKey(item))) {
+					nextItems.push(item);
+				}
+
+				if ((index + 1) % 128 !== 0) {
+					continue;
+				}
+
+				const now = performance.now();
+				if (now - lastPublish <= 16) {
+					continue;
+				}
+
+				filteredItems = nextItems.slice();
+				await yieldToMainThreadIdleAware({ maxDelayMs: 16 });
+				lastPublish = performance.now();
+			}
+
+			if (serial !== filterRunSerial) {
+				return;
+			}
+
+			filteredItems = shouldPin
+				? pinBookmarkedViewItems(nextItems, bookmarks)
+				: nextItems;
+		})();
 	});
 
 	let initialVisibleCount = $derived(applicationStore.initialVisibleCount);

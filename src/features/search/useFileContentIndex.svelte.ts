@@ -24,6 +24,7 @@ import {
 	reconcileFileContentIndex,
 	type SearchContentIndexEntry,
 } from "features/search/fileContentSearchIndex";
+import { yieldToMainThreadIdleAware } from "core/indexing/timeSlicing";
 import type { SearchWorkerFileContentSnapshot } from "./searchWorkerTypes";
 import { getFileContentVaultEventHub } from "./fileContentVaultEventHub";
 import { getSearchQueryTerms } from "./searchQueryTerms";
@@ -195,6 +196,14 @@ export function useFileContentIndex(
 					applyLoadedFileContentEntry(stagedIndex, path, entry);
 					fileContentIndex.set(path, entry);
 				}
+
+				if (canceled || end >= filesToLoad.length) {
+					continue;
+				}
+
+				await yieldToMainThreadIdleAware({ maxDelayMs: 16 });
+
+				if (canceled) break;
 			}
 
 			if (canceled) return;

@@ -86,6 +86,30 @@ const workerHarness = vi.hoisted(() => {
 	};
 });
 
+const yieldHarness = vi.hoisted(() => {
+	const calls: unknown[] = [];
+	let nextYield: (() => Promise<void>) | null = null;
+
+	return {
+		calls,
+		setNextYield(fn: () => Promise<void>) {
+			nextYield = fn;
+		},
+		reset() {
+			calls.length = 0;
+			nextYield = null;
+		},
+		async yieldToMainThreadIdleAware(options: unknown) {
+			calls.push(options);
+			const fn = nextYield;
+			nextYield = null;
+			if (fn) {
+				await fn();
+			}
+		},
+	};
+});
+
 const fileContentIndexHarness = vi.hoisted(() => {
 	const state = {
 		isLoading: false,
@@ -110,6 +134,28 @@ const fileContentIndexHarness = vi.hoisted(() => {
 		},
 	};
 });
+
+const mockBookmarksState = vi.hoisted(() => {
+	const filePaths = new Set<string>();
+	const orderedFilePaths: string[] = [];
+
+	return {
+		filePaths,
+		orderedFilePaths,
+		isBookmarked: vi.fn(
+			(path: string | null | undefined) => !!path && filePaths.has(path),
+		),
+		reset() {
+			filePaths.clear();
+			orderedFilePaths.length = 0;
+			this.isBookmarked.mockClear();
+		},
+	};
+});
+
+vi.mock("core/indexing/timeSlicing", () => ({
+	yieldToMainThreadIdleAware: yieldHarness.yieldToMainThreadIdleAware,
+}));
 
 vi.mock("features/search/searchWorkerClient", async () => {
 	const { filterSearchWorkerDataset } =
@@ -198,11 +244,7 @@ vi.mock("features/search/searchWorkerClient", async () => {
 });
 
 vi.mock("ui/hooks/useBookmarks.svelte", () => ({
-	useBookmarks: () => ({
-		filePaths: new Set<string>(),
-		orderedFilePaths: [],
-		isBookmarked: () => false,
-	}),
+	useBookmarks: () => mockBookmarksState,
 }));
 
 vi.mock("features/search/useFileContentIndex.svelte", () => ({
@@ -403,11 +445,24 @@ function createTestProps(overrides?: { items?: ViewItem[]; sourceFile?: TFile })
 	};
 }
 
+function createDeferred<T>() {
+	let resolve!: (value: T | PromiseLike<T>) => void;
+	let reject!: (reason?: unknown) => void;
+	const promise = new Promise<T>((res, rej) => {
+		resolve = res;
+		reject = rej;
+	});
+
+	return { promise, resolve, reject };
+}
+
 describe("SearchableItemList worker integration", () => {
 	beforeEach(() => {
 		vi.useFakeTimers();
 		workerHarness.reset();
+		yieldHarness.reset();
 		fileContentIndexHarness.reset();
+		mockBookmarksState.reset();
 	});
 
 	afterEach(() => {
@@ -454,5 +509,126 @@ describe("SearchableItemList worker integration", () => {
 		await waitFor(() =>
 			expect(queryAllByTestIdIncludingShadow("searchable-item")).toHaveLength(0),
 		);
+	});
+
+	it("publishes large filtered results in chunks", async () => {
+		vi.useRealTimers();
+		const yieldGate = createDeferred<void>();
+		yieldHarness.setNextYield(() => yieldGate.promise);
+		let now = 0;
+		const performanceSpy = vi.spyOn(performance, "now").mockImplementation(() => {
+			now += 17;
+			return now;
+		});
+		const items = Array.from({ length: 260 }, (_unused, index) =>
+			createTaggedNoteItem(
+				createMockTFile(`notes/target-${String(index).padStart(3, "0")}.md`),
+			),
+		);
+
+		try {
+			render(SearchableItemList, { props: createTestProps({ items }) });
+			await flushAsyncUi();
+
+			const input = screen.getByRole("searchbox");
+			await fireEvent.input(input, { target: { value: "target" } });
+			await flushAsyncUi();
+
+			await waitFor(() =>
+				expect(screen.getByTestId("filtered-count")).toHaveTextContent("128"),
+			);
+			expect(yieldHarness.calls).toEqual([{ maxDelayMs: 16 }]);
+
+			yieldGate.resolve();
+
+			await waitFor(() =>
+				expect(screen.getByTestId("filtered-count")).toHaveTextContent("260"),
+			);
+		} finally {
+			performanceSpy.mockRestore();
+		}
+	}, 10000);
+
+	it("discards an older chunked filter run after the query changes", async () => {
+		vi.useRealTimers();
+		const yieldGate = createDeferred<void>();
+		yieldHarness.setNextYield(() => yieldGate.promise);
+		let now = 0;
+		const performanceSpy = vi.spyOn(performance, "now").mockImplementation(() => {
+			now += 17;
+			return now;
+		});
+		const alphaItems = Array.from({ length: 260 }, (_unused, index) =>
+			createTaggedNoteItem(
+				createMockTFile(`notes/alpha-${String(index).padStart(3, "0")}.md`),
+			),
+		);
+		const betaItem = createTaggedNoteItem(createMockTFile("notes/beta.md"));
+
+		try {
+			const props = createTestProps({ items: [...alphaItems, betaItem] });
+			props.config = {
+				...props.config,
+				getSearchText: (item) =>
+					item.type === "taggedNote" ? item.data.file.basename : "",
+			};
+			render(SearchableItemList, {
+				props,
+			});
+			await flushAsyncUi();
+
+			const input = screen.getByRole("searchbox");
+			await fireEvent.input(input, { target: { value: "alpha" } });
+			await flushAsyncUi();
+
+			await waitFor(() =>
+				expect(screen.getByTestId("filtered-count")).toHaveTextContent("128"),
+			);
+
+			await fireEvent.input(input, { target: { value: "beta" } });
+			await flushAsyncUi();
+
+			await waitFor(() =>
+				expect(screen.getByTestId("filtered-count")).toHaveTextContent(/^1$/),
+			);
+			expect(getAllSearchableItems()[0]).toHaveTextContent("beta");
+
+			yieldGate.resolve();
+			await flushAsyncUi();
+
+			expect(screen.getByTestId("filtered-count")).toHaveTextContent(/^1$/);
+			expect(getAllSearchableItems()[0]).toHaveTextContent("beta");
+		} finally {
+			performanceSpy.mockRestore();
+		}
+	}, 10000);
+
+	it("applies bookmark pinning to the final filtered result", async () => {
+		mockBookmarksState.filePaths.add("notes/beta.md");
+		mockBookmarksState.orderedFilePaths.push("notes/beta.md");
+		const items = [
+			createTaggedNoteItem(createMockTFile("notes/alpha.md")),
+			createTaggedNoteItem(createMockTFile("notes/beta.md")),
+		];
+		const props = createTestProps({ items });
+		props.config = {
+			...props.config,
+			pinBookmarkedToTop: true,
+		};
+
+		render(SearchableItemList, { props });
+		await flushAsyncUi();
+
+		const input = screen.getByRole("searchbox");
+		await fireEvent.input(input, { target: { value: "a" } });
+		await flushAsyncUi();
+
+		await waitFor(() =>
+			expect(screen.getByTestId("filtered-count")).toHaveTextContent("2"),
+		);
+
+		const renderedItems = getAllSearchableItems();
+		expect(renderedItems[0]).toHaveTextContent("beta");
+		expect(renderedItems[1]).toHaveTextContent("alpha");
 	});
 });

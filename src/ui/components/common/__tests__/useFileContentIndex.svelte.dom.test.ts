@@ -6,6 +6,34 @@ import { createMockTFile } from "testing/__mocks__/testHelpers";
 import { BoundedQueryCache } from "features/search/useFileContentIndex.svelte";
 import UseFileContentIndexHarness from "./UseFileContentIndexHarness.svelte";
 
+const yieldHarness = vi.hoisted(() => {
+	const calls: unknown[] = [];
+	let nextYield: (() => Promise<void>) | null = null;
+
+	return {
+		calls,
+		setNextYield(fn: () => Promise<void>) {
+			nextYield = fn;
+		},
+		reset() {
+			calls.length = 0;
+			nextYield = null;
+		},
+		async yieldToMainThreadIdleAware(options: unknown) {
+			calls.push(options);
+			const fn = nextYield;
+			nextYield = null;
+			if (fn) {
+				await fn();
+			}
+		},
+	};
+});
+
+vi.mock("core/indexing/timeSlicing", () => ({
+	yieldToMainThreadIdleAware: yieldHarness.yieldToMainThreadIdleAware,
+}));
+
 vi.mock("obsidian", () => {
 	class MockComponent {
 		registerEvent(_eventRef: unknown) {}
@@ -71,6 +99,7 @@ function createDeferred<T>() {
 
 afterEach(() => {
 	cleanup();
+	yieldHarness.reset();
 });
 
 describe("useFileContentIndex", () => {
@@ -251,6 +280,81 @@ describe("useFileContentIndex", () => {
 		await waitFor(() => {
 			expect(screen.getByTestId("is-loading").textContent).toBe("false");
 		});
+	});
+
+	it("yields between multiple file content load batches", async () => {
+		const files = Array.from({ length: 11 }, (_unused, index) =>
+			createMockTFile(`notes/yield-${index}.md`),
+		);
+		const { app, cachedRead } = createMockApp(
+			Object.fromEntries(files.map((file) => [file.path, "content"])),
+		);
+
+		render(UseFileContentIndexHarness, {
+			props: {
+				app,
+				files,
+				targetFile: files[10],
+				query: "content",
+				enabled: true,
+			},
+		});
+
+		await waitFor(() => {
+			expect(cachedRead).toHaveBeenCalledTimes(11);
+		});
+		await waitFor(() => {
+			expect(screen.getByTestId("is-loading").textContent).toBe("false");
+		});
+
+		expect(yieldHarness.calls).toEqual([{ maxDelayMs: 16 }]);
+	});
+
+	it("does not apply later batches after cancellation", async () => {
+		const files = Array.from({ length: 11 }, (_unused, index) =>
+			createMockTFile(`notes/cancel-${index}.md`),
+		);
+		const yieldGate = createDeferred<void>();
+		yieldHarness.setNextYield(() => yieldGate.promise);
+		const { app, cachedRead } = createMockApp(
+			Object.fromEntries(
+				files.map((file, index) => [
+					file.path,
+					index === 10 ? "second-batch-token" : "first batch",
+				]),
+			),
+		);
+
+		const view = render(UseFileContentIndexHarness, {
+			props: {
+				app,
+				files,
+				targetFile: files[10],
+				query: "second-batch-token",
+				enabled: true,
+			},
+		});
+
+		await waitFor(() => {
+			expect(yieldHarness.calls).toHaveLength(1);
+		});
+		expect(cachedRead).toHaveBeenCalledTimes(10);
+
+		await view.rerender({
+			app,
+			files,
+			targetFile: files[10],
+			query: "second-batch-token",
+			enabled: false,
+		});
+		yieldGate.resolve();
+
+		await waitFor(() => {
+			expect(screen.getByTestId("is-loading").textContent).toBe("false");
+		});
+
+		expect(cachedRead).toHaveBeenCalledTimes(10);
+		expect(screen.getByTestId("has-match").textContent).toBe("false");
 	});
 
 	it("isLoading is true until loading completes", async () => {
