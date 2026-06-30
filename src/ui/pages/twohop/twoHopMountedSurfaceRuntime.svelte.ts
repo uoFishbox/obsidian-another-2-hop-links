@@ -5,8 +5,7 @@ import type {
 } from "ui/components/common/virtual-list/reconciliation/viewPlanMountedCells";
 import { useVirtualList } from "ui/components/common/virtual-list/svelte/useVirtualList.svelte";
 import { resolveVirtualizedItemVisibilityForPreviewRange } from "ui/components/common/virtual-list/svelte/virtualizedItemVisibilityState.svelte";
-import type { VirtualizedItemVisibilityState } from "ui/components/common/virtualizedItemVisibility";
-import type { VirtualizedItemVisibility } from "ui/components/common/virtual-list/types";
+import type { SectionedVirtualListItemRenderArgs } from "ui/components/common/virtual-list/types";
 import type { TwoHopMountedRowsBuild } from "./twoHopMountedRowBuild";
 import type { TwoHopViewPlanRowModel } from "./twoHopViewPlan";
 import type {
@@ -85,16 +84,10 @@ export function createTwoHopMountedSurfaceRuntime(params: {
 			TwoHopVirtualListSection
 		>,
 		observerRoot: HTMLElement | null,
-	): {
-		item: TwoHopVirtualListItem;
-		section: TwoHopVirtualListSection;
-		index: number;
-		rowIndex: number;
-		observerRoot: HTMLElement | null;
-		visibilityState: VirtualizedItemVisibilityState;
-		readonly visibility: VirtualizedItemVisibility;
-		activationCandidateId: string;
-	} => {
+	): SectionedVirtualListItemRenderArgs<
+		TwoHopVirtualListItem,
+		TwoHopVirtualListSection
+	> => {
 		const visibilityState = mountRuntime.getOrCreateVisibilityState(
 			renderedCell,
 			untrack(() => {

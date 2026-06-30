@@ -1,7 +1,4 @@
-export type { VirtualizedItemVisibility } from "./virtual-list/types";
-
-import type { VirtualizedItemVisibility } from "./virtual-list/types";
-
-export interface VirtualizedItemVisibilityState {
-	visibility: VirtualizedItemVisibility | undefined;
-}
+export type {
+	VirtualizedItemVisibility,
+	VirtualizedItemVisibilityState,
+} from "./virtual-list/types";

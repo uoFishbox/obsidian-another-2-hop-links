@@ -7,6 +7,33 @@ import type { RowKey } from "./rowKey";
 
 export type VirtualizedItemVisibility = "visible" | "mounted";
 
+export interface VirtualizedItemVisibilityState {
+	visibility: VirtualizedItemVisibility | undefined;
+}
+
+/**
+ * Props passed to flat virtual list item render snippets.
+ */
+export interface VirtualListItemRenderArgs<T> {
+	item: T;
+	index: number;
+	observerRoot: HTMLElement | null;
+	readonly visibility: VirtualizedItemVisibility;
+	visibilityState: VirtualizedItemVisibilityState;
+	rowIndex: number;
+	activationCandidateId: string;
+}
+
+/**
+ * Props passed to sectioned virtual list item render snippets.
+ */
+export interface SectionedVirtualListItemRenderArgs<
+	T,
+	G,
+> extends VirtualListItemRenderArgs<T> {
+	section: G;
+}
+
 declare const brand: unique symbol;
 
 export type Brand<T, TBrand extends string> = T & {

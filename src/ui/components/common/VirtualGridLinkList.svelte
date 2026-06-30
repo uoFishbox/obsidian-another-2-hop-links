@@ -1,28 +1,14 @@
 <script lang="ts" generics="T">
-	import { setContext } from "svelte";
-	import { ARIA_LABELS } from "../../../appConstants";
-	import { svgAttrs, ICON_PATHS } from "ui/utils/icons";
+	import { providePreviewActivationContexts } from "features/preview/scheduling/previewActivationContexts";
 	import VirtualSurface from "./virtual-list/VirtualSurface.svelte";
+	import VirtualListLoadMoreButton from "./virtual-list/VirtualListLoadMoreButton.svelte";
 	import {
 		useFlatVirtualGridList,
 		type FlatVirtualGridListProps,
 	} from "./virtual-list/svelte/useFlatVirtualGridList.svelte";
-	import {
-		createPreviewActivationScope,
-		PREVIEW_ACTIVATION_SCOPE_CONTEXT_KEY,
-	} from "features/preview/scheduling/previewActivationScope";
-	import {
-		createRowPreviewActivationRuntime,
-		PREVIEW_ROW_ACTIVATION_CONTEXT_KEY,
-	} from "features/preview/scheduling/rowPreviewActivationRuntime";
 
 	const props: FlatVirtualGridListProps<T> = $props();
-	const previewActivationScope = createPreviewActivationScope();
-	const rowPreviewActivationRuntime = createRowPreviewActivationRuntime({
-		scope: previewActivationScope,
-	});
-	setContext(PREVIEW_ACTIVATION_SCOPE_CONTEXT_KEY, previewActivationScope);
-	setContext(PREVIEW_ROW_ACTIVATION_CONTEXT_KEY, rowPreviewActivationRuntime);
+	providePreviewActivationContexts();
 	const list = useFlatVirtualGridList(props);
 </script>
 
@@ -63,16 +49,7 @@
 					{@render props.item(itemRenderArgs)}
 				{/if}
 			{:else}
-				<button
-					type="button"
-					class="cosense-card-links__load-more-button cosense-card-links__box"
-					aria-label={ARIA_LABELS.LOAD_MORE}
-					onclick={list.loadNextPage}
-				>
-					<svg {...svgAttrs} width="28" height="28" stroke="currentColor">
-						{@html ICON_PATHS.Ellipsis}
-					</svg>
-				</button>
+				<VirtualListLoadMoreButton onClick={list.loadNextPage} />
 			{/if}
 		{/snippet}
 		{#snippet afterContent()}

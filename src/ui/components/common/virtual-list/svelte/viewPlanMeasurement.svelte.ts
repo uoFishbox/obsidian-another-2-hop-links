@@ -2,6 +2,7 @@ import { untrack } from "svelte";
 import type { SectionRenderDescriptor } from "../../../sections/types";
 import { CARD_VIRTUAL_LIST_MAX_UNSTABLE_MEASUREMENT_RETRIES } from "../cardVirtualListPolicy";
 import { createVirtualListController } from "../dom/virtualListController";
+import { flushVirtualScrollMeasurement as flushCachedVirtualScrollMeasurement } from "../dom/flushVirtualScrollMeasurement";
 import { resolveCachedCardGridLayoutBase } from "../dom/virtualListCardLayout";
 import { createVirtualListMeasurementState } from "../dom/virtualListMeasurementState";
 import { resolveVirtualListLayoutStability } from "../dom/virtualListMeasurementStability";
@@ -516,19 +517,13 @@ export function createViewPlanMeasurementRuntime<
 		scrollContainerEl: HTMLElement | null,
 		targetTop: number,
 	): void => {
-		const measurement = params.state.measurement;
-		if (measurement.scrollContainerEl !== scrollContainerEl) {
-			measurement.scrollContainerEl = scrollContainerEl;
-		}
-		if (scrollContainerEl && scrollContainerEl.clientHeight > 0) {
-			measurement.viewportHeight = scrollContainerEl.clientHeight;
-			measurement.sectionTop = Math.max(
-				0,
-				scrollContainerEl.scrollTop - targetTop,
-			);
-			measurement.hasStableScrollMetrics = true;
-		}
-		virtualListController.updateFromCachedMeasurement();
+		flushCachedVirtualScrollMeasurement({
+			measurement: params.state.measurement,
+			scrollContainerEl,
+			targetTop,
+			updateFromCachedMeasurement: () =>
+				virtualListController.updateFromCachedMeasurement(),
+		});
 	};
 
 	return {

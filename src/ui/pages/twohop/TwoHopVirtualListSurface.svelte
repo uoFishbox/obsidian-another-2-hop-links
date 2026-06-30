@@ -1,13 +1,15 @@
 <script lang="ts">
-	import { ARIA_LABELS, IS_PROD } from "../../../appConstants";
-	import { svgAttrs, ICON_PATHS } from "ui/utils/icons";
+	import { IS_PROD } from "../../../appConstants";
+	import { providePreviewActivationContexts } from "features/preview/scheduling/previewActivationContexts";
 	import VirtualSurface from "ui/components/common/virtual-list/VirtualSurface.svelte";
+	import VirtualListLoadMoreButton from "ui/components/common/virtual-list/VirtualListLoadMoreButton.svelte";
+	import type { SectionedVirtualListItemRenderArgs } from "ui/components/common/virtual-list/types";
 	import type {
 		MountedFlatCell,
 		MountedFlatHeaderCell,
 		MountedFlatItemCell,
 	} from "ui/components/common/virtual-list/reconciliation/viewPlanMountedCells";
-	import { setContext, type Snippet } from "svelte";
+	import type { Snippet } from "svelte";
 	import type { ApplicationStore } from "ui/stores/ApplicationStore.svelte";
 	import type { SectionRenderDescriptor } from "ui/components/sections/types";
 	import type {
@@ -16,20 +18,8 @@
 	} from "./twoHopVirtualListModel";
 	import { useTwoHopViewPlanVirtualList } from "./useTwoHopVirtualListSurface.svelte";
 	import type { TwoHopVirtualListTuning } from "./twoHopVirtualListTuning";
-	import type {
-		VirtualizedItemVisibility,
-		VirtualizedItemVisibilityState,
-	} from "ui/components/common/virtualizedItemVisibility";
 	import type { ItemInteractionDescriptor } from "ui/interactions/interactionTypes";
 	import { createTwoHopInteractionResolverProvider } from "./twoHopInteractionResolverCache";
-	import {
-		createPreviewActivationScope,
-		PREVIEW_ACTIVATION_SCOPE_CONTEXT_KEY,
-	} from "features/preview/scheduling/previewActivationScope";
-	import {
-		createRowPreviewActivationRuntime,
-		PREVIEW_ROW_ACTIVATION_CONTEXT_KEY,
-	} from "features/preview/scheduling/rowPreviewActivationRuntime";
 
 	interface Props {
 		sections: readonly SectionRenderDescriptor<
@@ -61,16 +51,10 @@
 		>;
 		renderItem: Snippet<
 			[
-				{
-					item: TwoHopVirtualListItem;
-					section: TwoHopVirtualListSection;
-					index: number;
-					rowIndex: number;
-					observerRoot: HTMLElement | null;
-					visibility: VirtualizedItemVisibility;
-					visibilityState: VirtualizedItemVisibilityState;
-					activationCandidateId: string;
-				},
+				SectionedVirtualListItemRenderArgs<
+					TwoHopVirtualListItem,
+					TwoHopVirtualListSection
+				>,
 			]
 		>;
 	}
@@ -78,12 +62,7 @@
 	const TWO_HOP_CELL_CLASS_NAME = "view-plan-virtual-list-cell view-plan-flow-cell";
 
 	const props: Props = $props();
-	const previewActivationScope = createPreviewActivationScope();
-	const rowPreviewActivationRuntime = createRowPreviewActivationRuntime({
-		scope: previewActivationScope,
-	});
-	setContext(PREVIEW_ACTIVATION_SCOPE_CONTEXT_KEY, previewActivationScope);
-	setContext(PREVIEW_ROW_ACTIVATION_CONTEXT_KEY, rowPreviewActivationRuntime);
+	providePreviewActivationContexts();
 	const list = useTwoHopViewPlanVirtualList(props);
 	const interactionDescriptorResolverProvider =
 		createTwoHopInteractionResolverProvider({
@@ -154,19 +133,10 @@
 				list.createItemRenderArgs(renderedCell, observerRoot),
 			)}
 		{:else}
-			<button
-				type="button"
-				class="cosense-card-links__load-more-button cosense-card-links__box"
-				aria-label={ARIA_LABELS.LOAD_MORE}
-				{...!IS_PROD
-					? { "data-testid": `load-more-${renderedCell.sectionId}` }
-					: {}}
-				onclick={() => list.loadMore(renderedCell.sectionId)}
-			>
-				<svg {...svgAttrs} width="28" height="28" stroke="currentColor">
-					{@html ICON_PATHS.Ellipsis}
-				</svg>
-			</button>
+			<VirtualListLoadMoreButton
+				testId={!IS_PROD ? `load-more-${renderedCell.sectionId}` : undefined}
+				onClick={() => list.loadMore(renderedCell.sectionId)}
+			/>
 		{/if}
 	{/snippet}
 </VirtualSurface>

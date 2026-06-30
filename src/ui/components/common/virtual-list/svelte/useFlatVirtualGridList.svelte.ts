@@ -35,20 +35,21 @@ import { scheduleAnimationFrame } from "ui/utils/frame";
 import { createSectionPaginationState } from "../pagination";
 import { useVirtualList } from "./useVirtualList.svelte";
 import type { VirtualListLogicalCell } from "../logicalCell";
-import type {
-	VirtualizedItemVisibility,
-	VirtualizedItemVisibilityState,
-} from "../../virtualizedItemVisibility";
 import {
 	createVirtualizedItemVisibilityStateController,
 	resolveVirtualizedItemVisibilityForPreviewRange,
 } from "./virtualizedItemVisibilityState.svelte";
 import type { RenderRevision, RenderRevisionFallbackPolicy } from "../renderRevision";
-import type { VirtualNavigationTarget, VirtualRanges } from "../types";
+import type {
+	VirtualListItemRenderArgs,
+	VirtualNavigationTarget,
+	VirtualRanges,
+} from "../types";
 import {
 	PREVIEW_ROW_ACTIVATION_CONTEXT_KEY,
 	type RowPreviewActivationRuntime,
 } from "features/preview/scheduling/rowPreviewActivationRuntime";
+import { flushVirtualScrollMeasurement as flushCachedVirtualScrollMeasurement } from "../dom/flushVirtualScrollMeasurement";
 
 export interface FlatVirtualGridListProps<T> {
 	items?: readonly T[];
@@ -67,19 +68,7 @@ export interface FlatVirtualGridListProps<T> {
 	getItemRenderRevision?: (item: T, index: number) => RenderRevision | undefined;
 	renderRevisionFallbackPolicy?: RenderRevisionFallbackPolicy;
 	header?: Snippet;
-	item?: Snippet<
-		[
-			{
-				item: T;
-				index: number;
-				observerRoot: HTMLElement | null;
-				visibility: VirtualizedItemVisibility;
-				visibilityState: VirtualizedItemVisibilityState;
-				rowIndex: number;
-				activationCandidateId: string;
-			},
-		]
-	>;
+	item?: Snippet<[VirtualListItemRenderArgs<T>]>;
 	empty?: Snippet;
 	initialVisibleCount?: number | undefined;
 	loadMoreIncrement?: number;
@@ -773,18 +762,13 @@ export function useFlatVirtualGridList<T>(props: FlatVirtualGridListProps<T>) {
 		scrollContainerEl: HTMLElement | null,
 		targetTop: number,
 	): void => {
-		if (measurement.scrollContainerEl !== scrollContainerEl) {
-			measurement.scrollContainerEl = scrollContainerEl;
-		}
-		if (scrollContainerEl && scrollContainerEl.clientHeight > 0) {
-			measurement.viewportHeight = scrollContainerEl.clientHeight;
-			measurement.sectionTop = Math.max(
-				0,
-				scrollContainerEl.scrollTop - targetTop,
-			);
-			measurement.hasStableScrollMetrics = true;
-		}
-		virtualListController.updateFromCachedMeasurement();
+		flushCachedVirtualScrollMeasurement({
+			measurement,
+			scrollContainerEl,
+			targetTop,
+			updateFromCachedMeasurement: () =>
+				virtualListController.updateFromCachedMeasurement(),
+		});
 	};
 
 	const resolveNavigationTarget = (
@@ -801,7 +785,7 @@ export function useFlatVirtualGridList<T>(props: FlatVirtualGridListProps<T>) {
 	const createItemRenderArgs = (
 		mountedCell: MountedVirtualGridCell<T>,
 		observerRoot: HTMLElement | null,
-	) => {
+	): VirtualListItemRenderArgs<T> => {
 		const itemCell = mountedCell as FlatMountedItemCell<T>;
 		const visibilityState = visibilityStates.getOrCreateState(
 			itemCell,
