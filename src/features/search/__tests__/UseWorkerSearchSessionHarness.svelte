@@ -8,6 +8,7 @@
 		query: string;
 		enabled: boolean;
 		enabledFromQuery?: boolean;
+		contentIndexEnabled?: boolean;
 		files: TFile[];
 		getSearchableFiles?: () => TFile[];
 		dataset: SearchWorkerItemSnapshot[];
@@ -21,6 +22,7 @@
 		query,
 		enabled,
 		enabledFromQuery = false,
+		contentIndexEnabled,
 		files,
 		getSearchableFiles,
 		dataset,
@@ -33,6 +35,7 @@
 		app,
 		query: () => query,
 		enabled: () => (enabledFromQuery ? !!query : enabled),
+		contentIndexEnabled,
 		getSearchableFiles: () => getSearchableFiles?.() ?? files,
 		buildDataset: () => buildDataset?.() ?? dataset,
 		contentSyncMode,

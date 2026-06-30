@@ -30,6 +30,7 @@ export interface UseWorkerSearchSessionOptions {
 	app: App;
 	query: () => string;
 	enabled?: boolean | (() => boolean);
+	contentIndexEnabled?: boolean | (() => boolean);
 	matchScope?: SearchWorkerMatchScope | (() => SearchWorkerMatchScope);
 	getSearchableFiles: () => TFile[];
 	buildDataset: () => SearchWorkerItemSnapshot[];
@@ -58,6 +59,7 @@ export function useWorkerSearchSession(
 		app,
 		query,
 		enabled = true,
+		contentIndexEnabled = enabled,
 		matchScope = "title-and-content",
 		getSearchableFiles,
 		buildDataset,
@@ -68,6 +70,10 @@ export function useWorkerSearchSession(
 	} = options;
 	const isEnabled = (): boolean =>
 		typeof enabled === "function" ? enabled() : enabled;
+	const isContentIndexEnabled = (): boolean =>
+		typeof contentIndexEnabled === "function"
+			? contentIndexEnabled()
+			: contentIndexEnabled;
 	const getMatchScope = (): SearchWorkerMatchScope =>
 		typeof matchScope === "function" ? matchScope() : matchScope;
 	const getContentSearchBackend = (): ContentSearchBackend =>
@@ -90,7 +96,7 @@ export function useWorkerSearchSession(
 			: "worker";
 	const contentIndex = useFileContentIndex(app, getSearchableFiles, {
 		enabled: () =>
-			sessionEnabled &&
+			isContentIndexEnabled() &&
 			currentMatchScope === "title-and-content" &&
 			getEffectiveContentSearchBackend() !== "ripgrep",
 	});
@@ -243,7 +249,12 @@ export function useWorkerSearchSession(
 	});
 
 	$effect(() => {
-		if (!sessionEnabled) {
+		const contentSyncCanTrackPaths =
+			isContentIndexEnabled() &&
+			currentMatchScope === "title-and-content" &&
+			getEffectiveContentSearchBackend() !== "ripgrep";
+
+		if (!sessionEnabled && !contentSyncCanTrackPaths) {
 			matchedKeySet = null;
 			matchedItemByKey = null;
 			ripgrepPositionByPath = EMPTY_RIPGREP_POSITION_BY_PATH;
@@ -252,9 +263,19 @@ export function useWorkerSearchSession(
 			return;
 		}
 
-		const nextWorkerDataset = workerDataset;
+		if (!sessionEnabled) {
+			matchedKeySet = null;
+			matchedItemByKey = null;
+			ripgrepPositionByPath = EMPTY_RIPGREP_POSITION_BY_PATH;
+			isWorkerFiltering = false;
+			lastIssuedSearchSignature = "";
+		}
+
+		const nextWorkerDataset = sessionEnabled
+			? workerDataset
+			: lastSyncedWorkerDataset;
 		const shouldSyncContents =
-			getEffectiveContentSearchBackend() !== "ripgrep" &&
+			contentSyncCanTrackPaths &&
 			shouldSyncWorkerFileContents({
 				sessionEnabled,
 				matchScope: currentMatchScope,
@@ -263,18 +284,28 @@ export function useWorkerSearchSession(
 				progressiveTick,
 				contentIndexIsLoading: contentIndex.isLoading(),
 			});
-		const contentDiff = diffSearchWorkerFileContentsFromVisitor(
-			(visitor) => contentIndex.forEachEntry(visitor),
-			lastSyncedFileContentsByPath,
-			shouldSyncContents,
-		);
-		const datasetChanged = nextWorkerDataset !== lastSyncedWorkerDataset;
+		const contentDiff = contentSyncCanTrackPaths
+			? diffSearchWorkerFileContentsFromVisitor(
+					(visitor) => contentIndex.forEachEntry(visitor),
+					lastSyncedFileContentsByPath,
+					shouldSyncContents,
+				)
+			: {
+					changed: false,
+					upserts: [],
+					removals: [],
+					nextEntriesByPath: null,
+				};
+		const datasetChanged =
+			nextWorkerDataset !== null &&
+			sessionEnabled &&
+			nextWorkerDataset !== lastSyncedWorkerDataset;
 		if (!datasetChanged && !contentDiff.changed) {
 			return;
 		}
 
 		syncedDatasetVersion += 1;
-		if (datasetChanged) {
+		if (datasetChanged && nextWorkerDataset !== null) {
 			searchWorkerClient.syncItems({
 				datasetVersion: syncedDatasetVersion,
 				items: nextWorkerDataset,

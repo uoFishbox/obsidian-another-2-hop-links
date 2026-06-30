@@ -52,21 +52,10 @@ export function diffSearchWorkerFileContentsFromVisitor(
 	includeContents: boolean,
 ): SearchWorkerFileContentDiff {
 	if (!includeContents) {
-		if (previousEntriesByPath.size === 0) {
-			return {
-				changed: false,
-				upserts: [],
-				removals: [],
-				nextEntriesByPath: null,
-			};
-		}
-
-		return {
-			changed: true,
-			upserts: [],
-			removals: Array.from(previousEntriesByPath.keys()),
-			nextEntriesByPath: new Map(),
-		};
+		return diffRemovedFileContentsFromVisitor(
+			visitCurrentEntries,
+			previousEntriesByPath,
+		);
 	}
 
 	const seenPaths = new Set<string>();
@@ -131,21 +120,7 @@ export function diffSearchWorkerFileContents(
 	includeContents: boolean,
 ): SearchWorkerFileContentDiff {
 	if (!includeContents) {
-		if (previousEntriesByPath.size === 0) {
-			return {
-				changed: false,
-				upserts: [],
-				removals: [],
-				nextEntriesByPath: null,
-			};
-		}
-
-		return {
-			changed: true,
-			upserts: [],
-			removals: Array.from(previousEntriesByPath.keys()),
-			nextEntriesByPath: new Map(),
-		};
+		return diffRemovedFileContents(currentEntries, previousEntriesByPath);
 	}
 
 	const seenPaths = new Set<string>();
@@ -199,6 +174,64 @@ export function diffSearchWorkerFileContents(
 	return {
 		changed: true,
 		upserts,
+		removals,
+		nextEntriesByPath: nextEntriesByPath ?? new Map(),
+	};
+}
+
+function diffRemovedFileContentsFromVisitor(
+	visitCurrentEntries: FileContentEntryVisitor,
+	previousEntriesByPath: ReadonlyMap<string, Readonly<SearchContentIndexEntry>>,
+): SearchWorkerFileContentDiff {
+	const seenPaths = new Set<string>();
+	visitCurrentEntries((path) => {
+		seenPaths.add(path);
+	});
+
+	return buildRemovedFileContentDiff(seenPaths, previousEntriesByPath);
+}
+
+function diffRemovedFileContents(
+	currentEntries: Iterable<readonly [string, Readonly<SearchContentIndexEntry>]>,
+	previousEntriesByPath: ReadonlyMap<string, Readonly<SearchContentIndexEntry>>,
+): SearchWorkerFileContentDiff {
+	const seenPaths = new Set<string>();
+	for (const [path] of currentEntries) {
+		seenPaths.add(path);
+	}
+
+	return buildRemovedFileContentDiff(seenPaths, previousEntriesByPath);
+}
+
+function buildRemovedFileContentDiff(
+	seenPaths: ReadonlySet<string>,
+	previousEntriesByPath: ReadonlyMap<string, Readonly<SearchContentIndexEntry>>,
+): SearchWorkerFileContentDiff {
+	const removals: string[] = [];
+	let nextEntriesByPath: Map<string, Readonly<SearchContentIndexEntry>> | null = null;
+
+	for (const path of previousEntriesByPath.keys()) {
+		if (seenPaths.has(path)) {
+			continue;
+		}
+
+		removals.push(path);
+		nextEntriesByPath ??= new Map(previousEntriesByPath);
+		nextEntriesByPath.delete(path);
+	}
+
+	if (removals.length === 0) {
+		return {
+			changed: false,
+			upserts: [],
+			removals,
+			nextEntriesByPath: null,
+		};
+	}
+
+	return {
+		changed: true,
+		upserts: [],
 		removals,
 		nextEntriesByPath: nextEntriesByPath ?? new Map(),
 	};

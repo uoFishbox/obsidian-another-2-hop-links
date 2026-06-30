@@ -426,6 +426,69 @@ describe("useWorkerSearchSession", () => {
 		});
 	});
 
+	it("does not remove synced worker contents when the query is emptied", async () => {
+		fileContentIndexHarness.setEntries([
+			{
+				path: "notes/alpha.md",
+				content: "alpha body content",
+				mtime: 1,
+			},
+		]);
+
+		const view = render(UseWorkerSearchSessionHarness, {
+			props: {
+				app: {} as never,
+				query: "alpha body",
+				enabled: true,
+				enabledFromQuery: true,
+				contentIndexEnabled: true,
+				files: [],
+				dataset: [
+					{
+						key: "alpha",
+						searchText: "alpha title",
+						targetFilePath: "notes/alpha.md",
+					},
+				],
+				contentSyncMode: "progressive",
+			},
+		});
+
+		await flushAsyncUi();
+
+		expect(workerHarness.client.upsertFileContents).toHaveBeenCalledWith({
+			datasetVersion: expect.any(Number),
+			entries: [
+				{
+					path: "notes/alpha.md",
+					content: "alpha body content",
+					mtime: 1,
+				},
+			],
+		});
+
+		await view.rerender({
+			app: {} as never,
+			query: "",
+			enabled: true,
+			enabledFromQuery: true,
+			contentIndexEnabled: true,
+			files: [],
+			dataset: [
+				{
+					key: "alpha",
+					searchText: "alpha title",
+					targetFilePath: "notes/alpha.md",
+				},
+			],
+			contentSyncMode: "progressive",
+		});
+
+		await flushAsyncUi();
+
+		expect(workerHarness.client.removeFileContents).not.toHaveBeenCalled();
+	});
+
 	it("terminates the worker client on destroy", async () => {
 		const view = render(UseWorkerSearchSessionHarness, {
 			props: {

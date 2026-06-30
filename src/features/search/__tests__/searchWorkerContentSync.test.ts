@@ -146,20 +146,41 @@ describe("diffSearchWorkerFileContents", () => {
 		expect(result.nextEntriesByPath).toBeNull();
 	});
 
-	it("returns all removals when includeContents=false and previous exists", () => {
+	it("keeps active previous entries when includeContents=false", () => {
 		const previous = entriesMap({
 			"a.md": makeEntry(),
 			"b.md": makeEntry(),
 		});
 		const result = diffSearchWorkerFileContents(
-			iterableFromEntries({}),
+			iterableFromEntries({
+				"a.md": makeEntry({ content: "changed while inactive", mtime: 2 }),
+				"b.md": makeEntry(),
+			}),
+			previous,
+			false,
+		);
+		expect(result.changed).toBe(false);
+		expect(result.upserts).toEqual([]);
+		expect(result.removals).toEqual([]);
+		expect(result.nextEntriesByPath).toBeNull();
+	});
+
+	it("returns stale removals when includeContents=false and target paths changed", () => {
+		const previous = entriesMap({
+			"a.md": makeEntry(),
+			"b.md": makeEntry(),
+		});
+		const result = diffSearchWorkerFileContents(
+			iterableFromEntries({ "b.md": makeEntry() }),
 			previous,
 			false,
 		);
 		expect(result.changed).toBe(true);
 		expect(result.upserts).toEqual([]);
-		expect(result.removals).toEqual(["a.md", "b.md"]);
-		expect(result.nextEntriesByPath).toEqual(new Map());
+		expect(result.removals).toEqual(["a.md"]);
+		expect(result.nextEntriesByPath).toEqual(
+			entriesMap({ "b.md": previous.get("b.md") as SearchContentIndexEntry }),
+		);
 	});
 
 	it("upserts new entries", () => {
@@ -268,15 +289,35 @@ describe("diffSearchWorkerFileContentsFromVisitor", () => {
 		expect(result.changed).toBe(false);
 	});
 
-	it("returns all removals when includeContents=false and previous exists", () => {
+	it("keeps active previous entries when includeContents=false", () => {
 		const previous = entriesMap({ "a.md": makeEntry(), "b.md": makeEntry() });
 		const result = diffSearchWorkerFileContentsFromVisitor(
-			visitorFromEntries({}),
+			visitorFromEntries({
+				"a.md": makeEntry({ content: "changed while inactive", mtime: 2 }),
+				"b.md": makeEntry(),
+			}),
+			previous,
+			false,
+		);
+		expect(result.changed).toBe(false);
+		expect(result.upserts).toEqual([]);
+		expect(result.removals).toEqual([]);
+		expect(result.nextEntriesByPath).toBeNull();
+	});
+
+	it("returns stale removals when includeContents=false and target paths changed", () => {
+		const previous = entriesMap({ "a.md": makeEntry(), "b.md": makeEntry() });
+		const result = diffSearchWorkerFileContentsFromVisitor(
+			visitorFromEntries({ "b.md": makeEntry() }),
 			previous,
 			false,
 		);
 		expect(result.changed).toBe(true);
-		expect(result.removals).toEqual(["a.md", "b.md"]);
+		expect(result.upserts).toEqual([]);
+		expect(result.removals).toEqual(["a.md"]);
+		expect(result.nextEntriesByPath).toEqual(
+			entriesMap({ "b.md": previous.get("b.md") as SearchContentIndexEntry }),
+		);
 	});
 
 	it("upserts new entries via visitor", () => {

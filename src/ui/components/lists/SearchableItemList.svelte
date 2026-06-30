@@ -228,6 +228,7 @@
 		app,
 		query: () => search.normalized,
 		enabled: () => searchEnabled && !!search.normalized,
+		contentIndexEnabled: () => searchEnabled,
 		matchScope: () =>
 			allowContentSearch && contentSearchEnabled
 				? "title-and-content"
