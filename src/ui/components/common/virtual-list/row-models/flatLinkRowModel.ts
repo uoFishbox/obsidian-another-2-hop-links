@@ -1,8 +1,8 @@
-import { computeVisibleRowRange } from "../layout/flatGridLayout";
 import type { FlatLogicalCellSource } from "../flatLogicalCellSource";
 import type { VirtualListLogicalCell } from "../logicalCell";
 import type { RowRange } from "../rowRange";
 import type { FlatGridLayoutMetrics } from "../layoutMetrics";
+import type { StablePreviewScrollTopBand } from "../dom/activeScrollWindowGate";
 import type {
 	VirtualNavigationTarget,
 	VirtualRanges,
@@ -24,6 +24,10 @@ export interface FlatLinkVirtualRow<T> extends VirtualRow<VirtualListLogicalCell
 	startCellIndex: number;
 }
 
+type StablePreviewScrollTopBandMutable = {
+	-readonly [K in keyof StablePreviewScrollTopBand]: StablePreviewScrollTopBand[K];
+};
+
 export interface FlatLinkRowModel<T> extends VirtualRowModel<
 	VirtualListLogicalCell<T>
 > {
@@ -37,6 +41,70 @@ export interface FlatLinkRowModel<T> extends VirtualRowModel<
 		mountedOverscanPx: number;
 		previewOverscanPx?: number;
 	}): VirtualRanges;
+	findVisibleRangeInto(
+		out: RowRange,
+		params: {
+			scrollTop: number;
+			viewportHeight: number;
+			overscanPx: number;
+		},
+	): void;
+	findVisibleRangesInto(
+		out: VirtualRanges,
+		params: {
+			scrollTop: number;
+			viewportHeight: number;
+			mountedOverscanPx: number;
+			previewOverscanPx?: number;
+		},
+	): void;
+	findVisibleRangesFromMounted(params: {
+		scrollTop: number;
+		viewportHeight: number;
+		mounted: RowRange;
+		mountedOverscanPx: number;
+		previewOverscanPx?: number;
+	}): VirtualRanges;
+	findVisibleRangesFromMountedInto(
+		out: VirtualRanges,
+		params: {
+			scrollTop: number;
+			viewportHeight: number;
+			mounted: RowRange;
+			mountedOverscanPx: number;
+			previewOverscanPx?: number;
+		},
+	): void;
+	findStablePreviewScrollTopBandInto(
+		out: StablePreviewScrollTopBandMutable,
+		params: {
+			viewportHeight: number;
+			mountedOverscanPx: number;
+			previewOverscanPx?: number;
+			previewVisible: RowRange;
+		},
+	): void;
+	findStableMountedScrollTopBandInto(
+		out: StablePreviewScrollTopBandMutable,
+		params: {
+			mountedOverscanPx: number;
+			viewportHeight: number;
+			mounted: RowRange;
+		},
+	): void;
+}
+
+function copyRowRangeInto(out: RowRange, range: RowRange): void {
+	out.start = range.start;
+	out.end = range.end;
+}
+
+function normalizePreviewOverscan(
+	value: number | undefined,
+	mountedOverscanPx: number,
+): number {
+	if (value === undefined || !Number.isFinite(value) || value <= 0) return 0;
+	return Math.min(mountedOverscanPx, value);
 }
 
 export function createFlatLinkRowModel<T>(
@@ -65,23 +133,98 @@ export function createFlatLinkRowModel<T>(
 		rowIndex * columns + columnIndex;
 	const resolveCellAtIndex = (index: number): VirtualListLogicalCell<T> | null =>
 		cellSource.resolveCellAtIndex(index);
+	const resolveOverscanRows = (overscanPx: number): number =>
+		rowStride > 0 ? Math.ceil(Math.max(0, overscanPx) / rowStride) : 0;
+	const writeVisibleRange = (
+		out: RowRange,
+		scrollTop: number,
+		viewportHeight: number,
+		overscanPx: number,
+	): void => {
+		if (rowCount <= 0) {
+			out.start = 0;
+			out.end = 0;
+			return;
+		}
+		if (rowStride <= 0) {
+			out.start = 0;
+			out.end = rowCount;
+			return;
+		}
+
+		const sectionViewportTop = scrollTop;
+		const sectionViewportBottom = scrollTop + viewportHeight;
+		if (sectionViewportBottom <= 0 || sectionViewportTop >= totalHeight) {
+			out.start = 0;
+			out.end = 0;
+			return;
+		}
+
+		const overscanRows = resolveOverscanRows(overscanPx);
+		const firstVisibleRow = Math.floor(Math.max(0, sectionViewportTop) / rowStride);
+		const lastVisibleRow = Math.floor(
+			Math.max(0, sectionViewportBottom - 1) / rowStride,
+		);
+		out.start = Math.max(0, firstVisibleRow - overscanRows);
+		out.end = Math.min(rowCount, lastVisibleRow + overscanRows + 1);
+	};
 	const findVisibleRange = (params: {
 		scrollTop: number;
 		viewportHeight: number;
 		overscanPx: number;
 	}): RowRange => {
-		const overscanRows =
-			rowStride > 0 ? Math.ceil(Math.max(0, params.overscanPx) / rowStride) : 0;
-
-		return computeVisibleRowRange({
-			scrollTop: params.scrollTop,
-			viewportHeight: params.viewportHeight,
-			sectionTop: 0,
-			rowHeight: input.layout.rowHeight,
-			gap: input.layout.gap,
-			rowCount,
-			overscanRows,
-		});
+		const range = { start: 0, end: 0 };
+		writeVisibleRange(
+			range,
+			params.scrollTop,
+			params.viewportHeight,
+			params.overscanPx,
+		);
+		return range;
+	};
+	const resolveMountedAndPreviewRangesInto = (
+		out: VirtualRanges,
+		params: {
+			scrollTop: number;
+			viewportHeight: number;
+			mountedOverscanPx: number;
+			previewOverscanPx?: number;
+			mounted?: RowRange;
+			reuseMountedReference?: boolean;
+		},
+	): VirtualRanges => {
+		const mountedOverscanPx = Math.max(0, params.mountedOverscanPx);
+		const previewOverscanPx = normalizePreviewOverscan(
+			params.previewOverscanPx,
+			mountedOverscanPx,
+		);
+		if (params.mounted === undefined) {
+			writeVisibleRange(
+				out.mounted,
+				params.scrollTop,
+				params.viewportHeight,
+				mountedOverscanPx,
+			);
+		} else if (params.reuseMountedReference === true) {
+			out.mounted = params.mounted;
+		} else {
+			copyRowRangeInto(out.mounted, params.mounted);
+		}
+		if (previewOverscanPx >= mountedOverscanPx) {
+			if (params.reuseMountedReference === true) {
+				out.previewVisible = out.mounted;
+				return out;
+			}
+			copyRowRangeInto(out.previewVisible, out.mounted);
+			return out;
+		}
+		writeVisibleRange(
+			out.previewVisible,
+			params.scrollTop,
+			params.viewportHeight,
+			previewOverscanPx,
+		);
+		return out;
 	};
 	const findVisibleRanges = (params: {
 		scrollTop: number;
@@ -89,36 +232,135 @@ export function createFlatLinkRowModel<T>(
 		mountedOverscanPx: number;
 		previewOverscanPx?: number;
 	}): VirtualRanges => {
-		const mountedOverscanPx = Math.max(0, params.mountedOverscanPx);
-		const previewOverscanPx = Math.min(
-			mountedOverscanPx,
-			Math.max(0, params.previewOverscanPx ?? 0),
-		);
-		const mounted =
-			mountedOverscanPx <= 0
-				? findVisibleRange({
-						scrollTop: params.scrollTop,
-						viewportHeight: params.viewportHeight,
-						overscanPx: 0,
-					})
-				: findVisibleRange({
-						scrollTop: params.scrollTop,
-						viewportHeight: params.viewportHeight,
-						overscanPx: mountedOverscanPx,
-					});
-		const previewVisible =
-			previewOverscanPx >= mountedOverscanPx
-				? mounted
-				: findVisibleRange({
-						scrollTop: params.scrollTop,
-						viewportHeight: params.viewportHeight,
-						overscanPx: previewOverscanPx,
-					});
-
-		return {
-			mounted,
-			previewVisible,
+		const ranges = {
+			mounted: { start: 0, end: 0 },
+			previewVisible: { start: 0, end: 0 },
 		};
+		return resolveMountedAndPreviewRangesInto(ranges, {
+			...params,
+			reuseMountedReference: true,
+		});
+	};
+	const findVisibleRangesInto = (
+		out: VirtualRanges,
+		params: {
+			scrollTop: number;
+			viewportHeight: number;
+			mountedOverscanPx: number;
+			previewOverscanPx?: number;
+		},
+	): void => {
+		resolveMountedAndPreviewRangesInto(out, params);
+	};
+	const findVisibleRangesFromMounted = (params: {
+		scrollTop: number;
+		viewportHeight: number;
+		mounted: RowRange;
+		mountedOverscanPx: number;
+		previewOverscanPx?: number;
+	}): VirtualRanges => {
+		const ranges = {
+			mounted: { start: 0, end: 0 },
+			previewVisible: { start: 0, end: 0 },
+		};
+		return resolveMountedAndPreviewRangesInto(ranges, {
+			...params,
+			reuseMountedReference: true,
+		});
+	};
+	const findVisibleRangesFromMountedInto = (
+		out: VirtualRanges,
+		params: {
+			scrollTop: number;
+			viewportHeight: number;
+			mounted: RowRange;
+			mountedOverscanPx: number;
+			previewOverscanPx?: number;
+		},
+	): void => {
+		resolveMountedAndPreviewRangesInto(out, params);
+	};
+	const writeInvalidStableScrollTopBand = (
+		out: StablePreviewScrollTopBandMutable,
+	): void => {
+		out.min = Number.POSITIVE_INFINITY;
+		out.max = Number.NEGATIVE_INFINITY;
+	};
+	const writeStableScrollTopBand = (
+		out: StablePreviewScrollTopBandMutable,
+		range: RowRange,
+		viewportHeight: number,
+		overscanPx: number,
+	): void => {
+		if (range.start >= range.end || viewportHeight <= 0) {
+			writeInvalidStableScrollTopBand(out);
+			return;
+		}
+		if (rowStride <= 0) {
+			out.min = Number.NEGATIVE_INFINITY;
+			out.max = Number.POSITIVE_INFINITY;
+			return;
+		}
+
+		const overscanRows = resolveOverscanRows(overscanPx);
+		const minForStart =
+			range.start === 0
+				? Number.NEGATIVE_INFINITY
+				: (range.start + overscanRows) * rowStride;
+		const maxForStart = (range.start + overscanRows + 1) * rowStride;
+		const endBoundaryRow = range.end - overscanRows - 1;
+		const minForEnd = endBoundaryRow * rowStride - viewportHeight + 1;
+		const maxForEnd =
+			range.end >= rowCount
+				? Number.POSITIVE_INFINITY
+				: (endBoundaryRow + 1) * rowStride - viewportHeight + 1;
+
+		out.min = Math.max(minForStart, minForEnd, -viewportHeight);
+		out.max = Math.min(maxForStart, maxForEnd, totalHeight);
+		if (out.min >= out.max) {
+			writeInvalidStableScrollTopBand(out);
+		}
+	};
+	const findStablePreviewScrollTopBandInto = (
+		out: StablePreviewScrollTopBandMutable,
+		params: {
+			viewportHeight: number;
+			mountedOverscanPx: number;
+			previewOverscanPx?: number;
+			previewVisible: RowRange;
+		},
+	): void => {
+		const mountedOverscanPx = Math.max(0, params.mountedOverscanPx);
+		const previewOverscanPx = normalizePreviewOverscan(
+			params.previewOverscanPx,
+			mountedOverscanPx,
+		);
+		if (previewOverscanPx >= mountedOverscanPx) {
+			out.min = Number.NEGATIVE_INFINITY;
+			out.max = Number.POSITIVE_INFINITY;
+			return;
+		}
+		writeStableScrollTopBand(
+			out,
+			params.previewVisible,
+			params.viewportHeight,
+			previewOverscanPx,
+		);
+	};
+	const findStableMountedScrollTopBandInto = (
+		out: StablePreviewScrollTopBandMutable,
+		params: {
+			mountedOverscanPx: number;
+			viewportHeight: number;
+			mounted: RowRange;
+		},
+	): void => {
+		writeStableScrollTopBand(
+			out,
+			params.mounted,
+			params.viewportHeight,
+			Math.max(0, params.mountedOverscanPx),
+		);
 	};
 	const layoutRevision = createVirtualListLayoutRevisionToken([
 		columns,
@@ -176,6 +418,21 @@ export function createFlatLinkRowModel<T>(
 		}): RowRange {
 			return findVisibleRange(params);
 		},
+		findVisibleRangeInto(
+			out: RowRange,
+			params: {
+				scrollTop: number;
+				viewportHeight: number;
+				overscanPx: number;
+			},
+		): void {
+			writeVisibleRange(
+				out,
+				params.scrollTop,
+				params.viewportHeight,
+				params.overscanPx,
+			);
+		},
 		findVisibleRanges(params: {
 			scrollTop: number;
 			viewportHeight: number;
@@ -184,6 +441,11 @@ export function createFlatLinkRowModel<T>(
 		}): VirtualRanges {
 			return findVisibleRanges(params);
 		},
+		findVisibleRangesInto,
+		findVisibleRangesFromMounted,
+		findVisibleRangesFromMountedInto,
+		findStablePreviewScrollTopBandInto,
+		findStableMountedScrollTopBandInto,
 		resolveNavigationTarget(
 			currentKey,
 			direction,

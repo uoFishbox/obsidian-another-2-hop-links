@@ -21,6 +21,7 @@ import {
 	createVirtualListController,
 	type VirtualListStableMeasurementContext,
 } from "../dom/virtualListController";
+import type { StablePreviewScrollTopBand } from "../dom/activeScrollWindowGate";
 import { createVirtualListMeasurementState } from "../dom/virtualListMeasurementState";
 import { resolveVirtualListLayoutStability } from "../dom/virtualListMeasurementStability";
 import { resolveCachedCardGridLayoutBase } from "../dom/virtualListCardLayout";
@@ -107,6 +108,9 @@ type ConfiguredCardLayout = ReturnType<typeof resolveCardLayoutSettings>;
 type FlatMountedItemCell<T> = MountedVirtualGridCell<T> & {
 	readonly cell: Extract<VirtualListLogicalCell<T>, { kind: "item" }>;
 };
+type StableScrollTopBandMutable = {
+	-readonly [K in keyof StablePreviewScrollTopBand]: StablePreviewScrollTopBand[K];
+};
 
 const isSameLayout = (current: VirtualGridLayout, next: VirtualGridLayout): boolean =>
 	current.containerWidth === next.containerWidth &&
@@ -151,17 +155,91 @@ export function useFlatVirtualGridList<T>(props: FlatVirtualGridListProps<T>) {
 	});
 	let visibilityMountedRows: readonly MountedVirtualGridRowSlice<T>[] | readonly [] =
 		EMPTY_MOUNTED_ROWS;
-	let visibilityMountedRange: RowRange = { start: 0, end: 0 };
+	const visibilityMountedRange: RowRange = { start: 0, end: 0 };
 	let visibilityRowModel: object | null = null;
-	let visibilityPreviewRange: RowRange | null = null;
+	const visibilityPreviewRange: RowRange = { start: 0, end: 0 };
+	let hasVisibilityPreviewRange = false;
 	const reusableRowSlotsScratch: number[] = [];
+	const mountedRangeParams: Parameters<FlatLinkRowModel<T>["findVisibleRange"]>[0] = {
+		scrollTop: 0,
+		viewportHeight: 0,
+		overscanPx: 0,
+	};
+	const rangeParams: Parameters<FlatLinkRowModel<T>["findVisibleRanges"]>[0] = {
+		scrollTop: 0,
+		viewportHeight: 0,
+		mountedOverscanPx: 0,
+		previewOverscanPx: 0,
+	};
+	const rangesFromMountedParams: Parameters<
+		FlatLinkRowModel<T>["findVisibleRangesFromMounted"]
+	>[0] = {
+		scrollTop: 0,
+		viewportHeight: 0,
+		mounted: { start: 0, end: 0 },
+		mountedOverscanPx: 0,
+		previewOverscanPx: 0,
+	};
+	let lastResolvedActiveScrollPolicyLayout: VirtualGridLayout | undefined;
+	let lastResolvedActiveScrollPolicy:
+		| ReturnType<typeof createCardVirtualListPolicy>
+		| undefined;
+	const mountedScrollWindowMeasurement = {
+		identity: {} as object,
+		mounted: { start: 0, end: 0 },
+		stableMountedScrollTopBand: undefined,
+	};
+	const scrollWindowMeasurement = {
+		identity: {} as object,
+		ranges: {
+			mounted: { start: 0, end: 0 },
+			previewVisible: { start: 0, end: 0 },
+		},
+		stablePreviewScrollTopBand: { min: 0, max: 0 },
+	};
+	const committedScrollWindowMeasurement = {
+		identity: {} as object,
+		ranges: {
+			mounted: { start: 0, end: 0 },
+			previewVisible: { start: 0, end: 0 },
+		},
+		stablePreviewScrollTopBand: { min: 0, max: 0 },
+	};
+	const resolveActiveScrollPolicy = (
+		nextLayout: VirtualGridLayout,
+	): ReturnType<typeof createCardVirtualListPolicy> => {
+		if (lastResolvedActiveScrollPolicyLayout !== nextLayout) {
+			lastResolvedActiveScrollPolicyLayout = nextLayout;
+			lastResolvedActiveScrollPolicy = createCardVirtualListPolicy({
+				layout: nextLayout,
+				previewActivationAheadRows,
+			});
+		}
+		return lastResolvedActiveScrollPolicy!;
+	};
+	const updateStablePreviewScrollTopBand = (
+		out: StableScrollTopBandMutable,
+		measurementRowModel: FlatLinkRowModel<T>,
+		sectionTop: number,
+		params: Parameters<FlatLinkRowModel<T>["findVisibleRanges"]>[0],
+		previewVisible: RowRange,
+	): void => {
+		measurementRowModel.findStablePreviewScrollTopBandInto(out, {
+			viewportHeight: params.viewportHeight,
+			mountedOverscanPx: params.mountedOverscanPx,
+			previewOverscanPx: params.previewOverscanPx,
+			previewVisible,
+		});
+		out.min += sectionTop;
+		out.max += sectionTop;
+	};
 	const syncVisibilityStates = (
 		mountedRows: readonly MountedVirtualGridRowSlice<T>[] | readonly [],
 		nextMountedRange: RowRange,
 		nextPreviewRange: RowRange,
 		nextRowModel: object,
 	): void => {
-		if (!visibilityPreviewRange || nextRowModel !== visibilityRowModel) {
+		if (!hasVisibilityPreviewRange || nextRowModel !== visibilityRowModel) {
 			visibilityStates.syncMountedRows({
 				mountedRows,
 				previewRange: nextPreviewRange,
@@ -183,9 +261,12 @@ export function useFlatVirtualGridList<T>(props: FlatVirtualGridListProps<T>) {
 		}
 
 		visibilityMountedRows = mountedRows;
-		visibilityMountedRange = nextMountedRange;
+		visibilityMountedRange.start = nextMountedRange.start;
+		visibilityMountedRange.end = nextMountedRange.end;
 		visibilityRowModel = nextRowModel;
-		visibilityPreviewRange = nextPreviewRange;
+		visibilityPreviewRange.start = nextPreviewRange.start;
+		visibilityPreviewRange.end = nextPreviewRange.end;
+		hasVisibilityPreviewRange = true;
 	};
 
 	let sectionExpandedLimits = $state.raw<Record<string, number>>({});
@@ -391,7 +472,7 @@ export function useFlatVirtualGridList<T>(props: FlatVirtualGridListProps<T>) {
 				nextLayout,
 				precomputedRanges,
 			),
-		resolveScrollWindowMeasurement: (
+		resolveMountedScrollWindowMeasurement: (
 			scrollTop,
 			viewportHeight,
 			sectionTop,
@@ -399,20 +480,85 @@ export function useFlatVirtualGridList<T>(props: FlatVirtualGridListProps<T>) {
 			nextLayout,
 		) => {
 			const measurementRowModel = resolveFlatLinkRowModel(nextLayout);
-			const visibilityPolicy = createCardVirtualListPolicy({
-				layout: nextLayout,
-				previewActivationAheadRows,
-			});
-			return {
-				identity: measurementRowModel,
-				ranges: measurementRowModel.findVisibleRanges({
-					scrollTop: scrollTop - sectionTop,
-					viewportHeight,
-					mountedOverscanPx: visibilityPolicy.mountedOverscanPx,
-					previewOverscanPx: visibilityPolicy.previewOverscanPx,
-				}),
-			};
+			const visibilityPolicy = resolveActiveScrollPolicy(nextLayout);
+			const localScrollTop = scrollTop - sectionTop;
+			const mountedOverscanPx = visibilityPolicy.mountedOverscanPx;
+
+			mountedRangeParams.scrollTop = localScrollTop;
+			mountedRangeParams.viewportHeight = viewportHeight;
+			mountedRangeParams.overscanPx = mountedOverscanPx;
+			mountedScrollWindowMeasurement.identity = measurementRowModel;
+			measurementRowModel.findVisibleRangeInto(
+				mountedScrollWindowMeasurement.mounted,
+				mountedRangeParams,
+			);
+			mountedScrollWindowMeasurement.stableMountedScrollTopBand = undefined;
+			return mountedScrollWindowMeasurement;
 		},
+		resolveScrollWindowMeasurement: (
+			scrollTop,
+			viewportHeight,
+			sectionTop,
+			_content,
+			nextLayout,
+			precomputedMountedRange,
+		) => {
+			const measurementRowModel = resolveFlatLinkRowModel(nextLayout);
+			const visibilityPolicy = resolveActiveScrollPolicy(nextLayout);
+			rangeParams.scrollTop = scrollTop - sectionTop;
+			rangeParams.viewportHeight = viewportHeight;
+			rangeParams.mountedOverscanPx = visibilityPolicy.mountedOverscanPx;
+			rangeParams.previewOverscanPx = visibilityPolicy.previewOverscanPx;
+			if (!precomputedMountedRange) {
+				committedScrollWindowMeasurement.identity = measurementRowModel;
+				measurementRowModel.findVisibleRangesInto(
+					committedScrollWindowMeasurement.ranges,
+					rangeParams,
+				);
+				updateStablePreviewScrollTopBand(
+					committedScrollWindowMeasurement.stablePreviewScrollTopBand,
+					measurementRowModel,
+					sectionTop,
+					rangeParams,
+					committedScrollWindowMeasurement.ranges.previewVisible,
+				);
+				return committedScrollWindowMeasurement;
+			}
+
+			scrollWindowMeasurement.identity = measurementRowModel;
+			rangesFromMountedParams.scrollTop = rangeParams.scrollTop;
+			rangesFromMountedParams.viewportHeight = rangeParams.viewportHeight;
+			rangesFromMountedParams.mounted = precomputedMountedRange;
+			rangesFromMountedParams.mountedOverscanPx = rangeParams.mountedOverscanPx;
+			rangesFromMountedParams.previewOverscanPx = rangeParams.previewOverscanPx;
+			measurementRowModel.findVisibleRangesFromMountedInto(
+				scrollWindowMeasurement.ranges,
+				rangesFromMountedParams,
+			);
+			updateStablePreviewScrollTopBand(
+				scrollWindowMeasurement.stablePreviewScrollTopBand,
+				measurementRowModel,
+				sectionTop,
+				rangeParams,
+				scrollWindowMeasurement.ranges.previewVisible,
+			);
+			return scrollWindowMeasurement;
+		},
+		onActiveScrollPreviewRangeMeasurement: (ranges) => {
+			const activeRowModel =
+				visibilityRowModel ?? virtualList.getSnapshot()?.rowModel ?? null;
+			if (!activeRowModel) {
+				return;
+			}
+
+			syncVisibilityStates(
+				visibilityMountedRows,
+				visibilityMountedRange,
+				ranges.previewVisible,
+				activeRowModel,
+			);
+		},
+		activeScrollWindowComparison: "mounted-only",
 		onStableLayoutMeasurement: (context) => {
 			maybeScheduleInfiniteScrollLoad(context);
 		},
