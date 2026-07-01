@@ -314,7 +314,7 @@ export function useFlatVirtualGridList<T>(props: FlatVirtualGridListProps<T>) {
 		virtualListController.scheduleLayoutMeasurement();
 	};
 
-	const syncRenderableContentMeasurement = (
+	const syncVirtualListForRenderableContent = (
 		nextLogicalCellCount: number,
 		nextRowModel: FlatLinkRowModel<T>,
 	): void => {
@@ -324,6 +324,10 @@ export function useFlatVirtualGridList<T>(props: FlatVirtualGridListProps<T>) {
 				reason: "no-renderable-content",
 			});
 			return;
+		}
+
+		if (virtualList.getSnapshot()?.rowModel !== nextRowModel) {
+			virtualList.recompute({ rowModel: nextRowModel });
 		}
 
 		virtualListController.scheduleLayoutMeasurement();
@@ -341,25 +345,6 @@ export function useFlatVirtualGridList<T>(props: FlatVirtualGridListProps<T>) {
 
 		lastEmptyMountedCellsNotification = currentSnapshot;
 		untrack(() => props.onMountedCellsChange?.([]));
-	};
-
-	const recomputeVirtualListForRowModel = (
-		nextLogicalCellCount: number,
-		nextRowModel: FlatLinkRowModel<T>,
-	): void => {
-		if (nextLogicalCellCount === 0) {
-			virtualList.setEmpty({
-				rowModel: nextRowModel,
-				reason: "no-renderable-content",
-			});
-			return;
-		}
-
-		if (virtualList.getSnapshot()?.rowModel === nextRowModel) {
-			return;
-		}
-
-		virtualList.recompute({ rowModel: nextRowModel });
 	};
 
 	const observeInfiniteScrollSentinel = (
@@ -411,15 +396,11 @@ export function useFlatVirtualGridList<T>(props: FlatVirtualGridListProps<T>) {
 	});
 
 	$effect(() => {
-		syncRenderableContentMeasurement(logicalCellCount, rowModel);
+		syncVirtualListForRenderableContent(logicalCellCount, rowModel);
 	});
 
 	$effect(() => {
 		notifyEmptyMountedCellsChange(virtualListSnapshot);
-	});
-
-	$effect(() => {
-		recomputeVirtualListForRowModel(logicalCellCount, rowModel);
 	});
 
 	const loadNextPage = () => {
