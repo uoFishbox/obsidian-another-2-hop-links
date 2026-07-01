@@ -19,7 +19,7 @@ import {
 	type InteractionDescriptor,
 } from "./interactionTypes";
 import { installNativeDragSelectionShim } from "./cardDragState";
-import { getOwnerWindow } from "ui/utils/realmSafeDom";
+import { getOwnerWindow, isNodeLike } from "ui/utils/realmSafeDom";
 
 interface DelegatedDispatcherDeps {
 	registry: InteractionRegistry;
@@ -53,6 +53,17 @@ function resolveInteractionDescriptor(
 	}
 
 	return registry.resolve(interactionId) ?? null;
+}
+
+function isRelatedTargetWithinElement(
+	event: MouseEvent,
+	element: HTMLElement,
+): boolean {
+	const relatedTarget = event.relatedTarget;
+	return (
+		isNodeLike(relatedTarget) &&
+		(relatedTarget === element || element.contains(relatedTarget))
+	);
 }
 
 function dispatchActivation(
@@ -288,6 +299,10 @@ export function createDelegatedInteractionDispatcher({
 				return;
 			}
 
+			if (isRelatedTargetWithinElement(event, element)) {
+				return;
+			}
+
 			const descriptor = resolveInteractionDescriptor(registry, element);
 			if (!descriptor) {
 				return;
@@ -334,6 +349,10 @@ export function createDelegatedInteractionDispatcher({
 		handleMouseOut(event: MouseEvent): void {
 			const element = getInteractionElement(event);
 			if (!element) {
+				return;
+			}
+
+			if (isRelatedTargetWithinElement(event, element)) {
 				return;
 			}
 

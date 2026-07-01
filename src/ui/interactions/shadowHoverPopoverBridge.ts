@@ -76,6 +76,17 @@ function isEventTargetWithinAnchor(
 	return isNodeLike(target) && anchorEl.contains(target);
 }
 
+function isRelatedTargetWithinAnchor(
+	anchorEl: HTMLElement,
+	event: MouseEvent,
+): boolean {
+	const relatedTarget = event.relatedTarget;
+	return (
+		isNodeLike(relatedTarget) &&
+		(relatedTarget === anchorEl || anchorEl.contains(relatedTarget))
+	);
+}
+
 function leaveActiveAnchor(handle: SharedShadowHoverBridgeHandle): void {
 	if (!handle.activeAnchorEl) {
 		handle.activeInteractionId = null;
@@ -213,6 +224,10 @@ function handleMouseOut(
 		return;
 	}
 
+	if (isRelatedTargetWithinAnchor(currentAnchorEl, event)) {
+		return;
+	}
+
 	const currentInteractionId = getInteractionIdFromElement(currentAnchorEl);
 	if (
 		currentAnchorEl !== handle.activeAnchorEl &&
@@ -257,6 +272,13 @@ function handlePointerMove(
 		return;
 	}
 
+	if (!isEventTargetWithinAnchor(activeAnchorEl, event.target)) {
+		const anchorEl = resolveInteractionElementFromEvent(handle.shadowRoot, event);
+		if (anchorEl !== activeAnchorEl) {
+			return;
+		}
+	}
+
 	const currentInteractionId = getInteractionIdFromElement(activeAnchorEl);
 	if (!currentInteractionId) {
 		leaveActiveAnchor(handle);
@@ -284,13 +306,6 @@ function handlePointerMove(
 	handle.lastPointerModState = modState;
 	if (!shouldRetrigger) {
 		return;
-	}
-
-	if (!isEventTargetWithinAnchor(activeAnchorEl, event.target)) {
-		const anchorEl = resolveInteractionElementFromEvent(handle.shadowRoot, event);
-		if (anchorEl !== activeAnchorEl) {
-			return;
-		}
 	}
 
 	handle.controller.handleDelegatedPointerMove(activeAnchorEl, interactionId, event);

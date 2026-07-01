@@ -1,7 +1,10 @@
 <script lang="ts">
 	import type { Snippet } from "svelte";
 	import type { PluginSettings } from "types/settings";
-	import type { SectionHeaderInteractionDescriptor } from "ui/interactions/interactionTypes";
+	import {
+		interactionIdBinding,
+		type SectionHeaderInteractionDescriptor,
+	} from "ui/interactions/interactionTypes";
 	import { useInteractionRegistry } from "ui/interactions/interactionRegistry";
 
 	export interface Props {
@@ -61,6 +64,7 @@
 	data-ccl-interaction-id={interactionId}
 	data-ccl-interaction-kind={interactionKind}
 	data-directory={directory}
+	use:interactionIdBinding={interactionId}
 	onclick={() => onClick?.()}
 	onkeydown={(e) => {
 		if (e.key === "Enter" || e.key === " ") {

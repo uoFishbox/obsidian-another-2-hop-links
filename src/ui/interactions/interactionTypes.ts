@@ -28,6 +28,7 @@ export const INTERACTION_SELECTOR = `[${INTERACTION_ID_ATTRIBUTE}]`;
 const CARD_INTERACTION_SELECTOR = `.cosense-card-links__box${INTERACTION_SELECTOR}`;
 const SYNTHETIC_HOVER_EVENT_FLAG = "__cclSyntheticHover";
 const LAST_TOUCH_AT_DATASET_KEY = "cclLastTouchAt";
+const interactionIdsByElement = new WeakMap<Element, string>();
 
 export type InteractionKind = "item" | "sectionHeader";
 
@@ -66,6 +67,30 @@ export function buildInteractionDataAttributes(
 	return {
 		[INTERACTION_ID_ATTRIBUTE]: interactionId,
 		[INTERACTION_KIND_ATTRIBUTE]: kind,
+	};
+}
+
+function bindInteractionId(element: Element, interactionId: string): void {
+	interactionIdsByElement.set(element, interactionId);
+}
+
+function unbindInteractionId(element: Element): void {
+	interactionIdsByElement.delete(element);
+}
+
+export function interactionIdBinding(
+	element: HTMLElement,
+	interactionId: string,
+): { update: (nextInteractionId: string) => void; destroy: () => void } {
+	bindInteractionId(element, interactionId);
+
+	return {
+		update(nextInteractionId: string): void {
+			bindInteractionId(element, nextInteractionId);
+		},
+		destroy(): void {
+			unbindInteractionId(element);
+		},
 	};
 }
 
@@ -222,7 +247,13 @@ export function getAttachedInteractionHoverTarget(event: Event): HTMLElement | n
 export function getInteractionIdFromElement(
 	element: HTMLElement | null,
 ): string | null {
-	return element?.dataset.cclInteractionId ?? null;
+	if (!element) {
+		return null;
+	}
+
+	return (
+		interactionIdsByElement.get(element) ?? element.dataset.cclInteractionId ?? null
+	);
 }
 
 export function markInteractionLongPressed(element: HTMLElement): void {

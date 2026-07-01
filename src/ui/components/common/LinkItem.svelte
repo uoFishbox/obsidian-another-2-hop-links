@@ -2,7 +2,10 @@
 	import type { PluginSettings } from "types/settings";
 	import { type TFile } from "obsidian";
 	import { svgAttrs, ICON_PATHS } from "ui/utils/icons";
-	import { type InteractionKind } from "ui/interactions/interactionTypes";
+	import {
+		interactionIdBinding,
+		type InteractionKind,
+	} from "ui/interactions/interactionTypes";
 	import { isAttachment } from "core/rules/fileRules";
 	import { AUDIO_EXTENSIONS, IMAGE_EXTENSIONS } from "../../../appConstants";
 	import { type Snippet } from "svelte";
@@ -100,6 +103,7 @@
 	data-ccl-interaction-kind={interactionKind}
 	data-directory={directory}
 	{draggable}
+	use:interactionIdBinding={interactionId}
 >
 	<div class="cosense-card-links__box-title-wrapper">
 		<div class="cosense-card-links__box-title">

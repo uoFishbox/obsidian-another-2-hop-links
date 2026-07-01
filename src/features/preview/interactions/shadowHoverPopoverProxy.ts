@@ -12,6 +12,7 @@ import {
 	isMouseEventLike,
 	isShadowRootLike,
 } from "ui/utils/realmSafeDom";
+import { getInteractionIdFromElement } from "ui/interactions/interactionTypes";
 
 type ShadowHoverPopoverSourceRef = {
 	deref(): HTMLElement | undefined;
@@ -218,7 +219,7 @@ function createProxyElement(
 	proxyEl.setAttribute(SHADOW_PROXY_ATTRIBUTE, "1");
 	proxyEl.setAttribute("aria-hidden", "true");
 
-	const interactionId = sourceEl.dataset.cclInteractionId;
+	const interactionId = getInteractionIdFromElement(sourceEl);
 	if (interactionId) {
 		proxyEl.setAttribute("data-ccl-shadow-hover-proxy-for", interactionId);
 	}
