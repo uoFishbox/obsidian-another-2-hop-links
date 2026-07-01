@@ -34,8 +34,13 @@ export type ResolvedHeaderRenderRevisionToken = {
 const DEFAULT_RENDER_REVISION_FALLBACK_POLICY: RenderRevisionFallbackPolicy =
 	"source-key-only";
 
-const escapeRenderRevisionString = (value: string): string =>
-	value.replace(/\\/g, "\\\\").replace(/\|/g, "\\p");
+const escapeRenderRevisionString = (value: string): string => {
+	if (!value.includes("\\") && !value.includes("|")) {
+		return value;
+	}
+
+	return value.replace(/\\/g, "\\\\").replace(/\|/g, "\\p");
+};
 
 export function encodeRenderRevisionToken(value: RenderRevision): string {
 	if (value === null) {
