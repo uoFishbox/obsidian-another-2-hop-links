@@ -111,6 +111,46 @@ describe("createTwoHopMountRuntime", () => {
 		expect(secondState.visibility).toBe("visible");
 	});
 
+	it("keeps visibility state on the reused render slot when the logical item changes", () => {
+		const runtime = createTwoHopMountRuntime();
+		const mounted = runtime.buildMountedRows({
+			rowModel,
+			rowRange: { start: 1, end: 4 },
+			ranges: {
+				mounted: { start: 1, end: 4 },
+				previewVisible: { start: 1, end: 2 },
+			},
+		});
+		const removedItem = mounted.rowSlices[0]?.cells[0];
+		if (!removedItem) {
+			throw new Error("Expected removed mounted item.");
+		}
+
+		runtime.syncSnapshot(mounted, { start: 1, end: 2 });
+		const state = runtime.getOrCreateVisibilityState(removedItem, "visible");
+
+		const scrolled = runtime.buildMountedRows({
+			rowModel,
+			rowRange: { start: 2, end: 5 },
+			ranges: {
+				mounted: { start: 2, end: 5 },
+				previewVisible: { start: 4, end: 5 },
+			},
+			previousBuild: mounted,
+		});
+		runtime.syncSnapshot(scrolled, { start: 4, end: 5 });
+
+		const addedItem = scrolled.rowSlices.find((row) => row.rowIndex === 4)
+			?.cells[0];
+		if (!addedItem) {
+			throw new Error("Expected added mounted item.");
+		}
+
+		expect(addedItem.cellSlotKey).toBe(removedItem.cellSlotKey);
+		expect(runtime.getOrCreateVisibilityState(addedItem, "mounted")).toBe(state);
+		expect(state.visibility).toBe("visible");
+	});
+
 	it("returns the previous build by identity on same-plan, same-range recompute", () => {
 		const runtime = createTwoHopMountRuntime();
 		const range = { start: 0, end: 2 };

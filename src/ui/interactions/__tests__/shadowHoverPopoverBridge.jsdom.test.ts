@@ -7,6 +7,7 @@ const {
 	handleDelegatedModifierKeyMock,
 	handleDelegatedLeaveMock,
 	handleDelegatedPointerMoveMock,
+	closeActivePopoverMock,
 	destroyMock,
 	buildShadowHoverLinkSpecMock,
 } = vi.hoisted(() => ({
@@ -15,6 +16,7 @@ const {
 	handleDelegatedModifierKeyMock: vi.fn(),
 	handleDelegatedLeaveMock: vi.fn(),
 	handleDelegatedPointerMoveMock: vi.fn(),
+	closeActivePopoverMock: vi.fn(),
 	destroyMock: vi.fn(),
 	buildShadowHoverLinkSpecMock: vi.fn((descriptor?: { interactionId?: string }) =>
 		descriptor?.interactionId
@@ -33,7 +35,7 @@ vi.mock("features/preview/shadow-hover/controller", () => ({
 		handleDelegatedModifierKey = handleDelegatedModifierKeyMock;
 		handleDelegatedLeave = handleDelegatedLeaveMock;
 		handleDelegatedPointerMove = handleDelegatedPointerMoveMock;
-		closeActivePopover = vi.fn();
+		closeActivePopover = closeActivePopoverMock;
 		syncActivePopover = vi.fn();
 		destroy = destroyMock;
 	},
@@ -52,6 +54,7 @@ describe("shadowHoverPopoverBridge", () => {
 		handleDelegatedModifierKeyMock.mockReset();
 		handleDelegatedLeaveMock.mockReset();
 		handleDelegatedPointerMoveMock.mockReset();
+		closeActivePopoverMock.mockReset();
 		destroyMock.mockReset();
 		buildShadowHoverLinkSpecMock.mockClear();
 	});
@@ -230,6 +233,68 @@ describe("shadowHoverPopoverBridge", () => {
 			second,
 			"item:first",
 			expect.any(MouseEvent),
+		);
+
+		dispose();
+	});
+
+	it("relaunches when the same anchor element is reused for a different interaction", () => {
+		const { shadowRoot, dispose } = installBridge();
+		const interaction = createInteractionElement("item:first");
+		shadowRoot.append(interaction);
+
+		interaction.dispatchEvent(
+			new MouseEvent("mouseover", {
+				bubbles: true,
+				composed: true,
+			}),
+		);
+		interaction.dataset.cclInteractionId = "item:second";
+		interaction.dispatchEvent(
+			new MouseEvent("mouseover", {
+				bubbles: true,
+				composed: true,
+			}),
+		);
+
+		expect(closeActivePopoverMock).toHaveBeenCalledTimes(1);
+		expect(handleDelegatedAnchorSyncMock).not.toHaveBeenCalled();
+		expect(handleDelegatedEnterMock).toHaveBeenCalledTimes(2);
+		expect(handleDelegatedEnterMock).toHaveBeenLastCalledWith(
+			interaction,
+			"item:second",
+			expect.any(MouseEvent),
+		);
+
+		dispose();
+	});
+
+	it("uses the current interaction id on pointermove when a slot anchor is reused", () => {
+		const { shadowRoot, dispose } = installBridge();
+		const interaction = createInteractionElement("item:first");
+		shadowRoot.append(interaction);
+
+		interaction.dispatchEvent(
+			new MouseEvent("mouseover", {
+				bubbles: true,
+				composed: true,
+			}),
+		);
+		interaction.dataset.cclInteractionId = "item:second";
+		interaction.dispatchEvent(
+			new PointerEvent("pointermove", {
+				bubbles: true,
+				composed: true,
+			}),
+		);
+
+		expect(closeActivePopoverMock).toHaveBeenCalledTimes(1);
+		expect(handleDelegatedPointerMoveMock).not.toHaveBeenCalled();
+		expect(handleDelegatedEnterMock).toHaveBeenCalledTimes(2);
+		expect(handleDelegatedEnterMock).toHaveBeenLastCalledWith(
+			interaction,
+			"item:second",
+			expect.any(PointerEvent),
 		);
 
 		dispose();

@@ -10,10 +10,12 @@ import {
 
 const EMPTY_MOUNTED_ROWS: readonly MountedVirtualGridRowSlice<never>[] = [];
 
-export interface FlatGridVisibilityAdapterOptions extends VirtualizedItemVisibilityStateControllerOptions {}
+export interface FlatGridVisibilityAdapterOptions<
+	T,
+> extends VirtualizedItemVisibilityStateControllerOptions<MountedVirtualGridCell<T>> {}
 
 export function createFlatGridVisibilityAdapter<T>(
-	options: FlatGridVisibilityAdapterOptions = {},
+	options: FlatGridVisibilityAdapterOptions<T> = {},
 ) {
 	const visibilityStates =
 		createVirtualizedItemVisibilityStateController<MountedVirtualGridCell<T>>(

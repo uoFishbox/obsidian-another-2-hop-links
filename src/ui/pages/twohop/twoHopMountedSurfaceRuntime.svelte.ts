@@ -36,6 +36,10 @@ interface CachedItemRenderArgs {
 	readonly args: TwoHopItemRenderArgs;
 }
 
+function getTwoHopActivationCandidateId(cell: TwoHopMountedItemCell): string {
+	return `slot:${cell.cellSlotKey ?? cell.renderSlotIndex}`;
+}
+
 export function createTwoHopMountedSurfaceRuntime(params: {
 	readonly inputRuntime: TwoHopVirtualListPlanRuntime;
 	onStableVisibleRange(): void;
@@ -126,7 +130,7 @@ export function createTwoHopMountedSurfaceRuntime(params: {
 			rowIndex: renderedCell.rowIndex,
 			observerRoot,
 			visibilityState,
-			activationCandidateId: renderedCell.key,
+			activationCandidateId: getTwoHopActivationCandidateId(renderedCell),
 			get visibility() {
 				return visibilityState.visibility;
 			},

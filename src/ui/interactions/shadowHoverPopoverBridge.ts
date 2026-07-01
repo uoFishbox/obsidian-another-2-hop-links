@@ -89,6 +89,19 @@ function leaveActiveAnchor(handle: SharedShadowHoverBridgeHandle): void {
 	handle.lastPointerModState = null;
 }
 
+function relaunchActiveAnchorForInteraction(
+	handle: SharedShadowHoverBridgeHandle,
+	anchorEl: HTMLElement,
+	interactionId: string,
+	event: MouseEvent,
+): void {
+	handle.controller.closeActivePopover();
+	handle.activeAnchorEl = anchorEl;
+	handle.activeInteractionId = interactionId;
+	handle.lastPointerModState = getModifierState(event);
+	handle.controller.handleDelegatedEnter(anchorEl, interactionId, event);
+}
+
 function handleModifierStateChange(
 	handle: SharedShadowHoverBridgeHandle,
 	event: KeyboardEvent,
@@ -130,16 +143,28 @@ function handleMouseOver(
 
 	const nextDescriptor = handle.registry.resolve(nextInteractionId);
 	if (nextDescriptor?.hoverPreviewEnabled === false) {
+		if (handle.activeAnchorEl === nextAnchorEl) {
+			leaveActiveAnchor(handle);
+		}
 		return;
 	}
 
 	if (handle.activeAnchorEl === nextAnchorEl) {
 		handle.lastPointerModState = getModifierState(event);
-		handle.controller.handleDelegatedAnchorSync(
-			nextAnchorEl,
-			nextInteractionId,
-			event,
-		);
+		if (handle.activeInteractionId === nextInteractionId) {
+			handle.controller.handleDelegatedAnchorSync(
+				nextAnchorEl,
+				nextInteractionId,
+				event,
+			);
+		} else {
+			relaunchActiveAnchorForInteraction(
+				handle,
+				nextAnchorEl,
+				nextInteractionId,
+				event,
+			);
+		}
 		return;
 	}
 
@@ -229,6 +254,28 @@ function handlePointerMove(
 	const activeAnchorEl = handle.activeAnchorEl;
 	const interactionId = handle.activeInteractionId;
 	if (!activeAnchorEl || !interactionId) {
+		return;
+	}
+
+	const currentInteractionId = getInteractionIdFromElement(activeAnchorEl);
+	if (!currentInteractionId) {
+		leaveActiveAnchor(handle);
+		return;
+	}
+
+	const currentDescriptor = handle.registry.resolve(currentInteractionId);
+	if (currentDescriptor?.hoverPreviewEnabled === false) {
+		leaveActiveAnchor(handle);
+		return;
+	}
+
+	if (currentInteractionId !== interactionId) {
+		relaunchActiveAnchorForInteraction(
+			handle,
+			activeAnchorEl,
+			currentInteractionId,
+			event,
+		);
 		return;
 	}
 

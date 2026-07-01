@@ -35,7 +35,10 @@ export const resolveVirtualizedItemVisibilityForPreviewRange = (
 	return "mounted";
 };
 
-export interface VirtualizedItemVisibilityStateControllerOptions {
+export interface VirtualizedItemVisibilityStateControllerOptions<
+	TCell extends VisibilityCell = VisibilityCell,
+> {
+	readonly getStateKey?: (cell: TCell) => string;
 	readonly onRowVisibilityChanged?: (
 		rowIndex: number,
 		visibility: VirtualizedItemVisibility,
@@ -45,7 +48,7 @@ export interface VirtualizedItemVisibilityStateControllerOptions {
 
 export function createVirtualizedItemVisibilityStateController<
 	TCell extends VisibilityCell,
->(options: VirtualizedItemVisibilityStateControllerOptions = {}) {
+>(options: VirtualizedItemVisibilityStateControllerOptions<TCell> = {}) {
 	interface TrackedState {
 		readonly state: VirtualizedItemResolvedVisibilityState;
 		seenEpoch: number;
@@ -60,6 +63,7 @@ export function createVirtualizedItemVisibilityStateController<
 	const mountedItemKeyCounts = new Map<string, number>();
 	const rowVisibilityByIndex = new Map<number, VirtualizedItemVisibility>();
 	const nextRowIndicesScratch = new Set<number>();
+	const getStateKey = options.getStateKey ?? ((cell: TCell) => cell.key);
 
 	const rememberPreviousPreviewVisible = (previewRange: RowRange): void => {
 		previousPreviewVisible.start = previewRange.start;
@@ -83,7 +87,7 @@ export function createVirtualizedItemVisibilityStateController<
 				continue;
 			}
 
-			const key = cell.key;
+			const key = getStateKey(cell);
 			const nextCount = (mountedItemKeyCounts.get(key) ?? 0) + delta;
 			if (nextCount > 0) {
 				mountedItemKeyCounts.set(key, nextCount);
@@ -99,7 +103,7 @@ export function createVirtualizedItemVisibilityStateController<
 				continue;
 			}
 
-			const key = cell.key;
+			const key = getStateKey(cell);
 			if (!mountedItemKeyCounts.has(key)) {
 				states.delete(key);
 			}
@@ -110,7 +114,7 @@ export function createVirtualizedItemVisibilityStateController<
 		cell: TCell,
 		initialVisibility: VirtualizedItemVisibility,
 	): VirtualizedItemResolvedVisibilityState => {
-		const key = cell.key;
+		const key = getStateKey(cell);
 		const existing = states.get(key);
 		if (existing) {
 			return existing.state;
@@ -146,7 +150,7 @@ export function createVirtualizedItemVisibilityStateController<
 				continue;
 			}
 
-			const key = cell.key;
+			const key = getStateKey(cell);
 			const tracked = states.get(key);
 			if (!tracked) {
 				continue;
@@ -221,7 +225,7 @@ export function createVirtualizedItemVisibilityStateController<
 					continue;
 				}
 
-				const key = cell.key;
+				const key = getStateKey(cell);
 				mountedItemKeyCounts.set(key, (mountedItemKeyCounts.get(key) ?? 0) + 1);
 				const tracked = states.get(key);
 				if (!tracked) {

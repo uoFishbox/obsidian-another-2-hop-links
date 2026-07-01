@@ -8,11 +8,13 @@ import type { RowRange } from "../../rowRange";
 
 type TestCell = {
 	key: string;
+	stateKey?: string;
 	cell: { kind: string };
 };
 
-const item = (key: string): TestCell => ({
+const item = (key: string, stateKey?: string): TestCell => ({
 	key,
+	stateKey,
 	cell: { kind: "item" },
 });
 
@@ -83,6 +85,20 @@ describe("createVirtualizedItemVisibilityStateController", () => {
 		const state2 = ctrl.getOrCreateState(cell2, "visible");
 
 		expect(state1).toBe(state2);
+	});
+
+	it("can resolve state identity from a caller-provided key", () => {
+		const ctrl = createVirtualizedItemVisibilityStateController<TestCell>({
+			getStateKey: (cell) => cell.stateKey ?? cell.key,
+		});
+		const cell1 = item("a", "slot:0");
+		const cell2 = item("b", "slot:0");
+
+		const state1 = ctrl.getOrCreateState(cell1, "mounted");
+		const state2 = ctrl.getOrCreateState(cell2, "visible");
+
+		expect(state2).toBe(state1);
+		expect(state2.visibility).toBe("mounted");
 	});
 
 	it("path 1: no-op when rowSlices and previewVisible are identical", () => {

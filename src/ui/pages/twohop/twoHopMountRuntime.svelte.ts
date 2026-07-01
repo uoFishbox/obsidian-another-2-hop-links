@@ -35,6 +35,10 @@ interface TwoHopVisibilitySyncBuild {
 	readonly plan: TwoHopMountedRowsBuild["plan"] | null;
 }
 
+function getTwoHopVisibilityStateKey(cell: TwoHopMountedCell): string {
+	return `slot:${cell.cellSlotKey ?? cell.renderSlotIndex}`;
+}
+
 export function createTwoHopMountRuntime(
 	params: {
 		rowPreviewActivationRuntime?: RowPreviewActivationRuntime;
@@ -42,6 +46,7 @@ export function createTwoHopMountRuntime(
 ) {
 	const visibilityStates =
 		createVirtualizedItemVisibilityStateController<TwoHopMountedCell>({
+			getStateKey: getTwoHopVisibilityStateKey,
 			onRowVisibilityChanged: (rowIndex, visibility) => {
 				params.rowPreviewActivationRuntime?.setRowVisibility(
 					rowIndex,

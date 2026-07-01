@@ -134,7 +134,9 @@
 	const shouldRenderPreview = $derived.by(() => {
 		if (DEBUG_DISABLE_CARD_DOM_PREVIEW) return false;
 		if (!renderedPreviewSnapshot) return false;
-		return virtualizedVisibility === "visible";
+		if (virtualizedVisibility !== "visible") return false;
+
+		return canKeepRenderedPreviewForNextSnapshot(currentPreviewSnapshot);
 	});
 
 	function cancelPendingActivation(): void {
