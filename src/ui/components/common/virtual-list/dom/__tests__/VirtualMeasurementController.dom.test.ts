@@ -141,6 +141,44 @@ describe("createVirtualMeasurementController", () => {
 		rootEl.remove();
 	});
 
+	it("can force publish unchanged stable cached scroll measurements", () => {
+		const rootEl = createRoot();
+		document.body.append(rootEl);
+		const state = createVirtualListMeasurementState();
+		state.sectionTop = 25;
+		state.viewportHeight = 200;
+		state.hasStableScrollMetrics = true;
+		const onMeasurement = vi.fn();
+		const controller = createVirtualMeasurementController({
+			getRootEl: () => rootEl,
+			measurement: state,
+			onMeasurement,
+			maxUnstableMeasurementRetries: 1,
+		});
+		const sharedScrollMetrics = {
+			scrollTop: 120,
+			viewportHeight: 200,
+			frameId: 1,
+			isScrollActive: true,
+		};
+
+		expect(controller.runScrollMeasurement(sharedScrollMetrics).kind).toBe(
+			"measured",
+		);
+		const forced = controller.runScrollMeasurement(
+			{
+				...sharedScrollMetrics,
+				frameId: 2,
+			},
+			{ forcePublish: true },
+		);
+
+		expect(forced.kind).toBe("measured");
+		expect(onMeasurement).toHaveBeenCalledTimes(2);
+
+		rootEl.remove();
+	});
+
 	it("skips measurement when no root is available for layout", () => {
 		const state = createVirtualListMeasurementState();
 		const controller = createVirtualMeasurementController({

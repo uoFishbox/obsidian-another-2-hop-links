@@ -363,7 +363,9 @@ export function createViewPlanMeasurementRuntime<
 		const nextRowModel = params.runtime.resolveRowModel(nextLayout);
 		cachedRowModelOverride = nextRowModel;
 		try {
-			measurementController.runScrollMeasurement();
+			measurementController.runScrollMeasurement(undefined, {
+				forcePublish: true,
+			});
 		} finally {
 			cachedRowModelOverride = null;
 		}

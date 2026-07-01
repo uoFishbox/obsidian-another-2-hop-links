@@ -39,6 +39,14 @@ export interface VirtualListStableMeasurementContext {
 	sharedScrollMetrics?: VirtualListSharedScrollMetrics;
 }
 
+export interface RunVirtualScrollMeasurementOptions {
+	/**
+	 * Publish even when the cached scroll geometry matches the last stable
+	 * measurement. Use this when non-scroll inputs, such as row data, changed.
+	 */
+	forcePublish?: boolean;
+}
+
 type MutableVirtualMeasurement = {
 	-readonly [K in keyof VirtualMeasurement]: VirtualMeasurement[K];
 };
@@ -189,6 +197,7 @@ export function createVirtualMeasurementController({
 
 	const runScrollMeasurement = (
 		sharedScrollMetrics?: VirtualListSharedScrollMetrics,
+		options: RunVirtualScrollMeasurementOptions = {},
 	): VirtualMeasurementResult => {
 		if (!getOptionalOwnerWindow(getRootEl() ?? measurement.scrollContainerEl)) {
 			return SKIPPED_NO_WINDOW;
@@ -205,6 +214,7 @@ export function createVirtualMeasurementController({
 			sharedScrollMetrics,
 		});
 		if (
+			!options.forcePublish &&
 			isUnchangedPublishedScrollMeasurement({
 				scrollTop: scrollMeasurement.scrollTop,
 				viewportHeight: scrollMeasurement.viewportHeight,
