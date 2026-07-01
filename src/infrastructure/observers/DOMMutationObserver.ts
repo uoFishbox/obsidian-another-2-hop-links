@@ -6,6 +6,13 @@ import { enableLogging, logger } from "utils/logger";
 
 const BASES_DISCOVERY_IGNORE_SELECTOR = [
 	".cosense-card-links__root",
+	".cosense-card-links__container",
+	".cosense-card-links__section",
+	".cosense-card-links__virtual-grid",
+	".view-plan-virtual-list",
+	".view-plan-flow-row",
+	".view-plan-flow-cell",
+	".cosense-card-links__box",
 	".cosense-card-links__box-preview",
 	"[data-ccl-preview-island]",
 	"[data-ccl-shadow-hover-proxy]",
@@ -151,8 +158,15 @@ export class DOMMutationObserver {
 
 	private hasBasesViewContainerChange(mutations: MutationRecord[]): boolean {
 		for (const mutation of mutations) {
+			const target = mutation.target;
+			if (
+				target instanceof HTMLElement &&
+				this.shouldIgnoreBasesDiscoveryNode(target)
+			) {
+				continue;
+			}
+
 			if (mutation.type === "attributes") {
-				const target = mutation.target;
 				if (target instanceof HTMLElement && target.matches(".bases-view")) {
 					return true;
 				}
