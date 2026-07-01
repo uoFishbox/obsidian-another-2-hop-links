@@ -270,7 +270,7 @@
 		),
 	);
 
-	let filteredItems = $state<ViewItem[]>([]);
+	let filteredItems = $state.raw<ViewItem[]>([]);
 	let filterRunSerial = 0;
 
 	$effect(() => {
