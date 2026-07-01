@@ -88,6 +88,13 @@ export interface CreateVirtualListRuntimeOptions<
 		state: VirtualListRuntimeState<TCell, TMountedCell, TMountedBuild>,
 	) => void;
 	visibilityMetadataPolicy?: VirtualCellVisibilityMetadataPolicy;
+	/**
+	 * Provide the previous mounted-cell key index to mounted-cell builders and
+	 * engine-managed metadata reconciliation.
+	 *
+	 * @default true
+	 */
+	providePreviousCellsByKey?: boolean;
 	trackMountedCellsForChange?: boolean;
 }
 
@@ -198,6 +205,7 @@ export function createVirtualListRuntime<
 			previous: previousSnapshot,
 			previousState: previousReconciliationState,
 			visibilityMetadataPolicy: options.visibilityMetadataPolicy,
+			providePreviousCellsByKey: options.providePreviousCellsByKey,
 			buildMountedCells: options.buildMountedCells,
 		});
 		const nextSnapshot = result.snapshot;
@@ -243,6 +251,7 @@ export function createVirtualListRuntime<
 			previous: previousSnapshot,
 			previousState: runtimeState.reconciliationState,
 			visibilityMetadataPolicy: options.visibilityMetadataPolicy,
+			providePreviousCellsByKey: options.providePreviousCellsByKey,
 			buildMountedCells: options.buildMountedCells,
 		});
 		commitComputation(result);

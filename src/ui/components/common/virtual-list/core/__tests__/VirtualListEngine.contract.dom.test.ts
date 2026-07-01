@@ -317,6 +317,101 @@ describe("VirtualListEngine contract", () => {
 		expect(mountedCellsByKeyReadCount).toBe(0);
 	});
 
+	it("does not read previous mountedCellsByKey when the key index is not provided", () => {
+		const rowModel = createRowModel(30);
+		const initial = computeSnapshot({
+			rowModel,
+			scrollTop: 0,
+			viewportHeight: 100,
+			mountedOverscanPx: 0,
+			visibilityMetadataPolicy: { type: "caller-managed" },
+		});
+		const mountedCellsByKeyDescriptor = Object.getOwnPropertyDescriptor(
+			initial,
+			"mountedCellsByKey",
+		);
+		const getMountedCellsByKey = mountedCellsByKeyDescriptor?.get;
+		if (!getMountedCellsByKey) {
+			throw new Error(
+				"Expected caller-managed snapshot mountedCellsByKey getter.",
+			);
+		}
+		let mountedCellsByKeyReadCount = 0;
+		Object.defineProperty(initial, "mountedCellsByKey", {
+			...mountedCellsByKeyDescriptor,
+			get() {
+				mountedCellsByKeyReadCount += 1;
+				return getMountedCellsByKey.call(initial);
+			},
+		});
+		let computePreviousCellsByKey:
+			| ReadonlyMap<string, MountedVirtualGridCell<TestItem>>
+			| undefined;
+
+		computeVirtualListSnapshotWithState({
+			rowModel,
+			measurement: {
+				scrollTop: 500,
+				viewportHeight: 100,
+				sectionTop: 0,
+				isStableMeasurement: true,
+				hasStableVisibleRange: true,
+				currentMountedRange: initial.ranges.mounted,
+			},
+			visibilityPolicy: {
+				bootstrapRows: 3,
+				mountedOverscanPx: 0,
+			},
+			previous: initial,
+			previousState: stateBySnapshot.get(initial),
+			visibilityMetadataPolicy: { type: "caller-managed" },
+			providePreviousCellsByKey: false,
+			buildMountedCells: ({
+				rowModel,
+				rowRange,
+				previousBuild,
+				previousCellsByKey,
+			}) => {
+				computePreviousCellsByKey = previousCellsByKey;
+				return buildMountedVirtualGridCellsFromRowModel({
+					rowModel: rowModel as FlatLinkRowModel<TestItem>,
+					rowRange,
+					previousBuild,
+					previousCellsByKey,
+				});
+			},
+		});
+
+		let recomputePreviousCellsByKey:
+			| ReadonlyMap<string, MountedVirtualGridCell<TestItem>>
+			| undefined;
+		recomputeVirtualListSnapshotWithState({
+			rowModel: createRowModel(30),
+			previous: initial,
+			previousState: stateBySnapshot.get(initial),
+			visibilityMetadataPolicy: { type: "caller-managed" },
+			providePreviousCellsByKey: false,
+			buildMountedCells: ({
+				rowModel,
+				rowRange,
+				previousBuild,
+				previousCellsByKey,
+			}) => {
+				recomputePreviousCellsByKey = previousCellsByKey;
+				return buildMountedVirtualGridCellsFromRowModel({
+					rowModel: rowModel as FlatLinkRowModel<TestItem>,
+					rowRange,
+					previousBuild,
+					previousCellsByKey,
+				});
+			},
+		});
+
+		expect(computePreviousCellsByKey).toBeUndefined();
+		expect(recomputePreviousCellsByKey).toBeUndefined();
+		expect(mountedCellsByKeyReadCount).toBe(0);
+	});
+
 	it("updates caller-managed ranges during active scroll when only preview visibility changes", () => {
 		const rowModel = createRowModel(12);
 		const initial = computeSnapshot({

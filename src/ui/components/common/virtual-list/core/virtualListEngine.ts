@@ -99,6 +99,13 @@ export interface VirtualListInput<
 	previous?: VirtualListSnapshot<TCell, TMountedCell, TMountedBuild> | null;
 	previousState?: VirtualListReconciliationState<TMountedBuild> | null;
 	visibilityMetadataPolicy?: VirtualCellVisibilityMetadataPolicy;
+	/**
+	 * Provide the previous mounted-cell key index to mounted-cell builders and
+	 * engine-managed metadata reconciliation.
+	 *
+	 * @default true
+	 */
+	providePreviousCellsByKey?: boolean;
 	buildMountedCells(params: {
 		rowModel: VirtualRowModel<TCell>;
 		rowRange: RowRange;
@@ -118,6 +125,13 @@ export interface VirtualListRecomputeInput<
 	previous: VirtualListSnapshot<TCell, TMountedCell, TMountedBuild>;
 	previousState?: VirtualListReconciliationState<TMountedBuild> | null;
 	visibilityMetadataPolicy?: VirtualCellVisibilityMetadataPolicy;
+	/**
+	 * Provide the previous mounted-cell key index to mounted-cell builders and
+	 * engine-managed metadata reconciliation.
+	 *
+	 * @default true
+	 */
+	providePreviousCellsByKey?: boolean;
 	buildMountedCells(params: {
 		rowModel: VirtualRowModel<TCell>;
 		rowRange: RowRange;
@@ -152,6 +166,27 @@ const DEFAULT_VISIBILITY_METADATA_POLICY: VirtualCellVisibilityMetadataPolicy = 
 const shouldApplyVisibilityMetadata = (
 	policy: VirtualCellVisibilityMetadataPolicy = DEFAULT_VISIBILITY_METADATA_POLICY,
 ): boolean => policy.type === "engine-managed";
+
+const shouldProvidePreviousCellsByKey = (
+	providePreviousCellsByKey: boolean | undefined,
+): boolean => providePreviousCellsByKey !== false;
+
+const resolvePreviousCellsByKey = <
+	TCell,
+	TMountedCell extends MountedVirtualCell,
+	TMountedBuild extends MountedVirtualCellsBuild<TMountedCell>,
+>(
+	previous:
+		| VirtualListSnapshot<TCell, TMountedCell, TMountedBuild>
+		| null
+		| undefined,
+	providePreviousCellsByKey: boolean | undefined,
+): ReadonlyMap<string, TMountedCell> | undefined => {
+	if (!shouldProvidePreviousCellsByKey(providePreviousCellsByKey)) {
+		return undefined;
+	}
+	return previous?.mountedCellsByKey;
+};
 
 export const resolveVirtualizedItemVisibility = (
 	rowIndex: number | undefined,
@@ -579,6 +614,8 @@ export function computeVirtualListSnapshotWithState<
 				rowModel: input.rowModel,
 				previous,
 				previousState: input.previousState,
+				visibilityMetadataPolicy: input.visibilityMetadataPolicy,
+				providePreviousCellsByKey: input.providePreviousCellsByKey,
 				buildMountedCells: input.buildMountedCells,
 			});
 			return {
@@ -684,6 +721,10 @@ export function computeVirtualListSnapshotWithState<
 		};
 	}
 
+	const previousCellsByKey = resolvePreviousCellsByKey(
+		previous,
+		input.providePreviousCellsByKey,
+	);
 	const mountedBuild = input.buildMountedCells({
 		rowModel: input.rowModel,
 		rowRange: rangesResult.ranges.mounted,
@@ -692,7 +733,7 @@ export function computeVirtualListSnapshotWithState<
 		previousCells: callerManagesVisibilityMetadata
 			? undefined
 			: previous?.mountedCells,
-		previousCellsByKey: previous?.mountedCellsByKey,
+		previousCellsByKey,
 	});
 	if (callerManagesVisibilityMetadata) {
 		return {
@@ -712,7 +753,7 @@ export function computeVirtualListSnapshotWithState<
 	const mountedCells = applyVirtualCellMetadata(
 		mountedBuild.cells,
 		rangesResult.ranges,
-		previous?.mountedCellsByKey,
+		previousCellsByKey,
 		{
 			visibilityMetadataPolicy: input.visibilityMetadataPolicy,
 		},
@@ -777,6 +818,10 @@ export function recomputeVirtualListSnapshotWithState<
 	const callerManagesVisibilityMetadata = !shouldApplyVisibilityMetadata(
 		input.visibilityMetadataPolicy,
 	);
+	const previousCellsByKey = resolvePreviousCellsByKey(
+		input.previous,
+		input.providePreviousCellsByKey,
+	);
 	const mountedBuild = input.buildMountedCells({
 		rowModel: input.rowModel,
 		rowRange: ranges.mounted,
@@ -785,7 +830,7 @@ export function recomputeVirtualListSnapshotWithState<
 		previousCells: callerManagesVisibilityMetadata
 			? undefined
 			: input.previous.mountedCells,
-		previousCellsByKey: input.previous.mountedCellsByKey,
+		previousCellsByKey,
 	});
 	if (callerManagesVisibilityMetadata) {
 		return {
@@ -805,7 +850,7 @@ export function recomputeVirtualListSnapshotWithState<
 	const mountedCells = applyVirtualCellMetadata(
 		mountedBuild.cells,
 		ranges,
-		input.previous.mountedCellsByKey,
+		previousCellsByKey,
 		{
 			visibilityMetadataPolicy: input.visibilityMetadataPolicy,
 		},

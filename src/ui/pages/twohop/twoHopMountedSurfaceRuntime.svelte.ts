@@ -39,6 +39,7 @@ export function createTwoHopMountedSurfaceRuntime(params: {
 	>({
 		buildMountedCells: (buildParams) => mountRuntime.buildMountedRows(buildParams),
 		visibilityMetadataPolicy: { type: "caller-managed" },
+		providePreviousCellsByKey: false,
 		trackMountedCellsForChange: false,
 		onStableVisibleRange: params.onStableVisibleRange,
 		onSnapshotUpdated: (snapshot, reconciliationState) => {
