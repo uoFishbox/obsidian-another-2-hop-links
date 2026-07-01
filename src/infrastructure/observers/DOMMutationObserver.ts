@@ -1,6 +1,7 @@
 import type { StylingService } from "features/link-decoration/stylingService";
 import type { PluginHost } from "types/pluginHost";
 import { processBasesPane } from "infrastructure/markdown/markdownHandlers";
+import { scheduleAnimationFrame } from "ui/utils/frame";
 import { enableLogging, logger } from "utils/logger";
 
 const BASES_DISCOVERY_IGNORE_SELECTOR = [
@@ -22,7 +23,7 @@ export class DOMMutationObserver {
 	private basesObservers: Map<HTMLElement, MutationObserver> = new Map();
 	private basesDiscoveryObserver: MutationObserver | null = null;
 	private basesObserverRefreshTimer: number | null = null;
-	private basesPaneRefreshTimers = new Map<HTMLElement, number>();
+	private basesPaneRefreshTimers = new Map<HTMLElement, () => void>();
 	private destroyed = false;
 
 	constructor(
@@ -49,8 +50,8 @@ export class DOMMutationObserver {
 			window.clearTimeout(this.basesObserverRefreshTimer);
 			this.basesObserverRefreshTimer = null;
 		}
-		this.basesPaneRefreshTimers.forEach((timer) => {
-			window.clearTimeout(timer);
+		this.basesPaneRefreshTimers.forEach((cancel) => {
+			cancel();
 		});
 		this.basesPaneRefreshTimers.clear();
 
@@ -254,7 +255,7 @@ export class DOMMutationObserver {
 			return;
 		}
 
-		const timer = window.setTimeout(() => {
+		const cancel = scheduleAnimationFrame(() => {
 			this.basesPaneRefreshTimers.delete(container);
 			if (this.destroyed) return;
 			if (!container.isConnected) {
@@ -262,8 +263,8 @@ export class DOMMutationObserver {
 				return;
 			}
 			this.processExistingLinksInBases(container);
-		}, 0);
-		this.basesPaneRefreshTimers.set(container, timer);
+		});
+		this.basesPaneRefreshTimers.set(container, cancel);
 	}
 
 	private processExistingLinksInBases(container: HTMLElement): void {
