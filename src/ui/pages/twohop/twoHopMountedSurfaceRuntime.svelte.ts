@@ -21,6 +21,21 @@ import {
 
 const EMPTY_MOUNTED_ROWS: readonly [] = [];
 
+type TwoHopMountedItemCell = MountedFlatItemCell<
+	TwoHopVirtualListItem,
+	TwoHopVirtualListSection
+>;
+
+type TwoHopItemRenderArgs = SectionedVirtualListItemRenderArgs<
+	TwoHopVirtualListItem,
+	TwoHopVirtualListSection
+>;
+
+interface CachedItemRenderArgs {
+	readonly observerRoot: HTMLElement | null;
+	readonly args: TwoHopItemRenderArgs;
+}
+
 export function createTwoHopMountedSurfaceRuntime(params: {
 	readonly inputRuntime: TwoHopVirtualListPlanRuntime;
 	onStableVisibleRange(): void;
@@ -78,17 +93,20 @@ export function createTwoHopMountedSurfaceRuntime(params: {
 
 		return mountRuntime.getMountedRows();
 	});
+	const itemRenderArgsCache = new WeakMap<
+		TwoHopMountedItemCell,
+		CachedItemRenderArgs
+	>();
 
 	const createItemRenderArgs = (
-		renderedCell: MountedFlatItemCell<
-			TwoHopVirtualListItem,
-			TwoHopVirtualListSection
-		>,
+		renderedCell: TwoHopMountedItemCell,
 		observerRoot: HTMLElement | null,
-	): SectionedVirtualListItemRenderArgs<
-		TwoHopVirtualListItem,
-		TwoHopVirtualListSection
-	> => {
+	): TwoHopItemRenderArgs => {
+		const cached = itemRenderArgsCache.get(renderedCell);
+		if (cached?.observerRoot === observerRoot) {
+			return cached.args;
+		}
+
 		const visibilityState = mountRuntime.getOrCreateVisibilityState(
 			renderedCell,
 			untrack(() => {
@@ -101,7 +119,7 @@ export function createTwoHopMountedSurfaceRuntime(params: {
 					: "mounted";
 			}),
 		);
-		return {
+		const args: TwoHopItemRenderArgs = {
 			item: renderedCell.cell.item,
 			section: renderedCell.section,
 			index: renderedCell.cell.itemIndex,
@@ -113,6 +131,8 @@ export function createTwoHopMountedSurfaceRuntime(params: {
 				return visibilityState.visibility;
 			},
 		};
+		itemRenderArgsCache.set(renderedCell, { observerRoot, args });
+		return args;
 	};
 
 	return {
