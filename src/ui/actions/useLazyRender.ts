@@ -11,7 +11,6 @@ import { isHTMLElementLike, isShadowRootLike } from "ui/utils/realmSafeDom";
 
 export interface LazyRenderActionParams {
 	cacheKey?: string;
-	minHeight?: number;
 	rootMargin?: string;
 	threshold?: number;
 	intersectedCache?: Set<string>;

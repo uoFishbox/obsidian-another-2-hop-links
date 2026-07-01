@@ -3,17 +3,11 @@
 
 	interface Props {
 		params: LazyRenderActionParams;
-		minHeight?: number;
 	}
 
-	let { params, minHeight = 80 }: Props = $props();
+	let { params }: Props = $props();
 </script>
 
-<div
-	data-testid="lazy-target"
-	class="preview-mount-slot"
-	use:lazyRender={params}
-	style:min-height={`${minHeight}px`}
->
+<div data-testid="lazy-target" class="preview-mount-slot" use:lazyRender={params}>
 	<div class="lazy-placeholder"></div>
 </div>
