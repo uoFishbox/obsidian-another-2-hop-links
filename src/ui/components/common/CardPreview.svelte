@@ -3,6 +3,7 @@
 	import type { TFile } from "obsidian";
 	import type { PreviewData, PreviewRequestOptions } from "ui/context/linkContext";
 	import { useAppContext } from "ui/context/linkContext";
+	import { DEFAULT_SETTINGS, type PluginSettings } from "types/settings";
 	import { DEBUG_DISABLE_CARD_DOM_PREVIEW } from "../../../appConstants";
 	import { processPreviewContent } from "../../../features/preview/renderers/markdownPreviewRenderer";
 	import { toPreviewImageSrc } from "../../../features/preview/utils/externalFileImage";
@@ -42,8 +43,8 @@
 		previewContentIdentityKey: string;
 		renderCacheKey: string;
 		previewOverride: PreviewData | null;
-		refreshToken: number;
 		searchQuery: string;
+		settings: PluginSettings;
 	}
 
 	let {
@@ -55,10 +56,9 @@
 	}: Props = $props();
 	let container = $state<HTMLDivElement | undefined>(undefined);
 	const { app, applicationStore, resolveSearchMatchPosition } = useAppContext();
-	let settings = $derived(applicationStore.settings);
 
-	let lastRenderedCacheKey = "";
-	let lastRenderedRefreshToken = -1;
+	let lastPreviewRenderRequest: PreviewRenderRequest | null = null;
+	let lastPreviewRenderDomOverride: PreviewData | null = null;
 	let renderSequence = 0;
 
 	let isMathRendering = $state(false);
@@ -73,9 +73,12 @@
 
 	const previewRenderRequest = $derived.by((): PreviewRenderRequest | null => {
 		if (!file) {
+			lastPreviewRenderRequest = null;
+			lastPreviewRenderDomOverride = null;
 			return null;
 		}
 
+		const settings = createPreviewRenderSettings(applicationStore.settings);
 		const previewRenderVersion =
 			applicationStore.getPreviewRenderVersion?.(file.path) ?? "0:0";
 		const effectivePreviewRenderVersion = `${previewRenderVersion}:${previewRefreshToken}`;
@@ -87,31 +90,43 @@
 			settings,
 			renderVersionIdentity,
 		);
+		const domPreviewOverride =
+			previewOverride?.type === "dom" ? previewOverride : null;
 
-		return {
+		if (
+			lastPreviewRenderRequest &&
+			lastPreviewRenderRequest.renderCacheKey === renderCacheKey &&
+			lastPreviewRenderDomOverride === domPreviewOverride
+		) {
+			return lastPreviewRenderRequest;
+		}
+
+		lastPreviewRenderDomOverride = domPreviewOverride;
+		lastPreviewRenderRequest = {
 			file,
 			previewCacheRevision: effectivePreviewRenderVersion,
 			previewContentIdentityKey,
 			renderCacheKey,
 			previewOverride,
-			refreshToken: previewRefreshToken,
 			searchQuery,
+			settings,
 		};
+		return lastPreviewRenderRequest;
 	});
 
-	function shouldSkipRenderRequest(request: PreviewRenderRequest): boolean {
-		if (request.previewOverride?.type === "dom") {
-			return false;
-		}
-
-		if (
-			request.renderCacheKey === lastRenderedCacheKey &&
-			request.refreshToken === lastRenderedRefreshToken
-		) {
-			return true;
-		}
-
-		return false;
+	function createPreviewRenderSettings(settings: PluginSettings): PluginSettings {
+		return {
+			...DEFAULT_SETTINGS,
+			cardHeightRatio: settings.cardHeightRatio,
+			cardWidthPx: settings.cardWidthPx,
+			previewMaxChars: settings.previewMaxChars,
+			previewMaxLines: settings.previewMaxLines,
+			previewVisualLineSafetyMargin: settings.previewVisualLineSafetyMargin,
+			priorityFrontmatterKeyForPreview: settings.priorityFrontmatterKeyForPreview,
+			renderCodeBlockTypes: settings.renderCodeBlockTypes,
+			searchPreviewSeekBufferChars: settings.searchPreviewSeekBufferChars,
+			searchPreviewSeekThresholdChars: settings.searchPreviewSeekThresholdChars,
+		};
 	}
 
 	function renderCurrentPreview(request: PreviewRenderRequest): () => void {
@@ -138,6 +153,7 @@
 			request.previewContentIdentityKey,
 			request.renderCacheKey,
 			request.previewOverride,
+			request.settings,
 		).then((didRender) => {
 			if (
 				didRender &&
@@ -145,8 +161,6 @@
 				renderToken === renderSequence
 			) {
 				hasRenderedContent = true;
-				lastRenderedCacheKey = request.renderCacheKey;
-				lastRenderedRefreshToken = request.refreshToken;
 			}
 		});
 
@@ -162,10 +176,6 @@
 
 	$effect(() => {
 		if (!container || !previewRenderRequest) {
-			return;
-		}
-
-		if (shouldSkipRenderRequest(previewRenderRequest)) {
 			return;
 		}
 
@@ -239,6 +249,7 @@
 		previewContentIdentityKey: string,
 		renderCacheKey: string,
 		previewOverride: PreviewData | null,
+		settings: PluginSettings,
 	): Promise<boolean> {
 		try {
 			if (
@@ -268,6 +279,7 @@
 				signal,
 				queryForRender,
 				previewContentIdentityKey,
+				settings,
 			);
 
 			if (isRenderStale(signal, renderToken)) return false;
@@ -490,6 +502,7 @@
 		signal: AbortSignal,
 		queryForRender: string,
 		previewContentIdentityKey: string,
+		settings: PluginSettings,
 	): Promise<PreviewData> {
 		if (preview.type !== "text") {
 			return preview;

@@ -1,6 +1,8 @@
 import { render, waitFor } from "@testing-library/svelte";
+import { tick } from "svelte";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { DEFAULT_SETTINGS, type PluginSettings } from "types/settings";
+import { ApplicationStore } from "ui/stores/ApplicationStore.svelte";
 import CardPreview from "../CardPreview.svelte";
 import { clearCardPreviewSharedCaches } from "../cardPreviewSharedCache";
 import { createMockTFile } from "testing/__mocks__/testHelpers";
@@ -12,7 +14,7 @@ const state = vi.hoisted(() => ({
 			settings: {} as PluginSettings,
 			updateVersion: 0,
 			getPreviewRenderVersion: vi.fn(() => "0:0"),
-		},
+		} as unknown as ApplicationStore,
 	},
 	processPreviewContent: vi.fn(),
 	enqueueMathRender: vi.fn(),
@@ -23,6 +25,7 @@ const state = vi.hoisted(() => ({
 	getFileContent: vi.fn(),
 	analyzePreviewContent: vi.fn(),
 	syncMathJaxStylesForNode: vi.fn(),
+	componentUnload: vi.fn(),
 	disableCardDomPreview: false,
 	disableRenderedPreviewCache: false,
 }));
@@ -36,7 +39,9 @@ vi.mock("obsidian", async () => {
 
 	class MockComponent {
 		load(): void {}
-		unload(): void {}
+		unload(): void {
+			state.componentUnload();
+		}
 	}
 
 	return {
@@ -45,14 +50,19 @@ vi.mock("obsidian", async () => {
 	};
 });
 
-vi.mock("appConstants", () => ({
-	get DEBUG_DISABLE_CARD_DOM_PREVIEW() {
-		return state.disableCardDomPreview;
-	},
-	get DEBUG_DISABLE_RENDERED_PREVIEW_CACHE() {
-		return state.disableRenderedPreviewCache;
-	},
-}));
+vi.mock("appConstants", async (importOriginal) => {
+	const actual = await importOriginal<typeof import("appConstants")>();
+
+	return {
+		...actual,
+		get DEBUG_DISABLE_CARD_DOM_PREVIEW() {
+			return state.disableCardDomPreview;
+		},
+		get DEBUG_DISABLE_RENDERED_PREVIEW_CACHE() {
+			return state.disableRenderedPreviewCache;
+		},
+	};
+});
 
 vi.mock("features/preview/renderers/mathRenderQueue", () => ({
 	enqueueMathRender: state.enqueueMathRender,
@@ -97,6 +107,10 @@ function createSettings(overrides: Partial<PluginSettings> = {}): PluginSettings
 	};
 }
 
+function createReactiveApplicationStore(settings = createSettings()): ApplicationStore {
+	return new ApplicationStore(settings, {} as never, vi.fn() as never, vi.fn());
+}
+
 describe("CardPreview", () => {
 	beforeEach(() => {
 		(HTMLElement.prototype as any).createEl = function (
@@ -127,7 +141,7 @@ describe("CardPreview", () => {
 			settings: createSettings(),
 			updateVersion: 0,
 			getPreviewRenderVersion: vi.fn(() => "0:0"),
-		};
+		} as unknown as ApplicationStore;
 		state.disableCardDomPreview = false;
 		state.disableRenderedPreviewCache = false;
 
@@ -179,6 +193,8 @@ describe("CardPreview", () => {
 
 		state.syncMathJaxStylesForNode.mockReset();
 		state.syncMathJaxStylesForNode.mockReturnValue(true);
+
+		state.componentUnload.mockReset();
 	});
 
 	it("displays rendered text preview", async () => {
@@ -385,6 +401,49 @@ describe("CardPreview", () => {
 		expect(getPreview).not.toHaveBeenCalled();
 	});
 
+	it("keeps the current dom preview component loaded when unrelated settings change", async () => {
+		const file = createMockTFile("notes/dom-settings.md");
+		const applicationStore = createReactiveApplicationStore();
+		state.appContext.applicationStore = applicationStore;
+		const getPreview = vi.fn(async () => ({
+			type: "empty" as const,
+			content: "",
+		}));
+		const previewOverride = {
+			type: "dom" as const,
+			render: vi.fn(async (container: HTMLElement) => {
+				container.textContent = "stable dom";
+			}),
+		};
+
+		const rendered = render(CardPreview, {
+			props: {
+				file,
+				getPreview,
+				searchQuery: "",
+				previewOverride,
+			},
+		});
+
+		await waitFor(() => {
+			expect(
+				rendered.container.querySelector(".cosense-card-links__box-preview")
+					?.textContent,
+			).toBe("stable dom");
+		});
+		state.componentUnload.mockClear();
+
+		applicationStore.setSettings(createSettings({ language: "ja" }));
+		await tick();
+
+		expect(previewOverride.render).toHaveBeenCalledTimes(1);
+		expect(state.componentUnload).not.toHaveBeenCalled();
+		expect(
+			rendered.container.querySelector(".cosense-card-links__box-preview")
+				?.textContent,
+		).toBe("stable dom");
+	});
+
 	it("rerenders when preview content changes", async () => {
 		const file = createMockTFile("notes/preview-invalidation.md");
 		const getPreview = vi
@@ -405,7 +464,7 @@ describe("CardPreview", () => {
 			settings: createSettings(),
 			updateVersion: 0,
 			getPreviewRenderVersion,
-		};
+		} as unknown as ApplicationStore;
 
 		const firstRender = render(CardPreview, {
 			props: { file, getPreview, searchQuery: "" },

@@ -14,6 +14,8 @@ const settingsSignatureCache = new WeakMap<PluginSettings, PreviewSettingsSignat
 export function buildPreviewContentSettingsSignature(settings: PluginSettings): string {
 	const renderCodeBlockTypes = settings.renderCodeBlockTypes ?? [];
 	return [
+		settings.cardWidthPx,
+		settings.cardHeightRatio,
 		settings.priorityFrontmatterKeyForPreview ?? "",
 		settings.previewMaxChars,
 		settings.previewMaxLines,
@@ -25,6 +27,8 @@ export function buildPreviewContentSettingsSignature(settings: PluginSettings): 
 
 function buildSearchContextSettingsSignature(settings: PluginSettings): string {
 	return [
+		settings.cardWidthPx,
+		settings.cardHeightRatio,
 		settings.previewMaxChars,
 		settings.previewMaxLines,
 		settings.previewVisualLineSafetyMargin,
