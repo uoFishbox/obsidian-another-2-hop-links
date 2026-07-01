@@ -36,6 +36,8 @@ interface CachedItemRenderArgs {
 	readonly args: TwoHopItemRenderArgs;
 }
 
+// Activation candidates are slot-scoped; CardPreviewGate keeps the logical
+// preview identity in activationKey.
 function getTwoHopActivationCandidateId(cell: TwoHopMountedItemCell): string {
 	return `slot:${cell.cellSlotKey ?? cell.renderSlotIndex}`;
 }

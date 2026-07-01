@@ -35,6 +35,11 @@ interface TwoHopVisibilitySyncBuild {
 	readonly plan: TwoHopMountedRowsBuild["plan"] | null;
 }
 
+// Visibility state is intentionally keyed by render slot, not logical item.
+// The virtual surface reuses slot components while scrolling, so slot-keyed
+// state avoids per-item state churn at the mounted range edges. Logical preview
+// correctness is guarded separately by previewIdentity / activationKey in
+// CardPreviewGate and by logical-item renderBodyKey revisions.
 function getTwoHopVisibilityStateKey(cell: TwoHopMountedCell): string {
 	return `slot:${cell.cellSlotKey ?? cell.renderSlotIndex}`;
 }
