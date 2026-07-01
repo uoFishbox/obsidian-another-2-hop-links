@@ -42,15 +42,15 @@
 			<div data-testid="twohop-header-cell">{sectionId}</div>
 		{/snippet}
 
-		{#snippet renderItem({ item, index, visibility })}
+		{#snippet renderItem(item, rowIndex, visibilityState)}
 			<div
 				data-testid="twohop-item-cell"
-				data-index={index}
-				data-visibility={visibility}
+				data-index={item.virtualKey}
+				data-visibility={visibilityState.visibility}
 				data-ccl-interaction-id={item.interactionId}
 				data-ccl-interaction-kind="item"
 			>
-				Item {index}
+				Item {rowIndex}
 			</div>
 		{/snippet}
 	</TwoHopViewPlanVirtualList>

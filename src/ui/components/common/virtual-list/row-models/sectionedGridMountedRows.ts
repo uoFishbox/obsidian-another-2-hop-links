@@ -11,6 +11,7 @@ import type { MountedFlatRowSlice } from "../core/reconciliation/viewPlanRenderR
 import {
 	getViewPlanRenderBodyIdentityFields,
 	resolveStableViewPlanRenderBodyKey,
+	type RenderBodyKeyPolicy,
 } from "../core/reconciliation/renderBodyRevision";
 
 export interface SectionedGridSectionPlan<T, G> {
@@ -72,6 +73,7 @@ export interface BuildSectionedGridMountedRowsParams<
 	readonly previousBuild?: SectionedGridMountedRowsBuild<T, G, TPlan>;
 	readonly reusableRowSlotsScratch?: number[];
 	readonly resolvedRowScratch?: SectionedGridResolvedRowScratch;
+	readonly renderBodyKeyPolicy?: RenderBodyKeyPolicy;
 	findSectionIndexByRow(sections: readonly TSection[], rowIndex: number): number;
 	/**
 	 * Optional hot-path lookup for the first mounted row. Callers with compiled
@@ -135,6 +137,7 @@ export function buildSectionedGridMountedRows<
 	params: BuildSectionedGridMountedRowsParams<T, G, TSection, TPlan>,
 ): SectionedGridMountedRowsBuild<T, G, TPlan> {
 	const { plan } = params;
+	const renderBodyKeyPolicy = params.renderBodyKeyPolicy ?? "eager";
 	const start = Math.max(0, params.rowRange.start);
 	const end = Math.min(plan.rowCount, params.rowRange.end);
 	// Same-plan, same-clamped-range fast path: when the plan object and the
@@ -322,6 +325,7 @@ export function buildSectionedGridMountedRows<
 							row,
 							section: sectionLayout,
 							renderSlotIndex,
+							renderBodyKeyPolicy,
 							cellSlotKey,
 						})
 					: createMountedFlatCell({
@@ -332,11 +336,14 @@ export function buildSectionedGridMountedRows<
 							rowIndex,
 							columnIndex,
 							renderSlotIndex,
-							renderBodyKey: resolveStableViewPlanRenderBodyKey({
-								previous,
-								cell,
-								descriptor: sectionLayout.descriptor,
-							}),
+							renderBodyKey:
+								renderBodyKeyPolicy === "eager"
+									? resolveStableViewPlanRenderBodyKey({
+											previous,
+											cell,
+											descriptor: sectionLayout.descriptor,
+										})
+									: undefined,
 							renderBodyIdentity: getViewPlanRenderBodyIdentityFields(
 								cell,
 								sectionLayout.descriptor,

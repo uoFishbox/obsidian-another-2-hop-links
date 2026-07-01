@@ -5,7 +5,6 @@ import type {
 } from "ui/components/common/virtual-list/core/reconciliation/viewPlanMountedCells";
 import { useVirtualList } from "ui/components/common/virtual-list/svelte/useVirtualList.svelte";
 import { resolveVirtualizedItemVisibilityForPreviewRange } from "ui/components/common/virtual-list/svelte/virtualizedItemVisibilityState.svelte";
-import type { SectionedVirtualListItemRenderArgs } from "ui/components/common/virtual-list/svelte/renderArgs";
 import type { TwoHopMountedRowsBuild } from "./twoHopMountedRowBuild";
 import type { TwoHopViewPlanRowModel } from "./twoHopViewPlan";
 import type {
@@ -25,16 +24,6 @@ type TwoHopMountedItemCell = MountedFlatItemCell<
 	TwoHopVirtualListItem,
 	TwoHopVirtualListSection
 >;
-
-type TwoHopItemRenderArgs = SectionedVirtualListItemRenderArgs<
-	TwoHopVirtualListItem,
-	TwoHopVirtualListSection
->;
-
-interface CachedItemRenderArgs {
-	readonly observerRoot: HTMLElement | null;
-	readonly args: TwoHopItemRenderArgs;
-}
 
 // Activation candidates are slot-scoped; CardPreviewGate keeps the logical
 // preview identity in activationKey.
@@ -99,21 +88,8 @@ export function createTwoHopMountedSurfaceRuntime(params: {
 
 		return mountRuntime.getMountedRows();
 	});
-	const itemRenderArgsCache = new WeakMap<
-		TwoHopMountedItemCell,
-		CachedItemRenderArgs
-	>();
-
-	const createItemRenderArgs = (
-		renderedCell: TwoHopMountedItemCell,
-		observerRoot: HTMLElement | null,
-	): TwoHopItemRenderArgs => {
-		const cached = itemRenderArgsCache.get(renderedCell);
-		if (cached?.observerRoot === observerRoot) {
-			return cached.args;
-		}
-
-		const visibilityState = mountRuntime.getOrCreateVisibilityState(
+	const getItemVisibilityState = (renderedCell: TwoHopMountedItemCell) =>
+		mountRuntime.getOrCreateVisibilityState(
 			renderedCell,
 			untrack(() => {
 				const previewVisible = virtualList.getSnapshot()?.ranges.previewVisible;
@@ -125,21 +101,6 @@ export function createTwoHopMountedSurfaceRuntime(params: {
 					: "mounted";
 			}),
 		);
-		const args: TwoHopItemRenderArgs = {
-			item: renderedCell.cell.item,
-			section: renderedCell.section,
-			index: renderedCell.cell.itemIndex,
-			rowIndex: renderedCell.rowIndex,
-			observerRoot,
-			visibilityState,
-			activationCandidateId: getTwoHopActivationCandidateId(renderedCell),
-			get visibility() {
-				return visibilityState.visibility;
-			},
-		};
-		itemRenderArgsCache.set(renderedCell, { observerRoot, args });
-		return args;
-	};
 
 	return {
 		mountRuntime,
@@ -153,7 +114,8 @@ export function createTwoHopMountedSurfaceRuntime(params: {
 		get mountedRowsForSurface() {
 			return mountedRowsForSurface;
 		},
-		createItemRenderArgs,
+		getItemVisibilityState,
+		getItemActivationCandidateId: getTwoHopActivationCandidateId,
 		syncPreviewVisibleRange(start: number, end: number) {
 			mountRuntime.schedulePreviewRangeSync(
 				virtualList.getReconciliationState().mountedBuild,

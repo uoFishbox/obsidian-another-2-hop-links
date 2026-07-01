@@ -147,4 +147,29 @@ describe("buildSectionedGridMountedRows", () => {
 		expect(resolveInitialSectionIndexByRow).toHaveBeenCalledWith(plan, 1);
 		expect(findSectionIndexByRow).not.toHaveBeenCalled();
 	});
+
+	it("can omit renderBodyKey while retaining structured render body identity", () => {
+		const plan = createPlan();
+		const build = buildSectionedGridMountedRows({
+			plan,
+			rowRange: { start: 0, end: 1 },
+			renderBodyKeyPolicy: "omit",
+			findSectionIndexByRow: () => 0,
+			resolveInitialSectionIndexByRow: () => 0,
+			resolveRowInSection: (_plan, sectionPlan, rowIndex) => ({
+				rowIndexInSection: rowIndex - sectionPlan.firstRowIndex,
+				sectionCellStartIndex: rowIndex - sectionPlan.firstRowIndex,
+				cellCount: 1,
+				top: rowIndex * 10,
+			}),
+			readLogicalCellInSection: (plan, sectionIndex, sectionCellIndex) =>
+				plan.logicalCellsBySection[sectionIndex]?.[sectionCellIndex] ?? null,
+		});
+
+		expect(build.cells[0]?.renderBodyKey).toBeUndefined();
+		expect(build.cells[0]?.renderBodyKind).toBe("item");
+		expect(build.cells[0]?.renderBodySectionId).toBe("section-0");
+		expect(build.cells[0]?.renderBodySourceKey).toBe("a");
+		expect(build.cells[0]?.renderBodyRevision).toBeNull();
+	});
 });

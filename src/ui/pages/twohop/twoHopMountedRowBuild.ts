@@ -142,5 +142,6 @@ export function buildTwoHopMountedRows(params: {
 		resolveRowInSection: resolveTwoHopRowInSection,
 		resolveRowInSectionInto: resolveTwoHopRowInSectionInto,
 		readLogicalCellInSection: readTwoHopLogicalCellInSection,
+		renderBodyKeyPolicy: "omit",
 	});
 }

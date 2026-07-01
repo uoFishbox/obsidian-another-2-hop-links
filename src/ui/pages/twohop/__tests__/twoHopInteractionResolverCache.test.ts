@@ -61,11 +61,16 @@ function createMountedRows(params: {
 	item: TwoHopVirtualListItem;
 	cellSlotKey?: number;
 	renderBodyKey?: string;
+	renderBodyRevision?: unknown;
 }): readonly TwoHopMountedRow[] {
 	const cell = {
 		cellSlotKey: params.cellSlotKey ?? 0,
 		renderSlotIndex: params.cellSlotKey ?? 0,
 		renderBodyKey: params.renderBodyKey ?? params.item.virtualKey,
+		renderBodyKind: "item",
+		renderBodySectionId: "primary",
+		renderBodySourceKey: params.item.virtualKey,
+		renderBodyRevision: params.renderBodyRevision ?? null,
 		cell: {
 			kind: "item",
 			item: params.item,
@@ -88,12 +93,17 @@ function createMountedHeaderRows(params: {
 	sectionId?: string;
 	descriptor?: SectionHeaderInteractionDescriptor;
 	renderBodyKey?: string;
+	renderBodyRevision?: unknown;
 }): readonly TwoHopMountedRow[] {
 	const sectionId = params.sectionId ?? "branch-alpha";
 	const headerCell = {
 		cellSlotKey: 0,
 		renderSlotIndex: 0,
 		renderBodyKey: params.renderBodyKey ?? `header:${sectionId}`,
+		renderBodyKind: "header",
+		renderBodySectionId: sectionId,
+		renderBodyCellKey: `header:${sectionId}`,
+		renderBodyRevision: params.renderBodyRevision ?? null,
 		sectionId,
 		cell: {
 			kind: "header",
@@ -176,6 +186,37 @@ describe("twoHopInteractionResolverCache", () => {
 			descriptor,
 		);
 		expect(resolveDescriptor).toHaveBeenCalledTimes(1);
+	});
+
+	it("provider reruns descriptor resolution when item render body revision changes", () => {
+		const item = createItem("alpha.md");
+		const firstDescriptor = createDescriptor(item);
+		const secondDescriptor = createDescriptor(item);
+		let renderBodyRevision: unknown = 1;
+		const resolveDescriptor = vi
+			.fn()
+			.mockReturnValueOnce(firstDescriptor)
+			.mockReturnValueOnce(secondDescriptor);
+		const provider = createTwoHopInteractionResolverProvider({
+			getMountedRows: () =>
+				createMountedRows({
+					item,
+					renderBodyKey: undefined,
+					renderBodyRevision,
+				}),
+			resolveDescriptor,
+		});
+
+		expect(provider.resolveInteractionDescriptor("item:file:alpha.md")).toBe(
+			firstDescriptor,
+		);
+
+		renderBodyRevision = 2;
+
+		expect(provider.resolveInteractionDescriptor("item:file:alpha.md")).toBe(
+			secondDescriptor,
+		);
+		expect(resolveDescriptor).toHaveBeenCalledTimes(2);
 	});
 
 	it("provider reruns descriptor resolution when descriptor revision changes", () => {

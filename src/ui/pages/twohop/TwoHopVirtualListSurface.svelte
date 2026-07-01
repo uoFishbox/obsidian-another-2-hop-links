@@ -3,7 +3,7 @@
 	import { providePreviewActivationContexts } from "features/preview/scheduling/previewActivationContexts";
 	import VirtualSurface from "ui/components/common/virtual-list/VirtualSurface.svelte";
 	import VirtualListLoadMoreButton from "ui/components/common/virtual-list/VirtualListLoadMoreButton.svelte";
-	import type { SectionedVirtualListItemRenderArgs } from "ui/components/common/virtual-list/svelte/renderArgs";
+	import type { VirtualizedItemVisibilityState } from "ui/components/common/virtual-list/types";
 	import type {
 		MountedFlatCell,
 		MountedFlatHeaderCell,
@@ -50,12 +50,7 @@
 			]
 		>;
 		renderItem: Snippet<
-			[
-				SectionedVirtualListItemRenderArgs<
-					TwoHopVirtualListItem,
-					TwoHopVirtualListSection
-				>,
-			]
+			[TwoHopVirtualListItem, number, VirtualizedItemVisibilityState, string]
 		>;
 	}
 
@@ -119,7 +114,7 @@
 	resolveNavigationTarget={list.resolveNavigationTarget}
 	flushVirtualScrollMeasurement={list.flushVirtualScrollMeasurement}
 >
-	{#snippet renderCell({ mountedCell: renderedCell, observerRoot })}
+	{#snippet renderCell({ mountedCell: renderedCell })}
 		{#if isHeaderCell(renderedCell)}
 			{@render props.renderHeader({
 				section: renderedCell.section,
@@ -130,7 +125,10 @@
 			})}
 		{:else if isItemCell(renderedCell)}
 			{@render props.renderItem(
-				list.createItemRenderArgs(renderedCell, observerRoot),
+				renderedCell.cell.item,
+				renderedCell.rowIndex,
+				list.getItemVisibilityState(renderedCell),
+				list.getItemActivationCandidateId(renderedCell),
 			)}
 		{:else}
 			<VirtualListLoadMoreButton

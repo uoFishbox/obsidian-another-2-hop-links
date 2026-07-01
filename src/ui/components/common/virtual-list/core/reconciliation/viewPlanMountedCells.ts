@@ -11,6 +11,7 @@ import {
 	getViewPlanRenderBodyIdentityFields,
 	resolveStableViewPlanRenderBodyKey,
 	type MountedRenderBodyIdentity,
+	type RenderBodyKeyPolicy,
 } from "./renderBodyRevision";
 import type { FlatRow, SectionLayout } from "../../layout/viewPlanRowTypes";
 
@@ -145,7 +146,7 @@ function updateMountedFlatCellDiscriminated<T, G>(
 		renderSlotIndex: update.renderSlotIndex,
 		renderSlotKey: update.renderSlotKey,
 		cellMetadataKey: previous.cellMetadataKey,
-		renderBodyKey: update.renderBodyKey ?? previous.renderBodyKey,
+		renderBodyKey: update.renderBodyKey,
 		position: update.position,
 		cellSlotKey: update.cellSlotKey ?? previous.cellSlotKey,
 		renderBodyKind: update.renderBodyKind,
@@ -194,16 +195,21 @@ export function updateMountedFlatCell<T, G>(params: {
 	row: FlatRow<T, G>;
 	section: SectionLayout<T, G>;
 	renderRevisionFallbackPolicy?: RenderRevisionFallbackPolicy;
+	renderBodyKeyPolicy?: RenderBodyKeyPolicy;
 	renderSlotIndex?: number;
 	cellSlotKey?: number;
 }): MountedFlatCell<T, G> {
 	const renderSlotIndex = params.renderSlotIndex ?? params.previous.renderSlotIndex;
-	const renderBodyKey = resolveStableViewPlanRenderBodyKey({
-		previous: params.previous,
-		cell: params.cell,
-		descriptor: params.section.descriptor,
-		fallbackPolicy: params.renderRevisionFallbackPolicy,
-	});
+	const renderBodyKeyPolicy = params.renderBodyKeyPolicy ?? "eager";
+	const renderBodyKey =
+		renderBodyKeyPolicy === "eager"
+			? resolveStableViewPlanRenderBodyKey({
+					previous: params.previous,
+					cell: params.cell,
+					descriptor: params.section.descriptor,
+					fallbackPolicy: params.renderRevisionFallbackPolicy,
+				})
+			: undefined;
 	const hasSameLayoutMetadata =
 		params.previous.rowIndex === params.rowIndex &&
 		params.previous.rowIndexInSection === params.row.rowIndexInSection &&
@@ -247,7 +253,7 @@ export function createMountedFlatCell<T, G>(params: {
 	columnIndex: number;
 	renderSlotIndex: number;
 	position?: MountedFlatCellPosition;
-	renderBodyKey: RenderBodyKey;
+	renderBodyKey?: RenderBodyKey;
 	renderBodyIdentity: MountedRenderBodyIdentity;
 	cellSlotKey?: number;
 }): MountedFlatCell<T, G> {

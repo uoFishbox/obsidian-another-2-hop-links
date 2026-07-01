@@ -22,6 +22,8 @@ export interface MountedRenderBodyIdentity {
 	readonly renderBodyRevision?: RenderRevision;
 }
 
+export type RenderBodyKeyPolicy = "eager" | "omit";
+
 export type ResolvedItemRenderRevisionToken = {
 	readonly kind: "render";
 	readonly revision: RenderRevision;

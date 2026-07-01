@@ -27,6 +27,8 @@ type TwoHopMountedHeaderCell = MountedFlatHeaderCell<
 interface ItemProviderCacheEntry {
 	kind: "item";
 	itemRevision: TwoHopVirtualListItem;
+	renderBodySectionId: string;
+	renderBodySourceKey: string | undefined;
 	renderBodyRevision: unknown;
 	resolveDescriptorRevision: unknown;
 	descriptorRevision: unknown;
@@ -36,6 +38,8 @@ interface ItemProviderCacheEntry {
 interface SectionHeaderProviderCacheEntry {
 	kind: "sectionHeader";
 	headerPropsRevision: unknown;
+	renderBodySectionId: string;
+	renderBodyCellKey: string | undefined;
 	renderBodyRevision: unknown;
 	descriptor: SectionHeaderInteractionDescriptor;
 }
@@ -93,7 +97,9 @@ export function createTwoHopInteractionResolverProvider({
 				cached &&
 				cached.kind === "item" &&
 				cached.itemRevision === item &&
-				Object.is(cached.renderBodyRevision, itemCell.renderBodyKey) &&
+				cached.renderBodySectionId === itemCell.renderBodySectionId &&
+				cached.renderBodySourceKey === itemCell.renderBodySourceKey &&
+				Object.is(cached.renderBodyRevision, itemCell.renderBodyRevision) &&
 				Object.is(cached.resolveDescriptorRevision, resolveDescriptor) &&
 				Object.is(cached.descriptorRevision, descriptorRevision)
 			) {
@@ -108,7 +114,9 @@ export function createTwoHopInteractionResolverProvider({
 			descriptorsByInteractionId.set(interactionId, {
 				kind: "item",
 				itemRevision: item,
-				renderBodyRevision: itemCell.renderBodyKey,
+				renderBodySectionId: itemCell.renderBodySectionId,
+				renderBodySourceKey: itemCell.renderBodySourceKey,
+				renderBodyRevision: itemCell.renderBodyRevision,
 				resolveDescriptorRevision: resolveDescriptor,
 				descriptorRevision,
 				descriptor,
@@ -140,7 +148,9 @@ function resolveMountedSectionHeaderDescriptor(params: {
 		cached &&
 		cached.kind === "sectionHeader" &&
 		cached.headerPropsRevision === headerCell.headerProps &&
-		Object.is(cached.renderBodyRevision, headerCell.renderBodyKey)
+		cached.renderBodySectionId === headerCell.renderBodySectionId &&
+		cached.renderBodyCellKey === headerCell.renderBodyCellKey &&
+		Object.is(cached.renderBodyRevision, headerCell.renderBodyRevision)
 	) {
 		return cached.descriptor;
 	}
@@ -148,7 +158,9 @@ function resolveMountedSectionHeaderDescriptor(params: {
 	params.descriptorsByInteractionId.set(params.interactionId, {
 		kind: "sectionHeader",
 		headerPropsRevision: headerCell.headerProps,
-		renderBodyRevision: headerCell.renderBodyKey,
+		renderBodySectionId: headerCell.renderBodySectionId,
+		renderBodyCellKey: headerCell.renderBodyCellKey,
+		renderBodyRevision: headerCell.renderBodyRevision,
 		descriptor,
 	});
 	return descriptor;

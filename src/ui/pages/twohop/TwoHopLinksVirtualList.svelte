@@ -9,7 +9,6 @@
 		SearchWorkerMatchScope,
 	} from "features/search/searchWorkerTypes";
 	import type { VirtualizedItemVisibilityState } from "ui/components/common/virtualizedItemVisibility";
-	import type { VirtualizedItemVisibility } from "ui/components/common/virtual-list/types";
 	import type {
 		TwoHopVirtualListSection,
 		TwoHopVirtualListItem,
@@ -66,17 +65,6 @@
 			linkContext,
 		}),
 	);
-
-	type RenderItemArgs = {
-		item: TwoHopVirtualListItem;
-		section: TwoHopVirtualListSection;
-		index: number;
-		rowIndex: number;
-		observerRoot: HTMLElement | null;
-		visibilityState: VirtualizedItemVisibilityState;
-		visibility: VirtualizedItemVisibility;
-		activationCandidateId: string;
-	};
 </script>
 
 {#if renderableDescriptors.length > 0}
@@ -99,21 +87,22 @@
 			/>
 		{/snippet}
 
-		{#snippet renderItem(args: RenderItemArgs)}
-			{@const row = args?.item}
-
-			{#if row}
-				<TwoHopVirtualItemCard
-					{row}
-					settings={currentSettings}
-					{searchQuery}
-					{searchScope}
-					{matchedItemByKey}
-					rowIndex={args?.rowIndex}
-					visibilityState={args?.visibilityState}
-					activationCandidateId={args?.activationCandidateId}
-				/>
-			{/if}
+		{#snippet renderItem(
+			row: TwoHopVirtualListItem,
+			rowIndex: number,
+			visibilityState: VirtualizedItemVisibilityState,
+			activationCandidateId: string,
+		)}
+			<TwoHopVirtualItemCard
+				{row}
+				settings={currentSettings}
+				{searchQuery}
+				{searchScope}
+				{matchedItemByKey}
+				{rowIndex}
+				{visibilityState}
+				{activationCandidateId}
+			/>
 		{/snippet}
 	</TwoHopViewPlanVirtualList>
 {/if}
