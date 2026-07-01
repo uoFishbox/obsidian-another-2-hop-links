@@ -109,27 +109,13 @@
 	let activationSequence = 0;
 	let unregisterRowActivationCandidate: (() => void) | undefined = undefined;
 	let registeredRowActivationCandidateId: string | undefined = undefined;
-	let registeredRowActivationCandidateSignature: string | undefined = undefined;
+	let registeredRowActivationCandidateRowIndex: number | undefined = undefined;
+	let registeredRowActivationCandidatePreviewIdentity: string | undefined =
+		undefined;
 	const fallbackCandidateId = `card-preview-gate:${++nextCardPreviewGateId}`;
 
 	let renderedPreviewSnapshot = $state<RenderedPreviewSnapshot | undefined>(
 		undefined,
-	);
-
-	const currentPreviewSnapshot = $derived.by(
-		(): RenderedPreviewSnapshot | undefined => {
-			if (!file || !previewIdentity) {
-				return undefined;
-			}
-
-			return {
-				identity: previewIdentity,
-				file,
-				searchQuery: effectiveSearchQuery,
-				previewRefreshToken,
-				previewOverride,
-			};
-		},
 	);
 
 	const shouldRenderPreview = $derived.by(() => {
@@ -137,7 +123,7 @@
 		if (!renderedPreviewSnapshot) return false;
 		if (virtualizedVisibility !== "visible") return false;
 
-		return canKeepRenderedPreviewForNextSnapshot(currentPreviewSnapshot);
+		return canKeepRenderedPreviewForCurrentPreview();
 	});
 	const componentReevaluationProbe = $derived.by(() => {
 		if (IS_PROD) return "";
@@ -162,7 +148,6 @@
 		void previewIdentity;
 		void activatedPreviewIdentity;
 		void renderedPreviewSnapshot;
-		void currentPreviewSnapshot;
 		void shouldRenderPreview;
 		return markCCLComponentReevaluation("CardPreviewGate");
 	});
@@ -174,17 +159,28 @@
 		pendingPreviewIdentity = undefined;
 	}
 
-	function canKeepRenderedPreviewForNextSnapshot(
-		nextSnapshot: RenderedPreviewSnapshot | undefined,
-	): boolean {
-		if (!renderedPreviewSnapshot || !nextSnapshot) {
+	function canKeepRenderedPreviewForCurrentPreview(): boolean {
+		if (!renderedPreviewSnapshot || !file || !previewIdentity) {
 			return false;
 		}
 
 		return (
-			renderedPreviewSnapshot.file.path === nextSnapshot.file.path &&
-			renderedPreviewSnapshot.file.extension === nextSnapshot.file.extension
+			renderedPreviewSnapshot.file.path === file.path &&
+			renderedPreviewSnapshot.file.extension === file.extension
 		);
+	}
+
+	function createRenderedPreviewSnapshot(
+		identity: string,
+		snapshotFile: TFile,
+	): RenderedPreviewSnapshot {
+		return {
+			identity,
+			file: snapshotFile,
+			searchQuery: effectiveSearchQuery,
+			previewRefreshToken,
+			previewOverride,
+		};
 	}
 
 	function commitRenderedPreviewSnapshot(snapshot: RenderedPreviewSnapshot): void {
@@ -192,10 +188,8 @@
 		activatedPreviewIdentity = snapshot.identity;
 	}
 
-	function resetPreviewActivationForSnapshot(
-		nextSnapshot: RenderedPreviewSnapshot | undefined,
-	): void {
-		const nextIdentity = nextSnapshot?.identity;
+	function resetPreviewActivationForCurrentPreview(): void {
+		const nextIdentity = previewIdentity;
 
 		if (nextIdentity === lastPreviewIdentity) {
 			return;
@@ -204,7 +198,7 @@
 		cancelPendingActivation();
 
 		// ファイル自体が変わった場合は、旧previewを見せ続けると誤表示になるので消す。
-		if (!canKeepRenderedPreviewForNextSnapshot(nextSnapshot)) {
+		if (!canKeepRenderedPreviewForCurrentPreview()) {
 			renderedPreviewSnapshot = undefined;
 			activatedPreviewIdentity = undefined;
 		}
@@ -217,7 +211,8 @@
 		unregisterRowActivationCandidate?.();
 		unregisterRowActivationCandidate = undefined;
 		registeredRowActivationCandidateId = undefined;
-		registeredRowActivationCandidateSignature = undefined;
+		registeredRowActivationCandidateRowIndex = undefined;
+		registeredRowActivationCandidatePreviewIdentity = undefined;
 	}
 
 	function registerVisibleRowActivationCandidate(): void {
@@ -231,16 +226,20 @@
 		}
 
 		const candidateId = activationCandidateId ?? fallbackCandidateId;
-		const signature = `${candidateId}\0${rowIndex}\0${previewIdentity}`;
 
-		if (registeredRowActivationCandidateSignature === signature) {
+		if (
+			registeredRowActivationCandidateId === candidateId &&
+			registeredRowActivationCandidateRowIndex === rowIndex &&
+			registeredRowActivationCandidatePreviewIdentity === previewIdentity
+		) {
 			return;
 		}
 
 		clearRegisteredRowActivationCandidate();
 
 		registeredRowActivationCandidateId = candidateId;
-		registeredRowActivationCandidateSignature = signature;
+		registeredRowActivationCandidateRowIndex = rowIndex;
+		registeredRowActivationCandidatePreviewIdentity = previewIdentity;
 		unregisterRowActivationCandidate =
 			rowPreviewActivationRuntime.registerCandidate({
 				id: candidateId,
@@ -248,17 +247,17 @@
 				activationKey: previewIdentity,
 				getVisibleQueueSize: getVisiblePreviewQueueSize,
 				onActivated: (activationKey) => {
-					const snapshot = currentPreviewSnapshot;
-
 					if (
-						!snapshot ||
-						activationKey !== snapshot.identity ||
+						!file ||
+						activationKey !== previewIdentity ||
 						virtualizedVisibility !== "visible"
 					) {
 						return;
 					}
 
-					commitRenderedPreviewSnapshot(snapshot);
+					commitRenderedPreviewSnapshot(
+						createRenderedPreviewSnapshot(activationKey, file),
+					);
 				},
 			});
 	}
@@ -274,24 +273,22 @@
 			return;
 		}
 
-		const snapshot = currentPreviewSnapshot;
-
-		if (virtualizedVisibility !== "visible" || !snapshot) {
+		if (virtualizedVisibility !== "visible" || !file || !previewIdentity) {
 			if (pendingPreviewIdentity) {
 				cancelPendingActivation();
 			}
 			return;
 		}
 
-		if (activatedPreviewIdentity === snapshot.identity) {
+		if (activatedPreviewIdentity === previewIdentity) {
 			return;
 		}
 
-		if (pendingPreviewIdentity === snapshot.identity) {
+		if (pendingPreviewIdentity === previewIdentity) {
 			return;
 		}
 
-		const identity = snapshot.identity;
+		const identity = previewIdentity;
 
 		cancelPendingActivation();
 
@@ -312,10 +309,10 @@
 
 			if (!activated) return;
 			if (activationSequence !== sequence) return;
-			if (currentPreviewSnapshot?.identity !== identity) return;
+			if (!file || previewIdentity !== identity) return;
 			if (virtualizedVisibility !== "visible") return;
 
-			commitRenderedPreviewSnapshot(currentPreviewSnapshot);
+			commitRenderedPreviewSnapshot(createRenderedPreviewSnapshot(identity, file));
 		};
 
 		request = requestQueuedPreviewActivation(
@@ -334,7 +331,7 @@
 	}
 
 	$effect(() => {
-		resetPreviewActivationForSnapshot(currentPreviewSnapshot);
+		resetPreviewActivationForCurrentPreview();
 	});
 
 	$effect(() => {
