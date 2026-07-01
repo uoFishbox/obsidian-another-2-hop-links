@@ -6,6 +6,7 @@ import {
 	type TwoHopMountedRowsBuild,
 } from "./twoHopMountedRowBuild";
 import type { TwoHopViewPlanRowModel } from "./twoHopViewPlan";
+import { recordCCLDevMeasurement } from "infrastructure/debug/CCLDevMeasurements";
 
 export interface TwoHopMountedRowWindowApplyParams {
 	readonly rowModel: TwoHopViewPlanRowModel;
@@ -86,22 +87,33 @@ export function createTwoHopMountedRowWindow(): TwoHopMountedRowWindow {
 	};
 
 	function apply(params: TwoHopMountedRowWindowApplyParams): TwoHopMountedRowsBuild {
+		recordCCLDevMeasurement("twoHop.rowWindow.apply");
+
 		const { rowModel, rowRange, ranges, previousBuild } = params;
 		const plan = rowModel.plan;
 		const cellStoreRevisionBeforeBuild = plan.cellStore.revision;
 		const clampedStart = resolveClampedRangeStart(rowRange);
 		const clampedEnd = resolveClampedRangeEnd(rowRange, plan.rowCount);
+		const currentBuild = state.build;
+		const isFirstBuild = currentBuild === undefined;
+		const hasPlanChanged = !isFirstBuild && state.plan !== plan;
+		const hasRowRangeChanged =
+			!isFirstBuild &&
+			(state.rowRange.start !== clampedStart ||
+				state.rowRange.end !== clampedEnd);
+		const hasCellStoreRevisionChanged =
+			!isFirstBuild && state.cellStoreRevision !== cellStoreRevisionBeforeBuild;
 
 		// Fast path: nothing changed — skip the builder entirely.
 		if (
-			state.build !== undefined &&
-			state.plan === plan &&
-			state.rowRange.start === clampedStart &&
-			state.rowRange.end === clampedEnd &&
-			state.cellStoreRevision === cellStoreRevisionBeforeBuild
+			!isFirstBuild &&
+			!hasPlanChanged &&
+			!hasRowRangeChanged &&
+			!hasCellStoreRevisionChanged
 		) {
 			state.lastApplyChanged = false;
-			return state.build;
+			recordCCLDevMeasurement("twoHop.rowWindow.apply.skipped");
+			return currentBuild;
 		}
 
 		// Something changed — delegate to the builder.
@@ -119,6 +131,19 @@ export function createTwoHopMountedRowWindow(): TwoHopMountedRowWindow {
 		setClampedRange(state.rowRange, build.rowRange, plan.rowCount);
 		state.cellStoreRevision = plan.cellStore.revision;
 		state.lastApplyChanged = true;
+		recordCCLDevMeasurement("twoHop.rowWindow.apply.changed");
+		if (isFirstBuild) {
+			recordCCLDevMeasurement("twoHop.rowWindow.apply.changed.firstBuild");
+		}
+		if (hasPlanChanged) {
+			recordCCLDevMeasurement("twoHop.rowWindow.apply.changed.plan");
+		}
+		if (hasRowRangeChanged) {
+			recordCCLDevMeasurement("twoHop.rowWindow.apply.changed.rowRange");
+		}
+		if (hasCellStoreRevisionChanged) {
+			recordCCLDevMeasurement("twoHop.rowWindow.apply.changed.cellStoreRevision");
+		}
 
 		return build;
 	}

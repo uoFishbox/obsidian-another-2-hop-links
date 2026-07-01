@@ -1,4 +1,7 @@
-import type { ViewPlanLayoutMetrics } from "ui/components/common/virtual-list/svelte/viewPlanLayout";
+import {
+	isSameViewPlanLayout,
+	type ViewPlanLayoutMetrics,
+} from "ui/components/common/virtual-list/svelte/viewPlanLayout";
 import type { TwoHopVirtualSectionDescriptor } from "./twoHopVirtualListModel";
 import {
 	compileTwoHopViewPlan,
@@ -6,6 +9,7 @@ import {
 	type TwoHopViewPlanMaterialization,
 	type TwoHopViewPlanRowModel,
 } from "./twoHopViewPlan";
+import { recordCCLDevMeasurement } from "infrastructure/debug/CCLDevMeasurements";
 
 export interface TwoHopRowModelCache {
 	resolve(
@@ -13,6 +17,24 @@ export interface TwoHopRowModelCache {
 		sectionVisibleCounts: Readonly<Record<string, number>>,
 		layout: ViewPlanLayoutMetrics,
 	): TwoHopViewPlanRowModel;
+}
+
+function hasSameVisibleCounts(
+	current: Readonly<Record<string, number>>,
+	next: Readonly<Record<string, number>>,
+): boolean {
+	const currentKeys = Object.keys(current);
+	const nextKeys = Object.keys(next);
+	if (currentKeys.length !== nextKeys.length) {
+		return false;
+	}
+
+	for (const key of currentKeys) {
+		if (current[key] !== next[key]) {
+			return false;
+		}
+	}
+	return true;
 }
 
 export function createTwoHopRowModelCache(params: {
@@ -33,7 +55,39 @@ export function createTwoHopRowModelCache(params: {
 				sectionVisibleCounts === previousVisibleCounts &&
 				layout === previousLayout
 			) {
+				recordCCLDevMeasurement("twoHop.rowModelCache.hit");
 				return previousRowModel;
+			}
+
+			recordCCLDevMeasurement("twoHop.rowModelCache.miss");
+			if (!previousRowModel) {
+				recordCCLDevMeasurement("twoHop.rowModelCache.miss.firstResolve");
+			} else {
+				if (sections !== previousSections) {
+					recordCCLDevMeasurement("twoHop.rowModelCache.miss.sections");
+				}
+				if (sectionVisibleCounts !== previousVisibleCounts) {
+					recordCCLDevMeasurement("twoHop.rowModelCache.miss.visibleCounts");
+					if (
+						previousVisibleCounts &&
+						hasSameVisibleCounts(previousVisibleCounts, sectionVisibleCounts)
+					) {
+						recordCCLDevMeasurement(
+							"twoHop.rowModelCache.miss.visibleCountsSemanticallySame",
+						);
+					}
+				}
+				if (layout !== previousLayout) {
+					recordCCLDevMeasurement("twoHop.rowModelCache.miss.layout");
+					if (
+						previousLayout &&
+						isSameViewPlanLayout(previousLayout, layout)
+					) {
+						recordCCLDevMeasurement(
+							"twoHop.rowModelCache.miss.layoutSemanticallySame",
+						);
+					}
+				}
 			}
 
 			const rowModel = createTwoHopViewPlanRowModel(

@@ -17,11 +17,23 @@ import {
 	setCCLDebugAutoFreeze,
 } from "./CCLDebugRuntime";
 import { ObsidianInternalFacade } from "infrastructure/capabilities/ObsidianInternalFacade";
+import {
+	getCCLDevMeasurementSnapshot,
+	resetCCLDevMeasurements,
+	type CCLDevMeasurementSnapshot,
+} from "./CCLDevMeasurements";
+
+interface CCLDevMeasurementsApi {
+	readonly snapshot: CCLDevMeasurementSnapshot;
+	getSnapshot(): CCLDevMeasurementSnapshot;
+	reset(): CCLDevMeasurementSnapshot;
+}
 
 interface CCLDebugApi {
 	readonly autoFreeze: boolean;
 	readonly lastSnapshot: ReturnType<typeof getCCLDebugLastSnapshot>;
 	readonly frozenPopover: unknown;
+	readonly measurements: CCLDevMeasurementsApi;
 	readonly app: PluginHost["app"];
 	readonly plugin: PluginHost;
 	readonly pagePreviewPlugin: unknown;
@@ -155,6 +167,18 @@ function listOwnKeys(obj: unknown): string[] {
 }
 
 export function installCCLDebugExposure(plugin: PluginHost): void {
+	const measurements: CCLDevMeasurementsApi = {
+		get snapshot() {
+			return getCCLDevMeasurementSnapshot();
+		},
+		getSnapshot() {
+			return getCCLDevMeasurementSnapshot();
+		},
+		reset() {
+			resetCCLDevMeasurements();
+			return getCCLDevMeasurementSnapshot();
+		},
+	};
 	const api: CCLDebugApi = {
 		get autoFreeze() {
 			return getCCLDebugAutoFreeze();
@@ -164,6 +188,9 @@ export function installCCLDebugExposure(plugin: PluginHost): void {
 		},
 		get frozenPopover() {
 			return getCCLDebugFrozenPopover();
+		},
+		get measurements() {
+			return measurements;
 		},
 		get app() {
 			return plugin.app;

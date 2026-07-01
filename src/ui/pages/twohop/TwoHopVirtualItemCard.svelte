@@ -1,12 +1,14 @@
 <script lang="ts">
 	import PreviewVisibilityProvider from "ui/components/items/PreviewVisibilityProvider.svelte";
 	import ViewItemCard from "ui/components/items/ViewItemCard.svelte";
+	import { IS_PROD } from "../../../appConstants";
 	import type { PluginSettings } from "types/settings";
 	import type { SearchWorkerMatchedItem } from "features/search/searchWorkerTypes";
 	import type { SearchWorkerMatchScope } from "features/search/searchWorkerTypes";
 	import type { VirtualizedItemVisibilityState } from "ui/components/common/virtualizedItemVisibility";
 	import type { TwoHopVirtualListItem } from "./twoHopVirtualListModel";
 	import { resolveTwoHopPageItemSearchScope } from "./twoHopVirtualListModel";
+	import { markCCLComponentReevaluation } from "infrastructure/debug/CCLDevMeasurements";
 
 	interface Props {
 		row: TwoHopVirtualListItem;
@@ -34,8 +36,24 @@
 	const resolvedSearchScope = $derived(
 		resolveTwoHopPageItemSearchScope(row, searchScope, matchedItem?.contentMatched),
 	);
+	const componentReevaluationProbe = $derived.by(() => {
+		if (IS_PROD) return "";
+
+		void row;
+		void settings;
+		void searchQuery;
+		void searchScope;
+		void matchedItemByKey;
+		void rowIndex;
+		void visibilityState;
+		void activationCandidateId;
+		void matchedItem;
+		void resolvedSearchScope;
+		return markCCLComponentReevaluation("TwoHopVirtualItemCard");
+	});
 </script>
 
+{componentReevaluationProbe}
 <PreviewVisibilityProvider {visibilityState}>
 	<ViewItemCard
 		item={row.item}

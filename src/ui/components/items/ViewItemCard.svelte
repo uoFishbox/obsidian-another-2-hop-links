@@ -4,7 +4,11 @@
 	import LinkItem from "ui/components/common/LinkItem.svelte";
 	import CardPreviewGate from "./CardPreviewGate.svelte";
 	import UnresolvedPreviewPlaceholder from "./UnresolvedPreviewPlaceholder.svelte";
-	import { ARIA_LABELS, DEBUG_DISABLE_CARD_DOM_PREVIEW } from "../../../appConstants";
+	import {
+		ARIA_LABELS,
+		DEBUG_DISABLE_CARD_DOM_PREVIEW,
+		IS_PROD,
+	} from "../../../appConstants";
 	import { formatLinkText } from "features/preview/text-processing/textUtils";
 	import { getItemStrategy } from "application/presenters";
 	import { getPriorityFrontmatterCardTitle } from "core/frontmatterCardTitle";
@@ -14,6 +18,7 @@
 		type ItemInteractionDescriptor,
 	} from "ui/interactions/interactionTypes";
 	import { useInteractionRegistry } from "ui/interactions/interactionRegistry";
+	import { markCCLComponentReevaluation } from "infrastructure/debug/CCLDevMeasurements";
 
 	let {
 		item,
@@ -101,6 +106,33 @@
 				})
 			: null,
 	);
+	const componentReevaluationProbe = $derived.by(() => {
+		if (IS_PROD) return "";
+
+		void item;
+		void settings;
+		void searchQuery;
+		void searchScope;
+		void draggable;
+		void previewRefreshToken;
+		void contentPreview;
+		void interactionRegistration;
+		void providedInteractionId;
+		void providedInteractionKey;
+		void rowIndex;
+		void activationCandidateId;
+		void strategy;
+		void targetFile;
+		void className;
+		void title;
+		void ariaLabel;
+		void extension;
+		void directory;
+		void interactionKey;
+		void interactionId;
+		void interactionDescriptor;
+		return markCCLComponentReevaluation("ViewItemCard");
+	});
 
 	function registerInteractionDescriptor(): (() => void) | undefined {
 		if (
@@ -122,6 +154,7 @@
 	});
 </script>
 
+{componentReevaluationProbe}
 {#if item && interactionId}
 	<LinkItem
 		{title}

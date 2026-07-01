@@ -18,11 +18,12 @@
 	} from "features/preview/scheduling/previewActivationScheduler";
 	import { buildCardPreviewActivationIdentity } from "features/preview/core/cardPreviewActivationIdentity";
 	import { normalizePreviewQuery } from "features/preview/core/previewRenderKeys";
-	import { DEBUG_DISABLE_CARD_DOM_PREVIEW } from "../../../appConstants";
+	import { DEBUG_DISABLE_CARD_DOM_PREVIEW, IS_PROD } from "../../../appConstants";
 	import {
 		PREVIEW_VISIBILITY_CONTEXT_KEY,
 		type PreviewVisibilityContext,
 	} from "./previewVisibilityContext";
+	import { markCCLComponentReevaluation } from "infrastructure/debug/CCLDevMeasurements";
 
 	let nextCardPreviewGateId = 0;
 
@@ -137,6 +138,33 @@
 		if (virtualizedVisibility !== "visible") return false;
 
 		return canKeepRenderedPreviewForNextSnapshot(currentPreviewSnapshot);
+	});
+	const componentReevaluationProbe = $derived.by(() => {
+		if (IS_PROD) return "";
+
+		void file;
+		void getPreview;
+		void providedGetVisiblePreviewQueueSize;
+		void applicationStore;
+		void searchQuery;
+		void searchScope;
+		void previewRefreshToken;
+		void contentPreview;
+		void rowIndex;
+		void activationCandidateId;
+		void visibility;
+		void previewOverride;
+		void settings;
+		void previewRenderVersion;
+		void virtualizedVisibility;
+		void effectiveSearchQuery;
+		void normalizedSearchQuery;
+		void previewIdentity;
+		void activatedPreviewIdentity;
+		void renderedPreviewSnapshot;
+		void currentPreviewSnapshot;
+		void shouldRenderPreview;
+		return markCCLComponentReevaluation("CardPreviewGate");
 	});
 
 	function cancelPendingActivation(): void {
@@ -323,6 +351,7 @@
 	});
 </script>
 
+{componentReevaluationProbe}
 {#if !DEBUG_DISABLE_CARD_DOM_PREVIEW && file}
 	{#if shouldRenderPreview && renderedPreviewSnapshot}
 		<CardPreview
