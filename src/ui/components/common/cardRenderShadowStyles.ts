@@ -58,7 +58,7 @@ export const CARD_RENDER_SHADOW_CSS = String.raw`
 	height: var(--ccl-box-height);
 	display: flex;
 	gap: var(--ccl-box-gap);
-	contain: layout paint;
+	contain: layout;
 }
 
 .cosense-card-links__virtual-grid-row {
