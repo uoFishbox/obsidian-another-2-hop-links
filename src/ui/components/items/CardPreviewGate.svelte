@@ -114,7 +114,7 @@
 		undefined;
 	const fallbackCandidateId = `card-preview-gate:${++nextCardPreviewGateId}`;
 
-	let renderedPreviewSnapshot = $state<RenderedPreviewSnapshot | undefined>(
+	let renderedPreviewSnapshot = $state.raw<RenderedPreviewSnapshot | undefined>(
 		undefined,
 	);
 

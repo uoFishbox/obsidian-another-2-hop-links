@@ -29,7 +29,7 @@
 		previewRefreshTokens = {},
 	}: Props = $props();
 
-	let currentItems = $state<ViewItem[]>(items);
+	let currentItems = $state.raw<ViewItem[]>(items);
 	let currentPreviewRefreshTokens =
 		$state.raw<Record<string, number>>(previewRefreshTokens);
 

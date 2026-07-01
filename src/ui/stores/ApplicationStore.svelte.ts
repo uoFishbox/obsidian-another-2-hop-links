@@ -270,7 +270,7 @@ export class ApplicationStore {
 		this.error = $derived(getLoadError(this.loadState));
 		this.sortOption = $state<SortOption>(initialSettings.lastUsedSortOption);
 		this.settings = $state.raw<PluginSettings>(initialSettings);
-		this.sectionExpandedLimits = $state<SectionExpansionLimits>({});
+		this.sectionExpandedLimits = $state.raw<SectionExpansionLimits>({});
 		this.updateVersion = $state(0);
 		this.previewGlobalVersion = $state(0);
 		this.previewPathVersions = $state.raw<Record<string, number>>({});

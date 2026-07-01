@@ -36,8 +36,8 @@
 	let lifecycleCell: TMountedCell | undefined = undefined;
 	let lifecycleLogicalKey: string | undefined = undefined;
 	let cellElement = $state<HTMLDivElement | undefined>(undefined);
-	let cellRegistration = $state<VirtualCellElementRegistration | undefined>(
-		undefined,
+	let cellRegistration = $state.raw<VirtualCellElementRegistration | undefined>(
+	undefined
 	);
 
 	$effect(() => {
