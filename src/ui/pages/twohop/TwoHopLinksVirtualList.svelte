@@ -51,8 +51,6 @@
 	} catch {
 		linkContext = undefined;
 	}
-	const renderableDescriptors = $derived(sections);
-
 	const getCellClassName = (section: TwoHopVirtualListSection): string | undefined =>
 		section.className;
 
@@ -67,9 +65,9 @@
 	);
 </script>
 
-{#if renderableDescriptors.length > 0}
+{#if sections.length > 0}
 	<TwoHopViewPlanVirtualList
-		sections={renderableDescriptors}
+		{sections}
 		{applicationStore}
 		{initialVisibleCount}
 		{loadMoreIncrement}

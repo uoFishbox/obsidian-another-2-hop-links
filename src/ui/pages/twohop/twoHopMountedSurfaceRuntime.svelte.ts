@@ -62,7 +62,6 @@ export function createTwoHopMountedSurfaceRuntime(params: {
 			}
 		},
 	});
-	const mountedBuild = $derived(virtualList.getReconciliationState().mountedBuild);
 	const contentHeight = $derived.by(() => {
 		const activeRowModel = params.inputRuntime.rowModel;
 		const snapshot = virtualList.getSnapshot();
@@ -79,7 +78,7 @@ export function createTwoHopMountedSurfaceRuntime(params: {
 	});
 	let mountedRowsVersion = $state.raw(0);
 	const mountedRowsForSurface = $derived.by(() => {
-		const build = mountedBuild;
+		const build = virtualList.getReconciliationState().mountedBuild;
 		void mountedRowsVersion;
 
 		if (!build) {
