@@ -1,6 +1,6 @@
 import type { VirtualListSharedScrollMetrics } from "./virtualListDomObserver";
 import { observeVirtualListViewport } from "./virtualListDomObserver";
-import { readVirtualListCachedMeasurement } from "./virtualListCachedMeasurement";
+import { readVirtualListCachedMeasurementInto } from "./virtualListCachedMeasurement";
 import { readVirtualListLiveMeasurement } from "./virtualListLiveMeasurement";
 import { type VirtualListScrollSnapshot } from "./virtualListMeasurementAdapter";
 import { createBootstrapMeasurementSuppression } from "./bootstrapMeasurementSuppression";
@@ -100,6 +100,10 @@ export function createVirtualMeasurementController({
 		source: "scroll",
 		sharedScrollMetrics: undefined,
 	};
+	const scrollMeasurementResult: VirtualMeasurementResult = {
+		kind: "measured",
+		measurement: scrollMeasurement,
+	};
 	let hasLastPublishedScrollMeasurement = false;
 	let lastPublishedScrollTop = 0;
 	let lastPublishedViewportHeight = 0;
@@ -136,16 +140,8 @@ export function createVirtualMeasurementController({
 
 	const publishMeasurement = (
 		nextMeasurement: VirtualMeasurement,
-	): {
-		readonly result: VirtualMeasurementResult;
-		readonly applicationResult: VirtualMeasurementApplicationResult;
-	} => {
-		const applicationResult = onMeasurement?.(nextMeasurement) ?? "stable";
-		return {
-			result: { kind: "measured", measurement: nextMeasurement },
-			applicationResult,
-		};
-	};
+	): VirtualMeasurementApplicationResult =>
+		onMeasurement?.(nextMeasurement) ?? "stable";
 
 	const runLayoutMeasurement = (): VirtualMeasurementResult => {
 		const rootEl = getRootEl();
@@ -171,7 +167,7 @@ export function createVirtualMeasurementController({
 		);
 		hasLastPublishedScrollMeasurement = false;
 
-		const { result, applicationResult } = publishMeasurement({
+		const nextMeasurement: VirtualMeasurement = {
 			scrollTop: liveMeasurement.scrollTop,
 			viewportHeight: liveMeasurement.viewportHeight,
 			sectionTop: liveMeasurement.sectionTop,
@@ -179,7 +175,8 @@ export function createVirtualMeasurementController({
 			isScrollActive: false,
 			source: "layout",
 			sectionRect: liveMeasurement.sectionRect,
-		});
+		};
+		const applicationResult = publishMeasurement(nextMeasurement);
 
 		if (liveMeasurement.isStableMeasurement && applicationResult === "stable") {
 			resetUnstableMeasurementRetry();
@@ -187,7 +184,7 @@ export function createVirtualMeasurementController({
 			scheduleUnstableMeasurementRetry();
 		}
 
-		return result;
+		return { kind: "measured", measurement: nextMeasurement };
 	};
 
 	const runScrollMeasurement = (
@@ -197,7 +194,7 @@ export function createVirtualMeasurementController({
 			return SKIPPED_NO_WINDOW;
 		}
 
-		const cachedMeasurement = readVirtualListCachedMeasurement({
+		readVirtualListCachedMeasurementInto(scrollMeasurement, {
 			rootEl: getRootEl(),
 			scrollContainerEl: measurement.scrollContainerEl,
 			viewportHeight: measurement.viewportHeight,
@@ -209,34 +206,26 @@ export function createVirtualMeasurementController({
 		});
 		if (
 			isUnchangedPublishedScrollMeasurement({
-				scrollTop: cachedMeasurement.scrollTop,
-				viewportHeight: cachedMeasurement.viewportHeight,
-				sectionTop: cachedMeasurement.sectionTop,
-				isStableMeasurement: cachedMeasurement.isStableMeasurement,
-				isScrollActive: cachedMeasurement.isScrollActive,
+				scrollTop: scrollMeasurement.scrollTop,
+				viewportHeight: scrollMeasurement.viewportHeight,
+				sectionTop: scrollMeasurement.sectionTop,
+				isStableMeasurement: scrollMeasurement.isStableMeasurement,
+				isScrollActive: scrollMeasurement.isScrollActive,
 			})
 		) {
 			return SKIPPED_UNCHANGED_SCROLL;
 		}
 
-		scrollMeasurement.scrollTop = cachedMeasurement.scrollTop;
-		scrollMeasurement.viewportHeight = cachedMeasurement.viewportHeight;
-		scrollMeasurement.sectionTop = cachedMeasurement.sectionTop;
-		scrollMeasurement.isStableMeasurement = cachedMeasurement.isStableMeasurement;
-		scrollMeasurement.isScrollActive = cachedMeasurement.isScrollActive;
-		scrollMeasurement.sharedScrollMetrics = cachedMeasurement.sharedScrollMetrics;
-		const { result, applicationResult } = publishMeasurement(scrollMeasurement);
-		if (result.kind === "measured") {
-			rememberPublishedScrollMeasurement(result.measurement);
-		}
+		const applicationResult = publishMeasurement(scrollMeasurement);
+		rememberPublishedScrollMeasurement(scrollMeasurement);
 
-		if (cachedMeasurement.isStableMeasurement && applicationResult === "stable") {
+		if (scrollMeasurement.isStableMeasurement && applicationResult === "stable") {
 			resetUnstableMeasurementRetry();
 		} else {
 			scheduleUnstableMeasurementRetry();
 		}
 
-		return result;
+		return scrollMeasurementResult;
 	};
 
 	const {

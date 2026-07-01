@@ -25,16 +25,19 @@ export interface VirtualListCachedMeasurementResult {
 	sharedScrollMetrics?: VirtualListSharedScrollMetrics;
 }
 
-export function readVirtualListCachedMeasurement({
-	rootEl,
-	scrollContainerEl,
-	viewportHeight,
-	sectionTop,
-	hasStableScrollMetrics,
-	hasRenderableContent,
-	cachedScrollSnapshot,
-	sharedScrollMetrics,
-}: VirtualListCachedMeasurementInput): VirtualListCachedMeasurementResult {
+export function readVirtualListCachedMeasurementInto(
+	out: VirtualListCachedMeasurementResult,
+	{
+		rootEl,
+		scrollContainerEl,
+		viewportHeight,
+		sectionTop,
+		hasStableScrollMetrics,
+		hasRenderableContent,
+		cachedScrollSnapshot,
+		sharedScrollMetrics,
+	}: VirtualListCachedMeasurementInput,
+): VirtualListCachedMeasurementResult {
 	const snapshot =
 		sharedScrollMetrics ??
 		readScrollSnapshot(
@@ -46,19 +49,33 @@ export function readVirtualListCachedMeasurement({
 	const scrollTop = snapshot.scrollTop;
 	const resolvedViewportHeight = snapshot.viewportHeight;
 
-	return {
+	out.scrollTop = scrollTop;
+	out.viewportHeight = resolvedViewportHeight;
+	out.sectionTop = sectionTop;
+	out.isScrollActive = sharedScrollMetrics?.isScrollActive ?? false;
+	out.isStableMeasurement = isStableCachedVirtualListMeasurementFromMetrics(
+		hasRenderableContent,
+		hasStableScrollMetrics,
+		viewportHeight,
 		scrollTop,
-		viewportHeight: resolvedViewportHeight,
+		resolvedViewportHeight,
 		sectionTop,
-		isScrollActive: sharedScrollMetrics?.isScrollActive ?? false,
-		isStableMeasurement: isStableCachedVirtualListMeasurementFromMetrics(
-			hasRenderableContent,
-			hasStableScrollMetrics,
-			viewportHeight,
-			scrollTop,
-			resolvedViewportHeight,
-			sectionTop,
-		),
-		...(sharedScrollMetrics ? { sharedScrollMetrics } : {}),
-	};
+	);
+	out.sharedScrollMetrics = sharedScrollMetrics;
+	return out;
+}
+
+export function readVirtualListCachedMeasurement(
+	input: VirtualListCachedMeasurementInput,
+): VirtualListCachedMeasurementResult {
+	return readVirtualListCachedMeasurementInto(
+		{
+			scrollTop: 0,
+			viewportHeight: 0,
+			sectionTop: 0,
+			isScrollActive: false,
+			isStableMeasurement: false,
+		},
+		input,
+	);
 }
