@@ -1,6 +1,14 @@
 import type { RowRange } from "../rowRange";
 import type { VirtualRanges } from "../types";
 
+/**
+ * Allocation-conscious scroll-window state.
+ *
+ * The `update*` functions intentionally mutate the supplied `previous` object
+ * rather than allocating a new one on every scroll. Callers should treat the
+ * returned object as the canonical state and discard any prior reference.
+ */
+
 export type ScrollWindowIdentity = object | string | number | symbol;
 
 export type LastScrollWindow = {
@@ -80,6 +88,10 @@ export const createMountedScrollWindow = (
 		stableMountedScrollTopBand?.max ?? INVALID_STABLE_MOUNTED_SCROLL_TOP_MAX,
 });
 
+/**
+ * Updates `previous` in place to suppress allocation. If `previous` is null, a
+ * new object is created.
+ */
 export const updateScrollWindow = (
 	previous: LastScrollWindow | null,
 	identity: ScrollWindowIdentity,
@@ -104,6 +116,10 @@ export const updateScrollWindow = (
 	return previous;
 };
 
+/**
+ * Updates `previous` in place to suppress allocation. If `previous` is null, a
+ * new object is created.
+ */
 export const updateMountedScrollWindow = (
 	previous: LastScrollWindow | null,
 	identity: ScrollWindowIdentity,
@@ -128,6 +144,10 @@ export const updateMountedScrollWindow = (
 	return previous;
 };
 
+/**
+ * Updates `previous` in place to suppress allocation. If `previous` is null, a
+ * new object is created.
+ */
 export const updateMountedAndPreviewScrollWindow = (
 	previous: LastScrollWindow | null,
 	identity: ScrollWindowIdentity,
