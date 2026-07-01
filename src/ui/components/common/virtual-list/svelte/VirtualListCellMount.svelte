@@ -2,6 +2,7 @@
 	import { IS_PROD } from "../../../../../appConstants";
 	import { onDestroy, onMount, type Snippet } from "svelte";
 	import type { LogicalCellKey, RenderSlotKey } from "../types";
+	import { registerVirtualCellElement } from "./VirtualCellRegistry";
 
 	interface Props {
 		logicalKey: LogicalCellKey;
@@ -43,6 +44,7 @@
 
 	let lifecycleCell: TMountedCell | undefined = undefined;
 	let lifecycleLogicalKey: string | undefined = undefined;
+	let cellElement = $state<HTMLDivElement | undefined>(undefined);
 
 	const hasPosition = $derived(
 		left !== undefined &&
@@ -108,6 +110,18 @@
 		lifecycleCell = mountedCell;
 	});
 
+	$effect(() => {
+		if (!cellElement) {
+			return;
+		}
+
+		return registerVirtualCellElement(cellElement, {
+			logicalKey: String(logicalKey),
+			rowIndex,
+			columnIndex,
+		});
+	});
+
 	onDestroy(() => {
 		if (lifecycleMode !== "logical" || lifecycleCell === undefined) {
 			return;
@@ -127,15 +141,22 @@
 	}
 </script>
 
-<div
-	class={className}
-	data-ccl-logical-key={logicalKeyAttribute}
-	data-ccl-render-slot={!IS_PROD ? renderSlotKeyAttribute : undefined}
-	data-ccl-cell-slot={!IS_PROD && cellSlotKey !== undefined ? cellSlotKey : undefined}
-	data-testid={!IS_PROD ? dataTestId : undefined}
-	data-ccl-row-index={rowIndex}
-	data-ccl-column-index={columnIndex}
-	style={positionStyle}
->
-	{@render children?.()}
-</div>
+{#if IS_PROD}
+	<div bind:this={cellElement} class={className} style={positionStyle}>
+		{@render children?.()}
+	</div>
+{:else}
+	<div
+		bind:this={cellElement}
+		class={className}
+		data-ccl-logical-key={logicalKeyAttribute}
+		data-ccl-render-slot={renderSlotKeyAttribute}
+		data-ccl-cell-slot={cellSlotKey}
+		data-testid={dataTestId}
+		data-ccl-row-index={rowIndex}
+		data-ccl-column-index={columnIndex}
+		style={positionStyle}
+	>
+		{@render children?.()}
+	</div>
+{/if}

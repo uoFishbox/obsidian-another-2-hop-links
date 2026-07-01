@@ -8,6 +8,10 @@ import { getScrollMetrics } from "../dom/virtualListMeasurementAdapter";
 import { createVirtualListKeyboardHandler } from "./VirtualSurfaceKeyboard";
 import { findNearestScrollContainer } from "../dom/scrollContainer";
 import { invalidateScrollGeometry } from "../dom/virtualListScrollGeometryInvalidation";
+import {
+	findClosestRegisteredVirtualCell,
+	findRegisteredVirtualCellElementByKey,
+} from "./VirtualCellRegistry";
 
 const LOGICAL_CELL_SELECTOR = "[data-ccl-logical-key]";
 
@@ -17,6 +21,11 @@ export function findMountedCellElementByKey(
 ): HTMLElement | null {
 	if (!container || !key) {
 		return null;
+	}
+
+	const registeredElement = findRegisteredVirtualCellElementByKey(container, key);
+	if (registeredElement) {
+		return registeredElement;
 	}
 
 	for (const element of container.querySelectorAll<HTMLElement>(
@@ -151,12 +160,19 @@ export const createVirtualSurfaceNavigation = (options: {
 		currentTarget: HTMLElement,
 		direction: ResultNavigationDirection,
 	): Promise<boolean> => {
-		const currentCellElement = currentTarget.closest<HTMLElement>(
-			"[data-ccl-logical-key]",
-		);
-		const currentKey = currentCellElement?.dataset.cclLogicalKey;
-		const rowIndex = Number(currentCellElement?.dataset.cclRowIndex);
-		const columnIndex = Number(currentCellElement?.dataset.cclColumnIndex);
+		const registeredCell = findClosestRegisteredVirtualCell(currentTarget);
+		const currentCellElement =
+			registeredCell?.element ??
+			currentTarget.closest<HTMLElement>(LOGICAL_CELL_SELECTOR);
+		const currentKey =
+			registeredCell?.metadata.logicalKey ??
+			currentCellElement?.dataset.cclLogicalKey;
+		const rowIndex =
+			registeredCell?.metadata.rowIndex ??
+			Number(currentCellElement?.dataset.cclRowIndex);
+		const columnIndex =
+			registeredCell?.metadata.columnIndex ??
+			Number(currentCellElement?.dataset.cclColumnIndex);
 		if (
 			!currentKey ||
 			!Number.isInteger(rowIndex) ||

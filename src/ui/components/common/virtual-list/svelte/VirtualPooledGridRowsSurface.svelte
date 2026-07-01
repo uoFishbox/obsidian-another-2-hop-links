@@ -89,6 +89,16 @@
 		_version: number | undefined,
 	): LogicalCellKey => cell.key;
 
+	const resolveMountedCellRowIndex = (
+		cell: TMountedCell,
+		_version: number | undefined,
+	): number => cell.rowIndex;
+
+	const resolveMountedCellColumnIndex = (
+		cell: TMountedCell,
+		_version: number | undefined,
+	): number | undefined => cell.columnIndex;
+
 	const resolveMountedCellBodyKey = (
 		cell: TMountedCell,
 		_version: number | undefined,
@@ -113,8 +123,14 @@
 					className={resolveCellClassName(mountedCell)}
 					dataTestId={getCellDataTestId?.(mountedCell)}
 					cellSlotKey={resolveCellSlotKey(row, mountedCell)}
-					rowIndex={mountedCell.rowIndex}
-					columnIndex={mountedCell.columnIndex}
+					rowIndex={resolveMountedCellRowIndex(
+						mountedCell,
+						mountedRowsVersion,
+					)}
+					columnIndex={resolveMountedCellColumnIndex(
+						mountedCell,
+						mountedRowsVersion,
+					)}
 					{mountedCell}
 					lifecycleMode="logical"
 					onMountCell={onLogicalCellAttach}
