@@ -2,7 +2,7 @@
 	import { IS_PROD } from "../../../../../appConstants";
 	import type { Snippet } from "svelte";
 	import type { LogicalCellKey, MountedVirtualCell } from "../types";
-	import VirtualListCellMount from "./VirtualListCellMount.svelte";
+	import VirtualGridLogicalCellMount from "./VirtualGridLogicalCellMount.svelte";
 	import type { VirtualSurfaceMountedRow } from "./VirtualSurfaceTypes";
 
 	interface Props<TMountedCell extends MountedVirtualCell> {
@@ -115,7 +115,7 @@
 			{...row.attributes}
 		>
 			{#each row.cells as mountedCell (resolveCellSlotKey(row, mountedCell))}
-				<VirtualListCellMount
+				<VirtualGridLogicalCellMount
 					logicalKey={resolveMountedCellLogicalKey(
 						mountedCell,
 						mountedRowsVersion,
@@ -132,9 +132,8 @@
 						mountedRowsVersion,
 					)}
 					{mountedCell}
-					lifecycleMode="logical"
-					onMountCell={onLogicalCellAttach}
-					onDestroyCell={onLogicalCellDetach}
+					{onLogicalCellAttach}
+					{onLogicalCellDetach}
 				>
 					{#if remountCellBodyOnKeyChange}
 						{#key resolveMountedCellBodyKey(mountedCell, mountedRowsVersion)}
@@ -149,7 +148,7 @@
 							observerRoot,
 						})}
 					{/if}
-				</VirtualListCellMount>
+				</VirtualGridLogicalCellMount>
 			{/each}
 		</div>
 	{/each}

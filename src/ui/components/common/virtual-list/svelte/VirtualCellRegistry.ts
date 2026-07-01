@@ -4,13 +4,28 @@ export interface VirtualCellMetadata {
 	readonly columnIndex?: number;
 }
 
+/**
+ * Reuses one metadata object for a mounted cell element across logical updates.
+ */
+export interface VirtualCellElementRegistration {
+	update(
+		logicalKey: string,
+		rowIndex: number | undefined,
+		columnIndex: number | undefined,
+	): void;
+	unregister(): void;
+}
+
+interface MutableVirtualCellMetadata {
+	logicalKey: string;
+	rowIndex?: number;
+	columnIndex?: number;
+}
+
 const metadataByElement = new WeakMap<HTMLElement, VirtualCellMetadata>();
 const elementsByLogicalKey = new Map<string, Set<HTMLElement>>();
 
-function removeElementFromLogicalKey(
-	element: HTMLElement,
-	logicalKey: string,
-): void {
+function removeElementFromLogicalKey(element: HTMLElement, logicalKey: string): void {
 	const elements = elementsByLogicalKey.get(logicalKey);
 	if (!elements) return;
 
@@ -49,6 +64,60 @@ export function registerVirtualCellElement(
 
 		metadataByElement.delete(element);
 		removeElementFromLogicalKey(element, metadata.logicalKey);
+	};
+}
+
+/**
+ * Creates an updatable cell registration for pooled surfaces that reuse DOM
+ * shells across logical cells.
+ */
+export function createVirtualCellElementRegistration(
+	element: HTMLElement,
+): VirtualCellElementRegistration {
+	const metadata: MutableVirtualCellMetadata = {
+		logicalKey: "",
+	};
+	let isRegistered = false;
+
+	const unregister = (): void => {
+		if (!isRegistered) {
+			return;
+		}
+
+		if (metadataByElement.get(element) === metadata) {
+			metadataByElement.delete(element);
+			removeElementFromLogicalKey(element, metadata.logicalKey);
+		}
+		isRegistered = false;
+	};
+
+	const update = (
+		logicalKey: string,
+		rowIndex: number | undefined,
+		columnIndex: number | undefined,
+	): void => {
+		if (!isRegistered) {
+			const previousMetadata = metadataByElement.get(element);
+			if (previousMetadata) {
+				removeElementFromLogicalKey(element, previousMetadata.logicalKey);
+			}
+
+			metadataByElement.set(element, metadata);
+			addElementForLogicalKey(element, logicalKey);
+			isRegistered = true;
+		} else if (metadata.logicalKey !== logicalKey) {
+			removeElementFromLogicalKey(element, metadata.logicalKey);
+			addElementForLogicalKey(element, logicalKey);
+		}
+
+		metadata.logicalKey = logicalKey;
+		metadata.rowIndex = rowIndex;
+		metadata.columnIndex = columnIndex;
+	};
+
+	return {
+		update,
+		unregister,
 	};
 }
 

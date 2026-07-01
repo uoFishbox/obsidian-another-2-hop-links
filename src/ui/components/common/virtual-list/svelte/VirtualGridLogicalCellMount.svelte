@@ -1,0 +1,105 @@
+<script lang="ts" generics="TMountedCell">
+	import { IS_PROD } from "../../../../../appConstants";
+	import { onDestroy, type Snippet } from "svelte";
+	import type { LogicalCellKey } from "../types";
+	import {
+		createVirtualCellElementRegistration,
+		type VirtualCellElementRegistration,
+	} from "./VirtualCellRegistry";
+
+	interface Props {
+		logicalKey: LogicalCellKey;
+		className?: string;
+		dataTestId?: string;
+		cellSlotKey?: number;
+		rowIndex?: number;
+		columnIndex?: number;
+		mountedCell?: TMountedCell;
+		onLogicalCellAttach?: (cell: TMountedCell) => void;
+		onLogicalCellDetach?: (cell: TMountedCell) => void;
+		children?: Snippet;
+	}
+
+	let {
+		logicalKey,
+		className = "",
+		dataTestId,
+		cellSlotKey,
+		rowIndex,
+		columnIndex,
+		mountedCell,
+		onLogicalCellAttach,
+		onLogicalCellDetach,
+		children,
+	}: Props = $props();
+
+	let lifecycleCell: TMountedCell | undefined = undefined;
+	let lifecycleLogicalKey: string | undefined = undefined;
+	let cellElement = $state<HTMLDivElement | undefined>(undefined);
+	let cellRegistration = $state<VirtualCellElementRegistration | undefined>(
+		undefined,
+	);
+
+	$effect(() => {
+		const nextLogicalKey = String(logicalKey);
+		const previousLogicalKey = lifecycleLogicalKey;
+		const previousCell = lifecycleCell;
+
+		if (
+			previousCell !== undefined &&
+			previousLogicalKey !== undefined &&
+			previousLogicalKey !== nextLogicalKey
+		) {
+			onLogicalCellDetach?.(previousCell);
+		}
+
+		if (mountedCell !== undefined && previousLogicalKey !== nextLogicalKey) {
+			onLogicalCellAttach?.(mountedCell);
+		}
+
+		lifecycleLogicalKey = nextLogicalKey;
+		lifecycleCell = mountedCell;
+	});
+
+	$effect(() => {
+		if (!cellElement) {
+			return;
+		}
+
+		const registration = createVirtualCellElementRegistration(cellElement);
+		cellRegistration = registration;
+
+		return () => {
+			registration.unregister();
+			if (cellRegistration === registration) {
+				cellRegistration = undefined;
+			}
+		};
+	});
+
+	$effect(() => {
+		cellRegistration?.update(String(logicalKey), rowIndex, columnIndex);
+	});
+
+	onDestroy(() => {
+		if (lifecycleCell === undefined) {
+			return;
+		}
+
+		onLogicalCellDetach?.(lifecycleCell);
+		lifecycleCell = undefined;
+		lifecycleLogicalKey = undefined;
+	});
+</script>
+
+<div
+	bind:this={cellElement}
+	class={className}
+	data-ccl-logical-key={!IS_PROD ? String(logicalKey) : undefined}
+	data-ccl-cell-slot={!IS_PROD ? cellSlotKey : undefined}
+	data-testid={!IS_PROD ? dataTestId : undefined}
+	data-ccl-row-index={!IS_PROD ? rowIndex : undefined}
+	data-ccl-column-index={!IS_PROD ? columnIndex : undefined}
+>
+	{@render children?.()}
+</div>
