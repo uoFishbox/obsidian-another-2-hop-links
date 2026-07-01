@@ -73,6 +73,12 @@ export interface BuildSectionedGridMountedRowsParams<
 	readonly reusableRowSlotsScratch?: number[];
 	readonly resolvedRowScratch?: SectionedGridResolvedRowScratch;
 	findSectionIndexByRow(sections: readonly TSection[], rowIndex: number): number;
+	/**
+	 * Optional hot-path lookup for the first mounted row. Callers with compiled
+	 * row metadata can bypass section binary search while the generic lookup
+	 * remains the fallback.
+	 */
+	resolveInitialSectionIndexByRow?(plan: TPlan, rowIndex: number): number;
 	resolveRowInSection(
 		plan: TPlan,
 		sectionPlan: TSection,
@@ -214,7 +220,9 @@ export function buildSectionedGridMountedRows<
 		nextRowSlotIndex += 1;
 		return slotIndex;
 	};
-	let sectionIndex = params.findSectionIndexByRow(plan.sections, start);
+	let sectionIndex =
+		params.resolveInitialSectionIndexByRow?.(plan, start) ??
+		params.findSectionIndexByRow(plan.sections, start);
 	let lastSectionIndex = -1;
 	let sectionLayout: SectionLayout<T, G> | null = null;
 
@@ -230,6 +238,13 @@ export function buildSectionedGridMountedRows<
 	const useInto = params.resolveRowInSectionInto !== undefined;
 
 	for (let rowIndex = start; rowIndex < end; rowIndex += 1) {
+		const rowKey = rowIndex;
+		const previousRow = getPreviousRow(rowIndex);
+		if (params.previousBuild?.plan === plan && previousRow) {
+			rowSlices.push(previousRow);
+			mountedCellCount += previousRow.cells.length;
+			continue;
+		}
 		while (
 			sectionIndex >= 0 &&
 			rowIndex >=
@@ -257,13 +272,6 @@ export function buildSectionedGridMountedRows<
 			cellCount: rowCellCount,
 			top: rowTop,
 		} = resolvedRow;
-		const rowKey = rowIndex;
-		const previousRow = getPreviousRow(rowIndex);
-		if (params.previousBuild?.plan === plan && previousRow) {
-			rowSlices.push(previousRow);
-			mountedCellCount += previousRow.cells.length;
-			continue;
-		}
 		if (sectionIndex !== lastSectionIndex) {
 			lastSectionIndex = sectionIndex;
 			sectionLayout = sectionPlan.mountedLayout;

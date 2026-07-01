@@ -72,6 +72,15 @@ export type TwoHopMountedRowSlice = MountedFlatRowSlice<
 	TwoHopVirtualListSection
 >;
 
+function resolveInitialTwoHopSectionIndexByRow(
+	plan: TwoHopViewPlan,
+	rowIndex: number,
+): number {
+	const table = plan.rowTable;
+	if (rowIndex < 0 || rowIndex >= table.rowCount) return -1;
+	return table.sectionIndexByRow[rowIndex];
+}
+
 /**
  * Assigns compiled TwoHop cells directly to pooled surface slots.
  *
@@ -126,6 +135,7 @@ export function buildTwoHopMountedRows(params: {
 		reusableRowSlotsScratch: params.reusableRowSlotsScratch,
 		resolvedRowScratch: params.resolvedRowScratch,
 		findSectionIndexByRow: findTwoHopSectionIndexByRow,
+		resolveInitialSectionIndexByRow: resolveInitialTwoHopSectionIndexByRow,
 		resolveRowInSection: resolveTwoHopRowInSection,
 		resolveRowInSectionInto: resolveTwoHopRowInSectionInto,
 		readLogicalCellInSection: readTwoHopLogicalCellInSection,
