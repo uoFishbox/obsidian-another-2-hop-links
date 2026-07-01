@@ -49,11 +49,18 @@ export function createTwoHopRowModelCache(params: {
 
 	return {
 		resolve(sections, sectionVisibleCounts, layout) {
+			const hasSemanticallySameLayout =
+				previousLayout !== undefined &&
+				isSameViewPlanLayout(previousLayout, layout);
+			const hasCacheCompatibleLayout =
+				previousLayout !== undefined &&
+				(layout === previousLayout || hasSemanticallySameLayout);
+
 			if (
 				previousRowModel &&
 				sections === previousSections &&
 				sectionVisibleCounts === previousVisibleCounts &&
-				layout === previousLayout
+				hasCacheCompatibleLayout
 			) {
 				recordCCLDevMeasurement("twoHop.rowModelCache.hit");
 				return previousRowModel;
@@ -70,23 +77,22 @@ export function createTwoHopRowModelCache(params: {
 					recordCCLDevMeasurement("twoHop.rowModelCache.miss.visibleCounts");
 					if (
 						previousVisibleCounts &&
-						hasSameVisibleCounts(previousVisibleCounts, sectionVisibleCounts)
+						hasSameVisibleCounts(
+							previousVisibleCounts,
+							sectionVisibleCounts,
+						)
 					) {
 						recordCCLDevMeasurement(
 							"twoHop.rowModelCache.miss.visibleCountsSemanticallySame",
 						);
 					}
 				}
-				if (layout !== previousLayout) {
+				if (!hasCacheCompatibleLayout) {
 					recordCCLDevMeasurement("twoHop.rowModelCache.miss.layout");
-					if (
-						previousLayout &&
-						isSameViewPlanLayout(previousLayout, layout)
-					) {
-						recordCCLDevMeasurement(
-							"twoHop.rowModelCache.miss.layoutSemanticallySame",
-						);
-					}
+				} else if (layout !== previousLayout) {
+					recordCCLDevMeasurement(
+						"twoHop.rowModelCache.miss.layoutSemanticallySame",
+					);
 				}
 			}
 

@@ -37,7 +37,25 @@ const descriptor: TwoHopVirtualSectionDescriptor = {
 };
 
 describe("createTwoHopRowModelCache in a DOM runtime", () => {
-	it("reuses only the exact descriptor, pagination, and layout inputs", () => {
+	it("reuses semantically matching layout inputs without replacing the plan layout", () => {
+		const cache = createTwoHopRowModelCache({
+			materialization: { kind: "eager" },
+			resolveInitialSectionVisibleCount: (section) => section.loadedCount,
+			clampVisibleCount: (section, count) => Math.min(section.loadedCount, count),
+		});
+		const sections = [descriptor];
+		const visibleCounts = { "new-links": 1 };
+		const first = cache.resolve(sections, visibleCounts, layout);
+		const equivalentLayout = { ...layout };
+
+		expect(cache.resolve(sections, visibleCounts, layout)).toBe(first);
+		expect(cache.resolve(sections, visibleCounts, equivalentLayout)).toBe(first);
+		expect(first.plan.layout).toBe(layout);
+		expect(first.plan.layout).not.toBe(equivalentLayout);
+		expect(first.revision).toEqual({ kind: "opaque", token: first.plan });
+	});
+
+	it("misses when descriptor or pagination inputs change", () => {
 		const cache = createTwoHopRowModelCache({
 			materialization: { kind: "eager" },
 			resolveInitialSectionVisibleCount: (section) => section.loadedCount,
@@ -47,10 +65,39 @@ describe("createTwoHopRowModelCache in a DOM runtime", () => {
 		const visibleCounts = { "new-links": 1 };
 		const first = cache.resolve(sections, visibleCounts, layout);
 
-		expect(cache.resolve(sections, visibleCounts, layout)).toBe(first);
 		expect(cache.resolve([...sections], visibleCounts, layout)).not.toBe(first);
-		expect(cache.resolve(sections, { ...visibleCounts }, layout)).not.toBe(first);
-		expect(cache.resolve(sections, visibleCounts, { ...layout })).not.toBe(first);
-		expect(first.revision).toEqual({ kind: "opaque", token: first.plan });
+
+		const cacheForVisibleCounts = createTwoHopRowModelCache({
+			materialization: { kind: "eager" },
+			resolveInitialSectionVisibleCount: (section) => section.loadedCount,
+			clampVisibleCount: (section, count) => Math.min(section.loadedCount, count),
+		});
+		const firstForVisibleCounts = cacheForVisibleCounts.resolve(
+			sections,
+			visibleCounts,
+			layout,
+		);
+
+		expect(
+			cacheForVisibleCounts.resolve(sections, { ...visibleCounts }, layout),
+		).not.toBe(firstForVisibleCounts);
+	});
+
+	it("misses when layout values change", () => {
+		const cache = createTwoHopRowModelCache({
+			materialization: { kind: "eager" },
+			resolveInitialSectionVisibleCount: (section) => section.loadedCount,
+			clampVisibleCount: (section, count) => Math.min(section.loadedCount, count),
+		});
+		const sections = [descriptor];
+		const visibleCounts = { "new-links": 1 };
+		const first = cache.resolve(sections, visibleCounts, layout);
+
+		expect(
+			cache.resolve(sections, visibleCounts, {
+				...layout,
+				columns: layout.columns + 1,
+			}),
+		).not.toBe(first);
 	});
 });
