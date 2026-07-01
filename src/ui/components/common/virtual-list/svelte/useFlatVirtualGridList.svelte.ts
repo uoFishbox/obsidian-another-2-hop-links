@@ -326,7 +326,12 @@ export function useFlatVirtualGridList<T>(props: FlatVirtualGridListProps<T>) {
 			return;
 		}
 
-		if (virtualList.getSnapshot()?.rowModel !== nextRowModel) {
+		const currentSnapshot = virtualList.getSnapshot();
+		if (currentSnapshot?.rowModel === nextRowModel) {
+			return;
+		}
+
+		if (currentSnapshot) {
 			virtualList.recompute({ rowModel: nextRowModel });
 		}
 
