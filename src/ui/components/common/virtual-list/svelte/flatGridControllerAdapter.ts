@@ -12,20 +12,8 @@ import {
 	type ConfiguredCardLayout,
 	type VirtualGridLayout,
 } from "../dom/flatGridLayoutMeasurement";
-import type { MeasurementUpdateResult } from "../dom/virtualListMeasurementAdapter";
-import {
-	createMountedScrollWindow,
-	isSameMountedScrollWindow,
-	isSameRangedScrollWindow,
-	isWithinStableMountedScrollWindow,
-	isWithinStablePreviewScrollWindow,
-	type LastScrollWindow,
-	type MountedScrollWindowMeasurement,
-	type RangedScrollWindowMeasurement,
-	updateMountedAndPreviewScrollWindow,
-} from "../core/scrollWindowGate";
-import type { RowRange } from "../rowRange";
 import type { createFlatGridMeasurementAdapter } from "./flatGridMeasurementAdapter";
+import { createVirtualScrollWindowMeasurementController } from "./virtualScrollWindowMeasurementController";
 
 export interface CreateFlatGridControllerAdapterOptions<T> {
 	getRootEl(): HTMLElement | null;
@@ -52,7 +40,6 @@ export function createFlatGridControllerAdapter<T>({
 	measurementAdapter,
 	onStableMeasurement,
 }: CreateFlatGridControllerAdapterOptions<T>) {
-	let lastScrollWindow: LastScrollWindow | null = null;
 	const stableMeasurementContext: VirtualListStableMeasurementContext = {
 		scrollTop: 0,
 		viewportHeight: 0,
@@ -60,11 +47,6 @@ export function createFlatGridControllerAdapter<T>({
 		isScrollActive: false,
 		sharedScrollMetrics: undefined,
 	};
-
-	const toApplicationResult = (
-		result: MeasurementUpdateResult<RowRange>,
-	): VirtualMeasurementApplicationResult =>
-		result.kind === "stable" ? "stable" : "unstable";
 
 	const notifyStableMeasurement = (measurement: VirtualMeasurement): void => {
 		stableMeasurementContext.scrollTop = measurement.scrollTop;
@@ -75,35 +57,54 @@ export function createFlatGridControllerAdapter<T>({
 		onStableMeasurement(stableMeasurementContext);
 	};
 
-	const primeLastScrollWindow = (
-		measurement: VirtualMeasurement,
-		layout: VirtualGridLayout,
-	): void => {
-		if (!measurement.isStableMeasurement) {
-			lastScrollWindow = null;
-			return;
-		}
-
-		const mountedScrollWindowMeasurement =
-			measurementAdapter.resolveMountedScrollWindowMeasurement(
-				measurement.scrollTop,
-				measurement.viewportHeight,
-				measurement.sectionTop,
+	const scrollWindowMeasurementController =
+		createVirtualScrollWindowMeasurementController<VirtualGridLayout>({
+			resolveMountedScrollWindowMeasurement(measurement, layout) {
+				return measurementAdapter.resolveMountedScrollWindowMeasurement(
+					measurement.scrollTop,
+					measurement.viewportHeight,
+					measurement.sectionTop,
+					layout,
+				);
+			},
+			resolveScrollWindowMeasurement(
+				measurement,
 				layout,
-			);
-		lastScrollWindow = createMountedScrollWindow(
-			mountedScrollWindowMeasurement.identity,
-			mountedScrollWindowMeasurement.mounted,
-			mountedScrollWindowMeasurement.stableMountedScrollTopBand,
-		);
-	};
+				precomputedMountedRange,
+			) {
+				return measurementAdapter.resolveScrollWindowMeasurement(
+					measurement.scrollTop,
+					measurement.viewportHeight,
+					measurement.sectionTop,
+					layout,
+					precomputedMountedRange,
+				);
+			},
+			applyRangeMeasurement(measurement, layout, precomputedRanges) {
+				return measurementAdapter.applyRangeMeasurement(
+					measurement.scrollTop,
+					measurement.viewportHeight,
+					measurement.sectionTop,
+					measurement.isStableMeasurement,
+					measurement.isScrollActive,
+					layout,
+					precomputedRanges,
+				);
+			},
+			syncPreviewRange(ranges) {
+				measurementAdapter.onActiveScrollPreviewRangeMeasurement(ranges);
+			},
+			onStableMeasurement(measurement) {
+				notifyStableMeasurement(measurement);
+			},
+		});
 
 	const applyLayoutMeasurement = (
 		nextMeasurement: VirtualMeasurement,
 	): VirtualMeasurementApplicationResult => {
 		const rootEl = getRootEl();
 		if (!rootEl || !nextMeasurement.sectionRect) {
-			lastScrollWindow = null;
+			scrollWindowMeasurementController.resetLastScrollWindow();
 			return "skipped";
 		}
 
@@ -129,19 +130,15 @@ export function createFlatGridControllerAdapter<T>({
 			layoutMeasurement.layout,
 		);
 		if (result.kind !== "stable" || !layoutMeasurement.hasStableLayout) {
-			lastScrollWindow = null;
+			scrollWindowMeasurementController.resetLastScrollWindow();
 			return "unstable";
 		}
 
-		primeLastScrollWindow(nextMeasurement, layoutMeasurement.layout);
+		scrollWindowMeasurementController.primeLastScrollWindow(
+			nextMeasurement,
+			layoutMeasurement.layout,
+		);
 		measurementController.scheduleScrollMeasurement();
-		notifyStableMeasurement(nextMeasurement);
-		return "stable";
-	};
-
-	const returnStableScrollMeasurement = (
-		nextMeasurement: VirtualMeasurement,
-	): VirtualMeasurementApplicationResult => {
 		notifyStableMeasurement(nextMeasurement);
 		return "stable";
 	};
@@ -149,153 +146,10 @@ export function createFlatGridControllerAdapter<T>({
 	const applyScrollMeasurement = (
 		nextMeasurement: VirtualMeasurement,
 	): VirtualMeasurementApplicationResult => {
-		const layout = getLayout();
-		let pendingMountedScrollWindowMeasurement: MountedScrollWindowMeasurement | null =
-			null;
-		let nextScrollWindowIdentity: RangedScrollWindowMeasurement["identity"] | null =
-			null;
-		let nextScrollWindowRanges: RangedScrollWindowMeasurement["ranges"] | null =
-			null;
-		let nextStablePreviewScrollTopBand:
-			| RangedScrollWindowMeasurement["stablePreviewScrollTopBand"]
-			| undefined;
-		let nextStableMountedScrollTopBand:
-			| MountedScrollWindowMeasurement["stableMountedScrollTopBand"]
-			| undefined;
-		let precomputedMountedRange: RowRange | undefined;
-		let precomputedRanges: RangedScrollWindowMeasurement["ranges"] | undefined;
-
-		if (nextMeasurement.isStableMeasurement && nextMeasurement.isScrollActive) {
-			const mountedScrollWindowMeasurement =
-				measurementAdapter.resolveMountedScrollWindowMeasurement(
-					nextMeasurement.scrollTop,
-					nextMeasurement.viewportHeight,
-					nextMeasurement.sectionTop,
-					layout,
-				);
-			precomputedMountedRange = mountedScrollWindowMeasurement.mounted;
-			if (
-				isSameMountedScrollWindow(
-					lastScrollWindow,
-					mountedScrollWindowMeasurement.identity,
-					mountedScrollWindowMeasurement.mounted,
-				)
-			) {
-				if (
-					isWithinStableMountedScrollWindow(
-						lastScrollWindow,
-						mountedScrollWindowMeasurement.identity,
-						mountedScrollWindowMeasurement.mounted,
-						nextMeasurement.scrollTop,
-					) ||
-					isWithinStablePreviewScrollWindow(
-						lastScrollWindow,
-						mountedScrollWindowMeasurement.identity,
-						mountedScrollWindowMeasurement.mounted,
-						nextMeasurement.scrollTop,
-					)
-				) {
-					return returnStableScrollMeasurement(nextMeasurement);
-				}
-			}
-			pendingMountedScrollWindowMeasurement = mountedScrollWindowMeasurement;
-
-			const scrollWindowMeasurement =
-				measurementAdapter.resolveScrollWindowMeasurement(
-					nextMeasurement.scrollTop,
-					nextMeasurement.viewportHeight,
-					nextMeasurement.sectionTop,
-					layout,
-					precomputedMountedRange,
-				);
-			precomputedRanges = scrollWindowMeasurement.ranges;
-			if (
-				isSameRangedScrollWindow(
-					lastScrollWindow,
-					scrollWindowMeasurement.identity,
-					scrollWindowMeasurement.ranges,
-					"visible-and-mounted",
-				)
-			) {
-				return returnStableScrollMeasurement(nextMeasurement);
-			}
-			if (
-				isSameMountedScrollWindow(
-					lastScrollWindow,
-					scrollWindowMeasurement.identity,
-					scrollWindowMeasurement.ranges.mounted,
-				)
-			) {
-				measurementAdapter.onActiveScrollPreviewRangeMeasurement(
-					scrollWindowMeasurement.ranges,
-				);
-				lastScrollWindow = updateMountedAndPreviewScrollWindow(
-					lastScrollWindow,
-					scrollWindowMeasurement.identity,
-					scrollWindowMeasurement.ranges,
-					scrollWindowMeasurement.stablePreviewScrollTopBand,
-					pendingMountedScrollWindowMeasurement.stableMountedScrollTopBand,
-				);
-				return returnStableScrollMeasurement(nextMeasurement);
-			}
-
-			nextScrollWindowIdentity = scrollWindowMeasurement.identity;
-			nextScrollWindowRanges = scrollWindowMeasurement.ranges;
-			nextStablePreviewScrollTopBand =
-				scrollWindowMeasurement.stablePreviewScrollTopBand;
-			if (
-				pendingMountedScrollWindowMeasurement.identity ===
-					scrollWindowMeasurement.identity &&
-				pendingMountedScrollWindowMeasurement.mounted.start ===
-					scrollWindowMeasurement.ranges.mounted.start &&
-				pendingMountedScrollWindowMeasurement.mounted.end ===
-					scrollWindowMeasurement.ranges.mounted.end
-			) {
-				nextStableMountedScrollTopBand =
-					pendingMountedScrollWindowMeasurement.stableMountedScrollTopBand;
-			}
-		} else {
-			lastScrollWindow = null;
-		}
-
-		const result = measurementAdapter.applyRangeMeasurement(
-			nextMeasurement.scrollTop,
-			nextMeasurement.viewportHeight,
-			nextMeasurement.sectionTop,
-			nextMeasurement.isStableMeasurement,
-			nextMeasurement.isScrollActive,
-			layout,
-			precomputedRanges,
+		return scrollWindowMeasurementController.applyScrollMeasurement(
+			nextMeasurement,
+			getLayout(),
 		);
-		if (result.kind !== "stable") {
-			if (lastScrollWindow === null && pendingMountedScrollWindowMeasurement) {
-				lastScrollWindow = createMountedScrollWindow(
-					pendingMountedScrollWindowMeasurement.identity,
-					pendingMountedScrollWindowMeasurement.mounted,
-					pendingMountedScrollWindowMeasurement.stableMountedScrollTopBand,
-				);
-			} else {
-				lastScrollWindow = null;
-			}
-			return toApplicationResult(result);
-		}
-
-		if (nextScrollWindowIdentity === null) {
-			lastScrollWindow = null;
-		} else if (nextScrollWindowRanges) {
-			lastScrollWindow = updateMountedAndPreviewScrollWindow(
-				lastScrollWindow,
-				nextScrollWindowIdentity,
-				nextScrollWindowRanges,
-				nextStablePreviewScrollTopBand,
-				nextStableMountedScrollTopBand,
-			);
-		}
-		if (!nextMeasurement.isScrollActive) {
-			primeLastScrollWindow(nextMeasurement, layout);
-		}
-		notifyStableMeasurement(nextMeasurement);
-		return "stable";
 	};
 
 	const applyMeasurement = (
