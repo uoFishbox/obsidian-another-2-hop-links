@@ -86,20 +86,16 @@ function parseStyleNumber(value: string | null | undefined): number | null {
 	return Number.isFinite(parsed) ? parsed : null;
 }
 
-function parseTransformTranslate(
+function parseTransformOffset(
 	value: string | null | undefined,
 ): { left: number; top: number } | null {
 	if (!value || value === "none") {
 		return null;
 	}
 
-	const translateMatch =
-		value.match(
-			/^translate(?:3d)?\(\s*([+-]?(?:\d+\.?\d*|\.\d+)(?:px)?)\s*(?:,\s*([+-]?(?:\d+\.?\d*|\.\d+)(?:px)?))?(?:,\s*[+-]?(?:\d+\.?\d*|\.\d+)(?:px)?)?\s*\)$/i,
-		) ??
-		value.match(
-			/^translateX\(\s*([+-]?(?:\d+\.?\d*|\.\d+)(?:px)?)\s*\)\s*translateY\(\s*([+-]?(?:\d+\.?\d*|\.\d+)(?:px)?)\s*\)$/i,
-		);
+	const translateMatch = value.match(
+		/^translate(?:3d)?\(\s*([+-]?(?:\d+\.?\d*|\.\d+)(?:px)?)\s*(?:,\s*([+-]?(?:\d+\.?\d*|\.\d+)(?:px)?))?(?:,\s*[+-]?(?:\d+\.?\d*|\.\d+)(?:px)?)?\s*\)$/i,
+	);
 	if (translateMatch) {
 		const left = Number.parseFloat(translateMatch[1]);
 		const top = Number.parseFloat(translateMatch[2] ?? "0");
@@ -122,6 +118,18 @@ function parseTransformTranslate(
 	return null;
 }
 
+function resolvePositionedCellOffset(
+	cell: HTMLElement,
+): { left: number; top: number } | null {
+	const left = parseStyleNumber(cell.style.left);
+	const top = parseStyleNumber(cell.style.top);
+	if (left !== null && top !== null) {
+		return { left, top };
+	}
+
+	return parseTransformOffset(cell.style.transform);
+}
+
 function buildRectFromPositionedCell(element: HTMLElement): NavigationRect | null {
 	const cell = findClosestComposed(element, NAVIGATION_CELL_SELECTOR);
 	if (!cell) {
@@ -130,7 +138,7 @@ function buildRectFromPositionedCell(element: HTMLElement): NavigationRect | nul
 
 	const width = parseStyleNumber(cell.style.width);
 	const height = parseStyleNumber(cell.style.height);
-	const position = parseTransformTranslate(cell.style.transform);
+	const position = resolvePositionedCellOffset(cell);
 	if (!position || width === null || height === null) {
 		return null;
 	}

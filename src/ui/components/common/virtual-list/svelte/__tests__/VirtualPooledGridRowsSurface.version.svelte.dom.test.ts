@@ -75,7 +75,8 @@ describe("VirtualPooledGridRowsSurface version invalidation", () => {
 			"[data-ccl-row-index='0']",
 		) as HTMLElement;
 		expect(rowEl).toBeTruthy();
-		expect(rowEl.style.transform).toBe("translateY(0px)");
+		expect(rowEl.style.top).toBe("0px");
+		expect(rowEl.style.transform).toBe("");
 
 		// Mutate same row object
 		row.top = 120;
@@ -88,7 +89,8 @@ describe("VirtualPooledGridRowsSurface version invalidation", () => {
 		const updatedRowEl = container.querySelector(
 			"[data-ccl-row-index='0']",
 		) as HTMLElement;
-		expect(updatedRowEl.style.transform).toBe("translateY(120px)");
+		expect(updatedRowEl.style.top).toBe("120px");
+		expect(updatedRowEl.style.transform).toBe("");
 	});
 
 	it("same cell object logicalKey mutation is reflected when version bumps", async () => {

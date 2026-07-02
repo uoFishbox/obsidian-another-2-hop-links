@@ -51,7 +51,8 @@ function createVirtualCell({
 }): HTMLElement {
 	const cell = document.createElement("div");
 	cell.className = "view-plan-virtual-list-cell";
-	cell.style.transform = `translate(${left}px, ${top}px)`;
+	cell.style.left = `${left}px`;
+	cell.style.top = `${top}px`;
 	cell.style.width = `${width}px`;
 	cell.style.height = `${height}px`;
 	return cell;
@@ -90,7 +91,7 @@ describe("moveFocusBetweenResults", () => {
 		vi.restoreAllMocks();
 	});
 
-	it("uses the virtual cell transform when the card rect is unavailable", () => {
+	it("uses the virtual cell position when the card rect is unavailable", () => {
 		const root = document.createElement("div");
 		root.className = "view-plan-virtual-list";
 

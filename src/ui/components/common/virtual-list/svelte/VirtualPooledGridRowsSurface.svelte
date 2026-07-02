@@ -79,10 +79,10 @@
 	 * Without passing version into the expression, Svelte's compiler may skip
 	 * re-evaluation because the object identity has not changed.
 	 */
-	const resolveRowTransform = (
+	const resolveRowTop = (
 		row: VirtualSurfaceMountedRow<TMountedCell>,
 		_version: number | undefined,
-	): string => `translateY(${row.top}px)`;
+	): string => `${row.top}px`;
 
 	const resolveMountedCellLogicalKey = (
 		cell: TMountedCell,
@@ -111,7 +111,7 @@
 			class={rowClassName}
 			data-ccl-row-slot={!IS_PROD ? row.slotIndex : undefined}
 			data-ccl-row-index={!IS_PROD ? row.rowIndex : undefined}
-			style:transform={resolveRowTransform(row, mountedRowsVersion)}
+			style:top={resolveRowTop(row, mountedRowsVersion)}
 			{...row.attributes}
 		>
 			{#each row.cells as mountedCell (resolveCellSlotKey(row, mountedCell))}

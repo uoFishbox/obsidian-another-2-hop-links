@@ -48,8 +48,10 @@ describe("VirtualGridLinkList regression", () => {
 				".cosense-card-links__virtual-grid-row",
 			),
 		);
-		expect(rows[0].style.transform).toBe("translateY(0px)");
-		expect(rows[1].style.transform).toMatch(/translateY\(\d+px\)/);
+		expect(rows[0].style.top).toBe("0px");
+		expect(rows[0].style.transform).toBe("");
+		expect(rows[1].style.top).toMatch(/\d+px/);
+		expect(rows[1].style.transform).toBe("");
 
 		const cells = Array.from(
 			shadowRoot.querySelectorAll<HTMLElement>(

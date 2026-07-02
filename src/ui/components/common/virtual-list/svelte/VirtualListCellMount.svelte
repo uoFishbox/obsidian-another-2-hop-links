@@ -60,7 +60,7 @@
 
 	const positionStyle = $derived(
 		hasPosition
-			? `left:${left}px; transform:translateY(${top}px); width:${width}px; height:${height}px;`
+			? `left:${left}px; top:${top}px; width:${width}px; height:${height}px;`
 			: undefined,
 	);
 
