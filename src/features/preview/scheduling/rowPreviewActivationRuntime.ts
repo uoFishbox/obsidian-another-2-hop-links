@@ -17,15 +17,16 @@ export interface RowPreviewActivationRuntime {
 	/**
 	 * Registers a preview activation candidate for a row.
 	 *
-	 * The returned function unregisters the candidate and cancels any pending
-	 * activation request for its key when no other candidates share that key.
+	 * The returned function unregisters the candidate. Pending activation is
+	 * managed per row: as long as the visible row still has at least one
+	 * candidate, one queued activation request covers the whole row.
 	 */
 	registerCandidate(candidate: RowPreviewActivationCandidate): () => void;
 	/**
 	 * Notifies the runtime that a row's visibility has changed.
 	 *
-	 * `"visible"` enqueues the row's candidates; `"mounted"` cancels pending
-	 * requests while keeping the candidates registered.
+	 * `"visible"` enqueues one activation request for the row. `"mounted"`
+	 * cancels the pending row request while keeping candidates registered.
 	 */
 	setRowVisibility(rowIndex: number, visibility: "visible" | "mounted"): void;
 	/**
@@ -45,12 +46,15 @@ export interface CreateRowPreviewActivationRuntimeOptions {
 	scope?: PreviewActivationScope;
 }
 
+let nextRowPreviewActivationRuntimeId = 0;
+
 export function createRowPreviewActivationRuntime(
 	options: CreateRowPreviewActivationRuntimeOptions = {},
 ): RowPreviewActivationRuntime {
 	const scope = options.scope ?? createPreviewActivationScope();
+	const runtimeId = ++nextRowPreviewActivationRuntimeId;
 	const rows = new Map<number, RowActivationState>();
-	const pendingByActivationKey = new Map<string, PreviewActivationHandle>();
+	const pendingByRowIndex = new Map<number, PreviewActivationHandle>();
 
 	function getOrCreateRowState(rowIndex: number): RowActivationState {
 		const existing = rows.get(rowIndex);
@@ -66,131 +70,95 @@ export function createRowPreviewActivationRuntime(
 		return state;
 	}
 
-	function hasCandidateWithKey(activationKey: string): boolean {
-		for (const state of rows.values()) {
-			for (const candidate of state.candidates.values()) {
-				if (candidate.activationKey === activationKey) {
-					return true;
-				}
-			}
-		}
-
-		return false;
+	function buildRowActivationRequestKey(rowIndex: number): string {
+		return `row-preview:${runtimeId}:${rowIndex}`;
 	}
 
-	function hasVisibleCandidateWithKey(activationKey: string): boolean {
-		for (const state of rows.values()) {
-			if (state.visibility !== "visible") {
-				continue;
-			}
-
-			for (const candidate of state.candidates.values()) {
-				if (candidate.activationKey === activationKey) {
-					return true;
-				}
-			}
-		}
-
-		return false;
-	}
-
-	function cancelPendingByKey(activationKey: string): void {
-		const handle = pendingByActivationKey.get(activationKey);
-		if (handle) {
-			handle.cancel();
-			pendingByActivationKey.delete(activationKey);
-		}
-	}
-
-	function cancelPendingUnlessVisibleElsewhere(activationKey: string): void {
-		if (hasVisibleCandidateWithKey(activationKey)) {
+	function cancelPendingRow(rowIndex: number): void {
+		const handle = pendingByRowIndex.get(rowIndex);
+		if (!handle) {
 			return;
 		}
 
-		cancelPendingByKey(activationKey);
+		handle.cancel();
+		pendingByRowIndex.delete(rowIndex);
 	}
 
-	function notifyVisibleCandidates(activationKey: string): void {
-		for (const state of rows.values()) {
-			if (state.visibility !== "visible") {
-				continue;
-			}
-
-			for (const candidate of state.candidates.values()) {
-				if (candidate.activationKey !== activationKey) {
-					continue;
-				}
-
-				try {
-					candidate.onActivated(activationKey);
-				} catch (error) {
-					console.error("Row preview activation callback failed", error);
-				}
-			}
-		}
-	}
-
-	function enqueueActivationForKey(
-		activationKey: string,
-		getVisibleQueueSize: () => number,
-	): void {
-		if (pendingByActivationKey.has(activationKey)) {
-			return;
-		}
-
-		const handle = requestQueuedPreviewActivation(
-			activationKey,
-			getVisibleQueueSize,
-			scope,
-			(activated) => {
-				pendingByActivationKey.delete(activationKey);
-				if (!activated) {
-					return;
-				}
-
-				notifyVisibleCandidates(activationKey);
-			},
-		);
-
-		pendingByActivationKey.set(activationKey, handle);
-	}
-
-	function enqueueRowCandidates(rowIndex: number): void {
+	function notifyVisibleRowCandidates(rowIndex: number): void {
 		const state = rows.get(rowIndex);
 		if (!state || state.visibility !== "visible") {
 			return;
 		}
 
-		const queuedKeys = new Set<string>();
 		for (const candidate of state.candidates.values()) {
-			const { activationKey } = candidate;
-			if (queuedKeys.has(activationKey)) {
-				continue;
+			try {
+				candidate.onActivated(candidate.activationKey);
+			} catch (error) {
+				console.error("Row preview activation callback failed", error);
 			}
-			queuedKeys.add(activationKey);
+		}
+	}
 
-			enqueueActivationForKey(activationKey, candidate.getVisibleQueueSize);
+	function enqueueRowActivation(rowIndex: number): void {
+		if (pendingByRowIndex.has(rowIndex)) {
+			return;
+		}
+
+		const state = rows.get(rowIndex);
+		if (!state || state.visibility !== "visible") {
+			return;
+		}
+
+		const firstCandidate = state.candidates.values().next().value;
+		if (!firstCandidate) {
+			return;
+		}
+
+		let request: PreviewActivationHandle | null = null;
+		let synchronousResult: boolean | undefined;
+		const requestKey = buildRowActivationRequestKey(rowIndex);
+		const onSettled = (activated: boolean): void => {
+			if (!request) {
+				synchronousResult = activated;
+				return;
+			}
+
+			if (pendingByRowIndex.get(rowIndex) !== request) {
+				return;
+			}
+
+			pendingByRowIndex.delete(rowIndex);
+			if (!activated) {
+				return;
+			}
+
+			notifyVisibleRowCandidates(rowIndex);
+		};
+
+		request = requestQueuedPreviewActivation(
+			requestKey,
+			firstCandidate.getVisibleQueueSize,
+			scope,
+			onSettled,
+		);
+		pendingByRowIndex.set(rowIndex, request);
+
+		if (synchronousResult !== undefined) {
+			onSettled(synchronousResult);
 		}
 	}
 
 	function registerCandidate(candidate: RowPreviewActivationCandidate): () => void {
-		const { id, rowIndex, activationKey } = candidate;
+		const { id, rowIndex } = candidate;
 		const state = getOrCreateRowState(rowIndex);
 
 		// Remove any previous registration with the same id so the cleanup
 		// contract stays tied to the current component lifetime.
-		const previousCandidate = state.candidates.get(id);
-		if (previousCandidate) {
-			state.candidates.delete(id);
-			if (!hasCandidateWithKey(previousCandidate.activationKey)) {
-				cancelPendingByKey(previousCandidate.activationKey);
-			}
-		}
-
+		state.candidates.delete(id);
 		state.candidates.set(id, candidate);
 
 		if (state.visibility === "visible") {
-			enqueueRowCandidates(rowIndex);
+			enqueueRowActivation(rowIndex);
 		}
 
 		return () => {
@@ -199,13 +167,13 @@ export function createRowPreviewActivationRuntime(
 				return;
 			}
 
-			const hadCandidate = currentState.candidates.delete(id);
-			if (!hadCandidate) {
+			if (currentState.candidates.get(id) !== candidate) {
 				return;
 			}
 
-			if (!hasCandidateWithKey(activationKey)) {
-				cancelPendingByKey(activationKey);
+			currentState.candidates.delete(id);
+			if (currentState.candidates.size === 0) {
+				cancelPendingRow(rowIndex);
 			}
 		};
 	}
@@ -218,38 +186,20 @@ export function createRowPreviewActivationRuntime(
 		state.visibility = visibility;
 
 		if (visibility === "visible") {
-			enqueueRowCandidates(rowIndex);
+			enqueueRowActivation(rowIndex);
 			return;
 		}
 
-		const queuedKeys = new Set<string>();
-		for (const candidate of state.candidates.values()) {
-			const { activationKey } = candidate;
-			if (queuedKeys.has(activationKey)) {
-				continue;
-			}
-			queuedKeys.add(activationKey);
-
-			cancelPendingUnlessVisibleElsewhere(activationKey);
-		}
+		cancelPendingRow(rowIndex);
 	}
 
 	function clearRow(rowIndex: number): void {
-		const state = rows.get(rowIndex);
-		if (!state) {
+		if (!rows.has(rowIndex)) {
 			return;
 		}
 
-		const activationKeys = new Set<string>();
-		for (const candidate of state.candidates.values()) {
-			activationKeys.add(candidate.activationKey);
-		}
-
 		rows.delete(rowIndex);
-
-		for (const activationKey of activationKeys) {
-			cancelPendingUnlessVisibleElsewhere(activationKey);
-		}
+		cancelPendingRow(rowIndex);
 	}
 
 	return {

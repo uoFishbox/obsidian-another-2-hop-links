@@ -88,7 +88,7 @@ describe("rowPreviewActivationRuntime", () => {
 		expect(onActivated).toHaveBeenCalledWith("key-a");
 	});
 
-	it("activates at most two candidates per animation frame", async () => {
+	it("activates every candidate in a row from one queued row request", async () => {
 		const runtime = createRowPreviewActivationRuntime();
 		const activatedKeys: string[] = [];
 
@@ -105,10 +105,31 @@ describe("rowPreviewActivationRuntime", () => {
 		}
 
 		await flushAnimationFrame();
+
+		expect(activatedKeys).toEqual(["key-0", "key-1", "key-2", "key-3"]);
+	});
+
+	it("limits activation scheduling to two rows per animation frame", async () => {
+		const runtime = createRowPreviewActivationRuntime();
+		const activatedKeys: string[] = [];
+
+		for (let rowIndex = 0; rowIndex < 3; rowIndex += 1) {
+			runtime.setRowVisibility(rowIndex, "visible");
+			runtime.registerCandidate(
+				createTestCandidate({
+					id: `c${rowIndex}`,
+					rowIndex,
+					activationKey: `key-${rowIndex}`,
+					onActivated: (key) => activatedKeys.push(key),
+				}),
+			);
+		}
+
+		await flushAnimationFrame();
 		expect(activatedKeys).toEqual(["key-0", "key-1"]);
 
 		await flushAnimationFrame();
-		expect(activatedKeys).toEqual(["key-0", "key-1", "key-2", "key-3"]);
+		expect(activatedKeys).toEqual(["key-0", "key-1", "key-2"]);
 	});
 
 	it("cancels pending activations when a row returns to mounted", async () => {
