@@ -4,7 +4,10 @@
 	import type { VirtualSurfaceCommonProps } from "./VirtualSurfaceProps";
 	import { createVirtualSurfaceInteractions } from "./VirtualSurfaceInteractions.svelte";
 	import { watchVirtualSurfaceMountedCellsChange } from "./VirtualSurfaceMountedCellsChange.svelte";
-	import type { VirtualSurfaceMountedRow } from "./VirtualSurfaceTypes";
+	import type {
+		VirtualSurfaceMountedRow,
+		VirtualSurfaceMountedRowSlot,
+	} from "./VirtualSurfaceTypes";
 
 	type Props<TMountedCell extends MountedVirtualCell> = Pick<
 		VirtualSurfaceCommonProps<TMountedCell>,
@@ -27,7 +30,7 @@
 		layoutMode?: "absolute-cells" | "grid-rows";
 		mountedCells?: readonly TMountedCell[];
 		mountedRows?: readonly VirtualSurfaceMountedRow<TMountedCell>[];
-		mountedRowsVersion?: number;
+		mountedRowSlots?: readonly VirtualSurfaceMountedRowSlot<TMountedCell>[];
 		children?: Snippet;
 	};
 
@@ -41,7 +44,7 @@
 		layoutMode = "absolute-cells",
 		mountedCells = undefined,
 		mountedRows = undefined,
-		mountedRowsVersion = undefined,
+		mountedRowSlots = undefined,
 		mountedCellsForChange,
 		interactionDescriptorScopeId,
 		interactionDescriptors = [],
@@ -78,8 +81,9 @@
 			layoutMode === "grid-rows"
 				? {
 						layoutMode,
-						mountedRows: mountedRows ?? [],
-						mountedRowsVersion,
+						...(mountedRowSlots
+							? { mountedRowSlots }
+							: { mountedRows: mountedRows ?? [] }),
 					}
 				: {
 						layoutMode: "absolute-cells",

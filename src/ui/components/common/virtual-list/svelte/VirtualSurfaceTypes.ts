@@ -18,16 +18,30 @@ export interface VirtualSurfaceMountedRow<TMountedCell extends MountedVirtualCel
 	cells: readonly TMountedCell[];
 }
 
+export interface VirtualSurfaceMountedRowSlot<TMountedCell extends MountedVirtualCell> {
+	readonly slotIndex: number;
+	readonly slotKey: number;
+	readonly row: VirtualSurfaceMountedRow<TMountedCell> | null;
+}
+
 export type VirtualSurfaceRenderInput<TMountedCell extends MountedVirtualCell> =
 	| {
 			layoutMode?: "absolute-cells";
 			mountedCells: readonly TMountedCell[];
 			mountedRows?: never;
-			mountedRowsVersion?: never;
+			mountedRowSlots?: never;
 	  }
-	| {
-			layoutMode: "grid-rows";
-			mountedCells?: never;
-			mountedRows: readonly VirtualSurfaceMountedRow<TMountedCell>[];
-			mountedRowsVersion?: number;
-	  };
+	| (
+			| {
+					layoutMode: "grid-rows";
+					mountedCells?: never;
+					mountedRows: readonly VirtualSurfaceMountedRow<TMountedCell>[];
+					mountedRowSlots?: never;
+			  }
+			| {
+					layoutMode: "grid-rows";
+					mountedCells?: never;
+					mountedRows?: never;
+					mountedRowSlots: readonly VirtualSurfaceMountedRowSlot<TMountedCell>[];
+			  }
+	  );

@@ -1,25 +1,17 @@
 <script lang="ts">
-	import { IS_PROD } from "../../../../../../appConstants";
-	import {
-		logicalCellKey,
-		renderSlotKey,
-		type LogicalCellKey,
-		type MountedVirtualCell,
-		type RenderSlotKey,
-	} from "../../types";
+	import { type MountedVirtualCell } from "../../types";
+	import { VirtualSurfaceRowSlot } from "../VirtualSurfaceRowSlot.svelte";
 	import VirtualPooledGridRowsSurface from "../VirtualPooledGridRowsSurface.svelte";
-	import type { VirtualSurfaceMountedRow } from "../VirtualSurfaceTypes";
 
 	interface TestCell extends MountedVirtualCell {
 		bodyContent: string;
 	}
 
 	interface Props {
-		mountedRows: VirtualSurfaceMountedRow<TestCell>[];
-		mountedRowsVersion?: number;
+		mountedRowSlots: VirtualSurfaceRowSlot<TestCell>[];
 	}
 
-	let { mountedRows, mountedRowsVersion }: Props = $props();
+	let { mountedRowSlots }: Props = $props();
 </script>
 
 <VirtualPooledGridRowsSurface
@@ -28,8 +20,7 @@
 	cellClassName="test-cell"
 	contentHeight={1000}
 	rowHeight={50}
-	{mountedRows}
-	{mountedRowsVersion}
+	{mountedRowSlots}
 >
 	{#snippet renderCell({ mountedCell })}
 		<span data-testid="cell-body">{mountedCell.bodyContent}</span>

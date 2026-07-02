@@ -21,8 +21,7 @@ export interface TwoHopMountedRowWindow {
 	 * notified.
 	 *
 	 * Returns the current mounted build. Check `lastApplyChanged` immediately
-	 * after calling to determine whether the caller should bump
-	 * `mountedRowsVersion`.
+	 * after calling to determine whether mounted row slots should be synced.
 	 */
 	apply(params: TwoHopMountedRowWindowApplyParams): TwoHopMountedRowsBuild;
 

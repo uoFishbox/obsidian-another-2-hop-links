@@ -50,7 +50,7 @@
 		layoutMode = "absolute-cells",
 		mountedCells = undefined,
 		mountedRows = undefined,
-		mountedRowsVersion = undefined,
+		mountedRowSlots = undefined,
 		contentEl = $bindable<HTMLDivElement | null>(null),
 		observerRoot = null,
 		getCellPosition,
@@ -64,26 +64,47 @@
 </script>
 
 {#if layoutMode === "grid-rows"}
-	<VirtualPooledGridRowsSurface
-		{contentClassName}
-		{rowClassName}
-		{cellClassName}
-		{contentHeight}
-		{cellWidth}
-		{rowHeight}
-		{columns}
-		{gap}
-		mountedRows={mountedRows ?? []}
-		{mountedRowsVersion}
-		bind:contentEl
-		{observerRoot}
-		{getCellClassName}
-		{getCellDataTestId}
-		onLogicalCellAttach={onCellMount}
-		onLogicalCellDetach={onCellDestroy}
-		{remountCellBodyOnKeyChange}
-		{renderCell}
-	/>
+	{#if mountedRowSlots !== undefined}
+		<VirtualPooledGridRowsSurface
+			{contentClassName}
+			{rowClassName}
+			{cellClassName}
+			{contentHeight}
+			{cellWidth}
+			{rowHeight}
+			{columns}
+			{gap}
+			{mountedRowSlots}
+			bind:contentEl
+			{observerRoot}
+			{getCellClassName}
+			{getCellDataTestId}
+			onLogicalCellAttach={onCellMount}
+			onLogicalCellDetach={onCellDestroy}
+			{remountCellBodyOnKeyChange}
+			{renderCell}
+		/>
+	{:else}
+		<VirtualPooledGridRowsSurface
+			{contentClassName}
+			{rowClassName}
+			{cellClassName}
+			{contentHeight}
+			{cellWidth}
+			{rowHeight}
+			{columns}
+			{gap}
+			mountedRows={mountedRows ?? []}
+			bind:contentEl
+			{observerRoot}
+			{getCellClassName}
+			{getCellDataTestId}
+			onLogicalCellAttach={onCellMount}
+			onLogicalCellDetach={onCellDestroy}
+			{remountCellBodyOnKeyChange}
+			{renderCell}
+		/>
+	{/if}
 {:else}
 	<VirtualAbsoluteCellSurface
 		{contentClassName}

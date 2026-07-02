@@ -106,8 +106,7 @@
 	rowClassName="view-plan-flow-row"
 	cellClassName=""
 	contentHeight={list.contentHeight}
-	mountedRows={list.mountedRows}
-	mountedRowsVersion={list.mountedRowsVersion}
+	mountedRowSlots={list.mountedRowSlots}
 	cellWidth={list.layout.cellWidth}
 	rowHeight={list.layout.rowHeight}
 	columns={list.layout.columns}

@@ -91,8 +91,8 @@ export function useTwoHopViewPlanVirtualList(props: TwoHopVirtualListSurfaceProp
 		get mountedRows() {
 			return surfaceRuntime.mountedRowsForSurface;
 		},
-		get mountedRowsVersion() {
-			return surfaceRuntime.mountedRowsVersion;
+		get mountedRowSlots() {
+			return surfaceRuntime.mountedRowSlotsForSurface;
 		},
 		getCellDataTestId: !IS_PROD
 			? (

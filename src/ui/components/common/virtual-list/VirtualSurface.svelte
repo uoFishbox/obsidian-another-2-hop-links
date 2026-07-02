@@ -17,7 +17,7 @@
 		layoutMode = "absolute-cells",
 		mountedCells = undefined,
 		mountedRows = undefined,
-		mountedRowsVersion = undefined,
+		mountedRowSlots = undefined,
 		mountedCellsForChange,
 		interactionDescriptorScopeId,
 		interactionDescriptors = [],
@@ -52,7 +52,7 @@
 	{layoutMode}
 	{mountedCells}
 	{mountedRows}
-	{mountedRowsVersion}
+	{mountedRowSlots}
 	{mountedCellsForChange}
 	{interactionDescriptorScopeId}
 	{interactionDescriptors}
@@ -64,28 +64,51 @@
 	{flushVirtualScrollMeasurement}
 >
 	{#if layoutMode === "grid-rows"}
-		<VirtualSurfaceCells
-			{contentClassName}
-			{rowClassName}
-			{cellClassName}
-			{contentHeight}
-			{cellWidth}
-			{rowHeight}
-			{columns}
-			{gap}
-			layoutMode="grid-rows"
-			mountedRows={mountedRows ?? []}
-			{mountedRowsVersion}
-			bind:contentEl
-			{observerRoot}
-			{getCellPosition}
-			{getCellClassName}
-			{getCellDataTestId}
-			{onCellMount}
-			{onCellDestroy}
-			{remountCellBodyOnKeyChange}
-			{renderCell}
-		/>
+		{#if mountedRowSlots !== undefined}
+			<VirtualSurfaceCells
+				{contentClassName}
+				{rowClassName}
+				{cellClassName}
+				{contentHeight}
+				{cellWidth}
+				{rowHeight}
+				{columns}
+				{gap}
+				layoutMode="grid-rows"
+				{mountedRowSlots}
+				bind:contentEl
+				{observerRoot}
+				{getCellPosition}
+				{getCellClassName}
+				{getCellDataTestId}
+				{onCellMount}
+				{onCellDestroy}
+				{remountCellBodyOnKeyChange}
+				{renderCell}
+			/>
+		{:else}
+			<VirtualSurfaceCells
+				{contentClassName}
+				{rowClassName}
+				{cellClassName}
+				{contentHeight}
+				{cellWidth}
+				{rowHeight}
+				{columns}
+				{gap}
+				layoutMode="grid-rows"
+				mountedRows={mountedRows ?? []}
+				bind:contentEl
+				{observerRoot}
+				{getCellPosition}
+				{getCellClassName}
+				{getCellDataTestId}
+				{onCellMount}
+				{onCellDestroy}
+				{remountCellBodyOnKeyChange}
+				{renderCell}
+			/>
+		{/if}
 	{:else}
 		<VirtualSurfaceCells
 			{contentClassName}

@@ -5,13 +5,17 @@ import type {
 } from "ui/components/common/virtual-list/core/reconciliation/viewPlanMountedCells";
 import { useVirtualList } from "ui/components/common/virtual-list/svelte/useVirtualList.svelte";
 import { resolveVirtualizedItemVisibilityForPreviewRange } from "ui/components/common/virtual-list/svelte/virtualizedItemVisibilityState.svelte";
-import type { TwoHopMountedRowsBuild } from "./twoHopMountedRowBuild";
+import type {
+	TwoHopMountedRowSlice,
+	TwoHopMountedRowsBuild,
+} from "./twoHopMountedRowBuild";
 import type { TwoHopViewPlanRowModel } from "./twoHopViewPlan";
 import type {
 	TwoHopVirtualListItem,
 	TwoHopVirtualListSection,
 } from "./twoHopVirtualListModel";
 import { createTwoHopMountRuntime } from "./twoHopMountRuntime.svelte";
+import { TwoHopRowSlot } from "./twoHopRowSlot.svelte";
 import type { TwoHopVirtualListPlanRuntime } from "./twoHopVirtualListPlanRuntime.svelte";
 import {
 	PREVIEW_ROW_ACTIVATION_CONTEXT_KEY,
@@ -19,8 +23,13 @@ import {
 } from "features/preview/scheduling/rowPreviewActivationRuntime";
 
 const EMPTY_MOUNTED_ROWS: readonly [] = [];
+const EMPTY_ROW_SLOT_INDICES: readonly number[] = [];
 
 type TwoHopMountedItemCell = MountedFlatItemCell<
+	TwoHopVirtualListItem,
+	TwoHopVirtualListSection
+>;
+type TwoHopMountedRowSlot = TwoHopRowSlot<
 	TwoHopVirtualListItem,
 	TwoHopVirtualListSection
 >;
@@ -41,6 +50,70 @@ export function createTwoHopMountedSurfaceRuntime(params: {
 	const mountRuntime = createTwoHopMountRuntime({
 		rowPreviewActivationRuntime,
 	});
+	const activeSlotIndexScratch = new Set<number>();
+	const nextActiveSlotIndicesScratch: number[] = [];
+	let mountedRowSlots = $state.raw<readonly TwoHopMountedRowSlot[]>([]);
+	let activeSlotIndices: readonly number[] = EMPTY_ROW_SLOT_INDICES;
+
+	const ensureRowSlot = (
+		slotIndex: number,
+	): {
+		readonly slots: readonly TwoHopMountedRowSlot[];
+		readonly changed: boolean;
+	} => {
+		if (mountedRowSlots[slotIndex]) {
+			return { slots: mountedRowSlots, changed: false };
+		}
+
+		const nextSlots = mountedRowSlots.slice();
+		for (let index = nextSlots.length; index <= slotIndex; index += 1) {
+			nextSlots.push(new TwoHopRowSlot(index));
+		}
+		return { slots: nextSlots, changed: true };
+	};
+
+	function syncMountedRowSlots(rows: readonly TwoHopMountedRowSlice[]): boolean {
+		let slots = mountedRowSlots;
+		let slotsChanged = false;
+		let rowChanged = false;
+		activeSlotIndexScratch.clear();
+		nextActiveSlotIndicesScratch.length = 0;
+
+		for (const row of rows) {
+			const slotIndex = row.slotIndex ?? row.rowIndex;
+			const ensured = slots[slotIndex]
+				? { slots, changed: false }
+				: ensureRowSlot(slotIndex);
+			if (ensured.changed) {
+				slots = ensured.slots;
+				mountedRowSlots = slots;
+				slotsChanged = true;
+			}
+			const slot = slots[slotIndex];
+			activeSlotIndexScratch.add(slotIndex);
+			nextActiveSlotIndicesScratch.push(slotIndex);
+			rowChanged = slot.setRow(row) || rowChanged;
+		}
+
+		for (const slotIndex of activeSlotIndices) {
+			if (activeSlotIndexScratch.has(slotIndex)) continue;
+			const slot = slots[slotIndex];
+			if (!slot) continue;
+			rowChanged = slot.setRow(null) || rowChanged;
+		}
+
+		activeSlotIndices = nextActiveSlotIndicesScratch.slice();
+		if (!rowChanged && rows.length > 0) {
+			for (const row of rows) {
+				const slotIndex = row.slotIndex ?? row.rowIndex;
+				slots[slotIndex]?.refreshRow(row);
+			}
+			rowChanged = true;
+		}
+
+		return slotsChanged || rowChanged;
+	}
+
 	const virtualList = useVirtualList<
 		import("ui/components/common/virtual-list/logicalCell").VirtualListLogicalCell<TwoHopVirtualListItem>,
 		TwoHopViewPlanRowModel,
@@ -58,7 +131,7 @@ export function createTwoHopMountedSurfaceRuntime(params: {
 				snapshot.ranges.previewVisible,
 			);
 			if (mountRuntime.consumeMountedRowsChange()) {
-				mountedRowsVersion += 1;
+				syncMountedRowSlots(mountRuntime.getMountedRows());
 			}
 		},
 	});
@@ -75,17 +148,6 @@ export function createTwoHopMountedSurfaceRuntime(params: {
 		}
 
 		return snapshot.totalHeight;
-	});
-	let mountedRowsVersion = $state.raw(0);
-	const mountedRowsForSurface = $derived.by(() => {
-		const build = virtualList.getReconciliationState().mountedBuild;
-		void mountedRowsVersion;
-
-		if (!build) {
-			return EMPTY_MOUNTED_ROWS;
-		}
-
-		return mountRuntime.getMountedRows();
 	});
 	const getItemVisibilityState = (renderedCell: TwoHopMountedItemCell) =>
 		mountRuntime.getOrCreateVisibilityState(
@@ -107,11 +169,13 @@ export function createTwoHopMountedSurfaceRuntime(params: {
 		get contentHeight() {
 			return contentHeight;
 		},
-		get mountedRowsVersion() {
-			return mountedRowsVersion;
-		},
 		get mountedRowsForSurface() {
-			return mountedRowsForSurface;
+			const build = virtualList.getReconciliationState().mountedBuild;
+			if (!build) return EMPTY_MOUNTED_ROWS;
+			return mountRuntime.getMountedRows();
+		},
+		get mountedRowSlotsForSurface() {
+			return mountedRowSlots;
 		},
 		getItemVisibilityState,
 		getItemActivationCandidateId: getTwoHopActivationCandidateId,

@@ -3,7 +3,10 @@
 	import type { Snippet } from "svelte";
 	import type { LogicalCellKey, MountedVirtualCell } from "../types";
 	import VirtualGridLogicalCellMount from "./VirtualGridLogicalCellMount.svelte";
-	import type { VirtualSurfaceMountedRow } from "./VirtualSurfaceTypes";
+	import type {
+		VirtualSurfaceMountedRow,
+		VirtualSurfaceMountedRowSlot,
+	} from "./VirtualSurfaceTypes";
 
 	interface Props<TMountedCell extends MountedVirtualCell> {
 		contentClassName?: string;
@@ -14,8 +17,8 @@
 		rowHeight: number;
 		columns?: number;
 		gap?: number;
-		mountedRows: readonly VirtualSurfaceMountedRow<TMountedCell>[];
-		mountedRowsVersion?: number;
+		mountedRows?: readonly VirtualSurfaceMountedRow<TMountedCell>[];
+		mountedRowSlots?: readonly VirtualSurfaceMountedRowSlot<TMountedCell>[];
 		contentEl?: HTMLDivElement | null;
 		observerRoot?: HTMLElement | null;
 		getCellClassName?: (cell: TMountedCell) => string | undefined;
@@ -42,8 +45,8 @@
 		rowHeight,
 		columns = 1,
 		gap = undefined,
-		mountedRows,
-		mountedRowsVersion = undefined,
+		mountedRows = [],
+		mountedRowSlots = undefined,
 		contentEl = $bindable<HTMLDivElement | null>(null),
 		observerRoot = null,
 		getCellClassName,
@@ -67,89 +70,74 @@
 
 	const resolveRowSlotKey = (row: VirtualSurfaceMountedRow<TMountedCell>): number =>
 		row.slotKey ?? row.key;
+	const createMountedRowSlot = (
+		row: VirtualSurfaceMountedRow<TMountedCell>,
+	): VirtualSurfaceMountedRowSlot<TMountedCell> => ({
+		slotIndex: row.slotIndex ?? row.key,
+		slotKey: resolveRowSlotKey(row),
+		row,
+	});
+	const mountedRowsAsSlots = $derived.by(() => mountedRows.map(createMountedRowSlot));
+	const rowSlots = $derived(mountedRowSlots ?? mountedRowsAsSlots);
 	const resolveCellSlotKey = (
 		_row: VirtualSurfaceMountedRow<TMountedCell>,
 		cell: TMountedCell,
 	): number => cell.cellSlotKey ?? cell.renderSlotIndex;
 
-	/**
-	 * Helper functions that take `mountedRowsVersion` as a parameter to ensure
-	 * Svelte re-reads mutated row/cell properties when the version changes.
-	 *
-	 * Without passing version into the expression, Svelte's compiler may skip
-	 * re-evaluation because the object identity has not changed.
-	 */
-	const resolveRowTop = (
-		row: VirtualSurfaceMountedRow<TMountedCell>,
-		_version: number | undefined,
-	): string => `${row.top}px`;
+	const resolveRowTop = (row: VirtualSurfaceMountedRow<TMountedCell>): string =>
+		`${row.top}px`;
 
-	const resolveMountedCellLogicalKey = (
-		cell: TMountedCell,
-		_version: number | undefined,
-	): LogicalCellKey => cell.key;
+	const resolveMountedCellLogicalKey = (cell: TMountedCell): LogicalCellKey =>
+		cell.key;
 
-	const resolveMountedCellRowIndex = (
-		cell: TMountedCell,
-		_version: number | undefined,
-	): number => cell.rowIndex;
+	const resolveMountedCellRowIndex = (cell: TMountedCell): number => cell.rowIndex;
 
-	const resolveMountedCellColumnIndex = (
-		cell: TMountedCell,
-		_version: number | undefined,
-	): number | undefined => cell.columnIndex;
+	const resolveMountedCellColumnIndex = (cell: TMountedCell): number | undefined =>
+		cell.columnIndex;
 
-	const resolveMountedCellBodyKey = (
-		cell: TMountedCell,
-		_version: number | undefined,
-	): unknown => cell.renderBodyKey ?? cell.cellMetadataKey ?? cell.key;
+	const resolveMountedCellBodyKey = (cell: TMountedCell): unknown =>
+		cell.renderBodyKey ?? cell.cellMetadataKey ?? cell.key;
 </script>
 
 <div class={contentClassName} bind:this={contentEl} style={contentStyle}>
-	{#each mountedRows as row (resolveRowSlotKey(row))}
-		<div
-			class={rowClassName}
-			data-ccl-row-slot={!IS_PROD ? row.slotIndex : undefined}
-			data-ccl-row-index={!IS_PROD ? row.rowIndex : undefined}
-			style:top={resolveRowTop(row, mountedRowsVersion)}
-			{...row.attributes}
-		>
-			{#each row.cells as mountedCell (resolveCellSlotKey(row, mountedCell))}
-				<VirtualGridLogicalCellMount
-					logicalKey={resolveMountedCellLogicalKey(
-						mountedCell,
-						mountedRowsVersion,
-					)}
-					className={resolveCellClassName(mountedCell)}
-					dataTestId={getCellDataTestId?.(mountedCell)}
-					cellSlotKey={resolveCellSlotKey(row, mountedCell)}
-					rowIndex={resolveMountedCellRowIndex(
-						mountedCell,
-						mountedRowsVersion,
-					)}
-					columnIndex={resolveMountedCellColumnIndex(
-						mountedCell,
-						mountedRowsVersion,
-					)}
-					{mountedCell}
-					{onLogicalCellAttach}
-					{onLogicalCellDetach}
-				>
-					{#if remountCellBodyOnKeyChange}
-						{#key resolveMountedCellBodyKey(mountedCell, mountedRowsVersion)}
+	{#each rowSlots as rowSlot (rowSlot.slotKey)}
+		{#if rowSlot.row}
+			{@const row = rowSlot.row}
+			<div
+				class={rowClassName}
+				data-ccl-row-slot={!IS_PROD ? row.slotIndex : undefined}
+				data-ccl-row-index={!IS_PROD ? row.rowIndex : undefined}
+				style:top={resolveRowTop(row)}
+				{...row.attributes}
+			>
+				{#each row.cells as mountedCell (resolveCellSlotKey(row, mountedCell))}
+					<VirtualGridLogicalCellMount
+						logicalKey={resolveMountedCellLogicalKey(mountedCell)}
+						className={resolveCellClassName(mountedCell)}
+						dataTestId={getCellDataTestId?.(mountedCell)}
+						cellSlotKey={resolveCellSlotKey(row, mountedCell)}
+						rowIndex={resolveMountedCellRowIndex(mountedCell)}
+						columnIndex={resolveMountedCellColumnIndex(mountedCell)}
+						{mountedCell}
+						{onLogicalCellAttach}
+						{onLogicalCellDetach}
+					>
+						{#if remountCellBodyOnKeyChange}
+							{#key resolveMountedCellBodyKey(mountedCell)}
+								{@render renderCell({
+									mountedCell,
+									observerRoot,
+								})}
+							{/key}
+						{:else}
 							{@render renderCell({
 								mountedCell,
 								observerRoot,
 							})}
-						{/key}
-					{:else}
-						{@render renderCell({
-							mountedCell,
-							observerRoot,
-						})}
-					{/if}
-				</VirtualGridLogicalCellMount>
-			{/each}
-		</div>
+						{/if}
+					</VirtualGridLogicalCellMount>
+				{/each}
+			</div>
+		{/if}
 	{/each}
 </div>
