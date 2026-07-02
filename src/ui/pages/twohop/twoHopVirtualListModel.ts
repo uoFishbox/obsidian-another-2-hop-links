@@ -1,5 +1,6 @@
 import type { TwoHopLinkBranch } from "types/domain";
 import type { ViewItem } from "application/presenters";
+import type { VirtualizedItemVisibilityState } from "ui/components/common/virtualizedItemVisibility";
 import type {
 	ClickableHeaderExtraProps,
 	SectionRenderDescriptor,
@@ -87,6 +88,15 @@ export type TwoHopVirtualSectionDescriptor = SectionRenderDescriptor<
 	TwoHopVirtualListSection
 >;
 
+export interface TwoHopVirtualItemRenderCell {
+	item: ViewItem;
+	searchKey: string;
+	virtualKey: string;
+	interactionId?: string;
+	rowIndex: number;
+	visibilityState: VirtualizedItemVisibilityState;
+}
+
 export const getTwoHopPageItemKey = (
 	row: TwoHopVirtualListItem,
 	_index: number,
@@ -111,7 +121,6 @@ export const createTaggedNoteSectionItemKey = (
 };
 
 export const resolveTwoHopPageItemSearchScope = (
-	row: TwoHopVirtualListItem,
 	searchScope: SearchWorkerMatchScope,
 	contentMatched: boolean | undefined,
 ): SearchWorkerMatchScope =>

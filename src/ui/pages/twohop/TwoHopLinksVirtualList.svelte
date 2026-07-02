@@ -8,11 +8,11 @@
 		SearchWorkerMatchedItem,
 		SearchWorkerMatchScope,
 	} from "features/search/searchWorkerTypes";
-	import type { VirtualizedItemVisibilityState } from "ui/components/common/virtualizedItemVisibility";
 	import type {
 		TwoHopVirtualListSection,
 		TwoHopVirtualListItem,
 		TwoHopVirtualSectionDescriptor,
+		TwoHopVirtualItemRenderCell,
 	} from "./twoHopVirtualListModel";
 	import { useLinkContext } from "ui/context/linkContext";
 	import {
@@ -85,20 +85,20 @@
 			/>
 		{/snippet}
 
-		{#snippet renderItem(
-			row: TwoHopVirtualListItem,
-			rowIndex: number,
-			visibilityState: VirtualizedItemVisibilityState,
-			_activationCandidateId: string,
-		)}
+		{#snippet renderItem(cell: TwoHopVirtualItemRenderCell)}
+			{@const matchedItem = matchedItemByKey?.get(cell.searchKey) ?? null}
 			<TwoHopVirtualItemCard
-				{row}
+				item={cell.item}
+				searchKey={cell.searchKey}
+				virtualKey={cell.virtualKey}
+				interactionId={cell.interactionId}
 				settings={currentSettings}
 				{searchQuery}
 				{searchScope}
-				{matchedItemByKey}
-				{rowIndex}
-				{visibilityState}
+				contentMatched={matchedItem?.contentMatched}
+				contentPreview={matchedItem?.contentPreview}
+				rowIndex={cell.rowIndex}
+				visibilityState={cell.visibilityState}
 			/>
 		{/snippet}
 	</TwoHopViewPlanVirtualList>

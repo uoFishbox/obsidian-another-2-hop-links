@@ -3,49 +3,63 @@
 	import ViewItemCard from "ui/components/items/ViewItemCard.svelte";
 	import { IS_PROD } from "../../../appConstants";
 	import type { PluginSettings } from "types/settings";
-	import type { SearchWorkerMatchedItem } from "features/search/searchWorkerTypes";
 	import type { SearchWorkerMatchScope } from "features/search/searchWorkerTypes";
 	import type { VirtualizedItemVisibilityState } from "ui/components/common/virtualizedItemVisibility";
-	import type { TwoHopVirtualListItem } from "./twoHopVirtualListModel";
+	import type { ViewItem } from "application/presenters";
 	import { resolveTwoHopPageItemSearchScope } from "./twoHopVirtualListModel";
 	import { markCCLComponentReevaluation } from "infrastructure/debug/CCLDevMeasurements";
+	import { createItemInteractionKey } from "ui/interactions/interactionTypes";
 
 	interface Props {
-		row: TwoHopVirtualListItem;
+		item: ViewItem;
+		searchKey: string;
+		virtualKey: string;
+		interactionId?: string;
 		settings: PluginSettings;
 		searchQuery: string;
 		searchScope: SearchWorkerMatchScope;
-		matchedItemByKey: Map<string, SearchWorkerMatchedItem> | null;
+		contentMatched?: boolean;
+		contentPreview?: string;
 		rowIndex: number;
 		visibilityState: VirtualizedItemVisibilityState;
 	}
 
 	let {
-		row,
+		item,
+		searchKey,
+		virtualKey,
+		interactionId,
 		settings,
 		searchQuery,
 		searchScope,
-		matchedItemByKey,
+		contentMatched,
+		contentPreview,
 		rowIndex,
 		visibilityState,
 	}: Props = $props();
 
-	const matchedItem = $derived(matchedItemByKey?.get(row.searchKey));
 	const resolvedSearchScope = $derived(
-		resolveTwoHopPageItemSearchScope(row, searchScope, matchedItem?.contentMatched),
+		resolveTwoHopPageItemSearchScope(searchScope, contentMatched),
+	);
+	const interactionKey = $derived(
+		item ? createItemInteractionKey(item, virtualKey) : undefined,
 	);
 	const componentReevaluationProbe = $derived.by(() => {
 		if (IS_PROD) return "";
 
-		void row;
+		void item;
+		void searchKey;
+		void virtualKey;
+		void interactionId;
 		void settings;
 		void searchQuery;
 		void searchScope;
-		void matchedItemByKey;
+		void contentMatched;
+		void contentPreview;
 		void rowIndex;
 		void visibilityState;
-		void matchedItem;
 		void resolvedSearchScope;
+		void interactionKey;
 		return markCCLComponentReevaluation("TwoHopVirtualItemCard");
 	});
 </script>
@@ -53,14 +67,14 @@
 {componentReevaluationProbe}
 <PreviewVisibilityProvider {visibilityState}>
 	<ViewItemCard
-		item={row.item}
+		{item}
 		{settings}
 		{searchQuery}
 		searchScope={resolvedSearchScope}
-		contentPreview={matchedItem?.contentPreview}
+		{contentPreview}
 		{rowIndex}
 		interactionRegistration="snapshot"
-		interactionId={row.interactionId}
-		interactionKey={row.interactionKey}
+		{interactionId}
+		{interactionKey}
 	/>
 </PreviewVisibilityProvider>

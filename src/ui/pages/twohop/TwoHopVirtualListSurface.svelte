@@ -4,7 +4,6 @@
 	import { useLinkContext } from "ui/context/linkContext";
 	import VirtualSurface from "ui/components/common/virtual-list/VirtualSurface.svelte";
 	import VirtualListLoadMoreButton from "ui/components/common/virtual-list/VirtualListLoadMoreButton.svelte";
-	import type { VirtualizedItemVisibilityState } from "ui/components/common/virtual-list/types";
 	import type {
 		MountedFlatCell,
 		MountedFlatHeaderCell,
@@ -16,6 +15,7 @@
 	import type {
 		TwoHopVirtualListSection,
 		TwoHopVirtualListItem,
+		TwoHopVirtualItemRenderCell,
 	} from "./twoHopVirtualListModel";
 	import { useTwoHopViewPlanVirtualList } from "./useTwoHopVirtualListSurface.svelte";
 	import type { TwoHopVirtualListTuning } from "./twoHopVirtualListTuning";
@@ -50,9 +50,7 @@
 				},
 			]
 		>;
-		renderItem: Snippet<
-			[TwoHopVirtualListItem, number, VirtualizedItemVisibilityState, string]
-		>;
+		renderItem: Snippet<[TwoHopVirtualItemRenderCell]>;
 	}
 
 	const TWO_HOP_CELL_CLASS_NAME = "view-plan-virtual-list-cell view-plan-flow-cell";
@@ -132,12 +130,15 @@
 				headerProps: renderedCell.headerProps,
 			})}
 		{:else if isItemCell(renderedCell)}
-			{@render props.renderItem(
-				renderedCell.cell.item,
-				renderedCell.rowIndex,
-				list.getItemVisibilityState(renderedCell),
-				list.getItemActivationCandidateId(renderedCell),
-			)}
+			{@const renderedItem = renderedCell.cell.item}
+			{@render props.renderItem({
+				item: renderedItem.item,
+				searchKey: renderedItem.searchKey,
+				virtualKey: renderedItem.virtualKey,
+				interactionId: renderedItem.interactionId,
+				rowIndex: renderedCell.rowIndex,
+				visibilityState: list.getItemVisibilityState(renderedCell),
+			})}
 		{:else}
 			<VirtualListLoadMoreButton
 				testId={!IS_PROD ? `load-more-${renderedCell.sectionId}` : undefined}
