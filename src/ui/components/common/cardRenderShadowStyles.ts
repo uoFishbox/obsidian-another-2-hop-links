@@ -47,7 +47,7 @@ export const CARD_RENDER_SHADOW_CSS = String.raw`
 	width: var(--ccl-cell-width);
 	flex: 0 0 var(--ccl-cell-width);
 	height: var(--ccl-box-height);
-	contain: layout paint;
+	contain: layout;
 }
 
 .view-plan-flow-row {
@@ -58,7 +58,7 @@ export const CARD_RENDER_SHADOW_CSS = String.raw`
 	height: var(--ccl-box-height);
 	display: flex;
 	gap: var(--ccl-box-gap);
-	contain: layout;
+	contain: layout paint;
 }
 
 .cosense-card-links__virtual-grid-row {
