@@ -25,8 +25,6 @@
 	} from "./previewVisibilityContext";
 	import { markCCLComponentReevaluation } from "infrastructure/debug/CCLDevMeasurements";
 
-	let nextCardPreviewGateId = 0;
-
 	interface RenderedPreviewSnapshot {
 		readonly identity: string;
 		readonly file: TFile;
@@ -49,7 +47,6 @@
 		previewRefreshToken?: number;
 		contentPreview?: string;
 		rowIndex?: number;
-		activationCandidateId?: string;
 	}
 
 	let {
@@ -62,7 +59,6 @@
 		previewRefreshToken = 0,
 		contentPreview = undefined,
 		rowIndex = undefined,
-		activationCandidateId = undefined,
 	}: Props = $props();
 
 	const getVisiblePreviewQueueSize = providedGetVisiblePreviewQueueSize ?? (() => 0);
@@ -107,12 +103,8 @@
 	let pendingPreviewIdentity: string | undefined = undefined;
 	let activationRequest: PreviewActivationHandle | null = null;
 	let activationSequence = 0;
-	let unregisterRowActivationCandidate: (() => void) | undefined = undefined;
-	let registeredRowActivationCandidateId: string | undefined = undefined;
-	let registeredRowActivationCandidateRowIndex: number | undefined = undefined;
-	let registeredRowActivationCandidatePreviewIdentity: string | undefined =
-		undefined;
-	const fallbackCandidateId = `card-preview-gate:${++nextCardPreviewGateId}`;
+	let rowActivationVersion = $state<number | undefined>(undefined);
+	let lastHandledRowActivationVersion: number | undefined = undefined;
 
 	let renderedPreviewSnapshot = $state.raw<RenderedPreviewSnapshot | undefined>(
 		undefined,
@@ -137,7 +129,6 @@
 		void previewRefreshToken;
 		void contentPreview;
 		void rowIndex;
-		void activationCandidateId;
 		void visibility;
 		void previewOverride;
 		void settings;
@@ -207,64 +198,46 @@
 		lastPreviewIdentity = nextIdentity;
 	}
 
-	function clearRegisteredRowActivationCandidate(): void {
-		unregisterRowActivationCandidate?.();
-		unregisterRowActivationCandidate = undefined;
-		registeredRowActivationCandidateId = undefined;
-		registeredRowActivationCandidateRowIndex = undefined;
-		registeredRowActivationCandidatePreviewIdentity = undefined;
-	}
-
-	function registerVisibleRowActivationCandidate(): void {
-		if (
-			!rowPreviewActivationRuntime ||
-			rowIndex === undefined ||
-			!previewIdentity
-		) {
-			clearRegisteredRowActivationCandidate();
+	function subscribeRowActivationVersion(): (() => void) | undefined {
+		if (!rowPreviewActivationRuntime || rowIndex === undefined) {
+			rowActivationVersion = undefined;
+			lastHandledRowActivationVersion = undefined;
 			return;
 		}
 
-		const candidateId = activationCandidateId ?? fallbackCandidateId;
-
-		if (
-			registeredRowActivationCandidateId === candidateId &&
-			registeredRowActivationCandidateRowIndex === rowIndex &&
-			registeredRowActivationCandidatePreviewIdentity === previewIdentity
-		) {
-			return;
-		}
-
-		clearRegisteredRowActivationCandidate();
-
-		registeredRowActivationCandidateId = candidateId;
-		registeredRowActivationCandidateRowIndex = rowIndex;
-		registeredRowActivationCandidatePreviewIdentity = previewIdentity;
-		unregisterRowActivationCandidate =
-			rowPreviewActivationRuntime.registerCandidate({
-				id: candidateId,
-				rowIndex,
-				activationKey: previewIdentity,
-				getVisibleQueueSize: getVisiblePreviewQueueSize,
-				onActivated: (activationKey) => {
-					if (
-						!file ||
-						activationKey !== previewIdentity ||
-						virtualizedVisibility !== "visible"
-					) {
-						return;
-					}
-
-					commitRenderedPreviewSnapshot(
-						createRenderedPreviewSnapshot(activationKey, file),
-					);
-				},
+		lastHandledRowActivationVersion = undefined;
+		return rowPreviewActivationRuntime
+			.getRowActivationVersion(rowIndex)
+			.subscribe((nextVersion) => {
+				rowActivationVersion = nextVersion;
 			});
 	}
 
+	function requestVisibleRowActivation(): boolean {
+		if (!rowPreviewActivationRuntime || rowIndex === undefined) {
+			return false;
+		}
+
+		cancelPendingActivation();
+
+		if (DEBUG_DISABLE_CARD_DOM_PREVIEW) {
+			return true;
+		}
+
+		if (virtualizedVisibility !== "visible" || !file || !previewIdentity) {
+			return true;
+		}
+
+		if (activatedPreviewIdentity === previewIdentity) {
+			return true;
+		}
+
+		rowPreviewActivationRuntime.requestRowActivation(rowIndex);
+		return true;
+	}
+
 	function activateVisibleVirtualPreview(): void {
-		if (rowPreviewActivationRuntime && rowIndex !== undefined) {
-			cancelPendingActivation();
+		if (requestVisibleRowActivation()) {
 			return;
 		}
 
@@ -312,7 +285,9 @@
 			if (!file || previewIdentity !== identity) return;
 			if (virtualizedVisibility !== "visible") return;
 
-			commitRenderedPreviewSnapshot(createRenderedPreviewSnapshot(identity, file));
+			commitRenderedPreviewSnapshot(
+				createRenderedPreviewSnapshot(identity, file),
+			);
 		};
 
 		request = requestQueuedPreviewActivation(
@@ -330,20 +305,56 @@
 		}
 	}
 
+	function commitVisibleRowActivation(): void {
+		if (
+			!rowPreviewActivationRuntime ||
+			rowIndex === undefined ||
+			rowActivationVersion === undefined ||
+			rowActivationVersion <= 0
+		) {
+			return;
+		}
+
+		if (lastHandledRowActivationVersion === rowActivationVersion) {
+			return;
+		}
+
+		lastHandledRowActivationVersion = rowActivationVersion;
+		if (
+			DEBUG_DISABLE_CARD_DOM_PREVIEW ||
+			virtualizedVisibility !== "visible" ||
+			!file ||
+			!previewIdentity
+		) {
+			return;
+		}
+
+		if (activatedPreviewIdentity === previewIdentity) {
+			return;
+		}
+
+		commitRenderedPreviewSnapshot(
+			createRenderedPreviewSnapshot(previewIdentity, file),
+		);
+	}
+
 	$effect(() => {
 		resetPreviewActivationForCurrentPreview();
 	});
 
 	$effect(() => {
-		registerVisibleRowActivationCandidate();
+		return subscribeRowActivationVersion();
 	});
 
 	$effect(() => {
 		activateVisibleVirtualPreview();
 	});
 
+	$effect(() => {
+		commitVisibleRowActivation();
+	});
+
 	onDestroy(() => {
-		clearRegisteredRowActivationCandidate();
 		cancelPendingActivation();
 	});
 </script>

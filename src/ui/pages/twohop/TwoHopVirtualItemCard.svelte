@@ -18,7 +18,6 @@
 		matchedItemByKey: Map<string, SearchWorkerMatchedItem> | null;
 		rowIndex: number;
 		visibilityState: VirtualizedItemVisibilityState;
-		activationCandidateId: string;
 	}
 
 	let {
@@ -29,7 +28,6 @@
 		matchedItemByKey,
 		rowIndex,
 		visibilityState,
-		activationCandidateId,
 	}: Props = $props();
 
 	const matchedItem = $derived(matchedItemByKey?.get(row.searchKey));
@@ -46,7 +44,6 @@
 		void matchedItemByKey;
 		void rowIndex;
 		void visibilityState;
-		void activationCandidateId;
 		void matchedItem;
 		void resolvedSearchScope;
 		return markCCLComponentReevaluation("TwoHopVirtualItemCard");
@@ -62,7 +59,6 @@
 		searchScope={resolvedSearchScope}
 		contentPreview={matchedItem?.contentPreview}
 		{rowIndex}
-		{activationCandidateId}
 		interactionRegistration="snapshot"
 		interactionId={row.interactionId}
 		interactionKey={row.interactionKey}

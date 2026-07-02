@@ -1,3 +1,4 @@
+import { writable, type Readable, type Writable } from "svelte/store";
 import type { PreviewActivationHandle } from "./previewActivationScheduler";
 import {
 	createPreviewActivationScope,
@@ -5,32 +6,26 @@ import {
 } from "./previewActivationScheduler";
 import type { PreviewActivationScope } from "./previewActivationScope";
 
-export interface RowPreviewActivationCandidate {
-	readonly id: string;
-	readonly rowIndex: number;
-	readonly activationKey: string;
-	readonly getVisibleQueueSize: () => number;
-	readonly onActivated: (activationKey: string) => void;
-}
-
 export interface RowPreviewActivationRuntime {
 	/**
-	 * Registers a preview activation candidate for a row.
-	 *
-	 * The returned function unregisters the candidate. Pending activation is
-	 * managed per row: as long as the visible row still has at least one
-	 * candidate, one queued activation request covers the whole row.
+	 * Returns a row-scoped activation version store. The value increments when
+	 * the row may mount card previews.
 	 */
-	registerCandidate(candidate: RowPreviewActivationCandidate): () => void;
+	getRowActivationVersion(rowIndex: number): Readable<number>;
+	/**
+	 * Requests one queued activation for a visible row. Multiple requests for
+	 * the same row share one pending scheduler entry.
+	 */
+	requestRowActivation(rowIndex: number): void;
 	/**
 	 * Notifies the runtime that a row's visibility has changed.
 	 *
 	 * `"visible"` enqueues one activation request for the row. `"mounted"`
-	 * cancels the pending row request while keeping candidates registered.
+	 * cancels the pending row request while keeping the activation store alive.
 	 */
 	setRowVisibility(rowIndex: number, visibility: "visible" | "mounted"): void;
 	/**
-	 * Removes a row and all its candidates and pending requests.
+	 * Removes a row activation store and any pending request.
 	 */
 	clearRow(rowIndex: number): void;
 }
@@ -39,11 +34,14 @@ export const PREVIEW_ROW_ACTIVATION_CONTEXT_KEY = Symbol("preview-row-activation
 
 interface RowActivationState {
 	visibility: "visible" | "mounted";
-	candidates: Map<string, RowPreviewActivationCandidate>;
+	readonly requestKey: string;
+	activationVersion: number;
+	readonly activationVersionStore: Writable<number>;
 }
 
 export interface CreateRowPreviewActivationRuntimeOptions {
 	scope?: PreviewActivationScope;
+	getVisibleQueueSize?: () => number;
 }
 
 let nextRowPreviewActivationRuntimeId = 0;
@@ -52,6 +50,7 @@ export function createRowPreviewActivationRuntime(
 	options: CreateRowPreviewActivationRuntimeOptions = {},
 ): RowPreviewActivationRuntime {
 	const scope = options.scope ?? createPreviewActivationScope();
+	const getVisibleQueueSize = options.getVisibleQueueSize ?? (() => 0);
 	const runtimeId = ++nextRowPreviewActivationRuntimeId;
 	const rows = new Map<number, RowActivationState>();
 	const pendingByRowIndex = new Map<number, PreviewActivationHandle>();
@@ -64,7 +63,9 @@ export function createRowPreviewActivationRuntime(
 
 		const state: RowActivationState = {
 			visibility: "mounted",
-			candidates: new Map<string, RowPreviewActivationCandidate>(),
+			requestKey: buildRowActivationRequestKey(rowIndex),
+			activationVersion: 0,
+			activationVersionStore: writable(0),
 		};
 		rows.set(rowIndex, state);
 		return state;
@@ -84,19 +85,14 @@ export function createRowPreviewActivationRuntime(
 		pendingByRowIndex.delete(rowIndex);
 	}
 
-	function notifyVisibleRowCandidates(rowIndex: number): void {
+	function notifyVisibleRowActivation(rowIndex: number): void {
 		const state = rows.get(rowIndex);
 		if (!state || state.visibility !== "visible") {
 			return;
 		}
 
-		for (const candidate of state.candidates.values()) {
-			try {
-				candidate.onActivated(candidate.activationKey);
-			} catch (error) {
-				console.error("Row preview activation callback failed", error);
-			}
-		}
+		state.activationVersion += 1;
+		state.activationVersionStore.set(state.activationVersion);
 	}
 
 	function enqueueRowActivation(rowIndex: number): void {
@@ -109,14 +105,8 @@ export function createRowPreviewActivationRuntime(
 			return;
 		}
 
-		const firstCandidate = state.candidates.values().next().value;
-		if (!firstCandidate) {
-			return;
-		}
-
 		let request: PreviewActivationHandle | null = null;
 		let synchronousResult: boolean | undefined;
-		const requestKey = buildRowActivationRequestKey(rowIndex);
 		const onSettled = (activated: boolean): void => {
 			if (!request) {
 				synchronousResult = activated;
@@ -132,12 +122,12 @@ export function createRowPreviewActivationRuntime(
 				return;
 			}
 
-			notifyVisibleRowCandidates(rowIndex);
+			notifyVisibleRowActivation(rowIndex);
 		};
 
 		request = requestQueuedPreviewActivation(
-			requestKey,
-			firstCandidate.getVisibleQueueSize,
+			state.requestKey,
+			getVisibleQueueSize,
 			scope,
 			onSettled,
 		);
@@ -148,41 +138,31 @@ export function createRowPreviewActivationRuntime(
 		}
 	}
 
-	function registerCandidate(candidate: RowPreviewActivationCandidate): () => void {
-		const { id, rowIndex } = candidate;
-		const state = getOrCreateRowState(rowIndex);
+	function getRowActivationVersion(rowIndex: number): Readable<number> {
+		return getOrCreateRowState(rowIndex).activationVersionStore;
+	}
 
-		// Remove any previous registration with the same id so the cleanup
-		// contract stays tied to the current component lifetime.
-		state.candidates.delete(id);
-		state.candidates.set(id, candidate);
-
-		if (state.visibility === "visible") {
-			enqueueRowActivation(rowIndex);
+	function requestRowActivation(rowIndex: number): void {
+		const state = rows.get(rowIndex);
+		if (!state || state.visibility !== "visible") {
+			return;
 		}
 
-		return () => {
-			const currentState = rows.get(rowIndex);
-			if (!currentState) {
-				return;
-			}
-
-			if (currentState.candidates.get(id) !== candidate) {
-				return;
-			}
-
-			currentState.candidates.delete(id);
-			if (currentState.candidates.size === 0) {
-				cancelPendingRow(rowIndex);
-			}
-		};
+		enqueueRowActivation(rowIndex);
 	}
 
 	function setRowVisibility(
 		rowIndex: number,
 		visibility: "visible" | "mounted",
 	): void {
-		const state = getOrCreateRowState(rowIndex);
+		const state =
+			visibility === "visible"
+				? getOrCreateRowState(rowIndex)
+				: rows.get(rowIndex);
+		if (!state) {
+			return;
+		}
+
 		state.visibility = visibility;
 
 		if (visibility === "visible") {
@@ -203,7 +183,8 @@ export function createRowPreviewActivationRuntime(
 	}
 
 	return {
-		registerCandidate,
+		getRowActivationVersion,
+		requestRowActivation,
 		setRowVisibility,
 		clearRow,
 	};

@@ -1,5 +1,6 @@
 <script lang="ts" generics="T">
 	import { providePreviewActivationContexts } from "features/preview/scheduling/previewActivationContexts";
+	import { useLinkContext } from "ui/context/linkContext";
 	import VirtualSurface from "./virtual-list/VirtualSurface.svelte";
 	import VirtualListLoadMoreButton from "./virtual-list/VirtualListLoadMoreButton.svelte";
 	import {
@@ -8,7 +9,15 @@
 	} from "./virtual-list/svelte/useFlatVirtualGridList.svelte";
 
 	const props: FlatVirtualGridListProps<T> = $props();
-	providePreviewActivationContexts();
+	let getVisiblePreviewQueueSize: (() => number) | undefined;
+	try {
+		getVisiblePreviewQueueSize = useLinkContext().getVisiblePreviewQueueSize;
+	} catch {
+		getVisiblePreviewQueueSize = undefined;
+	}
+	providePreviewActivationContexts({
+		getVisibleQueueSize: getVisiblePreviewQueueSize,
+	});
 	const list = useFlatVirtualGridList(props);
 </script>
 

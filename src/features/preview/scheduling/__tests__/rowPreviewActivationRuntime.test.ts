@@ -1,28 +1,27 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
 	createRowPreviewActivationRuntime,
-	type RowPreviewActivationCandidate,
 	type RowPreviewActivationRuntime,
 } from "../rowPreviewActivationRuntime";
 import { resetPreviewActivationSchedulerForTests } from "../previewActivationScheduler";
 
-interface TestCandidateOptions {
-	readonly id: string;
-	readonly rowIndex: number;
-	readonly activationKey: string;
-	readonly onActivated?: (key: string) => void;
+interface ObservedRowActivation {
+	readonly versions: number[];
+	readonly unsubscribe: () => void;
 }
 
-function createTestCandidate(
-	options: TestCandidateOptions,
-): RowPreviewActivationCandidate {
-	return {
-		id: options.id,
-		rowIndex: options.rowIndex,
-		activationKey: options.activationKey,
-		getVisibleQueueSize: () => 0,
-		onActivated: options.onActivated ?? (() => undefined),
-	};
+function observeRowActivation(
+	runtime: RowPreviewActivationRuntime,
+	rowIndex: number,
+): ObservedRowActivation {
+	const versions: number[] = [];
+	const unsubscribe = runtime
+		.getRowActivationVersion(rowIndex)
+		.subscribe((version) => {
+			versions.push(version);
+		});
+
+	return { versions, unsubscribe };
 }
 
 async function flushAnimationFrame(): Promise<void> {
@@ -51,294 +50,153 @@ afterEach(() => {
 });
 
 describe("rowPreviewActivationRuntime", () => {
-	it("does not enqueue candidates for a mounted row", async () => {
+	it("does not activate a mounted row", async () => {
 		const runtime = createRowPreviewActivationRuntime();
-		const onActivated = vi.fn();
+		const observed = observeRowActivation(runtime, 0);
 
-		runtime.registerCandidate(
-			createTestCandidate({
-				id: "c1",
-				rowIndex: 0,
-				activationKey: "key-a",
-				onActivated,
-			}),
-		);
+		runtime.requestRowActivation(0);
 		await flushAnimationFrame();
 		await flushAnimationFrame();
 
-		expect(onActivated).not.toHaveBeenCalled();
+		expect(observed.versions).toEqual([0]);
+		observed.unsubscribe();
 	});
 
-	it("enqueues candidates when a row becomes visible", async () => {
+	it("activates a row when it becomes visible", async () => {
 		const runtime = createRowPreviewActivationRuntime();
-		const onActivated = vi.fn();
+		const observed = observeRowActivation(runtime, 0);
 
 		runtime.setRowVisibility(0, "visible");
-		runtime.registerCandidate(
-			createTestCandidate({
-				id: "c1",
-				rowIndex: 0,
-				activationKey: "key-a",
-				onActivated,
-			}),
-		);
-		await flushAnimationFrame();
 		await flushAnimationFrame();
 
-		expect(onActivated).toHaveBeenCalledWith("key-a");
+		expect(observed.versions).toEqual([0, 1]);
+		observed.unsubscribe();
 	});
 
-	it("activates every candidate in a row from one queued row request", async () => {
+	it("deduplicates multiple activation requests for the same visible row", async () => {
 		const runtime = createRowPreviewActivationRuntime();
-		const activatedKeys: string[] = [];
+		const observed = observeRowActivation(runtime, 0);
 
 		runtime.setRowVisibility(0, "visible");
-		for (let i = 0; i < 4; i += 1) {
-			runtime.registerCandidate(
-				createTestCandidate({
-					id: `c${i}`,
-					rowIndex: 0,
-					activationKey: `key-${i}`,
-					onActivated: (key) => activatedKeys.push(key),
-				}),
-			);
-		}
-
+		runtime.requestRowActivation(0);
+		runtime.requestRowActivation(0);
+		runtime.requestRowActivation(0);
 		await flushAnimationFrame();
 
-		expect(activatedKeys).toEqual(["key-0", "key-1", "key-2", "key-3"]);
+		expect(observed.versions).toEqual([0, 1]);
+		observed.unsubscribe();
 	});
 
 	it("limits activation scheduling to two rows per animation frame", async () => {
 		const runtime = createRowPreviewActivationRuntime();
-		const activatedKeys: string[] = [];
+		const observedRows = [0, 1, 2].map((rowIndex) =>
+			observeRowActivation(runtime, rowIndex),
+		);
 
 		for (let rowIndex = 0; rowIndex < 3; rowIndex += 1) {
 			runtime.setRowVisibility(rowIndex, "visible");
-			runtime.registerCandidate(
-				createTestCandidate({
-					id: `c${rowIndex}`,
-					rowIndex,
-					activationKey: `key-${rowIndex}`,
-					onActivated: (key) => activatedKeys.push(key),
-				}),
-			);
 		}
 
 		await flushAnimationFrame();
-		expect(activatedKeys).toEqual(["key-0", "key-1"]);
+		expect(observedRows.map((row) => row.versions)).toEqual([[0, 1], [0, 1], [0]]);
 
 		await flushAnimationFrame();
-		expect(activatedKeys).toEqual(["key-0", "key-1", "key-2"]);
+		expect(observedRows.map((row) => row.versions)).toEqual([
+			[0, 1],
+			[0, 1],
+			[0, 1],
+		]);
+
+		for (const observed of observedRows) {
+			observed.unsubscribe();
+		}
 	});
 
-	it("cancels pending activations when a row returns to mounted", async () => {
+	it("cancels pending activation when a row returns to mounted", async () => {
 		const runtime = createRowPreviewActivationRuntime();
-		const onActivated = vi.fn();
+		const observed = observeRowActivation(runtime, 0);
 
 		runtime.setRowVisibility(0, "visible");
-		runtime.registerCandidate(
-			createTestCandidate({
-				id: "c1",
-				rowIndex: 0,
-				activationKey: "key-a",
-				onActivated,
-			}),
-		);
 		runtime.setRowVisibility(0, "mounted");
 		await flushAnimationFrame();
 		await flushAnimationFrame();
 
-		expect(onActivated).not.toHaveBeenCalled();
+		expect(observed.versions).toEqual([0]);
+		observed.unsubscribe();
 	});
 
-	it("removes candidates and pending activations when a row is unmounted", async () => {
+	it("removes pending activation when a row is cleared", async () => {
 		const runtime = createRowPreviewActivationRuntime();
-		const onActivated = vi.fn();
+		const observed = observeRowActivation(runtime, 0);
 
 		runtime.setRowVisibility(0, "visible");
-		runtime.registerCandidate(
-			createTestCandidate({
-				id: "c1",
-				rowIndex: 0,
-				activationKey: "key-a",
-				onActivated,
-			}),
-		);
 		runtime.clearRow(0);
 		await flushAnimationFrame();
 		await flushAnimationFrame();
 
-		expect(onActivated).not.toHaveBeenCalled();
+		expect(observed.versions).toEqual([0]);
+		observed.unsubscribe();
 	});
 
-	it("enqueues candidates registered after the row is already visible", async () => {
+	it("activates again when a visible row receives a later request", async () => {
 		const runtime = createRowPreviewActivationRuntime();
-		const onActivated = vi.fn();
+		const observed = observeRowActivation(runtime, 0);
 
 		runtime.setRowVisibility(0, "visible");
-		runtime.registerCandidate(
-			createTestCandidate({
-				id: "c1",
-				rowIndex: 0,
-				activationKey: "key-a",
-				onActivated,
-			}),
-		);
-		await flushAnimationFrame();
 		await flushAnimationFrame();
 
-		expect(onActivated).toHaveBeenCalledWith("key-a");
+		runtime.requestRowActivation(0);
+		await flushAnimationFrame();
+
+		expect(observed.versions).toEqual([0, 1, 2]);
+		observed.unsubscribe();
 	});
 
-	it("does not call onActivated for a replaced activation key", async () => {
-		const runtime = createRowPreviewActivationRuntime();
-		const onActivatedA = vi.fn();
-		const onActivatedB = vi.fn();
-
-		runtime.setRowVisibility(0, "visible");
-		const cleanupA = runtime.registerCandidate(
-			createTestCandidate({
-				id: "c1",
-				rowIndex: 0,
-				activationKey: "key-a",
-				onActivated: onActivatedA,
-			}),
-		);
-		cleanupA();
-		runtime.registerCandidate(
-			createTestCandidate({
-				id: "c2",
-				rowIndex: 0,
-				activationKey: "key-b",
-				onActivated: onActivatedB,
-			}),
-		);
-		await flushAnimationFrame();
-		await flushAnimationFrame();
-
-		expect(onActivatedA).not.toHaveBeenCalled();
-		expect(onActivatedB).toHaveBeenCalledWith("key-b");
-	});
-
-	it("notifies all visible candidates sharing the same activation key", async () => {
-		const runtime = createRowPreviewActivationRuntime();
-		const onActivatedA = vi.fn();
-		const onActivatedB = vi.fn();
-
-		runtime.setRowVisibility(1, "visible");
-		runtime.setRowVisibility(5, "visible");
-		runtime.registerCandidate(
-			createTestCandidate({
-				id: "c1",
-				rowIndex: 1,
-				activationKey: "shared-key",
-				onActivated: onActivatedA,
-			}),
-		);
-		runtime.registerCandidate(
-			createTestCandidate({
-				id: "c2",
-				rowIndex: 5,
-				activationKey: "shared-key",
-				onActivated: onActivatedB,
-			}),
-		);
-		await flushAnimationFrame();
-		await flushAnimationFrame();
-
-		expect(onActivatedA).toHaveBeenCalledWith("shared-key");
-		expect(onActivatedB).toHaveBeenCalledWith("shared-key");
-	});
-
-	it("cancels pending activation when clearing the only visible row for a key", async () => {
-		const runtime = createRowPreviewActivationRuntime();
-		const onActivated = vi.fn();
-
-		runtime.setRowVisibility(0, "visible");
-		runtime.registerCandidate({
-			id: "old",
-			rowIndex: 0,
-			activationKey: "shared-key",
-			getVisibleQueueSize: () => 1,
-			onActivated: vi.fn(),
+	it("waits for the visible preview queue to drain", async () => {
+		let visibleQueueSize = 1;
+		const runtime = createRowPreviewActivationRuntime({
+			getVisibleQueueSize: () => visibleQueueSize,
 		});
+		const observed = observeRowActivation(runtime, 0);
 
+		runtime.setRowVisibility(0, "visible");
+		await flushAnimationFrame();
+		expect(observed.versions).toEqual([0]);
+
+		visibleQueueSize = 0;
+		await flushAnimationFrame();
+		expect(observed.versions).toEqual([0, 1]);
+
+		observed.unsubscribe();
+	});
+
+	it("exposes the latest activation version to late subscribers", async () => {
+		const runtime = createRowPreviewActivationRuntime();
+
+		runtime.setRowVisibility(0, "visible");
+		await flushAnimationFrame();
+
+		const observed = observeRowActivation(runtime, 0);
+
+		expect(observed.versions).toEqual([1]);
+		observed.unsubscribe();
+	});
+
+	it("starts a cleared row with a fresh activation version store", async () => {
+		const runtime = createRowPreviewActivationRuntime();
+		const oldObserved = observeRowActivation(runtime, 0);
+
+		runtime.setRowVisibility(0, "visible");
+		await flushAnimationFrame();
 		runtime.clearRow(0);
 
-		runtime.setRowVisibility(1, "visible");
-		runtime.registerCandidate({
-			id: "new",
-			rowIndex: 1,
-			activationKey: "shared-key",
-			getVisibleQueueSize: () => 0,
-			onActivated,
-		});
-
-		await flushAnimationFrame();
+		const newObserved = observeRowActivation(runtime, 0);
+		runtime.setRowVisibility(0, "visible");
 		await flushAnimationFrame();
 
-		expect(onActivated).toHaveBeenCalledWith("shared-key");
-	});
-
-	it("notifies duplicate candidates with the same activation key in the same row", async () => {
-		const runtime = createRowPreviewActivationRuntime();
-		const onActivatedA = vi.fn();
-		const onActivatedB = vi.fn();
-
-		runtime.setRowVisibility(1, "visible");
-
-		runtime.registerCandidate(
-			createTestCandidate({
-				id: "c1",
-				rowIndex: 1,
-				activationKey: "shared-key",
-				onActivated: onActivatedA,
-			}),
-		);
-		runtime.registerCandidate(
-			createTestCandidate({
-				id: "c2",
-				rowIndex: 1,
-				activationKey: "shared-key",
-				onActivated: onActivatedB,
-			}),
-		);
-
-		await flushAnimationFrame();
-
-		expect(onActivatedA).toHaveBeenCalledWith("shared-key");
-		expect(onActivatedB).toHaveBeenCalledWith("shared-key");
-	});
-
-	it("keeps pending activation when another visible row shares the same key", async () => {
-		const runtime = createRowPreviewActivationRuntime();
-		const onActivatedA = vi.fn();
-		const onActivatedB = vi.fn();
-
-		runtime.setRowVisibility(1, "visible");
-		runtime.setRowVisibility(5, "visible");
-		runtime.registerCandidate(
-			createTestCandidate({
-				id: "c1",
-				rowIndex: 1,
-				activationKey: "shared-key",
-				onActivated: onActivatedA,
-			}),
-		);
-		runtime.registerCandidate(
-			createTestCandidate({
-				id: "c2",
-				rowIndex: 5,
-				activationKey: "shared-key",
-				onActivated: onActivatedB,
-			}),
-		);
-		runtime.setRowVisibility(1, "mounted");
-		await flushAnimationFrame();
-		await flushAnimationFrame();
-
-		expect(onActivatedA).not.toHaveBeenCalled();
-		expect(onActivatedB).toHaveBeenCalledWith("shared-key");
+		expect(oldObserved.versions).toEqual([0, 1]);
+		expect(newObserved.versions).toEqual([0, 1]);
+		oldObserved.unsubscribe();
+		newObserved.unsubscribe();
 	});
 });

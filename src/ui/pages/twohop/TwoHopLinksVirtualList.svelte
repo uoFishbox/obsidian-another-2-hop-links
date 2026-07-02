@@ -89,7 +89,7 @@
 			row: TwoHopVirtualListItem,
 			rowIndex: number,
 			visibilityState: VirtualizedItemVisibilityState,
-			activationCandidateId: string,
+			_activationCandidateId: string,
 		)}
 			<TwoHopVirtualItemCard
 				{row}
@@ -99,7 +99,6 @@
 				{matchedItemByKey}
 				{rowIndex}
 				{visibilityState}
-				{activationCandidateId}
 			/>
 		{/snippet}
 	</TwoHopViewPlanVirtualList>

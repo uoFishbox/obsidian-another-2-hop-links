@@ -15,13 +15,20 @@ export interface PreviewActivationContexts {
 	readonly rowPreviewActivationRuntime: RowPreviewActivationRuntime;
 }
 
+export interface ProvidePreviewActivationContextsOptions {
+	readonly getVisibleQueueSize?: () => number;
+}
+
 /**
  * Creates and provides preview activation contexts for one Svelte card surface.
  */
-export function providePreviewActivationContexts(): PreviewActivationContexts {
+export function providePreviewActivationContexts(
+	options: ProvidePreviewActivationContextsOptions = {},
+): PreviewActivationContexts {
 	const previewActivationScope = createPreviewActivationScope();
 	const rowPreviewActivationRuntime = createRowPreviewActivationRuntime({
 		scope: previewActivationScope,
+		getVisibleQueueSize: options.getVisibleQueueSize,
 	});
 
 	setContext(PREVIEW_ACTIVATION_SCOPE_CONTEXT_KEY, previewActivationScope);
