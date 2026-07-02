@@ -47,7 +47,7 @@ export const CARD_RENDER_SHADOW_CSS = String.raw`
 	width: var(--ccl-cell-width);
 	flex: 0 0 var(--ccl-cell-width);
 	height: var(--ccl-box-height);
-	contain: layout;
+	contain: layout paint;
 }
 
 .view-plan-flow-row {
