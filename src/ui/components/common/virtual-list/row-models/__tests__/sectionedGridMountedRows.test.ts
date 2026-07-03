@@ -191,6 +191,40 @@ describe("buildSectionedGridMountedRows", () => {
 		expect(narrowed.rowSlotChanges.maxSlotIndex).toBe(2);
 	});
 
+	it("does not treat stale assigned slot marks as current assignments", () => {
+		const plan = createPlan();
+		const assignedRowSlotMarksScratch: number[] = [];
+		const build = (
+			rowRange: { start: number; end: number },
+			previousBuild?: TestMountedRowsBuild,
+		) =>
+			buildSectionedGridMountedRows({
+				plan,
+				rowRange,
+				previousBuild,
+				assignedRowSlotMarksScratch,
+				findSectionIndexByRow: () => 0,
+				resolveInitialSectionIndexByRow: () => 0,
+				resolveRowInSection: (_plan, sectionPlan, rowIndex) => ({
+					rowIndexInSection: rowIndex - sectionPlan.firstRowIndex,
+					sectionCellStartIndex: rowIndex - sectionPlan.firstRowIndex,
+					cellCount: 1,
+					top: rowIndex * 10,
+				}),
+				readLogicalCellInSection: (plan, sectionIndex, sectionCellIndex) =>
+					plan.logicalCellsBySection[sectionIndex]?.[sectionCellIndex] ??
+					null,
+			});
+
+		const first = build({ start: 0, end: 3 });
+		const narrowed = build({ start: 1, end: 2 }, first);
+		expect(narrowed.rowSlotChanges.clearedSlotIndices).toEqual([0, 2]);
+
+		const shifted = build({ start: 2, end: 3 }, first);
+		expect(shifted.rowSlices[0]).toBe(first.rowSlices[2]);
+		expect(shifted.rowSlotChanges.clearedSlotIndices).toEqual([0, 1]);
+	});
+
 	it("can omit renderBodyKey while retaining structured render body identity", () => {
 		const plan = createPlan();
 		const build = buildSectionedGridMountedRows({

@@ -78,7 +78,7 @@ function setClampedRange(out: RowRange, range: RowRange, rowCount: number): void
  */
 export function createTwoHopMountedRowWindow(): TwoHopMountedRowWindow {
 	const reusableRowSlotsScratch: number[] = [];
-	const assignedRowSlotsScratch: number[] = [];
+	const assignedRowSlotMarksScratch: number[] = [];
 	const resolvedRowScratch: SectionedGridResolvedRowScratch = {
 		rowIndexInSection: 0,
 		sectionCellStartIndex: 0,
@@ -158,7 +158,7 @@ export function createTwoHopMountedRowWindow(): TwoHopMountedRowWindow {
 			ranges,
 			previousBuild: previousBuild ?? state.build,
 			reusableRowSlotsScratch,
-			assignedRowSlotsScratch,
+			assignedRowSlotMarksScratch,
 			resolvedRowScratch,
 		});
 

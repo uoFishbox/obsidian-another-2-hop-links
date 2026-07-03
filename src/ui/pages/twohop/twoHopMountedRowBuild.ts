@@ -91,7 +91,7 @@ export function buildTwoHopMountedRows(params: {
 	readonly ranges: VirtualRanges;
 	readonly previousBuild?: TwoHopMountedRowsBuild;
 	readonly reusableRowSlotsScratch?: number[];
-	readonly assignedRowSlotsScratch?: number[];
+	readonly assignedRowSlotMarksScratch?: number[];
 	readonly resolvedRowScratch?: SectionedGridResolvedRowScratch;
 }): TwoHopMountedRowsBuild {
 	recordCCLDevMeasurement("twoHop.buildMountedRows");
@@ -115,7 +115,7 @@ export function buildTwoHopMountedRows(params: {
 		rowRange: range,
 		previousBuild: previous,
 		reusableRowSlotsScratch: params.reusableRowSlotsScratch,
-		assignedRowSlotsScratch: params.assignedRowSlotsScratch,
+		assignedRowSlotMarksScratch: params.assignedRowSlotMarksScratch,
 		resolvedRowScratch: params.resolvedRowScratch,
 		findSectionIndexByRow: findTwoHopSectionIndexByRow,
 		resolveInitialSectionIndexByRow: resolveInitialTwoHopSectionIndexByRow,

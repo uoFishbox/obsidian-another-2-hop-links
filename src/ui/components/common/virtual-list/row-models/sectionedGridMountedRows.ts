@@ -80,6 +80,9 @@ export interface BuildSectionedGridMountedRowsParams<
 	readonly rowRange: RowRange;
 	readonly previousBuild?: SectionedGridMountedRowsBuild<T, G, TPlan>;
 	readonly reusableRowSlotsScratch?: number[];
+	/** Reusable slotIndex → generation marks for assigned row slots. */
+	readonly assignedRowSlotMarksScratch?: number[];
+	/** @deprecated Use assignedRowSlotMarksScratch. */
 	readonly assignedRowSlotsScratch?: number[];
 	readonly resolvedRowScratch?: SectionedGridResolvedRowScratch;
 	readonly renderBodyKeyPolicy?: RenderBodyKeyPolicy;
@@ -126,6 +129,10 @@ export interface BuildSectionedGridMountedRowsParams<
 
 type SectionedGridMountedCell<T, G> = MountedFlatCell<T, G>;
 
+interface AssignedSlotMarksScratch extends Array<number> {
+	generation?: number;
+}
+
 export const EMPTY_ROW_SLOT_CHANGE_SET: RowSlotChangeSet<never> = {
 	fullSync: false,
 	maxSlotIndex: -1,
@@ -134,6 +141,19 @@ export const EMPTY_ROW_SLOT_CHANGE_SET: RowSlotChangeSet<never> = {
 };
 
 const EMPTY_PREVIOUS_CELLS: ReadonlyMap<string, never> = new Map<string, never>();
+const MAX_ASSIGNED_SLOT_GENERATION = 0x7fffffff;
+
+function advanceAssignedSlotGeneration(scratch: number[]): number {
+	const marks = scratch as AssignedSlotMarksScratch;
+	const nextGeneration = (marks.generation ?? 0) + 1;
+	if (nextGeneration > MAX_ASSIGNED_SLOT_GENERATION) {
+		scratch.length = 0;
+		marks.generation = 1;
+		return 1;
+	}
+	marks.generation = nextGeneration;
+	return nextGeneration;
+}
 
 const flattenMountedRowCells = <T, G>(
 	rowSlices: readonly MountedFlatRowSlice<T, G>[],
@@ -191,9 +211,6 @@ export function buildSectionedGridMountedRows<
 			if (params.reusableRowSlotsScratch) {
 				params.reusableRowSlotsScratch.length = 0;
 			}
-			if (params.assignedRowSlotsScratch) {
-				params.assignedRowSlotsScratch.length = 0;
-			}
 			return previousBuild;
 		}
 	}
@@ -227,11 +244,15 @@ export function buildSectionedGridMountedRows<
 	const previousRowStart = params.previousBuild?.rowRange.start ?? 0;
 	const previousRowEnd = params.previousBuild?.rowRange.end ?? 0;
 	const assignedRows: MountedFlatRowSlice<T, G>[] = [];
-	const assignedSlotIndices =
-		previousRows !== undefined ? (params.assignedRowSlotsScratch ?? []) : undefined;
-	if (assignedSlotIndices) {
-		assignedSlotIndices.length = 0;
-	}
+	const assignedSlotMarks =
+		previousRows !== undefined
+			? (params.assignedRowSlotMarksScratch ??
+				params.assignedRowSlotsScratch ??
+				[])
+			: undefined;
+	const assignedSlotGeneration = assignedSlotMarks
+		? advanceAssignedSlotGeneration(assignedSlotMarks)
+		: 0;
 	let maxSlotIndex = -1;
 	const registerActiveRowSlot = (
 		rowSlice: MountedFlatRowSlice<T, G>,
@@ -239,17 +260,15 @@ export function buildSectionedGridMountedRows<
 	): void => {
 		const slotIndex = rowSlice.slotIndex ?? rowSlice.rowIndex;
 		maxSlotIndex = Math.max(maxSlotIndex, slotIndex);
-		assignedSlotIndices?.push(slotIndex);
+		if (assignedSlotMarks) {
+			assignedSlotMarks[slotIndex] = assignedSlotGeneration;
+		}
 		if (changed) {
 			assignedRows.push(rowSlice);
 		}
 	};
 	const hasAssignedSlot = (slotIndex: number): boolean => {
-		if (!assignedSlotIndices) return false;
-		for (const assignedSlotIndex of assignedSlotIndices) {
-			if (assignedSlotIndex === slotIndex) return true;
-		}
-		return false;
+		return assignedSlotMarks?.[slotIndex] === assignedSlotGeneration;
 	};
 	const getPreviousRow = (
 		rowIndex: number,
@@ -435,7 +454,7 @@ export function buildSectionedGridMountedRows<
 	}
 
 	const clearedSlotIndices: number[] = [];
-	if (previousRows && assignedSlotIndices) {
+	if (previousRows && assignedSlotMarks) {
 		for (const previousRow of previousRows) {
 			const slotIndex = previousRow.slotIndex ?? previousRow.rowIndex;
 			if (hasAssignedSlot(slotIndex)) continue;
