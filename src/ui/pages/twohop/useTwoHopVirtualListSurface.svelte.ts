@@ -69,7 +69,6 @@ export function useTwoHopViewPlanVirtualList(props: TwoHopVirtualListSurfaceProp
 				) {
 					return;
 				}
-				surfaceRuntime.refreshMountedRowsInRange(affectedRowRange);
 				surfaceRuntime.virtualList.recompute({ rowModel: activeRowModel });
 			},
 		);
