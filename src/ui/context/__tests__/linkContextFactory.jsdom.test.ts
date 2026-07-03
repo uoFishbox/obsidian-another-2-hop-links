@@ -1,9 +1,10 @@
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { TFile } from "obsidian";
 import { createMockTFile } from "testing/__mocks__/testHelpers";
 import { createLinkContextFactory } from "ui/context/linkContextFactory";
 import type { TwoHopIndexedLink } from "types";
 import { triggerHoverPopover } from "features/preview/interactions/mobilePopover";
+import { getPreviewRenderBacklogCount } from "features/preview/renderers/previewRenderQueue";
 
 vi.mock("ui/handlers/viewHandlers", () => ({
 	handleTagClick: vi.fn(),
@@ -12,6 +13,14 @@ vi.mock("ui/handlers/viewHandlers", () => ({
 vi.mock("features/preview/interactions/mobilePopover", () => ({
 	triggerHoverPopover: vi.fn(),
 }));
+
+vi.mock("features/preview/renderers/previewRenderQueue", () => ({
+	getPreviewRenderBacklogCount: vi.fn(() => 0),
+}));
+
+beforeEach(() => {
+	vi.mocked(getPreviewRenderBacklogCount).mockReturnValue(0);
+});
 
 function createPosition(line: number) {
 	return {
@@ -33,6 +42,41 @@ function createBaseLink(sourceFile: TFile): TwoHopIndexedLink {
 }
 
 describe("createLinkContextFactory", () => {
+	it("getVisiblePreviewQueueSize includes queued, active, and render backlog previews", () => {
+		const sourceFile = createMockTFile("notes/source.md");
+		vi.mocked(getPreviewRenderBacklogCount).mockReturnValue(3);
+
+		const factory = createLinkContextFactory(
+			{
+				fileToLinktext: vi.fn((f: TFile) => f.basename),
+			} as unknown as Parameters<typeof createLinkContextFactory>[0],
+			{
+				handleResolveFile: vi.fn(),
+				handleOpenFile: vi.fn(),
+				handleOpenLinkDestination: vi.fn(),
+				handleGetFileContent: vi.fn(),
+				handleGetMetadata: vi.fn(),
+				handleShowFileMenu: vi.fn(),
+			} as unknown as Parameters<typeof createLinkContextFactory>[1],
+			{} as Parameters<typeof createLinkContextFactory>[2],
+			{} as Parameters<typeof createLinkContextFactory>[3],
+			{} as Parameters<typeof createLinkContextFactory>[4],
+			{} as Parameters<typeof createLinkContextFactory>[5],
+			{} as Parameters<typeof createLinkContextFactory>[6],
+			{
+				getPreview: vi.fn(async () => ({ type: "text" as const, content: "" })),
+				getVisibleQueueSize: vi.fn(() => 2),
+				getActiveVisiblePreviewCount: vi.fn(() => 1),
+			},
+		);
+		const context = factory(
+			sourceFile,
+			{} as Parameters<ReturnType<typeof createLinkContextFactory>>[1],
+		);
+
+		expect(context.getVisiblePreviewQueueSize?.()).toBe(6);
+	});
+
 	it("onHop2Click: does not pass property key when search hit position is prioritized", () => {
 		const sourceFile = createMockTFile("notes/source.md");
 		const handleOpenFile = vi.fn();

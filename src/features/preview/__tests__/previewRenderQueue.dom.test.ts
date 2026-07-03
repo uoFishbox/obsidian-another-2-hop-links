@@ -125,4 +125,28 @@ describe("enqueuePreviewRender", () => {
 		await first;
 		expect(events).toEqual(["first:start", "first:end"]);
 	});
+
+	test("reports active and pending render tasks as backlog", async () => {
+		const { enqueuePreviewRender, getPreviewRenderBacklogCount } =
+			await loadQueueModule();
+		const releaseFirst = createDeferred();
+
+		const first = enqueuePreviewRender(async () => {
+			await releaseFirst.promise;
+			return "first";
+		});
+		const second = enqueuePreviewRender(async () => "second");
+
+		expect(getPreviewRenderBacklogCount()).toBe(2);
+
+		await vi.advanceTimersByTimeAsync(0);
+		expect(getPreviewRenderBacklogCount()).toBe(2);
+
+		releaseFirst.resolve();
+		await expect(first).resolves.toBe("first");
+
+		await vi.advanceTimersByTimeAsync(0);
+		await expect(second).resolves.toBe("second");
+		expect(getPreviewRenderBacklogCount()).toBe(0);
+	});
 });

@@ -130,6 +130,10 @@ export function enqueuePreviewRender<T>(
 	});
 }
 
+export function getPreviewRenderBacklogCount(): number {
+	return activePreviewRenders + pendingTasks.length;
+}
+
 export function clearPreviewRenderQueue(): void {
 	for (const task of pendingTasks.splice(0)) {
 		task.cancelled = true;

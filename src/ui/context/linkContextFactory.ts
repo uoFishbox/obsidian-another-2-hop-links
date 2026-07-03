@@ -16,6 +16,7 @@ import { buildDragLinkFormat } from "application/presenters/linkHelper";
 import { handleTagClick } from "ui/handlers/viewHandlers";
 import { hydrateRuntimeBacklinkLink } from "./runtimeBacklinkPositionResolver";
 import { isMouseEventLike } from "ui/utils/realmSafeDom";
+import { getPreviewRenderBacklogCount } from "features/preview/renderers/previewRenderQueue";
 
 export function createLinkContextFactory(
 	metadataCache: MetadataCache,
@@ -74,7 +75,10 @@ export function createLinkContextFactory(
 		const linkContext: Partial<LinkContext> = {
 			getPreview: (fileToLoad, signal, options) =>
 				previewService.getPreview(fileToLoad, signal, options),
-			getVisiblePreviewQueueSize: () => previewService.getVisibleQueueSize(),
+			getVisiblePreviewQueueSize: () =>
+				previewService.getVisibleQueueSize() +
+				previewService.getActiveVisiblePreviewCount() +
+				getPreviewRenderBacklogCount(),
 			resolveFile: eventHandlers.handleResolveFile,
 			buildWikiLink: (targetFile: TFile | null, fallback: string) =>
 				targetFile ? dragLinkFormat(targetFile) : `[[${fallback}]]`,
