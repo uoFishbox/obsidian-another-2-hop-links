@@ -1,4 +1,8 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import {
+	markScrollActivityActive,
+	resetScrollActivityForTests,
+} from "infrastructure/scroll/scrollActivity";
 import type { TFile } from "obsidian";
 import type { ViewItem } from "application/presenters";
 import type {
@@ -14,6 +18,7 @@ import type { MountedFlatRowSlice } from "ui/components/common/virtual-list/core
 import type { TwoHopIndexedLink } from "types/domain";
 import {
 	collectTwoHopMountedInteractionIds,
+	createTwoHopInteractionResolverPruneScheduler,
 	createTwoHopInteractionResolverProvider,
 } from "../twoHopInteractionResolverCache";
 import type {
@@ -165,7 +170,46 @@ function createDescriptor(item: TwoHopVirtualListItem): ItemInteractionDescripto
 	};
 }
 
+function installIdleWindowHarness() {
+	let nextIdleCallbackId = 1;
+	const idleCallbacks = new Map<number, IdleRequestCallback>();
+	const requestIdleCallback = vi.fn((callback: IdleRequestCallback) => {
+		const id = nextIdleCallbackId;
+		nextIdleCallbackId += 1;
+		idleCallbacks.set(id, callback);
+		return id;
+	});
+	const cancelIdleCallback = vi.fn((id: number) => {
+		idleCallbacks.delete(id);
+	});
+
+	return {
+		window: {
+			requestIdleCallback,
+			cancelIdleCallback,
+			setTimeout: vi.fn(),
+			clearTimeout: vi.fn(),
+		} as unknown as Window,
+		idleCallbacks,
+		requestIdleCallback,
+		cancelIdleCallback,
+		get latestCallbackId() {
+			return nextIdleCallbackId - 1;
+		},
+	};
+}
+
+const idleDeadline = {
+	didTimeout: false,
+	timeRemaining: () => 50,
+} satisfies IdleDeadline;
+
 describe("twoHopInteractionResolverCache", () => {
+	afterEach(() => {
+		resetScrollActivityForTests();
+		vi.restoreAllMocks();
+	});
+
 	it("provider resolves against the current mounted rows", () => {
 		let mountedRows: readonly TwoHopMountedRow[] = [];
 		const firstItem = createItem("alpha.md");
@@ -303,6 +347,53 @@ describe("twoHopInteractionResolverCache", () => {
 			secondDescriptor,
 		);
 		expect(resolveDescriptor).toHaveBeenCalledTimes(2);
+	});
+
+	it("schedules pruning for an idle callback", () => {
+		const idle = installIdleWindowHarness();
+		const item = createItem("alpha.md");
+		const pruneExcept = vi.fn();
+		const scheduler = createTwoHopInteractionResolverPruneScheduler({
+			getMountedRows: () => createMountedRows({ item }),
+			pruneExcept,
+			getWindow: () => idle.window,
+		});
+
+		scheduler.schedule();
+
+		expect(pruneExcept).not.toHaveBeenCalled();
+
+		idle.idleCallbacks.get(idle.latestCallbackId)?.(idleDeadline);
+
+		expect(pruneExcept).toHaveBeenCalledTimes(1);
+		expect(pruneExcept.mock.calls[0]?.[0].has("item:file:alpha.md")).toBe(true);
+	});
+
+	it("waits for scroll idle before pruning", () => {
+		const idle = installIdleWindowHarness();
+		const item = createItem("alpha.md");
+		const scrollSource = {};
+		const pruneExcept = vi.fn();
+		const scheduler = createTwoHopInteractionResolverPruneScheduler({
+			getMountedRows: () => createMountedRows({ item }),
+			pruneExcept,
+			getWindow: () => idle.window,
+		});
+
+		scheduler.schedule();
+		markScrollActivityActive(scrollSource);
+		idle.idleCallbacks.get(idle.latestCallbackId)?.(idleDeadline);
+
+		expect(pruneExcept).not.toHaveBeenCalled();
+		expect(idle.requestIdleCallback).toHaveBeenCalledTimes(1);
+
+		resetScrollActivityForTests();
+
+		expect(idle.requestIdleCallback).toHaveBeenCalledTimes(2);
+
+		idle.idleCallbacks.get(idle.latestCallbackId)?.(idleDeadline);
+
+		expect(pruneExcept).toHaveBeenCalledTimes(1);
 	});
 
 	it("provider resolves mounted section header descriptors without item resolution", () => {

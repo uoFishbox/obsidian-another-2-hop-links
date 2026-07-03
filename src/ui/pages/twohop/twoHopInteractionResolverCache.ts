@@ -1,3 +1,7 @@
+import {
+	isScrollActivityActive,
+	subscribeScrollActivity,
+} from "infrastructure/scroll/scrollActivity";
 import type {
 	InteractionDescriptor,
 	ItemInteractionDescriptor,
@@ -68,6 +72,11 @@ export interface TwoHopInteractionResolverProvider extends InteractionDescriptor
 	pruneExcept: (mountedInteractionIds: ReadonlySet<string>) => void;
 }
 
+export interface TwoHopInteractionResolverPruneScheduler {
+	schedule: () => void;
+	cancel: () => void;
+}
+
 /**
  * Collects the current mounted interaction ids into the provided set.
  */
@@ -92,6 +101,92 @@ export function collectTwoHopMountedInteractionIds(
 	}
 
 	return target;
+}
+
+export function createTwoHopInteractionResolverPruneScheduler(params: {
+	getMountedRows: () => readonly TwoHopMountedRow[];
+	pruneExcept: (mountedInteractionIds: ReadonlySet<string>) => void;
+	getWindow?: () => Window | null;
+}): TwoHopInteractionResolverPruneScheduler {
+	const mountedInteractionIds = new Set<string>();
+	let pending = false;
+	let idleCallbackId: number | null = null;
+	let timeoutId: number | null = null;
+	let unsubscribeScrollActivity: (() => void) | undefined;
+
+	const getOwnerWindow = (): Window | null =>
+		params.getWindow?.() ?? (typeof window === "undefined" ? null : window);
+
+	const clearIdleHandle = (): void => {
+		const ownerWindow = getOwnerWindow();
+		if (ownerWindow && idleCallbackId !== null) {
+			ownerWindow.cancelIdleCallback(idleCallbackId);
+		}
+		if (ownerWindow && timeoutId !== null) {
+			ownerWindow.clearTimeout(timeoutId);
+		}
+		idleCallbackId = null;
+		timeoutId = null;
+	};
+
+	const pruneNow = (): void => {
+		mountedInteractionIds.clear();
+		collectTwoHopMountedInteractionIds(
+			params.getMountedRows(),
+			mountedInteractionIds,
+		);
+		params.pruneExcept(mountedInteractionIds);
+	};
+
+	const scheduleIdlePrune = (): void => {
+		const ownerWindow = getOwnerWindow();
+		if (!ownerWindow) {
+			pending = false;
+			pruneNow();
+			return;
+		}
+		if (idleCallbackId !== null || timeoutId !== null) return;
+
+		const runWhenIdle = (): void => {
+			idleCallbackId = null;
+			timeoutId = null;
+			if (!pending) return;
+
+			if (isScrollActivityActive()) {
+				if (unsubscribeScrollActivity) return;
+				unsubscribeScrollActivity = subscribeScrollActivity((isActive) => {
+					if (isActive) return;
+					unsubscribeScrollActivity?.();
+					unsubscribeScrollActivity = undefined;
+					scheduleIdlePrune();
+				});
+				return;
+			}
+
+			pending = false;
+			pruneNow();
+		};
+
+		if (typeof ownerWindow.requestIdleCallback === "function") {
+			idleCallbackId = ownerWindow.requestIdleCallback(runWhenIdle);
+			return;
+		}
+
+		timeoutId = ownerWindow.setTimeout(runWhenIdle, 0);
+	};
+
+	return {
+		schedule: () => {
+			pending = true;
+			scheduleIdlePrune();
+		},
+		cancel: () => {
+			pending = false;
+			clearIdleHandle();
+			unsubscribeScrollActivity?.();
+			unsubscribeScrollActivity = undefined;
+		},
+	};
 }
 
 /**

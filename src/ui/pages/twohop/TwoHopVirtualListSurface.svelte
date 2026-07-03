@@ -9,7 +9,7 @@
 		MountedFlatHeaderCell,
 		MountedFlatItemCell,
 	} from "ui/components/common/virtual-list/core/reconciliation/viewPlanMountedCells";
-	import type { Snippet } from "svelte";
+	import { onDestroy, type Snippet } from "svelte";
 	import type { ApplicationStore } from "ui/stores/ApplicationStore.svelte";
 	import type { SectionRenderDescriptor } from "ui/components/sections/types";
 	import type {
@@ -21,7 +21,7 @@
 	import type { TwoHopVirtualListTuning } from "./twoHopVirtualListTuning";
 	import type { ItemInteractionDescriptor } from "ui/interactions/interactionTypes";
 	import {
-		collectTwoHopMountedInteractionIds,
+		createTwoHopInteractionResolverPruneScheduler,
 		createTwoHopInteractionResolverProvider,
 	} from "./twoHopInteractionResolverCache";
 
@@ -75,13 +75,16 @@
 			resolveDescriptor: (item) => props.getItemInteractionDescriptor(item),
 			getDescriptorRevision: () => props.interactionDescriptorRevision,
 		});
-	const mountedInteractionIds = new Set<string>();
+	const interactionResolverPruneScheduler =
+		createTwoHopInteractionResolverPruneScheduler({
+			getMountedRows: () => list.mountedRows,
+			pruneExcept: interactionDescriptorResolverProvider.pruneExcept,
+		});
 	$effect(() => {
-		const mountedRows = list.mountedRows;
-		mountedInteractionIds.clear();
-		collectTwoHopMountedInteractionIds(mountedRows, mountedInteractionIds);
-		interactionDescriptorResolverProvider.pruneExcept(mountedInteractionIds);
+		void list.mountedRows;
+		interactionResolverPruneScheduler.schedule();
 	});
+	onDestroy(() => interactionResolverPruneScheduler.cancel());
 	const resolvedCellClassNameBySectionClassName = new Map<string, string>();
 	const resolveSectionCellClassName = (
 		sectionClassName: string | undefined,
