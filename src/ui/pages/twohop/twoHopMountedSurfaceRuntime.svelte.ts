@@ -9,7 +9,7 @@ import type {
 	TwoHopMountedRowSlice,
 	TwoHopMountedRowsBuild,
 } from "./twoHopMountedRowBuild";
-import type { TwoHopViewPlanRowModel } from "./twoHopViewPlan";
+import type { TwoHopViewPlan, TwoHopViewPlanRowModel } from "./twoHopViewPlan";
 import type {
 	TwoHopVirtualListItem,
 	TwoHopVirtualListSection,
@@ -23,6 +23,7 @@ import {
 } from "features/preview/scheduling/rowPreviewActivationRuntime";
 
 const EMPTY_MOUNTED_ROWS: readonly [] = [];
+const TRAILING_EMPTY_ROW_SLOT_TRIM_THRESHOLD = 8;
 
 type TwoHopMountedItemCell = MountedFlatItemCell<
 	TwoHopVirtualListItem,
@@ -49,6 +50,7 @@ export function createTwoHopMountedSurfaceRuntime(params: {
 		rowPreviewActivationRuntime,
 	});
 	let mountedRowSlots = $state.raw<readonly TwoHopMountedRowSlot[]>([]);
+	let lastMountedRowSlotPlan: TwoHopViewPlan | undefined;
 
 	function resolveRowSlotIndex(row: TwoHopMountedRowSlice): number {
 		return row.slotIndex ?? row.rowIndex;
@@ -64,18 +66,78 @@ export function createTwoHopMountedSurfaceRuntime(params: {
 		return true;
 	}
 
-	function trimTrailingEmptyRowSlots(): boolean {
-		let nextLength = mountedRowSlots.length;
-		while (nextLength > 0 && mountedRowSlots[nextLength - 1]?.row === null) {
-			nextLength -= 1;
-		}
-		if (nextLength === mountedRowSlots.length) return false;
-		mountedRowSlots = mountedRowSlots.slice(0, nextLength);
+	function trimTrailingEmptyRowSlotsToLength(nextLength: number): boolean {
+		const clampedLength = Math.max(0, Math.min(nextLength, mountedRowSlots.length));
+		if (clampedLength === mountedRowSlots.length) return false;
+		mountedRowSlots = mountedRowSlots.slice(0, clampedLength);
 		return true;
 	}
 
+	function resolveMaxActiveRowSlotIndex(
+		rows: readonly TwoHopMountedRowSlice[],
+	): number {
+		let maxSlotIndex = -1;
+		for (const row of rows) {
+			maxSlotIndex = Math.max(maxSlotIndex, resolveRowSlotIndex(row));
+		}
+		return maxSlotIndex;
+	}
+
+	function hasPlanStructureChanged(
+		previous: TwoHopViewPlan,
+		next: TwoHopViewPlan,
+	): boolean {
+		if (previous.columns !== next.columns) return true;
+		if (previous.sections.length !== next.sections.length) return true;
+
+		for (let index = 0; index < previous.sections.length; index += 1) {
+			const previousSection = previous.sections[index];
+			const nextSection = next.sections[index];
+			if (
+				previousSection.sectionId !== nextSection.sectionId ||
+				previousSection.firstRowIndex !== nextSection.firstRowIndex ||
+				previousSection.rowCount !== nextSection.rowCount ||
+				previousSection.cellCount !== nextSection.cellCount
+			) {
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+	function consumePlanStructureTrimRequest(build: TwoHopMountedRowsBuild): boolean {
+		const previousPlan = lastMountedRowSlotPlan;
+		lastMountedRowSlotPlan = build.plan;
+		return (
+			previousPlan !== undefined &&
+			previousPlan !== build.plan &&
+			hasPlanStructureChanged(previousPlan, build.plan)
+		);
+	}
+
+	function shouldTrimTrailingEmptyRowSlots(params: {
+		readonly build: TwoHopMountedRowsBuild;
+		readonly maxActiveSlotIndex: number;
+		readonly forceForPlanStructureChange: boolean;
+	}): boolean {
+		if (mountedRowSlots.length === 0) return false;
+		if (params.build.plan.rowCount === 0 || params.build.rowSlices.length === 0) {
+			return true;
+		}
+		if (params.forceForPlanStructureChange) return true;
+
+		const retainedLength = params.maxActiveSlotIndex + 1;
+		const trailingEmptySlotCount = mountedRowSlots.length - retainedLength;
+		return trailingEmptySlotCount >= TRAILING_EMPTY_ROW_SLOT_TRIM_THRESHOLD;
+	}
+
 	function applyRowSlotChanges(
+		build: TwoHopMountedRowsBuild,
 		changes: TwoHopMountedRowsBuild["rowSlotChanges"],
+		options: {
+			readonly forceTrimForPlanStructureChange: boolean;
+		},
 	): boolean {
 		let rowChanged = false;
 		const slotsChanged =
@@ -95,7 +157,14 @@ export function createTwoHopMountedSurfaceRuntime(params: {
 			rowChanged = slot.setRow(null) || rowChanged;
 		}
 
-		const slotsTrimmed = trimTrailingEmptyRowSlots();
+		const maxActiveSlotIndex = resolveMaxActiveRowSlotIndex(build.rowSlices);
+		const slotsTrimmed = shouldTrimTrailingEmptyRowSlots({
+			build,
+			maxActiveSlotIndex,
+			forceForPlanStructureChange: options.forceTrimForPlanStructureChange,
+		})
+			? trimTrailingEmptyRowSlotsToLength(maxActiveSlotIndex + 1)
+			: false;
 		return slotsChanged || rowChanged || slotsTrimmed;
 	}
 
@@ -117,13 +186,26 @@ export function createTwoHopMountedSurfaceRuntime(params: {
 			);
 			if (reconciliationState.mountedBuild === null) {
 				mountRuntime.resetMountedRows();
+				lastMountedRowSlotPlan = undefined;
 				if (mountedRowSlots.length > 0) {
 					mountedRowSlots = [];
 				}
 				return;
 			}
+			const forceTrimForPlanStructureChange = consumePlanStructureTrimRequest(
+				reconciliationState.mountedBuild,
+			);
 			if (mountRuntime.consumeMountedRowsChange()) {
-				applyRowSlotChanges(mountRuntime.getMountedRowSlotChanges());
+				applyRowSlotChanges(
+					reconciliationState.mountedBuild,
+					mountRuntime.getMountedRowSlotChanges(),
+					{ forceTrimForPlanStructureChange },
+				);
+			} else if (forceTrimForPlanStructureChange) {
+				const maxActiveSlotIndex = resolveMaxActiveRowSlotIndex(
+					reconciliationState.mountedBuild.rowSlices,
+				);
+				trimTrailingEmptyRowSlotsToLength(maxActiveSlotIndex + 1);
 			}
 		},
 	});
