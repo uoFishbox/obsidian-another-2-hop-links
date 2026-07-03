@@ -15,7 +15,7 @@ import type {
 	TwoHopVirtualListSection,
 } from "./twoHopVirtualListModel";
 import { createTwoHopMountRuntime } from "./twoHopMountRuntime.svelte";
-import { TwoHopRowSlot } from "./twoHopRowSlot.svelte";
+import { VirtualSurfaceRowSlot } from "ui/components/common/virtual-list/svelte/VirtualSurfaceRowSlot.svelte";
 import type { TwoHopVirtualListPlanRuntime } from "./twoHopVirtualListPlanRuntime.svelte";
 import {
 	PREVIEW_ROW_ACTIVATION_CONTEXT_KEY,
@@ -28,9 +28,8 @@ type TwoHopMountedItemCell = MountedFlatItemCell<
 	TwoHopVirtualListItem,
 	TwoHopVirtualListSection
 >;
-type TwoHopMountedRowSlot = TwoHopRowSlot<
-	TwoHopVirtualListItem,
-	TwoHopVirtualListSection
+type TwoHopMountedRowSlot = VirtualSurfaceRowSlot<
+	MountedFlatCell<TwoHopVirtualListItem, TwoHopVirtualListSection>
 >;
 
 // Activation candidates are slot-scoped; CardPreviewGate keeps the logical
@@ -63,7 +62,7 @@ export function createTwoHopMountedSurfaceRuntime(params: {
 		if (maxSlotIndex < mountedRowSlots.length) return false;
 		const nextSlots = mountedRowSlots.slice();
 		for (let index = nextSlots.length; index <= maxSlotIndex; index += 1) {
-			nextSlots.push(new TwoHopRowSlot(index));
+			nextSlots.push(new VirtualSurfaceRowSlot(index));
 		}
 		mountedRowSlots = nextSlots;
 		return true;
