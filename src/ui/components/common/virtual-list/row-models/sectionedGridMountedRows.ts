@@ -52,9 +52,17 @@ export interface SectionedGridResolvedRowScratch {
 	top: number;
 }
 
+export interface RowSlotChangeSet<T> {
+	readonly fullSync: boolean;
+	readonly maxSlotIndex: number;
+	readonly assignedRows: readonly T[];
+	readonly clearedSlotIndices: readonly number[];
+}
+
 export interface SectionedGridMountedRowsBuild<T, G, TPlan> {
 	readonly cells: MountedFlatCell<T, G>[];
 	readonly rowSlices: MountedFlatRowSlice<T, G>[];
+	readonly rowSlotChanges: RowSlotChangeSet<MountedFlatRowSlice<T, G>>;
 	readonly reusableCellsByKey: Map<string, MountedFlatCell<T, G>>;
 	readonly mountedCellCount: number;
 	readonly nextRenderSlotIndex: number;
@@ -116,6 +124,13 @@ export interface BuildSectionedGridMountedRowsParams<
  */
 
 type SectionedGridMountedCell<T, G> = MountedFlatCell<T, G>;
+
+export const EMPTY_ROW_SLOT_CHANGE_SET: RowSlotChangeSet<never> = {
+	fullSync: false,
+	maxSlotIndex: -1,
+	assignedRows: [],
+	clearedSlotIndices: [],
+};
 
 const EMPTY_PREVIOUS_CELLS: ReadonlyMap<string, never> = new Map<string, never>();
 
@@ -207,6 +222,21 @@ export function buildSectionedGridMountedRows<
 	const previousRows = params.previousBuild?.rowSlices;
 	const previousRowStart = params.previousBuild?.rowRange.start ?? 0;
 	const previousRowEnd = params.previousBuild?.rowRange.end ?? 0;
+	const assignedRows: MountedFlatRowSlice<T, G>[] = [];
+	const assignedSlotIndices =
+		previousRows !== undefined ? new Set<number>() : undefined;
+	let maxSlotIndex = -1;
+	const registerActiveRowSlot = (
+		rowSlice: MountedFlatRowSlice<T, G>,
+		changed: boolean,
+	): void => {
+		const slotIndex = rowSlice.slotIndex ?? rowSlice.rowIndex;
+		maxSlotIndex = Math.max(maxSlotIndex, slotIndex);
+		assignedSlotIndices?.add(slotIndex);
+		if (changed) {
+			assignedRows.push(rowSlice);
+		}
+	};
 	const getPreviousRow = (
 		rowIndex: number,
 	): MountedFlatRowSlice<T, G> | undefined => {
@@ -272,6 +302,7 @@ export function buildSectionedGridMountedRows<
 		const previousSlotIndex = previousRow?.slotIndex;
 		if (canReusePreviousRow(previousRow)) {
 			rowSlices.push(previousRow);
+			registerActiveRowSlot(previousRow, false);
 			mountedCellCount += previousRow.cells.length;
 			continue;
 		}
@@ -331,6 +362,7 @@ export function buildSectionedGridMountedRows<
 		};
 		if (!sectionLayout) {
 			rowSlices.push(rowSlice);
+			registerActiveRowSlot(rowSlice, true);
 			continue;
 		}
 		for (let columnIndex = 0; columnIndex < rowCellCount; columnIndex += 1) {
@@ -385,7 +417,24 @@ export function buildSectionedGridMountedRows<
 			mountedCellCount += 1;
 		}
 		rowSlices.push(rowSlice);
+		registerActiveRowSlot(rowSlice, true);
 	}
+
+	const clearedSlotIndices: number[] = [];
+	if (previousRows && assignedSlotIndices) {
+		for (const previousRow of previousRows) {
+			const slotIndex = previousRow.slotIndex ?? previousRow.rowIndex;
+			if (assignedSlotIndices.has(slotIndex)) continue;
+			clearedSlotIndices.push(slotIndex);
+			maxSlotIndex = Math.max(maxSlotIndex, slotIndex);
+		}
+	}
+	const rowSlotChanges: RowSlotChangeSet<MountedFlatRowSlice<T, G>> = {
+		fullSync: previousBuild === undefined || previousBuild.plan !== plan,
+		maxSlotIndex,
+		assignedRows,
+		clearedSlotIndices,
+	};
 
 	return {
 		get cells() {
@@ -393,6 +442,7 @@ export function buildSectionedGridMountedRows<
 			return flattenedCells;
 		},
 		rowSlices,
+		rowSlotChanges,
 		get reusableCellsByKey() {
 			return getReusableCellsByKey();
 		},

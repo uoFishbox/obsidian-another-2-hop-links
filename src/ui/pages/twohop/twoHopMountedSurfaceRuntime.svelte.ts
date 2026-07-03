@@ -49,10 +49,6 @@ export function createTwoHopMountedSurfaceRuntime(params: {
 		rowPreviewActivationRuntime,
 	});
 	let mountedRowSlots = $state.raw<readonly TwoHopMountedRowSlot[]>([]);
-	let activeSlotGeneration = 1;
-	let activeSlotMarks = new Uint32Array(0);
-	let activeSlotIndices: number[] = [];
-	let nextActiveSlotIndices: number[] = [];
 
 	function resolveRowSlotIndex(row: TwoHopMountedRowSlice): number {
 		return row.slotIndex ?? row.rowIndex;
@@ -68,58 +64,26 @@ export function createTwoHopMountedSurfaceRuntime(params: {
 		return true;
 	}
 
-	function ensureActiveSlotMarkCapacity(maxSlotIndex: number): void {
-		if (maxSlotIndex < activeSlotMarks.length) return;
-
-		const nextLength = Math.max(maxSlotIndex + 1, activeSlotMarks.length * 2, 8);
-		const nextMarks = new Uint32Array(nextLength);
-		nextMarks.set(activeSlotMarks);
-		activeSlotMarks = nextMarks;
-	}
-
-	function nextActiveSlotGeneration(): number {
-		activeSlotGeneration += 1;
-		if (activeSlotGeneration !== 0) return activeSlotGeneration;
-
-		activeSlotMarks.fill(0);
-		activeSlotGeneration = 1;
-		return activeSlotGeneration;
-	}
-
-	function syncMountedRowSlots(rows: readonly TwoHopMountedRowSlice[]): boolean {
-		let maxSlotIndex = -1;
+	function applyRowSlotChanges(
+		changes: TwoHopMountedRowsBuild["rowSlotChanges"],
+	): boolean {
 		let rowChanged = false;
-		nextActiveSlotIndices.length = 0;
-
-		for (const row of rows) {
-			maxSlotIndex = Math.max(maxSlotIndex, resolveRowSlotIndex(row));
-		}
-
-		const slotsChanged = maxSlotIndex >= 0 && ensureRowSlotCapacity(maxSlotIndex);
-		if (maxSlotIndex >= 0) {
-			ensureActiveSlotMarkCapacity(maxSlotIndex);
-		}
-		const generation = nextActiveSlotGeneration();
+		const slotsChanged =
+			changes.maxSlotIndex >= 0 && ensureRowSlotCapacity(changes.maxSlotIndex);
 		const slots = mountedRowSlots;
 
-		for (const row of rows) {
+		for (const row of changes.assignedRows) {
 			const slotIndex = resolveRowSlotIndex(row);
 			const slot = slots[slotIndex];
-			activeSlotMarks[slotIndex] = generation;
-			nextActiveSlotIndices.push(slotIndex);
+			if (!slot) continue;
 			rowChanged = slot.setRow(row) || rowChanged;
 		}
 
-		for (const slotIndex of activeSlotIndices) {
-			if (activeSlotMarks[slotIndex] === generation) continue;
+		for (const slotIndex of changes.clearedSlotIndices) {
 			const slot = slots[slotIndex];
 			if (!slot) continue;
 			rowChanged = slot.setRow(null) || rowChanged;
 		}
-
-		const previousActiveSlotIndices = activeSlotIndices;
-		activeSlotIndices = nextActiveSlotIndices;
-		nextActiveSlotIndices = previousActiveSlotIndices;
 
 		return slotsChanged || rowChanged;
 	}
@@ -141,7 +105,7 @@ export function createTwoHopMountedSurfaceRuntime(params: {
 				snapshot.ranges.previewVisible,
 			);
 			if (mountRuntime.consumeMountedRowsChange()) {
-				syncMountedRowSlots(mountRuntime.getMountedRows());
+				applyRowSlotChanges(mountRuntime.getMountedRowSlotChanges());
 			}
 		},
 	});

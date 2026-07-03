@@ -92,6 +92,10 @@ describe("createTwoHopMountedRowWindow", () => {
 		expect(window.lastApplyChanged).toBe(true);
 		expect(result).toBeDefined();
 		expect(result.rowSlices.length).toBeGreaterThan(0);
+		expect(window.lastRowSlotChanges.fullSync).toBe(true);
+		expect(window.lastRowSlotChanges.assignedRows.length).toBe(
+			result.rowSlices.length,
+		);
 	});
 
 	it("returns unchanged when plan, range, and cellStore.revision are identical", () => {
@@ -110,6 +114,8 @@ describe("createTwoHopMountedRowWindow", () => {
 			ranges,
 		});
 		expect(window.lastApplyChanged).toBe(false);
+		expect(window.lastRowSlotChanges.assignedRows).toEqual([]);
+		expect(window.lastRowSlotChanges.clearedSlotIndices).toEqual([]);
 		expect(second).toBe(first);
 	});
 
@@ -174,6 +180,10 @@ describe("createTwoHopMountedRowWindow", () => {
 
 		expect(result).toBe(window.build);
 		expect(window.lastApplyChanged).toBe(true);
+		expect(window.lastRowSlotChanges.fullSync).toBe(false);
+		expect(
+			window.lastRowSlotChanges.assignedRows.map((row) => row.rowIndex),
+		).toEqual([2]);
 	});
 
 	it("returns unchanged when only the global cellStore.revision changes with same range", () => {

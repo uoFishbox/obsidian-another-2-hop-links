@@ -200,6 +200,9 @@ export function createTwoHopMountRuntime(
 		getMountedRows(): TwoHopMountedRowsBuild["rowSlices"] | readonly [] {
 			return rowWindow.build?.rowSlices ?? EMPTY_MOUNTED_ROWS;
 		},
+		getMountedRowSlotChanges(): TwoHopMountedRowsBuild["rowSlotChanges"] {
+			return rowWindow.lastRowSlotChanges;
+		},
 		getOrCreateVisibilityState(
 			cell: TwoHopMountedCell,
 			initialVisibility: VirtualizedItemVisibility,

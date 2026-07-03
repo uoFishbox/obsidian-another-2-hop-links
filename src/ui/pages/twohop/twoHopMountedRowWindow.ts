@@ -1,6 +1,9 @@
 import type { RowRange } from "ui/components/common/virtual-list/rowRange";
 import type { VirtualRanges } from "ui/components/common/virtual-list/types";
-import type { SectionedGridResolvedRowScratch } from "ui/components/common/virtual-list/row-models/sectionedGridMountedRows";
+import {
+	EMPTY_ROW_SLOT_CHANGE_SET,
+	type SectionedGridResolvedRowScratch,
+} from "ui/components/common/virtual-list/row-models/sectionedGridMountedRows";
 import {
 	buildTwoHopMountedRows,
 	type TwoHopMountedRowsBuild,
@@ -28,6 +31,9 @@ export interface TwoHopMountedRowWindow {
 	/** Whether the most recent `apply` changed the mounted build. */
 	readonly lastApplyChanged: boolean;
 
+	/** Slot-level changes produced by the most recent changed `apply`. */
+	readonly lastRowSlotChanges: TwoHopMountedRowsBuild["rowSlotChanges"];
+
 	/** The current build, or undefined if no apply has been called yet. */
 	readonly build: TwoHopMountedRowsBuild | undefined;
 
@@ -41,6 +47,7 @@ interface TwoHopMountedRowWindowState {
 	rowRange: RowRange;
 	cellStoreRevision: number;
 	lastApplyChanged: boolean;
+	lastRowSlotChanges: TwoHopMountedRowsBuild["rowSlotChanges"];
 }
 
 const INITIAL_ROW_RANGE: RowRange = { start: -1, end: -1 };
@@ -83,6 +90,7 @@ export function createTwoHopMountedRowWindow(): TwoHopMountedRowWindow {
 		rowRange: { ...INITIAL_ROW_RANGE },
 		cellStoreRevision: -1,
 		lastApplyChanged: false,
+		lastRowSlotChanges: EMPTY_ROW_SLOT_CHANGE_SET,
 	};
 
 	function haveMountedRowRevisionsChanged(build: TwoHopMountedRowsBuild): boolean {
@@ -123,6 +131,7 @@ export function createTwoHopMountedRowWindow(): TwoHopMountedRowWindow {
 			!hasCellStoreRevisionChanged
 		) {
 			state.lastApplyChanged = false;
+			state.lastRowSlotChanges = EMPTY_ROW_SLOT_CHANGE_SET;
 			recordCCLDevMeasurement("twoHop.rowWindow.apply.skipped");
 			return currentBuild;
 		}
@@ -136,6 +145,7 @@ export function createTwoHopMountedRowWindow(): TwoHopMountedRowWindow {
 		) {
 			state.cellStoreRevision = cellStoreRevisionBeforeBuild;
 			state.lastApplyChanged = false;
+			state.lastRowSlotChanges = EMPTY_ROW_SLOT_CHANGE_SET;
 			recordCCLDevMeasurement("twoHop.rowWindow.apply.skipped");
 			return currentBuild;
 		}
@@ -155,6 +165,7 @@ export function createTwoHopMountedRowWindow(): TwoHopMountedRowWindow {
 		setClampedRange(state.rowRange, build.rowRange, plan.rowCount);
 		state.cellStoreRevision = plan.cellStore.revision;
 		state.lastApplyChanged = true;
+		state.lastRowSlotChanges = build.rowSlotChanges;
 		recordCCLDevMeasurement("twoHop.rowWindow.apply.changed");
 		if (isFirstBuild) {
 			recordCCLDevMeasurement("twoHop.rowWindow.apply.changed.firstBuild");
@@ -179,6 +190,7 @@ export function createTwoHopMountedRowWindow(): TwoHopMountedRowWindow {
 		state.rowRange.end = INITIAL_ROW_RANGE.end;
 		state.cellStoreRevision = -1;
 		state.lastApplyChanged = false;
+		state.lastRowSlotChanges = EMPTY_ROW_SLOT_CHANGE_SET;
 	}
 
 	return {
@@ -189,6 +201,9 @@ export function createTwoHopMountedRowWindow(): TwoHopMountedRowWindow {
 		},
 		get lastApplyChanged() {
 			return state.lastApplyChanged;
+		},
+		get lastRowSlotChanges() {
+			return state.lastRowSlotChanges;
 		},
 	};
 }

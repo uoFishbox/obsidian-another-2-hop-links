@@ -141,11 +141,54 @@ describe("buildSectionedGridMountedRows", () => {
 
 		expect(scrolled.rowSlices[0]).toBe(first.rowSlices[1]);
 		expect(scrolled.rowSlices[1].rowIndex).toBe(2);
+		expect(scrolled.rowSlotChanges.fullSync).toBe(false);
+		expect(scrolled.rowSlotChanges.maxSlotIndex).toBe(1);
+		expect(scrolled.rowSlotChanges.assignedRows.map((row) => row.rowIndex)).toEqual(
+			[2],
+		);
+		expect(scrolled.rowSlotChanges.clearedSlotIndices).toEqual([]);
 		expect(scrolled.mountedCellCount).toBe(2);
 		expect(resolvedRows).toEqual([2]);
 		expect(resolveRowInSectionInto).toHaveBeenCalledTimes(1);
 		expect(resolveInitialSectionIndexByRow).toHaveBeenCalledWith(plan, 1);
 		expect(findSectionIndexByRow).not.toHaveBeenCalled();
+	});
+
+	it("reports row slot changes for first mount and cleared slots", () => {
+		const plan = createPlan();
+		const build = (
+			rowRange: { start: number; end: number },
+			previousBuild?: TestMountedRowsBuild,
+		) =>
+			buildSectionedGridMountedRows({
+				plan,
+				rowRange,
+				previousBuild,
+				findSectionIndexByRow: () => 0,
+				resolveInitialSectionIndexByRow: () => 0,
+				resolveRowInSection: (_plan, sectionPlan, rowIndex) => ({
+					rowIndexInSection: rowIndex - sectionPlan.firstRowIndex,
+					sectionCellStartIndex: rowIndex - sectionPlan.firstRowIndex,
+					cellCount: 1,
+					top: rowIndex * 10,
+				}),
+				readLogicalCellInSection: (plan, sectionIndex, sectionCellIndex) =>
+					plan.logicalCellsBySection[sectionIndex]?.[sectionCellIndex] ??
+					null,
+			});
+
+		const first = build({ start: 0, end: 3 });
+		expect(first.rowSlotChanges.fullSync).toBe(true);
+		expect(first.rowSlotChanges.maxSlotIndex).toBe(2);
+		expect(first.rowSlotChanges.assignedRows).toEqual(first.rowSlices);
+		expect(first.rowSlotChanges.clearedSlotIndices).toEqual([]);
+
+		const narrowed = build({ start: 1, end: 2 }, first);
+		expect(narrowed.rowSlices[0]).toBe(first.rowSlices[1]);
+		expect(narrowed.rowSlotChanges.fullSync).toBe(false);
+		expect(narrowed.rowSlotChanges.assignedRows).toEqual([]);
+		expect(narrowed.rowSlotChanges.clearedSlotIndices).toEqual([0, 2]);
+		expect(narrowed.rowSlotChanges.maxSlotIndex).toBe(2);
 	});
 
 	it("can omit renderBodyKey while retaining structured render body identity", () => {
