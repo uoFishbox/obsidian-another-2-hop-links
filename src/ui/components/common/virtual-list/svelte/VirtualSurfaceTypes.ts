@@ -22,6 +22,7 @@ export interface VirtualSurfaceMountedRowSlot<TMountedCell extends MountedVirtua
 	readonly slotIndex: number;
 	readonly slotKey: number;
 	readonly row: VirtualSurfaceMountedRow<TMountedCell> | null;
+	readonly revision?: number;
 }
 
 export type VirtualSurfaceRenderInput<TMountedCell extends MountedVirtualCell> =

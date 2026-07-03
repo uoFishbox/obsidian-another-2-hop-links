@@ -3,6 +3,7 @@ import type {
 	MountedFlatCell,
 	MountedFlatItemCell,
 } from "ui/components/common/virtual-list/core/reconciliation/viewPlanMountedCells";
+import type { RowRange } from "ui/components/common/virtual-list/rowRange";
 import { useVirtualList } from "ui/components/common/virtual-list/svelte/useVirtualList.svelte";
 import { resolveVirtualizedItemVisibilityForPreviewRange } from "ui/components/common/virtual-list/svelte/virtualizedItemVisibilityState.svelte";
 import type {
@@ -54,6 +55,7 @@ export function createTwoHopMountedSurfaceRuntime(params: {
 	let activeSlotMarks = new Uint32Array(0);
 	let activeSlotIndices: number[] = [];
 	let nextActiveSlotIndices: number[] = [];
+	let pendingRefreshRowRange: RowRange | null = null;
 
 	function resolveRowSlotIndex(row: TwoHopMountedRowSlice): number {
 		return row.slotIndex ?? row.rowIndex;
@@ -87,9 +89,15 @@ export function createTwoHopMountedSurfaceRuntime(params: {
 		return activeSlotGeneration;
 	}
 
+	function shouldRefreshRow(row: TwoHopMountedRowSlice, range: RowRange): boolean {
+		return row.rowIndex >= range.start && row.rowIndex < range.end;
+	}
+
 	function syncMountedRowSlots(rows: readonly TwoHopMountedRowSlice[]): boolean {
 		let maxSlotIndex = -1;
 		let rowChanged = false;
+		const refreshRowRange = pendingRefreshRowRange;
+		pendingRefreshRowRange = null;
 		nextActiveSlotIndices.length = 0;
 
 		for (const row of rows) {
@@ -121,12 +129,13 @@ export function createTwoHopMountedSurfaceRuntime(params: {
 		const previousActiveSlotIndices = activeSlotIndices;
 		activeSlotIndices = nextActiveSlotIndices;
 		nextActiveSlotIndices = previousActiveSlotIndices;
-		if (!rowChanged && rows.length > 0) {
+		if (!rowChanged && refreshRowRange && rows.length > 0) {
 			for (const row of rows) {
+				if (!shouldRefreshRow(row, refreshRowRange)) continue;
 				const slotIndex = resolveRowSlotIndex(row);
-				slots[slotIndex]?.refreshRow(row);
+				slots[slotIndex]?.refresh();
+				rowChanged = true;
 			}
-			rowChanged = true;
 		}
 
 		return slotsChanged || rowChanged;
@@ -197,6 +206,20 @@ export function createTwoHopMountedSurfaceRuntime(params: {
 		},
 		getItemVisibilityState,
 		getItemActivationCandidateId: getTwoHopActivationCandidateId,
+		refreshMountedRowsInRange(range: RowRange) {
+			if (pendingRefreshRowRange) {
+				pendingRefreshRowRange.start = Math.min(
+					pendingRefreshRowRange.start,
+					range.start,
+				);
+				pendingRefreshRowRange.end = Math.max(
+					pendingRefreshRowRange.end,
+					range.end,
+				);
+				return;
+			}
+			pendingRefreshRowRange = { start: range.start, end: range.end };
+		},
 		syncPreviewVisibleRange(start: number, end: number) {
 			mountRuntime.schedulePreviewRangeSync(
 				virtualList.getReconciliationState().mountedBuild,

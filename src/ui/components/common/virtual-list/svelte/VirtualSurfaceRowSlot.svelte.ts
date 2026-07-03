@@ -5,6 +5,7 @@ export class VirtualSurfaceRowSlot<TMountedCell extends MountedVirtualCell> {
 	readonly slotIndex: number;
 	readonly slotKey: number;
 	row = $state.raw<VirtualSurfaceMountedRow<TMountedCell> | null>(null);
+	revision = $state(0);
 
 	constructor(slotIndex: number) {
 		this.slotIndex = slotIndex;
@@ -14,11 +15,11 @@ export class VirtualSurfaceRowSlot<TMountedCell extends MountedVirtualCell> {
 	setRow(next: VirtualSurfaceMountedRow<TMountedCell> | null): boolean {
 		if (this.row === next) return false;
 		this.row = next;
+		this.revision += 1;
 		return true;
 	}
 
-	refreshRow(next: VirtualSurfaceMountedRow<TMountedCell>): void {
-		this.row = null;
-		this.row = next;
+	refresh(): void {
+		this.revision += 1;
 	}
 }

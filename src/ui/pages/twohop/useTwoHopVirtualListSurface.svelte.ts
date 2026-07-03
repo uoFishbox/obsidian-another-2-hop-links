@@ -54,6 +54,9 @@ export function useTwoHopViewPlanVirtualList(props: TwoHopVirtualListSurfaceProp
 		return inputRuntime.materializationScheduler.schedule(
 			activeRowModel,
 			(affectedRowRange) => {
+				if (!affectedRowRange) {
+					return;
+				}
 				// Background materialization mostly builds cells for rows that are not
 				// currently mounted. Skip the synchronous recompute when the affected
 				// row range falls entirely outside the mounted range: the next scroll /
@@ -66,6 +69,7 @@ export function useTwoHopViewPlanVirtualList(props: TwoHopVirtualListSurfaceProp
 				) {
 					return;
 				}
+				surfaceRuntime.refreshMountedRowsInRange(affectedRowRange);
 				surfaceRuntime.virtualList.recompute({ rowModel: activeRowModel });
 			},
 		);

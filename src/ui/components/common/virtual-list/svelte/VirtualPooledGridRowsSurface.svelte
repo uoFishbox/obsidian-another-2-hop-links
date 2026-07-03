@@ -84,6 +84,14 @@
 		cell: TMountedCell,
 	): number => cell.cellSlotKey ?? cell.renderSlotIndex;
 
+	const resolveRowCells = (
+		row: VirtualSurfaceMountedRow<TMountedCell>,
+		revision: number | undefined,
+	): readonly TMountedCell[] => {
+		void revision;
+		return row.cells;
+	};
+
 	const resolveRowTop = (row: VirtualSurfaceMountedRow<TMountedCell>): string =>
 		`${row.top}px`;
 
@@ -110,7 +118,7 @@
 				style:top={resolveRowTop(row)}
 				{...row.attributes}
 			>
-				{#each row.cells as mountedCell (resolveCellSlotKey(row, mountedCell))}
+				{#each resolveRowCells(row, rowSlot.revision) as mountedCell (resolveCellSlotKey(row, mountedCell))}
 					<VirtualGridLogicalCellMount
 						logicalKey={resolveMountedCellLogicalKey(mountedCell)}
 						className={resolveCellClassName(mountedCell)}

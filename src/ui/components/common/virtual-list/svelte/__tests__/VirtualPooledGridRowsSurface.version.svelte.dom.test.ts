@@ -122,6 +122,36 @@ describe("VirtualPooledGridRowsSurface row slot invalidation", () => {
 		expect(updatedCellEl).toBeTruthy();
 	});
 
+	it("cell logical key changes when the same slot row is refreshed", async () => {
+		const cell = makeCell("logical-a", 0, "body-a");
+		const row = makeRow(0, 0, [cell]);
+		const rowSlot = new VirtualSurfaceRowSlot<TestCell>(0);
+		rowSlot.setRow(row);
+
+		const { container } = render(VirtualPooledGridRowsSurfaceVersionHarness, {
+			props: {
+				mountedRowSlots: [rowSlot],
+			},
+		});
+
+		const cellEl = container.querySelector("[data-ccl-logical-key='logical-a']");
+		expect(cellEl).toBeTruthy();
+
+		row.cells = [
+			{
+				...cell,
+				key: logicalCellKey("logical-b"),
+			},
+		];
+		rowSlot.refresh();
+		await tick();
+
+		const updatedCellEl = container.querySelector(
+			"[data-ccl-logical-key='logical-b']",
+		);
+		expect(updatedCellEl).toBeTruthy();
+	});
+
 	it("renderBodyKey change triggers body remount when the slot row is reassigned", async () => {
 		const cell = makeCell("cell-body", 0, "original body", {
 			renderBodyKey: "body-a" as RenderBodyKey,
