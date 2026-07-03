@@ -2,7 +2,8 @@ import {
 	isScrollActivityActive,
 	subscribeScrollActivity,
 } from "infrastructure/scroll/scrollActivity";
-import { DEBUG_DISABLE_CARD_DOM_PREVIEW } from "../../../appConstants";
+import { DEBUG_DISABLE_CARD_DOM_PREVIEW, IS_PROD } from "../../../appConstants";
+import { recordCCLDevMeasurement } from "infrastructure/debug/CCLDevMeasurements";
 
 const ACTIVATION_FRAME_BUDGET = 2;
 /**
@@ -173,15 +174,41 @@ function scheduleFrameDrain(): void {
 }
 
 function drainFrame(): void {
+	let isScrollActive = false;
+	if (!IS_PROD) {
+		recordCCLDevMeasurement("PreviewActivationScheduler.drainFrame");
+		isScrollActive = isScrollActivityActive();
+		if (isScrollActive) {
+			recordCCLDevMeasurement(
+				"PreviewActivationScheduler.drainFrame.duringScroll",
+			);
+		}
+	}
+
 	let activated = 0;
 	for (const queue of queuesByScope.values()) {
 		for (const request of queue.values()) {
 			if (hasVisiblePreviewBacklog(request.getVisibleQueueSize)) {
+				if (!IS_PROD) {
+					recordCCLDevMeasurement(
+						"PreviewActivationScheduler.drainFrame.skipBacklog",
+					);
+				}
 				scheduleFrameDrain();
 				return;
 			}
 
 			settleRequest(request, true);
+			if (!IS_PROD) {
+				recordCCLDevMeasurement(
+					"PreviewActivationScheduler.drainFrame.activated",
+				);
+				if (isScrollActive) {
+					recordCCLDevMeasurement(
+						"PreviewActivationScheduler.drainFrame.activatedDuringScroll",
+					);
+				}
+			}
 			activated += 1;
 			if (activated >= ACTIVATION_FRAME_BUDGET) break;
 		}
@@ -229,6 +256,13 @@ function enqueuePreviewActivationRequest(
 	scope: PreviewActivationScope,
 	onSettled: ((activated: boolean) => void) | undefined,
 ): PreviewActivationHandle {
+	if (!IS_PROD) {
+		recordCCLDevMeasurement("PreviewActivationScheduler.enqueue");
+		if (isScrollActivityActive()) {
+			recordCCLDevMeasurement("PreviewActivationScheduler.enqueue.duringScroll");
+		}
+	}
+
 	ensureSubscription();
 	ensureWarmupStarted(scope);
 
@@ -296,6 +330,15 @@ export function requestQueuedPreviewActivation(
 	scope: PreviewActivationScope = defaultScope,
 	onSettled?: (activated: boolean) => void,
 ): PreviewActivationHandle {
+	if (!IS_PROD) {
+		recordCCLDevMeasurement("PreviewActivationScheduler.requestQueued");
+		if (isScrollActivityActive()) {
+			recordCCLDevMeasurement(
+				"PreviewActivationScheduler.requestQueued.duringScroll",
+			);
+		}
+	}
+
 	if (DEBUG_DISABLE_CARD_DOM_PREVIEW) {
 		return createSettledActivationHandle(key, false, onSettled);
 	}

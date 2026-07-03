@@ -21,6 +21,7 @@ import {
 	type TwoHopViewPlanRowModel,
 } from "./twoHopViewPlan";
 import { recordCCLDevMeasurement } from "infrastructure/debug/CCLDevMeasurements";
+import { IS_PROD } from "appConstants";
 
 /**
  * Materializes only the row ranges in `next` that are not covered by
@@ -94,7 +95,9 @@ export function buildTwoHopMountedRows(params: {
 	readonly assignedRowSlotMarksScratch?: number[];
 	readonly resolvedRowScratch?: SectionedGridResolvedRowScratch;
 }): TwoHopMountedRowsBuild {
-	recordCCLDevMeasurement("twoHop.buildMountedRows");
+	if (!IS_PROD) {
+		recordCCLDevMeasurement("twoHop.buildMountedRows");
+	}
 
 	const plan = params.rowModel.plan;
 	const range = params.rowRange;

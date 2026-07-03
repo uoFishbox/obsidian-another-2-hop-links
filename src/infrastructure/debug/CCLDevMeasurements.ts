@@ -28,23 +28,76 @@ export type CCLDevMeasurementName =
 	| "component.ViewItemCard.reevaluate"
 	| "component.CardPreviewGate.reevaluate"
 	| "CardPreviewGate.resetPreviewActivation"
+	| "CardPreviewGate.resetPreviewActivation.identityChanged"
+	| "CardPreviewGate.resetPreviewActivation.clearRenderedSnapshot"
+	| "CardPreviewGate.resetPreviewActivation.clearRequested"
 	| "CardPreviewGate.subscribeActivationVersion"
 	| "CardPreviewGate.requestVisibleActivation"
 	| "CardPreviewGate.requestVisibleActivation.sent"
+	| "CardPreviewGate.requestVisibleActivation.sentDuringScroll"
+	| "CardPreviewGate.requestVisibleActivation.skipNoRuntime"
+	| "CardPreviewGate.requestVisibleActivation.skipNoActivationKey"
+	| "CardPreviewGate.requestVisibleActivation.skipDomPreviewDisabled"
 	| "CardPreviewGate.requestVisibleActivation.skipAlreadyActivated"
 	| "CardPreviewGate.requestVisibleActivation.skipAlreadyRequested"
+	| "CardPreviewGate.requestVisibleActivation.skipAwaitingInitialRuntimeActivation"
 	| "CardPreviewGate.requestVisibleActivation.skipNotVisible"
 	| "CardPreviewGate.requestVisibleActivation.skipMissingFile"
 	| "CardPreviewGate.activateVisibleVirtualPreview"
 	| "CardPreviewGate.commitVisibleActivation"
 	| "CardPreviewGate.commitVisibleActivation.committed"
+	| "CardPreviewGate.commitVisibleActivation.committedDuringScroll"
 	| "CardPreviewGate.commitVisibleActivation.skipAlreadyHandled"
+	| "CardPreviewGate.commitVisibleActivation.skipNoRuntime"
+	| "CardPreviewGate.commitVisibleActivation.skipNoActivationKey"
+	| "CardPreviewGate.commitVisibleActivation.skipNoActivationVersion"
+	| "CardPreviewGate.commitVisibleActivation.skipInitialActivationVersion"
+	| "CardPreviewGate.commitVisibleActivation.skipDomPreviewDisabled"
 	| "CardPreviewGate.commitVisibleActivation.skipAlreadyActivated"
 	| "CardPreviewGate.commitVisibleActivation.skipNotVisible"
+	| "CardPreviewGate.commitVisibleActivation.skipMissingFile"
 	| "CardPreviewGate.renderedPreviewSnapshot.commit"
+	| "CardPreviewGate.renderedPreviewSnapshot.commitFromRuntimeActivation"
+	| "CardPreviewGate.renderedPreviewSnapshot.commitFromDirectActivation"
+	| "CardPreviewGate.renderedPreviewSnapshot.commitDuringScroll"
 	| "CardPreviewGate.shouldRenderPreview.true"
+	| "CardPreviewGate.shouldRenderPreview.trueDuringScroll"
+	| "CardPreview.render.start"
+	| "CardPreview.render.startDuringScroll"
+	| "CardPreview.render.cacheHit"
+	| "CardPreview.render.getPreview"
+	| "CardPreview.render.getPreviewDuringScroll"
+	| "CardPreview.render.previewOverride"
+	| "CardPreview.render.markdown"
+	| "CardPreview.render.markdownDuringScroll"
+	| "CardPreview.render.dom"
+	| "CardPreview.render.image"
+	| "CardPreview.render.mathQueued"
+	| "CardPreview.render.completed"
+	| "CardPreview.render.abortedOrStale"
+	| "CardPreview.render.error"
+	| "PreviewActivationScheduler.requestQueued"
+	| "PreviewActivationScheduler.requestQueued.duringScroll"
+	| "PreviewActivationScheduler.drainFrame"
+	| "PreviewActivationScheduler.drainFrame.duringScroll"
+	| "PreviewActivationScheduler.drainFrame.activated"
+	| "PreviewActivationScheduler.drainFrame.activatedDuringScroll"
+	| "PreviewActivationScheduler.drainFrame.skipBacklog"
+	| "PreviewActivationScheduler.enqueue"
+	| "PreviewActivationScheduler.enqueue.duringScroll"
 	| "RowPreviewActivationRuntime.enqueueActivation"
+	| "RowPreviewActivationRuntime.enqueueActivation.fromSetVisibility"
+	| "RowPreviewActivationRuntime.enqueueActivation.fromRequestActivation"
+	| "RowPreviewActivationRuntime.enqueueActivation.skipNotVisible"
 	| "RowPreviewActivationRuntime.enqueueActivation.dedupedPending"
+	| "RowPreviewActivationRuntime.enqueueActivation.dedupedPending.fromSetVisibility"
+	| "RowPreviewActivationRuntime.enqueueActivation.dedupedPending.fromRequestActivation"
+	| "RowPreviewActivationRuntime.requestActivation"
+	| "RowPreviewActivationRuntime.requestActivation.skipNotVisible"
+	| "RowPreviewActivationRuntime.setVisibility.visible"
+	| "RowPreviewActivationRuntime.setVisibility.visibleUnchanged"
+	| "RowPreviewActivationRuntime.setVisibility.mounted"
+	| "RowPreviewActivationRuntime.setVisibility.mountedUnchanged"
 	| "RowPreviewActivationRuntime.notifyVisibleActivation";
 
 export const CCL_DEV_MEASUREMENT_NAMES: readonly CCLDevMeasurementName[] = [
@@ -75,23 +128,76 @@ export const CCL_DEV_MEASUREMENT_NAMES: readonly CCLDevMeasurementName[] = [
 	"component.ViewItemCard.reevaluate",
 	"component.CardPreviewGate.reevaluate",
 	"CardPreviewGate.resetPreviewActivation",
+	"CardPreviewGate.resetPreviewActivation.identityChanged",
+	"CardPreviewGate.resetPreviewActivation.clearRenderedSnapshot",
+	"CardPreviewGate.resetPreviewActivation.clearRequested",
 	"CardPreviewGate.subscribeActivationVersion",
 	"CardPreviewGate.requestVisibleActivation",
 	"CardPreviewGate.requestVisibleActivation.sent",
+	"CardPreviewGate.requestVisibleActivation.sentDuringScroll",
+	"CardPreviewGate.requestVisibleActivation.skipNoRuntime",
+	"CardPreviewGate.requestVisibleActivation.skipNoActivationKey",
+	"CardPreviewGate.requestVisibleActivation.skipDomPreviewDisabled",
 	"CardPreviewGate.requestVisibleActivation.skipAlreadyActivated",
 	"CardPreviewGate.requestVisibleActivation.skipAlreadyRequested",
+	"CardPreviewGate.requestVisibleActivation.skipAwaitingInitialRuntimeActivation",
 	"CardPreviewGate.requestVisibleActivation.skipNotVisible",
 	"CardPreviewGate.requestVisibleActivation.skipMissingFile",
 	"CardPreviewGate.activateVisibleVirtualPreview",
 	"CardPreviewGate.commitVisibleActivation",
 	"CardPreviewGate.commitVisibleActivation.committed",
+	"CardPreviewGate.commitVisibleActivation.committedDuringScroll",
 	"CardPreviewGate.commitVisibleActivation.skipAlreadyHandled",
+	"CardPreviewGate.commitVisibleActivation.skipNoRuntime",
+	"CardPreviewGate.commitVisibleActivation.skipNoActivationKey",
+	"CardPreviewGate.commitVisibleActivation.skipNoActivationVersion",
+	"CardPreviewGate.commitVisibleActivation.skipInitialActivationVersion",
+	"CardPreviewGate.commitVisibleActivation.skipDomPreviewDisabled",
 	"CardPreviewGate.commitVisibleActivation.skipAlreadyActivated",
 	"CardPreviewGate.commitVisibleActivation.skipNotVisible",
+	"CardPreviewGate.commitVisibleActivation.skipMissingFile",
 	"CardPreviewGate.renderedPreviewSnapshot.commit",
+	"CardPreviewGate.renderedPreviewSnapshot.commitFromRuntimeActivation",
+	"CardPreviewGate.renderedPreviewSnapshot.commitFromDirectActivation",
+	"CardPreviewGate.renderedPreviewSnapshot.commitDuringScroll",
 	"CardPreviewGate.shouldRenderPreview.true",
+	"CardPreviewGate.shouldRenderPreview.trueDuringScroll",
+	"CardPreview.render.start",
+	"CardPreview.render.startDuringScroll",
+	"CardPreview.render.cacheHit",
+	"CardPreview.render.getPreview",
+	"CardPreview.render.getPreviewDuringScroll",
+	"CardPreview.render.previewOverride",
+	"CardPreview.render.markdown",
+	"CardPreview.render.markdownDuringScroll",
+	"CardPreview.render.dom",
+	"CardPreview.render.image",
+	"CardPreview.render.mathQueued",
+	"CardPreview.render.completed",
+	"CardPreview.render.abortedOrStale",
+	"CardPreview.render.error",
+	"PreviewActivationScheduler.requestQueued",
+	"PreviewActivationScheduler.requestQueued.duringScroll",
+	"PreviewActivationScheduler.drainFrame",
+	"PreviewActivationScheduler.drainFrame.duringScroll",
+	"PreviewActivationScheduler.drainFrame.activated",
+	"PreviewActivationScheduler.drainFrame.activatedDuringScroll",
+	"PreviewActivationScheduler.drainFrame.skipBacklog",
+	"PreviewActivationScheduler.enqueue",
+	"PreviewActivationScheduler.enqueue.duringScroll",
 	"RowPreviewActivationRuntime.enqueueActivation",
+	"RowPreviewActivationRuntime.enqueueActivation.fromSetVisibility",
+	"RowPreviewActivationRuntime.enqueueActivation.fromRequestActivation",
+	"RowPreviewActivationRuntime.enqueueActivation.skipNotVisible",
 	"RowPreviewActivationRuntime.enqueueActivation.dedupedPending",
+	"RowPreviewActivationRuntime.enqueueActivation.dedupedPending.fromSetVisibility",
+	"RowPreviewActivationRuntime.enqueueActivation.dedupedPending.fromRequestActivation",
+	"RowPreviewActivationRuntime.requestActivation",
+	"RowPreviewActivationRuntime.requestActivation.skipNotVisible",
+	"RowPreviewActivationRuntime.setVisibility.visible",
+	"RowPreviewActivationRuntime.setVisibility.visibleUnchanged",
+	"RowPreviewActivationRuntime.setVisibility.mounted",
+	"RowPreviewActivationRuntime.setVisibility.mountedUnchanged",
 	"RowPreviewActivationRuntime.notifyVisibleActivation",
 ];
 

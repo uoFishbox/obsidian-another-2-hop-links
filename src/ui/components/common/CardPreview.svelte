@@ -4,7 +4,7 @@
 	import type { PreviewData, PreviewRequestOptions } from "ui/context/linkContext";
 	import { useAppContext } from "ui/context/linkContext";
 	import { DEFAULT_SETTINGS, type PluginSettings } from "types/settings";
-	import { DEBUG_DISABLE_CARD_DOM_PREVIEW } from "../../../appConstants";
+	import { DEBUG_DISABLE_CARD_DOM_PREVIEW, IS_PROD } from "../../../appConstants";
 	import { processPreviewContent } from "../../../features/preview/renderers/markdownPreviewRenderer";
 	import { toPreviewImageSrc } from "../../../features/preview/utils/externalFileImage";
 	import { enqueueMathRender } from "features/preview/renderers/mathRenderQueue";
@@ -24,6 +24,8 @@
 	} from "./cardPreviewSharedCache";
 	import { nextAnimationFrame } from "ui/utils/frame";
 	import { syncMathJaxStylesForNode } from "ui/utils/mathJaxShadowStyles";
+	import { recordCCLDevMeasurement } from "infrastructure/debug/CCLDevMeasurements";
+	import { isScrollActivityActive } from "infrastructure/scroll/scrollActivity";
 
 	interface Props {
 		file: TFile | undefined;
@@ -129,6 +131,27 @@
 		};
 	}
 
+	function recordRenderStart(): void {
+		recordCCLDevMeasurement("CardPreview.render.start");
+		if (isScrollActivityActive()) {
+			recordCCLDevMeasurement("CardPreview.render.startDuringScroll");
+		}
+	}
+
+	function recordGetPreviewRequest(): void {
+		recordCCLDevMeasurement("CardPreview.render.getPreview");
+		if (isScrollActivityActive()) {
+			recordCCLDevMeasurement("CardPreview.render.getPreviewDuringScroll");
+		}
+	}
+
+	function recordMarkdownRender(): void {
+		recordCCLDevMeasurement("CardPreview.render.markdown");
+		if (isScrollActivityActive()) {
+			recordCCLDevMeasurement("CardPreview.render.markdownDuringScroll");
+		}
+	}
+
 	function renderCurrentPreview(request: PreviewRenderRequest): () => void {
 		const abortController = new AbortController();
 		let component: Component | undefined;
@@ -143,6 +166,9 @@
 		const renderToken = ++renderSequence;
 		const queryForRender = request.searchQuery;
 
+		if (!IS_PROD) {
+			recordRenderStart();
+		}
 		renderPreview(
 			request.file,
 			abortController.signal,
@@ -155,6 +181,13 @@
 			request.previewOverride,
 			request.settings,
 		).then((didRender) => {
+			if (!IS_PROD) {
+				recordCCLDevMeasurement(
+					didRender
+						? "CardPreview.render.completed"
+						: "CardPreview.render.abortedOrStale",
+				);
+			}
 			if (
 				didRender &&
 				!abortController.signal.aborted &&
@@ -222,6 +255,9 @@
 			return false;
 		}
 
+		if (!IS_PROD) {
+			recordCCLDevMeasurement("CardPreview.render.cacheHit");
+		}
 		await nextAnimationFrame();
 		if (isRenderStale(signal, renderToken)) return false;
 		previewContentType = "text";
@@ -265,13 +301,22 @@
 				return true;
 			}
 
-			const preview = previewOverride
-				? normalizePreviewData(previewOverride)
-				: normalizePreviewData(
-						await getPreview(targetFile, signal, {
-							cacheRevision: previewCacheRevision,
-						}),
-					);
+			let preview: PreviewData;
+			if (previewOverride) {
+				if (!IS_PROD) {
+					recordCCLDevMeasurement("CardPreview.render.previewOverride");
+				}
+				preview = normalizePreviewData(previewOverride);
+			} else {
+				if (!IS_PROD) {
+					recordGetPreviewRequest();
+				}
+				preview = normalizePreviewData(
+					await getPreview(targetFile, signal, {
+						cacheRevision: previewCacheRevision,
+					}),
+				);
+			}
 
 			const previewForRender = await applySearchContextToPreview(
 				preview,
@@ -358,6 +403,9 @@
 				}
 
 				if (previewForRender.type === "image") {
+					if (!IS_PROD) {
+						recordCCLDevMeasurement("CardPreview.render.image");
+					}
 					isMathRendering = false;
 					await nextAnimationFrame();
 					if (isRenderStale(signal, renderToken) || !container) return false;
@@ -405,6 +453,9 @@
 			// 数式がある場合、スケルトンを表示してからレンダリング
 			isMathRendering = true;
 
+			if (!IS_PROD) {
+				recordCCLDevMeasurement("CardPreview.render.mathQueued");
+			}
 			await enqueueMathRender(
 				async () => {
 					if (isRenderStale(signal, renderToken)) {
@@ -489,6 +540,9 @@
 		} catch (error) {
 			if (signal.aborted || isAbortError(error) || !container) {
 				return false;
+			}
+			if (!IS_PROD) {
+				recordCCLDevMeasurement("CardPreview.render.error");
 			}
 			previewContentType = undefined;
 			handlePreviewError(container, error);
@@ -599,6 +653,9 @@
 		}
 
 		if (preview.type === "image") {
+			if (!IS_PROD) {
+				recordCCLDevMeasurement("CardPreview.render.image");
+			}
 			element.createEl("img", {
 				attr: {
 					alt: `preview for ${basename}`,
@@ -612,8 +669,14 @@
 			if (signal?.aborted) {
 				return;
 			}
+			if (!IS_PROD) {
+				recordCCLDevMeasurement("CardPreview.render.dom");
+			}
 			await preview.render(element, component, signal);
 		} else if (preview.type === "text") {
+			if (!IS_PROD) {
+				recordMarkdownRender();
+			}
 			await processPreviewContent(
 				element,
 				preview.content,

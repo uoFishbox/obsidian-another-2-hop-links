@@ -25,6 +25,7 @@ import {
 	recordCCLDevMeasurement,
 	recordCCLDevMeasurementCount,
 } from "infrastructure/debug/CCLDevMeasurements";
+import { IS_PROD } from "appConstants";
 
 const EMPTY_MOUNTED_ROWS: readonly [] = [];
 const TRAILING_EMPTY_ROW_SLOT_TRIM_THRESHOLD = 8;
@@ -67,7 +68,9 @@ export function createTwoHopMountedSurfaceRuntime(params: {
 			nextSlots.push(new VirtualSurfaceRowSlot(index));
 		}
 		mountedRowSlots = nextSlots;
-		recordCCLDevMeasurement("twoHop.rowSlotCapacity.grow");
+		if (!IS_PROD) {
+			recordCCLDevMeasurement("twoHop.rowSlotCapacity.grow");
+		}
 		return true;
 	}
 
@@ -75,7 +78,9 @@ export function createTwoHopMountedSurfaceRuntime(params: {
 		const clampedLength = Math.max(0, Math.min(nextLength, mountedRowSlots.length));
 		if (clampedLength === mountedRowSlots.length) return false;
 		mountedRowSlots = mountedRowSlots.slice(0, clampedLength);
-		recordCCLDevMeasurement("twoHop.rowSlotCapacity.trim");
+		if (!IS_PROD) {
+			recordCCLDevMeasurement("twoHop.rowSlotCapacity.trim");
+		}
 		return true;
 	}
 
@@ -84,8 +89,10 @@ export function createTwoHopMountedSurfaceRuntime(params: {
 		row: TwoHopMountedRowSlice | null,
 	): boolean {
 		const changed = slot.setRow(row);
-		if (changed) {
-			recordCCLDevMeasurement("twoHop.VirtualSurfaceRowSlot.setRow.changed");
+		if (!IS_PROD) {
+			if (changed) {
+				recordCCLDevMeasurement("twoHop.VirtualSurfaceRowSlot.setRow.changed");
+			}
 		}
 		return changed;
 	}
@@ -156,15 +163,17 @@ export function createTwoHopMountedSurfaceRuntime(params: {
 			readonly forceTrimForPlanStructureChange: boolean;
 		},
 	): boolean {
-		recordCCLDevMeasurement("twoHop.rowSlotChanges.apply");
-		recordCCLDevMeasurementCount(
-			"twoHop.rowSlotChanges.assignedRows",
-			changes.assignedRows.length,
-		);
-		recordCCLDevMeasurementCount(
-			"twoHop.rowSlotChanges.clearedSlots",
-			changes.clearedSlotIndices.length,
-		);
+		if (!IS_PROD) {
+			recordCCLDevMeasurement("twoHop.rowSlotChanges.apply");
+			recordCCLDevMeasurementCount(
+				"twoHop.rowSlotChanges.assignedRows",
+				changes.assignedRows.length,
+			);
+			recordCCLDevMeasurementCount(
+				"twoHop.rowSlotChanges.clearedSlots",
+				changes.clearedSlotIndices.length,
+			);
+		}
 
 		let rowChanged = false;
 		const slotsChanged =

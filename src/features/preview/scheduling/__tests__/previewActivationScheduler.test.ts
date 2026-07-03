@@ -5,6 +5,7 @@ const state = vi.hoisted(() => ({
 }));
 
 vi.mock("../../../../appConstants", () => ({
+	IS_PROD: false,
 	get DEBUG_DISABLE_CARD_DOM_PREVIEW() {
 		return state.disableCardDomPreview;
 	},

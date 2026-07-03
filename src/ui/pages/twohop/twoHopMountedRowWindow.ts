@@ -10,6 +10,7 @@ import {
 } from "./twoHopMountedRowBuild";
 import type { TwoHopViewPlanRowModel } from "./twoHopViewPlan";
 import { recordCCLDevMeasurement } from "infrastructure/debug/CCLDevMeasurements";
+import { IS_PROD } from "appConstants";
 
 export interface TwoHopMountedRowWindowApplyParams {
 	readonly rowModel: TwoHopViewPlanRowModel;
@@ -107,7 +108,9 @@ export function createTwoHopMountedRowWindow(): TwoHopMountedRowWindow {
 	}
 
 	function apply(params: TwoHopMountedRowWindowApplyParams): TwoHopMountedRowsBuild {
-		recordCCLDevMeasurement("twoHop.rowWindow.apply");
+		if (!IS_PROD) {
+			recordCCLDevMeasurement("twoHop.rowWindow.apply");
+		}
 
 		const { rowModel, rowRange, ranges, previousBuild } = params;
 		const plan = rowModel.plan;
@@ -133,7 +136,9 @@ export function createTwoHopMountedRowWindow(): TwoHopMountedRowWindow {
 		) {
 			state.lastApplyChanged = false;
 			state.lastRowSlotChanges = EMPTY_ROW_SLOT_CHANGE_SET;
-			recordCCLDevMeasurement("twoHop.rowWindow.apply.skipped");
+			if (!IS_PROD) {
+				recordCCLDevMeasurement("twoHop.rowWindow.apply.skipped");
+			}
 			return currentBuild;
 		}
 
@@ -147,7 +152,9 @@ export function createTwoHopMountedRowWindow(): TwoHopMountedRowWindow {
 			state.cellStoreRevision = cellStoreRevisionBeforeBuild;
 			state.lastApplyChanged = false;
 			state.lastRowSlotChanges = EMPTY_ROW_SLOT_CHANGE_SET;
-			recordCCLDevMeasurement("twoHop.rowWindow.apply.skipped");
+			if (!IS_PROD) {
+				recordCCLDevMeasurement("twoHop.rowWindow.apply.skipped");
+			}
 			return currentBuild;
 		}
 
@@ -168,18 +175,22 @@ export function createTwoHopMountedRowWindow(): TwoHopMountedRowWindow {
 		state.cellStoreRevision = plan.cellStore.revision;
 		state.lastApplyChanged = true;
 		state.lastRowSlotChanges = build.rowSlotChanges;
-		recordCCLDevMeasurement("twoHop.rowWindow.apply.changed");
-		if (isFirstBuild) {
-			recordCCLDevMeasurement("twoHop.rowWindow.apply.changed.firstBuild");
-		}
-		if (hasPlanChanged) {
-			recordCCLDevMeasurement("twoHop.rowWindow.apply.changed.plan");
-		}
-		if (hasRowRangeChanged) {
-			recordCCLDevMeasurement("twoHop.rowWindow.apply.changed.rowRange");
-		}
-		if (hasCellStoreRevisionChanged) {
-			recordCCLDevMeasurement("twoHop.rowWindow.apply.changed.cellStoreRevision");
+		if (!IS_PROD) {
+			recordCCLDevMeasurement("twoHop.rowWindow.apply.changed");
+			if (isFirstBuild) {
+				recordCCLDevMeasurement("twoHop.rowWindow.apply.changed.firstBuild");
+			}
+			if (hasPlanChanged) {
+				recordCCLDevMeasurement("twoHop.rowWindow.apply.changed.plan");
+			}
+			if (hasRowRangeChanged) {
+				recordCCLDevMeasurement("twoHop.rowWindow.apply.changed.rowRange");
+			}
+			if (hasCellStoreRevisionChanged) {
+				recordCCLDevMeasurement(
+					"twoHop.rowWindow.apply.changed.cellStoreRevision",
+				);
+			}
 		}
 
 		return build;

@@ -6,6 +6,7 @@ import {
 } from "./previewActivationScheduler";
 import type { PreviewActivationScope } from "./previewActivationScope";
 import { recordCCLDevMeasurement } from "infrastructure/debug/CCLDevMeasurements";
+import { IS_PROD } from "appConstants";
 
 export interface RowPreviewActivationRuntime {
 	/**
@@ -61,6 +62,8 @@ interface RowActivationState {
 	readonly activationVersionStore: Writable<number>;
 }
 
+type ActivationRequestSource = "setVisibility" | "requestActivation";
+
 export interface CreateRowPreviewActivationRuntimeOptions {
 	scope?: PreviewActivationScope;
 	getVisibleQueueSize?: () => number;
@@ -115,25 +118,56 @@ export function createRowPreviewActivationRuntime(
 			return;
 		}
 
-		recordCCLDevMeasurement("RowPreviewActivationRuntime.notifyVisibleActivation");
+		if (!IS_PROD) {
+			recordCCLDevMeasurement(
+				"RowPreviewActivationRuntime.notifyVisibleActivation",
+			);
+		}
 		state.activationVersion += 1;
 		state.activationVersionStore.set(state.activationVersion);
 	}
 
-	function enqueueActivation(key: string): void {
+	function recordAcceptedEnqueueSource(source: ActivationRequestSource): void {
+		recordCCLDevMeasurement(
+			source === "setVisibility"
+				? "RowPreviewActivationRuntime.enqueueActivation.fromSetVisibility"
+				: "RowPreviewActivationRuntime.enqueueActivation.fromRequestActivation",
+		);
+	}
+
+	function recordDedupedEnqueueSource(source: ActivationRequestSource): void {
+		recordCCLDevMeasurement(
+			source === "setVisibility"
+				? "RowPreviewActivationRuntime.enqueueActivation.dedupedPending.fromSetVisibility"
+				: "RowPreviewActivationRuntime.enqueueActivation.dedupedPending.fromRequestActivation",
+		);
+	}
+
+	function enqueueActivation(key: string, source: ActivationRequestSource): void {
 		if (pendingByKey.has(key)) {
-			recordCCLDevMeasurement(
-				"RowPreviewActivationRuntime.enqueueActivation.dedupedPending",
-			);
+			if (!IS_PROD) {
+				recordCCLDevMeasurement(
+					"RowPreviewActivationRuntime.enqueueActivation.dedupedPending",
+				);
+				recordDedupedEnqueueSource(source);
+			}
 			return;
 		}
 
 		const state = entries.get(key);
 		if (!state || state.visibility !== "visible") {
+			if (!IS_PROD) {
+				recordCCLDevMeasurement(
+					"RowPreviewActivationRuntime.enqueueActivation.skipNotVisible",
+				);
+			}
 			return;
 		}
 
-		recordCCLDevMeasurement("RowPreviewActivationRuntime.enqueueActivation");
+		if (!IS_PROD) {
+			recordCCLDevMeasurement("RowPreviewActivationRuntime.enqueueActivation");
+			recordAcceptedEnqueueSource(source);
+		}
 		let request: PreviewActivationHandle | null = null;
 		let synchronousResult: boolean | undefined;
 		const onSettled = (activated: boolean): void => {
@@ -172,12 +206,20 @@ export function createRowPreviewActivationRuntime(
 	}
 
 	function requestActivation(key: string): void {
+		if (!IS_PROD) {
+			recordCCLDevMeasurement("RowPreviewActivationRuntime.requestActivation");
+		}
 		const state = entries.get(key);
 		if (!state || state.visibility !== "visible") {
+			if (!IS_PROD) {
+				recordCCLDevMeasurement(
+					"RowPreviewActivationRuntime.requestActivation.skipNotVisible",
+				);
+			}
 			return;
 		}
 
-		enqueueActivation(key);
+		enqueueActivation(key, "requestActivation");
 	}
 
 	function setVisibility(key: string, visibility: "visible" | "mounted"): void {
@@ -187,13 +229,34 @@ export function createRowPreviewActivationRuntime(
 			return;
 		}
 
+		const previousVisibility = state.visibility;
 		state.visibility = visibility;
 
 		if (visibility === "visible") {
-			enqueueActivation(key);
+			if (!IS_PROD) {
+				recordCCLDevMeasurement(
+					"RowPreviewActivationRuntime.setVisibility.visible",
+				);
+				if (previousVisibility === "visible") {
+					recordCCLDevMeasurement(
+						"RowPreviewActivationRuntime.setVisibility.visibleUnchanged",
+					);
+				}
+			}
+			enqueueActivation(key, "setVisibility");
 			return;
 		}
 
+		if (!IS_PROD) {
+			recordCCLDevMeasurement(
+				"RowPreviewActivationRuntime.setVisibility.mounted",
+			);
+			if (previousVisibility === "mounted") {
+				recordCCLDevMeasurement(
+					"RowPreviewActivationRuntime.setVisibility.mountedUnchanged",
+				);
+			}
+		}
 		cancelPending(key);
 	}
 

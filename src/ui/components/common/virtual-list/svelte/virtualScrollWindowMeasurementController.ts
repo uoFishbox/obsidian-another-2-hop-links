@@ -17,6 +17,7 @@ import {
 import type { RowRange } from "../rowRange";
 import type { VirtualRanges } from "../types";
 import { recordCCLDevMeasurement } from "infrastructure/debug/CCLDevMeasurements";
+import { IS_PROD } from "appConstants";
 
 export interface CreateVirtualScrollWindowMeasurementControllerOptions<TContext> {
 	applyUnstableScrollMeasurement?: boolean;
@@ -89,7 +90,9 @@ export function createVirtualScrollWindowMeasurementController<TContext>({
 		nextMeasurement: VirtualMeasurement,
 		context: TContext,
 	): VirtualMeasurementApplicationResult => {
-		recordCCLDevMeasurement("virtualScroll.applyScrollMeasurement");
+		if (!IS_PROD) {
+			recordCCLDevMeasurement("virtualScroll.applyScrollMeasurement");
+		}
 
 		if (!nextMeasurement.isStableMeasurement && !applyUnstableScrollMeasurement) {
 			lastScrollWindow = null;

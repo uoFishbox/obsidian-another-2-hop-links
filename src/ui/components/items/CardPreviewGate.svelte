@@ -27,6 +27,7 @@
 		markCCLComponentReevaluation,
 		recordCCLDevMeasurement,
 	} from "infrastructure/debug/CCLDevMeasurements";
+	import { isScrollActivityActive } from "infrastructure/scroll/scrollActivity";
 
 	interface RenderedPreviewSnapshot {
 		readonly identity: string;
@@ -35,6 +36,8 @@
 		readonly previewRefreshToken: number;
 		readonly previewOverride: PreviewData | null;
 	}
+
+	type RenderedPreviewCommitSource = "runtime" | "direct";
 
 	interface Props {
 		file: TFile | null;
@@ -126,8 +129,13 @@
 		if (virtualizedVisibility !== "visible") return false;
 
 		const shouldRender = canKeepRenderedPreviewForCurrentPreview();
-		if (shouldRender) {
+		if (!IS_PROD && shouldRender) {
 			recordCCLDevMeasurement("CardPreviewGate.shouldRenderPreview.true");
+			if (isScrollActivityActive()) {
+				recordCCLDevMeasurement(
+					"CardPreviewGate.shouldRenderPreview.trueDuringScroll",
+				);
+			}
 		}
 		return shouldRender;
 	});
@@ -190,14 +198,31 @@
 		};
 	}
 
-	function commitRenderedPreviewSnapshot(snapshot: RenderedPreviewSnapshot): void {
-		recordCCLDevMeasurement("CardPreviewGate.renderedPreviewSnapshot.commit");
+	function commitRenderedPreviewSnapshot(
+		snapshot: RenderedPreviewSnapshot,
+		source: RenderedPreviewCommitSource,
+	): void {
+		if (!IS_PROD) {
+			recordCCLDevMeasurement("CardPreviewGate.renderedPreviewSnapshot.commit");
+			recordCCLDevMeasurement(
+				source === "runtime"
+					? "CardPreviewGate.renderedPreviewSnapshot.commitFromRuntimeActivation"
+					: "CardPreviewGate.renderedPreviewSnapshot.commitFromDirectActivation",
+			);
+			if (isScrollActivityActive()) {
+				recordCCLDevMeasurement(
+					"CardPreviewGate.renderedPreviewSnapshot.commitDuringScroll",
+				);
+			}
+		}
 		renderedPreviewSnapshot = snapshot;
 		activatedPreviewIdentity = snapshot.identity;
 	}
 
 	function resetPreviewActivationForCurrentPreview(): void {
-		recordCCLDevMeasurement("CardPreviewGate.resetPreviewActivation");
+		if (!IS_PROD) {
+			recordCCLDevMeasurement("CardPreviewGate.resetPreviewActivation");
+		}
 
 		const nextIdentity = previewIdentity;
 
@@ -205,21 +230,38 @@
 			return;
 		}
 
+		if (!IS_PROD) {
+			recordCCLDevMeasurement(
+				"CardPreviewGate.resetPreviewActivation.identityChanged",
+			);
+		}
 		cancelPendingActivation();
 
 		// ファイル自体が変わった場合は、旧previewを見せ続けると誤表示になるので消す。
 		if (!canKeepRenderedPreviewForCurrentPreview()) {
+			if (!IS_PROD && (renderedPreviewSnapshot || activatedPreviewIdentity)) {
+				recordCCLDevMeasurement(
+					"CardPreviewGate.resetPreviewActivation.clearRenderedSnapshot",
+				);
+			}
 			renderedPreviewSnapshot = undefined;
 			activatedPreviewIdentity = undefined;
 		}
 
 		// 同じファイルなら renderedPreviewSnapshot は残す。
 		lastPreviewIdentity = nextIdentity;
+		if (!IS_PROD && requestedVisibleActivationIdentity !== undefined) {
+			recordCCLDevMeasurement(
+				"CardPreviewGate.resetPreviewActivation.clearRequested",
+			);
+		}
 		requestedVisibleActivationIdentity = undefined;
 	}
 
 	function subscribeActivationVersion(): (() => void) | undefined {
-		recordCCLDevMeasurement("CardPreviewGate.subscribeActivationVersion");
+		if (!IS_PROD) {
+			recordCCLDevMeasurement("CardPreviewGate.subscribeActivationVersion");
+		}
 
 		if (!rowPreviewActivationRuntime || activationKey === undefined) {
 			activationVersion = undefined;
@@ -236,57 +278,105 @@
 	}
 
 	function requestVisibleActivation(): boolean {
-		recordCCLDevMeasurement("CardPreviewGate.requestVisibleActivation");
+		if (!IS_PROD) {
+			recordCCLDevMeasurement("CardPreviewGate.requestVisibleActivation");
+		}
 
-		if (!rowPreviewActivationRuntime || activationKey === undefined) {
+		if (!rowPreviewActivationRuntime) {
+			if (!IS_PROD) {
+				recordCCLDevMeasurement(
+					"CardPreviewGate.requestVisibleActivation.skipNoRuntime",
+				);
+			}
+			return false;
+		}
+
+		if (activationKey === undefined) {
+			if (!IS_PROD) {
+				recordCCLDevMeasurement(
+					"CardPreviewGate.requestVisibleActivation.skipNoActivationKey",
+				);
+			}
 			return false;
 		}
 
 		cancelPendingActivation();
 
 		if (DEBUG_DISABLE_CARD_DOM_PREVIEW) {
+			if (!IS_PROD) {
+				recordCCLDevMeasurement(
+					"CardPreviewGate.requestVisibleActivation.skipDomPreviewDisabled",
+				);
+			}
 			return true;
 		}
 
 		if (virtualizedVisibility !== "visible") {
-			recordCCLDevMeasurement(
-				"CardPreviewGate.requestVisibleActivation.skipNotVisible",
-			);
+			if (!IS_PROD) {
+				recordCCLDevMeasurement(
+					"CardPreviewGate.requestVisibleActivation.skipNotVisible",
+				);
+			}
 			requestedVisibleActivationIdentity = undefined;
 			return true;
 		}
 
 		if (!file || !previewIdentity) {
-			recordCCLDevMeasurement(
-				"CardPreviewGate.requestVisibleActivation.skipMissingFile",
-			);
+			if (!IS_PROD) {
+				recordCCLDevMeasurement(
+					"CardPreviewGate.requestVisibleActivation.skipMissingFile",
+				);
+			}
 			requestedVisibleActivationIdentity = undefined;
 			return true;
 		}
 
 		if (activatedPreviewIdentity === previewIdentity) {
-			recordCCLDevMeasurement(
-				"CardPreviewGate.requestVisibleActivation.skipAlreadyActivated",
-			);
+			if (!IS_PROD) {
+				recordCCLDevMeasurement(
+					"CardPreviewGate.requestVisibleActivation.skipAlreadyActivated",
+				);
+			}
 			requestedVisibleActivationIdentity = undefined;
 			return true;
 		}
 
 		if (requestedVisibleActivationIdentity === previewIdentity) {
-			recordCCLDevMeasurement(
-				"CardPreviewGate.requestVisibleActivation.skipAlreadyRequested",
-			);
+			if (!IS_PROD) {
+				recordCCLDevMeasurement(
+					"CardPreviewGate.requestVisibleActivation.skipAlreadyRequested",
+				);
+			}
 			return true;
 		}
 
-		recordCCLDevMeasurement("CardPreviewGate.requestVisibleActivation.sent");
+		if (activationVersion === undefined || activationVersion <= 0) {
+			if (!IS_PROD) {
+				recordCCLDevMeasurement(
+					"CardPreviewGate.requestVisibleActivation.skipAwaitingInitialRuntimeActivation",
+				);
+			}
+			requestedVisibleActivationIdentity = previewIdentity;
+			return true;
+		}
+
+		if (!IS_PROD) {
+			recordCCLDevMeasurement("CardPreviewGate.requestVisibleActivation.sent");
+			if (isScrollActivityActive()) {
+				recordCCLDevMeasurement(
+					"CardPreviewGate.requestVisibleActivation.sentDuringScroll",
+				);
+			}
+		}
 		requestedVisibleActivationIdentity = previewIdentity;
 		rowPreviewActivationRuntime.requestActivation(activationKey);
 		return true;
 	}
 
 	function activateVisibleVirtualPreview(): void {
-		recordCCLDevMeasurement("CardPreviewGate.activateVisibleVirtualPreview");
+		if (!IS_PROD) {
+			recordCCLDevMeasurement("CardPreviewGate.activateVisibleVirtualPreview");
+		}
 
 		if (requestVisibleActivation()) {
 			return;
@@ -338,6 +428,7 @@
 
 			commitRenderedPreviewSnapshot(
 				createRenderedPreviewSnapshot(identity, file),
+				"direct",
 			);
 		};
 
@@ -357,50 +448,105 @@
 	}
 
 	function commitVisibleActivation(): void {
-		recordCCLDevMeasurement("CardPreviewGate.commitVisibleActivation");
+		if (!IS_PROD) {
+			recordCCLDevMeasurement("CardPreviewGate.commitVisibleActivation");
+		}
 
-		if (
-			!rowPreviewActivationRuntime ||
-			activationKey === undefined ||
-			activationVersion === undefined ||
-			activationVersion <= 0
-		) {
+		if (!rowPreviewActivationRuntime) {
+			if (!IS_PROD) {
+				recordCCLDevMeasurement(
+					"CardPreviewGate.commitVisibleActivation.skipNoRuntime",
+				);
+			}
+			return;
+		}
+
+		if (activationKey === undefined) {
+			if (!IS_PROD) {
+				recordCCLDevMeasurement(
+					"CardPreviewGate.commitVisibleActivation.skipNoActivationKey",
+				);
+			}
+			return;
+		}
+
+		if (activationVersion === undefined) {
+			if (!IS_PROD) {
+				recordCCLDevMeasurement(
+					"CardPreviewGate.commitVisibleActivation.skipNoActivationVersion",
+				);
+			}
+			return;
+		}
+
+		if (activationVersion <= 0) {
+			if (!IS_PROD) {
+				recordCCLDevMeasurement(
+					"CardPreviewGate.commitVisibleActivation.skipInitialActivationVersion",
+				);
+			}
 			return;
 		}
 
 		if (lastHandledActivationVersion === activationVersion) {
-			recordCCLDevMeasurement(
-				"CardPreviewGate.commitVisibleActivation.skipAlreadyHandled",
-			);
+			if (!IS_PROD) {
+				recordCCLDevMeasurement(
+					"CardPreviewGate.commitVisibleActivation.skipAlreadyHandled",
+				);
+			}
 			return;
 		}
 
 		lastHandledActivationVersion = activationVersion;
 		if (DEBUG_DISABLE_CARD_DOM_PREVIEW) {
+			if (!IS_PROD) {
+				recordCCLDevMeasurement(
+					"CardPreviewGate.commitVisibleActivation.skipDomPreviewDisabled",
+				);
+			}
 			return;
 		}
 
 		if (virtualizedVisibility !== "visible") {
-			recordCCLDevMeasurement(
-				"CardPreviewGate.commitVisibleActivation.skipNotVisible",
-			);
+			if (!IS_PROD) {
+				recordCCLDevMeasurement(
+					"CardPreviewGate.commitVisibleActivation.skipNotVisible",
+				);
+			}
 			return;
 		}
 
 		if (!file || !previewIdentity) {
+			if (!IS_PROD) {
+				recordCCLDevMeasurement(
+					"CardPreviewGate.commitVisibleActivation.skipMissingFile",
+				);
+			}
 			return;
 		}
 
 		if (activatedPreviewIdentity === previewIdentity) {
-			recordCCLDevMeasurement(
-				"CardPreviewGate.commitVisibleActivation.skipAlreadyActivated",
-			);
+			if (!IS_PROD) {
+				recordCCLDevMeasurement(
+					"CardPreviewGate.commitVisibleActivation.skipAlreadyActivated",
+				);
+			}
 			return;
 		}
 
-		recordCCLDevMeasurement("CardPreviewGate.commitVisibleActivation.committed");
+		if (!IS_PROD) {
+			recordCCLDevMeasurement(
+				"CardPreviewGate.commitVisibleActivation.committed",
+			);
+			if (isScrollActivityActive()) {
+				recordCCLDevMeasurement(
+					"CardPreviewGate.commitVisibleActivation.committedDuringScroll",
+				);
+			}
+		}
 		commitRenderedPreviewSnapshot(
 			createRenderedPreviewSnapshot(previewIdentity, file),
+			"runtime",
 		);
 	}
 

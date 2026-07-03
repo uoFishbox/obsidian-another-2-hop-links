@@ -1,11 +1,17 @@
 import { render, waitFor } from "@testing-library/svelte";
 import { tick } from "svelte";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { DEFAULT_SETTINGS, type PluginSettings } from "types/settings";
 import { ApplicationStore } from "ui/stores/ApplicationStore.svelte";
 import CardPreview from "../CardPreview.svelte";
 import { clearCardPreviewSharedCaches } from "../cardPreviewSharedCache";
 import { createMockTFile } from "testing/__mocks__/testHelpers";
+import {
+	markScrollActivityActive,
+	resetScrollActivityForTests,
+} from "infrastructure/scroll/scrollActivity";
+
+const scrollSource = {};
 
 const state = vi.hoisted(() => ({
 	appContext: {
@@ -113,6 +119,7 @@ function createReactiveApplicationStore(settings = createSettings()): Applicatio
 
 describe("CardPreview", () => {
 	beforeEach(() => {
+		resetScrollActivityForTests();
 		(HTMLElement.prototype as any).createEl = function (
 			tagName: string,
 			options?: { attr?: Record<string, string> },
@@ -197,6 +204,10 @@ describe("CardPreview", () => {
 		state.componentUnload.mockReset();
 	});
 
+	afterEach(() => {
+		resetScrollActivityForTests();
+	});
+
 	it("displays rendered text preview", async () => {
 		const file = createMockTFile("notes/render-cache.md");
 		const getPreview = vi.fn(async () => ({
@@ -212,6 +223,26 @@ describe("CardPreview", () => {
 			expect(
 				document.querySelector(".cosense-card-links__box-preview")?.textContent,
 			).toContain("rendered:preview text");
+		});
+		expect(getPreview).toHaveBeenCalledTimes(1);
+	});
+
+	it("displays uncached text preview while scrolling", async () => {
+		const file = createMockTFile("notes/render-during-scroll.md");
+		const getPreview = vi.fn(async () => ({
+			type: "text" as const,
+			content: "preview while scrolling",
+		}));
+
+		markScrollActivityActive(scrollSource);
+		render(CardPreview, {
+			props: { file, getPreview, searchQuery: "" },
+		});
+
+		await waitFor(() => {
+			expect(
+				document.querySelector(".cosense-card-links__box-preview")?.textContent,
+			).toContain("rendered:preview while scrolling");
 		});
 		expect(getPreview).toHaveBeenCalledTimes(1);
 	});
