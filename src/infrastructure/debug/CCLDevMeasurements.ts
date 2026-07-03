@@ -30,10 +30,22 @@ export type CCLDevMeasurementName =
 	| "CardPreviewGate.resetPreviewActivation"
 	| "CardPreviewGate.subscribeActivationVersion"
 	| "CardPreviewGate.requestVisibleActivation"
+	| "CardPreviewGate.requestVisibleActivation.sent"
+	| "CardPreviewGate.requestVisibleActivation.skipAlreadyActivated"
+	| "CardPreviewGate.requestVisibleActivation.skipAlreadyRequested"
+	| "CardPreviewGate.requestVisibleActivation.skipNotVisible"
+	| "CardPreviewGate.requestVisibleActivation.skipMissingFile"
 	| "CardPreviewGate.activateVisibleVirtualPreview"
 	| "CardPreviewGate.commitVisibleActivation"
+	| "CardPreviewGate.commitVisibleActivation.committed"
+	| "CardPreviewGate.commitVisibleActivation.skipAlreadyHandled"
+	| "CardPreviewGate.commitVisibleActivation.skipAlreadyActivated"
+	| "CardPreviewGate.commitVisibleActivation.skipNotVisible"
 	| "CardPreviewGate.renderedPreviewSnapshot.commit"
-	| "CardPreviewGate.shouldRenderPreview.true";
+	| "CardPreviewGate.shouldRenderPreview.true"
+	| "RowPreviewActivationRuntime.enqueueActivation"
+	| "RowPreviewActivationRuntime.enqueueActivation.dedupedPending"
+	| "RowPreviewActivationRuntime.notifyVisibleActivation";
 
 export const CCL_DEV_MEASUREMENT_NAMES: readonly CCLDevMeasurementName[] = [
 	"virtualScroll.applyScrollMeasurement",
@@ -65,10 +77,22 @@ export const CCL_DEV_MEASUREMENT_NAMES: readonly CCLDevMeasurementName[] = [
 	"CardPreviewGate.resetPreviewActivation",
 	"CardPreviewGate.subscribeActivationVersion",
 	"CardPreviewGate.requestVisibleActivation",
+	"CardPreviewGate.requestVisibleActivation.sent",
+	"CardPreviewGate.requestVisibleActivation.skipAlreadyActivated",
+	"CardPreviewGate.requestVisibleActivation.skipAlreadyRequested",
+	"CardPreviewGate.requestVisibleActivation.skipNotVisible",
+	"CardPreviewGate.requestVisibleActivation.skipMissingFile",
 	"CardPreviewGate.activateVisibleVirtualPreview",
 	"CardPreviewGate.commitVisibleActivation",
+	"CardPreviewGate.commitVisibleActivation.committed",
+	"CardPreviewGate.commitVisibleActivation.skipAlreadyHandled",
+	"CardPreviewGate.commitVisibleActivation.skipAlreadyActivated",
+	"CardPreviewGate.commitVisibleActivation.skipNotVisible",
 	"CardPreviewGate.renderedPreviewSnapshot.commit",
 	"CardPreviewGate.shouldRenderPreview.true",
+	"RowPreviewActivationRuntime.enqueueActivation",
+	"RowPreviewActivationRuntime.enqueueActivation.dedupedPending",
+	"RowPreviewActivationRuntime.notifyVisibleActivation",
 ];
 
 export interface CCLDevMeasurementCounter {

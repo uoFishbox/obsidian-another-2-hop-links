@@ -5,6 +5,7 @@ import {
 	requestQueuedPreviewActivation,
 } from "./previewActivationScheduler";
 import type { PreviewActivationScope } from "./previewActivationScope";
+import { recordCCLDevMeasurement } from "infrastructure/debug/CCLDevMeasurements";
 
 export interface RowPreviewActivationRuntime {
 	/**
@@ -114,12 +115,16 @@ export function createRowPreviewActivationRuntime(
 			return;
 		}
 
+		recordCCLDevMeasurement("RowPreviewActivationRuntime.notifyVisibleActivation");
 		state.activationVersion += 1;
 		state.activationVersionStore.set(state.activationVersion);
 	}
 
 	function enqueueActivation(key: string): void {
 		if (pendingByKey.has(key)) {
+			recordCCLDevMeasurement(
+				"RowPreviewActivationRuntime.enqueueActivation.dedupedPending",
+			);
 			return;
 		}
 
@@ -128,6 +133,7 @@ export function createRowPreviewActivationRuntime(
 			return;
 		}
 
+		recordCCLDevMeasurement("RowPreviewActivationRuntime.enqueueActivation");
 		let request: PreviewActivationHandle | null = null;
 		let synchronousResult: boolean | undefined;
 		const onSettled = (activated: boolean): void => {

@@ -114,6 +114,7 @@
 	let activationSequence = 0;
 	let activationVersion = $state<number | undefined>(undefined);
 	let lastHandledActivationVersion: number | undefined = undefined;
+	let requestedVisibleActivationIdentity: string | undefined = undefined;
 
 	let renderedPreviewSnapshot = $state.raw<RenderedPreviewSnapshot | undefined>(
 		undefined,
@@ -214,6 +215,7 @@
 
 		// 同じファイルなら renderedPreviewSnapshot は残す。
 		lastPreviewIdentity = nextIdentity;
+		requestedVisibleActivationIdentity = undefined;
 	}
 
 	function subscribeActivationVersion(): (() => void) | undefined {
@@ -246,14 +248,39 @@
 			return true;
 		}
 
-		if (virtualizedVisibility !== "visible" || !file || !previewIdentity) {
+		if (virtualizedVisibility !== "visible") {
+			recordCCLDevMeasurement(
+				"CardPreviewGate.requestVisibleActivation.skipNotVisible",
+			);
+			requestedVisibleActivationIdentity = undefined;
+			return true;
+		}
+
+		if (!file || !previewIdentity) {
+			recordCCLDevMeasurement(
+				"CardPreviewGate.requestVisibleActivation.skipMissingFile",
+			);
+			requestedVisibleActivationIdentity = undefined;
 			return true;
 		}
 
 		if (activatedPreviewIdentity === previewIdentity) {
+			recordCCLDevMeasurement(
+				"CardPreviewGate.requestVisibleActivation.skipAlreadyActivated",
+			);
+			requestedVisibleActivationIdentity = undefined;
 			return true;
 		}
 
+		if (requestedVisibleActivationIdentity === previewIdentity) {
+			recordCCLDevMeasurement(
+				"CardPreviewGate.requestVisibleActivation.skipAlreadyRequested",
+			);
+			return true;
+		}
+
+		recordCCLDevMeasurement("CardPreviewGate.requestVisibleActivation.sent");
+		requestedVisibleActivationIdentity = previewIdentity;
 		rowPreviewActivationRuntime.requestActivation(activationKey);
 		return true;
 	}
@@ -342,23 +369,36 @@
 		}
 
 		if (lastHandledActivationVersion === activationVersion) {
+			recordCCLDevMeasurement(
+				"CardPreviewGate.commitVisibleActivation.skipAlreadyHandled",
+			);
 			return;
 		}
 
 		lastHandledActivationVersion = activationVersion;
-		if (
-			DEBUG_DISABLE_CARD_DOM_PREVIEW ||
-			virtualizedVisibility !== "visible" ||
-			!file ||
-			!previewIdentity
-		) {
+		if (DEBUG_DISABLE_CARD_DOM_PREVIEW) {
+			return;
+		}
+
+		if (virtualizedVisibility !== "visible") {
+			recordCCLDevMeasurement(
+				"CardPreviewGate.commitVisibleActivation.skipNotVisible",
+			);
+			return;
+		}
+
+		if (!file || !previewIdentity) {
 			return;
 		}
 
 		if (activatedPreviewIdentity === previewIdentity) {
+			recordCCLDevMeasurement(
+				"CardPreviewGate.commitVisibleActivation.skipAlreadyActivated",
+			);
 			return;
 		}
 
+		recordCCLDevMeasurement("CardPreviewGate.commitVisibleActivation.committed");
 		commitRenderedPreviewSnapshot(
 			createRenderedPreviewSnapshot(previewIdentity, file),
 		);

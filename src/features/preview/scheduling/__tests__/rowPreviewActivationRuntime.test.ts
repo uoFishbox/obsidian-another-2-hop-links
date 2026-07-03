@@ -4,6 +4,10 @@ import {
 	type RowPreviewActivationRuntime,
 } from "../rowPreviewActivationRuntime";
 import { resetPreviewActivationSchedulerForTests } from "../previewActivationScheduler";
+import {
+	getCCLDevMeasurementSnapshot,
+	resetCCLDevMeasurements,
+} from "infrastructure/debug/CCLDevMeasurements";
 
 interface ObservedRowActivation {
 	readonly versions: number[];
@@ -61,6 +65,7 @@ beforeEach(() => {
 
 afterEach(() => {
 	resetPreviewActivationSchedulerForTests();
+	resetCCLDevMeasurements();
 	vi.restoreAllMocks();
 	vi.unstubAllGlobals();
 	vi.useRealTimers();
@@ -112,6 +117,33 @@ describe("rowPreviewActivationRuntime", () => {
 		await flushAnimationFrame();
 
 		expect(observed.versions).toEqual([0, 1]);
+		observed.unsubscribe();
+	});
+
+	it("records enqueue, pending dedupe, and visible notification counters", async () => {
+		const runtime = createRowPreviewActivationRuntime();
+		const observed = observeRowActivation(runtime, 0);
+
+		runtime.setRowVisibility(0, "visible");
+		runtime.requestRowActivation(0);
+		runtime.requestRowActivation(0);
+
+		let counters = getCCLDevMeasurementSnapshot().counters;
+		expect(counters["RowPreviewActivationRuntime.enqueueActivation"].count).toBe(1);
+		expect(
+			counters["RowPreviewActivationRuntime.enqueueActivation.dedupedPending"]
+				.count,
+		).toBe(2);
+		expect(
+			counters["RowPreviewActivationRuntime.notifyVisibleActivation"].count,
+		).toBe(0);
+
+		await flushAnimationFrame();
+
+		counters = getCCLDevMeasurementSnapshot().counters;
+		expect(
+			counters["RowPreviewActivationRuntime.notifyVisibleActivation"].count,
+		).toBe(1);
 		observed.unsubscribe();
 	});
 

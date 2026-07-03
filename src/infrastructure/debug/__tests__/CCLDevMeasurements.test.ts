@@ -24,12 +24,44 @@ describe("CCLDevMeasurements", () => {
 		expect(counters["CardPreviewGate.resetPreviewActivation"]).toBeDefined();
 		expect(counters["CardPreviewGate.subscribeActivationVersion"]).toBeDefined();
 		expect(counters["CardPreviewGate.requestVisibleActivation"]).toBeDefined();
+		expect(counters["CardPreviewGate.requestVisibleActivation.sent"]).toBeDefined();
+		expect(
+			counters["CardPreviewGate.requestVisibleActivation.skipAlreadyActivated"],
+		).toBeDefined();
+		expect(
+			counters["CardPreviewGate.requestVisibleActivation.skipAlreadyRequested"],
+		).toBeDefined();
+		expect(
+			counters["CardPreviewGate.requestVisibleActivation.skipNotVisible"],
+		).toBeDefined();
+		expect(
+			counters["CardPreviewGate.requestVisibleActivation.skipMissingFile"],
+		).toBeDefined();
 		expect(counters["CardPreviewGate.activateVisibleVirtualPreview"]).toBeDefined();
 		expect(counters["CardPreviewGate.commitVisibleActivation"]).toBeDefined();
+		expect(
+			counters["CardPreviewGate.commitVisibleActivation.committed"],
+		).toBeDefined();
+		expect(
+			counters["CardPreviewGate.commitVisibleActivation.skipAlreadyHandled"],
+		).toBeDefined();
+		expect(
+			counters["CardPreviewGate.commitVisibleActivation.skipAlreadyActivated"],
+		).toBeDefined();
+		expect(
+			counters["CardPreviewGate.commitVisibleActivation.skipNotVisible"],
+		).toBeDefined();
 		expect(
 			counters["CardPreviewGate.renderedPreviewSnapshot.commit"],
 		).toBeDefined();
 		expect(counters["CardPreviewGate.shouldRenderPreview.true"]).toBeDefined();
+		expect(counters["RowPreviewActivationRuntime.enqueueActivation"]).toBeDefined();
+		expect(
+			counters["RowPreviewActivationRuntime.enqueueActivation.dedupedPending"],
+		).toBeDefined();
+		expect(
+			counters["RowPreviewActivationRuntime.notifyVisibleActivation"],
+		).toBeDefined();
 	});
 
 	it("does not expose obsolete fixed slot measurement counters", () => {
