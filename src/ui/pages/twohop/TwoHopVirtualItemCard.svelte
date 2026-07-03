@@ -6,15 +6,18 @@
 	import type { SearchWorkerMatchScope } from "features/search/searchWorkerTypes";
 	import type { VirtualizedItemVisibilityState } from "ui/components/common/virtualizedItemVisibility";
 	import type { ViewItem } from "application/presenters";
-	import { resolveTwoHopPageItemSearchScope } from "./twoHopVirtualListModel";
+	import {
+		resolveTwoHopItemInteractionKey,
+		resolveTwoHopPageItemSearchScope,
+	} from "./twoHopVirtualListModel";
 	import { markCCLComponentReevaluation } from "infrastructure/debug/CCLDevMeasurements";
-	import { createItemInteractionKey } from "ui/interactions/interactionTypes";
 
 	interface Props {
 		item: ViewItem;
 		searchKey: string;
 		virtualKey: string;
 		interactionId?: string;
+		interactionKey?: string;
 		settings: PluginSettings;
 		searchQuery: string;
 		searchScope: SearchWorkerMatchScope;
@@ -30,6 +33,7 @@
 		searchKey,
 		virtualKey,
 		interactionId,
+		interactionKey: providedInteractionKey,
 		settings,
 		searchQuery,
 		searchScope,
@@ -43,9 +47,14 @@
 	const resolvedSearchScope = $derived(
 		resolveTwoHopPageItemSearchScope(searchScope, contentMatched),
 	);
-	const interactionKey = $derived(
-		item ? createItemInteractionKey(item, virtualKey) : undefined,
+	const resolvedInteractionKey = $derived(
+		resolveTwoHopItemInteractionKey({
+			item,
+			virtualKey,
+			interactionKey: providedInteractionKey,
+		}),
 	);
+	const resolvedInteractionId = $derived(interactionId ?? resolvedInteractionKey);
 	const componentReevaluationProbe = $derived.by(() => {
 		if (IS_PROD) return "";
 
@@ -53,6 +62,7 @@
 		void searchKey;
 		void virtualKey;
 		void interactionId;
+		void providedInteractionKey;
 		void settings;
 		void searchQuery;
 		void searchScope;
@@ -62,7 +72,8 @@
 		void visibilityState;
 		void activationCandidateId;
 		void resolvedSearchScope;
-		void interactionKey;
+		void resolvedInteractionKey;
+		void resolvedInteractionId;
 		return markCCLComponentReevaluation("TwoHopVirtualItemCard");
 	});
 </script>
@@ -78,7 +89,7 @@
 		{rowIndex}
 		{activationCandidateId}
 		interactionRegistration="snapshot"
-		{interactionId}
-		{interactionKey}
+		interactionId={resolvedInteractionId}
+		interactionKey={resolvedInteractionKey}
 	/>
 </PreviewVisibilityProvider>

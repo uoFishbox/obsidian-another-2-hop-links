@@ -136,6 +136,7 @@
 				searchKey: renderedItem.searchKey,
 				virtualKey: renderedItem.virtualKey,
 				interactionId: renderedItem.interactionId,
+				interactionKey: renderedItem.interactionKey,
 				rowIndex: renderedCell.rowIndex,
 				visibilityState: list.getItemVisibilityState(renderedCell),
 				activationCandidateId: list.getItemActivationCandidateId(renderedCell),

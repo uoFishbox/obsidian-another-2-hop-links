@@ -5,6 +5,7 @@ import type {
 	ItemInteractionDescriptor,
 	SectionHeaderInteractionDescriptor,
 } from "ui/interactions/interactionTypes";
+import { createItemInteractionKey } from "ui/interactions/interactionTypes";
 import type {
 	MountedFlatHeaderCell,
 	MountedFlatItemCell,
@@ -39,6 +40,32 @@ function createItem(path: string): TwoHopVirtualListItem {
 		sourceSectionId: "primary",
 		searchKey: path,
 		virtualKey: path,
+	};
+}
+
+function createFallbackNewLinkItem(params: {
+	sourcePath: string;
+	rawText: string;
+	virtualKey: string;
+}): TwoHopVirtualListItem {
+	const sourceFile = {
+		path: params.sourcePath,
+		basename: params.sourcePath,
+	} as TFile;
+	return {
+		kind: "new-link",
+		item: {
+			type: "newLink",
+			data: {
+				sourceFile,
+				rawText: params.rawText,
+				lookupPath: params.rawText,
+				path: undefined,
+				isUnresolved: true,
+			} satisfies TwoHopIndexedLink,
+		},
+		searchKey: params.rawText,
+		virtualKey: params.virtualKey,
 	};
 }
 
@@ -289,5 +316,34 @@ describe("twoHopInteractionResolverCache", () => {
 
 		expect(provider.resolveInteractionDescriptor("h0")).toBeNull();
 		expect(provider.resolveInteractionDescriptor("h1")).toBe(secondDescriptor);
+	});
+
+	it("provider resolves fallback item ids with the virtual key", () => {
+		const item = createFallbackNewLinkItem({
+			sourcePath: "source.md",
+			rawText: "Missing",
+			virtualKey: "new-link:source.md:Missing:duplicate-1",
+		});
+		const fallbackInteractionId = createItemInteractionKey(
+			item.item,
+			item.virtualKey,
+		);
+		const descriptor: ItemInteractionDescriptor = {
+			interactionId: fallbackInteractionId,
+			interactionKey: fallbackInteractionId,
+			kind: "item",
+			item: item.item,
+			targetFile: null,
+		};
+		const resolveDescriptor = vi.fn(() => descriptor);
+		const provider = createTwoHopInteractionResolverProvider({
+			getMountedRows: () => createMountedRows({ item }),
+			resolveDescriptor,
+		});
+
+		expect(provider.resolveInteractionDescriptor(fallbackInteractionId)).toBe(
+			descriptor,
+		);
+		expect(resolveDescriptor).toHaveBeenCalledTimes(1);
 	});
 });

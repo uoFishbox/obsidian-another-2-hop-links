@@ -8,6 +8,7 @@ import type {
 import type { SearchWorkerMatchScope } from "features/search/searchWorkerTypes";
 import { generateLinkKey } from "features/preview/text-processing/textUtils";
 import type { TagGroup, TaggedNote } from "types/domain";
+import { createItemInteractionKey } from "ui/interactions/interactionTypes";
 
 export interface PrimarySectionSource {
 	sectionId: string;
@@ -93,9 +94,16 @@ export interface TwoHopVirtualItemRenderCell {
 	searchKey: string;
 	virtualKey: string;
 	interactionId?: string;
+	interactionKey?: string;
 	rowIndex: number;
 	visibilityState: VirtualizedItemVisibilityState;
 	activationCandidateId: string;
+}
+
+export interface TwoHopItemInteractionIdentitySource {
+	item: ViewItem;
+	virtualKey: string;
+	interactionKey?: string;
 }
 
 export const getTwoHopPageItemKey = (
@@ -128,5 +136,9 @@ export const resolveTwoHopPageItemSearchScope = (
 	searchScope === "title-and-content" && (contentMatched ?? true)
 		? "title-and-content"
 		: "title-only";
+
+export const resolveTwoHopItemInteractionKey = (
+	row: TwoHopItemInteractionIdentitySource,
+): string => row.interactionKey ?? createItemInteractionKey(row.item, row.virtualKey);
 
 export type { TagGroup, TaggedNote };

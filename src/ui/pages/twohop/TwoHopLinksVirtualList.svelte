@@ -92,6 +92,7 @@
 				searchKey={cell.searchKey}
 				virtualKey={cell.virtualKey}
 				interactionId={cell.interactionId}
+				interactionKey={cell.interactionKey}
 				settings={currentSettings}
 				{searchQuery}
 				{searchScope}

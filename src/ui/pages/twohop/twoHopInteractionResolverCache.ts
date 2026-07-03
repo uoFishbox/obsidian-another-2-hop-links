@@ -9,11 +9,11 @@ import type {
 	MountedFlatItemCell,
 } from "ui/components/common/virtual-list/core/reconciliation/viewPlanMountedCells";
 import type { MountedFlatRowSlice } from "ui/components/common/virtual-list/core/reconciliation/viewPlanRenderRows";
-import { createItemInteractionKey } from "ui/interactions/interactionTypes";
 import type {
 	TwoHopVirtualListItem,
 	TwoHopVirtualListSection,
 } from "./twoHopVirtualListModel";
+import { resolveTwoHopItemInteractionKey } from "./twoHopVirtualListModel";
 
 type TwoHopMountedItemCell = MountedFlatItemCell<
 	TwoHopVirtualListItem,
@@ -203,7 +203,7 @@ function findMountedItemCellByInteractionId(params: {
 			const itemCell = cell as TwoHopMountedItemCell;
 			const item = itemCell.cell.item;
 			const itemInteractionId =
-				item.interactionId ?? createItemInteractionKey(item.item);
+				item.interactionId ?? resolveTwoHopItemInteractionKey(item);
 			if (itemInteractionId === params.interactionId) {
 				return itemCell;
 			}

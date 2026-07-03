@@ -1,11 +1,11 @@
 import type { LinkUtilitiesContext } from "ui/context/linkContext";
 import type { PluginSettings } from "types/settings";
 import type { ItemInteractionDescriptor } from "ui/interactions/interactionTypes";
+import { createItemInteractionDescriptor } from "ui/interactions/interactionTypes";
 import {
-	createItemInteractionDescriptor,
-	createItemInteractionKey,
-} from "ui/interactions/interactionTypes";
-import type { TwoHopVirtualListItem } from "./twoHopVirtualListModel";
+	resolveTwoHopItemInteractionKey,
+	type TwoHopVirtualListItem,
+} from "./twoHopVirtualListModel";
 
 export interface TwoHopInteractionDescriptorRevision {
 	settings: PluginSettings;
@@ -38,7 +38,7 @@ export function resolveTwoHopItemInteractionDescriptor(
 		revision.linkContext,
 		{
 			interactionId: row.interactionId,
-			interactionKey: row.interactionKey ?? createItemInteractionKey(row.item),
+			interactionKey: resolveTwoHopItemInteractionKey(row),
 		},
 	);
 }
