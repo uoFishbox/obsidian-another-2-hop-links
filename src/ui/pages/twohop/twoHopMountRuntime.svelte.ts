@@ -52,14 +52,14 @@ export function createTwoHopMountRuntime(
 	const visibilityStates =
 		createVirtualizedItemVisibilityStateController<TwoHopMountedCell>({
 			getStateKey: getTwoHopVisibilityStateKey,
-			onRowVisibilityChanged: (rowIndex, visibility) => {
-				params.rowPreviewActivationRuntime?.setRowVisibility(
-					rowIndex,
+			onItemVisibilityChanged: (activationKey, visibility) => {
+				params.rowPreviewActivationRuntime?.setVisibility(
+					activationKey,
 					visibility,
 				);
 			},
-			onRowCleared: (rowIndex) => {
-				params.rowPreviewActivationRuntime?.clearRow(rowIndex);
+			onItemCleared: (activationKey) => {
+				params.rowPreviewActivationRuntime?.clear(activationKey);
 			},
 		});
 	let visibilityMountedRows: TwoHopMountedRowsBuild["rowSlices"] | readonly [] =

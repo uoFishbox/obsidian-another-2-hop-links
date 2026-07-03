@@ -99,6 +99,7 @@
 				contentPreview={matchedItem?.contentPreview}
 				rowIndex={cell.rowIndex}
 				visibilityState={cell.visibilityState}
+				activationCandidateId={cell.activationCandidateId}
 			/>
 		{/snippet}
 	</TwoHopViewPlanVirtualList>

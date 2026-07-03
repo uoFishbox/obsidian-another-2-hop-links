@@ -32,6 +32,7 @@
 		interactionId: providedInteractionId = undefined,
 		interactionKey: providedInteractionKey = undefined,
 		rowIndex = undefined,
+		activationCandidateId = undefined,
 	}: ItemProps = $props();
 
 	const context = useLinkContext();
@@ -119,6 +120,7 @@
 		void providedInteractionId;
 		void providedInteractionKey;
 		void rowIndex;
+		void activationCandidateId;
 		void strategy;
 		void targetFile;
 		void className;
@@ -181,6 +183,7 @@
 					{previewRefreshToken}
 					{contentPreview}
 					{rowIndex}
+					{activationCandidateId}
 				/>
 			{/if}
 		{/snippet}

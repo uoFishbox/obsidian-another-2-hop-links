@@ -95,6 +95,7 @@ export interface TwoHopVirtualItemRenderCell {
 	interactionId?: string;
 	rowIndex: number;
 	visibilityState: VirtualizedItemVisibilityState;
+	activationCandidateId: string;
 }
 
 export const getTwoHopPageItemKey = (

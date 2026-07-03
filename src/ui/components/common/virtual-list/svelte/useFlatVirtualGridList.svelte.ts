@@ -114,10 +114,10 @@ export function useFlatVirtualGridList<T>(props: FlatVirtualGridListProps<T>) {
 	>(PREVIEW_ROW_ACTIVATION_CONTEXT_KEY);
 	const visibilityAdapter = createFlatGridVisibilityAdapter<T>({
 		onRowVisibilityChanged: (rowIndex, visibility) => {
-			rowPreviewActivationRuntime?.setRowVisibility(rowIndex, visibility);
+			rowPreviewActivationRuntime?.setVisibility(`row:${rowIndex}`, visibility);
 		},
 		onRowCleared: (rowIndex) => {
-			rowPreviewActivationRuntime?.clearRow(rowIndex);
+			rowPreviewActivationRuntime?.clear(`row:${rowIndex}`);
 		},
 	});
 	const reusableRowSlotsScratch: number[] = [];
@@ -542,7 +542,7 @@ export function useFlatVirtualGridList<T>(props: FlatVirtualGridListProps<T>) {
 			observerRoot,
 			visibilityState,
 			rowIndex: itemCell.rowIndex,
-			activationCandidateId: itemCell.key,
+			activationCandidateId: `row:${itemCell.rowIndex}`,
 			get visibility() {
 				return visibilityState.visibility;
 			},

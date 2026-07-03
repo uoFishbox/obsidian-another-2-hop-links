@@ -138,6 +138,7 @@
 				interactionId: renderedItem.interactionId,
 				rowIndex: renderedCell.rowIndex,
 				visibilityState: list.getItemVisibilityState(renderedCell),
+				activationCandidateId: list.getItemActivationCandidateId(renderedCell),
 			})}
 		{:else}
 			<VirtualListLoadMoreButton

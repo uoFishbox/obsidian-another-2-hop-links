@@ -8,6 +8,27 @@ import type { PreviewActivationScope } from "./previewActivationScope";
 
 export interface RowPreviewActivationRuntime {
 	/**
+	 * Returns an activation version store for a caller-defined key. The value
+	 * increments when that key may mount card previews.
+	 */
+	getActivationVersion(key: string): Readable<number>;
+	/**
+	 * Requests one queued activation for a visible key. Multiple requests for
+	 * the same key share one pending scheduler entry.
+	 */
+	requestActivation(key: string): void;
+	/**
+	 * Notifies the runtime that an activation key's visibility has changed.
+	 *
+	 * `"visible"` enqueues one activation request for the key. `"mounted"`
+	 * cancels the pending request while keeping the activation store alive.
+	 */
+	setVisibility(key: string, visibility: "visible" | "mounted"): void;
+	/**
+	 * Removes an activation store and any pending request.
+	 */
+	clear(key: string): void;
+	/**
 	 * Returns a row-scoped activation version store. The value increments when
 	 * the row may mount card previews.
 	 */
@@ -46,47 +67,49 @@ export interface CreateRowPreviewActivationRuntimeOptions {
 
 let nextRowPreviewActivationRuntimeId = 0;
 
+const getRowActivationKey = (rowIndex: number): string => `row:${rowIndex}`;
+
 export function createRowPreviewActivationRuntime(
 	options: CreateRowPreviewActivationRuntimeOptions = {},
 ): RowPreviewActivationRuntime {
 	const scope = options.scope ?? createPreviewActivationScope();
 	const getVisibleQueueSize = options.getVisibleQueueSize ?? (() => 0);
 	const runtimeId = ++nextRowPreviewActivationRuntimeId;
-	const rows = new Map<number, RowActivationState>();
-	const pendingByRowIndex = new Map<number, PreviewActivationHandle>();
+	const entries = new Map<string, RowActivationState>();
+	const pendingByKey = new Map<string, PreviewActivationHandle>();
 
-	function getOrCreateRowState(rowIndex: number): RowActivationState {
-		const existing = rows.get(rowIndex);
+	function getOrCreateState(key: string): RowActivationState {
+		const existing = entries.get(key);
 		if (existing) {
 			return existing;
 		}
 
 		const state: RowActivationState = {
 			visibility: "mounted",
-			requestKey: buildRowActivationRequestKey(rowIndex),
+			requestKey: buildActivationRequestKey(key),
 			activationVersion: 0,
 			activationVersionStore: writable(0),
 		};
-		rows.set(rowIndex, state);
+		entries.set(key, state);
 		return state;
 	}
 
-	function buildRowActivationRequestKey(rowIndex: number): string {
-		return `row-preview:${runtimeId}:${rowIndex}`;
+	function buildActivationRequestKey(key: string): string {
+		return `row-preview:${runtimeId}:${key}`;
 	}
 
-	function cancelPendingRow(rowIndex: number): void {
-		const handle = pendingByRowIndex.get(rowIndex);
+	function cancelPending(key: string): void {
+		const handle = pendingByKey.get(key);
 		if (!handle) {
 			return;
 		}
 
 		handle.cancel();
-		pendingByRowIndex.delete(rowIndex);
+		pendingByKey.delete(key);
 	}
 
-	function notifyVisibleRowActivation(rowIndex: number): void {
-		const state = rows.get(rowIndex);
+	function notifyVisibleActivation(key: string): void {
+		const state = entries.get(key);
 		if (!state || state.visibility !== "visible") {
 			return;
 		}
@@ -95,12 +118,12 @@ export function createRowPreviewActivationRuntime(
 		state.activationVersionStore.set(state.activationVersion);
 	}
 
-	function enqueueRowActivation(rowIndex: number): void {
-		if (pendingByRowIndex.has(rowIndex)) {
+	function enqueueActivation(key: string): void {
+		if (pendingByKey.has(key)) {
 			return;
 		}
 
-		const state = rows.get(rowIndex);
+		const state = entries.get(key);
 		if (!state || state.visibility !== "visible") {
 			return;
 		}
@@ -113,16 +136,16 @@ export function createRowPreviewActivationRuntime(
 				return;
 			}
 
-			if (pendingByRowIndex.get(rowIndex) !== request) {
+			if (pendingByKey.get(key) !== request) {
 				return;
 			}
 
-			pendingByRowIndex.delete(rowIndex);
+			pendingByKey.delete(key);
 			if (!activated) {
 				return;
 			}
 
-			notifyVisibleRowActivation(rowIndex);
+			notifyVisibleActivation(key);
 		};
 
 		request = requestQueuedPreviewActivation(
@@ -131,34 +154,29 @@ export function createRowPreviewActivationRuntime(
 			scope,
 			onSettled,
 		);
-		pendingByRowIndex.set(rowIndex, request);
+		pendingByKey.set(key, request);
 
 		if (synchronousResult !== undefined) {
 			onSettled(synchronousResult);
 		}
 	}
 
-	function getRowActivationVersion(rowIndex: number): Readable<number> {
-		return getOrCreateRowState(rowIndex).activationVersionStore;
+	function getActivationVersion(key: string): Readable<number> {
+		return getOrCreateState(key).activationVersionStore;
 	}
 
-	function requestRowActivation(rowIndex: number): void {
-		const state = rows.get(rowIndex);
+	function requestActivation(key: string): void {
+		const state = entries.get(key);
 		if (!state || state.visibility !== "visible") {
 			return;
 		}
 
-		enqueueRowActivation(rowIndex);
+		enqueueActivation(key);
 	}
 
-	function setRowVisibility(
-		rowIndex: number,
-		visibility: "visible" | "mounted",
-	): void {
+	function setVisibility(key: string, visibility: "visible" | "mounted"): void {
 		const state =
-			visibility === "visible"
-				? getOrCreateRowState(rowIndex)
-				: rows.get(rowIndex);
+			visibility === "visible" ? getOrCreateState(key) : entries.get(key);
 		if (!state) {
 			return;
 		}
@@ -166,23 +184,46 @@ export function createRowPreviewActivationRuntime(
 		state.visibility = visibility;
 
 		if (visibility === "visible") {
-			enqueueRowActivation(rowIndex);
+			enqueueActivation(key);
 			return;
 		}
 
-		cancelPendingRow(rowIndex);
+		cancelPending(key);
+	}
+
+	function clear(key: string): void {
+		if (!entries.has(key)) {
+			return;
+		}
+
+		entries.delete(key);
+		cancelPending(key);
+	}
+
+	function getRowActivationVersion(rowIndex: number): Readable<number> {
+		return getActivationVersion(getRowActivationKey(rowIndex));
+	}
+
+	function requestRowActivation(rowIndex: number): void {
+		requestActivation(getRowActivationKey(rowIndex));
+	}
+
+	function setRowVisibility(
+		rowIndex: number,
+		visibility: "visible" | "mounted",
+	): void {
+		setVisibility(getRowActivationKey(rowIndex), visibility);
 	}
 
 	function clearRow(rowIndex: number): void {
-		if (!rows.has(rowIndex)) {
-			return;
-		}
-
-		rows.delete(rowIndex);
-		cancelPendingRow(rowIndex);
+		clear(getRowActivationKey(rowIndex));
 	}
 
 	return {
+		getActivationVersion,
+		requestActivation,
+		setVisibility,
+		clear,
 		getRowActivationVersion,
 		requestRowActivation,
 		setRowVisibility,

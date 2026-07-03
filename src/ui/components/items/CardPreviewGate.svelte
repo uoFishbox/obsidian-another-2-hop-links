@@ -47,6 +47,7 @@
 		previewRefreshToken?: number;
 		contentPreview?: string;
 		rowIndex?: number;
+		activationCandidateId?: string;
 	}
 
 	let {
@@ -59,6 +60,7 @@
 		previewRefreshToken = 0,
 		contentPreview = undefined,
 		rowIndex = undefined,
+		activationCandidateId = undefined,
 	}: Props = $props();
 
 	const getVisiblePreviewQueueSize = providedGetVisiblePreviewQueueSize ?? (() => 0);
@@ -86,6 +88,10 @@
 		searchScope === "title-only" ? "" : searchQuery,
 	);
 	const normalizedSearchQuery = $derived(normalizePreviewQuery(effectiveSearchQuery));
+	const activationKey = $derived(
+		activationCandidateId ??
+			(rowIndex !== undefined ? `row:${rowIndex}` : undefined),
+	);
 	const previewIdentity = $derived(
 		file
 			? buildCardPreviewActivationIdentity(
@@ -103,8 +109,8 @@
 	let pendingPreviewIdentity: string | undefined = undefined;
 	let activationRequest: PreviewActivationHandle | null = null;
 	let activationSequence = 0;
-	let rowActivationVersion = $state<number | undefined>(undefined);
-	let lastHandledRowActivationVersion: number | undefined = undefined;
+	let activationVersion = $state<number | undefined>(undefined);
+	let lastHandledActivationVersion: number | undefined = undefined;
 
 	let renderedPreviewSnapshot = $state.raw<RenderedPreviewSnapshot | undefined>(
 		undefined,
@@ -129,6 +135,7 @@
 		void previewRefreshToken;
 		void contentPreview;
 		void rowIndex;
+		void activationCandidateId;
 		void visibility;
 		void previewOverride;
 		void settings;
@@ -136,6 +143,7 @@
 		void virtualizedVisibility;
 		void effectiveSearchQuery;
 		void normalizedSearchQuery;
+		void activationKey;
 		void previewIdentity;
 		void activatedPreviewIdentity;
 		void renderedPreviewSnapshot;
@@ -198,23 +206,23 @@
 		lastPreviewIdentity = nextIdentity;
 	}
 
-	function subscribeRowActivationVersion(): (() => void) | undefined {
-		if (!rowPreviewActivationRuntime || rowIndex === undefined) {
-			rowActivationVersion = undefined;
-			lastHandledRowActivationVersion = undefined;
+	function subscribeActivationVersion(): (() => void) | undefined {
+		if (!rowPreviewActivationRuntime || activationKey === undefined) {
+			activationVersion = undefined;
+			lastHandledActivationVersion = undefined;
 			return;
 		}
 
-		lastHandledRowActivationVersion = undefined;
+		lastHandledActivationVersion = undefined;
 		return rowPreviewActivationRuntime
-			.getRowActivationVersion(rowIndex)
+			.getActivationVersion(activationKey)
 			.subscribe((nextVersion) => {
-				rowActivationVersion = nextVersion;
+				activationVersion = nextVersion;
 			});
 	}
 
-	function requestVisibleRowActivation(): boolean {
-		if (!rowPreviewActivationRuntime || rowIndex === undefined) {
+	function requestVisibleActivation(): boolean {
+		if (!rowPreviewActivationRuntime || activationKey === undefined) {
 			return false;
 		}
 
@@ -232,12 +240,12 @@
 			return true;
 		}
 
-		rowPreviewActivationRuntime.requestRowActivation(rowIndex);
+		rowPreviewActivationRuntime.requestActivation(activationKey);
 		return true;
 	}
 
 	function activateVisibleVirtualPreview(): void {
-		if (requestVisibleRowActivation()) {
+		if (requestVisibleActivation()) {
 			return;
 		}
 
@@ -305,21 +313,21 @@
 		}
 	}
 
-	function commitVisibleRowActivation(): void {
+	function commitVisibleActivation(): void {
 		if (
 			!rowPreviewActivationRuntime ||
-			rowIndex === undefined ||
-			rowActivationVersion === undefined ||
-			rowActivationVersion <= 0
+			activationKey === undefined ||
+			activationVersion === undefined ||
+			activationVersion <= 0
 		) {
 			return;
 		}
 
-		if (lastHandledRowActivationVersion === rowActivationVersion) {
+		if (lastHandledActivationVersion === activationVersion) {
 			return;
 		}
 
-		lastHandledRowActivationVersion = rowActivationVersion;
+		lastHandledActivationVersion = activationVersion;
 		if (
 			DEBUG_DISABLE_CARD_DOM_PREVIEW ||
 			virtualizedVisibility !== "visible" ||
@@ -343,7 +351,7 @@
 	});
 
 	$effect(() => {
-		return subscribeRowActivationVersion();
+		return subscribeActivationVersion();
 	});
 
 	$effect(() => {
@@ -351,7 +359,7 @@
 	});
 
 	$effect(() => {
-		commitVisibleRowActivation();
+		commitVisibleActivation();
 	});
 
 	onDestroy(() => {

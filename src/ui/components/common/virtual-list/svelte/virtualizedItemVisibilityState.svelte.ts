@@ -39,6 +39,12 @@ export interface VirtualizedItemVisibilityStateControllerOptions<
 	TCell extends VisibilityCell = VisibilityCell,
 > {
 	readonly getStateKey?: (cell: TCell) => string;
+	readonly onItemVisibilityChanged?: (
+		key: string,
+		visibility: VirtualizedItemVisibility,
+		cell: TCell,
+	) => void;
+	readonly onItemCleared?: (key: string, cell: TCell) => void;
 	readonly onRowVisibilityChanged?: (
 		rowIndex: number,
 		visibility: VirtualizedItemVisibility,
@@ -61,6 +67,8 @@ export function createVirtualizedItemVisibilityStateController<
 	let hasPreviousPreviewVisible = false;
 	let rowsByIndex = new Map<number, VisibilityRow<TCell>>();
 	const mountedItemKeyCounts = new Map<string, number>();
+	const mountedItemCellByKey = new Map<string, TCell>();
+	const itemVisibilityByKey = new Map<string, VirtualizedItemVisibility>();
 	const rowVisibilityByIndex = new Map<number, VirtualizedItemVisibility>();
 	const nextRowIndicesScratch = new Set<number>();
 	const getStateKey = options.getStateKey ?? ((cell: TCell) => cell.key);
@@ -91,11 +99,42 @@ export function createVirtualizedItemVisibilityStateController<
 			const nextCount = (mountedItemKeyCounts.get(key) ?? 0) + delta;
 			if (nextCount > 0) {
 				mountedItemKeyCounts.set(key, nextCount);
+				if (delta === 1) {
+					mountedItemCellByKey.set(key, cell);
+				}
 			} else {
 				mountedItemKeyCounts.delete(key);
+				clearItemVisibility(key);
 			}
 		}
 	};
+
+	const notifyItemVisibilityIfChanged = (
+		key: string,
+		cell: TCell,
+		nextVisibility: VirtualizedItemVisibility,
+	): void => {
+		const previous = itemVisibilityByKey.get(key);
+		if (previous === nextVisibility) {
+			return;
+		}
+
+		itemVisibilityByKey.set(key, nextVisibility);
+		options.onItemVisibilityChanged?.(key, nextVisibility, cell);
+	};
+
+	function clearItemVisibility(key: string): void {
+		const cell = mountedItemCellByKey.get(key);
+		mountedItemCellByKey.delete(key);
+		if (!itemVisibilityByKey.has(key)) {
+			return;
+		}
+
+		itemVisibilityByKey.delete(key);
+		if (cell) {
+			options.onItemCleared?.(key, cell);
+		}
+	}
 
 	const pruneUnmountedRowState = (row: VisibilityRow<TCell>): void => {
 		for (const cell of row.cells) {
@@ -151,6 +190,7 @@ export function createVirtualizedItemVisibilityStateController<
 			}
 
 			const key = getStateKey(cell);
+			notifyItemVisibilityIfChanged(key, cell, nextVisibility);
 			const tracked = states.get(key);
 			if (!tracked) {
 				continue;
@@ -227,6 +267,8 @@ export function createVirtualizedItemVisibilityStateController<
 
 				const key = getStateKey(cell);
 				mountedItemKeyCounts.set(key, (mountedItemKeyCounts.get(key) ?? 0) + 1);
+				mountedItemCellByKey.set(key, cell);
+				notifyItemVisibilityIfChanged(key, cell, nextVisibility);
 				const tracked = states.get(key);
 				if (!tracked) {
 					continue;
@@ -238,6 +280,14 @@ export function createVirtualizedItemVisibilityStateController<
 				}
 			}
 			notifyRowVisibilityIfChanged(row.rowIndex, nextVisibility);
+		}
+
+		for (const key of Array.from(itemVisibilityByKey.keys())) {
+			if (mountedItemKeyCounts.has(key)) {
+				continue;
+			}
+
+			clearItemVisibility(key);
 		}
 
 		for (const [key, tracked] of states) {

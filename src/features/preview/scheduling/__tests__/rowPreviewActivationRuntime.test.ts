@@ -10,6 +10,11 @@ interface ObservedRowActivation {
 	readonly unsubscribe: () => void;
 }
 
+interface ObservedActivation {
+	readonly versions: number[];
+	readonly unsubscribe: () => void;
+}
+
 function observeRowActivation(
 	runtime: RowPreviewActivationRuntime,
 	rowIndex: number,
@@ -20,6 +25,18 @@ function observeRowActivation(
 		.subscribe((version) => {
 			versions.push(version);
 		});
+
+	return { versions, unsubscribe };
+}
+
+function observeActivation(
+	runtime: RowPreviewActivationRuntime,
+	key: string,
+): ObservedActivation {
+	const versions: number[] = [];
+	const unsubscribe = runtime.getActivationVersion(key).subscribe((version) => {
+		versions.push(version);
+	});
 
 	return { versions, unsubscribe };
 }
@@ -50,6 +67,17 @@ afterEach(() => {
 });
 
 describe("rowPreviewActivationRuntime", () => {
+	it("activates a caller-provided key when it becomes visible", async () => {
+		const runtime = createRowPreviewActivationRuntime();
+		const observed = observeActivation(runtime, "slot:0");
+
+		runtime.setVisibility("slot:0", "visible");
+		await flushAnimationFrame();
+
+		expect(observed.versions).toEqual([0, 1]);
+		observed.unsubscribe();
+	});
+
 	it("does not activate a mounted row", async () => {
 		const runtime = createRowPreviewActivationRuntime();
 		const observed = observeRowActivation(runtime, 0);

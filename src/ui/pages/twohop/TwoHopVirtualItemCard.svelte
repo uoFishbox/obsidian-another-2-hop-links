@@ -22,6 +22,7 @@
 		contentPreview?: string;
 		rowIndex: number;
 		visibilityState: VirtualizedItemVisibilityState;
+		activationCandidateId: string;
 	}
 
 	let {
@@ -36,6 +37,7 @@
 		contentPreview,
 		rowIndex,
 		visibilityState,
+		activationCandidateId,
 	}: Props = $props();
 
 	const resolvedSearchScope = $derived(
@@ -58,6 +60,7 @@
 		void contentPreview;
 		void rowIndex;
 		void visibilityState;
+		void activationCandidateId;
 		void resolvedSearchScope;
 		void interactionKey;
 		return markCCLComponentReevaluation("TwoHopVirtualItemCard");
@@ -73,6 +76,7 @@
 		searchScope={resolvedSearchScope}
 		{contentPreview}
 		{rowIndex}
+		{activationCandidateId}
 		interactionRegistration="snapshot"
 		{interactionId}
 		{interactionKey}

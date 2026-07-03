@@ -101,6 +101,39 @@ describe("createVirtualizedItemVisibilityStateController", () => {
 		expect(state2.visibility).toBe("mounted");
 	});
 
+	it("emits item visibility by caller-provided key without clearing reused slots", () => {
+		const visibilityChanges: Array<[string, string]> = [];
+		const clearedKeys: string[] = [];
+		const ctrl = createVirtualizedItemVisibilityStateController<TestCell>({
+			getStateKey: (cell) => cell.stateKey ?? cell.key,
+			onItemVisibilityChanged: (key, visibility) => {
+				visibilityChanges.push([key, visibility]);
+			},
+			onItemCleared: (key) => {
+				clearedKeys.push(key);
+			},
+		});
+
+		ctrl.syncMountedRows({
+			mountedRows: [row(10, [item("a", "slot:0")])],
+			previewRange: range(10, 11),
+		});
+		ctrl.syncMountedRows({
+			mountedRows: [row(20, [item("b", "slot:0")])],
+			previewRange: range(20, 21),
+		});
+
+		expect(visibilityChanges).toEqual([["slot:0", "visible"]]);
+		expect(clearedKeys).toEqual([]);
+
+		ctrl.syncMountedRows({
+			mountedRows: [],
+			previewRange: range(0, 0),
+		});
+
+		expect(clearedKeys).toEqual(["slot:0"]);
+	});
+
 	it("path 1: no-op when rowSlices and previewVisible are identical", () => {
 		const ctrl = createVirtualizedItemVisibilityStateController<TestCell>();
 		const cells = [item("a"), item("b")];
