@@ -21,6 +21,10 @@ import {
 	PREVIEW_ROW_ACTIVATION_CONTEXT_KEY,
 	type RowPreviewActivationRuntime,
 } from "features/preview/scheduling/rowPreviewActivationRuntime";
+import {
+	recordCCLDevMeasurement,
+	recordCCLDevMeasurementCount,
+} from "infrastructure/debug/CCLDevMeasurements";
 
 const EMPTY_MOUNTED_ROWS: readonly [] = [];
 const TRAILING_EMPTY_ROW_SLOT_TRIM_THRESHOLD = 8;
@@ -63,6 +67,7 @@ export function createTwoHopMountedSurfaceRuntime(params: {
 			nextSlots.push(new VirtualSurfaceRowSlot(index));
 		}
 		mountedRowSlots = nextSlots;
+		recordCCLDevMeasurement("twoHop.rowSlotCapacity.grow");
 		return true;
 	}
 
@@ -70,7 +75,19 @@ export function createTwoHopMountedSurfaceRuntime(params: {
 		const clampedLength = Math.max(0, Math.min(nextLength, mountedRowSlots.length));
 		if (clampedLength === mountedRowSlots.length) return false;
 		mountedRowSlots = mountedRowSlots.slice(0, clampedLength);
+		recordCCLDevMeasurement("twoHop.rowSlotCapacity.trim");
 		return true;
+	}
+
+	function setRowSlotRow(
+		slot: TwoHopMountedRowSlot,
+		row: TwoHopMountedRowSlice | null,
+	): boolean {
+		const changed = slot.setRow(row);
+		if (changed) {
+			recordCCLDevMeasurement("twoHop.VirtualSurfaceRowSlot.setRow.changed");
+		}
+		return changed;
 	}
 
 	function resolveMaxActiveRowSlotIndex(
@@ -139,6 +156,16 @@ export function createTwoHopMountedSurfaceRuntime(params: {
 			readonly forceTrimForPlanStructureChange: boolean;
 		},
 	): boolean {
+		recordCCLDevMeasurement("twoHop.rowSlotChanges.apply");
+		recordCCLDevMeasurementCount(
+			"twoHop.rowSlotChanges.assignedRows",
+			changes.assignedRows.length,
+		);
+		recordCCLDevMeasurementCount(
+			"twoHop.rowSlotChanges.clearedSlots",
+			changes.clearedSlotIndices.length,
+		);
+
 		let rowChanged = false;
 		const slotsChanged =
 			changes.maxSlotIndex >= 0 && ensureRowSlotCapacity(changes.maxSlotIndex);
@@ -148,13 +175,13 @@ export function createTwoHopMountedSurfaceRuntime(params: {
 			const slotIndex = resolveRowSlotIndex(row);
 			const slot = slots[slotIndex];
 			if (!slot) continue;
-			rowChanged = slot.setRow(row) || rowChanged;
+			rowChanged = setRowSlotRow(slot, row) || rowChanged;
 		}
 
 		for (const slotIndex of changes.clearedSlotIndices) {
 			const slot = slots[slotIndex];
 			if (!slot) continue;
-			rowChanged = slot.setRow(null) || rowChanged;
+			rowChanged = setRowSlotRow(slot, null) || rowChanged;
 		}
 
 		const maxActiveSlotIndex = resolveMaxActiveRowSlotIndex(build.rowSlices);

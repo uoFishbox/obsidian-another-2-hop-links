@@ -18,11 +18,22 @@ export type CCLDevMeasurementName =
 	| "twoHop.rowModelCache.miss.visibleCountsSemanticallySame"
 	| "twoHop.rowModelCache.miss.layout"
 	| "twoHop.rowModelCache.miss.layoutSemanticallySame"
-	| "twoHop.fixedSlotPool.syncFromBuild"
-	| "twoHop.TwoHopFixedCellSlot.update"
+	| "twoHop.rowSlotChanges.apply"
+	| "twoHop.rowSlotChanges.assignedRows"
+	| "twoHop.rowSlotChanges.clearedSlots"
+	| "twoHop.VirtualSurfaceRowSlot.setRow.changed"
+	| "twoHop.rowSlotCapacity.grow"
+	| "twoHop.rowSlotCapacity.trim"
 	| "component.TwoHopVirtualItemCard.reevaluate"
 	| "component.ViewItemCard.reevaluate"
-	| "component.CardPreviewGate.reevaluate";
+	| "component.CardPreviewGate.reevaluate"
+	| "CardPreviewGate.resetPreviewActivation"
+	| "CardPreviewGate.subscribeActivationVersion"
+	| "CardPreviewGate.requestVisibleActivation"
+	| "CardPreviewGate.activateVisibleVirtualPreview"
+	| "CardPreviewGate.commitVisibleActivation"
+	| "CardPreviewGate.renderedPreviewSnapshot.commit"
+	| "CardPreviewGate.shouldRenderPreview.true";
 
 export const CCL_DEV_MEASUREMENT_NAMES: readonly CCLDevMeasurementName[] = [
 	"virtualScroll.applyScrollMeasurement",
@@ -42,11 +53,22 @@ export const CCL_DEV_MEASUREMENT_NAMES: readonly CCLDevMeasurementName[] = [
 	"twoHop.rowModelCache.miss.visibleCountsSemanticallySame",
 	"twoHop.rowModelCache.miss.layout",
 	"twoHop.rowModelCache.miss.layoutSemanticallySame",
-	"twoHop.fixedSlotPool.syncFromBuild",
-	"twoHop.TwoHopFixedCellSlot.update",
+	"twoHop.rowSlotChanges.apply",
+	"twoHop.rowSlotChanges.assignedRows",
+	"twoHop.rowSlotChanges.clearedSlots",
+	"twoHop.VirtualSurfaceRowSlot.setRow.changed",
+	"twoHop.rowSlotCapacity.grow",
+	"twoHop.rowSlotCapacity.trim",
 	"component.TwoHopVirtualItemCard.reevaluate",
 	"component.ViewItemCard.reevaluate",
 	"component.CardPreviewGate.reevaluate",
+	"CardPreviewGate.resetPreviewActivation",
+	"CardPreviewGate.subscribeActivationVersion",
+	"CardPreviewGate.requestVisibleActivation",
+	"CardPreviewGate.activateVisibleVirtualPreview",
+	"CardPreviewGate.commitVisibleActivation",
+	"CardPreviewGate.renderedPreviewSnapshot.commit",
+	"CardPreviewGate.shouldRenderPreview.true",
 ];
 
 export interface CCLDevMeasurementCounter {
@@ -72,20 +94,31 @@ function nowIsoString(): string {
 }
 
 export function recordCCLDevMeasurement(name: CCLDevMeasurementName): void {
+	recordCCLDevMeasurementCount(name, 1);
+}
+
+export function recordCCLDevMeasurementCount(
+	name: CCLDevMeasurementName,
+	count: number,
+): void {
 	if (IS_PROD) {
+		return;
+	}
+
+	if (count <= 0) {
 		return;
 	}
 
 	const counter = counters.get(name);
 	if (!counter) {
 		counters.set(name, {
-			count: 1,
+			count,
 			lastUpdatedAt: nowIsoString(),
 		});
 		return;
 	}
 
-	counter.count += 1;
+	counter.count += count;
 	counter.lastUpdatedAt = nowIsoString();
 }
 

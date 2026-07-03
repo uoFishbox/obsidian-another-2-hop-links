@@ -23,7 +23,10 @@
 		PREVIEW_VISIBILITY_CONTEXT_KEY,
 		type PreviewVisibilityContext,
 	} from "./previewVisibilityContext";
-	import { markCCLComponentReevaluation } from "infrastructure/debug/CCLDevMeasurements";
+	import {
+		markCCLComponentReevaluation,
+		recordCCLDevMeasurement,
+	} from "infrastructure/debug/CCLDevMeasurements";
 
 	interface RenderedPreviewSnapshot {
 		readonly identity: string;
@@ -121,7 +124,11 @@
 		if (!renderedPreviewSnapshot) return false;
 		if (virtualizedVisibility !== "visible") return false;
 
-		return canKeepRenderedPreviewForCurrentPreview();
+		const shouldRender = canKeepRenderedPreviewForCurrentPreview();
+		if (shouldRender) {
+			recordCCLDevMeasurement("CardPreviewGate.shouldRenderPreview.true");
+		}
+		return shouldRender;
 	});
 	const componentReevaluationProbe = $derived.by(() => {
 		if (IS_PROD) return "";
@@ -183,11 +190,14 @@
 	}
 
 	function commitRenderedPreviewSnapshot(snapshot: RenderedPreviewSnapshot): void {
+		recordCCLDevMeasurement("CardPreviewGate.renderedPreviewSnapshot.commit");
 		renderedPreviewSnapshot = snapshot;
 		activatedPreviewIdentity = snapshot.identity;
 	}
 
 	function resetPreviewActivationForCurrentPreview(): void {
+		recordCCLDevMeasurement("CardPreviewGate.resetPreviewActivation");
+
 		const nextIdentity = previewIdentity;
 
 		if (nextIdentity === lastPreviewIdentity) {
@@ -207,6 +217,8 @@
 	}
 
 	function subscribeActivationVersion(): (() => void) | undefined {
+		recordCCLDevMeasurement("CardPreviewGate.subscribeActivationVersion");
+
 		if (!rowPreviewActivationRuntime || activationKey === undefined) {
 			activationVersion = undefined;
 			lastHandledActivationVersion = undefined;
@@ -222,6 +234,8 @@
 	}
 
 	function requestVisibleActivation(): boolean {
+		recordCCLDevMeasurement("CardPreviewGate.requestVisibleActivation");
+
 		if (!rowPreviewActivationRuntime || activationKey === undefined) {
 			return false;
 		}
@@ -245,6 +259,8 @@
 	}
 
 	function activateVisibleVirtualPreview(): void {
+		recordCCLDevMeasurement("CardPreviewGate.activateVisibleVirtualPreview");
+
 		if (requestVisibleActivation()) {
 			return;
 		}
@@ -314,6 +330,8 @@
 	}
 
 	function commitVisibleActivation(): void {
+		recordCCLDevMeasurement("CardPreviewGate.commitVisibleActivation");
+
 		if (
 			!rowPreviewActivationRuntime ||
 			activationKey === undefined ||
