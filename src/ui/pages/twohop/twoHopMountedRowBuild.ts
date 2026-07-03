@@ -88,8 +88,8 @@ function resolveInitialTwoHopSectionIndexByRow(
  * When the previous build used the same plan object, only the row ranges
  * that are new relative to the previous mounted range are materialized.
  * This avoids re-walking the entire range on every small scroll step.
- * Non-contiguous jumps (no overlap with the previous range) fall back to
- * full materialization of the new range.
+ * Non-contiguous jumps are covered by the diff path because both tails
+ * together span the full next range.
  */
 export function buildTwoHopMountedRows(params: {
 	readonly rowModel: TwoHopViewPlanRowModel;
@@ -109,23 +109,7 @@ export function buildTwoHopMountedRows(params: {
 	// reads them, so the generic builder has a single responsibility: convert
 	// a row range into mounted rows.
 	if (previous !== undefined && previous.plan === plan) {
-		const prevRange = previous.rowRange;
-		if (range.start === prevRange.start && range.end === prevRange.end) {
-			// Same range, same plan — no materialization needed.
-		} else {
-			// Check if the new range overlaps with the previous range.
-			// Contiguous scroll produces an overlap or adjacency; a jump
-			// produces no overlap at all.
-			const overlapStart = Math.max(range.start, prevRange.start);
-			const overlapEnd = Math.min(range.end, prevRange.end);
-			if (overlapStart < overlapEnd) {
-				// Overlapping — materialize only the diff tails.
-				materializeDiffRows(plan, prevRange, range);
-			} else {
-				// Non-contiguous jump — fall back to full materialization.
-				ensureTwoHopMountedRangeMaterialized(plan, range);
-			}
-		}
+		materializeDiffRows(plan, previous.rowRange, range);
 	} else {
 		// Different plan (or no previous build) — full materialization.
 		ensureTwoHopMountedRangeMaterialized(plan, range);
