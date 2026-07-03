@@ -64,6 +64,16 @@ export function createTwoHopMountedSurfaceRuntime(params: {
 		return true;
 	}
 
+	function trimTrailingEmptyRowSlots(): boolean {
+		let nextLength = mountedRowSlots.length;
+		while (nextLength > 0 && mountedRowSlots[nextLength - 1]?.row === null) {
+			nextLength -= 1;
+		}
+		if (nextLength === mountedRowSlots.length) return false;
+		mountedRowSlots = mountedRowSlots.slice(0, nextLength);
+		return true;
+	}
+
 	function applyRowSlotChanges(
 		changes: TwoHopMountedRowsBuild["rowSlotChanges"],
 	): boolean {
@@ -85,7 +95,8 @@ export function createTwoHopMountedSurfaceRuntime(params: {
 			rowChanged = slot.setRow(null) || rowChanged;
 		}
 
-		return slotsChanged || rowChanged;
+		const slotsTrimmed = trimTrailingEmptyRowSlots();
+		return slotsChanged || rowChanged || slotsTrimmed;
 	}
 
 	const virtualList = useVirtualList<
