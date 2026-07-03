@@ -1096,7 +1096,7 @@ describe("buildTwoHopMountedRows diff materialization", () => {
 		});
 
 		expect(ensureSpy).toHaveBeenCalledTimes(1);
-		expect(ensureSpy).toHaveBeenCalledWith(plan, { start: 10, end: 11 });
+		expect(ensureSpy).toHaveBeenCalledWith(plan, 10, 11);
 		ensureSpy.mockRestore();
 	});
 
@@ -1129,7 +1129,7 @@ describe("buildTwoHopMountedRows diff materialization", () => {
 		});
 
 		expect(ensureSpy).toHaveBeenCalledTimes(1);
-		expect(ensureSpy).toHaveBeenCalledWith(plan, { start: 0, end: 1 });
+		expect(ensureSpy).toHaveBeenCalledWith(plan, 0, 1);
 		ensureSpy.mockRestore();
 	});
 
@@ -1162,7 +1162,7 @@ describe("buildTwoHopMountedRows diff materialization", () => {
 		});
 
 		expect(ensureSpy).toHaveBeenCalledTimes(1);
-		expect(ensureSpy).toHaveBeenCalledWith(plan, { start: 10, end: 15 });
+		expect(ensureSpy).toHaveBeenCalledWith(plan, 10, 15);
 		ensureSpy.mockRestore();
 	});
 
@@ -1227,8 +1227,8 @@ describe("buildTwoHopMountedRows diff materialization", () => {
 		});
 
 		expect(ensureSpy).toHaveBeenCalledTimes(2);
-		expect(ensureSpy).toHaveBeenCalledWith(plan, { start: 10, end: 12 });
-		expect(ensureSpy).toHaveBeenCalledWith(plan, { start: 3, end: 5 });
+		expect(ensureSpy).toHaveBeenCalledWith(plan, 10, 12);
+		expect(ensureSpy).toHaveBeenCalledWith(plan, 3, 5);
 		ensureSpy.mockRestore();
 	});
 

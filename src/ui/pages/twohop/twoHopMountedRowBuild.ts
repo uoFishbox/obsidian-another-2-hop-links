@@ -43,17 +43,11 @@ function materializeDiffRows(
 
 	// Forward tail: rows entering at the trailing edge.
 	if (forwardStart < forwardEnd) {
-		ensureTwoHopMountedRangeMaterialized(plan, {
-			start: forwardStart,
-			end: forwardEnd,
-		});
+		ensureTwoHopMountedRangeMaterialized(plan, forwardStart, forwardEnd);
 	}
 	// Backward tail: rows entering at the leading edge.
 	if (backwardStart < backwardEnd) {
-		ensureTwoHopMountedRangeMaterialized(plan, {
-			start: backwardStart,
-			end: backwardEnd,
-		});
+		ensureTwoHopMountedRangeMaterialized(plan, backwardStart, backwardEnd);
 	}
 }
 
@@ -97,6 +91,7 @@ export function buildTwoHopMountedRows(params: {
 	readonly ranges: VirtualRanges;
 	readonly previousBuild?: TwoHopMountedRowsBuild;
 	readonly reusableRowSlotsScratch?: number[];
+	readonly assignedRowSlotsScratch?: number[];
 	readonly resolvedRowScratch?: SectionedGridResolvedRowScratch;
 }): TwoHopMountedRowsBuild {
 	recordCCLDevMeasurement("twoHop.buildMountedRows");
@@ -120,6 +115,7 @@ export function buildTwoHopMountedRows(params: {
 		rowRange: range,
 		previousBuild: previous,
 		reusableRowSlotsScratch: params.reusableRowSlotsScratch,
+		assignedRowSlotsScratch: params.assignedRowSlotsScratch,
 		resolvedRowScratch: params.resolvedRowScratch,
 		findSectionIndexByRow: findTwoHopSectionIndexByRow,
 		resolveInitialSectionIndexByRow: resolveInitialTwoHopSectionIndexByRow,

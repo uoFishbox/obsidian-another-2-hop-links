@@ -368,11 +368,29 @@ export function ensureTwoHopSectionCellRangeMaterialized(
 export function ensureTwoHopMountedRangeMaterialized(
 	plan: TwoHopViewPlan,
 	range: RowRange,
+): boolean;
+export function ensureTwoHopMountedRangeMaterialized(
+	plan: TwoHopViewPlan,
+	startRowIndex: number,
+	endRowIndex: number,
+): boolean;
+export function ensureTwoHopMountedRangeMaterialized(
+	plan: TwoHopViewPlan,
+	rangeOrStartRowIndex: RowRange | number,
+	endRowIndex?: number,
 ): boolean {
 	const table = plan.rowTable;
 	const cellStore = plan.cellStore;
-	const start = Math.max(0, range.start);
-	const end = Math.min(table.rowCount, range.end);
+	const rawStart =
+		typeof rangeOrStartRowIndex === "number"
+			? rangeOrStartRowIndex
+			: rangeOrStartRowIndex.start;
+	const rawEnd =
+		typeof rangeOrStartRowIndex === "number"
+			? (endRowIndex ?? rangeOrStartRowIndex)
+			: rangeOrStartRowIndex.end;
+	const start = Math.max(0, rawStart);
+	const end = Math.min(table.rowCount, rawEnd);
 	if (start >= end) return false;
 	let changed = false;
 	for (let rowIndex = start; rowIndex < end; ) {

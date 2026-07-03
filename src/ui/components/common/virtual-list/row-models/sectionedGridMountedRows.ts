@@ -80,6 +80,7 @@ export interface BuildSectionedGridMountedRowsParams<
 	readonly rowRange: RowRange;
 	readonly previousBuild?: SectionedGridMountedRowsBuild<T, G, TPlan>;
 	readonly reusableRowSlotsScratch?: number[];
+	readonly assignedRowSlotsScratch?: number[];
 	readonly resolvedRowScratch?: SectionedGridResolvedRowScratch;
 	readonly renderBodyKeyPolicy?: RenderBodyKeyPolicy;
 	findSectionIndexByRow(sections: readonly TSection[], rowIndex: number): number;
@@ -190,6 +191,9 @@ export function buildSectionedGridMountedRows<
 			if (params.reusableRowSlotsScratch) {
 				params.reusableRowSlotsScratch.length = 0;
 			}
+			if (params.assignedRowSlotsScratch) {
+				params.assignedRowSlotsScratch.length = 0;
+			}
 			return previousBuild;
 		}
 	}
@@ -224,7 +228,10 @@ export function buildSectionedGridMountedRows<
 	const previousRowEnd = params.previousBuild?.rowRange.end ?? 0;
 	const assignedRows: MountedFlatRowSlice<T, G>[] = [];
 	const assignedSlotIndices =
-		previousRows !== undefined ? new Set<number>() : undefined;
+		previousRows !== undefined ? (params.assignedRowSlotsScratch ?? []) : undefined;
+	if (assignedSlotIndices) {
+		assignedSlotIndices.length = 0;
+	}
 	let maxSlotIndex = -1;
 	const registerActiveRowSlot = (
 		rowSlice: MountedFlatRowSlice<T, G>,
@@ -232,10 +239,17 @@ export function buildSectionedGridMountedRows<
 	): void => {
 		const slotIndex = rowSlice.slotIndex ?? rowSlice.rowIndex;
 		maxSlotIndex = Math.max(maxSlotIndex, slotIndex);
-		assignedSlotIndices?.add(slotIndex);
+		assignedSlotIndices?.push(slotIndex);
 		if (changed) {
 			assignedRows.push(rowSlice);
 		}
+	};
+	const hasAssignedSlot = (slotIndex: number): boolean => {
+		if (!assignedSlotIndices) return false;
+		for (const assignedSlotIndex of assignedSlotIndices) {
+			if (assignedSlotIndex === slotIndex) return true;
+		}
+		return false;
 	};
 	const getPreviousRow = (
 		rowIndex: number,
@@ -424,7 +438,7 @@ export function buildSectionedGridMountedRows<
 	if (previousRows && assignedSlotIndices) {
 		for (const previousRow of previousRows) {
 			const slotIndex = previousRow.slotIndex ?? previousRow.rowIndex;
-			if (assignedSlotIndices.has(slotIndex)) continue;
+			if (hasAssignedSlot(slotIndex)) continue;
 			clearedSlotIndices.push(slotIndex);
 			maxSlotIndex = Math.max(maxSlotIndex, slotIndex);
 		}
