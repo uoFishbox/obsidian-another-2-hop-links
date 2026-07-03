@@ -23,6 +23,10 @@ type TwoHopMountedHeaderCell = MountedFlatHeaderCell<
 	TwoHopVirtualListItem,
 	TwoHopVirtualListSection
 >;
+type TwoHopMountedRow = MountedFlatRowSlice<
+	TwoHopVirtualListItem,
+	TwoHopVirtualListSection
+>;
 
 interface ItemProviderCacheEntry {
 	kind: "item";
@@ -57,6 +61,39 @@ export interface TwoHopInteractionResolverProviderParams {
 	getDescriptorRevision?: () => unknown;
 }
 
+export interface TwoHopInteractionResolverProvider extends InteractionDescriptorResolverProvider {
+	/**
+	 * Removes descriptors for interactions that are no longer mounted.
+	 */
+	pruneExcept: (mountedInteractionIds: ReadonlySet<string>) => void;
+}
+
+/**
+ * Collects the current mounted interaction ids into the provided set.
+ */
+export function collectTwoHopMountedInteractionIds(
+	mountedRows: readonly TwoHopMountedRow[],
+	target: Set<string> = new Set<string>(),
+): Set<string> {
+	for (const row of mountedRows) {
+		for (const cell of row.cells) {
+			if (cell.cell.kind === "header") {
+				target.add(
+					resolveMountedHeaderInteractionId(cell as TwoHopMountedHeaderCell),
+				);
+				continue;
+			}
+			if (cell.cell.kind === "item") {
+				target.add(
+					resolveMountedItemInteractionId(cell as TwoHopMountedItemCell),
+				);
+			}
+		}
+	}
+
+	return target;
+}
+
 /**
  * Creates a lazy provider that resolves against the current mounted rows.
  * The provider avoids per-scroll resolver snapshots; descriptor work happens
@@ -66,10 +103,16 @@ export function createTwoHopInteractionResolverProvider({
 	getMountedRows,
 	resolveDescriptor,
 	getDescriptorRevision,
-}: TwoHopInteractionResolverProviderParams): InteractionDescriptorResolverProvider {
+}: TwoHopInteractionResolverProviderParams): TwoHopInteractionResolverProvider {
 	const descriptorsByInteractionId = new Map<string, ProviderCacheEntry>();
 
 	return {
+		pruneExcept: (mountedInteractionIds) => {
+			for (const interactionId of descriptorsByInteractionId.keys()) {
+				if (mountedInteractionIds.has(interactionId)) continue;
+				descriptorsByInteractionId.delete(interactionId);
+			}
+		},
 		resolveInteractionDescriptor: (interactionId) => {
 			const mountedRows = getMountedRows();
 			const headerDescriptor = resolveMountedSectionHeaderDescriptor({
@@ -178,9 +221,9 @@ function findMountedHeaderCellByInteractionId(params: {
 			if (cell.cell.kind !== "header") continue;
 
 			const headerCell = cell as TwoHopMountedHeaderCell;
-			const headerInteractionId =
-				headerCell.headerProps.interactionId ?? headerCell.sectionId;
-			if (headerInteractionId === params.interactionId) {
+			if (
+				resolveMountedHeaderInteractionId(headerCell) === params.interactionId
+			) {
 				return headerCell;
 			}
 		}
@@ -201,14 +244,22 @@ function findMountedItemCellByInteractionId(params: {
 			if (cell.cell.kind !== "item") continue;
 
 			const itemCell = cell as TwoHopMountedItemCell;
-			const item = itemCell.cell.item;
-			const itemInteractionId =
-				item.interactionId ?? resolveTwoHopItemInteractionKey(item);
-			if (itemInteractionId === params.interactionId) {
+			if (resolveMountedItemInteractionId(itemCell) === params.interactionId) {
 				return itemCell;
 			}
 		}
 	}
 
 	return null;
+}
+
+function resolveMountedHeaderInteractionId(
+	headerCell: TwoHopMountedHeaderCell,
+): string {
+	return headerCell.headerProps.interactionId ?? headerCell.sectionId;
+}
+
+function resolveMountedItemInteractionId(itemCell: TwoHopMountedItemCell): string {
+	const item = itemCell.cell.item;
+	return item.interactionId ?? resolveTwoHopItemInteractionKey(item);
 }

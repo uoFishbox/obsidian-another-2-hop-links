@@ -20,7 +20,10 @@
 	import { useTwoHopViewPlanVirtualList } from "./useTwoHopVirtualListSurface.svelte";
 	import type { TwoHopVirtualListTuning } from "./twoHopVirtualListTuning";
 	import type { ItemInteractionDescriptor } from "ui/interactions/interactionTypes";
-	import { createTwoHopInteractionResolverProvider } from "./twoHopInteractionResolverCache";
+	import {
+		collectTwoHopMountedInteractionIds,
+		createTwoHopInteractionResolverProvider,
+	} from "./twoHopInteractionResolverCache";
 
 	interface Props {
 		sections: readonly SectionRenderDescriptor<
@@ -72,6 +75,13 @@
 			resolveDescriptor: (item) => props.getItemInteractionDescriptor(item),
 			getDescriptorRevision: () => props.interactionDescriptorRevision,
 		});
+	const mountedInteractionIds = new Set<string>();
+	$effect(() => {
+		const mountedRows = list.mountedRows;
+		mountedInteractionIds.clear();
+		collectTwoHopMountedInteractionIds(mountedRows, mountedInteractionIds);
+		interactionDescriptorResolverProvider.pruneExcept(mountedInteractionIds);
+	});
 	const resolvedCellClassNameBySectionClassName = new Map<string, string>();
 	const resolveSectionCellClassName = (
 		sectionClassName: string | undefined,

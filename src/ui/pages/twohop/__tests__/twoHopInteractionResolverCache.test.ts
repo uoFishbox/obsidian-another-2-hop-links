@@ -12,7 +12,10 @@ import type {
 } from "ui/components/common/virtual-list/core/reconciliation/viewPlanMountedCells";
 import type { MountedFlatRowSlice } from "ui/components/common/virtual-list/core/reconciliation/viewPlanRenderRows";
 import type { TwoHopIndexedLink } from "types/domain";
-import { createTwoHopInteractionResolverProvider } from "../twoHopInteractionResolverCache";
+import {
+	collectTwoHopMountedInteractionIds,
+	createTwoHopInteractionResolverProvider,
+} from "../twoHopInteractionResolverCache";
 import type {
 	TwoHopVirtualListItem,
 	TwoHopVirtualListSection,
@@ -277,6 +280,31 @@ describe("twoHopInteractionResolverCache", () => {
 		expect(resolveDescriptor).toHaveBeenCalledTimes(2);
 	});
 
+	it("provider prunes cached descriptors outside the mounted interaction ids", () => {
+		const item = createItem("alpha.md");
+		const firstDescriptor = createDescriptor(item);
+		const secondDescriptor = createDescriptor(item);
+		const resolveDescriptor = vi
+			.fn()
+			.mockReturnValueOnce(firstDescriptor)
+			.mockReturnValueOnce(secondDescriptor);
+		const provider = createTwoHopInteractionResolverProvider({
+			getMountedRows: () => createMountedRows({ item }),
+			resolveDescriptor,
+		});
+
+		expect(provider.resolveInteractionDescriptor("item:file:alpha.md")).toBe(
+			firstDescriptor,
+		);
+
+		provider.pruneExcept(new Set(["item:file:beta.md"]));
+
+		expect(provider.resolveInteractionDescriptor("item:file:alpha.md")).toBe(
+			secondDescriptor,
+		);
+		expect(resolveDescriptor).toHaveBeenCalledTimes(2);
+	});
+
 	it("provider resolves mounted section header descriptors without item resolution", () => {
 		const descriptor = createHeaderDescriptor("h0");
 		const resolveDescriptor = vi.fn();
@@ -316,6 +344,30 @@ describe("twoHopInteractionResolverCache", () => {
 
 		expect(provider.resolveInteractionDescriptor("h0")).toBeNull();
 		expect(provider.resolveInteractionDescriptor("h1")).toBe(secondDescriptor);
+	});
+
+	it("collects mounted item and section header interaction ids", () => {
+		const item = createFallbackNewLinkItem({
+			sourcePath: "source.md",
+			rawText: "Missing",
+			virtualKey: "new-link:source.md:Missing:duplicate-1",
+		});
+		const fallbackInteractionId = createItemInteractionKey(
+			item.item,
+			item.virtualKey,
+		);
+		const mountedRows = [
+			...createMountedRows({ item }),
+			...createMountedHeaderRows({
+				sectionId: "branch-alpha",
+				descriptor: createHeaderDescriptor("branch-alpha"),
+			}),
+		];
+
+		const mountedInteractionIds = collectTwoHopMountedInteractionIds(mountedRows);
+
+		expect(mountedInteractionIds.has(fallbackInteractionId)).toBe(true);
+		expect(mountedInteractionIds.has("branch-alpha")).toBe(true);
 	});
 
 	it("provider resolves fallback item ids with the virtual key", () => {
