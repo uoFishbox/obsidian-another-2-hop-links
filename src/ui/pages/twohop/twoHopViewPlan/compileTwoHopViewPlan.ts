@@ -153,6 +153,7 @@ export function compileTwoHopViewPlan(
 		logicalCellsBySectionIndex,
 		sections.length,
 		totalCellCount,
+		totalRowCount,
 	);
 	const rowTable: TwoHopRowTable = {
 		rowCount: totalRowCount,

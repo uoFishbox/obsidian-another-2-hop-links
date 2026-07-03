@@ -8,6 +8,7 @@ export function createTwoHopCellStore(
 	>,
 	sectionCount: number,
 	totalCellCount: number,
+	totalRowCount: number,
 ): TwoHopCellStore {
 	return {
 		logicalCellsBySectionIndex,
@@ -23,11 +24,22 @@ export function createTwoHopCellStore(
 		remainingUnmaterializedCellCount: totalCellCount,
 		remainingUnmaterializedSectionCount: sectionCount,
 		revision: 0,
+		rowRevisionByRowIndex: new Uint32Array(totalRowCount),
 	};
 }
 
 export function markTwoHopMaterializationChanged(plan: TwoHopViewPlan): void {
 	plan.cellStore.revision += 1;
+}
+
+export function markTwoHopRowMaterializationChanged(
+	plan: TwoHopViewPlan,
+	rowIndex: number,
+): void {
+	if (rowIndex < 0 || rowIndex >= plan.cellStore.rowRevisionByRowIndex.length) {
+		return;
+	}
+	plan.cellStore.rowRevisionByRowIndex[rowIndex] += 1;
 }
 
 export function markTwoHopSectionMaterialized(

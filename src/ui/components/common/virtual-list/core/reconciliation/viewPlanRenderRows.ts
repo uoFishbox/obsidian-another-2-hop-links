@@ -8,5 +8,6 @@ export interface MountedFlatRowSlice<T, G> {
 	rowKey: RowKey;
 	key: RowKey;
 	top: number;
+	materializationRevision?: number;
 	cells: MountedFlatCell<T, G>[];
 }

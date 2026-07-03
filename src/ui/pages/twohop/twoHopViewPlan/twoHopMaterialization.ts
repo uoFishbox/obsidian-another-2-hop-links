@@ -9,6 +9,7 @@ import type {
 import type { TwoHopSectionPlan, TwoHopViewPlan } from "./types";
 import {
 	markTwoHopMaterializationChanged,
+	markTwoHopRowMaterializationChanged,
 	markTwoHopSectionMaterialized,
 	recordTwoHopCellFilled,
 } from "./twoHopCellStore";
@@ -111,14 +112,24 @@ export function materializeTwoHopSectionCells(
 		return false;
 	}
 	let changed = false;
+	const columns = Math.max(1, plan.columns);
 	for (let cellIndex = 0; cellIndex < sectionPlan.cellCount; cellIndex += 1) {
-		changed =
-			ensureTwoHopSectionCellMaterialized(
+		if (
+			!ensureTwoHopSectionCellMaterialized(
 				plan,
 				sectionPlan,
 				cellIndex,
 				resolvedItems,
-			) || changed;
+			)
+		) {
+			continue;
+		}
+		const rowIndexInSection = Math.floor(cellIndex / columns);
+		markTwoHopRowMaterializationChanged(
+			plan,
+			sectionPlan.firstRowIndex + rowIndexInSection,
+		);
+		changed = true;
 	}
 	const state = cellStore.materializationStateBySectionIndex[sectionIndex];
 	if (state) {
@@ -223,9 +234,10 @@ export function materializeNextTwoHopCellBatch(
 		);
 		if (newlyMaterialized) {
 			materialized = true;
-			const sectionCompleted = recordTwoHopCellFilled(plan, sectionIndex);
 			const rowIndexInSection = Math.floor(cellIndex / columns);
 			const globalRowIndex = sectionPlan.firstRowIndex + rowIndexInSection;
+			const sectionCompleted = recordTwoHopCellFilled(plan, sectionIndex);
+			markTwoHopRowMaterializationChanged(plan, globalRowIndex);
 			if (globalRowIndex < minAffectedRowIndex) {
 				minAffectedRowIndex = globalRowIndex;
 			}
@@ -306,12 +318,18 @@ function materializeSectionCellRange(
 	if (!sectionPlan) return false;
 	let changed = false;
 	let sectionCompleted = false;
+	const columns = Math.max(1, plan.columns);
 	const start = Math.max(0, startCellIndex);
 	const end = Math.min(sectionPlan.cellCount, endCellIndex);
 	for (let cellIndex = start; cellIndex < end; cellIndex += 1) {
 		if (!ensureTwoHopSectionCellMaterialized(plan, sectionPlan, cellIndex)) {
 			continue;
 		}
+		const rowIndexInSection = Math.floor(cellIndex / columns);
+		markTwoHopRowMaterializationChanged(
+			plan,
+			sectionPlan.firstRowIndex + rowIndexInSection,
+		);
 		changed = true;
 		sectionCompleted =
 			recordTwoHopCellFilled(plan, sectionIndex) || sectionCompleted;

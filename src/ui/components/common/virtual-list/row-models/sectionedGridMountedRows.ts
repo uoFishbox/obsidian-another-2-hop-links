@@ -97,6 +97,7 @@ export interface BuildSectionedGridMountedRowsParams<
 		sectionPlan: TSection,
 		rowIndex: number,
 	): boolean;
+	getRowMaterializationRevision?(plan: TPlan, rowIndex: number): number;
 	readLogicalCellInSection(
 		plan: TPlan,
 		sectionIndex: number,
@@ -158,10 +159,24 @@ export function buildSectionedGridMountedRows<
 		previousBuild.rowRange.start === start &&
 		previousBuild.rowRange.end === end
 	) {
-		if (params.reusableRowSlotsScratch) {
-			params.reusableRowSlotsScratch.length = 0;
+		let canReusePreviousBuild = true;
+		if (params.getRowMaterializationRevision) {
+			for (const previousRow of previousBuild.rowSlices) {
+				if (
+					(previousRow.materializationRevision ?? 0) !==
+					params.getRowMaterializationRevision(plan, previousRow.rowIndex)
+				) {
+					canReusePreviousBuild = false;
+					break;
+				}
+			}
 		}
-		return previousBuild;
+		if (canReusePreviousBuild) {
+			if (params.reusableRowSlotsScratch) {
+				params.reusableRowSlotsScratch.length = 0;
+			}
+			return previousBuild;
+		}
 	}
 	const rowSlices: MountedFlatRowSlice<T, G>[] = [];
 	let flattenedCells: SectionedGridMountedCell<T, G>[] | undefined;
@@ -201,6 +216,17 @@ export function buildSectionedGridMountedRows<
 		}
 		const previousRow = previousRows[rowIndex - previousRowStart];
 		return previousRow?.rowIndex === rowIndex ? previousRow : undefined;
+	};
+	const canReusePreviousRow = (
+		previousRow: MountedFlatRowSlice<T, G> | undefined,
+	): previousRow is MountedFlatRowSlice<T, G> => {
+		if (!previousRow) return false;
+		if (params.previousBuild?.plan !== plan) return false;
+		if (!params.getRowMaterializationRevision) return true;
+		return (
+			(previousRow.materializationRevision ?? 0) ===
+			params.getRowMaterializationRevision(plan, previousRow.rowIndex)
+		);
 	};
 	const reusableRowSlots = params.reusableRowSlotsScratch ?? [];
 	reusableRowSlots.length = 0;
@@ -243,7 +269,8 @@ export function buildSectionedGridMountedRows<
 	for (let rowIndex = start; rowIndex < end; rowIndex += 1) {
 		const rowKey = rowIndex;
 		const previousRow = getPreviousRow(rowIndex);
-		if (params.previousBuild?.plan === plan && previousRow) {
+		const previousSlotIndex = previousRow?.slotIndex;
+		if (canReusePreviousRow(previousRow)) {
 			rowSlices.push(previousRow);
 			mountedCellCount += previousRow.cells.length;
 			continue;
@@ -288,7 +315,7 @@ export function buildSectionedGridMountedRows<
 			top: rowTop,
 			bottomSpacing: plan.rowGap,
 		};
-		const slotIndex = previousRow?.slotIndex ?? allocateRowSlotIndex();
+		const slotIndex = previousSlotIndex ?? allocateRowSlotIndex();
 		const rowSlice: MountedFlatRowSlice<T, G> = {
 			slotIndex,
 			slotKey: slotIndex,
@@ -296,6 +323,10 @@ export function buildSectionedGridMountedRows<
 			rowKey,
 			key: rowKey,
 			top: rowTop,
+			materializationRevision: params.getRowMaterializationRevision?.(
+				plan,
+				rowIndex,
+			),
 			cells: [],
 		};
 		if (!sectionLayout) {

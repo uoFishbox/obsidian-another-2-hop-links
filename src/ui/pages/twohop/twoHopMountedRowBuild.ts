@@ -141,6 +141,8 @@ export function buildTwoHopMountedRows(params: {
 		resolveInitialSectionIndexByRow: resolveInitialTwoHopSectionIndexByRow,
 		resolveRowInSection: resolveTwoHopRowInSection,
 		resolveRowInSectionInto: resolveTwoHopRowInSectionInto,
+		getRowMaterializationRevision: (plan, rowIndex) =>
+			plan.cellStore.rowRevisionByRowIndex[rowIndex] ?? 0,
 		readLogicalCellInSection: readTwoHopLogicalCellInSection,
 		renderBodyKeyPolicy: "omit",
 	});

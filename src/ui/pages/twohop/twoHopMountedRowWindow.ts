@@ -63,7 +63,7 @@ function setClampedRange(out: RowRange, range: RowRange, rowCount: number): void
  *
  * This is a non-reactive guard in front of `buildTwoHopMountedRows`. Its
  * primary purpose is to skip the builder entirely when nothing has changed
- * (same plan, same clamped range, same cellStore.revision).
+ * (same plan, same clamped range, same relevant materialization revisions).
  *
  * Row/cell slot reuse is delegated to the existing
  * `buildSectionedGridMountedRows` builder, which already handles slot
@@ -84,6 +84,18 @@ export function createTwoHopMountedRowWindow(): TwoHopMountedRowWindow {
 		cellStoreRevision: -1,
 		lastApplyChanged: false,
 	};
+
+	function haveMountedRowRevisionsChanged(build: TwoHopMountedRowsBuild): boolean {
+		const rowRevisions = build.plan.cellStore.rowRevisionByRowIndex;
+		for (const row of build.rowSlices) {
+			if (
+				(row.materializationRevision ?? 0) !== (rowRevisions[row.rowIndex] ?? 0)
+			) {
+				return true;
+			}
+		}
+		return false;
+	}
 
 	function apply(params: TwoHopMountedRowWindowApplyParams): TwoHopMountedRowsBuild {
 		recordCCLDevMeasurement("twoHop.rowWindow.apply");
@@ -110,6 +122,19 @@ export function createTwoHopMountedRowWindow(): TwoHopMountedRowWindow {
 			!hasRowRangeChanged &&
 			!hasCellStoreRevisionChanged
 		) {
+			state.lastApplyChanged = false;
+			recordCCLDevMeasurement("twoHop.rowWindow.apply.skipped");
+			return currentBuild;
+		}
+
+		if (
+			!isFirstBuild &&
+			!hasPlanChanged &&
+			!hasRowRangeChanged &&
+			hasCellStoreRevisionChanged &&
+			!haveMountedRowRevisionsChanged(currentBuild)
+		) {
+			state.cellStoreRevision = cellStoreRevisionBeforeBuild;
 			state.lastApplyChanged = false;
 			recordCCLDevMeasurement("twoHop.rowWindow.apply.skipped");
 			return currentBuild;

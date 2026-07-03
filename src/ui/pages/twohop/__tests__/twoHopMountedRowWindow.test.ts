@@ -176,7 +176,7 @@ describe("createTwoHopMountedRowWindow", () => {
 		expect(window.lastApplyChanged).toBe(true);
 	});
 
-	it("returns changed when cellStore.revision changes with same range", () => {
+	it("returns unchanged when only the global cellStore.revision changes with same range", () => {
 		const window = createTwoHopMountedRowWindow();
 
 		const first = window.apply({
@@ -196,6 +196,31 @@ describe("createTwoHopMountedRowWindow", () => {
 		});
 
 		expect(second).toBe(first);
+		expect(window.lastApplyChanged).toBe(false);
+	});
+
+	it("returns changed rows when a mounted row materialization revision changes", () => {
+		const window = createTwoHopMountedRowWindow();
+
+		const first = window.apply({
+			rowModel,
+			rowRange: { start: 0, end: 2 },
+			ranges,
+		});
+		expect(window.lastApplyChanged).toBe(true);
+
+		rowModel.plan.cellStore.revision += 1;
+		rowModel.plan.cellStore.rowRevisionByRowIndex[0] += 1;
+
+		const second = window.apply({
+			rowModel,
+			rowRange: { start: 0, end: 2 },
+			ranges,
+		});
+
+		expect(second).not.toBe(first);
+		expect(second.rowSlices[0]).not.toBe(first.rowSlices[0]);
+		expect(second.rowSlices[1]).toBe(first.rowSlices[1]);
 		expect(window.lastApplyChanged).toBe(true);
 	});
 

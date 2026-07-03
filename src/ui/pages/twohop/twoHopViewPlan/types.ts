@@ -65,6 +65,7 @@ export interface TwoHopCellStore {
 	remainingUnmaterializedCellCount: number;
 	remainingUnmaterializedSectionCount: number;
 	revision: number;
+	readonly rowRevisionByRowIndex: Uint32Array;
 }
 
 export interface TwoHopRowPlan {
