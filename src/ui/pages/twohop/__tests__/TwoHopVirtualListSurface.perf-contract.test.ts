@@ -165,6 +165,52 @@ describe("TwoHopViewPlanVirtualList DOM performance contracts", () => {
 		expect(getItemInteractionDescriptor).not.toHaveBeenCalled();
 	});
 
+	it("clears mounted row slots when the row model becomes empty", async () => {
+		const { container, rerender } = render(TwoHopViewPlanVirtualListPerfHarness, {
+			props: {
+				sections: [createDescriptor(20)],
+				applicationStore,
+			},
+		});
+		const scrollRoot = container.querySelector<HTMLElement>(
+			"[data-testid='scroll-root']",
+		);
+		const virtualListRoot = container.querySelector<HTMLElement>(
+			".twohop-page-virtual-list",
+		);
+		if (!scrollRoot || !virtualListRoot) {
+			throw new Error("Expected TwoHop virtual-list elements.");
+		}
+
+		setNumericProperty(scrollRoot, "clientHeight", 120);
+		setNumericProperty(scrollRoot, "scrollTop", 0);
+		setElementRect(scrollRoot, { top: 0, width: 330, height: 120 });
+		setElementRect(virtualListRoot, {
+			top: 0,
+			width: 330,
+			height: 2_000,
+		});
+		triggerResize(virtualListRoot, 330, 2_000);
+		triggerResize(scrollRoot, 330, 120);
+		await flushFrames();
+		await flushFrames();
+
+		const shadowRoot = virtualListRoot.shadowRoot;
+		expect(shadowRoot?.querySelector("[data-ccl-row-index]")).toBeTruthy();
+
+		await rerender({
+			sections: [],
+			applicationStore,
+		});
+		await flushFrames();
+		await flushFrames();
+
+		expect(shadowRoot?.querySelector("[data-ccl-row-index]")).toBeNull();
+		expect(
+			shadowRoot?.querySelector("[data-testid='twohop-item-cell']"),
+		).toBeNull();
+	});
+
 	it("keeps a resolved descriptor cached for a retained cell while scrolling", async () => {
 		const getItemInteractionDescriptor = vi.fn(
 			(item: TwoHopVirtualListItem): ItemInteractionDescriptor => ({

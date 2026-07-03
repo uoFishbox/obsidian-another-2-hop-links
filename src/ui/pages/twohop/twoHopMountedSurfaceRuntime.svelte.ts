@@ -104,6 +104,13 @@ export function createTwoHopMountedSurfaceRuntime(params: {
 				reconciliationState.mountedBuild,
 				snapshot.ranges.previewVisible,
 			);
+			if (reconciliationState.mountedBuild === null) {
+				mountRuntime.resetMountedRows();
+				if (mountedRowSlots.length > 0) {
+					mountedRowSlots = [];
+				}
+				return;
+			}
 			if (mountRuntime.consumeMountedRowsChange()) {
 				applyRowSlotChanges(mountRuntime.getMountedRowSlotChanges());
 			}

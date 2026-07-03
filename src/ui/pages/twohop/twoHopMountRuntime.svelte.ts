@@ -181,6 +181,11 @@ export function createTwoHopMountRuntime(
 		): void {
 			syncVisibilityStates(mountedBuild, previewRange);
 		},
+		resetMountedRows(): void {
+			rowWindow.reset();
+			hasPendingMountedRowsChange = false;
+			pendingBuild = null;
+		},
 		schedulePreviewRangeSync(
 			mountedBuild: TwoHopMountedRowsBuild | null | undefined,
 			start: number,
