@@ -2,7 +2,10 @@
 	import { IS_PROD } from "../../../../../appConstants";
 	import { onDestroy, onMount, type Snippet } from "svelte";
 	import type { LogicalCellKey, RenderSlotKey } from "../types";
-	import { registerVirtualCellElement } from "./VirtualCellRegistry";
+	import {
+		createVirtualCellElementRegistration,
+		type VirtualCellElementRegistration,
+	} from "./VirtualCellRegistry";
 
 	interface Props {
 		logicalKey: LogicalCellKey;
@@ -45,6 +48,9 @@
 	let lifecycleCell: TMountedCell | undefined = undefined;
 	let lifecycleLogicalKey: string | undefined = undefined;
 	let cellElement = $state<HTMLDivElement | undefined>(undefined);
+	let cellRegistration = $state.raw<VirtualCellElementRegistration | undefined>(
+		undefined,
+	);
 
 	const hasPosition = $derived(
 		left !== undefined &&
@@ -90,7 +96,7 @@
 			return;
 		}
 
-		const nextLogicalKey = String(logicalKey);
+		const nextLogicalKey = logicalKeyAttribute;
 		const previousLogicalKey = lifecycleLogicalKey;
 		const previousCell = lifecycleCell;
 
@@ -115,11 +121,19 @@
 			return;
 		}
 
-		return registerVirtualCellElement(cellElement, {
-			logicalKey: String(logicalKey),
-			rowIndex,
-			columnIndex,
-		});
+		const registration = createVirtualCellElementRegistration(cellElement);
+		cellRegistration = registration;
+
+		return () => {
+			registration.unregister();
+			if (cellRegistration === registration) {
+				cellRegistration = undefined;
+			}
+		};
+	});
+
+	$effect(() => {
+		cellRegistration?.update(logicalKeyAttribute, rowIndex, columnIndex);
 	});
 
 	onDestroy(() => {

@@ -37,11 +37,13 @@
 	let lifecycleLogicalKey: string | undefined = undefined;
 	let cellElement = $state<HTMLDivElement | undefined>(undefined);
 	let cellRegistration = $state.raw<VirtualCellElementRegistration | undefined>(
-	undefined
+		undefined,
 	);
 
+	const logicalKeyAttribute = $derived(String(logicalKey));
+
 	$effect(() => {
-		const nextLogicalKey = String(logicalKey);
+		const nextLogicalKey = logicalKeyAttribute;
 		const previousLogicalKey = lifecycleLogicalKey;
 		const previousCell = lifecycleCell;
 
@@ -78,7 +80,7 @@
 	});
 
 	$effect(() => {
-		cellRegistration?.update(String(logicalKey), rowIndex, columnIndex);
+		cellRegistration?.update(logicalKeyAttribute, rowIndex, columnIndex);
 	});
 
 	onDestroy(() => {
@@ -95,7 +97,7 @@
 <div
 	bind:this={cellElement}
 	class={className}
-	data-ccl-logical-key={!IS_PROD ? String(logicalKey) : undefined}
+	data-ccl-logical-key={!IS_PROD ? logicalKeyAttribute : undefined}
 	data-ccl-cell-slot={!IS_PROD ? cellSlotKey : undefined}
 	data-testid={!IS_PROD ? dataTestId : undefined}
 	data-ccl-row-index={!IS_PROD ? rowIndex : undefined}

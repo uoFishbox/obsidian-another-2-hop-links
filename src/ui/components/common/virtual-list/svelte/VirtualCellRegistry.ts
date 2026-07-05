@@ -96,6 +96,15 @@ export function createVirtualCellElementRegistration(
 		rowIndex: number | undefined,
 		columnIndex: number | undefined,
 	): void => {
+		if (
+			isRegistered &&
+			metadata.logicalKey === logicalKey &&
+			metadata.rowIndex === rowIndex &&
+			metadata.columnIndex === columnIndex
+		) {
+			return;
+		}
+
 		if (!isRegistered) {
 			const previousMetadata = metadataByElement.get(element);
 			if (previousMetadata) {

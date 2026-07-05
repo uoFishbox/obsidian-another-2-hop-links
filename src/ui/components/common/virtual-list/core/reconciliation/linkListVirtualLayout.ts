@@ -80,6 +80,11 @@ interface MountedVirtualGridCellsBuildState<
 	gap: number;
 }
 
+const EMPTY_PREVIOUS_MOUNTED_GRID_CELLS: ReadonlyMap<string, never> = new Map<
+	string,
+	never
+>();
+
 // Module-level comparator avoids allocating a fresh closure on every scroll
 // frame when sorting the free row-slot pool in-place.
 const compareVirtualGridRowSlotIndex = (left: number, right: number): number =>
@@ -487,7 +492,7 @@ function buildMountedVirtualGridCellsFromCore<T>(params: {
 	const previousCellsByKey =
 		previousBuild?.reusableCellsByKey ??
 		params.previousCellsByKey ??
-		new Map<string, MountedVirtualGridCell<T>>();
+		EMPTY_PREVIOUS_MOUNTED_GRID_CELLS;
 	const reusableCellsByKey = new Map<string, MountedVirtualGridCell<T>>();
 	const rowSlices: MountedVirtualGridRowSlice<T>[] = [];
 	const cells: MountedVirtualGridCell<T>[] = [];

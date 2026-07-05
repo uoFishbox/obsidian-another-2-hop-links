@@ -118,12 +118,17 @@ type SectionedGridMountedCell<T, G> = MountedFlatCell<T, G>;
 
 const EMPTY_PREVIOUS_CELLS: ReadonlyMap<string, never> = new Map<string, never>();
 
+const compareSectionedGridRowSlotIndex = (left: number, right: number): number =>
+	left - right;
+
 const flattenMountedRowCells = <T, G>(
 	rowSlices: readonly MountedFlatRowSlice<T, G>[],
 ): SectionedGridMountedCell<T, G>[] => {
 	const cells: SectionedGridMountedCell<T, G>[] = [];
 	for (const rowSlice of rowSlices) {
-		cells.push(...rowSlice.cells);
+		for (const cell of rowSlice.cells) {
+			cells.push(cell);
+		}
 	}
 	return cells;
 };
@@ -211,6 +216,9 @@ export function buildSectionedGridMountedRows<
 		if (previousRow.rowIndex < start || previousRow.rowIndex >= end) {
 			reusableRowSlots.push(slotIndex);
 		}
+	}
+	if (reusableRowSlots.length > 1) {
+		reusableRowSlots.sort(compareSectionedGridRowSlotIndex);
 	}
 	let reusableRowSlotOffset = 0;
 	const allocateRowSlotIndex = (): number => {
