@@ -63,6 +63,7 @@
 
 	let isMathRendering = $state(false);
 	let hasRenderedContent = $state(false);
+	let lastAppliedRenderCacheKey: string | undefined = undefined;
 	const shouldShowInitialSkeleton = $derived(isMathRendering && !hasRenderedContent);
 	let previewContentType = $state<PreviewData["type"] | undefined>(undefined);
 	const previewTypeClass = $derived(
@@ -192,18 +193,29 @@
 			: error instanceof Error && error.name === "AbortError";
 	}
 
+	function shouldSkipDomApply(renderCacheKey: string): boolean {
+		return (
+			lastAppliedRenderCacheKey === renderCacheKey &&
+			!!container?.firstChild &&
+			lastPreviewRenderDomOverride === null
+		);
+	}
+
 	async function replaceContainerContent(
 		source: HTMLElement,
 		signal: AbortSignal,
 		renderToken: number,
+		renderCacheKey: string,
 		shouldSyncMathJaxStyles = false,
 	): Promise<boolean> {
 		await nextAnimationFrame();
 		if (isRenderStale(signal, renderToken) || !container) return false;
+		if (shouldSkipDomApply(renderCacheKey)) return true;
 		container.replaceChildren();
 		while (source.firstChild) {
 			container.appendChild(source.firstChild);
 		}
+		lastAppliedRenderCacheKey = renderCacheKey;
 
 		if (shouldSyncMathJaxStyles) {
 			syncMathJaxStylesForNode(container);
@@ -224,8 +236,10 @@
 
 		await nextAnimationFrame();
 		if (isRenderStale(signal, renderToken)) return false;
+		if (shouldSkipDomApply(cacheKey)) return true;
 		previewContentType = "text";
 		container.replaceChildren(cloneRenderedPreviewContent(renderedEntry));
+		lastAppliedRenderCacheKey = cacheKey;
 		if (renderedEntry.hasMath) {
 			syncMathJaxStylesForNode(container);
 		}
@@ -322,10 +336,12 @@
 						if (!container) return false;
 						await nextAnimationFrame();
 						if (isRenderStale(signal, renderToken)) return false;
+						if (shouldSkipDomApply(renderCacheKey)) return true;
 						previewContentType = previewForRender.type;
 						container.replaceChildren(
 							cloneRenderedPreviewContent(renderedEntry),
 						);
+						lastAppliedRenderCacheKey = renderCacheKey;
 						if (shouldSyncMathStyles) {
 							syncMathJaxStylesForNode(container);
 						}
@@ -349,6 +365,7 @@
 						tempContainer,
 						signal,
 						renderToken,
+						renderCacheKey,
 						shouldSyncMathStyles,
 					);
 					if (didReplace) {
@@ -361,6 +378,7 @@
 					isMathRendering = false;
 					await nextAnimationFrame();
 					if (isRenderStale(signal, renderToken) || !container) return false;
+					if (shouldSkipDomApply(renderCacheKey)) return true;
 
 					const img = document.createElement("img");
 					img.alt = `preview for ${targetFile.basename}`;
@@ -371,6 +389,7 @@
 
 					previewContentType = "image";
 					container.replaceChildren(img);
+					lastAppliedRenderCacheKey = renderCacheKey;
 					return true;
 				}
 
@@ -394,6 +413,7 @@
 					tempContainer,
 					signal,
 					renderToken,
+					renderCacheKey,
 					shouldSyncMathStyles,
 				);
 				if (didReplace) {
@@ -437,10 +457,15 @@
 							if (isRenderStale(signal, renderToken)) {
 								return;
 							}
+							if (shouldSkipDomApply(renderCacheKey)) {
+								isMathRendering = false;
+								return;
+							}
 							previewContentType = previewForRender.type;
 							container.replaceChildren(
 								cloneRenderedPreviewContent(renderedEntry),
 							);
+							lastAppliedRenderCacheKey = renderCacheKey;
 							if (shouldSyncMathStyles) {
 								syncMathJaxStylesForNode(container);
 							}
@@ -471,6 +496,7 @@
 							mathContainer,
 							signal,
 							renderToken,
+							renderCacheKey,
 							true,
 						)
 					) {
