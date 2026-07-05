@@ -55,14 +55,19 @@ export function createTwoHopRowModelCache(params: {
 			const hasCacheCompatibleLayout =
 				previousLayout !== undefined &&
 				(layout === previousLayout || hasSemanticallySameLayout);
+			const hasCompatibleVisibleCounts =
+				sectionVisibleCounts === previousVisibleCounts ||
+				(previousVisibleCounts !== undefined &&
+					hasSameVisibleCounts(previousVisibleCounts, sectionVisibleCounts));
 
 			if (
 				previousRowModel &&
 				sections === previousSections &&
-				sectionVisibleCounts === previousVisibleCounts &&
+				hasCompatibleVisibleCounts &&
 				hasCacheCompatibleLayout
 			) {
 				recordCCLDevMeasurement("twoHop.rowModelCache.hit");
+				previousVisibleCounts = sectionVisibleCounts;
 				return previousRowModel;
 			}
 

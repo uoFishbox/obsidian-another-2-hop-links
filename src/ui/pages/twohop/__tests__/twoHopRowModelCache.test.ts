@@ -55,7 +55,20 @@ describe("createTwoHopRowModelCache in a DOM runtime", () => {
 		expect(first.revision).toEqual({ kind: "opaque", token: first.plan });
 	});
 
-	it("misses when descriptor or pagination inputs change", () => {
+	it("reuses semantically matching pagination inputs", () => {
+		const cache = createTwoHopRowModelCache({
+			materialization: { kind: "eager" },
+			resolveInitialSectionVisibleCount: (section) => section.loadedCount,
+			clampVisibleCount: (section, count) => Math.min(section.loadedCount, count),
+		});
+		const sections = [descriptor];
+		const visibleCounts = { "new-links": 1 };
+		const first = cache.resolve(sections, visibleCounts, layout);
+
+		expect(cache.resolve(sections, { ...visibleCounts }, layout)).toBe(first);
+	});
+
+	it("misses when descriptor or pagination values change", () => {
 		const cache = createTwoHopRowModelCache({
 			materialization: { kind: "eager" },
 			resolveInitialSectionVisibleCount: (section) => section.loadedCount,
@@ -79,7 +92,7 @@ describe("createTwoHopRowModelCache in a DOM runtime", () => {
 		);
 
 		expect(
-			cacheForVisibleCounts.resolve(sections, { ...visibleCounts }, layout),
+			cacheForVisibleCounts.resolve(sections, { "new-links": 0 }, layout),
 		).not.toBe(firstForVisibleCounts);
 	});
 
