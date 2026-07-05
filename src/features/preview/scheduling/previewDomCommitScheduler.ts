@@ -17,6 +17,7 @@ interface QueuedPreviewDomCommitTask extends PreviewDomCommitTask {
 
 const pendingByKey = new Map<string, QueuedPreviewDomCommitTask>();
 let pendingQueue: QueuedPreviewDomCommitTask[] = [];
+let pendingQueueHead = 0;
 let frameHandle: number | null = null;
 let frameHandleKind: "animation-frame" | "timeout" | null = null;
 
@@ -47,11 +48,25 @@ function readFrameBudget(): number {
 }
 
 function compactQueue(): void {
-	if (pendingQueue.length <= pendingByKey.size * 2 + 16) return;
+	if (
+		pendingQueueHead < 64 &&
+		pendingQueue.length <= pendingByKey.size * 2 + 16
+	) {
+		return;
+	}
 
-	pendingQueue = pendingQueue.filter(
+	pendingQueue = pendingQueue.slice(pendingQueueHead).filter(
 		(task) => !task.settled && pendingByKey.get(task.key) === task,
 	);
+	pendingQueueHead = 0;
+}
+
+function readNextQueuedTask(): QueuedPreviewDomCommitTask | undefined {
+	if (pendingQueueHead >= pendingQueue.length) return undefined;
+
+	const task = pendingQueue[pendingQueueHead];
+	pendingQueueHead += 1;
+	return task;
 }
 
 function scheduleFrameDrain(): void {
@@ -79,9 +94,10 @@ function drainFrame(): void {
 	const commitBudget = readFrameBudget();
 	let committed = 0;
 
-	while (committed < commitBudget && pendingQueue.length > 0) {
-		const task = pendingQueue.shift();
-		if (!task || task.settled) continue;
+	while (committed < commitBudget) {
+		const task = readNextQueuedTask();
+		if (!task) break;
+		if (task.settled) continue;
 		if (pendingByKey.get(task.key) !== task) continue;
 
 		if (task.isStale()) {
@@ -134,6 +150,7 @@ export function resetPreviewDomCommitSchedulerForTests(): void {
 	for (const task of pendingQueue.splice(0)) {
 		settleTask(task, false);
 	}
+	pendingQueueHead = 0;
 	pendingByKey.clear();
 
 	if (frameHandle !== null) {

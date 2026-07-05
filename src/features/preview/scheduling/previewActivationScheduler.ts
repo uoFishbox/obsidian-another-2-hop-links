@@ -29,6 +29,7 @@ export interface PreviewActivationScope {
 	warmupFrameHandle: number | null;
 	pendingByKey: Map<string, PreviewActivationRequest>;
 	pendingQueue: PreviewActivationRequest[];
+	pendingQueueHead: number;
 	frameHandle: number | null;
 	getBackpressure: () => PreviewBackpressure;
 	backpressureProviders: Map<() => number, PreviewBackpressureProviderRegistration>;
@@ -111,6 +112,7 @@ export function createPreviewActivationScope(
 		warmupFrameHandle: null,
 		pendingByKey: new Map<string, PreviewActivationRequest>(),
 		pendingQueue: [],
+		pendingQueueHead: 0,
 		frameHandle: null,
 		getBackpressure: options.getBackpressure ?? getEmptyBackpressure,
 		backpressureProviders: new Map<
@@ -264,12 +266,28 @@ function resolveActivationBudget(params: {
 }
 
 function compactScopeQueue(scope: PreviewActivationScope): void {
-	if (scope.pendingQueue.length <= scope.pendingByKey.size * 2 + 16) return;
+	if (
+		scope.pendingQueueHead < 64 &&
+		scope.pendingQueue.length <= scope.pendingByKey.size * 2 + 16
+	) {
+		return;
+	}
 
-	scope.pendingQueue = scope.pendingQueue.filter(
+	scope.pendingQueue = scope.pendingQueue.slice(scope.pendingQueueHead).filter(
 		(request) =>
 			!request.settled && scope.pendingByKey.get(request.key) === request,
 	);
+	scope.pendingQueueHead = 0;
+}
+
+function readNextQueuedRequest(
+	scope: PreviewActivationScope,
+): PreviewActivationRequest | undefined {
+	if (scope.pendingQueueHead >= scope.pendingQueue.length) return undefined;
+
+	const request = scope.pendingQueue[scope.pendingQueueHead];
+	scope.pendingQueueHead += 1;
+	return request;
 }
 
 function drainScopeFrame(scope: PreviewActivationScope): void {
@@ -286,9 +304,10 @@ function drainScopeFrame(scope: PreviewActivationScope): void {
 	});
 	let activated = 0;
 
-	while (activated < activationBudget && scope.pendingQueue.length > 0) {
-		const request = scope.pendingQueue.shift();
-		if (!request || request.settled) continue;
+	while (activated < activationBudget) {
+		const request = readNextQueuedRequest(scope);
+		if (!request) break;
+		if (request.settled) continue;
 		if (scope.pendingByKey.get(request.key) !== request) continue;
 
 		settleRequest(request, true);
@@ -437,6 +456,7 @@ export function resetPreviewActivationSchedulerForTests(): void {
 		scope.frameHandle = null;
 		scope.pendingByKey.clear();
 		scope.pendingQueue = [];
+		scope.pendingQueueHead = 0;
 	}
 	activeQueuedScopes.clear();
 	scheduledFrameScopes.clear();
@@ -458,6 +478,7 @@ export function resetPreviewActivationSchedulerForTests(): void {
 	defaultScope.warmupFrameHandle = null;
 	defaultScope.pendingByKey.clear();
 	defaultScope.pendingQueue = [];
+	defaultScope.pendingQueueHead = 0;
 	defaultScope.frameHandle = null;
 	defaultScope.backpressureProviders.clear();
 
