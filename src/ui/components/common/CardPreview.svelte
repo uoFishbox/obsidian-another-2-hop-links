@@ -1,3 +1,7 @@
+<script module lang="ts">
+	let nextCardPreviewDomCommitScopeId = 0;
+</script>
+
 <script lang="ts">
 	import { Component } from "obsidian";
 	import type { TFile } from "obsidian";
@@ -22,7 +26,7 @@
 		normalizePreviewQuery,
 		type PreviewSearchContext,
 	} from "./cardPreviewSharedCache";
-	import { nextAnimationFrame } from "ui/utils/frame";
+	import { enqueuePreviewDomCommit } from "features/preview/scheduling/previewDomCommitScheduler";
 	import { syncMathJaxStylesForNode } from "ui/utils/mathJaxShadowStyles";
 
 	interface Props {
@@ -56,6 +60,7 @@
 	}: Props = $props();
 	let container = $state<HTMLDivElement | undefined>(undefined);
 	const { app, applicationStore, resolveSearchMatchPosition } = useAppContext();
+	const domCommitScopeKey = `card-preview:${++nextCardPreviewDomCommitScopeId}`;
 
 	let lastPreviewRenderRequest: PreviewRenderRequest | null = null;
 	let lastPreviewRenderDomOverride: PreviewData | null = null;
@@ -201,6 +206,10 @@
 		);
 	}
 
+	function buildDomCommitKey(renderCacheKey: string): string {
+		return `${domCommitScopeKey}:${renderCacheKey}`;
+	}
+
 	async function replaceContainerContent(
 		source: HTMLElement,
 		signal: AbortSignal,
@@ -208,19 +217,26 @@
 		renderCacheKey: string,
 		shouldSyncMathJaxStyles = false,
 	): Promise<boolean> {
-		await nextAnimationFrame();
-		if (isRenderStale(signal, renderToken) || !container) return false;
-		if (shouldSkipDomApply(renderCacheKey)) return true;
-		container.replaceChildren();
-		while (source.firstChild) {
-			container.appendChild(source.firstChild);
-		}
-		lastAppliedRenderCacheKey = renderCacheKey;
+		const targetContainer = container;
+		if (!targetContainer) return false;
 
-		if (shouldSyncMathJaxStyles) {
-			syncMathJaxStylesForNode(container);
-		}
-		return true;
+		return enqueuePreviewDomCommit({
+			key: buildDomCommitKey(renderCacheKey),
+			isStale: () =>
+				isRenderStale(signal, renderToken) || !targetContainer.isConnected,
+			commit: () => {
+				if (shouldSkipDomApply(renderCacheKey)) return;
+				targetContainer.replaceChildren();
+				while (source.firstChild) {
+					targetContainer.appendChild(source.firstChild);
+				}
+				lastAppliedRenderCacheKey = renderCacheKey;
+
+				if (shouldSyncMathJaxStyles) {
+					syncMathJaxStylesForNode(targetContainer);
+				}
+			},
+		});
 	}
 
 	async function applyRenderedEntry(
@@ -234,16 +250,19 @@
 			return false;
 		}
 
-		await nextAnimationFrame();
-		if (isRenderStale(signal, renderToken)) return false;
-		if (shouldSkipDomApply(cacheKey)) return true;
-		previewContentType = "text";
-		container.replaceChildren(cloneRenderedPreviewContent(renderedEntry));
-		lastAppliedRenderCacheKey = cacheKey;
-		if (renderedEntry.hasMath) {
-			syncMathJaxStylesForNode(container);
-		}
-		return true;
+		return enqueuePreviewDomCommit({
+			key: buildDomCommitKey(cacheKey),
+			isStale: () => isRenderStale(signal, renderToken) || !container.isConnected,
+			commit: () => {
+				if (shouldSkipDomApply(cacheKey)) return;
+				previewContentType = "text";
+				container.replaceChildren(cloneRenderedPreviewContent(renderedEntry));
+				lastAppliedRenderCacheKey = cacheKey;
+				if (renderedEntry.hasMath) {
+					syncMathJaxStylesForNode(container);
+				}
+			},
+		});
 	}
 
 	function shouldSyncMathJaxStyles(
@@ -333,19 +352,25 @@
 						);
 
 						if (isRenderStale(signal, renderToken)) return false;
-						if (!container) return false;
-						await nextAnimationFrame();
-						if (isRenderStale(signal, renderToken)) return false;
-						if (shouldSkipDomApply(renderCacheKey)) return true;
-						previewContentType = previewForRender.type;
-						container.replaceChildren(
-							cloneRenderedPreviewContent(renderedEntry),
-						);
-						lastAppliedRenderCacheKey = renderCacheKey;
-						if (shouldSyncMathStyles) {
-							syncMathJaxStylesForNode(container);
-						}
-						return true;
+						const targetContainer = container;
+						if (!targetContainer) return false;
+						return enqueuePreviewDomCommit({
+							key: buildDomCommitKey(renderCacheKey),
+							isStale: () =>
+								isRenderStale(signal, renderToken) ||
+								!targetContainer.isConnected,
+							commit: () => {
+								if (shouldSkipDomApply(renderCacheKey)) return;
+								previewContentType = previewForRender.type;
+								targetContainer.replaceChildren(
+									cloneRenderedPreviewContent(renderedEntry),
+								);
+								lastAppliedRenderCacheKey = renderCacheKey;
+								if (shouldSyncMathStyles) {
+									syncMathJaxStylesForNode(targetContainer);
+								}
+							},
+						});
 					}
 
 					const tempContainer = document.createElement("div");
@@ -376,9 +401,9 @@
 
 				if (previewForRender.type === "image") {
 					isMathRendering = false;
-					await nextAnimationFrame();
-					if (isRenderStale(signal, renderToken) || !container) return false;
-					if (shouldSkipDomApply(renderCacheKey)) return true;
+					const targetContainer = container;
+					if (isRenderStale(signal, renderToken) || !targetContainer)
+						return false;
 
 					const img = document.createElement("img");
 					img.alt = `preview for ${targetFile.basename}`;
@@ -387,10 +412,18 @@
 					img.fetchPriority = "low";
 					img.src = toPreviewImageSrc(previewForRender.content);
 
-					previewContentType = "image";
-					container.replaceChildren(img);
-					lastAppliedRenderCacheKey = renderCacheKey;
-					return true;
+					return enqueuePreviewDomCommit({
+						key: buildDomCommitKey(renderCacheKey),
+						isStale: () =>
+							isRenderStale(signal, renderToken) ||
+							!targetContainer.isConnected,
+						commit: () => {
+							if (shouldSkipDomApply(renderCacheKey)) return;
+							previewContentType = "image";
+							targetContainer.replaceChildren(img);
+							lastAppliedRenderCacheKey = renderCacheKey;
+						},
+					});
 				}
 
 				// 数式がなければ従来どおり即時反映
@@ -448,26 +481,32 @@
 								return;
 							}
 
-							if (!container) {
+							const targetContainer = container;
+							if (!targetContainer) {
 								isMathRendering = false;
 								return;
 							}
 
-							await nextAnimationFrame();
-							if (isRenderStale(signal, renderToken)) {
-								return;
-							}
-							if (shouldSkipDomApply(renderCacheKey)) {
+							const didCommit = await enqueuePreviewDomCommit({
+								key: buildDomCommitKey(renderCacheKey),
+								isStale: () =>
+									isRenderStale(signal, renderToken) ||
+									!targetContainer.isConnected,
+								commit: () => {
+									if (shouldSkipDomApply(renderCacheKey)) return;
+									previewContentType = previewForRender.type;
+									targetContainer.replaceChildren(
+										cloneRenderedPreviewContent(renderedEntry),
+									);
+									lastAppliedRenderCacheKey = renderCacheKey;
+									if (shouldSyncMathStyles) {
+										syncMathJaxStylesForNode(targetContainer);
+									}
+								},
+							});
+							if (!didCommit) {
 								isMathRendering = false;
 								return;
-							}
-							previewContentType = previewForRender.type;
-							container.replaceChildren(
-								cloneRenderedPreviewContent(renderedEntry),
-							);
-							lastAppliedRenderCacheKey = renderCacheKey;
-							if (shouldSyncMathStyles) {
-								syncMathJaxStylesForNode(container);
 							}
 							isMathRendering = false;
 							return;
@@ -513,11 +552,19 @@
 
 			return !isRenderStale(signal, renderToken);
 		} catch (error) {
-			if (signal.aborted || isAbortError(error) || !container) {
+			const targetContainer = container;
+			if (signal.aborted || isAbortError(error) || !targetContainer) {
 				return false;
 			}
-			previewContentType = undefined;
-			handlePreviewError(container, error);
+			await enqueuePreviewDomCommit({
+				key: buildDomCommitKey(renderCacheKey),
+				isStale: () =>
+					isRenderStale(signal, renderToken) || !targetContainer.isConnected,
+				commit: () => {
+					previewContentType = undefined;
+					handlePreviewError(targetContainer, error);
+				},
+			});
 			return false;
 		}
 	}

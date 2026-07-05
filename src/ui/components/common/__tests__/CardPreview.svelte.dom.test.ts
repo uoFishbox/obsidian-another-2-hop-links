@@ -1,11 +1,12 @@
 import { render, waitFor } from "@testing-library/svelte";
 import { tick } from "svelte";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { DEFAULT_SETTINGS, type PluginSettings } from "types/settings";
 import { ApplicationStore } from "ui/stores/ApplicationStore.svelte";
 import CardPreview from "../CardPreview.svelte";
 import { clearCardPreviewSharedCaches } from "../cardPreviewSharedCache";
 import { createMockTFile } from "testing/__mocks__/testHelpers";
+import { resetPreviewDomCommitSchedulerForTests } from "features/preview/scheduling/previewDomCommitScheduler";
 
 const state = vi.hoisted(() => ({
 	appContext: {
@@ -195,6 +196,10 @@ describe("CardPreview", () => {
 		state.syncMathJaxStylesForNode.mockReturnValue(true);
 
 		state.componentUnload.mockReset();
+	});
+
+	afterEach(() => {
+		resetPreviewDomCommitSchedulerForTests();
 	});
 
 	it("displays rendered text preview", async () => {
