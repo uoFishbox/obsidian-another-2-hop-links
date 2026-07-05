@@ -165,7 +165,7 @@
 	}
 
 	function registerVisibleRowActivationCandidate(): void {
-		if (!previewIdentity) {
+		if (!previewIdentity || activatedPreviewIdentity === previewIdentity) {
 			clearRegisteredRowActivationCandidate();
 			return;
 		}
