@@ -125,7 +125,6 @@
 	const shouldRenderPreview = $derived.by(() => {
 		if (DEBUG_DISABLE_CARD_DOM_PREVIEW) return false;
 		if (!renderedPreviewSnapshot) return false;
-		if (virtualizedVisibility !== "visible") return false;
 
 		return canKeepRenderedPreviewForCurrentPreview();
 	});
