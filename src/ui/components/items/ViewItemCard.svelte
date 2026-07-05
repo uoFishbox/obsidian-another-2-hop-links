@@ -106,6 +106,11 @@
 				})
 			: null,
 	);
+	const previewGateRowProps = $derived.by(() =>
+		rowIndex !== undefined && activationCandidateId !== undefined
+			? { rowIndex, activationCandidateId }
+			: null,
+	);
 	const componentReevaluationProbe = $derived.by(() => {
 		if (IS_PROD) return "";
 
@@ -131,6 +136,7 @@
 		void interactionKey;
 		void interactionId;
 		void interactionDescriptor;
+		void previewGateRowProps;
 		return markCCLComponentReevaluation("ViewItemCard");
 	});
 
@@ -172,7 +178,7 @@
 		{#snippet children()}
 			{#if !DEBUG_DISABLE_CARD_DOM_PREVIEW && item.type === "newLink" && !targetFile}
 				<UnresolvedPreviewPlaceholder />
-			{:else if !DEBUG_DISABLE_CARD_DOM_PREVIEW}
+			{:else if !DEBUG_DISABLE_CARD_DOM_PREVIEW && previewGateRowProps}
 				<CardPreviewGate
 					file={targetFile}
 					getPreview={context.getPreview}
@@ -183,8 +189,8 @@
 					{searchScope}
 					{previewRefreshToken}
 					{contentPreview}
-					{rowIndex}
-					{activationCandidateId}
+					rowIndex={previewGateRowProps.rowIndex}
+					activationCandidateId={previewGateRowProps.activationCandidateId}
 				/>
 			{/if}
 		{/snippet}

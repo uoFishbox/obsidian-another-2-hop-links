@@ -144,7 +144,7 @@ describe("ViewItemCard", () => {
 		expect(linkContext.getPreview).not.toHaveBeenCalled();
 	});
 
-	it("virtualizer visibility visible renders preview immediately", async () => {
+	it("row activation renders preview after the row becomes visible", async () => {
 		const file = createMockTFile("notes/alpha.md");
 		const item = { type: "file", data: file } as ViewItem;
 		const linkContext = {
@@ -181,7 +181,7 @@ describe("ViewItemCard", () => {
 		expect(document.querySelector(".lazy-placeholder")).toBeNull();
 	});
 
-	it("virtualizer visibility mounted does not execute preview", async () => {
+	it("mounted row does not execute preview before activation", async () => {
 		const file = createMockTFile("notes/alpha.md");
 		const item = { type: "file", data: file } as ViewItem;
 		const linkContext = {
@@ -219,7 +219,7 @@ describe("ViewItemCard", () => {
 		expect(linkContext.getPreview).not.toHaveBeenCalled();
 	});
 
-	it("unmounts preview when returning to mounted after visible", async () => {
+	it("keeps activated preview mounted when the row returns to mounted", async () => {
 		const file = createMockTFile("notes/alpha.md");
 		const item = { type: "file", data: file } as ViewItem;
 		const linkContext = {
@@ -264,6 +264,6 @@ describe("ViewItemCard", () => {
 		});
 		await Promise.resolve();
 
-		expect(screen.queryByTestId("card-preview-probe")).toBeNull();
+		expect(screen.getByTestId("card-preview-probe")).toBeTruthy();
 	});
 });
