@@ -13,10 +13,10 @@ import type {
 } from "./twoHopVirtualListModel";
 import {
 	ensureTwoHopMountedRangeMaterialized,
-	findTwoHopSectionIndexByRow,
 	readTwoHopLogicalCellInSection,
 	resolveTwoHopRowInSection,
 	resolveTwoHopRowInSectionInto,
+	type TwoHopSectionPlan,
 	type TwoHopViewPlan,
 	type TwoHopViewPlanRowModel,
 } from "./twoHopViewPlan";
@@ -82,6 +82,26 @@ function resolveInitialTwoHopSectionIndexByRow(
 	return table.sectionIndexByRow[rowIndex];
 }
 
+function findTwoHopSectionIndexByRowFromSections(
+	sections: readonly TwoHopSectionPlan[],
+	rowIndex: number,
+): number {
+	if (rowIndex < 0 || sections.length === 0) return -1;
+	let low = 0;
+	let high = sections.length;
+	while (low < high) {
+		const mid = (low + high) >>> 1;
+		if (sections[mid].firstRowIndex > rowIndex) high = mid;
+		else low = mid + 1;
+	}
+	const sectionIndex = low - 1;
+	const section = sections[sectionIndex];
+	if (!section || rowIndex >= section.firstRowIndex + section.rowCount) {
+		return -1;
+	}
+	return sectionIndex;
+}
+
 /**
  * Assigns compiled TwoHop cells directly to pooled surface slots.
  *
@@ -137,7 +157,7 @@ export function buildTwoHopMountedRows(params: {
 		previousBuild: previous,
 		reusableRowSlotsScratch: params.reusableRowSlotsScratch,
 		resolvedRowScratch: params.resolvedRowScratch,
-		findSectionIndexByRow: findTwoHopSectionIndexByRow,
+		findSectionIndexByRow: findTwoHopSectionIndexByRowFromSections,
 		resolveInitialSectionIndexByRow: resolveInitialTwoHopSectionIndexByRow,
 		resolveRowInSection: resolveTwoHopRowInSection,
 		resolveRowInSectionInto: resolveTwoHopRowInSectionInto,

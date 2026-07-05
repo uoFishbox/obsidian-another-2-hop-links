@@ -59,8 +59,9 @@ export interface TwoHopCellStore {
 	readonly logicalCellsBySectionIndex: Array<
 		Array<VirtualListLogicalCell<TwoHopVirtualListItem> | undefined>
 	>;
-	readonly materializationStateBySectionIndex: TwoHopSectionMaterializationState[];
-	readonly materializedSectionByIndex: boolean[];
+	readonly nextCellIndexBySection: Uint32Array;
+	readonly materializedCellCountBySection: Uint32Array;
+	readonly materializedSectionByIndex: Uint8Array;
 	nextUnmaterializedSectionIndex: number;
 	remainingUnmaterializedCellCount: number;
 	remainingUnmaterializedSectionCount: number;
@@ -93,6 +94,25 @@ export interface TwoHopRowTable {
 	readonly topByRow: Float64Array;
 }
 
+/**
+ * Struct-of-typed-arrays storage for compiled per-section prefix metadata.
+ *
+ * The descriptor-rich `sections` array remains the source for rendering and
+ * section identity. Scroll range resolution reads this table directly to keep
+ * binary searches and section-boundary math on contiguous numeric buffers.
+ */
+export interface TwoHopSectionTable {
+	readonly sectionCount: number;
+	readonly topBySection: Float64Array;
+	readonly heightBySection: Float64Array;
+	readonly firstRowIndexBySection: Uint32Array;
+	readonly rowCountBySection: Uint32Array;
+	readonly firstCellIndexBySection: Uint32Array;
+	readonly cellCountBySection: Uint32Array;
+	readonly visibleCountBySection: Uint32Array;
+	readonly showLoadMoreBySection: Uint8Array;
+}
+
 export interface TwoHopViewPlan {
 	readonly sections: readonly TwoHopSectionPlan[];
 	/**
@@ -105,6 +125,7 @@ export interface TwoHopViewPlan {
 	 */
 	readonly rows: readonly TwoHopRowPlan[];
 	readonly rowTable: TwoHopRowTable;
+	readonly sectionTable: TwoHopSectionTable;
 	readonly rowCount: number;
 	readonly cellCount: number;
 	readonly columns: number;
@@ -178,7 +199,7 @@ export type StablePreviewScrollTopBandMutable = {
 };
 
 export interface FindTwoHopRowsByOffsetParams {
-	readonly sections: readonly TwoHopSectionPlan[];
+	readonly sectionTable: TwoHopSectionTable;
 	readonly rowHeight: number;
 	readonly rowGap: number;
 	readonly scrollTop: number;

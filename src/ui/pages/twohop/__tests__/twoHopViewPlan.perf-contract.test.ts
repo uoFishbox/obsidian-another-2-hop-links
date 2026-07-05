@@ -9,6 +9,7 @@ import type { SectionRenderDescriptor } from "ui/components/sections/types";
 import {
 	compileTwoHopViewPlan,
 	createTwoHopViewPlanRowModel,
+	type TwoHopCellStore,
 	type TwoHopViewPlanMaterialization,
 	type TwoHopViewPlanRowModel,
 } from "../twoHopViewPlan";
@@ -47,6 +48,21 @@ const createBatchedMaterialization = (
 	background: {
 		maxCellCountPerSlice: backgroundCellCount,
 	},
+});
+
+const readMaterializedSectionFlags = (cellStore: TwoHopCellStore): boolean[] =>
+	Array.from(
+		cellStore.materializedSectionByIndex,
+		(materialized) => materialized !== 0,
+	);
+
+const readMaterializationState = (
+	cellStore: TwoHopCellStore,
+	sectionIndex: number,
+) => ({
+	nextCellIndex: cellStore.nextCellIndexBySection[sectionIndex],
+	materializedCellCount:
+		cellStore.materializedCellCountBySection[sectionIndex],
 });
 
 const layout = {
@@ -350,7 +366,7 @@ describe("TwoHop view-plan performance contracts", () => {
 
 		const plan = compilePlan(sections, { batched: true });
 
-		expect(plan.cellStore.materializedSectionByIndex).toEqual([
+		expect(readMaterializedSectionFlags(plan.cellStore)).toEqual([
 			...new Array<boolean>(10).fill(true),
 			...new Array<boolean>(22).fill(false),
 		]);
@@ -369,11 +385,11 @@ describe("TwoHop view-plan performance contracts", () => {
 			clampVisibleCount: (section, count) => Math.min(section.loadedCount, count),
 		});
 
-		expect(plan.cellStore.materializationStateBySectionIndex[0]).toEqual({
+		expect(readMaterializationState(plan.cellStore, 0)).toEqual({
 			nextCellIndex: 200,
 			materializedCellCount: 200,
 		});
-		expect(plan.cellStore.materializedSectionByIndex[0]).toBe(false);
+		expect(plan.cellStore.materializedSectionByIndex[0]).toBe(0);
 	});
 
 	it("materializes only the jumped-to mounted window during scrolling", () => {

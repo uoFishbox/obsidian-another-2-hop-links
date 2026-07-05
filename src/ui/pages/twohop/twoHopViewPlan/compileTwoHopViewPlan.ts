@@ -9,6 +9,7 @@ import type {
 	CompileTwoHopViewPlanParams,
 	TwoHopCellStore,
 	TwoHopRowTable,
+	TwoHopSectionTable,
 	TwoHopSectionPlan,
 	TwoHopViewPlan,
 } from "./types";
@@ -31,9 +32,13 @@ export function compileTwoHopViewPlan(
 	const gap = Math.max(0, params.layout.gap);
 	const sectionMarginBottom = Math.max(0, params.layout.sectionMarginBottom);
 	const sectionCount = params.sections.length;
-	const visibleCounts = new Uint32Array(sectionCount);
-	const cellCounts = new Uint32Array(sectionCount);
-	const rowCounts = new Uint32Array(sectionCount);
+	const topBySection = new Float64Array(sectionCount);
+	const heightBySection = new Float64Array(sectionCount);
+	const firstRowIndexBySection = new Uint32Array(sectionCount);
+	const rowCountBySection = new Uint32Array(sectionCount);
+	const firstCellIndexBySection = new Uint32Array(sectionCount);
+	const cellCountBySection = new Uint32Array(sectionCount);
+	const visibleCountBySection = new Uint32Array(sectionCount);
 	const showLoadMoreBySection = new Uint8Array(sectionCount);
 	const eagerItemsBySection: (readonly TwoHopVirtualListItem[] | undefined)[] = [];
 	const batchedMaterialization = params.materialization?.kind === "batched";
@@ -62,9 +67,9 @@ export function compileTwoHopViewPlan(
 		const showLoadMore = visibleCount < descriptor.loadedCount;
 		const cellCount = 1 + visibleItemCount + (showLoadMore ? 1 : 0);
 		const rowCount = Math.ceil(cellCount / columns);
-		visibleCounts[sectionIndex] = visibleCount;
-		cellCounts[sectionIndex] = cellCount;
-		rowCounts[sectionIndex] = rowCount;
+		visibleCountBySection[sectionIndex] = visibleCount;
+		cellCountBySection[sectionIndex] = cellCount;
+		rowCountBySection[sectionIndex] = rowCount;
 		showLoadMoreBySection[sectionIndex] = showLoadMore ? 1 : 0;
 		totalCellCount += cellCount;
 		totalRowCount += rowCount;
@@ -84,9 +89,9 @@ export function compileTwoHopViewPlan(
 
 	for (let sectionIndex = 0; sectionIndex < sectionCount; sectionIndex += 1) {
 		const descriptor = params.sections[sectionIndex];
-		const visibleCount = visibleCounts[sectionIndex];
-		const cellCount = cellCounts[sectionIndex];
-		const rowCount = rowCounts[sectionIndex];
+		const visibleCount = visibleCountBySection[sectionIndex];
+		const cellCount = cellCountBySection[sectionIndex];
+		const rowCount = rowCountBySection[sectionIndex];
 		const showLoadMore = showLoadMoreBySection[sectionIndex] !== 0;
 		const firstCellIndex = nextCellIndex;
 		nextCellIndex += cellCount;
@@ -96,6 +101,10 @@ export function compileTwoHopViewPlan(
 		const contentHeight =
 			rowCount > 0 ? rowCount * rowHeight + (rowCount - 1) * gap : 0;
 		const height = contentHeight + sectionMarginBottom;
+		topBySection[sectionIndex] = top;
+		heightBySection[sectionIndex] = height;
+		firstRowIndexBySection[sectionIndex] = firstRowIndex;
+		firstCellIndexBySection[sectionIndex] = firstCellIndex;
 
 		for (
 			let rowIndexInSection = 0;
@@ -149,6 +158,17 @@ export function compileTwoHopViewPlan(
 		top += height;
 	}
 
+	const sectionTable: TwoHopSectionTable = {
+		sectionCount,
+		topBySection,
+		heightBySection,
+		firstRowIndexBySection,
+		rowCountBySection,
+		firstCellIndexBySection,
+		cellCountBySection,
+		visibleCountBySection,
+		showLoadMoreBySection,
+	};
 	const cellStore = createTwoHopCellStore(
 		logicalCellsBySectionIndex,
 		sections.length,
@@ -166,6 +186,7 @@ export function compileTwoHopViewPlan(
 		sections,
 		rows: createTwoHopRowPlanFacade(rowTable),
 		rowTable,
+		sectionTable,
 		rowCount: totalRowCount,
 		cellCount: totalCellCount,
 		columns,

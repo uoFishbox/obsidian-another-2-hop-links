@@ -4,6 +4,7 @@ import type {
 	TwoHopVirtualListSection,
 	TwoHopVirtualListItem,
 } from "../twoHopVirtualListModel";
+import type { TwoHopCellStore, TwoHopSectionTable } from "../twoHopViewPlan";
 import * as viewPlanModule from "../twoHopViewPlan";
 import {
 	compileTwoHopViewPlan,
@@ -31,6 +32,52 @@ const createBatchedMaterialization = (
 			maxCellCountPerSlice: 200,
 		},
 	}) as const;
+
+const readMaterializedSectionFlags = (cellStore: TwoHopCellStore): boolean[] =>
+	Array.from(
+		cellStore.materializedSectionByIndex,
+		(materialized) => materialized !== 0,
+	);
+
+const readMaterializationState = (
+	cellStore: TwoHopCellStore,
+	sectionIndex: number,
+) => ({
+	nextCellIndex: cellStore.nextCellIndexBySection[sectionIndex],
+	materializedCellCount:
+		cellStore.materializedCellCountBySection[sectionIndex],
+});
+
+const createSectionTable = (
+	sections: readonly {
+		readonly top: number;
+		readonly firstRowIndex: number;
+		readonly rowCount: number;
+	}[],
+): TwoHopSectionTable => {
+	const sectionCount = sections.length;
+	const topBySection = new Float64Array(sectionCount);
+	const heightBySection = new Float64Array(sectionCount);
+	const firstRowIndexBySection = new Uint32Array(sectionCount);
+	const rowCountBySection = new Uint32Array(sectionCount);
+	for (let sectionIndex = 0; sectionIndex < sectionCount; sectionIndex += 1) {
+		const section = sections[sectionIndex];
+		topBySection[sectionIndex] = section.top;
+		firstRowIndexBySection[sectionIndex] = section.firstRowIndex;
+		rowCountBySection[sectionIndex] = section.rowCount;
+	}
+	return {
+		sectionCount,
+		topBySection,
+		heightBySection,
+		firstRowIndexBySection,
+		rowCountBySection,
+		firstCellIndexBySection: new Uint32Array(sectionCount),
+		cellCountBySection: new Uint32Array(sectionCount),
+		visibleCountBySection: new Uint32Array(sectionCount),
+		showLoadMoreBySection: new Uint8Array(sectionCount),
+	};
+};
 
 const layout = {
 	containerWidth: 320,
@@ -176,7 +223,7 @@ describe("compileTwoHopViewPlan", () => {
 			clampVisibleCount: (_section, count) => count,
 		});
 
-		expect(plan.cellStore.materializedSectionByIndex).toEqual([false, false]);
+		expect(readMaterializedSectionFlags(plan.cellStore)).toEqual([false, false]);
 		expect(
 			plan.cellStore.logicalCellsBySectionIndex.map(
 				(logicalCells) => logicalCells.length,
@@ -186,7 +233,7 @@ describe("compileTwoHopViewPlan", () => {
 			kind: "item",
 			sourceKey: "section-b::b",
 		});
-		expect(plan.cellStore.materializedSectionByIndex).toEqual([false, false]);
+		expect(readMaterializedSectionFlags(plan.cellStore)).toEqual([false, false]);
 		expect(
 			plan.cellStore.logicalCellsBySectionIndex[1].map((cell) => cell?.kind),
 		).toEqual([undefined, "item"]);
@@ -473,7 +520,7 @@ describe("compileTwoHopViewPlan", () => {
 				eagerRowModel.getRowTop?.(rowIndex),
 			),
 		);
-		expect(batchedPlan.cellStore.materializedSectionByIndex).toEqual([
+		expect(readMaterializedSectionFlags(batchedPlan.cellStore)).toEqual([
 			true,
 			true,
 			true,
@@ -493,14 +540,14 @@ describe("compileTwoHopViewPlan", () => {
 		expect(hasUnmaterializedTwoHopSections(batchedPlan)).toBe(true);
 
 		expect(batchedRowModel.getRow(11)?.getCell(1)?.kind).toBe("item");
-		expect(batchedPlan.cellStore.materializedSectionByIndex[11]).toBe(false);
+		expect(batchedPlan.cellStore.materializedSectionByIndex[11]).toBe(0);
 		expect(batchedPlan.cellStore.nextUnmaterializedSectionIndex).toBe(10);
 		expect(batchedPlan.cellStore.remainingUnmaterializedSectionCount).toBe(2);
 		// Synchronous scroll-style materialization must keep the progress
 		// bookkeeping in sync with the cache: section 11's item cell was just
 		// filled out-of-band, so one fewer cell remains for the background
 		// materializer to process.
-		expect(batchedPlan.cellStore.materializationStateBySectionIndex[11]).toEqual({
+		expect(readMaterializationState(batchedPlan.cellStore, 11)).toEqual({
 			nextCellIndex: 0,
 			materializedCellCount: 1,
 		});
@@ -514,7 +561,7 @@ describe("compileTwoHopViewPlan", () => {
 				maxSectionCount: 10,
 			}),
 		).toBe(true);
-		expect(batchedPlan.cellStore.materializedSectionByIndex).toEqual(
+		expect(readMaterializedSectionFlags(batchedPlan.cellStore)).toEqual(
 			new Array<boolean>(12).fill(true),
 		);
 		expect(getItemsBySection.map((getItems) => getItems.mock.calls.length)).toEqual(
@@ -546,7 +593,11 @@ describe("compileTwoHopViewPlan", () => {
 				maxCellCount: 3,
 			}),
 		).toBe(true);
-		expect(plan.cellStore.materializedSectionByIndex).toEqual([true, false, false]);
+		expect(readMaterializedSectionFlags(plan.cellStore)).toEqual([
+			true,
+			false,
+			false,
+		]);
 	});
 
 	it("bounds initial materialization by cell count", () => {
@@ -563,7 +614,11 @@ describe("compileTwoHopViewPlan", () => {
 			clampVisibleCount: (_section, count) => count,
 		});
 
-		expect(plan.cellStore.materializedSectionByIndex).toEqual([true, false, false]);
+		expect(readMaterializedSectionFlags(plan.cellStore)).toEqual([
+			true,
+			false,
+			false,
+		]);
 	});
 
 	it("stops deferred materialization when its time budget is exhausted", () => {
@@ -590,8 +645,8 @@ describe("compileTwoHopViewPlan", () => {
 				shouldContinue,
 			}),
 		).toBe(true);
-		expect(plan.cellStore.materializedSectionByIndex).toEqual([false, false]);
-		expect(plan.cellStore.materializationStateBySectionIndex[0]).toEqual({
+		expect(readMaterializedSectionFlags(plan.cellStore)).toEqual([false, false]);
+		expect(readMaterializationState(plan.cellStore, 0)).toEqual({
 			nextCellIndex: 1,
 			materializedCellCount: 1,
 		});
@@ -621,8 +676,8 @@ describe("compileTwoHopViewPlan", () => {
 				maxCellCount: 2,
 			}),
 		).toBe(true);
-		expect(plan.cellStore.materializedSectionByIndex).toEqual([false, false]);
-		expect(plan.cellStore.materializationStateBySectionIndex[0]).toEqual({
+		expect(readMaterializedSectionFlags(plan.cellStore)).toEqual([false, false]);
+		expect(readMaterializationState(plan.cellStore, 0)).toEqual({
 			nextCellIndex: 2,
 			materializedCellCount: 2,
 		});
@@ -825,12 +880,14 @@ describe("compileTwoHopViewPlan", () => {
 });
 
 describe("findTwoHopRowsByOffset", () => {
-	const sections = [{ top: 0, firstRowIndex: 0, rowCount: 3 }] as never;
+	const sectionTable = createSectionTable([
+		{ top: 0, firstRowIndex: 0, rowCount: 3 },
+	]);
 
 	it("calculates the row index within a section", () => {
 		expect(
 			findTwoHopRowsByOffset({
-				sections,
+				sectionTable,
 				rowHeight: 50,
 				rowGap: 10,
 				scrollTop: 55,
@@ -844,7 +901,7 @@ describe("findTwoHopRowsByOffset", () => {
 		const out = { start: -1, end: -1 };
 
 		findTwoHopRowsByOffsetInto(out, {
-			sections,
+			sectionTable,
 			rowHeight: 50,
 			rowGap: 10,
 			scrollTop: 55,
@@ -858,7 +915,7 @@ describe("findTwoHopRowsByOffset", () => {
 	it("excludes rows that only touch the viewport boundaries", () => {
 		expect(
 			findTwoHopRowsByOffset({
-				sections,
+				sectionTable,
 				rowHeight: 50,
 				rowGap: 10,
 				scrollTop: 50,
@@ -871,10 +928,10 @@ describe("findTwoHopRowsByOffset", () => {
 	it("finds sections across section margins", () => {
 		expect(
 			findTwoHopRowsByOffset({
-				sections: [
+				sectionTable: createSectionTable([
 					{ top: 0, firstRowIndex: 0, rowCount: 2 },
 					{ top: 200, firstRowIndex: 2, rowCount: 2 },
-				] as never,
+				]),
 				rowHeight: 50,
 				rowGap: 10,
 				scrollTop: 170,
@@ -887,10 +944,10 @@ describe("findTwoHopRowsByOffset", () => {
 	it("excludes the next section when the viewport end matches its top", () => {
 		expect(
 			findTwoHopRowsByOffset({
-				sections: [
+				sectionTable: createSectionTable([
 					{ top: 0, firstRowIndex: 0, rowCount: 2 },
 					{ top: 200, firstRowIndex: 2, rowCount: 2 },
-				] as never,
+				]),
 				rowHeight: 50,
 				rowGap: 10,
 				scrollTop: 60,
@@ -903,10 +960,10 @@ describe("findTwoHopRowsByOffset", () => {
 	it("returns no rows for zero-height sections", () => {
 		expect(
 			findTwoHopRowsByOffset({
-				sections: [
+				sectionTable: createSectionTable([
 					{ top: 0, firstRowIndex: 0, rowCount: 1 },
 					{ top: 0, firstRowIndex: 1, rowCount: 1 },
-				] as never,
+				]),
 				rowHeight: 0,
 				rowGap: 0,
 				scrollTop: 0,
@@ -1005,10 +1062,12 @@ describe("scroll-driven materialization keeps bookkeeping in sync", () => {
 			clampVisibleCount: (_section, count) => count,
 		});
 		const rowModel = createTwoHopViewPlanRowModel(plan);
-		const state = plan.cellStore.materializationStateBySectionIndex[0];
 
 		expect(plan.cellStore.remainingUnmaterializedCellCount).toBe(7);
-		expect(state).toEqual({ nextCellIndex: 0, materializedCellCount: 0 });
+		expect(readMaterializationState(plan.cellStore, 0)).toEqual({
+			nextCellIndex: 0,
+			materializedCellCount: 0,
+		});
 
 		// Simulate a deep scroll: the mounted-row builder synchronously
 		// materializes cells for late rows before the idle/background task
@@ -1026,9 +1085,12 @@ describe("scroll-driven materialization keeps bookkeeping in sync", () => {
 		expect(scrollCell4?.kind).toBe("item");
 		expect(scrollCell6?.kind).toBe("item");
 		// Rows 2-3 cover cells 4,5,6; the bookkeeping counts exactly those.
-		expect(state).toEqual({ nextCellIndex: 0, materializedCellCount: 3 });
+		expect(readMaterializationState(plan.cellStore, 0)).toEqual({
+			nextCellIndex: 0,
+			materializedCellCount: 3,
+		});
 		expect(plan.cellStore.remainingUnmaterializedCellCount).toBe(4);
-		expect(plan.cellStore.materializedSectionByIndex).toEqual([false]);
+		expect(readMaterializedSectionFlags(plan.cellStore)).toEqual([false]);
 
 		// The background materializer walks the remaining prefix (cells 0-3)
 		// and must fast-forward past the scroll-materialized tail without
@@ -1038,9 +1100,12 @@ describe("scroll-driven materialization keeps bookkeeping in sync", () => {
 			changed: true,
 			affectedRowRange: { start: 0, end: 2 },
 		});
-		expect(state).toEqual({ nextCellIndex: 4, materializedCellCount: 7 });
+		expect(readMaterializationState(plan.cellStore, 0)).toEqual({
+			nextCellIndex: 4,
+			materializedCellCount: 7,
+		});
 		expect(plan.cellStore.remainingUnmaterializedCellCount).toBe(0);
-		expect(plan.cellStore.materializedSectionByIndex).toEqual([true]);
+		expect(readMaterializedSectionFlags(plan.cellStore)).toEqual([true]);
 		expect(plan.cellStore.nextUnmaterializedSectionIndex).toBe(1);
 		// The scroll-materialized cells were not re-created by the background.
 		expect(plan.cellStore.logicalCellsBySectionIndex[0][4]).toBe(scrollCell4);

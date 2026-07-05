@@ -11,14 +11,9 @@ export function createTwoHopCellStore(
 ): TwoHopCellStore {
 	return {
 		logicalCellsBySectionIndex,
-		materializationStateBySectionIndex: Array.from(
-			{ length: sectionCount },
-			() => ({
-				nextCellIndex: 0,
-				materializedCellCount: 0,
-			}),
-		),
-		materializedSectionByIndex: new Array<boolean>(sectionCount).fill(false),
+		nextCellIndexBySection: new Uint32Array(sectionCount),
+		materializedCellCountBySection: new Uint32Array(sectionCount),
+		materializedSectionByIndex: new Uint8Array(sectionCount),
 		nextUnmaterializedSectionIndex: 0,
 		remainingUnmaterializedCellCount: totalCellCount,
 		remainingUnmaterializedSectionCount: sectionCount,
@@ -35,8 +30,8 @@ export function markTwoHopSectionMaterialized(
 	sectionIndex: number,
 ): void {
 	const cellStore = plan.cellStore;
-	if (cellStore.materializedSectionByIndex[sectionIndex]) return;
-	cellStore.materializedSectionByIndex[sectionIndex] = true;
+	if (cellStore.materializedSectionByIndex[sectionIndex] !== 0) return;
+	cellStore.materializedSectionByIndex[sectionIndex] = 1;
 	cellStore.remainingUnmaterializedSectionCount -= 1;
 }
 
@@ -57,13 +52,15 @@ export function recordTwoHopCellFilled(
 	sectionIndex: number,
 ): boolean {
 	const cellStore = plan.cellStore;
-	const state = cellStore.materializationStateBySectionIndex[sectionIndex];
 	const sectionPlan = plan.sections[sectionIndex];
-	if (!state || !sectionPlan) return false;
-	state.materializedCellCount += 1;
+	if (!sectionPlan || sectionIndex < 0) return false;
+	cellStore.materializedCellCountBySection[sectionIndex] += 1;
 	cellStore.remainingUnmaterializedCellCount = Math.max(
 		0,
 		cellStore.remainingUnmaterializedCellCount - 1,
 	);
-	return state.materializedCellCount >= sectionPlan.cellCount;
+	return (
+		cellStore.materializedCellCountBySection[sectionIndex] >=
+		sectionPlan.cellCount
+	);
 }

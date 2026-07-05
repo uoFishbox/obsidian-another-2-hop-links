@@ -9,6 +9,7 @@ export type {
 	TwoHopResolvedRow,
 	TwoHopRowPlan,
 	TwoHopRowTable,
+	TwoHopSectionTable,
 	TwoHopSectionMaterializationState,
 	TwoHopSectionPlan,
 	TwoHopViewPlan,

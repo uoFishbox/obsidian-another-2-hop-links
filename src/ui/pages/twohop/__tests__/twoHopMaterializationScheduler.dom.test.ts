@@ -4,6 +4,7 @@ import {
 	resetScrollActivityForTests,
 } from "infrastructure/scroll/scrollActivity";
 import type { TwoHopVirtualSectionDescriptor } from "../twoHopVirtualListModel";
+import type { TwoHopCellStore } from "../twoHopViewPlan";
 import { createTwoHopRowModelCache } from "../twoHopRowModelCache";
 import { createTwoHopMaterializationScheduler } from "../twoHopMaterializationScheduler";
 
@@ -52,6 +53,15 @@ const createBatchedMaterialization = (backgroundCellCount: number) =>
 			maxCellCountPerSlice: backgroundCellCount,
 		},
 	}) as const;
+
+const readMaterializationState = (
+	cellStore: TwoHopCellStore,
+	sectionIndex: number,
+) => ({
+	nextCellIndex: cellStore.nextCellIndexBySection[sectionIndex],
+	materializedCellCount:
+		cellStore.materializedCellCountBySection[sectionIndex],
+});
 
 function installIdleCallbackHarness() {
 	let nextIdleCallbackId = 1;
@@ -130,7 +140,7 @@ describe("createTwoHopMaterializationScheduler in a DOM runtime", () => {
 		const { materialization, rowModel } = createDeferredRowModel();
 		const scheduler = createTwoHopMaterializationScheduler({ materialization });
 
-		expect(rowModel.plan.cellStore.materializationStateBySectionIndex[0]).toEqual({
+		expect(readMaterializationState(rowModel.plan.cellStore, 0)).toEqual({
 			nextCellIndex: 0,
 			materializedCellCount: 0,
 		});
@@ -138,7 +148,7 @@ describe("createTwoHopMaterializationScheduler in a DOM runtime", () => {
 		scheduler.schedule(rowModel, onMaterialized);
 		idle.idleCallbacks.get(idle.latestCallbackId)?.(idleDeadline);
 
-		expect(rowModel.plan.cellStore.materializationStateBySectionIndex[0]).toEqual({
+		expect(readMaterializationState(rowModel.plan.cellStore, 0)).toEqual({
 			nextCellIndex: 1,
 			materializedCellCount: 1,
 		});
@@ -158,8 +168,7 @@ describe("createTwoHopMaterializationScheduler in a DOM runtime", () => {
 
 		expect(rowModel.plan.cellStore.revision).toBe(0);
 		expect(
-			rowModel.plan.cellStore.materializationStateBySectionIndex[0]
-				?.materializedCellCount,
+			rowModel.plan.cellStore.materializedCellCountBySection[0],
 		).toBe(0);
 		expect(onMaterialized).not.toHaveBeenCalled();
 		// No re-scheduled idle callback while scroll is active.

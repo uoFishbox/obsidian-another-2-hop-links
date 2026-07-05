@@ -8,23 +8,28 @@ import type {
 	TwoHopBandRowTopsMutable,
 	TwoHopResolvedRow,
 	TwoHopSectionPlan,
+	TwoHopSectionTable,
 	TwoHopViewPlan,
 } from "./types";
 export function findTwoHopSectionIndexByRow(
-	sections: readonly TwoHopSectionPlan[],
+	sectionTable: TwoHopSectionTable,
 	rowIndex: number,
 ): number {
-	if (rowIndex < 0 || sections.length === 0) return -1;
+	if (rowIndex < 0 || sectionTable.sectionCount === 0) return -1;
 	let low = 0;
-	let high = sections.length;
+	let high = sectionTable.sectionCount;
 	while (low < high) {
 		const mid = (low + high) >>> 1;
-		if (sections[mid].firstRowIndex > rowIndex) high = mid;
+		if (sectionTable.firstRowIndexBySection[mid] > rowIndex) high = mid;
 		else low = mid + 1;
 	}
 	const sectionIndex = low - 1;
-	const section = sections[sectionIndex];
-	if (!section || rowIndex >= section.firstRowIndex + section.rowCount) {
+	if (
+		sectionIndex < 0 ||
+		rowIndex >=
+			sectionTable.firstRowIndexBySection[sectionIndex] +
+				sectionTable.rowCountBySection[sectionIndex]
+	) {
 		return -1;
 	}
 	return sectionIndex;
@@ -128,120 +133,133 @@ export function resolveTwoHopRowTopsForBandInto(
 }
 
 function upperBoundSectionTop(
-	sections: readonly TwoHopSectionPlan[],
+	sectionTable: TwoHopSectionTable,
 	target: number,
 ): number {
 	let low = 0;
-	let high = sections.length;
+	let high = sectionTable.sectionCount;
 	while (low < high) {
 		const mid = (low + high) >>> 1;
-		if (sections[mid].top > target) high = mid;
+		if (sectionTable.topBySection[mid] > target) high = mid;
 		else low = mid + 1;
 	}
 	return low;
 }
 
 function lowerBoundSectionTop(
-	sections: readonly TwoHopSectionPlan[],
+	sectionTable: TwoHopSectionTable,
 	target: number,
 ): number {
 	let low = 0;
-	let high = sections.length;
+	let high = sectionTable.sectionCount;
 	while (low < high) {
 		const mid = (low + high) >>> 1;
-		if (sections[mid].top >= target) high = mid;
+		if (sectionTable.topBySection[mid] >= target) high = mid;
 		else low = mid + 1;
 	}
 	return low;
 }
 
+function readTwoHopSectionTableRowCount(
+	sectionTable: TwoHopSectionTable,
+): number {
+	if (sectionTable.sectionCount === 0) return 0;
+	const lastSectionIndex = sectionTable.sectionCount - 1;
+	return (
+		sectionTable.firstRowIndexBySection[lastSectionIndex] +
+		sectionTable.rowCountBySection[lastSectionIndex]
+	);
+}
+
 function writeFirstTwoHopRowByTopFromSection(
 	out: FirstTwoHopRowByTopResolutionScratch,
-	sections: readonly TwoHopSectionPlan[],
+	sectionTable: TwoHopSectionTable,
 	rowStride: number,
 	target: number,
 	inclusive: boolean,
 	sectionIndex: number,
 	rowCount: number,
 ): void {
-	const section = sections[sectionIndex];
-	if (!section) {
+	if (sectionIndex < 0 || sectionIndex >= sectionTable.sectionCount) {
 		out.rowIndex = rowCount;
-		out.sectionIndex = sections.length;
+		out.sectionIndex = sectionTable.sectionCount;
 		return;
 	}
-	const relativeTarget = target - section.top;
+	const sectionTop = sectionTable.topBySection[sectionIndex];
+	const sectionRowCount = sectionTable.rowCountBySection[sectionIndex];
+	const relativeTarget = target - sectionTop;
 	const rowIndexInSection = inclusive
 		? Math.ceil(relativeTarget / rowStride)
 		: Math.floor(relativeTarget / rowStride) + 1;
 	const firstMatchingRowIndex = Math.max(0, rowIndexInSection);
-	if (firstMatchingRowIndex < section.rowCount) {
-		out.rowIndex = section.firstRowIndex + firstMatchingRowIndex;
+	if (firstMatchingRowIndex < sectionRowCount) {
+		out.rowIndex =
+			sectionTable.firstRowIndexBySection[sectionIndex] + firstMatchingRowIndex;
 		out.sectionIndex = sectionIndex;
 		return;
 	}
 	const nextSectionIndex = sectionIndex + 1;
-	const nextSection = sections[nextSectionIndex];
-	if (nextSection) {
-		out.rowIndex = nextSection.firstRowIndex;
+	if (nextSectionIndex < sectionTable.sectionCount) {
+		out.rowIndex = sectionTable.firstRowIndexBySection[nextSectionIndex];
 		out.sectionIndex = nextSectionIndex;
 	} else {
 		out.rowIndex = rowCount;
-		out.sectionIndex = sections.length;
+		out.sectionIndex = sectionTable.sectionCount;
 	}
 }
 
 function canResolveFirstTwoHopRowByTopFromSection(
-	sections: readonly TwoHopSectionPlan[],
+	sectionTable: TwoHopSectionTable,
 	target: number,
 	inclusive: boolean,
 	sectionIndex: number,
 ): boolean {
-	const nextSection = sections[sectionIndex + 1];
-	if (!nextSection) return true;
-	return target < nextSection.top || (inclusive && target === nextSection.top);
+	const nextSectionIndex = sectionIndex + 1;
+	if (nextSectionIndex >= sectionTable.sectionCount) return true;
+	const nextSectionTop = sectionTable.topBySection[nextSectionIndex];
+	return target < nextSectionTop || (inclusive && target === nextSectionTop);
 }
 
 function writeFirstTwoHopRowByTop(
 	out: FirstTwoHopRowByTopResolutionScratch,
-	sections: readonly TwoHopSectionPlan[],
+	sectionTable: TwoHopSectionTable,
 	rowStride: number,
 	target: number,
 	inclusive: boolean,
 ): void {
-	if (sections.length === 0) {
+	if (sectionTable.sectionCount === 0) {
 		out.rowIndex = 0;
 		out.sectionIndex = 0;
 		return;
 	}
-	const lastSection = sections[sections.length - 1];
-	const rowCount = lastSection.firstRowIndex + lastSection.rowCount;
+	const rowCount = readTwoHopSectionTableRowCount(sectionTable);
 	const boundaryIndex = inclusive
-		? lowerBoundSectionTop(sections, target)
-		: upperBoundSectionTop(sections, target);
+		? lowerBoundSectionTop(sectionTable, target)
+		: upperBoundSectionTop(sectionTable, target);
 	if (inclusive) {
-		const matchingSection = sections[boundaryIndex];
-		if (matchingSection?.top === target) {
-			out.rowIndex = matchingSection.firstRowIndex;
+		if (
+			boundaryIndex < sectionTable.sectionCount &&
+			sectionTable.topBySection[boundaryIndex] === target
+		) {
+			out.rowIndex = sectionTable.firstRowIndexBySection[boundaryIndex];
 			out.sectionIndex = boundaryIndex;
 			return;
 		}
 	}
 	if (rowStride <= 0) {
-		const matchingSection = sections[boundaryIndex];
-		if (matchingSection) {
-			out.rowIndex = matchingSection.firstRowIndex;
+		if (boundaryIndex < sectionTable.sectionCount) {
+			out.rowIndex = sectionTable.firstRowIndexBySection[boundaryIndex];
 			out.sectionIndex = boundaryIndex;
 		} else {
 			out.rowIndex = rowCount;
-			out.sectionIndex = sections.length;
+			out.sectionIndex = sectionTable.sectionCount;
 		}
 		return;
 	}
 	const sectionIndex = Math.max(0, boundaryIndex - 1);
 	writeFirstTwoHopRowByTopFromSection(
 		out,
-		sections,
+		sectionTable,
 		rowStride,
 		target,
 		inclusive,
@@ -253,14 +271,14 @@ function writeFirstTwoHopRowByTop(
 export function writeTwoHopRowsByOffsetIntoScratch(
 	out: RowRange,
 	resolutionScratch: FirstTwoHopRowByTopResolutionScratch,
-	sections: readonly TwoHopSectionPlan[],
+	sectionTable: TwoHopSectionTable,
 	rowHeight: number,
 	rowGap: number,
 	scrollTop: number,
 	viewportHeight: number,
 	overscanPx: number,
 ): void {
-	if (sections.length === 0 || viewportHeight <= 0) {
+	if (sectionTable.sectionCount === 0 || viewportHeight <= 0) {
 		out.start = 0;
 		out.end = 0;
 		return;
@@ -273,20 +291,19 @@ export function writeTwoHopRowsByOffsetIntoScratch(
 	const endTarget = endOffset;
 	writeFirstTwoHopRowByTop(
 		resolutionScratch,
-		sections,
+		sectionTable,
 		rowStride,
 		startTarget,
 		false,
 	);
-	const lastSection = sections[sections.length - 1];
-	const rowCount = lastSection.firstRowIndex + lastSection.rowCount;
+	const rowCount = readTwoHopSectionTableRowCount(sectionTable);
 	const start = resolutionScratch.rowIndex;
 	const startSectionIndex = resolutionScratch.sectionIndex;
 	let endRow: number;
 	if (
 		rowStride > 0 &&
 		canResolveFirstTwoHopRowByTopFromSection(
-			sections,
+			sectionTable,
 			endTarget,
 			true,
 			startSectionIndex,
@@ -294,7 +311,7 @@ export function writeTwoHopRowsByOffsetIntoScratch(
 	) {
 		writeFirstTwoHopRowByTopFromSection(
 			resolutionScratch,
-			sections,
+			sectionTable,
 			rowStride,
 			endTarget,
 			true,
@@ -305,7 +322,7 @@ export function writeTwoHopRowsByOffsetIntoScratch(
 	} else {
 		writeFirstTwoHopRowByTop(
 			resolutionScratch,
-			sections,
+			sectionTable,
 			rowStride,
 			endTarget,
 			true,
@@ -318,7 +335,7 @@ export function writeTwoHopRowsByOffsetIntoScratch(
 
 function writeTwoHopRowsByOffset(
 	out: RowRange,
-	sections: readonly TwoHopSectionPlan[],
+	sectionTable: TwoHopSectionTable,
 	rowHeight: number,
 	rowGap: number,
 	scrollTop: number,
@@ -332,7 +349,7 @@ function writeTwoHopRowsByOffset(
 	writeTwoHopRowsByOffsetIntoScratch(
 		out,
 		resolutionScratch,
-		sections,
+		sectionTable,
 		rowHeight,
 		rowGap,
 		scrollTop,
@@ -347,7 +364,7 @@ export function findTwoHopRowsByOffsetInto(
 ): void {
 	writeTwoHopRowsByOffset(
 		out,
-		params.sections,
+		params.sectionTable,
 		params.rowHeight,
 		params.rowGap,
 		params.scrollTop,

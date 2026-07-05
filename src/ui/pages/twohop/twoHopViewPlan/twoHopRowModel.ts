@@ -57,7 +57,7 @@ export function createTwoHopViewPlanRowModel(
 		writeTwoHopRowsByOffsetIntoScratch(
 			out,
 			resolutionScratch,
-			plan.sections,
+			plan.sectionTable,
 			plan.rowHeight,
 			plan.rowGap,
 			scrollTop,

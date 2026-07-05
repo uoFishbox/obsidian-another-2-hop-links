@@ -21,10 +21,10 @@ export function resolveInitialMaterializationCellCount(
 	let cellCount = 0;
 	for (
 		let sectionIndex = 0;
-		sectionIndex < Math.min(sectionCount, plan.sections.length);
+		sectionIndex < Math.min(sectionCount, plan.sectionTable.sectionCount);
 		sectionIndex += 1
 	) {
-		cellCount += plan.sections[sectionIndex]?.cellCount ?? 0;
+		cellCount += plan.sectionTable.cellCountBySection[sectionIndex];
 	}
 	return cellCount;
 }
@@ -107,7 +107,7 @@ export function materializeTwoHopSectionCells(
 ): boolean {
 	const sectionPlan = plan.sections[sectionIndex];
 	const cellStore = plan.cellStore;
-	if (!sectionPlan || cellStore.materializedSectionByIndex[sectionIndex]) {
+	if (!sectionPlan || cellStore.materializedSectionByIndex[sectionIndex] !== 0) {
 		return false;
 	}
 	let changed = false;
@@ -120,19 +120,19 @@ export function materializeTwoHopSectionCells(
 				resolvedItems,
 			) || changed;
 	}
-	const state = cellStore.materializationStateBySectionIndex[sectionIndex];
-	if (state) {
-		const remainingCells = Math.max(
-			0,
-			sectionPlan.cellCount - state.materializedCellCount,
-		);
-		state.nextCellIndex = sectionPlan.cellCount;
-		state.materializedCellCount = sectionPlan.cellCount;
-		cellStore.remainingUnmaterializedCellCount = Math.max(
-			0,
-			cellStore.remainingUnmaterializedCellCount - remainingCells,
-		);
-	}
+	const materializedCellCount =
+		cellStore.materializedCellCountBySection[sectionIndex];
+	const remainingCells = Math.max(
+		0,
+		sectionPlan.cellCount - materializedCellCount,
+	);
+	cellStore.nextCellIndexBySection[sectionIndex] = sectionPlan.cellCount;
+	cellStore.materializedCellCountBySection[sectionIndex] =
+		sectionPlan.cellCount;
+	cellStore.remainingUnmaterializedCellCount = Math.max(
+		0,
+		cellStore.remainingUnmaterializedCellCount - remainingCells,
+	);
 	markTwoHopSectionMaterialized(plan, sectionIndex);
 	if (changed) {
 		markTwoHopMaterializationChanged(plan);
@@ -186,12 +186,14 @@ export function materializeNextTwoHopCellBatch(
 		if (options.shouldContinue && !options.shouldContinue()) break;
 		const sectionIndex = cellStore.nextUnmaterializedSectionIndex;
 		const sectionPlan = plan.sections[sectionIndex];
-		const state = cellStore.materializationStateBySectionIndex[sectionIndex];
-		if (!sectionPlan || !state) {
+		if (!sectionPlan) {
 			cellStore.nextUnmaterializedSectionIndex += 1;
 			continue;
 		}
-		if (state.materializedCellCount >= sectionPlan.cellCount) {
+		if (
+			cellStore.materializedCellCountBySection[sectionIndex] >=
+			sectionPlan.cellCount
+		) {
 			markTwoHopSectionMaterialized(plan, sectionIndex);
 			cellStore.nextUnmaterializedSectionIndex += 1;
 			continue;
@@ -201,21 +203,26 @@ export function materializeNextTwoHopCellBatch(
 		// accounted for at their fill point, so re-walking them here would
 		// double-count progress and waste the slice budget; skip them for free.
 		const logicalCells = cellStore.logicalCellsBySectionIndex[sectionIndex];
+		let nextCellIndex = cellStore.nextCellIndexBySection[sectionIndex];
 		while (
-			state.nextCellIndex < sectionPlan.cellCount &&
-			logicalCells?.[state.nextCellIndex] !== undefined
+			nextCellIndex < sectionPlan.cellCount &&
+			logicalCells?.[nextCellIndex] !== undefined
 		) {
-			state.nextCellIndex += 1;
+			nextCellIndex += 1;
 		}
-		if (state.nextCellIndex >= sectionPlan.cellCount) {
+		cellStore.nextCellIndexBySection[sectionIndex] = nextCellIndex;
+		if (nextCellIndex >= sectionPlan.cellCount) {
 			// Every remaining cell in this section is already materialized.
-			if (state.materializedCellCount >= sectionPlan.cellCount) {
+			if (
+				cellStore.materializedCellCountBySection[sectionIndex] >=
+				sectionPlan.cellCount
+			) {
 				markTwoHopSectionMaterialized(plan, sectionIndex);
 			}
 			cellStore.nextUnmaterializedSectionIndex += 1;
 			continue;
 		}
-		const cellIndex = state.nextCellIndex;
+		const cellIndex = nextCellIndex;
 		const newlyMaterialized = ensureTwoHopSectionCellMaterialized(
 			plan,
 			sectionPlan,
@@ -232,7 +239,7 @@ export function materializeNextTwoHopCellBatch(
 			if (globalRowIndex > maxAffectedRowIndex) {
 				maxAffectedRowIndex = globalRowIndex;
 			}
-			state.nextCellIndex += 1;
+			cellStore.nextCellIndexBySection[sectionIndex] = cellIndex + 1;
 			remainingCellBudget -= 1;
 			if (sectionCompleted) {
 				markTwoHopSectionMaterialized(plan, sectionIndex);
@@ -246,7 +253,7 @@ export function materializeNextTwoHopCellBatch(
 				0,
 				cellStore.remainingUnmaterializedCellCount - 1,
 			);
-			state.nextCellIndex += 1;
+			cellStore.nextCellIndexBySection[sectionIndex] = cellIndex + 1;
 			remainingCellBudget -= 1;
 		}
 	}
@@ -301,7 +308,7 @@ function materializeSectionCellRange(
 	startCellIndex: number,
 	endCellIndex: number,
 ): boolean {
-	if (plan.cellStore.materializedSectionByIndex[sectionIndex]) return false;
+	if (plan.cellStore.materializedSectionByIndex[sectionIndex] !== 0) return false;
 	const sectionPlan = plan.sections[sectionIndex];
 	if (!sectionPlan) return false;
 	let changed = false;
@@ -364,7 +371,7 @@ export function ensureTwoHopMountedRangeMaterialized(
 			continue;
 		}
 		// Skip entire section if already materialized.
-		if (cellStore.materializedSectionByIndex[sectionIndex]) {
+		if (cellStore.materializedSectionByIndex[sectionIndex] !== 0) {
 			let nextRow = rowIndex + 1;
 			while (nextRow < end && table.sectionIndexByRow[nextRow] === sectionIndex) {
 				nextRow += 1;
