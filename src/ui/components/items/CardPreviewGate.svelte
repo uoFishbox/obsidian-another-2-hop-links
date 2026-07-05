@@ -13,6 +13,7 @@
 		type RowPreviewActivationRuntime,
 	} from "features/preview/scheduling/rowPreviewActivationRuntime";
 	import {
+		registerPreviewActivationBackpressure,
 		requestQueuedPreviewActivation,
 		type PreviewActivationHandle,
 	} from "features/preview/scheduling/previewActivationScheduler";
@@ -43,6 +44,7 @@
 			options?: PreviewRequestOptions,
 		) => Promise<PreviewData>;
 		getVisiblePreviewQueueSize?: () => number;
+		getActiveVisiblePreviewCount?: () => number;
 		applicationStore: ApplicationStore;
 		searchQuery?: string;
 		searchScope?: "title-only" | "title-and-content";
@@ -56,6 +58,7 @@
 		file,
 		getPreview,
 		getVisiblePreviewQueueSize: providedGetVisiblePreviewQueueSize,
+		getActiveVisiblePreviewCount: providedGetActiveVisiblePreviewCount,
 		applicationStore,
 		searchQuery = "",
 		searchScope = "title-and-content",
@@ -66,6 +69,8 @@
 	}: Props = $props();
 
 	const getVisiblePreviewQueueSize = providedGetVisiblePreviewQueueSize ?? (() => 0);
+	const getActiveVisiblePreviewCount =
+		providedGetActiveVisiblePreviewCount ?? (() => 0);
 	const previewVisibilityContext = getContext<PreviewVisibilityContext | undefined>(
 		PREVIEW_VISIBILITY_CONTEXT_KEY,
 	);
@@ -110,8 +115,7 @@
 	let unregisterRowActivationCandidate: (() => void) | undefined = undefined;
 	let registeredRowActivationCandidateId: string | undefined = undefined;
 	let registeredRowActivationCandidateRowIndex: number | undefined = undefined;
-	let registeredRowActivationCandidatePreviewIdentity: string | undefined =
-		undefined;
+	let registeredRowActivationCandidatePreviewIdentity: string | undefined = undefined;
 	const fallbackCandidateId = `card-preview-gate:${++nextCardPreviewGateId}`;
 
 	let renderedPreviewSnapshot = $state.raw<RenderedPreviewSnapshot | undefined>(
@@ -131,6 +135,7 @@
 		void file;
 		void getPreview;
 		void providedGetVisiblePreviewQueueSize;
+		void providedGetActiveVisiblePreviewCount;
 		void applicationStore;
 		void searchQuery;
 		void searchScope;
@@ -245,7 +250,6 @@
 				id: candidateId,
 				rowIndex,
 				activationKey: previewIdentity,
-				getVisibleQueueSize: getVisiblePreviewQueueSize,
 				onActivated: (activationKey) => {
 					if (
 						!file ||
@@ -312,12 +316,13 @@
 			if (!file || previewIdentity !== identity) return;
 			if (virtualizedVisibility !== "visible") return;
 
-			commitRenderedPreviewSnapshot(createRenderedPreviewSnapshot(identity, file));
+			commitRenderedPreviewSnapshot(
+				createRenderedPreviewSnapshot(identity, file),
+			);
 		};
 
 		request = requestQueuedPreviewActivation(
 			identity,
-			getVisiblePreviewQueueSize,
 			previewActivationScope,
 			onSettled,
 		);
@@ -336,6 +341,17 @@
 
 	$effect(() => {
 		registerVisibleRowActivationCandidate();
+	});
+
+	$effect(() => {
+		if (!previewActivationScope || !providedGetVisiblePreviewQueueSize) {
+			return;
+		}
+
+		return registerPreviewActivationBackpressure(previewActivationScope, {
+			getQueuedPreviewJobs: getVisiblePreviewQueueSize,
+			getActivePreviewJobs: getActiveVisiblePreviewCount,
+		});
 	});
 
 	$effect(() => {

@@ -8,6 +8,7 @@ export interface LinkUtilitiesContext {
 		options?: PreviewRequestOptions,
 	) => Promise<PreviewData>;
 	getVisiblePreviewQueueSize?: () => number;
+	getActiveVisiblePreviewCount?: () => number;
 	resolveFile: (path: string) => TFile | null;
 	buildWikiLink: (targetFile: TFile | null, fallback: string) => string;
 	fileToLinktext: (

@@ -4,7 +4,10 @@ import {
 	type RowPreviewActivationCandidate,
 	type RowPreviewActivationRuntime,
 } from "../rowPreviewActivationRuntime";
-import { resetPreviewActivationSchedulerForTests } from "../previewActivationScheduler";
+import {
+	createPreviewActivationScope,
+	resetPreviewActivationSchedulerForTests,
+} from "../previewActivationScheduler";
 
 interface TestCandidateOptions {
 	readonly id: string;
@@ -20,7 +23,6 @@ function createTestCandidate(
 		id: options.id,
 		rowIndex: options.rowIndex,
 		activationKey: options.activationKey,
-		getVisibleQueueSize: () => 0,
 		onActivated: options.onActivated ?? (() => undefined),
 	};
 }
@@ -88,7 +90,7 @@ describe("rowPreviewActivationRuntime", () => {
 		expect(onActivated).toHaveBeenCalledWith("key-a");
 	});
 
-	it("activates at most two candidates per animation frame", async () => {
+	it("drains idle row activations in a larger per-frame batch", async () => {
 		const runtime = createRowPreviewActivationRuntime();
 		const activatedKeys: string[] = [];
 
@@ -103,9 +105,6 @@ describe("rowPreviewActivationRuntime", () => {
 				}),
 			);
 		}
-
-		await flushAnimationFrame();
-		expect(activatedKeys).toEqual(["key-0", "key-1"]);
 
 		await flushAnimationFrame();
 		expect(activatedKeys).toEqual(["key-0", "key-1", "key-2", "key-3"]);
@@ -231,7 +230,12 @@ describe("rowPreviewActivationRuntime", () => {
 	});
 
 	it("cancels pending activation when clearing the only visible row for a key", async () => {
-		const runtime = createRowPreviewActivationRuntime();
+		let visibleQueueSize = 1;
+		const runtime = createRowPreviewActivationRuntime({
+			scope: createPreviewActivationScope({
+				getBackpressure: () => ({ queued: visibleQueueSize, active: 0 }),
+			}),
+		});
 		const onActivated = vi.fn();
 
 		runtime.setRowVisibility(0, "visible");
@@ -239,18 +243,17 @@ describe("rowPreviewActivationRuntime", () => {
 			id: "old",
 			rowIndex: 0,
 			activationKey: "shared-key",
-			getVisibleQueueSize: () => 1,
 			onActivated: vi.fn(),
 		});
 
 		runtime.clearRow(0);
 
+		visibleQueueSize = 0;
 		runtime.setRowVisibility(1, "visible");
 		runtime.registerCandidate({
 			id: "new",
 			rowIndex: 1,
 			activationKey: "shared-key",
-			getVisibleQueueSize: () => 0,
 			onActivated,
 		});
 

@@ -177,6 +177,7 @@
 					file={targetFile}
 					getPreview={context.getPreview}
 					getVisiblePreviewQueueSize={context.getVisiblePreviewQueueSize}
+					getActiveVisiblePreviewCount={context.getActiveVisiblePreviewCount}
 					{applicationStore}
 					{searchQuery}
 					{searchScope}

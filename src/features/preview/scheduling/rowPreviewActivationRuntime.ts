@@ -9,7 +9,6 @@ export interface RowPreviewActivationCandidate {
 	readonly id: string;
 	readonly rowIndex: number;
 	readonly activationKey: string;
-	readonly getVisibleQueueSize: () => number;
 	readonly onActivated: (activationKey: string) => void;
 }
 
@@ -38,7 +37,8 @@ export const PREVIEW_ROW_ACTIVATION_CONTEXT_KEY = Symbol("preview-row-activation
 
 interface RowActivationState {
 	visibility: "visible" | "mounted";
-	candidates: Map<string, RowPreviewActivationCandidate>;
+	candidatesById: Map<string, RowPreviewActivationCandidate>;
+	keyCounts: Map<string, number>;
 }
 
 export interface CreateRowPreviewActivationRuntimeOptions {
@@ -51,6 +51,11 @@ export function createRowPreviewActivationRuntime(
 	const scope = options.scope ?? createPreviewActivationScope();
 	const rows = new Map<number, RowActivationState>();
 	const pendingByActivationKey = new Map<string, PreviewActivationHandle>();
+	const allCandidatesByKey = new Map<string, Set<RowPreviewActivationCandidate>>();
+	const visibleCandidatesByKey = new Map<
+		string,
+		Set<RowPreviewActivationCandidate>
+	>();
 
 	function getOrCreateRowState(rowIndex: number): RowActivationState {
 		const existing = rows.get(rowIndex);
@@ -60,38 +65,84 @@ export function createRowPreviewActivationRuntime(
 
 		const state: RowActivationState = {
 			visibility: "mounted",
-			candidates: new Map<string, RowPreviewActivationCandidate>(),
+			candidatesById: new Map<string, RowPreviewActivationCandidate>(),
+			keyCounts: new Map<string, number>(),
 		};
 		rows.set(rowIndex, state);
 		return state;
 	}
 
-	function hasCandidateWithKey(activationKey: string): boolean {
-		for (const state of rows.values()) {
-			for (const candidate of state.candidates.values()) {
-				if (candidate.activationKey === activationKey) {
-					return true;
-				}
-			}
+	function addCandidateToIndex(
+		index: Map<string, Set<RowPreviewActivationCandidate>>,
+		candidate: RowPreviewActivationCandidate,
+	): void {
+		const existing = index.get(candidate.activationKey);
+		if (existing) {
+			existing.add(candidate);
+			return;
 		}
 
-		return false;
+		index.set(candidate.activationKey, new Set([candidate]));
 	}
 
-	function hasVisibleCandidateWithKey(activationKey: string): boolean {
-		for (const state of rows.values()) {
-			if (state.visibility !== "visible") {
-				continue;
-			}
+	function removeCandidateFromIndex(
+		index: Map<string, Set<RowPreviewActivationCandidate>>,
+		candidate: RowPreviewActivationCandidate,
+	): void {
+		const candidates = index.get(candidate.activationKey);
+		if (!candidates) return;
 
-			for (const candidate of state.candidates.values()) {
-				if (candidate.activationKey === activationKey) {
-					return true;
-				}
-			}
+		candidates.delete(candidate);
+		if (candidates.size === 0) {
+			index.delete(candidate.activationKey);
+		}
+	}
+
+	function incrementRowKeyCount(
+		state: RowActivationState,
+		activationKey: string,
+	): void {
+		state.keyCounts.set(
+			activationKey,
+			(state.keyCounts.get(activationKey) ?? 0) + 1,
+		);
+	}
+
+	function decrementRowKeyCount(
+		state: RowActivationState,
+		activationKey: string,
+	): void {
+		const nextCount = (state.keyCounts.get(activationKey) ?? 0) - 1;
+		if (nextCount > 0) {
+			state.keyCounts.set(activationKey, nextCount);
+			return;
 		}
 
-		return false;
+		state.keyCounts.delete(activationKey);
+	}
+
+	function addCandidateToRow(
+		state: RowActivationState,
+		candidate: RowPreviewActivationCandidate,
+	): void {
+		state.candidatesById.set(candidate.id, candidate);
+		incrementRowKeyCount(state, candidate.activationKey);
+		addCandidateToIndex(allCandidatesByKey, candidate);
+		if (state.visibility === "visible") {
+			addCandidateToIndex(visibleCandidatesByKey, candidate);
+		}
+	}
+
+	function removeCandidateFromRow(
+		state: RowActivationState,
+		candidate: RowPreviewActivationCandidate,
+	): void {
+		state.candidatesById.delete(candidate.id);
+		decrementRowKeyCount(state, candidate.activationKey);
+		removeCandidateFromIndex(allCandidatesByKey, candidate);
+		if (state.visibility === "visible") {
+			removeCandidateFromIndex(visibleCandidatesByKey, candidate);
+		}
 	}
 
 	function cancelPendingByKey(activationKey: string): void {
@@ -103,7 +154,7 @@ export function createRowPreviewActivationRuntime(
 	}
 
 	function cancelPendingUnlessVisibleElsewhere(activationKey: string): void {
-		if (hasVisibleCandidateWithKey(activationKey)) {
+		if (visibleCandidatesByKey.has(activationKey)) {
 			return;
 		}
 
@@ -111,36 +162,25 @@ export function createRowPreviewActivationRuntime(
 	}
 
 	function notifyVisibleCandidates(activationKey: string): void {
-		for (const state of rows.values()) {
-			if (state.visibility !== "visible") {
-				continue;
-			}
+		const candidates = visibleCandidatesByKey.get(activationKey);
+		if (!candidates) return;
 
-			for (const candidate of state.candidates.values()) {
-				if (candidate.activationKey !== activationKey) {
-					continue;
-				}
-
-				try {
-					candidate.onActivated(activationKey);
-				} catch (error) {
-					console.error("Row preview activation callback failed", error);
-				}
+		for (const candidate of Array.from(candidates)) {
+			try {
+				candidate.onActivated(activationKey);
+			} catch (error) {
+				console.error("Row preview activation callback failed", error);
 			}
 		}
 	}
 
-	function enqueueActivationForKey(
-		activationKey: string,
-		getVisibleQueueSize: () => number,
-	): void {
+	function enqueueActivationForKey(activationKey: string): void {
 		if (pendingByActivationKey.has(activationKey)) {
 			return;
 		}
 
 		const handle = requestQueuedPreviewActivation(
 			activationKey,
-			getVisibleQueueSize,
 			scope,
 			(activated) => {
 				pendingByActivationKey.delete(activationKey);
@@ -161,15 +201,8 @@ export function createRowPreviewActivationRuntime(
 			return;
 		}
 
-		const queuedKeys = new Set<string>();
-		for (const candidate of state.candidates.values()) {
-			const { activationKey } = candidate;
-			if (queuedKeys.has(activationKey)) {
-				continue;
-			}
-			queuedKeys.add(activationKey);
-
-			enqueueActivationForKey(activationKey, candidate.getVisibleQueueSize);
+		for (const activationKey of state.keyCounts.keys()) {
+			enqueueActivationForKey(activationKey);
 		}
 	}
 
@@ -179,15 +212,17 @@ export function createRowPreviewActivationRuntime(
 
 		// Remove any previous registration with the same id so the cleanup
 		// contract stays tied to the current component lifetime.
-		const previousCandidate = state.candidates.get(id);
+		const previousCandidate = state.candidatesById.get(id);
 		if (previousCandidate) {
-			state.candidates.delete(id);
-			if (!hasCandidateWithKey(previousCandidate.activationKey)) {
+			removeCandidateFromRow(state, previousCandidate);
+			if (state.visibility === "visible") {
+				cancelPendingUnlessVisibleElsewhere(previousCandidate.activationKey);
+			} else if (!allCandidatesByKey.has(previousCandidate.activationKey)) {
 				cancelPendingByKey(previousCandidate.activationKey);
 			}
 		}
 
-		state.candidates.set(id, candidate);
+		addCandidateToRow(state, candidate);
 
 		if (state.visibility === "visible") {
 			enqueueRowCandidates(rowIndex);
@@ -199,12 +234,18 @@ export function createRowPreviewActivationRuntime(
 				return;
 			}
 
-			const hadCandidate = currentState.candidates.delete(id);
-			if (!hadCandidate) {
+			const currentCandidate = currentState.candidatesById.get(id);
+			if (!currentCandidate) {
+				return;
+			}
+			if (currentCandidate !== candidate) {
 				return;
 			}
 
-			if (!hasCandidateWithKey(activationKey)) {
+			removeCandidateFromRow(currentState, currentCandidate);
+			if (currentState.visibility === "visible") {
+				cancelPendingUnlessVisibleElsewhere(activationKey);
+			} else if (!allCandidatesByKey.has(activationKey)) {
 				cancelPendingByKey(activationKey);
 			}
 		};
@@ -215,21 +256,28 @@ export function createRowPreviewActivationRuntime(
 		visibility: "visible" | "mounted",
 	): void {
 		const state = getOrCreateRowState(rowIndex);
+		if (state.visibility === visibility) {
+			if (visibility === "visible") {
+				enqueueRowCandidates(rowIndex);
+			}
+			return;
+		}
+
 		state.visibility = visibility;
 
 		if (visibility === "visible") {
+			for (const candidate of state.candidatesById.values()) {
+				addCandidateToIndex(visibleCandidatesByKey, candidate);
+			}
 			enqueueRowCandidates(rowIndex);
 			return;
 		}
 
-		const queuedKeys = new Set<string>();
-		for (const candidate of state.candidates.values()) {
-			const { activationKey } = candidate;
-			if (queuedKeys.has(activationKey)) {
-				continue;
-			}
-			queuedKeys.add(activationKey);
+		for (const candidate of state.candidatesById.values()) {
+			removeCandidateFromIndex(visibleCandidatesByKey, candidate);
+		}
 
+		for (const activationKey of state.keyCounts.keys()) {
 			cancelPendingUnlessVisibleElsewhere(activationKey);
 		}
 	}
@@ -240,15 +288,23 @@ export function createRowPreviewActivationRuntime(
 			return;
 		}
 
-		const activationKeys = new Set<string>();
-		for (const candidate of state.candidates.values()) {
-			activationKeys.add(candidate.activationKey);
+		const wasVisible = state.visibility === "visible";
+		const activationKeys = Array.from(state.keyCounts.keys());
+		for (const candidate of state.candidatesById.values()) {
+			removeCandidateFromIndex(allCandidatesByKey, candidate);
+			if (wasVisible) {
+				removeCandidateFromIndex(visibleCandidatesByKey, candidate);
+			}
 		}
 
 		rows.delete(rowIndex);
 
 		for (const activationKey of activationKeys) {
-			cancelPendingUnlessVisibleElsewhere(activationKey);
+			if (wasVisible) {
+				cancelPendingUnlessVisibleElsewhere(activationKey);
+			} else if (!allCandidatesByKey.has(activationKey)) {
+				cancelPendingByKey(activationKey);
+			}
 		}
 	}
 

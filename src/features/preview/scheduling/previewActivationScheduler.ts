@@ -4,25 +4,50 @@ import {
 } from "infrastructure/scroll/scrollActivity";
 import { DEBUG_DISABLE_CARD_DOM_PREVIEW } from "../../../appConstants";
 
-const ACTIVATION_FRAME_BUDGET = 2;
+const SCROLLING_MAX_ACTIVATIONS_PER_FRAME = 2;
+const IDLE_MAX_ACTIVATIONS_PER_FRAME = 6;
+const BACKPRESSURE_MAX_ACTIVATIONS_PER_FRAME = 1;
 /**
  * Number of animation frames after the first activation request during which
  * idle/no-backlog requests are forced through the queued drain path.
  */
 const WARMUP_FRAMES = 2;
 
+export interface PreviewBackpressure {
+	readonly queued: number;
+	readonly active: number;
+}
+
+export interface PreviewBackpressureProvider {
+	readonly getQueuedPreviewJobs: () => number;
+	readonly getActivePreviewJobs?: () => number;
+}
+
 export interface PreviewActivationScope {
 	warmupStarted: boolean;
 	warmupRemainingFrames: number;
 	warmupFrameHandle: number | null;
+	pendingByKey: Map<string, PreviewActivationRequest>;
+	pendingQueue: PreviewActivationRequest[];
+	frameHandle: number | null;
+	getBackpressure: () => PreviewBackpressure;
+	backpressureProviders: Map<() => number, PreviewBackpressureProviderRegistration>;
 }
 
 interface PreviewActivationRequest {
 	key: string;
 	scope: PreviewActivationScope;
-	getVisibleQueueSize: () => number;
 	onSettled: ((activated: boolean) => void) | undefined;
 	settled: boolean;
+}
+
+interface PreviewBackpressureProviderRegistration {
+	provider: PreviewBackpressureProvider;
+	refCount: number;
+}
+
+export interface CreatePreviewActivationScopeOptions {
+	readonly getBackpressure?: () => PreviewBackpressure;
 }
 
 export interface PreviewActivationHandle {
@@ -38,12 +63,9 @@ interface PreviewActivationHandleInternal extends PreviewActivationHandle {
 }
 
 const defaultScope = createPreviewActivationScope();
-const queuesByScope = new Map<
-	PreviewActivationScope,
-	Map<string, PreviewActivationRequest>
->();
+const activeQueuedScopes = new Set<PreviewActivationScope>();
 const activeWarmupScopes = new Set<PreviewActivationScope>();
-let frameHandle: number | null = null;
+const scheduledFrameScopes = new Set<PreviewActivationScope>();
 let unsubscribeScrollActivity: (() => void) | undefined;
 
 function cancelHandle(this: PreviewActivationHandleInternal): void {
@@ -76,23 +98,56 @@ function invokeSettlementCallback(
 	}
 }
 
-export function createPreviewActivationScope(): PreviewActivationScope {
+function getEmptyBackpressure(): PreviewBackpressure {
+	return { queued: 0, active: 0 };
+}
+
+export function createPreviewActivationScope(
+	options: CreatePreviewActivationScopeOptions = {},
+): PreviewActivationScope {
 	return {
 		warmupStarted: false,
 		warmupRemainingFrames: 0,
 		warmupFrameHandle: null,
+		pendingByKey: new Map<string, PreviewActivationRequest>(),
+		pendingQueue: [],
+		frameHandle: null,
+		getBackpressure: options.getBackpressure ?? getEmptyBackpressure,
+		backpressureProviders: new Map<
+			() => number,
+			PreviewBackpressureProviderRegistration
+		>(),
 	};
 }
 
-function getScopeQueue(
+export function registerPreviewActivationBackpressure(
 	scope: PreviewActivationScope,
-): Map<string, PreviewActivationRequest> {
-	const existing = queuesByScope.get(scope);
-	if (existing) return existing;
+	provider: PreviewBackpressureProvider,
+): () => void {
+	const existing = scope.backpressureProviders.get(provider.getQueuedPreviewJobs);
+	if (existing) {
+		existing.refCount += 1;
+		return () => unregisterPreviewActivationBackpressure(scope, provider);
+	}
 
-	const queue = new Map<string, PreviewActivationRequest>();
-	queuesByScope.set(scope, queue);
-	return queue;
+	scope.backpressureProviders.set(provider.getQueuedPreviewJobs, {
+		provider,
+		refCount: 1,
+	});
+	return () => unregisterPreviewActivationBackpressure(scope, provider);
+}
+
+function unregisterPreviewActivationBackpressure(
+	scope: PreviewActivationScope,
+	provider: PreviewBackpressureProvider,
+): void {
+	const registration = scope.backpressureProviders.get(provider.getQueuedPreviewJobs);
+	if (!registration) return;
+
+	registration.refCount -= 1;
+	if (registration.refCount > 0) return;
+
+	scope.backpressureProviders.delete(provider.getQueuedPreviewJobs);
 }
 
 function isWarmupActive(scope: PreviewActivationScope): boolean {
@@ -136,12 +191,11 @@ function settleRequest(request: PreviewActivationRequest, activated: boolean): v
 	if (request.settled) return;
 
 	request.settled = true;
-	const queue = queuesByScope.get(request.scope);
-	if (queue?.get(request.key) === request) {
-		queue.delete(request.key);
-		if (queue.size === 0) {
-			queuesByScope.delete(request.scope);
-		}
+	if (request.scope.pendingByKey.get(request.key) === request) {
+		request.scope.pendingByKey.delete(request.key);
+	}
+	if (request.scope.pendingByKey.size === 0) {
+		activeQueuedScopes.delete(request.scope);
 	}
 	invokeSettlementCallback(request.onSettled, activated);
 }
@@ -151,45 +205,100 @@ function ensureSubscription(): void {
 
 	unsubscribeScrollActivity = subscribeScrollActivity((active) => {
 		if (!active) {
-			drainFrame();
+			drainAllActiveScopes();
 			return;
 		}
-		scheduleFrameDrain();
+		for (const scope of activeQueuedScopes) {
+			scheduleScopeFrameDrain(scope);
+		}
 	});
 }
 
-function scheduleFrameDrain(): void {
+function scheduleScopeFrameDrain(scope: PreviewActivationScope): void {
 	if (
-		frameHandle !== null ||
+		scope.frameHandle !== null ||
 		typeof globalThis.requestAnimationFrame !== "function"
 	) {
 		return;
 	}
 
-	frameHandle = globalThis.requestAnimationFrame(() => {
-		frameHandle = null;
-		drainFrame();
+	scheduledFrameScopes.add(scope);
+	scope.frameHandle = globalThis.requestAnimationFrame(() => {
+		scheduledFrameScopes.delete(scope);
+		scope.frameHandle = null;
+		drainScopeFrame(scope);
 	});
 }
 
-function drainFrame(): void {
-	let activated = 0;
-	for (const queue of queuesByScope.values()) {
-		for (const request of queue.values()) {
-			if (hasVisiblePreviewBacklog(request.getVisibleQueueSize)) {
-				scheduleFrameDrain();
-				return;
-			}
+function drainAllActiveScopes(): void {
+	for (const scope of Array.from(activeQueuedScopes)) {
+		drainScopeFrame(scope);
+	}
+}
 
-			settleRequest(request, true);
-			activated += 1;
-			if (activated >= ACTIVATION_FRAME_BUDGET) break;
-		}
-		if (activated >= ACTIVATION_FRAME_BUDGET) break;
+function readScopeBackpressure(scope: PreviewActivationScope): PreviewBackpressure {
+	let pressure = scope.getBackpressure();
+	let queued = pressure.queued;
+	let active = pressure.active;
+
+	for (const registration of scope.backpressureProviders.values()) {
+		queued = Math.max(queued, registration.provider.getQueuedPreviewJobs());
+		active = Math.max(active, registration.provider.getActivePreviewJobs?.() ?? 0);
 	}
 
-	if (queuesByScope.size > 0) {
-		scheduleFrameDrain();
+	return { queued, active };
+}
+
+function resolveActivationBudget(params: {
+	readonly isScrolling: boolean;
+	readonly queuedPreviewJobs: number;
+	readonly activePreviewJobs: number;
+}): number {
+	if (params.queuedPreviewJobs > 0 || params.activePreviewJobs > 0) {
+		return BACKPRESSURE_MAX_ACTIVATIONS_PER_FRAME;
+	}
+
+	return params.isScrolling
+		? SCROLLING_MAX_ACTIVATIONS_PER_FRAME
+		: IDLE_MAX_ACTIVATIONS_PER_FRAME;
+}
+
+function compactScopeQueue(scope: PreviewActivationScope): void {
+	if (scope.pendingQueue.length <= scope.pendingByKey.size * 2 + 16) return;
+
+	scope.pendingQueue = scope.pendingQueue.filter(
+		(request) =>
+			!request.settled && scope.pendingByKey.get(request.key) === request,
+	);
+}
+
+function drainScopeFrame(scope: PreviewActivationScope): void {
+	if (scope.pendingByKey.size === 0) {
+		activeQueuedScopes.delete(scope);
+		return;
+	}
+
+	const pressure = readScopeBackpressure(scope);
+	const activationBudget = resolveActivationBudget({
+		isScrolling: isScrollActivityActive(),
+		queuedPreviewJobs: pressure.queued,
+		activePreviewJobs: pressure.active,
+	});
+	let activated = 0;
+
+	while (activated < activationBudget && scope.pendingQueue.length > 0) {
+		const request = scope.pendingQueue.shift();
+		if (!request || request.settled) continue;
+		if (scope.pendingByKey.get(request.key) !== request) continue;
+
+		settleRequest(request, true);
+		activated += 1;
+	}
+
+	compactScopeQueue(scope);
+
+	if (scope.pendingByKey.size > 0) {
+		scheduleScopeFrameDrain(scope);
 	}
 }
 
@@ -204,16 +313,16 @@ function createSettledActivationHandle(
 }
 
 export function canActivatePreviewImmediately(
-	getVisibleQueueSize: () => number,
 	scope: PreviewActivationScope = defaultScope,
 ): boolean {
 	if (DEBUG_DISABLE_CARD_DOM_PREVIEW) return false;
 
 	ensureWarmupStarted(scope);
+	const pressure = readScopeBackpressure(scope);
 	return (
 		!isWarmupActive(scope) &&
 		!isScrollActivityActive() &&
-		!hasVisiblePreviewBacklog(getVisibleQueueSize)
+		!hasVisiblePreviewBacklog(() => pressure.queued)
 	);
 }
 
@@ -225,31 +334,27 @@ export function canActivatePreviewImmediately(
  */
 function enqueuePreviewActivationRequest(
 	key: string,
-	getVisibleQueueSize: () => number,
 	scope: PreviewActivationScope,
 	onSettled: ((activated: boolean) => void) | undefined,
 ): PreviewActivationHandle {
 	ensureSubscription();
 	ensureWarmupStarted(scope);
 
-	const queue = getScopeQueue(scope);
-	const existing = queue.get(key);
+	const existing = scope.pendingByKey.get(key);
 	if (existing) {
 		settleRequest(existing, false);
-		// settleRequest removes an empty scope queue. Re-register the same queue
-		// before installing its replacement request.
-		queuesByScope.set(scope, queue);
 	}
 
 	const request: PreviewActivationRequest = {
 		key,
 		scope,
-		getVisibleQueueSize,
 		onSettled,
 		settled: false,
 	};
-	queue.set(key, request);
-	scheduleFrameDrain();
+	scope.pendingByKey.set(key, request);
+	scope.pendingQueue.push(request);
+	activeQueuedScopes.add(scope);
+	scheduleScopeFrameDrain(scope);
 
 	return createActivationHandle(key, request);
 }
@@ -262,7 +367,6 @@ function enqueuePreviewActivationRequest(
  */
 export function requestPreviewActivation(
 	key: string,
-	getVisibleQueueSize: () => number,
 	scope: PreviewActivationScope = defaultScope,
 	onSettled?: (activated: boolean) => void,
 ): PreviewActivationHandle {
@@ -271,15 +375,16 @@ export function requestPreviewActivation(
 	}
 
 	ensureWarmupStarted(scope);
+	const pressure = readScopeBackpressure(scope);
 	if (
 		!isWarmupActive(scope) &&
 		!isScrollActivityActive() &&
-		!hasVisiblePreviewBacklog(getVisibleQueueSize)
+		!hasVisiblePreviewBacklog(() => pressure.queued)
 	) {
 		return createSettledActivationHandle(key, true, onSettled);
 	}
 
-	return enqueuePreviewActivationRequest(key, getVisibleQueueSize, scope, onSettled);
+	return enqueuePreviewActivationRequest(key, scope, onSettled);
 }
 
 /**
@@ -292,7 +397,6 @@ export function requestPreviewActivation(
  */
 export function requestQueuedPreviewActivation(
 	key: string,
-	getVisibleQueueSize: () => number,
 	scope: PreviewActivationScope = defaultScope,
 	onSettled?: (activated: boolean) => void,
 ): PreviewActivationHandle {
@@ -300,28 +404,42 @@ export function requestQueuedPreviewActivation(
 		return createSettledActivationHandle(key, false, onSettled);
 	}
 
-	return enqueuePreviewActivationRequest(key, getVisibleQueueSize, scope, onSettled);
+	return enqueuePreviewActivationRequest(key, scope, onSettled);
 }
 
-export function cancelPreviewActivation(key: string): void {
-	const request = queuesByScope.get(defaultScope)?.get(key);
+export function cancelPreviewActivation(
+	key: string,
+	scope: PreviewActivationScope = defaultScope,
+): void {
+	const request = scope.pendingByKey.get(key);
 	if (request) {
 		settleRequest(request, false);
 	}
 }
 
 export function resetPreviewActivationSchedulerForTests(): void {
-	for (const queue of Array.from(queuesByScope.values())) {
-		for (const request of Array.from(queue.values())) {
+	const scopesToReset = new Set([
+		...Array.from(activeQueuedScopes),
+		...Array.from(scheduledFrameScopes),
+	]);
+
+	for (const scope of scopesToReset) {
+		for (const request of Array.from(scope.pendingByKey.values())) {
 			settleRequest(request, false);
 		}
-	}
-	queuesByScope.clear();
 
-	if (frameHandle !== null && typeof globalThis.cancelAnimationFrame === "function") {
-		globalThis.cancelAnimationFrame(frameHandle);
+		if (
+			scope.frameHandle !== null &&
+			typeof globalThis.cancelAnimationFrame === "function"
+		) {
+			globalThis.cancelAnimationFrame(scope.frameHandle);
+		}
+		scope.frameHandle = null;
+		scope.pendingByKey.clear();
+		scope.pendingQueue = [];
 	}
-	frameHandle = null;
+	activeQueuedScopes.clear();
+	scheduledFrameScopes.clear();
 
 	for (const scope of activeWarmupScopes) {
 		if (
@@ -338,6 +456,10 @@ export function resetPreviewActivationSchedulerForTests(): void {
 	defaultScope.warmupStarted = false;
 	defaultScope.warmupRemainingFrames = 0;
 	defaultScope.warmupFrameHandle = null;
+	defaultScope.pendingByKey.clear();
+	defaultScope.pendingQueue = [];
+	defaultScope.frameHandle = null;
+	defaultScope.backpressureProviders.clear();
 
 	unsubscribeScrollActivity?.();
 	unsubscribeScrollActivity = undefined;
