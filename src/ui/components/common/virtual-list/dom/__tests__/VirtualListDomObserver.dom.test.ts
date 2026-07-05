@@ -3,11 +3,14 @@ import { observeVirtualListViewport } from "../virtualListDomObserver";
 import { resetScrollActivityForTests } from "infrastructure/scroll/scrollActivity";
 import {
 	installMutationObserverMock,
+	installAnimationFrameMock,
 	installResizeObserverMock,
+	flushFrames,
 	mutationObserverRecords,
 	resetRecords,
 	resizeObserverRecords,
 	setElementRect,
+	teardownAnimationFrameMock,
 	teardownMutationObserverMock,
 	teardownResizeObserverMock,
 	triggerResize,
@@ -168,6 +171,85 @@ describe("observeVirtualListViewport", () => {
 		expect(scheduleLayoutMeasurement).toHaveBeenCalledTimes(1);
 
 		stopObserving();
+	});
+
+	it("uses the scroll event metrics snapshot for scroll measurement", async () => {
+		installAnimationFrameMock();
+
+		const scrollContainer = document.createElement("div");
+		const rootEl = document.createElement("div");
+
+		scrollContainer.classList.add("cm-scroller", "ccl-inline-card-host");
+		scrollContainer.style.overflow = "auto";
+		document.body.append(scrollContainer);
+		scrollContainer.append(rootEl);
+
+		setElementRect(rootEl, {
+			top: 10,
+			width: 200,
+			height: 100,
+		});
+		setElementRect(scrollContainer, {
+			top: 0,
+			width: 240,
+			height: 240,
+		});
+
+		let scrollTop = 120;
+		let clientHeight = 240;
+		const scrollTopGetter = vi.fn(() => scrollTop);
+		const clientHeightGetter = vi.fn(() => clientHeight);
+		Object.defineProperty(scrollContainer, "scrollHeight", {
+			value: 1000,
+			configurable: true,
+		});
+		Object.defineProperty(scrollContainer, "scrollTop", {
+			get: scrollTopGetter,
+			configurable: true,
+		});
+		Object.defineProperty(scrollContainer, "clientHeight", {
+			get: clientHeightGetter,
+			configurable: true,
+		});
+
+		const runScrollMeasurement = vi.fn();
+		const onScrollContainerChange = vi.fn();
+		const stopObserving = observeVirtualListViewport({
+			rootEl,
+			onWidthChange: vi.fn(),
+			onScrollContainerChange,
+			scheduleLayoutMeasurement: vi.fn(),
+			scheduleScrollMeasurement: vi.fn(),
+			runScrollMeasurement,
+			runInitialLayoutMeasurement: vi.fn(),
+		});
+
+		scrollTopGetter.mockClear();
+		clientHeightGetter.mockClear();
+
+		try {
+			scrollContainer.dispatchEvent(new Event("scroll"));
+			scrollTop = 180;
+			clientHeight = 300;
+
+			await flushFrames();
+		} finally {
+			stopObserving();
+			teardownAnimationFrameMock();
+		}
+
+		expect(onScrollContainerChange).toHaveBeenCalledWith(scrollContainer);
+		expect(runScrollMeasurement).toHaveBeenCalledTimes(1);
+		expect(runScrollMeasurement).toHaveBeenCalledWith(
+			expect.objectContaining({
+				scrollTop: 120,
+				viewportHeight: 240,
+				frameId: expect.any(Number),
+				isScrollActive: true,
+			}),
+		);
+		expect(scrollTopGetter).toHaveBeenCalledTimes(1);
+		expect(clientHeightGetter).toHaveBeenCalledTimes(1);
 	});
 
 	it("keeps structure mutation measurements isolated by scroller", async () => {
