@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { IS_PROD } from "../../../appConstants";
 	import { providePreviewActivationContexts } from "features/preview/scheduling/previewActivationContexts";
+	import { useLinkContext } from "ui/context/linkContext";
 	import VirtualSurface from "ui/components/common/virtual-list/VirtualSurface.svelte";
 	import VirtualListLoadMoreButton from "ui/components/common/virtual-list/VirtualListLoadMoreButton.svelte";
 	import type { VirtualizedItemVisibilityState } from "ui/components/common/virtual-list/types";
@@ -57,7 +58,19 @@
 	const TWO_HOP_CELL_CLASS_NAME = "view-plan-virtual-list-cell view-plan-flow-cell";
 
 	const props: Props = $props();
-	providePreviewActivationContexts();
+	let linkContext: ReturnType<typeof useLinkContext> | undefined;
+	try {
+		linkContext = useLinkContext();
+	} catch {
+		linkContext = undefined;
+	}
+
+	providePreviewActivationContexts({
+		getBackpressure: () => ({
+			queued: linkContext?.getVisiblePreviewQueueSize?.() ?? 0,
+			active: linkContext?.getActiveVisiblePreviewCount?.() ?? 0,
+		}),
+	});
 	const list = useTwoHopViewPlanVirtualList(props);
 	const interactionDescriptorResolverProvider =
 		createTwoHopInteractionResolverProvider({
