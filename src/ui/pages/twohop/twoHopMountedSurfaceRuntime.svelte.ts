@@ -17,6 +17,7 @@ import {
 	PREVIEW_ROW_ACTIVATION_CONTEXT_KEY,
 	type RowPreviewActivationRuntime,
 } from "features/preview/scheduling/rowPreviewActivationRuntime";
+import { resolveTwoHopSlotId } from "./twoHopSlotId";
 
 const EMPTY_MOUNTED_ROWS: readonly [] = [];
 
@@ -28,7 +29,7 @@ type TwoHopMountedItemCell = MountedFlatItemCell<
 // Activation candidates are slot-scoped; CardPreviewGate keeps the logical
 // preview identity in activationKey.
 function getTwoHopActivationCandidateId(cell: TwoHopMountedItemCell): string {
-	return `slot:${cell.cellSlotKey ?? cell.renderSlotIndex}`;
+	return resolveTwoHopSlotId(cell);
 }
 
 export function createTwoHopMountedSurfaceRuntime(params: {

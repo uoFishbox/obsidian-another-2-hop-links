@@ -21,6 +21,7 @@ import type {
 } from "./twoHopVirtualListModel";
 import type { TwoHopViewPlanRowModel } from "./twoHopViewPlan";
 import type { RowPreviewActivationRuntime } from "features/preview/scheduling/rowPreviewActivationRuntime";
+import { resolveTwoHopSlotId } from "./twoHopSlotId";
 
 const EMPTY_MOUNTED_ROWS: readonly [] = [];
 
@@ -41,7 +42,7 @@ interface TwoHopVisibilitySyncBuild {
 // correctness is guarded separately by previewIdentity / activationKey in
 // CardPreviewGate and by logical-item renderBodyKey revisions.
 function getTwoHopVisibilityStateKey(cell: TwoHopMountedCell): string {
-	return `slot:${cell.cellSlotKey ?? cell.renderSlotIndex}`;
+	return resolveTwoHopSlotId(cell);
 }
 
 export function createTwoHopMountRuntime(
