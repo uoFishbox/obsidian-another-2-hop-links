@@ -1,6 +1,9 @@
 import type { VirtualListSharedScrollMetrics } from "./virtualListDomObserver";
 import { observeVirtualListViewport } from "./virtualListDomObserver";
-import { readVirtualListCachedMeasurementInto } from "./virtualListCachedMeasurement";
+import {
+	readVirtualListCachedMeasurementInto,
+	type VirtualListCachedMeasurementInput,
+} from "./virtualListCachedMeasurement";
 import { readVirtualListLiveMeasurement } from "./virtualListLiveMeasurement";
 import { type VirtualListScrollSnapshot } from "./virtualListMeasurementAdapter";
 import { createBootstrapMeasurementSuppression } from "./bootstrapMeasurementSuppression";
@@ -82,6 +85,8 @@ const SKIPPED_UNCHANGED_SCROLL: VirtualMeasurementResult = {
 	reason: "unchanged-scroll",
 };
 
+const EMPTY_RUN_SCROLL_MEASUREMENT_OPTIONS: RunVirtualScrollMeasurementOptions = {};
+
 export function createVirtualMeasurementController({
 	getRootEl,
 	measurement,
@@ -112,6 +117,15 @@ export function createVirtualMeasurementController({
 		kind: "measured",
 		measurement: scrollMeasurement,
 	};
+	const cachedMeasurementInput: VirtualListCachedMeasurementInput = {
+		rootEl: null,
+		scrollContainerEl: null,
+		viewportHeight: 0,
+		sectionTop: 0,
+		hasStableScrollMetrics: false,
+		hasRenderableContent: false,
+		cachedScrollSnapshot,
+	};
 	let hasLastPublishedScrollMeasurement = false;
 	let lastPublishedScrollTop = 0;
 	let lastPublishedViewportHeight = 0;
@@ -130,21 +144,21 @@ export function createVirtualMeasurementController({
 		lastPublishedIsScrollActive = measurement.isScrollActive;
 	};
 
-	const isUnchangedPublishedScrollMeasurement = (params: {
-		scrollTop: number;
-		viewportHeight: number;
-		sectionTop: number;
-		isStableMeasurement: boolean;
-		isScrollActive: boolean;
-	}): boolean =>
+	const isUnchangedPublishedScrollMeasurement = (
+		scrollTop: number,
+		viewportHeight: number,
+		sectionTop: number,
+		isStableMeasurement: boolean,
+		isScrollActive: boolean,
+	): boolean =>
 		hasLastPublishedScrollMeasurement &&
-		params.isStableMeasurement &&
+		isStableMeasurement &&
 		lastPublishedIsStableMeasurement &&
-		lastPublishedScrollTop === params.scrollTop &&
-		lastPublishedViewportHeight === params.viewportHeight &&
-		lastPublishedSectionTop === params.sectionTop &&
-		lastPublishedIsStableMeasurement === params.isStableMeasurement &&
-		lastPublishedIsScrollActive === params.isScrollActive;
+		lastPublishedScrollTop === scrollTop &&
+		lastPublishedViewportHeight === viewportHeight &&
+		lastPublishedSectionTop === sectionTop &&
+		lastPublishedIsStableMeasurement === isStableMeasurement &&
+		lastPublishedIsScrollActive === isScrollActive;
 
 	const publishMeasurement = (
 		nextMeasurement: VirtualMeasurement,
@@ -197,31 +211,32 @@ export function createVirtualMeasurementController({
 
 	const runScrollMeasurement = (
 		sharedScrollMetrics?: VirtualListSharedScrollMetrics,
-		options: RunVirtualScrollMeasurementOptions = {},
+		options: RunVirtualScrollMeasurementOptions = EMPTY_RUN_SCROLL_MEASUREMENT_OPTIONS,
 	): VirtualMeasurementResult => {
-		if (!getOptionalOwnerWindow(getRootEl() ?? measurement.scrollContainerEl)) {
+		const rootEl = getRootEl();
+		if (!getOptionalOwnerWindow(rootEl ?? measurement.scrollContainerEl)) {
 			return SKIPPED_NO_WINDOW;
 		}
 
-		readVirtualListCachedMeasurementInto(scrollMeasurement, {
-			rootEl: getRootEl(),
-			scrollContainerEl: measurement.scrollContainerEl,
-			viewportHeight: measurement.viewportHeight,
-			sectionTop: measurement.sectionTop,
-			hasStableScrollMetrics: measurement.hasStableScrollMetrics,
-			hasRenderableContent: hasRenderableContent(),
-			cachedScrollSnapshot,
-			sharedScrollMetrics,
-		});
+		cachedMeasurementInput.rootEl = rootEl;
+		cachedMeasurementInput.scrollContainerEl = measurement.scrollContainerEl;
+		cachedMeasurementInput.viewportHeight = measurement.viewportHeight;
+		cachedMeasurementInput.sectionTop = measurement.sectionTop;
+		cachedMeasurementInput.hasStableScrollMetrics =
+			measurement.hasStableScrollMetrics;
+		cachedMeasurementInput.hasRenderableContent = hasRenderableContent();
+		cachedMeasurementInput.sharedScrollMetrics = sharedScrollMetrics;
+
+		readVirtualListCachedMeasurementInto(scrollMeasurement, cachedMeasurementInput);
 		if (
 			!options.forcePublish &&
-			isUnchangedPublishedScrollMeasurement({
-				scrollTop: scrollMeasurement.scrollTop,
-				viewportHeight: scrollMeasurement.viewportHeight,
-				sectionTop: scrollMeasurement.sectionTop,
-				isStableMeasurement: scrollMeasurement.isStableMeasurement,
-				isScrollActive: scrollMeasurement.isScrollActive,
-			})
+			isUnchangedPublishedScrollMeasurement(
+				scrollMeasurement.scrollTop,
+				scrollMeasurement.viewportHeight,
+				scrollMeasurement.sectionTop,
+				scrollMeasurement.isStableMeasurement,
+				scrollMeasurement.isScrollActive,
+			)
 		) {
 			return SKIPPED_UNCHANGED_SCROLL;
 		}
