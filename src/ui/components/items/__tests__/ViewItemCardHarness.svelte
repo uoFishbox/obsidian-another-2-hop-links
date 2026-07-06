@@ -43,12 +43,7 @@
 	}: Props = $props();
 	const rowIndex = 0;
 	const activationCandidateId = "view-item-card-harness";
-	const activationContexts = providePreviewActivationContexts({
-		getBackpressure: () => ({
-			queued: linkContext.getVisiblePreviewQueueSize?.() ?? 0,
-			active: linkContext.getActiveVisiblePreviewCount?.() ?? 0,
-		}),
-	});
+	const activationContexts = providePreviewActivationContexts();
 	const scopedLinkContext = {
 		...linkContext,
 		sourceFile,

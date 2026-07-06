@@ -5,9 +5,14 @@
 	import CardPreview from "ui/components/common/CardPreview.svelte";
 	import type { ApplicationStore } from "ui/stores/ApplicationStore.svelte";
 	import {
+		PREVIEW_ACTIVATION_SCOPE_CONTEXT_KEY,
+		type PreviewActivationScope,
+	} from "features/preview/scheduling/previewActivationScope";
+	import {
 		PREVIEW_ROW_ACTIVATION_CONTEXT_KEY,
 		type RowPreviewActivationRuntime,
 	} from "features/preview/scheduling/rowPreviewActivationRuntime";
+	import { registerPreviewActivationBackpressure } from "features/preview/scheduling/previewActivationScheduler";
 	import { buildCardPreviewActivationIdentity } from "features/preview/core/cardPreviewActivationIdentity";
 	import { normalizePreviewQuery } from "features/preview/core/previewRenderKeys";
 	import { DEBUG_DISABLE_CARD_DOM_PREVIEW, IS_PROD } from "../../../appConstants";
@@ -28,6 +33,8 @@
 			signal?: AbortSignal,
 			options?: PreviewRequestOptions,
 		) => Promise<PreviewData>;
+		getVisiblePreviewQueueSize?: () => number;
+		getActiveVisiblePreviewCount?: () => number;
 		applicationStore: ApplicationStore;
 		searchQuery?: string;
 		searchScope?: "title-only" | "title-and-content";
@@ -40,6 +47,8 @@
 	let {
 		file,
 		getPreview,
+		getVisiblePreviewQueueSize: providedGetVisiblePreviewQueueSize,
+		getActiveVisiblePreviewCount: providedGetActiveVisiblePreviewCount,
 		applicationStore,
 		searchQuery = "",
 		searchScope = "title-and-content",
@@ -49,6 +58,12 @@
 		activationCandidateId,
 	}: Props = $props();
 
+	const getVisiblePreviewQueueSize = providedGetVisiblePreviewQueueSize ?? (() => 0);
+	const getActiveVisiblePreviewCount =
+		providedGetActiveVisiblePreviewCount ?? (() => 0);
+	const previewActivationScope = getContext<PreviewActivationScope>(
+		PREVIEW_ACTIVATION_SCOPE_CONTEXT_KEY,
+	);
 	const rowPreviewActivationRuntime = getContext<RowPreviewActivationRuntime>(
 		PREVIEW_ROW_ACTIVATION_CONTEXT_KEY,
 	);
@@ -92,6 +107,8 @@
 
 		void file;
 		void getPreview;
+		void providedGetVisiblePreviewQueueSize;
+		void providedGetActiveVisiblePreviewCount;
 		void applicationStore;
 		void searchQuery;
 		void searchScope;
@@ -209,6 +226,17 @@
 
 	$effect(() => {
 		registerVisibleRowActivationCandidate();
+	});
+
+	$effect(() => {
+		if (!providedGetVisiblePreviewQueueSize) {
+			return;
+		}
+
+		return registerPreviewActivationBackpressure(previewActivationScope, {
+			getQueuedPreviewJobs: getVisiblePreviewQueueSize,
+			getActivePreviewJobs: getActiveVisiblePreviewCount,
+		});
 	});
 
 	onDestroy(() => {
