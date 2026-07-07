@@ -17,6 +17,7 @@ interface Entry {
 	dispatchIdle: () => void;
 	idleTimer: number | null;
 	isScrollActive: boolean;
+	lastScrollTime: number;
 }
 
 const entries = new WeakMap<ScrollTarget, Entry>();
@@ -57,7 +58,17 @@ export function subscribeScrollTarget(
 			phaseCallbacks: new Set(),
 			idleTimer: null,
 			isScrollActive: false,
+			lastScrollTime: 0,
 			dispatchIdle: () => {
+				const elapsed = Date.now() - entry!.lastScrollTime;
+				if (elapsed < SCROLL_IDLE_MS) {
+					entry!.idleTimer = targetWindow.setTimeout(
+						entry!.dispatchIdle,
+						SCROLL_IDLE_MS - elapsed,
+					);
+					return;
+				}
+
 				entry!.idleTimer = null;
 				entry!.isScrollActive = false;
 				for (const cb of entry!.phaseCallbacks) {
@@ -66,6 +77,8 @@ export function subscribeScrollTarget(
 			},
 			dispatch: () => {
 				const metrics = snapshotScrollTargetMetrics(target);
+				entry!.lastScrollTime = Date.now();
+
 				if (!entry!.isScrollActive) {
 					entry!.isScrollActive = true;
 					for (const cb of entry!.phaseCallbacks) {
@@ -77,14 +90,12 @@ export function subscribeScrollTarget(
 					cb("scroll", metrics);
 				}
 
-				if (entry!.idleTimer !== null) {
-					targetWindow.clearTimeout(entry!.idleTimer);
+				if (entry!.idleTimer === null) {
+					entry!.idleTimer = targetWindow.setTimeout(
+						entry!.dispatchIdle,
+						SCROLL_IDLE_MS,
+					);
 				}
-
-				entry!.idleTimer = targetWindow.setTimeout(
-					entry!.dispatchIdle,
-					SCROLL_IDLE_MS,
-				);
 			},
 		};
 
