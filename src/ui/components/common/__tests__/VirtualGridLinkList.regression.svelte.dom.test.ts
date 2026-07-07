@@ -10,7 +10,7 @@ import {
 setupVirtualGridTestEnvironment();
 
 describe("VirtualGridLinkList regression", () => {
-	it("positions only virtual rows while cells are laid out by row flow", async () => {
+	it("lays out virtual rows in normal flow with spacers", async () => {
 		const driver = renderVirtualGridList({
 			items: createItems(6),
 			initialVisibleCount: 6,
@@ -48,8 +48,16 @@ describe("VirtualGridLinkList regression", () => {
 				".cosense-card-links__virtual-grid-row",
 			),
 		);
-		expect(rows[0].style.transform).toBe("translateY(0px)");
-		expect(rows[1].style.transform).toMatch(/translateY\(\d+px\)/);
+		const topSpacer = shadowRoot.querySelector<HTMLElement>(
+			"[data-ccl-virtual-flow-spacer='top']",
+		);
+		const bottomSpacer = shadowRoot.querySelector<HTMLElement>(
+			"[data-ccl-virtual-flow-spacer='bottom']",
+		);
+		expect(topSpacer?.style.height).toBe("0px");
+		expect(bottomSpacer).not.toBeNull();
+		expect(rows[0].style.transform).toBe("");
+		expect(rows[1].style.transform).toBe("");
 
 		const cells = Array.from(
 			shadowRoot.querySelectorAll<HTMLElement>(

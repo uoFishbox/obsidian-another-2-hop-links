@@ -79,10 +79,33 @@
 	 * Without passing version into the expression, Svelte's compiler may skip
 	 * re-evaluation because the object identity has not changed.
 	 */
-	const resolveRowTransform = (
-		row: VirtualSurfaceMountedRow<TMountedCell>,
+	const resolveTopSpacerHeight = (
+		rows: readonly VirtualSurfaceMountedRow<TMountedCell>[],
 		_version: number | undefined,
-	): string => `translateY(${row.top}px)`;
+	): number => Math.max(0, rows[0]?.top ?? 0);
+
+	const resolveRowBottomSpacing = (
+		rows: readonly VirtualSurfaceMountedRow<TMountedCell>[],
+		rowIndex: number,
+		currentRowHeight: number,
+		_version: number | undefined,
+	): number => {
+		const row = rows[rowIndex];
+		const nextRow = rows[rowIndex + 1];
+		if (!row || !nextRow) return 0;
+		return Math.max(0, nextRow.top - (row.top + currentRowHeight));
+	};
+
+	const resolveBottomSpacerHeight = (
+		rows: readonly VirtualSurfaceMountedRow<TMountedCell>[],
+		currentContentHeight: number,
+		currentRowHeight: number,
+		_version: number | undefined,
+	): number => {
+		const lastRow = rows[rows.length - 1];
+		if (!lastRow) return Math.max(0, currentContentHeight);
+		return Math.max(0, currentContentHeight - (lastRow.top + currentRowHeight));
+	};
 
 	const resolveMountedCellLogicalKey = (
 		cell: TMountedCell,
@@ -106,12 +129,22 @@
 </script>
 
 <div class={contentClassName} bind:this={contentEl} style={contentStyle}>
-	{#each mountedRows as row (resolveRowSlotKey(row))}
+	<div
+		data-ccl-virtual-flow-spacer="top"
+		style:height={`${resolveTopSpacerHeight(mountedRows, mountedRowsVersion)}px`}
+		aria-hidden="true"
+	></div>
+	{#each mountedRows as row, rowIndex (resolveRowSlotKey(row))}
 		<div
 			class={rowClassName}
 			data-ccl-row-slot={!IS_PROD ? row.slotIndex : undefined}
 			data-ccl-row-index={!IS_PROD ? row.rowIndex : undefined}
-			style:transform={resolveRowTransform(row, mountedRowsVersion)}
+			style:margin-bottom={`${resolveRowBottomSpacing(
+				mountedRows,
+				rowIndex,
+				rowHeight,
+				mountedRowsVersion,
+			)}px`}
 			{...row.attributes}
 		>
 			{#each row.cells as mountedCell (resolveCellSlotKey(row, mountedCell))}
@@ -152,4 +185,14 @@
 			{/each}
 		</div>
 	{/each}
+	<div
+		data-ccl-virtual-flow-spacer="bottom"
+		style:height={`${resolveBottomSpacerHeight(
+			mountedRows,
+			contentHeight,
+			rowHeight,
+			mountedRowsVersion,
+		)}px`}
+		aria-hidden="true"
+	></div>
 </div>

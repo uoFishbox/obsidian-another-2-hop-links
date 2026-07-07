@@ -56,7 +56,7 @@ describe("VirtualPooledGridRowsSurface version invalidation", () => {
 		cleanup();
 	});
 
-	it("same row object top mutation is reflected when version bumps", async () => {
+	it("same row object top mutation is reflected in flow spacers when version bumps", async () => {
 		const cell = makeCell("cell-1", 0, "body-1");
 		const row = makeRow(0, 0, [cell]);
 		const mountedRows: TestRow[] = [row];
@@ -74,8 +74,12 @@ describe("VirtualPooledGridRowsSurface version invalidation", () => {
 		const rowEl = container.querySelector(
 			"[data-ccl-row-index='0']",
 		) as HTMLElement;
+		const topSpacer = container.querySelector(
+			"[data-ccl-virtual-flow-spacer='top']",
+		) as HTMLElement;
 		expect(rowEl).toBeTruthy();
-		expect(rowEl.style.transform).toBe("translateY(0px)");
+		expect(rowEl.style.transform).toBe("");
+		expect(topSpacer.style.height).toBe("0px");
 
 		// Mutate same row object
 		row.top = 120;
@@ -88,7 +92,11 @@ describe("VirtualPooledGridRowsSurface version invalidation", () => {
 		const updatedRowEl = container.querySelector(
 			"[data-ccl-row-index='0']",
 		) as HTMLElement;
-		expect(updatedRowEl.style.transform).toBe("translateY(120px)");
+		const updatedTopSpacer = container.querySelector(
+			"[data-ccl-virtual-flow-spacer='top']",
+		) as HTMLElement;
+		expect(updatedRowEl.style.transform).toBe("");
+		expect(updatedTopSpacer.style.height).toBe("120px");
 	});
 
 	it("same cell object logicalKey mutation is reflected when version bumps", async () => {

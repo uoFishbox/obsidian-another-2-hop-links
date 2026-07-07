@@ -86,14 +86,12 @@
 	}
 
 	:global(.cosense-card-links__virtual-grid-row) {
-		position: absolute;
-		top: 0;
-		left: 0;
+		position: relative;
 		width: 100%;
 		height: var(--ccl-box-height);
 		display: flex;
 		gap: var(--ccl-box-gap);
-		contain: layout paint;
+		contain: layout;
 	}
 
 	:global(.cosense-card-links__infinite-scroll-sentinel) {
