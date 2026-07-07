@@ -56,7 +56,7 @@ describe("VirtualPooledGridRowsSurface version invalidation", () => {
 		cleanup();
 	});
 
-	it("same row object top mutation is reflected in flow spacers when version bumps", async () => {
+	it("same row object top mutation is reflected in row top when version bumps", async () => {
 		const cell = makeCell("cell-1", 0, "body-1");
 		const row = makeRow(0, 0, [cell]);
 		const mountedRows: TestRow[] = [row];
@@ -78,6 +78,7 @@ describe("VirtualPooledGridRowsSurface version invalidation", () => {
 			"[data-ccl-virtual-flow-spacer='top']",
 		) as HTMLElement;
 		expect(rowEl).toBeTruthy();
+		expect(rowEl.style.top).toBe("0px");
 		expect(rowEl.style.transform).toBe("");
 		expect(topSpacer.style.height).toBe("0px");
 
@@ -95,8 +96,37 @@ describe("VirtualPooledGridRowsSurface version invalidation", () => {
 		const updatedTopSpacer = container.querySelector(
 			"[data-ccl-virtual-flow-spacer='top']",
 		) as HTMLElement;
+		expect(updatedRowEl.style.top).toBe("120px");
 		expect(updatedRowEl.style.transform).toBe("");
-		expect(updatedTopSpacer.style.height).toBe("120px");
+		expect(updatedTopSpacer.style.height).toBe("0px");
+	});
+
+	it("renders row shells in physical slot order when logical rows shift", async () => {
+		const slotZeroRow = makeRow(2, 100, [makeCell("cell-2", 2, "body-2")], {
+			slotIndex: 0,
+			slotKey: 0,
+		});
+		const slotOneRow = makeRow(1, 50, [makeCell("cell-1", 1, "body-1")], {
+			slotIndex: 1,
+			slotKey: 1,
+		});
+		const mountedRows: TestRow[] = [slotOneRow, slotZeroRow];
+
+		const { container } = render(VirtualPooledGridRowsSurfaceVersionHarness, {
+			props: {
+				mountedRows,
+				mountedRowsVersion: 0,
+			},
+		});
+
+		const rows = Array.from(
+			container.querySelectorAll<HTMLElement>("[data-ccl-row-slot]"),
+		);
+
+		expect(rows.map((row) => row.dataset.cclRowSlot)).toEqual(["0", "1"]);
+		expect(rows.map((row) => row.dataset.cclRowIndex)).toEqual(["2", "1"]);
+		expect(rows.map((row) => row.style.top)).toEqual(["100px", "50px"]);
+		expect(rows.map((row) => row.style.transform)).toEqual(["", ""]);
 	});
 
 	it("same cell object logicalKey mutation is reflected when version bumps", async () => {

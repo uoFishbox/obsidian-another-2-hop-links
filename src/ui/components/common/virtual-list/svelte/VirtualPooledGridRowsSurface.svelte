@@ -67,6 +67,23 @@
 
 	const resolveRowSlotKey = (row: VirtualSurfaceMountedRow<TMountedCell>): number =>
 		row.slotKey ?? row.key;
+	const compareRowSlotKey = (
+		left: VirtualSurfaceMountedRow<TMountedCell>,
+		right: VirtualSurfaceMountedRow<TMountedCell>,
+	): number => resolveRowSlotKey(left) - resolveRowSlotKey(right);
+
+	const resolveSlotOrderedRows = (
+		rows: readonly VirtualSurfaceMountedRow<TMountedCell>[],
+		_version: number | undefined,
+	): readonly VirtualSurfaceMountedRow<TMountedCell>[] => {
+		for (let index = 1; index < rows.length; index += 1) {
+			if (resolveRowSlotKey(rows[index - 1]) > resolveRowSlotKey(rows[index])) {
+				return Array.from(rows).sort(compareRowSlotKey);
+			}
+		}
+
+		return rows;
+	};
 	const resolveCellSlotKey = (
 		_row: VirtualSurfaceMountedRow<TMountedCell>,
 		cell: TMountedCell,
@@ -79,34 +96,6 @@
 	 * Without passing version into the expression, Svelte's compiler may skip
 	 * re-evaluation because the object identity has not changed.
 	 */
-	const resolveTopSpacerHeight = (
-		rows: readonly VirtualSurfaceMountedRow<TMountedCell>[],
-		_version: number | undefined,
-	): number => Math.max(0, rows[0]?.top ?? 0);
-
-	const resolveRowBottomSpacing = (
-		rows: readonly VirtualSurfaceMountedRow<TMountedCell>[],
-		rowIndex: number,
-		currentRowHeight: number,
-		_version: number | undefined,
-	): number => {
-		const row = rows[rowIndex];
-		const nextRow = rows[rowIndex + 1];
-		if (!row || !nextRow) return 0;
-		return Math.max(0, nextRow.top - (row.top + currentRowHeight));
-	};
-
-	const resolveBottomSpacerHeight = (
-		rows: readonly VirtualSurfaceMountedRow<TMountedCell>[],
-		currentContentHeight: number,
-		currentRowHeight: number,
-		_version: number | undefined,
-	): number => {
-		const lastRow = rows[rows.length - 1];
-		if (!lastRow) return Math.max(0, currentContentHeight);
-		return Math.max(0, currentContentHeight - (lastRow.top + currentRowHeight));
-	};
-
 	const resolveMountedCellLogicalKey = (
 		cell: TMountedCell,
 		_version: number | undefined,
@@ -126,26 +115,30 @@
 		cell: TMountedCell,
 		_version: number | undefined,
 	): unknown => cell.renderBodyKey ?? cell.cellMetadataKey ?? cell.key;
+
+	const resolveRowStyle = (
+		row: VirtualSurfaceMountedRow<TMountedCell>,
+		_version: number | undefined,
+	): string =>
+		`position:absolute; left:0; right:0; top:${Math.max(
+			0,
+			row.top,
+		)}px; margin-bottom:0`;
+
+	const slotOrderedRows = $derived(
+		resolveSlotOrderedRows(mountedRows, mountedRowsVersion),
+	);
 </script>
 
 <div class={contentClassName} bind:this={contentEl} style={contentStyle}>
-	<div
-		data-ccl-virtual-flow-spacer="top"
-		style:height={`${resolveTopSpacerHeight(mountedRows, mountedRowsVersion)}px`}
-		aria-hidden="true"
-	></div>
-	{#each mountedRows as row, rowIndex (resolveRowSlotKey(row))}
+	<div data-ccl-virtual-flow-spacer="top" style:height="0px" aria-hidden="true"></div>
+	{#each slotOrderedRows as row (resolveRowSlotKey(row))}
 		<div
+			{...row.attributes}
 			class={rowClassName}
 			data-ccl-row-slot={!IS_PROD ? row.slotIndex : undefined}
 			data-ccl-row-index={!IS_PROD ? row.rowIndex : undefined}
-			style:margin-bottom={`${resolveRowBottomSpacing(
-				mountedRows,
-				rowIndex,
-				rowHeight,
-				mountedRowsVersion,
-			)}px`}
-			{...row.attributes}
+			style={resolveRowStyle(row, mountedRowsVersion)}
 		>
 			{#each row.cells as mountedCell (resolveCellSlotKey(row, mountedCell))}
 				<VirtualGridLogicalCellMount
@@ -187,12 +180,7 @@
 	{/each}
 	<div
 		data-ccl-virtual-flow-spacer="bottom"
-		style:height={`${resolveBottomSpacerHeight(
-			mountedRows,
-			contentHeight,
-			rowHeight,
-			mountedRowsVersion,
-		)}px`}
+		style:height="0px"
 		aria-hidden="true"
 	></div>
 </div>

@@ -10,7 +10,7 @@ import {
 setupVirtualGridTestEnvironment();
 
 describe("VirtualGridLinkList regression", () => {
-	it("lays out virtual rows in normal flow with spacers", async () => {
+	it("lays out virtual rows by positioning physical row slots", async () => {
 		const driver = renderVirtualGridList({
 			items: createItems(6),
 			initialVisibleCount: 6,
@@ -56,7 +56,12 @@ describe("VirtualGridLinkList regression", () => {
 		);
 		expect(topSpacer?.style.height).toBe("0px");
 		expect(bottomSpacer).not.toBeNull();
+		expect(bottomSpacer?.style.height).toBe("0px");
+		expect(rows[0].style.position).toBe("absolute");
+		expect(rows[0].style.top).toBe("0px");
 		expect(rows[0].style.transform).toBe("");
+		expect(rows[1].style.position).toBe("absolute");
+		expect(rows[1].style.top).toBe("134px");
 		expect(rows[1].style.transform).toBe("");
 
 		const cells = Array.from(
@@ -107,6 +112,19 @@ describe("VirtualGridLinkList regression", () => {
 			expect(firstRowShell?.isConnected).toBe(true);
 			expect(firstRowShell?.dataset.cclRowIndex).not.toBe("0");
 		});
+
+		const rows = Array.from(
+			shadowRoot.querySelectorAll<HTMLElement>(
+				".cosense-card-links__virtual-grid-row",
+			),
+		);
+		const rowSlots = rows.map((row) => Number(row.dataset.cclRowSlot));
+		expect(rowSlots).toEqual([...rowSlots].sort((left, right) => left - right));
+		for (const row of rows) {
+			expect(row.style.position).toBe("absolute");
+			expect(row.style.top).toMatch(/px$/);
+			expect(row.style.transform).toBe("");
+		}
 		expect(driver.renderedIndexes()).not.toContain(0);
 	});
 
