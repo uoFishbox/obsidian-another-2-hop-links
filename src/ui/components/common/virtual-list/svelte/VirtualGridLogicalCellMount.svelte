@@ -47,6 +47,12 @@
 		const previousLogicalKey = lifecycleLogicalKey;
 		const previousCell = lifecycleCell;
 
+		if (!onLogicalCellAttach && !onLogicalCellDetach) {
+			lifecycleLogicalKey = nextLogicalKey;
+			lifecycleCell = mountedCell;
+			return;
+		}
+
 		if (
 			previousCell !== undefined &&
 			previousLogicalKey !== undefined &&
