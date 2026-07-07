@@ -1,7 +1,8 @@
 <script lang="ts">
 	import type { PluginSettings } from "types/settings";
 	import { type TFile } from "obsidian";
-	import { svgAttrs, ICON_PATHS } from "ui/utils/icons";
+	import Icon from "ui/components/common/Icon.svelte";
+	import { type IconName } from "ui/utils/icons";
 	import {
 		interactionIdBinding,
 		type InteractionKind,
@@ -56,28 +57,20 @@
 			: undefined,
 	);
 
-	type FileIconKind =
-		| "image"
-		| "file-text"
-		| "file-audio"
-		| "layout-dashboard"
-		| "layout-list"
-		| "file";
-
-	/** 拡張子に応じたアイコン種別 */
-	const fileIconKind = $derived.by((): FileIconKind | null => {
+	/** 拡張子に応じたアイコン名（ICONS のキー） */
+	const fileIconName = $derived.by((): IconName | null => {
 		if (!normalizedExtension) return null;
-		return getFileIconKind(normalizedExtension);
+		return getFileIconName(normalizedExtension);
 	});
 
-	/** 拡張子からObsidianアイコンIDを判定 */
-	function getFileIconKind(ext: string): FileIconKind {
-		if (IMAGE_EXTENSIONS.has(ext)) return "image";
-		if (ext === "pdf") return "file-text";
-		if (AUDIO_EXTENSIONS.has(ext)) return "file-audio";
-		if (ext === "canvas") return "layout-dashboard";
-		if (ext === "base") return "layout-list";
-		return "file";
+	/** 拡張子から表示するアイコン名を判定 */
+	function getFileIconName(ext: string): IconName {
+		if (IMAGE_EXTENSIONS.has(ext)) return "Image";
+		if (ext === "pdf") return "FileText";
+		if (AUDIO_EXTENSIONS.has(ext)) return "FileAudio";
+		if (ext === "canvas") return "LayoutDashboard";
+		if (ext === "base") return "LayoutList";
+		return "File";
 	}
 
 	const isAttachmentFile = $derived(isAttachment(extension));
@@ -107,69 +100,9 @@
 >
 	<div class="cosense-card-links__box-title-wrapper">
 		<div class="cosense-card-links__box-title">
-			{#if fileIconKind}
+			{#if fileIconName}
 				<span class="cosense-card-links__file-icon">
-					{#if fileIconKind === "image"}
-						<svg
-							{...svgAttrs}
-							width="16"
-							height="16"
-							stroke="currentColor"
-							aria-hidden="true"
-						>
-							{@html ICON_PATHS.Image}
-						</svg>
-					{:else if fileIconKind === "file-text"}
-						<svg
-							{...svgAttrs}
-							width="16"
-							height="16"
-							stroke="currentColor"
-							aria-hidden="true"
-						>
-							{@html ICON_PATHS.FileText}
-						</svg>
-					{:else if fileIconKind === "file-audio"}
-						<svg
-							{...svgAttrs}
-							width="16"
-							height="16"
-							stroke="currentColor"
-							aria-hidden="true"
-						>
-							{@html ICON_PATHS.FileAudio}
-						</svg>
-					{:else if fileIconKind === "layout-dashboard"}
-						<svg
-							{...svgAttrs}
-							width="16"
-							height="16"
-							stroke="currentColor"
-							aria-hidden="true"
-						>
-							{@html ICON_PATHS.LayoutDashboard}
-						</svg>
-					{:else if fileIconKind === "layout-list"}
-						<svg
-							{...svgAttrs}
-							width="16"
-							height="16"
-							stroke="currentColor"
-							aria-hidden="true"
-						>
-							{@html ICON_PATHS.LayoutList}
-						</svg>
-					{:else}
-						<svg
-							{...svgAttrs}
-							width="16"
-							height="16"
-							stroke="currentColor"
-							aria-hidden="true"
-						>
-							{@html ICON_PATHS.File}
-						</svg>
-					{/if}
+					<Icon name={fileIconName} width={16} height={16} />
 				</span>
 			{/if}
 			{#if hasSearchQuery}
@@ -187,9 +120,13 @@
 	{@render children?.()}
 	{#if showBookmarkIcon}
 		<div class="cosense-card-links__box-bookmark-bg">
-			<svg {...svgAttrs} width="22" height="22" fill="currentColor" stroke="none">
-				{@html ICON_PATHS.Bookmark}
-			</svg>
+			<Icon
+				name="Bookmark"
+				width={22}
+				height={22}
+				fill="currentColor"
+				stroke="none"
+			/>
 		</div>
 	{/if}
 </div>

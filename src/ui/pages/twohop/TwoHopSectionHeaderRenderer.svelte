@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { svgAttrs, ICON_PATHS } from "ui/utils/icons";
+	import Icon from "ui/components/common/Icon.svelte";
 	import LinkSectionHeader from "ui/components/common/LinkSectionHeader.svelte";
 	import TwoHopSectionHeader from "./TwoHopSectionHeader.svelte";
 	import type {
@@ -27,15 +27,7 @@
 {:else if section.kind === "new-links-section"}
 	<LinkSectionHeader {title} {totalCount}>
 		{#snippet icon()}
-			<svg
-				{...svgAttrs}
-				width="26"
-				height="26"
-				stroke="currentColor"
-				class="twohop-links-icon"
-			>
-				{@html ICON_PATHS.Unlink}
-			</svg>
+			<Icon name="Unlink" width={26} height={26} class="twohop-links-icon" />
 		{/snippet}
 	</LinkSectionHeader>
 {:else if section.kind === "two-hop-branch" || section.kind === "tag-section"}

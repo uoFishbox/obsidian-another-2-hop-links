@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { Menu } from "obsidian";
-	import { svgAttrs, ICON_PATHS } from "ui/utils/icons";
+	import Icon from "ui/components/common/Icon.svelte";
 	import type { Snippet } from "svelte";
 	import { useAppContext } from "ui/context/linkContext";
 
@@ -85,15 +85,7 @@
 		<span class="cosense-card-links__header-title">{title}</span>
 		{@render icon?.()}
 		{#if !icon}
-			<svg
-				{...svgAttrs}
-				width={iconSize}
-				height={iconSize}
-				stroke="currentColor"
-				class={iconClass}
-			>
-				{@html ICON_PATHS.Link}
-			</svg>
+			<Icon name="Link" width={iconSize} height={iconSize} class={iconClass} />
 		{/if}
 	</div>
 </div>

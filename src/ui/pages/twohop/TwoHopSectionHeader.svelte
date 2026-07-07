@@ -1,5 +1,6 @@
 <script lang="ts">
-	import { svgAttrs, ICON_PATHS } from "ui/utils/icons";
+	import Icon from "ui/components/common/Icon.svelte";
+	import { type IconName } from "ui/utils/icons";
 	import ClickableHeader from "ui/components/common/ClickableHeader.svelte";
 	import type { ClickableHeaderExtraProps } from "ui/components/sections/types";
 	import type { TwoHopVirtualListSection } from "./twoHopVirtualListModel";
@@ -19,8 +20,8 @@
 
 	let { kind, title, count, sectionId, header }: Props = $props();
 
-	const iconPath = $derived(
-		kind === "tag-section" ? ICON_PATHS.Tag : ICON_PATHS.Link,
+	const iconName = $derived(
+		(kind === "tag-section" ? "Tag" : "Link") satisfies IconName,
 	);
 	const clickableHeaderProps = $derived.by(() => {
 		const rest: ClickableHeaderExtraProps = { ...header };
@@ -37,14 +38,6 @@
 	interactionKind={header.interactionKind ?? "sectionHeader"}
 >
 	{#snippet icon()}
-		<svg
-			{...svgAttrs}
-			width="26"
-			height="26"
-			stroke="currentColor"
-			class="twohop-links-icon"
-		>
-			{@html iconPath}
-		</svg>
+		<Icon name={iconName} width={26} height={26} class="twohop-links-icon" />
 	{/snippet}
 </ClickableHeader>

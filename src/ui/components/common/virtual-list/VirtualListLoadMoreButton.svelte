@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { ARIA_LABELS } from "../../../../appConstants";
-	import { ICON_PATHS, svgAttrs } from "ui/utils/icons";
+	import Icon from "ui/components/common/Icon.svelte";
 
 	interface Props {
 		onClick: () => void;
@@ -17,7 +17,5 @@
 	{...testId ? { "data-testid": testId } : {}}
 	onclick={onClick}
 >
-	<svg {...svgAttrs} width="28" height="28" stroke="currentColor">
-		{@html ICON_PATHS.Ellipsis}
-	</svg>
+	<Icon name="Ellipsis" width={28} height={28} />
 </button>
