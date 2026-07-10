@@ -30,7 +30,7 @@ export interface TwoHopHeaderInteractionSnapshot {
 export interface TwoHopItemsDeps {
 	hop2: TwoHopLinkBranch["hop2"];
 	sortOption: SortOption;
-	updateVersion: number;
+	sortContextVersion: number;
 	getSortedTwoHopItems: ApplicationStore["getSortedTwoHopItems"];
 }
 

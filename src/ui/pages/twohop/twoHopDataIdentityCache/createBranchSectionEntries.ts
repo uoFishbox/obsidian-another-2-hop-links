@@ -1,9 +1,5 @@
 import type { TFile } from "obsidian";
-import {
-	createStableViewItemReconciler,
-	type StableViewItemReconciler,
-	type ViewItem,
-} from "application/presenters";
+import type { ViewItem } from "application/presenters";
 import { createItemInteractionKey } from "ui/interactions/interactionTypes";
 import type { ClickableHeaderExtraProps } from "ui/components/sections/types";
 import type { SectionHeaderInteractionDescriptor } from "ui/interactions/interactionTypes";
@@ -15,10 +11,9 @@ import {
 import type { TwoHopIndexedLink, TwoHopLinkBranch } from "types/domain";
 import type { PluginSettings, SortOption } from "types/settings";
 import type { ApplicationStore } from "ui/stores/ApplicationStore.svelte";
-import { hasSameBacklinkIndexedLink } from "ui/utils/twohopEquality";
 import {
 	createDescriptor,
-	createReconciledVirtualItemAccessors,
+	createSparseStableVirtualItemAccessors,
 	type CachedVirtualItemAccessors,
 } from "./descriptorIdentity";
 import type { TwoHopInteractionTokenAllocator } from "./interactionTokenAllocator";
@@ -43,7 +38,6 @@ export interface BranchEntry {
 	applicationStore: ApplicationStore;
 	branch: TwoHopLinkBranch;
 	itemsDeps: TwoHopItemsDeps;
-	itemsReconciler: StableViewItemReconciler<TwoHopIndexedLink>;
 	itemsAccessors: CachedVirtualItemAccessors;
 	getItems: CachedVirtualItemAccessors["getItems"];
 	getItem: CachedVirtualItemAccessors["getItem"];
@@ -100,7 +94,7 @@ export function resolveBranchSectionEntry(
 	const itemsDeps: TwoHopItemsDeps = {
 		hop2: params.branch.hop2,
 		sortOption: params.currentSort,
-		updateVersion: params.applicationStore.updateVersion,
+		sortContextVersion: params.applicationStore.getSortContextVersion?.() ?? 0,
 		getSortedTwoHopItems: params.applicationStore.getSortedTwoHopItems,
 	};
 
@@ -177,19 +171,15 @@ function createBranchSectionEntry(
 	let applicationStore = params.applicationStore;
 	let branch = params.branch;
 	let itemsDeps = params.itemsDeps;
-	const itemsReconciler = createStableViewItemReconciler<TwoHopIndexedLink>({
-		getKey: (item) => generateBacklinkKey(item),
-		toViewItem: (item) => ({ type: "backlink", data: item }),
-		canReuseSource: hasSameBacklinkIndexedLink,
-	});
-	const itemsAccessors = createReconciledVirtualItemAccessors<
+	const itemsAccessors = createSparseStableVirtualItemAccessors<
 		TwoHopIndexedLink,
 		ViewItem
 	>({
 		getLength: () => branch.hop2.length,
 		getSortedItems: () =>
 			itemsDeps.getSortedTwoHopItems.call(applicationStore, branch.hop2),
-		itemsReconciler,
+		getKey: (item) => generateBacklinkKey(item),
+		toViewItem: (item) => ({ type: "backlink", data: item }),
 		createItem: (item, virtualKey) => {
 			const branchBaseKey = getTwohopBranchSearchBaseKey(branch);
 			const interactionKey = createItemInteractionKey(item, virtualKey);
@@ -238,7 +228,6 @@ function createBranchSectionEntry(
 		set itemsDeps(next) {
 			itemsDeps = next;
 		},
-		itemsReconciler,
 		itemsAccessors,
 		getItems: itemsAccessors.getItems,
 		getItem: itemsAccessors.getItem,

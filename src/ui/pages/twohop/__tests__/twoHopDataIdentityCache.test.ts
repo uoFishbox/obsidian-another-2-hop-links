@@ -215,6 +215,27 @@ describe("createTwoHopDataIdentityCache", () => {
 		expect(section?.getItem?.(0)?.interactionId).toBe("i1");
 	});
 
+	it("does not reset branch sorting for a render-only updateVersion change", () => {
+		const cache = createTwoHopDataIdentityCache();
+		const { baseParams, getSortedTwoHopItems } = createHarness();
+		const branch = createBranch("parent.md", [createLink("child.md")]);
+		const first = cache.resolve({
+			...baseParams,
+			displayData: createDisplayData([], [branch]),
+		});
+		first[0]?.getItem?.(0);
+
+		baseParams.applicationStore.updateVersion += 1;
+		const second = cache.resolve({
+			...baseParams,
+			displayData: createDisplayData([], [branch]),
+		});
+		second[0]?.getItem?.(0);
+
+		expect(second[0]).toBe(first[0]);
+		expect(getSortedTwoHopItems).toHaveBeenCalledTimes(1);
+	});
+
 	it("keeps descriptor identity for equivalent section values", () => {
 		const cache = createTwoHopDataIdentityCache();
 		const { baseParams } = createHarness();

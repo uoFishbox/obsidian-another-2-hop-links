@@ -22,7 +22,7 @@ export function hasSameTwoHopItemsDeps(
 		(current.hop2 === next.hop2 ||
 			hasSameBacklinkIndexedLinks(current.hop2, next.hop2)) &&
 		current.sortOption === next.sortOption &&
-		current.updateVersion === next.updateVersion &&
+		current.sortContextVersion === next.sortContextVersion &&
 		current.getSortedTwoHopItems === next.getSortedTwoHopItems
 	);
 }

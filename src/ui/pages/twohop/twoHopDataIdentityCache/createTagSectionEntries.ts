@@ -1,18 +1,13 @@
-import {
-	createStableViewItemReconciler,
-	type StableViewItemReconciler,
-	type ViewItem,
-} from "application/presenters";
+import type { ViewItem } from "application/presenters";
 import { createItemInteractionKey } from "ui/interactions/interactionTypes";
 import type { ClickableHeaderExtraProps } from "ui/components/sections/types";
 import { buildScopedSectionId } from "ui/components/common/listPagination";
 import { generateLinkKey } from "features/preview/text-processing/textUtils";
 import type { TagGroup, TaggedNote } from "types/domain";
 import type { ApplicationStore } from "ui/stores/ApplicationStore.svelte";
-import { hasSameTaggedNote } from "ui/utils/twohopEquality";
 import {
 	createDescriptor,
-	createReconciledVirtualItemAccessors,
+	createSparseStableVirtualItemAccessors,
 	type CachedVirtualItemAccessors,
 } from "./descriptorIdentity";
 import type { TwoHopInteractionTokenAllocator } from "./interactionTokenAllocator";
@@ -28,7 +23,6 @@ export interface TagEntry {
 	applicationStore: ApplicationStore;
 	source: TagGroup;
 	itemsDeps: TagSectionItemsDeps;
-	itemsReconciler: StableViewItemReconciler<TaggedNote>;
 	itemsAccessors: CachedVirtualItemAccessors;
 	getItems: CachedVirtualItemAccessors["getItems"];
 	getItem: CachedVirtualItemAccessors["getItem"];
@@ -87,15 +81,6 @@ function createTagSectionEntry(params: ResolveTagSectionEntryParams): TagEntry {
 	let itemsDeps = params.itemsDeps;
 	let tag = params.source.tag;
 	let onTagClick = params.onTagClick;
-	const itemsReconciler = createStableViewItemReconciler<TaggedNote>({
-		getKey: (item) =>
-			generateLinkKey(item.file.path, item.file.basename, "tag-note"),
-		toViewItem: (item) => ({
-			type: "taggedNote",
-			data: item,
-		}),
-		canReuseSource: hasSameTaggedNote,
-	});
 	const headerProps: ClickableHeaderExtraProps = {
 		className: "cosense-card-links__box--tag",
 		interactionId: params.tokens.createHeaderInteractionIdentity(
@@ -104,27 +89,31 @@ function createTagSectionEntry(params: ResolveTagSectionEntryParams): TagEntry {
 		interactionKind: "sectionHeader",
 		onClick: () => onTagClick(tag),
 	};
-	const itemsAccessors = createReconciledVirtualItemAccessors<TaggedNote, ViewItem>({
-		getLength: () => source.notes.length,
-		getSortedItems: () =>
-			itemsDeps.getSortedTagGroupItems.call(applicationStore, source.notes),
-		itemsReconciler,
-		createItem: (item, baseKey, index) => {
-			const virtualKey = createTaggedNoteSectionItemKey(item, tag, index);
-			const interactionKey = createItemInteractionKey(item, virtualKey);
-			const interactionId =
-				params.tokens.createItemInteractionToken(interactionKey);
-			return {
-				kind: "tag-link",
-				item,
-				interactionId,
-				interactionKey,
-				tag,
-				searchKey: getTagNoteSearchKeyFromBaseKey(tag, baseKey),
-				virtualKey,
-			};
+	const itemsAccessors = createSparseStableVirtualItemAccessors<TaggedNote, ViewItem>(
+		{
+			getLength: () => source.notes.length,
+			getSortedItems: () =>
+				itemsDeps.getSortedTagGroupItems.call(applicationStore, source.notes),
+			getKey: (item) =>
+				generateLinkKey(item.file.path, item.file.basename, "tag-note"),
+			toViewItem: (item) => ({ type: "taggedNote", data: item }),
+			createItem: (item, baseKey, index) => {
+				const virtualKey = createTaggedNoteSectionItemKey(item, tag, index);
+				const interactionKey = createItemInteractionKey(item, virtualKey);
+				const interactionId =
+					params.tokens.createItemInteractionToken(interactionKey);
+				return {
+					kind: "tag-link",
+					item,
+					interactionId,
+					interactionKey,
+					tag,
+					searchKey: getTagNoteSearchKeyFromBaseKey(tag, baseKey),
+					virtualKey,
+				};
+			},
 		},
-	});
+	);
 
 	return {
 		get applicationStore() {
@@ -145,7 +134,6 @@ function createTagSectionEntry(params: ResolveTagSectionEntryParams): TagEntry {
 		set itemsDeps(next) {
 			itemsDeps = next;
 		},
-		itemsReconciler,
 		get tag() {
 			return tag;
 		},

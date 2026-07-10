@@ -468,6 +468,10 @@ export class ApplicationStore {
 		return this.displayDataBuilder.getSortedTagGroupItems(items, this.sortOption);
 	}
 
+	getSortContextVersion(): number {
+		return this.displayDataBuilder.getSortContextVersion();
+	}
+
 	setSortOption(sortOption: SortOption): void {
 		const next = resolveSortOption(this.sortOption, sortOption);
 		if (next !== this.sortOption) {

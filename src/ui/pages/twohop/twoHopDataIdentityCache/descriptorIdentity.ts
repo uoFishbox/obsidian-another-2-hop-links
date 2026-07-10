@@ -28,6 +28,18 @@ export interface ReconciledVirtualItemAccessorsParams<T, TViewItem> {
 	) => TwoHopVirtualListItem | undefined;
 }
 
+export interface SparseStableVirtualItemAccessorsParams<T, TViewItem> {
+	readonly getLength: () => number;
+	readonly getSortedItems: () => readonly T[];
+	readonly getKey: (item: T, index: number) => string;
+	readonly toViewItem: (item: T) => TViewItem;
+	readonly createItem: (
+		item: TViewItem,
+		key: string,
+		index: number,
+	) => TwoHopVirtualListItem | undefined;
+}
+
 export function createDescriptor(
 	section: TwoHopVirtualListSection,
 	searchQuery: string,
@@ -122,6 +134,46 @@ export function createReconciledVirtualItemAccessors<T, TViewItem>(
 		reset() {
 			reconciledItems = undefined;
 			reconciledKeys = undefined;
+			resetSparseAccessors();
+		},
+	};
+}
+
+/**
+ * Lazily wraps a sorted section without reconciling every source item on the
+ * first random-access read. The sorted array is still prepared once, but
+ * ViewItem and virtual-item allocation is limited to requested indexes.
+ */
+export function createSparseStableVirtualItemAccessors<T, TViewItem>(
+	params: SparseStableVirtualItemAccessorsParams<T, TViewItem>,
+): CachedVirtualItemAccessors {
+	let sortedItems: readonly T[] | undefined;
+	let viewItems: TViewItem[] | undefined;
+	let keys: string[] | undefined;
+	const ensureSortedItems = (): readonly T[] =>
+		(sortedItems ??= params.getSortedItems());
+	const accessors = createSparseVirtualItemAccessors({
+		getLength: params.getLength,
+		createItem: (index) => {
+			const source = ensureSortedItems()[index];
+			if (!source) return undefined;
+			viewItems ??= [];
+			keys ??= [];
+			const viewItem =
+				viewItems[index] ?? (viewItems[index] = params.toViewItem(source));
+			const key = keys[index] ?? (keys[index] = params.getKey(source, index));
+			return params.createItem(viewItem, key, index);
+		},
+	});
+	const resetSparseAccessors = accessors.reset;
+
+	return {
+		getItems: accessors.getItems,
+		getItem: accessors.getItem,
+		reset() {
+			sortedItems = undefined;
+			viewItems = undefined;
+			keys = undefined;
 			resetSparseAccessors();
 		},
 	};
