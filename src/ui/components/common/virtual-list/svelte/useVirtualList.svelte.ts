@@ -38,6 +38,7 @@ export function useVirtualList<
 		},
 	});
 	runtimeState = runtime.getState();
+	$effect(() => () => runtime.dispose());
 
 	return {
 		getSnapshot() {

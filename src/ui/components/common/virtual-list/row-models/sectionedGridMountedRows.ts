@@ -13,6 +13,10 @@ import {
 	resolveStableViewPlanRenderBodyKey,
 	type RenderBodyKeyPolicy,
 } from "../core/reconciliation/renderBodyRevision";
+import {
+	createPooledRowSlotAllocator,
+	type PooledRowSlotAllocator,
+} from "../core/reconciliation/pooledRowSlotAllocator";
 
 export interface SectionedGridSectionPlan<T, G> {
 	readonly sectionIndex: number;
@@ -55,11 +59,15 @@ export interface SectionedGridResolvedRowScratch {
 export interface SectionedGridMountedRowsBuild<T, G, TPlan> {
 	readonly cells: MountedFlatCell<T, G>[];
 	readonly rowSlices: MountedFlatRowSlice<T, G>[];
+	readonly rowsBySlot: MountedFlatRowSlice<T, G>[];
 	readonly reusableCellsByKey: Map<string, MountedFlatCell<T, G>>;
 	readonly mountedCellCount: number;
 	readonly nextRenderSlotIndex: number;
+	readonly poolCapacity: number;
+	readonly poolEpoch: number;
 	readonly rowRange: RowRange;
 	readonly plan: TPlan;
+	readonly sourceRevision: unknown;
 }
 
 export interface BuildSectionedGridMountedRowsParams<
@@ -71,8 +79,9 @@ export interface BuildSectionedGridMountedRowsParams<
 	readonly plan: TPlan;
 	readonly rowRange: RowRange;
 	readonly previousBuild?: SectionedGridMountedRowsBuild<T, G, TPlan>;
-	readonly reusableRowSlotsScratch?: number[];
 	readonly resolvedRowScratch?: SectionedGridResolvedRowScratch;
+	readonly rowSlotAllocator?: PooledRowSlotAllocator;
+	readonly sourceRevision?: unknown;
 	readonly renderBodyKeyPolicy?: RenderBodyKeyPolicy;
 	findSectionIndexByRow(sections: readonly TSection[], rowIndex: number): number;
 	/**
@@ -118,8 +127,10 @@ type SectionedGridMountedCell<T, G> = MountedFlatCell<T, G>;
 
 const EMPTY_PREVIOUS_CELLS: ReadonlyMap<string, never> = new Map<string, never>();
 
-const compareSectionedGridRowSlotIndex = (left: number, right: number): number =>
-	left - right;
+const ROW_SLOT_ALLOCATOR = Symbol("sectioned-grid-row-slot-allocator");
+type SectionedGridMountedRowsBuildState = {
+	readonly [ROW_SLOT_ALLOCATOR]: PooledRowSlotAllocator;
+};
 
 const flattenMountedRowCells = <T, G>(
 	rowSlices: readonly MountedFlatRowSlice<T, G>[],
@@ -160,12 +171,10 @@ export function buildSectionedGridMountedRows<
 	if (
 		previousBuild !== undefined &&
 		previousBuild.plan === plan &&
+		Object.is(previousBuild.sourceRevision, params.sourceRevision) &&
 		previousBuild.rowRange.start === start &&
 		previousBuild.rowRange.end === end
 	) {
-		if (params.reusableRowSlotsScratch) {
-			params.reusableRowSlotsScratch.length = 0;
-		}
 		return previousBuild;
 	}
 	const rowSlices: MountedFlatRowSlice<T, G>[] = [];
@@ -207,30 +216,21 @@ export function buildSectionedGridMountedRows<
 		const previousRow = previousRows[rowIndex - previousRowStart];
 		return previousRow?.rowIndex === rowIndex ? previousRow : undefined;
 	};
-	const reusableRowSlots = params.reusableRowSlotsScratch ?? [];
-	reusableRowSlots.length = 0;
-	let nextRowSlotIndex = 0;
-	for (const previousRow of previousRows ?? []) {
-		const slotIndex = previousRow.slotIndex ?? 0;
-		nextRowSlotIndex = Math.max(nextRowSlotIndex, slotIndex + 1);
-		if (previousRow.rowIndex < start || previousRow.rowIndex >= end) {
-			reusableRowSlots.push(slotIndex);
-		}
-	}
-	if (reusableRowSlots.length > 1) {
-		reusableRowSlots.sort(compareSectionedGridRowSlotIndex);
-	}
-	let reusableRowSlotOffset = 0;
-	const allocateRowSlotIndex = (): number => {
-		const reusableSlot = reusableRowSlots[reusableRowSlotOffset];
-		if (reusableSlot !== undefined) {
-			reusableRowSlotOffset += 1;
-			return reusableSlot;
-		}
-		const slotIndex = nextRowSlotIndex;
-		nextRowSlotIndex += 1;
-		return slotIndex;
-	};
+	const previousBuildState = previousBuild as
+		| (typeof previousBuild & SectionedGridMountedRowsBuildState)
+		| undefined;
+	const rowSlotAllocator =
+		params.rowSlotAllocator ??
+		previousBuildState?.[ROW_SLOT_ALLOCATOR] ??
+		createPooledRowSlotAllocator();
+	const rowKeys = Array.from(
+		{ length: Math.max(0, end - start) },
+		(_, index) => start + index,
+	);
+	const slotAllocation = rowSlotAllocator.apply({
+		rowKeys,
+		layoutKey: `${plan.columns}|${plan.rowGap}`,
+	});
 	let sectionIndex =
 		params.resolveInitialSectionIndexByRow?.(plan, start) ??
 		params.findSectionIndexByRow(plan.sections, start);
@@ -251,7 +251,11 @@ export function buildSectionedGridMountedRows<
 	for (let rowIndex = start; rowIndex < end; rowIndex += 1) {
 		const rowKey = rowIndex;
 		const previousRow = getPreviousRow(rowIndex);
-		if (params.previousBuild?.plan === plan && previousRow) {
+		if (
+			params.previousBuild?.plan === plan &&
+			Object.is(previousBuild?.sourceRevision, params.sourceRevision) &&
+			previousRow
+		) {
 			rowSlices.push(previousRow);
 			mountedCellCount += previousRow.cells.length;
 			continue;
@@ -296,7 +300,7 @@ export function buildSectionedGridMountedRows<
 			top: rowTop,
 			bottomSpacing: plan.rowGap,
 		};
-		const slotIndex = previousRow?.slotIndex ?? allocateRowSlotIndex();
+		const slotIndex = slotAllocation.slotIndexes[rowIndex - start] ?? 0;
 		const rowSlice: MountedFlatRowSlice<T, G> = {
 			slotIndex,
 			slotKey: slotIndex,
@@ -364,18 +368,35 @@ export function buildSectionedGridMountedRows<
 		rowSlices.push(rowSlice);
 	}
 
-	return {
+	const sparseRowsBySlot: Array<MountedFlatRowSlice<T, G> | undefined> =
+		new Array(slotAllocation.capacity);
+	for (const row of rowSlices) sparseRowsBySlot[row.slotIndex ?? 0] = row;
+	const rowsBySlot: MountedFlatRowSlice<T, G>[] = [];
+	for (const row of sparseRowsBySlot) {
+		if (row) rowsBySlot.push(row);
+	}
+
+	const build = {
 		get cells() {
 			flattenedCells ??= flattenMountedRowCells(rowSlices);
 			return flattenedCells;
 		},
 		rowSlices,
+		rowsBySlot,
 		get reusableCellsByKey() {
 			return getReusableCellsByKey();
 		},
 		mountedCellCount,
-		nextRenderSlotIndex: nextRowSlotIndex * plan.columns,
+		nextRenderSlotIndex: slotAllocation.capacity * plan.columns,
+		poolCapacity: slotAllocation.capacity,
+		poolEpoch: slotAllocation.epoch,
 		rowRange: { start, end },
 		plan,
+		sourceRevision: params.sourceRevision,
 	};
+	Object.defineProperty(build, ROW_SLOT_ALLOCATOR, {
+		value: rowSlotAllocator,
+		enumerable: false,
+	});
+	return build;
 }

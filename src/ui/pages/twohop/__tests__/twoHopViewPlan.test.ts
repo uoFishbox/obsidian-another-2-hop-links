@@ -791,7 +791,7 @@ describe("compileTwoHopViewPlan", () => {
 		expect(scrolled.reusableCellsByKey.size).toBe(scrolled.cells.length);
 	});
 
-	it("reuses same-plan row slices after materialization changes", () => {
+	it("publishes new descriptors after same-plan materialization changes", () => {
 		const plan = compileTwoHopViewPlan({
 			sections: [
 				createDescriptor([createItem("a"), createItem("b"), createItem("c")]),
@@ -830,10 +830,14 @@ describe("compileTwoHopViewPlan", () => {
 			previousBuild: mounted,
 		});
 
-		// The scroll hot path must stay unaffected by background materialization:
-		// revising the plan in place must not invalidate row-slice reuse.
-		expect(rebuilt.rowSlices[0]).toBe(mounted.rowSlices[0]);
-		expect(rebuilt.cells[0]).toBe(mounted.cells[0]);
+		// A changed source revision produces a new immutable build instead of
+		// relying on a version signal to expose in-place descriptor mutations.
+		expect(rebuilt).not.toBe(mounted);
+		expect(rebuilt.rowSlices[0]).not.toBe(mounted.rowSlices[0]);
+		expect(rebuilt.cells[0]).not.toBe(mounted.cells[0]);
+		expect(rebuilt.rowSlices[0]?.slotIndex).toBe(
+			mounted.rowSlices[0]?.slotIndex,
+		);
 	});
 
 	it("indexes previous cells when the plan changes", () => {

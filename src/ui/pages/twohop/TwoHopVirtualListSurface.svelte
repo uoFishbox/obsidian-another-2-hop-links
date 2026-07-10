@@ -98,7 +98,6 @@
 	cellClassName=""
 	contentHeight={list.contentHeight}
 	mountedRows={list.mountedRows}
-	mountedRowsVersion={list.mountedRowsVersion}
 	cellWidth={list.layout.cellWidth}
 	rowHeight={list.layout.rowHeight}
 	columns={list.layout.columns}

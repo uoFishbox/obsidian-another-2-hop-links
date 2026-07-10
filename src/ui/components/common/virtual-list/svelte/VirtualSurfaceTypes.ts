@@ -23,11 +23,9 @@ export type VirtualSurfaceRenderInput<TMountedCell extends MountedVirtualCell> =
 			layoutMode?: "absolute-cells";
 			mountedCells: readonly TMountedCell[];
 			mountedRows?: never;
-			mountedRowsVersion?: never;
 	  }
 	| {
 			layoutMode: "grid-rows";
 			mountedCells?: never;
 			mountedRows: readonly VirtualSurfaceMountedRow<TMountedCell>[];
-			mountedRowsVersion?: number;
 	  };

@@ -248,71 +248,14 @@ describe("createTwoHopMountRuntime", () => {
 		}).not.toThrow();
 	});
 
-	it("consumeMountedRowsChange returns false on same range recompute", () => {
+	it("returns slot-ordered rows as part of each immutable build", () => {
 		const runtime = createTwoHopMountRuntime();
-		const range = { start: 0, end: 2 };
-		runtime.buildMountedRows({
-			rowModel,
-			rowRange: range,
-			ranges: { mounted: range, previewVisible: range },
-		});
-		// First build triggers change.
-		expect(runtime.consumeMountedRowsChange()).toBe(true);
-
-		// Same range recompute should not trigger change.
-		runtime.buildMountedRows({
-			rowModel,
-			rowRange: range,
-			ranges: { mounted: range, previewVisible: range },
-		});
-		expect(runtime.consumeMountedRowsChange()).toBe(false);
-	});
-
-	it("consumeMountedRowsChange returns true on range change", () => {
-		const runtime = createTwoHopMountRuntime();
-		const range = { start: 0, end: 2 };
-		runtime.buildMountedRows({
-			rowModel,
-			rowRange: range,
-			ranges: { mounted: range, previewVisible: range },
-		});
-		runtime.consumeMountedRowsChange();
-
-		// Range change should trigger change.
-		runtime.buildMountedRows({
-			rowModel,
-			rowRange: { start: 1, end: 3 },
-			ranges: {
-				mounted: { start: 1, end: 3 },
-				previewVisible: { start: 1, end: 3 },
-			},
-		});
-		expect(runtime.consumeMountedRowsChange()).toBe(true);
-	});
-
-	it("consumeMountedRowsChange returns true only once", () => {
-		const runtime = createTwoHopMountRuntime();
-		const range = { start: 0, end: 2 };
-		runtime.buildMountedRows({
-			rowModel,
-			rowRange: range,
-			ranges: { mounted: range, previewVisible: range },
-		});
-		expect(runtime.consumeMountedRowsChange()).toBe(true);
-		// Second consume returns false.
-		expect(runtime.consumeMountedRowsChange()).toBe(false);
-	});
-
-	it("getMountedRows returns the current row slices", () => {
-		const runtime = createTwoHopMountRuntime();
-		expect(runtime.getMountedRows()).toEqual([]);
-
 		const range = { start: 0, end: 2 };
 		const build = runtime.buildMountedRows({
 			rowModel,
 			rowRange: range,
 			ranges: { mounted: range, previewVisible: range },
 		});
-		expect(runtime.getMountedRows()).toBe(build.rowSlices);
+		expect(build.rowsBySlot.map((row) => row.slotIndex)).toEqual([0, 1]);
 	});
 });

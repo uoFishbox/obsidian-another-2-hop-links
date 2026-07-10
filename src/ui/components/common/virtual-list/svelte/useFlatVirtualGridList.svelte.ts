@@ -45,6 +45,7 @@ import {
 } from "../dom/flatGridLayoutMeasurement";
 import { createFlatGridVisibilityAdapter } from "./flatGridVisibilityAdapter";
 import { createFlatGridControllerAdapter } from "./flatGridControllerAdapter";
+import { createPooledRowSlotAllocator } from "../core/reconciliation/pooledRowSlotAllocator";
 
 interface FlatVirtualGridApplicationSettings extends CardLayoutSettings {
 	previewActivationAheadRows?: number;
@@ -120,7 +121,7 @@ export function useFlatVirtualGridList<T>(props: FlatVirtualGridListProps<T>) {
 			rowPreviewActivationRuntime?.clearRow(rowIndex);
 		},
 	});
-	const reusableRowSlotsScratch: number[] = [];
+	const rowSlotAllocator = createPooledRowSlotAllocator();
 	let lastResolvedActiveScrollPolicyLayout: VirtualGridLayout | undefined;
 	let lastResolvedActiveScrollPolicy:
 		| ReturnType<typeof createCardVirtualListPolicy>
@@ -224,8 +225,9 @@ export function useFlatVirtualGridList<T>(props: FlatVirtualGridListProps<T>) {
 				previousBuild,
 				previousCellsByKey,
 				renderRevisionFallbackPolicy: props.renderRevisionFallbackPolicy,
-				reusableRowSlotsScratch,
+				rowSlotAllocator,
 			}),
+		mountedRowsReconciler: rowSlotAllocator,
 		onStableVisibleRange: () => {
 			measurement.hasStableVisibleRange = true;
 		},
@@ -246,8 +248,8 @@ export function useFlatVirtualGridList<T>(props: FlatVirtualGridListProps<T>) {
 		virtualList.getMountedCells(),
 	);
 	const mountedRows = $derived.by<readonly MountedVirtualGridRowSlice<T>[]>(() => {
-		const rowSlices = virtualList.getReconciliationState().mountedBuild?.rowSlices;
-		return rowSlices && rowSlices.length > 0 ? rowSlices : EMPTY_MOUNTED_ROWS;
+		const rowsBySlot = virtualList.getReconciliationState().mountedBuild?.rowsBySlot;
+		return rowsBySlot && rowsBySlot.length > 0 ? rowsBySlot : EMPTY_MOUNTED_ROWS;
 	});
 	const mountedCellsForChange = $derived<readonly MountedVirtualGridCell<T>[]>(
 		virtualList.getMountedCellsForChange(),

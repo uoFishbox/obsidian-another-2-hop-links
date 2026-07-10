@@ -96,6 +96,10 @@ export interface CreateVirtualListRuntimeOptions<
 	 */
 	providePreviousCellsByKey?: boolean;
 	trackMountedCellsForChange?: boolean;
+	mountedRowsReconciler?: {
+		reset(reason: "empty" | "layout" | "source"): void;
+		dispose(): void;
+	};
 }
 
 const hasSameRefs = <T>(current: readonly T[], next: readonly T[]): boolean => {
@@ -209,6 +213,9 @@ export function createVirtualListRuntime<
 			buildMountedCells: options.buildMountedCells,
 		});
 		const nextSnapshot = result.snapshot;
+		if (nextSnapshot.mode.kind === "empty" && previousMountedBuild) {
+			options.mountedRowsReconciler?.reset("empty");
+		}
 		commitComputation(result);
 
 		if (result.measurementKind === "skipped") {
@@ -254,10 +261,17 @@ export function createVirtualListRuntime<
 			providePreviousCellsByKey: options.providePreviousCellsByKey,
 			buildMountedCells: options.buildMountedCells,
 		});
+		if (
+			result.snapshot.mode.kind === "empty" &&
+			runtimeState.reconciliationState.mountedBuild
+		) {
+			options.mountedRowsReconciler?.reset("empty");
+		}
 		commitComputation(result);
 	};
 
 	const setEmpty = (params: { rowModel: TRowModel; reason?: EmptyReason }): void => {
+		options.mountedRowsReconciler?.reset("empty");
 		const result = createEmptyVirtualListComputation<
 			TCell,
 			TMountedCell,
@@ -301,5 +315,8 @@ export function createVirtualListRuntime<
 		applyMeasurement,
 		recompute,
 		setEmpty,
+		dispose() {
+			options.mountedRowsReconciler?.dispose();
+		},
 	};
 }

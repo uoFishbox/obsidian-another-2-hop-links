@@ -50,7 +50,6 @@
 		layoutMode = "absolute-cells",
 		mountedCells = undefined,
 		mountedRows = undefined,
-		mountedRowsVersion = undefined,
 		contentEl = $bindable<HTMLDivElement | null>(null),
 		observerRoot = null,
 		getCellPosition,
@@ -74,7 +73,6 @@
 		{columns}
 		{gap}
 		mountedRows={mountedRows ?? []}
-		{mountedRowsVersion}
 		bind:contentEl
 		{observerRoot}
 		{getCellClassName}

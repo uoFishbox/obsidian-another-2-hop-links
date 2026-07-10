@@ -14,7 +14,6 @@ import {
 	buildTwoHopMountedRows,
 	type TwoHopMountedRowsBuild,
 } from "./twoHopMountedRowBuild";
-import { createTwoHopMountedRowWindow } from "./twoHopMountedRowWindow";
 import type {
 	TwoHopVirtualListItem,
 	TwoHopVirtualListSection,
@@ -22,6 +21,8 @@ import type {
 import type { TwoHopViewPlanRowModel } from "./twoHopViewPlan";
 import type { RowPreviewActivationRuntime } from "features/preview/scheduling/rowPreviewActivationRuntime";
 import { resolveTwoHopSlotId } from "./twoHopSlotId";
+import { createPooledRowSlotAllocator } from "ui/components/common/virtual-list/core/reconciliation/pooledRowSlotAllocator";
+import type { SectionedGridResolvedRowScratch } from "ui/components/common/virtual-list/row-models/sectionedGridMountedRows";
 
 const EMPTY_MOUNTED_ROWS: readonly [] = [];
 
@@ -72,8 +73,13 @@ export function createTwoHopMountRuntime(
 	let pendingBuild: TwoHopMountedRowsBuild | null = null;
 	const pendingPreviewRange: RowRange = { start: 0, end: 0 };
 	let hasPendingPreviewRange = false;
-	const rowWindow = createTwoHopMountedRowWindow();
-	let hasPendingMountedRowsChange = false;
+	const rowSlotAllocator = createPooledRowSlotAllocator();
+	const resolvedRowScratch: SectionedGridResolvedRowScratch = {
+		rowIndexInSection: 0,
+		sectionCellStartIndex: 0,
+		cellCount: 0,
+		top: 0,
+	};
 	const mountedRowsSyncParams: Parameters<
 		typeof visibilityStates.syncMountedRows
 	>[0] = {
@@ -165,16 +171,11 @@ export function createTwoHopMountRuntime(
 			ranges: VirtualRanges;
 			previousBuild?: TwoHopMountedRowsBuild;
 		}): TwoHopMountedRowsBuild {
-			const build = rowWindow.apply(params);
-			if (rowWindow.lastApplyChanged) {
-				hasPendingMountedRowsChange = true;
-			}
-			return build;
-		},
-		consumeMountedRowsChange(): boolean {
-			if (!hasPendingMountedRowsChange) return false;
-			hasPendingMountedRowsChange = false;
-			return true;
+			return buildTwoHopMountedRows({
+				...params,
+				rowSlotAllocator,
+				resolvedRowScratch,
+			});
 		},
 		syncSnapshot(
 			mountedBuild: TwoHopMountedRowsBuild | null | undefined,
@@ -198,9 +199,7 @@ export function createTwoHopMountRuntime(
 			hasPendingPreviewRange = false;
 			previewVisibleSyncTask.cancel();
 		},
-		getMountedRows(): TwoHopMountedRowsBuild["rowSlices"] | readonly [] {
-			return rowWindow.build?.rowSlices ?? EMPTY_MOUNTED_ROWS;
-		},
+		rowSlotAllocator,
 		getOrCreateVisibilityState(
 			cell: TwoHopMountedCell,
 			initialVisibility: VirtualizedItemVisibility,

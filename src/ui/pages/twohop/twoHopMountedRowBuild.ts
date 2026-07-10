@@ -21,6 +21,7 @@ import {
 	type TwoHopViewPlanRowModel,
 } from "./twoHopViewPlan";
 import { recordCCLDevMeasurement } from "infrastructure/debug/CCLDevMeasurements";
+import type { PooledRowSlotAllocator } from "ui/components/common/virtual-list/core/reconciliation/pooledRowSlotAllocator";
 
 /**
  * Materializes only the row ranges in `next` that are not covered by
@@ -116,8 +117,8 @@ export function buildTwoHopMountedRows(params: {
 	readonly rowRange: RowRange;
 	readonly ranges: VirtualRanges;
 	readonly previousBuild?: TwoHopMountedRowsBuild;
-	readonly reusableRowSlotsScratch?: number[];
 	readonly resolvedRowScratch?: SectionedGridResolvedRowScratch;
+	readonly rowSlotAllocator?: PooledRowSlotAllocator;
 }): TwoHopMountedRowsBuild {
 	recordCCLDevMeasurement("twoHop.buildMountedRows");
 
@@ -155,8 +156,9 @@ export function buildTwoHopMountedRows(params: {
 		plan,
 		rowRange: range,
 		previousBuild: previous,
-		reusableRowSlotsScratch: params.reusableRowSlotsScratch,
 		resolvedRowScratch: params.resolvedRowScratch,
+		rowSlotAllocator: params.rowSlotAllocator,
+		sourceRevision: plan.cellStore.revision,
 		findSectionIndexByRow: findTwoHopSectionIndexByRowFromSections,
 		resolveInitialSectionIndexByRow: resolveInitialTwoHopSectionIndexByRow,
 		resolveRowInSection: resolveTwoHopRowInSection,

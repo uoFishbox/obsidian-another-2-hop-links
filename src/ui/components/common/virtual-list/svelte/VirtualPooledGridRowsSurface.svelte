@@ -15,7 +15,6 @@
 		columns?: number;
 		gap?: number;
 		mountedRows: readonly VirtualSurfaceMountedRow<TMountedCell>[];
-		mountedRowsVersion?: number;
 		contentEl?: HTMLDivElement | null;
 		observerRoot?: HTMLElement | null;
 		getCellClassName?: (cell: TMountedCell) => string | undefined;
@@ -43,7 +42,6 @@
 		columns = 1,
 		gap = undefined,
 		mountedRows,
-		mountedRowsVersion = undefined,
 		contentEl = $bindable<HTMLDivElement | null>(null),
 		observerRoot = null,
 		getCellClassName,
@@ -67,102 +65,60 @@
 
 	const resolveRowSlotKey = (row: VirtualSurfaceMountedRow<TMountedCell>): number =>
 		row.slotKey ?? row.key;
-	const compareRowSlotKey = (
-		left: VirtualSurfaceMountedRow<TMountedCell>,
-		right: VirtualSurfaceMountedRow<TMountedCell>,
-	): number => resolveRowSlotKey(left) - resolveRowSlotKey(right);
-
-	const resolveSlotOrderedRows = (
-		rows: readonly VirtualSurfaceMountedRow<TMountedCell>[],
-		_version: number | undefined,
-	): readonly VirtualSurfaceMountedRow<TMountedCell>[] => {
-		for (let index = 1; index < rows.length; index += 1) {
-			if (resolveRowSlotKey(rows[index - 1]) > resolveRowSlotKey(rows[index])) {
-				return Array.from(rows).sort(compareRowSlotKey);
-			}
-		}
-
-		return rows;
-	};
 	const resolveCellSlotKey = (
 		_row: VirtualSurfaceMountedRow<TMountedCell>,
 		cell: TMountedCell,
 	): number => cell.cellSlotKey ?? cell.renderSlotIndex;
 
-	/**
-	 * Helper functions that take `mountedRowsVersion` as a parameter to ensure
-	 * Svelte re-reads mutated row/cell properties when the version changes.
-	 *
-	 * Without passing version into the expression, Svelte's compiler may skip
-	 * re-evaluation because the object identity has not changed.
-	 */
-	const resolveMountedCellLogicalKey = (
-		cell: TMountedCell,
-		_version: number | undefined,
-	): LogicalCellKey => cell.key;
+	const resolveMountedCellLogicalKey = (cell: TMountedCell): LogicalCellKey =>
+		cell.key;
 
 	const resolveMountedCellRowIndex = (
 		cell: TMountedCell,
-		_version: number | undefined,
 	): number => cell.rowIndex;
 
 	const resolveMountedCellColumnIndex = (
 		cell: TMountedCell,
-		_version: number | undefined,
 	): number | undefined => cell.columnIndex;
 
 	const resolveMountedCellBodyKey = (
 		cell: TMountedCell,
-		_version: number | undefined,
 	): unknown => cell.renderBodyKey ?? cell.cellMetadataKey ?? cell.key;
 
 	const resolveRowStyle = (
 		row: VirtualSurfaceMountedRow<TMountedCell>,
-		_version: number | undefined,
 	): string =>
 		`position:absolute; left:0; right:0; top:${Math.max(
 			0,
 			row.top,
 		)}px; margin-bottom:0`;
 
-	const slotOrderedRows = $derived(
-		resolveSlotOrderedRows(mountedRows, mountedRowsVersion),
-	);
 </script>
 
 <div class={contentClassName} bind:this={contentEl} style={contentStyle}>
 	<div data-ccl-virtual-flow-spacer="top" style:height="0px" aria-hidden="true"></div>
-	{#each slotOrderedRows as row (resolveRowSlotKey(row))}
+	{#each mountedRows as row (resolveRowSlotKey(row))}
 		<div
 			{...row.attributes}
 			class={rowClassName}
 			data-ccl-row-slot={!IS_PROD ? row.slotIndex : undefined}
 			data-ccl-row-index={!IS_PROD ? row.rowIndex : undefined}
-			style={resolveRowStyle(row, mountedRowsVersion)}
+			style={resolveRowStyle(row)}
 		>
 			{#each row.cells as mountedCell (resolveCellSlotKey(row, mountedCell))}
 				<VirtualGridLogicalCellMount
-					logicalKey={resolveMountedCellLogicalKey(
-						mountedCell,
-						mountedRowsVersion,
-					)}
+					logicalKey={resolveMountedCellLogicalKey(mountedCell)}
 					className={resolveCellClassName(mountedCell)}
 					dataTestId={getCellDataTestId?.(mountedCell)}
 					cellSlotKey={resolveCellSlotKey(row, mountedCell)}
-					rowIndex={resolveMountedCellRowIndex(
-						mountedCell,
-						mountedRowsVersion,
-					)}
-					columnIndex={resolveMountedCellColumnIndex(
-						mountedCell,
-						mountedRowsVersion,
-					)}
+					rowIndex={resolveMountedCellRowIndex(mountedCell)}
+					columnIndex={resolveMountedCellColumnIndex(mountedCell)}
 					{mountedCell}
 					{onLogicalCellAttach}
 					{onLogicalCellDetach}
 				>
 					{#if remountCellBodyOnKeyChange}
-						{#key resolveMountedCellBodyKey(mountedCell, mountedRowsVersion)}
+						{#key resolveMountedCellBodyKey(mountedCell)}
 							{@render renderCell({
 								mountedCell,
 								observerRoot,

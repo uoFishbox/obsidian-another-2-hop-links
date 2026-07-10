@@ -27,7 +27,6 @@
 		layoutMode?: "absolute-cells" | "grid-rows";
 		mountedCells?: readonly TMountedCell[];
 		mountedRows?: readonly VirtualSurfaceMountedRow<TMountedCell>[];
-		mountedRowsVersion?: number;
 		children?: Snippet;
 	};
 
@@ -41,7 +40,6 @@
 		layoutMode = "absolute-cells",
 		mountedCells = undefined,
 		mountedRows = undefined,
-		mountedRowsVersion = undefined,
 		mountedCellsForChange,
 		interactionDescriptorScopeId,
 		interactionDescriptors = [],
@@ -79,7 +77,6 @@
 				? {
 						layoutMode,
 						mountedRows: mountedRows ?? [],
-						mountedRowsVersion,
 					}
 				: {
 						layoutMode: "absolute-cells",

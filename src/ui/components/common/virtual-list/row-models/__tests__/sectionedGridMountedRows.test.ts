@@ -60,22 +60,25 @@ function createSectionLayout(
 	};
 }
 
-function createPlan(): TestPlan {
+function createPlan(rowCount = 3): TestPlan {
 	const section: TestSectionPlan = {
 		sectionIndex: 0,
 		firstRowIndex: 0,
-		rowCount: 3,
-		cellCount: 3,
-		mountedLayout: createSectionLayout(0, 3, 3),
+		rowCount,
+		cellCount: rowCount,
+		mountedLayout: createSectionLayout(0, rowCount, rowCount),
 	};
 	return {
 		sections: [section],
-		rowCount: 3,
+		rowCount,
 		columns: 1,
 		rowGap: 0,
-		rowSectionIndexes: [0, 0, 0],
+		rowSectionIndexes: Array.from({ length: rowCount }, () => 0),
 		logicalCellsBySection: [
-			["a", "b", "c"].map((key, itemIndex) => ({
+			Array.from(
+				{ length: rowCount },
+				(_, index) => ["a", "b", "c"][index] ?? `item-${index}`,
+			).map((key, itemIndex) => ({
 				kind: "item",
 				key: logicalCellKey(key),
 				sourceKey: sourceKey(key),
@@ -87,6 +90,40 @@ function createPlan(): TestPlan {
 }
 
 describe("buildSectionedGridMountedRows", () => {
+	it("shares the bounded row-slot behavior used by flat grids", () => {
+		const plan = createPlan(30);
+		const buildRange = (
+			rowRange: { start: number; end: number },
+			previousBuild?: TestMountedRowsBuild,
+		) =>
+			buildSectionedGridMountedRows({
+				plan,
+				rowRange,
+				previousBuild,
+				findSectionIndexByRow: () => 0,
+				resolveRowInSection: (_plan, sectionPlan, rowIndex) => ({
+					rowIndexInSection: rowIndex - sectionPlan.firstRowIndex,
+					sectionCellStartIndex: rowIndex,
+					cellCount: 1,
+					top: rowIndex * 10,
+				}),
+				readLogicalCellInSection: (source, sectionIndex, cellIndex) =>
+					source.logicalCellsBySection[sectionIndex]?.[cellIndex] ?? null,
+			});
+
+		let build = buildRange({ start: 0, end: 10 });
+		for (const range of [
+			{ start: 9, end: 10 },
+			{ start: 9, end: 19 },
+			{ start: 18, end: 19 },
+			{ start: 18, end: 28 },
+		]) {
+			build = buildRange(range, build);
+			expect(build.poolCapacity).toBe(10);
+			expect(Math.max(...build.rowSlices.map((row) => row.slotIndex ?? 0))).toBeLessThan(10);
+		}
+	});
+
 	it("reuses same-plan previous rows before resolving their sections", () => {
 		const plan = createPlan();
 		const findSectionIndexByRow = vi.fn(() => {

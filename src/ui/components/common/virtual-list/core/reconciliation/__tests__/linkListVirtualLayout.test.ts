@@ -128,6 +128,31 @@ function expectSameSlotsForKeys(
 }
 
 describe("linkListVirtualLayout", () => {
+	it("keeps the row-slot pool bounded when the mounted window repeatedly shrinks", () => {
+		const items = createItems(90);
+		let build = buildCells({
+			items,
+			visibleWindow: { start: 0, end: 30 },
+		});
+		expect(build.poolCapacity).toBe(10);
+
+		for (const visibleWindow of [
+			{ start: 27, end: 30 },
+			{ start: 27, end: 57 },
+			{ start: 54, end: 57 },
+			{ start: 54, end: 84 },
+		]) {
+			build = buildCells({ items, visibleWindow, previousBuild: build });
+			expect(build.poolCapacity).toBe(10);
+			expect(Math.max(...build.rowSlices.map((row) => row.slotIndex))).toBeLessThan(
+				build.poolCapacity,
+			);
+			expect(build.rowsBySlot.map((row) => row.slotIndex)).toEqual(
+				build.rowsBySlot.map((row) => row.slotIndex).sort((a, b) => a - b),
+			);
+		}
+	});
+
 	it("keeps keys, items, positions, and render slots stable when logical cells are rebuilt for the same items", () => {
 		const items = createItems(3);
 

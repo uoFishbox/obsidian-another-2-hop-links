@@ -52,15 +52,13 @@ export function createTwoHopMountedSurfaceRuntime(params: {
 		visibilityMetadataPolicy: { type: "caller-managed" },
 		providePreviousCellsByKey: false,
 		trackMountedCellsForChange: false,
+		mountedRowsReconciler: mountRuntime.rowSlotAllocator,
 		onStableVisibleRange: params.onStableVisibleRange,
 		onSnapshotUpdated: (snapshot, reconciliationState) => {
 			mountRuntime.syncSnapshot(
 				reconciliationState.mountedBuild,
 				snapshot.ranges.previewVisible,
 			);
-			if (mountRuntime.consumeMountedRowsChange()) {
-				mountedRowsVersion += 1;
-			}
 		},
 	});
 	const contentHeight = $derived.by(() => {
@@ -77,16 +75,14 @@ export function createTwoHopMountedSurfaceRuntime(params: {
 
 		return snapshot.totalHeight;
 	});
-	let mountedRowsVersion = $state.raw(0);
 	const mountedRowsForSurface = $derived.by(() => {
 		const build = virtualList.getReconciliationState().mountedBuild;
-		void mountedRowsVersion;
 
 		if (!build) {
 			return EMPTY_MOUNTED_ROWS;
 		}
 
-		return mountRuntime.getMountedRows();
+		return build.rowsBySlot;
 	});
 	const getItemVisibilityState = (renderedCell: TwoHopMountedItemCell) =>
 		mountRuntime.getOrCreateVisibilityState(
@@ -107,9 +103,6 @@ export function createTwoHopMountedSurfaceRuntime(params: {
 		virtualList,
 		get contentHeight() {
 			return contentHeight;
-		},
-		get mountedRowsVersion() {
-			return mountedRowsVersion;
 		},
 		get mountedRowsForSurface() {
 			return mountedRowsForSurface;
