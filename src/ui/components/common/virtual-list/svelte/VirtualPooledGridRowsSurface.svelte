@@ -54,6 +54,31 @@
 		renderCell,
 	}: Props<TMountedCell> = $props();
 
+	const resolvePhysicalRowSlotKey = (
+		row: VirtualSurfaceMountedRow<TMountedCell>,
+	): number => row.slotKey ?? row.slotIndex ?? row.key;
+
+	const compareRowsByPhysicalSlot = (
+		left: VirtualSurfaceMountedRow<TMountedCell>,
+		right: VirtualSurfaceMountedRow<TMountedCell>,
+	): number => resolvePhysicalRowSlotKey(left) - resolvePhysicalRowSlotKey(right);
+
+	const resolveRowsInPhysicalSlotOrder = (
+		rows: readonly VirtualSurfaceMountedRow<TMountedCell>[],
+		_version: number | undefined,
+	): readonly VirtualSurfaceMountedRow<TMountedCell>[] => {
+		for (let index = 1; index < rows.length; index += 1) {
+			if (
+				resolvePhysicalRowSlotKey(rows[index - 1]) >
+				resolvePhysicalRowSlotKey(rows[index])
+			) {
+				return [...rows].sort(compareRowsByPhysicalSlot);
+			}
+		}
+
+		return rows;
+	};
+
 	const resolveCellClassName = (mountedCell: TMountedCell): string => {
 		const extraClassName = getCellClassName?.(mountedCell);
 		if (!extraClassName) return cellClassName;
@@ -66,7 +91,7 @@
 	);
 
 	const resolveRowSlotKey = (row: VirtualSurfaceMountedRow<TMountedCell>): number =>
-		row.slotKey ?? row.key;
+		resolvePhysicalRowSlotKey(row);
 	const resolveCellSlotKey = (
 		_row: VirtualSurfaceMountedRow<TMountedCell>,
 		cell: TMountedCell,
@@ -103,10 +128,14 @@
 		cell: TMountedCell,
 		_version: number | undefined,
 	): unknown => cell.renderBodyKey ?? cell.cellMetadataKey ?? cell.key;
+
+	const physicalSlotRows = $derived(
+		resolveRowsInPhysicalSlotOrder(mountedRows, mountedRowsVersion),
+	);
 </script>
 
 <div class={contentClassName} bind:this={contentEl} style={contentStyle}>
-	{#each mountedRows as row (resolveRowSlotKey(row))}
+	{#each physicalSlotRows as row (resolveRowSlotKey(row))}
 		<div
 			class={rowClassName}
 			data-ccl-row-slot={!IS_PROD ? row.slotIndex : undefined}

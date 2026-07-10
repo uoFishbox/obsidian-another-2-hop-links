@@ -391,6 +391,73 @@ describe("VirtualSurface recycling", () => {
 		).toBe("B");
 	});
 
+	it("keeps grid-row DOM order in physical slot order", async () => {
+		const slotOneCells = createCells(["A"]).map((cell) => ({
+			...cell,
+			rowIndex: 1,
+			columnIndex: 0,
+		}));
+		const slotZeroCells = createCells(["B"]).map((cell) => ({
+			...cell,
+			rowIndex: 2,
+			columnIndex: 0,
+		}));
+		const { container } = render(VirtualSurfaceRecyclingHarness, {
+			props: {
+				mountedCells: [...slotOneCells, ...slotZeroCells],
+				mountedRows: [
+					{
+						key: 1,
+						rowIndex: 1,
+						top: 50,
+						slotIndex: 1,
+						slotKey: 1,
+						cells: slotOneCells,
+					},
+					{
+						key: 2,
+						rowIndex: 2,
+						top: 100,
+						slotIndex: 0,
+						slotKey: 0,
+						cells: slotZeroCells,
+					},
+				],
+				contentHeight: 200,
+				rowHeight: 50,
+				layoutMode: "grid-rows",
+			},
+		});
+		await flushFrames();
+
+		const host = container.querySelector(
+			".recycling-test-root",
+		) as HTMLElement | null;
+		const shadowRoot = host?.shadowRoot;
+		expect(shadowRoot).toBeTruthy();
+		if (!shadowRoot) return;
+
+		const rowShells = Array.from(
+			shadowRoot.querySelectorAll<HTMLElement>("[data-ccl-row-slot]"),
+		);
+		expect(rowShells.map((row) => row.dataset.cclRowSlot)).toStrictEqual([
+			"0",
+			"1",
+		]);
+		expect(
+			rowShells[0]
+				?.querySelector('[data-testid="probe-cell"]')
+				?.getAttribute("data-key"),
+		).toBe("B");
+		expect(rowShells[0]?.style.transform).toBe("translateY(100px)");
+		expect(
+			rowShells[1]
+				?.querySelector('[data-testid="probe-cell"]')
+				?.getAttribute("data-key"),
+		).toBe("A");
+		expect(rowShells[1]?.style.transform).toBe("translateY(50px)");
+	});
+
 	it("can reuse a grid-row body when the same physical slot receives another logical item", async () => {
 		const mountedKeys: string[] = [];
 		const updatedKeys: string[] = [];
