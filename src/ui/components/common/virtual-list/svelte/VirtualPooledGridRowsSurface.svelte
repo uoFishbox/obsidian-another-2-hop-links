@@ -88,10 +88,10 @@
 	const resolveRowStyle = (
 		row: VirtualSurfaceMountedRow<TMountedCell>,
 	): string =>
-		`position:absolute; left:0; right:0; top:${Math.max(
+		`position:absolute; left:0; right:0; top:0; transform:translateY(${Math.max(
 			0,
 			row.top,
-		)}px; margin-bottom:0`;
+		)}px); margin-bottom:0`;
 
 </script>
 
