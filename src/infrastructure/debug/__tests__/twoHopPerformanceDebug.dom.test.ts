@@ -76,6 +76,9 @@ describe("twoHopPerformanceDebug", () => {
 			rootFound: true,
 			shadowRootFound: true,
 			scrollContainerFound: true,
+			totalCards: 100,
+			loadedCards: 90,
+			sectionCount: 2,
 			scrollHeight: 2_000,
 			clientHeight: 120,
 			maxScrollTop: 1_880,
@@ -196,6 +199,9 @@ function createTwoHopListDom(): {
 
 	const root = document.createElement("div");
 	root.className = "twohop-page-virtual-list";
+	root.dataset.twoHopTotalCardCount = "100";
+	root.dataset.twoHopLoadedCardCount = "90";
+	root.dataset.twoHopSectionCount = "2";
 	const shadowRoot = root.attachShadow({ mode: "open" });
 	const content = document.createElement("div");
 	content.className = "view-plan-virtual-list-content";

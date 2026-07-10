@@ -139,6 +139,8 @@ await __cclDebug.twoHopPerformance.runScroll({
 __cclDebug.twoHopPerformance.getCounterRows();
 ```
 
+`getDomStats()` / `getTwoHopVirtualListDomStats()` は、`totalCards`（全sectionの `totalCount` 合計）、`loadedCards`（全sectionの `loadedCount` 合計）、`sectionCount`、mounted DOM数、スクロールコンテナ寸法を返す。
+
 `runScroll()` はスクロールコンテナを検出し、指定フレーム数だけ `requestAnimationFrame` ごとに `scrollTop` を進め、p50/p95/max、16.7ms超過数、33.3ms超過数、前後の mounted DOM数、主要カウンターを返す。profile-clean ビルドではカウンター値は0になるため、呼び出し回数の確認には開発ビルドを使う。
 
 `result.actualDistancePx` が `0` の場合は、スクロール距離がない要素を測定している。`afterDomStats.scrollContainerFound`、`afterDomStats.scrollHeight`、`afterDomStats.clientHeight`、`afterDomStats.maxScrollTop` を確認すること。root検出が外れている場合は、明示的に対象を渡す。

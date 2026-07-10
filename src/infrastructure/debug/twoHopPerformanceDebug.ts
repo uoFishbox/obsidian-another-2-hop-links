@@ -38,6 +38,9 @@ export interface TwoHopVirtualListDomStats {
 	readonly rootFound: boolean;
 	readonly shadowRootFound: boolean;
 	readonly scrollContainerFound: boolean;
+	readonly totalCards: number | null;
+	readonly loadedCards: number | null;
+	readonly sectionCount: number | null;
 	readonly scrollTop: number;
 	readonly scrollHeight: number;
 	readonly clientHeight: number;
@@ -174,6 +177,9 @@ function getTwoHopVirtualListDomStats(
 		rootFound: root !== null,
 		shadowRootFound: shadowRoot !== null,
 		scrollContainerFound: scroller !== null,
+		totalCards: parseDatasetInteger(root?.dataset.twoHopTotalCardCount),
+		loadedCards: parseDatasetInteger(root?.dataset.twoHopLoadedCardCount),
+		sectionCount: parseDatasetInteger(root?.dataset.twoHopSectionCount),
 		scrollTop: scroller?.scrollTop ?? 0,
 		scrollHeight,
 		clientHeight,
@@ -366,6 +372,15 @@ function normalizeNonNegativeNumber(
 ): number {
 	if (value === undefined || !Number.isFinite(value)) return fallback;
 	return Math.max(0, value);
+}
+
+function parseDatasetInteger(value: string | undefined): number | null {
+	if (value === undefined) return null;
+
+	const parsed = Number(value);
+	if (!Number.isSafeInteger(parsed) || parsed < 0) return null;
+
+	return parsed;
 }
 
 function percentile(sortedValues: readonly number[], ratio: number): number {

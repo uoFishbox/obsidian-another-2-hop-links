@@ -59,6 +59,13 @@
 	const props: Props = $props();
 	providePreviewActivationContexts();
 	const list = useTwoHopViewPlanVirtualList(props);
+	const totalCardCount = $derived(
+		props.sections.reduce((sum, section) => sum + section.totalCount, 0),
+	);
+	const loadedCardCount = $derived(
+		props.sections.reduce((sum, section) => sum + section.loadedCount, 0),
+	);
+	const sectionCount = $derived(props.sections.length);
 	const interactionDescriptorResolverProvider =
 		createTwoHopInteractionResolverProvider({
 			getMountedRows: () => list.mountedRows,
@@ -89,6 +96,15 @@
 		cell: MountedFlatCell<TwoHopVirtualListItem, TwoHopVirtualListSection>,
 	): cell is MountedFlatItemCell<TwoHopVirtualListItem, TwoHopVirtualListSection> =>
 		cell.cell.kind === "item";
+
+	$effect(() => {
+		const root = list.rootEl;
+		if (!root) return;
+
+		root.dataset.twoHopTotalCardCount = String(totalCardCount);
+		root.dataset.twoHopLoadedCardCount = String(loadedCardCount);
+		root.dataset.twoHopSectionCount = String(sectionCount);
+	});
 </script>
 
 <VirtualSurface

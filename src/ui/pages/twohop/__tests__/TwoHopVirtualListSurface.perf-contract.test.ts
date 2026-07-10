@@ -121,6 +121,13 @@ describe("TwoHopViewPlanVirtualList DOM performance contracts", () => {
 			expect(
 				shadowRoot?.querySelectorAll(".view-plan-virtual-list-cell").length,
 			).toBeLessThanOrEqual(6);
+			expect(virtualListRoot.dataset.twoHopTotalCardCount).toBe(
+				String(cardCount),
+			);
+			expect(virtualListRoot.dataset.twoHopLoadedCardCount).toBe(
+				String(cardCount),
+			);
+			expect(virtualListRoot.dataset.twoHopSectionCount).toBe("1");
 			expect(renderedItems).toBeGreaterThan(0);
 			expect(renderedItems).toBeLessThan(cardCount);
 		},
