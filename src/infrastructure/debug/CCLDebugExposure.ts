@@ -22,6 +22,14 @@ import {
 	resetCCLDevMeasurements,
 	type CCLDevMeasurementSnapshot,
 } from "./CCLDevMeasurements";
+import {
+	createTwoHopPerformanceDebugApi,
+	type TwoHopPerformanceDebugApi,
+	type TwoHopScrollRun,
+	type TwoHopScrollRunOptions,
+	type TwoHopVirtualListDomStats,
+	type TwoHopVirtualListQueryOptions,
+} from "./twoHopPerformanceDebug";
 
 interface CCLDevMeasurementsApi {
 	readonly snapshot: CCLDevMeasurementSnapshot;
@@ -34,6 +42,7 @@ interface CCLDebugApi {
 	readonly lastSnapshot: ReturnType<typeof getCCLDebugLastSnapshot>;
 	readonly frozenPopover: unknown;
 	readonly measurements: CCLDevMeasurementsApi;
+	readonly twoHopPerformance: TwoHopPerformanceDebugApi;
 	readonly app: PluginHost["app"];
 	readonly plugin: PluginHost;
 	readonly pagePreviewPlugin: unknown;
@@ -70,6 +79,12 @@ interface CCLDebugApi {
 declare global {
 	interface Window {
 		__cclDebug?: CCLDebugApi;
+		runTwoHopScroll?: (
+			options?: TwoHopScrollRunOptions,
+		) => Promise<TwoHopScrollRun>;
+		getTwoHopVirtualListDomStats?: (
+			options?: TwoHopVirtualListQueryOptions,
+		) => TwoHopVirtualListDomStats;
 	}
 }
 
@@ -179,6 +194,10 @@ export function installCCLDebugExposure(plugin: PluginHost): void {
 			return getCCLDevMeasurementSnapshot();
 		},
 	};
+	const twoHopPerformance = createTwoHopPerformanceDebugApi({
+		getMeasurementSnapshot: getCCLDevMeasurementSnapshot,
+		resetMeasurements: resetCCLDevMeasurements,
+	});
 	const api: CCLDebugApi = {
 		get autoFreeze() {
 			return getCCLDebugAutoFreeze();
@@ -192,6 +211,7 @@ export function installCCLDebugExposure(plugin: PluginHost): void {
 		get measurements() {
 			return measurements;
 		},
+		twoHopPerformance,
 		get app() {
 			return plugin.app;
 		},
@@ -286,11 +306,25 @@ export function installCCLDebugExposure(plugin: PluginHost): void {
 		},
 	};
 
+	const runTwoHopScroll = (options?: TwoHopScrollRunOptions) =>
+		twoHopPerformance.runScroll(options);
+	const getTwoHopVirtualListDomStats = (
+		options?: TwoHopVirtualListQueryOptions,
+	) =>
+		twoHopPerformance.getDomStats(options);
 	window.__cclDebug = api;
+	window.runTwoHopScroll = runTwoHopScroll;
+	window.getTwoHopVirtualListDomStats = getTwoHopVirtualListDomStats;
 
 	plugin.register(() => {
 		if (window.__cclDebug === api) {
 			delete window.__cclDebug;
+		}
+		if (window.runTwoHopScroll === runTwoHopScroll) {
+			delete window.runTwoHopScroll;
+		}
+		if (window.getTwoHopVirtualListDomStats === getTwoHopVirtualListDomStats) {
+			delete window.getTwoHopVirtualListDomStats;
 		}
 	});
 }

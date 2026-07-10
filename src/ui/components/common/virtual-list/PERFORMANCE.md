@@ -98,3 +98,54 @@ Vault全体のベンチマークは、インデックス作成レイヤーやE2E
 - 変更したキャッシュにおける、キャッシュのヒット数、ミス数、無効化数、および破棄（エビクション）数。
 
 現状、すべてのキャッシュにデバッグカウンターが実装されているわけではない。キャッシュのチューニングを行う際は、本番環境のパフォーマンスに影響を与えないよう、既存のデバッグフラグの背後に診断用カウンターを追加すること。
+
+## TwoHop測定用ビルドとコンソールAPI
+
+実時間の比較には、開発ビルドではなく profile-clean ビルドを使うこと。
+
+```sh
+bun run build:profile
+```
+
+このビルドは Svelte `dev: false`、`NODE_ENV=production`、minifyなし、inline sourcemapありで出力する。`CCLDevMeasurements` は production 扱いで無効になるため、時間測定に開発カウンターのコストを混ぜない。
+
+preview の切り分けはビルド時フラグで行う。
+
+```sh
+# PowerShell
+$env:CCL_DISABLE_CARD_DOM_PREVIEW = "true"
+bun run build:profile
+
+$env:CCL_DISABLE_RENDERED_PREVIEW_CACHE = "true"
+bun run build:profile
+```
+
+Obsidian のDeveloper Toolsでは、次のAPIを使える。
+
+```js
+getTwoHopVirtualListDomStats();
+await runTwoHopScroll({ frames: 300, distance: 4000 });
+```
+
+同じ機能は `window.__cclDebug.twoHopPerformance` にも公開されている。
+
+```js
+__cclDebug.twoHopPerformance.getDomStats();
+await __cclDebug.twoHopPerformance.runScroll({
+	frames: 300,
+	distance: 4000,
+	resetCounters: true,
+});
+__cclDebug.twoHopPerformance.getCounterRows();
+```
+
+`runScroll()` はスクロールコンテナを検出し、指定フレーム数だけ `requestAnimationFrame` ごとに `scrollTop` を進め、p50/p95/max、16.7ms超過数、33.3ms超過数、前後の mounted DOM数、主要カウンターを返す。profile-clean ビルドではカウンター値は0になるため、呼び出し回数の確認には開発ビルドを使う。
+
+paint containment のA/B確認には、Shadow Root内へ一時ルールを注入できる。
+
+```js
+__cclDebug.twoHopPerformance.setPaintContainmentProbe(true);
+__cclDebug.twoHopPerformance.setPaintContainmentProbe(false);
+```
+
+このprobeは `.view-plan-virtual-list-cell { contain: layout paint !important; }` だけを追加する。視覚回帰確認なしに恒久反映しないこと。
