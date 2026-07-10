@@ -1,5 +1,3 @@
-import { IS_PROD } from "appConstants";
-
 export type CCLDevMeasurementName =
 	| "virtualScroll.applyScrollMeasurement"
 	| "virtualScroll.stableBandHit"
@@ -94,7 +92,7 @@ function nowIsoString(): string {
 }
 
 export function recordCCLDevMeasurement(name: CCLDevMeasurementName): void {
-	if (IS_PROD) {
+	if (process.env.NODE_ENV === "production") {
 		return;
 	}
 
@@ -123,7 +121,7 @@ export function getCCLDevMeasurementSnapshot(): CCLDevMeasurementSnapshot {
 	}
 
 	return {
-		enabled: !IS_PROD,
+		enabled: process.env.NODE_ENV !== "production",
 		counters: snapshot,
 	};
 }

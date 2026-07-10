@@ -7,7 +7,6 @@
 	import {
 		ARIA_LABELS,
 		DEBUG_DISABLE_CARD_DOM_PREVIEW,
-		IS_PROD,
 	} from "../../../appConstants";
 	import { formatLinkText } from "features/preview/text-processing/textUtils";
 	import { getItemStrategy } from "application/presenters";
@@ -112,7 +111,7 @@
 			: null,
 	);
 	const componentReevaluationProbe = $derived.by(() => {
-		if (IS_PROD) return "";
+		if (process.env.NODE_ENV === "production") return "";
 
 		void item;
 		void settings;

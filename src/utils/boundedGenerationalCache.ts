@@ -18,7 +18,7 @@
  * therefore bounded by roughly `2 * maxEntries`.
  *
  * Stats (hits, misses, promotions, generation rotations, clears, sizes) are
- * tracked for debug measurement.
+ * tracked outside production for debug measurement.
  */
 
 export interface BoundedGenerationalCacheStats {
@@ -59,6 +59,77 @@ export function createBoundedGenerationalCache<K, V>(
 		);
 	}
 
+	if (process.env.NODE_ENV === "production") {
+		return createUnmeasuredBoundedGenerationalCache(name, maxEntries);
+	}
+
+	return createMeasuredBoundedGenerationalCache(name, maxEntries);
+}
+
+function createUnmeasuredBoundedGenerationalCache<K, V>(
+	name: string,
+	maxEntries: number,
+): BoundedGenerationalCache<K, V> {
+	let current = new Map<K, V>();
+	let previous = new Map<K, V>();
+
+	function rotate(): void {
+		previous = current;
+		current = new Map<K, V>();
+	}
+
+	return {
+		get(key: K): V | undefined {
+			const fromCurrent = current.get(key);
+			if (fromCurrent !== undefined) {
+				return fromCurrent;
+			}
+
+			const fromPrevious = previous.get(key);
+			if (fromPrevious !== undefined) {
+				previous.delete(key);
+				current.set(key, fromPrevious);
+				if (current.size >= maxEntries) {
+					rotate();
+				}
+				return fromPrevious;
+			}
+
+			return undefined;
+		},
+
+		set(key: K, value: V): void {
+			current.set(key, value);
+			if (current.size >= maxEntries) {
+				rotate();
+			}
+		},
+
+		clear(): void {
+			current = new Map<K, V>();
+			previous = new Map<K, V>();
+		},
+
+		getStats(): BoundedGenerationalCacheStats {
+			return {
+				name,
+				maxEntries,
+				currentSize: current.size,
+				previousSize: previous.size,
+				hits: 0,
+				misses: 0,
+				promotions: 0,
+				generations: 0,
+				clears: 0,
+			};
+		},
+	};
+}
+
+function createMeasuredBoundedGenerationalCache<K, V>(
+	name: string,
+	maxEntries: number,
+): BoundedGenerationalCache<K, V> {
 	let current = new Map<K, V>();
 	let previous = new Map<K, V>();
 	let hits = 0;

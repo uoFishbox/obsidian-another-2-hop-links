@@ -64,38 +64,42 @@ export function createTwoHopRowModelCache(params: {
 				hasCompatibleVisibleCounts &&
 				hasCacheCompatibleLayout
 			) {
-				recordCCLDevMeasurement("twoHop.rowModelCache.hit");
+				if (process.env.NODE_ENV !== "production") {
+					recordCCLDevMeasurement("twoHop.rowModelCache.hit");
+				}
 				previousVisibleCounts = sectionVisibleCounts;
 				return previousRowModel;
 			}
 
-			recordCCLDevMeasurement("twoHop.rowModelCache.miss");
-			if (!previousRowModel) {
-				recordCCLDevMeasurement("twoHop.rowModelCache.miss.firstResolve");
-			} else {
-				if (sections !== previousSections) {
-					recordCCLDevMeasurement("twoHop.rowModelCache.miss.sections");
-				}
-				if (sectionVisibleCounts !== previousVisibleCounts) {
-					recordCCLDevMeasurement("twoHop.rowModelCache.miss.visibleCounts");
-					if (
-						previousVisibleCounts &&
-						hasSameVisibleCounts(
-							previousVisibleCounts,
-							sectionVisibleCounts,
-						)
-					) {
+			if (process.env.NODE_ENV !== "production") {
+				recordCCLDevMeasurement("twoHop.rowModelCache.miss");
+				if (!previousRowModel) {
+					recordCCLDevMeasurement("twoHop.rowModelCache.miss.firstResolve");
+				} else {
+					if (sections !== previousSections) {
+						recordCCLDevMeasurement("twoHop.rowModelCache.miss.sections");
+					}
+					if (sectionVisibleCounts !== previousVisibleCounts) {
+						recordCCLDevMeasurement("twoHop.rowModelCache.miss.visibleCounts");
+						if (
+							previousVisibleCounts &&
+							hasSameVisibleCounts(
+								previousVisibleCounts,
+								sectionVisibleCounts,
+							)
+						) {
+							recordCCLDevMeasurement(
+								"twoHop.rowModelCache.miss.visibleCountsSemanticallySame",
+							);
+						}
+					}
+					if (!hasCacheCompatibleLayout) {
+						recordCCLDevMeasurement("twoHop.rowModelCache.miss.layout");
+					} else if (layout !== previousLayout) {
 						recordCCLDevMeasurement(
-							"twoHop.rowModelCache.miss.visibleCountsSemanticallySame",
+							"twoHop.rowModelCache.miss.layoutSemanticallySame",
 						);
 					}
-				}
-				if (!hasCacheCompatibleLayout) {
-					recordCCLDevMeasurement("twoHop.rowModelCache.miss.layout");
-				} else if (layout !== previousLayout) {
-					recordCCLDevMeasurement(
-						"twoHop.rowModelCache.miss.layoutSemanticallySame",
-					);
 				}
 			}
 

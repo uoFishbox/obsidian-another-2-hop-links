@@ -130,7 +130,9 @@ export default class CosenseCardLinksPlugin extends Plugin implements PluginHost
 
 		this.initializeServices();
 		registerCardDragStateCleanup(this);
-		installCCLDebugExposure(this);
+		if (process.env.NODE_ENV !== "production") {
+			installCCLDebugExposure(this);
+		}
 
 		this.addSettingTab(new CosenseCardLinksSettingTab(this.app, this));
 		registerViews(this);
@@ -138,7 +140,9 @@ export default class CosenseCardLinksPlugin extends Plugin implements PluginHost
 			scrollManager: this.scrollManager,
 			keyboardCardNavigator: this.keyboardCardNavigator,
 		});
-		registerBenchmarkCommand(this, this.indexingService);
+		if (process.env.NODE_ENV !== "production") {
+			registerBenchmarkCommand(this, this.indexingService);
+		}
 		registerEditorExtensions(this, {
 			linkStatusService: this.linkStatusService,
 		});

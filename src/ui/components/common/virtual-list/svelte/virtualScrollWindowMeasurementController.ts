@@ -89,7 +89,9 @@ export function createVirtualScrollWindowMeasurementController<TContext>({
 		nextMeasurement: VirtualMeasurement,
 		context: TContext,
 	): VirtualMeasurementApplicationResult => {
-		recordCCLDevMeasurement("virtualScroll.applyScrollMeasurement");
+		if (process.env.NODE_ENV !== "production") {
+			recordCCLDevMeasurement("virtualScroll.applyScrollMeasurement");
+		}
 
 		if (!nextMeasurement.isStableMeasurement && !applyUnstableScrollMeasurement) {
 			lastScrollWindow = null;
@@ -134,7 +136,9 @@ export function createVirtualScrollWindowMeasurementController<TContext>({
 						nextMeasurement.scrollTop,
 					))
 			) {
-				recordCCLDevMeasurement("virtualScroll.stableBandHit");
+				if (process.env.NODE_ENV !== "production") {
+					recordCCLDevMeasurement("virtualScroll.stableBandHit");
+				}
 				return returnStableScrollMeasurement(nextMeasurement, context);
 			}
 			pendingMountedScrollWindowMeasurement = mountedScrollWindowMeasurement;
@@ -153,7 +157,9 @@ export function createVirtualScrollWindowMeasurementController<TContext>({
 					"visible-and-mounted",
 				)
 			) {
-				recordCCLDevMeasurement("virtualScroll.stableBandHit");
+				if (process.env.NODE_ENV !== "production") {
+					recordCCLDevMeasurement("virtualScroll.stableBandHit");
+				}
 				return returnStableScrollMeasurement(nextMeasurement, context);
 			}
 			if (
@@ -163,7 +169,9 @@ export function createVirtualScrollWindowMeasurementController<TContext>({
 					scrollWindowMeasurement.ranges.mounted,
 				)
 			) {
-				recordCCLDevMeasurement("virtualScroll.previewOnlyCrossing");
+				if (process.env.NODE_ENV !== "production") {
+					recordCCLDevMeasurement("virtualScroll.previewOnlyCrossing");
+				}
 				syncPreviewRange(scrollWindowMeasurement.ranges);
 				lastScrollWindow = updateMountedAndPreviewScrollWindow(
 					lastScrollWindow,

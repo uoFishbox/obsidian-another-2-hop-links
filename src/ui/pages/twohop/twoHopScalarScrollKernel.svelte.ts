@@ -73,7 +73,9 @@ const EMPTY_SECTION = {} as TwoHopVirtualListSection;
 const EMPTY_HEADER_PROPS: ClickableHeaderExtraProps = {};
 
 function createCellSlotRecord(renderSlotIndex: number): CellSlotRecord {
-	recordCCLDevMeasurement("twoHop.scalarKernel.cellShellCreated");
+	if (process.env.NODE_ENV !== "production") {
+		recordCCLDevMeasurement("twoHop.scalarKernel.cellShellCreated");
+	}
 	const mutable: MutableMountedCellShell = {
 		key: EMPTY_LOGICAL_CELL.key,
 		logicalKey: EMPTY_LOGICAL_CELL.key,
@@ -110,7 +112,9 @@ function createCellSlotRecord(renderSlotIndex: number): CellSlotRecord {
 }
 
 function createRowSlotRecord(slotIndex: number, columns: number): RowSlotRecord {
-	recordCCLDevMeasurement("twoHop.scalarKernel.rowShellCreated");
+	if (process.env.NODE_ENV !== "production") {
+		recordCCLDevMeasurement("twoHop.scalarKernel.rowShellCreated");
+	}
 	const cells: TwoHopMountedCell[] = [];
 	const cellSlots: CellSlotRecord[] = [];
 	for (let columnIndex = 0; columnIndex < columns; columnIndex += 1) {
@@ -460,7 +464,9 @@ export function createTwoHopScalarScrollKernel(params: {
 		pendingDirtyEnd = Number.NEGATIVE_INFINITY;
 		mountedRange.start = nextStart;
 		mountedRange.end = nextEnd;
-		recordCCLDevMeasurement("twoHop.scalarKernel.mountedRangeCommit");
+		if (process.env.NODE_ENV !== "production") {
+			recordCCLDevMeasurement("twoHop.scalarKernel.mountedRangeCommit");
+		}
 		return true;
 	}
 

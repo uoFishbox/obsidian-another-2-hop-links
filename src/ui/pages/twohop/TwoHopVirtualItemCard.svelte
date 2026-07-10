@@ -1,7 +1,6 @@
 <script lang="ts">
 	import PreviewVisibilityProvider from "ui/components/items/PreviewVisibilityProvider.svelte";
 	import ViewItemCard from "ui/components/items/ViewItemCard.svelte";
-	import { IS_PROD } from "../../../appConstants";
 	import type { PluginSettings } from "types/settings";
 	import type { SearchWorkerMatchedItem } from "features/search/searchWorkerTypes";
 	import type { SearchWorkerMatchScope } from "features/search/searchWorkerTypes";
@@ -37,7 +36,7 @@
 		resolveTwoHopPageItemSearchScope(row, searchScope, matchedItem?.contentMatched),
 	);
 	const componentReevaluationProbe = $derived.by(() => {
-		if (IS_PROD) return "";
+		if (process.env.NODE_ENV === "production") return "";
 
 		void row;
 		void settings;

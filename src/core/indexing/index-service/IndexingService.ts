@@ -282,7 +282,9 @@ export class IndexingService implements IIndexingService {
 		this.beginIndexing();
 		this.queryEngine.invalidate();
 		this.commonTagsCache = undefined;
-		const startTime = performance.now();
+		const shouldLogRebuildTiming =
+			process.env.NODE_ENV !== "production" || enableLogging;
+		const startTime = shouldLogRebuildTiming ? performance.now() : undefined;
 
 		try {
 			const includeTagIndex = this.isTagFeatureEnabled();
@@ -414,11 +416,13 @@ export class IndexingService implements IIndexingService {
 		this.notifyDataUpdate({ affectsAll: true });
 	}
 
-	private logRebuildComplete(message: string, startTime: number): void {
-		const duration = performance.now() - startTime;
-		console.log(
-			`[${PLUGIN_NAME}] Backlinks map built: ${this.snapshot.backlinksMap.size} entries in ${duration.toFixed(2)}ms`,
-		);
+	private logRebuildComplete(message: string, startTime: number | undefined): void {
+		if (startTime !== undefined) {
+			const duration = performance.now() - startTime;
+			console.log(
+				`[${PLUGIN_NAME}] Backlinks map built: ${this.snapshot.backlinksMap.size} entries in ${duration.toFixed(2)}ms`,
+			);
+		}
 		if (enableLogging)
 			logger(`${message} ${this.snapshot.backlinksMap.size} entries`);
 	}

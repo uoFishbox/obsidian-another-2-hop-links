@@ -1,5 +1,4 @@
 import type { TwoHopMountedRowSlice } from "./twoHopMountedTypes";
-import { IS_PROD } from "../../../appConstants";
 import { recordCCLDevMeasurement } from "infrastructure/debug/CCLDevMeasurements";
 
 export interface TwoHopFixedRowSlotController {
@@ -27,7 +26,7 @@ function createController(slotIndex: number): TwoHopFixedRowSlotController {
 			return row;
 		},
 		bindRow(nextRow): void {
-			if (!IS_PROD) {
+			if (process.env.NODE_ENV !== "production") {
 				recordCCLDevMeasurement("twoHop.reboundRowSlot");
 				for (const _cell of nextRow.cells) {
 					recordCCLDevMeasurement("twoHop.reboundCellSlot");
