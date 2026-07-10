@@ -1,4 +1,5 @@
 import type { TwoHopMountedRowSlice } from "./twoHopMountedTypes";
+import { IS_PROD } from "../../../appConstants";
 import { recordCCLDevMeasurement } from "infrastructure/debug/CCLDevMeasurements";
 
 export interface TwoHopFixedRowSlotController {
@@ -11,6 +12,7 @@ export interface TwoHopFixedRowSlotController {
 export interface TwoHopFixedRowSlotPool {
 	readonly controllers: readonly TwoHopFixedRowSlotController[];
 	ensureCapacity(capacity: number): void;
+	setCapacity(capacity: number): void;
 	bindRow(row: TwoHopMountedRowSlice): void;
 	clearSlot(slotIndex: number): void;
 }
@@ -25,9 +27,11 @@ function createController(slotIndex: number): TwoHopFixedRowSlotController {
 			return row;
 		},
 		bindRow(nextRow): void {
-			recordCCLDevMeasurement("twoHop.reboundRowSlot");
-			for (const _cell of nextRow.cells) {
-				recordCCLDevMeasurement("twoHop.reboundCellSlot");
+			if (!IS_PROD) {
+				recordCCLDevMeasurement("twoHop.reboundRowSlot");
+				for (const _cell of nextRow.cells) {
+					recordCCLDevMeasurement("twoHop.reboundCellSlot");
+				}
 			}
 			row = nextRow;
 			revision += 1;
@@ -52,11 +56,23 @@ export function createTwoHopFixedRowSlotPool(): TwoHopFixedRowSlotPool {
 		controllers = next;
 	}
 
+	function setCapacity(capacity: number): void {
+		if (capacity >= controllers.length) {
+			ensureCapacity(capacity);
+			return;
+		}
+		for (let slotIndex = capacity; slotIndex < controllers.length; slotIndex += 1) {
+			controllers[slotIndex]?.clear();
+		}
+		controllers = controllers.slice(0, capacity);
+	}
+
 	return {
 		get controllers() {
 			return controllers;
 		},
 		ensureCapacity,
+		setCapacity,
 		bindRow(row): void {
 			const slotIndex = row.slotIndex ?? 0;
 			ensureCapacity(slotIndex + 1);

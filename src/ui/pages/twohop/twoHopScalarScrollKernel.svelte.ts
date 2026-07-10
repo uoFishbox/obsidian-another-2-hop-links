@@ -24,10 +24,7 @@ import {
 	type TwoHopViewPlan,
 	type TwoHopViewPlanRowModel,
 } from "./twoHopViewPlan";
-import type {
-	TwoHopMountedCell,
-	TwoHopMountedRowSlice,
-} from "./twoHopMountedTypes";
+import type { TwoHopMountedCell, TwoHopMountedRowSlice } from "./twoHopMountedTypes";
 
 interface MutableMountedCellShell {
 	key: LogicalCellKey;
@@ -139,9 +136,7 @@ function resolveVisibility(
 	previewStart: number,
 	previewEnd: number,
 ): VirtualizedItemVisibility {
-	return rowIndex >= previewStart && rowIndex < previewEnd
-		? "visible"
-		: "mounted";
+	return rowIndex >= previewStart && rowIndex < previewEnd ? "visible" : "mounted";
 }
 
 export interface TwoHopScalarKernelSnapshot {
@@ -229,7 +224,7 @@ export function createTwoHopScalarScrollKernel(params: {
 			rowSlots.push(record);
 			mountedRows.push(record.row);
 		}
-		fixedRowSlotPool.ensureCapacity(capacity);
+		fixedRowSlotPool.setCapacity(capacity);
 	}
 
 	function ensurePhysicalPool(columns: number, capacity: number): void {
@@ -237,7 +232,7 @@ export function createTwoHopScalarScrollKernel(params: {
 			resetPhysicalPool(columns, capacity);
 			return;
 		}
-		fixedRowSlotPool.ensureCapacity(capacity);
+		fixedRowSlotPool.setCapacity(capacity);
 		for (let slotIndex = rowSlots.length; slotIndex < capacity; slotIndex += 1) {
 			const record = createRowSlotRecord(slotIndex, columns);
 			rowSlots.push(record);
@@ -246,6 +241,8 @@ export function createTwoHopScalarScrollKernel(params: {
 		for (let slotIndex = capacity; slotIndex < rowSlots.length; slotIndex += 1) {
 			clearRowSlot(rowSlots[slotIndex]);
 		}
+		rowSlots.length = capacity;
+		mountedRows.length = capacity;
 	}
 
 	function setRowVisibility(record: RowSlotRecord): void {
@@ -384,11 +381,7 @@ export function createTwoHopScalarScrollKernel(params: {
 		const previousStart = mountedRange.start;
 		const previousEnd = mountedRange.end;
 		const planChanged = activePlan !== plan;
-		arithmeticRowSlotPool.prepareRange(
-			nextStart,
-			nextEnd,
-			plan.layout,
-		);
+		arithmeticRowSlotPool.prepareRange(nextStart, nextEnd, plan.layout);
 		const poolChanged = activePoolEpoch !== arithmeticRowSlotPool.epoch;
 		activePoolEpoch = arithmeticRowSlotPool.epoch;
 		ensurePhysicalPool(plan.columns, arithmeticRowSlotPool.capacity);
@@ -406,6 +399,10 @@ export function createTwoHopScalarScrollKernel(params: {
 			for (const record of rowSlots) clearRowSlot(record);
 		} else if (planChanged || poolChanged) {
 			for (const record of rowSlots) {
+				if (poolChanged) {
+					clearRowSlot(record);
+					continue;
+				}
 				if (
 					record.active &&
 					!isRowInRange(record.row.rowIndex, nextStart, nextEnd)
@@ -524,17 +521,10 @@ export function createTwoHopScalarScrollKernel(params: {
 			mountedStart,
 			Math.min(nextRowModel.rowCount, nextRanges.mounted.end),
 		);
-		const previewStart = Math.max(
-			mountedStart,
-			nextRanges.previewVisible.start,
-		);
+		const previewStart = Math.max(mountedStart, nextRanges.previewVisible.start);
 		const previewEnd = Math.min(mountedEnd, nextRanges.previewVisible.end);
 		applyPreviewRange(previewStart, previewEnd);
-		const changed = applyMountedRange(
-			nextRowModel.plan,
-			mountedStart,
-			mountedEnd,
-		);
+		const changed = applyMountedRange(nextRowModel.plan, mountedStart, mountedEnd);
 		return changed;
 	}
 

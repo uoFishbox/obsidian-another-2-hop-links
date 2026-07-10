@@ -4,10 +4,7 @@ import {
 	resetCCLDevMeasurements,
 } from "infrastructure/debug/CCLDevMeasurements";
 import type { SectionRenderDescriptor } from "ui/components/sections/types";
-import {
-	compileTwoHopViewPlan,
-	createTwoHopViewPlanRowModel,
-} from "../twoHopViewPlan";
+import { compileTwoHopViewPlan, createTwoHopViewPlanRowModel } from "../twoHopViewPlan";
 import { createTwoHopScalarScrollKernel } from "../twoHopScalarScrollKernel.svelte";
 import type {
 	TwoHopVirtualListItem,
@@ -64,6 +61,7 @@ const rowModel = createTwoHopViewPlanRowModel(
 function applyRange(
 	kernel: ReturnType<typeof createTwoHopScalarScrollKernel>,
 	start: number,
+	mountedRowCount = 3,
 ): void {
 	kernel.applyMeasurement({
 		rowModel,
@@ -74,7 +72,7 @@ function applyRange(
 		isScrollActive: true,
 		hasStableVisibleRange: true,
 		precomputedRanges: {
-			mounted: { start, end: start + 3 },
+			mounted: { start, end: start + mountedRowCount },
 			previewVisible: { start: start + 1, end: start + 2 },
 		},
 		visibilityPolicy: {
@@ -157,5 +155,44 @@ describe("TwoHop scalar scroll kernel", () => {
 		expect(counters["twoHop.reboundRowSlot"].count).toBe(300);
 		expect(counters["twoHop.reboundCellSlot"].count).toBe(600);
 		expect(counters["twoHop.buildMountedRows"].count).toBe(0);
+	});
+
+	it("rebinds the full range when capacity growth changes slot mapping", () => {
+		const kernel = createTwoHopScalarScrollKernel({
+			initialRowModel: rowModel,
+			onStableVisibleRange() {},
+		});
+		applyRange(kernel, 10, 3);
+		resetCCLDevMeasurements();
+
+		applyRange(kernel, 10, 4);
+
+		const mountedRowIndexes = kernel.mountedRows
+			.map((row) => row.rowIndex)
+			.sort((left, right) => left - right);
+		expect(mountedRowIndexes).toEqual([10, 11, 12, 13]);
+		const counters = getCCLDevMeasurementSnapshot().counters;
+		expect(counters["twoHop.reboundRowSlot"].count).toBe(4);
+		expect(counters["twoHop.reboundCellSlot"].count).toBe(8);
+	});
+
+	it("compacts physical row slots after sustained under-utilization", () => {
+		const kernel = createTwoHopScalarScrollKernel({
+			initialRowModel: rowModel,
+			onStableVisibleRange() {},
+		});
+		applyRange(kernel, 0, 12);
+
+		applyRange(kernel, 9, 3);
+		applyRange(kernel, 9, 3);
+		applyRange(kernel, 9, 3);
+
+		expect(kernel.mountedRows).toHaveLength(3);
+		expect(kernel.fixedRowSlotPool.controllers).toHaveLength(3);
+		expect(
+			kernel.mountedRows
+				.map((row) => row.rowIndex)
+				.sort((left, right) => left - right),
+		).toEqual([9, 10, 11]);
 	});
 });
