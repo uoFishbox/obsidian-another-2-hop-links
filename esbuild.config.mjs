@@ -11,7 +11,14 @@ if you want to view the source, please visit the github repository of this plugi
 */
 `;
 
-const prod = process.argv[2] === "production";
+const mode = process.argv[2];
+const prod = mode === "production";
+const profile = mode === "profile";
+const optimized = prod || profile;
+
+function readBooleanEnv(name) {
+	return process.env[name] === "true" || process.env[name] === "1";
+}
 
 const context = await esbuild.context({
 	banner: {
@@ -40,7 +47,7 @@ const context = await esbuild.context({
 		esbuildSvelte({
 			compilerOptions: {
 				css: "injected",
-				dev: !prod,
+				dev: !optimized,
 			},
 			preprocess: sveltePreprocess(),
 		}),
@@ -49,17 +56,23 @@ const context = await esbuild.context({
 	target: "es2018",
 	define: {
 		"process.env.NODE_ENV": JSON.stringify(
-			prod ? "production" : "development",
+			optimized ? "production" : "development",
+		),
+		"process.env.CCL_DISABLE_CARD_DOM_PREVIEW": JSON.stringify(
+			readBooleanEnv("CCL_DISABLE_CARD_DOM_PREVIEW") ? "true" : "false",
+		),
+		"process.env.CCL_DISABLE_RENDERED_PREVIEW_CACHE": JSON.stringify(
+			readBooleanEnv("CCL_DISABLE_RENDERED_PREVIEW_CACHE") ? "true" : "false",
 		),
 	},
 	logLevel: "info",
-	sourcemap: prod ? false : "inline",
+	sourcemap: profile ? "inline" : prod ? false : "inline",
 	treeShaking: true,
 	outfile: "main.js",
 	minify: prod,
 });
 
-if (prod) {
+if (optimized) {
 	await context.rebuild();
 	process.exit(0);
 } else {

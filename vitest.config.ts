@@ -7,6 +7,8 @@ export default defineConfig({
 	plugins: [svelte(), tsconfigPaths()],
 	define: {
 		"process.env.NODE_ENV": JSON.stringify("test"),
+		"process.env.CCL_DISABLE_CARD_DOM_PREVIEW": JSON.stringify("false"),
+		"process.env.CCL_DISABLE_RENDERED_PREVIEW_CACHE": JSON.stringify("false"),
 	},
 	test: {
 		coverage: {

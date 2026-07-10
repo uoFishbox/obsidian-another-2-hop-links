@@ -95,8 +95,10 @@ export const SOURCE_EXTENSIONS = new Set([
 
 export const CANVAS_EXTENSION = "canvas";
 
-export const DEBUG_DISABLE_CARD_DOM_PREVIEW = false;
-export const DEBUG_DISABLE_RENDERED_PREVIEW_CACHE = false;
+export const DEBUG_DISABLE_CARD_DOM_PREVIEW =
+	process.env.CCL_DISABLE_CARD_DOM_PREVIEW === "true";
+export const DEBUG_DISABLE_RENDERED_PREVIEW_CACHE =
+	process.env.CCL_DISABLE_RENDERED_PREVIEW_CACHE === "true";
 export const UNRESOLVED_LINK_ATTRIBUTE = {
 	NAME: "data-twohop-link-state",
 	VALUE_SPECIAL: "special-unresolved",
