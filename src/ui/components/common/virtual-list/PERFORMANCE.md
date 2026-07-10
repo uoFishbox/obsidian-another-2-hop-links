@@ -125,6 +125,7 @@ Obsidian のDeveloper Toolsでは、次のAPIを使える。
 ```js
 getTwoHopVirtualListDomStats();
 await runTwoHopScroll({ frames: 300, distance: 4000 });
+await runTwoHopScroll({ frames: 300, distance: 4000, targetFps: 120 });
 ```
 
 同じ機能は `window.__cclDebug.twoHopPerformance` にも公開されている。
@@ -142,6 +143,8 @@ __cclDebug.twoHopPerformance.getCounterRows();
 `getDomStats()` / `getTwoHopVirtualListDomStats()` は、`totalCards`（全sectionの `totalCount` 合計）、`loadedCards`（全sectionの `loadedCount` 合計）、`sectionCount`、mounted DOM数、スクロールコンテナ寸法を返す。
 
 `runScroll()` はスクロールコンテナを検出し、指定フレーム数だけ `requestAnimationFrame` ごとに `scrollTop` を進め、p50/p95/max、16.7ms超過数、33.3ms超過数、前後の mounted DOM数、主要カウンターを返す。profile-clean ビルドではカウンター値は0になるため、呼び出し回数の確認には開発ビルドを使う。
+
+`targetFps` を指定すると、`frameBudgetMs = 1000 / targetFps` を基準に `overFrameBudgetMs` と `overDoubleFrameBudgetMs` を返す。120fps想定では `frameBudgetMs` は約 `8.33ms`。`over16_7Ms` / `over33_3Ms` は従来比較用の60Hz系固定値として残している。
 
 `result.actualDistancePx` が `0` の場合は、スクロール距離がない要素を測定している。`afterDomStats.scrollContainerFound`、`afterDomStats.scrollHeight`、`afterDomStats.clientHeight`、`afterDomStats.maxScrollTop` を確認すること。root検出が外れている場合は、明示的に対象を渡す。
 

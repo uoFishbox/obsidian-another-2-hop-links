@@ -149,6 +149,8 @@ describe("twoHopPerformanceDebug", () => {
 			actualDistancePx: 100,
 			startScrollTop: 0,
 			endScrollTop: 100,
+			targetFps: 60,
+			frameBudgetMs: 16.67,
 		});
 		expect(run.frameDurations).toHaveLength(2);
 		expect(scroller.scrollTop).toBe(100);
@@ -184,6 +186,35 @@ describe("twoHopPerformanceDebug", () => {
 		expect(run.result.actualDistancePx).toBe(80);
 		expect(scroller.scrollTop).toBe(80);
 		expect(wrapper.scrollTop).toBe(0);
+	});
+
+	it("summarizes frame-budget misses for a requested target FPS", async () => {
+		const { root } = createTwoHopListDom();
+		const nowSpy = vi
+			.spyOn(performance, "now")
+			.mockReturnValueOnce(0)
+			.mockReturnValueOnce(9)
+			.mockReturnValueOnce(27);
+		const api = createTwoHopPerformanceDebugApi({
+			getMeasurementSnapshot: () => EMPTY_SNAPSHOT,
+			resetMeasurements: () => {},
+		});
+
+		const run = await api.runScroll({
+			root,
+			frames: 2,
+			distance: 100,
+			targetFps: 120,
+			log: false,
+		});
+
+		expect(nowSpy).toHaveBeenCalled();
+		expect(run.result).toMatchObject({
+			targetFps: 120,
+			frameBudgetMs: 8.33,
+			overFrameBudgetMs: 2,
+			overDoubleFrameBudgetMs: 2,
+		});
 	});
 });
 

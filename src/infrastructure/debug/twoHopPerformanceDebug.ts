@@ -56,6 +56,7 @@ export interface TwoHopVirtualListDomStats {
 export interface TwoHopScrollRunOptions extends TwoHopVirtualListQueryOptions {
 	readonly frames?: number;
 	readonly distance?: number;
+	readonly targetFps?: number;
 	readonly log?: boolean;
 	readonly resetCounters?: boolean;
 }
@@ -69,6 +70,10 @@ export interface TwoHopScrollSummary {
 	readonly p50Ms: number;
 	readonly p95Ms: number;
 	readonly maxMs: number;
+	readonly targetFps: number;
+	readonly frameBudgetMs: number;
+	readonly overFrameBudgetMs: number;
+	readonly overDoubleFrameBudgetMs: number;
 	readonly over16_7Ms: number;
 	readonly over33_3Ms: number;
 }
@@ -223,6 +228,7 @@ async function runTwoHopScrollWorkload(
 
 	const frames = normalizePositiveInteger(options.frames, 300);
 	const distance = normalizeNonNegativeNumber(options.distance, 4_000);
+	const targetFps = normalizePositiveNumber(options.targetFps, 60);
 	const beforeDomStats = getTwoHopVirtualListDomStats({ root });
 	const originalBehavior = scroller.style.scrollBehavior;
 	scroller.style.scrollBehavior = "auto";
@@ -249,6 +255,7 @@ async function runTwoHopScrollWorkload(
 	const result = summarizeScrollRun({
 		frames,
 		distance,
+		targetFps,
 		start,
 		end,
 		frameDurations,
@@ -266,11 +273,14 @@ async function runTwoHopScrollWorkload(
 function summarizeScrollRun(input: {
 	readonly frames: number;
 	readonly distance: number;
+	readonly targetFps: number;
 	readonly start: number;
 	readonly end: number;
 	readonly frameDurations: readonly number[];
 }): TwoHopScrollSummary {
 	const sorted = [...input.frameDurations].sort((a, b) => a - b);
+	const frameBudget = 1_000 / input.targetFps;
+	const doubleFrameBudget = frameBudget * 2;
 
 	return {
 		frames: input.frames,
@@ -281,6 +291,14 @@ function summarizeScrollRun(input: {
 		p50Ms: roundToTwoDecimals(percentile(sorted, 0.5)),
 		p95Ms: roundToTwoDecimals(percentile(sorted, 0.95)),
 		maxMs: roundToTwoDecimals(Math.max(...input.frameDurations)),
+		targetFps: roundToTwoDecimals(input.targetFps),
+		frameBudgetMs: roundToTwoDecimals(frameBudget),
+		overFrameBudgetMs: input.frameDurations.filter(
+			(value) => value > frameBudget,
+		).length,
+		overDoubleFrameBudgetMs: input.frameDurations.filter(
+			(value) => value > doubleFrameBudget,
+		).length,
 		over16_7Ms: input.frameDurations.filter((value) => value > 16.7).length,
 		over33_3Ms: input.frameDurations.filter((value) => value > 33.3).length,
 	};
@@ -372,6 +390,14 @@ function normalizeNonNegativeNumber(
 ): number {
 	if (value === undefined || !Number.isFinite(value)) return fallback;
 	return Math.max(0, value);
+}
+
+function normalizePositiveNumber(
+	value: number | undefined,
+	fallback: number,
+): number {
+	if (value === undefined || !Number.isFinite(value)) return fallback;
+	return value > 0 ? value : fallback;
 }
 
 function parseDatasetInteger(value: string | undefined): number | null {
