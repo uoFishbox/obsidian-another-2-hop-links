@@ -75,6 +75,10 @@ describe("twoHopPerformanceDebug", () => {
 		expect(api.getDomStats({ root })).toMatchObject({
 			rootFound: true,
 			shadowRootFound: true,
+			scrollContainerFound: true,
+			scrollHeight: 2_000,
+			clientHeight: 120,
+			maxScrollTop: 1_880,
 			rows: 1,
 			cells: 2,
 			cards: 2,
@@ -149,6 +153,34 @@ describe("twoHopPerformanceDebug", () => {
 			name: "virtualScroll.applyScrollMeasurement",
 			count: 2,
 		});
+	});
+
+	it("skips overflow ancestors that cannot actually scroll", async () => {
+		const { root, scroller } = createTwoHopListDom();
+		const wrapper = document.createElement("div");
+		wrapper.style.overflowY = "auto";
+		setNumericProperty(wrapper, "scrollHeight", 100);
+		setNumericProperty(wrapper, "clientHeight", 100);
+		scroller.replaceChildren(wrapper);
+		wrapper.append(root);
+		setNumericProperty(scroller, "scrollHeight", 1_000);
+		setNumericProperty(scroller, "clientHeight", 100);
+		scroller.scrollTop = 0;
+		const api = createTwoHopPerformanceDebugApi({
+			getMeasurementSnapshot: () => EMPTY_SNAPSHOT,
+			resetMeasurements: () => {},
+		});
+
+		const run = await api.runScroll({
+			root,
+			frames: 1,
+			distance: 80,
+			log: false,
+		});
+
+		expect(run.result.actualDistancePx).toBe(80);
+		expect(scroller.scrollTop).toBe(80);
+		expect(wrapper.scrollTop).toBe(0);
 	});
 });
 

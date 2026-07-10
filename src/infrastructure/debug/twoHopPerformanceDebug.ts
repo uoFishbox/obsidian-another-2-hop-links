@@ -37,6 +37,11 @@ export interface TwoHopVirtualListQueryOptions {
 export interface TwoHopVirtualListDomStats {
 	readonly rootFound: boolean;
 	readonly shadowRootFound: boolean;
+	readonly scrollContainerFound: boolean;
+	readonly scrollTop: number;
+	readonly scrollHeight: number;
+	readonly clientHeight: number;
+	readonly maxScrollTop: number;
 	readonly rows: number;
 	readonly cells: number;
 	readonly cards: number;
@@ -158,14 +163,21 @@ function getTwoHopVirtualListDomStats(
 			?.querySelector(".view-plan-flow-row")
 			?.getBoundingClientRect().height ?? 0;
 	const scroller = root ? findNearestScrollableAncestor(root) : null;
+	const scrollHeight = scroller?.scrollHeight ?? 0;
+	const clientHeight = scroller?.clientHeight ?? 0;
 	const viewportRows =
 		scroller && firstRowHeight > 0
-			? Math.ceil(scroller.clientHeight / firstRowHeight)
+			? Math.ceil(clientHeight / firstRowHeight)
 			: null;
 
 	return {
 		rootFound: root !== null,
 		shadowRootFound: shadowRoot !== null,
+		scrollContainerFound: scroller !== null,
+		scrollTop: scroller?.scrollTop ?? 0,
+		scrollHeight,
+		clientHeight,
+		maxScrollTop: Math.max(0, scrollHeight - clientHeight),
 		rows,
 		cells,
 		cards,
@@ -200,7 +212,7 @@ async function runTwoHopScrollWorkload(
 
 	const scroller = findNearestScrollableAncestor(root);
 	if (!scroller) {
-		throw new Error("Scroll container not found");
+		throw new Error("Scrollable container not found");
 	}
 
 	const frames = normalizePositiveInteger(options.frames, 300);
@@ -301,20 +313,43 @@ function resolveTwoHopVirtualListRoot(
 	if (options.root) return options.root;
 
 	const selector = options.rootSelector ?? DEFAULT_ROOT_SELECTOR;
-	return document.querySelector<HTMLElement>(selector);
+	const roots = Array.from(document.querySelectorAll<HTMLElement>(selector));
+	return (
+		roots.find((root) => {
+			if (!root.isConnected || !root.shadowRoot) return false;
+			return (
+				root.shadowRoot.querySelector(".view-plan-virtual-list-cell") !== null
+			);
+		}) ??
+		roots.find((root) => root.isConnected && root.shadowRoot) ??
+		roots.find((root) => root.isConnected) ??
+		null
+	);
 }
 
 function findNearestScrollableAncestor(root: HTMLElement): HTMLElement | null {
 	let scroller = root.parentElement;
 
 	while (scroller) {
-		if (/(auto|scroll|overlay)/.test(getComputedStyle(scroller).overflowY)) {
+		if (isScrollableElement(scroller)) {
 			return scroller;
 		}
 		scroller = scroller.parentElement;
 	}
 
-	return null;
+	const documentScroller = document.scrollingElement;
+	return documentScroller instanceof HTMLElement &&
+		isScrollableElement(documentScroller)
+		? documentScroller
+		: null;
+}
+
+function isScrollableElement(element: HTMLElement): boolean {
+	if (!/(auto|scroll|overlay)/.test(getComputedStyle(element).overflowY)) {
+		return false;
+	}
+
+	return element.scrollHeight > element.clientHeight;
 }
 
 function normalizePositiveInteger(
