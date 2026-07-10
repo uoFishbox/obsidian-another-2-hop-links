@@ -398,15 +398,13 @@ export function createViewPlanMeasurementRuntime<
 	};
 
 	const flushVirtualScrollMeasurement = (
-		scrollContainerEl: HTMLElement | null,
-		targetTop: number,
+		snapshot: Parameters<typeof flushCachedVirtualScrollMeasurement>[0]["snapshot"],
 	): void => {
 		flushCachedVirtualScrollMeasurement({
 			measurement: params.state.measurement,
-			scrollContainerEl,
-			targetTop,
-			updateFromCachedMeasurement: () =>
-				measurementController.runScrollMeasurement(),
+			snapshot,
+			updateFromCachedMeasurement: (metrics) =>
+				measurementController.runScrollMeasurement(metrics),
 		});
 	};
 

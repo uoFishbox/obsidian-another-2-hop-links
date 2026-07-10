@@ -319,7 +319,7 @@ export function createVirtualMeasurementController({
 				? () => {
 						if (measurement.hasStableScrollMetrics) return;
 						if (hasPendingLayoutMeasurement()) return;
-						runLayoutMeasurement();
+						scheduleLayoutMeasurement();
 					}
 				: undefined,
 		});

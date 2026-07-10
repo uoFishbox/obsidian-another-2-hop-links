@@ -8,6 +8,7 @@ import { getScrollMetrics } from "../dom/virtualListMeasurementAdapter";
 import { createVirtualListKeyboardHandler } from "./VirtualSurfaceKeyboard";
 import { findNearestScrollContainer } from "../dom/scrollContainer";
 import { invalidateScrollGeometry } from "../dom/virtualListScrollGeometryInvalidation";
+import type { ProgrammaticScrollSnapshot } from "../dom/flushVirtualScrollMeasurement";
 import {
 	findClosestRegisteredVirtualCell,
 	findRegisteredVirtualCellElementByKey,
@@ -44,7 +45,7 @@ const scrollElementIntoVirtualViewport = (params: {
 	scrollContainerEl: HTMLElement | null;
 	targetTop: number;
 	targetHeight: number;
-}): void => {
+}): ProgrammaticScrollSnapshot => {
 	const scrollMetrics = getScrollMetrics(params.rootEl, params.scrollContainerEl);
 	const absoluteTargetTop = scrollMetrics.sectionTop + params.targetTop;
 	const absoluteTargetBottom = absoluteTargetTop + params.targetHeight;
@@ -58,15 +59,26 @@ const scrollElementIntoVirtualViewport = (params: {
 		nextScrollTop = absoluteTargetBottom - scrollMetrics.viewportHeight;
 	}
 
+	const resolvedScrollTop = Math.max(0, nextScrollTop);
+	const snapshot: ProgrammaticScrollSnapshot = {
+		scrollContainerEl: params.scrollContainerEl,
+		scrollTop: resolvedScrollTop,
+		viewportHeight: scrollMetrics.viewportHeight,
+		sectionTop: Math.max(0, resolvedScrollTop - params.targetTop),
+		didScroll: resolvedScrollTop !== viewportTop,
+	};
+	if (resolvedScrollTop === viewportTop) {
+		return snapshot;
+	}
+
 	if (params.scrollContainerEl) {
-		params.scrollContainerEl.scrollTop = Math.max(0, nextScrollTop);
-		params.scrollContainerEl.dispatchEvent(new Event("scroll"));
+		params.scrollContainerEl.scrollTop = resolvedScrollTop;
 	} else if (typeof window !== "undefined") {
 		window.scrollTo({
-			top: Math.max(0, nextScrollTop),
+			top: resolvedScrollTop,
 		});
-		window.dispatchEvent(new Event("scroll"));
 	}
+	return snapshot;
 };
 
 export { scrollElementIntoVirtualViewport };
@@ -103,10 +115,7 @@ export const createVirtualSurfaceNavigation = (options: {
 		direction: ResultNavigationDirection,
 		context: VirtualSurfaceNavigationContext,
 	) => Promise<boolean>;
-	flushVirtualScrollMeasurement?: (
-		scrollContainerEl: HTMLElement | null,
-		targetTop: number,
-	) => void;
+	flushVirtualScrollMeasurement?: (snapshot: ProgrammaticScrollSnapshot) => void;
 }): ((event: KeyboardEvent) => Promise<void>) => {
 	const getFocusableCellTarget = (
 		cellElement: HTMLElement | null,
@@ -120,7 +129,6 @@ export const createVirtualSurfaceNavigation = (options: {
 		}
 
 		target.focus({ preventScroll: true });
-		target.scrollIntoView({ block: "nearest", inline: "nearest" });
 		return true;
 	};
 
@@ -129,28 +137,30 @@ export const createVirtualSurfaceNavigation = (options: {
 	): Promise<boolean> => {
 		const getMountedCellElement = (key: string): HTMLElement | null =>
 			findMountedCellElementByKey(options.getContentEl(), key);
-
-		if (focusCellTarget(getMountedCellElement(target.key))) {
-			return true;
-		}
+		const mountedCellElement = getMountedCellElement(target.key);
 
 		const rootEl = options.getRootEl();
 		if (!rootEl) {
-			return false;
+			return focusCellTarget(mountedCellElement);
 		}
-		invalidateScrollGeometry(rootEl, "navigation-scroll");
 		const scrollContainerEl =
 			options.getScrollContainerEl() ?? findNearestScrollContainer(rootEl);
 
-		scrollElementIntoVirtualViewport({
+		const scrollSnapshot = scrollElementIntoVirtualViewport({
 			rootEl,
 			scrollContainerEl,
 			targetTop: target.rowTop,
 			targetHeight: options.getRowHeight(),
 		});
+		if (scrollSnapshot.didScroll) {
+			invalidateScrollGeometry(rootEl, "navigation-scroll");
+		}
+		if (!scrollSnapshot.didScroll && focusCellTarget(mountedCellElement)) {
+			return true;
+		}
 
 		await waitForNextAnimationFrame();
-		options.flushVirtualScrollMeasurement?.(scrollContainerEl, target.rowTop);
+		options.flushVirtualScrollMeasurement?.(scrollSnapshot);
 		await options.flushMountedState();
 
 		return focusCellTarget(getMountedCellElement(target.key));

@@ -178,8 +178,10 @@ export function createFlatGridControllerAdapter<T>({
 		runScrollMeasurement: measurementController.runScrollMeasurement,
 		scheduleLayoutMeasurement: measurementController.scheduleLayoutMeasurement,
 		scheduleScrollMeasurement: measurementController.scheduleScrollMeasurement,
-		updateFromCachedMeasurement(): void {
-			measurementController.runScrollMeasurement();
+		updateFromCachedMeasurement(
+			metrics?: Parameters<typeof measurementController.runScrollMeasurement>[0],
+		): void {
+			measurementController.runScrollMeasurement(metrics);
 		},
 	};
 }

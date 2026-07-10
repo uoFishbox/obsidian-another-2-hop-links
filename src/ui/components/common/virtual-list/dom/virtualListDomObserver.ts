@@ -21,6 +21,7 @@ import {
 } from "./sharedResizeObservers";
 import {
 	readVirtualListSharedScrollMetricsInto,
+	resolveCachedViewportHeight,
 	type VirtualListSharedScrollMetrics,
 } from "./sharedScrollMetrics";
 import { hasRelevantStructureMutation } from "./structureMutationObserver";
@@ -164,7 +165,9 @@ const readSharedScrollMetrics = (
 		entry.pendingScrollTargetMetrics = null;
 		const out = entry.sharedScrollMetricsScratch;
 		out.scrollTop = snapshot.scrollTop;
-		out.viewportHeight = snapshot.clientHeight;
+		out.viewportHeight =
+			resolveCachedViewportHeight(getActiveSubscriber(entry)) ??
+			out.viewportHeight;
 		out.frameId = ++scrollMeasurementFrameId;
 		out.isScrollActive = entry.scrollPhaseState.type === "scrolling";
 		return out;

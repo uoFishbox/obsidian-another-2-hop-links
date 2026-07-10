@@ -173,7 +173,7 @@ describe("observeVirtualListViewport", () => {
 		stopObserving();
 	});
 
-	it("uses the scroll event metrics snapshot for scroll measurement", async () => {
+	it("reads only scrollTop from the native scroll event", async () => {
 		installAnimationFrameMock();
 
 		const scrollContainer = document.createElement("div");
@@ -199,6 +199,8 @@ describe("observeVirtualListViewport", () => {
 		let clientHeight = 240;
 		const scrollTopGetter = vi.fn(() => scrollTop);
 		const clientHeightGetter = vi.fn(() => clientHeight);
+		const rootRectGetter = vi.spyOn(rootEl, "getBoundingClientRect");
+		const scrollerRectGetter = vi.spyOn(scrollContainer, "getBoundingClientRect");
 		Object.defineProperty(scrollContainer, "scrollHeight", {
 			value: 1000,
 			configurable: true,
@@ -217,6 +219,7 @@ describe("observeVirtualListViewport", () => {
 		const stopObserving = observeVirtualListViewport({
 			rootEl,
 			onWidthChange: vi.fn(),
+			getCachedViewportHeight: () => 240,
 			onScrollContainerChange,
 			scheduleLayoutMeasurement: vi.fn(),
 			scheduleScrollMeasurement: vi.fn(),
@@ -226,6 +229,8 @@ describe("observeVirtualListViewport", () => {
 
 		scrollTopGetter.mockClear();
 		clientHeightGetter.mockClear();
+		rootRectGetter.mockClear();
+		scrollerRectGetter.mockClear();
 
 		try {
 			scrollContainer.dispatchEvent(new Event("scroll"));
@@ -249,7 +254,9 @@ describe("observeVirtualListViewport", () => {
 			}),
 		);
 		expect(scrollTopGetter).toHaveBeenCalledTimes(1);
-		expect(clientHeightGetter).toHaveBeenCalledTimes(1);
+		expect(clientHeightGetter).not.toHaveBeenCalled();
+		expect(rootRectGetter).not.toHaveBeenCalled();
+		expect(scrollerRectGetter).not.toHaveBeenCalled();
 	});
 
 	it("keeps structure mutation measurements isolated by scroller", async () => {

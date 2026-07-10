@@ -495,15 +495,13 @@ export function useFlatVirtualGridList<T>(props: FlatVirtualGridListProps<T>) {
 	});
 
 	const flushVirtualScrollMeasurement = (
-		scrollContainerEl: HTMLElement | null,
-		targetTop: number,
+		snapshot: Parameters<typeof flushCachedVirtualScrollMeasurement>[0]["snapshot"],
 	): void => {
 		flushCachedVirtualScrollMeasurement({
 			measurement,
-			scrollContainerEl,
-			targetTop,
-			updateFromCachedMeasurement: () =>
-				virtualListController.updateFromCachedMeasurement(),
+			snapshot,
+			updateFromCachedMeasurement: (metrics) =>
+				virtualListController.updateFromCachedMeasurement(metrics),
 		});
 	};
 

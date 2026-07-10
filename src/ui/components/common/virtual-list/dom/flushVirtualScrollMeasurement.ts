@@ -1,10 +1,19 @@
 import type { VirtualListMeasurementState } from "./virtualListMeasurementState";
+import type { VirtualListSharedScrollMetrics } from "./sharedScrollMetrics";
+
+/** Geometry captured before a programmatic virtual-list scroll write. */
+export interface ProgrammaticScrollSnapshot {
+	readonly scrollContainerEl: HTMLElement | null;
+	readonly scrollTop: number;
+	readonly viewportHeight: number;
+	readonly sectionTop: number;
+	readonly didScroll: boolean;
+}
 
 export interface FlushVirtualScrollMeasurementParams {
 	measurement: VirtualListMeasurementState;
-	scrollContainerEl: HTMLElement | null;
-	targetTop: number;
-	updateFromCachedMeasurement: () => void;
+	snapshot: ProgrammaticScrollSnapshot;
+	updateFromCachedMeasurement: (metrics: VirtualListSharedScrollMetrics) => void;
 }
 
 /**
@@ -13,16 +22,20 @@ export interface FlushVirtualScrollMeasurementParams {
 export function flushVirtualScrollMeasurement(
 	params: FlushVirtualScrollMeasurementParams,
 ): void {
-	const { measurement, scrollContainerEl, targetTop, updateFromCachedMeasurement } =
-		params;
+	const { measurement, snapshot, updateFromCachedMeasurement } = params;
 
-	if (measurement.scrollContainerEl !== scrollContainerEl) {
-		measurement.scrollContainerEl = scrollContainerEl;
+	if (measurement.scrollContainerEl !== snapshot.scrollContainerEl) {
+		measurement.scrollContainerEl = snapshot.scrollContainerEl;
 	}
-	if (scrollContainerEl && scrollContainerEl.clientHeight > 0) {
-		measurement.viewportHeight = scrollContainerEl.clientHeight;
-		measurement.sectionTop = Math.max(0, scrollContainerEl.scrollTop - targetTop);
+	if (snapshot.viewportHeight > 0) {
+		measurement.viewportHeight = snapshot.viewportHeight;
+		measurement.sectionTop = snapshot.sectionTop;
 		measurement.hasStableScrollMetrics = true;
 	}
-	updateFromCachedMeasurement();
+	updateFromCachedMeasurement({
+		scrollTop: snapshot.scrollTop,
+		viewportHeight: snapshot.viewportHeight,
+		frameId: 0,
+		isScrollActive: false,
+	});
 }

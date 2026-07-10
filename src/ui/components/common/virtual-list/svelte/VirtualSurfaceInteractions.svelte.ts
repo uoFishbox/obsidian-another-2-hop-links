@@ -10,6 +10,7 @@ import { useAppContext, useLinkContext } from "ui/context/linkContext";
 import type { ResultNavigationDirection } from "features/keyboard-navigation/resultFocus";
 import type { InteractionDescriptor } from "ui/interactions/interactionTypes";
 import type { MountedVirtualCell, VirtualNavigationTarget } from "../types";
+import type { ProgrammaticScrollSnapshot } from "../dom/flushVirtualScrollMeasurement";
 import { installVirtualListInteractions } from "./VirtualListInteractions.svelte";
 import {
 	createVirtualSurfaceNavigation,
@@ -44,10 +45,7 @@ export interface VirtualSurfaceInteractionParams<
 		direction: ResultNavigationDirection,
 		context: VirtualSurfaceNavigationContext,
 	) => Promise<boolean>;
-	flushVirtualScrollMeasurement?: (
-		scrollContainerEl: HTMLElement | null,
-		targetTop: number,
-	) => void;
+	flushVirtualScrollMeasurement?: (snapshot: ProgrammaticScrollSnapshot) => void;
 }
 
 export function createVirtualSurfaceInteractions<

@@ -218,4 +218,28 @@ describe("createVirtualMeasurementController", () => {
 		cleanup();
 		rootEl.remove();
 	});
+
+	it("defers unstable scroll-start live measurement outside the event handler", () => {
+		const rootEl = createRoot({ height: 0, bottom: 10 });
+		document.body.append(rootEl);
+		const rectGetter = vi.spyOn(rootEl, "getBoundingClientRect");
+		const state = createVirtualListMeasurementState();
+		const controller = createVirtualMeasurementController({
+			getRootEl: () => rootEl,
+			measurement: state,
+			primeUnstableScrollStart: true,
+			maxUnstableMeasurementRetries: 1,
+		});
+
+		const cleanup = controller.observeRoot(rootEl);
+		state.hasStableScrollMetrics = false;
+		rectGetter.mockClear();
+
+		window.dispatchEvent(new Event("scroll"));
+
+		expect(rectGetter).not.toHaveBeenCalled();
+
+		cleanup();
+		rootEl.remove();
+	});
 });

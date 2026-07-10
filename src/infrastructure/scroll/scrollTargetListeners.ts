@@ -4,7 +4,6 @@ type ScrollTarget = Window | HTMLElement;
 export type ScrollPhase = "start" | "scroll" | "idle";
 export interface ScrollTargetMetrics {
 	scrollTop: number;
-	clientHeight: number;
 }
 
 type ScrollPhaseCallback = (phase: ScrollPhase, metrics?: ScrollTargetMetrics) => void;
@@ -39,7 +38,6 @@ function snapshotScrollTargetMetrics(
 
 	return {
 		scrollTop: target.scrollTop,
-		clientHeight: target.clientHeight,
 	};
 }
 

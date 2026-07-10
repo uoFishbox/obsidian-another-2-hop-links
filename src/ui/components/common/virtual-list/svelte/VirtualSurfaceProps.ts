@@ -6,6 +6,7 @@ import type {
 	InteractionDescriptorResolverProvider,
 } from "ui/interactions/interactionRegistry";
 import type { MountedVirtualCell, VirtualNavigationTarget } from "../types";
+import type { ProgrammaticScrollSnapshot } from "../dom/flushVirtualScrollMeasurement";
 import type { VirtualSurfaceNavigationContext } from "./VirtualSurfaceNavigation";
 import type {
 	VirtualSurfaceCellPosition,
@@ -60,10 +61,7 @@ export interface VirtualSurfaceCommonProps<TMountedCell extends MountedVirtualCe
 		direction: ResultNavigationDirection,
 		context: VirtualSurfaceNavigationContext,
 	) => Promise<boolean>;
-	flushVirtualScrollMeasurement?: (
-		scrollContainerEl: HTMLElement | null,
-		targetTop: number,
-	) => void;
+	flushVirtualScrollMeasurement?: (snapshot: ProgrammaticScrollSnapshot) => void;
 }
 
 export type VirtualSurfaceProps<TMountedCell extends MountedVirtualCell> =
