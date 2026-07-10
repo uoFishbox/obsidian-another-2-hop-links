@@ -1,45 +1,80 @@
-import type { TwoHopRowPlan, TwoHopRowTable, TwoHopViewPlan } from "./types";
-/**
- * Reads a row-table entry as a `TwoHopRowPlan` snapshot, or null when the
- * row index is out of range.
- */
-function readTwoHopRowTableAt(
-	table: TwoHopRowTable,
+import type {
+	TwoHopRowPlan,
+	TwoHopSectionTable,
+	TwoHopViewPlan,
+} from "./types";
+
+interface TwoHopRowGeometrySource {
+	readonly sectionTable: TwoHopSectionTable;
+	readonly rowCount: number;
+	readonly columns: number;
+	readonly rowHeight: number;
+	readonly rowGap: number;
+}
+
+export function findTwoHopSectionIndexByRow(
+	sectionTable: TwoHopSectionTable,
 	rowIndex: number,
-): TwoHopRowPlan | null {
-	if (rowIndex < 0 || rowIndex >= table.rowCount) return null;
+): number {
+	if (rowIndex < 0 || sectionTable.sectionCount === 0) return -1;
+	let low = 0;
+	let high = sectionTable.sectionCount;
+	while (low < high) {
+		const mid = (low + high) >>> 1;
+		if (sectionTable.firstRowIndexBySection[mid] > rowIndex) high = mid;
+		else low = mid + 1;
+	}
+	const sectionIndex = low - 1;
+	if (
+		sectionIndex < 0 ||
+		rowIndex >=
+			sectionTable.firstRowIndexBySection[sectionIndex] +
+				sectionTable.rowCountBySection[sectionIndex]
+	) {
+		return -1;
+	}
+	return sectionIndex;
+}
+
+function readRow(source: TwoHopRowGeometrySource, rowIndex: number): TwoHopRowPlan | null {
+	if (rowIndex < 0 || rowIndex >= source.rowCount) return null;
+	const sectionIndex = findTwoHopSectionIndexByRow(source.sectionTable, rowIndex);
+	if (sectionIndex < 0) return null;
+	const rowIndexInSection =
+		rowIndex - source.sectionTable.firstRowIndexBySection[sectionIndex];
+	const sectionCellStartIndex = rowIndexInSection * source.columns;
 	return {
-		sectionIndex: table.sectionIndexByRow[rowIndex],
-		rowIndexInSection: table.rowIndexInSectionByRow[rowIndex],
-		sectionCellStartIndex: table.sectionCellStartByRow[rowIndex],
-		cellCount: table.cellCountByRow[rowIndex],
-		top: table.topByRow[rowIndex],
+		sectionIndex,
+		rowIndexInSection,
+		sectionCellStartIndex,
+		cellCount: Math.min(
+			source.columns,
+			source.sectionTable.cellCountBySection[sectionIndex] -
+				sectionCellStartIndex,
+		),
+		top:
+			source.sectionTable.topBySection[sectionIndex] +
+			rowIndexInSection * (source.rowHeight + source.rowGap),
 	};
 }
 
-/**
- * Builds the `plan.rows` facade: a read-only, index-access-only view over a
- * row table that materializes `TwoHopRowPlan` snapshots on demand.
- */
 export function createTwoHopRowPlanFacade(
-	table: TwoHopRowTable,
+	source: TwoHopRowGeometrySource,
 ): readonly TwoHopRowPlan[] {
 	return new Proxy([] as TwoHopRowPlan[], {
 		get(_target, prop): unknown {
-			if (prop === "length") return table.rowCount;
+			if (prop === "length") return source.rowCount;
 			if (typeof prop === "string" && /^[0-9]+$/.test(prop)) {
-				return readTwoHopRowTableAt(table, Number(prop));
+				return readRow(source, Number(prop));
 			}
 			return undefined;
 		},
 	});
 }
-/**
- * Reads a compiled row plan entry, or null when the row index is out of range.
- */
+
 export function readTwoHopRowPlan(
 	plan: TwoHopViewPlan,
 	rowIndex: number,
 ): TwoHopRowPlan | null {
-	return readTwoHopRowTableAt(plan.rowTable, rowIndex);
+	return readRow(plan, rowIndex);
 }

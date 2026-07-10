@@ -9,13 +9,7 @@ import type {
 	TwoHopVirtualSectionDescriptor,
 } from "./twoHopVirtualListModel";
 import { createTwoHopRowModelCache } from "./twoHopRowModelCache";
-import { createTwoHopMaterializationScheduler } from "./twoHopMaterializationScheduler";
 import { type TwoHopViewPlanRowModel } from "./twoHopViewPlan";
-import {
-	DEFAULT_TWO_HOP_VIRTUAL_LIST_TUNING,
-	resolveMaterializationFromTuning,
-	type TwoHopVirtualListTuning,
-} from "./twoHopVirtualListTuning";
 
 type ViewPlanMeasurementState = ReturnType<
 	typeof import("ui/components/common/virtual-list/svelte/viewPlanMeasurement.svelte").createViewPlanMeasurementState
@@ -26,7 +20,6 @@ export interface TwoHopVirtualListSurfaceProps {
 	readonly applicationStore?: ApplicationStore;
 	readonly initialVisibleCount?: number;
 	readonly loadMoreIncrement?: number;
-	readonly tuning?: TwoHopVirtualListTuning;
 }
 
 export function createTwoHopVirtualListPlanRuntime(params: {
@@ -51,18 +44,9 @@ export function createTwoHopVirtualListPlanRuntime(params: {
 		initialVisibleCount: params.props.initialVisibleCount,
 		loadMoreIncrement: params.props.loadMoreIncrement,
 	});
-	const materialization = resolveMaterializationFromTuning(
-		params.props.tuning ?? DEFAULT_TWO_HOP_VIRTUAL_LIST_TUNING,
-	);
 	const layoutPlanCache = createTwoHopRowModelCache({
-		materialization,
 		resolveInitialSectionVisibleCount: inputState.resolveInitialSectionVisibleCount,
 		clampVisibleCount: inputState.clampVisibleCount,
-	});
-	const materializationScheduler = createTwoHopMaterializationScheduler({
-		materialization,
-		getWindow: () =>
-			params.measurementState.rootEl?.ownerDocument.defaultView ?? null,
 	});
 	const resolveRowModel = (
 		layout: ViewPlanLayoutMetrics = params.measurementState.layout,
@@ -78,7 +62,6 @@ export function createTwoHopVirtualListPlanRuntime(params: {
 		applicationStore,
 		inputState,
 		layoutPlanCache,
-		materializationScheduler,
 		get configuredCardLayout() {
 			return configuredCardLayout;
 		},

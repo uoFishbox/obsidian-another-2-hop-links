@@ -11,48 +11,29 @@ import type {
 	TwoHopSectionTable,
 	TwoHopViewPlan,
 } from "./types";
-export function findTwoHopSectionIndexByRow(
-	sectionTable: TwoHopSectionTable,
-	rowIndex: number,
-): number {
-	if (rowIndex < 0 || sectionTable.sectionCount === 0) return -1;
-	let low = 0;
-	let high = sectionTable.sectionCount;
-	while (low < high) {
-		const mid = (low + high) >>> 1;
-		if (sectionTable.firstRowIndexBySection[mid] > rowIndex) high = mid;
-		else low = mid + 1;
-	}
-	const sectionIndex = low - 1;
-	if (
-		sectionIndex < 0 ||
-		rowIndex >=
-			sectionTable.firstRowIndexBySection[sectionIndex] +
-				sectionTable.rowCountBySection[sectionIndex]
-	) {
-		return -1;
-	}
-	return sectionIndex;
-}
+import { findTwoHopSectionIndexByRow, readTwoHopRowPlan } from "./twoHopRowTable";
+
+export { findTwoHopSectionIndexByRow } from "./twoHopRowTable";
 
 export function resolveTwoHopRowInSection(
 	plan: TwoHopViewPlan,
 	sectionPlan: TwoHopSectionPlan,
 	rowIndex: number,
 ): TwoHopResolvedRow | null {
-	const table = plan.rowTable;
-	if (rowIndex < 0 || rowIndex >= table.rowCount) return null;
-	const sectionIndex = table.sectionIndexByRow[rowIndex];
-	if (sectionIndex !== sectionPlan.sectionIndex) return null;
-	const rowIndexInSection = table.rowIndexInSectionByRow[rowIndex];
-	const sectionCellStartIndex = table.sectionCellStartByRow[rowIndex];
+	if (rowIndex < sectionPlan.firstRowIndex) return null;
+	const rowIndexInSection = rowIndex - sectionPlan.firstRowIndex;
+	if (rowIndexInSection < 0 || rowIndexInSection >= sectionPlan.rowCount) return null;
+	const sectionCellStartIndex = rowIndexInSection * plan.columns;
 	return {
-		sectionIndex,
+		sectionIndex: sectionPlan.sectionIndex,
 		rowIndexInSection,
 		firstCellIndex: sectionPlan.firstCellIndex + sectionCellStartIndex,
 		sectionCellStartIndex,
-		cellCount: table.cellCountByRow[rowIndex],
-		top: table.topByRow[rowIndex],
+		cellCount: Math.min(
+			plan.columns,
+			sectionPlan.cellCount - sectionCellStartIndex,
+		),
+		top: sectionPlan.top + rowIndexInSection * (plan.rowHeight + plan.rowGap),
 	};
 }
 
@@ -67,13 +48,16 @@ export function resolveTwoHopRowInSectionInto(
 	sectionPlan: TwoHopSectionPlan,
 	rowIndex: number,
 ): boolean {
-	const table = plan.rowTable;
-	if (rowIndex < 0 || rowIndex >= table.rowCount) return false;
-	if (table.sectionIndexByRow[rowIndex] !== sectionPlan.sectionIndex) return false;
-	out.rowIndexInSection = table.rowIndexInSectionByRow[rowIndex];
-	out.sectionCellStartIndex = table.sectionCellStartByRow[rowIndex];
-	out.cellCount = table.cellCountByRow[rowIndex];
-	out.top = table.topByRow[rowIndex];
+	const rowIndexInSection = rowIndex - sectionPlan.firstRowIndex;
+	if (rowIndexInSection < 0 || rowIndexInSection >= sectionPlan.rowCount) return false;
+	out.rowIndexInSection = rowIndexInSection;
+	out.sectionCellStartIndex = rowIndexInSection * plan.columns;
+	out.cellCount = Math.min(
+		plan.columns,
+		sectionPlan.cellCount - out.sectionCellStartIndex,
+	);
+	out.top =
+		sectionPlan.top + rowIndexInSection * (plan.rowHeight + plan.rowGap);
 	return true;
 }
 
@@ -81,19 +65,17 @@ export function resolveTwoHopRow(
 	plan: TwoHopViewPlan,
 	rowIndex: number,
 ): TwoHopResolvedRow | null {
-	const table = plan.rowTable;
-	if (rowIndex < 0 || rowIndex >= table.rowCount) return null;
-	const sectionIndex = table.sectionIndexByRow[rowIndex];
+	const row = readTwoHopRowPlan(plan, rowIndex);
+	if (!row) return null;
+	const sectionIndex = row.sectionIndex;
 	const sectionPlan = plan.sections[sectionIndex];
-	const rowIndexInSection = table.rowIndexInSectionByRow[rowIndex];
-	const sectionCellStartIndex = table.sectionCellStartByRow[rowIndex];
 	return {
 		sectionIndex,
-		rowIndexInSection,
-		firstCellIndex: sectionPlan.firstCellIndex + sectionCellStartIndex,
-		sectionCellStartIndex,
-		cellCount: table.cellCountByRow[rowIndex],
-		top: table.topByRow[rowIndex],
+		rowIndexInSection: row.rowIndexInSection,
+		firstCellIndex: sectionPlan.firstCellIndex + row.sectionCellStartIndex,
+		sectionCellStartIndex: row.sectionCellStartIndex,
+		cellCount: row.cellCount,
+		top: row.top,
 	};
 }
 
@@ -102,9 +84,7 @@ export function resolveTwoHopRow(
  * Returns a scalar to avoid allocating a tiny object.
  */
 function readTwoHopRowTop(plan: TwoHopViewPlan, rowIndex: number): number | null {
-	const table = plan.rowTable;
-	if (rowIndex < 0 || rowIndex >= table.rowCount) return null;
-	return table.topByRow[rowIndex];
+	return readTwoHopRowPlan(plan, rowIndex)?.top ?? null;
 }
 
 export function resolveTwoHopRowTopsForBandInto(
@@ -158,6 +138,27 @@ function lowerBoundSectionTop(
 		else low = mid + 1;
 	}
 	return low;
+}
+
+function resolveSectionIndexByTopWithCursor(
+	sectionTable: TwoHopSectionTable,
+	target: number,
+	cursor: number,
+): number {
+	const count = sectionTable.sectionCount;
+	if (count === 0 || target < sectionTable.topBySection[0]) return 0;
+	const isTargetInSectionBand = (sectionIndex: number): boolean => {
+		if (sectionIndex < 0 || sectionIndex >= count) return false;
+		const nextTop =
+			sectionIndex + 1 < count
+				? sectionTable.topBySection[sectionIndex + 1]
+				: Number.POSITIVE_INFINITY;
+		return target >= sectionTable.topBySection[sectionIndex] && target < nextTop;
+	};
+	if (isTargetInSectionBand(cursor)) return cursor;
+	if (isTargetInSectionBand(cursor + 1)) return cursor + 1;
+	if (isTargetInSectionBand(cursor - 1)) return cursor - 1;
+	return Math.max(0, upperBoundSectionTop(sectionTable, target) - 1);
 }
 
 function readTwoHopSectionTableRowCount(
@@ -233,6 +234,31 @@ function writeFirstTwoHopRowByTop(
 		return;
 	}
 	const rowCount = readTwoHopSectionTableRowCount(sectionTable);
+	if (rowStride > 0) {
+		const sectionIndex = resolveSectionIndexByTopWithCursor(
+			sectionTable,
+			target,
+			out.sectionIndex,
+		);
+		if (
+			inclusive &&
+			sectionTable.topBySection[sectionIndex] === target
+		) {
+			out.rowIndex = sectionTable.firstRowIndexBySection[sectionIndex];
+			out.sectionIndex = sectionIndex;
+			return;
+		}
+		writeFirstTwoHopRowByTopFromSection(
+			out,
+			sectionTable,
+			rowStride,
+			target,
+			inclusive,
+			sectionIndex,
+			rowCount,
+		);
+		return;
+	}
 	const boundaryIndex = inclusive
 		? lowerBoundSectionTop(sectionTable, target)
 		: upperBoundSectionTop(sectionTable, target);
@@ -246,26 +272,13 @@ function writeFirstTwoHopRowByTop(
 			return;
 		}
 	}
-	if (rowStride <= 0) {
-		if (boundaryIndex < sectionTable.sectionCount) {
-			out.rowIndex = sectionTable.firstRowIndexBySection[boundaryIndex];
-			out.sectionIndex = boundaryIndex;
-		} else {
-			out.rowIndex = rowCount;
-			out.sectionIndex = sectionTable.sectionCount;
-		}
-		return;
+	if (boundaryIndex < sectionTable.sectionCount) {
+		out.rowIndex = sectionTable.firstRowIndexBySection[boundaryIndex];
+		out.sectionIndex = boundaryIndex;
+	} else {
+		out.rowIndex = rowCount;
+		out.sectionIndex = sectionTable.sectionCount;
 	}
-	const sectionIndex = Math.max(0, boundaryIndex - 1);
-	writeFirstTwoHopRowByTopFromSection(
-		out,
-		sectionTable,
-		rowStride,
-		target,
-		inclusive,
-		sectionIndex,
-		rowCount,
-	);
 }
 
 export function writeTwoHopRowsByOffsetIntoScratch(

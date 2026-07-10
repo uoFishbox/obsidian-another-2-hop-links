@@ -165,6 +165,56 @@ describe("TwoHopViewPlanVirtualList DOM performance contracts", () => {
 		expect(getItemInteractionDescriptor).not.toHaveBeenCalled();
 	});
 
+	it("updates a recycled cell shell to the entering logical item", async () => {
+		const { container } = render(TwoHopViewPlanVirtualListPerfHarness, {
+			props: {
+				sections: [createDescriptor(100)],
+				applicationStore,
+			},
+		});
+		const scrollRoot = container.querySelector<HTMLElement>(
+			"[data-testid='scroll-root']",
+		);
+		const virtualListRoot = container.querySelector<HTMLElement>(
+			".twohop-page-virtual-list",
+		);
+		if (!scrollRoot || !virtualListRoot) {
+			throw new Error("Expected TwoHop virtual-list elements.");
+		}
+		setNumericProperty(scrollRoot, "clientHeight", 120);
+		setNumericProperty(scrollRoot, "scrollTop", 0);
+		setElementRect(scrollRoot, { top: 0, width: 330, height: 120 });
+		setElementRect(virtualListRoot, { top: 0, width: 330, height: 20_000 });
+		triggerResize(virtualListRoot, 330, 20_000);
+		triggerResize(scrollRoot, 330, 120);
+		await flushFrames();
+		await flushFrames();
+		const initialIndexes = new Set(
+			Array.from(
+				virtualListRoot.shadowRoot?.querySelectorAll<HTMLElement>(
+					"[data-testid='twohop-item-cell']",
+				) ?? [],
+				(cell) => cell.dataset.index,
+			),
+		);
+
+		setNumericProperty(scrollRoot, "scrollTop", 360);
+		await fireEvent.scroll(scrollRoot);
+		await flushFrames();
+		await flushFrames();
+		const nextIndexes = new Set(
+			Array.from(
+				virtualListRoot.shadowRoot?.querySelectorAll<HTMLElement>(
+					"[data-testid='twohop-item-cell']",
+				) ?? [],
+				(cell) => cell.dataset.index,
+			),
+		);
+
+		expect(nextIndexes).not.toEqual(initialIndexes);
+		expect([...nextIndexes].some((index) => !initialIndexes.has(index))).toBe(true);
+	});
+
 	it("keeps a resolved descriptor cached for a retained cell while scrolling", async () => {
 		const getItemInteractionDescriptor = vi.fn(
 			(item: TwoHopVirtualListItem): ItemInteractionDescriptor => ({

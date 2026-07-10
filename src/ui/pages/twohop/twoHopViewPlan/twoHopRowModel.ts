@@ -25,13 +25,13 @@ import type {
 	TwoHopViewPlan,
 	TwoHopViewPlanRowModel,
 } from "./types";
-import { resolveTwoHopLogicalCellInSection } from "./twoHopMaterialization";
 import {
 	resolveTwoHopRowTopsForBandInto,
 	writeTwoHopRowsByOffsetIntoScratch,
 	writeTwoHopStablePreviewScrollTopBand,
 } from "./twoHopRowRangeResolver";
 import { resolveTwoHopNavigationTarget } from "./twoHopNavigation";
+import { readTwoHopRowPlan } from "./twoHopRowTable";
 
 export function createTwoHopViewPlanRowModel(
 	plan: TwoHopViewPlan,
@@ -168,22 +168,22 @@ export function createTwoHopViewPlanRowModel(
 	): void => {
 		resolveTwoHopRowTopsForBandInto(out, plan, params);
 	};
-	const table = plan.rowTable;
 	const getRowCellCountAt = (rowIndex: number): number =>
-		rowIndex < 0 || rowIndex >= table.rowCount ? 0 : table.cellCountByRow[rowIndex];
+		readTwoHopRowPlan(plan, rowIndex)?.cellCount ?? 0;
 	const getRowTopAt = (rowIndex: number): number =>
-		rowIndex < 0 || rowIndex >= table.rowCount ? 0 : table.topByRow[rowIndex];
+		readTwoHopRowPlan(plan, rowIndex)?.top ?? 0;
 	const resolveCell = (
 		rowIndex: number,
 		columnIndex: number,
 	): VirtualListLogicalCell<TwoHopVirtualListItem> | null => {
-		if (rowIndex < 0 || rowIndex >= table.rowCount) return null;
-		const cellCount = table.cellCountByRow[rowIndex];
+		const row = readTwoHopRowPlan(plan, rowIndex);
+		if (!row) return null;
+		const cellCount = row.cellCount;
 		if (columnIndex < 0 || columnIndex >= cellCount) return null;
-		return resolveTwoHopLogicalCellInSection(
-			plan,
-			table.sectionIndexByRow[rowIndex],
-			table.sectionCellStartByRow[rowIndex] + columnIndex,
+		return (
+			plan.sections[row.sectionIndex]?.itemSource.readCell(
+				row.sectionCellStartIndex + columnIndex,
+			) ?? null
 		);
 	};
 	const resolveNavigationTarget = (
@@ -209,14 +209,15 @@ export function createTwoHopViewPlanRowModel(
 		getRow(
 			rowIndex,
 		): VirtualRow<VirtualListLogicalCell<TwoHopVirtualListItem>> | null {
-			if (rowIndex < 0 || rowIndex >= table.rowCount) return null;
+			const row = readTwoHopRowPlan(plan, rowIndex);
+			if (!row) return null;
 			return {
 				key: rowIndex,
 				index: rowIndex,
-				top: table.topByRow[rowIndex],
+				top: row.top,
 				height: plan.rowHeight,
 				bottomSpacing: plan.rowGap,
-				cellCount: table.cellCountByRow[rowIndex],
+				cellCount: row.cellCount,
 				getCell(columnIndex) {
 					return resolveCell(rowIndex, columnIndex);
 				},
@@ -225,8 +226,8 @@ export function createTwoHopViewPlanRowModel(
 		getRowCellCount: getRowCellCountAt,
 		getRowTop: getRowTopAt,
 		getRowEnd: (rowIndex) => {
-			if (rowIndex < 0 || rowIndex >= table.rowCount) return 0;
-			return table.topByRow[rowIndex] + plan.rowHeight;
+			const row = readTwoHopRowPlan(plan, rowIndex);
+			return row ? row.top + plan.rowHeight : 0;
 		},
 		findVisibleRange: findRange,
 		findVisibleRangeInto: (out, params) => {

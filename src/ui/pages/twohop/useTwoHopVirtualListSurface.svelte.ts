@@ -13,7 +13,6 @@ import type {
 	TwoHopVirtualListItem,
 	TwoHopVirtualListSection,
 } from "./twoHopVirtualListModel";
-import { affectsMountedRows } from "./twoHopMaterializationRecomputePolicy";
 
 export type { TwoHopVirtualListSurfaceProps as TwoHopViewPlanVirtualListProps };
 
@@ -49,27 +48,6 @@ export function useTwoHopViewPlanVirtualList(props: TwoHopVirtualListSurfaceProp
 		void inputRuntime.sectionVisibleCounts;
 		measurementRuntime.updateCachedMeasurementForDataChange();
 	});
-	$effect(() => {
-		const activeRowModel = inputRuntime.rowModel;
-		return inputRuntime.materializationScheduler.schedule(
-			activeRowModel,
-			(affectedRowRange) => {
-				// Background materialization mostly builds cells for rows that are not
-				// currently mounted. Skip the synchronous recompute when the affected
-				// row range falls entirely outside the mounted range: the next scroll /
-				// mounted-range recompute will pick up the freshly materialized cells.
-				if (
-					!affectsMountedRows(
-						surfaceRuntime.virtualList.getSnapshot()?.ranges.mounted,
-						affectedRowRange,
-					)
-				) {
-					return;
-				}
-				surfaceRuntime.virtualList.recompute({ rowModel: activeRowModel });
-			},
-		);
-	});
 	$effect(() => measurementRuntime.observeRootElement());
 
 	return {
@@ -90,6 +68,9 @@ export function useTwoHopViewPlanVirtualList(props: TwoHopVirtualListSurfaceProp
 		},
 		get mountedRows() {
 			return surfaceRuntime.mountedRowsForSurface;
+		},
+		get fixedRowSlotControllers() {
+			return surfaceRuntime.fixedRowSlotControllers;
 		},
 		getCellDataTestId: !IS_PROD
 			? (

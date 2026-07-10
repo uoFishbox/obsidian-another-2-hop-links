@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { IS_PROD } from "../../../appConstants";
 	import { providePreviewActivationContexts } from "features/preview/scheduling/previewActivationContexts";
-	import VirtualSurface from "ui/components/common/virtual-list/VirtualSurface.svelte";
+	import VirtualInteractiveSurface from "ui/components/common/virtual-list/svelte/VirtualInteractiveSurface.svelte";
 	import VirtualListLoadMoreButton from "ui/components/common/virtual-list/VirtualListLoadMoreButton.svelte";
 	import type { VirtualizedItemVisibilityState } from "ui/components/common/virtual-list/types";
 	import type {
@@ -17,9 +17,9 @@
 		TwoHopVirtualListItem,
 	} from "./twoHopVirtualListModel";
 	import { useTwoHopViewPlanVirtualList } from "./useTwoHopVirtualListSurface.svelte";
-	import type { TwoHopVirtualListTuning } from "./twoHopVirtualListTuning";
 	import type { ItemInteractionDescriptor } from "ui/interactions/interactionTypes";
 	import { createTwoHopInteractionResolverProvider } from "./twoHopInteractionResolverCache";
+	import TwoHopFixedRowSlotsSurface from "./TwoHopFixedRowSlotsSurface.svelte";
 
 	interface Props {
 		sections: readonly SectionRenderDescriptor<
@@ -29,7 +29,6 @@
 		applicationStore?: ApplicationStore;
 		initialVisibleCount?: number;
 		loadMoreIncrement?: number;
-		tuning?: TwoHopVirtualListTuning;
 		getCellClassName?: (section: TwoHopVirtualListSection) => string | undefined;
 		getItemInteractionDescriptor: (
 			item: TwoHopVirtualListItem,
@@ -55,8 +54,10 @@
 	}
 
 	const TWO_HOP_CELL_CLASS_NAME = "view-plan-virtual-list-cell view-plan-flow-cell";
+	const EMPTY_MOUNTED_ROWS: readonly [] = [];
 
 	const props: Props = $props();
+	let contentEl = $state<HTMLDivElement | null>(null);
 	providePreviewActivationContexts();
 	const list = useTwoHopViewPlanVirtualList(props);
 	const interactionDescriptorResolverProvider =
@@ -91,28 +92,33 @@
 		cell.cell.kind === "item";
 </script>
 
-<VirtualSurface
+<VirtualInteractiveSurface
 	className="cosense-card-links__section view-plan-virtual-list twohop-page-virtual-list"
-	contentClassName="view-plan-virtual-list-content view-plan-flow-content"
-	rowClassName="view-plan-flow-row"
-	cellClassName=""
-	contentHeight={list.contentHeight}
-	mountedRows={list.mountedRows}
-	cellWidth={list.layout.cellWidth}
 	rowHeight={list.layout.rowHeight}
-	columns={list.layout.columns}
-	gap={list.layout.gap}
 	layoutMode="grid-rows"
-	remountCellBodyOnKeyChange={false}
+	mountedRows={EMPTY_MOUNTED_ROWS}
 	interactionDescriptorScopeId="twohop-mounted-cells"
 	{interactionDescriptorResolverProvider}
 	bind:rootEl={list.rootEl}
+	bind:contentEl
 	observerRoot={list.observerRoot}
-	getCellClassName={getMountedCellClassName}
-	getCellDataTestId={list.getCellDataTestId}
 	resolveNavigationTarget={list.resolveNavigationTarget}
 	flushVirtualScrollMeasurement={list.flushVirtualScrollMeasurement}
 >
+	<TwoHopFixedRowSlotsSurface
+		contentClassName="view-plan-virtual-list-content view-plan-flow-content"
+		rowClassName="view-plan-flow-row"
+		contentHeight={list.contentHeight}
+		rowSlotControllers={list.fixedRowSlotControllers}
+		cellWidth={list.layout.cellWidth}
+		rowHeight={list.layout.rowHeight}
+		columns={list.layout.columns}
+		gap={list.layout.gap}
+		bind:contentEl
+		observerRoot={list.observerRoot}
+		getCellClassName={getMountedCellClassName}
+		getCellDataTestId={list.getCellDataTestId}
+	>
 	{#snippet renderCell({ mountedCell: renderedCell })}
 		{#if isHeaderCell(renderedCell)}
 			{@render props.renderHeader({
@@ -136,4 +142,5 @@
 			/>
 		{/if}
 	{/snippet}
-</VirtualSurface>
+	</TwoHopFixedRowSlotsSurface>
+</VirtualInteractiveSurface>

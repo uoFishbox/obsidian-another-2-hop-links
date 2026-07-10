@@ -2,6 +2,8 @@ import { IS_PROD } from "appConstants";
 
 export type CCLDevMeasurementName =
 	| "virtualScroll.applyScrollMeasurement"
+	| "virtualScroll.stableBandHit"
+	| "virtualScroll.previewOnlyCrossing"
 	| "twoHop.rowWindow.apply"
 	| "twoHop.rowWindow.apply.changed"
 	| "twoHop.rowWindow.apply.changed.firstBuild"
@@ -10,6 +12,15 @@ export type CCLDevMeasurementName =
 	| "twoHop.rowWindow.apply.changed.cellStoreRevision"
 	| "twoHop.rowWindow.apply.skipped"
 	| "twoHop.buildMountedRows"
+	| "twoHop.mountedBoundaryCrossing"
+	| "twoHop.reboundRowSlot"
+	| "twoHop.reboundCellSlot"
+	| "twoHop.retainedSlotStateWrite"
+	| "twoHop.scrollSynchronousSectionPreparation"
+	| "twoHop.scrollItemSortOrReconcile"
+	| "twoHop.scalarKernel.mountedRangeCommit"
+	| "twoHop.scalarKernel.rowShellCreated"
+	| "twoHop.scalarKernel.cellShellCreated"
 	| "twoHop.rowModelCache.hit"
 	| "twoHop.rowModelCache.miss"
 	| "twoHop.rowModelCache.miss.firstResolve"
@@ -26,6 +37,8 @@ export type CCLDevMeasurementName =
 
 export const CCL_DEV_MEASUREMENT_NAMES: readonly CCLDevMeasurementName[] = [
 	"virtualScroll.applyScrollMeasurement",
+	"virtualScroll.stableBandHit",
+	"virtualScroll.previewOnlyCrossing",
 	"twoHop.rowWindow.apply",
 	"twoHop.rowWindow.apply.changed",
 	"twoHop.rowWindow.apply.changed.firstBuild",
@@ -34,6 +47,15 @@ export const CCL_DEV_MEASUREMENT_NAMES: readonly CCLDevMeasurementName[] = [
 	"twoHop.rowWindow.apply.changed.cellStoreRevision",
 	"twoHop.rowWindow.apply.skipped",
 	"twoHop.buildMountedRows",
+	"twoHop.mountedBoundaryCrossing",
+	"twoHop.reboundRowSlot",
+	"twoHop.reboundCellSlot",
+	"twoHop.retainedSlotStateWrite",
+	"twoHop.scrollSynchronousSectionPreparation",
+	"twoHop.scrollItemSortOrReconcile",
+	"twoHop.scalarKernel.mountedRangeCommit",
+	"twoHop.scalarKernel.rowShellCreated",
+	"twoHop.scalarKernel.cellShellCreated",
 	"twoHop.rowModelCache.hit",
 	"twoHop.rowModelCache.miss",
 	"twoHop.rowModelCache.miss.firstResolve",

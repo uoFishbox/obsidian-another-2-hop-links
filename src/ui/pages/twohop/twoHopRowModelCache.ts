@@ -6,7 +6,6 @@ import type { TwoHopVirtualSectionDescriptor } from "./twoHopVirtualListModel";
 import {
 	compileTwoHopViewPlan,
 	createTwoHopViewPlanRowModel,
-	type TwoHopViewPlanMaterialization,
 	type TwoHopViewPlanRowModel,
 } from "./twoHopViewPlan";
 import { recordCCLDevMeasurement } from "infrastructure/debug/CCLDevMeasurements";
@@ -38,7 +37,6 @@ function hasSameVisibleCounts(
 }
 
 export function createTwoHopRowModelCache(params: {
-	readonly materialization: TwoHopViewPlanMaterialization;
 	resolveInitialSectionVisibleCount(section: TwoHopVirtualSectionDescriptor): number;
 	clampVisibleCount(section: TwoHopVirtualSectionDescriptor, count: number): number;
 }): TwoHopRowModelCache {
@@ -106,7 +104,6 @@ export function createTwoHopRowModelCache(params: {
 					sections,
 					sectionVisibleCounts,
 					layout,
-					materialization: params.materialization,
 					resolveInitialSectionVisibleCount:
 						params.resolveInitialSectionVisibleCount,
 					clampVisibleCount: params.clampVisibleCount,

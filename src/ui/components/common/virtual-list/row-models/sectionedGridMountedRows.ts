@@ -115,12 +115,9 @@ export interface BuildSectionedGridMountedRowsParams<
 
 /**
  * The builder is a pure "row range → mounted rows" transform: it reads every
- * cell through {@link readLogicalCellInSection}. Callers must ensure the cells
- * for {@link BuildSectionedGridMountedRowsParams.rowRange} are materialized
- * before invoking the builder (e.g. via an equivalent of
- * `ensureMountedRangeMaterialized(rowRange)` on the cell store). Carrying the
- * materialization side effect inside the builder would blur its single
- * responsibility of converting a mounted row range into mounted rows.
+ * cell through {@link readLogicalCellInSection}. Callers own any upstream
+ * preparation needed before invoking the builder; this module only converts a
+ * mounted row range into mounted rows.
  */
 
 type SectionedGridMountedCell<T, G> = MountedFlatCell<T, G>;
@@ -164,9 +161,7 @@ export function buildSectionedGridMountedRows<
 	// cells / reusableCellsByKey). Return the previous build directly to
 	// preserve rowSlices array identity, which lets the engine skip
 	// applyVirtualCellMetadata / indexMountedCells and lets Svelte #each
-	// blocks skip re-rendering keyed rows. Logical cells are mutated in place
-	// within a single plan object, so reused mounted cells already observe the
-	// latest cell state and no rebuild is required.
+	// blocks skip re-rendering keyed rows.
 	const previousBuild = params.previousBuild;
 	if (
 		previousBuild !== undefined &&
@@ -198,9 +193,9 @@ export function buildSectionedGridMountedRows<
 	> => params.previousBuild?.reusableCellsByKey ?? EMPTY_PREVIOUS_CELLS;
 	// Cell-level reuse across the previous build is only useful when the plan
 	// object changes (same data re-compiled). Within a single plan object,
-	// materialization mutates logical cells in place, so reused rows carry
-	// stable cell references via the slice-reuse fast path below, and rows
-	// newly entering the range never had cells in the previous build.
+	// reused rows carry stable cell references via the slice-reuse fast path
+	// below, and rows newly entering the range never had cells in the previous
+	// build.
 	const canReusePreviousCellsByKey =
 		params.previousBuild !== undefined && params.previousBuild.plan !== plan;
 	const previousRows = params.previousBuild?.rowSlices;
@@ -223,14 +218,16 @@ export function buildSectionedGridMountedRows<
 		params.rowSlotAllocator ??
 		previousBuildState?.[ROW_SLOT_ALLOCATOR] ??
 		createPooledRowSlotAllocator();
-	const rowKeys = Array.from(
-		{ length: Math.max(0, end - start) },
-		(_, index) => start + index,
-	);
+	const layoutKey = `${plan.columns}|${plan.rowGap}`;
 	const slotAllocation = rowSlotAllocator.apply({
-		rowKeys,
-		layoutKey: `${plan.columns}|${plan.rowGap}`,
+		rowKeys: Array.from(
+			{ length: Math.max(0, end - start) },
+			(_, index) => start + index,
+		),
+		layoutKey,
 	});
+	const poolCapacity = slotAllocation.capacity;
+	const poolEpoch = slotAllocation.epoch;
 	let sectionIndex =
 		params.resolveInitialSectionIndexByRow?.(plan, start) ??
 		params.findSectionIndexByRow(plan.sections, start);
@@ -251,10 +248,12 @@ export function buildSectionedGridMountedRows<
 	for (let rowIndex = start; rowIndex < end; rowIndex += 1) {
 		const rowKey = rowIndex;
 		const previousRow = getPreviousRow(rowIndex);
+		const slotIndex = slotAllocation.slotIndexes[rowIndex - start] ?? 0;
 		if (
 			params.previousBuild?.plan === plan &&
 			Object.is(previousBuild?.sourceRevision, params.sourceRevision) &&
-			previousRow
+			previousRow &&
+			previousRow.slotIndex === slotIndex
 		) {
 			rowSlices.push(previousRow);
 			mountedCellCount += previousRow.cells.length;
@@ -300,7 +299,6 @@ export function buildSectionedGridMountedRows<
 			top: rowTop,
 			bottomSpacing: plan.rowGap,
 		};
-		const slotIndex = slotAllocation.slotIndexes[rowIndex - start] ?? 0;
 		const rowSlice: MountedFlatRowSlice<T, G> = {
 			slotIndex,
 			slotKey: slotIndex,
@@ -369,7 +367,7 @@ export function buildSectionedGridMountedRows<
 	}
 
 	const sparseRowsBySlot: Array<MountedFlatRowSlice<T, G> | undefined> =
-		new Array(slotAllocation.capacity);
+		new Array(poolCapacity);
 	for (const row of rowSlices) sparseRowsBySlot[row.slotIndex ?? 0] = row;
 	const rowsBySlot: MountedFlatRowSlice<T, G>[] = [];
 	for (const row of sparseRowsBySlot) {
@@ -387,9 +385,9 @@ export function buildSectionedGridMountedRows<
 			return getReusableCellsByKey();
 		},
 		mountedCellCount,
-		nextRenderSlotIndex: slotAllocation.capacity * plan.columns,
-		poolCapacity: slotAllocation.capacity,
-		poolEpoch: slotAllocation.epoch,
+		nextRenderSlotIndex: poolCapacity * plan.columns,
+		poolCapacity,
+		poolEpoch,
 		rowRange: { start, end },
 		plan,
 		sourceRevision: params.sourceRevision,

@@ -5,31 +5,15 @@ export type {
 	StablePreviewScrollTopBandMutable,
 	TwoHopBandRowTops,
 	TwoHopBandRowTopsMutable,
-	TwoHopCellStore,
 	TwoHopResolvedRow,
 	TwoHopRowPlan,
-	TwoHopRowTable,
+	PreparedTwoHopSection,
 	TwoHopSectionTable,
-	TwoHopSectionMaterializationState,
 	TwoHopSectionPlan,
 	TwoHopViewPlan,
-	TwoHopViewPlanMaterialization,
 	TwoHopViewPlanRowModel,
 } from "./twoHopViewPlan/types";
 export { compileTwoHopViewPlan } from "./twoHopViewPlan/compileTwoHopViewPlan";
-export {
-	ensureTwoHopMountedRangeMaterialized,
-	ensureTwoHopSectionCellRangeMaterialized,
-	hasUnmaterializedTwoHopSections,
-	materializeNextTwoHopCellBatch,
-	materializeNextTwoHopSectionBatch,
-	materializeTwoHopSectionCells,
-	readTwoHopLogicalCellInSection,
-	resolveTwoHopLogicalCellInSection,
-	type MaterializeNextTwoHopCellBatchOptions,
-	type MaterializeNextTwoHopCellBatchResult,
-	type MaterializeNextTwoHopSectionBatchOptions,
-} from "./twoHopViewPlan/twoHopMaterialization";
 export { readTwoHopRowPlan } from "./twoHopViewPlan/twoHopRowTable";
 export {
 	findTwoHopRowsByOffset,

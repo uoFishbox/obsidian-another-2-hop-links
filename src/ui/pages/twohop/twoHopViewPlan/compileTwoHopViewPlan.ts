@@ -7,19 +7,13 @@ import type {
 } from "../twoHopVirtualListModel";
 import type {
 	CompileTwoHopViewPlanParams,
-	TwoHopCellStore,
-	TwoHopRowTable,
 	TwoHopSectionTable,
 	TwoHopSectionPlan,
+	PreparedTwoHopSection,
 	TwoHopViewPlan,
 } from "./types";
-import { createTwoHopCellStore } from "./twoHopCellStore";
 import { createTwoHopRowPlanFacade } from "./twoHopRowTable";
-import {
-	materializeNextTwoHopCellBatch,
-	materializeTwoHopSectionCells,
-	resolveInitialMaterializationCellCount,
-} from "./twoHopMaterialization";
+import { logicalCellKey, sourceKey } from "ui/components/common/virtual-list/types";
 /**
  * Compiles TwoHop data into section prefix metadata consumed while scrolling.
  */
@@ -40,29 +34,26 @@ export function compileTwoHopViewPlan(
 	const cellCountBySection = new Uint32Array(sectionCount);
 	const visibleCountBySection = new Uint32Array(sectionCount);
 	const showLoadMoreBySection = new Uint8Array(sectionCount);
-	const eagerItemsBySection: (readonly TwoHopVirtualListItem[] | undefined)[] = [];
-	const batchedMaterialization = params.materialization?.kind === "batched";
+	const preparedItemsBySection: (readonly TwoHopVirtualListItem[])[] = [];
 	let totalRowCount = 0;
 	let totalCellCount = 0;
 
 	for (let sectionIndex = 0; sectionIndex < sectionCount; sectionIndex += 1) {
 		const descriptor = params.sections[sectionIndex];
+		// Descriptor access may sort/reconcile. Resolve it while compiling the
+		// data snapshot so the scroll path only performs O(1)
+		// prepared array reads.
+		const preparedItems = descriptor.getItems();
+		preparedItemsBySection.push(preparedItems);
 		const paginationKey = getSectionPaginationKey(descriptor);
 		const visibleCount = params.clampVisibleCount(
 			descriptor,
 			params.sectionVisibleCounts[paginationKey] ??
 				params.resolveInitialSectionVisibleCount(descriptor),
 		);
-		let visibleItemCount = visibleCount;
-		if (!batchedMaterialization) {
-			const items = descriptor.getItems();
-			eagerItemsBySection.push(items);
-			visibleItemCount = 0;
-			for (let itemIndex = 0; itemIndex < visibleCount; itemIndex += 1) {
-				if (items[itemIndex]) visibleItemCount += 1;
-			}
-		} else {
-			eagerItemsBySection.push(undefined);
+		let visibleItemCount = 0;
+		for (let itemIndex = 0; itemIndex < visibleCount; itemIndex += 1) {
+			if (preparedItems[itemIndex]) visibleItemCount += 1;
 		}
 		const showLoadMore = visibleCount < descriptor.loadedCount;
 		const cellCount = 1 + visibleItemCount + (showLoadMore ? 1 : 0);
@@ -78,21 +69,44 @@ export function compileTwoHopViewPlan(
 	let top = 0;
 	let nextCellIndex = 0;
 	let nextRowIndex = 0;
-	const sectionIndexByRow = new Int32Array(totalRowCount);
-	const rowIndexInSectionByRow = new Int32Array(totalRowCount);
-	const sectionCellStartByRow = new Int32Array(totalRowCount);
-	const cellCountByRow = new Uint16Array(totalRowCount);
-	const topByRow = new Float64Array(totalRowCount);
-	const logicalCellsBySectionIndex: TwoHopCellStore["logicalCellsBySectionIndex"] =
-		[];
-	const rowStride = rowHeight + gap;
-
 	for (let sectionIndex = 0; sectionIndex < sectionCount; sectionIndex += 1) {
 		const descriptor = params.sections[sectionIndex];
 		const visibleCount = visibleCountBySection[sectionIndex];
 		const cellCount = cellCountBySection[sectionIndex];
 		const rowCount = rowCountBySection[sectionIndex];
 		const showLoadMore = showLoadMoreBySection[sectionIndex] !== 0;
+		const preparedItems = preparedItemsBySection[sectionIndex] ?? [];
+		const sectionIdPrefix = `${descriptor.sectionId}::`;
+		const preparedCells = new Array<
+			VirtualListLogicalCell<TwoHopVirtualListItem> | undefined
+		>(cellCount);
+		preparedCells[0] = {
+			kind: "header",
+			key: logicalCellKey(`${sectionIdPrefix}__header`),
+		};
+		for (let itemIndex = 0; itemIndex < visibleCount; itemIndex += 1) {
+			const item = preparedItems[itemIndex];
+			if (!item) continue;
+			preparedCells[itemIndex + 1] = {
+				kind: "item",
+				key: logicalCellKey(`${sectionIdPrefix}item:${itemIndex}`),
+				sourceKey: sourceKey(`${sectionIdPrefix}${item.virtualKey}`),
+				item,
+				itemIndex,
+			};
+		}
+		if (showLoadMore) {
+			preparedCells[cellCount - 1] = {
+				kind: "load-more",
+				key: logicalCellKey(`${sectionIdPrefix}__load-more`),
+			};
+		}
+		const itemSource: PreparedTwoHopSection = {
+			id: descriptor.sectionId,
+			itemCount: preparedItems.length,
+			readItem: (index) => preparedItems[index],
+			readCell: (index) => preparedCells[index],
+		};
 		const firstCellIndex = nextCellIndex;
 		nextCellIndex += cellCount;
 
@@ -106,22 +120,6 @@ export function compileTwoHopViewPlan(
 		firstRowIndexBySection[sectionIndex] = firstRowIndex;
 		firstCellIndexBySection[sectionIndex] = firstCellIndex;
 
-		for (
-			let rowIndexInSection = 0;
-			rowIndexInSection < rowCount;
-			rowIndexInSection += 1
-		) {
-			const sectionCellStartIndex = rowIndexInSection * columns;
-			const writeIndex = firstRowIndex + rowIndexInSection;
-			sectionIndexByRow[writeIndex] = sectionIndex;
-			rowIndexInSectionByRow[writeIndex] = rowIndexInSection;
-			sectionCellStartByRow[writeIndex] = sectionCellStartIndex;
-			cellCountByRow[writeIndex] = Math.min(
-				columns,
-				cellCount - sectionCellStartIndex,
-			);
-			topByRow[writeIndex] = top + rowIndexInSection * rowStride;
-		}
 		const mountedLayout: SectionLayout<
 			TwoHopVirtualListItem,
 			TwoHopVirtualListSection
@@ -137,14 +135,11 @@ export function compileTwoHopViewPlan(
 			blockHeight: height,
 			sectionTop: top,
 		};
-		logicalCellsBySectionIndex[sectionIndex] = new Array<
-			VirtualListLogicalCell<TwoHopVirtualListItem> | undefined
-		>(cellCount);
 		sections.push({
 			descriptor,
 			sectionIndex,
 			sectionId: descriptor.sectionId,
-			sectionIdPrefix: `${descriptor.sectionId}::`,
+			sectionIdPrefix,
 			top,
 			height,
 			firstRowIndex,
@@ -153,6 +148,7 @@ export function compileTwoHopViewPlan(
 			cellCount,
 			visibleCount,
 			showLoadMore,
+			itemSource,
 			mountedLayout,
 		});
 		top += height;
@@ -169,23 +165,16 @@ export function compileTwoHopViewPlan(
 		visibleCountBySection,
 		showLoadMoreBySection,
 	};
-	const cellStore = createTwoHopCellStore(
-		logicalCellsBySectionIndex,
-		sections.length,
-		totalCellCount,
-	);
-	const rowTable: TwoHopRowTable = {
+	const geometry = {
+		sectionTable,
 		rowCount: totalRowCount,
-		sectionIndexByRow,
-		rowIndexInSectionByRow,
-		sectionCellStartByRow,
-		cellCountByRow,
-		topByRow,
+		columns,
+		rowHeight,
+		rowGap: gap,
 	};
 	const plan: TwoHopViewPlan = {
 		sections,
-		rows: createTwoHopRowPlanFacade(rowTable),
-		rowTable,
+		rows: createTwoHopRowPlanFacade(geometry),
 		sectionTable,
 		rowCount: totalRowCount,
 		cellCount: totalCellCount,
@@ -194,27 +183,6 @@ export function compileTwoHopViewPlan(
 		rowGap: gap,
 		totalHeight: top,
 		layout: params.layout,
-		cellStore,
 	};
-	if (params.materialization?.kind === "batched") {
-		const initialCellCount = Math.min(
-			Math.max(0, Math.floor(params.materialization.initial.maxCellCount)),
-			resolveInitialMaterializationCellCount(
-				plan,
-				params.materialization.initial.maxSectionCount,
-			),
-		);
-		materializeNextTwoHopCellBatch(plan, {
-			maxCellCount: initialCellCount,
-		});
-	} else {
-		for (let sectionIndex = 0; sectionIndex < sections.length; sectionIndex += 1) {
-			materializeTwoHopSectionCells(
-				plan,
-				sectionIndex,
-				eagerItemsBySection[sectionIndex],
-			);
-		}
-	}
 	return plan;
 }

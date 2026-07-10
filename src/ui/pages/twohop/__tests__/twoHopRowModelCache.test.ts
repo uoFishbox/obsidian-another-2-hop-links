@@ -39,7 +39,6 @@ const descriptor: TwoHopVirtualSectionDescriptor = {
 describe("createTwoHopRowModelCache in a DOM runtime", () => {
 	it("reuses semantically matching layout inputs without replacing the plan layout", () => {
 		const cache = createTwoHopRowModelCache({
-			materialization: { kind: "eager" },
 			resolveInitialSectionVisibleCount: (section) => section.loadedCount,
 			clampVisibleCount: (section, count) => Math.min(section.loadedCount, count),
 		});
@@ -57,7 +56,6 @@ describe("createTwoHopRowModelCache in a DOM runtime", () => {
 
 	it("reuses semantically matching pagination inputs", () => {
 		const cache = createTwoHopRowModelCache({
-			materialization: { kind: "eager" },
 			resolveInitialSectionVisibleCount: (section) => section.loadedCount,
 			clampVisibleCount: (section, count) => Math.min(section.loadedCount, count),
 		});
@@ -70,7 +68,6 @@ describe("createTwoHopRowModelCache in a DOM runtime", () => {
 
 	it("misses when descriptor or pagination values change", () => {
 		const cache = createTwoHopRowModelCache({
-			materialization: { kind: "eager" },
 			resolveInitialSectionVisibleCount: (section) => section.loadedCount,
 			clampVisibleCount: (section, count) => Math.min(section.loadedCount, count),
 		});
@@ -81,7 +78,6 @@ describe("createTwoHopRowModelCache in a DOM runtime", () => {
 		expect(cache.resolve([...sections], visibleCounts, layout)).not.toBe(first);
 
 		const cacheForVisibleCounts = createTwoHopRowModelCache({
-			materialization: { kind: "eager" },
 			resolveInitialSectionVisibleCount: (section) => section.loadedCount,
 			clampVisibleCount: (section, count) => Math.min(section.loadedCount, count),
 		});
@@ -98,7 +94,6 @@ describe("createTwoHopRowModelCache in a DOM runtime", () => {
 
 	it("misses when layout values change", () => {
 		const cache = createTwoHopRowModelCache({
-			materialization: { kind: "eager" },
 			resolveInitialSectionVisibleCount: (section) => section.loadedCount,
 			clampVisibleCount: (section, count) => Math.min(section.loadedCount, count),
 		});

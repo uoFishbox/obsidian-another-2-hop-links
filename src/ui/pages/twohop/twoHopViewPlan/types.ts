@@ -30,42 +30,20 @@ export interface TwoHopSectionPlan {
 	readonly cellCount: number;
 	readonly visibleCount: number;
 	readonly showLoadMore: boolean;
+	readonly itemSource: PreparedTwoHopSection;
 	readonly mountedLayout: SectionLayout<
 		TwoHopVirtualListItem,
 		TwoHopVirtualListSection
 	>;
 }
 
-/**
- * Per-section progress for background materialization.
- *
- * `nextCellIndex` is the background walk cursor: the next section-local cell
- * the background materializer will inspect. It only advances and never
- * reflects cells filled out-of-band.
- *
- * `materializedCellCount` is the number of cells in this section that are
- * currently materialized (cache filled) by *anyone* — synchronous
- * scroll-driven materialization or the background materializer alike. It is
- * updated at the single transition point where a cell goes from empty to
- * filled, so both paths share one source of truth and the background loop
- * never re-counts cells already filled by the scroll path.
- */
-export interface TwoHopSectionMaterializationState {
-	nextCellIndex: number;
-	materializedCellCount: number;
-}
-
-export interface TwoHopCellStore {
-	readonly logicalCellsBySectionIndex: Array<
-		Array<VirtualListLogicalCell<TwoHopVirtualListItem> | undefined>
-	>;
-	readonly nextCellIndexBySection: Uint32Array;
-	readonly materializedCellCountBySection: Uint32Array;
-	readonly materializedSectionByIndex: Uint8Array;
-	nextUnmaterializedSectionIndex: number;
-	remainingUnmaterializedCellCount: number;
-	remainingUnmaterializedSectionCount: number;
-	revision: number;
+export interface PreparedTwoHopSection {
+	readonly id: string;
+	readonly itemCount: number;
+	/** O(1) prepared lookup. Must not sort, reconcile, or allocate. */
+	readItem(index: number): TwoHopVirtualListItem | undefined;
+	/** O(1) prepared logical-cell lookup used by the scalar scroll kernel. */
+	readCell(index: number): VirtualListLogicalCell<TwoHopVirtualListItem> | undefined;
 }
 
 export interface TwoHopRowPlan {
@@ -85,15 +63,6 @@ export interface TwoHopRowPlan {
  * per row. Hot-path readers below access these arrays directly rather than
  * going through the `plan.rows` facade.
  */
-export interface TwoHopRowTable {
-	readonly rowCount: number;
-	readonly sectionIndexByRow: Int32Array;
-	readonly rowIndexInSectionByRow: Int32Array;
-	readonly sectionCellStartByRow: Int32Array;
-	readonly cellCountByRow: Uint16Array;
-	readonly topByRow: Float64Array;
-}
-
 /**
  * Struct-of-typed-arrays storage for compiled per-section prefix metadata.
  *
@@ -118,13 +87,9 @@ export interface TwoHopViewPlan {
 	/**
 	 * Compiled per-row metadata, indexed by the global row index.
 	 *
-	 * This is a lazy facade over {@link TwoHopViewPlan.rowTable}: each index
-	 * access materializes a fresh `TwoHopRowPlan` snapshot. It is retained for
-	 * external/test ergonomics; the scroll hot path reads `rowTable` directly
-	 * to avoid per-access allocation.
+	 * Lazy arithmetic facade retained for external/test ergonomics.
 	 */
 	readonly rows: readonly TwoHopRowPlan[];
-	readonly rowTable: TwoHopRowTable;
 	readonly sectionTable: TwoHopSectionTable;
 	readonly rowCount: number;
 	readonly cellCount: number;
@@ -133,21 +98,7 @@ export interface TwoHopViewPlan {
 	readonly rowGap: number;
 	readonly totalHeight: number;
 	readonly layout: ViewPlanLayoutMetrics;
-	readonly cellStore: TwoHopCellStore;
 }
-
-export type TwoHopViewPlanMaterialization =
-	| { readonly kind: "eager" }
-	| {
-			readonly kind: "batched";
-			readonly initial: {
-				readonly maxSectionCount: number;
-				readonly maxCellCount: number;
-			};
-			readonly background: {
-				readonly maxCellCountPerSlice: number;
-			};
-	  };
 
 export interface CompileTwoHopViewPlanParams {
 	readonly sections: readonly SectionRenderDescriptor<
@@ -156,7 +107,6 @@ export interface CompileTwoHopViewPlanParams {
 	>[];
 	readonly sectionVisibleCounts: Readonly<Record<string, number>>;
 	readonly layout: ViewPlanLayoutMetrics;
-	readonly materialization?: TwoHopViewPlanMaterialization;
 	resolveInitialSectionVisibleCount(
 		section: SectionRenderDescriptor<
 			TwoHopVirtualListItem,
