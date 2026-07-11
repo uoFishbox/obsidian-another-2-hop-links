@@ -19,8 +19,8 @@ import type {
 	TwoHopVirtualListSection,
 } from "./twoHopVirtualListModel";
 import {
-	findTwoHopSectionIndexByRow,
 	type TwoHopSectionPlan,
+	type CompiledTwoHopCell,
 	type TwoHopViewPlan,
 	type TwoHopViewPlanRowModel,
 } from "./twoHopViewPlan";
@@ -285,7 +285,7 @@ export function createTwoHopScalarScrollKernel(params: {
 
 	function populateCell(
 		slot: CellSlotRecord,
-		logicalCell: VirtualListLogicalCell<TwoHopVirtualListItem>,
+		compiledCell: CompiledTwoHopCell,
 		sectionPlan: TwoHopSectionPlan,
 		rowIndex: number,
 		rowIndexInSection: number,
@@ -294,8 +294,9 @@ export function createTwoHopScalarScrollKernel(params: {
 	): void {
 		const mutable = slot.mutable;
 		const descriptor = sectionPlan.descriptor;
-		mutable.key = logicalCell.key;
-		mutable.logicalKey = logicalCell.key;
+		const logicalCell = compiledCell.logicalCell;
+		mutable.key = compiledCell.logicalKey;
+		mutable.logicalKey = compiledCell.logicalKey;
 		mutable.cell = logicalCell;
 		mutable.rowIndex = rowIndex;
 		mutable.rowIndexInSection = rowIndexInSection;
@@ -306,26 +307,12 @@ export function createTwoHopScalarScrollKernel(params: {
 		mutable.title = descriptor.title;
 		mutable.totalCount = descriptor.totalCount;
 		mutable.headerProps = descriptor.headerProps;
-		mutable.renderBodyKind = logicalCell.kind;
-		mutable.renderBodySectionId = descriptor.sectionId;
-		mutable.renderBodySourceKey =
-			logicalCell.kind === "item"
-				? String(logicalCell.sourceKey ?? logicalCell.key)
-				: undefined;
-		mutable.renderBodyCellKey =
-			logicalCell.kind === "item" ? undefined : String(logicalCell.key);
-		mutable.renderBodyRevision =
-			logicalCell.kind === "item"
-				? (logicalCell.itemRenderRevision ?? null)
-				: logicalCell.kind === "header"
-					? (descriptor.headerRenderRevision ?? null)
-					: undefined;
-		mutable.renderBodyKey =
-			logicalCell.kind === "item"
-				? `item|${descriptor.sectionId}|${String(logicalCell.sourceKey ?? logicalCell.key)}|${String(logicalCell.itemRenderRevision)}`
-				: logicalCell.kind === "header"
-					? `header|${String(logicalCell.key)}|${descriptor.sectionId}|${String(descriptor.headerRenderRevision)}`
-					: `load-more|${String(logicalCell.key)}|${descriptor.sectionId}`;
+		mutable.renderBodyKind = compiledCell.renderBodyKind;
+		mutable.renderBodySectionId = compiledCell.renderBodySectionId;
+		mutable.renderBodySourceKey = compiledCell.renderBodySourceKey;
+		mutable.renderBodyCellKey = compiledCell.renderBodyCellKey;
+		mutable.renderBodyRevision = compiledCell.renderBodyRevision;
+		mutable.renderBodyKey = compiledCell.renderBodyKey;
 	}
 
 	function bindLogicalRow(plan: TwoHopViewPlan, logicalRowIndex: number): void {
@@ -335,36 +322,27 @@ export function createTwoHopScalarScrollKernel(params: {
 		if (record.active && record.row.rowIndex !== logicalRowIndex) {
 			params.rowPreviewActivationRuntime?.clearRow(record.row.rowIndex);
 		}
-		const sectionIndex = findTwoHopSectionIndexByRow(
-			plan.sectionTable,
-			logicalRowIndex,
-		);
+		const sectionIndex = plan.rowSectionIndex[logicalRowIndex];
 		const sectionPlan = plan.sections[sectionIndex];
 		if (!sectionPlan) {
 			clearRowSlot(record);
 			return;
 		}
 		const rowIndexInSection = logicalRowIndex - sectionPlan.firstRowIndex;
-		const sectionCellStart = rowIndexInSection * plan.columns;
-		const cellCount = Math.min(
-			plan.columns,
-			sectionPlan.cellCount - sectionCellStart,
-		);
-		const rowTop =
-			sectionPlan.top + rowIndexInSection * (plan.rowHeight + plan.rowGap);
+		const cellCount = plan.rowCellCount[logicalRowIndex];
+		const rowTop = plan.rowTop[logicalRowIndex];
 		record.row.rowIndex = logicalRowIndex;
 		record.row.rowKey = logicalRowIndex;
 		record.row.key = logicalRowIndex;
 		record.row.top = rowTop;
 		for (let columnIndex = 0; columnIndex < cellCount; columnIndex += 1) {
-			const logicalCell = sectionPlan.itemSource.readCell(
-				sectionCellStart + columnIndex,
-			);
+			const compiledCell =
+				plan.cells[plan.rowFirstCellIndex[logicalRowIndex] + columnIndex];
 			const cellSlot = record.cellSlots[columnIndex];
-			if (!logicalCell || !cellSlot) continue;
+			if (!compiledCell || !cellSlot) continue;
 			populateCell(
 				cellSlot,
-				logicalCell,
+				compiledCell,
 				sectionPlan,
 				logicalRowIndex,
 				rowIndexInSection,

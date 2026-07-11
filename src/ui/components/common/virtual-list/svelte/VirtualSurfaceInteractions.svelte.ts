@@ -11,6 +11,7 @@ import type { ResultNavigationDirection } from "features/keyboard-navigation/res
 import type { InteractionDescriptor } from "ui/interactions/interactionTypes";
 import type { MountedVirtualCell, VirtualNavigationTarget } from "../types";
 import type { ProgrammaticScrollSnapshot } from "../dom/flushVirtualScrollMeasurement";
+import type { VirtualCellRegistry } from "./VirtualCellRegistry";
 import { installVirtualListInteractions } from "./VirtualListInteractions.svelte";
 import {
 	createVirtualSurfaceNavigation,
@@ -46,6 +47,7 @@ export interface VirtualSurfaceInteractionParams<
 		context: VirtualSurfaceNavigationContext,
 	) => Promise<boolean>;
 	flushVirtualScrollMeasurement?: (snapshot: ProgrammaticScrollSnapshot) => void;
+	cellRegistry?: VirtualCellRegistry;
 }
 
 export function createVirtualSurfaceInteractions<
@@ -64,6 +66,7 @@ export function createVirtualSurfaceInteractions<
 	resolveNavigationTarget,
 	moveFocusWithinList,
 	flushVirtualScrollMeasurement,
+	cellRegistry,
 }: VirtualSurfaceInteractionParams<TMountedCell>) {
 	const interactionRegistry = createInteractionRegistry();
 	setInteractionRegistryContext(interactionRegistry);
@@ -101,6 +104,7 @@ export function createVirtualSurfaceInteractions<
 		moveFocusWithinList,
 		flushVirtualScrollMeasurement,
 		flushMountedState,
+		cellRegistry,
 	});
 
 	installVirtualListInteractions({

@@ -12,6 +12,7 @@ import type { ProgrammaticScrollSnapshot } from "../dom/flushVirtualScrollMeasur
 import {
 	findClosestRegisteredVirtualCell,
 	findRegisteredVirtualCellElementByKey,
+	type VirtualCellRegistry,
 } from "./VirtualCellRegistry";
 
 const LOGICAL_CELL_SELECTOR = "[data-ccl-logical-key]";
@@ -116,6 +117,7 @@ export const createVirtualSurfaceNavigation = (options: {
 		context: VirtualSurfaceNavigationContext,
 	) => Promise<boolean>;
 	flushVirtualScrollMeasurement?: (snapshot: ProgrammaticScrollSnapshot) => void;
+	cellRegistry?: VirtualCellRegistry;
 }): ((event: KeyboardEvent) => Promise<void>) => {
 	const getFocusableCellTarget = (
 		cellElement: HTMLElement | null,
@@ -136,6 +138,7 @@ export const createVirtualSurfaceNavigation = (options: {
 		target: VirtualNavigationTarget,
 	): Promise<boolean> => {
 		const getMountedCellElement = (key: string): HTMLElement | null =>
+			options.cellRegistry?.findByKey(key) ??
 			findMountedCellElementByKey(options.getContentEl(), key);
 		const mountedCellElement = getMountedCellElement(target.key);
 
@@ -170,7 +173,9 @@ export const createVirtualSurfaceNavigation = (options: {
 		currentTarget: HTMLElement,
 		direction: ResultNavigationDirection,
 	): Promise<boolean> => {
-		const registeredCell = findClosestRegisteredVirtualCell(currentTarget);
+		const registeredCell =
+			options.cellRegistry?.findClosest(currentTarget) ??
+			findClosestRegisteredVirtualCell(currentTarget);
 		const currentCellElement =
 			registeredCell?.element ??
 			currentTarget.closest<HTMLElement>(LOGICAL_CELL_SELECTOR);
@@ -222,10 +227,14 @@ export const createVirtualSurfaceNavigation = (options: {
 					rootEl: options.getRootEl(),
 					scrollContainerEl: options.getScrollContainerEl(),
 					getMountedElementByKey: (key) =>
+						options.cellRegistry?.findByKey(key) ??
 						findMountedCellElementByKey(options.getContentEl(), key),
 					hasMountedElement: (key) =>
-						findMountedCellElementByKey(options.getContentEl(), key) !==
-						null,
+						(options.cellRegistry?.findByKey(key) ??
+							findMountedCellElementByKey(
+								options.getContentEl(),
+								key,
+							)) !== null,
 					flushMountedState: options.flushMountedState,
 				})) ?? false
 			);

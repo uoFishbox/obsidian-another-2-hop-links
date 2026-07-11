@@ -20,6 +20,7 @@
 	import type { ItemInteractionDescriptor } from "ui/interactions/interactionTypes";
 	import { createTwoHopInteractionResolverProvider } from "./twoHopInteractionResolverCache";
 	import TwoHopFixedRowSlotsSurface from "./TwoHopFixedRowSlotsSurface.svelte";
+	import { createSurfaceVirtualCellRegistry } from "ui/components/common/virtual-list/svelte/VirtualCellRegistry";
 
 	interface Props {
 		sections: readonly SectionRenderDescriptor<
@@ -57,6 +58,7 @@
 	const EMPTY_MOUNTED_ROWS: readonly [] = [];
 
 	const props: Props = $props();
+	const cellRegistry = createSurfaceVirtualCellRegistry();
 	let contentEl = $state<HTMLDivElement | null>(null);
 	providePreviewActivationContexts();
 	const list = useTwoHopViewPlanVirtualList(props);
@@ -104,6 +106,7 @@
 	observerRoot={list.observerRoot}
 	resolveNavigationTarget={list.resolveNavigationTarget}
 	flushVirtualScrollMeasurement={list.flushVirtualScrollMeasurement}
+	{cellRegistry}
 >
 	<TwoHopFixedRowSlotsSurface
 		contentClassName="view-plan-virtual-list-content view-plan-flow-content"
@@ -118,29 +121,32 @@
 		observerRoot={list.observerRoot}
 		getCellClassName={getMountedCellClassName}
 		getCellDataTestId={list.getCellDataTestId}
+		{cellRegistry}
 	>
-	{#snippet renderCell({ mountedCell: renderedCell })}
-		{#if isHeaderCell(renderedCell)}
-			{@render props.renderHeader({
-				section: renderedCell.section,
-				title: renderedCell.title,
-				totalCount: renderedCell.totalCount,
-				sectionId: renderedCell.sectionId,
-				headerProps: renderedCell.headerProps,
-			})}
-		{:else if isItemCell(renderedCell)}
-			{@render props.renderItem(
-				renderedCell.cell.item,
-				renderedCell.rowIndex,
-				list.getItemVisibilityState(renderedCell),
-				list.getItemActivationCandidateId(renderedCell),
-			)}
-		{:else}
-			<VirtualListLoadMoreButton
-				testId={!IS_PROD ? `load-more-${renderedCell.sectionId}` : undefined}
-				onClick={() => list.loadMore(renderedCell.sectionId)}
-			/>
-		{/if}
-	{/snippet}
+		{#snippet renderCell({ mountedCell: renderedCell })}
+			{#if isHeaderCell(renderedCell)}
+				{@render props.renderHeader({
+					section: renderedCell.section,
+					title: renderedCell.title,
+					totalCount: renderedCell.totalCount,
+					sectionId: renderedCell.sectionId,
+					headerProps: renderedCell.headerProps,
+				})}
+			{:else if isItemCell(renderedCell)}
+				{@render props.renderItem(
+					renderedCell.cell.item,
+					renderedCell.rowIndex,
+					list.getItemVisibilityState(renderedCell),
+					list.getItemActivationCandidateId(renderedCell),
+				)}
+			{:else}
+				<VirtualListLoadMoreButton
+					testId={!IS_PROD
+						? `load-more-${renderedCell.sectionId}`
+						: undefined}
+					onClick={() => list.loadMore(renderedCell.sectionId)}
+				/>
+			{/if}
+		{/snippet}
 	</TwoHopFixedRowSlotsSurface>
 </VirtualInteractiveSurface>

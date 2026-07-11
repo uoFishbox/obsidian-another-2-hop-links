@@ -1,5 +1,6 @@
 export type {
 	CompileTwoHopViewPlanParams,
+	CompiledTwoHopCell,
 	FindTwoHopRowsByOffsetParams,
 	ResolveTwoHopRowTopsForBandParams,
 	StablePreviewScrollTopBandMutable,

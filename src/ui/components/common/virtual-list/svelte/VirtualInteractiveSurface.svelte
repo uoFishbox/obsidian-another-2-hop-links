@@ -17,6 +17,7 @@
 		| "resolveNavigationTarget"
 		| "moveFocusWithinList"
 		| "flushVirtualScrollMeasurement"
+		| "cellRegistry"
 	> & {
 		className?: string;
 		rootEl?: HTMLDivElement | null;
@@ -49,6 +50,7 @@
 		resolveNavigationTarget,
 		moveFocusWithinList,
 		flushVirtualScrollMeasurement,
+		cellRegistry,
 		children,
 	}: Props<TMountedCell> = $props();
 
@@ -69,6 +71,7 @@
 		resolveNavigationTarget,
 		moveFocusWithinList,
 		flushVirtualScrollMeasurement,
+		cellRegistry,
 	});
 
 	watchVirtualSurfaceMountedCellsChange<TMountedCell>({

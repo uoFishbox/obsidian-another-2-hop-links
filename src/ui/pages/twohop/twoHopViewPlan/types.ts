@@ -9,6 +9,10 @@ import type {
 	VirtualRowModel,
 } from "ui/components/common/virtual-list/types";
 import type { RowRange } from "ui/components/common/virtual-list/rowRange";
+import type {
+	RenderBodyKey,
+	RenderRevision,
+} from "ui/components/common/virtual-list/renderRevision";
 import type { SectionLayout } from "ui/components/common/virtual-list/layout/viewPlanRowTypes";
 import type {
 	TwoHopVirtualListSection,
@@ -44,6 +48,18 @@ export interface PreparedTwoHopSection {
 	readItem(index: number): TwoHopVirtualListItem | undefined;
 	/** O(1) prepared logical-cell lookup used by the scalar scroll kernel. */
 	readCell(index: number): VirtualListLogicalCell<TwoHopVirtualListItem> | undefined;
+}
+
+/** Immutable cell identity compiled before the scroll hot path begins. */
+export interface CompiledTwoHopCell {
+	readonly logicalCell: VirtualListLogicalCell<TwoHopVirtualListItem>;
+	readonly logicalKey: VirtualListLogicalCell<TwoHopVirtualListItem>["key"];
+	readonly renderBodyKey: RenderBodyKey;
+	readonly renderBodyKind: "item" | "header" | "load-more";
+	readonly renderBodySectionId: string;
+	readonly renderBodySourceKey: string | undefined;
+	readonly renderBodyCellKey: string | undefined;
+	readonly renderBodyRevision: RenderRevision | undefined;
 }
 
 export interface TwoHopRowPlan {
@@ -84,6 +100,7 @@ export interface TwoHopSectionTable {
 
 export interface TwoHopViewPlan {
 	readonly sections: readonly TwoHopSectionPlan[];
+	readonly cells: readonly CompiledTwoHopCell[];
 	/**
 	 * Compiled per-row metadata, indexed by the global row index.
 	 *
@@ -91,6 +108,11 @@ export interface TwoHopViewPlan {
 	 */
 	readonly rows: readonly TwoHopRowPlan[];
 	readonly sectionTable: TwoHopSectionTable;
+	/** Direct, allocation-free row lookup tables used by the scroll hot path. */
+	readonly rowSectionIndex: Uint32Array;
+	readonly rowFirstCellIndex: Uint32Array;
+	readonly rowCellCount: Uint8Array;
+	readonly rowTop: Float64Array;
 	readonly rowCount: number;
 	readonly cellCount: number;
 	readonly columns: number;

@@ -93,12 +93,14 @@ describe("TwoHop scalar scroll kernel", () => {
 		const recycledRowShell = mountedRows[0];
 		const recycledCellShells = [...recycledRowShell.cells];
 		const controllers = kernel.fixedRowSlotPool.controllers;
+		const recycledControllerCells = controllers[0]?.cells;
 
 		resetCCLDevMeasurements();
 		applyRange(kernel, 1);
 
 		expect(kernel.mountedRows).toBe(mountedRows);
 		expect(kernel.fixedRowSlotPool.controllers).toBe(controllers);
+		expect(controllers[0]?.cells).toBe(recycledControllerCells);
 		expect(mountedRows[0]).toBe(recycledRowShell);
 		expect(mountedRows[0]?.rowIndex).toBe(3);
 		expect(mountedRows[0]?.cells[0]).toBe(recycledCellShells[0]);

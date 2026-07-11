@@ -1,9 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import type { SectionRenderDescriptor } from "ui/components/sections/types";
-import {
-	compileTwoHopViewPlan,
-	createTwoHopViewPlanRowModel,
-} from "../twoHopViewPlan";
+import { compileTwoHopViewPlan, createTwoHopViewPlanRowModel } from "../twoHopViewPlan";
 import { createTwoHopScalarScrollKernel } from "../twoHopScalarScrollKernel.svelte";
 import type {
 	TwoHopVirtualListItem,
@@ -80,7 +77,7 @@ const compilePlan = (
 	});
 
 describe("TwoHop view-plan performance contracts", () => {
-	it("stores geometry proportional to sections rather than logical rows", () => {
+	it("compiles direct typed row geometry without heap row objects", () => {
 		const sections = Array.from({ length: 32 }, (_, index) =>
 			createDescriptor(1_000, `section-${index}`),
 		);
@@ -88,10 +85,15 @@ describe("TwoHop view-plan performance contracts", () => {
 
 		expect("rowTable" in plan).toBe(false);
 		expect("cellStore" in plan).toBe(false);
+		expect(plan.cells).toHaveLength(plan.cellCount);
 		expect(plan.rowCount).toBeGreaterThan(plan.sections.length * 300);
 		expect(plan.sectionTable.topBySection).toHaveLength(sections.length);
 		expect(plan.sectionTable.firstRowIndexBySection).toHaveLength(sections.length);
 		expect(plan.sectionTable.rowCountBySection).toHaveLength(sections.length);
+		expect(plan.rowSectionIndex).toHaveLength(plan.rowCount);
+		expect(plan.rowFirstCellIndex).toHaveLength(plan.rowCount);
+		expect(plan.rowCellCount).toHaveLength(plan.rowCount);
+		expect(plan.rowTop).toHaveLength(plan.rowCount);
 	});
 
 	it("prepares section items once and reads cells without descriptor access during scroll", () => {

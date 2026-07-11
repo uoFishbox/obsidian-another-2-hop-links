@@ -4,6 +4,7 @@
 	import VirtualGridLogicalCellMount from "ui/components/common/virtual-list/svelte/VirtualGridLogicalCellMount.svelte";
 	import type { TwoHopMountedCell } from "./twoHopMountedTypes";
 	import type { TwoHopFixedRowSlotController } from "./twoHopFixedRowSlotPool.svelte";
+	import type { VirtualCellRegistry } from "ui/components/common/virtual-list/svelte/VirtualCellRegistry";
 
 	interface Props {
 		contentClassName?: string;
@@ -19,6 +20,7 @@
 		getCellClassName?: (cell: TwoHopMountedCell) => string | undefined;
 		getCellDataTestId?: (cell: TwoHopMountedCell) => string | undefined;
 		renderCell: Snippet<[{ mountedCell: TwoHopMountedCell }]>;
+		cellRegistry: VirtualCellRegistry;
 	}
 
 	let {
@@ -34,6 +36,7 @@
 		getCellClassName,
 		getCellDataTestId,
 		renderCell,
+		cellRegistry,
 	}: Props = $props();
 
 	const contentStyle = $derived(
@@ -52,20 +55,23 @@
 				style={`position:absolute; left:0; right:0; top:0; transform:translateY(${Math.max(0, controller.top)}px); margin-bottom:0`}
 			>
 				{#each controller.cells as cellController (cellController.cellSlotKey)}
-					{@const mountedCell = cellController.mountedCell}
-					<VirtualGridLogicalCellMount
-						logicalKey={cellController.logicalKey}
-						className={getCellClassName?.(mountedCell) ?? ""}
-						dataTestId={getCellDataTestId?.(mountedCell)}
-						cellSlotKey={cellController.cellSlotKey}
-						rowIndex={cellController.rowIndex}
-						columnIndex={cellController.columnIndex}
-						{mountedCell}
-					>
-						{#key cellController.renderBodyKey ?? cellController.logicalKey}
-							{@render renderCell({ mountedCell })}
-						{/key}
-					</VirtualGridLogicalCellMount>
+					{#if cellController.active}
+						{@const mountedCell = cellController.mountedCell}
+						<VirtualGridLogicalCellMount
+							logicalKey={cellController.logicalKey}
+							className={getCellClassName?.(mountedCell) ?? ""}
+							dataTestId={getCellDataTestId?.(mountedCell)}
+							cellSlotKey={cellController.cellSlotKey}
+							rowIndex={cellController.rowIndex}
+							columnIndex={cellController.columnIndex}
+							{mountedCell}
+							{cellRegistry}
+						>
+							{#key cellController.renderBodyKey ?? cellController.logicalKey}
+								{@render renderCell({ mountedCell })}
+							{/key}
+						</VirtualGridLogicalCellMount>
+					{/if}
 				{/each}
 			</div>
 		{/if}

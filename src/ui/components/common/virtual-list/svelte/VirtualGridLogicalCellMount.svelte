@@ -4,6 +4,7 @@
 	import type { LogicalCellKey } from "../types";
 	import {
 		createVirtualCellElementRegistration,
+		type VirtualCellRegistry,
 		type VirtualCellElementRegistration,
 	} from "./VirtualCellRegistry";
 
@@ -18,6 +19,7 @@
 		onLogicalCellAttach?: (cell: TMountedCell) => void;
 		onLogicalCellDetach?: (cell: TMountedCell) => void;
 		children?: Snippet;
+		cellRegistry?: VirtualCellRegistry;
 	}
 
 	let {
@@ -31,6 +33,7 @@
 		onLogicalCellAttach,
 		onLogicalCellDetach,
 		children,
+		cellRegistry,
 	}: Props = $props();
 
 	let lifecycleCell: TMountedCell | undefined = undefined;
@@ -74,7 +77,9 @@
 			return;
 		}
 
-		const registration = createVirtualCellElementRegistration(cellElement);
+		const registration = cellRegistry
+			? cellRegistry.createRegistration(cellElement)
+			: createVirtualCellElementRegistration(cellElement);
 		cellRegistration = registration;
 
 		return () => {

@@ -14,6 +14,11 @@ import type {
 } from "./types";
 import { createTwoHopRowPlanFacade } from "./twoHopRowTable";
 import { logicalCellKey, sourceKey } from "ui/components/common/virtual-list/types";
+import {
+	getViewPlanRenderBodyIdentityFields,
+	resolveStableViewPlanRenderBodyKey,
+} from "ui/components/common/virtual-list/core/reconciliation/renderBodyRevision";
+import type { CompiledTwoHopCell } from "./types";
 /**
  * Compiles TwoHop data into section prefix metadata consumed while scrolling.
  */
@@ -65,6 +70,11 @@ export function compileTwoHopViewPlan(
 		totalCellCount += cellCount;
 		totalRowCount += rowCount;
 	}
+	const rowSectionIndex = new Uint32Array(totalRowCount);
+	const rowFirstCellIndex = new Uint32Array(totalRowCount);
+	const rowCellCount = new Uint8Array(totalRowCount);
+	const rowTop = new Float64Array(totalRowCount);
+	const cells: CompiledTwoHopCell[] = [];
 
 	let top = 0;
 	let nextCellIndex = 0;
@@ -101,6 +111,27 @@ export function compileTwoHopViewPlan(
 				key: logicalCellKey(`${sectionIdPrefix}__load-more`),
 			};
 		}
+		for (const logicalCell of preparedCells) {
+			if (!logicalCell) continue;
+			const identity = getViewPlanRenderBodyIdentityFields(
+				logicalCell,
+				descriptor,
+			);
+			cells.push({
+				logicalCell,
+				logicalKey: logicalCell.key,
+				renderBodyKey: resolveStableViewPlanRenderBodyKey({
+					previous: undefined,
+					cell: logicalCell,
+					descriptor,
+				}),
+				renderBodyKind: identity.renderBodyKind,
+				renderBodySectionId: identity.renderBodySectionId,
+				renderBodySourceKey: identity.renderBodySourceKey,
+				renderBodyCellKey: identity.renderBodyCellKey,
+				renderBodyRevision: identity.renderBodyRevision,
+			});
+		}
 		const itemSource: PreparedTwoHopSection = {
 			id: descriptor.sectionId,
 			itemCount: preparedItems.length,
@@ -119,6 +150,21 @@ export function compileTwoHopViewPlan(
 		heightBySection[sectionIndex] = height;
 		firstRowIndexBySection[sectionIndex] = firstRowIndex;
 		firstCellIndexBySection[sectionIndex] = firstCellIndex;
+		for (
+			let rowIndexInSection = 0;
+			rowIndexInSection < rowCount;
+			rowIndexInSection += 1
+		) {
+			const rowIndex = firstRowIndex + rowIndexInSection;
+			const sectionCellStartIndex = rowIndexInSection * columns;
+			rowSectionIndex[rowIndex] = sectionIndex;
+			rowFirstCellIndex[rowIndex] = firstCellIndex + sectionCellStartIndex;
+			rowCellCount[rowIndex] = Math.min(
+				columns,
+				cellCount - sectionCellStartIndex,
+			);
+			rowTop[rowIndex] = top + rowIndexInSection * (rowHeight + gap);
+		}
 
 		const mountedLayout: SectionLayout<
 			TwoHopVirtualListItem,
@@ -171,11 +217,20 @@ export function compileTwoHopViewPlan(
 		columns,
 		rowHeight,
 		rowGap: gap,
+		rowSectionIndex,
+		rowFirstCellIndex,
+		rowCellCount,
+		rowTop,
 	};
 	const plan: TwoHopViewPlan = {
 		sections,
+		cells,
 		rows: createTwoHopRowPlanFacade(geometry),
 		sectionTable,
+		rowSectionIndex,
+		rowFirstCellIndex,
+		rowCellCount,
+		rowTop,
 		rowCount: totalRowCount,
 		cellCount: totalCellCount,
 		columns,

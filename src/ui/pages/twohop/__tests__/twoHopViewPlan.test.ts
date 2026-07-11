@@ -115,14 +115,23 @@ describe("compileTwoHopViewPlan", () => {
 		expect(getItems).toHaveBeenCalledTimes(1);
 		expect(plan).not.toHaveProperty("cellStore");
 		expect(
-			Array.from({ length: plan.sections[0].cellCount }, (_, index) =>
-				plan.sections[0].itemSource.readCell(index)?.kind,
+			Array.from(
+				{ length: plan.sections[0].cellCount },
+				(_, index) => plan.sections[0].itemSource.readCell(index)?.kind,
 			),
 		).toEqual(["header", "item", "item", "item"]);
 		expect(plan.sections[0].itemSource.readCell(1)).toMatchObject({
 			key: "new-links::item:0",
 			sourceKey: "new-links::a",
 		});
+		expect(plan.cells[1]).toMatchObject({
+			logicalKey: "new-links::item:0",
+			renderBodyKind: "item",
+			renderBodySectionId: "new-links",
+			renderBodySourceKey: "new-links::a",
+			renderBodyRevision: null,
+		});
+		expect(plan.cells[1]?.renderBodyKey).toContain("new-links::a");
 		expect(plan.rows[0]).toMatchObject({
 			sectionIndex: 0,
 			rowIndexInSection: 0,
@@ -135,6 +144,10 @@ describe("compileTwoHopViewPlan", () => {
 			rowIndexInSection: 1,
 			top: 110,
 		});
+		expect(Array.from(plan.rowSectionIndex)).toEqual([0, 0]);
+		expect(Array.from(plan.rowFirstCellIndex)).toEqual([0, 2]);
+		expect(Array.from(plan.rowCellCount)).toEqual([2, 2]);
+		expect(Array.from(plan.rowTop)).toEqual([0, 110]);
 	});
 
 	it("resolves rows, navigation, and visible ranges from the prepared snapshot", () => {
@@ -172,19 +185,14 @@ describe("compileTwoHopViewPlan", () => {
 
 	it("includes a prepared load-more cell when visible items are truncated", () => {
 		const plan = compilePlan(
-			[
-				createDescriptor([
-					createItem("a"),
-					createItem("b"),
-					createItem("c"),
-				]),
-			],
+			[createDescriptor([createItem("a"), createItem("b"), createItem("c")])],
 			{ "new-links": 1 },
 		);
 
 		expect(
-			Array.from({ length: plan.sections[0].cellCount }, (_, index) =>
-				plan.sections[0].itemSource.readCell(index)?.kind,
+			Array.from(
+				{ length: plan.sections[0].cellCount },
+				(_, index) => plan.sections[0].itemSource.readCell(index)?.kind,
 			),
 		).toEqual(["header", "item", "load-more"]);
 		expect(plan.sections[0].showLoadMore).toBe(true);

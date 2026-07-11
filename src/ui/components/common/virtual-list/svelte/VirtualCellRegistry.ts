@@ -16,6 +16,14 @@ export interface VirtualCellElementRegistration {
 	unregister(): void;
 }
 
+export interface VirtualCellRegistry {
+	createRegistration(element: HTMLElement): VirtualCellElementRegistration;
+	findByKey(key: string | null | undefined): HTMLElement | null;
+	findClosest(
+		target: HTMLElement | null,
+	): { element: HTMLElement; metadata: VirtualCellMetadata } | null;
+}
+
 interface MutableVirtualCellMetadata {
 	logicalKey: string;
 	rowIndex?: number;
@@ -168,4 +176,53 @@ export function findClosestRegisteredVirtualCell(
 	}
 
 	return null;
+}
+
+/** Creates an index owned by one virtual surface, where logical keys are unique. */
+export function createSurfaceVirtualCellRegistry(): VirtualCellRegistry {
+	const localMetadataByElement = new WeakMap<
+		HTMLElement,
+		MutableVirtualCellMetadata
+	>();
+	const elementByLogicalKey = new Map<string, HTMLElement>();
+
+	return {
+		createRegistration(element): VirtualCellElementRegistration {
+			const metadata: MutableVirtualCellMetadata = { logicalKey: "" };
+			let registered = false;
+			return {
+				update(logicalKey, rowIndex, columnIndex): void {
+					if (registered && metadata.logicalKey !== logicalKey) {
+						if (elementByLogicalKey.get(metadata.logicalKey) === element) {
+							elementByLogicalKey.delete(metadata.logicalKey);
+						}
+					}
+					metadata.logicalKey = logicalKey;
+					metadata.rowIndex = rowIndex;
+					metadata.columnIndex = columnIndex;
+					localMetadataByElement.set(element, metadata);
+					elementByLogicalKey.set(logicalKey, element);
+					registered = true;
+				},
+				unregister(): void {
+					if (!registered) return;
+					if (elementByLogicalKey.get(metadata.logicalKey) === element) {
+						elementByLogicalKey.delete(metadata.logicalKey);
+					}
+					localMetadataByElement.delete(element);
+					registered = false;
+				},
+			};
+		},
+		findByKey(key): HTMLElement | null {
+			return key ? (elementByLogicalKey.get(key) ?? null) : null;
+		},
+		findClosest(target) {
+			for (let element = target; element; element = element.parentElement) {
+				const metadata = localMetadataByElement.get(element);
+				if (metadata) return { element, metadata };
+			}
+			return null;
+		},
+	};
 }

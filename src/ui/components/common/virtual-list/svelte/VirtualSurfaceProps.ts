@@ -8,6 +8,7 @@ import type {
 import type { MountedVirtualCell, VirtualNavigationTarget } from "../types";
 import type { ProgrammaticScrollSnapshot } from "../dom/flushVirtualScrollMeasurement";
 import type { VirtualSurfaceNavigationContext } from "./VirtualSurfaceNavigation";
+import type { VirtualCellRegistry } from "./VirtualCellRegistry";
 import type {
 	VirtualSurfaceCellPosition,
 	VirtualSurfaceRenderInput,
@@ -62,6 +63,7 @@ export interface VirtualSurfaceCommonProps<TMountedCell extends MountedVirtualCe
 		context: VirtualSurfaceNavigationContext,
 	) => Promise<boolean>;
 	flushVirtualScrollMeasurement?: (snapshot: ProgrammaticScrollSnapshot) => void;
+	cellRegistry?: VirtualCellRegistry;
 }
 
 export type VirtualSurfaceProps<TMountedCell extends MountedVirtualCell> =

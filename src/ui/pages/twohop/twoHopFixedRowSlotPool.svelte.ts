@@ -5,12 +5,14 @@ import { recordCCLDevMeasurement } from "infrastructure/debug/CCLDevMeasurements
 
 export interface TwoHopFixedCellSlotController {
 	readonly cellSlotKey: number;
+	readonly active: boolean;
 	readonly logicalKey: LogicalCellKey;
 	readonly rowIndex: number;
 	readonly columnIndex: number;
 	readonly renderBodyKey: RenderBodyKey | undefined;
 	readonly mountedCell: TwoHopMountedCell;
 	bindCell(cell: TwoHopMountedCell): void;
+	clear(): void;
 }
 
 export interface TwoHopFixedRowSlotController {
@@ -40,10 +42,14 @@ function createCellController(
 	let columnIndex = $state(initialCell.columnIndex);
 	let renderBodyKey = $state(initialCell.renderBodyKey);
 	let mountedCell = $state.raw(initialCell);
+	let active = $state(true);
 	let revision = $state(0);
 
 	return {
 		cellSlotKey,
+		get active() {
+			return active;
+		},
 		get logicalKey() {
 			return logicalKey;
 		},
@@ -67,6 +73,10 @@ function createCellController(
 			renderBodyKey = nextCell.renderBodyKey;
 			mountedCell = nextCell;
 			revision += 1;
+			active = true;
+		},
+		clear(): void {
+			active = false;
 		},
 	};
 }
@@ -75,7 +85,7 @@ function createController(slotIndex: number): TwoHopFixedRowSlotController {
 	let active = $state(false);
 	let rowIndex = $state(-1);
 	let top = $state(0);
-	let cells = $state.raw<readonly TwoHopFixedCellSlotController[]>([]);
+	const cells: TwoHopFixedCellSlotController[] = [];
 	let revision = $state(0);
 	return {
 		slotIndex,
@@ -99,19 +109,21 @@ function createController(slotIndex: number): TwoHopFixedRowSlotController {
 					recordCCLDevMeasurement("twoHop.reboundCellSlot");
 				}
 			}
-			const nextCells = cells.slice(0, nextRow.cells.length);
 			for (let index = 0; index < nextRow.cells.length; index += 1) {
 				const nextCell = nextRow.cells[index];
 				if (!nextCell) continue;
 				const cellSlotKey = nextCell.cellSlotKey ?? nextCell.renderSlotIndex;
-				const controller = nextCells[index];
+				const controller = cells[index];
 				if (controller?.cellSlotKey === cellSlotKey) {
 					controller.bindCell(nextCell);
 					continue;
 				}
-				nextCells[index] = createCellController(cellSlotKey, nextCell);
+				cells[index]?.clear();
+				cells[index] = createCellController(cellSlotKey, nextCell);
 			}
-			cells = nextCells;
+			for (let index = nextRow.cells.length; index < cells.length; index += 1) {
+				cells[index]?.clear();
+			}
 			rowIndex = nextRow.rowIndex;
 			top = nextRow.top;
 			active = true;
@@ -120,6 +132,7 @@ function createController(slotIndex: number): TwoHopFixedRowSlotController {
 		clear(): void {
 			if (!active) return;
 			active = false;
+			for (const cell of cells) cell.clear();
 			revision += 1;
 		},
 	};

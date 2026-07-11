@@ -1,8 +1,4 @@
-import type {
-	TwoHopRowPlan,
-	TwoHopSectionTable,
-	TwoHopViewPlan,
-} from "./types";
+import type { TwoHopRowPlan, TwoHopSectionTable, TwoHopViewPlan } from "./types";
 
 interface TwoHopRowGeometrySource {
 	readonly sectionTable: TwoHopSectionTable;
@@ -10,6 +6,10 @@ interface TwoHopRowGeometrySource {
 	readonly columns: number;
 	readonly rowHeight: number;
 	readonly rowGap: number;
+	readonly rowSectionIndex?: Uint32Array;
+	readonly rowFirstCellIndex?: Uint32Array;
+	readonly rowCellCount?: Uint8Array;
+	readonly rowTop?: Float64Array;
 }
 
 export function findTwoHopSectionIndexByRow(
@@ -36,8 +36,29 @@ export function findTwoHopSectionIndexByRow(
 	return sectionIndex;
 }
 
-function readRow(source: TwoHopRowGeometrySource, rowIndex: number): TwoHopRowPlan | null {
+function readRow(
+	source: TwoHopRowGeometrySource,
+	rowIndex: number,
+): TwoHopRowPlan | null {
 	if (rowIndex < 0 || rowIndex >= source.rowCount) return null;
+	if (
+		source.rowSectionIndex &&
+		source.rowFirstCellIndex &&
+		source.rowCellCount &&
+		source.rowTop
+	) {
+		const sectionIndex = source.rowSectionIndex[rowIndex];
+		return {
+			sectionIndex,
+			rowIndexInSection:
+				rowIndex - source.sectionTable.firstRowIndexBySection[sectionIndex],
+			sectionCellStartIndex:
+				source.rowFirstCellIndex[rowIndex] -
+				source.sectionTable.firstCellIndexBySection[sectionIndex],
+			cellCount: source.rowCellCount[rowIndex],
+			top: source.rowTop[rowIndex],
+		};
+	}
 	const sectionIndex = findTwoHopSectionIndexByRow(source.sectionTable, rowIndex);
 	if (sectionIndex < 0) return null;
 	const rowIndexInSection =
