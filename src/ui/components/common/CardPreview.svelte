@@ -222,8 +222,7 @@
 
 		return enqueuePreviewDomCommit({
 			key: buildDomCommitKey(renderCacheKey),
-			isStale: () =>
-				isRenderStale(signal, renderToken) || !targetContainer.isConnected,
+			isStale: () => isRenderStale(signal, renderToken),
 			commit: () => {
 				if (shouldSkipDomApply(renderCacheKey)) return;
 				targetContainer.replaceChildren();
@@ -252,7 +251,7 @@
 
 		return enqueuePreviewDomCommit({
 			key: buildDomCommitKey(cacheKey),
-			isStale: () => isRenderStale(signal, renderToken) || !container.isConnected,
+			isStale: () => isRenderStale(signal, renderToken),
 			commit: () => {
 				if (shouldSkipDomApply(cacheKey)) return;
 				previewContentType = "text";
@@ -356,9 +355,7 @@
 						if (!targetContainer) return false;
 						return enqueuePreviewDomCommit({
 							key: buildDomCommitKey(renderCacheKey),
-							isStale: () =>
-								isRenderStale(signal, renderToken) ||
-								!targetContainer.isConnected,
+							isStale: () => isRenderStale(signal, renderToken),
 							commit: () => {
 								if (shouldSkipDomApply(renderCacheKey)) return;
 								previewContentType = previewForRender.type;
@@ -414,9 +411,7 @@
 
 					return enqueuePreviewDomCommit({
 						key: buildDomCommitKey(renderCacheKey),
-						isStale: () =>
-							isRenderStale(signal, renderToken) ||
-							!targetContainer.isConnected,
+						isStale: () => isRenderStale(signal, renderToken),
 						commit: () => {
 							if (shouldSkipDomApply(renderCacheKey)) return;
 							previewContentType = "image";
@@ -489,9 +484,7 @@
 
 							const didCommit = await enqueuePreviewDomCommit({
 								key: buildDomCommitKey(renderCacheKey),
-								isStale: () =>
-									isRenderStale(signal, renderToken) ||
-									!targetContainer.isConnected,
+								isStale: () => isRenderStale(signal, renderToken),
 								commit: () => {
 									if (shouldSkipDomApply(renderCacheKey)) return;
 									previewContentType = previewForRender.type;
@@ -558,8 +551,7 @@
 			}
 			await enqueuePreviewDomCommit({
 				key: buildDomCommitKey(renderCacheKey),
-				isStale: () =>
-					isRenderStale(signal, renderToken) || !targetContainer.isConnected,
+				isStale: () => isRenderStale(signal, renderToken),
 				commit: () => {
 					previewContentType = undefined;
 					handlePreviewError(targetContainer, error);

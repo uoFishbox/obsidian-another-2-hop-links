@@ -27,6 +27,9 @@ import {
 } from "../previewActivationScheduler";
 
 const scrollSource = {};
+const DEFAULT_FRAME_INTERVAL_MS = 1000 / 60;
+let frameIntervalMs = DEFAULT_FRAME_INTERVAL_MS;
+let frameTimestamp = 0;
 let visibleQueueSize = 0;
 let activeVisiblePreviewCount = 0;
 let activationScope: PreviewActivationScope;
@@ -54,12 +57,35 @@ function requestQueuedActivationResult(
 }
 
 async function flushAnimationFrame(): Promise<void> {
-	await vi.advanceTimersByTimeAsync(16);
+	await vi.advanceTimersByTimeAsync(frameIntervalMs);
 	await Promise.resolve();
+}
+
+async function countScrollingActivations(params: {
+	readonly intervalMs: number;
+	readonly durationMs: number;
+}): Promise<number> {
+	resetPreviewActivationSchedulerForTests();
+	resetScrollActivityForTests();
+	frameIntervalMs = params.intervalMs;
+	const scope = createPreviewActivationScope();
+	let activated = 0;
+
+	markScrollActivityActive(scrollSource);
+	for (let index = 0; index < 200; index += 1) {
+		requestQueuedPreviewActivation(`preview-${index}`, scope, (value) => {
+			if (value) activated += 1;
+		});
+	}
+
+	await vi.advanceTimersByTimeAsync(params.durationMs);
+	return activated;
 }
 
 beforeEach(() => {
 	state.disableCardDomPreview = false;
+	frameIntervalMs = DEFAULT_FRAME_INTERVAL_MS;
+	frameTimestamp = 0;
 	visibleQueueSize = 0;
 	activeVisiblePreviewCount = 0;
 	activationScope = createPreviewActivationScope({
@@ -72,7 +98,10 @@ beforeEach(() => {
 	vi.stubGlobal(
 		"requestAnimationFrame",
 		vi.fn((callback: FrameRequestCallback) =>
-			setTimeout(() => callback(Date.now()), 16),
+			setTimeout(() => {
+				frameTimestamp += frameIntervalMs;
+				callback(frameTimestamp);
+			}, frameIntervalMs),
 		),
 	);
 	vi.stubGlobal("cancelAnimationFrame", (handle: number) => {
@@ -89,7 +118,7 @@ afterEach(() => {
 });
 
 describe("preview activation scheduler", () => {
-	it("skips scheduled activation while card DOM previews are disabled", async () => {
+	it("skips scheduled activation while card DOM previews are disabled", () => {
 		state.disableCardDomPreview = true;
 		const getDisabledVisibleQueueSize = vi.fn(() => 1);
 		const disabledScope = createPreviewActivationScope({
@@ -114,22 +143,29 @@ describe("preview activation scheduler", () => {
 		expect(activation.key).toBe("preview-disabled");
 	});
 
-	it("queues the first idle request during the warmup window", async () => {
+	it("queues the first idle request during the time-based warmup window", async () => {
 		const results: boolean[] = [];
 
 		requestPreviewActivation("preview-warmup", activationScope, (activated) =>
 			results.push(activated),
 		);
 
-		// The warmup window forces the initial batch through the queued drain
-		// path so the first materialization batch does not render every
-		// visible preview synchronously.
+		expect(results).toEqual([]);
 		await flushAnimationFrame();
 		expect(results).toEqual([true]);
 	});
 
+	it("ends warmup based on elapsed time rather than animation-frame count", async () => {
+		const scope = createPreviewActivationScope();
+
+		expect(canActivatePreviewImmediately(scope)).toBe(false);
+		await vi.advanceTimersByTimeAsync(31);
+		expect(canActivatePreviewImmediately(scope)).toBe(false);
+		await vi.advanceTimersByTimeAsync(1);
+		expect(canActivatePreviewImmediately(scope)).toBe(true);
+	});
+
 	it("activates immediately while scrolling is idle after warmup", async () => {
-		// Drain the warmup window first.
 		const warmup = requestActivationResult("preview-warmup-drain");
 		await flushAnimationFrame();
 		await flushAnimationFrame();
@@ -142,51 +178,67 @@ describe("preview activation scheduler", () => {
 		expect(activated).toEqual([true]);
 	});
 
-	it("limits scrolling activations to two previews per animation frame", async () => {
-		markScrollActivityActive(scrollSource);
+	it("does not activate immediately while a preview job is active", async () => {
+		await vi.advanceTimersByTimeAsync(32);
+		activeVisiblePreviewCount = 1;
 
-		const results: boolean[] = [];
-
-		requestPreviewActivation("preview-a", activationScope, (activated) =>
-			results.push(activated),
-		);
-		requestPreviewActivation("preview-b", activationScope, (activated) =>
-			results.push(activated),
-		);
-		requestPreviewActivation("preview-c", activationScope, (activated) =>
-			results.push(activated),
-		);
-
-		await flushAnimationFrame();
-		expect(results).toEqual([true, true]);
-
-		await flushAnimationFrame();
-		expect(results).toEqual([true, true, true]);
+		expect(canActivatePreviewImmediately(activationScope)).toBe(false);
 	});
 
-	it("limits backpressured idle activations to one preview per animation frame", async () => {
-		visibleQueueSize = 1;
+	it("rate-limits scrolling activation independently of refresh rate", async () => {
+		const activationsAt60Hz = await countScrollingActivations({
+			intervalMs: 1000 / 60,
+			durationMs: 1000,
+		});
+		const activationsAt120Hz = await countScrollingActivations({
+			intervalMs: 1000 / 120,
+			durationMs: 1000,
+		});
 
+		expect(Math.abs(activationsAt60Hz - activationsAt120Hz)).toBeLessThanOrEqual(1);
+		expect(activationsAt60Hz).toBeGreaterThanOrEqual(59);
+		expect(activationsAt60Hz).toBeLessThanOrEqual(63);
+		expect(activationsAt120Hz).toBeGreaterThanOrEqual(59);
+		expect(activationsAt120Hz).toBeLessThanOrEqual(63);
+	});
+
+	it("does not spend a new scrolling token on every 120 Hz frame", async () => {
+		frameIntervalMs = 1000 / 120;
+		markScrollActivityActive(scrollSource);
 		const results: boolean[] = [];
 
-		requestPreviewActivation("preview-a", activationScope, (activated) =>
-			results.push(activated),
-		);
-		requestPreviewActivation("preview-b", activationScope, (activated) =>
-			results.push(activated),
-		);
-		requestPreviewActivation("preview-c", activationScope, (activated) =>
-			results.push(activated),
-		);
+		for (const key of ["preview-a", "preview-b", "preview-c"]) {
+			requestQueuedPreviewActivation(key, activationScope, (activated) =>
+				results.push(activated),
+			);
+		}
 
 		await flushAnimationFrame();
 		expect(results).toEqual([true]);
+		await flushAnimationFrame();
+		expect(results).toEqual([true]);
+		await flushAnimationFrame();
+		expect(results).toEqual([true, true]);
+	});
 
+	it("limits backpressured activations to a lower time-based rate", async () => {
+		visibleQueueSize = 1;
+		const results: boolean[] = [];
+
+		for (const key of ["preview-a", "preview-b", "preview-c"]) {
+			requestQueuedPreviewActivation(key, activationScope, (activated) =>
+				results.push(activated),
+			);
+		}
+
+		await flushAnimationFrame();
+		expect(results).toEqual([true]);
+		await flushAnimationFrame();
+		expect(results).toEqual([true]);
 		await flushAnimationFrame();
 		expect(results).toEqual([true, true]);
 
 		visibleQueueSize = 0;
-
 		await flushAnimationFrame();
 		expect(results).toEqual([true, true, true]);
 	});
@@ -194,7 +246,6 @@ describe("preview activation scheduler", () => {
 	it("keeps activating slowly while PreviewService has visible backlog", async () => {
 		visibleQueueSize = 1;
 		const results: boolean[] = [];
-
 		const activation = requestActivationResult("preview-a");
 		activation.result.then((activated) => results.push(activated));
 
@@ -203,21 +254,55 @@ describe("preview activation scheduler", () => {
 		expect(results).toEqual([true]);
 	});
 
+	it("uses one global animation-frame callback for multiple scopes", () => {
+		const firstScope = createPreviewActivationScope();
+		const secondScope = createPreviewActivationScope();
+
+		requestQueuedPreviewActivation("preview-a", firstScope);
+		requestQueuedPreviewActivation("preview-b", secondScope);
+
+		expect(requestAnimationFrame).toHaveBeenCalledTimes(1);
+	});
+
+	it("drains multiple scopes in round-robin order", async () => {
+		const firstScope = createPreviewActivationScope();
+		const secondScope = createPreviewActivationScope();
+		const activated: string[] = [];
+
+		requestQueuedPreviewActivation("a-1", firstScope, () => activated.push("a-1"));
+		requestQueuedPreviewActivation("a-2", firstScope, () => activated.push("a-2"));
+		requestQueuedPreviewActivation("b-1", secondScope, () => activated.push("b-1"));
+		requestQueuedPreviewActivation("b-2", secondScope, () => activated.push("b-2"));
+
+		await flushAnimationFrame();
+		expect(activated).toEqual(["a-1", "b-1"]);
+	});
+
+	it("does not synchronously burst when scrolling becomes idle", async () => {
+		markScrollActivityActive(scrollSource);
+		const results: boolean[] = [];
+		requestQueuedPreviewActivation("preview-a", activationScope, (activated) =>
+			results.push(activated),
+		);
+
+		markScrollActivityIdle(scrollSource);
+		expect(results).toEqual([]);
+		await flushAnimationFrame();
+		expect(results).toEqual([true]);
+	});
+
 	it("resolves replaced requests as not activated", async () => {
 		markScrollActivityActive(scrollSource);
-
 		const original = requestActivationResult("preview-a");
 		const replacement = requestActivationResult("preview-a");
 
 		await expect(original.result).resolves.toBe(false);
-
 		await flushAnimationFrame();
 		await expect(replacement.result).resolves.toBe(true);
 	});
 
 	it("resolves cancelled requests as not activated", async () => {
 		markScrollActivityActive(scrollSource);
-
 		const activation = requestActivationResult("preview-a");
 		cancelPreviewActivation("preview-a", activationScope);
 
@@ -226,7 +311,6 @@ describe("preview activation scheduler", () => {
 
 	it("handle cancel resolves only its own request as not activated", async () => {
 		markScrollActivityActive(scrollSource);
-
 		const activation = requestActivationResult("preview-a");
 		activation.handle.cancel();
 
@@ -235,14 +319,11 @@ describe("preview activation scheduler", () => {
 
 	it("stale handle cancel does not affect new queued request with same key", async () => {
 		markScrollActivityActive(scrollSource);
-
 		const first = requestActivationResult("preview-a");
 		const second = requestActivationResult("preview-a");
 
 		first.handle.cancel();
-
 		await expect(first.result).resolves.toBe(false);
-
 		await flushAnimationFrame();
 		await expect(second.result).resolves.toBe(true);
 	});
@@ -274,17 +355,18 @@ describe("preview activation scheduler", () => {
 	});
 
 	it("continues draining when a settlement callback throws", async () => {
-		markScrollActivityActive(scrollSource);
 		const consoleError = vi
 			.spyOn(console, "error")
 			.mockImplementation(() => undefined);
 		const results: boolean[] = [];
 
-		requestPreviewActivation("preview-throws", activationScope, () => {
+		requestQueuedPreviewActivation("preview-throws", activationScope, () => {
 			throw new Error("callback failed");
 		});
-		requestPreviewActivation("preview-after-throw", activationScope, (activated) =>
-			results.push(activated),
+		requestQueuedPreviewActivation(
+			"preview-after-throw",
+			activationScope,
+			(activated) => results.push(activated),
 		);
 
 		await flushAnimationFrame();
@@ -296,10 +378,8 @@ describe("preview activation scheduler", () => {
 		const firstScope = createPreviewActivationScope();
 		const secondScope = createPreviewActivationScope();
 
-		const firstWarmup = requestActivationResult("preview-a", firstScope);
-		await flushAnimationFrame();
-		await flushAnimationFrame();
-		await expect(firstWarmup.result).resolves.toBe(true);
+		expect(canActivatePreviewImmediately(firstScope)).toBe(false);
+		await vi.advanceTimersByTimeAsync(32);
 
 		expect(canActivatePreviewImmediately(firstScope)).toBe(true);
 		expect(canActivatePreviewImmediately(secondScope)).toBe(false);
@@ -307,10 +387,9 @@ describe("preview activation scheduler", () => {
 
 	describe("requestQueuedPreviewActivation", () => {
 		it("does not activate synchronously even after warmup", async () => {
-			const warmup = requestActivationResult("preview-warmup");
-			await flushAnimationFrame();
-			await flushAnimationFrame();
-			await expect(warmup.result).resolves.toBe(true);
+			await vi.advanceTimersByTimeAsync(32);
+			canActivatePreviewImmediately(activationScope);
+			await vi.advanceTimersByTimeAsync(32);
 
 			const results: boolean[] = [];
 			requestQueuedPreviewActivation(
@@ -324,62 +403,26 @@ describe("preview activation scheduler", () => {
 			expect(results).toEqual([true]);
 		});
 
-		it("allows idle queued activations to drain in a larger batch", async () => {
-			const warmup = requestActivationResult("preview-warmup");
-			await flushAnimationFrame();
-			await flushAnimationFrame();
-			await warmup.result;
-
+		it("allows idle queued activations to use a small burst", async () => {
 			const results: boolean[] = [];
-			requestQueuedPreviewActivation("preview-a", activationScope, (activated) =>
-				results.push(activated),
-			);
-			requestQueuedPreviewActivation("preview-b", activationScope, (activated) =>
-				results.push(activated),
-			);
-			requestQueuedPreviewActivation("preview-c", activationScope, (activated) =>
-				results.push(activated),
-			);
+			for (const key of ["preview-a", "preview-b", "preview-c"]) {
+				requestQueuedPreviewActivation(key, activationScope, (activated) =>
+					results.push(activated),
+				);
+			}
 
 			expect(results).toEqual([]);
+			await flushAnimationFrame();
+			expect(results).toEqual([true, true]);
 			await flushAnimationFrame();
 			expect(results).toEqual([true, true, true]);
 		});
 
-		it("limits queued activations while a visible preview backlog exists", async () => {
-			const warmup = requestActivationResult("preview-warmup");
-			await flushAnimationFrame();
-			await flushAnimationFrame();
-			await warmup.result;
-
-			visibleQueueSize = 1;
-			const results: boolean[] = [];
-			requestQueuedPreviewActivation("preview-a", activationScope, (activated) =>
-				results.push(activated),
-			);
-			requestQueuedPreviewActivation("preview-b", activationScope, (activated) =>
-				results.push(activated),
-			);
-
-			await flushAnimationFrame();
-			expect(results).toEqual([true]);
-
-			visibleQueueSize = 0;
-			await flushAnimationFrame();
-			expect(results).toEqual([true, true]);
-		});
-
 		it("replaces requests with the same key", async () => {
-			const warmup = requestActivationResult("preview-warmup");
-			await flushAnimationFrame();
-			await flushAnimationFrame();
-			await warmup.result;
-
 			const original = requestQueuedActivationResult("preview-a");
 			const replacement = requestQueuedActivationResult("preview-a");
 
 			await expect(original.result).resolves.toBe(false);
-
 			await flushAnimationFrame();
 			await expect(replacement.result).resolves.toBe(true);
 		});

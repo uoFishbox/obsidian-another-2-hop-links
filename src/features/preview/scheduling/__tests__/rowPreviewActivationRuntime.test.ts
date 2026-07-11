@@ -9,6 +9,9 @@ import {
 	resetPreviewActivationSchedulerForTests,
 } from "../previewActivationScheduler";
 
+const FRAME_INTERVAL_MS = 1000 / 60;
+let frameTimestamp = 0;
+
 interface TestCandidateOptions {
 	readonly id: string;
 	readonly rowIndex: number;
@@ -28,16 +31,20 @@ function createTestCandidate(
 }
 
 async function flushAnimationFrame(): Promise<void> {
-	await vi.advanceTimersByTimeAsync(16);
+	await vi.advanceTimersByTimeAsync(FRAME_INTERVAL_MS);
 	await Promise.resolve();
 }
 
 beforeEach(() => {
+	frameTimestamp = 0;
 	vi.useFakeTimers();
 	vi.stubGlobal(
 		"requestAnimationFrame",
 		vi.fn((callback: FrameRequestCallback) =>
-			setTimeout(() => callback(Date.now()), 16),
+			setTimeout(() => {
+				frameTimestamp += FRAME_INTERVAL_MS;
+				callback(frameTimestamp);
+			}, FRAME_INTERVAL_MS),
 		),
 	);
 	vi.stubGlobal("cancelAnimationFrame", (handle: number) => {
@@ -90,7 +97,7 @@ describe("rowPreviewActivationRuntime", () => {
 		expect(onActivated).toHaveBeenCalledWith("key-a");
 	});
 
-	it("drains idle row activations in a larger per-frame batch", async () => {
+	it("drains idle row activations with a bounded time-based burst", async () => {
 		const runtime = createRowPreviewActivationRuntime();
 		const activatedKeys: string[] = [];
 
@@ -105,6 +112,9 @@ describe("rowPreviewActivationRuntime", () => {
 				}),
 			);
 		}
+
+		await flushAnimationFrame();
+		expect(activatedKeys).toEqual(["key-0", "key-1"]);
 
 		await flushAnimationFrame();
 		expect(activatedKeys).toEqual(["key-0", "key-1", "key-2", "key-3"]);
@@ -130,7 +140,7 @@ describe("rowPreviewActivationRuntime", () => {
 		expect(onActivated).not.toHaveBeenCalled();
 	});
 
-	it("removes candidates and pending activations when a row is unmounted", async () => {
+	it("cancels pending activations when a row is cleared", async () => {
 		const runtime = createRowPreviewActivationRuntime();
 		const onActivated = vi.fn();
 
@@ -148,6 +158,32 @@ describe("rowPreviewActivationRuntime", () => {
 		await flushAnimationFrame();
 
 		expect(onActivated).not.toHaveBeenCalled();
+	});
+
+	it("reactivates a retained candidate when a recycled row becomes visible again", async () => {
+		const runtime = createRowPreviewActivationRuntime();
+		const onActivated = vi.fn();
+
+		runtime.setRowVisibility(0, "visible");
+		runtime.registerCandidate(
+			createTestCandidate({
+				id: "stable-card",
+				rowIndex: 0,
+				activationKey: "key-a",
+				onActivated,
+			}),
+		);
+		runtime.clearRow(0);
+
+		await flushAnimationFrame();
+		expect(onActivated).not.toHaveBeenCalled();
+
+		// Fixed virtual row shells can be rebound without rerunning the card's
+		// registration effect when its props did not change.
+		runtime.setRowVisibility(0, "visible");
+		await flushAnimationFrame();
+
+		expect(onActivated).toHaveBeenCalledWith("key-a");
 	});
 
 	it("enqueues candidates registered after the row is already visible", async () => {
@@ -233,7 +269,10 @@ describe("rowPreviewActivationRuntime", () => {
 		let visibleQueueSize = 1;
 		const runtime = createRowPreviewActivationRuntime({
 			scope: createPreviewActivationScope({
-				getBackpressure: () => ({ queued: visibleQueueSize, active: 0 }),
+				getBackpressure: () => ({
+					queued: visibleQueueSize,
+					active: 0,
+				}),
 			}),
 		});
 		const onActivated = vi.fn();

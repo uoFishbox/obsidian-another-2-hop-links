@@ -28,7 +28,12 @@ export interface RowPreviewActivationRuntime {
 	 */
 	setRowVisibility(rowIndex: number, visibility: "visible" | "mounted"): void;
 	/**
-	 * Removes a row and all its candidates and pending requests.
+	 * Deactivates a row and cancels its pending requests.
+	 *
+	 * Candidate registrations are retained until their component cleanup runs.
+	 * Virtual row shells can be cleared and rebound without unmounting their
+	 * card components, so dropping registrations here would leave an unchanged
+	 * card with no way to register again.
 	 */
 	clearRow(rowIndex: number): void;
 }
@@ -288,23 +293,15 @@ export function createRowPreviewActivationRuntime(
 			return;
 		}
 
-		const wasVisible = state.visibility === "visible";
-		const activationKeys = Array.from(state.keyCounts.keys());
-		for (const candidate of state.candidatesById.values()) {
-			removeCandidateFromIndex(allCandidatesByKey, candidate);
-			if (wasVisible) {
+		if (state.visibility === "visible") {
+			for (const candidate of state.candidatesById.values()) {
 				removeCandidateFromIndex(visibleCandidatesByKey, candidate);
 			}
 		}
 
-		rows.delete(rowIndex);
-
-		for (const activationKey of activationKeys) {
-			if (wasVisible) {
-				cancelPendingUnlessVisibleElsewhere(activationKey);
-			} else if (!allCandidatesByKey.has(activationKey)) {
-				cancelPendingByKey(activationKey);
-			}
+		state.visibility = "mounted";
+		for (const activationKey of state.keyCounts.keys()) {
+			cancelPendingUnlessVisibleElsewhere(activationKey);
 		}
 	}
 

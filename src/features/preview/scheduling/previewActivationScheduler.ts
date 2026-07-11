@@ -4,14 +4,32 @@ import {
 } from "infrastructure/scroll/scrollActivity";
 import { DEBUG_DISABLE_CARD_DOM_PREVIEW } from "../../../appConstants";
 
-const SCROLLING_MAX_ACTIVATIONS_PER_FRAME = 2;
-const IDLE_MAX_ACTIVATIONS_PER_FRAME = 6;
-const BACKPRESSURE_MAX_ACTIVATIONS_PER_FRAME = 1;
-/**
- * Number of animation frames after the first activation request during which
- * idle/no-backlog requests are forced through the queued drain path.
- */
-const WARMUP_FRAMES = 2;
+const WARMUP_MS = 32;
+const MAX_REFILL_ELAPSED_MS = 250;
+const MAX_QUEUE_ENTRIES_PER_DRAIN = 256;
+const ACTIVATION_TOKEN_EPSILON = 1e-9;
+
+interface PreviewActivationPolicy {
+	readonly activationsPerSecond: number;
+	readonly burstCapacity: number;
+	readonly maxDrainCpuMs: number;
+}
+
+const SCROLLING_POLICY: PreviewActivationPolicy = {
+	activationsPerSecond: 60,
+	burstCapacity: 1,
+	maxDrainCpuMs: 1,
+};
+const IDLE_POLICY: PreviewActivationPolicy = {
+	activationsPerSecond: 120,
+	burstCapacity: 2,
+	maxDrainCpuMs: 2,
+};
+const BACKPRESSURED_POLICY: PreviewActivationPolicy = {
+	activationsPerSecond: 30,
+	burstCapacity: 1,
+	maxDrainCpuMs: 1,
+};
 
 export interface PreviewBackpressure {
 	readonly queued: number;
@@ -24,13 +42,10 @@ export interface PreviewBackpressureProvider {
 }
 
 export interface PreviewActivationScope {
-	warmupStarted: boolean;
-	warmupRemainingFrames: number;
-	warmupFrameHandle: number | null;
+	warmupUntil: number | null;
 	pendingByKey: Map<string, PreviewActivationRequest>;
 	pendingQueue: PreviewActivationRequest[];
 	pendingQueueHead: number;
-	frameHandle: number | null;
 	getBackpressure: () => PreviewBackpressure;
 	backpressureProviders: Map<() => number, PreviewBackpressureProviderRegistration>;
 }
@@ -65,8 +80,10 @@ interface PreviewActivationHandleInternal extends PreviewActivationHandle {
 
 const defaultScope = createPreviewActivationScope();
 const activeQueuedScopes = new Set<PreviewActivationScope>();
-const activeWarmupScopes = new Set<PreviewActivationScope>();
-const scheduledFrameScopes = new Set<PreviewActivationScope>();
+let globalFrameHandle: number | null = null;
+let roundRobinCursor = 0;
+let availableActivationTokens = 0;
+let lastTokenRefillTimestamp: number | null = null;
 let unsubscribeScrollActivity: (() => void) | undefined;
 
 function cancelHandle(this: PreviewActivationHandleInternal): void {
@@ -99,6 +116,13 @@ function invokeSettlementCallback(
 	}
 }
 
+function readMonotonicTime(): number {
+	if (typeof globalThis.performance?.now === "function") {
+		return globalThis.performance.now();
+	}
+	return Date.now();
+}
+
 function getEmptyBackpressure(): PreviewBackpressure {
 	return { queued: 0, active: 0 };
 }
@@ -107,13 +131,10 @@ export function createPreviewActivationScope(
 	options: CreatePreviewActivationScopeOptions = {},
 ): PreviewActivationScope {
 	return {
-		warmupStarted: false,
-		warmupRemainingFrames: 0,
-		warmupFrameHandle: null,
+		warmupUntil: null,
 		pendingByKey: new Map<string, PreviewActivationRequest>(),
 		pendingQueue: [],
 		pendingQueueHead: 0,
-		frameHandle: null,
 		getBackpressure: options.getBackpressure ?? getEmptyBackpressure,
 		backpressureProviders: new Map<
 			() => number,
@@ -152,41 +173,19 @@ function unregisterPreviewActivationBackpressure(
 	scope.backpressureProviders.delete(provider.getQueuedPreviewJobs);
 }
 
-function isWarmupActive(scope: PreviewActivationScope): boolean {
-	return scope.warmupRemainingFrames > 0;
+function ensureWarmupStarted(
+	scope: PreviewActivationScope,
+	now = readMonotonicTime(),
+): void {
+	if (scope.warmupUntil !== null) return;
+	scope.warmupUntil = now + WARMUP_MS;
 }
 
-function scheduleWarmupCountdown(scope: PreviewActivationScope): void {
-	if (scope.warmupFrameHandle !== null) return;
-
-	if (typeof globalThis.requestAnimationFrame !== "function") {
-		scope.warmupRemainingFrames = 0;
-		activeWarmupScopes.delete(scope);
-		return;
-	}
-
-	activeWarmupScopes.add(scope);
-	scope.warmupFrameHandle = globalThis.requestAnimationFrame(() => {
-		scope.warmupFrameHandle = null;
-		scope.warmupRemainingFrames = Math.max(0, scope.warmupRemainingFrames - 1);
-		if (scope.warmupRemainingFrames > 0) {
-			scheduleWarmupCountdown(scope);
-			return;
-		}
-		activeWarmupScopes.delete(scope);
-	});
-}
-
-function ensureWarmupStarted(scope: PreviewActivationScope): void {
-	if (scope.warmupStarted) return;
-
-	scope.warmupStarted = true;
-	scope.warmupRemainingFrames = WARMUP_FRAMES;
-	scheduleWarmupCountdown(scope);
-}
-
-function hasVisiblePreviewBacklog(getVisibleQueueSize: () => number): boolean {
-	return getVisibleQueueSize() > 0;
+function isWarmupActive(
+	scope: PreviewActivationScope,
+	now = readMonotonicTime(),
+): boolean {
+	return scope.warmupUntil !== null && now < scope.warmupUntil;
 }
 
 function settleRequest(request: PreviewActivationRequest, activated: boolean): void {
@@ -205,37 +204,24 @@ function settleRequest(request: PreviewActivationRequest, activated: boolean): v
 function ensureSubscription(): void {
 	if (unsubscribeScrollActivity) return;
 
-	unsubscribeScrollActivity = subscribeScrollActivity((active) => {
-		if (!active) {
-			drainAllActiveScopes();
-			return;
-		}
-		for (const scope of activeQueuedScopes) {
-			scheduleScopeFrameDrain(scope);
-		}
+	unsubscribeScrollActivity = subscribeScrollActivity(() => {
+		scheduleGlobalFrameDrain();
 	});
 }
 
-function scheduleScopeFrameDrain(scope: PreviewActivationScope): void {
+function scheduleGlobalFrameDrain(): void {
 	if (
-		scope.frameHandle !== null ||
+		globalFrameHandle !== null ||
+		activeQueuedScopes.size === 0 ||
 		typeof globalThis.requestAnimationFrame !== "function"
 	) {
 		return;
 	}
 
-	scheduledFrameScopes.add(scope);
-	scope.frameHandle = globalThis.requestAnimationFrame(() => {
-		scheduledFrameScopes.delete(scope);
-		scope.frameHandle = null;
-		drainScopeFrame(scope);
+	globalFrameHandle = globalThis.requestAnimationFrame((timestamp) => {
+		globalFrameHandle = null;
+		drainGlobalFrame(timestamp);
 	});
-}
-
-function drainAllActiveScopes(): void {
-	for (const scope of Array.from(activeQueuedScopes)) {
-		drainScopeFrame(scope);
-	}
 }
 
 function readScopeBackpressure(scope: PreviewActivationScope): PreviewBackpressure {
@@ -251,18 +237,50 @@ function readScopeBackpressure(scope: PreviewActivationScope): PreviewBackpressu
 	return { queued, active };
 }
 
-function resolveActivationBudget(params: {
+function readGlobalBackpressure(): PreviewBackpressure {
+	let queued = 0;
+	let active = 0;
+
+	for (const scope of activeQueuedScopes) {
+		const pressure = readScopeBackpressure(scope);
+		queued = Math.max(queued, pressure.queued);
+		active = Math.max(active, pressure.active);
+	}
+
+	return { queued, active };
+}
+
+function resolveActivationPolicy(params: {
 	readonly isScrolling: boolean;
 	readonly queuedPreviewJobs: number;
 	readonly activePreviewJobs: number;
-}): number {
+}): PreviewActivationPolicy {
 	if (params.queuedPreviewJobs > 0 || params.activePreviewJobs > 0) {
-		return BACKPRESSURE_MAX_ACTIVATIONS_PER_FRAME;
+		return BACKPRESSURED_POLICY;
 	}
 
-	return params.isScrolling
-		? SCROLLING_MAX_ACTIVATIONS_PER_FRAME
-		: IDLE_MAX_ACTIVATIONS_PER_FRAME;
+	return params.isScrolling ? SCROLLING_POLICY : IDLE_POLICY;
+}
+
+function refillActivationTokens(
+	timestamp: number,
+	policy: PreviewActivationPolicy,
+): void {
+	if (lastTokenRefillTimestamp === null) {
+		lastTokenRefillTimestamp = timestamp;
+		availableActivationTokens = policy.burstCapacity;
+		return;
+	}
+
+	const elapsedMs = Math.min(
+		MAX_REFILL_ELAPSED_MS,
+		Math.max(0, timestamp - lastTokenRefillTimestamp),
+	);
+	lastTokenRefillTimestamp = timestamp;
+	availableActivationTokens = Math.min(
+		policy.burstCapacity,
+		availableActivationTokens + (elapsedMs * policy.activationsPerSecond) / 1000,
+	);
 }
 
 function compactScopeQueue(scope: PreviewActivationScope): void {
@@ -273,10 +291,12 @@ function compactScopeQueue(scope: PreviewActivationScope): void {
 		return;
 	}
 
-	scope.pendingQueue = scope.pendingQueue.slice(scope.pendingQueueHead).filter(
-		(request) =>
-			!request.settled && scope.pendingByKey.get(request.key) === request,
-	);
+	scope.pendingQueue = scope.pendingQueue
+		.slice(scope.pendingQueueHead)
+		.filter(
+			(request) =>
+				!request.settled && scope.pendingByKey.get(request.key) === request,
+		);
 	scope.pendingQueueHead = 0;
 }
 
@@ -290,34 +310,60 @@ function readNextQueuedRequest(
 	return request;
 }
 
-function drainScopeFrame(scope: PreviewActivationScope): void {
-	if (scope.pendingByKey.size === 0) {
-		activeQueuedScopes.delete(scope);
-		return;
+function readNextRoundRobinRequest(
+	scopes: readonly PreviewActivationScope[],
+): PreviewActivationRequest | undefined {
+	if (scopes.length === 0) return undefined;
+
+	for (let offset = 0; offset < scopes.length; offset += 1) {
+		const scopeIndex = (roundRobinCursor + offset) % scopes.length;
+		const scope = scopes[scopeIndex];
+		const request = readNextQueuedRequest(scope);
+		if (!request) continue;
+
+		roundRobinCursor = (scopeIndex + 1) % scopes.length;
+		return request;
 	}
 
-	const pressure = readScopeBackpressure(scope);
-	const activationBudget = resolveActivationBudget({
+	return undefined;
+}
+
+function drainGlobalFrame(frameTimestamp: number): void {
+	if (activeQueuedScopes.size === 0) return;
+
+	const pressure = readGlobalBackpressure();
+	const policy = resolveActivationPolicy({
 		isScrolling: isScrollActivityActive(),
 		queuedPreviewJobs: pressure.queued,
 		activePreviewJobs: pressure.active,
 	});
-	let activated = 0;
+	refillActivationTokens(frameTimestamp, policy);
 
-	while (activated < activationBudget) {
-		const request = readNextQueuedRequest(scope);
+	const scopes = Array.from(activeQueuedScopes);
+	const deadline = readMonotonicTime() + policy.maxDrainCpuMs;
+	let inspectedQueueEntries = 0;
+
+	while (
+		availableActivationTokens + ACTIVATION_TOKEN_EPSILON >= 1 &&
+		inspectedQueueEntries < MAX_QUEUE_ENTRIES_PER_DRAIN &&
+		readMonotonicTime() <= deadline
+	) {
+		const request = readNextRoundRobinRequest(scopes);
 		if (!request) break;
+		inspectedQueueEntries += 1;
 		if (request.settled) continue;
-		if (scope.pendingByKey.get(request.key) !== request) continue;
+		if (request.scope.pendingByKey.get(request.key) !== request) continue;
 
 		settleRequest(request, true);
-		activated += 1;
+		availableActivationTokens = Math.max(0, availableActivationTokens - 1);
 	}
 
-	compactScopeQueue(scope);
+	for (const scope of scopes) {
+		compactScopeQueue(scope);
+	}
 
-	if (scope.pendingByKey.size > 0) {
-		scheduleScopeFrameDrain(scope);
+	if (activeQueuedScopes.size > 0) {
+		scheduleGlobalFrameDrain();
 	}
 }
 
@@ -336,12 +382,14 @@ export function canActivatePreviewImmediately(
 ): boolean {
 	if (DEBUG_DISABLE_CARD_DOM_PREVIEW) return false;
 
-	ensureWarmupStarted(scope);
+	const now = readMonotonicTime();
+	ensureWarmupStarted(scope, now);
 	const pressure = readScopeBackpressure(scope);
 	return (
-		!isWarmupActive(scope) &&
+		!isWarmupActive(scope, now) &&
 		!isScrollActivityActive() &&
-		!hasVisiblePreviewBacklog(() => pressure.queued)
+		pressure.queued <= 0 &&
+		pressure.active <= 0
 	);
 }
 
@@ -373,7 +421,7 @@ function enqueuePreviewActivationRequest(
 	scope.pendingByKey.set(key, request);
 	scope.pendingQueue.push(request);
 	activeQueuedScopes.add(scope);
-	scheduleScopeFrameDrain(scope);
+	scheduleGlobalFrameDrain();
 
 	return createActivationHandle(key, request);
 }
@@ -393,12 +441,14 @@ export function requestPreviewActivation(
 		return createSettledActivationHandle(key, false, onSettled);
 	}
 
-	ensureWarmupStarted(scope);
+	const now = readMonotonicTime();
+	ensureWarmupStarted(scope, now);
 	const pressure = readScopeBackpressure(scope);
 	if (
-		!isWarmupActive(scope) &&
+		!isWarmupActive(scope, now) &&
 		!isScrollActivityActive() &&
-		!hasVisiblePreviewBacklog(() => pressure.queued)
+		pressure.queued <= 0 &&
+		pressure.active <= 0
 	) {
 		return createSettledActivationHandle(key, true, onSettled);
 	}
@@ -407,12 +457,12 @@ export function requestPreviewActivation(
 }
 
 /**
- * Requests activation strictly through the frame-budgeted queue.
+ * Requests activation strictly through the time-budgeted queue.
  *
  * Unlike {@link requestPreviewActivation}, this never activates synchronously,
  * even when the scheduler is idle and warmed up. This is intended for bulk
  * row-visible activations where multiple cards become visible at once and
- * must be spread across frames.
+ * must be rate-limited independently of the display refresh rate.
  */
 export function requestQueuedPreviewActivation(
 	key: string,
@@ -436,50 +486,36 @@ export function cancelPreviewActivation(
 	}
 }
 
+function resetScopeQueue(scope: PreviewActivationScope): void {
+	for (const request of Array.from(scope.pendingByKey.values())) {
+		settleRequest(request, false);
+	}
+
+	scope.warmupUntil = null;
+	scope.pendingByKey.clear();
+	scope.pendingQueue = [];
+	scope.pendingQueueHead = 0;
+}
+
 export function resetPreviewActivationSchedulerForTests(): void {
-	const scopesToReset = new Set([
-		...Array.from(activeQueuedScopes),
-		...Array.from(scheduledFrameScopes),
-	]);
-
+	const scopesToReset = Array.from(activeQueuedScopes);
 	for (const scope of scopesToReset) {
-		for (const request of Array.from(scope.pendingByKey.values())) {
-			settleRequest(request, false);
-		}
-
-		if (
-			scope.frameHandle !== null &&
-			typeof globalThis.cancelAnimationFrame === "function"
-		) {
-			globalThis.cancelAnimationFrame(scope.frameHandle);
-		}
-		scope.frameHandle = null;
-		scope.pendingByKey.clear();
-		scope.pendingQueue = [];
-		scope.pendingQueueHead = 0;
+		resetScopeQueue(scope);
 	}
 	activeQueuedScopes.clear();
-	scheduledFrameScopes.clear();
 
-	for (const scope of activeWarmupScopes) {
-		if (
-			scope.warmupFrameHandle !== null &&
-			typeof globalThis.cancelAnimationFrame === "function"
-		) {
-			globalThis.cancelAnimationFrame(scope.warmupFrameHandle);
-		}
-		scope.warmupFrameHandle = null;
-		scope.warmupStarted = false;
-		scope.warmupRemainingFrames = 0;
+	if (
+		globalFrameHandle !== null &&
+		typeof globalThis.cancelAnimationFrame === "function"
+	) {
+		globalThis.cancelAnimationFrame(globalFrameHandle);
 	}
-	activeWarmupScopes.clear();
-	defaultScope.warmupStarted = false;
-	defaultScope.warmupRemainingFrames = 0;
-	defaultScope.warmupFrameHandle = null;
-	defaultScope.pendingByKey.clear();
-	defaultScope.pendingQueue = [];
-	defaultScope.pendingQueueHead = 0;
-	defaultScope.frameHandle = null;
+	globalFrameHandle = null;
+	roundRobinCursor = 0;
+	availableActivationTokens = 0;
+	lastTokenRefillTimestamp = null;
+
+	resetScopeQueue(defaultScope);
 	defaultScope.backpressureProviders.clear();
 
 	unsubscribeScrollActivity?.();

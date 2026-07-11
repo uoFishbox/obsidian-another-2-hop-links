@@ -1,7 +1,26 @@
 import { isScrollActivityActive } from "infrastructure/scroll/scrollActivity";
 
-const SCROLLING_DOM_COMMITS_PER_FRAME = 1;
-const IDLE_DOM_COMMITS_PER_FRAME = 4;
+const MAX_REFILL_ELAPSED_MS = 250;
+const MAX_QUEUE_ENTRIES_PER_DRAIN = 256;
+const DOM_COMMIT_TOKEN_EPSILON = 1e-9;
+const FALLBACK_FRAME_INTERVAL_MS = 1000 / 60;
+
+interface PreviewDomCommitPolicy {
+	readonly commitsPerSecond: number;
+	readonly burstCapacity: number;
+	readonly maxDrainCpuMs: number;
+}
+
+const SCROLLING_POLICY: PreviewDomCommitPolicy = {
+	commitsPerSecond: 60,
+	burstCapacity: 1,
+	maxDrainCpuMs: 1,
+};
+const IDLE_POLICY: PreviewDomCommitPolicy = {
+	commitsPerSecond: 240,
+	burstCapacity: 4,
+	maxDrainCpuMs: 2,
+};
 
 export interface PreviewDomCommitTask {
 	readonly key: string;
@@ -20,6 +39,15 @@ let pendingQueue: QueuedPreviewDomCommitTask[] = [];
 let pendingQueueHead = 0;
 let frameHandle: number | null = null;
 let frameHandleKind: "animation-frame" | "timeout" | null = null;
+let availableCommitTokens = 0;
+let lastTokenRefillTimestamp: number | null = null;
+
+function readMonotonicTime(): number {
+	if (typeof globalThis.performance?.now === "function") {
+		return globalThis.performance.now();
+	}
+	return Date.now();
+}
 
 function settleTask(task: QueuedPreviewDomCommitTask, didCommit: boolean): void {
 	if (task.settled) return;
@@ -41,23 +69,36 @@ function rejectTask(task: QueuedPreviewDomCommitTask, error: unknown): void {
 	task.reject(error);
 }
 
-function readFrameBudget(): number {
-	return isScrollActivityActive()
-		? SCROLLING_DOM_COMMITS_PER_FRAME
-		: IDLE_DOM_COMMITS_PER_FRAME;
+function readCommitPolicy(): PreviewDomCommitPolicy {
+	return isScrollActivityActive() ? SCROLLING_POLICY : IDLE_POLICY;
 }
 
-function compactQueue(): void {
-	if (
-		pendingQueueHead < 64 &&
-		pendingQueue.length <= pendingByKey.size * 2 + 16
-	) {
+function refillCommitTokens(timestamp: number, policy: PreviewDomCommitPolicy): void {
+	if (lastTokenRefillTimestamp === null) {
+		lastTokenRefillTimestamp = timestamp;
+		availableCommitTokens = policy.burstCapacity;
 		return;
 	}
 
-	pendingQueue = pendingQueue.slice(pendingQueueHead).filter(
-		(task) => !task.settled && pendingByKey.get(task.key) === task,
+	const elapsedMs = Math.min(
+		MAX_REFILL_ELAPSED_MS,
+		Math.max(0, timestamp - lastTokenRefillTimestamp),
 	);
+	lastTokenRefillTimestamp = timestamp;
+	availableCommitTokens = Math.min(
+		policy.burstCapacity,
+		availableCommitTokens + (elapsedMs * policy.commitsPerSecond) / 1000,
+	);
+}
+
+function compactQueue(): void {
+	if (pendingQueueHead < 64 && pendingQueue.length <= pendingByKey.size * 2 + 16) {
+		return;
+	}
+
+	pendingQueue = pendingQueue
+		.slice(pendingQueueHead)
+		.filter((task) => !task.settled && pendingByKey.get(task.key) === task);
 	pendingQueueHead = 0;
 }
 
@@ -77,26 +118,34 @@ function scheduleFrameDrain(): void {
 		frameHandle = globalThis.setTimeout(() => {
 			frameHandle = null;
 			frameHandleKind = null;
-			drainFrame();
-		}, 0) as unknown as number;
+			drainFrame(readMonotonicTime());
+		}, FALLBACK_FRAME_INTERVAL_MS) as unknown as number;
 		return;
 	}
 
 	frameHandleKind = "animation-frame";
-	frameHandle = globalThis.requestAnimationFrame(() => {
+	frameHandle = globalThis.requestAnimationFrame((timestamp) => {
 		frameHandle = null;
 		frameHandleKind = null;
-		drainFrame();
+		drainFrame(timestamp);
 	});
 }
 
-function drainFrame(): void {
-	const commitBudget = readFrameBudget();
-	let committed = 0;
+function drainFrame(frameTimestamp: number): void {
+	const policy = readCommitPolicy();
+	refillCommitTokens(frameTimestamp, policy);
 
-	while (committed < commitBudget) {
+	const deadline = readMonotonicTime() + policy.maxDrainCpuMs;
+	let inspectedQueueEntries = 0;
+
+	while (
+		availableCommitTokens + DOM_COMMIT_TOKEN_EPSILON >= 1 &&
+		inspectedQueueEntries < MAX_QUEUE_ENTRIES_PER_DRAIN &&
+		readMonotonicTime() <= deadline
+	) {
 		const task = readNextQueuedTask();
 		if (!task) break;
+		inspectedQueueEntries += 1;
 		if (task.settled) continue;
 		if (pendingByKey.get(task.key) !== task) continue;
 
@@ -108,7 +157,7 @@ function drainFrame(): void {
 		try {
 			task.commit();
 			settleTask(task, true);
-			committed += 1;
+			availableCommitTokens = Math.max(0, availableCommitTokens - 1);
 		} catch (error) {
 			rejectTask(task, error);
 		}
@@ -152,6 +201,8 @@ export function resetPreviewDomCommitSchedulerForTests(): void {
 	}
 	pendingQueueHead = 0;
 	pendingByKey.clear();
+	availableCommitTokens = 0;
+	lastTokenRefillTimestamp = null;
 
 	if (frameHandle !== null) {
 		if (

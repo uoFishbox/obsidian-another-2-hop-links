@@ -202,6 +202,28 @@ describe("CardPreview", () => {
 		resetPreviewDomCommitSchedulerForTests();
 	});
 
+	it("commits a preview while its card is temporarily detached", async () => {
+		const detachedTarget = document.createElement("div");
+		const file = createMockTFile("notes/detached-preview.md");
+		const getPreview = vi.fn(async () => ({
+			type: "text" as const,
+			content: "detached content",
+		}));
+
+		const rendered = render(CardPreview, {
+			target: detachedTarget,
+			props: { file, getPreview, searchQuery: "" },
+		});
+
+		await waitFor(() => {
+			expect(rendered.container.isConnected).toBe(false);
+			expect(
+				rendered.container.querySelector(".cosense-card-links__box-preview")
+					?.textContent,
+			).toContain("rendered:detached content");
+		});
+	});
+
 	it("displays rendered text preview", async () => {
 		const file = createMockTFile("notes/render-cache.md");
 		const getPreview = vi.fn(async () => ({
