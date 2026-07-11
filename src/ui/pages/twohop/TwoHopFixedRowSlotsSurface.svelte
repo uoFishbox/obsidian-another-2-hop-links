@@ -62,7 +62,9 @@
 						columnIndex={mountedCell.columnIndex}
 						{mountedCell}
 					>
-						{@render renderCell({ mountedCell })}
+						{#key mountedCell.renderBodyKey ?? mountedCell.key}
+							{@render renderCell({ mountedCell })}
+						{/key}
 					</VirtualGridLogicalCellMount>
 				{/each}
 			</div>

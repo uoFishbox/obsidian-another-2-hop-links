@@ -38,7 +38,7 @@ interface MutableMountedCellShell {
 	rowTop: number;
 	sectionId: string;
 	cellMetadataKey: unknown;
-	renderBodyKey: undefined;
+	renderBodyKey: string | undefined;
 	position: undefined;
 	cellSlotKey: number;
 	renderBodyKind: "item" | "header" | "load-more";
@@ -320,6 +320,12 @@ export function createTwoHopScalarScrollKernel(params: {
 				: logicalCell.kind === "header"
 					? (descriptor.headerRenderRevision ?? null)
 					: undefined;
+		mutable.renderBodyKey =
+			logicalCell.kind === "item"
+				? `item|${descriptor.sectionId}|${String(logicalCell.sourceKey ?? logicalCell.key)}|${String(logicalCell.itemRenderRevision)}`
+				: logicalCell.kind === "header"
+					? `header|${String(logicalCell.key)}|${descriptor.sectionId}|${String(descriptor.headerRenderRevision)}`
+					: `load-more|${String(logicalCell.key)}|${descriptor.sectionId}`;
 	}
 
 	function bindLogicalRow(plan: TwoHopViewPlan, logicalRowIndex: number): void {
