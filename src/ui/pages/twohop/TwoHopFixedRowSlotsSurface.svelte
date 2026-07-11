@@ -18,7 +18,7 @@
 		observerRoot?: HTMLElement | null;
 		getCellClassName?: (cell: TwoHopMountedCell) => string | undefined;
 		getCellDataTestId?: (cell: TwoHopMountedCell) => string | undefined;
-		renderCell: Snippet<[{ mountedCell: TwoHopMountedCell }]>
+		renderCell: Snippet<[{ mountedCell: TwoHopMountedCell }]>;
 	}
 
 	let {
@@ -44,25 +44,25 @@
 <div class={contentClassName} bind:this={contentEl} style={contentStyle}>
 	<div data-ccl-virtual-flow-spacer="top" style:height="0px" aria-hidden="true"></div>
 	{#each rowSlotControllers as controller (controller.slotIndex)}
-		{#if controller.row}
-			{@const row = controller.row}
+		{#if controller.active}
 			<div
 				class={rowClassName}
 				data-ccl-row-slot={!IS_PROD ? controller.slotIndex : undefined}
-				data-ccl-row-index={!IS_PROD ? row.rowIndex : undefined}
-				style={`position:absolute; left:0; right:0; top:0; transform:translateY(${Math.max(0, row.top)}px); margin-bottom:0`}
+				data-ccl-row-index={!IS_PROD ? controller.rowIndex : undefined}
+				style={`position:absolute; left:0; right:0; top:0; transform:translateY(${Math.max(0, controller.top)}px); margin-bottom:0`}
 			>
-				{#each row.cells as mountedCell (mountedCell.cellSlotKey ?? mountedCell.renderSlotIndex)}
+				{#each controller.cells as cellController (cellController.cellSlotKey)}
+					{@const mountedCell = cellController.mountedCell}
 					<VirtualGridLogicalCellMount
-						logicalKey={mountedCell.key}
+						logicalKey={cellController.logicalKey}
 						className={getCellClassName?.(mountedCell) ?? ""}
 						dataTestId={getCellDataTestId?.(mountedCell)}
-						cellSlotKey={mountedCell.cellSlotKey ?? mountedCell.renderSlotIndex}
-						rowIndex={mountedCell.rowIndex}
-						columnIndex={mountedCell.columnIndex}
+						cellSlotKey={cellController.cellSlotKey}
+						rowIndex={cellController.rowIndex}
+						columnIndex={cellController.columnIndex}
 						{mountedCell}
 					>
-						{#key mountedCell.renderBodyKey ?? mountedCell.key}
+						{#key cellController.renderBodyKey ?? cellController.logicalKey}
 							{@render renderCell({ mountedCell })}
 						{/key}
 					</VirtualGridLogicalCellMount>
@@ -70,5 +70,9 @@
 			</div>
 		{/if}
 	{/each}
-	<div data-ccl-virtual-flow-spacer="bottom" style:height="0px" aria-hidden="true"></div>
+	<div
+		data-ccl-virtual-flow-spacer="bottom"
+		style:height="0px"
+		aria-hidden="true"
+	></div>
 </div>

@@ -215,6 +215,61 @@ describe("TwoHopViewPlanVirtualList DOM performance contracts", () => {
 		expect([...nextIndexes].some((index) => !initialIndexes.has(index))).toBe(true);
 	});
 
+	it("publishes recycled row coordinates after a distant scroll jump", async () => {
+		const { container } = render(TwoHopViewPlanVirtualListPerfHarness, {
+			props: {
+				sections: [createDescriptor(10_000)],
+				applicationStore,
+			},
+		});
+		const scrollRoot = container.querySelector<HTMLElement>(
+			"[data-testid='scroll-root']",
+		);
+		const virtualListRoot = container.querySelector<HTMLElement>(
+			".twohop-page-virtual-list",
+		);
+		if (!scrollRoot || !virtualListRoot) {
+			throw new Error("Expected TwoHop virtual-list elements.");
+		}
+
+		setNumericProperty(scrollRoot, "clientHeight", 120);
+		setNumericProperty(scrollRoot, "scrollTop", 0);
+		setElementRect(scrollRoot, { top: 0, width: 330, height: 120 });
+		setElementRect(virtualListRoot, { top: 0, width: 330, height: 500_000 });
+		triggerResize(virtualListRoot, 330, 500_000);
+		triggerResize(scrollRoot, 330, 120);
+		await flushFrames();
+		await flushFrames();
+
+		setNumericProperty(scrollRoot, "scrollTop", 10_000);
+		await fireEvent.scroll(scrollRoot);
+		await flushFrames();
+		await flushFrames();
+
+		const rows = Array.from(
+			virtualListRoot.shadowRoot?.querySelectorAll<HTMLElement>(
+				"[data-ccl-row-slot]",
+			) ?? [],
+		);
+		expect(rows).toHaveLength(4);
+		expect(
+			rows
+				.map((row) => Number(row.dataset.cclRowIndex))
+				.sort((left, right) => left - right),
+		).toEqual([73, 74, 75, 76]);
+
+		for (const row of rows) {
+			const rowIndex = row.dataset.cclRowIndex;
+			expect(rowIndex).toBeTruthy();
+			expect(row.style.transform).toBe(`translateY(${Number(rowIndex) * 134}px)`);
+			for (const cell of row.querySelectorAll<HTMLElement>(
+				"[data-ccl-cell-slot]",
+			)) {
+				expect(cell.dataset.cclRowIndex).toBe(rowIndex);
+			}
+		}
+	});
+
 	it("keeps a resolved descriptor cached for a retained cell while scrolling", async () => {
 		const getItemInteractionDescriptor = vi.fn(
 			(item: TwoHopVirtualListItem): ItemInteractionDescriptor => ({
