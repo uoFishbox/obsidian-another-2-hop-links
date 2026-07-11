@@ -66,6 +66,7 @@
 							columnIndex={cellController.columnIndex}
 							{mountedCell}
 							{cellRegistry}
+							cellRegistrationOwner={cellController}
 						>
 							{#key cellController.renderBodyKey ?? cellController.logicalKey}
 								{@render renderCell({ mountedCell })}

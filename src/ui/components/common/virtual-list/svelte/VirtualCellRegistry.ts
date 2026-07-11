@@ -24,6 +24,11 @@ export interface VirtualCellRegistry {
 	): { element: HTMLElement; metadata: VirtualCellMetadata } | null;
 }
 
+export interface VirtualCellRegistrationOwner {
+	attachElement(element: HTMLElement, registry: VirtualCellRegistry): void;
+	detachElement(element: HTMLElement): void;
+}
+
 interface MutableVirtualCellMetadata {
 	logicalKey: string;
 	rowIndex?: number;

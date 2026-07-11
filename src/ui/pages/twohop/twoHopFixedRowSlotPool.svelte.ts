@@ -2,8 +2,13 @@ import type { TwoHopMountedCell, TwoHopMountedRowSlice } from "./twoHopMountedTy
 import type { LogicalCellKey } from "ui/components/common/virtual-list/types";
 import type { RenderBodyKey } from "ui/components/common/virtual-list/renderRevision";
 import { recordCCLDevMeasurement } from "infrastructure/debug/CCLDevMeasurements";
+import type {
+	VirtualCellElementRegistration,
+	VirtualCellRegistrationOwner,
+	VirtualCellRegistry,
+} from "ui/components/common/virtual-list/svelte/VirtualCellRegistry";
 
-export interface TwoHopFixedCellSlotController {
+export interface TwoHopFixedCellSlotController extends VirtualCellRegistrationOwner {
 	readonly cellSlotKey: number;
 	readonly active: boolean;
 	readonly logicalKey: LogicalCellKey;
@@ -44,6 +49,22 @@ function createCellController(
 	let mountedCell = $state.raw(initialCell);
 	let active = $state(true);
 	let revision = $state(0);
+	let cellElement: HTMLElement | null = null;
+	let cellRegistry: VirtualCellRegistry | null = null;
+	let cellRegistration: VirtualCellElementRegistration | null = null;
+
+	function registerCurrentBinding(): void {
+		if (!active || !cellElement || !cellRegistry) return;
+		if (!cellRegistration) {
+			cellRegistration = cellRegistry.createRegistration(cellElement);
+		}
+		cellRegistration.update(String(logicalKey), rowIndex, columnIndex);
+	}
+
+	function unregisterCurrentBinding(): void {
+		cellRegistration?.unregister();
+		cellRegistration = null;
+	}
 
 	return {
 		cellSlotKey,
@@ -74,9 +95,24 @@ function createCellController(
 			mountedCell = nextCell;
 			revision += 1;
 			active = true;
+			registerCurrentBinding();
 		},
 		clear(): void {
 			active = false;
+			unregisterCurrentBinding();
+		},
+		attachElement(element, registry): void {
+			if (cellElement === element && cellRegistry === registry) return;
+			unregisterCurrentBinding();
+			cellElement = element;
+			cellRegistry = registry;
+			registerCurrentBinding();
+		},
+		detachElement(element): void {
+			if (cellElement !== element) return;
+			unregisterCurrentBinding();
+			cellElement = null;
+			cellRegistry = null;
 		},
 	};
 }

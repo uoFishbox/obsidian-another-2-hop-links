@@ -6,6 +6,7 @@
 		createVirtualCellElementRegistration,
 		type VirtualCellRegistry,
 		type VirtualCellElementRegistration,
+		type VirtualCellRegistrationOwner,
 	} from "./VirtualCellRegistry";
 
 	interface Props {
@@ -20,6 +21,7 @@
 		onLogicalCellDetach?: (cell: TMountedCell) => void;
 		children?: Snippet;
 		cellRegistry?: VirtualCellRegistry;
+		cellRegistrationOwner?: VirtualCellRegistrationOwner;
 	}
 
 	let {
@@ -34,6 +36,7 @@
 		onLogicalCellDetach,
 		children,
 		cellRegistry,
+		cellRegistrationOwner,
 	}: Props = $props();
 
 	let lifecycleCell: TMountedCell | undefined = undefined;
@@ -76,10 +79,15 @@
 		if (!cellElement) {
 			return;
 		}
+		const element = cellElement;
+		if (cellRegistrationOwner && cellRegistry) {
+			cellRegistrationOwner.attachElement(element, cellRegistry);
+			return () => cellRegistrationOwner.detachElement(element);
+		}
 
 		const registration = cellRegistry
-			? cellRegistry.createRegistration(cellElement)
-			: createVirtualCellElementRegistration(cellElement);
+			? cellRegistry.createRegistration(element)
+			: createVirtualCellElementRegistration(element);
 		cellRegistration = registration;
 
 		return () => {
@@ -91,6 +99,7 @@
 	});
 
 	$effect(() => {
+		if (cellRegistrationOwner) return;
 		cellRegistration?.update(logicalKeyAttribute, rowIndex, columnIndex);
 	});
 

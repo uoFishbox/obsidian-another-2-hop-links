@@ -6,6 +6,7 @@ import {
 import type { SectionRenderDescriptor } from "ui/components/sections/types";
 import { compileTwoHopViewPlan, createTwoHopViewPlanRowModel } from "../twoHopViewPlan";
 import { createTwoHopScalarScrollKernel } from "../twoHopScalarScrollKernel.svelte";
+import { createSurfaceVirtualCellRegistry } from "ui/components/common/virtual-list/svelte/VirtualCellRegistry";
 import type {
 	TwoHopVirtualListItem,
 	TwoHopVirtualListSection,
@@ -83,6 +84,32 @@ function applyRange(
 }
 
 describe("TwoHop scalar scroll kernel", () => {
+	it("updates the surface navigation index inside the slot bind transaction", () => {
+		const kernel = createTwoHopScalarScrollKernel({
+			initialRowModel: rowModel,
+			onStableVisibleRange() {},
+		});
+		const registry = createSurfaceVirtualCellRegistry();
+		const element = document.createElement("div");
+		applyRange(kernel, 0);
+		const cellController = kernel.fixedRowSlotPool.controllers[0]?.cells[0];
+		expect(cellController).toBeDefined();
+		if (!cellController) return;
+
+		cellController.attachElement(element, registry);
+		const previousKey = String(cellController.logicalKey);
+		expect(registry.findByKey(previousKey)).toBe(element);
+
+		applyRange(kernel, 1);
+		const nextKey = String(cellController.logicalKey);
+		expect(nextKey).not.toBe(previousKey);
+		expect(registry.findByKey(previousKey)).toBeNull();
+		expect(registry.findByKey(nextKey)).toBe(element);
+
+		kernel.dispose();
+		expect(registry.findByKey(nextKey)).toBeNull();
+	});
+
 	it("reuses row/cell shells and writes only the entering slot", () => {
 		const kernel = createTwoHopScalarScrollKernel({
 			initialRowModel: rowModel,
