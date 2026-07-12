@@ -83,6 +83,61 @@ export function resolveCardLayoutSettings(
 	};
 }
 
+/**
+ * Returns the previous resolved layout object when the layout-affecting
+ * setting values are unchanged.
+ */
+export function createResolvedCardLayoutSettingsMemo(): (
+	settings?: CardLayoutSettings | null,
+) => ResolvedCardLayoutSettings | null {
+	let previous: ResolvedCardLayoutSettings | null = null;
+
+	return (settings) => {
+		if (!settings) {
+			previous = null;
+			return null;
+		}
+
+		const cardWidthPx = normalizeCardWidthPx(settings.cardWidthPx);
+		const cardHeightRatio = normalizeCardHeightRatio(settings.cardHeightRatio);
+		const cardHeightPx = computeCardHeightPxFromWidth(cardWidthPx, cardHeightRatio);
+		const cardGapPx = normalizePositiveInteger(
+			settings.cardGapPx,
+			DEFAULT_CARD_GAP_PX,
+		);
+		const cardMaxColumns = normalizePositiveInteger(
+			settings.cardMaxColumns,
+			DEFAULT_CARD_MAX_COLUMNS,
+		);
+		const sectionMarginBottomPx = normalizePositiveInteger(
+			settings.sectionMarginBottomPx,
+			DEFAULT_SECTION_MARGIN_BOTTOM_PX,
+		);
+
+		if (
+			previous &&
+			previous.cardWidthPx === cardWidthPx &&
+			previous.cardHeightPx === cardHeightPx &&
+			previous.cardHeightRatio === cardHeightRatio &&
+			previous.cardGapPx === cardGapPx &&
+			previous.cardMaxColumns === cardMaxColumns &&
+			previous.sectionMarginBottomPx === sectionMarginBottomPx
+		) {
+			return previous;
+		}
+
+		previous = {
+			cardWidthPx,
+			cardHeightPx,
+			cardHeightRatio,
+			cardGapPx,
+			cardMaxColumns,
+			sectionMarginBottomPx,
+		};
+		return previous;
+	};
+}
+
 export function getCardLayoutCssText(settings?: CardLayoutSettings): string {
 	const layout = resolveCardLayoutSettings(settings);
 	return [

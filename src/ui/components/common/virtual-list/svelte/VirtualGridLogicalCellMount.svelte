@@ -49,15 +49,13 @@
 	const logicalKeyAttribute = $derived(String(logicalKey));
 
 	$effect(() => {
+		if (!onLogicalCellAttach && !onLogicalCellDetach) {
+			return;
+		}
+
 		const nextLogicalKey = logicalKeyAttribute;
 		const previousLogicalKey = lifecycleLogicalKey;
 		const previousCell = lifecycleCell;
-
-		if (!onLogicalCellAttach && !onLogicalCellDetach) {
-			lifecycleLogicalKey = nextLogicalKey;
-			lifecycleCell = mountedCell;
-			return;
-		}
 
 		if (
 			previousCell !== undefined &&

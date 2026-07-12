@@ -17,7 +17,7 @@ import type { VirtualListStableMeasurementContext } from "../dom/virtualMeasurem
 import { createVirtualListMeasurementState } from "../dom/virtualListMeasurementState";
 import { createCardVirtualListPolicy } from "../cardVirtualListPolicy";
 import {
-	resolveCardLayoutSettings,
+	createResolvedCardLayoutSettingsMemo,
 	type CardLayoutSettings,
 } from "ui/utils/cardLayoutCssVars";
 import { getOptionalOwnerWindow } from "ui/utils/realmSafeDom";
@@ -122,15 +122,24 @@ export function useFlatVirtualGridList<T>(props: FlatVirtualGridListProps<T>) {
 		},
 	});
 	const rowSlotAllocator = createContiguousRowSlotAllocator();
-	let lastResolvedActiveScrollPolicyLayout: VirtualGridLayout | undefined;
+	let lastResolvedActiveScrollPolicyRowHeight: number | undefined;
+	let lastResolvedActiveScrollPolicyGap: number | undefined;
+	let lastResolvedActiveScrollPolicyAheadRows: number | undefined;
 	let lastResolvedActiveScrollPolicy:
 		| ReturnType<typeof createCardVirtualListPolicy>
 		| undefined;
 	const resolveActiveScrollPolicy = (
 		nextLayout: VirtualGridLayout,
 	): ReturnType<typeof createCardVirtualListPolicy> => {
-		if (lastResolvedActiveScrollPolicyLayout !== nextLayout) {
-			lastResolvedActiveScrollPolicyLayout = nextLayout;
+		if (
+			!lastResolvedActiveScrollPolicy ||
+			lastResolvedActiveScrollPolicyRowHeight !== nextLayout.rowHeight ||
+			lastResolvedActiveScrollPolicyGap !== nextLayout.gap ||
+			lastResolvedActiveScrollPolicyAheadRows !== previewActivationAheadRows
+		) {
+			lastResolvedActiveScrollPolicyRowHeight = nextLayout.rowHeight;
+			lastResolvedActiveScrollPolicyGap = nextLayout.gap;
+			lastResolvedActiveScrollPolicyAheadRows = previewActivationAheadRows;
 			lastResolvedActiveScrollPolicy = createCardVirtualListPolicy({
 				layout: nextLayout,
 				previewActivationAheadRows,
@@ -147,10 +156,9 @@ export function useFlatVirtualGridList<T>(props: FlatVirtualGridListProps<T>) {
 	let loadScheduled = $state(false);
 	let chainedInfiniteScrollLoads = $state(0);
 	let layout = $state.raw(DEFAULT_FLAT_GRID_LAYOUT);
+	const resolveConfiguredCardLayout = createResolvedCardLayoutSettingsMemo();
 	const configuredCardLayout = $derived.by(() =>
-		applicationStore?.settings
-			? resolveCardLayoutSettings(applicationStore.settings)
-			: null,
+		resolveConfiguredCardLayout(applicationStore?.settings),
 	);
 	const previewActivationAheadRows = $derived(
 		applicationStore?.settings?.previewActivationAheadRows ?? 1,

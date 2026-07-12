@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { getContext, onDestroy } from "svelte";
+	import { getContext, onDestroy, untrack } from "svelte";
 	import type { TFile } from "obsidian";
 	import type { PreviewData, PreviewRequestOptions } from "ui/context/linkContext";
 	import CardPreview from "ui/components/common/CardPreview.svelte";
@@ -164,7 +164,7 @@
 		}
 
 		// ファイル自体が変わった場合は、旧previewを見せ続けると誤表示になるので消す。
-		if (!canKeepRenderedPreviewForCurrentPreview()) {
+		if (!untrack(canKeepRenderedPreviewForCurrentPreview)) {
 			renderedPreviewSnapshot = undefined;
 			activatedPreviewIdentity = undefined;
 		}

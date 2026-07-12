@@ -2,7 +2,7 @@ import { getContext } from "svelte";
 import type { ApplicationStore } from "ui/stores/ApplicationStore.svelte";
 import { createViewPlanInputState } from "ui/components/common/virtual-list/svelte/viewPlanInputState.svelte";
 import type { ViewPlanLayoutMetrics } from "ui/components/common/virtual-list/svelte/viewPlanLayout";
-import { resolveCardLayoutSettings } from "ui/utils/cardLayoutCssVars";
+import { createResolvedCardLayoutSettingsMemo } from "ui/utils/cardLayoutCssVars";
 import type {
 	TwoHopVirtualListItem,
 	TwoHopVirtualListSection,
@@ -30,10 +30,9 @@ export function createTwoHopVirtualListPlanRuntime(params: {
 	if (!applicationStore) {
 		applicationStore = getContext<ApplicationStore>("applicationStore");
 	}
+	const resolveConfiguredCardLayout = createResolvedCardLayoutSettingsMemo();
 	const configuredCardLayout = $derived.by(() =>
-		applicationStore?.settings
-			? resolveCardLayoutSettings(applicationStore.settings)
-			: null,
+		resolveConfiguredCardLayout(applicationStore?.settings),
 	);
 	const inputState = createViewPlanInputState<
 		TwoHopVirtualListItem,
