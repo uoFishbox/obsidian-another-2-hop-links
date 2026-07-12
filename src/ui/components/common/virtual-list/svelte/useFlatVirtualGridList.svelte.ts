@@ -241,6 +241,7 @@ export function useFlatVirtualGridList<T>(props: FlatVirtualGridListProps<T>) {
 				rowModel: snapshot.rowModel,
 			});
 		},
+		trackMountedCellsForChange: props.onMountedCellsChange !== undefined,
 	});
 	const virtualListSnapshot = $derived(virtualList.getSnapshot());
 	const contentHeight = $derived(virtualList.getTotalHeight(layout.contentHeight));
@@ -248,12 +249,18 @@ export function useFlatVirtualGridList<T>(props: FlatVirtualGridListProps<T>) {
 		virtualList.getMountedCells(),
 	);
 	const mountedRows = $derived.by<readonly MountedVirtualGridRowSlice<T>[]>(() => {
-		const rowsBySlot = virtualList.getReconciliationState().mountedBuild?.rowsBySlot;
+		const rowsBySlot =
+			virtualList.getReconciliationState().mountedBuild?.rowsBySlot;
 		return rowsBySlot && rowsBySlot.length > 0 ? rowsBySlot : EMPTY_MOUNTED_ROWS;
 	});
-	const mountedCellsForChange = $derived<readonly MountedVirtualGridCell<T>[]>(
-		virtualList.getMountedCellsForChange(),
-	);
+	const mountedCellsForChange = $derived.by<
+		readonly MountedVirtualGridCell<T>[] | undefined
+	>(() => {
+		if (!props.onMountedCellsChange) {
+			return undefined;
+		}
+		return virtualList.getMountedCellsForChange();
+	});
 	let lastEmptyMountedCellsNotification: unknown = null;
 	const flatGridMeasurementAdapter = createFlatGridMeasurementAdapter<
 		T,

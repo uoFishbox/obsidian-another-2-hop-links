@@ -2,6 +2,7 @@ import {
 	computeVisibleCellWindow,
 	type VisibleCellWindow,
 } from "../../layout/flatGridLayout";
+import { recordCCLDevMeasurement } from "infrastructure/debug/CCLDevMeasurements";
 import { createArrayBackedFlatLogicalCellSource } from "../../flatLogicalCellSource";
 import type { VirtualListLogicalCell } from "../../logicalCell";
 import { clampRange, isEmptyRange, sameRange, type RowRange } from "../../rowRange";
@@ -141,22 +142,25 @@ const createMountedVirtualGridCell = <T>(params: {
 	previous?: MountedVirtualGridCell<T>;
 	renderRevisionFallbackPolicy?: RenderRevisionFallbackPolicy;
 	cellSlotKey?: number;
-}): MountedVirtualGridCell<T> => ({
-	key: params.key,
-	renderSlotIndex: params.renderSlotIndex,
-	renderSlotKey: renderSlotKey(params.renderSlotIndex),
-	rowIndex: params.rowIndex,
-	columnIndex: params.position.column,
-	cell: params.cell,
-	cellIndex: params.cellIndex,
-	position: params.position,
-	renderBodyKey: resolveMountedVirtualGridCellBodyKey({
-		previous: params.previous,
+}): MountedVirtualGridCell<T> => {
+	recordCCLDevMeasurement("virtualGrid.cellShellCreated");
+	return {
+		key: params.key,
+		renderSlotIndex: params.renderSlotIndex,
+		renderSlotKey: renderSlotKey(params.renderSlotIndex),
+		rowIndex: params.rowIndex,
+		columnIndex: params.position.column,
 		cell: params.cell,
-		fallbackPolicy: params.renderRevisionFallbackPolicy,
-	}),
-	cellSlotKey: params.cellSlotKey,
-});
+		cellIndex: params.cellIndex,
+		position: params.position,
+		renderBodyKey: resolveMountedVirtualGridCellBodyKey({
+			previous: params.previous,
+			cell: params.cell,
+			fallbackPolicy: params.renderRevisionFallbackPolicy,
+		}),
+		cellSlotKey: params.cellSlotKey,
+	};
+};
 
 function isSameLogicalCellForMountedReuse<T>(
 	previous: VirtualListLogicalCell<T>,
@@ -243,6 +247,7 @@ function updateMountedVirtualGridCell<T>(
 		return previous;
 	}
 
+	recordCCLDevMeasurement("virtualGrid.cellShellRebound");
 	const position = {
 		row: rowIndex,
 		column: columnIndex,
@@ -584,6 +589,7 @@ function buildMountedVirtualGridCellsFromCore<T>(params: {
 			rowCells.push(mountedCell);
 		}
 
+		recordCCLDevMeasurement("virtualGrid.rowShellCreated");
 		rowSlices.push({
 			key: rowIndex,
 			slotIndex: rowSlotIndex,
@@ -638,6 +644,7 @@ function buildMountedVirtualGridCellsFromCore<T>(params: {
 		value: rowSlotAllocator,
 		enumerable: false,
 	});
+	recordCCLDevMeasurement("virtualGrid.buildMountedRows");
 	assertMountedVirtualGridBuildInvariants(buildState);
 	return buildState;
 }

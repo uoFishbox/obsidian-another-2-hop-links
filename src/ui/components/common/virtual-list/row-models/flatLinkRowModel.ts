@@ -44,6 +44,7 @@ export interface FlatLinkRowModel<T> extends VirtualRowModel<
 	cellSource: FlatLogicalCellSource<T>;
 	cellCount: number;
 	getCellIndex(rowIndex: number, columnIndex: number): number;
+	getRowCellCount(rowIndex: number): number;
 	resolveCellAtIndex(index: number): VirtualListLogicalCell<T> | null;
 	findVisibleRanges(params: {
 		scrollTop: number;
@@ -111,20 +112,19 @@ export function createFlatLinkRowModel<T>(
 	const cellSource = input.cellSource;
 	const cellCount = cellSource.cellCount;
 	const rowCount = cellCount > 0 ? Math.ceil(cellCount / columns) : 0;
-	const rowCellCountByRow = new Uint16Array(rowCount);
 	const rowStride = input.layout.rowHeight + input.layout.gap;
 	const totalHeight =
 		rowCount > 0
 			? rowCount * input.layout.rowHeight + (rowCount - 1) * input.layout.gap
 			: 0;
 
-	for (let rowIndex = 0; rowIndex < rowCount; rowIndex += 1) {
+	const getRowCellCount = (rowIndex: number): number => {
+		if (rowIndex < 0 || rowIndex >= rowCount) {
+			return 0;
+		}
 		const startCellIndex = rowIndex * columns;
-		rowCellCountByRow[rowIndex] = Math.min(
-			columns,
-			Math.max(0, cellCount - startCellIndex),
-		);
-	}
+		return Math.min(columns, Math.max(0, cellCount - startCellIndex));
+	};
 
 	const getCellIndex = (rowIndex: number, columnIndex: number): number =>
 		rowIndex * columns + columnIndex;
@@ -317,7 +317,6 @@ export function createFlatLinkRowModel<T>(
 			layout: layoutRevision,
 		}),
 		rowCount,
-		rowCellCountByRow,
 		totalHeight,
 		layout: {
 			...input.layout,
@@ -326,6 +325,7 @@ export function createFlatLinkRowModel<T>(
 		cellSource,
 		cellCount,
 		getCellIndex,
+		getRowCellCount,
 		resolveCellAtIndex,
 		getRow(rowIndex): FlatLinkVirtualRow<T> | null {
 			if (rowIndex < 0 || rowIndex >= rowCount) {
@@ -333,7 +333,7 @@ export function createFlatLinkRowModel<T>(
 			}
 
 			const startCellIndex = rowIndex * columns;
-			const rowCellCount = rowCellCountByRow[rowIndex];
+			const rowCellCount = getRowCellCount(rowIndex);
 			const isLastRow = rowIndex === rowCount - 1;
 
 			return {

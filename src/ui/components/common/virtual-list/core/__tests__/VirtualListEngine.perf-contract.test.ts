@@ -1,4 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
+import {
+	getCCLDevMeasurementSnapshot,
+	resetCCLDevMeasurements,
+} from "infrastructure/debug/CCLDevMeasurements";
 import { createFlatLogicalCellSource } from "../../flatLogicalCellSource";
 import { computeVirtualGridLayout } from "../../layout/flatGridLayout";
 import type { VirtualListLogicalCell } from "../../logicalCell";
@@ -175,6 +179,7 @@ describe("VirtualListEngine performance contracts", () => {
 		const mountedRows = mounted.rowSlices.length;
 		const columns = rowModel.layout.columns;
 
+		resetCCLDevMeasurements();
 		for (let frame = 1; frame <= NO_OP_MEASUREMENTS; frame += 1) {
 			mounted = buildMountedVirtualGridCellsFromRowModel({
 				rowModel,
@@ -189,6 +194,12 @@ describe("VirtualListEngine performance contracts", () => {
 		expect(mounted.rowSlices).toHaveLength(mountedRows);
 		expect(resolveCellAtIndex).toHaveBeenCalledTimes(
 			mountedRows * columns + NO_OP_MEASUREMENTS * columns,
+		);
+		const counters = getCCLDevMeasurementSnapshot().counters;
+		expect(counters["virtualGrid.buildMountedRows"].count).toBe(NO_OP_MEASUREMENTS);
+		expect(counters["virtualGrid.rowShellCreated"].count).toBe(NO_OP_MEASUREMENTS);
+		expect(counters["virtualGrid.cellShellCreated"].count).toBe(
+			NO_OP_MEASUREMENTS * columns,
 		);
 	});
 });

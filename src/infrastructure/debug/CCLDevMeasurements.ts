@@ -2,6 +2,10 @@ export type CCLDevMeasurementName =
 	| "virtualScroll.applyScrollMeasurement"
 	| "virtualScroll.stableBandHit"
 	| "virtualScroll.previewOnlyCrossing"
+	| "virtualGrid.buildMountedRows"
+	| "virtualGrid.rowShellCreated"
+	| "virtualGrid.cellShellCreated"
+	| "virtualGrid.cellShellRebound"
 	| "twoHop.rowWindow.apply"
 	| "twoHop.rowWindow.apply.changed"
 	| "twoHop.rowWindow.apply.changed.firstBuild"
@@ -37,6 +41,10 @@ export const CCL_DEV_MEASUREMENT_NAMES: readonly CCLDevMeasurementName[] = [
 	"virtualScroll.applyScrollMeasurement",
 	"virtualScroll.stableBandHit",
 	"virtualScroll.previewOnlyCrossing",
+	"virtualGrid.buildMountedRows",
+	"virtualGrid.rowShellCreated",
+	"virtualGrid.cellShellCreated",
+	"virtualGrid.cellShellRebound",
 	"twoHop.rowWindow.apply",
 	"twoHop.rowWindow.apply.changed",
 	"twoHop.rowWindow.apply.changed.firstBuild",

@@ -30,6 +30,18 @@ const createRowModel = (itemCount: number) => {
 };
 
 describe("flatLinkRowModel", () => {
+	it("resolves row cell counts arithmetically without a per-row lookup table", () => {
+		const rowModel = createRowModel(8);
+
+		expect(rowModel.rowCellCountByRow).toBeUndefined();
+		expect(rowModel.getRowCellCount(0)).toBe(3);
+		expect(rowModel.getRowCellCount(1)).toBe(3);
+		expect(rowModel.getRowCellCount(2)).toBe(2);
+		expect(rowModel.getRowCellCount(-1)).toBe(0);
+		expect(rowModel.getRowCellCount(3)).toBe(0);
+		expect(rowModel.getRow(2)?.cellCount).toBe(2);
+	});
+
 	it("writes visible ranges into caller-owned scratch objects", () => {
 		const rowModel = createRowModel(30);
 		const mountedScratch = { start: -1, end: -1 };

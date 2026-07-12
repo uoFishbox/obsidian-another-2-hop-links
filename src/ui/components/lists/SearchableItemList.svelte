@@ -5,7 +5,6 @@
 	import ListControls from "ui/components/common/ListControls.svelte";
 	import LinkList from "ui/components/common/VirtualGridLinkList.svelte";
 	import LinkSectionHeader from "ui/components/common/LinkSectionHeader.svelte";
-	import type { MountedVirtualGridCell } from "ui/components/common/virtual-list/core/reconciliation/linkListVirtualLayout";
 	import { buildScopedSectionId } from "ui/components/common/listPagination";
 	import { useSearchQuery } from "ui/hooks/useSearchQuery.svelte";
 	import { useBookmarks } from "ui/hooks/useBookmarks.svelte";
@@ -87,10 +86,6 @@
 		void reconcileResetVersion;
 		return viewItemReconciler.reconcile(items);
 	});
-
-	const handleMountedCellsChange = (
-		_cells: readonly MountedVirtualGridCell<ViewItem>[],
-	): void => {};
 
 	const search = useSearchQuery();
 	let contentSearchEnabled = $state(false);
@@ -397,7 +392,6 @@
 			{initialVisibleCount}
 			{loadMoreIncrement}
 			paginationMode={config.paginationMode ?? "button"}
-			onMountedCellsChange={handleMountedCellsChange}
 			remountCellBodyOnKeyChange={config.itemComponent !== ViewItemCard}
 			header={config.showSectionHeader ? sectionHeader : undefined}
 		>
