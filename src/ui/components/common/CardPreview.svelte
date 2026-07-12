@@ -206,8 +206,8 @@
 		);
 	}
 
-	function buildDomCommitKey(renderCacheKey: string): string {
-		return `${domCommitScopeKey}:${renderCacheKey}`;
+	function buildDomCommitRevisionKey(renderCacheKey: string): string {
+		return renderCacheKey;
 	}
 
 	async function replaceContainerContent(
@@ -221,10 +221,11 @@
 		if (!targetContainer) return false;
 
 		return enqueuePreviewDomCommit({
-			key: buildDomCommitKey(renderCacheKey),
+			targetKey: domCommitScopeKey,
+			revisionKey: buildDomCommitRevisionKey(renderCacheKey),
 			isStale: () => isRenderStale(signal, renderToken),
 			commit: () => {
-				if (shouldSkipDomApply(renderCacheKey)) return;
+				if (shouldSkipDomApply(renderCacheKey)) return false;
 				targetContainer.replaceChildren();
 				while (source.firstChild) {
 					targetContainer.appendChild(source.firstChild);
@@ -234,6 +235,7 @@
 				if (shouldSyncMathJaxStyles) {
 					syncMathJaxStylesForNode(targetContainer);
 				}
+				return true;
 			},
 		});
 	}
@@ -249,19 +251,22 @@
 			return false;
 		}
 
-		return enqueuePreviewDomCommit({
-			key: buildDomCommitKey(cacheKey),
+		const didMutateDom = await enqueuePreviewDomCommit({
+			targetKey: domCommitScopeKey,
+			revisionKey: buildDomCommitRevisionKey(cacheKey),
 			isStale: () => isRenderStale(signal, renderToken),
 			commit: () => {
-				if (shouldSkipDomApply(cacheKey)) return;
+				if (shouldSkipDomApply(cacheKey)) return false;
 				previewContentType = "text";
 				container.replaceChildren(cloneRenderedPreviewContent(renderedEntry));
 				lastAppliedRenderCacheKey = cacheKey;
 				if (renderedEntry.hasMath) {
 					syncMathJaxStylesForNode(container);
 				}
+				return true;
 			},
 		});
+		return didMutateDom || shouldSkipDomApply(cacheKey);
 	}
 
 	function shouldSyncMathJaxStyles(
@@ -354,10 +359,11 @@
 						const targetContainer = container;
 						if (!targetContainer) return false;
 						return enqueuePreviewDomCommit({
-							key: buildDomCommitKey(renderCacheKey),
+							targetKey: domCommitScopeKey,
+							revisionKey: buildDomCommitRevisionKey(renderCacheKey),
 							isStale: () => isRenderStale(signal, renderToken),
 							commit: () => {
-								if (shouldSkipDomApply(renderCacheKey)) return;
+								if (shouldSkipDomApply(renderCacheKey)) return false;
 								previewContentType = previewForRender.type;
 								targetContainer.replaceChildren(
 									cloneRenderedPreviewContent(renderedEntry),
@@ -366,6 +372,7 @@
 								if (shouldSyncMathStyles) {
 									syncMathJaxStylesForNode(targetContainer);
 								}
+								return true;
 							},
 						});
 					}
@@ -410,13 +417,15 @@
 					img.src = toPreviewImageSrc(previewForRender.content);
 
 					return enqueuePreviewDomCommit({
-						key: buildDomCommitKey(renderCacheKey),
+						targetKey: domCommitScopeKey,
+						revisionKey: buildDomCommitRevisionKey(renderCacheKey),
 						isStale: () => isRenderStale(signal, renderToken),
 						commit: () => {
-							if (shouldSkipDomApply(renderCacheKey)) return;
+							if (shouldSkipDomApply(renderCacheKey)) return false;
 							previewContentType = "image";
 							targetContainer.replaceChildren(img);
 							lastAppliedRenderCacheKey = renderCacheKey;
+							return true;
 						},
 					});
 				}
@@ -483,10 +492,12 @@
 							}
 
 							const didCommit = await enqueuePreviewDomCommit({
-								key: buildDomCommitKey(renderCacheKey),
+								targetKey: domCommitScopeKey,
+								revisionKey: buildDomCommitRevisionKey(renderCacheKey),
 								isStale: () => isRenderStale(signal, renderToken),
 								commit: () => {
-									if (shouldSkipDomApply(renderCacheKey)) return;
+									if (shouldSkipDomApply(renderCacheKey))
+										return false;
 									previewContentType = previewForRender.type;
 									targetContainer.replaceChildren(
 										cloneRenderedPreviewContent(renderedEntry),
@@ -495,6 +506,7 @@
 									if (shouldSyncMathStyles) {
 										syncMathJaxStylesForNode(targetContainer);
 									}
+									return true;
 								},
 							});
 							if (!didCommit) {
@@ -550,11 +562,13 @@
 				return false;
 			}
 			await enqueuePreviewDomCommit({
-				key: buildDomCommitKey(renderCacheKey),
+				targetKey: domCommitScopeKey,
+				revisionKey: buildDomCommitRevisionKey(renderCacheKey),
 				isStale: () => isRenderStale(signal, renderToken),
 				commit: () => {
 					previewContentType = undefined;
 					handlePreviewError(targetContainer, error);
+					return true;
 				},
 			});
 			return false;

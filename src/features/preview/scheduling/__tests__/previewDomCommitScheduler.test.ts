@@ -19,6 +19,26 @@ async function flushAnimationFrame(): Promise<void> {
 	await Promise.resolve();
 }
 
+interface EnqueueTestCommitOptions {
+	readonly targetKey: string;
+	readonly revisionKey?: string;
+	readonly isStale?: () => boolean;
+	readonly didMutateDom?: boolean;
+	readonly onCommit?: () => void;
+}
+
+function enqueueTestCommit(options: EnqueueTestCommitOptions): Promise<boolean> {
+	return enqueuePreviewDomCommit({
+		targetKey: options.targetKey,
+		revisionKey: options.revisionKey ?? options.targetKey,
+		isStale: options.isStale ?? (() => false),
+		commit: () => {
+			options.onCommit?.();
+			return options.didMutateDom ?? true;
+		},
+	});
+}
+
 async function countCommits(params: {
 	readonly intervalMs: number;
 	readonly durationMs: number;
@@ -33,10 +53,9 @@ async function countCommits(params: {
 		markScrollActivityActive(scrollSource);
 	}
 	for (let index = 0; index < 500; index += 1) {
-		void enqueuePreviewDomCommit({
-			key: `preview-${index}`,
-			isStale: () => false,
-			commit: () => {
+		void enqueueTestCommit({
+			targetKey: `preview-${index}`,
+			onCommit: () => {
 				committed += 1;
 			},
 		});
@@ -73,18 +92,18 @@ afterEach(() => {
 });
 
 describe("preview DOM commit scheduler", () => {
-	it("coalesces pending commits by key", async () => {
+	it("coalesces pending commits by target key", async () => {
 		const committed: string[] = [];
 
-		const firstCommit = enqueuePreviewDomCommit({
-			key: "preview-a",
-			isStale: () => false,
-			commit: () => committed.push("first"),
+		const firstCommit = enqueueTestCommit({
+			targetKey: "preview-a",
+			revisionKey: "old",
+			onCommit: () => committed.push("first"),
 		});
-		const secondCommit = enqueuePreviewDomCommit({
-			key: "preview-a",
-			isStale: () => false,
-			commit: () => committed.push("second"),
+		const secondCommit = enqueueTestCommit({
+			targetKey: "preview-a",
+			revisionKey: "new",
+			onCommit: () => committed.push("second"),
 		});
 
 		await expect(firstCommit).resolves.toBe(false);
@@ -95,15 +114,44 @@ describe("preview DOM commit scheduler", () => {
 		expect(committed).toEqual(["second"]);
 	});
 
+	it("does not let old revisions delay the latest target commit", async () => {
+		const committed: string[] = [];
+		const commits: Promise<boolean>[] = [];
+
+		for (let revision = 0; revision < 300; revision += 1) {
+			commits.push(
+				enqueueTestCommit({
+					targetKey: "preview-a",
+					revisionKey: `old-${revision}`,
+					onCommit: () => committed.push(`old-${revision}`),
+				}),
+			);
+		}
+
+		const latestCommit = enqueueTestCommit({
+			targetKey: "preview-a",
+			revisionKey: "latest",
+			onCommit: () => committed.push("latest"),
+		});
+		commits.push(latestCommit);
+
+		await flushAnimationFrame();
+
+		await expect(latestCommit).resolves.toBe(true);
+		expect(committed).toEqual(["latest"]);
+		await expect(Promise.all(commits.slice(0, -1))).resolves.toEqual(
+			Array.from({ length: 300 }, () => false),
+		);
+	});
+
 	it("limits scrolling commits by elapsed time", async () => {
 		markScrollActivityActive(scrollSource);
 		const committed: string[] = [];
 
 		const commits = ["a", "b", "c"].map((key) =>
-			enqueuePreviewDomCommit({
-				key,
-				isStale: () => false,
-				commit: () => committed.push(key),
+			enqueueTestCommit({
+				targetKey: key,
+				onCommit: () => committed.push(key),
 			}),
 		);
 
@@ -122,10 +170,9 @@ describe("preview DOM commit scheduler", () => {
 		const committed: string[] = [];
 
 		const commits = ["a", "b", "c", "d", "e"].map((key) =>
-			enqueuePreviewDomCommit({
-				key,
-				isStale: () => false,
-				commit: () => committed.push(key),
+			enqueueTestCommit({
+				targetKey: key,
+				onCommit: () => committed.push(key),
 			}),
 		);
 
@@ -186,10 +233,9 @@ describe("preview DOM commit scheduler", () => {
 		const committed: string[] = [];
 
 		for (const key of ["a", "b", "c", "d"]) {
-			void enqueuePreviewDomCommit({
-				key,
-				isStale: () => false,
-				commit: () => committed.push(key),
+			void enqueueTestCommit({
+				targetKey: key,
+				onCommit: () => committed.push(key),
 			});
 		}
 
@@ -201,18 +247,17 @@ describe("preview DOM commit scheduler", () => {
 		expect(committed).toEqual(["a", "b"]);
 	});
 
-	it("skips stale commits without consuming time-budgeted capacity", async () => {
+	it("skips stale commits without consuming token capacity", async () => {
 		const committed: string[] = [];
 
-		const staleCommit = enqueuePreviewDomCommit({
-			key: "stale",
+		const staleCommit = enqueueTestCommit({
+			targetKey: "stale",
 			isStale: () => true,
-			commit: () => committed.push("stale"),
+			onCommit: () => committed.push("stale"),
 		});
-		const liveCommit = enqueuePreviewDomCommit({
-			key: "live",
-			isStale: () => false,
-			commit: () => committed.push("live"),
+		const liveCommit = enqueueTestCommit({
+			targetKey: "live",
+			onCommit: () => committed.push("live"),
 		});
 
 		await flushAnimationFrame();
@@ -222,6 +267,33 @@ describe("preview DOM commit scheduler", () => {
 		expect(committed).toEqual(["live"]);
 	});
 
+	it("does not consume token capacity for no-op commits", async () => {
+		const committed: string[] = [];
+
+		const commits = ["noop-a", "noop-b", "noop-c", "noop-d"].map((key) =>
+			enqueueTestCommit({
+				targetKey: key,
+				didMutateDom: false,
+				onCommit: () => committed.push(key),
+			}),
+		);
+		const liveCommit = enqueueTestCommit({
+			targetKey: "live",
+			onCommit: () => committed.push("live"),
+		});
+
+		await flushAnimationFrame();
+
+		await expect(Promise.all(commits)).resolves.toEqual([
+			false,
+			false,
+			false,
+			false,
+		]);
+		await expect(liveCommit).resolves.toBe(true);
+		expect(committed).toEqual(["noop-a", "noop-b", "noop-c", "noop-d", "live"]);
+	});
+
 	it("uses the current scroll state when a frame drains", async () => {
 		markScrollActivityActive(scrollSource);
 		const committed: string[] = [];
@@ -229,10 +301,9 @@ describe("preview DOM commit scheduler", () => {
 
 		for (const key of ["a", "b", "c", "d"]) {
 			commits.push(
-				enqueuePreviewDomCommit({
-					key,
-					isStale: () => false,
-					commit: () => committed.push(key),
+				enqueueTestCommit({
+					targetKey: key,
+					onCommit: () => committed.push(key),
 				}),
 			);
 		}

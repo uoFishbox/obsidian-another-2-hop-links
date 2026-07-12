@@ -23,9 +23,10 @@ const IDLE_POLICY: PreviewDomCommitPolicy = {
 };
 
 export interface PreviewDomCommitTask {
-	readonly key: string;
+	readonly targetKey: string;
+	readonly revisionKey: string;
 	readonly isStale: () => boolean;
-	readonly commit: () => void;
+	readonly commit: () => boolean;
 }
 
 interface QueuedPreviewDomCommitTask extends PreviewDomCommitTask {
@@ -34,7 +35,7 @@ interface QueuedPreviewDomCommitTask extends PreviewDomCommitTask {
 	settled: boolean;
 }
 
-const pendingByKey = new Map<string, QueuedPreviewDomCommitTask>();
+const pendingByTargetKey = new Map<string, QueuedPreviewDomCommitTask>();
 let pendingQueue: QueuedPreviewDomCommitTask[] = [];
 let pendingQueueHead = 0;
 let frameHandle: number | null = null;
@@ -53,8 +54,8 @@ function settleTask(task: QueuedPreviewDomCommitTask, didCommit: boolean): void 
 	if (task.settled) return;
 
 	task.settled = true;
-	if (pendingByKey.get(task.key) === task) {
-		pendingByKey.delete(task.key);
+	if (pendingByTargetKey.get(task.targetKey) === task) {
+		pendingByTargetKey.delete(task.targetKey);
 	}
 	task.resolve(didCommit);
 }
@@ -63,8 +64,8 @@ function rejectTask(task: QueuedPreviewDomCommitTask, error: unknown): void {
 	if (task.settled) return;
 
 	task.settled = true;
-	if (pendingByKey.get(task.key) === task) {
-		pendingByKey.delete(task.key);
+	if (pendingByTargetKey.get(task.targetKey) === task) {
+		pendingByTargetKey.delete(task.targetKey);
 	}
 	task.reject(error);
 }
@@ -92,13 +93,18 @@ function refillCommitTokens(timestamp: number, policy: PreviewDomCommitPolicy): 
 }
 
 function compactQueue(): void {
-	if (pendingQueueHead < 64 && pendingQueue.length <= pendingByKey.size * 2 + 16) {
+	if (
+		pendingQueueHead < 64 &&
+		pendingQueue.length <= pendingByTargetKey.size * 2 + 16
+	) {
 		return;
 	}
 
 	pendingQueue = pendingQueue
 		.slice(pendingQueueHead)
-		.filter((task) => !task.settled && pendingByKey.get(task.key) === task);
+		.filter(
+			(task) => !task.settled && pendingByTargetKey.get(task.targetKey) === task,
+		);
 	pendingQueueHead = 0;
 }
 
@@ -147,7 +153,7 @@ function drainFrame(frameTimestamp: number): void {
 		if (!task) break;
 		inspectedQueueEntries += 1;
 		if (task.settled) continue;
-		if (pendingByKey.get(task.key) !== task) continue;
+		if (pendingByTargetKey.get(task.targetKey) !== task) continue;
 
 		if (task.isStale()) {
 			settleTask(task, false);
@@ -155,9 +161,11 @@ function drainFrame(frameTimestamp: number): void {
 		}
 
 		try {
-			task.commit();
-			settleTask(task, true);
-			availableCommitTokens = Math.max(0, availableCommitTokens - 1);
+			const didCommit = task.commit();
+			settleTask(task, didCommit);
+			if (didCommit) {
+				availableCommitTokens = Math.max(0, availableCommitTokens - 1);
+			}
 		} catch (error) {
 			rejectTask(task, error);
 		}
@@ -165,22 +173,24 @@ function drainFrame(frameTimestamp: number): void {
 
 	compactQueue();
 
-	if (pendingByKey.size > 0) {
+	if (pendingByTargetKey.size > 0) {
 		scheduleFrameDrain();
 	}
 }
 
 /**
- * Queues a live preview DOM replacement and coalesces older work by key.
+ * Queues a live preview DOM replacement and coalesces older work by target.
  *
  * The returned promise resolves to `false` when the task was replaced or stale
- * before commit, and resolves to `true` only after `commit` has run.
+ * before commit, or when `commit` found no DOM mutation to apply. It resolves
+ * to `true` only after `commit` mutates the DOM.
  */
 export function enqueuePreviewDomCommit(task: PreviewDomCommitTask): Promise<boolean> {
 	return new Promise<boolean>((resolve, reject) => {
-		const existingTask = pendingByKey.get(task.key);
+		const existingTask = pendingByTargetKey.get(task.targetKey);
 		if (existingTask) {
 			settleTask(existingTask, false);
+			compactQueue();
 		}
 
 		const queuedTask: QueuedPreviewDomCommitTask = {
@@ -189,7 +199,7 @@ export function enqueuePreviewDomCommit(task: PreviewDomCommitTask): Promise<boo
 			reject,
 			settled: false,
 		};
-		pendingByKey.set(task.key, queuedTask);
+		pendingByTargetKey.set(task.targetKey, queuedTask);
 		pendingQueue.push(queuedTask);
 		scheduleFrameDrain();
 	});
@@ -200,7 +210,7 @@ export function resetPreviewDomCommitSchedulerForTests(): void {
 		settleTask(task, false);
 	}
 	pendingQueueHead = 0;
-	pendingByKey.clear();
+	pendingByTargetKey.clear();
 	availableCommitTokens = 0;
 	lastTokenRefillTimestamp = null;
 
