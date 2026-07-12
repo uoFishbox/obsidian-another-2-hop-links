@@ -20,6 +20,7 @@
 	import type { ItemInteractionDescriptor } from "ui/interactions/interactionTypes";
 	import { createTwoHopInteractionResolverProvider } from "./twoHopInteractionResolverCache";
 	import TwoHopFixedRowSlotsSurface from "./TwoHopFixedRowSlotsSurface.svelte";
+	import TwoHopItemCellRender from "./TwoHopItemCellRender.svelte";
 	import { createSurfaceVirtualCellRegistry } from "ui/components/common/virtual-list/svelte/VirtualCellRegistry";
 
 	interface Props {
@@ -123,7 +124,7 @@
 		getCellDataTestId={list.getCellDataTestId}
 		{cellRegistry}
 	>
-		{#snippet renderCell({ mountedCell: renderedCell })}
+		{#snippet renderCell({ mountedCell: renderedCell, cellController })}
 			{#if isHeaderCell(renderedCell)}
 				{@render props.renderHeader({
 					section: renderedCell.section,
@@ -133,12 +134,13 @@
 					headerProps: renderedCell.headerProps,
 				})}
 			{:else if isItemCell(renderedCell)}
-				{@render props.renderItem(
-					renderedCell.cell.item,
-					renderedCell.rowIndex,
-					list.getItemVisibilityState(renderedCell),
-					list.getItemActivationCandidateId(renderedCell),
-				)}
+				<TwoHopItemCellRender
+					{cellController}
+					initialCell={renderedCell}
+					getItemVisibilityState={list.getItemVisibilityState}
+					getItemActivationCandidateId={list.getItemActivationCandidateId}
+					renderItem={props.renderItem}
+				/>
 			{:else}
 				<VirtualListLoadMoreButton
 					testId={!IS_PROD

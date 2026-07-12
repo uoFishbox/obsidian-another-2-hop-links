@@ -165,7 +165,7 @@ describe("TwoHopViewPlanVirtualList DOM performance contracts", () => {
 		expect(getItemInteractionDescriptor).not.toHaveBeenCalled();
 	});
 
-	it("updates a recycled cell shell to the entering logical item", async () => {
+	it("reuses an item body when a recycled cell shell receives another logical item", async () => {
 		const { container } = render(TwoHopViewPlanVirtualListPerfHarness, {
 			props: {
 				sections: [createDescriptor(100)],
@@ -189,14 +189,20 @@ describe("TwoHopViewPlanVirtualList DOM performance contracts", () => {
 		triggerResize(scrollRoot, 330, 120);
 		await flushFrames();
 		await flushFrames();
+		const shadowRoot = virtualListRoot.shadowRoot;
 		const initialIndexes = new Set(
 			Array.from(
-				virtualListRoot.shadowRoot?.querySelectorAll<HTMLElement>(
+				shadowRoot?.querySelectorAll<HTMLElement>(
 					"[data-testid='twohop-item-cell']",
 				) ?? [],
 				(cell) => cell.dataset.index,
 			),
 		);
+		const recycledItemElement = shadowRoot?.querySelector<HTMLElement>(
+			"[data-ccl-cell-slot='1'] [data-testid='twohop-item-cell']",
+		);
+		const recycledItemIndex = recycledItemElement?.dataset.index;
+		expect(recycledItemElement).toBeTruthy();
 
 		setNumericProperty(scrollRoot, "scrollTop", 360);
 		await fireEvent.scroll(scrollRoot);
@@ -213,6 +219,66 @@ describe("TwoHopViewPlanVirtualList DOM performance contracts", () => {
 
 		expect(nextIndexes).not.toEqual(initialIndexes);
 		expect([...nextIndexes].some((index) => !initialIndexes.has(index))).toBe(true);
+		const reboundItemElement = shadowRoot?.querySelector<HTMLElement>(
+			"[data-ccl-cell-slot='1'] [data-testid='twohop-item-cell']",
+		);
+		expect(reboundItemElement).toBe(recycledItemElement);
+		expect(reboundItemElement?.dataset.index).not.toBe(recycledItemIndex);
+	});
+
+	it("updates derived props in a reused child Svelte component", async () => {
+		const { container } = render(TwoHopViewPlanVirtualListPerfHarness, {
+			props: {
+				sections: [createDescriptor(100)],
+				applicationStore,
+				renderChildComponent: true,
+			},
+		});
+		const scrollRoot = container.querySelector<HTMLElement>(
+			"[data-testid='scroll-root']",
+		);
+		const virtualListRoot = container.querySelector<HTMLElement>(
+			".twohop-page-virtual-list",
+		);
+		if (!scrollRoot || !virtualListRoot) {
+			throw new Error("Expected TwoHop virtual-list elements.");
+		}
+
+		setNumericProperty(scrollRoot, "clientHeight", 120);
+		setNumericProperty(scrollRoot, "scrollTop", 0);
+		setElementRect(scrollRoot, { top: 0, width: 330, height: 120 });
+		setElementRect(virtualListRoot, { top: 0, width: 330, height: 20_000 });
+		triggerResize(virtualListRoot, 330, 20_000);
+		triggerResize(scrollRoot, 330, 120);
+		await flushFrames();
+		await flushFrames();
+
+		const shadowRoot = virtualListRoot.shadowRoot;
+		const initialChild = shadowRoot?.querySelector<HTMLElement>(
+			"[data-ccl-cell-slot='1'] [data-testid='twohop-child-item-cell']",
+		);
+		const initialIndex = initialChild?.dataset.index;
+		const initialRowIndex = initialChild?.dataset.rowIndex;
+		const initialRenderedKey = initialChild?.dataset.renderedKey;
+		const initialInstanceId = initialChild?.dataset.instanceId;
+		expect(initialChild).toBeTruthy();
+
+		setNumericProperty(scrollRoot, "scrollTop", 360);
+		await fireEvent.scroll(scrollRoot);
+		await flushFrames();
+		await flushFrames();
+
+		const reboundChild = shadowRoot?.querySelector<HTMLElement>(
+			"[data-ccl-cell-slot='1'] [data-testid='twohop-child-item-cell']",
+		);
+		expect(reboundChild).toBe(initialChild);
+		expect(reboundChild?.dataset.instanceId).toBe(initialInstanceId);
+		expect(reboundChild?.dataset.index).not.toBe(initialIndex);
+		expect(reboundChild?.dataset.rowIndex).not.toBe(initialRowIndex);
+		expect(reboundChild?.dataset.renderedKey).not.toBe(initialRenderedKey);
+		expect(reboundChild?.dataset.renderedKey).toBe(
+			`${reboundChild?.dataset.index}:${reboundChild?.dataset.rowIndex}`,
+		);
 	});
 
 	it("publishes recycled row coordinates after a distant scroll jump", async () => {

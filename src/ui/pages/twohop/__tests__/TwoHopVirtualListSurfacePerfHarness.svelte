@@ -7,6 +7,7 @@
 		TwoHopVirtualListSection,
 	} from "../twoHopVirtualListModel";
 	import type { ItemInteractionDescriptor } from "ui/interactions/interactionTypes";
+	import TwoHopVirtualListSurfaceChildItem from "./TwoHopVirtualListSurfaceChildItem.svelte";
 
 	interface Props {
 		sections: readonly SectionRenderDescriptor<
@@ -17,12 +18,14 @@
 		getItemInteractionDescriptor?: (
 			item: TwoHopVirtualListItem,
 		) => ItemInteractionDescriptor | null;
+		renderChildComponent?: boolean;
 	}
 
 	let {
 		sections,
 		applicationStore,
 		getItemInteractionDescriptor = () => null,
+		renderChildComponent = false,
 	}: Props = $props();
 </script>
 
@@ -43,15 +46,23 @@
 		{/snippet}
 
 		{#snippet renderItem(item, rowIndex, visibilityState)}
-			<div
-				data-testid="twohop-item-cell"
-				data-index={item.virtualKey}
-				data-visibility={visibilityState.visibility}
-				data-ccl-interaction-id={item.interactionId}
-				data-ccl-interaction-kind="item"
-			>
-				Item {rowIndex}
-			</div>
+			{#if renderChildComponent}
+				<TwoHopVirtualListSurfaceChildItem
+					{item}
+					{rowIndex}
+					{visibilityState}
+				/>
+			{:else}
+				<div
+					data-testid="twohop-item-cell"
+					data-index={item.virtualKey}
+					data-visibility={visibilityState.visibility}
+					data-ccl-interaction-id={item.interactionId}
+					data-ccl-interaction-kind="item"
+				>
+					Item {rowIndex}
+				</div>
+			{/if}
 		{/snippet}
 	</TwoHopViewPlanVirtualList>
 </div>

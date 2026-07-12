@@ -3,7 +3,10 @@
 	import type { Snippet } from "svelte";
 	import VirtualGridLogicalCellMount from "ui/components/common/virtual-list/svelte/VirtualGridLogicalCellMount.svelte";
 	import type { TwoHopMountedCell } from "./twoHopMountedTypes";
-	import type { TwoHopFixedRowSlotController } from "./twoHopFixedRowSlotPool.svelte";
+	import type {
+		TwoHopFixedCellSlotController,
+		TwoHopFixedRowSlotController,
+	} from "./twoHopFixedRowSlotPool.svelte";
 	import type { VirtualCellRegistry } from "ui/components/common/virtual-list/svelte/VirtualCellRegistry";
 
 	interface Props {
@@ -19,7 +22,14 @@
 		observerRoot?: HTMLElement | null;
 		getCellClassName?: (cell: TwoHopMountedCell) => string | undefined;
 		getCellDataTestId?: (cell: TwoHopMountedCell) => string | undefined;
-		renderCell: Snippet<[{ mountedCell: TwoHopMountedCell }]>;
+		renderCell: Snippet<
+			[
+				{
+					mountedCell: TwoHopMountedCell;
+					cellController: TwoHopFixedCellSlotController;
+				},
+			]
+		>;
 		cellRegistry: VirtualCellRegistry;
 	}
 
@@ -39,6 +49,9 @@
 		cellRegistry,
 	}: Props = $props();
 
+	// Item bodies receive reactive slot bindings and can retain their component instance.
+	// Header and load-more bodies keep their logical remount keys.
+	const ITEM_CELL_BODY_REUSE_KEY = {};
 	const contentStyle = $derived(
 		`height:${contentHeight}px; position:relative; --ccl-box-height:${rowHeight}px; --ccl-cell-width:${cellWidth ?? 0}px; --ccl-columns:${Math.max(1, Math.floor(columns))}${gap !== undefined ? `; --ccl-box-gap:${gap}px` : ""}`,
 	);
@@ -68,8 +81,8 @@
 							{cellRegistry}
 							cellRegistrationOwner={cellController}
 						>
-							{#key cellController.renderBodyKey ?? cellController.logicalKey}
-								{@render renderCell({ mountedCell })}
+							{#key mountedCell.cell.kind === "item" ? ITEM_CELL_BODY_REUSE_KEY : (cellController.renderBodyKey ?? cellController.logicalKey)}
+								{@render renderCell({ mountedCell, cellController })}
 							{/key}
 						</VirtualGridLogicalCellMount>
 					{/if}
