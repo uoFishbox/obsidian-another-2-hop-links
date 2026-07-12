@@ -197,6 +197,9 @@ describe("VirtualListEngine performance contracts", () => {
 		);
 		const counters = getCCLDevMeasurementSnapshot().counters;
 		expect(counters["virtualGrid.buildMountedRows"].count).toBe(NO_OP_MEASUREMENTS);
+		expect(counters["virtualGrid.contiguousSlotPool.apply"].count).toBe(
+			NO_OP_MEASUREMENTS,
+		);
 		expect(counters["virtualGrid.rowShellCreated"].count).toBe(NO_OP_MEASUREMENTS);
 		expect(counters["virtualGrid.cellShellCreated"].count).toBe(
 			NO_OP_MEASUREMENTS * columns,

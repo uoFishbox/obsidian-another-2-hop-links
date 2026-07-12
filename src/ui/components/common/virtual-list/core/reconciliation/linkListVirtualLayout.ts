@@ -28,8 +28,21 @@ import {
 	createPooledRowSlotAllocator,
 	type PooledRowSlotAllocator,
 } from "./pooledRowSlotAllocator";
+import {
+	createContiguousRowSlotAllocator,
+	type ContiguousRowSlotAllocator,
+} from "./contiguousRowSlotAllocator";
 
 const ROW_SLOT_ALLOCATOR = Symbol("flat-grid-row-slot-allocator");
+
+type RowSlotStrategy = "arbitrary-row-key" | "contiguous-range";
+type RowSlotAllocatorState = PooledRowSlotAllocator | ContiguousRowSlotAllocator;
+
+interface MountedRowSlotAllocation {
+	readonly capacity: number;
+	readonly epoch: number;
+	resolveSlotIndex(rowIndex: number, rangeOffset: number): number;
+}
 
 export interface MountedVirtualGridCellPosition {
 	readonly row: number;
@@ -88,7 +101,8 @@ interface MountedVirtualGridCellsBuildState<
 	cellWidth: number;
 	rowHeight: number;
 	gap: number;
-	readonly [ROW_SLOT_ALLOCATOR]: PooledRowSlotAllocator;
+	readonly rowSlotStrategy: RowSlotStrategy;
+	readonly [ROW_SLOT_ALLOCATOR]: RowSlotAllocatorState;
 }
 
 const EMPTY_PREVIOUS_MOUNTED_GRID_CELLS: ReadonlyMap<string, never> = new Map<
@@ -316,6 +330,7 @@ const hasCompatibleMountedVirtualGridCellsBuild = <T>(
 		cellWidth: number;
 		rowHeight: number;
 		gap: number;
+		rowSlotStrategy: RowSlotStrategy;
 	},
 ): previousBuild is MountedVirtualGridCellsBuildResult<T> =>
 	previousBuild !== undefined &&
@@ -324,7 +339,8 @@ const hasCompatibleMountedVirtualGridCellsBuild = <T>(
 	previousBuild.columns === params.columns &&
 	previousBuild.cellWidth === params.cellWidth &&
 	previousBuild.rowHeight === params.rowHeight &&
-	previousBuild.gap === params.gap;
+	previousBuild.gap === params.gap &&
+	previousBuildState.rowSlotStrategy === params.rowSlotStrategy;
 
 const hasCompatibleMountedVirtualGridRowSlots = <T>(
 	previousBuild: MountedVirtualGridCellsBuildResult<T> | undefined,
@@ -334,6 +350,7 @@ const hasCompatibleMountedVirtualGridRowSlots = <T>(
 		cellWidth: number;
 		rowHeight: number;
 		gap: number;
+		rowSlotStrategy: RowSlotStrategy;
 	},
 ): previousBuild is MountedVirtualGridCellsBuildResult<T> =>
 	previousBuild !== undefined &&
@@ -341,7 +358,8 @@ const hasCompatibleMountedVirtualGridRowSlots = <T>(
 	previousBuild.columns === params.columns &&
 	previousBuild.cellWidth === params.cellWidth &&
 	previousBuild.rowHeight === params.rowHeight &&
-	previousBuild.gap === params.gap;
+	previousBuild.gap === params.gap &&
+	previousBuildState.rowSlotStrategy === params.rowSlotStrategy;
 
 const getPreviousMountedVirtualGridRow = <T>(
 	previousBuild: MountedVirtualGridCellsBuildResult<T> | undefined,
@@ -422,6 +440,70 @@ const assertMountedVirtualGridBuildInvariants = <T>(
 	}
 };
 
+function resolveMountedRowSlotAllocation(params: {
+	visibleRows: RowRange;
+	layoutKey: unknown;
+	strategy: RowSlotStrategy;
+	previousBuildState?: MountedVirtualGridCellsBuildState<unknown>;
+	rowSlotAllocator?: PooledRowSlotAllocator;
+	contiguousRowSlotAllocator?: ContiguousRowSlotAllocator;
+}): {
+	allocation: MountedRowSlotAllocation;
+	allocator: RowSlotAllocatorState;
+} {
+	if (params.strategy === "contiguous-range") {
+		const allocator =
+			params.contiguousRowSlotAllocator ??
+			(params.previousBuildState?.rowSlotStrategy === "contiguous-range"
+				? (params.previousBuildState[ROW_SLOT_ALLOCATOR] as
+						| ContiguousRowSlotAllocator
+						| undefined)
+				: undefined) ??
+			createContiguousRowSlotAllocator();
+		allocator.prepareRange({
+			start: params.visibleRows.start,
+			end: params.visibleRows.end,
+			layoutKey: params.layoutKey,
+		});
+		return {
+			allocator,
+			allocation: {
+				capacity: allocator.capacity,
+				epoch: allocator.epoch,
+				resolveSlotIndex: (rowIndex) => allocator.resolveSlotIndex(rowIndex),
+			},
+		};
+	}
+
+	const allocator =
+		params.rowSlotAllocator ??
+		(params.previousBuildState?.rowSlotStrategy === "arbitrary-row-key"
+			? (params.previousBuildState[ROW_SLOT_ALLOCATOR] as
+					| PooledRowSlotAllocator
+					| undefined)
+			: undefined) ??
+		createPooledRowSlotAllocator();
+	const rowCount = Math.max(0, params.visibleRows.end - params.visibleRows.start);
+	const visibleRowKeys = Array.from(
+		{ length: rowCount },
+		(_, index) => params.visibleRows.start + index,
+	);
+	const allocation = allocator.apply({
+		rowKeys: visibleRowKeys,
+		layoutKey: params.layoutKey,
+	});
+
+	return {
+		allocator,
+		allocation: {
+			capacity: allocation.capacity,
+			epoch: allocation.epoch,
+			resolveSlotIndex: (_rowIndex, rangeOffset) =>
+				allocation.slotIndexes[rangeOffset] ?? 0,
+		},
+	};
+}
+
 function buildMountedVirtualGridCellsFromCore<T>(params: {
 	cellCount: number;
 	cellSourceRevision: unknown;
@@ -435,6 +517,8 @@ function buildMountedVirtualGridCellsFromCore<T>(params: {
 	previousCellsByKey?: ReadonlyMap<string, MountedVirtualGridCell<T>>;
 	renderRevisionFallbackPolicy?: RenderRevisionFallbackPolicy;
 	rowSlotAllocator?: PooledRowSlotAllocator;
+	contiguousRowSlotAllocator?: ContiguousRowSlotAllocator;
+	rowSlotStrategy?: RowSlotStrategy;
 }): MountedVirtualGridCellsBuildResult<T> {
 	const columns = Math.max(1, params.columns);
 	const previousBuild = params.previousBuild;
@@ -443,6 +527,8 @@ function buildMountedVirtualGridCellsFromCore<T>(params: {
 	const visibleRows = resolveVisibleRowWindow(visibleWindow, columns);
 	const rowStep = params.rowHeight + params.gap;
 	const colStep = params.cellWidth + params.gap;
+	const rowSlotStrategy = params.rowSlotStrategy ?? "arbitrary-row-key";
+	const layoutKey = `${columns}|${params.cellWidth}|${params.rowHeight}|${params.gap}`;
 
 	const hasCompatiblePreviousBuild = hasCompatibleMountedVirtualGridCellsBuild(
 		previousBuild,
@@ -453,6 +539,7 @@ function buildMountedVirtualGridCellsFromCore<T>(params: {
 			cellWidth: params.cellWidth,
 			rowHeight: params.rowHeight,
 			gap: params.gap,
+			rowSlotStrategy,
 		},
 	);
 	if (
@@ -471,21 +558,21 @@ function buildMountedVirtualGridCellsFromCore<T>(params: {
 			cellWidth: params.cellWidth,
 			rowHeight: params.rowHeight,
 			gap: params.gap,
+			rowSlotStrategy,
 		},
 	);
 
-	const rowSlotAllocator =
-		params.rowSlotAllocator ??
-		previousBuildState?.[ROW_SLOT_ALLOCATOR] ??
-		createPooledRowSlotAllocator();
-	const visibleRowKeys = Array.from(
-		{ length: Math.max(0, visibleRows.end - visibleRows.start) },
-		(_, index) => visibleRows.start + index,
-	);
-	const slotAllocation = rowSlotAllocator.apply({
-		rowKeys: visibleRowKeys,
-		layoutKey: `${columns}|${params.cellWidth}|${params.rowHeight}|${params.gap}`,
-	});
+	const { allocation: slotAllocation, allocator: rowSlotAllocator } =
+		resolveMountedRowSlotAllocation({
+			visibleRows,
+			layoutKey,
+			strategy: rowSlotStrategy,
+			previousBuildState: previousBuildState as
+				| MountedVirtualGridCellsBuildState<unknown>
+				| undefined,
+			rowSlotAllocator: params.rowSlotAllocator,
+			contiguousRowSlotAllocator: params.contiguousRowSlotAllocator,
+		});
 
 	const previousCellsByKey =
 		previousBuild?.reusableCellsByKey ??
@@ -505,8 +592,10 @@ function buildMountedVirtualGridCellsFromCore<T>(params: {
 		const previousRowWithCompatibleSlot = hasCompatiblePreviousRowSlots
 			? getPreviousMountedVirtualGridRow(previousBuild, rowIndex)
 			: undefined;
-		const rowSlotIndex =
-			slotAllocation.slotIndexes[rowIndex - visibleRows.start] ?? 0;
+		const rowSlotIndex = slotAllocation.resolveSlotIndex(
+			rowIndex,
+			rowIndex - visibleRows.start,
+		);
 		const previousRow = hasCompatiblePreviousBuild
 			? previousRowWithCompatibleSlot
 			: undefined;
@@ -639,6 +728,7 @@ function buildMountedVirtualGridCellsFromCore<T>(params: {
 		cellWidth: params.cellWidth,
 		rowHeight: params.rowHeight,
 		gap: params.gap,
+		rowSlotStrategy,
 	} as MountedVirtualGridCellsBuildState<T>;
 	Object.defineProperty(buildState, ROW_SLOT_ALLOCATOR, {
 		value: rowSlotAllocator,
@@ -685,6 +775,7 @@ export function buildMountedVirtualGridCellsFromRowModel<T>(params: {
 	previousCellsByKey?: ReadonlyMap<string, MountedVirtualGridCell<T>>;
 	renderRevisionFallbackPolicy?: RenderRevisionFallbackPolicy;
 	rowSlotAllocator?: PooledRowSlotAllocator;
+	contiguousRowSlotAllocator?: ContiguousRowSlotAllocator;
 }): MountedVirtualGridCellsBuildResult<T> {
 	const { rowModel } = params;
 	// Pass rowModel fields directly to avoid allocating a resolver object
@@ -706,5 +797,7 @@ export function buildMountedVirtualGridCellsFromRowModel<T>(params: {
 		previousCellsByKey: params.previousCellsByKey,
 		renderRevisionFallbackPolicy: params.renderRevisionFallbackPolicy,
 		rowSlotAllocator: params.rowSlotAllocator,
+		contiguousRowSlotAllocator: params.contiguousRowSlotAllocator,
+		rowSlotStrategy: "contiguous-range",
 	});
 }
