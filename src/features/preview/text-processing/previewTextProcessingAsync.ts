@@ -5,7 +5,12 @@ import {
 	type FencedCodeBlockRange,
 } from "./fencedCodeBlocks";
 import { extractFirstEmbeddedMedia, type ParsedEmbed } from "./mediaExtractor";
-import { getContentSnippet, type GetContentSnippetOptions } from "./snippetExtractor";
+import {
+	prepareContentSnippet,
+	renderPreparedContentSnippet,
+	type GetContentSnippetOptions,
+	type PreviewSnippetSettings,
+} from "./snippetExtractor";
 import { highlightSearchMatchesInHtml } from "./searchHighlighter";
 import { transformContentForPreview } from "./textTransformUtils";
 import type { TransformContentForPreviewOptions } from "./types";
@@ -18,6 +23,25 @@ import type { PluginSettings } from "types/settings";
 
 function shouldUsePreviewTextWorker(content: string): boolean {
 	return content.length > PREVIEW_TEXT_WORKER_MIN_CONTENT_LENGTH;
+}
+
+function selectPreviewSnippetSettings(
+	settings: PluginSettings | undefined,
+): PreviewSnippetSettings | undefined {
+	if (!settings) {
+		return undefined;
+	}
+
+	return {
+		cardWidthPx: settings.cardWidthPx,
+		cardHeightRatio: settings.cardHeightRatio,
+		previewMaxLines: settings.previewMaxLines,
+		previewMaxChars: settings.previewMaxChars,
+		previewVisualLineSafetyMargin: settings.previewVisualLineSafetyMargin,
+		searchPreviewSeekThresholdChars: settings.searchPreviewSeekThresholdChars,
+		searchPreviewSeekBufferChars: settings.searchPreviewSeekBufferChars,
+		renderCodeBlockTypes: settings.renderCodeBlockTypes,
+	};
 }
 
 async function runWithFallback<T>(
@@ -52,22 +76,27 @@ export async function getContentSnippetAsync(
 	searchOptions?: GetContentSnippetOptions,
 	signal?: AbortSignal,
 ): Promise<string> {
-	if (!shouldUsePreviewTextWorker(content)) {
-		return getContentSnippet(content, settings, searchQuery, searchOptions);
+	const prepared = prepareContentSnippet(
+		content,
+		settings,
+		searchQuery,
+		searchOptions,
+	);
+
+	if (!shouldUsePreviewTextWorker(prepared.contentToProcess)) {
+		return renderPreparedContentSnippet(prepared, settings);
 	}
 
 	return await runWithFallback<string>(
 		runPreviewTextWorker(
 			{
-				type: "get-content-snippet",
-				content,
-				settings,
-				searchQuery,
-				searchOptions,
+				type: "render-prepared-content-snippet",
+				prepared,
+				settings: selectPreviewSnippetSettings(settings),
 			},
 			signal,
 		),
-		() => getContentSnippet(content, settings, searchQuery, searchOptions),
+		() => renderPreparedContentSnippet(prepared, settings),
 	);
 }
 

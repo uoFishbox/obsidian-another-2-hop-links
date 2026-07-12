@@ -5,6 +5,7 @@ import {
 	highlightSearchMatchesInHtmlAsync,
 } from "../previewTextProcessingAsync";
 import { PREVIEW_TEXT_WORKER_MIN_CONTENT_LENGTH } from "../previewTextWorkerTypes";
+import { DEFAULT_SETTINGS } from "types/settings";
 
 const state = vi.hoisted(() => ({
 	runPreviewTextWorker: vi.fn(),
@@ -28,15 +29,37 @@ describe("preview text processing async wrappers", () => {
 		expect(state.runPreviewTextWorker).not.toHaveBeenCalled();
 	});
 
-	test("uses worker above threshold", async () => {
-		state.runPreviewTextWorker.mockResolvedValue("worker-result");
+	test("prepares snippet before deciding whether to use worker", async () => {
 		const content = "x".repeat(PREVIEW_TEXT_WORKER_MIN_CONTENT_LENGTH + 1);
 
-		await expect(getContentSnippetAsync(content)).resolves.toBe("worker-result");
+		const result = await getContentSnippetAsync(content, DEFAULT_SETTINGS);
+
+		expect(result.length).toBeLessThan(PREVIEW_TEXT_WORKER_MIN_CONTENT_LENGTH);
+		expect(result.endsWith("...")).toBe(true);
+		expect(state.runPreviewTextWorker).not.toHaveBeenCalled();
+	});
+
+	test("uses worker when prepared snippet remains above threshold", async () => {
+		state.runPreviewTextWorker.mockResolvedValue("worker-result");
+		const content = "x".repeat(200000);
+		const settings = {
+			...DEFAULT_SETTINGS,
+			previewMaxChars: 20000,
+			previewMaxLines: 0,
+		};
+
+		await expect(getContentSnippetAsync(content, settings)).resolves.toBe(
+			"worker-result",
+		);
 		expect(state.runPreviewTextWorker).toHaveBeenCalledWith(
 			expect.objectContaining({
-				type: "get-content-snippet",
-				content,
+				type: "render-prepared-content-snippet",
+				prepared: expect.objectContaining({
+					contentToProcess: "x".repeat(80000),
+				}),
+				settings: expect.not.objectContaining({
+					language: expect.any(String),
+				}),
 			}),
 			undefined,
 		);
@@ -44,10 +67,14 @@ describe("preview text processing async wrappers", () => {
 
 	test("falls back to synchronous implementation when worker is unavailable", async () => {
 		state.runPreviewTextWorker.mockReturnValue(undefined);
-		const content =
-			"Hello [[World]]" + "x".repeat(PREVIEW_TEXT_WORKER_MIN_CONTENT_LENGTH + 1);
+		const content = "Hello [[World]]" + "x".repeat(200000);
+		const settings = {
+			...DEFAULT_SETTINGS,
+			previewMaxChars: 20000,
+			previewMaxLines: 0,
+		};
 
-		await expect(getContentSnippetAsync(content)).resolves.toContain(
+		await expect(getContentSnippetAsync(content, settings)).resolves.toContain(
 			'Hello <span class="cosense-card-links__wikilink">World</span>',
 		);
 	});

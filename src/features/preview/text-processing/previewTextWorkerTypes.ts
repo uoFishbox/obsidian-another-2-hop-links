@@ -1,5 +1,9 @@
 import type { FencedCodeBlockRange } from "./fencedCodeBlocks";
-import type { GetContentSnippetOptions } from "./snippetExtractor";
+import type {
+	GetContentSnippetOptions,
+	PreparedContentSnippet,
+	PreviewSnippetSettings,
+} from "./snippetExtractor";
 import type { TextTransformContext, TransformContentForPreviewOptions } from "./types";
 import type { ParsedEmbed } from "./mediaExtractor";
 import type { PluginSettings } from "types/settings";
@@ -14,6 +18,12 @@ export type PreviewTextWorkerRequest =
 			settings?: PluginSettings;
 			searchQuery?: string;
 			searchOptions?: GetContentSnippetOptions;
+	  }
+	| {
+			type: "render-prepared-content-snippet";
+			requestId: number;
+			prepared: PreparedContentSnippet;
+			settings?: PreviewSnippetSettings;
 	  }
 	| {
 			type: "transform-content";
@@ -45,6 +55,10 @@ export type PreviewTextWorkerRequest =
 			content: string;
 			allowedTypes: readonly string[];
 			maxScanChars?: number;
+	  }
+	| {
+			type: "cancel";
+			requestId: number;
 	  }
 	| {
 			type: "dispose";
@@ -80,6 +94,10 @@ export interface PreviewTextWorkerRunRequestMap {
 	"get-content-snippet": Extract<
 		PreviewTextWorkerRequest,
 		{ type: "get-content-snippet" }
+	>;
+	"render-prepared-content-snippet": Extract<
+		PreviewTextWorkerRequest,
+		{ type: "render-prepared-content-snippet" }
 	>;
 	"transform-content": Extract<
 		PreviewTextWorkerRequest,

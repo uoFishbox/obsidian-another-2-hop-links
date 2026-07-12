@@ -14,6 +14,8 @@ import type { PluginSettings } from "types/settings";
 const INLINE_CODE_REGEX = /`([^`]+)`/g;
 const EMPTY_PROTECTED_SEGMENTS: ProtectedSegment[] = [];
 
+export type TextTransformSettings = Pick<PluginSettings, "renderCodeBlockTypes">;
+
 interface ProtectedSegment {
 	token: string;
 	html: string;
@@ -120,7 +122,7 @@ function getAllowedBlockTypes(
 
 export function transformContentForPreview(
 	content: string,
-	settings?: PluginSettings,
+	settings?: TextTransformSettings,
 	options?: TransformContentForPreviewOptions,
 ): string {
 	let transformedContent = content;

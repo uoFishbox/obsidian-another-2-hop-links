@@ -8,8 +8,27 @@ import { findCaseInsensitiveIndex } from "./searchUtils";
 import type { TextTransformContext } from "./types";
 import type { PluginSettings } from "types/settings";
 
+export type PreviewSnippetSettings = Pick<
+	PluginSettings,
+	| "cardWidthPx"
+	| "cardHeightRatio"
+	| "previewMaxLines"
+	| "previewMaxChars"
+	| "previewVisualLineSafetyMargin"
+	| "searchPreviewSeekThresholdChars"
+	| "searchPreviewSeekBufferChars"
+	| "renderCodeBlockTypes"
+>;
+
 export interface GetContentSnippetOptions {
 	firstMatchIndex?: number;
+}
+
+export interface PreparedContentSnippet {
+	contentToProcess: string;
+	context: TextTransformContext;
+	hasLeadingOmission: boolean;
+	hasTrailingOmission: boolean;
 }
 
 interface BlockDefinition {
@@ -45,7 +64,7 @@ function getDisplayCellWidth(char: string): number {
 	return getCharWeightFromCode(char.charCodeAt(0));
 }
 
-function resolvePreviewVisualMetrics(settings: PluginSettings): {
+function resolvePreviewVisualMetrics(settings: PreviewSnippetSettings): {
 	columns: number;
 	maxVisualLines: number;
 } {
@@ -417,7 +436,7 @@ function scanAndTruncate(
 
 function applyTruncation(
 	content: string,
-	settings: PluginSettings,
+	settings: PreviewSnippetSettings,
 ): { result: string; wasTruncated: boolean } {
 	const maxChars = settings.previewMaxChars > 0 ? settings.previewMaxChars : Infinity;
 	const visualMetrics = resolvePreviewVisualMetrics(settings);
@@ -436,7 +455,7 @@ function applyTruncation(
 
 function buildFallbackSnippetFromRawContent(
 	contentToProcess: string,
-	settings: PluginSettings,
+	settings: PreviewSnippetSettings,
 	context: TextTransformContext,
 ): { result: string; wasTruncated: boolean } {
 	const rawTruncation = applyTruncation(contentToProcess, settings);
@@ -466,7 +485,7 @@ const DEFAULT_SEARCH_PREVIEW_SEEK_THRESHOLD_CHARS = 300;
 const DEFAULT_SEARCH_PREVIEW_SEEK_BUFFER_CHARS = 30;
 
 function resolveSearchPreviewSeekThresholdChars(
-	settings: PluginSettings | undefined,
+	settings: PreviewSnippetSettings | undefined,
 ): number {
 	const fallbackThreshold =
 		settings?.previewMaxChars && settings.previewMaxChars > 0
@@ -478,7 +497,7 @@ function resolveSearchPreviewSeekThresholdChars(
 }
 
 function resolveSearchPreviewSeekBufferChars(
-	settings: PluginSettings | undefined,
+	settings: PreviewSnippetSettings | undefined,
 ): number {
 	const configuredBuffer =
 		settings?.searchPreviewSeekBufferChars ??
@@ -490,7 +509,44 @@ function findEnclosingFencedCodeBlock(
 	content: string,
 	matchIndex: number,
 ): FencedCodeBlockRange | null {
+	if (
+		content.lastIndexOf("```", matchIndex) === -1 &&
+		content.lastIndexOf("~~~", matchIndex) === -1
+	) {
+		return null;
+	}
+
 	return findEnclosingFencedCodeBlockRange(content, matchIndex);
+}
+
+function resolveEffectiveSearchOptionsAfterFrontmatter(
+	effectiveContent: string,
+	removedLength: number,
+	normalizedSearchQuery: string,
+	searchOptions?: GetContentSnippetOptions,
+): GetContentSnippetOptions {
+	const firstMatchIndex = searchOptions?.firstMatchIndex;
+	if (typeof firstMatchIndex !== "number") {
+		return {
+			firstMatchIndex: findCaseInsensitiveIndex(
+				effectiveContent,
+				normalizedSearchQuery,
+			),
+		};
+	}
+
+	if (firstMatchIndex >= removedLength) {
+		return {
+			firstMatchIndex: firstMatchIndex - removedLength,
+		};
+	}
+
+	return {
+		firstMatchIndex: findCaseInsensitiveIndex(
+			effectiveContent,
+			normalizedSearchQuery,
+		),
+	};
 }
 
 function buildFencedBlockSliceAroundMatch(
@@ -556,7 +612,7 @@ function buildFencedBlockSliceAroundMatch(
 function getContentSliceForSearch(
 	content: string,
 	safeLimit: number,
-	settings: PluginSettings | undefined,
+	settings: PreviewSnippetSettings | undefined,
 	normalizedSearchQuery: string,
 	searchOptions?: GetContentSnippetOptions,
 ): {
@@ -668,12 +724,15 @@ function getContentSliceForSearch(
 	};
 }
 
-export function getContentSnippet(
+/**
+ * Resolves the smallest raw markdown range needed to build a preview snippet.
+ */
+export function prepareContentSnippet(
 	content: string,
-	settings?: PluginSettings,
+	settings?: PreviewSnippetSettings,
 	searchQuery?: string,
 	searchOptions?: GetContentSnippetOptions,
-): string {
+): PreparedContentSnippet {
 	const normalizedSearchQuery = normalizeSearchQuery(searchQuery);
 	const context: TextTransformContext =
 		normalizedSearchQuery.length > 0 ? "searchSnippet" : "preview";
@@ -681,12 +740,12 @@ export function getContentSnippet(
 	const effectiveContent = strippedFrontmatter.content;
 	const effectiveSearchOptions =
 		normalizedSearchQuery.length > 0 && strippedFrontmatter.removed
-			? {
-					firstMatchIndex: findCaseInsensitiveIndex(
-						effectiveContent,
-						normalizedSearchQuery,
-					),
-				}
+			? resolveEffectiveSearchOptionsAfterFrontmatter(
+					effectiveContent,
+					strippedFrontmatter.removedLength,
+					normalizedSearchQuery,
+					searchOptions,
+				)
 			: searchOptions;
 
 	// 巨大ファイルの全体変換を避けるため、事前にスライスする
@@ -698,12 +757,30 @@ export function getContentSnippet(
 		normalizedSearchQuery,
 		effectiveSearchOptions,
 	);
-	const contentToProcess = contentSlice.contentToProcess;
 
-	let processedContent = transformContentForPreview(contentToProcess, settings, {
+	return {
+		contentToProcess: contentSlice.contentToProcess,
 		context,
-		skipFrontmatterRemoval: true,
-	});
+		hasLeadingOmission: contentSlice.hasLeadingOmission,
+		hasTrailingOmission: contentSlice.hasTrailingOmission,
+	};
+}
+
+/**
+ * Converts a prepared markdown range into the final HTML preview snippet.
+ */
+export function renderPreparedContentSnippet(
+	prepared: PreparedContentSnippet,
+	settings?: PreviewSnippetSettings,
+): string {
+	let processedContent = transformContentForPreview(
+		prepared.contentToProcess,
+		settings,
+		{
+			context: prepared.context,
+			skipFrontmatterRemoval: true,
+		},
+	);
 	processedContent = processedContent.replace(/^[\r\n]+/, "");
 
 	if (!settings || (settings.previewMaxLines <= 0 && settings.previewMaxChars <= 0)) {
@@ -719,9 +796,9 @@ export function getContentSnippet(
 	// 生Markdownを先に切り詰めてから再変換する。
 	if (!trimmedResult) {
 		const fallback = buildFallbackSnippetFromRawContent(
-			contentToProcess,
+			prepared.contentToProcess,
 			settings,
-			context,
+			prepared.context,
 		);
 		trimmedResult = fallback.result;
 		effectiveWasTruncated = effectiveWasTruncated || fallback.wasTruncated;
@@ -732,12 +809,27 @@ export function getContentSnippet(
 	}
 
 	let finalResult = trimmedResult;
-	if (contentSlice.hasLeadingOmission) {
+	if (prepared.hasLeadingOmission) {
 		finalResult = "..." + finalResult;
 	}
-	if (effectiveWasTruncated || contentSlice.hasTrailingOmission) {
+	if (effectiveWasTruncated || prepared.hasTrailingOmission) {
 		finalResult += "...";
 	}
 
 	return finalResult;
+}
+
+export function getContentSnippet(
+	content: string,
+	settings?: PluginSettings,
+	searchQuery?: string,
+	searchOptions?: GetContentSnippetOptions,
+): string {
+	const prepared = prepareContentSnippet(
+		content,
+		settings,
+		searchQuery,
+		searchOptions,
+	);
+	return renderPreparedContentSnippet(prepared, settings);
 }

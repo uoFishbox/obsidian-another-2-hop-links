@@ -16,7 +16,7 @@ type PendingRequest = {
 type DistributiveOmit<T, K extends keyof any> = T extends unknown ? Omit<T, K> : never;
 
 type RunnablePreviewTextWorkerRequest = DistributiveOmit<
-	PreviewTextWorkerRequest,
+	Exclude<PreviewTextWorkerRequest, { type: "cancel" }>,
 	"requestId"
 >;
 
@@ -33,6 +33,13 @@ function buildWorkerRequest(
 				settings: request.settings,
 				searchQuery: request.searchQuery,
 				searchOptions: request.searchOptions,
+			};
+		case "render-prepared-content-snippet":
+			return {
+				type: "render-prepared-content-snippet",
+				requestId,
+				prepared: request.prepared,
+				settings: request.settings,
 			};
 		case "transform-content":
 			return {
@@ -87,6 +94,15 @@ function createAbortError(): DOMException | Error {
 	const error = new Error("Preview text worker request aborted");
 	error.name = "AbortError";
 	return error;
+}
+
+function postCancelRequest(activeWorker: Worker, requestId: number): void {
+	try {
+		activeWorker.postMessage({ type: "cancel", requestId });
+	} catch {
+		// The local promise is already being rejected. If the worker is gone,
+		// there is no remote queue left to cancel.
+	}
 }
 
 function getWorker(): Worker | null {
@@ -168,6 +184,7 @@ export function runPreviewTextWorker(
 			pending.onAbort = () => {
 				pendingRequests.delete(requestId);
 				signal.removeEventListener("abort", pending.onAbort!);
+				postCancelRequest(activeWorker, requestId);
 				reject(createAbortError());
 			};
 			signal.addEventListener("abort", pending.onAbort, { once: true });

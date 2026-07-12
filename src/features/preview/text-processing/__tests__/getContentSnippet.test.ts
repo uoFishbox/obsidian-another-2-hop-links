@@ -431,6 +431,16 @@ describe("getContentSnippet with search query", () => {
 		expect(result.startsWith("...")).toBe(true);
 	});
 
+	test("reuses body firstMatchIndex after frontmatter removal", () => {
+		const content = `---\ntitle: Test\n---\n\n${"A".repeat(1200)} target near end.`;
+		const firstMatchIndex = content.toLowerCase().indexOf("target");
+		const withOpt = getContentSnippet(content, defaultSettings, "target", {
+			firstMatchIndex,
+		});
+		const withoutOpt = getContentSnippet(content, defaultSettings, "target");
+		expect(withOpt).toBe(withoutOpt);
+	});
+
 	test("does not show YAML when keyword only exists in frontmatter", () => {
 		const content = `---\ntitle: target note\n---\n\nBody without keyword.`;
 		const result = getContentSnippet(content, defaultSettings, "target");
