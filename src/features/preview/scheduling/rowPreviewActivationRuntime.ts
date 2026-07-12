@@ -36,6 +36,8 @@ export interface RowPreviewActivationRuntime {
 	 * card with no way to register again.
 	 */
 	clearRow(rowIndex: number): void;
+	/** Releases all row registrations and pending activation handles. */
+	dispose(): void;
 }
 
 export const PREVIEW_ROW_ACTIVATION_CONTEXT_KEY = Symbol("preview-row-activation");
@@ -61,6 +63,7 @@ export function createRowPreviewActivationRuntime(
 		string,
 		Set<RowPreviewActivationCandidate>
 	>();
+	let disposed = false;
 
 	function getOrCreateRowState(rowIndex: number): RowActivationState {
 		const existing = rows.get(rowIndex);
@@ -150,6 +153,14 @@ export function createRowPreviewActivationRuntime(
 		}
 	}
 
+	function pruneRowIfEmpty(rowIndex: number, state: RowActivationState): void {
+		if (state.visibility !== "mounted") return;
+		if (state.candidatesById.size > 0 || state.keyCounts.size > 0) return;
+		if (rows.get(rowIndex) === state) {
+			rows.delete(rowIndex);
+		}
+	}
+
 	function cancelPendingByKey(activationKey: string): void {
 		const handle = pendingByActivationKey.get(activationKey);
 		if (handle) {
@@ -167,6 +178,7 @@ export function createRowPreviewActivationRuntime(
 	}
 
 	function notifyVisibleCandidates(activationKey: string): void {
+		if (disposed) return;
 		const candidates = visibleCandidatesByKey.get(activationKey);
 		if (!candidates) return;
 
@@ -212,6 +224,8 @@ export function createRowPreviewActivationRuntime(
 	}
 
 	function registerCandidate(candidate: RowPreviewActivationCandidate): () => void {
+		if (disposed) return () => {};
+
 		const { id, rowIndex, activationKey } = candidate;
 		const state = getOrCreateRowState(rowIndex);
 
@@ -253,6 +267,7 @@ export function createRowPreviewActivationRuntime(
 			} else if (!allCandidatesByKey.has(activationKey)) {
 				cancelPendingByKey(activationKey);
 			}
+			pruneRowIfEmpty(rowIndex, currentState);
 		};
 	}
 
@@ -260,6 +275,8 @@ export function createRowPreviewActivationRuntime(
 		rowIndex: number,
 		visibility: "visible" | "mounted",
 	): void {
+		if (disposed) return;
+
 		const state = getOrCreateRowState(rowIndex);
 		if (state.visibility === visibility) {
 			if (visibility === "visible") {
@@ -285,9 +302,12 @@ export function createRowPreviewActivationRuntime(
 		for (const activationKey of state.keyCounts.keys()) {
 			cancelPendingUnlessVisibleElsewhere(activationKey);
 		}
+		pruneRowIfEmpty(rowIndex, state);
 	}
 
 	function clearRow(rowIndex: number): void {
+		if (disposed) return;
+
 		const state = rows.get(rowIndex);
 		if (!state) {
 			return;
@@ -303,11 +323,26 @@ export function createRowPreviewActivationRuntime(
 		for (const activationKey of state.keyCounts.keys()) {
 			cancelPendingUnlessVisibleElsewhere(activationKey);
 		}
+		pruneRowIfEmpty(rowIndex, state);
+	}
+
+	function dispose(): void {
+		if (disposed) return;
+		disposed = true;
+
+		for (const handle of pendingByActivationKey.values()) {
+			handle.cancel();
+		}
+		pendingByActivationKey.clear();
+		rows.clear();
+		allCandidatesByKey.clear();
+		visibleCandidatesByKey.clear();
 	}
 
 	return {
 		registerCandidate,
 		setRowVisibility,
 		clearRow,
+		dispose,
 	};
 }

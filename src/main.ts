@@ -70,6 +70,8 @@ import {
 	type DisposablePreviewService,
 } from "features/preview/core/createPreviewService";
 import { clearCardPreviewSharedCaches } from "ui/components/common/cardPreviewSharedCache";
+import { disposePreviewActivationScheduler } from "features/preview/scheduling/previewActivationScheduler";
+import { disposePreviewDomCommitScheduler } from "features/preview/scheduling/previewDomCommitScheduler";
 import { installCCLDebugExposure } from "infrastructure/debug/CCLDebugExposure";
 import { registerBenchmarkCommand } from "infrastructure/debug/benchmarkCommandController";
 import { registerCardDragStateCleanup } from "ui/interactions/cardDragState";
@@ -228,6 +230,8 @@ export default class CosenseCardLinksPlugin extends Plugin implements PluginHost
 
 	onunload(): void {
 		this.isUnloaded = true;
+		disposePreviewActivationScheduler();
+		disposePreviewDomCommitScheduler();
 		if (this.frameScheduler) {
 			this.frameScheduler.destroy();
 		}

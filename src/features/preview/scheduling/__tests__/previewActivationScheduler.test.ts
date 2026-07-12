@@ -19,6 +19,7 @@ import {
 	canActivatePreviewImmediately,
 	cancelPreviewActivation,
 	createPreviewActivationScope,
+	disposePreviewActivationScheduler,
 	requestPreviewActivation,
 	requestQueuedPreviewActivation,
 	resetPreviewActivationSchedulerForTests,
@@ -185,7 +186,7 @@ describe("preview activation scheduler", () => {
 		expect(canActivatePreviewImmediately(activationScope)).toBe(false);
 	});
 
-	it("rate-limits scrolling activation independently of refresh rate", async () => {
+	it("preserves the scrolling activation rate across refresh rates", async () => {
 		const activationsAt60Hz = await countScrollingActivations({
 			intervalMs: 1000 / 60,
 			durationMs: 1000,
@@ -195,14 +196,13 @@ describe("preview activation scheduler", () => {
 			durationMs: 1000,
 		});
 
-		expect(Math.abs(activationsAt60Hz - activationsAt120Hz)).toBeLessThanOrEqual(1);
 		expect(activationsAt60Hz).toBeGreaterThanOrEqual(59);
 		expect(activationsAt60Hz).toBeLessThanOrEqual(63);
-		expect(activationsAt120Hz).toBeGreaterThanOrEqual(59);
-		expect(activationsAt120Hz).toBeLessThanOrEqual(63);
+		expect(activationsAt120Hz).toBeGreaterThanOrEqual(88);
+		expect(activationsAt120Hz).toBeLessThanOrEqual(96);
 	});
 
-	it("does not spend a new scrolling token on every 120 Hz frame", async () => {
+	it("preserves fractional scrolling credit at 120 Hz", async () => {
 		frameIntervalMs = 1000 / 120;
 		markScrollActivityActive(scrollSource);
 		const results: boolean[] = [];
@@ -216,9 +216,9 @@ describe("preview activation scheduler", () => {
 		await flushAnimationFrame();
 		expect(results).toEqual([true]);
 		await flushAnimationFrame();
-		expect(results).toEqual([true]);
-		await flushAnimationFrame();
 		expect(results).toEqual([true, true]);
+		await flushAnimationFrame();
+		expect(results).toEqual([true, true, true]);
 	});
 
 	it("limits backpressured activations to a lower time-based rate", async () => {
@@ -234,9 +234,9 @@ describe("preview activation scheduler", () => {
 		await flushAnimationFrame();
 		expect(results).toEqual([true]);
 		await flushAnimationFrame();
-		expect(results).toEqual([true]);
-		await flushAnimationFrame();
 		expect(results).toEqual([true, true]);
+		await flushAnimationFrame();
+		expect(results).toEqual([true, true, true]);
 
 		visibleQueueSize = 0;
 		await flushAnimationFrame();
@@ -252,6 +252,51 @@ describe("preview activation scheduler", () => {
 		await flushAnimationFrame();
 		await expect(activation.result).resolves.toBe(true);
 		expect(results).toEqual([true]);
+	});
+
+	it("holds activation while the outstanding preview admission limit is full", async () => {
+		let queuedPreviewJobs = 2;
+		let activePreviewJobs = 1;
+		const scope = createPreviewActivationScope({
+			getBackpressure: () => ({
+				queued: queuedPreviewJobs,
+				active: activePreviewJobs,
+			}),
+		});
+		const results: boolean[] = [];
+
+		requestQueuedPreviewActivation("preview-blocked", scope, (activated) =>
+			results.push(activated),
+		);
+		await flushAnimationFrame();
+		expect(results).toEqual([]);
+
+		queuedPreviewJobs = 1;
+		await flushAnimationFrame();
+		expect(results).toEqual([true]);
+	});
+
+	it("uses a timeout fallback when requestAnimationFrame is unavailable", async () => {
+		vi.stubGlobal("requestAnimationFrame", undefined);
+		const results: boolean[] = [];
+
+		requestQueuedPreviewActivation(
+			"preview-fallback",
+			activationScope,
+			(activated) => results.push(activated),
+		);
+		await vi.advanceTimersByTimeAsync(frameIntervalMs);
+
+		expect(results).toEqual([true]);
+	});
+
+	it("settles pending activations when the scheduler is disposed", async () => {
+		markScrollActivityActive(scrollSource);
+		const result = requestActivationResult("preview-disposed");
+
+		disposePreviewActivationScheduler();
+
+		await expect(result.result).resolves.toBe(false);
 	});
 
 	it("uses one global animation-frame callback for multiple scopes", () => {
@@ -307,6 +352,17 @@ describe("preview activation scheduler", () => {
 		cancelPreviewActivation("preview-a", activationScope);
 
 		await expect(activation.result).resolves.toBe(false);
+	});
+
+	it("clears a scope queue after its final request is cancelled", () => {
+		markScrollActivityActive(scrollSource);
+		requestQueuedPreviewActivation("preview-a", activationScope);
+
+		expect(activationScope.pendingQueue).toHaveLength(1);
+		cancelPreviewActivation("preview-a", activationScope);
+
+		expect(activationScope.pendingQueue).toEqual([]);
+		expect(activationScope.pendingQueueHead).toBe(0);
 	});
 
 	it("handle cancel resolves only its own request as not activated", async () => {

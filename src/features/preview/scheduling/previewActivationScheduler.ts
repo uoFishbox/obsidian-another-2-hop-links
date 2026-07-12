@@ -3,31 +3,42 @@ import {
 	subscribeScrollActivity,
 } from "infrastructure/scroll/scrollActivity";
 import { DEBUG_DISABLE_CARD_DOM_PREVIEW } from "../../../appConstants";
+import {
+	canConsumePreviewScheduleToken,
+	consumePreviewScheduleToken,
+	createEmptyPreviewScheduleTokenState,
+	refillPreviewScheduleTokens,
+	type PreviewScheduleTokenState,
+} from "./previewScheduleTokenBucket";
 
 const WARMUP_MS = 32;
-const MAX_REFILL_ELAPSED_MS = 250;
 const MAX_QUEUE_ENTRIES_PER_DRAIN = 256;
-const ACTIVATION_TOKEN_EPSILON = 1e-9;
+const FALLBACK_FRAME_INTERVAL_MS = 1000 / 60;
+const MAX_OUTSTANDING_PREVIEW_JOBS = 3;
 
 interface PreviewActivationPolicy {
-	readonly activationsPerSecond: number;
-	readonly burstCapacity: number;
+	readonly ratePerSecond: number;
+	readonly creditCapacity: number;
+	readonly maxTasksPerDrain: number;
 	readonly maxDrainCpuMs: number;
 }
 
 const SCROLLING_POLICY: PreviewActivationPolicy = {
-	activationsPerSecond: 90,
-	burstCapacity: 1,
+	ratePerSecond: 90,
+	creditCapacity: 2,
+	maxTasksPerDrain: 1,
 	maxDrainCpuMs: 1,
 };
 const IDLE_POLICY: PreviewActivationPolicy = {
-	activationsPerSecond: 120,
-	burstCapacity: 2,
+	ratePerSecond: 120,
+	creditCapacity: 2,
+	maxTasksPerDrain: 2,
 	maxDrainCpuMs: 2,
 };
 const BACKPRESSURED_POLICY: PreviewActivationPolicy = {
-	activationsPerSecond: 30,
-	burstCapacity: 1,
+	ratePerSecond: 30,
+	creditCapacity: 2,
+	maxTasksPerDrain: 1,
 	maxDrainCpuMs: 1,
 };
 
@@ -81,9 +92,10 @@ interface PreviewActivationHandleInternal extends PreviewActivationHandle {
 const defaultScope = createPreviewActivationScope();
 const activeQueuedScopes = new Set<PreviewActivationScope>();
 let globalFrameHandle: number | null = null;
+let globalFrameHandleKind: "animation-frame" | "timeout" | null = null;
 let roundRobinCursor = 0;
-let availableActivationTokens = 0;
-let lastTokenRefillTimestamp: number | null = null;
+let activationTokenState: PreviewScheduleTokenState =
+	createEmptyPreviewScheduleTokenState();
 let unsubscribeScrollActivity: (() => void) | undefined;
 
 function cancelHandle(this: PreviewActivationHandleInternal): void {
@@ -197,8 +209,11 @@ function settleRequest(request: PreviewActivationRequest, activated: boolean): v
 	}
 	if (request.scope.pendingByKey.size === 0) {
 		activeQueuedScopes.delete(request.scope);
+		request.scope.pendingQueue = [];
+		request.scope.pendingQueueHead = 0;
 	}
 	invokeSettlementCallback(request.onSettled, activated);
+	releaseGlobalResourcesIfIdle();
 }
 
 function ensureSubscription(): void {
@@ -210,18 +225,52 @@ function ensureSubscription(): void {
 }
 
 function scheduleGlobalFrameDrain(): void {
-	if (
-		globalFrameHandle !== null ||
-		activeQueuedScopes.size === 0 ||
-		typeof globalThis.requestAnimationFrame !== "function"
-	) {
+	if (globalFrameHandle !== null || activeQueuedScopes.size === 0) {
 		return;
 	}
 
-	globalFrameHandle = globalThis.requestAnimationFrame((timestamp) => {
+	if (typeof globalThis.requestAnimationFrame === "function") {
+		globalFrameHandleKind = "animation-frame";
+		globalFrameHandle = globalThis.requestAnimationFrame((timestamp) => {
+			globalFrameHandle = null;
+			globalFrameHandleKind = null;
+			drainGlobalFrame(timestamp);
+		});
+		return;
+	}
+
+	if (typeof globalThis.setTimeout !== "function") return;
+
+	globalFrameHandleKind = "timeout";
+	globalFrameHandle = globalThis.setTimeout(() => {
 		globalFrameHandle = null;
-		drainGlobalFrame(timestamp);
-	});
+		globalFrameHandleKind = null;
+		drainGlobalFrame(readMonotonicTime());
+	}, FALLBACK_FRAME_INTERVAL_MS) as unknown as number;
+}
+
+function cancelGlobalFrame(): void {
+	if (globalFrameHandle === null) return;
+
+	if (
+		globalFrameHandleKind === "animation-frame" &&
+		typeof globalThis.cancelAnimationFrame === "function"
+	) {
+		globalThis.cancelAnimationFrame(globalFrameHandle);
+	} else if (typeof globalThis.clearTimeout === "function") {
+		globalThis.clearTimeout(globalFrameHandle);
+	}
+
+	globalFrameHandle = null;
+	globalFrameHandleKind = null;
+}
+
+function releaseGlobalResourcesIfIdle(): void {
+	if (activeQueuedScopes.size > 0) return;
+
+	cancelGlobalFrame();
+	unsubscribeScrollActivity?.();
+	unsubscribeScrollActivity = undefined;
 }
 
 function readScopeBackpressure(scope: PreviewActivationScope): PreviewBackpressure {
@@ -266,21 +315,15 @@ function refillActivationTokens(
 	timestamp: number,
 	policy: PreviewActivationPolicy,
 ): void {
-	if (lastTokenRefillTimestamp === null) {
-		lastTokenRefillTimestamp = timestamp;
-		availableActivationTokens = policy.burstCapacity;
-		return;
-	}
+	activationTokenState = refillPreviewScheduleTokens(
+		activationTokenState,
+		timestamp,
+		policy,
+	);
+}
 
-	const elapsedMs = Math.min(
-		MAX_REFILL_ELAPSED_MS,
-		Math.max(0, timestamp - lastTokenRefillTimestamp),
-	);
-	lastTokenRefillTimestamp = timestamp;
-	availableActivationTokens = Math.min(
-		policy.burstCapacity,
-		availableActivationTokens + (elapsedMs * policy.activationsPerSecond) / 1000,
-	);
+function hasPreviewAdmissionCapacity(pressure: PreviewBackpressure): boolean {
+	return pressure.queued + pressure.active < MAX_OUTSTANDING_PREVIEW_JOBS;
 }
 
 function compactScopeQueue(scope: PreviewActivationScope): void {
@@ -342,12 +385,16 @@ function drainGlobalFrame(frameTimestamp: number): void {
 	const scopes = Array.from(activeQueuedScopes);
 	const deadline = readMonotonicTime() + policy.maxDrainCpuMs;
 	let inspectedQueueEntries = 0;
+	let drainedTasks = 0;
 
 	while (
-		availableActivationTokens + ACTIVATION_TOKEN_EPSILON >= 1 &&
+		canConsumePreviewScheduleToken(activationTokenState) &&
+		drainedTasks < policy.maxTasksPerDrain &&
 		inspectedQueueEntries < MAX_QUEUE_ENTRIES_PER_DRAIN &&
 		readMonotonicTime() <= deadline
 	) {
+		if (!hasPreviewAdmissionCapacity(readGlobalBackpressure())) break;
+
 		const request = readNextRoundRobinRequest(scopes);
 		if (!request) break;
 		inspectedQueueEntries += 1;
@@ -355,7 +402,8 @@ function drainGlobalFrame(frameTimestamp: number): void {
 		if (request.scope.pendingByKey.get(request.key) !== request) continue;
 
 		settleRequest(request, true);
-		availableActivationTokens = Math.max(0, availableActivationTokens - 1);
+		activationTokenState = consumePreviewScheduleToken(activationTokenState);
+		drainedTasks += 1;
 	}
 
 	for (const scope of scopes) {
@@ -411,6 +459,7 @@ function enqueuePreviewActivationRequest(
 	if (existing) {
 		settleRequest(existing, false);
 	}
+	ensureSubscription();
 
 	const request: PreviewActivationRequest = {
 		key,
@@ -497,27 +546,31 @@ function resetScopeQueue(scope: PreviewActivationScope): void {
 	scope.pendingQueueHead = 0;
 }
 
-export function resetPreviewActivationSchedulerForTests(): void {
+function resetPreviewActivationSchedulerState(): void {
 	const scopesToReset = Array.from(activeQueuedScopes);
 	for (const scope of scopesToReset) {
 		resetScopeQueue(scope);
 	}
 	activeQueuedScopes.clear();
 
-	if (
-		globalFrameHandle !== null &&
-		typeof globalThis.cancelAnimationFrame === "function"
-	) {
-		globalThis.cancelAnimationFrame(globalFrameHandle);
-	}
-	globalFrameHandle = null;
+	cancelGlobalFrame();
 	roundRobinCursor = 0;
-	availableActivationTokens = 0;
-	lastTokenRefillTimestamp = null;
+	activationTokenState = createEmptyPreviewScheduleTokenState();
 
 	resetScopeQueue(defaultScope);
 	defaultScope.backpressureProviders.clear();
 
 	unsubscribeScrollActivity?.();
 	unsubscribeScrollActivity = undefined;
+}
+
+/**
+ * Stops activation scheduling and settles all pending activation requests.
+ */
+export function disposePreviewActivationScheduler(): void {
+	resetPreviewActivationSchedulerState();
+}
+
+export function resetPreviewActivationSchedulerForTests(): void {
+	resetPreviewActivationSchedulerState();
 }

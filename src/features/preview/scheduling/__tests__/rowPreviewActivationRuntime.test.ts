@@ -160,6 +160,36 @@ describe("rowPreviewActivationRuntime", () => {
 		expect(onActivated).not.toHaveBeenCalled();
 	});
 
+	it("disposes pending activations and rejects future registrations", async () => {
+		const runtime = createRowPreviewActivationRuntime();
+		const onActivated = vi.fn();
+
+		runtime.setRowVisibility(0, "visible");
+		runtime.registerCandidate(
+			createTestCandidate({
+				id: "c1",
+				rowIndex: 0,
+				activationKey: "key-a",
+				onActivated,
+			}),
+		);
+		runtime.dispose();
+		await flushAnimationFrame();
+
+		runtime.setRowVisibility(1, "visible");
+		runtime.registerCandidate(
+			createTestCandidate({
+				id: "c2",
+				rowIndex: 1,
+				activationKey: "key-b",
+				onActivated,
+			}),
+		);
+		await flushAnimationFrame();
+
+		expect(onActivated).not.toHaveBeenCalled();
+	});
+
 	it("reactivates a retained candidate when a recycled row becomes visible again", async () => {
 		const runtime = createRowPreviewActivationRuntime();
 		const onActivated = vi.fn();

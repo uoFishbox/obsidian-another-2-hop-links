@@ -1,30 +1,37 @@
 import { isScrollActivityActive } from "infrastructure/scroll/scrollActivity";
+import {
+	canConsumePreviewScheduleToken,
+	consumePreviewScheduleToken,
+	createEmptyPreviewScheduleTokenState,
+	refillPreviewScheduleTokens,
+	type PreviewScheduleTokenState,
+} from "./previewScheduleTokenBucket";
 
-const MAX_REFILL_ELAPSED_MS = 250;
 const MAX_QUEUE_ENTRIES_PER_DRAIN = 256;
-const DOM_COMMIT_TOKEN_EPSILON = 1e-9;
 const FALLBACK_FRAME_INTERVAL_MS = 1000 / 60;
 
 interface PreviewDomCommitPolicy {
-	readonly commitsPerSecond: number;
-	readonly burstCapacity: number;
+	readonly ratePerSecond: number;
+	readonly creditCapacity: number;
+	readonly maxTasksPerDrain: number;
 	readonly maxDrainCpuMs: number;
 }
 
 const SCROLLING_POLICY: PreviewDomCommitPolicy = {
-	commitsPerSecond: 90,
-	burstCapacity: 1,
+	ratePerSecond: 90,
+	creditCapacity: 2,
+	maxTasksPerDrain: 1,
 	maxDrainCpuMs: 1,
 };
 const IDLE_POLICY: PreviewDomCommitPolicy = {
-	commitsPerSecond: 240,
-	burstCapacity: 4,
+	ratePerSecond: 240,
+	creditCapacity: 4,
+	maxTasksPerDrain: 4,
 	maxDrainCpuMs: 2,
 };
 
 export interface PreviewDomCommitTask {
 	readonly targetKey: string;
-	readonly revisionKey: string;
 	readonly isStale: () => boolean;
 	readonly commit: () => boolean;
 }
@@ -40,8 +47,8 @@ let pendingQueue: QueuedPreviewDomCommitTask[] = [];
 let pendingQueueHead = 0;
 let frameHandle: number | null = null;
 let frameHandleKind: "animation-frame" | "timeout" | null = null;
-let availableCommitTokens = 0;
-let lastTokenRefillTimestamp: number | null = null;
+let commitTokenState: PreviewScheduleTokenState =
+	createEmptyPreviewScheduleTokenState();
 
 function readMonotonicTime(): number {
 	if (typeof globalThis.performance?.now === "function") {
@@ -75,21 +82,7 @@ function readCommitPolicy(): PreviewDomCommitPolicy {
 }
 
 function refillCommitTokens(timestamp: number, policy: PreviewDomCommitPolicy): void {
-	if (lastTokenRefillTimestamp === null) {
-		lastTokenRefillTimestamp = timestamp;
-		availableCommitTokens = policy.burstCapacity;
-		return;
-	}
-
-	const elapsedMs = Math.min(
-		MAX_REFILL_ELAPSED_MS,
-		Math.max(0, timestamp - lastTokenRefillTimestamp),
-	);
-	lastTokenRefillTimestamp = timestamp;
-	availableCommitTokens = Math.min(
-		policy.burstCapacity,
-		availableCommitTokens + (elapsedMs * policy.commitsPerSecond) / 1000,
-	);
+	commitTokenState = refillPreviewScheduleTokens(commitTokenState, timestamp, policy);
 }
 
 function compactQueue(): void {
@@ -143,9 +136,11 @@ function drainFrame(frameTimestamp: number): void {
 
 	const deadline = readMonotonicTime() + policy.maxDrainCpuMs;
 	let inspectedQueueEntries = 0;
+	let drainedTasks = 0;
 
 	while (
-		availableCommitTokens + DOM_COMMIT_TOKEN_EPSILON >= 1 &&
+		canConsumePreviewScheduleToken(commitTokenState) &&
+		drainedTasks < policy.maxTasksPerDrain &&
 		inspectedQueueEntries < MAX_QUEUE_ENTRIES_PER_DRAIN &&
 		readMonotonicTime() <= deadline
 	) {
@@ -160,11 +155,12 @@ function drainFrame(frameTimestamp: number): void {
 			continue;
 		}
 
+		drainedTasks += 1;
 		try {
 			const didCommit = task.commit();
 			settleTask(task, didCommit);
 			if (didCommit) {
-				availableCommitTokens = Math.max(0, availableCommitTokens - 1);
+				commitTokenState = consumePreviewScheduleToken(commitTokenState);
 			}
 		} catch (error) {
 			rejectTask(task, error);
@@ -205,14 +201,16 @@ export function enqueuePreviewDomCommit(task: PreviewDomCommitTask): Promise<boo
 	});
 }
 
-export function resetPreviewDomCommitSchedulerForTests(): void {
+/**
+ * Stops DOM commit scheduling and settles all pending commit requests.
+ */
+export function disposePreviewDomCommitScheduler(): void {
 	for (const task of pendingQueue.splice(0)) {
 		settleTask(task, false);
 	}
 	pendingQueueHead = 0;
 	pendingByTargetKey.clear();
-	availableCommitTokens = 0;
-	lastTokenRefillTimestamp = null;
+	commitTokenState = createEmptyPreviewScheduleTokenState();
 
 	if (frameHandle !== null) {
 		if (
@@ -226,4 +224,8 @@ export function resetPreviewDomCommitSchedulerForTests(): void {
 		frameHandle = null;
 		frameHandleKind = null;
 	}
+}
+
+export function resetPreviewDomCommitSchedulerForTests(): void {
+	disposePreviewDomCommitScheduler();
 }

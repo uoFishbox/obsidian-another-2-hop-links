@@ -5,6 +5,7 @@ import {
 	resetScrollActivityForTests,
 } from "infrastructure/scroll/scrollActivity";
 import {
+	disposePreviewDomCommitScheduler,
 	enqueuePreviewDomCommit,
 	resetPreviewDomCommitSchedulerForTests,
 } from "../previewDomCommitScheduler";
@@ -21,7 +22,6 @@ async function flushAnimationFrame(): Promise<void> {
 
 interface EnqueueTestCommitOptions {
 	readonly targetKey: string;
-	readonly revisionKey?: string;
 	readonly isStale?: () => boolean;
 	readonly didMutateDom?: boolean;
 	readonly onCommit?: () => void;
@@ -30,7 +30,6 @@ interface EnqueueTestCommitOptions {
 function enqueueTestCommit(options: EnqueueTestCommitOptions): Promise<boolean> {
 	return enqueuePreviewDomCommit({
 		targetKey: options.targetKey,
-		revisionKey: options.revisionKey ?? options.targetKey,
 		isStale: options.isStale ?? (() => false),
 		commit: () => {
 			options.onCommit?.();
@@ -97,12 +96,10 @@ describe("preview DOM commit scheduler", () => {
 
 		const firstCommit = enqueueTestCommit({
 			targetKey: "preview-a",
-			revisionKey: "old",
 			onCommit: () => committed.push("first"),
 		});
 		const secondCommit = enqueueTestCommit({
 			targetKey: "preview-a",
-			revisionKey: "new",
 			onCommit: () => committed.push("second"),
 		});
 
@@ -114,7 +111,7 @@ describe("preview DOM commit scheduler", () => {
 		expect(committed).toEqual(["second"]);
 	});
 
-	it("does not let old revisions delay the latest target commit", async () => {
+	it("does not let replaced work delay the latest target commit", async () => {
 		const committed: string[] = [];
 		const commits: Promise<boolean>[] = [];
 
@@ -122,7 +119,6 @@ describe("preview DOM commit scheduler", () => {
 			commits.push(
 				enqueueTestCommit({
 					targetKey: "preview-a",
-					revisionKey: `old-${revision}`,
 					onCommit: () => committed.push(`old-${revision}`),
 				}),
 			);
@@ -130,7 +126,6 @@ describe("preview DOM commit scheduler", () => {
 
 		const latestCommit = enqueueTestCommit({
 			targetKey: "preview-a",
-			revisionKey: "latest",
 			onCommit: () => committed.push("latest"),
 		});
 		commits.push(latestCommit);
@@ -190,7 +185,7 @@ describe("preview DOM commit scheduler", () => {
 		]);
 	});
 
-	it("rate-limits scrolling commits independently of refresh rate", async () => {
+	it("preserves the scrolling commit rate across refresh rates", async () => {
 		const commitsAt60Hz = await countCommits({
 			intervalMs: 1000 / 60,
 			durationMs: 1000,
@@ -202,11 +197,10 @@ describe("preview DOM commit scheduler", () => {
 			scrolling: true,
 		});
 
-		expect(Math.abs(commitsAt60Hz - commitsAt120Hz)).toBeLessThanOrEqual(1);
 		expect(commitsAt60Hz).toBeGreaterThanOrEqual(59);
 		expect(commitsAt60Hz).toBeLessThanOrEqual(63);
-		expect(commitsAt120Hz).toBeGreaterThanOrEqual(59);
-		expect(commitsAt120Hz).toBeLessThanOrEqual(63);
+		expect(commitsAt120Hz).toBeGreaterThanOrEqual(88);
+		expect(commitsAt120Hz).toBeLessThanOrEqual(96);
 	});
 
 	it("rate-limits idle commits independently of refresh rate", async () => {
@@ -290,6 +284,7 @@ describe("preview DOM commit scheduler", () => {
 			false,
 			false,
 		]);
+		await flushAnimationFrame();
 		await expect(liveCommit).resolves.toBe(true);
 		expect(committed).toEqual(["noop-a", "noop-b", "noop-c", "noop-d", "live"]);
 	});
@@ -313,5 +308,22 @@ describe("preview DOM commit scheduler", () => {
 
 		expect(committed).toEqual(["a", "b", "c", "d"]);
 		await expect(Promise.all(commits)).resolves.toEqual([true, true, true, true]);
+	});
+
+	it("uses a timeout fallback when requestAnimationFrame is unavailable", async () => {
+		vi.stubGlobal("requestAnimationFrame", undefined);
+		const commit = enqueueTestCommit({ targetKey: "fallback" });
+
+		await vi.advanceTimersByTimeAsync(frameIntervalMs);
+
+		await expect(commit).resolves.toBe(true);
+	});
+
+	it("settles pending commits when the scheduler is disposed", async () => {
+		const commit = enqueueTestCommit({ targetKey: "disposed" });
+
+		disposePreviewDomCommitScheduler();
+
+		await expect(commit).resolves.toBe(false);
 	});
 });

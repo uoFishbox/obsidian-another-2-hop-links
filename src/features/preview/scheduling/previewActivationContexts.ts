@@ -1,4 +1,4 @@
-import { setContext } from "svelte";
+import { onDestroy, setContext } from "svelte";
 import {
 	createPreviewActivationScope,
 	PREVIEW_ACTIVATION_SCOPE_CONTEXT_KEY,
@@ -31,6 +31,7 @@ export function providePreviewActivationContexts(
 
 	setContext(PREVIEW_ACTIVATION_SCOPE_CONTEXT_KEY, previewActivationScope);
 	setContext(PREVIEW_ROW_ACTIVATION_CONTEXT_KEY, rowPreviewActivationRuntime);
+	onDestroy(() => rowPreviewActivationRuntime.dispose());
 
 	return {
 		previewActivationScope,

@@ -206,10 +206,6 @@
 		);
 	}
 
-	function buildDomCommitRevisionKey(renderCacheKey: string): string {
-		return renderCacheKey;
-	}
-
 	async function replaceContainerContent(
 		source: HTMLElement,
 		signal: AbortSignal,
@@ -222,7 +218,6 @@
 
 		return enqueuePreviewDomCommit({
 			targetKey: domCommitScopeKey,
-			revisionKey: buildDomCommitRevisionKey(renderCacheKey),
 			isStale: () => isRenderStale(signal, renderToken),
 			commit: () => {
 				if (shouldSkipDomApply(renderCacheKey)) return false;
@@ -253,7 +248,6 @@
 
 		const didMutateDom = await enqueuePreviewDomCommit({
 			targetKey: domCommitScopeKey,
-			revisionKey: buildDomCommitRevisionKey(cacheKey),
 			isStale: () => isRenderStale(signal, renderToken),
 			commit: () => {
 				if (shouldSkipDomApply(cacheKey)) return false;
@@ -360,7 +354,6 @@
 						if (!targetContainer) return false;
 						return enqueuePreviewDomCommit({
 							targetKey: domCommitScopeKey,
-							revisionKey: buildDomCommitRevisionKey(renderCacheKey),
 							isStale: () => isRenderStale(signal, renderToken),
 							commit: () => {
 								if (shouldSkipDomApply(renderCacheKey)) return false;
@@ -418,7 +411,6 @@
 
 					return enqueuePreviewDomCommit({
 						targetKey: domCommitScopeKey,
-						revisionKey: buildDomCommitRevisionKey(renderCacheKey),
 						isStale: () => isRenderStale(signal, renderToken),
 						commit: () => {
 							if (shouldSkipDomApply(renderCacheKey)) return false;
@@ -493,7 +485,6 @@
 
 							const didCommit = await enqueuePreviewDomCommit({
 								targetKey: domCommitScopeKey,
-								revisionKey: buildDomCommitRevisionKey(renderCacheKey),
 								isStale: () => isRenderStale(signal, renderToken),
 								commit: () => {
 									if (shouldSkipDomApply(renderCacheKey))
@@ -563,7 +554,6 @@
 			}
 			await enqueuePreviewDomCommit({
 				targetKey: domCommitScopeKey,
-				revisionKey: buildDomCommitRevisionKey(renderCacheKey),
 				isStale: () => isRenderStale(signal, renderToken),
 				commit: () => {
 					previewContentType = undefined;
