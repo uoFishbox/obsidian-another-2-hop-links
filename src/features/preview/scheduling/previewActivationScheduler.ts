@@ -16,7 +16,7 @@ interface PreviewActivationPolicy {
 }
 
 const SCROLLING_POLICY: PreviewActivationPolicy = {
-	activationsPerSecond: 60,
+	activationsPerSecond: 90,
 	burstCapacity: 1,
 	maxDrainCpuMs: 1,
 };
