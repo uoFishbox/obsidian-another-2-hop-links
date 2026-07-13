@@ -14,9 +14,9 @@ import {
 	type RenderBodyKeyPolicy,
 } from "../core/reconciliation/renderBodyRevision";
 import {
-	createPooledRowSlotAllocator,
-	type PooledRowSlotAllocator,
-} from "../core/reconciliation/pooledRowSlotAllocator";
+	createContiguousRowSlotAllocator,
+	type ContiguousRowSlotAllocator,
+} from "../core/reconciliation/contiguousRowSlotAllocator";
 
 export interface SectionedGridSectionPlan<T, G> {
 	readonly sectionIndex: number;
@@ -80,7 +80,7 @@ export interface BuildSectionedGridMountedRowsParams<
 	readonly rowRange: RowRange;
 	readonly previousBuild?: SectionedGridMountedRowsBuild<T, G, TPlan>;
 	readonly resolvedRowScratch?: SectionedGridResolvedRowScratch;
-	readonly rowSlotAllocator?: PooledRowSlotAllocator;
+	readonly rowSlotAllocator?: ContiguousRowSlotAllocator;
 	readonly sourceRevision?: unknown;
 	readonly renderBodyKeyPolicy?: RenderBodyKeyPolicy;
 	findSectionIndexByRow(sections: readonly TSection[], rowIndex: number): number;
@@ -126,7 +126,7 @@ const EMPTY_PREVIOUS_CELLS: ReadonlyMap<string, never> = new Map<string, never>(
 
 const ROW_SLOT_ALLOCATOR = Symbol("sectioned-grid-row-slot-allocator");
 type SectionedGridMountedRowsBuildState = {
-	readonly [ROW_SLOT_ALLOCATOR]: PooledRowSlotAllocator;
+	readonly [ROW_SLOT_ALLOCATOR]: ContiguousRowSlotAllocator;
 };
 
 const flattenMountedRowCells = <T, G>(
@@ -217,17 +217,15 @@ export function buildSectionedGridMountedRows<
 	const rowSlotAllocator =
 		params.rowSlotAllocator ??
 		previousBuildState?.[ROW_SLOT_ALLOCATOR] ??
-		createPooledRowSlotAllocator();
+		createContiguousRowSlotAllocator();
 	const layoutKey = `${plan.columns}|${plan.rowGap}`;
-	const slotAllocation = rowSlotAllocator.apply({
-		rowKeys: Array.from(
-			{ length: Math.max(0, end - start) },
-			(_, index) => start + index,
-		),
+	rowSlotAllocator.prepareRange({
+		start,
+		end,
 		layoutKey,
 	});
-	const poolCapacity = slotAllocation.capacity;
-	const poolEpoch = slotAllocation.epoch;
+	const poolCapacity = rowSlotAllocator.capacity;
+	const poolEpoch = rowSlotAllocator.epoch;
 	let sectionIndex =
 		params.resolveInitialSectionIndexByRow?.(plan, start) ??
 		params.findSectionIndexByRow(plan.sections, start);
@@ -248,7 +246,7 @@ export function buildSectionedGridMountedRows<
 	for (let rowIndex = start; rowIndex < end; rowIndex += 1) {
 		const rowKey = rowIndex;
 		const previousRow = getPreviousRow(rowIndex);
-		const slotIndex = slotAllocation.slotIndexes[rowIndex - start] ?? 0;
+		const slotIndex = rowSlotAllocator.resolveSlotIndex(rowIndex);
 		if (
 			params.previousBuild?.plan === plan &&
 			Object.is(previousBuild?.sourceRevision, params.sourceRevision) &&
@@ -366,8 +364,9 @@ export function buildSectionedGridMountedRows<
 		rowSlices.push(rowSlice);
 	}
 
-	const sparseRowsBySlot: Array<MountedFlatRowSlice<T, G> | undefined> =
-		new Array(poolCapacity);
+	const sparseRowsBySlot: Array<MountedFlatRowSlice<T, G> | undefined> = new Array(
+		poolCapacity,
+	);
 	for (const row of rowSlices) sparseRowsBySlot[row.slotIndex ?? 0] = row;
 	const rowsBySlot: MountedFlatRowSlice<T, G>[] = [];
 	for (const row of sparseRowsBySlot) {

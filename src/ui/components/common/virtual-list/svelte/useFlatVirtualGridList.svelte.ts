@@ -233,7 +233,7 @@ export function useFlatVirtualGridList<T>(props: FlatVirtualGridListProps<T>) {
 				previousBuild,
 				previousCellsByKey,
 				renderRevisionFallbackPolicy: props.renderRevisionFallbackPolicy,
-				contiguousRowSlotAllocator: rowSlotAllocator,
+				rowSlotAllocator,
 			}),
 		mountedRowsReconciler: rowSlotAllocator,
 		onStableVisibleRange: () => {

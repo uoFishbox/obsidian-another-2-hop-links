@@ -1,5 +1,6 @@
 import { recordCCLDevMeasurement } from "infrastructure/debug/CCLDevMeasurements";
-import type { PooledRowSlotResetReason } from "./pooledRowSlotAllocator";
+
+export type RowSlotResetReason = "empty" | "layout" | "source";
 
 export interface ContiguousRowSlotAllocator {
 	/**
@@ -12,7 +13,7 @@ export interface ContiguousRowSlotAllocator {
 		readonly layoutKey: unknown;
 	}): void;
 	resolveSlotIndex(logicalRowIndex: number): number;
-	reset(reason: PooledRowSlotResetReason): void;
+	reset(reason: RowSlotResetReason): void;
 	dispose(): void;
 	readonly capacity: number;
 	readonly epoch: number;
@@ -31,7 +32,7 @@ export function createContiguousRowSlotAllocator(): ContiguousRowSlotAllocator {
 	let disposed = false;
 	let underutilizedApplyCount = 0;
 
-	function reset(_reason: PooledRowSlotResetReason): void {
+	function reset(_reason: RowSlotResetReason): void {
 		capacity = 0;
 		layoutKey = undefined;
 		hasLayoutKey = false;
