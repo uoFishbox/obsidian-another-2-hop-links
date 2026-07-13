@@ -161,12 +161,6 @@ export function collectTwohopSearchableFiles(
 	return Array.from(filesByPath.values());
 }
 
-export function buildTwohopSearchDataset(
-	options: TwohopSearchAdapterOptions,
-): SearchWorkerItemSnapshot[] {
-	return buildTwohopSearchDatasetWithCache(options);
-}
-
 function buildTwohopSearchDatasetWithCache(
 	options: TwohopSearchAdapterOptions,
 	searchKeyCache?: SearchKeyCache,
@@ -279,20 +273,6 @@ function buildTwohopSearchDatasetWithCache(
 	}
 
 	return snapshots;
-}
-
-export function filterTwohopDisplayData(
-	displayData: DisplayData,
-	query: string,
-	matchedKeySet: Set<string> | null,
-	renderMode: TwohopSearchRenderMode,
-): DisplayData {
-	return filterTwohopDisplayDataWithCache(
-		displayData,
-		query,
-		matchedKeySet,
-		renderMode,
-	);
 }
 
 function filterTwohopDisplayDataWithCache(
@@ -476,10 +456,6 @@ export function createTwohopChildSearchKeyFromBaseKeys(
 
 function getTagGroupSearchKey(section: TagGroup): string {
 	return `${TAG_GROUP_SEARCH_PREFIX}${section.tag}`;
-}
-
-export function getTagNoteSearchKey(section: TagGroup, note: TaggedNote): string {
-	return createTagNoteSearchKey(section, note);
 }
 
 export function getTagNoteSearchKeyFromBaseKey(tag: string, baseKey: string): string {

@@ -92,7 +92,6 @@ describe("useVirtualList", () => {
 		const virtualList = createVirtualList();
 
 		expect(virtualList.getSnapshot()).toBeNull();
-		expect(virtualList.getMode()).toEqual({ kind: "uninitialized" });
 		expect(virtualList.getMountedCells()).toEqual([]);
 		expect(virtualList.getReconciliationState()).toEqual({
 			mountedBuild: null,
@@ -157,7 +156,7 @@ describe("useVirtualList", () => {
 			},
 		});
 
-		expect(virtualList.getMode()).toEqual({
+		expect(virtualList.getSnapshot()?.mode).toEqual({
 			kind: "stable",
 			scrolling: true,
 		});
@@ -339,7 +338,7 @@ describe("useVirtualList", () => {
 		});
 		expect(virtualList.getSnapshot()).not.toBe(initial);
 		expect(virtualList.getSnapshot()?.mountedCells).toBe(initial?.mountedCells);
-		expect(virtualList.getMode().kind).toBe("skipped");
+		expect(virtualList.getSnapshot()?.mode.kind).toBe("skipped");
 		expect(onSnapshotUpdated).toHaveBeenCalledTimes(2);
 	});
 
@@ -365,7 +364,7 @@ describe("useVirtualList", () => {
 			reason: "no-renderable-content",
 		});
 
-		expect(virtualList.getMode()).toEqual({
+		expect(virtualList.getSnapshot()?.mode).toEqual({
 			kind: "empty",
 			reason: "no-renderable-content",
 		});
@@ -407,7 +406,7 @@ describe("useVirtualList", () => {
 			},
 		});
 
-		expect(virtualList.getMode().kind).toBe("stable");
+		expect(virtualList.getSnapshot()?.mode.kind).toBe("stable");
 		expect(virtualList.getMountedCells()).not.toBe(initialCells);
 		expect(virtualList.getMountedCells()[0]?.renderSlotIndex).toBe(0);
 	});

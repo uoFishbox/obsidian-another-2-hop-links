@@ -13,7 +13,6 @@ import {
 import type {
 	EmptyReason,
 	MaterializedVirtualListMode,
-	VirtualListMode,
 } from "./VirtualListMode";
 import type { MountedVirtualCell, VirtualRanges, VirtualRowModel } from "../types";
 
@@ -290,27 +289,6 @@ export function createVirtualListRuntime<
 	return {
 		getState() {
 			return runtimeState;
-		},
-		getSnapshot() {
-			return runtimeState.snapshot;
-		},
-		getMode(): VirtualListMode {
-			return runtimeState.mode;
-		},
-		getMountedCells() {
-			return runtimeState.mode.kind === "empty" ||
-				runtimeState.mode.kind === "uninitialized"
-				? []
-				: (runtimeState.snapshot?.mountedCells ?? []);
-		},
-		getMountedCellsForChange() {
-			return runtimeState.mountedCellsForChange;
-		},
-		getReconciliationState() {
-			return runtimeState.reconciliationState;
-		},
-		getTotalHeight(fallback: number) {
-			return runtimeState.snapshot?.totalHeight ?? fallback;
 		},
 		applyMeasurement,
 		recompute,

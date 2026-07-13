@@ -43,7 +43,6 @@ describe("listPagination", () => {
 		});
 
 		expect(pagination.getVisibleCount("section", 10)).toBe(2);
-		expect(pagination.canLoadMore("section", 10)).toBe(true);
 
 		pagination.loadMore("section", 10);
 
@@ -67,7 +66,6 @@ describe("listPagination", () => {
 		});
 
 		expect(pagination.getVisibleCount("section", 10)).toBe(0);
-		expect(pagination.canLoadMore("section", 10)).toBe(true);
 	});
 
 	it("clamps stored and store-provided expanded limits to loaded items", () => {
@@ -85,23 +83,6 @@ describe("listPagination", () => {
 
 		expect(pagination.getVisibleCount("stored", 5)).toBe(5);
 		expect(pagination.getVisibleCount("from-store", 5)).toBe(5);
-	});
-
-	it("prunes counts for removed sections", () => {
-		let expandedLimits: Record<string, number> = {
-			keep: 4,
-			remove: 2,
-		};
-		const pagination = createSectionPaginationState({
-			getExpandedLimits: () => expandedLimits,
-			setExpandedLimits: (nextExpandedLimits) => {
-				expandedLimits = nextExpandedLimits;
-			},
-		});
-
-		pagination.prune(new Set(["keep"]));
-
-		expect(expandedLimits).toEqual({ keep: 4 });
 	});
 
 	it("falls back when the provided store does not expose pagination methods", () => {

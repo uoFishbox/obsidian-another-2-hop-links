@@ -9,10 +9,7 @@ export interface SectionPaginationApplicationStore {
 
 export interface SectionPaginationState {
 	getVisibleCount(sectionId: string, totalLoadedCount: number): number;
-	setExpandedLimit(sectionId: string, limit: number): void;
 	loadMore(sectionId: string, loadedCount: number): void;
-	canLoadMore(sectionId: string, loadedCount: number): boolean;
-	prune(sectionIds: ReadonlySet<string>): void;
 }
 
 export interface CreateSectionPaginationStateParams {
@@ -328,10 +325,6 @@ export function createSectionPaginationState({
 
 	return {
 		getVisibleCount,
-		setExpandedLimit,
-		canLoadMore(sectionId, loadedCount) {
-			return getVisibleCount(sectionId, loadedCount) < loadedCount;
-		},
 		loadMore(sectionId, loadedCount) {
 			const visibleCount = getVisibleCount(sectionId, loadedCount);
 			if (visibleCount >= loadedCount) {
@@ -347,26 +340,6 @@ export function createSectionPaginationState({
 				sectionId,
 				Math.max(getExpandedLimit(sectionId) ?? 0, nextCount),
 			);
-		},
-		prune(sectionIds) {
-			const expandedLimits = getExpandedLimits();
-			const hasRemovedSection = Object.keys(expandedLimits).some(
-				(sectionId) => !sectionIds.has(sectionId),
-			);
-
-			if (!hasRemovedSection) {
-				return;
-			}
-
-			const nextExpandedLimits: Record<string, number> = {};
-
-			for (const sectionId in expandedLimits) {
-				if (sectionIds.has(sectionId)) {
-					nextExpandedLimits[sectionId] = expandedLimits[sectionId];
-				}
-			}
-
-			setExpandedLimits(nextExpandedLimits);
 		},
 	};
 }

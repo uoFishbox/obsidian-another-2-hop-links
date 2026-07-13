@@ -4,7 +4,6 @@ import {
 	type VirtualListRuntimeState,
 } from "../core/virtualListRuntime";
 import type { MountedVirtualCellsBuild } from "../core/virtualListEngine";
-import type { VirtualListMode } from "../core/VirtualListMode";
 import type { MountedVirtualCell, VirtualRowModel } from "../types";
 
 export type UseVirtualListOptions<
@@ -43,9 +42,6 @@ export function useVirtualList<
 	return {
 		getSnapshot() {
 			return runtimeState.snapshot;
-		},
-		getMode(): VirtualListMode {
-			return runtimeState.mode;
 		},
 		getMountedCells() {
 			return runtimeState.mode.kind === "empty" ||

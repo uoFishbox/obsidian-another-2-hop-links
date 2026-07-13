@@ -14,20 +14,6 @@ export interface CachedVirtualItemAccessors {
 	readonly reset: () => void;
 }
 
-export interface ReconciledVirtualItemAccessorsParams<T, TViewItem> {
-	readonly getLength: () => number;
-	readonly getSortedItems: () => readonly T[];
-	readonly itemsReconciler: {
-		reconcile(items: readonly T[]): readonly TViewItem[];
-		getKeys(): readonly string[];
-	};
-	readonly createItem: (
-		item: TViewItem,
-		key: string,
-		index: number,
-	) => TwoHopVirtualListItem | undefined;
-}
-
 export interface SparseStableVirtualItemAccessorsParams<T, TViewItem> {
 	readonly getLength: () => number;
 	readonly getSortedItems: () => readonly T[];
@@ -101,40 +87,6 @@ export function createSparseVirtualItemAccessors(params: {
 		getItem,
 		reset() {
 			itemsCache = undefined;
-		},
-	};
-}
-
-export function createReconciledVirtualItemAccessors<T, TViewItem>(
-	params: ReconciledVirtualItemAccessorsParams<T, TViewItem>,
-): CachedVirtualItemAccessors {
-	let reconciledItems: readonly TViewItem[] | undefined;
-	let reconciledKeys: readonly string[] | undefined;
-	const ensureReconciled = (): void => {
-		if (reconciledItems && reconciledKeys) return;
-
-		reconciledItems = params.itemsReconciler.reconcile(params.getSortedItems());
-		reconciledKeys = params.itemsReconciler.getKeys();
-	};
-	const accessors = createSparseVirtualItemAccessors({
-		getLength: params.getLength,
-		createItem: (index) => {
-			ensureReconciled();
-			const item = reconciledItems?.[index];
-			const key = reconciledKeys?.[index];
-			if (!item || !key) return undefined;
-			return params.createItem(item, key, index);
-		},
-	});
-	const resetSparseAccessors = accessors.reset;
-
-	return {
-		getItems: accessors.getItems,
-		getItem: accessors.getItem,
-		reset() {
-			reconciledItems = undefined;
-			reconciledKeys = undefined;
-			resetSparseAccessors();
 		},
 	};
 }

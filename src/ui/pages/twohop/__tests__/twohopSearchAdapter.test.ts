@@ -9,10 +9,8 @@ import type {
 } from "types/domain";
 import type { DisplayData } from "application/presenters/displayDataBuilder";
 import {
-	buildTwohopSearchDataset,
 	collectTwohopSearchableFiles,
 	createTwohopSearchAdapter,
-	filterTwohopDisplayData,
 	type TwohopSearchRenderMode,
 } from "../twoHopSearchAdapter";
 
@@ -141,7 +139,9 @@ function createAdapterOptions(
 	};
 }
 
-describe("buildTwohopSearchDataset", () => {
+describe("TwohopSearchAdapter.buildDataset", () => {
+	const searchAdapter = createTwohopSearchAdapter();
+
 	it("builds snapshot from resolved outgoing branch with frontmatter title", () => {
 		const sourceFile = createMockTFile("notes/source.md");
 		const targetFile = createMockTFile("notes/outgoing-target.md");
@@ -150,7 +150,7 @@ describe("buildTwohopSearchDataset", () => {
 		});
 		const options = createAdapterOptions(displayData, sourceFile);
 
-		const snapshots = buildTwohopSearchDataset(options);
+		const snapshots = searchAdapter.buildDataset(options);
 		const outgoingSnapshot = snapshots.find((s) => s.key.startsWith("o"));
 
 		expect(outgoingSnapshot?.searchText).toContain("outgoing-target link");
@@ -173,7 +173,7 @@ describe("buildTwohopSearchDataset", () => {
 			showTags: true,
 		});
 
-		const snapshots = buildTwohopSearchDataset(options);
+		const snapshots = searchAdapter.buildDataset(options);
 		const mergedBranchSnapshot = snapshots.find(
 			(s) => s.key.startsWith("m") && s.searchText.includes("merged branch raw"),
 		);
@@ -201,7 +201,7 @@ describe("buildTwohopSearchDataset", () => {
 		});
 		const options = createAdapterOptions(displayData, sourceFile);
 
-		const snapshots = buildTwohopSearchDataset(options);
+		const snapshots = searchAdapter.buildDataset(options);
 		const childSnapshot = snapshots.find((s) => s.key.startsWith("h"));
 
 		expect(childSnapshot?.searchText).toContain("child-source link");
@@ -221,7 +221,7 @@ describe("buildTwohopSearchDataset", () => {
 		});
 		const options = createAdapterOptions(displayData, sourceFile);
 
-		const snapshots = buildTwohopSearchDataset(options);
+		const snapshots = searchAdapter.buildDataset(options);
 		const tagGroupSnapshot = snapshots.find((s) => s.key.startsWith("g"));
 
 		expect(tagGroupSnapshot?.searchText).toBe("#alpha");
@@ -239,13 +239,13 @@ describe("buildTwohopSearchDataset", () => {
 			mergedItems: [createBranch(sourceFile, mergedTarget.path, "Merged Raw")],
 		});
 
-		const separateSnapshots = buildTwohopSearchDataset(
+		const separateSnapshots = searchAdapter.buildDataset(
 			createAdapterOptions(displayData, sourceFile, {
 				useMergedLinks: false,
 				showTags: true,
 			}),
 		);
-		const mergedSnapshots = buildTwohopSearchDataset(
+		const mergedSnapshots = searchAdapter.buildDataset(
 			createAdapterOptions(displayData, sourceFile, {
 				useMergedLinks: true,
 				showTags: true,
@@ -284,7 +284,7 @@ describe("buildTwohopSearchDataset", () => {
 			],
 		});
 
-		const snapshots = buildTwohopSearchDataset(
+		const snapshots = searchAdapter.buildDataset(
 			createAdapterOptions(displayData, sourceFile, {
 				useMergedLinks: false,
 				showTags: false,
@@ -296,7 +296,9 @@ describe("buildTwohopSearchDataset", () => {
 	});
 });
 
-describe("filterTwohopDisplayData", () => {
+describe("TwohopSearchAdapter.filterDisplayData", () => {
+	const searchAdapter = createTwohopSearchAdapter();
+
 	it("returns original displayData when query is empty", () => {
 		const sourceFile = createMockTFile("notes/source.md");
 		const targetFile = createMockTFile("notes/target.md");
@@ -304,7 +306,7 @@ describe("filterTwohopDisplayData", () => {
 			outgoing: [createBranch(sourceFile, targetFile.path, "target")],
 		});
 
-		const result = filterTwohopDisplayData(
+		const result = searchAdapter.filterDisplayData(
 			displayData,
 			"",
 			new Set(),
@@ -322,7 +324,7 @@ describe("filterTwohopDisplayData", () => {
 			backlinks: [createBacklink(targetFile, "backlink")],
 		});
 
-		const result = filterTwohopDisplayData(
+		const result = searchAdapter.filterDisplayData(
 			displayData,
 			"query",
 			null,
@@ -349,10 +351,10 @@ describe("filterTwohopDisplayData", () => {
 			],
 		});
 		const options = createAdapterOptions(displayData, sourceFile);
-		const snapshots = buildTwohopSearchDataset(options);
+		const snapshots = searchAdapter.buildDataset(options);
 		const parentKey = snapshots.find((s) => !s.key.startsWith("h"))?.key;
 
-		const result = filterTwohopDisplayData(
+		const result = searchAdapter.filterDisplayData(
 			displayData,
 			"query",
 			new Set([parentKey ?? ""]),
@@ -376,10 +378,10 @@ describe("filterTwohopDisplayData", () => {
 			],
 		});
 		const options = createAdapterOptions(displayData, sourceFile);
-		const snapshots = buildTwohopSearchDataset(options);
+		const snapshots = searchAdapter.buildDataset(options);
 		const betaChildKey = snapshots.find((s) => s.key.includes("beta-child"))?.key;
 
-		const result = filterTwohopDisplayData(
+		const result = searchAdapter.filterDisplayData(
 			displayData,
 			"query",
 			new Set([betaChildKey ?? ""]),
@@ -402,10 +404,10 @@ describe("filterTwohopDisplayData", () => {
 			],
 		});
 		const options = createAdapterOptions(displayData, sourceFile);
-		const snapshots = buildTwohopSearchDataset(options);
+		const snapshots = searchAdapter.buildDataset(options);
 		const tagGroupKey = snapshots.find((s) => s.key.startsWith("g"))?.key;
 
-		const result = filterTwohopDisplayData(
+		const result = searchAdapter.filterDisplayData(
 			displayData,
 			"query",
 			new Set([tagGroupKey ?? ""]),
@@ -432,10 +434,10 @@ describe("filterTwohopDisplayData", () => {
 			],
 		});
 		const options = createAdapterOptions(displayData, sourceFile);
-		const snapshots = buildTwohopSearchDataset(options);
+		const snapshots = searchAdapter.buildDataset(options);
 		const betaNoteKey = snapshots.find((s) => s.key.includes("beta-note"))?.key;
 
-		const result = filterTwohopDisplayData(
+		const result = searchAdapter.filterDisplayData(
 			displayData,
 			"query",
 			new Set([betaNoteKey ?? ""]),
@@ -460,7 +462,7 @@ describe("filterTwohopDisplayData", () => {
 			],
 		});
 
-		const result = filterTwohopDisplayData(
+		const result = searchAdapter.filterDisplayData(
 			displayData,
 			"query",
 			new Set(),
@@ -532,11 +534,11 @@ describe("filterTwohopDisplayData", () => {
 			useMergedLinks: true,
 			showTags: true,
 		});
-		const mergedKey = buildTwohopSearchDataset(options).find((snapshot) =>
+		const mergedKey = searchAdapter.buildDataset(options).find((snapshot) =>
 			snapshot.key.startsWith("m"),
 		)?.key;
 
-		const result = filterTwohopDisplayData(
+		const result = searchAdapter.filterDisplayData(
 			displayData,
 			"query",
 			new Set([mergedKey ?? ""]),
@@ -563,11 +565,11 @@ describe("filterTwohopDisplayData", () => {
 			],
 		});
 		const options = createAdapterOptions(displayData, sourceFile);
-		const tagGroupKey = buildTwohopSearchDataset(options).find((snapshot) =>
+		const tagGroupKey = searchAdapter.buildDataset(options).find((snapshot) =>
 			snapshot.key.startsWith("g"),
 		)?.key;
 
-		const result = filterTwohopDisplayData(
+		const result = searchAdapter.filterDisplayData(
 			displayData,
 			"query",
 			new Set([tagGroupKey ?? ""]),
