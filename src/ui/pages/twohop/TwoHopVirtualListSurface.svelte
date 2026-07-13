@@ -22,6 +22,7 @@
 	import TwoHopFixedRowSlotsSurface from "./TwoHopFixedRowSlotsSurface.svelte";
 	import TwoHopItemCellRender from "./TwoHopItemCellRender.svelte";
 	import { createSurfaceVirtualCellRegistry } from "ui/components/common/virtual-list/svelte/VirtualCellRegistry";
+	import type { TwoHopCardPresentationState } from "./twoHopCellBinding";
 
 	interface Props {
 		sections: readonly SectionRenderDescriptor<
@@ -31,7 +32,6 @@
 		applicationStore?: ApplicationStore;
 		initialVisibleCount?: number;
 		loadMoreIncrement?: number;
-		getCellClassName?: (section: TwoHopVirtualListSection) => string | undefined;
 		getItemInteractionDescriptor: (
 			item: TwoHopVirtualListItem,
 		) => ItemInteractionDescriptor | null;
@@ -51,11 +51,16 @@
 			]
 		>;
 		renderItem: Snippet<
-			[TwoHopVirtualListItem, number, VirtualizedItemVisibilityState, string]
+			[
+				TwoHopVirtualListItem,
+				number,
+				VirtualizedItemVisibilityState,
+				string,
+				TwoHopCardPresentationState,
+			]
 		>;
 	}
 
-	const TWO_HOP_CELL_CLASS_NAME = "view-plan-virtual-list-cell view-plan-flow-cell";
 	const EMPTY_MOUNTED_ROWS: readonly [] = [];
 
 	const props: Props = $props();
@@ -69,22 +74,6 @@
 			resolveDescriptor: (item) => props.getItemInteractionDescriptor(item),
 			getDescriptorRevision: () => props.interactionDescriptorRevision,
 		});
-	const resolvedCellClassNameBySectionClassName = new Map<string, string>();
-	const resolveSectionCellClassName = (
-		sectionClassName: string | undefined,
-	): string => {
-		if (!sectionClassName) return TWO_HOP_CELL_CLASS_NAME;
-
-		let resolved = resolvedCellClassNameBySectionClassName.get(sectionClassName);
-		if (resolved !== undefined) return resolved;
-
-		resolved = `${TWO_HOP_CELL_CLASS_NAME} ${sectionClassName}`;
-		resolvedCellClassNameBySectionClassName.set(sectionClassName, resolved);
-		return resolved;
-	};
-	const getMountedCellClassName = (
-		cell: MountedFlatCell<TwoHopVirtualListItem, TwoHopVirtualListSection>,
-	): string => resolveSectionCellClassName(props.getCellClassName?.(cell.section));
 	const isHeaderCell = (
 		cell: MountedFlatCell<TwoHopVirtualListItem, TwoHopVirtualListSection>,
 	): cell is MountedFlatHeaderCell<TwoHopVirtualListItem, TwoHopVirtualListSection> =>
@@ -120,7 +109,6 @@
 		gap={list.layout.gap}
 		bind:contentEl
 		observerRoot={list.observerRoot}
-		getCellClassName={getMountedCellClassName}
 		getCellDataTestId={list.getCellDataTestId}
 		{cellRegistry}
 	>

@@ -4,6 +4,7 @@
 	import ClickableHeader from "ui/components/common/ClickableHeader.svelte";
 	import type { ClickableHeaderExtraProps } from "ui/components/sections/types";
 	import type { TwoHopVirtualListSection } from "./twoHopVirtualListModel";
+	import type { CardSectionVariant } from "ui/components/common/cardPresentation";
 
 	type HeaderSection = Extract<
 		TwoHopVirtualListSection,
@@ -16,9 +17,10 @@
 		count: number;
 		sectionId: string;
 		header: ClickableHeaderExtraProps;
+		sectionVariant: CardSectionVariant;
 	}
 
-	let { kind, title, count, sectionId, header }: Props = $props();
+	let { kind, title, count, sectionId, header, sectionVariant }: Props = $props();
 
 	const iconName = $derived(
 		(kind === "tag-section" ? "Tag" : "Link") satisfies IconName,
@@ -36,6 +38,7 @@
 	{...clickableHeaderProps}
 	interactionId={header.interactionId ?? sectionId}
 	interactionKind={header.interactionKind ?? "sectionHeader"}
+	{sectionVariant}
 >
 	{#snippet icon()}
 		<Icon name={iconName} width={26} height={26} class="twohop-links-icon" />

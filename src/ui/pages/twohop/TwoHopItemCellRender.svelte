@@ -7,6 +7,7 @@
 		TwoHopVirtualListItem,
 		TwoHopVirtualListSection,
 	} from "./twoHopVirtualListModel";
+	import type { TwoHopCardPresentationState } from "./twoHopCellBinding";
 
 	type TwoHopMountedItemCell = MountedFlatItemCell<
 		TwoHopVirtualListItem,
@@ -21,7 +22,13 @@
 		) => VirtualizedItemVisibilityState;
 		getItemActivationCandidateId: (cell: TwoHopMountedItemCell) => string;
 		renderItem: Snippet<
-			[TwoHopVirtualListItem, number, VirtualizedItemVisibilityState, string]
+			[
+				TwoHopVirtualListItem,
+				number,
+				VirtualizedItemVisibilityState,
+				string,
+				TwoHopCardPresentationState,
+			]
 		>;
 	}
 
@@ -48,13 +55,21 @@
 	// then read ordinary reactive snapshot fields instead of traversing the slot
 	// controller and resolving visibility on every individual prop access.
 	const snapshot = $derived.by(() => {
-		const mountedCell = cellController.mountedCell;
+		const binding = cellController.binding;
+		const mountedCell = binding?.mountedCell;
 		const itemCell = isItemCell(mountedCell) ? mountedCell : fallbackItemCell;
+		const presentation = binding?.presentation;
 		return {
 			item: itemCell.cell.item,
 			rowIndex: itemCell.rowIndex,
 			visibilityState: getItemVisibilityState(itemCell),
 			activationCandidateId: getItemActivationCandidateId(itemCell),
+			presentation: presentation ?? {
+				sectionVariant: "two-hop" as const,
+				resolution: "resolved" as const,
+				attachment: false,
+				extension: null,
+			},
 		};
 	});
 </script>
@@ -64,4 +79,5 @@
 	snapshot.rowIndex,
 	snapshot.visibilityState,
 	snapshot.activationCandidateId,
+	snapshot.presentation,
 )}

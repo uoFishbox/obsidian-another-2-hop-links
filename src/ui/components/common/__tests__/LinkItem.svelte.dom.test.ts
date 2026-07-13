@@ -100,4 +100,44 @@ describe("LinkItem", () => {
 			"false",
 		);
 	});
+
+	it("commits section and resolution presentation on the reused card root", async () => {
+		const baseProps = {
+			title: "Alpha",
+			ariaLabel: "alpha",
+			interactionId: "item:new-link:alpha",
+			interactionKind: "item" as const,
+			settings: DEFAULT_SETTINGS,
+		};
+		const { container, rerender } = render(LinkItem, {
+			props: {
+				...baseProps,
+				presentation: {
+					sectionVariant: "new-links" as const,
+					resolution: "missing" as const,
+					attachment: false,
+					extension: null,
+				},
+			},
+		});
+		const card = container.querySelector<HTMLElement>(".cosense-card-links__box");
+
+		expect(card).toHaveAttribute("data-ccl-section-variant", "new-links");
+		expect(card).toHaveAttribute("data-ccl-resolution", "missing");
+
+		await rerender({
+			...baseProps,
+			interactionId: "item:file:alpha",
+			presentation: {
+				sectionVariant: "backlinks",
+				resolution: "resolved",
+				attachment: false,
+				extension: null,
+			},
+		});
+
+		expect(container.querySelector(".cosense-card-links__box")).toBe(card);
+		expect(card).toHaveAttribute("data-ccl-section-variant", "backlinks");
+		expect(card).toHaveAttribute("data-ccl-resolution", "resolved");
+	});
 });

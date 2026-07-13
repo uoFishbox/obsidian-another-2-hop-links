@@ -7,6 +7,7 @@
 		TwoHopVirtualListSection,
 	} from "./twoHopVirtualListModel";
 	import type { SectionRenderDescriptor } from "ui/components/sections/types";
+	import { resolveTwoHopSectionVariant } from "./twoHopCellBinding";
 
 	interface Props {
 		section: TwoHopVirtualListSection;
@@ -20,12 +21,13 @@
 	}
 
 	let { section, title, totalCount, sectionId, headerProps }: Props = $props();
+	const sectionVariant = $derived(resolveTwoHopSectionVariant(section));
 </script>
 
 {#if section.kind === "primary-section"}
-	<LinkSectionHeader {title} {totalCount} />
+	<LinkSectionHeader {title} {totalCount} {sectionVariant} />
 {:else if section.kind === "new-links-section"}
-	<LinkSectionHeader {title} {totalCount}>
+	<LinkSectionHeader {title} {totalCount} {sectionVariant}>
 		{#snippet icon()}
 			<Icon name="Unlink" width={26} height={26} class="twohop-links-icon" />
 		{/snippet}
@@ -37,5 +39,6 @@
 		count={totalCount}
 		{sectionId}
 		header={headerProps}
+		{sectionVariant}
 	/>
 {/if}

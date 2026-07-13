@@ -10,6 +10,8 @@ import type {
 	VirtualCellRegistrationOwner,
 	VirtualCellRegistry,
 } from "ui/components/common/virtual-list/svelte/VirtualCellRegistry";
+import { createTwoHopCellBinding, type TwoHopCellBinding } from "./twoHopCellBinding";
+import { dispatchVirtualCellWillRebind } from "ui/interactions/virtualCellRebind";
 
 export interface TwoHopFixedCellSlotController extends VirtualCellRegistrationOwner {
 	readonly cellSlotKey: number;
@@ -20,6 +22,7 @@ export interface TwoHopFixedCellSlotController extends VirtualCellRegistrationOw
 	readonly renderBodyKey: RenderBodyKey | undefined;
 	readonly renderBodyKind: TwoHopMountedCell["renderBodyKind"];
 	readonly mountedCell: TwoHopMountedCell | undefined;
+	readonly binding: TwoHopCellBinding | null;
 	bindCell(cell: TwoHopMountedCell): void;
 	clear(): void;
 }
@@ -58,6 +61,9 @@ function createCellController(
 	let mountedCell = $state.raw<TwoHopMountedCell | undefined>(initialCell);
 	let active = $state(initialCell !== undefined);
 	let revision = $state(0);
+	let binding = $state.raw<TwoHopCellBinding | null>(
+		initialCell ? createTwoHopCellBinding(initialCell, 0) : null,
+	);
 	let cellElement: HTMLElement | null = null;
 	let cellRegistry: VirtualCellRegistry | null = null;
 	let cellRegistration: VirtualCellElementRegistration | null = null;
@@ -99,20 +105,47 @@ function createCellController(
 			void revision;
 			return mountedCell;
 		},
+		get binding() {
+			void revision;
+			return binding;
+		},
 		bindCell(nextCell): void {
+			const previousBinding = binding;
+			if (
+				previousBinding &&
+				previousBinding.logicalKey !== nextCell.key &&
+				cellElement
+			) {
+				dispatchVirtualCellWillRebind(cellElement, {
+					previousLogicalKey: String(previousBinding.logicalKey),
+					nextLogicalKey: String(nextCell.key),
+				});
+			}
+			const nextBinding = createTwoHopCellBinding(
+				nextCell,
+				(previousBinding?.epoch ?? -1) + 1,
+			);
 			logicalKey = nextCell.key;
 			rowIndex = nextCell.rowIndex;
 			columnIndex = nextCell.columnIndex;
 			renderBodyKey = nextCell.renderBodyKey;
 			renderBodyKind = nextCell.renderBodyKind;
 			mountedCell = nextCell;
+			binding = nextBinding;
 			revision += 1;
 			active = true;
 			registerCurrentBinding();
 		},
 		clear(): void {
+			if (binding && cellElement) {
+				dispatchVirtualCellWillRebind(cellElement, {
+					previousLogicalKey: String(binding.logicalKey),
+					nextLogicalKey: "",
+				});
+			}
 			active = false;
 			mountedCell = undefined;
+			binding = null;
 			unregisterCurrentBinding();
 		},
 		attachElement(element, registry): void {

@@ -223,8 +223,14 @@ export function createDelegatedInteractionDispatcher({
 		longPressElement = null;
 	}
 
+	function resetTransientState(): void {
+		resetLongPressState();
+		activeHoverInteractionId = null;
+	}
+
 	return {
 		clearLongPressTimer: resetLongPressState,
+		resetTransientState,
 
 		handleClick(event: MouseEvent): void {
 			const element = getInteractionElement(event);

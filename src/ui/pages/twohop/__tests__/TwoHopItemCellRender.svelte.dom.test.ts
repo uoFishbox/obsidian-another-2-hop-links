@@ -259,6 +259,61 @@ describe("TwoHopItemCellRender", () => {
 		kernel.dispose();
 	});
 
+	it("remounts only the item body when a physical slot crosses a reuse-family boundary", async () => {
+		const kernel = createTwoHopScalarScrollKernel({
+			initialRowModel: rowModel,
+			onStableVisibleRange() {},
+		});
+		applyRange(kernel, 1);
+		const controller = kernel.fixedRowSlotPool.controllers[0]?.cells[0];
+		expect(controller).toBeDefined();
+		if (!controller || !isItemCell(controller.mountedCell)) return;
+
+		const { container } = render(TwoHopFixedRowSlotsSurfaceHarness, {
+			props: { rowSlotControllers: kernel.fixedRowSlotPool.controllers },
+		});
+		await tick();
+		const physicalCell = container.querySelector<HTMLElement>(
+			"[data-ccl-cell-slot='0']",
+		);
+		const initialBody = physicalCell?.querySelector<HTMLElement>(
+			"[data-testid='twohop-child-item-cell']",
+		);
+		expect(initialBody).toBeTruthy();
+
+		const previous = controller.mountedCell;
+		controller.bindCell({
+			...previous,
+			key: `${String(previous.key)}:file` as typeof previous.key,
+			logicalKey:
+				`${String(previous.logicalKey)}:file` as typeof previous.logicalKey,
+			cell: {
+				...previous.cell,
+				item: {
+					kind: "primary-link",
+					item: { type: "file", data: { basename: "file" } } as never,
+					sourceSectionId: "backlinks",
+					searchKey: "file-item",
+					virtualKey: "file-item",
+				} satisfies TwoHopVirtualListItem,
+			},
+		});
+		await tick();
+		await tick();
+
+		const reboundPhysicalCell = container.querySelector<HTMLElement>(
+			"[data-ccl-cell-slot='0']",
+		);
+		const reboundBody = reboundPhysicalCell?.querySelector<HTMLElement>(
+			"[data-testid='twohop-child-item-cell']",
+		);
+		expect(reboundPhysicalCell).toBe(physicalCell);
+		expect(reboundBody).toBeTruthy();
+		expect(reboundBody).not.toBe(initialBody);
+
+		kernel.dispose();
+	});
+
 	it("keeps an item snapshot valid while its physical slot changes kind", async () => {
 		const kernel = createTwoHopScalarScrollKernel({
 			initialRowModel: rowModelWithLoadMore,

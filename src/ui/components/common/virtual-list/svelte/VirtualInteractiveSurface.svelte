@@ -5,6 +5,7 @@
 	import { createVirtualSurfaceInteractions } from "./VirtualSurfaceInteractions.svelte";
 	import { watchVirtualSurfaceMountedCellsChange } from "./VirtualSurfaceMountedCellsChange.svelte";
 	import type { VirtualSurfaceMountedRow } from "./VirtualSurfaceTypes";
+	import { VIRTUAL_CELL_WILL_REBIND_EVENT } from "ui/interactions/virtualCellRebind";
 
 	type Props<TMountedCell extends MountedVirtualCell> = Pick<
 		VirtualSurfaceCommonProps<TMountedCell>,
@@ -87,6 +88,25 @@
 					},
 		getMountedCellsForChange: () => mountedCellsForChange,
 		onMountedCellsChange,
+	});
+
+	function handleVirtualCellWillRebind(): void {
+		delegatedInteractions.resetTransientState();
+	}
+
+	$effect(() => {
+		const element = rootEl;
+		if (!element) return;
+
+		element.addEventListener(
+			VIRTUAL_CELL_WILL_REBIND_EVENT,
+			handleVirtualCellWillRebind,
+		);
+		return () =>
+			element.removeEventListener(
+				VIRTUAL_CELL_WILL_REBIND_EVENT,
+				handleVirtualCellWillRebind,
+			);
 	});
 </script>
 

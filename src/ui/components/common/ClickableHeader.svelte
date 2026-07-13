@@ -6,6 +6,7 @@
 		type SectionHeaderInteractionDescriptor,
 	} from "ui/interactions/interactionTypes";
 	import { useInteractionRegistry } from "ui/interactions/interactionRegistry";
+	import type { CardSectionVariant } from "./cardPresentation";
 
 	export interface Props {
 		title: string;
@@ -19,6 +20,7 @@
 		interactionKind: "sectionHeader";
 		interactionDescriptor?: SectionHeaderInteractionDescriptor;
 		onClick?: () => void;
+		sectionVariant?: CardSectionVariant;
 	}
 
 	let {
@@ -33,6 +35,7 @@
 		interactionKind,
 		interactionDescriptor,
 		onClick,
+		sectionVariant,
 	}: Props = $props();
 
 	const interactionRegistry = useInteractionRegistry();
@@ -64,6 +67,7 @@
 	data-ccl-interaction-id={interactionId}
 	data-ccl-interaction-kind={interactionKind}
 	data-directory={directory}
+	data-ccl-section-variant={sectionVariant}
 	use:interactionIdBinding={interactionId}
 	onclick={() => onClick?.()}
 	onkeydown={(e) => {

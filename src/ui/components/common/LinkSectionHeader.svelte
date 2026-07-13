@@ -3,6 +3,7 @@
 	import Icon from "ui/components/common/Icon.svelte";
 	import type { Snippet } from "svelte";
 	import { useAppContext } from "ui/context/linkContext";
+	import type { CardSectionVariant } from "./cardPresentation";
 
 	interface Props {
 		title: string;
@@ -11,6 +12,7 @@
 		iconClass?: string;
 		containerClass?: string;
 		icon?: Snippet;
+		sectionVariant?: CardSectionVariant;
 	}
 
 	let {
@@ -20,6 +22,7 @@
 		iconClass = "twohop-links-icon",
 		containerClass = "cosense-card-links__connected-links-header",
 		icon,
+		sectionVariant,
 	}: Props = $props();
 
 	const tooltip = $derived(
@@ -80,6 +83,7 @@
 	role="button"
 	tabindex="0"
 	oncontextmenu={handleContextMenu}
+	data-ccl-section-variant={sectionVariant}
 >
 	<div class="cosense-card-links__title-container">
 		<span class="cosense-card-links__header-title">{title}</span>

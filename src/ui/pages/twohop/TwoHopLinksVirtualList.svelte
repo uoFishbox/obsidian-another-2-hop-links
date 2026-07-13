@@ -19,6 +19,7 @@
 		createTwoHopInteractionDescriptorRevision,
 		resolveTwoHopItemInteractionDescriptor,
 	} from "./twoHopInteractionDescriptorRevision";
+	import type { TwoHopCardPresentationState } from "./twoHopCellBinding";
 
 	interface Props {
 		sections: readonly TwoHopVirtualSectionDescriptor[];
@@ -51,9 +52,6 @@
 	} catch {
 		linkContext = undefined;
 	}
-	const getCellClassName = (section: TwoHopVirtualListSection): string | undefined =>
-		section.className;
-
 	const getItemInteractionDescriptor = (row: TwoHopVirtualListItem) =>
 		resolveTwoHopItemInteractionDescriptor(row, interactionDescriptorRevision);
 	const interactionDescriptorRevision = $derived(
@@ -71,7 +69,6 @@
 		{applicationStore}
 		{initialVisibleCount}
 		{loadMoreIncrement}
-		{getCellClassName}
 		{getItemInteractionDescriptor}
 		{interactionDescriptorRevision}
 	>
@@ -90,6 +87,7 @@
 			rowIndex: number,
 			visibilityState: VirtualizedItemVisibilityState,
 			activationCandidateId: string,
+			presentation: TwoHopCardPresentationState,
 		)}
 			<TwoHopVirtualItemCard
 				{row}
@@ -100,6 +98,7 @@
 				{rowIndex}
 				{visibilityState}
 				{activationCandidateId}
+				{presentation}
 			/>
 		{/snippet}
 	</TwoHopViewPlanVirtualList>

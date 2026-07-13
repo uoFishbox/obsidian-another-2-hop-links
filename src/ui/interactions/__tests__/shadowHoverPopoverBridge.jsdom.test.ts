@@ -46,6 +46,7 @@ vi.mock("../shadowHoverLinkSpec", () => ({
 }));
 
 import { installShadowHoverPopoverBridge } from "../shadowHoverPopoverBridge";
+import { dispatchVirtualCellWillRebind } from "../virtualCellRebind";
 
 describe("shadowHoverPopoverBridge", () => {
 	beforeEach(() => {
@@ -265,6 +266,31 @@ describe("shadowHoverPopoverBridge", () => {
 			"item:second",
 			expect.any(MouseEvent),
 		);
+
+		dispose();
+	});
+
+	it("ends logical hover and the active popover before a stationary-pointer rebind", () => {
+		const { shadowRoot, dispose } = installBridge();
+		const physicalCell = document.createElement("div");
+		const interaction = createInteractionElement("item:first");
+		physicalCell.append(interaction);
+		shadowRoot.append(physicalCell);
+
+		interaction.dispatchEvent(
+			new MouseEvent("mouseover", { bubbles: true, composed: true }),
+		);
+		expect(interaction.dataset.cclHovered).toBe("true");
+
+		dispatchVirtualCellWillRebind(physicalCell, {
+			previousLogicalKey: "first",
+			nextLogicalKey: "second",
+		});
+		interaction.dataset.cclInteractionId = "item:second";
+
+		expect(interaction.dataset.cclHovered).toBeUndefined();
+		expect(handleDelegatedLeaveMock).toHaveBeenCalledWith(interaction);
+		expect(handleDelegatedEnterMock).toHaveBeenCalledTimes(1);
 
 		dispose();
 	});

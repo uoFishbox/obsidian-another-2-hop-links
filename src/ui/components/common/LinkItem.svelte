@@ -12,6 +12,7 @@
 	import { type Snippet } from "svelte";
 	import { useAppContext } from "ui/context/linkContext";
 	import { highlightTextForSearch } from "features/preview/text-processing/searchHighlighter";
+	import type { CardPresentationState } from "./cardPresentation";
 
 	interface Props {
 		title: string;
@@ -26,6 +27,7 @@
 		directory?: string | null;
 		file?: TFile | null;
 		searchQuery?: string;
+		presentation?: CardPresentationState;
 	}
 
 	let {
@@ -41,6 +43,7 @@
 		directory = null,
 		file = null,
 		searchQuery = "",
+		presentation,
 	}: Props = $props();
 
 	let appContext: ReturnType<typeof useAppContext> | undefined;
@@ -95,6 +98,12 @@
 	data-ccl-interaction-id={interactionId}
 	data-ccl-interaction-kind={interactionKind}
 	data-directory={directory}
+	data-ccl-section-variant={presentation?.sectionVariant}
+	data-ccl-resolution={presentation?.resolution}
+	data-ccl-attachment={(presentation?.attachment ?? isAttachmentFile)
+		? "true"
+		: "false"}
+	data-ccl-extension={presentation?.extension ?? normalizedExtension ?? ""}
 	{draggable}
 	use:interactionIdBinding={interactionId}
 >
@@ -140,7 +149,10 @@
 		color: var(--color-base-50);
 	}
 
-	.cosense-card-links__section.twohop-links-new-links .cosense-card-links__box-title {
+	.cosense-card-links__box[data-ccl-resolution="missing"]
+		.cosense-card-links__box-title,
+	.cosense-card-links__box[data-ccl-section-variant="new-links"]
+		.cosense-card-links__box-title {
 		color: var(--color-base-50);
 	}
 </style>

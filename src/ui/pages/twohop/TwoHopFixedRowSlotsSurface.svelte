@@ -20,7 +20,6 @@
 		rowSlotControllers: readonly TwoHopFixedRowSlotController[];
 		contentEl?: HTMLDivElement | null;
 		observerRoot?: HTMLElement | null;
-		getCellClassName?: (cell: TwoHopMountedCell) => string | undefined;
 		getCellDataTestId?: (cell: TwoHopMountedCell) => string | undefined;
 		renderCell: Snippet<
 			[
@@ -43,7 +42,6 @@
 		gap,
 		rowSlotControllers,
 		contentEl = $bindable<HTMLDivElement | null>(null),
-		getCellClassName,
 		getCellDataTestId,
 		renderCell,
 		cellRegistry,
@@ -55,11 +53,13 @@
 	function resolveBodyLifecycleKey(
 		controller: TwoHopFixedCellSlotController,
 	): string {
-		if (controller.renderBodyKind === "item") {
-			return "twohop-physical-item-body";
+		const binding = controller.binding;
+		if (!binding) return "empty";
+		if (binding.renderKind === "item") {
+			return `twohop-item:${binding.reuseFamily ?? "resolved-item"}`;
 		}
 
-		return `${controller.renderBodyKind}:${controller.renderBodyKey ?? controller.logicalKey}`;
+		return `${binding.renderKind}:${controller.renderBodyKey ?? binding.logicalKey}`;
 	}
 
 	const contentStyle = $derived(
@@ -78,11 +78,12 @@
 				style={`position:absolute; left:0; right:0; top:0; transform:translateY(${Math.max(0, controller.top)}px); margin-bottom:0`}
 			>
 				{#each controller.cells as cellController (cellController.cellSlotKey)}
-					{#if cellController.active && cellController.mountedCell}
-						{@const mountedCell = cellController.mountedCell}
+					{#if cellController.active && cellController.binding}
+						{@const binding = cellController.binding}
+						{@const mountedCell = binding.mountedCell}
 						<VirtualGridLogicalCellMount
-							logicalKey={cellController.logicalKey}
-							className={getCellClassName?.(mountedCell) ?? ""}
+							logicalKey={binding.logicalKey}
+							className="view-plan-virtual-list-cell view-plan-flow-cell"
 							dataTestId={getCellDataTestId?.(mountedCell)}
 							cellSlotKey={cellController.cellSlotKey}
 							rowIndex={cellController.rowIndex}

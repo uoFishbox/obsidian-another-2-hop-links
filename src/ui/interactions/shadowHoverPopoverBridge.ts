@@ -11,6 +11,7 @@ import { ShadowHoverControllerImpl } from "features/preview/shadow-hover/control
 import { WorkspaceTriggerPopoverLauncher } from "features/preview/shadow-hover/launcher";
 import { COSENSE_CARD_LINKS_HOVER_SOURCE_ID } from "features/preview/interactions/hoverPopoverLinkSpec";
 import { isHTMLElementLike, isNodeLike } from "ui/utils/realmSafeDom";
+import { VIRTUAL_CELL_WILL_REBIND_EVENT } from "./virtualCellRebind";
 
 interface ShadowHoverPopoverBridgeOptions {
 	shadowRoot: ShadowRoot;
@@ -26,6 +27,7 @@ interface SharedShadowHoverBridgeHandle {
 	appContext?: AppContext;
 	refCount: number;
 	controller: ShadowHoverControllerImpl;
+	hoveredAnchorEl: HTMLElement | null;
 	activeAnchorEl: HTMLElement | null;
 	activeInteractionId: string | null;
 	lastPointerModState: boolean | null;
@@ -94,10 +96,22 @@ function leaveActiveAnchor(handle: SharedShadowHoverBridgeHandle): void {
 		return;
 	}
 
+	delete handle.activeAnchorEl.dataset.cclHovered;
 	handle.controller.handleDelegatedLeave(handle.activeAnchorEl);
 	handle.activeAnchorEl = null;
 	handle.activeInteractionId = null;
 	handle.lastPointerModState = null;
+}
+
+function enterLogicalHover(
+	handle: SharedShadowHoverBridgeHandle,
+	element: HTMLElement,
+): void {
+	if (handle.hoveredAnchorEl && handle.hoveredAnchorEl !== element) {
+		delete handle.hoveredAnchorEl.dataset.cclHovered;
+	}
+	element.dataset.cclHovered = "true";
+	handle.hoveredAnchorEl = element;
 }
 
 function relaunchActiveAnchorForInteraction(
@@ -107,6 +121,10 @@ function relaunchActiveAnchorForInteraction(
 	event: MouseEvent,
 ): void {
 	handle.controller.closeActivePopover();
+	if (handle.activeAnchorEl && handle.activeAnchorEl !== anchorEl) {
+		delete handle.activeAnchorEl.dataset.cclHovered;
+	}
+	enterLogicalHover(handle, anchorEl);
 	handle.activeAnchorEl = anchorEl;
 	handle.activeInteractionId = interactionId;
 	handle.lastPointerModState = getModifierState(event);
@@ -151,6 +169,7 @@ function handleMouseOver(
 	if (!nextInteractionId) {
 		return;
 	}
+	enterLogicalHover(handle, nextAnchorEl);
 
 	const nextDescriptor = handle.registry.resolve(nextInteractionId);
 	if (nextDescriptor?.hoverPreviewEnabled === false) {
@@ -180,6 +199,10 @@ function handleMouseOver(
 	}
 
 	if (handle.activeInteractionId === nextInteractionId) {
+		if (handle.activeAnchorEl && handle.activeAnchorEl !== nextAnchorEl) {
+			delete handle.activeAnchorEl.dataset.cclHovered;
+		}
+		enterLogicalHover(handle, nextAnchorEl);
 		handle.activeAnchorEl = nextAnchorEl;
 		handle.activeInteractionId = nextInteractionId;
 		handle.lastPointerModState = getModifierState(event);
@@ -206,6 +229,10 @@ function handleMouseOver(
 		}
 	}
 
+	if (handle.activeAnchorEl && handle.activeAnchorEl !== nextAnchorEl) {
+		delete handle.activeAnchorEl.dataset.cclHovered;
+	}
+	enterLogicalHover(handle, nextAnchorEl);
 	handle.activeAnchorEl = nextAnchorEl;
 	handle.activeInteractionId = nextInteractionId;
 	handle.lastPointerModState = getModifierState(event);
@@ -226,6 +253,10 @@ function handleMouseOut(
 
 	if (isRelatedTargetWithinAnchor(currentAnchorEl, event)) {
 		return;
+	}
+	delete currentAnchorEl.dataset.cclHovered;
+	if (handle.hoveredAnchorEl === currentAnchorEl) {
+		handle.hoveredAnchorEl = null;
 	}
 
 	const currentInteractionId = getInteractionIdFromElement(currentAnchorEl);
@@ -353,6 +384,7 @@ function createHandle({
 		appContext,
 		refCount: 1,
 		controller,
+		hoveredAnchorEl: null,
 		activeAnchorEl: null,
 		activeInteractionId: null,
 		lastPointerModState: null,
@@ -373,11 +405,31 @@ function createHandle({
 	const onWindowBlur = () => {
 		handle.lastPointerModState = null;
 	};
+	const onVirtualCellWillRebind: EventListener = (event) => {
+		const target = event.target;
+		if (!isHTMLElementLike(target)) return;
+
+		for (const hovered of target.querySelectorAll<HTMLElement>(
+			"[data-ccl-hovered='true']",
+		)) {
+			delete hovered.dataset.cclHovered;
+		}
+		if (handle.hoveredAnchorEl && target.contains(handle.hoveredAnchorEl)) {
+			handle.hoveredAnchorEl = null;
+		}
+		if (handle.activeAnchorEl && target.contains(handle.activeAnchorEl)) {
+			leaveActiveAnchor(handle);
+		}
+	};
 	const doc = shadowRoot.ownerDocument;
 	const win = doc.defaultView;
 	shadowRoot.addEventListener("mouseover", onMouseOver);
 	shadowRoot.addEventListener("mouseout", onMouseOut);
 	shadowRoot.addEventListener("pointermove", onPointerMove);
+	shadowRoot.addEventListener(
+		VIRTUAL_CELL_WILL_REBIND_EVENT,
+		onVirtualCellWillRebind,
+	);
 	doc.addEventListener("keydown", onKeyDown, true);
 	doc.addEventListener("keyup", onKeyUp, true);
 	win?.addEventListener("blur", onWindowBlur);
@@ -385,6 +437,10 @@ function createHandle({
 		shadowRoot.removeEventListener("mouseover", onMouseOver);
 		shadowRoot.removeEventListener("mouseout", onMouseOut);
 		shadowRoot.removeEventListener("pointermove", onPointerMove);
+		shadowRoot.removeEventListener(
+			VIRTUAL_CELL_WILL_REBIND_EVENT,
+			onVirtualCellWillRebind,
+		);
 		doc.removeEventListener("keydown", onKeyDown, true);
 		doc.removeEventListener("keyup", onKeyUp, true);
 		win?.removeEventListener("blur", onWindowBlur);

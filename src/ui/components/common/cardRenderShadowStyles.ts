@@ -95,7 +95,7 @@ export const CARD_RENDER_SHADOW_CSS = String.raw`
 }
 
 @media (hover: hover) {
-	.cosense-card-links__box:not(.cosense-card-links__connected-links-header):hover {
+	.cosense-card-links__box:not(.cosense-card-links__connected-links-header)[data-ccl-hovered="true"] {
 		border-color: var(--background-modifier-border-hover);
 	}
 }
@@ -144,13 +144,15 @@ export const CARD_RENDER_SHADOW_CSS = String.raw`
 }
 
 .cosense-card-links__twohop-header.cosense-card-links__box--missing,
-.cosense-card-links__box--missing {
+.cosense-card-links__box--missing,
+.cosense-card-links__box[data-ccl-resolution="missing"] {
 	border: 1px dashed var(--color-base-40);
 }
 
 @media (hover: hover) {
 	.cosense-card-links__twohop-header.cosense-card-links__box--missing:hover,
-	.cosense-card-links__box.cosense-card-links__box--missing:hover {
+	.cosense-card-links__box.cosense-card-links__box--missing[data-ccl-hovered="true"],
+	.cosense-card-links__box[data-ccl-resolution="missing"][data-ccl-hovered="true"] {
 		border-color: var(--background-modifier-border-hover);
 	}
 }
@@ -218,8 +220,8 @@ export const CARD_RENDER_SHADOW_CSS = String.raw`
 }
 
 
-.cosense-card-links__new-links .cosense-card-links__box-title,
-.twohop-links-new-links .cosense-card-links__box-title {
+.cosense-card-links__box[data-ccl-resolution="missing"] .cosense-card-links__box-title,
+.cosense-card-links__box[data-ccl-section-variant="new-links"] .cosense-card-links__box-title {
 	color: var(--color-base-50);
 }
 
@@ -227,8 +229,7 @@ export const CARD_RENDER_SHADOW_CSS = String.raw`
 	background-color: var(--ccl-bg-box) !important;
 }
 
-.cosense-card-links__new-links .cosense-card-links__connected-links-header,
-.twohop-links-new-links .cosense-card-links__connected-links-header {
+.cosense-card-links__connected-links-header[data-ccl-section-variant="new-links"] {
 	background-color: var(--ccl-single-backlink-unresolved) !important;
 }
 

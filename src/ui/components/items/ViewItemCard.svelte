@@ -4,10 +4,7 @@
 	import LinkItem from "ui/components/common/LinkItem.svelte";
 	import CardPreviewGate from "./CardPreviewGate.svelte";
 	import UnresolvedPreviewPlaceholder from "./UnresolvedPreviewPlaceholder.svelte";
-	import {
-		ARIA_LABELS,
-		DEBUG_DISABLE_CARD_DOM_PREVIEW,
-	} from "../../../appConstants";
+	import { ARIA_LABELS, DEBUG_DISABLE_CARD_DOM_PREVIEW } from "../../../appConstants";
 	import { formatLinkText } from "features/preview/text-processing/textUtils";
 	import { getItemStrategy } from "application/presenters";
 	import { getPriorityFrontmatterCardTitle } from "core/frontmatterCardTitle";
@@ -32,6 +29,7 @@
 		interactionKey: providedInteractionKey = undefined,
 		rowIndex = undefined,
 		activationCandidateId = undefined,
+		presentation = undefined,
 	}: ItemProps = $props();
 
 	const context = useLinkContext();
@@ -125,6 +123,7 @@
 		void providedInteractionKey;
 		void rowIndex;
 		void activationCandidateId;
+		void presentation;
 		void strategy;
 		void targetFile;
 		void className;
@@ -173,6 +172,7 @@
 		{directory}
 		{settings}
 		{searchQuery}
+		{presentation}
 	>
 		{#snippet children()}
 			{#if !DEBUG_DISABLE_CARD_DOM_PREVIEW && item.type === "newLink" && !targetFile}

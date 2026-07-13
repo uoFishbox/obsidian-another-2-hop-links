@@ -8,6 +8,7 @@
 	import type { TwoHopVirtualListItem } from "./twoHopVirtualListModel";
 	import { resolveTwoHopPageItemSearchScope } from "./twoHopVirtualListModel";
 	import { markCCLComponentReevaluation } from "infrastructure/debug/CCLDevMeasurements";
+	import type { TwoHopCardPresentationState } from "./twoHopCellBinding";
 
 	interface Props {
 		row: TwoHopVirtualListItem;
@@ -18,6 +19,7 @@
 		rowIndex: number;
 		visibilityState: VirtualizedItemVisibilityState;
 		activationCandidateId: string;
+		presentation: TwoHopCardPresentationState;
 	}
 
 	let {
@@ -29,6 +31,7 @@
 		rowIndex,
 		visibilityState,
 		activationCandidateId,
+		presentation,
 	}: Props = $props();
 
 	const matchedItem = $derived(matchedItemByKey?.get(row.searchKey));
@@ -46,6 +49,7 @@
 		void rowIndex;
 		void visibilityState;
 		void activationCandidateId;
+		void presentation;
 		void matchedItem;
 		void resolvedSearchScope;
 		return markCCLComponentReevaluation("TwoHopVirtualItemCard");
@@ -65,5 +69,6 @@
 		interactionRegistration="snapshot"
 		interactionId={row.interactionId}
 		interactionKey={row.interactionKey}
+		{presentation}
 	/>
 </PreviewVisibilityProvider>
