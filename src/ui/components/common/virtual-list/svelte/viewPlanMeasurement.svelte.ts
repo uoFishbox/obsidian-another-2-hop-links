@@ -248,6 +248,17 @@ export function createViewPlanMeasurementRuntime<
 			scrollWindowMeasurementController.resetLastScrollWindow();
 			return "skipped";
 		}
+		const hasRenderableSections = params.getValidatedSections().length > 0;
+		const layoutStability = resolveVirtualListLayoutStability({
+			rootEl: sectionEl,
+			rootRect: nextMeasurement.sectionRect,
+			measuredWidth: params.state.measurement.measuredWidth,
+			hasRenderableContent: hasRenderableSections,
+		});
+		if (!nextMeasurement.isStableMeasurement || !layoutStability.isStable) {
+			scrollWindowMeasurementController.resetLastScrollWindow();
+			return "unstable";
+		}
 
 		const layoutBase = resolveCachedCardGridLayoutBase({
 			rootEl: sectionEl,
@@ -270,13 +281,6 @@ export function createViewPlanMeasurementRuntime<
 			),
 		};
 		const nextRowModel = params.runtime.resolveRowModel(nextLayout);
-		const hasRenderableSections = params.getValidatedSections().length > 0;
-		const layoutStability = resolveVirtualListLayoutStability({
-			rootEl: sectionEl,
-			rootRect: nextMeasurement.sectionRect,
-			measuredWidth: params.state.measurement.measuredWidth,
-			hasRenderableContent: hasRenderableSections,
-		});
 		if (!isSameViewPlanLayout(params.state.layout, nextLayout)) {
 			params.state.setLayout(nextLayout);
 		}
@@ -290,7 +294,7 @@ export function createViewPlanMeasurementRuntime<
 			nextRowModel,
 			nextLayout,
 		);
-		if (result.kind !== "stable" || !layoutStability.isStable) {
+		if (result.kind !== "stable") {
 			scrollWindowMeasurementController.resetLastScrollWindow();
 			return "unstable";
 		}

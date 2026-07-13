@@ -165,6 +165,75 @@ describe("TwoHopViewPlanVirtualList DOM performance contracts", () => {
 		expect(getItemInteractionDescriptor).not.toHaveBeenCalled();
 	});
 
+	it("keeps the last stable card layout while its tab is hidden", async () => {
+		const { container } = render(TwoHopViewPlanVirtualListPerfHarness, {
+			props: {
+				sections: [createDescriptor(100)],
+				applicationStore,
+			},
+		});
+		const scrollRoot = container.querySelector<HTMLElement>(
+			"[data-testid='scroll-root']",
+		);
+		const virtualListRoot = container.querySelector<HTMLElement>(
+			".twohop-page-virtual-list",
+		);
+		if (!scrollRoot || !virtualListRoot) {
+			throw new Error("Expected TwoHop virtual-list elements.");
+		}
+
+		setNumericProperty(scrollRoot, "clientHeight", 120);
+		setNumericProperty(scrollRoot, "scrollTop", 0);
+		setElementRect(scrollRoot, { top: 0, width: 330, height: 120 });
+		setElementRect(virtualListRoot, { top: 0, width: 330, height: 20_000 });
+		triggerResize(virtualListRoot, 330, 20_000);
+		triggerResize(scrollRoot, 330, 120);
+		await flushFrames();
+		await flushFrames();
+
+		const shadowRoot = virtualListRoot.shadowRoot;
+		const content = shadowRoot?.querySelector<HTMLElement>(
+			".view-plan-virtual-list-content",
+		);
+		const initialStyle = content?.getAttribute("style");
+		const initialLogicalKeys = Array.from(
+			shadowRoot?.querySelectorAll<HTMLElement>("[data-ccl-logical-key]") ?? [],
+			(element) => element.dataset.cclLogicalKey,
+		);
+		expect(initialStyle).toContain("--ccl-columns: 3");
+		expect(initialLogicalKeys.length).toBeGreaterThan(0);
+
+		setNumericProperty(scrollRoot, "clientHeight", 0);
+		setElementRect(scrollRoot, { top: 0, width: 0, height: 0 });
+		setElementRect(virtualListRoot, { top: 0, width: 0, height: 0 });
+		triggerResize(virtualListRoot, 0, 0);
+		triggerResize(scrollRoot, 0, 0);
+		await flushFrames();
+		await flushFrames();
+
+		expect(content?.getAttribute("style")).toBe(initialStyle);
+		expect(
+			Array.from(
+				shadowRoot?.querySelectorAll<HTMLElement>("[data-ccl-logical-key]") ??
+					[],
+				(element) => element.dataset.cclLogicalKey,
+			),
+		).toEqual(initialLogicalKeys);
+
+		setNumericProperty(scrollRoot, "clientHeight", 120);
+		setElementRect(scrollRoot, { top: 0, width: 330, height: 120 });
+		setElementRect(virtualListRoot, { top: 0, width: 330, height: 20_000 });
+		triggerResize(virtualListRoot, 330, 20_000);
+		triggerResize(scrollRoot, 330, 120);
+		await flushFrames();
+		await flushFrames();
+
+		expect(content?.getAttribute("style")).toBe(initialStyle);
+		expect(
+			shadowRoot?.querySelectorAll("[data-testid='twohop-item-cell']").length,
+		).toBeGreaterThan(0);
+	});
+
 	it("retains an item body when a recycled cell shell receives another logical item", async () => {
 		const { container } = render(TwoHopViewPlanVirtualListPerfHarness, {
 			props: {
