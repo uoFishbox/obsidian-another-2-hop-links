@@ -18,7 +18,7 @@ interface PreviewDomCommitPolicy {
 }
 
 const SCROLLING_POLICY: PreviewDomCommitPolicy = {
-	ratePerSecond: 90,
+	ratePerSecond: 60,
 	creditCapacity: 2,
 	maxTasksPerDrain: 1,
 	maxDrainCpuMs: 1,
