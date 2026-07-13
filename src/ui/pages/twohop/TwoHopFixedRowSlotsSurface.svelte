@@ -49,9 +49,19 @@
 		cellRegistry,
 	}: Props = $props();
 
-	// A physical slot may be rebound to a different logical card without leaving
-	// the mounted range. Remount the body on logical identity changes so nested
-	// imperative state cannot leak between cards.
+	// Item bodies are owned by the physical slot so scrolling can update their
+	// props without recreating the Svelte card tree. Other body kinds retain
+	// logical identity keys because their renderers do not implement item rebinds.
+	function resolveBodyLifecycleKey(
+		controller: TwoHopFixedCellSlotController,
+	): string {
+		if (controller.renderBodyKind === "item") {
+			return "twohop-physical-item-body";
+		}
+
+		return `${controller.renderBodyKind}:${controller.renderBodyKey ?? controller.logicalKey}`;
+	}
+
 	const contentStyle = $derived(
 		`height:${contentHeight}px; position:relative; --ccl-box-height:${rowHeight}px; --ccl-cell-width:${cellWidth ?? 0}px; --ccl-columns:${Math.max(1, Math.floor(columns))}${gap !== undefined ? `; --ccl-box-gap:${gap}px` : ""}`,
 	);
@@ -81,7 +91,7 @@
 							{cellRegistry}
 							cellRegistrationOwner={cellController}
 						>
-							{#key cellController.renderBodyKey ?? cellController.logicalKey}
+							{#key resolveBodyLifecycleKey(cellController)}
 								{@render renderCell({ mountedCell, cellController })}
 							{/key}
 						</VirtualGridLogicalCellMount>

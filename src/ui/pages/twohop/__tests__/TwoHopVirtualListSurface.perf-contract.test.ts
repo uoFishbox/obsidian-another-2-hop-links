@@ -165,7 +165,7 @@ describe("TwoHopViewPlanVirtualList DOM performance contracts", () => {
 		expect(getItemInteractionDescriptor).not.toHaveBeenCalled();
 	});
 
-	it("remounts an item body when a recycled cell shell receives another logical item", async () => {
+	it("retains an item body when a recycled cell shell receives another logical item", async () => {
 		const { container } = render(TwoHopViewPlanVirtualListPerfHarness, {
 			props: {
 				sections: [createDescriptor(100)],
@@ -222,11 +222,11 @@ describe("TwoHopViewPlanVirtualList DOM performance contracts", () => {
 		const reboundItemElement = shadowRoot?.querySelector<HTMLElement>(
 			"[data-ccl-cell-slot='1'] [data-testid='twohop-item-cell']",
 		);
-		expect(reboundItemElement).not.toBe(recycledItemElement);
+		expect(reboundItemElement).toBe(recycledItemElement);
 		expect(reboundItemElement?.dataset.index).not.toBe(recycledItemIndex);
 	});
 
-	it("remounts a child Svelte component for a different logical item", async () => {
+	it("retains a child Svelte component for a different logical item", async () => {
 		const { container } = render(TwoHopViewPlanVirtualListPerfHarness, {
 			props: {
 				sections: [createDescriptor(100)],
@@ -271,8 +271,8 @@ describe("TwoHopViewPlanVirtualList DOM performance contracts", () => {
 		const reboundChild = shadowRoot?.querySelector<HTMLElement>(
 			"[data-ccl-cell-slot='1'] [data-testid='twohop-child-item-cell']",
 		);
-		expect(reboundChild).not.toBe(initialChild);
-		expect(reboundChild?.dataset.instanceId).not.toBe(initialInstanceId);
+		expect(reboundChild).toBe(initialChild);
+		expect(reboundChild?.dataset.instanceId).toBe(initialInstanceId);
 		expect(reboundChild?.dataset.index).not.toBe(initialIndex);
 		expect(reboundChild?.dataset.rowIndex).not.toBe(initialRowIndex);
 		expect(reboundChild?.dataset.renderedKey).not.toBe(initialRenderedKey);

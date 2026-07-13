@@ -224,7 +224,7 @@ describe("TwoHopItemCellRender", () => {
 		kernel.dispose();
 	});
 
-	it("remounts an item body when a visible physical slot receives another logical item", async () => {
+	it("retains an item body when a visible physical slot receives another logical item", async () => {
 		const kernel = createTwoHopScalarScrollKernel({
 			initialRowModel: rowModel,
 			onStableVisibleRange() {},
@@ -252,8 +252,8 @@ describe("TwoHopItemCellRender", () => {
 			"[data-ccl-cell-slot='0'] [data-testid='twohop-child-item-cell']",
 		);
 		expect(reboundChild).toBeTruthy();
-		expect(reboundChild).not.toBe(initialChild);
-		expect(reboundChild?.dataset.instanceId).not.toBe(initialInstanceId);
+		expect(reboundChild).toBe(initialChild);
+		expect(reboundChild?.dataset.instanceId).toBe(initialInstanceId);
 		expect(reboundChild?.dataset.index).not.toBe(initialIndex);
 
 		kernel.dispose();
