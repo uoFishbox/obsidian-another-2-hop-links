@@ -49,9 +49,9 @@
 		cellRegistry,
 	}: Props = $props();
 
-	// Item bodies receive reactive slot bindings and can retain their component instance.
-	// Header and load-more bodies keep their logical remount keys.
-	const ITEM_CELL_BODY_REUSE_KEY = {};
+	// A physical slot may be rebound to a different logical card without leaving
+	// the mounted range. Remount the body on logical identity changes so nested
+	// imperative state cannot leak between cards.
 	const contentStyle = $derived(
 		`height:${contentHeight}px; position:relative; --ccl-box-height:${rowHeight}px; --ccl-cell-width:${cellWidth ?? 0}px; --ccl-columns:${Math.max(1, Math.floor(columns))}${gap !== undefined ? `; --ccl-box-gap:${gap}px` : ""}`,
 	);
@@ -68,7 +68,7 @@
 				style={`position:absolute; left:0; right:0; top:0; transform:translateY(${Math.max(0, controller.top)}px); margin-bottom:0`}
 			>
 				{#each controller.cells as cellController (cellController.cellSlotKey)}
-					{#if cellController.active}
+					{#if cellController.active && cellController.mountedCell}
 						{@const mountedCell = cellController.mountedCell}
 						<VirtualGridLogicalCellMount
 							logicalKey={cellController.logicalKey}
@@ -81,7 +81,7 @@
 							{cellRegistry}
 							cellRegistrationOwner={cellController}
 						>
-							{#key mountedCell.cell.kind === "item" ? ITEM_CELL_BODY_REUSE_KEY : (cellController.renderBodyKey ?? cellController.logicalKey)}
+							{#key cellController.renderBodyKey ?? cellController.logicalKey}
 								{@render renderCell({ mountedCell, cellController })}
 							{/key}
 						</VirtualGridLogicalCellMount>

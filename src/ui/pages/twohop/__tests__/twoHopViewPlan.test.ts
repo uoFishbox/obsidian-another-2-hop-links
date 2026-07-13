@@ -198,6 +198,42 @@ describe("compileTwoHopViewPlan", () => {
 		expect(plan.sections[0].showLoadMore).toBe(true);
 	});
 
+	it("compacts sparse visible items before assigning rows and load-more", () => {
+		const sparseItems: TwoHopVirtualListItem[] = [];
+		sparseItems.length = 3;
+		sparseItems[0] = createItem("a");
+		sparseItems[2] = createItem("c");
+		const descriptor = {
+			...createDescriptor(sparseItems),
+			totalCount: 4,
+			loadedCount: 4,
+		};
+
+		const plan = compilePlan([descriptor], { "new-links": 3 });
+
+		expect(plan.cellCount).toBe(4);
+		expect(plan.cells).toHaveLength(4);
+		expect(Array.from(plan.rowCellCount)).toEqual([2, 2]);
+		expect(
+			Array.from(
+				{ length: plan.sections[0].cellCount },
+				(_, index) => plan.sections[0].itemSource.readCell(index)?.kind,
+			),
+		).toEqual(["header", "item", "item", "load-more"]);
+		expect(plan.sections[0].itemSource.readCell(2)).toMatchObject({
+			kind: "item",
+			itemIndex: 2,
+			sourceKey: "new-links::c",
+		});
+		expect(plan.sections[0].itemSource.readCell(3)).toMatchObject({
+			kind: "load-more",
+		});
+		expect(plan.rows[1]).toMatchObject({
+			sectionCellStartIndex: 2,
+			cellCount: 2,
+		});
+	});
+
 	it("keeps section-local prepared cells independent across sections", () => {
 		const plan = compilePlan([
 			createDescriptor([createItem("a")], undefined, "section-a"),

@@ -35,14 +35,21 @@
 
 	const isItemCell = (
 		cell: TwoHopFixedCellSlotController["mountedCell"],
-	): cell is TwoHopMountedItemCell => cell.cell.kind === "item";
+	): cell is TwoHopMountedItemCell => cell?.cell.kind === "item";
+
+	// Keep an immutable fallback because the scalar kernel mutates the physical
+	// cell shell before the parent keyed block can unmount this item body.
+	const fallbackItemCell: TwoHopMountedItemCell = {
+		...initialCell,
+		cell: { ...initialCell.cell },
+	};
 
 	// Recompute this object once for each physical-slot reassignment. Consumers
 	// then read ordinary reactive snapshot fields instead of traversing the slot
 	// controller and resolving visibility on every individual prop access.
 	const snapshot = $derived.by(() => {
 		const mountedCell = cellController.mountedCell;
-		const itemCell = isItemCell(mountedCell) ? mountedCell : initialCell;
+		const itemCell = isItemCell(mountedCell) ? mountedCell : fallbackItemCell;
 		return {
 			item: itemCell.cell.item,
 			rowIndex: itemCell.rowIndex,

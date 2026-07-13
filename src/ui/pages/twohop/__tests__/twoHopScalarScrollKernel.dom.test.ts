@@ -6,6 +6,7 @@ import {
 import type { SectionRenderDescriptor } from "ui/components/sections/types";
 import { compileTwoHopViewPlan, createTwoHopViewPlanRowModel } from "../twoHopViewPlan";
 import { createTwoHopScalarScrollKernel } from "../twoHopScalarScrollKernel.svelte";
+import { createTwoHopFixedRowSlotPool } from "../twoHopFixedRowSlotPool.svelte";
 import { createSurfaceVirtualCellRegistry } from "ui/components/common/virtual-list/svelte/VirtualCellRegistry";
 import type {
 	TwoHopVirtualListItem,
@@ -59,13 +60,49 @@ const rowModel = createTwoHopViewPlanRowModel(
 	}),
 );
 
-function applyRange(
+const sparseItems: TwoHopVirtualListItem[] = [];
+sparseItems.length = 3;
+sparseItems[0] = items[0];
+sparseItems[2] = items[2];
+const sparseDescriptor: SectionRenderDescriptor<
+	TwoHopVirtualListItem,
+	TwoHopVirtualListSection
+> = {
+	...descriptor,
+	totalCount: 4,
+	loadedCount: 4,
+	getItems: () => sparseItems,
+};
+const sparsePlan = compileTwoHopViewPlan({
+	sections: [sparseDescriptor],
+	sectionVisibleCounts: { "new-links": 3 },
+	layout: {
+		containerWidth: 220,
+		columns: 2,
+		cellWidth: 100,
+		rowHeight: 100,
+		gap: 10,
+		sectionMarginBottom: 20,
+	},
+	resolveInitialSectionVisibleCount: () => 3,
+	clampVisibleCount: (_current, count) => count,
+});
+const sparseRowModel = createTwoHopViewPlanRowModel(sparsePlan);
+const malformedCells = [...sparsePlan.cells];
+malformedCells.pop();
+const malformedRowModel = createTwoHopViewPlanRowModel({
+	...sparsePlan,
+	cells: malformedCells,
+});
+
+function applyModelRange(
 	kernel: ReturnType<typeof createTwoHopScalarScrollKernel>,
+	targetRowModel: ReturnType<typeof createTwoHopViewPlanRowModel>,
 	start: number,
-	mountedRowCount = 3,
+	mountedRowCount: number,
 ): void {
 	kernel.applyMeasurement({
-		rowModel,
+		rowModel: targetRowModel,
 		scrollTop: 0,
 		viewportHeight: 100,
 		sectionTop: 0,
@@ -74,7 +111,10 @@ function applyRange(
 		hasStableVisibleRange: true,
 		precomputedRanges: {
 			mounted: { start, end: start + mountedRowCount },
-			previewVisible: { start: start + 1, end: start + 2 },
+			previewVisible: {
+				start: start + 1,
+				end: Math.min(start + 2, start + mountedRowCount),
+			},
 		},
 		visibilityPolicy: {
 			bootstrapRows: 1,
@@ -83,7 +123,119 @@ function applyRange(
 	});
 }
 
+function applyRange(
+	kernel: ReturnType<typeof createTwoHopScalarScrollKernel>,
+	start: number,
+	mountedRowCount = 3,
+): void {
+	applyModelRange(kernel, rowModel, start, mountedRowCount);
+}
+
 describe("TwoHop scalar scroll kernel", () => {
+	it("mounts every declared slot for sparse items and load-more", () => {
+		const kernel = createTwoHopScalarScrollKernel({
+			initialRowModel: sparseRowModel,
+			onStableVisibleRange() {},
+		});
+
+		applyModelRange(kernel, sparseRowModel, 0, 2);
+
+		expect(kernel.mountedRows).toHaveLength(2);
+		expect(kernel.mountedRows.map((row) => row.cells.length)).toEqual([2, 2]);
+		expect(
+			kernel.mountedRows.flatMap((row) =>
+				row.cells.map((cell) => cell.cell.kind),
+			),
+		).toEqual(["header", "item", "item", "load-more"]);
+		expect(
+			kernel.fixedRowSlotPool.controllers.map(
+				(controller) => controller.cells.filter((cell) => cell.active).length,
+			),
+		).toEqual([2, 2]);
+
+		kernel.dispose();
+	});
+
+	it("clears and later rebinds a physical cell slot when a row contains a hole", () => {
+		const kernel = createTwoHopScalarScrollKernel({
+			initialRowModel: rowModel,
+			onStableVisibleRange() {},
+		});
+		applyRange(kernel, 0, 1);
+		const fullRow = kernel.mountedRows[0];
+		const firstCell = fullRow?.cells[0];
+		expect(fullRow?.cells).toHaveLength(2);
+		expect(firstCell).toBeDefined();
+		if (!fullRow || !firstCell) return;
+
+		const pool = createTwoHopFixedRowSlotPool();
+		pool.bindRow(fullRow);
+		expect(pool.controllers[0]?.cells.map((cell) => cell.active)).toEqual([
+			true,
+			true,
+		]);
+
+		const cellsWithHole = [firstCell];
+		cellsWithHole.length = 2;
+		pool.bindRow({ ...fullRow, cells: cellsWithHole });
+		expect(pool.controllers[0]?.cells.map((cell) => cell.active)).toEqual([
+			true,
+			false,
+		]);
+
+		pool.bindRow(fullRow);
+		expect(pool.controllers[0]?.cells.map((cell) => cell.active)).toEqual([
+			true,
+			true,
+		]);
+
+		kernel.dispose();
+	});
+
+	it("creates every cell slot before a short row is recycled", () => {
+		const kernel = createTwoHopScalarScrollKernel({
+			initialRowModel: rowModel,
+			onStableVisibleRange() {},
+		});
+		applyRange(kernel, 0, 1);
+		const fullRow = kernel.mountedRows[0];
+		const firstCell = fullRow?.cells[0];
+		expect(fullRow?.cells).toHaveLength(2);
+		expect(firstCell).toBeDefined();
+		if (!fullRow || !firstCell) return;
+
+		const pool = createTwoHopFixedRowSlotPool();
+		pool.setCapacity(1, 2);
+		const secondSlot = pool.controllers[0]?.cells[1];
+		pool.bindRow({ ...fullRow, cells: [firstCell] });
+
+		expect(pool.controllers[0]?.cells).toHaveLength(2);
+		expect(pool.controllers[0]?.cells[1]).toBe(secondSlot);
+		expect(secondSlot?.active).toBe(false);
+
+		pool.bindRow(fullRow);
+		expect(pool.controllers[0]?.cells[1]).toBe(secondSlot);
+		expect(secondSlot?.active).toBe(true);
+
+		kernel.dispose();
+	});
+
+	it("does not leave a partially bound row when its compiled slot is missing", () => {
+		const kernel = createTwoHopScalarScrollKernel({
+			initialRowModel: malformedRowModel,
+			onStableVisibleRange() {},
+		});
+
+		applyModelRange(kernel, malformedRowModel, 0, 2);
+
+		expect(kernel.mountedRows[0]?.cells).toHaveLength(2);
+		expect(kernel.fixedRowSlotPool.controllers[0]?.active).toBe(true);
+		expect(kernel.mountedRows[1]?.cells).toHaveLength(0);
+		expect(kernel.fixedRowSlotPool.controllers[1]?.active).toBe(false);
+
+		kernel.dispose();
+	});
+
 	it("updates the surface navigation index inside the slot bind transaction", () => {
 		const kernel = createTwoHopScalarScrollKernel({
 			initialRowModel: rowModel,

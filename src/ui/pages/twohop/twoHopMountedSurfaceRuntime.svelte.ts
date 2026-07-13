@@ -1,4 +1,4 @@
-import { getContext } from "svelte";
+import { getContext, untrack } from "svelte";
 import type { MountedFlatItemCell } from "ui/components/common/virtual-list/core/reconciliation/viewPlanMountedCells";
 import type {
 	TwoHopVirtualListItem,
@@ -32,6 +32,13 @@ export function createTwoHopMountedSurfaceRuntime(params: {
 		initialRowModel: params.inputRuntime.rowModel,
 		rowPreviewActivationRuntime,
 		onStableVisibleRange: params.onStableVisibleRange,
+	});
+	$effect(() => {
+		const nextRowModel = params.inputRuntime.rowModel;
+		untrack(() => {
+			if (kernel.getSnapshot()?.rowModel === nextRowModel) return;
+			kernel.recompute({ rowModel: nextRowModel });
+		});
 	});
 	$effect(() => () => kernel.dispose());
 

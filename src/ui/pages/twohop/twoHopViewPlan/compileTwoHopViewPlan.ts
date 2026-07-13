@@ -87,32 +87,30 @@ export function compileTwoHopViewPlan(
 		const showLoadMore = showLoadMoreBySection[sectionIndex] !== 0;
 		const preparedItems = preparedItemsBySection[sectionIndex] ?? [];
 		const sectionIdPrefix = `${descriptor.sectionId}::`;
-		const preparedCells = new Array<
-			VirtualListLogicalCell<TwoHopVirtualListItem> | undefined
-		>(cellCount);
-		preparedCells[0] = {
-			kind: "header",
-			key: logicalCellKey(`${sectionIdPrefix}__header`),
-		};
+		const preparedCells: VirtualListLogicalCell<TwoHopVirtualListItem>[] = [
+			{
+				kind: "header",
+				key: logicalCellKey(`${sectionIdPrefix}__header`),
+			},
+		];
 		for (let itemIndex = 0; itemIndex < visibleCount; itemIndex += 1) {
 			const item = preparedItems[itemIndex];
 			if (!item) continue;
-			preparedCells[itemIndex + 1] = {
+			preparedCells.push({
 				kind: "item",
 				key: logicalCellKey(`${sectionIdPrefix}item:${itemIndex}`),
 				sourceKey: sourceKey(`${sectionIdPrefix}${item.virtualKey}`),
 				item,
 				itemIndex,
-			};
+			});
 		}
 		if (showLoadMore) {
-			preparedCells[cellCount - 1] = {
+			preparedCells.push({
 				kind: "load-more",
 				key: logicalCellKey(`${sectionIdPrefix}__load-more`),
-			};
+			});
 		}
 		for (const logicalCell of preparedCells) {
-			if (!logicalCell) continue;
 			const identity = getViewPlanRenderBodyIdentityFields(
 				logicalCell,
 				descriptor,

@@ -1,5 +1,8 @@
 import type { TwoHopMountedCell, TwoHopMountedRowSlice } from "./twoHopMountedTypes";
-import type { LogicalCellKey } from "ui/components/common/virtual-list/types";
+import {
+	logicalCellKey,
+	type LogicalCellKey,
+} from "ui/components/common/virtual-list/types";
 import type { RenderBodyKey } from "ui/components/common/virtual-list/renderRevision";
 import { recordCCLDevMeasurement } from "infrastructure/debug/CCLDevMeasurements";
 import type {
@@ -15,7 +18,8 @@ export interface TwoHopFixedCellSlotController extends VirtualCellRegistrationOw
 	readonly rowIndex: number;
 	readonly columnIndex: number;
 	readonly renderBodyKey: RenderBodyKey | undefined;
-	readonly mountedCell: TwoHopMountedCell;
+	readonly renderBodyKind: TwoHopMountedCell["renderBodyKind"];
+	readonly mountedCell: TwoHopMountedCell | undefined;
 	bindCell(cell: TwoHopMountedCell): void;
 	clear(): void;
 }
@@ -30,24 +34,29 @@ export interface TwoHopFixedRowSlotController {
 	clear(): void;
 }
 
+interface MutableTwoHopFixedRowSlotController extends TwoHopFixedRowSlotController {
+	setCellCapacity(capacity: number): void;
+}
+
 export interface TwoHopFixedRowSlotPool {
 	readonly controllers: readonly TwoHopFixedRowSlotController[];
-	ensureCapacity(capacity: number): void;
-	setCapacity(capacity: number): void;
+	ensureCapacity(capacity: number, cellCapacity?: number): void;
+	setCapacity(capacity: number, cellCapacity?: number): void;
 	bindRow(row: TwoHopMountedRowSlice): void;
 	clearSlot(slotIndex: number): void;
 }
 
 function createCellController(
 	cellSlotKey: number,
-	initialCell: TwoHopMountedCell,
+	initialCell?: TwoHopMountedCell,
 ): TwoHopFixedCellSlotController {
-	let logicalKey = $state(initialCell.key);
-	let rowIndex = $state(initialCell.rowIndex);
-	let columnIndex = $state(initialCell.columnIndex);
-	let renderBodyKey = $state(initialCell.renderBodyKey);
-	let mountedCell = $state.raw(initialCell);
-	let active = $state(true);
+	let logicalKey = $state(initialCell?.key ?? logicalCellKey(""));
+	let rowIndex = $state(initialCell?.rowIndex ?? -1);
+	let columnIndex = $state(initialCell?.columnIndex ?? -1);
+	let renderBodyKey = $state(initialCell?.renderBodyKey);
+	let renderBodyKind = $state(initialCell?.renderBodyKind ?? "header");
+	let mountedCell = $state.raw<TwoHopMountedCell | undefined>(initialCell);
+	let active = $state(initialCell !== undefined);
 	let revision = $state(0);
 	let cellElement: HTMLElement | null = null;
 	let cellRegistry: VirtualCellRegistry | null = null;
@@ -83,6 +92,9 @@ function createCellController(
 		get renderBodyKey() {
 			return renderBodyKey;
 		},
+		get renderBodyKind() {
+			return renderBodyKind;
+		},
 		get mountedCell() {
 			void revision;
 			return mountedCell;
@@ -92,6 +104,7 @@ function createCellController(
 			rowIndex = nextCell.rowIndex;
 			columnIndex = nextCell.columnIndex;
 			renderBodyKey = nextCell.renderBodyKey;
+			renderBodyKind = nextCell.renderBodyKind;
 			mountedCell = nextCell;
 			revision += 1;
 			active = true;
@@ -99,6 +112,7 @@ function createCellController(
 		},
 		clear(): void {
 			active = false;
+			mountedCell = undefined;
 			unregisterCurrentBinding();
 		},
 		attachElement(element, registry): void {
@@ -117,7 +131,7 @@ function createCellController(
 	};
 }
 
-function createController(slotIndex: number): TwoHopFixedRowSlotController {
+function createController(slotIndex: number): MutableTwoHopFixedRowSlotController {
 	let active = $state(false);
 	let rowIndex = $state(-1);
 	let top = $state(0);
@@ -138,7 +152,17 @@ function createController(slotIndex: number): TwoHopFixedRowSlotController {
 			void revision;
 			return cells;
 		},
+		setCellCapacity(capacity): void {
+			if (cells.length === capacity) return;
+			for (const cell of cells) cell.clear();
+			cells.length = 0;
+			for (let columnIndex = 0; columnIndex < capacity; columnIndex += 1) {
+				cells.push(createCellController(slotIndex * capacity + columnIndex));
+			}
+			revision += 1;
+		},
 		bindRow(nextRow): void {
+			this.setCellCapacity(Math.max(cells.length, nextRow.cells.length));
 			if (process.env.NODE_ENV !== "production") {
 				recordCCLDevMeasurement("twoHop.reboundRowSlot");
 				for (const _cell of nextRow.cells) {
@@ -147,7 +171,10 @@ function createController(slotIndex: number): TwoHopFixedRowSlotController {
 			}
 			for (let index = 0; index < nextRow.cells.length; index += 1) {
 				const nextCell = nextRow.cells[index];
-				if (!nextCell) continue;
+				if (!nextCell) {
+					cells[index]?.clear();
+					continue;
+				}
 				const cellSlotKey = nextCell.cellSlotKey ?? nextCell.renderSlotIndex;
 				const controller = cells[index];
 				if (controller?.cellSlotKey === cellSlotKey) {
@@ -175,21 +202,32 @@ function createController(slotIndex: number): TwoHopFixedRowSlotController {
 }
 
 export function createTwoHopFixedRowSlotPool(): TwoHopFixedRowSlotPool {
-	let controllers = $state.raw<readonly TwoHopFixedRowSlotController[]>([]);
+	let controllers = $state.raw<readonly MutableTwoHopFixedRowSlotController[]>([]);
+	let configuredCellCapacity = 0;
 
-	function ensureCapacity(capacity: number): void {
+	function ensureCapacity(capacity: number, cellCapacity?: number): void {
+		if (cellCapacity !== undefined) configuredCellCapacity = cellCapacity;
+		for (const controller of controllers) {
+			controller.setCellCapacity(configuredCellCapacity);
+		}
 		if (capacity <= controllers.length) return;
 		const next = controllers.slice();
 		for (let slotIndex = next.length; slotIndex < capacity; slotIndex += 1) {
-			next.push(createController(slotIndex));
+			const controller = createController(slotIndex);
+			controller.setCellCapacity(configuredCellCapacity);
+			next.push(controller);
 		}
 		controllers = next;
 	}
 
-	function setCapacity(capacity: number): void {
+	function setCapacity(capacity: number, cellCapacity?: number): void {
 		if (capacity >= controllers.length) {
-			ensureCapacity(capacity);
+			ensureCapacity(capacity, cellCapacity);
 			return;
+		}
+		if (cellCapacity !== undefined) configuredCellCapacity = cellCapacity;
+		for (let slotIndex = 0; slotIndex < capacity; slotIndex += 1) {
+			controllers[slotIndex]?.setCellCapacity(configuredCellCapacity);
 		}
 		for (let slotIndex = capacity; slotIndex < controllers.length; slotIndex += 1) {
 			controllers[slotIndex]?.clear();

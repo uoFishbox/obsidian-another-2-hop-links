@@ -228,7 +228,7 @@ export function createTwoHopScalarScrollKernel(params: {
 			rowSlots.push(record);
 			mountedRows.push(record.row);
 		}
-		fixedRowSlotPool.setCapacity(capacity);
+		fixedRowSlotPool.setCapacity(capacity, columns);
 	}
 
 	function ensurePhysicalPool(columns: number, capacity: number): void {
@@ -236,7 +236,7 @@ export function createTwoHopScalarScrollKernel(params: {
 			resetPhysicalPool(columns, capacity);
 			return;
 		}
-		fixedRowSlotPool.setCapacity(capacity);
+		fixedRowSlotPool.setCapacity(capacity, columns);
 		for (let slotIndex = rowSlots.length; slotIndex < capacity; slotIndex += 1) {
 			const record = createRowSlotRecord(slotIndex, columns);
 			rowSlots.push(record);
@@ -339,7 +339,13 @@ export function createTwoHopScalarScrollKernel(params: {
 			const compiledCell =
 				plan.cells[plan.rowFirstCellIndex[logicalRowIndex] + columnIndex];
 			const cellSlot = record.cellSlots[columnIndex];
-			if (!compiledCell || !cellSlot) continue;
+			if (!compiledCell || !cellSlot) {
+				params.rowPreviewActivationRuntime?.clearRow(logicalRowIndex);
+				record.row.cells.length = 0;
+				record.active = false;
+				fixedRowSlotPool.clearSlot(record.row.slotIndex ?? 0);
+				return;
+			}
 			populateCell(
 				cellSlot,
 				compiledCell,
