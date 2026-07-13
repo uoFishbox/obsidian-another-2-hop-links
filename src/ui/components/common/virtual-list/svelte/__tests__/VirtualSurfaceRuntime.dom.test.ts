@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { findMountedCellElementByKey } from "../VirtualSurfaceNavigation";
 import {
+	createVirtualCellElementRegistration,
 	findClosestRegisteredVirtualCell,
-	registerVirtualCellElement,
 } from "../VirtualCellRegistry";
 
 describe("findMountedCellElementByKey", () => {
@@ -32,11 +32,8 @@ describe("findMountedCellElementByKey", () => {
 		const cell = document.createElement("div");
 		container.append(cell);
 
-		const unregister = registerVirtualCellElement(cell, {
-			logicalKey: "registered-a",
-			rowIndex: 1,
-			columnIndex: 2,
-		});
+		const registration = createVirtualCellElementRegistration(cell);
+		registration.update("registered-a", 1, 2);
 
 		expect(findMountedCellElementByKey(container, "registered-a")).toBe(cell);
 
@@ -48,7 +45,7 @@ describe("findMountedCellElementByKey", () => {
 			columnIndex: 2,
 		});
 
-		unregister();
+		registration.unregister();
 
 		expect(findMountedCellElementByKey(container, "registered-a")).toBeNull();
 		expect(findClosestRegisteredVirtualCell(cell)).toBeNull();

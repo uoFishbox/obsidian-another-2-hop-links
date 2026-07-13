@@ -314,25 +314,3 @@ export function resolveStableViewPlanRenderBodyKey<T, G>(params: {
 		params.fallbackPolicy,
 	);
 }
-
-export function hasSameReusableCellKey(previous: unknown, next: unknown): boolean {
-	if (Object.is(previous, next)) {
-		return true;
-	}
-
-	if (!Array.isArray(previous) || !Array.isArray(next)) {
-		return false;
-	}
-
-	if (previous.length !== next.length) {
-		return false;
-	}
-
-	for (let index = 0; index < previous.length; index += 1) {
-		if (!Object.is(previous[index], next[index])) {
-			return false;
-		}
-	}
-
-	return true;
-}

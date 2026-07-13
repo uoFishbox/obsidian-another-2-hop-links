@@ -3,7 +3,7 @@ import { tick } from "svelte";
 import { afterEach, describe, expect, it } from "vitest";
 import VirtualListCellMountHarness from "./VirtualListCellMountHarness.svelte";
 import { logicalCellKey } from "../../types";
-import { getVirtualCellMetadata } from "../VirtualCellRegistry";
+import { findClosestRegisteredVirtualCell } from "../VirtualCellRegistry";
 
 describe("VirtualListCellMount", () => {
 	afterEach(() => {
@@ -36,7 +36,9 @@ describe("VirtualListCellMount", () => {
 		const cell = getByTestId("cell-mount-harness");
 
 		await tick();
-		expect(getVirtualCellMetadata(cell)?.logicalKey).toBe("logical-a");
+		expect(findClosestRegisteredVirtualCell(cell)?.metadata.logicalKey).toBe(
+			"logical-a",
+		);
 
 		await rerender({
 			logicalKey: logicalCellKey("logical-b"),
@@ -44,6 +46,8 @@ describe("VirtualListCellMount", () => {
 		await tick();
 
 		expect(getByTestId("cell-mount-harness")).toBe(cell);
-		expect(getVirtualCellMetadata(cell)?.logicalKey).toBe("logical-b");
+		expect(findClosestRegisteredVirtualCell(cell)?.metadata.logicalKey).toBe(
+			"logical-b",
+		);
 	});
 });

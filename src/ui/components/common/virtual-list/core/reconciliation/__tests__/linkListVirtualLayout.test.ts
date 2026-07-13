@@ -2,14 +2,16 @@ import { describe, expect, it } from "vitest";
 import {
 	createArrayVirtualGridDataSource,
 	createFlatLogicalCellSource,
+	type FlatLogicalCellSource,
 } from "../../../flatLogicalCellSource";
-import type { VirtualListLogicalCell } from "../../../logicalCell";
+import { computeVirtualGridLayout } from "../../../layout/flatGridLayout";
 import type {
 	RenderRevision,
 	RenderRevisionFallbackPolicy,
 } from "../../../renderRevision";
+import { createFlatLinkRowModel } from "../../../row-models/flatLinkRowModel";
 import {
-	buildMountedVirtualGridCells,
+	buildMountedVirtualGridCellsFromRowModel,
 	type MountedVirtualGridCellsBuildResult,
 } from "../linkListVirtualLayout";
 import {
@@ -35,7 +37,7 @@ function itemKey(index: number): string {
 	return `item-${index}::item:${index}`;
 }
 
-function buildLogicalCells(params: {
+function createLogicalCellSource(params: {
 	header: boolean;
 	items: TestItem[];
 	visibleCount: number;
@@ -46,27 +48,41 @@ function buildLogicalCells(params: {
 		item: TestItem,
 		index: number,
 	) => RenderRevision | undefined;
-}): VirtualListLogicalCell<TestItem>[] {
+}): FlatLogicalCellSource<TestItem> {
 	const dataSource = createArrayVirtualGridDataSource({
 		items: params.items,
 		getKey: params.getKey,
 		getItemRenderRevision: params.getItemRenderRevision,
 	});
-	const source = createFlatLogicalCellSource({
+	return createFlatLogicalCellSource({
 		header: params.header,
 		dataSource,
 		visibleCount: params.visibleCount,
 		showLoadMore: params.showLoadMore,
 		sectionId: params.sectionId,
 	});
-	const cells: VirtualListLogicalCell<TestItem>[] = [];
-	for (let index = 0; index < source.cellCount; index += 1) {
-		const cell = source.resolveCellAtIndex(index);
-		if (cell) {
-			cells.push(cell);
-		}
-	}
-	return cells;
+}
+
+function createRowModel(params: {
+	cellSource: FlatLogicalCellSource<TestItem>;
+	columns: number;
+	cellWidth: number;
+	rowHeight: number;
+	gap: number;
+}) {
+	const layout = computeVirtualGridLayout({
+		containerWidth:
+			params.columns * params.cellWidth + params.gap * (params.columns - 1),
+		minCellWidth: params.cellWidth,
+		gap: params.gap,
+		maxColumns: params.columns,
+		rowHeight: params.rowHeight,
+		cellCount: params.cellSource.cellCount,
+	});
+	return createFlatLinkRowModel({
+		cellSource: params.cellSource,
+		layout,
+	});
 }
 
 function buildCells(params: {
@@ -83,7 +99,7 @@ function buildCells(params: {
 	) => RenderRevision | undefined;
 	renderRevisionFallbackPolicy?: RenderRevisionFallbackPolicy;
 }): TestBuildResult {
-	const logicalCells = buildLogicalCells({
+	const cellSource = createLogicalCellSource({
 		header: false,
 		items: params.items,
 		visibleCount: params.items.length,
@@ -92,17 +108,28 @@ function buildCells(params: {
 		sectionId: "section-0",
 		getItemRenderRevision: params.getItemRenderRevision,
 	});
+	const columns = params.columns ?? 3;
+	const cellWidth = params.cellWidth ?? 100;
+	const rowHeight = params.rowHeight ?? 120;
+	const gap = params.gap ?? 10;
+	const rowModel = createRowModel({
+		cellSource,
+		columns,
+		cellWidth,
+		rowHeight,
+		gap,
+	});
+	const visibleWindow = params.visibleWindow ?? {
+		start: 0,
+		end: cellSource.cellCount,
+	};
 
-	return buildMountedVirtualGridCells({
-		logicalCells,
-		visibleWindow: params.visibleWindow ?? {
-			start: 0,
-			end: logicalCells.length,
+	return buildMountedVirtualGridCellsFromRowModel({
+		rowModel,
+		rowRange: {
+			start: Math.floor(Math.max(0, visibleWindow.start) / columns),
+			end: Math.ceil(Math.max(0, visibleWindow.end) / columns),
 		},
-		columns: params.columns ?? 3,
-		cellWidth: params.cellWidth ?? 100,
-		rowHeight: params.rowHeight ?? 120,
-		gap: params.gap ?? 10,
 		previousBuild: params.previousBuild,
 		renderRevisionFallbackPolicy: params.renderRevisionFallbackPolicy,
 	});
@@ -281,12 +308,12 @@ describe("linkListVirtualLayout", () => {
 		});
 	});
 
-	it("mounts only cells inside the visible window", () => {
+	it("mounts only cells inside the visible row window", () => {
 		const items = createItems(8);
 
 		const result = buildCells({
 			items,
-			visibleWindow: { start: 2, end: 6 },
+			visibleWindow: { start: 3, end: 6 },
 			columns: 3,
 			cellWidth: 100,
 			rowHeight: 120,
@@ -294,24 +321,23 @@ describe("linkListVirtualLayout", () => {
 		});
 
 		expectKeys(result.cells).toEqual([
-			itemKey(2),
 			itemKey(3),
 			itemKey(4),
 			itemKey(5),
 		]);
 
-		expect(result.cells.map((cell) => cell.cellIndex)).toEqual([2, 3, 4, 5]);
+		expect(result.cells.map((cell) => cell.cellIndex)).toEqual([3, 4, 5]);
 		expect(result.cells[0].position).toMatchObject({
-			row: 0,
-			column: 2,
-			top: 0,
-			left: 220,
-		});
-		expect(result.cells[1].position).toMatchObject({
 			row: 1,
 			column: 0,
 			top: 130,
 			left: 0,
+		});
+		expect(result.cells[1].position).toMatchObject({
+			row: 1,
+			column: 1,
+			top: 130,
+			left: 110,
 		});
 		expectUniqueRenderSlots(result.cells);
 	});
@@ -371,7 +397,7 @@ describe("linkListVirtualLayout", () => {
 
 	it("reuses retained row slices when scrolling with the same cell source", () => {
 		const items = createItems(9);
-		const logicalCells = buildLogicalCells({
+		const cellSource = createLogicalCellSource({
 			header: false,
 			items,
 			visibleCount: items.length,
@@ -379,21 +405,20 @@ describe("linkListVirtualLayout", () => {
 			getKey: (item) => item.id,
 			sectionId: "section-0",
 		});
-		const initial = buildMountedVirtualGridCells({
-			logicalCells,
-			visibleWindow: { start: 0, end: 6 },
+		const rowModel = createRowModel({
+			cellSource,
 			columns: 3,
 			cellWidth: 100,
 			rowHeight: 120,
 			gap: 10,
 		});
-		const shifted = buildMountedVirtualGridCells({
-			logicalCells,
-			visibleWindow: { start: 3, end: 9 },
-			columns: 3,
-			cellWidth: 100,
-			rowHeight: 120,
-			gap: 10,
+		const initial = buildMountedVirtualGridCellsFromRowModel({
+			rowModel,
+			rowRange: { start: 0, end: 2 },
+		});
+		const shifted = buildMountedVirtualGridCellsFromRowModel({
+			rowModel,
+			rowRange: { start: 1, end: 3 },
 			previousBuild: initial,
 		});
 

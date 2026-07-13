@@ -20,13 +20,3 @@ export function clampRange(range: RowRange, itemCount: number): RowRange {
 
 	return { start, end };
 }
-
-export function rangeOverlap(a: RowRange, b: RowRange): RowRange {
-	const start = Math.max(a.start, b.start);
-	const end = Math.min(a.end, b.end);
-
-	return {
-		start,
-		end: Math.max(start, end),
-	};
-}

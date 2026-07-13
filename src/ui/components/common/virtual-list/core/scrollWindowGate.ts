@@ -92,62 +92,6 @@ export const createMountedScrollWindow = (
  * Updates `previous` in place to suppress allocation. If `previous` is null, a
  * new object is created.
  */
-export const updateScrollWindow = (
-	previous: LastScrollWindow | null,
-	identity: ScrollWindowIdentity,
-	ranges: VirtualRanges,
-	stablePreviewScrollTopBand?: StablePreviewScrollTopBand,
-): LastScrollWindow => {
-	if (!previous) {
-		return createScrollWindow(identity, ranges, stablePreviewScrollTopBand);
-	}
-
-	previous.identity = identity;
-	previous.mountedStart = ranges.mounted.start;
-	previous.mountedEnd = ranges.mounted.end;
-	previous.visibleStart = ranges.previewVisible.start;
-	previous.visibleEnd = ranges.previewVisible.end;
-	previous.stablePreviewScrollTopMin =
-		stablePreviewScrollTopBand?.min ?? INVALID_STABLE_PREVIEW_SCROLL_TOP_MIN;
-	previous.stablePreviewScrollTopMax =
-		stablePreviewScrollTopBand?.max ?? INVALID_STABLE_PREVIEW_SCROLL_TOP_MAX;
-	previous.stableMountedScrollTopMin = INVALID_STABLE_MOUNTED_SCROLL_TOP_MIN;
-	previous.stableMountedScrollTopMax = INVALID_STABLE_MOUNTED_SCROLL_TOP_MAX;
-	return previous;
-};
-
-/**
- * Updates `previous` in place to suppress allocation. If `previous` is null, a
- * new object is created.
- */
-export const updateMountedScrollWindow = (
-	previous: LastScrollWindow | null,
-	identity: ScrollWindowIdentity,
-	mounted: RowRange,
-	stableMountedScrollTopBand?: StableScrollTopBand,
-): LastScrollWindow => {
-	if (!previous) {
-		return createMountedScrollWindow(identity, mounted, stableMountedScrollTopBand);
-	}
-
-	previous.identity = identity;
-	previous.mountedStart = mounted.start;
-	previous.mountedEnd = mounted.end;
-	previous.visibleStart = 0;
-	previous.visibleEnd = 0;
-	previous.stablePreviewScrollTopMin = INVALID_STABLE_PREVIEW_SCROLL_TOP_MIN;
-	previous.stablePreviewScrollTopMax = INVALID_STABLE_PREVIEW_SCROLL_TOP_MAX;
-	previous.stableMountedScrollTopMin =
-		stableMountedScrollTopBand?.min ?? INVALID_STABLE_MOUNTED_SCROLL_TOP_MIN;
-	previous.stableMountedScrollTopMax =
-		stableMountedScrollTopBand?.max ?? INVALID_STABLE_MOUNTED_SCROLL_TOP_MAX;
-	return previous;
-};
-
-/**
- * Updates `previous` in place to suppress allocation. If `previous` is null, a
- * new object is created.
- */
 export const updateMountedAndPreviewScrollWindow = (
 	previous: LastScrollWindow | null,
 	identity: ScrollWindowIdentity,

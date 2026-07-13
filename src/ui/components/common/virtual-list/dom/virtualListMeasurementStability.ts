@@ -1,5 +1,3 @@
-import type { VirtualListScrollSnapshot } from "./virtualListMeasurementAdapter";
-
 const isFiniteRect = (rect: DOMRect): boolean =>
 	Number.isFinite(rect.top) &&
 	Number.isFinite(rect.bottom) &&
@@ -67,14 +65,6 @@ export function resolveVirtualListLayoutStability({
 	};
 }
 
-export interface IsStableCachedVirtualListMeasurementParams {
-	hasRenderableContent: boolean;
-	hasStableCachedScrollMetrics: boolean;
-	cachedViewportHeight: number;
-	scrollSnapshot: VirtualListScrollSnapshot;
-	cachedSectionTop: number;
-}
-
 export function isStableCachedVirtualListMeasurementFromMetrics(
 	hasRenderableContent: boolean,
 	hasStableCachedScrollMetrics: boolean,
@@ -94,22 +84,5 @@ export function isStableCachedVirtualListMeasurementFromMetrics(
 		Number.isFinite(scrollTop) &&
 		Number.isFinite(viewportHeight) &&
 		Number.isFinite(cachedSectionTop)
-	);
-}
-
-export function isStableCachedVirtualListMeasurement({
-	hasRenderableContent,
-	hasStableCachedScrollMetrics,
-	cachedViewportHeight,
-	scrollSnapshot,
-	cachedSectionTop,
-}: IsStableCachedVirtualListMeasurementParams): boolean {
-	return isStableCachedVirtualListMeasurementFromMetrics(
-		hasRenderableContent,
-		hasStableCachedScrollMetrics,
-		cachedViewportHeight,
-		scrollSnapshot.scrollTop,
-		scrollSnapshot.viewportHeight,
-		cachedSectionTop,
 	);
 }

@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 import {
-	readVirtualListSharedScrollMetrics,
 	readVirtualListSharedScrollMetricsInto,
 	resolveCachedViewportHeight,
 } from "../sharedScrollMetrics";
@@ -42,14 +41,21 @@ describe("sharedScrollMetrics", () => {
 			configurable: true,
 		});
 
-		expect(
-			readVirtualListSharedScrollMetrics({
-				scroller,
-				subscriber: null,
-				isScrollActive: true,
-				frameId: 7,
-			}),
-		).toEqual({
+		const out = {
+			scrollTop: 0,
+			viewportHeight: 0,
+			frameId: 0,
+			isScrollActive: false,
+		};
+		const result = readVirtualListSharedScrollMetricsInto(out, {
+			scroller,
+			subscriber: null,
+			isScrollActive: true,
+			frameId: 7,
+		});
+
+		expect(result).toBe(out);
+		expect(out).toEqual({
 			scrollTop: 120,
 			viewportHeight: 240,
 			frameId: 7,

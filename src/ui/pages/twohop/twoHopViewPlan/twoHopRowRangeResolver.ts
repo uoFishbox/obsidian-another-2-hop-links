@@ -1,5 +1,4 @@
 import type { RowRange } from "ui/components/common/virtual-list/rowRange";
-import type { SectionedGridResolvedRowScratch } from "ui/components/common/virtual-list/row-models/sectionedGridMountedRows";
 import type {
 	FindTwoHopRowsByOffsetParams,
 	FirstTwoHopRowByTopResolutionScratch,
@@ -14,6 +13,14 @@ import type {
 import { findTwoHopSectionIndexByRow, readTwoHopRowPlan } from "./twoHopRowTable";
 
 export { findTwoHopSectionIndexByRow } from "./twoHopRowTable";
+
+/** Mutable output used by the allocation-free two-hop row resolver. */
+export interface TwoHopResolvedRowScratch {
+	rowIndexInSection: number;
+	sectionCellStartIndex: number;
+	cellCount: number;
+	top: number;
+}
 
 export function resolveTwoHopRowInSection(
 	plan: TwoHopViewPlan,
@@ -40,10 +47,10 @@ export function resolveTwoHopRowInSection(
 /**
  * Into-style variant of {@link resolveTwoHopRowInSection} that writes into a
  * reusable scratch object instead of allocating a new object per call.
- * Only writes the 4 fields required by {@link SectionedGridResolvedRow}.
+ * Only writes the scalar fields consumed by the caller.
  */
 export function resolveTwoHopRowInSectionInto(
-	out: SectionedGridResolvedRowScratch,
+	out: TwoHopResolvedRowScratch,
 	plan: TwoHopViewPlan,
 	sectionPlan: TwoHopSectionPlan,
 	rowIndex: number,

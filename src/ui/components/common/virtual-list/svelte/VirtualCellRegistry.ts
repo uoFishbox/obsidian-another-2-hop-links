@@ -58,28 +58,6 @@ function addElementForLogicalKey(element: HTMLElement, logicalKey: string): void
 	elements.add(element);
 }
 
-export function registerVirtualCellElement(
-	element: HTMLElement,
-	metadata: VirtualCellMetadata,
-): () => void {
-	const previousMetadata = metadataByElement.get(element);
-	if (previousMetadata) {
-		removeElementFromLogicalKey(element, previousMetadata.logicalKey);
-	}
-
-	metadataByElement.set(element, metadata);
-	addElementForLogicalKey(element, metadata.logicalKey);
-
-	return () => {
-		if (metadataByElement.get(element) !== metadata) {
-			return;
-		}
-
-		metadataByElement.delete(element);
-		removeElementFromLogicalKey(element, metadata.logicalKey);
-	};
-}
-
 /**
  * Creates an updatable cell registration for pooled surfaces that reuse DOM
  * shells across logical cells.
@@ -158,16 +136,6 @@ export function findRegisteredVirtualCellElementByKey(
 	}
 
 	return null;
-}
-
-export function getVirtualCellMetadata(
-	element: HTMLElement | null,
-): VirtualCellMetadata | null {
-	if (!element) {
-		return null;
-	}
-
-	return metadataByElement.get(element) ?? null;
 }
 
 export function findClosestRegisteredVirtualCell(

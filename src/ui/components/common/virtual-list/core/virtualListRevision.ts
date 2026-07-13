@@ -6,27 +6,6 @@ export type VirtualListRevisionDependency = Partial<
 	Record<VirtualListRevisionKey, true>
 >;
 
-export type VirtualListRevisionDependencySnapshot = {
-	-readonly [K in keyof VirtualListRevision]?: VirtualListRevision[K];
-};
-
-export const VIRTUAL_LIST_CONTENT_LAYOUT_DEPENDENCY = {
-	content: true,
-	layout: true,
-} as const satisfies VirtualListRevisionDependency;
-
-export const VIRTUAL_LIST_CONTENT_LAYOUT_KEY_DEPENDENCY = {
-	content: true,
-	layout: true,
-	keyResolver: true,
-} as const satisfies VirtualListRevisionDependency;
-
-export const VIRTUAL_LIST_CONTENT_LAYOUT_PAGINATION_DEPENDENCY = {
-	content: true,
-	layout: true,
-	pagination: true,
-} as const satisfies VirtualListRevisionDependency;
-
 const EMPTY_TOKEN = Symbol("virtual-list-empty-revision-token");
 const VIRTUAL_LIST_LAYOUT_REVISION_TOKEN = Symbol("virtual-list-layout-revision-token");
 
@@ -155,32 +134,4 @@ export function hasSameVirtualListRevisionDependency(
 	}
 
 	return true;
-}
-
-export function pickVirtualListRevisionDependency(
-	revision: VirtualListRevision,
-	dependency: VirtualListRevisionDependency,
-): VirtualListRevisionDependencySnapshot {
-	const picked: VirtualListRevisionDependencySnapshot = {};
-
-	if ("content" in dependency) {
-		picked.content = revision.content;
-	}
-	if ("layout" in dependency) {
-		picked.layout = revision.layout;
-	}
-	if ("keyResolver" in dependency) {
-		picked.keyResolver = revision.keyResolver;
-	}
-	if ("pagination" in dependency) {
-		picked.pagination = revision.pagination;
-	}
-	if ("measurement" in dependency) {
-		picked.measurement = revision.measurement;
-	}
-	if ("previewPolicy" in dependency) {
-		picked.previewPolicy = revision.previewPolicy;
-	}
-
-	return picked;
 }

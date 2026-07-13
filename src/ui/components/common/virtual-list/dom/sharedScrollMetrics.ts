@@ -61,17 +61,3 @@ export function readVirtualListSharedScrollMetricsInto(
 	out.isScrollActive = params.isScrollActive;
 	return out;
 }
-
-export function readVirtualListSharedScrollMetrics(
-	params: ReadVirtualListSharedScrollMetricsParams,
-): VirtualListSharedScrollMetrics {
-	return readVirtualListSharedScrollMetricsInto(
-		{
-			scrollTop: 0,
-			viewportHeight: 0,
-			frameId: 0,
-			isScrollActive: false,
-		},
-		params,
-	);
-}

@@ -3,7 +3,6 @@ import {
 	createVirtualListLayoutRevisionToken,
 	createVirtualListRevision,
 	hasSameVirtualListRevisionDependency,
-	pickVirtualListRevisionDependency,
 	sameRevisionToken,
 } from "../virtualListRevision";
 
@@ -109,24 +108,4 @@ describe("VirtualListRevision", () => {
 		).toBe(false);
 	});
 
-	it("picks a cache dependency snapshot from a full revision", () => {
-		const revision = createVirtualListRevision({
-			content: "rows",
-			layout: "layout",
-			keyResolver: "keys",
-			pagination: "page",
-			measurement: "scroll",
-			previewPolicy: "preview",
-		});
-
-		expect(
-			pickVirtualListRevisionDependency(revision, {
-				content: true,
-				keyResolver: true,
-			}),
-		).toEqual({
-			content: "rows",
-			keyResolver: "keys",
-		});
-	});
 });

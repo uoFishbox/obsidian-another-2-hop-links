@@ -64,18 +64,3 @@ export function readVirtualListCachedMeasurementInto(
 	out.sharedScrollMetrics = sharedScrollMetrics;
 	return out;
 }
-
-export function readVirtualListCachedMeasurement(
-	input: VirtualListCachedMeasurementInput,
-): VirtualListCachedMeasurementResult {
-	return readVirtualListCachedMeasurementInto(
-		{
-			scrollTop: 0,
-			viewportHeight: 0,
-			sectionTop: 0,
-			isScrollActive: false,
-			isStableMeasurement: false,
-		},
-		input,
-	);
-}

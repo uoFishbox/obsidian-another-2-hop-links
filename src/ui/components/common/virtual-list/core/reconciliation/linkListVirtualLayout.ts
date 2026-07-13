@@ -3,7 +3,6 @@ import {
 	type VisibleCellWindow,
 } from "../../layout/flatGridLayout";
 import { recordCCLDevMeasurement } from "infrastructure/debug/CCLDevMeasurements";
-import { createArrayBackedFlatLogicalCellSource } from "../../flatLogicalCellSource";
 import type { VirtualListLogicalCell } from "../../logicalCell";
 import { clampRange, isEmptyRange, sameRange, type RowRange } from "../../rowRange";
 import type { FlatLinkRowModel } from "../../row-models/flatLinkRowModel";
@@ -682,35 +681,6 @@ function buildMountedVirtualGridCellsFromCore<T>(params: {
 	recordCCLDevMeasurement("virtualGrid.buildMountedRows");
 	assertMountedVirtualGridBuildInvariants(buildState);
 	return buildState;
-}
-
-export function buildMountedVirtualGridCells<T>(params: {
-	logicalCells: readonly VirtualListLogicalCell<T>[];
-	visibleWindow: VisibleCellWindow;
-	columns: number;
-	cellWidth: number;
-	rowHeight: number;
-	gap: number;
-	previousBuild?: MountedVirtualGridCellsBuildResult<T>;
-	previousCellsByKey?: ReadonlyMap<string, MountedVirtualGridCell<T>>;
-	renderRevisionFallbackPolicy?: RenderRevisionFallbackPolicy;
-	rowSlotAllocator?: ContiguousRowSlotAllocator;
-}): MountedVirtualGridCellsBuildResult<T> {
-	const resolver = createArrayBackedFlatLogicalCellSource(params.logicalCells);
-	return buildMountedVirtualGridCellsFromCore({
-		cellCount: resolver.cellCount,
-		cellSourceRevision: resolver.revision,
-		resolveCellAtIndex: (index) => resolver.resolveCellAtIndex(index),
-		visibleWindow: params.visibleWindow,
-		columns: params.columns,
-		cellWidth: params.cellWidth,
-		rowHeight: params.rowHeight,
-		gap: params.gap,
-		previousBuild: params.previousBuild,
-		previousCellsByKey: params.previousCellsByKey,
-		renderRevisionFallbackPolicy: params.renderRevisionFallbackPolicy,
-		rowSlotAllocator: params.rowSlotAllocator,
-	});
 }
 
 export function buildMountedVirtualGridCellsFromRowModel<T>(params: {

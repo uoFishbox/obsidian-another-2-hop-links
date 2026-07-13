@@ -4,10 +4,10 @@ import {
 	computeColumnCount,
 	computeVirtualGridLayout,
 	computeVisibleRowRange,
-} from "../virtualGridLinkListLayout";
+} from "../virtual-list/layout/flatGridLayout";
 import {
 	createFlatLogicalCellSource,
-	createLogicalCellItemKeyResolver,
+	createArrayVirtualGridDataSource,
 } from "../virtual-list/flatLogicalCellSource";
 
 describe("linkListLayout", () => {
@@ -143,14 +143,21 @@ describe("linkListLayout", () => {
 			expect(item.key).toBe("source-a::item:0");
 		});
 
-		it("does not prefix scan when resolving key for far index", () => {
+	it("does not prefix scan when resolving key for far index", () => {
 			const getKey = vi.fn((item: string) => item);
-			const resolver = createLogicalCellItemKeyResolver({
+			const dataSource = createArrayVirtualGridDataSource({
 				items: Array.from({ length: 100_000 }, (_, index) => `item-${index}`),
 				getKey,
 			});
+			const source = createFlatLogicalCellSource({
+				header: false,
+				dataSource,
+				visibleCount: dataSource.count,
+				showLoadMore: false,
+				sectionId: "demo",
+			});
 
-			expect(resolver.resolveLogicalCellKeyAtItemIndex(90_000)).toBe(
+			expect(source.resolveLogicalCellKeyAtItemIndex(90_000)).toBe(
 				"item-90000::item:90000",
 			);
 			expect(getKey).toHaveBeenCalledTimes(1);

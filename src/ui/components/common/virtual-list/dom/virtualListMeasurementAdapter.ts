@@ -44,18 +44,6 @@ export function readScrollSnapshot(
 	return out;
 }
 
-export const getScrollSnapshot = (
-	scrollContainer: HTMLElement | null,
-	viewportHeightOverride?: number,
-	ownerElement?: HTMLElement | null,
-): VirtualListScrollSnapshot =>
-	readScrollSnapshot(
-		scrollContainer,
-		viewportHeightOverride,
-		undefined,
-		ownerElement,
-	);
-
 export const getScrollMetrics = (
 	element: HTMLElement,
 	scrollContainer: HTMLElement | null,

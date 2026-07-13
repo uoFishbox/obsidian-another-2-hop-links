@@ -7,8 +7,6 @@ import {
 	isWithinStableMountedScrollWindow,
 	isWithinStablePreviewScrollWindow,
 	updateMountedAndPreviewScrollWindow,
-	updateMountedScrollWindow,
-	updateScrollWindow,
 } from "../scrollWindowGate";
 
 describe("scrollWindowGate", () => {
@@ -130,7 +128,7 @@ describe("scrollWindowGate", () => {
 		);
 		const identity = {};
 
-		const updated = updateScrollWindow(previous, identity, {
+		const updated = updateMountedAndPreviewScrollWindow(previous, identity, {
 			mounted: { start: 3, end: 8 },
 			previewVisible: { start: 4, end: 7 },
 		});
@@ -159,7 +157,7 @@ describe("scrollWindowGate", () => {
 		);
 		const identity = {};
 
-		const updated = updateScrollWindow(
+		const updated = updateMountedAndPreviewScrollWindow(
 			previous,
 			identity,
 			{
@@ -200,9 +198,9 @@ describe("scrollWindowGate", () => {
 		);
 		const identity = {};
 
-		const updated = updateMountedScrollWindow(previous, identity, {
-			start: 3,
-			end: 8,
+		const updated = updateMountedAndPreviewScrollWindow(previous, identity, {
+			mounted: { start: 3, end: 8 },
+			previewVisible: { start: 0, end: 0 },
 		});
 
 		expect(updated).toBe(previous);

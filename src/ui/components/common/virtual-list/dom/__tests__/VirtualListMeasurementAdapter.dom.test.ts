@@ -1,71 +1,15 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
 	getScrollMetrics,
-	getScrollSnapshot,
 	readScrollSnapshot,
 } from "../virtualListMeasurementAdapter";
 import {
-	createDomRect,
 	setElementRect,
 	setNumericProperty,
 } from "testing/helpers/DOMObserverMock";
 
 afterEach(() => {
 	document.body.innerHTML = "";
-});
-
-describe("getScrollSnapshot", () => {
-	it("reads element scroll state without layout access", () => {
-		const scrollContainer = document.createElement("div");
-		const rectSpy = vi.fn(() =>
-			createDomRect({
-				top: 20,
-				width: 240,
-				height: 180,
-			}),
-		);
-
-		setNumericProperty(scrollContainer, "scrollTop", 120);
-		const clientHeightSpy = vi.fn(() => 180);
-		Object.defineProperty(scrollContainer, "clientHeight", {
-			configurable: true,
-			get: clientHeightSpy,
-		});
-		Object.defineProperty(scrollContainer, "getBoundingClientRect", {
-			configurable: true,
-			value: rectSpy,
-		});
-
-		expect(getScrollSnapshot(scrollContainer, 180)).toEqual({
-			scrollTop: 120,
-			viewportHeight: 180,
-		});
-		expect(clientHeightSpy).not.toHaveBeenCalled();
-		expect(rectSpy).not.toHaveBeenCalled();
-	});
-
-	it("reads window scroll state without layout access", () => {
-		const rectSpy = vi.fn(() =>
-			createDomRect({
-				top: 40,
-				width: 240,
-				height: 180,
-			}),
-		);
-
-		setNumericProperty(window, "scrollY", 96);
-		setNumericProperty(window, "innerHeight", 720);
-		Object.defineProperty(document.documentElement, "getBoundingClientRect", {
-			configurable: true,
-			value: rectSpy,
-		});
-
-		expect(getScrollSnapshot(null)).toEqual({
-			scrollTop: 96,
-			viewportHeight: 720,
-		});
-		expect(rectSpy).not.toHaveBeenCalled();
-	});
 });
 
 describe("readScrollSnapshot", () => {

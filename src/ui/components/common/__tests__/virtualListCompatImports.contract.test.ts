@@ -7,6 +7,7 @@ const commonRoot = join(sourceRoot, "ui", "components", "common");
 
 const compatModules = new Set(
 	[
+		"virtualGridLinkListLayout.ts",
 		"VirtualListCellMount.svelte",
 		"virtualListHelpers.svelte.ts",
 		"virtualListKeyboard.ts",

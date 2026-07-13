@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
-	isStableCachedVirtualListMeasurement,
+	isStableCachedVirtualListMeasurementFromMetrics,
 	isStableVirtualListMeasurement,
 	resolveVirtualListLayoutStability,
 } from "../virtualListMeasurementStability";
@@ -18,16 +18,14 @@ describe("virtual list measurement stability", () => {
 			}),
 		).toBe(true);
 		expect(
-			isStableCachedVirtualListMeasurement({
-				hasRenderableContent: false,
-				hasStableCachedScrollMetrics: false,
-				cachedViewportHeight: 0,
-				scrollSnapshot: {
-					scrollTop: Number.NaN,
-					viewportHeight: 0,
-				},
-				cachedSectionTop: Number.NaN,
-			}),
+			isStableCachedVirtualListMeasurementFromMetrics(
+				false,
+				false,
+				0,
+				Number.NaN,
+				0,
+				Number.NaN,
+			),
 		).toBe(true);
 	});
 
@@ -42,16 +40,14 @@ describe("virtual list measurement stability", () => {
 			}),
 		).toBe(true);
 		expect(
-			isStableCachedVirtualListMeasurement({
-				hasRenderableContent: true,
-				hasStableCachedScrollMetrics: true,
-				cachedViewportHeight: 600,
-				scrollSnapshot: {
-					scrollTop: 10,
-					viewportHeight: 600,
-				},
-				cachedSectionTop: 20,
-			}),
+			isStableCachedVirtualListMeasurementFromMetrics(
+				true,
+				true,
+				600,
+				10,
+				600,
+				20,
+			),
 		).toBe(true);
 		expect(
 			isStableVirtualListMeasurement({
@@ -63,16 +59,14 @@ describe("virtual list measurement stability", () => {
 			}),
 		).toBe(false);
 		expect(
-			isStableCachedVirtualListMeasurement({
-				hasRenderableContent: true,
-				hasStableCachedScrollMetrics: false,
-				cachedViewportHeight: 600,
-				scrollSnapshot: {
-					scrollTop: 10,
-					viewportHeight: 600,
-				},
-				cachedSectionTop: 20,
-			}),
+			isStableCachedVirtualListMeasurementFromMetrics(
+				true,
+				false,
+				600,
+				10,
+				600,
+				20,
+			),
 		).toBe(false);
 	});
 
