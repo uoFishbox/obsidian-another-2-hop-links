@@ -12,7 +12,7 @@ import {
 import type { VirtualizedItemResolvedVisibilityState } from "ui/components/common/virtual-list/svelte/virtualizedItemVisibilityState.svelte";
 import type { VirtualizedItemVisibility } from "ui/components/common/virtualizedItemVisibility";
 import type { RenderRevision } from "ui/components/common/virtual-list/renderRevision";
-import { createTwoHopArithmeticRowSlotPool } from "./twoHopArithmeticRowSlotPool";
+import { createContiguousRowSlotAllocator } from "ui/components/common/virtual-list/core/reconciliation/contiguousRowSlotAllocator";
 import { createTwoHopFixedRowSlotPool } from "./twoHopFixedRowSlotPool.svelte";
 import type {
 	TwoHopVirtualListItem,
@@ -155,7 +155,7 @@ export function createTwoHopScalarScrollKernel(params: {
 	onStableVisibleRange(): void;
 }) {
 	const fixedRowSlotPool = createTwoHopFixedRowSlotPool();
-	const arithmeticRowSlotPool = createTwoHopArithmeticRowSlotPool();
+	const rowSlotAllocator = createContiguousRowSlotAllocator();
 	let rowModel = $state.raw(params.initialRowModel);
 	const mountedRange = $state({ start: 0, end: 0 });
 	const previewRange = $state({ start: 0, end: 0 });
@@ -267,16 +267,16 @@ export function createTwoHopScalarScrollKernel(params: {
 	}
 
 	function setLogicalRowVisibility(rowIndex: number): void {
-		if (arithmeticRowSlotPool.capacity === 0) return;
-		const slotIndex = arithmeticRowSlotPool.resolveSlotIndex(rowIndex);
+		if (rowSlotAllocator.capacity === 0) return;
+		const slotIndex = rowSlotAllocator.resolveSlotIndex(rowIndex);
 		const record = rowSlots[slotIndex];
 		if (!record?.active || record.row.rowIndex !== rowIndex) return;
 		setRowVisibility(record);
 	}
 
 	function clearLogicalRowIfStillBound(rowIndex: number): void {
-		if (arithmeticRowSlotPool.capacity === 0) return;
-		const slotIndex = arithmeticRowSlotPool.resolveSlotIndex(rowIndex);
+		if (rowSlotAllocator.capacity === 0) return;
+		const slotIndex = rowSlotAllocator.resolveSlotIndex(rowIndex);
 		const record = rowSlots[slotIndex];
 		if (record?.active && record.row.rowIndex === rowIndex) {
 			clearRowSlot(record);
@@ -316,7 +316,7 @@ export function createTwoHopScalarScrollKernel(params: {
 	}
 
 	function bindLogicalRow(plan: TwoHopViewPlan, logicalRowIndex: number): void {
-		const slotIndex = arithmeticRowSlotPool.resolveSlotIndex(logicalRowIndex);
+		const slotIndex = rowSlotAllocator.resolveSlotIndex(logicalRowIndex);
 		const record = rowSlots[slotIndex];
 		if (!record) return;
 		if (record.active && record.row.rowIndex !== logicalRowIndex) {
@@ -369,10 +369,14 @@ export function createTwoHopScalarScrollKernel(params: {
 		const previousStart = mountedRange.start;
 		const previousEnd = mountedRange.end;
 		const planChanged = activePlan !== plan;
-		arithmeticRowSlotPool.prepareRange(nextStart, nextEnd, plan.layout);
-		const poolChanged = activePoolEpoch !== arithmeticRowSlotPool.epoch;
-		activePoolEpoch = arithmeticRowSlotPool.epoch;
-		ensurePhysicalPool(plan.columns, arithmeticRowSlotPool.capacity);
+		rowSlotAllocator.prepareRange({
+			start: nextStart,
+			end: nextEnd,
+			layoutKey: plan.layout,
+		});
+		const poolChanged = activePoolEpoch !== rowSlotAllocator.epoch;
+		activePoolEpoch = rowSlotAllocator.epoch;
+		ensurePhysicalPool(plan.columns, rowSlotAllocator.capacity);
 
 		const hasDirtyRows =
 			pendingDirtyStart < pendingDirtyEnd &&
@@ -383,7 +387,7 @@ export function createTwoHopScalarScrollKernel(params: {
 			return false;
 		}
 
-		if (arithmeticRowSlotPool.capacity === 0) {
+		if (rowSlotAllocator.capacity === 0) {
 			for (const record of rowSlots) clearRowSlot(record);
 		} else if (planChanged || poolChanged) {
 			for (const record of rowSlots) {
@@ -596,7 +600,7 @@ export function createTwoHopScalarScrollKernel(params: {
 		},
 		dispose(): void {
 			for (const record of rowSlots) clearRowSlot(record);
-			arithmeticRowSlotPool.dispose();
+			rowSlotAllocator.dispose();
 		},
 	};
 }
