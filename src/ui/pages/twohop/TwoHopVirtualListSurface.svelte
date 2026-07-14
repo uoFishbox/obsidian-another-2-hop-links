@@ -70,7 +70,7 @@
 	const list = createTwoHopVirtualListController(props);
 	const interactionDescriptorResolverProvider =
 		createTwoHopInteractionDescriptorCache({
-			getMountedRows: () => list.mountedRows,
+			getMountedCellByInteractionId: list.getMountedCellByInteractionId,
 			resolveDescriptor: (item) => props.getItemInteractionDescriptor(item),
 			getDescriptorRevision: () => props.interactionDescriptorRevision,
 		});

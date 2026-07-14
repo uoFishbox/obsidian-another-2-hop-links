@@ -39,6 +39,9 @@ export interface TwoHopVirtualListController {
 	readonly getItemVisibilityState: (
 		cell: TwoHopMountedCell,
 	) => VirtualizedItemResolvedVisibilityState;
+	readonly getMountedCellByInteractionId: (
+		interactionId: string,
+	) => TwoHopMountedCell | undefined;
 	readonly getItemActivationCandidateId: (
 		cell: Extract<TwoHopMountedCell, { cell: { kind: "item" } }>,
 	) => string;
@@ -114,6 +117,7 @@ export function createTwoHopVirtualListController(
 						: undefined
 			: undefined,
 		getItemVisibilityState: mountedRuntime.getItemVisibilityState,
+		getMountedCellByInteractionId: mountedRuntime.getMountedCellByInteractionId,
 		getItemActivationCandidateId: mountedRuntime.getItemActivationCandidateId,
 		loadMore: inputRuntime.loadMore,
 		resolveNavigationTarget: inputRuntime.resolveNavigationTarget,

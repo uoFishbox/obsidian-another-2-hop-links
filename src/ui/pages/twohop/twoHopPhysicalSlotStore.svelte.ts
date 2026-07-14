@@ -2,6 +2,10 @@ import type { RowPreviewActivationRuntime } from "features/preview/scheduling/ro
 import { recordCCLDevMeasurement } from "infrastructure/debug/CCLDevMeasurements";
 import type { ClickableHeaderExtraProps } from "ui/components/sections/types";
 import type { VirtualListLogicalCell } from "ui/components/common/virtual-list/logicalCell";
+import type {
+	MountedFlatHeaderCell,
+	MountedFlatItemCell,
+} from "ui/components/common/virtual-list/core/reconciliation/viewPlanMountedCells";
 import { createContiguousRowSlotAllocator } from "ui/components/common/virtual-list/core/reconciliation/contiguousRowSlotAllocator";
 import type { RenderBodyKey } from "ui/components/common/virtual-list/renderRevision";
 import type { RenderRevision } from "ui/components/common/virtual-list/renderRevision";
@@ -19,6 +23,7 @@ import type {
 	VirtualCellRegistry,
 } from "ui/components/common/virtual-list/svelte/VirtualCellRegistry";
 import { dispatchVirtualCellWillRebind } from "ui/interactions/virtualCellRebind";
+import { createItemInteractionKey } from "ui/interactions/interactionTypes";
 import { createTwoHopCellBinding, type TwoHopCellBinding } from "./twoHopCellBinding";
 import type { TwoHopMountedCell, TwoHopMountedRowSlice } from "./twoHopMountedTypes";
 import type {
@@ -30,6 +35,15 @@ import type {
 	TwoHopVirtualListItem,
 	TwoHopVirtualListSection,
 } from "./twoHopVirtualListModel";
+
+type TwoHopMountedItemCell = MountedFlatItemCell<
+	TwoHopVirtualListItem,
+	TwoHopVirtualListSection
+>;
+type TwoHopMountedHeaderCell = MountedFlatHeaderCell<
+	TwoHopVirtualListItem,
+	TwoHopVirtualListSection
+>;
 
 export interface TwoHopFixedCellSlotController extends VirtualCellRegistrationOwner {
 	readonly cellSlotKey: number;
@@ -127,6 +141,7 @@ export interface TwoHopPhysicalSlotStore {
 	getItemVisibilityState(
 		cell: TwoHopMountedCell,
 	): VirtualizedItemResolvedVisibilityState;
+	getMountedCellByInteractionId(interactionId: string): TwoHopMountedCell | undefined;
 	dispose(): void;
 }
 
@@ -508,6 +523,7 @@ export function createTwoHopPhysicalSlotStore(params: {
 	const rowSlotAllocator = createContiguousRowSlotAllocator();
 	const rowSlots: RowSlotRecord[] = [];
 	const mountedRows: TwoHopMountedRowSlice[] = [];
+	const mountedCellsByInteractionId = new Map<string, TwoHopMountedCell>();
 	let activeColumns = 0;
 	let activePoolEpoch = -1;
 	let previewStart = 0;
@@ -520,9 +536,49 @@ export function createTwoHopPhysicalSlotStore(params: {
 		visibility: "mounted",
 	});
 
+	function isMountedHeaderCell(
+		cell: TwoHopMountedCell,
+	): cell is TwoHopMountedHeaderCell {
+		return cell.cell.kind === "header";
+	}
+
+	function isMountedItemCell(cell: TwoHopMountedCell): cell is TwoHopMountedItemCell {
+		return cell.cell.kind === "item";
+	}
+
+	function resolveInteractionId(cell: TwoHopMountedCell): string | null {
+		if (isMountedHeaderCell(cell)) {
+			return cell.headerProps.interactionId ?? cell.sectionId;
+		}
+		if (!isMountedItemCell(cell)) return null;
+
+		const item = cell.cell.item;
+		return item.interactionId ?? createItemInteractionKey(item.item);
+	}
+
+	function indexRecord(record: RowSlotRecord): void {
+		for (const cell of record.row.cells) {
+			const interactionId = resolveInteractionId(cell);
+			if (interactionId) mountedCellsByInteractionId.set(interactionId, cell);
+		}
+	}
+
+	function unindexRecord(record: RowSlotRecord): void {
+		for (const cell of record.row.cells) {
+			const interactionId = resolveInteractionId(cell);
+			if (
+				interactionId &&
+				mountedCellsByInteractionId.get(interactionId) === cell
+			) {
+				mountedCellsByInteractionId.delete(interactionId);
+			}
+		}
+	}
+
 	function clearRecord(record: RowSlotRecord): void {
 		if (!record.active) return;
 		params.rowPreviewActivationRuntime?.clearRow(record.row.rowIndex);
+		unindexRecord(record);
 		record.active = false;
 		record.row.cells.length = 0;
 		fixedRowSlotPool.clearSlot(record.row.slotIndex ?? 0);
@@ -641,6 +697,7 @@ export function createTwoHopPhysicalSlotStore(params: {
 			if (record.active && record.row.rowIndex !== logicalRowIndex) {
 				params.rowPreviewActivationRuntime?.clearRow(record.row.rowIndex);
 			}
+			if (record.active) unindexRecord(record);
 			const sectionIndex = plan.rowSectionIndex[logicalRowIndex];
 			const sectionPlan = plan.sections[sectionIndex];
 			if (!sectionPlan) {
@@ -678,6 +735,7 @@ export function createTwoHopPhysicalSlotStore(params: {
 			}
 			record.row.cells.length = cellCount;
 			record.active = true;
+			indexRecord(record);
 			fixedRowSlotPool.bindRow(record.row);
 			setRowVisibility(record);
 		},
@@ -746,8 +804,12 @@ export function createTwoHopPhysicalSlotStore(params: {
 				fallbackVisibilityState
 			);
 		},
+		getMountedCellByInteractionId(interactionId) {
+			return mountedCellsByInteractionId.get(interactionId);
+		},
 		dispose(): void {
 			for (const record of rowSlots) clearRecord(record);
+			mountedCellsByInteractionId.clear();
 			rowSlotAllocator.dispose();
 		},
 	};

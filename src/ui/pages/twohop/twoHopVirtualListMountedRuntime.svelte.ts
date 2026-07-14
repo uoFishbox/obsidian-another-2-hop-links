@@ -65,6 +65,7 @@ export function createTwoHopVirtualListMountedRuntime(params: {
 			return kernel.fixedRowSlotPool.controllers;
 		},
 		getItemVisibilityState: kernel.getItemVisibilityState,
+		getMountedCellByInteractionId: kernel.getMountedCellByInteractionId,
 		getItemActivationCandidateId: getTwoHopActivationCandidateId,
 		syncPreviewVisibleRange: kernel.syncPreviewVisibleRange,
 		cancelPreviewVisibleRangeSync: kernel.cancelPreviewVisibleRangeSync,

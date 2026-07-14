@@ -18,6 +18,7 @@ import type { TwoHopCellBinding } from "../twoHopCellBinding";
 const items = Array.from({ length: 1_000 }, (_, index) => ({
 	kind: "new-link" as const,
 	item: { type: "link" } as never,
+	interactionId: `item:test:${index}`,
 	searchKey: `item-${index}`,
 	virtualKey: `item-${index}`,
 }));
@@ -134,6 +135,42 @@ function applyRange(
 }
 
 describe("TwoHop scalar scroll kernel", () => {
+	it("keeps the mounted interaction index synchronized across slot rebind and clear", () => {
+		const kernel = createTwoHopScalarScrollKernel({
+			initialRowModel: rowModel,
+			onStableVisibleRange() {},
+		});
+
+		applyRange(kernel, 0, 1);
+
+		expect(kernel.getMountedCellByInteractionId("new-links")?.cell.kind).toBe(
+			"header",
+		);
+		expect(kernel.getMountedCellByInteractionId("item:test:0")?.cell.kind).toBe(
+			"item",
+		);
+
+		applyRange(kernel, 3, 1);
+
+		expect(kernel.getMountedCellByInteractionId("new-links")).toBeUndefined();
+		expect(kernel.getMountedCellByInteractionId("item:test:0")).toBeUndefined();
+		const reboundItem = kernel.mountedRows[0]?.cells.find(
+			(cell) => cell.cell.kind === "item",
+		);
+		if (reboundItem?.cell.kind !== "item") return;
+		const reboundInteractionId = reboundItem.cell.item.interactionId;
+		expect(reboundInteractionId).toBeDefined();
+		if (!reboundInteractionId) return;
+		expect(kernel.getMountedCellByInteractionId(reboundInteractionId)).toBe(
+			reboundItem,
+		);
+
+		kernel.dispose();
+		expect(
+			kernel.getMountedCellByInteractionId(reboundInteractionId),
+		).toBeUndefined();
+	});
+
 	it("mounts every declared slot for sparse items and load-more", () => {
 		const kernel = createTwoHopScalarScrollKernel({
 			initialRowModel: sparseRowModel,

@@ -254,6 +254,7 @@ export function createTwoHopScalarScrollKernel(params: {
 		): VirtualizedItemResolvedVisibilityState {
 			return physicalSlotStore.getItemVisibilityState(cell);
 		},
+		getMountedCellByInteractionId: physicalSlotStore.getMountedCellByInteractionId,
 		dispose(): void {
 			physicalSlotStore.dispose();
 		},

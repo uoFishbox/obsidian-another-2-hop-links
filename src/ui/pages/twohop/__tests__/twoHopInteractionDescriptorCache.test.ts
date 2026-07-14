@@ -34,6 +34,35 @@ type TwoHopMountedRow = MountedFlatRowSlice<
 	TwoHopVirtualListSection
 >;
 
+function createMountedCellResolver(
+	rows: readonly TwoHopMountedRow[],
+): (
+	interactionId: string,
+) => TwoHopMountedItemCell | TwoHopMountedHeaderCell | undefined {
+	const cellsByInteractionId = new Map<
+		string,
+		TwoHopMountedItemCell | TwoHopMountedHeaderCell
+	>();
+	for (const row of rows) {
+		for (const cell of row.cells) {
+			if (cell.cell.kind === "header") {
+				const headerCell = cell as TwoHopMountedHeaderCell;
+				cellsByInteractionId.set(
+					headerCell.headerProps.interactionId ?? headerCell.sectionId,
+					headerCell,
+				);
+				continue;
+			}
+			if (cell.cell.kind !== "item") continue;
+
+			const itemCell = cell as TwoHopMountedItemCell;
+			const interactionId = itemCell.cell.item.interactionId;
+			if (interactionId) cellsByInteractionId.set(interactionId, itemCell);
+		}
+	}
+	return (interactionId) => cellsByInteractionId.get(interactionId);
+}
+
 function createItem(path: string): TwoHopVirtualListItem {
 	const file = { path, basename: path } as TFile;
 	return {
@@ -142,6 +171,7 @@ function createDescriptor(item: TwoHopVirtualListItem): ItemInteractionDescripto
 describe("twoHopInteractionDescriptorCache", () => {
 	it("provider resolves against the current mounted rows", () => {
 		let mountedRows: readonly TwoHopMountedRow[] = [];
+		let getMountedCellByInteractionId = createMountedCellResolver(mountedRows);
 		const firstItem = createItem("alpha.md");
 		const secondItem = createItem("beta.md");
 		const firstDescriptor = createDescriptor(firstItem);
@@ -152,17 +182,20 @@ describe("twoHopInteractionDescriptorCache", () => {
 			return null;
 		});
 		const provider = createTwoHopInteractionDescriptorCache({
-			getMountedRows: () => mountedRows,
+			getMountedCellByInteractionId: (interactionId) =>
+				getMountedCellByInteractionId(interactionId),
 			resolveDescriptor,
 		});
 
 		mountedRows = createMountedRows({ item: firstItem });
+		getMountedCellByInteractionId = createMountedCellResolver(mountedRows);
 
 		expect(provider.resolveInteractionDescriptor("item:file:alpha.md")).toBe(
 			firstDescriptor,
 		);
 
 		mountedRows = createMountedRows({ item: secondItem });
+		getMountedCellByInteractionId = createMountedCellResolver(mountedRows);
 
 		expect(provider.resolveInteractionDescriptor("item:file:alpha.md")).toBeNull();
 		expect(provider.resolveInteractionDescriptor("item:file:beta.md")).toBe(
@@ -176,11 +209,12 @@ describe("twoHopInteractionDescriptorCache", () => {
 		const descriptor = createDescriptor(item);
 		const resolveDescriptor = vi.fn(() => descriptor);
 		const provider = createTwoHopInteractionDescriptorCache({
-			getMountedRows: () =>
+			getMountedCellByInteractionId: createMountedCellResolver(
 				createMountedRows({
 					item,
 					renderBodyKey: "item:alpha:1",
 				}),
+			),
 			resolveDescriptor,
 		});
 
@@ -212,17 +246,20 @@ describe("twoHopInteractionDescriptorCache", () => {
 		const firstDescriptor = createDescriptor(item);
 		const secondDescriptor = createDescriptor(item);
 		let renderBodyRevision: unknown = 1;
+		let getMountedCellByInteractionId = createMountedCellResolver(
+			createMountedRows({
+				item,
+				renderBodyKey: undefined,
+				renderBodyRevision,
+			}),
+		);
 		const resolveDescriptor = vi
 			.fn()
 			.mockReturnValueOnce(firstDescriptor)
 			.mockReturnValueOnce(secondDescriptor);
 		const provider = createTwoHopInteractionDescriptorCache({
-			getMountedRows: () =>
-				createMountedRows({
-					item,
-					renderBodyKey: undefined,
-					renderBodyRevision,
-				}),
+			getMountedCellByInteractionId: (interactionId) =>
+				getMountedCellByInteractionId(interactionId),
 			resolveDescriptor,
 		});
 
@@ -231,6 +268,13 @@ describe("twoHopInteractionDescriptorCache", () => {
 		);
 
 		renderBodyRevision = 2;
+		getMountedCellByInteractionId = createMountedCellResolver(
+			createMountedRows({
+				item,
+				renderBodyKey: undefined,
+				renderBodyRevision,
+			}),
+		);
 
 		expect(provider.resolveInteractionDescriptor("item:file:alpha.md")).toBe(
 			secondDescriptor,
@@ -248,11 +292,12 @@ describe("twoHopInteractionDescriptorCache", () => {
 			.mockReturnValueOnce(firstDescriptor)
 			.mockReturnValueOnce(secondDescriptor);
 		const provider = createTwoHopInteractionDescriptorCache({
-			getMountedRows: () =>
+			getMountedCellByInteractionId: createMountedCellResolver(
 				createMountedRows({
 					item,
 					renderBodyKey: "item:alpha:1",
 				}),
+			),
 			resolveDescriptor,
 			getDescriptorRevision: () => descriptorRevision,
 		});
@@ -273,11 +318,12 @@ describe("twoHopInteractionDescriptorCache", () => {
 		const descriptor = createHeaderDescriptor("h0");
 		const resolveDescriptor = vi.fn();
 		const provider = createTwoHopInteractionDescriptorCache({
-			getMountedRows: () =>
+			getMountedCellByInteractionId: createMountedCellResolver(
 				createMountedHeaderRows({
 					interactionId: "h0",
 					descriptor,
 				}),
+			),
 			resolveDescriptor,
 		});
 
@@ -287,10 +333,12 @@ describe("twoHopInteractionDescriptorCache", () => {
 
 	it("provider resolves section header ids against the current mounted rows", () => {
 		let mountedRows: readonly TwoHopMountedRow[] = [];
+		let getMountedCellByInteractionId = createMountedCellResolver(mountedRows);
 		const firstDescriptor = createHeaderDescriptor("h0");
 		const secondDescriptor = createHeaderDescriptor("h1");
 		const provider = createTwoHopInteractionDescriptorCache({
-			getMountedRows: () => mountedRows,
+			getMountedCellByInteractionId: (interactionId) =>
+				getMountedCellByInteractionId(interactionId),
 			resolveDescriptor: vi.fn(() => null),
 		});
 
@@ -298,6 +346,7 @@ describe("twoHopInteractionDescriptorCache", () => {
 			interactionId: "h0",
 			descriptor: firstDescriptor,
 		});
+		getMountedCellByInteractionId = createMountedCellResolver(mountedRows);
 
 		expect(provider.resolveInteractionDescriptor("h0")).toBe(firstDescriptor);
 
@@ -305,6 +354,7 @@ describe("twoHopInteractionDescriptorCache", () => {
 			interactionId: "h1",
 			descriptor: secondDescriptor,
 		});
+		getMountedCellByInteractionId = createMountedCellResolver(mountedRows);
 
 		expect(provider.resolveInteractionDescriptor("h0")).toBeNull();
 		expect(provider.resolveInteractionDescriptor("h1")).toBe(secondDescriptor);

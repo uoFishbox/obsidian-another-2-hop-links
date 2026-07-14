@@ -8,12 +8,11 @@ import type {
 	MountedFlatHeaderCell,
 	MountedFlatItemCell,
 } from "ui/components/common/virtual-list/core/reconciliation/viewPlanMountedCells";
-import type { MountedFlatRowSlice } from "ui/components/common/virtual-list/core/reconciliation/viewPlanRenderRows";
-import { createItemInteractionKey } from "ui/interactions/interactionTypes";
 import type {
 	TwoHopVirtualListItem,
 	TwoHopVirtualListSection,
 } from "./twoHopVirtualListModel";
+import type { TwoHopMountedCell } from "./twoHopMountedTypes";
 import { recordCCLDevMeasurement } from "infrastructure/debug/CCLDevMeasurements";
 
 type TwoHopMountedItemCell = MountedFlatItemCell<
@@ -24,6 +23,14 @@ type TwoHopMountedHeaderCell = MountedFlatHeaderCell<
 	TwoHopVirtualListItem,
 	TwoHopVirtualListSection
 >;
+
+function isMountedHeaderCell(cell: TwoHopMountedCell): cell is TwoHopMountedHeaderCell {
+	return cell.cell.kind === "header";
+}
+
+function isMountedItemCell(cell: TwoHopMountedCell): cell is TwoHopMountedItemCell {
+	return cell.cell.kind === "item";
+}
 
 interface ItemProviderCacheEntry {
 	kind: "item";
@@ -48,10 +55,9 @@ interface SectionHeaderProviderCacheEntry {
 type ProviderCacheEntry = ItemProviderCacheEntry | SectionHeaderProviderCacheEntry;
 
 export interface TwoHopInteractionDescriptorCacheParams {
-	getMountedRows: () => readonly MountedFlatRowSlice<
-		TwoHopVirtualListItem,
-		TwoHopVirtualListSection
-	>[];
+	getMountedCellByInteractionId: (
+		interactionId: string,
+	) => TwoHopMountedCell | undefined;
 	resolveDescriptor: (
 		item: TwoHopVirtualListItem,
 	) => ItemInteractionDescriptor | null;
@@ -76,7 +82,7 @@ export interface TwoHopInteractionDescriptorCache extends InteractionDescriptorR
  * only when an interaction asks for a concrete descriptor.
  */
 export function createTwoHopInteractionDescriptorCache({
-	getMountedRows,
+	getMountedCellByInteractionId,
 	resolveDescriptor,
 	getDescriptorRevision,
 }: TwoHopInteractionDescriptorCacheParams): TwoHopInteractionDescriptorCache {
@@ -84,25 +90,24 @@ export function createTwoHopInteractionDescriptorCache({
 
 	return {
 		resolveInteractionDescriptor: (interactionId) => {
-			const mountedRows = getMountedRows();
-			const headerDescriptor = resolveMountedSectionHeaderDescriptor({
-				mountedRows,
-				interactionId,
-				descriptorsByInteractionId,
-			});
-			if (headerDescriptor) {
-				return headerDescriptor;
+			const mountedCell = getMountedCellByInteractionId(interactionId);
+			if (!mountedCell) {
+				descriptorsByInteractionId.delete(interactionId);
+				return null;
 			}
-
-			const itemCell = findMountedItemCellByInteractionId({
-				mountedRows,
-				interactionId,
-			});
-			if (!itemCell) {
+			if (isMountedHeaderCell(mountedCell)) {
+				return resolveMountedSectionHeaderDescriptor({
+					headerCell: mountedCell,
+					interactionId,
+					descriptorsByInteractionId,
+				});
+			}
+			if (!isMountedItemCell(mountedCell)) {
 				descriptorsByInteractionId.delete(interactionId);
 				return null;
 			}
 
+			const itemCell = mountedCell;
 			const item = itemCell.cell.item;
 			const cached = descriptorsByInteractionId.get(interactionId);
 			const descriptorRevision = getDescriptorRevision?.();
@@ -152,21 +157,16 @@ export function createTwoHopInteractionDescriptorCache({
 }
 
 function resolveMountedSectionHeaderDescriptor(params: {
-	mountedRows: readonly MountedFlatRowSlice<
-		TwoHopVirtualListItem,
-		TwoHopVirtualListSection
-	>[];
+	headerCell: TwoHopMountedHeaderCell;
 	interactionId: string;
 	descriptorsByInteractionId: Map<string, ProviderCacheEntry>;
 }): InteractionDescriptor | null {
-	const headerCell = findMountedHeaderCellByInteractionId({
-		mountedRows: params.mountedRows,
-		interactionId: params.interactionId,
-	});
-	if (!headerCell) return null;
-
+	const headerCell = params.headerCell;
 	const descriptor = headerCell.headerProps.interactionDescriptor;
-	if (!descriptor) return null;
+	if (!descriptor) {
+		params.descriptorsByInteractionId.delete(params.interactionId);
+		return null;
+	}
 
 	const cached = params.descriptorsByInteractionId.get(params.interactionId);
 	if (
@@ -195,51 +195,4 @@ function resolveMountedSectionHeaderDescriptor(params: {
 		descriptor,
 	});
 	return descriptor;
-}
-
-function findMountedHeaderCellByInteractionId(params: {
-	mountedRows: readonly MountedFlatRowSlice<
-		TwoHopVirtualListItem,
-		TwoHopVirtualListSection
-	>[];
-	interactionId: string;
-}): TwoHopMountedHeaderCell | null {
-	for (const row of params.mountedRows) {
-		for (const cell of row.cells) {
-			if (cell.cell.kind !== "header") continue;
-
-			const headerCell = cell as TwoHopMountedHeaderCell;
-			const headerInteractionId =
-				headerCell.headerProps.interactionId ?? headerCell.sectionId;
-			if (headerInteractionId === params.interactionId) {
-				return headerCell;
-			}
-		}
-	}
-
-	return null;
-}
-
-function findMountedItemCellByInteractionId(params: {
-	mountedRows: readonly MountedFlatRowSlice<
-		TwoHopVirtualListItem,
-		TwoHopVirtualListSection
-	>[];
-	interactionId: string;
-}): TwoHopMountedItemCell | null {
-	for (const row of params.mountedRows) {
-		for (const cell of row.cells) {
-			if (cell.cell.kind !== "item") continue;
-
-			const itemCell = cell as TwoHopMountedItemCell;
-			const item = itemCell.cell.item;
-			const itemInteractionId =
-				item.interactionId ?? createItemInteractionKey(item.item);
-			if (itemInteractionId === params.interactionId) {
-				return itemCell;
-			}
-		}
-	}
-
-	return null;
 }
