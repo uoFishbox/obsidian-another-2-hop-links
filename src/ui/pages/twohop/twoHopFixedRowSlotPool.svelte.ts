@@ -41,6 +41,19 @@ interface MutableTwoHopFixedRowSlotController extends TwoHopFixedRowSlotControll
 	setCellCapacity(capacity: number): void;
 }
 
+interface TwoHopCellSlotSnapshot {
+	readonly active: boolean;
+	readonly binding: TwoHopCellBinding | null;
+	readonly revision: number;
+}
+
+interface TwoHopRowSlotSnapshot {
+	readonly active: boolean;
+	readonly rowIndex: number;
+	readonly top: number;
+	readonly revision: number;
+}
+
 export interface TwoHopFixedRowSlotPool {
 	readonly controllers: readonly TwoHopFixedRowSlotController[];
 	ensureCapacity(capacity: number, cellCapacity?: number): void;
@@ -53,27 +66,26 @@ function createCellController(
 	cellSlotKey: number,
 	initialCell?: TwoHopMountedCell,
 ): TwoHopFixedCellSlotController {
-	let logicalKey = $state(initialCell?.key ?? logicalCellKey(""));
-	let rowIndex = $state(initialCell?.rowIndex ?? -1);
-	let columnIndex = $state(initialCell?.columnIndex ?? -1);
-	let renderBodyKey = $state(initialCell?.renderBodyKey);
-	let renderBodyKind = $state(initialCell?.renderBodyKind ?? "header");
-	let mountedCell = $state.raw<TwoHopMountedCell | undefined>(initialCell);
-	let active = $state(initialCell !== undefined);
-	let revision = $state(0);
-	let binding = $state.raw<TwoHopCellBinding | null>(
-		initialCell ? createTwoHopCellBinding(initialCell, 0) : null,
-	);
+	let snapshot = $state.raw<TwoHopCellSlotSnapshot>({
+		active: initialCell !== undefined,
+		binding: initialCell ? createTwoHopCellBinding(initialCell, 0) : null,
+		revision: 0,
+	});
 	let cellElement: HTMLElement | null = null;
 	let cellRegistry: VirtualCellRegistry | null = null;
 	let cellRegistration: VirtualCellElementRegistration | null = null;
 
 	function registerCurrentBinding(): void {
-		if (!active || !cellElement || !cellRegistry) return;
+		const binding = snapshot.binding;
+		if (!snapshot.active || !binding || !cellElement || !cellRegistry) return;
 		if (!cellRegistration) {
 			cellRegistration = cellRegistry.createRegistration(cellElement);
 		}
-		cellRegistration.update(String(logicalKey), rowIndex, columnIndex);
+		cellRegistration.update(
+			String(binding.logicalKey),
+			binding.rowIndex,
+			binding.columnIndex,
+		);
 	}
 
 	function unregisterCurrentBinding(): void {
@@ -84,33 +96,31 @@ function createCellController(
 	return {
 		cellSlotKey,
 		get active() {
-			return active;
+			return snapshot.active;
 		},
 		get logicalKey() {
-			return logicalKey;
+			return snapshot.binding?.logicalKey ?? logicalCellKey("");
 		},
 		get rowIndex() {
-			return rowIndex;
+			return snapshot.binding?.rowIndex ?? -1;
 		},
 		get columnIndex() {
-			return columnIndex;
+			return snapshot.binding?.columnIndex ?? -1;
 		},
 		get renderBodyKey() {
-			return renderBodyKey;
+			return snapshot.binding?.mountedCell.renderBodyKey;
 		},
 		get renderBodyKind() {
-			return renderBodyKind;
+			return snapshot.binding?.renderKind ?? "header";
 		},
 		get mountedCell() {
-			void revision;
-			return mountedCell;
+			return snapshot.binding?.mountedCell;
 		},
 		get binding() {
-			void revision;
-			return binding;
+			return snapshot.binding;
 		},
 		bindCell(nextCell): void {
-			const previousBinding = binding;
+			const previousBinding = snapshot.binding;
 			if (
 				previousBinding &&
 				previousBinding.logicalKey !== nextCell.key &&
@@ -125,27 +135,25 @@ function createCellController(
 				nextCell,
 				(previousBinding?.epoch ?? -1) + 1,
 			);
-			logicalKey = nextCell.key;
-			rowIndex = nextCell.rowIndex;
-			columnIndex = nextCell.columnIndex;
-			renderBodyKey = nextCell.renderBodyKey;
-			renderBodyKind = nextCell.renderBodyKind;
-			mountedCell = nextCell;
-			binding = nextBinding;
-			revision += 1;
-			active = true;
+			snapshot = {
+				active: true,
+				binding: nextBinding,
+				revision: snapshot.revision + 1,
+			};
 			registerCurrentBinding();
 		},
 		clear(): void {
-			if (binding && cellElement) {
+			if (snapshot.binding && cellElement) {
 				dispatchVirtualCellWillRebind(cellElement, {
-					previousLogicalKey: String(binding.logicalKey),
+					previousLogicalKey: String(snapshot.binding.logicalKey),
 					nextLogicalKey: "",
 				});
 			}
-			active = false;
-			mountedCell = undefined;
-			binding = null;
+			snapshot = {
+				active: false,
+				binding: null,
+				revision: snapshot.revision + 1,
+			};
 			unregisterCurrentBinding();
 		},
 		attachElement(element, registry): void {
@@ -165,24 +173,26 @@ function createCellController(
 }
 
 function createController(slotIndex: number): MutableTwoHopFixedRowSlotController {
-	let active = $state(false);
-	let rowIndex = $state(-1);
-	let top = $state(0);
+	let snapshot = $state.raw<TwoHopRowSlotSnapshot>({
+		active: false,
+		rowIndex: -1,
+		top: 0,
+		revision: 0,
+	});
 	const cells: TwoHopFixedCellSlotController[] = [];
-	let revision = $state(0);
 	return {
 		slotIndex,
 		get active() {
-			return active;
+			return snapshot.active;
 		},
 		get rowIndex() {
-			return rowIndex;
+			return snapshot.rowIndex;
 		},
 		get top() {
-			return top;
+			return snapshot.top;
 		},
 		get cells() {
-			void revision;
+			void snapshot.revision;
 			return cells;
 		},
 		setCellCapacity(capacity): void {
@@ -192,7 +202,10 @@ function createController(slotIndex: number): MutableTwoHopFixedRowSlotControlle
 			for (let columnIndex = 0; columnIndex < capacity; columnIndex += 1) {
 				cells.push(createCellController(slotIndex * capacity + columnIndex));
 			}
-			revision += 1;
+			snapshot = {
+				...snapshot,
+				revision: snapshot.revision + 1,
+			};
 		},
 		bindRow(nextRow): void {
 			this.setCellCapacity(Math.max(cells.length, nextRow.cells.length));
@@ -220,16 +233,21 @@ function createController(slotIndex: number): MutableTwoHopFixedRowSlotControlle
 			for (let index = nextRow.cells.length; index < cells.length; index += 1) {
 				cells[index]?.clear();
 			}
-			rowIndex = nextRow.rowIndex;
-			top = nextRow.top;
-			active = true;
-			revision += 1;
+			snapshot = {
+				active: true,
+				rowIndex: nextRow.rowIndex,
+				top: nextRow.top,
+				revision: snapshot.revision + 1,
+			};
 		},
 		clear(): void {
-			if (!active) return;
-			active = false;
+			if (!snapshot.active) return;
 			for (const cell of cells) cell.clear();
-			revision += 1;
+			snapshot = {
+				...snapshot,
+				active: false,
+				revision: snapshot.revision + 1,
+			};
 		},
 	};
 }
