@@ -23,6 +23,7 @@
 	} from "./twohop/twoHopSearchAdapter";
 	import { tick } from "svelte";
 	import { createTwoHopDataIdentityCache } from "./twohop/twoHopDataIdentityCache";
+	import type { TwoHopVirtualSectionDescriptor } from "./twohop/twoHopVirtualListModel";
 
 	interface Props {
 		file: TFile;
@@ -51,9 +52,6 @@
 	let displayData = $derived(displayState.displayData);
 	let hasDisplayableItems = $derived(
 		loadingPhase !== "initial" && displayState.hasDisplayableItems,
-	);
-	let showTwoHopPlaceholder = $derived(
-		loadingPhase === "base-ready" && (linkResult?.branches.length ?? 0) > 0,
 	);
 	let initialVisibleCount = $derived(applicationStore.initialVisibleCount);
 	let loadMoreIncrement = $derived(applicationStore.loadMoreIncrement);
@@ -118,8 +116,30 @@
 	const fileToLinktext = linkContext.fileToLinktext;
 	const onTagClick = linkContext.onTagClick;
 	const dataIdentityCache = createTwoHopDataIdentityCache();
-	const twoHopVirtualListSections = $derived.by(() =>
-		dataIdentityCache.resolve({
+
+	type VirtualListBootstrapState =
+		| { type: "building" }
+		| {
+				type: "ready";
+				sections: readonly TwoHopVirtualSectionDescriptor[];
+		  };
+
+	const BUILDING_VIRTUAL_LIST_STATE: VirtualListBootstrapState = {
+		type: "building",
+	};
+
+	const virtualListBootstrapState = $derived.by((): VirtualListBootstrapState => {
+		if (
+			(loadingPhase !== "twohop-ready" && loadingPhase !== "complete") ||
+			!linkResult
+		) {
+			return BUILDING_VIRTUAL_LIST_STATE;
+		}
+
+		// The virtual list builds its initial row model synchronously during child
+		// initialization. Resolve the complete data snapshot and descriptors first so
+		// no base -> two-hop rebuild can race with an already-scrollable surface.
+		const sections = dataIdentityCache.resolve({
 			displayData: filteredDisplayData,
 			searchQuery: search.normalized,
 			useMergedLinks,
@@ -131,8 +151,10 @@
 			currentSettings,
 			applicationStore,
 			onTagClick,
-		}),
-	);
+		});
+
+		return { type: "ready", sections };
+	});
 
 	setAppContext({
 		linkContext,
@@ -234,7 +256,7 @@
 			{/if}
 		</div>
 	{/if}
-	{#if loadingPhase !== "initial" && linkResult && hasDisplayableItems}
+	{#if virtualListBootstrapState.type === "ready" && hasDisplayableItems}
 		<ListControls
 			searchInputValue={search.value}
 			onSearchInput={(value) => (search.value = value)}
@@ -257,10 +279,14 @@
 	>
 		{#if loading}
 			<LoadingState message="Waiting for the initial index to finish building." />
+		{:else if virtualListBootstrapState.type === "building"}
+			{#if loadingPhase === "base-ready"}
+				<LoadingState message="Loading two-hop links..." />
+			{/if}
 		{:else if linkResult}
-			{#if twoHopVirtualListSections.length}
+			{#if virtualListBootstrapState.sections.length}
 				<TwoHopPageVirtualList
-					sections={twoHopVirtualListSections}
+					sections={virtualListBootstrapState.sections}
 					{applicationStore}
 					searchQuery={search.normalized}
 					{searchScope}
@@ -268,11 +294,6 @@
 					{initialVisibleCount}
 					{loadMoreIncrement}
 				/>
-			{/if}
-			{#if !filteredDisplayData.twoHopBranches.length && showTwoHopPlaceholder}
-				<div class="cosense-card-links__phase-placeholder">
-					<LoadingState message="Loading two-hop links..." />
-				</div>
 			{/if}
 		{/if}
 	</div>
@@ -287,10 +308,6 @@
 		white-space: nowrap;
 		overflow: clip;
 		text-overflow: ellipsis;
-	}
-
-	.cosense-card-links__phase-placeholder {
-		padding: 12px 0 4px;
 	}
 
 	.cosense-card-links__search-result-container {
