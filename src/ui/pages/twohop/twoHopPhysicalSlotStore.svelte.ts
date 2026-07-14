@@ -332,9 +332,13 @@ export function createTwoHopFixedRowSlotPool(): TwoHopFixedRowSlotPool {
 	let configuredCellCapacity = 0;
 
 	function ensureCapacity(capacity: number, cellCapacity?: number): void {
-		if (cellCapacity !== undefined) configuredCellCapacity = cellCapacity;
-		for (const controller of controllers) {
-			controller.setCellCapacity(configuredCellCapacity);
+		const cellCapacityChanged =
+			cellCapacity !== undefined && cellCapacity !== configuredCellCapacity;
+		if (cellCapacityChanged) {
+			configuredCellCapacity = cellCapacity;
+			for (const controller of controllers) {
+				controller.setCellCapacity(configuredCellCapacity);
+			}
 		}
 		if (capacity <= controllers.length) return;
 		const next = controllers.slice();
@@ -369,6 +373,11 @@ export function createTwoHopFixedRowSlotPool(): TwoHopFixedRowSlotPool {
 		setCapacity,
 		bindRow(row): void {
 			const slotIndex = row.slotIndex ?? 0;
+			const controller = controllers[slotIndex];
+			if (controller) {
+				controller.bindRow(row);
+				return;
+			}
 			ensureCapacity(slotIndex + 1);
 			controllers[slotIndex]?.bindRow(row);
 		},

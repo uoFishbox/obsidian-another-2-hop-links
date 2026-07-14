@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
 	getCCLDevMeasurementSnapshot,
 	resetCCLDevMeasurements,
@@ -255,6 +255,40 @@ describe("TwoHop scalar scroll kernel", () => {
 		pool.bindRow(fullRow);
 		expect(pool.controllers[0]?.cells[1]).toBe(secondSlot);
 		expect(secondSlot?.active).toBe(true);
+
+		kernel.dispose();
+	});
+
+	it("skips cell-capacity scans when pool dimensions are unchanged", () => {
+		const kernel = createTwoHopScalarScrollKernel({
+			initialRowModel: rowModel,
+			onStableVisibleRange() {},
+		});
+		applyRange(kernel, 0, 1);
+		const row = kernel.mountedRows[0];
+		expect(row).toBeDefined();
+		if (!row) return;
+
+		const pool = createTwoHopFixedRowSlotPool();
+		pool.setCapacity(3, 2);
+		const setCellCapacitySpies = pool.controllers.map((controller) =>
+			vi.spyOn(
+				controller as typeof controller & {
+					setCellCapacity(capacity: number): void;
+				},
+				"setCellCapacity",
+			),
+		);
+
+		pool.setCapacity(3, 2);
+		for (const setCellCapacitySpy of setCellCapacitySpies) {
+			expect(setCellCapacitySpy).not.toHaveBeenCalled();
+		}
+
+		pool.bindRow(row);
+		expect(setCellCapacitySpies[0]).toHaveBeenCalledOnce();
+		expect(setCellCapacitySpies[1]).not.toHaveBeenCalled();
+		expect(setCellCapacitySpies[2]).not.toHaveBeenCalled();
 
 		kernel.dispose();
 	});
