@@ -69,7 +69,8 @@ export interface TwoHopInteractionDescriptorCacheParams {
  *
  * Entries are keyed by interaction id and invalidated by item/header,
  * render-body, resolver, or descriptor revision changes. No descriptor is
- * created during mount or scroll. Explicit invalidation clears every entry;
+ * created during mount or scroll. Unmounted entries are pruned on the next
+ * interaction resolution, and explicit invalidation clears every entry;
  * counters are reported under `twoHop.interactionDescriptorCache.*`.
  */
 export interface TwoHopInteractionDescriptorCache extends InteractionDescriptorResolverProvider {
@@ -91,8 +92,13 @@ export function createTwoHopInteractionDescriptorCache({
 	return {
 		resolveInteractionDescriptor: (interactionId) => {
 			const mountedCell = getMountedCellByInteractionId(interactionId);
+			pruneUnmountedEntries({
+				descriptorsByInteractionId,
+				getMountedCellByInteractionId,
+				resolvedInteractionId: interactionId,
+				resolvedMountedCell: mountedCell,
+			});
 			if (!mountedCell) {
-				descriptorsByInteractionId.delete(interactionId);
 				return null;
 			}
 			if (isMountedHeaderCell(mountedCell)) {
@@ -154,6 +160,27 @@ export function createTwoHopInteractionDescriptorCache({
 			}
 		},
 	};
+}
+
+function pruneUnmountedEntries(params: {
+	descriptorsByInteractionId: Map<string, ProviderCacheEntry>;
+	getMountedCellByInteractionId: (
+		interactionId: string,
+	) => TwoHopMountedCell | undefined;
+	resolvedInteractionId: string;
+	resolvedMountedCell: TwoHopMountedCell | undefined;
+}): void {
+	for (const cachedInteractionId of params.descriptorsByInteractionId.keys()) {
+		if (cachedInteractionId === params.resolvedInteractionId) {
+			if (!params.resolvedMountedCell) {
+				params.descriptorsByInteractionId.delete(cachedInteractionId);
+			}
+			continue;
+		}
+		if (params.getMountedCellByInteractionId(cachedInteractionId)) continue;
+
+		params.descriptorsByInteractionId.delete(cachedInteractionId);
+	}
 }
 
 function resolveMountedSectionHeaderDescriptor(params: {

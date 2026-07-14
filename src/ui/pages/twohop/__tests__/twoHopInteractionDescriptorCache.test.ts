@@ -203,6 +203,32 @@ describe("twoHopInteractionDescriptorCache", () => {
 		);
 	});
 
+	it("prunes cached descriptors for items that are no longer mounted", () => {
+		const firstItem = createItem("alpha.md");
+		const secondItem = createItem("beta.md");
+		let getMountedCellByInteractionId = createMountedCellResolver(
+			createMountedRows({ item: firstItem }),
+		);
+		const resolveDescriptor = vi.fn(createDescriptor);
+		const provider = createTwoHopInteractionDescriptorCache({
+			getMountedCellByInteractionId: (interactionId) =>
+				getMountedCellByInteractionId(interactionId),
+			resolveDescriptor,
+		});
+
+		provider.resolveInteractionDescriptor("item:file:alpha.md");
+		getMountedCellByInteractionId = createMountedCellResolver(
+			createMountedRows({ item: secondItem }),
+		);
+		provider.resolveInteractionDescriptor("item:file:beta.md");
+		getMountedCellByInteractionId = createMountedCellResolver(
+			createMountedRows({ item: firstItem }),
+		);
+		provider.resolveInteractionDescriptor("item:file:alpha.md");
+
+		expect(resolveDescriptor).toHaveBeenCalledTimes(3);
+	});
+
 	it("provider reuses descriptors while item and render body revisions are unchanged", () => {
 		resetCCLDevMeasurements();
 		const item = createItem("alpha.md");

@@ -18,6 +18,7 @@
 		getItemInteractionDescriptor?: (
 			item: TwoHopVirtualListItem,
 		) => ItemInteractionDescriptor | null;
+		interactionDescriptorRevision?: unknown;
 		renderChildComponent?: boolean;
 	}
 
@@ -25,6 +26,7 @@
 		sections,
 		applicationStore,
 		getItemInteractionDescriptor = () => null,
+		interactionDescriptorRevision,
 		renderChildComponent = false,
 	}: Props = $props();
 </script>
@@ -40,6 +42,7 @@
 		initialVisibleCount={10_000}
 		loadMoreIncrement={10_000}
 		{getItemInteractionDescriptor}
+		{interactionDescriptorRevision}
 	>
 		{#snippet renderHeader({ sectionId })}
 			<div data-testid="twohop-header-cell">{sectionId}</div>

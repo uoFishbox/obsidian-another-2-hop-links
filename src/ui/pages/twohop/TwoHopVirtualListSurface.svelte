@@ -74,6 +74,12 @@
 			resolveDescriptor: (item) => props.getItemInteractionDescriptor(item),
 			getDescriptorRevision: () => props.interactionDescriptorRevision,
 		});
+	// Entries for removed interaction ids cannot evict themselves after an input update.
+	$effect(() => {
+		void props.sections;
+		void props.interactionDescriptorRevision;
+		interactionDescriptorResolverProvider.invalidate();
+	});
 	const isHeaderCell = (
 		cell: MountedFlatCell<TwoHopVirtualListItem, TwoHopVirtualListSection>,
 	): cell is MountedFlatHeaderCell<TwoHopVirtualListItem, TwoHopVirtualListSection> =>
