@@ -1,76 +1,37 @@
-import { getContext, untrack } from "svelte";
-import type { MountedFlatItemCell } from "ui/components/common/virtual-list/core/reconciliation/viewPlanMountedCells";
-import type {
-	TwoHopVirtualListItem,
-	TwoHopVirtualListSection,
-} from "./twoHopVirtualListModel";
-import type { TwoHopVirtualListPlanRuntime } from "./twoHopVirtualListPlanRuntime.svelte";
 import {
-	PREVIEW_ROW_ACTIVATION_CONTEXT_KEY,
-	type RowPreviewActivationRuntime,
-} from "features/preview/scheduling/rowPreviewActivationRuntime";
-import { resolveTwoHopSlotId } from "./twoHopSlotId";
-import { createTwoHopScalarScrollKernel } from "./twoHopScalarScrollKernel.svelte";
+	createTwoHopVirtualListMountedRuntime,
+	type TwoHopVirtualListMountedRuntime,
+} from "./twoHopVirtualListMountedRuntime.svelte";
+import type { TwoHopVirtualListPlanRuntime } from "./twoHopVirtualListPlanRuntime.svelte";
 
-type TwoHopMountedItemCell = MountedFlatItemCell<
-	TwoHopVirtualListItem,
-	TwoHopVirtualListSection
->;
-
-function getTwoHopActivationCandidateId(cell: TwoHopMountedItemCell): string {
-	return resolveTwoHopSlotId(cell);
-}
-
+/** @deprecated Use `twoHopVirtualListMountedRuntime.svelte`. */
 export function createTwoHopMountedSurfaceRuntime(params: {
 	readonly inputRuntime: TwoHopVirtualListPlanRuntime;
 	onStableVisibleRange(): void;
 }) {
-	const rowPreviewActivationRuntime = getContext<
-		RowPreviewActivationRuntime | undefined
-	>(PREVIEW_ROW_ACTIVATION_CONTEXT_KEY);
-	const kernel = createTwoHopScalarScrollKernel({
-		initialRowModel: params.inputRuntime.rowModel,
-		rowPreviewActivationRuntime,
-		onStableVisibleRange: params.onStableVisibleRange,
-	});
-	$effect(() => {
-		const nextRowModel = params.inputRuntime.rowModel;
-		untrack(() => {
-			if (kernel.getSnapshot()?.rowModel === nextRowModel) return;
-			kernel.recompute({ rowModel: nextRowModel });
-		});
-	});
-	$effect(() => () => kernel.dispose());
-
-	const contentHeight = $derived.by(() => {
-		const activeRowModel = params.inputRuntime.rowModel;
-		const snapshot = kernel.getSnapshot();
-		if (!snapshot) return activeRowModel.totalHeight;
-		if (snapshot.rowModel !== activeRowModel) {
-			return Math.max(snapshot.totalHeight, activeRowModel.totalHeight);
-		}
-		return snapshot.totalHeight;
-	});
-
+	const internalRuntime = createTwoHopVirtualListMountedRuntime(params);
 	return {
-		mountRuntime: kernel,
-		virtualList: kernel,
+		internalRuntime,
+		mountRuntime: internalRuntime.kernel,
+		virtualList: internalRuntime.kernel,
 		get contentHeight() {
-			return contentHeight;
+			return internalRuntime.contentHeight;
 		},
 		get mountedRowsForSurface() {
-			return kernel.mountedRows;
+			return internalRuntime.mountedRows;
 		},
 		get fixedRowSlotControllers() {
-			return kernel.fixedRowSlotPool.controllers;
+			return internalRuntime.rowSlotControllers;
 		},
-		getItemVisibilityState: kernel.getItemVisibilityState,
-		getItemActivationCandidateId: getTwoHopActivationCandidateId,
-		syncPreviewVisibleRange: kernel.syncPreviewVisibleRange,
-		cancelPreviewVisibleRangeSync: kernel.cancelPreviewVisibleRangeSync,
+		getItemVisibilityState: internalRuntime.getItemVisibilityState,
+		getItemActivationCandidateId: internalRuntime.getItemActivationCandidateId,
+		syncPreviewVisibleRange: internalRuntime.syncPreviewVisibleRange,
+		cancelPreviewVisibleRangeSync: internalRuntime.cancelPreviewVisibleRangeSync,
 	};
 }
 
 export type TwoHopMountedSurfaceRuntime = ReturnType<
 	typeof createTwoHopMountedSurfaceRuntime
 >;
+
+export type { TwoHopVirtualListMountedRuntime };

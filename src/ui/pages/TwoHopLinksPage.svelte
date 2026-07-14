@@ -22,7 +22,7 @@
 		createTwohopSearchAdapter,
 	} from "./twohop/twoHopSearchAdapter";
 	import { tick } from "svelte";
-	import { createTwoHopDataIdentityCache } from "./twohop/twoHopDataIdentityCache";
+	import { createTwoHopSectionDescriptorIdentityCache } from "./twohop/twoHopSectionDescriptorIdentityCache";
 
 	interface Props {
 		file: TFile;
@@ -117,7 +117,7 @@
 	const sourceFile = linkContext.sourceFile;
 	const fileToLinktext = linkContext.fileToLinktext;
 	const onTagClick = linkContext.onTagClick;
-	const dataIdentityCache = createTwoHopDataIdentityCache();
+	const dataIdentityCache = createTwoHopSectionDescriptorIdentityCache();
 	const twoHopVirtualListSections = $derived.by(() =>
 		dataIdentityCache.resolve({
 			displayData: filteredDisplayData,

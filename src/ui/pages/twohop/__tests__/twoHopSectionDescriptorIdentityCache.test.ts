@@ -4,7 +4,11 @@ import type { DisplayData } from "application/presenters/displayDataBuilder";
 import type { ApplicationStore } from "ui/stores/ApplicationStore.svelte";
 import { DEFAULT_SETTINGS } from "types/settings";
 import type { TaggedNote, TwoHopIndexedLink, TwoHopLinkBranch } from "types/domain";
-import { createTwoHopDataIdentityCache } from "../twoHopDataIdentityCache";
+import { createTwoHopSectionDescriptorIdentityCache } from "../twoHopSectionDescriptorIdentityCache";
+import {
+	getCCLDevMeasurementSnapshot,
+	resetCCLDevMeasurements,
+} from "infrastructure/debug/CCLDevMeasurements";
 
 const sourceFile = { path: "source.md" } as TFile;
 
@@ -70,9 +74,10 @@ const createHarness = () => {
 	};
 };
 
-describe("createTwoHopDataIdentityCache", () => {
+describe("createTwoHopSectionDescriptorIdentityCache", () => {
 	it("reuses immutable descriptor output and resolves items lazily", () => {
-		const cache = createTwoHopDataIdentityCache();
+		resetCCLDevMeasurements();
+		const cache = createTwoHopSectionDescriptorIdentityCache();
 		const { baseParams, getSortedTagGroupItems } = createHarness();
 		const alpha = {
 			tag: "alpha",
@@ -96,10 +101,20 @@ describe("createTwoHopDataIdentityCache", () => {
 		expect(firstItems).toHaveLength(1);
 		expect(first[0]?.getItems()).toBe(firstItems);
 		expect(getSortedTagGroupItems).toHaveBeenCalledTimes(1);
+		let counters = getCCLDevMeasurementSnapshot().counters;
+		expect(counters["twoHop.sectionDescriptorIdentityCache.miss"].count).toBe(1);
+		expect(counters["twoHop.sectionDescriptorIdentityCache.hit"].count).toBe(1);
+
+		cache.invalidate();
+		expect(cache.resolve(params)).not.toBe(first);
+		counters = getCCLDevMeasurementSnapshot().counters;
+		expect(counters["twoHop.sectionDescriptorIdentityCache.invalidate"].count).toBe(
+			1,
+		);
 	});
 
 	it("replaces only changed sections and scopes pagination keys", () => {
-		const cache = createTwoHopDataIdentityCache();
+		const cache = createTwoHopSectionDescriptorIdentityCache();
 		const { baseParams } = createHarness();
 		const alpha = {
 			tag: "alpha",
@@ -142,7 +157,7 @@ describe("createTwoHopDataIdentityCache", () => {
 	});
 
 	it("resolves tag getItem through the shared sorted item cache", () => {
-		const cache = createTwoHopDataIdentityCache();
+		const cache = createTwoHopSectionDescriptorIdentityCache();
 		const { baseParams, getSortedTagGroupItems } = createHarness();
 		const alpha = {
 			tag: "alpha",
@@ -163,7 +178,7 @@ describe("createTwoHopDataIdentityCache", () => {
 	});
 
 	it("materializes tag wrappers only for requested indexes", () => {
-		const cache = createTwoHopDataIdentityCache();
+		const cache = createTwoHopSectionDescriptorIdentityCache();
 		const { baseParams } = createHarness();
 		const alpha = {
 			tag: "alpha",
@@ -182,7 +197,7 @@ describe("createTwoHopDataIdentityCache", () => {
 	});
 
 	it("resolves branch getItem through the shared sorted item cache", () => {
-		const cache = createTwoHopDataIdentityCache();
+		const cache = createTwoHopSectionDescriptorIdentityCache();
 		const { baseParams, getSortedTwoHopItems } = createHarness();
 		const branch = createBranch("parent.md", [
 			createLink("child-1.md"),
@@ -200,7 +215,7 @@ describe("createTwoHopDataIdentityCache", () => {
 	});
 
 	it("materializes branch wrappers only for requested indexes", () => {
-		const cache = createTwoHopDataIdentityCache();
+		const cache = createTwoHopSectionDescriptorIdentityCache();
 		const { baseParams } = createHarness();
 		const branch = createBranch("parent.md", [
 			createLink("child-1.md"),
@@ -216,7 +231,7 @@ describe("createTwoHopDataIdentityCache", () => {
 	});
 
 	it("does not reset branch sorting for a render-only updateVersion change", () => {
-		const cache = createTwoHopDataIdentityCache();
+		const cache = createTwoHopSectionDescriptorIdentityCache();
 		const { baseParams, getSortedTwoHopItems } = createHarness();
 		const branch = createBranch("parent.md", [createLink("child.md")]);
 		const first = cache.resolve({
@@ -237,7 +252,7 @@ describe("createTwoHopDataIdentityCache", () => {
 	});
 
 	it("keeps descriptor identity for equivalent section values", () => {
-		const cache = createTwoHopDataIdentityCache();
+		const cache = createTwoHopSectionDescriptorIdentityCache();
 		const { baseParams } = createHarness();
 		const alpha = {
 			tag: "alpha",
@@ -265,7 +280,7 @@ describe("createTwoHopDataIdentityCache", () => {
 	});
 
 	it("drops removed section entries instead of reusing stale descriptors", () => {
-		const cache = createTwoHopDataIdentityCache();
+		const cache = createTwoHopSectionDescriptorIdentityCache();
 		const { baseParams } = createHarness();
 		const alpha = {
 			tag: "alpha",

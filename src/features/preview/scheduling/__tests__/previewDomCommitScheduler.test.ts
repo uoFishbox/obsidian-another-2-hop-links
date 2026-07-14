@@ -185,7 +185,7 @@ describe("preview DOM commit scheduler", () => {
 		]);
 	});
 
-	it("preserves the scrolling commit rate across refresh rates", async () => {
+	it("rate-limits scrolling commits independently of refresh rate", async () => {
 		const commitsAt60Hz = await countCommits({
 			intervalMs: 1000 / 60,
 			durationMs: 1000,
@@ -199,8 +199,9 @@ describe("preview DOM commit scheduler", () => {
 
 		expect(commitsAt60Hz).toBeGreaterThanOrEqual(59);
 		expect(commitsAt60Hz).toBeLessThanOrEqual(63);
-		expect(commitsAt120Hz).toBeGreaterThanOrEqual(88);
-		expect(commitsAt120Hz).toBeLessThanOrEqual(96);
+		expect(commitsAt120Hz).toBeGreaterThanOrEqual(59);
+		expect(commitsAt120Hz).toBeLessThanOrEqual(65);
+		expect(Math.abs(commitsAt60Hz - commitsAt120Hz)).toBeLessThanOrEqual(5);
 	});
 
 	it("rate-limits idle commits independently of refresh rate", async () => {

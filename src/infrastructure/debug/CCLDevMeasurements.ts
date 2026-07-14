@@ -9,18 +9,9 @@ export type CCLDevMeasurementName =
 	| "virtualGrid.cellShellRebound"
 	| "twoHop.rowWindow.apply"
 	| "twoHop.rowWindow.apply.changed"
-	| "twoHop.rowWindow.apply.changed.firstBuild"
-	| "twoHop.rowWindow.apply.changed.plan"
-	| "twoHop.rowWindow.apply.changed.rowRange"
-	| "twoHop.rowWindow.apply.changed.cellStoreRevision"
-	| "twoHop.rowWindow.apply.skipped"
 	| "twoHop.buildMountedRows"
-	| "twoHop.mountedBoundaryCrossing"
 	| "twoHop.reboundRowSlot"
 	| "twoHop.reboundCellSlot"
-	| "twoHop.retainedSlotStateWrite"
-	| "twoHop.scrollSynchronousSectionPreparation"
-	| "twoHop.scrollItemSortOrReconcile"
 	| "twoHop.scalarKernel.mountedRangeCommit"
 	| "twoHop.scalarKernel.rowShellCreated"
 	| "twoHop.scalarKernel.cellShellCreated"
@@ -30,6 +21,13 @@ export type CCLDevMeasurementName =
 	| "twoHop.itemBody.mount"
 	| "twoHop.interactionDescriptorCache.hit"
 	| "twoHop.interactionDescriptorCache.miss"
+	| "twoHop.interactionDescriptorCache.invalidate"
+	| "twoHop.compiledPlanCache.hit"
+	| "twoHop.compiledPlanCache.miss"
+	| "twoHop.compiledPlanCache.invalidate"
+	| "twoHop.sectionDescriptorIdentityCache.hit"
+	| "twoHop.sectionDescriptorIdentityCache.miss"
+	| "twoHop.sectionDescriptorIdentityCache.invalidate"
 	| "twoHop.rowModelCache.hit"
 	| "twoHop.rowModelCache.miss"
 	| "twoHop.rowModelCache.miss.firstResolve"
@@ -38,8 +36,6 @@ export type CCLDevMeasurementName =
 	| "twoHop.rowModelCache.miss.visibleCountsSemanticallySame"
 	| "twoHop.rowModelCache.miss.layout"
 	| "twoHop.rowModelCache.miss.layoutSemanticallySame"
-	| "twoHop.fixedSlotPool.syncFromBuild"
-	| "twoHop.TwoHopFixedCellSlot.update"
 	| "component.TwoHopVirtualItemCard.reevaluate"
 	| "component.ViewItemCard.reevaluate"
 	| "component.CardPreviewGate.reevaluate";
@@ -55,18 +51,9 @@ export const CCL_DEV_MEASUREMENT_NAMES: readonly CCLDevMeasurementName[] = [
 	"virtualGrid.cellShellRebound",
 	"twoHop.rowWindow.apply",
 	"twoHop.rowWindow.apply.changed",
-	"twoHop.rowWindow.apply.changed.firstBuild",
-	"twoHop.rowWindow.apply.changed.plan",
-	"twoHop.rowWindow.apply.changed.rowRange",
-	"twoHop.rowWindow.apply.changed.cellStoreRevision",
-	"twoHop.rowWindow.apply.skipped",
 	"twoHop.buildMountedRows",
-	"twoHop.mountedBoundaryCrossing",
 	"twoHop.reboundRowSlot",
 	"twoHop.reboundCellSlot",
-	"twoHop.retainedSlotStateWrite",
-	"twoHop.scrollSynchronousSectionPreparation",
-	"twoHop.scrollItemSortOrReconcile",
 	"twoHop.scalarKernel.mountedRangeCommit",
 	"twoHop.scalarKernel.rowShellCreated",
 	"twoHop.scalarKernel.cellShellCreated",
@@ -76,6 +63,13 @@ export const CCL_DEV_MEASUREMENT_NAMES: readonly CCLDevMeasurementName[] = [
 	"twoHop.itemBody.mount",
 	"twoHop.interactionDescriptorCache.hit",
 	"twoHop.interactionDescriptorCache.miss",
+	"twoHop.interactionDescriptorCache.invalidate",
+	"twoHop.compiledPlanCache.hit",
+	"twoHop.compiledPlanCache.miss",
+	"twoHop.compiledPlanCache.invalidate",
+	"twoHop.sectionDescriptorIdentityCache.hit",
+	"twoHop.sectionDescriptorIdentityCache.miss",
+	"twoHop.sectionDescriptorIdentityCache.invalidate",
 	"twoHop.rowModelCache.hit",
 	"twoHop.rowModelCache.miss",
 	"twoHop.rowModelCache.miss.firstResolve",
@@ -84,8 +78,6 @@ export const CCL_DEV_MEASUREMENT_NAMES: readonly CCLDevMeasurementName[] = [
 	"twoHop.rowModelCache.miss.visibleCountsSemanticallySame",
 	"twoHop.rowModelCache.miss.layout",
 	"twoHop.rowModelCache.miss.layoutSemanticallySame",
-	"twoHop.fixedSlotPool.syncFromBuild",
-	"twoHop.TwoHopFixedCellSlot.update",
 	"component.TwoHopVirtualItemCard.reevaluate",
 	"component.ViewItemCard.reevaluate",
 	"component.CardPreviewGate.reevaluate",

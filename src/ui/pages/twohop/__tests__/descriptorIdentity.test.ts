@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { createSparseStableVirtualItemAccessors } from "../twoHopDataIdentityCache/descriptorIdentity";
+import { createSparseStableVirtualItemAccessors } from "../twoHopSectionDescriptorIdentityCache/descriptorIdentity";
 
 describe("createSparseStableVirtualItemAccessors", () => {
 	it("creates a ViewItem only for the requested sorted index", () => {

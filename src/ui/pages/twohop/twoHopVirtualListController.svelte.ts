@@ -4,17 +4,18 @@ import type { MountedFlatCell } from "ui/components/common/virtual-list/core/rec
 import type { ProgrammaticScrollSnapshot } from "ui/components/common/virtual-list/dom/flushVirtualScrollMeasurement";
 import type { ViewPlanLayoutMetrics } from "ui/components/common/virtual-list/svelte/viewPlanLayout";
 import type { VirtualizedItemResolvedVisibilityState } from "ui/components/common/virtual-list/svelte/virtualizedItemVisibilityState.svelte";
+import type { VirtualNavigationTarget } from "ui/components/common/virtual-list/types";
 import type { TwoHopFixedRowSlotController } from "./twoHopFixedRowSlotPool.svelte";
 import {
-	createTwoHopMeasurementBridge,
-	createTwoHopMeasurementState,
-} from "./twoHopMeasurementBridge.svelte";
-import { createTwoHopMountedSurfaceRuntime } from "./twoHopMountedSurfaceRuntime.svelte";
-import type { TwoHopMountedCell, TwoHopMountedRowSlice } from "./twoHopMountedTypes";
-import {
-	createTwoHopVirtualListPlanRuntime,
+	createTwoHopVirtualListInputRuntime,
 	type TwoHopVirtualListSurfaceProps,
-} from "./twoHopVirtualListPlanRuntime.svelte";
+} from "./twoHopVirtualListInputRuntime.svelte";
+import {
+	createTwoHopMeasurementState,
+	createTwoHopVirtualListMeasurementRuntime,
+} from "./twoHopVirtualListMeasurementRuntime.svelte";
+import { createTwoHopVirtualListMountedRuntime } from "./twoHopVirtualListMountedRuntime.svelte";
+import type { TwoHopMountedCell, TwoHopMountedRowSlice } from "./twoHopMountedTypes";
 import type {
 	TwoHopVirtualListItem,
 	TwoHopVirtualListSection,
@@ -46,36 +47,32 @@ export interface TwoHopVirtualListController {
 		currentKey: string,
 		direction: ResultNavigationDirection,
 		currentPosition: { rowIndex: number; columnIndex: number },
-	): ReturnType<
-		ReturnType<typeof createTwoHopVirtualListPlanRuntime>["resolveNavigationTarget"]
-	>;
+	): VirtualNavigationTarget | null;
 	flushScrollMeasurement(snapshot: ProgrammaticScrollSnapshot): void;
 }
 
-/** Composes plan, measurement, and mounted-surface runtimes behind one facade. */
+/** Composes the one-way input -> plan -> measurement -> slot pipeline. */
 export function createTwoHopVirtualListController(
 	props: TwoHopVirtualListSurfaceProps,
 ): TwoHopVirtualListController {
 	const measurementState = createTwoHopMeasurementState();
-	const inputRuntime = createTwoHopVirtualListPlanRuntime({
+	const inputRuntime = createTwoHopVirtualListInputRuntime({
 		props,
 		measurementState,
 	});
-	const surfaceRuntime = createTwoHopMountedSurfaceRuntime({
+	const mountedRuntime = createTwoHopVirtualListMountedRuntime({
 		inputRuntime,
 		onStableVisibleRange: () => {
 			measurementState.measurement.hasStableVisibleRange = true;
 		},
 	});
-	const { measurementRuntime } = createTwoHopMeasurementBridge({
+	const { measurementRuntime } = createTwoHopVirtualListMeasurementRuntime({
 		inputRuntime,
-		surfaceRuntime,
+		mountedRuntime,
 		measurementState,
 	});
 
-	$effect(() => {
-		inputRuntime.inputState.syncVisibleCountsForInput();
-	});
+	$effect(() => inputRuntime.inputState.syncVisibleCountsForInput());
 	$effect(() => {
 		measurementRuntime.scheduleLayoutMeasurementForCardLayout(
 			inputRuntime.configuredCardLayout,
@@ -99,16 +96,16 @@ export function createTwoHopVirtualListController(
 			return measurementState.measurement.scrollContainerEl;
 		},
 		get contentHeight() {
-			return surfaceRuntime.contentHeight;
+			return mountedRuntime.contentHeight;
 		},
 		get layout() {
 			return measurementState.layout;
 		},
 		get mountedRows() {
-			return surfaceRuntime.mountedRowsForSurface;
+			return mountedRuntime.mountedRows;
 		},
 		get rowSlotControllers() {
-			return surfaceRuntime.fixedRowSlotControllers;
+			return mountedRuntime.rowSlotControllers;
 		},
 		getCellDataTestId: !IS_PROD
 			? (cell) =>
@@ -116,8 +113,8 @@ export function createTwoHopVirtualListController(
 						? `section-block-${cell.sectionId}`
 						: undefined
 			: undefined,
-		getItemVisibilityState: surfaceRuntime.getItemVisibilityState,
-		getItemActivationCandidateId: surfaceRuntime.getItemActivationCandidateId,
+		getItemVisibilityState: mountedRuntime.getItemVisibilityState,
+		getItemActivationCandidateId: mountedRuntime.getItemActivationCandidateId,
 		loadMore: inputRuntime.loadMore,
 		resolveNavigationTarget: inputRuntime.resolveNavigationTarget,
 		flushScrollMeasurement: measurementRuntime.flushVirtualScrollMeasurement,

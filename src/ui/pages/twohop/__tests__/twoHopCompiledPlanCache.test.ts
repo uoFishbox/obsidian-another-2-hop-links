@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { TwoHopVirtualSectionDescriptor } from "../twoHopVirtualListModel";
-import { createTwoHopRowModelCache } from "../twoHopRowModelCache";
+import { createTwoHopCompiledPlanCache } from "../twoHopCompiledPlanCache";
 import {
 	getCCLDevMeasurementSnapshot,
 	resetCCLDevMeasurements,
@@ -40,10 +40,10 @@ const descriptor: TwoHopVirtualSectionDescriptor = {
 	headerProps: {},
 };
 
-describe("createTwoHopRowModelCache in a DOM runtime", () => {
+describe("createTwoHopCompiledPlanCache in a DOM runtime", () => {
 	it("reuses semantically matching layout inputs without replacing the plan layout", () => {
 		resetCCLDevMeasurements();
-		const cache = createTwoHopRowModelCache({
+		const cache = createTwoHopCompiledPlanCache({
 			resolveInitialSectionVisibleCount: (section) => section.loadedCount,
 			clampVisibleCount: (section, count) => Math.min(section.loadedCount, count),
 		});
@@ -60,10 +60,20 @@ describe("createTwoHopRowModelCache in a DOM runtime", () => {
 		const counters = getCCLDevMeasurementSnapshot().counters;
 		expect(counters["twoHop.plan.compile"].count).toBe(1);
 		expect(counters["twoHop.rowModelCache.hit"].count).toBe(2);
+		expect(counters["twoHop.compiledPlanCache.miss"].count).toBe(1);
+		expect(counters["twoHop.compiledPlanCache.hit"].count).toBe(2);
+
+		cache.invalidate();
+		expect(cache.resolve(sections, visibleCounts, layout)).not.toBe(first);
+		expect(
+			getCCLDevMeasurementSnapshot().counters[
+				"twoHop.compiledPlanCache.invalidate"
+			].count,
+		).toBe(1);
 	});
 
 	it("reuses semantically matching pagination inputs", () => {
-		const cache = createTwoHopRowModelCache({
+		const cache = createTwoHopCompiledPlanCache({
 			resolveInitialSectionVisibleCount: (section) => section.loadedCount,
 			clampVisibleCount: (section, count) => Math.min(section.loadedCount, count),
 		});
@@ -75,7 +85,7 @@ describe("createTwoHopRowModelCache in a DOM runtime", () => {
 	});
 
 	it("misses when descriptor or pagination values change", () => {
-		const cache = createTwoHopRowModelCache({
+		const cache = createTwoHopCompiledPlanCache({
 			resolveInitialSectionVisibleCount: (section) => section.loadedCount,
 			clampVisibleCount: (section, count) => Math.min(section.loadedCount, count),
 		});
@@ -85,7 +95,7 @@ describe("createTwoHopRowModelCache in a DOM runtime", () => {
 
 		expect(cache.resolve([...sections], visibleCounts, layout)).not.toBe(first);
 
-		const cacheForVisibleCounts = createTwoHopRowModelCache({
+		const cacheForVisibleCounts = createTwoHopCompiledPlanCache({
 			resolveInitialSectionVisibleCount: (section) => section.loadedCount,
 			clampVisibleCount: (section, count) => Math.min(section.loadedCount, count),
 		});
@@ -101,7 +111,7 @@ describe("createTwoHopRowModelCache in a DOM runtime", () => {
 	});
 
 	it("misses when layout values change", () => {
-		const cache = createTwoHopRowModelCache({
+		const cache = createTwoHopCompiledPlanCache({
 			resolveInitialSectionVisibleCount: (section) => section.loadedCount,
 			clampVisibleCount: (section, count) => Math.min(section.loadedCount, count),
 		});

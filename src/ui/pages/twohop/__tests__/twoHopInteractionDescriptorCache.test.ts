@@ -11,7 +11,7 @@ import type {
 } from "ui/components/common/virtual-list/core/reconciliation/viewPlanMountedCells";
 import type { MountedFlatRowSlice } from "ui/components/common/virtual-list/core/reconciliation/viewPlanRenderRows";
 import type { TwoHopIndexedLink } from "types/domain";
-import { createTwoHopInteractionResolverProvider } from "../twoHopInteractionResolverCache";
+import { createTwoHopInteractionDescriptorCache } from "../twoHopInteractionDescriptorCache";
 import type {
 	TwoHopVirtualListItem,
 	TwoHopVirtualListSection,
@@ -139,7 +139,7 @@ function createDescriptor(item: TwoHopVirtualListItem): ItemInteractionDescripto
 	};
 }
 
-describe("twoHopInteractionResolverCache", () => {
+describe("twoHopInteractionDescriptorCache", () => {
 	it("provider resolves against the current mounted rows", () => {
 		let mountedRows: readonly TwoHopMountedRow[] = [];
 		const firstItem = createItem("alpha.md");
@@ -151,7 +151,7 @@ describe("twoHopInteractionResolverCache", () => {
 			if (item === secondItem) return secondDescriptor;
 			return null;
 		});
-		const provider = createTwoHopInteractionResolverProvider({
+		const provider = createTwoHopInteractionDescriptorCache({
 			getMountedRows: () => mountedRows,
 			resolveDescriptor,
 		});
@@ -175,7 +175,7 @@ describe("twoHopInteractionResolverCache", () => {
 		const item = createItem("alpha.md");
 		const descriptor = createDescriptor(item);
 		const resolveDescriptor = vi.fn(() => descriptor);
-		const provider = createTwoHopInteractionResolverProvider({
+		const provider = createTwoHopInteractionDescriptorCache({
 			getMountedRows: () =>
 				createMountedRows({
 					item,
@@ -194,6 +194,17 @@ describe("twoHopInteractionResolverCache", () => {
 		const counters = getCCLDevMeasurementSnapshot().counters;
 		expect(counters["twoHop.interactionDescriptorCache.miss"].count).toBe(1);
 		expect(counters["twoHop.interactionDescriptorCache.hit"].count).toBe(1);
+
+		provider.invalidate();
+		expect(provider.resolveInteractionDescriptor("item:file:alpha.md")).toBe(
+			descriptor,
+		);
+		expect(resolveDescriptor).toHaveBeenCalledTimes(2);
+		expect(
+			getCCLDevMeasurementSnapshot().counters[
+				"twoHop.interactionDescriptorCache.invalidate"
+			].count,
+		).toBe(1);
 	});
 
 	it("provider reruns descriptor resolution when item render body revision changes", () => {
@@ -205,7 +216,7 @@ describe("twoHopInteractionResolverCache", () => {
 			.fn()
 			.mockReturnValueOnce(firstDescriptor)
 			.mockReturnValueOnce(secondDescriptor);
-		const provider = createTwoHopInteractionResolverProvider({
+		const provider = createTwoHopInteractionDescriptorCache({
 			getMountedRows: () =>
 				createMountedRows({
 					item,
@@ -236,7 +247,7 @@ describe("twoHopInteractionResolverCache", () => {
 			.fn()
 			.mockReturnValueOnce(firstDescriptor)
 			.mockReturnValueOnce(secondDescriptor);
-		const provider = createTwoHopInteractionResolverProvider({
+		const provider = createTwoHopInteractionDescriptorCache({
 			getMountedRows: () =>
 				createMountedRows({
 					item,
@@ -261,7 +272,7 @@ describe("twoHopInteractionResolverCache", () => {
 	it("provider resolves mounted section header descriptors without item resolution", () => {
 		const descriptor = createHeaderDescriptor("h0");
 		const resolveDescriptor = vi.fn();
-		const provider = createTwoHopInteractionResolverProvider({
+		const provider = createTwoHopInteractionDescriptorCache({
 			getMountedRows: () =>
 				createMountedHeaderRows({
 					interactionId: "h0",
@@ -278,7 +289,7 @@ describe("twoHopInteractionResolverCache", () => {
 		let mountedRows: readonly TwoHopMountedRow[] = [];
 		const firstDescriptor = createHeaderDescriptor("h0");
 		const secondDescriptor = createHeaderDescriptor("h1");
-		const provider = createTwoHopInteractionResolverProvider({
+		const provider = createTwoHopInteractionDescriptorCache({
 			getMountedRows: () => mountedRows,
 			resolveDescriptor: vi.fn(() => null),
 		});

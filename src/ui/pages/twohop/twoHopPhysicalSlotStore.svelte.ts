@@ -111,7 +111,6 @@ export interface TwoHopPhysicalSlotPreparation {
 }
 
 export interface TwoHopPhysicalSlotStore {
-	readonly controllers: readonly TwoHopFixedRowSlotController[];
 	readonly fixedRowSlotPool: TwoHopFixedRowSlotPool;
 	readonly mountedRows: readonly TwoHopMountedRowSlice[];
 	prepareCapacity(
@@ -623,9 +622,6 @@ export function createTwoHopPhysicalSlotStore(params: {
 	}
 
 	return {
-		get controllers() {
-			return fixedRowSlotPool.controllers;
-		},
 		fixedRowSlotPool,
 		get mountedRows() {
 			return mountedRows;

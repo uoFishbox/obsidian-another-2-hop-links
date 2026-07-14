@@ -18,7 +18,7 @@
 	} from "./twoHopVirtualListModel";
 	import { createTwoHopVirtualListController } from "./twoHopVirtualListController.svelte";
 	import type { ItemInteractionDescriptor } from "ui/interactions/interactionTypes";
-	import { createTwoHopInteractionResolverProvider } from "./twoHopInteractionResolverCache";
+	import { createTwoHopInteractionDescriptorCache } from "./twoHopInteractionDescriptorCache";
 	import TwoHopFixedRowSlotsSurface from "./TwoHopFixedRowSlotsSurface.svelte";
 	import TwoHopItemCellRender from "./TwoHopItemCellRender.svelte";
 	import { createSurfaceVirtualCellRegistry } from "ui/components/common/virtual-list/svelte/VirtualCellRegistry";
@@ -69,7 +69,7 @@
 	providePreviewActivationContexts();
 	const list = createTwoHopVirtualListController(props);
 	const interactionDescriptorResolverProvider =
-		createTwoHopInteractionResolverProvider({
+		createTwoHopInteractionDescriptorCache({
 			getMountedRows: () => list.mountedRows,
 			resolveDescriptor: (item) => props.getItemInteractionDescriptor(item),
 			getDescriptorRevision: () => props.interactionDescriptorRevision,

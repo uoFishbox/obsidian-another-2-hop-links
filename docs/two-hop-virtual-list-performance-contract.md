@@ -68,3 +68,15 @@ The relevant development counters are:
 The checked-in baseline is the contract encoded by the tests rather than a
 machine-specific duration. Before the staged refactor, `bun run check`, the 65
 two-hop unit/DOM tests, and the 14 two-hop perf tests passed on 2026-07-14.
+
+## Common-layer extraction decision
+
+Phase 8 remains deferred. The generic flat/grid runtimes share the
+allocation-free `createContiguousRowSlotAllocator`, but no other production
+surface currently consumes the two-hop combination of a retained physical
+row/cell store, atomic item-family binding, and descriptor-rich typed-array
+plan. Extracting `RetainedPhysicalSlotStore` or `AtomicCellBinding` now would
+therefore create a one-consumer abstraction without proving compatible
+invalidation and identity requirements. The two-hop plan/range resolver and
+slot store remain feature-local until a second consumer needs the same full
+contract.
