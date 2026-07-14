@@ -8,10 +8,12 @@ import { compileTwoHopViewPlan, createTwoHopViewPlanRowModel } from "../twoHopVi
 import { createTwoHopScalarScrollKernel } from "../twoHopScalarScrollKernel.svelte";
 import { createTwoHopFixedRowSlotPool } from "../twoHopFixedRowSlotPool.svelte";
 import { createSurfaceVirtualCellRegistry } from "ui/components/common/virtual-list/svelte/VirtualCellRegistry";
+import { VIRTUAL_CELL_WILL_REBIND_EVENT } from "ui/interactions/virtualCellRebind";
 import type {
 	TwoHopVirtualListItem,
 	TwoHopVirtualListSection,
 } from "../twoHopVirtualListModel";
+import type { TwoHopCellBinding } from "../twoHopCellBinding";
 
 const items = Array.from({ length: 1_000 }, (_, index) => ({
 	kind: "new-link" as const,
@@ -262,6 +264,41 @@ describe("TwoHop scalar scroll kernel", () => {
 		expect(registry.findByKey(nextKey)).toBeNull();
 	});
 
+	it("publishes one complete binding after will-rebind", () => {
+		const kernel = createTwoHopScalarScrollKernel({
+			initialRowModel: rowModel,
+			onStableVisibleRange() {},
+		});
+		const element = document.createElement("div");
+		const registry = createSurfaceVirtualCellRegistry();
+		applyRange(kernel, 0);
+		const controller = kernel.fixedRowSlotPool.controllers[0]?.cells[0];
+		expect(controller?.binding).not.toBeNull();
+		if (!controller?.binding) return;
+		controller.attachElement(element, registry);
+		const previousBinding = controller.binding;
+		let observedDuringWillRebind: TwoHopCellBinding | null = controller.binding;
+		element.addEventListener(VIRTUAL_CELL_WILL_REBIND_EVENT, () => {
+			observedDuringWillRebind = controller.binding;
+		});
+
+		resetCCLDevMeasurements();
+		applyRange(kernel, 1);
+
+		const nextBinding = controller.binding;
+		expect(observedDuringWillRebind).toBe(previousBinding);
+		expect(nextBinding).not.toBe(previousBinding);
+		expect(nextBinding?.logicalKey).toBe(nextBinding?.mountedCell.key);
+		expect(nextBinding?.rowIndex).toBe(nextBinding?.mountedCell.rowIndex);
+		expect(nextBinding?.columnIndex).toBe(nextBinding?.mountedCell.columnIndex);
+		expect(nextBinding?.renderKind).toBe(nextBinding?.mountedCell.renderBodyKind);
+		expect(
+			getCCLDevMeasurementSnapshot().counters["twoHop.binding.commit"].count,
+		).toBe(2);
+
+		kernel.dispose();
+	});
+
 	it("reuses row/cell shells and writes only the entering slot", () => {
 		const kernel = createTwoHopScalarScrollKernel({
 			initialRowModel: rowModel,
@@ -290,6 +327,8 @@ describe("TwoHop scalar scroll kernel", () => {
 		expect(counters["twoHop.scalarKernel.cellShellCreated"].count).toBe(0);
 		expect(counters["twoHop.reboundRowSlot"].count).toBe(1);
 		expect(counters["twoHop.reboundCellSlot"].count).toBe(2);
+		expect(counters["twoHop.binding.commit"].count).toBe(2);
+		expect(counters["twoHop.physicalPool.resize"].count).toBe(0);
 		expect(counters["twoHop.buildMountedRows"].count).toBe(0);
 	});
 
@@ -307,6 +346,7 @@ describe("TwoHop scalar scroll kernel", () => {
 		expect(counters["twoHop.scalarKernel.mountedRangeCommit"].count).toBe(0);
 		expect(counters["twoHop.reboundRowSlot"].count).toBe(0);
 		expect(counters["twoHop.reboundCellSlot"].count).toBe(0);
+		expect(counters["twoHop.binding.commit"].count).toBe(0);
 	});
 
 	it("crosses 300 boundaries without allocating new row or cell shells", () => {
@@ -335,6 +375,7 @@ describe("TwoHop scalar scroll kernel", () => {
 		expect(counters["twoHop.scalarKernel.cellShellCreated"].count).toBe(0);
 		expect(counters["twoHop.reboundRowSlot"].count).toBe(300);
 		expect(counters["twoHop.reboundCellSlot"].count).toBe(600);
+		expect(counters["twoHop.binding.commit"].count).toBe(600);
 		expect(counters["twoHop.buildMountedRows"].count).toBe(0);
 	});
 
@@ -355,6 +396,7 @@ describe("TwoHop scalar scroll kernel", () => {
 		const counters = getCCLDevMeasurementSnapshot().counters;
 		expect(counters["twoHop.reboundRowSlot"].count).toBe(4);
 		expect(counters["twoHop.reboundCellSlot"].count).toBe(8);
+		expect(counters["twoHop.physicalPool.resize"].count).toBe(1);
 	});
 
 	it("compacts physical row slots after sustained under-utilization", () => {

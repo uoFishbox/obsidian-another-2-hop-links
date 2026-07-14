@@ -1,6 +1,10 @@
 import { cleanup, render } from "@testing-library/svelte";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { tick } from "svelte";
+import {
+	getCCLDevMeasurementSnapshot,
+	resetCCLDevMeasurements,
+} from "infrastructure/debug/CCLDevMeasurements";
 import type { SectionRenderDescriptor } from "ui/components/sections/types";
 import type { VirtualizedItemVisibilityState } from "ui/components/common/virtual-list/types";
 import { compileTwoHopViewPlan, createTwoHopViewPlanRowModel } from "../twoHopViewPlan";
@@ -243,6 +247,7 @@ describe("TwoHopItemCellRender", () => {
 		const initialIndex = initialChild?.dataset.index;
 		const initialInstanceId = initialChild?.dataset.instanceId;
 		expect(initialChild).toBeTruthy();
+		resetCCLDevMeasurements();
 
 		applyRange(kernel, 4);
 		await tick();
@@ -255,6 +260,9 @@ describe("TwoHopItemCellRender", () => {
 		expect(reboundChild).toBe(initialChild);
 		expect(reboundChild?.dataset.instanceId).toBe(initialInstanceId);
 		expect(reboundChild?.dataset.index).not.toBe(initialIndex);
+		expect(
+			getCCLDevMeasurementSnapshot().counters["twoHop.itemBody.mount"].count,
+		).toBe(0);
 
 		kernel.dispose();
 	});
@@ -314,7 +322,7 @@ describe("TwoHopItemCellRender", () => {
 		kernel.dispose();
 	});
 
-	it("keeps an item snapshot valid while its physical slot changes kind", async () => {
+	it("does not render a stale item while a standalone slot changes kind", async () => {
 		const kernel = createTwoHopScalarScrollKernel({
 			initialRowModel: rowModelWithLoadMore,
 			onStableVisibleRange() {},
@@ -352,11 +360,11 @@ describe("TwoHopItemCellRender", () => {
 		await tick();
 
 		expect(controller.renderBodyKind).toBe("load-more");
-		const retainedChild = container.querySelector<HTMLElement>(
+		const staleChild = container.querySelector<HTMLElement>(
 			"[data-testid='twohop-child-item-cell']",
 		);
-		expect(retainedChild).toBe(initialChild);
-		expect(retainedChild?.dataset.index).toBe(initialIndex);
+		expect(staleChild).toBeNull();
+		expect(initialChild?.dataset.index).toBe(initialIndex);
 
 		kernel.dispose();
 	});

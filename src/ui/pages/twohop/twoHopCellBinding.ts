@@ -9,6 +9,7 @@ import type {
 	CardPresentationState,
 	CardSectionVariant,
 } from "ui/components/common/cardPresentation";
+import type { RenderBodyKey } from "ui/components/common/virtual-list/renderRevision";
 import { isAttachment } from "core/rules/fileRules";
 
 export type TwoHopCardSectionVariant = CardSectionVariant;
@@ -33,6 +34,7 @@ export interface TwoHopCellBinding {
 	readonly logicalKey: LogicalCellKey;
 	readonly rowIndex: number;
 	readonly columnIndex: number;
+	readonly renderBodyKey: RenderBodyKey | undefined;
 	readonly renderKind: TwoHopMountedCell["renderBodyKind"];
 	readonly reuseFamily: TwoHopItemReuseFamily | null;
 	readonly presentation: TwoHopCardPresentationState | null;
@@ -151,17 +153,22 @@ export function createTwoHopCellBinding(
 	cell: TwoHopMountedCell,
 	epoch: number,
 ): TwoHopCellBinding {
-	const itemState = isItemCell(cell)
-		? resolveItemState(cell)
+	const mountedCell = {
+		...cell,
+		cell: { ...cell.cell },
+	} as TwoHopMountedCell;
+	const itemState = isItemCell(mountedCell)
+		? resolveItemState(mountedCell)
 		: { reuseFamily: null, presentation: null, interactionId: null };
 
 	return {
 		epoch,
-		logicalKey: cell.key,
-		rowIndex: cell.rowIndex,
-		columnIndex: cell.columnIndex,
-		renderKind: cell.renderBodyKind,
+		logicalKey: mountedCell.key,
+		rowIndex: mountedCell.rowIndex,
+		columnIndex: mountedCell.columnIndex,
+		renderBodyKey: mountedCell.renderBodyKey,
+		renderKind: mountedCell.renderBodyKind,
 		...itemState,
-		mountedCell: cell,
+		mountedCell,
 	};
 }

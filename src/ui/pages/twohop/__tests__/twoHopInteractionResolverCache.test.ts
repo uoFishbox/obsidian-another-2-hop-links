@@ -16,6 +16,10 @@ import type {
 	TwoHopVirtualListItem,
 	TwoHopVirtualListSection,
 } from "../twoHopVirtualListModel";
+import {
+	getCCLDevMeasurementSnapshot,
+	resetCCLDevMeasurements,
+} from "infrastructure/debug/CCLDevMeasurements";
 
 type TwoHopMountedItemCell = MountedFlatItemCell<
 	TwoHopVirtualListItem,
@@ -167,6 +171,7 @@ describe("twoHopInteractionResolverCache", () => {
 	});
 
 	it("provider reuses descriptors while item and render body revisions are unchanged", () => {
+		resetCCLDevMeasurements();
 		const item = createItem("alpha.md");
 		const descriptor = createDescriptor(item);
 		const resolveDescriptor = vi.fn(() => descriptor);
@@ -186,6 +191,9 @@ describe("twoHopInteractionResolverCache", () => {
 			descriptor,
 		);
 		expect(resolveDescriptor).toHaveBeenCalledTimes(1);
+		const counters = getCCLDevMeasurementSnapshot().counters;
+		expect(counters["twoHop.interactionDescriptorCache.miss"].count).toBe(1);
+		expect(counters["twoHop.interactionDescriptorCache.hit"].count).toBe(1);
 	});
 
 	it("provider reruns descriptor resolution when item render body revision changes", () => {

@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 import type { TwoHopVirtualSectionDescriptor } from "../twoHopVirtualListModel";
 import { createTwoHopRowModelCache } from "../twoHopRowModelCache";
+import {
+	getCCLDevMeasurementSnapshot,
+	resetCCLDevMeasurements,
+} from "infrastructure/debug/CCLDevMeasurements";
 
 const layout = {
 	containerWidth: 320,
@@ -38,6 +42,7 @@ const descriptor: TwoHopVirtualSectionDescriptor = {
 
 describe("createTwoHopRowModelCache in a DOM runtime", () => {
 	it("reuses semantically matching layout inputs without replacing the plan layout", () => {
+		resetCCLDevMeasurements();
 		const cache = createTwoHopRowModelCache({
 			resolveInitialSectionVisibleCount: (section) => section.loadedCount,
 			clampVisibleCount: (section, count) => Math.min(section.loadedCount, count),
@@ -52,6 +57,9 @@ describe("createTwoHopRowModelCache in a DOM runtime", () => {
 		expect(first.plan.layout).toBe(layout);
 		expect(first.plan.layout).not.toBe(equivalentLayout);
 		expect(first.revision).toEqual({ kind: "opaque", token: first.plan });
+		const counters = getCCLDevMeasurementSnapshot().counters;
+		expect(counters["twoHop.plan.compile"].count).toBe(1);
+		expect(counters["twoHop.rowModelCache.hit"].count).toBe(2);
 	});
 
 	it("reuses semantically matching pagination inputs", () => {

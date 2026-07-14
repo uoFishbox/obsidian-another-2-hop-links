@@ -80,7 +80,9 @@ export function createTwoHopRowModelCache(params: {
 						recordCCLDevMeasurement("twoHop.rowModelCache.miss.sections");
 					}
 					if (sectionVisibleCounts !== previousVisibleCounts) {
-						recordCCLDevMeasurement("twoHop.rowModelCache.miss.visibleCounts");
+						recordCCLDevMeasurement(
+							"twoHop.rowModelCache.miss.visibleCounts",
+						);
 						if (
 							previousVisibleCounts &&
 							hasSameVisibleCounts(
@@ -103,6 +105,9 @@ export function createTwoHopRowModelCache(params: {
 				}
 			}
 
+			if (process.env.NODE_ENV !== "production") {
+				recordCCLDevMeasurement("twoHop.plan.compile");
+			}
 			const rowModel = createTwoHopViewPlanRowModel(
 				compileTwoHopViewPlan({
 					sections,

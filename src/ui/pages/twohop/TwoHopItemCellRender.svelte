@@ -8,6 +8,7 @@
 		TwoHopVirtualListSection,
 	} from "./twoHopVirtualListModel";
 	import type { TwoHopCardPresentationState } from "./twoHopCellBinding";
+	import { recordCCLDevMeasurement } from "infrastructure/debug/CCLDevMeasurements";
 
 	type TwoHopMountedItemCell = MountedFlatItemCell<
 		TwoHopVirtualListItem,
@@ -16,7 +17,6 @@
 
 	interface Props {
 		cellController: TwoHopFixedCellSlotController;
-		initialCell: TwoHopMountedItemCell;
 		getItemVisibilityState: (
 			cell: TwoHopMountedItemCell,
 		) => VirtualizedItemVisibilityState;
@@ -34,22 +34,17 @@
 
 	let {
 		cellController,
-		initialCell,
 		getItemVisibilityState,
 		getItemActivationCandidateId,
 		renderItem,
 	}: Props = $props();
+	if (process.env.NODE_ENV !== "production") {
+		recordCCLDevMeasurement("twoHop.itemBody.mount");
+	}
 
 	const isItemCell = (
 		cell: TwoHopFixedCellSlotController["mountedCell"],
 	): cell is TwoHopMountedItemCell => cell?.cell.kind === "item";
-
-	// Keep an immutable fallback because the scalar kernel mutates the physical
-	// cell shell before the parent keyed block can unmount this item body.
-	const fallbackItemCell: TwoHopMountedItemCell = {
-		...initialCell,
-		cell: { ...initialCell.cell },
-	};
 
 	// Recompute this object once for each physical-slot reassignment. Consumers
 	// then read ordinary reactive snapshot fields instead of traversing the slot
@@ -57,7 +52,8 @@
 	const snapshot = $derived.by(() => {
 		const binding = cellController.binding;
 		const mountedCell = binding?.mountedCell;
-		const itemCell = isItemCell(mountedCell) ? mountedCell : fallbackItemCell;
+		if (!isItemCell(mountedCell)) return null;
+		const itemCell = mountedCell;
 		const presentation = binding?.presentation;
 		return {
 			item: itemCell.cell.item,
@@ -74,10 +70,12 @@
 	});
 </script>
 
-{@render renderItem(
-	snapshot.item,
-	snapshot.rowIndex,
-	snapshot.visibilityState,
-	snapshot.activationCandidateId,
-	snapshot.presentation,
-)}
+{#if snapshot}
+	{@render renderItem(
+		snapshot.item,
+		snapshot.rowIndex,
+		snapshot.visibilityState,
+		snapshot.activationCandidateId,
+		snapshot.presentation,
+	)}
+{/if}

@@ -16,7 +16,7 @@
 		TwoHopVirtualListSection,
 		TwoHopVirtualListItem,
 	} from "./twoHopVirtualListModel";
-	import { useTwoHopViewPlanVirtualList } from "./useTwoHopVirtualListSurface.svelte";
+	import { createTwoHopVirtualListController } from "./twoHopVirtualListController.svelte";
 	import type { ItemInteractionDescriptor } from "ui/interactions/interactionTypes";
 	import { createTwoHopInteractionResolverProvider } from "./twoHopInteractionResolverCache";
 	import TwoHopFixedRowSlotsSurface from "./TwoHopFixedRowSlotsSurface.svelte";
@@ -67,7 +67,7 @@
 	const cellRegistry = createSurfaceVirtualCellRegistry();
 	let contentEl = $state<HTMLDivElement | null>(null);
 	providePreviewActivationContexts();
-	const list = useTwoHopViewPlanVirtualList(props);
+	const list = createTwoHopVirtualListController(props);
 	const interactionDescriptorResolverProvider =
 		createTwoHopInteractionResolverProvider({
 			getMountedRows: () => list.mountedRows,
@@ -96,7 +96,7 @@
 	bind:contentEl
 	observerRoot={list.observerRoot}
 	resolveNavigationTarget={list.resolveNavigationTarget}
-	flushVirtualScrollMeasurement={list.flushVirtualScrollMeasurement}
+	flushVirtualScrollMeasurement={list.flushScrollMeasurement}
 	{cellRegistry}
 >
 	{#key fixedSurfaceLayoutKey}
@@ -104,7 +104,7 @@
 			contentClassName="view-plan-virtual-list-content view-plan-flow-content"
 			rowClassName="view-plan-flow-row"
 			contentHeight={list.contentHeight}
-			rowSlotControllers={list.fixedRowSlotControllers}
+			rowSlotControllers={list.rowSlotControllers}
 			cellWidth={list.layout.cellWidth}
 			rowHeight={list.layout.rowHeight}
 			columns={list.layout.columns}
@@ -126,7 +126,6 @@
 				{:else if isItemCell(renderedCell)}
 					<TwoHopItemCellRender
 						{cellController}
-						initialCell={renderedCell}
 						getItemVisibilityState={list.getItemVisibilityState}
 						getItemActivationCandidateId={list.getItemActivationCandidateId}
 						renderItem={props.renderItem}

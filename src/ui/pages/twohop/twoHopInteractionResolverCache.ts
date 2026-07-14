@@ -14,6 +14,7 @@ import type {
 	TwoHopVirtualListItem,
 	TwoHopVirtualListSection,
 } from "./twoHopVirtualListModel";
+import { recordCCLDevMeasurement } from "infrastructure/debug/CCLDevMeasurements";
 
 type TwoHopMountedItemCell = MountedFlatItemCell<
 	TwoHopVirtualListItem,
@@ -103,9 +104,15 @@ export function createTwoHopInteractionResolverProvider({
 				Object.is(cached.resolveDescriptorRevision, resolveDescriptor) &&
 				Object.is(cached.descriptorRevision, descriptorRevision)
 			) {
+				if (process.env.NODE_ENV !== "production") {
+					recordCCLDevMeasurement("twoHop.interactionDescriptorCache.hit");
+				}
 				return cached.descriptor;
 			}
 
+			if (process.env.NODE_ENV !== "production") {
+				recordCCLDevMeasurement("twoHop.interactionDescriptorCache.miss");
+			}
 			const descriptor = resolveDescriptor(item);
 			if (!descriptor) {
 				descriptorsByInteractionId.delete(interactionId);
@@ -152,9 +159,15 @@ function resolveMountedSectionHeaderDescriptor(params: {
 		cached.renderBodyCellKey === headerCell.renderBodyCellKey &&
 		Object.is(cached.renderBodyRevision, headerCell.renderBodyRevision)
 	) {
+		if (process.env.NODE_ENV !== "production") {
+			recordCCLDevMeasurement("twoHop.interactionDescriptorCache.hit");
+		}
 		return cached.descriptor;
 	}
 
+	if (process.env.NODE_ENV !== "production") {
+		recordCCLDevMeasurement("twoHop.interactionDescriptorCache.miss");
+	}
 	params.descriptorsByInteractionId.set(params.interactionId, {
 		kind: "sectionHeader",
 		headerPropsRevision: headerCell.headerProps,

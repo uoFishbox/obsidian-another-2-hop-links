@@ -33,7 +33,6 @@
 
 <TwoHopItemCellRender
 	{cellController}
-	{initialCell}
 	{getItemVisibilityState}
 	{getItemActivationCandidateId}
 >

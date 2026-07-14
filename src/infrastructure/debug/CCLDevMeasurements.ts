@@ -24,6 +24,12 @@ export type CCLDevMeasurementName =
 	| "twoHop.scalarKernel.mountedRangeCommit"
 	| "twoHop.scalarKernel.rowShellCreated"
 	| "twoHop.scalarKernel.cellShellCreated"
+	| "twoHop.plan.compile"
+	| "twoHop.physicalPool.resize"
+	| "twoHop.binding.commit"
+	| "twoHop.itemBody.mount"
+	| "twoHop.interactionDescriptorCache.hit"
+	| "twoHop.interactionDescriptorCache.miss"
 	| "twoHop.rowModelCache.hit"
 	| "twoHop.rowModelCache.miss"
 	| "twoHop.rowModelCache.miss.firstResolve"
@@ -64,6 +70,12 @@ export const CCL_DEV_MEASUREMENT_NAMES: readonly CCLDevMeasurementName[] = [
 	"twoHop.scalarKernel.mountedRangeCommit",
 	"twoHop.scalarKernel.rowShellCreated",
 	"twoHop.scalarKernel.cellShellCreated",
+	"twoHop.plan.compile",
+	"twoHop.physicalPool.resize",
+	"twoHop.binding.commit",
+	"twoHop.itemBody.mount",
+	"twoHop.interactionDescriptorCache.hit",
+	"twoHop.interactionDescriptorCache.miss",
 	"twoHop.rowModelCache.hit",
 	"twoHop.rowModelCache.miss",
 	"twoHop.rowModelCache.miss.firstResolve",

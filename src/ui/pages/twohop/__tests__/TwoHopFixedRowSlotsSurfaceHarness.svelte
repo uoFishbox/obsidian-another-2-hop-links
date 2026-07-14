@@ -43,7 +43,6 @@
 		{#if isItemCell(mountedCell)}
 			<TwoHopItemCellRender
 				{cellController}
-				initialCell={mountedCell}
 				{getItemVisibilityState}
 				{getItemActivationCandidateId}
 			>
