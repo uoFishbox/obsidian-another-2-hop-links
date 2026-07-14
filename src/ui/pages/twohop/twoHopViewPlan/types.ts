@@ -34,20 +34,10 @@ export interface TwoHopSectionPlan {
 	readonly cellCount: number;
 	readonly visibleCount: number;
 	readonly showLoadMore: boolean;
-	readonly itemSource: PreparedTwoHopSection;
 	readonly mountedLayout: SectionLayout<
 		TwoHopVirtualListItem,
 		TwoHopVirtualListSection
 	>;
-}
-
-export interface PreparedTwoHopSection {
-	readonly id: string;
-	readonly itemCount: number;
-	/** O(1) prepared lookup. Must not sort, reconcile, or allocate. */
-	readItem(index: number): TwoHopVirtualListItem | undefined;
-	/** O(1) prepared logical-cell lookup used by the scalar scroll kernel. */
-	readCell(index: number): VirtualListLogicalCell<TwoHopVirtualListItem> | undefined;
 }
 
 /** Immutable cell identity compiled before the scroll hot path begins. */

@@ -180,11 +180,11 @@ export function createTwoHopViewPlanRowModel(
 		if (!row) return null;
 		const cellCount = row.cellCount;
 		if (columnIndex < 0 || columnIndex >= cellCount) return null;
-		return (
-			plan.sections[row.sectionIndex]?.itemSource.readCell(
-				row.sectionCellStartIndex + columnIndex,
-			) ?? null
-		);
+		const sectionPlan = plan.sections[row.sectionIndex];
+		if (!sectionPlan) return null;
+		const cellIndex =
+			sectionPlan.firstCellIndex + row.sectionCellStartIndex + columnIndex;
+		return plan.cells[cellIndex]?.logicalCell ?? null;
 	};
 	const resolveNavigationTarget = (
 		_currentKey: string,

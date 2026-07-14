@@ -8,7 +8,6 @@ export type {
 	TwoHopBandRowTopsMutable,
 	TwoHopResolvedRow,
 	TwoHopRowPlan,
-	PreparedTwoHopSection,
 	TwoHopSectionTable,
 	TwoHopSectionPlan,
 	TwoHopViewPlan,

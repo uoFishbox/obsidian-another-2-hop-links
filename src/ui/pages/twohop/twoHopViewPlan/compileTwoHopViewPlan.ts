@@ -9,7 +9,6 @@ import type {
 	CompileTwoHopViewPlanParams,
 	TwoHopSectionTable,
 	TwoHopSectionPlan,
-	PreparedTwoHopSection,
 	TwoHopViewPlan,
 } from "./types";
 import { createTwoHopRowPlanFacade } from "./twoHopRowTable";
@@ -19,6 +18,29 @@ import {
 	resolveStableViewPlanRenderBodyKey,
 } from "ui/components/common/virtual-list/core/reconciliation/renderBodyRevision";
 import type { CompiledTwoHopCell } from "./types";
+
+function appendCompiledCell(
+	cells: CompiledTwoHopCell[],
+	logicalCell: VirtualListLogicalCell<TwoHopVirtualListItem>,
+	descriptor: CompileTwoHopViewPlanParams["sections"][number],
+): void {
+	const identity = getViewPlanRenderBodyIdentityFields(logicalCell, descriptor);
+	cells.push({
+		logicalCell,
+		logicalKey: logicalCell.key,
+		renderBodyKey: resolveStableViewPlanRenderBodyKey({
+			previous: undefined,
+			cell: logicalCell,
+			descriptor,
+		}),
+		renderBodyKind: identity.renderBodyKind,
+		renderBodySectionId: identity.renderBodySectionId,
+		renderBodySourceKey: identity.renderBodySourceKey,
+		renderBodyCellKey: identity.renderBodyCellKey,
+		renderBodyRevision: identity.renderBodyRevision,
+	});
+}
+
 /**
  * Compiles TwoHop data into section prefix metadata consumed while scrolling.
  */
@@ -77,7 +99,6 @@ export function compileTwoHopViewPlan(
 	const cells: CompiledTwoHopCell[] = [];
 
 	let top = 0;
-	let nextCellIndex = 0;
 	let nextRowIndex = 0;
 	for (let sectionIndex = 0; sectionIndex < sectionCount; sectionIndex += 1) {
 		const descriptor = params.sections[sectionIndex];
@@ -87,57 +108,40 @@ export function compileTwoHopViewPlan(
 		const showLoadMore = showLoadMoreBySection[sectionIndex] !== 0;
 		const preparedItems = preparedItemsBySection[sectionIndex] ?? [];
 		const sectionIdPrefix = `${descriptor.sectionId}::`;
-		const preparedCells: VirtualListLogicalCell<TwoHopVirtualListItem>[] = [
+		const firstCellIndex = cells.length;
+		appendCompiledCell(
+			cells,
 			{
 				kind: "header",
 				key: logicalCellKey(`${sectionIdPrefix}__header`),
 			},
-		];
+			descriptor,
+		);
 		for (let itemIndex = 0; itemIndex < visibleCount; itemIndex += 1) {
 			const item = preparedItems[itemIndex];
 			if (!item) continue;
-			preparedCells.push({
-				kind: "item",
-				key: logicalCellKey(`${sectionIdPrefix}item:${itemIndex}`),
-				sourceKey: sourceKey(`${sectionIdPrefix}${item.virtualKey}`),
-				item,
-				itemIndex,
-			});
-		}
-		if (showLoadMore) {
-			preparedCells.push({
-				kind: "load-more",
-				key: logicalCellKey(`${sectionIdPrefix}__load-more`),
-			});
-		}
-		for (const logicalCell of preparedCells) {
-			const identity = getViewPlanRenderBodyIdentityFields(
-				logicalCell,
+			appendCompiledCell(
+				cells,
+				{
+					kind: "item",
+					key: logicalCellKey(`${sectionIdPrefix}item:${itemIndex}`),
+					sourceKey: sourceKey(`${sectionIdPrefix}${item.virtualKey}`),
+					item,
+					itemIndex,
+				},
 				descriptor,
 			);
-			cells.push({
-				logicalCell,
-				logicalKey: logicalCell.key,
-				renderBodyKey: resolveStableViewPlanRenderBodyKey({
-					previous: undefined,
-					cell: logicalCell,
-					descriptor,
-				}),
-				renderBodyKind: identity.renderBodyKind,
-				renderBodySectionId: identity.renderBodySectionId,
-				renderBodySourceKey: identity.renderBodySourceKey,
-				renderBodyCellKey: identity.renderBodyCellKey,
-				renderBodyRevision: identity.renderBodyRevision,
-			});
 		}
-		const itemSource: PreparedTwoHopSection = {
-			id: descriptor.sectionId,
-			itemCount: preparedItems.length,
-			readItem: (index) => preparedItems[index],
-			readCell: (index) => preparedCells[index],
-		};
-		const firstCellIndex = nextCellIndex;
-		nextCellIndex += cellCount;
+		if (showLoadMore) {
+			appendCompiledCell(
+				cells,
+				{
+					kind: "load-more",
+					key: logicalCellKey(`${sectionIdPrefix}__load-more`),
+				},
+				descriptor,
+			);
+		}
 
 		const firstRowIndex = nextRowIndex;
 		nextRowIndex += rowCount;
@@ -192,7 +196,6 @@ export function compileTwoHopViewPlan(
 			cellCount,
 			visibleCount,
 			showLoadMore,
-			itemSource,
 			mountedLayout,
 		});
 		top += height;
