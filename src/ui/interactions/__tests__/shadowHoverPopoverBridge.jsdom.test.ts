@@ -46,7 +46,10 @@ vi.mock("../shadowHoverLinkSpec", () => ({
 }));
 
 import { installShadowHoverPopoverBridge } from "../shadowHoverPopoverBridge";
-import { dispatchVirtualCellWillRebind } from "../virtualCellRebind";
+import {
+	markVirtualCellInteractionDirty,
+	prepareVirtualCellForRebind,
+} from "../virtualCellRebind";
 
 describe("shadowHoverPopoverBridge", () => {
 	beforeEach(() => {
@@ -282,10 +285,7 @@ describe("shadowHoverPopoverBridge", () => {
 		);
 		expect(interaction.dataset.cclHovered).toBe("true");
 
-		dispatchVirtualCellWillRebind(physicalCell, {
-			previousLogicalKey: "first",
-			nextLogicalKey: "second",
-		});
+		prepareVirtualCellForRebind(physicalCell, "first", "second");
 		interaction.dataset.cclInteractionId = "item:second";
 
 		expect(interaction.dataset.cclHovered).toBeUndefined();
@@ -411,6 +411,12 @@ function installBridge(registry = createRegistryStub()): {
 		shadowRoot,
 		registry,
 		appContext: { app: {} } as never,
+		markInteractionDirty(element) {
+			const physicalCell = element.parentElement;
+			if (physicalCell) {
+				markVirtualCellInteractionDirty(physicalCell);
+			}
+		},
 	});
 	return { shadowRoot, dispose };
 }

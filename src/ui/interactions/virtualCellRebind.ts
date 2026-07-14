@@ -5,11 +5,26 @@ export interface VirtualCellWillRebindDetail {
 	readonly nextLogicalKey: string;
 }
 
-/** Announces that a physical cell is about to stop representing a logical card. */
-export function dispatchVirtualCellWillRebind(
+const dirtyVirtualCells = new WeakSet<HTMLElement>();
+
+/** Marks a physical cell as holding transient interaction state. */
+export function markVirtualCellInteractionDirty(cell: HTMLElement): void {
+	dirtyVirtualCells.add(cell);
+}
+
+/**
+ * Clears transient state before a dirty physical cell represents another card.
+ * Clean cells return without reading or traversing the DOM.
+ */
+export function prepareVirtualCellForRebind(
 	element: HTMLElement,
-	detail: VirtualCellWillRebindDetail,
-): void {
+	previousLogicalKey: string,
+	nextLogicalKey: string,
+): boolean {
+	if (!dirtyVirtualCells.delete(element)) {
+		return false;
+	}
+
 	const activeElement = element.ownerDocument.activeElement;
 	if (
 		activeElement &&
@@ -33,7 +48,11 @@ export function dispatchVirtualCellWillRebind(
 		new CustomEventConstructor(VIRTUAL_CELL_WILL_REBIND_EVENT, {
 			bubbles: true,
 			composed: true,
-			detail,
+			detail: {
+				previousLogicalKey,
+				nextLogicalKey,
+			} satisfies VirtualCellWillRebindDetail,
 		}),
 	);
+	return true;
 }

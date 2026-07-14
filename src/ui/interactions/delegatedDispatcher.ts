@@ -25,6 +25,7 @@ interface DelegatedDispatcherDeps {
 	registry: InteractionRegistry;
 	linkContext?: LinkContext;
 	appContext?: AppContext;
+	markInteractionDirty?: (element: HTMLElement) => void;
 }
 
 const MOBILE_TOUCH_MOUSEOVER_SUPPRESSION_MS = 900;
@@ -203,6 +204,7 @@ export function createDelegatedInteractionDispatcher({
 	registry,
 	linkContext,
 	appContext,
+	markInteractionDirty,
 }: DelegatedDispatcherDeps) {
 	const resolvedLinkContext = linkContext ?? appContext?.linkContext;
 	let activeHoverInteractionId: string | null = null;
@@ -428,6 +430,7 @@ export function createDelegatedInteractionDispatcher({
 			longPressElement = element;
 			longPressStartX = touch.clientX;
 			longPressStartY = touch.clientY;
+			markInteractionDirty?.(element);
 			markInteractionTouched(element);
 			clearInteractionLongPressed(element);
 

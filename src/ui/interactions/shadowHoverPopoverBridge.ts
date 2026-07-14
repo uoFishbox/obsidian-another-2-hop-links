@@ -18,6 +18,7 @@ interface ShadowHoverPopoverBridgeOptions {
 	registry: InteractionRegistry;
 	linkContext?: LinkContext;
 	appContext?: AppContext;
+	markInteractionDirty?: (element: HTMLElement) => void;
 }
 
 interface SharedShadowHoverBridgeHandle {
@@ -25,6 +26,7 @@ interface SharedShadowHoverBridgeHandle {
 	registry: InteractionRegistry;
 	linkContext?: LinkContext;
 	appContext?: AppContext;
+	markInteractionDirty?: (element: HTMLElement) => void;
 	refCount: number;
 	controller: ShadowHoverControllerImpl;
 	hoveredAnchorEl: HTMLElement | null;
@@ -107,6 +109,7 @@ function enterLogicalHover(
 	handle: SharedShadowHoverBridgeHandle,
 	element: HTMLElement,
 ): void {
+	handle.markInteractionDirty?.(element);
 	if (handle.hoveredAnchorEl && handle.hoveredAnchorEl !== element) {
 		delete handle.hoveredAnchorEl.dataset.cclHovered;
 	}
@@ -357,6 +360,7 @@ function createHandle({
 	registry,
 	linkContext,
 	appContext,
+	markInteractionDirty,
 }: ShadowHoverPopoverBridgeOptions): SharedShadowHoverBridgeHandle | null {
 	const app = appContext?.app;
 	if (!app) {
@@ -382,6 +386,7 @@ function createHandle({
 		registry,
 		linkContext,
 		appContext,
+		markInteractionDirty,
 		refCount: 1,
 		controller,
 		hoveredAnchorEl: null,
@@ -409,12 +414,8 @@ function createHandle({
 		const target = event.target;
 		if (!isHTMLElementLike(target)) return;
 
-		for (const hovered of target.querySelectorAll<HTMLElement>(
-			"[data-ccl-hovered='true']",
-		)) {
-			delete hovered.dataset.cclHovered;
-		}
 		if (handle.hoveredAnchorEl && target.contains(handle.hoveredAnchorEl)) {
+			delete handle.hoveredAnchorEl.dataset.cclHovered;
 			handle.hoveredAnchorEl = null;
 		}
 		if (handle.activeAnchorEl && target.contains(handle.activeAnchorEl)) {
@@ -453,6 +454,7 @@ export function installShadowHoverPopoverBridge({
 	registry,
 	linkContext,
 	appContext,
+	markInteractionDirty,
 }: ShadowHoverPopoverBridgeOptions): () => void {
 	const existingHandle = sharedShadowHoverBridgeHandles.get(shadowRoot);
 	if (existingHandle) {
@@ -460,6 +462,7 @@ export function installShadowHoverPopoverBridge({
 		existingHandle.registry = registry;
 		existingHandle.linkContext = linkContext;
 		existingHandle.appContext = appContext;
+		existingHandle.markInteractionDirty = markInteractionDirty;
 		return () => {
 			existingHandle.refCount = Math.max(0, existingHandle.refCount - 1);
 			if (existingHandle.refCount === 0) {
@@ -474,6 +477,7 @@ export function installShadowHoverPopoverBridge({
 		registry,
 		linkContext,
 		appContext,
+		markInteractionDirty,
 	});
 	if (!handle) {
 		return () => {};

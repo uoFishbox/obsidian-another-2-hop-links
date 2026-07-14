@@ -8,7 +8,11 @@ import {
 } from "ui/interactions/interactionRegistry";
 import { useAppContext, useLinkContext } from "ui/context/linkContext";
 import type { ResultNavigationDirection } from "features/keyboard-navigation/resultFocus";
-import type { InteractionDescriptor } from "ui/interactions/interactionTypes";
+import {
+	getInteractionElement,
+	type InteractionDescriptor,
+} from "ui/interactions/interactionTypes";
+import { markVirtualCellInteractionDirty } from "ui/interactions/virtualCellRebind";
 import type { MountedVirtualCell, VirtualNavigationTarget } from "../types";
 import type { ProgrammaticScrollSnapshot } from "../dom/flushVirtualScrollMeasurement";
 import type { VirtualCellRegistry } from "./VirtualCellRegistry";
@@ -84,10 +88,25 @@ export function createVirtualSurfaceInteractions<
 		linkContext = appContext?.linkContext;
 	}
 
+	const markInteractionDirty = (element: HTMLElement): void => {
+		const physicalCell = cellRegistry?.findClosest(element)?.element;
+		if (!physicalCell) return;
+
+		markVirtualCellInteractionDirty(physicalCell);
+	};
+
+	const handleFocusIn = (event: FocusEvent): void => {
+		const interaction = getInteractionElement(event);
+		if (!interaction) return;
+
+		markInteractionDirty(interaction);
+	};
+
 	const delegatedInteractions = createDelegatedInteractionDispatcher({
 		registry: interactionRegistry,
 		linkContext,
 		appContext,
+		markInteractionDirty,
 	});
 
 	const flushMountedState = async (): Promise<void> => {
@@ -116,6 +135,7 @@ export function createVirtualSurfaceInteractions<
 		interactionRegistry,
 		linkContext,
 		appContext,
+		markInteractionDirty,
 	});
 
 	let syncedInteractionDescriptorScopeId: string | undefined;
@@ -182,5 +202,6 @@ export function createVirtualSurfaceInteractions<
 	return {
 		delegatedInteractions,
 		handleKeyDown,
+		handleFocusIn,
 	};
 }

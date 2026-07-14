@@ -11,7 +11,7 @@ import type {
 	VirtualCellRegistry,
 } from "ui/components/common/virtual-list/svelte/VirtualCellRegistry";
 import { createTwoHopCellBinding, type TwoHopCellBinding } from "./twoHopCellBinding";
-import { dispatchVirtualCellWillRebind } from "ui/interactions/virtualCellRebind";
+import { prepareVirtualCellForRebind } from "ui/interactions/virtualCellRebind";
 
 export interface TwoHopFixedCellSlotController extends VirtualCellRegistrationOwner {
 	readonly cellSlotKey: number;
@@ -126,10 +126,11 @@ function createCellController(
 				previousBinding.logicalKey !== nextCell.key &&
 				cellElement
 			) {
-				dispatchVirtualCellWillRebind(cellElement, {
-					previousLogicalKey: String(previousBinding.logicalKey),
-					nextLogicalKey: String(nextCell.key),
-				});
+				prepareVirtualCellForRebind(
+					cellElement,
+					String(previousBinding.logicalKey),
+					String(nextCell.key),
+				);
 			}
 			const nextBinding = createTwoHopCellBinding(
 				nextCell,
@@ -144,10 +145,11 @@ function createCellController(
 		},
 		clear(): void {
 			if (snapshot.binding && cellElement) {
-				dispatchVirtualCellWillRebind(cellElement, {
-					previousLogicalKey: String(snapshot.binding.logicalKey),
-					nextLogicalKey: "",
-				});
+				prepareVirtualCellForRebind(
+					cellElement,
+					String(snapshot.binding.logicalKey),
+					"",
+				);
 			}
 			snapshot = {
 				active: false,

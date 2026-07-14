@@ -404,11 +404,13 @@ describe("delegated interaction dispatcher", () => {
 			file,
 		);
 		registry.register(descriptor);
+		const markInteractionDirty = vi.fn();
 
 		const dispatcher = createDelegatedInteractionDispatcher({
 			registry,
 			linkContext,
 			appContext,
+			markInteractionDirty,
 		});
 		attachDispatcher(root, dispatcher);
 
@@ -423,6 +425,7 @@ describe("delegated interaction dispatcher", () => {
 		);
 		vi.advanceTimersByTime(500);
 
+		expect(markInteractionDirty).toHaveBeenCalledWith(element);
 		expect(element.dataset.cclLongPressed).toBe("1");
 		expect(linkContext.onLinkHover).toHaveBeenCalledTimes(1);
 		expect(linkContext.onOpenFile).toHaveBeenCalledTimes(0);

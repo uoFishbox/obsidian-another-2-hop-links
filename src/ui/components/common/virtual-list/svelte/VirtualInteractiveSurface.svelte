@@ -55,25 +55,26 @@
 		children,
 	}: Props<TMountedCell> = $props();
 
-	const { delegatedInteractions, handleKeyDown } = createVirtualSurfaceInteractions({
-		getRootEl: () => rootEl,
-		getContentEl: () => contentEl,
-		getShadowRoot: () => interactionShadowRoot,
-		setShadowRoot: (sr) => {
-			interactionShadowRoot = sr;
-		},
-		getObserverRoot: () => observerRoot,
-		getRowHeight: () => rowHeight,
-		getInteractionDescriptorScopeId: () => interactionDescriptorScopeId,
-		getInteractionDescriptors: () => interactionDescriptors,
-		getInteractionDescriptorResolvers: () => interactionDescriptorResolvers,
-		getInteractionDescriptorResolverProvider: () =>
-			interactionDescriptorResolverProvider,
-		resolveNavigationTarget,
-		moveFocusWithinList,
-		flushVirtualScrollMeasurement,
-		cellRegistry,
-	});
+	const { delegatedInteractions, handleKeyDown, handleFocusIn } =
+		createVirtualSurfaceInteractions({
+			getRootEl: () => rootEl,
+			getContentEl: () => contentEl,
+			getShadowRoot: () => interactionShadowRoot,
+			setShadowRoot: (sr) => {
+				interactionShadowRoot = sr;
+			},
+			getObserverRoot: () => observerRoot,
+			getRowHeight: () => rowHeight,
+			getInteractionDescriptorScopeId: () => interactionDescriptorScopeId,
+			getInteractionDescriptors: () => interactionDescriptors,
+			getInteractionDescriptorResolvers: () => interactionDescriptorResolvers,
+			getInteractionDescriptorResolverProvider: () =>
+				interactionDescriptorResolverProvider,
+			resolveNavigationTarget,
+			moveFocusWithinList,
+			flushVirtualScrollMeasurement,
+			cellRegistry,
+		});
 
 	watchVirtualSurfaceMountedCellsChange<TMountedCell>({
 		getRenderInput: () =>
@@ -118,6 +119,7 @@
 	onmousedown={delegatedInteractions.handleMouseDown}
 	oncontextmenu={delegatedInteractions.handleContextMenu}
 	onkeydown={handleKeyDown}
+	onfocusin={handleFocusIn}
 	ondragstart={delegatedInteractions.handleDragStart}
 	ontouchstart={delegatedInteractions.handleTouchStart}
 	ontouchmove={delegatedInteractions.handleTouchMove}
