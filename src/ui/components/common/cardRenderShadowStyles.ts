@@ -338,10 +338,7 @@ export const CARD_RENDER_SHADOW_CSS = String.raw`
 	text-decoration: underline;
 }
 
-.cosense-card-links__box:focus-visible {
-	// box-shadow: 0 0 0 var(--input-border-width-focus) var(--background-modifier-border-focus);
-	outline: 2px solid var(--background-modifier-border-focus);
-}
+
 
 .cosense-card-links__box[data-ccl-kb-row-selected="1"] {
 	position: relative;
