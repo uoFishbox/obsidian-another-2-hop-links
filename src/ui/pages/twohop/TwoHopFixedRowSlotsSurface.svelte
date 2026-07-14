@@ -56,7 +56,7 @@
 		const binding = controller.binding;
 		if (!binding) return "empty";
 		if (binding.renderKind === "item") {
-			return `twohop-item:${binding.reuseFamily ?? "resolved-item"}`;
+			return `twohop-item:${binding.reuseFamily ?? "resolved-card"}`;
 		}
 
 		return `${binding.renderKind}:${controller.renderBodyKey ?? binding.logicalKey}`;

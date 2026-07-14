@@ -20,7 +20,15 @@ import TwoHopItemCellRenderHarness from "./TwoHopItemCellRenderHarness.svelte";
 
 const items = Array.from({ length: 100 }, (_, index) => ({
 	kind: "new-link" as const,
-	item: { type: "link" } as never,
+	item: {
+		type: "newLink",
+		data: {
+			rawText: `new-link-${index}`,
+			path: undefined,
+			isUnresolved: true,
+			sourceFile: { path: "notes/source.md" },
+		},
+	} as never,
 	searchKey: `item-${index}`,
 	virtualKey: `item-${index}`,
 }));
@@ -318,6 +326,155 @@ describe("TwoHopItemCellRender", () => {
 		expect(reboundPhysicalCell).toBe(physicalCell);
 		expect(reboundBody).toBeTruthy();
 		expect(reboundBody).not.toBe(initialBody);
+
+		kernel.dispose();
+	});
+
+	it("retains one item body across resolved view-item types", async () => {
+		const kernel = createTwoHopScalarScrollKernel({
+			initialRowModel: rowModel,
+			onStableVisibleRange() {},
+		});
+		applyRange(kernel, 1);
+		const controller = kernel.fixedRowSlotPool.controllers[0]?.cells[0];
+		expect(controller).toBeDefined();
+		if (!controller || !isItemCell(controller.mountedCell)) return;
+
+		const { container } = render(TwoHopFixedRowSlotsSurfaceHarness, {
+			props: { rowSlotControllers: kernel.fixedRowSlotPool.controllers },
+		});
+		await tick();
+
+		const bindResolvedItem = (
+			type: "branch" | "taggedNote" | "file" | "backlink",
+			data: object,
+			interactionId: string,
+			itemSection: TwoHopVirtualListSection,
+		): void => {
+			const previous = controller.mountedCell;
+			if (!isItemCell(previous)) return;
+			controller.bindCell({
+				...previous,
+				key: `${String(previous.key)}:${type}` as typeof previous.key,
+				logicalKey:
+					`${String(previous.logicalKey)}:${type}` as typeof previous.logicalKey,
+				section: itemSection,
+				sectionId: itemSection.sectionId,
+				cell: {
+					...previous.cell,
+					item: {
+						kind: "primary-link",
+						item: { type, data } as never,
+						interactionId,
+						sourceSectionId: "backlinks",
+						searchKey: `${type}-item`,
+						virtualKey: `${type}-item`,
+					} satisfies TwoHopVirtualListItem,
+				},
+			});
+		};
+
+		bindResolvedItem(
+			"branch",
+			{ hop1: { isUnresolved: false, path: "notes/branch.md" }, hop2: [] },
+			"item:branch:notes/branch.md",
+			{
+				...section,
+				kind: "primary-section",
+				rawSectionId: "outgoing",
+				sectionId: "outgoing",
+				source: {} as never,
+			},
+		);
+		await tick();
+		await tick();
+
+		const resolvedBody = container.querySelector<HTMLElement>(
+			"[data-ccl-cell-slot='0'] [data-testid='twohop-child-item-cell']",
+		);
+		expect(resolvedBody).toBeTruthy();
+		expect(controller.binding?.reuseFamily).toBe("resolved-card");
+		expect(controller.binding?.presentation).toMatchObject({
+			sectionVariant: "outgoing",
+			resolution: "resolved",
+			extension: null,
+		});
+
+		const resolvedItems = [
+			{
+				type: "taggedNote" as const,
+				data: {
+					file: { extension: "md" },
+					path: "notes/tagged.md",
+					commonTags: ["tag"],
+				},
+				interactionId: "item:taggedNote:notes/tagged.md",
+				section: {
+					...section,
+					kind: "tag-section" as const,
+					sectionId: "tagged",
+					tag: "#tag",
+					headerProps: {} as never,
+				},
+				expectedPresentation: {
+					sectionVariant: "tag",
+					extension: null,
+					attachment: false,
+				},
+			},
+			{
+				type: "file" as const,
+				data: { extension: "pdf", path: "files/document.pdf" },
+				interactionId: "item:file:files/document.pdf",
+				section: {
+					...section,
+					kind: "primary-section" as const,
+					rawSectionId: "merged",
+					sectionId: "merged",
+					source: {} as never,
+				},
+				expectedPresentation: {
+					sectionVariant: "merged",
+					extension: "pdf",
+					attachment: true,
+				},
+			},
+			{
+				type: "backlink" as const,
+				data: {
+					sourceFile: { extension: "md", path: "notes/backlink.md" },
+				},
+				interactionId: "item:backlink:notes/backlink.md",
+				section: {
+					...section,
+					kind: "primary-section" as const,
+					rawSectionId: "backlinks",
+					sectionId: "backlinks",
+					source: {} as never,
+				},
+				expectedPresentation: {
+					sectionVariant: "backlinks",
+					extension: null,
+					attachment: false,
+				},
+			},
+		];
+
+		for (const item of resolvedItems) {
+			bindResolvedItem(item.type, item.data, item.interactionId, item.section);
+			await tick();
+			await tick();
+
+			const reboundBody = container.querySelector<HTMLElement>(
+				"[data-ccl-cell-slot='0'] [data-testid='twohop-child-item-cell']",
+			);
+			expect(reboundBody).toBe(resolvedBody);
+			expect(controller.binding?.reuseFamily).toBe("resolved-card");
+			expect(controller.binding?.interactionId).toBe(item.interactionId);
+			expect(controller.binding?.presentation).toMatchObject(
+				item.expectedPresentation,
+			);
+		}
 
 		kernel.dispose();
 	});

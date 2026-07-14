@@ -14,12 +14,7 @@ import { isAttachment } from "core/rules/fileRules";
 
 export type TwoHopCardSectionVariant = CardSectionVariant;
 
-export type TwoHopItemReuseFamily =
-	| "resolved-item"
-	| "missing-branch"
-	| "new-link"
-	| "tagged-note"
-	| "file";
+export type TwoHopItemReuseFamily = "resolved-card" | "missing-branch" | "new-link";
 
 export type TwoHopCardPresentationState = CardPresentationState;
 
@@ -89,26 +84,26 @@ function resolveItemState(
 		case "branch": {
 			const missing = row.item.data.hop1.isUnresolved;
 			return {
-				reuseFamily: missing ? "missing-branch" : "resolved-item",
+				reuseFamily: missing ? "missing-branch" : "resolved-card",
 				presentation: presentation(missing ? "missing" : "resolved"),
 				interactionId: row.interactionId ?? null,
 			};
 		}
 		case "taggedNote":
 			return {
-				reuseFamily: "tagged-note",
+				reuseFamily: "resolved-card",
 				presentation: presentation("resolved"),
 				interactionId: row.interactionId ?? null,
 			};
 		case "file":
 			return {
-				reuseFamily: "file",
+				reuseFamily: "resolved-card",
 				presentation: presentation("resolved"),
 				interactionId: row.interactionId ?? null,
 			};
 		case "backlink":
 			return {
-				reuseFamily: "resolved-item",
+				reuseFamily: "resolved-card",
 				presentation: presentation("resolved"),
 				interactionId: row.interactionId ?? null,
 			};
