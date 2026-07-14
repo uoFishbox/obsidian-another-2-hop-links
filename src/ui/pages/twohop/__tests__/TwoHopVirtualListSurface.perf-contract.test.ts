@@ -126,6 +126,132 @@ describe("TwoHopViewPlanVirtualList DOM performance contracts", () => {
 		},
 	);
 
+	it("rebuilds the retained surface when a resize changes column topology", async () => {
+		const { container } = render(TwoHopViewPlanVirtualListPerfHarness, {
+			props: {
+				sections: [createDescriptor(100)],
+				applicationStore,
+				renderChildComponent: true,
+			},
+		});
+		const scrollRoot = container.querySelector<HTMLElement>(
+			"[data-testid='scroll-root']",
+		);
+		const virtualListRoot = container.querySelector<HTMLElement>(
+			".twohop-page-virtual-list",
+		);
+		if (!scrollRoot || !virtualListRoot) {
+			throw new Error("Expected TwoHop virtual-list elements.");
+		}
+
+		setNumericProperty(scrollRoot, "clientHeight", 120);
+		setNumericProperty(scrollRoot, "scrollTop", 0);
+		setElementRect(scrollRoot, { top: 0, width: 330, height: 120 });
+		setElementRect(virtualListRoot, { top: 0, width: 330, height: 20_000 });
+		triggerResize(virtualListRoot, 330, 20_000);
+		triggerResize(scrollRoot, 330, 120);
+		await flushFrames();
+		await flushFrames();
+
+		const initialContent = virtualListRoot.shadowRoot?.querySelector<HTMLElement>(
+			".view-plan-virtual-list-content",
+		);
+		const initialChild = virtualListRoot.shadowRoot?.querySelector<HTMLElement>(
+			"[data-testid='twohop-child-item-cell']",
+		);
+		expect(initialContent?.getAttribute("style")).toContain("--ccl-columns: 3");
+		expect(initialChild).toBeTruthy();
+
+		setElementRect(scrollRoot, { top: 0, width: 210, height: 120 });
+		setElementRect(virtualListRoot, { top: 0, width: 210, height: 20_000 });
+		triggerResize(virtualListRoot, 210, 20_000);
+		triggerResize(scrollRoot, 210, 120);
+		await flushFrames();
+		await flushFrames();
+
+		const resizedContent = virtualListRoot.shadowRoot?.querySelector<HTMLElement>(
+			".view-plan-virtual-list-content",
+		);
+		const resizedChild = virtualListRoot.shadowRoot?.querySelector<HTMLElement>(
+			"[data-testid='twohop-child-item-cell']",
+		);
+		expect(resizedContent?.getAttribute("style")).toContain("--ccl-columns: 2");
+		expect(resizedContent).not.toBe(initialContent);
+		expect(resizedChild).not.toBe(initialChild);
+		expect(
+			Array.from(
+				virtualListRoot.shadowRoot?.querySelectorAll<HTMLElement>(
+					"[data-ccl-row-slot]",
+				) ?? [],
+			).every((row) => row.querySelectorAll("[data-ccl-cell-slot]").length <= 2),
+		).toBe(true);
+	});
+
+	it("updates retained geometry without scrolling when the column count is unchanged", async () => {
+		const { container } = render(TwoHopViewPlanVirtualListPerfHarness, {
+			props: {
+				sections: [createDescriptor(100)],
+				applicationStore,
+				renderChildComponent: true,
+			},
+		});
+		const scrollRoot = container.querySelector<HTMLElement>(
+			"[data-testid='scroll-root']",
+		);
+		const virtualListRoot = container.querySelector<HTMLElement>(
+			".twohop-page-virtual-list",
+		);
+		if (!scrollRoot || !virtualListRoot) {
+			throw new Error("Expected TwoHop virtual-list elements.");
+		}
+
+		setNumericProperty(scrollRoot, "clientHeight", 120);
+		setNumericProperty(scrollRoot, "scrollTop", 0);
+		setElementRect(scrollRoot, { top: 0, width: 330, height: 120 });
+		setElementRect(virtualListRoot, { top: 0, width: 330, height: 20_000 });
+		triggerResize(virtualListRoot, 330, 20_000);
+		triggerResize(scrollRoot, 330, 120);
+		await flushFrames();
+		await flushFrames();
+
+		const initialContent = virtualListRoot.shadowRoot?.querySelector<HTMLElement>(
+			".view-plan-virtual-list-content",
+		);
+		const initialChild = virtualListRoot.shadowRoot?.querySelector<HTMLElement>(
+			"[data-testid='twohop-child-item-cell']",
+		);
+		expect(initialContent?.getAttribute("style")).toContain(
+			"--ccl-box-height: 124px",
+		);
+
+		setElementRect(scrollRoot, { top: 0, width: 360, height: 120 });
+		setElementRect(virtualListRoot, { top: 0, width: 360, height: 20_000 });
+		triggerResize(virtualListRoot, 360, 20_000);
+		triggerResize(scrollRoot, 360, 120);
+		await flushFrames();
+		await flushFrames();
+
+		const resizedContent = virtualListRoot.shadowRoot?.querySelector<HTMLElement>(
+			".view-plan-virtual-list-content",
+		);
+		const resizedChild = virtualListRoot.shadowRoot?.querySelector<HTMLElement>(
+			"[data-testid='twohop-child-item-cell']",
+		);
+		expect(resizedContent).toBe(initialContent);
+		expect(resizedChild).toBe(initialChild);
+		expect(resizedContent?.getAttribute("style")).toContain(
+			"--ccl-box-height: 136px",
+		);
+		for (const row of Array.from(
+			virtualListRoot.shadowRoot?.querySelectorAll<HTMLElement>(
+				"[data-ccl-row-slot]",
+			) ?? [],
+		)) {
+			const rowIndex = Number(row.dataset.cclRowIndex);
+			expect(row.style.transform).toBe(`translateY(${rowIndex * 146}px)`);
+		}
+	});
+
 	it("does not create interaction descriptors while mounting visible cells", async () => {
 		const getItemInteractionDescriptor = vi.fn(() => null);
 		const { container } = render(TwoHopViewPlanVirtualListPerfHarness, {

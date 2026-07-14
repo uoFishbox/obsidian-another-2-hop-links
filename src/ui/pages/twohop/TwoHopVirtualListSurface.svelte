@@ -78,6 +78,7 @@
 		cell: MountedFlatCell<TwoHopVirtualListItem, TwoHopVirtualListSection>,
 	): cell is MountedFlatHeaderCell<TwoHopVirtualListItem, TwoHopVirtualListSection> =>
 		cell.cell.kind === "header";
+	const fixedSurfaceLayoutKey = $derived(list.layout.columns);
 	const isItemCell = (
 		cell: MountedFlatCell<TwoHopVirtualListItem, TwoHopVirtualListSection>,
 	): cell is MountedFlatItemCell<TwoHopVirtualListItem, TwoHopVirtualListSection> =>
@@ -98,45 +99,47 @@
 	flushVirtualScrollMeasurement={list.flushVirtualScrollMeasurement}
 	{cellRegistry}
 >
-	<TwoHopFixedRowSlotsSurface
-		contentClassName="view-plan-virtual-list-content view-plan-flow-content"
-		rowClassName="view-plan-flow-row"
-		contentHeight={list.contentHeight}
-		rowSlotControllers={list.fixedRowSlotControllers}
-		cellWidth={list.layout.cellWidth}
-		rowHeight={list.layout.rowHeight}
-		columns={list.layout.columns}
-		gap={list.layout.gap}
-		bind:contentEl
-		observerRoot={list.observerRoot}
-		getCellDataTestId={list.getCellDataTestId}
-		{cellRegistry}
-	>
-		{#snippet renderCell({ mountedCell: renderedCell, cellController })}
-			{#if isHeaderCell(renderedCell)}
-				{@render props.renderHeader({
-					section: renderedCell.section,
-					title: renderedCell.title,
-					totalCount: renderedCell.totalCount,
-					sectionId: renderedCell.sectionId,
-					headerProps: renderedCell.headerProps,
-				})}
-			{:else if isItemCell(renderedCell)}
-				<TwoHopItemCellRender
-					{cellController}
-					initialCell={renderedCell}
-					getItemVisibilityState={list.getItemVisibilityState}
-					getItemActivationCandidateId={list.getItemActivationCandidateId}
-					renderItem={props.renderItem}
-				/>
-			{:else}
-				<VirtualListLoadMoreButton
-					testId={!IS_PROD
-						? `load-more-${renderedCell.sectionId}`
-						: undefined}
-					onClick={() => list.loadMore(renderedCell.sectionId)}
-				/>
-			{/if}
-		{/snippet}
-	</TwoHopFixedRowSlotsSurface>
+	{#key fixedSurfaceLayoutKey}
+		<TwoHopFixedRowSlotsSurface
+			contentClassName="view-plan-virtual-list-content view-plan-flow-content"
+			rowClassName="view-plan-flow-row"
+			contentHeight={list.contentHeight}
+			rowSlotControllers={list.fixedRowSlotControllers}
+			cellWidth={list.layout.cellWidth}
+			rowHeight={list.layout.rowHeight}
+			columns={list.layout.columns}
+			gap={list.layout.gap}
+			bind:contentEl
+			observerRoot={list.observerRoot}
+			getCellDataTestId={list.getCellDataTestId}
+			{cellRegistry}
+		>
+			{#snippet renderCell({ mountedCell: renderedCell, cellController })}
+				{#if isHeaderCell(renderedCell)}
+					{@render props.renderHeader({
+						section: renderedCell.section,
+						title: renderedCell.title,
+						totalCount: renderedCell.totalCount,
+						sectionId: renderedCell.sectionId,
+						headerProps: renderedCell.headerProps,
+					})}
+				{:else if isItemCell(renderedCell)}
+					<TwoHopItemCellRender
+						{cellController}
+						initialCell={renderedCell}
+						getItemVisibilityState={list.getItemVisibilityState}
+						getItemActivationCandidateId={list.getItemActivationCandidateId}
+						renderItem={props.renderItem}
+					/>
+				{:else}
+					<VirtualListLoadMoreButton
+						testId={!IS_PROD
+							? `load-more-${renderedCell.sectionId}`
+							: undefined}
+						onClick={() => list.loadMore(renderedCell.sectionId)}
+					/>
+				{/if}
+			{/snippet}
+		</TwoHopFixedRowSlotsSurface>
+	{/key}
 </VirtualInteractiveSurface>
