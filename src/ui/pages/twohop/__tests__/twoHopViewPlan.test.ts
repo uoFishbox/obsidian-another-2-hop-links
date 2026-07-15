@@ -101,6 +101,37 @@ const createSectionTable = (
 };
 
 describe("compileTwoHopViewPlan", () => {
+	it("compiles immutable item display metadata before scrolling", () => {
+		const item: TwoHopVirtualListItem = {
+			kind: "new-link",
+			item: {
+				type: "file",
+				data: { extension: "PDF" },
+			} as TwoHopVirtualListItem["item"],
+			interactionId: "item:file:document.pdf",
+			searchKey: "document.pdf",
+			virtualKey: "document.pdf",
+		};
+
+		const plan = compilePlan([createDescriptor([item])]);
+
+		expect(plan.cells[0]).toMatchObject({
+			reuseFamily: null,
+			presentation: null,
+			interactionId: null,
+		});
+		expect(plan.cells[1]).toMatchObject({
+			reuseFamily: "file",
+			presentation: {
+				sectionVariant: "new-links",
+				resolution: "resolved",
+				attachment: true,
+				extension: "pdf",
+			},
+			interactionId: "item:file:document.pdf",
+		});
+	});
+
 	it("compiles section geometry and prepared cells without a cell store", () => {
 		const getItems = vi.fn(() => [
 			createItem("a"),

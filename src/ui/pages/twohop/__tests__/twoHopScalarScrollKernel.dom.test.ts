@@ -262,7 +262,7 @@ describe("TwoHop scalar scroll kernel", () => {
 		expect(registry.findByKey(nextKey)).toBeNull();
 	});
 
-	it("stores preview visibility on each physical cell controller", () => {
+	it("stores preview visibility once per physical row controller", () => {
 		const kernel = createTwoHopScalarScrollKernel({
 			initialRowModel: rowModel,
 			onStableVisibleRange() {},
@@ -271,7 +271,7 @@ describe("TwoHop scalar scroll kernel", () => {
 
 		expect(
 			kernel.fixedRowSlotPool.controllers.map(
-				(row) => row.cells[0]?.visibilityState.visibility,
+				(row) => row.visibilityState.visibility,
 			),
 		).toEqual(["mounted", "visible", "mounted"]);
 
@@ -279,7 +279,7 @@ describe("TwoHop scalar scroll kernel", () => {
 
 		expect(
 			kernel.fixedRowSlotPool.controllers.map(
-				(row) => row.cells[0]?.visibilityState.visibility,
+				(row) => row.visibilityState.visibility,
 			),
 		).toEqual(["mounted", "mounted", "visible"]);
 

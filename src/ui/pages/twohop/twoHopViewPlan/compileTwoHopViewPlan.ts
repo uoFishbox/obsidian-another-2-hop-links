@@ -19,6 +19,7 @@ import {
 	resolveStableViewPlanRenderBodyKey,
 } from "ui/components/common/virtual-list/core/reconciliation/renderBodyRevision";
 import type { CompiledTwoHopCell } from "./types";
+import { compileTwoHopCellDisplayMetadata } from "../twoHopCellDisplayMetadata";
 /**
  * Compiles TwoHop data into section prefix metadata consumed while scrolling.
  */
@@ -115,6 +116,10 @@ export function compileTwoHopViewPlan(
 				logicalCell,
 				descriptor,
 			);
+			const displayMetadata = compileTwoHopCellDisplayMetadata(
+				logicalCell,
+				descriptor.section,
+			);
 			cells.push({
 				logicalCell,
 				logicalKey: logicalCell.key,
@@ -128,6 +133,7 @@ export function compileTwoHopViewPlan(
 				renderBodySourceKey: identity.renderBodySourceKey,
 				renderBodyCellKey: identity.renderBodyCellKey,
 				renderBodyRevision: identity.renderBodyRevision,
+				...displayMetadata,
 			});
 		}
 		const itemSource: PreparedTwoHopSection = {

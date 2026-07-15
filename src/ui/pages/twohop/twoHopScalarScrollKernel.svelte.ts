@@ -24,6 +24,7 @@ import {
 	type TwoHopViewPlanRowModel,
 } from "./twoHopViewPlan";
 import type { TwoHopMountedCell, TwoHopMountedRowSlice } from "./twoHopMountedTypes";
+import type { TwoHopCellDisplayMetadata } from "./twoHopCellDisplayMetadata";
 
 interface MutableMountedCellShell {
 	key: LogicalCellKey;
@@ -49,6 +50,9 @@ interface MutableMountedCellShell {
 	title: string;
 	totalCount: number;
 	headerProps: ClickableHeaderExtraProps;
+	reuseFamily: TwoHopCellDisplayMetadata["reuseFamily"];
+	presentation: TwoHopCellDisplayMetadata["presentation"];
+	interactionId: TwoHopCellDisplayMetadata["interactionId"];
 }
 
 interface CellSlotRecord {
@@ -98,6 +102,9 @@ function createCellSlotRecord(renderSlotIndex: number): CellSlotRecord {
 		title: "",
 		totalCount: 0,
 		headerProps: EMPTY_HEADER_PROPS,
+		reuseFamily: null,
+		presentation: null,
+		interactionId: null,
 	};
 	return {
 		mutable,
@@ -247,9 +254,7 @@ export function createTwoHopScalarScrollKernel(params: {
 			previewRange.end,
 		);
 		const rowController = fixedRowSlotPool.controllers[record.row.slotIndex ?? 0];
-		for (let index = 0; index < record.row.cells.length; index += 1) {
-			rowController?.cells[index]?.setVisibility(visibility);
-		}
+		rowController?.setVisibility(visibility);
 		params.rowPreviewActivationRuntime?.setRowVisibility(
 			record.row.rowIndex,
 			visibility,
@@ -303,6 +308,9 @@ export function createTwoHopScalarScrollKernel(params: {
 		mutable.renderBodyCellKey = compiledCell.renderBodyCellKey;
 		mutable.renderBodyRevision = compiledCell.renderBodyRevision;
 		mutable.renderBodyKey = compiledCell.renderBodyKey;
+		mutable.reuseFamily = compiledCell.reuseFamily;
+		mutable.presentation = compiledCell.presentation;
+		mutable.interactionId = compiledCell.interactionId;
 	}
 
 	function bindLogicalRow(plan: TwoHopViewPlan, logicalRowIndex: number): void {

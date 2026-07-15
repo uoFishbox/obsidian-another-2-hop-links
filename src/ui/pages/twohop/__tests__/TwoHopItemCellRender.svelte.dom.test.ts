@@ -167,14 +167,19 @@ describe("TwoHopItemCellRender", () => {
 			onStableVisibleRange() {},
 		});
 		applyRange(kernel, 1);
-		const controller = kernel.fixedRowSlotPool.controllers
-			.flatMap((row) => row.cells)
-			.find((cell) => isItemCell(cell.mountedCell));
+		const rowController = kernel.fixedRowSlotPool.controllers.find((row) =>
+			row.cells.some((cell) => isItemCell(cell.mountedCell)),
+		);
+		const controller = rowController?.cells.find((cell) =>
+			isItemCell(cell.mountedCell),
+		);
 		expect(controller).toBeDefined();
-		if (!controller || !isItemCell(controller.mountedCell)) return;
+		if (!rowController || !controller || !isItemCell(controller.mountedCell)) {
+			return;
+		}
 
 		const { container } = render(TwoHopItemCellRenderHarness, {
-			props: { controller },
+			props: { controller, visibilityState: rowController.visibilityState },
 		});
 		await tick();
 
@@ -188,7 +193,7 @@ describe("TwoHopItemCellRender", () => {
 		expect(initialActivationCandidateId).toBe(`slot:${controller.cellSlotKey}`);
 		const nextVisibility =
 			initialChild?.dataset.visibility === "visible" ? "mounted" : "visible";
-		controller.setVisibility(nextVisibility);
+		rowController.setVisibility(nextVisibility);
 		await tick();
 		expect(initialChild?.dataset.visibility).toBe(nextVisibility);
 
@@ -273,6 +278,7 @@ describe("TwoHopItemCellRender", () => {
 		const previous = controller.mountedCell;
 		controller.bindCell({
 			...previous,
+			reuseFamily: "file",
 			key: `${String(previous.key)}:file` as typeof previous.key,
 			logicalKey:
 				`${String(previous.logicalKey)}:file` as typeof previous.logicalKey,
@@ -310,11 +316,14 @@ describe("TwoHopItemCellRender", () => {
 		});
 		applySingleRowRange(kernel, 1);
 		const controller = kernel.fixedRowSlotPool.controllers[0]?.cells[0];
+		const visibilityState = kernel.fixedRowSlotPool.controllers[0]?.visibilityState;
 		expect(controller).toBeDefined();
-		if (!controller || !isItemCell(controller.mountedCell)) return;
+		if (!controller || !visibilityState || !isItemCell(controller.mountedCell)) {
+			return;
+		}
 
 		const { container } = render(TwoHopItemCellRenderHarness, {
-			props: { controller },
+			props: { controller, visibilityState },
 		});
 		await tick();
 

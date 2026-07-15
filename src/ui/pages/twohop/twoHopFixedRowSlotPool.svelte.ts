@@ -19,17 +19,14 @@ export interface TwoHopFixedCellSlotController extends VirtualCellRegistrationOw
 	readonly cellSlotKey: number;
 	readonly activationCandidateId: string;
 	readonly active: boolean;
-	readonly revision: number;
 	readonly logicalKey: LogicalCellKey;
 	readonly rowIndex: number;
 	readonly columnIndex: number;
-	readonly visibilityState: VirtualizedItemVisibilityState;
 	readonly renderBodyKey: RenderBodyKey | undefined;
 	readonly renderBodyKind: TwoHopMountedCell["renderBodyKind"];
 	readonly mountedCell: TwoHopMountedCell | undefined;
 	readonly binding: TwoHopCellBinding | null;
 	bindCell(cell: TwoHopMountedCell): void;
-	setVisibility(visibility: VirtualizedItemVisibility): void;
 	clear(): void;
 }
 
@@ -39,7 +36,9 @@ export interface TwoHopFixedRowSlotController {
 	readonly rowIndex: number;
 	readonly top: number;
 	readonly cells: readonly TwoHopFixedCellSlotController[];
+	readonly visibilityState: VirtualizedItemVisibilityState;
 	bindRow(row: TwoHopMountedRowSlice): void;
+	setVisibility(visibility: VirtualizedItemVisibility): void;
 	clear(): void;
 }
 
@@ -47,17 +46,10 @@ interface MutableTwoHopFixedRowSlotController extends TwoHopFixedRowSlotControll
 	setCellCapacity(capacity: number): void;
 }
 
-interface TwoHopCellSlotSnapshot {
-	readonly active: boolean;
-	readonly binding: TwoHopCellBinding | null;
-	readonly revision: number;
-}
-
 interface TwoHopRowSlotSnapshot {
 	readonly active: boolean;
 	readonly rowIndex: number;
 	readonly top: number;
-	readonly revision: number;
 }
 
 export interface TwoHopFixedRowSlotPool {
@@ -73,21 +65,15 @@ function createCellController(
 	initialCell?: TwoHopMountedCell,
 ): TwoHopFixedCellSlotController {
 	const activationCandidateId = `slot:${cellSlotKey}`;
-	const visibilityState = $state<VirtualizedItemVisibilityState>({
-		visibility: "mounted",
-	});
-	let snapshot = $state.raw<TwoHopCellSlotSnapshot>({
-		active: initialCell !== undefined,
-		binding: initialCell ? createTwoHopCellBinding(initialCell, 0) : null,
-		revision: 0,
-	});
+	let binding = $state.raw<TwoHopCellBinding | null>(
+		initialCell ? createTwoHopCellBinding(initialCell, 0) : null,
+	);
 	let cellElement: HTMLElement | null = null;
 	let cellRegistry: VirtualCellRegistry | null = null;
 	let cellRegistration: VirtualCellElementRegistration | null = null;
 
 	function registerCurrentBinding(): void {
-		const binding = snapshot.binding;
-		if (!snapshot.active || !binding || !cellElement || !cellRegistry) return;
+		if (!binding || !cellElement || !cellRegistry) return;
 		if (!cellRegistration) {
 			cellRegistration = cellRegistry.createRegistration(cellElement);
 		}
@@ -107,35 +93,31 @@ function createCellController(
 		cellSlotKey,
 		activationCandidateId,
 		get active() {
-			return snapshot.active;
-		},
-		get revision() {
-			return snapshot.revision;
+			return binding !== null;
 		},
 		get logicalKey() {
-			return snapshot.binding?.logicalKey ?? logicalCellKey("");
+			return binding?.logicalKey ?? logicalCellKey("");
 		},
 		get rowIndex() {
-			return snapshot.binding?.rowIndex ?? -1;
+			return binding?.rowIndex ?? -1;
 		},
 		get columnIndex() {
-			return snapshot.binding?.columnIndex ?? -1;
+			return binding?.columnIndex ?? -1;
 		},
-		visibilityState,
 		get renderBodyKey() {
-			return snapshot.binding?.mountedCell.renderBodyKey;
+			return binding?.mountedCell.renderBodyKey;
 		},
 		get renderBodyKind() {
-			return snapshot.binding?.renderKind ?? "header";
+			return binding?.renderKind ?? "header";
 		},
 		get mountedCell() {
-			return snapshot.binding?.mountedCell;
+			return binding?.mountedCell;
 		},
 		get binding() {
-			return snapshot.binding;
+			return binding;
 		},
 		bindCell(nextCell): void {
-			const previousBinding = snapshot.binding;
+			const previousBinding = binding;
 			if (
 				previousBinding &&
 				previousBinding.logicalKey !== nextCell.key &&
@@ -147,34 +129,21 @@ function createCellController(
 					String(nextCell.key),
 				);
 			}
-			const nextBinding = createTwoHopCellBinding(
+			binding = createTwoHopCellBinding(
 				nextCell,
 				(previousBinding?.epoch ?? -1) + 1,
 			);
-			snapshot = {
-				active: true,
-				binding: nextBinding,
-				revision: snapshot.revision + 1,
-			};
 			registerCurrentBinding();
 		},
-		setVisibility(visibility): void {
-			if (visibilityState.visibility === visibility) return;
-			visibilityState.visibility = visibility;
-		},
 		clear(): void {
-			if (snapshot.binding && cellElement) {
+			if (binding && cellElement) {
 				prepareVirtualCellForRebind(
 					cellElement,
-					String(snapshot.binding.logicalKey),
+					String(binding.logicalKey),
 					"",
 				);
 			}
-			snapshot = {
-				active: false,
-				binding: null,
-				revision: snapshot.revision + 1,
-			};
+			binding = null;
 			unregisterCurrentBinding();
 		},
 		attachElement(element, registry): void {
@@ -198,8 +167,11 @@ function createController(slotIndex: number): MutableTwoHopFixedRowSlotControlle
 		active: false,
 		rowIndex: -1,
 		top: 0,
-		revision: 0,
 	});
+	const visibilityState = $state<VirtualizedItemVisibilityState>({
+		visibility: "mounted",
+	});
+	let cellsRevision = $state(0);
 	const cells: TwoHopFixedCellSlotController[] = [];
 	return {
 		slotIndex,
@@ -213,9 +185,10 @@ function createController(slotIndex: number): MutableTwoHopFixedRowSlotControlle
 			return snapshot.top;
 		},
 		get cells() {
-			void snapshot.revision;
+			void cellsRevision;
 			return cells;
 		},
+		visibilityState,
 		setCellCapacity(capacity): void {
 			if (process.env.NODE_ENV !== "production") {
 				recordCCLDevMeasurement("twoHop.fixedSlotPool.cellCapacityCheck");
@@ -226,13 +199,11 @@ function createController(slotIndex: number): MutableTwoHopFixedRowSlotControlle
 			for (let columnIndex = 0; columnIndex < capacity; columnIndex += 1) {
 				cells.push(createCellController(slotIndex * capacity + columnIndex));
 			}
-			snapshot = {
-				...snapshot,
-				revision: snapshot.revision + 1,
-			};
+			cellsRevision += 1;
 		},
 		bindRow(nextRow): void {
 			this.setCellCapacity(Math.max(cells.length, nextRow.cells.length));
+			let cellsChanged = false;
 			if (process.env.NODE_ENV !== "production") {
 				recordCCLDevMeasurement("twoHop.reboundRowSlot");
 				for (const _cell of nextRow.cells) {
@@ -253,6 +224,7 @@ function createController(slotIndex: number): MutableTwoHopFixedRowSlotControlle
 				}
 				cells[index]?.clear();
 				cells[index] = createCellController(cellSlotKey, nextCell);
+				cellsChanged = true;
 			}
 			for (let index = nextRow.cells.length; index < cells.length; index += 1) {
 				cells[index]?.clear();
@@ -261,8 +233,12 @@ function createController(slotIndex: number): MutableTwoHopFixedRowSlotControlle
 				active: true,
 				rowIndex: nextRow.rowIndex,
 				top: nextRow.top,
-				revision: snapshot.revision + 1,
 			};
+			if (cellsChanged) cellsRevision += 1;
+		},
+		setVisibility(visibility): void {
+			if (visibilityState.visibility === visibility) return;
+			visibilityState.visibility = visibility;
 		},
 		clear(): void {
 			if (!snapshot.active) return;
@@ -270,7 +246,6 @@ function createController(slotIndex: number): MutableTwoHopFixedRowSlotControlle
 			snapshot = {
 				...snapshot,
 				active: false,
-				revision: snapshot.revision + 1,
 			};
 		},
 	};

@@ -2,11 +2,7 @@ import { getOptionalOwnerWindow } from "ui/utils/realmSafeDom";
 
 type ScrollTarget = Window | HTMLElement;
 export type ScrollPhase = "start" | "scroll" | "idle";
-export interface ScrollTargetMetrics {
-	scrollTop: number;
-}
-
-type ScrollPhaseCallback = (phase: ScrollPhase, metrics?: ScrollTargetMetrics) => void;
+type ScrollPhaseCallback = (phase: ScrollPhase, scrollTop?: number) => void;
 
 const SCROLL_IDLE_MS = 140;
 
@@ -29,16 +25,12 @@ function resolveScrollTargetWindow(target: ScrollTarget): Window | null {
 	return getOptionalOwnerWindow(target);
 }
 
-function snapshotScrollTargetMetrics(
-	target: ScrollTarget,
-): ScrollTargetMetrics | undefined {
+function readScrollTop(target: ScrollTarget): number | undefined {
 	if ("document" in target) {
 		return undefined;
 	}
 
-	return {
-		scrollTop: target.scrollTop,
-	};
+	return target.scrollTop;
 }
 
 export function subscribeScrollTarget(
@@ -74,7 +66,7 @@ export function subscribeScrollTarget(
 				}
 			},
 			dispatch: () => {
-				const metrics = snapshotScrollTargetMetrics(target);
+				const scrollTop = readScrollTop(target);
 				entry!.lastScrollTime = Date.now();
 
 				if (!entry!.isScrollActive) {
@@ -85,7 +77,7 @@ export function subscribeScrollTarget(
 				}
 
 				for (const cb of entry!.phaseCallbacks) {
-					cb("scroll", metrics);
+					cb("scroll", scrollTop);
 				}
 
 				if (entry!.idleTimer === null) {

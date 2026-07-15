@@ -114,7 +114,11 @@
 			getCellDataTestId={list.getCellDataTestId}
 			{cellRegistry}
 		>
-			{#snippet renderCell({ mountedCell: renderedCell, cellController })}
+			{#snippet renderCell({
+				mountedCell: renderedCell,
+				cellController,
+				visibilityState,
+			})}
 				{#if isHeaderCell(renderedCell)}
 					{@render props.renderHeader({
 						section: renderedCell.section,
@@ -126,6 +130,7 @@
 				{:else if isItemCell(renderedCell)}
 					<TwoHopItemCellRender
 						controller={cellController}
+						{visibilityState}
 						renderItem={props.renderItem}
 					/>
 				{:else}

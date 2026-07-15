@@ -1,21 +1,17 @@
 <script lang="ts">
 	import type { Snippet } from "svelte";
 	import type { VirtualizedItemVisibilityState } from "ui/components/common/virtual-list/types";
-	import type { MountedFlatItemCell } from "ui/components/common/virtual-list/core/reconciliation/viewPlanMountedCells";
 	import type { TwoHopFixedCellSlotController } from "./twoHopFixedRowSlotPool.svelte";
 	import type {
 		TwoHopVirtualListItem,
 		TwoHopVirtualListSection,
 	} from "./twoHopVirtualListModel";
 	import type { TwoHopCardPresentationState } from "./twoHopCellBinding";
-
-	type TwoHopMountedItemCell = MountedFlatItemCell<
-		TwoHopVirtualListItem,
-		TwoHopVirtualListSection
-	>;
+	import type { TwoHopMountedItemCell } from "./twoHopMountedTypes";
 
 	interface Props {
 		controller: TwoHopFixedCellSlotController;
+		visibilityState: VirtualizedItemVisibilityState;
 		renderItem: Snippet<
 			[
 				TwoHopVirtualListItem,
@@ -27,7 +23,7 @@
 		>;
 	}
 
-	let { controller, renderItem }: Props = $props();
+	let { controller, visibilityState, renderItem }: Props = $props();
 
 	const isItemCell = (
 		cell: TwoHopFixedCellSlotController["mountedCell"],
@@ -49,7 +45,6 @@
 		extension: null,
 	};
 	const item = $derived.by(() => {
-		void controller.revision;
 		const binding = controller.binding;
 		const mountedCell = binding?.mountedCell;
 		return isItemCell(mountedCell)
@@ -57,7 +52,6 @@
 			: fallbackItemCell?.cell.item;
 	});
 	const rowIndex = $derived.by(() => {
-		void controller.revision;
 		const binding = controller.binding;
 		const mountedCell = binding?.mountedCell;
 		return isItemCell(mountedCell)
@@ -65,7 +59,6 @@
 			: fallbackItemCell?.rowIndex;
 	});
 	const presentation = $derived.by(() => {
-		void controller.revision;
 		return controller.binding?.presentation ?? fallbackPresentation;
 	});
 </script>
@@ -74,7 +67,7 @@
 	{@render renderItem(
 		item,
 		rowIndex,
-		controller.visibilityState,
+		visibilityState,
 		controller.activationCandidateId,
 		presentation,
 	)}

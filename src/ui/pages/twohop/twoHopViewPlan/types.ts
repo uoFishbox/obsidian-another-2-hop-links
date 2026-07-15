@@ -18,6 +18,7 @@ import type {
 	TwoHopVirtualListSection,
 	TwoHopVirtualListItem,
 } from "../twoHopVirtualListModel";
+import type { TwoHopCellDisplayMetadata } from "../twoHopCellDisplayMetadata";
 export interface TwoHopSectionPlan {
 	readonly descriptor: SectionRenderDescriptor<
 		TwoHopVirtualListItem,
@@ -51,7 +52,7 @@ export interface PreparedTwoHopSection {
 }
 
 /** Immutable cell identity compiled before the scroll hot path begins. */
-export interface CompiledTwoHopCell {
+export interface CompiledTwoHopCell extends TwoHopCellDisplayMetadata {
 	readonly logicalCell: VirtualListLogicalCell<TwoHopVirtualListItem>;
 	readonly logicalKey: VirtualListLogicalCell<TwoHopVirtualListItem>["key"];
 	readonly renderBodyKey: RenderBodyKey;

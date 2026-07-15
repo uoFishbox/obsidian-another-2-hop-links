@@ -1,20 +1,13 @@
 <script lang="ts">
-	import type { MountedFlatItemCell } from "ui/components/common/virtual-list/core/reconciliation/viewPlanMountedCells";
 	import { createSurfaceVirtualCellRegistry } from "ui/components/common/virtual-list/svelte/VirtualCellRegistry";
 	import TwoHopFixedRowSlotsSurface from "../TwoHopFixedRowSlotsSurface.svelte";
 	import TwoHopItemCellRender from "../TwoHopItemCellRender.svelte";
 	import type { TwoHopFixedRowSlotController } from "../twoHopFixedRowSlotPool.svelte";
-	import type { TwoHopMountedCell } from "../twoHopMountedTypes";
 	import type {
-		TwoHopVirtualListItem,
-		TwoHopVirtualListSection,
-	} from "../twoHopVirtualListModel";
+		TwoHopMountedCell,
+		TwoHopMountedItemCell,
+	} from "../twoHopMountedTypes";
 	import TwoHopVirtualListSurfaceChildItem from "./TwoHopVirtualListSurfaceChildItem.svelte";
-
-	type TwoHopMountedItemCell = MountedFlatItemCell<
-		TwoHopVirtualListItem,
-		TwoHopVirtualListSection
-	>;
 
 	interface Props {
 		rowSlotControllers: readonly TwoHopFixedRowSlotController[];
@@ -33,9 +26,9 @@
 	{rowSlotControllers}
 	{cellRegistry}
 >
-	{#snippet renderCell({ mountedCell, cellController })}
+	{#snippet renderCell({ mountedCell, cellController, visibilityState })}
 		{#if isItemCell(mountedCell)}
-			<TwoHopItemCellRender controller={cellController}>
+			<TwoHopItemCellRender controller={cellController} {visibilityState}>
 				{#snippet renderItem(item, rowIndex, visibilityState)}
 					<TwoHopVirtualListSurfaceChildItem
 						{item}

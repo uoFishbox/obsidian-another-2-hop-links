@@ -1,149 +1,22 @@
 import type { LogicalCellKey } from "ui/components/common/virtual-list/types";
 import type { TwoHopMountedCell } from "./twoHopMountedTypes";
-import type {
-	TwoHopVirtualListItem,
-	TwoHopVirtualListSection,
-} from "./twoHopVirtualListModel";
-import type { MountedFlatItemCell } from "ui/components/common/virtual-list/core/reconciliation/viewPlanMountedCells";
-import type {
-	CardPresentationState,
-	CardSectionVariant,
-} from "ui/components/common/cardPresentation";
-import { isAttachment } from "core/rules/fileRules";
+import type { TwoHopCellDisplayMetadata } from "./twoHopCellDisplayMetadata";
 
-export type TwoHopCardSectionVariant = CardSectionVariant;
-
-export type TwoHopItemReuseFamily =
-	| "resolved-item"
-	| "missing-branch"
-	| "new-link"
-	| "tagged-note"
-	| "file";
-
-export type TwoHopCardPresentationState = CardPresentationState;
-
-type TwoHopMountedItemCell = MountedFlatItemCell<
-	TwoHopVirtualListItem,
-	TwoHopVirtualListSection
->;
+export {
+	resolveTwoHopSectionVariant,
+	type TwoHopCardPresentationState,
+	type TwoHopCardSectionVariant,
+	type TwoHopItemReuseFamily,
+} from "./twoHopCellDisplayMetadata";
 
 /** Complete, committed state for one physical cell's current logical binding. */
-export interface TwoHopCellBinding {
+export interface TwoHopCellBinding extends TwoHopCellDisplayMetadata {
 	readonly epoch: number;
 	readonly logicalKey: LogicalCellKey;
 	readonly rowIndex: number;
 	readonly columnIndex: number;
 	readonly renderKind: TwoHopMountedCell["renderBodyKind"];
-	readonly reuseFamily: TwoHopItemReuseFamily | null;
-	readonly presentation: TwoHopCardPresentationState | null;
-	readonly interactionId: string | null;
 	readonly mountedCell: TwoHopMountedCell;
-}
-
-export function resolveTwoHopSectionVariant(
-	section: TwoHopVirtualListSection,
-): TwoHopCardSectionVariant {
-	switch (section.kind) {
-		case "new-links-section":
-			return "new-links";
-		case "tag-section":
-			return "tag";
-		case "two-hop-branch":
-			return "two-hop";
-		case "primary-section":
-			switch (section.rawSectionId) {
-				case "outgoing":
-					return "outgoing";
-				case "merged":
-					return "merged";
-				default:
-					return "backlinks";
-			}
-	}
-}
-
-function resolveItemState(
-	cell: TwoHopMountedItemCell,
-): Pick<TwoHopCellBinding, "reuseFamily" | "presentation" | "interactionId"> {
-	const row = cell.cell.item;
-	const sectionVariant = resolveTwoHopSectionVariant(cell.section);
-	const extension = resolveItemExtension(row.item);
-	const presentation = (
-		resolution: TwoHopCardPresentationState["resolution"],
-	): TwoHopCardPresentationState => ({
-		sectionVariant,
-		resolution,
-		attachment: isAttachment(extension ?? undefined),
-		extension,
-	});
-
-	switch (row.item.type) {
-		case "newLink":
-			return {
-				reuseFamily: "new-link",
-				presentation: presentation("missing"),
-				interactionId: row.interactionId ?? null,
-			};
-		case "branch": {
-			const missing = row.item.data.hop1.isUnresolved;
-			return {
-				reuseFamily: missing ? "missing-branch" : "resolved-item",
-				presentation: presentation(missing ? "missing" : "resolved"),
-				interactionId: row.interactionId ?? null,
-			};
-		}
-		case "taggedNote":
-			return {
-				reuseFamily: "tagged-note",
-				presentation: presentation("resolved"),
-				interactionId: row.interactionId ?? null,
-			};
-		case "file":
-			return {
-				reuseFamily: "file",
-				presentation: presentation("resolved"),
-				interactionId: row.interactionId ?? null,
-			};
-		case "backlink":
-			return {
-				reuseFamily: "resolved-item",
-				presentation: presentation("resolved"),
-				interactionId: row.interactionId ?? null,
-			};
-	}
-}
-
-function normalizeExtension(extension: string | undefined): string | null {
-	if (!extension || extension.toLowerCase() === "md") return null;
-	return extension.toLowerCase();
-}
-
-function resolvePathExtension(path: string | undefined): string | null {
-	if (!path) return null;
-	const fileName = path.split("/").at(-1) ?? "";
-	const extensionIndex = fileName.lastIndexOf(".");
-	return normalizeExtension(
-		extensionIndex > 0 ? fileName.slice(extensionIndex + 1) : undefined,
-	);
-}
-
-function resolveItemExtension(item: TwoHopVirtualListItem["item"]): string | null {
-	switch (item.type) {
-		case "newLink":
-			return null;
-		case "branch":
-			return resolvePathExtension(item.data.hop1.path);
-		case "backlink":
-			return normalizeExtension(item.data.sourceFile.extension);
-		case "taggedNote":
-			return normalizeExtension(item.data.file.extension);
-		case "file":
-			return normalizeExtension(item.data.extension);
-	}
-}
-
-function isItemCell(cell: TwoHopMountedCell): cell is TwoHopMountedItemCell {
-	return cell.cell.kind === "item";
 }
 
 /** Builds the single snapshot committed by a physical slot rebind. */
@@ -151,17 +24,15 @@ export function createTwoHopCellBinding(
 	cell: TwoHopMountedCell,
 	epoch: number,
 ): TwoHopCellBinding {
-	const itemState = isItemCell(cell)
-		? resolveItemState(cell)
-		: { reuseFamily: null, presentation: null, interactionId: null };
-
 	return {
 		epoch,
 		logicalKey: cell.key,
 		rowIndex: cell.rowIndex,
 		columnIndex: cell.columnIndex,
 		renderKind: cell.renderBodyKind,
-		...itemState,
+		reuseFamily: cell.reuseFamily,
+		presentation: cell.presentation,
+		interactionId: cell.interactionId,
 		mountedCell: cell,
 	};
 }

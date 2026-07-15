@@ -8,6 +8,7 @@
 		TwoHopFixedRowSlotController,
 	} from "./twoHopFixedRowSlotPool.svelte";
 	import type { VirtualCellRegistry } from "ui/components/common/virtual-list/svelte/VirtualCellRegistry";
+	import type { VirtualizedItemVisibilityState } from "ui/components/common/virtual-list/types";
 
 	interface Props {
 		contentClassName?: string;
@@ -26,6 +27,7 @@
 				{
 					mountedCell: TwoHopMountedCell;
 					cellController: TwoHopFixedCellSlotController;
+					visibilityState: VirtualizedItemVisibilityState;
 				},
 			]
 		>;
@@ -93,7 +95,11 @@
 							cellRegistrationOwner={cellController}
 						>
 							{#key resolveBodyLifecycleKey(cellController)}
-								{@render renderCell({ mountedCell, cellController })}
+								{@render renderCell({
+									mountedCell,
+									cellController,
+									visibilityState: controller.visibilityState,
+								})}
 							{/key}
 						</VirtualGridLogicalCellMount>
 					{/if}
