@@ -262,6 +262,30 @@ describe("TwoHop scalar scroll kernel", () => {
 		expect(registry.findByKey(nextKey)).toBeNull();
 	});
 
+	it("stores preview visibility on each physical cell controller", () => {
+		const kernel = createTwoHopScalarScrollKernel({
+			initialRowModel: rowModel,
+			onStableVisibleRange() {},
+		});
+		applyRange(kernel, 0);
+
+		expect(
+			kernel.fixedRowSlotPool.controllers.map(
+				(row) => row.cells[0]?.visibilityState.visibility,
+			),
+		).toEqual(["mounted", "visible", "mounted"]);
+
+		kernel.syncPreviewVisibleRange(2, 3);
+
+		expect(
+			kernel.fixedRowSlotPool.controllers.map(
+				(row) => row.cells[0]?.visibilityState.visibility,
+			),
+		).toEqual(["mounted", "mounted", "visible"]);
+
+		kernel.dispose();
+	});
+
 	it("reuses row/cell shells and writes only the entering slot", () => {
 		const kernel = createTwoHopScalarScrollKernel({
 			initialRowModel: rowModel,
@@ -290,6 +314,7 @@ describe("TwoHop scalar scroll kernel", () => {
 		expect(counters["twoHop.scalarKernel.cellShellCreated"].count).toBe(0);
 		expect(counters["twoHop.reboundRowSlot"].count).toBe(1);
 		expect(counters["twoHop.reboundCellSlot"].count).toBe(2);
+		expect(counters["twoHop.fixedSlotPool.cellCapacityCheck"].count).toBe(1);
 		expect(counters["twoHop.buildMountedRows"].count).toBe(0);
 	});
 

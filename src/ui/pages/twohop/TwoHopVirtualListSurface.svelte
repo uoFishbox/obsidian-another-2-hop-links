@@ -125,10 +125,7 @@
 					})}
 				{:else if isItemCell(renderedCell)}
 					<TwoHopItemCellRender
-						{cellController}
-						initialCell={renderedCell}
-						getItemVisibilityState={list.getItemVisibilityState}
-						getItemActivationCandidateId={list.getItemActivationCandidateId}
+						controller={cellController}
 						renderItem={props.renderItem}
 					/>
 				{:else}

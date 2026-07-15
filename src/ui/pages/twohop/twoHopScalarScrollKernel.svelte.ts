@@ -9,7 +9,6 @@ import {
 	type RenderSlotKey,
 	type VirtualRanges,
 } from "ui/components/common/virtual-list/types";
-import type { VirtualizedItemResolvedVisibilityState } from "ui/components/common/virtual-list/svelte/virtualizedItemVisibilityState.svelte";
 import type { VirtualizedItemVisibility } from "ui/components/common/virtualizedItemVisibility";
 import type { RenderRevision } from "ui/components/common/virtual-list/renderRevision";
 import { createContiguousRowSlotAllocator } from "ui/components/common/virtual-list/core/reconciliation/contiguousRowSlotAllocator";
@@ -55,7 +54,6 @@ interface MutableMountedCellShell {
 interface CellSlotRecord {
 	readonly mutable: MutableMountedCellShell;
 	readonly mounted: TwoHopMountedCell;
-	readonly visibilityState: VirtualizedItemResolvedVisibilityState;
 }
 
 interface RowSlotRecord {
@@ -101,13 +99,9 @@ function createCellSlotRecord(renderSlotIndex: number): CellSlotRecord {
 		totalCount: 0,
 		headerProps: EMPTY_HEADER_PROPS,
 	};
-	const visibilityState: VirtualizedItemResolvedVisibilityState = $state({
-		visibility: "mounted",
-	});
 	return {
 		mutable,
 		mounted: mutable as unknown as TwoHopMountedCell,
-		visibilityState,
 	};
 }
 
@@ -175,10 +169,6 @@ export function createTwoHopScalarScrollKernel(params: {
 		mounted: { start: 0, end: 0 },
 		previewVisible: { start: 0, end: 0 },
 	};
-	const fallbackVisibilityState: VirtualizedItemResolvedVisibilityState = $state({
-		visibility: "mounted",
-	});
-
 	const snapshot: TwoHopScalarKernelSnapshot = {
 		get rowModel() {
 			return rowModel;
@@ -256,9 +246,9 @@ export function createTwoHopScalarScrollKernel(params: {
 			previewRange.start,
 			previewRange.end,
 		);
+		const rowController = fixedRowSlotPool.controllers[record.row.slotIndex ?? 0];
 		for (let index = 0; index < record.row.cells.length; index += 1) {
-			const state = record.cellSlots[index]?.visibilityState;
-			if (state && state.visibility !== visibility) state.visibility = visibility;
+			rowController?.cells[index]?.setVisibility(visibility);
 		}
 		params.rowPreviewActivationRuntime?.setRowVisibility(
 			record.row.rowIndex,
@@ -359,8 +349,8 @@ export function createTwoHopScalarScrollKernel(params: {
 		}
 		record.row.cells.length = cellCount;
 		record.active = true;
-		setRowVisibility(record);
 		fixedRowSlotPool.bindRow(record.row);
+		setRowVisibility(record);
 	}
 
 	function isRowInRange(rowIndex: number, start: number, end: number): boolean {
@@ -593,17 +583,6 @@ export function createTwoHopScalarScrollKernel(params: {
 			applyPreviewRange(start, end);
 		},
 		cancelPreviewVisibleRangeSync(): void {},
-		getItemVisibilityState(
-			cell: TwoHopMountedCell,
-		): VirtualizedItemResolvedVisibilityState {
-			const columns = Math.max(1, activeColumns);
-			const slotIndex = Math.floor(cell.renderSlotIndex / columns);
-			const columnIndex = cell.renderSlotIndex % columns;
-			return (
-				rowSlots[slotIndex]?.cellSlots[columnIndex]?.visibilityState ??
-				fallbackVisibilityState
-			);
-		},
 		dispose(): void {
 			for (const record of rowSlots) clearRowSlot(record);
 			rowSlotAllocator.dispose();

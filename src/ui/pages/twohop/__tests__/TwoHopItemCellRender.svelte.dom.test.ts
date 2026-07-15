@@ -1,8 +1,7 @@
 import { cleanup, render } from "@testing-library/svelte";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 import { tick } from "svelte";
 import type { SectionRenderDescriptor } from "ui/components/sections/types";
-import type { VirtualizedItemVisibilityState } from "ui/components/common/virtual-list/types";
 import { compileTwoHopViewPlan, createTwoHopViewPlanRowModel } from "../twoHopViewPlan";
 import { createTwoHopScalarScrollKernel } from "../twoHopScalarScrollKernel.svelte";
 import { createTwoHopFixedRowSlotPool } from "../twoHopFixedRowSlotPool.svelte";
@@ -162,7 +161,7 @@ describe("TwoHopItemCellRender", () => {
 		kernel.dispose();
 	});
 
-	it("resolves one snapshot per slot reassignment and updates a retained child", async () => {
+	it("updates a retained child through its stable physical controller", async () => {
 		const kernel = createTwoHopScalarScrollKernel({
 			initialRowModel: rowModel,
 			onStableVisibleRange() {},
@@ -174,21 +173,8 @@ describe("TwoHopItemCellRender", () => {
 		expect(controller).toBeDefined();
 		if (!controller || !isItemCell(controller.mountedCell)) return;
 
-		const visibilityState = {
-			visibility: "mounted",
-		} as VirtualizedItemVisibilityState;
-		const getItemVisibilityState = vi.fn(() => visibilityState);
-		const getItemActivationCandidateId = vi.fn(
-			(cell: Extract<TwoHopMountedCell, { cell: { kind: "item" } }>) =>
-				`candidate:${cell.cell.item.virtualKey}`,
-		);
 		const { container } = render(TwoHopItemCellRenderHarness, {
-			props: {
-				cellController: controller,
-				initialCell: controller.mountedCell,
-				getItemVisibilityState,
-				getItemActivationCandidateId,
-			},
+			props: { controller },
 		});
 		await tick();
 
@@ -197,9 +183,14 @@ describe("TwoHopItemCellRender", () => {
 		);
 		const initialIndex = initialChild?.dataset.index;
 		const initialInstanceId = initialChild?.dataset.instanceId;
+		const initialActivationCandidateId = controller.activationCandidateId;
 		expect(initialChild).toBeTruthy();
-		expect(getItemVisibilityState).toHaveBeenCalledTimes(1);
-		expect(getItemActivationCandidateId).toHaveBeenCalledTimes(1);
+		expect(initialActivationCandidateId).toBe(`slot:${controller.cellSlotKey}`);
+		const nextVisibility =
+			initialChild?.dataset.visibility === "visible" ? "mounted" : "visible";
+		controller.setVisibility(nextVisibility);
+		await tick();
+		expect(initialChild?.dataset.visibility).toBe(nextVisibility);
 
 		applyRange(kernel, 4);
 		await tick();
@@ -214,12 +205,10 @@ describe("TwoHopItemCellRender", () => {
 		expect(reboundChild?.dataset.renderedKey).toBe(
 			`${reboundChild?.dataset.index}:${reboundChild?.dataset.rowIndex}`,
 		);
-		expect(getItemVisibilityState).toHaveBeenCalledTimes(2);
-		expect(getItemActivationCandidateId).toHaveBeenCalledTimes(2);
 		expect(
 			container.querySelector<HTMLElement>("[data-activation-candidate-id]")
 				?.dataset.activationCandidateId,
-		).toBe(`candidate:${reboundChild?.dataset.index}`);
+		).toBe(initialActivationCandidateId);
 
 		kernel.dispose();
 	});
@@ -324,20 +313,8 @@ describe("TwoHopItemCellRender", () => {
 		expect(controller).toBeDefined();
 		if (!controller || !isItemCell(controller.mountedCell)) return;
 
-		const getItemVisibilityState = vi.fn(() => ({
-			visibility: "mounted" as const,
-		}));
-		const getItemActivationCandidateId = vi.fn(
-			(cell: Extract<TwoHopMountedCell, { cell: { kind: "item" } }>) =>
-				`candidate:${cell.cell.item.virtualKey}`,
-		);
 		const { container } = render(TwoHopItemCellRenderHarness, {
-			props: {
-				cellController: controller,
-				initialCell: controller.mountedCell,
-				getItemVisibilityState,
-				getItemActivationCandidateId,
-			},
+			props: { controller },
 		});
 		await tick();
 

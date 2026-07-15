@@ -277,7 +277,12 @@ export function createRowPreviewActivationRuntime(
 	): void {
 		if (disposed) return;
 
-		const state = getOrCreateRowState(rowIndex);
+		const existing = rows.get(rowIndex);
+		if (!existing && visibility === "mounted") {
+			return;
+		}
+
+		const state = existing ?? getOrCreateRowState(rowIndex);
 		if (state.visibility === visibility) {
 			if (visibility === "visible") {
 				enqueueRowCandidates(rowIndex);

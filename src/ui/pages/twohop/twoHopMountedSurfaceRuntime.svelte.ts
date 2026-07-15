@@ -1,25 +1,10 @@
 import { getContext, untrack } from "svelte";
-import type { MountedFlatItemCell } from "ui/components/common/virtual-list/core/reconciliation/viewPlanMountedCells";
-import type {
-	TwoHopVirtualListItem,
-	TwoHopVirtualListSection,
-} from "./twoHopVirtualListModel";
 import type { TwoHopVirtualListPlanRuntime } from "./twoHopVirtualListPlanRuntime.svelte";
 import {
 	PREVIEW_ROW_ACTIVATION_CONTEXT_KEY,
 	type RowPreviewActivationRuntime,
 } from "features/preview/scheduling/rowPreviewActivationRuntime";
-import { resolveTwoHopSlotId } from "./twoHopSlotId";
 import { createTwoHopScalarScrollKernel } from "./twoHopScalarScrollKernel.svelte";
-
-type TwoHopMountedItemCell = MountedFlatItemCell<
-	TwoHopVirtualListItem,
-	TwoHopVirtualListSection
->;
-
-function getTwoHopActivationCandidateId(cell: TwoHopMountedItemCell): string {
-	return resolveTwoHopSlotId(cell);
-}
 
 export function createTwoHopMountedSurfaceRuntime(params: {
 	readonly inputRuntime: TwoHopVirtualListPlanRuntime;
@@ -64,8 +49,6 @@ export function createTwoHopMountedSurfaceRuntime(params: {
 		get fixedRowSlotControllers() {
 			return kernel.fixedRowSlotPool.controllers;
 		},
-		getItemVisibilityState: kernel.getItemVisibilityState,
-		getItemActivationCandidateId: getTwoHopActivationCandidateId,
 		syncPreviewVisibleRange: kernel.syncPreviewVisibleRange,
 		cancelPreviewVisibleRangeSync: kernel.cancelPreviewVisibleRangeSync,
 	};

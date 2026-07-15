@@ -2,7 +2,9 @@ import type { TwoHopMountedCell, TwoHopMountedRowSlice } from "./twoHopMountedTy
 import {
 	logicalCellKey,
 	type LogicalCellKey,
+	type VirtualizedItemVisibilityState,
 } from "ui/components/common/virtual-list/types";
+import type { VirtualizedItemVisibility } from "ui/components/common/virtualizedItemVisibility";
 import type { RenderBodyKey } from "ui/components/common/virtual-list/renderRevision";
 import { recordCCLDevMeasurement } from "infrastructure/debug/CCLDevMeasurements";
 import type {
@@ -15,15 +17,19 @@ import { prepareVirtualCellForRebind } from "ui/interactions/virtualCellRebind";
 
 export interface TwoHopFixedCellSlotController extends VirtualCellRegistrationOwner {
 	readonly cellSlotKey: number;
+	readonly activationCandidateId: string;
 	readonly active: boolean;
+	readonly revision: number;
 	readonly logicalKey: LogicalCellKey;
 	readonly rowIndex: number;
 	readonly columnIndex: number;
+	readonly visibilityState: VirtualizedItemVisibilityState;
 	readonly renderBodyKey: RenderBodyKey | undefined;
 	readonly renderBodyKind: TwoHopMountedCell["renderBodyKind"];
 	readonly mountedCell: TwoHopMountedCell | undefined;
 	readonly binding: TwoHopCellBinding | null;
 	bindCell(cell: TwoHopMountedCell): void;
+	setVisibility(visibility: VirtualizedItemVisibility): void;
 	clear(): void;
 }
 
@@ -66,6 +72,10 @@ function createCellController(
 	cellSlotKey: number,
 	initialCell?: TwoHopMountedCell,
 ): TwoHopFixedCellSlotController {
+	const activationCandidateId = `slot:${cellSlotKey}`;
+	const visibilityState = $state<VirtualizedItemVisibilityState>({
+		visibility: "mounted",
+	});
 	let snapshot = $state.raw<TwoHopCellSlotSnapshot>({
 		active: initialCell !== undefined,
 		binding: initialCell ? createTwoHopCellBinding(initialCell, 0) : null,
@@ -95,8 +105,12 @@ function createCellController(
 
 	return {
 		cellSlotKey,
+		activationCandidateId,
 		get active() {
 			return snapshot.active;
+		},
+		get revision() {
+			return snapshot.revision;
 		},
 		get logicalKey() {
 			return snapshot.binding?.logicalKey ?? logicalCellKey("");
@@ -107,6 +121,7 @@ function createCellController(
 		get columnIndex() {
 			return snapshot.binding?.columnIndex ?? -1;
 		},
+		visibilityState,
 		get renderBodyKey() {
 			return snapshot.binding?.mountedCell.renderBodyKey;
 		},
@@ -142,6 +157,10 @@ function createCellController(
 				revision: snapshot.revision + 1,
 			};
 			registerCurrentBinding();
+		},
+		setVisibility(visibility): void {
+			if (visibilityState.visibility === visibility) return;
+			visibilityState.visibility = visibility;
 		},
 		clear(): void {
 			if (snapshot.binding && cellElement) {
@@ -198,6 +217,9 @@ function createController(slotIndex: number): MutableTwoHopFixedRowSlotControlle
 			return cells;
 		},
 		setCellCapacity(capacity): void {
+			if (process.env.NODE_ENV !== "production") {
+				recordCCLDevMeasurement("twoHop.fixedSlotPool.cellCapacityCheck");
+			}
 			if (cells.length === capacity) return;
 			for (const cell of cells) cell.clear();
 			cells.length = 0;
@@ -259,9 +281,18 @@ export function createTwoHopFixedRowSlotPool(): TwoHopFixedRowSlotPool {
 	let configuredCellCapacity = 0;
 
 	function ensureCapacity(capacity: number, cellCapacity?: number): void {
-		if (cellCapacity !== undefined) configuredCellCapacity = cellCapacity;
-		for (const controller of controllers) {
-			controller.setCellCapacity(configuredCellCapacity);
+		const nextCellCapacity = cellCapacity ?? configuredCellCapacity;
+		if (
+			capacity <= controllers.length &&
+			nextCellCapacity === configuredCellCapacity
+		) {
+			return;
+		}
+		if (nextCellCapacity !== configuredCellCapacity) {
+			configuredCellCapacity = nextCellCapacity;
+			for (const controller of controllers) {
+				controller.setCellCapacity(configuredCellCapacity);
+			}
 		}
 		if (capacity <= controllers.length) return;
 		const next = controllers.slice();
@@ -278,9 +309,12 @@ export function createTwoHopFixedRowSlotPool(): TwoHopFixedRowSlotPool {
 			ensureCapacity(capacity, cellCapacity);
 			return;
 		}
-		if (cellCapacity !== undefined) configuredCellCapacity = cellCapacity;
-		for (let slotIndex = 0; slotIndex < capacity; slotIndex += 1) {
-			controllers[slotIndex]?.setCellCapacity(configuredCellCapacity);
+		const nextCellCapacity = cellCapacity ?? configuredCellCapacity;
+		if (nextCellCapacity !== configuredCellCapacity) {
+			configuredCellCapacity = nextCellCapacity;
+			for (let slotIndex = 0; slotIndex < capacity; slotIndex += 1) {
+				controllers[slotIndex]?.setCellCapacity(configuredCellCapacity);
+			}
 		}
 		for (let slotIndex = capacity; slotIndex < controllers.length; slotIndex += 1) {
 			controllers[slotIndex]?.clear();
@@ -296,8 +330,12 @@ export function createTwoHopFixedRowSlotPool(): TwoHopFixedRowSlotPool {
 		setCapacity,
 		bindRow(row): void {
 			const slotIndex = row.slotIndex ?? 0;
-			ensureCapacity(slotIndex + 1);
-			controllers[slotIndex]?.bindRow(row);
+			let controller = controllers[slotIndex];
+			if (!controller) {
+				ensureCapacity(slotIndex + 1);
+				controller = controllers[slotIndex];
+			}
+			controller?.bindRow(row);
 		},
 		clearSlot(slotIndex): void {
 			controllers[slotIndex]?.clear();

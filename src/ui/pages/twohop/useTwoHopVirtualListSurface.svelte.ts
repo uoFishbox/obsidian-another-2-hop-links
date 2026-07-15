@@ -83,8 +83,6 @@ export function useTwoHopViewPlanVirtualList(props: TwoHopVirtualListSurfaceProp
 						? `section-block-${cell.sectionId}`
 						: undefined
 			: undefined,
-		getItemVisibilityState: surfaceRuntime.getItemVisibilityState,
-		getItemActivationCandidateId: surfaceRuntime.getItemActivationCandidateId,
 		loadMore: inputRuntime.loadMore,
 		resolveNavigationTarget: inputRuntime.resolveNavigationTarget,
 		flushVirtualScrollMeasurement: measurementRuntime.flushVirtualScrollMeasurement,

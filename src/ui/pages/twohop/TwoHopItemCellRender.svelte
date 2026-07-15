@@ -15,12 +15,7 @@
 	>;
 
 	interface Props {
-		cellController: TwoHopFixedCellSlotController;
-		initialCell: TwoHopMountedItemCell;
-		getItemVisibilityState: (
-			cell: TwoHopMountedItemCell,
-		) => VirtualizedItemVisibilityState;
-		getItemActivationCandidateId: (cell: TwoHopMountedItemCell) => string;
+		controller: TwoHopFixedCellSlotController;
 		renderItem: Snippet<
 			[
 				TwoHopVirtualListItem,
@@ -32,52 +27,55 @@
 		>;
 	}
 
-	let {
-		cellController,
-		initialCell,
-		getItemVisibilityState,
-		getItemActivationCandidateId,
-		renderItem,
-	}: Props = $props();
+	let { controller, renderItem }: Props = $props();
 
 	const isItemCell = (
 		cell: TwoHopFixedCellSlotController["mountedCell"],
 	): cell is TwoHopMountedItemCell => cell?.cell.kind === "item";
 
-	// Keep an immutable fallback because the scalar kernel mutates the physical
-	// cell shell before the parent keyed block can unmount this item body.
-	const fallbackItemCell: TwoHopMountedItemCell = {
-		...initialCell,
-		cell: { ...initialCell.cell },
+	const initialCell = controller.mountedCell;
+	// The parent normally unmounts this body when its slot changes kind. Keep the
+	// last item shell valid during that keyed-block transition.
+	const fallbackItemCell: TwoHopMountedItemCell | null = isItemCell(initialCell)
+		? {
+				...initialCell,
+				cell: { ...initialCell.cell },
+			}
+		: null;
+	const fallbackPresentation: TwoHopCardPresentationState = {
+		sectionVariant: "two-hop",
+		resolution: "resolved",
+		attachment: false,
+		extension: null,
 	};
-
-	// Recompute this object once for each physical-slot reassignment. Consumers
-	// then read ordinary reactive snapshot fields instead of traversing the slot
-	// controller and resolving visibility on every individual prop access.
-	const snapshot = $derived.by(() => {
-		const binding = cellController.binding;
+	const item = $derived.by(() => {
+		void controller.revision;
+		const binding = controller.binding;
 		const mountedCell = binding?.mountedCell;
-		const itemCell = isItemCell(mountedCell) ? mountedCell : fallbackItemCell;
-		const presentation = binding?.presentation;
-		return {
-			item: itemCell.cell.item,
-			rowIndex: itemCell.rowIndex,
-			visibilityState: getItemVisibilityState(itemCell),
-			activationCandidateId: getItemActivationCandidateId(itemCell),
-			presentation: presentation ?? {
-				sectionVariant: "two-hop" as const,
-				resolution: "resolved" as const,
-				attachment: false,
-				extension: null,
-			},
-		};
+		return isItemCell(mountedCell)
+			? mountedCell.cell.item
+			: fallbackItemCell?.cell.item;
+	});
+	const rowIndex = $derived.by(() => {
+		void controller.revision;
+		const binding = controller.binding;
+		const mountedCell = binding?.mountedCell;
+		return isItemCell(mountedCell)
+			? mountedCell.rowIndex
+			: fallbackItemCell?.rowIndex;
+	});
+	const presentation = $derived.by(() => {
+		void controller.revision;
+		return controller.binding?.presentation ?? fallbackPresentation;
 	});
 </script>
 
-{@render renderItem(
-	snapshot.item,
-	snapshot.rowIndex,
-	snapshot.visibilityState,
-	snapshot.activationCandidateId,
-	snapshot.presentation,
-)}
+{#if item && rowIndex !== undefined}
+	{@render renderItem(
+		item,
+		rowIndex,
+		controller.visibilityState,
+		controller.activationCandidateId,
+		presentation,
+	)}
+{/if}

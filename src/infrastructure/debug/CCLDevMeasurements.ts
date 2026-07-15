@@ -24,6 +24,7 @@ export type CCLDevMeasurementName =
 	| "twoHop.scalarKernel.mountedRangeCommit"
 	| "twoHop.scalarKernel.rowShellCreated"
 	| "twoHop.scalarKernel.cellShellCreated"
+	| "twoHop.fixedSlotPool.cellCapacityCheck"
 	| "twoHop.rowModelCache.hit"
 	| "twoHop.rowModelCache.miss"
 	| "twoHop.rowModelCache.miss.firstResolve"
@@ -64,6 +65,7 @@ export const CCL_DEV_MEASUREMENT_NAMES: readonly CCLDevMeasurementName[] = [
 	"twoHop.scalarKernel.mountedRangeCommit",
 	"twoHop.scalarKernel.rowShellCreated",
 	"twoHop.scalarKernel.cellShellCreated",
+	"twoHop.fixedSlotPool.cellCapacityCheck",
 	"twoHop.rowModelCache.hit",
 	"twoHop.rowModelCache.miss",
 	"twoHop.rowModelCache.miss.firstResolve",
