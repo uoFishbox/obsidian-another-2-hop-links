@@ -18,6 +18,7 @@ import type {
 	TwoHopVirtualListSection,
 	TwoHopVirtualListItem,
 } from "../twoHopVirtualListModel";
+import type { TwoHopCellStaticState } from "../twoHopCellStaticState";
 export interface TwoHopSectionPlan {
 	readonly descriptor: SectionRenderDescriptor<
 		TwoHopVirtualListItem,
@@ -41,7 +42,7 @@ export interface TwoHopSectionPlan {
 }
 
 /** Immutable cell identity compiled before the scroll hot path begins. */
-export interface CompiledTwoHopCell {
+export interface CompiledTwoHopCell extends TwoHopCellStaticState {
 	readonly logicalCell: VirtualListLogicalCell<TwoHopVirtualListItem>;
 	readonly logicalKey: VirtualListLogicalCell<TwoHopVirtualListItem>["key"];
 	readonly renderBodyKey: RenderBodyKey;

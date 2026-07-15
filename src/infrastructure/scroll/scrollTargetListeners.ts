@@ -3,6 +3,10 @@ import { getOptionalOwnerWindow } from "ui/utils/realmSafeDom";
 type ScrollTarget = Window | HTMLElement;
 export type ScrollPhase = "start" | "scroll" | "idle";
 export interface ScrollTargetMetrics {
+	readonly scrollTop: number;
+}
+
+interface MutableScrollTargetMetrics {
 	scrollTop: number;
 }
 
@@ -17,6 +21,7 @@ interface Entry {
 	idleTimer: number | null;
 	isScrollActive: boolean;
 	lastScrollTime: number;
+	metricsScratch: MutableScrollTargetMetrics | undefined;
 }
 
 const entries = new WeakMap<ScrollTarget, Entry>();
@@ -27,18 +32,6 @@ function resolveScrollTargetWindow(target: ScrollTarget): Window | null {
 	}
 
 	return getOptionalOwnerWindow(target);
-}
-
-function snapshotScrollTargetMetrics(
-	target: ScrollTarget,
-): ScrollTargetMetrics | undefined {
-	if ("document" in target) {
-		return undefined;
-	}
-
-	return {
-		scrollTop: target.scrollTop,
-	};
 }
 
 export function subscribeScrollTarget(
@@ -57,6 +50,7 @@ export function subscribeScrollTarget(
 			idleTimer: null,
 			isScrollActive: false,
 			lastScrollTime: 0,
+			metricsScratch: "document" in target ? undefined : { scrollTop: 0 },
 			dispatchIdle: () => {
 				const elapsed = Date.now() - entry!.lastScrollTime;
 				if (elapsed < SCROLL_IDLE_MS) {
@@ -74,7 +68,10 @@ export function subscribeScrollTarget(
 				}
 			},
 			dispatch: () => {
-				const metrics = snapshotScrollTargetMetrics(target);
+				const metrics = entry!.metricsScratch;
+				if (metrics && !("document" in target)) {
+					metrics.scrollTop = target.scrollTop;
+				}
 				entry!.lastScrollTime = Date.now();
 
 				if (!entry!.isScrollActive) {

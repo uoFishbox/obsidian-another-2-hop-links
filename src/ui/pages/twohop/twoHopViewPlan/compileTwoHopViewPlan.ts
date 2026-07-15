@@ -18,6 +18,7 @@ import {
 	resolveStableViewPlanRenderBodyKey,
 } from "ui/components/common/virtual-list/core/reconciliation/renderBodyRevision";
 import type { CompiledTwoHopCell } from "./types";
+import { resolveTwoHopItemStaticState } from "../twoHopCellStaticState";
 
 function appendCompiledCell(
 	cells: CompiledTwoHopCell[],
@@ -25,7 +26,20 @@ function appendCompiledCell(
 	descriptor: CompileTwoHopViewPlanParams["sections"][number],
 ): void {
 	const identity = getViewPlanRenderBodyIdentityFields(logicalCell, descriptor);
+	const staticState =
+		logicalCell.kind === "item"
+			? resolveTwoHopItemStaticState(logicalCell.item, descriptor.section)
+			: {
+					reuseFamily: null,
+					presentation: null,
+					interactionId:
+						logicalCell.kind === "header"
+							? (descriptor.headerProps.interactionId ??
+								descriptor.sectionId)
+							: null,
+				};
 	cells.push({
+		...staticState,
 		logicalCell,
 		logicalKey: logicalCell.key,
 		renderBodyKey: resolveStableViewPlanRenderBodyKey({

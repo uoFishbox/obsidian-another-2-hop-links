@@ -4,7 +4,7 @@ import type {
 	TwoHopVirtualListItem,
 	TwoHopVirtualListSection,
 } from "../twoHopVirtualListModel";
-import type { TwoHopSectionTable } from "../twoHopViewPlan";
+import type { TwoHopSectionTable, TwoHopViewPlan } from "../twoHopViewPlan";
 import {
 	compileTwoHopViewPlan,
 	createTwoHopViewPlanRowModel,
@@ -69,6 +69,19 @@ const compilePlan = (
 		clampVisibleCount: (section, count) => Math.min(section.loadedCount, count),
 	});
 
+function readSectionCell(
+	plan: TwoHopViewPlan,
+	sectionIndex: number,
+	sectionCellIndex: number,
+) {
+	const section = plan.sections[sectionIndex];
+	if (!section || sectionCellIndex < 0 || sectionCellIndex >= section.cellCount) {
+		return undefined;
+	}
+
+	return plan.cells[section.firstCellIndex + sectionCellIndex]?.logicalCell;
+}
+
 const createSectionTable = (
 	sections: readonly {
 		readonly top: number;
@@ -117,10 +130,10 @@ describe("compileTwoHopViewPlan", () => {
 		expect(
 			Array.from(
 				{ length: plan.sections[0].cellCount },
-				(_, index) => plan.sections[0].itemSource.readCell(index)?.kind,
+				(_, index) => readSectionCell(plan, 0, index)?.kind,
 			),
 		).toEqual(["header", "item", "item", "item"]);
-		expect(plan.sections[0].itemSource.readCell(1)).toMatchObject({
+		expect(readSectionCell(plan, 0, 1)).toMatchObject({
 			key: "new-links::item:0",
 			sourceKey: "new-links::a",
 		});
@@ -192,7 +205,7 @@ describe("compileTwoHopViewPlan", () => {
 		expect(
 			Array.from(
 				{ length: plan.sections[0].cellCount },
-				(_, index) => plan.sections[0].itemSource.readCell(index)?.kind,
+				(_, index) => readSectionCell(plan, 0, index)?.kind,
 			),
 		).toEqual(["header", "item", "load-more"]);
 		expect(plan.sections[0].showLoadMore).toBe(true);
@@ -217,15 +230,15 @@ describe("compileTwoHopViewPlan", () => {
 		expect(
 			Array.from(
 				{ length: plan.sections[0].cellCount },
-				(_, index) => plan.sections[0].itemSource.readCell(index)?.kind,
+				(_, index) => readSectionCell(plan, 0, index)?.kind,
 			),
 		).toEqual(["header", "item", "item", "load-more"]);
-		expect(plan.sections[0].itemSource.readCell(2)).toMatchObject({
+		expect(readSectionCell(plan, 0, 2)).toMatchObject({
 			kind: "item",
 			itemIndex: 2,
 			sourceKey: "new-links::c",
 		});
-		expect(plan.sections[0].itemSource.readCell(3)).toMatchObject({
+		expect(readSectionCell(plan, 0, 3)).toMatchObject({
 			kind: "load-more",
 		});
 		expect(plan.rows[1]).toMatchObject({
@@ -240,15 +253,15 @@ describe("compileTwoHopViewPlan", () => {
 			createDescriptor([createItem("b")], undefined, "section-b"),
 		]);
 
-		expect(plan.sections[0].itemSource.readCell(1)).toMatchObject({
+		expect(readSectionCell(plan, 0, 1)).toMatchObject({
 			kind: "item",
 			sourceKey: "section-a::a",
 		});
-		expect(plan.sections[1].itemSource.readCell(1)).toMatchObject({
+		expect(readSectionCell(plan, 1, 1)).toMatchObject({
 			kind: "item",
 			sourceKey: "section-b::b",
 		});
-		expect(plan.sections[1].itemSource.readCell(2)).toBeUndefined();
+		expect(readSectionCell(plan, 1, 2)).toBeUndefined();
 	});
 });
 

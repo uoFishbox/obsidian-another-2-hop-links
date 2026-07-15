@@ -145,6 +145,23 @@ function isItemCell(
 afterEach(() => cleanup());
 
 describe("TwoHopItemCellRender", () => {
+	it("shares compiled item state with each fresh binding snapshot", () => {
+		const kernel = createTwoHopScalarScrollKernel({
+			initialRowModel: rowModel,
+			onStableVisibleRange() {},
+		});
+		applyRange(kernel, 1);
+		const binding = kernel.fixedRowSlotPool.controllers[0]?.cells[0]?.binding;
+		const compiledCell = binding?.mountedCell.compiledCell;
+
+		expect(compiledCell).toBeDefined();
+		expect(binding?.presentation).toBe(compiledCell?.presentation);
+		expect(binding?.reuseFamily).toBe("new-link");
+		expect(binding?.interactionId).toBe(compiledCell?.interactionId);
+
+		kernel.dispose();
+	});
+
 	it("renders a precreated empty slot when its row is recycled", async () => {
 		const kernel = createTwoHopScalarScrollKernel({
 			initialRowModel: rowModel,

@@ -2,10 +2,6 @@ import type { RowPreviewActivationRuntime } from "features/preview/scheduling/ro
 import { recordCCLDevMeasurement } from "infrastructure/debug/CCLDevMeasurements";
 import type { ClickableHeaderExtraProps } from "ui/components/sections/types";
 import type { VirtualListLogicalCell } from "ui/components/common/virtual-list/logicalCell";
-import type {
-	MountedFlatHeaderCell,
-	MountedFlatItemCell,
-} from "ui/components/common/virtual-list/core/reconciliation/viewPlanMountedCells";
 import { createContiguousRowSlotAllocator } from "ui/components/common/virtual-list/core/reconciliation/contiguousRowSlotAllocator";
 import type { RenderBodyKey } from "ui/components/common/virtual-list/renderRevision";
 import type { RenderRevision } from "ui/components/common/virtual-list/renderRevision";
@@ -23,7 +19,6 @@ import type {
 	VirtualCellRegistry,
 } from "ui/components/common/virtual-list/svelte/VirtualCellRegistry";
 import { dispatchVirtualCellWillRebind } from "ui/interactions/virtualCellRebind";
-import { createItemInteractionKey } from "ui/interactions/interactionTypes";
 import { createTwoHopCellBinding, type TwoHopCellBinding } from "./twoHopCellBinding";
 import type { TwoHopMountedCell, TwoHopMountedRowSlice } from "./twoHopMountedTypes";
 import type {
@@ -35,15 +30,6 @@ import type {
 	TwoHopVirtualListItem,
 	TwoHopVirtualListSection,
 } from "./twoHopVirtualListModel";
-
-type TwoHopMountedItemCell = MountedFlatItemCell<
-	TwoHopVirtualListItem,
-	TwoHopVirtualListSection
->;
-type TwoHopMountedHeaderCell = MountedFlatHeaderCell<
-	TwoHopVirtualListItem,
-	TwoHopVirtualListSection
->;
 
 export interface TwoHopFixedCellSlotController extends VirtualCellRegistrationOwner {
 	readonly cellSlotKey: number;
@@ -105,6 +91,7 @@ interface MutableMountedCellShell {
 	title: string;
 	totalCount: number;
 	headerProps: ClickableHeaderExtraProps;
+	compiledCell: CompiledTwoHopCell | undefined;
 }
 
 interface CellSlotRecord {
@@ -289,6 +276,7 @@ function createRowController(slotIndex: number): MutableTwoHopFixedRowSlotContro
 		},
 		bindRow(nextRow): void {
 			this.setCellCapacity(Math.max(cells.length, nextRow.cells.length));
+			let structureChanged = false;
 			if (process.env.NODE_ENV !== "production") {
 				recordCCLDevMeasurement("twoHop.reboundRowSlot");
 				for (const _cell of nextRow.cells) {
@@ -309,6 +297,7 @@ function createRowController(slotIndex: number): MutableTwoHopFixedRowSlotContro
 				}
 				cells[index]?.clear();
 				cells[index] = createCellController(cellSlotKey, nextCell);
+				structureChanged = true;
 			}
 			for (let index = nextRow.cells.length; index < cells.length; index += 1) {
 				cells[index]?.clear();
@@ -316,13 +305,12 @@ function createRowController(slotIndex: number): MutableTwoHopFixedRowSlotContro
 			rowIndex = nextRow.rowIndex;
 			top = nextRow.top;
 			active = true;
-			revision += 1;
+			if (structureChanged) revision += 1;
 		},
 		clear(): void {
 			if (!active) return;
 			active = false;
 			for (const cell of cells) cell.clear();
-			revision += 1;
 		},
 	};
 }
@@ -415,6 +403,7 @@ function createCellSlotRecord(renderSlotIndex: number): CellSlotRecord {
 		title: "",
 		totalCount: 0,
 		headerProps: EMPTY_HEADER_PROPS,
+		compiledCell: undefined,
 	};
 	const visibilityState: VirtualizedItemResolvedVisibilityState = $state({
 		visibility: "mounted",
@@ -497,6 +486,9 @@ function createMountedCellView(mutable: MutableMountedCellShell): TwoHopMountedC
 		get headerProps() {
 			return mutable.headerProps;
 		},
+		get compiledCell() {
+			return mutable.compiledCell;
+		},
 	} as TwoHopMountedCell;
 }
 
@@ -545,24 +537,8 @@ export function createTwoHopPhysicalSlotStore(params: {
 		visibility: "mounted",
 	});
 
-	function isMountedHeaderCell(
-		cell: TwoHopMountedCell,
-	): cell is TwoHopMountedHeaderCell {
-		return cell.cell.kind === "header";
-	}
-
-	function isMountedItemCell(cell: TwoHopMountedCell): cell is TwoHopMountedItemCell {
-		return cell.cell.kind === "item";
-	}
-
 	function resolveInteractionId(cell: TwoHopMountedCell): string | null {
-		if (isMountedHeaderCell(cell)) {
-			return cell.headerProps.interactionId ?? cell.sectionId;
-		}
-		if (!isMountedItemCell(cell)) return null;
-
-		const item = cell.cell.item;
-		return item.interactionId ?? createItemInteractionKey(item.item);
+		return cell.compiledCell?.interactionId ?? null;
 	}
 
 	function indexRecord(record: RowSlotRecord): void {
@@ -684,6 +660,7 @@ export function createTwoHopPhysicalSlotStore(params: {
 		mutable.renderBodyCellKey = compiledCell.renderBodyCellKey;
 		mutable.renderBodyRevision = compiledCell.renderBodyRevision;
 		mutable.renderBodyKey = compiledCell.renderBodyKey;
+		mutable.compiledCell = compiledCell;
 	}
 
 	return {

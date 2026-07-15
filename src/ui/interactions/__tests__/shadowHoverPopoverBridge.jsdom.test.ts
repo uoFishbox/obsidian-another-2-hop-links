@@ -281,6 +281,7 @@ describe("shadowHoverPopoverBridge", () => {
 			new MouseEvent("mouseover", { bubbles: true, composed: true }),
 		);
 		expect(interaction.dataset.cclHovered).toBe("true");
+		const subtreeQuery = vi.spyOn(physicalCell, "querySelectorAll");
 
 		dispatchVirtualCellWillRebind(physicalCell, {
 			previousLogicalKey: "first",
@@ -289,6 +290,7 @@ describe("shadowHoverPopoverBridge", () => {
 		interaction.dataset.cclInteractionId = "item:second";
 
 		expect(interaction.dataset.cclHovered).toBeUndefined();
+		expect(subtreeQuery).toHaveBeenCalledTimes(1);
 		expect(handleDelegatedLeaveMock).toHaveBeenCalledWith(interaction);
 		expect(handleDelegatedEnterMock).toHaveBeenCalledTimes(1);
 

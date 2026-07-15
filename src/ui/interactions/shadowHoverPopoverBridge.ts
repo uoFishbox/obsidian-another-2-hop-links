@@ -409,11 +409,6 @@ function createHandle({
 		const target = event.target;
 		if (!isHTMLElementLike(target)) return;
 
-		for (const hovered of target.querySelectorAll<HTMLElement>(
-			"[data-ccl-hovered='true']",
-		)) {
-			delete hovered.dataset.cclHovered;
-		}
 		if (handle.hoveredAnchorEl && target.contains(handle.hoveredAnchorEl)) {
 			handle.hoveredAnchorEl = null;
 		}
