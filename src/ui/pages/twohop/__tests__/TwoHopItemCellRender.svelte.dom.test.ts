@@ -9,12 +9,16 @@ import type { SectionRenderDescriptor } from "ui/components/sections/types";
 import type { VirtualizedItemVisibilityState } from "ui/components/common/virtual-list/types";
 import { compileTwoHopViewPlan, createTwoHopViewPlanRowModel } from "../twoHopViewPlan";
 import { createTwoHopScalarScrollKernel } from "../twoHopScalarScrollKernel.svelte";
-import { createTwoHopFixedRowSlotPool } from "../twoHopFixedRowSlotPool.svelte";
+import {
+	createTwoHopFixedRowSlotPool,
+	type TwoHopFixedCellSlotController,
+} from "../twoHopFixedRowSlotPool.svelte";
 import type {
 	TwoHopVirtualListItem,
 	TwoHopVirtualListSection,
 } from "../twoHopVirtualListModel";
 import type { TwoHopMountedCell } from "../twoHopMountedTypes";
+import type { TwoHopRenderItemCellSnapshot } from "../twoHopCellBinding";
 import TwoHopFixedRowSlotsSurfaceHarness from "./TwoHopFixedRowSlotsSurfaceHarness.svelte";
 import TwoHopItemCellRenderHarness from "./TwoHopItemCellRenderHarness.svelte";
 
@@ -142,6 +146,41 @@ function isItemCell(
 	return cell?.cell.kind === "item";
 }
 
+function getMountedRow(
+	kernel: ReturnType<typeof createTwoHopScalarScrollKernel>,
+	rowIndex: number,
+) {
+	return kernel.mountedRows.find(
+		(row) => row.rowIndex === rowIndex && row.cells.length > 0,
+	);
+}
+
+function getFirstItemSlot(
+	kernel: ReturnType<typeof createTwoHopScalarScrollKernel>,
+):
+	| {
+			controller: TwoHopFixedCellSlotController;
+			cell: Extract<TwoHopMountedCell, { cell: { kind: "item" } }>;
+	  }
+	| undefined {
+	for (const row of kernel.mountedRows) {
+		for (const cell of row.cells) {
+			if (!isItemCell(cell)) continue;
+			const controller = kernel.fixedRowSlotPool.controllers
+				.flatMap((rowController) => rowController.cells)
+				.find((candidate) => candidate.logicalKey === cell.key);
+			if (controller) return { controller, cell };
+		}
+	}
+	return undefined;
+}
+
+function getPhysicalCellSelector(
+	controller: TwoHopFixedCellSlotController,
+): string {
+	return `[data-ccl-cell-slot='${controller.cellSlotKey}']`;
+}
+
 afterEach(() => cleanup());
 
 describe("TwoHopItemCellRender", () => {
@@ -151,7 +190,10 @@ describe("TwoHopItemCellRender", () => {
 			onStableVisibleRange() {},
 		});
 		applyRange(kernel, 1);
-		const binding = kernel.fixedRowSlotPool.controllers[0]?.cells[0]?.binding;
+		const itemSlot = getFirstItemSlot(kernel);
+		expect(itemSlot).toBeDefined();
+		if (!itemSlot) return;
+		const binding = itemSlot.controller.binding;
 		const compiledCell = binding?.mountedCell.compiledCell;
 
 		expect(compiledCell).toBeDefined();
@@ -167,23 +209,28 @@ describe("TwoHopItemCellRender", () => {
 			initialRowModel: rowModel,
 			onStableVisibleRange() {},
 		});
-		applyRange(kernel, 1);
-		const fullRow = kernel.mountedRows[0];
+		applyRange(kernel, 0);
+		const fullRow = getMountedRow(kernel, 0);
 		const firstCell = fullRow?.cells[0];
 		expect(fullRow?.cells).toHaveLength(2);
 		expect(firstCell).toBeDefined();
 		if (!fullRow || !firstCell) return;
+		const standaloneRow = {
+			...fullRow,
+			slotIndex: 0,
+			slotKey: 0,
+		};
 
 		const pool = createTwoHopFixedRowSlotPool();
 		pool.setCapacity(1, 2);
-		pool.bindRow({ ...fullRow, cells: [firstCell] });
+		pool.bindRow({ ...standaloneRow, cells: [firstCell] });
 		const { container } = render(TwoHopFixedRowSlotsSurfaceHarness, {
 			props: { rowSlotControllers: pool.controllers },
 		});
 		await tick();
 		expect(container.querySelector("[data-ccl-cell-slot='1']")).toBeNull();
 
-		pool.bindRow(fullRow);
+		pool.bindRow(standaloneRow);
 		await tick();
 		await tick();
 
@@ -199,22 +246,21 @@ describe("TwoHopItemCellRender", () => {
 		applyRange(kernel, 1);
 		const controller = kernel.fixedRowSlotPool.controllers
 			.flatMap((row) => row.cells)
-			.find((cell) => isItemCell(cell.mountedCell));
+			.find((cell) => cell.mountedCell?.cell.kind === "item");
 		expect(controller).toBeDefined();
-		if (!controller || !isItemCell(controller.mountedCell)) return;
+		if (!controller || controller.mountedCell?.cell.kind !== "item") return;
 
 		const visibilityState = {
 			visibility: "mounted",
 		} as VirtualizedItemVisibilityState;
 		const getItemVisibilityState = vi.fn(() => visibilityState);
 		const getItemActivationCandidateId = vi.fn(
-			(cell: Extract<TwoHopMountedCell, { cell: { kind: "item" } }>) =>
+			(cell: TwoHopRenderItemCellSnapshot) =>
 				`candidate:${cell.cell.item.virtualKey}`,
 		);
 		const { container } = render(TwoHopItemCellRenderHarness, {
 			props: {
 				cellController: controller,
-				initialCell: controller.mountedCell,
 				getItemVisibilityState,
 				getItemActivationCandidateId,
 			},
@@ -230,7 +276,7 @@ describe("TwoHopItemCellRender", () => {
 		expect(getItemVisibilityState).toHaveBeenCalledTimes(1);
 		expect(getItemActivationCandidateId).toHaveBeenCalledTimes(1);
 
-		applyRange(kernel, 4);
+		applyRange(kernel, 7);
 		await tick();
 		await tick();
 
@@ -259,6 +305,10 @@ describe("TwoHopItemCellRender", () => {
 			onStableVisibleRange() {},
 		});
 		applyRange(kernel, 1);
+		const itemSlot = getFirstItemSlot(kernel);
+		expect(itemSlot).toBeDefined();
+		if (!itemSlot) return;
+		const physicalCellSelector = getPhysicalCellSelector(itemSlot.controller);
 		const { container } = render(TwoHopFixedRowSlotsSurfaceHarness, {
 			props: {
 				rowSlotControllers: kernel.fixedRowSlotPool.controllers,
@@ -267,19 +317,19 @@ describe("TwoHopItemCellRender", () => {
 		await tick();
 
 		const initialChild = container.querySelector<HTMLElement>(
-			"[data-ccl-cell-slot='0'] [data-testid='twohop-child-item-cell']",
+			`${physicalCellSelector} [data-testid='twohop-child-item-cell']`,
 		);
 		const initialIndex = initialChild?.dataset.index;
 		const initialInstanceId = initialChild?.dataset.instanceId;
 		expect(initialChild).toBeTruthy();
 		resetCCLDevMeasurements();
 
-		applyRange(kernel, 4);
+		applyRange(kernel, 7);
 		await tick();
 		await tick();
 
 		const reboundChild = container.querySelector<HTMLElement>(
-			"[data-ccl-cell-slot='0'] [data-testid='twohop-child-item-cell']",
+			`${physicalCellSelector} [data-testid='twohop-child-item-cell']`,
 		);
 		expect(reboundChild).toBeTruthy();
 		expect(reboundChild).toBe(initialChild);
@@ -298,30 +348,31 @@ describe("TwoHopItemCellRender", () => {
 			onStableVisibleRange() {},
 		});
 		applyRange(kernel, 1);
-		const controller = kernel.fixedRowSlotPool.controllers[0]?.cells[0];
-		expect(controller).toBeDefined();
-		if (!controller || !isItemCell(controller.mountedCell)) return;
+		const itemSlot = getFirstItemSlot(kernel);
+		expect(itemSlot).toBeDefined();
+		if (!itemSlot) return;
+		const { controller, cell: sourceCell } = itemSlot;
+		const physicalCellSelector = getPhysicalCellSelector(controller);
 
 		const { container } = render(TwoHopFixedRowSlotsSurfaceHarness, {
 			props: { rowSlotControllers: kernel.fixedRowSlotPool.controllers },
 		});
 		await tick();
 		const physicalCell = container.querySelector<HTMLElement>(
-			"[data-ccl-cell-slot='0']",
+			physicalCellSelector,
 		);
 		const initialBody = physicalCell?.querySelector<HTMLElement>(
 			"[data-testid='twohop-child-item-cell']",
 		);
 		expect(initialBody).toBeTruthy();
 
-		const previous = controller.mountedCell;
 		controller.bindCell({
-			...previous,
-			key: `${String(previous.key)}:file` as typeof previous.key,
+			...sourceCell,
+			key: `${String(sourceCell.key)}:file` as typeof sourceCell.key,
 			logicalKey:
-				`${String(previous.logicalKey)}:file` as typeof previous.logicalKey,
+				`${String(sourceCell.logicalKey)}:file` as typeof sourceCell.logicalKey,
 			cell: {
-				...previous.cell,
+				...sourceCell.cell,
 				item: {
 					kind: "primary-link",
 					item: { type: "file", data: { basename: "file" } } as never,
@@ -335,7 +386,7 @@ describe("TwoHopItemCellRender", () => {
 		await tick();
 
 		const reboundPhysicalCell = container.querySelector<HTMLElement>(
-			"[data-ccl-cell-slot='0']",
+			physicalCellSelector,
 		);
 		const reboundBody = reboundPhysicalCell?.querySelector<HTMLElement>(
 			"[data-testid='twohop-child-item-cell']",
@@ -353,9 +404,12 @@ describe("TwoHopItemCellRender", () => {
 			onStableVisibleRange() {},
 		});
 		applyRange(kernel, 1);
-		const controller = kernel.fixedRowSlotPool.controllers[0]?.cells[0];
-		expect(controller).toBeDefined();
-		if (!controller || !isItemCell(controller.mountedCell)) return;
+		const itemSlot = getFirstItemSlot(kernel);
+		expect(itemSlot).toBeDefined();
+		if (!itemSlot) return;
+		const { controller, cell: sourceCell } = itemSlot;
+		const physicalCellSelector = getPhysicalCellSelector(controller);
+		let currentCell = sourceCell;
 
 		const { container } = render(TwoHopFixedRowSlotsSurfaceHarness, {
 			props: { rowSlotControllers: kernel.fixedRowSlotPool.controllers },
@@ -368,17 +422,15 @@ describe("TwoHopItemCellRender", () => {
 			interactionId: string,
 			itemSection: TwoHopVirtualListSection,
 		): void => {
-			const previous = controller.mountedCell;
-			if (!isItemCell(previous)) return;
-			controller.bindCell({
-				...previous,
-				key: `${String(previous.key)}:${type}` as typeof previous.key,
+			const nextCell = {
+				...currentCell,
+				key: `${String(currentCell.key)}:${type}` as typeof currentCell.key,
 				logicalKey:
-					`${String(previous.logicalKey)}:${type}` as typeof previous.logicalKey,
+					`${String(currentCell.logicalKey)}:${type}` as typeof currentCell.logicalKey,
 				section: itemSection,
 				sectionId: itemSection.sectionId,
 				cell: {
-					...previous.cell,
+					...currentCell.cell,
 					item: {
 						kind: "primary-link",
 						item: { type, data } as never,
@@ -388,7 +440,9 @@ describe("TwoHopItemCellRender", () => {
 						virtualKey: `${type}-item`,
 					} satisfies TwoHopVirtualListItem,
 				},
-			});
+			};
+			currentCell = nextCell;
+			controller.bindCell(nextCell);
 		};
 
 		bindResolvedItem(
@@ -407,7 +461,7 @@ describe("TwoHopItemCellRender", () => {
 		await tick();
 
 		const resolvedBody = container.querySelector<HTMLElement>(
-			"[data-ccl-cell-slot='0'] [data-testid='twohop-child-item-cell']",
+			`${physicalCellSelector} [data-testid='twohop-child-item-cell']`,
 		);
 		expect(resolvedBody).toBeTruthy();
 		expect(controller.binding?.reuseFamily).toBe("resolved-card");
@@ -483,7 +537,7 @@ describe("TwoHopItemCellRender", () => {
 			await tick();
 
 			const reboundBody = container.querySelector<HTMLElement>(
-				"[data-ccl-cell-slot='0'] [data-testid='twohop-child-item-cell']",
+				`${physicalCellSelector} [data-testid='twohop-child-item-cell']`,
 			);
 			expect(reboundBody).toBe(resolvedBody);
 			expect(controller.binding?.reuseFamily).toBe("resolved-card");
@@ -496,27 +550,27 @@ describe("TwoHopItemCellRender", () => {
 		kernel.dispose();
 	});
 
-	it("does not render a stale item while a standalone slot changes kind", async () => {
+	it("does not render a stale item after a standalone slot leaves the range", async () => {
 		const kernel = createTwoHopScalarScrollKernel({
 			initialRowModel: rowModelWithLoadMore,
 			onStableVisibleRange() {},
 		});
 		applySingleRowRange(kernel, 1);
-		const controller = kernel.fixedRowSlotPool.controllers[0]?.cells[0];
-		expect(controller).toBeDefined();
-		if (!controller || !isItemCell(controller.mountedCell)) return;
+		const itemSlot = getFirstItemSlot(kernel);
+		expect(itemSlot).toBeDefined();
+		if (!itemSlot) return;
+		const { controller } = itemSlot;
 
 		const getItemVisibilityState = vi.fn(() => ({
 			visibility: "mounted" as const,
 		}));
 		const getItemActivationCandidateId = vi.fn(
-			(cell: Extract<TwoHopMountedCell, { cell: { kind: "item" } }>) =>
+			(cell: TwoHopRenderItemCellSnapshot) =>
 				`candidate:${cell.cell.item.virtualKey}`,
 		);
 		const { container } = render(TwoHopItemCellRenderHarness, {
 			props: {
 				cellController: controller,
-				initialCell: controller.mountedCell,
 				getItemVisibilityState,
 				getItemActivationCandidateId,
 			},
@@ -533,7 +587,7 @@ describe("TwoHopItemCellRender", () => {
 		await tick();
 		await tick();
 
-		expect(controller.renderBodyKind).toBe("load-more");
+		expect(controller.renderBodyKind).not.toBe("item");
 		const staleChild = container.querySelector<HTMLElement>(
 			"[data-testid='twohop-child-item-cell']",
 		);

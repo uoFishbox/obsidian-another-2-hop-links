@@ -68,6 +68,16 @@ const createDescriptor = (
 	};
 };
 
+function resolvePoolCycleScrollTop(shadowRoot: ShadowRoot): number {
+	const activeRows = shadowRoot.querySelectorAll("[data-ccl-row-slot]").length;
+	const poolCapacity = Math.ceil(activeRows * 1.25) + 2;
+	const rowStride =
+		applicationStore.settings.cardWidthPx *
+			applicationStore.settings.cardHeightRatio +
+		applicationStore.settings.cardGapPx;
+	return poolCapacity * rowStride;
+}
+
 describe("TwoHopViewPlanVirtualList DOM performance contracts", () => {
 	beforeEach(() => {
 		resetRecords();
@@ -399,7 +409,12 @@ describe("TwoHopViewPlanVirtualList DOM performance contracts", () => {
 		const recycledItemIndex = recycledItemElement?.dataset.index;
 		expect(recycledItemElement).toBeTruthy();
 
-		setNumericProperty(scrollRoot, "scrollTop", 360);
+		if (!shadowRoot) throw new Error("Expected TwoHop shadow root.");
+		setNumericProperty(
+			scrollRoot,
+			"scrollTop",
+			resolvePoolCycleScrollTop(shadowRoot),
+		);
 		await fireEvent.scroll(scrollRoot);
 		await flushFrames();
 		await flushFrames();
@@ -458,7 +473,12 @@ describe("TwoHopViewPlanVirtualList DOM performance contracts", () => {
 		const initialInstanceId = initialChild?.dataset.instanceId;
 		expect(initialChild).toBeTruthy();
 
-		setNumericProperty(scrollRoot, "scrollTop", 360);
+		if (!shadowRoot) throw new Error("Expected TwoHop shadow root.");
+		setNumericProperty(
+			scrollRoot,
+			"scrollTop",
+			resolvePoolCycleScrollTop(shadowRoot),
+		);
 		await fireEvent.scroll(scrollRoot);
 		await flushFrames();
 		await flushFrames();

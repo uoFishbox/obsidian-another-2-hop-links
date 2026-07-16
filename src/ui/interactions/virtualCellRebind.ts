@@ -5,28 +5,16 @@ export interface VirtualCellWillRebindDetail {
 	readonly nextLogicalKey: string;
 }
 
-/** Announces that a physical cell is about to stop representing a logical card. */
-export function dispatchVirtualCellWillRebind(
+const TRANSIENT_INTERACTION_SELECTOR = [
+	'[data-ccl-hovered="true"]',
+	'[data-ccl-long-pressed="1"]',
+	"[data-ccl-last-touch-at]",
+].join(",");
+
+function dispatchRebindEvent(
 	element: HTMLElement,
 	detail: VirtualCellWillRebindDetail,
 ): void {
-	const activeElement = element.ownerDocument.activeElement;
-	if (
-		activeElement &&
-		"blur" in activeElement &&
-		typeof activeElement.blur === "function" &&
-		element.contains(activeElement)
-	) {
-		activeElement.blur();
-	}
-	for (const interaction of element.querySelectorAll<HTMLElement>(
-		"[data-ccl-interaction-id]",
-	)) {
-		delete interaction.dataset.cclHovered;
-		delete interaction.dataset.cclLongPressed;
-		delete interaction.dataset.cclLastTouchAt;
-	}
-
 	const CustomEventConstructor =
 		element.ownerDocument.defaultView?.CustomEvent ?? CustomEvent;
 	element.dispatchEvent(
@@ -36,4 +24,43 @@ export function dispatchVirtualCellWillRebind(
 			detail,
 		}),
 	);
+}
+
+/** Announces that a physical cell is about to stop representing a logical card. */
+export function dispatchVirtualCellWillRebind(
+	element: HTMLElement,
+	detail: VirtualCellWillRebindDetail,
+): void {
+	const activeElement = element.ownerDocument.activeElement;
+	const hasFocusedDescendant = Boolean(
+		activeElement &&
+		"blur" in activeElement &&
+		typeof activeElement.blur === "function" &&
+		element.contains(activeElement),
+	);
+	const transientInteractions = element.querySelectorAll<HTMLElement>(
+		TRANSIENT_INTERACTION_SELECTOR,
+	);
+
+	if (!hasFocusedDescendant && transientInteractions.length === 0) {
+		return;
+	}
+
+	if (
+		hasFocusedDescendant &&
+		activeElement &&
+		"blur" in activeElement &&
+		typeof activeElement.blur === "function"
+	) {
+		activeElement.blur();
+	}
+	for (const interaction of transientInteractions) {
+		delete interaction.dataset.cclHovered;
+		delete interaction.dataset.cclLongPressed;
+		delete interaction.dataset.cclLastTouchAt;
+	}
+
+	if (transientInteractions.length > 0) {
+		dispatchRebindEvent(element, detail);
+	}
 }

@@ -8,7 +8,7 @@ import {
 	planMountedRangeTransition,
 	type MountedRangeTransitionInput,
 } from "./twoHopMountedRangeTransition";
-import type { TwoHopMountedCell } from "./twoHopMountedTypes";
+import type { TwoHopSlotIdCell } from "./twoHopSlotId";
 import { createTwoHopPhysicalSlotStore } from "./twoHopPhysicalSlotStore.svelte";
 import type { TwoHopViewPlan, TwoHopViewPlanRowModel } from "./twoHopViewPlan";
 
@@ -250,7 +250,7 @@ export function createTwoHopScalarScrollKernel(params: {
 		},
 		cancelPreviewVisibleRangeSync(): void {},
 		getItemVisibilityState(
-			cell: TwoHopMountedCell,
+			cell: TwoHopSlotIdCell,
 		): VirtualizedItemResolvedVisibilityState {
 			return physicalSlotStore.getItemVisibilityState(cell);
 		},

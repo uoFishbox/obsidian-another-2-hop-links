@@ -1,6 +1,5 @@
 import { IS_PROD } from "../../../appConstants";
 import type { ResultNavigationDirection } from "features/keyboard-navigation/resultFocus";
-import type { MountedFlatCell } from "ui/components/common/virtual-list/core/reconciliation/viewPlanMountedCells";
 import type { ProgrammaticScrollSnapshot } from "ui/components/common/virtual-list/dom/flushVirtualScrollMeasurement";
 import type { ViewPlanLayoutMetrics } from "ui/components/common/virtual-list/svelte/viewPlanLayout";
 import type { VirtualizedItemResolvedVisibilityState } from "ui/components/common/virtual-list/svelte/virtualizedItemVisibilityState.svelte";
@@ -16,10 +15,8 @@ import {
 } from "./twoHopVirtualListMeasurementRuntime.svelte";
 import { createTwoHopVirtualListMountedRuntime } from "./twoHopVirtualListMountedRuntime.svelte";
 import type { TwoHopMountedCell, TwoHopMountedRowSlice } from "./twoHopMountedTypes";
-import type {
-	TwoHopVirtualListItem,
-	TwoHopVirtualListSection,
-} from "./twoHopVirtualListModel";
+import type { TwoHopSlotIdCell } from "./twoHopSlotId";
+import type { TwoHopRenderCellSnapshot } from "./twoHopCellBinding";
 
 export type { TwoHopVirtualListSurfaceProps };
 
@@ -33,18 +30,16 @@ export interface TwoHopVirtualListController {
 	readonly rowSlotControllers: readonly TwoHopFixedRowSlotController[];
 	readonly getCellDataTestId:
 		| ((
-				cell: MountedFlatCell<TwoHopVirtualListItem, TwoHopVirtualListSection>,
+				cell: Pick<TwoHopRenderCellSnapshot, "cell" | "sectionId">,
 		  ) => string | undefined)
 		| undefined;
 	readonly getItemVisibilityState: (
-		cell: TwoHopMountedCell,
+		cell: TwoHopSlotIdCell,
 	) => VirtualizedItemResolvedVisibilityState;
 	readonly getMountedCellByInteractionId: (
 		interactionId: string,
 	) => TwoHopMountedCell | undefined;
-	readonly getItemActivationCandidateId: (
-		cell: Extract<TwoHopMountedCell, { cell: { kind: "item" } }>,
-	) => string;
+	readonly getItemActivationCandidateId: (cell: TwoHopSlotIdCell) => string;
 	loadMore(sectionId: string): void;
 	resolveNavigationTarget(
 		currentKey: string,

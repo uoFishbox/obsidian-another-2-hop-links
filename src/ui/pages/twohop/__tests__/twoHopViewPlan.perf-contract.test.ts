@@ -11,6 +11,7 @@ const LARGE_CARD_COUNT = 10_000;
 const SCROLL_FRAMES = 300;
 const COLUMNS = 3;
 const MOUNTED_ROWS = 9;
+const POOL_CAPACITY = Math.ceil(MOUNTED_ROWS * 1.25) + 2;
 
 const layout = {
 	containerWidth: 640,
@@ -132,8 +133,8 @@ describe("TwoHop view-plan performance contracts", () => {
 		}
 
 		expect(getItems).not.toHaveBeenCalled();
-		expect(kernel.mountedRows).toHaveLength(MOUNTED_ROWS);
-		expect(kernel.fixedRowSlotPool.controllers).toHaveLength(MOUNTED_ROWS);
+		expect(kernel.mountedRows).toHaveLength(POOL_CAPACITY);
+		expect(kernel.fixedRowSlotPool.controllers).toHaveLength(POOL_CAPACITY);
 	});
 
 	it("keeps cell render slot keys bounded across 300 scroll frames", () => {
@@ -171,6 +172,6 @@ describe("TwoHop view-plan performance contracts", () => {
 			}
 		}
 
-		expect(maxCellSlotKey).toBeLessThan(MOUNTED_ROWS * COLUMNS);
+		expect(maxCellSlotKey).toBeLessThan(POOL_CAPACITY * COLUMNS);
 	});
 });

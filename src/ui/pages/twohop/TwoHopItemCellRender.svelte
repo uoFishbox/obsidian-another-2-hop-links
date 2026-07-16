@@ -1,26 +1,21 @@
 <script lang="ts">
 	import type { Snippet } from "svelte";
 	import type { VirtualizedItemVisibilityState } from "ui/components/common/virtual-list/types";
-	import type { MountedFlatItemCell } from "ui/components/common/virtual-list/core/reconciliation/viewPlanMountedCells";
 	import type { TwoHopFixedCellSlotController } from "./twoHopFixedRowSlotPool.svelte";
 	import type {
-		TwoHopVirtualListItem,
-		TwoHopVirtualListSection,
-	} from "./twoHopVirtualListModel";
-	import type { TwoHopCardPresentationState } from "./twoHopCellBinding";
+		TwoHopCardPresentationState,
+		TwoHopRenderCellSnapshot,
+		TwoHopRenderItemCellSnapshot,
+	} from "./twoHopCellBinding";
+	import type { TwoHopVirtualListItem } from "./twoHopVirtualListModel";
 	import { recordCCLDevMeasurement } from "infrastructure/debug/CCLDevMeasurements";
-
-	type TwoHopMountedItemCell = MountedFlatItemCell<
-		TwoHopVirtualListItem,
-		TwoHopVirtualListSection
-	>;
 
 	interface Props {
 		cellController: TwoHopFixedCellSlotController;
 		getItemVisibilityState: (
-			cell: TwoHopMountedItemCell,
+			cell: TwoHopRenderItemCellSnapshot,
 		) => VirtualizedItemVisibilityState;
-		getItemActivationCandidateId: (cell: TwoHopMountedItemCell) => string;
+		getItemActivationCandidateId: (cell: TwoHopRenderItemCellSnapshot) => string;
 		renderItem: Snippet<
 			[
 				TwoHopVirtualListItem,
@@ -43,8 +38,8 @@
 	}
 
 	const isItemCell = (
-		cell: TwoHopFixedCellSlotController["mountedCell"],
-	): cell is TwoHopMountedItemCell => cell?.cell.kind === "item";
+		cell: TwoHopRenderCellSnapshot | undefined,
+	): cell is TwoHopRenderItemCellSnapshot => cell?.cell.kind === "item";
 
 	// Recompute this object once for each physical-slot reassignment. Consumers
 	// then read ordinary reactive snapshot fields instead of traversing the slot

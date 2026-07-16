@@ -19,7 +19,11 @@ import type {
 	VirtualCellRegistry,
 } from "ui/components/common/virtual-list/svelte/VirtualCellRegistry";
 import { dispatchVirtualCellWillRebind } from "ui/interactions/virtualCellRebind";
-import { createTwoHopCellBinding, type TwoHopCellBinding } from "./twoHopCellBinding";
+import {
+	createTwoHopCellBinding,
+	type TwoHopCellBinding,
+	type TwoHopRenderCellSnapshot,
+} from "./twoHopCellBinding";
 import type { TwoHopMountedCell, TwoHopMountedRowSlice } from "./twoHopMountedTypes";
 import type {
 	CompiledTwoHopCell,
@@ -30,6 +34,7 @@ import type {
 	TwoHopVirtualListItem,
 	TwoHopVirtualListSection,
 } from "./twoHopVirtualListModel";
+import type { TwoHopSlotIdCell } from "./twoHopSlotId";
 
 export interface TwoHopFixedCellSlotController extends VirtualCellRegistrationOwner {
 	readonly cellSlotKey: number;
@@ -39,7 +44,7 @@ export interface TwoHopFixedCellSlotController extends VirtualCellRegistrationOw
 	readonly columnIndex: number;
 	readonly renderBodyKey: RenderBodyKey | undefined;
 	readonly renderBodyKind: TwoHopMountedCell["renderBodyKind"];
-	readonly mountedCell: TwoHopMountedCell | undefined;
+	readonly mountedCell: TwoHopRenderCellSnapshot | undefined;
 	readonly binding: TwoHopCellBinding | null;
 	bindCell(cell: TwoHopMountedCell): void;
 	clear(): void;
@@ -126,7 +131,7 @@ export interface TwoHopPhysicalSlotStore {
 	clearOutsideRange(start: number, end: number): void;
 	setPreviewRange(start: number, end: number): void;
 	getItemVisibilityState(
-		cell: TwoHopMountedCell,
+		cell: TwoHopSlotIdCell,
 	): VirtualizedItemResolvedVisibilityState;
 	getMountedCellByInteractionId(interactionId: string): TwoHopMountedCell | undefined;
 	dispose(): void;

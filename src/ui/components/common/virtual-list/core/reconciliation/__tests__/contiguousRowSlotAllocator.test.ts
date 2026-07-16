@@ -6,36 +6,40 @@ describe("createContiguousRowSlotAllocator", () => {
 		const allocator = createContiguousRowSlotAllocator();
 		allocator.prepareRange({ start: 100, end: 120, layoutKey: "four-columns" });
 
-		expect(allocator.capacity).toBe(20);
-		expect(allocator.resolveSlotIndex(100)).toBe(0);
-		expect(allocator.resolveSlotIndex(119)).toBe(19);
-		expect(allocator.resolveSlotIndex(120)).toBe(0);
+		expect(allocator.capacity).toBe(27);
+		expect(allocator.resolveSlotIndex(100)).toBe(19);
+		expect(allocator.resolveSlotIndex(119)).toBe(11);
+		expect(allocator.resolveSlotIndex(127)).toBe(19);
 	});
 
 	it("keeps peak capacity until a layout reset", () => {
 		const allocator = createContiguousRowSlotAllocator();
 		allocator.prepareRange({ start: 0, end: 20, layoutKey: "wide" });
 		allocator.prepareRange({ start: 10, end: 18, layoutKey: "wide" });
-		expect(allocator.capacity).toBe(20);
+		expect(allocator.capacity).toBe(27);
 
 		allocator.prepareRange({ start: 10, end: 18, layoutKey: "narrow" });
-		expect(allocator.capacity).toBe(8);
+		expect(allocator.capacity).toBe(12);
 		expect(allocator.epoch).toBe(1);
 	});
 
-	it("starts a new epoch when capacity growth changes modulo mapping", () => {
+	it("uses growth headroom before starting a new epoch", () => {
 		const allocator = createContiguousRowSlotAllocator();
 		allocator.prepareRange({ start: 10, end: 13, layoutKey: "layout" });
 		const previousEpoch = allocator.epoch;
 
 		allocator.prepareRange({ start: 10, end: 14, layoutKey: "layout" });
+		expect(allocator.capacity).toBe(6);
+		expect(allocator.epoch).toBe(previousEpoch);
 
-		expect(allocator.capacity).toBe(4);
+		allocator.prepareRange({ start: 10, end: 17, layoutKey: "layout" });
+
+		expect(allocator.capacity).toBe(11);
 		expect(allocator.epoch).toBe(previousEpoch + 1);
-		expect(allocator.resolveSlotIndex(10)).toBe(2);
+		expect(allocator.resolveSlotIndex(10)).toBe(10);
 	});
 
-	it("compacts capacity after sustained substantial under-utilization", () => {
+	it("does not compact after sustained substantial under-utilization", () => {
 		const allocator = createContiguousRowSlotAllocator();
 		allocator.prepareRange({ start: 0, end: 12, layoutKey: "layout" });
 		allocator.prepareRange({ start: 9, end: 12, layoutKey: "layout" });
@@ -44,7 +48,7 @@ describe("createContiguousRowSlotAllocator", () => {
 
 		allocator.prepareRange({ start: 9, end: 12, layoutKey: "layout" });
 
-		expect(allocator.capacity).toBe(3);
-		expect(allocator.epoch).toBe(previousEpoch + 1);
+		expect(allocator.capacity).toBe(17);
+		expect(allocator.epoch).toBe(previousEpoch);
 	});
 });

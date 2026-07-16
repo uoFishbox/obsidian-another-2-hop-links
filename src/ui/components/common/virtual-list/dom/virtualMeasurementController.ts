@@ -1,3 +1,4 @@
+import { markVirtualScrollMeasurementRun } from "infrastructure/scroll/virtualScrollMeasurementFrame";
 import type { VirtualListSharedScrollMetrics } from "./virtualListDomObserver";
 import { observeVirtualListViewport } from "./virtualListDomObserver";
 import {
@@ -217,6 +218,7 @@ export function createVirtualMeasurementController({
 		if (!getOptionalOwnerWindow(rootEl ?? measurement.scrollContainerEl)) {
 			return SKIPPED_NO_WINDOW;
 		}
+		markVirtualScrollMeasurementRun();
 
 		cachedMeasurementInput.rootEl = rootEl;
 		cachedMeasurementInput.scrollContainerEl = measurement.scrollContainerEl;

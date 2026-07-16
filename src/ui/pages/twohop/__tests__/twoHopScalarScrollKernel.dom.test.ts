@@ -13,7 +13,7 @@ import type {
 	TwoHopVirtualListItem,
 	TwoHopVirtualListSection,
 } from "../twoHopVirtualListModel";
-import type { TwoHopCellBinding } from "../twoHopCellBinding";
+import { createTwoHopCellBinding, type TwoHopCellBinding } from "../twoHopCellBinding";
 
 const items = Array.from({ length: 1_000 }, (_, index) => ({
 	kind: "new-link" as const,
@@ -134,7 +134,47 @@ function applyRange(
 	applyModelRange(kernel, rowModel, start, mountedRowCount);
 }
 
+function getActiveRows(
+	kernel: ReturnType<typeof createTwoHopScalarScrollKernel>,
+) {
+	return kernel.mountedRows.filter((row) => row.cells.length > 0);
+}
+
+function getMountedRow(
+	kernel: ReturnType<typeof createTwoHopScalarScrollKernel>,
+	rowIndex: number,
+) {
+	return kernel.mountedRows.find(
+		(row) => row.rowIndex === rowIndex && row.cells.length > 0,
+	);
+}
+
 describe("TwoHop scalar scroll kernel", () => {
+	it("reads only render snapshot fields while creating a cell binding", () => {
+		const kernel = createTwoHopScalarScrollKernel({
+			initialRowModel: rowModel,
+			onStableVisibleRange() {},
+		});
+		applyRange(kernel, 0);
+		const sourceCell = kernel.mountedRows[0]?.cells[0];
+		expect(sourceCell).toBeDefined();
+		if (!sourceCell) return;
+		const logicalKeyGetter = vi.spyOn(sourceCell, "logicalKey", "get");
+		const renderSlotKeyGetter = vi.spyOn(sourceCell, "renderSlotKey", "get");
+		const rowTopGetter = vi.spyOn(sourceCell, "rowTop", "get");
+		const renderRevisionGetter = vi.spyOn(sourceCell, "renderBodyRevision", "get");
+
+		const binding = createTwoHopCellBinding(sourceCell, 1);
+
+		expect(binding.logicalKey).toBe(sourceCell.key);
+		expect(logicalKeyGetter).not.toHaveBeenCalled();
+		expect(renderSlotKeyGetter).not.toHaveBeenCalled();
+		expect(rowTopGetter).not.toHaveBeenCalled();
+		expect(renderRevisionGetter).not.toHaveBeenCalled();
+
+		kernel.dispose();
+	});
+
 	it("keeps the mounted interaction index synchronized across slot rebind and clear", () => {
 		const kernel = createTwoHopScalarScrollKernel({
 			initialRowModel: rowModel,
@@ -154,7 +194,7 @@ describe("TwoHop scalar scroll kernel", () => {
 
 		expect(kernel.getMountedCellByInteractionId("new-links")).toBeUndefined();
 		expect(kernel.getMountedCellByInteractionId("item:test:0")).toBeUndefined();
-		const reboundItem = kernel.mountedRows[0]?.cells.find(
+		const reboundItem = getMountedRow(kernel, 3)?.cells.find(
 			(cell) => cell.cell.kind === "item",
 		);
 		if (reboundItem?.cell.kind !== "item") return;
@@ -178,18 +218,22 @@ describe("TwoHop scalar scroll kernel", () => {
 		});
 
 		applyModelRange(kernel, sparseRowModel, 0, 2);
+		const activeRows = getActiveRows(kernel);
 
-		expect(kernel.mountedRows).toHaveLength(2);
-		expect(kernel.mountedRows.map((row) => row.cells.length)).toEqual([2, 2]);
+		expect(kernel.mountedRows).toHaveLength(5);
+		expect(activeRows).toHaveLength(2);
+		expect(activeRows.map((row) => row.cells.length)).toEqual([2, 2]);
 		expect(
-			kernel.mountedRows.flatMap((row) =>
+			activeRows.flatMap((row) =>
 				row.cells.map((cell) => cell.cell.kind),
 			),
 		).toEqual(["header", "item", "item", "load-more"]);
 		expect(
-			kernel.fixedRowSlotPool.controllers.map(
+			kernel.fixedRowSlotPool.controllers
+				.filter((controller) => controller.active)
+				.map(
 				(controller) => controller.cells.filter((cell) => cell.active).length,
-			),
+				),
 		).toEqual([2, 2]);
 
 		kernel.dispose();
@@ -325,7 +369,7 @@ describe("TwoHop scalar scroll kernel", () => {
 		const previousKey = String(cellController.logicalKey);
 		expect(registry.findByKey(previousKey)).toBe(element);
 
-		applyRange(kernel, 1);
+		applyRange(kernel, 6);
 		const nextKey = String(cellController.logicalKey);
 		expect(nextKey).not.toBe(previousKey);
 		expect(registry.findByKey(previousKey)).toBeNull();
@@ -349,12 +393,15 @@ describe("TwoHop scalar scroll kernel", () => {
 		controller.attachElement(element, registry);
 		const previousBinding = controller.binding;
 		let observedDuringWillRebind: TwoHopCellBinding | null = controller.binding;
+		const transientInteraction = document.createElement("div");
+		transientInteraction.dataset.cclHovered = "true";
+		element.append(transientInteraction);
 		element.addEventListener(VIRTUAL_CELL_WILL_REBIND_EVENT, () => {
 			observedDuringWillRebind = controller.binding;
 		});
 
 		resetCCLDevMeasurements();
-		applyRange(kernel, 1);
+		applyRange(kernel, 6);
 
 		const nextBinding = controller.binding;
 		expect(observedDuringWillRebind).toBe(previousBinding);
@@ -365,33 +412,33 @@ describe("TwoHop scalar scroll kernel", () => {
 		expect(nextBinding?.renderKind).toBe(nextBinding?.mountedCell.renderBodyKind);
 		expect(
 			getCCLDevMeasurementSnapshot().counters["twoHop.binding.commit"].count,
-		).toBe(2);
+		).toBe(6);
 
 		kernel.dispose();
 	});
 
-	it("reuses row/cell shells and writes only the entering slot", () => {
+	it("uses preallocated row and cell shells for the entering slot", () => {
 		const kernel = createTwoHopScalarScrollKernel({
 			initialRowModel: rowModel,
 			onStableVisibleRange() {},
 		});
 		applyRange(kernel, 0);
 		const mountedRows = kernel.mountedRows;
-		const recycledRowShell = mountedRows[0];
-		const recycledCellShells = [...recycledRowShell.cells];
+		const recycledRowShell = mountedRows[3];
 		const controllers = kernel.fixedRowSlotPool.controllers;
-		const recycledControllerCells = controllers[0]?.cells;
+		const recycledControllerCells = controllers[3]?.cells;
+		expect(recycledRowShell?.cells).toHaveLength(0);
 
 		resetCCLDevMeasurements();
 		applyRange(kernel, 1);
 
 		expect(kernel.mountedRows).toBe(mountedRows);
 		expect(kernel.fixedRowSlotPool.controllers).toBe(controllers);
-		expect(controllers[0]?.cells).toBe(recycledControllerCells);
-		expect(mountedRows[0]).toBe(recycledRowShell);
-		expect(mountedRows[0]?.rowIndex).toBe(3);
-		expect(mountedRows[0]?.cells[0]).toBe(recycledCellShells[0]);
-		expect(mountedRows[0]?.cells[1]).toBe(recycledCellShells[1]);
+		expect(controllers[3]?.cells).toBe(recycledControllerCells);
+		expect(mountedRows[3]).toBe(recycledRowShell);
+		expect(mountedRows[3]?.rowIndex).toBe(3);
+		expect(mountedRows[3]?.cells).toHaveLength(2);
+		expect(mountedRows[0]?.cells).toHaveLength(0);
 
 		const counters = getCCLDevMeasurementSnapshot().counters;
 		expect(counters["twoHop.scalarKernel.rowShellCreated"].count).toBe(0);
@@ -428,7 +475,8 @@ describe("TwoHop scalar scroll kernel", () => {
 		applyRange(kernel, 0);
 		const mountedRows = kernel.mountedRows;
 		const rowShells = [...mountedRows];
-		const cellShells = mountedRows.map((row) => [...row.cells]);
+		const controllers = kernel.fixedRowSlotPool.controllers;
+		const controllerCellShells = controllers.map((controller) => controller.cells);
 		resetCCLDevMeasurements();
 
 		for (let frame = 1; frame <= 300; frame += 1) {
@@ -438,8 +486,9 @@ describe("TwoHop scalar scroll kernel", () => {
 		expect(kernel.mountedRows).toBe(mountedRows);
 		for (let slotIndex = 0; slotIndex < rowShells.length; slotIndex += 1) {
 			expect(mountedRows[slotIndex]).toBe(rowShells[slotIndex]);
-			expect(mountedRows[slotIndex]?.cells[0]).toBe(cellShells[slotIndex]?.[0]);
-			expect(mountedRows[slotIndex]?.cells[1]).toBe(cellShells[slotIndex]?.[1]);
+			expect(controllers[slotIndex]?.cells).toBe(
+				controllerCellShells[slotIndex],
+			);
 		}
 		const counters = getCCLDevMeasurementSnapshot().counters;
 		expect(counters["twoHop.scalarKernel.rowShellCreated"].count).toBe(0);
@@ -450,7 +499,7 @@ describe("TwoHop scalar scroll kernel", () => {
 		expect(counters["twoHop.buildMountedRows"].count).toBe(0);
 	});
 
-	it("rebinds the full range when capacity growth changes slot mapping", () => {
+	it("uses capacity headroom before growth rebinds the full range", () => {
 		const kernel = createTwoHopScalarScrollKernel({
 			initialRowModel: rowModel,
 			onStableVisibleRange() {},
@@ -459,18 +508,29 @@ describe("TwoHop scalar scroll kernel", () => {
 		resetCCLDevMeasurements();
 
 		applyRange(kernel, 10, 4);
-
-		const mountedRowIndexes = kernel.mountedRows
+		let mountedRowIndexes = getActiveRows(kernel)
 			.map((row) => row.rowIndex)
 			.sort((left, right) => left - right);
 		expect(mountedRowIndexes).toEqual([10, 11, 12, 13]);
-		const counters = getCCLDevMeasurementSnapshot().counters;
-		expect(counters["twoHop.reboundRowSlot"].count).toBe(4);
-		expect(counters["twoHop.reboundCellSlot"].count).toBe(8);
+		let counters = getCCLDevMeasurementSnapshot().counters;
+		expect(counters["twoHop.reboundRowSlot"].count).toBe(1);
+		expect(counters["twoHop.reboundCellSlot"].count).toBe(2);
+		expect(counters["twoHop.physicalPool.resize"].count).toBe(0);
+
+		resetCCLDevMeasurements();
+		applyRange(kernel, 10, 7);
+
+		mountedRowIndexes = getActiveRows(kernel)
+			.map((row) => row.rowIndex)
+			.sort((left, right) => left - right);
+		expect(mountedRowIndexes).toEqual([10, 11, 12, 13, 14, 15, 16]);
+		counters = getCCLDevMeasurementSnapshot().counters;
+		expect(counters["twoHop.reboundRowSlot"].count).toBe(7);
+		expect(counters["twoHop.reboundCellSlot"].count).toBe(14);
 		expect(counters["twoHop.physicalPool.resize"].count).toBe(1);
 	});
 
-	it("compacts physical row slots after sustained under-utilization", () => {
+	it("keeps physical row slots after sustained under-utilization", () => {
 		const kernel = createTwoHopScalarScrollKernel({
 			initialRowModel: rowModel,
 			onStableVisibleRange() {},
@@ -481,10 +541,10 @@ describe("TwoHop scalar scroll kernel", () => {
 		applyRange(kernel, 9, 3);
 		applyRange(kernel, 9, 3);
 
-		expect(kernel.mountedRows).toHaveLength(3);
-		expect(kernel.fixedRowSlotPool.controllers).toHaveLength(3);
+		expect(kernel.mountedRows).toHaveLength(17);
+		expect(kernel.fixedRowSlotPool.controllers).toHaveLength(17);
 		expect(
-			kernel.mountedRows
+			getActiveRows(kernel)
 				.map((row) => row.rowIndex)
 				.sort((left, right) => left - right),
 		).toEqual([9, 10, 11]);

@@ -16,6 +16,10 @@ import {
 	resetScrollActivityForTests,
 } from "infrastructure/scroll/scrollActivity";
 import {
+	markVirtualScrollMeasurementRun,
+	resetVirtualScrollMeasurementFrameForTests,
+} from "infrastructure/scroll/virtualScrollMeasurementFrame";
+import {
 	canActivatePreviewImmediately,
 	cancelPreviewActivation,
 	createPreviewActivationScope,
@@ -113,6 +117,7 @@ beforeEach(() => {
 afterEach(() => {
 	resetPreviewActivationSchedulerForTests();
 	resetScrollActivityForTests();
+	resetVirtualScrollMeasurementFrameForTests();
 	vi.restoreAllMocks();
 	vi.unstubAllGlobals();
 	vi.useRealTimers();
@@ -149,6 +154,65 @@ describe("preview activation scheduler", () => {
 
 		requestPreviewActivation("preview-warmup", activationScope, (activated) =>
 			results.push(activated),
+		);
+
+		expect(results).toEqual([]);
+		await flushAnimationFrame();
+		expect(results).toEqual([true]);
+	});
+
+	it("defers a pending activation when scroll measurement ran in its frame", async () => {
+		const results: boolean[] = [];
+		requestQueuedPreviewActivation(
+			"preview-after-measurement",
+			activationScope,
+			(activated) => results.push(activated),
+		);
+		markVirtualScrollMeasurementRun();
+
+		await flushAnimationFrame();
+		expect(results).toEqual([]);
+
+		await flushAnimationFrame();
+		expect(results).toEqual([true]);
+	});
+
+	it("continues activating while scroll measurement runs every frame", async () => {
+		const results: boolean[] = [];
+		markScrollActivityActive(scrollSource);
+		for (const key of ["preview-a", "preview-b", "preview-c"]) {
+			requestQueuedPreviewActivation(key, activationScope, (activated) =>
+				results.push(activated),
+			);
+		}
+
+		markVirtualScrollMeasurementRun();
+		await flushAnimationFrame();
+		expect(results).toEqual([]);
+
+		markVirtualScrollMeasurementRun();
+		await flushAnimationFrame();
+		expect(results).toEqual([true]);
+
+		markVirtualScrollMeasurementRun();
+		await flushAnimationFrame();
+		expect(results).toEqual([true, true]);
+
+		markVirtualScrollMeasurementRun();
+		await flushAnimationFrame();
+		expect(results).toEqual([true, true, true]);
+	});
+
+	it("does not activate synchronously in a scroll measurement frame", async () => {
+		expect(canActivatePreviewImmediately(activationScope)).toBe(false);
+		await vi.advanceTimersByTimeAsync(32);
+		markVirtualScrollMeasurementRun();
+		const results: boolean[] = [];
+
+		requestPreviewActivation(
+			"preview-after-immediate-measurement",
+			activationScope,
+			(activated) => results.push(activated),
 		);
 
 		expect(results).toEqual([]);

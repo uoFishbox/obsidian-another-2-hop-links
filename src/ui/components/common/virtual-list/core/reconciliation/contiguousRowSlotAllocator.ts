@@ -30,13 +30,11 @@ export function createContiguousRowSlotAllocator(): ContiguousRowSlotAllocator {
 	let layoutKey: unknown;
 	let hasLayoutKey = false;
 	let disposed = false;
-	let underutilizedApplyCount = 0;
 
 	function reset(_reason: RowSlotResetReason): void {
 		capacity = 0;
 		layoutKey = undefined;
 		hasLayoutKey = false;
-		underutilizedApplyCount = 0;
 		epoch += 1;
 	}
 
@@ -61,16 +59,10 @@ export function createContiguousRowSlotAllocator(): ContiguousRowSlotAllocator {
 		let nextCapacity = capacity;
 
 		if (activeRows > capacity) {
-			nextCapacity = activeRows;
-			underutilizedApplyCount = 0;
-		} else if (activeRows > 0 && activeRows * 4 <= capacity) {
-			underutilizedApplyCount += 1;
-			if (underutilizedApplyCount >= 3) {
-				nextCapacity = activeRows;
-				underutilizedApplyCount = 0;
-			}
-		} else {
-			underutilizedApplyCount = 0;
+			nextCapacity = Math.max(
+				activeRows,
+				Math.ceil(activeRows * 1.25) + 2,
+			);
 		}
 
 		if (nextCapacity === capacity) {

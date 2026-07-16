@@ -2,6 +2,7 @@ import {
 	isScrollActivityActive,
 	subscribeScrollActivity,
 } from "infrastructure/scroll/scrollActivity";
+import { shouldDeferPreviewActivationForVirtualScrollMeasurement } from "infrastructure/scroll/virtualScrollMeasurementFrame";
 import { DEBUG_DISABLE_CARD_DOM_PREVIEW } from "../../../appConstants";
 import {
 	canConsumePreviewScheduleToken,
@@ -24,7 +25,7 @@ interface PreviewActivationPolicy {
 }
 
 const SCROLLING_POLICY: PreviewActivationPolicy = {
-	ratePerSecond: 90,
+	ratePerSecond: 60,
 	creditCapacity: 2,
 	maxTasksPerDrain: 1,
 	maxDrainCpuMs: 1,
@@ -65,6 +66,7 @@ interface PreviewActivationRequest {
 	key: string;
 	scope: PreviewActivationScope;
 	onSettled: ((activated: boolean) => void) | undefined;
+	hasDeferredForVirtualScrollMeasurement: boolean;
 	settled: boolean;
 }
 
@@ -383,6 +385,17 @@ function drainGlobalFrame(frameTimestamp: number): void {
 	refillActivationTokens(frameTimestamp, policy);
 
 	const scopes = Array.from(activeQueuedScopes);
+	const shouldDeferUndeferredRequests =
+		shouldDeferPreviewActivationForVirtualScrollMeasurement();
+	const queueEntriesAvailableAtDrainStart = scopes.reduce(
+		(total, scope) =>
+			total + Math.max(0, scope.pendingQueue.length - scope.pendingQueueHead),
+		0,
+	);
+	const maxInspectableQueueEntries = Math.min(
+		MAX_QUEUE_ENTRIES_PER_DRAIN,
+		queueEntriesAvailableAtDrainStart,
+	);
 	const deadline = readMonotonicTime() + policy.maxDrainCpuMs;
 	let inspectedQueueEntries = 0;
 	let drainedTasks = 0;
@@ -390,7 +403,7 @@ function drainGlobalFrame(frameTimestamp: number): void {
 	while (
 		canConsumePreviewScheduleToken(activationTokenState) &&
 		drainedTasks < policy.maxTasksPerDrain &&
-		inspectedQueueEntries < MAX_QUEUE_ENTRIES_PER_DRAIN &&
+		inspectedQueueEntries < maxInspectableQueueEntries &&
 		readMonotonicTime() <= deadline
 	) {
 		if (!hasPreviewAdmissionCapacity(readGlobalBackpressure())) break;
@@ -400,6 +413,14 @@ function drainGlobalFrame(frameTimestamp: number): void {
 		inspectedQueueEntries += 1;
 		if (request.settled) continue;
 		if (request.scope.pendingByKey.get(request.key) !== request) continue;
+		if (
+			shouldDeferUndeferredRequests &&
+			!request.hasDeferredForVirtualScrollMeasurement
+		) {
+			request.hasDeferredForVirtualScrollMeasurement = true;
+			request.scope.pendingQueue.push(request);
+			continue;
+		}
 
 		settleRequest(request, true);
 		activationTokenState = consumePreviewScheduleToken(activationTokenState);
@@ -436,6 +457,7 @@ export function canActivatePreviewImmediately(
 	return (
 		!isWarmupActive(scope, now) &&
 		!isScrollActivityActive() &&
+		!shouldDeferPreviewActivationForVirtualScrollMeasurement() &&
 		pressure.queued <= 0 &&
 		pressure.active <= 0
 	);
@@ -465,6 +487,7 @@ function enqueuePreviewActivationRequest(
 		key,
 		scope,
 		onSettled,
+		hasDeferredForVirtualScrollMeasurement: false,
 		settled: false,
 	};
 	scope.pendingByKey.set(key, request);
@@ -496,6 +519,7 @@ export function requestPreviewActivation(
 	if (
 		!isWarmupActive(scope, now) &&
 		!isScrollActivityActive() &&
+		!shouldDeferPreviewActivationForVirtualScrollMeasurement() &&
 		pressure.queued <= 0 &&
 		pressure.active <= 0
 	) {

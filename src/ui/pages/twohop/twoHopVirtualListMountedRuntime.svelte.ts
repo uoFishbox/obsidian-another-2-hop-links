@@ -1,23 +1,14 @@
 import { getContext, untrack } from "svelte";
-import type { MountedFlatItemCell } from "ui/components/common/virtual-list/core/reconciliation/viewPlanMountedCells";
-import type {
-	TwoHopVirtualListItem,
-	TwoHopVirtualListSection,
-} from "./twoHopVirtualListModel";
 import type { TwoHopVirtualListInputRuntime } from "./twoHopVirtualListInputRuntime.svelte";
 import {
 	PREVIEW_ROW_ACTIVATION_CONTEXT_KEY,
 	type RowPreviewActivationRuntime,
 } from "features/preview/scheduling/rowPreviewActivationRuntime";
 import { resolveTwoHopSlotId } from "./twoHopSlotId";
+import type { TwoHopSlotIdCell } from "./twoHopSlotId";
 import { createTwoHopScalarScrollKernel } from "./twoHopScalarScrollKernel.svelte";
 
-type TwoHopMountedItemCell = MountedFlatItemCell<
-	TwoHopVirtualListItem,
-	TwoHopVirtualListSection
->;
-
-function getTwoHopActivationCandidateId(cell: TwoHopMountedItemCell): string {
+function getTwoHopActivationCandidateId(cell: TwoHopSlotIdCell): string {
 	return resolveTwoHopSlotId(cell);
 }
 

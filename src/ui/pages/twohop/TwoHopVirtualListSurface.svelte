@@ -4,11 +4,6 @@
 	import VirtualInteractiveSurface from "ui/components/common/virtual-list/svelte/VirtualInteractiveSurface.svelte";
 	import VirtualListLoadMoreButton from "ui/components/common/virtual-list/VirtualListLoadMoreButton.svelte";
 	import type { VirtualizedItemVisibilityState } from "ui/components/common/virtual-list/types";
-	import type {
-		MountedFlatCell,
-		MountedFlatHeaderCell,
-		MountedFlatItemCell,
-	} from "ui/components/common/virtual-list/core/reconciliation/viewPlanMountedCells";
 	import type { Snippet } from "svelte";
 	import type { ApplicationStore } from "ui/stores/ApplicationStore.svelte";
 	import type { SectionRenderDescriptor } from "ui/components/sections/types";
@@ -22,7 +17,10 @@
 	import TwoHopFixedRowSlotsSurface from "./TwoHopFixedRowSlotsSurface.svelte";
 	import TwoHopItemCellRender from "./TwoHopItemCellRender.svelte";
 	import { createSurfaceVirtualCellRegistry } from "ui/components/common/virtual-list/svelte/VirtualCellRegistry";
-	import type { TwoHopCardPresentationState } from "./twoHopCellBinding";
+	import type {
+		TwoHopCardPresentationState,
+		TwoHopRenderCellSnapshot,
+	} from "./twoHopCellBinding";
 
 	interface Props {
 		sections: readonly SectionRenderDescriptor<
@@ -81,13 +79,13 @@
 		interactionDescriptorResolverProvider.invalidate();
 	});
 	const isHeaderCell = (
-		cell: MountedFlatCell<TwoHopVirtualListItem, TwoHopVirtualListSection>,
-	): cell is MountedFlatHeaderCell<TwoHopVirtualListItem, TwoHopVirtualListSection> =>
+		cell: TwoHopRenderCellSnapshot,
+	): cell is Extract<TwoHopRenderCellSnapshot, { cell: { kind: "header" } }> =>
 		cell.cell.kind === "header";
 	const fixedSurfaceLayoutKey = $derived(list.layout.columns);
 	const isItemCell = (
-		cell: MountedFlatCell<TwoHopVirtualListItem, TwoHopVirtualListSection>,
-	): cell is MountedFlatItemCell<TwoHopVirtualListItem, TwoHopVirtualListSection> =>
+		cell: TwoHopRenderCellSnapshot,
+	): cell is Extract<TwoHopRenderCellSnapshot, { cell: { kind: "item" } }> =>
 		cell.cell.kind === "item";
 </script>
 

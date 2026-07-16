@@ -2,7 +2,7 @@
 	import { IS_PROD } from "../../../appConstants";
 	import type { Snippet } from "svelte";
 	import VirtualGridLogicalCellMount from "ui/components/common/virtual-list/svelte/VirtualGridLogicalCellMount.svelte";
-	import type { TwoHopMountedCell } from "./twoHopMountedTypes";
+	import type { TwoHopRenderCellSnapshot } from "./twoHopCellBinding";
 	import type {
 		TwoHopFixedCellSlotController,
 		TwoHopFixedRowSlotController,
@@ -20,11 +20,11 @@
 		rowSlotControllers: readonly TwoHopFixedRowSlotController[];
 		contentEl?: HTMLDivElement | null;
 		observerRoot?: HTMLElement | null;
-		getCellDataTestId?: (cell: TwoHopMountedCell) => string | undefined;
+		getCellDataTestId?: (cell: TwoHopRenderCellSnapshot) => string | undefined;
 		renderCell: Snippet<
 			[
 				{
-					mountedCell: TwoHopMountedCell;
+					mountedCell: TwoHopRenderCellSnapshot;
 					cellController: TwoHopFixedCellSlotController;
 				},
 			]
