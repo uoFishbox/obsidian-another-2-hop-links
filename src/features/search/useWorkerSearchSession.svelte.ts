@@ -43,8 +43,6 @@ export interface UseWorkerSearchSessionOptions {
 export interface WorkerSearchSessionResult {
 	readonly matchedKeySet: Set<string> | null;
 	readonly matchedItemByKey: Map<string, SearchWorkerMatchedItem> | null;
-	readonly matchedQuery: string;
-	readonly matchedScope: SearchWorkerMatchScope;
 	readonly isFiltering: boolean;
 	readonly isLoading: boolean;
 	readonly contentIndex: FileContentIndexResult;
@@ -113,16 +111,12 @@ export function useWorkerSearchSession(
 	let workerDataset = $derived.by(buildWorkerDataset);
 	let matchedKeySet = $state<Set<string> | null>(null);
 	let matchedItemByKey = $state<Map<string, SearchWorkerMatchedItem> | null>(null);
-	let matchedQuery = $state("");
-	let matchedScope = $state<SearchWorkerMatchScope>("title-only");
 	let ripgrepPositionByPath = $state<Map<string, Pos>>(
 		EMPTY_RIPGREP_POSITION_BY_PATH,
 	);
 	let isWorkerFiltering = $state(false);
 	let syncedDatasetVersion = $state(0);
 	let requestSerial = 0;
-	let activeRequestQuery = "";
-	let activeRequestScope: SearchWorkerMatchScope = "title-only";
 	let ripgrepRequestSerial = 0;
 	let ripgrepAbortController: AbortController | null = null;
 	let lastIssuedSearchSignature = "";
@@ -166,8 +160,6 @@ export function useWorkerSearchSession(
 		}
 		matchedKeySet = nextMatchedKeySet;
 		matchedItemByKey = nextMatchedItemByKey;
-		matchedQuery = activeRequestQuery;
-		matchedScope = activeRequestScope;
 		ripgrepPositionByPath = EMPTY_RIPGREP_POSITION_BY_PATH;
 		isWorkerFiltering = false;
 	});
@@ -265,7 +257,6 @@ export function useWorkerSearchSession(
 		if (!sessionEnabled && !contentSyncCanTrackPaths) {
 			matchedKeySet = null;
 			matchedItemByKey = null;
-			matchedQuery = "";
 			ripgrepPositionByPath = EMPTY_RIPGREP_POSITION_BY_PATH;
 			isWorkerFiltering = false;
 			lastIssuedSearchSignature = "";
@@ -275,7 +266,6 @@ export function useWorkerSearchSession(
 		if (!sessionEnabled) {
 			matchedKeySet = null;
 			matchedItemByKey = null;
-			matchedQuery = "";
 			ripgrepPositionByPath = EMPTY_RIPGREP_POSITION_BY_PATH;
 			isWorkerFiltering = false;
 			lastIssuedSearchSignature = "";
@@ -348,7 +338,6 @@ export function useWorkerSearchSession(
 			requestSerial += 1;
 			matchedKeySet = null;
 			matchedItemByKey = null;
-			matchedQuery = "";
 			ripgrepPositionByPath = EMPTY_RIPGREP_POSITION_BY_PATH;
 			isWorkerFiltering = false;
 			lastIssuedSearchSignature = "";
@@ -362,7 +351,6 @@ export function useWorkerSearchSession(
 			requestSerial += 1;
 			matchedKeySet = null;
 			matchedItemByKey = null;
-			matchedQuery = "";
 			ripgrepPositionByPath = EMPTY_RIPGREP_POSITION_BY_PATH;
 			isWorkerFiltering = false;
 			lastIssuedSearchSignature = "";
@@ -374,17 +362,14 @@ export function useWorkerSearchSession(
 
 	const issueSearchFilter = (normalizedQuery: string): void => {
 		const backend = getEffectiveContentSearchBackend();
-		const requestScope = currentMatchScope;
-		const signature = `${syncedDatasetVersion}:${requestScope}:${backend}:${normalizedQuery}`;
+		const signature = `${syncedDatasetVersion}:${currentMatchScope}:${backend}:${normalizedQuery}`;
 		if (signature === lastIssuedSearchSignature) {
 			return;
 		}
 
 		lastIssuedSearchSignature = signature;
 		const requestId = ++requestSerial;
-		activeRequestQuery = normalizedQuery;
-		activeRequestScope = requestScope;
-		if (backend === "ripgrep" && requestScope === "title-and-content") {
+		if (backend === "ripgrep" && currentMatchScope === "title-and-content") {
 			cancelRipgrepSearch();
 			const abortController = new AbortController();
 			ripgrepAbortController = abortController;
@@ -426,8 +411,6 @@ export function useWorkerSearchSession(
 					}
 					matchedKeySet = nextMatchedKeySet;
 					matchedItemByKey = nextMatchedItemByKey;
-					matchedQuery = normalizedQuery;
-					matchedScope = requestScope;
 					ripgrepPositionByPath = ripgrepResult.positionByPath;
 					isWorkerFiltering = false;
 				} catch {
@@ -441,6 +424,7 @@ export function useWorkerSearchSession(
 
 					ripgrepBackendUnavailable = true;
 					lastIssuedSearchSignature = "";
+					ripgrepPositionByPath = EMPTY_RIPGREP_POSITION_BY_PATH;
 					isWorkerFiltering = false;
 				} finally {
 					if (ripgrepAbortController === abortController) {
@@ -454,11 +438,12 @@ export function useWorkerSearchSession(
 
 		cancelRipgrepSearch();
 		isWorkerFiltering = true;
+		ripgrepPositionByPath = EMPTY_RIPGREP_POSITION_BY_PATH;
 		searchWorkerClient.filter({
 			requestId,
 			datasetVersion: syncedDatasetVersion,
 			query: normalizedQuery,
-			matchScope: requestScope,
+			matchScope: currentMatchScope,
 		});
 	};
 
@@ -468,12 +453,6 @@ export function useWorkerSearchSession(
 		},
 		get matchedItemByKey() {
 			return matchedItemByKey;
-		},
-		get matchedQuery() {
-			return matchedQuery;
-		},
-		get matchedScope() {
-			return matchedScope;
 		},
 		get isFiltering() {
 			return isWorkerFiltering;

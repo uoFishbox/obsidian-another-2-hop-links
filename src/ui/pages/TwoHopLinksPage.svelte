@@ -104,22 +104,13 @@
 		ripgrepExecutablePath: () => currentSettings.ripgrepExecutablePath || undefined,
 	});
 	let isSearchLoading = $derived(workerSearchSession.isLoading);
-	let matchedKeySet = $derived(workerSearchSession.matchedKeySet);
 	let matchedItemByKey = $derived(workerSearchSession.matchedItemByKey);
-	let appliedSearchQuery = $derived(
-		matchedKeySet === null
-			? search.normalized
-			: workerSearchSession.matchedQuery,
-	);
-	let appliedSearchScope = $derived(
-		matchedKeySet === null ? searchScope : workerSearchSession.matchedScope,
-	);
 
 	let filteredDisplayData = $derived.by(() => {
 		return searchAdapter.filterDisplayData(
 			displayData,
-			appliedSearchQuery,
-			matchedKeySet,
+			search.normalized,
+			workerSearchSession.matchedKeySet,
 			getSearchRenderMode(),
 		);
 	});
@@ -130,7 +121,7 @@
 	const twoHopVirtualListSections = $derived.by(() =>
 		dataIdentityCache.resolve({
 			displayData: filteredDisplayData,
-			searchQuery: appliedSearchQuery,
+			searchQuery: search.normalized,
 			useMergedLinks,
 			showTags,
 			sourceFile,
@@ -271,8 +262,8 @@
 				<TwoHopPageVirtualList
 					sections={twoHopVirtualListSections}
 					{applicationStore}
-					searchQuery={appliedSearchQuery}
-					searchScope={appliedSearchScope}
+					searchQuery={search.normalized}
+					{searchScope}
 					{matchedItemByKey}
 					{initialVisibleCount}
 					{loadMoreIncrement}
