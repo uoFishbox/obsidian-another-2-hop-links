@@ -14,6 +14,7 @@ export interface TwoHopCardShellSlot {
 	logicalIdentity: string | null;
 	generation: number;
 	previewGeneration: number;
+	renderRevision: number;
 	previewStatus: "empty" | "queued" | "loading" | "ready";
 	cardModel: CardRenderModel | null;
 	disposePreview: (() => void) | null;
@@ -103,6 +104,7 @@ export function createTwoHopDomPool(params: {
 				logicalIdentity: null,
 				generation: 0,
 				previewGeneration: 0,
+				renderRevision: 0,
 				previewStatus: "empty",
 				cardModel: null,
 				disposePreview: null,

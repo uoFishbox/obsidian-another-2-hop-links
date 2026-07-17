@@ -98,6 +98,48 @@ describe("twoHop imperative DOM pool", () => {
 		expect(slot.root.classList.contains("is-skeleton")).toBe(false);
 	});
 
+	it("refreshes the model and preview state after a render revision change", () => {
+		const { snapshot, geometry } = createFixture();
+		const content = document.createElement("div");
+		const pool = createTwoHopDomPool({ content, rowCapacity: 1, columns: 2 });
+		const resolveItemCardModel = vi.fn(() => ({
+			item: snapshot.sections[0].items[0].item,
+			targetFile: null,
+			title: "Resolved title",
+			ariaLabel: "Open Resolved title",
+			className: null,
+			extension: null,
+			directory: null,
+			interactionId: "item:missing",
+			interactionKey: "item:missing",
+			presentation: undefined,
+			searchQuery: "",
+			searchScope: "title-only" as const,
+			contentPreview: undefined,
+			previewRefreshToken: 0,
+			previewActivationIdentity: undefined,
+		}));
+		const renderer = createTwoHopShellRenderer({ resolveItemCardModel });
+		const cell = resolveTwoHopCell(snapshot, geometry, 0, 1);
+		if (!cell) throw new Error("expected item cell");
+		const slot = pool.rows[0].cells[1];
+		renderer.renderShell(slot, cell, snapshot);
+		const disposePreview = vi.fn();
+		const generation = slot.generation;
+		slot.previewStatus = "ready";
+		slot.disposePreview = disposePreview;
+		slot.previewHost.append(document.createElement("strong"));
+
+		renderer.invalidateCardModels();
+		renderer.renderShell(slot, cell, snapshot);
+
+		expect(resolveItemCardModel).toHaveBeenCalledTimes(2);
+		expect(disposePreview).toHaveBeenCalledOnce();
+		expect(slot.generation).toBe(generation + 1);
+		expect(slot.previewStatus).toBe("empty");
+		expect(slot.previewHost.childElementCount).toBe(0);
+	});
+
 	it("renders section headers as title and icon without a visible count", () => {
 		const { snapshot, geometry } = createFixture();
 		const content = document.createElement("div");

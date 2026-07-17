@@ -21,6 +21,7 @@ export interface TwoHopShellRendererParams {
 }
 
 export function createTwoHopShellRenderer(params: TwoHopShellRendererParams) {
+	let renderRevision = 0;
 	let modelCache = new WeakMap<
 		Extract<TwoHopResolvedCell, { kind: "item" }>["item"],
 		CardRenderModel
@@ -30,7 +31,13 @@ export function createTwoHopShellRenderer(params: TwoHopShellRendererParams) {
 		cell: TwoHopResolvedCell | null,
 		snapshot: TwoHopSnapshot,
 	): void {
-		prepareSlot(slot, cell, snapshot);
+		prepareSlot(
+			slot,
+			cell,
+			snapshot,
+			slot.renderRevision !== renderRevision,
+		);
+		slot.renderRevision = renderRevision;
 		slot.rich = false;
 		slot.cardModel = null;
 		slot.root.classList.add("is-skeleton");
@@ -45,14 +52,17 @@ export function createTwoHopShellRenderer(params: TwoHopShellRendererParams) {
 		snapshot: TwoHopSnapshot,
 	): void {
 		const identity = resolveCellIdentity(cell, snapshot);
-		const retainedRichShell = slot.rich && slot.logicalIdentity === identity;
+		const revisionChanged = slot.renderRevision !== renderRevision;
+		const retainedRichShell =
+			slot.rich && slot.logicalIdentity === identity && !revisionChanged;
 		if (retainedRichShell) {
 			slot.logicalRowIndex = cell.rowIndex;
 			slot.logicalColumnIndex = cell.columnIndex;
 			slot.cell.style.visibility = "visible";
 			return;
 		}
-		prepareSlot(slot, cell, snapshot);
+		prepareSlot(slot, cell, snapshot, revisionChanged);
+		slot.renderRevision = renderRevision;
 		slot.rich = true;
 		slot.root.classList.remove("is-skeleton");
 		resetVariantClasses(slot.root);
@@ -162,6 +172,7 @@ export function createTwoHopShellRenderer(params: TwoHopShellRendererParams) {
 		renderShell,
 		invalidateCardModels() {
 			modelCache = new WeakMap();
+			renderRevision += 1;
 		},
 	};
 }
@@ -170,9 +181,10 @@ function prepareSlot(
 	slot: TwoHopCardShellSlot,
 	cell: TwoHopResolvedCell | null,
 	snapshot: TwoHopSnapshot,
+	forceRefresh = false,
 ): void {
 	const identity = cell ? resolveCellIdentity(cell, snapshot) : null;
-	if (slot.logicalIdentity !== identity) {
+	if (slot.logicalIdentity !== identity || forceRefresh) {
 		slot.disposePreview?.();
 		slot.disposePreview = null;
 		slot.logicalIdentity = identity;

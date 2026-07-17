@@ -59,6 +59,7 @@ describe("createCardRenderModel", () => {
 			contentPreview: "matched content",
 		});
 		expect(model.previewActivationIdentity).toBeTruthy();
+		expect(model.previewCacheRevision).toBe("4:2:0");
 		expect(getPreviewRenderVersion).toHaveBeenCalledWith(targetFile.path);
 		expect(fileToLinktext).not.toHaveBeenCalled();
 	});

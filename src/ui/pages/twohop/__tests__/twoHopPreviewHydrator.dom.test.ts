@@ -3,8 +3,12 @@ import type { TFile } from "obsidian";
 import { createTwoHopDomPool } from "../twoHopDomPool";
 import { createTwoHopPreviewHydrator } from "../twoHopPreviewHydrator";
 import type { CardRenderModel } from "ui/components/items/cardRenderModel";
+import type { PreviewRequestOptions } from "features/preview/public-types";
 
-function createModel(path: string): CardRenderModel {
+function createModel(
+	path: string,
+	previewCacheRevision?: number | string,
+): CardRenderModel {
 	const targetFile = { path, extension: "md" } as TFile;
 	return {
 		item: { type: "file" } as CardRenderModel["item"],
@@ -21,6 +25,7 @@ function createModel(path: string): CardRenderModel {
 		searchScope: "title-only",
 		contentPreview: undefined,
 		previewRefreshToken: 0,
+		previewCacheRevision,
 		previewActivationIdentity: `preview:${path}`,
 	};
 }
@@ -130,6 +135,36 @@ describe("twoHopPreviewHydrator", () => {
 		expect(host.querySelector("strong")?.textContent).toBe("Rendered");
 		expect(host.querySelector("a")?.textContent).toBe("link");
 		expect(host.textContent).not.toContain("<strong>");
+		hydrator.dispose();
+	});
+
+	it("passes the index preview revision to the preview cache", () => {
+		const pool = createReadyPool();
+		pool.rows[0].cells[0].cardModel = createModel("notes/0.md", "3:7:0");
+		pool.rows[0].cells[1].previewStatus = "ready";
+		const getPreview = vi.fn(
+			async (
+				_file: TFile,
+				_signal?: AbortSignal,
+				_options?: PreviewRequestOptions,
+			) => ({ type: "empty" as const, content: "" }),
+		);
+		const hydrator = createTwoHopPreviewHydrator({
+			getRows: () => pool.rows,
+			getPreview,
+			setTimer: () => 1,
+			clearTimer: () => {},
+		});
+		hydrator.notifyViewport({
+			visibleStart: 0,
+			visibleEnd: 1,
+			scrollActive: false,
+			velocityRowsPerMs: 0,
+			criticalWorkPending: false,
+		});
+
+		expect(hydrator.hydrateNext("visible-idle")).toBe(true);
+		expect(getPreview.mock.calls[0]?.[2]?.cacheRevision).toBe("3:7:0");
 		hydrator.dispose();
 	});
 });

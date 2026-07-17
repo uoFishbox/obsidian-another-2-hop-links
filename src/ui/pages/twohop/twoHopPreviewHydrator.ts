@@ -144,7 +144,8 @@ export function createTwoHopPreviewHydrator(
 			const preview = model?.contentPreview
 				? ({ type: "text", content: model.contentPreview } as const)
 				: await params.getPreview(file, abortController.signal, {
-						cacheRevision: model?.previewRefreshToken,
+						cacheRevision:
+							model?.previewCacheRevision ?? model?.previewRefreshToken,
 					});
 			if (!isCurrent(slot, generation, identity)) {
 				stats.staleCompletions += 1;

@@ -27,6 +27,7 @@ export interface CardRenderModel {
 	readonly searchScope: "title-only" | "title-and-content";
 	readonly contentPreview: string | undefined;
 	readonly previewRefreshToken: number;
+	readonly previewCacheRevision?: number | string;
 	readonly previewActivationIdentity: string | undefined;
 }
 
@@ -62,6 +63,10 @@ export function createCardRenderModel(
 	const searchScope = params.searchScope ?? "title-and-content";
 	const contentPreview = params.contentPreview;
 	const previewRefreshToken = params.previewRefreshToken ?? 0;
+	const previewRenderVersion = targetFile
+		? params.getPreviewRenderVersion(targetFile.path)
+		: "0:0";
+	const previewCacheRevision = `${previewRenderVersion}:${previewRefreshToken}`;
 	const interactionKey =
 		params.interactionKey ?? createItemInteractionKey(params.item);
 	const interactionId = params.interactionId ?? interactionKey;
@@ -86,12 +91,13 @@ export function createCardRenderModel(
 		searchScope,
 		contentPreview,
 		previewRefreshToken,
+		previewCacheRevision,
 		previewActivationIdentity: targetFile
 			? buildCardPreviewActivationIdentity(
 					targetFile,
 					params.settings,
 					normalizePreviewQuery(effectiveSearchQuery),
-					params.getPreviewRenderVersion(targetFile.path),
+					previewRenderVersion,
 					previewRefreshToken,
 					previewOverride,
 				)
