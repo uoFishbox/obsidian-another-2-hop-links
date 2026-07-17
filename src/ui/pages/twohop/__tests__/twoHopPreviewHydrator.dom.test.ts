@@ -102,4 +102,34 @@ describe("twoHopPreviewHydrator", () => {
 		expect(hydrator.getStats().requested).toBe(2);
 		hydrator.dispose();
 	});
+
+	it("renders text preview markup as HTML instead of escaped source", async () => {
+		const pool = createReadyPool();
+		const hydrator = createTwoHopPreviewHydrator({
+			getRows: () => pool.rows,
+			getPreview: async () => ({
+				type: "text",
+				content: "<strong>Rendered</strong><a href=\"#target\">link</a>",
+			}),
+			setTimer: () => 1,
+			clearTimer: () => {},
+		});
+		hydrator.notifyViewport({
+			visibleStart: 0,
+			visibleEnd: 1,
+			scrollActive: false,
+			velocityRowsPerMs: 0,
+			criticalWorkPending: false,
+		});
+
+		expect(hydrator.hydrateNext("visible-idle")).toBe(true);
+		await Promise.resolve();
+		await Promise.resolve();
+
+		const host = pool.rows[0].cells[0].previewHost;
+		expect(host.querySelector("strong")?.textContent).toBe("Rendered");
+		expect(host.querySelector("a")?.textContent).toBe("link");
+		expect(host.textContent).not.toContain("<strong>");
+		hydrator.dispose();
+	});
 });

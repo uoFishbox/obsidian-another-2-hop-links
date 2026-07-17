@@ -1,6 +1,8 @@
-import { Component, type TFile } from "obsidian";
+import { Component, type App, type TFile } from "obsidian";
 import type { PreviewData, PreviewRequestOptions } from "features/preview/public-types";
 import type { TwoHopDomRowSlot, TwoHopCardShellSlot } from "./twoHopDomPool";
+import { processPreviewContent } from "features/preview/renderers/markdownPreviewRenderer";
+import { toPreviewImageSrc } from "features/preview/utils/externalFileImage";
 
 export type TwoHopPreviewLane = "visible-idle" | "scroll-opportunistic";
 
@@ -38,6 +40,8 @@ export interface CreateTwoHopPreviewHydratorParams {
 	readonly idleDelayMs?: number;
 	readonly opportunisticIntervalMs?: number;
 	readonly opportunisticVelocityLimit?: number;
+	readonly app?: App;
+	readonly sourcePath?: string;
 }
 
 /** Schedules preview work by scanning physical slots; no candidate Map/Set is built. */
@@ -150,6 +154,8 @@ export function createTwoHopPreviewHydrator(
 				slot.previewHost,
 				preview,
 				abortController.signal,
+				params.app,
+				params.sourcePath ?? file.path,
 			);
 			if (!isCurrent(slot, generation, identity)) {
 				disposeRendered?.();
@@ -244,6 +250,8 @@ async function commitPreview(
 	host: HTMLElement,
 	preview: PreviewData,
 	signal: AbortSignal,
+	app: App | undefined,
+	sourcePath: string,
 ): Promise<(() => void) | undefined> {
 	if (signal.aborted) return;
 	const ownerDocument = host.ownerDocument;
@@ -255,11 +263,31 @@ async function commitPreview(
 			host.replaceChildren();
 			return;
 		case "text":
-			container.textContent = preview.content;
-			break;
+			if (!app) {
+				container.innerHTML = preview.content;
+				break;
+			}
+			{
+				const component = new Component();
+				component.load();
+				await processPreviewContent(
+					container,
+					preview.content,
+					app,
+					sourcePath,
+					component,
+					{ signal },
+				);
+				if (signal.aborted) {
+					component.unload();
+					return;
+				}
+				host.replaceChildren(container);
+				return () => component.unload();
+			}
 		case "image": {
 			const image = ownerDocument.createElement("img");
-			image.src = preview.content;
+			image.src = toPreviewImageSrc(preview.content);
 			image.draggable = false;
 			container.append(image);
 			break;

@@ -9,6 +9,7 @@ import type { TwoHopResolvedCell } from "./twoHopGeometry";
 import { resolveTwoHopItemStaticState, resolveTwoHopSectionVariant } from "./twoHopCellStaticState";
 import type { TwoHopSnapshot } from "./twoHopSnapshot";
 import { resolveTwoHopNavigationCellKey } from "./twoHopInteractionRouter";
+import { ICONS, svgAttrs, type IconName, type SvgElement } from "ui/utils/icons";
 
 export interface TwoHopShellRendererParams {
 	readonly resolveItemCardModel?: (
@@ -66,9 +67,16 @@ export function createTwoHopShellRenderer(params: TwoHopShellRendererParams) {
 					? "cosense-card-links__connected-links-header"
 					: "cosense-card-links__twohop-header",
 			);
+			slot.titleWrapper.className = "cosense-card-links__title-container";
 			slot.title.className = "cosense-card-links__header-title";
 			slot.title.textContent = descriptor.title;
-			slot.meta.textContent = `${descriptor.totalCount}`;
+			slot.meta.textContent = "";
+			slot.meta.style.display = "none";
+			renderHeaderIcon(
+				slot.headerIcon,
+				resolveHeaderIconName(descriptor.section.kind),
+			);
+			slot.previewHost.style.display = "none";
 			slot.root.setAttribute(
 				"aria-label",
 				`${descriptor.totalCount} notes`,
@@ -119,6 +127,7 @@ export function createTwoHopShellRenderer(params: TwoHopShellRendererParams) {
 			modelCache.set(cell.item, model);
 		}
 		slot.title.className = "cosense-card-links__box-title";
+		slot.titleWrapper.className = "cosense-card-links__box-title-wrapper";
 		slot.cardModel = model;
 		slot.title.textContent = model?.title ?? cell.item.virtualKey;
 		slot.meta.textContent = model?.extension ?? presentation?.extension ?? "";
@@ -170,6 +179,10 @@ function prepareSlot(
 	slot.logicalRowIndex = cell?.rowIndex ?? -1;
 	slot.logicalColumnIndex = cell?.columnIndex ?? -1;
 	slot.cell.style.visibility = cell ? "visible" : "hidden";
+	slot.titleWrapper.className = "cosense-card-links__box-title-wrapper";
+	slot.meta.style.display = "";
+	slot.headerIcon.style.display = "none";
+	slot.previewHost.style.display = "";
 	if (identity) slot.cell.dataset.cclLogicalKey = identity;
 	else delete slot.cell.dataset.cclLogicalKey;
 	delete slot.cell.dataset.testid;
@@ -228,4 +241,51 @@ function applyCustomClassName(root: HTMLElement, className: string | null): void
 		if (token) root.classList.add(token);
 	}
 	root.dataset.cclShellClassName = className;
+}
+
+function resolveHeaderIconName(
+	kind: TwoHopSnapshot["sections"][number]["descriptor"]["section"]["kind"],
+): IconName {
+	switch (kind) {
+		case "new-links-section":
+			return "Unlink";
+		case "tag-section":
+			return "Tag";
+		case "primary-section":
+		case "two-hop-branch":
+			return "Link";
+	}
+}
+
+function renderHeaderIcon(icon: SVGSVGElement, name: IconName): void {
+	if (icon.dataset.cclIconName !== name) {
+		icon.replaceChildren();
+		for (const [attribute, value] of Object.entries(svgAttrs)) {
+			icon.setAttribute(attribute, value);
+		}
+		icon.setAttribute("width", "26");
+		icon.setAttribute("height", "26");
+		icon.setAttribute("stroke", "currentColor");
+		icon.setAttribute("aria-hidden", "true");
+		for (const element of ICONS[name]) {
+			icon.append(createSvgIconElement(icon.ownerDocument, element));
+		}
+		icon.dataset.cclIconName = name;
+	}
+	icon.style.display = "";
+}
+
+function createSvgIconElement(
+	ownerDocument: Document,
+	element: SvgElement,
+): SVGElement {
+	const node = ownerDocument.createElementNS(
+		"http://www.w3.org/2000/svg",
+		element.tag,
+	);
+	for (const [attribute, value] of Object.entries(element)) {
+		if (attribute === "tag" || value === undefined) continue;
+		node.setAttribute(attribute, value);
+	}
+	return node;
 }

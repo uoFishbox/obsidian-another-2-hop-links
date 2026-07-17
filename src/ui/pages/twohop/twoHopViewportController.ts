@@ -39,7 +39,7 @@ import { createTwoHopInteractionRouter } from "./twoHopInteractionRouter";
 import type { ResultNavigationDirection } from "features/keyboard-navigation/resultFocus";
 import type { VirtualNavigationTarget } from "ui/components/common/virtual-list/types";
 import type { PreviewData, PreviewRequestOptions } from "features/preview/public-types";
-import type { TFile } from "obsidian";
+import type { App, TFile } from "obsidian";
 import {
 	createTwoHopPreviewHydrator,
 	type TwoHopPreviewHydrator,
@@ -73,6 +73,8 @@ export interface TwoHopViewportControllerParams {
 	readonly requestAnimationFrame?: (callback: FrameRequestCallback) => number;
 	readonly cancelAnimationFrame?: (handle: number) => void;
 	readonly now?: () => number;
+	readonly previewApp?: App;
+	readonly previewSourcePath?: string;
 }
 
 export interface TwoHopViewportControllerStats {
@@ -266,6 +268,8 @@ export function createTwoHopViewportController(
 		return createTwoHopPreviewHydrator({
 			getRows: () => pool.rows,
 			getPreview: params.getPreview,
+			app: params.previewApp,
+			sourcePath: params.previewSourcePath,
 		});
 	}
 
@@ -454,6 +458,9 @@ export function createTwoHopViewportController(
 				(previousGeometry.heightBySection[anchorSectionIndex] ?? 0);
 			if (scrollContainerEl) scrollContainerEl.scrollTop += delta;
 			else ownerWindow?.scrollBy(0, delta);
+		}
+		for (const row of pool.rows) {
+			pool.hideRow(row);
 		}
 		residentStart = -1;
 		residentEnd = -1;

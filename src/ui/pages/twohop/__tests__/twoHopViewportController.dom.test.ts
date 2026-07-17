@@ -207,6 +207,11 @@ describe("twoHopViewportController", () => {
 			cancelAnimationFrame: () => {},
 			now: () => 10,
 		});
+		const secondHeaderBefore = controller.contentEl.querySelector<HTMLElement>(
+			"[data-testid='section-block-second']",
+		);
+		const secondHeaderRowBefore = secondHeaderBefore?.parentElement;
+		expect(secondHeaderRowBefore?.dataset.cclRowIndex).toBe("2");
 		const secondItems = new Set(second.getItems());
 		const secondCallsBefore = resolveItemCardModel.mock.calls.filter(([item]) =>
 			secondItems.has(item),
@@ -218,8 +223,14 @@ describe("twoHopViewportController", () => {
 		const secondCallsAfter = resolveItemCardModel.mock.calls.filter(([item]) =>
 			secondItems.has(item),
 		).length;
+		const secondHeaderAfter = controller.contentEl.querySelector<HTMLElement>(
+			"[data-testid='section-block-second']",
+		);
+		const secondHeaderRowAfter = secondHeaderAfter?.parentElement;
 		expect(scroller.scrollTop).toBe(scrollTopBefore + 110);
 		expect(secondCallsAfter).toBe(secondCallsBefore);
+		expect(secondHeaderRowAfter?.dataset.cclRowIndex).toBe("3");
+		expect(secondHeaderRowAfter?.style.transform).toContain("340px");
 		controller.dispose();
 		scroller.remove();
 	});

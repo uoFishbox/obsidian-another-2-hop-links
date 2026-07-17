@@ -7,6 +7,7 @@
 	import { createResolvedCardLayoutSettingsMemo } from "ui/utils/cardLayoutCssVars";
 	import type { CardRenderModel } from "ui/components/items/cardRenderModel";
 	import type { LinkUtilitiesContext } from "types/linkContext";
+	import { useAppContext } from "ui/context/linkContext";
 	import type { TwoHopCardPresentationState } from "./twoHopCellStaticState";
 	import type {
 		TwoHopVirtualListItem,
@@ -35,6 +36,13 @@
 	}
 
 	const props: Props = $props();
+	const previewAppContext = (() => {
+		try {
+			return useAppContext();
+		} catch {
+			return undefined;
+		}
+	})();
 	let rootEl = $state<HTMLDivElement | null>(null);
 	let contentEl = $state<HTMLDivElement | null>(null);
 	let interactionShadowRoot = $state<ShadowRoot | null>(null);
@@ -88,6 +96,8 @@
 			getItemInteractionDescriptor: (item) =>
 				props.getItemInteractionDescriptor(item),
 			getPreview: props.linkContext?.getPreview,
+			previewApp: previewAppContext?.app,
+			previewSourcePath: props.linkContext?.sourceFile.path,
 		});
 		contentEl = controller.contentEl;
 		interactionShadowRoot = controller.shadowRoot;

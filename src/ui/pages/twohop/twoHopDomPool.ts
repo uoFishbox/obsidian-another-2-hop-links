@@ -4,8 +4,10 @@ export interface TwoHopCardShellSlot {
 	readonly slotIndex: number;
 	readonly cell: HTMLDivElement;
 	readonly root: HTMLDivElement;
+	readonly titleWrapper: HTMLDivElement;
 	readonly title: HTMLDivElement;
 	readonly meta: HTMLSpanElement;
+	readonly headerIcon: SVGSVGElement;
 	readonly previewHost: HTMLDivElement;
 	logicalRowIndex: number;
 	logicalColumnIndex: number;
@@ -75,9 +77,15 @@ export function createTwoHopDomPool(params: {
 			title.className = "cosense-card-links__box-title";
 			const meta = ownerDocument.createElement("span");
 			meta.className = "cosense-card-links__box-extension";
+			const headerIcon = ownerDocument.createElementNS(
+				"http://www.w3.org/2000/svg",
+				"svg",
+			);
+			headerIcon.classList.add("twohop-links-icon");
+			headerIcon.style.display = "none";
 			const previewHost = ownerDocument.createElement("div");
 			previewHost.className = "preview-mount-slot twohop-preview-host";
-			titleWrapper.append(title, meta);
+			titleWrapper.append(title, meta, headerIcon);
 			root.append(titleWrapper, previewHost);
 			cell.append(root);
 			row.append(cell);
@@ -85,8 +93,10 @@ export function createTwoHopDomPool(params: {
 				slotIndex: nextCellSlotIndex,
 				cell,
 				root,
+				titleWrapper,
 				title,
 				meta,
+				headerIcon,
 				previewHost,
 				logicalRowIndex: -1,
 				logicalColumnIndex: columnIndex,

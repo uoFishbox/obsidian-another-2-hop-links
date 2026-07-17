@@ -97,4 +97,21 @@ describe("twoHop imperative DOM pool", () => {
 		expect(slot.root.dataset.cclInteractionId).toBe("item:missing");
 		expect(slot.root.classList.contains("is-skeleton")).toBe(false);
 	});
+
+	it("renders section headers as title and icon without a visible count", () => {
+		const { snapshot, geometry } = createFixture();
+		const content = document.createElement("div");
+		const pool = createTwoHopDomPool({ content, rowCapacity: 1, columns: 2 });
+		const renderer = createTwoHopShellRenderer({});
+		const header = resolveTwoHopCell(snapshot, geometry, 0, 0);
+		if (!header) throw new Error("expected header cell");
+
+		renderer.renderShell(pool.rows[0].cells[0], header, snapshot);
+
+		const slot = pool.rows[0].cells[0];
+		expect(slot.title.textContent).toBe("New links");
+		expect(slot.meta.textContent).toBe("");
+		expect(slot.headerIcon.dataset.cclIconName).toBe("Unlink");
+		expect(slot.headerIcon.querySelectorAll("path, circle, rect, line").length).toBeGreaterThan(0);
+	});
 });
