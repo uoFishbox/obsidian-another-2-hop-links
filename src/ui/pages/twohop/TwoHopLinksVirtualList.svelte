@@ -51,14 +51,15 @@
 	}
 
 	const currentSettings = $derived(applicationStore.settings);
-	let linkContext = providedLinkContext;
-	if (!linkContext) {
+	function resolveLinkContext(): LinkUtilitiesContext | undefined {
+		if (providedLinkContext) return providedLinkContext;
 		try {
-			linkContext = useLinkContext();
+			return useLinkContext();
 		} catch {
-			linkContext = undefined;
+			return undefined;
 		}
 	}
+	const linkContext = resolveLinkContext();
 	const cardModelCache = createTwoHopCardRenderModelCache();
 	const cardModelRevision = $derived.by(
 		(): TwoHopCardModelRevision | undefined =>
@@ -105,5 +106,6 @@
 		{interactionDescriptorRevision}
 		{cardModelRevision}
 		{resolveItemCardModel}
+		linkContext={linkContext}
 	/>
 {/if}

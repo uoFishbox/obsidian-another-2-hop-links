@@ -31,6 +31,7 @@ export function createTwoHopShellRenderer(params: TwoHopShellRendererParams) {
 	): void {
 		prepareSlot(slot, cell, snapshot);
 		slot.rich = false;
+		slot.cardModel = null;
 		slot.root.classList.add("is-skeleton");
 		slot.title.textContent = "";
 		slot.meta.textContent = "";
@@ -53,6 +54,7 @@ export function createTwoHopShellRenderer(params: TwoHopShellRendererParams) {
 		const section = snapshot.sections[cell.sectionIndex];
 		const descriptor = section.descriptor;
 		if (cell.kind === "header") {
+			slot.cardModel = null;
 			slot.root.classList.add(
 				descriptor.section.kind === "primary-section" ||
 					descriptor.section.kind === "new-links-section"
@@ -82,6 +84,7 @@ export function createTwoHopShellRenderer(params: TwoHopShellRendererParams) {
 		}
 
 		if (cell.kind === "load-more") {
+			slot.cardModel = null;
 			slot.root.classList.add("cosense-card-links__load-more-button");
 			slot.title.className = "cosense-card-links__box-title";
 			slot.title.textContent = "•••";
@@ -106,6 +109,7 @@ export function createTwoHopShellRenderer(params: TwoHopShellRendererParams) {
 			modelCache.set(cell.item, model);
 		}
 		slot.title.className = "cosense-card-links__box-title";
+		slot.cardModel = model;
 		slot.title.textContent = model?.title ?? cell.item.virtualKey;
 		slot.meta.textContent = model?.extension ?? presentation?.extension ?? "";
 		slot.root.setAttribute("aria-label", model?.ariaLabel ?? slot.title.textContent);
@@ -142,10 +146,14 @@ function prepareSlot(
 ): void {
 	const identity = cell ? resolveCellIdentity(cell, snapshot) : null;
 	if (slot.logicalIdentity !== identity) {
+		slot.disposePreview?.();
+		slot.disposePreview = null;
 		slot.logicalIdentity = identity;
 		slot.generation += 1;
 		slot.previewGeneration += 1;
 		slot.previewHost.replaceChildren();
+		slot.previewStatus = "empty";
+		slot.cardModel = null;
 	}
 	slot.logicalRowIndex = cell?.rowIndex ?? -1;
 	slot.logicalColumnIndex = cell?.columnIndex ?? -1;

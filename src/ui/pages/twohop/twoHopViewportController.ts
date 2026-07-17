@@ -35,6 +35,12 @@ import type {
 import { createTwoHopInteractionRouter } from "./twoHopInteractionRouter";
 import type { ResultNavigationDirection } from "features/keyboard-navigation/resultFocus";
 import type { VirtualNavigationTarget } from "ui/components/common/virtual-list/types";
+import type { PreviewData, PreviewRequestOptions } from "features/preview/public-types";
+import type { TFile } from "obsidian";
+import {
+	createTwoHopPreviewHydrator,
+	type TwoHopPreviewHydrator,
+} from "./twoHopPreviewHydrator";
 
 const BEHIND_ROWS = 4;
 const AHEAD_ROWS = 8;
@@ -56,6 +62,11 @@ export interface TwoHopViewportControllerParams {
 	readonly getItemInteractionDescriptor: (
 		item: TwoHopVirtualListItem,
 	) => InteractionDescriptor | null;
+	readonly getPreview?: (
+		file: TFile,
+		signal?: AbortSignal,
+		options?: PreviewRequestOptions,
+	) => Promise<PreviewData>;
 	readonly requestAnimationFrame?: (callback: FrameRequestCallback) => number;
 	readonly cancelAnimationFrame?: (handle: number) => void;
 	readonly now?: () => number;
@@ -68,6 +79,9 @@ export interface TwoHopViewportControllerStats {
 	readonly skeletonBinds: number;
 	readonly distantJumps: number;
 	readonly poolRows: number;
+	readonly previewRequested: number;
+	readonly previewCommitted: number;
+	readonly stalePreviewCompletions: number;
 }
 
 export interface TwoHopViewportController {
@@ -134,6 +148,8 @@ export function createTwoHopViewportController(
 	let refillFrameHandle = 0;
 	let resizeFrameHandle = 0;
 	let lastScrollEventAt = Number.NEGATIVE_INFINITY;
+	let lastMeasuredRowOffset = 0;
+	let lastMeasuredTimestamp = 0;
 	let disposed = false;
 	let revision: unknown;
 	let stats = {
@@ -155,6 +171,7 @@ export function createTwoHopViewportController(
 	pool = createPool();
 	applyLayoutStyles();
 	pool.setContentHeight(geometry.totalHeight);
+	let previewHydrator = createPreviewHydrator();
 	flush(now());
 
 	function measureLayout(): ViewPlanLayoutMetrics {
@@ -213,6 +230,14 @@ export function createTwoHopViewportController(
 		content.style.setProperty("--ccl-box-gap", `${layout.gap}px`);
 	}
 
+	function createPreviewHydrator(): TwoHopPreviewHydrator | null {
+		if (!params.getPreview) return null;
+		return createTwoHopPreviewHydrator({
+			getRows: () => pool.rows,
+			getPreview: params.getPreview,
+		});
+	}
+
 	function onScroll(): void {
 		lastScrollEventAt = now();
 		if (frameHandle) return;
@@ -232,6 +257,15 @@ export function createTwoHopViewportController(
 			localScrollOffset,
 			Math.max(geometry.rowHeight, metrics.viewportHeight),
 		);
+		const rowOffset = localScrollOffset / Math.max(1, geometry.rowStride);
+		const elapsed = timestamp - lastMeasuredTimestamp;
+		const velocityRowsPerMs =
+			lastMeasuredTimestamp > 0 && elapsed > 0
+				? (rowOffset - lastMeasuredRowOffset) / elapsed
+				: 0;
+		lastMeasuredRowOffset = rowOffset;
+		lastMeasuredTimestamp = timestamp;
+		const scrollActive = timestamp - lastScrollEventAt <= SCROLL_IDLE_DELAY_MS;
 		const nextStart = Math.max(0, visible.start - BEHIND_ROWS);
 		const nextEnd = Math.min(geometry.rowCount, nextStart + pool.capacity);
 
@@ -241,6 +275,13 @@ export function createTwoHopViewportController(
 			visible.end <= residentEnd
 		) {
 			stats.residentHits += 1;
+			previewHydrator?.notifyViewport({
+				visibleStart: visible.start,
+				visibleEnd: visible.end,
+				scrollActive,
+				velocityRowsPerMs,
+				criticalWorkPending: hasPendingShells(),
+			});
 			return;
 		}
 
@@ -252,7 +293,26 @@ export function createTwoHopViewportController(
 		bindResidentWindow(nextStart, nextEnd, visible, distantJump, budget);
 		residentStart = nextStart;
 		residentEnd = nextEnd;
+		previewHydrator?.notifyViewport({
+			visibleStart: visible.start,
+			visibleEnd: visible.end,
+			scrollActive,
+			velocityRowsPerMs,
+			criticalWorkPending: hasPendingShells(),
+		});
 		scheduleRefill();
+	}
+
+	function hasPendingShells(): boolean {
+		for (const row of pool.rows) {
+			if (row.logicalRowIndex < residentStart || row.logicalRowIndex >= residentEnd) {
+				continue;
+			}
+			for (const slot of row.cells) {
+				if (!slot.rich && slot.logicalIdentity) return true;
+			}
+		}
+		return false;
 	}
 
 	function bindResidentWindow(
@@ -336,6 +396,7 @@ export function createTwoHopViewportController(
 		}
 
 		if (hasPending) scheduleRefill();
+		else previewHydrator?.notifyShellsChanged();
 	}
 
 	function rebuildData(anchorSectionIndex = -1): void {
@@ -362,6 +423,7 @@ export function createTwoHopViewportController(
 		residentStart = -1;
 		residentEnd = -1;
 		flush(now());
+		previewHydrator?.notifyShellsChanged();
 	}
 
 	function loadMore(sectionId: string): void {
@@ -433,8 +495,10 @@ export function createTwoHopViewportController(
 			}
 			layout = nextLayout;
 			geometry = createTwoHopGeometry(snapshot, layout);
+			previewHydrator?.dispose();
 			pool.dispose();
 			pool = createPool();
+			previewHydrator = createPreviewHydrator();
 			applyLayoutStyles();
 			pool.setContentHeight(geometry.totalHeight);
 			residentStart = -1;
@@ -474,7 +538,14 @@ export function createTwoHopViewportController(
 		resolveNavigationTarget: interactionRouter.resolveNavigationTarget,
 		flush,
 		getStats() {
-			return { ...stats, poolRows: pool.capacity };
+			const previewStats = previewHydrator?.getStats();
+			return {
+				...stats,
+				poolRows: pool.capacity,
+				previewRequested: previewStats?.requested ?? 0,
+				previewCommitted: previewStats?.committed ?? 0,
+				stalePreviewCompletions: previewStats?.staleCompletions ?? 0,
+			};
 		},
 		dispose() {
 			if (disposed) return;
@@ -483,6 +554,7 @@ export function createTwoHopViewportController(
 			if (refillFrameHandle) cancelFrame(refillFrameHandle);
 			if (resizeFrameHandle) cancelFrame(resizeFrameHandle);
 			resizeObserver?.disconnect();
+			previewHydrator?.dispose();
 			scrollTarget.removeEventListener("scroll", onScroll);
 			contentEl.removeEventListener("click", handleSurfaceClick);
 			pool.dispose();

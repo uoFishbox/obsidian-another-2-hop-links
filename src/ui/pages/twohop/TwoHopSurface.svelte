@@ -6,6 +6,7 @@
 	import type { InteractionDescriptorResolverProvider } from "ui/interactions/interactionRegistry";
 	import { createResolvedCardLayoutSettingsMemo } from "ui/utils/cardLayoutCssVars";
 	import type { CardRenderModel } from "ui/components/items/cardRenderModel";
+	import type { LinkUtilitiesContext } from "types/linkContext";
 	import type { TwoHopCardPresentationState } from "./twoHopCellStaticState";
 	import type {
 		TwoHopVirtualListItem,
@@ -30,6 +31,7 @@
 			item: TwoHopVirtualListItem,
 			presentation: TwoHopCardPresentationState,
 		) => CardRenderModel;
+		linkContext?: LinkUtilitiesContext;
 	}
 
 	const props: Props = $props();
@@ -85,6 +87,7 @@
 				} satisfies CardRenderModel),
 			getItemInteractionDescriptor: (item) =>
 				props.getItemInteractionDescriptor(item),
+			getPreview: props.linkContext?.getPreview,
 		});
 		contentEl = controller.contentEl;
 		interactionShadowRoot = controller.shadowRoot;
