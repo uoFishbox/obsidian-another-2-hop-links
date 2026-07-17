@@ -254,6 +254,45 @@ describe("useWorkerSearchSession", () => {
 		expect(screen.getByTestId("is-filtering")).toHaveTextContent("false");
 	});
 
+	it("keeps the previous query paired with its results until the next result arrives", async () => {
+		const dataset = createDataset(["alpha", "beta"]);
+		const view = render(UseWorkerSearchSessionHarness, {
+			props: {
+				app: {} as never,
+				query: "alpha",
+				enabled: true,
+				files: [],
+				dataset,
+			},
+		});
+
+		await flushAsyncUi();
+		workerHarness.resolveLatestPendingSearch(["alpha"]);
+		await waitFor(() => {
+			expect(screen.getByTestId("matched-state")).toHaveTextContent("alpha");
+			expect(screen.getByTestId("matched-query")).toHaveTextContent("alpha");
+		});
+
+		await view.rerender({
+			app: {} as never,
+			query: "beta",
+			enabled: true,
+			files: [],
+			dataset,
+		});
+		await flushAsyncUi();
+
+		expect(screen.getByTestId("matched-state")).toHaveTextContent("alpha");
+		expect(screen.getByTestId("matched-query")).toHaveTextContent("alpha");
+		expect(screen.getByTestId("is-filtering")).toHaveTextContent("true");
+
+		workerHarness.resolveLatestPendingSearch(["beta"]);
+		await waitFor(() => {
+			expect(screen.getByTestId("matched-state")).toHaveTextContent("beta");
+			expect(screen.getByTestId("matched-query")).toHaveTextContent("beta");
+		});
+	});
+
 	it("adopts only the latest query result even when a stale worker response arrives later", async () => {
 		const dataset = createDataset(["alpha", "beta"]);
 		const view = render(UseWorkerSearchSessionHarness, {
