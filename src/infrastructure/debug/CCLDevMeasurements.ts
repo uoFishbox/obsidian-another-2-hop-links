@@ -36,6 +36,14 @@ export type CCLDevMeasurementName =
 	| "twoHop.rowModelCache.miss.visibleCountsSemanticallySame"
 	| "twoHop.rowModelCache.miss.layout"
 	| "twoHop.rowModelCache.miss.layoutSemanticallySame"
+	| "virtualList.scheduler.animationFrame"
+	| "virtualList.postPaintScheduler.animationFrame"
+	| "virtualScroll.measurementMarker.animationFrame"
+	| "preview.activationScheduler.animationFrame"
+	| "preview.renderScheduler.animationFrame"
+	| "preview.domCommitScheduler.animationFrame"
+	| "preview.activationDuringScroll"
+	| "preview.domCommitDuringScroll"
 	| "component.TwoHopVirtualItemCard.reevaluate"
 	| "component.ViewItemCard.reevaluate"
 	| "component.CardPreviewGate.reevaluate";
@@ -78,6 +86,14 @@ export const CCL_DEV_MEASUREMENT_NAMES: readonly CCLDevMeasurementName[] = [
 	"twoHop.rowModelCache.miss.visibleCountsSemanticallySame",
 	"twoHop.rowModelCache.miss.layout",
 	"twoHop.rowModelCache.miss.layoutSemanticallySame",
+	"virtualList.scheduler.animationFrame",
+	"virtualList.postPaintScheduler.animationFrame",
+	"virtualScroll.measurementMarker.animationFrame",
+	"preview.activationScheduler.animationFrame",
+	"preview.renderScheduler.animationFrame",
+	"preview.domCommitScheduler.animationFrame",
+	"preview.activationDuringScroll",
+	"preview.domCommitDuringScroll",
 	"component.TwoHopVirtualItemCard.reevaluate",
 	"component.ViewItemCard.reevaluate",
 	"component.CardPreviewGate.reevaluate",

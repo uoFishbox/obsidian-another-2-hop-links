@@ -1,5 +1,4 @@
 <script lang="ts">
-	import type { VirtualizedItemVisibilityState } from "ui/components/common/virtual-list/types";
 	import { createSurfaceVirtualCellRegistry } from "ui/components/common/virtual-list/svelte/VirtualCellRegistry";
 	import TwoHopFixedRowSlotsSurface from "../TwoHopFixedRowSlotsSurface.svelte";
 	import TwoHopItemCellRender from "../TwoHopItemCellRender.svelte";
@@ -16,9 +15,6 @@
 
 	let { rowSlotControllers }: Props = $props();
 	const cellRegistry = createSurfaceVirtualCellRegistry();
-	const getItemVisibilityState = (
-		_cell: TwoHopRenderItemCellSnapshot,
-	): VirtualizedItemVisibilityState => ({ visibility: "mounted" });
 	const getItemActivationCandidateId = (cell: TwoHopRenderItemCellSnapshot): string =>
 		`candidate:${cell.cell.item.virtualKey}`;
 	const isItemCell = (
@@ -37,15 +33,10 @@
 		{#if isItemCell(mountedCell)}
 			<TwoHopItemCellRender
 				{cellController}
-				{getItemVisibilityState}
 				{getItemActivationCandidateId}
 			>
-				{#snippet renderItem(item, rowIndex, visibilityState)}
-					<TwoHopVirtualListSurfaceChildItem
-						{item}
-						{rowIndex}
-						{visibilityState}
-					/>
+				{#snippet renderItem(item, rowIndex)}
+					<TwoHopVirtualListSurfaceChildItem {item} {rowIndex} />
 				{/snippet}
 			</TwoHopItemCellRender>
 		{:else}

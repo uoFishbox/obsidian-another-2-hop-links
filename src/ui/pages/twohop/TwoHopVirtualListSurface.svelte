@@ -3,7 +3,6 @@
 	import { providePreviewActivationContexts } from "features/preview/scheduling/previewActivationContexts";
 	import VirtualInteractiveSurface from "ui/components/common/virtual-list/svelte/VirtualInteractiveSurface.svelte";
 	import VirtualListLoadMoreButton from "ui/components/common/virtual-list/VirtualListLoadMoreButton.svelte";
-	import type { VirtualizedItemVisibilityState } from "ui/components/common/virtual-list/types";
 	import type { Snippet } from "svelte";
 	import type { ApplicationStore } from "ui/stores/ApplicationStore.svelte";
 	import type { SectionRenderDescriptor } from "ui/components/sections/types";
@@ -52,7 +51,6 @@
 			[
 				TwoHopVirtualListItem,
 				number,
-				VirtualizedItemVisibilityState,
 				string,
 				TwoHopCardPresentationState,
 			]
@@ -130,7 +128,6 @@
 				{:else if isItemCell(renderedCell)}
 					<TwoHopItemCellRender
 						{cellController}
-						getItemVisibilityState={list.getItemVisibilityState}
 						getItemActivationCandidateId={list.getItemActivationCandidateId}
 						renderItem={props.renderItem}
 					/>

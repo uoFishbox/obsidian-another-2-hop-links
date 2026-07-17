@@ -5,6 +5,10 @@ import {
 	resetScrollActivityForTests,
 } from "infrastructure/scroll/scrollActivity";
 import {
+	getCCLDevMeasurementSnapshot,
+	resetCCLDevMeasurements,
+} from "infrastructure/debug/CCLDevMeasurements";
+import {
 	disposePreviewDomCommitScheduler,
 	enqueuePreviewDomCommit,
 	resetPreviewDomCommitSchedulerForTests,
@@ -67,6 +71,7 @@ async function countCommits(params: {
 beforeEach(() => {
 	frameIntervalMs = DEFAULT_FRAME_INTERVAL_MS;
 	frameTimestamp = 0;
+	resetCCLDevMeasurements();
 	vi.useFakeTimers();
 	vi.stubGlobal(
 		"requestAnimationFrame",
@@ -85,6 +90,7 @@ beforeEach(() => {
 afterEach(() => {
 	resetPreviewDomCommitSchedulerForTests();
 	resetScrollActivityForTests();
+	resetCCLDevMeasurements();
 	vi.restoreAllMocks();
 	vi.unstubAllGlobals();
 	vi.useRealTimers();
@@ -139,7 +145,7 @@ describe("preview DOM commit scheduler", () => {
 		);
 	});
 
-	it("limits scrolling commits by elapsed time", async () => {
+	it("holds DOM commits and animation-frame work until scrolling becomes idle", async () => {
 		markScrollActivityActive(scrollSource);
 		const committed: string[] = [];
 
@@ -150,14 +156,18 @@ describe("preview DOM commit scheduler", () => {
 			}),
 		);
 
-		await flushAnimationFrame();
-		expect(committed).toEqual(["a"]);
+		await vi.advanceTimersByTimeAsync(1_000);
+		expect(committed).toEqual([]);
+		expect(requestAnimationFrame).not.toHaveBeenCalled();
+		let counters = getCCLDevMeasurementSnapshot().counters;
+		expect(counters["preview.domCommitScheduler.animationFrame"].count).toBe(0);
+		expect(counters["preview.domCommitDuringScroll"].count).toBe(0);
 
-		await flushAnimationFrame();
-		expect(committed).toEqual(["a", "b"]);
-
+		markScrollActivityIdle(scrollSource);
 		await flushAnimationFrame();
 		expect(committed).toEqual(["a", "b", "c"]);
+		counters = getCCLDevMeasurementSnapshot().counters;
+		expect(counters["preview.domCommitScheduler.animationFrame"].count).toBe(1);
 		await expect(Promise.all(commits)).resolves.toEqual([true, true, true]);
 	});
 
@@ -185,7 +195,7 @@ describe("preview DOM commit scheduler", () => {
 		]);
 	});
 
-	it("rate-limits scrolling commits independently of refresh rate", async () => {
+	it("suppresses scrolling DOM commits independently of refresh rate", async () => {
 		const commitsAt60Hz = await countCommits({
 			intervalMs: 1000 / 60,
 			durationMs: 1000,
@@ -197,11 +207,8 @@ describe("preview DOM commit scheduler", () => {
 			scrolling: true,
 		});
 
-		expect(commitsAt60Hz).toBeGreaterThanOrEqual(59);
-		expect(commitsAt60Hz).toBeLessThanOrEqual(63);
-		expect(commitsAt120Hz).toBeGreaterThanOrEqual(59);
-		expect(commitsAt120Hz).toBeLessThanOrEqual(65);
-		expect(Math.abs(commitsAt60Hz - commitsAt120Hz)).toBeLessThanOrEqual(5);
+		expect(commitsAt60Hz).toBe(0);
+		expect(commitsAt120Hz).toBe(0);
 	});
 
 	it("rate-limits idle commits independently of refresh rate", async () => {
@@ -223,7 +230,7 @@ describe("preview DOM commit scheduler", () => {
 		expect(commitsAt120Hz).toBeLessThanOrEqual(252);
 	});
 
-	it("does not accumulate an unbounded burst after a long frame gap", async () => {
+	it("does not commit after a long scrolling frame gap", async () => {
 		markScrollActivityActive(scrollSource);
 		const committed: string[] = [];
 
@@ -234,12 +241,14 @@ describe("preview DOM commit scheduler", () => {
 			});
 		}
 
-		await flushAnimationFrame();
-		expect(committed).toEqual(["a"]);
-
 		frameIntervalMs = 5000;
 		await flushAnimationFrame();
-		expect(committed).toEqual(["a", "b"]);
+		expect(committed).toEqual([]);
+
+		frameIntervalMs = DEFAULT_FRAME_INTERVAL_MS;
+		markScrollActivityIdle(scrollSource);
+		await flushAnimationFrame();
+		expect(committed).toEqual(["a", "b", "c", "d"]);
 	});
 
 	it("skips stale commits without consuming token capacity", async () => {

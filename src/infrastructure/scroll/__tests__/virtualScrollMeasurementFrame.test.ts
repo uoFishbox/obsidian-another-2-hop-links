@@ -4,11 +4,16 @@ import {
 	resetVirtualScrollMeasurementFrameForTests,
 	shouldDeferPreviewActivationForVirtualScrollMeasurement,
 } from "../virtualScrollMeasurementFrame";
+import {
+	getCCLDevMeasurementSnapshot,
+	resetCCLDevMeasurements,
+} from "infrastructure/debug/CCLDevMeasurements";
 
 describe("virtual scroll measurement frame", () => {
 	let frameCallbacks: FrameRequestCallback[];
 
 	beforeEach(() => {
+		resetCCLDevMeasurements();
 		frameCallbacks = [];
 		vi.stubGlobal(
 			"requestAnimationFrame",
@@ -22,6 +27,7 @@ describe("virtual scroll measurement frame", () => {
 
 	afterEach(() => {
 		resetVirtualScrollMeasurementFrameForTests();
+		resetCCLDevMeasurements();
 		vi.unstubAllGlobals();
 	});
 
@@ -30,6 +36,11 @@ describe("virtual scroll measurement frame", () => {
 
 		expect(shouldDeferPreviewActivationForVirtualScrollMeasurement()).toBe(true);
 		expect(frameCallbacks).toHaveLength(1);
+		expect(
+			getCCLDevMeasurementSnapshot().counters[
+				"virtualScroll.measurementMarker.animationFrame"
+			].count,
+		).toBe(1);
 
 		frameCallbacks.shift()?.(16);
 
@@ -41,6 +52,11 @@ describe("virtual scroll measurement frame", () => {
 		markVirtualScrollMeasurementRun();
 
 		expect(frameCallbacks).toHaveLength(1);
+		expect(
+			getCCLDevMeasurementSnapshot().counters[
+				"virtualScroll.measurementMarker.animationFrame"
+			].count,
+		).toBe(1);
 
 		frameCallbacks.shift()?.(16);
 

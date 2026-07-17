@@ -48,18 +48,13 @@
 			<div data-testid="twohop-header-cell">{sectionId}</div>
 		{/snippet}
 
-		{#snippet renderItem(item, rowIndex, visibilityState)}
+		{#snippet renderItem(item, rowIndex)}
 			{#if renderChildComponent}
-				<TwoHopVirtualListSurfaceChildItem
-					{item}
-					{rowIndex}
-					{visibilityState}
-				/>
+				<TwoHopVirtualListSurfaceChildItem {item} {rowIndex} />
 			{:else}
 				<div
 					data-testid="twohop-item-cell"
 					data-index={item.virtualKey}
-					data-visibility={visibilityState.visibility}
 					data-ccl-interaction-id={item.interactionId}
 					data-ccl-interaction-kind="item"
 				>

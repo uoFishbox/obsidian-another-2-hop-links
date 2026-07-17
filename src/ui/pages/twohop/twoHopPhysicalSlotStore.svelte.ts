@@ -11,7 +11,6 @@ import {
 	type LogicalCellKey,
 	type RenderSlotKey,
 } from "ui/components/common/virtual-list/types";
-import type { VirtualizedItemResolvedVisibilityState } from "ui/components/common/virtual-list/svelte/virtualizedItemVisibilityState.svelte";
 import type { VirtualizedItemVisibility } from "ui/components/common/virtualizedItemVisibility";
 import type {
 	VirtualCellElementRegistration,
@@ -34,7 +33,6 @@ import type {
 	TwoHopVirtualListItem,
 	TwoHopVirtualListSection,
 } from "./twoHopVirtualListModel";
-import type { TwoHopSlotIdCell } from "./twoHopSlotId";
 
 export interface TwoHopFixedCellSlotController extends VirtualCellRegistrationOwner {
 	readonly cellSlotKey: number;
@@ -102,7 +100,6 @@ interface MutableMountedCellShell {
 interface CellSlotRecord {
 	readonly mutable: MutableMountedCellShell;
 	readonly mounted: TwoHopMountedCell;
-	readonly visibilityState: VirtualizedItemResolvedVisibilityState;
 }
 
 interface RowSlotRecord {
@@ -130,9 +127,6 @@ export interface TwoHopPhysicalSlotStore {
 	clearAll(): void;
 	clearOutsideRange(start: number, end: number): void;
 	setPreviewRange(start: number, end: number): void;
-	getItemVisibilityState(
-		cell: TwoHopSlotIdCell,
-	): VirtualizedItemResolvedVisibilityState;
 	getMountedCellByInteractionId(interactionId: string): TwoHopMountedCell | undefined;
 	dispose(): void;
 }
@@ -410,13 +404,9 @@ function createCellSlotRecord(renderSlotIndex: number): CellSlotRecord {
 		headerProps: EMPTY_HEADER_PROPS,
 		compiledCell: undefined,
 	};
-	const visibilityState: VirtualizedItemResolvedVisibilityState = $state({
-		visibility: "mounted",
-	});
 	return {
 		mutable,
 		mounted: createMountedCellView(mutable),
-		visibilityState,
 	};
 }
 
@@ -538,9 +528,6 @@ export function createTwoHopPhysicalSlotStore(params: {
 		capacity: 0,
 		poolChanged: false,
 	};
-	const fallbackVisibilityState: VirtualizedItemResolvedVisibilityState = $state({
-		visibility: "mounted",
-	});
 
 	function resolveInteractionId(cell: TwoHopMountedCell): string | null {
 		return cell.compiledCell?.interactionId ?? null;
@@ -618,10 +605,6 @@ export function createTwoHopPhysicalSlotStore(params: {
 	function setRowVisibility(record: RowSlotRecord): void {
 		if (!record.active) return;
 		const visibility = resolveVisibility(record.row.rowIndex);
-		for (let index = 0; index < record.row.cells.length; index += 1) {
-			const state = record.cellSlots[index]?.visibilityState;
-			if (state && state.visibility !== visibility) state.visibility = visibility;
-		}
 		params.rowPreviewActivationRuntime?.setRowVisibility(
 			record.row.rowIndex,
 			visibility,
@@ -785,15 +768,6 @@ export function createTwoHopPhysicalSlotStore(params: {
 					setLogicalRowVisibility(row);
 				}
 			}
-		},
-		getItemVisibilityState(cell) {
-			const columns = Math.max(1, activeColumns);
-			const slotIndex = Math.floor(cell.renderSlotIndex / columns);
-			const columnIndex = cell.renderSlotIndex % columns;
-			return (
-				rowSlots[slotIndex]?.cellSlots[columnIndex]?.visibilityState ??
-				fallbackVisibilityState
-			);
 		},
 		getMountedCellByInteractionId(interactionId) {
 			return mountedCellsByInteractionId.get(interactionId);

@@ -1,4 +1,8 @@
-import { isScrollActivityActive } from "infrastructure/scroll/scrollActivity";
+import {
+	isScrollActivityActive,
+	subscribeScrollActivity,
+} from "infrastructure/scroll/scrollActivity";
+import { recordCCLDevMeasurement } from "infrastructure/debug/CCLDevMeasurements";
 import {
 	canConsumePreviewScheduleToken,
 	consumePreviewScheduleToken,
@@ -17,12 +21,6 @@ interface PreviewDomCommitPolicy {
 	readonly maxDrainCpuMs: number;
 }
 
-const SCROLLING_POLICY: PreviewDomCommitPolicy = {
-	ratePerSecond: 60,
-	creditCapacity: 2,
-	maxTasksPerDrain: 1,
-	maxDrainCpuMs: 1,
-};
 const IDLE_POLICY: PreviewDomCommitPolicy = {
 	ratePerSecond: 240,
 	creditCapacity: 4,
@@ -49,6 +47,7 @@ let frameHandle: number | null = null;
 let frameHandleKind: "animation-frame" | "timeout" | null = null;
 let commitTokenState: PreviewScheduleTokenState =
 	createEmptyPreviewScheduleTokenState();
+let unsubscribeScrollActivity: (() => void) | undefined;
 
 function readMonotonicTime(): number {
 	if (typeof globalThis.performance?.now === "function") {
@@ -75,10 +74,6 @@ function rejectTask(task: QueuedPreviewDomCommitTask, error: unknown): void {
 		pendingByTargetKey.delete(task.targetKey);
 	}
 	task.reject(error);
-}
-
-function readCommitPolicy(): PreviewDomCommitPolicy {
-	return isScrollActivityActive() ? SCROLLING_POLICY : IDLE_POLICY;
 }
 
 function refillCommitTokens(timestamp: number, policy: PreviewDomCommitPolicy): void {
@@ -109,8 +104,48 @@ function readNextQueuedTask(): QueuedPreviewDomCommitTask | undefined {
 	return task;
 }
 
+function cancelFrameDrain(): void {
+	if (frameHandle === null) return;
+
+	if (
+		frameHandleKind === "animation-frame" &&
+		typeof globalThis.cancelAnimationFrame === "function"
+	) {
+		globalThis.cancelAnimationFrame(frameHandle);
+	} else if (typeof globalThis.clearTimeout === "function") {
+		globalThis.clearTimeout(frameHandle);
+	}
+
+	frameHandle = null;
+	frameHandleKind = null;
+}
+
+function ensureScrollActivitySubscription(): void {
+	if (unsubscribeScrollActivity) return;
+
+	unsubscribeScrollActivity = subscribeScrollActivity((isActive) => {
+		if (isActive) {
+			cancelFrameDrain();
+			return;
+		}
+		scheduleFrameDrain();
+	});
+}
+
+function releaseScrollActivitySubscriptionIfIdle(): void {
+	if (pendingByTargetKey.size > 0) return;
+	unsubscribeScrollActivity?.();
+	unsubscribeScrollActivity = undefined;
+}
+
 function scheduleFrameDrain(): void {
-	if (frameHandle !== null) return;
+	if (
+		frameHandle !== null ||
+		pendingByTargetKey.size === 0 ||
+		isScrollActivityActive()
+	) {
+		return;
+	}
 
 	if (typeof globalThis.requestAnimationFrame !== "function") {
 		frameHandleKind = "timeout";
@@ -122,6 +157,9 @@ function scheduleFrameDrain(): void {
 		return;
 	}
 
+	if (process.env.NODE_ENV !== "production") {
+		recordCCLDevMeasurement("preview.domCommitScheduler.animationFrame");
+	}
 	frameHandleKind = "animation-frame";
 	frameHandle = globalThis.requestAnimationFrame((timestamp) => {
 		frameHandle = null;
@@ -131,7 +169,9 @@ function scheduleFrameDrain(): void {
 }
 
 function drainFrame(frameTimestamp: number): void {
-	const policy = readCommitPolicy();
+	if (isScrollActivityActive()) return;
+
+	const policy = IDLE_POLICY;
 	refillCommitTokens(frameTimestamp, policy);
 
 	const deadline = readMonotonicTime() + policy.maxDrainCpuMs;
@@ -155,6 +195,14 @@ function drainFrame(frameTimestamp: number): void {
 			continue;
 		}
 
+		if (isScrollActivityActive()) {
+			if (process.env.NODE_ENV !== "production") {
+				recordCCLDevMeasurement("preview.domCommitDuringScroll");
+			}
+			pendingQueue.push(task);
+			break;
+		}
+
 		drainedTasks += 1;
 		try {
 			const didCommit = task.commit();
@@ -171,6 +219,8 @@ function drainFrame(frameTimestamp: number): void {
 
 	if (pendingByTargetKey.size > 0) {
 		scheduleFrameDrain();
+	} else {
+		releaseScrollActivitySubscriptionIfIdle();
 	}
 }
 
@@ -183,6 +233,7 @@ function drainFrame(frameTimestamp: number): void {
  */
 export function enqueuePreviewDomCommit(task: PreviewDomCommitTask): Promise<boolean> {
 	return new Promise<boolean>((resolve, reject) => {
+		ensureScrollActivitySubscription();
 		const existingTask = pendingByTargetKey.get(task.targetKey);
 		if (existingTask) {
 			settleTask(existingTask, false);
@@ -197,6 +248,7 @@ export function enqueuePreviewDomCommit(task: PreviewDomCommitTask): Promise<boo
 		};
 		pendingByTargetKey.set(task.targetKey, queuedTask);
 		pendingQueue.push(queuedTask);
+		ensureScrollActivitySubscription();
 		scheduleFrameDrain();
 	});
 }
@@ -211,19 +263,9 @@ export function disposePreviewDomCommitScheduler(): void {
 	pendingQueueHead = 0;
 	pendingByTargetKey.clear();
 	commitTokenState = createEmptyPreviewScheduleTokenState();
-
-	if (frameHandle !== null) {
-		if (
-			frameHandleKind === "animation-frame" &&
-			typeof globalThis.cancelAnimationFrame === "function"
-		) {
-			globalThis.cancelAnimationFrame(frameHandle);
-		} else {
-			globalThis.clearTimeout(frameHandle);
-		}
-		frameHandle = null;
-		frameHandleKind = null;
-	}
+	cancelFrameDrain();
+	unsubscribeScrollActivity?.();
+	unsubscribeScrollActivity = undefined;
 }
 
 export function resetPreviewDomCommitSchedulerForTests(): void {

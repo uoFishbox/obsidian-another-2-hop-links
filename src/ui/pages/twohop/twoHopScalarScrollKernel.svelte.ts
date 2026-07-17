@@ -2,13 +2,11 @@ import type { RowPreviewActivationRuntime } from "features/preview/scheduling/ro
 import { recordCCLDevMeasurement } from "infrastructure/debug/CCLDevMeasurements";
 import type { RowRange } from "ui/components/common/virtual-list/rowRange";
 import type { VirtualRanges } from "ui/components/common/virtual-list/types";
-import type { VirtualizedItemResolvedVisibilityState } from "ui/components/common/virtual-list/svelte/virtualizedItemVisibilityState.svelte";
 import {
 	createMountedRangeTransitionScratch,
 	planMountedRangeTransition,
 	type MountedRangeTransitionInput,
 } from "./twoHopMountedRangeTransition";
-import type { TwoHopSlotIdCell } from "./twoHopSlotId";
 import { createTwoHopPhysicalSlotStore } from "./twoHopPhysicalSlotStore.svelte";
 import type { TwoHopViewPlan, TwoHopViewPlanRowModel } from "./twoHopViewPlan";
 
@@ -249,11 +247,6 @@ export function createTwoHopScalarScrollKernel(params: {
 			applyPreviewRange(start, end);
 		},
 		cancelPreviewVisibleRangeSync(): void {},
-		getItemVisibilityState(
-			cell: TwoHopSlotIdCell,
-		): VirtualizedItemResolvedVisibilityState {
-			return physicalSlotStore.getItemVisibilityState(cell);
-		},
 		getMountedCellByInteractionId: physicalSlotStore.getMountedCellByInteractionId,
 		dispose(): void {
 			physicalSlotStore.dispose();

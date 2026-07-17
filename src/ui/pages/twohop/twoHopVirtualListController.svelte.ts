@@ -2,7 +2,6 @@ import { IS_PROD } from "../../../appConstants";
 import type { ResultNavigationDirection } from "features/keyboard-navigation/resultFocus";
 import type { ProgrammaticScrollSnapshot } from "ui/components/common/virtual-list/dom/flushVirtualScrollMeasurement";
 import type { ViewPlanLayoutMetrics } from "ui/components/common/virtual-list/svelte/viewPlanLayout";
-import type { VirtualizedItemResolvedVisibilityState } from "ui/components/common/virtual-list/svelte/virtualizedItemVisibilityState.svelte";
 import type { VirtualNavigationTarget } from "ui/components/common/virtual-list/types";
 import type { TwoHopFixedRowSlotController } from "./twoHopFixedRowSlotPool.svelte";
 import {
@@ -33,9 +32,6 @@ export interface TwoHopVirtualListController {
 				cell: Pick<TwoHopRenderCellSnapshot, "cell" | "sectionId">,
 		  ) => string | undefined)
 		| undefined;
-	readonly getItemVisibilityState: (
-		cell: TwoHopSlotIdCell,
-	) => VirtualizedItemResolvedVisibilityState;
 	readonly getMountedCellByInteractionId: (
 		interactionId: string,
 	) => TwoHopMountedCell | undefined;
@@ -111,7 +107,6 @@ export function createTwoHopVirtualListController(
 						? `section-block-${cell.sectionId}`
 						: undefined
 			: undefined,
-		getItemVisibilityState: mountedRuntime.getItemVisibilityState,
 		getMountedCellByInteractionId: mountedRuntime.getMountedCellByInteractionId,
 		getItemActivationCandidateId: mountedRuntime.getItemActivationCandidateId,
 		loadMore: inputRuntime.loadMore,

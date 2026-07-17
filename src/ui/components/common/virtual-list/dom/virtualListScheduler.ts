@@ -1,3 +1,5 @@
+import { recordCCLDevMeasurement } from "infrastructure/debug/CCLDevMeasurements";
+
 export interface ScheduledVirtualListTask {
 	schedule: () => boolean;
 	cancel: () => void;
@@ -36,6 +38,9 @@ export const createScheduledVirtualListTask = (
 			scheduled = true;
 
 			if (typeof ownerWindow.requestAnimationFrame === "function") {
+				if (process.env.NODE_ENV !== "production") {
+					recordCCLDevMeasurement("virtualList.scheduler.animationFrame");
+				}
 				usesAnimationFrame = true;
 				handle = ownerWindow.requestAnimationFrame(fire);
 				return true;
@@ -102,6 +107,9 @@ export const createPostPaintVirtualListTask = (
 		}
 
 		if (typeof ownerWindow.requestAnimationFrame === "function") {
+			if (process.env.NODE_ENV !== "production") {
+				recordCCLDevMeasurement("virtualList.postPaintScheduler.animationFrame");
+			}
 			handle = ownerWindow.requestAnimationFrame(() => {
 				handle = null;
 

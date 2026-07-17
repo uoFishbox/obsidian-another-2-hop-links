@@ -4,9 +4,14 @@ import {
 	createScheduledVirtualListTask,
 } from "../virtualListScheduler";
 import { createVirtualListMeasurementScheduler } from "../virtualListMeasurementScheduler";
+import {
+	getCCLDevMeasurementSnapshot,
+	resetCCLDevMeasurements,
+} from "infrastructure/debug/CCLDevMeasurements";
 
 describe("createVirtualListMeasurementScheduler", () => {
 	beforeEach(() => {
+		resetCCLDevMeasurements();
 		vi.useFakeTimers();
 		vi.stubGlobal("window", {
 			setTimeout,
@@ -15,6 +20,7 @@ describe("createVirtualListMeasurementScheduler", () => {
 	});
 
 	afterEach(() => {
+		resetCCLDevMeasurements();
 		vi.unstubAllGlobals();
 		vi.useRealTimers();
 	});
@@ -74,6 +80,7 @@ describe("createVirtualListMeasurementScheduler", () => {
 
 describe("createPostPaintVirtualListTask", () => {
 	beforeEach(() => {
+		resetCCLDevMeasurements();
 		vi.useFakeTimers();
 		vi.stubGlobal("window", {
 			setTimeout,
@@ -82,6 +89,7 @@ describe("createPostPaintVirtualListTask", () => {
 	});
 
 	afterEach(() => {
+		resetCCLDevMeasurements();
 		vi.unstubAllGlobals();
 		vi.useRealTimers();
 	});
@@ -98,6 +106,11 @@ describe("createPostPaintVirtualListTask", () => {
 
 		expect(callback).toHaveBeenCalledTimes(1);
 		expect(task.isScheduled()).toBe(false);
+		expect(
+			getCCLDevMeasurementSnapshot().counters[
+				"virtualList.postPaintScheduler.animationFrame"
+			].count,
+		).toBe(0);
 	});
 
 	it("respects custom frame delay", async () => {
@@ -110,6 +123,30 @@ describe("createPostPaintVirtualListTask", () => {
 		await vi.runAllTimersAsync();
 
 		expect(callback).toHaveBeenCalledTimes(1);
+	});
+
+	it("counts each post-paint animation frame", () => {
+		const handlers: Array<() => void> = [];
+		vi.stubGlobal("window", {
+			requestAnimationFrame: (handler: () => void) => {
+				handlers.push(handler);
+				return handlers.length;
+			},
+			cancelAnimationFrame: vi.fn(),
+			setTimeout,
+			clearTimeout,
+		});
+		const task = createPostPaintVirtualListTask(vi.fn());
+
+		task.schedule();
+		handlers[0]();
+		handlers[1]();
+
+		expect(
+			getCCLDevMeasurementSnapshot().counters[
+				"virtualList.postPaintScheduler.animationFrame"
+			].count,
+		).toBe(2);
 	});
 
 	it("does not schedule if already scheduled", () => {
@@ -150,7 +187,12 @@ describe("createPostPaintVirtualListTask", () => {
 });
 
 describe("createScheduledVirtualListTask", () => {
+	beforeEach(() => {
+		resetCCLDevMeasurements();
+	});
+
 	afterEach(() => {
+		resetCCLDevMeasurements();
 		vi.unstubAllGlobals();
 	});
 
@@ -176,6 +218,11 @@ describe("createScheduledVirtualListTask", () => {
 
 		expect(callback).toHaveBeenCalledTimes(1);
 		expect(task.isScheduled()).toBe(false);
+		expect(
+			getCCLDevMeasurementSnapshot().counters[
+				"virtualList.scheduler.animationFrame"
+			].count,
+		).toBe(1);
 	});
 
 	it("falls back to setTimeout when requestAnimationFrame is unavailable", () => {

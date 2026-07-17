@@ -23,7 +23,6 @@ export function createTwoHopMountedSurfaceRuntime(params: {
 		get fixedRowSlotControllers() {
 			return internalRuntime.rowSlotControllers;
 		},
-		getItemVisibilityState: internalRuntime.getItemVisibilityState,
 		getItemActivationCandidateId: internalRuntime.getItemActivationCandidateId,
 		syncPreviewVisibleRange: internalRuntime.syncPreviewVisibleRange,
 		cancelPreviewVisibleRangeSync: internalRuntime.cancelPreviewVisibleRangeSync,

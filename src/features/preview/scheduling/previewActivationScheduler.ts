@@ -3,6 +3,7 @@ import {
 	subscribeScrollActivity,
 } from "infrastructure/scroll/scrollActivity";
 import { shouldDeferPreviewActivationForVirtualScrollMeasurement } from "infrastructure/scroll/virtualScrollMeasurementFrame";
+import { recordCCLDevMeasurement } from "infrastructure/debug/CCLDevMeasurements";
 import { DEBUG_DISABLE_CARD_DOM_PREVIEW } from "../../../appConstants";
 import {
 	canConsumePreviewScheduleToken,
@@ -24,12 +25,6 @@ interface PreviewActivationPolicy {
 	readonly maxDrainCpuMs: number;
 }
 
-const SCROLLING_POLICY: PreviewActivationPolicy = {
-	ratePerSecond: 60,
-	creditCapacity: 2,
-	maxTasksPerDrain: 1,
-	maxDrainCpuMs: 1,
-};
 const IDLE_POLICY: PreviewActivationPolicy = {
 	ratePerSecond: 120,
 	creditCapacity: 2,
@@ -221,17 +216,28 @@ function settleRequest(request: PreviewActivationRequest, activated: boolean): v
 function ensureSubscription(): void {
 	if (unsubscribeScrollActivity) return;
 
-	unsubscribeScrollActivity = subscribeScrollActivity(() => {
+	unsubscribeScrollActivity = subscribeScrollActivity((isActive) => {
+		if (isActive) {
+			cancelGlobalFrame();
+			return;
+		}
 		scheduleGlobalFrameDrain();
 	});
 }
 
 function scheduleGlobalFrameDrain(): void {
-	if (globalFrameHandle !== null || activeQueuedScopes.size === 0) {
+	if (
+		globalFrameHandle !== null ||
+		activeQueuedScopes.size === 0 ||
+		isScrollActivityActive()
+	) {
 		return;
 	}
 
 	if (typeof globalThis.requestAnimationFrame === "function") {
+		if (process.env.NODE_ENV !== "production") {
+			recordCCLDevMeasurement("preview.activationScheduler.animationFrame");
+		}
 		globalFrameHandleKind = "animation-frame";
 		globalFrameHandle = globalThis.requestAnimationFrame((timestamp) => {
 			globalFrameHandle = null;
@@ -302,7 +308,6 @@ function readGlobalBackpressure(): PreviewBackpressure {
 }
 
 function resolveActivationPolicy(params: {
-	readonly isScrolling: boolean;
 	readonly queuedPreviewJobs: number;
 	readonly activePreviewJobs: number;
 }): PreviewActivationPolicy {
@@ -310,7 +315,7 @@ function resolveActivationPolicy(params: {
 		return BACKPRESSURED_POLICY;
 	}
 
-	return params.isScrolling ? SCROLLING_POLICY : IDLE_POLICY;
+	return IDLE_POLICY;
 }
 
 function refillActivationTokens(
@@ -375,10 +380,10 @@ function readNextRoundRobinRequest(
 
 function drainGlobalFrame(frameTimestamp: number): void {
 	if (activeQueuedScopes.size === 0) return;
+	if (isScrollActivityActive()) return;
 
 	const pressure = readGlobalBackpressure();
 	const policy = resolveActivationPolicy({
-		isScrolling: isScrollActivityActive(),
 		queuedPreviewJobs: pressure.queued,
 		activePreviewJobs: pressure.active,
 	});
@@ -420,6 +425,14 @@ function drainGlobalFrame(frameTimestamp: number): void {
 			request.hasDeferredForVirtualScrollMeasurement = true;
 			request.scope.pendingQueue.push(request);
 			continue;
+		}
+
+		if (isScrollActivityActive()) {
+			if (process.env.NODE_ENV !== "production") {
+				recordCCLDevMeasurement("preview.activationDuringScroll");
+			}
+			request.scope.pendingQueue.push(request);
+			break;
 		}
 
 		settleRequest(request, true);

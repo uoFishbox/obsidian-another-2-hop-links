@@ -6,7 +6,6 @@ import {
 	resetCCLDevMeasurements,
 } from "infrastructure/debug/CCLDevMeasurements";
 import type { SectionRenderDescriptor } from "ui/components/sections/types";
-import type { VirtualizedItemVisibilityState } from "ui/components/common/virtual-list/types";
 import { compileTwoHopViewPlan, createTwoHopViewPlanRowModel } from "../twoHopViewPlan";
 import { createTwoHopScalarScrollKernel } from "../twoHopScalarScrollKernel.svelte";
 import {
@@ -250,10 +249,6 @@ describe("TwoHopItemCellRender", () => {
 		expect(controller).toBeDefined();
 		if (!controller || controller.mountedCell?.cell.kind !== "item") return;
 
-		const visibilityState = {
-			visibility: "mounted",
-		} as VirtualizedItemVisibilityState;
-		const getItemVisibilityState = vi.fn(() => visibilityState);
 		const getItemActivationCandidateId = vi.fn(
 			(cell: TwoHopRenderItemCellSnapshot) =>
 				`candidate:${cell.cell.item.virtualKey}`,
@@ -261,7 +256,6 @@ describe("TwoHopItemCellRender", () => {
 		const { container } = render(TwoHopItemCellRenderHarness, {
 			props: {
 				cellController: controller,
-				getItemVisibilityState,
 				getItemActivationCandidateId,
 			},
 		});
@@ -273,7 +267,6 @@ describe("TwoHopItemCellRender", () => {
 		const initialIndex = initialChild?.dataset.index;
 		const initialInstanceId = initialChild?.dataset.instanceId;
 		expect(initialChild).toBeTruthy();
-		expect(getItemVisibilityState).toHaveBeenCalledTimes(1);
 		expect(getItemActivationCandidateId).toHaveBeenCalledTimes(1);
 
 		applyRange(kernel, 7);
@@ -289,7 +282,6 @@ describe("TwoHopItemCellRender", () => {
 		expect(reboundChild?.dataset.renderedKey).toBe(
 			`${reboundChild?.dataset.index}:${reboundChild?.dataset.rowIndex}`,
 		);
-		expect(getItemVisibilityState).toHaveBeenCalledTimes(2);
 		expect(getItemActivationCandidateId).toHaveBeenCalledTimes(2);
 		expect(
 			container.querySelector<HTMLElement>("[data-activation-candidate-id]")
@@ -561,9 +553,6 @@ describe("TwoHopItemCellRender", () => {
 		if (!itemSlot) return;
 		const { controller } = itemSlot;
 
-		const getItemVisibilityState = vi.fn(() => ({
-			visibility: "mounted" as const,
-		}));
 		const getItemActivationCandidateId = vi.fn(
 			(cell: TwoHopRenderItemCellSnapshot) =>
 				`candidate:${cell.cell.item.virtualKey}`,
@@ -571,7 +560,6 @@ describe("TwoHopItemCellRender", () => {
 		const { container } = render(TwoHopItemCellRenderHarness, {
 			props: {
 				cellController: controller,
-				getItemVisibilityState,
 				getItemActivationCandidateId,
 			},
 		});

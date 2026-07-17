@@ -1,10 +1,8 @@
 <script lang="ts">
-	import PreviewVisibilityProvider from "ui/components/items/PreviewVisibilityProvider.svelte";
 	import ViewItemCard from "ui/components/items/ViewItemCard.svelte";
 	import type { PluginSettings } from "types/settings";
 	import type { SearchWorkerMatchedItem } from "features/search/searchWorkerTypes";
 	import type { SearchWorkerMatchScope } from "features/search/searchWorkerTypes";
-	import type { VirtualizedItemVisibilityState } from "ui/components/common/virtualizedItemVisibility";
 	import type { TwoHopVirtualListItem } from "./twoHopVirtualListModel";
 	import { resolveTwoHopPageItemSearchScope } from "./twoHopVirtualListModel";
 	import { markCCLComponentReevaluation } from "infrastructure/debug/CCLDevMeasurements";
@@ -17,7 +15,6 @@
 		searchScope: SearchWorkerMatchScope;
 		matchedItemByKey: Map<string, SearchWorkerMatchedItem> | null;
 		rowIndex: number;
-		visibilityState: VirtualizedItemVisibilityState;
 		activationCandidateId: string;
 		presentation: TwoHopCardPresentationState;
 	}
@@ -29,7 +26,6 @@
 		searchScope,
 		matchedItemByKey,
 		rowIndex,
-		visibilityState,
 		activationCandidateId,
 		presentation,
 	}: Props = $props();
@@ -47,7 +43,6 @@
 		void searchScope;
 		void matchedItemByKey;
 		void rowIndex;
-		void visibilityState;
 		void activationCandidateId;
 		void presentation;
 		void matchedItem;
@@ -57,18 +52,16 @@
 </script>
 
 {componentReevaluationProbe}
-<PreviewVisibilityProvider {visibilityState}>
-	<ViewItemCard
-		item={row.item}
-		{settings}
-		{searchQuery}
-		searchScope={resolvedSearchScope}
-		contentPreview={matchedItem?.contentPreview}
-		{rowIndex}
-		{activationCandidateId}
-		interactionRegistration="snapshot"
-		interactionId={row.interactionId}
-		interactionKey={row.interactionKey}
-		{presentation}
-	/>
-</PreviewVisibilityProvider>
+<ViewItemCard
+	item={row.item}
+	{settings}
+	{searchQuery}
+	searchScope={resolvedSearchScope}
+	contentPreview={matchedItem?.contentPreview}
+	{rowIndex}
+	{activationCandidateId}
+	interactionRegistration="snapshot"
+	interactionId={row.interactionId}
+	interactionKey={row.interactionKey}
+	{presentation}
+/>

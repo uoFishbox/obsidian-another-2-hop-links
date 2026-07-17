@@ -20,6 +20,10 @@ import {
 	resetVirtualScrollMeasurementFrameForTests,
 } from "infrastructure/scroll/virtualScrollMeasurementFrame";
 import {
+	getCCLDevMeasurementSnapshot,
+	resetCCLDevMeasurements,
+} from "infrastructure/debug/CCLDevMeasurements";
+import {
 	canActivatePreviewImmediately,
 	cancelPreviewActivation,
 	createPreviewActivationScope,
@@ -93,6 +97,7 @@ beforeEach(() => {
 	frameTimestamp = 0;
 	visibleQueueSize = 0;
 	activeVisiblePreviewCount = 0;
+	resetCCLDevMeasurements();
 	activationScope = createPreviewActivationScope({
 		getBackpressure: () => ({
 			queued: visibleQueueSize,
@@ -118,6 +123,7 @@ afterEach(() => {
 	resetPreviewActivationSchedulerForTests();
 	resetScrollActivityForTests();
 	resetVirtualScrollMeasurementFrameForTests();
+	resetCCLDevMeasurements();
 	vi.restoreAllMocks();
 	vi.unstubAllGlobals();
 	vi.useRealTimers();
@@ -177,7 +183,7 @@ describe("preview activation scheduler", () => {
 		expect(results).toEqual([true]);
 	});
 
-	it("continues activating while scroll measurement runs every frame", async () => {
+	it("holds activation and animation-frame work until scrolling becomes idle", async () => {
 		const results: boolean[] = [];
 		markScrollActivityActive(scrollSource);
 		for (const key of ["preview-a", "preview-b", "preview-c"]) {
@@ -186,21 +192,20 @@ describe("preview activation scheduler", () => {
 			);
 		}
 
-		markVirtualScrollMeasurementRun();
-		await flushAnimationFrame();
+		await vi.advanceTimersByTimeAsync(1_000);
 		expect(results).toEqual([]);
+		expect(requestAnimationFrame).not.toHaveBeenCalled();
+		let counters = getCCLDevMeasurementSnapshot().counters;
+		expect(counters["preview.activationScheduler.animationFrame"].count).toBe(0);
+		expect(counters["preview.activationDuringScroll"].count).toBe(0);
 
-		markVirtualScrollMeasurementRun();
-		await flushAnimationFrame();
-		expect(results).toEqual([true]);
-
-		markVirtualScrollMeasurementRun();
+		markScrollActivityIdle(scrollSource);
 		await flushAnimationFrame();
 		expect(results).toEqual([true, true]);
-
-		markVirtualScrollMeasurementRun();
 		await flushAnimationFrame();
 		expect(results).toEqual([true, true, true]);
+		counters = getCCLDevMeasurementSnapshot().counters;
+		expect(counters["preview.activationScheduler.animationFrame"].count).toBe(2);
 	});
 
 	it("does not activate synchronously in a scroll measurement frame", async () => {
@@ -250,7 +255,7 @@ describe("preview activation scheduler", () => {
 		expect(canActivatePreviewImmediately(activationScope)).toBe(false);
 	});
 
-	it("preserves the scrolling activation rate across refresh rates", async () => {
+	it("suppresses scrolling activation independently of refresh rate", async () => {
 		const activationsAt60Hz = await countScrollingActivations({
 			intervalMs: 1000 / 60,
 			durationMs: 1000,
@@ -260,13 +265,11 @@ describe("preview activation scheduler", () => {
 			durationMs: 1000,
 		});
 
-		expect(activationsAt60Hz).toBeGreaterThanOrEqual(59);
-		expect(activationsAt60Hz).toBeLessThanOrEqual(63);
-		expect(activationsAt120Hz).toBeGreaterThanOrEqual(88);
-		expect(activationsAt120Hz).toBeLessThanOrEqual(96);
+		expect(activationsAt60Hz).toBe(0);
+		expect(activationsAt120Hz).toBe(0);
 	});
 
-	it("preserves fractional scrolling credit at 120 Hz", async () => {
+	it("resumes queued activation at 120 Hz only after scroll idle", async () => {
 		frameIntervalMs = 1000 / 120;
 		markScrollActivityActive(scrollSource);
 		const results: boolean[] = [];
@@ -278,7 +281,13 @@ describe("preview activation scheduler", () => {
 		}
 
 		await flushAnimationFrame();
-		expect(results).toEqual([true]);
+		expect(results).toEqual([]);
+		await flushAnimationFrame();
+		expect(results).toEqual([]);
+		await flushAnimationFrame();
+		expect(results).toEqual([]);
+
+		markScrollActivityIdle(scrollSource);
 		await flushAnimationFrame();
 		expect(results).toEqual([true, true]);
 		await flushAnimationFrame();
@@ -406,6 +415,7 @@ describe("preview activation scheduler", () => {
 		const replacement = requestActivationResult("preview-a");
 
 		await expect(original.result).resolves.toBe(false);
+		markScrollActivityIdle(scrollSource);
 		await flushAnimationFrame();
 		await expect(replacement.result).resolves.toBe(true);
 	});
@@ -444,6 +454,7 @@ describe("preview activation scheduler", () => {
 
 		first.handle.cancel();
 		await expect(first.result).resolves.toBe(false);
+		markScrollActivityIdle(scrollSource);
 		await flushAnimationFrame();
 		await expect(second.result).resolves.toBe(true);
 	});

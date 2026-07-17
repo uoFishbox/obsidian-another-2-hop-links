@@ -1,6 +1,5 @@
 <script lang="ts">
 	import type { Snippet } from "svelte";
-	import type { VirtualizedItemVisibilityState } from "ui/components/common/virtual-list/types";
 	import type { TwoHopFixedCellSlotController } from "./twoHopFixedRowSlotPool.svelte";
 	import type {
 		TwoHopCardPresentationState,
@@ -12,15 +11,11 @@
 
 	interface Props {
 		cellController: TwoHopFixedCellSlotController;
-		getItemVisibilityState: (
-			cell: TwoHopRenderItemCellSnapshot,
-		) => VirtualizedItemVisibilityState;
 		getItemActivationCandidateId: (cell: TwoHopRenderItemCellSnapshot) => string;
 		renderItem: Snippet<
 			[
 				TwoHopVirtualListItem,
 				number,
-				VirtualizedItemVisibilityState,
 				string,
 				TwoHopCardPresentationState,
 			]
@@ -29,7 +24,6 @@
 
 	let {
 		cellController,
-		getItemVisibilityState,
 		getItemActivationCandidateId,
 		renderItem,
 	}: Props = $props();
@@ -53,7 +47,6 @@
 		return {
 			item: itemCell.cell.item,
 			rowIndex: itemCell.rowIndex,
-			visibilityState: getItemVisibilityState(itemCell),
 			activationCandidateId: getItemActivationCandidateId(itemCell),
 			presentation: presentation ?? {
 				sectionVariant: "two-hop" as const,
@@ -69,7 +62,6 @@
 	{@render renderItem(
 		snapshot.item,
 		snapshot.rowIndex,
-		snapshot.visibilityState,
 		snapshot.activationCandidateId,
 		snapshot.presentation,
 	)}

@@ -1,3 +1,5 @@
+import { recordCCLDevMeasurement } from "infrastructure/debug/CCLDevMeasurements";
+
 let didRunMeasurement = false;
 let resetHandle: number | null = null;
 let resetHandleKind: "animation-frame" | "timeout" | null = null;
@@ -6,6 +8,9 @@ function scheduleRunMarkerReset(): void {
 	if (resetHandle !== null) return;
 
 	if (typeof globalThis.requestAnimationFrame === "function") {
+		if (process.env.NODE_ENV !== "production") {
+			recordCCLDevMeasurement("virtualScroll.measurementMarker.animationFrame");
+		}
 		resetHandleKind = "animation-frame";
 		resetHandle = globalThis.requestAnimationFrame(clearRunMarker);
 		return;

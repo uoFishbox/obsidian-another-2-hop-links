@@ -8,7 +8,6 @@
 		SearchWorkerMatchedItem,
 		SearchWorkerMatchScope,
 	} from "features/search/searchWorkerTypes";
-	import type { VirtualizedItemVisibilityState } from "ui/components/common/virtualizedItemVisibility";
 	import type {
 		TwoHopVirtualListSection,
 		TwoHopVirtualListItem,
@@ -85,7 +84,6 @@
 		{#snippet renderItem(
 			row: TwoHopVirtualListItem,
 			rowIndex: number,
-			visibilityState: VirtualizedItemVisibilityState,
 			activationCandidateId: string,
 			presentation: TwoHopCardPresentationState,
 		)}
@@ -96,7 +94,6 @@
 				{searchScope}
 				{matchedItemByKey}
 				{rowIndex}
-				{visibilityState}
 				{activationCandidateId}
 				{presentation}
 			/>
