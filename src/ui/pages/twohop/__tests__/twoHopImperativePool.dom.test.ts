@@ -86,7 +86,7 @@ describe("twoHop imperative DOM pool", () => {
 		const cell = resolveTwoHopCell(snapshot, geometry, 0, 1);
 		const slot = pool.rows[0].cells[1];
 
-		renderer.renderSkeleton(slot, cell);
+		renderer.renderSkeleton(slot, cell, snapshot);
 		expect(resolveItemCardModel).not.toHaveBeenCalled();
 		expect(slot.root.classList.contains("is-skeleton")).toBe(true);
 

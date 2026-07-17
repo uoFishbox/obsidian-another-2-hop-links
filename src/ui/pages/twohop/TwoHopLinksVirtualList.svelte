@@ -1,8 +1,6 @@
 <script lang="ts">
 	import { getContext } from "svelte";
-	import TwoHopViewPlanVirtualList from "./TwoHopVirtualListSurface.svelte";
-	import TwoHopSectionHeaderRenderer from "./TwoHopSectionHeaderRenderer.svelte";
-	import TwoHopVirtualItemCard from "./TwoHopVirtualItemCard.svelte";
+	import TwoHopSurface from "./TwoHopSurface.svelte";
 	import type { ApplicationStore } from "ui/stores/ApplicationStore.svelte";
 	import type {
 		SearchWorkerMatchedItem,
@@ -98,7 +96,7 @@
 </script>
 
 {#if sections.length > 0}
-	<TwoHopViewPlanVirtualList
+	<TwoHopSurface
 		{sections}
 		{applicationStore}
 		{initialVisibleCount}
@@ -107,35 +105,5 @@
 		{interactionDescriptorRevision}
 		{cardModelRevision}
 		{resolveItemCardModel}
-	>
-		{#snippet renderHeader({ section, title, totalCount, sectionId, headerProps })}
-			<TwoHopSectionHeaderRenderer
-				{section}
-				{title}
-				{totalCount}
-				{sectionId}
-				{headerProps}
-			/>
-		{/snippet}
-
-		{#snippet renderItem(
-			row: TwoHopVirtualListItem,
-			rowIndex: number,
-			activationCandidateId: string,
-			presentation: TwoHopCardPresentationState,
-			model: CardRenderModel | null,
-		)}
-			<TwoHopVirtualItemCard
-				{row}
-				settings={currentSettings}
-				{searchQuery}
-				{searchScope}
-				{matchedItemByKey}
-				{rowIndex}
-				{activationCandidateId}
-				{presentation}
-				{model}
-			/>
-		{/snippet}
-	</TwoHopViewPlanVirtualList>
+	/>
 {/if}

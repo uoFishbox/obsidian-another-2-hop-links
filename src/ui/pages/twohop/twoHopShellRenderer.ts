@@ -8,6 +8,7 @@ import type { TwoHopCardShellSlot } from "./twoHopDomPool";
 import type { TwoHopResolvedCell } from "./twoHopGeometry";
 import { resolveTwoHopItemStaticState, resolveTwoHopSectionVariant } from "./twoHopCellStaticState";
 import type { TwoHopSnapshot } from "./twoHopSnapshot";
+import { resolveTwoHopNavigationCellKey } from "./twoHopInteractionRouter";
 
 export interface TwoHopShellRendererParams {
 	readonly resolveItemCardModel?: (
@@ -19,11 +20,16 @@ export interface TwoHopShellRendererParams {
 }
 
 export function createTwoHopShellRenderer(params: TwoHopShellRendererParams) {
+	let modelCache = new WeakMap<
+		Extract<TwoHopResolvedCell, { kind: "item" }>["item"],
+		CardRenderModel
+	>();
 	function renderSkeleton(
 		slot: TwoHopCardShellSlot,
 		cell: TwoHopResolvedCell | null,
+		snapshot: TwoHopSnapshot,
 	): void {
-		prepareSlot(slot, cell);
+		prepareSlot(slot, cell, snapshot);
 		slot.rich = false;
 		slot.root.classList.add("is-skeleton");
 		slot.title.textContent = "";
@@ -36,7 +42,10 @@ export function createTwoHopShellRenderer(params: TwoHopShellRendererParams) {
 		cell: TwoHopResolvedCell,
 		snapshot: TwoHopSnapshot,
 	): void {
-		prepareSlot(slot, cell);
+		const identity = resolveCellIdentity(cell, snapshot);
+		const retainedRichShell = slot.rich && slot.logicalIdentity === identity;
+		prepareSlot(slot, cell, snapshot);
+		if (retainedRichShell) return;
 		slot.rich = true;
 		slot.root.classList.remove("is-skeleton");
 		resetVariantClasses(slot.root);
@@ -91,10 +100,11 @@ export function createTwoHopShellRenderer(params: TwoHopShellRendererParams) {
 			descriptor.section,
 		);
 		const presentation = staticState.presentation;
-		const model =
-			presentation && params.resolveItemCardModel
-				? params.resolveItemCardModel(cell.item, presentation)
-				: null;
+		let model = modelCache.get(cell.item) ?? null;
+		if (!model && presentation && params.resolveItemCardModel) {
+			model = params.resolveItemCardModel(cell.item, presentation);
+			modelCache.set(cell.item, model);
+		}
 		slot.title.className = "cosense-card-links__box-title";
 		slot.title.textContent = model?.title ?? cell.item.virtualKey;
 		slot.meta.textContent = model?.extension ?? presentation?.extension ?? "";
@@ -104,6 +114,10 @@ export function createTwoHopShellRenderer(params: TwoHopShellRendererParams) {
 		slot.root.dataset.cclAttachment = presentation?.attachment ? "true" : "false";
 		slot.root.dataset.cclExtension = presentation?.extension ?? "";
 		slot.root.classList.toggle("is-attachment", presentation?.attachment ?? false);
+		if (!IS_PROD) {
+			slot.cell.dataset.testid = "twohop-item-cell";
+			slot.cell.dataset.index = String(cell.itemIndex);
+		}
 		const interactionId = model?.interactionId ?? staticState.interactionId;
 		if (interactionId) {
 			setInteraction(slot.root, interactionId, "item");
@@ -112,16 +126,21 @@ export function createTwoHopShellRenderer(params: TwoHopShellRendererParams) {
 		}
 	}
 
-	return { renderSkeleton, renderShell };
+	return {
+		renderSkeleton,
+		renderShell,
+		invalidateCardModels() {
+			modelCache = new WeakMap();
+		},
+	};
 }
 
 function prepareSlot(
 	slot: TwoHopCardShellSlot,
 	cell: TwoHopResolvedCell | null,
+	snapshot: TwoHopSnapshot,
 ): void {
-	const identity = cell
-		? `${cell.sectionIndex}:${cell.rowIndex}:${cell.columnIndex}`
-		: null;
+	const identity = cell ? resolveCellIdentity(cell, snapshot) : null;
 	if (slot.logicalIdentity !== identity) {
 		slot.logicalIdentity = identity;
 		slot.generation += 1;
@@ -131,8 +150,17 @@ function prepareSlot(
 	slot.logicalRowIndex = cell?.rowIndex ?? -1;
 	slot.logicalColumnIndex = cell?.columnIndex ?? -1;
 	slot.cell.style.visibility = cell ? "visible" : "hidden";
+	if (identity) slot.cell.dataset.cclLogicalKey = identity;
+	else delete slot.cell.dataset.cclLogicalKey;
 	delete slot.cell.dataset.testid;
 	delete slot.root.dataset.twoHopLoadMoreSection;
+}
+
+function resolveCellIdentity(
+	cell: TwoHopResolvedCell,
+	snapshot: TwoHopSnapshot,
+): string {
+	return resolveTwoHopNavigationCellKey(cell, snapshot);
 }
 
 function resetVariantClasses(root: HTMLElement): void {

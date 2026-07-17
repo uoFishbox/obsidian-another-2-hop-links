@@ -49,6 +49,7 @@ export function createTwoHopDomPool(params: {
 	for (let rowSlotIndex = 0; rowSlotIndex < capacity; rowSlotIndex += 1) {
 		const row = ownerDocument.createElement("div");
 		row.className = "view-plan-flow-row twohop-imperative-row";
+		row.dataset.cclRowSlot = String(rowSlotIndex);
 		row.style.position = "absolute";
 		row.style.inset = "0 auto auto 0";
 		row.style.visibility = "hidden";
@@ -58,6 +59,7 @@ export function createTwoHopDomPool(params: {
 			const cell = ownerDocument.createElement("div");
 			cell.className = "view-plan-virtual-list-cell view-plan-flow-cell";
 			cell.dataset.slot = String(nextCellSlotIndex);
+			cell.dataset.cclCellSlot = String(nextCellSlotIndex);
 			const root = ownerDocument.createElement("div");
 			root.className = "cosense-card-links__box twohop-card-shell is-skeleton";
 			root.setAttribute("role", "button");
@@ -110,11 +112,19 @@ export function createTwoHopDomPool(params: {
 		},
 		positionRow(slot, logicalRowIndex, top) {
 			slot.logicalRowIndex = logicalRowIndex;
+			slot.root.dataset.cclRowIndex = String(logicalRowIndex);
+			for (const cell of slot.cells) {
+				cell.cell.dataset.cclRowIndex = String(logicalRowIndex);
+				cell.cell.dataset.cclColumnIndex = String(
+					cell.logicalColumnIndex,
+				);
+			}
 			slot.root.style.transform = `translate3d(0, ${top}px, 0)`;
 			slot.root.style.visibility = "visible";
 		},
 		hideRow(slot) {
 			slot.logicalRowIndex = -1;
+			delete slot.root.dataset.cclRowIndex;
 			slot.root.style.visibility = "hidden";
 		},
 		dispose() {

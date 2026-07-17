@@ -88,8 +88,8 @@ vi.mock("ui/components/items/ViewItemCard.svelte", async () => {
 	return { default: component.default };
 });
 
-vi.mock("../twohop/TwoHopVirtualListSurface.svelte", async () => {
-	const component = await import("./ViewPlanVirtualListPageStub.svelte");
+vi.mock("../twohop/TwoHopSurface.svelte", async () => {
+	const component = await import("./TwoHopImperativeSurfacePageStub.svelte");
 	return { default: component.default };
 });
 

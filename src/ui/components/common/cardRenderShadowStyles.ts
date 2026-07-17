@@ -94,6 +94,27 @@ export const CARD_RENDER_SHADOW_CSS = String.raw`
 	touch-action: manipulation;
 }
 
+.twohop-card-shell.is-skeleton {
+	pointer-events: none;
+	background: linear-gradient(
+		100deg,
+		var(--ccl-bg-box) 20%,
+		var(--background-modifier-hover) 50%,
+		var(--ccl-bg-box) 80%
+	);
+	background-size: 240% 100%;
+	opacity: 0.72;
+}
+
+.twohop-card-shell.is-skeleton .cosense-card-links__box-title-wrapper::before {
+	content: "";
+	display: block;
+	width: 62%;
+	height: 0.8em;
+	border-radius: 999px;
+	background: var(--background-modifier-border);
+}
+
 @media (hover: hover) {
 	.cosense-card-links__box:not(.cosense-card-links__connected-links-header)[data-ccl-hovered="true"] {
 		border-color: var(--background-modifier-border-hover);

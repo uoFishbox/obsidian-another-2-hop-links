@@ -142,4 +142,83 @@ describe("twoHopViewportController", () => {
 		controller.dispose();
 		scroller.remove();
 	});
+
+	it("anchors scroll and does not regenerate other-section card models on load more", () => {
+		const scroller = document.createElement("div");
+		scroller.style.overflow = "auto";
+		Object.defineProperty(scroller, "clientHeight", { value: 300 });
+		Object.defineProperty(scroller, "scrollHeight", { value: 20000 });
+		Object.defineProperty(scroller, "scrollTop", { value: 350, writable: true });
+		const rootEl = document.createElement("div");
+		const shadowHostEl = document.createElement("div");
+		rootEl.append(shadowHostEl);
+		scroller.append(rootEl);
+		document.body.append(scroller);
+		setRect(scroller, 0, 210, 300);
+		vi.spyOn(rootEl, "getBoundingClientRect").mockImplementation(() => ({
+			x: 0,
+			y: -scroller.scrollTop,
+			top: -scroller.scrollTop,
+			left: 0,
+			right: 210,
+			bottom: 20000 - scroller.scrollTop,
+			width: 210,
+			height: 20000,
+			toJSON: () => ({}),
+		}));
+		const first = createSection("first", 8);
+		const second = createSection("second", 8);
+		const resolveItemCardModel = vi.fn((item: TwoHopVirtualListItem, presentation) => ({
+			item: item.item,
+			targetFile: null,
+			title: item.virtualKey,
+			ariaLabel: item.virtualKey,
+			className: null,
+			extension: null,
+			directory: null,
+			interactionId: item.interactionId ?? item.virtualKey,
+			interactionKey: item.virtualKey,
+			presentation,
+			searchQuery: "",
+			searchScope: "title-only" as const,
+			contentPreview: undefined,
+			previewRefreshToken: 0,
+			previewActivationIdentity: undefined,
+		}));
+		const controller = createTwoHopViewportController({
+			rootEl,
+			shadowHostEl,
+			sections: [first, second],
+			initialVisibleCount: 1,
+			loadMoreIncrement: 2,
+			configuredLayout: {
+				cardWidthPx: 100,
+				cardHeightPx: 100,
+				cardHeightRatio: 1,
+				cardGapPx: 10,
+				cardMaxColumns: 2,
+				sectionMarginBottomPx: 20,
+			},
+			resolveItemCardModel,
+			getItemInteractionDescriptor: () => null,
+			requestAnimationFrame: () => 1,
+			cancelAnimationFrame: () => {},
+			now: () => 10,
+		});
+		const secondItems = new Set(second.getItems());
+		const secondCallsBefore = resolveItemCardModel.mock.calls.filter(([item]) =>
+			secondItems.has(item),
+		).length;
+		const scrollTopBefore = scroller.scrollTop;
+
+		controller.loadMore("first");
+
+		const secondCallsAfter = resolveItemCardModel.mock.calls.filter(([item]) =>
+			secondItems.has(item),
+		).length;
+		expect(scroller.scrollTop).toBe(scrollTopBefore + 110);
+		expect(secondCallsAfter).toBe(secondCallsBefore);
+		controller.dispose();
+		scroller.remove();
+	});
 });

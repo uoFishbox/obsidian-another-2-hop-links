@@ -32,6 +32,9 @@ import type {
 	TwoHopVirtualListItem,
 	TwoHopVirtualSectionDescriptor,
 } from "./twoHopVirtualListModel";
+import { createTwoHopInteractionRouter } from "./twoHopInteractionRouter";
+import type { ResultNavigationDirection } from "features/keyboard-navigation/resultFocus";
+import type { VirtualNavigationTarget } from "ui/components/common/virtual-list/types";
 
 const BEHIND_ROWS = 4;
 const AHEAD_ROWS = 8;
@@ -78,6 +81,11 @@ export interface TwoHopViewportController {
 	setConfiguredLayout(layout: ResolvedCardLayoutSettings | null): void;
 	loadMore(sectionId: string): void;
 	resolveInteractionDescriptor(interactionId: string): InteractionDescriptor | null;
+	resolveNavigationTarget(
+		currentKey: string,
+		direction: ResultNavigationDirection,
+		currentPosition: { readonly rowIndex: number; readonly columnIndex: number },
+	): VirtualNavigationTarget | null;
 	flush(timestamp?: number): void;
 	getStats(): TwoHopViewportControllerStats;
 	dispose(): void;
@@ -107,6 +115,8 @@ export function createTwoHopViewportController(
 		loadMoreIncrement: params.loadMoreIncrement,
 	});
 	const shadowSurface = ensureCardRenderShadowSurface(params.shadowHostEl);
+	const contentEl = params.rootEl.ownerDocument.createElement("div");
+	shadowSurface.surfaceEl.append(contentEl);
 	const renderer = createTwoHopShellRenderer({
 		resolveItemCardModel: params.resolveItemCardModel,
 	});
@@ -133,12 +143,17 @@ export function createTwoHopViewportController(
 		skeletonBinds: 0,
 		distantJumps: 0,
 	};
+	const interactionRouter = createTwoHopInteractionRouter({
+		getSnapshot: () => snapshot,
+		getGeometry: () => geometry,
+	});
 
 	const visibleCountUpdate = pagination.resolveForInput(sections);
 	layout = measureLayout();
 	snapshot = createSnapshot(visibleCountUpdate.snapshot.visibleCounts);
 	geometry = createTwoHopGeometry(snapshot, layout);
 	pool = createPool();
+	applyLayoutStyles();
 	pool.setContentHeight(geometry.totalHeight);
 	flush(now());
 
@@ -181,13 +196,21 @@ export function createTwoHopViewportController(
 				(layout.rowHeight + layout.gap),
 		);
 		return createTwoHopDomPool({
-			content: shadowSurface.surfaceEl,
+			content: contentEl,
 			rowCapacity: Math.max(
 				MINIMUM_POOL_ROWS,
 				viewportRows + BEHIND_ROWS + AHEAD_ROWS,
 			),
 			columns: layout.columns,
 		});
+	}
+
+	function applyLayoutStyles(): void {
+		const content = contentEl;
+		content.style.setProperty("--ccl-columns", String(layout.columns));
+		content.style.setProperty("--ccl-cell-width", `${layout.cellWidth}px`);
+		content.style.setProperty("--ccl-box-height", `${layout.rowHeight}px`);
+		content.style.setProperty("--ccl-box-gap", `${layout.gap}px`);
 	}
 
 	function onScroll(): void {
@@ -207,7 +230,7 @@ export function createTwoHopViewportController(
 		const visible = resolveTwoHopVisibleRows(
 			geometry,
 			localScrollOffset,
-			metrics.viewportHeight,
+			Math.max(geometry.rowHeight, metrics.viewportHeight),
 		);
 		const nextStart = Math.max(0, visible.start - BEHIND_ROWS);
 		const nextEnd = Math.min(geometry.rowCount, nextStart + pool.capacity);
@@ -255,7 +278,8 @@ export function createTwoHopViewportController(
 			pool.positionRow(rowSlot, rowIndex, resolveTwoHopRowTop(geometry, rowIndex));
 			const isVisible = rowIndex >= visible.start && rowIndex < visible.end;
 			const canBindRich =
-				(!distantJump || isVisible) && budget.canBind(now());
+				(residentStart < 0 && isVisible) ||
+				((!distantJump || isVisible) && budget.canBind(now()));
 			bindRow(rowSlot, rowIndex, canBindRich);
 			if (canBindRich) budget.consumeBind();
 		}
@@ -273,7 +297,7 @@ export function createTwoHopViewportController(
 				renderer.renderShell(slot, cell, snapshot);
 				stats.shellBinds += 1;
 			} else {
-				renderer.renderSkeleton(slot, cell);
+				renderer.renderSkeleton(slot, cell, snapshot);
 				stats.skeletonBinds += 1;
 			}
 		}
@@ -411,6 +435,7 @@ export function createTwoHopViewportController(
 			geometry = createTwoHopGeometry(snapshot, layout);
 			pool.dispose();
 			pool = createPool();
+			applyLayoutStyles();
 			pool.setContentHeight(geometry.totalHeight);
 			residentStart = -1;
 			residentEnd = -1;
@@ -424,16 +449,17 @@ export function createTwoHopViewportController(
 	resizeObserver?.observe(params.rootEl);
 	const scrollTarget: EventTarget = scrollContainerEl ?? ownerWindow!;
 	scrollTarget.addEventListener("scroll", onScroll, { passive: true });
-	shadowSurface.surfaceEl.addEventListener("click", handleSurfaceClick);
+	contentEl.addEventListener("click", handleSurfaceClick);
 
 	return {
 		shadowRoot: shadowSurface.shadowRoot,
-		contentEl: shadowSurface.surfaceEl,
+		contentEl,
 		get scrollContainerEl() {
 			return scrollContainerEl;
 		},
 		setSections(nextSections, nextRevision) {
 			if (sections === nextSections && revision === nextRevision) return;
+			if (revision !== nextRevision) renderer.invalidateCardModels();
 			sections = nextSections;
 			revision = nextRevision;
 			rebuildData();
@@ -445,6 +471,7 @@ export function createTwoHopViewportController(
 		},
 		loadMore,
 		resolveInteractionDescriptor,
+		resolveNavigationTarget: interactionRouter.resolveNavigationTarget,
 		flush,
 		getStats() {
 			return { ...stats, poolRows: pool.capacity };
@@ -457,8 +484,9 @@ export function createTwoHopViewportController(
 			if (resizeFrameHandle) cancelFrame(resizeFrameHandle);
 			resizeObserver?.disconnect();
 			scrollTarget.removeEventListener("scroll", onScroll);
-			shadowSurface.surfaceEl.removeEventListener("click", handleSurfaceClick);
+			contentEl.removeEventListener("click", handleSurfaceClick);
 			pool.dispose();
+			contentEl.remove();
 			shadowSurface.dispose();
 		},
 	};
