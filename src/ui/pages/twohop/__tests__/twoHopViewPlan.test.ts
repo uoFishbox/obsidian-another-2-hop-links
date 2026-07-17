@@ -11,6 +11,8 @@ import {
 	findTwoHopRowsByOffset,
 	findTwoHopRowsByOffsetInto,
 } from "../twoHopViewPlan";
+import { createMockTFile } from "testing/__mocks__/testHelpers";
+import type { CardRenderModel } from "ui/components/items/cardRenderModel";
 
 const layout = {
 	containerWidth: 320,
@@ -114,6 +116,46 @@ const createSectionTable = (
 };
 
 describe("compileTwoHopViewPlan", () => {
+	it("attaches a precomputed card model to item cells", () => {
+		const targetFile = createMockTFile("notes/model.md");
+		const item: TwoHopVirtualListItem = {
+			kind: "new-link",
+			item: { type: "file", data: targetFile },
+			searchKey: "model",
+			virtualKey: "model",
+		};
+		const cardModel: CardRenderModel = {
+			item: item.item,
+			targetFile,
+			title: "Model",
+			ariaLabel: "Open Model",
+			className: null,
+			extension: "md",
+			directory: null,
+			interactionId: "model-id",
+			interactionKey: "model-key",
+			presentation: undefined,
+			searchQuery: "",
+			searchScope: "title-and-content",
+			contentPreview: undefined,
+			previewRefreshToken: 0,
+			previewActivationIdentity: "model-preview",
+		};
+		const resolveItemCardModel = vi.fn(() => cardModel);
+
+		const plan = compileTwoHopViewPlan({
+			sections: [createDescriptor([item])],
+			sectionVisibleCounts: { "new-links": 1 },
+			layout,
+			resolveInitialSectionVisibleCount: (section) => section.loadedCount,
+			clampVisibleCount: (section, count) => Math.min(section.loadedCount, count),
+			resolveItemCardModel,
+		});
+
+		expect(resolveItemCardModel).toHaveBeenCalledOnce();
+		expect(plan.cells[1]?.cardModel).toBe(cardModel);
+	});
+
 	it("compiles section geometry and prepared cells without a cell store", () => {
 		const getItems = vi.fn(() => [
 			createItem("a"),

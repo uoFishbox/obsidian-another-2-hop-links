@@ -19,6 +19,12 @@
 		resolveTwoHopItemInteractionDescriptor,
 	} from "./twoHopInteractionDescriptorRevision";
 	import type { TwoHopCardPresentationState } from "./twoHopCellBinding";
+	import {
+		createTwoHopCardRenderModelCache,
+		type TwoHopCardModelRevision,
+	} from "./twoHopCardRenderModelCache";
+	import type { CardRenderModel } from "ui/components/items/cardRenderModel";
+	import type { LinkUtilitiesContext } from "types/linkContext";
 
 	interface Props {
 		sections: readonly TwoHopVirtualSectionDescriptor[];
@@ -28,6 +34,7 @@
 		matchedItemByKey?: Map<string, SearchWorkerMatchedItem> | null;
 		initialVisibleCount?: number;
 		loadMoreIncrement?: number;
+		linkContext?: LinkUtilitiesContext;
 	}
 
 	let {
@@ -38,6 +45,7 @@
 		matchedItemByKey = null,
 		initialVisibleCount,
 		loadMoreIncrement,
+		linkContext: providedLinkContext = undefined,
 	}: Props = $props();
 
 	if (!applicationStore) {
@@ -45,12 +53,39 @@
 	}
 
 	const currentSettings = $derived(applicationStore.settings);
-	let linkContext: ReturnType<typeof useLinkContext> | undefined;
-	try {
-		linkContext = useLinkContext();
-	} catch {
-		linkContext = undefined;
+	let linkContext = providedLinkContext;
+	if (!linkContext) {
+		try {
+			linkContext = useLinkContext();
+		} catch {
+			linkContext = undefined;
+		}
 	}
+	const cardModelCache = createTwoHopCardRenderModelCache();
+	const cardModelRevision = $derived.by(
+		(): TwoHopCardModelRevision | undefined =>
+			linkContext
+				? {
+					settings: currentSettings,
+					searchQuery,
+					searchScope,
+					matchedItemByKey,
+					linkContext,
+					applicationStore,
+					applicationUpdateVersion: applicationStore.updateVersion,
+					previewGlobalVersion: applicationStore.previewGlobalVersion,
+					previewPathVersions: applicationStore.previewPathVersions,
+				}
+				: undefined,
+	);
+	const resolveItemCardModel = $derived.by(() => {
+		const revision = cardModelRevision;
+		if (!revision) return undefined;
+		return (
+			row: TwoHopVirtualListItem,
+			presentation: TwoHopCardPresentationState,
+		): CardRenderModel => cardModelCache.resolve(row, presentation, revision);
+	});
 	const getItemInteractionDescriptor = (row: TwoHopVirtualListItem) =>
 		resolveTwoHopItemInteractionDescriptor(row, interactionDescriptorRevision);
 	const interactionDescriptorRevision = $derived(
@@ -70,6 +105,8 @@
 		{loadMoreIncrement}
 		{getItemInteractionDescriptor}
 		{interactionDescriptorRevision}
+		{cardModelRevision}
+		{resolveItemCardModel}
 	>
 		{#snippet renderHeader({ section, title, totalCount, sectionId, headerProps })}
 			<TwoHopSectionHeaderRenderer
@@ -86,6 +123,7 @@
 			rowIndex: number,
 			activationCandidateId: string,
 			presentation: TwoHopCardPresentationState,
+			model: CardRenderModel | null,
 		)}
 			<TwoHopVirtualItemCard
 				{row}
@@ -96,6 +134,7 @@
 				{rowIndex}
 				{activationCandidateId}
 				{presentation}
+				{model}
 			/>
 		{/snippet}
 	</TwoHopViewPlanVirtualList>

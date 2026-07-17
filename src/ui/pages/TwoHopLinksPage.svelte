@@ -267,6 +267,7 @@
 					{matchedItemByKey}
 					{initialVisibleCount}
 					{loadMoreIncrement}
+					{linkContext}
 				/>
 			{/if}
 			{#if !filteredDisplayData.twoHopBranches.length && showTwoHopPlaceholder}

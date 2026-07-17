@@ -8,6 +8,7 @@
 	} from "./twoHopCellBinding";
 	import type { TwoHopVirtualListItem } from "./twoHopVirtualListModel";
 	import { recordCCLDevMeasurement } from "infrastructure/debug/CCLDevMeasurements";
+	import type { CardRenderModel } from "ui/components/items/cardRenderModel";
 
 	interface Props {
 		cellController: TwoHopFixedCellSlotController;
@@ -18,15 +19,12 @@
 				number,
 				string,
 				TwoHopCardPresentationState,
+				CardRenderModel | null,
 			]
 		>;
 	}
 
-	let {
-		cellController,
-		getItemActivationCandidateId,
-		renderItem,
-	}: Props = $props();
+	let { cellController, getItemActivationCandidateId, renderItem }: Props = $props();
 	if (process.env.NODE_ENV !== "production") {
 		recordCCLDevMeasurement("twoHop.itemBody.mount");
 	}
@@ -54,6 +52,7 @@
 				attachment: false,
 				extension: null,
 			},
+			cardModel: itemCell.compiledCell?.cardModel ?? null,
 		};
 	});
 </script>
@@ -64,5 +63,6 @@
 		snapshot.rowIndex,
 		snapshot.activationCandidateId,
 		snapshot.presentation,
+		snapshot.cardModel,
 	)}
 {/if}

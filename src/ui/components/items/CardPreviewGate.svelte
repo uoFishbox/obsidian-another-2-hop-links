@@ -40,6 +40,7 @@
 		searchScope?: "title-only" | "title-and-content";
 		previewRefreshToken?: number;
 		contentPreview?: string;
+		precomputedPreviewIdentity?: string;
 		rowIndex: number;
 		activationCandidateId: string;
 	}
@@ -54,6 +55,7 @@
 		searchScope = "title-and-content",
 		previewRefreshToken = 0,
 		contentPreview = undefined,
+		precomputedPreviewIdentity = undefined,
 		rowIndex,
 		activationCandidateId,
 	}: Props = $props();
@@ -81,16 +83,17 @@
 	);
 	const normalizedSearchQuery = $derived(normalizePreviewQuery(effectiveSearchQuery));
 	const previewIdentity = $derived(
-		file
-			? buildCardPreviewActivationIdentity(
-					file,
-					settings,
-					normalizedSearchQuery,
-					previewRenderVersion,
-					previewRefreshToken,
-					previewOverride,
-				)
-			: undefined,
+		precomputedPreviewIdentity ??
+			(file
+				? buildCardPreviewActivationIdentity(
+						file,
+						settings,
+						normalizedSearchQuery,
+						previewRenderVersion,
+						previewRefreshToken,
+						previewOverride,
+					)
+				: undefined),
 	);
 	let activatedPreviewIdentity = $state<string | undefined>(undefined);
 	let lastPreviewIdentity: string | undefined = undefined;
@@ -114,6 +117,7 @@
 		void searchScope;
 		void previewRefreshToken;
 		void contentPreview;
+		void precomputedPreviewIdentity;
 		void rowIndex;
 		void activationCandidateId;
 		void previewOverride;

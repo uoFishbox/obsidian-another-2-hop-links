@@ -10,6 +10,8 @@ import type {
 } from "./twoHopVirtualListModel";
 import { createTwoHopCompiledPlanCache } from "./twoHopCompiledPlanCache";
 import { type TwoHopViewPlanRowModel } from "./twoHopViewPlan";
+import type { CardRenderModel } from "ui/components/items/cardRenderModel";
+import type { TwoHopCardPresentationState } from "./twoHopCellStaticState";
 
 type ViewPlanMeasurementState = ReturnType<
 	typeof import("ui/components/common/virtual-list/svelte/viewPlanMeasurement.svelte").createViewPlanMeasurementState
@@ -20,6 +22,11 @@ export interface TwoHopVirtualListSurfaceProps {
 	readonly applicationStore?: ApplicationStore;
 	readonly initialVisibleCount?: number;
 	readonly loadMoreIncrement?: number;
+	readonly cardModelRevision?: unknown;
+	readonly resolveItemCardModel?: (
+		item: TwoHopVirtualListItem,
+		presentation: TwoHopCardPresentationState,
+	) => CardRenderModel;
 }
 
 /** Resolves input, pagination, layout settings, and the compiled plan. */
@@ -55,6 +62,8 @@ export function createTwoHopVirtualListInputRuntime(params: {
 			inputState.validatedSections,
 			inputState.sectionVisibleCounts,
 			layout,
+			params.props.cardModelRevision,
+			params.props.resolveItemCardModel,
 		);
 	const rowModel = $derived(resolveRowModel());
 

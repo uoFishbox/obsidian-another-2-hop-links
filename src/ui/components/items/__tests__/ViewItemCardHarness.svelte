@@ -11,6 +11,7 @@
 	import type { App, TFile } from "obsidian";
 	import type { ViewItem } from "application/presenters";
 	import type { VirtualizedItemVisibility } from "ui/components/common/virtualizedItemVisibility";
+	import type { CardRenderModel } from "../cardRenderModel";
 
 	interface Props {
 		item: ViewItem | undefined;
@@ -23,6 +24,7 @@
 		visibility?: VirtualizedItemVisibility;
 		previewRefreshToken?: number;
 		bookmarks?: BookmarksState;
+		model?: CardRenderModel;
 	}
 
 	let {
@@ -40,6 +42,7 @@
 			orderedFilePaths: [],
 			isBookmarked: () => false,
 		},
+		model = undefined,
 	}: Props = $props();
 	const rowIndex = 0;
 	const activationCandidateId = "view-item-card-harness";
@@ -78,5 +81,6 @@
 		{previewRefreshToken}
 		{rowIndex}
 		{activationCandidateId}
+		{model}
 	/>
 </PreviewVisibilityProvider>

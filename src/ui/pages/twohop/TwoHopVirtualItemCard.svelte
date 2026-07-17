@@ -7,6 +7,7 @@
 	import { resolveTwoHopPageItemSearchScope } from "./twoHopVirtualListModel";
 	import { markCCLComponentReevaluation } from "infrastructure/debug/CCLDevMeasurements";
 	import type { TwoHopCardPresentationState } from "./twoHopCellBinding";
+	import type { CardRenderModel } from "ui/components/items/cardRenderModel";
 
 	interface Props {
 		row: TwoHopVirtualListItem;
@@ -17,6 +18,7 @@
 		rowIndex: number;
 		activationCandidateId: string;
 		presentation: TwoHopCardPresentationState;
+		model: CardRenderModel | null;
 	}
 
 	let {
@@ -28,11 +30,19 @@
 		rowIndex,
 		activationCandidateId,
 		presentation,
+		model,
 	}: Props = $props();
 
-	const matchedItem = $derived(matchedItemByKey?.get(row.searchKey));
+	const matchedItem = $derived(
+		model ? undefined : matchedItemByKey?.get(row.searchKey),
+	);
 	const resolvedSearchScope = $derived(
-		resolveTwoHopPageItemSearchScope(row, searchScope, matchedItem?.contentMatched),
+		model?.searchScope ??
+			resolveTwoHopPageItemSearchScope(
+				row,
+				searchScope,
+				matchedItem?.contentMatched,
+			),
 	);
 	const componentReevaluationProbe = $derived.by(() => {
 		if (process.env.NODE_ENV === "production") return "";
@@ -45,6 +55,7 @@
 		void rowIndex;
 		void activationCandidateId;
 		void presentation;
+		void model;
 		void matchedItem;
 		void resolvedSearchScope;
 		return markCCLComponentReevaluation("TwoHopVirtualItemCard");
@@ -64,4 +75,5 @@
 	interactionId={row.interactionId}
 	interactionKey={row.interactionKey}
 	{presentation}
+	model={model ?? undefined}
 />

@@ -6,6 +6,7 @@ import type { ViewItem } from "application/presenters";
 import { DEFAULT_SETTINGS } from "types/settings";
 import ViewItemCardHarness from "./ViewItemCardHarness.svelte";
 import { getLazyLoadManager } from "infrastructure/observers/IntersectionObserverRegistry";
+import type { CardRenderModel } from "../cardRenderModel";
 
 vi.mock("obsidian", async () => {
 	const actual = await vi.importActual<typeof import("obsidian")>("obsidian");
@@ -101,6 +102,61 @@ describe("ViewItemCard", () => {
 
 		expect(screen.getByText("Custom Title")).toBeInTheDocument();
 		expect(fileToLinktext).not.toHaveBeenCalled();
+	});
+
+	it("uses a precomputed card model without resolving display metadata", () => {
+		const sourceFile = createMockTFile("notes/source.md");
+		const targetFile = createMockTFile("attachments/model.pdf");
+		const item = { type: "file", data: targetFile } as ViewItem;
+		const fileToLinktext = vi.fn(() => "fallback title");
+		const getMetadata = vi.fn(() => null);
+		const linkContext = {
+			getPreview: vi.fn(),
+			resolveFile: vi.fn(),
+			buildWikiLink: vi.fn(),
+			fileToLinktext,
+			sourceFile,
+			getMetadata,
+			onOpenFile: vi.fn(),
+			onHop1Click: vi.fn(),
+			onHop2Click: vi.fn(),
+			onTagClick: vi.fn(),
+		};
+		const model: CardRenderModel = {
+			item,
+			targetFile,
+			title: "Compiled title",
+			ariaLabel: "Compiled aria label",
+			className: "compiled-card",
+			extension: "pdf",
+			directory: "attachments",
+			interactionId: "compiled-id",
+			interactionKey: "compiled-key",
+			presentation: undefined,
+			searchQuery: "compiled",
+			searchScope: "title-only",
+			contentPreview: undefined,
+			previewRefreshToken: 0,
+			previewActivationIdentity: "compiled-preview",
+		};
+
+		render(ViewItemCardHarness, {
+			props: {
+				item,
+				model,
+				linkContext: linkContext as never,
+				applicationStore: { updateVersion: 0 } as never,
+				sourceFile,
+			},
+		});
+
+		const card = screen.getByLabelText("Compiled aria label");
+		expect(card).toHaveTextContent("Compiled title");
+		expect(card).toHaveClass("compiled-card");
+		expect(card).toHaveAttribute("data-ccl-interaction-id", "compiled-id");
+		expect(card).toHaveAttribute("data-directory", "attachments");
+		expect(fileToLinktext).not.toHaveBeenCalled();
+		expect(getMetadata).not.toHaveBeenCalled();
 	});
 
 	it("newLink renders placeholder immediately without preview processing", () => {

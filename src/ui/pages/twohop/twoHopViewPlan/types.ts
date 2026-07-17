@@ -19,6 +19,8 @@ import type {
 	TwoHopVirtualListItem,
 } from "../twoHopVirtualListModel";
 import type { TwoHopCellStaticState } from "../twoHopCellStaticState";
+import type { TwoHopCardPresentationState } from "../twoHopCellStaticState";
+import type { CardRenderModel } from "ui/components/items/cardRenderModel";
 export interface TwoHopSectionPlan {
 	readonly descriptor: SectionRenderDescriptor<
 		TwoHopVirtualListItem,
@@ -43,6 +45,7 @@ export interface TwoHopSectionPlan {
 
 /** Immutable cell identity compiled before the scroll hot path begins. */
 export interface CompiledTwoHopCell extends TwoHopCellStaticState {
+	readonly cardModel: CardRenderModel | null;
 	readonly logicalCell: VirtualListLogicalCell<TwoHopVirtualListItem>;
 	readonly logicalKey: VirtualListLogicalCell<TwoHopVirtualListItem>["key"];
 	readonly renderBodyKey: RenderBodyKey;
@@ -133,6 +136,10 @@ export interface CompileTwoHopViewPlanParams {
 		>,
 		count: number,
 	): number;
+	resolveItemCardModel?(
+		item: TwoHopVirtualListItem,
+		presentation: TwoHopCardPresentationState,
+	): CardRenderModel;
 }
 
 export interface TwoHopResolvedRow {

@@ -9,6 +9,9 @@ import {
 	type TwoHopViewPlanRowModel,
 } from "./twoHopViewPlan";
 import { recordCCLDevMeasurement } from "infrastructure/debug/CCLDevMeasurements";
+import type { CardRenderModel } from "ui/components/items/cardRenderModel";
+import type { TwoHopCardPresentationState } from "./twoHopCellStaticState";
+import type { TwoHopVirtualListItem } from "./twoHopVirtualListModel";
 
 /**
  * Single-entry compiled-plan cache owned by a virtual-list controller.
@@ -23,6 +26,11 @@ export interface TwoHopCompiledPlanCache {
 		sections: readonly TwoHopVirtualSectionDescriptor[],
 		sectionVisibleCounts: Readonly<Record<string, number>>,
 		layout: ViewPlanLayoutMetrics,
+		cardModelRevision?: unknown,
+		resolveItemCardModel?: (
+			item: TwoHopVirtualListItem,
+			presentation: TwoHopCardPresentationState,
+		) => CardRenderModel,
 	): TwoHopViewPlanRowModel;
 	invalidate(): void;
 }
@@ -52,10 +60,23 @@ export function createTwoHopCompiledPlanCache(params: {
 	let previousSections: readonly TwoHopVirtualSectionDescriptor[] | undefined;
 	let previousVisibleCounts: Readonly<Record<string, number>> | undefined;
 	let previousLayout: ViewPlanLayoutMetrics | undefined;
+	let previousCardModelRevision: unknown;
+	let previousResolveItemCardModel:
+		| ((
+				item: TwoHopVirtualListItem,
+				presentation: TwoHopCardPresentationState,
+		  ) => CardRenderModel)
+		| undefined;
 	let previousRowModel: TwoHopViewPlanRowModel | undefined;
 
 	return {
-		resolve(sections, sectionVisibleCounts, layout) {
+		resolve(
+			sections,
+			sectionVisibleCounts,
+			layout,
+			cardModelRevision,
+			resolveItemCardModel,
+		) {
 			const hasSemanticallySameLayout =
 				previousLayout !== undefined &&
 				isSameViewPlanLayout(previousLayout, layout);
@@ -71,7 +92,9 @@ export function createTwoHopCompiledPlanCache(params: {
 				previousRowModel &&
 				sections === previousSections &&
 				hasCompatibleVisibleCounts &&
-				hasCacheCompatibleLayout
+				hasCacheCompatibleLayout &&
+				cardModelRevision === previousCardModelRevision &&
+				resolveItemCardModel === previousResolveItemCardModel
 			) {
 				if (process.env.NODE_ENV !== "production") {
 					recordCCLDevMeasurement("twoHop.rowModelCache.hit");
@@ -127,11 +150,14 @@ export function createTwoHopCompiledPlanCache(params: {
 					resolveInitialSectionVisibleCount:
 						params.resolveInitialSectionVisibleCount,
 					clampVisibleCount: params.clampVisibleCount,
+					resolveItemCardModel,
 				}),
 			);
 			previousSections = sections;
 			previousVisibleCounts = sectionVisibleCounts;
 			previousLayout = layout;
+			previousCardModelRevision = cardModelRevision;
+			previousResolveItemCardModel = resolveItemCardModel;
 			previousRowModel = rowModel;
 			return rowModel;
 		},
@@ -139,6 +165,8 @@ export function createTwoHopCompiledPlanCache(params: {
 			previousSections = undefined;
 			previousVisibleCounts = undefined;
 			previousLayout = undefined;
+			previousCardModelRevision = undefined;
+			previousResolveItemCardModel = undefined;
 			previousRowModel = undefined;
 			if (process.env.NODE_ENV !== "production") {
 				recordCCLDevMeasurement("twoHop.compiledPlanCache.invalidate");

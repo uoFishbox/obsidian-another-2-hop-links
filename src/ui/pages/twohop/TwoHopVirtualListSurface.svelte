@@ -20,6 +20,7 @@
 		TwoHopCardPresentationState,
 		TwoHopRenderCellSnapshot,
 	} from "./twoHopCellBinding";
+	import type { CardRenderModel } from "ui/components/items/cardRenderModel";
 
 	interface Props {
 		sections: readonly SectionRenderDescriptor<
@@ -33,6 +34,11 @@
 			item: TwoHopVirtualListItem,
 		) => ItemInteractionDescriptor | null;
 		interactionDescriptorRevision?: unknown;
+		cardModelRevision?: unknown;
+		resolveItemCardModel?: (
+			item: TwoHopVirtualListItem,
+			presentation: TwoHopCardPresentationState,
+		) => CardRenderModel;
 		renderHeader: Snippet<
 			[
 				{
@@ -53,6 +59,7 @@
 				number,
 				string,
 				TwoHopCardPresentationState,
+				CardRenderModel | null,
 			]
 		>;
 	}

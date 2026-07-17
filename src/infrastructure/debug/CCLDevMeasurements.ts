@@ -36,6 +36,9 @@ export type CCLDevMeasurementName =
 	| "twoHop.rowModelCache.miss.visibleCountsSemanticallySame"
 	| "twoHop.rowModelCache.miss.layout"
 	| "twoHop.rowModelCache.miss.layoutSemanticallySame"
+	| "twoHop.cardRenderModelCache.hit"
+	| "twoHop.cardRenderModelCache.miss"
+	| "twoHop.cardRenderModelCache.invalidate"
 	| "virtualList.scheduler.animationFrame"
 	| "virtualList.postPaintScheduler.animationFrame"
 	| "virtualScroll.measurementMarker.animationFrame"
@@ -86,6 +89,9 @@ export const CCL_DEV_MEASUREMENT_NAMES: readonly CCLDevMeasurementName[] = [
 	"twoHop.rowModelCache.miss.visibleCountsSemanticallySame",
 	"twoHop.rowModelCache.miss.layout",
 	"twoHop.rowModelCache.miss.layoutSemanticallySame",
+	"twoHop.cardRenderModelCache.hit",
+	"twoHop.cardRenderModelCache.miss",
+	"twoHop.cardRenderModelCache.invalidate",
 	"virtualList.scheduler.animationFrame",
 	"virtualList.postPaintScheduler.animationFrame",
 	"virtualScroll.measurementMarker.animationFrame",

@@ -24,6 +24,7 @@ function appendCompiledCell(
 	cells: CompiledTwoHopCell[],
 	logicalCell: VirtualListLogicalCell<TwoHopVirtualListItem>,
 	descriptor: CompileTwoHopViewPlanParams["sections"][number],
+	params: CompileTwoHopViewPlanParams,
 ): void {
 	const identity = getViewPlanRenderBodyIdentityFields(logicalCell, descriptor);
 	const staticState =
@@ -38,8 +39,15 @@ function appendCompiledCell(
 								descriptor.sectionId)
 							: null,
 				};
+	const cardModel =
+		logicalCell.kind === "item" &&
+		staticState.presentation &&
+		params.resolveItemCardModel
+			? params.resolveItemCardModel(logicalCell.item, staticState.presentation)
+			: null;
 	cells.push({
 		...staticState,
+		cardModel,
 		logicalCell,
 		logicalKey: logicalCell.key,
 		renderBodyKey: resolveStableViewPlanRenderBodyKey({
@@ -130,6 +138,7 @@ export function compileTwoHopViewPlan(
 				key: logicalCellKey(`${sectionIdPrefix}__header`),
 			},
 			descriptor,
+			params,
 		);
 		for (let itemIndex = 0; itemIndex < visibleCount; itemIndex += 1) {
 			const item = preparedItems[itemIndex];
@@ -144,6 +153,7 @@ export function compileTwoHopViewPlan(
 					itemIndex,
 				},
 				descriptor,
+				params,
 			);
 		}
 		if (showLoadMore) {
@@ -154,6 +164,7 @@ export function compileTwoHopViewPlan(
 					key: logicalCellKey(`${sectionIdPrefix}__load-more`),
 				},
 				descriptor,
+				params,
 			);
 		}
 
