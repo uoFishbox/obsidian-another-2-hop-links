@@ -135,8 +135,10 @@ export function createTwoHopPreviewHydrator(
 		const generation = slot.generation;
 		const identity = slot.cardModel?.previewActivationIdentity ?? file.path;
 		const abortController = new AbortController();
+		const abortRequest = () => abortController.abort();
+		slot.abortPreviewRequest?.();
 		slot.previewStatus = "loading";
-		slot.disposePreview = () => abortController.abort();
+		slot.abortPreviewRequest = abortRequest;
 		stats.requested += 1;
 
 		try {
@@ -157,18 +159,17 @@ export function createTwoHopPreviewHydrator(
 				abortController.signal,
 				params.app,
 				params.sourcePath ?? file.path,
+				() => isCurrent(slot, generation, identity),
 			);
 			if (!isCurrent(slot, generation, identity)) {
 				disposeRendered?.();
-				slot.previewHost.replaceChildren();
 				stats.staleCompletions += 1;
 				return;
 			}
+			slot.disposePreview?.();
 			slot.previewStatus = "ready";
-			slot.disposePreview = () => {
-				abortController.abort();
-				disposeRendered?.();
-			};
+			slot.disposePreview = disposeRendered ?? null;
+			slot.abortPreviewRequest = null;
 			stats.committed += 1;
 		} catch (error) {
 			if (!abortController.signal.aborted) {
@@ -176,7 +177,9 @@ export function createTwoHopPreviewHydrator(
 			}
 			if (slot.generation === generation) {
 				slot.previewStatus = "empty";
-				slot.disposePreview = null;
+				if (slot.abortPreviewRequest === abortRequest) {
+					slot.abortPreviewRequest = null;
+				}
 			}
 		}
 	}
@@ -200,6 +203,8 @@ export function createTwoHopPreviewHydrator(
 		if (idleTimer) clearTimer(idleTimer);
 		for (const row of params.getRows()) {
 			for (const slot of row.cells) {
+				slot.abortPreviewRequest?.();
+				slot.abortPreviewRequest = null;
 				slot.disposePreview?.();
 				slot.disposePreview = null;
 				slot.previewStatus = "empty";
@@ -253,14 +258,16 @@ async function commitPreview(
 	signal: AbortSignal,
 	app: App | undefined,
 	sourcePath: string,
+	canCommit: () => boolean,
 ): Promise<(() => void) | undefined> {
-	if (signal.aborted) return;
+	if (signal.aborted || !canCommit()) return;
 	const ownerDocument = host.ownerDocument;
 	const container = ownerDocument.createElement("div");
 	container.className = `cosense-card-links__box-preview cosense-card-links__box-preview--${preview.type}`;
 
 	switch (preview.type) {
 		case "empty":
+			if (!canCommit()) return;
 			host.replaceChildren();
 			return;
 		case "text":
@@ -279,7 +286,7 @@ async function commitPreview(
 					component,
 					{ signal },
 				);
-				if (signal.aborted) {
+				if (signal.aborted || !canCommit()) {
 					component.unload();
 					return;
 				}
@@ -297,7 +304,7 @@ async function commitPreview(
 			const component = new Component();
 			component.load();
 			await preview.render(container, component, signal);
-			if (signal.aborted) {
+			if (signal.aborted || !canCommit()) {
 				component.unload();
 				return;
 			}
@@ -306,7 +313,7 @@ async function commitPreview(
 		}
 	}
 
-	if (!signal.aborted) host.replaceChildren(container);
+	if (!signal.aborted && canCommit()) host.replaceChildren(container);
 	return;
 }
 

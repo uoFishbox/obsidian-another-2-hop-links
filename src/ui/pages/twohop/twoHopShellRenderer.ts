@@ -53,6 +53,12 @@ export function createTwoHopShellRenderer(params: TwoHopShellRendererParams) {
 	): void {
 		const identity = resolveCellIdentity(cell, snapshot);
 		const revisionChanged = slot.renderRevision !== renderRevision;
+		const previousPreviewFilePath = slot.cardModel?.targetFile?.path;
+		const preservePreview =
+			revisionChanged &&
+			slot.logicalIdentity === identity &&
+			cell.kind === "item" &&
+			previousPreviewFilePath !== undefined;
 		const retainedRichShell =
 			slot.rich && slot.logicalIdentity === identity && !revisionChanged;
 		if (retainedRichShell) {
@@ -61,7 +67,7 @@ export function createTwoHopShellRenderer(params: TwoHopShellRendererParams) {
 			slot.cell.style.visibility = "visible";
 			return;
 		}
-		prepareSlot(slot, cell, snapshot, revisionChanged);
+		prepareSlot(slot, cell, snapshot, revisionChanged, preservePreview);
 		slot.renderRevision = renderRevision;
 		slot.rich = true;
 		slot.root.classList.remove("is-skeleton");
@@ -145,6 +151,12 @@ export function createTwoHopShellRenderer(params: TwoHopShellRendererParams) {
 		slot.title.className = "cosense-card-links__box-title";
 		slot.titleWrapper.className = "cosense-card-links__box-title-wrapper";
 		slot.cardModel = model;
+		if (
+			preservePreview &&
+			model?.targetFile?.path !== previousPreviewFilePath
+		) {
+			discardPreview(slot);
+		}
 		slot.title.textContent = model?.title ?? cell.item.virtualKey;
 		slot.meta.textContent = visibleExtension ?? "";
 		slot.root.setAttribute("aria-label", model?.ariaLabel ?? slot.title.textContent);
@@ -182,15 +194,20 @@ function prepareSlot(
 	cell: TwoHopResolvedCell | null,
 	snapshot: TwoHopSnapshot,
 	forceRefresh = false,
+	preservePreview = false,
 ): void {
 	const identity = cell ? resolveCellIdentity(cell, snapshot) : null;
 	if (slot.logicalIdentity !== identity || forceRefresh) {
-		slot.disposePreview?.();
-		slot.disposePreview = null;
+		slot.abortPreviewRequest?.();
+		slot.abortPreviewRequest = null;
+		if (!preservePreview) {
+			slot.disposePreview?.();
+			slot.disposePreview = null;
+			slot.previewHost.replaceChildren();
+		}
 		slot.logicalIdentity = identity;
 		slot.generation += 1;
 		slot.previewGeneration += 1;
-		slot.previewHost.replaceChildren();
 		slot.previewStatus = "empty";
 		slot.cardModel = null;
 	}
@@ -208,6 +225,15 @@ function prepareSlot(
 	delete slot.root.dataset.twoHopHeaderSection;
 	delete slot.root.dataset.directory;
 	applyCustomClassName(slot.root, null);
+}
+
+function discardPreview(slot: TwoHopCardShellSlot): void {
+	slot.abortPreviewRequest?.();
+	slot.abortPreviewRequest = null;
+	slot.disposePreview?.();
+	slot.disposePreview = null;
+	slot.previewHost.replaceChildren();
+	slot.previewStatus = "empty";
 }
 
 function resolveCellIdentity(

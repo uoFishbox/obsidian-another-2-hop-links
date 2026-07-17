@@ -138,7 +138,49 @@ describe("twoHopPreviewHydrator", () => {
 		hydrator.dispose();
 	});
 
-	it("passes the index preview revision to the preview cache", () => {
+	it("keeps the previous preview visible until its replacement is ready", async () => {
+		const pool = createReadyPool();
+		const slot = pool.rows[0].cells[0];
+		const previousPreview = document.createElement("strong");
+		previousPreview.textContent = "Previous";
+		slot.previewHost.append(previousPreview);
+		const disposePrevious = vi.fn();
+		slot.disposePreview = disposePrevious;
+		pool.rows[0].cells[1].previewStatus = "ready";
+		let resolvePreview!: (value: { type: "text"; content: string }) => void;
+		const previewPromise = new Promise<{ type: "text"; content: string }>(
+			(resolve) => {
+				resolvePreview = resolve;
+			},
+		);
+		const hydrator = createTwoHopPreviewHydrator({
+			getRows: () => pool.rows,
+			getPreview: () => previewPromise,
+			setTimer: () => 1,
+			clearTimer: () => {},
+		});
+		hydrator.notifyViewport({
+			visibleStart: 0,
+			visibleEnd: 1,
+			scrollActive: false,
+			velocityRowsPerMs: 0,
+			criticalWorkPending: false,
+		});
+
+		expect(hydrator.hydrateNext("visible-idle")).toBe(true);
+		expect(slot.previewHost.textContent).toBe("Previous");
+		expect(disposePrevious).not.toHaveBeenCalled();
+
+		resolvePreview({ type: "text", content: "<em>Updated</em>" });
+		await Promise.resolve();
+		await Promise.resolve();
+
+		expect(slot.previewHost.querySelector("em")?.textContent).toBe("Updated");
+		expect(disposePrevious).toHaveBeenCalledOnce();
+		hydrator.dispose();
+	});
+
+	it("passes the index preview revision to the preview cache", async () => {
 		const pool = createReadyPool();
 		pool.rows[0].cells[0].cardModel = createModel("notes/0.md", "3:7:0");
 		pool.rows[0].cells[1].previewStatus = "ready";
@@ -165,6 +207,8 @@ describe("twoHopPreviewHydrator", () => {
 
 		expect(hydrator.hydrateNext("visible-idle")).toBe(true);
 		expect(getPreview.mock.calls[0]?.[2]?.cacheRevision).toBe("3:7:0");
+		await Promise.resolve();
+		await Promise.resolve();
 		hydrator.dispose();
 	});
 });

@@ -5,6 +5,7 @@ import { createTwoHopSnapshot } from "../twoHopSnapshot";
 import { createTwoHopGeometry, resolveTwoHopCell } from "../twoHopGeometry";
 import type { TwoHopVirtualSectionDescriptor } from "../twoHopVirtualListModel";
 import type { TwoHopVirtualListItem } from "../twoHopVirtualListModel";
+import type { TFile } from "obsidian";
 
 function createFixture() {
 	const item = {
@@ -104,7 +105,10 @@ describe("twoHop imperative DOM pool", () => {
 		const pool = createTwoHopDomPool({ content, rowCapacity: 1, columns: 2 });
 		const resolveItemCardModel = vi.fn(() => ({
 			item: snapshot.sections[0].items[0].item,
-			targetFile: null,
+			targetFile: {
+				path: "notes/missing.md",
+				extension: "md",
+			} as TFile,
 			title: "Resolved title",
 			ariaLabel: "Open Resolved title",
 			className: null,
@@ -117,7 +121,7 @@ describe("twoHop imperative DOM pool", () => {
 			searchScope: "title-only" as const,
 			contentPreview: undefined,
 			previewRefreshToken: 0,
-			previewActivationIdentity: undefined,
+			previewActivationIdentity: "preview:notes/missing.md",
 		}));
 		const renderer = createTwoHopShellRenderer({ resolveItemCardModel });
 		const cell = resolveTwoHopCell(snapshot, geometry, 0, 1);
@@ -134,10 +138,10 @@ describe("twoHop imperative DOM pool", () => {
 		renderer.renderShell(slot, cell, snapshot);
 
 		expect(resolveItemCardModel).toHaveBeenCalledTimes(2);
-		expect(disposePreview).toHaveBeenCalledOnce();
+		expect(disposePreview).not.toHaveBeenCalled();
 		expect(slot.generation).toBe(generation + 1);
 		expect(slot.previewStatus).toBe("empty");
-		expect(slot.previewHost.childElementCount).toBe(0);
+		expect(slot.previewHost.childElementCount).toBe(1);
 	});
 
 	it("renders section headers as title and icon without a visible count", () => {

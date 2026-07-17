@@ -18,6 +18,7 @@ export interface TwoHopCardShellSlot {
 	previewStatus: "empty" | "queued" | "loading" | "ready";
 	cardModel: CardRenderModel | null;
 	disposePreview: (() => void) | null;
+	abortPreviewRequest: (() => void) | null;
 	rich: boolean;
 }
 
@@ -108,6 +109,7 @@ export function createTwoHopDomPool(params: {
 				previewStatus: "empty",
 				cardModel: null,
 				disposePreview: null,
+				abortPreviewRequest: null,
 				rich: false,
 			});
 			nextCellSlotIndex += 1;
