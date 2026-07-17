@@ -224,12 +224,14 @@ export function createTwoHopViewportController(
 
 	function createSnapshot(
 		visibleCounts: Readonly<Record<string, number>>,
+		previousSnapshot?: TwoHopSnapshot,
 	): TwoHopSnapshot {
 		return createTwoHopSnapshot({
 			sections,
 			visibleCounts,
 			initialVisibleCount: params.initialVisibleCount ?? Number.POSITIVE_INFINITY,
 			revision,
+			previousSnapshot,
 		});
 	}
 
@@ -442,12 +444,16 @@ export function createTwoHopViewportController(
 		else previewHydrator?.notifyShellsChanged();
 	}
 
-	function rebuildData(anchorSectionIndex = -1): void {
+	function rebuildData(anchorSectionIndex = -1, reusePreviousSnapshot = false): void {
 		const localScrollOffset = Math.max(0, readScrollTop() - cachedSectionTop);
 		const previousGeometry = geometry;
+		const previousSnapshot = snapshot;
 		const visibleCounts =
 			pagination.resolveForInput(sections).snapshot.visibleCounts;
-		snapshot = createSnapshot(visibleCounts);
+		snapshot = createSnapshot(
+			visibleCounts,
+			reusePreviousSnapshot ? previousSnapshot : undefined,
+		);
 		geometry = createTwoHopGeometry(snapshot, layout);
 		pool.setContentHeight(geometry.totalHeight);
 		if (
@@ -481,7 +487,7 @@ export function createTwoHopViewportController(
 		const paginationKey = getSectionPaginationKey(section);
 		const result = pagination.loadMore(paginationKey, section.loadedCount);
 		if (!result.changed) return;
-		rebuildData(sectionIndex);
+		rebuildData(sectionIndex, true);
 	}
 
 	function resolveInteractionDescriptor(

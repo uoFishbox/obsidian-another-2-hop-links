@@ -35,6 +35,7 @@ function createSection(
 		totalCount: count,
 		loadedCount: count,
 		getItems: () => items,
+		getItem: (index) => items[index],
 		headerProps: {},
 	};
 }
@@ -205,6 +206,8 @@ describe("twoHopViewportController", () => {
 		}));
 		const first = createSection("first", 8);
 		const second = createSection("second", 8);
+		const firstGetItem = vi.spyOn(first, "getItem");
+		const secondGetItem = vi.spyOn(second, "getItem");
 		const resolveItemCardModel = vi.fn(
 			(item: TwoHopVirtualListItem, presentation) => ({
 				item: item.item,
@@ -254,6 +257,8 @@ describe("twoHopViewportController", () => {
 			secondItems.has(item),
 		).length;
 		const scrollTopBefore = scroller.scrollTop;
+		firstGetItem.mockClear();
+		secondGetItem.mockClear();
 
 		controller.loadMore("first");
 
@@ -265,6 +270,8 @@ describe("twoHopViewportController", () => {
 		);
 		const secondHeaderRowAfter = secondHeaderAfter?.parentElement;
 		expect(scroller.scrollTop).toBe(scrollTopBefore + 110);
+		expect(firstGetItem.mock.calls.map(([index]) => index)).toEqual([1, 2]);
+		expect(secondGetItem).not.toHaveBeenCalled();
 		expect(secondCallsAfter).toBe(secondCallsBefore);
 		expect(secondHeaderRowAfter?.dataset.cclRowIndex).toBe("3");
 		expect(secondHeaderRowAfter?.style.transform).toContain("340px");

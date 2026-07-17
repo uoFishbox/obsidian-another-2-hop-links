@@ -28,6 +28,7 @@ function createFixture() {
 		totalCount: 3,
 		loadedCount: 3,
 		getItems: () => items,
+		getItem: (index) => items[index],
 		headerProps: {},
 	} satisfies TwoHopVirtualSectionDescriptor;
 	const snapshot = createTwoHopSnapshot({

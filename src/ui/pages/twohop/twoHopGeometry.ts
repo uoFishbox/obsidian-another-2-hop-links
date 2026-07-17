@@ -80,12 +80,12 @@ export function createTwoHopGeometry(
 
 	for (let sectionIndex = 0; sectionIndex < sectionCount; sectionIndex += 1) {
 		const section = snapshot.sections[sectionIndex];
-		const cellCount =
-			1 + section.visibleItemCount + (section.showLoadMore ? 1 : 0);
+		const cellCount = 1 + section.visibleItemCount + (section.showLoadMore ? 1 : 0);
 		const sectionRowCount = Math.ceil(cellCount / columns);
 		const contentHeight =
 			sectionRowCount > 0
-				? sectionRowCount * rowHeight + (sectionRowCount - 1) * (rowStride - rowHeight)
+				? sectionRowCount * rowHeight +
+					(sectionRowCount - 1) * (rowStride - rowHeight)
 				: 0;
 		const sectionHeight = contentHeight + sectionMarginBottom;
 
@@ -162,7 +162,7 @@ export function resolveTwoHopCellInto(
 	const visibleItemOffset = cellIndex - 1;
 	if (visibleItemOffset < section.visibleItemCount) {
 		const itemIndex = section.visibleItemSourceIndexes[visibleItemOffset];
-		const item = section.items[itemIndex];
+		const item = section.visibleItems[visibleItemOffset];
 		if (!item) return null;
 		target.kind = "item";
 		target.sectionIndex = sectionIndex;
@@ -197,7 +197,10 @@ export function resolveTwoHopVisibleRows(
 
 	const start = resolveRowAtOffset(geometry, Math.max(0, scrollOffset));
 	const lastOffset = Math.max(0, scrollOffset + viewportHeight - 1);
-	const end = Math.min(geometry.rowCount, resolveRowAtOffset(geometry, lastOffset) + 1);
+	const end = Math.min(
+		geometry.rowCount,
+		resolveRowAtOffset(geometry, lastOffset) + 1,
+	);
 	return { start, end };
 }
 

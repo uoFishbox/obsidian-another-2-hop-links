@@ -6,7 +6,7 @@ import type {
 
 export interface TwoHopSectionSnapshot {
 	readonly descriptor: TwoHopVirtualSectionDescriptor;
-	readonly items: readonly TwoHopVirtualListItem[];
+	readonly visibleItems: readonly TwoHopVirtualListItem[];
 	readonly visibleCount: number;
 	readonly visibleItemCount: number;
 	readonly visibleItemSourceIndexes: Uint32Array;
@@ -23,6 +23,8 @@ export interface CreateTwoHopSnapshotParams {
 	readonly visibleCounts: Readonly<Record<string, number>>;
 	readonly initialVisibleCount: number;
 	readonly revision?: unknown;
+	/** Reuses materialized prefixes when the descriptor and revision are unchanged. */
+	readonly previousSnapshot?: TwoHopSnapshot;
 }
 
 /**
@@ -33,34 +35,68 @@ export function createTwoHopSnapshot(
 	params: CreateTwoHopSnapshotParams,
 ): TwoHopSnapshot {
 	const sections: TwoHopSectionSnapshot[] = [];
+	const previousSnapshot = params.previousSnapshot;
+	const reusablePreviousSections =
+		previousSnapshot && previousSnapshot.revision === params.revision
+			? previousSnapshot.sections
+			: [];
+	const previousSections = new Map(
+		reusablePreviousSections.map(
+			(section) => [section.descriptor, section] as const,
+		),
+	);
 
 	for (const descriptor of params.sections) {
-		const items = descriptor.getItems();
 		const paginationKey = getSectionPaginationKey(descriptor);
 		const requestedVisibleCount =
 			params.visibleCounts[paginationKey] ?? params.initialVisibleCount;
 		const visibleCount = clampVisibleCount(descriptor, requestedVisibleCount);
-		const sourceIndexes: number[] = [];
+		const previousSection = previousSections.get(descriptor);
 
-		for (let sourceIndex = 0; sourceIndex < visibleCount; sourceIndex += 1) {
-			if (items[sourceIndex]) {
-				sourceIndexes.push(sourceIndex);
-			}
-		}
-
-		sections.push({
-			descriptor,
-			items,
-			visibleCount,
-			visibleItemCount: sourceIndexes.length,
-			visibleItemSourceIndexes: Uint32Array.from(sourceIndexes),
-			showLoadMore: visibleCount < descriptor.loadedCount,
-		});
+		sections.push(createSectionSnapshot(descriptor, visibleCount, previousSection));
 	}
 
 	return {
 		revision: params.revision,
 		sections,
+	};
+}
+
+function createSectionSnapshot(
+	descriptor: TwoHopVirtualSectionDescriptor,
+	visibleCount: number,
+	previousSection: TwoHopSectionSnapshot | undefined,
+): TwoHopSectionSnapshot {
+	if (previousSection?.visibleCount === visibleCount) {
+		return previousSection;
+	}
+
+	const canExtendPrevious =
+		previousSection !== undefined && previousSection.visibleCount < visibleCount;
+	const visibleItems = canExtendPrevious ? [...previousSection.visibleItems] : [];
+	const sourceIndexes = canExtendPrevious
+		? Array.from(previousSection.visibleItemSourceIndexes)
+		: [];
+	const startSourceIndex = canExtendPrevious ? previousSection.visibleCount : 0;
+
+	for (
+		let sourceIndex = startSourceIndex;
+		sourceIndex < visibleCount;
+		sourceIndex += 1
+	) {
+		const item = descriptor.getItem(sourceIndex);
+		if (!item) continue;
+		visibleItems.push(item);
+		sourceIndexes.push(sourceIndex);
+	}
+
+	return {
+		descriptor,
+		visibleItems,
+		visibleCount,
+		visibleItemCount: sourceIndexes.length,
+		visibleItemSourceIndexes: Uint32Array.from(sourceIndexes),
+		showLoadMore: visibleCount < descriptor.loadedCount,
 	};
 }
 

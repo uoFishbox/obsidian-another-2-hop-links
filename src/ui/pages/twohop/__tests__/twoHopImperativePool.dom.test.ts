@@ -30,6 +30,7 @@ function createFixture() {
 		totalCount: 4,
 		loadedCount: 4,
 		getItems: () => [item],
+		getItem: (index) => (index === 0 ? item : undefined),
 		headerProps: {},
 	} satisfies TwoHopVirtualSectionDescriptor;
 	const snapshot = createTwoHopSnapshot({
@@ -67,7 +68,7 @@ describe("twoHop imperative DOM pool", () => {
 		const content = document.createElement("div");
 		const pool = createTwoHopDomPool({ content, rowCapacity: 2, columns: 2 });
 		const resolveItemCardModel = vi.fn(() => ({
-			item: snapshot.sections[0].items[0].item,
+			item: snapshot.sections[0].visibleItems[0].item,
 			targetFile: null,
 			title: "Resolved title",
 			ariaLabel: "Open Resolved title",
@@ -107,7 +108,7 @@ describe("twoHop imperative DOM pool", () => {
 		const content = document.createElement("div");
 		const pool = createTwoHopDomPool({ content, rowCapacity: 1, columns: 2 });
 		const resolveItemCardModel = vi.fn(() => ({
-			item: snapshot.sections[0].items[0].item,
+			item: snapshot.sections[0].visibleItems[0].item,
 			targetFile: {
 				path: "notes/missing.md",
 				extension: "md",
@@ -153,7 +154,7 @@ describe("twoHop imperative DOM pool", () => {
 		const pool = createTwoHopDomPool({ content, rowCapacity: 1, columns: 2 });
 		let previewActivationIdentity = "preview:notes/missing.md:query-a";
 		const resolveItemCardModel = vi.fn(() => ({
-			item: snapshot.sections[0].items[0].item,
+			item: snapshot.sections[0].visibleItems[0].item,
 			targetFile: {
 				path: "notes/missing.md",
 				extension: "md",

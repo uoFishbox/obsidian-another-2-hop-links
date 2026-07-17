@@ -1,5 +1,4 @@
-import { describe, expect, it } from "vitest";
-import type { SectionRenderDescriptor } from "ui/components/sections/types";
+import { describe, expect, it, vi } from "vitest";
 import {
 	createTwoHopGeometry,
 	resolveTwoHopCell,
@@ -9,7 +8,7 @@ import {
 import { createTwoHopSnapshot } from "../twoHopSnapshot";
 import type {
 	TwoHopVirtualListItem,
-	TwoHopVirtualListSection,
+	TwoHopVirtualSectionDescriptor,
 } from "../twoHopVirtualListModel";
 
 const createItem = (key: string): TwoHopVirtualListItem => ({
@@ -23,7 +22,7 @@ function createSection(
 	sectionId: string,
 	items: readonly TwoHopVirtualListItem[],
 	loadedCount = items.length,
-): SectionRenderDescriptor<TwoHopVirtualListItem, TwoHopVirtualListSection> {
+): TwoHopVirtualSectionDescriptor {
 	return {
 		section: {
 			kind: "new-links-section",
@@ -39,6 +38,7 @@ function createSection(
 		totalCount: loadedCount,
 		loadedCount,
 		getItems: () => items,
+		getItem: (index) => items[index],
 		headerProps: {},
 	};
 }
@@ -53,6 +53,39 @@ const layout = {
 };
 
 describe("twoHopSnapshot geometry", () => {
+	it("materializes only the visible range and extends it incrementally", () => {
+		const items = Array.from({ length: 10 }, (_, index) =>
+			createItem(String(index)),
+		);
+		const descriptor = createSection("first", items);
+		const getItems = vi.spyOn(descriptor, "getItems");
+		const getItem = vi.spyOn(descriptor, "getItem");
+		const initialSnapshot = createTwoHopSnapshot({
+			sections: [descriptor],
+			visibleCounts: { first: 2 },
+			initialVisibleCount: 2,
+		});
+
+		expect(getItems).not.toHaveBeenCalled();
+		expect(getItem.mock.calls.map(([index]) => index)).toEqual([0, 1]);
+		expect(initialSnapshot.sections[0].visibleItems).toEqual(items.slice(0, 2));
+
+		getItem.mockClear();
+		const expandedSnapshot = createTwoHopSnapshot({
+			sections: [descriptor],
+			visibleCounts: { first: 5 },
+			initialVisibleCount: 2,
+			previousSnapshot: initialSnapshot,
+		});
+
+		expect(getItems).not.toHaveBeenCalled();
+		expect(getItem.mock.calls.map(([index]) => index)).toEqual([2, 3, 4]);
+		expect(expandedSnapshot.sections[0].visibleItems).toEqual(items.slice(0, 5));
+		expect(expandedSnapshot.sections[0].visibleItemSourceIndexes).toEqual(
+			new Uint32Array([0, 1, 2, 3, 4]),
+		);
+	});
+
 	it("resolves header, sparse items, and load-more without compiled cells", () => {
 		const sparseItems: TwoHopVirtualListItem[] = [
 			createItem("a"),

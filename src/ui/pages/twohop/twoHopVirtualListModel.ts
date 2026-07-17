@@ -85,7 +85,9 @@ export type TwoHopVirtualListItem =
 export type TwoHopVirtualSectionDescriptor = SectionRenderDescriptor<
 	TwoHopVirtualListItem,
 	TwoHopVirtualListSection
->;
+> & {
+	readonly getItem: (index: number) => TwoHopVirtualListItem | undefined;
+};
 
 export const createTaggedNoteSectionItemKey = (
 	item: ViewItem,
