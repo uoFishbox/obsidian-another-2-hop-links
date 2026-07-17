@@ -16,7 +16,7 @@
 		createTwoHopInteractionDescriptorRevision,
 		resolveTwoHopItemInteractionDescriptor,
 	} from "./twoHopInteractionDescriptorRevision";
-	import type { TwoHopCardPresentationState } from "./twoHopCellBinding";
+	import type { TwoHopCardPresentationState } from "./twoHopCellStaticState";
 	import {
 		createTwoHopCardRenderModelCache,
 		type TwoHopCardModelRevision,

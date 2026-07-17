@@ -7,43 +7,12 @@ export type CCLDevMeasurementName =
 	| "virtualGrid.rowShellCreated"
 	| "virtualGrid.cellShellCreated"
 	| "virtualGrid.cellShellRebound"
-	| "twoHop.rowWindow.apply"
-	| "twoHop.rowWindow.apply.changed"
-	| "twoHop.buildMountedRows"
-	| "twoHop.reboundRowSlot"
-	| "twoHop.reboundCellSlot"
-	| "twoHop.scalarKernel.mountedRangeCommit"
-	| "twoHop.scalarKernel.rowShellCreated"
-	| "twoHop.scalarKernel.cellShellCreated"
-	| "twoHop.plan.compile"
-	| "twoHop.physicalPool.resize"
-	| "twoHop.binding.commit"
-	| "twoHop.rowFrame.commit"
-	| "residentWindow.hit"
-	| "residentWindow.refill"
-	| "residentWindow.emergencyBind"
-	| "residentWindow.distantJump"
 	| "virtualFrame.critical"
 	| "virtualFrame.postPaint"
 	| "virtualFrame.idle"
-	| "twoHop.itemBody.mount"
-	| "twoHop.interactionDescriptorCache.hit"
-	| "twoHop.interactionDescriptorCache.miss"
-	| "twoHop.interactionDescriptorCache.invalidate"
-	| "twoHop.compiledPlanCache.hit"
-	| "twoHop.compiledPlanCache.miss"
-	| "twoHop.compiledPlanCache.invalidate"
 	| "twoHop.sectionDescriptorIdentityCache.hit"
 	| "twoHop.sectionDescriptorIdentityCache.miss"
 	| "twoHop.sectionDescriptorIdentityCache.invalidate"
-	| "twoHop.rowModelCache.hit"
-	| "twoHop.rowModelCache.miss"
-	| "twoHop.rowModelCache.miss.firstResolve"
-	| "twoHop.rowModelCache.miss.sections"
-	| "twoHop.rowModelCache.miss.visibleCounts"
-	| "twoHop.rowModelCache.miss.visibleCountsSemanticallySame"
-	| "twoHop.rowModelCache.miss.layout"
-	| "twoHop.rowModelCache.miss.layoutSemanticallySame"
 	| "twoHop.cardRenderModelCache.hit"
 	| "twoHop.cardRenderModelCache.miss"
 	| "twoHop.cardRenderModelCache.invalidate"
@@ -55,7 +24,6 @@ export type CCLDevMeasurementName =
 	| "preview.domCommitScheduler.animationFrame"
 	| "preview.activationDuringScroll"
 	| "preview.domCommitDuringScroll"
-	| "component.TwoHopVirtualItemCard.reevaluate"
 	| "component.ViewItemCard.reevaluate"
 	| "component.CardPreviewGate.reevaluate";
 
@@ -68,43 +36,12 @@ export const CCL_DEV_MEASUREMENT_NAMES: readonly CCLDevMeasurementName[] = [
 	"virtualGrid.rowShellCreated",
 	"virtualGrid.cellShellCreated",
 	"virtualGrid.cellShellRebound",
-	"twoHop.rowWindow.apply",
-	"twoHop.rowWindow.apply.changed",
-	"twoHop.buildMountedRows",
-	"twoHop.reboundRowSlot",
-	"twoHop.reboundCellSlot",
-	"twoHop.scalarKernel.mountedRangeCommit",
-	"twoHop.scalarKernel.rowShellCreated",
-	"twoHop.scalarKernel.cellShellCreated",
-	"twoHop.plan.compile",
-	"twoHop.physicalPool.resize",
-	"twoHop.binding.commit",
-	"twoHop.rowFrame.commit",
-	"residentWindow.hit",
-	"residentWindow.refill",
-	"residentWindow.emergencyBind",
-	"residentWindow.distantJump",
 	"virtualFrame.critical",
 	"virtualFrame.postPaint",
 	"virtualFrame.idle",
-	"twoHop.itemBody.mount",
-	"twoHop.interactionDescriptorCache.hit",
-	"twoHop.interactionDescriptorCache.miss",
-	"twoHop.interactionDescriptorCache.invalidate",
-	"twoHop.compiledPlanCache.hit",
-	"twoHop.compiledPlanCache.miss",
-	"twoHop.compiledPlanCache.invalidate",
 	"twoHop.sectionDescriptorIdentityCache.hit",
 	"twoHop.sectionDescriptorIdentityCache.miss",
 	"twoHop.sectionDescriptorIdentityCache.invalidate",
-	"twoHop.rowModelCache.hit",
-	"twoHop.rowModelCache.miss",
-	"twoHop.rowModelCache.miss.firstResolve",
-	"twoHop.rowModelCache.miss.sections",
-	"twoHop.rowModelCache.miss.visibleCounts",
-	"twoHop.rowModelCache.miss.visibleCountsSemanticallySame",
-	"twoHop.rowModelCache.miss.layout",
-	"twoHop.rowModelCache.miss.layoutSemanticallySame",
 	"twoHop.cardRenderModelCache.hit",
 	"twoHop.cardRenderModelCache.miss",
 	"twoHop.cardRenderModelCache.invalidate",
@@ -116,7 +53,6 @@ export const CCL_DEV_MEASUREMENT_NAMES: readonly CCLDevMeasurementName[] = [
 	"preview.domCommitScheduler.animationFrame",
 	"preview.activationDuringScroll",
 	"preview.domCommitDuringScroll",
-	"component.TwoHopVirtualItemCard.reevaluate",
 	"component.ViewItemCard.reevaluate",
 	"component.CardPreviewGate.reevaluate",
 ];
@@ -183,7 +119,7 @@ export function resetCCLDevMeasurements(): void {
 }
 
 export function markCCLComponentReevaluation(
-	name: "TwoHopVirtualItemCard" | "ViewItemCard" | "CardPreviewGate",
+	name: "ViewItemCard" | "CardPreviewGate",
 ): string {
 	recordCCLDevMeasurement(`component.${name}.reevaluate`);
 	return "";
