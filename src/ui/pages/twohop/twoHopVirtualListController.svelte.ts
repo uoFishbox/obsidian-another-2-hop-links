@@ -13,9 +13,11 @@ import {
 	createTwoHopVirtualListMeasurementRuntime,
 } from "./twoHopVirtualListMeasurementRuntime.svelte";
 import { createTwoHopVirtualListMountedRuntime } from "./twoHopVirtualListMountedRuntime.svelte";
-import type { TwoHopMountedCell, TwoHopMountedRowSlice } from "./twoHopMountedTypes";
 import type { TwoHopSlotIdCell } from "./twoHopSlotId";
-import type { TwoHopRenderCellSnapshot } from "./twoHopCellBinding";
+import type {
+	TwoHopCellBinding,
+	TwoHopResidentCell,
+} from "./twoHopCellBinding";
 
 export type { TwoHopVirtualListSurfaceProps };
 
@@ -25,16 +27,16 @@ export interface TwoHopVirtualListController {
 	readonly observerRoot: HTMLElement | null;
 	readonly contentHeight: number;
 	readonly layout: ViewPlanLayoutMetrics;
-	readonly mountedRows: readonly TwoHopMountedRowSlice[];
+	readonly mountedRows: readonly TwoHopFixedRowSlotController[];
 	readonly rowSlotControllers: readonly TwoHopFixedRowSlotController[];
 	readonly getCellDataTestId:
 		| ((
-				cell: Pick<TwoHopRenderCellSnapshot, "cell" | "sectionId">,
+				binding: TwoHopCellBinding,
 		  ) => string | undefined)
 		| undefined;
 	readonly getMountedCellByInteractionId: (
 		interactionId: string,
-	) => TwoHopMountedCell | undefined;
+	) => TwoHopResidentCell | undefined;
 	readonly getItemActivationCandidateId: (cell: TwoHopSlotIdCell) => string;
 	loadMore(sectionId: string): void;
 	resolveNavigationTarget(
@@ -102,9 +104,9 @@ export function createTwoHopVirtualListController(
 			return mountedRuntime.rowSlotControllers;
 		},
 		getCellDataTestId: !IS_PROD
-			? (cell) =>
-					cell.cell.kind === "header"
-						? `section-block-${cell.sectionId}`
+			? (binding) =>
+					binding.compiledCell.logicalCell.kind === "header"
+						? `section-block-${binding.compiledCell.renderBodySectionId}`
 						: undefined
 			: undefined,
 		getMountedCellByInteractionId: mountedRuntime.getMountedCellByInteractionId,

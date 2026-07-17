@@ -150,27 +150,29 @@ function getMountedRow(
 }
 
 describe("TwoHop scalar scroll kernel", () => {
-	it("reads only render snapshot fields while creating a cell binding", () => {
+	it("creates a minimal binding that retains the compiled cell reference", () => {
 		const kernel = createTwoHopScalarScrollKernel({
 			initialRowModel: rowModel,
 			onStableVisibleRange() {},
 		});
 		applyRange(kernel, 0);
-		const sourceCell = kernel.mountedRows[0]?.cells[0];
-		expect(sourceCell).toBeDefined();
-		if (!sourceCell) return;
-		const logicalKeyGetter = vi.spyOn(sourceCell, "logicalKey", "get");
-		const renderSlotKeyGetter = vi.spyOn(sourceCell, "renderSlotKey", "get");
-		const rowTopGetter = vi.spyOn(sourceCell, "rowTop", "get");
-		const renderRevisionGetter = vi.spyOn(sourceCell, "renderBodyRevision", "get");
+		const sourceBinding = kernel.mountedRows[0]?.cells[0]?.binding;
+		expect(sourceBinding).toBeDefined();
+		if (!sourceBinding) return;
+		const binding = createTwoHopCellBinding({
+			compiledCell: sourceBinding.compiledCell,
+			logicalRowIndex: sourceBinding.logicalRowIndex,
+			columnIndex: sourceBinding.columnIndex,
+			epoch: 1,
+		});
 
-		const binding = createTwoHopCellBinding(sourceCell, 1);
-
-		expect(binding.logicalKey).toBe(sourceCell.key);
-		expect(logicalKeyGetter).not.toHaveBeenCalled();
-		expect(renderSlotKeyGetter).not.toHaveBeenCalled();
-		expect(rowTopGetter).not.toHaveBeenCalled();
-		expect(renderRevisionGetter).not.toHaveBeenCalled();
+		expect(binding.compiledCell).toBe(sourceBinding.compiledCell);
+		expect(Object.keys(binding)).toEqual([
+			"epoch",
+			"logicalRowIndex",
+			"columnIndex",
+			"compiledCell",
+		]);
 
 		kernel.dispose();
 	});
@@ -183,10 +185,10 @@ describe("TwoHop scalar scroll kernel", () => {
 
 		applyRange(kernel, 0, 1);
 
-		expect(kernel.getMountedCellByInteractionId("new-links")?.cell.kind).toBe(
+		expect(kernel.getMountedCellByInteractionId("new-links")?.binding.compiledCell.logicalCell.kind).toBe(
 			"header",
 		);
-		expect(kernel.getMountedCellByInteractionId("item:test:0")?.cell.kind).toBe(
+		expect(kernel.getMountedCellByInteractionId("item:test:0")?.binding.compiledCell.logicalCell.kind).toBe(
 			"item",
 		);
 
@@ -195,14 +197,14 @@ describe("TwoHop scalar scroll kernel", () => {
 		expect(kernel.getMountedCellByInteractionId("new-links")).toBeUndefined();
 		expect(kernel.getMountedCellByInteractionId("item:test:0")).toBeUndefined();
 		const reboundItem = getMountedRow(kernel, 3)?.cells.find(
-			(cell) => cell.cell.kind === "item",
+			(cell) => cell.binding?.compiledCell.logicalCell.kind === "item",
 		);
-		if (reboundItem?.cell.kind !== "item") return;
-		const reboundInteractionId = reboundItem.cell.item.interactionId;
+		if (reboundItem?.binding?.compiledCell.logicalCell.kind !== "item") return;
+		const reboundInteractionId = reboundItem.binding.compiledCell.logicalCell.item.interactionId;
 		expect(reboundInteractionId).toBeDefined();
 		if (!reboundInteractionId) return;
-		expect(kernel.getMountedCellByInteractionId(reboundInteractionId)).toBe(
-			reboundItem,
+		expect(kernel.getMountedCellByInteractionId(reboundInteractionId)?.binding).toBe(
+			reboundItem.binding,
 		);
 
 		kernel.dispose();
@@ -225,7 +227,7 @@ describe("TwoHop scalar scroll kernel", () => {
 		expect(activeRows.map((row) => row.cells.length)).toEqual([2, 2]);
 		expect(
 			activeRows.flatMap((row) =>
-				row.cells.map((cell) => cell.cell.kind),
+				row.cells.map((cell) => cell.binding?.compiledCell.logicalCell.kind),
 			),
 		).toEqual(["header", "item", "item", "load-more"]);
 		expect(
@@ -246,28 +248,30 @@ describe("TwoHop scalar scroll kernel", () => {
 		});
 		applyRange(kernel, 0, 1);
 		const fullRow = kernel.mountedRows[0];
-		const firstCell = fullRow?.cells[0];
+		const fullFrame = fullRow?.frame;
+		const firstBinding = fullFrame?.cells[0];
 		expect(fullRow?.cells).toHaveLength(2);
-		expect(firstCell).toBeDefined();
-		if (!fullRow || !firstCell) return;
+		expect(firstBinding).toBeDefined();
+		if (!fullFrame || !firstBinding) return;
 
 		const pool = createTwoHopFixedRowSlotPool();
-		pool.bindRow(fullRow);
-		expect(pool.controllers[0]?.cells.map((cell) => cell.active)).toEqual([
+		pool.setCapacity(1, 2);
+		pool.commit({ ...fullFrame, slotIndex: 0 });
+		expect(pool.controllers[0]?.cellControllers.map((cell) => cell.active)).toEqual([
 			true,
 			true,
 		]);
 
-		const cellsWithHole = [firstCell];
+		const cellsWithHole = [firstBinding];
 		cellsWithHole.length = 2;
-		pool.bindRow({ ...fullRow, cells: cellsWithHole });
-		expect(pool.controllers[0]?.cells.map((cell) => cell.active)).toEqual([
+		pool.commit({ ...fullFrame, slotIndex: 0, cells: cellsWithHole });
+		expect(pool.controllers[0]?.cellControllers.map((cell) => cell.active)).toEqual([
 			true,
 			false,
 		]);
 
-		pool.bindRow(fullRow);
-		expect(pool.controllers[0]?.cells.map((cell) => cell.active)).toEqual([
+		pool.commit({ ...fullFrame, slotIndex: 0 });
+		expect(pool.controllers[0]?.cellControllers.map((cell) => cell.active)).toEqual([
 			true,
 			true,
 		]);
@@ -282,28 +286,29 @@ describe("TwoHop scalar scroll kernel", () => {
 		});
 		applyRange(kernel, 0, 1);
 		const fullRow = kernel.mountedRows[0];
-		const firstCell = fullRow?.cells[0];
+		const fullFrame = fullRow?.frame;
+		const firstBinding = fullFrame?.cells[0];
 		expect(fullRow?.cells).toHaveLength(2);
-		expect(firstCell).toBeDefined();
-		if (!fullRow || !firstCell) return;
+		expect(firstBinding).toBeDefined();
+		if (!fullFrame || !firstBinding) return;
 
 		const pool = createTwoHopFixedRowSlotPool();
 		pool.setCapacity(1, 2);
-		const secondSlot = pool.controllers[0]?.cells[1];
-		pool.bindRow({ ...fullRow, cells: [firstCell] });
+		const secondSlot = pool.controllers[0]?.cellControllers[1];
+		pool.commit({ ...fullFrame, slotIndex: 0, cells: [firstBinding] });
 
-		expect(pool.controllers[0]?.cells).toHaveLength(2);
-		expect(pool.controllers[0]?.cells[1]).toBe(secondSlot);
+		expect(pool.controllers[0]?.cellControllers).toHaveLength(2);
+		expect(pool.controllers[0]?.cellControllers[1]).toBe(secondSlot);
 		expect(secondSlot?.active).toBe(false);
 
-		pool.bindRow(fullRow);
-		expect(pool.controllers[0]?.cells[1]).toBe(secondSlot);
+		pool.commit({ ...fullFrame, slotIndex: 0 });
+		expect(pool.controllers[0]?.cellControllers[1]).toBe(secondSlot);
 		expect(secondSlot?.active).toBe(true);
 
 		kernel.dispose();
 	});
 
-	it("skips cell-capacity scans when pool dimensions are unchanged", () => {
+	it("skips cell-capacity scans during commits when pool dimensions are unchanged", () => {
 		const kernel = createTwoHopScalarScrollKernel({
 			initialRowModel: rowModel,
 			onStableVisibleRange() {},
@@ -329,8 +334,9 @@ describe("TwoHop scalar scroll kernel", () => {
 			expect(setCellCapacitySpy).not.toHaveBeenCalled();
 		}
 
-		pool.bindRow(row);
-		expect(setCellCapacitySpies[0]).toHaveBeenCalledOnce();
+		if (!row.frame) return;
+		pool.commit({ ...row.frame, slotIndex: 0 });
+		expect(setCellCapacitySpies[0]).not.toHaveBeenCalled();
 		expect(setCellCapacitySpies[1]).not.toHaveBeenCalled();
 		expect(setCellCapacitySpies[2]).not.toHaveBeenCalled();
 
@@ -406,10 +412,15 @@ describe("TwoHop scalar scroll kernel", () => {
 		const nextBinding = controller.binding;
 		expect(observedDuringWillRebind).toBe(previousBinding);
 		expect(nextBinding).not.toBe(previousBinding);
-		expect(nextBinding?.logicalKey).toBe(nextBinding?.mountedCell.key);
-		expect(nextBinding?.rowIndex).toBe(nextBinding?.mountedCell.rowIndex);
-		expect(nextBinding?.columnIndex).toBe(nextBinding?.mountedCell.columnIndex);
-		expect(nextBinding?.renderKind).toBe(nextBinding?.mountedCell.renderBodyKind);
+		expect(nextBinding?.compiledCell.logicalKey).toBe(controller.logicalKey);
+		expect(nextBinding?.logicalRowIndex).toBe(controller.rowIndex);
+		expect(nextBinding?.columnIndex).toBe(controller.columnIndex);
+		expect(nextBinding?.compiledCell.renderBodyKind).toBe(
+			controller.renderBodyKind,
+		);
+		expect(
+			getCCLDevMeasurementSnapshot().counters["twoHop.rowFrame.commit"].count,
+		).toBe(3);
 		expect(
 			getCCLDevMeasurementSnapshot().counters["twoHop.binding.commit"].count,
 		).toBe(6);
@@ -426,7 +437,7 @@ describe("TwoHop scalar scroll kernel", () => {
 		const mountedRows = kernel.mountedRows;
 		const recycledRowShell = mountedRows[3];
 		const controllers = kernel.fixedRowSlotPool.controllers;
-		const recycledControllerCells = controllers[3]?.cells;
+		const recycledControllerCells = controllers[3]?.cellControllers;
 		expect(recycledRowShell?.cells).toHaveLength(0);
 
 		resetCCLDevMeasurements();
@@ -434,7 +445,7 @@ describe("TwoHop scalar scroll kernel", () => {
 
 		expect(kernel.mountedRows).toBe(mountedRows);
 		expect(kernel.fixedRowSlotPool.controllers).toBe(controllers);
-		expect(controllers[3]?.cells).toBe(recycledControllerCells);
+		expect(controllers[3]?.cellControllers).toBe(recycledControllerCells);
 		expect(mountedRows[3]).toBe(recycledRowShell);
 		expect(mountedRows[3]?.rowIndex).toBe(3);
 		expect(mountedRows[3]?.cells).toHaveLength(2);
@@ -467,7 +478,7 @@ describe("TwoHop scalar scroll kernel", () => {
 		expect(counters["twoHop.binding.commit"].count).toBe(0);
 	});
 
-	it("crosses 300 boundaries without allocating new row or cell shells", () => {
+	it("crosses 300 boundaries without allocating new row or cell controllers", () => {
 		const kernel = createTwoHopScalarScrollKernel({
 			initialRowModel: rowModel,
 			onStableVisibleRange() {},
@@ -476,7 +487,9 @@ describe("TwoHop scalar scroll kernel", () => {
 		const mountedRows = kernel.mountedRows;
 		const rowShells = [...mountedRows];
 		const controllers = kernel.fixedRowSlotPool.controllers;
-		const controllerCellShells = controllers.map((controller) => controller.cells);
+		const controllerCellShells = controllers.map(
+			(controller) => controller.cellControllers,
+		);
 		resetCCLDevMeasurements();
 
 		for (let frame = 1; frame <= 300; frame += 1) {
@@ -486,7 +499,7 @@ describe("TwoHop scalar scroll kernel", () => {
 		expect(kernel.mountedRows).toBe(mountedRows);
 		for (let slotIndex = 0; slotIndex < rowShells.length; slotIndex += 1) {
 			expect(mountedRows[slotIndex]).toBe(rowShells[slotIndex]);
-			expect(controllers[slotIndex]?.cells).toBe(
+			expect(controllers[slotIndex]?.cellControllers).toBe(
 				controllerCellShells[slotIndex],
 			);
 		}

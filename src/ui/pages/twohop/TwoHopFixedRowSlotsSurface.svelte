@@ -2,7 +2,10 @@
 	import { IS_PROD } from "../../../appConstants";
 	import type { Snippet } from "svelte";
 	import VirtualGridLogicalCellMount from "ui/components/common/virtual-list/svelte/VirtualGridLogicalCellMount.svelte";
-	import type { TwoHopRenderCellSnapshot } from "./twoHopCellBinding";
+	import type {
+		TwoHopCellBinding,
+		TwoHopRowSlotFrame,
+	} from "./twoHopCellBinding";
 	import type {
 		TwoHopFixedCellSlotController,
 		TwoHopFixedRowSlotController,
@@ -20,11 +23,12 @@
 		rowSlotControllers: readonly TwoHopFixedRowSlotController[];
 		contentEl?: HTMLDivElement | null;
 		observerRoot?: HTMLElement | null;
-		getCellDataTestId?: (cell: TwoHopRenderCellSnapshot) => string | undefined;
+		getCellDataTestId?: (binding: TwoHopCellBinding) => string | undefined;
 		renderCell: Snippet<
 			[
 				{
-					mountedCell: TwoHopRenderCellSnapshot;
+					binding: TwoHopCellBinding;
+					rowFrame: TwoHopRowSlotFrame;
 					cellController: TwoHopFixedCellSlotController;
 				},
 			]
@@ -50,16 +54,13 @@
 	// Item bodies are owned by the physical slot so scrolling can update their
 	// props without recreating the Svelte card tree. Other body kinds retain
 	// logical identity keys because their renderers do not implement item rebinds.
-	function resolveBodyLifecycleKey(
-		controller: TwoHopFixedCellSlotController,
-	): string {
-		const binding = controller.binding;
-		if (!binding) return "empty";
-		if (binding.renderKind === "item") {
-			return `twohop-item:${binding.reuseFamily ?? "resolved-card"}`;
+	function resolveBodyLifecycleKey(binding: TwoHopCellBinding): string {
+		const compiledCell = binding.compiledCell;
+		if (compiledCell.renderBodyKind === "item") {
+			return `twohop-item:${compiledCell.reuseFamily ?? "resolved-card"}`;
 		}
 
-		return `${binding.renderKind}:${controller.renderBodyKey ?? binding.logicalKey}`;
+		return `${compiledCell.renderBodyKind}:${compiledCell.renderBodyKey ?? compiledCell.logicalKey}`;
 	}
 
 	const contentStyle = $derived(
@@ -70,30 +71,29 @@
 <div class={contentClassName} bind:this={contentEl} style={contentStyle}>
 	<div data-ccl-virtual-flow-spacer="top" style:height="0px" aria-hidden="true"></div>
 	{#each rowSlotControllers as controller (controller.slotIndex)}
-		{#if controller.active}
+		{#if controller.frame}
+			{@const rowFrame = controller.frame}
 			<div
 				class={rowClassName}
 				data-ccl-row-slot={!IS_PROD ? controller.slotIndex : undefined}
 				data-ccl-row-index={!IS_PROD ? controller.rowIndex : undefined}
 				style={`position:absolute; left:0; right:0; top:0; transform:translateY(${Math.max(0, controller.top)}px); margin-bottom:0`}
 			>
-				{#each controller.cells as cellController (cellController.cellSlotKey)}
+				{#each controller.cellControllers as cellController (cellController.cellSlotKey)}
 					{#if cellController.active && cellController.binding}
 						{@const binding = cellController.binding}
-						{@const mountedCell = binding.mountedCell}
 						<VirtualGridLogicalCellMount
-							logicalKey={binding.logicalKey}
+							logicalKey={binding.compiledCell.logicalKey}
 							className="view-plan-virtual-list-cell view-plan-flow-cell"
-							dataTestId={getCellDataTestId?.(mountedCell)}
+							dataTestId={getCellDataTestId?.(binding)}
 							cellSlotKey={cellController.cellSlotKey}
 							rowIndex={cellController.rowIndex}
 							columnIndex={cellController.columnIndex}
-							{mountedCell}
 							{cellRegistry}
 							cellRegistrationOwner={cellController}
 						>
-							{#key resolveBodyLifecycleKey(cellController)}
-								{@render renderCell({ mountedCell, cellController })}
+							{#key resolveBodyLifecycleKey(binding)}
+								{@render renderCell({ binding, rowFrame, cellController })}
 							{/key}
 						</VirtualGridLogicalCellMount>
 					{/if}

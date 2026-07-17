@@ -5,32 +5,10 @@ import type {
 } from "ui/interactions/interactionTypes";
 import type { InteractionDescriptorResolverProvider } from "ui/interactions/interactionRegistry";
 import type {
-	MountedFlatHeaderCell,
-	MountedFlatItemCell,
-} from "ui/components/common/virtual-list/core/reconciliation/viewPlanMountedCells";
-import type {
 	TwoHopVirtualListItem,
-	TwoHopVirtualListSection,
 } from "./twoHopVirtualListModel";
-import type { TwoHopMountedCell } from "./twoHopMountedTypes";
+import type { TwoHopResidentCell } from "./twoHopCellBinding";
 import { recordCCLDevMeasurement } from "infrastructure/debug/CCLDevMeasurements";
-
-type TwoHopMountedItemCell = MountedFlatItemCell<
-	TwoHopVirtualListItem,
-	TwoHopVirtualListSection
->;
-type TwoHopMountedHeaderCell = MountedFlatHeaderCell<
-	TwoHopVirtualListItem,
-	TwoHopVirtualListSection
->;
-
-function isMountedHeaderCell(cell: TwoHopMountedCell): cell is TwoHopMountedHeaderCell {
-	return cell.cell.kind === "header";
-}
-
-function isMountedItemCell(cell: TwoHopMountedCell): cell is TwoHopMountedItemCell {
-	return cell.cell.kind === "item";
-}
 
 interface ItemProviderCacheEntry {
 	kind: "item";
@@ -57,7 +35,7 @@ type ProviderCacheEntry = ItemProviderCacheEntry | SectionHeaderProviderCacheEnt
 export interface TwoHopInteractionDescriptorCacheParams {
 	getMountedCellByInteractionId: (
 		interactionId: string,
-	) => TwoHopMountedCell | undefined;
+	) => TwoHopResidentCell | undefined;
 	resolveDescriptor: (
 		item: TwoHopVirtualListItem,
 	) => ItemInteractionDescriptor | null;
@@ -91,39 +69,39 @@ export function createTwoHopInteractionDescriptorCache({
 
 	return {
 		resolveInteractionDescriptor: (interactionId) => {
-			const mountedCell = getMountedCellByInteractionId(interactionId);
+			const residentCell = getMountedCellByInteractionId(interactionId);
 			pruneUnmountedEntries({
 				descriptorsByInteractionId,
 				getMountedCellByInteractionId,
 				resolvedInteractionId: interactionId,
-				resolvedMountedCell: mountedCell,
+				resolvedMountedCell: residentCell,
 			});
-			if (!mountedCell) {
+			if (!residentCell) {
 				return null;
 			}
-			if (isMountedHeaderCell(mountedCell)) {
+			const compiledCell = residentCell.binding.compiledCell;
+			if (compiledCell.logicalCell.kind === "header") {
 				return resolveMountedSectionHeaderDescriptor({
-					headerCell: mountedCell,
+					residentCell,
 					interactionId,
 					descriptorsByInteractionId,
 				});
 			}
-			if (!isMountedItemCell(mountedCell)) {
+			if (compiledCell.logicalCell.kind !== "item") {
 				descriptorsByInteractionId.delete(interactionId);
 				return null;
 			}
 
-			const itemCell = mountedCell;
-			const item = itemCell.cell.item;
+			const item = compiledCell.logicalCell.item;
 			const cached = descriptorsByInteractionId.get(interactionId);
 			const descriptorRevision = getDescriptorRevision?.();
 			if (
 				cached &&
 				cached.kind === "item" &&
 				cached.itemRevision === item &&
-				cached.renderBodySectionId === itemCell.renderBodySectionId &&
-				cached.renderBodySourceKey === itemCell.renderBodySourceKey &&
-				Object.is(cached.renderBodyRevision, itemCell.renderBodyRevision) &&
+				cached.renderBodySectionId === compiledCell.renderBodySectionId &&
+				cached.renderBodySourceKey === compiledCell.renderBodySourceKey &&
+				Object.is(cached.renderBodyRevision, compiledCell.renderBodyRevision) &&
 				Object.is(cached.resolveDescriptorRevision, resolveDescriptor) &&
 				Object.is(cached.descriptorRevision, descriptorRevision)
 			) {
@@ -144,9 +122,9 @@ export function createTwoHopInteractionDescriptorCache({
 			descriptorsByInteractionId.set(interactionId, {
 				kind: "item",
 				itemRevision: item,
-				renderBodySectionId: itemCell.renderBodySectionId,
-				renderBodySourceKey: itemCell.renderBodySourceKey,
-				renderBodyRevision: itemCell.renderBodyRevision,
+				renderBodySectionId: compiledCell.renderBodySectionId,
+				renderBodySourceKey: compiledCell.renderBodySourceKey,
+				renderBodyRevision: compiledCell.renderBodyRevision,
 				resolveDescriptorRevision: resolveDescriptor,
 				descriptorRevision,
 				descriptor,
@@ -166,9 +144,9 @@ function pruneUnmountedEntries(params: {
 	descriptorsByInteractionId: Map<string, ProviderCacheEntry>;
 	getMountedCellByInteractionId: (
 		interactionId: string,
-	) => TwoHopMountedCell | undefined;
+	) => TwoHopResidentCell | undefined;
 	resolvedInteractionId: string;
-	resolvedMountedCell: TwoHopMountedCell | undefined;
+	resolvedMountedCell: TwoHopResidentCell | undefined;
 }): void {
 	for (const cachedInteractionId of params.descriptorsByInteractionId.keys()) {
 		if (cachedInteractionId === params.resolvedInteractionId) {
@@ -184,12 +162,13 @@ function pruneUnmountedEntries(params: {
 }
 
 function resolveMountedSectionHeaderDescriptor(params: {
-	headerCell: TwoHopMountedHeaderCell;
+	residentCell: TwoHopResidentCell;
 	interactionId: string;
 	descriptorsByInteractionId: Map<string, ProviderCacheEntry>;
 }): InteractionDescriptor | null {
-	const headerCell = params.headerCell;
-	const descriptor = headerCell.headerProps.interactionDescriptor;
+	const compiledCell = params.residentCell.binding.compiledCell;
+	const headerProps = params.residentCell.rowFrame.sectionPlan.descriptor.headerProps;
+	const descriptor = headerProps.interactionDescriptor;
 	if (!descriptor) {
 		params.descriptorsByInteractionId.delete(params.interactionId);
 		return null;
@@ -199,10 +178,10 @@ function resolveMountedSectionHeaderDescriptor(params: {
 	if (
 		cached &&
 		cached.kind === "sectionHeader" &&
-		cached.headerPropsRevision === headerCell.headerProps &&
-		cached.renderBodySectionId === headerCell.renderBodySectionId &&
-		cached.renderBodyCellKey === headerCell.renderBodyCellKey &&
-		Object.is(cached.renderBodyRevision, headerCell.renderBodyRevision)
+		cached.headerPropsRevision === headerProps &&
+		cached.renderBodySectionId === compiledCell.renderBodySectionId &&
+		cached.renderBodyCellKey === compiledCell.renderBodyCellKey &&
+		Object.is(cached.renderBodyRevision, compiledCell.renderBodyRevision)
 	) {
 		if (process.env.NODE_ENV !== "production") {
 			recordCCLDevMeasurement("twoHop.interactionDescriptorCache.hit");
@@ -215,10 +194,10 @@ function resolveMountedSectionHeaderDescriptor(params: {
 	}
 	params.descriptorsByInteractionId.set(params.interactionId, {
 		kind: "sectionHeader",
-		headerPropsRevision: headerCell.headerProps,
-		renderBodySectionId: headerCell.renderBodySectionId,
-		renderBodyCellKey: headerCell.renderBodyCellKey,
-		renderBodyRevision: headerCell.renderBodyRevision,
+		headerPropsRevision: headerProps,
+		renderBodySectionId: compiledCell.renderBodySectionId,
+		renderBodyCellKey: compiledCell.renderBodyCellKey,
+		renderBodyRevision: compiledCell.renderBodyRevision,
 		descriptor,
 	});
 	return descriptor;

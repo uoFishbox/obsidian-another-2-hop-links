@@ -1,12 +1,11 @@
 <script lang="ts">
 	import TwoHopItemCellRender from "../TwoHopItemCellRender.svelte";
 	import type { TwoHopFixedCellSlotController } from "../twoHopFixedRowSlotPool.svelte";
-	import type { TwoHopRenderItemCellSnapshot } from "../twoHopCellBinding";
 	import TwoHopVirtualListSurfaceChildItem from "./TwoHopVirtualListSurfaceChildItem.svelte";
 
 	interface Props {
 		cellController: TwoHopFixedCellSlotController;
-		getItemActivationCandidateId: (cell: TwoHopRenderItemCellSnapshot) => string;
+		getItemActivationCandidateId: (cell: TwoHopFixedCellSlotController) => string;
 	}
 
 	let {

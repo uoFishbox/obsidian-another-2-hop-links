@@ -18,7 +18,8 @@
 	import { createSurfaceVirtualCellRegistry } from "ui/components/common/virtual-list/svelte/VirtualCellRegistry";
 	import type {
 		TwoHopCardPresentationState,
-		TwoHopRenderCellSnapshot,
+		TwoHopCellBinding,
+		TwoHopItemCellBinding,
 	} from "./twoHopCellBinding";
 	import type { CardRenderModel } from "ui/components/items/cardRenderModel";
 
@@ -83,15 +84,13 @@
 		void props.interactionDescriptorRevision;
 		interactionDescriptorResolverProvider.invalidate();
 	});
-	const isHeaderCell = (
-		cell: TwoHopRenderCellSnapshot,
-	): cell is Extract<TwoHopRenderCellSnapshot, { cell: { kind: "header" } }> =>
-		cell.cell.kind === "header";
+	const isHeaderCell = (binding: TwoHopCellBinding): boolean =>
+		binding.compiledCell.logicalCell.kind === "header";
 	const fixedSurfaceLayoutKey = $derived(list.layout.columns);
 	const isItemCell = (
-		cell: TwoHopRenderCellSnapshot,
-	): cell is Extract<TwoHopRenderCellSnapshot, { cell: { kind: "item" } }> =>
-		cell.cell.kind === "item";
+		binding: TwoHopCellBinding,
+	): binding is TwoHopItemCellBinding =>
+		binding.compiledCell.logicalCell.kind === "item";
 </script>
 
 <VirtualInteractiveSurface
@@ -123,16 +122,17 @@
 			getCellDataTestId={list.getCellDataTestId}
 			{cellRegistry}
 		>
-			{#snippet renderCell({ mountedCell: renderedCell, cellController })}
-				{#if isHeaderCell(renderedCell)}
+			{#snippet renderCell({ binding, rowFrame, cellController })}
+				{#if isHeaderCell(binding)}
+					{@const descriptor = rowFrame.sectionPlan.descriptor}
 					{@render props.renderHeader({
-						section: renderedCell.section,
-						title: renderedCell.title,
-						totalCount: renderedCell.totalCount,
-						sectionId: renderedCell.sectionId,
-						headerProps: renderedCell.headerProps,
+						section: descriptor.section,
+						title: descriptor.title,
+						totalCount: descriptor.totalCount,
+						sectionId: descriptor.sectionId,
+						headerProps: descriptor.headerProps,
 					})}
-				{:else if isItemCell(renderedCell)}
+				{:else if isItemCell(binding)}
 					<TwoHopItemCellRender
 						{cellController}
 						getItemActivationCandidateId={list.getItemActivationCandidateId}
@@ -141,9 +141,9 @@
 				{:else}
 					<VirtualListLoadMoreButton
 						testId={!IS_PROD
-							? `load-more-${renderedCell.sectionId}`
+							? `load-more-${rowFrame.sectionPlan.sectionId}`
 							: undefined}
-						onClick={() => list.loadMore(renderedCell.sectionId)}
+						onClick={() => list.loadMore(rowFrame.sectionPlan.sectionId)}
 					/>
 				{/if}
 			{/snippet}

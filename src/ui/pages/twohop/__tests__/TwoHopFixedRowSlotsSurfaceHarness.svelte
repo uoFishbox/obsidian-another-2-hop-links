@@ -4,8 +4,8 @@
 	import TwoHopItemCellRender from "../TwoHopItemCellRender.svelte";
 	import type { TwoHopFixedRowSlotController } from "../twoHopFixedRowSlotPool.svelte";
 	import type {
-		TwoHopRenderCellSnapshot,
-		TwoHopRenderItemCellSnapshot,
+		TwoHopCellBinding,
+		TwoHopItemCellBinding,
 	} from "../twoHopCellBinding";
 	import TwoHopVirtualListSurfaceChildItem from "./TwoHopVirtualListSurfaceChildItem.svelte";
 
@@ -15,11 +15,12 @@
 
 	let { rowSlotControllers }: Props = $props();
 	const cellRegistry = createSurfaceVirtualCellRegistry();
-	const getItemActivationCandidateId = (cell: TwoHopRenderItemCellSnapshot): string =>
-		`candidate:${cell.cell.item.virtualKey}`;
+	const getItemActivationCandidateId = (cell: { cellSlotKey: number }): string =>
+		`candidate:${cell.cellSlotKey}`;
 	const isItemCell = (
-		cell: TwoHopRenderCellSnapshot,
-	): cell is TwoHopRenderItemCellSnapshot => cell.cell.kind === "item";
+		binding: TwoHopCellBinding,
+	): binding is TwoHopItemCellBinding =>
+		binding.compiledCell.logicalCell.kind === "item";
 </script>
 
 <TwoHopFixedRowSlotsSurface
@@ -29,8 +30,8 @@
 	{rowSlotControllers}
 	{cellRegistry}
 >
-	{#snippet renderCell({ mountedCell, cellController })}
-		{#if isItemCell(mountedCell)}
+	{#snippet renderCell({ binding, cellController })}
+		{#if isItemCell(binding)}
 			<TwoHopItemCellRender
 				{cellController}
 				{getItemActivationCandidateId}
@@ -40,8 +41,8 @@
 				{/snippet}
 			</TwoHopItemCellRender>
 		{:else}
-			<div data-testid={`twohop-${mountedCell.cell.kind}-cell`}>
-				{mountedCell.cell.kind}
+			<div data-testid={`twohop-${binding.compiledCell.logicalCell.kind}-cell`}>
+				{binding.compiledCell.logicalCell.kind}
 			</div>
 		{/if}
 	{/snippet}

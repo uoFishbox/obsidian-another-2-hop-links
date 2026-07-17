@@ -5,11 +5,6 @@ import type {
 	ItemInteractionDescriptor,
 	SectionHeaderInteractionDescriptor,
 } from "ui/interactions/interactionTypes";
-import type {
-	MountedFlatHeaderCell,
-	MountedFlatItemCell,
-} from "ui/components/common/virtual-list/core/reconciliation/viewPlanMountedCells";
-import type { MountedFlatRowSlice } from "ui/components/common/virtual-list/core/reconciliation/viewPlanRenderRows";
 import type { TwoHopIndexedLink } from "types/domain";
 import { createTwoHopInteractionDescriptorCache } from "../twoHopInteractionDescriptorCache";
 import type {
@@ -20,44 +15,25 @@ import {
 	getCCLDevMeasurementSnapshot,
 	resetCCLDevMeasurements,
 } from "infrastructure/debug/CCLDevMeasurements";
+import type {
+	TwoHopCellBinding,
+	TwoHopResidentCell,
+	TwoHopRowSlotFrame,
+} from "../twoHopCellBinding";
+import type { CompiledTwoHopCell, TwoHopSectionPlan } from "../twoHopViewPlan";
 
-type TwoHopMountedItemCell = MountedFlatItemCell<
-	TwoHopVirtualListItem,
-	TwoHopVirtualListSection
->;
-type TwoHopMountedHeaderCell = MountedFlatHeaderCell<
-	TwoHopVirtualListItem,
-	TwoHopVirtualListSection
->;
-type TwoHopMountedRow = MountedFlatRowSlice<
-	TwoHopVirtualListItem,
-	TwoHopVirtualListSection
->;
+type TwoHopMountedRow = readonly TwoHopResidentCell[];
 
 function createMountedCellResolver(
 	rows: readonly TwoHopMountedRow[],
 ): (
 	interactionId: string,
-) => TwoHopMountedItemCell | TwoHopMountedHeaderCell | undefined {
-	const cellsByInteractionId = new Map<
-		string,
-		TwoHopMountedItemCell | TwoHopMountedHeaderCell
-	>();
+) => TwoHopResidentCell | undefined {
+	const cellsByInteractionId = new Map<string, TwoHopResidentCell>();
 	for (const row of rows) {
-		for (const cell of row.cells) {
-			if (cell.cell.kind === "header") {
-				const headerCell = cell as TwoHopMountedHeaderCell;
-				cellsByInteractionId.set(
-					headerCell.headerProps.interactionId ?? headerCell.sectionId,
-					headerCell,
-				);
-				continue;
-			}
-			if (cell.cell.kind !== "item") continue;
-
-			const itemCell = cell as TwoHopMountedItemCell;
-			const interactionId = itemCell.cell.item.interactionId;
-			if (interactionId) cellsByInteractionId.set(interactionId, itemCell);
+		for (const cell of row) {
+			const interactionId = cell.binding.compiledCell.interactionId;
+			if (interactionId) cellsByInteractionId.set(interactionId, cell);
 		}
 	}
 	return (interactionId) => cellsByInteractionId.get(interactionId);
@@ -96,29 +72,23 @@ function createMountedRows(params: {
 	renderBodyKey?: string;
 	renderBodyRevision?: unknown;
 }): readonly TwoHopMountedRow[] {
-	const cell = {
-		cellSlotKey: params.cellSlotKey ?? 0,
-		renderSlotIndex: params.cellSlotKey ?? 0,
+	const compiledCell = {
+		logicalKey: params.item.virtualKey,
 		renderBodyKey: params.renderBodyKey ?? params.item.virtualKey,
 		renderBodyKind: "item",
 		renderBodySectionId: "primary",
 		renderBodySourceKey: params.item.virtualKey,
 		renderBodyRevision: params.renderBodyRevision ?? null,
-		cell: {
+		logicalCell: {
 			kind: "item",
 			item: params.item,
 		},
-	} as unknown as TwoHopMountedItemCell;
-
-	return [
-		{
-			rowIndex: 0,
-			rowKey: 0,
-			key: 0,
-			top: 0,
-			cells: [cell],
-		},
-	];
+		cardModel: null,
+		reuseFamily: "resolved-card",
+		presentation: null,
+		interactionId: params.item.interactionId ?? null,
+	} as CompiledTwoHopCell;
+	return [createResidentRow(compiledCell, {})];
 }
 
 function createMountedHeaderRows(params: {
@@ -129,34 +99,53 @@ function createMountedHeaderRows(params: {
 	renderBodyRevision?: unknown;
 }): readonly TwoHopMountedRow[] {
 	const sectionId = params.sectionId ?? "branch-alpha";
-	const headerCell = {
-		cellSlotKey: 0,
-		renderSlotIndex: 0,
+	const headerProps = {
+		interactionId: params.interactionId,
+		interactionKind: "sectionHeader" as const,
+		interactionDescriptor: params.descriptor,
+	};
+	const compiledCell = {
+		logicalKey: `header:${sectionId}`,
 		renderBodyKey: params.renderBodyKey ?? `header:${sectionId}`,
 		renderBodyKind: "header",
 		renderBodySectionId: sectionId,
 		renderBodyCellKey: `header:${sectionId}`,
 		renderBodyRevision: params.renderBodyRevision ?? null,
-		sectionId,
-		cell: {
+		logicalCell: {
 			kind: "header",
+			key: `header:${sectionId}`,
 		},
-		headerProps: {
-			interactionId: params.interactionId,
-			interactionKind: "sectionHeader",
-			interactionDescriptor: params.descriptor,
-		},
-	} as unknown as TwoHopMountedHeaderCell;
+		cardModel: null,
+		reuseFamily: null,
+		presentation: null,
+		interactionId: params.interactionId ?? sectionId,
+	} as CompiledTwoHopCell;
+	return [createResidentRow(compiledCell, headerProps)];
+}
 
-	return [
-		{
-			rowIndex: 0,
-			rowKey: 0,
-			key: 0,
-			top: 0,
-			cells: [headerCell],
-		},
-	];
+function createResidentRow(
+	compiledCell: CompiledTwoHopCell,
+	headerProps: Record<string, unknown>,
+): TwoHopMountedRow {
+	const binding: TwoHopCellBinding = {
+		epoch: 0,
+		logicalRowIndex: 0,
+		columnIndex: 0,
+		compiledCell,
+	};
+	const sectionPlan = {
+		sectionId: compiledCell.renderBodySectionId,
+		descriptor: { headerProps },
+	} as unknown as TwoHopSectionPlan;
+	const rowFrame: TwoHopRowSlotFrame = {
+		epoch: 0,
+		slotIndex: 0,
+		logicalRowIndex: 0,
+		top: 0,
+		sectionPlan,
+		cells: [binding],
+	};
+	return [{ binding, rowFrame }];
 }
 
 function createDescriptor(item: TwoHopVirtualListItem): ItemInteractionDescriptor {

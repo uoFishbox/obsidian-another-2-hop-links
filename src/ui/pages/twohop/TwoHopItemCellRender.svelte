@@ -3,8 +3,7 @@
 	import type { TwoHopFixedCellSlotController } from "./twoHopFixedRowSlotPool.svelte";
 	import type {
 		TwoHopCardPresentationState,
-		TwoHopRenderCellSnapshot,
-		TwoHopRenderItemCellSnapshot,
+		TwoHopItemCellBinding,
 	} from "./twoHopCellBinding";
 	import type { TwoHopVirtualListItem } from "./twoHopVirtualListModel";
 	import { recordCCLDevMeasurement } from "infrastructure/debug/CCLDevMeasurements";
@@ -12,7 +11,9 @@
 
 	interface Props {
 		cellController: TwoHopFixedCellSlotController;
-		getItemActivationCandidateId: (cell: TwoHopRenderItemCellSnapshot) => string;
+		getItemActivationCandidateId: (
+			cell: TwoHopFixedCellSlotController,
+		) => string;
 		renderItem: Snippet<
 			[
 				TwoHopVirtualListItem,
@@ -29,30 +30,30 @@
 		recordCCLDevMeasurement("twoHop.itemBody.mount");
 	}
 
-	const isItemCell = (
-		cell: TwoHopRenderCellSnapshot | undefined,
-	): cell is TwoHopRenderItemCellSnapshot => cell?.cell.kind === "item";
+	const isItemBinding = (
+		binding: TwoHopFixedCellSlotController["binding"],
+	): binding is TwoHopItemCellBinding =>
+		binding?.compiledCell.logicalCell.kind === "item";
 
 	// Recompute this object once for each physical-slot reassignment. Consumers
 	// then read ordinary reactive snapshot fields instead of traversing the slot
 	// controller and resolving visibility on every individual prop access.
 	const snapshot = $derived.by(() => {
 		const binding = cellController.binding;
-		const mountedCell = binding?.mountedCell;
-		if (!isItemCell(mountedCell)) return null;
-		const itemCell = mountedCell;
-		const presentation = binding?.presentation;
+		if (!isItemBinding(binding)) return null;
+		const compiledCell = binding.compiledCell;
+		const presentation = compiledCell.presentation;
 		return {
-			item: itemCell.cell.item,
-			rowIndex: itemCell.rowIndex,
-			activationCandidateId: getItemActivationCandidateId(itemCell),
+			item: compiledCell.logicalCell.item,
+			rowIndex: binding.logicalRowIndex,
+			activationCandidateId: getItemActivationCandidateId(cellController),
 			presentation: presentation ?? {
 				sectionVariant: "two-hop" as const,
 				resolution: "resolved" as const,
 				attachment: false,
 				extension: null,
 			},
-			cardModel: itemCell.compiledCell?.cardModel ?? null,
+			cardModel: compiledCell.cardModel,
 		};
 	});
 </script>
