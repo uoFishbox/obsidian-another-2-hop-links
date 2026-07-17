@@ -150,6 +150,58 @@ function getMountedRow(
 }
 
 describe("TwoHop scalar scroll kernel", () => {
+	it("keeps resident hits free of row commits and refills shifted windows later", () => {
+		const kernel = createTwoHopScalarScrollKernel({
+			initialRowModel: rowModel,
+			enableResidentWindow: true,
+			onStableVisibleRange() {},
+		});
+		const applyScrollTop = (scrollTop: number): void => {
+			kernel.applyMeasurement({
+				rowModel,
+				scrollTop,
+				viewportHeight: 100,
+				sectionTop: 0,
+				isStableMeasurement: true,
+				isScrollActive: true,
+				hasStableVisibleRange: true,
+				visibilityPolicy: {
+					bootstrapRows: 1,
+					mountedOverscanPx: 110,
+					previewOverscanPx: 0,
+				},
+			});
+		};
+
+		applyScrollTop(0);
+		kernel.drainResidentRefill();
+		resetCCLDevMeasurements();
+
+		applyScrollTop(110);
+		let counters = getCCLDevMeasurementSnapshot().counters;
+		expect(counters["residentWindow.hit"].count).toBe(1);
+		expect(counters["twoHop.rowFrame.commit"].count).toBe(0);
+		expect(counters["residentWindow.emergencyBind"].count).toBe(0);
+
+		resetCCLDevMeasurements();
+		applyScrollTop(440);
+		counters = getCCLDevMeasurementSnapshot().counters;
+		expect(counters["twoHop.rowFrame.commit"].count).toBe(0);
+		expect(counters["residentWindow.emergencyBind"].count).toBe(0);
+
+		kernel.drainResidentRefill();
+		counters = getCCLDevMeasurementSnapshot().counters;
+		expect(counters["residentWindow.refill"].count).toBeGreaterThan(0);
+		expect(counters["twoHop.rowFrame.commit"].count).toBeGreaterThan(0);
+
+		resetCCLDevMeasurements();
+		applyScrollTop(10_000);
+		counters = getCCLDevMeasurementSnapshot().counters;
+		expect(counters["residentWindow.distantJump"].count).toBe(1);
+		expect(counters["residentWindow.emergencyBind"].count).toBeGreaterThan(0);
+		kernel.dispose();
+	});
+
 	it("creates a minimal binding that retains the compiled cell reference", () => {
 		const kernel = createTwoHopScalarScrollKernel({
 			initialRowModel: rowModel,

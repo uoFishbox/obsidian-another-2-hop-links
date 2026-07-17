@@ -19,6 +19,10 @@ export type CCLDevMeasurementName =
 	| "twoHop.physicalPool.resize"
 	| "twoHop.binding.commit"
 	| "twoHop.rowFrame.commit"
+	| "residentWindow.hit"
+	| "residentWindow.refill"
+	| "residentWindow.emergencyBind"
+	| "residentWindow.distantJump"
 	| "twoHop.itemBody.mount"
 	| "twoHop.interactionDescriptorCache.hit"
 	| "twoHop.interactionDescriptorCache.miss"
@@ -73,6 +77,10 @@ export const CCL_DEV_MEASUREMENT_NAMES: readonly CCLDevMeasurementName[] = [
 	"twoHop.physicalPool.resize",
 	"twoHop.binding.commit",
 	"twoHop.rowFrame.commit",
+	"residentWindow.hit",
+	"residentWindow.refill",
+	"residentWindow.emergencyBind",
+	"residentWindow.distantJump",
 	"twoHop.itemBody.mount",
 	"twoHop.interactionDescriptorCache.hit",
 	"twoHop.interactionDescriptorCache.miss",

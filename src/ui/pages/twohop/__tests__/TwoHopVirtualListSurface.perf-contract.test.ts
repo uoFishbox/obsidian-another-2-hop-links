@@ -78,6 +78,12 @@ function resolvePoolCycleScrollTop(shadowRoot: ShadowRoot): number {
 	return poolCapacity * rowStride;
 }
 
+async function flushResidentWindow(): Promise<void> {
+	for (let frame = 0; frame < 24; frame += 1) {
+		await flushFrames();
+	}
+}
+
 describe("TwoHopViewPlanVirtualList DOM performance contracts", () => {
 	beforeEach(() => {
 		resetRecords();
@@ -162,6 +168,7 @@ describe("TwoHopViewPlanVirtualList DOM performance contracts", () => {
 		triggerResize(scrollRoot, 330, 120);
 		await flushFrames();
 		await flushFrames();
+		await flushResidentWindow();
 
 		const initialContent = virtualListRoot.shadowRoot?.querySelector<HTMLElement>(
 			".view-plan-virtual-list-content",
@@ -326,6 +333,7 @@ describe("TwoHopViewPlanVirtualList DOM performance contracts", () => {
 		triggerResize(scrollRoot, 330, 120);
 		await flushFrames();
 		await flushFrames();
+		await flushResidentWindow();
 
 		const shadowRoot = virtualListRoot.shadowRoot;
 		const content = shadowRoot?.querySelector<HTMLElement>(
@@ -394,6 +402,7 @@ describe("TwoHopViewPlanVirtualList DOM performance contracts", () => {
 		triggerResize(scrollRoot, 330, 120);
 		await flushFrames();
 		await flushFrames();
+		await flushResidentWindow();
 		const shadowRoot = virtualListRoot.shadowRoot;
 		const initialIndexes = new Set(
 			Array.from(
@@ -462,6 +471,7 @@ describe("TwoHopViewPlanVirtualList DOM performance contracts", () => {
 		triggerResize(scrollRoot, 330, 120);
 		await flushFrames();
 		await flushFrames();
+		await flushResidentWindow();
 
 		const shadowRoot = virtualListRoot.shadowRoot;
 		const initialChild = shadowRoot?.querySelector<HTMLElement>(
@@ -532,14 +542,14 @@ describe("TwoHopViewPlanVirtualList DOM performance contracts", () => {
 				"[data-ccl-row-slot]",
 			) ?? [],
 		);
-		expect(rows).toHaveLength(4);
-		expect(
-			rows
-				.map((row) => Number(row.dataset.cclRowIndex))
-				.sort((left, right) => left - right),
-		).toEqual([73, 74, 75, 76]);
+		const rowIndexes = rows.map((row) => Number(row.dataset.cclRowIndex));
+		expect(rowIndexes).toEqual(expect.arrayContaining([74, 75]));
+		expect(rowIndexes).not.toContain(73);
+		expect(rowIndexes).not.toContain(76);
 
-		for (const row of rows) {
+		for (const row of rows.filter((row) =>
+			[74, 75].includes(Number(row.dataset.cclRowIndex)),
+		)) {
 			const rowIndex = row.dataset.cclRowIndex;
 			expect(rowIndex).toBeTruthy();
 			expect(row.style.transform).toBe(`translateY(${Number(rowIndex) * 134}px)`);

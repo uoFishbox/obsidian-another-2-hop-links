@@ -1,5 +1,6 @@
 import type { RowPreviewActivationRuntime } from "features/preview/scheduling/rowPreviewActivationRuntime";
 import { recordCCLDevMeasurement } from "infrastructure/debug/CCLDevMeasurements";
+import { createPostPaintVirtualListTask } from "ui/components/common/virtual-list/dom/virtualListScheduler";
 import type { RowRange } from "ui/components/common/virtual-list/rowRange";
 import type { VirtualRanges } from "ui/components/common/virtual-list/types";
 import {
@@ -9,6 +10,10 @@ import {
 } from "./twoHopMountedRangeTransition";
 import { createTwoHopPhysicalSlotStore } from "./twoHopPhysicalSlotStore.svelte";
 import type { TwoHopViewPlan, TwoHopViewPlanRowModel } from "./twoHopViewPlan";
+import {
+	planResidentWindow,
+	type ResidentScrollDirection,
+} from "./residentWindowPlanner";
 
 export interface TwoHopScalarKernelSnapshot {
 	readonly rowModel: TwoHopViewPlanRowModel;
@@ -20,8 +25,10 @@ export interface TwoHopScalarKernelSnapshot {
 export function createTwoHopScalarScrollKernel(params: {
 	readonly initialRowModel: TwoHopViewPlanRowModel;
 	readonly rowPreviewActivationRuntime?: RowPreviewActivationRuntime;
+	readonly enableResidentWindow?: boolean;
 	onStableVisibleRange(): void;
 }) {
+	const enableResidentWindow = params.enableResidentWindow ?? false;
 	const physicalSlotStore = createTwoHopPhysicalSlotStore({
 		rowPreviewActivationRuntime: params.rowPreviewActivationRuntime,
 	});
@@ -36,6 +43,10 @@ export function createTwoHopScalarScrollKernel(params: {
 	let activePlan: TwoHopViewPlan | null = null;
 	let pendingDirtyStart = Number.POSITIVE_INFINITY;
 	let pendingDirtyEnd = Number.NEGATIVE_INFINITY;
+	let lastLocalScrollTop: number | null = null;
+	let residentDirection: ResidentScrollDirection = "none";
+	let residentVisibleStart = 0;
+	let residentVisibleEnd = 0;
 	const rangeScratch: VirtualRanges = {
 		mounted: { start: 0, end: 0 },
 		previewVisible: { start: 0, end: 0 },
@@ -43,6 +54,7 @@ export function createTwoHopScalarScrollKernel(params: {
 	const transitionScratch = createMountedRangeTransitionScratch();
 	const nextMountedRangeScratch: RowRange = { start: 0, end: 0 };
 	const dirtyRangeScratch: RowRange = { start: 0, end: 0 };
+	const strictVisibleRangeScratch: RowRange = { start: 0, end: 0 };
 	const transitionInput: MountedRangeTransitionInput = {
 		previous: mountedRange,
 		next: nextMountedRangeScratch,
@@ -82,6 +94,12 @@ export function createTwoHopScalarScrollKernel(params: {
 		range: mountedRange,
 		updateKind: "reused",
 	} as const;
+	const residentRefillTask = createPostPaintVirtualListTask(
+		() => {
+			refillResidentOnce();
+		},
+		2,
+	);
 
 	function bindRange(plan: TwoHopViewPlan, start: number, end: number): void {
 		for (let rowIndex = start; rowIndex < end; rowIndex += 1) {
@@ -163,6 +181,187 @@ export function createTwoHopScalarScrollKernel(params: {
 		physicalSlotStore.setPreviewRange(nextStart, nextEnd);
 	}
 
+	function resolveScrollDirection(
+		localScrollTop: number,
+	): ResidentScrollDirection {
+		const previousScrollTop = lastLocalScrollTop;
+		lastLocalScrollTop = localScrollTop;
+		if (previousScrollTop === null || localScrollTop === previousScrollTop) {
+			return residentDirection;
+		}
+		residentDirection =
+			localScrollTop > previousScrollTop ? "forward" : "backward";
+		return residentDirection;
+	}
+
+	function findNextResidentRefillRow(): number | null {
+		if (!activePlan) return null;
+		if (residentDirection === "backward") {
+			for (
+				let rowIndex = residentVisibleStart - 1;
+				rowIndex >= mountedRange.start;
+				rowIndex -= 1
+			) {
+				if (!physicalSlotStore.isRowBound(rowIndex)) return rowIndex;
+			}
+			for (
+				let rowIndex = residentVisibleEnd;
+				rowIndex < mountedRange.end;
+				rowIndex += 1
+			) {
+				if (!physicalSlotStore.isRowBound(rowIndex)) return rowIndex;
+			}
+			return null;
+		}
+
+		for (
+			let rowIndex = residentVisibleEnd;
+			rowIndex < mountedRange.end;
+			rowIndex += 1
+		) {
+			if (!physicalSlotStore.isRowBound(rowIndex)) return rowIndex;
+		}
+		for (
+			let rowIndex = residentVisibleStart - 1;
+			rowIndex >= mountedRange.start;
+			rowIndex -= 1
+		) {
+			if (!physicalSlotStore.isRowBound(rowIndex)) return rowIndex;
+		}
+		return null;
+	}
+
+	function hasPendingResidentWork(): boolean {
+		return (
+			findNextResidentRefillRow() !== null ||
+			physicalSlotStore.hasBoundOutsideRange(
+				mountedRange.start,
+				mountedRange.end,
+			)
+		);
+	}
+
+	function scheduleResidentRefill(): void {
+		if (!enableResidentWindow || !hasPendingResidentWork()) return;
+		residentRefillTask.schedule();
+	}
+
+	function refillResidentOnce(): boolean {
+		if (!enableResidentWindow || !activePlan) return false;
+		const rowIndex = findNextResidentRefillRow();
+		if (rowIndex !== null) {
+			physicalSlotStore.bindRow(activePlan, rowIndex);
+			if (process.env.NODE_ENV !== "production") {
+				recordCCLDevMeasurement("residentWindow.refill");
+			}
+			scheduleResidentRefill();
+			return true;
+		}
+		const didClear = physicalSlotStore.clearOneOutsideRange(
+			mountedRange.start,
+			mountedRange.end,
+		);
+		if (didClear) scheduleResidentRefill();
+		return didClear;
+	}
+
+	function applyResidentRanges(
+		nextRowModel: TwoHopViewPlanRowModel,
+		nextRanges: VirtualRanges,
+		input: {
+			readonly localScrollTop: number;
+			readonly viewportHeight: number;
+			readonly isScrollActive: boolean;
+		},
+	): boolean {
+		rowModel = nextRowModel;
+		nextRowModel.findVisibleRangeInto(strictVisibleRangeScratch, {
+			scrollTop: input.localScrollTop,
+			viewportHeight: input.viewportHeight,
+			overscanPx: 0,
+		});
+		const direction = resolveScrollDirection(input.localScrollTop);
+		const residentPlan = planResidentWindow({
+			current: mountedRange,
+			visible: strictVisibleRangeScratch,
+			rowCount: nextRowModel.rowCount,
+			direction,
+		});
+		const previousStart = mountedRange.start;
+		const previousEnd = mountedRange.end;
+		const planChanged = activePlan !== nextRowModel.plan;
+		const preparation = physicalSlotStore.prepareCapacity(
+			residentPlan.start,
+			residentPlan.end,
+			nextRowModel.plan.layout,
+			nextRowModel.plan.columns,
+		);
+		if (planChanged || preparation.poolChanged) {
+			physicalSlotStore.clearAll();
+		}
+
+		mountedRange.start = residentPlan.start;
+		mountedRange.end = residentPlan.end;
+		residentVisibleStart = strictVisibleRangeScratch.start;
+		residentVisibleEnd = strictVisibleRangeScratch.end;
+		activePlan = nextRowModel.plan;
+
+		let emergencyBindCount = 0;
+		for (
+			let rowIndex = residentVisibleStart;
+			rowIndex < residentVisibleEnd;
+			rowIndex += 1
+		) {
+			if (!physicalSlotStore.isRowBound(rowIndex)) {
+				physicalSlotStore.bindRow(nextRowModel.plan, rowIndex);
+				emergencyBindCount += 1;
+			}
+		}
+
+		if (process.env.NODE_ENV !== "production") {
+			if (initialized && emergencyBindCount > 0) {
+				for (let count = 0; count < emergencyBindCount; count += 1) {
+					recordCCLDevMeasurement("residentWindow.emergencyBind");
+				}
+			}
+			if (residentPlan.distantJump) {
+				recordCCLDevMeasurement("residentWindow.distantJump");
+			}
+			if (
+				initialized &&
+				emergencyBindCount === 0 &&
+				residentPlan.visibleWithinCurrent
+			) {
+				recordCCLDevMeasurement("residentWindow.hit");
+			}
+		}
+
+		const previewLimitStart = input.isScrollActive
+			? residentVisibleStart
+			: mountedRange.start;
+		const previewLimitEnd = input.isScrollActive
+			? residentVisibleEnd
+			: mountedRange.end;
+		const previewStart = Math.max(
+			previewLimitStart,
+			nextRanges.previewVisible.start,
+		);
+		const previewEnd = Math.max(
+			previewStart,
+			Math.min(previewLimitEnd, nextRanges.previewVisible.end),
+		);
+		applyPreviewRange(previewStart, previewEnd);
+		pendingDirtyStart = Number.POSITIVE_INFINITY;
+		pendingDirtyEnd = Number.NEGATIVE_INFINITY;
+		scheduleResidentRefill();
+		const rangeChanged =
+			previousStart !== mountedRange.start || previousEnd !== mountedRange.end;
+		if ((rangeChanged || emergencyBindCount > 0) && process.env.NODE_ENV !== "production") {
+			recordCCLDevMeasurement("twoHop.scalarKernel.mountedRangeCommit");
+		}
+		return rangeChanged || emergencyBindCount > 0;
+	}
+
 	function applyResolvedRanges(
 		nextRowModel: TwoHopViewPlanRowModel,
 		nextRanges: VirtualRanges,
@@ -213,7 +412,13 @@ export function createTwoHopScalarScrollKernel(params: {
 				previewOverscanPx: input.visibilityPolicy.previewOverscanPx,
 			});
 		}
-		const changed = applyResolvedRanges(input.rowModel, rangeScratch);
+		const changed = enableResidentWindow
+			? applyResidentRanges(input.rowModel, rangeScratch, {
+					localScrollTop: input.scrollTop - input.sectionTop,
+					viewportHeight: input.viewportHeight,
+					isScrollActive: input.isScrollActive,
+				})
+			: applyResolvedRanges(input.rowModel, rangeScratch);
 		if (!initialized) {
 			initialized = true;
 			return bootstrappedRecomputedResult;
@@ -247,8 +452,17 @@ export function createTwoHopScalarScrollKernel(params: {
 			applyPreviewRange(start, end);
 		},
 		cancelPreviewVisibleRangeSync(): void {},
+		drainResidentRefill(): void {
+			residentRefillTask.cancel();
+			let remaining = Math.max(1, mountedRange.end - mountedRange.start + 16);
+			while (remaining > 0 && refillResidentOnce()) {
+				residentRefillTask.cancel();
+				remaining -= 1;
+			}
+		},
 		getMountedCellByInteractionId: physicalSlotStore.getMountedCellByInteractionId,
 		dispose(): void {
+			residentRefillTask.cancel();
 			physicalSlotStore.dispose();
 		},
 	};

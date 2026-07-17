@@ -83,6 +83,9 @@ export interface TwoHopPhysicalSlotStore {
 	clearRow(logicalRowIndex: number): void;
 	clearAll(): void;
 	clearOutsideRange(start: number, end: number): void;
+	clearOneOutsideRange(start: number, end: number): boolean;
+	hasBoundOutsideRange(start: number, end: number): boolean;
+	isRowBound(logicalRowIndex: number): boolean;
 	setPreviewRange(start: number, end: number): void;
 	getMountedCellByInteractionId(
 		interactionId: string,
@@ -512,6 +515,34 @@ export function createTwoHopPhysicalSlotStore(params: {
 					clearController(controller);
 				}
 			}
+		},
+		clearOneOutsideRange(start, end): boolean {
+			for (const controller of fixedRowSlotPool.controllers) {
+				const rowIndex = controller.frame?.logicalRowIndex;
+				if (rowIndex === undefined || (rowIndex >= start && rowIndex < end)) {
+					continue;
+				}
+				clearController(controller);
+				return true;
+			}
+			return false;
+		},
+		hasBoundOutsideRange(start, end): boolean {
+			for (const controller of fixedRowSlotPool.controllers) {
+				const rowIndex = controller.frame?.logicalRowIndex;
+				if (rowIndex !== undefined && (rowIndex < start || rowIndex >= end)) {
+					return true;
+				}
+			}
+			return false;
+		},
+		isRowBound(logicalRowIndex): boolean {
+			if (rowSlotAllocator.capacity === 0) return false;
+			const slotIndex = rowSlotAllocator.resolveSlotIndex(logicalRowIndex);
+			return (
+				fixedRowSlotPool.controllers[slotIndex]?.frame?.logicalRowIndex ===
+				logicalRowIndex
+			);
 		},
 		setPreviewRange(start, end): void {
 			if (previewStart === start && previewEnd === end) return;

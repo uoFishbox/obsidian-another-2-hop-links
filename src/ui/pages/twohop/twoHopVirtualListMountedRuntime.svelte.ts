@@ -23,6 +23,7 @@ export function createTwoHopVirtualListMountedRuntime(params: {
 	const kernel = createTwoHopScalarScrollKernel({
 		initialRowModel: params.inputRuntime.rowModel,
 		rowPreviewActivationRuntime,
+		enableResidentWindow: true,
 		onStableVisibleRange: params.onStableVisibleRange,
 	});
 	$effect(() => {
