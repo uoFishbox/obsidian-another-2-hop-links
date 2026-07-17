@@ -54,6 +54,41 @@ function setRect(element: Element, top: number, width: number, height: number) {
 }
 
 describe("twoHopViewportController", () => {
+	it("does not rebuild when the initial sections revision is set again", () => {
+		const scroller = document.createElement("div");
+		scroller.style.overflow = "auto";
+		Object.defineProperty(scroller, "clientHeight", { value: 300 });
+		Object.defineProperty(scroller, "scrollHeight", { value: 10000 });
+		Object.defineProperty(scroller, "scrollTop", { value: 0, writable: true });
+		const rootEl = document.createElement("div");
+		const shadowHostEl = document.createElement("div");
+		rootEl.append(shadowHostEl);
+		scroller.append(rootEl);
+		document.body.append(scroller);
+		setRect(scroller, 0, 420, 300);
+		setRect(rootEl, 0, 420, 5000);
+		const sections = [createSection("section", 100)];
+		const revision = {};
+		const controller = createTwoHopViewportController({
+			rootEl,
+			shadowHostEl,
+			sections,
+			revision,
+			initialVisibleCount: 100,
+			getItemInteractionDescriptor: () => null,
+			requestAnimationFrame: () => 1,
+			cancelAnimationFrame: () => {},
+			now: () => 10,
+		});
+		const initialStats = controller.getStats();
+
+		controller.setSections(sections, revision);
+
+		expect(controller.getStats()).toEqual(initialStats);
+		controller.dispose();
+		scroller.remove();
+	});
+
 	it("keeps a fixed pool and performs no shell binds on resident hits", () => {
 		const scroller = document.createElement("div");
 		scroller.style.overflow = "auto";
@@ -170,23 +205,25 @@ describe("twoHopViewportController", () => {
 		}));
 		const first = createSection("first", 8);
 		const second = createSection("second", 8);
-		const resolveItemCardModel = vi.fn((item: TwoHopVirtualListItem, presentation) => ({
-			item: item.item,
-			targetFile: null,
-			title: item.virtualKey,
-			ariaLabel: item.virtualKey,
-			className: null,
-			extension: null,
-			directory: null,
-			interactionId: item.interactionId ?? item.virtualKey,
-			interactionKey: item.virtualKey,
-			presentation,
-			searchQuery: "",
-			searchScope: "title-only" as const,
-			contentPreview: undefined,
-			previewRefreshToken: 0,
-			previewActivationIdentity: undefined,
-		}));
+		const resolveItemCardModel = vi.fn(
+			(item: TwoHopVirtualListItem, presentation) => ({
+				item: item.item,
+				targetFile: null,
+				title: item.virtualKey,
+				ariaLabel: item.virtualKey,
+				className: null,
+				extension: null,
+				directory: null,
+				interactionId: item.interactionId ?? item.virtualKey,
+				interactionKey: item.virtualKey,
+				presentation,
+				searchQuery: "",
+				searchScope: "title-only" as const,
+				contentPreview: undefined,
+				previewRefreshToken: 0,
+				previewActivationIdentity: undefined,
+			}),
+		);
 		const controller = createTwoHopViewportController({
 			rootEl,
 			shadowHostEl,

@@ -52,11 +52,12 @@
 	const configuredLayout = $derived(
 		resolveConfiguredLayout(props.applicationStore?.settings),
 	);
-	const interactionDescriptorResolverProvider: InteractionDescriptorResolverProvider = {
-		resolveInteractionDescriptor(interactionId) {
-			return controller?.resolveInteractionDescriptor(interactionId) ?? null;
-		},
-	};
+	const interactionDescriptorResolverProvider: InteractionDescriptorResolverProvider =
+		{
+			resolveInteractionDescriptor(interactionId) {
+				return controller?.resolveInteractionDescriptor(interactionId) ?? null;
+			},
+		};
 	const resolveNavigationTarget = (
 		...args: Parameters<TwoHopViewportController["resolveNavigationTarget"]>
 	) => controller?.resolveNavigationTarget(...args) ?? null;
@@ -70,6 +71,7 @@
 			rootEl: element,
 			shadowHostEl: element,
 			sections: props.sections,
+			revision: props.cardModelRevision,
 			applicationStore: props.applicationStore,
 			initialVisibleCount: props.initialVisibleCount,
 			loadMoreIncrement: props.loadMoreIncrement,

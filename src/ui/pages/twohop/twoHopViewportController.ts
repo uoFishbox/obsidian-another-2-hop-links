@@ -15,7 +15,11 @@ import {
 import type { CardRenderModel } from "ui/components/items/cardRenderModel";
 import type { ResolvedCardLayoutSettings } from "ui/utils/cardLayoutCssVars";
 import type { InteractionDescriptor } from "ui/interactions/interactionTypes";
-import { createTwoHopDomPool, type TwoHopDomPool, type TwoHopDomRowSlot } from "./twoHopDomPool";
+import {
+	createTwoHopDomPool,
+	type TwoHopDomPool,
+	type TwoHopDomRowSlot,
+} from "./twoHopDomPool";
 import {
 	createTwoHopGeometry,
 	resolveTwoHopCell,
@@ -54,6 +58,7 @@ export interface TwoHopViewportControllerParams {
 	readonly rootEl: HTMLDivElement;
 	readonly shadowHostEl: HTMLDivElement;
 	readonly sections: readonly TwoHopVirtualSectionDescriptor[];
+	readonly revision?: unknown;
 	readonly applicationStore?: SectionPaginationApplicationStore;
 	readonly initialVisibleCount?: number;
 	readonly loadMoreIncrement?: number;
@@ -124,7 +129,8 @@ export function createTwoHopViewportController(
 		params.cancelAnimationFrame ??
 		ownerWindow?.cancelAnimationFrame.bind(ownerWindow) ??
 		((handle: number) => ownerWindow?.clearTimeout(handle));
-	const now = params.now ?? (() => ownerWindow?.performance.now() ?? performance.now());
+	const now =
+		params.now ?? (() => ownerWindow?.performance.now() ?? performance.now());
 	const pagination = createSectionVisibleCountsController<
 		TwoHopVirtualListItem,
 		TwoHopVirtualSectionDescriptor["section"]
@@ -158,7 +164,7 @@ export function createTwoHopViewportController(
 	let lastMeasuredRowOffset = 0;
 	let lastMeasuredTimestamp = 0;
 	let disposed = false;
-	let revision: unknown;
+	let revision = params.revision;
 	let stats = {
 		scrollFrames: 0,
 		residentHits: 0,
@@ -240,10 +246,7 @@ export function createTwoHopViewportController(
 			Math.max(nextLayout.rowHeight, cachedViewportHeight) /
 				(nextLayout.rowHeight + nextLayout.gap),
 		);
-		return Math.max(
-			MINIMUM_POOL_ROWS,
-			viewportRows + BEHIND_ROWS + AHEAD_ROWS,
-		);
+		return Math.max(MINIMUM_POOL_ROWS, viewportRows + BEHIND_ROWS + AHEAD_ROWS);
 	}
 
 	function createCellBuffers(): TwoHopResolvedCellBuffer[] {
@@ -339,7 +342,10 @@ export function createTwoHopViewportController(
 
 	function hasPendingShells(): boolean {
 		for (const row of pool.rows) {
-			if (row.logicalRowIndex < residentStart || row.logicalRowIndex >= residentEnd) {
+			if (
+				row.logicalRowIndex < residentStart ||
+				row.logicalRowIndex >= residentEnd
+			) {
 				continue;
 			}
 			for (const slot of row.cells) {
@@ -357,10 +363,7 @@ export function createTwoHopViewportController(
 		budget: ReturnType<typeof frameBudgetTracker.beginFrame>,
 	): void {
 		for (const rowSlot of pool.rows) {
-			if (
-				rowSlot.logicalRowIndex >= start &&
-				rowSlot.logicalRowIndex < end
-			) {
+			if (rowSlot.logicalRowIndex >= start && rowSlot.logicalRowIndex < end) {
 				continue;
 			}
 			pool.hideRow(rowSlot);
@@ -369,7 +372,11 @@ export function createTwoHopViewportController(
 		for (let rowIndex = start; rowIndex < end; rowIndex += 1) {
 			const rowSlot = pool.rows[rowIndex % pool.capacity];
 			if (rowSlot.logicalRowIndex === rowIndex) continue;
-			pool.positionRow(rowSlot, rowIndex, resolveTwoHopRowTop(geometry, rowIndex));
+			pool.positionRow(
+				rowSlot,
+				rowIndex,
+				resolveTwoHopRowTop(geometry, rowIndex),
+			);
 			const isVisible = rowIndex >= visible.start && rowIndex < visible.end;
 			const canBindRich =
 				(residentStart < 0 && isVisible) ||
@@ -379,11 +386,7 @@ export function createTwoHopViewportController(
 		}
 	}
 
-	function bindRow(
-		rowSlot: TwoHopDomRowSlot,
-		rowIndex: number,
-		rich: boolean,
-	): void {
+	function bindRow(rowSlot: TwoHopDomRowSlot, rowIndex: number, rich: boolean): void {
 		for (let columnIndex = 0; columnIndex < pool.columns; columnIndex += 1) {
 			const slot = rowSlot.cells[columnIndex];
 			const cell = resolveTwoHopCellInto(
@@ -442,7 +445,8 @@ export function createTwoHopViewportController(
 	function rebuildData(anchorSectionIndex = -1): void {
 		const localScrollOffset = Math.max(0, readScrollTop() - cachedSectionTop);
 		const previousGeometry = geometry;
-		const visibleCounts = pagination.resolveForInput(sections).snapshot.visibleCounts;
+		const visibleCounts =
+			pagination.resolveForInput(sections).snapshot.visibleCounts;
 		snapshot = createSnapshot(visibleCounts);
 		geometry = createTwoHopGeometry(snapshot, layout);
 		pool.setContentHeight(geometry.totalHeight);
