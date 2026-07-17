@@ -129,11 +129,14 @@ export function createTwoHopShellRenderer(params: TwoHopShellRendererParams) {
 			model = params.resolveItemCardModel(cell.item, presentation);
 			modelCache.set(cell.item, model);
 		}
+		const visibleExtension = normalizeVisibleExtension(
+			model?.extension ?? presentation?.extension,
+		);
 		slot.title.className = "cosense-card-links__box-title";
 		slot.titleWrapper.className = "cosense-card-links__box-title-wrapper";
 		slot.cardModel = model;
 		slot.title.textContent = model?.title ?? cell.item.virtualKey;
-		slot.meta.textContent = model?.extension ?? presentation?.extension ?? "";
+		slot.meta.textContent = visibleExtension ?? "";
 		slot.root.setAttribute("aria-label", model?.ariaLabel ?? slot.title.textContent);
 		slot.root.dataset.cclSectionVariant = presentation?.sectionVariant ?? "";
 		slot.root.dataset.cclResolution = presentation?.resolution ?? "resolved";
@@ -258,6 +261,11 @@ function resolveHeaderIconName(
 		case "two-hop-branch":
 			return "Link";
 	}
+}
+
+function normalizeVisibleExtension(extension: string | null | undefined): string | null {
+	if (!extension || extension.toLowerCase() === "md") return null;
+	return extension.toLowerCase();
 }
 
 function renderIcon(icon: SVGSVGElement, name: IconName, size: number): void {
