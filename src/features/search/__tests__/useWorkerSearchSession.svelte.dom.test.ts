@@ -254,7 +254,7 @@ describe("useWorkerSearchSession", () => {
 		expect(screen.getByTestId("is-filtering")).toHaveTextContent("false");
 	});
 
-	it("keeps the previous query paired with its results until the next result arrives", async () => {
+	it("clears previous results while a different query is filtering", async () => {
 		const dataset = createDataset(["alpha", "beta"]);
 		const view = render(UseWorkerSearchSessionHarness, {
 			props: {
@@ -282,8 +282,8 @@ describe("useWorkerSearchSession", () => {
 		});
 		await flushAsyncUi();
 
-		expect(screen.getByTestId("matched-state")).toHaveTextContent("alpha");
-		expect(screen.getByTestId("matched-query")).toHaveTextContent("alpha");
+		expect(screen.getByTestId("matched-state")).toHaveTextContent("null");
+		expect(screen.getByTestId("matched-query")).toHaveTextContent(/^$/);
 		expect(screen.getByTestId("is-filtering")).toHaveTextContent("true");
 
 		workerHarness.resolveLatestPendingSearch(["beta"]);
@@ -291,6 +291,38 @@ describe("useWorkerSearchSession", () => {
 			expect(screen.getByTestId("matched-state")).toHaveTextContent("beta");
 			expect(screen.getByTestId("matched-query")).toHaveTextContent("beta");
 		});
+	});
+
+	it("keeps current results while the same query is re-filtering", async () => {
+		const initialDataset = createDataset(["alpha"]);
+		const view = render(UseWorkerSearchSessionHarness, {
+			props: {
+				app: {} as never,
+				query: "alpha",
+				enabled: true,
+				files: [],
+				dataset: initialDataset,
+			},
+		});
+
+		await flushAsyncUi();
+		workerHarness.resolveLatestPendingSearch(["alpha"]);
+		await waitFor(() => {
+			expect(screen.getByTestId("matched-state")).toHaveTextContent("alpha");
+		});
+
+		await view.rerender({
+			app: {} as never,
+			query: "alpha",
+			enabled: true,
+			files: [],
+			dataset: createDataset(["alpha", "beta"]),
+		});
+		await flushAsyncUi();
+
+		expect(screen.getByTestId("matched-state")).toHaveTextContent("alpha");
+		expect(screen.getByTestId("matched-query")).toHaveTextContent("alpha");
+		expect(screen.getByTestId("is-filtering")).toHaveTextContent("true");
 	});
 
 	it("adopts only the latest query result even when a stale worker response arrives later", async () => {

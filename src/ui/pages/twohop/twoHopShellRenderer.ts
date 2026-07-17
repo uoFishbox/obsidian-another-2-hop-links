@@ -6,7 +6,10 @@ import {
 } from "ui/interactions/interactionTypes";
 import type { TwoHopCardShellSlot } from "./twoHopDomPool";
 import type { TwoHopResolvedCell } from "./twoHopGeometry";
-import { resolveTwoHopItemStaticState, resolveTwoHopSectionVariant } from "./twoHopCellStaticState";
+import {
+	resolveTwoHopItemStaticState,
+	resolveTwoHopSectionVariant,
+} from "./twoHopCellStaticState";
 import type { TwoHopSnapshot } from "./twoHopSnapshot";
 import { resolveTwoHopNavigationCellKey } from "./twoHopInteractionRouter";
 import { ICONS, svgAttrs, type IconName, type SvgElement } from "ui/utils/icons";
@@ -14,7 +17,7 @@ import { highlightTextForSearch } from "features/preview/text-processing/searchH
 
 export interface TwoHopShellRendererParams {
 	readonly resolveItemCardModel?: (
-		item: Extract<TwoHopResolvedCell, { kind: "item" }>['item'],
+		item: Extract<TwoHopResolvedCell, { kind: "item" }>["item"],
 		presentation: NonNullable<
 			ReturnType<typeof resolveTwoHopItemStaticState>["presentation"]
 		>,
@@ -32,12 +35,7 @@ export function createTwoHopShellRenderer(params: TwoHopShellRendererParams) {
 		cell: TwoHopResolvedCell | null,
 		snapshot: TwoHopSnapshot,
 	): void {
-		prepareSlot(
-			slot,
-			cell,
-			snapshot,
-			slot.renderRevision !== renderRevision,
-		);
+		prepareSlot(slot, cell, snapshot, slot.renderRevision !== renderRevision);
 		slot.renderRevision = renderRevision;
 		slot.rich = false;
 		slot.cardModel = null;
@@ -54,12 +52,12 @@ export function createTwoHopShellRenderer(params: TwoHopShellRendererParams) {
 	): void {
 		const identity = resolveCellIdentity(cell, snapshot);
 		const revisionChanged = slot.renderRevision !== renderRevision;
-		const previousPreviewFilePath = slot.cardModel?.targetFile?.path;
-		const preservePreview =
+		const previousPreviewIdentity = slot.cardModel?.previewActivationIdentity;
+		const tentativelyPreservePreview =
 			revisionChanged &&
 			slot.logicalIdentity === identity &&
 			cell.kind === "item" &&
-			previousPreviewFilePath !== undefined;
+			previousPreviewIdentity !== undefined;
 		const retainedRichShell =
 			slot.rich && slot.logicalIdentity === identity && !revisionChanged;
 		if (retainedRichShell) {
@@ -68,7 +66,7 @@ export function createTwoHopShellRenderer(params: TwoHopShellRendererParams) {
 			slot.cell.style.visibility = "visible";
 			return;
 		}
-		prepareSlot(slot, cell, snapshot, revisionChanged, preservePreview);
+		prepareSlot(slot, cell, snapshot, revisionChanged, tentativelyPreservePreview);
 		slot.renderRevision = renderRevision;
 		slot.rich = true;
 		slot.root.classList.remove("is-skeleton");
@@ -95,10 +93,7 @@ export function createTwoHopShellRenderer(params: TwoHopShellRendererParams) {
 				26,
 			);
 			slot.previewHost.style.display = "none";
-			slot.root.setAttribute(
-				"aria-label",
-				`${descriptor.totalCount} notes`,
-			);
+			slot.root.setAttribute("aria-label", `${descriptor.totalCount} notes`);
 			slot.root.dataset.cclSectionVariant = resolveTwoHopSectionVariant(
 				descriptor.section,
 			);
@@ -136,10 +131,7 @@ export function createTwoHopShellRenderer(params: TwoHopShellRendererParams) {
 			return;
 		}
 
-		const staticState = resolveTwoHopItemStaticState(
-			cell.item,
-			descriptor.section,
-		);
+		const staticState = resolveTwoHopItemStaticState(cell.item, descriptor.section);
 		const presentation = staticState.presentation;
 		let model = modelCache.get(cell.item) ?? null;
 		if (!model && presentation && params.resolveItemCardModel) {
@@ -153,8 +145,8 @@ export function createTwoHopShellRenderer(params: TwoHopShellRendererParams) {
 		slot.titleWrapper.className = "cosense-card-links__box-title-wrapper";
 		slot.cardModel = model;
 		if (
-			preservePreview &&
-			model?.targetFile?.path !== previousPreviewFilePath
+			tentativelyPreservePreview &&
+			model?.previewActivationIdentity !== previousPreviewIdentity
 		) {
 			discardPreview(slot);
 		}
@@ -165,7 +157,10 @@ export function createTwoHopShellRenderer(params: TwoHopShellRendererParams) {
 			slot.title.textContent = title;
 		}
 		slot.meta.textContent = visibleExtension ?? "";
-		slot.root.setAttribute("aria-label", model?.ariaLabel ?? slot.title.textContent);
+		slot.root.setAttribute(
+			"aria-label",
+			model?.ariaLabel ?? slot.title.textContent,
+		);
 		slot.root.dataset.cclSectionVariant = presentation?.sectionVariant ?? "";
 		slot.root.dataset.cclResolution = presentation?.resolution ?? "resolved";
 		slot.root.dataset.cclAttachment = presentation?.attachment ? "true" : "false";
@@ -307,7 +302,9 @@ function resolveHeaderIconName(
 	}
 }
 
-function normalizeVisibleExtension(extension: string | null | undefined): string | null {
+function normalizeVisibleExtension(
+	extension: string | null | undefined,
+): string | null {
 	if (!extension || extension.toLowerCase() === "md") return null;
 	return extension.toLowerCase();
 }

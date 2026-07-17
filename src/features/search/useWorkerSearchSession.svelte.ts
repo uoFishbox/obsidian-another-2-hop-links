@@ -380,6 +380,16 @@ export function useWorkerSearchSession(
 			return;
 		}
 
+		if (
+			matchedKeySet !== null &&
+			(matchedQuery !== normalizedQuery || matchedScope !== requestScope)
+		) {
+			matchedKeySet = null;
+			matchedItemByKey = null;
+			matchedQuery = "";
+			ripgrepPositionByPath = EMPTY_RIPGREP_POSITION_BY_PATH;
+		}
+
 		lastIssuedSearchSignature = signature;
 		const requestId = ++requestSerial;
 		activeRequestQuery = normalizedQuery;

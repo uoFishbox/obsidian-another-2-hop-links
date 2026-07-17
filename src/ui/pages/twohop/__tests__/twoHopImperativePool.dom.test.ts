@@ -102,7 +102,7 @@ describe("twoHop imperative DOM pool", () => {
 		expect(slot.root.classList.contains("is-skeleton")).toBe(false);
 	});
 
-	it("refreshes the model and preview state after a render revision change", () => {
+	it("retains the preview when its activation identity is unchanged", () => {
 		const { snapshot, geometry } = createFixture();
 		const content = document.createElement("div");
 		const pool = createTwoHopDomPool({ content, rowCapacity: 1, columns: 2 });
@@ -147,6 +147,53 @@ describe("twoHop imperative DOM pool", () => {
 		expect(slot.previewHost.childElementCount).toBe(1);
 	});
 
+	it("discards a retained preview when its activation identity changes", () => {
+		const { snapshot, geometry } = createFixture();
+		const content = document.createElement("div");
+		const pool = createTwoHopDomPool({ content, rowCapacity: 1, columns: 2 });
+		let previewActivationIdentity = "preview:notes/missing.md:query-a";
+		const resolveItemCardModel = vi.fn(() => ({
+			item: snapshot.sections[0].items[0].item,
+			targetFile: {
+				path: "notes/missing.md",
+				extension: "md",
+			} as TFile,
+			title: "Resolved title",
+			ariaLabel: "Open Resolved title",
+			className: null,
+			extension: null,
+			directory: null,
+			interactionId: "item:missing",
+			interactionKey: "item:missing",
+			presentation: undefined,
+			searchQuery: "",
+			searchScope: "title-and-content" as const,
+			contentPreview: undefined,
+			previewRefreshToken: 0,
+			previewActivationIdentity,
+		}));
+		const renderer = createTwoHopShellRenderer({ resolveItemCardModel });
+		const cell = resolveTwoHopCell(snapshot, geometry, 0, 1);
+		if (!cell) throw new Error("expected item cell");
+		const slot = pool.rows[0].cells[1];
+		renderer.renderShell(slot, cell, snapshot);
+		const disposePreview = vi.fn();
+		const generation = slot.generation;
+		slot.previewStatus = "ready";
+		slot.disposePreview = disposePreview;
+		slot.previewHost.append(document.createElement("strong"));
+
+		previewActivationIdentity = "preview:notes/missing.md:query-b";
+		renderer.invalidateCardModels();
+		renderer.renderShell(slot, cell, snapshot);
+
+		expect(resolveItemCardModel).toHaveBeenCalledTimes(2);
+		expect(disposePreview).toHaveBeenCalledOnce();
+		expect(slot.previewHost.childElementCount).toBe(0);
+		expect(slot.previewStatus).toBe("empty");
+		expect(slot.generation).toBe(generation + 1);
+	});
+
 	it("renders section headers as title and icon without a visible count", () => {
 		const { snapshot, geometry } = createFixture();
 		const content = document.createElement("div");
@@ -161,7 +208,9 @@ describe("twoHop imperative DOM pool", () => {
 		expect(slot.title.textContent).toBe("New links");
 		expect(slot.meta.textContent).toBe("");
 		expect(slot.headerIcon.dataset.cclIconName).toBe("Unlink");
-		expect(slot.headerIcon.querySelectorAll("path, circle, rect, line").length).toBeGreaterThan(0);
+		expect(
+			slot.headerIcon.querySelectorAll("path, circle, rect, line").length,
+		).toBeGreaterThan(0);
 	});
 
 	it("renders load more with the original centered ellipsis icon", () => {
@@ -177,7 +226,9 @@ describe("twoHop imperative DOM pool", () => {
 		renderer.renderShell(pool.rows[0].cells[0], loadMore, snapshot);
 
 		const slot = pool.rows[0].cells[0];
-		expect(slot.root.classList.contains("cosense-card-links__load-more-button")).toBe(true);
+		expect(
+			slot.root.classList.contains("cosense-card-links__load-more-button"),
+		).toBe(true);
 		expect(slot.title.textContent).toBe("");
 		expect(slot.meta.style.display).toBe("none");
 		expect(slot.previewHost.style.display).toBe("none");
