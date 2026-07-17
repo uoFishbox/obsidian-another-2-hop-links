@@ -3,6 +3,8 @@ import type { PreviewData, PreviewRequestOptions } from "features/preview/public
 import type { TwoHopDomRowSlot, TwoHopCardShellSlot } from "./twoHopDomPool";
 import { processPreviewContent } from "features/preview/renderers/markdownPreviewRenderer";
 import { toPreviewImageSrc } from "features/preview/utils/externalFileImage";
+import { highlightSearchMatchesInHtml } from "features/preview/text-processing/searchHighlighter";
+import type { CardRenderModel } from "ui/components/items/cardRenderModel";
 
 export type TwoHopPreviewLane = "visible-idle" | "scroll-opportunistic";
 
@@ -143,12 +145,13 @@ export function createTwoHopPreviewHydrator(
 
 		try {
 			const model = slot.cardModel;
-			const preview = model?.contentPreview
+			const sourcePreview = model?.contentPreview
 				? ({ type: "text", content: model.contentPreview } as const)
 				: await params.getPreview(file, abortController.signal, {
 						cacheRevision:
 							model?.previewCacheRevision ?? model?.previewRefreshToken,
 					});
+			const preview = applyPreviewSearchHighlight(sourcePreview, model);
 			if (!isCurrent(slot, generation, identity)) {
 				stats.staleCompletions += 1;
 				return;
@@ -315,6 +318,27 @@ async function commitPreview(
 
 	if (!signal.aborted && canCommit()) host.replaceChildren(container);
 	return;
+}
+
+function applyPreviewSearchHighlight(
+	preview: PreviewData,
+	model: CardRenderModel | null,
+): PreviewData {
+	if (
+		preview.type !== "text" ||
+		model?.searchScope !== "title-and-content" ||
+		!model.searchQuery.trim()
+	) {
+		return preview;
+	}
+
+	return {
+		...preview,
+		content: highlightSearchMatchesInHtml(
+			preview.content,
+			model.searchQuery,
+		),
+	};
 }
 
 function resolveOwnerWindow(

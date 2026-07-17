@@ -10,6 +10,7 @@ import { resolveTwoHopItemStaticState, resolveTwoHopSectionVariant } from "./two
 import type { TwoHopSnapshot } from "./twoHopSnapshot";
 import { resolveTwoHopNavigationCellKey } from "./twoHopInteractionRouter";
 import { ICONS, svgAttrs, type IconName, type SvgElement } from "ui/utils/icons";
+import { highlightTextForSearch } from "features/preview/text-processing/searchHighlighter";
 
 export interface TwoHopShellRendererParams {
 	readonly resolveItemCardModel?: (
@@ -157,7 +158,12 @@ export function createTwoHopShellRenderer(params: TwoHopShellRendererParams) {
 		) {
 			discardPreview(slot);
 		}
-		slot.title.textContent = model?.title ?? cell.item.virtualKey;
+		const title = model?.title ?? cell.item.virtualKey;
+		if (model?.searchQuery) {
+			slot.title.innerHTML = highlightTextForSearch(title, model.searchQuery);
+		} else {
+			slot.title.textContent = title;
+		}
 		slot.meta.textContent = visibleExtension ?? "";
 		slot.root.setAttribute("aria-label", model?.ariaLabel ?? slot.title.textContent);
 		slot.root.dataset.cclSectionVariant = presentation?.sectionVariant ?? "";

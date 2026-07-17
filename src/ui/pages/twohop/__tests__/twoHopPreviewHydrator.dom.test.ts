@@ -138,6 +138,44 @@ describe("twoHopPreviewHydrator", () => {
 		hydrator.dispose();
 	});
 
+	it("highlights visible preview matches during content search", async () => {
+		const pool = createReadyPool();
+		const slot = pool.rows[0].cells[0];
+		if (!slot.cardModel) throw new Error("expected card model");
+		slot.cardModel = {
+			...slot.cardModel,
+			searchQuery: "needle",
+			searchScope: "title-and-content",
+			contentPreview: "<p>Before Needle after</p>",
+		};
+		pool.rows[0].cells[1].previewStatus = "ready";
+		const hydrator = createTwoHopPreviewHydrator({
+			getRows: () => pool.rows,
+			getPreview: vi.fn(async () => ({ type: "empty" as const, content: "" })),
+			setTimer: () => 1,
+			clearTimer: () => {},
+		});
+		hydrator.notifyViewport({
+			visibleStart: 0,
+			visibleEnd: 1,
+			scrollActive: false,
+			velocityRowsPerMs: 0,
+			criticalWorkPending: false,
+		});
+
+		expect(hydrator.hydrateNext("visible-idle")).toBe(true);
+		await Promise.resolve();
+		await Promise.resolve();
+
+		expect(
+			slot.previewHost.querySelector(".ccl-search-highlight")?.textContent,
+		).toBe("Needle");
+		expect(slot.previewHost.querySelector("p")?.textContent).toBe(
+			"Before Needle after",
+		);
+		hydrator.dispose();
+	});
+
 	it("keeps the previous preview visible until its replacement is ready", async () => {
 		const pool = createReadyPool();
 		const slot = pool.rows[0].cells[0];

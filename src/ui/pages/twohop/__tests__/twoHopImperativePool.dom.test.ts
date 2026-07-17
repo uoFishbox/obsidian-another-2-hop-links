@@ -77,7 +77,7 @@ describe("twoHop imperative DOM pool", () => {
 			interactionId: "item:missing",
 			interactionKey: "item:missing",
 			presentation: undefined,
-			searchQuery: "",
+			searchQuery: "resolved",
 			searchScope: "title-only" as const,
 			contentPreview: undefined,
 			previewRefreshToken: 0,
@@ -95,6 +95,9 @@ describe("twoHop imperative DOM pool", () => {
 		renderer.renderShell(slot, cell, snapshot);
 		expect(resolveItemCardModel).toHaveBeenCalledOnce();
 		expect(slot.title.textContent).toBe("Resolved title");
+		expect(slot.title.querySelector(".ccl-search-highlight")?.textContent).toBe(
+			"Resolved",
+		);
 		expect(slot.root.dataset.cclInteractionId).toBe("item:missing");
 		expect(slot.root.classList.contains("is-skeleton")).toBe(false);
 	});
