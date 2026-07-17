@@ -32,6 +32,7 @@ import {
 	type ViewPlanLayoutMetrics,
 } from "./viewPlanLayout";
 import { createVirtualScrollWindowMeasurementController } from "./virtualScrollWindowMeasurementController";
+import type { VirtualFrameCoordinator } from "ui/virtualization/frameCoordinator";
 
 type ConfiguredCardLayout = ReturnType<typeof resolveCardLayoutSettings>;
 
@@ -95,6 +96,7 @@ export function createViewPlanMeasurementRuntime<
 	getConfiguredCardLayout(): ConfiguredCardLayout | null;
 	getValidatedSections(): readonly SectionRenderDescriptor<T, G>[];
 	policyResolver: ViewPlanCardVirtualListPolicyResolver;
+	frameCoordinator?: VirtualFrameCoordinator;
 }) {
 	let hasObservedInitialLayout = $state(false);
 	let hasConsumedInitialCardLayoutEffect = false;
@@ -339,6 +341,7 @@ export function createViewPlanMeasurementRuntime<
 		primeUnstableScrollStart: true,
 		maxUnstableMeasurementRetries:
 			CARD_VIRTUAL_LIST_MAX_UNSTABLE_MEASUREMENT_RETRIES,
+		frameCoordinator: params.frameCoordinator,
 	});
 
 	const scheduleLayoutMeasurementForCardLayout = (

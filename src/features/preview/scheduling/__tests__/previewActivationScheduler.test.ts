@@ -34,6 +34,7 @@ import {
 	type PreviewActivationHandle,
 	type PreviewActivationScope,
 } from "../previewActivationScheduler";
+import type { VirtualFrameCoordinator } from "ui/virtualization/frameCoordinator";
 
 const scrollSource = {};
 const DEFAULT_FRAME_INTERVAL_MS = 1000 / 60;
@@ -206,6 +207,32 @@ describe("preview activation scheduler", () => {
 		expect(results).toEqual([true, true, true]);
 		counters = getCCLDevMeasurementSnapshot().counters;
 		expect(counters["preview.activationScheduler.animationFrame"].count).toBe(2);
+	});
+
+	it("delegates idle activation drains to the surface frame coordinator", async () => {
+		let idleTask: (() => void) | undefined;
+		const frameCoordinator: VirtualFrameCoordinator = {
+			schedule: vi.fn((_lane, _key, task) => {
+				idleTask = task;
+				return true;
+			}),
+			cancel: vi.fn(),
+			isScheduled: vi.fn(() => false),
+			dispose: vi.fn(),
+		};
+		const scope = createPreviewActivationScope({ frameCoordinator });
+		const activation = requestQueuedActivationResult("preview-coordinated", scope);
+
+		expect(frameCoordinator.schedule).toHaveBeenCalledWith(
+			"idle",
+			"preview:activation-drain",
+			expect.any(Function),
+		);
+		expect(requestAnimationFrame).not.toHaveBeenCalled();
+		idleTask?.();
+
+		await expect(activation.result).resolves.toBe(true);
+		expect(requestAnimationFrame).not.toHaveBeenCalled();
 	});
 
 	it("does not activate synchronously in a scroll measurement frame", async () => {

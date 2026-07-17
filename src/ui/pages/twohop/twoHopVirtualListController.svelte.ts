@@ -18,6 +18,7 @@ import type {
 	TwoHopCellBinding,
 	TwoHopResidentCell,
 } from "./twoHopCellBinding";
+import type { VirtualFrameCoordinator } from "ui/virtualization/frameCoordinator";
 
 export type { TwoHopVirtualListSurfaceProps };
 
@@ -50,6 +51,7 @@ export interface TwoHopVirtualListController {
 /** Composes the one-way input -> plan -> measurement -> slot pipeline. */
 export function createTwoHopVirtualListController(
 	props: TwoHopVirtualListSurfaceProps,
+	options: { readonly frameCoordinator?: VirtualFrameCoordinator } = {},
 ): TwoHopVirtualListController {
 	const measurementState = createTwoHopMeasurementState();
 	const inputRuntime = createTwoHopVirtualListInputRuntime({
@@ -58,6 +60,7 @@ export function createTwoHopVirtualListController(
 	});
 	const mountedRuntime = createTwoHopVirtualListMountedRuntime({
 		inputRuntime,
+		frameCoordinator: options.frameCoordinator,
 		onStableVisibleRange: () => {
 			measurementState.measurement.hasStableVisibleRange = true;
 		},
@@ -66,6 +69,7 @@ export function createTwoHopVirtualListController(
 		inputRuntime,
 		mountedRuntime,
 		measurementState,
+		frameCoordinator: options.frameCoordinator,
 	});
 
 	$effect(() => inputRuntime.inputState.syncVisibleCountsForInput());

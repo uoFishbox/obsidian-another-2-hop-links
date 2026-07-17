@@ -7,6 +7,7 @@ import {
 import { resolveTwoHopSlotId } from "./twoHopSlotId";
 import type { TwoHopSlotIdCell } from "./twoHopSlotId";
 import { createTwoHopScalarScrollKernel } from "./twoHopScalarScrollKernel.svelte";
+import type { VirtualFrameCoordinator } from "ui/virtualization/frameCoordinator";
 
 function getTwoHopActivationCandidateId(cell: TwoHopSlotIdCell): string {
 	return resolveTwoHopSlotId(cell);
@@ -15,6 +16,7 @@ function getTwoHopActivationCandidateId(cell: TwoHopSlotIdCell): string {
 /** Owns the scalar kernel and its reactive row-model synchronization. */
 export function createTwoHopVirtualListMountedRuntime(params: {
 	readonly inputRuntime: TwoHopVirtualListInputRuntime;
+	readonly frameCoordinator?: VirtualFrameCoordinator;
 	onStableVisibleRange(): void;
 }) {
 	const rowPreviewActivationRuntime = getContext<
@@ -24,6 +26,7 @@ export function createTwoHopVirtualListMountedRuntime(params: {
 		initialRowModel: params.inputRuntime.rowModel,
 		rowPreviewActivationRuntime,
 		enableResidentWindow: true,
+		frameCoordinator: params.frameCoordinator,
 		onStableVisibleRange: params.onStableVisibleRange,
 	});
 	$effect(() => {

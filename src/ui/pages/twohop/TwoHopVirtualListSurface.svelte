@@ -22,6 +22,7 @@
 		TwoHopItemCellBinding,
 	} from "./twoHopCellBinding";
 	import type { CardRenderModel } from "ui/components/items/cardRenderModel";
+	import { provideVirtualFrameCoordinator } from "ui/virtualization/frameCoordinatorContext.svelte";
 
 	interface Props {
 		sections: readonly SectionRenderDescriptor<
@@ -70,8 +71,9 @@
 	const props: Props = $props();
 	const cellRegistry = createSurfaceVirtualCellRegistry();
 	let contentEl = $state<HTMLDivElement | null>(null);
-	providePreviewActivationContexts();
-	const list = createTwoHopVirtualListController(props);
+	const frameCoordinator = provideVirtualFrameCoordinator();
+	providePreviewActivationContexts({ frameCoordinator });
+	const list = createTwoHopVirtualListController(props, { frameCoordinator });
 	const interactionDescriptorResolverProvider =
 		createTwoHopInteractionDescriptorCache({
 			getMountedCellByInteractionId: list.getMountedCellByInteractionId,

@@ -13,6 +13,7 @@ import {
 	enqueuePreviewDomCommit,
 	resetPreviewDomCommitSchedulerForTests,
 } from "../previewDomCommitScheduler";
+import type { VirtualFrameCoordinator } from "ui/virtualization/frameCoordinator";
 
 const scrollSource = {};
 const DEFAULT_FRAME_INTERVAL_MS = 1000 / 60;
@@ -169,6 +170,36 @@ describe("preview DOM commit scheduler", () => {
 		counters = getCCLDevMeasurementSnapshot().counters;
 		expect(counters["preview.domCommitScheduler.animationFrame"].count).toBe(1);
 		await expect(Promise.all(commits)).resolves.toEqual([true, true, true]);
+	});
+
+	it("delegates idle DOM commits to the surface frame coordinator", async () => {
+		let idleTask: (() => void) | undefined;
+		const frameCoordinator: VirtualFrameCoordinator = {
+			schedule: vi.fn((_lane, _key, task) => {
+				idleTask = task;
+				return true;
+			}),
+			cancel: vi.fn(),
+			isScheduled: vi.fn(() => false),
+			dispose: vi.fn(),
+		};
+		const commit = enqueuePreviewDomCommit({
+			targetKey: "preview-coordinated",
+			isStale: () => false,
+			commit: () => true,
+			frameCoordinator,
+		});
+
+		expect(frameCoordinator.schedule).toHaveBeenCalledWith(
+			"idle",
+			"preview:dom-commit-drain",
+			expect.any(Function),
+		);
+		expect(requestAnimationFrame).not.toHaveBeenCalled();
+		idleTask?.();
+
+		await expect(commit).resolves.toBe(true);
+		expect(requestAnimationFrame).not.toHaveBeenCalled();
 	});
 
 	it("allows an idle burst of four commits", async () => {

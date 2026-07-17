@@ -1,6 +1,10 @@
 import type { RowPreviewActivationRuntime } from "features/preview/scheduling/rowPreviewActivationRuntime";
 import { recordCCLDevMeasurement } from "infrastructure/debug/CCLDevMeasurements";
 import { createPostPaintVirtualListTask } from "ui/components/common/virtual-list/dom/virtualListScheduler";
+import {
+	createCoordinatedScheduledTask,
+	type VirtualFrameCoordinator,
+} from "ui/virtualization/frameCoordinator";
 import type { RowRange } from "ui/components/common/virtual-list/rowRange";
 import type { VirtualRanges } from "ui/components/common/virtual-list/types";
 import {
@@ -26,6 +30,7 @@ export function createTwoHopScalarScrollKernel(params: {
 	readonly initialRowModel: TwoHopViewPlanRowModel;
 	readonly rowPreviewActivationRuntime?: RowPreviewActivationRuntime;
 	readonly enableResidentWindow?: boolean;
+	readonly frameCoordinator?: VirtualFrameCoordinator;
 	onStableVisibleRange(): void;
 }) {
 	const enableResidentWindow = params.enableResidentWindow ?? false;
@@ -94,12 +99,17 @@ export function createTwoHopScalarScrollKernel(params: {
 		range: mountedRange,
 		updateKind: "reused",
 	} as const;
-	const residentRefillTask = createPostPaintVirtualListTask(
-		() => {
-			refillResidentOnce();
-		},
-		2,
-	);
+	const runResidentRefill = (): void => {
+		refillResidentOnce();
+	};
+	const residentRefillTask = params.frameCoordinator
+		? createCoordinatedScheduledTask({
+				coordinator: params.frameCoordinator,
+				lane: "post-paint",
+				key: "two-hop:resident-refill",
+				task: runResidentRefill,
+			})
+		: createPostPaintVirtualListTask(runResidentRefill, 2);
 
 	function bindRange(plan: TwoHopViewPlan, start: number, end: number): void {
 		for (let rowIndex = start; rowIndex < end; rowIndex += 1) {

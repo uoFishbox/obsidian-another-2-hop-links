@@ -5,6 +5,7 @@ import {
 import { createViewPlanCardVirtualListPolicyResolver } from "ui/components/common/virtual-list/svelte/viewPlanPolicy";
 import type { TwoHopVirtualListInputRuntime } from "./twoHopVirtualListInputRuntime.svelte";
 import type { TwoHopVirtualListMountedRuntime } from "./twoHopVirtualListMountedRuntime.svelte";
+import type { VirtualFrameCoordinator } from "ui/virtualization/frameCoordinator";
 
 export { createViewPlanMeasurementState as createTwoHopMeasurementState };
 
@@ -13,6 +14,7 @@ export function createTwoHopVirtualListMeasurementRuntime(params: {
 	readonly inputRuntime: TwoHopVirtualListInputRuntime;
 	readonly mountedRuntime: TwoHopVirtualListMountedRuntime;
 	readonly measurementState: ReturnType<typeof createViewPlanMeasurementState>;
+	readonly frameCoordinator?: VirtualFrameCoordinator;
 }) {
 	const policyResolver = createViewPlanCardVirtualListPolicyResolver({
 		getPreviewActivationAheadRows: () =>
@@ -36,6 +38,7 @@ export function createTwoHopVirtualListMeasurementRuntime(params: {
 		getConfiguredCardLayout: () => params.inputRuntime.configuredCardLayout,
 		getValidatedSections: () => params.inputRuntime.validatedSections,
 		policyResolver,
+		frameCoordinator: params.frameCoordinator,
 	});
 
 	return {

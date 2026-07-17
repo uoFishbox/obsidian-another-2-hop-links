@@ -23,6 +23,9 @@ export type CCLDevMeasurementName =
 	| "residentWindow.refill"
 	| "residentWindow.emergencyBind"
 	| "residentWindow.distantJump"
+	| "virtualFrame.critical"
+	| "virtualFrame.postPaint"
+	| "virtualFrame.idle"
 	| "twoHop.itemBody.mount"
 	| "twoHop.interactionDescriptorCache.hit"
 	| "twoHop.interactionDescriptorCache.miss"
@@ -81,6 +84,9 @@ export const CCL_DEV_MEASUREMENT_NAMES: readonly CCLDevMeasurementName[] = [
 	"residentWindow.refill",
 	"residentWindow.emergencyBind",
 	"residentWindow.distantJump",
+	"virtualFrame.critical",
+	"virtualFrame.postPaint",
+	"virtualFrame.idle",
 	"twoHop.itemBody.mount",
 	"twoHop.interactionDescriptorCache.hit",
 	"twoHop.interactionDescriptorCache.miss",

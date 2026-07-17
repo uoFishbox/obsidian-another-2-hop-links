@@ -26,8 +26,12 @@
 		normalizePreviewQuery,
 		type PreviewSearchContext,
 	} from "./cardPreviewSharedCache";
-	import { enqueuePreviewDomCommit } from "features/preview/scheduling/previewDomCommitScheduler";
+	import {
+		enqueuePreviewDomCommit,
+		type PreviewDomCommitTask,
+	} from "features/preview/scheduling/previewDomCommitScheduler";
 	import { syncMathJaxStylesForNode } from "ui/utils/mathJaxShadowStyles";
+	import { getVirtualFrameCoordinatorContext } from "ui/virtualization/frameCoordinatorContext.svelte";
 
 	interface Props {
 		file: TFile | undefined;
@@ -61,6 +65,11 @@
 	let container = $state<HTMLDivElement | undefined>(undefined);
 	const { app, applicationStore, resolveSearchMatchPosition } = useAppContext();
 	const domCommitScopeKey = `card-preview:${++nextCardPreviewDomCommitScopeId}`;
+	const frameCoordinator = getVirtualFrameCoordinatorContext();
+	const enqueueCoordinatedPreviewDomCommit = (
+		task: PreviewDomCommitTask,
+	): Promise<boolean> =>
+		enqueuePreviewDomCommit({ ...task, frameCoordinator });
 
 	let lastPreviewRenderRequest: PreviewRenderRequest | null = null;
 	let lastPreviewRenderDomOverride: PreviewData | null = null;
@@ -216,7 +225,7 @@
 		const targetContainer = container;
 		if (!targetContainer) return false;
 
-		return enqueuePreviewDomCommit({
+		return enqueueCoordinatedPreviewDomCommit({
 			targetKey: domCommitScopeKey,
 			isStale: () => isRenderStale(signal, renderToken),
 			commit: () => {
@@ -246,7 +255,7 @@
 			return false;
 		}
 
-		const didMutateDom = await enqueuePreviewDomCommit({
+		const didMutateDom = await enqueueCoordinatedPreviewDomCommit({
 			targetKey: domCommitScopeKey,
 			isStale: () => isRenderStale(signal, renderToken),
 			commit: () => {
@@ -352,7 +361,7 @@
 						if (isRenderStale(signal, renderToken)) return false;
 						const targetContainer = container;
 						if (!targetContainer) return false;
-						return enqueuePreviewDomCommit({
+						return enqueueCoordinatedPreviewDomCommit({
 							targetKey: domCommitScopeKey,
 							isStale: () => isRenderStale(signal, renderToken),
 							commit: () => {
@@ -409,7 +418,7 @@
 					img.fetchPriority = "low";
 					img.src = toPreviewImageSrc(previewForRender.content);
 
-					return enqueuePreviewDomCommit({
+					return enqueueCoordinatedPreviewDomCommit({
 						targetKey: domCommitScopeKey,
 						isStale: () => isRenderStale(signal, renderToken),
 						commit: () => {
@@ -483,7 +492,7 @@
 								return;
 							}
 
-							const didCommit = await enqueuePreviewDomCommit({
+							const didCommit = await enqueueCoordinatedPreviewDomCommit({
 								targetKey: domCommitScopeKey,
 								isStale: () => isRenderStale(signal, renderToken),
 								commit: () => {
@@ -552,7 +561,7 @@
 			if (signal.aborted || isAbortError(error) || !targetContainer) {
 				return false;
 			}
-			await enqueuePreviewDomCommit({
+			await enqueueCoordinatedPreviewDomCommit({
 				targetKey: domCommitScopeKey,
 				isStale: () => isRenderStale(signal, renderToken),
 				commit: () => {

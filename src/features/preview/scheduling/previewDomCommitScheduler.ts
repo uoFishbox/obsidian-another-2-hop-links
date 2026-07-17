@@ -10,6 +10,7 @@ import {
 	refillPreviewScheduleTokens,
 	type PreviewScheduleTokenState,
 } from "./previewScheduleTokenBucket";
+import type { VirtualFrameCoordinator } from "ui/virtualization/frameCoordinator";
 
 const MAX_QUEUE_ENTRIES_PER_DRAIN = 256;
 const FALLBACK_FRAME_INTERVAL_MS = 1000 / 60;
@@ -32,6 +33,7 @@ export interface PreviewDomCommitTask {
 	readonly targetKey: string;
 	readonly isStale: () => boolean;
 	readonly commit: () => boolean;
+	readonly frameCoordinator?: VirtualFrameCoordinator;
 }
 
 interface QueuedPreviewDomCommitTask extends PreviewDomCommitTask {
@@ -45,6 +47,7 @@ let pendingQueue: QueuedPreviewDomCommitTask[] = [];
 let pendingQueueHead = 0;
 let frameHandle: number | null = null;
 let frameHandleKind: "animation-frame" | "timeout" | null = null;
+let scheduledFrameCoordinator: VirtualFrameCoordinator | undefined;
 let commitTokenState: PreviewScheduleTokenState =
 	createEmptyPreviewScheduleTokenState();
 let unsubscribeScrollActivity: (() => void) | undefined;
@@ -105,6 +108,10 @@ function readNextQueuedTask(): QueuedPreviewDomCommitTask | undefined {
 }
 
 function cancelFrameDrain(): void {
+	if (scheduledFrameCoordinator) {
+		scheduledFrameCoordinator.cancel("idle", "preview:dom-commit-drain");
+		scheduledFrameCoordinator = undefined;
+	}
 	if (frameHandle === null) return;
 
 	if (
@@ -141,10 +148,26 @@ function releaseScrollActivitySubscriptionIfIdle(): void {
 function scheduleFrameDrain(): void {
 	if (
 		frameHandle !== null ||
+		scheduledFrameCoordinator !== undefined ||
 		pendingByTargetKey.size === 0 ||
 		isScrollActivityActive()
 	) {
 		return;
+	}
+	const coordinator = resolvePendingCoordinator();
+	if (coordinator) {
+		const scheduled = coordinator.schedule(
+			"idle",
+			"preview:dom-commit-drain",
+			() => {
+				scheduledFrameCoordinator = undefined;
+				drainFrame(readMonotonicTime());
+			},
+		);
+		if (scheduled) {
+			scheduledFrameCoordinator = coordinator;
+			return;
+		}
 	}
 
 	if (typeof globalThis.requestAnimationFrame !== "function") {
@@ -166,6 +189,17 @@ function scheduleFrameDrain(): void {
 		frameHandleKind = null;
 		drainFrame(timestamp);
 	});
+}
+
+function resolvePendingCoordinator(): VirtualFrameCoordinator | undefined {
+	let coordinator: VirtualFrameCoordinator | undefined;
+	for (const task of pendingByTargetKey.values()) {
+		if (task.settled) continue;
+		if (!task.frameCoordinator) return undefined;
+		if (coordinator && coordinator !== task.frameCoordinator) return undefined;
+		coordinator = task.frameCoordinator;
+	}
+	return coordinator;
 }
 
 function drainFrame(frameTimestamp: number): void {

@@ -8,6 +8,7 @@ import {
 	getCCLDevMeasurementSnapshot,
 	resetCCLDevMeasurements,
 } from "infrastructure/debug/CCLDevMeasurements";
+import type { VirtualFrameCoordinator } from "ui/virtualization/frameCoordinator";
 
 describe("createVirtualListMeasurementScheduler", () => {
 	beforeEach(() => {
@@ -75,6 +76,41 @@ describe("createVirtualListMeasurementScheduler", () => {
 		await vi.runAllTimersAsync();
 
 		expect(runLayoutMeasurement).toHaveBeenCalledTimes(3);
+	});
+
+	it("delegates measurement work to the coordinator critical lane", () => {
+		const scheduledTasks = new Map<string, () => void>();
+		const frameCoordinator: VirtualFrameCoordinator = {
+			schedule: vi.fn((lane, key, task) => {
+				const taskKey = `${lane}:${key}`;
+				if (scheduledTasks.has(taskKey)) return false;
+				scheduledTasks.set(taskKey, task);
+				return true;
+			}),
+			cancel: vi.fn((lane, key) => {
+				scheduledTasks.delete(`${lane}:${key}`);
+			}),
+			isScheduled: vi.fn((lane, key) =>
+				scheduledTasks.has(`${lane}:${key}`),
+			),
+			dispose: vi.fn(),
+		};
+		const runScrollMeasurement = vi.fn();
+		const scheduler = createVirtualListMeasurementScheduler({
+			runLayoutMeasurement: vi.fn(),
+			runScrollMeasurement,
+			maxUnstableMeasurementRetries: 3,
+			frameCoordinator,
+		});
+
+		scheduler.scheduleScrollMeasurement();
+		expect(frameCoordinator.schedule).toHaveBeenCalledWith(
+			"scroll-critical",
+			"virtual-list:scroll-measurement",
+			runScrollMeasurement,
+		);
+		scheduledTasks.get("scroll-critical:virtual-list:scroll-measurement")?.();
+		expect(runScrollMeasurement).toHaveBeenCalledOnce();
 	});
 });
 

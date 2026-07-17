@@ -12,6 +12,7 @@ import {
 	refillPreviewScheduleTokens,
 	type PreviewScheduleTokenState,
 } from "./previewScheduleTokenBucket";
+import type { VirtualFrameCoordinator } from "ui/virtualization/frameCoordinator";
 
 const WARMUP_MS = 32;
 const MAX_QUEUE_ENTRIES_PER_DRAIN = 256;
@@ -55,6 +56,7 @@ export interface PreviewActivationScope {
 	pendingQueueHead: number;
 	getBackpressure: () => PreviewBackpressure;
 	backpressureProviders: Map<() => number, PreviewBackpressureProviderRegistration>;
+	frameCoordinator?: VirtualFrameCoordinator;
 }
 
 interface PreviewActivationRequest {
@@ -72,6 +74,7 @@ interface PreviewBackpressureProviderRegistration {
 
 export interface CreatePreviewActivationScopeOptions {
 	readonly getBackpressure?: () => PreviewBackpressure;
+	readonly frameCoordinator?: VirtualFrameCoordinator;
 }
 
 export interface PreviewActivationHandle {
@@ -90,6 +93,7 @@ const defaultScope = createPreviewActivationScope();
 const activeQueuedScopes = new Set<PreviewActivationScope>();
 let globalFrameHandle: number | null = null;
 let globalFrameHandleKind: "animation-frame" | "timeout" | null = null;
+let globalFrameCoordinator: VirtualFrameCoordinator | undefined;
 let roundRobinCursor = 0;
 let activationTokenState: PreviewScheduleTokenState =
 	createEmptyPreviewScheduleTokenState();
@@ -149,6 +153,7 @@ export function createPreviewActivationScope(
 			() => number,
 			PreviewBackpressureProviderRegistration
 		>(),
+		frameCoordinator: options.frameCoordinator,
 	};
 }
 
@@ -228,10 +233,26 @@ function ensureSubscription(): void {
 function scheduleGlobalFrameDrain(): void {
 	if (
 		globalFrameHandle !== null ||
+		globalFrameCoordinator !== undefined ||
 		activeQueuedScopes.size === 0 ||
 		isScrollActivityActive()
 	) {
 		return;
+	}
+	const queuedCoordinator = resolveQueuedCoordinator();
+	if (queuedCoordinator) {
+		const scheduled = queuedCoordinator.schedule(
+			"idle",
+			"preview:activation-drain",
+			() => {
+				globalFrameCoordinator = undefined;
+				drainGlobalFrame(readMonotonicTime());
+			},
+		);
+		if (scheduled) {
+			globalFrameCoordinator = queuedCoordinator;
+			return;
+		}
 	}
 
 	if (typeof globalThis.requestAnimationFrame === "function") {
@@ -257,7 +278,21 @@ function scheduleGlobalFrameDrain(): void {
 	}, FALLBACK_FRAME_INTERVAL_MS) as unknown as number;
 }
 
+function resolveQueuedCoordinator(): VirtualFrameCoordinator | undefined {
+	let coordinator: VirtualFrameCoordinator | undefined;
+	for (const scope of activeQueuedScopes) {
+		if (!scope.frameCoordinator) return undefined;
+		if (coordinator && coordinator !== scope.frameCoordinator) return undefined;
+		coordinator = scope.frameCoordinator;
+	}
+	return coordinator;
+}
+
 function cancelGlobalFrame(): void {
+	if (globalFrameCoordinator) {
+		globalFrameCoordinator.cancel("idle", "preview:activation-drain");
+		globalFrameCoordinator = undefined;
+	}
 	if (globalFrameHandle === null) return;
 
 	if (

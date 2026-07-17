@@ -14,6 +14,7 @@ import type {
 	TwoHopVirtualListSection,
 } from "../twoHopVirtualListModel";
 import { createTwoHopCellBinding, type TwoHopCellBinding } from "../twoHopCellBinding";
+import type { VirtualFrameCoordinator } from "ui/virtualization/frameCoordinator";
 
 const items = Array.from({ length: 1_000 }, (_, index) => ({
 	kind: "new-link" as const,
@@ -150,6 +151,51 @@ function getMountedRow(
 }
 
 describe("TwoHop scalar scroll kernel", () => {
+	it("delegates resident refill to the coordinator post-paint lane", () => {
+		let residentRefill: (() => void) | undefined;
+		const frameCoordinator: VirtualFrameCoordinator = {
+			schedule: vi.fn((_lane, _key, task) => {
+				residentRefill = task;
+				return true;
+			}),
+			cancel: vi.fn(),
+			isScheduled: vi.fn(() => residentRefill !== undefined),
+			dispose: vi.fn(),
+		};
+		const kernel = createTwoHopScalarScrollKernel({
+			initialRowModel: rowModel,
+			enableResidentWindow: true,
+			frameCoordinator,
+			onStableVisibleRange() {},
+		});
+
+		kernel.applyMeasurement({
+			rowModel,
+			scrollTop: 0,
+			viewportHeight: 100,
+			sectionTop: 0,
+			isStableMeasurement: true,
+			isScrollActive: true,
+			hasStableVisibleRange: true,
+			visibilityPolicy: {
+				bootstrapRows: 1,
+				mountedOverscanPx: 110,
+				previewOverscanPx: 0,
+			},
+		});
+
+		expect(frameCoordinator.schedule).toHaveBeenCalledWith(
+			"post-paint",
+			"two-hop:resident-refill",
+			expect.any(Function),
+		);
+		residentRefill?.();
+		expect(
+			getCCLDevMeasurementSnapshot().counters["residentWindow.refill"].count,
+		).toBeGreaterThan(0);
+		kernel.dispose();
+	});
+
 	it("keeps resident hits free of row commits and refills shifted windows later", () => {
 		const kernel = createTwoHopScalarScrollKernel({
 			initialRowModel: rowModel,
