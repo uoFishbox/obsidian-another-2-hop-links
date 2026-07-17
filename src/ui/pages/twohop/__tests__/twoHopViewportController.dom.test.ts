@@ -234,4 +234,57 @@ describe("twoHopViewportController", () => {
 		controller.dispose();
 		scroller.remove();
 	});
+
+	it("consumes the load-more click before its shell is rebound to a card", () => {
+		const scroller = document.createElement("div");
+		scroller.style.overflow = "auto";
+		Object.defineProperty(scroller, "clientHeight", { value: 400 });
+		Object.defineProperty(scroller, "scrollHeight", { value: 10000 });
+		Object.defineProperty(scroller, "scrollTop", { value: 0, writable: true });
+		const rootEl = document.createElement("div");
+		const shadowHostEl = document.createElement("div");
+		rootEl.append(shadowHostEl);
+		scroller.append(rootEl);
+		document.body.append(scroller);
+		setRect(scroller, 0, 210, 400);
+		setRect(rootEl, 0, 210, 10000);
+		const outerClick = vi.fn();
+		rootEl.addEventListener("click", outerClick);
+		const controller = createTwoHopViewportController({
+			rootEl,
+			shadowHostEl,
+			sections: [createSection("section", 8)],
+			initialVisibleCount: 1,
+			loadMoreIncrement: 2,
+			configuredLayout: {
+				cardWidthPx: 100,
+				cardHeightPx: 100,
+				cardHeightRatio: 1,
+				cardGapPx: 10,
+				cardMaxColumns: 2,
+				sectionMarginBottomPx: 20,
+			},
+			getItemInteractionDescriptor: () => null,
+			requestAnimationFrame: () => 1,
+			cancelAnimationFrame: () => {},
+			now: () => 10,
+		});
+		const loadMore = controller.contentEl.querySelector<HTMLElement>(
+			"[data-two-hop-load-more-section='section']",
+		);
+		expect(loadMore).toBeTruthy();
+
+		const click = new MouseEvent("click", {
+			bubbles: true,
+			cancelable: true,
+			composed: true,
+		});
+		loadMore?.dispatchEvent(click);
+
+		expect(click.defaultPrevented).toBe(true);
+		expect(outerClick).not.toHaveBeenCalled();
+		expect(loadMore?.dataset.cclInteractionKind).toBe("item");
+		controller.dispose();
+		scroller.remove();
+	});
 });

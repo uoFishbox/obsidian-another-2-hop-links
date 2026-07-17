@@ -513,6 +513,11 @@ export function createTwoHopViewportController(
 			if (!(target instanceof ownerWindow!.HTMLElement)) continue;
 			const sectionId = target.dataset.twoHopLoadMoreSection;
 			if (sectionId) {
+				// This physical shell can become the first newly revealed card during
+				// loadMore(). Consume the original click before rebinding so an outer
+				// delegated handler cannot reinterpret it as that new card.
+				event.preventDefault();
+				event.stopPropagation();
 				loadMore(sectionId);
 				return;
 			}
