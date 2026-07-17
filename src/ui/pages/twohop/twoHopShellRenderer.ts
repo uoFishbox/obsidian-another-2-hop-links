@@ -63,7 +63,7 @@ export function createTwoHopShellRenderer(params: TwoHopShellRendererParams) {
 		if (retainedRichShell) {
 			slot.logicalRowIndex = cell.rowIndex;
 			slot.logicalColumnIndex = cell.columnIndex;
-			slot.cell.style.visibility = "visible";
+			slot.cell.style.visibility = "";
 			return;
 		}
 		prepareSlot(slot, cell, identity, revisionChanged, tentativelyPreservePreview);
@@ -221,7 +221,7 @@ function prepareSlot(
 	}
 	slot.logicalRowIndex = cell?.rowIndex ?? -1;
 	slot.logicalColumnIndex = cell?.columnIndex ?? -1;
-	slot.cell.style.visibility = cell ? "visible" : "hidden";
+	slot.cell.style.visibility = cell ? "" : "hidden";
 	slot.titleWrapper.className = "cosense-card-links__box-title-wrapper";
 	slot.meta.style.display = "";
 	slot.headerIcon.style.display = "none";

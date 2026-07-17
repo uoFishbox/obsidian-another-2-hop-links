@@ -63,6 +63,25 @@ describe("twoHop imperative DOM pool", () => {
 		expect(pool.rows[0].root.style.transform).toContain("2200px");
 	});
 
+	it("lets hidden pool rows hide cells after rendering and reuse", () => {
+		const { snapshot, geometry } = createFixture();
+		const content = document.createElement("div");
+		const pool = createTwoHopDomPool({ content, rowCapacity: 1, columns: 2 });
+		const renderer = createTwoHopShellRenderer({});
+		const cell = resolveTwoHopCell(snapshot, geometry, 0, 0);
+		if (!cell) throw new Error("expected header cell");
+		const row = pool.rows[0];
+		const slot = row.cells[0];
+
+		pool.positionRow(row, 0, 0);
+		renderer.renderShell(slot, cell, snapshot);
+		renderer.renderShell(slot, cell, snapshot);
+		pool.hideRow(row);
+
+		expect(row.root.style.visibility).toBe("hidden");
+		expect(slot.cell.style.visibility).toBe("");
+	});
+
 	it("renders a cheap skeleton before resolving a rich card model", () => {
 		const { snapshot, geometry } = createFixture();
 		const content = document.createElement("div");
