@@ -38,8 +38,7 @@ function createSection(count: number): TwoHopVirtualSectionDescriptor {
 }
 
 describe("TwoHopSurface", () => {
-	it("mounts one imperative shadow surface with a bounded fixed pool", () => {
-		const applicationStore = {
+	const applicationStore = {
 			settings: {
 				...DEFAULT_SETTINGS,
 				cardWidthPx: 100,
@@ -47,9 +46,13 @@ describe("TwoHopSurface", () => {
 				cardMaxColumns: 3,
 			},
 		} as unknown as ApplicationStore;
+
+	it.each([100, 1_000, 10_000])(
+		"mounts %i logical cards with a bounded fixed pool",
+		(cardCount) => {
 		const { container } = render(TwoHopSurface, {
 			props: {
-				sections: [createSection(10_000)],
+				sections: [createSection(cardCount)],
 				applicationStore,
 				initialVisibleCount: 10_000,
 				getItemInteractionDescriptor: () => null,
@@ -69,5 +72,31 @@ describe("TwoHopSurface", () => {
 			root?.shadowRoot?.querySelectorAll("[data-testid='twohop-item-cell']")
 				.length,
 		).toBeGreaterThan(0);
+		},
+	);
+
+	it.each([1, 8, 32])("keeps %i simultaneous surfaces independently bounded", (count) => {
+		const roots: HTMLElement[] = [];
+		for (let index = 0; index < count; index += 1) {
+			const { container } = render(TwoHopSurface, {
+				props: {
+					sections: [createSection(100)],
+					applicationStore,
+					initialVisibleCount: 100,
+					getItemInteractionDescriptor: () => null,
+				},
+			});
+			const root = container.querySelector<HTMLElement>(
+				".twohop-imperative-surface",
+			);
+			if (root) roots.push(root);
+		}
+
+		expect(roots).toHaveLength(count);
+		for (const root of roots) {
+			expect(
+				root.shadowRoot?.querySelectorAll(".view-plan-virtual-list-cell").length,
+			).toBeLessThan(100);
+		}
 	});
 });

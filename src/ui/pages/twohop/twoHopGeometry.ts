@@ -41,6 +41,26 @@ export interface TwoHopRowRange {
 	readonly end: number;
 }
 
+export interface TwoHopResolvedCellBuffer {
+	kind: TwoHopResolvedCell["kind"];
+	sectionIndex: number;
+	rowIndex: number;
+	columnIndex: number;
+	itemIndex: number;
+	item: TwoHopVirtualListItem | null;
+}
+
+export function createTwoHopResolvedCellBuffer(): TwoHopResolvedCellBuffer {
+	return {
+		kind: "header",
+		sectionIndex: -1,
+		rowIndex: -1,
+		columnIndex: -1,
+		itemIndex: -1,
+		item: null,
+	};
+}
+
 /** Builds compact section-prefix geometry. No per-row or per-cell objects are created. */
 export function createTwoHopGeometry(
 	snapshot: TwoHopSnapshot,
@@ -97,6 +117,23 @@ export function resolveTwoHopCell(
 	rowIndex: number,
 	columnIndex: number,
 ): TwoHopResolvedCell | null {
+	return resolveTwoHopCellInto(
+		snapshot,
+		geometry,
+		rowIndex,
+		columnIndex,
+		createTwoHopResolvedCellBuffer(),
+	);
+}
+
+/** Resolves into caller-owned storage for allocation-free physical slot binding. */
+export function resolveTwoHopCellInto(
+	snapshot: TwoHopSnapshot,
+	geometry: TwoHopGeometry,
+	rowIndex: number,
+	columnIndex: number,
+	target: TwoHopResolvedCellBuffer,
+): TwoHopResolvedCell | null {
 	if (
 		rowIndex < 0 ||
 		rowIndex >= geometry.rowCount ||
@@ -113,7 +150,13 @@ export function resolveTwoHopCell(
 	const cellIndex = rowInSection * geometry.columns + columnIndex;
 
 	if (cellIndex === 0) {
-		return { kind: "header", sectionIndex, rowIndex, columnIndex };
+		target.kind = "header";
+		target.sectionIndex = sectionIndex;
+		target.rowIndex = rowIndex;
+		target.columnIndex = columnIndex;
+		target.itemIndex = -1;
+		target.item = null;
+		return target as unknown as Extract<TwoHopResolvedCell, { kind: "header" }>;
 	}
 
 	const visibleItemOffset = cellIndex - 1;
@@ -121,18 +164,23 @@ export function resolveTwoHopCell(
 		const itemIndex = section.visibleItemSourceIndexes[visibleItemOffset];
 		const item = section.items[itemIndex];
 		if (!item) return null;
-		return {
-			kind: "item",
-			sectionIndex,
-			rowIndex,
-			columnIndex,
-			itemIndex,
-			item,
-		};
+		target.kind = "item";
+		target.sectionIndex = sectionIndex;
+		target.rowIndex = rowIndex;
+		target.columnIndex = columnIndex;
+		target.itemIndex = itemIndex;
+		target.item = item;
+		return target as unknown as Extract<TwoHopResolvedCell, { kind: "item" }>;
 	}
 
 	if (section.showLoadMore && visibleItemOffset === section.visibleItemCount) {
-		return { kind: "load-more", sectionIndex, rowIndex, columnIndex };
+		target.kind = "load-more";
+		target.sectionIndex = sectionIndex;
+		target.rowIndex = rowIndex;
+		target.columnIndex = columnIndex;
+		target.itemIndex = -1;
+		target.item = null;
+		return target as unknown as Extract<TwoHopResolvedCell, { kind: "load-more" }>;
 	}
 
 	return null;

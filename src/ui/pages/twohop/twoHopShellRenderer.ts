@@ -45,8 +45,13 @@ export function createTwoHopShellRenderer(params: TwoHopShellRendererParams) {
 	): void {
 		const identity = resolveCellIdentity(cell, snapshot);
 		const retainedRichShell = slot.rich && slot.logicalIdentity === identity;
+		if (retainedRichShell) {
+			slot.logicalRowIndex = cell.rowIndex;
+			slot.logicalColumnIndex = cell.columnIndex;
+			slot.cell.style.visibility = "visible";
+			return;
+		}
 		prepareSlot(slot, cell, snapshot);
-		if (retainedRichShell) return;
 		slot.rich = true;
 		slot.root.classList.remove("is-skeleton");
 		resetVariantClasses(slot.root);
@@ -71,6 +76,11 @@ export function createTwoHopShellRenderer(params: TwoHopShellRendererParams) {
 			slot.root.dataset.cclSectionVariant = resolveTwoHopSectionVariant(
 				descriptor.section,
 			);
+			slot.root.dataset.twoHopHeaderSection = descriptor.sectionId;
+			slot.root.draggable = descriptor.headerProps.draggable ?? false;
+			if (descriptor.headerProps.directory) {
+				slot.root.dataset.directory = descriptor.headerProps.directory;
+			}
 			const interactionId = descriptor.headerProps.interactionId;
 			if (interactionId) {
 				setInteraction(slot.root, interactionId, "sectionHeader");
@@ -117,6 +127,8 @@ export function createTwoHopShellRenderer(params: TwoHopShellRendererParams) {
 		slot.root.dataset.cclResolution = presentation?.resolution ?? "resolved";
 		slot.root.dataset.cclAttachment = presentation?.attachment ? "true" : "false";
 		slot.root.dataset.cclExtension = presentation?.extension ?? "";
+		if (model?.directory) slot.root.dataset.directory = model.directory;
+		applyCustomClassName(slot.root, model?.className ?? null);
 		slot.root.classList.toggle("is-attachment", presentation?.attachment ?? false);
 		if (!IS_PROD) {
 			slot.cell.dataset.testid = "twohop-item-cell";
@@ -162,6 +174,9 @@ function prepareSlot(
 	else delete slot.cell.dataset.cclLogicalKey;
 	delete slot.cell.dataset.testid;
 	delete slot.root.dataset.twoHopLoadMoreSection;
+	delete slot.root.dataset.twoHopHeaderSection;
+	delete slot.root.dataset.directory;
+	applyCustomClassName(slot.root, null);
 }
 
 function resolveCellIdentity(
@@ -196,4 +211,21 @@ function clearInteraction(root: HTMLElement): void {
 	root.removeAttribute(INTERACTION_KIND_ATTRIBUTE);
 	root.tabIndex = -1;
 	root.draggable = false;
+}
+
+function applyCustomClassName(root: HTMLElement, className: string | null): void {
+	const previous = root.dataset.cclShellClassName;
+	if (previous) {
+		for (const token of previous.split(/\s+/)) {
+			if (token) root.classList.remove(token);
+		}
+	}
+	if (!className) {
+		delete root.dataset.cclShellClassName;
+		return;
+	}
+	for (const token of className.split(/\s+/)) {
+		if (token) root.classList.add(token);
+	}
+	root.dataset.cclShellClassName = className;
 }

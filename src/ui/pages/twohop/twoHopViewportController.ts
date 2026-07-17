@@ -19,10 +19,13 @@ import { createTwoHopDomPool, type TwoHopDomPool, type TwoHopDomRowSlot } from "
 import {
 	createTwoHopGeometry,
 	resolveTwoHopCell,
+	resolveTwoHopCellInto,
 	resolveTwoHopRowTop,
 	resolveTwoHopVisibleRows,
+	createTwoHopResolvedCellBuffer,
 	type TwoHopGeometry,
 	type TwoHopResolvedCell,
+	type TwoHopResolvedCellBuffer,
 } from "./twoHopGeometry";
 import { createTwoHopFrameBudgetTracker } from "./twoHopFrameBudget";
 import type { TwoHopCardPresentationState } from "./twoHopCellStaticState";
@@ -142,6 +145,8 @@ export function createTwoHopViewportController(
 	let layout: ViewPlanLayoutMetrics;
 	let pool: TwoHopDomPool;
 	let scrollContainerEl = findNearestScrollContainerCached(params.rootEl);
+	let cachedSectionTop = 0;
+	let cachedViewportHeight = 0;
 	let residentStart = -1;
 	let residentEnd = -1;
 	let frameHandle = 0;
@@ -164,6 +169,7 @@ export function createTwoHopViewportController(
 		getGeometry: () => geometry,
 	});
 
+	refreshScrollGeometry();
 	const visibleCountUpdate = pagination.resolveForInput(sections);
 	layout = measureLayout();
 	snapshot = createSnapshot(visibleCountUpdate.snapshot.visibleCounts);
@@ -172,7 +178,20 @@ export function createTwoHopViewportController(
 	applyLayoutStyles();
 	pool.setContentHeight(geometry.totalHeight);
 	let previewHydrator = createPreviewHydrator();
+	let cellBuffers = createCellBuffers();
 	flush(now());
+
+	function refreshScrollGeometry(): void {
+		const metrics = getScrollMetrics(params.rootEl, scrollContainerEl);
+		cachedSectionTop = metrics.sectionTop;
+		cachedViewportHeight = metrics.viewportHeight;
+	}
+
+	function readScrollTop(): number {
+		return scrollContainerEl
+			? scrollContainerEl.scrollTop
+			: (ownerWindow?.scrollY ?? ownerWindow?.pageYOffset ?? 0);
+	}
 
 	function measureLayout(): ViewPlanLayoutMetrics {
 		const rootRect = params.rootEl.getBoundingClientRect();
@@ -207,19 +226,31 @@ export function createTwoHopViewportController(
 	}
 
 	function createPool(): TwoHopDomPool {
-		const metrics = getScrollMetrics(params.rootEl, scrollContainerEl);
-		const viewportRows = Math.ceil(
-			Math.max(layout.rowHeight, metrics.viewportHeight) /
-				(layout.rowHeight + layout.gap),
-		);
 		return createTwoHopDomPool({
 			content: contentEl,
-			rowCapacity: Math.max(
-				MINIMUM_POOL_ROWS,
-				viewportRows + BEHIND_ROWS + AHEAD_ROWS,
-			),
+			rowCapacity: resolveRequiredPoolRows(layout),
 			columns: layout.columns,
 		});
+	}
+
+	function resolveRequiredPoolRows(nextLayout: ViewPlanLayoutMetrics): number {
+		const viewportRows = Math.ceil(
+			Math.max(nextLayout.rowHeight, cachedViewportHeight) /
+				(nextLayout.rowHeight + nextLayout.gap),
+		);
+		return Math.max(
+			MINIMUM_POOL_ROWS,
+			viewportRows + BEHIND_ROWS + AHEAD_ROWS,
+		);
+	}
+
+	function createCellBuffers(): TwoHopResolvedCellBuffer[] {
+		const buffers: TwoHopResolvedCellBuffer[] = [];
+		const cellCount = pool.capacity * pool.columns;
+		for (let index = 0; index < cellCount; index += 1) {
+			buffers.push(createTwoHopResolvedCellBuffer());
+		}
+		return buffers;
 	}
 
 	function applyLayoutStyles(): void {
@@ -250,12 +281,11 @@ export function createTwoHopViewportController(
 	function flush(timestamp = now()): void {
 		if (disposed) return;
 		stats.scrollFrames += 1;
-		const metrics = getScrollMetrics(params.rootEl, scrollContainerEl);
-		const localScrollOffset = Math.max(0, metrics.scrollTop - metrics.sectionTop);
+		const localScrollOffset = Math.max(0, readScrollTop() - cachedSectionTop);
 		const visible = resolveTwoHopVisibleRows(
 			geometry,
 			localScrollOffset,
-			Math.max(geometry.rowHeight, metrics.viewportHeight),
+			Math.max(geometry.rowHeight, cachedViewportHeight),
 		);
 		const rowOffset = localScrollOffset / Math.max(1, geometry.rowStride);
 		const elapsed = timestamp - lastMeasuredTimestamp;
@@ -352,7 +382,13 @@ export function createTwoHopViewportController(
 	): void {
 		for (let columnIndex = 0; columnIndex < pool.columns; columnIndex += 1) {
 			const slot = rowSlot.cells[columnIndex];
-			const cell = resolveTwoHopCell(snapshot, geometry, rowIndex, columnIndex);
+			const cell = resolveTwoHopCellInto(
+				snapshot,
+				geometry,
+				rowIndex,
+				columnIndex,
+				cellBuffers[slot.slotIndex],
+			);
 			if (rich && cell) {
 				renderer.renderShell(slot, cell, snapshot);
 				stats.shellBinds += 1;
@@ -400,8 +436,7 @@ export function createTwoHopViewportController(
 	}
 
 	function rebuildData(anchorSectionIndex = -1): void {
-		const metrics = getScrollMetrics(params.rootEl, scrollContainerEl);
-		const localScrollOffset = Math.max(0, metrics.scrollTop - metrics.sectionTop);
+		const localScrollOffset = Math.max(0, readScrollTop() - cachedSectionTop);
 		const previousGeometry = geometry;
 		const visibleCounts = pagination.resolveForInput(sections).snapshot.visibleCounts;
 		snapshot = createSnapshot(visibleCounts);
@@ -470,8 +505,31 @@ export function createTwoHopViewportController(
 		for (const target of event.composedPath()) {
 			if (!(target instanceof ownerWindow!.HTMLElement)) continue;
 			const sectionId = target.dataset.twoHopLoadMoreSection;
-			if (!sectionId) continue;
-			loadMore(sectionId);
+			if (sectionId) {
+				loadMore(sectionId);
+				return;
+			}
+			const headerSectionId = target.dataset.twoHopHeaderSection;
+			if (!headerSectionId) continue;
+			sections
+				.find((section) => section.sectionId === headerSectionId)
+				?.headerProps.onClick?.();
+			return;
+		}
+	}
+
+	function handleSurfaceKeyDown(event: KeyboardEvent): void {
+		if (event.key !== "Enter" && event.key !== " ") return;
+		for (const target of event.composedPath()) {
+			if (!(target instanceof ownerWindow!.HTMLElement)) continue;
+			if (
+				!target.dataset.twoHopLoadMoreSection &&
+				!target.dataset.twoHopHeaderSection
+			) {
+				continue;
+			}
+			event.preventDefault();
+			target.click();
 			return;
 		}
 	}
@@ -484,13 +542,16 @@ export function createTwoHopViewportController(
 				scheduleResize();
 				return;
 			}
+			refreshScrollGeometry();
 			const nextLayout = measureLayout();
-			if (
+			const layoutUnchanged =
 				nextLayout.columns === layout.columns &&
 				nextLayout.rowHeight === layout.rowHeight &&
 				nextLayout.gap === layout.gap &&
-				nextLayout.sectionMarginBottom === layout.sectionMarginBottom
-			) {
+				nextLayout.sectionMarginBottom === layout.sectionMarginBottom;
+			const requiresLargerPool =
+				resolveRequiredPoolRows(nextLayout) > pool.capacity;
+			if (layoutUnchanged && !requiresLargerPool) {
 				return;
 			}
 			layout = nextLayout;
@@ -498,6 +559,7 @@ export function createTwoHopViewportController(
 			previewHydrator?.dispose();
 			pool.dispose();
 			pool = createPool();
+			cellBuffers = createCellBuffers();
 			previewHydrator = createPreviewHydrator();
 			applyLayoutStyles();
 			pool.setContentHeight(geometry.totalHeight);
@@ -514,6 +576,7 @@ export function createTwoHopViewportController(
 	const scrollTarget: EventTarget = scrollContainerEl ?? ownerWindow!;
 	scrollTarget.addEventListener("scroll", onScroll, { passive: true });
 	contentEl.addEventListener("click", handleSurfaceClick);
+	contentEl.addEventListener("keydown", handleSurfaceKeyDown);
 
 	return {
 		shadowRoot: shadowSurface.shadowRoot,
@@ -557,6 +620,7 @@ export function createTwoHopViewportController(
 			previewHydrator?.dispose();
 			scrollTarget.removeEventListener("scroll", onScroll);
 			contentEl.removeEventListener("click", handleSurfaceClick);
+			contentEl.removeEventListener("keydown", handleSurfaceKeyDown);
 			pool.dispose();
 			contentEl.remove();
 			shadowSurface.dispose();

@@ -86,12 +86,14 @@ describe("twoHopViewportController", () => {
 			".twohop-imperative-row",
 		).length;
 
-		controller.flush(20);
+		for (let frame = 0; frame < 300; frame += 1) {
+			controller.flush(20 + frame * 4.2);
+		}
 		const afterResidentHit = controller.getStats();
 
 		expect(afterResidentHit.poolRows).toBe(initialRows);
 		expect(afterResidentHit.shellBinds).toBe(initialStats.shellBinds);
-		expect(afterResidentHit.residentHits).toBe(initialStats.residentHits + 1);
+		expect(afterResidentHit.residentHits).toBe(initialStats.residentHits + 300);
 		controller.dispose();
 		scroller.remove();
 	});
