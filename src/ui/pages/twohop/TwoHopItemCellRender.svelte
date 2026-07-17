@@ -1,6 +1,6 @@
 <script lang="ts">
 	import type { Snippet } from "svelte";
-	import type { TwoHopFixedCellSlotController } from "./twoHopFixedRowSlotPool.svelte";
+	import type { TwoHopFixedCellSlotController } from "./twoHopPhysicalSlotStore.svelte";
 	import type {
 		TwoHopCardPresentationState,
 		TwoHopItemCellBinding,

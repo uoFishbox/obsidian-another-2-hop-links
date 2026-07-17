@@ -3,7 +3,7 @@ import { tick } from "svelte";
 import { afterEach, describe, expect, it } from "vitest";
 import type { SectionRenderDescriptor } from "ui/components/sections/types";
 import Harness from "./TwoHopMountedSurfaceRuntimeHarness.svelte";
-import type { TwoHopMountedSurfaceRuntime } from "../twoHopMountedSurfaceRuntime.svelte";
+import type { TwoHopVirtualListMountedRuntime } from "../twoHopVirtualListMountedRuntime.svelte";
 import {
 	compileTwoHopViewPlan,
 	createTwoHopViewPlanRowModel,
@@ -65,10 +65,10 @@ function createRowModel(visibleCount: number, columns = 2): TwoHopViewPlanRowMod
 }
 
 function applyInitialMeasurement(
-	runtime: TwoHopMountedSurfaceRuntime,
+	runtime: TwoHopVirtualListMountedRuntime,
 	rowModel: TwoHopViewPlanRowModel,
 ): void {
-	runtime.virtualList.applyMeasurement({
+	runtime.kernel.applyMeasurement({
 		rowModel,
 		scrollTop: 0,
 		viewportHeight: 300,
@@ -93,11 +93,11 @@ describe("TwoHop mounted surface runtime", () => {
 	it("rebinds the current physical slots when the input row model changes", async () => {
 		const initialRowModel = createRowModel(4);
 		const updatedRowModel = createRowModel(8);
-		let runtime: TwoHopMountedSurfaceRuntime | undefined;
+		let runtime: TwoHopVirtualListMountedRuntime | undefined;
 		const rendered = render(Harness, {
 			props: {
 				rowModel: initialRowModel,
-				onRuntime(nextRuntime: TwoHopMountedSurfaceRuntime) {
+				onRuntime(nextRuntime: TwoHopVirtualListMountedRuntime) {
 					runtime = nextRuntime;
 				},
 			},
@@ -105,22 +105,22 @@ describe("TwoHop mounted surface runtime", () => {
 		expect(runtime).toBeDefined();
 		if (!runtime) return;
 		applyInitialMeasurement(runtime, initialRowModel);
-		expect(runtime.fixedRowSlotControllers[2]?.cells[1]?.renderBodyKind).toBe(
+		expect(runtime.rowSlotControllers[2]?.cells[1]?.renderBodyKind).toBe(
 			"load-more",
 		);
 
 		await rendered.rerender({
 			rowModel: updatedRowModel,
-			onRuntime(nextRuntime: TwoHopMountedSurfaceRuntime) {
+			onRuntime(nextRuntime: TwoHopVirtualListMountedRuntime) {
 				runtime = nextRuntime;
 			},
 		});
 		await tick();
 
-		expect(runtime.fixedRowSlotControllers[2]?.cells[1]?.renderBodyKind).toBe(
+		expect(runtime.rowSlotControllers[2]?.cells[1]?.renderBodyKind).toBe(
 			"item",
 		);
-		expect(String(runtime.fixedRowSlotControllers[2]?.cells[1]?.logicalKey)).toBe(
+		expect(String(runtime.rowSlotControllers[2]?.cells[1]?.logicalKey)).toBe(
 			"new-links::item:4",
 		);
 	});
@@ -128,11 +128,11 @@ describe("TwoHop mounted surface runtime", () => {
 	it("rebuilds the physical pool when the row model column count changes", async () => {
 		const initialRowModel = createRowModel(8, 3);
 		const updatedRowModel = createRowModel(8, 2);
-		let runtime: TwoHopMountedSurfaceRuntime | undefined;
+		let runtime: TwoHopVirtualListMountedRuntime | undefined;
 		const rendered = render(Harness, {
 			props: {
 				rowModel: initialRowModel,
-				onRuntime(nextRuntime: TwoHopMountedSurfaceRuntime) {
+				onRuntime(nextRuntime: TwoHopVirtualListMountedRuntime) {
 					runtime = nextRuntime;
 				},
 			},
@@ -141,21 +141,21 @@ describe("TwoHop mounted surface runtime", () => {
 		if (!runtime) return;
 		applyInitialMeasurement(runtime, initialRowModel);
 		expect(
-			runtime.fixedRowSlotControllers[0]?.cells.filter((cell) => cell.active),
+			runtime.rowSlotControllers[0]?.cells.filter((cell) => cell.active),
 		).toHaveLength(3);
 
 		await rendered.rerender({
 			rowModel: updatedRowModel,
-			onRuntime(nextRuntime: TwoHopMountedSurfaceRuntime) {
+			onRuntime(nextRuntime: TwoHopVirtualListMountedRuntime) {
 				runtime = nextRuntime;
 			},
 		});
 		await tick();
 
 		expect(
-			runtime.fixedRowSlotControllers[0]?.cells.filter((cell) => cell.active),
+			runtime.rowSlotControllers[0]?.cells.filter((cell) => cell.active),
 		).toHaveLength(2);
-		expect(String(runtime.fixedRowSlotControllers[1]?.cells[0]?.logicalKey)).toBe(
+		expect(String(runtime.rowSlotControllers[1]?.cells[0]?.logicalKey)).toBe(
 			"new-links::item:1",
 		);
 		expect(runtime.contentHeight).toBe(updatedRowModel.totalHeight);

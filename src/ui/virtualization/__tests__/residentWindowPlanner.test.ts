@@ -32,11 +32,7 @@ describe("planResidentWindow", () => {
 				rowCount: 100,
 				direction: "forward",
 			}),
-		).toMatchObject({
-				start: 58,
-				end: 68,
-				distantJump: true,
-			});
+		).toMatchObject({ start: 58, end: 68, distantJump: true });
 	});
 
 	it("clamps buffers at the content edges", () => {

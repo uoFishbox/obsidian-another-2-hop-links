@@ -3,7 +3,7 @@ import type { ResultNavigationDirection } from "features/keyboard-navigation/res
 import type { ProgrammaticScrollSnapshot } from "ui/components/common/virtual-list/dom/flushVirtualScrollMeasurement";
 import type { ViewPlanLayoutMetrics } from "ui/components/common/virtual-list/svelte/viewPlanLayout";
 import type { VirtualNavigationTarget } from "ui/components/common/virtual-list/types";
-import type { TwoHopFixedRowSlotController } from "./twoHopFixedRowSlotPool.svelte";
+import type { TwoHopFixedRowSlotController } from "./twoHopPhysicalSlotStore.svelte";
 import {
 	createTwoHopVirtualListInputRuntime,
 	type TwoHopVirtualListSurfaceProps,

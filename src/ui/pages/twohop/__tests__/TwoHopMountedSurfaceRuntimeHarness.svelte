@@ -1,12 +1,14 @@
 <script lang="ts">
 	import type { TwoHopViewPlanRowModel } from "../twoHopViewPlan";
-	import { createTwoHopMountedSurfaceRuntime } from "../twoHopMountedSurfaceRuntime.svelte";
-	import type { TwoHopVirtualListPlanRuntime } from "../twoHopVirtualListPlanRuntime.svelte";
-	import type { TwoHopMountedSurfaceRuntime } from "../twoHopMountedSurfaceRuntime.svelte";
+	import {
+		createTwoHopVirtualListMountedRuntime,
+		type TwoHopVirtualListMountedRuntime,
+	} from "../twoHopVirtualListMountedRuntime.svelte";
+	import type { TwoHopVirtualListInputRuntime } from "../twoHopVirtualListInputRuntime.svelte";
 
 	interface Props {
 		rowModel: TwoHopViewPlanRowModel;
-		onRuntime(runtime: TwoHopMountedSurfaceRuntime): void;
+		onRuntime(runtime: TwoHopVirtualListMountedRuntime): void;
 	}
 
 	let { rowModel, onRuntime }: Props = $props();
@@ -14,8 +16,8 @@
 		get rowModel() {
 			return rowModel;
 		},
-	} as TwoHopVirtualListPlanRuntime;
-	const runtime = createTwoHopMountedSurfaceRuntime({
+	} as TwoHopVirtualListInputRuntime;
+	const runtime = createTwoHopVirtualListMountedRuntime({
 		inputRuntime,
 		onStableVisibleRange() {},
 	});

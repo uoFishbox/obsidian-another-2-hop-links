@@ -1,7 +1,12 @@
 import type { RowPreviewActivationRuntime } from "features/preview/scheduling/rowPreviewActivationRuntime";
 import { recordCCLDevMeasurement } from "infrastructure/debug/CCLDevMeasurements";
-import { createContiguousRowSlotAllocator } from "ui/components/common/virtual-list/core/reconciliation/contiguousRowSlotAllocator";
-import { logicalCellKey, type LogicalCellKey } from "ui/components/common/virtual-list/types";
+import { createResidentRowSlotAllocator } from "ui/virtualization/residentSlotAllocator";
+import {
+	logicalCellKey,
+	renderSlotKey,
+	type LogicalCellKey,
+	type MountedVirtualCell,
+} from "ui/components/common/virtual-list/types";
 import type { VirtualListLogicalCell } from "ui/components/common/virtual-list/logicalCell";
 import type { VirtualizedItemVisibility } from "ui/components/common/virtualizedItemVisibility";
 import type {
@@ -9,6 +14,7 @@ import type {
 	VirtualCellRegistrationOwner,
 	VirtualCellRegistry,
 } from "ui/components/common/virtual-list/svelte/VirtualCellRegistry";
+import type { VirtualSurfaceMountedRow } from "ui/components/common/virtual-list/svelte/VirtualSurfaceTypes";
 import { dispatchVirtualCellWillRebind } from "ui/interactions/virtualCellRebind";
 import {
 	createTwoHopCellBinding,
@@ -19,10 +25,13 @@ import {
 import type { TwoHopViewPlan } from "./twoHopViewPlan";
 import type { TwoHopVirtualListItem } from "./twoHopVirtualListModel";
 
-export interface TwoHopFixedCellSlotController extends VirtualCellRegistrationOwner {
+export interface TwoHopFixedCellSlotController
+	extends MountedVirtualCell,
+		VirtualCellRegistrationOwner {
 	readonly cellSlotKey: number;
 	readonly active: boolean;
 	readonly logicalKey: LogicalCellKey;
+	readonly rowFrame: TwoHopRowSlotFrame | null;
 	readonly rowIndex: number;
 	readonly columnIndex: number;
 	readonly cell: VirtualListLogicalCell<TwoHopVirtualListItem> | undefined;
@@ -30,7 +39,8 @@ export interface TwoHopFixedCellSlotController extends VirtualCellRegistrationOw
 	readonly binding: TwoHopCellBinding | null;
 }
 
-export interface TwoHopFixedRowSlotController {
+export interface TwoHopFixedRowSlotController
+	extends VirtualSurfaceMountedRow<TwoHopFixedCellSlotController> {
 	readonly slotIndex: number;
 	readonly active: boolean;
 	readonly rowIndex: number;
@@ -126,11 +136,19 @@ function createCellController(params: {
 
 	return {
 		cellSlotKey: params.cellSlotKey,
+		renderSlotKey: renderSlotKey(params.cellSlotKey),
+		renderSlotIndex: params.cellSlotKey,
 		get active() {
 			return readBinding() !== null;
 		},
+		get key() {
+			return readBinding()?.compiledCell.logicalKey ?? logicalCellKey("");
+		},
 		get logicalKey() {
 			return readBinding()?.compiledCell.logicalKey ?? logicalCellKey("");
+		},
+		get rowFrame() {
+			return params.readFrame();
 		},
 		get rowIndex() {
 			return readBinding()?.logicalRowIndex ?? -1;
@@ -262,7 +280,9 @@ function createRowController(
 	}
 
 	return {
+		key: slotIndex,
 		slotIndex,
+		slotKey: slotIndex,
 		get active() {
 			return frame !== null;
 		},
@@ -354,7 +374,7 @@ export function createTwoHopPhysicalSlotStore(params: {
 	readonly rowPreviewActivationRuntime?: RowPreviewActivationRuntime;
 }): TwoHopPhysicalSlotStore {
 	const fixedRowSlotPool = createTwoHopFixedRowSlotPool();
-	const rowSlotAllocator = createContiguousRowSlotAllocator();
+	const rowSlotAllocator = createResidentRowSlotAllocator();
 	const mountedCellsByInteractionId = new Map<string, TwoHopResidentCell>();
 	let activeColumns = 0;
 	let activePoolEpoch = -1;

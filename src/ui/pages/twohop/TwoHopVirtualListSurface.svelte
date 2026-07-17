@@ -13,7 +13,7 @@
 	import { createTwoHopVirtualListController } from "./twoHopVirtualListController.svelte";
 	import type { ItemInteractionDescriptor } from "ui/interactions/interactionTypes";
 	import { createTwoHopInteractionDescriptorCache } from "./twoHopInteractionDescriptorCache";
-	import TwoHopFixedRowSlotsSurface from "./TwoHopFixedRowSlotsSurface.svelte";
+	import VirtualPooledGridRowsSurface from "ui/components/common/virtual-list/svelte/VirtualPooledGridRowsSurface.svelte";
 	import TwoHopItemCellRender from "./TwoHopItemCellRender.svelte";
 	import { createSurfaceVirtualCellRegistry } from "ui/components/common/virtual-list/svelte/VirtualCellRegistry";
 	import type {
@@ -23,6 +23,11 @@
 	} from "./twoHopCellBinding";
 	import type { CardRenderModel } from "ui/components/items/cardRenderModel";
 	import { provideVirtualFrameCoordinator } from "ui/virtualization/frameCoordinatorContext.svelte";
+	import type {
+		TwoHopFixedCellSlotController,
+		TwoHopFixedRowSlotController,
+	} from "./twoHopPhysicalSlotStore.svelte";
+	import { TWO_HOP_BODY_LIFECYCLE_POLICY } from "./twoHopBodyLifecycle";
 
 	interface Props {
 		sections: readonly SectionRenderDescriptor<
@@ -66,8 +71,6 @@
 		>;
 	}
 
-	const EMPTY_MOUNTED_ROWS: readonly [] = [];
-
 	const props: Props = $props();
 	const cellRegistry = createSurfaceVirtualCellRegistry();
 	let contentEl = $state<HTMLDivElement | null>(null);
@@ -93,13 +96,21 @@
 		binding: TwoHopCellBinding,
 	): binding is TwoHopItemCellBinding =>
 		binding.compiledCell.logicalCell.kind === "item";
+	const isActiveRow = (row: TwoHopFixedRowSlotController): boolean => row.active;
+	const getCellRegistrationOwner = (
+		cell: TwoHopFixedCellSlotController,
+	): TwoHopFixedCellSlotController => cell;
+	const getCellDataTestId = (
+		cell: TwoHopFixedCellSlotController,
+	): string | undefined =>
+		cell.binding ? list.getCellDataTestId?.(cell.binding) : undefined;
 </script>
 
 <VirtualInteractiveSurface
 	className="cosense-card-links__section view-plan-virtual-list twohop-page-virtual-list"
 	rowHeight={list.layout.rowHeight}
 	layoutMode="grid-rows"
-	mountedRows={EMPTY_MOUNTED_ROWS}
+	mountedRows={list.rowSlotControllers}
 	interactionDescriptorScopeId="twohop-mounted-cells"
 	{interactionDescriptorResolverProvider}
 	bind:rootEl={list.rootEl}
@@ -110,45 +121,53 @@
 	{cellRegistry}
 >
 	{#key fixedSurfaceLayoutKey}
-		<TwoHopFixedRowSlotsSurface
+		<VirtualPooledGridRowsSurface
 			contentClassName="view-plan-virtual-list-content view-plan-flow-content"
 			rowClassName="view-plan-flow-row"
+			cellClassName="view-plan-virtual-list-cell view-plan-flow-cell"
 			contentHeight={list.contentHeight}
-			rowSlotControllers={list.rowSlotControllers}
+			mountedRows={list.rowSlotControllers}
 			cellWidth={list.layout.cellWidth}
 			rowHeight={list.layout.rowHeight}
 			columns={list.layout.columns}
 			gap={list.layout.gap}
 			bind:contentEl
 			observerRoot={list.observerRoot}
-			getCellDataTestId={list.getCellDataTestId}
+			{getCellDataTestId}
+			bodyLifecyclePolicy={TWO_HOP_BODY_LIFECYCLE_POLICY}
+			isRowActive={isActiveRow}
 			{cellRegistry}
+			{getCellRegistrationOwner}
 		>
-			{#snippet renderCell({ binding, rowFrame, cellController })}
-				{#if isHeaderCell(binding)}
-					{@const descriptor = rowFrame.sectionPlan.descriptor}
-					{@render props.renderHeader({
-						section: descriptor.section,
-						title: descriptor.title,
-						totalCount: descriptor.totalCount,
-						sectionId: descriptor.sectionId,
-						headerProps: descriptor.headerProps,
-					})}
-				{:else if isItemCell(binding)}
-					<TwoHopItemCellRender
-						{cellController}
-						getItemActivationCandidateId={list.getItemActivationCandidateId}
-						renderItem={props.renderItem}
-					/>
-				{:else}
-					<VirtualListLoadMoreButton
-						testId={!IS_PROD
-							? `load-more-${rowFrame.sectionPlan.sectionId}`
-							: undefined}
-						onClick={() => list.loadMore(rowFrame.sectionPlan.sectionId)}
-					/>
+			{#snippet renderCell({ mountedCell: cellController })}
+				{#if cellController.binding && cellController.rowFrame}
+					{@const binding = cellController.binding}
+					{@const rowFrame = cellController.rowFrame}
+					{#if isHeaderCell(binding)}
+						{@const descriptor = rowFrame.sectionPlan.descriptor}
+						{@render props.renderHeader({
+							section: descriptor.section,
+							title: descriptor.title,
+							totalCount: descriptor.totalCount,
+							sectionId: descriptor.sectionId,
+							headerProps: descriptor.headerProps,
+						})}
+					{:else if isItemCell(binding)}
+						<TwoHopItemCellRender
+							{cellController}
+							getItemActivationCandidateId={list.getItemActivationCandidateId}
+							renderItem={props.renderItem}
+						/>
+					{:else}
+						<VirtualListLoadMoreButton
+							testId={!IS_PROD
+								? `load-more-${rowFrame.sectionPlan.sectionId}`
+								: undefined}
+							onClick={() => list.loadMore(rowFrame.sectionPlan.sectionId)}
+						/>
+					{/if}
 				{/if}
 			{/snippet}
-		</TwoHopFixedRowSlotsSurface>
+		</VirtualPooledGridRowsSurface>
 	{/key}
 </VirtualInteractiveSurface>

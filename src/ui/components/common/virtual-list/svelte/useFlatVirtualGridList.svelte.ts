@@ -45,7 +45,7 @@ import {
 } from "../dom/flatGridLayoutMeasurement";
 import { createFlatGridVisibilityAdapter } from "./flatGridVisibilityAdapter";
 import { createFlatGridControllerAdapter } from "./flatGridControllerAdapter";
-import { createContiguousRowSlotAllocator } from "../core/reconciliation/contiguousRowSlotAllocator";
+import { createResidentRowSlotAllocator } from "ui/virtualization/residentSlotAllocator";
 
 interface FlatVirtualGridApplicationSettings extends CardLayoutSettings {
 	previewActivationAheadRows?: number;
@@ -121,7 +121,7 @@ export function useFlatVirtualGridList<T>(props: FlatVirtualGridListProps<T>) {
 			rowPreviewActivationRuntime?.clearRow(rowIndex);
 		},
 	});
-	const rowSlotAllocator = createContiguousRowSlotAllocator();
+	const rowSlotAllocator = createResidentRowSlotAllocator();
 	let lastResolvedActiveScrollPolicyRowHeight: number | undefined;
 	let lastResolvedActiveScrollPolicyGap: number | undefined;
 	let lastResolvedActiveScrollPolicyAheadRows: number | undefined;

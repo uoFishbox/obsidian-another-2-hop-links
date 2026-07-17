@@ -1,6 +1,6 @@
 <script lang="ts">
 	import TwoHopItemCellRender from "../TwoHopItemCellRender.svelte";
-	import type { TwoHopFixedCellSlotController } from "../twoHopFixedRowSlotPool.svelte";
+	import type { TwoHopFixedCellSlotController } from "../twoHopPhysicalSlotStore.svelte";
 	import TwoHopVirtualListSurfaceChildItem from "./TwoHopVirtualListSurfaceChildItem.svelte";
 
 	interface Props {

@@ -1,37 +1,30 @@
 import { recordCCLDevMeasurement } from "infrastructure/debug/CCLDevMeasurements";
 
-export type RowSlotResetReason = "empty" | "layout" | "source";
+export type ResidentSlotResetReason = "empty" | "layout" | "source";
 
-export interface ContiguousRowSlotAllocator {
-	/**
-	 * Prepares a bounded physical slot pool for a contiguous integer row range.
-	 * Slot identity is resolved arithmetically by logical row index.
-	 */
+export interface ResidentRowSlotAllocator {
+	/** Prepares a bounded physical slot pool for a contiguous integer row range. */
 	prepareRange(params: {
 		readonly start: number;
 		readonly end: number;
 		readonly layoutKey: unknown;
 	}): void;
 	resolveSlotIndex(logicalRowIndex: number): number;
-	reset(reason: RowSlotResetReason): void;
+	reset(reason: ResidentSlotResetReason): void;
 	dispose(): void;
 	readonly capacity: number;
 	readonly epoch: number;
 }
 
-/**
- * Creates an arithmetic slot allocator for contiguous row ranges.
- * Capacity changes start a new epoch because modulo slot identities depend on
- * the divisor.
- */
-export function createContiguousRowSlotAllocator(): ContiguousRowSlotAllocator {
+/** Creates the shared arithmetic slot lifecycle used by resident row windows. */
+export function createResidentRowSlotAllocator(): ResidentRowSlotAllocator {
 	let capacity = 0;
 	let epoch = 0;
 	let layoutKey: unknown;
 	let hasLayoutKey = false;
 	let disposed = false;
 
-	function reset(_reason: RowSlotResetReason): void {
+	function reset(_reason: ResidentSlotResetReason): void {
 		capacity = 0;
 		layoutKey = undefined;
 		hasLayoutKey = false;
@@ -59,15 +52,10 @@ export function createContiguousRowSlotAllocator(): ContiguousRowSlotAllocator {
 		let nextCapacity = capacity;
 
 		if (activeRows > capacity) {
-			nextCapacity = Math.max(
-				activeRows,
-				Math.ceil(activeRows * 1.25) + 2,
-			);
+			nextCapacity = Math.max(activeRows, Math.ceil(activeRows * 1.25) + 2);
 		}
 
-		if (nextCapacity === capacity) {
-			return;
-		}
+		if (nextCapacity === capacity) return;
 
 		capacity = nextCapacity;
 		if (!resetDuringPrepare && previousCapacity !== 0) {
@@ -76,9 +64,7 @@ export function createContiguousRowSlotAllocator(): ContiguousRowSlotAllocator {
 	}
 
 	function resolveSlotIndex(logicalRowIndex: number): number {
-		if (capacity === 0) {
-			return 0;
-		}
+		if (capacity === 0) return 0;
 
 		const remainder = logicalRowIndex % capacity;
 		return remainder < 0 ? remainder + capacity : remainder;

@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { createContiguousRowSlotAllocator } from "../contiguousRowSlotAllocator";
+import { createResidentRowSlotAllocator } from "../residentSlotAllocator";
 
-describe("createContiguousRowSlotAllocator", () => {
+describe("createResidentRowSlotAllocator", () => {
 	it("maps a contiguous range arithmetically and reuses the leaving slot", () => {
-		const allocator = createContiguousRowSlotAllocator();
+		const allocator = createResidentRowSlotAllocator();
 		allocator.prepareRange({ start: 100, end: 120, layoutKey: "four-columns" });
 
 		expect(allocator.capacity).toBe(27);
@@ -13,7 +13,7 @@ describe("createContiguousRowSlotAllocator", () => {
 	});
 
 	it("keeps peak capacity until a layout reset", () => {
-		const allocator = createContiguousRowSlotAllocator();
+		const allocator = createResidentRowSlotAllocator();
 		allocator.prepareRange({ start: 0, end: 20, layoutKey: "wide" });
 		allocator.prepareRange({ start: 10, end: 18, layoutKey: "wide" });
 		expect(allocator.capacity).toBe(27);
@@ -24,7 +24,7 @@ describe("createContiguousRowSlotAllocator", () => {
 	});
 
 	it("uses growth headroom before starting a new epoch", () => {
-		const allocator = createContiguousRowSlotAllocator();
+		const allocator = createResidentRowSlotAllocator();
 		allocator.prepareRange({ start: 10, end: 13, layoutKey: "layout" });
 		const previousEpoch = allocator.epoch;
 
@@ -33,21 +33,19 @@ describe("createContiguousRowSlotAllocator", () => {
 		expect(allocator.epoch).toBe(previousEpoch);
 
 		allocator.prepareRange({ start: 10, end: 17, layoutKey: "layout" });
-
 		expect(allocator.capacity).toBe(11);
 		expect(allocator.epoch).toBe(previousEpoch + 1);
 		expect(allocator.resolveSlotIndex(10)).toBe(10);
 	});
 
 	it("does not compact after sustained substantial under-utilization", () => {
-		const allocator = createContiguousRowSlotAllocator();
+		const allocator = createResidentRowSlotAllocator();
 		allocator.prepareRange({ start: 0, end: 12, layoutKey: "layout" });
 		allocator.prepareRange({ start: 9, end: 12, layoutKey: "layout" });
 		allocator.prepareRange({ start: 9, end: 12, layoutKey: "layout" });
 		const previousEpoch = allocator.epoch;
 
 		allocator.prepareRange({ start: 9, end: 12, layoutKey: "layout" });
-
 		expect(allocator.capacity).toBe(17);
 		expect(allocator.epoch).toBe(previousEpoch);
 	});

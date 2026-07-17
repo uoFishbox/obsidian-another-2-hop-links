@@ -3,6 +3,7 @@
 	import VirtualSurfaceCells from "./svelte/VirtualSurfaceCells.svelte";
 	import type { VirtualSurfaceProps } from "./svelte/VirtualSurfaceProps";
 	import type { MountedVirtualCell } from "./types";
+	import { KEYED_VIRTUAL_CELL_BODY_LIFECYCLE } from "ui/virtualization/bodyLifecycle";
 
 	let {
 		className = "",
@@ -34,7 +35,7 @@
 		onCellMount,
 		onCellDestroy,
 		onMountedCellsChange,
-		remountCellBodyOnKeyChange = true,
+		bodyLifecyclePolicy = KEYED_VIRTUAL_CELL_BODY_LIFECYCLE,
 		resolveNavigationTarget,
 		moveFocusWithinList,
 		flushVirtualScrollMeasurement,
@@ -80,7 +81,7 @@
 			{getCellDataTestId}
 			{onCellMount}
 			{onCellDestroy}
-			{remountCellBodyOnKeyChange}
+			{bodyLifecyclePolicy}
 			{renderCell}
 		/>
 	{:else}
@@ -102,7 +103,7 @@
 			{getCellDataTestId}
 			{onCellMount}
 			{onCellDestroy}
-			{remountCellBodyOnKeyChange}
+			{bodyLifecyclePolicy}
 			{renderCell}
 		/>
 	{/if}

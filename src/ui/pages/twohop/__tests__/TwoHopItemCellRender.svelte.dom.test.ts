@@ -12,14 +12,14 @@ import {
 	createTwoHopFixedRowSlotPool,
 	type TwoHopFixedCellSlotController,
 	type TwoHopFixedRowSlotController,
-} from "../twoHopFixedRowSlotPool.svelte";
+} from "../twoHopPhysicalSlotStore.svelte";
 import type {
 	TwoHopVirtualListItem,
 	TwoHopVirtualListSection,
 } from "../twoHopVirtualListModel";
 import type { TwoHopCellBinding } from "../twoHopCellBinding";
 import { resolveTwoHopItemStaticState } from "../twoHopCellStaticState";
-import TwoHopFixedRowSlotsSurfaceHarness from "./TwoHopFixedRowSlotsSurfaceHarness.svelte";
+import TwoHopPooledGridRowsSurfaceHarness from "./TwoHopPooledGridRowsSurfaceHarness.svelte";
 import TwoHopItemCellRenderHarness from "./TwoHopItemCellRenderHarness.svelte";
 
 const items = Array.from({ length: 100 }, (_, index) => ({
@@ -266,7 +266,7 @@ describe("TwoHopItemCellRender", () => {
 		const pool = createTwoHopFixedRowSlotPool();
 		pool.setCapacity(1, 2);
 		pool.commit({ ...standaloneFrame, cells: sourceFrame.cells.slice(0, 1) });
-		const { container } = render(TwoHopFixedRowSlotsSurfaceHarness, {
+		const { container } = render(TwoHopPooledGridRowsSurfaceHarness, {
 			props: { rowSlotControllers: pool.controllers },
 		});
 		await tick();
@@ -344,7 +344,7 @@ describe("TwoHopItemCellRender", () => {
 		expect(itemSlot).toBeDefined();
 		if (!itemSlot) return;
 		const physicalCellSelector = getPhysicalCellSelector(itemSlot.controller);
-		const { container } = render(TwoHopFixedRowSlotsSurfaceHarness, {
+		const { container } = render(TwoHopPooledGridRowsSurfaceHarness, {
 			props: {
 				rowSlotControllers: kernel.fixedRowSlotPool.controllers,
 			},
@@ -389,7 +389,7 @@ describe("TwoHopItemCellRender", () => {
 		const { controller, rowController } = itemSlot;
 		const physicalCellSelector = getPhysicalCellSelector(controller);
 
-		const { container } = render(TwoHopFixedRowSlotsSurfaceHarness, {
+		const { container } = render(TwoHopPooledGridRowsSurfaceHarness, {
 			props: { rowSlotControllers: kernel.fixedRowSlotPool.controllers },
 		});
 		await tick();
@@ -442,7 +442,7 @@ describe("TwoHopItemCellRender", () => {
 		const { controller, rowController } = itemSlot;
 		const physicalCellSelector = getPhysicalCellSelector(controller);
 
-		const { container } = render(TwoHopFixedRowSlotsSurfaceHarness, {
+		const { container } = render(TwoHopPooledGridRowsSurfaceHarness, {
 			props: { rowSlotControllers: kernel.fixedRowSlotPool.controllers },
 		});
 		await tick();
@@ -623,7 +623,7 @@ describe("TwoHopItemCellRender", () => {
 			onStableVisibleRange() {},
 		});
 		applySingleRowRange(kernel, 1);
-		const { container } = render(TwoHopFixedRowSlotsSurfaceHarness, {
+		const { container } = render(TwoHopPooledGridRowsSurfaceHarness, {
 			props: {
 				rowSlotControllers: kernel.fixedRowSlotPool.controllers,
 			},

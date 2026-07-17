@@ -6,7 +6,7 @@ import {
 import type { SectionRenderDescriptor } from "ui/components/sections/types";
 import { compileTwoHopViewPlan, createTwoHopViewPlanRowModel } from "../twoHopViewPlan";
 import { createTwoHopScalarScrollKernel } from "../twoHopScalarScrollKernel.svelte";
-import { createTwoHopFixedRowSlotPool } from "../twoHopFixedRowSlotPool.svelte";
+import { createTwoHopFixedRowSlotPool } from "../twoHopPhysicalSlotStore.svelte";
 import { createSurfaceVirtualCellRegistry } from "ui/components/common/virtual-list/svelte/VirtualCellRegistry";
 import { VIRTUAL_CELL_WILL_REBIND_EVENT } from "ui/interactions/virtualCellRebind";
 import type {

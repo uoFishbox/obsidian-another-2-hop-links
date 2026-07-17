@@ -5,6 +5,10 @@ import {
 	createCoordinatedScheduledTask,
 	type VirtualFrameCoordinator,
 } from "ui/virtualization/frameCoordinator";
+import {
+	planResidentWindow,
+	type ResidentScrollDirection,
+} from "ui/virtualization/residentWindowPlanner";
 import type { RowRange } from "ui/components/common/virtual-list/rowRange";
 import type { VirtualRanges } from "ui/components/common/virtual-list/types";
 import {
@@ -14,10 +18,6 @@ import {
 } from "./twoHopMountedRangeTransition";
 import { createTwoHopPhysicalSlotStore } from "./twoHopPhysicalSlotStore.svelte";
 import type { TwoHopViewPlan, TwoHopViewPlanRowModel } from "./twoHopViewPlan";
-import {
-	planResidentWindow,
-	type ResidentScrollDirection,
-} from "./residentWindowPlanner";
 
 export interface TwoHopScalarKernelSnapshot {
 	readonly rowModel: TwoHopViewPlanRowModel;

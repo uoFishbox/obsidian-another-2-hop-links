@@ -9,6 +9,7 @@ import type { MountedVirtualCell, VirtualNavigationTarget } from "../types";
 import type { ProgrammaticScrollSnapshot } from "../dom/flushVirtualScrollMeasurement";
 import type { VirtualSurfaceNavigationContext } from "./VirtualSurfaceNavigation";
 import type { VirtualCellRegistry } from "./VirtualCellRegistry";
+import type { VirtualCellBodyLifecyclePolicy } from "ui/virtualization/bodyLifecycle";
 import type {
 	VirtualSurfaceCellPosition,
 	VirtualSurfaceRenderInput,
@@ -48,7 +49,7 @@ export interface VirtualSurfaceCommonProps<TMountedCell extends MountedVirtualCe
 	onCellMount?: (cell: TMountedCell) => void;
 	onCellDestroy?: (cell: TMountedCell) => void;
 	onMountedCellsChange?: (cells: readonly TMountedCell[]) => void;
-	remountCellBodyOnKeyChange?: boolean;
+	bodyLifecyclePolicy?: VirtualCellBodyLifecyclePolicy<TMountedCell>;
 	resolveNavigationTarget?: (
 		currentKey: string,
 		direction: ResultNavigationDirection,

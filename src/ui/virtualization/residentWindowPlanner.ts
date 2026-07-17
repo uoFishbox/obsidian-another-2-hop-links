@@ -28,7 +28,7 @@ const DEFAULT_BACKWARD_AHEAD_ROWS = 2;
 const DEFAULT_NEUTRAL_BUFFER_ROWS = 5;
 const MIN_EDGE_BUFFER_ROWS = 2;
 
-/** Plans a direction-biased resident window without reading DOM or Svelte state. */
+/** Plans a direction-biased resident window without reading DOM or UI state. */
 export function planResidentWindow(
 	input: ResidentWindowPlannerInput,
 ): ResidentWindowPlan {
@@ -49,12 +49,9 @@ export function planResidentWindow(
 	const currentEnd = clamp(input.current.end, currentStart, rowCount);
 	const hasCurrent = currentStart < currentEnd;
 	const visibleWithinCurrent =
-		hasCurrent &&
-		visibleStart >= currentStart &&
-		visibleEnd <= currentEnd;
+		hasCurrent && visibleStart >= currentStart && visibleEnd <= currentEnd;
 	const distantJump =
-		hasCurrent &&
-		(visibleEnd <= currentStart || visibleStart >= currentEnd);
+		hasCurrent && (visibleEnd <= currentStart || visibleStart >= currentEnd);
 	const behindMargin = visibleStart - currentStart;
 	const aheadMargin = currentEnd - visibleEnd;
 	const canRetain =
