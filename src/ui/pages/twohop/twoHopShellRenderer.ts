@@ -72,9 +72,10 @@ export function createTwoHopShellRenderer(params: TwoHopShellRendererParams) {
 			slot.title.textContent = descriptor.title;
 			slot.meta.textContent = "";
 			slot.meta.style.display = "none";
-			renderHeaderIcon(
+			renderIcon(
 				slot.headerIcon,
 				resolveHeaderIconName(descriptor.section.kind),
+				26,
 			);
 			slot.previewHost.style.display = "none";
 			slot.root.setAttribute(
@@ -104,9 +105,11 @@ export function createTwoHopShellRenderer(params: TwoHopShellRendererParams) {
 		if (cell.kind === "load-more") {
 			slot.cardModel = null;
 			slot.root.classList.add("cosense-card-links__load-more-button");
-			slot.title.className = "cosense-card-links__box-title";
-			slot.title.textContent = "•••";
+			slot.title.textContent = "";
 			slot.meta.textContent = "";
+			slot.meta.style.display = "none";
+			renderIcon(slot.headerIcon, "Ellipsis", 28);
+			slot.previewHost.style.display = "none";
 			slot.root.setAttribute("aria-label", "Load more");
 			slot.root.dataset.twoHopLoadMoreSection = descriptor.sectionId;
 			clearInteraction(slot.root);
@@ -257,14 +260,12 @@ function resolveHeaderIconName(
 	}
 }
 
-function renderHeaderIcon(icon: SVGSVGElement, name: IconName): void {
+function renderIcon(icon: SVGSVGElement, name: IconName, size: number): void {
 	if (icon.dataset.cclIconName !== name) {
 		icon.replaceChildren();
 		for (const [attribute, value] of Object.entries(svgAttrs)) {
 			icon.setAttribute(attribute, value);
 		}
-		icon.setAttribute("width", "26");
-		icon.setAttribute("height", "26");
 		icon.setAttribute("stroke", "currentColor");
 		icon.setAttribute("aria-hidden", "true");
 		for (const element of ICONS[name]) {
@@ -272,6 +273,8 @@ function renderHeaderIcon(icon: SVGSVGElement, name: IconName): void {
 		}
 		icon.dataset.cclIconName = name;
 	}
+	icon.setAttribute("width", String(size));
+	icon.setAttribute("height", String(size));
 	icon.style.display = "";
 }
 

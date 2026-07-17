@@ -114,4 +114,27 @@ describe("twoHop imperative DOM pool", () => {
 		expect(slot.headerIcon.dataset.cclIconName).toBe("Unlink");
 		expect(slot.headerIcon.querySelectorAll("path, circle, rect, line").length).toBeGreaterThan(0);
 	});
+
+	it("renders load more with the original centered ellipsis icon", () => {
+		const { snapshot, geometry } = createFixture();
+		const content = document.createElement("div");
+		const pool = createTwoHopDomPool({ content, rowCapacity: 1, columns: 2 });
+		const renderer = createTwoHopShellRenderer({});
+		const loadMore = resolveTwoHopCell(snapshot, geometry, 1, 0);
+		if (!loadMore || loadMore.kind !== "load-more") {
+			throw new Error("expected load-more cell");
+		}
+
+		renderer.renderShell(pool.rows[0].cells[0], loadMore, snapshot);
+
+		const slot = pool.rows[0].cells[0];
+		expect(slot.root.classList.contains("cosense-card-links__load-more-button")).toBe(true);
+		expect(slot.title.textContent).toBe("");
+		expect(slot.meta.style.display).toBe("none");
+		expect(slot.previewHost.style.display).toBe("none");
+		expect(slot.headerIcon.dataset.cclIconName).toBe("Ellipsis");
+		expect(slot.headerIcon.getAttribute("width")).toBe("28");
+		expect(slot.headerIcon.getAttribute("height")).toBe("28");
+		expect(slot.headerIcon.querySelectorAll("circle")).toHaveLength(3);
+	});
 });
