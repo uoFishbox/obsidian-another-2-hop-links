@@ -16,13 +16,13 @@ export interface TwoHopPreviewHydratorStats {
 }
 
 export interface TwoHopPreviewHydrator {
-	notifyViewport(params: {
-		readonly visibleStart: number;
-		readonly visibleEnd: number;
-		readonly scrollActive: boolean;
-		readonly velocityRowsPerMs: number;
-		readonly criticalWorkPending: boolean;
-	}): void;
+	notifyViewport(
+		visibleStart: number,
+		visibleEnd: number,
+		scrollActive: boolean,
+		velocityRowsPerMs: number,
+		criticalWorkPending: boolean,
+	): void;
 	notifyShellsChanged(): void;
 	hydrateNext(lane: TwoHopPreviewLane): boolean;
 	getStats(): TwoHopPreviewHydratorStats;
@@ -51,7 +51,8 @@ export function createTwoHopPreviewHydrator(
 	params: CreateTwoHopPreviewHydratorParams,
 ): TwoHopPreviewHydrator {
 	const ownerWindow = resolveOwnerWindow(params.getRows());
-	const now = params.now ?? (() => ownerWindow?.performance.now() ?? performance.now());
+	const now =
+		params.now ?? (() => ownerWindow?.performance.now() ?? performance.now());
 	const setTimer =
 		params.setTimer ??
 		((callback: () => void, delayMs: number) =>
@@ -60,11 +61,11 @@ export function createTwoHopPreviewHydrator(
 		params.clearTimer ?? ((handle: number) => ownerWindow?.clearTimeout(handle));
 	const idleDelayMs = params.idleDelayMs ?? 140;
 	const opportunisticIntervalMs = params.opportunisticIntervalMs ?? 160;
-	const opportunisticVelocityLimit =
-		params.opportunisticVelocityLimit ?? 0.012;
+	const opportunisticVelocityLimit = params.opportunisticVelocityLimit ?? 0.012;
 	let visibleStart = 0;
 	let visibleEnd = 0;
 	let idleTimer = 0;
+	let idleDeadline = 0;
 	let disposed = false;
 	let lastOpportunisticActivationAt = Number.NEGATIVE_INFINITY;
 	let stats = {
@@ -74,20 +75,20 @@ export function createTwoHopPreviewHydrator(
 		opportunisticActivations: 0,
 	};
 
-	function notifyViewport(viewport: {
-		readonly visibleStart: number;
-		readonly visibleEnd: number;
-		readonly scrollActive: boolean;
-		readonly velocityRowsPerMs: number;
-		readonly criticalWorkPending: boolean;
-	}): void {
-		visibleStart = viewport.visibleStart;
-		visibleEnd = viewport.visibleEnd;
+	function notifyViewport(
+		nextVisibleStart: number,
+		nextVisibleEnd: number,
+		scrollActive: boolean,
+		velocityRowsPerMs: number,
+		criticalWorkPending: boolean,
+	): void {
+		visibleStart = nextVisibleStart;
+		visibleEnd = nextVisibleEnd;
 		scheduleIdle();
 		if (
-			!viewport.scrollActive ||
-			viewport.criticalWorkPending ||
-			Math.abs(viewport.velocityRowsPerMs) > opportunisticVelocityLimit ||
+			!scrollActive ||
+			criticalWorkPending ||
+			Math.abs(velocityRowsPerMs) > opportunisticVelocityLimit ||
 			now() - lastOpportunisticActivationAt < opportunisticIntervalMs
 		) {
 			return;
@@ -105,20 +106,30 @@ export function createTwoHopPreviewHydrator(
 
 	function scheduleIdle(): void {
 		if (disposed) return;
-		if (idleTimer) clearTimer(idleTimer);
-		idleTimer = setTimer(() => {
+		idleDeadline = now() + idleDelayMs;
+		if (idleTimer) return;
+		idleTimer = setTimer(handleIdleTimer, idleDelayMs);
+	}
+
+	function handleIdleTimer(): void {
+		if (disposed) {
 			idleTimer = 0;
-			drainIdleLane();
-		}, idleDelayMs);
+			return;
+		}
+		const remaining = idleDeadline - now();
+		if (remaining > 0) {
+			idleTimer = setTimer(handleIdleTimer, remaining);
+			return;
+		}
+
+		idleTimer = 0;
+		drainIdleLane();
 	}
 
 	function drainIdleLane(): void {
 		if (disposed) return;
 		if (hydrateNext("visible-idle")) {
-			idleTimer = setTimer(() => {
-				idleTimer = 0;
-				drainIdleLane();
-			}, 0);
+			idleTimer = setTimer(handleIdleTimer, 0);
 		}
 	}
 
@@ -130,10 +141,7 @@ export function createTwoHopPreviewHydrator(
 		return true;
 	}
 
-	async function hydrateSlot(
-		slot: TwoHopCardShellSlot,
-		file: TFile,
-	): Promise<void> {
+	async function hydrateSlot(slot: TwoHopCardShellSlot, file: TFile): Promise<void> {
 		const generation = slot.generation;
 		const identity = slot.cardModel?.previewActivationIdentity ?? file.path;
 		const abortController = new AbortController();
@@ -334,15 +342,10 @@ function applyPreviewSearchHighlight(
 
 	return {
 		...preview,
-		content: highlightSearchMatchesInHtml(
-			preview.content,
-			model.searchQuery,
-		),
+		content: highlightSearchMatchesInHtml(preview.content, model.searchQuery),
 	};
 }
 
-function resolveOwnerWindow(
-	rows: readonly TwoHopDomRowSlot[],
-): Window | null {
+function resolveOwnerWindow(rows: readonly TwoHopDomRowSlot[]): Window | null {
 	return rows[0]?.root.ownerDocument.defaultView ?? null;
 }

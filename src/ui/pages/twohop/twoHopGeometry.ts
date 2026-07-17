@@ -17,12 +17,14 @@ export interface TwoHopGeometry {
 export type TwoHopResolvedCell =
 	| {
 			readonly kind: "header";
+			readonly logicalKey: string;
 			readonly sectionIndex: number;
 			readonly rowIndex: number;
 			readonly columnIndex: number;
 	  }
 	| {
 			readonly kind: "item";
+			readonly logicalKey: string;
 			readonly sectionIndex: number;
 			readonly rowIndex: number;
 			readonly columnIndex: number;
@@ -31,18 +33,20 @@ export type TwoHopResolvedCell =
 	  }
 	| {
 			readonly kind: "load-more";
+			readonly logicalKey: string;
 			readonly sectionIndex: number;
 			readonly rowIndex: number;
 			readonly columnIndex: number;
 	  };
 
 export interface TwoHopRowRange {
-	readonly start: number;
-	readonly end: number;
+	start: number;
+	end: number;
 }
 
 export interface TwoHopResolvedCellBuffer {
 	kind: TwoHopResolvedCell["kind"];
+	logicalKey: string;
 	sectionIndex: number;
 	rowIndex: number;
 	columnIndex: number;
@@ -53,6 +57,7 @@ export interface TwoHopResolvedCellBuffer {
 export function createTwoHopResolvedCellBuffer(): TwoHopResolvedCellBuffer {
 	return {
 		kind: "header",
+		logicalKey: "",
 		sectionIndex: -1,
 		rowIndex: -1,
 		columnIndex: -1,
@@ -151,6 +156,7 @@ export function resolveTwoHopCellInto(
 
 	if (cellIndex === 0) {
 		target.kind = "header";
+		target.logicalKey = section.headerLogicalKey;
 		target.sectionIndex = sectionIndex;
 		target.rowIndex = rowIndex;
 		target.columnIndex = columnIndex;
@@ -165,6 +171,7 @@ export function resolveTwoHopCellInto(
 		const item = section.visibleItems[visibleItemOffset];
 		if (!item) return null;
 		target.kind = "item";
+		target.logicalKey = section.visibleItemLogicalKeys[visibleItemOffset];
 		target.sectionIndex = sectionIndex;
 		target.rowIndex = rowIndex;
 		target.columnIndex = columnIndex;
@@ -175,6 +182,7 @@ export function resolveTwoHopCellInto(
 
 	if (section.showLoadMore && visibleItemOffset === section.visibleItemCount) {
 		target.kind = "load-more";
+		target.logicalKey = section.loadMoreLogicalKey;
 		target.sectionIndex = sectionIndex;
 		target.rowIndex = rowIndex;
 		target.columnIndex = columnIndex;
@@ -191,8 +199,22 @@ export function resolveTwoHopVisibleRows(
 	scrollOffset: number,
 	viewportHeight: number,
 ): TwoHopRowRange {
+	const range = { start: 0, end: 0 };
+	resolveTwoHopVisibleRowsInto(range, geometry, scrollOffset, viewportHeight);
+	return range;
+}
+
+/** Resolves visible rows into caller-owned storage for the scroll hot path. */
+export function resolveTwoHopVisibleRowsInto(
+	target: TwoHopRowRange,
+	geometry: TwoHopGeometry,
+	scrollOffset: number,
+	viewportHeight: number,
+): void {
 	if (geometry.rowCount === 0 || viewportHeight <= 0) {
-		return { start: 0, end: 0 };
+		target.start = 0;
+		target.end = 0;
+		return;
 	}
 
 	const start = resolveRowAtOffset(geometry, Math.max(0, scrollOffset));
@@ -201,7 +223,8 @@ export function resolveTwoHopVisibleRows(
 		geometry.rowCount,
 		resolveRowAtOffset(geometry, lastOffset) + 1,
 	);
-	return { start, end };
+	target.start = start;
+	target.end = end;
 }
 
 export function resolveTwoHopRowTop(

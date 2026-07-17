@@ -4,6 +4,7 @@ import {
 	resolveTwoHopCell,
 	resolveTwoHopRowTop,
 	resolveTwoHopVisibleRows,
+	resolveTwoHopVisibleRowsInto,
 } from "../twoHopGeometry";
 import { createTwoHopSnapshot } from "../twoHopSnapshot";
 import type {
@@ -135,6 +136,9 @@ describe("twoHopSnapshot geometry", () => {
 			start: 1,
 			end: 3,
 		});
+		const reusableRange = { start: 0, end: 0 };
+		resolveTwoHopVisibleRowsInto(reusableRange, geometry, 225, 120);
+		expect(reusableRange).toEqual({ start: 1, end: 3 });
 		expect(resolveTwoHopCell(snapshot, geometry, 2, 0)).toMatchObject({
 			kind: "header",
 			sectionIndex: 1,

@@ -36,7 +36,7 @@ export function createTwoHopInteractionRouter(params: {
 		);
 		if (!cell) return null;
 		return {
-			key: resolveTwoHopNavigationCellKey(cell, snapshot),
+			key: resolveTwoHopNavigationCellKey(cell),
 			rowTop: resolveTwoHopRowTop(geometry, cell.rowIndex),
 		};
 	}
@@ -44,19 +44,8 @@ export function createTwoHopInteractionRouter(params: {
 	return { resolveNavigationTarget };
 }
 
-export function resolveTwoHopNavigationCellKey(
-	cell: TwoHopResolvedCell,
-	snapshot: TwoHopSnapshot,
-): string {
-	const sectionId = snapshot.sections[cell.sectionIndex].descriptor.sectionId;
-	switch (cell.kind) {
-		case "header":
-			return `header:${sectionId}`;
-		case "load-more":
-			return `load-more:${sectionId}`;
-		case "item":
-			return `item:${sectionId}:${cell.item.virtualKey}`;
-	}
+export function resolveTwoHopNavigationCellKey(cell: TwoHopResolvedCell): string {
+	return cell.logicalKey;
 }
 
 function resolveDirectionalCell(
@@ -80,7 +69,11 @@ function resolveDirectionalCell(
 				columnIndex,
 			);
 			if (sameColumn) return sameColumn;
-			for (let fallbackColumn = geometry.columns - 1; fallbackColumn >= 0; fallbackColumn -= 1) {
+			for (
+				let fallbackColumn = geometry.columns - 1;
+				fallbackColumn >= 0;
+				fallbackColumn -= 1
+			) {
 				const fallback = resolveTwoHopCell(
 					snapshot,
 					geometry,

@@ -58,13 +58,7 @@ describe("twoHopPreviewHydrator", () => {
 			setTimer: () => 1,
 			clearTimer: () => {},
 		});
-		hydrator.notifyViewport({
-			visibleStart: 0,
-			visibleEnd: 1,
-			scrollActive: false,
-			velocityRowsPerMs: 0,
-			criticalWorkPending: false,
-		});
+		hydrator.notifyViewport(0, 1, false, 0, false);
 		expect(hydrator.hydrateNext("visible-idle")).toBe(true);
 		const slot = pool.rows[0].cells[0];
 		slot.generation += 1;
@@ -88,14 +82,7 @@ describe("twoHopPreviewHydrator", () => {
 			clearTimer: () => {},
 			opportunisticIntervalMs: 160,
 		});
-		const notify = () =>
-			hydrator.notifyViewport({
-				visibleStart: 0,
-				visibleEnd: 1,
-				scrollActive: true,
-				velocityRowsPerMs: 0,
-				criticalWorkPending: false,
-			});
+		const notify = () => hydrator.notifyViewport(0, 1, true, 0, false);
 
 		notify();
 		timestamp = 250;
@@ -108,24 +95,58 @@ describe("twoHopPreviewHydrator", () => {
 		hydrator.dispose();
 	});
 
+	it("keeps one idle timer while viewport notifications extend the deadline", () => {
+		const pool = createReadyPool();
+		let timestamp = 0;
+		const callbacks: Array<() => void> = [];
+		const delays: number[] = [];
+		const clearTimer = vi.fn();
+		const hydrator = createTwoHopPreviewHydrator({
+			getRows: () => pool.rows,
+			getPreview: () => new Promise(() => {}),
+			now: () => timestamp,
+			idleDelayMs: 100,
+			setTimer: (callback, delayMs) => {
+				callbacks.push(callback);
+				delays.push(delayMs);
+				return callbacks.length;
+			},
+			clearTimer,
+		});
+
+		hydrator.notifyViewport(0, 1, false, 0, false);
+		timestamp = 20;
+		hydrator.notifyViewport(0, 1, false, 0, false);
+		timestamp = 40;
+		hydrator.notifyViewport(0, 1, false, 0, false);
+
+		expect(callbacks).toHaveLength(1);
+		expect(clearTimer).not.toHaveBeenCalled();
+		timestamp = 100;
+		callbacks[0]();
+		expect(delays).toEqual([100, 40]);
+		expect(callbacks[1]).toBe(callbacks[0]);
+
+		timestamp = 140;
+		callbacks[1]();
+		expect(hydrator.getStats().requested).toBe(1);
+		expect(delays).toEqual([100, 40, 0]);
+		expect(callbacks[2]).toBe(callbacks[0]);
+		hydrator.dispose();
+	});
+
 	it("renders text preview markup as HTML instead of escaped source", async () => {
 		const pool = createReadyPool();
 		const hydrator = createTwoHopPreviewHydrator({
 			getRows: () => pool.rows,
 			getPreview: async () => ({
 				type: "text",
-				content: "<strong>Rendered</strong><a href=\"#target\">link</a>",
+				content: '<strong>Rendered</strong><a href="#target">link</a>',
 			}),
 			setTimer: () => 1,
 			clearTimer: () => {},
 		});
-		hydrator.notifyViewport({
-			visibleStart: 0,
-			visibleEnd: 1,
-			scrollActive: false,
-			velocityRowsPerMs: 0,
-			criticalWorkPending: false,
-		});
+		hydrator.notifyViewport(0, 1, false, 0, false);
 
 		expect(hydrator.hydrateNext("visible-idle")).toBe(true);
 		await Promise.resolve();
@@ -155,13 +176,7 @@ describe("twoHopPreviewHydrator", () => {
 			setTimer: () => 1,
 			clearTimer: () => {},
 		});
-		hydrator.notifyViewport({
-			visibleStart: 0,
-			visibleEnd: 1,
-			scrollActive: false,
-			velocityRowsPerMs: 0,
-			criticalWorkPending: false,
-		});
+		hydrator.notifyViewport(0, 1, false, 0, false);
 
 		expect(hydrator.hydrateNext("visible-idle")).toBe(true);
 		await Promise.resolve();
@@ -197,13 +212,7 @@ describe("twoHopPreviewHydrator", () => {
 			setTimer: () => 1,
 			clearTimer: () => {},
 		});
-		hydrator.notifyViewport({
-			visibleStart: 0,
-			visibleEnd: 1,
-			scrollActive: false,
-			velocityRowsPerMs: 0,
-			criticalWorkPending: false,
-		});
+		hydrator.notifyViewport(0, 1, false, 0, false);
 
 		expect(hydrator.hydrateNext("visible-idle")).toBe(true);
 		expect(slot.previewHost.textContent).toBe("Previous");
@@ -235,13 +244,7 @@ describe("twoHopPreviewHydrator", () => {
 			setTimer: () => 1,
 			clearTimer: () => {},
 		});
-		hydrator.notifyViewport({
-			visibleStart: 0,
-			visibleEnd: 1,
-			scrollActive: false,
-			velocityRowsPerMs: 0,
-			criticalWorkPending: false,
-		});
+		hydrator.notifyViewport(0, 1, false, 0, false);
 
 		expect(hydrator.hydrateNext("visible-idle")).toBe(true);
 		expect(getPreview.mock.calls[0]?.[2]?.cacheRevision).toBe("3:7:0");

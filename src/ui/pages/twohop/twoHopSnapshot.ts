@@ -6,7 +6,10 @@ import type {
 
 export interface TwoHopSectionSnapshot {
 	readonly descriptor: TwoHopVirtualSectionDescriptor;
+	readonly headerLogicalKey: string;
+	readonly loadMoreLogicalKey: string;
 	readonly visibleItems: readonly TwoHopVirtualListItem[];
+	readonly visibleItemLogicalKeys: readonly string[];
 	readonly visibleCount: number;
 	readonly visibleItemCount: number;
 	readonly visibleItemSourceIndexes: Uint32Array;
@@ -74,6 +77,9 @@ function createSectionSnapshot(
 	const canExtendPrevious =
 		previousSection !== undefined && previousSection.visibleCount < visibleCount;
 	const visibleItems = canExtendPrevious ? [...previousSection.visibleItems] : [];
+	const visibleItemLogicalKeys = canExtendPrevious
+		? [...previousSection.visibleItemLogicalKeys]
+		: [];
 	const sourceIndexes = canExtendPrevious
 		? Array.from(previousSection.visibleItemSourceIndexes)
 		: [];
@@ -87,12 +93,16 @@ function createSectionSnapshot(
 		const item = descriptor.getItem(sourceIndex);
 		if (!item) continue;
 		visibleItems.push(item);
+		visibleItemLogicalKeys.push(`item:${descriptor.sectionId}:${item.virtualKey}`);
 		sourceIndexes.push(sourceIndex);
 	}
 
 	return {
 		descriptor,
+		headerLogicalKey: `header:${descriptor.sectionId}`,
+		loadMoreLogicalKey: `load-more:${descriptor.sectionId}`,
 		visibleItems,
+		visibleItemLogicalKeys,
 		visibleCount,
 		visibleItemCount: sourceIndexes.length,
 		visibleItemSourceIndexes: Uint32Array.from(sourceIndexes),

@@ -11,7 +11,6 @@ import {
 	resolveTwoHopSectionVariant,
 } from "./twoHopCellStaticState";
 import type { TwoHopSnapshot } from "./twoHopSnapshot";
-import { resolveTwoHopNavigationCellKey } from "./twoHopInteractionRouter";
 import { ICONS, svgAttrs, type IconName, type SvgElement } from "ui/utils/icons";
 import { highlightTextForSearch } from "features/preview/text-processing/searchHighlighter";
 
@@ -33,9 +32,10 @@ export function createTwoHopShellRenderer(params: TwoHopShellRendererParams) {
 	function renderSkeleton(
 		slot: TwoHopCardShellSlot,
 		cell: TwoHopResolvedCell | null,
-		snapshot: TwoHopSnapshot,
+		_snapshot: TwoHopSnapshot,
 	): void {
-		prepareSlot(slot, cell, snapshot, slot.renderRevision !== renderRevision);
+		const identity = cell?.logicalKey ?? null;
+		prepareSlot(slot, cell, identity, slot.renderRevision !== renderRevision);
 		slot.renderRevision = renderRevision;
 		slot.rich = false;
 		slot.cardModel = null;
@@ -50,7 +50,7 @@ export function createTwoHopShellRenderer(params: TwoHopShellRendererParams) {
 		cell: TwoHopResolvedCell,
 		snapshot: TwoHopSnapshot,
 	): void {
-		const identity = resolveCellIdentity(cell, snapshot);
+		const identity = cell.logicalKey;
 		const revisionChanged = slot.renderRevision !== renderRevision;
 		const previousPreviewIdentity = slot.cardModel?.previewActivationIdentity;
 		const tentativelyPreservePreview =
@@ -66,7 +66,7 @@ export function createTwoHopShellRenderer(params: TwoHopShellRendererParams) {
 			slot.cell.style.visibility = "visible";
 			return;
 		}
-		prepareSlot(slot, cell, snapshot, revisionChanged, tentativelyPreservePreview);
+		prepareSlot(slot, cell, identity, revisionChanged, tentativelyPreservePreview);
 		slot.renderRevision = renderRevision;
 		slot.rich = true;
 		slot.root.classList.remove("is-skeleton");
@@ -131,12 +131,21 @@ export function createTwoHopShellRenderer(params: TwoHopShellRendererParams) {
 			return;
 		}
 
-		const staticState = resolveTwoHopItemStaticState(cell.item, descriptor.section);
-		const presentation = staticState.presentation;
 		let model = modelCache.get(cell.item) ?? null;
-		if (!model && presentation && params.resolveItemCardModel) {
-			model = params.resolveItemCardModel(cell.item, presentation);
-			modelCache.set(cell.item, model);
+		let presentation = model?.presentation ?? null;
+		let interactionId = model?.interactionId ?? null;
+		if (!model || !presentation) {
+			const staticState = resolveTwoHopItemStaticState(
+				cell.item,
+				descriptor.section,
+			);
+			presentation ??= staticState.presentation;
+			interactionId ??= staticState.interactionId;
+			if (!model && presentation && params.resolveItemCardModel) {
+				model = params.resolveItemCardModel(cell.item, presentation);
+				modelCache.set(cell.item, model);
+				interactionId = model.interactionId;
+			}
 		}
 		const visibleExtension = normalizeVisibleExtension(
 			model?.extension ?? presentation?.extension,
@@ -172,7 +181,6 @@ export function createTwoHopShellRenderer(params: TwoHopShellRendererParams) {
 			slot.cell.dataset.testid = "twohop-item-cell";
 			slot.cell.dataset.index = String(cell.itemIndex);
 		}
-		const interactionId = model?.interactionId ?? staticState.interactionId;
 		if (interactionId) {
 			setInteraction(slot.root, interactionId, "item");
 		} else {
@@ -193,11 +201,10 @@ export function createTwoHopShellRenderer(params: TwoHopShellRendererParams) {
 function prepareSlot(
 	slot: TwoHopCardShellSlot,
 	cell: TwoHopResolvedCell | null,
-	snapshot: TwoHopSnapshot,
+	identity: string | null,
 	forceRefresh = false,
 	preservePreview = false,
 ): void {
-	const identity = cell ? resolveCellIdentity(cell, snapshot) : null;
 	if (slot.logicalIdentity !== identity || forceRefresh) {
 		slot.abortPreviewRequest?.();
 		slot.abortPreviewRequest = null;
@@ -235,13 +242,6 @@ function discardPreview(slot: TwoHopCardShellSlot): void {
 	slot.disposePreview = null;
 	slot.previewHost.replaceChildren();
 	slot.previewStatus = "empty";
-}
-
-function resolveCellIdentity(
-	cell: TwoHopResolvedCell,
-	snapshot: TwoHopSnapshot,
-): string {
-	return resolveTwoHopNavigationCellKey(cell, snapshot);
 }
 
 function resetVariantClasses(root: HTMLElement): void {

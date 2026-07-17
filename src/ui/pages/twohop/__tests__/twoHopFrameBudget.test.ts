@@ -6,10 +6,10 @@ describe("twoHopFrameBudget", () => {
 		const tracker = createTwoHopFrameBudgetTracker();
 		tracker.beginFrame(100);
 		tracker.beginFrame(104.2);
-		const budget = tracker.beginFrame(108.4);
+		tracker.beginFrame(108.4);
 
-		expect(budget.frameIntervalMs).toBeCloseTo(4.2, 5);
-		expect(budget.deadline - 108.4).toBeCloseTo(0.84, 5);
+		expect(tracker.frameIntervalMs).toBeCloseTo(4.2, 5);
+		expect(tracker.deadline - 108.4).toBeCloseTo(0.84, 5);
 	});
 
 	it("caps work by bind count as well as time", () => {
@@ -19,10 +19,10 @@ describe("twoHopFrameBudget", () => {
 			minimumBudgetMs: 10,
 			maximumBudgetMs: 10,
 		});
-		const budget = tracker.beginFrame(100);
-		expect(budget.canBind(101)).toBe(true);
-		budget.consumeBind();
-		budget.consumeBind();
-		expect(budget.canBind(101)).toBe(false);
+		tracker.beginFrame(100);
+		expect(tracker.canBind(101)).toBe(true);
+		tracker.consumeBind();
+		tracker.consumeBind();
+		expect(tracker.canBind(101)).toBe(false);
 	});
 });

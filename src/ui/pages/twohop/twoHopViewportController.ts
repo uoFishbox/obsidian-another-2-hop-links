@@ -25,13 +25,17 @@ import {
 	resolveTwoHopCell,
 	resolveTwoHopCellInto,
 	resolveTwoHopRowTop,
-	resolveTwoHopVisibleRows,
+	resolveTwoHopVisibleRowsInto,
 	createTwoHopResolvedCellBuffer,
 	type TwoHopGeometry,
+	type TwoHopRowRange,
 	type TwoHopResolvedCell,
 	type TwoHopResolvedCellBuffer,
 } from "./twoHopGeometry";
-import { createTwoHopFrameBudgetTracker } from "./twoHopFrameBudget";
+import {
+	createTwoHopFrameBudgetTracker,
+	type TwoHopFrameBudgetTracker,
+} from "./twoHopFrameBudget";
 import type { TwoHopCardPresentationState } from "./twoHopCellStaticState";
 import { createTwoHopShellRenderer } from "./twoHopShellRenderer";
 import { createTwoHopSnapshot, type TwoHopSnapshot } from "./twoHopSnapshot";
@@ -165,6 +169,7 @@ export function createTwoHopViewportController(
 	let lastMeasuredTimestamp = 0;
 	let disposed = false;
 	let revision = params.revision;
+	const visibleRange: TwoHopRowRange = { start: 0, end: 0 };
 	let stats = {
 		scrollFrames: 0,
 		residentHits: 0,
@@ -291,7 +296,8 @@ export function createTwoHopViewportController(
 		if (disposed) return;
 		stats.scrollFrames += 1;
 		const localScrollOffset = Math.max(0, readScrollTop() - cachedSectionTop);
-		const visible = resolveTwoHopVisibleRows(
+		resolveTwoHopVisibleRowsInto(
+			visibleRange,
 			geometry,
 			localScrollOffset,
 			Math.max(geometry.rowHeight, cachedViewportHeight),
@@ -305,22 +311,22 @@ export function createTwoHopViewportController(
 		lastMeasuredRowOffset = rowOffset;
 		lastMeasuredTimestamp = timestamp;
 		const scrollActive = timestamp - lastScrollEventAt <= SCROLL_IDLE_DELAY_MS;
-		const nextStart = Math.max(0, visible.start - BEHIND_ROWS);
+		const nextStart = Math.max(0, visibleRange.start - BEHIND_ROWS);
 		const nextEnd = Math.min(geometry.rowCount, nextStart + pool.capacity);
 
 		if (
 			residentStart >= 0 &&
-			visible.start >= residentStart &&
-			visible.end <= residentEnd
+			visibleRange.start >= residentStart &&
+			visibleRange.end <= residentEnd
 		) {
 			stats.residentHits += 1;
-			previewHydrator?.notifyViewport({
-				visibleStart: visible.start,
-				visibleEnd: visible.end,
+			previewHydrator?.notifyViewport(
+				visibleRange.start,
+				visibleRange.end,
 				scrollActive,
 				velocityRowsPerMs,
-				criticalWorkPending: hasPendingShells(),
-			});
+				hasPendingShells(),
+			);
 			return;
 		}
 
@@ -328,17 +334,23 @@ export function createTwoHopViewportController(
 			residentStart >= 0 &&
 			(nextEnd <= residentStart || nextStart >= residentEnd);
 		if (distantJump) stats.distantJumps += 1;
-		const budget = frameBudgetTracker.beginFrame(timestamp);
-		bindResidentWindow(nextStart, nextEnd, visible, distantJump, budget);
+		frameBudgetTracker.beginFrame(timestamp);
+		bindResidentWindow(
+			nextStart,
+			nextEnd,
+			visibleRange,
+			distantJump,
+			frameBudgetTracker,
+		);
 		residentStart = nextStart;
 		residentEnd = nextEnd;
-		previewHydrator?.notifyViewport({
-			visibleStart: visible.start,
-			visibleEnd: visible.end,
+		previewHydrator?.notifyViewport(
+			visibleRange.start,
+			visibleRange.end,
 			scrollActive,
 			velocityRowsPerMs,
-			criticalWorkPending: hasPendingShells(),
-		});
+			hasPendingShells(),
+		);
 		scheduleRefill();
 	}
 
@@ -360,9 +372,9 @@ export function createTwoHopViewportController(
 	function bindResidentWindow(
 		start: number,
 		end: number,
-		visible: { readonly start: number; readonly end: number },
+		visible: TwoHopRowRange,
 		distantJump: boolean,
-		budget: ReturnType<typeof frameBudgetTracker.beginFrame>,
+		budget: TwoHopFrameBudgetTracker,
 	): void {
 		for (const rowSlot of pool.rows) {
 			if (rowSlot.logicalRowIndex >= start && rowSlot.logicalRowIndex < end) {
@@ -418,7 +430,7 @@ export function createTwoHopViewportController(
 
 	function refill(timestamp: number): void {
 		if (disposed || residentStart < 0) return;
-		const budget = frameBudgetTracker.beginFrame(timestamp);
+		frameBudgetTracker.beginFrame(timestamp);
 		let hasPending = false;
 
 		for (let rowIndex = residentStart; rowIndex < residentEnd; rowIndex += 1) {
@@ -432,12 +444,12 @@ export function createTwoHopViewportController(
 				}
 			}
 			if (!rowNeedsRichBind) continue;
-			if (!budget.canBind(now())) {
+			if (!frameBudgetTracker.canBind(now())) {
 				hasPending = true;
 				break;
 			}
 			bindRow(rowSlot, rowIndex, true);
-			budget.consumeBind();
+			frameBudgetTracker.consumeBind();
 		}
 
 		if (hasPending) scheduleRefill();
