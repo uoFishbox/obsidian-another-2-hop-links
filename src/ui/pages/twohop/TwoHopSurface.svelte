@@ -28,10 +28,12 @@
 		) => ItemInteractionDescriptor | null;
 		interactionDescriptorRevision?: unknown;
 		cardModelRevision?: unknown;
+		shellTitleRevision?: unknown;
 		resolveItemCardModel?: (
 			item: TwoHopVirtualListItem,
 			presentation: TwoHopCardPresentationState,
 		) => CardRenderModel;
+		resolveItemTitle?: (item: TwoHopVirtualListItem) => string;
 		linkContext?: LinkUtilitiesContext;
 		previewActive?: boolean;
 	}
@@ -73,6 +75,7 @@
 			shadowHostEl: element,
 			sections: props.sections,
 			revision: props.cardModelRevision,
+			shellTitleRevision: props.shellTitleRevision,
 			applicationStore: props.applicationStore,
 			initialVisibleCount: props.initialVisibleCount,
 			loadMoreIncrement: props.loadMoreIncrement,
@@ -96,6 +99,8 @@
 					previewRefreshToken: 0,
 					previewActivationIdentity: undefined,
 				} satisfies CardRenderModel),
+			resolveItemTitle: (item) =>
+				props.resolveItemTitle?.(item) ?? item.virtualKey,
 			getItemInteractionDescriptor: (item) =>
 				props.getItemInteractionDescriptor(item),
 			getPreview: props.linkContext?.getPreview,
@@ -109,7 +114,11 @@
 
 	$effect(() => {
 		void props.interactionDescriptorRevision;
-		controller?.setSections(props.sections, props.cardModelRevision);
+		controller?.setSections(
+			props.sections,
+			props.cardModelRevision,
+			props.shellTitleRevision,
+		);
 	});
 
 	$effect(() => {

@@ -115,6 +115,14 @@ export const CARD_RENDER_SHADOW_CSS = String.raw`
 	background: var(--background-modifier-border);
 }
 
+.twohop-card-shell.is-skeleton.has-shell-title .cosense-card-links__box-title-wrapper::before {
+	display: none;
+}
+
+.twohop-card-shell.is-skeleton.has-shell-title .cosense-card-links__box-title {
+	opacity: 0.78;
+}
+
 @media (hover: hover) {
 	.cosense-card-links__box:not(.cosense-card-links__connected-links-header)[data-ccl-hovered="true"] {
 		border-color: var(--background-modifier-border-hover);

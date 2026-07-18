@@ -30,6 +30,7 @@ export type TwoHopResolvedCell =
 			readonly columnIndex: number;
 			readonly itemIndex: number;
 			readonly item: TwoHopVirtualListItem;
+			readonly shellTitle: string;
 	  }
 	| {
 			readonly kind: "load-more";
@@ -52,6 +53,7 @@ export interface TwoHopResolvedCellBuffer {
 	columnIndex: number;
 	itemIndex: number;
 	item: TwoHopVirtualListItem | null;
+	shellTitle: string;
 }
 
 export function createTwoHopResolvedCellBuffer(): TwoHopResolvedCellBuffer {
@@ -63,6 +65,7 @@ export function createTwoHopResolvedCellBuffer(): TwoHopResolvedCellBuffer {
 		columnIndex: -1,
 		itemIndex: -1,
 		item: null,
+		shellTitle: "",
 	};
 }
 
@@ -162,6 +165,7 @@ export function resolveTwoHopCellInto(
 		target.columnIndex = columnIndex;
 		target.itemIndex = -1;
 		target.item = null;
+		target.shellTitle = "";
 		return target as unknown as Extract<TwoHopResolvedCell, { kind: "header" }>;
 	}
 
@@ -177,6 +181,7 @@ export function resolveTwoHopCellInto(
 		target.columnIndex = columnIndex;
 		target.itemIndex = itemIndex;
 		target.item = item;
+		target.shellTitle = section.visibleItemTitles[visibleItemOffset] ?? "";
 		return target as unknown as Extract<TwoHopResolvedCell, { kind: "item" }>;
 	}
 
@@ -188,6 +193,7 @@ export function resolveTwoHopCellInto(
 		target.columnIndex = columnIndex;
 		target.itemIndex = -1;
 		target.item = null;
+		target.shellTitle = "";
 		return target as unknown as Extract<TwoHopResolvedCell, { kind: "load-more" }>;
 	}
 

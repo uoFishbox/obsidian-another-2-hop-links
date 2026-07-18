@@ -35,6 +35,7 @@ function createFixture() {
 		sections: [descriptor],
 		visibleCounts: { section: 3 },
 		initialVisibleCount: 3,
+		resolveItemTitle: (item) => item.virtualKey,
 	});
 	const geometry = createTwoHopGeometry(snapshot, {
 		containerWidth: 200,

@@ -37,6 +37,7 @@ function createFixture() {
 		sections: [descriptor],
 		visibleCounts: { new: 1 },
 		initialVisibleCount: 1,
+		resolveItemTitle: () => "Shell title",
 	});
 	const geometry = createTwoHopGeometry(snapshot, {
 		containerWidth: 400,
@@ -111,6 +112,8 @@ describe("twoHop imperative DOM pool", () => {
 		renderer.renderSkeleton(slot, cell, snapshot);
 		expect(resolveItemCardModel).not.toHaveBeenCalled();
 		expect(slot.root.classList.contains("is-skeleton")).toBe(true);
+		expect(slot.root.classList.contains("has-shell-title")).toBe(true);
+		expect(slot.title.textContent).toBe("Shell title");
 
 		if (!cell) throw new Error("expected item cell");
 		renderer.renderShell(slot, cell, snapshot);
@@ -121,6 +124,21 @@ describe("twoHop imperative DOM pool", () => {
 		);
 		expect(slot.root.dataset.cclInteractionId).toBe("item:missing");
 		expect(slot.root.classList.contains("is-skeleton")).toBe(false);
+		expect(slot.root.classList.contains("has-shell-title")).toBe(false);
+	});
+
+	it("renders a section title in a skeleton header", () => {
+		const { snapshot, geometry } = createFixture();
+		const content = document.createElement("div");
+		const pool = createTwoHopDomPool({ content, rowCapacity: 1, columns: 2 });
+		const renderer = createTwoHopShellRenderer({});
+		const header = resolveTwoHopCell(snapshot, geometry, 0, 0);
+		const slot = pool.rows[0].cells[0];
+
+		renderer.renderSkeleton(slot, header, snapshot);
+
+		expect(slot.title.textContent).toBe("New links");
+		expect(slot.root.classList.contains("has-shell-title")).toBe(true);
 	});
 
 	it("retains the preview when its activation identity is unchanged", () => {

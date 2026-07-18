@@ -3,7 +3,7 @@ import type { ViewItem } from "application/presenters";
 import { createMockTFile } from "testing/__mocks__/testHelpers";
 import type { LinkUtilitiesContext } from "types/linkContext";
 import { DEFAULT_SETTINGS } from "types/settings";
-import { createCardRenderModel } from "../cardRenderModel";
+import { createCardRenderModel, resolveCardTitleSnapshot } from "../cardRenderModel";
 import type { CachedMetadata } from "obsidian";
 
 describe("createCardRenderModel", () => {
@@ -62,5 +62,15 @@ describe("createCardRenderModel", () => {
 		expect(model.previewCacheRevision).toBe("4:2:0");
 		expect(getPreviewRenderVersion).toHaveBeenCalledWith(targetFile.path);
 		expect(fileToLinktext).not.toHaveBeenCalled();
+
+		const titleSnapshot = resolveCardTitleSnapshot(
+			item,
+			{ priorityFrontmatterKeyForTitle: "title" },
+			context,
+		);
+		expect(titleSnapshot).toEqual({
+			targetFile,
+			title: model.title,
+		});
 	});
 });

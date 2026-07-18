@@ -54,6 +54,8 @@ function setRect(element: Element, top: number, width: number, height: number) {
 	});
 }
 
+const resolveItemTitle = (item: TwoHopVirtualListItem): string => item.virtualKey;
+
 describe("twoHopViewportController", () => {
 	it("does not rebuild when the initial sections revision is set again", () => {
 		const scroller = document.createElement("div");
@@ -76,6 +78,7 @@ describe("twoHopViewportController", () => {
 			sections,
 			revision,
 			initialVisibleCount: 100,
+			resolveItemTitle,
 			getItemInteractionDescriptor: () => null,
 			requestAnimationFrame: () => 1,
 			cancelAnimationFrame: () => {},
@@ -86,6 +89,46 @@ describe("twoHopViewportController", () => {
 		controller.setSections(sections, revision);
 
 		expect(controller.getStats()).toEqual(initialStats);
+		controller.dispose();
+		scroller.remove();
+	});
+
+	it("reuses shell titles when only the rich card revision changes", () => {
+		const scroller = document.createElement("div");
+		scroller.style.overflow = "auto";
+		Object.defineProperty(scroller, "clientHeight", { value: 300 });
+		Object.defineProperty(scroller, "scrollHeight", { value: 10000 });
+		Object.defineProperty(scroller, "scrollTop", { value: 0, writable: true });
+		const rootEl = document.createElement("div");
+		const shadowHostEl = document.createElement("div");
+		rootEl.append(shadowHostEl);
+		scroller.append(rootEl);
+		document.body.append(scroller);
+		setRect(scroller, 0, 420, 300);
+		setRect(rootEl, 0, 420, 5000);
+		const sections = [createSection("section", 10)];
+		const shellTitleRevision = {};
+		const resolveItemTitle = vi.fn(
+			(item: TwoHopVirtualListItem) => `Title ${item.virtualKey}`,
+		);
+		const controller = createTwoHopViewportController({
+			rootEl,
+			shadowHostEl,
+			sections,
+			revision: {},
+			shellTitleRevision,
+			initialVisibleCount: 10,
+			resolveItemTitle,
+			getItemInteractionDescriptor: () => null,
+			requestAnimationFrame: () => 1,
+			cancelAnimationFrame: () => {},
+			now: () => 10,
+		});
+		expect(resolveItemTitle).toHaveBeenCalledTimes(10);
+
+		controller.setSections(sections, {}, shellTitleRevision);
+
+		expect(resolveItemTitle).toHaveBeenCalledTimes(10);
 		controller.dispose();
 		scroller.remove();
 	});
@@ -109,6 +152,7 @@ describe("twoHopViewportController", () => {
 			shadowHostEl,
 			sections: [createSection("section", 100)],
 			initialVisibleCount: 100,
+			resolveItemTitle,
 			getItemInteractionDescriptor: () => null,
 			requestAnimationFrame: (callback) => {
 				queuedFrames.push(callback);
@@ -162,6 +206,7 @@ describe("twoHopViewportController", () => {
 			shadowHostEl,
 			sections: [createSection("section", 1000)],
 			initialVisibleCount: 1000,
+			resolveItemTitle,
 			getItemInteractionDescriptor: () => null,
 			requestAnimationFrame: () => 1,
 			cancelAnimationFrame: () => {},
@@ -203,6 +248,7 @@ describe("twoHopViewportController", () => {
 				createSection("section", 100),
 			],
 			initialVisibleCount: 100,
+			resolveItemTitle,
 			configuredLayout: {
 				cardWidthPx: 100,
 				cardHeightPx: 100,
@@ -285,6 +331,7 @@ describe("twoHopViewportController", () => {
 				sectionMarginBottomPx: 20,
 			},
 			resolveItemCardModel,
+			resolveItemTitle,
 			getItemInteractionDescriptor: () => null,
 			requestAnimationFrame: () => 1,
 			cancelAnimationFrame: () => {},
@@ -351,6 +398,7 @@ describe("twoHopViewportController", () => {
 				cardMaxColumns: 2,
 				sectionMarginBottomPx: 20,
 			},
+			resolveItemTitle,
 			getItemInteractionDescriptor: () => null,
 			requestAnimationFrame: () => 1,
 			cancelAnimationFrame: () => {},

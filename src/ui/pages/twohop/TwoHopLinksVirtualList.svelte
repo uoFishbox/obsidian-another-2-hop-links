@@ -23,6 +23,10 @@
 	} from "./twoHopCardRenderModelCache";
 	import type { CardRenderModel } from "ui/components/items/cardRenderModel";
 	import type { LinkUtilitiesContext } from "types/linkContext";
+	import {
+		resolveTwoHopShellTitle,
+		type TwoHopShellTitleRevision,
+	} from "./twoHopShellTitle";
 
 	interface Props {
 		sections: readonly TwoHopVirtualSectionDescriptor[];
@@ -86,6 +90,23 @@
 			presentation: TwoHopCardPresentationState,
 		): CardRenderModel => cardModelCache.resolve(row, presentation, revision);
 	});
+	const shellTitleRevision = $derived.by((): TwoHopShellTitleRevision | undefined =>
+		linkContext
+			? {
+					priorityFrontmatterKeyForTitle:
+						currentSettings.priorityFrontmatterKeyForTitle,
+					metadataVersion: applicationStore.updateVersion,
+					sourcePath: linkContext.sourceFile.path,
+					linkContext,
+				}
+			: undefined,
+	);
+	const resolveItemTitle = $derived.by(() => {
+		const revision = shellTitleRevision;
+		if (!revision) return undefined;
+		return (row: TwoHopVirtualListItem): string =>
+			resolveTwoHopShellTitle(row, revision);
+	});
 	const getItemInteractionDescriptor = (row: TwoHopVirtualListItem) =>
 		resolveTwoHopItemInteractionDescriptor(row, interactionDescriptorRevision);
 	const interactionDescriptorRevision = $derived(
@@ -106,7 +127,9 @@
 		{getItemInteractionDescriptor}
 		{interactionDescriptorRevision}
 		{cardModelRevision}
+		{shellTitleRevision}
 		{resolveItemCardModel}
+		{resolveItemTitle}
 		{linkContext}
 		{previewActive}
 	/>

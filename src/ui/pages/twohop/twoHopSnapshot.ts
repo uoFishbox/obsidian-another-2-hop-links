@@ -9,6 +9,7 @@ export interface TwoHopSectionSnapshot {
 	readonly headerLogicalKey: string;
 	readonly loadMoreLogicalKey: string;
 	readonly visibleItems: readonly TwoHopVirtualListItem[];
+	readonly visibleItemTitles: readonly string[];
 	readonly visibleItemLogicalKeys: readonly string[];
 	readonly visibleCount: number;
 	readonly visibleItemCount: number;
@@ -26,6 +27,7 @@ export interface CreateTwoHopSnapshotParams {
 	readonly visibleCounts: Readonly<Record<string, number>>;
 	readonly initialVisibleCount: number;
 	readonly revision?: unknown;
+	readonly resolveItemTitle: (item: TwoHopVirtualListItem) => string;
 	/** Reuses materialized prefixes when the descriptor and revision are unchanged. */
 	readonly previousSnapshot?: TwoHopSnapshot;
 }
@@ -56,7 +58,14 @@ export function createTwoHopSnapshot(
 		const visibleCount = clampVisibleCount(descriptor, requestedVisibleCount);
 		const previousSection = previousSections.get(descriptor);
 
-		sections.push(createSectionSnapshot(descriptor, visibleCount, previousSection));
+		sections.push(
+			createSectionSnapshot(
+				descriptor,
+				visibleCount,
+				previousSection,
+				params.resolveItemTitle,
+			),
+		);
 	}
 
 	return {
@@ -69,6 +78,7 @@ function createSectionSnapshot(
 	descriptor: TwoHopVirtualSectionDescriptor,
 	visibleCount: number,
 	previousSection: TwoHopSectionSnapshot | undefined,
+	resolveItemTitle: (item: TwoHopVirtualListItem) => string,
 ): TwoHopSectionSnapshot {
 	if (previousSection?.visibleCount === visibleCount) {
 		return previousSection;
@@ -77,6 +87,9 @@ function createSectionSnapshot(
 	const canExtendPrevious =
 		previousSection !== undefined && previousSection.visibleCount < visibleCount;
 	const visibleItems = canExtendPrevious ? [...previousSection.visibleItems] : [];
+	const visibleItemTitles = canExtendPrevious
+		? [...previousSection.visibleItemTitles]
+		: [];
 	const visibleItemLogicalKeys = canExtendPrevious
 		? [...previousSection.visibleItemLogicalKeys]
 		: [];
@@ -93,6 +106,7 @@ function createSectionSnapshot(
 		const item = descriptor.getItem(sourceIndex);
 		if (!item) continue;
 		visibleItems.push(item);
+		visibleItemTitles.push(resolveItemTitle(item));
 		visibleItemLogicalKeys.push(`item:${descriptor.sectionId}:${item.virtualKey}`);
 		sourceIndexes.push(sourceIndex);
 	}
@@ -102,6 +116,7 @@ function createSectionSnapshot(
 		headerLogicalKey: `header:${descriptor.sectionId}`,
 		loadMoreLogicalKey: `load-more:${descriptor.sectionId}`,
 		visibleItems,
+		visibleItemTitles,
 		visibleItemLogicalKeys,
 		visibleCount,
 		visibleItemCount: sourceIndexes.length,

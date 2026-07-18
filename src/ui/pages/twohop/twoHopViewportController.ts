@@ -62,7 +62,10 @@ export interface TwoHopViewportControllerParams {
 	readonly rootEl: HTMLDivElement;
 	readonly shadowHostEl: HTMLDivElement;
 	readonly sections: readonly TwoHopVirtualSectionDescriptor[];
+	/** Invalidates rich card models, including preview and search state. */
 	readonly revision?: unknown;
+	/** Invalidates only the titles materialized into the visible snapshot. */
+	readonly shellTitleRevision?: unknown;
 	readonly applicationStore?: SectionPaginationApplicationStore;
 	readonly initialVisibleCount?: number;
 	readonly loadMoreIncrement?: number;
@@ -71,6 +74,7 @@ export interface TwoHopViewportControllerParams {
 		item: TwoHopVirtualListItem,
 		presentation: TwoHopCardPresentationState,
 	) => CardRenderModel;
+	readonly resolveItemTitle: (item: TwoHopVirtualListItem) => string;
 	readonly getItemInteractionDescriptor: (
 		item: TwoHopVirtualListItem,
 	) => InteractionDescriptor | null;
@@ -105,6 +109,7 @@ export interface TwoHopViewportController {
 	setSections(
 		sections: readonly TwoHopVirtualSectionDescriptor[],
 		revision?: unknown,
+		shellTitleRevision?: unknown,
 	): void;
 	setConfiguredLayout(layout: ResolvedCardLayoutSettings | null): void;
 	setPreviewActive(active: boolean): void;
@@ -171,6 +176,7 @@ export function createTwoHopViewportController(
 	let disposed = false;
 	let previewActive = true;
 	let revision = params.revision;
+	let shellTitleRevision = params.shellTitleRevision;
 	const visibleRange: TwoHopRowRange = { start: 0, end: 0 };
 	let stats = {
 		scrollFrames: 0,
@@ -237,7 +243,8 @@ export function createTwoHopViewportController(
 			sections,
 			visibleCounts,
 			initialVisibleCount: params.initialVisibleCount ?? Number.POSITIVE_INFINITY,
-			revision,
+			revision: shellTitleRevision,
+			resolveItemTitle: params.resolveItemTitle,
 			previousSnapshot,
 		});
 	}
@@ -632,12 +639,25 @@ export function createTwoHopViewportController(
 		get scrollContainerEl() {
 			return scrollContainerEl;
 		},
-		setSections(nextSections, nextRevision) {
-			if (sections === nextSections && revision === nextRevision) return;
-			if (revision !== nextRevision) renderer.invalidateCardModels();
+		setSections(nextSections, nextRevision, nextShellTitleRevision) {
+			if (
+				sections === nextSections &&
+				revision === nextRevision &&
+				shellTitleRevision === nextShellTitleRevision
+			) {
+				return;
+			}
+			const canReuseTitleSnapshot = shellTitleRevision === nextShellTitleRevision;
+			if (
+				revision !== nextRevision ||
+				shellTitleRevision !== nextShellTitleRevision
+			) {
+				renderer.invalidateCardModels();
+			}
 			sections = nextSections;
 			revision = nextRevision;
-			rebuildData();
+			shellTitleRevision = nextShellTitleRevision;
+			rebuildData(-1, canReuseTitleSnapshot);
 		},
 		setConfiguredLayout(nextLayout) {
 			if (configuredLayout === nextLayout) return;

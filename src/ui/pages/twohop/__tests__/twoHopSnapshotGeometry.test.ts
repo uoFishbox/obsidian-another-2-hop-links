@@ -19,6 +19,8 @@ const createItem = (key: string): TwoHopVirtualListItem => ({
 	virtualKey: key,
 });
 
+const resolveItemTitle = (item: TwoHopVirtualListItem): string => item.virtualKey;
+
 function createSection(
 	sectionId: string,
 	items: readonly TwoHopVirtualListItem[],
@@ -61,27 +63,46 @@ describe("twoHopSnapshot geometry", () => {
 		const descriptor = createSection("first", items);
 		const getItems = vi.spyOn(descriptor, "getItems");
 		const getItem = vi.spyOn(descriptor, "getItem");
+		const resolveVisibleItemTitle = vi.fn(
+			(item: TwoHopVirtualListItem) => `Title ${item.virtualKey}`,
+		);
 		const initialSnapshot = createTwoHopSnapshot({
 			sections: [descriptor],
 			visibleCounts: { first: 2 },
 			initialVisibleCount: 2,
+			resolveItemTitle: resolveVisibleItemTitle,
 		});
 
 		expect(getItems).not.toHaveBeenCalled();
 		expect(getItem.mock.calls.map(([index]) => index)).toEqual([0, 1]);
 		expect(initialSnapshot.sections[0].visibleItems).toEqual(items.slice(0, 2));
+		expect(initialSnapshot.sections[0].visibleItemTitles).toEqual([
+			"Title 0",
+			"Title 1",
+		]);
 
 		getItem.mockClear();
 		const expandedSnapshot = createTwoHopSnapshot({
 			sections: [descriptor],
 			visibleCounts: { first: 5 },
 			initialVisibleCount: 2,
+			resolveItemTitle: resolveVisibleItemTitle,
 			previousSnapshot: initialSnapshot,
 		});
 
 		expect(getItems).not.toHaveBeenCalled();
 		expect(getItem.mock.calls.map(([index]) => index)).toEqual([2, 3, 4]);
 		expect(expandedSnapshot.sections[0].visibleItems).toEqual(items.slice(0, 5));
+		expect(expandedSnapshot.sections[0].visibleItemTitles).toEqual([
+			"Title 0",
+			"Title 1",
+			"Title 2",
+			"Title 3",
+			"Title 4",
+		]);
+		expect(
+			resolveVisibleItemTitle.mock.calls.map(([item]) => item.virtualKey),
+		).toEqual(["0", "1", "2", "3", "4"]);
 		expect(expandedSnapshot.sections[0].visibleItemSourceIndexes).toEqual(
 			new Uint32Array([0, 1, 2, 3, 4]),
 		);
@@ -98,6 +119,7 @@ describe("twoHopSnapshot geometry", () => {
 			sections: [createSection("first", sparseItems, 6)],
 			visibleCounts: { first: 4 },
 			initialVisibleCount: 2,
+			resolveItemTitle,
 		});
 		const geometry = createTwoHopGeometry(snapshot, layout);
 
@@ -109,6 +131,7 @@ describe("twoHopSnapshot geometry", () => {
 		expect(resolveTwoHopCell(snapshot, geometry, 0, 1)).toMatchObject({
 			kind: "item",
 			itemIndex: 0,
+			shellTitle: "a",
 		});
 		expect(resolveTwoHopCell(snapshot, geometry, 1, 0)).toMatchObject({
 			kind: "item",
@@ -126,6 +149,7 @@ describe("twoHopSnapshot geometry", () => {
 			],
 			visibleCounts: {},
 			initialVisibleCount: 10,
+			resolveItemTitle,
 		});
 		const geometry = createTwoHopGeometry(snapshot, layout);
 

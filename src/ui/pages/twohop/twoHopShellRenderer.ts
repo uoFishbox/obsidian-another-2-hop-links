@@ -32,7 +32,7 @@ export function createTwoHopShellRenderer(params: TwoHopShellRendererParams) {
 	function renderSkeleton(
 		slot: TwoHopCardShellSlot,
 		cell: TwoHopResolvedCell | null,
-		_snapshot: TwoHopSnapshot,
+		snapshot: TwoHopSnapshot,
 	): void {
 		const identity = cell?.logicalKey ?? null;
 		prepareSlot(slot, cell, identity, slot.renderRevision !== renderRevision);
@@ -40,7 +40,11 @@ export function createTwoHopShellRenderer(params: TwoHopShellRendererParams) {
 		slot.rich = false;
 		slot.cardModel = null;
 		slot.root.classList.add("is-skeleton");
-		slot.title.textContent = "";
+		resetVariantClasses(slot.root);
+		slot.title.className = "cosense-card-links__box-title";
+		const shellTitle = resolveSkeletonTitle(cell, snapshot);
+		slot.title.textContent = shellTitle;
+		slot.root.classList.toggle("has-shell-title", shellTitle.length > 0);
 		slot.meta.textContent = "";
 		clearInteraction(slot.root);
 	}
@@ -70,6 +74,7 @@ export function createTwoHopShellRenderer(params: TwoHopShellRendererParams) {
 		slot.renderRevision = renderRevision;
 		slot.rich = true;
 		slot.root.classList.remove("is-skeleton");
+		slot.root.classList.remove("has-shell-title");
 		resetVariantClasses(slot.root);
 
 		const section = snapshot.sections[cell.sectionIndex];
@@ -196,6 +201,17 @@ export function createTwoHopShellRenderer(params: TwoHopShellRendererParams) {
 			renderRevision += 1;
 		},
 	};
+}
+
+function resolveSkeletonTitle(
+	cell: TwoHopResolvedCell | null,
+	snapshot: TwoHopSnapshot,
+): string {
+	if (cell?.kind === "item") return cell.shellTitle;
+	if (cell?.kind === "header") {
+		return snapshot.sections[cell.sectionIndex]?.descriptor.title ?? "";
+	}
+	return "";
 }
 
 function prepareSlot(

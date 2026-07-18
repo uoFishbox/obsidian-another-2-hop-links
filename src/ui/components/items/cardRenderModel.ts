@@ -31,6 +31,11 @@ export interface CardRenderModel {
 	readonly previewActivationIdentity: string | undefined;
 }
 
+export interface CardTitleSnapshot {
+	readonly title: string;
+	readonly targetFile: TFile | null;
+}
+
 export interface CreateCardRenderModelParams {
 	readonly item: ViewItem;
 	readonly settings: PluginSettings;
@@ -105,10 +110,25 @@ export function createCardRenderModel(
 	};
 }
 
+/** Resolves only the file identity and display title needed by a card shell. */
+export function resolveCardTitleSnapshot(
+	item: ViewItem,
+	settings: Pick<PluginSettings, "priorityFrontmatterKeyForTitle">,
+	context: LinkUtilitiesContext,
+): CardTitleSnapshot {
+	const strategy = getItemStrategy(item);
+	const targetFile = strategy?.getTargetFile(item.data, context) ?? null;
+
+	return {
+		targetFile,
+		title: resolveCardTitle(item, targetFile, settings, context),
+	};
+}
+
 function resolveCardTitle(
 	item: ViewItem,
 	targetFile: TFile | null,
-	settings: PluginSettings,
+	settings: Pick<PluginSettings, "priorityFrontmatterKeyForTitle">,
 	context: LinkUtilitiesContext,
 ): string {
 	if (targetFile) {
