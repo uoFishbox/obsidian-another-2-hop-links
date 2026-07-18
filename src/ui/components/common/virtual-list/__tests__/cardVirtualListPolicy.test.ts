@@ -5,22 +5,23 @@ import {
 } from "../cardVirtualListPolicy";
 
 describe("card virtual list policy", () => {
-	it("keeps mounted overscan while scrolling", () => {
+	it("shrinks preview activation to the strict viewport while scrolling", () => {
 		expect(
 			createCardVirtualListPolicy({
 				layout: {
 					rowHeight: 120,
 					gap: 12,
 				},
+				isScrollActive: true,
 			}),
 		).toEqual({
 			bootstrapRows: 3,
 			mountedOverscanPx: 132,
-			previewOverscanPx: 132,
+			previewOverscanPx: 0,
 		});
 	});
 
-	it("keeps one mounted overscan row for view-plan lists while scrolling", () => {
+	it("keeps one mounted overscan row while idle", () => {
 		expect(
 			createCardVirtualListPolicy({
 				layout: {

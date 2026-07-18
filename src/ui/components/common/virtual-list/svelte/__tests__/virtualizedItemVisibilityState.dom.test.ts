@@ -515,4 +515,54 @@ describe("createVirtualizedItemVisibilityStateController", () => {
 
 		expect(clearedRows).toEqual([]);
 	});
+
+	it("commits a snapshot through one atomic visibility delta", () => {
+		const deltas: Array<{
+			activatedRows: readonly number[];
+			deactivatedRows: readonly number[];
+			clearedRows: readonly number[];
+		}> = [];
+		const cells = [item("a"), item("b")];
+		const rows = [row(0, [cells[0]]), row(1, [cells[1]])];
+		const ctrl = createVirtualizedItemVisibilityStateController<TestCell>({
+			onVisibilityDelta: (delta) => {
+				deltas.push(delta);
+			},
+		});
+		const stateA = ctrl.getOrCreateState(cells[0], "mounted");
+		const stateB = ctrl.getOrCreateState(cells[1], "mounted");
+		const rowModelRevision = {};
+
+		ctrl.commit({
+			rowModelRevision,
+			mountedRows: rows,
+			mountedRange: range(0, 2),
+			previewActiveRange: range(0, 1),
+		});
+
+		expect(deltas).toEqual([
+			{
+				activatedRows: [0],
+				deactivatedRows: [1],
+				clearedRows: [],
+			},
+		]);
+		expect(stateA.visibility).toBe("visible");
+		expect(stateB.visibility).toBe("mounted");
+
+		ctrl.commit({
+			rowModelRevision,
+			mountedRows: rows,
+			mountedRange: range(0, 2),
+			previewActiveRange: range(1, 2),
+		});
+
+		expect(deltas[1]).toEqual({
+			activatedRows: [1],
+			deactivatedRows: [0],
+			clearedRows: [],
+		});
+		expect(stateA.visibility).toBe("mounted");
+		expect(stateB.visibility).toBe("visible");
+	});
 });

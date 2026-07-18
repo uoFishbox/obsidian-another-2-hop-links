@@ -1,6 +1,5 @@
 <script lang="ts">
 	import { setContext } from "svelte";
-	import PreviewVisibilityProvider from "ui/components/items/PreviewVisibilityProvider.svelte";
 	import ViewItemCard from "ui/components/items/ViewItemCard.svelte";
 	import ListControls from "ui/components/common/ListControls.svelte";
 	import LinkList from "ui/components/common/VirtualGridLinkList.svelte";
@@ -335,7 +334,9 @@
 	let preserveResultsHeightOnSearch = $derived(
 		config.preserveResultsHeightOnSearch ?? true,
 	);
-	let shouldPassVisibilityProp = $derived(config.itemComponent !== ViewItemCard);
+	let visibilityConsumption = $derived(
+		config.visibilityConsumption ?? "reactive-state",
+	);
 
 	let resultsContainerEl = $state<HTMLDivElement | null>(null);
 	let resultsMinHeight = $derived(
@@ -392,6 +393,7 @@
 			{initialVisibleCount}
 			{loadMoreIncrement}
 			paginationMode={config.paginationMode ?? "button"}
+			{visibilityConsumption}
 			remountCellBodyOnKeyChange={config.itemComponent !== ViewItemCard}
 			header={config.showSectionHeader ? sectionHeader : undefined}
 		>
@@ -399,7 +401,6 @@
 				item,
 				observerRoot,
 				visibility,
-				visibilityState,
 				rowIndex,
 				activationCandidateId,
 			})}
@@ -408,7 +409,7 @@
 					previewRefreshTokens[config.getItemKey(item)] ?? 0}
 				{@const renderedItemKey = config.getItemKey(item)}
 				{@const matchedItem = matchedItemByKey?.get(renderedItemKey) ?? null}
-				{#if shouldPassVisibilityProp}
+				{#if visibilityConsumption !== "none"}
 					<ItemComponent
 						{...config.getItemProps(item)}
 						searchQuery={search.normalized}
@@ -425,21 +426,19 @@
 						{activationCandidateId}
 					/>
 				{:else}
-					<PreviewVisibilityProvider {visibilityState}>
-						<ItemComponent
-							{...config.getItemProps(item)}
-							searchQuery={search.normalized}
-							searchScope={allowContentSearch &&
-							contentSearchEnabled &&
-							(matchedItem?.contentMatched ?? true)
-								? "title-and-content"
-								: "title-only"}
-							contentPreview={matchedItem?.contentPreview}
-							{previewRefreshToken}
-							{rowIndex}
-							{activationCandidateId}
-						/>
-					</PreviewVisibilityProvider>
+					<ItemComponent
+						{...config.getItemProps(item)}
+						searchQuery={search.normalized}
+						searchScope={allowContentSearch &&
+						contentSearchEnabled &&
+						(matchedItem?.contentMatched ?? true)
+							? "title-and-content"
+							: "title-only"}
+						contentPreview={matchedItem?.contentPreview}
+						{previewRefreshToken}
+						{rowIndex}
+						{activationCandidateId}
+					/>
 				{/if}
 			{/snippet}
 		</LinkList>

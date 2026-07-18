@@ -392,4 +392,39 @@ describe("rowPreviewActivationRuntime", () => {
 		expect(onActivatedA).not.toHaveBeenCalled();
 		expect(onActivatedB).toHaveBeenCalledWith("shared-key");
 	});
+
+	it("applies row replacement as one visibility batch", async () => {
+		const runtime = createRowPreviewActivationRuntime();
+		const oldActivated = vi.fn();
+		const nextActivated = vi.fn();
+
+		runtime.setRowVisibility(0, "visible");
+		runtime.registerCandidate(
+			createTestCandidate({
+				id: "old",
+				rowIndex: 0,
+				activationKey: "shared-key",
+				onActivated: oldActivated,
+			}),
+		);
+		runtime.registerCandidate(
+			createTestCandidate({
+				id: "next",
+				rowIndex: 1,
+				activationKey: "shared-key",
+				onActivated: nextActivated,
+			}),
+		);
+
+		runtime.applyVisibilityDelta({
+			activatedRows: [1],
+			deactivatedRows: [],
+			clearedRows: [0],
+		});
+		await flushAnimationFrame();
+		await flushAnimationFrame();
+
+		expect(oldActivated).not.toHaveBeenCalled();
+		expect(nextActivated).toHaveBeenCalledWith("shared-key");
+	});
 });

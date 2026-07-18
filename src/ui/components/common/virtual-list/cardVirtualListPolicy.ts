@@ -10,14 +10,18 @@ export interface CreateCardVirtualListPolicyParams {
 		gap: number;
 	};
 	previewActivationAheadRows?: number;
+	isScrollActive?: boolean;
 }
 
 export function createCardVirtualListPolicy({
 	layout,
 	previewActivationAheadRows = 1,
+	isScrollActive = false,
 }: CreateCardVirtualListPolicyParams): VirtualVisibilityPolicy {
 	const rowOverscanPx = Math.max(0, layout.rowHeight + layout.gap);
-	const aheadRows = Math.max(0, Math.floor(previewActivationAheadRows));
+	const aheadRows = isScrollActive
+		? 0
+		: Math.max(0, Math.floor(previewActivationAheadRows));
 	const previewOverscanPx = rowOverscanPx * aheadRows;
 
 	return {

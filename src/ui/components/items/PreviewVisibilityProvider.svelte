@@ -28,14 +28,6 @@
 		get visibility() {
 			return providedVisibilityState?.visibility ?? ownedVisibility;
 		},
-		set visibility(next: VirtualizedItemVisibility | undefined) {
-			if (providedVisibilityState) {
-				providedVisibilityState.visibility = next;
-				return;
-			}
-
-			ownedVisibility = next;
-		},
 	};
 
 	setContext(PREVIEW_VISIBILITY_CONTEXT_KEY, context);

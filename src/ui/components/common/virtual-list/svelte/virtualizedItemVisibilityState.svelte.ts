@@ -11,13 +11,30 @@ interface VisibilityCell {
 	};
 }
 
-interface VisibilityRow<TCell extends VisibilityCell> {
+export interface VisibilityRow<TCell extends VisibilityCell> {
 	readonly rowIndex: number;
 	readonly cells: readonly TCell[];
 }
 
 export interface VirtualizedItemResolvedVisibilityState extends VirtualizedItemVisibilityState {
+	readonly visibility: VirtualizedItemVisibility;
+}
+
+interface MutableVisibilityState {
 	visibility: VirtualizedItemVisibility;
+}
+
+export interface RowVisibilityDelta {
+	readonly activatedRows: readonly number[];
+	readonly deactivatedRows: readonly number[];
+	readonly clearedRows: readonly number[];
+}
+
+export interface VirtualCardDisplaySnapshot<TCell extends VisibilityCell> {
+	readonly rowModelRevision: unknown;
+	readonly mountedRows: readonly VisibilityRow<TCell>[];
+	readonly mountedRange: RowRange;
+	readonly previewActiveRange: RowRange;
 }
 
 export const resolveVirtualizedItemVisibilityForPreviewRange = (
@@ -44,6 +61,8 @@ export interface VirtualizedItemVisibilityStateControllerOptions<
 		visibility: VirtualizedItemVisibility,
 	) => void;
 	readonly onRowCleared?: (rowIndex: number) => void;
+	/** Receives one notification after all internal maps and states are committed. */
+	readonly onVisibilityDelta?: (delta: RowVisibilityDelta) => void;
 }
 
 export function createVirtualizedItemVisibilityStateController<
@@ -51,6 +70,7 @@ export function createVirtualizedItemVisibilityStateController<
 >(options: VirtualizedItemVisibilityStateControllerOptions<TCell> = {}) {
 	interface TrackedState {
 		readonly state: VirtualizedItemResolvedVisibilityState;
+		readonly mutableState: MutableVisibilityState;
 		seenEpoch: number;
 	}
 
@@ -63,7 +83,57 @@ export function createVirtualizedItemVisibilityStateController<
 	const mountedItemKeyCounts = new Map<string, number>();
 	const rowVisibilityByIndex = new Map<number, VirtualizedItemVisibility>();
 	const nextRowIndicesScratch = new Set<number>();
+	const activatedRowsScratch = new Set<number>();
+	const deactivatedRowsScratch = new Set<number>();
+	const clearedRowsScratch = new Set<number>();
+	let visibilityCommitDepth = 0;
+	let committedRowModelRevision: unknown;
+	let hasCommittedSnapshot = false;
+	let committedMountedRows: readonly VisibilityRow<TCell>[] = [];
+	const committedMountedRange: RowRange = { start: 0, end: 0 };
 	const getStateKey = options.getStateKey ?? ((cell: TCell) => cell.key);
+
+	const flushVisibilityDelta = (): void => {
+		if (
+			activatedRowsScratch.size === 0 &&
+			deactivatedRowsScratch.size === 0 &&
+			clearedRowsScratch.size === 0
+		) {
+			return;
+		}
+
+		const delta: RowVisibilityDelta = {
+			activatedRows: Array.from(activatedRowsScratch),
+			deactivatedRows: Array.from(deactivatedRowsScratch),
+			clearedRows: Array.from(clearedRowsScratch),
+		};
+		activatedRowsScratch.clear();
+		deactivatedRowsScratch.clear();
+		clearedRowsScratch.clear();
+
+		options.onVisibilityDelta?.(delta);
+		for (const rowIndex of delta.activatedRows) {
+			options.onRowVisibilityChanged?.(rowIndex, "visible");
+		}
+		for (const rowIndex of delta.deactivatedRows) {
+			options.onRowVisibilityChanged?.(rowIndex, "mounted");
+		}
+		for (const rowIndex of delta.clearedRows) {
+			options.onRowCleared?.(rowIndex);
+		}
+	};
+
+	const runVisibilityCommit = (commit: () => void): void => {
+		visibilityCommitDepth += 1;
+		try {
+			commit();
+		} finally {
+			visibilityCommitDepth -= 1;
+			if (visibilityCommitDepth === 0) {
+				flushVisibilityDelta();
+			}
+		}
+	};
 
 	const rememberPreviousPreviewVisible = (previewRange: RowRange): void => {
 		previousPreviewVisible.start = previewRange.start;
@@ -120,10 +190,11 @@ export function createVirtualizedItemVisibilityStateController<
 			return existing.state;
 		}
 
-		const state: VirtualizedItemResolvedVisibilityState = $state({
+		const mutableState: MutableVisibilityState = $state({
 			visibility: initialVisibility,
 		});
-		const tracked: TrackedState = { state, seenEpoch: 0 };
+		const state: VirtualizedItemResolvedVisibilityState = mutableState;
+		const tracked: TrackedState = { state, mutableState, seenEpoch: 0 };
 		states.set(key, tracked);
 		return state;
 	};
@@ -138,7 +209,22 @@ export function createVirtualizedItemVisibilityStateController<
 		}
 
 		rowVisibilityByIndex.set(rowIndex, nextVisibility);
-		options.onRowVisibilityChanged?.(rowIndex, nextVisibility);
+		clearedRowsScratch.delete(rowIndex);
+		if (nextVisibility === "visible") {
+			deactivatedRowsScratch.delete(rowIndex);
+			activatedRowsScratch.add(rowIndex);
+			return;
+		}
+
+		activatedRowsScratch.delete(rowIndex);
+		deactivatedRowsScratch.add(rowIndex);
+	};
+
+	const notifyRowCleared = (rowIndex: number): void => {
+		rowVisibilityByIndex.delete(rowIndex);
+		activatedRowsScratch.delete(rowIndex);
+		deactivatedRowsScratch.delete(rowIndex);
+		clearedRowsScratch.add(rowIndex);
 	};
 
 	const applyVisibilityToRow = (
@@ -156,8 +242,8 @@ export function createVirtualizedItemVisibilityStateController<
 				continue;
 			}
 
-			if (tracked.state.visibility !== nextVisibility) {
-				tracked.state.visibility = nextVisibility;
+			if (tracked.mutableState.visibility !== nextVisibility) {
+				tracked.mutableState.visibility = nextVisibility;
 			}
 		}
 
@@ -207,8 +293,7 @@ export function createVirtualizedItemVisibilityStateController<
 
 		for (const rowIndex of rowsByIndex.keys()) {
 			if (!nextRowIndicesScratch.has(rowIndex)) {
-				rowVisibilityByIndex.delete(rowIndex);
-				options.onRowCleared?.(rowIndex);
+				notifyRowCleared(rowIndex);
 			}
 		}
 		nextRowIndicesScratch.clear();
@@ -233,8 +318,8 @@ export function createVirtualizedItemVisibilityStateController<
 				}
 
 				tracked.seenEpoch = epoch;
-				if (tracked.state.visibility !== nextVisibility) {
-					tracked.state.visibility = nextVisibility;
+				if (tracked.mutableState.visibility !== nextVisibility) {
+					tracked.mutableState.visibility = nextVisibility;
 				}
 			}
 			notifyRowVisibilityIfChanged(row.rowIndex, nextVisibility);
@@ -261,7 +346,7 @@ export function createVirtualizedItemVisibilityStateController<
 		updateMountedItemKeyCount(row, -1);
 		pruneUnmountedRowState(row);
 		rowVisibilityByIndex.delete(row.rowIndex);
-		options.onRowCleared?.(row.rowIndex);
+		notifyRowCleared(row.rowIndex);
 	};
 
 	const addMountedRow = (row: VisibilityRow<TCell>, previewRange: RowRange): void => {
@@ -292,7 +377,7 @@ export function createVirtualizedItemVisibilityStateController<
 		return true;
 	};
 
-	const syncMountedRows = (params: {
+	const syncMountedRowsInternal = (params: {
 		mountedRows: readonly VisibilityRow<TCell>[];
 		previewRange: RowRange;
 	}): void => {
@@ -313,7 +398,7 @@ export function createVirtualizedItemVisibilityStateController<
 		rebuildRowsByIndex(mountedRows);
 	};
 
-	const syncMountedRowRangeDelta = (params: {
+	const syncMountedRowRangeDeltaInternal = (params: {
 		previousRows: readonly VisibilityRow<TCell>[];
 		nextRows: readonly VisibilityRow<TCell>[];
 		previousRowRange: RowRange;
@@ -323,7 +408,7 @@ export function createVirtualizedItemVisibilityStateController<
 		const { previousRows, nextRows, previousRowRange, nextRowRange, previewRange } =
 			params;
 		if (previousRows !== previousRowSlices || !hasPreviousPreviewVisible) {
-			syncMountedRows({
+			syncMountedRowsInternal({
 				mountedRows: nextRows,
 				previewRange,
 			});
@@ -365,7 +450,7 @@ export function createVirtualizedItemVisibilityStateController<
 				previewRange,
 			);
 		if (!hasAllDeltaRows) {
-			syncMountedRows({ mountedRows: nextRows, previewRange });
+			syncMountedRowsInternal({ mountedRows: nextRows, previewRange });
 			return;
 		}
 
@@ -407,7 +492,7 @@ export function createVirtualizedItemVisibilityStateController<
 		rememberPreviousPreviewVisible(previewRange);
 	};
 
-	const syncPreviewRangeDelta = (params: {
+	const syncPreviewRangeDeltaInternal = (params: {
 		previousPreviewRange: RowRange;
 		nextPreviewRange: RowRange;
 		mountedRows: readonly VisibilityRow<TCell>[];
@@ -419,7 +504,7 @@ export function createVirtualizedItemVisibilityStateController<
 			!hasPreviousPreviewVisible ||
 			!sameRange(previousPreviewRange, previousPreviewVisible)
 		) {
-			syncMountedRows({
+			syncMountedRowsInternal({
 				mountedRows,
 				previewRange: nextPreviewRange,
 			});
@@ -434,24 +519,80 @@ export function createVirtualizedItemVisibilityStateController<
 		rememberPreviousPreviewVisible(nextPreviewRange);
 	};
 
-	const sync = (
+	const syncInternal = (
 		mountedRows: readonly VisibilityRow<TCell>[],
 		previewRange: RowRange,
 	): void => {
 		if (!hasPreviousPreviewVisible || mountedRows !== previousRowSlices) {
-			syncMountedRows({ mountedRows, previewRange });
+			syncMountedRowsInternal({ mountedRows, previewRange });
 			return;
 		}
 
-		syncPreviewRangeDelta({
+		syncPreviewRangeDeltaInternal({
 			previousPreviewRange: previousPreviewVisible,
 			nextPreviewRange: previewRange,
 			mountedRows,
 		});
 	};
 
+	const syncMountedRows = (
+		params: Parameters<typeof syncMountedRowsInternal>[0],
+	): void => runVisibilityCommit(() => syncMountedRowsInternal(params));
+
+	const syncMountedRowRangeDelta = (
+		params: Parameters<typeof syncMountedRowRangeDeltaInternal>[0],
+	): void => runVisibilityCommit(() => syncMountedRowRangeDeltaInternal(params));
+
+	const syncPreviewRangeDelta = (
+		params: Parameters<typeof syncPreviewRangeDeltaInternal>[0],
+	): void => runVisibilityCommit(() => syncPreviewRangeDeltaInternal(params));
+
+	const sync = (
+		mountedRows: readonly VisibilityRow<TCell>[],
+		previewRange: RowRange,
+	): void => runVisibilityCommit(() => syncInternal(mountedRows, previewRange));
+
+	const commit = (snapshot: VirtualCardDisplaySnapshot<TCell>): void => {
+		runVisibilityCommit(() => {
+			if (
+				!hasCommittedSnapshot ||
+				snapshot.rowModelRevision !== committedRowModelRevision
+			) {
+				syncMountedRowsInternal({
+					mountedRows: snapshot.mountedRows,
+					previewRange: snapshot.previewActiveRange,
+				});
+			} else if (snapshot.mountedRows !== committedMountedRows) {
+				syncMountedRowRangeDeltaInternal({
+					previousRows: committedMountedRows,
+					nextRows: snapshot.mountedRows,
+					previousRowRange: committedMountedRange,
+					nextRowRange: snapshot.mountedRange,
+					previewRange: snapshot.previewActiveRange,
+				});
+			} else {
+				syncPreviewRangeDeltaInternal({
+					previousPreviewRange: previousPreviewVisible,
+					nextPreviewRange: snapshot.previewActiveRange,
+					mountedRows: snapshot.mountedRows,
+				});
+			}
+
+			committedRowModelRevision = snapshot.rowModelRevision;
+			committedMountedRows = snapshot.mountedRows;
+			committedMountedRange.start = snapshot.mountedRange.start;
+			committedMountedRange.end = snapshot.mountedRange.end;
+			hasCommittedSnapshot = true;
+		});
+	};
+
 	return {
 		getOrCreateState,
+		commit,
+		getCommittedMountedRows: () => committedMountedRows,
+		getCommittedMountedRange: () => committedMountedRange,
+		getCommittedRowModelRevision: () =>
+			hasCommittedSnapshot ? committedRowModelRevision : null,
 		syncMountedRows,
 		syncMountedRowRangeDelta,
 		syncPreviewRangeDelta,

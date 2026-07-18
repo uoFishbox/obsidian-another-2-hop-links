@@ -26,7 +26,10 @@ export interface ApplyFlatGridMeasurementParams<
 
 export interface CreateFlatGridMeasurementAdapterOptions<T, TLayout> {
 	resolveRowModel(layout: TLayout): FlatLinkRowModel<T>;
-	resolveVisibilityPolicy(layout: TLayout): VirtualVisibilityPolicy;
+	resolveVisibilityPolicy(
+		layout: TLayout,
+		isScrollActive: boolean,
+	): VirtualVisibilityPolicy;
 	applyMeasurement(
 		params: ApplyFlatGridMeasurementParams<T, TLayout>,
 	): MeasurementUpdateResult<RowRange>;
@@ -49,7 +52,7 @@ export function createFlatGridMeasurementAdapter<T, TLayout>({
 		TLayout
 	>({
 		resolveRowModel,
-		resolveVisibilityPolicy,
+		resolveVisibilityPolicy: (layout) => resolveVisibilityPolicy(layout, true),
 	});
 
 	return {
@@ -72,7 +75,7 @@ export function createFlatGridMeasurementAdapter<T, TLayout>({
 				isScrollActive,
 				layout,
 				precomputedRanges,
-				visibilityPolicy: resolveVisibilityPolicy(layout),
+				visibilityPolicy: resolveVisibilityPolicy(layout, isScrollActive),
 			});
 		},
 		resolveMountedScrollWindowMeasurement(

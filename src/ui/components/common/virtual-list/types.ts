@@ -6,8 +6,10 @@ import type { RowKey } from "./rowKey";
 
 export type VirtualizedItemVisibility = "visible" | "mounted";
 
+export type VisibilityConsumption = "none" | "value" | "reactive-state";
+
 export interface VirtualizedItemVisibilityState {
-	visibility: VirtualizedItemVisibility | undefined;
+	readonly visibility: VirtualizedItemVisibility | undefined;
 }
 
 declare const brand: unique symbol;
