@@ -12,7 +12,7 @@ export const CARD_RENDER_SHADOW_CSS = String.raw`
 .view-plan-virtual-list-content {
 	position: relative;
 	width: 100%;
-	contain: layout;
+	contain: content;
 	overflow-anchor: none;
 }
 
