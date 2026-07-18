@@ -1,4 +1,4 @@
-import type { CardRenderShadowSurfaceHandles } from "ui/components/common/cardRenderShadowSurface";
+import { DEBUG_DISABLE_CARD_DOM_PREVIEW } from "appConstants";
 import { ensureCardRenderShadowSurface } from "ui/components/common/cardRenderShadowSurface";
 import { findNearestScrollContainerCached } from "ui/components/common/virtual-list/dom/scrollContainer";
 import { getScrollMetrics } from "ui/components/common/virtual-list/dom/virtualListMeasurementAdapter";
@@ -274,7 +274,10 @@ export function createTwoHopViewportController(
 	}
 
 	function createPreviewHydrator(): TwoHopPreviewHydrator | null {
-		if (!params.getPreview) return null;
+		if (DEBUG_DISABLE_CARD_DOM_PREVIEW || !params.getPreview) {
+			return null;
+		}
+
 		return createTwoHopPreviewHydrator({
 			getRows: () => pool.rows,
 			getPreview: params.getPreview,
