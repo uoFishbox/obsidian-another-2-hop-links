@@ -60,7 +60,7 @@ export function createTwoHopPreviewHydrator(
 			ownerWindow?.setTimeout(callback, delayMs) ?? 0);
 	const clearTimer =
 		params.clearTimer ?? ((handle: number) => ownerWindow?.clearTimeout(handle));
-	const idleDelayMs = params.idleDelayMs ?? 140;
+	const idleDelayMs = params.idleDelayMs ?? 90;
 	const opportunisticIntervalMs = params.opportunisticIntervalMs ?? 160;
 	const opportunisticVelocityLimit = params.opportunisticVelocityLimit ?? 0.012;
 	let visibleStart = 0;
