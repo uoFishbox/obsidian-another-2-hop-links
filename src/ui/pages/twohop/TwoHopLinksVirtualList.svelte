@@ -33,6 +33,7 @@
 		initialVisibleCount?: number;
 		loadMoreIncrement?: number;
 		linkContext?: LinkUtilitiesContext;
+		previewActive?: boolean;
 	}
 
 	let {
@@ -44,6 +45,7 @@
 		initialVisibleCount,
 		loadMoreIncrement,
 		linkContext: providedLinkContext = undefined,
+		previewActive = true,
 	}: Props = $props();
 
 	if (!applicationStore) {
@@ -61,10 +63,9 @@
 	}
 	const linkContext = resolveLinkContext();
 	const cardModelCache = createTwoHopCardRenderModelCache();
-	const cardModelRevision = $derived.by(
-		(): TwoHopCardModelRevision | undefined =>
-			linkContext
-				? {
+	const cardModelRevision = $derived.by((): TwoHopCardModelRevision | undefined =>
+		linkContext
+			? {
 					settings: currentSettings,
 					searchQuery,
 					searchScope,
@@ -75,7 +76,7 @@
 					previewGlobalVersion: applicationStore.previewGlobalVersion,
 					previewPathVersions: applicationStore.previewPathVersions,
 				}
-				: undefined,
+			: undefined,
 	);
 	const resolveItemCardModel = $derived.by(() => {
 		const revision = cardModelRevision;
@@ -106,6 +107,7 @@
 		{interactionDescriptorRevision}
 		{cardModelRevision}
 		{resolveItemCardModel}
-		linkContext={linkContext}
+		{linkContext}
+		{previewActive}
 	/>
 {/if}

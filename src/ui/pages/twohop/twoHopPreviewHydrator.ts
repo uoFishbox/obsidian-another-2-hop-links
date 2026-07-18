@@ -24,6 +24,7 @@ export interface TwoHopPreviewHydrator {
 		criticalWorkPending: boolean,
 	): void;
 	notifyShellsChanged(): void;
+	setActive(active: boolean): void;
 	hydrateNext(lane: TwoHopPreviewLane): boolean;
 	getStats(): TwoHopPreviewHydratorStats;
 	dispose(): void;
@@ -67,6 +68,7 @@ export function createTwoHopPreviewHydrator(
 	let idleTimer = 0;
 	let idleDeadline = 0;
 	let disposed = false;
+	let active = true;
 	let lastOpportunisticActivationAt = Number.NEGATIVE_INFINITY;
 	let stats = {
 		requested: 0,
@@ -84,6 +86,7 @@ export function createTwoHopPreviewHydrator(
 	): void {
 		visibleStart = nextVisibleStart;
 		visibleEnd = nextVisibleEnd;
+		if (!active) return;
 		scheduleIdle();
 		if (
 			!scrollActive ||
@@ -101,18 +104,41 @@ export function createTwoHopPreviewHydrator(
 	}
 
 	function notifyShellsChanged(): void {
+		if (!active) return;
 		scheduleIdle();
 	}
 
+	function setActive(nextActive: boolean): void {
+		if (disposed || active === nextActive) return;
+		active = nextActive;
+		if (active) {
+			scheduleIdle();
+			return;
+		}
+
+		if (idleTimer) {
+			clearTimer(idleTimer);
+			idleTimer = 0;
+		}
+		for (const row of params.getRows()) {
+			for (const slot of row.cells) {
+				if (slot.previewStatus !== "loading") continue;
+				slot.abortPreviewRequest?.();
+				slot.abortPreviewRequest = null;
+				slot.previewStatus = "empty";
+			}
+		}
+	}
+
 	function scheduleIdle(): void {
-		if (disposed) return;
+		if (disposed || !active) return;
 		idleDeadline = now() + idleDelayMs;
 		if (idleTimer) return;
 		idleTimer = setTimer(handleIdleTimer, idleDelayMs);
 	}
 
 	function handleIdleTimer(): void {
-		if (disposed) {
+		if (disposed || !active) {
 			idleTimer = 0;
 			return;
 		}
@@ -127,14 +153,14 @@ export function createTwoHopPreviewHydrator(
 	}
 
 	function drainIdleLane(): void {
-		if (disposed) return;
+		if (disposed || !active) return;
 		if (hydrateNext("visible-idle")) {
 			idleTimer = setTimer(handleIdleTimer, 0);
 		}
 	}
 
 	function hydrateNext(lane: TwoHopPreviewLane): boolean {
-		if (disposed) return false;
+		if (disposed || !active) return false;
 		const slot = findBestCandidate(params.getRows(), visibleStart, visibleEnd);
 		if (!slot?.cardModel?.targetFile) return false;
 		void hydrateSlot(slot, slot.cardModel.targetFile);
@@ -186,11 +212,12 @@ export function createTwoHopPreviewHydrator(
 			if (!abortController.signal.aborted) {
 				console.error("Failed to hydrate two-hop card preview:", error);
 			}
-			if (slot.generation === generation) {
+			if (
+				slot.generation === generation &&
+				slot.abortPreviewRequest === abortRequest
+			) {
 				slot.previewStatus = "empty";
-				if (slot.abortPreviewRequest === abortRequest) {
-					slot.abortPreviewRequest = null;
-				}
+				slot.abortPreviewRequest = null;
 			}
 		}
 	}
@@ -202,6 +229,7 @@ export function createTwoHopPreviewHydrator(
 	): boolean {
 		return (
 			!disposed &&
+			active &&
 			slot.generation === generation &&
 			(slot.cardModel?.previewActivationIdentity ??
 				slot.cardModel?.targetFile?.path) === identity
@@ -226,6 +254,7 @@ export function createTwoHopPreviewHydrator(
 	return {
 		notifyViewport,
 		notifyShellsChanged,
+		setActive,
 		hydrateNext,
 		getStats: () => ({ ...stats }),
 		dispose,

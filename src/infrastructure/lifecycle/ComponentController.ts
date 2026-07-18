@@ -17,6 +17,7 @@ import { ApplicationStore } from "ui/stores/ApplicationStore.svelte";
 import type { PluginHostUi } from "types/pluginHostUi";
 import type { ResolveTwoHopLinks } from "ui/stores/application/TwoHopLinksLoader";
 import { mountTwoHopLinksRootView } from "ui/views/shared/viewFactories";
+import type { TwoHopLinksRootUiState } from "ui/views/shared/twoHopLinksRootUiState";
 import type { SvelteComponentInstance } from "ui/views/shared/svelteLifecycle";
 
 export type ComponentInstance = SvelteComponentInstance;
@@ -31,6 +32,11 @@ interface MountedComponent {
 	lifecycleManager: MarkdownRenderChild;
 }
 
+interface InlineViewUiState {
+	filePath: string;
+	uiState: TwoHopLinksRootUiState;
+}
+
 export const RECENT_APPLICATION_STORE_LIMIT = 6;
 
 export class ComponentController implements IComponentManager {
@@ -39,6 +45,7 @@ export class ComponentController implements IComponentManager {
 		MountedComponent[]
 	>();
 	private readonly lazyLoaderCaches = new WeakMap<MarkdownView, Set<string>>();
+	private readonly inlineUiStates = new WeakMap<MarkdownView, InlineViewUiState>();
 
 	private readonly applicationStores = new Map<string, ApplicationStore>();
 	private readonly applicationStoreRefCounts = new Map<string, number>();
@@ -64,6 +71,26 @@ export class ComponentController implements IComponentManager {
 
 	private clearLazyLoaderCache(view: MarkdownView): void {
 		this.lazyLoaderCaches.get(view)?.clear();
+	}
+
+	private getInlineUiState(
+		view: MarkdownView,
+		filePath: string,
+	): TwoHopLinksRootUiState {
+		let viewState = this.inlineUiStates.get(view);
+		if (!viewState || viewState.filePath !== filePath) {
+			viewState = {
+				filePath,
+				uiState: { searchInputValue: "" },
+			};
+			this.inlineUiStates.set(view, viewState);
+		}
+
+		return viewState.uiState;
+	}
+
+	private clearInlineUiState(view: MarkdownView): void {
+		this.inlineUiStates.delete(view);
 	}
 
 	private buildStoreKey(leafId: string, filePath: string): string {
@@ -119,6 +146,7 @@ export class ComponentController implements IComponentManager {
 		if (!file) {
 			this.unmountViewComponents(view);
 			this.clearLazyLoaderCache(view);
+			this.clearInlineUiState(view);
 			return;
 		}
 
@@ -142,6 +170,7 @@ export class ComponentController implements IComponentManager {
 
 		if (previousFilePath && previousFilePath !== file.path) {
 			this.clearLazyLoaderCache(view);
+			this.clearInlineUiState(view);
 		}
 
 		this.syncComponentForView(view, file, target);
@@ -393,6 +422,7 @@ export class ComponentController implements IComponentManager {
 				getApplicationStore: () => applicationStore!,
 				updateSetting: (key, value) =>
 					this.plugin.updateSetting(key as any, value),
+				uiState: this.getInlineUiState(view, file.path),
 			});
 
 			// --- ライフサイクル管理 ---

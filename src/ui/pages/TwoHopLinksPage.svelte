@@ -23,6 +23,8 @@
 	} from "./twohop/twoHopSearchAdapter";
 	import { tick } from "svelte";
 	import { createTwoHopSectionDescriptorIdentityCache } from "./twohop/twoHopSectionDescriptorIdentityCache";
+	import type { TwoHopLinksRootUiState } from "ui/views/shared/twoHopLinksRootUiState";
+	import { observePreviewSurfaceVisibility } from "features/preview/scheduling/previewSurfaceVisibility";
 
 	interface Props {
 		file: TFile;
@@ -32,6 +34,7 @@
 		lazyLoaderCache: Set<string>;
 		isSidebar?: boolean;
 		updateSetting?: <K extends string>(key: K, value: unknown) => Promise<void>;
+		uiState?: TwoHopLinksRootUiState;
 	}
 
 	let {
@@ -42,6 +45,7 @@
 		lazyLoaderCache,
 		isSidebar = false,
 		updateSetting,
+		uiState,
 	}: Props = $props();
 
 	let loading = $derived(applicationStore.loading);
@@ -73,7 +77,14 @@
 	);
 
 	// フックを利用
-	const search = useSearchQuery();
+	const search = useSearchQuery({
+		initialValue: uiState?.searchInputValue,
+		onInputChange: (value) => {
+			if (uiState) {
+				uiState.searchInputValue = value;
+			}
+		},
+	});
 	const bookmarks = useBookmarks(app);
 	const searchAdapter = createTwohopSearchAdapter();
 	const getSearchRenderMode = () => ({
@@ -107,9 +118,7 @@
 	let matchedKeySet = $derived(workerSearchSession.matchedKeySet);
 	let matchedItemByKey = $derived(workerSearchSession.matchedItemByKey);
 	let appliedSearchQuery = $derived(
-		matchedKeySet === null
-			? search.normalized
-			: workerSearchSession.matchedQuery,
+		matchedKeySet === null ? search.normalized : workerSearchSession.matchedQuery,
 	);
 	let appliedSearchScope = $derived(
 		matchedKeySet === null ? searchScope : workerSearchSession.matchedScope,
@@ -158,8 +167,18 @@
 	setLazyLoaderCache(lazyLoaderCache);
 
 	let rootEl = $state<HTMLDivElement | null>(null);
+	let previewSurfaceActive = $state(true);
 	let resultsContainerEl = $state<HTMLDivElement | null>(null);
 	let resultsMinHeight = $derived(search.normalized ? "100vh" : null);
+
+	$effect(() => {
+		const element = rootEl;
+		if (!element) return;
+
+		return observePreviewSurfaceVisibility(element, (active) => {
+			previewSurfaceActive = active;
+		});
+	});
 
 	type EditorWithCm = {
 		cm?: {
@@ -277,6 +296,7 @@
 					{initialVisibleCount}
 					{loadMoreIncrement}
 					{linkContext}
+					previewActive={previewSurfaceActive}
 				/>
 			{/if}
 			{#if !filteredDisplayData.twoHopBranches.length && showTwoHopPlaceholder}

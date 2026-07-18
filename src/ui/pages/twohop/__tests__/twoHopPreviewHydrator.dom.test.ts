@@ -43,6 +43,50 @@ function createReadyPool() {
 }
 
 describe("twoHopPreviewHydrator", () => {
+	it("aborts and suspends preview work while the surface is inactive", async () => {
+		const pool = createReadyPool();
+		pool.rows[0].cells[1].previewStatus = "ready";
+		let firstSignal: AbortSignal | undefined;
+		let resolveFirst!: (value: { type: "text"; content: string }) => void;
+		const firstPreview = new Promise<{ type: "text"; content: string }>(
+			(resolve) => {
+				resolveFirst = resolve;
+			},
+		);
+		const getPreview = vi
+			.fn()
+			.mockImplementationOnce((_file: TFile, signal?: AbortSignal) => {
+				firstSignal = signal;
+				return firstPreview;
+			})
+			.mockResolvedValueOnce({ type: "text", content: "resumed" });
+		const hydrator = createTwoHopPreviewHydrator({
+			getRows: () => pool.rows,
+			getPreview,
+			setTimer: () => 1,
+			clearTimer: () => {},
+		});
+		hydrator.notifyViewport(0, 1, false, 0, false);
+
+		expect(hydrator.hydrateNext("visible-idle")).toBe(true);
+		hydrator.setActive(false);
+		expect(firstSignal?.aborted).toBe(true);
+		expect(hydrator.hydrateNext("visible-idle")).toBe(false);
+
+		resolveFirst({ type: "text", content: "stale" });
+		await Promise.resolve();
+		await Promise.resolve();
+		expect(pool.rows[0].cells[0].previewHost.textContent).toBe("");
+
+		hydrator.setActive(true);
+		expect(hydrator.hydrateNext("visible-idle")).toBe(true);
+		await Promise.resolve();
+		await Promise.resolve();
+		expect(pool.rows[0].cells[0].previewHost.textContent).toBe("resumed");
+		expect(getPreview).toHaveBeenCalledTimes(2);
+		hydrator.dispose();
+	});
+
 	it("does not commit an async preview after its slot generation changes", async () => {
 		const pool = createReadyPool();
 		let resolvePreview!: (value: { type: "text"; content: string }) => void;

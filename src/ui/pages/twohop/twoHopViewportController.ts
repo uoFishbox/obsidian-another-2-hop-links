@@ -107,6 +107,7 @@ export interface TwoHopViewportController {
 		revision?: unknown,
 	): void;
 	setConfiguredLayout(layout: ResolvedCardLayoutSettings | null): void;
+	setPreviewActive(active: boolean): void;
 	loadMore(sectionId: string): void;
 	resolveInteractionDescriptor(interactionId: string): InteractionDescriptor | null;
 	resolveNavigationTarget(
@@ -168,6 +169,7 @@ export function createTwoHopViewportController(
 	let lastMeasuredRowOffset = 0;
 	let lastMeasuredTimestamp = 0;
 	let disposed = false;
+	let previewActive = true;
 	let revision = params.revision;
 	const visibleRange: TwoHopRowRange = { start: 0, end: 0 };
 	let stats = {
@@ -278,12 +280,14 @@ export function createTwoHopViewportController(
 			return null;
 		}
 
-		return createTwoHopPreviewHydrator({
+		const hydrator = createTwoHopPreviewHydrator({
 			getRows: () => pool.rows,
 			getPreview: params.getPreview,
 			app: params.previewApp,
 			sourcePath: params.previewSourcePath,
 		});
+		hydrator.setActive(previewActive);
+		return hydrator;
 	}
 
 	function onScroll(): void {
@@ -632,6 +636,11 @@ export function createTwoHopViewportController(
 			if (configuredLayout === nextLayout) return;
 			configuredLayout = nextLayout;
 			scheduleResize();
+		},
+		setPreviewActive(active) {
+			if (previewActive === active) return;
+			previewActive = active;
+			previewHydrator?.setActive(active);
 		},
 		loadMore,
 		resolveInteractionDescriptor,

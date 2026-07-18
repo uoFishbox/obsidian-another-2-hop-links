@@ -33,6 +33,7 @@
 			presentation: TwoHopCardPresentationState,
 		) => CardRenderModel;
 		linkContext?: LinkUtilitiesContext;
+		previewActive?: boolean;
 	}
 
 	const props: Props = $props();
@@ -113,6 +114,10 @@
 
 	$effect(() => {
 		controller?.setConfiguredLayout(configuredLayout);
+	});
+
+	$effect(() => {
+		controller?.setPreviewActive(props.previewActive ?? true);
 	});
 
 	onDestroy(() => controller?.dispose());

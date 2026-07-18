@@ -25,6 +25,7 @@ type WorkerMessageHandler = (message: SearchWorkerToMainMessage) => void;
 export function createSearchWorkerClient(
 	onMessage: WorkerMessageHandler,
 ): SearchWorkerClient {
+	let initialized = false;
 	let worker: Worker | null = null;
 	let latestItems: SearchWorkerItemsSnapshot = {
 		datasetVersion: 0,
@@ -32,9 +33,19 @@ export function createSearchWorkerClient(
 	};
 	let latestDatasetVersion = 0;
 	let fallbackFilterSerial = 0;
+	const latestContentByPath = new Map<string, string>();
 
-	try {
-		if (typeof Worker !== "undefined") {
+	function ensureInitialized(): void {
+		if (initialized) {
+			return;
+		}
+		initialized = true;
+
+		try {
+			if (typeof Worker === "undefined") {
+				return;
+			}
+
 			const nextWorker = createSearchFilterWorker();
 			nextWorker.onmessage = (event: MessageEvent<SearchWorkerToMainMessage>) => {
 				onMessage(event.data);
@@ -46,14 +57,14 @@ export function createSearchWorkerClient(
 				});
 			};
 			worker = nextWorker;
+		} catch {
+			worker = null;
 		}
-	} catch {
-		worker = null;
 	}
-	const latestContentByPath = worker ? null : new Map<string, string>();
 
 	return {
 		syncItems(snapshot: SearchWorkerItemsSnapshot): void {
+			ensureInitialized();
 			latestItems = snapshot;
 			latestDatasetVersion = snapshot.datasetVersion;
 			if (!worker) {
@@ -68,8 +79,9 @@ export function createSearchWorkerClient(
 			worker.postMessage(message);
 		},
 		upsertFileContents(update: SearchWorkerFileContentsUpsert): void {
+			ensureInitialized();
 			latestDatasetVersion = update.datasetVersion;
-			if (latestContentByPath) {
+			if (!worker) {
 				for (const entry of update.entries) {
 					latestContentByPath.set(entry.path, entry.content.toLowerCase());
 				}
@@ -87,8 +99,9 @@ export function createSearchWorkerClient(
 			worker.postMessage(message);
 		},
 		removeFileContents(update: SearchWorkerFileContentsRemoval): void {
+			ensureInitialized();
 			latestDatasetVersion = update.datasetVersion;
-			if (latestContentByPath) {
+			if (!worker) {
 				for (const path of update.paths) {
 					latestContentByPath.delete(path);
 				}
@@ -106,6 +119,7 @@ export function createSearchWorkerClient(
 			worker.postMessage(message);
 		},
 		filter(request: SearchWorkerFilterRequest): void {
+			ensureInitialized();
 			if (!worker) {
 				const serial = ++fallbackFilterSerial;
 				const matchedItems: SearchWorkerMatchedItem[] = [];
@@ -120,7 +134,7 @@ export function createSearchWorkerClient(
 						dataset: snapshot,
 						query: request.query,
 						matchScope: request.matchScope,
-						cachedContentByPath: latestContentByPath ?? undefined,
+						cachedContentByPath: latestContentByPath,
 						onMatch: (item) => matchedItems.push(item),
 						isCancelled: () => serial !== fallbackFilterSerial,
 					});
@@ -149,7 +163,8 @@ export function createSearchWorkerClient(
 			worker.postMessage(message);
 		},
 		terminate(): void {
-			if (!worker) {
+			fallbackFilterSerial += 1;
+			if (!initialized || !worker) {
 				return;
 			}
 

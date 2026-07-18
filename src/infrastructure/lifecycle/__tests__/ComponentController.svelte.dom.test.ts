@@ -174,6 +174,19 @@ function getLazyCachesFromMountCalls(): Set<unknown>[] {
 	return caches;
 }
 
+function getUiStatesFromMountCalls(): Array<{ searchInputValue: string }> {
+	const states: Array<{ searchInputValue: string }> = [];
+	for (const call of mountSpy.mock.calls) {
+		const options = call[1] as
+			| { props?: { uiState?: { searchInputValue: string } } }
+			| undefined;
+		if (options?.props?.uiState) {
+			states.push(options.props.uiState);
+		}
+	}
+	return states;
+}
+
 async function flushMicrotasks(): Promise<void> {
 	await Promise.resolve();
 	await Promise.resolve();
@@ -334,6 +347,46 @@ describe("ComponentController mountComponentsForView", () => {
 		expect(mountSpy).toHaveBeenCalledTimes(2);
 		expect(unmountSpy).toHaveBeenCalledTimes(1);
 		expect(secondCaches[0].size).toBe(0);
+	});
+
+	it("preserves the same search input across inline surface changes", () => {
+		const { controller, view } = createController();
+		const file = createMockTFile("notes/alpha.md");
+		const previewContainer = document.createElement("div");
+		document.body.append(previewContainer);
+
+		controller.mountComponentsForView(view, file);
+		getUiStatesFromMountCalls()[0].searchInputValue = "source query";
+
+		getActiveInlineContainerSpy.mockReturnValue({
+			surface: "preview",
+			container: previewContainer,
+		});
+		controller.mountComponentsForView(view, file, { skipIfMounted: true });
+		const previewState = getUiStatesFromMountCalls()[1];
+		expect(previewState.searchInputValue).toBe("source query");
+		expect(previewState).toBe(getUiStatesFromMountCalls()[0]);
+
+		getActiveInlineContainerSpy.mockReturnValue({
+			surface: "source",
+			container: sourceContainer,
+		});
+		controller.mountComponentsForView(view, file, { skipIfMounted: true });
+
+		expect(getUiStatesFromMountCalls()[2]).toBe(previewState);
+		expect(getUiStatesFromMountCalls()[2].searchInputValue).toBe("source query");
+	});
+
+	it("clears inline search state when the file changes", () => {
+		const { controller, view } = createController();
+		const firstFile = createMockTFile("notes/alpha.md");
+		const secondFile = createMockTFile("notes/beta.md");
+
+		controller.mountComponentsForView(view, firstFile);
+		getUiStatesFromMountCalls()[0].searchInputValue = "alpha query";
+		controller.mountComponentsForView(view, secondFile);
+
+		expect(getUiStatesFromMountCalls()[1].searchInputValue).toBe("");
 	});
 
 	it("reuses a recent store and builder when revisiting a file in the same leaf", async () => {

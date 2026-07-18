@@ -8,6 +8,7 @@ import { areTagFeaturesEnabled } from "types/settings";
 import { mount } from "svelte";
 import TwoHopLinksPage from "ui/pages/TwoHopLinksPage.svelte";
 import type { SvelteComponentInstance } from "ui/views/shared/svelteLifecycle";
+import type { TwoHopLinksRootUiState } from "ui/views/shared/twoHopLinksRootUiState";
 
 export function createDefaultApplicationStore(
 	plugin: PluginHostUi,
@@ -51,6 +52,7 @@ interface MountTwoHopLinksRootViewOptions {
 	wrapForView?: boolean;
 	getApplicationStore?: () => ApplicationStore;
 	updateSetting?: <K extends string>(key: K, value: unknown) => Promise<void>;
+	uiState?: TwoHopLinksRootUiState;
 }
 
 export function mountTwoHopLinksRootView(options: MountTwoHopLinksRootViewOptions): {
@@ -67,6 +69,7 @@ export function mountTwoHopLinksRootView(options: MountTwoHopLinksRootViewOption
 		wrapForView = true,
 		getApplicationStore,
 		updateSetting,
+		uiState,
 	} = options;
 	const applicationStore =
 		getApplicationStore?.() ?? createDefaultApplicationStore(plugin, settings);
@@ -85,6 +88,7 @@ export function mountTwoHopLinksRootView(options: MountTwoHopLinksRootViewOption
 			lazyLoaderCache,
 			isSidebar,
 			updateSetting,
+			uiState,
 		},
 	}) as SvelteComponentInstance;
 
