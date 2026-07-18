@@ -2,14 +2,14 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { DEFAULT_SETTINGS } from "types/settings";
 
 const {
-	getContainerElementsSpy,
+	getActiveInlineContainerSpy,
 	getLeafIdSpy,
 	handleMountErrorSpy,
 	handleUnmountErrorSpy,
 	mountSpy,
 	unmountSpy,
 } = vi.hoisted(() => ({
-	getContainerElementsSpy: vi.fn(),
+	getActiveInlineContainerSpy: vi.fn(),
 	getLeafIdSpy: vi.fn(),
 	handleMountErrorSpy: vi.fn(),
 	handleUnmountErrorSpy: vi.fn(),
@@ -18,7 +18,7 @@ const {
 }));
 
 vi.mock("ui/utils/domUtils", () => ({
-	getContainerElements: getContainerElementsSpy,
+	getActiveInlineContainer: getActiveInlineContainerSpy,
 }));
 
 vi.mock("infrastructure/utils/workspaceUtils", () => ({
@@ -181,24 +181,29 @@ async function flushMicrotasks(): Promise<void> {
 }
 
 describe("ComponentController mountComponentsForView", () => {
+	let sourceContainer: HTMLElement;
+
 	beforeEach(() => {
-		getContainerElementsSpy.mockReset();
+		getActiveInlineContainerSpy.mockReset();
 		getLeafIdSpy.mockReset();
 		handleMountErrorSpy.mockReset();
 		handleUnmountErrorSpy.mockReset();
 		mountSpy.mockReset();
 		unmountSpy.mockReset();
 
-		getContainerElementsSpy.mockImplementation(() => [
-			document.createElement("div"),
-		]);
+		sourceContainer = document.createElement("div");
+		document.body.append(sourceContainer);
+		getActiveInlineContainerSpy.mockReturnValue({
+			surface: "source",
+			container: sourceContainer,
+		});
 		getLeafIdSpy.mockReturnValue("leaf-1");
 		mountSpy.mockImplementation(() => ({
 			componentId: Symbol("mounted-component"),
 		}));
 	});
 
-	it("skips same-file mounts when skipIfMounted is enabled", () => {
+	it("skips the same file and target when skipIfMounted is enabled", () => {
 		const { controller, view } = createController();
 		const file = createMockTFile("notes/alpha.md");
 
@@ -209,6 +214,98 @@ describe("ComponentController mountComponentsForView", () => {
 
 		expect(mountSpy).toHaveBeenCalledTimes(1);
 		expect(unmountSpy).not.toHaveBeenCalled();
+	});
+
+	it("remounts the same file when the active surface changes", () => {
+		const { controller, view } = createController();
+		const file = createMockTFile("notes/alpha.md");
+		const previewContainer = document.createElement("div");
+		document.body.append(previewContainer);
+
+		controller.mountComponentsForView(view, file);
+		getActiveInlineContainerSpy.mockReturnValue({
+			surface: "preview",
+			container: previewContainer,
+		});
+		controller.mountComponentsForView(view, file, {
+			skipIfMounted: true,
+		});
+
+		expect(mountSpy).toHaveBeenCalledTimes(2);
+		expect(unmountSpy).toHaveBeenCalledTimes(1);
+		expect(getStoresFromMountCalls()[1]).toBe(getStoresFromMountCalls()[0]);
+		expect(view.removeChild).toHaveBeenCalledTimes(1);
+	});
+
+	it("mounts a new surface before unloading the previous surface", () => {
+		const { controller, view } = createController();
+		const file = createMockTFile("notes/alpha.md");
+		const previewContainer = document.createElement("div");
+		document.body.append(previewContainer);
+
+		controller.mountComponentsForView(view, file);
+		getActiveInlineContainerSpy.mockReturnValue({
+			surface: "preview",
+			container: previewContainer,
+		});
+		mountSpy.mockImplementationOnce(() => {
+			expect(unmountSpy).not.toHaveBeenCalled();
+			return { componentId: Symbol("next-component") };
+		});
+
+		controller.mountComponentsForView(view, file, {
+			skipIfMounted: true,
+		});
+
+		expect(unmountSpy).toHaveBeenCalledTimes(1);
+	});
+
+	it("keeps the previous root while the active container is unavailable", () => {
+		const { controller, view } = createController();
+		const file = createMockTFile("notes/alpha.md");
+
+		controller.mountComponentsForView(view, file);
+		getActiveInlineContainerSpy.mockReturnValue(null);
+		controller.mountComponentsForView(view, file, {
+			skipIfMounted: true,
+		});
+
+		expect(mountSpy).toHaveBeenCalledTimes(1);
+		expect(unmountSpy).not.toHaveBeenCalled();
+	});
+
+	it("keeps the previous root when mounting a new container fails", () => {
+		const { controller, view } = createController();
+		const file = createMockTFile("notes/alpha.md");
+		const previewContainer = document.createElement("div");
+		document.body.append(previewContainer);
+
+		controller.mountComponentsForView(view, file);
+		getActiveInlineContainerSpy.mockReturnValue({
+			surface: "preview",
+			container: previewContainer,
+		});
+		mountSpy.mockImplementationOnce(() => {
+			throw new Error("mount failed");
+		});
+
+		expect(() =>
+			controller.mountComponentsForView(view, file, {
+				skipIfMounted: true,
+			}),
+		).toThrow("mount failed");
+		expect(unmountSpy).not.toHaveBeenCalled();
+
+		getActiveInlineContainerSpy.mockReturnValue({
+			surface: "source",
+			container: sourceContainer,
+		});
+		controller.mountComponentsForView(view, file, {
+			skipIfMounted: true,
+		});
+
+		expect(mountSpy).toHaveBeenCalledTimes(2);
+		expect(handleMountErrorSpy).toHaveBeenCalledTimes(1);
 	});
 
 	it("remounts same-file views by default", () => {
@@ -237,34 +334,6 @@ describe("ComponentController mountComponentsForView", () => {
 		expect(mountSpy).toHaveBeenCalledTimes(2);
 		expect(unmountSpy).toHaveBeenCalledTimes(1);
 		expect(secondCaches[0].size).toBe(0);
-	});
-
-	it("keeps a shared store alive after all containers unmount", () => {
-		const { controller, view } = createController();
-		const file = createMockTFile("notes/alpha.md");
-		getContainerElementsSpy.mockImplementation(() => [
-			document.createElement("div"),
-			document.createElement("div"),
-		]);
-
-		controller.mountComponentsForView(view, file);
-
-		const stores = getStoresFromMountCalls();
-		expect(stores).toHaveLength(2);
-		expect(stores[0]).toBe(stores[1]);
-
-		const store = stores[0] as { destroy: () => void };
-		const destroySpy = vi.spyOn(store, "destroy");
-
-		const lifecycleManagers = (view.addChild as any).mock.calls.map(
-			(call: unknown[]) => call[0],
-		);
-
-		lifecycleManagers[0].unload();
-		expect(destroySpy).not.toHaveBeenCalled();
-
-		lifecycleManagers[1].unload();
-		expect(destroySpy).not.toHaveBeenCalled();
 	});
 
 	it("reuses a recent store and builder when revisiting a file in the same leaf", async () => {

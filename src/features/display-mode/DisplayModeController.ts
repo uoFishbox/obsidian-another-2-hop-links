@@ -103,6 +103,10 @@ export class DisplayModeController {
 		});
 	}
 
+	public reconcileInlineComponents(): void {
+		this.mountInlineComponents({ forceRemount: false });
+	}
+
 	public handleSettingsChange(): void {
 		this.currentStrategy.deactivate();
 		this.currentStrategy = createDisplayModeStrategy(

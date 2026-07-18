@@ -1,6 +1,10 @@
 import { App, MarkdownView, TFile, WorkspaceLeaf, MarkdownRenderChild } from "obsidian";
 import { unmount } from "svelte";
-import { getContainerElements } from "ui/utils/domUtils";
+import {
+	getActiveInlineContainer,
+	type ActiveInlineContainer,
+	type InlineMarkdownSurface,
+} from "ui/utils/domUtils";
 import { getLeafId } from "infrastructure/utils/workspaceUtils";
 import * as ErrorHandler from "utils/errorHandler";
 import type { PluginSettings, SortOption } from "types/settings";
@@ -19,7 +23,8 @@ export type ComponentInstance = SvelteComponentInstance;
 
 interface MountedComponent {
 	component: SvelteComponentInstance | undefined;
-	container: Element;
+	container: HTMLElement;
+	surface: InlineMarkdownSurface;
 	file: TFile;
 	filePath: string;
 	leafId: string;
@@ -117,11 +122,21 @@ export class ComponentController implements IComponentManager {
 			return;
 		}
 
-		const existingComponents = this.mountedComponents.get(view);
-		const previousFilePath = existingComponents?.[0]?.filePath;
-		const isSameFileMounted = !!previousFilePath && previousFilePath === file.path;
+		const target = getActiveInlineContainer(view);
+		if (!target) {
+			return;
+		}
 
-		if (isSameFileMounted && options?.skipIfMounted) {
+		const mountedList = this.mountedComponents.get(view) ?? [];
+		const previousFilePath = mountedList[0]?.filePath;
+		const sameTargetMounted =
+			mountedList.length === 1 &&
+			mountedList[0].filePath === file.path &&
+			mountedList[0].surface === target.surface &&
+			mountedList[0].container === target.container &&
+			mountedList[0].container.isConnected;
+
+		if (options?.skipIfMounted && sameTargetMounted) {
 			return;
 		}
 
@@ -129,7 +144,7 @@ export class ComponentController implements IComponentManager {
 			this.clearLazyLoaderCache(view);
 		}
 
-		this.syncComponentsForView(view, file);
+		this.syncComponentForView(view, file, target);
 	}
 
 	unmountViewComponents(view: MarkdownView): void {
@@ -138,11 +153,18 @@ export class ComponentController implements IComponentManager {
 			return;
 		}
 
+		this.unloadMountedComponents(view, mountedList);
+		this.mountedComponents.delete(view);
+	}
+
+	private unloadMountedComponents(
+		view: MarkdownView,
+		mountedList: readonly MountedComponent[],
+	): void {
 		for (const mounted of mountedList) {
 			mounted.lifecycleManager.unload();
 			view.removeChild(mounted.lifecycleManager);
 		}
-		this.mountedComponents.delete(view);
 	}
 
 	/**
@@ -289,42 +311,50 @@ export class ComponentController implements IComponentManager {
 
 	// ========== Component Lifecycle Management ==========
 
-	private syncComponentsForView(view: MarkdownView, file: TFile): void {
-		this.unmountViewComponents(view);
-
-		const containers = getContainerElements(view);
-		if (!containers.length) {
-			this.mountedComponents.delete(view);
-			this.clearLazyLoaderCache(view);
-			return;
-		}
-
+	private syncComponentForView(
+		view: MarkdownView,
+		file: TFile,
+		target: ActiveInlineContainer,
+	): void {
+		const previous = this.mountedComponents.get(view) ?? [];
 		// Leafを取得してLeafIDを生成
 		const leaf = this.getLeafFromView(view);
 		if (!leaf) {
 			console.warn("Could not find leaf for view");
-			this.mountedComponents.delete(view);
-			this.clearLazyLoaderCache(view);
 			return;
 		}
 
 		const leafId = getLeafId(leaf);
 		if (!leafId) {
 			console.warn("Could not get leaf id");
-			this.mountedComponents.delete(view);
-			this.clearLazyLoaderCache(view);
 			return;
 		}
 
-		const mountedComponents = containers.map((container) =>
-			this.mountComponent(container, file, leafId, view),
+		const usesSameContainer = previous.some(
+			(mounted) => mounted.container === target.container,
 		);
+		if (usesSameContainer) {
+			this.unloadMountedComponents(view, previous);
+			this.mountedComponents.delete(view);
+		}
 
-		this.mountedComponents.set(view, mountedComponents);
+		const next = this.mountComponent(
+			target.container,
+			target.surface,
+			file,
+			leafId,
+			view,
+		);
+		this.mountedComponents.set(view, [next]);
+
+		if (!usesSameContainer) {
+			this.unloadMountedComponents(view, previous);
+		}
 	}
 
 	private mountComponent(
-		container: Element,
+		container: HTMLElement,
+		surface: InlineMarkdownSurface,
 		file: TFile,
 		leafId: string,
 		view: MarkdownView,
@@ -389,6 +419,7 @@ export class ComponentController implements IComponentManager {
 			return {
 				component,
 				container,
+				surface,
 				file,
 				filePath: file.path,
 				leafId,

@@ -673,6 +673,74 @@ describe("ApplicationStore (Runes)", () => {
 		expect(store.error?.message).toBe("load failed");
 	});
 
+	it("shares an in-flight load for the same file", async () => {
+		const file = createMockTFile("target.md");
+		let resolveLoad!: (value: TwoHopLinkResult) => void;
+		const resolveTwoHopLinks = vi.fn<ResolveTwoHopLinks>().mockImplementation(
+			async () =>
+				await new Promise<TwoHopLinkResult>((resolve) => {
+					resolveLoad = resolve;
+				}),
+		);
+		const { store } = createStore({ resolveTwoHopLinks });
+
+		const first = store.load(file);
+		const second = store.load(file);
+
+		expect(second).toBe(first);
+		expect(resolveTwoHopLinks).toHaveBeenCalledTimes(1);
+
+		resolveLoad(createLinkResult(file.path));
+		await Promise.all([first, second]);
+	});
+
+	it("starts a new in-flight load when force is true", async () => {
+		const file = createMockTFile("target.md");
+		const resolvers: Array<(value: TwoHopLinkResult) => void> = [];
+		const resolveTwoHopLinks = vi.fn<ResolveTwoHopLinks>().mockImplementation(
+			async () =>
+				await new Promise<TwoHopLinkResult>((resolve) => {
+					resolvers.push(resolve);
+				}),
+		);
+		const { store } = createStore({ resolveTwoHopLinks });
+
+		const first = store.load(file);
+		const forced = store.load(file, { force: true });
+
+		expect(forced).not.toBe(first);
+		expect(resolveTwoHopLinks).toHaveBeenCalledTimes(2);
+
+		resolvers[1](createLinkResult(file.path));
+		await forced;
+		resolvers[0](createLinkResult(file.path));
+		await first;
+	});
+
+	it("does not share an in-flight load with a different file", async () => {
+		const firstFile = createMockTFile("first.md");
+		const secondFile = createMockTFile("second.md");
+		const resolvers: Array<(value: TwoHopLinkResult) => void> = [];
+		const resolveTwoHopLinks = vi.fn<ResolveTwoHopLinks>().mockImplementation(
+			async () =>
+				await new Promise<TwoHopLinkResult>((resolve) => {
+					resolvers.push(resolve);
+				}),
+		);
+		const { store } = createStore({ resolveTwoHopLinks });
+
+		const first = store.load(firstFile);
+		const second = store.load(secondFile);
+
+		expect(second).not.toBe(first);
+		expect(resolveTwoHopLinks).toHaveBeenCalledTimes(2);
+
+		resolvers[1](createLinkResult(secondFile.path));
+		await second;
+		resolvers[0](createLinkResult(firstFile.path));
+		await first;
+	});
+
 	it("reset returns the load lifecycle to idle without residual data", async () => {
 		const file = createMockTFile("target.md");
 		const { store } = createStore();

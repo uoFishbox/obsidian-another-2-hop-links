@@ -79,6 +79,11 @@ export interface ApplicationSnapshot {
 	settings: PluginSettings;
 }
 
+interface ActiveApplicationLoad {
+	filePath: string;
+	promise: Promise<void>;
+}
+
 const DISPLAY_REFRESH_EXCLUDED_SETTINGS = new Set<keyof PluginSettings>([
 	"lastUsedSortOption",
 	...CARD_LAYOUT_SETTING_KEYS,
@@ -243,6 +248,7 @@ export class ApplicationStore {
 	private readonly preprocessedDisplayDataCache: PreprocessedDisplayDataCache;
 	private readonly loader: TwoHopLinksLoader;
 	private unsubscribeDataUpdate: (() => void) | undefined = undefined;
+	private activeLoad: ActiveApplicationLoad | undefined;
 
 	constructor(
 		initialSettings: PluginSettings,
@@ -366,7 +372,30 @@ export class ApplicationStore {
 	}
 
 	// Link data management
-	async load(file: TFile, options: { force?: boolean } = {}): Promise<void> {
+	load(file: TFile, options: { force?: boolean } = {}): Promise<void> {
+		const activeLoad = this.activeLoad;
+		if (!options.force && activeLoad?.filePath === file.path) {
+			return activeLoad.promise;
+		}
+
+		const promise = this.executeLoad(file, options);
+		const trackedPromise = promise.finally(() => {
+			if (this.activeLoad?.promise === trackedPromise) {
+				this.activeLoad = undefined;
+			}
+		});
+
+		this.activeLoad = {
+			filePath: file.path,
+			promise: trackedPromise,
+		};
+		return trackedPromise;
+	}
+
+	private async executeLoad(
+		file: TFile,
+		options: { force?: boolean },
+	): Promise<void> {
 		const preparation = this.loader.prepareLoad(
 			file,
 			options,
@@ -512,6 +541,7 @@ export class ApplicationStore {
 	}
 
 	reset(): void {
+		this.activeLoad = undefined;
 		this.loader.reset();
 		this.mutableLoadState = { type: "idle" };
 		this.sortOption = this.settings.lastUsedSortOption;

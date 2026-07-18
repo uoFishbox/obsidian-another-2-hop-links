@@ -1,12 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const { getContainerElementsSpy, loggerSpy } = vi.hoisted(() => ({
-	getContainerElementsSpy: vi.fn(),
+const { getActiveInlineContainerSpy, loggerSpy } = vi.hoisted(() => ({
+	getActiveInlineContainerSpy: vi.fn(),
 	loggerSpy: vi.fn(),
 }));
 
 vi.mock("ui/utils/domUtils", () => ({
-	getContainerElements: getContainerElementsSpy,
+	getActiveInlineContainer: getActiveInlineContainerSpy,
 }));
 
 vi.mock("utils/logger", () => ({
@@ -77,7 +77,7 @@ function createPlugin(displayMode: "editor-inline" | "hybrid" | "sidebar") {
 
 describe("MarkdownViewPatcher", () => {
 	beforeEach(() => {
-		getContainerElementsSpy.mockReset();
+		getActiveInlineContainerSpy.mockReset();
 		loggerSpy.mockReset();
 	});
 
@@ -96,8 +96,8 @@ describe("MarkdownViewPatcher", () => {
 
 			await view.onLoadFile(file);
 
-			expect(getContainerElementsSpy).toHaveBeenCalledTimes(1);
-			expect(getContainerElementsSpy).toHaveBeenCalledWith(view);
+			expect(getActiveInlineContainerSpy).toHaveBeenCalledTimes(1);
+			expect(getActiveInlineContainerSpy).toHaveBeenCalledWith(view);
 			expect(
 				plugin.componentController.mountComponentsForView,
 			).not.toHaveBeenCalled();
@@ -118,7 +118,7 @@ describe("MarkdownViewPatcher", () => {
 			await view.onLoadFile(file);
 			await view.onUnloadFile(file);
 
-			expect(getContainerElementsSpy).not.toHaveBeenCalled();
+			expect(getActiveInlineContainerSpy).not.toHaveBeenCalled();
 			expect(
 				plugin.componentController.unmountViewComponents,
 			).toHaveBeenCalledTimes(1);
