@@ -137,11 +137,9 @@ export function createTwoHopDomPool(params: {
 			slot.root.dataset.cclRowIndex = String(logicalRowIndex);
 			for (const cell of slot.cells) {
 				cell.cell.dataset.cclRowIndex = String(logicalRowIndex);
-				cell.cell.dataset.cclColumnIndex = String(
-					cell.logicalColumnIndex,
-				);
+				cell.cell.dataset.cclColumnIndex = String(cell.logicalColumnIndex);
 			}
-			slot.root.style.transform = `translate3d(0, ${top}px, 0)`;
+			slot.root.style.top = `${top}px`;
 			slot.root.style.visibility = "visible";
 		},
 		hideRow(slot) {
