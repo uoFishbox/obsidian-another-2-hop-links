@@ -402,12 +402,17 @@ export function createTwoHopViewportController(
 			const canBindRich =
 				(residentStart < 0 && isVisible) ||
 				((!distantJump || isVisible) && budget.canBind(now()));
-			bindRow(rowSlot, rowIndex, canBindRich);
-			if (canBindRich) budget.consumeBind();
+			const shellBindCount = bindRow(rowSlot, rowIndex, canBindRich);
+			if (canBindRich) budget.consumeBinds(shellBindCount);
 		}
 	}
 
-	function bindRow(rowSlot: TwoHopDomRowSlot, rowIndex: number, rich: boolean): void {
+	function bindRow(
+		rowSlot: TwoHopDomRowSlot,
+		rowIndex: number,
+		rich: boolean,
+	): number {
+		let shellBindCount = 0;
 		for (let columnIndex = 0; columnIndex < pool.columns; columnIndex += 1) {
 			const slot = rowSlot.cells[columnIndex];
 			const cell = resolveTwoHopCellInto(
@@ -420,11 +425,13 @@ export function createTwoHopViewportController(
 			if (rich && cell) {
 				renderer.renderShell(slot, cell, snapshot);
 				stats.shellBinds += 1;
+				shellBindCount += 1;
 			} else {
 				renderer.renderSkeleton(slot, cell, snapshot);
 				stats.skeletonBinds += 1;
 			}
 		}
+		return shellBindCount;
 	}
 
 	function scheduleRefill(): void {
@@ -455,8 +462,8 @@ export function createTwoHopViewportController(
 				hasPending = true;
 				break;
 			}
-			bindRow(rowSlot, rowIndex, true);
-			frameBudgetTracker.consumeBind();
+			const shellBindCount = bindRow(rowSlot, rowIndex, true);
+			frameBudgetTracker.consumeBinds(shellBindCount);
 		}
 
 		if (hasPending) scheduleRefill();

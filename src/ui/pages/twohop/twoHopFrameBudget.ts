@@ -2,6 +2,7 @@ const SAMPLE_CAPACITY = 12;
 const DEFAULT_FRAME_INTERVAL_MS = 1000 / 60;
 
 export interface TwoHopFrameBudgetPolicy {
+	/** Soft card-shell budget. An atomic row bind may consume past zero. */
 	readonly maxShellBindsPerFrame: number;
 	readonly budgetRatio: number;
 	readonly minimumBudgetMs: number;
@@ -13,13 +14,14 @@ export interface TwoHopFrameBudgetTracker {
 	readonly deadline: number;
 	beginFrame(timestamp: number): void;
 	canBind(now: number): boolean;
-	consumeBind(): void;
+	/** Consumes the number of resolved card shells bound by a completed row. */
+	consumeBinds(count: number): void;
 }
 
 const DEFAULT_POLICY: TwoHopFrameBudgetPolicy = {
-	maxShellBindsPerFrame: 8,
-	budgetRatio: 0.2,
-	minimumBudgetMs: 0.5,
+	maxShellBindsPerFrame: 12,
+	budgetRatio: 0.3,
+	minimumBudgetMs: 0.75,
 	maximumBudgetMs: 3,
 };
 
@@ -66,14 +68,17 @@ export function createTwoHopFrameBudgetTracker(
 		return remainingBinds > 0 && now <= deadline;
 	}
 
-	function consumeBind(): void {
-		remainingBinds = Math.max(0, remainingBinds - 1);
+	function consumeBinds(count: number): void {
+		const normalizedCount = Number.isFinite(count)
+			? Math.max(0, Math.floor(count))
+			: 0;
+		remainingBinds = Math.max(0, remainingBinds - normalizedCount);
 	}
 
 	return {
 		beginFrame,
 		canBind,
-		consumeBind,
+		consumeBinds,
 		get frameIntervalMs() {
 			return estimatedFrameIntervalMs;
 		},

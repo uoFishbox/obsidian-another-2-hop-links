@@ -181,6 +181,49 @@ describe("twoHopViewportController", () => {
 		scroller.remove();
 	});
 
+	it("charges rich-bind budget by actual cells while binding each row atomically", () => {
+		const scroller = document.createElement("div");
+		scroller.style.overflow = "auto";
+		Object.defineProperty(scroller, "clientHeight", { value: 100 });
+		Object.defineProperty(scroller, "scrollHeight", { value: 10000 });
+		Object.defineProperty(scroller, "scrollTop", { value: 0, writable: true });
+		const rootEl = document.createElement("div");
+		const shadowHostEl = document.createElement("div");
+		rootEl.append(shadowHostEl);
+		scroller.append(rootEl);
+		document.body.append(scroller);
+		setRect(scroller, 0, 300, 100);
+		setRect(rootEl, 0, 300, 10000);
+
+		const controller = createTwoHopViewportController({
+			rootEl,
+			shadowHostEl,
+			sections: [
+				createSection("partial-section", 3),
+				createSection("section", 100),
+			],
+			initialVisibleCount: 100,
+			configuredLayout: {
+				cardWidthPx: 100,
+				cardHeightPx: 100,
+				cardHeightRatio: 1,
+				cardGapPx: 0,
+				cardMaxColumns: 3,
+				sectionMarginBottomPx: 0,
+			},
+			getItemInteractionDescriptor: () => null,
+			requestAnimationFrame: () => 1,
+			cancelAnimationFrame: () => {},
+			now: () => 10,
+		});
+
+		const stats = controller.getStats();
+		expect(stats.shellBinds).toBe(10);
+		expect(stats.skeletonBinds).toBeGreaterThan(0);
+		controller.dispose();
+		scroller.remove();
+	});
+
 	it("anchors scroll and does not regenerate other-section card models on load more", () => {
 		const scroller = document.createElement("div");
 		scroller.style.overflow = "auto";

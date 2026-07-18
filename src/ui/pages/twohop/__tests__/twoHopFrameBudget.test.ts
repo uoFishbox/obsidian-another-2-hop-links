@@ -21,8 +21,22 @@ describe("twoHopFrameBudget", () => {
 		});
 		tracker.beginFrame(100);
 		expect(tracker.canBind(101)).toBe(true);
-		tracker.consumeBind();
-		tracker.consumeBind();
+		tracker.consumeBinds(2);
+		expect(tracker.canBind(101)).toBe(false);
+	});
+
+	it("allows an atomic row bind to consume the remaining card budget", () => {
+		const tracker = createTwoHopFrameBudgetTracker({
+			maxShellBindsPerFrame: 8,
+			budgetRatio: 1,
+			minimumBudgetMs: 10,
+			maximumBudgetMs: 10,
+		});
+		tracker.beginFrame(100);
+		tracker.consumeBinds(6);
+
+		expect(tracker.canBind(101)).toBe(true);
+		tracker.consumeBinds(3);
 		expect(tracker.canBind(101)).toBe(false);
 	});
 });
