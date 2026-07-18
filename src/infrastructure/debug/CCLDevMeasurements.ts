@@ -7,35 +7,23 @@ export type CCLDevMeasurementName =
 	| "virtualGrid.rowShellCreated"
 	| "virtualGrid.cellShellCreated"
 	| "virtualGrid.cellShellRebound"
-	| "twoHop.rowWindow.apply"
-	| "twoHop.rowWindow.apply.changed"
-	| "twoHop.rowWindow.apply.changed.firstBuild"
-	| "twoHop.rowWindow.apply.changed.plan"
-	| "twoHop.rowWindow.apply.changed.rowRange"
-	| "twoHop.rowWindow.apply.changed.cellStoreRevision"
-	| "twoHop.rowWindow.apply.skipped"
-	| "twoHop.buildMountedRows"
-	| "twoHop.mountedBoundaryCrossing"
-	| "twoHop.reboundRowSlot"
-	| "twoHop.reboundCellSlot"
-	| "twoHop.retainedSlotStateWrite"
-	| "twoHop.scrollSynchronousSectionPreparation"
-	| "twoHop.scrollItemSortOrReconcile"
-	| "twoHop.scalarKernel.mountedRangeCommit"
-	| "twoHop.scalarKernel.rowShellCreated"
-	| "twoHop.scalarKernel.cellShellCreated"
-	| "twoHop.fixedSlotPool.cellCapacityCheck"
-	| "twoHop.rowModelCache.hit"
-	| "twoHop.rowModelCache.miss"
-	| "twoHop.rowModelCache.miss.firstResolve"
-	| "twoHop.rowModelCache.miss.sections"
-	| "twoHop.rowModelCache.miss.visibleCounts"
-	| "twoHop.rowModelCache.miss.visibleCountsSemanticallySame"
-	| "twoHop.rowModelCache.miss.layout"
-	| "twoHop.rowModelCache.miss.layoutSemanticallySame"
-	| "twoHop.fixedSlotPool.syncFromBuild"
-	| "twoHop.TwoHopFixedCellSlot.update"
-	| "component.TwoHopVirtualItemCard.reevaluate"
+	| "virtualFrame.critical"
+	| "virtualFrame.postPaint"
+	| "virtualFrame.idle"
+	| "twoHop.sectionDescriptorIdentityCache.hit"
+	| "twoHop.sectionDescriptorIdentityCache.miss"
+	| "twoHop.sectionDescriptorIdentityCache.invalidate"
+	| "twoHop.cardRenderModelCache.hit"
+	| "twoHop.cardRenderModelCache.miss"
+	| "twoHop.cardRenderModelCache.invalidate"
+	| "virtualList.scheduler.animationFrame"
+	| "virtualList.postPaintScheduler.animationFrame"
+	| "virtualScroll.measurementMarker.animationFrame"
+	| "preview.activationScheduler.animationFrame"
+	| "preview.renderScheduler.animationFrame"
+	| "preview.domCommitScheduler.animationFrame"
+	| "preview.activationDuringScroll"
+	| "preview.domCommitDuringScroll"
 	| "component.ViewItemCard.reevaluate"
 	| "component.CardPreviewGate.reevaluate";
 
@@ -48,35 +36,23 @@ export const CCL_DEV_MEASUREMENT_NAMES: readonly CCLDevMeasurementName[] = [
 	"virtualGrid.rowShellCreated",
 	"virtualGrid.cellShellCreated",
 	"virtualGrid.cellShellRebound",
-	"twoHop.rowWindow.apply",
-	"twoHop.rowWindow.apply.changed",
-	"twoHop.rowWindow.apply.changed.firstBuild",
-	"twoHop.rowWindow.apply.changed.plan",
-	"twoHop.rowWindow.apply.changed.rowRange",
-	"twoHop.rowWindow.apply.changed.cellStoreRevision",
-	"twoHop.rowWindow.apply.skipped",
-	"twoHop.buildMountedRows",
-	"twoHop.mountedBoundaryCrossing",
-	"twoHop.reboundRowSlot",
-	"twoHop.reboundCellSlot",
-	"twoHop.retainedSlotStateWrite",
-	"twoHop.scrollSynchronousSectionPreparation",
-	"twoHop.scrollItemSortOrReconcile",
-	"twoHop.scalarKernel.mountedRangeCommit",
-	"twoHop.scalarKernel.rowShellCreated",
-	"twoHop.scalarKernel.cellShellCreated",
-	"twoHop.fixedSlotPool.cellCapacityCheck",
-	"twoHop.rowModelCache.hit",
-	"twoHop.rowModelCache.miss",
-	"twoHop.rowModelCache.miss.firstResolve",
-	"twoHop.rowModelCache.miss.sections",
-	"twoHop.rowModelCache.miss.visibleCounts",
-	"twoHop.rowModelCache.miss.visibleCountsSemanticallySame",
-	"twoHop.rowModelCache.miss.layout",
-	"twoHop.rowModelCache.miss.layoutSemanticallySame",
-	"twoHop.fixedSlotPool.syncFromBuild",
-	"twoHop.TwoHopFixedCellSlot.update",
-	"component.TwoHopVirtualItemCard.reevaluate",
+	"virtualFrame.critical",
+	"virtualFrame.postPaint",
+	"virtualFrame.idle",
+	"twoHop.sectionDescriptorIdentityCache.hit",
+	"twoHop.sectionDescriptorIdentityCache.miss",
+	"twoHop.sectionDescriptorIdentityCache.invalidate",
+	"twoHop.cardRenderModelCache.hit",
+	"twoHop.cardRenderModelCache.miss",
+	"twoHop.cardRenderModelCache.invalidate",
+	"virtualList.scheduler.animationFrame",
+	"virtualList.postPaintScheduler.animationFrame",
+	"virtualScroll.measurementMarker.animationFrame",
+	"preview.activationScheduler.animationFrame",
+	"preview.renderScheduler.animationFrame",
+	"preview.domCommitScheduler.animationFrame",
+	"preview.activationDuringScroll",
+	"preview.domCommitDuringScroll",
 	"component.ViewItemCard.reevaluate",
 	"component.CardPreviewGate.reevaluate",
 ];
@@ -143,7 +119,7 @@ export function resetCCLDevMeasurements(): void {
 }
 
 export function markCCLComponentReevaluation(
-	name: "TwoHopVirtualItemCard" | "ViewItemCard" | "CardPreviewGate",
+	name: "ViewItemCard" | "CardPreviewGate",
 ): string {
 	recordCCLDevMeasurement(`component.${name}.reevaluate`);
 	return "";

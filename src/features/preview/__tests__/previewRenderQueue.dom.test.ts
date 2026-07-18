@@ -41,6 +41,31 @@ afterEach(() => {
 });
 
 describe("enqueuePreviewRender", () => {
+	test("counts animation-frame fallback scheduling", async () => {
+		window.requestIdleCallback = undefined as unknown as Window["requestIdleCallback"];
+		const requestAnimationFrame = vi
+			.spyOn(window, "requestAnimationFrame")
+			.mockImplementation((callback) => {
+				setTimeout(() => callback(0), 0);
+				return 1;
+			});
+		const { enqueuePreviewRender } = await loadQueueModule();
+		const { getCCLDevMeasurementSnapshot } = await import(
+			"infrastructure/debug/CCLDevMeasurements"
+		);
+
+		const result = enqueuePreviewRender(async () => "rendered");
+		await vi.runAllTimersAsync();
+
+		await expect(result).resolves.toBe("rendered");
+		expect(requestAnimationFrame).toHaveBeenCalledTimes(1);
+		expect(
+			getCCLDevMeasurementSnapshot().counters[
+				"preview.renderScheduler.animationFrame"
+			].count,
+		).toBe(1);
+	});
+
 	test("preview render tasks are serialized", async () => {
 		const { enqueuePreviewRender } = await loadQueueModule();
 		const releaseFirst = createDeferred();

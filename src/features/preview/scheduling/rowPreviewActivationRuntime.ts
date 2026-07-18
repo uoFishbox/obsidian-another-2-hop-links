@@ -20,6 +20,8 @@ export interface RowPreviewActivationRuntime {
 	 * activation request for its key when no other candidates share that key.
 	 */
 	registerCandidate(candidate: RowPreviewActivationCandidate): () => void;
+	/** Applies a complete row visibility change as one atomic update. */
+	applyVisibilityDelta(delta: RowPreviewVisibilityDelta): void;
 	/**
 	 * Notifies the runtime that a row's visibility has changed.
 	 *
@@ -38,6 +40,12 @@ export interface RowPreviewActivationRuntime {
 	clearRow(rowIndex: number): void;
 	/** Releases all row registrations and pending activation handles. */
 	dispose(): void;
+}
+
+export interface RowPreviewVisibilityDelta {
+	readonly activatedRows: readonly number[];
+	readonly deactivatedRows: readonly number[];
+	readonly clearedRows: readonly number[];
 }
 
 export const PREVIEW_ROW_ACTIVATION_CONTEXT_KEY = Symbol("preview-row-activation");
@@ -275,60 +283,79 @@ export function createRowPreviewActivationRuntime(
 		rowIndex: number,
 		visibility: "visible" | "mounted",
 	): void {
-		if (disposed) return;
-
-		const existing = rows.get(rowIndex);
-		if (!existing && visibility === "mounted") {
-			return;
-		}
-
-		const state = existing ?? getOrCreateRowState(rowIndex);
-		if (state.visibility === visibility) {
-			if (visibility === "visible") {
-				enqueueRowCandidates(rowIndex);
-			}
-			return;
-		}
-
-		state.visibility = visibility;
-
-		if (visibility === "visible") {
-			for (const candidate of state.candidatesById.values()) {
-				addCandidateToIndex(visibleCandidatesByKey, candidate);
-			}
-			enqueueRowCandidates(rowIndex);
-			return;
-		}
-
-		for (const candidate of state.candidatesById.values()) {
-			removeCandidateFromIndex(visibleCandidatesByKey, candidate);
-		}
-
-		for (const activationKey of state.keyCounts.keys()) {
-			cancelPendingUnlessVisibleElsewhere(activationKey);
-		}
-		pruneRowIfEmpty(rowIndex, state);
+		applyVisibilityDelta({
+			activatedRows: visibility === "visible" ? [rowIndex] : [],
+			deactivatedRows: visibility === "mounted" ? [rowIndex] : [],
+			clearedRows: [],
+		});
 	}
 
 	function clearRow(rowIndex: number): void {
+		applyVisibilityDelta({
+			activatedRows: [],
+			deactivatedRows: [],
+			clearedRows: [rowIndex],
+		});
+	}
+
+	function applyVisibilityDelta(delta: RowPreviewVisibilityDelta): void {
 		if (disposed) return;
 
-		const state = rows.get(rowIndex);
-		if (!state) {
-			return;
+		type FinalRowChange = "activated" | "deactivated" | "cleared";
+		const finalChanges = new Map<number, FinalRowChange>();
+		for (const rowIndex of delta.clearedRows) {
+			finalChanges.set(rowIndex, "cleared");
+		}
+		for (const rowIndex of delta.deactivatedRows) {
+			finalChanges.set(rowIndex, "deactivated");
+		}
+		for (const rowIndex of delta.activatedRows) {
+			finalChanges.set(rowIndex, "activated");
 		}
 
-		if (state.visibility === "visible") {
-			for (const candidate of state.candidatesById.values()) {
-				removeCandidateFromIndex(visibleCandidatesByKey, candidate);
+		const keysToCancel = new Set<string>();
+		const rowsToPrune: Array<[number, RowActivationState]> = [];
+		for (const [rowIndex, change] of finalChanges) {
+			if (change === "activated") continue;
+
+			const state = rows.get(rowIndex);
+			if (!state) continue;
+			if (state.visibility === "visible") {
+				for (const candidate of state.candidatesById.values()) {
+					removeCandidateFromIndex(visibleCandidatesByKey, candidate);
+				}
+			}
+
+			state.visibility = "mounted";
+			for (const activationKey of state.keyCounts.keys()) {
+				keysToCancel.add(activationKey);
+			}
+			rowsToPrune.push([rowIndex, state]);
+		}
+
+		for (const [rowIndex, change] of finalChanges) {
+			if (change !== "activated") continue;
+
+			const state = getOrCreateRowState(rowIndex);
+			if (state.visibility !== "visible") {
+				state.visibility = "visible";
+				for (const candidate of state.candidatesById.values()) {
+					addCandidateToIndex(visibleCandidatesByKey, candidate);
+				}
 			}
 		}
 
-		state.visibility = "mounted";
-		for (const activationKey of state.keyCounts.keys()) {
+		for (const activationKey of keysToCancel) {
 			cancelPendingUnlessVisibleElsewhere(activationKey);
 		}
-		pruneRowIfEmpty(rowIndex, state);
+		for (const [rowIndex, change] of finalChanges) {
+			if (change === "activated") {
+				enqueueRowCandidates(rowIndex);
+			}
+		}
+		for (const [rowIndex, state] of rowsToPrune) {
+			pruneRowIfEmpty(rowIndex, state);
+		}
 	}
 
 	function dispose(): void {
@@ -346,6 +373,7 @@ export function createRowPreviewActivationRuntime(
 
 	return {
 		registerCandidate,
+		applyVisibilityDelta,
 		setRowVisibility,
 		clearRow,
 		dispose,

@@ -1,3 +1,5 @@
+import { recordCCLDevMeasurement } from "infrastructure/debug/CCLDevMeasurements";
+
 type RenderTask<T> = {
 	cancelled: boolean;
 	cleanup: () => void;
@@ -25,6 +27,9 @@ function scheduleTask(task: () => void): void {
 			return;
 		}
 
+		if (process.env.NODE_ENV !== "production") {
+			recordCCLDevMeasurement("preview.renderScheduler.animationFrame");
+		}
 		window.requestAnimationFrame(() => task());
 		return;
 	}

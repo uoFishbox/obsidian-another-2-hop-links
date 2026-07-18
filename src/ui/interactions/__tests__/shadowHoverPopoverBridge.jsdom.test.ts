@@ -46,10 +46,12 @@ vi.mock("../shadowHoverLinkSpec", () => ({
 }));
 
 import { installShadowHoverPopoverBridge } from "../shadowHoverPopoverBridge";
+import { dispatchVirtualCellWillRebind } from "../virtualCellRebind";
 import {
-	markVirtualCellInteractionDirty,
-	prepareVirtualCellForRebind,
-} from "../virtualCellRebind";
+	markScrollActivityActive,
+	markScrollActivityIdle,
+	resetScrollActivityForTests,
+} from "infrastructure/scroll/scrollActivity";
 
 describe("shadowHoverPopoverBridge", () => {
 	beforeEach(() => {
@@ -64,6 +66,7 @@ describe("shadowHoverPopoverBridge", () => {
 	});
 
 	afterEach(() => {
+		resetScrollActivityForTests();
 		document.body.innerHTML = "";
 	});
 
@@ -211,6 +214,71 @@ describe("shadowHoverPopoverBridge", () => {
 		dispose();
 	});
 
+	it("ignores bubbling mouseover caused by movement within the same interaction", () => {
+		const { shadowRoot, dispose } = installBridge();
+		const interaction = createInteractionElement("item:first");
+		const firstChild = document.createElement("span");
+		const secondChild = document.createElement("span");
+		interaction.append(firstChild, secondChild);
+		shadowRoot.append(interaction);
+
+		firstChild.dispatchEvent(
+			new MouseEvent("mouseover", {
+				bubbles: true,
+				composed: true,
+			}),
+		);
+		secondChild.dispatchEvent(
+			new MouseEvent("mouseover", {
+				bubbles: true,
+				composed: true,
+				relatedTarget: firstChild,
+			}),
+		);
+
+		expect(handleDelegatedEnterMock).toHaveBeenCalledTimes(1);
+		expect(handleDelegatedAnchorSyncMock).not.toHaveBeenCalled();
+
+		dispose();
+	});
+
+	it("closes active hover on scroll and resumes on a later mouseover", () => {
+		const { shadowRoot, dispose } = installBridge();
+		const interaction = createInteractionElement("item:first");
+		shadowRoot.append(interaction);
+		const scrollSource = {};
+
+		interaction.dispatchEvent(
+			new MouseEvent("mouseover", { bubbles: true, composed: true }),
+		);
+		markScrollActivityActive(scrollSource);
+
+		expect(interaction.dataset.cclHovered).toBeUndefined();
+		expect(handleDelegatedLeaveMock).toHaveBeenCalledWith(interaction);
+		expect(closeActivePopoverMock).toHaveBeenCalledTimes(1);
+
+		interaction.dispatchEvent(
+			new MouseEvent("mouseover", { bubbles: true, composed: true }),
+		);
+		interaction.dispatchEvent(
+			new PointerEvent("pointermove", {
+				bubbles: true,
+				composed: true,
+				ctrlKey: true,
+			}),
+		);
+		expect(handleDelegatedEnterMock).toHaveBeenCalledTimes(1);
+		expect(handleDelegatedPointerMoveMock).not.toHaveBeenCalled();
+
+		markScrollActivityIdle(scrollSource);
+		interaction.dispatchEvent(
+			new MouseEvent("mouseover", { bubbles: true, composed: true }),
+		);
+		expect(handleDelegatedEnterMock).toHaveBeenCalledTimes(2);
+
+		dispose();
+	});
+
 	it("passes interaction metadata through anchor sync after DOM replacement", () => {
 		const { shadowRoot, dispose } = installBridge();
 		const first = createInteractionElement("item:first");
@@ -284,11 +352,16 @@ describe("shadowHoverPopoverBridge", () => {
 			new MouseEvent("mouseover", { bubbles: true, composed: true }),
 		);
 		expect(interaction.dataset.cclHovered).toBe("true");
+		const subtreeQuery = vi.spyOn(physicalCell, "querySelectorAll");
 
-		prepareVirtualCellForRebind(physicalCell, "first", "second");
+		dispatchVirtualCellWillRebind(physicalCell, {
+			previousLogicalKey: "first",
+			nextLogicalKey: "second",
+		});
 		interaction.dataset.cclInteractionId = "item:second";
 
 		expect(interaction.dataset.cclHovered).toBeUndefined();
+		expect(subtreeQuery).toHaveBeenCalledTimes(1);
 		expect(handleDelegatedLeaveMock).toHaveBeenCalledWith(interaction);
 		expect(handleDelegatedEnterMock).toHaveBeenCalledTimes(1);
 
@@ -411,12 +484,6 @@ function installBridge(registry = createRegistryStub()): {
 		shadowRoot,
 		registry,
 		appContext: { app: {} } as never,
-		markInteractionDirty(element) {
-			const physicalCell = element.parentElement;
-			if (physicalCell) {
-				markVirtualCellInteractionDirty(physicalCell);
-			}
-		},
 	});
 	return { shadowRoot, dispose };
 }

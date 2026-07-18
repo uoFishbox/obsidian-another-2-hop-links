@@ -49,12 +49,16 @@
 	);
 	const isFiltering = $derived(session.isFiltering);
 	const isLoading = $derived(session.isLoading);
+	const matchedQuery = $derived(session.matchedQuery);
+	const matchedScope = $derived(session.matchedScope);
 	let noise = $state(0);
 </script>
 
 <div data-testid="matched-state">{matchedState}</div>
 <div data-testid="is-filtering">{isFiltering ? "true" : "false"}</div>
 <div data-testid="is-loading">{isLoading ? "true" : "false"}</div>
+<div data-testid="matched-query">{matchedQuery}</div>
+<div data-testid="matched-scope">{matchedScope}</div>
 <button type="button" data-testid="rerender-noise" onclick={() => (noise += 1)}>
 	{noise}
 </button>

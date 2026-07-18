@@ -10,8 +10,8 @@ export interface VirtualListItemRenderArgs<T> {
 	item: T;
 	index: number;
 	observerRoot: HTMLElement | null;
-	readonly visibility: VirtualizedItemVisibility;
-	visibilityState: VirtualizedItemVisibilityState;
+	readonly visibility?: VirtualizedItemVisibility;
+	readonly visibilityState?: VirtualizedItemVisibilityState;
 	rowIndex: number;
 	activationCandidateId: string;
 }

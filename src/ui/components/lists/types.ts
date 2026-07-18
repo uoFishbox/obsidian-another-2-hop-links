@@ -4,6 +4,7 @@ import type { ApplicationStore } from "ui/stores/ApplicationStore.svelte";
 import type { ISortService } from "types";
 import type { App } from "obsidian";
 import type { ViewItem } from "application/presenters";
+import type { VisibilityConsumption } from "ui/components/common/virtualizedItemVisibility";
 
 export interface ListProps<T> {
 	items: T[];
@@ -25,6 +26,8 @@ export interface ListConfig<T = ViewItem> {
 	getSearchText?: (item: T, linkContext: LinkContext) => string;
 	onSearchSubmit?: (value: string) => void | Promise<void>;
 	itemComponent: Component<any>;
+	/** Declares whether item rendering consumes virtual visibility metadata. */
+	visibilityConsumption?: VisibilityConsumption;
 	getItemProps: (item: T) => Record<string, unknown>;
 	getItemKey: (item: T, index?: number) => string;
 	sectionId: string;

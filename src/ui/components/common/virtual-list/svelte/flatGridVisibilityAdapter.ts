@@ -8,8 +8,6 @@ import {
 	type VirtualizedItemVisibilityStateControllerOptions,
 } from "./virtualizedItemVisibilityState.svelte";
 
-const EMPTY_MOUNTED_ROWS: readonly MountedVirtualGridRowSlice<never>[] = [];
-
 export interface FlatGridVisibilityAdapterOptions<
 	T,
 > extends VirtualizedItemVisibilityStateControllerOptions<MountedVirtualGridCell<T>> {}
@@ -21,65 +19,31 @@ export function createFlatGridVisibilityAdapter<T>(
 		createVirtualizedItemVisibilityStateController<MountedVirtualGridCell<T>>(
 			options,
 		);
-	let visibilityMountedRows: readonly MountedVirtualGridRowSlice<T>[] | readonly [] =
-		EMPTY_MOUNTED_ROWS;
-	const visibilityMountedRange: RowRange = { start: 0, end: 0 };
-	let visibilityRowModel: object | null = null;
-	const visibilityPreviewRange: RowRange = { start: 0, end: 0 };
-	let hasVisibilityPreviewRange = false;
-
 	const syncVisibilityStates = (params: {
 		mountedRows: readonly MountedVirtualGridRowSlice<T>[] | readonly [];
 		mountedRange: RowRange;
 		previewRange: RowRange;
 		rowModel: object;
 	}): void => {
-		const {
-			mountedRows,
-			mountedRange: nextMountedRange,
-			previewRange: nextPreviewRange,
-			rowModel: nextRowModel,
-		} = params;
-		if (!hasVisibilityPreviewRange || nextRowModel !== visibilityRowModel) {
-			visibilityStates.syncMountedRows({
-				mountedRows,
-				previewRange: nextPreviewRange,
-			});
-		} else if (mountedRows !== visibilityMountedRows) {
-			visibilityStates.syncMountedRowRangeDelta({
-				previousRows: visibilityMountedRows,
-				nextRows: mountedRows,
-				previousRowRange: visibilityMountedRange,
-				nextRowRange: nextMountedRange,
-				previewRange: nextPreviewRange,
-			});
-		} else {
-			visibilityStates.syncPreviewRangeDelta({
-				previousPreviewRange: visibilityPreviewRange,
-				nextPreviewRange,
-				mountedRows,
-			});
-		}
-
-		visibilityMountedRows = mountedRows;
-		visibilityMountedRange.start = nextMountedRange.start;
-		visibilityMountedRange.end = nextMountedRange.end;
-		visibilityRowModel = nextRowModel;
-		visibilityPreviewRange.start = nextPreviewRange.start;
-		visibilityPreviewRange.end = nextPreviewRange.end;
-		hasVisibilityPreviewRange = true;
+		visibilityStates.commit({
+			rowModelRevision: params.rowModel,
+			mountedRows: params.mountedRows,
+			mountedRange: params.mountedRange,
+			previewActiveRange: params.previewRange,
+		});
 	};
 
 	return {
 		visibilityStates,
-		getMountedRows() {
-			return visibilityMountedRows;
+		getMountedRows(): readonly MountedVirtualGridRowSlice<T>[] | readonly [] {
+			return visibilityStates.getCommittedMountedRows() as readonly MountedVirtualGridRowSlice<T>[];
 		},
 		getMountedRange() {
-			return visibilityMountedRange;
+			return visibilityStates.getCommittedMountedRange();
 		},
 		getActiveRowModel() {
-			return visibilityRowModel;
+			const revision = visibilityStates.getCommittedRowModelRevision();
+			return typeof revision === "object" ? revision : null;
 		},
 		syncVisibilityStates,
 	};

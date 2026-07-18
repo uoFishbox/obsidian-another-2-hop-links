@@ -6,6 +6,10 @@
 		useFlatVirtualGridList,
 		type FlatVirtualGridListProps,
 	} from "./virtual-list/svelte/useFlatVirtualGridList.svelte";
+	import {
+		KEYED_VIRTUAL_CELL_BODY_LIFECYCLE,
+		PHYSICAL_SLOT_BODY_LIFECYCLE,
+	} from "ui/virtualization/bodyLifecycle";
 
 	const props: FlatVirtualGridListProps<T> = $props();
 	providePreviewActivationContexts();
@@ -33,7 +37,9 @@
 		observerRoot={list.observerRoot}
 		getCellPosition={list.getCellPosition}
 		onMountedCellsChange={props.onMountedCellsChange}
-		remountCellBodyOnKeyChange={props.remountCellBodyOnKeyChange}
+		bodyLifecyclePolicy={props.remountCellBodyOnKeyChange === false
+			? PHYSICAL_SLOT_BODY_LIFECYCLE
+			: KEYED_VIRTUAL_CELL_BODY_LIFECYCLE}
 		resolveNavigationTarget={list.resolveNavigationTarget}
 		flushVirtualScrollMeasurement={list.flushVirtualScrollMeasurement}
 	>

@@ -3,6 +3,10 @@
 	import VirtualSurfaceRecyclingProbe from "./VirtualSurfaceRecyclingProbe.svelte";
 	import type { MountedVirtualCell, LogicalCellKey, RenderSlotKey } from "../types";
 	import type { InteractionDescriptorResolver } from "ui/interactions/interactionRegistry";
+	import {
+		KEYED_VIRTUAL_CELL_BODY_LIFECYCLE,
+		PHYSICAL_SLOT_BODY_LIFECYCLE,
+	} from "ui/virtualization/bodyLifecycle";
 
 	interface TestMountedCell extends MountedVirtualCell {
 		columnIndex: number;
@@ -55,7 +59,9 @@
 		{contentHeight}
 		{rowHeight}
 		layoutMode="grid-rows"
-		{remountCellBodyOnKeyChange}
+		bodyLifecyclePolicy={remountCellBodyOnKeyChange
+			? KEYED_VIRTUAL_CELL_BODY_LIFECYCLE
+			: PHYSICAL_SLOT_BODY_LIFECYCLE}
 		interactionDescriptorScopeId={interactionId
 			? "recycling-test-items"
 			: undefined}

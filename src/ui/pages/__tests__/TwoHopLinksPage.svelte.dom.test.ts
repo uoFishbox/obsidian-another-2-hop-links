@@ -251,7 +251,7 @@ describe("TwoHopLinksPage", () => {
 		).toBeInTheDocument();
 	});
 
-	it("displays the two-hop loading state during base-ready", () => {
+	it("maintains base results and displays two-hop placeholder during base-ready", () => {
 		const file = createMockTFile("target.md");
 		const linkResult: TwoHopLinkResult = {
 			originFile: file as never,

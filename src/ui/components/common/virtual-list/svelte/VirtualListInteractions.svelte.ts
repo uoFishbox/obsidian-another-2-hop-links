@@ -12,7 +12,6 @@ export interface InstallVirtualListInteractionsParams {
 	interactionRegistry: InteractionRegistry;
 	linkContext: ReturnType<typeof useLinkContext> | undefined;
 	appContext: ReturnType<typeof useAppContext> | undefined;
-	markInteractionDirty: (element: HTMLElement) => void;
 }
 
 export function installVirtualListInteractions({
@@ -24,7 +23,6 @@ export function installVirtualListInteractions({
 	interactionRegistry,
 	linkContext,
 	appContext,
-	markInteractionDirty,
 }: InstallVirtualListInteractionsParams): void {
 	const installShadowSurface = (): (() => void) | undefined => {
 		const rootEl = getRootEl();
@@ -60,7 +58,6 @@ export function installVirtualListInteractions({
 			registry: interactionRegistry,
 			linkContext,
 			appContext,
-			markInteractionDirty,
 		});
 	};
 

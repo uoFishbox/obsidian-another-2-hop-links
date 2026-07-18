@@ -1,6 +1,7 @@
 import type { PluginSettings } from "types/settings";
 import type { ViewItem } from "application/presenters";
 import type { CardPresentationState } from "ui/components/common/cardPresentation";
+import type { CardRenderModel } from "./cardRenderModel";
 
 export interface ItemProps {
 	item: ViewItem | undefined;
@@ -16,4 +17,5 @@ export interface ItemProps {
 	rowIndex?: number;
 	activationCandidateId?: string;
 	presentation?: CardPresentationState;
+	model?: CardRenderModel;
 }

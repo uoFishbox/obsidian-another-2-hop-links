@@ -12,13 +12,16 @@ import { WorkspaceTriggerPopoverLauncher } from "features/preview/shadow-hover/l
 import { COSENSE_CARD_LINKS_HOVER_SOURCE_ID } from "features/preview/interactions/hoverPopoverLinkSpec";
 import { isHTMLElementLike, isNodeLike } from "ui/utils/realmSafeDom";
 import { VIRTUAL_CELL_WILL_REBIND_EVENT } from "./virtualCellRebind";
+import {
+	isScrollActivityActive,
+	subscribeScrollActivity,
+} from "infrastructure/scroll/scrollActivity";
 
 interface ShadowHoverPopoverBridgeOptions {
 	shadowRoot: ShadowRoot;
 	registry: InteractionRegistry;
 	linkContext?: LinkContext;
 	appContext?: AppContext;
-	markInteractionDirty?: (element: HTMLElement) => void;
 }
 
 interface SharedShadowHoverBridgeHandle {
@@ -26,7 +29,6 @@ interface SharedShadowHoverBridgeHandle {
 	registry: InteractionRegistry;
 	linkContext?: LinkContext;
 	appContext?: AppContext;
-	markInteractionDirty?: (element: HTMLElement) => void;
 	refCount: number;
 	controller: ShadowHoverControllerImpl;
 	hoveredAnchorEl: HTMLElement | null;
@@ -109,7 +111,6 @@ function enterLogicalHover(
 	handle: SharedShadowHoverBridgeHandle,
 	element: HTMLElement,
 ): void {
-	handle.markInteractionDirty?.(element);
 	if (handle.hoveredAnchorEl && handle.hoveredAnchorEl !== element) {
 		delete handle.hoveredAnchorEl.dataset.cclHovered;
 	}
@@ -163,6 +164,10 @@ function handleMouseOver(
 	handle: SharedShadowHoverBridgeHandle,
 	event: MouseEvent,
 ): void {
+	if (isScrollActivityActive()) {
+		return;
+	}
+
 	const nextAnchorEl = resolveInteractionElementFromEvent(handle.shadowRoot, event);
 	if (!nextAnchorEl) {
 		return;
@@ -170,6 +175,9 @@ function handleMouseOver(
 
 	const nextInteractionId = getInteractionIdFromElement(nextAnchorEl);
 	if (!nextInteractionId) {
+		return;
+	}
+	if (isRelatedTargetWithinAnchor(nextAnchorEl, event)) {
 		return;
 	}
 	enterLogicalHover(handle, nextAnchorEl);
@@ -300,6 +308,10 @@ function handlePointerMove(
 	handle: SharedShadowHoverBridgeHandle,
 	event: PointerEvent,
 ): void {
+	if (isScrollActivityActive()) {
+		return;
+	}
+
 	const activeAnchorEl = handle.activeAnchorEl;
 	const interactionId = handle.activeInteractionId;
 	if (!activeAnchorEl || !interactionId) {
@@ -360,7 +372,6 @@ function createHandle({
 	registry,
 	linkContext,
 	appContext,
-	markInteractionDirty,
 }: ShadowHoverPopoverBridgeOptions): SharedShadowHoverBridgeHandle | null {
 	const app = appContext?.app;
 	if (!app) {
@@ -386,7 +397,6 @@ function createHandle({
 		registry,
 		linkContext,
 		appContext,
-		markInteractionDirty,
 		refCount: 1,
 		controller,
 		hoveredAnchorEl: null,
@@ -410,12 +420,21 @@ function createHandle({
 	const onWindowBlur = () => {
 		handle.lastPointerModState = null;
 	};
+	const unsubscribeScrollActivity = subscribeScrollActivity((isActive) => {
+		if (!isActive || handle.disposed) return;
+
+		if (handle.hoveredAnchorEl) {
+			delete handle.hoveredAnchorEl.dataset.cclHovered;
+			handle.hoveredAnchorEl = null;
+		}
+		leaveActiveAnchor(handle);
+		handle.controller.closeActivePopover();
+	});
 	const onVirtualCellWillRebind: EventListener = (event) => {
 		const target = event.target;
 		if (!isHTMLElementLike(target)) return;
 
 		if (handle.hoveredAnchorEl && target.contains(handle.hoveredAnchorEl)) {
-			delete handle.hoveredAnchorEl.dataset.cclHovered;
 			handle.hoveredAnchorEl = null;
 		}
 		if (handle.activeAnchorEl && target.contains(handle.activeAnchorEl)) {
@@ -435,6 +454,7 @@ function createHandle({
 	doc.addEventListener("keyup", onKeyUp, true);
 	win?.addEventListener("blur", onWindowBlur);
 	handle.disposeListeners = () => {
+		unsubscribeScrollActivity();
 		shadowRoot.removeEventListener("mouseover", onMouseOver);
 		shadowRoot.removeEventListener("mouseout", onMouseOut);
 		shadowRoot.removeEventListener("pointermove", onPointerMove);
@@ -454,7 +474,6 @@ export function installShadowHoverPopoverBridge({
 	registry,
 	linkContext,
 	appContext,
-	markInteractionDirty,
 }: ShadowHoverPopoverBridgeOptions): () => void {
 	const existingHandle = sharedShadowHoverBridgeHandles.get(shadowRoot);
 	if (existingHandle) {
@@ -462,7 +481,6 @@ export function installShadowHoverPopoverBridge({
 		existingHandle.registry = registry;
 		existingHandle.linkContext = linkContext;
 		existingHandle.appContext = appContext;
-		existingHandle.markInteractionDirty = markInteractionDirty;
 		return () => {
 			existingHandle.refCount = Math.max(0, existingHandle.refCount - 1);
 			if (existingHandle.refCount === 0) {
@@ -477,7 +495,6 @@ export function installShadowHoverPopoverBridge({
 		registry,
 		linkContext,
 		appContext,
-		markInteractionDirty,
 	});
 	if (!handle) {
 		return () => {};

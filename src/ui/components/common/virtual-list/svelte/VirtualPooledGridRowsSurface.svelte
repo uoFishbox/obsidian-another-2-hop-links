@@ -1,11 +1,23 @@
-<script lang="ts" generics="TMountedCell extends MountedVirtualCell">
+<script lang="ts" generics="TMountedCell extends MountedVirtualCell, TMountedRow extends VirtualSurfaceMountedRow<TMountedCell>">
 	import { IS_PROD } from "../../../../../appConstants";
 	import type { Snippet } from "svelte";
 	import type { LogicalCellKey, MountedVirtualCell } from "../types";
+	import {
+		KEYED_VIRTUAL_CELL_BODY_LIFECYCLE,
+		resolveVirtualCellBodyKey,
+		type VirtualCellBodyLifecyclePolicy,
+	} from "ui/virtualization/bodyLifecycle";
 	import VirtualGridLogicalCellMount from "./VirtualGridLogicalCellMount.svelte";
+	import type {
+		VirtualCellRegistrationOwner,
+		VirtualCellRegistry,
+	} from "./VirtualCellRegistry";
 	import type { VirtualSurfaceMountedRow } from "./VirtualSurfaceTypes";
 
-	interface Props<TMountedCell extends MountedVirtualCell> {
+	interface Props<
+		TMountedCell extends MountedVirtualCell,
+		TMountedRow extends VirtualSurfaceMountedRow<TMountedCell>,
+	> {
 		contentClassName?: string;
 		rowClassName?: string;
 		cellClassName?: string;
@@ -14,14 +26,19 @@
 		rowHeight: number;
 		columns?: number;
 		gap?: number;
-		mountedRows: readonly VirtualSurfaceMountedRow<TMountedCell>[];
+		mountedRows: readonly TMountedRow[];
 		contentEl?: HTMLDivElement | null;
 		observerRoot?: HTMLElement | null;
 		getCellClassName?: (cell: TMountedCell) => string | undefined;
 		getCellDataTestId?: (cell: TMountedCell) => string | undefined;
 		onLogicalCellAttach?: (cell: TMountedCell) => void;
 		onLogicalCellDetach?: (cell: TMountedCell) => void;
-		remountCellBodyOnKeyChange?: boolean;
+		bodyLifecyclePolicy?: VirtualCellBodyLifecyclePolicy<TMountedCell>;
+		isRowActive?: (row: TMountedRow) => boolean;
+		cellRegistry?: VirtualCellRegistry;
+		getCellRegistrationOwner?: (
+			cell: TMountedCell,
+		) => VirtualCellRegistrationOwner | undefined;
 		renderCell: Snippet<
 			[
 				{
@@ -48,9 +65,12 @@
 		getCellDataTestId,
 		onLogicalCellAttach,
 		onLogicalCellDetach,
-		remountCellBodyOnKeyChange = true,
+		bodyLifecyclePolicy = KEYED_VIRTUAL_CELL_BODY_LIFECYCLE,
+		isRowActive,
+		cellRegistry,
+		getCellRegistrationOwner,
 		renderCell,
-	}: Props<TMountedCell> = $props();
+	}: Props<TMountedCell, TMountedRow> = $props();
 
 	const resolveCellClassName = (mountedCell: TMountedCell): string => {
 		const extraClassName = getCellClassName?.(mountedCell);
@@ -63,10 +83,10 @@
 		`height:${contentHeight}px; position:relative; --ccl-box-height:${rowHeight}px; --ccl-cell-width:${cellWidth ?? 0}px; --ccl-columns:${Math.max(1, Math.floor(columns))}${gap !== undefined ? `; --ccl-box-gap:${gap}px` : ""}`,
 	);
 
-	const resolveRowSlotKey = (row: VirtualSurfaceMountedRow<TMountedCell>): number =>
+	const resolveRowSlotKey = (row: TMountedRow): number =>
 		row.slotKey ?? row.key;
 	const resolveCellSlotKey = (
-		_row: VirtualSurfaceMountedRow<TMountedCell>,
+		_row: TMountedRow,
 		cell: TMountedCell,
 	): number => cell.cellSlotKey ?? cell.renderSlotIndex;
 
@@ -81,12 +101,19 @@
 		cell: TMountedCell,
 	): number | undefined => cell.columnIndex;
 
-	const resolveMountedCellBodyKey = (
-		cell: TMountedCell,
-	): unknown => cell.renderBodyKey ?? cell.cellMetadataKey ?? cell.key;
+	const resolveDefaultMountedCellBodyKey = (cell: TMountedCell): unknown =>
+		cell.renderBodyKey ?? cell.cellMetadataKey ?? cell.key;
+	const resolveMountedCellBodyKey = (cell: TMountedCell): unknown =>
+		bodyLifecyclePolicy.type === "keyed"
+			? resolveVirtualCellBodyKey({
+					cell,
+					policy: bodyLifecyclePolicy,
+					resolveDefaultKey: resolveDefaultMountedCellBodyKey,
+				})
+			: cell.renderSlotKey;
 
 	const resolveRowStyle = (
-		row: VirtualSurfaceMountedRow<TMountedCell>,
+		row: TMountedRow,
 	): string =>
 		`position:absolute; left:0; right:0; top:0; transform:translateY(${Math.max(
 			0,
@@ -98,41 +125,45 @@
 <div class={contentClassName} bind:this={contentEl} style={contentStyle}>
 	<div data-ccl-virtual-flow-spacer="top" style:height="0px" aria-hidden="true"></div>
 	{#each mountedRows as row (resolveRowSlotKey(row))}
-		<div
-			{...row.attributes}
-			class={rowClassName}
-			data-ccl-row-slot={!IS_PROD ? row.slotIndex : undefined}
-			data-ccl-row-index={!IS_PROD ? row.rowIndex : undefined}
-			style={resolveRowStyle(row)}
-		>
-			{#each row.cells as mountedCell (resolveCellSlotKey(row, mountedCell))}
-				<VirtualGridLogicalCellMount
-					logicalKey={resolveMountedCellLogicalKey(mountedCell)}
-					className={resolveCellClassName(mountedCell)}
-					dataTestId={getCellDataTestId?.(mountedCell)}
-					cellSlotKey={resolveCellSlotKey(row, mountedCell)}
-					rowIndex={resolveMountedCellRowIndex(mountedCell)}
-					columnIndex={resolveMountedCellColumnIndex(mountedCell)}
-					{mountedCell}
-					{onLogicalCellAttach}
-					{onLogicalCellDetach}
-				>
-					{#if remountCellBodyOnKeyChange}
-						{#key resolveMountedCellBodyKey(mountedCell)}
+		{#if !isRowActive || isRowActive(row)}
+			<div
+				{...row.attributes}
+				class={rowClassName}
+				data-ccl-row-slot={!IS_PROD ? row.slotIndex : undefined}
+				data-ccl-row-index={!IS_PROD ? row.rowIndex : undefined}
+				style={resolveRowStyle(row)}
+			>
+				{#each row.cells as mountedCell (resolveCellSlotKey(row, mountedCell))}
+					<VirtualGridLogicalCellMount
+						logicalKey={resolveMountedCellLogicalKey(mountedCell)}
+						className={resolveCellClassName(mountedCell)}
+						dataTestId={getCellDataTestId?.(mountedCell)}
+						cellSlotKey={resolveCellSlotKey(row, mountedCell)}
+						rowIndex={resolveMountedCellRowIndex(mountedCell)}
+						columnIndex={resolveMountedCellColumnIndex(mountedCell)}
+						{mountedCell}
+						{onLogicalCellAttach}
+						{onLogicalCellDetach}
+						{cellRegistry}
+						cellRegistrationOwner={getCellRegistrationOwner?.(mountedCell)}
+					>
+						{#if bodyLifecyclePolicy.type === "keyed"}
+							{#key resolveMountedCellBodyKey(mountedCell)}
+								{@render renderCell({
+									mountedCell,
+									observerRoot,
+								})}
+							{/key}
+						{:else}
 							{@render renderCell({
 								mountedCell,
 								observerRoot,
 							})}
-						{/key}
-					{:else}
-						{@render renderCell({
-							mountedCell,
-							observerRoot,
-						})}
-					{/if}
-				</VirtualGridLogicalCellMount>
-			{/each}
-		</div>
+						{/if}
+					</VirtualGridLogicalCellMount>
+				{/each}
+			</div>
+		{/if}
 	{/each}
 	<div
 		data-ccl-virtual-flow-spacer="bottom"

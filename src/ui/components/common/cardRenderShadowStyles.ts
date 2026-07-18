@@ -12,7 +12,7 @@ export const CARD_RENDER_SHADOW_CSS = String.raw`
 .view-plan-virtual-list-content {
 	position: relative;
 	width: 100%;
-	contain: layout;
+	contain: content;
 	overflow-anchor: none;
 }
 
@@ -92,6 +92,27 @@ export const CARD_RENDER_SHADOW_CSS = String.raw`
 	overflow: visible;
 	word-break: break-word;
 	touch-action: manipulation;
+}
+
+.twohop-card-shell.is-skeleton {
+	pointer-events: none;
+}
+
+.twohop-card-shell.is-skeleton .cosense-card-links__box-title-wrapper::before {
+	content: "";
+	display: block;
+	width: 62%;
+	height: 0.8em;
+	border-radius: 999px;
+	background: var(--background-modifier-border);
+}
+
+.twohop-card-shell.is-skeleton.has-shell-title .cosense-card-links__box-title-wrapper::before {
+	display: none;
+}
+
+.twohop-card-shell.is-skeleton.has-shell-title .cosense-card-links__box-title {
+	opacity: 0.78;
 }
 
 @media (hover: hover) {
@@ -390,6 +411,10 @@ export const CARD_RENDER_SHADOW_CSS = String.raw`
 .cosense-card-links__load-more-button.cosense-card-links__box {
 	border: none;
 	box-shadow: none;
+}
+
+.cosense-card-links__load-more-button > .cosense-card-links__box-title-wrapper {
+	display: contents;
 }
 
 

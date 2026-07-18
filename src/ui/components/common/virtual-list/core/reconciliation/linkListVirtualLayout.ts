@@ -24,9 +24,9 @@ import {
 	shouldAssertVirtualListInvariants,
 } from "./invariants";
 import {
-	createContiguousRowSlotAllocator,
-	type ContiguousRowSlotAllocator,
-} from "./contiguousRowSlotAllocator";
+	createResidentRowSlotAllocator,
+	type ResidentRowSlotAllocator,
+} from "ui/virtualization/residentSlotAllocator";
 
 const ROW_SLOT_ALLOCATOR = Symbol("flat-grid-row-slot-allocator");
 
@@ -93,7 +93,7 @@ interface MountedVirtualGridCellsBuildState<
 	cellWidth: number;
 	rowHeight: number;
 	gap: number;
-	readonly [ROW_SLOT_ALLOCATOR]: ContiguousRowSlotAllocator;
+	readonly [ROW_SLOT_ALLOCATOR]: ResidentRowSlotAllocator;
 }
 
 const EMPTY_PREVIOUS_MOUNTED_GRID_CELLS: ReadonlyMap<string, never> = new Map<
@@ -431,15 +431,15 @@ function resolveMountedRowSlotAllocation(params: {
 	visibleRows: RowRange;
 	layoutKey: unknown;
 	previousBuildState?: MountedVirtualGridCellsBuildState<unknown>;
-	rowSlotAllocator?: ContiguousRowSlotAllocator;
+	rowSlotAllocator?: ResidentRowSlotAllocator;
 }): {
 	allocation: MountedRowSlotAllocation;
-	allocator: ContiguousRowSlotAllocator;
+	allocator: ResidentRowSlotAllocator;
 } {
 	const allocator =
 		params.rowSlotAllocator ??
 		params.previousBuildState?.[ROW_SLOT_ALLOCATOR] ??
-		createContiguousRowSlotAllocator();
+		createResidentRowSlotAllocator();
 	allocator.prepareRange({
 		start: params.visibleRows.start,
 		end: params.visibleRows.end,
@@ -468,7 +468,7 @@ function buildMountedVirtualGridCellsFromCore<T>(params: {
 	previousBuild?: MountedVirtualGridCellsBuildResult<T>;
 	previousCellsByKey?: ReadonlyMap<string, MountedVirtualGridCell<T>>;
 	renderRevisionFallbackPolicy?: RenderRevisionFallbackPolicy;
-	rowSlotAllocator?: ContiguousRowSlotAllocator;
+	rowSlotAllocator?: ResidentRowSlotAllocator;
 }): MountedVirtualGridCellsBuildResult<T> {
 	const columns = Math.max(1, params.columns);
 	const previousBuild = params.previousBuild;
@@ -689,7 +689,7 @@ export function buildMountedVirtualGridCellsFromRowModel<T>(params: {
 	previousBuild?: MountedVirtualGridCellsBuildResult<T>;
 	previousCellsByKey?: ReadonlyMap<string, MountedVirtualGridCell<T>>;
 	renderRevisionFallbackPolicy?: RenderRevisionFallbackPolicy;
-	rowSlotAllocator?: ContiguousRowSlotAllocator;
+	rowSlotAllocator?: ResidentRowSlotAllocator;
 }): MountedVirtualGridCellsBuildResult<T> {
 	const { rowModel } = params;
 	// Pass rowModel fields directly to avoid allocating a resolver object

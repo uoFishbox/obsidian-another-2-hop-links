@@ -6,6 +6,7 @@ import {
 import {
 	subscribeScrollTarget,
 	type ScrollPhase,
+	type ScrollTargetMetrics,
 } from "infrastructure/scroll/scrollTargetListeners";
 import { subscribeWindowResize } from "infrastructure/scroll/windowResizeListeners";
 import { createScheduledVirtualListTask } from "./virtualListScheduler";
@@ -520,9 +521,17 @@ const applyScrollPhaseEffect = (
 const handleScrollPhase = (
 	entry: ScrollerViewportEntry,
 	phase: ScrollPhase,
-	scrollTop?: number,
+	metrics?: ScrollTargetMetrics,
 ): void => {
-	entry.pendingScrollTop = phase === "scroll" ? (scrollTop ?? null) : null;
+	entry.pendingScrollTop = phase === "scroll" ? (metrics?.scrollTop ?? null) : null;
+	if (
+		phase === "scroll" &&
+		entry.scrollPhaseState.type === "scrolling" &&
+		entry.scrollPhaseState.pendingAfterScroll.reconnectObserver
+	) {
+		scheduleScrollMeasurement(entry);
+		return;
+	}
 	const transition = reduceScrollerViewportPhase(entry.scrollPhaseState, phase);
 	entry.scrollPhaseState = transition.state;
 	applyScrollPhaseEffect(entry, transition.effect);
@@ -642,7 +651,7 @@ const getScrollerViewportEntry = (
 	);
 	entry.unsubscribeScrollTarget = subscribeScrollTarget(
 		entry.scrollTarget,
-		(phase, scrollTop) => handleScrollPhase(entry, phase, scrollTop),
+		(phase, metrics) => handleScrollPhase(entry, phase, metrics),
 	);
 	entry.unsubscribeWindowResize = subscribeWindowResize(() => {
 		scheduleLayoutMeasurementWhenIdle(entry);

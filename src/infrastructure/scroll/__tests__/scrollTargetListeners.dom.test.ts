@@ -1,22 +1,27 @@
-import { describe, expect, it } from "vitest";
-import { subscribeScrollTarget, type ScrollPhase } from "../scrollTargetListeners";
+import { describe, expect, it, vi } from "vitest";
+import { subscribeScrollTarget } from "../scrollTargetListeners";
 
 describe("subscribeScrollTarget", () => {
-	it("passes scrollTop as a primitive on native scroll events", () => {
+	it("reuses one metrics snapshot while publishing the latest scrollTop", () => {
+		vi.useFakeTimers();
 		const target = document.createElement("div");
-		target.scrollTop = 42;
-		const events: Array<readonly [ScrollPhase, number | undefined]> = [];
-		const unsubscribe = subscribeScrollTarget(target, (phase, scrollTop) => {
-			events.push([phase, scrollTop]);
+		const metrics: object[] = [];
+		const scrollTops: number[] = [];
+		const unsubscribe = subscribeScrollTarget(target, (phase, snapshot) => {
+			if (phase !== "scroll" || !snapshot) return;
+			metrics.push(snapshot);
+			scrollTops.push(snapshot.scrollTop);
 		});
 
+		target.scrollTop = 12;
 		target.dispatchEvent(new Event("scroll"));
-		unsubscribe();
+		target.scrollTop = 34;
+		target.dispatchEvent(new Event("scroll"));
 
-		expect(events).toEqual([
-			["start", undefined],
-			["scroll", 42],
-		]);
-		expect(typeof events[1]?.[1]).toBe("number");
+		expect(scrollTops).toEqual([12, 34]);
+		expect(metrics[1]).toBe(metrics[0]);
+
+		unsubscribe();
+		vi.useRealTimers();
 	});
 });

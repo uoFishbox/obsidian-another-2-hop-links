@@ -30,24 +30,44 @@
 		rowIndex = undefined,
 		activationCandidateId = undefined,
 		presentation = undefined,
+		model = undefined,
 	}: ItemProps = $props();
 
 	const context = useLinkContext();
 	const { applicationStore } = useAppContext();
 	const interactionRegistry = useInteractionRegistry();
 
-	const strategy = $derived(item ? getItemStrategy(item) : null);
+	const renderItem = $derived(model?.item ?? item);
+	const renderSearchQuery = $derived(model?.searchQuery ?? searchQuery);
+	const renderSearchScope = $derived(model?.searchScope ?? searchScope);
+	const renderContentPreview = $derived(model?.contentPreview ?? contentPreview);
+	const renderPreviewRefreshToken = $derived(
+		model?.previewRefreshToken ?? previewRefreshToken,
+	);
+	const renderPresentation = $derived(model?.presentation ?? presentation);
+	const strategy = $derived(
+		model ? null : renderItem ? getItemStrategy(renderItem) : null,
+	);
 
 	// 各プロパティをStrategyを通じて算出
 	const targetFile = $derived(
-		item ? (strategy?.getTargetFile(item.data, context) ?? null) : null,
+		model
+			? model.targetFile
+			: renderItem
+				? (strategy?.getTargetFile(renderItem.data, context) ?? null)
+				: null,
 	);
 	const className = $derived(
-		item ? (strategy?.getClassName(item.data) ?? null) : null,
+		model
+			? model.className
+			: renderItem
+				? (strategy?.getClassName(renderItem.data) ?? null)
+				: null,
 	);
 
 	const title = $derived.by(() => {
-		if (!item) {
+		if (model) return model.title;
+		if (!renderItem) {
 			return "";
 		}
 
@@ -61,33 +81,44 @@
 			);
 		}
 
-		switch (item.type) {
+		switch (renderItem.type) {
 			case "branch":
-				return formatLinkText(item.data.hop1);
+				return formatLinkText(renderItem.data.hop1);
 			case "backlink":
-				return formatLinkText(item.data);
+				return formatLinkText(renderItem.data);
 			case "taggedNote":
-				return item.data.file.basename;
+				return renderItem.data.file.basename;
 			case "file":
-				return item.data.basename;
+				return renderItem.data.basename;
 			case "newLink":
-				return formatLinkText(item.data);
+				return formatLinkText(renderItem.data);
 			default:
 				return "";
 		}
 	});
-	const ariaLabel = $derived.by(() =>
-		item?.type === "newLink"
-			? ARIA_LABELS.UNRESOLVED_LINK
-			: ARIA_LABELS.OPEN_LINK(title),
+	const ariaLabel = $derived(
+		model
+			? model.ariaLabel
+			: renderItem?.type === "newLink"
+				? ARIA_LABELS.UNRESOLVED_LINK
+				: ARIA_LABELS.OPEN_LINK(title),
 	);
 
-	const extension = $derived(targetFile?.extension ?? null);
-	const directory = $derived(targetFile?.parent?.path ?? null);
+	const extension = $derived(
+		model ? model.extension : (targetFile?.extension ?? null),
+	);
+	const directory = $derived(
+		model ? model.directory : (targetFile?.parent?.path ?? null),
+	);
 	const interactionKey = $derived(
-		item ? (providedInteractionKey ?? createItemInteractionKey(item)) : undefined,
+		model
+			? model.interactionKey
+			: renderItem
+				? (providedInteractionKey ?? createItemInteractionKey(renderItem))
+				: undefined,
 	);
 	const interactionId = $derived.by(() => {
+		if (model) return model.interactionId;
 		if (!interactionKey) return providedInteractionId;
 		return (
 			providedInteractionId ??
@@ -96,11 +127,20 @@
 		);
 	});
 	const interactionDescriptor = $derived.by((): ItemInteractionDescriptor | null =>
-		item && interactionId && interactionKey
-			? createItemInteractionDescriptor(item, settings, searchQuery, context, {
-					interactionId,
-					interactionKey,
-				})
+		interactionRegistration === "self" &&
+		renderItem &&
+		interactionId &&
+		interactionKey
+			? createItemInteractionDescriptor(
+					renderItem,
+					settings,
+					renderSearchQuery,
+					context,
+					{
+						interactionId,
+						interactionKey,
+					},
+				)
 			: null,
 	);
 	const previewGateRowProps = $derived.by(() =>
@@ -124,6 +164,13 @@
 		void rowIndex;
 		void activationCandidateId;
 		void presentation;
+		void model;
+		void renderItem;
+		void renderSearchQuery;
+		void renderSearchScope;
+		void renderContentPreview;
+		void renderPreviewRefreshToken;
+		void renderPresentation;
 		void strategy;
 		void targetFile;
 		void className;
@@ -159,7 +206,7 @@
 </script>
 
 {componentReevaluationProbe}
-{#if item && interactionId}
+{#if renderItem && interactionId}
 	<LinkItem
 		{title}
 		{ariaLabel}
@@ -171,11 +218,11 @@
 		className={className ?? undefined}
 		{directory}
 		{settings}
-		{searchQuery}
-		{presentation}
+		searchQuery={renderSearchQuery}
+		presentation={renderPresentation}
 	>
 		{#snippet children()}
-			{#if !DEBUG_DISABLE_CARD_DOM_PREVIEW && item.type === "newLink" && !targetFile}
+			{#if !DEBUG_DISABLE_CARD_DOM_PREVIEW && renderItem.type === "newLink" && !targetFile}
 				<UnresolvedPreviewPlaceholder />
 			{:else if !DEBUG_DISABLE_CARD_DOM_PREVIEW && previewGateRowProps}
 				<CardPreviewGate
@@ -184,10 +231,11 @@
 					getVisiblePreviewQueueSize={context.getVisiblePreviewQueueSize}
 					getActiveVisiblePreviewCount={context.getActiveVisiblePreviewCount}
 					{applicationStore}
-					{searchQuery}
-					{searchScope}
-					{previewRefreshToken}
-					{contentPreview}
+					searchQuery={renderSearchQuery}
+					searchScope={renderSearchScope}
+					previewRefreshToken={renderPreviewRefreshToken}
+					contentPreview={renderContentPreview}
+					precomputedPreviewIdentity={model?.previewActivationIdentity}
 					rowIndex={previewGateRowProps.rowIndex}
 					activationCandidateId={previewGateRowProps.activationCandidateId}
 				/>

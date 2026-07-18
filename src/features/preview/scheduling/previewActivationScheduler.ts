@@ -2,6 +2,8 @@ import {
 	isScrollActivityActive,
 	subscribeScrollActivity,
 } from "infrastructure/scroll/scrollActivity";
+import { shouldDeferPreviewActivationForVirtualScrollMeasurement } from "infrastructure/scroll/virtualScrollMeasurementFrame";
+import { recordCCLDevMeasurement } from "infrastructure/debug/CCLDevMeasurements";
 import { DEBUG_DISABLE_CARD_DOM_PREVIEW } from "../../../appConstants";
 import {
 	canConsumePreviewScheduleToken,
@@ -10,6 +12,7 @@ import {
 	refillPreviewScheduleTokens,
 	type PreviewScheduleTokenState,
 } from "./previewScheduleTokenBucket";
+import type { VirtualFrameCoordinator } from "ui/virtualization/frameCoordinator";
 
 const WARMUP_MS = 32;
 const MAX_QUEUE_ENTRIES_PER_DRAIN = 256;
@@ -23,12 +26,6 @@ interface PreviewActivationPolicy {
 	readonly maxDrainCpuMs: number;
 }
 
-const SCROLLING_POLICY: PreviewActivationPolicy = {
-	ratePerSecond: 90,
-	creditCapacity: 2,
-	maxTasksPerDrain: 1,
-	maxDrainCpuMs: 1,
-};
 const IDLE_POLICY: PreviewActivationPolicy = {
 	ratePerSecond: 120,
 	creditCapacity: 2,
@@ -59,12 +56,14 @@ export interface PreviewActivationScope {
 	pendingQueueHead: number;
 	getBackpressure: () => PreviewBackpressure;
 	backpressureProviders: Map<() => number, PreviewBackpressureProviderRegistration>;
+	frameCoordinator?: VirtualFrameCoordinator;
 }
 
 interface PreviewActivationRequest {
 	key: string;
 	scope: PreviewActivationScope;
 	onSettled: ((activated: boolean) => void) | undefined;
+	hasDeferredForVirtualScrollMeasurement: boolean;
 	settled: boolean;
 }
 
@@ -75,6 +74,7 @@ interface PreviewBackpressureProviderRegistration {
 
 export interface CreatePreviewActivationScopeOptions {
 	readonly getBackpressure?: () => PreviewBackpressure;
+	readonly frameCoordinator?: VirtualFrameCoordinator;
 }
 
 export interface PreviewActivationHandle {
@@ -93,6 +93,7 @@ const defaultScope = createPreviewActivationScope();
 const activeQueuedScopes = new Set<PreviewActivationScope>();
 let globalFrameHandle: number | null = null;
 let globalFrameHandleKind: "animation-frame" | "timeout" | null = null;
+let globalFrameCoordinator: VirtualFrameCoordinator | undefined;
 let roundRobinCursor = 0;
 let activationTokenState: PreviewScheduleTokenState =
 	createEmptyPreviewScheduleTokenState();
@@ -152,6 +153,7 @@ export function createPreviewActivationScope(
 			() => number,
 			PreviewBackpressureProviderRegistration
 		>(),
+		frameCoordinator: options.frameCoordinator,
 	};
 }
 
@@ -219,17 +221,44 @@ function settleRequest(request: PreviewActivationRequest, activated: boolean): v
 function ensureSubscription(): void {
 	if (unsubscribeScrollActivity) return;
 
-	unsubscribeScrollActivity = subscribeScrollActivity(() => {
+	unsubscribeScrollActivity = subscribeScrollActivity((isActive) => {
+		if (isActive) {
+			cancelGlobalFrame();
+			return;
+		}
 		scheduleGlobalFrameDrain();
 	});
 }
 
 function scheduleGlobalFrameDrain(): void {
-	if (globalFrameHandle !== null || activeQueuedScopes.size === 0) {
+	if (
+		globalFrameHandle !== null ||
+		globalFrameCoordinator !== undefined ||
+		activeQueuedScopes.size === 0 ||
+		isScrollActivityActive()
+	) {
 		return;
+	}
+	const queuedCoordinator = resolveQueuedCoordinator();
+	if (queuedCoordinator) {
+		const scheduled = queuedCoordinator.schedule(
+			"idle",
+			"preview:activation-drain",
+			() => {
+				globalFrameCoordinator = undefined;
+				drainGlobalFrame(readMonotonicTime());
+			},
+		);
+		if (scheduled) {
+			globalFrameCoordinator = queuedCoordinator;
+			return;
+		}
 	}
 
 	if (typeof globalThis.requestAnimationFrame === "function") {
+		if (process.env.NODE_ENV !== "production") {
+			recordCCLDevMeasurement("preview.activationScheduler.animationFrame");
+		}
 		globalFrameHandleKind = "animation-frame";
 		globalFrameHandle = globalThis.requestAnimationFrame((timestamp) => {
 			globalFrameHandle = null;
@@ -249,7 +278,21 @@ function scheduleGlobalFrameDrain(): void {
 	}, FALLBACK_FRAME_INTERVAL_MS) as unknown as number;
 }
 
+function resolveQueuedCoordinator(): VirtualFrameCoordinator | undefined {
+	let coordinator: VirtualFrameCoordinator | undefined;
+	for (const scope of activeQueuedScopes) {
+		if (!scope.frameCoordinator) return undefined;
+		if (coordinator && coordinator !== scope.frameCoordinator) return undefined;
+		coordinator = scope.frameCoordinator;
+	}
+	return coordinator;
+}
+
 function cancelGlobalFrame(): void {
+	if (globalFrameCoordinator) {
+		globalFrameCoordinator.cancel("idle", "preview:activation-drain");
+		globalFrameCoordinator = undefined;
+	}
 	if (globalFrameHandle === null) return;
 
 	if (
@@ -300,7 +343,6 @@ function readGlobalBackpressure(): PreviewBackpressure {
 }
 
 function resolveActivationPolicy(params: {
-	readonly isScrolling: boolean;
 	readonly queuedPreviewJobs: number;
 	readonly activePreviewJobs: number;
 }): PreviewActivationPolicy {
@@ -308,7 +350,7 @@ function resolveActivationPolicy(params: {
 		return BACKPRESSURED_POLICY;
 	}
 
-	return params.isScrolling ? SCROLLING_POLICY : IDLE_POLICY;
+	return IDLE_POLICY;
 }
 
 function refillActivationTokens(
@@ -373,16 +415,27 @@ function readNextRoundRobinRequest(
 
 function drainGlobalFrame(frameTimestamp: number): void {
 	if (activeQueuedScopes.size === 0) return;
+	if (isScrollActivityActive()) return;
 
 	const pressure = readGlobalBackpressure();
 	const policy = resolveActivationPolicy({
-		isScrolling: isScrollActivityActive(),
 		queuedPreviewJobs: pressure.queued,
 		activePreviewJobs: pressure.active,
 	});
 	refillActivationTokens(frameTimestamp, policy);
 
 	const scopes = Array.from(activeQueuedScopes);
+	const shouldDeferUndeferredRequests =
+		shouldDeferPreviewActivationForVirtualScrollMeasurement();
+	const queueEntriesAvailableAtDrainStart = scopes.reduce(
+		(total, scope) =>
+			total + Math.max(0, scope.pendingQueue.length - scope.pendingQueueHead),
+		0,
+	);
+	const maxInspectableQueueEntries = Math.min(
+		MAX_QUEUE_ENTRIES_PER_DRAIN,
+		queueEntriesAvailableAtDrainStart,
+	);
 	const deadline = readMonotonicTime() + policy.maxDrainCpuMs;
 	let inspectedQueueEntries = 0;
 	let drainedTasks = 0;
@@ -390,7 +443,7 @@ function drainGlobalFrame(frameTimestamp: number): void {
 	while (
 		canConsumePreviewScheduleToken(activationTokenState) &&
 		drainedTasks < policy.maxTasksPerDrain &&
-		inspectedQueueEntries < MAX_QUEUE_ENTRIES_PER_DRAIN &&
+		inspectedQueueEntries < maxInspectableQueueEntries &&
 		readMonotonicTime() <= deadline
 	) {
 		if (!hasPreviewAdmissionCapacity(readGlobalBackpressure())) break;
@@ -400,6 +453,22 @@ function drainGlobalFrame(frameTimestamp: number): void {
 		inspectedQueueEntries += 1;
 		if (request.settled) continue;
 		if (request.scope.pendingByKey.get(request.key) !== request) continue;
+		if (
+			shouldDeferUndeferredRequests &&
+			!request.hasDeferredForVirtualScrollMeasurement
+		) {
+			request.hasDeferredForVirtualScrollMeasurement = true;
+			request.scope.pendingQueue.push(request);
+			continue;
+		}
+
+		if (isScrollActivityActive()) {
+			if (process.env.NODE_ENV !== "production") {
+				recordCCLDevMeasurement("preview.activationDuringScroll");
+			}
+			request.scope.pendingQueue.push(request);
+			break;
+		}
 
 		settleRequest(request, true);
 		activationTokenState = consumePreviewScheduleToken(activationTokenState);
@@ -436,6 +505,7 @@ export function canActivatePreviewImmediately(
 	return (
 		!isWarmupActive(scope, now) &&
 		!isScrollActivityActive() &&
+		!shouldDeferPreviewActivationForVirtualScrollMeasurement() &&
 		pressure.queued <= 0 &&
 		pressure.active <= 0
 	);
@@ -465,6 +535,7 @@ function enqueuePreviewActivationRequest(
 		key,
 		scope,
 		onSettled,
+		hasDeferredForVirtualScrollMeasurement: false,
 		settled: false,
 	};
 	scope.pendingByKey.set(key, request);
@@ -496,6 +567,7 @@ export function requestPreviewActivation(
 	if (
 		!isWarmupActive(scope, now) &&
 		!isScrollActivityActive() &&
+		!shouldDeferPreviewActivationForVirtualScrollMeasurement() &&
 		pressure.queued <= 0 &&
 		pressure.active <= 0
 	) {

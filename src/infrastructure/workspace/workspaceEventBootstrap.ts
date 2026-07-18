@@ -61,6 +61,7 @@ export function setupWorkspaceEventHandlers(
 
 		deps.frameScheduler.scheduleAfterFirstPaint(() => {
 			isPostPaintViewWorkQueued = false;
+			deps.displayModeManager.reconcileInlineComponents();
 			deps.domMutationObserver.initObservers();
 			scheduleDecorationRefresh();
 		});

@@ -1,54 +1,70 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
+	dispatchVirtualCellWillRebind,
 	VIRTUAL_CELL_WILL_REBIND_EVENT,
-	markVirtualCellInteractionDirty,
-	prepareVirtualCellForRebind,
-	type VirtualCellWillRebindDetail,
 } from "../virtualCellRebind";
 
-describe("virtual cell rebind", () => {
-	it("does not inspect or notify a clean physical cell", () => {
-		const cell = document.createElement("div");
-		const querySelectorAll = vi.spyOn(cell, "querySelectorAll");
-		const dispatchEvent = vi.spyOn(cell, "dispatchEvent");
-
-		const prepared = prepareVirtualCellForRebind(cell, "first", "second");
-
-		expect(prepared).toBe(false);
-		expect(querySelectorAll).not.toHaveBeenCalled();
-		expect(dispatchEvent).not.toHaveBeenCalled();
+describe("dispatchVirtualCellWillRebind", () => {
+	afterEach(() => {
+		document.body.innerHTML = "";
 	});
 
-	it("clears and notifies a dirty physical cell only once", () => {
+	it("returns without dispatching for a cell with no transient state", () => {
 		const cell = document.createElement("div");
 		const interaction = document.createElement("button");
 		interaction.dataset.cclInteractionId = "item:first";
-		interaction.dataset.cclHovered = "true";
-		interaction.dataset.cclLongPressed = "1";
-		interaction.dataset.cclLastTouchAt = "123";
 		cell.append(interaction);
 		document.body.append(cell);
-		interaction.focus();
+		const listener = vi.fn();
+		cell.addEventListener(VIRTUAL_CELL_WILL_REBIND_EVENT, listener);
 
-		const details: VirtualCellWillRebindDetail[] = [];
-		cell.addEventListener(VIRTUAL_CELL_WILL_REBIND_EVENT, (event) => {
-			details.push((event as CustomEvent<VirtualCellWillRebindDetail>).detail);
+		dispatchVirtualCellWillRebind(cell, {
+			previousLogicalKey: "first",
+			nextLogicalKey: "second",
 		});
-		markVirtualCellInteractionDirty(cell);
 
-		expect(prepareVirtualCellForRebind(cell, "first", "second")).toBe(true);
-		expect(document.activeElement).not.toBe(interaction);
-		expect(interaction.dataset.cclHovered).toBeUndefined();
-		expect(interaction.dataset.cclLongPressed).toBeUndefined();
-		expect(interaction.dataset.cclLastTouchAt).toBeUndefined();
-		expect(details).toEqual([
-			{
-				previousLogicalKey: "first",
-				nextLogicalKey: "second",
-			},
-		]);
+		expect(listener).not.toHaveBeenCalled();
+		expect(interaction.dataset.cclInteractionId).toBe("item:first");
+	});
 
-		expect(prepareVirtualCellForRebind(cell, "second", "third")).toBe(false);
-		expect(details).toHaveLength(1);
+	it("clears transient state and dispatches one event", () => {
+		const cell = document.createElement("div");
+		const hovered = document.createElement("button");
+		const touched = document.createElement("button");
+		hovered.dataset.cclHovered = "true";
+		hovered.dataset.cclLongPressed = "1";
+		touched.dataset.cclLastTouchAt = "123";
+		cell.append(hovered, touched);
+		document.body.append(cell);
+		const listener = vi.fn();
+		cell.addEventListener(VIRTUAL_CELL_WILL_REBIND_EVENT, listener);
+
+		dispatchVirtualCellWillRebind(cell, {
+			previousLogicalKey: "first",
+			nextLogicalKey: "second",
+		});
+
+		expect(hovered.dataset.cclHovered).toBeUndefined();
+		expect(hovered.dataset.cclLongPressed).toBeUndefined();
+		expect(touched.dataset.cclLastTouchAt).toBeUndefined();
+		expect(listener).toHaveBeenCalledTimes(1);
+	});
+
+	it("blurs a focused descendant without dispatching when no transient state exists", () => {
+		const cell = document.createElement("div");
+		const input = document.createElement("input");
+		cell.append(input);
+		document.body.append(cell);
+		input.focus();
+		const listener = vi.fn();
+		cell.addEventListener(VIRTUAL_CELL_WILL_REBIND_EVENT, listener);
+
+		dispatchVirtualCellWillRebind(cell, {
+			previousLogicalKey: "first",
+			nextLogicalKey: "second",
+		});
+
+		expect(document.activeElement).not.toBe(input);
+		expect(listener).not.toHaveBeenCalled();
 	});
 });

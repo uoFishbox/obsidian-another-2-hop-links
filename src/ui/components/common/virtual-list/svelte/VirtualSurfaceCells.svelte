@@ -1,6 +1,10 @@
 <script lang="ts" generics="TMountedCell extends MountedVirtualCell">
 	import type { Snippet } from "svelte";
 	import type { MountedVirtualCell } from "../types";
+	import {
+		KEYED_VIRTUAL_CELL_BODY_LIFECYCLE,
+		type VirtualCellBodyLifecyclePolicy,
+	} from "ui/virtualization/bodyLifecycle";
 	import VirtualAbsoluteCellSurface from "./VirtualAbsoluteCellSurface.svelte";
 	import VirtualPooledGridRowsSurface from "./VirtualPooledGridRowsSurface.svelte";
 	import type {
@@ -24,7 +28,7 @@
 		getCellDataTestId?: (cell: TMountedCell) => string | undefined;
 		onCellMount?: (cell: TMountedCell) => void;
 		onCellDestroy?: (cell: TMountedCell) => void;
-		remountCellBodyOnKeyChange?: boolean;
+		bodyLifecyclePolicy?: VirtualCellBodyLifecyclePolicy<TMountedCell>;
 		renderCell: Snippet<
 			[
 				{
@@ -57,7 +61,7 @@
 		getCellDataTestId,
 		onCellMount,
 		onCellDestroy,
-		remountCellBodyOnKeyChange = true,
+		bodyLifecyclePolicy = KEYED_VIRTUAL_CELL_BODY_LIFECYCLE,
 		renderCell,
 	}: Props<TMountedCell> = $props();
 </script>
@@ -79,7 +83,7 @@
 		{getCellDataTestId}
 		onLogicalCellAttach={onCellMount}
 		onLogicalCellDetach={onCellDestroy}
-		{remountCellBodyOnKeyChange}
+		{bodyLifecyclePolicy}
 		{renderCell}
 	/>
 {:else}

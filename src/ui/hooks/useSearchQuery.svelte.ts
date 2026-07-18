@@ -1,6 +1,17 @@
-export function useSearchQuery(delayMs: number = 150) {
-	let inputValue = $state("");
-	let debouncedQuery = $state("");
+export interface SearchQueryOptions {
+	/** Delay before exposing the normalized query to search processing. */
+	delayMs?: number;
+	/** Value restored when the search control is mounted. */
+	initialValue?: string;
+	/** Persists each immediate input change outside the component. */
+	onInputChange?: (value: string) => void;
+}
+
+export function useSearchQuery(options: SearchQueryOptions = {}) {
+	const delayMs = options.delayMs ?? 150;
+	const initialValue = options.initialValue ?? "";
+	let inputValue = $state(initialValue);
+	let debouncedQuery = $state(initialValue);
 	let searchTimeout: ReturnType<typeof setTimeout> | null = null;
 
 	$effect(() => {
@@ -27,8 +38,9 @@ export function useSearchQuery(delayMs: number = 150) {
 		get value() {
 			return inputValue;
 		},
-		set value(v: string) {
-			inputValue = v;
+		set value(value: string) {
+			inputValue = value;
+			options.onInputChange?.(value);
 		},
 		get debounced() {
 			return debouncedQuery;

@@ -1,7 +1,7 @@
 import type { PluginHost } from "types/pluginHost";
 import { MarkdownView, TFile } from "obsidian";
 import { enableLogging, logger } from "utils/logger";
-import { getContainerElements } from "ui/utils/domUtils";
+import { getActiveInlineContainer } from "ui/utils/domUtils";
 import type { PatchRegistry } from "infrastructure/capabilities/PatchRegistry";
 
 export function initFilePatcher(
@@ -20,7 +20,7 @@ function patchViewLifecycle(plugin: PluginHost, patchRegistry: PatchRegistry) {
 			return;
 		}
 
-		getContainerElements(view);
+		getActiveInlineContainer(view);
 	};
 
 	const applied = patchRegistry.apply(plugin, {

@@ -1,6 +1,10 @@
 import { App, MarkdownView, TFile, WorkspaceLeaf, MarkdownRenderChild } from "obsidian";
 import { unmount } from "svelte";
-import { getContainerElements } from "ui/utils/domUtils";
+import {
+	getActiveInlineContainer,
+	type ActiveInlineContainer,
+	type InlineMarkdownSurface,
+} from "ui/utils/domUtils";
 import { getLeafId } from "infrastructure/utils/workspaceUtils";
 import * as ErrorHandler from "utils/errorHandler";
 import type { PluginSettings, SortOption } from "types/settings";
@@ -13,17 +17,24 @@ import { ApplicationStore } from "ui/stores/ApplicationStore.svelte";
 import type { PluginHostUi } from "types/pluginHostUi";
 import type { ResolveTwoHopLinks } from "ui/stores/application/TwoHopLinksLoader";
 import { mountTwoHopLinksRootView } from "ui/views/shared/viewFactories";
+import type { TwoHopLinksRootUiState } from "ui/views/shared/twoHopLinksRootUiState";
 import type { SvelteComponentInstance } from "ui/views/shared/svelteLifecycle";
 
 export type ComponentInstance = SvelteComponentInstance;
 
 interface MountedComponent {
 	component: SvelteComponentInstance | undefined;
-	container: Element;
+	container: HTMLElement;
+	surface: InlineMarkdownSurface;
 	file: TFile;
 	filePath: string;
 	leafId: string;
 	lifecycleManager: MarkdownRenderChild;
+}
+
+interface InlineViewUiState {
+	filePath: string;
+	uiState: TwoHopLinksRootUiState;
 }
 
 export const RECENT_APPLICATION_STORE_LIMIT = 6;
@@ -34,6 +45,7 @@ export class ComponentController implements IComponentManager {
 		MountedComponent[]
 	>();
 	private readonly lazyLoaderCaches = new WeakMap<MarkdownView, Set<string>>();
+	private readonly inlineUiStates = new WeakMap<MarkdownView, InlineViewUiState>();
 
 	private readonly applicationStores = new Map<string, ApplicationStore>();
 	private readonly applicationStoreRefCounts = new Map<string, number>();
@@ -59,6 +71,26 @@ export class ComponentController implements IComponentManager {
 
 	private clearLazyLoaderCache(view: MarkdownView): void {
 		this.lazyLoaderCaches.get(view)?.clear();
+	}
+
+	private getInlineUiState(
+		view: MarkdownView,
+		filePath: string,
+	): TwoHopLinksRootUiState {
+		let viewState = this.inlineUiStates.get(view);
+		if (!viewState || viewState.filePath !== filePath) {
+			viewState = {
+				filePath,
+				uiState: { searchInputValue: "" },
+			};
+			this.inlineUiStates.set(view, viewState);
+		}
+
+		return viewState.uiState;
+	}
+
+	private clearInlineUiState(view: MarkdownView): void {
+		this.inlineUiStates.delete(view);
 	}
 
 	private buildStoreKey(leafId: string, filePath: string): string {
@@ -114,22 +146,34 @@ export class ComponentController implements IComponentManager {
 		if (!file) {
 			this.unmountViewComponents(view);
 			this.clearLazyLoaderCache(view);
+			this.clearInlineUiState(view);
 			return;
 		}
 
-		const existingComponents = this.mountedComponents.get(view);
-		const previousFilePath = existingComponents?.[0]?.filePath;
-		const isSameFileMounted = !!previousFilePath && previousFilePath === file.path;
+		const target = getActiveInlineContainer(view);
+		if (!target) {
+			return;
+		}
 
-		if (isSameFileMounted && options?.skipIfMounted) {
+		const mountedList = this.mountedComponents.get(view) ?? [];
+		const previousFilePath = mountedList[0]?.filePath;
+		const sameTargetMounted =
+			mountedList.length === 1 &&
+			mountedList[0].filePath === file.path &&
+			mountedList[0].surface === target.surface &&
+			mountedList[0].container === target.container &&
+			mountedList[0].container.isConnected;
+
+		if (options?.skipIfMounted && sameTargetMounted) {
 			return;
 		}
 
 		if (previousFilePath && previousFilePath !== file.path) {
 			this.clearLazyLoaderCache(view);
+			this.clearInlineUiState(view);
 		}
 
-		this.syncComponentsForView(view, file);
+		this.syncComponentForView(view, file, target);
 	}
 
 	unmountViewComponents(view: MarkdownView): void {
@@ -138,11 +182,18 @@ export class ComponentController implements IComponentManager {
 			return;
 		}
 
+		this.unloadMountedComponents(view, mountedList);
+		this.mountedComponents.delete(view);
+	}
+
+	private unloadMountedComponents(
+		view: MarkdownView,
+		mountedList: readonly MountedComponent[],
+	): void {
 		for (const mounted of mountedList) {
 			mounted.lifecycleManager.unload();
 			view.removeChild(mounted.lifecycleManager);
 		}
-		this.mountedComponents.delete(view);
 	}
 
 	/**
@@ -289,42 +340,50 @@ export class ComponentController implements IComponentManager {
 
 	// ========== Component Lifecycle Management ==========
 
-	private syncComponentsForView(view: MarkdownView, file: TFile): void {
-		this.unmountViewComponents(view);
-
-		const containers = getContainerElements(view);
-		if (!containers.length) {
-			this.mountedComponents.delete(view);
-			this.clearLazyLoaderCache(view);
-			return;
-		}
-
+	private syncComponentForView(
+		view: MarkdownView,
+		file: TFile,
+		target: ActiveInlineContainer,
+	): void {
+		const previous = this.mountedComponents.get(view) ?? [];
 		// Leafを取得してLeafIDを生成
 		const leaf = this.getLeafFromView(view);
 		if (!leaf) {
 			console.warn("Could not find leaf for view");
-			this.mountedComponents.delete(view);
-			this.clearLazyLoaderCache(view);
 			return;
 		}
 
 		const leafId = getLeafId(leaf);
 		if (!leafId) {
 			console.warn("Could not get leaf id");
-			this.mountedComponents.delete(view);
-			this.clearLazyLoaderCache(view);
 			return;
 		}
 
-		const mountedComponents = containers.map((container) =>
-			this.mountComponent(container, file, leafId, view),
+		const usesSameContainer = previous.some(
+			(mounted) => mounted.container === target.container,
 		);
+		if (usesSameContainer) {
+			this.unloadMountedComponents(view, previous);
+			this.mountedComponents.delete(view);
+		}
 
-		this.mountedComponents.set(view, mountedComponents);
+		const next = this.mountComponent(
+			target.container,
+			target.surface,
+			file,
+			leafId,
+			view,
+		);
+		this.mountedComponents.set(view, [next]);
+
+		if (!usesSameContainer) {
+			this.unloadMountedComponents(view, previous);
+		}
 	}
 
 	private mountComponent(
-		container: Element,
+		container: HTMLElement,
+		surface: InlineMarkdownSurface,
 		file: TFile,
 		leafId: string,
 		view: MarkdownView,
@@ -363,6 +422,7 @@ export class ComponentController implements IComponentManager {
 				getApplicationStore: () => applicationStore!,
 				updateSetting: (key, value) =>
 					this.plugin.updateSetting(key as any, value),
+				uiState: this.getInlineUiState(view, file.path),
 			});
 
 			// --- ライフサイクル管理 ---
@@ -389,6 +449,7 @@ export class ComponentController implements IComponentManager {
 			return {
 				component,
 				container,
+				surface,
 				file,
 				filePath: file.path,
 				leafId,

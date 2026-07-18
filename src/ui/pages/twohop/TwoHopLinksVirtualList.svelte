@@ -1,14 +1,11 @@
 <script lang="ts">
 	import { getContext } from "svelte";
-	import TwoHopViewPlanVirtualList from "./TwoHopVirtualListSurface.svelte";
-	import TwoHopSectionHeaderRenderer from "./TwoHopSectionHeaderRenderer.svelte";
-	import TwoHopVirtualItemCard from "./TwoHopVirtualItemCard.svelte";
+	import TwoHopSurface from "./TwoHopSurface.svelte";
 	import type { ApplicationStore } from "ui/stores/ApplicationStore.svelte";
 	import type {
 		SearchWorkerMatchedItem,
 		SearchWorkerMatchScope,
 	} from "features/search/searchWorkerTypes";
-	import type { VirtualizedItemVisibilityState } from "ui/components/common/virtualizedItemVisibility";
 	import type {
 		TwoHopVirtualListSection,
 		TwoHopVirtualListItem,
@@ -19,7 +16,17 @@
 		createTwoHopInteractionDescriptorRevision,
 		resolveTwoHopItemInteractionDescriptor,
 	} from "./twoHopInteractionDescriptorRevision";
-	import type { TwoHopCardPresentationState } from "./twoHopCellBinding";
+	import type { TwoHopCardPresentationState } from "./twoHopCellStaticState";
+	import {
+		createTwoHopCardRenderModelCache,
+		type TwoHopCardModelRevision,
+	} from "./twoHopCardRenderModelCache";
+	import type { CardRenderModel } from "ui/components/items/cardRenderModel";
+	import type { LinkUtilitiesContext } from "types/linkContext";
+	import {
+		resolveTwoHopShellTitle,
+		type TwoHopShellTitleRevision,
+	} from "./twoHopShellTitle";
 
 	interface Props {
 		sections: readonly TwoHopVirtualSectionDescriptor[];
@@ -29,6 +36,8 @@
 		matchedItemByKey?: Map<string, SearchWorkerMatchedItem> | null;
 		initialVisibleCount?: number;
 		loadMoreIncrement?: number;
+		linkContext?: LinkUtilitiesContext;
+		previewActive?: boolean;
 	}
 
 	let {
@@ -39,6 +48,8 @@
 		matchedItemByKey = null,
 		initialVisibleCount,
 		loadMoreIncrement,
+		linkContext: providedLinkContext = undefined,
+		previewActive = true,
 	}: Props = $props();
 
 	if (!applicationStore) {
@@ -46,12 +57,56 @@
 	}
 
 	const currentSettings = $derived(applicationStore.settings);
-	let linkContext: ReturnType<typeof useLinkContext> | undefined;
-	try {
-		linkContext = useLinkContext();
-	} catch {
-		linkContext = undefined;
+	function resolveLinkContext(): LinkUtilitiesContext | undefined {
+		if (providedLinkContext) return providedLinkContext;
+		try {
+			return useLinkContext();
+		} catch {
+			return undefined;
+		}
 	}
+	const linkContext = resolveLinkContext();
+	const cardModelCache = createTwoHopCardRenderModelCache();
+	const cardModelRevision = $derived.by((): TwoHopCardModelRevision | undefined =>
+		linkContext
+			? {
+					settings: currentSettings,
+					searchQuery,
+					searchScope,
+					matchedItemByKey,
+					linkContext,
+					applicationStore,
+					applicationUpdateVersion: applicationStore.updateVersion,
+					previewGlobalVersion: applicationStore.previewGlobalVersion,
+					previewPathVersions: applicationStore.previewPathVersions,
+				}
+			: undefined,
+	);
+	const resolveItemCardModel = $derived.by(() => {
+		const revision = cardModelRevision;
+		if (!revision) return undefined;
+		return (
+			row: TwoHopVirtualListItem,
+			presentation: TwoHopCardPresentationState,
+		): CardRenderModel => cardModelCache.resolve(row, presentation, revision);
+	});
+	const shellTitleRevision = $derived.by((): TwoHopShellTitleRevision | undefined =>
+		linkContext
+			? {
+					priorityFrontmatterKeyForTitle:
+						currentSettings.priorityFrontmatterKeyForTitle,
+					metadataVersion: applicationStore.updateVersion,
+					sourcePath: linkContext.sourceFile.path,
+					linkContext,
+				}
+			: undefined,
+	);
+	const resolveItemTitle = $derived.by(() => {
+		const revision = shellTitleRevision;
+		if (!revision) return undefined;
+		return (row: TwoHopVirtualListItem): string =>
+			resolveTwoHopShellTitle(row, revision);
+	});
 	const getItemInteractionDescriptor = (row: TwoHopVirtualListItem) =>
 		resolveTwoHopItemInteractionDescriptor(row, interactionDescriptorRevision);
 	const interactionDescriptorRevision = $derived(
@@ -64,42 +119,18 @@
 </script>
 
 {#if sections.length > 0}
-	<TwoHopViewPlanVirtualList
+	<TwoHopSurface
 		{sections}
 		{applicationStore}
 		{initialVisibleCount}
 		{loadMoreIncrement}
 		{getItemInteractionDescriptor}
 		{interactionDescriptorRevision}
-	>
-		{#snippet renderHeader({ section, title, totalCount, sectionId, headerProps })}
-			<TwoHopSectionHeaderRenderer
-				{section}
-				{title}
-				{totalCount}
-				{sectionId}
-				{headerProps}
-			/>
-		{/snippet}
-
-		{#snippet renderItem(
-			row: TwoHopVirtualListItem,
-			rowIndex: number,
-			visibilityState: VirtualizedItemVisibilityState,
-			activationCandidateId: string,
-			presentation: TwoHopCardPresentationState,
-		)}
-			<TwoHopVirtualItemCard
-				{row}
-				settings={currentSettings}
-				{searchQuery}
-				{searchScope}
-				{matchedItemByKey}
-				{rowIndex}
-				{visibilityState}
-				{activationCandidateId}
-				{presentation}
-			/>
-		{/snippet}
-	</TwoHopViewPlanVirtualList>
+		{cardModelRevision}
+		{shellTitleRevision}
+		{resolveItemCardModel}
+		{resolveItemTitle}
+		{linkContext}
+		{previewActive}
+	/>
 {/if}

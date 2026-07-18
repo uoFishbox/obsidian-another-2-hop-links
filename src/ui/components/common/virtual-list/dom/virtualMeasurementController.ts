@@ -1,3 +1,4 @@
+import { markVirtualScrollMeasurementRun } from "infrastructure/scroll/virtualScrollMeasurementFrame";
 import type { VirtualListSharedScrollMetrics } from "./virtualListDomObserver";
 import { observeVirtualListViewport } from "./virtualListDomObserver";
 import {
@@ -11,6 +12,7 @@ import { createInitialVirtualListStabilization } from "./initialVirtualListStabi
 import { createVirtualListMeasurementScheduler } from "./virtualListMeasurementScheduler";
 import type { VirtualListMeasurementStateHandle } from "./virtualListMeasurementState";
 import { getOptionalOwnerWindow } from "ui/utils/realmSafeDom";
+import type { VirtualFrameCoordinator } from "ui/virtualization/frameCoordinator";
 
 export type VirtualMeasurementSource = "layout" | "scroll";
 
@@ -68,6 +70,7 @@ export interface CreateVirtualMeasurementControllerOptions {
 	initialStabilizationMaxPasses?: number;
 	primeUnstableScrollStart?: boolean;
 	maxUnstableMeasurementRetries: number;
+	frameCoordinator?: VirtualFrameCoordinator;
 }
 
 const SKIPPED_NO_ROOT: VirtualMeasurementResult = {
@@ -99,6 +102,7 @@ export function createVirtualMeasurementController({
 	initialStabilizationMaxPasses,
 	primeUnstableScrollStart = false,
 	maxUnstableMeasurementRetries,
+	frameCoordinator,
 }: CreateVirtualMeasurementControllerOptions) {
 	const cachedScrollSnapshot: VirtualListScrollSnapshot = {
 		scrollTop: 0,
@@ -217,6 +221,7 @@ export function createVirtualMeasurementController({
 		if (!getOptionalOwnerWindow(rootEl ?? measurement.scrollContainerEl)) {
 			return SKIPPED_NO_WINDOW;
 		}
+		markVirtualScrollMeasurementRun();
 
 		cachedMeasurementInput.rootEl = rootEl;
 		cachedMeasurementInput.scrollContainerEl = measurement.scrollContainerEl;
@@ -265,6 +270,7 @@ export function createVirtualMeasurementController({
 		runScrollMeasurement,
 		maxUnstableMeasurementRetries,
 		getWindow: () => getOptionalOwnerWindow(getRootEl()),
+		frameCoordinator,
 	});
 	const bootstrapMeasurementSuppression = createBootstrapMeasurementSuppression(
 		scheduleLayoutMeasurement,

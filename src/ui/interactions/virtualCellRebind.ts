@@ -5,54 +5,62 @@ export interface VirtualCellWillRebindDetail {
 	readonly nextLogicalKey: string;
 }
 
-const dirtyVirtualCells = new WeakSet<HTMLElement>();
+const TRANSIENT_INTERACTION_SELECTOR = [
+	'[data-ccl-hovered="true"]',
+	'[data-ccl-long-pressed="1"]',
+	"[data-ccl-last-touch-at]",
+].join(",");
 
-/** Marks a physical cell as holding transient interaction state. */
-export function markVirtualCellInteractionDirty(cell: HTMLElement): void {
-	dirtyVirtualCells.add(cell);
-}
-
-/**
- * Clears transient state before a dirty physical cell represents another card.
- * Clean cells return without reading or traversing the DOM.
- */
-export function prepareVirtualCellForRebind(
+function dispatchRebindEvent(
 	element: HTMLElement,
-	previousLogicalKey: string,
-	nextLogicalKey: string,
-): boolean {
-	if (!dirtyVirtualCells.delete(element)) {
-		return false;
-	}
-
-	const activeElement = element.ownerDocument.activeElement;
-	if (
-		activeElement &&
-		"blur" in activeElement &&
-		typeof activeElement.blur === "function" &&
-		element.contains(activeElement)
-	) {
-		activeElement.blur();
-	}
-	for (const interaction of element.querySelectorAll<HTMLElement>(
-		"[data-ccl-interaction-id]",
-	)) {
-		delete interaction.dataset.cclHovered;
-		delete interaction.dataset.cclLongPressed;
-		delete interaction.dataset.cclLastTouchAt;
-	}
-
+	detail: VirtualCellWillRebindDetail,
+): void {
 	const CustomEventConstructor =
 		element.ownerDocument.defaultView?.CustomEvent ?? CustomEvent;
 	element.dispatchEvent(
 		new CustomEventConstructor(VIRTUAL_CELL_WILL_REBIND_EVENT, {
 			bubbles: true,
 			composed: true,
-			detail: {
-				previousLogicalKey,
-				nextLogicalKey,
-			} satisfies VirtualCellWillRebindDetail,
+			detail,
 		}),
 	);
-	return true;
+}
+
+/** Announces that a physical cell is about to stop representing a logical card. */
+export function dispatchVirtualCellWillRebind(
+	element: HTMLElement,
+	detail: VirtualCellWillRebindDetail,
+): void {
+	const activeElement = element.ownerDocument.activeElement;
+	const hasFocusedDescendant = Boolean(
+		activeElement &&
+		"blur" in activeElement &&
+		typeof activeElement.blur === "function" &&
+		element.contains(activeElement),
+	);
+	const transientInteractions = element.querySelectorAll<HTMLElement>(
+		TRANSIENT_INTERACTION_SELECTOR,
+	);
+
+	if (!hasFocusedDescendant && transientInteractions.length === 0) {
+		return;
+	}
+
+	if (
+		hasFocusedDescendant &&
+		activeElement &&
+		"blur" in activeElement &&
+		typeof activeElement.blur === "function"
+	) {
+		activeElement.blur();
+	}
+	for (const interaction of transientInteractions) {
+		delete interaction.dataset.cclHovered;
+		delete interaction.dataset.cclLongPressed;
+		delete interaction.dataset.cclLastTouchAt;
+	}
+
+	if (transientInteractions.length > 0) {
+		dispatchRebindEvent(element, detail);
+	}
 }

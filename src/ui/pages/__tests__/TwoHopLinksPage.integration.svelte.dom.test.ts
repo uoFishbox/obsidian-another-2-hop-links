@@ -12,7 +12,6 @@ import type {
 	TwoHopLinkResult,
 } from "types/domain";
 import type { DisplayData } from "application/presenters/displayDataBuilder";
-import type { LoadingPhase } from "ui/stores/ApplicationStore.svelte";
 import TwoHopLinksPage from "../TwoHopLinksPage.svelte";
 
 vi.mock("features/search/searchWorkerClient", async () => {
@@ -89,8 +88,8 @@ vi.mock("ui/components/items/ViewItemCard.svelte", async () => {
 	return { default: component.default };
 });
 
-vi.mock("../twohop/TwoHopVirtualListSurface.svelte", async () => {
-	const component = await import("./ViewPlanVirtualListPageStub.svelte");
+vi.mock("../twohop/TwoHopSurface.svelte", async () => {
+	const component = await import("./TwoHopImperativeSurfacePageStub.svelte");
 	return { default: component.default };
 });
 
@@ -182,7 +181,6 @@ function createApplicationStore(
 	displayData: DisplayData,
 	settings: typeof DEFAULT_SETTINGS,
 	originFile: TFile,
-	loadingPhase: LoadingPhase = "complete",
 ) {
 	const expandedLimits = new Map<string, number>();
 	const linkResult: TwoHopLinkResult = {
@@ -194,7 +192,7 @@ function createApplicationStore(
 
 	return {
 		loading: false,
-		loadingPhase,
+		loadingPhase: "complete" as const,
 		data: linkResult,
 		displayState: {
 			displayData,
@@ -264,15 +262,9 @@ function createRootProps(
 	displayData: DisplayData,
 	settings: typeof DEFAULT_SETTINGS,
 	originFile: TFile,
-	loadingPhase: LoadingPhase = "complete",
 ): ComponentProps<typeof TwoHopLinksPage> {
 	const filesByPath = collectFiles(originFile, displayData);
-	const applicationStore = createApplicationStore(
-		displayData,
-		settings,
-		originFile,
-		loadingPhase,
-	);
+	const applicationStore = createApplicationStore(displayData, settings, originFile);
 	const linkContext = {
 		resolveFile: vi.fn((path: string) => filesByPath.get(path) ?? null),
 		fileToLinktext: vi.fn((target: TFile) => target.basename),
@@ -303,10 +295,9 @@ function renderRoot(
 	displayData: DisplayData,
 	settings: typeof DEFAULT_SETTINGS,
 	originFile: TFile,
-	loadingPhase: LoadingPhase = "complete",
 ) {
 	return render(TwoHopLinksPage, {
-		props: createRootProps(displayData, settings, originFile, loadingPhase),
+		props: createRootProps(displayData, settings, originFile),
 	});
 }
 
@@ -323,46 +314,6 @@ describe("TwoHopLinksPage descriptor plumbing", () => {
 
 	afterEach(() => {
 		vi.useRealTimers();
-	});
-
-	it("keeps the virtual list unmounted while two-hop data is building", async () => {
-		const file = createMockTFile("notes/target.md");
-		const parentFile = createMockTFile("notes/outgoing-parent.md");
-		const displayData = {
-			...createDisplayData(),
-			outgoing: [createBranch(file, parentFile, [], "outgoing-parent")],
-		};
-
-		const { container } = renderRoot(
-			displayData,
-			DEFAULT_SETTINGS,
-			file,
-			"base-ready",
-		);
-		await flushAsyncUi();
-
-		expect(screen.getByText("Loading two-hop links...")).toBeInTheDocument();
-		expect(container.querySelector(".view-plan-virtual-list")).toBeNull();
-	});
-
-	it("mounts the virtual list when two-hop data and sections are ready", async () => {
-		const file = createMockTFile("notes/target.md");
-		const parentFile = createMockTFile("notes/outgoing-parent.md");
-		const displayData = {
-			...createDisplayData(),
-			outgoing: [createBranch(file, parentFile, [], "outgoing-parent")],
-		};
-
-		const { container } = renderRoot(
-			displayData,
-			DEFAULT_SETTINGS,
-			file,
-			"twohop-ready",
-		);
-		await flushAsyncUi();
-
-		expect(container.querySelector(".view-plan-virtual-list")).not.toBeNull();
-		expect(screen.queryByText("Loading two-hop links...")).toBeNull();
 	});
 
 	it("renders sections and items on initial display", async () => {

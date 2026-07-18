@@ -30,7 +30,7 @@ import { useVirtualList } from "./useVirtualList.svelte";
 import type { VirtualListLogicalCell } from "../logicalCell";
 import { resolveVirtualizedItemVisibilityForPreviewRange } from "./virtualizedItemVisibilityState.svelte";
 import type { RenderRevision, RenderRevisionFallbackPolicy } from "../renderRevision";
-import type { VirtualNavigationTarget } from "../types";
+import type { VisibilityConsumption, VirtualNavigationTarget } from "../types";
 import type { VirtualListItemRenderArgs } from "./renderArgs";
 import {
 	PREVIEW_ROW_ACTIVATION_CONTEXT_KEY,
@@ -45,7 +45,7 @@ import {
 } from "../dom/flatGridLayoutMeasurement";
 import { createFlatGridVisibilityAdapter } from "./flatGridVisibilityAdapter";
 import { createFlatGridControllerAdapter } from "./flatGridControllerAdapter";
-import { createContiguousRowSlotAllocator } from "../core/reconciliation/contiguousRowSlotAllocator";
+import { createResidentRowSlotAllocator } from "ui/virtualization/residentSlotAllocator";
 
 interface FlatVirtualGridApplicationSettings extends CardLayoutSettings {
 	previewActivationAheadRows?: number;
@@ -82,6 +82,8 @@ export interface FlatVirtualGridListProps<T> {
 	paginationMode?: "button" | "infinite-scroll";
 	infiniteScrollRootMargin?: string;
 	remountCellBodyOnKeyChange?: boolean;
+	/** @default "reactive-state" */
+	visibilityConsumption?: VisibilityConsumption;
 	onMountedCellsChange?: (cells: readonly MountedVirtualGridCell<T>[]) => void;
 }
 
@@ -110,39 +112,45 @@ export function useFlatVirtualGridList<T>(props: FlatVirtualGridListProps<T>) {
 	const supportsIntersectionObserver =
 		typeof window !== "undefined" && "IntersectionObserver" in window;
 	const lazyLoadManager = getLazyLoadManager();
+	const visibilityConsumption = $derived(
+		props.visibilityConsumption ?? "reactive-state",
+	);
 	const rowPreviewActivationRuntime = getContext<
 		RowPreviewActivationRuntime | undefined
 	>(PREVIEW_ROW_ACTIVATION_CONTEXT_KEY);
 	const visibilityAdapter = createFlatGridVisibilityAdapter<T>({
-		onRowVisibilityChanged: (rowIndex, visibility) => {
-			rowPreviewActivationRuntime?.setRowVisibility(rowIndex, visibility);
-		},
-		onRowCleared: (rowIndex) => {
-			rowPreviewActivationRuntime?.clearRow(rowIndex);
+		onVisibilityDelta: (delta) => {
+			rowPreviewActivationRuntime?.applyVisibilityDelta(delta);
 		},
 	});
-	const rowSlotAllocator = createContiguousRowSlotAllocator();
+	const rowSlotAllocator = createResidentRowSlotAllocator();
 	let lastResolvedActiveScrollPolicyRowHeight: number | undefined;
 	let lastResolvedActiveScrollPolicyGap: number | undefined;
 	let lastResolvedActiveScrollPolicyAheadRows: number | undefined;
+	let lastResolvedActiveScrollPolicyIsScrollActive: boolean | undefined;
 	let lastResolvedActiveScrollPolicy:
 		| ReturnType<typeof createCardVirtualListPolicy>
 		| undefined;
 	const resolveActiveScrollPolicy = (
 		nextLayout: VirtualGridLayout,
+		isScrollActive: boolean,
 	): ReturnType<typeof createCardVirtualListPolicy> => {
+		const effectiveAheadRows = isScrollActive ? 0 : previewActivationAheadRows;
 		if (
 			!lastResolvedActiveScrollPolicy ||
 			lastResolvedActiveScrollPolicyRowHeight !== nextLayout.rowHeight ||
 			lastResolvedActiveScrollPolicyGap !== nextLayout.gap ||
-			lastResolvedActiveScrollPolicyAheadRows !== previewActivationAheadRows
+			lastResolvedActiveScrollPolicyAheadRows !== effectiveAheadRows ||
+			lastResolvedActiveScrollPolicyIsScrollActive !== isScrollActive
 		) {
 			lastResolvedActiveScrollPolicyRowHeight = nextLayout.rowHeight;
 			lastResolvedActiveScrollPolicyGap = nextLayout.gap;
-			lastResolvedActiveScrollPolicyAheadRows = previewActivationAheadRows;
+			lastResolvedActiveScrollPolicyAheadRows = effectiveAheadRows;
+			lastResolvedActiveScrollPolicyIsScrollActive = isScrollActive;
 			lastResolvedActiveScrollPolicy = createCardVirtualListPolicy({
 				layout: nextLayout,
 				previewActivationAheadRows,
+				isScrollActive,
 			});
 		}
 		return lastResolvedActiveScrollPolicy!;
@@ -538,18 +546,22 @@ export function useFlatVirtualGridList<T>(props: FlatVirtualGridListProps<T>) {
 		observerRoot: HTMLElement | null,
 	): VirtualListItemRenderArgs<T> => {
 		const itemCell = mountedCell as FlatMountedItemCell<T>;
-		const visibilityState = visibilityAdapter.visibilityStates.getOrCreateState(
-			itemCell,
-			untrack(() => {
-				const previewVisible = virtualList.getSnapshot()?.ranges.previewVisible;
-				return previewVisible
-					? resolveVirtualizedItemVisibilityForPreviewRange(
-							itemCell.rowIndex,
-							previewVisible,
-						)
-					: "mounted";
-			}),
-		);
+		const visibility = untrack(() => {
+			const previewVisible = virtualList.getSnapshot()?.ranges.previewVisible;
+			return previewVisible
+				? resolveVirtualizedItemVisibilityForPreviewRange(
+						itemCell.rowIndex,
+						previewVisible,
+					)
+				: "mounted";
+		});
+		const visibilityState =
+			visibilityConsumption === "reactive-state"
+				? visibilityAdapter.visibilityStates.getOrCreateState(
+						itemCell,
+						visibility,
+					)
+				: undefined;
 
 		return {
 			item: itemCell.cell.item,
@@ -559,7 +571,8 @@ export function useFlatVirtualGridList<T>(props: FlatVirtualGridListProps<T>) {
 			rowIndex: itemCell.rowIndex,
 			activationCandidateId: itemCell.key,
 			get visibility() {
-				return visibilityState.visibility;
+				if (visibilityConsumption === "none") return undefined;
+				return visibilityState?.visibility ?? visibility;
 			},
 		};
 	};
