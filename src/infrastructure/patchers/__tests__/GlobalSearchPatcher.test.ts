@@ -94,4 +94,78 @@ describe("GlobalSearchPatcher", () => {
 		expect(openTagNotesView).not.toHaveBeenCalled();
 		expect(originalOpenGlobalSearch).toHaveBeenCalledWith("tag:missing");
 	});
+
+	test("tag: falls back to original Global Search when tag lookup rejects", async () => {
+		const error = new Error("tag index unavailable");
+		const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+		const { instance, originalOpenGlobalSearch } = createPlugin(async () => {
+			throw error;
+		});
+
+		instance.openGlobalSearch("tag:broken");
+		await flushAsyncTasks();
+
+		expect(openTagNotesView).not.toHaveBeenCalled();
+		expect(originalOpenGlobalSearch).toHaveBeenCalledWith("tag:broken");
+		expect(consoleError).toHaveBeenCalledWith(
+			"[GlobalSearchPatcher] Tag search interception failed:",
+			error,
+		);
+	});
+
+	test("tag: falls back to original Global Search when TagNotesView fails", async () => {
+		const error = new Error("view failed to open");
+		const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+		openTagNotesView.mockRejectedValueOnce(error);
+		const { instance, originalOpenGlobalSearch } = createPlugin(async () => [
+			{ path: "note.md" } as TaggedNote,
+		]);
+
+		instance.openGlobalSearch("tag:shared");
+		await flushAsyncTasks();
+
+		expect(openTagNotesView).toHaveBeenCalledWith(
+			expect.anything(),
+			"shared",
+			"source.md",
+			false,
+		);
+		expect(originalOpenGlobalSearch).toHaveBeenCalledWith("tag:shared");
+		expect(consoleError).toHaveBeenCalledWith(
+			"[GlobalSearchPatcher] Tag search interception failed:",
+			error,
+		);
+	});
+
+	test("ignores an older tag lookup that completes after a newer search", async () => {
+		const resolvers = new Map<
+			string,
+			(notes: TaggedNote[]) => void
+		>();
+		const { instance, originalOpenGlobalSearch } = createPlugin(
+			(tag) =>
+				new Promise<TaggedNote[]>((resolve) => {
+					resolvers.set(tag, resolve);
+				}),
+		);
+
+		instance.openGlobalSearch("tag:old");
+		instance.openGlobalSearch("tag:new");
+		resolvers.get("new")?.([{ path: "new.md" } as TaggedNote]);
+		await flushAsyncTasks();
+
+		expect(openTagNotesView).toHaveBeenCalledTimes(1);
+		expect(openTagNotesView).toHaveBeenCalledWith(
+			expect.anything(),
+			"new",
+			"source.md",
+			false,
+		);
+
+		resolvers.get("old")?.([{ path: "old.md" } as TaggedNote]);
+		await flushAsyncTasks();
+
+		expect(openTagNotesView).toHaveBeenCalledTimes(1);
+		expect(originalOpenGlobalSearch).not.toHaveBeenCalled();
+	});
 });

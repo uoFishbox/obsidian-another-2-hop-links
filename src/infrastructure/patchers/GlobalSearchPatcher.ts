@@ -4,6 +4,7 @@ import { openTagNotesView } from "features/tag-notes/ui/TagNotesView";
 import { areTagFeaturesEnabled } from "features/settings/model";
 import { ObsidianInternalFacade } from "infrastructure/capabilities/ObsidianInternalFacade";
 import type { PatchRegistry } from "infrastructure/capabilities/PatchRegistry";
+import type { TaggedNote } from "types/domain";
 
 export function initGlobalSearchPatcher(
 	plugin: PluginHost,
@@ -31,7 +32,9 @@ function patchGlobalSearch(plugin: PluginHost, patchRegistry: PatchRegistry): vo
 		risk: capability.risk,
 		enabled: true,
 		wrap: (next) => {
+			let searchGeneration = 0;
 			return function (this: unknown, query: string) {
+				const currentGeneration = ++searchGeneration;
 				if (
 					!plugin.settings.enableGlobalSearchTagModal ||
 					!areTagFeaturesEnabled(plugin.settings)
@@ -49,19 +52,47 @@ function patchGlobalSearch(plugin: PluginHost, patchRegistry: PatchRegistry): vo
 
 					if (indexingService) {
 						void (async () => {
-							const notes = await indexingService.getNotesWithTag(tag);
-							if (notes.length > 0) {
-								if (enableLogging)
-									logger(
-										`[GlobalSearchPatcher] Intercepting tag search: "${tag}". Found ${notes.length} notes.`,
-									);
-								const sourcePath =
-									plugin.app.workspace.getActiveFile()?.path ?? "";
-								void openTagNotesView(plugin, tag, sourcePath, false);
+							let notes: TaggedNote[];
+							try {
+								notes = await indexingService.getNotesWithTag(tag);
+							} catch (error) {
+								if (currentGeneration !== searchGeneration) {
+									return;
+								}
+								console.error(
+									"[GlobalSearchPatcher] Tag search interception failed:",
+									error,
+								);
+								next.call(this, query);
 								return;
 							}
 
-							next.call(this, query);
+							if (currentGeneration !== searchGeneration) {
+								return;
+							}
+							if (notes.length === 0) {
+								next.call(this, query);
+								return;
+							}
+
+							if (enableLogging)
+								logger(
+									`[GlobalSearchPatcher] Intercepting tag search: "${tag}". Found ${notes.length} notes.`,
+								);
+							const sourcePath =
+								plugin.app.workspace.getActiveFile()?.path ?? "";
+							try {
+								await openTagNotesView(plugin, tag, sourcePath, false);
+							} catch (error) {
+								if (currentGeneration !== searchGeneration) {
+									return;
+								}
+								console.error(
+									"[GlobalSearchPatcher] Tag search interception failed:",
+									error,
+								);
+								next.call(this, query);
+							}
 						})();
 
 						// インデックス完了を待ってから判定するため、ここでは即 return する
