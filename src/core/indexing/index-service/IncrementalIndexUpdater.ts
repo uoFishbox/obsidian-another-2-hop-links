@@ -2,7 +2,9 @@ import { INDEXING_YIELD_INTERVAL_MS } from "../../../appConstants";
 import {
 	createBacklinkUpdater,
 	type BacklinkUpdater,
+	type BacklinkAdditionMutationCallback,
 	type BacklinkReconcileSink,
+	type BacklinkRemovalMutationCallback,
 } from "core/indexing/backlink-builder/backlinkUpdater";
 import { resolveFileByPath } from "core/utils/resolveFileByPath";
 import type { IMetadataCache, IVault } from "types/obsidian";
@@ -68,8 +70,10 @@ interface IncrementalUpdateRunState {
 	localScratch: FileLocalAggregation;
 	pathsToUpdate: Set<string>;
 	pathsToDelete: Set<string>;
-	createEventEvaluationCache: CreateEventEvaluationCache;
-	fastRenamePlans: RenameFastPathPlan[];
+	createEventEvaluationCache?: CreateEventEvaluationCache;
+	fastRenamePlans?: RenameFastPathPlan[];
+	backlinkRemovalMutationCallback: BacklinkRemovalMutationCallback;
+	backlinkAdditionMutationCallback: BacklinkAdditionMutationCallback;
 	backlinkReconcileSink: BacklinkReconcileSink;
 }
 
@@ -151,14 +155,16 @@ export class IncrementalIndexUpdater {
 					change,
 					run.yieldScheduler,
 				);
+				const createEventEvaluationCache = (run.createEventEvaluationCache ??=
+					createCreateEventEvaluationCache());
 				if (fastRenamePlan) {
-					run.fastRenamePlans.push(fastRenamePlan);
+					(run.fastRenamePlans ??= []).push(fastRenamePlan);
 					run.pathsToDelete.add(change.oldPath);
 					await this.createChangePlanner.collectPathsForCreateEventAsync(
 						run.snapshot,
 						change.newPath,
 						run.pathsToUpdate,
-						run.createEventEvaluationCache,
+						createEventEvaluationCache,
 						run.yieldScheduler,
 						{ includeCreatedPath: false },
 					);
@@ -168,7 +174,7 @@ export class IncrementalIndexUpdater {
 						run.snapshot,
 						change.newPath,
 						run.pathsToUpdate,
-						run.createEventEvaluationCache,
+						createEventEvaluationCache,
 						run.yieldScheduler,
 					);
 				}
@@ -177,11 +183,14 @@ export class IncrementalIndexUpdater {
 				if (change.type === "delete") {
 					run.pathsToDelete.add(change.path);
 				} else if (change.type === "create") {
+					const createEventEvaluationCache =
+						(run.createEventEvaluationCache ??=
+							createCreateEventEvaluationCache());
 					await this.collectPathsForCreateEventAsync(
 						run.snapshot,
 						change.path,
 						run.pathsToUpdate,
-						run.createEventEvaluationCache,
+						createEventEvaluationCache,
 						run.yieldScheduler,
 					);
 				} else if (change.type === "modify") {
@@ -247,24 +256,7 @@ export class IncrementalIndexUpdater {
 				run.snapshot.sourceSummaries.get(path),
 				run.yieldScheduler,
 				run.affectedLookupPaths,
-				(
-					lookupPath,
-					lookupKey,
-					sourcePath,
-					hadResolved,
-					isLookupPathEmptyAfter,
-				) => {
-					onRemoveSourceFromLookupPath(
-						run.snapshot,
-						lookupPath,
-						lookupKey,
-						sourcePath,
-						hadResolved,
-						isLookupPathEmptyAfter,
-						run.affectedLookupKeys,
-						run.touchedLookupKeys,
-					);
-				},
+				run.backlinkRemovalMutationCallback,
 			);
 			run.linkIndexChanged = true;
 			run.affectedLinkSourcePaths.add(path);
@@ -287,8 +279,13 @@ export class IncrementalIndexUpdater {
 	}
 
 	private async applyFastRenamesAsync(run: IncrementalUpdateRunState): Promise<void> {
+		const fastRenamePlans = run.fastRenamePlans;
+		if (!fastRenamePlans) {
+			return;
+		}
+
 		let fastRenameCount = 0;
-		for (const fastRenamePlan of run.fastRenamePlans) {
+		for (const fastRenamePlan of fastRenamePlans) {
 			await this.backlinkUpdater.reconcileBacklinksBySourceAsync(
 				run.snapshot.backlinksMap,
 				fastRenamePlan.change.newPath,
@@ -296,26 +293,7 @@ export class IncrementalIndexUpdater {
 				fastRenamePlan.movedSummary,
 				run.yieldScheduler,
 				undefined,
-				(
-					lookupPath,
-					lookupKey,
-					sourcePath,
-					isNewSource,
-					hadResolved,
-					hasResolved,
-				) => {
-					onAddEdge(
-						run.snapshot,
-						lookupPath,
-						lookupKey,
-						sourcePath,
-						isNewSource,
-						hadResolved,
-						hasResolved,
-						run.affectedLookupKeys,
-						run.touchedLookupKeys,
-					);
-				},
+				run.backlinkAdditionMutationCallback,
 				run.backlinkReconcileSink,
 			);
 			await replaceSourceSummaryAsync(
@@ -364,44 +342,8 @@ export class IncrementalIndexUpdater {
 					previousSummary,
 					nextSummary,
 					run.yieldScheduler,
-					(
-						lookupPath,
-						lookupKey,
-						sourcePath,
-						hadResolved,
-						isLookupPathEmptyAfter,
-					) => {
-						onRemoveSourceFromLookupPath(
-							run.snapshot,
-							lookupPath,
-							lookupKey,
-							sourcePath,
-							hadResolved,
-							isLookupPathEmptyAfter,
-							run.affectedLookupKeys,
-							run.touchedLookupKeys,
-						);
-					},
-					(
-						lookupPath,
-						lookupKey,
-						sourcePath,
-						isNewSource,
-						hadResolved,
-						hasResolved,
-					) => {
-						onAddEdge(
-							run.snapshot,
-							lookupPath,
-							lookupKey,
-							sourcePath,
-							isNewSource,
-							hadResolved,
-							hasResolved,
-							run.affectedLookupKeys,
-							run.touchedLookupKeys,
-						);
-					},
+					run.backlinkRemovalMutationCallback,
+					run.backlinkAdditionMutationCallback,
 					run.backlinkReconcileSink,
 				);
 
@@ -618,8 +560,44 @@ function createIncrementalUpdateRunState(
 		localScratch: createFileLocalAggregation(),
 		pathsToUpdate: new Set(),
 		pathsToDelete: new Set(),
-		createEventEvaluationCache: createCreateEventEvaluationCache(),
-		fastRenamePlans: [],
+		backlinkRemovalMutationCallback(
+			lookupPath,
+			lookupKey,
+			sourcePath,
+			hadResolved,
+			isLookupPathEmptyAfter,
+		) {
+			onRemoveSourceFromLookupPath(
+				snapshot,
+				lookupPath,
+				lookupKey,
+				sourcePath,
+				hadResolved,
+				isLookupPathEmptyAfter,
+				affectedLookupKeys,
+				touchedLookupKeys,
+			);
+		},
+		backlinkAdditionMutationCallback(
+			lookupPath,
+			lookupKey,
+			sourcePath,
+			isNewSource,
+			hadResolved,
+			hasResolved,
+		) {
+			onAddEdge(
+				snapshot,
+				lookupPath,
+				lookupKey,
+				sourcePath,
+				isNewSource,
+				hadResolved,
+				hasResolved,
+				affectedLookupKeys,
+				touchedLookupKeys,
+			);
+		},
 		backlinkReconcileSink: {
 			markAffectedDestination(destinationPath) {
 				affectedLookupPaths.add(destinationPath);

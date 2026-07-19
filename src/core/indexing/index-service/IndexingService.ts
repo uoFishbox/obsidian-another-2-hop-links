@@ -7,7 +7,10 @@ import { extractTags } from "core/indexing/metadata/metadataExtractor";
 import { buildIndexesAsync } from "core/indexing/index-service/indexSnapshotBuilder";
 import { IncrementalIndexUpdater } from "core/indexing/index-service/IncrementalIndexUpdater";
 import { IndexQueryEngine } from "core/indexing/index-service/IndexQueryEngine";
-import { TagIndexStore } from "core/indexing/tag-index/TagIndexStore";
+import {
+	EMPTY_TAG_MUTATION_RESULT,
+	TagIndexStore,
+} from "core/indexing/tag-index/TagIndexStore";
 import type { TaggedNote, TagReference, BacklinksMap } from "types/domain";
 import type { IVault, IMetadataCache } from "types/obsidian";
 import type { IIndexingService } from "types/services";
@@ -328,11 +331,6 @@ export class IndexingService implements IIndexingService {
 			);
 		this.beginIndexing();
 
-		let affectedPaths = new Set<string>();
-		let affectedLookupKeys = new Set<string>();
-		let affectedTags = new Set<string>();
-		let affectedLinkSourcePaths = new Set<string>();
-		let affectedTagSourcePaths = new Set<string>();
 		const sourceContentChangedPaths = new Set<string>();
 
 		try {
@@ -351,16 +349,12 @@ export class IndexingService implements IIndexingService {
 						changes,
 						timeSlicingOptions,
 					)
-				: {
-						affectedTags: new Set<string>(),
-						affectedTagSourcePaths: new Set<string>(),
-						tagIndexChanged: false,
-					};
-			affectedPaths = result.affectedPaths;
-			affectedLookupKeys = result.affectedLookupKeys;
-			affectedTags = tagResult.affectedTags;
-			affectedLinkSourcePaths = result.affectedLinkSourcePaths;
-			affectedTagSourcePaths = tagResult.affectedTagSourcePaths;
+				: EMPTY_TAG_MUTATION_RESULT;
+			const affectedPaths = result.affectedPaths;
+			const affectedLookupKeys = result.affectedLookupKeys;
+			const affectedTags = tagResult.affectedTags;
+			const affectedLinkSourcePaths = result.affectedLinkSourcePaths;
+			const affectedTagSourcePaths = tagResult.affectedTagSourcePaths;
 
 			for (const change of changes) {
 				if (change.type === "rename") {

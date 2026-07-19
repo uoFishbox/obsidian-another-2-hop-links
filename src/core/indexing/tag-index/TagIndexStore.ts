@@ -14,10 +14,19 @@ import type { TimeSlicingOptions } from "../types/IndexTypes";
 import { createYieldScheduler, defaultYieldToMainThread } from "../timeSlicing";
 
 export interface TagMutationResult {
-	affectedTags: Set<string>;
-	affectedTagSourcePaths: Set<string>;
-	tagIndexChanged: boolean;
+	readonly affectedTags: ReadonlySet<string>;
+	readonly affectedTagSourcePaths: ReadonlySet<string>;
+	readonly tagIndexChanged: boolean;
 }
+
+const EMPTY_STRING_SET: ReadonlySet<string> = new Set<string>();
+
+/** Shared result for updates that cannot change the tag index. */
+export const EMPTY_TAG_MUTATION_RESULT: TagMutationResult = {
+	affectedTags: EMPTY_STRING_SET,
+	affectedTagSourcePaths: EMPTY_STRING_SET,
+	tagIndexChanged: false,
+};
 
 export class TagIndexStore {
 	private tagIndex: TagIndex = createEmptyTagIndex();
@@ -48,19 +57,15 @@ export class TagIndexStore {
 		options: TimeSlicingOptions = {},
 	): Promise<TagMutationResult> {
 		if (!this.isEnabled()) {
-			return {
-				affectedTags: new Set<string>(),
-				affectedTagSourcePaths: new Set<string>(),
-				tagIndexChanged: false,
-			};
+			return EMPTY_TAG_MUTATION_RESULT;
 		}
 
 		const yieldScheduler = createYieldScheduler(
 			options.yieldFn ?? defaultYieldToMainThread,
 			options.yieldIntervalMs ?? INDEXING_YIELD_INTERVAL_MS,
 		);
-		const affectedTags = new Set<string>();
-		const affectedTagSourcePaths = new Set<string>();
+		let affectedTags: Set<string> | undefined;
+		let affectedTagSourcePaths: Set<string> | undefined;
 		let changeCount = 0;
 
 		for (const change of changes) {
@@ -75,6 +80,8 @@ export class TagIndexStore {
 					change.newPath,
 				);
 				if (movedTags) {
+					affectedTags ??= new Set<string>();
+					affectedTagSourcePaths ??= new Set<string>();
 					if (!newPathIsMd) {
 						removeFileTagsFromTagIndex(this.tagIndex, change.newPath);
 						collectExpandedTagNames(affectedTags, movedTags);
@@ -91,6 +98,8 @@ export class TagIndexStore {
 						const tags = extractTags(cache);
 						const tagSetChanged = hasTagSetChanged(previousTags, tags);
 						if (tagSetChanged) {
+							affectedTags ??= new Set<string>();
+							affectedTagSourcePaths ??= new Set<string>();
 							collectExpandedTagNames(affectedTags, previousTags);
 							collectExpandedTagNames(affectedTags, tags);
 							affectedTagSourcePaths.add(change.newPath);
@@ -108,6 +117,8 @@ export class TagIndexStore {
 				if (change.type === "delete") {
 					removeFileTagsFromTagIndex(this.tagIndex, change.path);
 					if (previousTags && previousTags.length > 0) {
+						affectedTags ??= new Set<string>();
+						affectedTagSourcePaths ??= new Set<string>();
 						collectExpandedTagNames(affectedTags, previousTags);
 						affectedTagSourcePaths.add(change.path);
 					}
@@ -119,6 +130,8 @@ export class TagIndexStore {
 						const tags = extractTags(cache);
 						const tagSetChanged = hasTagSetChanged(previousTags, tags);
 						if (tagSetChanged) {
+							affectedTags ??= new Set<string>();
+							affectedTagSourcePaths ??= new Set<string>();
 							collectExpandedTagNames(affectedTags, previousTags);
 							collectExpandedTagNames(affectedTags, tags);
 							affectedTagSourcePaths.add(change.path);
@@ -136,9 +149,10 @@ export class TagIndexStore {
 		}
 
 		return {
-			affectedTags,
-			affectedTagSourcePaths,
-			tagIndexChanged: affectedTags.size > 0 || affectedTagSourcePaths.size > 0,
+			affectedTags: affectedTags ?? EMPTY_STRING_SET,
+			affectedTagSourcePaths: affectedTagSourcePaths ?? EMPTY_STRING_SET,
+			tagIndexChanged:
+				affectedTags !== undefined || affectedTagSourcePaths !== undefined,
 		};
 	}
 }

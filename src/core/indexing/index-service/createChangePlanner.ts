@@ -14,6 +14,11 @@ import {
 	type YieldScheduler,
 } from "../timeSlicing";
 
+const EMPTY_SOURCE_LOOKUP_KEY_TO_RAW_LINK_PATHS: ReadonlyMap<
+	string,
+	string | readonly string[]
+> = new Map();
+
 export interface CreateEventEvaluationCache {
 	sourceLookupKeyToRawLinkPaths: Map<
 		string,
@@ -93,7 +98,7 @@ export function createCreateChangePlanner(
 			}
 		}
 
-		const evaluatedShadowSources = new Set<string>();
+		let evaluatedShadowSources: Set<string> | undefined;
 		let shadowingCount = 0;
 		let scheduledFromShadowing = 0;
 		for (const candidate of candidates) {
@@ -104,7 +109,7 @@ export function createCreateChangePlanner(
 			for (const sourcePath of sources) {
 				if (
 					pathsToUpdate.has(sourcePath) ||
-					evaluatedShadowSources.has(sourcePath)
+					evaluatedShadowSources?.has(sourcePath)
 				) {
 					shadowingCount++;
 					const pendingYield = maybeYield(
@@ -117,7 +122,7 @@ export function createCreateChangePlanner(
 					}
 					continue;
 				}
-				evaluatedShadowSources.add(sourcePath);
+				(evaluatedShadowSources ??= new Set<string>()).add(sourcePath);
 
 				if (
 					await sourceHasLinkResolvingToCreatedFileAsync(
@@ -246,12 +251,11 @@ export function createCreateChangePlanner(
 
 		const sourceFile = resolveFileByPath(vault, sourcePath);
 		if (!sourceFile) {
-			const empty: ReadonlyMap<string, string | readonly string[]> = new Map();
 			createEventEvaluationCache.sourceLookupKeyToRawLinkPaths.set(
 				sourcePath,
-				empty,
+				EMPTY_SOURCE_LOOKUP_KEY_TO_RAW_LINK_PATHS,
 			);
-			return empty;
+			return EMPTY_SOURCE_LOOKUP_KEY_TO_RAW_LINK_PATHS;
 		}
 
 		const cache = metadataCache.getFileCache(
