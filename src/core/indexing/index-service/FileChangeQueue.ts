@@ -40,6 +40,12 @@ export class FileChangeQueue {
 		this.requiresTagRebuild = true;
 	}
 
+	/** Marks all queued changes for recovery through a full index rebuild. */
+	requestFullRebuild(): void {
+		this.requiresBacklinkRebuild = true;
+		this.requiresTagRebuild = true;
+	}
+
 	hasPending(): boolean {
 		return (
 			this.requiresBacklinkRebuild ||

@@ -267,6 +267,59 @@ describe("IndexUpdateQueue", () => {
 		);
 	});
 
+	test("incremental update failure recovers with a full rebuild", async () => {
+		const harness = createHarness();
+		await initializeQueue(harness);
+		const error = new Error("temporary incremental update failure");
+		const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+		harness.indexingService.applyFileChangesTimeSliced.mockRejectedValueOnce(error);
+
+		harness.emitVaultEvent("delete", createMockTFile("notes/deleted.md"));
+		await flushAsyncTasks();
+
+		expect(
+			harness.indexingService.applyFileChangesTimeSliced,
+		).toHaveBeenCalledTimes(1);
+		expect(harness.indexingService.rebuildIndexesTimeSliced).toHaveBeenCalledTimes(
+			1,
+		);
+		expect(consoleError).toHaveBeenCalledWith(
+			"[IndexUpdateQueue] Failed to process pending changes:",
+			error,
+		);
+	});
+
+	test("failed recovery rebuild remains pending until the next change", async () => {
+		const harness = createHarness();
+		await initializeQueue(harness);
+		const applyError = new Error("incremental update failure");
+		const rebuildError = new Error("recovery rebuild failure");
+		vi.spyOn(console, "error").mockImplementation(() => {});
+		harness.indexingService.applyFileChangesTimeSliced.mockRejectedValueOnce(
+			applyError,
+		);
+		harness.indexingService.rebuildIndexesTimeSliced.mockRejectedValueOnce(
+			rebuildError,
+		);
+
+		harness.emitVaultEvent("delete", createMockTFile("notes/deleted.md"));
+		await flushAsyncTasks();
+
+		expect(harness.indexingService.rebuildIndexesTimeSliced).toHaveBeenCalledTimes(
+			1,
+		);
+
+		harness.emitVaultEvent("modify", createMockTFile("notes/next.md"));
+		await flushAsyncTasks();
+
+		expect(harness.indexingService.rebuildIndexesTimeSliced).toHaveBeenCalledTimes(
+			2,
+		);
+		expect(
+			harness.indexingService.applyFileChangesTimeSliced,
+		).toHaveBeenCalledTimes(1);
+	});
+
 	test("initial catch-up applies delete for a file created and deleted during initial scan", async () => {
 		const harness = createHarness();
 		const temp = createMockTFile("notes/temp.md");

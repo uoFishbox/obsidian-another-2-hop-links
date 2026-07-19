@@ -29,6 +29,7 @@ export class IndexUpdateQueue {
 	private unsubscribeIndexIdleWaiter: (() => void) | undefined;
 	private unsubscribeIndexDataUpdate: (() => void) | undefined;
 	private isProcessingPendingChanges = false;
+	private hasAttemptedAutomaticRecovery = false;
 	private initialFullScanState: InitialFullScanState = "pending";
 	private waitsForMetadataResolve = false;
 	private metadataResolveGeneration = 0;
@@ -283,6 +284,7 @@ export class IndexUpdateQueue {
 			return;
 		}
 
+		this.hasAttemptedAutomaticRecovery = false;
 		this.changeQueue.recordChange(change);
 
 		if (change.type === "create" || change.type === "rename") {
@@ -437,6 +439,7 @@ export class IndexUpdateQueue {
 			return;
 		}
 
+		let shouldScheduleRecovery = false;
 		this.isProcessingPendingChanges = true;
 		try {
 			while (this.changeQueue.hasPending()) {
@@ -461,10 +464,23 @@ export class IndexUpdateQueue {
 					await this.indexingService.applyFileChangesTimeSliced(changes);
 				}
 			}
+			if (!this.changeQueue.hasPending()) {
+				this.hasAttemptedAutomaticRecovery = false;
+			}
+		} catch (error) {
+			this.changeQueue.requestFullRebuild();
+			if (!this.hasAttemptedAutomaticRecovery) {
+				this.hasAttemptedAutomaticRecovery = true;
+				shouldScheduleRecovery = true;
+			}
+			throw error;
 		} finally {
 			this.isProcessingPendingChanges = false;
 			this.syncMetadataResolveGate();
 			this.notifyQueueIdleWaitersIfIdle();
+			if (shouldScheduleRecovery && !this.destroyed) {
+				this.schedulePendingProcessing();
+			}
 		}
 	}
 
