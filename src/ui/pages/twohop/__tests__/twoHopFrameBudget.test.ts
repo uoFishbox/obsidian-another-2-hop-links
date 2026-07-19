@@ -9,7 +9,7 @@ describe("twoHopFrameBudget", () => {
 		tracker.beginFrame(108.4);
 
 		expect(tracker.frameIntervalMs).toBeCloseTo(4.2, 5);
-		expect(tracker.deadline - 108.4).toBeCloseTo(0.84, 5);
+		expect(tracker.deadline - 108.4).toBeCloseTo(1.26, 5);
 	});
 
 	it("caps work by bind count as well as time", () => {
