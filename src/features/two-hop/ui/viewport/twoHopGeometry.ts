@@ -1,6 +1,6 @@
 import type { ViewPlanLayoutMetrics } from "ui/virtualization/svelte/viewPlanLayout";
 import type { TwoHopVirtualListItem } from "features/two-hop/ui/twoHopVirtualListModel";
-import type { TwoHopSnapshot } from "features/two-hop/ui/viewport/twoHopSnapshot";
+import type { TwoHopDocument } from "features/two-hop/ui/twoHopDocument";
 
 export interface TwoHopGeometry {
 	readonly columns: number;
@@ -30,7 +30,6 @@ export type TwoHopResolvedCell =
 			readonly columnIndex: number;
 			readonly itemIndex: number;
 			readonly item: TwoHopVirtualListItem;
-			readonly shellTitle: string;
 	  }
 	| {
 			readonly kind: "load-more";
@@ -53,7 +52,6 @@ export interface TwoHopResolvedCellBuffer {
 	columnIndex: number;
 	itemIndex: number;
 	item: TwoHopVirtualListItem | null;
-	shellTitle: string;
 }
 
 export interface TwoHopResolvedRowBuffer {
@@ -72,7 +70,6 @@ export function createTwoHopResolvedCellBuffer(): TwoHopResolvedCellBuffer {
 		columnIndex: -1,
 		itemIndex: -1,
 		item: null,
-		shellTitle: "",
 	};
 }
 
@@ -86,11 +83,11 @@ export function createTwoHopResolvedRowBuffer(): TwoHopResolvedRowBuffer {
 }
 
 /** Builds compact section-prefix geometry. No per-row or per-cell objects are created. */
-export function createTwoHopGeometry(
-	snapshot: TwoHopSnapshot,
+export function compileFixedGridLayout(
+	document: TwoHopDocument,
 	layout: ViewPlanLayoutMetrics,
 ): TwoHopGeometry {
-	const sectionCount = snapshot.sections.length;
+	const sectionCount = document.sections.length;
 	const columns = Math.max(1, Math.floor(layout.columns));
 	const rowHeight = Math.max(1, layout.rowHeight);
 	const rowStride = rowHeight + Math.max(0, layout.gap);
@@ -103,8 +100,9 @@ export function createTwoHopGeometry(
 	let top = 0;
 
 	for (let sectionIndex = 0; sectionIndex < sectionCount; sectionIndex += 1) {
-		const section = snapshot.sections[sectionIndex];
-		const cellCount = 1 + section.visibleItemCount + (section.showLoadMore ? 1 : 0);
+		const section = document.sections[sectionIndex];
+		const cellCount =
+			1 + section.visibleItemCount + (section.loadMore === null ? 0 : 1);
 		const sectionRowCount = Math.ceil(cellCount / columns);
 		const contentHeight =
 			sectionRowCount > 0
@@ -136,13 +134,13 @@ export function createTwoHopGeometry(
 
 /** Resolves a global row/column to section data using one binary search and arithmetic. */
 export function resolveTwoHopCell(
-	snapshot: TwoHopSnapshot,
+	document: TwoHopDocument,
 	geometry: TwoHopGeometry,
 	rowIndex: number,
 	columnIndex: number,
 ): TwoHopResolvedCell | null {
 	return resolveTwoHopCellInto(
-		snapshot,
+		document,
 		geometry,
 		rowIndex,
 		columnIndex,
@@ -152,7 +150,7 @@ export function resolveTwoHopCell(
 
 /** Resolves into caller-owned storage for allocation-free physical slot binding. */
 export function resolveTwoHopCellInto(
-	snapshot: TwoHopSnapshot,
+	document: TwoHopDocument,
 	geometry: TwoHopGeometry,
 	rowIndex: number,
 	columnIndex: number,
@@ -171,7 +169,7 @@ export function resolveTwoHopCellInto(
 	if (sectionIndex < 0) return null;
 	const rowInSection = rowIndex - geometry.firstRowBySection[sectionIndex];
 	return resolveTwoHopCellForSectionInto(
-		snapshot,
+		document,
 		geometry,
 		sectionIndex,
 		rowIndex,
@@ -201,7 +199,7 @@ export function resolveTwoHopRowInto(
 
 /** Resolves a cell from caller-owned row geometry without another section search. */
 export function resolveTwoHopCellInRowInto(
-	snapshot: TwoHopSnapshot,
+	document: TwoHopDocument,
 	geometry: TwoHopGeometry,
 	row: TwoHopResolvedRowBuffer,
 	columnIndex: number,
@@ -209,7 +207,7 @@ export function resolveTwoHopCellInRowInto(
 ): TwoHopResolvedCell | null {
 	if (columnIndex < 0 || columnIndex >= geometry.columns) return null;
 	return resolveTwoHopCellForSectionInto(
-		snapshot,
+		document,
 		geometry,
 		row.sectionIndex,
 		row.rowIndex,
@@ -220,7 +218,7 @@ export function resolveTwoHopCellInRowInto(
 }
 
 function resolveTwoHopCellForSectionInto(
-	snapshot: TwoHopSnapshot,
+	document: TwoHopDocument,
 	geometry: TwoHopGeometry,
 	sectionIndex: number,
 	rowIndex: number,
@@ -228,47 +226,44 @@ function resolveTwoHopCellForSectionInto(
 	columnIndex: number,
 	target: TwoHopResolvedCellBuffer,
 ): TwoHopResolvedCell | null {
-	const section = snapshot.sections[sectionIndex];
+	const section = document.sections[sectionIndex];
 	if (!section) return null;
 	const cellIndex = rowInSection * geometry.columns + columnIndex;
 
 	if (cellIndex === 0) {
 		target.kind = "header";
-		target.logicalKey = section.headerLogicalKey;
+		target.logicalKey = section.header.logicalKey;
 		target.sectionIndex = sectionIndex;
 		target.rowIndex = rowIndex;
 		target.columnIndex = columnIndex;
 		target.itemIndex = -1;
 		target.item = null;
-		target.shellTitle = "";
 		return target as unknown as Extract<TwoHopResolvedCell, { kind: "header" }>;
 	}
 
 	const visibleItemOffset = cellIndex - 1;
 	if (visibleItemOffset < section.visibleItemCount) {
-		const itemIndex = section.visibleItemSourceIndexes[visibleItemOffset];
-		const item = section.visibleItems[visibleItemOffset];
+		const itemIndex = section.visibleSourceIndexes[visibleItemOffset];
+		const item = section.getItem(visibleItemOffset);
 		if (!item) return null;
 		target.kind = "item";
-		target.logicalKey = section.visibleItemLogicalKeys[visibleItemOffset];
+		target.logicalKey = `item:${section.key}:${item.virtualKey}`;
 		target.sectionIndex = sectionIndex;
 		target.rowIndex = rowIndex;
 		target.columnIndex = columnIndex;
 		target.itemIndex = itemIndex;
 		target.item = item;
-		target.shellTitle = section.visibleItemTitles[visibleItemOffset] ?? "";
 		return target as unknown as Extract<TwoHopResolvedCell, { kind: "item" }>;
 	}
 
-	if (section.showLoadMore && visibleItemOffset === section.visibleItemCount) {
+	if (section.loadMore && visibleItemOffset === section.visibleItemCount) {
 		target.kind = "load-more";
-		target.logicalKey = section.loadMoreLogicalKey;
+		target.logicalKey = section.loadMore.logicalKey;
 		target.sectionIndex = sectionIndex;
 		target.rowIndex = rowIndex;
 		target.columnIndex = columnIndex;
 		target.itemIndex = -1;
 		target.item = null;
-		target.shellTitle = "";
 		return target as unknown as Extract<TwoHopResolvedCell, { kind: "load-more" }>;
 	}
 

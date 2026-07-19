@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { createTwoHopInteractionRouter } from "features/two-hop/ui/twoHopInteractionRouter";
-import { createTwoHopGeometry } from "features/two-hop/ui/viewport/twoHopGeometry";
-import { createTwoHopSnapshot } from "features/two-hop/ui/viewport/twoHopSnapshot";
+import { compileFixedGridLayout } from "features/two-hop/ui/viewport/twoHopGeometry";
+import { createTwoHopDocument } from "features/two-hop/ui/twoHopDocument";
 import type { TwoHopVirtualSectionDescriptor } from "features/two-hop/ui/twoHopVirtualListModel";
 import type { TwoHopVirtualListItem } from "features/two-hop/ui/twoHopVirtualListModel";
 
@@ -31,13 +31,12 @@ function createFixture() {
 		getItem: (index) => items[index],
 		headerProps: {},
 	} satisfies TwoHopVirtualSectionDescriptor;
-	const snapshot = createTwoHopSnapshot({
+	const document = createTwoHopDocument({
 		sections: [descriptor],
 		visibleCounts: { section: 3 },
 		initialVisibleCount: 3,
-		resolveItemTitle: (item) => item.virtualKey,
 	});
-	const geometry = createTwoHopGeometry(snapshot, {
+	const geometry = compileFixedGridLayout(document, {
 		containerWidth: 200,
 		columns: 2,
 		cellWidth: 95,
@@ -45,14 +44,14 @@ function createFixture() {
 		gap: 10,
 		sectionMarginBottom: 20,
 	});
-	return { snapshot, geometry };
+	return { document, geometry };
 }
 
 describe("twoHopInteractionRouter", () => {
 	it("resolves horizontal and vertical targets from compact geometry", () => {
-		const { snapshot, geometry } = createFixture();
+		const { document, geometry } = createFixture();
 		const router = createTwoHopInteractionRouter({
-			getSnapshot: () => snapshot,
+			getDocument: () => document,
 			getGeometry: () => geometry,
 		});
 

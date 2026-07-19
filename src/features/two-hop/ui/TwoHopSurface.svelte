@@ -17,6 +17,7 @@
 		createTwoHopViewportController,
 		type TwoHopViewportController,
 	} from "features/two-hop/ui/viewport/twoHopViewportController";
+	import { createTwoHopDocumentProjection } from "features/two-hop/ui/twoHopDocument";
 
 	interface Props {
 		sections: readonly TwoHopVirtualSectionDescriptor[];
@@ -39,6 +40,12 @@
 	}
 
 	const props: Props = $props();
+	const documentProjection = createTwoHopDocumentProjection({
+		sections: props.sections,
+		applicationStore: props.applicationStore,
+		initialVisibleCount: props.initialVisibleCount,
+		loadMoreIncrement: props.loadMoreIncrement,
+	});
 	const previewAppContext = (() => {
 		try {
 			return useAppContext();
@@ -65,6 +72,10 @@
 		...args: Parameters<TwoHopViewportController["resolveNavigationTarget"]>
 	) => controller?.resolveNavigationTarget(...args) ?? null;
 	const flushVirtualScrollMeasurement = () => controller?.flush();
+	const renderRevision = $derived.by(() => ({
+		cardModel: props.cardModelRevision,
+		shellTitle: props.shellTitleRevision,
+	}));
 
 	$effect(() => {
 		const element = rootEl;
@@ -73,12 +84,9 @@
 		controller = createTwoHopViewportController({
 			rootEl: element,
 			shadowHostEl: element,
-			sections: props.sections,
-			revision: props.cardModelRevision,
-			shellTitleRevision: props.shellTitleRevision,
-			applicationStore: props.applicationStore,
-			initialVisibleCount: props.initialVisibleCount,
-			loadMoreIncrement: props.loadMoreIncrement,
+			document: documentProjection.getDocument(),
+			loadMoreDocument: (sectionId) => documentProjection.loadMore(sectionId),
+			revision: renderRevision,
 			configuredLayout,
 			resolveItemCardModel: (item, presentation) =>
 				props.resolveItemCardModel?.(item, presentation) ??
@@ -114,11 +122,8 @@
 
 	$effect(() => {
 		void props.interactionDescriptorRevision;
-		controller?.setSections(
-			props.sections,
-			props.cardModelRevision,
-			props.shellTitleRevision,
-		);
+		const document = documentProjection.setSections(props.sections);
+		controller?.setDocument(document, renderRevision);
 	});
 
 	$effect(() => {

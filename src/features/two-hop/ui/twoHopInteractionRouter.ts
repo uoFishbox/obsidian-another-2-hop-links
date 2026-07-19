@@ -6,7 +6,7 @@ import {
 	type TwoHopGeometry,
 	type TwoHopResolvedCell,
 } from "features/two-hop/ui/viewport/twoHopGeometry";
-import type { TwoHopSnapshot } from "features/two-hop/ui/viewport/twoHopSnapshot";
+import type { TwoHopDocument } from "features/two-hop/ui/twoHopDocument";
 
 export interface TwoHopInteractionRouter {
 	resolveNavigationTarget(
@@ -17,7 +17,7 @@ export interface TwoHopInteractionRouter {
 }
 
 export function createTwoHopInteractionRouter(params: {
-	readonly getSnapshot: () => TwoHopSnapshot;
+	readonly getDocument: () => TwoHopDocument;
 	readonly getGeometry: () => TwoHopGeometry;
 }): TwoHopInteractionRouter {
 	function resolveNavigationTarget(
@@ -25,10 +25,10 @@ export function createTwoHopInteractionRouter(params: {
 		direction: ResultNavigationDirection,
 		currentPosition: { readonly rowIndex: number; readonly columnIndex: number },
 	): VirtualNavigationTarget | null {
-		const snapshot = params.getSnapshot();
+		const document = params.getDocument();
 		const geometry = params.getGeometry();
 		const cell = resolveDirectionalCell(
-			snapshot,
+			document,
 			geometry,
 			direction,
 			currentPosition.rowIndex,
@@ -49,7 +49,7 @@ export function resolveTwoHopNavigationCellKey(cell: TwoHopResolvedCell): string
 }
 
 function resolveDirectionalCell(
-	snapshot: TwoHopSnapshot,
+	document: TwoHopDocument,
 	geometry: TwoHopGeometry,
 	direction: ResultNavigationDirection,
 	rowIndex: number,
@@ -63,7 +63,7 @@ function resolveDirectionalCell(
 			nextRow += rowStep
 		) {
 			const sameColumn = resolveTwoHopCell(
-				snapshot,
+				document,
 				geometry,
 				nextRow,
 				columnIndex,
@@ -75,7 +75,7 @@ function resolveDirectionalCell(
 				fallbackColumn -= 1
 			) {
 				const fallback = resolveTwoHopCell(
-					snapshot,
+					document,
 					geometry,
 					nextRow,
 					fallbackColumn,
@@ -92,7 +92,7 @@ function resolveDirectionalCell(
 	while (linearIndex >= 0 && linearIndex < linearEnd) {
 		const nextRow = Math.floor(linearIndex / geometry.columns);
 		const nextColumn = linearIndex % geometry.columns;
-		const cell = resolveTwoHopCell(snapshot, geometry, nextRow, nextColumn);
+		const cell = resolveTwoHopCell(document, geometry, nextRow, nextColumn);
 		if (cell) return cell;
 		linearIndex += linearStep;
 	}

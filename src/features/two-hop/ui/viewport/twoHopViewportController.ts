@@ -11,11 +11,6 @@ import {
 	DEFAULT_VIEW_PLAN_CARD_LAYOUT,
 	type ViewPlanLayoutMetrics,
 } from "ui/virtualization/svelte/viewPlanLayout";
-import {
-	createSectionVisibleCountsController,
-	getSectionPaginationKey,
-	type SectionPaginationApplicationStore,
-} from "ui/virtualization/pagination";
 import type { CardRenderModel } from "ui/components/items/cardRenderModel";
 import type { ResolvedCardLayoutSettings } from "ui/shared/layout/cardLayoutCssVars";
 import type { InteractionDescriptor } from "ui/interactions/interactionTypes";
@@ -25,7 +20,7 @@ import {
 	type TwoHopDomRowSlot,
 } from "features/two-hop/ui/twoHopDomPool";
 import {
-	createTwoHopGeometry,
+	compileFixedGridLayout,
 	resolveTwoHopCell,
 	resolveTwoHopCellInRowInto,
 	resolveTwoHopVisibleRowsInto,
@@ -43,14 +38,8 @@ import {
 } from "features/two-hop/ui/twoHopFrameBudget";
 import type { TwoHopCardPresentationState } from "features/two-hop/ui/twoHopCellStaticState";
 import { createTwoHopShellRenderer } from "features/two-hop/ui/twoHopShellRenderer";
-import {
-	createTwoHopSnapshot,
-	type TwoHopSnapshot,
-} from "features/two-hop/ui/viewport/twoHopSnapshot";
-import type {
-	TwoHopVirtualListItem,
-	TwoHopVirtualSectionDescriptor,
-} from "features/two-hop/ui/twoHopVirtualListModel";
+import type { TwoHopDocument } from "features/two-hop/ui/twoHopDocument";
+import type { TwoHopVirtualListItem } from "features/two-hop/ui/twoHopVirtualListModel";
 import { createTwoHopInteractionRouter } from "features/two-hop/ui/twoHopInteractionRouter";
 import type { ResultNavigationDirection } from "features/keyboard-navigation/resultFocus";
 import type { VirtualNavigationTarget } from "ui/virtualization/types";
@@ -68,14 +57,10 @@ const MINIMUM_POOL_ROWS = 12;
 export interface TwoHopViewportControllerParams {
 	readonly rootEl: HTMLDivElement;
 	readonly shadowHostEl: HTMLDivElement;
-	readonly sections: readonly TwoHopVirtualSectionDescriptor[];
-	/** Invalidates rich card models, including preview and search state. */
+	readonly document: TwoHopDocument;
+	readonly loadMoreDocument: (sectionId: string) => TwoHopDocument | null;
+	/** Invalidates all presentation derived from document items. */
 	readonly revision?: unknown;
-	/** Invalidates only the titles materialized into the visible snapshot. */
-	readonly shellTitleRevision?: unknown;
-	readonly applicationStore?: SectionPaginationApplicationStore;
-	readonly initialVisibleCount?: number;
-	readonly loadMoreIncrement?: number;
 	readonly configuredLayout?: ResolvedCardLayoutSettings | null;
 	readonly resolveItemCardModel?: (
 		item: TwoHopVirtualListItem,
@@ -113,11 +98,7 @@ export interface TwoHopViewportController {
 	readonly shadowRoot: ShadowRoot;
 	readonly contentEl: HTMLDivElement;
 	readonly scrollContainerEl: HTMLElement | null;
-	setSections(
-		sections: readonly TwoHopVirtualSectionDescriptor[],
-		revision?: unknown,
-		shellTitleRevision?: unknown,
-	): void;
+	setDocument(document: TwoHopDocument, revision?: unknown): void;
 	setConfiguredLayout(layout: ResolvedCardLayoutSettings | null): void;
 	setPreviewActive(active: boolean): void;
 	loadMore(sectionId: string): void;
@@ -166,24 +147,16 @@ export function createTwoHopViewportController(
 		((handle: number) => ownerWindow?.clearTimeout(handle));
 	const now =
 		params.now ?? (() => ownerWindow?.performance.now() ?? performance.now());
-	const pagination = createSectionVisibleCountsController<
-		TwoHopVirtualListItem,
-		TwoHopVirtualSectionDescriptor["section"]
-	>({
-		applicationStore: params.applicationStore,
-		initialVisibleCount: params.initialVisibleCount,
-		loadMoreIncrement: params.loadMoreIncrement,
-	});
 	const shadowSurface = ensureCardRenderShadowSurface(params.shadowHostEl);
 	const contentEl = params.rootEl.ownerDocument.createElement("div");
 	shadowSurface.surfaceEl.append(contentEl);
 	const renderer = createTwoHopShellRenderer({
 		resolveItemCardModel: params.resolveItemCardModel,
+		resolveItemTitle: params.resolveItemTitle,
 	});
 	const frameBudgetTracker = createTwoHopFrameBudgetTracker();
-	let sections = params.sections;
 	let configuredLayout = params.configuredLayout ?? null;
-	let snapshot: TwoHopSnapshot;
+	let twoHopDocument = params.document;
 	let geometry: TwoHopGeometry;
 	let layout: ViewPlanLayoutMetrics;
 	let pool: TwoHopDomPool;
@@ -202,7 +175,6 @@ export function createTwoHopViewportController(
 	let disposed = false;
 	let previewActive = true;
 	let revision = params.revision;
-	let shellTitleRevision = params.shellTitleRevision;
 	const visibleRange: TwoHopRowRange = { start: 0, end: 0 };
 	let stats = {
 		scrollFrames: 0,
@@ -212,15 +184,13 @@ export function createTwoHopViewportController(
 		distantJumps: 0,
 	};
 	const interactionRouter = createTwoHopInteractionRouter({
-		getSnapshot: () => snapshot,
+		getDocument: () => twoHopDocument,
 		getGeometry: () => geometry,
 	});
 
 	refreshScrollGeometry();
-	const visibleCountUpdate = pagination.resolveForInput(sections);
 	layout = measureLayout();
-	snapshot = createSnapshot(visibleCountUpdate.snapshot.visibleCounts);
-	geometry = createTwoHopGeometry(snapshot, layout);
+	geometry = compileFixedGridLayout(twoHopDocument, layout);
 	pool = createPool();
 	let pendingShellSlots = createPendingShellSlots();
 	let pendingShellCount = 0;
@@ -265,20 +235,6 @@ export function createTwoHopViewportController(
 			gap: measured.gap,
 			sectionMarginBottom: measured.cardLayout.sectionMarginBottomPx,
 		};
-	}
-
-	function createSnapshot(
-		visibleCounts: Readonly<Record<string, number>>,
-		previousSnapshot?: TwoHopSnapshot,
-	): TwoHopSnapshot {
-		return createTwoHopSnapshot({
-			sections,
-			visibleCounts,
-			initialVisibleCount: params.initialVisibleCount ?? Number.POSITIVE_INFINITY,
-			revision: shellTitleRevision,
-			resolveItemTitle: params.resolveItemTitle,
-			previousSnapshot,
-		});
 	}
 
 	function createPool(): TwoHopDomPool {
@@ -500,18 +456,18 @@ export function createTwoHopViewportController(
 		for (let columnIndex = 0; columnIndex < pool.columns; columnIndex += 1) {
 			const slot = rowSlot.cells[columnIndex];
 			const cell = resolveTwoHopCellInRowInto(
-				snapshot,
+				twoHopDocument,
 				geometry,
 				rowBuffer,
 				columnIndex,
 				cellBuffers[slot.slotIndex],
 			);
 			if (rich && cell) {
-				renderer.renderShell(slot, cell, snapshot);
+				renderer.renderShell(slot, cell, twoHopDocument);
 				stats.shellBinds += 1;
 				shellBindCount += 1;
 			} else {
-				renderer.renderSkeleton(slot, cell, snapshot);
+				renderer.renderSkeleton(slot, cell, twoHopDocument);
 				stats.skeletonBinds += 1;
 			}
 			setSlotPending(slot.slotIndex, !slot.rich && Boolean(slot.logicalIdentity));
@@ -558,17 +514,11 @@ export function createTwoHopViewportController(
 		else previewHydrator?.notifyShellsChanged();
 	}
 
-	function rebuildData(anchorSectionIndex = -1, reusePreviousSnapshot = false): void {
+	function rebuildData(nextDocument: TwoHopDocument, anchorSectionIndex = -1): void {
 		const localScrollOffset = Math.max(0, readScrollTop() - cachedSectionTop);
 		const previousGeometry = geometry;
-		const previousSnapshot = snapshot;
-		const visibleCounts =
-			pagination.resolveForInput(sections).snapshot.visibleCounts;
-		snapshot = createSnapshot(
-			visibleCounts,
-			reusePreviousSnapshot ? previousSnapshot : undefined,
-		);
-		geometry = createTwoHopGeometry(snapshot, layout);
+		twoHopDocument = nextDocument;
+		geometry = compileFixedGridLayout(twoHopDocument, layout);
 		pool.setContentHeight(geometry.totalHeight);
 		if (
 			anchorSectionIndex >= 0 &&
@@ -592,16 +542,24 @@ export function createTwoHopViewportController(
 		previewHydrator?.notifyShellsChanged();
 	}
 
+	function refreshRenderedCells(): void {
+		for (const row of pool.rows) hideRow(row);
+		pendingShellCount = 0;
+		needsRefill = false;
+		residentStart = -1;
+		residentEnd = -1;
+		flush(now());
+		previewHydrator?.notifyShellsChanged();
+	}
+
 	function loadMore(sectionId: string): void {
-		const sectionIndex = sections.findIndex(
-			(section) => section.sectionId === sectionId,
+		const sectionIndex = twoHopDocument.sections.findIndex(
+			(section) => section.key === sectionId,
 		);
 		if (sectionIndex < 0) return;
-		const section = sections[sectionIndex];
-		const paginationKey = getSectionPaginationKey(section);
-		const result = pagination.loadMore(paginationKey, section.loadedCount);
-		if (!result.changed) return;
-		rebuildData(sectionIndex, true);
+		const nextDocument = params.loadMoreDocument(sectionId);
+		if (!nextDocument) return;
+		rebuildData(nextDocument, sectionIndex);
 	}
 
 	function resolveInteractionDescriptor(
@@ -612,7 +570,7 @@ export function createTwoHopViewportController(
 			for (const slot of rowSlot.cells) {
 				if (slot.root.dataset.cclInteractionId !== interactionId) continue;
 				const cell = resolveTwoHopCell(
-					snapshot,
+					twoHopDocument,
 					geometry,
 					rowSlot.logicalRowIndex,
 					slot.logicalColumnIndex,
@@ -623,7 +581,7 @@ export function createTwoHopViewportController(
 				}
 				if (cell.kind === "header") {
 					return (
-						snapshot.sections[cell.sectionIndex].descriptor.headerProps
+						twoHopDocument.sections[cell.sectionIndex].header.props
 							.interactionDescriptor ?? null
 					);
 				}
@@ -647,9 +605,9 @@ export function createTwoHopViewportController(
 			}
 			const headerSectionId = target.dataset.twoHopHeaderSection;
 			if (!headerSectionId) continue;
-			sections
-				.find((section) => section.sectionId === headerSectionId)
-				?.headerProps.onClick?.();
+			twoHopDocument.sections
+				.find((section) => section.key === headerSectionId)
+				?.header.props.onClick?.();
 			return;
 		}
 	}
@@ -690,7 +648,7 @@ export function createTwoHopViewportController(
 			return scrollGeometryChanged;
 		}
 		layout = nextLayout;
-		geometry = createTwoHopGeometry(snapshot, layout);
+		geometry = compileFixedGridLayout(twoHopDocument, layout);
 		previewHydrator?.dispose();
 		pool.dispose();
 		pool = createPool();
@@ -740,25 +698,17 @@ export function createTwoHopViewportController(
 		get scrollContainerEl() {
 			return scrollContainerEl;
 		},
-		setSections(nextSections, nextRevision, nextShellTitleRevision) {
-			if (
-				sections === nextSections &&
-				revision === nextRevision &&
-				shellTitleRevision === nextShellTitleRevision
-			) {
+		setDocument(nextDocument, nextRevision) {
+			if (twoHopDocument === nextDocument && revision === nextRevision) return;
+			const documentChanged = twoHopDocument !== nextDocument;
+			const presentationChanged = revision !== nextRevision;
+			if (presentationChanged) renderer.invalidateCardModels();
+			revision = nextRevision;
+			if (documentChanged) {
+				rebuildData(nextDocument);
 				return;
 			}
-			const canReuseTitleSnapshot = shellTitleRevision === nextShellTitleRevision;
-			if (
-				revision !== nextRevision ||
-				shellTitleRevision !== nextShellTitleRevision
-			) {
-				renderer.invalidateCardModels();
-			}
-			sections = nextSections;
-			revision = nextRevision;
-			shellTitleRevision = nextShellTitleRevision;
-			rebuildData(-1, canReuseTitleSnapshot);
+			refreshRenderedCells();
 		},
 		setConfiguredLayout(nextLayout) {
 			if (configuredLayout === nextLayout) return;

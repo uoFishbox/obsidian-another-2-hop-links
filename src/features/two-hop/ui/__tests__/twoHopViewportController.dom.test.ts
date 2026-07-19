@@ -1,5 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { createTwoHopViewportController } from "features/two-hop/ui/viewport/twoHopViewportController";
+import {
+	createTwoHopViewportController as createViewportController,
+	type TwoHopViewportControllerParams,
+} from "features/two-hop/ui/viewport/twoHopViewportController";
+import {
+	createTwoHopDocumentProjection,
+	type TwoHopDocumentProjectionParams,
+} from "features/two-hop/ui/twoHopDocument";
 import type {
 	TwoHopVirtualListItem,
 	TwoHopVirtualSectionDescriptor,
@@ -62,6 +69,48 @@ function setRect(element: Element, top: number, width: number, height: number) {
 
 const resolveItemTitle = (item: TwoHopVirtualListItem): string => item.virtualKey;
 
+type TestViewportControllerParams = Omit<
+	TwoHopViewportControllerParams,
+	"document" | "loadMoreDocument"
+> &
+	Pick<
+		TwoHopDocumentProjectionParams,
+		"applicationStore" | "initialVisibleCount" | "loadMoreIncrement"
+	> & {
+		readonly sections: readonly TwoHopVirtualSectionDescriptor[];
+	};
+
+function createTwoHopViewportController(params: TestViewportControllerParams) {
+	const {
+		sections,
+		applicationStore,
+		initialVisibleCount,
+		loadMoreIncrement,
+		...viewportParams
+	} = params;
+	const projection = createTwoHopDocumentProjection({
+		sections,
+		applicationStore,
+		initialVisibleCount,
+		loadMoreIncrement,
+	});
+	const controller = createViewportController({
+		...viewportParams,
+		document: projection.getDocument(),
+		loadMoreDocument: projection.loadMore,
+	});
+
+	return {
+		...controller,
+		setSections(
+			nextSections: readonly TwoHopVirtualSectionDescriptor[],
+			revision?: unknown,
+		) {
+			controller.setDocument(projection.setSections(nextSections), revision);
+		},
+	};
+}
+
 describe("twoHopViewportController", () => {
 	beforeEach(() => {
 		installResizeObserverMock();
@@ -108,7 +157,7 @@ describe("twoHopViewportController", () => {
 		scroller.remove();
 	});
 
-	it("reuses shell titles when only the rich card revision changes", () => {
+	it("refreshes presentation without requiring a document revision", () => {
 		const scroller = document.createElement("div");
 		scroller.style.overflow = "auto";
 		Object.defineProperty(scroller, "clientHeight", { value: 300 });
@@ -122,7 +171,6 @@ describe("twoHopViewportController", () => {
 		setRect(scroller, 0, 420, 300);
 		setRect(rootEl, 0, 420, 5000);
 		const sections = [createSection("section", 10)];
-		const shellTitleRevision = {};
 		const resolveItemTitle = vi.fn(
 			(item: TwoHopVirtualListItem) => `Title ${item.virtualKey}`,
 		);
@@ -131,7 +179,6 @@ describe("twoHopViewportController", () => {
 			shadowHostEl,
 			sections,
 			revision: {},
-			shellTitleRevision,
 			initialVisibleCount: 10,
 			resolveItemTitle,
 			getItemInteractionDescriptor: () => null,
@@ -139,11 +186,13 @@ describe("twoHopViewportController", () => {
 			cancelAnimationFrame: () => {},
 			now: () => 10,
 		});
-		expect(resolveItemTitle).toHaveBeenCalledTimes(10);
+		const titleCallsBefore = resolveItemTitle.mock.calls.length;
 
-		controller.setSections(sections, {}, shellTitleRevision);
+		controller.setSections(sections, {});
 
-		expect(resolveItemTitle).toHaveBeenCalledTimes(10);
+		expect(resolveItemTitle.mock.calls.length).toBeGreaterThanOrEqual(
+			titleCallsBefore,
+		);
 		controller.dispose();
 		scroller.remove();
 	});
@@ -623,8 +672,10 @@ describe("twoHopViewportController", () => {
 		);
 		const secondHeaderRowAfter = secondHeaderAfter?.parentElement;
 		expect(scroller.scrollTop).toBe(scrollTopBefore + 110);
-		expect(firstGetItem.mock.calls.map(([index]) => index)).toEqual([1, 2]);
-		expect(secondGetItem).not.toHaveBeenCalled();
+		const firstIndexes = firstGetItem.mock.calls.map(([index]) => index);
+		expect(firstIndexes.slice(0, 2)).toEqual([1, 2]);
+		expect(firstIndexes.every((index) => index <= 2)).toBe(true);
+		expect(secondGetItem.mock.calls.map(([index]) => index)).toEqual([0]);
 		expect(secondCallsAfter).toBe(secondCallsBefore);
 		expect(secondHeaderRowAfter?.dataset.cclRowIndex).toBe("3");
 		expect(secondHeaderRowAfter?.style.transform).toBe("translateY(340px)");

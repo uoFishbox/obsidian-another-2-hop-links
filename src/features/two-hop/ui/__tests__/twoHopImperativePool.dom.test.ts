@@ -1,9 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
 import { createTwoHopDomPool } from "features/two-hop/ui/twoHopDomPool";
 import { createTwoHopShellRenderer } from "features/two-hop/ui/twoHopShellRenderer";
-import { createTwoHopSnapshot } from "features/two-hop/ui/viewport/twoHopSnapshot";
+import { createTwoHopDocument } from "features/two-hop/ui/twoHopDocument";
 import {
-	createTwoHopGeometry,
+	compileFixedGridLayout,
 	resolveTwoHopCell,
 } from "features/two-hop/ui/viewport/twoHopGeometry";
 import type { TwoHopVirtualSectionDescriptor } from "features/two-hop/ui/twoHopVirtualListModel";
@@ -48,13 +48,12 @@ function createFixture() {
 		getItem: (index) => (index === 0 ? item : undefined),
 		headerProps: {},
 	} satisfies TwoHopVirtualSectionDescriptor;
-	const snapshot = createTwoHopSnapshot({
+	const model = createTwoHopDocument({
 		sections: [descriptor],
 		visibleCounts: { new: 1 },
 		initialVisibleCount: 1,
-		resolveItemTitle: () => "Shell title",
 	});
-	const geometry = createTwoHopGeometry(snapshot, {
+	const geometry = compileFixedGridLayout(model, {
 		containerWidth: 400,
 		columns: 2,
 		cellWidth: 195,
@@ -62,7 +61,7 @@ function createFixture() {
 		gap: 10,
 		sectionMarginBottom: 20,
 	});
-	return { snapshot, geometry };
+	return { model, geometry };
 }
 
 describe("twoHop imperative DOM pool", () => {
@@ -85,18 +84,18 @@ describe("twoHop imperative DOM pool", () => {
 	});
 
 	it("lets hidden pool rows hide cells after rendering and reuse", () => {
-		const { snapshot, geometry } = createFixture();
+		const { model, geometry } = createFixture();
 		const content = document.createElement("div");
 		const pool = createTwoHopDomPool({ content, rowCapacity: 1, columns: 2 });
 		const renderer = createTwoHopShellRenderer({});
-		const cell = resolveTwoHopCell(snapshot, geometry, 0, 0);
+		const cell = resolveTwoHopCell(model, geometry, 0, 0);
 		if (!cell) throw new Error("expected header cell");
 		const row = pool.rows[0];
 		const slot = row.cells[0];
 
 		pool.positionRow(row, 0, 0);
-		renderer.renderShell(slot, cell, snapshot);
-		renderer.renderShell(slot, cell, snapshot);
+		renderer.renderShell(slot, cell, model);
+		renderer.renderShell(slot, cell, model);
 		pool.hideRow(row);
 
 		expect(row.root.style.visibility).toBe("hidden");
@@ -105,16 +104,16 @@ describe("twoHop imperative DOM pool", () => {
 	});
 
 	it("releases transient interaction state before rebinding a physical cell", () => {
-		const { snapshot, geometry } = createFixture();
+		const { model, geometry } = createFixture();
 		const content = document.createElement("div");
 		document.body.append(content);
 		const pool = createTwoHopDomPool({ content, rowCapacity: 1, columns: 2 });
 		const renderer = createTwoHopShellRenderer({});
-		const item = resolveTwoHopCell(snapshot, geometry, 0, 1);
-		const header = resolveTwoHopCell(snapshot, geometry, 0, 0);
+		const item = resolveTwoHopCell(model, geometry, 0, 1);
+		const header = resolveTwoHopCell(model, geometry, 0, 0);
 		if (!item || !header) throw new Error("expected item and header cells");
 		const slot = pool.rows[0].cells[0];
-		renderer.renderShell(slot, item, snapshot);
+		renderer.renderShell(slot, item, model);
 		slot.root.dataset.cclHovered = "true";
 		slot.root.dataset.cclLongPressed = "1";
 		slot.root.dataset.cclLastTouchAt = "123";
@@ -139,7 +138,7 @@ describe("twoHop imperative DOM pool", () => {
 			});
 		});
 
-		renderer.renderShell(slot, header, snapshot);
+		renderer.renderShell(slot, header, model);
 
 		expect(document.activeElement).not.toBe(slot.root);
 		expect(slot.root.dataset.cclHovered).toBeUndefined();
@@ -157,18 +156,18 @@ describe("twoHop imperative DOM pool", () => {
 	});
 
 	it("releases every physical cell before hiding a pool row", () => {
-		const { snapshot, geometry } = createFixture();
+		const { model, geometry } = createFixture();
 		const content = document.createElement("div");
 		document.body.append(content);
 		const pool = createTwoHopDomPool({ content, rowCapacity: 1, columns: 2 });
 		const renderer = createTwoHopShellRenderer({});
 		const row = pool.rows[0];
-		const header = resolveTwoHopCell(snapshot, geometry, 0, 0);
-		const item = resolveTwoHopCell(snapshot, geometry, 0, 1);
+		const header = resolveTwoHopCell(model, geometry, 0, 0);
+		const item = resolveTwoHopCell(model, geometry, 0, 1);
 		if (!header || !item) throw new Error("expected header and item cells");
 		pool.positionRow(row, 0, 0);
-		renderer.renderShell(row.cells[0], header, snapshot);
-		renderer.renderShell(row.cells[1], item, snapshot);
+		renderer.renderShell(row.cells[0], header, model);
+		renderer.renderShell(row.cells[1], item, model);
 		for (const cell of row.cells) {
 			cell.root.dataset.cclHovered = "true";
 			cell.root.dataset.cclLongPressed = "1";
@@ -193,38 +192,38 @@ describe("twoHop imperative DOM pool", () => {
 	});
 
 	it("avoids subtree scans while releasing two-hop cells", () => {
-		const { snapshot, geometry } = createFixture();
+		const { model, geometry } = createFixture();
 		const content = document.createElement("div");
 		const pool = createTwoHopDomPool({ content, rowCapacity: 1, columns: 2 });
 		const renderer = createTwoHopShellRenderer({});
 		const row = pool.rows[0];
-		const header = resolveTwoHopCell(snapshot, geometry, 0, 0);
-		const item = resolveTwoHopCell(snapshot, geometry, 0, 1);
+		const header = resolveTwoHopCell(model, geometry, 0, 0);
+		const item = resolveTwoHopCell(model, geometry, 0, 1);
 		if (!header || !item) throw new Error("expected header and item cells");
 		const subtreeQueries = row.cells.map((slot) =>
 			vi.spyOn(slot.cell, "querySelectorAll"),
 		);
 
 		pool.positionRow(row, 0, 0);
-		renderer.renderShell(row.cells[0], header, snapshot);
-		renderer.renderShell(row.cells[1], item, snapshot);
+		renderer.renderShell(row.cells[0], header, model);
+		renderer.renderShell(row.cells[1], item, model);
 		expect(subtreeQueries.map((query) => query.mock.calls.length)).toEqual([0, 0]);
 
 		pool.hideRow(row);
 		pool.hideRow(row);
 		pool.positionRow(row, 1, 100);
-		renderer.renderShell(row.cells[0], item, snapshot);
-		renderer.renderShell(row.cells[1], header, snapshot);
+		renderer.renderShell(row.cells[0], item, model);
+		renderer.renderShell(row.cells[1], header, model);
 
 		expect(subtreeQueries.map((query) => query.mock.calls.length)).toEqual([0, 0]);
 	});
 
 	it("renders a cheap skeleton before resolving a rich card model", () => {
-		const { snapshot, geometry } = createFixture();
+		const { model, geometry } = createFixture();
 		const content = document.createElement("div");
 		const pool = createTwoHopDomPool({ content, rowCapacity: 2, columns: 2 });
 		const resolveItemCardModel = vi.fn(() => ({
-			item: snapshot.sections[0].visibleItems[0].item,
+			item: model.sections[0].getItem(0).item,
 			targetFile: null,
 			title: "Resolved title",
 			ariaLabel: "Open Resolved title",
@@ -240,18 +239,21 @@ describe("twoHop imperative DOM pool", () => {
 			previewRefreshToken: 0,
 			previewActivationIdentity: undefined,
 		}));
-		const renderer = createTwoHopShellRenderer({ resolveItemCardModel });
-		const cell = resolveTwoHopCell(snapshot, geometry, 0, 1);
+		const renderer = createTwoHopShellRenderer({
+			resolveItemCardModel,
+			resolveItemTitle: () => "Shell title",
+		});
+		const cell = resolveTwoHopCell(model, geometry, 0, 1);
 		const slot = pool.rows[0].cells[1];
 
-		renderer.renderSkeleton(slot, cell, snapshot);
+		renderer.renderSkeleton(slot, cell, model);
 		expect(resolveItemCardModel).not.toHaveBeenCalled();
 		expect(slot.root.classList.contains("is-skeleton")).toBe(true);
 		expect(slot.root.classList.contains("has-shell-title")).toBe(true);
 		expect(slot.title.textContent).toBe("Shell title");
 
 		if (!cell) throw new Error("expected item cell");
-		renderer.renderShell(slot, cell, snapshot);
+		renderer.renderShell(slot, cell, model);
 		expect(resolveItemCardModel).toHaveBeenCalledOnce();
 		expect(slot.title.textContent).toBe("Resolved title");
 		expect(slot.title.querySelector(".ccl-search-highlight")?.textContent).toBe(
@@ -263,25 +265,25 @@ describe("twoHop imperative DOM pool", () => {
 	});
 
 	it("renders a section title in a skeleton header", () => {
-		const { snapshot, geometry } = createFixture();
+		const { model, geometry } = createFixture();
 		const content = document.createElement("div");
 		const pool = createTwoHopDomPool({ content, rowCapacity: 1, columns: 2 });
 		const renderer = createTwoHopShellRenderer({});
-		const header = resolveTwoHopCell(snapshot, geometry, 0, 0);
+		const header = resolveTwoHopCell(model, geometry, 0, 0);
 		const slot = pool.rows[0].cells[0];
 
-		renderer.renderSkeleton(slot, header, snapshot);
+		renderer.renderSkeleton(slot, header, model);
 
 		expect(slot.title.textContent).toBe("New links");
 		expect(slot.root.classList.contains("has-shell-title")).toBe(true);
 	});
 
 	it("retains the preview when its activation identity is unchanged", () => {
-		const { snapshot, geometry } = createFixture();
+		const { model, geometry } = createFixture();
 		const content = document.createElement("div");
 		const pool = createTwoHopDomPool({ content, rowCapacity: 1, columns: 2 });
 		const resolveItemCardModel = vi.fn(() => ({
-			item: snapshot.sections[0].visibleItems[0].item,
+			item: model.sections[0].getItem(0).item,
 			targetFile: {
 				path: "notes/missing.md",
 				extension: "md",
@@ -301,16 +303,16 @@ describe("twoHop imperative DOM pool", () => {
 			previewActivationIdentity: "preview:notes/missing.md",
 		}));
 		const renderer = createTwoHopShellRenderer({ resolveItemCardModel });
-		const cell = resolveTwoHopCell(snapshot, geometry, 0, 1);
+		const cell = resolveTwoHopCell(model, geometry, 0, 1);
 		if (!cell) throw new Error("expected item cell");
 		const slot = pool.rows[0].cells[1];
-		renderer.renderShell(slot, cell, snapshot);
+		renderer.renderShell(slot, cell, model);
 		const disposePreview = vi.fn();
 		const generation = slot.generation;
 		installPreview(slot, document.createElement("strong"), disposePreview);
 
 		renderer.invalidateCardModels();
-		renderer.renderShell(slot, cell, snapshot);
+		renderer.renderShell(slot, cell, model);
 
 		expect(resolveItemCardModel).toHaveBeenCalledTimes(2);
 		expect(disposePreview).not.toHaveBeenCalled();
@@ -320,11 +322,11 @@ describe("twoHop imperative DOM pool", () => {
 	});
 
 	it("retains the preview across temporary row hiding", () => {
-		const { snapshot, geometry } = createFixture();
+		const { model, geometry } = createFixture();
 		const content = document.createElement("div");
 		const pool = createTwoHopDomPool({ content, rowCapacity: 1, columns: 2 });
 		const resolveItemCardModel = vi.fn(() => ({
-			item: snapshot.sections[0].visibleItems[0].item,
+			item: model.sections[0].getItem(0).item,
 			targetFile: {
 				path: "notes/missing.md",
 				extension: "md",
@@ -344,12 +346,12 @@ describe("twoHop imperative DOM pool", () => {
 			previewActivationIdentity: "preview:notes/missing.md",
 		}));
 		const renderer = createTwoHopShellRenderer({ resolveItemCardModel });
-		const cell = resolveTwoHopCell(snapshot, geometry, 0, 1);
+		const cell = resolveTwoHopCell(model, geometry, 0, 1);
 		if (!cell) throw new Error("expected item cell");
 		const row = pool.rows[0];
 		const slot = row.cells[1];
 		pool.positionRow(row, 0, 0);
-		renderer.renderShell(slot, cell, snapshot);
+		renderer.renderShell(slot, cell, model);
 		const disposePreview = vi.fn();
 		const preview = document.createElement("strong");
 		installPreview(slot, preview, disposePreview);
@@ -357,7 +359,7 @@ describe("twoHop imperative DOM pool", () => {
 		pool.hideRow(row);
 		pool.positionRow(row, 0, 0);
 		renderer.invalidateCardModels();
-		renderer.renderShell(slot, cell, snapshot);
+		renderer.renderShell(slot, cell, model);
 
 		expect(slot.previewHost.firstChild).toBe(preview);
 		expect(disposePreview).not.toHaveBeenCalled();
@@ -365,12 +367,12 @@ describe("twoHop imperative DOM pool", () => {
 	});
 
 	it("discards a retained preview when its activation identity changes", () => {
-		const { snapshot, geometry } = createFixture();
+		const { model, geometry } = createFixture();
 		const content = document.createElement("div");
 		const pool = createTwoHopDomPool({ content, rowCapacity: 1, columns: 2 });
 		let previewActivationIdentity = "preview:notes/missing.md:query-a";
 		const resolveItemCardModel = vi.fn(() => ({
-			item: snapshot.sections[0].visibleItems[0].item,
+			item: model.sections[0].getItem(0).item,
 			targetFile: {
 				path: "notes/missing.md",
 				extension: "md",
@@ -390,17 +392,17 @@ describe("twoHop imperative DOM pool", () => {
 			previewActivationIdentity,
 		}));
 		const renderer = createTwoHopShellRenderer({ resolveItemCardModel });
-		const cell = resolveTwoHopCell(snapshot, geometry, 0, 1);
+		const cell = resolveTwoHopCell(model, geometry, 0, 1);
 		if (!cell) throw new Error("expected item cell");
 		const slot = pool.rows[0].cells[1];
-		renderer.renderShell(slot, cell, snapshot);
+		renderer.renderShell(slot, cell, model);
 		const disposePreview = vi.fn();
 		const generation = slot.generation;
 		installPreview(slot, document.createElement("strong"), disposePreview);
 
 		previewActivationIdentity = "preview:notes/missing.md:query-b";
 		renderer.invalidateCardModels();
-		renderer.renderShell(slot, cell, snapshot);
+		renderer.renderShell(slot, cell, model);
 
 		expect(resolveItemCardModel).toHaveBeenCalledTimes(2);
 		expect(disposePreview).toHaveBeenCalledOnce();
@@ -410,18 +412,18 @@ describe("twoHop imperative DOM pool", () => {
 	});
 
 	it("renders section headers as title and icon without a visible count", () => {
-		const { snapshot, geometry } = createFixture();
+		const { model, geometry } = createFixture();
 		const content = document.createElement("div");
 		const pool = createTwoHopDomPool({ content, rowCapacity: 1, columns: 2 });
 		const renderer = createTwoHopShellRenderer({});
-		const header = resolveTwoHopCell(snapshot, geometry, 0, 0);
+		const header = resolveTwoHopCell(model, geometry, 0, 0);
 		if (!header) throw new Error("expected header cell");
 
 		const slot = pool.rows[0].cells[0];
-		renderer.renderShell(slot, header, snapshot);
+		renderer.renderShell(slot, header, model);
 		pool.hideRow(pool.rows[0]);
 		pool.positionRow(pool.rows[0], 0, 0);
-		renderer.renderShell(slot, header, snapshot);
+		renderer.renderShell(slot, header, model);
 
 		expect(slot.title.textContent).toBe("New links");
 		expect(slot.meta.textContent).toBe("");
@@ -435,16 +437,16 @@ describe("twoHop imperative DOM pool", () => {
 	});
 
 	it("renders load more with the original centered ellipsis icon", () => {
-		const { snapshot, geometry } = createFixture();
+		const { model, geometry } = createFixture();
 		const content = document.createElement("div");
 		const pool = createTwoHopDomPool({ content, rowCapacity: 1, columns: 2 });
 		const renderer = createTwoHopShellRenderer({});
-		const loadMore = resolveTwoHopCell(snapshot, geometry, 1, 0);
+		const loadMore = resolveTwoHopCell(model, geometry, 1, 0);
 		if (!loadMore || loadMore.kind !== "load-more") {
 			throw new Error("expected load-more cell");
 		}
 
-		renderer.renderShell(pool.rows[0].cells[0], loadMore, snapshot);
+		renderer.renderShell(pool.rows[0].cells[0], loadMore, model);
 
 		const slot = pool.rows[0].cells[0];
 		expect(

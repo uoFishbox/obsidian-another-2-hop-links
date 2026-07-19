@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import {
-	createTwoHopGeometry,
+	compileFixedGridLayout,
 	createTwoHopResolvedCellBuffer,
 	createTwoHopResolvedRowBuffer,
 	resolveTwoHopCell,
@@ -10,7 +10,7 @@ import {
 	resolveTwoHopVisibleRows,
 	resolveTwoHopVisibleRowsInto,
 } from "features/two-hop/ui/viewport/twoHopGeometry";
-import { createTwoHopSnapshot } from "features/two-hop/ui/viewport/twoHopSnapshot";
+import { createTwoHopDocument } from "features/two-hop/ui/twoHopDocument";
 import type {
 	TwoHopVirtualListItem,
 	TwoHopVirtualSectionDescriptor,
@@ -22,8 +22,6 @@ const createItem = (key: string): TwoHopVirtualListItem => ({
 	searchKey: key,
 	virtualKey: key,
 });
-
-const resolveItemTitle = (item: TwoHopVirtualListItem): string => item.virtualKey;
 
 function createSection(
 	sectionId: string,
@@ -59,57 +57,44 @@ const layout = {
 	sectionMarginBottom: 20,
 };
 
-describe("twoHopSnapshot geometry", () => {
-	it("materializes only the visible range and extends it incrementally", () => {
+describe("TwoHopDocument fixed-grid geometry", () => {
+	it("retains only visible source indexes and extends them incrementally", () => {
 		const items = Array.from({ length: 10 }, (_, index) =>
 			createItem(String(index)),
 		);
 		const descriptor = createSection("first", items);
 		const getItems = vi.spyOn(descriptor, "getItems");
 		const getItem = vi.spyOn(descriptor, "getItem");
-		const resolveVisibleItemTitle = vi.fn(
-			(item: TwoHopVirtualListItem) => `Title ${item.virtualKey}`,
-		);
-		const initialSnapshot = createTwoHopSnapshot({
+		const initialDocument = createTwoHopDocument({
 			sections: [descriptor],
 			visibleCounts: { first: 2 },
 			initialVisibleCount: 2,
-			resolveItemTitle: resolveVisibleItemTitle,
 		});
 
 		expect(getItems).not.toHaveBeenCalled();
 		expect(getItem.mock.calls.map(([index]) => index)).toEqual([0, 1]);
-		expect(initialSnapshot.sections[0].visibleItems).toEqual(items.slice(0, 2));
-		expect(initialSnapshot.sections[0].visibleItemTitles).toEqual([
-			"Title 0",
-			"Title 1",
-		]);
+		expect(initialDocument.sections[0].visibleSourceIndexes).toEqual(
+			new Uint32Array([0, 1]),
+		);
+		expect(initialDocument.sections[0].visibleItemCount).toBe(2);
+		expect("visibleItems" in initialDocument.sections[0]).toBe(false);
+		expect("visibleItemTitles" in initialDocument.sections[0]).toBe(false);
+		expect("visibleItemLogicalKeys" in initialDocument.sections[0]).toBe(false);
 
 		getItem.mockClear();
-		const expandedSnapshot = createTwoHopSnapshot({
+		const expandedDocument = createTwoHopDocument({
 			sections: [descriptor],
 			visibleCounts: { first: 5 },
 			initialVisibleCount: 2,
-			resolveItemTitle: resolveVisibleItemTitle,
-			previousSnapshot: initialSnapshot,
+			previousDocument: initialDocument,
 		});
 
 		expect(getItems).not.toHaveBeenCalled();
 		expect(getItem.mock.calls.map(([index]) => index)).toEqual([2, 3, 4]);
-		expect(expandedSnapshot.sections[0].visibleItems).toEqual(items.slice(0, 5));
-		expect(expandedSnapshot.sections[0].visibleItemTitles).toEqual([
-			"Title 0",
-			"Title 1",
-			"Title 2",
-			"Title 3",
-			"Title 4",
-		]);
-		expect(
-			resolveVisibleItemTitle.mock.calls.map(([item]) => item.virtualKey),
-		).toEqual(["0", "1", "2", "3", "4"]);
-		expect(expandedSnapshot.sections[0].visibleItemSourceIndexes).toEqual(
+		expect(expandedDocument.sections[0].visibleSourceIndexes).toEqual(
 			new Uint32Array([0, 1, 2, 3, 4]),
 		);
+		expect(expandedDocument.sections[0].getItem(4)).toBe(items[4]);
 	});
 
 	it("resolves header, sparse items, and load-more without compiled cells", () => {
@@ -119,43 +104,40 @@ describe("twoHopSnapshot geometry", () => {
 			createItem("c"),
 			createItem("d"),
 		];
-		const snapshot = createTwoHopSnapshot({
+		const document = createTwoHopDocument({
 			sections: [createSection("first", sparseItems, 6)],
 			visibleCounts: { first: 4 },
 			initialVisibleCount: 2,
-			resolveItemTitle,
 		});
-		const geometry = createTwoHopGeometry(snapshot, layout);
+		const geometry = compileFixedGridLayout(document, layout);
 
-		expect(snapshot.sections[0].visibleItemSourceIndexes).toEqual(
+		expect(document.sections[0].visibleSourceIndexes).toEqual(
 			new Uint32Array([0, 2, 3]),
 		);
 		expect(geometry.rowCount).toBe(3);
-		expect(resolveTwoHopCell(snapshot, geometry, 0, 0)?.kind).toBe("header");
-		expect(resolveTwoHopCell(snapshot, geometry, 0, 1)).toMatchObject({
+		expect(resolveTwoHopCell(document, geometry, 0, 0)?.kind).toBe("header");
+		expect(resolveTwoHopCell(document, geometry, 0, 1)).toMatchObject({
 			kind: "item",
 			itemIndex: 0,
-			shellTitle: "a",
 		});
-		expect(resolveTwoHopCell(snapshot, geometry, 1, 0)).toMatchObject({
+		expect(resolveTwoHopCell(document, geometry, 1, 0)).toMatchObject({
 			kind: "item",
 			itemIndex: 2,
 		});
-		expect(resolveTwoHopCell(snapshot, geometry, 2, 0)?.kind).toBe("load-more");
-		expect(resolveTwoHopCell(snapshot, geometry, 2, 1)).toBeNull();
+		expect(resolveTwoHopCell(document, geometry, 2, 0)?.kind).toBe("load-more");
+		expect(resolveTwoHopCell(document, geometry, 2, 1)).toBeNull();
 	});
 
 	it("uses section prefixes to resolve row positions and viewport ranges", () => {
-		const snapshot = createTwoHopSnapshot({
+		const document = createTwoHopDocument({
 			sections: [
 				createSection("first", [createItem("a"), createItem("b")]),
 				createSection("second", [createItem("c")]),
 			],
 			visibleCounts: {},
 			initialVisibleCount: 10,
-			resolveItemTitle,
 		});
-		const geometry = createTwoHopGeometry(snapshot, layout);
+		const geometry = compileFixedGridLayout(document, layout);
 
 		expect(geometry.firstRowBySection).toEqual(new Uint32Array([0, 2]));
 		expect(geometry.topBySection).toEqual(new Float64Array([0, 230]));
@@ -167,7 +149,7 @@ describe("twoHopSnapshot geometry", () => {
 		const reusableRange = { start: 0, end: 0 };
 		resolveTwoHopVisibleRowsInto(reusableRange, geometry, 225, 120);
 		expect(reusableRange).toEqual({ start: 1, end: 3 });
-		expect(resolveTwoHopCell(snapshot, geometry, 2, 0)).toMatchObject({
+		expect(resolveTwoHopCell(document, geometry, 2, 0)).toMatchObject({
 			kind: "header",
 			sectionIndex: 1,
 		});
@@ -180,12 +162,12 @@ describe("twoHopSnapshot geometry", () => {
 			rowInSection: 0,
 			top: 230,
 		});
-		expect(resolveTwoHopCellInRowInto(snapshot, geometry, row, 1, cell)).toMatchObject(
-			{
-				kind: "item",
-				sectionIndex: 1,
-				itemIndex: 0,
-			},
-		);
+		expect(
+			resolveTwoHopCellInRowInto(document, geometry, row, 1, cell),
+		).toMatchObject({
+			kind: "item",
+			sectionIndex: 1,
+			itemIndex: 0,
+		});
 	});
 });

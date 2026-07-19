@@ -10,7 +10,7 @@ import {
 	resolveTwoHopItemStaticState,
 	resolveTwoHopSectionVariant,
 } from "features/two-hop/ui/twoHopCellStaticState";
-import type { TwoHopSnapshot } from "features/two-hop/ui/viewport/twoHopSnapshot";
+import type { TwoHopDocument } from "features/two-hop/ui/twoHopDocument";
 import {
 	ICONS,
 	svgAttrs,
@@ -26,6 +26,9 @@ export interface TwoHopShellRendererParams {
 			ReturnType<typeof resolveTwoHopItemStaticState>["presentation"]
 		>,
 	) => CardRenderModel;
+	readonly resolveItemTitle?: (
+		item: Extract<TwoHopResolvedCell, { kind: "item" }>["item"],
+	) => string;
 }
 
 export function createTwoHopShellRenderer(params: TwoHopShellRendererParams) {
@@ -41,7 +44,7 @@ export function createTwoHopShellRenderer(params: TwoHopShellRendererParams) {
 	function renderSkeleton(
 		slot: TwoHopCardShellSlot,
 		cell: TwoHopResolvedCell | null,
-		snapshot: TwoHopSnapshot,
+		document: TwoHopDocument,
 	): void {
 		const identity = cell?.logicalKey ?? null;
 		bindSkeletonSlot(
@@ -55,7 +58,11 @@ export function createTwoHopShellRenderer(params: TwoHopShellRendererParams) {
 		slot.root.classList.add("is-skeleton");
 		resetVariantClasses(slot.root);
 		slot.title.className = "cosense-card-links__box-title";
-		const shellTitle = resolveSkeletonTitle(cell, snapshot);
+		const shellTitle = resolveSkeletonTitle(
+			cell,
+			document,
+			params.resolveItemTitle,
+		);
 		slot.title.textContent = shellTitle;
 		slot.root.classList.toggle("has-shell-title", shellTitle.length > 0);
 		slot.meta.textContent = "";
@@ -65,7 +72,7 @@ export function createTwoHopShellRenderer(params: TwoHopShellRendererParams) {
 	function renderShell(
 		slot: TwoHopCardShellSlot,
 		cell: TwoHopResolvedCell,
-		snapshot: TwoHopSnapshot,
+		document: TwoHopDocument,
 	): void {
 		const identity = cell.logicalKey;
 		if (
@@ -97,44 +104,40 @@ export function createTwoHopShellRenderer(params: TwoHopShellRendererParams) {
 		slot.root.classList.remove("has-shell-title");
 		resetVariantClasses(slot.root);
 
-		const section = snapshot.sections[cell.sectionIndex];
-		const descriptor = section.descriptor;
+		const section = document.sections[cell.sectionIndex];
+		const header = section.header;
 		if (cell.kind === "header") {
 			slot.promoteToRich({ cardModel: null });
 			slot.root.classList.add(
-				descriptor.section.kind === "primary-section" ||
-					descriptor.section.kind === "new-links-section"
+				header.section.kind === "primary-section" ||
+					header.section.kind === "new-links-section"
 					? "cosense-card-links__connected-links-header"
 					: "cosense-card-links__twohop-header",
 			);
 			slot.titleWrapper.className = "cosense-card-links__title-container";
 			slot.title.className = "cosense-card-links__header-title";
-			slot.title.textContent = descriptor.title;
+			slot.title.textContent = header.section.title;
 			slot.meta.textContent = "";
 			slot.meta.style.display = "none";
-			renderIcon(
-				slot.headerIcon,
-				resolveHeaderIconName(descriptor.section.kind),
-				26,
-			);
+			renderIcon(slot.headerIcon, resolveHeaderIconName(header.section.kind), 26);
 			slot.previewHost.style.display = "none";
-			slot.root.setAttribute("aria-label", `${descriptor.totalCount} notes`);
+			slot.root.setAttribute("aria-label", `${section.totalItemCount} notes`);
 			slot.root.dataset.cclSectionVariant = resolveTwoHopSectionVariant(
-				descriptor.section,
+				header.section,
 			);
-			slot.root.dataset.twoHopHeaderSection = descriptor.sectionId;
-			slot.root.draggable = descriptor.headerProps.draggable ?? false;
-			if (descriptor.headerProps.directory) {
-				slot.root.dataset.directory = descriptor.headerProps.directory;
+			slot.root.dataset.twoHopHeaderSection = header.sectionId;
+			slot.root.draggable = header.props.draggable ?? false;
+			if (header.props.directory) {
+				slot.root.dataset.directory = header.props.directory;
 			}
-			const interactionId = descriptor.headerProps.interactionId;
+			const interactionId = header.props.interactionId;
 			if (interactionId) {
 				setInteraction(slot.root, interactionId, "sectionHeader");
 			} else {
 				clearInteraction(slot.root);
 			}
 			if (!IS_PROD) {
-				slot.cell.dataset.testid = `section-block-${descriptor.sectionId}`;
+				slot.cell.dataset.testid = `section-block-${header.sectionId}`;
 			}
 			return;
 		}
@@ -148,10 +151,10 @@ export function createTwoHopShellRenderer(params: TwoHopShellRendererParams) {
 			renderIcon(slot.headerIcon, "Ellipsis", 28);
 			slot.previewHost.style.display = "none";
 			slot.root.setAttribute("aria-label", "Load more");
-			slot.root.dataset.twoHopLoadMoreSection = descriptor.sectionId;
+			slot.root.dataset.twoHopLoadMoreSection = section.key;
 			clearInteraction(slot.root);
 			if (!IS_PROD) {
-				slot.cell.dataset.testid = `load-more-${descriptor.sectionId}`;
+				slot.cell.dataset.testid = `load-more-${section.key}`;
 			}
 			return;
 		}
@@ -160,10 +163,7 @@ export function createTwoHopShellRenderer(params: TwoHopShellRendererParams) {
 		let presentation = model?.presentation ?? null;
 		let interactionId = model?.interactionId ?? null;
 		if (!model || !presentation) {
-			const staticState = resolveTwoHopItemStaticState(
-				cell.item,
-				descriptor.section,
-			);
+			const staticState = resolveTwoHopItemStaticState(cell.item, header.section);
 			presentation ??= staticState.presentation;
 			interactionId ??= staticState.interactionId;
 			if (!model && presentation && params.resolveItemCardModel) {
@@ -225,11 +225,14 @@ export function createTwoHopShellRenderer(params: TwoHopShellRendererParams) {
 
 function resolveSkeletonTitle(
 	cell: TwoHopResolvedCell | null,
-	snapshot: TwoHopSnapshot,
+	document: TwoHopDocument,
+	resolveItemTitle: TwoHopShellRendererParams["resolveItemTitle"],
 ): string {
-	if (cell?.kind === "item") return cell.shellTitle;
+	if (cell?.kind === "item") {
+		return resolveItemTitle?.(cell.item) ?? cell.item.virtualKey;
+	}
 	if (cell?.kind === "header") {
-		return snapshot.sections[cell.sectionIndex]?.descriptor.title ?? "";
+		return document.sections[cell.sectionIndex]?.header.section.title ?? "";
 	}
 	return "";
 }
@@ -308,7 +311,7 @@ function applyCustomClassName(root: HTMLElement, className: string | null): void
 }
 
 function resolveHeaderIconName(
-	kind: TwoHopSnapshot["sections"][number]["descriptor"]["section"]["kind"],
+	kind: TwoHopDocument["sections"][number]["header"]["section"]["kind"],
 ): IconName {
 	switch (kind) {
 		case "new-links-section":
