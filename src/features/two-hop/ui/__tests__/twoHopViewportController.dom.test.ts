@@ -1,9 +1,15 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createTwoHopViewportController } from "features/two-hop/ui/viewport/twoHopViewportController";
 import type {
 	TwoHopVirtualListItem,
 	TwoHopVirtualSectionDescriptor,
 } from "features/two-hop/ui/twoHopVirtualListModel";
+import {
+	installResizeObserverMock,
+	resetRecords,
+	teardownResizeObserverMock,
+	triggerResize,
+} from "testing/helpers/DOMObserverMock";
 
 function createItems(count: number): TwoHopVirtualListItem[] {
 	return Array.from({ length: count }, (_, index) => ({
@@ -57,6 +63,15 @@ function setRect(element: Element, top: number, width: number, height: number) {
 const resolveItemTitle = (item: TwoHopVirtualListItem): string => item.virtualKey;
 
 describe("twoHopViewportController", () => {
+	beforeEach(() => {
+		installResizeObserverMock();
+	});
+
+	afterEach(() => {
+		teardownResizeObserverMock();
+		resetRecords();
+	});
+
 	it("does not rebuild when the initial sections revision is set again", () => {
 		const scroller = document.createElement("div");
 		scroller.style.overflow = "auto";
@@ -174,6 +189,68 @@ describe("twoHopViewportController", () => {
 		expect(afterResidentHit.poolRows).toBe(initialRows);
 		expect(afterResidentHit.shellBinds).toBe(initialStats.shellBinds);
 		expect(afterResidentHit.residentHits).toBe(initialStats.residentHits + 300);
+		controller.dispose();
+		scroller.remove();
+	});
+
+	it("flushes when resize updates scroll geometry without changing layout", () => {
+		const scroller = document.createElement("div");
+		scroller.style.overflow = "auto";
+		Object.defineProperty(scroller, "clientHeight", { value: 300 });
+		Object.defineProperty(scroller, "scrollHeight", { value: 10000 });
+		Object.defineProperty(scroller, "scrollTop", {
+			value: 1000,
+			writable: true,
+		});
+		const rootEl = document.createElement("div");
+		const shadowHostEl = document.createElement("div");
+		rootEl.append(shadowHostEl);
+		scroller.append(rootEl);
+		document.body.append(scroller);
+		setRect(scroller, 0, 100, 300);
+		let rootTop = -1000;
+		vi.spyOn(rootEl, "getBoundingClientRect").mockImplementation(() => ({
+			x: 0,
+			y: rootTop,
+			top: rootTop,
+			left: 0,
+			right: 100,
+			bottom: rootTop + 10000,
+			width: 100,
+			height: 10000,
+			toJSON: () => ({}),
+		}));
+		const queuedFrames: FrameRequestCallback[] = [];
+		const controller = createTwoHopViewportController({
+			rootEl,
+			shadowHostEl,
+			sections: [createSection("section", 100)],
+			initialVisibleCount: 100,
+			configuredLayout: {
+				cardWidthPx: 100,
+				cardHeightPx: 100,
+				cardHeightRatio: 1,
+				cardGapPx: 0,
+				cardMaxColumns: 1,
+				sectionMarginBottomPx: 0,
+			},
+			resolveItemTitle,
+			getItemInteractionDescriptor: () => null,
+			requestAnimationFrame: (callback) => {
+				queuedFrames.push(callback);
+				return queuedFrames.length;
+			},
+			cancelAnimationFrame: () => {},
+			now: () => 10,
+		});
+		const beforeResize = controller.getStats();
+		rootTop = -500;
+
+		triggerResize(rootEl, 100, 10000);
+		queuedFrames.at(-1)?.(10);
+
+		expect(controller.getStats().scrollFrames).toBe(beforeResize.scrollFrames + 1);
+		expect(controller.getStats().poolRows).toBe(beforeResize.poolRows);
 		controller.dispose();
 		scroller.remove();
 	});

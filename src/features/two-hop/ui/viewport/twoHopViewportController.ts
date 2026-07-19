@@ -205,10 +205,14 @@ export function createTwoHopViewportController(
 	let cellBuffers = createCellBuffers();
 	flush(now());
 
-	function refreshScrollGeometry(): void {
+	function refreshScrollGeometry(): boolean {
 		const metrics = getScrollMetrics(params.rootEl, scrollContainerEl);
+		const changed =
+			metrics.sectionTop !== cachedSectionTop ||
+			metrics.viewportHeight !== cachedViewportHeight;
 		cachedSectionTop = metrics.sectionTop;
 		cachedViewportHeight = metrics.viewportHeight;
+		return changed;
 	}
 
 	function readScrollTop(): number {
@@ -607,7 +611,7 @@ export function createTwoHopViewportController(
 			scheduleResize();
 			return;
 		}
-		refreshScrollGeometry();
+		const scrollGeometryChanged = refreshScrollGeometry();
 		const nextLayout = measureLayout();
 		const layoutUnchanged =
 			nextLayout.columns === layout.columns &&
@@ -616,6 +620,7 @@ export function createTwoHopViewportController(
 			nextLayout.sectionMarginBottom === layout.sectionMarginBottom;
 		const requiresLargerPool = resolveRequiredPoolRows(nextLayout) > pool.capacity;
 		if (layoutUnchanged && !requiresLargerPool) {
+			if (scrollGeometryChanged) flush(now());
 			return;
 		}
 		layout = nextLayout;
