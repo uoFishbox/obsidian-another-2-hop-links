@@ -1,5 +1,5 @@
 import { App, TFile, FileView } from "obsidian";
-import { resolveFileByPath } from "infrastructure/utils/vaultUtils";
+import { resolveFileByPath } from "shared/obsidian/resolveFileByPath";
 import { CANVAS_NOTE_DRAG_FORMAT } from "../../appConstants";
 import type { CanvasView, CanvasViewCanvas } from "obsidian-typings";
 import { ObsidianInternalFacade } from "infrastructure/capabilities/ObsidianInternalFacade";

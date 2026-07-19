@@ -1,7 +1,7 @@
 import type { App, HoverPopover } from "obsidian";
 import { type TFile, Platform, type Workspace } from "obsidian";
 import type { TwoHopIndexedLink } from "types";
-import type { PluginSettings } from "types/settings";
+import type { PluginSettings } from "features/settings/model";
 import type { PluginHost } from "types/pluginHost";
 import type { HighlightMode } from "../public-types";
 import {
@@ -13,12 +13,12 @@ import {
 	buildHoverPopoverLinkSpec,
 	COSENSE_CARD_LINKS_HOVER_SOURCE_ID,
 } from "./hoverPopoverLinkSpec";
-import { enableLogging, logger } from "utils/logger";
+import { enableLogging, logger } from "shared/logging/logger";
 import {
 	ObsidianInternalFacade,
 	type PagePreviewOnLinkHoverCapability,
 } from "infrastructure/capabilities/ObsidianInternalFacade";
-import { isHTMLElementLike, isShadowRootLike } from "ui/utils/realmSafeDom";
+import { isHTMLElementLike, isShadowRootLike } from "ui/shared/dom/realmSafeDom";
 
 function describeTargetEl(
 	targetEl: HTMLElement | ShadowRoot | null | undefined,

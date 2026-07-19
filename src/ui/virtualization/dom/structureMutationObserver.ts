@@ -1,5 +1,5 @@
-import { findClosestComposed } from "ui/utils/shadowDom";
-import { isHTMLElementLike } from "ui/utils/realmSafeDom";
+import { findClosestComposed } from "ui/shared/dom/shadowDom";
+import { isHTMLElementLike } from "ui/shared/dom/realmSafeDom";
 
 export const STRUCTURE_MUTATION_IGNORE_SELECTOR = [
 	"[data-ccl-shadow-hover-proxy]",

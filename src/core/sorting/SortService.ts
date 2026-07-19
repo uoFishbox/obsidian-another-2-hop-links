@@ -1,4 +1,4 @@
-import type { SortOption } from "types/settings";
+import type { SortOption } from "features/settings/model";
 import type { SortableItem, SortKey, SortResult } from "./types";
 import type { ISortService, IMetricProvider, SortMetricKind } from "types";
 import { getSortPlan, type SortPlan } from "./comparators";

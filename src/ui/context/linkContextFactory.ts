@@ -8,14 +8,14 @@ import type {
 	TwoHopIndexedLink,
 } from "types";
 import type { HighlightMode, LinkContext, LinkInteractionOptions } from "./linkContext";
-import type { PluginSettings } from "types/settings";
+import type { PluginSettings } from "features/settings/model";
 import { triggerHoverPopover } from "features/preview/interactions/mobilePopover";
 import type { PluginHost } from "types/pluginHost";
 import { shouldHighlight } from "features/preview/interactions/highlightUtils";
 import { buildDragLinkFormat } from "application/presenters/linkHelper";
 import { handleTagClick } from "ui/handlers/viewHandlers";
 import { hydrateRuntimeBacklinkLink } from "./runtimeBacklinkPositionResolver";
-import { isMouseEventLike } from "ui/utils/realmSafeDom";
+import { isMouseEventLike } from "ui/shared/dom/realmSafeDom";
 
 export function createLinkContextFactory(
 	metadataCache: MetadataCache,

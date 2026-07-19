@@ -1,4 +1,4 @@
-import { isElementLike, isNodeLike } from "ui/utils/realmSafeDom";
+import { isElementLike, isNodeLike } from "ui/shared/dom/realmSafeDom";
 
 export function rectToObject(rect: DOMRect): Record<string, number> {
 	return {

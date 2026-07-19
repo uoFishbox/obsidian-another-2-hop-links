@@ -6,7 +6,7 @@ import type {
 } from "./snippetExtractor";
 import type { TextTransformContext, TransformContentForPreviewOptions } from "./types";
 import type { ParsedEmbed } from "./mediaExtractor";
-import type { PluginSettings } from "types/settings";
+import type { PluginSettings } from "features/settings/model";
 
 export const PREVIEW_TEXT_WORKER_MIN_CONTENT_LENGTH = 40000;
 

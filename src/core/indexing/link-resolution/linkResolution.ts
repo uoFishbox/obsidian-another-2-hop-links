@@ -7,7 +7,7 @@ import { LINK_NORMALIZATION_CACHE_MAX_ENTRIES } from "appConstants";
 import {
 	createBoundedGenerationalCache,
 	type BoundedGenerationalCache,
-} from "utils/boundedGenerationalCache";
+} from "shared/cache/boundedGenerationalCache";
 import { hasSourceDependentRawLinkPath } from "./sourceDependentLinks";
 
 const HAS_EXTENSION_RE = /\.[a-z0-9]+$/i;

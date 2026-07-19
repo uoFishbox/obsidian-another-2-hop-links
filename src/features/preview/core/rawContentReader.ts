@@ -1,6 +1,6 @@
 import type { TFile } from "obsidian";
 import type { IVault } from "types/obsidian";
-import { getFileContent } from "../utils/previewUtils";
+import { getFileContent } from "./previewContent";
 
 function createAbortError(): DOMException {
 	return new DOMException("Raw content read aborted", "AbortError");

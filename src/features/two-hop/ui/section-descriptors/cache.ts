@@ -20,13 +20,13 @@ import {
 } from "ui/components/common/listPagination";
 import { generateBranchKey } from "features/preview/text-processing/textUtils";
 import type { TagGroup, TwoHopIndexedLink, TwoHopLinkBranch } from "types/domain";
-import type { PluginSettings, SortOption } from "types/settings";
+import type { PluginSettings, SortOption } from "features/settings/model";
 import type { ApplicationStore } from "ui/stores/ApplicationStore.svelte";
 import {
 	hasSameBacklinkIndexedLink,
 	hasSameTwoHopBranchCard,
 	hasSameTwoHopIndexedLink,
-} from "features/two-hop/utils/equality";
+} from "features/two-hop/shared/twoHopEquality";
 import type { TwoHopVirtualSectionDescriptor } from "features/two-hop/ui/twoHopVirtualListModel";
 import type {
 	NewLinksSectionItemsDeps,

@@ -1,4 +1,4 @@
-import type { PluginSettings } from "types/settings";
+import type { PluginSettings } from "features/settings/model";
 import type { ViewItem } from "application/presenters";
 import type { CardPresentationState } from "ui/components/common/cardPresentation";
 import type { CardRenderModel } from "./cardRenderModel";

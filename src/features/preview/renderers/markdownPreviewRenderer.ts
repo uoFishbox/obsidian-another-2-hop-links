@@ -5,11 +5,11 @@ import { createProtectedSegmentRestorer } from "../text-processing/protectedHtml
 import {
 	analyzePreviewContent,
 	type PreviewContentAnalysis,
-} from "../utils/previewUtils";
+} from "../core/previewContent";
 import {
 	queueMathJaxShadowStylesSync,
 	syncMathJaxStylesForNode,
-} from "ui/utils/mathJaxShadowStyles";
+} from "ui/shared/dom/mathJaxShadowStyles";
 
 // Hot-path optimization: avoid re-allocating this RegExp object on every
 // preview render in the MathJax split loop. Module-level `g` flag regexes are

@@ -1,5 +1,5 @@
 import type { IndexingService } from "core/indexing/index-service/IndexingService";
-import type { PluginSettings, SortOption } from "types/settings";
+import type { PluginSettings, SortOption } from "features/settings/model";
 import type { DisplayDataBuilder } from "ui/stores/ApplicationStore.svelte";
 import { ApplicationStore } from "ui/stores/ApplicationStore.svelte";
 import type { ResolveTwoHopLinks } from "features/two-hop/application/TwoHopLinksLoader";

@@ -1,11 +1,11 @@
 <script lang="ts">
 	import { onDestroy } from "svelte";
 	import ViewItemCard from "../ViewItemCard.svelte";
-	import PreviewVisibilityProvider from "../PreviewVisibilityProvider.svelte";
+	import PreviewVisibilityProvider from "features/preview/ui/PreviewVisibilityProvider.svelte";
 	import { setAppContext, setLinkContext } from "ui/context/linkContext";
 	import { providePreviewActivationContexts } from "features/preview/scheduling/previewActivationContexts";
-	import { DEFAULT_SETTINGS } from "types/settings";
-	import type { PluginSettings } from "types/settings";
+	import { DEFAULT_SETTINGS } from "features/settings/model";
+	import type { PluginSettings } from "features/settings/model";
 	import type { ApplicationStore } from "ui/stores/ApplicationStore.svelte";
 	import type { BookmarksState, LinkContext } from "ui/context/linkContext";
 	import type { App, TFile } from "obsidian";

@@ -1,4 +1,4 @@
-import type { PluginSettings, SortOption } from "types/settings";
+import type { PluginSettings, SortOption } from "features/settings/model";
 
 export interface SectionExpansionLimits {
 	[sectionId: string]: number;

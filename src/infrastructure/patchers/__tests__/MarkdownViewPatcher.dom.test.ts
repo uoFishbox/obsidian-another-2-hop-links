@@ -5,11 +5,11 @@ const { getActiveInlineContainerSpy, loggerSpy } = vi.hoisted(() => ({
 	loggerSpy: vi.fn(),
 }));
 
-vi.mock("ui/utils/domUtils", () => ({
+vi.mock("ui/shared/dom/domUtils", () => ({
 	getActiveInlineContainer: getActiveInlineContainerSpy,
 }));
 
-vi.mock("utils/logger", () => ({
+vi.mock("shared/logging/logger", () => ({
 	enableLogging: false,
 	logger: loggerSpy,
 }));

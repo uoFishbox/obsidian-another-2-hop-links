@@ -1,13 +1,13 @@
 import type { TFile } from "obsidian";
 import { mount } from "svelte";
 import type { PluginHostUi } from "types/pluginHostUi";
-import type { PluginSettings } from "types/settings";
+import type { PluginSettings } from "features/settings/model";
 import type { ApplicationStore } from "ui/stores/ApplicationStore.svelte";
 import {
 	createDefaultApplicationStore,
 	createLinkContextForView,
-} from "ui/views/shared/viewFactories";
-import type { SvelteComponentInstance } from "ui/views/shared/svelteLifecycle";
+} from "ui/shared/views/viewFactories";
+import type { SvelteComponentInstance } from "ui/shared/views/svelteLifecycle";
 import TwoHopLinksPage from "./TwoHopLinksPage.svelte";
 import type { TwoHopLinksRootUiState } from "./twoHopLinksRootUiState";
 

@@ -1,7 +1,7 @@
 import { render, screen } from "@testing-library/svelte";
 import { describe, expect, it, vi } from "vitest";
 import LinkItem from "../LinkItem.svelte";
-import { DEFAULT_SETTINGS } from "types/settings";
+import { DEFAULT_SETTINGS } from "features/settings/model";
 
 vi.mock("obsidian", () => ({
 	Platform: {

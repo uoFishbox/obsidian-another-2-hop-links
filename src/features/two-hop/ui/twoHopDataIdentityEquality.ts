@@ -2,7 +2,7 @@ import {
 	hasSameBacklinkIndexedLinks,
 	hasSameTaggedNotes,
 	hasSameTwoHopIndexedLink,
-} from "features/two-hop/utils/equality";
+} from "features/two-hop/shared/twoHopEquality";
 import { createSectionHeaderInteractionKey } from "ui/interactions/interactionTypes";
 import type { SectionHeaderInteractionDescriptor } from "ui/interactions/interactionTypes";
 import type {

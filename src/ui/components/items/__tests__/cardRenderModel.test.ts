@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import type { ViewItem } from "application/presenters";
 import { createMockTFile } from "testing/__mocks__/testHelpers";
 import type { LinkUtilitiesContext } from "types/linkContext";
-import { DEFAULT_SETTINGS } from "types/settings";
+import { DEFAULT_SETTINGS } from "features/settings/model";
 import { createCardRenderModel, resolveCardTitleSnapshot } from "../cardRenderModel";
 import type { CachedMetadata } from "obsidian";
 

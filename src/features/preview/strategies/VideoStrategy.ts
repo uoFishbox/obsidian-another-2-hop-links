@@ -1,7 +1,7 @@
 import type { TFile } from "obsidian";
 import type { PreviewData } from "../public-types";
 import type { PreviewContext, PreviewStrategy } from "../core/PreviewStrategy";
-import { isVideo } from "../utils/previewUtils";
+import { isVideo } from "../core/previewContent";
 import { generateVideoPreview } from "../renderers/videoPreviewRenderer";
 
 export function createVideoPreviewStrategy(): PreviewStrategy {

@@ -21,8 +21,8 @@ import {
 	transitionSessionInteraction,
 } from "./session";
 import { getSessionOpenPopover } from "./state-machine";
-import { createOwnerMouseEvent, isHTMLElementLike } from "ui/utils/realmSafeDom";
-import { enableLogging } from "utils/logger";
+import { createOwnerMouseEvent, isHTMLElementLike } from "ui/shared/dom/realmSafeDom";
+import { enableLogging } from "shared/logging/logger";
 
 export class ShadowHoverControllerImpl implements ShadowHoverController {
 	private static readonly RECOVERY_RELAUNCH_DELAY_MS = 650;

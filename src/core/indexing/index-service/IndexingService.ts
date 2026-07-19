@@ -19,7 +19,7 @@ import {
 	INDEXING_YIELD_INTERVAL_MS,
 	PLUGIN_NAME,
 } from "../../../appConstants";
-import { enableLogging, logger } from "utils/logger";
+import { enableLogging, logger } from "shared/logging/logger";
 import {
 	createEmptyIndexSnapshot,
 	type IncrementalFileChange,

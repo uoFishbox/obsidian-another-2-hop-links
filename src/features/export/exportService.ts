@@ -1,5 +1,5 @@
 import { App, Notice, TFile } from "obsidian";
-import { resolveFileByPath } from "infrastructure/utils/vaultUtils";
+import { resolveFileByPath } from "shared/obsidian/resolveFileByPath";
 import type { TwoHopLinkResult } from "types/domain";
 
 interface ExportPageData {

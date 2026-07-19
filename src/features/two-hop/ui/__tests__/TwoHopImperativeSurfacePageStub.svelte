@@ -1,6 +1,6 @@
 <script lang="ts">
 	import ViewItemCard from "ui/components/items/ViewItemCard.svelte";
-	import type { PluginSettings } from "types/settings";
+	import type { PluginSettings } from "features/settings/model";
 	import type { TwoHopVirtualSectionDescriptor } from "features/two-hop/ui/twoHopVirtualListModel";
 
 	interface Props {

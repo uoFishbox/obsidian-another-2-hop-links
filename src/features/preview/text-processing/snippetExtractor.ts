@@ -6,7 +6,7 @@ import {
 } from "./fencedCodeBlocks";
 import { findCaseInsensitiveIndex } from "./searchUtils";
 import type { TextTransformContext } from "./types";
-import type { PluginSettings } from "types/settings";
+import type { PluginSettings } from "features/settings/model";
 
 export type PreviewSnippetSettings = Pick<
 	PluginSettings,

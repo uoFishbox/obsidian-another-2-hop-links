@@ -14,7 +14,7 @@ import {
 	isHTMLElementLike,
 	isMouseEventLike,
 	isShadowRootLike,
-} from "ui/utils/realmSafeDom";
+} from "ui/shared/dom/realmSafeDom";
 
 function resolveCandidateTarget(
 	targetEl: HTMLElement | ShadowRoot | null | undefined,

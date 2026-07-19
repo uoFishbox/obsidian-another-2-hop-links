@@ -1,7 +1,7 @@
 import type { PluginHost } from "types/pluginHost";
 import { MarkdownView, TFile } from "obsidian";
-import { enableLogging, logger } from "utils/logger";
-import { getActiveInlineContainer } from "ui/utils/domUtils";
+import { enableLogging, logger } from "shared/logging/logger";
+import { getActiveInlineContainer } from "ui/shared/dom/domUtils";
 import type { PatchRegistry } from "infrastructure/capabilities/PatchRegistry";
 
 export function initFilePatcher(

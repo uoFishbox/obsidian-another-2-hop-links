@@ -9,7 +9,7 @@ import type { IncrementalFileChange } from "core/indexing/types/IndexTypes";
 import { FileChangeQueue } from "core/indexing/index-service/FileChangeQueue";
 import type { IndexingService } from "core/indexing/index-service/IndexingService";
 import type { PluginHost } from "types/pluginHost";
-import { enableLogging, logger } from "utils/logger";
+import { enableLogging, logger } from "shared/logging/logger";
 import { InitialScanChangeRecorder } from "./InitialScanChangeRecorder";
 
 export type DataUpdateListener = (context: DataUpdateContext) => void;

@@ -1,6 +1,6 @@
 import type { App, TFile } from "obsidian";
 import type { TwoHopLinkBranch, TwoHopIndexedLink, TaggedNote } from "types/domain";
-import type { SortOption } from "types/settings";
+import type { SortOption } from "features/settings/model";
 
 export type SortableItem = TwoHopLinkBranch | TwoHopIndexedLink | TaggedNote | TFile;
 

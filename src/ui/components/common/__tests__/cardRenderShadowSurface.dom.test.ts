@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { syncMathJaxStylesForNode } from "ui/utils/mathJaxShadowStyles";
+import { syncMathJaxStylesForNode } from "ui/shared/dom/mathJaxShadowStyles";
 import { installVirtualListShadowSurface } from "ui/virtualization/svelte/VirtualSurfaceRuntime";
 import { ensureCardRenderShadowSurface } from "../cardRenderShadowSurface";
 

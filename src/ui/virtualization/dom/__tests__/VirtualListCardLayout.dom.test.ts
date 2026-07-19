@@ -3,7 +3,7 @@ import {
 	computeContainerWidth,
 	resolveCachedCardGridLayoutBase,
 } from "../virtualListCardLayout";
-import type { ResolvedCardLayoutSettings } from "ui/utils/cardLayoutCssVars";
+import type { ResolvedCardLayoutSettings } from "ui/shared/layout/cardLayoutCssVars";
 
 const defaults: ResolvedCardLayoutSettings = {
 	cardWidthPx: 160,

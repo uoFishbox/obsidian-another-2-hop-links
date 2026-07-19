@@ -9,7 +9,7 @@ import {
 	generateBacklinkKey,
 } from "features/preview/text-processing/textUtils";
 import type { TwoHopIndexedLink, TwoHopLinkBranch } from "types/domain";
-import type { PluginSettings, SortOption } from "types/settings";
+import type { PluginSettings, SortOption } from "features/settings/model";
 import type { ApplicationStore } from "ui/stores/ApplicationStore.svelte";
 import {
 	createDescriptor,

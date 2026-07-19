@@ -1,4 +1,4 @@
-import type { PluginSettings } from "types/settings";
+import type { PluginSettings } from "features/settings/model";
 
 export function shouldHighlight(
 	_event: MouseEvent | KeyboardEvent,

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { setEnableLogging } from "utils/logger";
+import { setEnableLogging } from "shared/logging/logger";
 import { markdownPostProcessor } from "../markdownHandlers";
 
 function createMockElement(innerTextValue: string) {

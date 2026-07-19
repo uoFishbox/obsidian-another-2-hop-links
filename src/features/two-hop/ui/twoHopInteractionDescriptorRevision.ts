@@ -1,5 +1,5 @@
 import type { LinkUtilitiesContext } from "ui/context/linkContext";
-import type { PluginSettings } from "types/settings";
+import type { PluginSettings } from "features/settings/model";
 import type { ItemInteractionDescriptor } from "ui/interactions/interactionTypes";
 import {
 	createItemInteractionDescriptor,

@@ -1,8 +1,8 @@
 import type { StylingService } from "features/link-decoration/stylingService";
 import type { PluginHost } from "types/pluginHost";
 import { processBasesPane } from "infrastructure/markdown/markdownHandlers";
-import { scheduleAnimationFrame } from "ui/utils/frame";
-import { enableLogging, logger } from "utils/logger";
+import { scheduleAnimationFrame } from "ui/shared/scheduling/frame";
+import { enableLogging, logger } from "shared/logging/logger";
 
 const BASES_DISCOVERY_IGNORE_SELECTOR = [
 	".cosense-card-links__root",

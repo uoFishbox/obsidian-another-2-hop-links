@@ -11,15 +11,15 @@
 	import { focusResultEdge } from "features/keyboard-navigation/resultFocus";
 	import { yieldToMainThreadIdleAware } from "core/indexing/timeSlicing";
 	import type { ListConfig } from "ui/components/lists/types";
-	import { hasSameViewItemSource } from "features/two-hop/utils/equality";
-	import { sameArrayBy } from "utils/arrayEquality";
+	import { hasSameViewItemSource } from "features/two-hop/shared/twoHopEquality";
+	import { sameArrayBy } from "shared/collections/arrayEquality";
 	import {
 		setLinkContext,
 		type LinkContext,
 		setAppContext,
 		setLazyLoaderCache,
 	} from "ui/context/linkContext";
-	import type { SortOption } from "types/settings";
+	import type { SortOption } from "features/settings/model";
 	import type { ApplicationStore } from "ui/stores/ApplicationStore.svelte";
 	import type { ISortService } from "types/services";
 	import type { App, TFile } from "obsidian";

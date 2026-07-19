@@ -8,10 +8,10 @@ import {
 	type Workspace,
 } from "obsidian";
 import type { EventHandlers } from "types/services";
-import * as ErrorHandler from "utils/errorHandler";
+import * as ErrorHandler from "shared/errors/errorHandler";
 import type { TwoHopIndexedLink } from "types";
 import { openFile, openLinkDestination } from "./fileOpener";
-import { resolveFileByPath } from "infrastructure/utils/vaultUtils";
+import { resolveFileByPath } from "shared/obsidian/resolveFileByPath";
 
 export const createEventHandlers = (
 	metadataCache: MetadataCache,

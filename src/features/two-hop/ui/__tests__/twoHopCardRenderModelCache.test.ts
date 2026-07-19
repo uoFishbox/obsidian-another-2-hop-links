@@ -6,7 +6,7 @@ import {
 } from "infrastructure/debug/CCLDevMeasurements";
 import { createMockTFile } from "testing/__mocks__/testHelpers";
 import type { LinkUtilitiesContext } from "types/linkContext";
-import { DEFAULT_SETTINGS } from "types/settings";
+import { DEFAULT_SETTINGS } from "features/settings/model";
 import {
 	createTwoHopCardRenderModelCache,
 	type TwoHopCardModelRevision,

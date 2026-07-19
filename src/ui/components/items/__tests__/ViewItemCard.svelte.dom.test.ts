@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { TFile } from "obsidian";
 import { createMockTFile } from "testing/__mocks__/testHelpers";
 import type { ViewItem } from "application/presenters";
-import { DEFAULT_SETTINGS } from "types/settings";
+import { DEFAULT_SETTINGS } from "features/settings/model";
 import ViewItemCardHarness from "./ViewItemCardHarness.svelte";
 import { getLazyLoadManager } from "infrastructure/observers/IntersectionObserverRegistry";
 import type { CardRenderModel } from "../cardRenderModel";
@@ -19,7 +19,7 @@ vi.mock("obsidian", async () => {
 	};
 });
 
-vi.mock("ui/components/common/CardPreview.svelte", async () => {
+vi.mock("features/preview/ui/CardPreview.svelte", async () => {
 	const component = await import("./CardPreviewMountProbe.svelte");
 	return { default: component.default };
 });

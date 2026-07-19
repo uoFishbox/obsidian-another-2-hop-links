@@ -12,7 +12,7 @@ import type {
 	TwoHopLinkResult,
 } from "types/domain";
 import type { IMetadataCache, IVault } from "types/obsidian";
-import { enableLogging, logger } from "utils/logger";
+import { enableLogging, logger } from "shared/logging/logger";
 import { ResolverCache } from "./ResolverCache";
 import { collectResolverDependencies } from "./ResolverDependencies";
 import { TwoHopBranchBuilder } from "./TwoHopBranchBuilder";

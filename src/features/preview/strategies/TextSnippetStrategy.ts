@@ -1,7 +1,7 @@
 import type { TFile } from "obsidian";
 import type { PreviewData } from "../public-types";
 import type { PreviewContext, PreviewStrategy } from "../core/PreviewStrategy";
-import { isSource, readPreviewContent } from "../utils/previewUtils";
+import { isSource, readPreviewContent } from "../core/previewContent";
 import { getContentSnippetAsync } from "../text-processing/previewTextProcessingAsync";
 
 export function createTextSnippetStrategy(): PreviewStrategy {

@@ -12,7 +12,7 @@ import type {
 	TwoHopIndexedLink,
 } from "types/domain";
 import type { IVault, IMetadataCache } from "types/obsidian";
-import { logger } from "utils/logger";
+import { logger } from "shared/logging/logger";
 import { extractTags, countLinkReferences } from "../metadata/metadataExtractor";
 import {
 	INDEXING_YIELD_INTERVAL_MS,

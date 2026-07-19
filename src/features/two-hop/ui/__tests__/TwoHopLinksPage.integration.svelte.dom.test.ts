@@ -3,7 +3,7 @@ import { TFile } from "obsidian";
 import { createMockTFile } from "testing/__mocks__/testHelpers";
 import type { ComponentProps } from "svelte";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { DEFAULT_SETTINGS } from "types/settings";
+import { DEFAULT_SETTINGS } from "features/settings/model";
 import type {
 	TagGroup,
 	TaggedNote,

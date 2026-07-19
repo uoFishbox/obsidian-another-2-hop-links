@@ -3,7 +3,7 @@ import { SortService } from "../SortService";
 import { TFile } from "obsidian";
 import type { TwoHopLinkBranch, TwoHopIndexedLink, TaggedNote } from "types/domain";
 import type { IMetricProvider } from "types/services";
-import type { SortOption } from "types/settings";
+import type { SortOption } from "features/settings/model";
 import type { SortableItem } from "../types";
 
 describe("SortService", () => {

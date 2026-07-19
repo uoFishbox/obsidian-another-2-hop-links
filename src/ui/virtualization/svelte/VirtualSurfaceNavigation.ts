@@ -2,7 +2,7 @@ import {
 	RESULT_FOCUS_SELECTOR,
 	type ResultNavigationDirection,
 } from "features/keyboard-navigation/resultFocus";
-import { waitForNextAnimationFrame } from "ui/utils/frame";
+import { waitForNextAnimationFrame } from "ui/shared/scheduling/frame";
 import type { VirtualNavigationTarget } from "../types";
 import { getScrollMetrics } from "../dom/virtualListMeasurementAdapter";
 import { createVirtualListKeyboardHandler } from "./VirtualSurfaceKeyboard";

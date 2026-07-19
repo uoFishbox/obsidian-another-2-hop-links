@@ -1,4 +1,4 @@
-import { isDocumentLike } from "ui/utils/realmSafeDom";
+import { isDocumentLike } from "ui/shared/dom/realmSafeDom";
 
 export type RegistrationToken = symbol;
 

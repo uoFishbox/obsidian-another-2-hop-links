@@ -1,5 +1,5 @@
 import type { LinkUtilitiesContext } from "types/linkContext";
-import type { PluginSettings } from "types/settings";
+import type { PluginSettings } from "features/settings/model";
 import { resolveCardTitleSnapshot } from "ui/components/items/cardRenderModel";
 import type { TwoHopVirtualListItem } from "features/two-hop/ui/twoHopVirtualListModel";
 

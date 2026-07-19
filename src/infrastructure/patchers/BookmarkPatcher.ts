@@ -1,6 +1,6 @@
 import type { PluginHost } from "types/pluginHost";
 import { normalizePath } from "obsidian";
-import { enableLogging, logger } from "utils/logger";
+import { enableLogging, logger } from "shared/logging/logger";
 import type { PatchRegistry } from "infrastructure/capabilities/PatchRegistry";
 
 type VaultAdapterWithWrite = {

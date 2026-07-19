@@ -4,7 +4,7 @@ import type {
 	TwoHopIndexedLink,
 } from "types/domain";
 import type { TaggedNote, TagGroup } from "types/domain";
-import type { PluginSettings, SortOption } from "types/settings";
+import type { PluginSettings, SortOption } from "features/settings/model";
 import type { ISortService, IDeduplicationService } from "types/services";
 import type { SortableItem } from "core/sorting";
 import { createDedupState } from "core/deduplication/usageTracker";

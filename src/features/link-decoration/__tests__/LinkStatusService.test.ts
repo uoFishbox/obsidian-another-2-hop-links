@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { createLinkStatusService } from "../linkStatusService";
 import type { IndexingService } from "core/indexing/index-service/IndexingService";
-import { DEFAULT_SETTINGS, type PluginSettings } from "types/settings";
+import { DEFAULT_SETTINGS, type PluginSettings } from "features/settings/model";
 
 type DataUpdateListener = () => void;
 

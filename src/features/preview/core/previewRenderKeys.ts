@@ -1,5 +1,5 @@
 import type { TFile } from "obsidian";
-import type { PluginSettings } from "types/settings";
+import type { PluginSettings } from "features/settings/model";
 
 export const CACHE_KEY_SEPARATOR = "\0";
 const SIGNATURE_SEP = "\u001f";

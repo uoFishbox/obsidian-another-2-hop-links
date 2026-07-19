@@ -19,7 +19,7 @@ import {
 	type PreviewTextWorkerResult,
 } from "./previewTextWorkerTypes";
 import { runPreviewTextWorker } from "./previewTextWorkerClient";
-import type { PluginSettings } from "types/settings";
+import type { PluginSettings } from "features/settings/model";
 
 function shouldUsePreviewTextWorker(content: string): boolean {
 	return content.length > PREVIEW_TEXT_WORKER_MIN_CONTENT_LENGTH;

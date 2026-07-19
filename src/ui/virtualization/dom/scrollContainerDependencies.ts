@@ -1,4 +1,4 @@
-import { isHTMLElementLike, isShadowRootLike } from "ui/utils/realmSafeDom";
+import { isHTMLElementLike, isShadowRootLike } from "ui/shared/dom/realmSafeDom";
 
 export const collectPositionDependencyElements = (
 	rootEl: HTMLElement,

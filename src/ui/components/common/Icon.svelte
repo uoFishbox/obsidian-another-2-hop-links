@@ -1,5 +1,5 @@
 <script lang="ts" module>
-	import { svgAttrs, ICONS, type IconName } from "ui/utils/icons";
+	import { svgAttrs, ICONS, type IconName } from "ui/shared/icons/iconRegistry";
 </script>
 
 <script lang="ts">

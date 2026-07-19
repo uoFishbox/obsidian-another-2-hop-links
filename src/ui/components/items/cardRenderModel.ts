@@ -8,7 +8,7 @@ import { normalizePreviewQuery } from "features/preview/core/previewRenderKeys";
 import type { PreviewData } from "features/preview/public-types";
 import { formatLinkText } from "features/preview/text-processing/textUtils";
 import type { LinkUtilitiesContext } from "types/linkContext";
-import type { PluginSettings } from "types/settings";
+import type { PluginSettings } from "features/settings/model";
 import type { CardPresentationState } from "ui/components/common/cardPresentation";
 import { createItemInteractionKey } from "ui/interactions/interactionTypes";
 

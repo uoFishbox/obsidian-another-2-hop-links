@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { SORT_OPTIONS, ARIA_LABELS } from "../../../appConstants";
 	import type { ResultFocusDirection } from "features/keyboard-navigation/resultFocus";
-	import type { SortOption } from "types/settings";
+	import type { SortOption } from "features/settings/model";
 
 	interface Props {
 		searchInputValue?: string;

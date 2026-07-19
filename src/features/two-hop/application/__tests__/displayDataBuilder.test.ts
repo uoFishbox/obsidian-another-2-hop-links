@@ -14,11 +14,11 @@ import type {
 	TwoHopLinkBranch,
 	TwoHopLinkResult,
 } from "types/domain";
-import type { PluginSettings, SortOption } from "types/settings";
+import type { PluginSettings, SortOption } from "features/settings/model";
 import type { ISortService, IDeduplicationService } from "types/services";
 import type { SortableItem } from "core/sorting";
 import { createMockTFile } from "testing/__mocks__/testHelpers";
-import { DEFAULT_SETTINGS } from "types/settings";
+import { DEFAULT_SETTINGS } from "features/settings/model";
 import * as grouping from "core/grouping";
 import { DISPLAY_ASSEMBLY_SETTING_DEPENDENCIES } from "../displayCacheDependencies";
 

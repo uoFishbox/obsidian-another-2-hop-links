@@ -9,7 +9,7 @@ import {
 } from "./textTransformStrategies";
 import { replaceFencedCodeBlocks } from "./fencedCodeBlocks";
 import type { TransformContentForPreviewOptions } from "./types";
-import type { PluginSettings } from "types/settings";
+import type { PluginSettings } from "features/settings/model";
 
 const INLINE_CODE_REGEX = /`([^`]+)`/g;
 const EMPTY_PROTECTED_SEGMENTS: ProtectedSegment[] = [];

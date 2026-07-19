@@ -2,7 +2,7 @@ import {
 	getOptionalOwnerWindow,
 	isHTMLElementLike,
 	isShadowRootLike,
-} from "ui/utils/realmSafeDom";
+} from "ui/shared/dom/realmSafeDom";
 
 const SCROLLABLE_OVERFLOW_PATTERN = /(auto|scroll|overlay)/;
 

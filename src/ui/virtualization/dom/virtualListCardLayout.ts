@@ -2,8 +2,8 @@ import {
 	computeCardHeightPxFromWidth,
 	normalizeCardHeightRatio,
 	type ResolvedCardLayoutSettings,
-} from "ui/utils/cardLayoutCssVars";
-import { getOptionalOwnerWindow } from "ui/utils/realmSafeDom";
+} from "ui/shared/layout/cardLayoutCssVars";
+import { getOptionalOwnerWindow } from "ui/shared/dom/realmSafeDom";
 import { computeColumnCount } from "../core/gridLayout";
 
 const parseCssNumber = (value: string, fallback: number): number => {

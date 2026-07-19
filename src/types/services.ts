@@ -7,7 +7,7 @@ import type {
 	TwoHopIndexedLink,
 } from "./domain";
 import type { DedupResult, DedupState } from "./deduplication";
-import type { SortOption } from "./settings";
+import type { SortOption } from "features/settings/model";
 import type { SortableItem } from "core/sorting/types";
 import type { PreviewData, PreviewRequestOptions } from "features/preview/public-types";
 import type { DataUpdateContext } from "core/indexing/index-service/IndexEvents";

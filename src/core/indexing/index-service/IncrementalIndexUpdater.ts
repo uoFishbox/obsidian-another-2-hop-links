@@ -6,7 +6,7 @@ import {
 	type BacklinkReconcileSink,
 	type BacklinkRemovalMutationCallback,
 } from "core/indexing/backlink-builder/backlinkUpdater";
-import { resolveFileByPath } from "core/utils/resolveFileByPath";
+import { resolveFileByPath } from "shared/obsidian/resolveFileByPath";
 import type { IMetadataCache, IVault } from "types/obsidian";
 import {
 	createCreateChangePlanner,

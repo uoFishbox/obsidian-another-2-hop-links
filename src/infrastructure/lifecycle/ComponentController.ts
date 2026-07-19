@@ -4,11 +4,11 @@ import {
 	getActiveInlineContainer,
 	type ActiveInlineContainer,
 	type InlineMarkdownSurface,
-} from "ui/utils/domUtils";
-import { getLeafId } from "infrastructure/utils/workspaceUtils";
-import * as ErrorHandler from "utils/errorHandler";
-import type { PluginSettings, SortOption } from "types/settings";
-import { areTagFeaturesEnabled } from "types/settings";
+} from "ui/shared/dom/domUtils";
+import { getLeafId } from "infrastructure/workspace/workspaceLeafIdentity";
+import * as ErrorHandler from "shared/errors/errorHandler";
+import type { PluginSettings, SortOption } from "features/settings/model";
+import { areTagFeaturesEnabled } from "features/settings/model";
 import type { IComponentManager } from "types/services";
 import type { TwoHopLinkResult } from "types/domain";
 import type {
@@ -20,7 +20,7 @@ import type { PluginHostUi } from "types/pluginHostUi";
 import type { ResolveTwoHopLinks } from "features/two-hop/application/TwoHopLinksLoader";
 import { mountTwoHopLinksRootView } from "features/two-hop/ui/mountTwoHopLinksRootView";
 import type { TwoHopLinksRootUiState } from "features/two-hop/ui/twoHopLinksRootUiState";
-import type { SvelteComponentInstance } from "ui/views/shared/svelteLifecycle";
+import type { SvelteComponentInstance } from "ui/shared/views/svelteLifecycle";
 import { ApplicationStorePool } from "./ApplicationStorePool";
 
 export { RECENT_APPLICATION_STORE_LIMIT } from "./ApplicationStorePool";

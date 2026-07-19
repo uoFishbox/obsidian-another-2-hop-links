@@ -13,7 +13,7 @@ import {
 	type SectionPaginationApplicationStore,
 } from "ui/virtualization/pagination";
 import type { CardRenderModel } from "ui/components/items/cardRenderModel";
-import type { ResolvedCardLayoutSettings } from "ui/utils/cardLayoutCssVars";
+import type { ResolvedCardLayoutSettings } from "ui/shared/layout/cardLayoutCssVars";
 import type { InteractionDescriptor } from "ui/interactions/interactionTypes";
 import {
 	createTwoHopDomPool,

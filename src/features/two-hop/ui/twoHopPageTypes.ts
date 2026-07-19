@@ -1,6 +1,6 @@
 import type { TFile } from "obsidian";
 import type { TaggedNote, TwoHopLinkBranch } from "types/domain";
-import type { PluginSettings, SortOption } from "types/settings";
+import type { PluginSettings, SortOption } from "features/settings/model";
 import type { ViewItem } from "application/presenters";
 import type { ApplicationStore } from "ui/stores/ApplicationStore.svelte";
 

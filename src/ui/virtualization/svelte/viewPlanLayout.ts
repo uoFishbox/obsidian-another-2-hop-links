@@ -1,4 +1,4 @@
-import { resolveCardLayoutSettings } from "ui/utils/cardLayoutCssVars";
+import { resolveCardLayoutSettings } from "ui/shared/layout/cardLayoutCssVars";
 
 export interface ViewPlanLayoutMetrics {
 	containerWidth: number;

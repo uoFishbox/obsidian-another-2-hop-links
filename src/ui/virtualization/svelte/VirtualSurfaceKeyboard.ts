@@ -6,8 +6,8 @@ import {
 	scrollSectionIntoViewForFocus,
 	type ResultNavigationDirection,
 } from "features/keyboard-navigation/resultFocus";
-import { waitForNextAnimationFrame } from "ui/utils/frame";
-import { isHTMLElementLike } from "ui/utils/realmSafeDom";
+import { waitForNextAnimationFrame } from "ui/shared/scheduling/frame";
+import { isHTMLElementLike } from "ui/shared/dom/realmSafeDom";
 
 interface DelegatedKeyboardInteractions {
 	handleKeyDown: (event: KeyboardEvent) => void;

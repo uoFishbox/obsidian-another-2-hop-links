@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { DEFAULT_SETTINGS } from "types/settings";
+import { DEFAULT_SETTINGS } from "features/settings/model";
 
 const {
 	getActiveInlineContainerSpy,
@@ -17,15 +17,15 @@ const {
 	unmountSpy: vi.fn(),
 }));
 
-vi.mock("ui/utils/domUtils", () => ({
+vi.mock("ui/shared/dom/domUtils", () => ({
 	getActiveInlineContainer: getActiveInlineContainerSpy,
 }));
 
-vi.mock("infrastructure/utils/workspaceUtils", () => ({
+vi.mock("infrastructure/workspace/workspaceLeafIdentity", () => ({
 	getLeafId: getLeafIdSpy,
 }));
 
-vi.mock("utils/errorHandler", () => ({
+vi.mock("shared/errors/errorHandler", () => ({
 	handleMountError: handleMountErrorSpy,
 	handleUnmountError: handleUnmountErrorSpy,
 }));

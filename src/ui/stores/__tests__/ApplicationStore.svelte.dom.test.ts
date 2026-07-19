@@ -17,7 +17,11 @@ import type {
 	TwoHopLinkBranch,
 	TwoHopLinkResult,
 } from "types/domain";
-import { DEFAULT_SETTINGS, type PluginSettings, type SortOption } from "types/settings";
+import {
+	DEFAULT_SETTINGS,
+	type PluginSettings,
+	type SortOption,
+} from "features/settings/model";
 
 function createEmptyDisplayData(): DisplayData {
 	return {

@@ -1,6 +1,6 @@
 import type { TFile } from "obsidian";
 import type { TwoHopIndexedLink } from "types";
-import type { PluginSettings } from "types/settings";
+import type { PluginSettings } from "features/settings/model";
 import type { HighlightMode } from "../public-types";
 import { isAdvancedCanvasPosition } from "core/rules/fileRules";
 

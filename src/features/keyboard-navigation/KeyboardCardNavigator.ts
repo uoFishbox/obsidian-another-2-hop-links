@@ -1,16 +1,16 @@
 import { MarkdownView, Notice, type WorkspaceLeaf } from "obsidian";
 import { findNearestScrollContainer } from "ui/virtualization/dom/scrollContainer";
 import { TWO_HOP_LINKS_VIEW_TYPE } from "features/two-hop/ui/TwoHopLinksView";
-import { VIEW_TYPE_PRE_CREATE } from "ui/views/PreCreationView";
-import { VIEW_TYPE_TAG_NOTES } from "ui/views/TagNotesView";
+import { VIEW_TYPE_PRE_CREATE } from "features/pre-creation/ui/PreCreationView";
+import { VIEW_TYPE_TAG_NOTES } from "features/tag-notes/ui/TagNotesView";
 import { CARD_SELECTOR, LOAD_MORE_SELECTOR } from "./resultFocus";
-import { querySelectorAllIncludingShadow } from "ui/utils/shadowDom";
-import { isElementVisible } from "ui/utils/domUtils";
+import { querySelectorAllIncludingShadow } from "ui/shared/dom/shadowDom";
+import { isElementVisible } from "ui/shared/dom/domUtils";
 import {
 	createOwnerMouseEvent,
 	getOptionalOwnerWindow,
 	isHTMLElementLike,
-} from "ui/utils/realmSafeDom";
+} from "ui/shared/dom/realmSafeDom";
 
 const INLINE_SURFACE_SELECTOR =
 	'.cosense-card-links__root[data-ccl-card-surface="inline"]';

@@ -8,10 +8,10 @@ import type {
 import type { SortableItem } from "./types";
 import type { IMetricProvider, SortMetricKind } from "types/services";
 import { countLinkReferences } from "core/indexing/metadata/metadataExtractor";
-import { resolveFileByPath } from "core/utils/resolveFileByPath";
+import { resolveFileByPath } from "shared/obsidian/resolveFileByPath";
 import type { IIndexingService } from "types/services";
 import type { IMetadataCache, IVault } from "types/obsidian";
-import type { PluginSettings } from "types/settings";
+import type { PluginSettings } from "features/settings/model";
 import { resolveFrontmatterDate } from "./frontmatterDate";
 import { getPriorityFrontmatterCardTitle } from "core/frontmatterCardTitle";
 

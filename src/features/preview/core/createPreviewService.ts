@@ -1,7 +1,7 @@
 import type { App, TFile } from "obsidian";
 import type { IMetadataCache, IVault } from "types/obsidian";
 import type { IPreviewService } from "types/services";
-import type { PluginSettings } from "types/settings";
+import type { PluginSettings } from "features/settings/model";
 import type { PreviewData, PreviewRequestOptions } from "../public-types";
 import type { PreviewStrategy } from "./PreviewStrategy";
 import type { PreviewQueueTask } from "./previewQueue";

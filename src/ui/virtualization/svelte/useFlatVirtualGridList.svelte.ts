@@ -19,9 +19,9 @@ import { createCardVirtualListPolicy } from "../cardVirtualListPolicy";
 import {
 	createResolvedCardLayoutSettingsMemo,
 	type CardLayoutSettings,
-} from "ui/utils/cardLayoutCssVars";
-import { getOptionalOwnerWindow } from "ui/utils/realmSafeDom";
-import { scheduleAnimationFrame } from "ui/utils/frame";
+} from "ui/shared/layout/cardLayoutCssVars";
+import { getOptionalOwnerWindow } from "ui/shared/dom/realmSafeDom";
+import { scheduleAnimationFrame } from "ui/shared/scheduling/frame";
 import {
 	createSectionPaginationState,
 	type SectionPaginationApplicationStore,

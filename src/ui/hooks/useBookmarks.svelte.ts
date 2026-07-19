@@ -2,7 +2,7 @@ import { Component, normalizePath, type App } from "obsidian";
 import { SvelteSet } from "svelte/reactivity";
 import type { BookmarksState } from "ui/context/linkContext";
 import { parseBookmarkedFilePaths } from "./bookmarksUtils";
-import { enableLogging, logger } from "utils/logger";
+import { enableLogging, logger } from "shared/logging/logger";
 
 const BOOKMARKS_RELOAD_DEBOUNCE_MS = 120;
 

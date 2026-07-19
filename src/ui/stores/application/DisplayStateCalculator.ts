@@ -6,7 +6,7 @@ import type {
 	TagPreprocessedDisplayData,
 } from "features/two-hop/application/displayDataBuilder";
 import type { TwoHopLinkResult } from "types";
-import type { PluginSettings, SortOption } from "types/settings";
+import type { PluginSettings, SortOption } from "features/settings/model";
 import {
 	createSettingsCacheKey,
 	LINK_PREPROCESS_CACHE_SETTING_DEPENDENCIES,

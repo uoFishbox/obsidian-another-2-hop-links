@@ -1,8 +1,8 @@
 import { MarkdownView, TFile, type Plugin, type App } from "obsidian";
-import { resolveFileByPath } from "infrastructure/utils/vaultUtils";
+import { resolveFileByPath } from "shared/obsidian/resolveFileByPath";
 import type { CanvasViewCanvas } from "obsidian-typings";
 import type { CanvasNodeData } from "types/obsidian";
-import type { SettingsManager } from "settings/SettingsManager";
+import type { SettingsManager } from "features/settings/persistence/SettingsManager";
 import type { IComponentManager } from "types/services";
 import type { WorkspaceViewQueries } from "infrastructure/workspace/workspaceViewQueries";
 import type { DisplayModeStrategy } from "features/display-mode/createDisplayModeStrategy";

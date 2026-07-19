@@ -1,8 +1,8 @@
 import type { IIndexingService } from "types";
 import type { LinkContext } from "../context/linkContext";
-import { openTagNotesView } from "ui/views/TagNotesView";
+import { openTagNotesView } from "features/tag-notes/ui/TagNotesView";
 import type { PluginHost } from "types/pluginHost";
-import { areTagFeaturesEnabled } from "types/settings";
+import { areTagFeaturesEnabled } from "features/settings/model";
 
 export async function handleTagClick(
 	tag: string,

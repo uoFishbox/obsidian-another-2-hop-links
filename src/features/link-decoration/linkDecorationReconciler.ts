@@ -11,7 +11,7 @@ import {
 } from "./decorationTargetCollector";
 import type { LinkStatusService } from "./linkStatusService";
 import { UNRESOLVED_LINK_ATTRIBUTE } from "../../appConstants";
-import { enableLogging, logger } from "utils/logger";
+import { enableLogging, logger } from "shared/logging/logger";
 
 export type LinkHrefExtractor = (el: HTMLElement) => string | undefined;
 

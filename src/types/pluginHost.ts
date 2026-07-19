@@ -1,7 +1,7 @@
 import type { MarkdownView, Plugin, TFile } from "obsidian";
 import type { IndexingService } from "core/indexing/index-service/IndexingService";
 import type { SortService } from "core/sorting/SortService";
-import type { PluginSettings } from "types/settings";
+import type { PluginSettings } from "features/settings/model";
 import type { ResolveProgress, TwoHopLinkResult } from "types/domain";
 import type { ResolveOptions } from "features/two-hop/domain/TwoHopLinkResolver";
 

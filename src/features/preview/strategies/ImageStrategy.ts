@@ -1,7 +1,7 @@
 import type { TFile } from "obsidian";
 import type { PreviewData } from "../public-types";
 import type { PreviewContext, PreviewStrategy } from "../core/PreviewStrategy";
-import { isImage } from "../utils/previewUtils";
+import { isImage } from "../core/previewContent";
 import { generateImagePreview } from "../renderers/imagePreviewRenderer";
 
 export function createImagePreviewStrategy(): PreviewStrategy {

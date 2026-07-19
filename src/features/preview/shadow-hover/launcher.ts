@@ -5,7 +5,7 @@ import { createRequestHoverParent } from "./session";
 import type { ShadowHoverLinkSpec } from "./public-types";
 import { debugLog } from "./debug";
 import { summarizeNode } from "./dom-utils";
-import { enableLogging } from "utils/logger";
+import { enableLogging } from "shared/logging/logger";
 
 export type ShadowPopoverLaunchRequest = {
 	session: ShadowHoverSession;

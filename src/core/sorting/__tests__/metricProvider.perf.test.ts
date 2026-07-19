@@ -4,7 +4,7 @@ import { TFile } from "obsidian";
 import type { TwoHopLinkBranch, CachedMetadataWithLinkReferences } from "types/domain";
 import type { IIndexingService } from "types/services";
 import type { IMetadataCache, IVault } from "types/obsidian";
-import { DEFAULT_SETTINGS, type PluginSettings } from "types/settings";
+import { DEFAULT_SETTINGS, type PluginSettings } from "features/settings/model";
 
 describe("MetricProvider Performance", () => {
 	let mockMetadataCache: MockedObject<IMetadataCache>;

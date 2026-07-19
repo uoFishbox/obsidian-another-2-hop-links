@@ -1,7 +1,7 @@
 import type { App, TFile } from "obsidian";
 import type { StylingService } from "features/link-decoration/stylingService";
 import type { CanvasView } from "obsidian-typings";
-import { enableLogging, logger } from "utils/logger";
+import { enableLogging, logger } from "shared/logging/logger";
 import {
 	getMetadataEditorContentEl,
 	getViewFile,

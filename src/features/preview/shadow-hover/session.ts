@@ -4,7 +4,7 @@ import {
 	POPOVER_ANCHOR_KEY,
 } from "./internal-constants";
 import { debugLog, summarizePopover, summarizeSession } from "./debug";
-import { enableLogging } from "utils/logger";
+import { enableLogging } from "shared/logging/logger";
 import { rectToObject } from "./dom-utils";
 import type {
 	HoverAnchorTarget,
@@ -27,7 +27,11 @@ import {
 	transitionHoverSession,
 	transitionHoverSessionInteraction,
 } from "./state-machine";
-import { isElementLike, isHTMLElementLike, isNodeLike } from "ui/utils/realmSafeDom";
+import {
+	isElementLike,
+	isHTMLElementLike,
+	isNodeLike,
+} from "ui/shared/dom/realmSafeDom";
 
 const patchedPopovers = new WeakMap<HoverPopoverLike, PopoverPatchState>();
 

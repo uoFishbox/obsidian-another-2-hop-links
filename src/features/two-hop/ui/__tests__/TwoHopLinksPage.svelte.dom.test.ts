@@ -1,6 +1,6 @@
 import { render, screen } from "@testing-library/svelte";
 import { describe, expect, it, vi } from "vitest";
-import { DEFAULT_SETTINGS } from "types/settings";
+import { DEFAULT_SETTINGS } from "features/settings/model";
 import { createMockTFile } from "testing/__mocks__/testHelpers";
 import type { TwoHopLinkResult } from "types/domain";
 import TwoHopLinksPage from "../TwoHopLinksPage.svelte";

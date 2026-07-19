@@ -1,8 +1,8 @@
 import type { PluginHost } from "types/pluginHost";
 import type { StylingService } from "features/link-decoration/stylingService";
 import type { PropertyWidgetStyler } from "features/link-decoration/propertyWidgetStyler";
-import { resolveFileByPath } from "infrastructure/utils/vaultUtils";
-import { enableLogging, logger } from "utils/logger";
+import { resolveFileByPath } from "shared/obsidian/resolveFileByPath";
+import { enableLogging, logger } from "shared/logging/logger";
 import {
 	ObsidianInternalFacade,
 	type PropertyWidgetComponentLike,

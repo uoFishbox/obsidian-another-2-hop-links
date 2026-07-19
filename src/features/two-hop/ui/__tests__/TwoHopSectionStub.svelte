@@ -1,7 +1,7 @@
 <script lang="ts">
 	import ViewItemCard from "ui/components/items/ViewItemCard.svelte";
 	import type { TwoHopLinkBranch } from "types/domain";
-	import { DEFAULT_SETTINGS } from "types/settings";
+	import { DEFAULT_SETTINGS } from "features/settings/model";
 
 	interface Props {
 		branches: TwoHopLinkBranch[];

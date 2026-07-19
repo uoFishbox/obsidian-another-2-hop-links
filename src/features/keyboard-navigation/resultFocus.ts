@@ -1,13 +1,13 @@
 import {
 	findClosestComposed,
 	querySelectorAllIncludingShadow,
-} from "ui/utils/shadowDom";
-import { isElementVisible } from "ui/utils/domUtils";
+} from "ui/shared/dom/shadowDom";
+import { isElementVisible } from "ui/shared/dom/domUtils";
 import {
 	getOptionalOwnerWindow,
 	isEventLike,
 	isHTMLElementLike,
-} from "ui/utils/realmSafeDom";
+} from "ui/shared/dom/realmSafeDom";
 export type ResultFocusDirection = "up" | "down";
 export type ResultNavigationDirection = ResultFocusDirection | "left" | "right";
 

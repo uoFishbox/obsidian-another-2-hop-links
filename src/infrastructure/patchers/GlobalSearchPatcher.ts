@@ -1,7 +1,7 @@
 import type { PluginHost } from "types/pluginHost";
-import { enableLogging, logger } from "utils/logger";
-import { openTagNotesView } from "ui/views/TagNotesView";
-import { areTagFeaturesEnabled } from "types/settings";
+import { enableLogging, logger } from "shared/logging/logger";
+import { openTagNotesView } from "features/tag-notes/ui/TagNotesView";
+import { areTagFeaturesEnabled } from "features/settings/model";
 import { ObsidianInternalFacade } from "infrastructure/capabilities/ObsidianInternalFacade";
 import type { PatchRegistry } from "infrastructure/capabilities/PatchRegistry";
 

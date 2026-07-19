@@ -11,7 +11,12 @@ import {
 	resolveTwoHopSectionVariant,
 } from "features/two-hop/ui/twoHopCellStaticState";
 import type { TwoHopSnapshot } from "features/two-hop/ui/viewport/twoHopSnapshot";
-import { ICONS, svgAttrs, type IconName, type SvgElement } from "ui/utils/icons";
+import {
+	ICONS,
+	svgAttrs,
+	type IconName,
+	type SvgElement,
+} from "ui/shared/icons/iconRegistry";
 import { highlightTextForSearch } from "features/preview/text-processing/searchHighlighter";
 
 export interface TwoHopShellRendererParams {

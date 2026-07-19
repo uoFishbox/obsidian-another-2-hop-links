@@ -1,5 +1,5 @@
 import { toCaseInsensitiveLookupKey } from "core/indexing/link-resolution/linkResolution";
-import { resolveFileByPath } from "core/utils/resolveFileByPath";
+import { resolveFileByPath } from "shared/obsidian/resolveFileByPath";
 import type {
 	BacklinkBucket,
 	BacklinkSourceMap,
@@ -7,7 +7,7 @@ import type {
 	TwoHopIndexedLink,
 } from "types/domain";
 import type { IVault } from "types/obsidian";
-import { enableLogging, logger } from "utils/logger";
+import { enableLogging, logger } from "shared/logging/logger";
 import type { IndexSnapshot } from "../types/IndexTypes";
 
 interface LookupSourceView {

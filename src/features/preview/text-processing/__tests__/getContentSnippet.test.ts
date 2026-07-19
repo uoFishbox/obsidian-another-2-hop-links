@@ -1,7 +1,7 @@
 import { describe, test, expect } from "vitest";
 import { getContentSnippet } from "../snippetExtractor";
-import type { PluginSettings } from "types/settings";
-import { DEFAULT_SETTINGS } from "types/settings";
+import type { PluginSettings } from "features/settings/model";
+import { DEFAULT_SETTINGS } from "features/settings/model";
 
 const defaultSettings: PluginSettings = DEFAULT_SETTINGS;
 

@@ -1,7 +1,7 @@
 import {
 	registerMathJaxShadowRoot,
 	unregisterMathJaxShadowRoot,
-} from "ui/utils/mathJaxShadowStyles";
+} from "ui/shared/dom/mathJaxShadowStyles";
 import { CARD_RENDER_SHADOW_CSS } from "./cardRenderShadowStyles";
 
 const SHADOW_BASE_STYLE_ATTRIBUTE = "data-ccl-card-render-shadow-base-style";

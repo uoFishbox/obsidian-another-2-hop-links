@@ -1,8 +1,8 @@
 import type { TFile } from "obsidian";
 import type { PreviewData } from "../public-types";
-import type { PluginSettings } from "types/settings";
-import { createSizedLRUCache, stringBytes } from "utils/sizedLRUCache";
-import type { SizedLRUCache } from "utils/sizedLRUCache";
+import type { PluginSettings } from "features/settings/model";
+import { createSizedLRUCache, stringBytes } from "shared/cache/sizedLRUCache";
+import type { SizedLRUCache } from "shared/cache/sizedLRUCache";
 
 const VIDEO_THUMBNAIL_CACHE_MAX_COUNT = 80;
 const CACHE_KEY_SEPARATOR = "\0";

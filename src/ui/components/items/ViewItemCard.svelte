@@ -2,8 +2,8 @@
 	import type { ItemProps } from "./types";
 	import { useAppContext, useLinkContext } from "ui/context/linkContext";
 	import LinkItem from "ui/components/common/LinkItem.svelte";
-	import CardPreviewGate from "./CardPreviewGate.svelte";
-	import UnresolvedPreviewPlaceholder from "./UnresolvedPreviewPlaceholder.svelte";
+	import CardPreviewGate from "features/preview/ui/CardPreviewGate.svelte";
+	import UnresolvedPreviewPlaceholder from "features/preview/ui/UnresolvedPreviewPlaceholder.svelte";
 	import { ARIA_LABELS, DEBUG_DISABLE_CARD_DOM_PREVIEW } from "../../../appConstants";
 	import { formatLinkText } from "features/preview/text-processing/textUtils";
 	import { getItemStrategy } from "application/presenters";

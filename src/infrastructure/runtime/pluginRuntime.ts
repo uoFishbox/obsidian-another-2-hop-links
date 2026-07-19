@@ -46,15 +46,15 @@ import {
 import {
 	createSettingsSideEffectController,
 	type SettingsSideEffectController,
-} from "settings/settingsSideEffectController";
-import type { SettingsManager } from "settings/SettingsManager";
+} from "features/settings/effects/settingsSideEffectController";
+import type { SettingsManager } from "features/settings/persistence/SettingsManager";
 import type { PluginHostUi } from "types/pluginHostUi";
 import {
 	areTagFeaturesEnabled,
 	type PluginSettings,
 	type SortOption,
-} from "types/settings";
-import { clearCardPreviewSharedCaches } from "ui/components/common/cardPreviewSharedCache";
+} from "features/settings/model";
+import { clearCardPreviewSharedCaches } from "features/preview/ui/cardPreviewSharedCache";
 import { getLazyLoadManager } from "infrastructure/observers/IntersectionObserverRegistry";
 
 export interface PluginRuntimeOptions {

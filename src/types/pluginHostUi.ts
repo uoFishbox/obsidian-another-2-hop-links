@@ -5,7 +5,7 @@ import type { LinkContext } from "ui/context/linkContext";
 import type { ApplicationStore } from "ui/stores/ApplicationStore.svelte";
 import type { ResolveTwoHopLinks } from "features/two-hop/application/TwoHopLinksLoader";
 import type { PluginHost } from "types/pluginHost";
-import type { PluginSettings } from "types/settings";
+import type { PluginSettings } from "features/settings/model";
 
 export interface PluginHostUi extends PluginHost {
 	readonly forceRedrawEffect: StateEffectType<undefined>;

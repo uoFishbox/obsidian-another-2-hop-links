@@ -1,4 +1,4 @@
-import { enableLogging, logger } from "utils/logger";
+import { enableLogging, logger } from "shared/logging/logger";
 import type {
 	DebugLogEntry,
 	HoverPopoverLike,

@@ -11,15 +11,15 @@ import type {
 	LinkUtilitiesContext,
 } from "ui/context/linkContext";
 import type { TwoHopIndexedLink } from "types";
-import type { PluginSettings } from "types/settings";
+import type { PluginSettings } from "features/settings/model";
 import { getItemStrategy } from "application/presenters";
-import { findClosestComposed } from "ui/utils/shadowDom";
+import { findClosestComposed } from "ui/shared/dom/shadowDom";
 import {
 	createOwnerMouseEvent,
 	isElementLike,
 	isEventLike,
 	isHTMLElementLike,
-} from "ui/utils/realmSafeDom";
+} from "ui/shared/dom/realmSafeDom";
 
 export const INTERACTION_ID_ATTRIBUTE = "data-ccl-interaction-id";
 export const INTERACTION_KIND_ATTRIBUTE = "data-ccl-interaction-kind";

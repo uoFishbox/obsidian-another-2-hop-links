@@ -5,7 +5,7 @@ import type {
 	TwoHopCardShellSlot,
 } from "features/two-hop/ui/twoHopDomPool";
 import { processPreviewContent } from "features/preview/renderers/markdownPreviewRenderer";
-import { toPreviewImageSrc } from "features/preview/utils/externalFileImage";
+import { toPreviewImageSrc } from "features/preview/renderers/externalImageSource";
 import { highlightSearchMatchesInHtml } from "features/preview/text-processing/searchHighlighter";
 import type { CardRenderModel } from "ui/components/items/cardRenderModel";
 

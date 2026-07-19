@@ -1,4 +1,4 @@
-import { getOptionalOwnerWindow } from "ui/utils/realmSafeDom";
+import { getOptionalOwnerWindow } from "ui/shared/dom/realmSafeDom";
 
 type ScrollTarget = Window | HTMLElement;
 export type ScrollPhase = "start" | "scroll" | "idle";

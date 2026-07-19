@@ -3,8 +3,8 @@ import { MarkdownRenderer } from "obsidian";
 import { PreviewService as PreviewServiceClass } from "../core/createPreviewService";
 import { generateVideoPreview } from "../renderers/videoPreviewRenderer";
 import { generateCanvasPreview } from "../renderers/canvasPreviewRenderer";
-import { applySharedSearchContextToTextPreview } from "ui/components/common/cardPreviewSharedCache";
-import { DEFAULT_SETTINGS } from "types/settings";
+import { applySharedSearchContextToTextPreview } from "features/preview/ui/cardPreviewSharedCache";
+import { DEFAULT_SETTINGS } from "features/settings/model";
 import type { IVault, IMetadataCache } from "types/obsidian";
 import {
 	createMockTFileAsPlainObject,

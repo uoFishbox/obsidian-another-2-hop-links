@@ -1,6 +1,6 @@
 import type { App, TFile } from "obsidian";
 import type { IMetadataCache, IVault } from "types/obsidian";
-import type { PluginSettings } from "types/settings";
+import type { PluginSettings } from "features/settings/model";
 import type { PreviewContext } from "./PreviewStrategy";
 import type { ParsedEmbed } from "../text-processing/mediaExtractor";
 import { defaultYieldToMainThread } from "core/indexing/timeSlicing";

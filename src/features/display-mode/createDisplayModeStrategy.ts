@@ -1,4 +1,4 @@
-import type { DisplayMode } from "types/settings";
+import type { DisplayMode } from "features/settings/model";
 import type {
 	DisplayModeStrategy,
 	DisplayModeStrategyContext,

@@ -1,7 +1,7 @@
 import { computeVirtualGridLayout } from "../layout/flatGridLayout";
 import { resolveCachedCardGridLayoutBase } from "./virtualListCardLayout";
 import { resolveVirtualListLayoutStability } from "./virtualListMeasurementStability";
-import { resolveCardLayoutSettings } from "ui/utils/cardLayoutCssVars";
+import { resolveCardLayoutSettings } from "ui/shared/layout/cardLayoutCssVars";
 
 export const DEFAULT_FLAT_GRID_CARD_LAYOUT = resolveCardLayoutSettings();
 

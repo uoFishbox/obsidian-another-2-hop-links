@@ -1,11 +1,11 @@
 import { TFile } from "obsidian";
 import type { IndexingService } from "core/indexing/index-service/IndexingService";
-import type { PluginSettings } from "types/settings";
+import type { PluginSettings } from "features/settings/model";
 import {
 	normalizeLinkToMarkdownPath,
 	stripLinkAnchor,
 } from "core/indexing/link-resolution/linkResolution";
-import { enableLogging, logger } from "utils/logger";
+import { enableLogging, logger } from "shared/logging/logger";
 
 export interface LinkStatusService {
 	invalidateCache(): void;

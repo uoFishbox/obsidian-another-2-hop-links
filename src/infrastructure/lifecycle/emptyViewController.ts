@@ -3,9 +3,9 @@ import { mount, unmount } from "svelte";
 import type { PluginHostUi } from "types/pluginHostUi";
 import type { ApplicationStore } from "ui/stores/ApplicationStore.svelte";
 import type { ComponentInstance } from "infrastructure/lifecycle/ComponentController";
-import AllNotesPage from "ui/pages/AllNotesPage.svelte";
-import { getLeafId } from "infrastructure/utils/workspaceUtils";
-import { areTagFeaturesEnabled } from "types/settings";
+import AllNotesPage from "features/all-notes/ui/AllNotesPage.svelte";
+import { getLeafId } from "infrastructure/workspace/workspaceLeafIdentity";
+import { areTagFeaturesEnabled } from "features/settings/model";
 
 interface MountedEmptyView {
 	component: ComponentInstance | undefined;

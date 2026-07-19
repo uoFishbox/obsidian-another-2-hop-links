@@ -1,4 +1,4 @@
-import { getOptionalOwnerWindow } from "ui/utils/realmSafeDom";
+import { getOptionalOwnerWindow } from "ui/shared/dom/realmSafeDom";
 
 export interface VirtualListScrollMetrics {
 	sectionRect: DOMRect;

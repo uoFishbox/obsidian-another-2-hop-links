@@ -1,6 +1,6 @@
 import type { Snippet } from "svelte";
 import type { SectionHeaderInteractionDescriptor } from "ui/interactions/interactionTypes";
-import type { PluginSettings } from "types/settings";
+import type { PluginSettings } from "features/settings/model";
 import type { RenderRevision } from "ui/virtualization/renderRevision";
 
 export interface SectionConfig<T> {

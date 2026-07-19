@@ -1,5 +1,5 @@
 import type { ViewItem } from "./ViewItem";
-import { sameArrayBy, samePrimitiveArray } from "utils/arrayEquality";
+import { sameArrayBy, samePrimitiveArray } from "shared/collections/arrayEquality";
 
 export interface StableViewItemReconcilerOptions<T> {
 	getKey: (item: T, index: number) => string;
@@ -227,11 +227,11 @@ export function createStableViewItemReconciler<T>(
 				const baseViewItem = previousEntry
 					? canReuseEntrySource(options, previousEntry.source, item)
 						? refreshViewItemData(
-							previousEntry.viewItem,
-							previousEntry.source,
-							item,
-							options,
-						)
+								previousEntry.viewItem,
+								previousEntry.source,
+								item,
+								options,
+							)
 						: options.toViewItem(item)
 					: options.toViewItem(item);
 

@@ -1,5 +1,5 @@
-import type { PluginSettings } from "types/settings";
-import { areTagFeaturesEnabled } from "types/settings";
+import type { PluginSettings } from "features/settings/model";
+import { areTagFeaturesEnabled } from "features/settings/model";
 
 export interface SettingsCacheDependency<Key extends string = string, Value = unknown> {
 	key: Key;

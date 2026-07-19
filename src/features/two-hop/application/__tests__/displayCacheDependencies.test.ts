@@ -5,7 +5,7 @@ import {
 	selectSettingsDependencies,
 	TAG_PREPROCESS_CACHE_SETTING_DEPENDENCIES,
 } from "../displayCacheDependencies";
-import { DEFAULT_SETTINGS } from "types/settings";
+import { DEFAULT_SETTINGS } from "features/settings/model";
 
 describe("displayCacheDependencies", () => {
 	it("selects only the declared assembly settings", () => {

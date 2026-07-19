@@ -1,6 +1,6 @@
 import type { TFile } from "obsidian";
 import { describe, expect, test } from "vitest";
-import { DEFAULT_SETTINGS } from "types/settings";
+import { DEFAULT_SETTINGS } from "features/settings/model";
 import { buildCardPreviewActivationIdentity } from "../cardPreviewActivationIdentity";
 import { createPreviewOverrideIdentity } from "../previewRenderIdentity";
 import {

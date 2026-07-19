@@ -7,7 +7,7 @@ import {
 	toCaseInsensitiveLookupKey,
 } from "core/indexing/link-resolution/linkResolution";
 import { UNRESOLVED_LINK_ATTRIBUTE } from "../../appConstants";
-import { enableLogging, logger } from "utils/logger";
+import { enableLogging, logger } from "shared/logging/logger";
 
 export async function markdownPostProcessor(
 	el: HTMLElement,

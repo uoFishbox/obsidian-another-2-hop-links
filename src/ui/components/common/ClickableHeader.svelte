@@ -1,6 +1,6 @@
 <script lang="ts">
 	import type { Snippet } from "svelte";
-	import type { PluginSettings } from "types/settings";
+	import type { PluginSettings } from "features/settings/model";
 	import {
 		interactionIdBinding,
 		type SectionHeaderInteractionDescriptor,

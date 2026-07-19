@@ -1,4 +1,4 @@
-import { installShadowHoverPopoverBridge } from "ui/interactions/shadowHoverPopoverBridge";
+import { installShadowHoverPopoverBridge } from "features/preview/interactions/shadowHoverPopoverBridge";
 import type { InteractionRegistry } from "ui/interactions/interactionRegistry";
 import type { useAppContext, useLinkContext } from "ui/context/linkContext";
 import { installVirtualListShadowSurface } from "./VirtualSurfaceRuntime";

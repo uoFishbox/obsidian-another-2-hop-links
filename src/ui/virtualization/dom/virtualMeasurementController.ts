@@ -11,7 +11,7 @@ import { createBootstrapMeasurementSuppression } from "./bootstrapMeasurementSup
 import { createInitialVirtualListStabilization } from "./initialVirtualListStabilization";
 import { createVirtualListMeasurementScheduler } from "./virtualListMeasurementScheduler";
 import type { VirtualListMeasurementStateHandle } from "./virtualListMeasurementState";
-import { getOptionalOwnerWindow } from "ui/utils/realmSafeDom";
+import { getOptionalOwnerWindow } from "ui/shared/dom/realmSafeDom";
 import type { VirtualFrameCoordinator } from "ui/virtualization/scheduling/frameCoordinator";
 
 export type VirtualMeasurementSource = "layout" | "scroll";

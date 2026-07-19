@@ -2,7 +2,7 @@ import { Platform } from "obsidian";
 import { CANVAS_NOTE_DRAG_FORMAT } from "../../appConstants";
 import { dispatchItemClick, dispatchItemHover } from "ui/handlers/linkItemHandlers";
 import type { AppContext, LinkContext } from "ui/context/linkContext";
-import { handleKeyboardActivation } from "ui/utils/keyboard";
+import { handleKeyboardActivation } from "ui/shared/input/keyboard";
 import { createHoverPreviewMouseEvent } from "features/preview/interactions/hoverPopoverTarget";
 import type { InteractionRegistry } from "./interactionRegistry";
 import {
@@ -19,7 +19,7 @@ import {
 	type InteractionDescriptor,
 } from "./interactionTypes";
 import { installNativeDragSelectionShim } from "./cardDragState";
-import { getOwnerWindow, isNodeLike } from "ui/utils/realmSafeDom";
+import { getOwnerWindow, isNodeLike } from "ui/shared/dom/realmSafeDom";
 
 interface DelegatedDispatcherDeps {
 	registry: InteractionRegistry;

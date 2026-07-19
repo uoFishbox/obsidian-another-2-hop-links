@@ -4,7 +4,7 @@ import type { ApplicationStore } from "ui/stores/ApplicationStore.svelte";
 import {
 	cleanupSvelteAndStore,
 	type SvelteComponentInstance,
-} from "ui/views/shared/svelteLifecycle";
+} from "ui/shared/views/svelteLifecycle";
 import { mountTwoHopLinksRootView } from "./mountTwoHopLinksRootView";
 
 export const TWO_HOP_LINKS_VIEW_TYPE = "cosense-card-links-view";

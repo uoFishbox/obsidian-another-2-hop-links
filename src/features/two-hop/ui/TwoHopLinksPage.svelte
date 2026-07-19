@@ -16,7 +16,7 @@
 		setLazyLoaderCache,
 	} from "ui/context/linkContext";
 	import type { ApplicationStore } from "ui/stores/ApplicationStore.svelte";
-	import { getCardLayoutCssText } from "ui/utils/cardLayoutCssVars";
+	import { getCardLayoutCssText } from "ui/shared/layout/cardLayoutCssVars";
 	import {
 		collectTwohopSearchableFiles,
 		createTwohopSearchAdapter,

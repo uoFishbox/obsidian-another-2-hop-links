@@ -5,7 +5,7 @@ import {
 	highlightSearchMatchesInHtmlAsync,
 } from "../previewTextProcessingAsync";
 import { PREVIEW_TEXT_WORKER_MIN_CONTENT_LENGTH } from "../previewTextWorkerTypes";
-import { DEFAULT_SETTINGS } from "types/settings";
+import { DEFAULT_SETTINGS } from "features/settings/model";
 
 const state = vi.hoisted(() => ({
 	runPreviewTextWorker: vi.fn(),

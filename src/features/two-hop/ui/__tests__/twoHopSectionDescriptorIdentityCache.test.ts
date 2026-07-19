@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import type { TFile } from "obsidian";
 import type { DisplayData } from "features/two-hop/application/displayDataBuilder";
 import type { ApplicationStore } from "ui/stores/ApplicationStore.svelte";
-import { DEFAULT_SETTINGS } from "types/settings";
+import { DEFAULT_SETTINGS } from "features/settings/model";
 import type { TaggedNote, TwoHopIndexedLink, TwoHopLinkBranch } from "types/domain";
 import { createTwoHopSectionDescriptorIdentityCache } from "features/two-hop/ui/section-descriptors/cache";
 import {

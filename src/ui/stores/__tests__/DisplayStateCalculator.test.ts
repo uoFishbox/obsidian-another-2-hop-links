@@ -7,7 +7,7 @@ import type {
 	TagPreprocessedDisplayData,
 } from "features/two-hop/application/displayDataBuilder";
 import type { TaggedNote, TwoHopIndexedLink, TwoHopLinkResult } from "types/domain";
-import { DEFAULT_SETTINGS, type PluginSettings } from "types/settings";
+import { DEFAULT_SETTINGS, type PluginSettings } from "features/settings/model";
 import {
 	computePreprocessedDisplayDataState,
 	createPreprocessedDisplayDataCache,

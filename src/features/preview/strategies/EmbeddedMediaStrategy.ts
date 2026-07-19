@@ -6,8 +6,11 @@ import {
 	type ParsedEmbed,
 } from "../text-processing/mediaExtractor";
 import { extractFirstEmbeddedMediaAsync } from "../text-processing/previewTextProcessingAsync";
-import { isImage, isVideo, readPreviewContent } from "../utils/previewUtils";
-import { isFileUrlImage, toObsidianResourceUrl } from "../utils/externalFileImage";
+import { isImage, isVideo, readPreviewContent } from "../core/previewContent";
+import {
+	isFileUrlImage,
+	toObsidianResourceUrl,
+} from "../renderers/externalImageSource";
 import { generateVideoPreview } from "../renderers/videoPreviewRenderer";
 
 const TEXT_PREVIEW_EMBED_HOSTS = ["x.com", "twitter.com", "youtube.com", "youtu.be"];

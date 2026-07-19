@@ -11,7 +11,7 @@ import {
 	isHTMLElementLike,
 	isMouseEventLike,
 	isShadowRootLike,
-} from "ui/utils/realmSafeDom";
+} from "ui/shared/dom/realmSafeDom";
 import { getInteractionIdFromElement } from "ui/interactions/interactionTypes";
 
 type ShadowHoverPopoverSourceRef = {

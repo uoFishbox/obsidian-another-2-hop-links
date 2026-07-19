@@ -20,7 +20,7 @@ import {
 	createVirtualScrollWindowRangeResolver,
 	type VirtualScrollWindowRangeRowModel,
 } from "../core/scrollWindowMeasurement";
-import { resolveCardLayoutSettings } from "ui/utils/cardLayoutCssVars";
+import { resolveCardLayoutSettings } from "ui/shared/layout/cardLayoutCssVars";
 import type {
 	ViewPlanCardVirtualListPolicy,
 	ViewPlanCardVirtualListPolicyResolver,

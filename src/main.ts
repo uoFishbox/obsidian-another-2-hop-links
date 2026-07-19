@@ -1,9 +1,9 @@
 import { Plugin, TFile, loadMathJax } from "obsidian";
-import { installMathJaxShadowPatch } from "ui/utils/mathJaxShadowStyles";
-import { SettingsManager } from "settings/SettingsManager";
-import { CosenseCardLinksSettingTab } from "settings/SettingTab";
-import { DEFAULT_SETTINGS } from "types/settings";
-import type { PluginSettings, SortOption } from "types/settings";
+import { installMathJaxShadowPatch } from "ui/shared/dom/mathJaxShadowStyles";
+import { SettingsManager } from "features/settings/persistence/SettingsManager";
+import { CosenseCardLinksSettingTab } from "features/settings/ui/SettingTab";
+import { DEFAULT_SETTINGS } from "features/settings/model";
+import type { PluginSettings, SortOption } from "features/settings/model";
 import {
 	TwoHopLinksView,
 	TWO_HOP_LINKS_VIEW_TYPE,
@@ -16,7 +16,7 @@ import {
 	type DisplayDataBuilder,
 } from "features/two-hop/application/displayDataBuilder";
 import { createDeduplicationService } from "core/deduplication/deduplicationService";
-import { setEnableLogging } from "utils/logger";
+import { setEnableLogging } from "shared/logging/logger";
 import type { ResolveTwoHopLinks } from "features/two-hop/application/TwoHopLinksLoader";
 import { disposePreviewActivationScheduler } from "features/preview/scheduling/previewActivationScheduler";
 import { disposePreviewDomCommitScheduler } from "features/preview/scheduling/previewDomCommitScheduler";

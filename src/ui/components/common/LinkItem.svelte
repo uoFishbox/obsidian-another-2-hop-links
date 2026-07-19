@@ -1,8 +1,8 @@
 <script lang="ts">
-	import type { PluginSettings } from "types/settings";
+	import type { PluginSettings } from "features/settings/model";
 	import { type TFile } from "obsidian";
 	import Icon from "ui/components/common/Icon.svelte";
-	import { type IconName } from "ui/utils/icons";
+	import { type IconName } from "ui/shared/icons/iconRegistry";
 	import {
 		interactionIdBinding,
 		type InteractionKind,

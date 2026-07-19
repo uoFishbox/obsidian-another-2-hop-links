@@ -1,8 +1,8 @@
 import type { CachedMetadata, TFile } from "obsidian";
 import type { PreviewData } from "../public-types";
 import type { IMetadataCache, IVault } from "types/obsidian";
-import { resolveFile } from "../utils/previewUtils";
-import { isFileUrlImage, toObsidianResourceUrl } from "../utils/externalFileImage";
+import { resolveFile } from "../core/previewContent";
+import { isFileUrlImage, toObsidianResourceUrl } from "./externalImageSource";
 
 function getMetadata(
 	file: TFile,

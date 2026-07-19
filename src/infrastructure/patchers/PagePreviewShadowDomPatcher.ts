@@ -3,7 +3,7 @@ import {
 	disposeShadowHoverPopoverProxies,
 	normalizeHoverPopoverTargetEl,
 } from "features/preview/interactions/hoverPopoverTarget";
-import { enableLogging, logger } from "utils/logger";
+import { enableLogging, logger } from "shared/logging/logger";
 import { ObsidianInternalFacade } from "infrastructure/capabilities/ObsidianInternalFacade";
 import type { PatchRegistry } from "infrastructure/capabilities/PatchRegistry";
 

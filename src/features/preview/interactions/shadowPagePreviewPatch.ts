@@ -5,7 +5,7 @@ import {
 	isEventLike,
 	isHTMLElementLike,
 	isShadowRootLike,
-} from "ui/utils/realmSafeDom";
+} from "ui/shared/dom/realmSafeDom";
 
 const PAGE_PREVIEW_SHADOW_PATCH_FLAG = "__cclShadowHoverPatched";
 

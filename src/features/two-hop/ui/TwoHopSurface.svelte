@@ -4,7 +4,7 @@
 	import type { ApplicationStore } from "ui/stores/ApplicationStore.svelte";
 	import type { ItemInteractionDescriptor } from "ui/interactions/interactionTypes";
 	import type { InteractionDescriptorResolverProvider } from "ui/interactions/interactionRegistry";
-	import { createResolvedCardLayoutSettingsMemo } from "ui/utils/cardLayoutCssVars";
+	import { createResolvedCardLayoutSettingsMemo } from "ui/shared/layout/cardLayoutCssVars";
 	import type { CardRenderModel } from "ui/components/items/cardRenderModel";
 	import type { LinkUtilitiesContext } from "types/linkContext";
 	import { useAppContext } from "ui/context/linkContext";

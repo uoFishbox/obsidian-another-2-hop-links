@@ -1,11 +1,11 @@
-import { findMatchingElementInComposedPath } from "ui/utils/shadowDom";
+import { findMatchingElementInComposedPath } from "ui/shared/dom/shadowDom";
 import {
 	getOwnerWindow,
 	getWindowEventConstructors,
 	isDocumentLike,
 	isHTMLElementLike,
 	isShadowRootLike,
-} from "ui/utils/realmSafeDom";
+} from "ui/shared/dom/realmSafeDom";
 
 const HOVER_TARGET_EVENT_PROPERTY = "__cclHoverTargetEl";
 

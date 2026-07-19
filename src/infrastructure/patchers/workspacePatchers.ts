@@ -18,9 +18,9 @@ import {
 	setPendingPreCreationBootstrapState,
 	setPersistedPreCreationBootstrapState,
 	VIEW_TYPE_PRE_CREATE,
-} from "ui/views/PreCreationView";
-import { resolveExpectedPath } from "infrastructure/utils/preCreationPathResolver";
-import { enableLogging, logger } from "utils/logger";
+} from "features/pre-creation/ui/PreCreationView";
+import { resolveExpectedPath } from "shared/obsidian/resolveExpectedPath";
+import { enableLogging, logger } from "shared/logging/logger";
 import {
 	isLeafHistoryInternal,
 	type LeafHistoryInternal,

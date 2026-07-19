@@ -34,7 +34,7 @@ import {
 	type ScrollPhaseEffect,
 } from "./scrollerViewportScrollPhase";
 import { invalidateScrollGeometry } from "./virtualListScrollGeometryInvalidation";
-import { getOptionalOwnerWindow, isHTMLElementLike } from "ui/utils/realmSafeDom";
+import { getOptionalOwnerWindow, isHTMLElementLike } from "ui/shared/dom/realmSafeDom";
 
 export type { VirtualListSharedScrollMetrics } from "./sharedScrollMetrics";
 

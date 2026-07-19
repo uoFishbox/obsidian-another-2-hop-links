@@ -1,6 +1,6 @@
 import type { SearchWorkerMatchedItem } from "features/search/searchWorkerTypes";
 import type { LinkUtilitiesContext } from "types/linkContext";
-import type { PluginSettings } from "types/settings";
+import type { PluginSettings } from "features/settings/model";
 import {
 	createCardRenderModel,
 	type CardRenderModel,

@@ -1,6 +1,6 @@
 import type { TFile, App } from "obsidian";
 import type { IVault, IMetadataCache } from "types/obsidian";
-import type { PluginSettings } from "types/settings";
+import type { PluginSettings } from "features/settings/model";
 import type { PreviewData } from "../public-types";
 import type { ParsedEmbed } from "../text-processing/mediaExtractor";
 

@@ -1,6 +1,6 @@
 import type { TFile } from "obsidian";
 import type { PreviewData } from "../public-types";
-import { DEFAULT_SETTINGS, type PluginSettings } from "types/settings";
+import { DEFAULT_SETTINGS, type PluginSettings } from "features/settings/model";
 import {
 	CACHE_KEY_SEPARATOR,
 	buildRenderCacheKeyFromNormalizedQuery,
