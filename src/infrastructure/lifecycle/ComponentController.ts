@@ -11,14 +11,19 @@ import type { PluginSettings, SortOption } from "types/settings";
 import { areTagFeaturesEnabled } from "types/settings";
 import type { IComponentManager } from "types/services";
 import type { TwoHopLinkResult } from "types/domain";
-import type { DisplayDataBuilder } from "ui/stores/ApplicationStore.svelte";
-import { IndexingService } from "core/indexing/index-service/IndexingService";
-import { ApplicationStore } from "ui/stores/ApplicationStore.svelte";
+import type {
+	ApplicationStore,
+	DisplayDataBuilder,
+} from "ui/stores/ApplicationStore.svelte";
+import type { IndexingService } from "core/indexing/index-service/IndexingService";
 import type { PluginHostUi } from "types/pluginHostUi";
 import type { ResolveTwoHopLinks } from "ui/stores/application/TwoHopLinksLoader";
 import { mountTwoHopLinksRootView } from "ui/views/shared/viewFactories";
 import type { TwoHopLinksRootUiState } from "ui/views/shared/twoHopLinksRootUiState";
 import type { SvelteComponentInstance } from "ui/views/shared/svelteLifecycle";
+import { ApplicationStorePool } from "./ApplicationStorePool";
+
+export { RECENT_APPLICATION_STORE_LIMIT } from "./ApplicationStorePool";
 
 export type ComponentInstance = SvelteComponentInstance;
 
@@ -37,8 +42,6 @@ interface InlineViewUiState {
 	uiState: TwoHopLinksRootUiState;
 }
 
-export const RECENT_APPLICATION_STORE_LIMIT = 6;
-
 export class ComponentController implements IComponentManager {
 	private readonly mountedComponents = new WeakMap<
 		MarkdownView,
@@ -47,20 +50,23 @@ export class ComponentController implements IComponentManager {
 	private readonly lazyLoaderCaches = new WeakMap<MarkdownView, Set<string>>();
 	private readonly inlineUiStates = new WeakMap<MarkdownView, InlineViewUiState>();
 
-	private readonly applicationStores = new Map<string, ApplicationStore>();
-	private readonly applicationStoreRefCounts = new Map<string, number>();
-	private readonly applicationStoreLastAccess = new Map<string, number>();
-	private readonly displayDataBuilders = new Map<string, DisplayDataBuilder>();
-	private applicationStoreAccessSequence = 0;
+	private readonly applicationStorePool: ApplicationStorePool;
 
 	constructor(
 		private readonly app: App,
 		private readonly plugin: PluginHostUi,
 		private readonly getSettings: () => PluginSettings,
-		private readonly indexingService: IndexingService,
-		private readonly updateSortOption: (option: SortOption) => void,
-		private readonly updateContentSearch: (enabled: boolean) => void = () => {},
-	) {}
+		indexingService: IndexingService,
+		updateSortOption: (option: SortOption) => void,
+		updateContentSearch: (enabled: boolean) => void = () => {},
+	) {
+		this.applicationStorePool = new ApplicationStorePool({
+			indexingService,
+			createDisplayDataBuilder: () => this.plugin.createDisplayDataBuilder(),
+			updateSortOption,
+			updateContentSearch,
+		});
+	}
 
 	private getLazyLoaderCache(view: MarkdownView): Set<string> {
 		if (!this.lazyLoaderCaches.has(view)) {
@@ -91,49 +97,6 @@ export class ComponentController implements IComponentManager {
 
 	private clearInlineUiState(view: MarkdownView): void {
 		this.inlineUiStates.delete(view);
-	}
-
-	private buildStoreKey(leafId: string, filePath: string): string {
-		return `${leafId}:${filePath}`;
-	}
-
-	private buildLeafStoreKeyPrefix(leafId: string): string {
-		return `${leafId}:`;
-	}
-
-	private touchApplicationStore(key: string): void {
-		this.applicationStoreLastAccess.set(key, ++this.applicationStoreAccessSequence);
-	}
-
-	private getOrCreateDisplayDataBuilder(leafId: string): DisplayDataBuilder {
-		let displayDataBuilder = this.displayDataBuilders.get(leafId);
-		if (!displayDataBuilder) {
-			displayDataBuilder = this.plugin.createDisplayDataBuilder();
-			this.displayDataBuilders.set(leafId, displayDataBuilder);
-		}
-		return displayDataBuilder;
-	}
-
-	private hasStoresForLeaf(leafId: string): boolean {
-		const prefix = this.buildLeafStoreKeyPrefix(leafId);
-		for (const key of this.applicationStores.keys()) {
-			if (key.startsWith(prefix)) {
-				return true;
-			}
-		}
-		return false;
-	}
-
-	private maybeReleaseDisplayDataBuilder(leafId: string): void {
-		if (!this.hasStoresForLeaf(leafId)) {
-			this.displayDataBuilders.delete(leafId);
-		}
-	}
-
-	private deleteApplicationStoreEntry(key: string): void {
-		this.applicationStores.delete(key);
-		this.applicationStoreRefCounts.delete(key);
-		this.applicationStoreLastAccess.delete(key);
 	}
 
 	mountComponentsForView(
@@ -204,34 +167,18 @@ export class ComponentController implements IComponentManager {
 		return leaves.find((leaf) => leaf.view === view) ?? undefined;
 	}
 
-	/**
-	 * ApplicationStoreを作成
-	 */
 	public createApplicationStore(
 		settings: PluginSettings,
 		buildDisplayData: DisplayDataBuilder,
 		resolveTwoHopLinks: ResolveTwoHopLinks,
 	): ApplicationStore {
-		const store = new ApplicationStore(
+		return this.applicationStorePool.create(
 			settings,
 			buildDisplayData,
 			resolveTwoHopLinks,
-			this.updateSortOption,
-			this.updateContentSearch,
 		);
-
-		// IndexingServiceのデータ更新を購読
-		const unsubscribe = this.indexingService.onDataUpdate((context) => {
-			store.handleDataUpdate(context);
-		});
-		store.subscribeToDataUpdates(unsubscribe);
-
-		return store;
 	}
 
-	/**
-	 * ApplicationStoreを取得または作成
-	 */
 	public getOrCreateApplicationStore(
 		leafId: string,
 		filePath: string,
@@ -239,103 +186,17 @@ export class ComponentController implements IComponentManager {
 		buildDisplayData: DisplayDataBuilder,
 		resolveTwoHopLinks: ResolveTwoHopLinks,
 	): ApplicationStore {
-		const key = this.buildStoreKey(leafId, filePath);
-		let store = this.applicationStores.get(key);
-		if (!store) {
-			store = this.createApplicationStore(
-				settings,
-				buildDisplayData,
-				resolveTwoHopLinks,
-			);
-			this.applicationStores.set(key, store);
-		}
-		this.touchApplicationStore(key);
-		this.applicationStoreRefCounts.set(
-			key,
-			(this.applicationStoreRefCounts.get(key) ?? 0) + 1,
+		return this.applicationStorePool.acquire(
+			leafId,
+			filePath,
+			settings,
+			buildDisplayData,
+			resolveTwoHopLinks,
 		);
-		return store;
 	}
 
-	/**
-	 * Storeをクリア
-	 */
 	public clearStore(leafId: string, filePath: string): void {
-		const key = this.buildStoreKey(leafId, filePath);
-		const refCount = this.applicationStoreRefCounts.get(key) ?? 0;
-		if (refCount > 0) {
-			return;
-		}
-
-		const store = this.applicationStores.get(key);
-		store?.destroy();
-		this.deleteApplicationStoreEntry(key);
-		this.maybeReleaseDisplayDataBuilder(leafId);
-	}
-
-	private releaseApplicationStore(leafId: string, filePath: string): void {
-		const key = this.buildStoreKey(leafId, filePath);
-		const store = this.applicationStores.get(key);
-		if (!store) {
-			this.applicationStoreRefCounts.delete(key);
-			return;
-		}
-
-		const nextRefCount = (this.applicationStoreRefCounts.get(key) ?? 0) - 1;
-		if (nextRefCount > 0) {
-			this.applicationStoreRefCounts.set(key, nextRefCount);
-			return;
-		}
-
-		this.applicationStoreRefCounts.set(key, 0);
-		this.touchApplicationStore(key);
-		this.trimIdleApplicationStores();
-	}
-
-	private disposeApplicationStore(leafId: string, filePath: string): void {
-		const key = this.buildStoreKey(leafId, filePath);
-		const store = this.applicationStores.get(key);
-		if (!store) {
-			this.deleteApplicationStoreEntry(key);
-			this.maybeReleaseDisplayDataBuilder(leafId);
-			return;
-		}
-
-		const nextRefCount = (this.applicationStoreRefCounts.get(key) ?? 0) - 1;
-		if (nextRefCount > 0) {
-			this.applicationStoreRefCounts.set(key, nextRefCount);
-			return;
-		}
-
-		store.destroy();
-		this.deleteApplicationStoreEntry(key);
-		this.maybeReleaseDisplayDataBuilder(leafId);
-	}
-
-	private trimIdleApplicationStores(): void {
-		const idleEntries = Array.from(this.applicationStores.entries())
-			.filter(([key]) => (this.applicationStoreRefCounts.get(key) ?? 0) === 0)
-			.map(([key, store]) => ({
-				key,
-				store,
-				lastAccess: this.applicationStoreLastAccess.get(key) ?? 0,
-			}));
-
-		if (idleEntries.length <= RECENT_APPLICATION_STORE_LIMIT) {
-			return;
-		}
-
-		idleEntries.sort((left, right) => left.lastAccess - right.lastAccess);
-		const evictionCount = idleEntries.length - RECENT_APPLICATION_STORE_LIMIT;
-
-		for (const { key, store } of idleEntries.slice(0, evictionCount)) {
-			store.destroy();
-			this.deleteApplicationStoreEntry(key);
-			const separatorIndex = key.indexOf(":");
-			if (separatorIndex !== -1) {
-				this.maybeReleaseDisplayDataBuilder(key.slice(0, separatorIndex));
-			}
-		}
+		this.applicationStorePool.clearIdleStore(leafId, filePath);
 	}
 
 	// ========== Component Lifecycle Management ==========
@@ -401,7 +262,7 @@ export class ComponentController implements IComponentManager {
 				leafId,
 				file.path,
 				settings,
-				this.getOrCreateDisplayDataBuilder(leafId),
+				this.applicationStorePool.getOrCreateDisplayDataBuilder(leafId),
 				(targetFile: TFile, onProgress) => {
 					const currentSettings = this.getSettings();
 					return this.plugin.getTwoHopLinkResult(targetFile, onProgress, {
@@ -439,7 +300,7 @@ export class ComponentController implements IComponentManager {
 
 				this.unmountComponent(component);
 
-				this.releaseApplicationStore(leafId, file.path);
+				this.applicationStorePool.release(leafId, file.path);
 			};
 
 			// Viewに子要素として登録することで、Viewのライフサイクルと連動させる
@@ -457,7 +318,7 @@ export class ComponentController implements IComponentManager {
 			};
 		} catch (error) {
 			if (shouldReleaseStoreOnError) {
-				this.disposeApplicationStore(leafId, file.path);
+				this.applicationStorePool.dispose(leafId, file.path);
 			}
 			ErrorHandler.handleMountError(error, file.path);
 			throw error;
@@ -500,12 +361,6 @@ export class ComponentController implements IComponentManager {
 			}
 		});
 
-		for (const store of this.applicationStores.values()) {
-			store.destroy();
-		}
-		this.applicationStores.clear();
-		this.applicationStoreRefCounts.clear();
-		this.applicationStoreLastAccess.clear();
-		this.displayDataBuilders.clear();
+		this.applicationStorePool.destroy();
 	}
 }

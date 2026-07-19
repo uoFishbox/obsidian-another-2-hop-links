@@ -2,74 +2,19 @@ import { Plugin, TFile, loadMathJax } from "obsidian";
 import { installMathJaxShadowPatch } from "ui/utils/mathJaxShadowStyles";
 import { SettingsManager } from "settings/SettingsManager";
 import { CosenseCardLinksSettingTab } from "settings/SettingTab";
-import {
-	createSettingsSideEffectController,
-	type SettingsSideEffectController,
-} from "settings/settingsSideEffectController";
-import { areTagFeaturesEnabled, DEFAULT_SETTINGS } from "types/settings";
+import { DEFAULT_SETTINGS } from "types/settings";
+import type { PluginSettings, SortOption } from "types/settings";
 import { TwoHopLinksView, TWO_HOP_LINKS_VIEW_TYPE } from "ui/views/TwoHopLinksView";
 import type { ResolveProgress, TwoHopLinkResult } from "types/domain";
-import type { PluginSettings, SortOption } from "types/settings";
+import type { ResolveOptions } from "core/indexing/two-hop-resolver/TwoHopLinkResolver";
 import { forceRedrawEffect } from "infrastructure/markdown/livePreview";
-import {
-	createWorkspaceViewQueries,
-	type WorkspaceViewQueries,
-} from "infrastructure/workspace/workspaceViewQueries";
-import { IndexUpdateQueue } from "infrastructure/lifecycle/IndexUpdateQueue";
-import { ComponentController } from "infrastructure/lifecycle/ComponentController";
-import {
-	createViewUpdateOrchestrator,
-	type ViewUpdateOrchestrator,
-} from "infrastructure/lifecycle/viewUpdateOrchestrator";
-import {
-	createFrameScheduler,
-	type FrameScheduler,
-} from "infrastructure/lifecycle/frameScheduler";
-import { RenderedMdElementsRegistry } from "infrastructure/markdown/RenderedMdElementsRegistry";
-import { DisplayModeController } from "features/display-mode/DisplayModeController";
-import { CanvasDropManager } from "infrastructure/workspace/CanvasDropHandler";
-import { DOMMutationObserver } from "infrastructure/observers/DOMMutationObserver";
-import { ScrollManager } from "infrastructure/workspace/ScrollHistoryState";
-import {
-	createEmptyViewController,
-	type EmptyViewController,
-} from "infrastructure/lifecycle/emptyViewController";
-import { createEventHandlers } from "infrastructure/workspace/eventHandlers";
-import { IndexingService } from "core/indexing/index-service/IndexingService";
-import {
-	TwoHopLinkResolver,
-	type ResolveOptions,
-} from "core/indexing/two-hop-resolver/TwoHopLinkResolver";
-import { createLinkContextFactory } from "ui/context/linkContextFactory";
-import type { LinkContext } from "ui/context/linkContext";
-import { SortService } from "core/sorting/SortService";
-import { MetricProvider } from "core/sorting/MetricProvider";
 import {
 	createDisplayDataBuilder,
 	type DisplayDataBuilder,
 } from "application/presenters/displayDataBuilder";
 import { createDeduplicationService } from "core/deduplication/deduplicationService";
-import {
-	createStylingService,
-	type StylingService,
-} from "features/link-decoration/stylingService";
-import {
-	createLinkStatusService,
-	type LinkStatusService,
-} from "features/link-decoration/linkStatusService";
-import {
-	createPropertyWidgetStyler,
-	type PropertyWidgetStyler,
-} from "features/link-decoration/propertyWidgetStyler";
-import { getLazyLoadManager } from "infrastructure/observers/IntersectionObserverRegistry";
-import { logger, setEnableLogging } from "utils/logger";
-import { KeyboardCardNavigator } from "features/keyboard-navigation/KeyboardCardNavigator";
+import { setEnableLogging } from "utils/logger";
 import type { ResolveTwoHopLinks } from "ui/stores/application/TwoHopLinksLoader";
-import {
-	createPreviewService,
-	type DisposablePreviewService,
-} from "features/preview/core/createPreviewService";
-import { clearCardPreviewSharedCaches } from "ui/components/common/cardPreviewSharedCache";
 import { disposePreviewActivationScheduler } from "features/preview/scheduling/previewActivationScheduler";
 import { disposePreviewDomCommitScheduler } from "features/preview/scheduling/previewDomCommitScheduler";
 import { installCCLDebugExposure } from "infrastructure/debug/CCLDebugExposure";
@@ -83,40 +28,37 @@ import { registerFileMenu } from "infrastructure/registration/registerFileMenu";
 import { installAllPatchers } from "infrastructure/patchers/installAllPatchers";
 import { setupWorkspaceEventHandlers } from "infrastructure/workspace/workspaceEventBootstrap";
 import { PatchRegistry } from "infrastructure/capabilities/PatchRegistry";
+import {
+	createPluginRuntime,
+	type PluginRuntime,
+} from "infrastructure/runtime/pluginRuntime";
 import type { PluginHostUi } from "types/pluginHostUi";
 
 export default class CosenseCardLinksPlugin extends Plugin implements PluginHostUi {
 	public settings: PluginSettings = { ...DEFAULT_SETTINGS };
 	public settingsManager!: SettingsManager;
 	private readonly patchRegistry = new PatchRegistry();
-
-	public indexingService!: IndexingService;
-	private twoHopLinkResolver!: TwoHopLinkResolver;
-	public sortService!: SortService;
-	private previewService!: DisposablePreviewService;
-
-	private workspaceViewQueries!: WorkspaceViewQueries;
-	public indexUpdateQueue!: IndexUpdateQueue;
-	private displayModeManager!: DisplayModeController;
-	private canvasDropManager!: CanvasDropManager;
-	private domMutationObserver!: DOMMutationObserver;
-	public componentController!: ComponentController;
-	private viewUpdateOrchestrator!: ViewUpdateOrchestrator;
-	private renderedMdElementsRegistry!: RenderedMdElementsRegistry;
-	private scrollManager!: ScrollManager;
-	private emptyViewController!: EmptyViewController;
-	private keyboardCardNavigator!: KeyboardCardNavigator;
-	private frameScheduler!: FrameScheduler;
-	private sideEffectController!: SettingsSideEffectController;
-
-	private linkStatusService!: LinkStatusService;
-	private stylingService!: StylingService;
-	private propertyWidgetStyler!: PropertyWidgetStyler;
-	private linkContextFactory!: (file: TFile, settings: PluginSettings) => LinkContext;
+	private runtime!: PluginRuntime;
 
 	public readonly forceRedrawEffect = forceRedrawEffect;
 	private sortContextVersion = 0;
 	private isUnloaded = false;
+
+	public get indexingService(): PluginRuntime["indexingService"] {
+		return this.runtime.indexingService;
+	}
+
+	public get sortService(): PluginRuntime["sortService"] {
+		return this.runtime.sortService;
+	}
+
+	public get indexUpdateQueue(): PluginRuntime["indexUpdateQueue"] {
+		return this.runtime.indexUpdateQueue;
+	}
+
+	public get componentController(): PluginRuntime["componentController"] {
+		return this.runtime.componentController;
+	}
 
 	async onload(): Promise<void> {
 		this.isUnloaded = false;
@@ -129,8 +71,44 @@ export default class CosenseCardLinksPlugin extends Plugin implements PluginHost
 		}
 
 		setEnableLogging(this.settings.enableLogging);
+		this.runtime = this.createRuntime();
+		this.registerPluginSurfaces();
+		this.startWorkspaceRuntime();
+	}
 
-		this.initializeServices();
+	private createRuntime(): PluginRuntime {
+		return createPluginRuntime({
+			app: this.app,
+			plugin: this,
+			settingsManager: this.settingsManager,
+			getSettings: () => this.settings,
+			getSettingsSnapshot: () => this.settingsManager.getSnapshot(),
+			isUnloaded: () => this.isUnloaded,
+			bumpSortContextVersion: () => this.bumpSortContextVersion(),
+			updateSortOption: (option: SortOption) => {
+				void this.updateSetting("lastUsedSortOption", option).catch((error) => {
+					console.error("設定の更新に失敗しました:", error);
+				});
+			},
+			updateContentSearch: (enabled: boolean) => {
+				void this.updateSetting("enableContentSearch", enabled).catch(
+					(error) => {
+						console.error("設定の更新に失敗しました:", error);
+					},
+				);
+			},
+			updateSidebarView: (file) => this.updateSidebarView(file),
+			setLoggingEnabled: setEnableLogging,
+			destroySettings: () => {
+				void this.settingsManager.destroy().catch((error) => {
+					console.error("設定の保存に失敗しました:", error);
+				});
+			},
+		});
+	}
+
+	private registerPluginSurfaces(): void {
+		const runtime = this.runtime;
 		registerCardDragStateCleanup(this);
 		if (process.env.NODE_ENV !== "production") {
 			installCCLDebugExposure(this);
@@ -139,65 +117,68 @@ export default class CosenseCardLinksPlugin extends Plugin implements PluginHost
 		this.addSettingTab(new CosenseCardLinksSettingTab(this.app, this));
 		registerViews(this);
 		registerCommands(this, {
-			scrollManager: this.scrollManager,
-			keyboardCardNavigator: this.keyboardCardNavigator,
+			scrollManager: runtime.scrollManager,
+			keyboardCardNavigator: runtime.keyboardCardNavigator,
 		});
 		if (process.env.NODE_ENV !== "production") {
-			registerBenchmarkCommand(this, this.indexingService);
+			registerBenchmarkCommand(this, runtime.indexingService);
 		}
 		registerEditorExtensions(this, {
-			linkStatusService: this.linkStatusService,
+			linkStatusService: runtime.linkStatusService,
 		});
 		registerMarkdownProcessors(this, {
 			app: this.app,
-			indexingService: this.indexingService,
-			stylingService: this.stylingService,
-			renderedMdElementsRegistry: this.renderedMdElementsRegistry,
+			indexingService: runtime.indexingService,
+			stylingService: runtime.stylingService,
+			renderedMdElementsRegistry: runtime.renderedMdElementsRegistry,
 		});
 		registerFileMenu(this, {
 			app: this.app,
 			getTwoHopLinkResult: (file, onProgress, options) =>
 				this.getTwoHopLinkResult(file, onProgress, options),
 		});
+	}
 
+	private startWorkspaceRuntime(): void {
+		const runtime = this.runtime;
 		this.app.workspace.onLayoutReady(async () => {
-			if (this.isUnloaded) {
-				return;
-			}
+			if (this.isUnloaded) return;
 
 			installAllPatchers(this, this.patchRegistry, {
-				stylingService: this.stylingService,
-				propertyWidgetStyler: this.propertyWidgetStyler,
+				stylingService: runtime.stylingService,
+				propertyWidgetStyler: runtime.propertyWidgetStyler,
 			});
 
 			await loadMathJax();
-			if (this.isUnloaded) {
-				return;
-			}
+			if (this.isUnloaded) return;
 			installMathJaxShadowPatch();
 
-			this.displayModeManager.handleSettingsChange();
-
-			this.domMutationObserver.initialize();
-			this.emptyViewController.sync();
+			runtime.displayModeController.handleSettingsChange();
+			runtime.domMutationObserver.initialize();
+			runtime.emptyViewController.sync();
 			setupWorkspaceEventHandlers(this, {
 				workspace: this.app.workspace,
-				frameScheduler: this.frameScheduler,
-				domMutationObserver: this.domMutationObserver,
-				emptyViewController: this.emptyViewController,
-				propertyWidgetStyler: this.propertyWidgetStyler,
-				displayModeManager: this.displayModeManager,
-				viewUpdateOrchestrator: this.viewUpdateOrchestrator,
-				scrollManager: this.scrollManager,
+				frameScheduler: runtime.frameScheduler,
+				domMutationObserver: runtime.domMutationObserver,
+				emptyViewController: runtime.emptyViewController,
+				propertyWidgetStyler: runtime.propertyWidgetStyler,
+				displayModeManager: runtime.displayModeController,
+				viewUpdateOrchestrator: runtime.viewUpdateOrchestrator,
+				scrollManager: runtime.scrollManager,
 				isUnloaded: () => this.isUnloaded,
 			});
 
-			await this.indexingService.awaitIdle();
-			if (this.isUnloaded) {
-				return;
-			}
-			this.propertyWidgetStyler.scanAndRegisterAll(this.app);
+			await runtime.indexingService.awaitIdle();
+			if (this.isUnloaded) return;
+			runtime.propertyWidgetStyler.scanAndRegisterAll(this.app);
 		});
+	}
+
+	onunload(): void {
+		this.isUnloaded = true;
+		disposePreviewActivationScheduler();
+		disposePreviewDomCommitScheduler();
+		this.runtime?.destroy();
 	}
 
 	public createDisplayDataBuilder(): DisplayDataBuilder {
@@ -228,206 +209,16 @@ export default class CosenseCardLinksPlugin extends Plugin implements PluginHost
 		});
 	}
 
-	onunload(): void {
-		this.isUnloaded = true;
-		disposePreviewActivationScheduler();
-		disposePreviewDomCommitScheduler();
-		if (this.frameScheduler) {
-			this.frameScheduler.destroy();
-		}
-		void this.settingsManager?.destroy().catch((error) => {
-			console.error("設定の保存に失敗しました:", error);
-		});
-		if (this.indexUpdateQueue) {
-			this.indexUpdateQueue.destroy();
-		}
-		clearCardPreviewSharedCaches();
-		if (this.componentController) {
-			this.componentController.destroy();
-		}
-
-		if (this.twoHopLinkResolver) {
-			this.twoHopLinkResolver.destroy();
-		}
-
-		if (this.displayModeManager) {
-			this.displayModeManager.destroy();
-		}
-
-		if (this.canvasDropManager) {
-			this.canvasDropManager.destroy();
-		}
-
-		if (this.domMutationObserver) {
-			this.domMutationObserver.destroy();
-		}
-
-		if (this.emptyViewController) {
-			this.emptyViewController.destroy();
-		}
-
-		if (this.keyboardCardNavigator) {
-			this.keyboardCardNavigator.deactivate();
-		}
-
-		if (this.renderedMdElementsRegistry) {
-			this.renderedMdElementsRegistry.destroy();
-		}
-
-		getLazyLoadManager().cleanup();
-	}
-
-	private initializeServices(): void {
-		this.frameScheduler = createFrameScheduler(() => this.isUnloaded);
-		this.previewService = createPreviewService({
-			vault: this.app.vault,
-			metadataCache: this.app.metadataCache,
-			app: this.app,
-			getSettings: () => this.settings,
-		});
-		this.register(() => this.previewService.dispose());
-
-		this.indexingService = new IndexingService(
-			this.app.vault,
-			this.app.metadataCache,
-			() => areTagFeaturesEnabled(this.settings),
-		);
-
-		this.twoHopLinkResolver = new TwoHopLinkResolver(
-			this.app.metadataCache,
-			this.app.vault,
-			this.indexingService,
-			() => ({
-				enableProgressiveTwoHopBuild:
-					this.settings.enableProgressiveTwoHopBuild,
-				maxOutgoingToProcess: this.settings.maxOutgoingToProcess,
-				maxHop2PerBranch: this.settings.maxHop2PerBranch,
-			}),
-		);
-
-		const metricProvider = new MetricProvider(
-			this.app.metadataCache,
-			this.app.vault,
-			this.indexingService,
-			() => this.settings,
-		);
-
-		this.sortService = new SortService(metricProvider);
-
-		const eventHandlers = createEventHandlers(
-			this.app.metadataCache,
-			this.app.vault,
-			this.app.workspace,
-		);
-
-		this.linkStatusService = createLinkStatusService(
-			this.indexingService,
-			() => this.settings,
-		);
-
-		this.stylingService = createStylingService(this.linkStatusService);
-
-		// PropertyWidgetStylerをStylingServiceの直後に初期化
-		this.propertyWidgetStyler = createPropertyWidgetStyler(this.stylingService);
-
-		this.renderedMdElementsRegistry = new RenderedMdElementsRegistry(
-			this.stylingService,
-		);
-
-		this.workspaceViewQueries = createWorkspaceViewQueries(this.app.workspace);
-
-		this.linkContextFactory = createLinkContextFactory(
-			this.app.metadataCache,
-			eventHandlers,
-			this.indexingService,
-			this.app.vault,
-			this.app.workspace,
-			this,
-			this.app,
-			this.previewService,
-		);
-
-		this.componentController = new ComponentController(
-			this.app,
-			this,
-			() => this.settingsManager.getSnapshot(),
-			this.indexingService,
-			(option: SortOption) => {
-				void this.updateSetting("lastUsedSortOption", option).catch((error) => {
-					console.error("設定の更新に失敗しました:", error);
-				});
-			},
-			(enabled: boolean) => {
-				void this.updateSetting("enableContentSearch", enabled).catch(
-					(error) => {
-						console.error("設定の更新に失敗しました:", error);
-					},
-				);
-			},
-		);
-
-		this.domMutationObserver = new DOMMutationObserver(this, this.stylingService);
-
-		this.indexUpdateQueue = new IndexUpdateQueue(this, this.indexingService);
-
-		this.displayModeManager = new DisplayModeController(
-			this.app,
-			this.settingsManager,
-			this.workspaceViewQueries,
-			this.componentController,
-			this,
-			(file: TFile) => this.updateSidebarView(file),
-			() => this.app.workspace.getActiveFile(),
-		);
-
-		this.canvasDropManager = new CanvasDropManager(this.app);
-		this.canvasDropManager.registerCanvasDropHandler((eventRef) =>
-			this.registerEvent(eventRef),
-		);
-
-		this.viewUpdateOrchestrator = createViewUpdateOrchestrator({
-			app: this.app,
-			plugin: this,
-			stylingService: this.stylingService,
-			markdownRenderManager: this.renderedMdElementsRegistry,
-			propertyStyleManager: this.propertyWidgetStyler,
-		});
-
-		this.scrollManager = new ScrollManager();
-		this.emptyViewController = createEmptyViewController(this.app, this);
-		this.keyboardCardNavigator = new KeyboardCardNavigator(this.app);
-
-		// IndexingService の通知は indexUpdateQueue 経由で集約する。
-		this.indexUpdateQueue.onDataUpdate((context) => {
-			this.sortService.invalidateCache();
-			this.bumpSortContextVersion();
-			this.viewUpdateOrchestrator.updateForContext(context);
-		});
-
-		this.indexUpdateQueue.setupEventListeners();
-
-		this.sideEffectController = createSettingsSideEffectController({
-			viewUpdateOrchestrator: this.viewUpdateOrchestrator,
-			emptyViewController: this.emptyViewController,
-			displayModeManager: this.displayModeManager,
-			sortService: this.sortService,
-			indexingService: this.indexingService,
-			workspace: this.app.workspace,
-			getSettings: () => this.settings,
-			bumpSortContextVersion: () => this.bumpSortContextVersion(),
-			setLoggingEnabled: (enabled) => {
-				setEnableLogging(enabled);
-			},
-		});
-	}
-
 	public async updateSetting<K extends keyof PluginSettings>(
 		key: K,
 		value: PluginSettings[K],
 		options: { immediate?: boolean } = {},
 	): Promise<void> {
 		const updatePromise = this.settingsManager.update(key, value, options);
-		this.sideEffectController.apply([key], this.settingsManager.getSnapshot());
+		this.runtime.sideEffectController.apply(
+			[key],
+			this.settingsManager.getSnapshot(),
+		);
 		await updatePromise;
 	}
 
@@ -436,7 +227,7 @@ export default class CosenseCardLinksPlugin extends Plugin implements PluginHost
 		options: { immediate?: boolean } = {},
 	): Promise<void> {
 		const updatePromise = this.settingsManager.updateBatch(updates, options);
-		this.sideEffectController.apply(
+		this.runtime.sideEffectController.apply(
 			Object.keys(updates) as Array<keyof PluginSettings>,
 			this.settingsManager.getSnapshot(),
 		);
@@ -448,15 +239,15 @@ export default class CosenseCardLinksPlugin extends Plugin implements PluginHost
 		onProgress?: (progress: ResolveProgress) => void,
 		options?: ResolveOptions,
 	): Promise<TwoHopLinkResult> {
-		return this.twoHopLinkResolver.resolve(file, onProgress, options);
+		return this.runtime.twoHopLinkResolver.resolve(file, onProgress, options);
 	}
 
 	public processUnresolvedLinksInElement(el: HTMLElement, sourcePath: string): void {
-		this.stylingService.decorateLinksInContainer(el, sourcePath);
+		this.runtime.stylingService.decorateLinksInContainer(el, sourcePath);
 	}
 
 	public getLinkContextFactory() {
-		return this.linkContextFactory;
+		return this.runtime.linkContextFactory;
 	}
 
 	public createApplicationStore(
