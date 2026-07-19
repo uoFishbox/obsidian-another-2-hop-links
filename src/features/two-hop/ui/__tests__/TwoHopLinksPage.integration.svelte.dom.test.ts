@@ -89,7 +89,7 @@ vi.mock("ui/components/items/ViewItemCard.svelte", async () => {
 });
 
 vi.mock("features/two-hop/ui/TwoHopSurface.svelte", async () => {
-	const component = await import("./TwoHopImperativeSurfacePageStub.svelte");
+	const component = await import("./TwoHopSurfacePageStub.svelte");
 	return { default: component.default };
 });
 

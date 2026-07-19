@@ -32,21 +32,19 @@ Vault全体のベンチマークは、インデックス作成レイヤーやE2E
 
 振る舞いのテストは、実装と同じ場所に配置されている。パフォーマンステストでは実行時間のしきい値ではなく、関数呼び出し回数やスパイカウンターを使用すること。
 
-### Two-hop imperative surface
+### Two-hop keyed pooled surface
 
-`TwoHopSurface.svelte` は外側のhostと低頻度input同期だけを所有する。scroll位置、resident範囲、physical slot、preview候補をSvelte stateへ追加してはならない。
+`TwoHopSurface.svelte` は共有 `VirtualSurface` のphysical row/cell shellを再利用し、カードbodyはlogical keyが変わるたびにremountする。
 
-- scroll listenerは最新位置の記録とrAF予約だけを行う。
-- rAFはlayout時にキャッシュした`sectionTop`/viewport scalarを使い、live DOM測定を行わない。
-- resident hitではcell解決、card model解決、DOM writeを行わない。
-- physical row/cellとresolved-cell bufferはlayout確定時に生成し、active scroll中に増設しない。
-- distant jumpでは同期rich bindをframe budget内に制限し、残りは既存skeleton shellを表示する。
-- load moreは既存itemのcard model cacheを保持し、上方sectionの高さが変わる場合はscroll anchorを補正する。
-- preview候補はphysical slot配列から導出し、cardごとのcandidate `Map`/`Set`を作らない。
-- previewの非同期commit前にslot generationとpreview identityを検証する。
-- scroll-opportunistic previewはcritical workがなく、速度とactivation間隔の両方が許可する場合に1件だけ開始する。
+- physical row/cell shellには位置とslot identityだけを保持する。
+- `renderBodyKey` はlogical cell keyと一致させ、別カードへのrebindでcomponent cleanupを必ず実行する。
+- resident windowが同一ならmounted-row buildを同一参照で返し、Svelte state commitとDOM writeを行わない。
+- previewは`ViewItemCard` / `CardPreviewGate` とrow preview activation runtimeを使い、two-hop専用candidate走査を持たない。
+- item/header interaction descriptorは各logical componentがsurfaceのregistryへ登録し、component破棄時に解除する。
+- load-more bodyは通常のbutton lifecycleを使い、クリック中に同じbodyを別カードへ書き換えない。
+- `TwoHopDocument` と固定grid geometryは全カード分のDOMやcell objectを生成せず、mounted rangeだけをmaterializeする。
 
-契約テストは `twohop/__tests__/TwoHopSurface.svelte.dom.test.ts`、`twoHopViewportController.dom.test.ts`、`twoHopPreviewHydrator.dom.test.ts` に置く。これらは`100`/`1,000`/`10,000` cards、別scroller上の`1`/`8`/`32` surfaces、同一scrollerへのtwo-hop surface mount数が最大1という制約、`300` resident frames、distant jump bind上限、generation mismatch、opportunistic intervalを呼び出し回数と固定DOM数で検証する。
+契約テストは `features/two-hop/ui/__tests__/TwoHopSurface.svelte.dom.test.ts` と `twoHopMountedRows.test.ts` に置く。`100`/`1,000`/`10,000` cardsと別scroller上の`1`/`8`/`32` surfacesでDOM数がboundedであること、physical slot再利用時にbody keyが変わること、resident hitでbuild identityを維持すること、load-more bodyが新しいlogical cardへremountされることを検証する。
 
 ## キャッシュ一覧（Cache Inventory）
 

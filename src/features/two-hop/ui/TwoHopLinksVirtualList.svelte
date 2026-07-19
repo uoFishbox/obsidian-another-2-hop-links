@@ -7,15 +7,10 @@
 		SearchWorkerMatchScope,
 	} from "features/search/searchWorkerTypes";
 	import type {
-		TwoHopVirtualListSection,
 		TwoHopVirtualListItem,
 		TwoHopVirtualSectionDescriptor,
 	} from "features/two-hop/ui/twoHopVirtualListModel";
 	import { useLinkContext } from "ui/context/linkContext";
-	import {
-		createTwoHopInteractionDescriptorRevision,
-		resolveTwoHopItemInteractionDescriptor,
-	} from "features/two-hop/ui/twoHopInteractionDescriptorRevision";
 	import type { TwoHopCardPresentationState } from "features/two-hop/ui/twoHopCellStaticState";
 	import {
 		createTwoHopCardRenderModelCache,
@@ -23,10 +18,6 @@
 	} from "features/two-hop/ui/twoHopCardRenderModelCache";
 	import type { CardRenderModel } from "ui/components/items/cardRenderModel";
 	import type { LinkUtilitiesContext } from "types/linkContext";
-	import {
-		resolveTwoHopShellTitle,
-		type TwoHopShellTitleRevision,
-	} from "features/two-hop/ui/twoHopShellTitle";
 
 	interface Props {
 		sections: readonly TwoHopVirtualSectionDescriptor[];
@@ -93,32 +84,6 @@
 			presentation: TwoHopCardPresentationState,
 		): CardRenderModel => cardModelCache.resolve(row, presentation, revision);
 	});
-	const shellTitleRevision = $derived.by((): TwoHopShellTitleRevision | undefined =>
-		linkContext
-			? {
-					priorityFrontmatterKeyForTitle:
-						currentSettings.priorityFrontmatterKeyForTitle,
-					metadataVersion: applicationStore.updateVersion,
-					sourcePath: linkContext.sourceFile.path,
-					linkContext,
-				}
-			: undefined,
-	);
-	const resolveItemTitle = $derived.by(() => {
-		const revision = shellTitleRevision;
-		if (!revision) return undefined;
-		return (row: TwoHopVirtualListItem): string =>
-			resolveTwoHopShellTitle(row, revision);
-	});
-	const getItemInteractionDescriptor = (row: TwoHopVirtualListItem) =>
-		resolveTwoHopItemInteractionDescriptor(row, interactionDescriptorRevision);
-	const interactionDescriptorRevision = $derived(
-		createTwoHopInteractionDescriptorRevision({
-			settings: currentSettings,
-			searchQuery,
-			linkContext,
-		}),
-	);
 </script>
 
 {#if sections.length > 0}
@@ -127,13 +92,7 @@
 		{applicationStore}
 		{initialVisibleCount}
 		{loadMoreIncrement}
-		{getItemInteractionDescriptor}
-		{interactionDescriptorRevision}
-		{cardModelRevision}
-		{shellTitleRevision}
 		{resolveItemCardModel}
-		{resolveItemTitle}
-		{linkContext}
 		{previewActive}
 	/>
 {/if}

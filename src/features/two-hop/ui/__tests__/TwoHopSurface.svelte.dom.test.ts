@@ -1,4 +1,4 @@
-import { cleanup, render } from "@testing-library/svelte";
+import { cleanup, fireEvent, render, waitFor } from "@testing-library/svelte";
 import { afterEach, describe, expect, it } from "vitest";
 import { DEFAULT_SETTINGS } from "features/settings/model";
 import type { ApplicationStore } from "ui/stores/ApplicationStore.svelte";
@@ -56,12 +56,9 @@ describe("TwoHopSurface", () => {
 					sections: [createSection(cardCount)],
 					applicationStore,
 					initialVisibleCount: 10_000,
-					getItemInteractionDescriptor: () => null,
 				},
 			});
-			const root = container.querySelector<HTMLElement>(
-				".twohop-imperative-surface",
-			);
+			const root = container.querySelector<HTMLElement>(".twohop-keyed-surface");
 			const cells = root?.shadowRoot?.querySelectorAll(
 				".view-plan-virtual-list-cell",
 			);
@@ -89,16 +86,15 @@ describe("TwoHopSurface", () => {
 				document.body.append(scroller);
 				scrollers.push(scroller);
 				render(TwoHopSurface, {
-				target: scroller,
+					target: scroller,
 					props: {
 						sections: [createSection(100)],
 						applicationStore,
 						initialVisibleCount: 100,
-						getItemInteractionDescriptor: () => null,
 					},
 				});
 				const root = scroller.querySelector<HTMLElement>(
-					".twohop-imperative-surface",
+					".twohop-keyed-surface",
 				);
 				if (root) roots.push(root);
 			}
@@ -113,4 +109,34 @@ describe("TwoHopSurface", () => {
 			for (const scroller of scrollers) scroller.remove();
 		},
 	);
+
+	it("remounts a load-more body as the newly revealed logical card", async () => {
+		const { container } = render(TwoHopSurface, {
+			props: {
+				sections: [createSection(10)],
+				applicationStore,
+				initialVisibleCount: 1,
+				loadMoreIncrement: 2,
+			},
+		});
+		const root = container.querySelector<HTMLElement>(".twohop-keyed-surface");
+		const loadMoreCell = root?.shadowRoot?.querySelector<HTMLElement>(
+			"[data-testid='load-more-section']",
+		);
+		const loadMoreButton = loadMoreCell?.querySelector<HTMLButtonElement>(
+			".cosense-card-links__load-more-button",
+		);
+
+		expect(loadMoreCell).not.toBeNull();
+		expect(loadMoreButton).not.toBeNull();
+		await fireEvent.click(loadMoreButton!);
+
+		await waitFor(() => {
+			expect(loadMoreCell?.dataset.testid).toBe("twohop-item-cell");
+		});
+		expect(
+			loadMoreCell?.querySelector(".cosense-card-links__load-more-button"),
+		).toBeNull();
+		expect(loadMoreCell?.textContent).toContain("item:1");
+	});
 });
