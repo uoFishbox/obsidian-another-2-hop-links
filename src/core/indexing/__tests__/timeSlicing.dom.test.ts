@@ -38,9 +38,69 @@ describe("createYieldScheduler", () => {
 		expect(maybeYield(scheduler, 1, 64)).toBeUndefined();
 		expect(scheduler.checkpoint).toHaveBeenCalledWith(1, 64);
 	});
+
+	test("yields immediately for pending input and stays responsive for 500ms", async () => {
+		const now = vi.spyOn(performance, "now");
+		const originalScheduling = Object.getOwnPropertyDescriptor(
+			navigator,
+			"scheduling",
+		);
+		try {
+			now.mockReturnValue(0);
+			const isInputPending = vi.fn(() => true);
+			Object.defineProperty(navigator, "scheduling", {
+				configurable: true,
+				value: { isInputPending },
+			});
+			const yieldFn = vi.fn(() => Promise.resolve());
+			const scheduler = createYieldScheduler(yieldFn, 24);
+
+			now.mockReturnValue(1);
+			const inputYield = scheduler.checkpoint(64, 64);
+			expect(inputYield).toBeInstanceOf(Promise);
+			await inputYield;
+
+			isInputPending.mockReturnValue(false);
+			now.mockReturnValue(8);
+			expect(scheduler.checkpoint(128, 64)).toBeUndefined();
+
+			now.mockReturnValue(9);
+			const responsiveYield = scheduler.checkpoint(192, 64);
+			expect(responsiveYield).toBeInstanceOf(Promise);
+			await responsiveYield;
+
+			now.mockReturnValue(510);
+			const normalModeYield = scheduler.checkpoint(256, 64);
+			expect(normalModeYield).toBeInstanceOf(Promise);
+			await normalModeYield;
+
+			now.mockReturnValue(526);
+			expect(scheduler.checkpoint(320, 64)).toBeUndefined();
+			expect(yieldFn).toHaveBeenCalledTimes(3);
+		} finally {
+			now.mockRestore();
+			if (originalScheduling) {
+				Object.defineProperty(navigator, "scheduling", originalScheduling);
+			} else {
+				Reflect.deleteProperty(navigator, "scheduling");
+			}
+		}
+	});
 });
 
 describe("defaultYieldToMainThread", () => {
+	test("prioritizes scheduler.yield when available", async () => {
+		const schedulerYield = vi.fn(() => Promise.resolve());
+		vi.stubGlobal("scheduler", { yield: schedulerYield });
+
+		try {
+			await expect(defaultYieldToMainThread()).resolves.toBeUndefined();
+			expect(schedulerYield).toHaveBeenCalledTimes(1);
+		} finally {
+			vi.unstubAllGlobals();
+		}
+	});
+
 	test("prioritizes requestIdleCallback when available", async () => {
 		const originalRequestIdleCallback = window.requestIdleCallback;
 		const originalCancelIdleCallback = window.cancelIdleCallback;

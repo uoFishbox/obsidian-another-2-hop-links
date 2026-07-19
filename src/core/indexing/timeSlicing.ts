@@ -1,6 +1,16 @@
 export const YIELD_CHECK_INTERVAL = 64;
 export const HEAVY_YIELD_CHECK_INTERVAL = 128;
 const DEFAULT_MAX_YIELD_DELAY_MS = 16;
+const RESPONSIVE_YIELD_INTERVAL_MS = 8;
+const RESPONSIVE_MODE_DURATION_MS = 500;
+
+interface BrowserScheduling {
+	isInputPending?: (options?: { includeContinuous?: boolean }) => boolean;
+}
+
+interface BrowserScheduler {
+	yield?: () => Promise<void>;
+}
 
 export interface YieldScheduler {
 	checkpoint(iteration: number, cadence: number): Promise<void> | undefined;
@@ -14,6 +24,21 @@ export interface YieldToMainThreadOptions {
 
 function hasWindow(): boolean {
 	return typeof window !== "undefined";
+}
+
+function hasPendingInput(): boolean {
+	if (typeof navigator === "undefined") {
+		return false;
+	}
+
+	const scheduling = (navigator as Navigator & { scheduling?: BrowserScheduling })
+		.scheduling;
+	return scheduling?.isInputPending?.({ includeContinuous: true }) ?? false;
+}
+
+function getBrowserScheduler(): BrowserScheduler | undefined {
+	return (globalThis as typeof globalThis & { scheduler?: BrowserScheduler })
+		.scheduler;
 }
 
 const idleRequestOptions: IdleRequestOptions = { timeout: 0 };
@@ -76,6 +101,11 @@ function schedulePause(resolve: () => void, maxDelayMs: number): void {
 export function yieldToMainThreadIdleAware(
 	options: YieldToMainThreadOptions = {},
 ): Promise<void> {
+	const browserScheduler = getBrowserScheduler();
+	if (browserScheduler?.yield) {
+		return browserScheduler.yield();
+	}
+
 	const maxDelayMs = options.maxDelayMs ?? DEFAULT_MAX_YIELD_DELAY_MS;
 
 	return new Promise((resolve) => {
@@ -92,6 +122,7 @@ export function createYieldScheduler(
 	yieldIntervalMs: number,
 ): YieldScheduler {
 	let lastYieldTime = performance.now();
+	let responsiveUntil = 0;
 
 	return {
 		checkpoint(iteration: number, cadence: number) {
@@ -100,7 +131,16 @@ export function createYieldScheduler(
 			}
 
 			const now = performance.now();
-			if (now - lastYieldTime < yieldIntervalMs) {
+			const inputPending = hasPendingInput();
+			if (inputPending) {
+				responsiveUntil = now + RESPONSIVE_MODE_DURATION_MS;
+			}
+
+			const effectiveYieldIntervalMs =
+				now < responsiveUntil
+					? Math.min(yieldIntervalMs, RESPONSIVE_YIELD_INTERVAL_MS)
+					: yieldIntervalMs;
+			if (!inputPending && now - lastYieldTime < effectiveYieldIntervalMs) {
 				return undefined;
 			}
 

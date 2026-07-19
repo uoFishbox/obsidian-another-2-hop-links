@@ -2,10 +2,10 @@ export const PLUGIN_NAME = "Cosense card links";
 export const IS_PROD = process.env.NODE_ENV === "production";
 
 export const INDEXING_DEBOUNCE_DELAY = 300;
-export const INDEXING_REBUILD_YIELD_INTERVAL_MS = 8;
-// インデックス再構築時のyield間隔（ms）- 16msは約1フレーム（60fps）
-// ファイル数ではなく経過時間でyieldすることで、速度と応答性の両立を図る
-export const INDEXING_YIELD_INTERVAL_MS = 8;
+export const INDEXING_REBUILD_YIELD_INTERVAL_MS = 24;
+// 通常時は24ms、入力待ち検出後はtimeSlicing側で一時的に8msへ短縮する。
+// ファイル数ではなく経過時間でyieldすることで、速度と応答性の両立を図る。
+export const INDEXING_YIELD_INTERVAL_MS = 24;
 // リンク正規化キャッシュの1世代あたりの最大エントリ数。
 // 2世代キャッシュのため、保持エントリは概ね maxEntries * 2 に上限制御される。
 // 正規化自体が安価なため、LRUの per-call delete/set ではなく
