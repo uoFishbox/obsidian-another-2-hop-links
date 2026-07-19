@@ -52,6 +52,7 @@ interface Harness {
 	setVaultFile: (file: TFile) => void;
 	removeVaultFile: (path: string) => void;
 	triggerLayoutReady: () => void;
+	waitForIndexIdle: () => Promise<void>;
 	emitVaultEvent: (event: string, ...args: unknown[]) => void;
 	emitMetadataEvent: (event: string, ...args: unknown[]) => void;
 }
@@ -92,6 +93,7 @@ function createHarness(): Harness {
 	};
 
 	let dataUpdateListener: ((context: DataUpdateContext) => void) | undefined;
+	let indexIdleWaiter: (() => Promise<void>) | undefined;
 	let indexVersion = 0;
 
 	const indexingService = {
@@ -117,7 +119,10 @@ function createHarness(): Harness {
 				}
 			},
 		),
-		registerIdleWaiter: vi.fn(() => vi.fn()),
+		registerIdleWaiter: vi.fn((waiter: () => Promise<void>) => {
+			indexIdleWaiter = waiter;
+			return vi.fn();
+		}),
 		onDataUpdate: vi.fn((listener: (context: DataUpdateContext) => void) => {
 			dataUpdateListener = listener;
 			return vi.fn();
@@ -139,6 +144,9 @@ function createHarness(): Harness {
 			for (const callback of layoutReadyCallbacks) {
 				callback();
 			}
+		},
+		waitForIndexIdle: async () => {
+			await indexIdleWaiter?.();
 		},
 		emitVaultEvent: (event: string, ...args: unknown[]) => {
 			const handlers = vaultHandlers.get(event) ?? [];
@@ -313,6 +321,54 @@ describe("IndexUpdateQueue", () => {
 		).toHaveBeenCalledTimes(1);
 		expect(harness.indexingService.applyFileChangesTimeSliced).toHaveBeenCalledWith(
 			[{ type: "create", path: "notes/new-note.md" }],
+		);
+	});
+
+	test("initial scan failure retries on the next change and keeps readiness pending", async () => {
+		const harness = createHarness();
+		const error = new Error("temporary read failure");
+		const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+		let rejectInitialScan: ((error: Error) => void) | undefined;
+		harness.indexingService.rebuildIndexesTimeSliced.mockImplementationOnce(
+			() =>
+				new Promise<void>((_resolve, reject) => {
+					rejectInitialScan = reject;
+				}),
+		);
+
+		startInitialScan(harness);
+		const changedDuringFailure = createMockTFile("notes/during-failure.md");
+		harness.setVaultFile(changedDuringFailure);
+		harness.emitVaultEvent("modify", changedDuringFailure);
+		rejectInitialScan?.(error);
+		await flushAsyncTasks();
+
+		let ready = false;
+		const readiness = harness.waitForIndexIdle().then(() => {
+			ready = true;
+		});
+		await flushAsyncTasks();
+		expect(ready).toBe(false);
+
+		const modified = createMockTFile("notes/retry.md");
+		harness.setVaultFile(modified);
+		harness.emitVaultEvent("modify", modified);
+		await flushAsyncTasks();
+		await readiness;
+
+		expect(harness.indexingService.rebuildIndexesTimeSliced).toHaveBeenCalledTimes(
+			2,
+		);
+		expect(harness.indexingService.applyFileChangesTimeSliced).toHaveBeenCalledWith(
+			[
+				{ type: "modify", path: "notes/during-failure.md" },
+				{ type: "modify", path: "notes/retry.md" },
+			],
+		);
+		expect(ready).toBe(true);
+		expect(consoleError).toHaveBeenCalledWith(
+			"[IndexUpdateQueue] Initial full scan failed:",
+			error,
 		);
 	});
 });

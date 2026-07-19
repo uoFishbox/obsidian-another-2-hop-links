@@ -14,6 +14,8 @@ import { InitialScanChangeRecorder } from "./InitialScanChangeRecorder";
 
 export type DataUpdateListener = (context: DataUpdateContext) => void;
 
+type InitialFullScanState = "pending" | "running" | "failed" | "completed";
+
 export class IndexUpdateQueue {
 	private dataUpdateListeners: Set<DataUpdateListener> = new Set();
 	private debouncedProcessPending: () => void;
@@ -27,8 +29,7 @@ export class IndexUpdateQueue {
 	private unsubscribeIndexIdleWaiter: (() => void) | undefined;
 	private unsubscribeIndexDataUpdate: (() => void) | undefined;
 	private isProcessingPendingChanges = false;
-	private hasInitialFullScanCompleted = false;
-	private isCapturingInitialChanges = false;
+	private initialFullScanState: InitialFullScanState = "pending";
 	private waitsForMetadataResolve = false;
 	private metadataResolveGeneration = 0;
 	private destroyed = false;
@@ -267,12 +268,18 @@ export class IndexUpdateQueue {
 			return;
 		}
 
-		if (this.isCapturingInitialChanges) {
+		if (this.initialFullScanState === "running") {
 			this.initialChangeRecorder.record(change, this.metadataResolveGeneration);
 			return;
 		}
 
-		if (!this.hasInitialFullScanCompleted) {
+		if (this.initialFullScanState === "failed") {
+			this.initialChangeRecorder.record(change, this.metadataResolveGeneration);
+			this.retryInitialFullScan();
+			return;
+		}
+
+		if (this.initialFullScanState === "pending") {
 			return;
 		}
 
@@ -326,11 +333,16 @@ export class IndexUpdateQueue {
 	}
 
 	private async runInitialFullScan(): Promise<void> {
+		if (
+			this.destroyed ||
+			this.initialFullScanState === "running" ||
+			this.initialFullScanState === "completed"
+		) {
+			return;
+		}
+
+		this.initialFullScanState = "running";
 		try {
-			if (this.destroyed) {
-				return;
-			}
-			this.isCapturingInitialChanges = true;
 			await this.indexingService.rebuildIndexesTimeSliced();
 			if (this.destroyed) {
 				return;
@@ -341,70 +353,70 @@ export class IndexUpdateQueue {
 			}
 			if (enableLogging)
 				logger(`${PLUGIN_NAME}: Detailed backlinks map built (Initial)`);
-		} finally {
+			this.initialFullScanState = "completed";
 			this.resolveInitialFullScanReady?.();
 			this.resolveInitialFullScanReady = undefined;
-			if (this.isCapturingInitialChanges) {
-				this.initialChangeRecorder.clear();
-				this.isCapturingInitialChanges = false;
+		} catch (error) {
+			if (!this.destroyed) {
+				this.initialFullScanState = "failed";
 			}
+			throw error;
+		} finally {
 			this.notifyQueueIdleWaitersIfIdle();
 		}
 	}
 
-	private async applyInitialCatchUpChanges(): Promise<void> {
-		if (!this.initialChangeRecorder.hasPending()) {
-			if (enableLogging) {
-				logger(
-					"[IndexUpdateQueue] Initial catch-up: no changes after full scan",
-				);
-			}
-			this.isCapturingInitialChanges = false;
-			this.hasInitialFullScanCompleted = true;
+	private retryInitialFullScan(): void {
+		if (this.destroyed || this.initialFullScanState !== "failed") {
 			return;
 		}
 
-		while (
-			this.initialChangeRecorder.needsMetadataResolve(
-				this.metadataResolveGeneration,
-				(path) => this.fileExists(path),
-			)
-		) {
-			await this.waitForNextMetadataResolve();
+		void this.runInitialFullScan().catch((error) => {
+			console.error("[IndexUpdateQueue] Initial full scan retry failed:", error);
+		});
+	}
 
-			if (this.destroyed) {
-				return;
-			}
-		}
-
-		const changes = this.initialChangeRecorder.drainToFinalStateChanges(
-			(path) => this.fileExists(path),
-			(path) => this.shouldIndexPath(path),
-		);
-
-		if (enableLogging) {
-			logger(
-				`[IndexUpdateQueue] Initial catch-up: applying ${changes.length} changes after full scan`,
-			);
-		}
-
+	private async applyInitialCatchUpChanges(): Promise<void> {
 		this.isProcessingPendingChanges = true;
-		this.isCapturingInitialChanges = false;
-		this.hasInitialFullScanCompleted = true;
-
 		try {
-			if (changes.length > 0) {
-				await this.indexingService.applyFileChangesTimeSliced(changes);
+			while (this.initialChangeRecorder.hasPending()) {
+				while (
+					this.initialChangeRecorder.needsMetadataResolve(
+						this.metadataResolveGeneration,
+						(path) => this.fileExists(path),
+					)
+				) {
+					await this.waitForNextMetadataResolve();
+
+					if (this.destroyed) {
+						return;
+					}
+				}
+
+				const changes = this.initialChangeRecorder.drainToFinalStateChanges(
+					(path) => this.fileExists(path),
+					(path) => this.shouldIndexPath(path),
+				);
+
+				if (enableLogging) {
+					logger(
+						`[IndexUpdateQueue] Initial catch-up: applying ${changes.length} changes after full scan`,
+					);
+				}
+
+				if (changes.length > 0) {
+					await this.indexingService.applyFileChangesTimeSliced(changes);
+				}
 			}
 			if (enableLogging) {
-				logger("[IndexUpdateQueue] Initial catch-up: complete");
+				logger(
+					"[IndexUpdateQueue] Initial catch-up: all observed changes applied",
+				);
 			}
 		} finally {
 			this.isProcessingPendingChanges = false;
 			this.notifyQueueIdleWaitersIfIdle();
 		}
-
-		this.schedulePendingProcessing();
 	}
 
 	private async processPendingChanges(): Promise<void> {
