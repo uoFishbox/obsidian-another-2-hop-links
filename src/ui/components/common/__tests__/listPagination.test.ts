@@ -4,8 +4,8 @@ import {
 	computeInitialVisibleCount,
 	createCompactSectionId,
 	normalizeIncrement,
-} from "../listPagination";
-import { createSectionPaginationState } from "../virtual-list/pagination";
+} from "ui/components/common/listPagination";
+import { createSectionPaginationState } from "ui/virtualization/pagination";
 
 describe("listPagination", () => {
 	it("clamps the initial visible count to the available items", () => {

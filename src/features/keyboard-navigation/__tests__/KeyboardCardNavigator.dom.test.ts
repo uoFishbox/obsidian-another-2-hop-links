@@ -26,7 +26,7 @@ vi.mock("obsidian", () => {
 	};
 });
 
-vi.mock("ui/views/TwoHopLinksView", () => ({
+vi.mock("features/two-hop/ui/TwoHopLinksView", () => ({
 	TWO_HOP_LINKS_VIEW_TYPE: "cosense-card-links-view",
 }));
 

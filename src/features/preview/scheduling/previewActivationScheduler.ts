@@ -1,8 +1,8 @@
 import {
 	isScrollActivityActive,
 	subscribeScrollActivity,
-} from "infrastructure/scroll/scrollActivity";
-import { shouldDeferPreviewActivationForVirtualScrollMeasurement } from "infrastructure/scroll/virtualScrollMeasurementFrame";
+} from "ui/virtualization/scheduling/scrollActivity";
+import { shouldDeferPreviewActivationForVirtualScrollMeasurement } from "ui/virtualization/scheduling/virtualScrollMeasurementFrame";
 import { recordCCLDevMeasurement } from "infrastructure/debug/CCLDevMeasurements";
 import { DEBUG_DISABLE_CARD_DOM_PREVIEW } from "../../../appConstants";
 import {
@@ -12,7 +12,7 @@ import {
 	refillPreviewScheduleTokens,
 	type PreviewScheduleTokenState,
 } from "./previewScheduleTokenBucket";
-import type { VirtualFrameCoordinator } from "ui/virtualization/frameCoordinator";
+import type { VirtualFrameCoordinator } from "ui/virtualization/scheduling/frameCoordinator";
 
 const WARMUP_MS = 32;
 const MAX_QUEUE_ENTRIES_PER_DRAIN = 256;

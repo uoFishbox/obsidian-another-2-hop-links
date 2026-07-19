@@ -15,7 +15,7 @@ import { VIRTUAL_CELL_WILL_REBIND_EVENT } from "./virtualCellRebind";
 import {
 	isScrollActivityActive,
 	subscribeScrollActivity,
-} from "infrastructure/scroll/scrollActivity";
+} from "ui/virtualization/scheduling/scrollActivity";
 
 interface ShadowHoverPopoverBridgeOptions {
 	shadowRoot: ShadowRoot;

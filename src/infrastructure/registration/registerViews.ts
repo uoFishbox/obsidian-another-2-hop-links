@@ -1,5 +1,8 @@
 import type { PluginHostUi } from "types/pluginHostUi";
-import { TwoHopLinksView, TWO_HOP_LINKS_VIEW_TYPE } from "ui/views/TwoHopLinksView";
+import {
+	TwoHopLinksView,
+	TWO_HOP_LINKS_VIEW_TYPE,
+} from "features/two-hop/ui/TwoHopLinksView";
 import { PreCreationView, VIEW_TYPE_PRE_CREATE } from "ui/views/PreCreationView";
 import { TagNotesView, VIEW_TYPE_TAG_NOTES } from "ui/views/TagNotesView";
 import {

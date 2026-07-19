@@ -3,7 +3,7 @@
 	import type {
 		RenderRevision,
 		RenderRevisionFallbackPolicy,
-	} from "../virtual-list/renderRevision";
+	} from "ui/virtualization/renderRevision";
 
 	interface HarnessItem {
 		id: string;

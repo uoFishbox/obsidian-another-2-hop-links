@@ -3,7 +3,7 @@ import {
 	markScrollActivityActive,
 	markScrollActivityIdle,
 	resetScrollActivityForTests,
-} from "infrastructure/scroll/scrollActivity";
+} from "ui/virtualization/scheduling/scrollActivity";
 import {
 	getCCLDevMeasurementSnapshot,
 	resetCCLDevMeasurements,
@@ -13,7 +13,7 @@ import {
 	enqueuePreviewDomCommit,
 	resetPreviewDomCommitSchedulerForTests,
 } from "../previewDomCommitScheduler";
-import type { VirtualFrameCoordinator } from "ui/virtualization/frameCoordinator";
+import type { VirtualFrameCoordinator } from "ui/virtualization/scheduling/frameCoordinator";
 
 const scrollSource = {};
 const DEFAULT_FRAME_INTERVAL_MS = 1000 / 60;

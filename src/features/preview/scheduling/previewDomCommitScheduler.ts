@@ -1,7 +1,7 @@
 import {
 	isScrollActivityActive,
 	subscribeScrollActivity,
-} from "infrastructure/scroll/scrollActivity";
+} from "ui/virtualization/scheduling/scrollActivity";
 import { recordCCLDevMeasurement } from "infrastructure/debug/CCLDevMeasurements";
 import {
 	canConsumePreviewScheduleToken,
@@ -10,7 +10,7 @@ import {
 	refillPreviewScheduleTokens,
 	type PreviewScheduleTokenState,
 } from "./previewScheduleTokenBucket";
-import type { VirtualFrameCoordinator } from "ui/virtualization/frameCoordinator";
+import type { VirtualFrameCoordinator } from "ui/virtualization/scheduling/frameCoordinator";
 
 const MAX_QUEUE_ENTRIES_PER_DRAIN = 256;
 const FALLBACK_FRAME_INTERVAL_MS = 1000 / 60;

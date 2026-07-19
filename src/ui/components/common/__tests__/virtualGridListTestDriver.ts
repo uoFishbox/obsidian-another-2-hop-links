@@ -7,7 +7,7 @@ import {
 	within,
 } from "@testing-library/svelte";
 import { afterEach, beforeEach, expect, vi } from "vitest";
-import { ARIA_LABELS } from "../../../../appConstants";
+import { ARIA_LABELS } from "appConstants";
 import { getLazyLoadManager } from "infrastructure/observers/IntersectionObserverRegistry";
 import LinkListHarness from "./VirtualGridLinkListHarness.svelte";
 import LinkListObjectHarness from "./VirtualGridLinkListObjectHarness.svelte";
@@ -35,7 +35,7 @@ import {
 import type {
 	RenderRevision,
 	RenderRevisionFallbackPolicy,
-} from "../virtual-list/renderRevision";
+} from "ui/virtualization/renderRevision";
 
 function queryAllByLabelTextDeep(text: TextMatcher): HTMLElement[] {
 	const seen = new Set<HTMLElement>();

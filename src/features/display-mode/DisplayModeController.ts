@@ -8,7 +8,10 @@ import type { WorkspaceViewQueries } from "infrastructure/workspace/workspaceVie
 import type { DisplayModeStrategy } from "features/display-mode/createDisplayModeStrategy";
 import type { DisplayModeStrategyContext } from "features/display-mode/DisplayModeStrategyContext";
 import { createDisplayModeStrategy } from "features/display-mode/createDisplayModeStrategy";
-import { TwoHopLinksView, TWO_HOP_LINKS_VIEW_TYPE } from "ui/views/TwoHopLinksView";
+import {
+	TwoHopLinksView,
+	TWO_HOP_LINKS_VIEW_TYPE,
+} from "features/two-hop/ui/TwoHopLinksView";
 import {
 	getCanvasFile,
 	getFileNodePath,

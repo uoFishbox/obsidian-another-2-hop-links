@@ -9,7 +9,7 @@ import { toPreviewImageSrc } from "features/preview/utils/externalFileImage";
 import type { PreviewContentAnalysis } from "features/preview/utils/previewUtils";
 import type { PreviewData, PreviewRequestOptions } from "ui/context/linkContext";
 import { syncMathJaxStylesForNode } from "ui/utils/mathJaxShadowStyles";
-import type { VirtualFrameCoordinator } from "ui/virtualization/frameCoordinator";
+import type { VirtualFrameCoordinator } from "ui/virtualization/scheduling/frameCoordinator";
 import {
 	applySharedSearchContextToTextPreview,
 	canShareRenderedTextPreview,

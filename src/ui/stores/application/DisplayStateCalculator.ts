@@ -4,7 +4,7 @@ import type {
 	LinkPreprocessedDisplayData,
 	PreprocessedDisplayData,
 	TagPreprocessedDisplayData,
-} from "application/presenters/displayDataBuilder";
+} from "features/two-hop/application/displayDataBuilder";
 import type { TwoHopLinkResult } from "types";
 import type { PluginSettings, SortOption } from "types/settings";
 import {
@@ -12,7 +12,7 @@ import {
 	LINK_PREPROCESS_CACHE_SETTING_DEPENDENCIES,
 	PREPROCESS_CACHE_SETTING_DEPENDENCIES,
 	TAG_PREPROCESS_CACHE_SETTING_DEPENDENCIES,
-} from "application/presenters/displayCacheDependencies";
+} from "features/two-hop/application/displayCacheDependencies";
 
 export interface ComputedDisplayData {
 	displayData: DisplayData;

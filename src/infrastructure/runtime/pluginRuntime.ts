@@ -21,7 +21,7 @@ import {
 	type EmptyViewController,
 } from "infrastructure/lifecycle/emptyViewController";
 import { IndexingService } from "core/indexing/index-service/IndexingService";
-import { TwoHopLinkResolver } from "core/indexing/two-hop-resolver/TwoHopLinkResolver";
+import { TwoHopLinkResolver } from "features/two-hop/domain/TwoHopLinkResolver";
 import { createLinkContextFactory } from "ui/context/linkContextFactory";
 import type { LinkContext } from "ui/context/linkContext";
 import { SortService } from "core/sorting/SortService";

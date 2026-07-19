@@ -2,7 +2,7 @@ import { TFile, type App } from "obsidian";
 import type { PluginHost } from "types/pluginHost";
 import { downloadAsFile, exportToClipboard } from "features/export/exportService";
 import type { TwoHopLinkResult, ResolveProgress } from "types/domain";
-import type { ResolveOptions } from "core/indexing/two-hop-resolver/TwoHopLinkResolver";
+import type { ResolveOptions } from "features/two-hop/domain/TwoHopLinkResolver";
 
 export interface RegisterFileMenuDeps {
 	readonly app: App;

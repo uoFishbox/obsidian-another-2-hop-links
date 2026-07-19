@@ -30,7 +30,7 @@ vi.mock("utils/errorHandler", () => ({
 	handleUnmountError: handleUnmountErrorSpy,
 }));
 
-vi.mock("ui/pages/TwoHopLinksPage.svelte", () => ({
+vi.mock("features/two-hop/ui/TwoHopLinksPage.svelte", () => ({
 	default: {},
 }));
 

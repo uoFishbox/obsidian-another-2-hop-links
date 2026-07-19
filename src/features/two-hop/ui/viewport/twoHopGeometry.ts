@@ -1,0 +1,301 @@
+import type { ViewPlanLayoutMetrics } from "ui/virtualization/svelte/viewPlanLayout";
+import type { TwoHopVirtualListItem } from "features/two-hop/ui/twoHopVirtualListModel";
+import type { TwoHopSnapshot } from "features/two-hop/ui/viewport/twoHopSnapshot";
+
+export interface TwoHopGeometry {
+	readonly columns: number;
+	readonly rowHeight: number;
+	readonly rowStride: number;
+	readonly rowCount: number;
+	readonly totalHeight: number;
+	readonly firstRowBySection: Uint32Array;
+	readonly rowCountBySection: Uint32Array;
+	readonly topBySection: Float64Array;
+	readonly heightBySection: Float64Array;
+}
+
+export type TwoHopResolvedCell =
+	| {
+			readonly kind: "header";
+			readonly logicalKey: string;
+			readonly sectionIndex: number;
+			readonly rowIndex: number;
+			readonly columnIndex: number;
+	  }
+	| {
+			readonly kind: "item";
+			readonly logicalKey: string;
+			readonly sectionIndex: number;
+			readonly rowIndex: number;
+			readonly columnIndex: number;
+			readonly itemIndex: number;
+			readonly item: TwoHopVirtualListItem;
+			readonly shellTitle: string;
+	  }
+	| {
+			readonly kind: "load-more";
+			readonly logicalKey: string;
+			readonly sectionIndex: number;
+			readonly rowIndex: number;
+			readonly columnIndex: number;
+	  };
+
+export interface TwoHopRowRange {
+	start: number;
+	end: number;
+}
+
+export interface TwoHopResolvedCellBuffer {
+	kind: TwoHopResolvedCell["kind"];
+	logicalKey: string;
+	sectionIndex: number;
+	rowIndex: number;
+	columnIndex: number;
+	itemIndex: number;
+	item: TwoHopVirtualListItem | null;
+	shellTitle: string;
+}
+
+export function createTwoHopResolvedCellBuffer(): TwoHopResolvedCellBuffer {
+	return {
+		kind: "header",
+		logicalKey: "",
+		sectionIndex: -1,
+		rowIndex: -1,
+		columnIndex: -1,
+		itemIndex: -1,
+		item: null,
+		shellTitle: "",
+	};
+}
+
+/** Builds compact section-prefix geometry. No per-row or per-cell objects are created. */
+export function createTwoHopGeometry(
+	snapshot: TwoHopSnapshot,
+	layout: ViewPlanLayoutMetrics,
+): TwoHopGeometry {
+	const sectionCount = snapshot.sections.length;
+	const columns = Math.max(1, Math.floor(layout.columns));
+	const rowHeight = Math.max(1, layout.rowHeight);
+	const rowStride = rowHeight + Math.max(0, layout.gap);
+	const firstRowBySection = new Uint32Array(sectionCount);
+	const rowCountBySection = new Uint32Array(sectionCount);
+	const topBySection = new Float64Array(sectionCount);
+	const heightBySection = new Float64Array(sectionCount);
+	const sectionMarginBottom = Math.max(0, layout.sectionMarginBottom);
+	let rowCount = 0;
+	let top = 0;
+
+	for (let sectionIndex = 0; sectionIndex < sectionCount; sectionIndex += 1) {
+		const section = snapshot.sections[sectionIndex];
+		const cellCount = 1 + section.visibleItemCount + (section.showLoadMore ? 1 : 0);
+		const sectionRowCount = Math.ceil(cellCount / columns);
+		const contentHeight =
+			sectionRowCount > 0
+				? sectionRowCount * rowHeight +
+					(sectionRowCount - 1) * (rowStride - rowHeight)
+				: 0;
+		const sectionHeight = contentHeight + sectionMarginBottom;
+
+		firstRowBySection[sectionIndex] = rowCount;
+		rowCountBySection[sectionIndex] = sectionRowCount;
+		topBySection[sectionIndex] = top;
+		heightBySection[sectionIndex] = sectionHeight;
+		rowCount += sectionRowCount;
+		top += sectionHeight;
+	}
+
+	return {
+		columns,
+		rowHeight,
+		rowStride,
+		rowCount,
+		totalHeight: top,
+		firstRowBySection,
+		rowCountBySection,
+		topBySection,
+		heightBySection,
+	};
+}
+
+/** Resolves a global row/column to section data using one binary search and arithmetic. */
+export function resolveTwoHopCell(
+	snapshot: TwoHopSnapshot,
+	geometry: TwoHopGeometry,
+	rowIndex: number,
+	columnIndex: number,
+): TwoHopResolvedCell | null {
+	return resolveTwoHopCellInto(
+		snapshot,
+		geometry,
+		rowIndex,
+		columnIndex,
+		createTwoHopResolvedCellBuffer(),
+	);
+}
+
+/** Resolves into caller-owned storage for allocation-free physical slot binding. */
+export function resolveTwoHopCellInto(
+	snapshot: TwoHopSnapshot,
+	geometry: TwoHopGeometry,
+	rowIndex: number,
+	columnIndex: number,
+	target: TwoHopResolvedCellBuffer,
+): TwoHopResolvedCell | null {
+	if (
+		rowIndex < 0 ||
+		rowIndex >= geometry.rowCount ||
+		columnIndex < 0 ||
+		columnIndex >= geometry.columns
+	) {
+		return null;
+	}
+
+	const sectionIndex = resolveSectionIndexForRow(geometry, rowIndex);
+	if (sectionIndex < 0) return null;
+	const section = snapshot.sections[sectionIndex];
+	const rowInSection = rowIndex - geometry.firstRowBySection[sectionIndex];
+	const cellIndex = rowInSection * geometry.columns + columnIndex;
+
+	if (cellIndex === 0) {
+		target.kind = "header";
+		target.logicalKey = section.headerLogicalKey;
+		target.sectionIndex = sectionIndex;
+		target.rowIndex = rowIndex;
+		target.columnIndex = columnIndex;
+		target.itemIndex = -1;
+		target.item = null;
+		target.shellTitle = "";
+		return target as unknown as Extract<TwoHopResolvedCell, { kind: "header" }>;
+	}
+
+	const visibleItemOffset = cellIndex - 1;
+	if (visibleItemOffset < section.visibleItemCount) {
+		const itemIndex = section.visibleItemSourceIndexes[visibleItemOffset];
+		const item = section.visibleItems[visibleItemOffset];
+		if (!item) return null;
+		target.kind = "item";
+		target.logicalKey = section.visibleItemLogicalKeys[visibleItemOffset];
+		target.sectionIndex = sectionIndex;
+		target.rowIndex = rowIndex;
+		target.columnIndex = columnIndex;
+		target.itemIndex = itemIndex;
+		target.item = item;
+		target.shellTitle = section.visibleItemTitles[visibleItemOffset] ?? "";
+		return target as unknown as Extract<TwoHopResolvedCell, { kind: "item" }>;
+	}
+
+	if (section.showLoadMore && visibleItemOffset === section.visibleItemCount) {
+		target.kind = "load-more";
+		target.logicalKey = section.loadMoreLogicalKey;
+		target.sectionIndex = sectionIndex;
+		target.rowIndex = rowIndex;
+		target.columnIndex = columnIndex;
+		target.itemIndex = -1;
+		target.item = null;
+		target.shellTitle = "";
+		return target as unknown as Extract<TwoHopResolvedCell, { kind: "load-more" }>;
+	}
+
+	return null;
+}
+
+export function resolveTwoHopVisibleRows(
+	geometry: TwoHopGeometry,
+	scrollOffset: number,
+	viewportHeight: number,
+): TwoHopRowRange {
+	const range = { start: 0, end: 0 };
+	resolveTwoHopVisibleRowsInto(range, geometry, scrollOffset, viewportHeight);
+	return range;
+}
+
+/** Resolves visible rows into caller-owned storage for the scroll hot path. */
+export function resolveTwoHopVisibleRowsInto(
+	target: TwoHopRowRange,
+	geometry: TwoHopGeometry,
+	scrollOffset: number,
+	viewportHeight: number,
+): void {
+	if (geometry.rowCount === 0 || viewportHeight <= 0) {
+		target.start = 0;
+		target.end = 0;
+		return;
+	}
+
+	const start = resolveRowAtOffset(geometry, Math.max(0, scrollOffset));
+	const lastOffset = Math.max(0, scrollOffset + viewportHeight - 1);
+	const end = Math.min(
+		geometry.rowCount,
+		resolveRowAtOffset(geometry, lastOffset) + 1,
+	);
+	target.start = start;
+	target.end = end;
+}
+
+export function resolveTwoHopRowTop(
+	geometry: TwoHopGeometry,
+	rowIndex: number,
+): number {
+	const sectionIndex = resolveSectionIndexForRow(geometry, rowIndex);
+	if (sectionIndex < 0) return 0;
+	return (
+		geometry.topBySection[sectionIndex] +
+		(rowIndex - geometry.firstRowBySection[sectionIndex]) * geometry.rowStride
+	);
+}
+
+export function resolveSectionIndexForRow(
+	geometry: TwoHopGeometry,
+	rowIndex: number,
+): number {
+	let low = 0;
+	let high = geometry.firstRowBySection.length - 1;
+
+	while (low <= high) {
+		const middle = (low + high) >>> 1;
+		const firstRow = geometry.firstRowBySection[middle];
+		const endRow = firstRow + geometry.rowCountBySection[middle];
+		if (rowIndex < firstRow) {
+			high = middle - 1;
+		} else if (rowIndex >= endRow) {
+			low = middle + 1;
+		} else {
+			return middle;
+		}
+	}
+
+	return -1;
+}
+
+function resolveRowAtOffset(geometry: TwoHopGeometry, offset: number): number {
+	let low = 0;
+	let high = geometry.topBySection.length - 1;
+	let sectionIndex = 0;
+
+	while (low <= high) {
+		const middle = (low + high) >>> 1;
+		const top = geometry.topBySection[middle];
+		const bottom = top + geometry.heightBySection[middle];
+		if (offset < top) {
+			high = middle - 1;
+		} else if (offset >= bottom) {
+			sectionIndex = Math.min(middle + 1, geometry.topBySection.length - 1);
+			low = middle + 1;
+		} else {
+			sectionIndex = middle;
+			break;
+		}
+	}
+
+	const firstRow = geometry.firstRowBySection[sectionIndex] ?? 0;
+	const sectionRowCount = geometry.rowCountBySection[sectionIndex] ?? 0;
+	const rowInSection = Math.floor(
+		Math.max(0, offset - (geometry.topBySection[sectionIndex] ?? 0)) /
+			geometry.rowStride,
+	);
+	return Math.min(
+		Math.max(0, geometry.rowCount - 1),
+		firstRow + Math.min(Math.max(0, sectionRowCount - 1), rowInSection),
+	);
+}

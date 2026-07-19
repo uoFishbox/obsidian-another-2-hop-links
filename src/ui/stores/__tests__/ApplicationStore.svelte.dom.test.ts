@@ -5,11 +5,11 @@ import {
 	ApplicationStore,
 	type DisplayDataBuilder,
 } from "ui/stores/ApplicationStore.svelte";
-import type { ResolveTwoHopLinks } from "ui/stores/application/TwoHopLinksLoader";
+import type { ResolveTwoHopLinks } from "features/two-hop/application/TwoHopLinksLoader";
 import type {
 	DisplayData,
 	PreprocessedDisplayData,
-} from "application/presenters/displayDataBuilder";
+} from "features/two-hop/application/displayDataBuilder";
 import type {
 	DisplayDataVersions,
 	ResolveProgress,

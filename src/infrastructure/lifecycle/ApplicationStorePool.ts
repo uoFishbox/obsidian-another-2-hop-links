@@ -2,7 +2,7 @@ import type { IndexingService } from "core/indexing/index-service/IndexingServic
 import type { PluginSettings, SortOption } from "types/settings";
 import type { DisplayDataBuilder } from "ui/stores/ApplicationStore.svelte";
 import { ApplicationStore } from "ui/stores/ApplicationStore.svelte";
-import type { ResolveTwoHopLinks } from "ui/stores/application/TwoHopLinksLoader";
+import type { ResolveTwoHopLinks } from "features/two-hop/application/TwoHopLinksLoader";
 
 export const RECENT_APPLICATION_STORE_LIMIT = 6;
 

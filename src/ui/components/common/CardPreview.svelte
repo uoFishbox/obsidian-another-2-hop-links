@@ -3,7 +3,7 @@
 	import { DEBUG_DISABLE_CARD_DOM_PREVIEW } from "appConstants";
 	import type { PreviewData } from "ui/context/linkContext";
 	import { useAppContext } from "ui/context/linkContext";
-	import { getVirtualFrameCoordinatorContext } from "ui/virtualization/frameCoordinatorContext.svelte";
+	import { getVirtualFrameCoordinatorContext } from "ui/virtualization/svelte/frameCoordinatorContext.svelte";
 	import {
 		createCardPreviewRenderer,
 		type CardPreviewLoader,

@@ -11,7 +11,7 @@
 	import { focusResultEdge } from "features/keyboard-navigation/resultFocus";
 	import { yieldToMainThreadIdleAware } from "core/indexing/timeSlicing";
 	import type { ListConfig } from "ui/components/lists/types";
-	import { hasSameViewItemSource } from "ui/utils/twohopEquality";
+	import { hasSameViewItemSource } from "features/two-hop/utils/equality";
 	import { sameArrayBy } from "utils/arrayEquality";
 	import {
 		setLinkContext,

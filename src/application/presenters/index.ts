@@ -1,11 +1,4 @@
 export {
-	createDisplayDataBuilder,
-	type DisplayData,
-	type DisplayDataBuilder,
-	type MergedLinkItem,
-} from "./displayDataBuilder";
-
-export {
 	type ItemStrategy,
 	type ViewItemData,
 	BacklinkStrategy,

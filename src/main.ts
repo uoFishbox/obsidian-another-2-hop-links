@@ -4,17 +4,20 @@ import { SettingsManager } from "settings/SettingsManager";
 import { CosenseCardLinksSettingTab } from "settings/SettingTab";
 import { DEFAULT_SETTINGS } from "types/settings";
 import type { PluginSettings, SortOption } from "types/settings";
-import { TwoHopLinksView, TWO_HOP_LINKS_VIEW_TYPE } from "ui/views/TwoHopLinksView";
+import {
+	TwoHopLinksView,
+	TWO_HOP_LINKS_VIEW_TYPE,
+} from "features/two-hop/ui/TwoHopLinksView";
 import type { ResolveProgress, TwoHopLinkResult } from "types/domain";
-import type { ResolveOptions } from "core/indexing/two-hop-resolver/TwoHopLinkResolver";
+import type { ResolveOptions } from "features/two-hop/domain/TwoHopLinkResolver";
 import { forceRedrawEffect } from "infrastructure/markdown/livePreview";
 import {
 	createDisplayDataBuilder,
 	type DisplayDataBuilder,
-} from "application/presenters/displayDataBuilder";
+} from "features/two-hop/application/displayDataBuilder";
 import { createDeduplicationService } from "core/deduplication/deduplicationService";
 import { setEnableLogging } from "utils/logger";
-import type { ResolveTwoHopLinks } from "ui/stores/application/TwoHopLinksLoader";
+import type { ResolveTwoHopLinks } from "features/two-hop/application/TwoHopLinksLoader";
 import { disposePreviewActivationScheduler } from "features/preview/scheduling/previewActivationScheduler";
 import { disposePreviewDomCommitScheduler } from "features/preview/scheduling/previewDomCommitScheduler";
 import { installCCLDebugExposure } from "infrastructure/debug/CCLDebugExposure";

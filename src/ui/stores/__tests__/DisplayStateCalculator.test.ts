@@ -5,14 +5,14 @@ import type {
 	DisplayDataBuilder,
 	LinkPreprocessedDisplayData,
 	TagPreprocessedDisplayData,
-} from "application/presenters/displayDataBuilder";
+} from "features/two-hop/application/displayDataBuilder";
 import type { TaggedNote, TwoHopIndexedLink, TwoHopLinkResult } from "types/domain";
 import { DEFAULT_SETTINGS, type PluginSettings } from "types/settings";
 import {
 	computePreprocessedDisplayDataState,
 	createPreprocessedDisplayDataCache,
 } from "ui/stores/application/DisplayStateCalculator";
-import { PREPROCESS_CACHE_SETTING_DEPENDENCIES } from "application/presenters/displayCacheDependencies";
+import { PREPROCESS_CACHE_SETTING_DEPENDENCIES } from "features/two-hop/application/displayCacheDependencies";
 
 function createBacklink(path: string): TwoHopIndexedLink {
 	return {

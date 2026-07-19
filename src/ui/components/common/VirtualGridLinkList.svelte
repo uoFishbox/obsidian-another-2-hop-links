@@ -1,15 +1,15 @@
 <script lang="ts" generics="T">
 	import { providePreviewActivationContexts } from "features/preview/scheduling/previewActivationContexts";
-	import VirtualSurface from "./virtual-list/VirtualSurface.svelte";
-	import VirtualListLoadMoreButton from "./virtual-list/VirtualListLoadMoreButton.svelte";
+	import VirtualSurface from "ui/virtualization/components/VirtualSurface.svelte";
+	import VirtualListLoadMoreButton from "ui/virtualization/components/VirtualListLoadMoreButton.svelte";
 	import {
 		useFlatVirtualGridList,
 		type FlatVirtualGridListProps,
-	} from "./virtual-list/svelte/useFlatVirtualGridList.svelte";
+	} from "ui/virtualization/svelte/useFlatVirtualGridList.svelte";
 	import {
 		KEYED_VIRTUAL_CELL_BODY_LIFECYCLE,
 		PHYSICAL_SLOT_BODY_LIFECYCLE,
-	} from "ui/virtualization/bodyLifecycle";
+	} from "ui/virtualization/core/bodyLifecycle";
 
 	const props: FlatVirtualGridListProps<T> = $props();
 	providePreviewActivationContexts();

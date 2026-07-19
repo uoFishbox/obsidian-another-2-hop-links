@@ -51,7 +51,7 @@ import {
 	markScrollActivityActive,
 	markScrollActivityIdle,
 	resetScrollActivityForTests,
-} from "infrastructure/scroll/scrollActivity";
+} from "ui/virtualization/scheduling/scrollActivity";
 
 describe("shadowHoverPopoverBridge", () => {
 	beforeEach(() => {

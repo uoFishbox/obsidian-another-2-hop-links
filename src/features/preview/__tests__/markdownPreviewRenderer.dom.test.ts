@@ -1,8 +1,15 @@
 import { describe, test, expect, vi, beforeEach, afterEach } from "vitest";
-import { finishRenderMath, MarkdownRenderer, renderMath } from "obsidian";
-import { processPreviewContent } from "../renderers/markdownPreviewRenderer";
 
-vi.mock("obsidian", () => {
+type ObsidianModule = typeof import("obsidian");
+type ProcessPreviewContent =
+	(typeof import("../renderers/markdownPreviewRenderer"))["processPreviewContent"];
+
+let finishRenderMath: ObsidianModule["finishRenderMath"];
+let MarkdownRenderer: ObsidianModule["MarkdownRenderer"];
+let renderMath: ObsidianModule["renderMath"];
+let processPreviewContent: ProcessPreviewContent;
+
+function createObsidianMock() {
 	class MockComponent {
 		load() {}
 		unload() {}
@@ -21,7 +28,7 @@ vi.mock("obsidian", () => {
 			render: vi.fn().mockResolvedValue(undefined),
 		},
 	};
-});
+}
 
 HTMLElement.prototype.createSpan = function (this: HTMLElement) {
 	const span = document.createElement("span");
@@ -45,7 +52,15 @@ describe("processPreviewContent DOM rendering", () => {
 	let mockApp: never;
 	let mockComponent: never;
 
-	beforeEach(() => {
+	beforeEach(async () => {
+		vi.resetModules();
+		vi.doMock("obsidian", createObsidianMock);
+		const obsidian = await import("obsidian");
+		finishRenderMath = obsidian.finishRenderMath;
+		MarkdownRenderer = obsidian.MarkdownRenderer;
+		renderMath = obsidian.renderMath;
+		({ processPreviewContent } =
+			await import("../renderers/markdownPreviewRenderer"));
 		containerEl = document.createElement("div");
 		mockApp = {} as never;
 		mockComponent = { load: vi.fn(), unload: vi.fn() } as never;
@@ -53,7 +68,8 @@ describe("processPreviewContent DOM rendering", () => {
 
 	afterEach(() => {
 		vi.clearAllMocks();
-		vi.mocked(MarkdownRenderer.render).mockReset().mockResolvedValue(undefined);
+		vi.doUnmock("obsidian");
+		vi.resetModules();
 	});
 
 	test("renders math through Obsidian math APIs", async () => {

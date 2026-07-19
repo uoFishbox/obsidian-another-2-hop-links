@@ -3,7 +3,7 @@ import type { IndexingService } from "core/indexing/index-service/IndexingServic
 import type { SortService } from "core/sorting/SortService";
 import type { PluginSettings } from "types/settings";
 import type { ResolveProgress, TwoHopLinkResult } from "types/domain";
-import type { ResolveOptions } from "core/indexing/two-hop-resolver/TwoHopLinkResolver";
+import type { ResolveOptions } from "features/two-hop/domain/TwoHopLinkResolver";
 
 export interface PluginSettingsManager {
 	readonly settings: PluginSettings;

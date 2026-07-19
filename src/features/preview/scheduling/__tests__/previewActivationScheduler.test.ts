@@ -14,11 +14,11 @@ import {
 	markScrollActivityActive,
 	markScrollActivityIdle,
 	resetScrollActivityForTests,
-} from "infrastructure/scroll/scrollActivity";
+} from "ui/virtualization/scheduling/scrollActivity";
 import {
 	markVirtualScrollMeasurementRun,
 	resetVirtualScrollMeasurementFrameForTests,
-} from "infrastructure/scroll/virtualScrollMeasurementFrame";
+} from "ui/virtualization/scheduling/virtualScrollMeasurementFrame";
 import {
 	getCCLDevMeasurementSnapshot,
 	resetCCLDevMeasurements,
@@ -34,7 +34,7 @@ import {
 	type PreviewActivationHandle,
 	type PreviewActivationScope,
 } from "../previewActivationScheduler";
-import type { VirtualFrameCoordinator } from "ui/virtualization/frameCoordinator";
+import type { VirtualFrameCoordinator } from "ui/virtualization/scheduling/frameCoordinator";
 
 const scrollSource = {};
 const DEFAULT_FRAME_INTERVAL_MS = 1000 / 60;

@@ -2,4 +2,4 @@ export type {
 	VirtualizedItemVisibility,
 	VirtualizedItemVisibilityState,
 	VisibilityConsumption,
-} from "./virtual-list/types";
+} from "ui/virtualization/types";

@@ -9,7 +9,7 @@ import type { SortService } from "core/sorting/SortService";
 import type { DisplayModeController } from "features/display-mode/DisplayModeController";
 import type { EmptyViewController } from "infrastructure/lifecycle/emptyViewController";
 import type { ViewUpdateOrchestrator } from "infrastructure/lifecycle/viewUpdateOrchestrator";
-import { TWO_HOP_LINKS_VIEW_TYPE } from "ui/views/TwoHopLinksView";
+import { TWO_HOP_LINKS_VIEW_TYPE } from "features/two-hop/ui/TwoHopLinksView";
 import { VIEW_TYPE_TAG_NOTES } from "ui/views/TagNotesView";
 import { VIEW_TYPE_PRE_CREATE } from "ui/views/PreCreationView";
 

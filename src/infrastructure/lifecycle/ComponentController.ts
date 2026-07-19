@@ -17,9 +17,9 @@ import type {
 } from "ui/stores/ApplicationStore.svelte";
 import type { IndexingService } from "core/indexing/index-service/IndexingService";
 import type { PluginHostUi } from "types/pluginHostUi";
-import type { ResolveTwoHopLinks } from "ui/stores/application/TwoHopLinksLoader";
-import { mountTwoHopLinksRootView } from "ui/views/shared/viewFactories";
-import type { TwoHopLinksRootUiState } from "ui/views/shared/twoHopLinksRootUiState";
+import type { ResolveTwoHopLinks } from "features/two-hop/application/TwoHopLinksLoader";
+import { mountTwoHopLinksRootView } from "features/two-hop/ui/mountTwoHopLinksRootView";
+import type { TwoHopLinksRootUiState } from "features/two-hop/ui/twoHopLinksRootUiState";
 import type { SvelteComponentInstance } from "ui/views/shared/svelteLifecycle";
 import { ApplicationStorePool } from "./ApplicationStorePool";
 

@@ -4,11 +4,11 @@ import {
 	computeColumnCount,
 	computeVirtualGridLayout,
 	computeVisibleRowRange,
-} from "../virtual-list/layout/flatGridLayout";
+} from "ui/virtualization/layout/flatGridLayout";
 import {
 	createFlatLogicalCellSource,
 	createArrayVirtualGridDataSource,
-} from "../virtual-list/flatLogicalCellSource";
+} from "ui/virtualization/flatLogicalCellSource";
 
 describe("linkListLayout", () => {
 	describe("computeColumnCount", () => {
@@ -143,7 +143,7 @@ describe("linkListLayout", () => {
 			expect(item.key).toBe("source-a::item:0");
 		});
 
-	it("does not prefix scan when resolving key for far index", () => {
+		it("does not prefix scan when resolving key for far index", () => {
 			const getKey = vi.fn((item: string) => item);
 			const dataSource = createArrayVirtualGridDataSource({
 				items: Array.from({ length: 100_000 }, (_, index) => `item-${index}`),

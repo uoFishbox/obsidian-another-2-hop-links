@@ -9,7 +9,7 @@ import type { TaggedNote, TwoHopIndexedLink } from "types/domain";
 import type {
 	DisplayData,
 	DisplayDataBuilder,
-} from "application/presenters/displayDataBuilder";
+} from "features/two-hop/application/displayDataBuilder";
 import type { DataUpdateContext } from "core/indexing/index-service/IndexEvents";
 import {
 	computePreprocessedDisplayDataState,
@@ -26,7 +26,7 @@ import {
 import {
 	type ResolveTwoHopLinks,
 	TwoHopLinksLoader,
-} from "ui/stores/application/TwoHopLinksLoader";
+} from "features/two-hop/application/TwoHopLinksLoader";
 import {
 	clearSectionExpandedLimit,
 	getDefaultSectionVisibleLimit,
@@ -36,7 +36,7 @@ import {
 	type SectionExpansionLimits,
 } from "ui/stores/application/viewUiStateManager";
 
-export type { DisplayDataBuilder } from "application/presenters/displayDataBuilder";
+export type { DisplayDataBuilder } from "features/two-hop/application/displayDataBuilder";
 
 export type LoadingPhase =
 	| "idle"
