@@ -23,10 +23,11 @@ import {
 import {
 	createTwoHopGeometry,
 	resolveTwoHopCell,
-	resolveTwoHopCellInto,
-	resolveTwoHopRowTop,
+	resolveTwoHopCellInRowInto,
 	resolveTwoHopVisibleRowsInto,
 	createTwoHopResolvedCellBuffer,
+	createTwoHopResolvedRowBuffer,
+	resolveTwoHopRowInto,
 	type TwoHopGeometry,
 	type TwoHopRowRange,
 	type TwoHopResolvedCell,
@@ -128,11 +129,38 @@ export interface TwoHopViewportController {
 	dispose(): void;
 }
 
+const mountedTwoHopOwners = new WeakMap<EventTarget, object>();
+
+function assertTwoHopScrollerAvailable(scrollTarget: EventTarget): void {
+	if (mountedTwoHopOwners.has(scrollTarget)) {
+		throw new Error("Only one two-hop virtual list is allowed per scroller.");
+	}
+}
+
+function claimTwoHopScroller(
+	scrollTarget: EventTarget,
+	owner: object,
+): () => void {
+	const current = mountedTwoHopOwners.get(scrollTarget);
+	if (current && current !== owner) {
+		throw new Error("Only one active two-hop virtual list is allowed per scroller.");
+	}
+	mountedTwoHopOwners.set(scrollTarget, owner);
+	return () => {
+		if (mountedTwoHopOwners.get(scrollTarget) === owner) {
+			mountedTwoHopOwners.delete(scrollTarget);
+		}
+	};
+}
+
 /** Owns scroll geometry and a fixed imperative DOM pool outside Svelte state. */
 export function createTwoHopViewportController(
 	params: TwoHopViewportControllerParams,
 ): TwoHopViewportController {
 	const ownerWindow = params.rootEl.ownerDocument.defaultView;
+	const initialScrollContainerEl = findNearestScrollContainerCached(params.rootEl);
+	const scrollTarget = initialScrollContainerEl ?? ownerWindow!;
+	assertTwoHopScrollerAvailable(scrollTarget);
 	const requestFrame =
 		params.requestAnimationFrame ??
 		ownerWindow?.requestAnimationFrame.bind(ownerWindow) ??
@@ -165,15 +193,17 @@ export function createTwoHopViewportController(
 	let geometry: TwoHopGeometry;
 	let layout: ViewPlanLayoutMetrics;
 	let pool: TwoHopDomPool;
-	let scrollContainerEl = findNearestScrollContainerCached(params.rootEl);
+	const scrollContainerEl = initialScrollContainerEl;
 	let cachedSectionTop = 0;
 	let cachedViewportHeight = 0;
 	let residentStart = -1;
 	let residentEnd = -1;
 	let frameHandle = 0;
-	let refillFrameHandle = 0;
-	let resizeFrameHandle = 0;
-	let lastScrollEventAt = Number.NEGATIVE_INFINITY;
+	let scrollIdleTimer = 0;
+	let scrollActive = false;
+	let needsScroll = false;
+	let needsResize = false;
+	let needsRefill = false;
 	let lastMeasuredRowOffset = 0;
 	let lastMeasuredTimestamp = 0;
 	let disposed = false;
@@ -199,11 +229,13 @@ export function createTwoHopViewportController(
 	snapshot = createSnapshot(visibleCountUpdate.snapshot.visibleCounts);
 	geometry = createTwoHopGeometry(snapshot, layout);
 	pool = createPool();
+	let pendingShellSlots = createPendingShellSlots();
+	let pendingShellCount = 0;
 	applyLayoutStyles();
 	pool.setContentHeight(geometry.totalHeight);
 	let previewHydrator = createPreviewHydrator();
 	let cellBuffers = createCellBuffers();
-	flush(now());
+	const rowBuffer = createTwoHopResolvedRowBuffer();
 
 	function refreshScrollGeometry(): boolean {
 		const metrics = getScrollMetrics(params.rootEl, scrollContainerEl);
@@ -281,6 +313,10 @@ export function createTwoHopViewportController(
 		return buffers;
 	}
 
+	function createPendingShellSlots(): Uint8Array {
+		return new Uint8Array(pool.capacity * pool.columns);
+	}
+
 	function applyLayoutStyles(): void {
 		const content = contentEl;
 		content.style.setProperty("--ccl-columns", String(layout.columns));
@@ -305,14 +341,46 @@ export function createTwoHopViewportController(
 	}
 
 	function onScroll(): void {
-		lastScrollEventAt = now();
-		if (frameHandle) return;
-		frameHandle = requestFrame(handleScrollFrame);
+		scrollActive = true;
+		needsScroll = true;
+		scheduleScrollIdle();
+		scheduleFrame();
 	}
 
-	function handleScrollFrame(timestamp: number): void {
+	function scheduleScrollIdle(): void {
+		if (scrollIdleTimer) ownerWindow?.clearTimeout(scrollIdleTimer);
+		scrollIdleTimer =
+			ownerWindow?.setTimeout(handleScrollIdle, SCROLL_IDLE_DELAY_MS) ?? 0;
+	}
+
+	function handleScrollIdle(): void {
+		scrollIdleTimer = 0;
+		scrollActive = false;
+		if (needsResize || needsRefill) scheduleFrame();
+	}
+
+	function scheduleFrame(): void {
+		if (frameHandle || disposed) return;
+		frameHandle = requestFrame(runFrame);
+	}
+
+	function runFrame(timestamp: number): void {
 		frameHandle = 0;
-		flush(timestamp);
+		if (needsScroll) {
+			needsScroll = false;
+			flush(timestamp);
+		}
+		if (!scrollActive && needsResize) {
+			needsResize = false;
+			applyResize(timestamp);
+		}
+		if (!needsScroll && !scrollActive && needsRefill) {
+			needsRefill = false;
+			refill(timestamp);
+		}
+		if (needsScroll || (!scrollActive && (needsResize || needsRefill))) {
+			scheduleFrame();
+		}
 	}
 
 	function flush(timestamp = now()): void {
@@ -333,7 +401,6 @@ export function createTwoHopViewportController(
 				: 0;
 		lastMeasuredRowOffset = rowOffset;
 		lastMeasuredTimestamp = timestamp;
-		const scrollActive = timestamp - lastScrollEventAt <= SCROLL_IDLE_DELAY_MS;
 		const nextStart = Math.max(0, visibleRange.start - BEHIND_ROWS);
 		const nextEnd = Math.min(geometry.rowCount, nextStart + pool.capacity);
 
@@ -343,13 +410,7 @@ export function createTwoHopViewportController(
 			visibleRange.end <= residentEnd
 		) {
 			stats.residentHits += 1;
-			previewHydrator?.notifyViewport(
-				visibleRange.start,
-				visibleRange.end,
-				scrollActive,
-				velocityRowsPerMs,
-				hasPendingShells(),
-			);
+			notifyViewport(scrollActive, velocityRowsPerMs);
 			return;
 		}
 
@@ -367,29 +428,22 @@ export function createTwoHopViewportController(
 		);
 		residentStart = nextStart;
 		residentEnd = nextEnd;
-		previewHydrator?.notifyViewport(
+		notifyViewport(scrollActive, velocityRowsPerMs);
+		scheduleRefill();
+	}
+
+	function notifyViewport(
+		scrollActive: boolean,
+		velocityRowsPerMs: number,
+	): void {
+		if (!previewActive || !previewHydrator) return;
+		previewHydrator.notifyViewport(
 			visibleRange.start,
 			visibleRange.end,
 			scrollActive,
 			velocityRowsPerMs,
-			hasPendingShells(),
+			pendingShellCount > 0,
 		);
-		scheduleRefill();
-	}
-
-	function hasPendingShells(): boolean {
-		for (const row of pool.rows) {
-			if (
-				row.logicalRowIndex < residentStart ||
-				row.logicalRowIndex >= residentEnd
-			) {
-				continue;
-			}
-			for (const slot of row.cells) {
-				if (!slot.rich && slot.logicalIdentity) return true;
-			}
-		}
-		return false;
 	}
 
 	function bindResidentWindow(
@@ -399,26 +453,51 @@ export function createTwoHopViewportController(
 		distantJump: boolean,
 		budget: TwoHopFrameBudgetTracker,
 	): void {
-		for (const rowSlot of pool.rows) {
-			if (rowSlot.logicalRowIndex >= start && rowSlot.logicalRowIndex < end) {
-				continue;
-			}
-			pool.hideRow(rowSlot);
+		const previousStart = residentStart;
+		const previousEnd = residentEnd;
+		if (previousStart < 0 || distantJump) {
+			for (const rowSlot of pool.rows) hideRow(rowSlot);
+			bindRowRange(start, end, visible, distantJump, budget);
+			return;
 		}
 
+		hideLogicalRowRange(previousStart, Math.min(previousEnd, start));
+		hideLogicalRowRange(Math.max(previousStart, end), previousEnd);
+		bindRowRange(start, Math.min(end, previousStart), visible, false, budget);
+		bindRowRange(Math.max(start, previousEnd), end, visible, false, budget);
+	}
+
+	function hideLogicalRowRange(start: number, end: number): void {
+		for (let rowIndex = start; rowIndex < end; rowIndex += 1) {
+			const rowSlot = pool.rows[rowIndex % pool.capacity];
+			if (rowSlot.logicalRowIndex === rowIndex) hideRow(rowSlot);
+		}
+	}
+
+	function hideRow(rowSlot: TwoHopDomRowSlot): void {
+		for (const slot of rowSlot.cells) {
+			if (pendingShellSlots[slot.slotIndex] === 0) continue;
+			pendingShellSlots[slot.slotIndex] = 0;
+			pendingShellCount -= 1;
+		}
+		pool.hideRow(rowSlot);
+	}
+
+	function bindRowRange(
+		start: number,
+		end: number,
+		visible: TwoHopRowRange,
+		distantJump: boolean,
+		budget: TwoHopFrameBudgetTracker,
+	): void {
 		for (let rowIndex = start; rowIndex < end; rowIndex += 1) {
 			const rowSlot = pool.rows[rowIndex % pool.capacity];
 			if (rowSlot.logicalRowIndex === rowIndex) continue;
-			pool.positionRow(
-				rowSlot,
-				rowIndex,
-				resolveTwoHopRowTop(geometry, rowIndex),
-			);
 			const isVisible = rowIndex >= visible.start && rowIndex < visible.end;
 			const canBindRich =
 				(residentStart < 0 && isVisible) ||
 				((!distantJump || isVisible) && budget.canBind(now()));
-			const shellBindCount = bindRow(rowSlot, rowIndex, canBindRich);
+			const shellBindCount = bindRow(rowSlot, rowIndex, canBindRich, true);
 			if (canBindRich) budget.consumeBinds(shellBindCount);
 		}
 	}
@@ -427,14 +506,17 @@ export function createTwoHopViewportController(
 		rowSlot: TwoHopDomRowSlot,
 		rowIndex: number,
 		rich: boolean,
+		position = false,
 	): number {
+		if (!resolveTwoHopRowInto(geometry, rowIndex, rowBuffer)) return 0;
+		if (position) pool.positionRow(rowSlot, rowIndex, rowBuffer.top);
 		let shellBindCount = 0;
 		for (let columnIndex = 0; columnIndex < pool.columns; columnIndex += 1) {
 			const slot = rowSlot.cells[columnIndex];
-			const cell = resolveTwoHopCellInto(
+			const cell = resolveTwoHopCellInRowInto(
 				snapshot,
 				geometry,
-				rowIndex,
+				rowBuffer,
 				columnIndex,
 				cellBuffers[slot.slotIndex],
 			);
@@ -446,45 +528,47 @@ export function createTwoHopViewportController(
 				renderer.renderSkeleton(slot, cell, snapshot);
 				stats.skeletonBinds += 1;
 			}
+			setSlotPending(slot.slotIndex, !slot.rich && Boolean(slot.logicalIdentity));
 		}
 		return shellBindCount;
 	}
 
-	function scheduleRefill(): void {
-		if (refillFrameHandle || disposed) return;
-		refillFrameHandle = requestFrame(handleRefillFrame);
+	function setSlotPending(slotIndex: number, pending: boolean): void {
+		const nextValue = pending ? 1 : 0;
+		if (pendingShellSlots[slotIndex] === nextValue) return;
+		pendingShellSlots[slotIndex] = nextValue;
+		pendingShellCount += pending ? 1 : -1;
 	}
 
-	function handleRefillFrame(timestamp: number): void {
-		refillFrameHandle = 0;
-		refill(timestamp);
+	function scheduleRefill(): void {
+		if (disposed || pendingShellCount === 0) return;
+		needsRefill = true;
+		if (!scrollActive) scheduleFrame();
 	}
 
 	function refill(timestamp: number): void {
-		if (disposed || residentStart < 0) return;
+		if (disposed || residentStart < 0 || pendingShellCount === 0) return;
 		frameBudgetTracker.beginFrame(timestamp);
-		let hasPending = false;
 
 		for (let rowIndex = residentStart; rowIndex < residentEnd; rowIndex += 1) {
 			const rowSlot = pool.rows[rowIndex % pool.capacity];
 			if (rowSlot.logicalRowIndex !== rowIndex) continue;
 			let rowNeedsRichBind = false;
 			for (const cell of rowSlot.cells) {
-				if (!cell.rich && cell.logicalIdentity) {
+				if (pendingShellSlots[cell.slotIndex] !== 0) {
 					rowNeedsRichBind = true;
 					break;
 				}
 			}
 			if (!rowNeedsRichBind) continue;
 			if (!frameBudgetTracker.canBind(now())) {
-				hasPending = true;
 				break;
 			}
 			const shellBindCount = bindRow(rowSlot, rowIndex, true);
 			frameBudgetTracker.consumeBinds(shellBindCount);
 		}
 
-		if (hasPending) scheduleRefill();
+		if (pendingShellCount > 0) scheduleRefill();
 		else previewHydrator?.notifyShellsChanged();
 	}
 
@@ -513,9 +597,9 @@ export function createTwoHopViewportController(
 			if (scrollContainerEl) scrollContainerEl.scrollTop += delta;
 			else ownerWindow?.scrollBy(0, delta);
 		}
-		for (const row of pool.rows) {
-			pool.hideRow(row);
-		}
+		for (const row of pool.rows) hideRow(row);
+		pendingShellCount = 0;
+		needsRefill = false;
 		residentStart = -1;
 		residentEnd = -1;
 		flush(now());
@@ -601,16 +685,12 @@ export function createTwoHopViewportController(
 	}
 
 	function scheduleResize(): void {
-		if (resizeFrameHandle || disposed) return;
-		resizeFrameHandle = requestFrame(handleResizeFrame);
+		if (disposed) return;
+		needsResize = true;
+		if (!scrollActive) scheduleFrame();
 	}
 
-	function handleResizeFrame(): void {
-		resizeFrameHandle = 0;
-		if (now() - lastScrollEventAt < SCROLL_IDLE_DELAY_MS) {
-			scheduleResize();
-			return;
-		}
+	function applyResize(timestamp: number): boolean {
 		const scrollGeometryChanged = refreshScrollGeometry();
 		const nextLayout = measureLayout();
 		const layoutUnchanged =
@@ -620,31 +700,53 @@ export function createTwoHopViewportController(
 			nextLayout.sectionMarginBottom === layout.sectionMarginBottom;
 		const requiresLargerPool = resolveRequiredPoolRows(nextLayout) > pool.capacity;
 		if (layoutUnchanged && !requiresLargerPool) {
-			if (scrollGeometryChanged) flush(now());
-			return;
+			if (scrollGeometryChanged) flush(timestamp);
+			return scrollGeometryChanged;
 		}
 		layout = nextLayout;
 		geometry = createTwoHopGeometry(snapshot, layout);
 		previewHydrator?.dispose();
 		pool.dispose();
 		pool = createPool();
+		pendingShellSlots = createPendingShellSlots();
+		pendingShellCount = 0;
+		needsRefill = false;
 		cellBuffers = createCellBuffers();
 		previewHydrator = createPreviewHydrator();
 		applyLayoutStyles();
 		pool.setContentHeight(geometry.totalHeight);
 		residentStart = -1;
 		residentEnd = -1;
-		flush(now());
+		flush(timestamp);
+		return true;
 	}
 
 	const resizeObserver = ownerWindow?.ResizeObserver
 		? new ownerWindow.ResizeObserver(scheduleResize)
 		: null;
-	resizeObserver?.observe(params.rootEl);
-	const scrollTarget: EventTarget = scrollContainerEl ?? ownerWindow!;
-	scrollTarget.addEventListener("scroll", onScroll, { passive: true });
+	const ownerToken = {};
+	let releaseScrollerOwner: (() => void) | null = null;
 	contentEl.addEventListener("click", handleSurfaceClick);
 	contentEl.addEventListener("keydown", handleSurfaceKeyDown);
+	try {
+		releaseScrollerOwner = claimTwoHopScroller(scrollTarget, ownerToken);
+		scrollTarget.addEventListener("scroll", onScroll, { passive: true });
+		resizeObserver?.observe(params.rootEl);
+		const resized = applyResize(now());
+		if (!resized) flush(now());
+		if (pendingShellCount > 0) scheduleRefill();
+	} catch (error) {
+		scrollTarget.removeEventListener("scroll", onScroll);
+		resizeObserver?.disconnect();
+		releaseScrollerOwner?.();
+		contentEl.removeEventListener("click", handleSurfaceClick);
+		contentEl.removeEventListener("keydown", handleSurfaceKeyDown);
+		previewHydrator?.dispose();
+		pool.dispose();
+		contentEl.remove();
+		shadowSurface.dispose();
+		throw error;
+	}
 
 	return {
 		shadowRoot: shadowSurface.shadowRoot,
@@ -699,12 +801,13 @@ export function createTwoHopViewportController(
 		dispose() {
 			if (disposed) return;
 			disposed = true;
-			if (frameHandle) cancelFrame(frameHandle);
-			if (refillFrameHandle) cancelFrame(refillFrameHandle);
-			if (resizeFrameHandle) cancelFrame(resizeFrameHandle);
-			resizeObserver?.disconnect();
-			previewHydrator?.dispose();
 			scrollTarget.removeEventListener("scroll", onScroll);
+			resizeObserver?.disconnect();
+			if (frameHandle) cancelFrame(frameHandle);
+			if (scrollIdleTimer) ownerWindow?.clearTimeout(scrollIdleTimer);
+			releaseScrollerOwner?.();
+			releaseScrollerOwner = null;
+			previewHydrator?.dispose();
 			contentEl.removeEventListener("click", handleSurfaceClick);
 			contentEl.removeEventListener("keydown", handleSurfaceKeyDown);
 			pool.dispose();

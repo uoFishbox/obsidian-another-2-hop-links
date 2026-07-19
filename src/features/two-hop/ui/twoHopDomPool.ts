@@ -1,5 +1,6 @@
+import { IS_PROD } from "appConstants";
 import type { CardRenderModel } from "ui/components/items/cardRenderModel";
-import { dispatchVirtualCellWillRebind } from "ui/interactions/virtualCellRebind";
+import { dispatchVirtualCellWillRebindFromRoot } from "ui/interactions/virtualCellRebind";
 
 export interface TwoHopCardShellSlot {
 	readonly slotIndex: number;
@@ -63,6 +64,7 @@ export function createTwoHopDomPool(params: {
 		row.dataset.cclRowSlot = String(rowSlotIndex);
 		row.style.position = "absolute";
 		row.style.inset = "0 auto auto 0";
+		row.style.top = "0";
 		row.style.visibility = "hidden";
 		const cells: TwoHopCardShellSlot[] = [];
 
@@ -139,17 +141,17 @@ export function createTwoHopDomPool(params: {
 		positionRow(slot, logicalRowIndex, top) {
 			slot.logicalRowIndex = logicalRowIndex;
 			const rowIndexText = String(logicalRowIndex);
-			slot.root.dataset.cclRowIndex = rowIndexText;
+			if (!IS_PROD) slot.root.dataset.cclRowIndex = rowIndexText;
 			for (const cell of slot.cells) {
 				cell.cell.dataset.cclRowIndex = rowIndexText;
 			}
-			slot.root.style.top = `${top}px`;
+			slot.root.style.transform = `translateY(${top}px)`;
 			slot.root.style.visibility = "visible";
 		},
 		hideRow(slot) {
 			for (const cell of slot.cells) {
 				if (cell.interactionStateReleased) continue;
-				dispatchVirtualCellWillRebind(cell.cell, {
+				dispatchVirtualCellWillRebindFromRoot(cell.cell, cell.root, {
 					previousLogicalKey: cell.logicalIdentity ?? "",
 					nextLogicalKey: "",
 				});

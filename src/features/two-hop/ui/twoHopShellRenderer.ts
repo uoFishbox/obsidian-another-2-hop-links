@@ -4,7 +4,7 @@ import {
 	INTERACTION_ID_ATTRIBUTE,
 	INTERACTION_KIND_ATTRIBUTE,
 } from "ui/interactions/interactionTypes";
-import { dispatchVirtualCellWillRebind } from "ui/interactions/virtualCellRebind";
+import { dispatchVirtualCellWillRebindFromRoot } from "ui/interactions/virtualCellRebind";
 import type { TwoHopCardShellSlot } from "features/two-hop/ui/twoHopDomPool";
 import type { TwoHopResolvedCell } from "features/two-hop/ui/viewport/twoHopGeometry";
 import {
@@ -34,6 +34,10 @@ export function createTwoHopShellRenderer(params: TwoHopShellRendererParams) {
 	let modelCache = new WeakMap<
 		Extract<TwoHopResolvedCell, { kind: "item" }>["item"],
 		CardRenderModel
+	>();
+	let highlightedTitleCache = new WeakMap<
+		Extract<TwoHopResolvedCell, { kind: "item" }>["item"],
+		string
 	>();
 	function renderSkeleton(
 		slot: TwoHopCardShellSlot,
@@ -173,7 +177,12 @@ export function createTwoHopShellRenderer(params: TwoHopShellRendererParams) {
 		}
 		const title = model?.title ?? cell.item.virtualKey;
 		if (model?.searchQuery) {
-			slot.title.innerHTML = highlightTextForSearch(title, model.searchQuery);
+			let highlightedTitle = highlightedTitleCache.get(cell.item);
+			if (highlightedTitle === undefined) {
+				highlightedTitle = highlightTextForSearch(title, model.searchQuery);
+				highlightedTitleCache.set(cell.item, highlightedTitle);
+			}
+			slot.title.innerHTML = highlightedTitle;
 		} else {
 			slot.title.textContent = title;
 		}
@@ -205,6 +214,7 @@ export function createTwoHopShellRenderer(params: TwoHopShellRendererParams) {
 		renderShell,
 		invalidateCardModels() {
 			modelCache = new WeakMap();
+			highlightedTitleCache = new WeakMap();
 			renderRevision += 1;
 		},
 	};
@@ -230,7 +240,7 @@ function prepareSlot(
 ): void {
 	const identityChanged = slot.logicalIdentity !== identity;
 	if (identityChanged && !slot.interactionStateReleased) {
-		dispatchVirtualCellWillRebind(slot.cell, {
+		dispatchVirtualCellWillRebindFromRoot(slot.cell, slot.root, {
 			previousLogicalKey: slot.logicalIdentity ?? "",
 			nextLogicalKey: identity ?? "",
 		});

@@ -39,4 +39,27 @@ describe("twoHopFrameBudget", () => {
 		tracker.consumeBinds(3);
 		expect(tracker.canBind(101)).toBe(false);
 	});
+
+	it("shares the bind budget between callbacks with the same frame timestamp", () => {
+		const tracker = createTwoHopFrameBudgetTracker({
+			maxShellBindsPerFrame: 2,
+			budgetRatio: 1,
+			minimumBudgetMs: 10,
+			maximumBudgetMs: 10,
+		});
+		tracker.beginFrame(100);
+		tracker.consumeBinds(2);
+
+		tracker.beginFrame(100);
+
+		expect(tracker.canBind(101)).toBe(false);
+	});
+
+	it("initializes a frame whose timestamp is zero", () => {
+		const tracker = createTwoHopFrameBudgetTracker();
+
+		tracker.beginFrame(0);
+
+		expect(tracker.canBind(0)).toBe(true);
+	});
 });

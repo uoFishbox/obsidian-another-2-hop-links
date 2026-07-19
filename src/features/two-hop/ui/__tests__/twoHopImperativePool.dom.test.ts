@@ -65,8 +65,8 @@ describe("twoHop imperative DOM pool", () => {
 
 		expect(pool.rows.map((row) => row.root)).toEqual(initialRows);
 		expect(content.querySelectorAll(".twohop-card-shell")).toHaveLength(6);
-		expect(pool.rows[0].root.style.top).toBe("2200px");
-		expect(pool.rows[0].root.style.transform).toBe("");
+		expect(pool.rows[0].root.style.top).toBe("0px");
+		expect(pool.rows[0].root.style.transform).toBe("translateY(2200px)");
 		expect(pool.rows[0].root.dataset.cclRowIndex).toBe("20");
 		expect(pool.rows[0].cells[0].cell.dataset.cclRowIndex).toBe("20");
 		expect(pool.rows[0].cells[0].cell.dataset.cclColumnIndex).toBe("0");
@@ -180,7 +180,7 @@ describe("twoHop imperative DOM pool", () => {
 		expect(row.root.style.visibility).toBe("hidden");
 	});
 
-	it("avoids repeated subtree scans for cells that are already released", () => {
+	it("avoids subtree scans while releasing two-hop cells", () => {
 		const { snapshot, geometry } = createFixture();
 		const content = document.createElement("div");
 		const pool = createTwoHopDomPool({ content, rowCapacity: 1, columns: 2 });
@@ -204,7 +204,7 @@ describe("twoHop imperative DOM pool", () => {
 		renderer.renderShell(row.cells[0], item, snapshot);
 		renderer.renderShell(row.cells[1], header, snapshot);
 
-		expect(subtreeQueries.map((query) => query.mock.calls.length)).toEqual([1, 1]);
+		expect(subtreeQueries.map((query) => query.mock.calls.length)).toEqual([0, 0]);
 	});
 
 	it("renders a cheap skeleton before resolving a rich card model", () => {

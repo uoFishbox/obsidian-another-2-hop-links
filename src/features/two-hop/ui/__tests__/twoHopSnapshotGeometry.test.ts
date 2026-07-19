@@ -1,7 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
 import {
 	createTwoHopGeometry,
+	createTwoHopResolvedCellBuffer,
+	createTwoHopResolvedRowBuffer,
 	resolveTwoHopCell,
+	resolveTwoHopCellInRowInto,
+	resolveTwoHopRowInto,
 	resolveTwoHopRowTop,
 	resolveTwoHopVisibleRows,
 	resolveTwoHopVisibleRowsInto,
@@ -167,5 +171,21 @@ describe("twoHopSnapshot geometry", () => {
 			kind: "header",
 			sectionIndex: 1,
 		});
+		const row = createTwoHopResolvedRowBuffer();
+		const cell = createTwoHopResolvedCellBuffer();
+		expect(resolveTwoHopRowInto(geometry, 2, row)).toBe(true);
+		expect(row).toEqual({
+			sectionIndex: 1,
+			rowIndex: 2,
+			rowInSection: 0,
+			top: 230,
+		});
+		expect(resolveTwoHopCellInRowInto(snapshot, geometry, row, 1, cell)).toMatchObject(
+			{
+				kind: "item",
+				sectionIndex: 1,
+				itemIndex: 0,
+			},
+		);
 	});
 });

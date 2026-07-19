@@ -193,6 +193,65 @@ describe("twoHopViewportController", () => {
 		scroller.remove();
 	});
 
+	it("rejects a second mounted controller and releases ownership on dispose", () => {
+		const scroller = document.createElement("div");
+		scroller.style.overflow = "auto";
+		Object.defineProperty(scroller, "clientHeight", { value: 300 });
+		Object.defineProperty(scroller, "scrollHeight", { value: 20000 });
+		Object.defineProperty(scroller, "scrollTop", { value: 0, writable: true });
+		const firstRoot = document.createElement("div");
+		const secondRoot = document.createElement("div");
+		const firstShadowHost = document.createElement("div");
+		const secondShadowHost = document.createElement("div");
+		firstRoot.append(firstShadowHost);
+		secondRoot.append(secondShadowHost);
+		scroller.append(firstRoot, secondRoot);
+		document.body.append(scroller);
+		setRect(scroller, 0, 420, 300);
+		setRect(firstRoot, 0, 420, 200);
+		setRect(secondRoot, 0, 420, 200);
+		const firstFrames = vi.fn(() => 1);
+		const secondFrames = vi.fn(() => 1);
+		const commonParams = {
+			sections: [createSection("section", 1)],
+			initialVisibleCount: 1,
+			resolveItemTitle,
+			getItemInteractionDescriptor: () => null,
+			cancelAnimationFrame: () => {},
+			now: () => 10,
+		};
+		const firstController = createTwoHopViewportController({
+			...commonParams,
+			rootEl: firstRoot,
+			shadowHostEl: firstShadowHost,
+			requestAnimationFrame: firstFrames,
+		});
+		expect(() =>
+			createTwoHopViewportController({
+				...commonParams,
+				rootEl: secondRoot,
+				shadowHostEl: secondShadowHost,
+				requestAnimationFrame: secondFrames,
+			}),
+		).toThrow("Only one two-hop virtual list is allowed per scroller.");
+		firstController.dispose();
+		const secondController = createTwoHopViewportController({
+			...commonParams,
+			rootEl: secondRoot,
+			shadowHostEl: secondShadowHost,
+			requestAnimationFrame: secondFrames,
+		});
+		firstFrames.mockClear();
+		secondFrames.mockClear();
+
+		scroller.dispatchEvent(new Event("scroll"));
+
+		expect(firstFrames).not.toHaveBeenCalled();
+		expect(secondFrames).toHaveBeenCalledTimes(1);
+		secondController.dispose();
+		scroller.remove();
+	});
+
 	it("flushes when resize updates scroll geometry without changing layout", () => {
 		const scroller = document.createElement("div");
 		scroller.style.overflow = "auto";
@@ -299,6 +358,62 @@ describe("twoHopViewportController", () => {
 		expect(afterJump.shellBinds - beforeJump.shellBinds).toBeLessThanOrEqual(16);
 		expect(afterJump.skeletonBinds).toBeGreaterThan(beforeJump.skeletonBinds);
 		expect(afterJump.poolRows).toBe(beforeJump.poolRows);
+		controller.dispose();
+		scroller.remove();
+	});
+
+	it("runs pending scroll work before refill work in the single frame loop", () => {
+		const scroller = document.createElement("div");
+		scroller.style.overflow = "auto";
+		Object.defineProperty(scroller, "clientHeight", { value: 300 });
+		Object.defineProperty(scroller, "scrollHeight", { value: 20000 });
+		Object.defineProperty(scroller, "scrollTop", { value: 0, writable: true });
+		const rootEl = document.createElement("div");
+		const shadowHostEl = document.createElement("div");
+		rootEl.append(shadowHostEl);
+		scroller.append(rootEl);
+		document.body.append(scroller);
+		setRect(scroller, 0, 420, 300);
+		vi.spyOn(rootEl, "getBoundingClientRect").mockImplementation(() => ({
+			x: 0,
+			y: -scroller.scrollTop,
+			top: -scroller.scrollTop,
+			left: 0,
+			right: 420,
+			bottom: 20000 - scroller.scrollTop,
+			width: 420,
+			height: 20000,
+			toJSON: () => ({}),
+		}));
+		const queuedFrames: FrameRequestCallback[] = [];
+		const controller = createTwoHopViewportController({
+			rootEl,
+			shadowHostEl,
+			sections: [createSection("section", 1000)],
+			initialVisibleCount: 1000,
+			resolveItemTitle,
+			getItemInteractionDescriptor: () => null,
+			requestAnimationFrame: (callback) => {
+				queuedFrames.push(callback);
+				return queuedFrames.length;
+			},
+			cancelAnimationFrame: () => {},
+			now: () => 100,
+		});
+		const beforeScroll = controller.getStats();
+		expect(queuedFrames).toHaveLength(1);
+		scroller.scrollTop = 10000;
+
+		scroller.dispatchEvent(new Event("scroll"));
+
+		expect(queuedFrames).toHaveLength(1);
+		queuedFrames[0](104.2);
+		const afterScroll = controller.getStats();
+		expect(afterScroll.distantJumps).toBe(beforeScroll.distantJumps + 1);
+		expect(afterScroll.shellBinds - beforeScroll.shellBinds).toBeLessThanOrEqual(
+			16,
+		);
+		expect(queuedFrames).toHaveLength(1);
 		controller.dispose();
 		scroller.remove();
 	});
@@ -441,7 +556,7 @@ describe("twoHopViewportController", () => {
 		expect(secondGetItem).not.toHaveBeenCalled();
 		expect(secondCallsAfter).toBe(secondCallsBefore);
 		expect(secondHeaderRowAfter?.dataset.cclRowIndex).toBe("3");
-		expect(secondHeaderRowAfter?.style.top).toBe("340px");
+		expect(secondHeaderRowAfter?.style.transform).toBe("translateY(340px)");
 		controller.dispose();
 		scroller.remove();
 	});

@@ -77,11 +77,19 @@ describe("TwoHopSurface", () => {
 	);
 
 	it.each([1, 8, 32])(
-		"keeps %i simultaneous surfaces independently bounded",
+		"keeps %i surfaces on separate scrollers independently bounded",
 		(count) => {
 			const roots: HTMLElement[] = [];
+			const scrollers: HTMLElement[] = [];
 			for (let index = 0; index < count; index += 1) {
-				const { container } = render(TwoHopSurface, {
+				const scroller = document.createElement("div");
+				scroller.style.overflow = "auto";
+				Object.defineProperty(scroller, "clientHeight", { value: 300 });
+				Object.defineProperty(scroller, "scrollHeight", { value: 10_000 });
+				document.body.append(scroller);
+				scrollers.push(scroller);
+				render(TwoHopSurface, {
+				target: scroller,
 					props: {
 						sections: [createSection(100)],
 						applicationStore,
@@ -89,7 +97,7 @@ describe("TwoHopSurface", () => {
 						getItemInteractionDescriptor: () => null,
 					},
 				});
-				const root = container.querySelector<HTMLElement>(
+				const root = scroller.querySelector<HTMLElement>(
 					".twohop-imperative-surface",
 				);
 				if (root) roots.push(root);
@@ -102,6 +110,7 @@ describe("TwoHopSurface", () => {
 						.length,
 				).toBeLessThan(100);
 			}
+			for (const scroller of scrollers) scroller.remove();
 		},
 	);
 });

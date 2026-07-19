@@ -46,7 +46,7 @@ Vault全体のベンチマークは、インデックス作成レイヤーやE2E
 - previewの非同期commit前にslot generationとpreview identityを検証する。
 - scroll-opportunistic previewはcritical workがなく、速度とactivation間隔の両方が許可する場合に1件だけ開始する。
 
-契約テストは `twohop/__tests__/TwoHopSurface.svelte.dom.test.ts`、`twoHopViewportController.dom.test.ts`、`twoHopPreviewHydrator.dom.test.ts` に置く。これらは`100`/`1,000`/`10,000` cards、`1`/`8`/`32` surfaces、`300` resident frames、distant jump bind上限、generation mismatch、opportunistic intervalを呼び出し回数と固定DOM数で検証する。
+契約テストは `twohop/__tests__/TwoHopSurface.svelte.dom.test.ts`、`twoHopViewportController.dom.test.ts`、`twoHopPreviewHydrator.dom.test.ts` に置く。これらは`100`/`1,000`/`10,000` cards、別scroller上の`1`/`8`/`32` surfaces、同一scrollerへのtwo-hop surface mount数が最大1という制約、`300` resident frames、distant jump bind上限、generation mismatch、opportunistic intervalを呼び出し回数と固定DOM数で検証する。
 
 ## キャッシュ一覧（Cache Inventory）
 

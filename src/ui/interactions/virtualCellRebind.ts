@@ -64,3 +64,39 @@ export function dispatchVirtualCellWillRebind(
 		dispatchRebindEvent(element, detail);
 	}
 }
+
+/** Announces a rebind when the interaction state is stored on a known root. */
+export function dispatchVirtualCellWillRebindFromRoot(
+	element: HTMLElement,
+	interactionRoot: HTMLElement,
+	detail: VirtualCellWillRebindDetail,
+): void {
+	const activeElement = element.ownerDocument.activeElement;
+	const hasFocusedDescendant = Boolean(
+		activeElement &&
+		"blur" in activeElement &&
+		typeof activeElement.blur === "function" &&
+		element.contains(activeElement),
+	);
+	const hasTransientInteraction =
+		interactionRoot.dataset.cclHovered === "true" ||
+		interactionRoot.dataset.cclLongPressed === "1" ||
+		interactionRoot.dataset.cclLastTouchAt !== undefined;
+
+	if (!hasFocusedDescendant && !hasTransientInteraction) return;
+
+	if (
+		hasFocusedDescendant &&
+		activeElement &&
+		"blur" in activeElement &&
+		typeof activeElement.blur === "function"
+	) {
+		activeElement.blur();
+	}
+	if (!hasTransientInteraction) return;
+
+	delete interactionRoot.dataset.cclHovered;
+	delete interactionRoot.dataset.cclLongPressed;
+	delete interactionRoot.dataset.cclLastTouchAt;
+	dispatchRebindEvent(element, detail);
+}

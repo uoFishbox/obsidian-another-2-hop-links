@@ -56,6 +56,13 @@ export interface TwoHopResolvedCellBuffer {
 	shellTitle: string;
 }
 
+export interface TwoHopResolvedRowBuffer {
+	sectionIndex: number;
+	rowIndex: number;
+	rowInSection: number;
+	top: number;
+}
+
 export function createTwoHopResolvedCellBuffer(): TwoHopResolvedCellBuffer {
 	return {
 		kind: "header",
@@ -66,6 +73,15 @@ export function createTwoHopResolvedCellBuffer(): TwoHopResolvedCellBuffer {
 		itemIndex: -1,
 		item: null,
 		shellTitle: "",
+	};
+}
+
+export function createTwoHopResolvedRowBuffer(): TwoHopResolvedRowBuffer {
+	return {
+		sectionIndex: -1,
+		rowIndex: -1,
+		rowInSection: -1,
+		top: 0,
 	};
 }
 
@@ -153,8 +169,67 @@ export function resolveTwoHopCellInto(
 
 	const sectionIndex = resolveSectionIndexForRow(geometry, rowIndex);
 	if (sectionIndex < 0) return null;
-	const section = snapshot.sections[sectionIndex];
 	const rowInSection = rowIndex - geometry.firstRowBySection[sectionIndex];
+	return resolveTwoHopCellForSectionInto(
+		snapshot,
+		geometry,
+		sectionIndex,
+		rowIndex,
+		rowInSection,
+		columnIndex,
+		target,
+	);
+}
+
+/** Resolves row geometry once for positioning and all column binds. */
+export function resolveTwoHopRowInto(
+	geometry: TwoHopGeometry,
+	rowIndex: number,
+	target: TwoHopResolvedRowBuffer,
+): boolean {
+	if (rowIndex < 0 || rowIndex >= geometry.rowCount) return false;
+	const sectionIndex = resolveSectionIndexForRow(geometry, rowIndex);
+	if (sectionIndex < 0) return false;
+	const rowInSection = rowIndex - geometry.firstRowBySection[sectionIndex];
+	target.sectionIndex = sectionIndex;
+	target.rowIndex = rowIndex;
+	target.rowInSection = rowInSection;
+	target.top =
+		geometry.topBySection[sectionIndex] + rowInSection * geometry.rowStride;
+	return true;
+}
+
+/** Resolves a cell from caller-owned row geometry without another section search. */
+export function resolveTwoHopCellInRowInto(
+	snapshot: TwoHopSnapshot,
+	geometry: TwoHopGeometry,
+	row: TwoHopResolvedRowBuffer,
+	columnIndex: number,
+	target: TwoHopResolvedCellBuffer,
+): TwoHopResolvedCell | null {
+	if (columnIndex < 0 || columnIndex >= geometry.columns) return null;
+	return resolveTwoHopCellForSectionInto(
+		snapshot,
+		geometry,
+		row.sectionIndex,
+		row.rowIndex,
+		row.rowInSection,
+		columnIndex,
+		target,
+	);
+}
+
+function resolveTwoHopCellForSectionInto(
+	snapshot: TwoHopSnapshot,
+	geometry: TwoHopGeometry,
+	sectionIndex: number,
+	rowIndex: number,
+	rowInSection: number,
+	columnIndex: number,
+	target: TwoHopResolvedCellBuffer,
+): TwoHopResolvedCell | null {
+	const section = snapshot.sections[sectionIndex];
+	if (!section) return null;
 	const cellIndex = rowInSection * geometry.columns + columnIndex;
 
 	if (cellIndex === 0) {

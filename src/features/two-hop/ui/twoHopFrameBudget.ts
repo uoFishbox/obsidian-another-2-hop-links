@@ -33,12 +33,13 @@ export function createTwoHopFrameBudgetTracker(
 	const orderedSamples = new Float64Array(SAMPLE_CAPACITY);
 	let sampleCount = 0;
 	let nextSampleIndex = 0;
-	let lastFrameTimestamp = 0;
+	let lastFrameTimestamp = Number.NaN;
 	let estimatedFrameIntervalMs = DEFAULT_FRAME_INTERVAL_MS;
 	let deadline = 0;
 	let remainingBinds = 0;
 
 	function beginFrame(timestamp: number): void {
+		if (timestamp === lastFrameTimestamp) return;
 		if (lastFrameTimestamp > 0) {
 			const interval = timestamp - lastFrameTimestamp;
 			if (interval > 0 && interval < 100) {
