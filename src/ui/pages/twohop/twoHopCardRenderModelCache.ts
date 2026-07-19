@@ -1,7 +1,6 @@
 import type { SearchWorkerMatchedItem } from "features/search/searchWorkerTypes";
 import type { LinkUtilitiesContext } from "types/linkContext";
 import type { PluginSettings } from "types/settings";
-import type { ApplicationStore } from "ui/stores/ApplicationStore.svelte";
 import {
 	createCardRenderModel,
 	type CardRenderModel,
@@ -19,7 +18,7 @@ export interface TwoHopCardModelRevision {
 	readonly searchScope: "title-only" | "title-and-content";
 	readonly matchedItemByKey: Map<string, SearchWorkerMatchedItem> | null;
 	readonly linkContext: LinkUtilitiesContext;
-	readonly applicationStore: ApplicationStore;
+	readonly getPreviewRenderVersion: (path: string) => string;
 	readonly applicationUpdateVersion: number;
 	readonly previewGlobalVersion: number;
 	readonly previewPathVersions: Readonly<Record<string, number>>;
@@ -65,8 +64,7 @@ export function createTwoHopCardRenderModelCache(): TwoHopCardRenderModelCache {
 				item: row.item,
 				settings: revision.settings,
 				context: revision.linkContext,
-				getPreviewRenderVersion: (path) =>
-					revision.applicationStore.getPreviewRenderVersion(path),
+				getPreviewRenderVersion: revision.getPreviewRenderVersion,
 				searchQuery: revision.searchQuery,
 				searchScope: resolveTwoHopPageItemSearchScope(
 					row,

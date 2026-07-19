@@ -63,6 +63,10 @@ describe("twoHop imperative DOM pool", () => {
 		expect(content.querySelectorAll(".twohop-card-shell")).toHaveLength(6);
 		expect(pool.rows[0].root.style.top).toBe("2200px");
 		expect(pool.rows[0].root.style.transform).toBe("");
+		expect(pool.rows[0].root.dataset.cclRowIndex).toBe("20");
+		expect(pool.rows[0].cells[0].cell.dataset.cclRowIndex).toBe("20");
+		expect(pool.rows[0].cells[0].cell.dataset.cclColumnIndex).toBe("0");
+		expect(pool.rows[0].cells[1].cell.dataset.cclColumnIndex).toBe("1");
 	});
 
 	it("lets hidden pool rows hide cells after rendering and reuse", () => {

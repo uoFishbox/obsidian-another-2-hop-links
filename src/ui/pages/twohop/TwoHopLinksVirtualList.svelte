@@ -67,6 +67,9 @@
 	}
 	const linkContext = resolveLinkContext();
 	const cardModelCache = createTwoHopCardRenderModelCache();
+	function getPreviewRenderVersion(path: string): string {
+		return applicationStore.getPreviewRenderVersion(path);
+	}
 	const cardModelRevision = $derived.by((): TwoHopCardModelRevision | undefined =>
 		linkContext
 			? {
@@ -75,7 +78,7 @@
 					searchScope,
 					matchedItemByKey,
 					linkContext,
-					applicationStore,
+					getPreviewRenderVersion,
 					applicationUpdateVersion: applicationStore.updateVersion,
 					previewGlobalVersion: applicationStore.previewGlobalVersion,
 					previewPathVersions: applicationStore.previewPathVersions,

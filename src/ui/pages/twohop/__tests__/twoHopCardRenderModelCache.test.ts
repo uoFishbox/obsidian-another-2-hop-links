@@ -7,7 +7,6 @@ import {
 import { createMockTFile } from "testing/__mocks__/testHelpers";
 import type { LinkUtilitiesContext } from "types/linkContext";
 import { DEFAULT_SETTINGS } from "types/settings";
-import type { ApplicationStore } from "ui/stores/ApplicationStore.svelte";
 import {
 	createTwoHopCardRenderModelCache,
 	type TwoHopCardModelRevision,
@@ -32,16 +31,14 @@ describe("createTwoHopCardRenderModelCache", () => {
 			sourceFile,
 			getMetadata,
 		};
-		const applicationStore = {
-			getPreviewRenderVersion: vi.fn(() => "0:0"),
-		} as unknown as ApplicationStore;
+		const getPreviewRenderVersion = vi.fn(() => "0:0");
 		const revision: TwoHopCardModelRevision = {
 			settings: DEFAULT_SETTINGS,
 			searchQuery: "",
 			searchScope: "title-and-content",
 			matchedItemByKey: null,
 			linkContext: context,
-			applicationStore,
+			getPreviewRenderVersion,
 			applicationUpdateVersion: 0,
 			previewGlobalVersion: 0,
 			previewPathVersions: {},

@@ -300,10 +300,12 @@ export function createTwoHopViewportController(
 	function onScroll(): void {
 		lastScrollEventAt = now();
 		if (frameHandle) return;
-		frameHandle = requestFrame((timestamp) => {
-			frameHandle = 0;
-			flush(timestamp);
-		});
+		frameHandle = requestFrame(handleScrollFrame);
+	}
+
+	function handleScrollFrame(timestamp: number): void {
+		frameHandle = 0;
+		flush(timestamp);
 	}
 
 	function flush(timestamp = now()): void {
@@ -443,10 +445,12 @@ export function createTwoHopViewportController(
 
 	function scheduleRefill(): void {
 		if (refillFrameHandle || disposed) return;
-		refillFrameHandle = requestFrame((timestamp) => {
-			refillFrameHandle = 0;
-			refill(timestamp);
-		});
+		refillFrameHandle = requestFrame(handleRefillFrame);
+	}
+
+	function handleRefillFrame(timestamp: number): void {
+		refillFrameHandle = 0;
+		refill(timestamp);
 	}
 
 	function refill(timestamp: number): void {
@@ -591,37 +595,38 @@ export function createTwoHopViewportController(
 
 	function scheduleResize(): void {
 		if (resizeFrameHandle || disposed) return;
-		resizeFrameHandle = requestFrame(() => {
-			resizeFrameHandle = 0;
-			if (now() - lastScrollEventAt < SCROLL_IDLE_DELAY_MS) {
-				scheduleResize();
-				return;
-			}
-			refreshScrollGeometry();
-			const nextLayout = measureLayout();
-			const layoutUnchanged =
-				nextLayout.columns === layout.columns &&
-				nextLayout.rowHeight === layout.rowHeight &&
-				nextLayout.gap === layout.gap &&
-				nextLayout.sectionMarginBottom === layout.sectionMarginBottom;
-			const requiresLargerPool =
-				resolveRequiredPoolRows(nextLayout) > pool.capacity;
-			if (layoutUnchanged && !requiresLargerPool) {
-				return;
-			}
-			layout = nextLayout;
-			geometry = createTwoHopGeometry(snapshot, layout);
-			previewHydrator?.dispose();
-			pool.dispose();
-			pool = createPool();
-			cellBuffers = createCellBuffers();
-			previewHydrator = createPreviewHydrator();
-			applyLayoutStyles();
-			pool.setContentHeight(geometry.totalHeight);
-			residentStart = -1;
-			residentEnd = -1;
-			flush(now());
-		});
+		resizeFrameHandle = requestFrame(handleResizeFrame);
+	}
+
+	function handleResizeFrame(): void {
+		resizeFrameHandle = 0;
+		if (now() - lastScrollEventAt < SCROLL_IDLE_DELAY_MS) {
+			scheduleResize();
+			return;
+		}
+		refreshScrollGeometry();
+		const nextLayout = measureLayout();
+		const layoutUnchanged =
+			nextLayout.columns === layout.columns &&
+			nextLayout.rowHeight === layout.rowHeight &&
+			nextLayout.gap === layout.gap &&
+			nextLayout.sectionMarginBottom === layout.sectionMarginBottom;
+		const requiresLargerPool = resolveRequiredPoolRows(nextLayout) > pool.capacity;
+		if (layoutUnchanged && !requiresLargerPool) {
+			return;
+		}
+		layout = nextLayout;
+		geometry = createTwoHopGeometry(snapshot, layout);
+		previewHydrator?.dispose();
+		pool.dispose();
+		pool = createPool();
+		cellBuffers = createCellBuffers();
+		previewHydrator = createPreviewHydrator();
+		applyLayoutStyles();
+		pool.setContentHeight(geometry.totalHeight);
+		residentStart = -1;
+		residentEnd = -1;
+		flush(now());
 	}
 
 	const resizeObserver = ownerWindow?.ResizeObserver

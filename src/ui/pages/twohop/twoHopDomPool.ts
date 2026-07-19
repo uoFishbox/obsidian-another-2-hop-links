@@ -69,6 +69,7 @@ export function createTwoHopDomPool(params: {
 			cell.className = "view-plan-virtual-list-cell view-plan-flow-cell";
 			cell.dataset.slot = String(nextCellSlotIndex);
 			cell.dataset.cclCellSlot = String(nextCellSlotIndex);
+			cell.dataset.cclColumnIndex = String(columnIndex);
 			const root = ownerDocument.createElement("div");
 			root.className = "cosense-card-links__box twohop-card-shell is-skeleton";
 			root.setAttribute("role", "button");
@@ -134,10 +135,10 @@ export function createTwoHopDomPool(params: {
 		},
 		positionRow(slot, logicalRowIndex, top) {
 			slot.logicalRowIndex = logicalRowIndex;
-			slot.root.dataset.cclRowIndex = String(logicalRowIndex);
+			const rowIndexText = String(logicalRowIndex);
+			slot.root.dataset.cclRowIndex = rowIndexText;
 			for (const cell of slot.cells) {
-				cell.cell.dataset.cclRowIndex = String(logicalRowIndex);
-				cell.cell.dataset.cclColumnIndex = String(cell.logicalColumnIndex);
+				cell.cell.dataset.cclRowIndex = rowIndexText;
 			}
 			slot.root.style.top = `${top}px`;
 			slot.root.style.visibility = "visible";

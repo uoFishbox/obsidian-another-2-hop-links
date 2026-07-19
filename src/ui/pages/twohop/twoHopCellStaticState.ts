@@ -51,28 +51,28 @@ export function resolveTwoHopItemStaticState(
 ): TwoHopCellStaticState {
 	const sectionVariant = resolveTwoHopSectionVariant(section);
 	const extension = resolveItemExtension(row.item);
-	const presentation = (
-		resolution: TwoHopCardPresentationState["resolution"],
-	): TwoHopCardPresentationState => ({
-		sectionVariant,
-		resolution,
-		attachment: isAttachment(extension ?? undefined),
-		extension,
-	});
 	const interactionId = row.interactionId ?? createItemInteractionKey(row.item);
 
 	switch (row.item.type) {
 		case "newLink":
 			return {
 				reuseFamily: "new-link",
-				presentation: presentation("missing"),
+				presentation: createPresentationState(
+					sectionVariant,
+					extension,
+					"missing",
+				),
 				interactionId,
 			};
 		case "branch": {
 			const missing = row.item.data.hop1.isUnresolved;
 			return {
 				reuseFamily: missing ? "missing-branch" : "resolved-card",
-				presentation: presentation(missing ? "missing" : "resolved"),
+				presentation: createPresentationState(
+					sectionVariant,
+					extension,
+					missing ? "missing" : "resolved",
+				),
 				interactionId,
 			};
 		}
@@ -81,7 +81,11 @@ export function resolveTwoHopItemStaticState(
 		case "backlink":
 			return {
 				reuseFamily: "resolved-card",
-				presentation: presentation("resolved"),
+				presentation: createPresentationState(
+					sectionVariant,
+					extension,
+					"resolved",
+				),
 				interactionId,
 			};
 		default:
@@ -93,6 +97,19 @@ export function resolveTwoHopItemStaticState(
 	}
 }
 
+function createPresentationState(
+	sectionVariant: TwoHopCardSectionVariant,
+	extension: string | null,
+	resolution: TwoHopCardPresentationState["resolution"],
+): TwoHopCardPresentationState {
+	return {
+		sectionVariant,
+		resolution,
+		attachment: isAttachment(extension ?? undefined),
+		extension,
+	};
+}
+
 function normalizeExtension(extension: string | undefined): string | null {
 	if (!extension || extension.toLowerCase() === "md") return null;
 	return extension.toLowerCase();
@@ -100,11 +117,11 @@ function normalizeExtension(extension: string | undefined): string | null {
 
 function resolvePathExtension(path: string | undefined): string | null {
 	if (!path) return null;
-	const fileName = path.split("/").at(-1) ?? "";
-	const extensionIndex = fileName.lastIndexOf(".");
-	return normalizeExtension(
-		extensionIndex > 0 ? fileName.slice(extensionIndex + 1) : undefined,
-	);
+	const separatorIndex = path.lastIndexOf("/");
+	const fileNameStart = separatorIndex < 0 ? 0 : separatorIndex + 1;
+	const extensionIndex = path.lastIndexOf(".");
+	if (extensionIndex <= fileNameStart) return null;
+	return normalizeExtension(path.slice(extensionIndex + 1));
 }
 
 function resolveItemExtension(item: TwoHopVirtualListItem["item"]): string | null {
