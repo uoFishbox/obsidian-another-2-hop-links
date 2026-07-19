@@ -10,6 +10,17 @@ import type { TwoHopVirtualSectionDescriptor } from "features/two-hop/ui/twoHopV
 import type { TwoHopVirtualListItem } from "features/two-hop/ui/twoHopVirtualListModel";
 import type { TFile } from "obsidian";
 import { VIRTUAL_CELL_WILL_REBIND_EVENT } from "ui/interactions/virtualCellRebind";
+import type { TwoHopCardShellSlot } from "features/two-hop/ui/twoHopDomPool";
+
+function installPreview(
+	slot: TwoHopCardShellSlot,
+	content: Node,
+	dispose: (() => void) | null,
+): void {
+	const token = slot.beginEnrichment("test-preview");
+	token.setDispose(dispose);
+	expect(slot.commitEnrichment(token, content)).toBe(true);
+}
 
 function createFixture() {
 	const item = {
@@ -90,6 +101,7 @@ describe("twoHop imperative DOM pool", () => {
 
 		expect(row.root.style.visibility).toBe("hidden");
 		expect(slot.cell.style.visibility).toBe("");
+		expect(slot.logicalIdentity).toBe(cell.logicalKey);
 	});
 
 	it("releases transient interaction state before rebinding a physical cell", () => {
@@ -295,9 +307,7 @@ describe("twoHop imperative DOM pool", () => {
 		renderer.renderShell(slot, cell, snapshot);
 		const disposePreview = vi.fn();
 		const generation = slot.generation;
-		slot.previewStatus = "ready";
-		slot.disposePreview = disposePreview;
-		slot.previewHost.append(document.createElement("strong"));
+		installPreview(slot, document.createElement("strong"), disposePreview);
 
 		renderer.invalidateCardModels();
 		renderer.renderShell(slot, cell, snapshot);
@@ -307,6 +317,51 @@ describe("twoHop imperative DOM pool", () => {
 		expect(slot.generation).toBe(generation + 1);
 		expect(slot.previewStatus).toBe("empty");
 		expect(slot.previewHost.childElementCount).toBe(1);
+	});
+
+	it("retains the preview across temporary row hiding", () => {
+		const { snapshot, geometry } = createFixture();
+		const content = document.createElement("div");
+		const pool = createTwoHopDomPool({ content, rowCapacity: 1, columns: 2 });
+		const resolveItemCardModel = vi.fn(() => ({
+			item: snapshot.sections[0].visibleItems[0].item,
+			targetFile: {
+				path: "notes/missing.md",
+				extension: "md",
+			} as TFile,
+			title: "Resolved title",
+			ariaLabel: "Open Resolved title",
+			className: null,
+			extension: null,
+			directory: null,
+			interactionId: "item:missing",
+			interactionKey: "item:missing",
+			presentation: undefined,
+			searchQuery: "",
+			searchScope: "title-only" as const,
+			contentPreview: undefined,
+			previewRefreshToken: 0,
+			previewActivationIdentity: "preview:notes/missing.md",
+		}));
+		const renderer = createTwoHopShellRenderer({ resolveItemCardModel });
+		const cell = resolveTwoHopCell(snapshot, geometry, 0, 1);
+		if (!cell) throw new Error("expected item cell");
+		const row = pool.rows[0];
+		const slot = row.cells[1];
+		pool.positionRow(row, 0, 0);
+		renderer.renderShell(slot, cell, snapshot);
+		const disposePreview = vi.fn();
+		const preview = document.createElement("strong");
+		installPreview(slot, preview, disposePreview);
+
+		pool.hideRow(row);
+		pool.positionRow(row, 0, 0);
+		renderer.invalidateCardModels();
+		renderer.renderShell(slot, cell, snapshot);
+
+		expect(slot.previewHost.firstChild).toBe(preview);
+		expect(disposePreview).not.toHaveBeenCalled();
+		expect(slot.logicalIdentity).toBe(cell.logicalKey);
 	});
 
 	it("discards a retained preview when its activation identity changes", () => {
@@ -341,9 +396,7 @@ describe("twoHop imperative DOM pool", () => {
 		renderer.renderShell(slot, cell, snapshot);
 		const disposePreview = vi.fn();
 		const generation = slot.generation;
-		slot.previewStatus = "ready";
-		slot.disposePreview = disposePreview;
-		slot.previewHost.append(document.createElement("strong"));
+		installPreview(slot, document.createElement("strong"), disposePreview);
 
 		previewActivationIdentity = "preview:notes/missing.md:query-b";
 		renderer.invalidateCardModels();
@@ -364,11 +417,17 @@ describe("twoHop imperative DOM pool", () => {
 		const header = resolveTwoHopCell(snapshot, geometry, 0, 0);
 		if (!header) throw new Error("expected header cell");
 
-		renderer.renderShell(pool.rows[0].cells[0], header, snapshot);
-
 		const slot = pool.rows[0].cells[0];
+		renderer.renderShell(slot, header, snapshot);
+		pool.hideRow(pool.rows[0]);
+		pool.positionRow(pool.rows[0], 0, 0);
+		renderer.renderShell(slot, header, snapshot);
+
 		expect(slot.title.textContent).toBe("New links");
 		expect(slot.meta.textContent).toBe("");
+		expect(slot.titleWrapper.className).toBe("cosense-card-links__title-container");
+		expect(slot.meta.style.display).toBe("none");
+		expect(slot.headerIcon.style.display).toBe("");
 		expect(slot.headerIcon.dataset.cclIconName).toBe("Unlink");
 		expect(
 			slot.headerIcon.querySelectorAll("path, circle, rect, line").length,

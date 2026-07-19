@@ -8,6 +8,7 @@ import { processPreviewContent } from "features/preview/renderers/markdownPrevie
 import { toPreviewImageSrc } from "features/preview/renderers/externalImageSource";
 import { highlightSearchMatchesInHtml } from "features/preview/text-processing/searchHighlighter";
 import type { CardRenderModel } from "ui/components/items/cardRenderModel";
+import type { EnrichmentToken } from "features/two-hop/ui/recyclableCellSlot";
 import {
 	createEnrichmentScheduler,
 	type EnrichmentRunContext,
@@ -65,6 +66,11 @@ interface TwoHopPreviewCandidate {
 	readonly opportunistic: boolean;
 }
 
+interface RenderedPreview {
+	readonly content: Node;
+	readonly dispose: (() => void) | null;
+}
+
 /** Adapts resident two-hop card slots to the shared enrichment scheduler. */
 export function createTwoHopPreviewHydrator(
 	params: CreateTwoHopPreviewHydratorParams,
@@ -90,6 +96,7 @@ export function createTwoHopPreviewHydrator(
 		opportunisticActivations: 0,
 	};
 	let opportunisticAllowed = false;
+	const activeTokens = new Map<TwoHopCardShellSlot, EnrichmentToken>();
 	const scheduler = createEnrichmentScheduler<TwoHopPreviewCandidate>({
 		getKey: (candidate) => candidate.key,
 		getGenerationToken: (candidate) => candidate.generationToken,
@@ -140,13 +147,7 @@ export function createTwoHopPreviewHydrator(
 		}
 
 		scheduler.setActive(false);
-		for (const row of params.getRows()) {
-			for (const slot of row.cells) {
-				if (slot.previewStatus !== "loading") continue;
-				slot.abortPreviewRequest = null;
-				slot.previewStatus = "empty";
-			}
-		}
+		failActiveEnrichments();
 	}
 
 	function buildCandidates(): TwoHopPreviewCandidate[] {
@@ -188,9 +189,13 @@ export function createTwoHopPreviewHydrator(
 	): Promise<void> {
 		const { slot, file, model, key } = candidate;
 		const invalidationKeys = new Set([key]);
-		const abortRequest = () => scheduler.invalidateKeys(invalidationKeys);
-		slot.previewStatus = "loading";
-		slot.abortPreviewRequest = abortRequest;
+		const token = slot.beginEnrichment(candidate.generationToken);
+		activeTokens.set(slot, token);
+		token.signal.addEventListener(
+			"abort",
+			() => scheduler.invalidateKeys(invalidationKeys),
+			{ once: true },
+		);
 		stats.requested += 1;
 		if (context.lane === "scroll-opportunistic") {
 			stats.opportunisticActivations += 1;
@@ -208,32 +213,32 @@ export function createTwoHopPreviewHydrator(
 				stats.staleCompletions += 1;
 				return;
 			}
-			const disposeRendered = await commitPreview(
-				slot.previewHost,
+			const rendered = await renderPreview(
+				slot.previewHost.ownerDocument,
 				preview,
 				context.signal,
 				params.app,
 				params.sourcePath ?? file.path,
 				() => isCurrent(candidate, context),
 			);
-			if (!isCurrent(candidate, context)) {
-				disposeRendered?.();
+			if (!rendered || !isCurrent(candidate, context) || token.signal.aborted) {
+				rendered?.dispose?.();
 				stats.staleCompletions += 1;
 				return;
 			}
-			slot.disposePreview?.();
-			slot.previewStatus = "ready";
-			slot.disposePreview = disposeRendered ?? null;
-			slot.abortPreviewRequest = null;
-			stats.committed += 1;
+			token.setDispose(rendered.dispose);
+			if (slot.commitEnrichment(token, rendered.content)) {
+				stats.committed += 1;
+			} else {
+				stats.staleCompletions += 1;
+			}
 		} catch (error) {
 			if (!context.signal.aborted) {
 				console.error("Failed to hydrate two-hop card preview:", error);
 			}
-			if (isSlotCurrent(candidate) && slot.abortPreviewRequest === abortRequest) {
-				slot.previewStatus = "empty";
-				slot.abortPreviewRequest = null;
-			}
+		} finally {
+			slot.failEnrichment(token);
+			if (activeTokens.get(slot) === token) activeTokens.delete(slot);
 		}
 	}
 
@@ -256,15 +261,17 @@ export function createTwoHopPreviewHydrator(
 		if (disposed) return;
 		disposed = true;
 		scheduler.dispose();
+		failActiveEnrichments();
 		for (const row of params.getRows()) {
-			for (const slot of row.cells) {
-				slot.abortPreviewRequest?.();
-				slot.abortPreviewRequest = null;
-				slot.disposePreview?.();
-				slot.disposePreview = null;
-				slot.previewStatus = "empty";
-			}
+			for (const slot of row.cells) slot.clearEnrichment();
 		}
+	}
+
+	function failActiveEnrichments(): void {
+		for (const [slot, token] of activeTokens) {
+			slot.failEnrichment(token);
+		}
+		activeTokens.clear();
 	}
 
 	return {
@@ -276,24 +283,25 @@ export function createTwoHopPreviewHydrator(
 	};
 }
 
-async function commitPreview(
-	host: HTMLElement,
+async function renderPreview(
+	ownerDocument: Document,
 	preview: PreviewData,
 	signal: AbortSignal,
 	app: App | undefined,
 	sourcePath: string,
 	canCommit: () => boolean,
-): Promise<(() => void) | undefined> {
-	if (signal.aborted || !canCommit()) return;
-	const ownerDocument = host.ownerDocument;
+): Promise<RenderedPreview | null> {
+	if (signal.aborted || !canCommit()) return null;
 	const container = ownerDocument.createElement("div");
 	container.className = `cosense-card-links__box-preview cosense-card-links__box-preview--${preview.type}`;
 
 	switch (preview.type) {
 		case "empty":
-			if (!canCommit()) return;
-			host.replaceChildren();
-			return;
+			if (!canCommit()) return null;
+			return {
+				content: ownerDocument.createDocumentFragment(),
+				dispose: null,
+			};
 		case "text":
 			if (!app) {
 				container.innerHTML = preview.content;
@@ -312,10 +320,12 @@ async function commitPreview(
 				);
 				if (signal.aborted || !canCommit()) {
 					component.unload();
-					return;
+					return null;
 				}
-				host.replaceChildren(container);
-				return () => component.unload();
+				return {
+					content: container,
+					dispose: () => component.unload(),
+				};
 			}
 		case "image": {
 			const image = ownerDocument.createElement("img");
@@ -330,15 +340,17 @@ async function commitPreview(
 			await preview.render(container, component, signal);
 			if (signal.aborted || !canCommit()) {
 				component.unload();
-				return;
+				return null;
 			}
-			host.replaceChildren(container);
-			return () => component.unload();
+			return {
+				content: container,
+				dispose: () => component.unload(),
+			};
 		}
 	}
 
-	if (!signal.aborted && canCommit()) host.replaceChildren(container);
-	return;
+	if (signal.aborted || !canCommit()) return null;
+	return { content: container, dispose: null };
 }
 
 function applyPreviewSearchHighlight(

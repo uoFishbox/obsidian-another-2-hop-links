@@ -4,6 +4,7 @@ import { createTwoHopDomPool } from "features/two-hop/ui/twoHopDomPool";
 import { createTwoHopPreviewHydrator } from "features/two-hop/ui/twoHopPreviewHydrator";
 import type { CardRenderModel } from "ui/components/items/cardRenderModel";
 import type { PreviewRequestOptions } from "features/preview/public-types";
+import type { TwoHopCardShellSlot } from "features/two-hop/ui/twoHopDomPool";
 
 function createModel(
 	path: string,
@@ -35,17 +36,71 @@ function createReadyPool() {
 	const pool = createTwoHopDomPool({ content, rowCapacity: 1, columns: 2 });
 	pool.positionRow(pool.rows[0], 0, 0);
 	for (const [index, slot] of pool.rows[0].cells.entries()) {
-		slot.rich = true;
-		slot.logicalIdentity = `item:${index}`;
-		slot.cardModel = createModel(`notes/${index}.md`);
+		bindRichSlot(slot, `item:${index}`, index, createModel(`notes/${index}.md`));
 	}
 	return pool;
 }
 
+function bindRichSlot(
+	slot: TwoHopCardShellSlot,
+	logicalIdentity: string,
+	logicalColumnIndex: number,
+	cardModel: CardRenderModel,
+	forceRefresh = false,
+	preservePreview = false,
+): void {
+	slot.bindSkeleton(
+		{
+			logicalIdentity,
+			logicalRowIndex: 0,
+			logicalColumnIndex,
+			renderRevision: 0,
+			forceRefresh,
+		},
+		{ preservePreview },
+	);
+	slot.promoteToRich({ cardModel });
+}
+
+function installPreview(
+	slot: TwoHopCardShellSlot,
+	content: Node = document.createDocumentFragment(),
+	dispose: (() => void) | null = null,
+): void {
+	const token = slot.beginEnrichment("test-preview");
+	token.setDispose(dispose);
+	expect(slot.commitEnrichment(token, content)).toBe(true);
+}
+
 describe("twoHopPreviewHydrator", () => {
+	it("disposes preview state without unbinding the rich shell", () => {
+		const pool = createReadyPool();
+		const slot = pool.rows[0].cells[0];
+		const cardModel = slot.cardModel;
+		const disposePreview = vi.fn();
+		const preview = document.createElement("strong");
+		installPreview(slot, preview, disposePreview);
+		const hydrator = createTwoHopPreviewHydrator({
+			getRows: () => pool.rows,
+			getPreview: vi.fn(async () => ({ type: "empty" as const, content: "" })),
+			setTimer: () => 1,
+			clearTimer: () => {},
+		});
+
+		hydrator.dispose();
+
+		expect(disposePreview).toHaveBeenCalledOnce();
+		expect(slot.previewHost.childNodes).toHaveLength(0);
+		expect(slot.previewStatus).toBe("empty");
+		expect(slot.logicalIdentity).toBe("item:0");
+		expect(slot.cardModel).toBe(cardModel);
+		expect(slot.rich).toBe(true);
+		expect(slot.cell.style.visibility).toBe("");
+	});
+
 	it("aborts and suspends preview work while the surface is inactive", async () => {
 		const pool = createReadyPool();
-		pool.rows[0].cells[1].previewStatus = "ready";
+		installPreview(pool.rows[0].cells[1]);
 		let firstSignal: AbortSignal | undefined;
 		let resolveFirst!: (value: { type: "text"; content: string }) => void;
 		const firstPreview = new Promise<{ type: "text"; content: string }>(
@@ -114,8 +169,7 @@ describe("twoHopPreviewHydrator", () => {
 		hydrator.notifyViewport(0, 1, true, 0, false);
 		expect(hydrator.getStats().requested).toBe(1);
 		const slot = pool.rows[0].cells[0];
-		slot.abortPreviewRequest?.();
-		slot.generation += 1;
+		slot.unbind();
 		expect(previewSignal?.aborted).toBe(true);
 		resolvePreview({ type: "text", content: "stale" });
 		await Promise.resolve();
@@ -219,13 +273,14 @@ describe("twoHopPreviewHydrator", () => {
 		const pool = createReadyPool();
 		const slot = pool.rows[0].cells[0];
 		if (!slot.cardModel) throw new Error("expected card model");
-		slot.cardModel = {
+		const highlightedModel: CardRenderModel = {
 			...slot.cardModel,
 			searchQuery: "needle",
 			searchScope: "title-and-content",
 			contentPreview: "<p>Before Needle after</p>",
 		};
-		pool.rows[0].cells[1].previewStatus = "ready";
+		bindRichSlot(slot, "item:0", 0, highlightedModel, true);
+		installPreview(pool.rows[0].cells[1]);
 		const hydrator = createTwoHopPreviewHydrator({
 			getRows: () => pool.rows,
 			getPreview: vi.fn(async () => ({ type: "empty" as const, content: "" })),
@@ -253,10 +308,11 @@ describe("twoHopPreviewHydrator", () => {
 		const slot = pool.rows[0].cells[0];
 		const previousPreview = document.createElement("strong");
 		previousPreview.textContent = "Previous";
-		slot.previewHost.append(previousPreview);
 		const disposePrevious = vi.fn();
-		slot.disposePreview = disposePrevious;
-		pool.rows[0].cells[1].previewStatus = "ready";
+		installPreview(slot, previousPreview, disposePrevious);
+		if (!slot.cardModel) throw new Error("expected card model");
+		bindRichSlot(slot, "item:0", 0, slot.cardModel, true, true);
+		installPreview(pool.rows[0].cells[1]);
 		let resolvePreview!: (value: { type: "text"; content: string }) => void;
 		const previewPromise = new Promise<{ type: "text"; content: string }>(
 			(resolve) => {
@@ -287,8 +343,14 @@ describe("twoHopPreviewHydrator", () => {
 
 	it("passes the index preview revision to the preview cache", async () => {
 		const pool = createReadyPool();
-		pool.rows[0].cells[0].cardModel = createModel("notes/0.md", "3:7:0");
-		pool.rows[0].cells[1].previewStatus = "ready";
+		bindRichSlot(
+			pool.rows[0].cells[0],
+			"item:0",
+			0,
+			createModel("notes/0.md", "3:7:0"),
+			true,
+		);
+		installPreview(pool.rows[0].cells[1]);
 		const getPreview = vi.fn(
 			async (
 				_file: TFile,

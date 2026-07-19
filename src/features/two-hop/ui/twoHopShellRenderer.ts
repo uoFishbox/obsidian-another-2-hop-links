@@ -4,7 +4,6 @@ import {
 	INTERACTION_ID_ATTRIBUTE,
 	INTERACTION_KIND_ATTRIBUTE,
 } from "ui/interactions/interactionTypes";
-import { dispatchVirtualCellWillRebindFromRoot } from "ui/interactions/virtualCellRebind";
 import type { TwoHopCardShellSlot } from "features/two-hop/ui/twoHopDomPool";
 import type { TwoHopResolvedCell } from "features/two-hop/ui/viewport/twoHopGeometry";
 import {
@@ -45,10 +44,14 @@ export function createTwoHopShellRenderer(params: TwoHopShellRendererParams) {
 		snapshot: TwoHopSnapshot,
 	): void {
 		const identity = cell?.logicalKey ?? null;
-		prepareSlot(slot, cell, identity, slot.renderRevision !== renderRevision);
-		slot.renderRevision = renderRevision;
-		slot.rich = false;
-		slot.cardModel = null;
+		bindSkeletonSlot(
+			slot,
+			cell,
+			identity,
+			renderRevision,
+			slot.renderRevision !== renderRevision,
+			false,
+		);
 		slot.root.classList.add("is-skeleton");
 		resetVariantClasses(slot.root);
 		slot.title.className = "cosense-card-links__box-title";
@@ -65,6 +68,16 @@ export function createTwoHopShellRenderer(params: TwoHopShellRendererParams) {
 		snapshot: TwoHopSnapshot,
 	): void {
 		const identity = cell.logicalKey;
+		if (
+			slot.retainRichBinding({
+				logicalIdentity: identity,
+				logicalRowIndex: cell.rowIndex,
+				logicalColumnIndex: cell.columnIndex,
+				renderRevision,
+			})
+		) {
+			return;
+		}
 		const revisionChanged = slot.renderRevision !== renderRevision;
 		const previousPreviewIdentity = slot.cardModel?.previewActivationIdentity;
 		const tentativelyPreservePreview =
@@ -72,18 +85,14 @@ export function createTwoHopShellRenderer(params: TwoHopShellRendererParams) {
 			slot.logicalIdentity === identity &&
 			cell.kind === "item" &&
 			previousPreviewIdentity !== undefined;
-		const retainedRichShell =
-			slot.rich && slot.logicalIdentity === identity && !revisionChanged;
-		if (retainedRichShell) {
-			slot.logicalRowIndex = cell.rowIndex;
-			slot.logicalColumnIndex = cell.columnIndex;
-			slot.interactionStateReleased = false;
-			slot.cell.style.visibility = "";
-			return;
-		}
-		prepareSlot(slot, cell, identity, revisionChanged, tentativelyPreservePreview);
-		slot.renderRevision = renderRevision;
-		slot.rich = true;
+		bindSkeletonSlot(
+			slot,
+			cell,
+			identity,
+			renderRevision,
+			revisionChanged,
+			tentativelyPreservePreview,
+		);
 		slot.root.classList.remove("is-skeleton");
 		slot.root.classList.remove("has-shell-title");
 		resetVariantClasses(slot.root);
@@ -91,7 +100,7 @@ export function createTwoHopShellRenderer(params: TwoHopShellRendererParams) {
 		const section = snapshot.sections[cell.sectionIndex];
 		const descriptor = section.descriptor;
 		if (cell.kind === "header") {
-			slot.cardModel = null;
+			slot.promoteToRich({ cardModel: null });
 			slot.root.classList.add(
 				descriptor.section.kind === "primary-section" ||
 					descriptor.section.kind === "new-links-section"
@@ -131,7 +140,7 @@ export function createTwoHopShellRenderer(params: TwoHopShellRendererParams) {
 		}
 
 		if (cell.kind === "load-more") {
-			slot.cardModel = null;
+			slot.promoteToRich({ cardModel: null });
 			slot.root.classList.add("cosense-card-links__load-more-button");
 			slot.title.textContent = "";
 			slot.meta.textContent = "";
@@ -168,13 +177,7 @@ export function createTwoHopShellRenderer(params: TwoHopShellRendererParams) {
 		);
 		slot.title.className = "cosense-card-links__box-title";
 		slot.titleWrapper.className = "cosense-card-links__box-title-wrapper";
-		slot.cardModel = model;
-		if (
-			tentativelyPreservePreview &&
-			model?.previewActivationIdentity !== previousPreviewIdentity
-		) {
-			discardPreview(slot);
-		}
+		slot.promoteToRich({ cardModel: model });
 		const title = model?.title ?? cell.item.virtualKey;
 		if (model?.searchQuery) {
 			let highlightedTitle = highlightedTitleCache.get(cell.item);
@@ -231,58 +234,33 @@ function resolveSkeletonTitle(
 	return "";
 }
 
-function prepareSlot(
+function bindSkeletonSlot(
 	slot: TwoHopCardShellSlot,
 	cell: TwoHopResolvedCell | null,
 	identity: string | null,
+	currentRenderRevision: number,
 	forceRefresh = false,
 	preservePreview = false,
 ): void {
-	const identityChanged = slot.logicalIdentity !== identity;
-	if (identityChanged && !slot.interactionStateReleased) {
-		dispatchVirtualCellWillRebindFromRoot(slot.cell, slot.root, {
-			previousLogicalKey: slot.logicalIdentity ?? "",
-			nextLogicalKey: identity ?? "",
-		});
-	}
-	if (identityChanged || forceRefresh) {
-		slot.abortPreviewRequest?.();
-		slot.abortPreviewRequest = null;
-		if (!preservePreview) {
-			slot.disposePreview?.();
-			slot.disposePreview = null;
-			slot.previewHost.replaceChildren();
-		}
-		slot.logicalIdentity = identity;
-		slot.generation += 1;
-		slot.previewGeneration += 1;
-		slot.previewStatus = "empty";
-		slot.cardModel = null;
-	}
-	slot.logicalRowIndex = cell?.rowIndex ?? -1;
-	slot.logicalColumnIndex = cell?.columnIndex ?? -1;
-	slot.interactionStateReleased = cell === null;
-	slot.cell.style.visibility = cell ? "" : "hidden";
+	slot.bindSkeleton(
+		{
+			logicalIdentity: identity,
+			logicalRowIndex: cell?.rowIndex ?? -1,
+			logicalColumnIndex: cell?.columnIndex ?? -1,
+			renderRevision: currentRenderRevision,
+			forceRefresh,
+		},
+		{ preservePreview },
+	);
 	slot.titleWrapper.className = "cosense-card-links__box-title-wrapper";
 	slot.meta.style.display = "";
 	slot.headerIcon.style.display = "none";
 	slot.previewHost.style.display = "";
-	if (identity) slot.cell.dataset.cclLogicalKey = identity;
-	else delete slot.cell.dataset.cclLogicalKey;
 	delete slot.cell.dataset.testid;
 	delete slot.root.dataset.twoHopLoadMoreSection;
 	delete slot.root.dataset.twoHopHeaderSection;
 	delete slot.root.dataset.directory;
 	applyCustomClassName(slot.root, null);
-}
-
-function discardPreview(slot: TwoHopCardShellSlot): void {
-	slot.abortPreviewRequest?.();
-	slot.abortPreviewRequest = null;
-	slot.disposePreview?.();
-	slot.disposePreview = null;
-	slot.previewHost.replaceChildren();
-	slot.previewStatus = "empty";
 }
 
 function resetVariantClasses(root: HTMLElement): void {

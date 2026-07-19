@@ -1,8 +1,10 @@
 import { IS_PROD } from "appConstants";
-import type { CardRenderModel } from "ui/components/items/cardRenderModel";
-import { dispatchVirtualCellWillRebindFromRoot } from "ui/interactions/virtualCellRebind";
+import {
+	createRecyclableCellSlot,
+	type RecyclableCellSlot,
+} from "features/two-hop/ui/recyclableCellSlot";
 
-export interface TwoHopCardShellSlot {
+export interface TwoHopCardShellSlot extends RecyclableCellSlot {
 	readonly slotIndex: number;
 	readonly cell: HTMLDivElement;
 	readonly root: HTMLDivElement;
@@ -11,18 +13,6 @@ export interface TwoHopCardShellSlot {
 	readonly meta: HTMLSpanElement;
 	readonly headerIcon: SVGSVGElement;
 	readonly previewHost: HTMLDivElement;
-	logicalRowIndex: number;
-	logicalColumnIndex: number;
-	logicalIdentity: string | null;
-	interactionStateReleased: boolean;
-	generation: number;
-	previewGeneration: number;
-	renderRevision: number;
-	previewStatus: "empty" | "queued" | "loading" | "ready";
-	cardModel: CardRenderModel | null;
-	disposePreview: (() => void) | null;
-	abortPreviewRequest: (() => void) | null;
-	rich: boolean;
 }
 
 export interface TwoHopDomRowSlot {
@@ -96,28 +86,19 @@ export function createTwoHopDomPool(params: {
 			root.append(titleWrapper, previewHost);
 			cell.append(root);
 			row.append(cell);
-			cells.push({
-				slotIndex: nextCellSlotIndex,
-				cell,
-				root,
-				titleWrapper,
-				title,
-				meta,
-				headerIcon,
-				previewHost,
-				logicalRowIndex: -1,
-				logicalColumnIndex: columnIndex,
-				logicalIdentity: null,
-				interactionStateReleased: true,
-				generation: 0,
-				previewGeneration: 0,
-				renderRevision: 0,
-				previewStatus: "empty",
-				cardModel: null,
-				disposePreview: null,
-				abortPreviewRequest: null,
-				rich: false,
-			});
+			const lifecycle = createRecyclableCellSlot({ cell, root, previewHost });
+			cells.push(
+				Object.assign(lifecycle, {
+					slotIndex: nextCellSlotIndex,
+					cell,
+					root,
+					titleWrapper,
+					title,
+					meta,
+					headerIcon,
+					previewHost,
+				}),
+			);
 			nextCellSlotIndex += 1;
 		}
 
@@ -150,19 +131,17 @@ export function createTwoHopDomPool(params: {
 		},
 		hideRow(slot) {
 			for (const cell of slot.cells) {
-				if (cell.interactionStateReleased) continue;
-				dispatchVirtualCellWillRebindFromRoot(cell.cell, cell.root, {
-					previousLogicalKey: cell.logicalIdentity ?? "",
-					nextLogicalKey: "",
-				});
-				cell.interactionStateReleased = true;
+				cell.suspend();
 			}
 			slot.logicalRowIndex = -1;
 			delete slot.root.dataset.cclRowIndex;
 			slot.root.style.visibility = "hidden";
 		},
 		dispose() {
-			for (const row of rows) row.root.remove();
+			for (const row of rows) {
+				for (const cell of row.cells) cell.unbind();
+				row.root.remove();
+			}
 		},
 	};
 }
