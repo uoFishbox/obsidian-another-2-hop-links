@@ -65,13 +65,16 @@ describe("twoHopPreviewHydrator", () => {
 			getPreview,
 			setTimer: () => 1,
 			clearTimer: () => {},
+			opportunisticIntervalMs: 0,
 		});
 		hydrator.notifyViewport(0, 1, false, 0, false);
 
-		expect(hydrator.hydrateNext("visible-idle")).toBe(true);
+		hydrator.notifyViewport(0, 1, true, 0, false);
+		expect(hydrator.getStats().requested).toBe(1);
 		hydrator.setActive(false);
 		expect(firstSignal?.aborted).toBe(true);
-		expect(hydrator.hydrateNext("visible-idle")).toBe(false);
+		hydrator.notifyViewport(0, 1, true, 0, false);
+		expect(hydrator.getStats().requested).toBe(1);
 
 		resolveFirst({ type: "text", content: "stale" });
 		await Promise.resolve();
@@ -79,7 +82,8 @@ describe("twoHopPreviewHydrator", () => {
 		expect(pool.rows[0].cells[0].previewHost.textContent).toBe("");
 
 		hydrator.setActive(true);
-		expect(hydrator.hydrateNext("visible-idle")).toBe(true);
+		hydrator.notifyViewport(0, 1, true, 0, false);
+		expect(hydrator.getStats().requested).toBe(2);
 		await Promise.resolve();
 		await Promise.resolve();
 		expect(pool.rows[0].cells[0].previewHost.textContent).toBe("resumed");
@@ -89,13 +93,17 @@ describe("twoHopPreviewHydrator", () => {
 
 	it("does not commit an async preview after its slot generation changes", async () => {
 		const pool = createReadyPool();
+		let previewSignal: AbortSignal | undefined;
 		let resolvePreview!: (value: { type: "text"; content: string }) => void;
 		const previewPromise = new Promise<{ type: "text"; content: string }>(
 			(resolve) => {
 				resolvePreview = resolve;
 			},
 		);
-		const getPreview = vi.fn(() => previewPromise);
+		const getPreview = vi.fn((_file: TFile, signal?: AbortSignal) => {
+			previewSignal = signal;
+			return previewPromise;
+		});
 		const hydrator = createTwoHopPreviewHydrator({
 			getRows: () => pool.rows,
 			getPreview,
@@ -103,9 +111,12 @@ describe("twoHopPreviewHydrator", () => {
 			clearTimer: () => {},
 		});
 		hydrator.notifyViewport(0, 1, false, 0, false);
-		expect(hydrator.hydrateNext("visible-idle")).toBe(true);
+		hydrator.notifyViewport(0, 1, true, 0, false);
+		expect(hydrator.getStats().requested).toBe(1);
 		const slot = pool.rows[0].cells[0];
+		slot.abortPreviewRequest?.();
 		slot.generation += 1;
+		expect(previewSignal?.aborted).toBe(true);
 		resolvePreview({ type: "text", content: "stale" });
 		await Promise.resolve();
 		await Promise.resolve();
@@ -139,7 +150,7 @@ describe("twoHopPreviewHydrator", () => {
 		hydrator.dispose();
 	});
 
-	it("keeps one idle timer while viewport notifications extend the deadline", () => {
+	it("keeps one idle timer and fills only the bounded concurrent capacity", () => {
 		const pool = createReadyPool();
 		let timestamp = 0;
 		const callbacks: Array<() => void> = [];
@@ -173,9 +184,9 @@ describe("twoHopPreviewHydrator", () => {
 
 		timestamp = 140;
 		callbacks[1]();
-		expect(hydrator.getStats().requested).toBe(1);
-		expect(delays).toEqual([100, 40, 0]);
-		expect(callbacks[2]).toBe(callbacks[0]);
+		expect(hydrator.getStats().requested).toBe(2);
+		expect(delays).toEqual([100, 40]);
+		expect(callbacks).toHaveLength(2);
 		hydrator.dispose();
 	});
 
@@ -192,7 +203,8 @@ describe("twoHopPreviewHydrator", () => {
 		});
 		hydrator.notifyViewport(0, 1, false, 0, false);
 
-		expect(hydrator.hydrateNext("visible-idle")).toBe(true);
+		hydrator.notifyViewport(0, 1, true, 0, false);
+		expect(hydrator.getStats().requested).toBe(1);
 		await Promise.resolve();
 		await Promise.resolve();
 
@@ -222,7 +234,8 @@ describe("twoHopPreviewHydrator", () => {
 		});
 		hydrator.notifyViewport(0, 1, false, 0, false);
 
-		expect(hydrator.hydrateNext("visible-idle")).toBe(true);
+		hydrator.notifyViewport(0, 1, true, 0, false);
+		expect(hydrator.getStats().requested).toBe(1);
 		await Promise.resolve();
 		await Promise.resolve();
 
@@ -258,7 +271,8 @@ describe("twoHopPreviewHydrator", () => {
 		});
 		hydrator.notifyViewport(0, 1, false, 0, false);
 
-		expect(hydrator.hydrateNext("visible-idle")).toBe(true);
+		hydrator.notifyViewport(0, 1, true, 0, false);
+		expect(hydrator.getStats().requested).toBe(1);
 		expect(slot.previewHost.textContent).toBe("Previous");
 		expect(disposePrevious).not.toHaveBeenCalled();
 
@@ -290,7 +304,8 @@ describe("twoHopPreviewHydrator", () => {
 		});
 		hydrator.notifyViewport(0, 1, false, 0, false);
 
-		expect(hydrator.hydrateNext("visible-idle")).toBe(true);
+		hydrator.notifyViewport(0, 1, true, 0, false);
+		expect(hydrator.getStats().requested).toBe(1);
 		expect(getPreview.mock.calls[0]?.[2]?.cacheRevision).toBe("3:7:0");
 		await Promise.resolve();
 		await Promise.resolve();

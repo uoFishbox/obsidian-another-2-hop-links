@@ -8,8 +8,10 @@ import { processPreviewContent } from "features/preview/renderers/markdownPrevie
 import { toPreviewImageSrc } from "features/preview/renderers/externalImageSource";
 import { highlightSearchMatchesInHtml } from "features/preview/text-processing/searchHighlighter";
 import type { CardRenderModel } from "ui/components/items/cardRenderModel";
-
-export type TwoHopPreviewLane = "visible-idle" | "scroll-opportunistic";
+import {
+	createEnrichmentScheduler,
+	type EnrichmentRunContext,
+} from "ui/shared/scheduling/enrichmentScheduler";
 
 export interface TwoHopPreviewHydratorStats {
 	readonly requested: number;
@@ -28,7 +30,6 @@ export interface TwoHopPreviewHydrator {
 	): void;
 	notifyShellsChanged(): void;
 	setActive(active: boolean): void;
-	hydrateNext(lane: TwoHopPreviewLane): boolean;
 	getStats(): TwoHopPreviewHydratorStats;
 	dispose(): void;
 }
@@ -43,6 +44,7 @@ export interface CreateTwoHopPreviewHydratorParams {
 	readonly now?: () => number;
 	readonly setTimer?: (callback: () => void, delayMs: number) => number;
 	readonly clearTimer?: (handle: number) => void;
+	readonly maxConcurrent?: number;
 	readonly idleDelayMs?: number;
 	readonly opportunisticIntervalMs?: number;
 	readonly opportunisticVelocityLimit?: number;
@@ -50,7 +52,20 @@ export interface CreateTwoHopPreviewHydratorParams {
 	readonly sourcePath?: string;
 }
 
-/** Schedules preview work by scanning physical slots; no candidate Map/Set is built. */
+interface TwoHopPreviewCandidate {
+	readonly key: string;
+	readonly generationToken: string;
+	readonly slot: TwoHopCardShellSlot;
+	readonly file: TFile;
+	readonly model: CardRenderModel;
+	readonly generation: number;
+	readonly identity: string;
+	readonly priority: number;
+	readonly visible: boolean;
+	readonly opportunistic: boolean;
+}
+
+/** Adapts resident two-hop card slots to the shared enrichment scheduler. */
 export function createTwoHopPreviewHydrator(
 	params: CreateTwoHopPreviewHydratorParams,
 ): TwoHopPreviewHydrator {
@@ -63,22 +78,34 @@ export function createTwoHopPreviewHydrator(
 			ownerWindow?.setTimeout(callback, delayMs) ?? 0);
 	const clearTimer =
 		params.clearTimer ?? ((handle: number) => ownerWindow?.clearTimeout(handle));
-	const idleDelayMs = params.idleDelayMs ?? 90;
-	const opportunisticIntervalMs = params.opportunisticIntervalMs ?? 160;
 	const opportunisticVelocityLimit = params.opportunisticVelocityLimit ?? 0.012;
 	let visibleStart = 0;
 	let visibleEnd = 0;
-	let idleTimer = 0;
-	let idleDeadline = 0;
 	let disposed = false;
 	let active = true;
-	let lastOpportunisticActivationAt = Number.NEGATIVE_INFINITY;
 	let stats = {
 		requested: 0,
 		committed: 0,
 		staleCompletions: 0,
 		opportunisticActivations: 0,
 	};
+	let opportunisticAllowed = false;
+	const scheduler = createEnrichmentScheduler<TwoHopPreviewCandidate>({
+		getKey: (candidate) => candidate.key,
+		getGenerationToken: (candidate) => candidate.generationToken,
+		getPriority: (candidate) => candidate.priority,
+		canStart: (candidate, lane) =>
+			candidate.visible &&
+			(lane === "visible-idle" || candidate.opportunistic) &&
+			isCandidateEligible(candidate),
+		enrich: hydrateCandidate,
+		maxConcurrent: params.maxConcurrent ?? 2,
+		idleDelayMs: params.idleDelayMs ?? 90,
+		opportunisticIntervalMs: params.opportunisticIntervalMs ?? 160,
+		now,
+		setTimer,
+		clearTimer,
+	});
 
 	function notifyViewport(
 		nextVisibleStart: number,
@@ -90,118 +117,106 @@ export function createTwoHopPreviewHydrator(
 		visibleStart = nextVisibleStart;
 		visibleEnd = nextVisibleEnd;
 		if (!active) return;
-		scheduleIdle();
-		if (
-			!scrollActive ||
-			criticalWorkPending ||
-			Math.abs(velocityRowsPerMs) > opportunisticVelocityLimit ||
-			now() - lastOpportunisticActivationAt < opportunisticIntervalMs
-		) {
-			return;
-		}
-
-		if (hydrateNext("scroll-opportunistic")) {
-			lastOpportunisticActivationAt = now();
-			stats.opportunisticActivations += 1;
-		}
+		opportunisticAllowed =
+			scrollActive &&
+			!criticalWorkPending &&
+			Math.abs(velocityRowsPerMs) <= opportunisticVelocityLimit;
+		scheduler.setCandidates(buildCandidates());
 	}
 
 	function notifyShellsChanged(): void {
 		if (!active) return;
-		scheduleIdle();
+		opportunisticAllowed = false;
+		scheduler.setCandidates(buildCandidates());
 	}
 
 	function setActive(nextActive: boolean): void {
 		if (disposed || active === nextActive) return;
 		active = nextActive;
 		if (active) {
-			scheduleIdle();
+			scheduler.setCandidates(buildCandidates());
+			scheduler.setActive(true);
 			return;
 		}
 
-		if (idleTimer) {
-			clearTimer(idleTimer);
-			idleTimer = 0;
-		}
+		scheduler.setActive(false);
 		for (const row of params.getRows()) {
 			for (const slot of row.cells) {
 				if (slot.previewStatus !== "loading") continue;
-				slot.abortPreviewRequest?.();
 				slot.abortPreviewRequest = null;
 				slot.previewStatus = "empty";
 			}
 		}
 	}
 
-	function scheduleIdle(): void {
-		if (disposed || !active) return;
-		idleDeadline = now() + idleDelayMs;
-		if (idleTimer) return;
-		idleTimer = setTimer(handleIdleTimer, idleDelayMs);
-	}
-
-	function handleIdleTimer(): void {
-		if (disposed || !active) {
-			idleTimer = 0;
-			return;
+	function buildCandidates(): TwoHopPreviewCandidate[] {
+		const candidates: TwoHopPreviewCandidate[] = [];
+		const center = (visibleStart + visibleEnd - 1) / 2;
+		for (const row of params.getRows()) {
+			const visible =
+				row.logicalRowIndex >= visibleStart && row.logicalRowIndex < visibleEnd;
+			const priority = Math.abs(row.logicalRowIndex - center);
+			for (const slot of row.cells) {
+				const model = slot.cardModel;
+				const file = model?.targetFile;
+				if (!slot.rich || !model || !file || row.logicalRowIndex < 0) continue;
+				const identity = model.previewActivationIdentity ?? file.path;
+				candidates.push({
+					key: String(slot.slotIndex),
+					generationToken: `${slot.generation}\u0000${identity}`,
+					slot,
+					file,
+					model,
+					generation: slot.generation,
+					identity,
+					priority,
+					visible,
+					opportunistic: opportunisticAllowed,
+				});
+			}
 		}
-		const remaining = idleDeadline - now();
-		if (remaining > 0) {
-			idleTimer = setTimer(handleIdleTimer, remaining);
-			return;
-		}
-
-		idleTimer = 0;
-		drainIdleLane();
+		return candidates;
 	}
 
-	function drainIdleLane(): void {
-		if (disposed || !active) return;
-		if (hydrateNext("visible-idle")) {
-			idleTimer = setTimer(handleIdleTimer, 0);
-		}
+	function isCandidateEligible(candidate: TwoHopPreviewCandidate): boolean {
+		return candidate.slot.previewStatus === "empty" && isSlotCurrent(candidate);
 	}
 
-	function hydrateNext(lane: TwoHopPreviewLane): boolean {
-		if (disposed || !active) return false;
-		const slot = findBestCandidate(params.getRows(), visibleStart, visibleEnd);
-		if (!slot?.cardModel?.targetFile) return false;
-		void hydrateSlot(slot, slot.cardModel.targetFile);
-		return true;
-	}
-
-	async function hydrateSlot(slot: TwoHopCardShellSlot, file: TFile): Promise<void> {
-		const generation = slot.generation;
-		const identity = slot.cardModel?.previewActivationIdentity ?? file.path;
-		const abortController = new AbortController();
-		const abortRequest = () => abortController.abort();
-		slot.abortPreviewRequest?.();
+	async function hydrateCandidate(
+		candidate: TwoHopPreviewCandidate,
+		context: EnrichmentRunContext,
+	): Promise<void> {
+		const { slot, file, model, key } = candidate;
+		const invalidationKeys = new Set([key]);
+		const abortRequest = () => scheduler.invalidateKeys(invalidationKeys);
 		slot.previewStatus = "loading";
 		slot.abortPreviewRequest = abortRequest;
 		stats.requested += 1;
+		if (context.lane === "scroll-opportunistic") {
+			stats.opportunisticActivations += 1;
+		}
 
 		try {
-			const model = slot.cardModel;
-			const sourcePreview = model?.contentPreview
+			const sourcePreview = model.contentPreview
 				? ({ type: "text", content: model.contentPreview } as const)
-				: await params.getPreview(file, abortController.signal, {
+				: await params.getPreview(file, context.signal, {
 						cacheRevision:
-							model?.previewCacheRevision ?? model?.previewRefreshToken,
+							model.previewCacheRevision ?? model.previewRefreshToken,
 					});
 			const preview = applyPreviewSearchHighlight(sourcePreview, model);
-			if (!isCurrent(slot, generation, identity)) {
+			if (!isCurrent(candidate, context)) {
 				stats.staleCompletions += 1;
 				return;
 			}
 			const disposeRendered = await commitPreview(
 				slot.previewHost,
 				preview,
-				abortController.signal,
+				context.signal,
 				params.app,
 				params.sourcePath ?? file.path,
-				() => isCurrent(slot, generation, identity),
+				() => isCurrent(candidate, context),
 			);
-			if (!isCurrent(slot, generation, identity)) {
+			if (!isCurrent(candidate, context)) {
 				disposeRendered?.();
 				stats.staleCompletions += 1;
 				return;
@@ -212,13 +227,10 @@ export function createTwoHopPreviewHydrator(
 			slot.abortPreviewRequest = null;
 			stats.committed += 1;
 		} catch (error) {
-			if (!abortController.signal.aborted) {
+			if (!context.signal.aborted) {
 				console.error("Failed to hydrate two-hop card preview:", error);
 			}
-			if (
-				slot.generation === generation &&
-				slot.abortPreviewRequest === abortRequest
-			) {
+			if (isSlotCurrent(candidate) && slot.abortPreviewRequest === abortRequest) {
 				slot.previewStatus = "empty";
 				slot.abortPreviewRequest = null;
 			}
@@ -226,23 +238,24 @@ export function createTwoHopPreviewHydrator(
 	}
 
 	function isCurrent(
-		slot: TwoHopCardShellSlot,
-		generation: number,
-		identity: string,
+		candidate: TwoHopPreviewCandidate,
+		context: EnrichmentRunContext,
 	): boolean {
+		return !disposed && active && context.isCurrent() && isSlotCurrent(candidate);
+	}
+
+	function isSlotCurrent(candidate: TwoHopPreviewCandidate): boolean {
 		return (
-			!disposed &&
-			active &&
-			slot.generation === generation &&
-			(slot.cardModel?.previewActivationIdentity ??
-				slot.cardModel?.targetFile?.path) === identity
+			candidate.slot.generation === candidate.generation &&
+			(candidate.slot.cardModel?.previewActivationIdentity ??
+				candidate.slot.cardModel?.targetFile?.path) === candidate.identity
 		);
 	}
 
 	function dispose(): void {
 		if (disposed) return;
 		disposed = true;
-		if (idleTimer) clearTimer(idleTimer);
+		scheduler.dispose();
 		for (const row of params.getRows()) {
 			for (const slot of row.cells) {
 				slot.abortPreviewRequest?.();
@@ -258,41 +271,9 @@ export function createTwoHopPreviewHydrator(
 		notifyViewport,
 		notifyShellsChanged,
 		setActive,
-		hydrateNext,
 		getStats: () => ({ ...stats }),
 		dispose,
 	};
-}
-
-function findBestCandidate(
-	rows: readonly TwoHopDomRowSlot[],
-	visibleStart: number,
-	visibleEnd: number,
-): TwoHopCardShellSlot | null {
-	const center = (visibleStart + visibleEnd - 1) / 2;
-	let best: TwoHopCardShellSlot | null = null;
-	let bestDistance = Number.POSITIVE_INFINITY;
-
-	for (const row of rows) {
-		if (row.logicalRowIndex < visibleStart || row.logicalRowIndex >= visibleEnd) {
-			continue;
-		}
-		const distance = Math.abs(row.logicalRowIndex - center);
-		for (const slot of row.cells) {
-			if (
-				!slot.rich ||
-				slot.previewStatus !== "empty" ||
-				!slot.cardModel?.targetFile
-			) {
-				continue;
-			}
-			if (distance < bestDistance) {
-				best = slot;
-				bestDistance = distance;
-			}
-		}
-	}
-	return best;
 }
 
 async function commitPreview(
