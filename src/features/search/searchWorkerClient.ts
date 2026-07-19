@@ -35,6 +35,22 @@ export function createSearchWorkerClient(
 	let fallbackFilterSerial = 0;
 	const latestContentByPath = new Map<string, string>();
 
+	function disableWorker(failedWorker: Worker): boolean {
+		if (worker !== failedWorker) {
+			return false;
+		}
+
+		worker = null;
+		failedWorker.onmessage = null;
+		failedWorker.onerror = null;
+		try {
+			failedWorker.terminate();
+		} catch {
+			// A failed Worker may already be unavailable to the host runtime.
+		}
+		return true;
+	}
+
 	function ensureInitialized(): void {
 		if (initialized) {
 			return;
@@ -51,6 +67,9 @@ export function createSearchWorkerClient(
 				onMessage(event.data);
 			};
 			nextWorker.onerror = (event: ErrorEvent) => {
+				if (!disableWorker(nextWorker)) {
+					return;
+				}
 				onMessage({
 					type: "error",
 					message: event.message || "Search worker failed.",
@@ -81,10 +100,8 @@ export function createSearchWorkerClient(
 		upsertFileContents(update: SearchWorkerFileContentsUpsert): void {
 			ensureInitialized();
 			latestDatasetVersion = update.datasetVersion;
-			if (!worker) {
-				for (const entry of update.entries) {
-					latestContentByPath.set(entry.path, entry.content.toLowerCase());
-				}
+			for (const entry of update.entries) {
+				latestContentByPath.set(entry.path, entry.content.toLowerCase());
 			}
 
 			if (!worker) {
@@ -101,10 +118,8 @@ export function createSearchWorkerClient(
 		removeFileContents(update: SearchWorkerFileContentsRemoval): void {
 			ensureInitialized();
 			latestDatasetVersion = update.datasetVersion;
-			if (!worker) {
-				for (const path of update.paths) {
-					latestContentByPath.delete(path);
-				}
+			for (const path of update.paths) {
+				latestContentByPath.delete(path);
 			}
 
 			if (!worker) {
@@ -168,13 +183,16 @@ export function createSearchWorkerClient(
 				return;
 			}
 
+			const activeWorker = worker;
+			worker = null;
 			try {
-				worker.postMessage({ type: "dispose" });
+				activeWorker.postMessage({ type: "dispose" });
 			} catch {
 				// Worker 側の終了処理はベストエフォートで十分
 			}
-			worker.terminate();
-			worker = null;
+			activeWorker.onmessage = null;
+			activeWorker.onerror = null;
+			activeWorker.terminate();
 		},
 	};
 }

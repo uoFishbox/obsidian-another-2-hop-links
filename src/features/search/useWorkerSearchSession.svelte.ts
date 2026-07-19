@@ -134,7 +134,12 @@ export function useWorkerSearchSession(
 
 	const searchWorkerClient = createSearchWorkerClient((message) => {
 		if (message.type === "error") {
+			lastIssuedSearchSignature = "";
 			isWorkerFiltering = false;
+			const normalizedQuery = query();
+			if (sessionEnabled && normalizedQuery) {
+				issueSearchFilter(normalizedQuery);
+			}
 			return;
 		}
 

@@ -11,6 +11,14 @@ vi.mock("../searchFilter.worker", () => ({
 }));
 
 import { createSearchWorkerClient } from "../searchWorkerClient";
+import type { SearchWorkerToMainMessage } from "../searchWorkerTypes";
+
+interface WorkerDouble {
+	onmessage: ((event: MessageEvent<SearchWorkerToMainMessage>) => void) | null;
+	onerror: ((event: ErrorEvent) => void) | null;
+	postMessage: ReturnType<typeof vi.fn>;
+	terminate: ReturnType<typeof vi.fn>;
+}
 
 describe("createSearchWorkerClient", () => {
 	const originalWorker = globalThis.Worker;
@@ -55,5 +63,67 @@ describe("createSearchWorkerClient", () => {
 		expect(() => client.terminate()).not.toThrow();
 		expect(workerHarness.factory).not.toHaveBeenCalled();
 		expect(workerHarness.terminate).not.toHaveBeenCalled();
+	});
+
+	it("terminates a failed worker and filters from the retained snapshot", async () => {
+		const messages: SearchWorkerToMainMessage[] = [];
+		const client = createSearchWorkerClient((message) => messages.push(message));
+		client.syncItems({
+			datasetVersion: 2,
+			items: [
+				{
+					key: "beta",
+					searchText: "beta title",
+					targetFilePath: "notes/beta.md",
+				},
+			],
+		});
+		client.upsertFileContents({
+			datasetVersion: 2,
+			entries: [
+				{
+					path: "notes/beta.md",
+					content: "Body contains the recovery token",
+					mtime: 1,
+				},
+			],
+		});
+		client.filter({
+			requestId: 1,
+			datasetVersion: 2,
+			query: "recovery token",
+			matchScope: "title-and-content",
+		});
+
+		const failedWorker = workerHarness.factory.mock.results[0]
+			.value as WorkerDouble;
+		failedWorker.onerror?.({ message: "worker crashed" } as ErrorEvent);
+
+		expect(workerHarness.terminate).toHaveBeenCalledTimes(1);
+		expect(messages).toEqual([{ type: "error", message: "worker crashed" }]);
+
+		client.filter({
+			requestId: 2,
+			datasetVersion: 2,
+			query: "recovery token",
+			matchScope: "title-and-content",
+		});
+
+		await vi.waitFor(() => {
+			expect(messages).toHaveLength(2);
+		});
+		expect(messages[1]).toEqual({
+			type: "filter-result",
+			requestId: 2,
+			datasetVersion: 2,
+			matchedItems: [
+				{
+					key: "beta",
+					titleMatched: false,
+					contentMatched: true,
+				},
+			],
+		});
+		expect(workerHarness.postMessage).toHaveBeenCalledTimes(3);
 	});
 });

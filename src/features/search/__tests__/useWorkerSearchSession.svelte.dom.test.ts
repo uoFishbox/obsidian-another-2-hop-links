@@ -83,6 +83,7 @@ const workerHarness = vi.hoisted(() => {
 			});
 		},
 		rejectLatestPendingSearch(message = "failed") {
+			pendingSearches.pop();
 			handler?.({
 				type: "error",
 				message,
@@ -399,7 +400,7 @@ describe("useWorkerSearchSession", () => {
 		});
 	});
 
-	it("clears filtering state on worker error", async () => {
+	it("reissues the current search after a worker error", async () => {
 		render(UseWorkerSearchSessionHarness, {
 			props: {
 				app: {} as never,
@@ -417,6 +418,15 @@ describe("useWorkerSearchSession", () => {
 		workerHarness.rejectLatestPendingSearch("failed");
 
 		await waitFor(() => {
+			expect(workerHarness.client.filter).toHaveBeenCalledTimes(2);
+		});
+		expect(workerHarness.getPendingSearchQueries()).toEqual(["alpha"]);
+		expect(screen.getByTestId("is-filtering")).toHaveTextContent("true");
+
+		workerHarness.resolveLatestPendingSearch(["alpha"]);
+
+		await waitFor(() => {
+			expect(screen.getByTestId("matched-state")).toHaveTextContent("alpha");
 			expect(screen.getByTestId("is-filtering")).toHaveTextContent("false");
 		});
 	});
