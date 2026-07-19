@@ -4,6 +4,10 @@ import { findNearestScrollContainerCached } from "ui/virtualization/dom/scrollCo
 import { getScrollMetrics } from "ui/virtualization/dom/virtualListMeasurementAdapter";
 import { resolveCachedCardGridLayoutBase } from "ui/virtualization/dom/virtualListCardLayout";
 import {
+	subscribeScrollTarget,
+	type ScrollPhase,
+} from "ui/virtualization/scheduling/scrollTargetListeners";
+import {
 	DEFAULT_VIEW_PLAN_CARD_LAYOUT,
 	type ViewPlanLayoutMetrics,
 } from "ui/virtualization/svelte/viewPlanLayout";
@@ -60,7 +64,6 @@ import {
 const BEHIND_ROWS = 4;
 const AHEAD_ROWS = 8;
 const MINIMUM_POOL_ROWS = 12;
-const SCROLL_IDLE_DELAY_MS = 120;
 
 export interface TwoHopViewportControllerParams {
 	readonly rootEl: HTMLDivElement;
@@ -129,27 +132,19 @@ export interface TwoHopViewportController {
 	dispose(): void;
 }
 
-const mountedTwoHopOwners = new WeakMap<EventTarget, object>();
+const activeTwoHopScrollers = new WeakSet<EventTarget>();
 
-function assertTwoHopScrollerAvailable(scrollTarget: EventTarget): void {
-	if (mountedTwoHopOwners.has(scrollTarget)) {
+function acquireTwoHopScroller(scrollTarget: EventTarget): () => void {
+	if (activeTwoHopScrollers.has(scrollTarget)) {
 		throw new Error("Only one two-hop virtual list is allowed per scroller.");
 	}
-}
 
-function claimTwoHopScroller(
-	scrollTarget: EventTarget,
-	owner: object,
-): () => void {
-	const current = mountedTwoHopOwners.get(scrollTarget);
-	if (current && current !== owner) {
-		throw new Error("Only one active two-hop virtual list is allowed per scroller.");
-	}
-	mountedTwoHopOwners.set(scrollTarget, owner);
+	activeTwoHopScrollers.add(scrollTarget);
+	let released = false;
 	return () => {
-		if (mountedTwoHopOwners.get(scrollTarget) === owner) {
-			mountedTwoHopOwners.delete(scrollTarget);
-		}
+		if (released) return;
+		released = true;
+		activeTwoHopScrollers.delete(scrollTarget);
 	};
 }
 
@@ -160,7 +155,6 @@ export function createTwoHopViewportController(
 	const ownerWindow = params.rootEl.ownerDocument.defaultView;
 	const initialScrollContainerEl = findNearestScrollContainerCached(params.rootEl);
 	const scrollTarget = initialScrollContainerEl ?? ownerWindow!;
-	assertTwoHopScrollerAvailable(scrollTarget);
 	const requestFrame =
 		params.requestAnimationFrame ??
 		ownerWindow?.requestAnimationFrame.bind(ownerWindow) ??
@@ -199,7 +193,6 @@ export function createTwoHopViewportController(
 	let residentStart = -1;
 	let residentEnd = -1;
 	let frameHandle = 0;
-	let scrollIdleTimer = 0;
 	let scrollActive = false;
 	let needsScroll = false;
 	let needsResize = false;
@@ -340,23 +333,19 @@ export function createTwoHopViewportController(
 		return hydrator;
 	}
 
-	function onScroll(): void {
-		scrollActive = true;
-		needsScroll = true;
-		scheduleScrollIdle();
-		scheduleFrame();
-	}
-
-	function scheduleScrollIdle(): void {
-		if (scrollIdleTimer) ownerWindow?.clearTimeout(scrollIdleTimer);
-		scrollIdleTimer =
-			ownerWindow?.setTimeout(handleScrollIdle, SCROLL_IDLE_DELAY_MS) ?? 0;
-	}
-
-	function handleScrollIdle(): void {
-		scrollIdleTimer = 0;
-		scrollActive = false;
-		if (needsResize || needsRefill) scheduleFrame();
+	function handleScrollPhase(phase: ScrollPhase): void {
+		switch (phase) {
+			case "start":
+				scrollActive = true;
+				return;
+			case "scroll":
+				needsScroll = true;
+				scheduleFrame();
+				return;
+			case "idle":
+				scrollActive = false;
+				if (needsResize || needsRefill) scheduleFrame();
+		}
 	}
 
 	function scheduleFrame(): void {
@@ -432,10 +421,7 @@ export function createTwoHopViewportController(
 		scheduleRefill();
 	}
 
-	function notifyViewport(
-		scrollActive: boolean,
-		velocityRowsPerMs: number,
-	): void {
+	function notifyViewport(scrollActive: boolean, velocityRowsPerMs: number): void {
 		if (!previewActive || !previewHydrator) return;
 		previewHydrator.notifyViewport(
 			visibleRange.start,
@@ -724,21 +710,21 @@ export function createTwoHopViewportController(
 	const resizeObserver = ownerWindow?.ResizeObserver
 		? new ownerWindow.ResizeObserver(scheduleResize)
 		: null;
-	const ownerToken = {};
-	let releaseScrollerOwner: (() => void) | null = null;
+	let releaseScroller: (() => void) | null = null;
+	let unsubscribeScroll: (() => void) | null = null;
 	contentEl.addEventListener("click", handleSurfaceClick);
 	contentEl.addEventListener("keydown", handleSurfaceKeyDown);
 	try {
-		releaseScrollerOwner = claimTwoHopScroller(scrollTarget, ownerToken);
-		scrollTarget.addEventListener("scroll", onScroll, { passive: true });
+		releaseScroller = acquireTwoHopScroller(scrollTarget);
+		unsubscribeScroll = subscribeScrollTarget(scrollTarget, handleScrollPhase);
 		resizeObserver?.observe(params.rootEl);
 		const resized = applyResize(now());
 		if (!resized) flush(now());
 		if (pendingShellCount > 0) scheduleRefill();
 	} catch (error) {
-		scrollTarget.removeEventListener("scroll", onScroll);
+		unsubscribeScroll?.();
 		resizeObserver?.disconnect();
-		releaseScrollerOwner?.();
+		releaseScroller?.();
 		contentEl.removeEventListener("click", handleSurfaceClick);
 		contentEl.removeEventListener("keydown", handleSurfaceKeyDown);
 		previewHydrator?.dispose();
@@ -801,12 +787,12 @@ export function createTwoHopViewportController(
 		dispose() {
 			if (disposed) return;
 			disposed = true;
-			scrollTarget.removeEventListener("scroll", onScroll);
+			unsubscribeScroll?.();
+			unsubscribeScroll = null;
 			resizeObserver?.disconnect();
 			if (frameHandle) cancelFrame(frameHandle);
-			if (scrollIdleTimer) ownerWindow?.clearTimeout(scrollIdleTimer);
-			releaseScrollerOwner?.();
-			releaseScrollerOwner = null;
+			releaseScroller?.();
+			releaseScroller = null;
 			previewHydrator?.dispose();
 			contentEl.removeEventListener("click", handleSurfaceClick);
 			contentEl.removeEventListener("keydown", handleSurfaceKeyDown);

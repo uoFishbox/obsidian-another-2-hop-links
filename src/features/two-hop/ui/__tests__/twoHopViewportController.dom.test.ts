@@ -252,6 +252,77 @@ describe("twoHopViewportController", () => {
 		scroller.remove();
 	});
 
+	it("releases scroller ownership when initialization fails after acquire", () => {
+		const scroller = document.createElement("div");
+		scroller.style.overflow = "auto";
+		Object.defineProperty(scroller, "clientHeight", { value: 300 });
+		Object.defineProperty(scroller, "scrollHeight", { value: 20000 });
+		const firstRoot = document.createElement("div");
+		const secondRoot = document.createElement("div");
+		const firstShadowHost = document.createElement("div");
+		const secondShadowHost = document.createElement("div");
+		firstRoot.append(firstShadowHost);
+		secondRoot.append(secondShadowHost);
+		scroller.append(firstRoot, secondRoot);
+		document.body.append(scroller);
+		setRect(scroller, 0, 420, 300);
+		setRect(firstRoot, 0, 420, 200);
+		setRect(secondRoot, 0, 420, 200);
+		const InstalledResizeObserver = window.ResizeObserver;
+		let failNextObserve = true;
+		class FailingResizeObserver implements ResizeObserver {
+			private readonly delegate: ResizeObserver;
+
+			constructor(callback: ResizeObserverCallback) {
+				this.delegate = new InstalledResizeObserver(callback);
+			}
+
+			observe(target: Element, options?: ResizeObserverOptions): void {
+				if (!failNextObserve) {
+					this.delegate.observe(target, options);
+					return;
+				}
+
+				failNextObserve = false;
+				throw new Error("resize setup failed");
+			}
+
+			unobserve(target: Element): void {
+				this.delegate.unobserve(target);
+			}
+
+			disconnect(): void {
+				this.delegate.disconnect();
+			}
+		}
+		globalThis.ResizeObserver = FailingResizeObserver;
+		const commonParams = {
+			sections: [createSection("section", 1)],
+			initialVisibleCount: 1,
+			resolveItemTitle,
+			getItemInteractionDescriptor: () => null,
+			requestAnimationFrame: () => 1,
+			cancelAnimationFrame: () => {},
+			now: () => 10,
+		};
+
+		expect(() =>
+			createTwoHopViewportController({
+				...commonParams,
+				rootEl: firstRoot,
+				shadowHostEl: firstShadowHost,
+			}),
+		).toThrow("resize setup failed");
+		const controller = createTwoHopViewportController({
+			...commonParams,
+			rootEl: secondRoot,
+			shadowHostEl: secondShadowHost,
+		});
+
+		controller.dispose();
+		scroller.remove();
+	});
+
 	it("flushes when resize updates scroll geometry without changing layout", () => {
 		const scroller = document.createElement("div");
 		scroller.style.overflow = "auto";
