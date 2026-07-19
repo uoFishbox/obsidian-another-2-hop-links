@@ -1,4 +1,5 @@
 import type { CardRenderModel } from "ui/components/items/cardRenderModel";
+import { dispatchVirtualCellWillRebind } from "ui/interactions/virtualCellRebind";
 
 export interface TwoHopCardShellSlot {
 	readonly slotIndex: number;
@@ -12,6 +13,7 @@ export interface TwoHopCardShellSlot {
 	logicalRowIndex: number;
 	logicalColumnIndex: number;
 	logicalIdentity: string | null;
+	interactionStateReleased: boolean;
 	generation: number;
 	previewGeneration: number;
 	renderRevision: number;
@@ -104,6 +106,7 @@ export function createTwoHopDomPool(params: {
 				logicalRowIndex: -1,
 				logicalColumnIndex: columnIndex,
 				logicalIdentity: null,
+				interactionStateReleased: true,
 				generation: 0,
 				previewGeneration: 0,
 				renderRevision: 0,
@@ -144,6 +147,14 @@ export function createTwoHopDomPool(params: {
 			slot.root.style.visibility = "visible";
 		},
 		hideRow(slot) {
+			for (const cell of slot.cells) {
+				if (cell.interactionStateReleased) continue;
+				dispatchVirtualCellWillRebind(cell.cell, {
+					previousLogicalKey: cell.logicalIdentity ?? "",
+					nextLogicalKey: "",
+				});
+				cell.interactionStateReleased = true;
+			}
 			slot.logicalRowIndex = -1;
 			delete slot.root.dataset.cclRowIndex;
 			slot.root.style.visibility = "hidden";

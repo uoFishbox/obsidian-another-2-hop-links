@@ -9,6 +9,7 @@ import {
 import type { TwoHopVirtualSectionDescriptor } from "features/two-hop/ui/twoHopVirtualListModel";
 import type { TwoHopVirtualListItem } from "features/two-hop/ui/twoHopVirtualListModel";
 import type { TFile } from "obsidian";
+import { VIRTUAL_CELL_WILL_REBIND_EVENT } from "ui/interactions/virtualCellRebind";
 
 function createFixture() {
 	const item = {
@@ -89,6 +90,121 @@ describe("twoHop imperative DOM pool", () => {
 
 		expect(row.root.style.visibility).toBe("hidden");
 		expect(slot.cell.style.visibility).toBe("");
+	});
+
+	it("releases transient interaction state before rebinding a physical cell", () => {
+		const { snapshot, geometry } = createFixture();
+		const content = document.createElement("div");
+		document.body.append(content);
+		const pool = createTwoHopDomPool({ content, rowCapacity: 1, columns: 2 });
+		const renderer = createTwoHopShellRenderer({});
+		const item = resolveTwoHopCell(snapshot, geometry, 0, 1);
+		const header = resolveTwoHopCell(snapshot, geometry, 0, 0);
+		if (!item || !header) throw new Error("expected item and header cells");
+		const slot = pool.rows[0].cells[0];
+		renderer.renderShell(slot, item, snapshot);
+		slot.root.dataset.cclHovered = "true";
+		slot.root.dataset.cclLongPressed = "1";
+		slot.root.dataset.cclLastTouchAt = "123";
+		slot.root.focus();
+		const eventDetails: Array<{
+			previousLogicalKey: string;
+			nextLogicalKey: string;
+			logicalKeyDuringDispatch: string | undefined;
+		}> = [];
+		const eventTargets: EventTarget[] = [];
+		slot.cell.addEventListener(VIRTUAL_CELL_WILL_REBIND_EVENT, (event) => {
+			const detail = (
+				event as CustomEvent<{
+					previousLogicalKey: string;
+					nextLogicalKey: string;
+				}>
+			).detail;
+			if (event.target) eventTargets.push(event.target);
+			eventDetails.push({
+				...detail,
+				logicalKeyDuringDispatch: slot.cell.dataset.cclLogicalKey,
+			});
+		});
+
+		renderer.renderShell(slot, header, snapshot);
+
+		expect(document.activeElement).not.toBe(slot.root);
+		expect(slot.root.dataset.cclHovered).toBeUndefined();
+		expect(slot.root.dataset.cclLongPressed).toBeUndefined();
+		expect(slot.root.dataset.cclLastTouchAt).toBeUndefined();
+		expect(eventDetails).toEqual([
+			{
+				previousLogicalKey: item.logicalKey,
+				nextLogicalKey: header.logicalKey,
+				logicalKeyDuringDispatch: item.logicalKey,
+			},
+		]);
+		expect(eventTargets).toEqual([slot.cell]);
+		expect(slot.cell.dataset.cclLogicalKey).toBe(header.logicalKey);
+	});
+
+	it("releases every physical cell before hiding a pool row", () => {
+		const { snapshot, geometry } = createFixture();
+		const content = document.createElement("div");
+		document.body.append(content);
+		const pool = createTwoHopDomPool({ content, rowCapacity: 1, columns: 2 });
+		const renderer = createTwoHopShellRenderer({});
+		const row = pool.rows[0];
+		const header = resolveTwoHopCell(snapshot, geometry, 0, 0);
+		const item = resolveTwoHopCell(snapshot, geometry, 0, 1);
+		if (!header || !item) throw new Error("expected header and item cells");
+		pool.positionRow(row, 0, 0);
+		renderer.renderShell(row.cells[0], header, snapshot);
+		renderer.renderShell(row.cells[1], item, snapshot);
+		for (const cell of row.cells) {
+			cell.root.dataset.cclHovered = "true";
+			cell.root.dataset.cclLongPressed = "1";
+			cell.root.dataset.cclLastTouchAt = "123";
+		}
+		row.cells[1].root.focus();
+		const releasedCells: HTMLElement[] = [];
+		content.addEventListener(VIRTUAL_CELL_WILL_REBIND_EVENT, (event) => {
+			if (event.target instanceof HTMLElement) releasedCells.push(event.target);
+		});
+
+		pool.hideRow(row);
+
+		expect(document.activeElement).not.toBe(row.cells[1].root);
+		expect(releasedCells).toEqual(row.cells.map((cell) => cell.cell));
+		for (const cell of row.cells) {
+			expect(cell.root.dataset.cclHovered).toBeUndefined();
+			expect(cell.root.dataset.cclLongPressed).toBeUndefined();
+			expect(cell.root.dataset.cclLastTouchAt).toBeUndefined();
+		}
+		expect(row.root.style.visibility).toBe("hidden");
+	});
+
+	it("avoids repeated subtree scans for cells that are already released", () => {
+		const { snapshot, geometry } = createFixture();
+		const content = document.createElement("div");
+		const pool = createTwoHopDomPool({ content, rowCapacity: 1, columns: 2 });
+		const renderer = createTwoHopShellRenderer({});
+		const row = pool.rows[0];
+		const header = resolveTwoHopCell(snapshot, geometry, 0, 0);
+		const item = resolveTwoHopCell(snapshot, geometry, 0, 1);
+		if (!header || !item) throw new Error("expected header and item cells");
+		const subtreeQueries = row.cells.map((slot) =>
+			vi.spyOn(slot.cell, "querySelectorAll"),
+		);
+
+		pool.positionRow(row, 0, 0);
+		renderer.renderShell(row.cells[0], header, snapshot);
+		renderer.renderShell(row.cells[1], item, snapshot);
+		expect(subtreeQueries.map((query) => query.mock.calls.length)).toEqual([0, 0]);
+
+		pool.hideRow(row);
+		pool.hideRow(row);
+		pool.positionRow(row, 1, 100);
+		renderer.renderShell(row.cells[0], item, snapshot);
+		renderer.renderShell(row.cells[1], header, snapshot);
+
+		expect(subtreeQueries.map((query) => query.mock.calls.length)).toEqual([1, 1]);
 	});
 
 	it("renders a cheap skeleton before resolving a rich card model", () => {

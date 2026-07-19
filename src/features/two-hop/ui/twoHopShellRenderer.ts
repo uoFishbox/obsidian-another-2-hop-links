@@ -4,6 +4,7 @@ import {
 	INTERACTION_ID_ATTRIBUTE,
 	INTERACTION_KIND_ATTRIBUTE,
 } from "ui/interactions/interactionTypes";
+import { dispatchVirtualCellWillRebind } from "ui/interactions/virtualCellRebind";
 import type { TwoHopCardShellSlot } from "features/two-hop/ui/twoHopDomPool";
 import type { TwoHopResolvedCell } from "features/two-hop/ui/viewport/twoHopGeometry";
 import {
@@ -72,6 +73,7 @@ export function createTwoHopShellRenderer(params: TwoHopShellRendererParams) {
 		if (retainedRichShell) {
 			slot.logicalRowIndex = cell.rowIndex;
 			slot.logicalColumnIndex = cell.columnIndex;
+			slot.interactionStateReleased = false;
 			slot.cell.style.visibility = "";
 			return;
 		}
@@ -226,7 +228,14 @@ function prepareSlot(
 	forceRefresh = false,
 	preservePreview = false,
 ): void {
-	if (slot.logicalIdentity !== identity || forceRefresh) {
+	const identityChanged = slot.logicalIdentity !== identity;
+	if (identityChanged && !slot.interactionStateReleased) {
+		dispatchVirtualCellWillRebind(slot.cell, {
+			previousLogicalKey: slot.logicalIdentity ?? "",
+			nextLogicalKey: identity ?? "",
+		});
+	}
+	if (identityChanged || forceRefresh) {
 		slot.abortPreviewRequest?.();
 		slot.abortPreviewRequest = null;
 		if (!preservePreview) {
@@ -242,6 +251,7 @@ function prepareSlot(
 	}
 	slot.logicalRowIndex = cell?.rowIndex ?? -1;
 	slot.logicalColumnIndex = cell?.columnIndex ?? -1;
+	slot.interactionStateReleased = cell === null;
 	slot.cell.style.visibility = cell ? "" : "hidden";
 	slot.titleWrapper.className = "cosense-card-links__box-title-wrapper";
 	slot.meta.style.display = "";
