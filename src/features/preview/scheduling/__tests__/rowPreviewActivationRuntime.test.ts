@@ -427,4 +427,39 @@ describe("rowPreviewActivationRuntime", () => {
 		expect(oldActivated).not.toHaveBeenCalled();
 		expect(nextActivated).toHaveBeenCalledWith("shared-key");
 	});
+
+	it("applies a normalized row replacement without array deltas", async () => {
+		const runtime = createRowPreviewActivationRuntime();
+		const oldActivated = vi.fn();
+		const nextActivated = vi.fn();
+
+		runtime.setRowVisibility(0, "visible");
+		runtime.registerCandidate(
+			createTestCandidate({
+				id: "old-normalized",
+				rowIndex: 0,
+				activationKey: "normalized-shared-key",
+				onActivated: oldActivated,
+			}),
+		);
+		runtime.registerCandidate(
+			createTestCandidate({
+				id: "next-normalized",
+				rowIndex: 1,
+				activationKey: "normalized-shared-key",
+				onActivated: nextActivated,
+			}),
+		);
+
+		runtime.applyNormalizedVisibilityDelta({
+			activatedRows: new Set([1]),
+			deactivatedRows: new Set(),
+			clearedRows: new Set([0]),
+		});
+		await flushAnimationFrame();
+		await flushAnimationFrame();
+
+		expect(oldActivated).not.toHaveBeenCalled();
+		expect(nextActivated).toHaveBeenCalledWith("normalized-shared-key");
+	});
 });

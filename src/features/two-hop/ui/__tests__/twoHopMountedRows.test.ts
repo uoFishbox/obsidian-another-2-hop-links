@@ -104,6 +104,39 @@ describe("TwoHop keyed mounted rows", () => {
 		).toBe(first);
 	});
 
+	it("orders a wrapped resident range by slot without exposing pool holes", () => {
+		const document = createTwoHopDocument({
+			sections: [createSection(200)],
+			visibleCounts: {},
+			initialVisibleCount: 200,
+		});
+		const rowModel = createTwoHopVirtualRowModel(document, layout);
+		const allocator = createResidentRowSlotAllocator();
+		buildTwoHopMountedRows({
+			rowModel,
+			rowRange: { start: 0, end: 12 },
+			rowSlotAllocator: allocator,
+		});
+		const wrappedStart = allocator.capacity - 1;
+		const wrapped = buildTwoHopMountedRows({
+			rowModel,
+			rowRange: { start: wrappedStart, end: wrappedStart + 3 },
+			rowSlotAllocator: allocator,
+		});
+
+		expect(wrapped.rowSlices.map((row) => row.slotIndex)).toEqual([
+			allocator.capacity - 1,
+			0,
+			1,
+		]);
+		expect(wrapped.rowsBySlot.map((row) => row.slotIndex)).toEqual([
+			0,
+			1,
+			allocator.capacity - 1,
+		]);
+		expect(wrapped.rowsBySlot).toHaveLength(wrapped.rowSlices.length);
+	});
+
 	it("resolves entering rows through compact geometry and reuses overlapping rows", () => {
 		const document = createTwoHopDocument({
 			sections: [createSection(20)],

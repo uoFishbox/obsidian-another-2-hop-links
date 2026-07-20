@@ -104,6 +104,9 @@ export function createVirtualScrollWindowRangeResolver<
 		min: 0,
 		max: 0,
 	};
+	let mountedStableBandViewportHeight: number | undefined;
+	let mountedStableBandSectionTop: number | undefined;
+	let mountedStableBandOverscanPx: number | undefined;
 	const scrollWindowMeasurement: RangedScrollWindowMeasurement = {
 		identity: {},
 		ranges: {
@@ -188,7 +191,10 @@ export function createVirtualScrollWindowRangeResolver<
 			prevBand !== undefined &&
 			scrollTop > prevBand.min &&
 			scrollTop < prevBand.max &&
-			mountedScrollWindowMeasurement.identity === measurementRowModel
+			mountedScrollWindowMeasurement.identity === measurementRowModel &&
+			mountedStableBandViewportHeight === viewportHeight &&
+			mountedStableBandSectionTop === sectionTop &&
+			mountedStableBandOverscanPx === mountedOverscanPx
 		) {
 			return mountedScrollWindowMeasurement;
 		}
@@ -210,6 +216,9 @@ export function createVirtualScrollWindowRangeResolver<
 				viewportHeight,
 				mountedScrollWindowMeasurement.mounted,
 			);
+		mountedStableBandViewportHeight = viewportHeight;
+		mountedStableBandSectionTop = sectionTop;
+		mountedStableBandOverscanPx = mountedOverscanPx;
 		return mountedScrollWindowMeasurement;
 	};
 

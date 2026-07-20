@@ -45,6 +45,8 @@ export type TwoHopVirtualRowModel = VirtualRowModel<TwoHopLogicalCell> &
 	VirtualScrollWindowRangeRowModel & {
 		readonly document: TwoHopDocument;
 		readonly geometry: TwoHopGeometry;
+		/** Stable allocator key for the layout that owns the physical row slots. */
+		readonly residentSlotLayoutKey: object;
 		getDocumentSection(rowIndex: number): TwoHopDocumentSection | null;
 	};
 
@@ -65,6 +67,7 @@ interface ResolveRangesParams {
 export function createTwoHopVirtualRowModel(
 	document: TwoHopDocument,
 	layout: ViewPlanLayoutMetrics,
+	residentSlotLayoutKey: object = layout,
 ): TwoHopVirtualRowModel {
 	const geometry = compileFixedGridLayout(document, layout);
 	const mountedScratch: RowRange = { start: 0, end: 0 };
@@ -255,6 +258,7 @@ export function createTwoHopVirtualRowModel(
 	return {
 		document,
 		geometry,
+		residentSlotLayoutKey,
 		revision: createVirtualListRevision({
 			content: document,
 			layout: createVirtualListLayoutRevisionToken([

@@ -20,6 +20,8 @@ export interface RowPreviewActivationRuntime {
 	 * activation request for its key when no other candidates share that key.
 	 */
 	registerCandidate(candidate: RowPreviewActivationCandidate): () => void;
+	/** Applies a controller-normalized delta without materializing row arrays. */
+	applyNormalizedVisibilityDelta(delta: NormalizedRowPreviewVisibilityDelta): void;
 	/** Applies a complete row visibility change as one atomic update. */
 	applyVisibilityDelta(delta: RowPreviewVisibilityDelta): void;
 	/**
@@ -46,6 +48,13 @@ export interface RowPreviewVisibilityDelta {
 	readonly activatedRows: readonly number[];
 	readonly deactivatedRows: readonly number[];
 	readonly clearedRows: readonly number[];
+}
+
+/** A conflict-free delta whose row sets are consumed synchronously. */
+export interface NormalizedRowPreviewVisibilityDelta {
+	readonly activatedRows: ReadonlySet<number>;
+	readonly deactivatedRows: ReadonlySet<number>;
+	readonly clearedRows: ReadonlySet<number>;
 }
 
 export const PREVIEW_ROW_ACTIVATION_CONTEXT_KEY = Symbol("preview-row-activation");
@@ -298,26 +307,8 @@ export function createRowPreviewActivationRuntime(
 		});
 	}
 
-	function applyVisibilityDelta(delta: RowPreviewVisibilityDelta): void {
-		if (disposed) return;
-
-		type FinalRowChange = "activated" | "deactivated" | "cleared";
-		const finalChanges = new Map<number, FinalRowChange>();
-		for (const rowIndex of delta.clearedRows) {
-			finalChanges.set(rowIndex, "cleared");
-		}
-		for (const rowIndex of delta.deactivatedRows) {
-			finalChanges.set(rowIndex, "deactivated");
-		}
-		for (const rowIndex of delta.activatedRows) {
-			finalChanges.set(rowIndex, "activated");
-		}
-
-		const keysToCancel = new Set<string>();
-		const rowsToPrune: Array<[number, RowActivationState]> = [];
-		for (const [rowIndex, change] of finalChanges) {
-			if (change === "activated") continue;
-
+	function setRowsMounted(rowIndices: Iterable<number>): void {
+		for (const rowIndex of rowIndices) {
 			const state = rows.get(rowIndex);
 			if (!state) continue;
 			if (state.visibility === "visible") {
@@ -325,37 +316,82 @@ export function createRowPreviewActivationRuntime(
 					removeCandidateFromIndex(visibleCandidatesByKey, candidate);
 				}
 			}
-
 			state.visibility = "mounted";
-			for (const activationKey of state.keyCounts.keys()) {
-				keysToCancel.add(activationKey);
-			}
-			rowsToPrune.push([rowIndex, state]);
 		}
+	}
 
-		for (const [rowIndex, change] of finalChanges) {
-			if (change !== "activated") continue;
-
+	function activateRows(rowIndices: Iterable<number>): void {
+		for (const rowIndex of rowIndices) {
 			const state = getOrCreateRowState(rowIndex);
-			if (state.visibility !== "visible") {
-				state.visibility = "visible";
-				for (const candidate of state.candidatesById.values()) {
-					addCandidateToIndex(visibleCandidatesByKey, candidate);
-				}
-			}
-		}
+			if (state.visibility === "visible") continue;
 
-		for (const activationKey of keysToCancel) {
-			cancelPendingUnlessVisibleElsewhere(activationKey);
-		}
-		for (const [rowIndex, change] of finalChanges) {
-			if (change === "activated") {
-				enqueueRowCandidates(rowIndex);
+			state.visibility = "visible";
+			for (const candidate of state.candidatesById.values()) {
+				addCandidateToIndex(visibleCandidatesByKey, candidate);
 			}
 		}
-		for (const [rowIndex, state] of rowsToPrune) {
-			pruneRowIfEmpty(rowIndex, state);
+	}
+
+	function cancelPendingForRows(rowIndices: Iterable<number>): void {
+		for (const rowIndex of rowIndices) {
+			const state = rows.get(rowIndex);
+			if (!state) continue;
+			for (const activationKey of state.keyCounts.keys()) {
+				cancelPendingUnlessVisibleElsewhere(activationKey);
+			}
 		}
+	}
+
+	function pruneRows(rowIndices: Iterable<number>): void {
+		for (const rowIndex of rowIndices) {
+			const state = rows.get(rowIndex);
+			if (state) pruneRowIfEmpty(rowIndex, state);
+		}
+	}
+
+	function applyNormalizedVisibilityDelta(
+		delta: NormalizedRowPreviewVisibilityDelta,
+	): void {
+		if (disposed) return;
+
+		setRowsMounted(delta.clearedRows);
+		setRowsMounted(delta.deactivatedRows);
+		activateRows(delta.activatedRows);
+
+		// Activation is applied before cancellation so a key moving between rows
+		// keeps its pending request and resolves against the new visible candidate.
+		cancelPendingForRows(delta.clearedRows);
+		cancelPendingForRows(delta.deactivatedRows);
+		for (const rowIndex of delta.activatedRows) {
+			enqueueRowCandidates(rowIndex);
+		}
+		pruneRows(delta.clearedRows);
+		pruneRows(delta.deactivatedRows);
+	}
+
+	function applyVisibilityDelta(delta: RowPreviewVisibilityDelta): void {
+		if (disposed) return;
+
+		const activatedRows = new Set<number>();
+		const deactivatedRows = new Set<number>();
+		const clearedRows = new Set<number>();
+		for (const rowIndex of delta.clearedRows) {
+			clearedRows.add(rowIndex);
+		}
+		for (const rowIndex of delta.deactivatedRows) {
+			clearedRows.delete(rowIndex);
+			deactivatedRows.add(rowIndex);
+		}
+		for (const rowIndex of delta.activatedRows) {
+			clearedRows.delete(rowIndex);
+			deactivatedRows.delete(rowIndex);
+			activatedRows.add(rowIndex);
+		}
+		applyNormalizedVisibilityDelta({
+			activatedRows,
+			deactivatedRows,
+			clearedRows,
+		});
 	}
 
 	function dispose(): void {
@@ -373,6 +409,7 @@ export function createRowPreviewActivationRuntime(
 
 	return {
 		registerCandidate,
+		applyNormalizedVisibilityDelta,
 		applyVisibilityDelta,
 		setRowVisibility,
 		clearRow,

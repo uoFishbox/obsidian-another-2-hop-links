@@ -22,7 +22,10 @@ import {
 	createViewPlanMeasurementState,
 } from "ui/virtualization/svelte/viewPlanMeasurement.svelte";
 import { createViewPlanCardVirtualListPolicyResolver } from "ui/virtualization/svelte/viewPlanPolicy";
-import type { ViewPlanLayoutMetrics } from "ui/virtualization/svelte/viewPlanLayout";
+import {
+	isSameViewPlanLayout,
+	type ViewPlanLayoutMetrics,
+} from "ui/virtualization/svelte/viewPlanLayout";
 import { createResolvedCardLayoutSettingsMemo } from "ui/shared/layout/cardLayoutCssVars";
 import { createVirtualizedItemVisibilityStateController } from "ui/virtualization/svelte/virtualizedItemVisibilityState.svelte";
 import {
@@ -32,6 +35,7 @@ import {
 import type { RowRange } from "ui/virtualization/rowRange";
 import type { VirtualNavigationTarget } from "ui/virtualization/types";
 import type { ResultNavigationDirection } from "features/keyboard-navigation/resultFocus";
+import type { VirtualFrameCoordinator } from "ui/virtualization/scheduling/frameCoordinator";
 
 export interface TwoHopVirtualListProps {
 	readonly sections: readonly TwoHopVirtualSectionDescriptor[];
@@ -45,7 +49,10 @@ const EMPTY_RANGE: RowRange = { start: 0, end: 0 };
 const EMPTY_MOUNTED_ROWS: readonly [] = [];
 
 /** Connects TwoHop geometry to the shared pooled-row virtual surface. */
-export function useTwoHopVirtualList(props: TwoHopVirtualListProps) {
+export function useTwoHopVirtualList(
+	props: TwoHopVirtualListProps,
+	frameCoordinator?: VirtualFrameCoordinator,
+) {
 	let applicationStore = props.applicationStore;
 	if (!applicationStore) {
 		try {
@@ -60,7 +67,8 @@ export function useTwoHopVirtualList(props: TwoHopVirtualListProps) {
 	);
 	const visibilityStates =
 		createVirtualizedItemVisibilityStateController<TwoHopMountedCell>({
-			onVisibilityDelta: (delta) => previewRuntime?.applyVisibilityDelta(delta),
+			onNormalizedVisibilityDelta: (delta) =>
+				previewRuntime?.applyNormalizedVisibilityDelta(delta),
 		});
 	const documentProjection = createTwoHopDocumentProjection({
 		sections: props.sections,
@@ -79,6 +87,16 @@ export function useTwoHopVirtualList(props: TwoHopVirtualListProps) {
 	let cachedDocument: TwoHopDocument | undefined;
 	let cachedLayout: ViewPlanLayoutMetrics | undefined;
 	let cachedRowModel: TwoHopVirtualRowModel | undefined;
+	let residentSlotLayout: ViewPlanLayoutMetrics | undefined;
+	let residentSlotLayoutKey: object = {};
+	const resolveResidentSlotLayoutKey = (layout: ViewPlanLayoutMetrics): object => {
+		if (residentSlotLayout && isSameViewPlanLayout(residentSlotLayout, layout)) {
+			return residentSlotLayoutKey;
+		}
+		residentSlotLayout = { ...layout };
+		residentSlotLayoutKey = {};
+		return residentSlotLayoutKey;
+	};
 	const resolveRowModel = (
 		layout: ViewPlanLayoutMetrics = measurementState.layout,
 	): TwoHopVirtualRowModel => {
@@ -87,7 +105,11 @@ export function useTwoHopVirtualList(props: TwoHopVirtualListProps) {
 		}
 		cachedDocument = document;
 		cachedLayout = layout;
-		cachedRowModel = createTwoHopVirtualRowModel(document, layout);
+		cachedRowModel = createTwoHopVirtualRowModel(
+			document,
+			layout,
+			resolveResidentSlotLayoutKey(layout),
+		);
 		return cachedRowModel;
 	};
 	const rowModel = $derived(resolveRowModel());
@@ -186,6 +208,7 @@ export function useTwoHopVirtualList(props: TwoHopVirtualListProps) {
 		getConfiguredCardLayout: () => configuredLayout,
 		getValidatedSections: () => props.sections,
 		policyResolver,
+		frameCoordinator,
 	});
 
 	const publishDocument = (nextDocument: TwoHopDocument): void => {

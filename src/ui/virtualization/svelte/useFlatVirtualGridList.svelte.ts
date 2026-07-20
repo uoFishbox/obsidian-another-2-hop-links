@@ -119,8 +119,8 @@ export function useFlatVirtualGridList<T>(props: FlatVirtualGridListProps<T>) {
 		RowPreviewActivationRuntime | undefined
 	>(PREVIEW_ROW_ACTIVATION_CONTEXT_KEY);
 	const visibilityAdapter = createFlatGridVisibilityAdapter<T>({
-		onVisibilityDelta: (delta) => {
-			rowPreviewActivationRuntime?.applyVisibilityDelta(delta);
+		onNormalizedVisibilityDelta: (delta) => {
+			rowPreviewActivationRuntime?.applyNormalizedVisibilityDelta(delta);
 		},
 	});
 	const rowSlotAllocator = createResidentRowSlotAllocator();

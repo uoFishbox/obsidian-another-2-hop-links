@@ -60,7 +60,7 @@ export function buildTwoHopMountedRows(params: {
 	allocator.prepareRange({
 		start,
 		end,
-		layoutKey: `${rowModel.layout.columns}|${rowModel.layout.cellWidth}|${rowModel.layout.rowHeight}|${rowModel.layout.gap}`,
+		layoutKey: rowModel.residentSlotLayoutKey,
 	});
 	const rowSlices: TwoHopMountedRow[] = [];
 	let flattenedCells: TwoHopMountedCell[] | undefined;
@@ -122,13 +122,23 @@ export function buildTwoHopMountedRows(params: {
 		});
 	}
 
-	const sparseRowsBySlot: Array<TwoHopMountedRow | undefined> = new Array(
-		allocator.capacity,
-	);
-	for (const row of rowSlices) sparseRowsBySlot[row.slotIndex] = row;
-	const rowsBySlot: TwoHopMountedRow[] = [];
-	for (const row of sparseRowsBySlot) {
-		if (row) rowsBySlot.push(row);
+	const rowsBySlot = new Array<TwoHopMountedRow>(rowSlices.length);
+	let splitIndex = 0;
+	for (let index = 1; index < rowSlices.length; index += 1) {
+		if (rowSlices[index].slotIndex < rowSlices[index - 1].slotIndex) {
+			splitIndex = index;
+			break;
+		}
+	}
+
+	let outputIndex = 0;
+	for (let index = splitIndex; index < rowSlices.length; index += 1) {
+		rowsBySlot[outputIndex] = rowSlices[index];
+		outputIndex += 1;
+	}
+	for (let index = 0; index < splitIndex; index += 1) {
+		rowsBySlot[outputIndex] = rowSlices[index];
+		outputIndex += 1;
 	}
 	const getCells = (): TwoHopMountedCell[] => {
 		if (flattenedCells) return flattenedCells;

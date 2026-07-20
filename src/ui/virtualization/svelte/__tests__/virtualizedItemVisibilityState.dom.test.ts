@@ -565,4 +565,52 @@ describe("createVirtualizedItemVisibilityStateController", () => {
 		expect(stateA.visibility).toBe("mounted");
 		expect(stateB.visibility).toBe("visible");
 	});
+
+	it("exposes normalized scratch sets to the synchronous internal callback", () => {
+		const received: Array<{
+			activatedRows: number[];
+			deactivatedRows: number[];
+			clearedRows: number[];
+		}> = [];
+		const rows = [row(0, [item("a")]), row(1, [item("b")])];
+		const ctrl = createVirtualizedItemVisibilityStateController<TestCell>({
+			onNormalizedVisibilityDelta: (delta) => {
+				expect(delta.activatedRows).toBeInstanceOf(Set);
+				expect(delta.deactivatedRows).toBeInstanceOf(Set);
+				expect(delta.clearedRows).toBeInstanceOf(Set);
+				received.push({
+					activatedRows: Array.from(delta.activatedRows),
+					deactivatedRows: Array.from(delta.deactivatedRows),
+					clearedRows: Array.from(delta.clearedRows),
+				});
+			},
+		});
+		const rowModelRevision = {};
+
+		ctrl.commit({
+			rowModelRevision,
+			mountedRows: rows,
+			mountedRange: range(0, 2),
+			previewActiveRange: range(0, 1),
+		});
+		ctrl.commit({
+			rowModelRevision,
+			mountedRows: rows,
+			mountedRange: range(0, 2),
+			previewActiveRange: range(1, 2),
+		});
+
+		expect(received).toEqual([
+			{
+				activatedRows: [0],
+				deactivatedRows: [1],
+				clearedRows: [],
+			},
+			{
+				activatedRows: [1],
+				deactivatedRows: [0],
+				clearedRows: [],
+			},
+		]);
+	});
 });

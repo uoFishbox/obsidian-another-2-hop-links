@@ -30,6 +30,13 @@ export interface RowVisibilityDelta {
 	readonly clearedRows: readonly number[];
 }
 
+/** A conflict-free view over controller-owned scratch sets. */
+export interface NormalizedRowVisibilityDelta {
+	readonly activatedRows: ReadonlySet<number>;
+	readonly deactivatedRows: ReadonlySet<number>;
+	readonly clearedRows: ReadonlySet<number>;
+}
+
 export interface VirtualCardDisplaySnapshot<TCell extends VisibilityCell> {
 	readonly rowModelRevision: unknown;
 	readonly mountedRows: readonly VisibilityRow<TCell>[];
@@ -61,6 +68,13 @@ export interface VirtualizedItemVisibilityStateControllerOptions<
 		visibility: VirtualizedItemVisibility,
 	) => void;
 	readonly onRowCleared?: (rowIndex: number) => void;
+	/**
+	 * Internal synchronous path over the controller's normalized scratch sets.
+	 * The callback must consume the sets immediately and must not retain them.
+	 */
+	readonly onNormalizedVisibilityDelta?: (
+		delta: NormalizedRowVisibilityDelta,
+	) => void;
 	/** Receives one notification after all internal maps and states are committed. */
 	readonly onVisibilityDelta?: (delta: RowVisibilityDelta) => void;
 }
@@ -86,6 +100,11 @@ export function createVirtualizedItemVisibilityStateController<
 	const activatedRowsScratch = new Set<number>();
 	const deactivatedRowsScratch = new Set<number>();
 	const clearedRowsScratch = new Set<number>();
+	const normalizedVisibilityDelta: NormalizedRowVisibilityDelta = {
+		activatedRows: activatedRowsScratch,
+		deactivatedRows: deactivatedRowsScratch,
+		clearedRows: clearedRowsScratch,
+	};
 	let visibilityCommitDepth = 0;
 	let committedRowModelRevision: unknown;
 	let hasCommittedSnapshot = false;
@@ -102,15 +121,27 @@ export function createVirtualizedItemVisibilityStateController<
 			return;
 		}
 
-		const delta: RowVisibilityDelta = {
-			activatedRows: Array.from(activatedRowsScratch),
-			deactivatedRows: Array.from(deactivatedRowsScratch),
-			clearedRows: Array.from(clearedRowsScratch),
-		};
-		activatedRowsScratch.clear();
-		deactivatedRowsScratch.clear();
-		clearedRowsScratch.clear();
+		const hasExternalCallbacks =
+			options.onVisibilityDelta !== undefined ||
+			options.onRowVisibilityChanged !== undefined ||
+			options.onRowCleared !== undefined;
+		const delta: RowVisibilityDelta | undefined = hasExternalCallbacks
+			? {
+					activatedRows: Array.from(activatedRowsScratch),
+					deactivatedRows: Array.from(deactivatedRowsScratch),
+					clearedRows: Array.from(clearedRowsScratch),
+				}
+			: undefined;
 
+		try {
+			options.onNormalizedVisibilityDelta?.(normalizedVisibilityDelta);
+		} finally {
+			activatedRowsScratch.clear();
+			deactivatedRowsScratch.clear();
+			clearedRowsScratch.clear();
+		}
+
+		if (!delta) return;
 		options.onVisibilityDelta?.(delta);
 		for (const rowIndex of delta.activatedRows) {
 			options.onRowVisibilityChanged?.(rowIndex, "visible");
