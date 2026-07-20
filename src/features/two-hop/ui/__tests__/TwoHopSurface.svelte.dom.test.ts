@@ -1,14 +1,39 @@
 import { cleanup, fireEvent, render, waitFor } from "@testing-library/svelte";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { DEFAULT_SETTINGS } from "features/settings/model";
 import type { ApplicationStore } from "ui/stores/ApplicationStore.svelte";
 import TwoHopSurface from "features/two-hop/ui/TwoHopSurface.svelte";
+import {
+	flushFrames,
+	installAnimationFrameMock,
+	installIntersectionObserverMock,
+	installResizeObserverMock,
+	resetRecords,
+	setElementRect,
+	setNumericProperty,
+	teardownAnimationFrameMock,
+	teardownIntersectionObserverMock,
+	teardownResizeObserverMock,
+	triggerResize,
+} from "testing/helpers/DOMObserverMock";
 import type {
 	TwoHopVirtualListItem,
 	TwoHopVirtualSectionDescriptor,
 } from "features/two-hop/ui/twoHopVirtualListModel";
 
-afterEach(cleanup);
+beforeEach(() => {
+	resetRecords();
+	installResizeObserverMock();
+	installIntersectionObserverMock();
+	installAnimationFrameMock();
+});
+
+afterEach(() => {
+	cleanup();
+	teardownResizeObserverMock();
+	teardownIntersectionObserverMock();
+	teardownAnimationFrameMock();
+});
 
 function createSection(count: number): TwoHopVirtualSectionDescriptor {
 	const items = Array.from({ length: count }, (_, index) => ({
@@ -38,16 +63,75 @@ function createSection(count: number): TwoHopVirtualSectionDescriptor {
 	};
 }
 
-describe("TwoHopSurface", () => {
-	const applicationStore = {
-		settings: {
-			...DEFAULT_SETTINGS,
-			cardWidthPx: 100,
-			cardHeightRatio: 1,
-			cardMaxColumns: 3,
-		},
-	} as unknown as ApplicationStore;
+const applicationStore = {
+	settings: {
+		...DEFAULT_SETTINGS,
+		cardWidthPx: 100,
+		cardHeightRatio: 1,
+		cardMaxColumns: 3,
+	},
+} as unknown as ApplicationStore;
 
+async function renderScrollableSurface(count: number): Promise<{
+	root: HTMLElement;
+	scroller: HTMLElement;
+}> {
+	const scroller = document.createElement("div");
+	scroller.style.overflow = "auto";
+	setNumericProperty(scroller, "clientHeight", 120);
+	setNumericProperty(scroller, "scrollHeight", 10_000);
+	setNumericProperty(scroller, "scrollTop", 0);
+	setElementRect(scroller, { top: 0, width: 330, height: 120 });
+	document.body.append(scroller);
+
+	render(TwoHopSurface, {
+		target: scroller,
+		props: {
+			sections: [createSection(count)],
+			applicationStore,
+			initialVisibleCount: count,
+		},
+	});
+	const root = scroller.querySelector<HTMLElement>(".twohop-keyed-surface");
+	if (!root) {
+		throw new Error("Two-hop virtual surface was not rendered");
+	}
+
+	setElementRect(root, { top: 0, width: 330, height: 10_000 });
+	triggerResize(root, 330, 10_000);
+	triggerResize(scroller, 330, 120);
+	await flushFrames();
+
+	return { root, scroller };
+}
+
+function getPhysicalSlot(
+	root: HTMLElement,
+	slot: number,
+): HTMLElement | null {
+	return (
+		root.shadowRoot?.querySelector<HTMLElement>(
+			`[data-ccl-cell-slot='${slot}']`,
+		) ?? null
+	);
+}
+
+async function scrollSurface(
+	root: HTMLElement,
+	scroller: HTMLElement,
+	scrollTop: number,
+): Promise<void> {
+	setNumericProperty(scroller, "scrollTop", scrollTop);
+	setElementRect(root, {
+		top: -scrollTop,
+		width: 330,
+		height: 10_000,
+	});
+	await fireEvent.scroll(scroller);
+	await flushFrames();
+}
+
+describe("TwoHopSurface", () => {
 	it.each([100, 1_000, 10_000])(
 		"mounts %i logical cards with a bounded fixed pool",
 		(cardCount) => {
@@ -110,6 +194,45 @@ describe("TwoHopSurface", () => {
 		},
 	);
 
+	it("reuses an item body when its physical slot receives another item", async () => {
+		const { root, scroller } = await renderScrollableSurface(100);
+		const initialSlot = getPhysicalSlot(root, 1);
+		const initialBody = initialSlot?.querySelector<HTMLElement>(
+			".cosense-card-links__box",
+		);
+		const initialKey = initialSlot?.dataset.cclLogicalKey;
+		const initialRowIndex = initialSlot?.dataset.cclRowIndex;
+
+		expect(initialBody?.textContent).toContain("item:0");
+		expect(initialKey).toContain("item:0");
+		if (!initialBody) {
+			throw new Error("Initial item body was not rendered");
+		}
+		initialBody.tabIndex = 0;
+		initialBody.dataset.cclHovered = "true";
+		initialBody.dataset.cclLongPressed = "1";
+		initialBody.focus();
+		expect(root.shadowRoot?.activeElement).toBe(initialBody);
+
+		await scrollSurface(root, scroller, 804);
+		await waitFor(() => {
+			expect(getPhysicalSlot(root, 1)?.dataset.cclLogicalKey).not.toBe(
+				initialKey,
+			);
+		});
+
+		const updatedSlot = getPhysicalSlot(root, 1);
+		const updatedBody = updatedSlot?.querySelector<HTMLElement>(
+			".cosense-card-links__box",
+		);
+		expect(updatedBody).toBe(initialBody);
+		expect(updatedBody?.textContent).not.toContain("item:0");
+		expect(updatedSlot?.dataset.cclRowIndex).not.toBe(initialRowIndex);
+		expect(root.shadowRoot?.activeElement).not.toBe(updatedBody);
+		expect(updatedBody?.dataset.cclHovered).toBeUndefined();
+		expect(updatedBody?.dataset.cclLongPressed).toBeUndefined();
+	});
+
 	it("remounts a load-more body as the newly revealed logical card", async () => {
 		const { container } = render(TwoHopSurface, {
 			props: {
@@ -137,6 +260,8 @@ describe("TwoHopSurface", () => {
 		expect(
 			loadMoreCell?.querySelector(".cosense-card-links__load-more-button"),
 		).toBeNull();
-		expect(loadMoreCell?.textContent).toContain("item:1");
+		const itemBody = loadMoreCell?.querySelector(".cosense-card-links__box");
+		expect(itemBody).not.toBe(loadMoreButton);
+		expect(itemBody?.textContent).toContain("item:1");
 	});
 });

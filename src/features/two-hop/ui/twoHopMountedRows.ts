@@ -37,7 +37,7 @@ export interface TwoHopMountedRowsBuild extends MountedVirtualCellsBuild<TwoHopM
 	readonly rowsBySlot: readonly TwoHopMountedRow[];
 }
 
-/** Builds bounded physical row/cell shells while keeping card bodies logical-keyed. */
+/** Builds bounded physical row/cell shells and exposes both slot and logical body keys. */
 export function buildTwoHopMountedRows(params: {
 	readonly rowModel: TwoHopVirtualRowModel;
 	readonly rowRange: RowRange;

@@ -2,6 +2,7 @@
 	import { IS_PROD } from "appConstants";
 	import { onDestroy, type Snippet } from "svelte";
 	import type { LogicalCellKey } from "../types";
+	import { dispatchVirtualCellWillRebind } from "ui/interactions/virtualCellRebind";
 	import {
 		createVirtualCellElementRegistration,
 		type VirtualCellRegistry,
@@ -49,10 +50,6 @@
 	const logicalKeyAttribute = $derived(String(logicalKey));
 
 	$effect(() => {
-		if (!onLogicalCellAttach && !onLogicalCellDetach) {
-			return;
-		}
-
 		const nextLogicalKey = logicalKeyAttribute;
 		const previousLogicalKey = lifecycleLogicalKey;
 		const previousCell = lifecycleCell;
@@ -62,6 +59,12 @@
 			previousLogicalKey !== undefined &&
 			previousLogicalKey !== nextLogicalKey
 		) {
+			if (cellElement) {
+				dispatchVirtualCellWillRebind(cellElement, {
+					previousLogicalKey,
+					nextLogicalKey,
+				});
+			}
 			onLogicalCellDetach?.(previousCell);
 		}
 

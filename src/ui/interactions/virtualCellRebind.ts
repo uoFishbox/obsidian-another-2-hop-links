@@ -1,3 +1,5 @@
+import { isShadowRootLike } from "ui/shared/dom/realmSafeDom";
+
 export const VIRTUAL_CELL_WILL_REBIND_EVENT = "cclvirtualcellwillrebind";
 
 export interface VirtualCellWillRebindDetail {
@@ -26,12 +28,25 @@ function dispatchRebindEvent(
 	);
 }
 
+function resolveActiveElement(element: HTMLElement): Element | null {
+	const rootNode = element.getRootNode();
+	let activeElement = isShadowRootLike(rootNode)
+		? rootNode.activeElement
+		: element.ownerDocument.activeElement;
+
+	while (activeElement?.shadowRoot?.activeElement) {
+		activeElement = activeElement.shadowRoot.activeElement;
+	}
+
+	return activeElement;
+}
+
 /** Announces that a physical cell is about to stop representing a logical card. */
 export function dispatchVirtualCellWillRebind(
 	element: HTMLElement,
 	detail: VirtualCellWillRebindDetail,
 ): void {
-	const activeElement = element.ownerDocument.activeElement;
+	const activeElement = resolveActiveElement(element);
 	const hasFocusedDescendant = Boolean(
 		activeElement &&
 		"blur" in activeElement &&
@@ -71,7 +86,7 @@ export function dispatchVirtualCellWillRebindFromRoot(
 	interactionRoot: HTMLElement,
 	detail: VirtualCellWillRebindDetail,
 ): void {
-	const activeElement = element.ownerDocument.activeElement;
+	const activeElement = resolveActiveElement(element);
 	const hasFocusedDescendant = Boolean(
 		activeElement &&
 		"blur" in activeElement &&

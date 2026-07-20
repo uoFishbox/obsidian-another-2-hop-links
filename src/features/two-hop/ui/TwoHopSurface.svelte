@@ -1,6 +1,6 @@
 <script lang="ts">
 	import VirtualSurface from "ui/virtualization/components/VirtualSurface.svelte";
-	import { KEYED_VIRTUAL_CELL_BODY_LIFECYCLE } from "ui/virtualization/core/bodyLifecycle";
+	import type { VirtualCellBodyLifecyclePolicy } from "ui/virtualization/core/bodyLifecycle";
 	import { providePreviewActivationContexts } from "features/preview/scheduling/previewActivationContexts";
 	import { provideVirtualFrameCoordinator } from "ui/virtualization/svelte/frameCoordinatorContext.svelte";
 	import TwoHopLogicalCell from "features/two-hop/ui/TwoHopLogicalCell.svelte";
@@ -8,6 +8,7 @@
 	import type { ApplicationStore } from "ui/stores/ApplicationStore.svelte";
 	import type { CardRenderModel } from "ui/components/items/cardRenderModel";
 	import type { TwoHopCardPresentationState } from "features/two-hop/ui/twoHopCellStaticState";
+	import type { TwoHopMountedCell } from "features/two-hop/ui/twoHopMountedRows";
 	import type {
 		TwoHopVirtualListItem,
 		TwoHopVirtualSectionDescriptor,
@@ -24,6 +25,14 @@
 		) => CardRenderModel;
 		previewActive?: boolean;
 	}
+
+	const TWO_HOP_BODY_LIFECYCLE = {
+		type: "keyed",
+		resolveKey: (cell: TwoHopMountedCell): unknown =>
+			cell.cell.kind === "item"
+				? cell.renderSlotKey
+				: (cell.renderBodyKey ?? cell.key),
+	} satisfies VirtualCellBodyLifecyclePolicy<TwoHopMountedCell>;
 
 	const props: Props = $props();
 	const frameCoordinator = provideVirtualFrameCoordinator();
@@ -43,7 +52,7 @@
 	gap={list.layout.gap}
 	layoutMode="grid-rows"
 	mountedRows={list.mountedRows}
-	bodyLifecyclePolicy={KEYED_VIRTUAL_CELL_BODY_LIFECYCLE}
+	bodyLifecyclePolicy={TWO_HOP_BODY_LIFECYCLE}
 	bind:rootEl={list.rootEl}
 	observerRoot={list.observerRoot}
 	getCellClassName={list.getCellClassName}

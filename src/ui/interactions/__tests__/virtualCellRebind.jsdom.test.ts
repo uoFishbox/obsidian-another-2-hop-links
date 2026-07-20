@@ -67,4 +67,23 @@ describe("dispatchVirtualCellWillRebind", () => {
 		expect(document.activeElement).not.toBe(input);
 		expect(listener).not.toHaveBeenCalled();
 	});
+
+	it("blurs a focused descendant inside a shadow root", () => {
+		const host = document.createElement("div");
+		const shadowRoot = host.attachShadow({ mode: "open" });
+		const cell = document.createElement("div");
+		const input = document.createElement("input");
+		cell.append(input);
+		shadowRoot.append(cell);
+		document.body.append(host);
+		input.focus();
+		expect(shadowRoot.activeElement).toBe(input);
+
+		dispatchVirtualCellWillRebind(cell, {
+			previousLogicalKey: "first",
+			nextLogicalKey: "second",
+		});
+
+		expect(shadowRoot.activeElement).not.toBe(input);
+	});
 });
