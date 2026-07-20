@@ -11,6 +11,7 @@ import {
 	resolveTwoHopRowTop,
 	resolveTwoHopVisibleRowsInto,
 	type TwoHopGeometry,
+	type TwoHopResolvedCell,
 } from "features/two-hop/ui/viewport/twoHopGeometry";
 import type { VirtualListLogicalCell } from "ui/virtualization/logicalCell";
 import type { RowRange } from "ui/virtualization/rowRange";
@@ -93,30 +94,7 @@ export function createTwoHopVirtualRowModel(
 	): TwoHopLogicalCell | null => {
 		const resolved = resolveTwoHopCell(document, geometry, rowIndex, columnIndex);
 		if (!resolved) return null;
-
-		switch (resolved.kind) {
-			case "header":
-				return {
-					kind: "header",
-					key: logicalCellKey(resolved.logicalKey),
-					sectionIndex: resolved.sectionIndex,
-				};
-			case "item":
-				return {
-					kind: "item",
-					key: logicalCellKey(resolved.logicalKey),
-					sourceKey: sourceKey(resolved.item.virtualKey),
-					item: resolved.item,
-					itemIndex: resolved.itemIndex,
-					sectionIndex: resolved.sectionIndex,
-				};
-			case "load-more":
-				return {
-					kind: "load-more",
-					key: logicalCellKey(resolved.logicalKey),
-					sectionIndex: resolved.sectionIndex,
-				};
-		}
+		return createTwoHopLogicalCell(resolved);
 	};
 
 	const writeVisibleRange = (
@@ -378,4 +356,33 @@ export function createTwoHopVirtualRowModel(
 				currentPosition.columnIndex,
 			),
 	};
+}
+
+/** Converts resolved compact geometry data into the logical cell render contract. */
+export function createTwoHopLogicalCell(
+	resolved: TwoHopResolvedCell,
+): TwoHopLogicalCell {
+	switch (resolved.kind) {
+		case "header":
+			return {
+				kind: "header",
+				key: logicalCellKey(resolved.logicalKey),
+				sectionIndex: resolved.sectionIndex,
+			};
+		case "item":
+			return {
+				kind: "item",
+				key: logicalCellKey(resolved.logicalKey),
+				sourceKey: sourceKey(resolved.item.virtualKey),
+				item: resolved.item,
+				itemIndex: resolved.itemIndex,
+				sectionIndex: resolved.sectionIndex,
+			};
+		case "load-more":
+			return {
+				kind: "load-more",
+				key: logicalCellKey(resolved.logicalKey),
+				sectionIndex: resolved.sectionIndex,
+			};
+	}
 }

@@ -3,6 +3,13 @@ import type {
 	TwoHopLogicalCell,
 	TwoHopVirtualRowModel,
 } from "features/two-hop/ui/twoHopVirtualRowModel";
+import { createTwoHopLogicalCell } from "features/two-hop/ui/twoHopVirtualRowModel";
+import {
+	createTwoHopResolvedCellBuffer,
+	createTwoHopResolvedRowBuffer,
+	resolveTwoHopCellInRowInto,
+	resolveTwoHopRowInto,
+} from "features/two-hop/ui/viewport/twoHopGeometry";
 import {
 	createResidentRowSlotAllocator,
 	type ResidentRowSlotAllocator,
@@ -30,14 +37,11 @@ export interface TwoHopMountedRowsBuild extends MountedVirtualCellsBuild<TwoHopM
 	readonly rowsBySlot: readonly TwoHopMountedRow[];
 }
 
-const EMPTY_PREVIOUS_CELLS: ReadonlyMap<string, TwoHopMountedCell> = new Map();
-
 /** Builds bounded physical row/cell shells while keeping card bodies logical-keyed. */
 export function buildTwoHopMountedRows(params: {
 	readonly rowModel: TwoHopVirtualRowModel;
 	readonly rowRange: RowRange;
 	readonly previousBuild?: TwoHopMountedRowsBuild;
-	readonly previousCellsByKey?: ReadonlyMap<string, TwoHopMountedCell>;
 	readonly rowSlotAllocator?: ResidentRowSlotAllocator;
 }): TwoHopMountedRowsBuild {
 	const { rowModel } = params;
@@ -58,46 +62,47 @@ export function buildTwoHopMountedRows(params: {
 		end,
 		layoutKey: `${rowModel.layout.columns}|${rowModel.layout.cellWidth}|${rowModel.layout.rowHeight}|${rowModel.layout.gap}`,
 	});
-	const previousCellsByKey =
-		previousBuild?.reusableCellsByKey ??
-		params.previousCellsByKey ??
-		EMPTY_PREVIOUS_CELLS;
-	const previousRowsByIndex = new Map<number, TwoHopMountedRow>();
-	for (const row of previousBuild?.rowSlices ?? []) {
-		previousRowsByIndex.set(row.rowIndex, row);
-	}
-
 	const rowSlices: TwoHopMountedRow[] = [];
-	const reusableCellsByKey = new Map<string, TwoHopMountedCell>();
-	const cells: TwoHopMountedCell[] = [];
-	const columns = Math.max(1, rowModel.layout.columns);
+	let flattenedCells: TwoHopMountedCell[] | undefined;
+	let reusableCellsByKey: Map<string, TwoHopMountedCell> | undefined;
+	const columns = rowModel.geometry.columns;
+	const rowScratch = createTwoHopResolvedRowBuffer();
+	const cellScratch = createTwoHopResolvedCellBuffer();
 
 	for (let rowIndex = start; rowIndex < end; rowIndex += 1) {
-		const row = rowModel.getRow(rowIndex);
-		const section = rowModel.getDocumentSection(rowIndex);
-		if (!row || !section) continue;
 		const slotIndex = allocator.resolveSlotIndex(rowIndex);
-		const previousRow = previousRowsByIndex.get(rowIndex);
-		if (
-			previousBuild?.rowModel === rowModel &&
-			previousRow?.slotIndex === slotIndex
-		) {
+		const previousRow = getPreviousRow(previousBuild, rowModel, rowIndex);
+		if (previousRow?.slotIndex === slotIndex) {
 			rowSlices.push(previousRow);
-			for (const cell of previousRow.cells) {
-				cells.push(cell);
-				reusableCellsByKey.set(cell.key, cell);
-			}
+			continue;
+		}
+		if (previousRow) {
+			rowSlices.push(rebindPreviousRow(previousRow, slotIndex, columns));
 			continue;
 		}
 
+		if (!resolveTwoHopRowInto(rowModel.geometry, rowIndex, rowScratch)) continue;
+		const section = rowModel.document.sections[rowScratch.sectionIndex];
+		if (!section) continue;
+
 		const rowCells: TwoHopMountedCell[] = [];
-		for (let columnIndex = 0; columnIndex < row.cellCount; columnIndex += 1) {
-			const logicalCell = row.getCell(columnIndex);
+		const sectionCellCount =
+			1 + section.visibleItemCount + (section.loadMore === null ? 0 : 1);
+		const rowCellCount = Math.min(
+			columns,
+			Math.max(0, sectionCellCount - rowScratch.rowInSection * columns),
+		);
+		for (let columnIndex = 0; columnIndex < rowCellCount; columnIndex += 1) {
+			const logicalCell = resolveLogicalCell({
+				rowModel,
+				rowScratch,
+				cellScratch,
+				columnIndex,
+			});
 			if (!logicalCell) continue;
 			const renderSlotIndex = slotIndex * columns + columnIndex;
-			const previous = previousCellsByKey.get(logicalCell.key);
 			const mountedCell = resolveMountedCell({
-				previous,
+				previous: undefined,
 				logicalCell,
 				section,
 				rowIndex,
@@ -105,32 +110,104 @@ export function buildTwoHopMountedRows(params: {
 				renderSlotIndex,
 			});
 			rowCells.push(mountedCell);
-			cells.push(mountedCell);
-			reusableCellsByKey.set(mountedCell.key, mountedCell);
 		}
 
 		rowSlices.push({
 			key: rowIndex,
 			rowIndex,
-			top: row.top,
+			top: rowScratch.top,
 			slotIndex,
 			slotKey: slotIndex,
 			cells: rowCells,
 		});
 	}
 
-	const rowsBySlot = [...rowSlices].sort(
-		(current, next) => current.slotIndex - next.slotIndex,
+	const sparseRowsBySlot: Array<TwoHopMountedRow | undefined> = new Array(
+		allocator.capacity,
 	);
+	for (const row of rowSlices) sparseRowsBySlot[row.slotIndex] = row;
+	const rowsBySlot: TwoHopMountedRow[] = [];
+	for (const row of sparseRowsBySlot) {
+		if (row) rowsBySlot.push(row);
+	}
+	const getCells = (): TwoHopMountedCell[] => {
+		if (flattenedCells) return flattenedCells;
+		flattenedCells = [];
+		for (const row of rowSlices) flattenedCells.push(...row.cells);
+		return flattenedCells;
+	};
+	const getReusableCellsByKey = (): Map<string, TwoHopMountedCell> => {
+		if (reusableCellsByKey) return reusableCellsByKey;
+		reusableCellsByKey = new Map();
+		for (const cell of getCells()) reusableCellsByKey.set(cell.key, cell);
+		return reusableCellsByKey;
+	};
 	return {
-		cells,
-		reusableCellsByKey,
+		get cells() {
+			return getCells();
+		},
+		get reusableCellsByKey() {
+			return getReusableCellsByKey();
+		},
 		nextRenderSlotIndex: allocator.capacity * columns,
 		rowModel,
 		rowRange: { start, end },
 		rowSlices,
 		rowsBySlot,
 	};
+}
+
+function rebindPreviousRow(
+	previousRow: TwoHopMountedRow,
+	slotIndex: number,
+	columns: number,
+): TwoHopMountedRow {
+	const cells = previousRow.cells.map((previous, columnIndex) =>
+		resolveMountedCell({
+			previous,
+			logicalCell: previous.cell,
+			section: previous.section,
+			rowIndex: previousRow.rowIndex,
+			columnIndex,
+			renderSlotIndex: slotIndex * columns + columnIndex,
+		}),
+	);
+	return {
+		key: previousRow.key,
+		rowIndex: previousRow.rowIndex,
+		top: previousRow.top,
+		slotIndex,
+		slotKey: slotIndex,
+		cells,
+	};
+}
+
+function getPreviousRow(
+	previousBuild: TwoHopMountedRowsBuild | undefined,
+	rowModel: TwoHopVirtualRowModel,
+	rowIndex: number,
+): TwoHopMountedRow | undefined {
+	if (!previousBuild || previousBuild.rowModel !== rowModel) return undefined;
+	const offset = rowIndex - previousBuild.rowRange.start;
+	if (offset < 0 || offset >= previousBuild.rowSlices.length) return undefined;
+	const row = previousBuild.rowSlices[offset];
+	return row?.rowIndex === rowIndex ? row : undefined;
+}
+
+function resolveLogicalCell(params: {
+	readonly rowModel: TwoHopVirtualRowModel;
+	readonly rowScratch: ReturnType<typeof createTwoHopResolvedRowBuffer>;
+	readonly cellScratch: ReturnType<typeof createTwoHopResolvedCellBuffer>;
+	readonly columnIndex: number;
+}): TwoHopLogicalCell | null {
+	const resolved = resolveTwoHopCellInRowInto(
+		params.rowModel.document,
+		params.rowModel.geometry,
+		params.rowScratch,
+		params.columnIndex,
+		params.cellScratch,
+	);
+	return resolved ? createTwoHopLogicalCell(resolved) : null;
 }
 
 function resolveMountedCell(params: {

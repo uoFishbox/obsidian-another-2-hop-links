@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { createTwoHopDocument } from "features/two-hop/ui/twoHopDocument";
 import { createTwoHopVirtualRowModel } from "features/two-hop/ui/twoHopVirtualRowModel";
 import { buildTwoHopMountedRows } from "features/two-hop/ui/twoHopMountedRows";
@@ -102,5 +102,35 @@ describe("TwoHop keyed mounted rows", () => {
 				rowSlotAllocator: allocator,
 			}),
 		).toBe(first);
+	});
+
+	it("resolves entering rows through compact geometry and reuses overlapping rows", () => {
+		const document = createTwoHopDocument({
+			sections: [createSection(20)],
+			visibleCounts: {},
+			initialVisibleCount: 20,
+		});
+		const rowModel = createTwoHopVirtualRowModel(document, layout);
+		const getRow = vi.spyOn(rowModel, "getRow");
+		const getDocumentSection = vi.spyOn(rowModel, "getDocumentSection");
+		const allocator = createResidentRowSlotAllocator();
+		const first = buildTwoHopMountedRows({
+			rowModel,
+			rowRange: { start: 1, end: 5 },
+			rowSlotAllocator: allocator,
+		});
+		const shifted = buildTwoHopMountedRows({
+			rowModel,
+			rowRange: { start: 2, end: 6 },
+			previousBuild: first,
+			rowSlotAllocator: allocator,
+		});
+
+		expect(getRow).not.toHaveBeenCalled();
+		expect(getDocumentSection).not.toHaveBeenCalled();
+		expect(shifted.rowSlices.slice(0, 3)).toEqual(first.rowSlices.slice(1, 4));
+		expect(shifted.rowSlices[0]).toBe(first.rowSlices[1]);
+		expect(shifted.cells).toBe(shifted.cells);
+		expect(shifted.reusableCellsByKey).toBe(shifted.reusableCellsByKey);
 	});
 });

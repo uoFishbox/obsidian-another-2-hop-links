@@ -113,21 +113,16 @@ export function useTwoHopVirtualList(props: TwoHopVirtualListProps) {
 		TwoHopMountedCell,
 		TwoHopMountedRowsBuild
 	>({
-		buildMountedCells: ({
-			rowModel: activeRowModel,
-			rowRange,
-			previousBuild,
-			previousCellsByKey,
-		}) =>
+		buildMountedCells: ({ rowModel: activeRowModel, rowRange, previousBuild }) =>
 			buildTwoHopMountedRows({
 				rowModel: activeRowModel,
 				rowRange,
 				previousBuild,
-				previousCellsByKey,
 				rowSlotAllocator,
 			}),
 		mountedRowsReconciler: rowSlotAllocator,
 		visibilityMetadataPolicy: { type: "caller-managed" },
+		providePreviousCellsByKey: false,
 		trackMountedCellsForChange: false,
 		onStableVisibleRange: () => {
 			measurementState.measurement.hasStableVisibleRange = true;
