@@ -2,6 +2,7 @@ import type {
 	VirtualizedItemVisibility,
 	VirtualizedItemVisibilityState,
 } from "../types";
+import type { CardPreviewSlotState } from "features/preview/ui/cardPreviewSnapshot";
 
 /**
  * Props passed to flat virtual list item render snippets.
@@ -14,6 +15,7 @@ export interface VirtualListItemRenderArgs<T> {
 	readonly visibilityState?: VirtualizedItemVisibilityState;
 	rowIndex: number;
 	activationCandidateId: string;
+	readonly previewState?: CardPreviewSlotState;
 }
 
 /**

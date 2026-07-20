@@ -12,6 +12,12 @@
 	import type { ViewItem } from "application/presenters";
 	import type { VirtualizedItemVisibility } from "ui/components/common/virtualizedItemVisibility";
 	import type { CardRenderModel } from "../cardRenderModel";
+	import {
+		createCardPreviewSnapshot,
+		createCardRenderModel,
+	} from "../cardRenderModel";
+	import { createRowPreviewController } from "features/preview/scheduling/rowPreviewController.svelte";
+	import type { CardPreviewSlotState } from "features/preview/ui/cardPreviewSnapshot";
 
 	interface Props {
 		item: ViewItem | undefined;
@@ -47,6 +53,12 @@
 	const rowIndex = 0;
 	const activationCandidateId = "view-item-card-harness";
 	const activationContexts = providePreviewActivationContexts();
+	const previewController = createRowPreviewController({
+		runtime: activationContexts.rowPreviewActivationRuntime,
+		scope: activationContexts.previewActivationScope,
+		getQueuedPreviewJobs: linkContext.getVisiblePreviewQueueSize,
+		getActivePreviewJobs: linkContext.getActiveVisiblePreviewCount,
+	});
 	const scopedLinkContext = {
 		...linkContext,
 		sourceFile,
@@ -60,6 +72,32 @@
 		app,
 		bookmarks,
 	});
+	const effectiveModel = $derived.by(
+		() =>
+			model ??
+			(item
+				? createCardRenderModel({
+						item,
+						settings,
+						context: scopedLinkContext,
+						getPreviewRenderVersion: (path) =>
+							applicationStore.getPreviewRenderVersion?.(path) ?? "0:0",
+						searchQuery,
+						previewRefreshToken,
+					})
+				: undefined),
+	);
+	let previewState = $state.raw<CardPreviewSlotState | undefined>(undefined);
+
+	$effect(() => {
+		const snapshot = effectiveModel
+			? createCardPreviewSnapshot(effectiveModel)
+			: null;
+		previewController.syncCards(
+			snapshot ? [{ slotId: activationCandidateId, rowIndex, snapshot }] : [],
+		);
+		previewState = previewController.getSlotState(activationCandidateId);
+	});
 
 	$effect(() => {
 		activationContexts.rowPreviewActivationRuntime.setRowVisibility(
@@ -69,7 +107,7 @@
 	});
 
 	onDestroy(() => {
-		activationContexts.rowPreviewActivationRuntime.clearRow(rowIndex);
+		previewController.dispose();
 	});
 </script>
 
@@ -79,8 +117,7 @@
 		{settings}
 		{searchQuery}
 		{previewRefreshToken}
-		{rowIndex}
-		{activationCandidateId}
-		{model}
+		model={effectiveModel}
+		{previewState}
 	/>
 </PreviewVisibilityProvider>

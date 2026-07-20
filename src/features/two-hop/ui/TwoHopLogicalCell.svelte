@@ -13,6 +13,7 @@
 		type TwoHopCardPresentationState,
 	} from "features/two-hop/ui/twoHopCellStaticState";
 	import type { TwoHopVirtualListItem } from "features/two-hop/ui/twoHopVirtualListModel";
+	import type { CardPreviewSlotState } from "features/preview/ui/cardPreviewSnapshot";
 
 	interface Props {
 		mountedCell: TwoHopMountedCell;
@@ -22,10 +23,16 @@
 			presentation: TwoHopCardPresentationState,
 		) => CardRenderModel;
 		onLoadMore: (sectionId: string) => void;
+		previewState?: CardPreviewSlotState;
 	}
 
-	let { mountedCell, applicationStore, resolveItemCardModel, onLoadMore }: Props =
-		$props();
+	let {
+		mountedCell,
+		applicationStore,
+		resolveItemCardModel,
+		onLoadMore,
+		previewState = undefined,
+	}: Props = $props();
 
 	const itemPresentation = $derived.by(() => {
 		if (mountedCell.cell.kind !== "item") return null;
@@ -112,9 +119,7 @@
 		item={mountedCell.cell.item.item}
 		settings={applicationStore.settings}
 		model={cardModel}
-		interactionRegistration="self"
-		rowIndex={mountedCell.rowIndex}
-		activationCandidateId={mountedCell.key}
+		{previewState}
 	/>
 {:else}
 	<div

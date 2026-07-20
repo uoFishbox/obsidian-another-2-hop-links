@@ -24,8 +24,7 @@ export type CCLDevMeasurementName =
 	| "preview.domCommitScheduler.animationFrame"
 	| "preview.activationDuringScroll"
 	| "preview.domCommitDuringScroll"
-	| "component.ViewItemCard.reevaluate"
-	| "component.CardPreviewGate.reevaluate";
+	| "component.ViewItemCard.reevaluate";
 
 export const CCL_DEV_MEASUREMENT_NAMES: readonly CCLDevMeasurementName[] = [
 	"virtualScroll.applyScrollMeasurement",
@@ -54,7 +53,6 @@ export const CCL_DEV_MEASUREMENT_NAMES: readonly CCLDevMeasurementName[] = [
 	"preview.activationDuringScroll",
 	"preview.domCommitDuringScroll",
 	"component.ViewItemCard.reevaluate",
-	"component.CardPreviewGate.reevaluate",
 ];
 
 export interface CCLDevMeasurementCounter {
@@ -118,9 +116,7 @@ export function resetCCLDevMeasurements(): void {
 	counters.clear();
 }
 
-export function markCCLComponentReevaluation(
-	name: "ViewItemCard" | "CardPreviewGate",
-): string {
+export function markCCLComponentReevaluation(name: "ViewItemCard"): string {
 	recordCCLDevMeasurement(`component.${name}.reevaluate`);
 	return "";
 }

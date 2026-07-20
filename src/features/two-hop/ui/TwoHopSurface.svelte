@@ -59,12 +59,15 @@
 	getCellDataTestId={list.getCellDataTestId}
 	resolveNavigationTarget={list.resolveNavigationTarget}
 	flushVirtualScrollMeasurement={list.flushVirtualScrollMeasurement}
+	interactionDescriptorScopeId="two-hop-card-slots"
+	interactionDescriptorResolverProvider={list.interactionDescriptorResolverProvider}
 >
 	{#snippet renderCell({ mountedCell })}
 		<TwoHopLogicalCell
 			{mountedCell}
 			applicationStore={props.applicationStore}
 			resolveItemCardModel={props.resolveItemCardModel}
+			previewState={list.getPreviewState(mountedCell)}
 			onLoadMore={list.loadMore}
 		/>
 	{/snippet}

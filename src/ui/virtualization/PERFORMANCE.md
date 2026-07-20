@@ -34,13 +34,13 @@ Vault全体のベンチマークは、インデックス作成レイヤーやE2E
 
 ### Two-hop keyed pooled surface
 
-`TwoHopSurface.svelte` は共有 `VirtualSurface` のphysical row/cell shellを再利用し、カードbodyはlogical keyが変わるたびにremountする。
+`TwoHopSurface.svelte` は共有 `VirtualSurface` のphysical row/cell shellとカードbodyを再利用する。
 
 - physical row/cell shellには位置とslot identityだけを保持する。
-- `renderBodyKey` はlogical cell keyと一致させ、別カードへのrebindでcomponent cleanupを必ず実行する。
+- itemの `renderBodyKey` はphysical slot keyと一致させ、別カードへのrebindでもcard componentを維持する。
 - resident windowが同一ならmounted-row buildを同一参照で返し、Svelte state commitとDOM writeを行わない。
-- previewは`ViewItemCard` / `CardPreviewGate` とrow preview activation runtimeを使い、two-hop専用candidate走査を持たない。
-- item/header interaction descriptorは各logical componentがsurfaceのregistryへ登録し、component破棄時に解除する。
+- preview候補とrow visibility deltaはsurface所有の`rowPreviewController`で同期し、`ViewItemCard`はactivated slot stateだけを描画する。
+- item interaction descriptorはphysical slot単位のresolver providerへ同期し、rebind時はentry内容だけを更新する。headerはlogical component lifecycleを使う。
 - load-more bodyは通常のbutton lifecycleを使い、クリック中に同じbodyを別カードへ書き換えない。
 - `TwoHopDocument` と固定grid geometryは全カード分のDOMやcell objectを生成せず、mounted rangeだけをmaterializeする。
 

@@ -2,6 +2,7 @@ import type { PluginSettings } from "features/settings/model";
 import type { ViewItem } from "application/presenters";
 import type { CardPresentationState } from "ui/components/common/cardPresentation";
 import type { CardRenderModel } from "./cardRenderModel";
+import type { CardPreviewSlotState } from "features/preview/ui/cardPreviewSnapshot";
 
 export interface ItemProps {
 	item: ViewItem | undefined;
@@ -11,11 +12,9 @@ export interface ItemProps {
 	draggable?: boolean;
 	previewRefreshToken?: number;
 	contentPreview?: string;
-	interactionRegistration?: "self" | "snapshot";
 	interactionId?: string;
 	interactionKey?: string;
-	rowIndex?: number;
-	activationCandidateId?: string;
+	previewState?: CardPreviewSlotState;
 	presentation?: CardPresentationState;
 	model?: CardRenderModel;
 }

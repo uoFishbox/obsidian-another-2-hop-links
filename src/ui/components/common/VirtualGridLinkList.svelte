@@ -42,6 +42,8 @@
 			: KEYED_VIRTUAL_CELL_BODY_LIFECYCLE}
 		resolveNavigationTarget={list.resolveNavigationTarget}
 		flushVirtualScrollMeasurement={list.flushVirtualScrollMeasurement}
+		interactionDescriptorScopeId="virtual-grid-card-slots"
+		interactionDescriptorResolverProvider={list.interactionDescriptorResolverProvider}
 	>
 		{#snippet renderCell({ mountedCell, observerRoot })}
 			{#if mountedCell.cell.kind === "header"}

@@ -8,6 +8,9 @@ import {
 	createPreviewActivationScope,
 	resetPreviewActivationSchedulerForTests,
 } from "../previewActivationScheduler";
+import { createRowPreviewController } from "../rowPreviewController.svelte";
+import type { CardPreviewSnapshot } from "features/preview/ui/cardPreviewSnapshot";
+import type { TFile } from "obsidian";
 
 const FRAME_INTERVAL_MS = 1000 / 60;
 let frameTimestamp = 0;
@@ -27,6 +30,16 @@ function createTestCandidate(
 		rowIndex: options.rowIndex,
 		activationKey: options.activationKey,
 		onActivated: options.onActivated ?? (() => undefined),
+	};
+}
+
+function createPreviewSnapshot(identity: string, path: string): CardPreviewSnapshot {
+	return {
+		identity,
+		file: { path, extension: "md" } as TFile,
+		searchQuery: "",
+		previewRefreshToken: 0,
+		previewOverride: null,
 	};
 }
 
@@ -461,5 +474,91 @@ describe("rowPreviewActivationRuntime", () => {
 
 		expect(oldActivated).not.toHaveBeenCalled();
 		expect(nextActivated).toHaveBeenCalledWith("normalized-shared-key");
+	});
+});
+
+describe("rowPreviewController", () => {
+	it("activates visible slot previews and removes them outside the preview range", async () => {
+		const scope = createPreviewActivationScope();
+		const runtime = createRowPreviewActivationRuntime({ scope });
+		const controller = createRowPreviewController({ runtime, scope });
+		const snapshot = createPreviewSnapshot("preview-a", "notes/a.md");
+
+		controller.syncCards([{ slotId: "slot-0", rowIndex: 2, snapshot }]);
+		controller.applyNormalizedVisibilityDelta({
+			activatedRows: new Set([2]),
+			deactivatedRows: new Set(),
+			clearedRows: new Set(),
+		});
+		await flushAnimationFrame();
+		await flushAnimationFrame();
+
+		expect(controller.getSlotState("slot-0")?.snapshot).toBe(snapshot);
+
+		controller.applyNormalizedVisibilityDelta({
+			activatedRows: new Set(),
+			deactivatedRows: new Set([2]),
+			clearedRows: new Set(),
+		});
+
+		expect(controller.getSlotState("slot-0")?.snapshot).toBeUndefined();
+		controller.dispose();
+		runtime.dispose();
+	});
+
+	it("updates a physical slot to only activate its current logical card", async () => {
+		const scope = createPreviewActivationScope();
+		const runtime = createRowPreviewActivationRuntime({ scope });
+		const controller = createRowPreviewController({ runtime, scope });
+		const first = createPreviewSnapshot("preview-a", "notes/a.md");
+		const second = createPreviewSnapshot("preview-b", "notes/b.md");
+
+		controller.syncCards([{ slotId: "slot-0", rowIndex: 0, snapshot: first }]);
+		controller.applyNormalizedVisibilityDelta({
+			activatedRows: new Set([0]),
+			deactivatedRows: new Set(),
+			clearedRows: new Set(),
+		});
+		controller.syncCards([{ slotId: "slot-0", rowIndex: 1, snapshot: second }]);
+		controller.applyNormalizedVisibilityDelta({
+			activatedRows: new Set([1]),
+			deactivatedRows: new Set(),
+			clearedRows: new Set([0]),
+		});
+		await flushAnimationFrame();
+		await flushAnimationFrame();
+
+		expect(controller.getSlotState("slot-0")?.snapshot).toBe(second);
+		controller.dispose();
+		runtime.dispose();
+	});
+
+	it("registers preview backpressure once for the whole surface", () => {
+		const scope = createPreviewActivationScope();
+		const runtime = createRowPreviewActivationRuntime({ scope });
+		const controller = createRowPreviewController({
+			runtime,
+			scope,
+			getQueuedPreviewJobs: () => 0,
+			getActivePreviewJobs: () => 0,
+		});
+
+		controller.syncCards([
+			{
+				slotId: "slot-0",
+				rowIndex: 0,
+				snapshot: createPreviewSnapshot("preview-a", "notes/a.md"),
+			},
+			{
+				slotId: "slot-1",
+				rowIndex: 0,
+				snapshot: createPreviewSnapshot("preview-b", "notes/b.md"),
+			},
+		]);
+
+		expect(scope.backpressureProviders.size).toBe(1);
+		controller.dispose();
+		expect(scope.backpressureProviders.size).toBe(0);
+		runtime.dispose();
 	});
 });

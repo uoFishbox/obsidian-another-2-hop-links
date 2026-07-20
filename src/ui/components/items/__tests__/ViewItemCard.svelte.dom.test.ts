@@ -132,12 +132,14 @@ describe("ViewItemCard", () => {
 			directory: "attachments",
 			interactionId: "compiled-id",
 			interactionKey: "compiled-key",
+			interactionDescriptor: null,
 			presentation: undefined,
 			searchQuery: "compiled",
 			searchScope: "title-only",
 			contentPreview: undefined,
 			previewRefreshToken: 0,
 			previewActivationIdentity: "compiled-preview",
+			previewOverride: null,
 		};
 
 		render(ViewItemCardHarness, {

@@ -1,19 +1,14 @@
 <script lang="ts">
 	import type { ItemProps } from "./types";
-	import { useAppContext, useLinkContext } from "ui/context/linkContext";
+	import { useLinkContext } from "ui/context/linkContext";
 	import LinkItem from "ui/components/common/LinkItem.svelte";
-	import CardPreviewGate from "features/preview/ui/CardPreviewGate.svelte";
+	import CardPreview from "features/preview/ui/CardPreview.svelte";
 	import UnresolvedPreviewPlaceholder from "features/preview/ui/UnresolvedPreviewPlaceholder.svelte";
 	import { ARIA_LABELS, DEBUG_DISABLE_CARD_DOM_PREVIEW } from "../../../appConstants";
 	import { formatLinkText } from "features/preview/text-processing/textUtils";
 	import { getItemStrategy } from "application/presenters";
 	import { getPriorityFrontmatterCardTitle } from "core/frontmatterCardTitle";
-	import {
-		createItemInteractionDescriptor,
-		createItemInteractionKey,
-		type ItemInteractionDescriptor,
-	} from "ui/interactions/interactionTypes";
-	import { useInteractionRegistry } from "ui/interactions/interactionRegistry";
+	import { createItemInteractionKey } from "ui/interactions/interactionTypes";
 	import { markCCLComponentReevaluation } from "infrastructure/debug/CCLDevMeasurements";
 
 	let {
@@ -24,18 +19,14 @@
 		draggable = true,
 		previewRefreshToken = 0,
 		contentPreview = undefined,
-		interactionRegistration = "self",
 		interactionId: providedInteractionId = undefined,
 		interactionKey: providedInteractionKey = undefined,
-		rowIndex = undefined,
-		activationCandidateId = undefined,
+		previewState = undefined,
 		presentation = undefined,
 		model = undefined,
 	}: ItemProps = $props();
 
 	const context = useLinkContext();
-	const { applicationStore } = useAppContext();
-	const interactionRegistry = useInteractionRegistry();
 
 	const renderItem = $derived(model?.item ?? item);
 	const renderSearchQuery = $derived(model?.searchQuery ?? searchQuery);
@@ -119,35 +110,9 @@
 	);
 	const interactionId = $derived.by(() => {
 		if (model) return model.interactionId;
-		if (!interactionKey) return providedInteractionId;
-		return (
-			providedInteractionId ??
-			interactionRegistry?.createInteractionToken(interactionKey) ??
-			interactionKey
-		);
+		return providedInteractionId ?? interactionKey;
 	});
-	const interactionDescriptor = $derived.by((): ItemInteractionDescriptor | null =>
-		interactionRegistration === "self" &&
-		renderItem &&
-		interactionId &&
-		interactionKey
-			? createItemInteractionDescriptor(
-					renderItem,
-					settings,
-					renderSearchQuery,
-					context,
-					{
-						interactionId,
-						interactionKey,
-					},
-				)
-			: null,
-	);
-	const previewGateRowProps = $derived.by(() =>
-		rowIndex !== undefined && activationCandidateId !== undefined
-			? { rowIndex, activationCandidateId }
-			: null,
-	);
+	const previewSnapshot = $derived(previewState?.snapshot);
 	const componentReevaluationProbe = $derived.by(() => {
 		if (process.env.NODE_ENV === "production") return "";
 
@@ -158,11 +123,9 @@
 		void draggable;
 		void previewRefreshToken;
 		void contentPreview;
-		void interactionRegistration;
 		void providedInteractionId;
 		void providedInteractionKey;
-		void rowIndex;
-		void activationCandidateId;
+		void previewState;
 		void presentation;
 		void model;
 		void renderItem;
@@ -180,28 +143,8 @@
 		void directory;
 		void interactionKey;
 		void interactionId;
-		void interactionDescriptor;
-		void previewGateRowProps;
+		void previewSnapshot;
 		return markCCLComponentReevaluation("ViewItemCard");
-	});
-
-	function registerInteractionDescriptor(): (() => void) | undefined {
-		if (
-			interactionRegistration !== "self" ||
-			!interactionRegistry ||
-			!interactionDescriptor
-		) {
-			return;
-		}
-
-		interactionRegistry.register(interactionDescriptor);
-		return () => {
-			interactionRegistry.unregister(interactionDescriptor.interactionId);
-		};
-	}
-
-	$effect(() => {
-		return registerInteractionDescriptor();
 	});
 </script>
 
@@ -224,20 +167,13 @@
 		{#snippet children()}
 			{#if !DEBUG_DISABLE_CARD_DOM_PREVIEW && renderItem.type === "newLink" && !targetFile}
 				<UnresolvedPreviewPlaceholder />
-			{:else if !DEBUG_DISABLE_CARD_DOM_PREVIEW && previewGateRowProps}
-				<CardPreviewGate
-					file={targetFile}
+			{:else if !DEBUG_DISABLE_CARD_DOM_PREVIEW && previewSnapshot}
+				<CardPreview
+					file={previewSnapshot.file}
 					getPreview={context.getPreview}
-					getVisiblePreviewQueueSize={context.getVisiblePreviewQueueSize}
-					getActiveVisiblePreviewCount={context.getActiveVisiblePreviewCount}
-					{applicationStore}
-					searchQuery={renderSearchQuery}
-					searchScope={renderSearchScope}
-					previewRefreshToken={renderPreviewRefreshToken}
-					contentPreview={renderContentPreview}
-					precomputedPreviewIdentity={model?.previewActivationIdentity}
-					rowIndex={previewGateRowProps.rowIndex}
-					activationCandidateId={previewGateRowProps.activationCandidateId}
+					searchQuery={previewSnapshot.searchQuery}
+					previewRefreshToken={previewSnapshot.previewRefreshToken}
+					previewOverride={previewSnapshot.previewOverride}
 				/>
 			{/if}
 		{/snippet}

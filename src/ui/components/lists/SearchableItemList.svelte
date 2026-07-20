@@ -37,6 +37,12 @@
 		pinBookmarkedViewItems,
 	} from "./searchableItemSorting";
 	import { tick } from "svelte";
+	import {
+		createCardPreviewSnapshot,
+		createCardRenderModel,
+		type CardRenderModel,
+	} from "ui/components/items/cardRenderModel";
+	import { createItemInteractionKey } from "ui/interactions/interactionTypes";
 
 	interface Props {
 		items: ViewItem[];
@@ -337,6 +343,75 @@
 	let visibilityConsumption = $derived(
 		config.visibilityConsumption ?? "reactive-state",
 	);
+	const cardModelCache = new WeakMap<
+		ViewItem,
+		{ revision: object; itemKey: string; model: CardRenderModel }
+	>();
+	const cardModelRevision = $derived.by(() => ({
+		settings: applicationStore.settings,
+		searchQuery: search.normalized,
+		contentSearchEnabled,
+		allowContentSearch,
+		matchedItemByKey,
+		previewRefreshTokens,
+		applicationUpdateVersion: applicationStore.updateVersion,
+		previewGlobalVersion: applicationStore.previewGlobalVersion,
+		previewPathVersions: applicationStore.previewPathVersions,
+	}));
+
+	function resolveViewItemCardModel(
+		item: ViewItem,
+		index: number,
+		revision = cardModelRevision,
+	): CardRenderModel {
+		const itemKey = config.getItemKey(item, index);
+		const cached = cardModelCache.get(item);
+		if (cached?.revision === revision && cached.itemKey === itemKey) {
+			return cached.model;
+		}
+
+		const matchedItem = revision.matchedItemByKey?.get(itemKey) ?? null;
+		const searchScope =
+			revision.allowContentSearch &&
+			revision.contentSearchEnabled &&
+			(matchedItem?.contentMatched ?? true)
+				? "title-and-content"
+				: "title-only";
+		const interactionKey = createItemInteractionKey(item, itemKey);
+		const model = createCardRenderModel({
+			item,
+			settings: revision.settings,
+			context: linkContext,
+			getPreviewRenderVersion: (path) =>
+				applicationStore.getPreviewRenderVersion?.(path) ?? "0:0",
+			searchQuery: revision.searchQuery,
+			searchScope,
+			contentPreview: matchedItem?.contentPreview,
+			previewRefreshToken: revision.previewRefreshTokens[itemKey] ?? 0,
+			interactionId: interactionKey,
+			interactionKey,
+		});
+		cardModelCache.set(item, { revision, itemKey, model });
+		return model;
+	}
+
+	const resolveItemPreviewSnapshot = $derived.by(() => {
+		const revision = cardModelRevision;
+		return config.itemComponent === ViewItemCard
+			? (item: ViewItem, index: number) =>
+					createCardPreviewSnapshot(
+						resolveViewItemCardModel(item, index, revision),
+					)
+			: undefined;
+	});
+	const resolveItemInteractionDescriptor = $derived.by(() => {
+		const revision = cardModelRevision;
+		return config.itemComponent === ViewItemCard
+			? (item: ViewItem, index: number) =>
+					resolveViewItemCardModel(item, index, revision)
+						.interactionDescriptor
+			: undefined;
+	});
 
 	let resultsContainerEl = $state<HTMLDivElement | null>(null);
 	let resultsMinHeight = $derived(
@@ -394,22 +469,34 @@
 			{loadMoreIncrement}
 			paginationMode={config.paginationMode ?? "button"}
 			{visibilityConsumption}
+			{resolveItemPreviewSnapshot}
+			{resolveItemInteractionDescriptor}
 			remountCellBodyOnKeyChange={config.itemComponent !== ViewItemCard}
 			header={config.showSectionHeader ? sectionHeader : undefined}
 		>
 			{#snippet item({
 				item,
+				index,
 				observerRoot,
 				visibility,
 				rowIndex,
 				activationCandidateId,
+				previewState,
 			})}
 				{@const ItemComponent = config.itemComponent}
 				{@const previewRefreshToken =
 					previewRefreshTokens[config.getItemKey(item)] ?? 0}
-				{@const renderedItemKey = config.getItemKey(item)}
+				{@const renderedItemKey = config.getItemKey(item, index)}
 				{@const matchedItem = matchedItemByKey?.get(renderedItemKey) ?? null}
-				{#if visibilityConsumption !== "none"}
+				{#if ItemComponent === ViewItemCard}
+					<ViewItemCard
+						{...config.getItemProps(item)}
+						{item}
+						settings={applicationStore.settings}
+						model={resolveViewItemCardModel(item, index)}
+						{previewState}
+					/>
+				{:else if visibilityConsumption !== "none"}
 					<ItemComponent
 						{...config.getItemProps(item)}
 						searchQuery={search.normalized}

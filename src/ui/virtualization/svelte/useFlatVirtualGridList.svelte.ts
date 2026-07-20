@@ -1,4 +1,4 @@
-import { tick, untrack, getContext, type Snippet } from "svelte";
+import { tick, untrack, getContext, onDestroy, type Snippet } from "svelte";
 import type { ResultNavigationDirection } from "features/keyboard-navigation/resultFocus";
 import {
 	getLazyLoadManager,
@@ -46,6 +46,21 @@ import {
 import { createFlatGridVisibilityAdapter } from "./flatGridVisibilityAdapter";
 import { createFlatGridControllerAdapter } from "./flatGridControllerAdapter";
 import { createResidentRowSlotAllocator } from "ui/virtualization/core/residentSlotAllocator";
+import {
+	PREVIEW_ACTIVATION_SCOPE_CONTEXT_KEY,
+	type PreviewActivationScope,
+} from "features/preview/scheduling/previewActivationScope";
+import {
+	createRowPreviewController,
+	type RowPreviewCardBinding,
+} from "features/preview/scheduling/rowPreviewController.svelte";
+import type { CardPreviewSnapshot } from "features/preview/ui/cardPreviewSnapshot";
+import type { ItemInteractionDescriptor } from "ui/interactions/interactionTypes";
+import {
+	createVirtualCardInteractionController,
+	type VirtualCardInteractionBinding,
+} from "ui/interactions/virtualCardInteractionController";
+import { useLinkContext } from "ui/context/linkContext";
 
 interface FlatVirtualGridApplicationSettings extends CardLayoutSettings {
 	previewActivationAheadRows?: number;
@@ -85,6 +100,13 @@ export interface FlatVirtualGridListProps<T> {
 	/** @default "reactive-state" */
 	visibilityConsumption?: VisibilityConsumption;
 	onMountedCellsChange?: (cells: readonly MountedVirtualGridCell<T>[]) => void;
+	/** Resolves immutable preview input for the surface-owned slot controller. */
+	resolveItemPreviewSnapshot?: (item: T, index: number) => CardPreviewSnapshot | null;
+	/** Resolves the current item descriptor without card-owned effects. */
+	resolveItemInteractionDescriptor?: (
+		item: T,
+		index: number,
+	) => ItemInteractionDescriptor | null;
 }
 
 const MAX_CHAINED_INFINITE_SCROLL_LOADS = 2;
@@ -118,9 +140,28 @@ export function useFlatVirtualGridList<T>(props: FlatVirtualGridListProps<T>) {
 	const rowPreviewActivationRuntime = getContext<
 		RowPreviewActivationRuntime | undefined
 	>(PREVIEW_ROW_ACTIVATION_CONTEXT_KEY);
+	const previewActivationScope = getContext<PreviewActivationScope | undefined>(
+		PREVIEW_ACTIVATION_SCOPE_CONTEXT_KEY,
+	);
+	let linkContext: ReturnType<typeof useLinkContext> | undefined;
+	try {
+		linkContext = useLinkContext();
+	} catch {
+		linkContext = undefined;
+	}
+	const rowPreviewController =
+		rowPreviewActivationRuntime && previewActivationScope
+			? createRowPreviewController({
+					runtime: rowPreviewActivationRuntime,
+					scope: previewActivationScope,
+					getQueuedPreviewJobs: linkContext?.getVisiblePreviewQueueSize,
+					getActivePreviewJobs: linkContext?.getActiveVisiblePreviewCount,
+				})
+			: undefined;
+	const interactionController = createVirtualCardInteractionController();
 	const visibilityAdapter = createFlatGridVisibilityAdapter<T>({
 		onNormalizedVisibilityDelta: (delta) => {
-			rowPreviewActivationRuntime?.applyNormalizedVisibilityDelta(delta);
+			rowPreviewController?.applyNormalizedVisibilityDelta(delta);
 		},
 	});
 	const rowSlotAllocator = createResidentRowSlotAllocator();
@@ -223,6 +264,35 @@ export function useFlatVirtualGridList<T>(props: FlatVirtualGridListProps<T>) {
 			layout: nextLayout,
 		});
 	const rowModel = $derived(resolveFlatLinkRowModel(layout));
+	const syncCardSlots = (rows: readonly MountedVirtualGridRowSlice<T>[]): void => {
+		const previewCards: RowPreviewCardBinding[] = [];
+		const interactionCards: VirtualCardInteractionBinding[] = [];
+		for (const row of rows) {
+			for (const mountedCell of row.cells) {
+				if (mountedCell.cell.kind !== "item") continue;
+				const { item, itemIndex } = mountedCell.cell;
+				const slotId = String(mountedCell.renderSlotKey);
+				const previewSnapshot = props.resolveItemPreviewSnapshot?.(
+					item,
+					itemIndex,
+				);
+				if (previewSnapshot) {
+					previewCards.push({
+						slotId,
+						rowIndex: mountedCell.rowIndex,
+						snapshot: previewSnapshot,
+					});
+				}
+				const descriptor = props.resolveItemInteractionDescriptor?.(
+					item,
+					itemIndex,
+				);
+				if (descriptor) interactionCards.push({ slotId, descriptor });
+			}
+		}
+		rowPreviewController?.syncCards(previewCards);
+		interactionController.syncCards(interactionCards);
+	};
 	const virtualList = useVirtualList<
 		VirtualListLogicalCell<T>,
 		FlatLinkRowModel<T>,
@@ -249,6 +319,9 @@ export function useFlatVirtualGridList<T>(props: FlatVirtualGridListProps<T>) {
 		},
 		visibilityMetadataPolicy: { type: "caller-managed" },
 		onSnapshotUpdated: (snapshot, reconciliationState) => {
+			syncCardSlots(
+				reconciliationState.mountedBuild?.rowSlices ?? EMPTY_MOUNTED_ROWS,
+			);
 			visibilityAdapter.syncVisibilityStates({
 				mountedRows:
 					reconciliationState.mountedBuild?.rowSlices ?? EMPTY_MOUNTED_ROWS,
@@ -433,6 +506,20 @@ export function useFlatVirtualGridList<T>(props: FlatVirtualGridListProps<T>) {
 		notifyEmptyMountedCellsChange(virtualListSnapshot);
 	});
 
+	$effect(() => {
+		void props.resolveItemPreviewSnapshot;
+		void props.resolveItemInteractionDescriptor;
+		const rows =
+			virtualList.getReconciliationState().mountedBuild?.rowSlices ??
+			EMPTY_MOUNTED_ROWS;
+		syncCardSlots(rows);
+	});
+
+	onDestroy(() => {
+		rowPreviewController?.dispose();
+		interactionController.clear();
+	});
+
 	const loadNextPage = () => {
 		if (!canLoadMore) {
 			return;
@@ -570,6 +657,9 @@ export function useFlatVirtualGridList<T>(props: FlatVirtualGridListProps<T>) {
 			visibilityState,
 			rowIndex: itemCell.rowIndex,
 			activationCandidateId: itemCell.key,
+			previewState: rowPreviewController?.getSlotState(
+				String(itemCell.renderSlotKey),
+			),
 			get visibility() {
 				if (visibilityConsumption === "none") return undefined;
 				return visibilityState?.visibility ?? visibility;
@@ -625,6 +715,9 @@ export function useFlatVirtualGridList<T>(props: FlatVirtualGridListProps<T>) {
 		},
 		get observerRoot() {
 			return measurement.scrollContainerEl;
+		},
+		get interactionDescriptorResolverProvider() {
+			return interactionController.provider;
 		},
 		get shouldUseInfiniteScroll() {
 			return shouldUseInfiniteScroll;

@@ -1,6 +1,11 @@
-import { getContext } from "svelte";
+import { getContext, onDestroy } from "svelte";
 import type { ApplicationStore } from "ui/stores/ApplicationStore.svelte";
-import type { TwoHopVirtualSectionDescriptor } from "features/two-hop/ui/twoHopVirtualListModel";
+import type {
+	TwoHopVirtualListItem,
+	TwoHopVirtualSectionDescriptor,
+} from "features/two-hop/ui/twoHopVirtualListModel";
+import type { TwoHopCardPresentationState } from "features/two-hop/ui/twoHopCellStaticState";
+import type { CardRenderModel } from "ui/components/items/cardRenderModel";
 import {
 	createTwoHopDocumentProjection,
 	type TwoHopDocument,
@@ -32,6 +37,21 @@ import {
 	PREVIEW_ROW_ACTIVATION_CONTEXT_KEY,
 	type RowPreviewActivationRuntime,
 } from "features/preview/scheduling/rowPreviewActivationRuntime";
+import {
+	PREVIEW_ACTIVATION_SCOPE_CONTEXT_KEY,
+	type PreviewActivationScope,
+} from "features/preview/scheduling/previewActivationScope";
+import {
+	createRowPreviewController,
+	type RowPreviewCardBinding,
+} from "features/preview/scheduling/rowPreviewController.svelte";
+import { createCardPreviewSnapshot } from "ui/components/items/cardRenderModel";
+import { resolveTwoHopItemStaticState } from "features/two-hop/ui/twoHopCellStaticState";
+import {
+	createVirtualCardInteractionController,
+	type VirtualCardInteractionBinding,
+} from "ui/interactions/virtualCardInteractionController";
+import { useLinkContext } from "ui/context/linkContext";
 import type { RowRange } from "ui/virtualization/rowRange";
 import type { VirtualNavigationTarget } from "ui/virtualization/types";
 import type { ResultNavigationDirection } from "features/keyboard-navigation/resultFocus";
@@ -43,6 +63,10 @@ export interface TwoHopVirtualListProps {
 	readonly initialVisibleCount?: number;
 	readonly loadMoreIncrement?: number;
 	readonly previewActive?: boolean;
+	readonly resolveItemCardModel?: (
+		item: TwoHopVirtualListItem,
+		presentation: TwoHopCardPresentationState,
+	) => CardRenderModel;
 }
 
 const EMPTY_RANGE: RowRange = { start: 0, end: 0 };
@@ -65,10 +89,29 @@ export function useTwoHopVirtualList(
 	const previewRuntime = getContext<RowPreviewActivationRuntime | undefined>(
 		PREVIEW_ROW_ACTIVATION_CONTEXT_KEY,
 	);
+	const previewScope = getContext<PreviewActivationScope | undefined>(
+		PREVIEW_ACTIVATION_SCOPE_CONTEXT_KEY,
+	);
+	let linkContext: ReturnType<typeof useLinkContext> | undefined;
+	try {
+		linkContext = useLinkContext();
+	} catch {
+		linkContext = undefined;
+	}
+	const previewController =
+		previewRuntime && previewScope
+			? createRowPreviewController({
+					runtime: previewRuntime,
+					scope: previewScope,
+					getQueuedPreviewJobs: linkContext?.getVisiblePreviewQueueSize,
+					getActivePreviewJobs: linkContext?.getActiveVisiblePreviewCount,
+				})
+			: undefined;
+	const interactionController = createVirtualCardInteractionController();
 	const visibilityStates =
 		createVirtualizedItemVisibilityStateController<TwoHopMountedCell>({
 			onNormalizedVisibilityDelta: (delta) =>
-				previewRuntime?.applyNormalizedVisibilityDelta(delta),
+				previewController?.applyNormalizedVisibilityDelta(delta),
 		});
 	const documentProjection = createTwoHopDocumentProjection({
 		sections: props.sections,
@@ -120,6 +163,7 @@ export function useTwoHopVirtualList(
 		readonly previewRange: RowRange;
 		readonly build: TwoHopMountedRowsBuild | null;
 	}): void => {
+		syncCardSlots(params.build?.rowSlices ?? EMPTY_MOUNTED_ROWS);
 		visibilityStates.commit({
 			rowModelRevision: params.rowModel,
 			mountedRows: params.build?.rowSlices ?? EMPTY_MOUNTED_ROWS,
@@ -127,6 +171,48 @@ export function useTwoHopVirtualList(
 			previewActiveRange:
 				props.previewActive === false ? EMPTY_RANGE : params.previewRange,
 		});
+	};
+
+	const resolveMountedCardModel = (cell: TwoHopMountedCell) => {
+		if (cell.cell.kind !== "item" || !props.resolveItemCardModel) {
+			return undefined;
+		}
+		const presentation = resolveTwoHopItemStaticState(
+			cell.cell.item,
+			cell.section.header.section,
+		).presentation;
+		if (!presentation) return undefined;
+		return props.resolveItemCardModel(cell.cell.item, presentation);
+	};
+
+	const syncCardSlots = (
+		rows: readonly TwoHopMountedRowsBuild["rowSlices"][number][],
+	): void => {
+		const previewCards: RowPreviewCardBinding[] = [];
+		const interactionCards: VirtualCardInteractionBinding[] = [];
+		for (const row of rows) {
+			for (const cell of row.cells) {
+				const model = resolveMountedCardModel(cell);
+				if (!model) continue;
+				const slotId = String(cell.renderSlotKey);
+				const previewSnapshot = createCardPreviewSnapshot(model);
+				if (previewSnapshot) {
+					previewCards.push({
+						slotId,
+						rowIndex: cell.rowIndex,
+						snapshot: previewSnapshot,
+					});
+				}
+				if (model.interactionDescriptor) {
+					interactionCards.push({
+						slotId,
+						descriptor: model.interactionDescriptor,
+					});
+				}
+			}
+		}
+		previewController?.syncCards(previewCards);
+		interactionController.syncCards(interactionCards);
 	};
 
 	const virtualList = useVirtualList<
@@ -250,6 +336,19 @@ export function useTwoHopVirtualList(
 		});
 	});
 
+	$effect(() => {
+		void props.resolveItemCardModel;
+		const rows =
+			virtualList.getReconciliationState().mountedBuild?.rowSlices ??
+			EMPTY_MOUNTED_ROWS;
+		syncCardSlots(rows);
+	});
+
+	onDestroy(() => {
+		previewController?.dispose();
+		interactionController.clear();
+	});
+
 	const loadMore = (sectionId: string): void => {
 		const nextDocument = documentProjection.loadMore(sectionId);
 		if (nextDocument) publishDocument(nextDocument);
@@ -284,6 +383,12 @@ export function useTwoHopVirtualList(
 				virtualList.getReconciliationState().mountedBuild?.rowsBySlot ??
 				EMPTY_MOUNTED_ROWS
 			);
+		},
+		get interactionDescriptorResolverProvider() {
+			return interactionController.provider;
+		},
+		getPreviewState(cell: TwoHopMountedCell) {
+			return previewController?.getSlotState(String(cell.renderSlotKey));
 		},
 		getCellClassName(cell: TwoHopMountedCell): string | undefined {
 			return cell.section.header.section.className;

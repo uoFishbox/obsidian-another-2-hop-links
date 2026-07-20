@@ -10,7 +10,12 @@ import { formatLinkText } from "features/preview/text-processing/textUtils";
 import type { LinkUtilitiesContext } from "types/linkContext";
 import type { PluginSettings } from "features/settings/model";
 import type { CardPresentationState } from "ui/components/common/cardPresentation";
-import { createItemInteractionKey } from "ui/interactions/interactionTypes";
+import {
+	createItemInteractionDescriptor,
+	createItemInteractionKey,
+	type ItemInteractionDescriptor,
+} from "ui/interactions/interactionTypes";
+import type { CardPreviewSnapshot } from "features/preview/ui/cardPreviewSnapshot";
 
 export interface CardRenderModel {
 	readonly item: ViewItem;
@@ -22,6 +27,7 @@ export interface CardRenderModel {
 	readonly directory: string | null;
 	readonly interactionId: string;
 	readonly interactionKey: string;
+	readonly interactionDescriptor: ItemInteractionDescriptor | null;
 	readonly presentation: CardPresentationState | undefined;
 	readonly searchQuery: string;
 	readonly searchScope: "title-only" | "title-and-content";
@@ -29,6 +35,7 @@ export interface CardRenderModel {
 	readonly previewRefreshToken: number;
 	readonly previewCacheRevision?: number | string;
 	readonly previewActivationIdentity: string | undefined;
+	readonly previewOverride: PreviewData | null;
 }
 
 export interface CardTitleSnapshot {
@@ -77,6 +84,13 @@ export function createCardRenderModel(
 	const interactionId = params.interactionId ?? interactionKey;
 	const previewOverride = createTextPreviewOverride(targetFile, contentPreview);
 	const effectiveSearchQuery = searchScope === "title-only" ? "" : searchQuery;
+	const interactionDescriptor = createItemInteractionDescriptor(
+		params.item,
+		params.settings,
+		searchQuery,
+		params.context,
+		{ interactionId, interactionKey },
+	);
 
 	return {
 		item: params.item,
@@ -91,6 +105,7 @@ export function createCardRenderModel(
 		directory: targetFile?.parent?.path ?? null,
 		interactionId,
 		interactionKey,
+		interactionDescriptor,
 		presentation: params.presentation,
 		searchQuery,
 		searchScope,
@@ -107,6 +122,22 @@ export function createCardRenderModel(
 					previewOverride,
 				)
 			: undefined,
+		previewOverride,
+	};
+}
+
+/** Builds the immutable preview input consumed by a physical slot controller. */
+export function createCardPreviewSnapshot(
+	model: CardRenderModel,
+): CardPreviewSnapshot | null {
+	if (!model.targetFile || !model.previewActivationIdentity) return null;
+
+	return {
+		identity: model.previewActivationIdentity,
+		file: model.targetFile,
+		searchQuery: model.searchScope === "title-only" ? "" : model.searchQuery,
+		previewRefreshToken: model.previewRefreshToken,
+		previewOverride: model.previewOverride,
 	};
 }
 
