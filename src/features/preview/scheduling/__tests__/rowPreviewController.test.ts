@@ -55,6 +55,47 @@ afterEach(() => {
 });
 
 describe("rowPreviewController", () => {
+	it("updates the preview window without rebinding physical slots", async () => {
+		const controller = createRowPreviewController();
+		const snapshot = createPreviewSnapshot("preview-a", "notes/a.md");
+
+		controller.syncBindings([binding("slot-0", 2, snapshot)]);
+		const slotState = controller.getSlotState("slot-0");
+		expect(slotState?.snapshot).toBeUndefined();
+
+		controller.setPreviewWindow({
+			previewRange: { start: 2, end: 3 },
+			active: true,
+		});
+		await flushAnimationFrame();
+		await flushAnimationFrame();
+		expect(controller.getSlotState("slot-0")).toBe(slotState);
+		expect(slotState?.snapshot).toBe(snapshot);
+
+		controller.setPreviewWindow({
+			previewRange: { start: 3, end: 4 },
+			active: true,
+		});
+		expect(controller.getSlotState("slot-0")).toBe(slotState);
+		expect(slotState?.snapshot).toBeUndefined();
+		controller.dispose();
+	});
+
+	it("reconciles new bindings against the current preview window", async () => {
+		const controller = createRowPreviewController();
+		const snapshot = createPreviewSnapshot("preview-a", "notes/a.md");
+
+		controller.setPreviewWindow({
+			previewRange: { start: 4, end: 5 },
+			active: true,
+		});
+		controller.syncBindings([binding("slot-0", 4, snapshot)]);
+		await flushAnimationFrame();
+		await flushAnimationFrame();
+
+		expect(controller.getSlotState("slot-0")?.snapshot).toBe(snapshot);
+		controller.dispose();
+	});
 	it("activates slots inside the preview range and clears them outside", async () => {
 		const controller = createRowPreviewController();
 		const snapshot = createPreviewSnapshot("preview-a", "notes/a.md");

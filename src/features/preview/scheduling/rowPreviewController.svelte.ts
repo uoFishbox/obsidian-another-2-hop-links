@@ -26,7 +26,16 @@ export interface RowPreviewControllerCommit {
 	readonly active: boolean;
 }
 
+export interface RowPreviewWindow {
+	readonly previewRange: RowRange;
+	readonly active: boolean;
+}
+
 export interface RowPreviewController {
+	/** Rebinds physical slots while retaining the current preview window. */
+	syncBindings(cards: readonly RowPreviewCardBinding[]): void;
+	/** Updates only the active preview window for the current bindings. */
+	setPreviewWindow(input: RowPreviewWindow): void;
 	/** Applies one complete virtual-surface snapshot and reconciles once. */
 	commit(input: RowPreviewControllerCommit): void;
 	getSlotState(slotId: string): CardPreviewSlotState | undefined;
@@ -149,6 +158,25 @@ export function createRowPreviewController(
 		for (const key of keysNeedingActivation) enqueueActivation(key);
 	}
 
+	function syncBindings(cards: readonly RowPreviewCardBinding[]): void {
+		if (disposed) return;
+		syncCards(cards);
+		reconcile();
+	}
+
+	function setPreviewWindow(input: RowPreviewWindow): void {
+		if (disposed) return;
+		const nextPreviewRange = input.active ? input.previewRange : EMPTY_RANGE;
+		if (
+			previewRange.start === nextPreviewRange.start &&
+			previewRange.end === nextPreviewRange.end
+		) {
+			return;
+		}
+		previewRange = nextPreviewRange;
+		reconcile();
+	}
+
 	function commit(input: RowPreviewControllerCommit): void {
 		if (disposed) return;
 		previewRange = input.active ? input.previewRange : EMPTY_RANGE;
@@ -167,6 +195,8 @@ export function createRowPreviewController(
 	}
 
 	return {
+		syncBindings,
+		setPreviewWindow,
 		commit,
 		getSlotState: (slotId) => slotsById.get(slotId)?.state,
 		dispose,
