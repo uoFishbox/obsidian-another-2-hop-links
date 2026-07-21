@@ -11,7 +11,8 @@ if you want to view the source, please visit the github repository of this plugi
 */
 `;
 
-const prod = process.argv[2] === "production";
+const mode = process.argv[2] ?? "development";
+const prod = mode === "production" || mode === "profile";
 
 const context = await esbuild.context({
 	banner: {
@@ -53,13 +54,13 @@ const context = await esbuild.context({
 		),
 	},
 	logLevel: "info",
-	sourcemap: prod ? false : "inline",
+	sourcemap: mode === "profile" ? "external" : mode === "development" ? "inline" : false,
 	treeShaking: true,
 	outfile: "main.js",
-	minify: prod,
+	minify: mode === "production",
 });
 
-if (prod) {
+if (mode !== "development") {
 	await context.rebuild();
 	process.exit(0);
 } else {
