@@ -38,7 +38,6 @@ import {
 	createRowPreviewController,
 	type RowPreviewCardBinding,
 } from "features/preview/scheduling/rowPreviewController.svelte";
-import { createCardPreviewSnapshot } from "ui/components/items/cardRenderModel";
 import { resolveTwoHopItemStaticState } from "features/two-hop/ui/twoHopCellStaticState";
 import {
 	createVirtualCardInteractionController,
@@ -144,6 +143,8 @@ export function useTwoHopVirtualList(
 	let hasSyncedCardBindings = false;
 	let syncedCardBindingsBuild: TwoHopMountedRowsBuild | null = null;
 	let syncedCardBindingsResolver = props.resolveItemCardModel;
+	const previewCardBindings: RowPreviewCardBinding[] = [];
+	const interactionCardBindings: VirtualCardInteractionBinding[] = [];
 
 	const resolveMountedCardModel = (
 		cell: TwoHopMountedCell,
@@ -168,31 +169,31 @@ export function useTwoHopVirtualList(
 			return;
 		}
 
-		const previewCards: RowPreviewCardBinding[] = [];
-		const interactionCards: VirtualCardInteractionBinding[] = [];
+		previewCardBindings.length = 0;
+		interactionCardBindings.length = 0;
 		for (const row of build?.rowSlices ?? EMPTY_MOUNTED_ROWS) {
 			for (const cell of row.cells) {
 				const model = resolveMountedCardModel(cell, resolver);
 				if (!model) continue;
 				const slotId = String(cell.renderSlotKey);
-				const previewSnapshot = createCardPreviewSnapshot(model);
+				const previewSnapshot = model.previewSnapshot;
 				if (previewSnapshot) {
-					previewCards.push({
+					previewCardBindings.push({
 						slotId,
 						rowIndex: cell.rowIndex,
 						snapshot: previewSnapshot,
 					});
 				}
 				if (model.interactionDescriptor) {
-					interactionCards.push({
+					interactionCardBindings.push({
 						slotId,
 						descriptor: model.interactionDescriptor,
 					});
 				}
 			}
 		}
-		previewController.syncBindings(previewCards);
-		interactionController.syncCards(interactionCards);
+		previewController.syncBindings(previewCardBindings);
+		interactionController.syncCards(interactionCardBindings);
 		hasSyncedCardBindings = true;
 		syncedCardBindingsBuild = build;
 		syncedCardBindingsResolver = resolver;

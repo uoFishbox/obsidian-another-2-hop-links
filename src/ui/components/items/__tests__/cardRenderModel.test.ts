@@ -3,7 +3,11 @@ import type { ViewItem } from "application/presenters";
 import { createMockTFile } from "testing/__mocks__/testHelpers";
 import type { LinkUtilitiesContext } from "types/linkContext";
 import { DEFAULT_SETTINGS } from "features/settings/model";
-import { createCardRenderModel, resolveCardTitleSnapshot } from "../cardRenderModel";
+import {
+	createCardPreviewSnapshot,
+	createCardRenderModel,
+	resolveCardTitleSnapshot,
+} from "../cardRenderModel";
 import type { CachedMetadata } from "obsidian";
 
 describe("createCardRenderModel", () => {
@@ -60,6 +64,14 @@ describe("createCardRenderModel", () => {
 		});
 		expect(model.previewActivationIdentity).toBeTruthy();
 		expect(model.previewCacheRevision).toBe("4:2:0");
+		expect(model.previewSnapshot).toMatchObject({
+			identity: model.previewActivationIdentity,
+			file: targetFile,
+			searchQuery: "",
+			previewRefreshToken: 0,
+			previewOverride: { type: "text", content: "matched content" },
+		});
+		expect(createCardPreviewSnapshot(model)).toBe(model.previewSnapshot);
 		expect(getPreviewRenderVersion).toHaveBeenCalledWith(targetFile.path);
 		expect(fileToLinktext).not.toHaveBeenCalled();
 

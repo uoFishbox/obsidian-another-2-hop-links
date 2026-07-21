@@ -140,6 +140,13 @@ describe("ViewItemCard", () => {
 			previewRefreshToken: 0,
 			previewActivationIdentity: "compiled-preview",
 			previewOverride: null,
+			previewSnapshot: {
+				identity: "compiled-preview",
+				file: targetFile,
+				searchQuery: "",
+				previewRefreshToken: 0,
+				previewOverride: null,
+			},
 		};
 
 		render(ViewItemCardHarness, {

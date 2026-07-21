@@ -36,6 +36,7 @@ export interface CardRenderModel {
 	readonly previewCacheRevision?: number | string;
 	readonly previewActivationIdentity: string | undefined;
 	readonly previewOverride: PreviewData | null;
+	readonly previewSnapshot: CardPreviewSnapshot | null;
 }
 
 export interface CardTitleSnapshot {
@@ -84,6 +85,26 @@ export function createCardRenderModel(
 	const interactionId = params.interactionId ?? interactionKey;
 	const previewOverride = createTextPreviewOverride(targetFile, contentPreview);
 	const effectiveSearchQuery = searchScope === "title-only" ? "" : searchQuery;
+	const previewActivationIdentity = targetFile
+		? buildCardPreviewActivationIdentity(
+				targetFile,
+				params.settings,
+				normalizePreviewQuery(effectiveSearchQuery),
+				previewRenderVersion,
+				previewRefreshToken,
+				previewOverride,
+			)
+		: undefined;
+	const previewSnapshot =
+		targetFile && previewActivationIdentity
+			? {
+					identity: previewActivationIdentity,
+					file: targetFile,
+					searchQuery: effectiveSearchQuery,
+					previewRefreshToken,
+					previewOverride,
+				}
+			: null;
 	const interactionDescriptor = createItemInteractionDescriptor(
 		params.item,
 		params.settings,
@@ -112,17 +133,9 @@ export function createCardRenderModel(
 		contentPreview,
 		previewRefreshToken,
 		previewCacheRevision,
-		previewActivationIdentity: targetFile
-			? buildCardPreviewActivationIdentity(
-					targetFile,
-					params.settings,
-					normalizePreviewQuery(effectiveSearchQuery),
-					previewRenderVersion,
-					previewRefreshToken,
-					previewOverride,
-				)
-			: undefined,
+		previewActivationIdentity,
 		previewOverride,
+		previewSnapshot,
 	};
 }
 
@@ -130,15 +143,7 @@ export function createCardRenderModel(
 export function createCardPreviewSnapshot(
 	model: CardRenderModel,
 ): CardPreviewSnapshot | null {
-	if (!model.targetFile || !model.previewActivationIdentity) return null;
-
-	return {
-		identity: model.previewActivationIdentity,
-		file: model.targetFile,
-		searchQuery: model.searchScope === "title-only" ? "" : model.searchQuery,
-		previewRefreshToken: model.previewRefreshToken,
-		previewOverride: model.previewOverride,
-	};
+	return model.previewSnapshot;
 }
 
 /** Resolves only the file identity and display title needed by a card shell. */
