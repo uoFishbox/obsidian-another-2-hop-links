@@ -1,10 +1,16 @@
+import { DEBUG_DISABLE_CARD_DOM_PREVIEW } from "../../../appConstants";
+import { recordCCLDevMeasurement } from "infrastructure/debug/CCLDevMeasurements";
 import {
 	isScrollActivityActive,
 	subscribeScrollActivity,
 } from "ui/virtualization/scheduling/scrollActivity";
 import { shouldDeferPreviewActivationForVirtualScrollMeasurement } from "ui/virtualization/scheduling/virtualScrollMeasurementFrame";
-import { recordCCLDevMeasurement } from "infrastructure/debug/CCLDevMeasurements";
-import { DEBUG_DISABLE_CARD_DOM_PREVIEW } from "../../../appConstants";
+import type { VirtualFrameCoordinator } from "ui/virtualization/scheduling/frameCoordinator";
+import {
+	createPreviewFrameDriver,
+	readPreviewSchedulingTime,
+	type PreviewFrameDriver,
+} from "./previewFrameDriver";
 import {
 	canConsumePreviewScheduleToken,
 	consumePreviewScheduleToken,
@@ -12,10 +18,8 @@ import {
 	refillPreviewScheduleTokens,
 	type PreviewScheduleTokenState,
 } from "./previewScheduleTokenBucket";
-import type { VirtualFrameCoordinator } from "ui/virtualization/scheduling/frameCoordinator";
 
 const MAX_QUEUE_ENTRIES_PER_DRAIN = 256;
-const FALLBACK_FRAME_INTERVAL_MS = 1000 / 60;
 const MAX_OUTSTANDING_PREVIEW_JOBS = 3;
 
 interface PreviewActivationPolicy {
@@ -43,46 +47,77 @@ export interface PreviewBackpressure {
 	readonly active: number;
 }
 
+export type PreviewBackpressureListener = (pressure: PreviewBackpressure) => void;
+
 export interface PreviewActivationScope {
+	readonly kind: "preview-activation-scope";
+}
+
+interface PreviewActivationScopeState {
+	readonly scope: PreviewActivationScope;
+	readonly runtime: PreviewActivationRuntime;
+	readonly partition: PreviewActivationPartition;
 	pendingByKey: Map<string, PreviewActivationRequest>;
 	pendingQueue: PreviewActivationRequest[];
 	pendingQueueHead: number;
-	getBackpressure: () => PreviewBackpressure;
-	frameCoordinator?: VirtualFrameCoordinator;
+	disposed: boolean;
 }
 
 interface PreviewActivationRequest {
-	key: string;
-	scope: PreviewActivationScope;
-	onActivated: (() => void) | undefined;
+	readonly key: string;
+	readonly scopeState: PreviewActivationScopeState;
+	readonly onActivated: (() => void) | undefined;
 	hasDeferredForVirtualScrollMeasurement: boolean;
 	settled: boolean;
 }
 
+interface PreviewActivationRuntime {
+	readonly identity: object;
+	readonly scopes: Set<PreviewActivationScopeState>;
+	readonly getBackpressure: () => PreviewBackpressure;
+	readonly subscribeBackpressure:
+		| ((listener: PreviewBackpressureListener) => () => void)
+		| undefined;
+	readonly roundRobinCursorByPartition: Map<PreviewActivationPartition, number>;
+	tokenState: PreviewScheduleTokenState;
+	blockedForBackpressure: boolean;
+	unsubscribeBackpressure: (() => void) | undefined;
+}
+
+interface PreviewActivationPartition {
+	readonly coordinator: VirtualFrameCoordinator | undefined;
+	readonly driver: PreviewFrameDriver;
+	readonly scopes: Set<PreviewActivationScopeState>;
+}
+
 export interface CreatePreviewActivationScopeOptions {
 	readonly getBackpressure?: () => PreviewBackpressure;
+	readonly subscribeBackpressure?: (
+		listener: PreviewBackpressureListener,
+	) => () => void;
+	/** Stable identity of the PreviewService whose admission limit is shared. */
+	readonly schedulerIdentity?: object;
 	readonly frameCoordinator?: VirtualFrameCoordinator;
 }
 
 export interface PreviewActivationHandle {
-	key: string;
+	readonly key: string;
 	/** Cancels this activation request if it is still pending. */
 	cancel(): void;
 }
 
 const ACTIVATION_REQUEST = Symbol("preview-activation-request");
+const DEFAULT_RUNTIME_IDENTITY = {};
+const FALLBACK_PARTITION_IDENTITY = {};
 
 interface PreviewActivationHandleInternal extends PreviewActivationHandle {
 	[ACTIVATION_REQUEST]: PreviewActivationRequest | undefined;
 }
 
-const activeQueuedScopes = new Set<PreviewActivationScope>();
-let globalFrameHandle: number | null = null;
-let globalFrameHandleKind: "animation-frame" | "timeout" | null = null;
-let globalFrameCoordinator: VirtualFrameCoordinator | undefined;
-let roundRobinCursor = 0;
-let activationTokenState: PreviewScheduleTokenState =
-	createEmptyPreviewScheduleTokenState();
+const scopeStates = new WeakMap<PreviewActivationScope, PreviewActivationScopeState>();
+const runtimesByIdentity = new Map<object, PreviewActivationRuntime>();
+const partitionsByIdentity = new Map<object, PreviewActivationPartition>();
+let nextPartitionId = 0;
 let unsubscribeScrollActivity: (() => void) | undefined;
 
 function createActivationHandle(
@@ -99,9 +134,7 @@ function createActivationHandle(
 
 function cancelHandle(this: PreviewActivationHandleInternal): void {
 	const request = this[ACTIVATION_REQUEST];
-	if (request) {
-		settleRequest(request, false);
-	}
+	if (request) settleRequest(request, false);
 }
 
 function invokeActivated(onActivated: (() => void) | undefined): void {
@@ -112,279 +145,336 @@ function invokeActivated(onActivated: (() => void) | undefined): void {
 	}
 }
 
-function readMonotonicTime(): number {
-	if (typeof globalThis.performance?.now === "function") {
-		return globalThis.performance.now();
-	}
-	return Date.now();
-}
-
 function getEmptyBackpressure(): PreviewBackpressure {
 	return { queued: 0, active: 0 };
+}
+
+function resolveRuntimeIdentity(options: CreatePreviewActivationScopeOptions): object {
+	if (options.schedulerIdentity) return options.schedulerIdentity;
+	if (options.getBackpressure) return options.getBackpressure;
+	if (options.subscribeBackpressure) return options.subscribeBackpressure;
+	return DEFAULT_RUNTIME_IDENTITY;
+}
+
+function getOrCreateRuntime(
+	options: CreatePreviewActivationScopeOptions,
+): PreviewActivationRuntime {
+	const identity = resolveRuntimeIdentity(options);
+	const existing = runtimesByIdentity.get(identity);
+	if (existing) return existing;
+
+	const runtime: PreviewActivationRuntime = {
+		identity,
+		scopes: new Set(),
+		getBackpressure: options.getBackpressure ?? getEmptyBackpressure,
+		subscribeBackpressure: options.subscribeBackpressure,
+		roundRobinCursorByPartition: new Map(),
+		tokenState: createEmptyPreviewScheduleTokenState(),
+		blockedForBackpressure: false,
+		unsubscribeBackpressure: undefined,
+	};
+	runtimesByIdentity.set(identity, runtime);
+	return runtime;
+}
+
+function getOrCreatePartition(
+	coordinator: VirtualFrameCoordinator | undefined,
+): PreviewActivationPartition {
+	const identity = coordinator ?? FALLBACK_PARTITION_IDENTITY;
+	const existing = partitionsByIdentity.get(identity);
+	if (existing) return existing;
+
+	let partition: PreviewActivationPartition;
+	const taskKey = `preview:activation-drain:${++nextPartitionId}`;
+	const driver = createPreviewFrameDriver({
+		coordinator,
+		taskKey,
+		onAnimationFrameScheduled: () => {
+			if (process.env.NODE_ENV !== "production") {
+				recordCCLDevMeasurement("preview.activationScheduler.animationFrame");
+			}
+		},
+		onFrame: (timestamp) => drainPartition(partition, timestamp),
+	});
+	partition = { coordinator, driver, scopes: new Set() };
+	partitionsByIdentity.set(identity, partition);
+	return partition;
 }
 
 export function createPreviewActivationScope(
 	options: CreatePreviewActivationScopeOptions = {},
 ): PreviewActivationScope {
-	return {
-		pendingByKey: new Map<string, PreviewActivationRequest>(),
+	const runtime = getOrCreateRuntime(options);
+	const partition = getOrCreatePartition(options.frameCoordinator);
+	const scope: PreviewActivationScope = { kind: "preview-activation-scope" };
+	const state: PreviewActivationScopeState = {
+		scope,
+		runtime,
+		partition,
+		pendingByKey: new Map(),
 		pendingQueue: [],
 		pendingQueueHead: 0,
-		getBackpressure: options.getBackpressure ?? getEmptyBackpressure,
-		frameCoordinator: options.frameCoordinator,
+		disposed: false,
 	};
+	scopeStates.set(scope, state);
+	runtime.scopes.add(state);
+	partition.scopes.add(state);
+	return scope;
+}
+
+function readScopeState(scope: PreviewActivationScope): PreviewActivationScopeState {
+	const state = scopeStates.get(scope);
+	if (state) return state;
+	throw new TypeError("Unknown preview activation scope");
+}
+
+function hasPendingScope(scopeState: PreviewActivationScopeState): boolean {
+	return !scopeState.disposed && scopeState.pendingByKey.size > 0;
+}
+
+function hasPendingRuntime(runtime: PreviewActivationRuntime): boolean {
+	for (const scopeState of runtime.scopes) {
+		if (hasPendingScope(scopeState)) return true;
+	}
+	return false;
+}
+
+function hasPendingPartition(partition: PreviewActivationPartition): boolean {
+	for (const scopeState of partition.scopes) {
+		if (hasPendingScope(scopeState)) return true;
+	}
+	return false;
 }
 
 function settleRequest(request: PreviewActivationRequest, activated: boolean): void {
 	if (request.settled) return;
 
 	request.settled = true;
-	if (request.scope.pendingByKey.get(request.key) === request) {
-		request.scope.pendingByKey.delete(request.key);
+	const scopeState = request.scopeState;
+	if (scopeState.pendingByKey.get(request.key) === request) {
+		scopeState.pendingByKey.delete(request.key);
 	}
-	if (request.scope.pendingByKey.size === 0) {
-		activeQueuedScopes.delete(request.scope);
-		request.scope.pendingQueue = [];
-		request.scope.pendingQueueHead = 0;
+	if (scopeState.pendingByKey.size === 0) {
+		scopeState.pendingQueue = [];
+		scopeState.pendingQueueHead = 0;
 	}
-	if (activated) {
-		invokeActivated(request.onActivated);
+	if (activated) invokeActivated(request.onActivated);
+
+	if (!hasPendingRuntime(scopeState.runtime)) {
+		releaseRuntimeBackpressureSubscription(scopeState.runtime);
 	}
-	releaseGlobalResourcesIfIdle();
+	if (!hasPendingPartition(scopeState.partition)) {
+		scopeState.partition.driver.cancel();
+	}
+	releaseScrollActivitySubscriptionIfIdle();
 }
 
-function ensureSubscription(): void {
+function ensureScrollActivitySubscription(): void {
 	if (unsubscribeScrollActivity) return;
 
 	unsubscribeScrollActivity = subscribeScrollActivity((isActive) => {
 		if (isActive) {
-			cancelGlobalFrame();
+			for (const partition of partitionsByIdentity.values()) {
+				partition.driver.cancel();
+			}
 			return;
 		}
-		scheduleGlobalFrameDrain();
+		for (const partition of partitionsByIdentity.values()) {
+			schedulePartition(partition);
+		}
 	});
 }
 
-function scheduleGlobalFrameDrain(): void {
-	if (
-		globalFrameHandle !== null ||
-		globalFrameCoordinator !== undefined ||
-		activeQueuedScopes.size === 0 ||
-		isScrollActivityActive()
-	) {
-		return;
+function hasAnyPendingActivation(): boolean {
+	for (const partition of partitionsByIdentity.values()) {
+		if (hasPendingPartition(partition)) return true;
 	}
-	const queuedCoordinator = resolveQueuedCoordinator();
-	if (queuedCoordinator) {
-		const scheduled = queuedCoordinator.schedule(
-			"idle",
-			"preview:activation-drain",
-			() => {
-				globalFrameCoordinator = undefined;
-				drainGlobalFrame(readMonotonicTime());
-			},
-		);
-		if (scheduled) {
-			globalFrameCoordinator = queuedCoordinator;
-			return;
-		}
-	}
-
-	if (typeof globalThis.requestAnimationFrame === "function") {
-		if (process.env.NODE_ENV !== "production") {
-			recordCCLDevMeasurement("preview.activationScheduler.animationFrame");
-		}
-		globalFrameHandleKind = "animation-frame";
-		globalFrameHandle = globalThis.requestAnimationFrame((timestamp) => {
-			globalFrameHandle = null;
-			globalFrameHandleKind = null;
-			drainGlobalFrame(timestamp);
-		});
-		return;
-	}
-
-	if (typeof globalThis.setTimeout !== "function") return;
-
-	globalFrameHandleKind = "timeout";
-	globalFrameHandle = globalThis.setTimeout(() => {
-		globalFrameHandle = null;
-		globalFrameHandleKind = null;
-		drainGlobalFrame(readMonotonicTime());
-	}, FALLBACK_FRAME_INTERVAL_MS) as unknown as number;
+	return false;
 }
 
-function resolveQueuedCoordinator(): VirtualFrameCoordinator | undefined {
-	let coordinator: VirtualFrameCoordinator | undefined;
-	for (const scope of activeQueuedScopes) {
-		if (!scope.frameCoordinator) return undefined;
-		if (coordinator && coordinator !== scope.frameCoordinator) return undefined;
-		coordinator = scope.frameCoordinator;
-	}
-	return coordinator;
-}
-
-function cancelGlobalFrame(): void {
-	if (globalFrameCoordinator) {
-		globalFrameCoordinator.cancel("idle", "preview:activation-drain");
-		globalFrameCoordinator = undefined;
-	}
-	if (globalFrameHandle === null) return;
-
-	if (
-		globalFrameHandleKind === "animation-frame" &&
-		typeof globalThis.cancelAnimationFrame === "function"
-	) {
-		globalThis.cancelAnimationFrame(globalFrameHandle);
-	} else if (typeof globalThis.clearTimeout === "function") {
-		globalThis.clearTimeout(globalFrameHandle);
-	}
-
-	globalFrameHandle = null;
-	globalFrameHandleKind = null;
-}
-
-function releaseGlobalResourcesIfIdle(): void {
-	if (activeQueuedScopes.size > 0) return;
-
-	cancelGlobalFrame();
+function releaseScrollActivitySubscriptionIfIdle(): void {
+	if (hasAnyPendingActivation()) return;
 	unsubscribeScrollActivity?.();
 	unsubscribeScrollActivity = undefined;
 }
 
-function readScopeBackpressure(scope: PreviewActivationScope): PreviewBackpressure {
-	return scope.getBackpressure();
+function ensureRuntimeBackpressureSubscription(
+	runtime: PreviewActivationRuntime,
+): void {
+	if (runtime.unsubscribeBackpressure || !runtime.subscribeBackpressure) return;
+
+	runtime.unsubscribeBackpressure = runtime.subscribeBackpressure(() => {
+		runtime.blockedForBackpressure = false;
+		for (const scopeState of runtime.scopes) {
+			if (hasPendingScope(scopeState)) schedulePartition(scopeState.partition);
+		}
+	});
 }
 
-function readGlobalBackpressure(): PreviewBackpressure {
-	let queued = 0;
-	let active = 0;
+function releaseRuntimeBackpressureSubscription(
+	runtime: PreviewActivationRuntime,
+): void {
+	runtime.unsubscribeBackpressure?.();
+	runtime.unsubscribeBackpressure = undefined;
+	runtime.blockedForBackpressure = false;
+}
 
-	for (const scope of activeQueuedScopes) {
-		const pressure = readScopeBackpressure(scope);
-		queued = Math.max(queued, pressure.queued);
-		active = Math.max(active, pressure.active);
+function canScheduleRuntime(runtime: PreviewActivationRuntime): boolean {
+	return !runtime.blockedForBackpressure || !runtime.subscribeBackpressure;
+}
+
+function schedulePartition(partition: PreviewActivationPartition): void {
+	if (
+		partition.driver.isScheduled() ||
+		isScrollActivityActive() ||
+		!hasPendingPartition(partition)
+	) {
+		return;
 	}
 
-	return { queued, active };
+	for (const scopeState of partition.scopes) {
+		if (!hasPendingScope(scopeState)) continue;
+		if (canScheduleRuntime(scopeState.runtime)) {
+			partition.driver.schedule();
+			return;
+		}
+	}
 }
 
-function resolveActivationPolicy(params: {
-	readonly queuedPreviewJobs: number;
-	readonly activePreviewJobs: number;
-}): PreviewActivationPolicy {
-	if (params.queuedPreviewJobs > 0 || params.activePreviewJobs > 0) {
+function resolveActivationPolicy(
+	pressure: PreviewBackpressure,
+): PreviewActivationPolicy {
+	if (pressure.queued > 0 || pressure.active > 0) {
 		return BACKPRESSURED_POLICY;
 	}
-
 	return IDLE_POLICY;
-}
-
-function refillActivationTokens(
-	timestamp: number,
-	policy: PreviewActivationPolicy,
-): void {
-	activationTokenState = refillPreviewScheduleTokens(
-		activationTokenState,
-		timestamp,
-		policy,
-	);
 }
 
 function hasPreviewAdmissionCapacity(pressure: PreviewBackpressure): boolean {
 	return pressure.queued + pressure.active < MAX_OUTSTANDING_PREVIEW_JOBS;
 }
 
-function compactScopeQueue(scope: PreviewActivationScope): void {
+function compactScopeQueue(scopeState: PreviewActivationScopeState): void {
 	if (
-		scope.pendingQueueHead < 64 &&
-		scope.pendingQueue.length <= scope.pendingByKey.size * 2 + 16
+		scopeState.pendingQueueHead < 64 &&
+		scopeState.pendingQueue.length <= scopeState.pendingByKey.size * 2 + 16
 	) {
 		return;
 	}
 
-	scope.pendingQueue = scope.pendingQueue
-		.slice(scope.pendingQueueHead)
+	scopeState.pendingQueue = scopeState.pendingQueue
+		.slice(scopeState.pendingQueueHead)
 		.filter(
 			(request) =>
-				!request.settled && scope.pendingByKey.get(request.key) === request,
+				!request.settled &&
+				scopeState.pendingByKey.get(request.key) === request,
 		);
-	scope.pendingQueueHead = 0;
+	scopeState.pendingQueueHead = 0;
 }
 
 function readNextQueuedRequest(
-	scope: PreviewActivationScope,
+	scopeState: PreviewActivationScopeState,
 ): PreviewActivationRequest | undefined {
-	if (scope.pendingQueueHead >= scope.pendingQueue.length) return undefined;
+	if (scopeState.pendingQueueHead >= scopeState.pendingQueue.length) {
+		return undefined;
+	}
 
-	const request = scope.pendingQueue[scope.pendingQueueHead];
-	scope.pendingQueueHead += 1;
+	const request = scopeState.pendingQueue[scopeState.pendingQueueHead];
+	scopeState.pendingQueueHead += 1;
 	return request;
 }
 
 function readNextRoundRobinRequest(
-	scopes: readonly PreviewActivationScope[],
+	runtime: PreviewActivationRuntime,
+	partition: PreviewActivationPartition,
+	scopes: readonly PreviewActivationScopeState[],
 ): PreviewActivationRequest | undefined {
 	if (scopes.length === 0) return undefined;
+	const cursor = runtime.roundRobinCursorByPartition.get(partition) ?? 0;
 
 	for (let offset = 0; offset < scopes.length; offset += 1) {
-		const scopeIndex = (roundRobinCursor + offset) % scopes.length;
-		const scope = scopes[scopeIndex];
-		const request = readNextQueuedRequest(scope);
+		const scopeIndex = (cursor + offset) % scopes.length;
+		const request = readNextQueuedRequest(scopes[scopeIndex]);
 		if (!request) continue;
 
-		roundRobinCursor = (scopeIndex + 1) % scopes.length;
+		runtime.roundRobinCursorByPartition.set(
+			partition,
+			(scopeIndex + 1) % scopes.length,
+		);
 		return request;
 	}
-
 	return undefined;
 }
 
-function drainGlobalFrame(frameTimestamp: number): void {
-	if (activeQueuedScopes.size === 0) return;
-	if (isScrollActivityActive()) return;
+function drainRuntimePartition(
+	runtime: PreviewActivationRuntime,
+	partition: PreviewActivationPartition,
+	frameTimestamp: number,
+): void {
+	const scopes = Array.from(partition.scopes).filter(
+		(scopeState) => scopeState.runtime === runtime && hasPendingScope(scopeState),
+	);
+	if (scopes.length === 0) return;
 
-	const pressure = readGlobalBackpressure();
-	const policy = resolveActivationPolicy({
-		queuedPreviewJobs: pressure.queued,
-		activePreviewJobs: pressure.active,
-	});
-	refillActivationTokens(frameTimestamp, policy);
+	const pressure = runtime.getBackpressure();
+	const policy = resolveActivationPolicy(pressure);
+	runtime.tokenState = refillPreviewScheduleTokens(
+		runtime.tokenState,
+		frameTimestamp,
+		policy,
+	);
 
-	const scopes = Array.from(activeQueuedScopes);
+	if (!hasPreviewAdmissionCapacity(pressure)) {
+		runtime.blockedForBackpressure = true;
+		ensureRuntimeBackpressureSubscription(runtime);
+		return;
+	}
+	runtime.blockedForBackpressure = false;
+
 	const shouldDeferUndeferredRequests =
 		shouldDeferPreviewActivationForVirtualScrollMeasurement();
 	const queueEntriesAvailableAtDrainStart = scopes.reduce(
-		(total, scope) =>
-			total + Math.max(0, scope.pendingQueue.length - scope.pendingQueueHead),
+		(total, scopeState) =>
+			total +
+			Math.max(0, scopeState.pendingQueue.length - scopeState.pendingQueueHead),
 		0,
 	);
 	const maxInspectableQueueEntries = Math.min(
 		MAX_QUEUE_ENTRIES_PER_DRAIN,
 		queueEntriesAvailableAtDrainStart,
 	);
-	const deadline = readMonotonicTime() + policy.maxDrainCpuMs;
+	const deadline = readPreviewSchedulingTime() + policy.maxDrainCpuMs;
 	let inspectedQueueEntries = 0;
 	let drainedTasks = 0;
 
 	while (
-		canConsumePreviewScheduleToken(activationTokenState) &&
+		canConsumePreviewScheduleToken(runtime.tokenState) &&
 		drainedTasks < policy.maxTasksPerDrain &&
 		inspectedQueueEntries < maxInspectableQueueEntries &&
-		readMonotonicTime() <= deadline
+		readPreviewSchedulingTime() <= deadline
 	) {
-		if (!hasPreviewAdmissionCapacity(readGlobalBackpressure())) break;
+		if (!hasPreviewAdmissionCapacity(runtime.getBackpressure())) {
+			runtime.blockedForBackpressure = true;
+			ensureRuntimeBackpressureSubscription(runtime);
+			break;
+		}
 
-		const request = readNextRoundRobinRequest(scopes);
+		const request = readNextRoundRobinRequest(runtime, partition, scopes);
 		if (!request) break;
 		inspectedQueueEntries += 1;
 		if (request.settled) continue;
-		if (request.scope.pendingByKey.get(request.key) !== request) continue;
+		if (
+			request.scopeState.pendingByKey.get(request.key) !== request ||
+			request.scopeState.disposed
+		) {
+			continue;
+		}
 		if (
 			shouldDeferUndeferredRequests &&
 			!request.hasDeferredForVirtualScrollMeasurement
 		) {
 			request.hasDeferredForVirtualScrollMeasurement = true;
-			request.scope.pendingQueue.push(request);
+			request.scopeState.pendingQueue.push(request);
 			continue;
 		}
 
@@ -392,22 +482,32 @@ function drainGlobalFrame(frameTimestamp: number): void {
 			if (process.env.NODE_ENV !== "production") {
 				recordCCLDevMeasurement("preview.activationDuringScroll");
 			}
-			request.scope.pendingQueue.push(request);
+			request.scopeState.pendingQueue.push(request);
 			break;
 		}
 
 		settleRequest(request, true);
-		activationTokenState = consumePreviewScheduleToken(activationTokenState);
+		runtime.tokenState = consumePreviewScheduleToken(runtime.tokenState);
 		drainedTasks += 1;
 	}
 
-	for (const scope of scopes) {
-		compactScopeQueue(scope);
-	}
+	for (const scopeState of scopes) compactScopeQueue(scopeState);
+}
 
-	if (activeQueuedScopes.size > 0) {
-		scheduleGlobalFrameDrain();
+function drainPartition(
+	partition: PreviewActivationPartition,
+	frameTimestamp: number,
+): void {
+	if (isScrollActivityActive()) return;
+
+	const runtimes = new Set<PreviewActivationRuntime>();
+	for (const scopeState of partition.scopes) {
+		if (hasPendingScope(scopeState)) runtimes.add(scopeState.runtime);
 	}
+	for (const runtime of runtimes) {
+		drainRuntimePartition(runtime, partition, frameTimestamp);
+	}
+	schedulePartition(partition);
 }
 
 function enqueuePreviewActivationRequest(
@@ -415,35 +515,30 @@ function enqueuePreviewActivationRequest(
 	scope: PreviewActivationScope,
 	onActivated: (() => void) | undefined,
 ): PreviewActivationHandle {
-	const existing = scope.pendingByKey.get(key);
-	if (existing) {
-		settleRequest(existing, false);
-	}
-	ensureSubscription();
+	const scopeState = readScopeState(scope);
+	if (scopeState.disposed) return createActivationHandle(key, undefined);
+
+	const existing = scopeState.pendingByKey.get(key);
+	if (existing) settleRequest(existing, false);
 
 	const request: PreviewActivationRequest = {
 		key,
-		scope,
+		scopeState,
 		onActivated,
 		hasDeferredForVirtualScrollMeasurement: false,
 		settled: false,
 	};
-	scope.pendingByKey.set(key, request);
-	scope.pendingQueue.push(request);
-	activeQueuedScopes.add(scope);
-	scheduleGlobalFrameDrain();
-
+	scopeState.pendingByKey.set(key, request);
+	scopeState.pendingQueue.push(request);
+	scopeState.runtime.blockedForBackpressure = false;
+	ensureScrollActivitySubscription();
+	ensureRuntimeBackpressureSubscription(scopeState.runtime);
+	schedulePartition(scopeState.partition);
 	return createActivationHandle(key, request);
 }
 
 /**
  * Requests preview activation strictly through the time-budgeted queue.
- *
- * Unlike a synchronously-resolved activation, this never activates before the
- * idle frame drain, so multiple visible cards stay rate-limited independently
- * of the display refresh rate. `onActivated` runs exactly once on activation
- * and is never invoked when the request is cancelled or the scheduler is
- * disposed; callers own cancellation through the returned handle.
  */
 export function requestQueuedPreviewActivation(
 	key: string,
@@ -453,38 +548,59 @@ export function requestQueuedPreviewActivation(
 	if (DEBUG_DISABLE_CARD_DOM_PREVIEW) {
 		return createActivationHandle(key, undefined);
 	}
-
 	return enqueuePreviewActivationRequest(key, scope, onActivated);
 }
 
-function resetScopeQueue(scope: PreviewActivationScope): void {
-	for (const request of Array.from(scope.pendingByKey.values())) {
+function resetScopeQueue(scopeState: PreviewActivationScopeState): void {
+	for (const request of Array.from(scopeState.pendingByKey.values())) {
 		settleRequest(request, false);
 	}
+	scopeState.pendingByKey.clear();
+	scopeState.pendingQueue = [];
+	scopeState.pendingQueueHead = 0;
+}
 
-	scope.pendingByKey.clear();
-	scope.pendingQueue = [];
-	scope.pendingQueueHead = 0;
+/** Releases one surface scope and cancels all activation requests it owns. */
+export function disposePreviewActivationScope(scope: PreviewActivationScope): void {
+	const scopeState = scopeStates.get(scope);
+	if (!scopeState || scopeState.disposed) return;
+
+	resetScopeQueue(scopeState);
+	scopeState.disposed = true;
+	scopeState.runtime.scopes.delete(scopeState);
+	scopeState.runtime.roundRobinCursorByPartition.delete(scopeState.partition);
+	scopeState.partition.scopes.delete(scopeState);
+	scopeStates.delete(scope);
+
+	if (scopeState.partition.scopes.size === 0) {
+		scopeState.partition.driver.dispose();
+		partitionsByIdentity.delete(
+			scopeState.partition.coordinator ?? FALLBACK_PARTITION_IDENTITY,
+		);
+	}
+	if (scopeState.runtime.scopes.size === 0) {
+		releaseRuntimeBackpressureSubscription(scopeState.runtime);
+		runtimesByIdentity.delete(scopeState.runtime.identity);
+	}
+	releaseScrollActivitySubscriptionIfIdle();
 }
 
 function resetPreviewActivationSchedulerState(): void {
-	const scopesToReset = Array.from(activeQueuedScopes);
-	for (const scope of scopesToReset) {
-		resetScopeQueue(scope);
+	const scopes = Array.from(runtimesByIdentity.values()).flatMap((runtime) =>
+		Array.from(runtime.scopes, (scopeState) => scopeState.scope),
+	);
+	for (const scope of scopes) disposePreviewActivationScope(scope);
+
+	for (const partition of partitionsByIdentity.values()) {
+		partition.driver.dispose();
 	}
-	activeQueuedScopes.clear();
-
-	cancelGlobalFrame();
-	roundRobinCursor = 0;
-	activationTokenState = createEmptyPreviewScheduleTokenState();
-
+	partitionsByIdentity.clear();
+	runtimesByIdentity.clear();
 	unsubscribeScrollActivity?.();
 	unsubscribeScrollActivity = undefined;
 }
 
-/**
- * Stops activation scheduling and settles all pending activation requests.
- */
+/** Stops activation scheduling and settles all pending activation requests. */
 export function disposePreviewActivationScheduler(): void {
 	resetPreviewActivationSchedulerState();
 }

@@ -59,14 +59,21 @@ describe("rowPreviewController", () => {
 		const controller = createRowPreviewController();
 		const snapshot = createPreviewSnapshot("preview-a", "notes/a.md");
 
-		controller.syncCards([binding("slot-0", 2, snapshot)]);
-		controller.setPreviewRange({ start: 2, end: 3 });
+		controller.commit({
+			cards: [binding("slot-0", 2, snapshot)],
+			previewRange: { start: 2, end: 3 },
+			active: true,
+		});
 		await flushAnimationFrame();
 		await flushAnimationFrame();
 
 		expect(controller.getSlotState("slot-0")?.snapshot).toBe(snapshot);
 
-		controller.setPreviewRange({ start: 0, end: 0 });
+		controller.commit({
+			cards: [binding("slot-0", 2, snapshot)],
+			previewRange: { start: 0, end: 0 },
+			active: true,
+		});
 		expect(controller.getSlotState("slot-0")?.snapshot).toBeUndefined();
 		controller.dispose();
 	});
@@ -76,10 +83,16 @@ describe("rowPreviewController", () => {
 		const first = createPreviewSnapshot("preview-a", "notes/a.md");
 		const second = createPreviewSnapshot("preview-b", "notes/b.md");
 
-		controller.syncCards([binding("slot-0", 0, first)]);
-		controller.setPreviewRange({ start: 0, end: 1 });
-		controller.syncCards([binding("slot-0", 1, second)]);
-		controller.setPreviewRange({ start: 1, end: 2 });
+		controller.commit({
+			cards: [binding("slot-0", 0, first)],
+			previewRange: { start: 0, end: 1 },
+			active: true,
+		});
+		controller.commit({
+			cards: [binding("slot-0", 1, second)],
+			previewRange: { start: 1, end: 2 },
+			active: true,
+		});
 		await flushAnimationFrame();
 		await flushAnimationFrame();
 
@@ -90,15 +103,22 @@ describe("rowPreviewController", () => {
 	it("activates a slot only when its row is inside the preview range", async () => {
 		const controller = createRowPreviewController();
 		const snapshot = createPreviewSnapshot("preview-a", "notes/a.md");
+		const cards = [binding("slot-0", 0, snapshot)];
 
-		controller.syncCards([binding("slot-0", 0, snapshot)]);
-		controller.setPreviewRange({ start: 5, end: 6 });
+		controller.commit({
+			cards,
+			previewRange: { start: 5, end: 6 },
+			active: true,
+		});
 		await flushAnimationFrame();
 		await flushAnimationFrame();
-
 		expect(controller.getSlotState("slot-0")?.snapshot).toBeUndefined();
 
-		controller.setPreviewRange({ start: 0, end: 1 });
+		controller.commit({
+			cards,
+			previewRange: { start: 0, end: 1 },
+			active: true,
+		});
 		await flushAnimationFrame();
 		await flushAnimationFrame();
 		expect(controller.getSlotState("slot-0")?.snapshot).toBe(snapshot);
@@ -110,11 +130,11 @@ describe("rowPreviewController", () => {
 		const snapshotA = createPreviewSnapshot("shared", "notes/a.md");
 		const snapshotB = createPreviewSnapshot("shared", "notes/b.md");
 
-		controller.syncCards([
-			binding("slot-0", 1, snapshotA),
-			binding("slot-1", 5, snapshotB),
-		]);
-		controller.setPreviewRange({ start: 0, end: 10 });
+		controller.commit({
+			cards: [binding("slot-0", 1, snapshotA), binding("slot-1", 5, snapshotB)],
+			previewRange: { start: 0, end: 10 },
+			active: true,
+		});
 		await flushAnimationFrame();
 		await flushAnimationFrame();
 
@@ -123,14 +143,20 @@ describe("rowPreviewController", () => {
 		controller.dispose();
 	});
 
-	it("keeps the pending activation when a slot moves between rows with the same identity", async () => {
+	it("keeps the pending activation when a slot moves with the same identity", async () => {
 		const controller = createRowPreviewController();
 		const snapshot = createPreviewSnapshot("shared", "notes/a.md");
 
-		controller.syncCards([binding("slot-0", 0, snapshot)]);
-		controller.setPreviewRange({ start: 0, end: 2 });
-		controller.syncCards([binding("slot-0", 1, snapshot)]);
-		controller.setPreviewRange({ start: 0, end: 3 });
+		controller.commit({
+			cards: [binding("slot-0", 0, snapshot)],
+			previewRange: { start: 0, end: 2 },
+			active: true,
+		});
+		controller.commit({
+			cards: [binding("slot-0", 1, snapshot)],
+			previewRange: { start: 0, end: 3 },
+			active: true,
+		});
 
 		await flushAnimationFrame();
 		await flushAnimationFrame();
@@ -138,17 +164,32 @@ describe("rowPreviewController", () => {
 		controller.dispose();
 	});
 
-	it("releases the slot snapshot when the card is unbound", async () => {
+	it("releases snapshots when a surface becomes inactive or unbound", async () => {
 		const controller = createRowPreviewController();
 		const snapshot = createPreviewSnapshot("preview-a", "notes/a.md");
+		const cards = [binding("slot-0", 0, snapshot)];
 
-		controller.syncCards([binding("slot-0", 0, snapshot)]);
-		controller.setPreviewRange({ start: 0, end: 1 });
+		controller.commit({
+			cards,
+			previewRange: { start: 0, end: 1 },
+			active: true,
+		});
 		await flushAnimationFrame();
 		await flushAnimationFrame();
 		expect(controller.getSlotState("slot-0")?.snapshot).toBe(snapshot);
 
-		controller.syncCards([]);
+		controller.commit({
+			cards,
+			previewRange: { start: 0, end: 1 },
+			active: false,
+		});
+		expect(controller.getSlotState("slot-0")?.snapshot).toBeUndefined();
+
+		controller.commit({
+			cards: [],
+			previewRange: { start: 0, end: 1 },
+			active: true,
+		});
 		expect(controller.getSlotState("slot-0")).toBeUndefined();
 		controller.dispose();
 	});

@@ -176,7 +176,7 @@ describe("preview activation scheduler", () => {
 
 		expect(frameCoordinator.schedule).toHaveBeenCalledWith(
 			"idle",
-			"preview:activation-drain",
+			expect.stringMatching(/^preview:activation-drain:/),
 			expect.any(Function),
 		);
 		expect(requestAnimationFrame).not.toHaveBeenCalled();
@@ -360,5 +360,94 @@ describe("preview activation scheduler", () => {
 
 		await flushAnimationFrame();
 		expect(activation.onActivated).not.toHaveBeenCalled();
+	});
+
+	it("keeps coordinator drains isolated to their own surface", async () => {
+		let firstIdleTask: (() => void) | undefined;
+		let secondIdleTask: (() => void) | undefined;
+		const firstCoordinator: VirtualFrameCoordinator = {
+			schedule: vi.fn((_lane, _key, task) => {
+				firstIdleTask = task;
+				return true;
+			}),
+			cancel: vi.fn(),
+			isScheduled: vi.fn(() => false),
+			dispose: vi.fn(),
+		};
+		const secondCoordinator: VirtualFrameCoordinator = {
+			schedule: vi.fn((_lane, _key, task) => {
+				secondIdleTask = task;
+				return true;
+			}),
+			cancel: vi.fn(),
+			isScheduled: vi.fn(() => false),
+			dispose: vi.fn(),
+		};
+		const firstScope = createPreviewActivationScope({
+			frameCoordinator: firstCoordinator,
+		});
+		const secondScope = createPreviewActivationScope({
+			frameCoordinator: secondCoordinator,
+		});
+		const first = requestActivation("preview-first", firstScope);
+		const second = requestActivation("preview-second", secondScope);
+
+		expect(firstCoordinator.schedule).toHaveBeenCalledOnce();
+		expect(secondCoordinator.schedule).toHaveBeenCalledOnce();
+		firstIdleTask?.();
+		await Promise.resolve();
+
+		expect(first.onActivated).toHaveBeenCalledOnce();
+		expect(second.onActivated).not.toHaveBeenCalled();
+
+		secondIdleTask?.();
+		await Promise.resolve();
+		expect(second.onActivated).toHaveBeenCalledOnce();
+	});
+
+	it("does not combine backpressure from independent preview services", async () => {
+		const blockedScope = createPreviewActivationScope({
+			schedulerIdentity: {},
+			getBackpressure: () => ({ queued: 2, active: 1 }),
+		});
+		const availableScope = createPreviewActivationScope({
+			schedulerIdentity: {},
+			getBackpressure: () => ({ queued: 0, active: 0 }),
+		});
+		const blocked = requestActivation("preview-blocked", blockedScope);
+		const available = requestActivation("preview-available", availableScope);
+
+		await flushAnimationFrame();
+
+		expect(blocked.onActivated).not.toHaveBeenCalled();
+		expect(available.onActivated).toHaveBeenCalledOnce();
+	});
+
+	it("waits for a backpressure notification instead of polling every frame", async () => {
+		let pressure = { queued: 2, active: 1 };
+		let notifyPressureChanged: (() => void) | undefined;
+		const unsubscribe = vi.fn();
+		const scope = createPreviewActivationScope({
+			schedulerIdentity: {},
+			getBackpressure: () => pressure,
+			subscribeBackpressure: (listener) => {
+				notifyPressureChanged = () => listener(pressure);
+				return unsubscribe;
+			},
+		});
+		const activation = requestActivation("preview-event-driven", scope);
+
+		await flushAnimationFrame();
+		expect(activation.onActivated).not.toHaveBeenCalled();
+		expect(requestAnimationFrame).toHaveBeenCalledTimes(1);
+
+		await vi.advanceTimersByTimeAsync(1_000);
+		expect(requestAnimationFrame).toHaveBeenCalledTimes(1);
+
+		pressure = { queued: 1, active: 1 };
+		notifyPressureChanged?.();
+		await flushAnimationFrame();
+		expect(activation.onActivated).toHaveBeenCalledOnce();
+		expect(unsubscribe).toHaveBeenCalledOnce();
 	});
 });

@@ -57,13 +57,15 @@ export function createCardPreviewRenderer(
 	let renderSequence = 0;
 	let lastAppliedRenderCacheKey: string | undefined;
 
-	const enqueueCoordinatedDomCommit = (
+	const enqueueCoordinatedDomCommit = async (
 		task: PreviewDomCommitTask,
-	): Promise<boolean> =>
-		enqueuePreviewDomCommit({
+	): Promise<boolean> => {
+		const result = await enqueuePreviewDomCommit({
 			...task,
 			frameCoordinator: options.frameCoordinator,
 		});
+		return result.type === "committed";
+	};
 
 	function render(
 		container: HTMLElement,

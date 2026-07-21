@@ -1,16 +1,18 @@
-import {
-	createPreviewActivationScope,
-	requestQueuedPreviewActivation,
-	type PreviewActivationHandle,
-	type PreviewActivationScope,
-	type PreviewBackpressure,
-} from "./previewActivationScheduler";
-import type { VirtualFrameCoordinator } from "ui/virtualization/scheduling/frameCoordinator";
-import type { RowRange } from "ui/virtualization/rowRange";
 import type {
 	CardPreviewSlotState,
 	CardPreviewSnapshot,
 } from "features/preview/ui/cardPreviewSnapshot";
+import type { RowRange } from "ui/virtualization/rowRange";
+import type { VirtualFrameCoordinator } from "ui/virtualization/scheduling/frameCoordinator";
+import {
+	createPreviewActivationScope,
+	disposePreviewActivationScope,
+	requestQueuedPreviewActivation,
+	type PreviewActivationHandle,
+	type PreviewActivationScope,
+	type PreviewBackpressure,
+	type PreviewBackpressureListener,
+} from "./previewActivationScheduler";
 
 export interface RowPreviewCardBinding {
 	readonly slotId: string;
@@ -18,17 +20,25 @@ export interface RowPreviewCardBinding {
 	readonly snapshot: CardPreviewSnapshot;
 }
 
+export interface RowPreviewControllerCommit {
+	readonly cards: readonly RowPreviewCardBinding[];
+	readonly previewRange: RowRange;
+	readonly active: boolean;
+}
+
 export interface RowPreviewController {
-	/** Rebinds the bounded physical slots to their current logical cards. */
-	syncCards(cards: readonly RowPreviewCardBinding[]): void;
-	/** Applies the final preview range; slots outside it lose their snapshot. */
-	setPreviewRange(range: RowRange): void;
+	/** Applies one complete virtual-surface snapshot and reconciles once. */
+	commit(input: RowPreviewControllerCommit): void;
 	getSlotState(slotId: string): CardPreviewSlotState | undefined;
 	dispose(): void;
 }
 
 export interface CreateRowPreviewControllerOptions {
 	readonly getBackpressure?: () => PreviewBackpressure;
+	readonly subscribeBackpressure?: (
+		listener: PreviewBackpressureListener,
+	) => () => void;
+	readonly schedulerIdentity?: object;
 	readonly frameCoordinator?: VirtualFrameCoordinator;
 }
 
@@ -41,14 +51,9 @@ interface BoundSlot {
 	readonly state: MutableCardPreviewSlotState;
 }
 
-/**
- * Owns preview activation for one virtual surface.
- *
- * Activation is recomputed from the current card bindings and the last applied
- * preview range rather than from incremental row visibility deltas. Slots bound
- * to the same activation identity are activated together, and slots leaving the
- * preview range or being rebound to a different card release their snapshot.
- */
+const EMPTY_RANGE: RowRange = { start: 0, end: 0 };
+
+/** Owns preview activation for one virtual surface. */
 export function createRowPreviewController(
 	options: CreateRowPreviewControllerOptions = {},
 ): RowPreviewController {
@@ -56,16 +61,19 @@ export function createRowPreviewController(
 	const pendingByKey = new Map<string, PreviewActivationHandle>();
 	const scope: PreviewActivationScope = createPreviewActivationScope({
 		getBackpressure: options.getBackpressure,
+		subscribeBackpressure: options.subscribeBackpressure,
+		schedulerIdentity: options.schedulerIdentity,
 		frameCoordinator: options.frameCoordinator,
 	});
-	let previewRange: RowRange = { start: 0, end: 0 };
+	let previewRange: RowRange = EMPTY_RANGE;
 	let disposed = false;
 
 	function getOrCreateState(slotId: string): MutableCardPreviewSlotState {
 		const existing = slotsById.get(slotId);
 		if (existing) return existing.state;
-
-		const state = $state<MutableCardPreviewSlotState>({ snapshot: undefined });
+		const state = $state<MutableCardPreviewSlotState>({
+			snapshot: undefined,
+		});
 		return state;
 	}
 
@@ -103,15 +111,25 @@ export function createRowPreviewController(
 		}
 
 		const state = previous?.state ?? getOrCreateState(binding.slotId);
-		if (previous) {
-			state.snapshot = undefined;
-		}
+		if (previous) state.snapshot = undefined;
 		slotsById.set(binding.slotId, { binding, state });
 	}
 
-	function reconcile(): void {
-		if (disposed) return;
+	function syncCards(cards: readonly RowPreviewCardBinding[]): void {
+		const retainedSlots = new Set<string>();
+		for (const card of cards) {
+			retainedSlots.add(card.slotId);
+			bindCard(card);
+		}
 
+		for (const [slotId, slot] of slotsById) {
+			if (retainedSlots.has(slotId)) continue;
+			slot.state.snapshot = undefined;
+			slotsById.delete(slotId);
+		}
+	}
+
+	function reconcile(): void {
 		const keysNeedingActivation = new Set<string>();
 		for (const slot of slotsById.values()) {
 			if (!isRowInPreviewRange(slot.binding.rowIndex)) {
@@ -128,52 +146,28 @@ export function createRowPreviewController(
 			handle.cancel();
 			pendingByKey.delete(key);
 		}
-
-		for (const key of keysNeedingActivation) {
-			enqueueActivation(key);
-		}
+		for (const key of keysNeedingActivation) enqueueActivation(key);
 	}
 
-	function syncCards(cards: readonly RowPreviewCardBinding[]): void {
+	function commit(input: RowPreviewControllerCommit): void {
 		if (disposed) return;
-
-		const retainedSlots = new Set<string>();
-		for (const card of cards) {
-			retainedSlots.add(card.slotId);
-			bindCard(card);
-		}
-
-		for (const [slotId, slot] of slotsById) {
-			if (retainedSlots.has(slotId)) continue;
-			slot.state.snapshot = undefined;
-			slotsById.delete(slotId);
-		}
-
-		reconcile();
-	}
-
-	function setPreviewRange(range: RowRange): void {
-		if (disposed) return;
-		previewRange = range;
+		previewRange = input.active ? input.previewRange : EMPTY_RANGE;
+		syncCards(input.cards);
 		reconcile();
 	}
 
 	function dispose(): void {
 		if (disposed) return;
 		disposed = true;
-		for (const handle of pendingByKey.values()) {
-			handle.cancel();
-		}
+		for (const handle of pendingByKey.values()) handle.cancel();
 		pendingByKey.clear();
-		for (const slot of slotsById.values()) {
-			slot.state.snapshot = undefined;
-		}
+		for (const slot of slotsById.values()) slot.state.snapshot = undefined;
 		slotsById.clear();
+		disposePreviewActivationScope(scope);
 	}
 
 	return {
-		syncCards,
-		setPreviewRange,
+		commit,
 		getSlotState: (slotId) => slotsById.get(slotId)?.state,
 		dispose,
 	};

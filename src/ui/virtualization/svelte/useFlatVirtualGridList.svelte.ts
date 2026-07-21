@@ -1,5 +1,6 @@
 import { tick, untrack, getContext, onDestroy, type Snippet } from "svelte";
 import type { ResultNavigationDirection } from "features/keyboard-navigation/resultFocus";
+import type { RowRange } from "ui/virtualization/rowRange";
 import {
 	getLazyLoadManager,
 	type RegistrationToken,
@@ -141,6 +142,8 @@ export function useFlatVirtualGridList<T>(props: FlatVirtualGridListProps<T>) {
 			queued: linkContext?.getVisiblePreviewQueueSize?.() ?? 0,
 			active: linkContext?.getActiveVisiblePreviewCount?.() ?? 0,
 		}),
+		subscribeBackpressure: linkContext?.subscribeVisiblePreviewQueue,
+		schedulerIdentity: linkContext?.previewSchedulingIdentity,
 	});
 	const interactionController = createVirtualCardInteractionController();
 	const visibilityAdapter = createFlatGridVisibilityAdapter<T>({});
@@ -244,7 +247,10 @@ export function useFlatVirtualGridList<T>(props: FlatVirtualGridListProps<T>) {
 			layout: nextLayout,
 		});
 	const rowModel = $derived(resolveFlatLinkRowModel(layout));
-	const syncCardSlots = (rows: readonly MountedVirtualGridRowSlice<T>[]): void => {
+	const syncCardSlots = (
+		rows: readonly MountedVirtualGridRowSlice<T>[],
+		previewRange: RowRange,
+	): void => {
 		const previewCards: RowPreviewCardBinding[] = [];
 		const interactionCards: VirtualCardInteractionBinding[] = [];
 		for (const row of rows) {
@@ -270,7 +276,11 @@ export function useFlatVirtualGridList<T>(props: FlatVirtualGridListProps<T>) {
 				if (descriptor) interactionCards.push({ slotId, descriptor });
 			}
 		}
-		rowPreviewController?.syncCards(previewCards);
+		rowPreviewController?.commit({
+			cards: previewCards,
+			previewRange,
+			active: true,
+		});
 		interactionController.syncCards(interactionCards);
 	};
 	const virtualList = useVirtualList<
@@ -301,6 +311,7 @@ export function useFlatVirtualGridList<T>(props: FlatVirtualGridListProps<T>) {
 		onSnapshotUpdated: (snapshot, reconciliationState) => {
 			syncCardSlots(
 				reconciliationState.mountedBuild?.rowSlices ?? EMPTY_MOUNTED_ROWS,
+				snapshot.ranges.previewVisible,
 			);
 			visibilityAdapter.syncVisibilityStates({
 				mountedRows:
@@ -309,7 +320,6 @@ export function useFlatVirtualGridList<T>(props: FlatVirtualGridListProps<T>) {
 				previewRange: snapshot.ranges.previewVisible,
 				rowModel: snapshot.rowModel,
 			});
-			rowPreviewController?.setPreviewRange(snapshot.ranges.previewVisible);
 		},
 		trackMountedCellsForChange: props.onMountedCellsChange !== undefined,
 	});
@@ -490,10 +500,12 @@ export function useFlatVirtualGridList<T>(props: FlatVirtualGridListProps<T>) {
 	$effect(() => {
 		void props.resolveItemPreviewSnapshot;
 		void props.resolveItemInteractionDescriptor;
+		const snapshot = virtualList.getSnapshot();
+		if (!snapshot) return;
 		const rows =
 			virtualList.getReconciliationState().mountedBuild?.rowSlices ??
 			EMPTY_MOUNTED_ROWS;
-		syncCardSlots(rows);
+		syncCardSlots(rows, snapshot.ranges.previewVisible);
 	});
 
 	onDestroy(() => {

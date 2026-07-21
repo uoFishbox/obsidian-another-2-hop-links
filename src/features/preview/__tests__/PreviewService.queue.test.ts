@@ -248,4 +248,48 @@ describe("PreviewService queue behavior", () => {
 
 		await expect(request).rejects.toMatchObject({ name: "AbortError" });
 	});
+
+	test("queue subscribers receive capacity changes", async () => {
+		const deferredByPath = new Map<
+			string,
+			ReturnType<typeof createDeferred<PreviewData>>
+		>();
+		const strategy: PreviewStrategy = {
+			canHandle: () => true,
+			generate: vi.fn((file) => {
+				const deferred = createDeferred<PreviewData>();
+				deferredByPath.set(file.path, deferred);
+				return deferred.promise;
+			}),
+		};
+		const service = new PreviewServiceClass([strategy]);
+		const snapshots: Array<{ queued: number; active: number }> = [];
+		const unsubscribe = service.subscribeVisiblePreviewQueue((snapshot) => {
+			snapshots.push(snapshot);
+		});
+		const firstFile = createMockTFileAsPlainObject("first.md");
+		const secondFile = createMockTFileAsPlainObject("second.md");
+
+		const firstPromise = service.getPreview(firstFile, vault, metadataCache);
+		const secondPromise = service.getPreview(secondFile, vault, metadataCache);
+		expect(snapshots).toContainEqual({ queued: 1, active: 1 });
+
+		deferredByPath.get(firstFile.path)?.resolve({
+			type: "text",
+			content: "first",
+		});
+		await firstPromise;
+		await Promise.resolve();
+		expect(snapshots).toContainEqual({ queued: 0, active: 1 });
+
+		deferredByPath.get(secondFile.path)?.resolve({
+			type: "text",
+			content: "second",
+		});
+		await secondPromise;
+		await Promise.resolve();
+		expect(snapshots.at(-1)).toEqual({ queued: 0, active: 0 });
+
+		unsubscribe();
+	});
 });

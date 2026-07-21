@@ -9,6 +9,13 @@ export interface LinkUtilitiesContext {
 	) => Promise<PreviewData>;
 	getVisiblePreviewQueueSize?: () => number;
 	getActiveVisiblePreviewCount?: () => number;
+	previewSchedulingIdentity?: object;
+	subscribeVisiblePreviewQueue?: (
+		listener: (metrics: {
+			readonly queued: number;
+			readonly active: number;
+		}) => void,
+	) => () => void;
 	resolveFile: (path: string) => TFile | null;
 	buildWikiLink: (targetFile: TFile | null, fallback: string) => string;
 	fileToLinktext: (

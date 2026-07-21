@@ -88,12 +88,13 @@
 		const snapshot = effectiveModel
 			? createCardPreviewSnapshot(effectiveModel)
 			: null;
-		previewController.setPreviewRange(
-			visibility === "visible" ? { start: 0, end: 1 } : { start: 0, end: 0 },
-		);
-		previewController.syncCards(
-			snapshot ? [{ slotId: activationCandidateId, rowIndex, snapshot }] : [],
-		);
+		previewController.commit({
+			cards: snapshot
+				? [{ slotId: activationCandidateId, rowIndex, snapshot }]
+				: [],
+			previewRange: { start: 0, end: 1 },
+			active: visibility === "visible",
+		});
 		previewState = previewController.getSlotState(activationCandidateId);
 	});
 

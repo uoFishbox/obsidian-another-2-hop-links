@@ -78,6 +78,11 @@ export interface IIndexingService {
 	onDataUpdate?(listener: (context: DataUpdateContext) => void): () => void;
 }
 
+export interface PreviewQueueMetrics {
+	readonly queued: number;
+	readonly active: number;
+}
+
 export interface IPreviewService {
 	getPreview(
 		file: TFile,
@@ -86,6 +91,10 @@ export interface IPreviewService {
 	): Promise<PreviewData>;
 	getVisibleQueueSize(): number;
 	getActiveVisiblePreviewCount(): number;
+	getSchedulingIdentity(): object;
+	subscribeVisiblePreviewQueue(
+		listener: (metrics: PreviewQueueMetrics) => void,
+	): () => void;
 }
 
 export type SortMetricKind =

@@ -77,6 +77,9 @@ export function createLinkContextFactory(
 			getVisiblePreviewQueueSize: () => previewService.getVisibleQueueSize(),
 			getActiveVisiblePreviewCount: () =>
 				previewService.getActiveVisiblePreviewCount(),
+			previewSchedulingIdentity: previewService.getSchedulingIdentity(),
+			subscribeVisiblePreviewQueue: (listener) =>
+				previewService.subscribeVisiblePreviewQueue(listener),
 			resolveFile: eventHandlers.handleResolveFile,
 			buildWikiLink: (targetFile: TFile | null, fallback: string) =>
 				targetFile ? dragLinkFormat(targetFile) : `[[${fallback}]]`,

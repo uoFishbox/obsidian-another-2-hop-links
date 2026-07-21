@@ -1,8 +1,14 @@
+import { recordCCLDevMeasurement } from "infrastructure/debug/CCLDevMeasurements";
 import {
 	isScrollActivityActive,
 	subscribeScrollActivity,
 } from "ui/virtualization/scheduling/scrollActivity";
-import { recordCCLDevMeasurement } from "infrastructure/debug/CCLDevMeasurements";
+import type { VirtualFrameCoordinator } from "ui/virtualization/scheduling/frameCoordinator";
+import {
+	createPreviewFrameDriver,
+	readPreviewSchedulingTime,
+	type PreviewFrameDriver,
+} from "./previewFrameDriver";
 import {
 	canConsumePreviewScheduleToken,
 	consumePreviewScheduleToken,
@@ -10,10 +16,8 @@ import {
 	refillPreviewScheduleTokens,
 	type PreviewScheduleTokenState,
 } from "./previewScheduleTokenBucket";
-import type { VirtualFrameCoordinator } from "ui/virtualization/scheduling/frameCoordinator";
 
 const MAX_QUEUE_ENTRIES_PER_DRAIN = 256;
-const FALLBACK_FRAME_INTERVAL_MS = 1000 / 60;
 
 interface PreviewDomCommitPolicy {
 	readonly ratePerSecond: number;
@@ -36,37 +40,81 @@ export interface PreviewDomCommitTask {
 	readonly frameCoordinator?: VirtualFrameCoordinator;
 }
 
+export type PreviewDomCommitResult =
+	| { readonly type: "committed" }
+	| {
+			readonly type: "skipped";
+			readonly reason: "replaced" | "stale" | "no-op" | "disposed";
+	  };
+
 interface QueuedPreviewDomCommitTask extends PreviewDomCommitTask {
-	readonly resolve: (didCommit: boolean) => void;
+	readonly partition: PreviewDomCommitPartition;
+	readonly resolve: (result: PreviewDomCommitResult) => void;
 	readonly reject: (error: unknown) => void;
 	settled: boolean;
 }
 
-const pendingByTargetKey = new Map<string, QueuedPreviewDomCommitTask>();
-let pendingQueue: QueuedPreviewDomCommitTask[] = [];
-let pendingQueueHead = 0;
-let frameHandle: number | null = null;
-let frameHandleKind: "animation-frame" | "timeout" | null = null;
-let scheduledFrameCoordinator: VirtualFrameCoordinator | undefined;
-let commitTokenState: PreviewScheduleTokenState =
-	createEmptyPreviewScheduleTokenState();
-let unsubscribeScrollActivity: (() => void) | undefined;
-
-function readMonotonicTime(): number {
-	if (typeof globalThis.performance?.now === "function") {
-		return globalThis.performance.now();
-	}
-	return Date.now();
+interface PreviewDomCommitPartition {
+	readonly coordinator: VirtualFrameCoordinator | undefined;
+	readonly driver: PreviewFrameDriver;
+	readonly pendingByTargetKey: Map<string, QueuedPreviewDomCommitTask>;
+	pendingQueue: QueuedPreviewDomCommitTask[];
+	pendingQueueHead: number;
+	tokenState: PreviewScheduleTokenState;
 }
 
-function settleTask(task: QueuedPreviewDomCommitTask, didCommit: boolean): void {
+const FALLBACK_PARTITION_IDENTITY = {};
+const pendingByTargetKey = new Map<string, QueuedPreviewDomCommitTask>();
+const partitionsByIdentity = new Map<object, PreviewDomCommitPartition>();
+let nextPartitionId = 0;
+let unsubscribeScrollActivity: (() => void) | undefined;
+
+function getOrCreatePartition(
+	coordinator: VirtualFrameCoordinator | undefined,
+): PreviewDomCommitPartition {
+	const identity = coordinator ?? FALLBACK_PARTITION_IDENTITY;
+	const existing = partitionsByIdentity.get(identity);
+	if (existing) return existing;
+
+	let partition: PreviewDomCommitPartition;
+	const driver = createPreviewFrameDriver({
+		coordinator,
+		taskKey: `preview:dom-commit-drain:${++nextPartitionId}`,
+		onAnimationFrameScheduled: () => {
+			if (process.env.NODE_ENV !== "production") {
+				recordCCLDevMeasurement("preview.domCommitScheduler.animationFrame");
+			}
+		},
+		onFrame: (timestamp) => drainPartition(partition, timestamp),
+	});
+	partition = {
+		coordinator,
+		driver,
+		pendingByTargetKey: new Map(),
+		pendingQueue: [],
+		pendingQueueHead: 0,
+		tokenState: createEmptyPreviewScheduleTokenState(),
+	};
+	partitionsByIdentity.set(identity, partition);
+	return partition;
+}
+
+function settleTask(
+	task: QueuedPreviewDomCommitTask,
+	result: PreviewDomCommitResult,
+): void {
 	if (task.settled) return;
 
 	task.settled = true;
 	if (pendingByTargetKey.get(task.targetKey) === task) {
 		pendingByTargetKey.delete(task.targetKey);
 	}
-	task.resolve(didCommit);
+	if (task.partition.pendingByTargetKey.get(task.targetKey) === task) {
+		task.partition.pendingByTargetKey.delete(task.targetKey);
+	}
+	task.resolve(result);
+	releasePartitionIfIdle(task.partition);
+	releaseScrollActivitySubscriptionIfIdle();
 }
 
 function rejectTask(task: QueuedPreviewDomCommitTask, error: unknown): void {
@@ -76,55 +124,42 @@ function rejectTask(task: QueuedPreviewDomCommitTask, error: unknown): void {
 	if (pendingByTargetKey.get(task.targetKey) === task) {
 		pendingByTargetKey.delete(task.targetKey);
 	}
+	if (task.partition.pendingByTargetKey.get(task.targetKey) === task) {
+		task.partition.pendingByTargetKey.delete(task.targetKey);
+	}
 	task.reject(error);
+	releasePartitionIfIdle(task.partition);
+	releaseScrollActivitySubscriptionIfIdle();
 }
 
-function refillCommitTokens(timestamp: number, policy: PreviewDomCommitPolicy): void {
-	commitTokenState = refillPreviewScheduleTokens(commitTokenState, timestamp, policy);
-}
-
-function compactQueue(): void {
+function compactQueue(partition: PreviewDomCommitPartition): void {
 	if (
-		pendingQueueHead < 64 &&
-		pendingQueue.length <= pendingByTargetKey.size * 2 + 16
+		partition.pendingQueueHead < 64 &&
+		partition.pendingQueue.length <= partition.pendingByTargetKey.size * 2 + 16
 	) {
 		return;
 	}
 
-	pendingQueue = pendingQueue
-		.slice(pendingQueueHead)
+	partition.pendingQueue = partition.pendingQueue
+		.slice(partition.pendingQueueHead)
 		.filter(
-			(task) => !task.settled && pendingByTargetKey.get(task.targetKey) === task,
+			(task) =>
+				!task.settled &&
+				partition.pendingByTargetKey.get(task.targetKey) === task,
 		);
-	pendingQueueHead = 0;
+	partition.pendingQueueHead = 0;
 }
 
-function readNextQueuedTask(): QueuedPreviewDomCommitTask | undefined {
-	if (pendingQueueHead >= pendingQueue.length) return undefined;
+function readNextQueuedTask(
+	partition: PreviewDomCommitPartition,
+): QueuedPreviewDomCommitTask | undefined {
+	if (partition.pendingQueueHead >= partition.pendingQueue.length) {
+		return undefined;
+	}
 
-	const task = pendingQueue[pendingQueueHead];
-	pendingQueueHead += 1;
+	const task = partition.pendingQueue[partition.pendingQueueHead];
+	partition.pendingQueueHead += 1;
 	return task;
-}
-
-function cancelFrameDrain(): void {
-	if (scheduledFrameCoordinator) {
-		scheduledFrameCoordinator.cancel("idle", "preview:dom-commit-drain");
-		scheduledFrameCoordinator = undefined;
-	}
-	if (frameHandle === null) return;
-
-	if (
-		frameHandleKind === "animation-frame" &&
-		typeof globalThis.cancelAnimationFrame === "function"
-	) {
-		globalThis.cancelAnimationFrame(frameHandle);
-	} else if (typeof globalThis.clearTimeout === "function") {
-		globalThis.clearTimeout(frameHandle);
-	}
-
-	frameHandle = null;
-	frameHandleKind = null;
 }
 
 function ensureScrollActivitySubscription(): void {
@@ -132,10 +167,14 @@ function ensureScrollActivitySubscription(): void {
 
 	unsubscribeScrollActivity = subscribeScrollActivity((isActive) => {
 		if (isActive) {
-			cancelFrameDrain();
+			for (const partition of partitionsByIdentity.values()) {
+				partition.driver.cancel();
+			}
 			return;
 		}
-		scheduleFrameDrain();
+		for (const partition of partitionsByIdentity.values()) {
+			schedulePartition(partition);
+		}
 	});
 }
 
@@ -145,87 +184,61 @@ function releaseScrollActivitySubscriptionIfIdle(): void {
 	unsubscribeScrollActivity = undefined;
 }
 
-function scheduleFrameDrain(): void {
+function schedulePartition(partition: PreviewDomCommitPartition): void {
 	if (
-		frameHandle !== null ||
-		scheduledFrameCoordinator !== undefined ||
-		pendingByTargetKey.size === 0 ||
+		partition.pendingByTargetKey.size === 0 ||
+		partition.driver.isScheduled() ||
 		isScrollActivityActive()
 	) {
 		return;
 	}
-	const coordinator = resolvePendingCoordinator();
-	if (coordinator) {
-		const scheduled = coordinator.schedule(
-			"idle",
-			"preview:dom-commit-drain",
-			() => {
-				scheduledFrameCoordinator = undefined;
-				drainFrame(readMonotonicTime());
-			},
-		);
-		if (scheduled) {
-			scheduledFrameCoordinator = coordinator;
-			return;
-		}
-	}
-
-	if (typeof globalThis.requestAnimationFrame !== "function") {
-		frameHandleKind = "timeout";
-		frameHandle = globalThis.setTimeout(() => {
-			frameHandle = null;
-			frameHandleKind = null;
-			drainFrame(readMonotonicTime());
-		}, FALLBACK_FRAME_INTERVAL_MS) as unknown as number;
-		return;
-	}
-
-	if (process.env.NODE_ENV !== "production") {
-		recordCCLDevMeasurement("preview.domCommitScheduler.animationFrame");
-	}
-	frameHandleKind = "animation-frame";
-	frameHandle = globalThis.requestAnimationFrame((timestamp) => {
-		frameHandle = null;
-		frameHandleKind = null;
-		drainFrame(timestamp);
-	});
+	partition.driver.schedule();
 }
 
-function resolvePendingCoordinator(): VirtualFrameCoordinator | undefined {
-	let coordinator: VirtualFrameCoordinator | undefined;
-	for (const task of pendingByTargetKey.values()) {
-		if (task.settled) continue;
-		if (!task.frameCoordinator) return undefined;
-		if (coordinator && coordinator !== task.frameCoordinator) return undefined;
-		coordinator = task.frameCoordinator;
-	}
-	return coordinator;
+function releasePartitionIfIdle(partition: PreviewDomCommitPartition): void {
+	if (partition.pendingByTargetKey.size > 0) return;
+
+	partition.driver.dispose();
+	partitionsByIdentity.delete(partition.coordinator ?? FALLBACK_PARTITION_IDENTITY);
 }
 
-function drainFrame(frameTimestamp: number): void {
+function drainPartition(
+	partition: PreviewDomCommitPartition,
+	frameTimestamp: number,
+): void {
 	if (isScrollActivityActive()) return;
 
-	const policy = IDLE_POLICY;
-	refillCommitTokens(frameTimestamp, policy);
-
-	const deadline = readMonotonicTime() + policy.maxDrainCpuMs;
+	partition.tokenState = refillPreviewScheduleTokens(
+		partition.tokenState,
+		frameTimestamp,
+		IDLE_POLICY,
+	);
+	const deadline = readPreviewSchedulingTime() + IDLE_POLICY.maxDrainCpuMs;
+	const queueEntriesAvailableAtDrainStart = Math.max(
+		0,
+		partition.pendingQueue.length - partition.pendingQueueHead,
+	);
+	const maxInspectableQueueEntries = Math.min(
+		MAX_QUEUE_ENTRIES_PER_DRAIN,
+		queueEntriesAvailableAtDrainStart,
+	);
 	let inspectedQueueEntries = 0;
 	let drainedTasks = 0;
 
 	while (
-		canConsumePreviewScheduleToken(commitTokenState) &&
-		drainedTasks < policy.maxTasksPerDrain &&
-		inspectedQueueEntries < MAX_QUEUE_ENTRIES_PER_DRAIN &&
-		readMonotonicTime() <= deadline
+		canConsumePreviewScheduleToken(partition.tokenState) &&
+		drainedTasks < IDLE_POLICY.maxTasksPerDrain &&
+		inspectedQueueEntries < maxInspectableQueueEntries &&
+		readPreviewSchedulingTime() <= deadline
 	) {
-		const task = readNextQueuedTask();
+		const task = readNextQueuedTask(partition);
 		if (!task) break;
 		inspectedQueueEntries += 1;
 		if (task.settled) continue;
-		if (pendingByTargetKey.get(task.targetKey) !== task) continue;
+		if (partition.pendingByTargetKey.get(task.targetKey) !== task) continue;
 
 		if (task.isStale()) {
-			settleTask(task, false);
+			settleTask(task, { type: "skipped", reason: "stale" });
 			continue;
 		}
 
@@ -233,71 +246,76 @@ function drainFrame(frameTimestamp: number): void {
 			if (process.env.NODE_ENV !== "production") {
 				recordCCLDevMeasurement("preview.domCommitDuringScroll");
 			}
-			pendingQueue.push(task);
+			partition.pendingQueue.push(task);
 			break;
 		}
 
 		drainedTasks += 1;
 		try {
 			const didCommit = task.commit();
-			settleTask(task, didCommit);
+			settleTask(
+				task,
+				didCommit
+					? { type: "committed" }
+					: { type: "skipped", reason: "no-op" },
+			);
 			if (didCommit) {
-				commitTokenState = consumePreviewScheduleToken(commitTokenState);
+				partition.tokenState = consumePreviewScheduleToken(
+					partition.tokenState,
+				);
 			}
 		} catch (error) {
 			rejectTask(task, error);
 		}
 	}
 
-	compactQueue();
-
-	if (pendingByTargetKey.size > 0) {
-		scheduleFrameDrain();
-	} else {
-		releaseScrollActivitySubscriptionIfIdle();
-	}
+	compactQueue(partition);
+	if (partition.pendingByTargetKey.size > 0) schedulePartition(partition);
 }
 
 /**
  * Queues a live preview DOM replacement and coalesces older work by target.
- *
- * The returned promise resolves to `false` when the task was replaced or stale
- * before commit, or when `commit` found no DOM mutation to apply. It resolves
- * to `true` only after `commit` mutates the DOM.
  */
-export function enqueuePreviewDomCommit(task: PreviewDomCommitTask): Promise<boolean> {
-	return new Promise<boolean>((resolve, reject) => {
-		ensureScrollActivitySubscription();
+export function enqueuePreviewDomCommit(
+	task: PreviewDomCommitTask,
+): Promise<PreviewDomCommitResult> {
+	return new Promise<PreviewDomCommitResult>((resolve, reject) => {
 		const existingTask = pendingByTargetKey.get(task.targetKey);
 		if (existingTask) {
-			settleTask(existingTask, false);
-			compactQueue();
+			settleTask(existingTask, { type: "skipped", reason: "replaced" });
+			compactQueue(existingTask.partition);
 		}
 
+		const partition = getOrCreatePartition(task.frameCoordinator);
 		const queuedTask: QueuedPreviewDomCommitTask = {
 			...task,
+			partition,
 			resolve,
 			reject,
 			settled: false,
 		};
 		pendingByTargetKey.set(task.targetKey, queuedTask);
-		pendingQueue.push(queuedTask);
+		partition.pendingByTargetKey.set(task.targetKey, queuedTask);
+		partition.pendingQueue.push(queuedTask);
 		ensureScrollActivitySubscription();
-		scheduleFrameDrain();
+		schedulePartition(partition);
 	});
 }
 
-/**
- * Stops DOM commit scheduling and settles all pending commit requests.
- */
+/** Stops DOM commit scheduling and settles all pending commit requests. */
 export function disposePreviewDomCommitScheduler(): void {
-	for (const task of pendingQueue.splice(0)) {
-		settleTask(task, false);
+	for (const task of Array.from(pendingByTargetKey.values())) {
+		settleTask(task, { type: "skipped", reason: "disposed" });
 	}
-	pendingQueueHead = 0;
 	pendingByTargetKey.clear();
-	commitTokenState = createEmptyPreviewScheduleTokenState();
-	cancelFrameDrain();
+	for (const partition of partitionsByIdentity.values()) {
+		partition.pendingQueue = [];
+		partition.pendingQueueHead = 0;
+		partition.pendingByTargetKey.clear();
+		partition.tokenState = createEmptyPreviewScheduleTokenState();
+		partition.driver.dispose();
+	}
+	partitionsByIdentity.clear();
 	unsubscribeScrollActivity?.();
 	unsubscribeScrollActivity = undefined;
 }

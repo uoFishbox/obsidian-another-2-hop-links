@@ -40,7 +40,7 @@ function enqueueTestCommit(options: EnqueueTestCommitOptions): Promise<boolean> 
 			options.onCommit?.();
 			return options.didMutateDom ?? true;
 		},
-	});
+	}).then((result) => result.type === "committed");
 }
 
 async function countCommits(params: {
@@ -192,13 +192,13 @@ describe("preview DOM commit scheduler", () => {
 
 		expect(frameCoordinator.schedule).toHaveBeenCalledWith(
 			"idle",
-			"preview:dom-commit-drain",
+			expect.stringMatching(/^preview:dom-commit-drain:/),
 			expect.any(Function),
 		);
 		expect(requestAnimationFrame).not.toHaveBeenCalled();
 		idleTask?.();
 
-		await expect(commit).resolves.toBe(true);
+		await expect(commit).resolves.toEqual({ type: "committed" });
 		expect(requestAnimationFrame).not.toHaveBeenCalled();
 	});
 
@@ -366,5 +366,84 @@ describe("preview DOM commit scheduler", () => {
 		disposePreviewDomCommitScheduler();
 
 		await expect(commit).resolves.toBe(false);
+	});
+
+	it("keeps coordinator drains isolated to their own surface", async () => {
+		let firstIdleTask: (() => void) | undefined;
+		let secondIdleTask: (() => void) | undefined;
+		const firstCoordinator: VirtualFrameCoordinator = {
+			schedule: vi.fn((_lane, _key, task) => {
+				firstIdleTask = task;
+				return true;
+			}),
+			cancel: vi.fn(),
+			isScheduled: vi.fn(() => false),
+			dispose: vi.fn(),
+		};
+		const secondCoordinator: VirtualFrameCoordinator = {
+			schedule: vi.fn((_lane, _key, task) => {
+				secondIdleTask = task;
+				return true;
+			}),
+			cancel: vi.fn(),
+			isScheduled: vi.fn(() => false),
+			dispose: vi.fn(),
+		};
+		const committed: string[] = [];
+		const first = enqueuePreviewDomCommit({
+			targetKey: "preview-first",
+			isStale: () => false,
+			commit: () => {
+				committed.push("first");
+				return true;
+			},
+			frameCoordinator: firstCoordinator,
+		});
+		const second = enqueuePreviewDomCommit({
+			targetKey: "preview-second",
+			isStale: () => false,
+			commit: () => {
+				committed.push("second");
+				return true;
+			},
+			frameCoordinator: secondCoordinator,
+		});
+
+		firstIdleTask?.();
+		await expect(first).resolves.toEqual({ type: "committed" });
+		expect(committed).toEqual(["first"]);
+		let secondSettled = false;
+		void second.then(() => {
+			secondSettled = true;
+		});
+		await Promise.resolve();
+		expect(secondSettled).toBe(false);
+
+		secondIdleTask?.();
+		await expect(second).resolves.toEqual({ type: "committed" });
+		expect(committed).toEqual(["first", "second"]);
+	});
+
+	it("reports why a DOM commit was skipped", async () => {
+		const first = enqueuePreviewDomCommit({
+			targetKey: "preview-replaced",
+			isStale: () => false,
+			commit: () => true,
+		});
+		const replacement = enqueuePreviewDomCommit({
+			targetKey: "preview-replaced",
+			isStale: () => true,
+			commit: () => true,
+		});
+
+		await expect(first).resolves.toEqual({
+			type: "skipped",
+			reason: "replaced",
+		});
+		await flushAnimationFrame();
+		await expect(replacement).resolves.toEqual({
+			type: "skipped",
+			reason: "stale",
+		});
 	});
 });

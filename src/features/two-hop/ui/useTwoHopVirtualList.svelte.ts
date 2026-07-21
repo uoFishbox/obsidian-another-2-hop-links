@@ -90,6 +90,8 @@ export function useTwoHopVirtualList(
 			queued: linkContext?.getVisiblePreviewQueueSize?.() ?? 0,
 			active: linkContext?.getActiveVisiblePreviewCount?.() ?? 0,
 		}),
+		subscribeBackpressure: linkContext?.subscribeVisiblePreviewQueue,
+		schedulerIdentity: linkContext?.previewSchedulingIdentity,
 		frameCoordinator,
 	});
 	const interactionController = createVirtualCardInteractionController();
@@ -145,10 +147,13 @@ export function useTwoHopVirtualList(
 		readonly previewRange: RowRange;
 		readonly build: TwoHopMountedRowsBuild | null;
 	}): void => {
-		syncCardSlots(params.build?.rowSlices ?? EMPTY_MOUNTED_ROWS);
-		const effectivePreviewRange =
-			props.previewActive === false ? EMPTY_RANGE : params.previewRange;
-		previewController?.setPreviewRange(effectivePreviewRange);
+		const active = props.previewActive !== false;
+		const effectivePreviewRange = active ? params.previewRange : EMPTY_RANGE;
+		syncCardSlots(
+			params.build?.rowSlices ?? EMPTY_MOUNTED_ROWS,
+			params.previewRange,
+			active,
+		);
 		visibilityStates.commit({
 			rowModelRevision: params.rowModel,
 			mountedRows: params.build?.rowSlices ?? EMPTY_MOUNTED_ROWS,
@@ -171,6 +176,8 @@ export function useTwoHopVirtualList(
 
 	const syncCardSlots = (
 		rows: readonly TwoHopMountedRowsBuild["rowSlices"][number][],
+		previewRange: RowRange,
+		active: boolean,
 	): void => {
 		const previewCards: RowPreviewCardBinding[] = [];
 		const interactionCards: VirtualCardInteractionBinding[] = [];
@@ -195,7 +202,7 @@ export function useTwoHopVirtualList(
 				}
 			}
 		}
-		previewController?.syncCards(previewCards);
+		previewController?.commit({ cards: previewCards, previewRange, active });
 		interactionController.syncCards(interactionCards);
 	};
 
@@ -322,10 +329,16 @@ export function useTwoHopVirtualList(
 
 	$effect(() => {
 		void props.resolveItemCardModel;
+		const snapshot = virtualList.getSnapshot();
+		if (!snapshot) return;
 		const rows =
 			virtualList.getReconciliationState().mountedBuild?.rowSlices ??
 			EMPTY_MOUNTED_ROWS;
-		syncCardSlots(rows);
+		syncCardSlots(
+			rows,
+			snapshot.ranges.previewVisible,
+			props.previewActive !== false,
+		);
 	});
 
 	onDestroy(() => {

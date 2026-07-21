@@ -13,16 +13,26 @@ export interface PreviewQueueTask {
 	started: boolean;
 }
 
+export interface PreviewQueueSnapshot {
+	readonly queued: number;
+	readonly active: number;
+}
+
+export type PreviewQueueListener = (snapshot: PreviewQueueSnapshot) => void;
+
 export interface PreviewQueue {
 	enqueue: (task: PreviewQueueTask) => Promise<PreviewData>;
 	getActiveCount: () => number;
 	getSize: () => number;
 	shutdown: () => void;
+	subscribe: (listener: PreviewQueueListener) => () => void;
 }
 
 export function createPreviewQueue(): PreviewQueue {
 	let activeVisiblePreviews = 0;
 	const visibleQueue: PreviewQueueTask[] = [];
+	const listeners = new Set<PreviewQueueListener>();
+	let lastSnapshot: PreviewQueueSnapshot = { queued: 0, active: 0 };
 
 	function getSize(): number {
 		return visibleQueue.length;
@@ -32,6 +42,27 @@ export function createPreviewQueue(): PreviewQueue {
 		return activeVisiblePreviews;
 	}
 
+	function notifyIfChanged(): void {
+		const snapshot: PreviewQueueSnapshot = {
+			queued: visibleQueue.length,
+			active: activeVisiblePreviews,
+		};
+		if (
+			snapshot.queued === lastSnapshot.queued &&
+			snapshot.active === lastSnapshot.active
+		) {
+			return;
+		}
+		lastSnapshot = snapshot;
+		for (const listener of listeners) listener(snapshot);
+	}
+
+	function subscribe(listener: PreviewQueueListener): () => void {
+		listeners.add(listener);
+		listener({ queued: visibleQueue.length, active: activeVisiblePreviews });
+		return () => listeners.delete(listener);
+	}
+
 	function shutdown(): void {
 		for (const task of visibleQueue) {
 			task.cancelled = true;
@@ -39,6 +70,7 @@ export function createPreviewQueue(): PreviewQueue {
 		}
 		visibleQueue.length = 0;
 		activeVisiblePreviews = 0;
+		notifyIfChanged();
 	}
 
 	function enqueue(task: PreviewQueueTask): Promise<PreviewData> {
@@ -80,6 +112,7 @@ export function createPreviewQueue(): PreviewQueue {
 			}
 
 			visibleQueue.push(task);
+			notifyIfChanged();
 			processQueue();
 		});
 	}
@@ -94,6 +127,7 @@ export function createPreviewQueue(): PreviewQueue {
 			if (!nextTask) {
 				return;
 			}
+			notifyIfChanged();
 
 			if (nextTask.cancelled || nextTask.signal?.aborted) {
 				nextTask.reject(createAbortError());
@@ -107,6 +141,7 @@ export function createPreviewQueue(): PreviewQueue {
 	function startTask(task: PreviewQueueTask): void {
 		task.started = true;
 		activeVisiblePreviews += 1;
+		notifyIfChanged();
 
 		void task
 			.run()
@@ -126,6 +161,7 @@ export function createPreviewQueue(): PreviewQueue {
 			})
 			.finally(() => {
 				activeVisiblePreviews = Math.max(activeVisiblePreviews - 1, 0);
+				notifyIfChanged();
 				processQueue();
 			});
 	}
@@ -134,6 +170,7 @@ export function createPreviewQueue(): PreviewQueue {
 		const index = visibleQueue.indexOf(task);
 		if (index >= 0) {
 			visibleQueue.splice(index, 1);
+			notifyIfChanged();
 		}
 	}
 
@@ -142,5 +179,6 @@ export function createPreviewQueue(): PreviewQueue {
 		getActiveCount,
 		getSize,
 		shutdown,
+		subscribe,
 	};
 }

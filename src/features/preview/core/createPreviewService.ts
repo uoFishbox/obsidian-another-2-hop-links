@@ -4,7 +4,7 @@ import type { IPreviewService } from "types/services";
 import type { PluginSettings } from "features/settings/model";
 import type { PreviewData, PreviewRequestOptions } from "../public-types";
 import type { PreviewStrategy } from "./PreviewStrategy";
-import type { PreviewQueueTask } from "./previewQueue";
+import type { PreviewQueueListener, PreviewQueueTask } from "./previewQueue";
 import {
 	buildPreviewGenerationKey,
 	createPreviewGenerationCache,
@@ -29,6 +29,7 @@ export class PreviewService {
 	private cache = createPreviewGenerationCache();
 	private inFlightRequests = new Map<string, InFlightRequest>();
 	private queue = createPreviewQueue();
+	private readonly schedulingIdentity = {};
 
 	constructor(strategies?: PreviewStrategy[]) {
 		this.strategies = strategies ?? createDefaultPreviewStrategies();
@@ -47,6 +48,14 @@ export class PreviewService {
 
 	public getActiveVisiblePreviewCount(): number {
 		return this.queue.getActiveCount();
+	}
+
+	public getSchedulingIdentity(): object {
+		return this.schedulingIdentity;
+	}
+
+	public subscribeVisiblePreviewQueue(listener: PreviewQueueListener): () => void {
+		return this.queue.subscribe(listener);
 	}
 
 	public shutdown(): void {
@@ -292,6 +301,9 @@ export function createPreviewService(
 			),
 		getVisibleQueueSize: () => service.getVisibleQueueSize(),
 		getActiveVisiblePreviewCount: () => service.getActiveVisiblePreviewCount(),
+		getSchedulingIdentity: () => service.getSchedulingIdentity(),
+		subscribeVisiblePreviewQueue: (listener) =>
+			service.subscribeVisiblePreviewQueue(listener),
 		clearCache: () => service.clearCache(),
 		dispose: () => service.dispose(),
 	};
