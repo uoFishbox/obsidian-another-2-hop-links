@@ -15,14 +15,22 @@ export interface VirtualCardInteractionController {
 /** Keeps one interaction registry entry per bounded physical card slot. */
 export function createVirtualCardInteractionController(): VirtualCardInteractionController {
 	const descriptorsBySlot = new Map<string, ItemInteractionDescriptor>();
+	const interactionIdBySlot = new Map<string, string>();
+	const descriptorByInteractionId = new Map<string, ItemInteractionDescriptor>();
 	const retainedSlots = new Set<string>();
+
+	function removeSlot(slotId: string) {
+		const prevId = interactionIdBySlot.get(slotId);
+		if (prevId !== undefined) {
+			descriptorByInteractionId.delete(prevId);
+			interactionIdBySlot.delete(slotId);
+		}
+		descriptorsBySlot.delete(slotId);
+	}
 
 	const provider: InteractionDescriptorResolverProvider = {
 		resolveInteractionDescriptor(interactionId) {
-			for (const descriptor of descriptorsBySlot.values()) {
-				if (descriptor.interactionId === interactionId) return descriptor;
-			}
-			return null;
+			return descriptorByInteractionId.get(interactionId) ?? null;
 		},
 	};
 
@@ -32,15 +40,26 @@ export function createVirtualCardInteractionController(): VirtualCardInteraction
 			retainedSlots.clear();
 			for (const card of cards) {
 				retainedSlots.add(card.slotId);
+				const prevId = interactionIdBySlot.get(card.slotId);
+				if (prevId !== undefined && prevId !== card.descriptor.interactionId) {
+					descriptorByInteractionId.delete(prevId);
+				}
 				descriptorsBySlot.set(card.slotId, card.descriptor);
+				interactionIdBySlot.set(card.slotId, card.descriptor.interactionId);
+				descriptorByInteractionId.set(
+					card.descriptor.interactionId,
+					card.descriptor,
+				);
 			}
 			for (const slotId of descriptorsBySlot.keys()) {
-				if (!retainedSlots.has(slotId)) descriptorsBySlot.delete(slotId);
+				if (!retainedSlots.has(slotId)) removeSlot(slotId);
 			}
 			retainedSlots.clear();
 		},
 		clear() {
 			descriptorsBySlot.clear();
+			interactionIdBySlot.clear();
+			descriptorByInteractionId.clear();
 			retainedSlots.clear();
 		},
 	};
