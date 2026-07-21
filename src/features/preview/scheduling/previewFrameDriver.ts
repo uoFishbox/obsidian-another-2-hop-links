@@ -1,4 +1,7 @@
-import type { VirtualFrameCoordinator } from "ui/virtualization/scheduling/frameCoordinator";
+import type {
+	VirtualFrameCoordinator,
+	VirtualFrameLane,
+} from "ui/virtualization/scheduling/frameCoordinator";
 
 const FALLBACK_FRAME_INTERVAL_MS = 1000 / 60;
 
@@ -6,7 +9,12 @@ export interface PreviewFrameDriver {
 	cancel(): void;
 	dispose(): void;
 	isScheduled(): boolean;
-	schedule(): void;
+	schedule(schedule: PreviewFrameSchedule): void;
+}
+
+export interface PreviewFrameSchedule {
+	readonly lane: Extract<VirtualFrameLane, "idle" | "post-paint">;
+	readonly delayMs?: number;
 }
 
 export interface CreatePreviewFrameDriverOptions {
@@ -32,11 +40,11 @@ export function createPreviewFrameDriver(
 ): PreviewFrameDriver {
 	let frameHandle: number | null = null;
 	let frameHandleKind: "animation-frame" | "timeout" | null = null;
-	let coordinatorScheduled = false;
+	let scheduledCoordinatorLane: PreviewFrameSchedule["lane"] | null = null;
 	let disposed = false;
 
 	function isScheduled(): boolean {
-		return coordinatorScheduled || frameHandle !== null;
+		return scheduledCoordinatorLane !== null || frameHandle !== null;
 	}
 
 	function runFrame(timestamp: number): void {
@@ -44,20 +52,18 @@ export function createPreviewFrameDriver(
 		options.onFrame(timestamp);
 	}
 
-	function schedule(): void {
-		if (disposed || isScheduled()) return;
-
+	function scheduleFrame(lane: PreviewFrameSchedule["lane"]): void {
 		if (options.coordinator) {
 			const scheduled = options.coordinator.schedule(
-				"idle",
+				lane,
 				options.taskKey,
 				() => {
-					coordinatorScheduled = false;
+					scheduledCoordinatorLane = null;
 					runFrame(readPreviewSchedulingTime());
 				},
 			);
 			if (scheduled) {
-				coordinatorScheduled = true;
+				scheduledCoordinatorLane = lane;
 				return;
 			}
 		}
@@ -68,6 +74,18 @@ export function createPreviewFrameDriver(
 			frameHandle = globalThis.requestAnimationFrame((timestamp) => {
 				frameHandle = null;
 				frameHandleKind = null;
+				if (
+					lane === "post-paint" &&
+					typeof globalThis.setTimeout === "function"
+				) {
+					frameHandleKind = "timeout";
+					frameHandle = globalThis.setTimeout(() => {
+						frameHandle = null;
+						frameHandleKind = null;
+						runFrame(timestamp);
+					}, 0) as unknown as number;
+					return;
+				}
 				runFrame(timestamp);
 			});
 			return;
@@ -82,10 +100,27 @@ export function createPreviewFrameDriver(
 		}, FALLBACK_FRAME_INTERVAL_MS) as unknown as number;
 	}
 
+	function schedule(schedule: PreviewFrameSchedule): void {
+		if (disposed || isScheduled()) return;
+
+		const delayMs = Math.max(0, schedule.delayMs ?? 0);
+		if (delayMs === 0 || typeof globalThis.setTimeout !== "function") {
+			scheduleFrame(schedule.lane);
+			return;
+		}
+
+		frameHandleKind = "timeout";
+		frameHandle = globalThis.setTimeout(() => {
+			frameHandle = null;
+			frameHandleKind = null;
+			scheduleFrame(schedule.lane);
+		}, delayMs) as unknown as number;
+	}
+
 	function cancel(): void {
-		if (coordinatorScheduled && options.coordinator) {
-			options.coordinator.cancel("idle", options.taskKey);
-			coordinatorScheduled = false;
+		if (scheduledCoordinatorLane && options.coordinator) {
+			options.coordinator.cancel(scheduledCoordinatorLane, options.taskKey);
+			scheduledCoordinatorLane = null;
 		}
 		if (frameHandle === null) return;
 

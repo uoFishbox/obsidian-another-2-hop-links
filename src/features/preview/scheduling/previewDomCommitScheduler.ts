@@ -13,6 +13,7 @@ import {
 	canConsumePreviewScheduleToken,
 	consumePreviewScheduleToken,
 	createEmptyPreviewScheduleTokenState,
+	readPreviewScheduleTokenDelayMs,
 	refillPreviewScheduleTokens,
 	type PreviewScheduleTokenState,
 } from "./previewScheduleTokenBucket";
@@ -31,6 +32,12 @@ const IDLE_POLICY: PreviewDomCommitPolicy = {
 	creditCapacity: 4,
 	maxTasksPerDrain: 4,
 	maxDrainCpuMs: 2,
+};
+const SCROLLING_POLICY: PreviewDomCommitPolicy = {
+	ratePerSecond: 32,
+	creditCapacity: 1,
+	maxTasksPerDrain: 1,
+	maxDrainCpuMs: 0.75,
 };
 
 export interface PreviewDomCommitTask {
@@ -166,14 +173,9 @@ function ensureScrollActivitySubscription(): void {
 	if (unsubscribeScrollActivity) return;
 
 	unsubscribeScrollActivity = subscribeScrollActivity((isActive) => {
-		if (isActive) {
-			for (const partition of partitionsByIdentity.values()) {
-				partition.driver.cancel();
-			}
-			return;
-		}
 		for (const partition of partitionsByIdentity.values()) {
-			schedulePartition(partition);
+			partition.driver.cancel();
+			schedulePartition(partition, 0, isActive);
 		}
 	});
 }
@@ -184,15 +186,18 @@ function releaseScrollActivitySubscriptionIfIdle(): void {
 	unsubscribeScrollActivity = undefined;
 }
 
-function schedulePartition(partition: PreviewDomCommitPartition): void {
-	if (
-		partition.pendingByTargetKey.size === 0 ||
-		partition.driver.isScheduled() ||
-		isScrollActivityActive()
-	) {
+function schedulePartition(
+	partition: PreviewDomCommitPartition,
+	delayMs = 0,
+	scrolling = isScrollActivityActive(),
+): void {
+	if (partition.pendingByTargetKey.size === 0 || partition.driver.isScheduled()) {
 		return;
 	}
-	partition.driver.schedule();
+	partition.driver.schedule({
+		lane: scrolling ? "post-paint" : "idle",
+		delayMs,
+	});
 }
 
 function releasePartitionIfIdle(partition: PreviewDomCommitPartition): void {
@@ -206,14 +211,15 @@ function drainPartition(
 	partition: PreviewDomCommitPartition,
 	frameTimestamp: number,
 ): void {
-	if (isScrollActivityActive()) return;
+	const scrolling = isScrollActivityActive();
+	const policy = scrolling ? SCROLLING_POLICY : IDLE_POLICY;
 
 	partition.tokenState = refillPreviewScheduleTokens(
 		partition.tokenState,
 		frameTimestamp,
-		IDLE_POLICY,
+		policy,
 	);
-	const deadline = readPreviewSchedulingTime() + IDLE_POLICY.maxDrainCpuMs;
+	const deadline = readPreviewSchedulingTime() + policy.maxDrainCpuMs;
 	const queueEntriesAvailableAtDrainStart = Math.max(
 		0,
 		partition.pendingQueue.length - partition.pendingQueueHead,
@@ -227,7 +233,7 @@ function drainPartition(
 
 	while (
 		canConsumePreviewScheduleToken(partition.tokenState) &&
-		drainedTasks < IDLE_POLICY.maxTasksPerDrain &&
+		drainedTasks < policy.maxTasksPerDrain &&
 		inspectedQueueEntries < maxInspectableQueueEntries &&
 		readPreviewSchedulingTime() <= deadline
 	) {
@@ -242,12 +248,8 @@ function drainPartition(
 			continue;
 		}
 
-		if (isScrollActivityActive()) {
-			if (process.env.NODE_ENV !== "production") {
-				recordCCLDevMeasurement("preview.domCommitDuringScroll");
-			}
-			partition.pendingQueue.push(task);
-			break;
+		if (scrolling && process.env.NODE_ENV !== "production") {
+			recordCCLDevMeasurement("preview.domCommitDuringScroll");
 		}
 
 		drainedTasks += 1;
@@ -270,7 +272,15 @@ function drainPartition(
 	}
 
 	compactQueue(partition);
-	if (partition.pendingByTargetKey.size > 0) schedulePartition(partition);
+	if (partition.pendingByTargetKey.size > 0) {
+		schedulePartition(
+			partition,
+			scrolling
+				? readPreviewScheduleTokenDelayMs(partition.tokenState, policy)
+				: 0,
+			scrolling,
+		);
+	}
 }
 
 /**

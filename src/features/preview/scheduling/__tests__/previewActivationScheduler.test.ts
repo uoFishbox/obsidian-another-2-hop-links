@@ -37,6 +37,7 @@ const scrollSource = {};
 const DEFAULT_FRAME_INTERVAL_MS = 1000 / 60;
 let frameIntervalMs = DEFAULT_FRAME_INTERVAL_MS;
 let frameTimestamp = 0;
+let frameTimeOrigin = 0;
 let visibleQueueSize = 0;
 let activeVisiblePreviewCount = 0;
 let activationScope: PreviewActivationScope;
@@ -55,6 +56,7 @@ function requestActivation(
 
 async function flushAnimationFrame(): Promise<void> {
 	await vi.advanceTimersByTimeAsync(frameIntervalMs);
+	await vi.advanceTimersByTimeAsync(1);
 	await Promise.resolve();
 }
 
@@ -94,11 +96,15 @@ beforeEach(() => {
 		}),
 	});
 	vi.useFakeTimers();
+	frameTimeOrigin = Date.now();
 	vi.stubGlobal(
 		"requestAnimationFrame",
 		vi.fn((callback: FrameRequestCallback) =>
 			setTimeout(() => {
-				frameTimestamp += frameIntervalMs;
+				frameTimestamp = Math.max(
+					frameTimestamp + frameIntervalMs,
+					Date.now() - frameTimeOrigin,
+				);
 				callback(frameTimestamp);
 			}, frameIntervalMs),
 		),
@@ -138,26 +144,35 @@ describe("preview activation scheduler", () => {
 		expect(activation.onActivated).toHaveBeenCalledOnce();
 	});
 
-	it("holds activation and animation-frame work until scrolling becomes idle", async () => {
+	it("activates previews sparsely while scrolling", async () => {
 		markScrollActivityActive(scrollSource);
-		requestActivation("preview-a");
-		requestActivation("preview-b");
-		requestActivation("preview-c");
+		for (let index = 0; index < 20; index += 1) {
+			requestActivation(`preview-${index}`);
+		}
 
 		await vi.advanceTimersByTimeAsync(1_000);
-		expect(results).toEqual([]);
-		expect(requestAnimationFrame).not.toHaveBeenCalled();
+		expect(results.length).toBeGreaterThanOrEqual(7);
+		expect(results.length).toBeLessThanOrEqual(9);
+		expect(
+			vi.mocked(requestAnimationFrame).mock.calls.length,
+		).toBeGreaterThanOrEqual(results.length);
+		expect(vi.mocked(requestAnimationFrame).mock.calls.length).toBeLessThanOrEqual(
+			results.length + 1,
+		);
 		let counters = getCCLDevMeasurementSnapshot().counters;
-		expect(counters["preview.activationScheduler.animationFrame"].count).toBe(0);
-		expect(counters["preview.activationDuringScroll"].count).toBe(0);
+		expect(counters["preview.activationScheduler.animationFrame"].count).toBe(
+			vi.mocked(requestAnimationFrame).mock.calls.length,
+		);
+		expect(counters["preview.activationDuringScroll"].count).toBe(results.length);
+		const scrollingActivationCount = results.length;
+		const scrollingFrameCount = vi.mocked(requestAnimationFrame).mock.calls.length;
 
 		markScrollActivityIdle(scrollSource);
 		await flushAnimationFrame();
-		expect(results).toEqual(["preview-a", "preview-b"]);
-		await flushAnimationFrame();
-		expect(results).toEqual(["preview-a", "preview-b", "preview-c"]);
-		counters = getCCLDevMeasurementSnapshot().counters;
-		expect(counters["preview.activationScheduler.animationFrame"].count).toBe(2);
+		expect(results.length).toBe(scrollingActivationCount + 2);
+		expect(vi.mocked(requestAnimationFrame).mock.calls.length).toBeGreaterThan(
+			scrollingFrameCount,
+		);
 	});
 
 	it("delegates idle activation drains to the surface frame coordinator", async () => {
@@ -187,7 +202,33 @@ describe("preview activation scheduler", () => {
 		expect(requestAnimationFrame).not.toHaveBeenCalled();
 	});
 
-	it("suppresses scrolling activation independently of refresh rate", async () => {
+	it("delegates scrolling activation drains to the post-paint lane", async () => {
+		markScrollActivityActive(scrollSource);
+		let postPaintTask: (() => void) | undefined;
+		const frameCoordinator: VirtualFrameCoordinator = {
+			schedule: vi.fn((_lane, _key, task) => {
+				postPaintTask = task;
+				return true;
+			}),
+			cancel: vi.fn(),
+			isScheduled: vi.fn(() => false),
+			dispose: vi.fn(),
+		};
+		const scope = createPreviewActivationScope({ frameCoordinator });
+		const activation = requestActivation("preview-coordinated-scroll", scope);
+
+		expect(frameCoordinator.schedule).toHaveBeenCalledWith(
+			"post-paint",
+			expect.stringMatching(/^preview:activation-drain:/),
+			expect.any(Function),
+		);
+		postPaintTask?.();
+
+		await Promise.resolve();
+		expect(activation.onActivated).toHaveBeenCalledOnce();
+	});
+
+	it("rate-limits scrolling activation independently of refresh rate", async () => {
 		const activationsAt60Hz = await countScrollingActivations({
 			intervalMs: 1000 / 60,
 			durationMs: 1000,
@@ -197,11 +238,14 @@ describe("preview activation scheduler", () => {
 			durationMs: 1000,
 		});
 
-		expect(activationsAt60Hz).toBe(0);
-		expect(activationsAt120Hz).toBe(0);
+		expect(Math.abs(activationsAt60Hz - activationsAt120Hz)).toBeLessThanOrEqual(1);
+		expect(activationsAt60Hz).toBeGreaterThanOrEqual(7);
+		expect(activationsAt60Hz).toBeLessThanOrEqual(9);
+		expect(activationsAt120Hz).toBeGreaterThanOrEqual(7);
+		expect(activationsAt120Hz).toBeLessThanOrEqual(9);
 	});
 
-	it("resumes queued activation only after scroll idle", async () => {
+	it("switches delayed scrolling work back to the idle burst policy", async () => {
 		frameIntervalMs = 1000 / 120;
 		markScrollActivityActive(scrollSource);
 		requestActivation("preview-a");
@@ -209,9 +253,7 @@ describe("preview activation scheduler", () => {
 		requestActivation("preview-c");
 
 		await flushAnimationFrame();
-		await flushAnimationFrame();
-		await flushAnimationFrame();
-		expect(results).toEqual([]);
+		expect(results).toEqual(["preview-a"]);
 
 		markScrollActivityIdle(scrollSource);
 		await flushAnimationFrame();

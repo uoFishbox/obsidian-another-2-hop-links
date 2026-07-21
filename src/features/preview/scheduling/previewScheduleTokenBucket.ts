@@ -58,3 +58,14 @@ export function consumePreviewScheduleToken(
 		lastRefillTimestamp: state.lastRefillTimestamp,
 	};
 }
+
+export function readPreviewScheduleTokenDelayMs(
+	state: PreviewScheduleTokenState,
+	policy: PreviewScheduleTokenPolicy,
+): number {
+	if (canConsumePreviewScheduleToken(state)) return 0;
+	if (policy.ratePerSecond <= 0) return Number.POSITIVE_INFINITY;
+
+	const missingCredits = Math.max(0, 1 - state.availableCredits);
+	return Math.ceil((missingCredits * 1000) / policy.ratePerSecond);
+}

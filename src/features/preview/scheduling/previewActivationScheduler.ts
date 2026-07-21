@@ -15,6 +15,7 @@ import {
 	canConsumePreviewScheduleToken,
 	consumePreviewScheduleToken,
 	createEmptyPreviewScheduleTokenState,
+	readPreviewScheduleTokenDelayMs,
 	refillPreviewScheduleTokens,
 	type PreviewScheduleTokenState,
 } from "./previewScheduleTokenBucket";
@@ -40,6 +41,12 @@ const BACKPRESSURED_POLICY: PreviewActivationPolicy = {
 	creditCapacity: 2,
 	maxTasksPerDrain: 1,
 	maxDrainCpuMs: 1,
+};
+const SCROLLING_POLICY: PreviewActivationPolicy = {
+	ratePerSecond: 24,
+	creditCapacity: 1,
+	maxTasksPerDrain: 1,
+	maxDrainCpuMs: 0.5,
 };
 
 export interface PreviewBackpressure {
@@ -273,14 +280,9 @@ function ensureScrollActivitySubscription(): void {
 	if (unsubscribeScrollActivity) return;
 
 	unsubscribeScrollActivity = subscribeScrollActivity((isActive) => {
-		if (isActive) {
-			for (const partition of partitionsByIdentity.values()) {
-				partition.driver.cancel();
-			}
-			return;
-		}
 		for (const partition of partitionsByIdentity.values()) {
-			schedulePartition(partition);
+			partition.driver.cancel();
+			schedulePartition(partition, 0, isActive);
 		}
 	});
 }
@@ -323,19 +325,22 @@ function canScheduleRuntime(runtime: PreviewActivationRuntime): boolean {
 	return !runtime.blockedForBackpressure || !runtime.subscribeBackpressure;
 }
 
-function schedulePartition(partition: PreviewActivationPartition): void {
-	if (
-		partition.driver.isScheduled() ||
-		isScrollActivityActive() ||
-		!hasPendingPartition(partition)
-	) {
+function schedulePartition(
+	partition: PreviewActivationPartition,
+	delayMs = 0,
+	scrolling = isScrollActivityActive(),
+): void {
+	if (partition.driver.isScheduled() || !hasPendingPartition(partition)) {
 		return;
 	}
 
 	for (const scopeState of partition.scopes) {
 		if (!hasPendingScope(scopeState)) continue;
 		if (canScheduleRuntime(scopeState.runtime)) {
-			partition.driver.schedule();
+			partition.driver.schedule({
+				lane: scrolling ? "post-paint" : "idle",
+				delayMs,
+			});
 			return;
 		}
 	}
@@ -343,7 +348,9 @@ function schedulePartition(partition: PreviewActivationPartition): void {
 
 function resolveActivationPolicy(
 	pressure: PreviewBackpressure,
+	scrolling: boolean,
 ): PreviewActivationPolicy {
+	if (scrolling) return SCROLLING_POLICY;
 	if (pressure.queued > 0 || pressure.active > 0) {
 		return BACKPRESSURED_POLICY;
 	}
@@ -410,14 +417,15 @@ function drainRuntimePartition(
 	runtime: PreviewActivationRuntime,
 	partition: PreviewActivationPartition,
 	frameTimestamp: number,
-): void {
+	scrolling: boolean,
+): number | null {
 	const scopes = Array.from(partition.scopes).filter(
 		(scopeState) => scopeState.runtime === runtime && hasPendingScope(scopeState),
 	);
-	if (scopes.length === 0) return;
+	if (scopes.length === 0) return null;
 
 	const pressure = runtime.getBackpressure();
-	const policy = resolveActivationPolicy(pressure);
+	const policy = resolveActivationPolicy(pressure, scrolling);
 	runtime.tokenState = refillPreviewScheduleTokens(
 		runtime.tokenState,
 		frameTimestamp,
@@ -427,7 +435,7 @@ function drainRuntimePartition(
 	if (!hasPreviewAdmissionCapacity(pressure)) {
 		runtime.blockedForBackpressure = true;
 		ensureRuntimeBackpressureSubscription(runtime);
-		return;
+		return runtime.subscribeBackpressure ? null : 0;
 	}
 	runtime.blockedForBackpressure = false;
 
@@ -478,12 +486,8 @@ function drainRuntimePartition(
 			continue;
 		}
 
-		if (isScrollActivityActive()) {
-			if (process.env.NODE_ENV !== "production") {
-				recordCCLDevMeasurement("preview.activationDuringScroll");
-			}
-			request.scopeState.pendingQueue.push(request);
-			break;
+		if (scrolling && process.env.NODE_ENV !== "production") {
+			recordCCLDevMeasurement("preview.activationDuringScroll");
 		}
 
 		settleRequest(request, true);
@@ -492,22 +496,34 @@ function drainRuntimePartition(
 	}
 
 	for (const scopeState of scopes) compactScopeQueue(scopeState);
+	if (!hasPendingRuntime(runtime) || runtime.blockedForBackpressure) return null;
+	return scrolling ? readPreviewScheduleTokenDelayMs(runtime.tokenState, policy) : 0;
 }
 
 function drainPartition(
 	partition: PreviewActivationPartition,
 	frameTimestamp: number,
 ): void {
-	if (isScrollActivityActive()) return;
-
+	const scrolling = isScrollActivityActive();
 	const runtimes = new Set<PreviewActivationRuntime>();
 	for (const scopeState of partition.scopes) {
 		if (hasPendingScope(scopeState)) runtimes.add(scopeState.runtime);
 	}
+
+	let nextDelayMs = Number.POSITIVE_INFINITY;
 	for (const runtime of runtimes) {
-		drainRuntimePartition(runtime, partition, frameTimestamp);
+		const delayMs = drainRuntimePartition(
+			runtime,
+			partition,
+			frameTimestamp,
+			scrolling,
+		);
+		if (delayMs !== null) nextDelayMs = Math.min(nextDelayMs, delayMs);
 	}
-	schedulePartition(partition);
+
+	if (Number.isFinite(nextDelayMs)) {
+		schedulePartition(partition, nextDelayMs, scrolling);
+	}
 }
 
 function enqueuePreviewActivationRequest(
