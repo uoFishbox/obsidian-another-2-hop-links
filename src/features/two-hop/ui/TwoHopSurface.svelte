@@ -1,7 +1,6 @@
 <script lang="ts">
 	import VirtualSurface from "ui/virtualization/components/VirtualSurface.svelte";
 	import type { VirtualCellBodyLifecyclePolicy } from "ui/virtualization/core/bodyLifecycle";
-	import { providePreviewActivationContexts } from "features/preview/scheduling/previewActivationContexts";
 	import { provideVirtualFrameCoordinator } from "ui/virtualization/svelte/frameCoordinatorContext.svelte";
 	import TwoHopLogicalCell from "features/two-hop/ui/TwoHopLogicalCell.svelte";
 	import { useTwoHopVirtualList } from "features/two-hop/ui/useTwoHopVirtualList.svelte";
@@ -36,7 +35,6 @@
 
 	const props: Props = $props();
 	const frameCoordinator = provideVirtualFrameCoordinator();
-	providePreviewActivationContexts({ frameCoordinator });
 	const list = useTwoHopVirtualList(props, frameCoordinator);
 </script>
 

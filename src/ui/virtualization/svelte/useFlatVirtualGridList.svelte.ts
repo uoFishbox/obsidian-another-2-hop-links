@@ -32,10 +32,6 @@ import { resolveVirtualizedItemVisibilityForPreviewRange } from "./virtualizedIt
 import type { RenderRevision, RenderRevisionFallbackPolicy } from "../renderRevision";
 import type { VisibilityConsumption, VirtualNavigationTarget } from "../types";
 import type { VirtualListItemRenderArgs } from "./renderArgs";
-import {
-	PREVIEW_ROW_ACTIVATION_CONTEXT_KEY,
-	type RowPreviewActivationRuntime,
-} from "features/preview/scheduling/rowPreviewActivationRuntime";
 import { flushVirtualScrollMeasurement as flushCachedVirtualScrollMeasurement } from "../dom/flushVirtualScrollMeasurement";
 import { createFlatGridMeasurementAdapter } from "./flatGridMeasurementAdapter";
 import {
@@ -47,13 +43,10 @@ import { createFlatGridVisibilityAdapter } from "./flatGridVisibilityAdapter";
 import { createFlatGridControllerAdapter } from "./flatGridControllerAdapter";
 import { createResidentRowSlotAllocator } from "ui/virtualization/core/residentSlotAllocator";
 import {
-	PREVIEW_ACTIVATION_SCOPE_CONTEXT_KEY,
-	type PreviewActivationScope,
-} from "features/preview/scheduling/previewActivationScope";
-import {
 	createRowPreviewController,
 	type RowPreviewCardBinding,
 } from "features/preview/scheduling/rowPreviewController.svelte";
+import type { PreviewBackpressure } from "features/preview/scheduling/previewActivationScheduler";
 import type { CardPreviewSnapshot } from "features/preview/ui/cardPreviewSnapshot";
 import type { ItemInteractionDescriptor } from "ui/interactions/interactionTypes";
 import {
@@ -137,33 +130,20 @@ export function useFlatVirtualGridList<T>(props: FlatVirtualGridListProps<T>) {
 	const visibilityConsumption = $derived(
 		props.visibilityConsumption ?? "reactive-state",
 	);
-	const rowPreviewActivationRuntime = getContext<
-		RowPreviewActivationRuntime | undefined
-	>(PREVIEW_ROW_ACTIVATION_CONTEXT_KEY);
-	const previewActivationScope = getContext<PreviewActivationScope | undefined>(
-		PREVIEW_ACTIVATION_SCOPE_CONTEXT_KEY,
-	);
 	let linkContext: ReturnType<typeof useLinkContext> | undefined;
 	try {
 		linkContext = useLinkContext();
 	} catch {
 		linkContext = undefined;
 	}
-	const rowPreviewController =
-		rowPreviewActivationRuntime && previewActivationScope
-			? createRowPreviewController({
-					runtime: rowPreviewActivationRuntime,
-					scope: previewActivationScope,
-					getQueuedPreviewJobs: linkContext?.getVisiblePreviewQueueSize,
-					getActivePreviewJobs: linkContext?.getActiveVisiblePreviewCount,
-				})
-			: undefined;
-	const interactionController = createVirtualCardInteractionController();
-	const visibilityAdapter = createFlatGridVisibilityAdapter<T>({
-		onNormalizedVisibilityDelta: (delta) => {
-			rowPreviewController?.applyNormalizedVisibilityDelta(delta);
-		},
+	const rowPreviewController = createRowPreviewController({
+		getBackpressure: (): PreviewBackpressure => ({
+			queued: linkContext?.getVisiblePreviewQueueSize?.() ?? 0,
+			active: linkContext?.getActiveVisiblePreviewCount?.() ?? 0,
+		}),
 	});
+	const interactionController = createVirtualCardInteractionController();
+	const visibilityAdapter = createFlatGridVisibilityAdapter<T>({});
 	const rowSlotAllocator = createResidentRowSlotAllocator();
 	let lastResolvedActiveScrollPolicyRowHeight: number | undefined;
 	let lastResolvedActiveScrollPolicyGap: number | undefined;
@@ -329,6 +309,7 @@ export function useFlatVirtualGridList<T>(props: FlatVirtualGridListProps<T>) {
 				previewRange: snapshot.ranges.previewVisible,
 				rowModel: snapshot.rowModel,
 			});
+			rowPreviewController?.setPreviewRange(snapshot.ranges.previewVisible);
 		},
 		trackMountedCellsForChange: props.onMountedCellsChange !== undefined,
 	});

@@ -277,7 +277,7 @@ describe("ViewItemCard", () => {
 		expect(linkContext.getPreview).not.toHaveBeenCalled();
 	});
 
-	it("keeps activated preview mounted when the row returns to mounted", async () => {
+	it("clears the preview when the row leaves the preview range and re-activates when it returns", async () => {
 		const file = createMockTFile("notes/alpha.md");
 		const item = { type: "file", data: file } as ViewItem;
 		const linkContext = {
@@ -320,8 +320,21 @@ describe("ViewItemCard", () => {
 			sourceFile: file,
 			visibility: "mounted",
 		});
-		await Promise.resolve();
+		await waitFor(() => {
+			expect(screen.queryByTestId("card-preview-probe")).toBeNull();
+		});
 
-		expect(screen.getByTestId("card-preview-probe")).toBeTruthy();
+		await rerender({
+			item,
+			settings: DEFAULT_SETTINGS,
+			searchQuery: "",
+			linkContext: linkContext as any,
+			applicationStore: { updateVersion: 0 } as any,
+			sourceFile: file,
+			visibility: "visible",
+		});
+		await waitFor(() => {
+			expect(screen.getByTestId("card-preview-probe")).toBeTruthy();
+		});
 	});
 });

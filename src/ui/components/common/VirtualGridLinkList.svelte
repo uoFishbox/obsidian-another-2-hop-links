@@ -1,5 +1,4 @@
 <script lang="ts" generics="T">
-	import { providePreviewActivationContexts } from "features/preview/scheduling/previewActivationContexts";
 	import VirtualSurface from "ui/virtualization/components/VirtualSurface.svelte";
 	import VirtualListLoadMoreButton from "ui/virtualization/components/VirtualListLoadMoreButton.svelte";
 	import {
@@ -12,7 +11,6 @@
 	} from "ui/virtualization/core/bodyLifecycle";
 
 	const props: FlatVirtualGridListProps<T> = $props();
-	providePreviewActivationContexts();
 	const list = useFlatVirtualGridList(props);
 </script>
 

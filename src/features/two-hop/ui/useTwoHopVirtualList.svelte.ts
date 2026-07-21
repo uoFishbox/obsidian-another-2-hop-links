@@ -33,14 +33,7 @@ import {
 } from "ui/virtualization/svelte/viewPlanLayout";
 import { createResolvedCardLayoutSettingsMemo } from "ui/shared/layout/cardLayoutCssVars";
 import { createVirtualizedItemVisibilityStateController } from "ui/virtualization/svelte/virtualizedItemVisibilityState.svelte";
-import {
-	PREVIEW_ROW_ACTIVATION_CONTEXT_KEY,
-	type RowPreviewActivationRuntime,
-} from "features/preview/scheduling/rowPreviewActivationRuntime";
-import {
-	PREVIEW_ACTIVATION_SCOPE_CONTEXT_KEY,
-	type PreviewActivationScope,
-} from "features/preview/scheduling/previewActivationScope";
+import type { PreviewBackpressure } from "features/preview/scheduling/previewActivationScheduler";
 import {
 	createRowPreviewController,
 	type RowPreviewCardBinding,
@@ -86,33 +79,22 @@ export function useTwoHopVirtualList(
 		}
 	}
 
-	const previewRuntime = getContext<RowPreviewActivationRuntime | undefined>(
-		PREVIEW_ROW_ACTIVATION_CONTEXT_KEY,
-	);
-	const previewScope = getContext<PreviewActivationScope | undefined>(
-		PREVIEW_ACTIVATION_SCOPE_CONTEXT_KEY,
-	);
 	let linkContext: ReturnType<typeof useLinkContext> | undefined;
 	try {
 		linkContext = useLinkContext();
 	} catch {
 		linkContext = undefined;
 	}
-	const previewController =
-		previewRuntime && previewScope
-			? createRowPreviewController({
-					runtime: previewRuntime,
-					scope: previewScope,
-					getQueuedPreviewJobs: linkContext?.getVisiblePreviewQueueSize,
-					getActivePreviewJobs: linkContext?.getActiveVisiblePreviewCount,
-				})
-			: undefined;
+	const previewController = createRowPreviewController({
+		getBackpressure: (): PreviewBackpressure => ({
+			queued: linkContext?.getVisiblePreviewQueueSize?.() ?? 0,
+			active: linkContext?.getActiveVisiblePreviewCount?.() ?? 0,
+		}),
+		frameCoordinator,
+	});
 	const interactionController = createVirtualCardInteractionController();
 	const visibilityStates =
-		createVirtualizedItemVisibilityStateController<TwoHopMountedCell>({
-			onNormalizedVisibilityDelta: (delta) =>
-				previewController?.applyNormalizedVisibilityDelta(delta),
-		});
+		createVirtualizedItemVisibilityStateController<TwoHopMountedCell>({});
 	const documentProjection = createTwoHopDocumentProjection({
 		sections: props.sections,
 		applicationStore,
@@ -164,12 +146,14 @@ export function useTwoHopVirtualList(
 		readonly build: TwoHopMountedRowsBuild | null;
 	}): void => {
 		syncCardSlots(params.build?.rowSlices ?? EMPTY_MOUNTED_ROWS);
+		const effectivePreviewRange =
+			props.previewActive === false ? EMPTY_RANGE : params.previewRange;
+		previewController?.setPreviewRange(effectivePreviewRange);
 		visibilityStates.commit({
 			rowModelRevision: params.rowModel,
 			mountedRows: params.build?.rowSlices ?? EMPTY_MOUNTED_ROWS,
 			mountedRange: params.mountedRange,
-			previewActiveRange:
-				props.previewActive === false ? EMPTY_RANGE : params.previewRange,
+			previewActiveRange: effectivePreviewRange,
 		});
 	};
 

@@ -3,7 +3,6 @@
 	import ViewItemCard from "../ViewItemCard.svelte";
 	import PreviewVisibilityProvider from "features/preview/ui/PreviewVisibilityProvider.svelte";
 	import { setAppContext, setLinkContext } from "ui/context/linkContext";
-	import { providePreviewActivationContexts } from "features/preview/scheduling/previewActivationContexts";
 	import { DEFAULT_SETTINGS } from "features/settings/model";
 	import type { PluginSettings } from "features/settings/model";
 	import type { ApplicationStore } from "ui/stores/ApplicationStore.svelte";
@@ -52,12 +51,8 @@
 	}: Props = $props();
 	const rowIndex = 0;
 	const activationCandidateId = "view-item-card-harness";
-	const activationContexts = providePreviewActivationContexts();
 	const previewController = createRowPreviewController({
-		runtime: activationContexts.rowPreviewActivationRuntime,
-		scope: activationContexts.previewActivationScope,
-		getQueuedPreviewJobs: linkContext.getVisiblePreviewQueueSize,
-		getActivePreviewJobs: linkContext.getActiveVisiblePreviewCount,
+		getBackpressure: () => ({ queued: 0, active: 0 }),
 	});
 	const scopedLinkContext = {
 		...linkContext,
@@ -93,17 +88,13 @@
 		const snapshot = effectiveModel
 			? createCardPreviewSnapshot(effectiveModel)
 			: null;
+		previewController.setPreviewRange(
+			visibility === "visible" ? { start: 0, end: 1 } : { start: 0, end: 0 },
+		);
 		previewController.syncCards(
 			snapshot ? [{ slotId: activationCandidateId, rowIndex, snapshot }] : [],
 		);
 		previewState = previewController.getSlotState(activationCandidateId);
-	});
-
-	$effect(() => {
-		activationContexts.rowPreviewActivationRuntime.setRowVisibility(
-			rowIndex,
-			visibility === "visible" ? "visible" : "mounted",
-		);
 	});
 
 	onDestroy(() => {
