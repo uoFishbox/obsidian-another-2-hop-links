@@ -20,7 +20,7 @@ import {
 	type TwoHopMountedCell,
 	type TwoHopMountedRowsBuild,
 } from "features/two-hop/ui/twoHopMountedRows";
-import { createResidentRowSlotAllocator } from "ui/virtualization/core/residentSlotAllocator";
+import { createTwoHopResidentRowSlotAllocator } from "features/two-hop/ui/twoHopResidentRowSlotAllocator";
 import { useVirtualList } from "ui/virtualization/svelte/useVirtualList.svelte";
 import {
 	createViewPlanMeasurementRuntime,
@@ -105,7 +105,7 @@ export function useTwoHopVirtualList(
 	});
 	let document = $state.raw<TwoHopDocument>(documentProjection.getDocument());
 	const measurementState = createViewPlanMeasurementState();
-	const rowSlotAllocator = createResidentRowSlotAllocator();
+	const rowSlotAllocator = createTwoHopResidentRowSlotAllocator();
 	const resolveConfiguredLayout = createResolvedCardLayoutSettingsMemo();
 	const configuredLayout = $derived(
 		resolveConfiguredLayout(applicationStore?.settings),

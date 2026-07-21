@@ -10,10 +10,8 @@ import {
 	resolveTwoHopCellInRowInto,
 	resolveTwoHopRowInto,
 } from "features/two-hop/ui/viewport/twoHopGeometry";
-import {
-	createResidentRowSlotAllocator,
-	type ResidentRowSlotAllocator,
-} from "ui/virtualization/core/residentSlotAllocator";
+import { createTwoHopResidentRowSlotAllocator } from "features/two-hop/ui/twoHopResidentRowSlotAllocator";
+import type { ResidentRowSlotAllocator } from "ui/virtualization/core/residentSlotAllocator";
 import type { MountedVirtualCellsBuild } from "ui/virtualization/core/virtualListEngine";
 import type { RowRange } from "ui/virtualization/rowRange";
 import { renderSlotKey, type MountedVirtualCell } from "ui/virtualization/types";
@@ -56,7 +54,7 @@ export function buildTwoHopMountedRows(params: {
 		return previousBuild;
 	}
 
-	const allocator = params.rowSlotAllocator ?? createResidentRowSlotAllocator();
+	const allocator = params.rowSlotAllocator ?? createTwoHopResidentRowSlotAllocator();
 	allocator.prepareRange({
 		start,
 		end,
@@ -122,23 +120,13 @@ export function buildTwoHopMountedRows(params: {
 		});
 	}
 
-	const rowsBySlot = new Array<TwoHopMountedRow>(rowSlices.length);
-	let splitIndex = 0;
-	for (let index = 1; index < rowSlices.length; index += 1) {
-		if (rowSlices[index].slotIndex < rowSlices[index - 1].slotIndex) {
-			splitIndex = index;
-			break;
-		}
-	}
-
-	let outputIndex = 0;
-	for (let index = splitIndex; index < rowSlices.length; index += 1) {
-		rowsBySlot[outputIndex] = rowSlices[index];
-		outputIndex += 1;
-	}
-	for (let index = 0; index < splitIndex; index += 1) {
-		rowsBySlot[outputIndex] = rowSlices[index];
-		outputIndex += 1;
+	const sparseRowsBySlot: Array<TwoHopMountedRow | undefined> = new Array(
+		allocator.capacity,
+	);
+	for (const row of rowSlices) sparseRowsBySlot[row.slotIndex] = row;
+	const rowsBySlot: TwoHopMountedRow[] = [];
+	for (const row of sparseRowsBySlot) {
+		if (row) rowsBySlot.push(row);
 	}
 	const getCells = (): TwoHopMountedCell[] => {
 		if (flattenedCells) return flattenedCells;

@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { createTwoHopDocument } from "features/two-hop/ui/twoHopDocument";
 import { createTwoHopVirtualRowModel } from "features/two-hop/ui/twoHopVirtualRowModel";
 import { buildTwoHopMountedRows } from "features/two-hop/ui/twoHopMountedRows";
-import { createResidentRowSlotAllocator } from "ui/virtualization/core/residentSlotAllocator";
+import { createTwoHopResidentRowSlotAllocator } from "features/two-hop/ui/twoHopResidentRowSlotAllocator";
 import type {
 	TwoHopVirtualListItem,
 	TwoHopVirtualSectionDescriptor,
@@ -52,7 +52,7 @@ describe("TwoHop keyed mounted rows", () => {
 			initialVisibleCount: 20,
 		});
 		const rowModel = createTwoHopVirtualRowModel(document, layout);
-		const allocator = createResidentRowSlotAllocator();
+		const allocator = createTwoHopResidentRowSlotAllocator();
 		const first = buildTwoHopMountedRows({
 			rowModel,
 			rowRange: { start: 0, end: 2 },
@@ -87,7 +87,7 @@ describe("TwoHop keyed mounted rows", () => {
 			initialVisibleCount: 20,
 		});
 		const rowModel = createTwoHopVirtualRowModel(document, layout);
-		const allocator = createResidentRowSlotAllocator();
+		const allocator = createTwoHopResidentRowSlotAllocator();
 		const first = buildTwoHopMountedRows({
 			rowModel,
 			rowRange: { start: 2, end: 6 },
@@ -104,37 +104,29 @@ describe("TwoHop keyed mounted rows", () => {
 		).toBe(first);
 	});
 
-	it("orders a wrapped resident range by slot without exposing pool holes", () => {
+	it("orders recycled resident rows by physical slot without exposing pool holes", () => {
 		const document = createTwoHopDocument({
 			sections: [createSection(200)],
 			visibleCounts: {},
 			initialVisibleCount: 200,
 		});
 		const rowModel = createTwoHopVirtualRowModel(document, layout);
-		const allocator = createResidentRowSlotAllocator();
-		buildTwoHopMountedRows({
+		const allocator = createTwoHopResidentRowSlotAllocator();
+		const initial = buildTwoHopMountedRows({
 			rowModel,
-			rowRange: { start: 0, end: 12 },
+			rowRange: { start: 0, end: 3 },
 			rowSlotAllocator: allocator,
 		});
-		const wrappedStart = allocator.capacity - 1;
-		const wrapped = buildTwoHopMountedRows({
+		const shifted = buildTwoHopMountedRows({
 			rowModel,
-			rowRange: { start: wrappedStart, end: wrappedStart + 3 },
+			rowRange: { start: 1, end: 4 },
+			previousBuild: initial,
 			rowSlotAllocator: allocator,
 		});
 
-		expect(wrapped.rowSlices.map((row) => row.slotIndex)).toEqual([
-			allocator.capacity - 1,
-			0,
-			1,
-		]);
-		expect(wrapped.rowsBySlot.map((row) => row.slotIndex)).toEqual([
-			0,
-			1,
-			allocator.capacity - 1,
-		]);
-		expect(wrapped.rowsBySlot).toHaveLength(wrapped.rowSlices.length);
+		expect(shifted.rowSlices.map((row) => row.slotIndex)).toEqual([1, 2, 0]);
+		expect(shifted.rowsBySlot.map((row) => row.slotIndex)).toEqual([0, 1, 2]);
+		expect(shifted.rowsBySlot).toHaveLength(shifted.rowSlices.length);
 	});
 
 	it("resolves entering rows through compact geometry and reuses overlapping rows", () => {
@@ -146,7 +138,7 @@ describe("TwoHop keyed mounted rows", () => {
 		const rowModel = createTwoHopVirtualRowModel(document, layout);
 		const getRow = vi.spyOn(rowModel, "getRow");
 		const getDocumentSection = vi.spyOn(rowModel, "getDocumentSection");
-		const allocator = createResidentRowSlotAllocator();
+		const allocator = createTwoHopResidentRowSlotAllocator();
 		const first = buildTwoHopMountedRows({
 			rowModel,
 			rowRange: { start: 1, end: 5 },
@@ -163,6 +155,7 @@ describe("TwoHop keyed mounted rows", () => {
 		expect(getDocumentSection).not.toHaveBeenCalled();
 		expect(shifted.rowSlices.slice(0, 3)).toEqual(first.rowSlices.slice(1, 4));
 		expect(shifted.rowSlices[0]).toBe(first.rowSlices[1]);
+		expect(shifted.rowSlices[3].slotIndex).toBe(first.rowSlices[0].slotIndex);
 		expect(shifted.cells).toBe(shifted.cells);
 		expect(shifted.reusableCellsByKey).toBe(shifted.reusableCellsByKey);
 	});
