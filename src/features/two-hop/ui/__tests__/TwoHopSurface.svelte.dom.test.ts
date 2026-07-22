@@ -105,14 +105,10 @@ async function renderScrollableSurface(count: number): Promise<{
 	return { root, scroller };
 }
 
-function getPhysicalSlot(
-	root: HTMLElement,
-	slot: number,
-): HTMLElement | null {
+function getPhysicalSlot(root: HTMLElement, slot: number): HTMLElement | null {
 	return (
-		root.shadowRoot?.querySelector<HTMLElement>(
-			`[data-ccl-cell-slot='${slot}']`,
-		) ?? null
+		root.shadowRoot?.querySelector<HTMLElement>(`[data-ccl-cell-slot='${slot}']`) ??
+		null
 	);
 }
 
@@ -194,7 +190,7 @@ describe("TwoHopSurface", () => {
 		},
 	);
 
-	it("reuses an item body when its physical slot receives another item", async () => {
+	it("updates pooled cells while scrolling an external observer root", async () => {
 		const { root, scroller } = await renderScrollableSurface(100);
 		const initialSlot = getPhysicalSlot(root, 1);
 		const initialBody = initialSlot?.querySelector<HTMLElement>(

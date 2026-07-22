@@ -32,7 +32,6 @@ import {
 	type ViewPlanLayoutMetrics,
 } from "ui/virtualization/svelte/viewPlanLayout";
 import { createResolvedCardLayoutSettingsMemo } from "ui/shared/layout/cardLayoutCssVars";
-import { createVirtualizedItemVisibilityStateController } from "ui/virtualization/svelte/virtualizedItemVisibilityState.svelte";
 import type { PreviewBackpressure } from "features/preview/scheduling/previewActivationScheduler";
 import {
 	createRowPreviewController,
@@ -103,8 +102,6 @@ export function useTwoHopVirtualList(
 			),
 	});
 	const interactionController = createVirtualCardInteractionController();
-	const visibilityStates =
-		createVirtualizedItemVisibilityStateController<TwoHopMountedCell>({});
 	const documentProjection = createTwoHopDocumentProjection({
 		sections: props.sections,
 		applicationStore,
@@ -213,29 +210,15 @@ export function useTwoHopVirtualList(
 		previewController.syncBindings(previewCardBindings);
 	};
 
-	const syncPreviewAndVisibility = (params: {
-		readonly rowModel: object;
-		readonly mountedRange: RowRange;
-		readonly previewRange: RowRange;
-		readonly build: TwoHopMountedRowsBuild | null;
-	}): void => {
+	const syncPreviewWindow = (params: { readonly previewRange: RowRange }): void => {
 		const active = props.previewActive !== false;
-		const effectivePreviewRange = active ? params.previewRange : EMPTY_RANGE;
 		previewController.setPreviewWindow({
 			previewRange: params.previewRange,
 			active,
 		});
-		visibilityStates.commit({
-			rowModelRevision: params.rowModel,
-			mountedRows: params.build?.rowSlices ?? EMPTY_MOUNTED_ROWS,
-			mountedRange: params.mountedRange,
-			previewActiveRange: effectivePreviewRange,
-		});
 	};
 
 	const syncDisplaySnapshot = (params: {
-		readonly rowModel: object;
-		readonly mountedRange: RowRange;
 		readonly previewRange: RowRange;
 		readonly build: TwoHopMountedRowsBuild | null;
 	}): void => {
@@ -245,12 +228,6 @@ export function useTwoHopVirtualList(
 			cards: previewCardBindings,
 			previewRange: params.previewRange,
 			active,
-		});
-		visibilityStates.commit({
-			rowModelRevision: params.rowModel,
-			mountedRows: params.build?.rowSlices ?? EMPTY_MOUNTED_ROWS,
-			mountedRange: params.mountedRange,
-			previewActiveRange: active ? params.previewRange : EMPTY_RANGE,
 		});
 	};
 
@@ -276,8 +253,6 @@ export function useTwoHopVirtualList(
 		},
 		onSnapshotUpdated: (snapshot, reconciliationState) => {
 			syncDisplaySnapshot({
-				rowModel: snapshot.rowModel,
-				mountedRange: snapshot.ranges.mounted,
 				previewRange: snapshot.ranges.previewVisible,
 				build: reconciliationState.mountedBuild,
 			});
@@ -312,21 +287,15 @@ export function useTwoHopVirtualList(
 			syncPreviewVisibleRange(start, end) {
 				const snapshot = virtualList.getSnapshot();
 				if (!snapshot) return;
-				syncPreviewAndVisibility({
-					rowModel: snapshot.rowModel,
-					mountedRange: snapshot.ranges.mounted,
+				syncPreviewWindow({
 					previewRange: { start, end },
-					build: virtualList.getReconciliationState().mountedBuild,
 				});
 			},
 			cancelPreviewVisibleRangeSync() {
 				const snapshot = virtualList.getSnapshot();
 				if (!snapshot) return;
-				syncPreviewAndVisibility({
-					rowModel: snapshot.rowModel,
-					mountedRange: snapshot.ranges.mounted,
+				syncPreviewWindow({
 					previewRange: EMPTY_RANGE,
-					build: virtualList.getReconciliationState().mountedBuild,
 				});
 			},
 		},
@@ -367,11 +336,8 @@ export function useTwoHopVirtualList(
 		const snapshot = virtualList.getSnapshot();
 		if (!snapshot) return;
 		void active;
-		syncPreviewAndVisibility({
-			rowModel: snapshot.rowModel,
-			mountedRange: snapshot.ranges.mounted,
+		syncPreviewWindow({
 			previewRange: snapshot.ranges.previewVisible,
-			build: virtualList.getReconciliationState().mountedBuild,
 		});
 	});
 

@@ -11,6 +11,7 @@ import {
 	resolveTwoHopVisibleRowsInto,
 } from "features/two-hop/ui/viewport/twoHopGeometry";
 import { createTwoHopDocument } from "features/two-hop/ui/twoHopDocument";
+import { createTwoHopVirtualRowModel } from "features/two-hop/ui/twoHopVirtualRowModel";
 import type {
 	TwoHopVirtualListItem,
 	TwoHopVirtualSectionDescriptor,
@@ -169,5 +170,35 @@ describe("TwoHopDocument fixed-grid geometry", () => {
 			sectionIndex: 1,
 			itemIndex: 0,
 		});
+	});
+
+	it("resolves keyboard navigation from row-model geometry", () => {
+		const document = createTwoHopDocument({
+			sections: [
+				createSection("first", [
+					createItem("a"),
+					createItem("b"),
+					createItem("c"),
+				]),
+			],
+			visibleCounts: {},
+			initialVisibleCount: 10,
+		});
+		const rowModel = createTwoHopVirtualRowModel(document, layout);
+		const expectedDown = rowModel.getRow(1)?.getCell(1);
+		const expectedRight = rowModel.getRow(1)?.getCell(0);
+
+		expect(
+			rowModel.resolveNavigationTarget?.("current", "down", {
+				rowIndex: 0,
+				columnIndex: 1,
+			}),
+		).toEqual({ key: expectedDown?.key, rowTop: 110 });
+		expect(
+			rowModel.resolveNavigationTarget?.("current", "right", {
+				rowIndex: 0,
+				columnIndex: 1,
+			}),
+		).toEqual({ key: expectedRight?.key, rowTop: 110 });
 	});
 });
