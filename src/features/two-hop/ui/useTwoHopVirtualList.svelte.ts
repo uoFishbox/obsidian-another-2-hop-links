@@ -222,8 +222,15 @@ export function useTwoHopVirtualList(
 		readonly previewRange: RowRange;
 		readonly build: TwoHopMountedRowsBuild | null;
 	}): void => {
-		refreshCardBindings(params.build);
+		const bindingsChanged = refreshCardBindings(params.build);
 		const active = props.previewActive !== false;
+		if (!bindingsChanged) {
+			previewController.setPreviewWindow({
+				previewRange: params.previewRange,
+				active,
+			});
+			return;
+		}
 		previewController.commit({
 			cards: previewCardBindings,
 			previewRange: params.previewRange,
