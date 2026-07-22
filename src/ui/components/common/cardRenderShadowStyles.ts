@@ -421,8 +421,13 @@ export const CARD_RENDER_SHADOW_CSS = String.raw`
 	display: contents;
 }
 
+.twohop-keyed-surface {
+	contain: layout paint style;
+}
 
-
+.twohop-keyed-row {
+	contain: layout paint;
+}
 
 @media (hover: hover) {
 	.cosense-card-links__load-more-button.cosense-card-links__box:hover {
