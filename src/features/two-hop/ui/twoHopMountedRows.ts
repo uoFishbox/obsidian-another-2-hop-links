@@ -10,11 +10,17 @@ import {
 	resolveTwoHopCellInRowInto,
 	resolveTwoHopRowInto,
 } from "features/two-hop/ui/viewport/twoHopGeometry";
-import { createTwoHopResidentRowSlotAllocator } from "features/two-hop/ui/twoHopResidentRowSlotAllocator";
-import type { ResidentRowSlotAllocator } from "ui/virtualization/core/residentSlotAllocator";
+import {
+	createTwoHopResidentRowSlotAllocator,
+	type TwoHopResidentRowSlotAllocator,
+} from "features/two-hop/ui/twoHopResidentRowSlotAllocator";
 import type { MountedVirtualCellsBuild } from "ui/virtualization/core/virtualListEngine";
 import type { RowRange } from "ui/virtualization/rowRange";
-import { renderSlotKey, type MountedVirtualCell } from "ui/virtualization/types";
+import {
+	renderSlotKey,
+	type MountedVirtualCell,
+	type RenderSlotKey,
+} from "ui/virtualization/types";
 import type { VirtualSurfaceMountedRow } from "ui/virtualization/svelte/VirtualSurfaceTypes";
 
 export interface TwoHopMountedCell extends MountedVirtualCell {
@@ -33,6 +39,19 @@ export interface TwoHopMountedRowsBuild extends MountedVirtualCellsBuild<TwoHopM
 	readonly rowRange: RowRange;
 	readonly rowSlices: readonly TwoHopMountedRow[];
 	readonly rowsBySlot: readonly TwoHopMountedRow[];
+	readonly identity: number;
+	readonly deltaBaseIdentity: number | null;
+	readonly slotDelta: TwoHopMountedSlotDelta;
+}
+
+let nextMountedBuildIdentity = 1;
+
+/** Cell-slot changes derived from the allocator's physical row-slot delta. */
+export interface TwoHopMountedSlotDelta {
+	readonly enteredSlots: readonly TwoHopMountedCell[];
+	readonly reboundSlots: readonly TwoHopMountedCell[];
+	readonly retainedSlots: readonly TwoHopMountedCell[];
+	readonly releasedSlots: readonly RenderSlotKey[];
 }
 
 /** Builds bounded physical row/cell shells and exposes both slot and logical body keys. */
@@ -40,7 +59,7 @@ export function buildTwoHopMountedRows(params: {
 	readonly rowModel: TwoHopVirtualRowModel;
 	readonly rowRange: RowRange;
 	readonly previousBuild?: TwoHopMountedRowsBuild;
-	readonly rowSlotAllocator?: ResidentRowSlotAllocator;
+	readonly rowSlotAllocator?: TwoHopResidentRowSlotAllocator;
 }): TwoHopMountedRowsBuild {
 	const { rowModel } = params;
 	const start = Math.max(0, params.rowRange.start);
@@ -55,7 +74,7 @@ export function buildTwoHopMountedRows(params: {
 	}
 
 	const allocator = params.rowSlotAllocator ?? createTwoHopResidentRowSlotAllocator();
-	allocator.prepareRange({
+	const rowSlotDelta = allocator.prepareRange({
 		start,
 		end,
 		layoutKey: rowModel.residentSlotLayoutKey,
@@ -128,6 +147,7 @@ export function buildTwoHopMountedRows(params: {
 	for (const row of sparseRowsBySlot) {
 		if (row) rowsBySlot.push(row);
 	}
+	const slotDelta = createMountedSlotDelta(previousBuild, rowsBySlot, rowSlotDelta);
 	const getCells = (): TwoHopMountedCell[] => {
 		if (flattenedCells) return flattenedCells;
 		flattenedCells = [];
@@ -152,6 +172,49 @@ export function buildTwoHopMountedRows(params: {
 		rowRange: { start, end },
 		rowSlices,
 		rowsBySlot,
+		identity: nextMountedBuildIdentity++,
+		deltaBaseIdentity: previousBuild?.identity ?? null,
+		slotDelta,
+	};
+}
+
+function createMountedSlotDelta(
+	previousBuild: TwoHopMountedRowsBuild | undefined,
+	rowsBySlot: readonly TwoHopMountedRow[],
+	rowSlotDelta: ReturnType<TwoHopResidentRowSlotAllocator["prepareRange"]>,
+): TwoHopMountedSlotDelta {
+	const previousCellsBySlot = new Map<RenderSlotKey, TwoHopMountedCell>();
+	for (const row of previousBuild?.rowsBySlot ?? []) {
+		for (const cell of row.cells) previousCellsBySlot.set(cell.renderSlotKey, cell);
+	}
+
+	const allocatorChangedSlots = new Set<number>();
+	for (const slot of rowSlotDelta.enteredSlots)
+		allocatorChangedSlots.add(slot.slotIndex);
+	for (const slot of rowSlotDelta.reboundSlots)
+		allocatorChangedSlots.add(slot.slotIndex);
+	const enteredSlots: TwoHopMountedCell[] = [];
+	const reboundSlots: TwoHopMountedCell[] = [];
+	const retainedSlots: TwoHopMountedCell[] = [];
+	for (const row of rowsBySlot) {
+		for (const cell of row.cells) {
+			const previous = previousCellsBySlot.get(cell.renderSlotKey);
+			previousCellsBySlot.delete(cell.renderSlotKey);
+			if (!previous) {
+				enteredSlots.push(cell);
+			} else if (previous === cell && !allocatorChangedSlots.has(row.slotIndex)) {
+				retainedSlots.push(cell);
+			} else {
+				reboundSlots.push(cell);
+			}
+		}
+	}
+
+	return {
+		enteredSlots,
+		reboundSlots,
+		retainedSlots,
+		releasedSlots: [...previousCellsBySlot.keys()],
 	};
 }
 

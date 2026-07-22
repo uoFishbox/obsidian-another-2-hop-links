@@ -127,6 +127,10 @@ describe("TwoHop keyed mounted rows", () => {
 		expect(shifted.rowSlices.map((row) => row.slotIndex)).toEqual([1, 2, 0]);
 		expect(shifted.rowsBySlot.map((row) => row.slotIndex)).toEqual([0, 1, 2]);
 		expect(shifted.rowsBySlot).toHaveLength(shifted.rowSlices.length);
+		expect(shifted.slotDelta.enteredSlots).toEqual([]);
+		expect(shifted.slotDelta.reboundSlots).toHaveLength(layout.columns);
+		expect(shifted.slotDelta.retainedSlots).toHaveLength(layout.columns * 2);
+		expect(shifted.slotDelta.releasedSlots).toEqual([]);
 	});
 
 	it("resolves entering rows through compact geometry and reuses overlapping rows", () => {

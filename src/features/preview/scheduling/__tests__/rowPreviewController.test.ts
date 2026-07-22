@@ -98,6 +98,62 @@ describe("rowPreviewController", () => {
 		expect(controller.getSlotState("slot-0")?.renderSnapshot).toBe(snapshot);
 		controller.dispose();
 	});
+
+	it("applies a mutable permanent binding through the delta API", async () => {
+		const controller = createRowPreviewController();
+		const first = createPreviewSnapshot("preview-a", "notes/a.md");
+		const second = createPreviewSnapshot("preview-b", "notes/b.md");
+		const permanentBinding = binding("slot-0", 0, first);
+
+		controller.commitBindingDelta(
+			{
+				enteredSlots: [permanentBinding],
+				reboundSlots: [],
+				releasedSlots: [],
+			},
+			{ previewRange: { start: 0, end: 2 }, active: true },
+		);
+		permanentBinding.rowIndex = 1;
+		permanentBinding.snapshot = second;
+		controller.syncBindingDelta({
+			enteredSlots: [],
+			reboundSlots: [permanentBinding],
+			releasedSlots: [],
+		});
+		await flushAnimationFrame();
+		await flushAnimationFrame();
+
+		expect(controller.getSlotState("slot-0")?.bindingIdentity).toBe(
+			second.identity,
+		);
+		expect(controller.getSlotState("slot-0")?.renderSnapshot).toBe(second);
+		controller.dispose();
+	});
+
+	it("releases only slots named by a binding delta", () => {
+		const controller = createRowPreviewController();
+		const first = binding(
+			"slot-0",
+			0,
+			createPreviewSnapshot("preview-a", "notes/a.md"),
+		);
+		const second = binding(
+			"slot-1",
+			1,
+			createPreviewSnapshot("preview-b", "notes/b.md"),
+		);
+		controller.syncBindings([first, second]);
+
+		controller.syncBindingDelta({
+			enteredSlots: [],
+			reboundSlots: [],
+			releasedSlots: [first.slotId],
+		});
+
+		expect(controller.getSlotState(first.slotId)).toBeUndefined();
+		expect(controller.getSlotState(second.slotId)).toBeDefined();
+		controller.dispose();
+	});
 	it("activates slots inside the preview range and clears them outside", async () => {
 		const controller = createRowPreviewController();
 		const snapshot = createPreviewSnapshot("preview-a", "notes/a.md");

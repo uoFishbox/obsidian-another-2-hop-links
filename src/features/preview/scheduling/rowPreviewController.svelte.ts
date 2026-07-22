@@ -16,8 +16,14 @@ import {
 
 export interface RowPreviewCardBinding {
 	readonly slotId: string;
-	readonly rowIndex: number;
-	readonly snapshot: CardPreviewSnapshot;
+	rowIndex: number;
+	snapshot: CardPreviewSnapshot;
+}
+
+export interface RowPreviewBindingDelta {
+	readonly enteredSlots: readonly RowPreviewCardBinding[];
+	readonly reboundSlots: readonly RowPreviewCardBinding[];
+	readonly releasedSlots: readonly string[];
 }
 
 export interface RowPreviewControllerCommit {
@@ -34,10 +40,14 @@ export interface RowPreviewWindow {
 export interface RowPreviewController {
 	/** Rebinds physical slots while retaining the current preview window. */
 	syncBindings(cards: readonly RowPreviewCardBinding[]): void;
+	/** Applies only changed physical slots while retaining all other bindings. */
+	syncBindingDelta(delta: RowPreviewBindingDelta): void;
 	/** Updates only the active preview window for the current bindings. */
 	setPreviewWindow(input: RowPreviewWindow): void;
 	/** Applies one complete virtual-surface snapshot and reconciles once. */
 	commit(input: RowPreviewControllerCommit): void;
+	/** Applies a binding delta and preview window in one reconciliation. */
+	commitBindingDelta(delta: RowPreviewBindingDelta, window: RowPreviewWindow): void;
 	getSlotState(slotId: string): CardPreviewSlotState | undefined;
 	dispose(): void;
 }
@@ -59,8 +69,10 @@ interface MutableCardPreviewSlotState {
 }
 
 interface BoundSlot {
-	readonly binding: RowPreviewCardBinding;
+	binding: RowPreviewCardBinding;
 	readonly state: MutableCardPreviewSlotState;
+	rowIndex: number;
+	snapshotIdentity: string;
 }
 
 const EMPTY_RANGE: RowRange = { start: 0, end: 0 };
@@ -100,8 +112,8 @@ export function createRowPreviewController(
 	function activateCurrentSlots(key: string): void {
 		if (disposed) return;
 		for (const slot of slotsById.values()) {
-			if (slot.binding.snapshot.identity !== key) continue;
-			if (!isRowInPreviewRange(slot.binding.rowIndex)) continue;
+			if (slot.snapshotIdentity !== key) continue;
+			if (!isRowInPreviewRange(slot.rowIndex)) continue;
 			slot.state.renderSnapshot = slot.binding.snapshot;
 		}
 	}
@@ -120,16 +132,35 @@ export function createRowPreviewController(
 		const previous = slotsById.get(binding.slotId);
 		if (
 			previous &&
-			previous.binding.rowIndex === binding.rowIndex &&
-			previous.binding.snapshot.identity === binding.snapshot.identity
+			previous.rowIndex === binding.rowIndex &&
+			previous.snapshotIdentity === binding.snapshot.identity
 		) {
+			previous.binding = binding;
 			return;
 		}
 
 		const state = previous?.state ?? getOrCreateState(binding.slotId);
 		state.bindingIdentity = binding.snapshot.identity;
 		state.renderSnapshot = undefined;
-		slotsById.set(binding.slotId, { binding, state });
+		slotsById.set(binding.slotId, {
+			binding,
+			state,
+			rowIndex: binding.rowIndex,
+			snapshotIdentity: binding.snapshot.identity,
+		});
+	}
+
+	function releaseSlot(slotId: string): void {
+		const slot = slotsById.get(slotId);
+		if (!slot) return;
+		slot.state.renderSnapshot = undefined;
+		slotsById.delete(slotId);
+	}
+
+	function applyBindingDelta(delta: RowPreviewBindingDelta): void {
+		for (const slotId of delta.releasedSlots) releaseSlot(slotId);
+		for (const binding of delta.enteredSlots) bindCard(binding);
+		for (const binding of delta.reboundSlots) bindCard(binding);
 	}
 
 	function syncCards(cards: readonly RowPreviewCardBinding[]): void {
@@ -150,7 +181,7 @@ export function createRowPreviewController(
 	function reconcile(): void {
 		activationKeysScratch.clear();
 		for (const slot of slotsById.values()) {
-			if (!isRowInPreviewRange(slot.binding.rowIndex)) {
+			if (!isRowInPreviewRange(slot.rowIndex)) {
 				slot.state.renderSnapshot = undefined;
 				continue;
 			}
@@ -174,6 +205,12 @@ export function createRowPreviewController(
 		reconcile();
 	}
 
+	function syncBindingDelta(delta: RowPreviewBindingDelta): void {
+		if (disposed) return;
+		applyBindingDelta(delta);
+		reconcile();
+	}
+
 	function setPreviewWindow(input: RowPreviewWindow): void {
 		if (disposed) return;
 		const nextPreviewRange = input.active ? input.previewRange : EMPTY_RANGE;
@@ -194,6 +231,16 @@ export function createRowPreviewController(
 		reconcile();
 	}
 
+	function commitBindingDelta(
+		delta: RowPreviewBindingDelta,
+		window: RowPreviewWindow,
+	): void {
+		if (disposed) return;
+		previewRange = window.active ? window.previewRange : EMPTY_RANGE;
+		applyBindingDelta(delta);
+		reconcile();
+	}
+
 	function dispose(): void {
 		if (disposed) return;
 		disposed = true;
@@ -208,8 +255,10 @@ export function createRowPreviewController(
 
 	return {
 		syncBindings,
+		syncBindingDelta,
 		setPreviewWindow,
 		commit,
+		commitBindingDelta,
 		getSlotState: (slotId) => slotsById.get(slotId)?.state,
 		dispose,
 	};

@@ -16,7 +16,7 @@ function resolveRangeSlots(params: {
 describe("createTwoHopResidentRowSlotAllocator", () => {
 	it("retains overlapping rows and immediately reuses the leaving slot", () => {
 		const allocator = createTwoHopResidentRowSlotAllocator();
-		allocator.prepareRange({
+		const initialDelta = allocator.prepareRange({
 			start: 100,
 			end: 120,
 			layoutKey: "four-columns",
@@ -25,8 +25,10 @@ describe("createTwoHopResidentRowSlotAllocator", () => {
 		const leavingSlot = allocator.resolveSlotIndex(100);
 		const retainedSlot = allocator.resolveSlotIndex(101);
 		expect(allocator.capacity).toBe(27);
+		expect(initialDelta.enteredSlots).toHaveLength(20);
+		expect(initialDelta.reboundSlots).toEqual([]);
 
-		allocator.prepareRange({
+		const shiftedDelta = allocator.prepareRange({
 			start: 101,
 			end: 121,
 			layoutKey: "four-columns",
@@ -34,9 +36,37 @@ describe("createTwoHopResidentRowSlotAllocator", () => {
 
 		expect(allocator.resolveSlotIndex(101)).toBe(retainedSlot);
 		expect(allocator.resolveSlotIndex(120)).toBe(leavingSlot);
+		expect(shiftedDelta.enteredSlots).toEqual([]);
+		expect(shiftedDelta.reboundSlots).toEqual([
+			{
+				slotIndex: leavingSlot,
+				previousLogicalRowIndex: 100,
+				logicalRowIndex: 120,
+			},
+		]);
+		expect(shiftedDelta.retainedSlots).toHaveLength(19);
+		expect(shiftedDelta.releasedSlots).toEqual([]);
 		expect(
 			new Set(resolveRangeSlots({ allocator, start: 101, end: 121 })).size,
 		).toBe(20);
+	});
+
+	it("reports slots released without replacement", () => {
+		const allocator = createTwoHopResidentRowSlotAllocator();
+		allocator.prepareRange({ start: 10, end: 14, layoutKey: "layout" });
+		const releasedSlot = allocator.resolveSlotIndex(10);
+
+		const delta = allocator.prepareRange({
+			start: 11,
+			end: 14,
+			layoutKey: "layout",
+		});
+
+		expect(delta.retainedSlots).toHaveLength(3);
+		expect(delta.reboundSlots).toEqual([]);
+		expect(delta.releasedSlots).toEqual([
+			{ slotIndex: releasedSlot, logicalRowIndex: 10 },
+		]);
 	});
 
 	it("reuses the same physical slot set after a non-overlapping jump", () => {
@@ -88,6 +118,11 @@ describe("createTwoHopResidentRowSlotAllocator", () => {
 		allocator.prepareRange({ start: 10, end: 18, layoutKey: "narrow" });
 		expect(allocator.capacity).toBe(12);
 		expect(allocator.epoch).toBe(1);
+		expect(
+			resolveRangeSlots({ allocator, start: 10, end: 18 }).every(
+				(slotIndex) => slotIndex < allocator.capacity,
+			),
+		).toBe(true);
 	});
 
 	it("uses growth headroom before starting a new epoch", () => {

@@ -4,8 +4,35 @@ import {
 	type ResidentSlotResetReason,
 } from "ui/virtualization/core/residentSlotAllocator";
 
+export interface TwoHopResidentRowSlotBinding {
+	readonly slotIndex: number;
+	readonly logicalRowIndex: number;
+}
+
+export interface TwoHopReboundRowSlot {
+	readonly slotIndex: number;
+	readonly previousLogicalRowIndex: number;
+	readonly logicalRowIndex: number;
+}
+
+/** Describes the physical row slots changed by one allocator update. */
+export interface TwoHopResidentRowSlotDelta {
+	readonly enteredSlots: readonly TwoHopResidentRowSlotBinding[];
+	readonly reboundSlots: readonly TwoHopReboundRowSlot[];
+	readonly retainedSlots: readonly TwoHopResidentRowSlotBinding[];
+	readonly releasedSlots: readonly TwoHopResidentRowSlotBinding[];
+}
+
+export interface TwoHopResidentRowSlotAllocator extends ResidentRowSlotAllocator {
+	prepareRange(params: {
+		readonly start: number;
+		readonly end: number;
+		readonly layoutKey: unknown;
+	}): TwoHopResidentRowSlotDelta;
+}
+
 /** Creates the stateful physical row-slot pool used by the two-hop surface. */
-export function createTwoHopResidentRowSlotAllocator(): ResidentRowSlotAllocator {
+export function createTwoHopResidentRowSlotAllocator(): TwoHopResidentRowSlotAllocator {
 	const capacityAllocator = createResidentRowSlotAllocator();
 	const slotByLogicalRow = new Map<number, number>();
 	const logicalRowBySlot: Array<number | undefined> = [];
@@ -17,9 +44,13 @@ export function createTwoHopResidentRowSlotAllocator(): ResidentRowSlotAllocator
 		readonly start: number;
 		readonly end: number;
 		readonly layoutKey: unknown;
-	}): void {
-		if (disposed) return;
+	}): TwoHopResidentRowSlotDelta {
+		if (disposed) return createEmptyDelta();
+		const releasedBySlot = new Map<number, number>();
 		if (hasLayoutKey && !Object.is(layoutKey, params.layoutKey)) {
+			for (const [logicalRowIndex, slotIndex] of slotByLogicalRow) {
+				releasedBySlot.set(slotIndex, logicalRowIndex);
+			}
 			clearAssignments();
 		}
 		layoutKey = params.layoutKey;
@@ -29,19 +60,68 @@ export function createTwoHopResidentRowSlotAllocator(): ResidentRowSlotAllocator
 		logicalRowBySlot.length = capacityAllocator.capacity;
 		const rangeStart = params.start;
 		const rangeEnd = Math.max(rangeStart, params.end);
+		const retainedSlots = collectRetainedSlots(rangeStart, rangeEnd);
 		const releasedSlots = releaseRowsOutsideRange(rangeStart, rangeEnd);
-		assignEnteringRows(rangeStart, rangeEnd, releasedSlots);
+		for (const binding of releasedSlots) {
+			releasedBySlot.set(binding.slotIndex, binding.logicalRowIndex);
+		}
+		const assignedSlots = assignEnteringRows(
+			rangeStart,
+			rangeEnd,
+			[...releasedBySlot.keys()]
+				.filter((slotIndex) => slotIndex < capacityAllocator.capacity)
+				.sort((left, right) => left - right),
+		);
+		const enteredSlots: TwoHopResidentRowSlotBinding[] = [];
+		const reboundSlots: TwoHopReboundRowSlot[] = [];
+		for (const binding of assignedSlots) {
+			const previousLogicalRowIndex = releasedBySlot.get(binding.slotIndex);
+			if (previousLogicalRowIndex === undefined) {
+				enteredSlots.push(binding);
+				continue;
+			}
+			releasedBySlot.delete(binding.slotIndex);
+			reboundSlots.push({
+				slotIndex: binding.slotIndex,
+				previousLogicalRowIndex,
+				logicalRowIndex: binding.logicalRowIndex,
+			});
+		}
+
+		return {
+			enteredSlots,
+			reboundSlots,
+			retainedSlots,
+			releasedSlots: [...releasedBySlot].map(([slotIndex, logicalRowIndex]) => ({
+				slotIndex,
+				logicalRowIndex,
+			})),
+		};
 	}
 
-	function releaseRowsOutsideRange(rangeStart: number, rangeEnd: number): number[] {
-		const releasedSlots: number[] = [];
+	function collectRetainedSlots(
+		rangeStart: number,
+		rangeEnd: number,
+	): TwoHopResidentRowSlotBinding[] {
+		const retainedSlots: TwoHopResidentRowSlotBinding[] = [];
+		for (const [logicalRowIndex, slotIndex] of slotByLogicalRow) {
+			if (logicalRowIndex < rangeStart || logicalRowIndex >= rangeEnd) continue;
+			retainedSlots.push({ slotIndex, logicalRowIndex });
+		}
+		return retainedSlots;
+	}
+
+	function releaseRowsOutsideRange(
+		rangeStart: number,
+		rangeEnd: number,
+	): TwoHopResidentRowSlotBinding[] {
+		const releasedSlots: TwoHopResidentRowSlotBinding[] = [];
 		for (const [logicalRowIndex, slotIndex] of slotByLogicalRow) {
 			if (logicalRowIndex >= rangeStart && logicalRowIndex < rangeEnd) continue;
 			slotByLogicalRow.delete(logicalRowIndex);
 			logicalRowBySlot[slotIndex] = undefined;
-			releasedSlots.push(slotIndex);
+			releasedSlots.push({ slotIndex, logicalRowIndex });
 		}
-		releasedSlots.sort((left, right) => left - right);
 		return releasedSlots;
 	}
 
@@ -49,7 +129,8 @@ export function createTwoHopResidentRowSlotAllocator(): ResidentRowSlotAllocator
 		rangeStart: number,
 		rangeEnd: number,
 		releasedSlots: readonly number[],
-	): void {
+	): TwoHopResidentRowSlotBinding[] {
+		const assignedSlots: TwoHopResidentRowSlotBinding[] = [];
 		let releasedSlotOffset = 0;
 		let nextFreeSlotIndex = 0;
 		for (
@@ -69,14 +150,18 @@ export function createTwoHopResidentRowSlotAllocator(): ResidentRowSlotAllocator
 				) {
 					nextFreeSlotIndex += 1;
 				}
-				if (nextFreeSlotIndex >= capacityAllocator.capacity) return;
+				if (nextFreeSlotIndex >= capacityAllocator.capacity) {
+					return assignedSlots;
+				}
 				slotIndex = nextFreeSlotIndex;
 				nextFreeSlotIndex += 1;
 			}
 
 			slotByLogicalRow.set(logicalRowIndex, slotIndex);
 			logicalRowBySlot[slotIndex] = logicalRowIndex;
+			assignedSlots.push({ slotIndex, logicalRowIndex });
 		}
+		return assignedSlots;
 	}
 
 	function resolveSlotIndex(logicalRowIndex: number): number {
@@ -113,5 +198,14 @@ export function createTwoHopResidentRowSlotAllocator(): ResidentRowSlotAllocator
 		get epoch() {
 			return capacityAllocator.epoch;
 		},
+	};
+}
+
+function createEmptyDelta(): TwoHopResidentRowSlotDelta {
+	return {
+		enteredSlots: [],
+		reboundSlots: [],
+		retainedSlots: [],
+		releasedSlots: [],
 	};
 }
