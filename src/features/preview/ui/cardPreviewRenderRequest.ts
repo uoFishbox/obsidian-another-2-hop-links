@@ -23,6 +23,8 @@ export type CardPreviewRenderRequestResolver = (
 	settings: PluginSettings,
 ) => CardPreviewRenderRequest | null;
 
+const previewSettingsCache = new WeakMap<PluginSettings, PluginSettings>();
+
 /** Keeps request identity stable while all render-relevant inputs are unchanged. */
 export function createCardPreviewRenderRequestResolver(): CardPreviewRenderRequestResolver {
 	let lastRequest: CardPreviewRenderRequest | null = null;
@@ -76,7 +78,12 @@ export function createCardPreviewRenderRequestResolver(): CardPreviewRenderReque
 }
 
 function createPreviewRenderSettings(settings: PluginSettings): PluginSettings {
-	return {
+	const cached = previewSettingsCache.get(settings);
+	if (cached && hasSamePreviewRenderSettings(cached, settings)) {
+		return cached;
+	}
+
+	const result = {
 		...DEFAULT_SETTINGS,
 		cardHeightRatio: settings.cardHeightRatio,
 		cardWidthPx: settings.cardWidthPx,
@@ -84,8 +91,43 @@ function createPreviewRenderSettings(settings: PluginSettings): PluginSettings {
 		previewMaxLines: settings.previewMaxLines,
 		previewVisualLineSafetyMargin: settings.previewVisualLineSafetyMargin,
 		priorityFrontmatterKeyForPreview: settings.priorityFrontmatterKeyForPreview,
-		renderCodeBlockTypes: settings.renderCodeBlockTypes,
+		renderCodeBlockTypes: [...settings.renderCodeBlockTypes],
 		searchPreviewSeekBufferChars: settings.searchPreviewSeekBufferChars,
 		searchPreviewSeekThresholdChars: settings.searchPreviewSeekThresholdChars,
 	};
+	previewSettingsCache.set(settings, result);
+	return result;
+}
+
+function hasSamePreviewRenderSettings(
+	previewSettings: PluginSettings,
+	settings: PluginSettings,
+): boolean {
+	return (
+		previewSettings.cardHeightRatio === settings.cardHeightRatio &&
+		previewSettings.cardWidthPx === settings.cardWidthPx &&
+		previewSettings.previewMaxChars === settings.previewMaxChars &&
+		previewSettings.previewMaxLines === settings.previewMaxLines &&
+		previewSettings.previewVisualLineSafetyMargin ===
+			settings.previewVisualLineSafetyMargin &&
+		previewSettings.priorityFrontmatterKeyForPreview ===
+			settings.priorityFrontmatterKeyForPreview &&
+		previewSettings.searchPreviewSeekBufferChars ===
+			settings.searchPreviewSeekBufferChars &&
+		previewSettings.searchPreviewSeekThresholdChars ===
+			settings.searchPreviewSeekThresholdChars &&
+		hasSameRenderCodeBlockTypes(
+			previewSettings.renderCodeBlockTypes,
+			settings.renderCodeBlockTypes,
+		)
+	);
+}
+
+function hasSameRenderCodeBlockTypes(
+	previous: readonly string[],
+	next: readonly string[],
+): boolean {
+	if (previous.length !== next.length) return false;
+
+	return previous.every((value, index) => value === next[index]);
 }
