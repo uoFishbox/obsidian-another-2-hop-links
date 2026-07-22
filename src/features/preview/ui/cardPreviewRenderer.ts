@@ -38,13 +38,20 @@ export interface CardPreviewRendererOptions {
 		file: TFile | null | undefined,
 	) => Pos | undefined;
 	onMathRenderingChange: (isRendering: boolean) => void;
-	onPreviewContentTypeChange: (contentType: PreviewData["type"] | undefined) => void;
+	onCommitted: (
+		identity: string,
+		contentType: PreviewData["type"] | undefined,
+		retention: CardPreviewRetention,
+	) => void;
 	onRendered: () => void;
 }
+
+export type CardPreviewRetention = "resident" | "lifecycle-bound";
 
 export type CardPreviewRenderer = (
 	container: HTMLElement,
 	request: CardPreviewRenderRequest,
+	bindingIdentity: string,
 ) => () => void;
 
 let nextDomCommitScopeId = 0;
@@ -70,6 +77,7 @@ export function createCardPreviewRenderer(
 	function render(
 		container: HTMLElement,
 		request: CardPreviewRenderRequest,
+		bindingIdentity: string,
 	): () => void {
 		const abortController = new AbortController();
 		let component: Component | undefined;
@@ -85,6 +93,7 @@ export function createCardPreviewRenderer(
 		void renderPreview(
 			container,
 			request,
+			bindingIdentity,
 			abortController.signal,
 			renderToken,
 			getOrCreateComponent,
@@ -107,6 +116,7 @@ export function createCardPreviewRenderer(
 	async function renderPreview(
 		container: HTMLElement,
 		request: CardPreviewRenderRequest,
+		bindingIdentity: string,
 		signal: AbortSignal,
 		renderToken: number,
 		getOrCreateComponent: () => Component,
@@ -114,7 +124,15 @@ export function createCardPreviewRenderer(
 		const { file, renderCacheKey, searchQuery } = request;
 
 		try {
-			if (await applyRenderedEntry(container, request, signal, renderToken)) {
+			if (
+				await applyRenderedEntry(
+					container,
+					request,
+					bindingIdentity,
+					signal,
+					renderToken,
+				)
+			) {
 				options.onMathRenderingChange(false);
 				return true;
 			}
@@ -170,6 +188,7 @@ export function createCardPreviewRenderer(
 					return commitRenderedTextEntry(
 						container,
 						request,
+						bindingIdentity,
 						signal,
 						renderToken,
 						renderedEntry,
@@ -190,10 +209,16 @@ export function createCardPreviewRenderer(
 						targetKey: domCommitScopeKey,
 						isStale: () => isRenderStale(signal, renderToken),
 						commit: () => {
-							if (shouldSkipDomApply(container, request)) return false;
-							options.onPreviewContentTypeChange("image");
-							container.replaceChildren(image);
+							if (!shouldSkipDomApply(container, request)) {
+								container.replaceChildren(image);
+							}
 							lastAppliedRenderCacheKey = renderCacheKey;
+							commitPreviewState(
+								container,
+								bindingIdentity,
+								"image",
+								"resident",
+							);
 							return true;
 						},
 					});
@@ -215,14 +240,14 @@ export function createCardPreviewRenderer(
 				const didReplace = await replaceContainerContent(
 					container,
 					request,
+					bindingIdentity,
 					signal,
 					renderToken,
 					tempContainer,
 					shouldSyncMathStyles,
+					previewForRender.type,
+					resolvePreviewRetention(previewForRender),
 				);
-				if (didReplace) {
-					options.onPreviewContentTypeChange(previewForRender.type);
-				}
 				return didReplace;
 			}
 
@@ -251,6 +276,7 @@ export function createCardPreviewRenderer(
 						const didCommit = await commitRenderedTextEntry(
 							container,
 							request,
+							bindingIdentity,
 							signal,
 							renderToken,
 							renderedEntry,
@@ -281,13 +307,15 @@ export function createCardPreviewRenderer(
 						await replaceContainerContent(
 							container,
 							request,
+							bindingIdentity,
 							signal,
 							renderToken,
 							mathContainer,
 							true,
+							previewForRender.type,
+							resolvePreviewRetention(previewForRender),
 						)
 					) {
-						options.onPreviewContentTypeChange(previewForRender.type);
 						options.onMathRenderingChange(false);
 					}
 				},
@@ -305,8 +333,13 @@ export function createCardPreviewRenderer(
 				targetKey: domCommitScopeKey,
 				isStale: () => isRenderStale(signal, renderToken),
 				commit: () => {
-					options.onPreviewContentTypeChange(undefined);
 					handlePreviewError(container, error);
+					commitPreviewState(
+						container,
+						bindingIdentity,
+						undefined,
+						"resident",
+					);
 					return true;
 				},
 			});
@@ -317,6 +350,7 @@ export function createCardPreviewRenderer(
 	async function applyRenderedEntry(
 		container: HTMLElement,
 		request: CardPreviewRenderRequest,
+		bindingIdentity: string,
 		signal: AbortSignal,
 		renderToken: number,
 	): Promise<boolean> {
@@ -327,13 +361,16 @@ export function createCardPreviewRenderer(
 			targetKey: domCommitScopeKey,
 			isStale: () => isRenderStale(signal, renderToken),
 			commit: () => {
-				if (shouldSkipDomApply(container, request)) return false;
-				options.onPreviewContentTypeChange("text");
-				container.replaceChildren(cloneRenderedPreviewContent(renderedEntry));
+				if (!shouldSkipDomApply(container, request)) {
+					container.replaceChildren(
+						cloneRenderedPreviewContent(renderedEntry),
+					);
+				}
 				lastAppliedRenderCacheKey = request.renderCacheKey;
 				if (renderedEntry.hasMath) {
 					syncMathJaxStylesForNode(container);
 				}
+				commitPreviewState(container, bindingIdentity, "text", "resident");
 				return true;
 			},
 		});
@@ -343,6 +380,7 @@ export function createCardPreviewRenderer(
 	function commitRenderedTextEntry(
 		container: HTMLElement,
 		request: CardPreviewRenderRequest,
+		bindingIdentity: string,
 		signal: AbortSignal,
 		renderToken: number,
 		renderedEntry: RenderedPreviewCacheEntry,
@@ -352,13 +390,16 @@ export function createCardPreviewRenderer(
 			targetKey: domCommitScopeKey,
 			isStale: () => isRenderStale(signal, renderToken),
 			commit: () => {
-				if (shouldSkipDomApply(container, request)) return false;
-				options.onPreviewContentTypeChange("text");
-				container.replaceChildren(cloneRenderedPreviewContent(renderedEntry));
+				if (!shouldSkipDomApply(container, request)) {
+					container.replaceChildren(
+						cloneRenderedPreviewContent(renderedEntry),
+					);
+				}
 				lastAppliedRenderCacheKey = request.renderCacheKey;
 				if (shouldSyncMathStyles) {
 					syncMathJaxStylesForNode(container);
 				}
+				commitPreviewState(container, bindingIdentity, "text", "resident");
 				return true;
 			},
 		});
@@ -367,16 +408,18 @@ export function createCardPreviewRenderer(
 	function replaceContainerContent(
 		container: HTMLElement,
 		request: CardPreviewRenderRequest,
+		bindingIdentity: string,
 		signal: AbortSignal,
 		renderToken: number,
 		source: HTMLElement,
 		shouldSyncMathStyles: boolean,
+		contentType: PreviewData["type"],
+		retention: CardPreviewRetention,
 	): Promise<boolean> {
 		return enqueueCoordinatedDomCommit({
 			targetKey: domCommitScopeKey,
 			isStale: () => isRenderStale(signal, renderToken),
 			commit: () => {
-				if (shouldSkipDomApply(container, request)) return false;
 				container.replaceChildren();
 				while (source.firstChild) {
 					container.appendChild(source.firstChild);
@@ -385,6 +428,7 @@ export function createCardPreviewRenderer(
 				if (shouldSyncMathStyles) {
 					syncMathJaxStylesForNode(container);
 				}
+				commitPreviewState(container, bindingIdentity, contentType, retention);
 				return true;
 			},
 		});
@@ -403,6 +447,16 @@ export function createCardPreviewRenderer(
 
 	function isRenderStale(signal: AbortSignal, renderToken: number): boolean {
 		return signal.aborted || renderToken !== renderSequence;
+	}
+
+	function commitPreviewState(
+		container: HTMLElement,
+		identity: string,
+		contentType: PreviewData["type"] | undefined,
+		retention: CardPreviewRetention,
+	): void {
+		container.classList.remove("is-stale");
+		options.onCommitted(identity, contentType, retention);
 	}
 
 	return render;
@@ -447,6 +501,14 @@ export function createCardPreviewRenderer(
 				: {}),
 		};
 	}
+}
+
+function resolvePreviewRetention(preview: PreviewData): CardPreviewRetention {
+	if (preview.type === "dom") return "lifecycle-bound";
+	if (preview.type === "text" && !canShareRenderedTextPreview(preview.content)) {
+		return "lifecycle-bound";
+	}
+	return "resident";
 }
 
 async function renderPreviewContent(

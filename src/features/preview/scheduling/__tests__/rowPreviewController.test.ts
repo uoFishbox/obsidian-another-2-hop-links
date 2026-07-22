@@ -61,7 +61,8 @@ describe("rowPreviewController", () => {
 
 		controller.syncBindings([binding("slot-0", 2, snapshot)]);
 		const slotState = controller.getSlotState("slot-0");
-		expect(slotState?.snapshot).toBeUndefined();
+		expect(slotState?.bindingIdentity).toBe(snapshot.identity);
+		expect(slotState?.renderSnapshot).toBeUndefined();
 
 		controller.setPreviewWindow({
 			previewRange: { start: 2, end: 3 },
@@ -70,14 +71,15 @@ describe("rowPreviewController", () => {
 		await flushAnimationFrame();
 		await flushAnimationFrame();
 		expect(controller.getSlotState("slot-0")).toBe(slotState);
-		expect(slotState?.snapshot).toBe(snapshot);
+		expect(slotState?.renderSnapshot).toBe(snapshot);
 
 		controller.setPreviewWindow({
 			previewRange: { start: 3, end: 4 },
 			active: true,
 		});
 		expect(controller.getSlotState("slot-0")).toBe(slotState);
-		expect(slotState?.snapshot).toBeUndefined();
+		expect(slotState?.bindingIdentity).toBe(snapshot.identity);
+		expect(slotState?.renderSnapshot).toBeUndefined();
 		controller.dispose();
 	});
 
@@ -93,7 +95,7 @@ describe("rowPreviewController", () => {
 		await flushAnimationFrame();
 		await flushAnimationFrame();
 
-		expect(controller.getSlotState("slot-0")?.snapshot).toBe(snapshot);
+		expect(controller.getSlotState("slot-0")?.renderSnapshot).toBe(snapshot);
 		controller.dispose();
 	});
 	it("activates slots inside the preview range and clears them outside", async () => {
@@ -108,14 +110,14 @@ describe("rowPreviewController", () => {
 		await flushAnimationFrame();
 		await flushAnimationFrame();
 
-		expect(controller.getSlotState("slot-0")?.snapshot).toBe(snapshot);
+		expect(controller.getSlotState("slot-0")?.renderSnapshot).toBe(snapshot);
 
 		controller.commit({
 			cards: [binding("slot-0", 2, snapshot)],
 			previewRange: { start: 0, end: 0 },
 			active: true,
 		});
-		expect(controller.getSlotState("slot-0")?.snapshot).toBeUndefined();
+		expect(controller.getSlotState("slot-0")?.renderSnapshot).toBeUndefined();
 		controller.dispose();
 	});
 
@@ -137,7 +139,10 @@ describe("rowPreviewController", () => {
 		await flushAnimationFrame();
 		await flushAnimationFrame();
 
-		expect(controller.getSlotState("slot-0")?.snapshot).toBe(second);
+		expect(controller.getSlotState("slot-0")?.bindingIdentity).toBe(
+			second.identity,
+		);
+		expect(controller.getSlotState("slot-0")?.renderSnapshot).toBe(second);
 		controller.dispose();
 	});
 
@@ -153,7 +158,7 @@ describe("rowPreviewController", () => {
 		});
 		await flushAnimationFrame();
 		await flushAnimationFrame();
-		expect(controller.getSlotState("slot-0")?.snapshot).toBeUndefined();
+		expect(controller.getSlotState("slot-0")?.renderSnapshot).toBeUndefined();
 
 		controller.commit({
 			cards,
@@ -162,7 +167,7 @@ describe("rowPreviewController", () => {
 		});
 		await flushAnimationFrame();
 		await flushAnimationFrame();
-		expect(controller.getSlotState("slot-0")?.snapshot).toBe(snapshot);
+		expect(controller.getSlotState("slot-0")?.renderSnapshot).toBe(snapshot);
 		controller.dispose();
 	});
 
@@ -179,8 +184,8 @@ describe("rowPreviewController", () => {
 		await flushAnimationFrame();
 		await flushAnimationFrame();
 
-		expect(controller.getSlotState("slot-0")?.snapshot).toBe(snapshotA);
-		expect(controller.getSlotState("slot-1")?.snapshot).toBe(snapshotB);
+		expect(controller.getSlotState("slot-0")?.renderSnapshot).toBe(snapshotA);
+		expect(controller.getSlotState("slot-1")?.renderSnapshot).toBe(snapshotB);
 		controller.dispose();
 	});
 
@@ -201,7 +206,7 @@ describe("rowPreviewController", () => {
 
 		await flushAnimationFrame();
 		await flushAnimationFrame();
-		expect(controller.getSlotState("slot-0")?.snapshot).toBe(snapshot);
+		expect(controller.getSlotState("slot-0")?.renderSnapshot).toBe(snapshot);
 		controller.dispose();
 	});
 
@@ -217,14 +222,17 @@ describe("rowPreviewController", () => {
 		});
 		await flushAnimationFrame();
 		await flushAnimationFrame();
-		expect(controller.getSlotState("slot-0")?.snapshot).toBe(snapshot);
+		expect(controller.getSlotState("slot-0")?.renderSnapshot).toBe(snapshot);
 
 		controller.commit({
 			cards,
 			previewRange: { start: 0, end: 1 },
 			active: false,
 		});
-		expect(controller.getSlotState("slot-0")?.snapshot).toBeUndefined();
+		expect(controller.getSlotState("slot-0")?.bindingIdentity).toBe(
+			snapshot.identity,
+		);
+		expect(controller.getSlotState("slot-0")?.renderSnapshot).toBeUndefined();
 
 		controller.commit({
 			cards: [],

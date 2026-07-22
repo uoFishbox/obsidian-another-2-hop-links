@@ -244,7 +244,7 @@ describe("CardPreview", () => {
 		expect(getPreview).toHaveBeenCalledTimes(1);
 	});
 
-	it("clears and hides rendered content while keeping the component mounted", async () => {
+	it("keeps committed static DOM resident when rendering is not admitted", async () => {
 		const file = createMockTFile("notes/inactive-preview.md");
 		const getPreview = vi.fn(async () => ({
 			type: "image" as const,
@@ -269,10 +269,59 @@ describe("CardPreview", () => {
 				".cosense-card-links__box-preview",
 			);
 			expect(preview).toBeTruthy();
-			expect(preview).toBeEmptyDOMElement();
-			expect(preview).toHaveClass("hidden");
-			expect(preview).not.toHaveClass("cosense-card-links__box-preview--image");
+			expect(preview?.querySelector("img")).toBeTruthy();
+			expect(preview).toHaveClass("is-stale");
+			expect(preview).not.toHaveClass("hidden");
+			expect(preview).toHaveClass("cosense-card-links__box-preview--image");
 		});
+	});
+
+	it("retains and reuses resident DOM when the same binding leaves and re-enters the preview range", async () => {
+		const file = createMockTFile("notes/resident-preview.md");
+		const snapshot = {
+			identity: "resident-identity",
+			file,
+			searchQuery: "",
+			previewRefreshToken: 0,
+			previewOverride: null,
+		};
+		const getPreview = vi.fn(async () => ({
+			type: "text" as const,
+			content: "resident content",
+		}));
+		const rendered = render(CardPreview, {
+			props: {
+				bindingIdentity: snapshot.identity,
+				renderSnapshot: snapshot,
+				getPreview,
+			},
+		});
+
+		const preview = rendered.container.querySelector(
+			".cosense-card-links__box-preview",
+		);
+		await waitFor(() => {
+			expect(preview?.textContent).toContain("rendered:resident content");
+		});
+		const committedContent = preview?.firstChild;
+
+		await rendered.rerender({
+			bindingIdentity: snapshot.identity,
+			renderSnapshot: undefined,
+			getPreview,
+		});
+		expect(preview?.firstChild).toBe(committedContent);
+		expect(preview).not.toHaveClass("is-stale");
+		expect(preview).not.toHaveClass("hidden");
+
+		await rendered.rerender({
+			bindingIdentity: snapshot.identity,
+			renderSnapshot: snapshot,
+			getPreview,
+		});
+		await tick();
+		expect(preview?.firstChild).toBe(committedContent);
+		expect(getPreview).toHaveBeenCalledTimes(1);
 	});
 
 	it("reactivates a different file in the same component without stale DOM", async () => {
@@ -297,7 +346,8 @@ describe("CardPreview", () => {
 			getPreview,
 			searchQuery: "",
 		});
-		await waitFor(() => expect(preview).toBeEmptyDOMElement());
+		await waitFor(() => expect(preview).toHaveClass("is-stale"));
+		expect(preview?.textContent).toContain("rendered:notes/preview-a.md");
 		await rendered.rerender({ file: fileB, getPreview, searchQuery: "" });
 
 		await waitFor(() => {
@@ -362,7 +412,8 @@ describe("CardPreview", () => {
 			);
 			expect(state.componentUnload).toHaveBeenCalledTimes(1);
 			expect(preview).toBeEmptyDOMElement();
-			expect(preview).not.toHaveClass("cosense-card-links__box-preview--dom");
+			expect(preview).toHaveClass("is-stale");
+			expect(preview).toHaveClass("cosense-card-links__box-preview--dom");
 		});
 	});
 
@@ -403,7 +454,7 @@ describe("CardPreview", () => {
 			expect(rendered.container.querySelector(".skeleton-loader")).toBeNull();
 			expect(
 				rendered.container.querySelector(".cosense-card-links__box-preview"),
-			).toHaveClass("hidden");
+			).toHaveClass("is-stale");
 		});
 		releaseMathQueue?.();
 		state.enqueueMathRender.mockImplementation(async (task) => {

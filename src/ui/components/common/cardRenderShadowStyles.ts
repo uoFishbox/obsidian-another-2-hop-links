@@ -1,4 +1,8 @@
 export const CARD_RENDER_SHADOW_CSS = String.raw`
+.cosense-card-links__box-preview.is-stale {
+	visibility: hidden;
+}
+
 :host {
 	display: block;
 }

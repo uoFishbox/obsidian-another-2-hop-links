@@ -5,9 +5,12 @@
 <script lang="ts">
 	import type { TFile } from "obsidian";
 	import type { PreviewData, PreviewRequestOptions } from "ui/context/linkContext";
+	import type { CardPreviewSnapshot } from "features/preview/ui/cardPreviewSnapshot";
 
 	interface Props {
-		file: TFile | undefined;
+		file?: TFile;
+		bindingIdentity?: string;
+		renderSnapshot?: CardPreviewSnapshot;
 		getPreview: (
 			file: TFile,
 			signal?: AbortSignal,
@@ -17,14 +20,26 @@
 		previewRefreshToken?: number;
 	}
 
-	let { file, searchQuery = "", previewRefreshToken = 0 }: Props = $props();
+	let {
+		file = undefined,
+		bindingIdentity = "",
+		renderSnapshot = undefined,
+		searchQuery = "",
+		previewRefreshToken = 0,
+	}: Props = $props();
 	const mountId = ++mountSequence;
+	const effectiveFile = $derived(renderSnapshot?.file ?? file);
+	const effectiveSearchQuery = $derived(renderSnapshot?.searchQuery ?? searchQuery);
+	const effectiveRefreshToken = $derived(
+		renderSnapshot?.previewRefreshToken ?? previewRefreshToken,
+	);
 </script>
 
 <div
 	data-testid="card-preview-probe"
 	data-mount-id={mountId}
-	data-file-path={file?.path ?? ""}
-	data-search-query={searchQuery}
-	data-preview-refresh-token={previewRefreshToken}
+	data-binding-identity={bindingIdentity}
+	data-file-path={effectiveFile?.path ?? ""}
+	data-search-query={effectiveSearchQuery}
+	data-preview-refresh-token={effectiveRefreshToken}
 ></div>

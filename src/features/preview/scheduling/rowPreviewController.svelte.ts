@@ -52,7 +52,8 @@ export interface CreateRowPreviewControllerOptions {
 }
 
 interface MutableCardPreviewSlotState {
-	snapshot: CardPreviewSnapshot | undefined;
+	bindingIdentity: string;
+	renderSnapshot: CardPreviewSnapshot | undefined;
 }
 
 interface BoundSlot {
@@ -83,7 +84,8 @@ export function createRowPreviewController(
 		const existing = slotsById.get(slotId);
 		if (existing) return existing.state;
 		const state = $state<MutableCardPreviewSlotState>({
-			snapshot: undefined,
+			bindingIdentity: "",
+			renderSnapshot: undefined,
 		});
 		return state;
 	}
@@ -97,7 +99,7 @@ export function createRowPreviewController(
 		for (const slot of slotsById.values()) {
 			if (slot.binding.snapshot.identity !== key) continue;
 			if (!isRowInPreviewRange(slot.binding.rowIndex)) continue;
-			slot.state.snapshot = slot.binding.snapshot;
+			slot.state.renderSnapshot = slot.binding.snapshot;
 		}
 	}
 
@@ -122,7 +124,8 @@ export function createRowPreviewController(
 		}
 
 		const state = previous?.state ?? getOrCreateState(binding.slotId);
-		if (previous) state.snapshot = undefined;
+		state.bindingIdentity = binding.snapshot.identity;
+		state.renderSnapshot = undefined;
 		slotsById.set(binding.slotId, { binding, state });
 	}
 
@@ -135,7 +138,7 @@ export function createRowPreviewController(
 
 		for (const [slotId, slot] of slotsById) {
 			if (retainedSlotsScratch.has(slotId)) continue;
-			slot.state.snapshot = undefined;
+			slot.state.renderSnapshot = undefined;
 			slotsById.delete(slotId);
 		}
 		retainedSlotsScratch.clear();
@@ -145,10 +148,10 @@ export function createRowPreviewController(
 		activationKeysScratch.clear();
 		for (const slot of slotsById.values()) {
 			if (!isRowInPreviewRange(slot.binding.rowIndex)) {
-				slot.state.snapshot = undefined;
+				slot.state.renderSnapshot = undefined;
 				continue;
 			}
-			if (!slot.state.snapshot) {
+			if (!slot.state.renderSnapshot) {
 				activationKeysScratch.add(slot.binding.snapshot.identity);
 			}
 		}
@@ -193,7 +196,7 @@ export function createRowPreviewController(
 		disposed = true;
 		for (const handle of pendingByKey.values()) handle.cancel();
 		pendingByKey.clear();
-		for (const slot of slotsById.values()) slot.state.snapshot = undefined;
+		for (const slot of slotsById.values()) slot.state.renderSnapshot = undefined;
 		slotsById.clear();
 		retainedSlotsScratch.clear();
 		activationKeysScratch.clear();

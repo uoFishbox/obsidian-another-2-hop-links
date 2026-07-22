@@ -26,9 +26,7 @@
 	--ccl-box-text-content: var(--color-base-60);
 	--ccl-title-header-new-text: #000000;
 	--ccl-card-preview-code-background: var(--code-background);
-	--ccl-single-backlink-unresolved: hsl(
-		from var(--text-error) h calc(s * 0.8) l
-	);
+	--ccl-single-backlink-unresolved: hsl(from var(--text-error) h calc(s * 0.8) l);
 	--ccl-single-backlink-unresolved-hover: hsl(
 		from var(--text-error) h calc(s * 0.9) l
 	);
@@ -44,9 +42,7 @@
 	--ccl-box-text-content: var(--color-base-60);
 	--ccl-title-header-new-text: #e0e0e0;
 	--ccl-card-preview-code-background: var(--code-background);
-	--ccl-single-backlink-unresolved: hsl(
-		from var(--text-error) h calc(s * 0.8) l
-	);
+	--ccl-single-backlink-unresolved: hsl(from var(--text-error) h calc(s * 0.8) l);
 	--ccl-single-backlink-unresolved-hover: hsl(
 		from var(--text-error) h calc(s * 0.9) l
 	);
@@ -156,8 +152,7 @@
 	scrollbar-gutter: stable;
 }
 
-.workspace-leaf-content[data-type="cosense-card-links-tag-notes-view"]
-	> .view-content {
+.workspace-leaf-content[data-type="cosense-card-links-tag-notes-view"] > .view-content {
 	scrollbar-gutter: stable;
 }
 
@@ -168,10 +163,8 @@
 
 /* pre-create ビューは view-content のパディングをリセットし、
    cm-sizer 内のパディングに任せる（本物のエディタと同様） */
-.workspace-leaf-content[data-type="cosense-card-links-pre-create-view"]
-	> .view-content,
-.workspace-leaf-content[data-type="cosense-card-links-tag-notes-view"]
-	> .view-content {
+.workspace-leaf-content[data-type="cosense-card-links-pre-create-view"] > .view-content,
+.workspace-leaf-content[data-type="cosense-card-links-tag-notes-view"] > .view-content {
 	padding: 0;
 	overflow: auto;
 }
@@ -191,8 +184,7 @@
 	display: none;
 }
 
-.view-content.cosense-card-links-empty-view-host
-	.cosense-card-links-empty-view {
+.view-content.cosense-card-links-empty-view-host .cosense-card-links-empty-view {
 	padding: var(--file-margins);
 }
 
@@ -381,4 +373,7 @@ span[data-twohop-link-state="special-unresolved"] > .is-unresolved,
 	.workspace-leaf-content[data-type="cosense-card-links-tag-notes-view"]
 	.view-content {
 	margin-top: unset;
+}
+.cosense-card-links__box-preview.is-stale {
+	visibility: hidden;
 }

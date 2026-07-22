@@ -12,5 +12,8 @@ export interface CardPreviewSnapshot {
 
 /** Reactive slot state owned by a virtual card surface. */
 export interface CardPreviewSlotState {
-	readonly snapshot: CardPreviewSnapshot | undefined;
+	/** Identity currently bound to this physical slot. */
+	readonly bindingIdentity: string;
+	/** Snapshot admitted by the preview scheduler for rendering. */
+	readonly renderSnapshot: CardPreviewSnapshot | undefined;
 }
