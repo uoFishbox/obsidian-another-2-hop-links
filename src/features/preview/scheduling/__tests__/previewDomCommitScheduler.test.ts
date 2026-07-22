@@ -32,9 +32,11 @@ interface EnqueueTestCommitOptions {
 	readonly isStale?: () => boolean;
 	readonly didMutateDom?: boolean;
 	readonly onCommit?: () => void;
+	readonly commitsPerSecond?: number;
 }
 
 function enqueueTestCommit(options: EnqueueTestCommitOptions): Promise<boolean> {
+	const commitsPerSecond = options.commitsPerSecond;
 	return enqueuePreviewDomCommit({
 		targetKey: options.targetKey,
 		isStale: options.isStale ?? (() => false),
@@ -42,6 +44,7 @@ function enqueueTestCommit(options: EnqueueTestCommitOptions): Promise<boolean> 
 			options.onCommit?.();
 			return options.didMutateDom ?? true;
 		},
+		getCommitsPerSecond: commitsPerSecond ? () => commitsPerSecond : undefined,
 	}).then((result) => result.type === "committed");
 }
 
@@ -49,6 +52,7 @@ async function countCommits(params: {
 	readonly intervalMs: number;
 	readonly durationMs: number;
 	readonly scrolling: boolean;
+	readonly commitsPerSecond?: number;
 }): Promise<number> {
 	resetPreviewDomCommitSchedulerForTests();
 	resetScrollActivityForTests();
@@ -64,6 +68,7 @@ async function countCommits(params: {
 			onCommit: () => {
 				committed += 1;
 			},
+			commitsPerSecond: params.commitsPerSecond,
 		});
 	}
 
@@ -156,7 +161,7 @@ describe("preview DOM commit scheduler", () => {
 		markScrollActivityActive(scrollSource);
 		const committed: string[] = [];
 
-		const commits = Array.from({ length: 20 }, (_, index) =>
+		const commits = Array.from({ length: 200 }, (_, index) =>
 			enqueueTestCommit({
 				targetKey: `preview-${index}`,
 				onCommit: () => committed.push(`preview-${index}`),
@@ -164,14 +169,8 @@ describe("preview DOM commit scheduler", () => {
 		);
 
 		await vi.advanceTimersByTimeAsync(1_000);
-		expect(committed.length).toBeGreaterThanOrEqual(10);
-		expect(committed.length).toBeLessThanOrEqual(12);
-		expect(
-			vi.mocked(requestAnimationFrame).mock.calls.length,
-		).toBeGreaterThanOrEqual(committed.length);
-		expect(vi.mocked(requestAnimationFrame).mock.calls.length).toBeLessThanOrEqual(
-			committed.length + 1,
-		);
+		expect(committed.length).toBeGreaterThanOrEqual(76);
+		expect(committed.length).toBeLessThanOrEqual(79);
 		let counters = getCCLDevMeasurementSnapshot().counters;
 		expect(counters["preview.domCommitScheduler.animationFrame"].count).toBe(
 			vi.mocked(requestAnimationFrame).mock.calls.length,
@@ -188,7 +187,7 @@ describe("preview DOM commit scheduler", () => {
 		);
 		disposePreviewDomCommitScheduler();
 		await expect(Promise.all(commits)).resolves.toEqual(
-			Array.from({ length: 20 }, (_, index) => index < committed.length),
+			Array.from({ length: 200 }, (_, index) => index < committed.length),
 		);
 	});
 
@@ -278,20 +277,32 @@ describe("preview DOM commit scheduler", () => {
 	it("rate-limits scrolling DOM commits independently of refresh rate", async () => {
 		const commitsAt60Hz = await countCommits({
 			intervalMs: 1000 / 60,
-			durationMs: 1000,
+			durationMs: 5_000,
 			scrolling: true,
 		});
 		const commitsAt120Hz = await countCommits({
 			intervalMs: 1000 / 120,
-			durationMs: 1000,
+			durationMs: 5_000,
 			scrolling: true,
 		});
 
 		expect(Math.abs(commitsAt60Hz - commitsAt120Hz)).toBeLessThanOrEqual(2);
-		expect(commitsAt60Hz).toBeGreaterThanOrEqual(10);
-		expect(commitsAt60Hz).toBeLessThanOrEqual(12);
-		expect(commitsAt120Hz).toBeGreaterThanOrEqual(10);
-		expect(commitsAt120Hz).toBeLessThanOrEqual(12);
+		expect(commitsAt60Hz).toBeGreaterThanOrEqual(397);
+		expect(commitsAt60Hz).toBeLessThanOrEqual(401);
+		expect(commitsAt120Hz).toBeGreaterThanOrEqual(397);
+		expect(commitsAt120Hz).toBeLessThanOrEqual(401);
+	});
+
+	it("honors the configured commits-per-second limit", async () => {
+		const committed = await countCommits({
+			intervalMs: 1000 / 60,
+			durationMs: 5_000,
+			scrolling: true,
+			commitsPerSecond: 39,
+		});
+
+		expect(committed).toBeGreaterThanOrEqual(192);
+		expect(committed).toBeLessThanOrEqual(196);
 	});
 
 	it("rate-limits idle commits independently of refresh rate", async () => {

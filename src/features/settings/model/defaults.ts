@@ -1,3 +1,4 @@
+import { DEFAULT_PREVIEW_DOM_COMMITS_PER_SECOND } from "appConstants";
 import {
 	DEFAULT_CARD_GAP_PX,
 	DEFAULT_CARD_HEIGHT_RATIO,
@@ -29,6 +30,7 @@ export const DEFAULT_SETTINGS: PluginSettings = {
 	previewMaxChars: 500,
 	previewVisualLineSafetyMargin: 0,
 	previewActivationAheadRows: 1,
+	previewDomCommitsPerSecond: DEFAULT_PREVIEW_DOM_COMMITS_PER_SECOND,
 	searchPreviewSeekThresholdChars: 0,
 	searchPreviewSeekBufferChars: 15,
 	showTwoHopForSelectedCanvasFileNode: true,

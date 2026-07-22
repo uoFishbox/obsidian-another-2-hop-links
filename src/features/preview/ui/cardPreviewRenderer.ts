@@ -33,6 +33,8 @@ export interface CardPreviewRendererOptions {
 	app: App;
 	getPreview: CardPreviewLoader;
 	frameCoordinator?: VirtualFrameCoordinator;
+	/** Resolves the scrolling DOM commit rate dynamically. */
+	getDomCommitsPerSecond?: () => number;
 	resolveSearchMatchPosition?: (
 		query: string,
 		file: TFile | null | undefined,
@@ -70,6 +72,7 @@ export function createCardPreviewRenderer(
 		const result = await enqueuePreviewDomCommit({
 			...task,
 			frameCoordinator: options.frameCoordinator,
+			getCommitsPerSecond: options.getDomCommitsPerSecond,
 		});
 		return result.type === "committed";
 	};

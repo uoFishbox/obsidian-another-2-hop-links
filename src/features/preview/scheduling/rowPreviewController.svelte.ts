@@ -49,6 +49,8 @@ export interface CreateRowPreviewControllerOptions {
 	) => () => void;
 	readonly schedulerIdentity?: object;
 	readonly frameCoordinator?: VirtualFrameCoordinator;
+	/** Resolves the scrolling activation rate dynamically. */
+	readonly getActivationsPerSecond?: () => number;
 }
 
 interface MutableCardPreviewSlotState {
@@ -76,6 +78,7 @@ export function createRowPreviewController(
 		subscribeBackpressure: options.subscribeBackpressure,
 		schedulerIdentity: options.schedulerIdentity,
 		frameCoordinator: options.frameCoordinator,
+		getActivationsPerSecond: options.getActivationsPerSecond,
 	});
 	let previewRange: RowRange = EMPTY_RANGE;
 	let disposed = false;

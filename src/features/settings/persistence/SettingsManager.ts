@@ -66,6 +66,10 @@ function mergeSettings(raw: RawSettings): PluginSettings {
 		settings.previewActivationAheadRows,
 		DEFAULT_SETTINGS.previewActivationAheadRows,
 	);
+	settings.previewDomCommitsPerSecond = normalizePositiveIntegerSetting(
+		settings.previewDomCommitsPerSecond,
+		DEFAULT_SETTINGS.previewDomCommitsPerSecond,
+	);
 
 	return settings as PluginSettings;
 }

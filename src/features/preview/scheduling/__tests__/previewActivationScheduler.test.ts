@@ -5,6 +5,7 @@ const state = vi.hoisted(() => ({
 }));
 
 vi.mock("../../../../appConstants", () => ({
+	DEFAULT_PREVIEW_ACTIVATIONS_PER_SECOND: 64,
 	get DEBUG_DISABLE_CARD_DOM_PREVIEW() {
 		return state.disableCardDomPreview;
 	},
@@ -63,15 +64,21 @@ async function flushAnimationFrame(): Promise<void> {
 async function countScrollingActivations(params: {
 	readonly intervalMs: number;
 	readonly durationMs: number;
+	readonly activationsPerSecond?: number;
 }): Promise<number> {
 	resetPreviewActivationSchedulerForTests();
 	resetScrollActivityForTests();
 	frameIntervalMs = params.intervalMs;
-	const scope = createPreviewActivationScope();
+	const activationsPerSecond = params.activationsPerSecond;
+	const scope = createPreviewActivationScope({
+		getActivationsPerSecond: activationsPerSecond
+			? () => activationsPerSecond
+			: undefined,
+	});
 	let activated = 0;
 
 	markScrollActivityActive(scrollSource);
-	for (let index = 0; index < 200; index += 1) {
+	for (let index = 0; index < 1_000; index += 1) {
 		requestQueuedPreviewActivation(`preview-${index}`, scope, () => {
 			activated += 1;
 		});
@@ -147,19 +154,13 @@ describe("preview activation scheduler", () => {
 
 	it("activates previews sparsely while scrolling", async () => {
 		markScrollActivityActive(scrollSource);
-		for (let index = 0; index < 20; index += 1) {
+		for (let index = 0; index < 200; index += 1) {
 			requestActivation(`preview-${index}`);
 		}
 
 		await vi.advanceTimersByTimeAsync(1_000);
-		expect(results.length).toBeGreaterThanOrEqual(7);
-		expect(results.length).toBeLessThanOrEqual(9);
-		expect(
-			vi.mocked(requestAnimationFrame).mock.calls.length,
-		).toBeGreaterThanOrEqual(results.length);
-		expect(vi.mocked(requestAnimationFrame).mock.calls.length).toBeLessThanOrEqual(
-			results.length + 1,
-		);
+		expect(results.length).toBeGreaterThanOrEqual(62);
+		expect(results.length).toBeLessThanOrEqual(65);
 		let counters = getCCLDevMeasurementSnapshot().counters;
 		expect(counters["preview.activationScheduler.animationFrame"].count).toBe(
 			vi.mocked(requestAnimationFrame).mock.calls.length,
@@ -232,18 +233,29 @@ describe("preview activation scheduler", () => {
 	it("rate-limits scrolling activation independently of refresh rate", async () => {
 		const activationsAt60Hz = await countScrollingActivations({
 			intervalMs: 1000 / 60,
-			durationMs: 1000,
+			durationMs: 5_000,
 		});
 		const activationsAt120Hz = await countScrollingActivations({
 			intervalMs: 1000 / 120,
-			durationMs: 1000,
+			durationMs: 5_000,
 		});
 
-		expect(Math.abs(activationsAt60Hz - activationsAt120Hz)).toBeLessThanOrEqual(1);
-		expect(activationsAt60Hz).toBeGreaterThanOrEqual(7);
-		expect(activationsAt60Hz).toBeLessThanOrEqual(9);
-		expect(activationsAt120Hz).toBeGreaterThanOrEqual(7);
-		expect(activationsAt120Hz).toBeLessThanOrEqual(9);
+		expect(Math.abs(activationsAt60Hz - activationsAt120Hz)).toBeLessThanOrEqual(2);
+		expect(activationsAt60Hz).toBeGreaterThanOrEqual(317);
+		expect(activationsAt60Hz).toBeLessThanOrEqual(321);
+		expect(activationsAt120Hz).toBeGreaterThanOrEqual(317);
+		expect(activationsAt120Hz).toBeLessThanOrEqual(321);
+	});
+
+	it("honors the configured activations-per-second limit", async () => {
+		const activated = await countScrollingActivations({
+			intervalMs: 1000 / 60,
+			durationMs: 5_000,
+			activationsPerSecond: 32,
+		});
+
+		expect(activated).toBeGreaterThanOrEqual(157);
+		expect(activated).toBeLessThanOrEqual(161);
 	});
 
 	it("switches delayed scrolling work back to the idle burst policy", async () => {

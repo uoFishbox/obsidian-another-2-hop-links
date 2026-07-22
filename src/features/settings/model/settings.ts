@@ -59,6 +59,8 @@ export interface PluginSettings {
 	previewMaxChars: number;
 	previewVisualLineSafetyMargin: number;
 	previewActivationAheadRows: number;
+	/** Maximum preview DOM updates committed per second while scrolling. */
+	previewDomCommitsPerSecond: number;
 	searchPreviewSeekThresholdChars?: number;
 	searchPreviewSeekBufferChars?: number;
 	showTwoHopForSelectedCanvasFileNode: boolean;

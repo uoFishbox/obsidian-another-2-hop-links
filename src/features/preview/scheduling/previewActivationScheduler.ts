@@ -1,4 +1,7 @@
-import { DEBUG_DISABLE_CARD_DOM_PREVIEW } from "../../../appConstants";
+import {
+	DEBUG_DISABLE_CARD_DOM_PREVIEW,
+	DEFAULT_PREVIEW_ACTIVATIONS_PER_SECOND,
+} from "../../../appConstants";
 import { recordCCLDevMeasurement } from "infrastructure/debug/CCLDevMeasurements";
 import {
 	isScrollActivityActive,
@@ -18,7 +21,6 @@ import {
 	canConsumePreviewScheduleToken,
 	consumePreviewScheduleToken,
 	createEmptyPreviewScheduleTokenState,
-	readPreviewScheduleTokenDelayMs,
 	refillPreviewScheduleTokens,
 	type PreviewScheduleTokenState,
 } from "./previewScheduleTokenBucket";
@@ -29,6 +31,7 @@ const MAX_OUTSTANDING_PREVIEW_JOBS = 3;
 interface PreviewActivationPolicy {
 	readonly ratePerSecond: number;
 	readonly creditCapacity: number;
+	readonly initialCredits?: number;
 	readonly maxTasksPerDrain: number;
 	readonly maxDrainCpuMs: number;
 }
@@ -46,9 +49,10 @@ const BACKPRESSURED_POLICY: PreviewActivationPolicy = {
 	maxDrainCpuMs: 1,
 };
 const SCROLLING_POLICY: PreviewActivationPolicy = {
-	ratePerSecond: 64,
-	creditCapacity: 1,
-	maxTasksPerDrain: 1,
+	ratePerSecond: DEFAULT_PREVIEW_ACTIVATIONS_PER_SECOND,
+	creditCapacity: 4,
+	initialCredits: 1,
+	maxTasksPerDrain: 4,
 	maxDrainCpuMs: 0.5,
 };
 
@@ -88,6 +92,7 @@ interface PreviewActivationRuntime {
 	readonly subscribeBackpressure:
 		| ((listener: PreviewBackpressureListener) => () => void)
 		| undefined;
+	readonly getActivationsPerSecond: () => number;
 	readonly roundRobinCursorByPartition: Map<PreviewActivationPartition, number>;
 	tokenState: PreviewScheduleTokenState;
 	blockedForBackpressure: boolean;
@@ -106,6 +111,8 @@ export interface CreatePreviewActivationScopeOptions {
 	readonly subscribeBackpressure?: (
 		listener: PreviewBackpressureListener,
 	) => () => void;
+	/** Maximum preview activations admitted per second while scrolling. */
+	readonly getActivationsPerSecond?: () => number;
 	/** Stable identity of the PreviewService whose admission limit is shared. */
 	readonly schedulerIdentity?: object;
 	readonly frameCoordinator?: VirtualFrameCoordinator;
@@ -160,10 +167,19 @@ function getEmptyBackpressure(): PreviewBackpressure {
 	return { queued: 0, active: 0 };
 }
 
+function getDefaultActivationsPerSecond(): number {
+	return DEFAULT_PREVIEW_ACTIVATIONS_PER_SECOND;
+}
+
+function resolvePositiveRate(value: number, fallback: number): number {
+	return Number.isFinite(value) && value > 0 ? value : fallback;
+}
+
 function resolveRuntimeIdentity(options: CreatePreviewActivationScopeOptions): object {
 	if (options.schedulerIdentity) return options.schedulerIdentity;
 	if (options.getBackpressure) return options.getBackpressure;
 	if (options.subscribeBackpressure) return options.subscribeBackpressure;
+	if (options.getActivationsPerSecond) return options.getActivationsPerSecond;
 	return DEFAULT_RUNTIME_IDENTITY;
 }
 
@@ -179,6 +195,8 @@ function getOrCreateRuntime(
 		scopes: new Set(),
 		getBackpressure: options.getBackpressure ?? getEmptyBackpressure,
 		subscribeBackpressure: options.subscribeBackpressure,
+		getActivationsPerSecond:
+			options.getActivationsPerSecond ?? getDefaultActivationsPerSecond,
 		roundRobinCursorByPartition: new Map(),
 		tokenState: createEmptyPreviewScheduleTokenState(),
 		blockedForBackpressure: false,
@@ -435,7 +453,16 @@ function drainRuntimePartition(
 	if (scopes.length === 0) return null;
 
 	const pressure = runtime.getBackpressure();
-	const policy = resolveActivationPolicy(pressure, scrolling);
+	const basePolicy = resolveActivationPolicy(pressure, scrolling);
+	const policy = scrolling
+		? {
+				...basePolicy,
+				ratePerSecond: resolvePositiveRate(
+					runtime.getActivationsPerSecond(),
+					DEFAULT_PREVIEW_ACTIVATIONS_PER_SECOND,
+				),
+			}
+		: basePolicy;
 	runtime.tokenState = refillPreviewScheduleTokens(
 		runtime.tokenState,
 		frameTimestamp,
@@ -505,7 +532,7 @@ function drainRuntimePartition(
 
 	for (const scopeState of scopes) compactScopeQueue(scopeState);
 	if (!hasPendingRuntime(runtime) || runtime.blockedForBackpressure) return null;
-	return scrolling ? readPreviewScheduleTokenDelayMs(runtime.tokenState, policy) : 0;
+	return 0;
 }
 
 function drainPartition(

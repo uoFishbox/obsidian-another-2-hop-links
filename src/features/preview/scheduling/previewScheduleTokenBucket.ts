@@ -4,6 +4,7 @@ export const TOKEN_CREDIT_EPSILON = 1e-9;
 export interface PreviewScheduleTokenPolicy {
 	readonly ratePerSecond: number;
 	readonly creditCapacity: number;
+	readonly initialCredits?: number;
 }
 
 export interface PreviewScheduleTokenState {
@@ -25,7 +26,10 @@ export function refillPreviewScheduleTokens(
 ): PreviewScheduleTokenState {
 	if (state.lastRefillTimestamp === null) {
 		return {
-			availableCredits: policy.creditCapacity,
+			availableCredits: Math.min(
+				policy.creditCapacity,
+				Math.max(0, policy.initialCredits ?? policy.creditCapacity),
+			),
 			lastRefillTimestamp: timestamp,
 		};
 	}
@@ -57,15 +61,4 @@ export function consumePreviewScheduleToken(
 		availableCredits: Math.max(0, state.availableCredits - 1),
 		lastRefillTimestamp: state.lastRefillTimestamp,
 	};
-}
-
-export function readPreviewScheduleTokenDelayMs(
-	state: PreviewScheduleTokenState,
-	policy: PreviewScheduleTokenPolicy,
-): number {
-	if (canConsumePreviewScheduleToken(state)) return 0;
-	if (policy.ratePerSecond <= 0) return Number.POSITIVE_INFINITY;
-
-	const missingCredits = Math.max(0, 1 - state.availableCredits);
-	return Math.ceil((missingCredits * 1000) / policy.ratePerSecond);
 }

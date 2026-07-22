@@ -32,6 +32,12 @@ function createBaseLink(sourceFile: TFile): TwoHopIndexedLink {
 	};
 }
 
+function createPreviewServiceMock() {
+	return {
+		getSchedulingIdentity: vi.fn(() => ({})),
+	};
+}
+
 describe("createLinkContextFactory", () => {
 	it("onHop2Click: does not pass property key when search hit position is prioritized", () => {
 		const sourceFile = createMockTFile("notes/source.md");
@@ -54,7 +60,7 @@ describe("createLinkContextFactory", () => {
 			{} as any,
 			{} as any,
 			{} as any,
-			{} as any,
+			createPreviewServiceMock() as any,
 		);
 		const context = factory(sourceFile, {
 			highlightOnOpen: "always",
@@ -105,7 +111,7 @@ describe("createLinkContextFactory", () => {
 				},
 			} as any,
 			{} as any,
-			{} as any,
+			createPreviewServiceMock() as any,
 		);
 		const context = factory(originFile, {
 			highlightOnOpen: "always",
@@ -164,7 +170,7 @@ describe("createLinkContextFactory", () => {
 			{} as any,
 			{} as any,
 			{} as any,
-			{} as any,
+			createPreviewServiceMock() as any,
 		);
 		const context = factory(sourceFile, {
 			highlightOnOpen: "always",
@@ -214,7 +220,7 @@ describe("createLinkContextFactory", () => {
 			{} as any,
 			{} as any,
 			{} as any,
-			{} as any,
+			createPreviewServiceMock() as any,
 		);
 		const context = factory(sourceFile, {
 			highlightOnOpen: "always",
@@ -266,7 +272,7 @@ describe("createLinkContextFactory", () => {
 			{} as any,
 			{} as any,
 			{} as any,
-			{} as any,
+			createPreviewServiceMock() as any,
 		);
 		const context = factory(sourceFile, {} as any);
 

@@ -43,6 +43,8 @@ export type TranslationKey =
 	| "maximumPreviewCharsDesc"
 	| "previewVisualLineSafetyMargin"
 	| "previewVisualLineSafetyMarginDesc"
+	| "previewDomCommitsPerSecond"
+	| "previewDomCommitsPerSecondDesc"
 	| "searchPreviewSeekThreshold"
 	| "searchPreviewSeekThresholdDesc"
 	| "searchPreviewLeadingBuffer"
@@ -161,6 +163,9 @@ const translations: Record<Language, Record<TranslationKey, string>> = {
 		previewVisualLineSafetyMargin: "Preview extra lines",
 		previewVisualLineSafetyMarginDesc:
 			"Add this many estimated visual lines to the card preview. Set to 0 to disable.",
+		previewDomCommitsPerSecond: "Preview DOM commits per second",
+		previewDomCommitsPerSecondDesc:
+			"Set DOM commits per second while scrolling. Preview activation is automatically kept 20% lower.",
 		searchPreviewSeekThreshold: "Search preview seek threshold (chars)",
 		searchPreviewSeekThresholdDesc:
 			"When the first search hit is after this position, shift the preview start to bring the hit into view.",
@@ -295,6 +300,9 @@ const translations: Record<Language, Record<TranslationKey, string>> = {
 		previewVisualLineSafetyMargin: "プレビュー追加行数",
 		previewVisualLineSafetyMarginDesc:
 			"プレビューに追加する推定表示行数を設定します。0に設定すると無効になります。",
+		previewDomCommitsPerSecond: "1秒あたりのプレビューDOM更新数",
+		previewDomCommitsPerSecondDesc:
+			"スクロール中のDOM更新数を設定します。プレビュー有効化数は自動的に20%少なく設定されます。",
 		searchPreviewSeekThreshold: "検索プレビューシーク閾値（文字数）",
 		searchPreviewSeekThresholdDesc:
 			"最初の検索ヒットがこの位置より後にある場合、プレビューの開始位置をシフトしてヒットを表示範囲内に含めます。",

@@ -55,9 +55,14 @@ import {
 	type VirtualCardInteractionBinding,
 } from "ui/interactions/virtualCardInteractionController";
 import { useLinkContext } from "ui/context/linkContext";
+import {
+	DEFAULT_PREVIEW_DOM_COMMITS_PER_SECOND,
+	resolvePreviewActivationsPerSecond,
+} from "appConstants";
 
 interface FlatVirtualGridApplicationSettings extends CardLayoutSettings {
 	previewActivationAheadRows?: number;
+	previewDomCommitsPerSecond?: number;
 }
 
 interface FlatVirtualGridApplicationStore extends SectionPaginationApplicationStore {
@@ -144,6 +149,11 @@ export function useFlatVirtualGridList<T>(props: FlatVirtualGridListProps<T>) {
 		}),
 		subscribeBackpressure: linkContext?.subscribeVisiblePreviewQueue,
 		schedulerIdentity: linkContext?.previewSchedulingIdentity,
+		getActivationsPerSecond: () =>
+			resolvePreviewActivationsPerSecond(
+				applicationStore?.settings?.previewDomCommitsPerSecond ??
+					DEFAULT_PREVIEW_DOM_COMMITS_PER_SECOND,
+			),
 	});
 	const interactionController = createVirtualCardInteractionController();
 	const visibilityAdapter = createFlatGridVisibilityAdapter<T>({});

@@ -1,4 +1,5 @@
 import { recordCCLDevMeasurement } from "infrastructure/debug/CCLDevMeasurements";
+import { DEFAULT_PREVIEW_DOM_COMMITS_PER_SECOND } from "appConstants";
 import {
 	isScrollActivityActive,
 	subscribeScrollActivity,
@@ -13,7 +14,6 @@ import {
 	canConsumePreviewScheduleToken,
 	consumePreviewScheduleToken,
 	createEmptyPreviewScheduleTokenState,
-	readPreviewScheduleTokenDelayMs,
 	refillPreviewScheduleTokens,
 	type PreviewScheduleTokenState,
 } from "./previewScheduleTokenBucket";
@@ -23,6 +23,7 @@ const MAX_QUEUE_ENTRIES_PER_DRAIN = 256;
 interface PreviewDomCommitPolicy {
 	readonly ratePerSecond: number;
 	readonly creditCapacity: number;
+	readonly initialCredits?: number;
 	readonly maxTasksPerDrain: number;
 	readonly maxDrainCpuMs: number;
 }
@@ -34,9 +35,10 @@ const IDLE_POLICY: PreviewDomCommitPolicy = {
 	maxDrainCpuMs: 2,
 };
 const SCROLLING_POLICY: PreviewDomCommitPolicy = {
-	ratePerSecond: 78,
-	creditCapacity: 1,
-	maxTasksPerDrain: 1,
+	ratePerSecond: DEFAULT_PREVIEW_DOM_COMMITS_PER_SECOND,
+	creditCapacity: 4,
+	initialCredits: 1,
+	maxTasksPerDrain: 4,
 	maxDrainCpuMs: 0.75,
 };
 
@@ -45,6 +47,8 @@ export interface PreviewDomCommitTask {
 	readonly isStale: () => boolean;
 	readonly commit: () => boolean;
 	readonly frameCoordinator?: VirtualFrameCoordinator;
+	/** Resolves the maximum DOM commits per second while scrolling. */
+	readonly getCommitsPerSecond?: () => number;
 }
 
 export type PreviewDomCommitResult =
@@ -65,6 +69,7 @@ interface PreviewDomCommitPartition {
 	readonly coordinator: VirtualFrameCoordinator | undefined;
 	readonly driver: PreviewFrameDriver;
 	readonly pendingByTargetKey: Map<string, QueuedPreviewDomCommitTask>;
+	readonly getCommitsPerSecond: () => number;
 	pendingQueue: QueuedPreviewDomCommitTask[];
 	pendingQueueHead: number;
 	tokenState: PreviewScheduleTokenState;
@@ -76,8 +81,17 @@ const partitionsByIdentity = new Map<object, PreviewDomCommitPartition>();
 let nextPartitionId = 0;
 let unsubscribeScrollActivity: (() => void) | undefined;
 
+function getDefaultCommitsPerSecond(): number {
+	return DEFAULT_PREVIEW_DOM_COMMITS_PER_SECOND;
+}
+
+function resolvePositiveRate(value: number, fallback: number): number {
+	return Number.isFinite(value) && value > 0 ? value : fallback;
+}
+
 function getOrCreatePartition(
 	coordinator: VirtualFrameCoordinator | undefined,
+	getCommitsPerSecond: (() => number) | undefined,
 ): PreviewDomCommitPartition {
 	const identity = coordinator ?? FALLBACK_PARTITION_IDENTITY;
 	const existing = partitionsByIdentity.get(identity);
@@ -98,6 +112,7 @@ function getOrCreatePartition(
 		coordinator,
 		driver,
 		pendingByTargetKey: new Map(),
+		getCommitsPerSecond: getCommitsPerSecond ?? getDefaultCommitsPerSecond,
 		pendingQueue: [],
 		pendingQueueHead: 0,
 		tokenState: createEmptyPreviewScheduleTokenState(),
@@ -212,7 +227,15 @@ function drainPartition(
 	frameTimestamp: number,
 ): void {
 	const scrolling = isScrollActivityActive();
-	const policy = scrolling ? SCROLLING_POLICY : IDLE_POLICY;
+	const policy = scrolling
+		? {
+				...SCROLLING_POLICY,
+				ratePerSecond: resolvePositiveRate(
+					partition.getCommitsPerSecond(),
+					DEFAULT_PREVIEW_DOM_COMMITS_PER_SECOND,
+				),
+			}
+		: IDLE_POLICY;
 
 	partition.tokenState = refillPreviewScheduleTokens(
 		partition.tokenState,
@@ -273,13 +296,7 @@ function drainPartition(
 
 	compactQueue(partition);
 	if (partition.pendingByTargetKey.size > 0) {
-		schedulePartition(
-			partition,
-			scrolling
-				? readPreviewScheduleTokenDelayMs(partition.tokenState, policy)
-				: 0,
-			scrolling,
-		);
+		schedulePartition(partition, 0, scrolling);
 	}
 }
 
@@ -296,7 +313,10 @@ export function enqueuePreviewDomCommit(
 			compactQueue(existingTask.partition);
 		}
 
-		const partition = getOrCreatePartition(task.frameCoordinator);
+		const partition = getOrCreatePartition(
+			task.frameCoordinator,
+			task.getCommitsPerSecond,
+		);
 		const queuedTask: QueuedPreviewDomCommitTask = {
 			...task,
 			partition,

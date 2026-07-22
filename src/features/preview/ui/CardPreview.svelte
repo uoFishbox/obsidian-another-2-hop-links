@@ -67,6 +67,8 @@
 		getPreview: (targetFile, signal, options) =>
 			getPreview(targetFile, signal, options),
 		frameCoordinator: getVirtualFrameCoordinatorContext(),
+		getDomCommitsPerSecond: () =>
+			applicationStore.settings.previewDomCommitsPerSecond,
 		resolveSearchMatchPosition,
 		onMathRenderingChange: (isRendering) => {
 			isMathRendering = isRendering;

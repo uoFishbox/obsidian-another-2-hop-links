@@ -48,6 +48,10 @@ import type { RowRange } from "ui/virtualization/rowRange";
 import type { VirtualNavigationTarget } from "ui/virtualization/types";
 import type { ResultNavigationDirection } from "features/keyboard-navigation/resultFocus";
 import type { VirtualFrameCoordinator } from "ui/virtualization/scheduling/frameCoordinator";
+import {
+	DEFAULT_PREVIEW_DOM_COMMITS_PER_SECOND,
+	resolvePreviewActivationsPerSecond,
+} from "appConstants";
 
 export interface TwoHopVirtualListProps {
 	readonly sections: readonly TwoHopVirtualSectionDescriptor[];
@@ -92,6 +96,11 @@ export function useTwoHopVirtualList(
 		subscribeBackpressure: linkContext?.subscribeVisiblePreviewQueue,
 		schedulerIdentity: linkContext?.previewSchedulingIdentity,
 		frameCoordinator,
+		getActivationsPerSecond: () =>
+			resolvePreviewActivationsPerSecond(
+				applicationStore?.settings.previewDomCommitsPerSecond ??
+					DEFAULT_PREVIEW_DOM_COMMITS_PER_SECOND,
+			),
 	});
 	const interactionController = createVirtualCardInteractionController();
 	const visibilityStates =
