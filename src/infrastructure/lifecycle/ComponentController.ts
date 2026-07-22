@@ -21,6 +21,7 @@ import type { ResolveTwoHopLinks } from "features/two-hop/application/TwoHopLink
 import { mountTwoHopLinksRootView } from "features/two-hop/ui/mountTwoHopLinksRootView";
 import type { TwoHopLinksRootUiState } from "features/two-hop/ui/twoHopLinksRootUiState";
 import type { SvelteComponentInstance } from "ui/shared/views/svelteLifecycle";
+import { createInlineSurfaceLayoutController } from "ui/shared/dom/inlineSurfaceLayoutController";
 import { ApplicationStorePool } from "./ApplicationStorePool";
 
 export { RECENT_APPLICATION_STORE_LIMIT } from "./ApplicationStorePool";
@@ -251,6 +252,10 @@ export class ComponentController implements IComponentManager {
 	): MountedComponent {
 		let applicationStore: ApplicationStore | undefined;
 		let shouldReleaseStoreOnError = false;
+		const layoutController = createInlineSurfaceLayoutController({
+			container,
+			surface,
+		});
 
 		try {
 			const settings = this.getSettings();
@@ -299,6 +304,7 @@ export class ComponentController implements IComponentManager {
 				isCleanedUp = true;
 
 				this.unmountComponent(component);
+				layoutController.dispose();
 
 				this.applicationStorePool.release(leafId, file.path);
 			};
@@ -317,6 +323,7 @@ export class ComponentController implements IComponentManager {
 				lifecycleManager,
 			};
 		} catch (error) {
+			layoutController.dispose();
 			if (shouldReleaseStoreOnError) {
 				this.applicationStorePool.dispose(leafId, file.path);
 			}

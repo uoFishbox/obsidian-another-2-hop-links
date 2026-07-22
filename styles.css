@@ -51,13 +51,10 @@
 
 /* Layout Components */
 .cm-scroller.ccl-inline-card-host {
-	display: flex;
-	flex-wrap: wrap;
-	height: auto !important;
+	position: relative;
 }
 
 .cm-scroller.ccl-inline-card-host > .cm-sizer {
-	flex: 0 0 auto;
 	min-height: 0% !important;
 }
 
@@ -68,17 +65,27 @@
 /* Main Container */
 .cosense-card-links__container {
 	position: relative;
-	width: 100%; /* .cm-scrollerでflex-wrapしているため、100%にして強制的に.cm-sizerの下に配置されるようにする */
+	width: 100%;
 	margin: var(--ccl-container-margin-top) auto 0 auto;
 	padding: var(--ccl-container-padding);
 	border: none;
-	flex: 0 0 auto;
 	justify-content: left;
 	user-select: none;
 	box-sizing: border-box;
 }
 
+.cm-scroller.ccl-inline-card-host > .cosense-card-links__container {
+	position: absolute;
+	inset-inline: 0;
+	top: var(--ccl-inline-surface-top, 0px);
+	width: auto;
+	max-width: none;
+	margin: var(--ccl-container-margin-top) 0 0;
+	contain: layout paint style;
+}
+
 .cosense-card-links__root {
+	width: 100%;
 	margin: 0 auto;
 	max-width: calc(
 		(var(--ccl-box-size) + var(--ccl-box-gap)) * var(--ccl-box-cols-max)
