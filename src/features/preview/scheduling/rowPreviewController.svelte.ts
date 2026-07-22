@@ -68,6 +68,8 @@ export function createRowPreviewController(
 ): RowPreviewController {
 	const slotsById = new Map<string, BoundSlot>();
 	const pendingByKey = new Map<string, PreviewActivationHandle>();
+	const retainedSlotsScratch = new Set<string>();
+	const activationKeysScratch = new Set<string>();
 	const scope: PreviewActivationScope = createPreviewActivationScope({
 		getBackpressure: options.getBackpressure,
 		subscribeBackpressure: options.subscribeBackpressure,
@@ -125,37 +127,39 @@ export function createRowPreviewController(
 	}
 
 	function syncCards(cards: readonly RowPreviewCardBinding[]): void {
-		const retainedSlots = new Set<string>();
+		retainedSlotsScratch.clear();
 		for (const card of cards) {
-			retainedSlots.add(card.slotId);
+			retainedSlotsScratch.add(card.slotId);
 			bindCard(card);
 		}
 
 		for (const [slotId, slot] of slotsById) {
-			if (retainedSlots.has(slotId)) continue;
+			if (retainedSlotsScratch.has(slotId)) continue;
 			slot.state.snapshot = undefined;
 			slotsById.delete(slotId);
 		}
+		retainedSlotsScratch.clear();
 	}
 
 	function reconcile(): void {
-		const keysNeedingActivation = new Set<string>();
+		activationKeysScratch.clear();
 		for (const slot of slotsById.values()) {
 			if (!isRowInPreviewRange(slot.binding.rowIndex)) {
 				slot.state.snapshot = undefined;
 				continue;
 			}
 			if (!slot.state.snapshot) {
-				keysNeedingActivation.add(slot.binding.snapshot.identity);
+				activationKeysScratch.add(slot.binding.snapshot.identity);
 			}
 		}
 
 		for (const [key, handle] of pendingByKey) {
-			if (keysNeedingActivation.has(key)) continue;
+			if (activationKeysScratch.has(key)) continue;
 			handle.cancel();
 			pendingByKey.delete(key);
 		}
-		for (const key of keysNeedingActivation) enqueueActivation(key);
+		for (const key of activationKeysScratch) enqueueActivation(key);
+		activationKeysScratch.clear();
 	}
 
 	function syncBindings(cards: readonly RowPreviewCardBinding[]): void {
@@ -191,6 +195,8 @@ export function createRowPreviewController(
 		pendingByKey.clear();
 		for (const slot of slotsById.values()) slot.state.snapshot = undefined;
 		slotsById.clear();
+		retainedSlotsScratch.clear();
+		activationKeysScratch.clear();
 		disposePreviewActivationScope(scope);
 	}
 
