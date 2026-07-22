@@ -18,7 +18,7 @@ import {
 	getRenderedPreviewCacheEntry,
 	getSharedPreviewAnalysis,
 	normalizePreviewQuery,
-	type RenderedPreviewCacheEntry,
+	type RenderedTextPreviewCacheEntry,
 	type PreviewSearchContext,
 } from "./cardPreviewSharedCache";
 import type { CardPreviewRenderRequest } from "./cardPreviewRenderRequest";
@@ -386,7 +386,7 @@ export function createCardPreviewRenderer(
 		bindingIdentity: string,
 		signal: AbortSignal,
 		renderToken: number,
-		renderedEntry: RenderedPreviewCacheEntry,
+		renderedEntry: RenderedTextPreviewCacheEntry,
 		shouldSyncMathStyles: boolean,
 	): Promise<boolean> {
 		return enqueueCoordinatedDomCommit({

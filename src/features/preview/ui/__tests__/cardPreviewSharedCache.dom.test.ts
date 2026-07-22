@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
+	cloneRenderedPreviewContent,
 	clearCardPreviewSharedCaches,
 	getOrCreateRenderedTextPreviewEntry,
 } from "../cardPreviewSharedCache";
@@ -86,7 +87,15 @@ describe("cardPreviewSharedCache render entries", () => {
 		renderFinished.resolve();
 
 		const entry = await second;
-		expect(entry.template.content.textContent).toBe("rendered:preview text");
+		expect(entry).toMatchObject({
+			kind: "text",
+			html: "<p>rendered:preview text</p>",
+			hasMath: false,
+		});
+		expect(entry.estimatedBytes).toBeGreaterThan(entry.html.length);
+		expect(
+			Object.values(entry).some((value: unknown) => value instanceof Node),
+		).toBe(false);
 		expect(state.processPreviewContent).toHaveBeenCalledTimes(2);
 	});
 
@@ -135,7 +144,27 @@ describe("cardPreviewSharedCache render entries", () => {
 			enableMathRendering: false,
 		});
 
-		expect(second.template.content.textContent).toBe("rendered:preview text");
+		expect(cloneRenderedPreviewContent(second).textContent).toBe(
+			"rendered:preview text",
+		);
 		expect(state.processPreviewContent).toHaveBeenCalledTimes(2);
+	});
+
+	it("creates independent document fragments only when an entry is displayed", async () => {
+		const entry = await getOrCreateRenderedTextPreviewEntry({
+			cacheKey: "render-cache:static-html",
+			content: "preview text",
+			app: {} as never,
+			sourcePath: "notes/static-html.md",
+			enableMathRendering: false,
+		});
+
+		const first = cloneRenderedPreviewContent(entry);
+		const second = cloneRenderedPreviewContent(entry);
+
+		expect(first).not.toBe(second);
+		expect(first.firstChild).not.toBe(second.firstChild);
+		expect(first.textContent).toBe("rendered:preview text");
+		expect(second.textContent).toBe("rendered:preview text");
 	});
 });

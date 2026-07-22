@@ -32,10 +32,11 @@ import { DEBUG_DISABLE_RENDERED_PREVIEW_CACHE } from "../../../appConstants";
 import type { PluginSettings } from "features/settings/model";
 import { createSizedLRUCache, stringBytes } from "shared/cache/sizedLRUCache";
 
-export type RenderedPreviewCacheEntry = {
+export type RenderedTextPreviewCacheEntry = {
 	kind: "text";
+	html: string;
 	hasMath: boolean;
-	template: HTMLTemplateElement;
+	estimatedBytes: number;
 };
 
 export type PreviewSearchContext = {
@@ -64,12 +65,12 @@ export {
 	normalizePreviewQuery,
 };
 
-const renderedPreviewCache = createSizedLRUCache<string, RenderedPreviewCacheEntry>(
+const renderedPreviewCache = createSizedLRUCache<string, RenderedTextPreviewCacheEntry>(
 	RENDERED_PREVIEW_CACHE_MAX_BYTES,
 );
 const renderedPreviewInFlight = new Map<
 	string,
-	SharedInFlightRequest<RenderedPreviewCacheEntry>
+	SharedInFlightRequest<RenderedTextPreviewCacheEntry>
 >();
 const searchContextPreviewCache = createSizedLRUCache<string, string>(
 	SEARCH_CONTEXT_CACHE_MAX_BYTES,
@@ -81,8 +82,8 @@ const previewAnalysisCache = createSizedLRUCache<string, PreviewContentAnalysis>
 const EMPTY_PREVIEW_PROTECTED_SEGMENTS: PreviewContentAnalysis["protectedSegments"] =
 	[];
 
-function estimateRenderedPreviewSizeFromContent(content: string): number {
-	return 1024 + stringBytes(content) * 4;
+function estimateRenderedTextPreviewSize(html: string): number {
+	return 128 + stringBytes(html);
 }
 
 function estimatePreviewAnalysisSize(analysis: PreviewContentAnalysis): number {
@@ -226,7 +227,7 @@ function resolveFirstMatchIndex(
 
 export function getRenderedPreviewCacheEntry(
 	cacheKey: string,
-): RenderedPreviewCacheEntry | undefined {
+): RenderedTextPreviewCacheEntry | undefined {
 	if (DEBUG_DISABLE_RENDERED_PREVIEW_CACHE) {
 		return undefined;
 	}
@@ -235,9 +236,11 @@ export function getRenderedPreviewCacheEntry(
 }
 
 export function cloneRenderedPreviewContent(
-	entry: RenderedPreviewCacheEntry,
+	entry: RenderedTextPreviewCacheEntry,
 ): DocumentFragment {
-	return entry.template.content.cloneNode(true) as DocumentFragment;
+	const template = document.createElement("template");
+	template.innerHTML = entry.html;
+	return template.content;
 }
 
 export function canShareRenderedTextPreview(content: string): boolean {
@@ -357,7 +360,7 @@ export async function getOrCreateRenderedTextPreviewEntry(params: {
 	enableMathRendering: boolean;
 	analysis?: PreviewContentAnalysis;
 	signal?: AbortSignal;
-}): Promise<RenderedPreviewCacheEntry> {
+}): Promise<RenderedTextPreviewCacheEntry> {
 	const {
 		cacheKey,
 		content,
@@ -404,7 +407,7 @@ export async function getOrCreateRenderedTextPreviewEntry(params: {
 		renderedPreviewInFlight.delete(cacheKey);
 	}
 
-	const request: SharedInFlightRequest<RenderedPreviewCacheEntry> = {
+	const request: SharedInFlightRequest<RenderedTextPreviewCacheEntry> = {
 		cacheKey,
 		callerCount: 0,
 		controller: new AbortController(),
@@ -422,7 +425,7 @@ export async function getOrCreateRenderedTextPreviewEntry(params: {
 		renderedPreviewCache.set(
 			cacheKey,
 			renderedEntry,
-			estimateRenderedPreviewSizeFromContent(content),
+			renderedEntry.estimatedBytes + stringBytes(cacheKey),
 		);
 		return renderedEntry;
 	});
@@ -444,7 +447,7 @@ function renderTextPreviewEntry(params: {
 	enableMathRendering: boolean;
 	analysis?: PreviewContentAnalysis;
 	signal?: AbortSignal;
-}): Promise<RenderedPreviewCacheEntry> {
+}): Promise<RenderedTextPreviewCacheEntry> {
 	const { content, app, sourcePath, enableMathRendering, analysis, signal } = params;
 
 	return enqueuePreviewRender(async () => {
@@ -469,15 +472,13 @@ function renderTextPreviewEntry(params: {
 			);
 			throwIfAborted(signal, "Preview render aborted");
 
-			const template = document.createElement("template");
-			while (tempContainer.firstChild) {
-				template.content.appendChild(tempContainer.firstChild);
-			}
+			const html = tempContainer.innerHTML;
 
 			return {
 				kind: "text",
+				html,
 				hasMath: enableMathRendering && analysis?.hasMathExpression === true,
-				template,
+				estimatedBytes: estimateRenderedTextPreviewSize(html),
 			};
 		} finally {
 			renderComponent.unload();
