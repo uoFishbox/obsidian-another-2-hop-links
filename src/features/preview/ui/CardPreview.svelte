@@ -68,9 +68,22 @@
 			applicationStore.settings,
 		),
 	);
+	const isPreviewInactive = $derived(!previewRenderRequest);
 
 	$effect(() => {
-		if (!container || !previewRenderRequest) return;
+		if (!container) return;
+
+		if (!previewRenderRequest) {
+			if (container.firstChild) {
+				container.replaceChildren();
+			}
+
+			isMathRendering = false;
+			hasRenderedContent = false;
+			previewContentType = undefined;
+			return;
+		}
+
 		return renderPreview(container, previewRenderRequest);
 	});
 </script>
@@ -82,6 +95,6 @@
 	<div
 		class="cosense-card-links__box-preview {previewTypeClass}"
 		bind:this={container}
-		class:hidden={shouldShowInitialSkeleton}
+		class:hidden={shouldShowInitialSkeleton || isPreviewInactive}
 	></div>
 {/if}

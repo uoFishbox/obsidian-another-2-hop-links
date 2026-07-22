@@ -14,14 +14,17 @@
 			options?: PreviewRequestOptions,
 		) => Promise<PreviewData>;
 		searchQuery?: string;
+		previewRefreshToken?: number;
 	}
 
-	let { searchQuery = "" }: Props = $props();
+	let { file, searchQuery = "", previewRefreshToken = 0 }: Props = $props();
 	const mountId = ++mountSequence;
 </script>
 
 <div
 	data-testid="card-preview-probe"
 	data-mount-id={mountId}
+	data-file-path={file?.path ?? ""}
 	data-search-query={searchQuery}
+	data-preview-refresh-token={previewRefreshToken}
 ></div>

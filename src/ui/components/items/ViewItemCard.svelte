@@ -113,6 +113,17 @@
 		return providedInteractionId ?? interactionKey;
 	});
 	const previewSnapshot = $derived(previewState?.snapshot);
+	const activePreviewSnapshot = $derived.by(() => {
+		if (!targetFile || !previewSnapshot) return undefined;
+		if (previewSnapshot.file.path !== targetFile.path) return undefined;
+
+		const expectedIdentity = model?.previewActivationIdentity;
+		if (expectedIdentity && previewSnapshot.identity !== expectedIdentity) {
+			return undefined;
+		}
+
+		return previewSnapshot;
+	});
 	const componentReevaluationProbe = $derived.by(() => {
 		if (process.env.NODE_ENV === "production") return "";
 
@@ -144,6 +155,7 @@
 		void interactionKey;
 		void interactionId;
 		void previewSnapshot;
+		void activePreviewSnapshot;
 		return markCCLComponentReevaluation("ViewItemCard");
 	});
 </script>
@@ -167,13 +179,13 @@
 		{#snippet children()}
 			{#if !DEBUG_DISABLE_CARD_DOM_PREVIEW && renderItem.type === "newLink" && !targetFile}
 				<UnresolvedPreviewPlaceholder />
-			{:else if !DEBUG_DISABLE_CARD_DOM_PREVIEW && previewSnapshot}
+			{:else if !DEBUG_DISABLE_CARD_DOM_PREVIEW && targetFile}
 				<CardPreview
-					file={previewSnapshot.file}
+					file={activePreviewSnapshot?.file}
 					getPreview={context.getPreview}
-					searchQuery={previewSnapshot.searchQuery}
-					previewRefreshToken={previewSnapshot.previewRefreshToken}
-					previewOverride={previewSnapshot.previewOverride}
+					searchQuery={activePreviewSnapshot?.searchQuery}
+					previewRefreshToken={activePreviewSnapshot?.previewRefreshToken}
+					previewOverride={activePreviewSnapshot?.previewOverride}
 				/>
 			{/if}
 		{/snippet}

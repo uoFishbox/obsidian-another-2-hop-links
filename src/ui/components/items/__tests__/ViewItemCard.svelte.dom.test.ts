@@ -240,7 +240,10 @@ describe("ViewItemCard", () => {
 			},
 		});
 		await waitFor(() => {
-			expect(screen.getByTestId("card-preview-probe")).toBeTruthy();
+			expect(screen.getByTestId("card-preview-probe")).toHaveAttribute(
+				"data-file-path",
+				file.path,
+			);
 		});
 		expect(document.querySelector(".preview-mount-slot")).toBeNull();
 		expect(document.querySelector(".lazy-placeholder")).toBeNull();
@@ -278,7 +281,10 @@ describe("ViewItemCard", () => {
 		});
 		await Promise.resolve();
 
-		expect(screen.queryByTestId("card-preview-probe")).toBeNull();
+		expect(screen.getByTestId("card-preview-probe")).toHaveAttribute(
+			"data-file-path",
+			"",
+		);
 		expect(document.querySelector(".preview-mount-slot")).toBeNull();
 		expect(document.querySelector(".lazy-placeholder")).toBeNull();
 		expect(linkContext.getPreview).not.toHaveBeenCalled();
@@ -315,8 +321,14 @@ describe("ViewItemCard", () => {
 			},
 		});
 		await waitFor(() => {
-			expect(screen.getByTestId("card-preview-probe")).toBeTruthy();
+			expect(screen.getByTestId("card-preview-probe")).toHaveAttribute(
+				"data-file-path",
+				file.path,
+			);
 		});
+		const mountId = screen
+			.getByTestId("card-preview-probe")
+			.getAttribute("data-mount-id");
 
 		await rerender({
 			item,
@@ -328,8 +340,15 @@ describe("ViewItemCard", () => {
 			visibility: "mounted",
 		});
 		await waitFor(() => {
-			expect(screen.queryByTestId("card-preview-probe")).toBeNull();
+			expect(screen.getByTestId("card-preview-probe")).toHaveAttribute(
+				"data-file-path",
+				"",
+			);
 		});
+		expect(screen.getByTestId("card-preview-probe")).toHaveAttribute(
+			"data-mount-id",
+			mountId,
+		);
 
 		await rerender({
 			item,
@@ -341,7 +360,142 @@ describe("ViewItemCard", () => {
 			visibility: "visible",
 		});
 		await waitFor(() => {
-			expect(screen.getByTestId("card-preview-probe")).toBeTruthy();
+			expect(screen.getByTestId("card-preview-probe")).toHaveAttribute(
+				"data-file-path",
+				file.path,
+			);
 		});
+		expect(screen.getByTestId("card-preview-probe")).toHaveAttribute(
+			"data-mount-id",
+			mountId,
+		);
+	});
+
+	it("keeps the preview shell mounted when a physical slot is rebound", async () => {
+		const sourceFile = createMockTFile("notes/source.md");
+		const fileA = createMockTFile("notes/alpha.md");
+		const fileB = createMockTFile("notes/beta.md");
+		const itemA = { type: "file", data: fileA } as ViewItem;
+		const itemB = { type: "file", data: fileB } as ViewItem;
+		const linkContext = {
+			getPreview: vi.fn(),
+			resolveFile: vi.fn(),
+			buildWikiLink: vi.fn(),
+			fileToLinktext: vi.fn((targetFile: TFile) => targetFile.basename),
+			sourceFile,
+			getMetadata: vi.fn(() => null),
+			onOpenFile: vi.fn(),
+			onHop1Click: vi.fn(),
+			onHop2Click: vi.fn(),
+			onTagClick: vi.fn(),
+		};
+		const commonProps = {
+			settings: DEFAULT_SETTINGS,
+			searchQuery: "",
+			linkContext: linkContext as any,
+			applicationStore: { updateVersion: 0 } as any,
+			sourceFile,
+			visibility: "visible" as const,
+		};
+		const rendered = render(ViewItemCardHarness, {
+			props: { ...commonProps, item: itemA },
+		});
+
+		await waitFor(() => {
+			expect(screen.getByTestId("card-preview-probe")).toHaveAttribute(
+				"data-file-path",
+				fileA.path,
+			);
+		});
+		const mountId = screen
+			.getByTestId("card-preview-probe")
+			.getAttribute("data-mount-id");
+
+		await rendered.rerender({ ...commonProps, item: itemB });
+
+		await waitFor(() => {
+			expect(screen.getByTestId("card-preview-probe")).toHaveAttribute(
+				"data-file-path",
+				fileB.path,
+			);
+		});
+		expect(screen.getByTestId("card-preview-probe")).toHaveAttribute(
+			"data-mount-id",
+			mountId,
+		);
+		expect(screen.getByTestId("card-preview-probe")).not.toHaveAttribute(
+			"data-file-path",
+			fileA.path,
+		);
+	});
+
+	it("does not activate a snapshot whose identity differs from the model", async () => {
+		const sourceFile = createMockTFile("notes/source.md");
+		const targetFile = createMockTFile("notes/identity.md");
+		const item = { type: "file", data: targetFile } as ViewItem;
+		const linkContext = {
+			getPreview: vi.fn(),
+			resolveFile: vi.fn(),
+			buildWikiLink: vi.fn(),
+			fileToLinktext: vi.fn(() => "identity"),
+			sourceFile,
+			getMetadata: vi.fn(() => null),
+			onOpenFile: vi.fn(),
+			onHop1Click: vi.fn(),
+			onHop2Click: vi.fn(),
+			onTagClick: vi.fn(),
+		};
+		const model: CardRenderModel = {
+			item,
+			targetFile,
+			title: "Identity",
+			ariaLabel: "Identity",
+			className: null,
+			extension: "md",
+			directory: "notes",
+			interactionId: "identity-id",
+			interactionKey: "identity-key",
+			interactionDescriptor: null,
+			presentation: undefined,
+			searchQuery: "",
+			searchScope: "title-and-content",
+			contentPreview: undefined,
+			previewRefreshToken: 0,
+			previewActivationIdentity: "current-identity",
+			previewOverride: null,
+			previewSnapshot: {
+				identity: "stale-identity",
+				file: targetFile,
+				searchQuery: "stale query",
+				previewRefreshToken: 4,
+				previewOverride: null,
+			},
+		};
+
+		render(ViewItemCardHarness, {
+			props: {
+				item,
+				model,
+				linkContext: linkContext as never,
+				applicationStore: { updateVersion: 0 } as never,
+				sourceFile,
+				visibility: "visible",
+			},
+		});
+
+		await waitFor(() => {
+			expect(screen.getByTestId("card-preview-probe")).toHaveAttribute(
+				"data-file-path",
+				"",
+			);
+		});
+		expect(screen.getByTestId("card-preview-probe")).toHaveAttribute(
+			"data-search-query",
+			"",
+		);
+		expect(screen.getByTestId("card-preview-probe")).toHaveAttribute(
+			"data-preview-refresh-token",
+			"0",
+		);
 	});
 });
