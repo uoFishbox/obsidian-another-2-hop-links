@@ -136,6 +136,7 @@ describe("preview activation scheduler", () => {
 	it("defers a pending activation when scroll measurement ran in its frame", async () => {
 		const activation = requestActivation("preview-after-measurement");
 		markVirtualScrollMeasurementRun();
+		expect(requestAnimationFrame).toHaveBeenCalledTimes(1);
 
 		await flushAnimationFrame();
 		expect(activation.onActivated).not.toHaveBeenCalled();

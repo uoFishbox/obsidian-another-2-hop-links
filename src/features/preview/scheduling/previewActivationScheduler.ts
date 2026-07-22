@@ -4,7 +4,10 @@ import {
 	isScrollActivityActive,
 	subscribeScrollActivity,
 } from "ui/virtualization/scheduling/scrollActivity";
-import { shouldDeferPreviewActivationForVirtualScrollMeasurement } from "ui/virtualization/scheduling/virtualScrollMeasurementFrame";
+import {
+	readVirtualScrollMeasurementEpoch,
+	shouldDeferPreviewActivationForVirtualScrollMeasurement,
+} from "ui/virtualization/scheduling/virtualScrollMeasurementFrame";
 import type { VirtualFrameCoordinator } from "ui/virtualization/scheduling/frameCoordinator";
 import {
 	createPreviewFrameDriver,
@@ -43,7 +46,7 @@ const BACKPRESSURED_POLICY: PreviewActivationPolicy = {
 	maxDrainCpuMs: 1,
 };
 const SCROLLING_POLICY: PreviewActivationPolicy = {
-	ratePerSecond: 24,
+	ratePerSecond: 64,
 	creditCapacity: 1,
 	maxTasksPerDrain: 1,
 	maxDrainCpuMs: 0.5,
@@ -95,6 +98,7 @@ interface PreviewActivationPartition {
 	readonly coordinator: VirtualFrameCoordinator | undefined;
 	readonly driver: PreviewFrameDriver;
 	readonly scopes: Set<PreviewActivationScopeState>;
+	lastObservedMeasurementEpoch: number;
 }
 
 export interface CreatePreviewActivationScopeOptions {
@@ -203,7 +207,12 @@ function getOrCreatePartition(
 		},
 		onFrame: (timestamp) => drainPartition(partition, timestamp),
 	});
-	partition = { coordinator, driver, scopes: new Set() };
+	partition = {
+		coordinator,
+		driver,
+		scopes: new Set(),
+		lastObservedMeasurementEpoch: readVirtualScrollMeasurementEpoch(),
+	};
 	partitionsByIdentity.set(identity, partition);
 	return partition;
 }
@@ -418,6 +427,7 @@ function drainRuntimePartition(
 	partition: PreviewActivationPartition,
 	frameTimestamp: number,
 	scrolling: boolean,
+	shouldDeferUndeferredRequests: boolean,
 ): number | null {
 	const scopes = Array.from(partition.scopes).filter(
 		(scopeState) => scopeState.runtime === runtime && hasPendingScope(scopeState),
@@ -439,8 +449,6 @@ function drainRuntimePartition(
 	}
 	runtime.blockedForBackpressure = false;
 
-	const shouldDeferUndeferredRequests =
-		shouldDeferPreviewActivationForVirtualScrollMeasurement();
 	const queueEntriesAvailableAtDrainStart = scopes.reduce(
 		(total, scopeState) =>
 			total +
@@ -505,6 +513,12 @@ function drainPartition(
 	frameTimestamp: number,
 ): void {
 	const scrolling = isScrollActivityActive();
+	const measurementEpoch = readVirtualScrollMeasurementEpoch();
+	const shouldDeferUndeferredRequests =
+		shouldDeferPreviewActivationForVirtualScrollMeasurement(
+			partition.lastObservedMeasurementEpoch,
+		);
+	partition.lastObservedMeasurementEpoch = measurementEpoch;
 	const runtimes = new Set<PreviewActivationRuntime>();
 	for (const scopeState of partition.scopes) {
 		if (hasPendingScope(scopeState)) runtimes.add(scopeState.runtime);
@@ -517,6 +531,7 @@ function drainPartition(
 			partition,
 			frameTimestamp,
 			scrolling,
+			shouldDeferUndeferredRequests,
 		);
 		if (delayMs !== null) nextDelayMs = Math.min(nextDelayMs, delayMs);
 	}

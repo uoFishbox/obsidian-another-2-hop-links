@@ -34,7 +34,7 @@ const IDLE_POLICY: PreviewDomCommitPolicy = {
 	maxDrainCpuMs: 2,
 };
 const SCROLLING_POLICY: PreviewDomCommitPolicy = {
-	ratePerSecond: 32,
+	ratePerSecond: 78,
 	creditCapacity: 1,
 	maxTasksPerDrain: 1,
 	maxDrainCpuMs: 0.75,

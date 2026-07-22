@@ -1,65 +1,46 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
 	markVirtualScrollMeasurementRun,
+	readVirtualScrollMeasurementEpoch,
 	resetVirtualScrollMeasurementFrameForTests,
 	shouldDeferPreviewActivationForVirtualScrollMeasurement,
 } from "../virtualScrollMeasurementFrame";
-import {
-	getCCLDevMeasurementSnapshot,
-	resetCCLDevMeasurements,
-} from "infrastructure/debug/CCLDevMeasurements";
 
 describe("virtual scroll measurement frame", () => {
-	let frameCallbacks: FrameRequestCallback[];
-
 	beforeEach(() => {
-		resetCCLDevMeasurements();
-		frameCallbacks = [];
-		vi.stubGlobal(
-			"requestAnimationFrame",
-			vi.fn((callback: FrameRequestCallback) => {
-				frameCallbacks.push(callback);
-				return frameCallbacks.length;
-			}),
-		);
-		vi.stubGlobal("cancelAnimationFrame", vi.fn());
+		resetVirtualScrollMeasurementFrameForTests();
 	});
 
 	afterEach(() => {
 		resetVirtualScrollMeasurementFrameForTests();
-		resetCCLDevMeasurements();
 		vi.unstubAllGlobals();
 	});
 
-	it("keeps preview work deferred until the frame after measurement runs", () => {
+	it("reports measurement work after the previously observed epoch", () => {
+		const previouslyObservedEpoch = readVirtualScrollMeasurementEpoch();
+
 		markVirtualScrollMeasurementRun();
 
-		expect(shouldDeferPreviewActivationForVirtualScrollMeasurement()).toBe(true);
-		expect(frameCallbacks).toHaveLength(1);
 		expect(
-			getCCLDevMeasurementSnapshot().counters[
-				"virtualScroll.measurementMarker.animationFrame"
-			].count,
-		).toBe(1);
-
-		frameCallbacks.shift()?.(16);
-
-		expect(shouldDeferPreviewActivationForVirtualScrollMeasurement()).toBe(false);
+			shouldDeferPreviewActivationForVirtualScrollMeasurement(
+				previouslyObservedEpoch,
+			),
+		).toBe(true);
+		expect(
+			shouldDeferPreviewActivationForVirtualScrollMeasurement(
+				readVirtualScrollMeasurementEpoch(),
+			),
+		).toBe(false);
 	});
 
-	it("coalesces multiple measurements from the same frame", () => {
+	it("does not schedule marker cleanup work", () => {
+		const requestAnimationFrame = vi.fn();
+		vi.stubGlobal("requestAnimationFrame", requestAnimationFrame);
+
 		markVirtualScrollMeasurementRun();
 		markVirtualScrollMeasurementRun();
 
-		expect(frameCallbacks).toHaveLength(1);
-		expect(
-			getCCLDevMeasurementSnapshot().counters[
-				"virtualScroll.measurementMarker.animationFrame"
-			].count,
-		).toBe(1);
-
-		frameCallbacks.shift()?.(16);
-
-		expect(shouldDeferPreviewActivationForVirtualScrollMeasurement()).toBe(false);
+		expect(readVirtualScrollMeasurementEpoch()).toBe(2);
+		expect(requestAnimationFrame).not.toHaveBeenCalled();
 	});
 });
