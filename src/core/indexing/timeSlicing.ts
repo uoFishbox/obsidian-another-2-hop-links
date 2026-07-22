@@ -26,7 +26,8 @@ function hasWindow(): boolean {
 	return typeof window !== "undefined";
 }
 
-function hasPendingInput(): boolean {
+/** Returns whether the browser reports queued discrete or continuous input. */
+export function hasPendingBrowserInput(): boolean {
 	if (typeof navigator === "undefined") {
 		return false;
 	}
@@ -131,7 +132,7 @@ export function createYieldScheduler(
 			}
 
 			const now = performance.now();
-			const inputPending = hasPendingInput();
+			const inputPending = hasPendingBrowserInput();
 			if (inputPending) {
 				responsiveUntil = now + RESPONSIVE_MODE_DURATION_MS;
 			}
