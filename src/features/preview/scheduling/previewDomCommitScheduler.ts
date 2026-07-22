@@ -21,6 +21,7 @@ import {
 const MAX_QUEUE_ENTRIES_PER_DRAIN = 256;
 
 interface PreviewDomCommitPolicy {
+	readonly mode: "idle" | "scrolling";
 	readonly ratePerSecond: number;
 	readonly creditCapacity: number;
 	readonly initialCredits?: number;
@@ -29,12 +30,14 @@ interface PreviewDomCommitPolicy {
 }
 
 const IDLE_POLICY: PreviewDomCommitPolicy = {
+	mode: "idle",
 	ratePerSecond: 240,
 	creditCapacity: 4,
 	maxTasksPerDrain: 4,
 	maxDrainCpuMs: 2,
 };
 const SCROLLING_POLICY: PreviewDomCommitPolicy = {
+	mode: "scrolling",
 	ratePerSecond: DEFAULT_PREVIEW_DOM_COMMITS_PER_SECOND,
 	creditCapacity: 4,
 	initialCredits: 1,

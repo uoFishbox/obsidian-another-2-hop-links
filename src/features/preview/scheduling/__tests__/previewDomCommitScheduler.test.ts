@@ -274,6 +274,31 @@ describe("preview DOM commit scheduler", () => {
 		]);
 	});
 
+	it("clamps idle credit when scrolling starts", async () => {
+		frameIntervalMs = 1_000;
+		const committed: string[] = [];
+
+		void enqueueTestCommit({
+			targetKey: "idle",
+			onCommit: () => {
+				committed.push("idle");
+				for (const key of ["a", "b", "c", "d"]) {
+					void enqueueTestCommit({
+						targetKey: key,
+						onCommit: () => committed.push(key),
+					});
+				}
+			},
+		});
+
+		await flushAnimationFrame();
+		expect(committed).toEqual(["idle"]);
+
+		markScrollActivityActive(scrollSource);
+		await flushAnimationFrame();
+		expect(committed).toEqual(["idle", "a"]);
+	});
+
 	it("rate-limits scrolling DOM commits independently of refresh rate", async () => {
 		const commitsAt60Hz = await countCommits({
 			intervalMs: 1000 / 60,

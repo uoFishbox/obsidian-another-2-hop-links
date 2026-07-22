@@ -275,6 +275,22 @@ describe("preview activation scheduler", () => {
 		expect(results).toEqual(["preview-a", "preview-b", "preview-c"]);
 	});
 
+	it("clamps idle credit when scrolling starts", async () => {
+		frameIntervalMs = 1_000;
+		requestActivation("preview-idle");
+
+		await flushAnimationFrame();
+		expect(results).toEqual(["preview-idle"]);
+
+		markScrollActivityActive(scrollSource);
+		for (const key of ["preview-a", "preview-b", "preview-c", "preview-d"]) {
+			requestActivation(key);
+		}
+
+		await flushAnimationFrame();
+		expect(results).toEqual(["preview-idle", "preview-a"]);
+	});
+
 	it("limits idle activations to a small time-based burst", async () => {
 		requestActivation("preview-a");
 		requestActivation("preview-b");

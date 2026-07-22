@@ -29,6 +29,7 @@ const MAX_QUEUE_ENTRIES_PER_DRAIN = 256;
 const MAX_OUTSTANDING_PREVIEW_JOBS = 3;
 
 interface PreviewActivationPolicy {
+	readonly mode: "idle" | "backpressured" | "scrolling";
 	readonly ratePerSecond: number;
 	readonly creditCapacity: number;
 	readonly initialCredits?: number;
@@ -37,18 +38,21 @@ interface PreviewActivationPolicy {
 }
 
 const IDLE_POLICY: PreviewActivationPolicy = {
+	mode: "idle",
 	ratePerSecond: 120,
 	creditCapacity: 2,
 	maxTasksPerDrain: 2,
 	maxDrainCpuMs: 2,
 };
 const BACKPRESSURED_POLICY: PreviewActivationPolicy = {
+	mode: "backpressured",
 	ratePerSecond: 30,
 	creditCapacity: 2,
 	maxTasksPerDrain: 1,
 	maxDrainCpuMs: 1,
 };
 const SCROLLING_POLICY: PreviewActivationPolicy = {
+	mode: "scrolling",
 	ratePerSecond: DEFAULT_PREVIEW_ACTIVATIONS_PER_SECOND,
 	creditCapacity: 4,
 	initialCredits: 1,
