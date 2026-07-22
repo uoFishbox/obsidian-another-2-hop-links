@@ -159,14 +159,14 @@ export function useTwoHopVirtualList(
 		return resolver(cell.cell.item, presentation);
 	};
 
-	const syncCardBindings = (build: TwoHopMountedRowsBuild | null): void => {
+	const refreshCardBindings = (build: TwoHopMountedRowsBuild | null): boolean => {
 		const resolver = props.resolveItemCardModel;
 		if (
 			hasSyncedCardBindings &&
 			syncedCardBindingsBuild === build &&
 			syncedCardBindingsResolver === resolver
 		) {
-			return;
+			return false;
 		}
 
 		previewCardBindings.length = 0;
@@ -192,11 +192,16 @@ export function useTwoHopVirtualList(
 				}
 			}
 		}
-		previewController.syncBindings(previewCardBindings);
 		interactionController.syncCards(interactionCardBindings);
 		hasSyncedCardBindings = true;
 		syncedCardBindingsBuild = build;
 		syncedCardBindingsResolver = resolver;
+		return true;
+	};
+
+	const syncCardBindings = (build: TwoHopMountedRowsBuild | null): void => {
+		if (!refreshCardBindings(build)) return;
+		previewController.syncBindings(previewCardBindings);
 	};
 
 	const syncPreviewAndVisibility = (params: {
@@ -225,8 +230,19 @@ export function useTwoHopVirtualList(
 		readonly previewRange: RowRange;
 		readonly build: TwoHopMountedRowsBuild | null;
 	}): void => {
-		syncCardBindings(params.build);
-		syncPreviewAndVisibility(params);
+		refreshCardBindings(params.build);
+		const active = props.previewActive !== false;
+		previewController.commit({
+			cards: previewCardBindings,
+			previewRange: params.previewRange,
+			active,
+		});
+		visibilityStates.commit({
+			rowModelRevision: params.rowModel,
+			mountedRows: params.build?.rowSlices ?? EMPTY_MOUNTED_ROWS,
+			mountedRange: params.mountedRange,
+			previewActiveRange: active ? params.previewRange : EMPTY_RANGE,
+		});
 	};
 
 	const virtualList = useVirtualList<
