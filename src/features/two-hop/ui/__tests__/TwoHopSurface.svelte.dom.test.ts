@@ -1,8 +1,9 @@
 import { cleanup, fireEvent, render, waitFor } from "@testing-library/svelte";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { DEFAULT_SETTINGS } from "features/settings/model";
 import type { ApplicationStore } from "ui/stores/ApplicationStore.svelte";
 import TwoHopSurface from "features/two-hop/ui/TwoHopSurface.svelte";
+import TwoHopSurfaceModelHarness from "./TwoHopSurfaceModelHarness.svelte";
 import {
 	flushFrames,
 	installAnimationFrameMock,
@@ -20,6 +21,8 @@ import type {
 	TwoHopVirtualListItem,
 	TwoHopVirtualSectionDescriptor,
 } from "features/two-hop/ui/twoHopVirtualListModel";
+import type { CardRenderModel } from "ui/components/items/cardRenderModel";
+import type { LinkContext } from "ui/context/linkContext";
 
 beforeEach(() => {
 	resetRecords();
@@ -128,6 +131,49 @@ async function scrollSurface(
 }
 
 describe("TwoHopSurface", () => {
+	it("shares each resolved card model with the rendered slot", () => {
+		const resolveItemCardModel = vi.fn(
+			(item: TwoHopVirtualListItem, presentation): CardRenderModel => ({
+				item: item.item,
+				targetFile: null,
+				title: item.virtualKey,
+				ariaLabel: item.virtualKey,
+				className: null,
+				extension: null,
+				directory: null,
+				interactionId: item.interactionId ?? item.virtualKey,
+				interactionKey: item.interactionId ?? item.virtualKey,
+				interactionDescriptor: null,
+				presentation,
+				searchQuery: "",
+				searchScope: "title-and-content",
+				contentPreview: undefined,
+				previewRefreshToken: 0,
+				previewActivationIdentity: undefined,
+				previewOverride: null,
+				previewSnapshot: null,
+			}),
+		);
+		const linkContext = {
+			getPreview: vi.fn(),
+		} as unknown as LinkContext;
+		const { container } = render(TwoHopSurfaceModelHarness, {
+			props: {
+				sections: [createSection(6)],
+				applicationStore,
+				linkContext,
+				resolveItemCardModel,
+			},
+		});
+		const root = container.querySelector<HTMLElement>(".twohop-keyed-surface");
+		const renderedCards = root?.shadowRoot?.querySelectorAll(
+			"[data-testid='twohop-item-cell']",
+		).length;
+
+		expect(renderedCards).toBeGreaterThan(0);
+		expect(resolveItemCardModel).toHaveBeenCalledTimes(renderedCards ?? 0);
+	});
+
 	it.each([100, 1_000, 10_000])(
 		"mounts %i logical cards with a bounded fixed pool",
 		(cardCount) => {

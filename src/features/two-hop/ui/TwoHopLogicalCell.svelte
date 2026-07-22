@@ -10,18 +10,13 @@
 	import {
 		resolveTwoHopItemStaticState,
 		resolveTwoHopSectionVariant,
-		type TwoHopCardPresentationState,
 	} from "features/two-hop/ui/twoHopCellStaticState";
-	import type { TwoHopVirtualListItem } from "features/two-hop/ui/twoHopVirtualListModel";
 	import type { CardPreviewSlotState } from "features/preview/ui/cardPreviewSnapshot";
 
 	interface Props {
 		mountedCell: TwoHopMountedCell;
 		applicationStore?: ApplicationStore;
-		resolveItemCardModel?: (
-			item: TwoHopVirtualListItem,
-			presentation: TwoHopCardPresentationState,
-		) => CardRenderModel;
+		cardModel?: CardRenderModel;
 		onLoadMore: (sectionId: string) => void;
 		previewState?: CardPreviewSlotState;
 	}
@@ -29,29 +24,19 @@
 	let {
 		mountedCell,
 		applicationStore,
-		resolveItemCardModel,
+		cardModel = undefined,
 		onLoadMore,
 		previewState = undefined,
 	}: Props = $props();
 
 	const itemPresentation = $derived.by(() => {
 		if (mountedCell.cell.kind !== "item") return null;
+		if (cardModel?.presentation) return cardModel.presentation;
 		return resolveTwoHopItemStaticState(
 			mountedCell.cell.item,
 			mountedCell.section.header.section,
 		).presentation;
 	});
-	const cardModel = $derived.by(() => {
-		if (
-			mountedCell.cell.kind !== "item" ||
-			!itemPresentation ||
-			!resolveItemCardModel
-		) {
-			return undefined;
-		}
-		return resolveItemCardModel(mountedCell.cell.item, itemPresentation);
-	});
-
 	const resolveHeaderIcon = (): IconName => {
 		switch (mountedCell.section.header.section.kind) {
 			case "new-links-section":

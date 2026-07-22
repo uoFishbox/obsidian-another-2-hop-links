@@ -61,11 +61,12 @@
 	interactionDescriptorResolverProvider={list.interactionDescriptorResolverProvider}
 >
 	{#snippet renderCell({ mountedCell })}
+		{@const slotState = list.getRenderSlotState(mountedCell)}
 		<TwoHopLogicalCell
 			{mountedCell}
 			applicationStore={props.applicationStore}
-			resolveItemCardModel={props.resolveItemCardModel}
-			previewState={list.getPreviewState(mountedCell)}
+			cardModel={slotState?.cardModel}
+			previewState={slotState?.previewState}
 			onLoadMore={list.loadMore}
 		/>
 	{/snippet}
