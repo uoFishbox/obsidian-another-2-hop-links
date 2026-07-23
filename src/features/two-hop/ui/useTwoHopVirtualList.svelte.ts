@@ -1,4 +1,4 @@
-import { getContext, onDestroy } from "svelte";
+import { getContext, onDestroy, untrack } from "svelte";
 import type { ApplicationStore } from "ui/stores/ApplicationStore.svelte";
 import type {
 	TwoHopVirtualListItem,
@@ -296,8 +296,10 @@ export function useTwoHopVirtualList(
 		if (slotState.previewState !== undefined) slotState.previewState = undefined;
 	};
 
-	const refreshCardBindings = (build: TwoHopMountedRowsBuild | null): boolean => {
-		const resolver = props.resolveItemCardModel;
+	const refreshCardBindings = (
+		build: TwoHopMountedRowsBuild | null,
+		resolver: TwoHopVirtualListProps["resolveItemCardModel"],
+	): boolean => {
 		if (
 			hasSyncedCardBindings &&
 			syncedCardBindingsBuild === build &&
@@ -362,36 +364,32 @@ export function useTwoHopVirtualList(
 		}
 	};
 
-	const syncCardBindings = (build: TwoHopMountedRowsBuild | null): void => {
-		if (!refreshCardBindings(build)) return;
+	const syncCardBindings = (
+		build: TwoHopMountedRowsBuild | null,
+		resolver: TwoHopVirtualListProps["resolveItemCardModel"],
+	): void => {
+		if (!refreshCardBindings(build, resolver)) return;
 		previewController.syncBindingDelta(previewBindingDelta);
 		syncRenderSlotPreviewStates();
-	};
-
-	const syncPreviewWindow = (params: { readonly previewRange: RowRange }): void => {
-		const active = props.previewActive !== false;
-		previewController.setPreviewWindow({
-			previewRange: params.previewRange,
-			active,
-		});
 	};
 
 	const syncDisplaySnapshot = (params: {
 		readonly previewRange: RowRange;
 		readonly build: TwoHopMountedRowsBuild | null;
+		readonly resolver: TwoHopVirtualListProps["resolveItemCardModel"];
+		readonly active: boolean;
 	}): void => {
-		const bindingsChanged = refreshCardBindings(params.build);
-		const active = props.previewActive !== false;
+		const bindingsChanged = refreshCardBindings(params.build, params.resolver);
 		if (!bindingsChanged) {
 			previewController.setPreviewWindow({
 				previewRange: params.previewRange,
-				active,
+				active: params.active,
 			});
 			return;
 		}
 		previewController.commitBindingDelta(previewBindingDelta, {
 			previewRange: params.previewRange,
-			active,
+			active: params.active,
 		});
 		syncRenderSlotPreviewStates();
 	};
@@ -417,6 +415,10 @@ export function useTwoHopVirtualList(
 			measurementState.measurement.hasStableVisibleRange = true;
 		},
 		onSnapshotUpdated: (snapshot, reconciliationState) => {
+			const { resolver, active } = untrack(() => ({
+				resolver: props.resolveItemCardModel,
+				active: props.previewActive !== false,
+			}));
 			residentRowsAdapter.sync(
 				reconciliationState.mountedBuild?.rowsBySlot ?? EMPTY_MOUNTED_ROWS,
 				rowSlotAllocator.capacity,
@@ -424,6 +426,8 @@ export function useTwoHopVirtualList(
 			syncDisplaySnapshot({
 				previewRange: snapshot.ranges.previewVisible,
 				build: reconciliationState.mountedBuild,
+				resolver,
+				active,
 			});
 		},
 	});
@@ -456,8 +460,9 @@ export function useTwoHopVirtualList(
 			cancelPreviewVisibleRangeSync() {
 				const snapshot = virtualList.getSnapshot();
 				if (!snapshot) return;
-				syncPreviewWindow({
+				previewController.setPreviewWindow({
 					previewRange: EMPTY_RANGE,
+					active: untrack(() => props.previewActive !== false),
 				});
 			},
 		},
@@ -495,17 +500,18 @@ export function useTwoHopVirtualList(
 
 	$effect(() => {
 		const active = props.previewActive !== false;
-		const snapshot = virtualList.getSnapshot();
+		const snapshot = untrack(() => virtualList.getSnapshot());
 		if (!snapshot) return;
-		void active;
-		syncPreviewWindow({
+		previewController.setPreviewWindow({
 			previewRange: snapshot.ranges.previewVisible,
+			active,
 		});
 	});
 
 	$effect(() => {
-		void props.resolveItemCardModel;
-		syncCardBindings(virtualList.getReconciliationState().mountedBuild);
+		const resolver = props.resolveItemCardModel;
+		const build = untrack(() => virtualList.getReconciliationState().mountedBuild);
+		syncCardBindings(build, resolver);
 	});
 
 	onDestroy(() => {
