@@ -216,12 +216,7 @@ export function createCardPreviewRenderer(
 								container.replaceChildren(image);
 							}
 							lastAppliedRenderCacheKey = renderCacheKey;
-							commitPreviewState(
-								container,
-								bindingIdentity,
-								"image",
-								"resident",
-							);
+							commitPreviewState(bindingIdentity, "image", "resident");
 							return true;
 						},
 					});
@@ -337,12 +332,7 @@ export function createCardPreviewRenderer(
 				isStale: () => isRenderStale(signal, renderToken),
 				commit: () => {
 					handlePreviewError(container, error);
-					commitPreviewState(
-						container,
-						bindingIdentity,
-						undefined,
-						"resident",
-					);
+					commitPreviewState(bindingIdentity, undefined, "resident");
 					return true;
 				},
 			});
@@ -373,7 +363,7 @@ export function createCardPreviewRenderer(
 				if (renderedEntry.hasMath) {
 					syncMathJaxStylesForNode(container);
 				}
-				commitPreviewState(container, bindingIdentity, "text", "resident");
+				commitPreviewState(bindingIdentity, "text", "resident");
 				return true;
 			},
 		});
@@ -402,7 +392,7 @@ export function createCardPreviewRenderer(
 				if (shouldSyncMathStyles) {
 					syncMathJaxStylesForNode(container);
 				}
-				commitPreviewState(container, bindingIdentity, "text", "resident");
+				commitPreviewState(bindingIdentity, "text", "resident");
 				return true;
 			},
 		});
@@ -431,7 +421,7 @@ export function createCardPreviewRenderer(
 				if (shouldSyncMathStyles) {
 					syncMathJaxStylesForNode(container);
 				}
-				commitPreviewState(container, bindingIdentity, contentType, retention);
+				commitPreviewState(bindingIdentity, contentType, retention);
 				return true;
 			},
 		});
@@ -453,12 +443,10 @@ export function createCardPreviewRenderer(
 	}
 
 	function commitPreviewState(
-		container: HTMLElement,
 		identity: string,
 		contentType: PreviewData["type"] | undefined,
 		retention: CardPreviewRetention,
 	): void {
-		container.classList.remove("is-stale");
 		options.onCommitted(identity, contentType, retention);
 	}
 
