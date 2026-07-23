@@ -10,6 +10,7 @@ export type CCLDevMeasurementName =
 	| "virtualFrame.critical"
 	| "virtualFrame.postPaint"
 	| "virtualFrame.idle"
+	| "twoHop.sectionDescriptorIdentityCache.exactHit"
 	| "twoHop.sectionDescriptorIdentityCache.hit"
 	| "twoHop.sectionDescriptorIdentityCache.miss"
 	| "twoHop.sectionDescriptorIdentityCache.invalidate"
@@ -38,6 +39,7 @@ export const CCL_DEV_MEASUREMENT_NAMES: readonly CCLDevMeasurementName[] = [
 	"virtualFrame.critical",
 	"virtualFrame.postPaint",
 	"virtualFrame.idle",
+	"twoHop.sectionDescriptorIdentityCache.exactHit",
 	"twoHop.sectionDescriptorIdentityCache.hit",
 	"twoHop.sectionDescriptorIdentityCache.miss",
 	"twoHop.sectionDescriptorIdentityCache.invalidate",

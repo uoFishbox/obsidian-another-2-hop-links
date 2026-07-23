@@ -89,6 +89,63 @@ interface PrimarySectionFactoryParams {
 	readonly useMergedLinks: boolean;
 }
 
+interface ResolveInputSnapshot {
+	readonly displayData: DisplayData;
+	readonly searchQuery: string;
+	readonly useMergedLinks: boolean;
+	readonly showTags: boolean;
+	readonly sourcePath: string;
+	readonly resolveFile: ResolveTwoHopSectionDescriptorIdentityParams["resolveFile"];
+	readonly fileToLinktext: ResolveTwoHopSectionDescriptorIdentityParams["fileToLinktext"];
+	readonly currentSort: SortOption;
+	readonly sortContextVersion: number;
+	readonly currentSettings: PluginSettings;
+	readonly applicationStore: ApplicationStore;
+	readonly updateVersion: number;
+	readonly onTagClick: ResolveTwoHopSectionDescriptorIdentityParams["onTagClick"];
+}
+
+function createResolveInputSnapshot(
+	params: ResolveTwoHopSectionDescriptorIdentityParams,
+): ResolveInputSnapshot {
+	return {
+		displayData: params.displayData,
+		searchQuery: params.searchQuery,
+		useMergedLinks: params.useMergedLinks,
+		showTags: params.showTags,
+		sourcePath: params.sourceFile.path,
+		resolveFile: params.resolveFile,
+		fileToLinktext: params.fileToLinktext,
+		currentSort: params.currentSort,
+		sortContextVersion: params.applicationStore.getSortContextVersion?.() ?? 0,
+		currentSettings: params.currentSettings,
+		applicationStore: params.applicationStore,
+		updateVersion: params.applicationStore.updateVersion,
+		onTagClick: params.onTagClick,
+	};
+}
+
+function hasSameResolveInputs(
+	current: ResolveInputSnapshot,
+	next: ResolveInputSnapshot,
+): boolean {
+	return (
+		current.displayData === next.displayData &&
+		current.searchQuery === next.searchQuery &&
+		current.useMergedLinks === next.useMergedLinks &&
+		current.showTags === next.showTags &&
+		current.sourcePath === next.sourcePath &&
+		current.resolveFile === next.resolveFile &&
+		current.fileToLinktext === next.fileToLinktext &&
+		current.currentSort === next.currentSort &&
+		current.sortContextVersion === next.sortContextVersion &&
+		current.currentSettings === next.currentSettings &&
+		current.applicationStore === next.applicationStore &&
+		current.updateVersion === next.updateVersion &&
+		current.onTagClick === next.onTagClick
+	);
+}
+
 const isBranchItem = (item: MergedLinkItem): item is TwoHopLinkBranch =>
 	"hop1" in item && "hop2" in item;
 
@@ -348,10 +405,28 @@ export function createTwoHopSectionDescriptorIdentityCache(): TwoHopSectionDescr
 	const newLinksEntries = new Map<string, NewLinksEntry>();
 	let tokens = createTwoHopInteractionTokenAllocator();
 	let previousDescriptors: readonly TwoHopVirtualSectionDescriptor[] = [];
+	let previousInputs: ResolveInputSnapshot | undefined;
 	let initialized = false;
 
 	return {
 		resolve(params) {
+			const inputs = createResolveInputSnapshot(params);
+			if (
+				initialized &&
+				previousInputs &&
+				hasSameResolveInputs(previousInputs, inputs)
+			) {
+				if (process.env.NODE_ENV !== "production") {
+					recordCCLDevMeasurement(
+						"twoHop.sectionDescriptorIdentityCache.exactHit",
+					);
+					recordCCLDevMeasurement(
+						"twoHop.sectionDescriptorIdentityCache.hit",
+					);
+				}
+				return previousDescriptors;
+			}
+
 			const descriptors: TwoHopVirtualSectionDescriptor[] = [];
 			const activeBranchIds = new Set<string>();
 			const activeTagIds = new Set<string>();
@@ -410,12 +485,14 @@ export function createTwoHopSectionDescriptorIdentityCache(): TwoHopSectionDescr
 						"twoHop.sectionDescriptorIdentityCache.hit",
 					);
 				}
+				previousInputs = inputs;
 				return previousDescriptors;
 			}
 			if (process.env.NODE_ENV !== "production") {
 				recordCCLDevMeasurement("twoHop.sectionDescriptorIdentityCache.miss");
 			}
 			previousDescriptors = Object.freeze(descriptors);
+			previousInputs = inputs;
 			initialized = true;
 			return previousDescriptors;
 		},
@@ -427,6 +504,7 @@ export function createTwoHopSectionDescriptorIdentityCache(): TwoHopSectionDescr
 			newLinksEntries.clear();
 			tokens = createTwoHopInteractionTokenAllocator();
 			previousDescriptors = [];
+			previousInputs = undefined;
 			initialized = false;
 			if (process.env.NODE_ENV !== "production") {
 				recordCCLDevMeasurement(

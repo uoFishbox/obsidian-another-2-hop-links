@@ -104,6 +104,9 @@ describe("createTwoHopSectionDescriptorIdentityCache", () => {
 		let counters = getCCLDevMeasurementSnapshot().counters;
 		expect(counters["twoHop.sectionDescriptorIdentityCache.miss"].count).toBe(1);
 		expect(counters["twoHop.sectionDescriptorIdentityCache.hit"].count).toBe(1);
+		expect(counters["twoHop.sectionDescriptorIdentityCache.exactHit"].count).toBe(
+			1,
+		);
 
 		cache.invalidate();
 		expect(cache.resolve(params)).not.toBe(first);
@@ -111,6 +114,41 @@ describe("createTwoHopSectionDescriptorIdentityCache", () => {
 		expect(counters["twoHop.sectionDescriptorIdentityCache.invalidate"].count).toBe(
 			1,
 		);
+	});
+
+	it("skips section traversal when every resolve input is unchanged", () => {
+		const cache = createTwoHopSectionDescriptorIdentityCache();
+		const { baseParams } = createHarness();
+		const branch = createBranch("parent.md", [createLink("child.md")]);
+		const params = {
+			...baseParams,
+			displayData: createDisplayData([], [branch]),
+		};
+
+		const first = cache.resolve(params);
+		const second = cache.resolve(params);
+
+		expect(second).toBe(first);
+		expect(baseParams.resolveFile).toHaveBeenCalledTimes(1);
+	});
+
+	it("does not use the exact fast path after a sort context change", () => {
+		const cache = createTwoHopSectionDescriptorIdentityCache();
+		const { baseParams } = createHarness();
+		const branch = createBranch("parent.md", [createLink("child.md")]);
+		const params = {
+			...baseParams,
+			displayData: createDisplayData([], [branch]),
+		};
+		let sortContextVersion = 0;
+		baseParams.applicationStore.getSortContextVersion = () => sortContextVersion;
+
+		const first = cache.resolve(params);
+		sortContextVersion += 1;
+		const second = cache.resolve(params);
+
+		expect(second[0]).not.toBe(first[0]);
+		expect(baseParams.resolveFile).toHaveBeenCalledTimes(2);
 	});
 
 	it("replaces only changed sections and scopes pagination keys", () => {
