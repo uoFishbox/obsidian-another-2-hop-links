@@ -174,8 +174,9 @@ describe("observeVirtualListViewport", () => {
 		stopObserving();
 	});
 
-	it("reads the latest scrollTop once in the scroll frame without layout reads", async () => {
+	it("reads scrollTop in the native event and runs measurement in the next frame", async () => {
 		installAnimationFrameMock();
+		const requestAnimationFrame = vi.spyOn(window, "requestAnimationFrame");
 
 		const scrollContainer = document.createElement("div");
 		const rootEl = document.createElement("div");
@@ -234,16 +235,19 @@ describe("observeVirtualListViewport", () => {
 		clientHeightGetter.mockClear();
 		rootRectGetter.mockClear();
 		scrollerRectGetter.mockClear();
+		requestAnimationFrame.mockClear();
 
 		try {
 			scrollContainer.dispatchEvent(new Event("scroll"));
 			scrollTop = 180;
 			clientHeight = 300;
 
-			await flushFrames();
+			expect(requestAnimationFrame).toHaveBeenCalledTimes(1);
+			expect(runScrollMeasurement).not.toHaveBeenCalled();
 			await flushFrames();
 		} finally {
 			stopObserving();
+			requestAnimationFrame.mockRestore();
 			teardownAnimationFrameMock();
 		}
 
@@ -251,7 +255,7 @@ describe("observeVirtualListViewport", () => {
 		expect(runScrollMeasurement).toHaveBeenCalledTimes(1);
 		expect(runScrollMeasurement).toHaveBeenCalledWith(
 			expect.objectContaining({
-				scrollTop: 180,
+				scrollTop: 120,
 				viewportHeight: 240,
 				frameId: expect.any(Number),
 				isScrollActive: true,
@@ -261,7 +265,6 @@ describe("observeVirtualListViewport", () => {
 		expect(onScrollStateChange.mock.calls).toEqual([
 			[0, false, false],
 			[0, false, true],
-			[1, true, true],
 			[1, false, true],
 		]);
 		expect(scrollTopGetter).toHaveBeenCalledTimes(1);
@@ -272,6 +275,7 @@ describe("observeVirtualListViewport", () => {
 
 	it("does not schedule a scroll measurement inside the controller range", async () => {
 		installAnimationFrameMock();
+		const requestAnimationFrame = vi.spyOn(window, "requestAnimationFrame");
 
 		const scrollContainer = document.createElement("div");
 		const rootEl = document.createElement("div");
@@ -286,20 +290,23 @@ describe("observeVirtualListViewport", () => {
 		});
 
 		const runScrollMeasurement = vi.fn();
+		const getScrollMeasurementRange = vi.fn(() => ({
+			minScrollTopBeforeMeasurement: 100,
+			maxScrollTopBeforeMeasurement: 150,
+		}));
 		const stopObserving = observeVirtualListViewport({
 			rootEl,
 			onWidthChange: vi.fn(),
 			getCachedViewportHeight: () => 240,
-			getScrollMeasurementRange: () => ({
-				minScrollTopBeforeMeasurement: 100,
-				maxScrollTopBeforeMeasurement: 150,
-			}),
+			getScrollMeasurementRange,
 			onScrollContainerChange: vi.fn(),
 			scheduleLayoutMeasurement: vi.fn(),
 			scheduleScrollMeasurement: vi.fn(),
 			runScrollMeasurement,
 			runInitialLayoutMeasurement: vi.fn(),
 		});
+		requestAnimationFrame.mockClear();
+		getScrollMeasurementRange.mockClear();
 
 		try {
 			scrollContainer.dispatchEvent(new Event("scroll"));
@@ -308,18 +315,24 @@ describe("observeVirtualListViewport", () => {
 			await flushFrames();
 
 			expect(runScrollMeasurement).not.toHaveBeenCalled();
+			expect(requestAnimationFrame).not.toHaveBeenCalled();
+			expect(getScrollMeasurementRange).not.toHaveBeenCalled();
 
 			scrollTop = 150;
 			scrollContainer.dispatchEvent(new Event("scroll"));
-			await flushFrames();
+			scrollTop = 180;
+			scrollContainer.dispatchEvent(new Event("scroll"));
+			expect(requestAnimationFrame).toHaveBeenCalledTimes(1);
 			await flushFrames();
 
 			expect(runScrollMeasurement).toHaveBeenCalledTimes(1);
 			expect(runScrollMeasurement).toHaveBeenCalledWith(
-				expect.objectContaining({ scrollTop: 150 }),
+				expect.objectContaining({ scrollTop: 180 }),
 			);
+			expect(getScrollMeasurementRange).toHaveBeenCalledTimes(1);
 		} finally {
 			stopObserving();
+			requestAnimationFrame.mockRestore();
 			teardownAnimationFrameMock();
 		}
 	});

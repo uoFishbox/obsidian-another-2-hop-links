@@ -1,4 +1,4 @@
-import type { ScrollPhase } from "ui/virtualization/scheduling/scrollTargetListeners";
+export type ScrollPhase = "start" | "scroll" | "idle";
 
 export interface ScrollerViewportScrollPendingAfterScroll {
 	readonly reconnectObserver: boolean;
@@ -58,20 +58,7 @@ export function reduceScrollerViewportPhase(
 		}
 		case "scroll": {
 			return {
-				state: {
-					type: "scrolling",
-					pendingAfterScroll: {
-						reconnectObserver: true,
-						refreshDependencies:
-							state.type === "scrolling"
-								? state.pendingAfterScroll.refreshDependencies
-								: false,
-						measureLayout:
-							state.type === "scrolling"
-								? state.pendingAfterScroll.measureLayout
-								: false,
-					},
-				},
+				state: markScrollerViewportScrollObserved(state),
 				effect: { type: "scroll-frame", measureScroll: true },
 			};
 		}
@@ -98,6 +85,29 @@ export function reduceScrollerViewportPhase(
 			};
 		}
 	}
+}
+
+export function markScrollerViewportScrollObserved(
+	state: ScrollerViewportScrollPhaseState,
+): ScrollerViewportScrollPhaseState {
+	if (state.type === "scrolling" && state.pendingAfterScroll.reconnectObserver) {
+		return state;
+	}
+
+	return {
+		type: "scrolling",
+		pendingAfterScroll: {
+			reconnectObserver: true,
+			refreshDependencies:
+				state.type === "scrolling"
+					? state.pendingAfterScroll.refreshDependencies
+					: false,
+			measureLayout:
+				state.type === "scrolling"
+					? state.pendingAfterScroll.measureLayout
+					: false,
+		},
+	};
 }
 
 export function markScrollerViewportDependencyRefreshAfterScroll(

@@ -3,11 +3,6 @@ import {
 	markScrollActivityActive,
 	markScrollActivityIdle,
 } from "ui/virtualization/scheduling/scrollActivity";
-import {
-	subscribeScrollTarget,
-	type ScrollPhase,
-	type ScrollTargetMetrics,
-} from "ui/virtualization/scheduling/scrollTargetListeners";
 import { subscribeWindowResize } from "ui/virtualization/scheduling/windowResizeListeners";
 import { createScheduledVirtualListTask } from "./virtualListScheduler";
 import {
@@ -29,8 +24,10 @@ import {
 	INITIAL_SCROLLER_VIEWPORT_SCROLL_PHASE_STATE,
 	markScrollerViewportDependencyRefreshAfterScroll,
 	markScrollerViewportLayoutMeasurementAfterScroll,
+	markScrollerViewportScrollObserved,
 	reduceScrollerViewportPhase,
 	type ScrollerViewportScrollPhaseState,
+	type ScrollPhase,
 	type ScrollPhaseEffect,
 } from "./scrollerViewportScrollPhase";
 import { invalidateScrollGeometry } from "./virtualListScrollGeometryInvalidation";
@@ -66,6 +63,7 @@ export interface ObserveVirtualListViewportOptions {
 }
 
 const ROOT_RESIZE_EPSILON_PX = 0.5;
+const SCROLL_IDLE_MS = 140;
 
 interface VirtualListViewportSubscriber extends Omit<
 	ObserveVirtualListViewportOptions,
@@ -94,12 +92,17 @@ interface ScrollerViewportEntry {
 	positionDependencyElements: Set<HTMLElement>;
 	scrollActivitySource: object;
 	sharedScrollMetricsScratch: VirtualListSharedScrollMetrics;
+	coverageScrollTopMin: number;
+	coverageScrollTopMax: number;
 	pendingScrollTop: number | null;
 	scrollGeneration: number;
 	scrollTarget: Window | HTMLElement;
+	scrollEndTarget: Document | HTMLElement | null;
 	scrollPhaseState: ScrollerViewportScrollPhaseState;
 	structureObserverConnected: boolean;
-	unsubscribeScrollTarget: (() => void) | null;
+	idleTimer: number | null;
+	onNativeScroll: () => void;
+	onNativeScrollEnd: () => void;
 	unsubscribeWindowResize: (() => void) | null;
 	layoutMeasurementTask: ReturnType<typeof createScheduledVirtualListTask>;
 	scrollMeasurementTask: ReturnType<typeof createScheduledVirtualListTask>;
@@ -132,6 +135,16 @@ const getResizeObserverConstructor = (ownerWindow: Window): typeof ResizeObserve
 const getMutationObserverConstructor = (ownerWindow: Window): typeof MutationObserver =>
 	(ownerWindow as WindowObserverConstructors).MutationObserver ?? MutationObserver;
 
+const readScrollTop = (target: Window | HTMLElement): number =>
+	"document" in target ? target.scrollY || target.pageYOffset || 0 : target.scrollTop;
+
+const resolveScrollEndTarget = (
+	target: Window | HTMLElement,
+): Document | HTMLElement | null => {
+	const eventTarget = "document" in target ? target.document : target;
+	return "onscrollend" in eventTarget ? eventTarget : null;
+};
+
 const getActiveSubscriber = (
 	entry: ScrollerViewportEntry,
 ): VirtualListViewportSubscriber | null => {
@@ -150,6 +163,8 @@ const scheduleLayoutMeasurement = (entry: ScrollerViewportEntry): void => {
 	}
 
 	entry.hasPendingLayoutMeasurement = true;
+	entry.coverageScrollTopMin = Number.NaN;
+	entry.coverageScrollTopMax = Number.NaN;
 	entry.layoutMeasurementTask.schedule();
 };
 
@@ -174,6 +189,18 @@ const notifyScrollStateChange = (entry: ScrollerViewportEntry): void => {
 		entry.scrollPhaseState.type === "scrolling",
 	);
 };
+
+const refreshCachedScrollMeasurementRange = (entry: ScrollerViewportEntry): void => {
+	const range = getActiveSubscriber(entry)?.getScrollMeasurementRange?.();
+	entry.coverageScrollTopMin = range?.minScrollTopBeforeMeasurement ?? Number.NaN;
+	entry.coverageScrollTopMax = range?.maxScrollTopBeforeMeasurement ?? Number.NaN;
+};
+
+const isWithinCachedScrollMeasurementRange = (
+	entry: ScrollerViewportEntry,
+	scrollTop: number,
+): boolean =>
+	scrollTop > entry.coverageScrollTopMin && scrollTop < entry.coverageScrollTopMax;
 
 const readSharedScrollMetrics = (
 	entry: ScrollerViewportEntry,
@@ -539,54 +566,68 @@ const applyScrollPhaseEffect = (
 	}
 };
 
-const handleScrollPhase = (
-	entry: ScrollerViewportEntry,
-	phase: ScrollPhase,
-	metrics?: ScrollTargetMetrics,
-): void => {
-	if (phase === "scroll") {
-		entry.scrollGeneration =
-			metrics?.scrollGeneration ?? entry.scrollGeneration + 1;
-	}
-	entry.pendingScrollTop = phase === "scroll" ? (metrics?.scrollTop ?? null) : null;
-	const suppressScrollMeasurement =
-		phase === "scroll" &&
-		metrics !== undefined &&
-		isWithinScrollMeasurementRange(
-			metrics.scrollTop,
-			getActiveSubscriber(entry)?.getScrollMeasurementRange?.(),
-		);
-	if (
-		phase === "scroll" &&
-		entry.scrollPhaseState.type === "scrolling" &&
-		entry.scrollPhaseState.pendingAfterScroll.reconnectObserver
-	) {
-		if (suppressScrollMeasurement) {
-			notifyScrollStateChange(entry);
-			return;
-		}
-		scheduleScrollMeasurement(entry);
-		notifyScrollStateChange(entry);
-		return;
-	}
+const handleScrollPhase = (entry: ScrollerViewportEntry, phase: ScrollPhase): void => {
 	const transition = reduceScrollerViewportPhase(entry.scrollPhaseState, phase);
 	entry.scrollPhaseState = transition.state;
-	if (transition.effect.type === "scroll-frame" && suppressScrollMeasurement) {
-		notifyScrollStateChange(entry);
-		return;
-	}
 	applyScrollPhaseEffect(entry, transition.effect);
 	notifyScrollStateChange(entry);
 };
 
-const isWithinScrollMeasurementRange = (
-	scrollTop: number,
-	range: ScrollMeasurementRange | null | undefined,
-): boolean =>
-	range !== null &&
-	range !== undefined &&
-	scrollTop > range.minScrollTopBeforeMeasurement &&
-	scrollTop < range.maxScrollTopBeforeMeasurement;
+const finishNativeScroll = (entry: ScrollerViewportEntry): void => {
+	if (entry.scrollPhaseState.type === "idle") {
+		return;
+	}
+
+	const ownerWindow = getOptionalOwnerWindow(entry.registryKey);
+	if (ownerWindow && entry.idleTimer !== null) {
+		ownerWindow.clearTimeout(entry.idleTimer);
+	}
+	entry.idleTimer = null;
+	entry.pendingScrollTop = null;
+	handleScrollPhase(entry, "idle");
+};
+
+const restartScrollIdleDetection = (
+	entry: ScrollerViewportEntry,
+	ownerWindow: Window,
+): void => {
+	if (entry.scrollEndTarget !== null) {
+		return;
+	}
+	if (entry.idleTimer !== null) {
+		ownerWindow.clearTimeout(entry.idleTimer);
+	}
+	entry.idleTimer = ownerWindow.setTimeout(entry.onNativeScrollEnd, SCROLL_IDLE_MS);
+};
+
+const handleNativeScroll = (
+	entry: ScrollerViewportEntry,
+	ownerWindow: Window,
+): void => {
+	const scrollTop = readScrollTop(entry.scrollTarget);
+
+	if (entry.scrollPhaseState.type === "idle") {
+		handleScrollPhase(entry, "start");
+	}
+	entry.pendingScrollTop = scrollTop;
+	entry.scrollGeneration += 1;
+	restartScrollIdleDetection(entry, ownerWindow);
+
+	if (
+		entry.scrollPhaseState.type === "scrolling" &&
+		!entry.scrollPhaseState.pendingAfterScroll.reconnectObserver
+	) {
+		entry.scrollPhaseState = markScrollerViewportScrollObserved(
+			entry.scrollPhaseState,
+		);
+	}
+
+	if (isWithinCachedScrollMeasurementRange(entry, scrollTop)) {
+		return;
+	}
+
+	scheduleScrollMeasurement(entry);
+};
 
 const handleStructureMutations = (
 	entry: ScrollerViewportEntry,
@@ -648,12 +689,17 @@ const getScrollerViewportEntry = (
 			isScrollActive: false,
 			scrollGeneration: 0,
 		},
+		coverageScrollTopMin: Number.NaN,
+		coverageScrollTopMax: Number.NaN,
 		pendingScrollTop: null,
 		scrollGeneration: 0,
 		scrollTarget: scroller ?? ownerWindow,
+		scrollEndTarget: null,
 		scrollPhaseState: INITIAL_SCROLLER_VIEWPORT_SCROLL_PHASE_STATE,
 		structureObserverConnected: false,
-		unsubscribeScrollTarget: null,
+		idleTimer: null,
+		onNativeScroll: undefined as unknown as () => void,
+		onNativeScrollEnd: undefined as unknown as () => void,
 		unsubscribeWindowResize: null,
 		layoutMeasurementTask: undefined as unknown as ReturnType<
 			typeof createScheduledVirtualListTask
@@ -696,16 +742,24 @@ const getScrollerViewportEntry = (
 			}
 
 			entry.hasPendingScrollMeasurement = false;
-			getActiveSubscriber(entry)?.runScrollMeasurement(
-				readSharedScrollMetrics(entry),
-			);
+			const subscriber = getActiveSubscriber(entry);
+			if (!subscriber) {
+				return;
+			}
+			subscriber.runScrollMeasurement(readSharedScrollMetrics(entry));
+			refreshCachedScrollMeasurementRange(entry);
 		},
 		() => getOptionalOwnerWindow(entry.registryKey),
 	);
-	entry.unsubscribeScrollTarget = subscribeScrollTarget(
-		entry.scrollTarget,
-		(phase, metrics) => handleScrollPhase(entry, phase, metrics),
-	);
+	entry.scrollEndTarget = resolveScrollEndTarget(entry.scrollTarget);
+	entry.onNativeScroll = () => handleNativeScroll(entry, ownerWindow);
+	entry.onNativeScrollEnd = () => finishNativeScroll(entry);
+	entry.scrollTarget.addEventListener("scroll", entry.onNativeScroll, {
+		passive: true,
+	});
+	entry.scrollEndTarget?.addEventListener("scrollend", entry.onNativeScrollEnd, {
+		passive: true,
+	});
 	entry.unsubscribeWindowResize = subscribeWindowResize(() => {
 		scheduleLayoutMeasurementWhenIdle(entry);
 	}, ownerWindow);
@@ -736,6 +790,7 @@ const registerSubscriber = (
 	entry.subscriber = subscriber;
 	observeRootResizeTarget(subscriber);
 	observeDependencyTargets(entry);
+	refreshCachedScrollMeasurementRange(entry);
 	notifyScrollStateChange(entry);
 };
 
@@ -757,11 +812,16 @@ const unregisterSubscriber = (subscriber: VirtualListViewportSubscriber): void =
 	entry.refreshDependencyObserversTask.cancel();
 	entry.layoutMeasurementTask.cancel();
 	entry.scrollMeasurementTask.cancel();
+	if (entry.idleTimer !== null) {
+		const ownerWindow = getOptionalOwnerWindow(entry.registryKey);
+		ownerWindow?.clearTimeout(entry.idleTimer);
+		entry.idleTimer = null;
+	}
 	entry.hasPendingScrollMeasurement = false;
 	entry.hasPendingLayoutMeasurement = false;
 	entry.pendingScrollTop = null;
-	entry.unsubscribeScrollTarget?.();
-	entry.unsubscribeScrollTarget = null;
+	entry.scrollTarget.removeEventListener("scroll", entry.onNativeScroll);
+	entry.scrollEndTarget?.removeEventListener("scrollend", entry.onNativeScrollEnd);
 	entry.unsubscribeWindowResize?.();
 	entry.unsubscribeWindowResize = null;
 	scrollerViewportEntries.delete(entry.registryKey);
@@ -792,6 +852,7 @@ export const observeVirtualListViewport = (
 	options.onScrollContainerChange(scrollContainer);
 	registerSubscriber(entry, subscriber);
 	options.runInitialLayoutMeasurement();
+	refreshCachedScrollMeasurementRange(entry);
 
 	return () => {
 		if (subscriber.isDisposed) {
