@@ -336,6 +336,8 @@ export function createViewPlanMeasurementRuntime<
 		measurement: params.state.measurement,
 		hasRenderableContent: () => params.runtime.rowModel.rowCount > 0,
 		onMeasurement: applyMeasurement,
+		getScrollMeasurementRange:
+			scrollWindowMeasurementController.getScrollMeasurementRange,
 		enableBootstrapMeasurementSuppression: true,
 		enableInitialStabilization: true,
 		primeUnstableScrollStart: true,

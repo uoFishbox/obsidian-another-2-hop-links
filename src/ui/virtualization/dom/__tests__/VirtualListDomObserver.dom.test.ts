@@ -259,6 +259,59 @@ describe("observeVirtualListViewport", () => {
 		expect(scrollerRectGetter).not.toHaveBeenCalled();
 	});
 
+	it("does not schedule a scroll measurement inside the controller range", async () => {
+		installAnimationFrameMock();
+
+		const scrollContainer = document.createElement("div");
+		const rootEl = document.createElement("div");
+		scrollContainer.style.overflow = "auto";
+		document.body.append(scrollContainer);
+		scrollContainer.append(rootEl);
+
+		let scrollTop = 120;
+		Object.defineProperty(scrollContainer, "scrollTop", {
+			get: () => scrollTop,
+			configurable: true,
+		});
+
+		const runScrollMeasurement = vi.fn();
+		const stopObserving = observeVirtualListViewport({
+			rootEl,
+			onWidthChange: vi.fn(),
+			getCachedViewportHeight: () => 240,
+			getScrollMeasurementRange: () => ({
+				minScrollTopBeforeMeasurement: 100,
+				maxScrollTopBeforeMeasurement: 150,
+			}),
+			onScrollContainerChange: vi.fn(),
+			scheduleLayoutMeasurement: vi.fn(),
+			scheduleScrollMeasurement: vi.fn(),
+			runScrollMeasurement,
+			runInitialLayoutMeasurement: vi.fn(),
+		});
+
+		try {
+			scrollContainer.dispatchEvent(new Event("scroll"));
+			scrollTop = 140;
+			scrollContainer.dispatchEvent(new Event("scroll"));
+			await flushFrames();
+
+			expect(runScrollMeasurement).not.toHaveBeenCalled();
+
+			scrollTop = 150;
+			scrollContainer.dispatchEvent(new Event("scroll"));
+			await flushFrames();
+
+			expect(runScrollMeasurement).toHaveBeenCalledTimes(1);
+			expect(runScrollMeasurement).toHaveBeenCalledWith(
+				expect.objectContaining({ scrollTop: 150 }),
+			);
+		} finally {
+			stopObserving();
+			teardownAnimationFrameMock();
+		}
+	});
+
 	it("keeps structure mutation measurements isolated by scroller", async () => {
 		vi.useFakeTimers();
 

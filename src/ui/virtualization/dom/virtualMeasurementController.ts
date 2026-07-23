@@ -13,6 +13,7 @@ import { createVirtualListMeasurementScheduler } from "./virtualListMeasurementS
 import type { VirtualListMeasurementStateHandle } from "./virtualListMeasurementState";
 import { getOptionalOwnerWindow } from "ui/shared/dom/realmSafeDom";
 import type { VirtualFrameCoordinator } from "ui/virtualization/scheduling/frameCoordinator";
+import type { ScrollMeasurementRange } from "../core/scrollWindowGate";
 
 export type VirtualMeasurementSource = "layout" | "scroll";
 
@@ -65,6 +66,8 @@ export interface CreateVirtualMeasurementControllerOptions {
 	) => VirtualMeasurementApplicationResult | void;
 	onObservedWidthChange?: (width: number) => void;
 	onScrollContainerChange?: (element: HTMLElement | null) => void;
+	/** Returns the current open interval that does not require measurement. */
+	getScrollMeasurementRange?: () => ScrollMeasurementRange | null;
 	enableBootstrapMeasurementSuppression?: boolean;
 	enableInitialStabilization?: boolean;
 	initialStabilizationMaxPasses?: number;
@@ -97,6 +100,7 @@ export function createVirtualMeasurementController({
 	onMeasurement,
 	onObservedWidthChange,
 	onScrollContainerChange,
+	getScrollMeasurementRange,
 	enableBootstrapMeasurementSuppression = false,
 	enableInitialStabilization = false,
 	initialStabilizationMaxPasses,
@@ -299,6 +303,7 @@ export function createVirtualMeasurementController({
 				onObservedWidthChange?.(width);
 			},
 			getCachedViewportHeight: () => measurement.viewportHeight,
+			getScrollMeasurementRange,
 			onScrollContainerChange: (element) => {
 				measurement.scrollContainerEl = element;
 				measurement.invalidateViewport();

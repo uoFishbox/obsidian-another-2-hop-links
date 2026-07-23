@@ -39,6 +39,14 @@ export type StablePreviewScrollTopBand = {
 	readonly max: number;
 };
 
+/**
+ * Open scrollTop interval in which a scroll-window measurement can be skipped.
+ */
+export interface ScrollMeasurementRange {
+	readonly minScrollTopBeforeMeasurement: number;
+	readonly maxScrollTopBeforeMeasurement: number;
+}
+
 export type RangedScrollWindowMeasurement = {
 	identity: ScrollWindowIdentity;
 	ranges: VirtualRanges;

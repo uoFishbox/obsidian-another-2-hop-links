@@ -12,6 +12,7 @@ import {
 	type LastScrollWindow,
 	type MountedScrollWindowMeasurement,
 	type RangedScrollWindowMeasurement,
+	type ScrollMeasurementRange,
 	updateMountedAndPreviewScrollWindow,
 } from "../core/scrollWindowGate";
 import type { RowRange } from "../rowRange";
@@ -47,6 +48,13 @@ export function createVirtualScrollWindowMeasurementController<TContext>({
 	onStableMeasurement,
 }: CreateVirtualScrollWindowMeasurementControllerOptions<TContext>) {
 	let lastScrollWindow: LastScrollWindow | null = null;
+	let lastStableScrollTop: number | null = null;
+	const scrollMeasurementRange: {
+		-readonly [K in keyof ScrollMeasurementRange]: ScrollMeasurementRange[K];
+	} = {
+		minScrollTopBeforeMeasurement: 0,
+		maxScrollTopBeforeMeasurement: 0,
+	};
 
 	const toApplicationResult = (
 		result: MeasurementUpdateResult<RowRange>,
@@ -55,6 +63,43 @@ export function createVirtualScrollWindowMeasurementController<TContext>({
 
 	const resetLastScrollWindow = (): void => {
 		lastScrollWindow = null;
+		lastStableScrollTop = null;
+	};
+
+	const getScrollMeasurementRange = (): ScrollMeasurementRange | null => {
+		if (!lastScrollWindow || lastStableScrollTop === null) {
+			return null;
+		}
+
+		const isWithinMountedBand =
+			lastStableScrollTop > lastScrollWindow.stableMountedScrollTopMin &&
+			lastStableScrollTop < lastScrollWindow.stableMountedScrollTopMax;
+		const isWithinPreviewBand =
+			lastStableScrollTop > lastScrollWindow.stablePreviewScrollTopMin &&
+			lastStableScrollTop < lastScrollWindow.stablePreviewScrollTopMax;
+		if (!isWithinMountedBand && !isWithinPreviewBand) {
+			return null;
+		}
+
+		scrollMeasurementRange.minScrollTopBeforeMeasurement = isWithinMountedBand
+			? lastScrollWindow.stableMountedScrollTopMin
+			: lastScrollWindow.stablePreviewScrollTopMin;
+		scrollMeasurementRange.maxScrollTopBeforeMeasurement = isWithinMountedBand
+			? lastScrollWindow.stableMountedScrollTopMax
+			: lastScrollWindow.stablePreviewScrollTopMax;
+
+		if (isWithinPreviewBand) {
+			scrollMeasurementRange.minScrollTopBeforeMeasurement = Math.min(
+				scrollMeasurementRange.minScrollTopBeforeMeasurement,
+				lastScrollWindow.stablePreviewScrollTopMin,
+			);
+			scrollMeasurementRange.maxScrollTopBeforeMeasurement = Math.max(
+				scrollMeasurementRange.maxScrollTopBeforeMeasurement,
+				lastScrollWindow.stablePreviewScrollTopMax,
+			);
+		}
+
+		return scrollMeasurementRange;
 	};
 
 	const primeLastScrollWindow = (
@@ -75,12 +120,14 @@ export function createVirtualScrollWindowMeasurementController<TContext>({
 			mountedScrollWindowMeasurement.mounted,
 			mountedScrollWindowMeasurement.stableMountedScrollTopBand,
 		);
+		lastStableScrollTop = measurement.scrollTop;
 	};
 
 	const returnStableScrollMeasurement = (
 		measurement: VirtualMeasurement,
 		context: TContext,
 	): VirtualMeasurementApplicationResult => {
+		lastStableScrollTop = measurement.scrollTop;
 		onStableMeasurement(measurement, context);
 		return "stable";
 	};
@@ -95,6 +142,7 @@ export function createVirtualScrollWindowMeasurementController<TContext>({
 
 		if (!nextMeasurement.isStableMeasurement && !applyUnstableScrollMeasurement) {
 			lastScrollWindow = null;
+			lastStableScrollTop = null;
 			return "unstable";
 		}
 
@@ -208,6 +256,7 @@ export function createVirtualScrollWindowMeasurementController<TContext>({
 			precomputedRanges,
 		);
 		if (result.kind !== "stable") {
+			lastStableScrollTop = null;
 			if (lastScrollWindow === null && pendingMountedScrollWindowMeasurement) {
 				lastScrollWindow = createMountedScrollWindow(
 					pendingMountedScrollWindowMeasurement.identity,
@@ -234,12 +283,14 @@ export function createVirtualScrollWindowMeasurementController<TContext>({
 		if (!nextMeasurement.isScrollActive) {
 			primeLastScrollWindow(nextMeasurement, context);
 		}
+		lastStableScrollTop = nextMeasurement.scrollTop;
 		onStableMeasurement(nextMeasurement, context);
 		return "stable";
 	};
 
 	return {
 		applyScrollMeasurement,
+		getScrollMeasurementRange,
 		primeLastScrollWindow,
 		resetLastScrollWindow,
 	};

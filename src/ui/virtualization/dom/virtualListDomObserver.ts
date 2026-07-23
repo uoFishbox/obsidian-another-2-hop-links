@@ -35,6 +35,7 @@ import {
 } from "./scrollerViewportScrollPhase";
 import { invalidateScrollGeometry } from "./virtualListScrollGeometryInvalidation";
 import { getOptionalOwnerWindow, isHTMLElementLike } from "ui/shared/dom/realmSafeDom";
+import type { ScrollMeasurementRange } from "../core/scrollWindowGate";
 
 export type { VirtualListSharedScrollMetrics } from "./sharedScrollMetrics";
 
@@ -42,6 +43,8 @@ export interface ObserveVirtualListViewportOptions {
 	rootEl: HTMLElement;
 	onWidthChange: (width: number) => void;
 	getCachedViewportHeight?: () => number;
+	/** Returns the current open interval that does not require measurement. */
+	getScrollMeasurementRange?: () => ScrollMeasurementRange | null;
 	onScrollContainerChange: (element: HTMLElement | null) => void;
 	scheduleLayoutMeasurement: () => void;
 	scheduleScrollMeasurement: () => void;
@@ -524,18 +527,40 @@ const handleScrollPhase = (
 	metrics?: ScrollTargetMetrics,
 ): void => {
 	entry.pendingScrollTop = phase === "scroll" ? (metrics?.scrollTop ?? null) : null;
+	const suppressScrollMeasurement =
+		phase === "scroll" &&
+		metrics !== undefined &&
+		isWithinScrollMeasurementRange(
+			metrics.scrollTop,
+			getActiveSubscriber(entry)?.getScrollMeasurementRange?.(),
+		);
 	if (
 		phase === "scroll" &&
 		entry.scrollPhaseState.type === "scrolling" &&
 		entry.scrollPhaseState.pendingAfterScroll.reconnectObserver
 	) {
+		if (suppressScrollMeasurement) {
+			return;
+		}
 		scheduleScrollMeasurement(entry);
 		return;
 	}
 	const transition = reduceScrollerViewportPhase(entry.scrollPhaseState, phase);
 	entry.scrollPhaseState = transition.state;
+	if (transition.effect.type === "scroll-frame" && suppressScrollMeasurement) {
+		return;
+	}
 	applyScrollPhaseEffect(entry, transition.effect);
 };
+
+const isWithinScrollMeasurementRange = (
+	scrollTop: number,
+	range: ScrollMeasurementRange | null | undefined,
+): boolean =>
+	range !== null &&
+	range !== undefined &&
+	scrollTop > range.minScrollTopBeforeMeasurement &&
+	scrollTop < range.maxScrollTopBeforeMeasurement;
 
 const handleStructureMutations = (
 	entry: ScrollerViewportEntry,

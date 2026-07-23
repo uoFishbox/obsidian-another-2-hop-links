@@ -164,6 +164,8 @@ export function createFlatGridControllerAdapter<T>({
 		measurement,
 		hasRenderableContent: () => getItemCount() > 0,
 		onMeasurement: applyMeasurement,
+		getScrollMeasurementRange:
+			scrollWindowMeasurementController.getScrollMeasurementRange,
 		enableBootstrapMeasurementSuppression: true,
 		enableInitialStabilization: true,
 		primeUnstableScrollStart: true,
