@@ -1,4 +1,5 @@
 <script lang="ts" generics="TMountedCell extends MountedVirtualCell">
+	import { IS_PROD } from "appConstants";
 	import type { Snippet } from "svelte";
 	import type { MountedVirtualCell } from "../types";
 	import VirtualListCellMount from "./VirtualListCellMount.svelte";
@@ -72,7 +73,7 @@
 			width={position.width}
 			height={position.height}
 			className={resolveCellClassName(mountedCell)}
-			dataTestId={getCellDataTestId?.(mountedCell)}
+			dataTestId={!IS_PROD ? getCellDataTestId?.(mountedCell) : undefined}
 			renderSlotKey={mountedCell.renderSlotKey}
 			rowIndex={mountedCell.rowIndex}
 			columnIndex={mountedCell.columnIndex}

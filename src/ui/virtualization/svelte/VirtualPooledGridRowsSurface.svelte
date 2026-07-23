@@ -131,7 +131,9 @@
 					<VirtualGridLogicalCellMount
 						logicalKey={resolveMountedCellLogicalKey(mountedCell)}
 						className={resolveCellClassName(mountedCell)}
-						dataTestId={getCellDataTestId?.(mountedCell)}
+						dataTestId={!IS_PROD
+							? getCellDataTestId?.(mountedCell)
+							: undefined}
 						cellSlotKey={resolveCellSlotKey(row, mountedCell)}
 						rowIndex={resolveMountedCellRowIndex(mountedCell)}
 						columnIndex={resolveMountedCellColumnIndex(mountedCell)}
