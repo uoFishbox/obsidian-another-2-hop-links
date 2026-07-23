@@ -15,7 +15,10 @@
 		VirtualCellRegistrationOwner,
 		VirtualCellRegistry,
 	} from "./VirtualCellRegistry";
-	import type { VirtualSurfaceMountedRow } from "./VirtualSurfaceTypes";
+	import type {
+		VirtualSurfaceMountedRow,
+		VirtualSurfaceResidentRowViewState,
+	} from "./VirtualSurfaceTypes";
 
 	interface Props<
 		TMountedCell extends MountedVirtualCell,
@@ -29,7 +32,8 @@
 		rowHeight: number;
 		columns?: number;
 		gap?: number;
-		mountedRows: readonly TMountedRow[];
+		mountedRows?: readonly TMountedRow[];
+		residentRows?: readonly VirtualSurfaceResidentRowViewState<TMountedCell>[];
 		contentEl?: HTMLDivElement | null;
 		observerRoot?: HTMLElement | null;
 		getCellClassName?: (cell: TMountedCell) => string | undefined;
@@ -61,7 +65,8 @@
 		rowHeight,
 		columns = 1,
 		gap = undefined,
-		mountedRows,
+		mountedRows = undefined,
+		residentRows = undefined,
 		contentEl = $bindable<HTMLDivElement | null>(null),
 		observerRoot = null,
 		getCellClassName,
@@ -86,7 +91,6 @@
 		`height:${contentHeight}px; position:relative; --ccl-box-height:${rowHeight}px; --ccl-cell-width:${cellWidth ?? 0}px; --ccl-columns:${Math.max(1, Math.floor(columns))}${gap !== undefined ? `; --ccl-box-gap:${gap}px` : ""}`,
 	);
 
-	const resolveRowSlotKey = (row: TMountedRow): number => row.slotKey ?? row.key;
 	const resolveCellSlotKey = (_row: TMountedRow, cell: TMountedCell): number =>
 		cell.cellSlotKey ?? cell.renderSlotIndex;
 
@@ -114,12 +118,21 @@
 			0,
 			row.top,
 		)}px); margin-bottom:0`;
+
+	const directRowViewStates = $derived(
+		(mountedRows ?? []).map((row) => ({
+			slotIndex: row.slotIndex ?? row.key,
+			row,
+		})),
+	);
+	const rowViewStates = $derived(residentRows ?? directRowViewStates);
 </script>
 
 <div class={contentClassName} bind:this={contentEl} style={contentStyle}>
 	<div data-ccl-virtual-flow-spacer="top" style:height="0px" aria-hidden="true"></div>
-	{#each mountedRows as row (resolveRowSlotKey(row))}
-		{#if !isRowActive || isRowActive(row)}
+	{#each rowViewStates as rowViewState (rowViewState.slotIndex)}
+		{@const row = rowViewState.row as TMountedRow | undefined}
+		{#if row && (!isRowActive || isRowActive(row))}
 			<div
 				{...row.attributes}
 				class={rowClassName}

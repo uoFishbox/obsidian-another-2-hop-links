@@ -18,9 +18,11 @@ import {
 import {
 	buildTwoHopMountedRows,
 	type TwoHopMountedCell,
+	type TwoHopMountedRow,
 	type TwoHopMountedRowsBuild,
 } from "features/two-hop/ui/twoHopMountedRows";
 import { createTwoHopResidentRowSlotAllocator } from "features/two-hop/ui/twoHopResidentRowSlotAllocator";
+import { createVirtualSurfaceResidentRowsAdapter } from "ui/virtualization/svelte/residentRowViewState.svelte";
 import { useVirtualList } from "ui/virtualization/svelte/useVirtualList.svelte";
 import {
 	createViewPlanMeasurementRuntime,
@@ -119,6 +121,10 @@ export function useTwoHopVirtualList(
 	let document = $state.raw<TwoHopDocument>(documentProjection.getDocument());
 	const measurementState = createViewPlanMeasurementState();
 	const rowSlotAllocator = createTwoHopResidentRowSlotAllocator();
+	const residentRowsAdapter = createVirtualSurfaceResidentRowsAdapter<
+		TwoHopMountedCell,
+		TwoHopMountedRow
+	>();
 	const resolveConfiguredLayout = createResolvedCardLayoutSettingsMemo();
 	const configuredLayout = $derived(
 		resolveConfiguredLayout(applicationStore?.settings),
@@ -411,6 +417,10 @@ export function useTwoHopVirtualList(
 			measurementState.measurement.hasStableVisibleRange = true;
 		},
 		onSnapshotUpdated: (snapshot, reconciliationState) => {
+			residentRowsAdapter.sync(
+				reconciliationState.mountedBuild?.rowsBySlot ?? EMPTY_MOUNTED_ROWS,
+				rowSlotAllocator.capacity,
+			);
 			syncDisplaySnapshot({
 				previewRange: snapshot.ranges.previewVisible,
 				build: reconciliationState.mountedBuild,
@@ -532,11 +542,8 @@ export function useTwoHopVirtualList(
 		get layout() {
 			return measurementState.layout;
 		},
-		get mountedRows() {
-			return (
-				virtualList.getReconciliationState().mountedBuild?.rowsBySlot ??
-				EMPTY_MOUNTED_ROWS
-			);
+		get residentRows() {
+			return residentRowsAdapter.rows;
 		},
 		get interactionDescriptorResolverProvider() {
 			return interactionController.provider;

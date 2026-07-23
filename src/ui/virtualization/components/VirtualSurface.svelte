@@ -18,6 +18,7 @@
 		layoutMode = "absolute-cells",
 		mountedCells = undefined,
 		mountedRows = undefined,
+		residentRows = undefined,
 		mountedCellsForChange,
 		interactionDescriptorScopeId,
 		interactionDescriptors = [],
@@ -73,7 +74,8 @@
 			{columns}
 			{gap}
 			layoutMode="grid-rows"
-			mountedRows={mountedRows ?? []}
+			{mountedRows}
+			{residentRows}
 			bind:contentEl
 			{observerRoot}
 			{getCellPosition}

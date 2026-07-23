@@ -9,7 +9,8 @@
 	import VirtualPooledGridRowsSurface from "./VirtualPooledGridRowsSurface.svelte";
 	import type {
 		VirtualSurfaceCellPosition,
-		VirtualSurfaceRenderInput,
+		VirtualSurfaceMountedRow,
+		VirtualSurfaceResidentRowViewState,
 	} from "./VirtualSurfaceTypes";
 
 	interface CommonProps<TMountedCell extends MountedVirtualCell> {
@@ -39,8 +40,12 @@
 		>;
 	}
 
-	type Props<TMountedCell extends MountedVirtualCell> = CommonProps<TMountedCell> &
-		VirtualSurfaceRenderInput<TMountedCell>;
+	type Props<TMountedCell extends MountedVirtualCell> = CommonProps<TMountedCell> & {
+		layoutMode?: "absolute-cells" | "grid-rows";
+		mountedCells?: readonly TMountedCell[];
+		mountedRows?: readonly VirtualSurfaceMountedRow<TMountedCell>[];
+		residentRows?: readonly VirtualSurfaceResidentRowViewState<TMountedCell>[];
+	};
 
 	let {
 		contentClassName = "",
@@ -54,6 +59,7 @@
 		layoutMode = "absolute-cells",
 		mountedCells = undefined,
 		mountedRows = undefined,
+		residentRows = undefined,
 		contentEl = $bindable<HTMLDivElement | null>(null),
 		observerRoot = null,
 		getCellPosition,
@@ -76,7 +82,8 @@
 		{rowHeight}
 		{columns}
 		{gap}
-		mountedRows={mountedRows ?? []}
+		{mountedRows}
+		{residentRows}
 		bind:contentEl
 		{observerRoot}
 		{getCellClassName}
