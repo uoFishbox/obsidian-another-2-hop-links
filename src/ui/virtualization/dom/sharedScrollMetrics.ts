@@ -5,6 +5,8 @@ export interface VirtualListSharedScrollMetrics {
 	viewportHeight: number;
 	frameId: number;
 	isScrollActive: boolean;
+	/** Monotonic observer-owned generation of the latest native scroll event. */
+	scrollGeneration: number;
 }
 
 export interface SharedScrollMetricsSubscriber {
@@ -18,6 +20,8 @@ export interface ReadVirtualListSharedScrollMetricsParams {
 	ownerElement?: HTMLElement | null;
 	isScrollActive: boolean;
 	frameId: number;
+	/** Observer generation captured with these metrics. */
+	scrollGeneration: number;
 }
 
 export function resolveCachedViewportHeight(
@@ -49,6 +53,7 @@ export function readVirtualListSharedScrollMetricsInto(
 		out.viewportHeight = cachedViewportHeight ?? params.scroller.clientHeight;
 		out.frameId = params.frameId;
 		out.isScrollActive = params.isScrollActive;
+		out.scrollGeneration = params.scrollGeneration;
 		return out;
 	}
 
@@ -59,5 +64,6 @@ export function readVirtualListSharedScrollMetricsInto(
 	out.viewportHeight = ownerWindow?.innerHeight ?? 0;
 	out.frameId = params.frameId;
 	out.isScrollActive = params.isScrollActive;
+	out.scrollGeneration = params.scrollGeneration;
 	return out;
 }

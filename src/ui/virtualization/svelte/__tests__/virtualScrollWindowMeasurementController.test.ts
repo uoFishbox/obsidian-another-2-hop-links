@@ -10,6 +10,7 @@ const STABLE_MEASUREMENT: VirtualMeasurement = {
 	sectionTop: 0,
 	isStableMeasurement: true,
 	isScrollActive: true,
+	scrollGeneration: 1,
 	source: "scroll",
 };
 

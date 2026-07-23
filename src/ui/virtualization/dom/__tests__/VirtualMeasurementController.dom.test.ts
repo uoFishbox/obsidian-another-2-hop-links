@@ -1,5 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { createVirtualMeasurementController } from "../virtualMeasurementController";
+import {
+	createVirtualMeasurementController,
+	type VirtualMeasurement,
+} from "../virtualMeasurementController";
 import { createVirtualListMeasurementState } from "../virtualListMeasurementState";
 
 const createRoot = (rectOverrides: Partial<DOMRect> = {}): HTMLElement => {
@@ -86,6 +89,7 @@ describe("createVirtualMeasurementController", () => {
 			viewportHeight: 200,
 			frameId: 1,
 			isScrollActive: true,
+			scrollGeneration: 1,
 		};
 		const result = controller.runScrollMeasurement(sharedScrollMetrics);
 
@@ -96,6 +100,7 @@ describe("createVirtualMeasurementController", () => {
 			sectionTop: 25,
 			isStableMeasurement: true,
 			isScrollActive: true,
+			scrollGeneration: 1,
 			source: "scroll",
 			sharedScrollMetrics,
 		});
@@ -122,6 +127,7 @@ describe("createVirtualMeasurementController", () => {
 			viewportHeight: 200,
 			frameId: 1,
 			isScrollActive: true,
+			scrollGeneration: 1,
 		};
 
 		expect(controller.runScrollMeasurement(sharedScrollMetrics).kind).toBe(
@@ -160,6 +166,7 @@ describe("createVirtualMeasurementController", () => {
 			viewportHeight: 200,
 			frameId: 1,
 			isScrollActive: true,
+			scrollGeneration: 1,
 		};
 
 		expect(controller.runScrollMeasurement(sharedScrollMetrics).kind).toBe(
@@ -238,6 +245,39 @@ describe("createVirtualMeasurementController", () => {
 		window.dispatchEvent(new Event("scroll"));
 
 		expect(rectGetter).not.toHaveBeenCalled();
+
+		cleanup();
+		rootEl.remove();
+	});
+
+	it("does not schedule a trailing scroll measurement after an unchanged layout", async () => {
+		const rootEl = createRoot();
+		document.body.append(rootEl);
+		const state = createVirtualListMeasurementState();
+		const onMeasurement = vi.fn(
+			(_measurement: VirtualMeasurement) => "stable" as const,
+		);
+		const controller = createVirtualMeasurementController({
+			getRootEl: () => rootEl,
+			measurement: state,
+			onMeasurement,
+			maxUnstableMeasurementRetries: 1,
+		});
+
+		const cleanup = controller.observeRoot(rootEl);
+		const layoutResult = controller.runLayoutMeasurement();
+		expect(layoutResult.kind).toBe("measured");
+		if (layoutResult.kind === "measured") {
+			controller.scheduleScrollMeasurementAfterLayout(layoutResult.measurement);
+		}
+
+		await vi.runAllTimersAsync();
+
+		expect(
+			onMeasurement.mock.calls.filter(
+				([measurement]) => measurement.source === "scroll",
+			),
+		).toHaveLength(0);
 
 		cleanup();
 		rootEl.remove();

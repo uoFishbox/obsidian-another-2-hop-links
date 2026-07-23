@@ -135,7 +135,7 @@ export function createFlatGridControllerAdapter<T>({
 			nextMeasurement,
 			layoutMeasurement.layout,
 		);
-		measurementController.scheduleScrollMeasurement();
+		measurementController.scheduleScrollMeasurementAfterLayout(nextMeasurement);
 		notifyStableMeasurement(nextMeasurement);
 		return "stable";
 	};

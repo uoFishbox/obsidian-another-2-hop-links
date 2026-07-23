@@ -216,6 +216,7 @@ describe("observeVirtualListViewport", () => {
 
 		const runScrollMeasurement = vi.fn();
 		const onScrollContainerChange = vi.fn();
+		const onScrollStateChange = vi.fn();
 		const stopObserving = observeVirtualListViewport({
 			rootEl,
 			onWidthChange: vi.fn(),
@@ -225,6 +226,7 @@ describe("observeVirtualListViewport", () => {
 			scheduleScrollMeasurement: vi.fn(),
 			runScrollMeasurement,
 			runInitialLayoutMeasurement: vi.fn(),
+			onScrollStateChange,
 		});
 
 		scrollTopGetter.mockClear();
@@ -251,8 +253,15 @@ describe("observeVirtualListViewport", () => {
 				viewportHeight: 240,
 				frameId: expect.any(Number),
 				isScrollActive: true,
+				scrollGeneration: 1,
 			}),
 		);
+		expect(onScrollStateChange.mock.calls).toEqual([
+			[0, false, false],
+			[0, false, true],
+			[1, true, true],
+			[1, false, true],
+		]);
 		expect(scrollTopGetter).toHaveBeenCalledTimes(1);
 		expect(clientHeightGetter).not.toHaveBeenCalled();
 		expect(rootRectGetter).not.toHaveBeenCalled();

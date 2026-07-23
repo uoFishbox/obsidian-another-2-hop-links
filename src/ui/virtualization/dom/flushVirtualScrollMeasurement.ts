@@ -37,5 +37,6 @@ export function flushVirtualScrollMeasurement(
 		viewportHeight: snapshot.viewportHeight,
 		frameId: 0,
 		isScrollActive: false,
+		scrollGeneration: 0,
 	});
 }

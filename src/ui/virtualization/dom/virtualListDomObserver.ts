@@ -51,6 +51,12 @@ export interface ObserveVirtualListViewportOptions {
 	runScrollMeasurement: (metrics?: VirtualListSharedScrollMetrics) => void;
 	runInitialLayoutMeasurement: () => void;
 	cancelInitialStabilizationMeasurement?: () => void;
+	/** Publishes observer-owned scroll state used to gate post-layout work. */
+	onScrollStateChange?: (
+		generation: number,
+		hasPendingScrollTop: boolean,
+		isScrollActive: boolean,
+	) => void;
 	/**
 	 * Invoked once when a scroll gesture starts (scroll "start" phase). Used to
 	 * prime layout measurement when scroll metrics are still unstable, so the
@@ -89,6 +95,7 @@ interface ScrollerViewportEntry {
 	scrollActivitySource: object;
 	sharedScrollMetricsScratch: VirtualListSharedScrollMetrics;
 	pendingScrollTop: number | null;
+	scrollGeneration: number;
 	scrollTarget: Window | HTMLElement;
 	scrollPhaseState: ScrollerViewportScrollPhaseState;
 	structureObserverConnected: boolean;
@@ -160,6 +167,14 @@ const scheduleScrollMeasurement = (entry: ScrollerViewportEntry): void => {
 	entry.scrollMeasurementTask.schedule();
 };
 
+const notifyScrollStateChange = (entry: ScrollerViewportEntry): void => {
+	getActiveSubscriber(entry)?.onScrollStateChange?.(
+		entry.scrollGeneration,
+		entry.pendingScrollTop !== null,
+		entry.scrollPhaseState.type === "scrolling",
+	);
+};
+
 const readSharedScrollMetrics = (
 	entry: ScrollerViewportEntry,
 ): VirtualListSharedScrollMetrics => {
@@ -173,6 +188,8 @@ const readSharedScrollMetrics = (
 			out.viewportHeight;
 		out.frameId = ++scrollMeasurementFrameId;
 		out.isScrollActive = entry.scrollPhaseState.type === "scrolling";
+		out.scrollGeneration = entry.scrollGeneration;
+		notifyScrollStateChange(entry);
 		return out;
 	}
 
@@ -183,6 +200,7 @@ const readSharedScrollMetrics = (
 		ownerElement: subscriber?.rootEl ?? entry.registryKey,
 		frameId: ++scrollMeasurementFrameId,
 		isScrollActive: entry.scrollPhaseState.type === "scrolling",
+		scrollGeneration: entry.scrollGeneration,
 	});
 };
 
@@ -526,6 +544,9 @@ const handleScrollPhase = (
 	phase: ScrollPhase,
 	metrics?: ScrollTargetMetrics,
 ): void => {
+	if (phase === "scroll") {
+		entry.scrollGeneration += 1;
+	}
 	entry.pendingScrollTop = phase === "scroll" ? (metrics?.scrollTop ?? null) : null;
 	const suppressScrollMeasurement =
 		phase === "scroll" &&
@@ -540,17 +561,21 @@ const handleScrollPhase = (
 		entry.scrollPhaseState.pendingAfterScroll.reconnectObserver
 	) {
 		if (suppressScrollMeasurement) {
+			notifyScrollStateChange(entry);
 			return;
 		}
 		scheduleScrollMeasurement(entry);
+		notifyScrollStateChange(entry);
 		return;
 	}
 	const transition = reduceScrollerViewportPhase(entry.scrollPhaseState, phase);
 	entry.scrollPhaseState = transition.state;
 	if (transition.effect.type === "scroll-frame" && suppressScrollMeasurement) {
+		notifyScrollStateChange(entry);
 		return;
 	}
 	applyScrollPhaseEffect(entry, transition.effect);
+	notifyScrollStateChange(entry);
 };
 
 const isWithinScrollMeasurementRange = (
@@ -620,8 +645,10 @@ const getScrollerViewportEntry = (
 			viewportHeight: 0,
 			frameId: 0,
 			isScrollActive: false,
+			scrollGeneration: 0,
 		},
 		pendingScrollTop: null,
+		scrollGeneration: 0,
 		scrollTarget: scroller ?? ownerWindow,
 		scrollPhaseState: INITIAL_SCROLLER_VIEWPORT_SCROLL_PHASE_STATE,
 		structureObserverConnected: false,
@@ -708,6 +735,7 @@ const registerSubscriber = (
 	entry.subscriber = subscriber;
 	observeRootResizeTarget(subscriber);
 	observeDependencyTargets(entry);
+	notifyScrollStateChange(entry);
 };
 
 const unregisterSubscriber = (subscriber: VirtualListViewportSubscriber): void => {

@@ -23,6 +23,8 @@ export interface VirtualMeasurement {
 	readonly sectionTop: number;
 	readonly isStableMeasurement: boolean;
 	readonly isScrollActive: boolean;
+	/** Observer scroll generation represented by this measurement. */
+	readonly scrollGeneration: number;
 	readonly source: VirtualMeasurementSource;
 	readonly sectionRect?: DOMRect;
 	readonly sharedScrollMetrics?: VirtualListSharedScrollMetrics;
@@ -118,6 +120,7 @@ export function createVirtualMeasurementController({
 		sectionTop: 0,
 		isStableMeasurement: false,
 		isScrollActive: false,
+		scrollGeneration: 0,
 		source: "scroll",
 		sharedScrollMetrics: undefined,
 	};
@@ -140,6 +143,9 @@ export function createVirtualMeasurementController({
 	let lastPublishedSectionTop = 0;
 	let lastPublishedIsStableMeasurement = false;
 	let lastPublishedIsScrollActive = false;
+	let observedScrollGeneration = 0;
+	let hasPendingObservedScrollTop = false;
+	let isObservedScrollActive = false;
 
 	const rememberPublishedScrollMeasurement = (
 		measurement: VirtualMeasurement,
@@ -203,6 +209,7 @@ export function createVirtualMeasurementController({
 			sectionTop: liveMeasurement.sectionTop,
 			isStableMeasurement: liveMeasurement.isStableMeasurement,
 			isScrollActive: false,
+			scrollGeneration: observedScrollGeneration,
 			source: "layout",
 			sectionRect: liveMeasurement.sectionRect,
 		};
@@ -235,6 +242,8 @@ export function createVirtualMeasurementController({
 		cachedMeasurementInput.sharedScrollMetrics = sharedScrollMetrics;
 
 		readVirtualListCachedMeasurementInto(scrollMeasurement, cachedMeasurementInput);
+		scrollMeasurement.scrollGeneration =
+			sharedScrollMetrics?.scrollGeneration ?? observedScrollGeneration;
 		if (
 			!options.forcePublish &&
 			isUnchangedPublishedScrollMeasurement(
@@ -303,6 +312,11 @@ export function createVirtualMeasurementController({
 			},
 			getCachedViewportHeight: () => measurement.viewportHeight,
 			getScrollMeasurementRange,
+			onScrollStateChange: (generation, hasPendingScrollTop, isScrollActive) => {
+				observedScrollGeneration = generation;
+				hasPendingObservedScrollTop = hasPendingScrollTop;
+				isObservedScrollActive = isScrollActive;
+			},
 			onScrollContainerChange: (element) => {
 				measurement.scrollContainerEl = element;
 				measurement.invalidateViewport();
@@ -349,5 +363,25 @@ export function createVirtualMeasurementController({
 		runScrollMeasurement,
 		scheduleLayoutMeasurement,
 		scheduleScrollMeasurement,
+		/**
+		 * Schedules the post-layout scroll pass only when observer-owned scroll
+		 * state was not fully represented by the layout measurement.
+		 */
+		scheduleScrollMeasurementAfterLayout(
+			layoutMeasurement: VirtualMeasurement,
+		): void {
+			if (layoutMeasurement.source !== "layout") {
+				return;
+			}
+			if (
+				observedScrollGeneration <= layoutMeasurement.scrollGeneration &&
+				!hasPendingObservedScrollTop &&
+				!isObservedScrollActive
+			) {
+				return;
+			}
+
+			scheduleScrollMeasurement();
+		},
 	};
 }

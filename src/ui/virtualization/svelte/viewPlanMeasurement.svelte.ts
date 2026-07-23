@@ -300,7 +300,7 @@ export function createViewPlanMeasurementRuntime<
 			nextMeasurement,
 			scrollMeasurementContext,
 		);
-		measurementController.scheduleScrollMeasurement();
+		measurementController.scheduleScrollMeasurementAfterLayout(nextMeasurement);
 		return "stable";
 	};
 

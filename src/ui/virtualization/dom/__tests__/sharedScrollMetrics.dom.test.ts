@@ -46,12 +46,14 @@ describe("sharedScrollMetrics", () => {
 			viewportHeight: 0,
 			frameId: 0,
 			isScrollActive: false,
+			scrollGeneration: 0,
 		};
 		const result = readVirtualListSharedScrollMetricsInto(out, {
 			scroller,
 			subscriber: null,
 			isScrollActive: true,
 			frameId: 7,
+			scrollGeneration: 3,
 		});
 
 		expect(result).toBe(out);
@@ -60,6 +62,7 @@ describe("sharedScrollMetrics", () => {
 			viewportHeight: 240,
 			frameId: 7,
 			isScrollActive: true,
+			scrollGeneration: 3,
 		});
 	});
 
@@ -78,6 +81,7 @@ describe("sharedScrollMetrics", () => {
 			viewportHeight: 0,
 			frameId: 0,
 			isScrollActive: false,
+			scrollGeneration: 0,
 		};
 
 		const result = readVirtualListSharedScrollMetricsInto(out, {
@@ -85,6 +89,7 @@ describe("sharedScrollMetrics", () => {
 			subscriber: null,
 			isScrollActive: true,
 			frameId: 8,
+			scrollGeneration: 4,
 		});
 
 		expect(result).toBe(out);
@@ -93,6 +98,7 @@ describe("sharedScrollMetrics", () => {
 			viewportHeight: 360,
 			frameId: 8,
 			isScrollActive: true,
+			scrollGeneration: 4,
 		});
 	});
 });
