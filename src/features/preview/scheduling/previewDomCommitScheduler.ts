@@ -20,6 +20,8 @@ import {
 } from "./previewScheduleTokenBucket";
 
 const MAX_QUEUE_ENTRIES_PER_DRAIN = 256;
+const EXPECTED_FRAME_INTERVAL_MS = 1000 / 60;
+const SCROLLING_REEVALUATION_DELAY_MS = EXPECTED_FRAME_INTERVAL_MS * 2;
 
 interface PreviewDomCommitPolicy {
 	readonly mode: "idle" | "scrolling";
@@ -219,6 +221,31 @@ function schedulePartition(
 	});
 }
 
+function readTokenAvailabilityDelayMs(
+	tokenState: PreviewScheduleTokenState,
+	ratePerSecond: number,
+): number {
+	if (canConsumePreviewScheduleToken(tokenState)) return 0;
+
+	const missingCredits = Math.max(0, 1 - tokenState.availableCredits);
+	const availabilityDelayMs = (missingCredits * 1000) / ratePerSecond;
+	// The driver observes and refills tokens on the scheduled frame itself.
+	return Math.max(0, availabilityDelayMs - EXPECTED_FRAME_INTERVAL_MS);
+}
+
+function schedulePendingPartition(
+	partition: PreviewDomCommitPartition,
+	policy: PreviewDomCommitPolicy,
+): void {
+	if (partition.pendingByTargetKey.size === 0) return;
+
+	const delayMs =
+		policy.mode === "scrolling"
+			? SCROLLING_REEVALUATION_DELAY_MS
+			: readTokenAvailabilityDelayMs(partition.tokenState, policy.ratePerSecond);
+	schedulePartition(partition, delayMs, policy.mode === "scrolling");
+}
+
 function releasePartitionIfIdle(partition: PreviewDomCommitPartition): void {
 	if (partition.pendingByTargetKey.size > 0) return;
 
@@ -232,7 +259,7 @@ function drainPartition(
 ): void {
 	const scrolling = isScrollActivityActive();
 	if (scrolling && hasPendingBrowserInput()) {
-		schedulePartition(partition, 0, true);
+		schedulePartition(partition, SCROLLING_REEVALUATION_DELAY_MS, true);
 		return;
 	}
 
@@ -304,9 +331,7 @@ function drainPartition(
 	}
 
 	compactQueue(partition);
-	if (partition.pendingByTargetKey.size > 0) {
-		schedulePartition(partition, 0, scrolling);
-	}
+	schedulePendingPartition(partition, policy);
 }
 
 /**

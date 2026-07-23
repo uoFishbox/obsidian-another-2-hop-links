@@ -250,6 +250,71 @@ describe("preview DOM commit scheduler", () => {
 		await expect(commit).resolves.toEqual({ type: "committed" });
 	});
 
+	it("does not immediately reschedule a scrolling partition only because its queue remains", () => {
+		markScrollActivityActive(scrollSource);
+		let postPaintTask: (() => void) | undefined;
+		const frameCoordinator: VirtualFrameCoordinator = {
+			schedule: vi.fn((_lane, _key, task) => {
+				postPaintTask = task;
+				return true;
+			}),
+			cancel: vi.fn(),
+			isScheduled: vi.fn(() => false),
+			dispose: vi.fn(),
+		};
+
+		for (const key of ["a", "b"]) {
+			void enqueuePreviewDomCommit({
+				targetKey: `preview-${key}`,
+				isStale: () => false,
+				commit: () => true,
+				frameCoordinator,
+			});
+		}
+
+		postPaintTask?.();
+		expect(frameCoordinator.schedule).toHaveBeenCalledTimes(1);
+
+		vi.advanceTimersByTime(32);
+		expect(frameCoordinator.schedule).toHaveBeenCalledTimes(1);
+
+		vi.advanceTimersByTime(2);
+		expect(frameCoordinator.schedule).toHaveBeenCalledTimes(2);
+	});
+
+	it("backs off instead of polling every frame while browser input is pending", () => {
+		markScrollActivityActive(scrollSource);
+		const isInputPending = vi.fn(() => true);
+		vi.stubGlobal("navigator", {
+			scheduling: { isInputPending },
+		});
+		let postPaintTask: (() => void) | undefined;
+		const frameCoordinator: VirtualFrameCoordinator = {
+			schedule: vi.fn((_lane, _key, task) => {
+				postPaintTask = task;
+				return true;
+			}),
+			cancel: vi.fn(),
+			isScheduled: vi.fn(() => false),
+			dispose: vi.fn(),
+		};
+
+		void enqueuePreviewDomCommit({
+			targetKey: "preview-input-pending",
+			isStale: () => false,
+			commit: () => true,
+			frameCoordinator,
+		});
+		postPaintTask?.();
+
+		expect(isInputPending).toHaveBeenCalledOnce();
+		expect(frameCoordinator.schedule).toHaveBeenCalledTimes(1);
+		vi.advanceTimersByTime(32);
+		expect(frameCoordinator.schedule).toHaveBeenCalledTimes(1);
+		vi.advanceTimersByTime(2);
+		expect(frameCoordinator.schedule).toHaveBeenCalledTimes(2);
+	});
+
 	it("allows an idle burst of four commits", async () => {
 		const committed: string[] = [];
 
@@ -312,9 +377,9 @@ describe("preview DOM commit scheduler", () => {
 		});
 
 		expect(Math.abs(commitsAt60Hz - commitsAt120Hz)).toBeLessThanOrEqual(2);
-		expect(commitsAt60Hz).toBeGreaterThanOrEqual(397);
+		expect(commitsAt60Hz).toBeGreaterThanOrEqual(392);
 		expect(commitsAt60Hz).toBeLessThanOrEqual(401);
-		expect(commitsAt120Hz).toBeGreaterThanOrEqual(397);
+		expect(commitsAt120Hz).toBeGreaterThanOrEqual(392);
 		expect(commitsAt120Hz).toBeLessThanOrEqual(401);
 	});
 
