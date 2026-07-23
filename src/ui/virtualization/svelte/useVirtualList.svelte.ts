@@ -3,7 +3,12 @@ import {
 	type CreateVirtualListRuntimeOptions,
 	type VirtualListRuntimeState,
 } from "../core/virtualListRuntime";
-import type { MountedVirtualCellsBuild } from "../core/virtualListEngine";
+import type {
+	MountedVirtualCellsBuild,
+	VirtualListReconciliationState,
+	VirtualListSnapshot,
+} from "../core/virtualListEngine";
+import type { VirtualListMode } from "../core/VirtualListMode";
 import type { MountedVirtualCell, VirtualRowModel } from "../types";
 
 export type UseVirtualListOptions<
@@ -16,15 +21,59 @@ export type UseVirtualListOptions<
 	"onStateChanged"
 >;
 
+const hasSameMode = (current: VirtualListMode, next: VirtualListMode): boolean => {
+	if (current.kind !== next.kind) {
+		return false;
+	}
+
+	switch (current.kind) {
+		case "uninitialized":
+			return true;
+		case "bootstrapped":
+		case "empty":
+		case "skipped":
+			return next.kind === current.kind && current.reason === next.reason;
+		case "stable":
+			return next.kind === "stable" && current.scrolling === next.scrolling;
+	}
+};
+
 export function useVirtualList<
 	TCell,
 	TRowModel extends VirtualRowModel<TCell>,
 	TMountedCell extends MountedVirtualCell,
 	TMountedBuild extends MountedVirtualCellsBuild<TMountedCell>,
 >(options: UseVirtualListOptions<TCell, TRowModel, TMountedCell, TMountedBuild>) {
-	let runtimeState = $state.raw<
-		VirtualListRuntimeState<TCell, TMountedCell, TMountedBuild>
-	>(null as unknown as VirtualListRuntimeState<TCell, TMountedCell, TMountedBuild>);
+	let latestSnapshot: VirtualListSnapshot<TCell, TMountedCell, TMountedBuild> | null =
+		null;
+	let latestMountedCellsForChange: readonly TMountedCell[] = [];
+	let mountedBuildState = $state.raw<VirtualListReconciliationState<TMountedBuild>>({
+		mountedBuild: null,
+	});
+	let totalHeightState = $state<number | null>(null);
+	let modeState = $state.raw<VirtualListMode>({ kind: "uninitialized" });
+
+	const publishSurfaceState = (
+		nextState: VirtualListRuntimeState<TCell, TMountedCell, TMountedBuild>,
+	): void => {
+		latestSnapshot = nextState.snapshot;
+		latestMountedCellsForChange = nextState.mountedCellsForChange;
+
+		const nextMountedBuild = nextState.reconciliationState.mountedBuild;
+		if (mountedBuildState.mountedBuild !== nextMountedBuild) {
+			mountedBuildState = nextState.reconciliationState;
+		}
+
+		const nextTotalHeight = nextState.snapshot?.totalHeight ?? null;
+		if (totalHeightState !== nextTotalHeight) {
+			totalHeightState = nextTotalHeight;
+		}
+
+		if (!hasSameMode(modeState, nextState.mode)) {
+			modeState = nextState.mode;
+		}
+	};
+
 	const runtime = createVirtualListRuntime<
 		TCell,
 		TRowModel,
@@ -32,31 +81,33 @@ export function useVirtualList<
 		TMountedBuild
 	>({
 		...options,
-		onStateChanged: (nextState) => {
-			runtimeState = nextState;
-		},
+		onStateChanged: publishSurfaceState,
 	});
-	runtimeState = runtime.getState();
 	$effect(() => () => runtime.dispose());
 
 	return {
 		getSnapshot() {
-			return runtimeState.snapshot;
+			void mountedBuildState;
+			void totalHeightState;
+			void modeState;
+			return latestSnapshot;
 		},
 		getMountedCells() {
-			return runtimeState.mode.kind === "empty" ||
-				runtimeState.mode.kind === "uninitialized"
+			void mountedBuildState;
+			return modeState.kind === "empty" || modeState.kind === "uninitialized"
 				? []
-				: (runtimeState.snapshot?.mountedCells ?? []);
+				: (latestSnapshot?.mountedCells ?? []);
 		},
 		getMountedCellsForChange() {
-			return runtimeState.mountedCellsForChange;
+			void mountedBuildState;
+			void modeState;
+			return latestMountedCellsForChange;
 		},
 		getReconciliationState() {
-			return runtimeState.reconciliationState;
+			return mountedBuildState;
 		},
 		getTotalHeight(fallback: number) {
-			return runtimeState.snapshot?.totalHeight ?? fallback;
+			return totalHeightState ?? fallback;
 		},
 		applyMeasurement: runtime.applyMeasurement,
 		recompute: runtime.recompute,
