@@ -26,18 +26,18 @@ describe("createViewPlanCardVirtualListPolicyResolver", () => {
 		});
 	});
 
-	it("drops preview overscan to 0 during active scroll while keeping one mounted overscan row", () => {
+	it("keeps configured preview overscan during active scroll", () => {
 		const resolver = createViewPlanCardVirtualListPolicyResolver({
 			getPreviewActivationAheadRows: () => 1,
 		});
 
 		expect(resolver.resolve(layout(), true)).toMatchObject({
 			mountedOverscanPx: 132,
-			previewOverscanPx: 0,
+			previewOverscanPx: 132,
 		});
 	});
 
-	it("narrows mounted overscan to one row during scroll for users with larger ahead rows", () => {
+	it("keeps larger configured overscan during active scroll", () => {
 		const resolver = createViewPlanCardVirtualListPolicyResolver({
 			getPreviewActivationAheadRows: () => 3,
 		});
@@ -47,8 +47,8 @@ describe("createViewPlanCardVirtualListPolicyResolver", () => {
 			previewOverscanPx: 132 * 3,
 		});
 		expect(resolver.resolve(layout(), true)).toMatchObject({
-			mountedOverscanPx: 132,
-			previewOverscanPx: 0,
+			mountedOverscanPx: 132 * 3,
+			previewOverscanPx: 132 * 3,
 		});
 	});
 
@@ -62,7 +62,7 @@ describe("createViewPlanCardVirtualListPolicyResolver", () => {
 		expect(resolver.resolve(baseLayout, false)).toBe(idlePolicy);
 	});
 
-	it("rebuilds the policy when scroll activity flips", () => {
+	it("reuses the policy when only scroll activity flips", () => {
 		const resolver = createViewPlanCardVirtualListPolicyResolver({
 			getPreviewActivationAheadRows: () => 2,
 		});
@@ -71,9 +71,8 @@ describe("createViewPlanCardVirtualListPolicyResolver", () => {
 		const idlePolicy = resolver.resolve(baseLayout, false);
 		const scrollPolicy = resolver.resolve(baseLayout, true);
 
-		expect(scrollPolicy).not.toBe(idlePolicy);
-		expect(scrollPolicy.previewOverscanPx).toBe(0);
-		expect(idlePolicy.previewOverscanPx).toBe(264);
+		expect(scrollPolicy).toBe(idlePolicy);
+		expect(scrollPolicy.previewOverscanPx).toBe(264);
 	});
 
 	it("rebuilds the policy when the configured ahead rows change", () => {

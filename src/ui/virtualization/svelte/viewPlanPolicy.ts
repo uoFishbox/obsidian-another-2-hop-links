@@ -17,29 +17,28 @@ export function createViewPlanCardVirtualListPolicyResolver(params: {
 }): ViewPlanCardVirtualListPolicyResolver {
 	let cachedPolicyRowHeight: number | undefined;
 	let cachedPolicyGap: number | undefined;
-	let cachedPolicyEffectiveAheadRows: number | undefined;
+	let cachedPolicyAheadRows: number | undefined;
 	let cachedPolicy: ViewPlanCardVirtualListPolicy | undefined;
 
 	return {
-		resolve(layout, isScrollActive) {
+		resolve(layout, _isScrollActive) {
 			const configuredAheadRows = params.getPreviewActivationAheadRows();
-			const effectiveAheadRows = isScrollActive ? 0 : configuredAheadRows;
 
 			if (
 				cachedPolicy &&
 				cachedPolicyRowHeight === layout.rowHeight &&
 				cachedPolicyGap === layout.gap &&
-				cachedPolicyEffectiveAheadRows === effectiveAheadRows
+				cachedPolicyAheadRows === configuredAheadRows
 			) {
 				return cachedPolicy;
 			}
 
 			cachedPolicyRowHeight = layout.rowHeight;
 			cachedPolicyGap = layout.gap;
-			cachedPolicyEffectiveAheadRows = effectiveAheadRows;
+			cachedPolicyAheadRows = configuredAheadRows;
 			cachedPolicy = createCardVirtualListPolicy({
 				layout,
-				previewActivationAheadRows: effectiveAheadRows,
+				previewActivationAheadRows: configuredAheadRows,
 			});
 			return cachedPolicy;
 		},
