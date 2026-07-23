@@ -1,6 +1,7 @@
 import { getOptionalOwnerWindow } from "ui/shared/dom/realmSafeDom";
 
 type ScrollTarget = Window | HTMLElement;
+type ScrollEndTarget = Document | HTMLElement;
 export type ScrollPhase = "start" | "scroll" | "idle";
 export interface ScrollTargetMetrics {
 	readonly scrollTop: number;
@@ -22,11 +23,14 @@ interface Entry {
 	dispatch: () => void;
 	dispatchFrame: () => void;
 	dispatchIdle: () => void;
+	dispatchScrollEnd: () => void;
 	frameHandle: number | null;
 	idleTimer: number | null;
 	isScrollActive: boolean;
 	lastScrollTime: number;
 	metricsScratch: MutableScrollTargetMetrics;
+	scrollEndPending: boolean;
+	scrollEndTarget: ScrollEndTarget | null;
 }
 
 const entries = new WeakMap<ScrollTarget, Entry>();
@@ -47,6 +51,11 @@ function readScrollTop(target: ScrollTarget): number {
 	return target.scrollTop;
 }
 
+function resolveScrollEndTarget(target: ScrollTarget): ScrollEndTarget | null {
+	const eventTarget = "document" in target ? target.document : target;
+	return "onscrollend" in eventTarget ? eventTarget : null;
+}
+
 export function subscribeScrollTarget(
 	target: ScrollTarget,
 	callback: ScrollPhaseCallback,
@@ -58,6 +67,7 @@ export function subscribeScrollTarget(
 	}
 
 	if (!entry) {
+		const scrollEndTarget = resolveScrollEndTarget(target);
 		entry = {
 			phaseCallbacks: new Set(),
 			frameHandle: null,
@@ -68,6 +78,8 @@ export function subscribeScrollTarget(
 				scrollTop: 0,
 				scrollGeneration: 0,
 			},
+			scrollEndPending: false,
+			scrollEndTarget,
 			dispatchIdle: () => {
 				if (entry!.frameHandle !== null) {
 					entry!.idleTimer = targetWindow.setTimeout(
@@ -92,6 +104,20 @@ export function subscribeScrollTarget(
 					cb("idle");
 				}
 			},
+			dispatchScrollEnd: () => {
+				if (!entry!.isScrollActive && entry!.frameHandle === null) {
+					return;
+				}
+				if (entry!.frameHandle !== null) {
+					entry!.scrollEndPending = true;
+					return;
+				}
+
+				entry!.isScrollActive = false;
+				for (const cb of entry!.phaseCallbacks) {
+					cb("idle");
+				}
+			},
 			dispatchFrame: () => {
 				entry!.frameHandle = null;
 				if (!entry!.isScrollActive) {
@@ -105,7 +131,13 @@ export function subscribeScrollTarget(
 					cb("scroll", entry!.metricsScratch);
 				}
 
-				if (entry!.idleTimer === null) {
+				if (entry!.scrollEndPending) {
+					entry!.scrollEndPending = false;
+					entry!.dispatchScrollEnd();
+				} else if (
+					entry!.scrollEndTarget === null &&
+					entry!.idleTimer === null
+				) {
 					entry!.idleTimer = targetWindow.setTimeout(
 						entry!.dispatchIdle,
 						SCROLL_IDLE_MS,
@@ -115,7 +147,10 @@ export function subscribeScrollTarget(
 			dispatch: () => {
 				entry!.metricsScratch.scrollTop = readScrollTop(target);
 				entry!.metricsScratch.scrollGeneration += 1;
-				entry!.lastScrollTime = Date.now();
+				entry!.scrollEndPending = false;
+				if (entry!.scrollEndTarget === null) {
+					entry!.lastScrollTime = Date.now();
+				}
 				if (entry!.frameHandle !== null) {
 					return;
 				}
@@ -128,6 +163,9 @@ export function subscribeScrollTarget(
 
 		entries.set(target, entry);
 		target.addEventListener("scroll", entry.dispatch, {
+			passive: true,
+		});
+		scrollEndTarget?.addEventListener("scrollend", entry.dispatchScrollEnd, {
 			passive: true,
 		});
 	}
@@ -150,6 +188,10 @@ export function subscribeScrollTarget(
 				targetWindow.clearTimeout(current.idleTimer);
 			}
 			target.removeEventListener("scroll", current.dispatch);
+			current.scrollEndTarget?.removeEventListener(
+				"scrollend",
+				current.dispatchScrollEnd,
+			);
 			entries.delete(target);
 		}
 	};

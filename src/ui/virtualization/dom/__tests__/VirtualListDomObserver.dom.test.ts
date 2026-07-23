@@ -161,6 +161,7 @@ describe("observeVirtualListViewport", () => {
 		});
 
 		scrollContainer.dispatchEvent(new Event("scroll"));
+		scrollContainer.dispatchEvent(new Event("scrollend"));
 		triggerResize(sizer, 240, 600);
 
 		expect(scheduleLayoutMeasurement).not.toHaveBeenCalled();
