@@ -9,6 +9,15 @@ describe("subscribeScrollTarget", () => {
 
 	it("publishes only the latest scroll snapshot once per frame", () => {
 		const target = document.createElement("div");
+		let currentScrollTop = 0;
+		const readScrollTop = vi.fn(() => currentScrollTop);
+		Object.defineProperty(target, "scrollTop", {
+			configurable: true,
+			get: readScrollTop,
+			set: (value: number) => {
+				currentScrollTop = value;
+			},
+		});
 		const metrics: object[] = [];
 		const scrollTops: number[] = [];
 		const generations: number[] = [];
@@ -25,6 +34,8 @@ describe("subscribeScrollTarget", () => {
 			scrollTops.push(snapshot.scrollTop);
 			generations.push(snapshot.scrollGeneration);
 		});
+		requestFrame.mockClear();
+		frameCallbacks.length = 0;
 
 		target.scrollTop = 12;
 		target.dispatchEvent(new Event("scroll"));
@@ -33,18 +44,21 @@ describe("subscribeScrollTarget", () => {
 
 		expect(requestFrame).toHaveBeenCalledTimes(1);
 		expect(scrollTops).toEqual([]);
+		expect(readScrollTop).not.toHaveBeenCalled();
 
 		frameCallbacks[0]?.(0);
 
 		expect(scrollTops).toEqual([34]);
-		expect(generations).toEqual([2]);
+		expect(generations).toEqual([1]);
+		expect(readScrollTop).toHaveBeenCalledTimes(1);
 
 		target.scrollTop = 56;
 		target.dispatchEvent(new Event("scroll"));
 		frameCallbacks[1]?.(16);
 
 		expect(scrollTops).toEqual([34, 56]);
-		expect(generations).toEqual([2, 3]);
+		expect(generations).toEqual([1, 2]);
+		expect(readScrollTop).toHaveBeenCalledTimes(2);
 		expect(metrics[1]).toBe(metrics[0]);
 
 		unsubscribe();
@@ -124,17 +138,25 @@ describe("subscribeScrollTarget", () => {
 		const target = document.createElement("div");
 		const phases: string[] = [];
 		const frameCallbacks: FrameRequestCallback[] = [];
+		const scrollEvent = new Event("scroll");
 		vi.spyOn(window, "requestAnimationFrame").mockImplementation((callback) => {
 			frameCallbacks.push(callback);
 			return frameCallbacks.length;
 		});
+		const dateNow = vi.spyOn(Date, "now");
 		try {
 			const unsubscribe = subscribeScrollTarget(target, (phase) => {
 				phases.push(phase);
 			});
 
-			target.dispatchEvent(new Event("scroll"));
+			target.dispatchEvent(scrollEvent);
+			target.dispatchEvent(scrollEvent);
+
+			expect(dateNow).not.toHaveBeenCalled();
+
 			frameCallbacks[0]?.(0);
+
+			expect(dateNow).toHaveBeenCalledTimes(1);
 			vi.advanceTimersByTime(139);
 
 			expect(phases).toEqual(["start", "scroll"]);

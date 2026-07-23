@@ -174,7 +174,7 @@ describe("observeVirtualListViewport", () => {
 		stopObserving();
 	});
 
-	it("reads only scrollTop from the native scroll event", async () => {
+	it("reads the latest scrollTop once in the scroll frame without layout reads", async () => {
 		installAnimationFrameMock();
 
 		const scrollContainer = document.createElement("div");
@@ -251,7 +251,7 @@ describe("observeVirtualListViewport", () => {
 		expect(runScrollMeasurement).toHaveBeenCalledTimes(1);
 		expect(runScrollMeasurement).toHaveBeenCalledWith(
 			expect.objectContaining({
-				scrollTop: 120,
+				scrollTop: 180,
 				viewportHeight: 240,
 				frameId: expect.any(Number),
 				isScrollActive: true,

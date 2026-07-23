@@ -5,7 +5,7 @@ type ScrollEndTarget = Document | HTMLElement;
 export type ScrollPhase = "start" | "scroll" | "idle";
 export interface ScrollTargetMetrics {
 	readonly scrollTop: number;
-	/** Monotonic generation of the latest native scroll event. */
+	/** Monotonic generation of the latest published scroll frame. */
 	readonly scrollGeneration: number;
 }
 
@@ -120,6 +120,11 @@ export function subscribeScrollTarget(
 			},
 			dispatchFrame: () => {
 				entry!.frameHandle = null;
+				entry!.metricsScratch.scrollTop = readScrollTop(target);
+				entry!.metricsScratch.scrollGeneration += 1;
+				if (entry!.scrollEndTarget === null) {
+					entry!.lastScrollTime = Date.now();
+				}
 				if (!entry!.isScrollActive) {
 					entry!.isScrollActive = true;
 					for (const cb of entry!.phaseCallbacks) {
@@ -145,12 +150,7 @@ export function subscribeScrollTarget(
 				}
 			},
 			dispatch: () => {
-				entry!.metricsScratch.scrollTop = readScrollTop(target);
-				entry!.metricsScratch.scrollGeneration += 1;
 				entry!.scrollEndPending = false;
-				if (entry!.scrollEndTarget === null) {
-					entry!.lastScrollTime = Date.now();
-				}
 				if (entry!.frameHandle !== null) {
 					return;
 				}
