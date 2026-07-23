@@ -193,8 +193,8 @@ export function createTwoHopVirtualRowModel(
 				? Number.POSITIVE_INFINITY
 				: rowBoundary(range.end) - viewportHeight - overscan + 1;
 
-		out.min = Math.max(startMin, endMin);
-		out.max = Math.min(startMax, endMax);
+		out.min = Math.max(startMin, endMin, -viewportHeight);
+		out.max = Math.min(startMax, endMax, geometry.totalHeight);
 		if (out.min >= out.max) {
 			out.min = Number.POSITIVE_INFINITY;
 			out.max = Number.NEGATIVE_INFINITY;
