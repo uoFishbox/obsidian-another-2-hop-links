@@ -42,6 +42,12 @@ export function createVirtualFrameCoordinator(
 	let idleHandle: number | null = null;
 	let idleUsesCallback = false;
 	let disposed = false;
+	const scheduledKeysScratch: string[] = [];
+	const scheduledTasksScratch: Array<() => void> = [];
+	const collectScheduledTask = (task: () => void, key: string): void => {
+		scheduledKeysScratch.push(key);
+		scheduledTasksScratch.push(task);
+	};
 
 	const resolveWindow = (): Window | null =>
 		params.getWindow?.() ?? (typeof window === "undefined" ? null : window);
@@ -52,15 +58,22 @@ export function createVirtualFrameCoordinator(
 
 	function runLane(lane: VirtualFrameLane, budgetMs: number, maxTasks: number): void {
 		const queue = queues[lane];
-		const scheduledAtDrainStart = Array.from(queue.entries());
+		queue.forEach(collectScheduledTask);
 		const deadline = readNow() + budgetMs;
 		let executed = 0;
-		for (const [key, task] of scheduledAtDrainStart) {
-			if (executed >= maxTasks || readNow() > deadline) break;
-			if (queue.get(key) !== task) continue;
-			queue.delete(key);
-			task();
-			executed += 1;
+		try {
+			for (let index = 0; index < scheduledKeysScratch.length; index += 1) {
+				if (executed >= maxTasks || readNow() > deadline) break;
+				const key = scheduledKeysScratch[index];
+				const task = scheduledTasksScratch[index];
+				if (queue.get(key) !== task) continue;
+				queue.delete(key);
+				task();
+				executed += 1;
+			}
+		} finally {
+			scheduledKeysScratch.length = 0;
+			scheduledTasksScratch.length = 0;
 		}
 		if (process.env.NODE_ENV !== "production" && executed > 0) {
 			recordCCLDevMeasurement(

@@ -30,7 +30,7 @@ const MAX_OUTSTANDING_PREVIEW_JOBS = 3;
 
 interface PreviewActivationPolicy {
 	readonly mode: "idle" | "backpressured" | "scrolling";
-	readonly ratePerSecond: number;
+	ratePerSecond: number;
 	readonly creditCapacity: number;
 	readonly initialCredits?: number;
 	readonly maxTasksPerDrain: number;
@@ -98,6 +98,7 @@ interface PreviewActivationRuntime {
 		| undefined;
 	readonly getActivationsPerSecond: () => number;
 	readonly roundRobinCursorByPartition: Map<PreviewActivationPartition, number>;
+	readonly scrollingPolicy: PreviewActivationPolicy;
 	tokenState: PreviewScheduleTokenState;
 	blockedForBackpressure: boolean;
 	unsubscribeBackpressure: (() => void) | undefined;
@@ -107,6 +108,8 @@ interface PreviewActivationPartition {
 	readonly coordinator: VirtualFrameCoordinator | undefined;
 	readonly driver: PreviewFrameDriver;
 	readonly scopes: Set<PreviewActivationScopeState>;
+	readonly pendingRuntimesScratch: Set<PreviewActivationRuntime>;
+	readonly pendingScopesScratch: PreviewActivationScopeState[];
 	lastObservedMeasurementEpoch: number;
 }
 
@@ -202,6 +205,7 @@ function getOrCreateRuntime(
 		getActivationsPerSecond:
 			options.getActivationsPerSecond ?? getDefaultActivationsPerSecond,
 		roundRobinCursorByPartition: new Map(),
+		scrollingPolicy: { ...SCROLLING_POLICY },
 		tokenState: createEmptyPreviewScheduleTokenState(),
 		blockedForBackpressure: false,
 		unsubscribeBackpressure: undefined,
@@ -233,6 +237,8 @@ function getOrCreatePartition(
 		coordinator,
 		driver,
 		scopes: new Set(),
+		pendingRuntimesScratch: new Set(),
+		pendingScopesScratch: [],
 		lastObservedMeasurementEpoch: readVirtualScrollMeasurementEpoch(),
 	};
 	partitionsByIdentity.set(identity, partition);
@@ -451,22 +457,23 @@ function drainRuntimePartition(
 	scrolling: boolean,
 	shouldDeferUndeferredRequests: boolean,
 ): number | null {
-	const scopes = Array.from(partition.scopes).filter(
-		(scopeState) => scopeState.runtime === runtime && hasPendingScope(scopeState),
-	);
+	const scopes = partition.pendingScopesScratch;
+	for (const scopeState of partition.scopes) {
+		if (scopeState.runtime === runtime && hasPendingScope(scopeState)) {
+			scopes.push(scopeState);
+		}
+	}
 	if (scopes.length === 0) return null;
 
 	const pressure = runtime.getBackpressure();
-	const basePolicy = resolveActivationPolicy(pressure, scrolling);
-	const policy = scrolling
-		? {
-				...basePolicy,
-				ratePerSecond: resolvePositiveRate(
-					runtime.getActivationsPerSecond(),
-					DEFAULT_PREVIEW_ACTIVATIONS_PER_SECOND,
-				),
-			}
-		: basePolicy;
+	let policy = resolveActivationPolicy(pressure, scrolling);
+	if (scrolling) {
+		runtime.scrollingPolicy.ratePerSecond = resolvePositiveRate(
+			runtime.getActivationsPerSecond(),
+			DEFAULT_PREVIEW_ACTIVATIONS_PER_SECOND,
+		);
+		policy = runtime.scrollingPolicy;
+	}
 	runtime.tokenState = refillPreviewScheduleTokens(
 		runtime.tokenState,
 		frameTimestamp,
@@ -480,12 +487,13 @@ function drainRuntimePartition(
 	}
 	runtime.blockedForBackpressure = false;
 
-	const queueEntriesAvailableAtDrainStart = scopes.reduce(
-		(total, scopeState) =>
-			total +
-			Math.max(0, scopeState.pendingQueue.length - scopeState.pendingQueueHead),
-		0,
-	);
+	let queueEntriesAvailableAtDrainStart = 0;
+	for (const scopeState of scopes) {
+		queueEntriesAvailableAtDrainStart += Math.max(
+			0,
+			scopeState.pendingQueue.length - scopeState.pendingQueueHead,
+		);
+	}
 	const maxInspectableQueueEntries = Math.min(
 		MAX_QUEUE_ENTRIES_PER_DRAIN,
 		queueEntriesAvailableAtDrainStart,
@@ -550,21 +558,30 @@ function drainPartition(
 			partition.lastObservedMeasurementEpoch,
 		);
 	partition.lastObservedMeasurementEpoch = measurementEpoch;
-	const runtimes = new Set<PreviewActivationRuntime>();
+	const runtimes = partition.pendingRuntimesScratch;
 	for (const scopeState of partition.scopes) {
 		if (hasPendingScope(scopeState)) runtimes.add(scopeState.runtime);
 	}
 
 	let nextDelayMs = Number.POSITIVE_INFINITY;
-	for (const runtime of runtimes) {
-		const delayMs = drainRuntimePartition(
-			runtime,
-			partition,
-			frameTimestamp,
-			scrolling,
-			shouldDeferUndeferredRequests,
-		);
-		if (delayMs !== null) nextDelayMs = Math.min(nextDelayMs, delayMs);
+	try {
+		for (const runtime of runtimes) {
+			let delayMs: number | null;
+			try {
+				delayMs = drainRuntimePartition(
+					runtime,
+					partition,
+					frameTimestamp,
+					scrolling,
+					shouldDeferUndeferredRequests,
+				);
+			} finally {
+				partition.pendingScopesScratch.length = 0;
+			}
+			if (delayMs !== null) nextDelayMs = Math.min(nextDelayMs, delayMs);
+		}
+	} finally {
+		runtimes.clear();
 	}
 
 	if (Number.isFinite(nextDelayMs)) {

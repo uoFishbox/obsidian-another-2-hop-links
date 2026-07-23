@@ -86,6 +86,38 @@ describe("createVirtualFrameCoordinator", () => {
 		coordinator.dispose();
 	});
 
+	it("defers a cancelled and replaced task to the next frame", () => {
+		const frames: FrameRequestCallback[] = [];
+		const ownerWindow = {
+			requestAnimationFrame: vi.fn((callback: FrameRequestCallback) => {
+				frames.push(callback);
+				return frames.length;
+			}),
+			cancelAnimationFrame: vi.fn(),
+		} as unknown as Window;
+		const coordinator = createVirtualFrameCoordinator({
+			getWindow: () => ownerWindow,
+		});
+		const order: string[] = [];
+		coordinator.schedule("scroll-critical", "first", () => {
+			order.push("first");
+			coordinator.cancel("scroll-critical", "second");
+			coordinator.schedule("scroll-critical", "second", () => {
+				order.push("replacement");
+			});
+		});
+		coordinator.schedule("scroll-critical", "second", () => {
+			order.push("original");
+		});
+
+		frames[0]?.(0);
+		expect(order).toEqual(["first"]);
+		expect(ownerWindow.requestAnimationFrame).toHaveBeenCalledTimes(2);
+		frames[1]?.(1);
+		expect(order).toEqual(["first", "replacement"]);
+		coordinator.dispose();
+	});
+
 	it("holds idle work until global scrolling becomes idle", async () => {
 		vi.useFakeTimers();
 		const scrollSource = {};

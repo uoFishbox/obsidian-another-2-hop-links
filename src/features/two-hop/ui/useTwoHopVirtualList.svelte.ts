@@ -307,7 +307,9 @@ export function useTwoHopVirtualList(
 			build !== null &&
 			build.deltaBaseIdentity === (syncedCardBindingsBuild?.identity ?? null);
 		if (build && canApplyBuildDelta) {
-			releasedSlotsScratch.push(...build.slotDelta.releasedSlots);
+			for (const renderSlotKey of build.slotDelta.releasedSlots) {
+				releasedSlotsScratch.push(renderSlotKey);
+			}
 		} else if (syncedCardBindingsBuild) {
 			for (const row of syncedCardBindingsBuild.rowSlices) {
 				for (const cell of row.cells)
@@ -319,10 +321,12 @@ export function useTwoHopVirtualList(
 				for (const cell of row.cells) changedCellsScratch.push(cell);
 			}
 		} else if (build) {
-			changedCellsScratch.push(
-				...build.slotDelta.enteredSlots,
-				...build.slotDelta.reboundSlots,
-			);
+			for (const cell of build.slotDelta.enteredSlots) {
+				changedCellsScratch.push(cell);
+			}
+			for (const cell of build.slotDelta.reboundSlots) {
+				changedCellsScratch.push(cell);
+			}
 		}
 		for (const renderSlotKey of releasedSlotsScratch) releaseSlot(renderSlotKey);
 		for (const cell of changedCellsScratch) updateChangedSlot(cell, resolver);
