@@ -4,12 +4,11 @@ import type { VirtualVisibilityPolicy } from "./virtualListEngine";
 import type {
 	MountedScrollWindowMeasurement,
 	RangedScrollWindowMeasurement,
-	StablePreviewScrollTopBand,
 	StableScrollTopBand,
 } from "./scrollWindowGate";
 
 type StableScrollTopBandMutable = {
-	-readonly [K in keyof StablePreviewScrollTopBand]: StablePreviewScrollTopBand[K];
+	-readonly [K in keyof StableScrollTopBand]: StableScrollTopBand[K];
 };
 
 export interface VirtualScrollWindowRangeRowModel {
@@ -39,15 +38,6 @@ export interface VirtualScrollWindowRangeRowModel {
 			mounted: RowRange;
 			mountedOverscanPx: number;
 			previewOverscanPx?: number;
-		},
-	): void;
-	findStablePreviewScrollTopBandInto(
-		out: StableScrollTopBandMutable,
-		params: {
-			viewportHeight: number;
-			mountedOverscanPx: number;
-			previewOverscanPx?: number;
-			previewVisible: RowRange;
 		},
 	): void;
 	findStableMountedScrollTopBandInto?(
@@ -113,7 +103,6 @@ export function createVirtualScrollWindowRangeResolver<
 			mounted: { start: 0, end: 0 },
 			previewVisible: { start: 0, end: 0 },
 		},
-		stablePreviewScrollTopBand: { min: 0, max: 0 },
 	};
 	const committedScrollWindowMeasurement: RangedScrollWindowMeasurement = {
 		identity: {},
@@ -121,29 +110,12 @@ export function createVirtualScrollWindowRangeResolver<
 			mounted: { start: 0, end: 0 },
 			previewVisible: { start: 0, end: 0 },
 		},
-		stablePreviewScrollTopBand: { min: 0, max: 0 },
 	};
 
 	const resolveMeasurementRowModel = (
 		layout: TLayout,
 		rowModel: TRowModel | undefined,
 	): TRowModel => rowModel ?? resolveRowModel(layout);
-
-	const updateStablePreviewScrollTopBand = (
-		out: StableScrollTopBandMutable,
-		measurementRowModel: TRowModel,
-		sectionTop: number,
-		previewVisible: RowRange,
-	): void => {
-		measurementRowModel.findStablePreviewScrollTopBandInto(out, {
-			viewportHeight: rangeParams.viewportHeight,
-			mountedOverscanPx: rangeParams.mountedOverscanPx,
-			previewOverscanPx: rangeParams.previewOverscanPx,
-			previewVisible,
-		});
-		out.min += sectionTop;
-		out.max += sectionTop;
-	};
 
 	const updateStableMountedScrollTopBand = (
 		out: StableScrollTopBandMutable,
@@ -243,12 +215,6 @@ export function createVirtualScrollWindowRangeResolver<
 				committedScrollWindowMeasurement.ranges,
 				rangeParams,
 			);
-			updateStablePreviewScrollTopBand(
-				committedScrollWindowMeasurement.stablePreviewScrollTopBand!,
-				measurementRowModel,
-				sectionTop,
-				committedScrollWindowMeasurement.ranges.previewVisible,
-			);
 			return committedScrollWindowMeasurement;
 		}
 
@@ -261,12 +227,6 @@ export function createVirtualScrollWindowRangeResolver<
 		measurementRowModel.findVisibleRangesFromMountedInto(
 			scrollWindowMeasurement.ranges,
 			rangesFromMountedParams,
-		);
-		updateStablePreviewScrollTopBand(
-			scrollWindowMeasurement.stablePreviewScrollTopBand!,
-			measurementRowModel,
-			sectionTop,
-			scrollWindowMeasurement.ranges.previewVisible,
 		);
 		return scrollWindowMeasurement;
 	};

@@ -91,9 +91,6 @@ export function createFlatGridControllerAdapter<T>({
 					precomputedRanges,
 				);
 			},
-			syncPreviewRange(ranges) {
-				measurementAdapter.onActiveScrollPreviewRangeMeasurement(ranges);
-			},
 			onStableMeasurement(measurement) {
 				notifyStableMeasurement(measurement);
 			},

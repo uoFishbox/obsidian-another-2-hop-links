@@ -443,13 +443,6 @@ export function useTwoHopVirtualList(
 			},
 			virtualList,
 			resolveRowModel,
-			syncPreviewVisibleRange(start, end) {
-				const snapshot = virtualList.getSnapshot();
-				if (!snapshot) return;
-				syncPreviewWindow({
-					previewRange: { start, end },
-				});
-			},
 			cancelPreviewVisibleRangeSync() {
 				const snapshot = virtualList.getSnapshot();
 				if (!snapshot) return;

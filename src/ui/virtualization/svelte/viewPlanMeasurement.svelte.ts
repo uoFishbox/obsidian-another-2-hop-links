@@ -58,7 +58,6 @@ interface MeasuredViewPlanRuntime<
 		}): import("../dom/virtualListMeasurementAdapter").MeasurementUpdateResult<RowRange>;
 	};
 	resolveRowModel(layout: ViewPlanLayoutMetrics): TRowModel;
-	syncPreviewVisibleRange(start: number, end: number): void;
 	cancelPreviewVisibleRangeSync(): void;
 }
 
@@ -230,12 +229,6 @@ export function createViewPlanMeasurementRuntime<
 						context.rowModel,
 						context.layout,
 						precomputedRanges,
-					);
-				},
-				syncPreviewRange(ranges) {
-					params.runtime.syncPreviewVisibleRange(
-						ranges.previewVisible.start,
-						ranges.previewVisible.end,
 					);
 				},
 				onStableMeasurement() {},

@@ -17,10 +17,6 @@ function createRowModel(
 		},
 		findVisibleRangesInto() {},
 		findVisibleRangesFromMountedInto() {},
-		findStablePreviewScrollTopBandInto(out) {
-			out.min = -1_000;
-			out.max = 1_000;
-		},
 		findStableMountedScrollTopBandInto(out) {
 			out.min = -1_000;
 			out.max = 1_000;

@@ -33,19 +33,12 @@ export interface CreateFlatGridMeasurementAdapterOptions<T, TLayout> {
 	applyMeasurement(
 		params: ApplyFlatGridMeasurementParams<T, TLayout>,
 	): MeasurementUpdateResult<RowRange>;
-	getActiveVisibilityRowModel(): object | null;
-	syncActiveScrollPreviewRange(params: {
-		previewVisible: RowRange;
-		rowModel: object;
-	}): void;
 }
 
 export function createFlatGridMeasurementAdapter<T, TLayout>({
 	resolveRowModel,
 	resolveVisibilityPolicy,
 	applyMeasurement,
-	getActiveVisibilityRowModel,
-	syncActiveScrollPreviewRange,
 }: CreateFlatGridMeasurementAdapterOptions<T, TLayout>) {
 	const rangeResolver = createVirtualScrollWindowRangeResolver<
 		FlatLinkRowModel<T>,
@@ -105,17 +98,6 @@ export function createFlatGridMeasurementAdapter<T, TLayout>({
 				layout,
 				precomputedMountedRange,
 			);
-		},
-		onActiveScrollPreviewRangeMeasurement(ranges: VirtualRanges): void {
-			const activeRowModel = getActiveVisibilityRowModel();
-			if (!activeRowModel) {
-				return;
-			}
-
-			syncActiveScrollPreviewRange({
-				previewVisible: ranges.previewVisible,
-				rowModel: activeRowModel,
-			});
 		},
 	};
 }

@@ -379,18 +379,6 @@ export function useFlatVirtualGridList<T>(props: FlatVirtualGridListProps<T>) {
 				precomputedRanges,
 				visibilityPolicy,
 			}),
-		getActiveVisibilityRowModel: () =>
-			visibilityAdapter.getActiveRowModel() ??
-			virtualList.getSnapshot()?.rowModel ??
-			null,
-		syncActiveScrollPreviewRange: ({ previewVisible, rowModel }) => {
-			visibilityAdapter.syncVisibilityStates({
-				mountedRows: visibilityAdapter.getMountedRows(),
-				mountedRange: visibilityAdapter.getMountedRange(),
-				previewRange: previewVisible,
-				rowModel,
-			});
-		},
 	});
 
 	const virtualListController = createFlatGridControllerAdapter<T>({

@@ -328,24 +328,6 @@ export function createTwoHopVirtualRowModel(
 			return ranges;
 		},
 		findVisibleRangesFromMountedInto: (out, params) => writeRanges(out, params),
-		findStablePreviewScrollTopBandInto(out, params) {
-			const mountedOverscan = Math.max(0, params.mountedOverscanPx);
-			const previewOverscan = Math.min(
-				mountedOverscan,
-				Math.max(0, params.previewOverscanPx ?? 0),
-			);
-			if (previewOverscan >= mountedOverscan) {
-				out.min = Number.NEGATIVE_INFINITY;
-				out.max = Number.POSITIVE_INFINITY;
-				return;
-			}
-			writeStableBand(
-				out,
-				params.previewVisible,
-				params.viewportHeight,
-				previewOverscan,
-			);
-		},
 		findStableMountedScrollTopBandInto: (out, params) =>
 			writeStableBand(
 				out,

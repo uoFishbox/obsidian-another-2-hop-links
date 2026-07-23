@@ -2,7 +2,7 @@ import type { FlatLogicalCellSource } from "../flatLogicalCellSource";
 import type { VirtualListLogicalCell } from "../logicalCell";
 import type { RowRange } from "../rowRange";
 import type { FlatGridLayoutMetrics } from "../layoutMetrics";
-import type { StablePreviewScrollTopBand } from "../core/scrollWindowGate";
+import type { StableScrollTopBand } from "../core/scrollWindowGate";
 import type {
 	VirtualNavigationTarget,
 	VirtualRanges,
@@ -11,7 +11,6 @@ import type {
 } from "../types";
 import {
 	createMutableVirtualRanges,
-	normalizePreviewOverscan,
 	resolveVirtualRangesInto,
 	resolveVisibleRange,
 } from "../virtualRanges";
@@ -34,8 +33,8 @@ export interface FlatLinkVirtualRow<T> extends VirtualRow<VirtualListLogicalCell
 	startCellIndex: number;
 }
 
-type StablePreviewScrollTopBandMutable = {
-	-readonly [K in keyof StablePreviewScrollTopBand]: StablePreviewScrollTopBand[K];
+type StableScrollTopBandMutable = {
+	-readonly [K in keyof StableScrollTopBand]: StableScrollTopBand[K];
 };
 
 export interface FlatLinkRowModel<T> extends VirtualRowModel<
@@ -86,17 +85,8 @@ export interface FlatLinkRowModel<T> extends VirtualRowModel<
 			previewOverscanPx?: number;
 		},
 	): void;
-	findStablePreviewScrollTopBandInto(
-		out: StablePreviewScrollTopBandMutable,
-		params: {
-			viewportHeight: number;
-			mountedOverscanPx: number;
-			previewOverscanPx?: number;
-			previewVisible: RowRange;
-		},
-	): void;
 	findStableMountedScrollTopBandInto(
-		out: StablePreviewScrollTopBandMutable,
+		out: StableScrollTopBandMutable,
 		params: {
 			mountedOverscanPx: number;
 			viewportHeight: number;
@@ -222,14 +212,12 @@ export function createFlatLinkRowModel<T>(
 	): void => {
 		resolveMountedAndPreviewRangesInto(out, params);
 	};
-	const writeInvalidStableScrollTopBand = (
-		out: StablePreviewScrollTopBandMutable,
-	): void => {
+	const writeInvalidStableScrollTopBand = (out: StableScrollTopBandMutable): void => {
 		out.min = Number.POSITIVE_INFINITY;
 		out.max = Number.NEGATIVE_INFINITY;
 	};
 	const writeStableScrollTopBand = (
-		out: StablePreviewScrollTopBandMutable,
+		out: StableScrollTopBandMutable,
 		range: RowRange,
 		viewportHeight: number,
 		overscanPx: number,
@@ -263,34 +251,8 @@ export function createFlatLinkRowModel<T>(
 			writeInvalidStableScrollTopBand(out);
 		}
 	};
-	const findStablePreviewScrollTopBandInto = (
-		out: StablePreviewScrollTopBandMutable,
-		params: {
-			viewportHeight: number;
-			mountedOverscanPx: number;
-			previewOverscanPx?: number;
-			previewVisible: RowRange;
-		},
-	): void => {
-		const mountedOverscanPx = Math.max(0, params.mountedOverscanPx);
-		const previewOverscanPx = normalizePreviewOverscan(
-			params.previewOverscanPx,
-			mountedOverscanPx,
-		);
-		if (previewOverscanPx >= mountedOverscanPx) {
-			out.min = Number.NEGATIVE_INFINITY;
-			out.max = Number.POSITIVE_INFINITY;
-			return;
-		}
-		writeStableScrollTopBand(
-			out,
-			params.previewVisible,
-			params.viewportHeight,
-			previewOverscanPx,
-		);
-	};
 	const findStableMountedScrollTopBandInto = (
-		out: StablePreviewScrollTopBandMutable,
+		out: StableScrollTopBandMutable,
 		params: {
 			mountedOverscanPx: number;
 			viewportHeight: number;
@@ -386,7 +348,6 @@ export function createFlatLinkRowModel<T>(
 		findVisibleRangesInto,
 		findVisibleRangesFromMounted,
 		findVisibleRangesFromMountedInto,
-		findStablePreviewScrollTopBandInto,
 		findStableMountedScrollTopBandInto,
 		resolveNavigationTarget(
 			currentKey,
