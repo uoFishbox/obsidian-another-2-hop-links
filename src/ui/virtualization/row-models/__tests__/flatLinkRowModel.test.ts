@@ -138,4 +138,54 @@ describe("flatLinkRowModel", () => {
 		});
 		expect(beyondMounted).not.toEqual(mounted);
 	});
+
+	it("resolves the wider scroll band covered by the resident mounted range", () => {
+		const rowModel = createRowModel(60);
+		const mounted = { start: 0, end: 0 };
+		rowModel.findVisibleRangeInto(mounted, {
+			scrollTop: 220,
+			viewportHeight: 100,
+			overscanPx: 110,
+		});
+		const stableBand = { min: Number.NaN, max: Number.NaN };
+		const coverageBand = { min: Number.NaN, max: Number.NaN };
+
+		rowModel.findStableMountedScrollTopBandInto(stableBand, {
+			mountedOverscanPx: 110,
+			viewportHeight: 100,
+			mounted,
+		});
+		rowModel.findMountedCoverageScrollTopBandInto(coverageBand, {
+			viewportHeight: 100,
+			mounted,
+			requiredOverscanPx: 0,
+		});
+
+		expect(coverageBand.min).toBeLessThan(stableBand.min);
+		expect(coverageBand.max).toBeGreaterThan(stableBand.max);
+
+		const requiredAtLowerEdge = { start: 0, end: 0 };
+		rowModel.findVisibleRangeInto(requiredAtLowerEdge, {
+			scrollTop: coverageBand.min,
+			viewportHeight: 100,
+			overscanPx: 0,
+		});
+		expect(requiredAtLowerEdge.start).toBe(mounted.start);
+
+		const requiredBeforeLowerEdge = { start: 0, end: 0 };
+		rowModel.findVisibleRangeInto(requiredBeforeLowerEdge, {
+			scrollTop: coverageBand.min - 1,
+			viewportHeight: 100,
+			overscanPx: 0,
+		});
+		expect(requiredBeforeLowerEdge.start).toBeLessThan(mounted.start);
+
+		const requiredAtUpperEdge = { start: 0, end: 0 };
+		rowModel.findVisibleRangeInto(requiredAtUpperEdge, {
+			scrollTop: coverageBand.max,
+			viewportHeight: 100,
+			overscanPx: 0,
+		});
+		expect(requiredAtUpperEdge.end).toBeGreaterThan(mounted.end);
+	});
 });

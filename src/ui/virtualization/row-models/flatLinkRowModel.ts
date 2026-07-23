@@ -93,6 +93,17 @@ export interface FlatLinkRowModel<T> extends VirtualRowModel<
 			mounted: RowRange;
 		},
 	): void;
+	/**
+	 * Writes the open scrollTop interval covered by the supplied resident rows.
+	 */
+	findMountedCoverageScrollTopBandInto(
+		out: StableScrollTopBandMutable,
+		params: {
+			viewportHeight: number;
+			mounted: RowRange;
+			requiredOverscanPx: number;
+		},
+	): void;
 }
 
 export function createFlatLinkRowModel<T>(
@@ -266,6 +277,38 @@ export function createFlatLinkRowModel<T>(
 			Math.max(0, params.mountedOverscanPx),
 		);
 	};
+	const findMountedCoverageScrollTopBandInto = (
+		out: StableScrollTopBandMutable,
+		params: {
+			viewportHeight: number;
+			mounted: RowRange;
+			requiredOverscanPx: number;
+		},
+	): void => {
+		const { mounted, viewportHeight } = params;
+		if (mounted.start >= mounted.end || viewportHeight <= 0) {
+			writeInvalidStableScrollTopBand(out);
+			return;
+		}
+		if (rowStride <= 0) {
+			out.min = Number.NEGATIVE_INFINITY;
+			out.max = Number.POSITIVE_INFINITY;
+			return;
+		}
+
+		const requiredOverscanRows = resolveOverscanRows(params.requiredOverscanPx);
+		out.min =
+			mounted.start === 0
+				? -viewportHeight
+				: (mounted.start + requiredOverscanRows) * rowStride;
+		out.max =
+			mounted.end >= rowCount
+				? totalHeight
+				: (mounted.end - requiredOverscanRows) * rowStride - viewportHeight + 1;
+		if (out.min >= out.max) {
+			writeInvalidStableScrollTopBand(out);
+		}
+	};
 	const layoutRevision = createVirtualListLayoutRevisionToken([
 		columns,
 		input.layout.cellWidth,
@@ -349,6 +392,7 @@ export function createFlatLinkRowModel<T>(
 		findVisibleRangesFromMounted,
 		findVisibleRangesFromMountedInto,
 		findStableMountedScrollTopBandInto,
+		findMountedCoverageScrollTopBandInto,
 		resolveNavigationTarget(
 			currentKey,
 			direction,

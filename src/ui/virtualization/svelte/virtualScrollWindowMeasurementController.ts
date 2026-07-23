@@ -67,16 +67,16 @@ export function createVirtualScrollWindowMeasurementController<TContext>({
 			return null;
 		}
 		if (
-			lastStableScrollTop <= lastMountedScrollWindow.stableScrollTopMin ||
-			lastStableScrollTop >= lastMountedScrollWindow.stableScrollTopMax
+			lastStableScrollTop <= lastMountedScrollWindow.coverageScrollTopMin ||
+			lastStableScrollTop >= lastMountedScrollWindow.coverageScrollTopMax
 		) {
 			return null;
 		}
 
 		scrollMeasurementRange.minScrollTopBeforeMeasurement =
-			lastMountedScrollWindow.stableScrollTopMin;
+			lastMountedScrollWindow.coverageScrollTopMin;
 		scrollMeasurementRange.maxScrollTopBeforeMeasurement =
-			lastMountedScrollWindow.stableScrollTopMax;
+			lastMountedScrollWindow.coverageScrollTopMax;
 		return scrollMeasurementRange;
 	};
 
@@ -97,6 +97,7 @@ export function createVirtualScrollWindowMeasurementController<TContext>({
 			mountedMeasurement.identity,
 			mountedMeasurement.mounted,
 			mountedMeasurement.stableMountedScrollTopBand,
+			mountedMeasurement.mountedCoverageScrollTopBand,
 		);
 		lastStableScrollTop = measurement.scrollTop;
 	};
@@ -159,6 +160,7 @@ export function createVirtualScrollWindowMeasurementController<TContext>({
 					mountedMeasurement.identity,
 					mountedMeasurement.mounted,
 					mountedMeasurement.stableMountedScrollTopBand,
+					mountedMeasurement.mountedCoverageScrollTopBand,
 				);
 				return returnStableScrollMeasurement(nextMeasurement, context);
 			}
@@ -185,6 +187,7 @@ export function createVirtualScrollWindowMeasurementController<TContext>({
 						pendingMountedMeasurement.identity,
 						pendingMountedMeasurement.mounted,
 						pendingMountedMeasurement.stableMountedScrollTopBand,
+						pendingMountedMeasurement.mountedCoverageScrollTopBand,
 					)
 				: null;
 			return toApplicationResult(result);
@@ -196,6 +199,7 @@ export function createVirtualScrollWindowMeasurementController<TContext>({
 				pendingMountedMeasurement.identity,
 				pendingMountedMeasurement.mounted,
 				pendingMountedMeasurement.stableMountedScrollTopBand,
+				pendingMountedMeasurement.mountedCoverageScrollTopBand,
 			);
 		} else {
 			lastMountedScrollWindow = null;

@@ -15,12 +15,13 @@ const STABLE_MEASUREMENT: VirtualMeasurement = {
 };
 
 describe("createVirtualScrollWindowMeasurementController", () => {
-	it("exposes only the mounted stable band", () => {
+	it("exposes the resident mounted coverage band", () => {
 		const controller = createVirtualScrollWindowMeasurementController({
 			resolveMountedScrollWindowMeasurement: () => ({
 				identity: IDENTITY,
 				mounted: { start: 0, end: 10 },
 				stableMountedScrollTopBand: { min: 40, max: 60 },
+				mountedCoverageScrollTopBand: { min: 20, max: 80 },
 			}),
 			resolveScrollWindowMeasurement: () => ({
 				identity: IDENTITY,
@@ -39,8 +40,8 @@ describe("createVirtualScrollWindowMeasurementController", () => {
 		controller.applyScrollMeasurement(STABLE_MEASUREMENT, undefined);
 
 		expect(controller.getScrollMeasurementRange()).toEqual({
-			minScrollTopBeforeMeasurement: 40,
-			maxScrollTopBeforeMeasurement: 60,
+			minScrollTopBeforeMeasurement: 20,
+			maxScrollTopBeforeMeasurement: 80,
 		});
 
 		controller.resetLastScrollWindow();

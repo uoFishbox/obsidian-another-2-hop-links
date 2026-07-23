@@ -17,12 +17,16 @@ export type LastMountedScrollWindow = {
 	mountedEnd: number;
 	stableScrollTopMin: number;
 	stableScrollTopMax: number;
+	coverageScrollTopMin: number;
+	coverageScrollTopMax: number;
 };
 
 export type MountedScrollWindowMeasurement = {
 	identity: ScrollWindowIdentity;
 	mounted: RowRange;
 	stableMountedScrollTopBand?: StableScrollTopBand;
+	/** Open interval in which the resident mounted rows cover the required range. */
+	mountedCoverageScrollTopBand?: StableScrollTopBand;
 };
 
 export type StableScrollTopBand = {
@@ -50,12 +54,15 @@ export const createMountedScrollWindow = (
 	identity: ScrollWindowIdentity,
 	mounted: RowRange,
 	stableScrollTopBand?: StableScrollTopBand,
+	coverageScrollTopBand?: StableScrollTopBand,
 ): LastMountedScrollWindow => ({
 	identity,
 	mountedStart: mounted.start,
 	mountedEnd: mounted.end,
 	stableScrollTopMin: stableScrollTopBand?.min ?? INVALID_STABLE_SCROLL_TOP_MIN,
 	stableScrollTopMax: stableScrollTopBand?.max ?? INVALID_STABLE_SCROLL_TOP_MAX,
+	coverageScrollTopMin: coverageScrollTopBand?.min ?? INVALID_STABLE_SCROLL_TOP_MIN,
+	coverageScrollTopMax: coverageScrollTopBand?.max ?? INVALID_STABLE_SCROLL_TOP_MAX,
 });
 
 /**
@@ -67,9 +74,15 @@ export const updateMountedScrollWindow = (
 	identity: ScrollWindowIdentity,
 	mounted: RowRange,
 	stableScrollTopBand?: StableScrollTopBand,
+	coverageScrollTopBand?: StableScrollTopBand,
 ): LastMountedScrollWindow => {
 	if (!previous) {
-		return createMountedScrollWindow(identity, mounted, stableScrollTopBand);
+		return createMountedScrollWindow(
+			identity,
+			mounted,
+			stableScrollTopBand,
+			coverageScrollTopBand,
+		);
 	}
 
 	previous.identity = identity;
@@ -79,6 +92,10 @@ export const updateMountedScrollWindow = (
 		stableScrollTopBand?.min ?? INVALID_STABLE_SCROLL_TOP_MIN;
 	previous.stableScrollTopMax =
 		stableScrollTopBand?.max ?? INVALID_STABLE_SCROLL_TOP_MAX;
+	previous.coverageScrollTopMin =
+		coverageScrollTopBand?.min ?? INVALID_STABLE_SCROLL_TOP_MIN;
+	previous.coverageScrollTopMax =
+		coverageScrollTopBand?.max ?? INVALID_STABLE_SCROLL_TOP_MAX;
 	return previous;
 };
 

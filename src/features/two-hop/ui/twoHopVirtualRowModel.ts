@@ -200,6 +200,37 @@ export function createTwoHopVirtualRowModel(
 			out.max = Number.NEGATIVE_INFINITY;
 		}
 	};
+	const writeCoverageBand = (
+		out: StableScrollTopBandMutable,
+		range: RowRange,
+		viewportHeight: number,
+		requiredOverscanPx: number,
+	): void => {
+		if (range.start >= range.end || viewportHeight <= 0) {
+			out.min = Number.POSITIVE_INFINITY;
+			out.max = Number.NEGATIVE_INFINITY;
+			return;
+		}
+
+		const rowBoundary = (rowIndex: number): number => {
+			if (rowIndex <= 0) return 0;
+			if (rowIndex >= geometry.rowCount) return geometry.totalHeight;
+			return resolveTwoHopRowTop(geometry, rowIndex);
+		};
+		const requiredOverscan = Math.max(0, requiredOverscanPx);
+		out.min =
+			range.start === 0
+				? -viewportHeight
+				: rowBoundary(range.start) + requiredOverscan;
+		out.max =
+			range.end >= geometry.rowCount
+				? geometry.totalHeight
+				: rowBoundary(range.end) - viewportHeight - requiredOverscan + 1;
+		if (out.min >= out.max) {
+			out.min = Number.POSITIVE_INFINITY;
+			out.max = Number.NEGATIVE_INFINITY;
+		}
+	};
 
 	const resolveDirectionalTarget = (
 		direction: ResultNavigationDirection,
@@ -334,6 +365,13 @@ export function createTwoHopVirtualRowModel(
 				params.mounted,
 				params.viewportHeight,
 				params.mountedOverscanPx,
+			),
+		findMountedCoverageScrollTopBandInto: (out, params) =>
+			writeCoverageBand(
+				out,
+				params.mounted,
+				params.viewportHeight,
+				params.requiredOverscanPx,
 			),
 		resolveNavigationTarget: (_currentKey, direction, currentPosition) =>
 			resolveDirectionalTarget(

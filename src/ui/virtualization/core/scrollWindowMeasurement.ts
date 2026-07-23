@@ -48,6 +48,17 @@ export interface VirtualScrollWindowRangeRowModel {
 			mounted: RowRange;
 		},
 	): void;
+	/**
+	 * Writes the open scrollTop interval covered by the supplied resident rows.
+	 */
+	findMountedCoverageScrollTopBandInto?(
+		out: StableScrollTopBandMutable,
+		params: {
+			viewportHeight: number;
+			mounted: RowRange;
+			requiredOverscanPx: number;
+		},
+	): void;
 }
 
 export interface CreateVirtualScrollWindowRangeResolverOptions<
@@ -89,8 +100,13 @@ export function createVirtualScrollWindowRangeResolver<
 		identity: {},
 		mounted: { start: 0, end: 0 },
 		stableMountedScrollTopBand: undefined,
+		mountedCoverageScrollTopBand: undefined,
 	};
 	const mountedStableBandScratch: StableScrollTopBandMutable = {
+		min: 0,
+		max: 0,
+	};
+	const mountedCoverageBandScratch: StableScrollTopBandMutable = {
 		min: 0,
 		max: 0,
 	};
@@ -144,6 +160,32 @@ export function createVirtualScrollWindowRangeResolver<
 		out.max += sectionTop;
 		return out;
 	};
+	const updateMountedCoverageScrollTopBand = (
+		out: StableScrollTopBandMutable,
+		measurementRowModel: TRowModel,
+		sectionTop: number,
+		viewportHeight: number,
+		mounted: RowRange,
+	): StableScrollTopBand | undefined => {
+		if (!resolveStableMountedScrollTopBand) {
+			return undefined;
+		}
+		if (!measurementRowModel.findMountedCoverageScrollTopBandInto) {
+			return undefined;
+		}
+		if (mounted.start >= mounted.end) {
+			return undefined;
+		}
+
+		measurementRowModel.findMountedCoverageScrollTopBandInto(out, {
+			viewportHeight,
+			mounted,
+			requiredOverscanPx: 0,
+		});
+		out.min += sectionTop;
+		out.max += sectionTop;
+		return out;
+	};
 
 	const resolveMountedScrollWindowMeasurement = (
 		scrollTop: number,
@@ -185,6 +227,14 @@ export function createVirtualScrollWindowRangeResolver<
 				measurementRowModel,
 				sectionTop,
 				mountedOverscanPx,
+				viewportHeight,
+				mountedScrollWindowMeasurement.mounted,
+			);
+		mountedScrollWindowMeasurement.mountedCoverageScrollTopBand =
+			updateMountedCoverageScrollTopBand(
+				mountedCoverageBandScratch,
+				measurementRowModel,
+				sectionTop,
 				viewportHeight,
 				mountedScrollWindowMeasurement.mounted,
 			);

@@ -41,6 +41,7 @@ describe("scrollWindowGate", () => {
 			identity,
 			{ start: 3, end: 8 },
 			{ min: 20, max: 80 },
+			{ min: 10, max: 90 },
 		);
 
 		expect(updated).toBe(previous);
@@ -50,6 +51,8 @@ describe("scrollWindowGate", () => {
 			mountedEnd: 8,
 			stableScrollTopMin: 20,
 			stableScrollTopMax: 80,
+			coverageScrollTopMin: 10,
+			coverageScrollTopMax: 90,
 		});
 	});
 

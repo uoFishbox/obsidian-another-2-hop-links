@@ -46,6 +46,7 @@ export function createFlatGridMeasurementAdapter<T, TLayout>({
 	>({
 		resolveRowModel,
 		resolveVisibilityPolicy: (layout) => resolveVisibilityPolicy(layout, true),
+		resolveStableMountedScrollTopBand: true,
 	});
 
 	return {

@@ -201,4 +201,53 @@ describe("TwoHopDocument fixed-grid geometry", () => {
 			}),
 		).toEqual({ key: expectedRight?.key, rowTop: 110 });
 	});
+
+	it("keeps the mounted rows resident while they cover the viewport", () => {
+		const items = Array.from({ length: 30 }, (_, index) =>
+			createItem(String(index)),
+		);
+		const document = createTwoHopDocument({
+			sections: [createSection("first", items)],
+			visibleCounts: {},
+			initialVisibleCount: items.length,
+		});
+		const rowModel = createTwoHopVirtualRowModel(document, layout);
+		const mounted = { start: 0, end: 0 };
+		rowModel.findVisibleRangeInto(mounted, {
+			scrollTop: 220,
+			viewportHeight: 100,
+			overscanPx: 110,
+		});
+		const coverageBand = { min: Number.NaN, max: Number.NaN };
+
+		rowModel.findMountedCoverageScrollTopBandInto?.(coverageBand, {
+			viewportHeight: 100,
+			mounted,
+			requiredOverscanPx: 0,
+		});
+
+		const requiredBeforeBand = { start: 0, end: 0 };
+		rowModel.findVisibleRangeInto(requiredBeforeBand, {
+			scrollTop: coverageBand.min - 1,
+			viewportHeight: 100,
+			overscanPx: 0,
+		});
+		const requiredInsideBand = { start: 0, end: 0 };
+		rowModel.findVisibleRangeInto(requiredInsideBand, {
+			scrollTop: coverageBand.max - 1,
+			viewportHeight: 100,
+			overscanPx: 0,
+		});
+		const requiredAtBandEnd = { start: 0, end: 0 };
+		rowModel.findVisibleRangeInto(requiredAtBandEnd, {
+			scrollTop: coverageBand.max,
+			viewportHeight: 100,
+			overscanPx: 0,
+		});
+
+		expect(requiredBeforeBand.start).toBeLessThan(mounted.start);
+		expect(requiredInsideBand.start).toBeGreaterThanOrEqual(mounted.start);
+		expect(requiredInsideBand.end).toBeLessThanOrEqual(mounted.end);
+		expect(requiredAtBandEnd.end).toBeGreaterThan(mounted.end);
+	});
 });

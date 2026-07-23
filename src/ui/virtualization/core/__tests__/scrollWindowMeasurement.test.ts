@@ -21,6 +21,10 @@ function createRowModel(
 			out.min = -1_000;
 			out.max = 1_000;
 		},
+		findMountedCoverageScrollTopBandInto(out) {
+			out.min = -2_000;
+			out.max = 2_000;
+		},
 	};
 }
 
@@ -40,9 +44,18 @@ describe("createVirtualScrollWindowRangeResolver", () => {
 			resolveStableMountedScrollTopBand: true,
 		});
 
-		resolver.resolveMountedScrollWindowMeasurement(100, 100, 0, layout);
+		const initial = resolver.resolveMountedScrollWindowMeasurement(
+			100,
+			100,
+			0,
+			layout,
+		);
 		resolver.resolveMountedScrollWindowMeasurement(101, 100, 0, layout);
 		expect(findVisibleRangeInto).toHaveBeenCalledTimes(1);
+		expect(initial.mountedCoverageScrollTopBand).toEqual({
+			min: -2_000,
+			max: 2_000,
+		});
 
 		resolver.resolveMountedScrollWindowMeasurement(102, 120, 0, layout);
 		resolver.resolveMountedScrollWindowMeasurement(103, 120, 5, layout);
