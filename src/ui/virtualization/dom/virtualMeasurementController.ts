@@ -225,8 +225,6 @@ export function createVirtualMeasurementController({
 		if (!getOptionalOwnerWindow(rootEl ?? measurement.scrollContainerEl)) {
 			return SKIPPED_NO_WINDOW;
 		}
-		markVirtualScrollMeasurementRun();
-
 		cachedMeasurementInput.rootEl = rootEl;
 		cachedMeasurementInput.scrollContainerEl = measurement.scrollContainerEl;
 		cachedMeasurementInput.viewportHeight = measurement.viewportHeight;
@@ -250,6 +248,7 @@ export function createVirtualMeasurementController({
 			return SKIPPED_UNCHANGED_SCROLL;
 		}
 
+		markVirtualScrollMeasurementRun();
 		const applicationResult = publishMeasurement(scrollMeasurement);
 		rememberPublishedScrollMeasurement(scrollMeasurement);
 
