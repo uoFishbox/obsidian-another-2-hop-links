@@ -30,11 +30,6 @@
 
 	const renderItem = $derived(model?.item ?? item);
 	const renderSearchQuery = $derived(model?.searchQuery ?? searchQuery);
-	const renderSearchScope = $derived(model?.searchScope ?? searchScope);
-	const renderContentPreview = $derived(model?.contentPreview ?? contentPreview);
-	const renderPreviewRefreshToken = $derived(
-		model?.previewRefreshToken ?? previewRefreshToken,
-	);
 	const renderPresentation = $derived(model?.presentation ?? presentation);
 	const strategy = $derived(
 		model ? null : renderItem ? getItemStrategy(renderItem) : null,
@@ -144,9 +139,6 @@
 		void model;
 		void renderItem;
 		void renderSearchQuery;
-		void renderSearchScope;
-		void renderContentPreview;
-		void renderPreviewRefreshToken;
 		void renderPresentation;
 		void strategy;
 		void targetFile;

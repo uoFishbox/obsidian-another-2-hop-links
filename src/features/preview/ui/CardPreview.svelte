@@ -92,15 +92,14 @@
 	);
 	const previewRenderRequest = $derived.by(() => {
 		const snapshot = effectiveRenderSnapshot;
+		if (!snapshot) return null;
+
 		return resolveRenderRequest(
-			snapshot?.file,
-			snapshot?.previewRefreshToken ?? 0,
-			snapshot?.previewOverride ?? null,
-			snapshot
-				? (applicationStore.getPreviewRenderVersion?.(snapshot.file.path) ??
-						"0:0")
-				: "0:0",
-			snapshot?.searchQuery ?? "",
+			snapshot.file,
+			snapshot.previewRefreshToken,
+			snapshot.previewOverride,
+			applicationStore.getPreviewRenderVersion?.(snapshot.file.path) ?? "0:0",
+			snapshot.searchQuery,
 			applicationStore.settings,
 		);
 	});
