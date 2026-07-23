@@ -5,7 +5,7 @@ export interface VirtualListSharedScrollMetrics {
 	viewportHeight: number;
 	frameId: number;
 	isScrollActive: boolean;
-	/** Monotonic observer-owned generation of the latest native scroll event. */
+	/** Monotonic scroll-target generation of the latest native scroll event. */
 	scrollGeneration: number;
 }
 

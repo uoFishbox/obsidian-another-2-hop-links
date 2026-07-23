@@ -240,6 +240,7 @@ describe("observeVirtualListViewport", () => {
 			clientHeight = 300;
 
 			await flushFrames();
+			await flushFrames();
 		} finally {
 			stopObserving();
 			teardownAnimationFrameMock();
@@ -309,6 +310,7 @@ describe("observeVirtualListViewport", () => {
 
 			scrollTop = 150;
 			scrollContainer.dispatchEvent(new Event("scroll"));
+			await flushFrames();
 			await flushFrames();
 
 			expect(runScrollMeasurement).toHaveBeenCalledTimes(1);

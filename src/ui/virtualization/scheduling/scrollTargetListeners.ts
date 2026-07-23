@@ -4,10 +4,13 @@ type ScrollTarget = Window | HTMLElement;
 export type ScrollPhase = "start" | "scroll" | "idle";
 export interface ScrollTargetMetrics {
 	readonly scrollTop: number;
+	/** Monotonic generation of the latest native scroll event. */
+	readonly scrollGeneration: number;
 }
 
 interface MutableScrollTargetMetrics {
 	scrollTop: number;
+	scrollGeneration: number;
 }
 
 type ScrollPhaseCallback = (phase: ScrollPhase, metrics?: ScrollTargetMetrics) => void;
@@ -17,11 +20,13 @@ const SCROLL_IDLE_MS = 140;
 interface Entry {
 	phaseCallbacks: Set<ScrollPhaseCallback>;
 	dispatch: () => void;
+	dispatchFrame: () => void;
 	dispatchIdle: () => void;
+	frameHandle: number | null;
 	idleTimer: number | null;
 	isScrollActive: boolean;
 	lastScrollTime: number;
-	metricsScratch: MutableScrollTargetMetrics | undefined;
+	metricsScratch: MutableScrollTargetMetrics;
 }
 
 const entries = new WeakMap<ScrollTarget, Entry>();
@@ -32,6 +37,14 @@ function resolveScrollTargetWindow(target: ScrollTarget): Window | null {
 	}
 
 	return getOptionalOwnerWindow(target);
+}
+
+function readScrollTop(target: ScrollTarget): number {
+	if ("document" in target) {
+		return target.scrollY || target.pageYOffset || 0;
+	}
+
+	return target.scrollTop;
 }
 
 export function subscribeScrollTarget(
@@ -47,11 +60,23 @@ export function subscribeScrollTarget(
 	if (!entry) {
 		entry = {
 			phaseCallbacks: new Set(),
+			frameHandle: null,
 			idleTimer: null,
 			isScrollActive: false,
 			lastScrollTime: 0,
-			metricsScratch: "document" in target ? undefined : { scrollTop: 0 },
+			metricsScratch: {
+				scrollTop: 0,
+				scrollGeneration: 0,
+			},
 			dispatchIdle: () => {
+				if (entry!.frameHandle !== null) {
+					entry!.idleTimer = targetWindow.setTimeout(
+						entry!.dispatchIdle,
+						SCROLL_IDLE_MS,
+					);
+					return;
+				}
+
 				const elapsed = Date.now() - entry!.lastScrollTime;
 				if (elapsed < SCROLL_IDLE_MS) {
 					entry!.idleTimer = targetWindow.setTimeout(
@@ -67,13 +92,8 @@ export function subscribeScrollTarget(
 					cb("idle");
 				}
 			},
-			dispatch: () => {
-				const metrics = entry!.metricsScratch;
-				if (metrics && !("document" in target)) {
-					metrics.scrollTop = target.scrollTop;
-				}
-				entry!.lastScrollTime = Date.now();
-
+			dispatchFrame: () => {
+				entry!.frameHandle = null;
 				if (!entry!.isScrollActive) {
 					entry!.isScrollActive = true;
 					for (const cb of entry!.phaseCallbacks) {
@@ -82,7 +102,7 @@ export function subscribeScrollTarget(
 				}
 
 				for (const cb of entry!.phaseCallbacks) {
-					cb("scroll", metrics);
+					cb("scroll", entry!.metricsScratch);
 				}
 
 				if (entry!.idleTimer === null) {
@@ -91,6 +111,18 @@ export function subscribeScrollTarget(
 						SCROLL_IDLE_MS,
 					);
 				}
+			},
+			dispatch: () => {
+				entry!.metricsScratch.scrollTop = readScrollTop(target);
+				entry!.metricsScratch.scrollGeneration += 1;
+				entry!.lastScrollTime = Date.now();
+				if (entry!.frameHandle !== null) {
+					return;
+				}
+
+				entry!.frameHandle = targetWindow.requestAnimationFrame(
+					entry!.dispatchFrame,
+				);
 			},
 		};
 
@@ -111,6 +143,9 @@ export function subscribeScrollTarget(
 		current.phaseCallbacks.delete(callback);
 
 		if (current.phaseCallbacks.size === 0) {
+			if (current.frameHandle !== null) {
+				targetWindow.cancelAnimationFrame(current.frameHandle);
+			}
 			if (current.idleTimer !== null) {
 				targetWindow.clearTimeout(current.idleTimer);
 			}

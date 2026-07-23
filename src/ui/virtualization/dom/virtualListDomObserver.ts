@@ -545,7 +545,8 @@ const handleScrollPhase = (
 	metrics?: ScrollTargetMetrics,
 ): void => {
 	if (phase === "scroll") {
-		entry.scrollGeneration += 1;
+		entry.scrollGeneration =
+			metrics?.scrollGeneration ?? entry.scrollGeneration + 1;
 	}
 	entry.pendingScrollTop = phase === "scroll" ? (metrics?.scrollTop ?? null) : null;
 	const suppressScrollMeasurement =
