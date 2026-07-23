@@ -481,7 +481,7 @@
 				visibility,
 				rowIndex,
 				activationCandidateId,
-				previewState,
+				previewSlotId,
 			})}
 				{@const ItemComponent = config.itemComponent}
 				{@const previewRefreshToken =
@@ -494,7 +494,7 @@
 						{item}
 						settings={applicationStore.settings}
 						model={resolveViewItemCardModel(item, index)}
-						{previewState}
+						{previewSlotId}
 					/>
 				{:else if visibilityConsumption !== "none"}
 					<ItemComponent

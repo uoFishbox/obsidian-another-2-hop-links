@@ -11,14 +11,13 @@
 		resolveTwoHopItemStaticState,
 		resolveTwoHopSectionVariant,
 	} from "features/two-hop/ui/twoHopCellStaticState";
-	import type { CardPreviewSlotState } from "features/preview/ui/cardPreviewSnapshot";
 
 	interface Props {
 		mountedCell: TwoHopMountedCell;
 		applicationStore?: ApplicationStore;
 		cardModel?: CardRenderModel;
 		onLoadMore: (sectionId: string) => void;
-		previewState?: CardPreviewSlotState;
+		previewSlotId: string;
 	}
 
 	let {
@@ -26,7 +25,7 @@
 		applicationStore,
 		cardModel = undefined,
 		onLoadMore,
-		previewState = undefined,
+		previewSlotId,
 	}: Props = $props();
 
 	const itemPresentation = $derived.by(() => {
@@ -104,7 +103,7 @@
 		item={mountedCell.cell.item.item}
 		settings={applicationStore.settings}
 		model={cardModel}
-		{previewState}
+		{previewSlotId}
 	/>
 {:else}
 	<div

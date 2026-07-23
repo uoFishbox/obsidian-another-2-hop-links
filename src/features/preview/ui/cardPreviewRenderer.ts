@@ -48,12 +48,24 @@ export interface CardPreviewRendererOptions {
 	onRendered: () => void;
 }
 
+export interface PreviewRenderCallbacks {
+	isCurrent(): boolean;
+	onLoadingChange(isLoading: boolean): void;
+	onCommitted(
+		contentType: PreviewData["type"] | undefined,
+		retention: CardPreviewRetention,
+	): void;
+	onRendered(): void;
+	onError?(): void;
+}
+
 export type CardPreviewRetention = "resident" | "lifecycle-bound";
 
 export type CardPreviewRenderer = (
 	container: HTMLElement,
 	request: CardPreviewRenderRequest,
 	bindingIdentity: string,
+	callbacks?: PreviewRenderCallbacks,
 ) => () => void;
 
 let nextDomCommitScopeId = 0;
@@ -65,6 +77,7 @@ export function createCardPreviewRenderer(
 	const domCommitScopeKey = `card-preview:${++nextDomCommitScopeId}`;
 	let renderSequence = 0;
 	let lastAppliedRenderCacheKey: string | undefined;
+	const callbacksByRenderToken = new Map<number, PreviewRenderCallbacks>();
 
 	const enqueueCoordinatedDomCommit = async (
 		task: PreviewDomCommitTask,
@@ -81,6 +94,7 @@ export function createCardPreviewRenderer(
 		container: HTMLElement,
 		request: CardPreviewRenderRequest,
 		bindingIdentity: string,
+		callbacks?: PreviewRenderCallbacks,
 	): () => void {
 		const abortController = new AbortController();
 		let component: Component | undefined;
@@ -92,6 +106,10 @@ export function createCardPreviewRenderer(
 			return component;
 		};
 		const renderToken = ++renderSequence;
+		if (callbacks) {
+			callbacksByRenderToken.set(renderToken, callbacks);
+			if (callbacks.isCurrent()) callbacks.onLoadingChange(true);
+		}
 
 		void renderPreview(
 			container,
@@ -100,18 +118,21 @@ export function createCardPreviewRenderer(
 			abortController.signal,
 			renderToken,
 			getOrCreateComponent,
-		).then((didRender) => {
-			if (
-				didRender &&
-				!abortController.signal.aborted &&
-				renderToken === renderSequence
-			) {
+		)
+			.then((didRender) => {
+				if (!didRender || isRenderStale(abortController.signal, renderToken)) {
+					return;
+				}
 				options.onRendered();
-			}
-		});
+				callbacks?.onRendered();
+			})
+			.finally(() => {
+				callbacksByRenderToken.delete(renderToken);
+			});
 
 		return () => {
 			abortController.abort();
+			callbacksByRenderToken.delete(renderToken);
 			component?.unload();
 		};
 	}
@@ -216,7 +237,12 @@ export function createCardPreviewRenderer(
 								container.replaceChildren(image);
 							}
 							lastAppliedRenderCacheKey = renderCacheKey;
-							commitPreviewState(bindingIdentity, "image", "resident");
+							commitPreviewState(
+								renderToken,
+								bindingIdentity,
+								"image",
+								"resident",
+							);
 							return true;
 						},
 					});
@@ -331,8 +357,19 @@ export function createCardPreviewRenderer(
 				targetKey: domCommitScopeKey,
 				isStale: () => isRenderStale(signal, renderToken),
 				commit: () => {
+					const callbacks = callbacksByRenderToken.get(renderToken);
+					if (callbacks?.isCurrent()) {
+						callbacks.onLoadingChange(false);
+						callbacks.onError?.();
+						return true;
+					}
 					handlePreviewError(container, error);
-					commitPreviewState(bindingIdentity, undefined, "resident");
+					commitPreviewState(
+						renderToken,
+						bindingIdentity,
+						undefined,
+						"resident",
+					);
 					return true;
 				},
 			});
@@ -363,7 +400,7 @@ export function createCardPreviewRenderer(
 				if (renderedEntry.hasMath) {
 					syncMathJaxStylesForNode(container);
 				}
-				commitPreviewState(bindingIdentity, "text", "resident");
+				commitPreviewState(renderToken, bindingIdentity, "text", "resident");
 				return true;
 			},
 		});
@@ -392,7 +429,7 @@ export function createCardPreviewRenderer(
 				if (shouldSyncMathStyles) {
 					syncMathJaxStylesForNode(container);
 				}
-				commitPreviewState(bindingIdentity, "text", "resident");
+				commitPreviewState(renderToken, bindingIdentity, "text", "resident");
 				return true;
 			},
 		});
@@ -421,7 +458,12 @@ export function createCardPreviewRenderer(
 				if (shouldSyncMathStyles) {
 					syncMathJaxStylesForNode(container);
 				}
-				commitPreviewState(bindingIdentity, contentType, retention);
+				commitPreviewState(
+					renderToken,
+					bindingIdentity,
+					contentType,
+					retention,
+				);
 				return true;
 			},
 		});
@@ -439,15 +481,25 @@ export function createCardPreviewRenderer(
 	}
 
 	function isRenderStale(signal: AbortSignal, renderToken: number): boolean {
-		return signal.aborted || renderToken !== renderSequence;
+		const callbacks = callbacksByRenderToken.get(renderToken);
+		return (
+			signal.aborted ||
+			renderToken !== renderSequence ||
+			(callbacks !== undefined && !callbacks.isCurrent())
+		);
 	}
 
 	function commitPreviewState(
+		renderToken: number,
 		identity: string,
 		contentType: PreviewData["type"] | undefined,
 		retention: CardPreviewRetention,
 	): void {
 		options.onCommitted(identity, contentType, retention);
+		const callbacks = callbacksByRenderToken.get(renderToken);
+		if (!callbacks?.isCurrent()) return;
+		callbacks.onLoadingChange(false);
+		callbacks.onCommitted(contentType, retention);
 	}
 
 	return render;

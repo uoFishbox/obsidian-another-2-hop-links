@@ -4,6 +4,7 @@
 	import { provideVirtualFrameCoordinator } from "ui/virtualization/svelte/frameCoordinatorContext.svelte";
 	import TwoHopLogicalCell from "features/two-hop/ui/TwoHopLogicalCell.svelte";
 	import { useTwoHopVirtualList } from "features/two-hop/ui/useTwoHopVirtualList.svelte";
+	import { provideVirtualPreviewSurface } from "features/preview/ui/virtualPreviewSurfaceContext";
 	import type { ApplicationStore } from "ui/stores/ApplicationStore.svelte";
 	import type { CardRenderModel } from "ui/components/items/cardRenderModel";
 	import type { TwoHopCardPresentationState } from "features/two-hop/ui/twoHopCellStaticState";
@@ -36,6 +37,7 @@
 	const props: Props = $props();
 	const frameCoordinator = provideVirtualFrameCoordinator();
 	const list = useTwoHopVirtualList(props, frameCoordinator);
+	provideVirtualPreviewSurface(list.previewSurface);
 </script>
 
 <VirtualSurface
@@ -66,7 +68,7 @@
 			{mountedCell}
 			applicationStore={props.applicationStore}
 			cardModel={slotState?.cardModel}
-			previewState={slotState?.previewState}
+			previewSlotId={String(mountedCell.renderSlotKey)}
 			onLoadMore={list.loadMore}
 		/>
 	{/snippet}

@@ -36,24 +36,24 @@ import {
 import { createResolvedCardLayoutSettingsMemo } from "ui/shared/layout/cardLayoutCssVars";
 import type { PreviewBackpressure } from "features/preview/scheduling/previewActivationScheduler";
 import {
-	createRowPreviewController,
+	createVirtualPreviewSurface,
 	type RowPreviewCardBinding,
-} from "features/preview/scheduling/rowPreviewController.svelte";
+} from "features/preview/scheduling/virtualPreviewSurface";
 import { resolveTwoHopItemStaticState } from "features/two-hop/ui/twoHopCellStaticState";
 import {
 	createVirtualCardInteractionController,
 	type VirtualCardInteractionBinding,
 } from "ui/interactions/virtualCardInteractionController";
-import { useLinkContext } from "ui/context/linkContext";
+import { useAppContext, useLinkContext } from "ui/context/linkContext";
 import type { RowRange } from "ui/virtualization/rowRange";
 import type { RenderSlotKey, VirtualNavigationTarget } from "ui/virtualization/types";
 import type { ResultNavigationDirection } from "features/keyboard-navigation/resultFocus";
 import type { VirtualFrameCoordinator } from "ui/virtualization/scheduling/frameCoordinator";
-import type { CardPreviewSlotState } from "features/preview/ui/cardPreviewSnapshot";
 import {
 	DEFAULT_PREVIEW_DOM_COMMITS_PER_SECOND,
 	resolvePreviewActivationsPerSecond,
 } from "appConstants";
+import { DEFAULT_SETTINGS } from "features/settings/model";
 
 export interface TwoHopVirtualListProps {
 	readonly sections: readonly TwoHopVirtualSectionDescriptor[];
@@ -71,7 +71,6 @@ export interface TwoHopVirtualListProps {
 export interface TwoHopRenderSlotState {
 	cell: TwoHopMountedCell | undefined;
 	cardModel: CardRenderModel | undefined;
-	previewState: CardPreviewSlotState | undefined;
 }
 
 const EMPTY_RANGE: RowRange = { start: 0, end: 0 };
@@ -97,7 +96,20 @@ export function useTwoHopVirtualList(
 	} catch {
 		linkContext = undefined;
 	}
-	const previewController = createRowPreviewController({
+	let appContext: ReturnType<typeof useAppContext> | undefined;
+	try {
+		appContext = useAppContext();
+	} catch {
+		appContext = undefined;
+	}
+	const previewApplicationStore = applicationStore ?? appContext?.applicationStore;
+	const previewSurface = createVirtualPreviewSurface({
+		app: appContext?.app,
+		getPreview: linkContext?.getPreview,
+		getSettings: () => previewApplicationStore?.settings ?? DEFAULT_SETTINGS,
+		getPreviewRenderVersion: (filePath) =>
+			previewApplicationStore?.getPreviewRenderVersion?.(filePath) ?? "0:0",
+		resolveSearchMatchPosition: appContext?.resolveSearchMatchPosition,
 		getBackpressure: (): PreviewBackpressure => ({
 			queued: linkContext?.getVisiblePreviewQueueSize?.() ?? 0,
 			active: linkContext?.getActiveVisiblePreviewCount?.() ?? 0,
@@ -107,9 +119,12 @@ export function useTwoHopVirtualList(
 		frameCoordinator,
 		getActivationsPerSecond: () =>
 			resolvePreviewActivationsPerSecond(
-				applicationStore?.settings.previewDomCommitsPerSecond ??
+				previewApplicationStore?.settings.previewDomCommitsPerSecond ??
 					DEFAULT_PREVIEW_DOM_COMMITS_PER_SECOND,
 			),
+		getDomCommitsPerSecond: () =>
+			previewApplicationStore?.settings.previewDomCommitsPerSecond ??
+			DEFAULT_PREVIEW_DOM_COMMITS_PER_SECOND,
 	});
 	const interactionController = createVirtualCardInteractionController();
 	const documentProjection = createTwoHopDocumentProjection({
@@ -253,8 +268,6 @@ export function useTwoHopVirtualList(
 			).push(binding);
 		} else if (previousPreview) {
 			previewBindingDelta.releasedSlots.push(String(cell.renderSlotKey));
-			if (slotState.previewState !== undefined)
-				slotState.previewState = undefined;
 		}
 
 		const previousInteraction = previousModel?.interactionDescriptor;
@@ -293,7 +306,6 @@ export function useTwoHopVirtualList(
 		}
 		if (slotState.cell !== undefined) slotState.cell = undefined;
 		if (slotState.cardModel !== undefined) slotState.cardModel = undefined;
-		if (slotState.previewState !== undefined) slotState.previewState = undefined;
 	};
 
 	const refreshCardBindings = (
@@ -351,26 +363,12 @@ export function useTwoHopVirtualList(
 		return true;
 	};
 
-	const syncRenderSlotPreviewStates = (): void => {
-		for (const cell of changedCellsScratch) {
-			const slotState = renderSlotStates[cell.renderSlotIndex];
-			if (!slotState || slotState.cell !== cell) continue;
-			const previewState = previewController.getSlotState(
-				String(cell.renderSlotKey),
-			);
-			if (slotState.previewState !== previewState) {
-				slotState.previewState = previewState;
-			}
-		}
-	};
-
 	const syncCardBindings = (
 		build: TwoHopMountedRowsBuild | null,
 		resolver: TwoHopVirtualListProps["resolveItemCardModel"],
 	): void => {
 		if (!refreshCardBindings(build, resolver)) return;
-		previewController.syncBindingDelta(previewBindingDelta);
-		syncRenderSlotPreviewStates();
+		previewSurface.syncBindingDelta(previewBindingDelta);
 	};
 
 	const syncDisplaySnapshot = (params: {
@@ -381,17 +379,16 @@ export function useTwoHopVirtualList(
 	}): void => {
 		const bindingsChanged = refreshCardBindings(params.build, params.resolver);
 		if (!bindingsChanged) {
-			previewController.setPreviewWindow({
+			previewSurface.setPreviewWindow({
 				previewRange: params.previewRange,
 				active: params.active,
 			});
 			return;
 		}
-		previewController.commitBindingDelta(previewBindingDelta, {
+		previewSurface.commitBindingDelta(previewBindingDelta, {
 			previewRange: params.previewRange,
 			active: params.active,
 		});
-		syncRenderSlotPreviewStates();
 	};
 
 	const virtualList = useVirtualList<
@@ -460,7 +457,7 @@ export function useTwoHopVirtualList(
 			cancelPreviewVisibleRangeSync() {
 				const snapshot = virtualList.getSnapshot();
 				if (!snapshot) return;
-				previewController.setPreviewWindow({
+				previewSurface.setPreviewWindow({
 					previewRange: EMPTY_RANGE,
 					active: untrack(() => props.previewActive !== false),
 				});
@@ -502,7 +499,7 @@ export function useTwoHopVirtualList(
 		const active = props.previewActive !== false;
 		const snapshot = untrack(() => virtualList.getSnapshot());
 		if (!snapshot) return;
-		previewController.setPreviewWindow({
+		previewSurface.setPreviewWindow({
 			previewRange: snapshot.ranges.previewVisible,
 			active,
 		});
@@ -515,7 +512,7 @@ export function useTwoHopVirtualList(
 	});
 
 	onDestroy(() => {
-		previewController?.dispose();
+		previewSurface.dispose();
 		interactionController.clear();
 	});
 
@@ -554,6 +551,9 @@ export function useTwoHopVirtualList(
 		get interactionDescriptorResolverProvider() {
 			return interactionController.provider;
 		},
+		get previewSurface() {
+			return previewSurface;
+		},
 		getRenderSlotState(cell: TwoHopMountedCell) {
 			const state = renderSlotStates[cell.renderSlotIndex];
 			return state?.cell === cell ? state : undefined;
@@ -580,7 +580,6 @@ export function useTwoHopVirtualList(
 function createTwoHopRenderSlotState(): TwoHopRenderSlotState {
 	let cell = $state.raw<TwoHopMountedCell | undefined>(undefined);
 	let cardModel = $state.raw<CardRenderModel | undefined>(undefined);
-	let previewState = $state.raw<CardPreviewSlotState | undefined>(undefined);
 	return {
 		get cell() {
 			return cell;
@@ -593,12 +592,6 @@ function createTwoHopRenderSlotState(): TwoHopRenderSlotState {
 		},
 		set cardModel(nextCardModel) {
 			cardModel = nextCardModel;
-		},
-		get previewState() {
-			return previewState;
-		},
-		set previewState(nextPreviewState) {
-			previewState = nextPreviewState;
 		},
 	};
 }

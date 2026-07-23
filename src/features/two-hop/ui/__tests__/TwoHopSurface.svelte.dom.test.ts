@@ -23,6 +23,12 @@ import type {
 } from "features/two-hop/ui/twoHopVirtualListModel";
 import type { CardRenderModel } from "ui/components/items/cardRenderModel";
 import type { LinkContext } from "ui/context/linkContext";
+import type { AppContext } from "ui/context/linkContext";
+import type { App, TFile } from "obsidian";
+import {
+	getCCLDevMeasurementSnapshot,
+	resetCCLDevMeasurements,
+} from "infrastructure/debug/CCLDevMeasurements";
 
 beforeEach(() => {
 	resetRecords();
@@ -131,6 +137,100 @@ async function scrollSurface(
 }
 
 describe("TwoHopSurface", () => {
+	it("commits two-hop preview DOM without reevaluating ViewItemCard", async () => {
+		const targetFile = {
+			path: "notes/preview.md",
+			basename: "preview",
+			extension: "md",
+			parent: { path: "notes" },
+			stat: { mtime: 1 },
+		} as TFile;
+		const getPreview = vi.fn(async () => ({
+			type: "image" as const,
+			content: "https://example.com/preview.png",
+		}));
+		const linkContext = {
+			getPreview,
+			sourceFile: targetFile,
+			fileToLinktext: () => "preview",
+			getMetadata: () => null,
+		} as unknown as LinkContext;
+		const appContext = {
+			app: { vault: {} } as App,
+			applicationStore,
+			linkContext,
+			bookmarks: {
+				filePaths: new Set(),
+				orderedFilePaths: [],
+				isBookmarked: () => false,
+			},
+		} as AppContext;
+		const resolveItemCardModel = (
+			item: TwoHopVirtualListItem,
+			presentation: CardRenderModel["presentation"],
+		): CardRenderModel => ({
+			item: item.item,
+			targetFile,
+			title: item.virtualKey,
+			ariaLabel: item.virtualKey,
+			className: null,
+			extension: "md",
+			directory: "notes",
+			interactionId: item.interactionId ?? item.virtualKey,
+			interactionKey: item.interactionId ?? item.virtualKey,
+			interactionDescriptor: null,
+			presentation,
+			searchQuery: "",
+			searchScope: "title-and-content",
+			contentPreview: undefined,
+			previewRefreshToken: 0,
+			previewActivationIdentity: `preview:${item.virtualKey}`,
+			previewOverride: null,
+			previewSnapshot: {
+				identity: `preview:${item.virtualKey}`,
+				file: targetFile,
+				searchQuery: "",
+				previewRefreshToken: 0,
+				previewOverride: null,
+			},
+		});
+		resetCCLDevMeasurements();
+		const { container } = render(TwoHopSurfaceModelHarness, {
+			props: {
+				sections: [createSection(1)],
+				applicationStore,
+				linkContext,
+				appContext,
+				resolveItemCardModel,
+			},
+		});
+		const root = container.querySelector<HTMLElement>(".twohop-keyed-surface");
+		const host = root?.shadowRoot?.querySelector<HTMLElement>(
+			'[data-preview-owner="virtual-surface"]',
+		);
+		expect(host).not.toBeNull();
+		const reevaluationsBefore =
+			getCCLDevMeasurementSnapshot().counters["component.ViewItemCard.reevaluate"]
+				.count;
+
+		for (let index = 0; index < 6; index += 1) {
+			await flushFrames();
+			await Promise.resolve();
+		}
+		await waitFor(() => expect(getPreview).toHaveBeenCalled());
+		for (let index = 0; index < 4; index += 1) {
+			await flushFrames();
+			await Promise.resolve();
+		}
+
+		expect(host?.dataset.previewState).toBe("committed");
+		expect(host?.querySelector("img")).not.toBeNull();
+		expect(
+			getCCLDevMeasurementSnapshot().counters["component.ViewItemCard.reevaluate"]
+				.count,
+		).toBe(reevaluationsBefore);
+	});
+
 	it("shares each resolved card model with the rendered slot", () => {
 		const resolveItemCardModel = vi.fn(
 			(item: TwoHopVirtualListItem, presentation): CardRenderModel => ({

@@ -3,6 +3,7 @@
 	import { useLinkContext } from "ui/context/linkContext";
 	import LinkItem from "ui/components/common/LinkItem.svelte";
 	import CardPreview from "features/preview/ui/CardPreview.svelte";
+	import PreviewHost from "features/preview/ui/PreviewHost.svelte";
 	import UnresolvedPreviewPlaceholder from "features/preview/ui/UnresolvedPreviewPlaceholder.svelte";
 	import { ARIA_LABELS, DEBUG_DISABLE_CARD_DOM_PREVIEW } from "../../../appConstants";
 	import { formatLinkText } from "features/preview/text-processing/textUtils";
@@ -21,7 +22,7 @@
 		contentPreview = undefined,
 		interactionId: providedInteractionId = undefined,
 		interactionKey: providedInteractionKey = undefined,
-		previewState = undefined,
+		previewSlotId = undefined,
 		presentation = undefined,
 		model = undefined,
 	}: ItemProps = $props();
@@ -107,11 +108,8 @@
 		if (model) return model.interactionId;
 		return providedInteractionId ?? interactionKey;
 	});
-	const bindingIdentity = $derived(
-		previewState?.bindingIdentity ?? model?.previewActivationIdentity,
-	);
-	const previewSnapshot = $derived(previewState?.renderSnapshot);
 	const activePreviewSnapshot = $derived.by(() => {
+		const previewSnapshot = model?.previewSnapshot ?? undefined;
 		if (!targetFile || !previewSnapshot) return undefined;
 		if (previewSnapshot.file.path !== targetFile.path) return undefined;
 
@@ -134,7 +132,7 @@
 		void contentPreview;
 		void providedInteractionId;
 		void providedInteractionKey;
-		void previewState;
+		void previewSlotId;
 		void presentation;
 		void model;
 		void renderItem;
@@ -149,8 +147,6 @@
 		void directory;
 		void interactionKey;
 		void interactionId;
-		void bindingIdentity;
-		void previewSnapshot;
 		void activePreviewSnapshot;
 		return markCCLComponentReevaluation("ViewItemCard");
 	});
@@ -175,10 +171,16 @@
 		{#snippet children()}
 			{#if !DEBUG_DISABLE_CARD_DOM_PREVIEW && renderItem.type === "newLink" && !targetFile}
 				<UnresolvedPreviewPlaceholder />
+			{:else if !DEBUG_DISABLE_CARD_DOM_PREVIEW && targetFile && previewSlotId}
+				<PreviewHost slotId={previewSlotId} />
 			{:else if !DEBUG_DISABLE_CARD_DOM_PREVIEW && targetFile}
 				<CardPreview
-					bindingIdentity={bindingIdentity ?? ""}
+					bindingIdentity={model?.previewActivationIdentity ?? ""}
 					renderSnapshot={activePreviewSnapshot}
+					file={model ? undefined : targetFile}
+					searchQuery={renderSearchQuery}
+					{previewRefreshToken}
+					previewOverride={model?.previewOverride ?? null}
 					getPreview={context.getPreview}
 				/>
 			{/if}

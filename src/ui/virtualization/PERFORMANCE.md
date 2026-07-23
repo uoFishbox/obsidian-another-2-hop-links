@@ -39,7 +39,7 @@ Vault全体のベンチマークは、インデックス作成レイヤーやE2E
 - physical row/cell shellには位置とslot identityだけを保持する。
 - itemの `renderBodyKey` はphysical slot keyと一致させ、別カードへのrebindでもcard componentを維持する。
 - resident windowが同一ならmounted-row buildを同一参照で返し、Svelte state commitとDOM writeを行わない。
-- preview候補とrow visibility deltaはsurface所有の`rowPreviewController`で同期し、`ViewItemCard`はactivated slot stateだけを描画する。
+- preview候補とrow visibility deltaはsurface所有の`VirtualPreviewSurface`で同期し、`ViewItemCard`は物理slot IDだけを`PreviewHost`へ渡す。
 - item interaction descriptorはphysical slot単位のresolver providerへ同期し、rebind時はentry内容だけを更新する。headerはlogical component lifecycleを使う。
 - load-more bodyは通常のbutton lifecycleを使い、クリック中に同じbodyを別カードへ書き換えない。
 - `TwoHopDocument` と固定grid geometryは全カード分のDOMやcell objectを生成せず、mounted rangeだけをmaterializeする。

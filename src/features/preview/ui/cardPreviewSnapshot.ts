@@ -9,11 +9,3 @@ export interface CardPreviewSnapshot {
 	readonly previewRefreshToken: number;
 	readonly previewOverride: PreviewData | null;
 }
-
-/** Reactive slot state owned by a virtual card surface. */
-export interface CardPreviewSlotState {
-	/** Identity currently bound to this physical slot. */
-	readonly bindingIdentity: string;
-	/** Snapshot admitted by the preview scheduler for rendering. */
-	readonly renderSnapshot: CardPreviewSnapshot | undefined;
-}
