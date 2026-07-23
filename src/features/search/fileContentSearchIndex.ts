@@ -12,7 +12,7 @@ export interface ReconciledFileContentIndex {
 }
 
 export function reconcileFileContentIndex(
-	searchableFiles: TFile[],
+	searchableFiles: readonly TFile[],
 	currentIndex: ReadonlyMap<string, SearchContentIndexEntry>,
 ): ReconciledFileContentIndex {
 	const nextIndex = new Map<string, SearchContentIndexEntry>();

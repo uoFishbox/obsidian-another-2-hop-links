@@ -583,6 +583,52 @@ describe("TwohopSearchAdapter.filterDisplayData", () => {
 	});
 });
 
+describe("TwohopSearchAdapter.buildSnapshot", () => {
+	it("builds worker items, unique files, and source locations in one snapshot", () => {
+		const sourceFile = createMockTFile("notes/source.md");
+		const repeatedFile = createMockTFile("notes/repeated.md");
+		const displayData = createDisplayData({
+			backlinks: [
+				createBacklink(repeatedFile, "First backlink"),
+				createBacklink(repeatedFile, "Second backlink"),
+			],
+			tagGroups: [
+				{
+					tag: "alpha",
+					notes: [createTaggedNote(repeatedFile)],
+				} satisfies TagGroup,
+			],
+		});
+		const options = createAdapterOptions(displayData, sourceFile);
+		const adapter = createTwohopSearchAdapter();
+
+		const snapshot = adapter.buildSnapshot(options);
+		const backlinkItems = snapshot.workerItems.filter((item) =>
+			item.key.startsWith("b"),
+		);
+		const tagGroupItem = snapshot.workerItems.find((item) =>
+			item.key.startsWith("g"),
+		);
+
+		expect(snapshot.searchableFiles).toEqual([repeatedFile]);
+		expect(snapshot.workerItems).toHaveLength(4);
+		expect(options.fileToLinktext).toHaveBeenCalledTimes(1);
+		expect(options.getMetadata).toHaveBeenCalledTimes(1);
+		expect(snapshot.locationByKey.get(backlinkItems[0].key)).toEqual({
+			sectionId: "backlinks",
+			sourceIndex: 0,
+		});
+		expect(snapshot.locationByKey.get(backlinkItems[1].key)).toEqual({
+			sectionId: "backlinks",
+			sourceIndex: 1,
+		});
+		expect(snapshot.locationByKey.get(tagGroupItem?.key ?? "")).toEqual({
+			sectionId: "tags-alpha",
+			sourceIndex: -1,
+		});
+	});
+});
+
 describe("collectTwohopSearchableFiles", () => {
 	it("collects files from visible sections", () => {
 		const sourceFile = createMockTFile("notes/source.md");

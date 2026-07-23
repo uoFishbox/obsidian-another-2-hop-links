@@ -17,10 +17,7 @@
 	} from "ui/context/linkContext";
 	import type { ApplicationStore } from "ui/stores/ApplicationStore.svelte";
 	import { getCardLayoutCssText } from "ui/shared/layout/cardLayoutCssVars";
-	import {
-		collectTwohopSearchableFiles,
-		createTwohopSearchAdapter,
-	} from "features/two-hop/ui/twoHopSearchAdapter";
+	import { createTwohopSearchAdapter } from "features/two-hop/ui/twoHopSearchAdapter";
 	import { tick } from "svelte";
 	import { createTwoHopSectionDescriptorIdentityCache } from "features/two-hop/ui/section-descriptors/cache";
 	import type { TwoHopLinksRootUiState } from "features/two-hop/ui/twoHopLinksRootUiState";
@@ -100,6 +97,9 @@
 		getMetadata: linkContext.getMetadata,
 		priorityFrontmatterKeyForTitle: currentSettings.priorityFrontmatterKeyForTitle,
 	});
+	let searchSnapshot = $derived.by(() =>
+		searchAdapter.buildSnapshot(getSearchAdapterOptions()),
+	);
 	const workerSearchSession = useWorkerSearchSession({
 		app,
 		query: () => search.normalized,
@@ -107,9 +107,8 @@
 		matchScope: () => (contentSearchEnabled ? "title-and-content" : "title-only"),
 		contentSyncMode: "progressive",
 		progressiveSyncIntervalMs: 400,
-		getSearchableFiles: () =>
-			collectTwohopSearchableFiles(getSearchAdapterOptions()),
-		buildDataset: () => searchAdapter.buildDataset(getSearchAdapterOptions()),
+		getSearchableFiles: () => searchSnapshot.searchableFiles,
+		buildDataset: () => searchSnapshot.workerItems,
 		contentSearchBackend: () =>
 			currentSettings.enableRipgrepContentSearch ? "ripgrep" : "worker",
 		ripgrepExecutablePath: () => currentSettings.ripgrepExecutablePath || undefined,

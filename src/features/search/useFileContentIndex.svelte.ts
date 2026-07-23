@@ -115,7 +115,7 @@ async function loadFileContentEntry(
 
 export function useFileContentIndex(
 	app: App,
-	getSearchableFiles: () => TFile[],
+	getSearchableFiles: () => readonly TFile[],
 	options: UseFileContentIndexOptions = {},
 ): FileContentIndexResult {
 	const { enabled = true } = options;

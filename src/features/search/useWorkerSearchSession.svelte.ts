@@ -21,7 +21,7 @@ import {
 	collectUniqueTargetFilePaths,
 } from "./ripgrepContentSearch";
 
-const EMPTY_SEARCH_WORKER_ITEMS: SearchWorkerItemSnapshot[] = [];
+const EMPTY_SEARCH_WORKER_ITEMS: readonly SearchWorkerItemSnapshot[] = [];
 const EMPTY_RIPGREP_POSITION_BY_PATH = new Map<string, Pos>();
 
 export type ContentSearchBackend = "worker" | "ripgrep";
@@ -32,8 +32,8 @@ export interface UseWorkerSearchSessionOptions {
 	enabled?: boolean | (() => boolean);
 	contentIndexEnabled?: boolean | (() => boolean);
 	matchScope?: SearchWorkerMatchScope | (() => SearchWorkerMatchScope);
-	getSearchableFiles: () => TFile[];
-	buildDataset: () => SearchWorkerItemSnapshot[];
+	getSearchableFiles: () => readonly TFile[];
+	buildDataset: () => readonly SearchWorkerItemSnapshot[];
 	contentSyncMode?: "eager" | "when-idle" | "progressive";
 	progressiveSyncIntervalMs?: number;
 	contentSearchBackend?: ContentSearchBackend | (() => ContentSearchBackend);
@@ -102,7 +102,7 @@ export function useWorkerSearchSession(
 			currentMatchScope === "title-and-content" &&
 			getEffectiveContentSearchBackend() !== "ripgrep",
 	});
-	const buildWorkerDataset = (): SearchWorkerItemSnapshot[] => {
+	const buildWorkerDataset = (): readonly SearchWorkerItemSnapshot[] => {
 		if (!sessionEnabled) {
 			return EMPTY_SEARCH_WORKER_ITEMS;
 		}
@@ -126,7 +126,7 @@ export function useWorkerSearchSession(
 	let ripgrepRequestSerial = 0;
 	let ripgrepAbortController: AbortController | null = null;
 	let lastIssuedSearchSignature = "";
-	let lastSyncedWorkerDataset: SearchWorkerItemSnapshot[] | null = null;
+	let lastSyncedWorkerDataset: readonly SearchWorkerItemSnapshot[] | null = null;
 	let lastSyncedFileContentsByPath = new Map<
 		string,
 		Readonly<SearchContentIndexEntry>

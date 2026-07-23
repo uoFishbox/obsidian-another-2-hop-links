@@ -483,7 +483,7 @@ export async function searchRipgrepContentByTerm(
 }
 
 export function filterSearchDatasetWithRipgrepMatches(
-	items: SearchWorkerItemSnapshot[],
+	items: readonly SearchWorkerItemSnapshot[],
 	query: string,
 	contentMatchesByTerm: ReadonlyMap<string, ReadonlySet<string>>,
 	contentPreviewByPath: ReadonlyMap<string, string> = EMPTY_CONTENT_PREVIEW_BY_PATH,

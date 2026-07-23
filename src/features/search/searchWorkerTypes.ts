@@ -16,13 +16,13 @@ export interface SearchWorkerFileContentSnapshot {
 
 export interface SearchWorkerDatasetSnapshot {
 	datasetVersion: number;
-	items: SearchWorkerItemSnapshot[];
+	items: readonly SearchWorkerItemSnapshot[];
 	fileContents: SearchWorkerFileContentSnapshot[];
 }
 
 export interface SearchWorkerItemsSnapshot {
 	datasetVersion: number;
-	items: SearchWorkerItemSnapshot[];
+	items: readonly SearchWorkerItemSnapshot[];
 }
 
 export interface SearchWorkerFileContentsUpsert {
@@ -67,7 +67,7 @@ export interface SearchWorkerErrorMessage {
 export interface SyncItemsMessage {
 	type: "sync-items";
 	datasetVersion: number;
-	items: SearchWorkerItemSnapshot[];
+	items: readonly SearchWorkerItemSnapshot[];
 }
 
 export interface UpsertFileContentsMessage {
