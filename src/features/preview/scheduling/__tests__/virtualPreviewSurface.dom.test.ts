@@ -218,6 +218,30 @@ describe("VirtualPreviewSurface", () => {
 		surface.dispose();
 	});
 
+	it("does not mutate host attributes when the applied state is unchanged", async () => {
+		const { surface } = createHarness();
+		const host = document.createElement("div");
+		const attributeMutations: MutationRecord[] = [];
+		const observer = new MutationObserver((records) => {
+			attributeMutations.push(...records);
+		});
+		observer.observe(host, { attributes: true });
+		surface.registerHost("slot-0", host);
+		await Promise.resolve();
+		attributeMutations.length = 0;
+
+		surface.syncBindingDelta({
+			enteredSlots: [],
+			reboundSlots: [],
+			releasedSlots: ["slot-0"],
+		});
+		await Promise.resolve();
+
+		expect(attributeMutations).toEqual([]);
+		observer.disconnect();
+		surface.dispose();
+	});
+
 	it("unloads and idle-clears lifecycle-bound DOM on deactivation", async () => {
 		const { surface, renders } = createHarness();
 		const host = document.createElement("div");

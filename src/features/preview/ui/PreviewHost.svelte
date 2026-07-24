@@ -18,6 +18,5 @@
 <div
 	bind:this={element}
 	class="cosense-card-links__box-preview"
-	data-preview-state="empty"
 	data-preview-owner="virtual-surface"
 ></div>

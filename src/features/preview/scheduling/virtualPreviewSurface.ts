@@ -66,6 +66,12 @@ export interface CreateVirtualPreviewSurfaceOptions {
 
 export type PreviewHostPhase = "empty" | "loading" | "committed" | "dormant" | "stale";
 
+interface PreviewHostState {
+	readonly phase: PreviewHostPhase;
+	readonly contentType?: PreviewData["type"];
+	readonly hasContent: boolean;
+}
+
 interface PreviewRenderToken {
 	readonly slotId: string;
 	readonly hostEpoch: number;
@@ -82,6 +88,7 @@ interface PreviewSlotRuntime {
 	host?: {
 		element: HTMLElement;
 		epoch: number;
+		appliedState?: PreviewHostState;
 	};
 	hostEpoch: number;
 	bindingEpoch: number;
@@ -156,12 +163,14 @@ export function createVirtualPreviewSurface(
 		const host = slot.host;
 		if (!host) return;
 		const element = host.element;
-		applyHostState(element, {
+		const nextState: PreviewHostState = {
 			phase: slot.phase,
 			contentType: slot.committed?.contentType,
 			hasContent:
 				slot.committed?.hostEpoch === host.epoch && !!element.firstChild,
-		});
+		};
+		applyHostState(element, host.appliedState, nextState);
+		host.appliedState = nextState;
 	}
 
 	function cancelLifecycleCleanup(slot: PreviewSlotRuntime): void {
@@ -478,30 +487,35 @@ export function createVirtualPreviewSurface(
 	};
 }
 
-export function applyHostState(
+function applyHostState(
 	element: HTMLElement,
-	state: {
-		phase: PreviewHostPhase;
-		contentType?: PreviewData["type"];
-		hasContent?: boolean;
-	},
+	previous: PreviewHostState | undefined,
+	next: PreviewHostState,
 ): void {
-	element.dataset.previewState = state.phase;
-	if (state.contentType) {
-		element.dataset.previewType = state.contentType;
-	} else {
-		delete element.dataset.previewType;
+	if (previous?.phase !== next.phase) {
+		element.dataset.previewState = next.phase;
+		element.classList.toggle("is-stale", next.phase === "stale");
 	}
-	if (state.hasContent) {
-		element.dataset.hasPreviewContent = "true";
-	} else {
-		delete element.dataset.hasPreviewContent;
+
+	if (!previous || previous.contentType !== next.contentType) {
+		if (next.contentType) {
+			element.dataset.previewType = next.contentType;
+		} else {
+			delete element.dataset.previewType;
+		}
+		for (const type of ["text", "image", "empty", "dom"] as const) {
+			element.classList.toggle(
+				`cosense-card-links__box-preview--${type}`,
+				next.contentType === type,
+			);
+		}
 	}
-	element.classList.toggle("is-stale", state.phase === "stale");
-	for (const type of ["text", "image", "empty", "dom"] as const) {
-		element.classList.toggle(
-			`cosense-card-links__box-preview--${type}`,
-			state.contentType === type,
-		);
+
+	if (!previous || previous.hasContent !== next.hasContent) {
+		if (next.hasContent) {
+			element.dataset.hasPreviewContent = "true";
+		} else {
+			delete element.dataset.hasPreviewContent;
+		}
 	}
 }
