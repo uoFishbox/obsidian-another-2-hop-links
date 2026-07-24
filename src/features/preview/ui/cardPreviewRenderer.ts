@@ -23,6 +23,14 @@ import {
 } from "./cardPreviewSharedCache";
 import type { CardPreviewRenderRequest } from "./cardPreviewRenderRequest";
 
+function moveChildrenToFragment(source: HTMLElement): DocumentFragment {
+	const fragment = document.createDocumentFragment();
+	while (source.firstChild) {
+		fragment.appendChild(source.firstChild);
+	}
+	return fragment;
+}
+
 export type CardPreviewLoader = (
 	file: TFile,
 	signal?: AbortSignal,
@@ -450,10 +458,7 @@ export function createCardPreviewRenderer(
 			targetKey: domCommitScopeKey,
 			isStale: () => isRenderStale(signal, renderToken),
 			commit: () => {
-				container.replaceChildren();
-				while (source.firstChild) {
-					container.appendChild(source.firstChild);
-				}
+				container.replaceChildren(moveChildrenToFragment(source));
 				lastAppliedRenderCacheKey = request.renderCacheKey;
 				if (shouldSyncMathStyles) {
 					syncMathJaxStylesForNode(container);
@@ -642,9 +647,8 @@ function isAbortError(error: unknown): boolean {
 
 function handlePreviewError(element: HTMLElement, error: unknown): void {
 	console.error("Preview error:", error);
-	element.replaceChildren();
 	const errorDiv = document.createElement("div");
 	errorDiv.className = "error";
 	errorDiv.textContent = "Preview not available.";
-	element.appendChild(errorDiv);
+	element.replaceChildren(errorDiv);
 }
