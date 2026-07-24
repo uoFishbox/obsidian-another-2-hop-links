@@ -326,6 +326,15 @@ export const CARD_RENDER_SHADOW_CSS = String.raw`
 	overflow: clip;
 }
 
+
+.cosense-card-links__box-preview {
+	flex: 1 1 0;
+	min-height: 0;
+	contain: size layout;
+	overflow: clip;
+}
+
+
 .cosense-card-links__box-preview.hidden {
 	display: none;
 }
