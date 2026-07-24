@@ -129,7 +129,6 @@ describe("TwoHop keyed mounted rows", () => {
 		expect(shifted.rowsBySlot).toHaveLength(shifted.rowSlices.length);
 		expect(shifted.slotDelta.enteredSlots).toEqual([]);
 		expect(shifted.slotDelta.reboundSlots).toHaveLength(layout.columns);
-		expect(shifted.slotDelta.retainedSlots).toHaveLength(layout.columns * 2);
 		expect(shifted.slotDelta.releasedSlots).toEqual([]);
 		expect(shifted.rowDelta.enteredRows).toEqual([]);
 		expect(shifted.rowDelta.reboundRows).toHaveLength(1);

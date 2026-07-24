@@ -51,7 +51,6 @@ let nextMountedBuildIdentity = 1;
 export interface TwoHopMountedSlotDelta {
 	readonly enteredSlots: readonly TwoHopMountedCell[];
 	readonly reboundSlots: readonly TwoHopMountedCell[];
-	readonly retainedSlots: readonly TwoHopMountedCell[];
 	readonly releasedSlots: readonly RenderSlotKey[];
 }
 
@@ -231,16 +230,13 @@ function createMountedSlotDelta(
 		allocatorChangedSlots.add(slot.slotIndex);
 	const enteredSlots: TwoHopMountedCell[] = [];
 	const reboundSlots: TwoHopMountedCell[] = [];
-	const retainedSlots: TwoHopMountedCell[] = [];
 	for (const row of rowsBySlot) {
 		for (const cell of row.cells) {
 			const previous = previousCellsBySlot.get(cell.renderSlotKey);
 			previousCellsBySlot.delete(cell.renderSlotKey);
 			if (!previous) {
 				enteredSlots.push(cell);
-			} else if (previous === cell && !allocatorChangedSlots.has(row.slotIndex)) {
-				retainedSlots.push(cell);
-			} else {
+			} else if (previous !== cell || allocatorChangedSlots.has(row.slotIndex)) {
 				reboundSlots.push(cell);
 			}
 		}
@@ -249,7 +245,6 @@ function createMountedSlotDelta(
 	return {
 		enteredSlots,
 		reboundSlots,
-		retainedSlots,
 		releasedSlots: [...previousCellsBySlot.keys()],
 	};
 }

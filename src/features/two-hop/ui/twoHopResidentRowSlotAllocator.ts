@@ -19,7 +19,6 @@ export interface TwoHopReboundRowSlot {
 export interface TwoHopResidentRowSlotDelta {
 	readonly enteredSlots: readonly TwoHopResidentRowSlotBinding[];
 	readonly reboundSlots: readonly TwoHopReboundRowSlot[];
-	readonly retainedSlots: readonly TwoHopResidentRowSlotBinding[];
 	readonly releasedSlots: readonly TwoHopResidentRowSlotBinding[];
 }
 
@@ -60,7 +59,6 @@ export function createTwoHopResidentRowSlotAllocator(): TwoHopResidentRowSlotAll
 		logicalRowBySlot.length = capacityAllocator.capacity;
 		const rangeStart = params.start;
 		const rangeEnd = Math.max(rangeStart, params.end);
-		const retainedSlots = collectRetainedSlots(rangeStart, rangeEnd);
 		const releasedSlots = releaseRowsOutsideRange(rangeStart, rangeEnd);
 		for (const binding of releasedSlots) {
 			releasedBySlot.set(binding.slotIndex, binding.logicalRowIndex);
@@ -91,24 +89,11 @@ export function createTwoHopResidentRowSlotAllocator(): TwoHopResidentRowSlotAll
 		return {
 			enteredSlots,
 			reboundSlots,
-			retainedSlots,
 			releasedSlots: [...releasedBySlot].map(([slotIndex, logicalRowIndex]) => ({
 				slotIndex,
 				logicalRowIndex,
 			})),
 		};
-	}
-
-	function collectRetainedSlots(
-		rangeStart: number,
-		rangeEnd: number,
-	): TwoHopResidentRowSlotBinding[] {
-		const retainedSlots: TwoHopResidentRowSlotBinding[] = [];
-		for (const [logicalRowIndex, slotIndex] of slotByLogicalRow) {
-			if (logicalRowIndex < rangeStart || logicalRowIndex >= rangeEnd) continue;
-			retainedSlots.push({ slotIndex, logicalRowIndex });
-		}
-		return retainedSlots;
 	}
 
 	function releaseRowsOutsideRange(
@@ -205,7 +190,6 @@ function createEmptyDelta(): TwoHopResidentRowSlotDelta {
 	return {
 		enteredSlots: [],
 		reboundSlots: [],
-		retainedSlots: [],
 		releasedSlots: [],
 	};
 }

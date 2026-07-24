@@ -44,7 +44,6 @@ describe("createTwoHopResidentRowSlotAllocator", () => {
 				logicalRowIndex: 120,
 			},
 		]);
-		expect(shiftedDelta.retainedSlots).toHaveLength(19);
 		expect(shiftedDelta.releasedSlots).toEqual([]);
 		expect(
 			new Set(resolveRangeSlots({ allocator, start: 101, end: 121 })).size,
@@ -62,7 +61,6 @@ describe("createTwoHopResidentRowSlotAllocator", () => {
 			layoutKey: "layout",
 		});
 
-		expect(delta.retainedSlots).toHaveLength(3);
 		expect(delta.reboundSlots).toEqual([]);
 		expect(delta.releasedSlots).toEqual([
 			{ slotIndex: releasedSlot, logicalRowIndex: 10 },
