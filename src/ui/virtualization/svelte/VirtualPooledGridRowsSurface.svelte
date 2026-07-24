@@ -15,6 +15,7 @@
 		VirtualCellRegistrationOwner,
 		VirtualCellRegistry,
 	} from "./VirtualCellRegistry";
+	import type { VirtualGridSurfaceTransaction } from "./VirtualGridSurfaceTransaction";
 	import type {
 		VirtualSurfaceMountedRow,
 		VirtualSurfaceResidentRowViewState,
@@ -46,6 +47,7 @@
 		getCellRegistrationOwner?: (
 			cell: TMountedCell,
 		) => VirtualCellRegistrationOwner | undefined;
+		surfaceTransaction: VirtualGridSurfaceTransaction;
 		renderCell: Snippet<
 			[
 				{
@@ -77,6 +79,7 @@
 		isRowActive,
 		cellRegistry,
 		getCellRegistrationOwner,
+		surfaceTransaction,
 		renderCell,
 	}: Props<TMountedCell, TMountedRow> = $props();
 
@@ -157,6 +160,7 @@
 						{onLogicalCellDetach}
 						{cellRegistry}
 						cellRegistrationOwner={getCellRegistrationOwner?.(mountedCell)}
+						{surfaceTransaction}
 					>
 						{#if bodyLifecyclePolicy.type === "keyed"}
 							{#key resolveMountedCellBodyKey(mountedCell)}

@@ -5,7 +5,7 @@
 	import { createVirtualSurfaceInteractions } from "./VirtualSurfaceInteractions.svelte";
 	import { watchVirtualSurfaceMountedCellsChange } from "./VirtualSurfaceMountedCellsChange.svelte";
 	import type { VirtualSurfaceMountedRow } from "./VirtualSurfaceTypes";
-	import { VIRTUAL_CELL_WILL_REBIND_EVENT } from "ui/interactions/virtualCellRebind";
+	import { createVirtualGridSurfaceTransaction } from "./VirtualGridSurfaceTransaction";
 
 	type Props<TMountedCell extends MountedVirtualCell> = Pick<
 		VirtualSurfaceCommonProps<TMountedCell>,
@@ -29,7 +29,7 @@
 		layoutMode?: "absolute-cells" | "grid-rows";
 		mountedCells?: readonly TMountedCell[];
 		mountedRows?: readonly VirtualSurfaceMountedRow<TMountedCell>[];
-		children?: Snippet;
+		children?: Snippet<[ReturnType<typeof createVirtualGridSurfaceTransaction>]>;
 	};
 
 	let {
@@ -90,23 +90,10 @@
 		onMountedCellsChange,
 	});
 
-	function handleVirtualCellWillRebind(): void {
-		delegatedInteractions.resetTransientState();
-	}
-
-	$effect(() => {
-		const element = rootEl;
-		if (!element) return;
-
-		element.addEventListener(
-			VIRTUAL_CELL_WILL_REBIND_EVENT,
-			handleVirtualCellWillRebind,
-		);
-		return () =>
-			element.removeEventListener(
-				VIRTUAL_CELL_WILL_REBIND_EVENT,
-				handleVirtualCellWillRebind,
-			);
+	const surfaceTransaction = createVirtualGridSurfaceTransaction({
+		onLogicalCellWillRebind: () => {
+			delegatedInteractions.resetTransientState();
+		},
 	});
 </script>
 
@@ -124,5 +111,5 @@
 	ontouchend={delegatedInteractions.handleTouchEnd}
 	ontouchcancel={delegatedInteractions.handleTouchEnd}
 >
-	{@render children?.()}
+	{@render children?.(surfaceTransaction)}
 </div>

@@ -12,6 +12,8 @@
 		VirtualSurfaceMountedRow,
 		VirtualSurfaceResidentRowViewState,
 	} from "./VirtualSurfaceTypes";
+	import type { VirtualCellRegistry } from "./VirtualCellRegistry";
+	import type { VirtualGridSurfaceTransaction } from "./VirtualGridSurfaceTransaction";
 
 	interface CommonProps<TMountedCell extends MountedVirtualCell> {
 		contentClassName?: string;
@@ -30,6 +32,8 @@
 		onCellMount?: (cell: TMountedCell) => void;
 		onCellDestroy?: (cell: TMountedCell) => void;
 		bodyLifecyclePolicy?: VirtualCellBodyLifecyclePolicy<TMountedCell>;
+		cellRegistry?: VirtualCellRegistry;
+		surfaceTransaction: VirtualGridSurfaceTransaction;
 		renderCell: Snippet<
 			[
 				{
@@ -68,6 +72,8 @@
 		onCellMount,
 		onCellDestroy,
 		bodyLifecyclePolicy = KEYED_VIRTUAL_CELL_BODY_LIFECYCLE,
+		cellRegistry,
+		surfaceTransaction,
 		renderCell,
 	}: Props<TMountedCell> = $props();
 </script>
@@ -91,6 +97,8 @@
 		onLogicalCellAttach={onCellMount}
 		onLogicalCellDetach={onCellDestroy}
 		{bodyLifecyclePolicy}
+		{cellRegistry}
+		{surfaceTransaction}
 		{renderCell}
 	/>
 {:else}

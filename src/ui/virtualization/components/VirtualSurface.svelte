@@ -40,6 +40,7 @@
 		resolveNavigationTarget,
 		moveFocusWithinList,
 		flushVirtualScrollMeasurement,
+		cellRegistry,
 	}: VirtualSurfaceProps<TMountedCell> = $props();
 </script>
 
@@ -62,52 +63,59 @@
 	{resolveNavigationTarget}
 	{moveFocusWithinList}
 	{flushVirtualScrollMeasurement}
+	{cellRegistry}
 >
-	{#if layoutMode === "grid-rows"}
-		<VirtualSurfaceCells
-			{contentClassName}
-			{rowClassName}
-			{cellClassName}
-			{contentHeight}
-			{cellWidth}
-			{rowHeight}
-			{columns}
-			{gap}
-			layoutMode="grid-rows"
-			{mountedRows}
-			{residentRows}
-			bind:contentEl
-			{observerRoot}
-			{getCellPosition}
-			{getCellClassName}
-			{getCellDataTestId}
-			{onCellMount}
-			{onCellDestroy}
-			{bodyLifecyclePolicy}
-			{renderCell}
-		/>
-	{:else}
-		<VirtualSurfaceCells
-			{contentClassName}
-			{rowClassName}
-			{cellClassName}
-			{contentHeight}
-			{cellWidth}
-			{rowHeight}
-			{columns}
-			{gap}
-			layoutMode="absolute-cells"
-			mountedCells={mountedCells ?? []}
-			bind:contentEl
-			{observerRoot}
-			{getCellPosition}
-			{getCellClassName}
-			{getCellDataTestId}
-			{onCellMount}
-			{onCellDestroy}
-			{bodyLifecyclePolicy}
-			{renderCell}
-		/>
-	{/if}
-	{@render afterContent?.()}
+	{#snippet children(surfaceTransaction)}
+		{#if layoutMode === "grid-rows"}
+			<VirtualSurfaceCells
+				{contentClassName}
+				{rowClassName}
+				{cellClassName}
+				{contentHeight}
+				{cellWidth}
+				{rowHeight}
+				{columns}
+				{gap}
+				layoutMode="grid-rows"
+				{mountedRows}
+				{residentRows}
+				bind:contentEl
+				{observerRoot}
+				{getCellPosition}
+				{getCellClassName}
+				{getCellDataTestId}
+				{onCellMount}
+				{onCellDestroy}
+				{bodyLifecyclePolicy}
+				{cellRegistry}
+				{surfaceTransaction}
+				{renderCell}
+			/>
+		{:else}
+			<VirtualSurfaceCells
+				{contentClassName}
+				{rowClassName}
+				{cellClassName}
+				{contentHeight}
+				{cellWidth}
+				{rowHeight}
+				{columns}
+				{gap}
+				layoutMode="absolute-cells"
+				mountedCells={mountedCells ?? []}
+				bind:contentEl
+				{observerRoot}
+				{getCellPosition}
+				{getCellClassName}
+				{getCellDataTestId}
+				{onCellMount}
+				{onCellDestroy}
+				{bodyLifecyclePolicy}
+				{cellRegistry}
+				{surfaceTransaction}
+				{renderCell}
+			/>
+		{/if}
+		{@render afterContent?.()}
+	{/snippet}
 </VirtualInteractiveSurface>
