@@ -42,6 +42,7 @@ export interface TwoHopMountedRowsBuild extends MountedVirtualCellsBuild<TwoHopM
 	readonly identity: number;
 	readonly deltaBaseIdentity: number | null;
 	readonly slotDelta: TwoHopMountedSlotDelta;
+	readonly rowDelta: TwoHopMountedRowDelta;
 }
 
 let nextMountedBuildIdentity = 1;
@@ -52,6 +53,13 @@ export interface TwoHopMountedSlotDelta {
 	readonly reboundSlots: readonly TwoHopMountedCell[];
 	readonly retainedSlots: readonly TwoHopMountedCell[];
 	readonly releasedSlots: readonly RenderSlotKey[];
+}
+
+/** Mounted row changes keyed by stable physical slot. */
+export interface TwoHopMountedRowDelta {
+	readonly enteredRows: readonly TwoHopMountedRow[];
+	readonly reboundRows: readonly TwoHopMountedRow[];
+	readonly releasedSlotIndexes: readonly number[];
 }
 
 /** Builds bounded physical row/cell shells and exposes both slot and logical body keys. */
@@ -148,6 +156,7 @@ export function buildTwoHopMountedRows(params: {
 		if (row) rowsBySlot.push(row);
 	}
 	const slotDelta = createMountedSlotDelta(previousBuild, rowsBySlot, rowSlotDelta);
+	const rowDelta = createMountedRowDelta(previousBuild, rowsBySlot);
 	const getCells = (): TwoHopMountedCell[] => {
 		if (flattenedCells) return flattenedCells;
 		flattenedCells = [];
@@ -175,6 +184,33 @@ export function buildTwoHopMountedRows(params: {
 		identity: nextMountedBuildIdentity++,
 		deltaBaseIdentity: previousBuild?.identity ?? null,
 		slotDelta,
+		rowDelta,
+	};
+}
+
+function createMountedRowDelta(
+	previousBuild: TwoHopMountedRowsBuild | undefined,
+	rowsBySlot: readonly TwoHopMountedRow[],
+): TwoHopMountedRowDelta {
+	const previousRowsBySlot = new Map<number, TwoHopMountedRow>();
+	for (const row of previousBuild?.rowsBySlot ?? []) {
+		previousRowsBySlot.set(row.slotIndex, row);
+	}
+	const enteredRows: TwoHopMountedRow[] = [];
+	const reboundRows: TwoHopMountedRow[] = [];
+	for (const row of rowsBySlot) {
+		const previous = previousRowsBySlot.get(row.slotIndex);
+		previousRowsBySlot.delete(row.slotIndex);
+		if (!previous) {
+			enteredRows.push(row);
+		} else if (previous !== row) {
+			reboundRows.push(row);
+		}
+	}
+	return {
+		enteredRows,
+		reboundRows,
+		releasedSlotIndexes: [...previousRowsBySlot.keys()],
 	};
 }
 

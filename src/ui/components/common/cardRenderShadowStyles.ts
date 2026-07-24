@@ -62,7 +62,10 @@ export const CARD_RENDER_SHADOW_CSS = String.raw`
 }
 
 .view-plan-flow-row {
-	position: relative;
+	position: absolute;
+	inset-inline: 0;
+	top: 0;
+	margin-bottom: 0;
 	width: 100%;
 	height: var(--ccl-box-height);
 	display: flex;
@@ -71,7 +74,10 @@ export const CARD_RENDER_SHADOW_CSS = String.raw`
 }
 
 .cosense-card-links__virtual-grid-row {
-	position: relative;
+	position: absolute;
+	inset-inline: 0;
+	top: 0;
+	margin-bottom: 0;
 	width: 100%;
 	height: var(--ccl-box-height);
 	display: flex;

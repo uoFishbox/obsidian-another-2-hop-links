@@ -131,6 +131,9 @@ describe("TwoHop keyed mounted rows", () => {
 		expect(shifted.slotDelta.reboundSlots).toHaveLength(layout.columns);
 		expect(shifted.slotDelta.retainedSlots).toHaveLength(layout.columns * 2);
 		expect(shifted.slotDelta.releasedSlots).toEqual([]);
+		expect(shifted.rowDelta.enteredRows).toEqual([]);
+		expect(shifted.rowDelta.reboundRows).toHaveLength(1);
+		expect(shifted.rowDelta.releasedSlotIndexes).toEqual([]);
 	});
 
 	it("resolves entering rows through compact geometry and reuses overlapping rows", () => {

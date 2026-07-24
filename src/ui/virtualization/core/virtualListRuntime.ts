@@ -1,4 +1,4 @@
-import type { RowRange } from "../rowRange";
+import { sameRange, type RowRange } from "../rowRange";
 import {
 	computeVirtualListSnapshotWithState,
 	createEmptyVirtualListComputation,
@@ -10,7 +10,11 @@ import {
 	type VirtualListSnapshot,
 	type VirtualVisibilityPolicy,
 } from "./virtualListEngine";
-import type { EmptyReason, MaterializedVirtualListMode } from "./VirtualListMode";
+import type {
+	EmptyReason,
+	MaterializedVirtualListMode,
+	VirtualListMode,
+} from "./VirtualListMode";
 import type { MountedVirtualCell, VirtualRanges, VirtualRowModel } from "../types";
 
 export interface ApplyVirtualListMeasurementParams<
@@ -61,12 +65,25 @@ export type VirtualListRuntimeState<
 			mountedCellsForChange: readonly TMountedCell[];
 	  };
 
+/** Publishes independently observable virtual-list state changes. */
+export interface VirtualListCallbacks<TMountedBuild> {
+	/** Runs only when the mounted build identity changes. */
+	onMountedBuildChanged?(
+		next: TMountedBuild | null,
+		previous: TMountedBuild | null,
+	): void;
+	/** Runs only when the preview-visible row range changes. */
+	onPreviewRangeChanged?(range: RowRange): void;
+	/** Runs only when the semantic list mode changes. */
+	onModeChanged?(mode: VirtualListMode): void;
+}
+
 export interface CreateVirtualListRuntimeOptions<
 	TCell,
 	TRowModel extends VirtualRowModel<TCell>,
 	TMountedCell extends MountedVirtualCell,
 	TMountedBuild extends MountedVirtualCellsBuild<TMountedCell>,
-> {
+> extends VirtualListCallbacks<TMountedBuild> {
 	buildMountedCells(params: {
 		rowModel: TRowModel;
 		rowRange: RowRange;
@@ -176,6 +193,22 @@ export function createVirtualListRuntime<
 						)
 					: previousState.mountedCellsForChange,
 		};
+		const previousMountedBuild = previousState.reconciliationState.mountedBuild;
+		const nextMountedBuild = nextReconciliationState.mountedBuild;
+		if (previousMountedBuild !== nextMountedBuild) {
+			options.onMountedBuildChanged?.(nextMountedBuild, previousMountedBuild);
+		}
+		const previousPreviewRange = previousState.snapshot?.ranges.previewVisible;
+		const nextPreviewRange = nextSnapshot.ranges.previewVisible;
+		if (
+			!previousPreviewRange ||
+			!sameRange(previousPreviewRange, nextPreviewRange)
+		) {
+			options.onPreviewRangeChanged?.(nextPreviewRange);
+		}
+		if (!hasSameMode(previousState.mode, nextSnapshot.mode)) {
+			options.onModeChanged?.(nextSnapshot.mode);
+		}
 		options.onSnapshotUpdated?.(nextSnapshot, nextReconciliationState);
 		options.onStateChanged?.(runtimeState);
 	};
@@ -294,4 +327,18 @@ export function createVirtualListRuntime<
 			options.mountedRowsReconciler?.dispose();
 		},
 	};
+}
+
+function hasSameMode(current: VirtualListMode, next: VirtualListMode): boolean {
+	if (current.kind !== next.kind) return false;
+	switch (current.kind) {
+		case "uninitialized":
+			return true;
+		case "bootstrapped":
+		case "empty":
+		case "skipped":
+			return next.kind === current.kind && current.reason === next.reason;
+		case "stable":
+			return next.kind === "stable" && current.scrolling === next.scrolling;
+	}
 }

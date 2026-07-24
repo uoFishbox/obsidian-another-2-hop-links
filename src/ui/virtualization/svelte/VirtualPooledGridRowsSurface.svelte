@@ -113,11 +113,13 @@
 				})
 			: cell.renderSlotKey;
 
-	const resolveRowStyle = (row: TMountedRow): string =>
-		`position:absolute; left:0; right:0; top:0; transform:translateY(${Math.max(
-			0,
-			row.top,
-		)}px); margin-bottom:0`;
+	const setRowTransform = (element: HTMLElement, top: number) => {
+		const update = (nextTop: number): void => {
+			element.style.transform = `translateY(${Math.max(0, nextTop)}px)`;
+		};
+		update(top);
+		return { update };
+	};
 
 	const directRowViewStates = $derived(
 		(mountedRows ?? []).map((row) => ({
@@ -138,7 +140,7 @@
 				class={rowClassName}
 				data-ccl-row-slot={!IS_PROD ? row.slotIndex : undefined}
 				data-ccl-row-index={!IS_PROD ? row.rowIndex : undefined}
-				style={resolveRowStyle(row)}
+				use:setRowTransform={row.top}
 			>
 				{#each row.cells as mountedCell (resolveCellSlotKey(row, mountedCell))}
 					<VirtualGridLogicalCellMount

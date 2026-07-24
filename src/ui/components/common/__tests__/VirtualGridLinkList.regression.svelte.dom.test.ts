@@ -57,11 +57,11 @@ describe("VirtualGridLinkList regression", () => {
 		expect(topSpacer?.style.height).toBe("0px");
 		expect(bottomSpacer).not.toBeNull();
 		expect(bottomSpacer?.style.height).toBe("0px");
-		expect(rows[0].style.position).toBe("absolute");
-		expect(rows[0].style.top).toBe("0px");
+		expect(rows[0].style.position).toBe("");
+		expect(rows[0].style.top).toBe("");
 		expect(rows[0].style.transform).toBe("translateY(0px)");
-		expect(rows[1].style.position).toBe("absolute");
-		expect(rows[1].style.top).toBe("0px");
+		expect(rows[1].style.position).toBe("");
+		expect(rows[1].style.top).toBe("");
 		expect(rows[1].style.transform).toBe("translateY(134px)");
 
 		const cells = Array.from(
@@ -121,8 +121,8 @@ describe("VirtualGridLinkList regression", () => {
 		const rowSlots = rows.map((row) => Number(row.dataset.cclRowSlot));
 		expect(rowSlots).toEqual([...rowSlots].sort((left, right) => left - right));
 		for (const row of rows) {
-			expect(row.style.position).toBe("absolute");
-			expect(row.style.top).toBe("0px");
+			expect(row.style.position).toBe("");
+			expect(row.style.top).toBe("");
 			expect(row.style.transform).toBe(
 				`translateY(${Number(row.dataset.cclRowIndex) * 134}px)`,
 			);

@@ -67,10 +67,14 @@ export interface TwoHopVirtualListProps {
 	) => CardRenderModel;
 }
 
+export interface TwoHopRenderSlotBinding {
+	readonly cell: TwoHopMountedCell;
+	readonly cardModel?: CardRenderModel;
+}
+
 /** Reactive display state owned by one physical render slot. */
 export interface TwoHopRenderSlotState {
-	cell: TwoHopMountedCell | undefined;
-	cardModel: CardRenderModel | undefined;
+	binding: TwoHopRenderSlotBinding | undefined;
 }
 
 const EMPTY_RANGE: RowRange = { start: 0, end: 0 };
@@ -240,10 +244,11 @@ export function useTwoHopVirtualList(
 		const slotIndex = cell.renderSlotIndex;
 		const slotState = renderSlotStates[slotIndex];
 		if (!slotState) return;
-		const previousModel = slotState.cardModel;
+		const previousModel = slotState.binding?.cardModel;
 		const model = resolveMountedCardModel(cell, resolver);
-		if (slotState.cell !== cell) slotState.cell = cell;
-		if (previousModel !== model) slotState.cardModel = model;
+		if (slotState.binding?.cell !== cell || slotState.binding.cardModel !== model) {
+			slotState.binding = { cell, cardModel: model };
+		}
 
 		const previousPreview = previousModel?.previewSnapshot;
 		const previewSnapshot = model?.previewSnapshot;
@@ -296,7 +301,7 @@ export function useTwoHopVirtualList(
 		const slotIndex = Number(renderSlotKey);
 		const slotState = renderSlotStates[slotIndex];
 		if (!slotState) return;
-		const previousModel = slotState.cardModel;
+		const previousModel = slotState.binding?.cardModel;
 		const slotId = String(renderSlotKey);
 		if (previousModel?.previewSnapshot) {
 			previewBindingDelta.releasedSlots.push(slotId);
@@ -304,8 +309,7 @@ export function useTwoHopVirtualList(
 		if (previousModel?.interactionDescriptor) {
 			interactionBindingDelta.releasedSlots.push(slotId);
 		}
-		if (slotState.cell !== undefined) slotState.cell = undefined;
-		if (slotState.cardModel !== undefined) slotState.cardModel = undefined;
+		if (slotState.binding !== undefined) slotState.binding = undefined;
 	};
 
 	const refreshCardBindings = (
@@ -371,26 +375,6 @@ export function useTwoHopVirtualList(
 		previewSurface.syncBindingDelta(previewBindingDelta);
 	};
 
-	const syncDisplaySnapshot = (params: {
-		readonly previewRange: RowRange;
-		readonly build: TwoHopMountedRowsBuild | null;
-		readonly resolver: TwoHopVirtualListProps["resolveItemCardModel"];
-		readonly active: boolean;
-	}): void => {
-		const bindingsChanged = refreshCardBindings(params.build, params.resolver);
-		if (!bindingsChanged) {
-			previewSurface.setPreviewWindow({
-				previewRange: params.previewRange,
-				active: params.active,
-			});
-			return;
-		}
-		previewSurface.commitBindingDelta(previewBindingDelta, {
-			previewRange: params.previewRange,
-			active: params.active,
-		});
-	};
-
 	const virtualList = useVirtualList<
 		TwoHopLogicalCell,
 		TwoHopVirtualRowModel,
@@ -411,22 +395,35 @@ export function useTwoHopVirtualList(
 		onStableVisibleRange: () => {
 			measurementState.measurement.hasStableVisibleRange = true;
 		},
-		onSnapshotUpdated: (snapshot, reconciliationState) => {
-			const { resolver, active } = untrack(() => ({
-				resolver: props.resolveItemCardModel,
-				active: props.previewActive !== false,
-			}));
-			residentRowsAdapter.sync(
-				reconciliationState.mountedBuild?.rowsBySlot ?? EMPTY_MOUNTED_ROWS,
-				rowSlotAllocator.capacity,
+		onMountedBuildChanged: (nextBuild, previousBuild) => {
+			if (
+				nextBuild &&
+				nextBuild.deltaBaseIdentity === (previousBuild?.identity ?? null)
+			) {
+				residentRowsAdapter.applyDelta(
+					nextBuild.rowDelta,
+					rowSlotAllocator.capacity,
+				);
+			} else {
+				residentRowsAdapter.sync(
+					nextBuild?.rowsBySlot ?? EMPTY_MOUNTED_ROWS,
+					rowSlotAllocator.capacity,
+				);
+			}
+			syncCardBindings(
+				nextBuild,
+				untrack(() => props.resolveItemCardModel),
 			);
-			syncDisplaySnapshot({
-				previewRange: snapshot.ranges.previewVisible,
-				build: reconciliationState.mountedBuild,
-				resolver,
-				active,
-			});
 		},
+		onPreviewRangeChanged:
+			props.previewActive === false
+				? undefined
+				: (previewRange) => {
+						previewSurface.setPreviewWindow({
+							previewRange,
+							active: true,
+						});
+					},
 	});
 
 	const policyResolver = createViewPlanCardVirtualListPolicyResolver({
@@ -556,7 +553,7 @@ export function useTwoHopVirtualList(
 		},
 		getRenderSlotState(cell: TwoHopMountedCell) {
 			const state = renderSlotStates[cell.renderSlotIndex];
-			return state?.cell === cell ? state : undefined;
+			return state?.binding?.cell === cell ? state : undefined;
 		},
 		getCellClassName(cell: TwoHopMountedCell): string | undefined {
 			return cell.section.header.section.className;
@@ -578,20 +575,13 @@ export function useTwoHopVirtualList(
 }
 
 function createTwoHopRenderSlotState(): TwoHopRenderSlotState {
-	let cell = $state.raw<TwoHopMountedCell | undefined>(undefined);
-	let cardModel = $state.raw<CardRenderModel | undefined>(undefined);
+	let binding = $state.raw<TwoHopRenderSlotBinding | undefined>(undefined);
 	return {
-		get cell() {
-			return cell;
+		get binding() {
+			return binding;
 		},
-		set cell(nextCell) {
-			cell = nextCell;
-		},
-		get cardModel() {
-			return cardModel;
-		},
-		set cardModel(nextCardModel) {
-			cardModel = nextCardModel;
+		set binding(nextBinding) {
+			binding = nextBinding;
 		},
 	};
 }

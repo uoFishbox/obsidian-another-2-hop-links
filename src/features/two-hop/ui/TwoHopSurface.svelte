@@ -67,7 +67,7 @@
 		<TwoHopLogicalCell
 			{mountedCell}
 			applicationStore={props.applicationStore}
-			cardModel={slotState?.cardModel}
+			cardModel={slotState?.binding?.cardModel}
 			previewSlotId={String(mountedCell.renderSlotKey)}
 			onLoadMore={list.loadMore}
 		/>

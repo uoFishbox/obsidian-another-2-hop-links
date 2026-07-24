@@ -305,6 +305,64 @@ describe("useVirtualList", () => {
 		expect(onSnapshotUpdated).toHaveBeenCalledTimes(1);
 	});
 
+	it("publishes mounted builds and preview ranges through independent callbacks", () => {
+		const rowModel = createRowModel(30);
+		const onMountedBuildChanged = vi.fn();
+		const onPreviewRangeChanged = vi.fn();
+		const onModeChanged = vi.fn();
+		const virtualList = useVirtualList<
+			VirtualListLogicalCell<TestItem>,
+			FlatLinkRowModel<TestItem>,
+			MountedVirtualGridCell<TestItem>,
+			MountedVirtualGridCellsBuildResult<TestItem>
+		>({
+			buildMountedCells: buildMountedVirtualGridCellsFromRowModel,
+			visibilityMetadataPolicy: { type: "caller-managed" },
+			onMountedBuildChanged,
+			onPreviewRangeChanged,
+			onModeChanged,
+		});
+		const measurement = {
+			rowModel,
+			scrollTop: 0,
+			viewportHeight: 100,
+			sectionTop: 0,
+			isStableMeasurement: true,
+			hasStableVisibleRange: false,
+			isScrollActive: true,
+			visibilityPolicy: {
+				bootstrapRows: 3,
+				mountedOverscanPx: 500,
+				previewActivationAheadRows: 0,
+			},
+			precomputedRanges: {
+				mounted: { start: 0, end: 7 },
+				previewVisible: { start: 0, end: 1 },
+			},
+		};
+
+		virtualList.applyMeasurement(measurement);
+		const initialBuild = virtualList.getReconciliationState().mountedBuild;
+		onMountedBuildChanged.mockClear();
+		onPreviewRangeChanged.mockClear();
+		onModeChanged.mockClear();
+
+		virtualList.applyMeasurement({
+			...measurement,
+			scrollTop: 100,
+			hasStableVisibleRange: true,
+			precomputedRanges: {
+				mounted: { start: 0, end: 7 },
+				previewVisible: { start: 1, end: 2 },
+			},
+		});
+
+		expect(virtualList.getReconciliationState().mountedBuild).toBe(initialBuild);
+		expect(onMountedBuildChanged).not.toHaveBeenCalled();
+		expect(onPreviewRangeChanged).toHaveBeenCalledTimes(1);
+		expect(onModeChanged).not.toHaveBeenCalled();
+	});
+
 	it("returns skipped and publishes skipped mode when unstable measurement keeps the same content", () => {
 		const onSnapshotUpdated = vi.fn();
 		const virtualList = createVirtualList(onSnapshotUpdated);
