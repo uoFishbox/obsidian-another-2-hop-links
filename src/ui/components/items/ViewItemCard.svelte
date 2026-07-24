@@ -11,6 +11,28 @@
 	import { getPriorityFrontmatterCardTitle } from "core/frontmatterCardTitle";
 	import { createItemInteractionKey } from "ui/interactions/interactionTypes";
 	import { markCCLComponentReevaluation } from "infrastructure/debug/CCLDevMeasurements";
+	import type { TFile } from "obsidian";
+	import type { ViewItem } from "application/presenters";
+	import type { CardPresentationState } from "ui/components/common/cardPresentation";
+	import type { PreviewData } from "features/preview/public-types";
+	import type { CardPreviewSnapshot } from "features/preview/ui/cardPreviewSnapshot";
+
+	interface ViewItemCardRenderState {
+		readonly item: ViewItem;
+		readonly targetFile: TFile | null;
+		readonly title: string;
+		readonly ariaLabel: string;
+		readonly className: string | null;
+		readonly extension: string | null;
+		readonly directory: string | null;
+		readonly interactionId: string;
+		readonly searchQuery: string;
+		readonly presentation: CardPresentationState | undefined;
+		readonly previewActivationIdentity: string;
+		readonly previewOverride: PreviewData | null;
+		readonly previewSnapshot: CardPreviewSnapshot | undefined;
+		readonly previewFile: TFile | undefined;
+	}
 
 	let {
 		item,
@@ -29,35 +51,70 @@
 
 	const context = useLinkContext();
 
-	const renderItem = $derived(model?.item ?? item);
-	const renderSearchQuery = $derived(model?.searchQuery ?? searchQuery);
-	const renderPresentation = $derived(model?.presentation ?? presentation);
-	const strategy = $derived(
-		model ? null : renderItem ? getItemStrategy(renderItem) : null,
-	);
-
-	// 各プロパティをStrategyを通じて算出
-	const targetFile = $derived(
-		model
-			? model.targetFile
-			: renderItem
-				? (strategy?.getTargetFile(renderItem.data, context) ?? null)
-				: null,
-	);
-	const className = $derived(
-		model
-			? model.className
-			: renderItem
-				? (strategy?.getClassName(renderItem.data) ?? null)
-				: null,
-	);
-
-	const title = $derived.by(() => {
-		if (model) return model.title;
-		if (!renderItem) {
-			return "";
+	const renderState = $derived.by((): ViewItemCardRenderState | null => {
+		if (model) {
+			const previewSnapshot = resolveActivePreviewSnapshot(
+				model.targetFile,
+				model.previewActivationIdentity,
+				model.previewSnapshot,
+			);
+			return {
+				item: model.item,
+				targetFile: model.targetFile,
+				title: model.title,
+				ariaLabel: model.ariaLabel,
+				className: model.className,
+				extension: model.extension,
+				directory: model.directory,
+				interactionId: model.interactionId,
+				searchQuery: model.searchQuery,
+				presentation: model.presentation,
+				previewActivationIdentity: model.previewActivationIdentity ?? "",
+				previewOverride: model.previewOverride,
+				previewSnapshot,
+				previewFile: undefined,
+			};
 		}
 
+		if (!item) return null;
+		return buildLegacyViewItemCardState(item);
+	});
+
+	function buildLegacyViewItemCardState(
+		renderItem: ViewItem,
+	): ViewItemCardRenderState {
+		const strategy = getItemStrategy(renderItem);
+		const targetFile = strategy?.getTargetFile(renderItem.data, context) ?? null;
+		const className = strategy?.getClassName(renderItem.data) ?? null;
+		const title = resolveLegacyTitle(renderItem, targetFile);
+		const interactionKey =
+			providedInteractionKey ?? createItemInteractionKey(renderItem);
+
+		return {
+			item: renderItem,
+			targetFile,
+			title,
+			ariaLabel:
+				renderItem.type === "newLink"
+					? ARIA_LABELS.UNRESOLVED_LINK
+					: ARIA_LABELS.OPEN_LINK(title),
+			className,
+			extension: targetFile?.extension ?? null,
+			directory: targetFile?.parent?.path ?? null,
+			interactionId: providedInteractionId ?? interactionKey,
+			searchQuery,
+			presentation,
+			previewActivationIdentity: "",
+			previewOverride: null,
+			previewSnapshot: undefined,
+			previewFile: targetFile ?? undefined,
+		};
+	}
+
+	function resolveLegacyTitle(
+		renderItem: ViewItem,
+		targetFile: TFile | null,
+	): string {
 		if (targetFile) {
 			return (
 				getPriorityFrontmatterCardTitle(
@@ -82,44 +139,22 @@
 			default:
 				return "";
 		}
-	});
-	const ariaLabel = $derived(
-		model
-			? model.ariaLabel
-			: renderItem?.type === "newLink"
-				? ARIA_LABELS.UNRESOLVED_LINK
-				: ARIA_LABELS.OPEN_LINK(title),
-	);
+	}
 
-	const extension = $derived(
-		model ? model.extension : (targetFile?.extension ?? null),
-	);
-	const directory = $derived(
-		model ? model.directory : (targetFile?.parent?.path ?? null),
-	);
-	const interactionKey = $derived(
-		model
-			? model.interactionKey
-			: renderItem
-				? (providedInteractionKey ?? createItemInteractionKey(renderItem))
-				: undefined,
-	);
-	const interactionId = $derived.by(() => {
-		if (model) return model.interactionId;
-		return providedInteractionId ?? interactionKey;
-	});
-	const activePreviewSnapshot = $derived.by(() => {
-		const previewSnapshot = model?.previewSnapshot ?? undefined;
+	function resolveActivePreviewSnapshot(
+		targetFile: TFile | null,
+		expectedIdentity: string | undefined,
+		previewSnapshot: CardPreviewSnapshot | null,
+	): CardPreviewSnapshot | undefined {
 		if (!targetFile || !previewSnapshot) return undefined;
 		if (previewSnapshot.file.path !== targetFile.path) return undefined;
-
-		const expectedIdentity = model?.previewActivationIdentity;
 		if (expectedIdentity && previewSnapshot.identity !== expectedIdentity) {
 			return undefined;
 		}
 
 		return previewSnapshot;
-	});
+	}
+
 	const componentReevaluationProbe = $derived.by(() => {
 		if (process.env.NODE_ENV === "production") return "";
 
@@ -135,52 +170,40 @@
 		void previewSlotId;
 		void presentation;
 		void model;
-		void renderItem;
-		void renderSearchQuery;
-		void renderPresentation;
-		void strategy;
-		void targetFile;
-		void className;
-		void title;
-		void ariaLabel;
-		void extension;
-		void directory;
-		void interactionKey;
-		void interactionId;
-		void activePreviewSnapshot;
+		void renderState;
 		return markCCLComponentReevaluation("ViewItemCard");
 	});
 </script>
 
 {componentReevaluationProbe}
-{#if renderItem && interactionId}
+{#if renderState}
 	<LinkItem
-		{title}
-		{ariaLabel}
-		file={targetFile}
-		extension={extension ?? undefined}
-		{interactionId}
+		title={renderState.title}
+		ariaLabel={renderState.ariaLabel}
+		file={renderState.targetFile}
+		extension={renderState.extension ?? undefined}
+		interactionId={renderState.interactionId}
 		interactionKind="item"
 		{draggable}
-		className={className ?? undefined}
-		{directory}
+		className={renderState.className ?? undefined}
+		directory={renderState.directory}
 		{settings}
-		searchQuery={renderSearchQuery}
-		presentation={renderPresentation}
+		searchQuery={renderState.searchQuery}
+		presentation={renderState.presentation}
 	>
 		{#snippet children()}
-			{#if !DEBUG_DISABLE_CARD_DOM_PREVIEW && renderItem.type === "newLink" && !targetFile}
+			{#if !DEBUG_DISABLE_CARD_DOM_PREVIEW && renderState.item.type === "newLink" && !renderState.targetFile}
 				<UnresolvedPreviewPlaceholder />
-			{:else if !DEBUG_DISABLE_CARD_DOM_PREVIEW && targetFile && previewSlotId}
+			{:else if !DEBUG_DISABLE_CARD_DOM_PREVIEW && renderState.targetFile && previewSlotId}
 				<PreviewHost slotId={previewSlotId} />
-			{:else if !DEBUG_DISABLE_CARD_DOM_PREVIEW && targetFile}
+			{:else if !DEBUG_DISABLE_CARD_DOM_PREVIEW && renderState.targetFile}
 				<CardPreview
-					bindingIdentity={model?.previewActivationIdentity ?? ""}
-					renderSnapshot={activePreviewSnapshot}
-					file={model ? undefined : targetFile}
-					searchQuery={renderSearchQuery}
+					bindingIdentity={renderState.previewActivationIdentity}
+					renderSnapshot={renderState.previewSnapshot}
+					file={renderState.previewFile}
+					searchQuery={renderState.searchQuery}
 					{previewRefreshToken}
-					previewOverride={model?.previewOverride ?? null}
+					previewOverride={renderState.previewOverride}
 					getPreview={context.getPreview}
 				/>
 			{/if}
