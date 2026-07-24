@@ -19,6 +19,7 @@ import {
 	buildTwoHopMountedRows,
 	type TwoHopMountedCell,
 	type TwoHopMountedRow,
+	type TwoHopMountedRowDelta,
 	type TwoHopMountedRowsBuild,
 } from "features/two-hop/ui/twoHopMountedRows";
 import { createTwoHopResidentRowSlotAllocator } from "features/two-hop/ui/twoHopResidentRowSlotAllocator";
@@ -37,16 +38,23 @@ import { createResolvedCardLayoutSettingsMemo } from "ui/shared/layout/cardLayou
 import type { PreviewBackpressure } from "features/preview/scheduling/previewActivationScheduler";
 import {
 	createVirtualPreviewSurface,
+	type RowPreviewBindingDelta,
 	type RowPreviewCardBinding,
+	type RowPreviewWindow,
 } from "features/preview/scheduling/virtualPreviewSurface";
 import { resolveTwoHopItemStaticState } from "features/two-hop/ui/twoHopCellStaticState";
 import {
 	createVirtualCardInteractionController,
 	type VirtualCardInteractionBinding,
+	type VirtualCardInteractionDelta,
 } from "ui/interactions/virtualCardInteractionController";
 import { useAppContext, useLinkContext } from "ui/context/linkContext";
 import type { RowRange } from "ui/virtualization/rowRange";
-import type { RenderSlotKey, VirtualNavigationTarget } from "ui/virtualization/types";
+import {
+	renderSlotKey,
+	type RenderSlotKey,
+	type VirtualNavigationTarget,
+} from "ui/virtualization/types";
 import type { ResultNavigationDirection } from "features/keyboard-navigation/resultFocus";
 import type { VirtualFrameCoordinator } from "ui/virtualization/scheduling/frameCoordinator";
 import {
@@ -77,8 +85,37 @@ export interface TwoHopRenderSlotState {
 	binding: TwoHopRenderSlotBinding | undefined;
 }
 
+interface TwoHopCardShellChange {
+	readonly slotIndex: number;
+	readonly binding: TwoHopRenderSlotBinding | undefined;
+}
+
+/** Reactive card-shell changes prepared for one surface publication. */
+export interface TwoHopCardShellDelta {
+	readonly mountedBuild: TwoHopMountedRowsBuild | null;
+	readonly resolver: TwoHopVirtualListProps["resolveItemCardModel"];
+	readonly nextCapacity: number;
+	readonly changes: readonly TwoHopCardShellChange[];
+}
+
+/** All TwoHop surface state published by one virtual-list snapshot update. */
+export interface TwoHopSurfaceCommit {
+	readonly generation: number;
+	readonly mountedBuild: TwoHopMountedRowsBuild | null;
+	readonly rowDelta: TwoHopMountedRowDelta | null;
+	readonly shellDelta: TwoHopCardShellDelta | null;
+	readonly interactionDelta: VirtualCardInteractionDelta | null;
+	readonly previewDelta: RowPreviewBindingDelta | null;
+	readonly previewWindow: RowPreviewWindow;
+}
+
 const EMPTY_RANGE: RowRange = { start: 0, end: 0 };
 const EMPTY_MOUNTED_ROWS: readonly [] = [];
+const EMPTY_PREVIEW_DELTA: RowPreviewBindingDelta = {
+	enteredSlots: [],
+	reboundSlots: [],
+	releasedSlots: [],
+};
 
 /** Connects TwoHop geometry to the shared pooled-row virtual surface. */
 export function useTwoHopVirtualList(
@@ -182,30 +219,10 @@ export function useTwoHopVirtualList(
 	let hasSyncedCardBindings = false;
 	let syncedCardBindingsBuild: TwoHopMountedRowsBuild | null = null;
 	let syncedCardBindingsResolver = props.resolveItemCardModel;
-	const previewBindingsBySlot: Array<RowPreviewCardBinding | undefined> = [];
-	const interactionBindingsBySlot: Array<VirtualCardInteractionBinding | undefined> =
-		[];
 	const renderSlotStates: TwoHopRenderSlotState[] = [];
-	const previewBindingDelta: {
-		enteredSlots: RowPreviewCardBinding[];
-		reboundSlots: RowPreviewCardBinding[];
-		releasedSlots: string[];
-	} = {
-		enteredSlots: [],
-		reboundSlots: [],
-		releasedSlots: [],
-	};
-	const interactionBindingDelta: {
-		enteredSlots: VirtualCardInteractionBinding[];
-		reboundSlots: VirtualCardInteractionBinding[];
-		releasedSlots: string[];
-	} = {
-		enteredSlots: [],
-		reboundSlots: [],
-		releasedSlots: [],
-	};
-	const changedCellsScratch: TwoHopMountedCell[] = [];
-	const releasedSlotsScratch: RenderSlotKey[] = [];
+	let residentRowsBuild: TwoHopMountedRowsBuild | null = null;
+	let nextSurfaceCommitGeneration = 1;
+	let committedSurfaceGeneration = 0;
 
 	const ensureRenderSlotCapacity = (capacity: number): void => {
 		while (renderSlotStates.length < capacity) {
@@ -226,153 +243,196 @@ export function useTwoHopVirtualList(
 		return resolver(cell.cell.item, presentation);
 	};
 
-	const clearBindingDelta = (): void => {
-		previewBindingDelta.enteredSlots.length = 0;
-		previewBindingDelta.reboundSlots.length = 0;
-		previewBindingDelta.releasedSlots.length = 0;
-		interactionBindingDelta.enteredSlots.length = 0;
-		interactionBindingDelta.reboundSlots.length = 0;
-		interactionBindingDelta.releasedSlots.length = 0;
-		changedCellsScratch.length = 0;
-		releasedSlotsScratch.length = 0;
-	};
-
-	const updateChangedSlot = (
-		cell: TwoHopMountedCell,
-		resolver: TwoHopVirtualListProps["resolveItemCardModel"],
-	): void => {
-		const slotIndex = cell.renderSlotIndex;
-		const slotState = renderSlotStates[slotIndex];
-		if (!slotState) return;
-		const previousModel = slotState.binding?.cardModel;
-		const model = resolveMountedCardModel(cell, resolver);
-		if (slotState.binding?.cell !== cell || slotState.binding.cardModel !== model) {
-			slotState.binding = { cell, cardModel: model };
-		}
-
-		const previousPreview = previousModel?.previewSnapshot;
-		const previewSnapshot = model?.previewSnapshot;
-		if (previewSnapshot) {
-			let binding = previewBindingsBySlot[slotIndex];
-			if (!binding) {
-				binding = {
-					slotId: String(cell.renderSlotKey),
-					rowIndex: cell.rowIndex,
-					snapshot: previewSnapshot,
-				};
-				previewBindingsBySlot[slotIndex] = binding;
-			} else {
-				if (binding.rowIndex !== cell.rowIndex)
-					binding.rowIndex = cell.rowIndex;
-				if (binding.snapshot !== previewSnapshot)
-					binding.snapshot = previewSnapshot;
-			}
-			(previousPreview
-				? previewBindingDelta.reboundSlots
-				: previewBindingDelta.enteredSlots
-			).push(binding);
-		} else if (previousPreview) {
-			previewBindingDelta.releasedSlots.push(String(cell.renderSlotKey));
-		}
-
-		const previousInteraction = previousModel?.interactionDescriptor;
-		const interactionDescriptor = model?.interactionDescriptor;
-		if (interactionDescriptor) {
-			let binding = interactionBindingsBySlot[slotIndex];
-			if (!binding) {
-				binding = {
-					slotId: String(cell.renderSlotKey),
-					descriptor: interactionDescriptor,
-				};
-				interactionBindingsBySlot[slotIndex] = binding;
-			} else if (binding.descriptor !== interactionDescriptor) {
-				binding.descriptor = interactionDescriptor;
-			}
-			(previousInteraction
-				? interactionBindingDelta.reboundSlots
-				: interactionBindingDelta.enteredSlots
-			).push(binding);
-		} else if (previousInteraction) {
-			interactionBindingDelta.releasedSlots.push(String(cell.renderSlotKey));
-		}
-	};
-
-	const releaseSlot = (renderSlotKey: RenderSlotKey): void => {
-		const slotIndex = Number(renderSlotKey);
-		const slotState = renderSlotStates[slotIndex];
-		if (!slotState) return;
-		const previousModel = slotState.binding?.cardModel;
-		const slotId = String(renderSlotKey);
-		if (previousModel?.previewSnapshot) {
-			previewBindingDelta.releasedSlots.push(slotId);
-		}
-		if (previousModel?.interactionDescriptor) {
-			interactionBindingDelta.releasedSlots.push(slotId);
-		}
-		if (slotState.binding !== undefined) slotState.binding = undefined;
-	};
-
-	const refreshCardBindings = (
+	const prepareCardBindingDeltas = (
 		build: TwoHopMountedRowsBuild | null,
 		resolver: TwoHopVirtualListProps["resolveItemCardModel"],
-	): boolean => {
+	): {
+		readonly shellDelta: TwoHopCardShellDelta | null;
+		readonly previewDelta: RowPreviewBindingDelta | null;
+		readonly interactionDelta: VirtualCardInteractionDelta | null;
+	} => {
 		if (
 			hasSyncedCardBindings &&
 			syncedCardBindingsBuild === build &&
 			syncedCardBindingsResolver === resolver
 		) {
-			return false;
+			return {
+				shellDelta: null,
+				previewDelta: null,
+				interactionDelta: null,
+			};
 		}
 
-		clearBindingDelta();
-		ensureRenderSlotCapacity(build?.nextRenderSlotIndex ?? 0);
+		const shellChangesBySlot = new Map<
+			number,
+			TwoHopRenderSlotBinding | undefined
+		>();
+		const enteredPreviewSlots: RowPreviewCardBinding[] = [];
+		const reboundPreviewSlots: RowPreviewCardBinding[] = [];
+		const releasedPreviewSlots: string[] = [];
+		const enteredInteractionSlots: VirtualCardInteractionBinding[] = [];
+		const reboundInteractionSlots: VirtualCardInteractionBinding[] = [];
+		const releasedInteractionSlots: string[] = [];
+		const changedCells: TwoHopMountedCell[] = [];
+		const releasedSlots: RenderSlotKey[] = [];
 		const resolverChanged = syncedCardBindingsResolver !== resolver;
 		const canApplyBuildDelta =
 			build !== null &&
 			build.deltaBaseIdentity === (syncedCardBindingsBuild?.identity ?? null);
 		if (build && canApplyBuildDelta) {
 			for (const renderSlotKey of build.slotDelta.releasedSlots) {
-				releasedSlotsScratch.push(renderSlotKey);
+				releasedSlots.push(renderSlotKey);
 			}
 		} else if (syncedCardBindingsBuild) {
 			for (const row of syncedCardBindingsBuild.rowSlices) {
-				for (const cell of row.cells)
-					releasedSlotsScratch.push(cell.renderSlotKey);
+				for (const cell of row.cells) releasedSlots.push(cell.renderSlotKey);
 			}
 		}
 		if (resolverChanged || !canApplyBuildDelta) {
 			for (const row of build?.rowSlices ?? EMPTY_MOUNTED_ROWS) {
-				for (const cell of row.cells) changedCellsScratch.push(cell);
+				for (const cell of row.cells) changedCells.push(cell);
 			}
 		} else if (build) {
 			for (const cell of build.slotDelta.enteredSlots) {
-				changedCellsScratch.push(cell);
+				changedCells.push(cell);
 			}
 			for (const cell of build.slotDelta.reboundSlots) {
-				changedCellsScratch.push(cell);
+				changedCells.push(cell);
 			}
 		}
-		for (const renderSlotKey of releasedSlotsScratch) releaseSlot(renderSlotKey);
-		for (const cell of changedCellsScratch) updateChangedSlot(cell, resolver);
-		const nextCapacity = build?.nextRenderSlotIndex ?? 0;
-		if (renderSlotStates.length > nextCapacity) {
-			renderSlotStates.length = nextCapacity;
-			previewBindingsBySlot.length = nextCapacity;
-			interactionBindingsBySlot.length = nextCapacity;
+
+		const getPreparedBinding = (
+			slotIndex: number,
+		): TwoHopRenderSlotBinding | undefined =>
+			shellChangesBySlot.has(slotIndex)
+				? shellChangesBySlot.get(slotIndex)
+				: renderSlotStates[slotIndex]?.binding;
+		const releaseSlot = (renderSlotKey: RenderSlotKey): void => {
+			const slotIndex = Number(renderSlotKey);
+			const previousModel = getPreparedBinding(slotIndex)?.cardModel;
+			const slotId = String(renderSlotKey);
+			if (previousModel?.previewSnapshot) releasedPreviewSlots.push(slotId);
+			if (previousModel?.interactionDescriptor)
+				releasedInteractionSlots.push(slotId);
+			shellChangesBySlot.set(slotIndex, undefined);
+		};
+		for (const renderSlotKey of releasedSlots) releaseSlot(renderSlotKey);
+
+		for (const cell of changedCells) {
+			const slotIndex = cell.renderSlotIndex;
+			const previousBinding = getPreparedBinding(slotIndex);
+			const previousModel = previousBinding?.cardModel;
+			const model = resolveMountedCardModel(cell, resolver);
+			if (previousBinding?.cell !== cell || previousModel !== model) {
+				shellChangesBySlot.set(slotIndex, { cell, cardModel: model });
+			}
+
+			const slotId = String(cell.renderSlotKey);
+			const previewSnapshot = model?.previewSnapshot;
+			if (previewSnapshot) {
+				const binding = {
+					slotId,
+					rowIndex: cell.rowIndex,
+					snapshot: previewSnapshot,
+				};
+				(previousModel?.previewSnapshot
+					? reboundPreviewSlots
+					: enteredPreviewSlots
+				).push(binding);
+			} else if (previousModel?.previewSnapshot) {
+				releasedPreviewSlots.push(slotId);
+			}
+
+			const interactionDescriptor = model?.interactionDescriptor;
+			if (interactionDescriptor) {
+				const binding = { slotId, descriptor: interactionDescriptor };
+				(previousModel?.interactionDescriptor
+					? reboundInteractionSlots
+					: enteredInteractionSlots
+				).push(binding);
+			} else if (previousModel?.interactionDescriptor) {
+				releasedInteractionSlots.push(slotId);
+			}
 		}
-		interactionController.syncCardDelta(interactionBindingDelta);
-		hasSyncedCardBindings = true;
-		syncedCardBindingsBuild = build;
-		syncedCardBindingsResolver = resolver;
-		return true;
+
+		const nextCapacity = build?.nextRenderSlotIndex ?? 0;
+		for (
+			let slotIndex = nextCapacity;
+			slotIndex < renderSlotStates.length;
+			slotIndex += 1
+		) {
+			if (!shellChangesBySlot.has(slotIndex)) {
+				releaseSlot(renderSlotKey(slotIndex));
+			}
+		}
+
+		const shellDelta: TwoHopCardShellDelta = {
+			mountedBuild: build,
+			resolver,
+			nextCapacity,
+			changes: Array.from(shellChangesBySlot, ([slotIndex, binding]) => ({
+				slotIndex,
+				binding,
+			})),
+		};
+		const previewDelta: RowPreviewBindingDelta = {
+			enteredSlots: enteredPreviewSlots,
+			reboundSlots: reboundPreviewSlots,
+			releasedSlots: releasedPreviewSlots,
+		};
+		const interactionDelta: VirtualCardInteractionDelta = {
+			enteredSlots: enteredInteractionSlots,
+			reboundSlots: reboundInteractionSlots,
+			releasedSlots: releasedInteractionSlots,
+		};
+		return { shellDelta, previewDelta, interactionDelta };
 	};
 
-	const syncCardBindings = (
+	const applyResidentRowDelta = (
 		build: TwoHopMountedRowsBuild | null,
-		resolver: TwoHopVirtualListProps["resolveItemCardModel"],
+		delta: TwoHopMountedRowDelta | null,
 	): void => {
-		if (!refreshCardBindings(build, resolver)) return;
-		previewSurface.syncBindingDelta(previewBindingDelta);
+		if (residentRowsBuild === build) return;
+		if (build && delta) {
+			residentRowsAdapter.applyDelta(delta, rowSlotAllocator.capacity);
+		} else {
+			residentRowsAdapter.sync(
+				build?.rowsBySlot ?? EMPTY_MOUNTED_ROWS,
+				rowSlotAllocator.capacity,
+			);
+		}
+		residentRowsBuild = build;
+	};
+
+	const applyCardShellDelta = (delta: TwoHopCardShellDelta | null): void => {
+		if (!delta) return;
+		ensureRenderSlotCapacity(delta.nextCapacity);
+		for (const change of delta.changes) {
+			const slotState = renderSlotStates[change.slotIndex];
+			if (slotState && slotState.binding !== change.binding) {
+				slotState.binding = change.binding;
+			}
+		}
+		if (renderSlotStates.length > delta.nextCapacity) {
+			renderSlotStates.length = delta.nextCapacity;
+		}
+		hasSyncedCardBindings = true;
+		syncedCardBindingsBuild = delta.mountedBuild;
+		syncedCardBindingsResolver = delta.resolver;
+	};
+
+	const commitSurface = (commit: TwoHopSurfaceCommit): void => {
+		if (commit.generation <= committedSurfaceGeneration) return;
+		committedSurfaceGeneration = commit.generation;
+		applyResidentRowDelta(commit.mountedBuild, commit.rowDelta);
+		applyCardShellDelta(commit.shellDelta);
+		if (commit.interactionDelta) {
+			interactionController.syncCardDelta(commit.interactionDelta);
+		}
+		previewSurface.commitBindingDelta(
+			commit.previewDelta ?? EMPTY_PREVIEW_DELTA,
+			commit.previewWindow,
+		);
 	};
 
 	const virtualList = useVirtualList<
@@ -395,35 +455,30 @@ export function useTwoHopVirtualList(
 		onStableVisibleRange: () => {
 			measurementState.measurement.hasStableVisibleRange = true;
 		},
-		onMountedBuildChanged: (nextBuild, previousBuild) => {
-			if (
-				nextBuild &&
-				nextBuild.deltaBaseIdentity === (previousBuild?.identity ?? null)
-			) {
-				residentRowsAdapter.applyDelta(
-					nextBuild.rowDelta,
-					rowSlotAllocator.capacity,
-				);
-			} else {
-				residentRowsAdapter.sync(
-					nextBuild?.rowsBySlot ?? EMPTY_MOUNTED_ROWS,
-					rowSlotAllocator.capacity,
-				);
-			}
-			syncCardBindings(
-				nextBuild,
+		onSnapshotUpdated: (snapshot, reconciliationState) => {
+			const mountedBuild = reconciliationState.mountedBuild;
+			const cardDeltas = prepareCardBindingDeltas(
+				mountedBuild,
 				untrack(() => props.resolveItemCardModel),
 			);
+			const canApplyRowDelta =
+				mountedBuild !== null &&
+				mountedBuild !== residentRowsBuild &&
+				mountedBuild.deltaBaseIdentity ===
+					(residentRowsBuild?.identity ?? null);
+			commitSurface({
+				generation: nextSurfaceCommitGeneration++,
+				mountedBuild,
+				rowDelta: canApplyRowDelta ? mountedBuild.rowDelta : null,
+				shellDelta: cardDeltas.shellDelta,
+				interactionDelta: cardDeltas.interactionDelta,
+				previewDelta: cardDeltas.previewDelta,
+				previewWindow: {
+					previewRange: snapshot.ranges.previewVisible,
+					active: untrack(() => props.previewActive !== false),
+				},
+			});
 		},
-		onPreviewRangeChanged:
-			props.previewActive === false
-				? undefined
-				: (previewRange) => {
-						previewSurface.setPreviewWindow({
-							previewRange,
-							active: true,
-						});
-					},
 	});
 
 	const policyResolver = createViewPlanCardVirtualListPolicyResolver({
@@ -505,7 +560,21 @@ export function useTwoHopVirtualList(
 	$effect(() => {
 		const resolver = props.resolveItemCardModel;
 		const build = untrack(() => virtualList.getReconciliationState().mountedBuild);
-		syncCardBindings(build, resolver);
+		const cardDeltas = prepareCardBindingDeltas(build, resolver);
+		if (!cardDeltas.shellDelta) return;
+		const snapshot = untrack(() => virtualList.getSnapshot());
+		commitSurface({
+			generation: nextSurfaceCommitGeneration++,
+			mountedBuild: build,
+			rowDelta: null,
+			shellDelta: cardDeltas.shellDelta,
+			interactionDelta: cardDeltas.interactionDelta,
+			previewDelta: cardDeltas.previewDelta,
+			previewWindow: {
+				previewRange: snapshot?.ranges.previewVisible ?? EMPTY_RANGE,
+				active: untrack(() => props.previewActive !== false),
+			},
+		});
 	});
 
 	onDestroy(() => {

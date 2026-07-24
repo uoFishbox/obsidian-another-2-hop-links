@@ -30,7 +30,44 @@ import {
 	resetCCLDevMeasurements,
 } from "infrastructure/debug/CCLDevMeasurements";
 
+const previewSurfaceCalls = vi.hoisted(() => ({
+	commitBindingDelta: vi.fn(),
+	syncBindingDelta: vi.fn(),
+}));
+
+vi.mock("features/preview/scheduling/virtualPreviewSurface", async (importOriginal) => {
+	const actual =
+		await importOriginal<
+			typeof import("features/preview/scheduling/virtualPreviewSurface")
+		>();
+	return {
+		...actual,
+		createVirtualPreviewSurface: (
+			...args: Parameters<typeof actual.createVirtualPreviewSurface>
+		) => {
+			const surface = actual.createVirtualPreviewSurface(...args);
+			return {
+				...surface,
+				syncBindingDelta: (
+					...syncArgs: Parameters<typeof surface.syncBindingDelta>
+				) => {
+					previewSurfaceCalls.syncBindingDelta(...syncArgs);
+					surface.syncBindingDelta(...syncArgs);
+				},
+				commitBindingDelta: (
+					...commitArgs: Parameters<typeof surface.commitBindingDelta>
+				) => {
+					previewSurfaceCalls.commitBindingDelta(...commitArgs);
+					surface.commitBindingDelta(...commitArgs);
+				},
+			};
+		},
+	};
+});
+
 beforeEach(() => {
+	previewSurfaceCalls.commitBindingDelta.mockClear();
+	previewSurfaceCalls.syncBindingDelta.mockClear();
 	resetRecords();
 	installResizeObserverMock();
 	installIntersectionObserverMock();
@@ -137,6 +174,22 @@ async function scrollSurface(
 }
 
 describe("TwoHopSurface", () => {
+	it("publishes each snapshot through the combined preview commit", async () => {
+		const { root, scroller } = await renderScrollableSurface(100);
+		previewSurfaceCalls.commitBindingDelta.mockClear();
+		previewSurfaceCalls.syncBindingDelta.mockClear();
+
+		await scrollSurface(root, scroller, 600);
+
+		expect(previewSurfaceCalls.commitBindingDelta).toHaveBeenCalled();
+		expect(previewSurfaceCalls.syncBindingDelta).not.toHaveBeenCalled();
+		for (const [previewDelta, previewWindow] of previewSurfaceCalls
+			.commitBindingDelta.mock.calls) {
+			expect(previewDelta).toBeDefined();
+			expect(previewWindow?.previewRange.start).toBeGreaterThan(0);
+		}
+	});
+
 	it("commits two-hop preview DOM without reevaluating ViewItemCard", async () => {
 		const targetFile = {
 			path: "notes/preview.md",
