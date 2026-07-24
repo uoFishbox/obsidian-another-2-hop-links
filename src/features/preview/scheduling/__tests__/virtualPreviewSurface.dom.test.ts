@@ -194,6 +194,31 @@ describe("VirtualPreviewSurface", () => {
 		surface.dispose();
 	});
 
+	it("skips slot reconciliation when bindings and preview range are unchanged", () => {
+		const { surface } = createHarness();
+		const card = binding("slot-0", 0, "a");
+		const cardSnapshot = card.snapshot;
+		let snapshotReads = 0;
+		Object.defineProperty(card, "snapshot", {
+			configurable: true,
+			get() {
+				snapshotReads += 1;
+				return cardSnapshot;
+			},
+		});
+		surface.registerHost("slot-0", document.createElement("div"));
+		enter(surface, card);
+		snapshotReads = 0;
+
+		surface.commitBindingDelta(
+			{ enteredSlots: [], reboundSlots: [], releasedSlots: [] },
+			{ previewRange: { start: 0, end: 1 }, active: true },
+		);
+
+		expect(snapshotReads).toBe(0);
+		surface.dispose();
+	});
+
 	it("keeps and reuses resident DOM outside the preview range", async () => {
 		const { surface, renders } = createHarness();
 		const host = document.createElement("div");

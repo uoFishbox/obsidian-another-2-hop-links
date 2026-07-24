@@ -454,7 +454,17 @@ export function createVirtualPreviewSurface(
 		window: RowPreviewWindow,
 	): void {
 		if (disposed) return;
-		previewRange = window.active ? window.previewRange : EMPTY_RANGE;
+		const hasBindingChanges =
+			delta.enteredSlots.length > 0 ||
+			delta.reboundSlots.length > 0 ||
+			delta.releasedSlots.length > 0;
+		const nextRange = window.active ? window.previewRange : EMPTY_RANGE;
+		const windowChanged =
+			nextRange.start !== previewRange.start ||
+			nextRange.end !== previewRange.end;
+		if (!hasBindingChanges && !windowChanged) return;
+
+		previewRange = nextRange;
 		applyBindingDelta(delta);
 		reconcile();
 	}
