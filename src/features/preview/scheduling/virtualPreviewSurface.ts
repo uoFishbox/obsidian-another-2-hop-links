@@ -8,6 +8,7 @@ import {
 	type PreviewBackpressure,
 	type PreviewBackpressureListener,
 } from "features/preview/scheduling/previewActivationScheduler";
+import { createPreviewFrameDriver } from "features/preview/scheduling/previewFrameDriver";
 import {
 	createCardPreviewRenderer,
 	type CardPreviewLoader,
@@ -107,6 +108,7 @@ interface PreviewSlotRuntime {
 }
 
 const EMPTY_RANGE: RowRange = { start: 0, end: 0 };
+const PREVIEW_SIDECAR_FLUSH_KEY = "two-hop:preview-sidecar-flush";
 
 /** Owns imperative preview DOM and lifecycle for one virtual surface. */
 export function createVirtualPreviewSurface(
@@ -115,6 +117,8 @@ export function createVirtualPreviewSurface(
 	const slotsById = new Map<string, PreviewSlotRuntime>();
 	const pendingByIdentity = new Map<string, PreviewActivationHandle>();
 	const activationIdentities = new Set<string>();
+	const stagedBindingsBySlot = new Map<string, RowPreviewCardBinding | null>();
+	const stagedInvalidatedSlots = new Set<string>();
 	const scope: PreviewActivationScope = createPreviewActivationScope({
 		getBackpressure: options.getBackpressure,
 		subscribeBackpressure: options.subscribeBackpressure,
@@ -123,7 +127,13 @@ export function createVirtualPreviewSurface(
 		getActivationsPerSecond: options.getActivationsPerSecond,
 	});
 	let previewRange: RowRange = EMPTY_RANGE;
+	let stagedPreviewRange: RowRange | undefined;
 	let disposed = false;
+	const stagedFlushDriver = createPreviewFrameDriver({
+		coordinator: options.frameCoordinator,
+		taskKey: PREVIEW_SIDECAR_FLUSH_KEY,
+		onFrame: flushStagedPreviewChanges,
+	});
 
 	function getOrCreateSlot(slotId: string): PreviewSlotRuntime {
 		const existing = slotsById.get(slotId);
@@ -150,12 +160,15 @@ export function createVirtualPreviewSurface(
 	}
 
 	function isCurrent(slot: PreviewSlotRuntime, token: PreviewRenderToken): boolean {
+		const desiredBinding = stagedBindingsBySlot.has(slot.slotId)
+			? stagedBindingsBySlot.get(slot.slotId)
+			: slot.binding;
 		return (
 			!disposed &&
 			slot.host?.epoch === token.hostEpoch &&
 			slot.bindingEpoch === token.bindingEpoch &&
 			slot.renderEpoch === token.renderEpoch &&
-			slot.binding?.snapshot.identity === token.identity
+			desiredBinding?.snapshot.identity === token.identity
 		);
 	}
 
@@ -409,6 +422,93 @@ export function createVirtualPreviewSurface(
 		for (const binding of delta.reboundSlots) bindCard(binding);
 	}
 
+	function getDesiredBinding(
+		slotId: string,
+	): RowPreviewCardBinding | null | undefined {
+		if (stagedBindingsBySlot.has(slotId)) {
+			return stagedBindingsBySlot.get(slotId);
+		}
+		return slotsById.get(slotId)?.binding;
+	}
+
+	function stageBinding(slotId: string, binding: RowPreviewCardBinding | null): void {
+		const previous = getDesiredBinding(slotId);
+		if (!previous && !binding) return;
+
+		const identityChanged =
+			previous?.snapshot.identity !== binding?.snapshot.identity;
+		const rowChanged = previous?.rowIndex !== binding?.rowIndex;
+		stagedBindingsBySlot.set(slotId, binding);
+		if (!identityChanged && !rowChanged) return;
+
+		const slot = getOrCreateSlot(slotId);
+		slot.bindingEpoch += 1;
+		stagedInvalidatedSlots.add(slotId);
+		if (identityChanged) slot.host?.element.classList.add("is-stale");
+	}
+
+	function stageBindingDelta(delta: RowPreviewBindingDelta): void {
+		for (const slotId of delta.releasedSlots) stageBinding(slotId, null);
+		for (const binding of delta.enteredSlots) {
+			stageBinding(binding.slotId, binding);
+		}
+		for (const binding of delta.reboundSlots) {
+			stageBinding(binding.slotId, binding);
+		}
+	}
+
+	function flushStagedSlot(
+		slotId: string,
+		binding: RowPreviewCardBinding | null,
+	): void {
+		const slot = getOrCreateSlot(slotId);
+		const invalidated = stagedInvalidatedSlots.has(slotId);
+		if (invalidated) {
+			cancelLifecycleCleanup(slot);
+			stopRender(slot);
+		}
+
+		if (!binding) {
+			slot.binding = undefined;
+			slot.bindingIdentity = undefined;
+			slot.bindingRowIndex = undefined;
+			clearCommittedDom(slot);
+			slot.phase = "empty";
+			applySlotState(slot);
+			return;
+		}
+
+		slot.binding = binding;
+		slot.bindingIdentity = binding.snapshot.identity;
+		slot.bindingRowIndex = binding.rowIndex;
+		if (!invalidated) return;
+		slot.phase = slot.committed ? "stale" : "empty";
+		applySlotState(slot);
+	}
+
+	function flushStagedPreviewChanges(): void {
+		if (disposed) return;
+		const nextBindings = Array.from(stagedBindingsBySlot);
+		const nextRange = stagedPreviewRange;
+		stagedBindingsBySlot.clear();
+		stagedPreviewRange = undefined;
+
+		if (nextRange) previewRange = nextRange;
+		for (const [slotId, binding] of nextBindings) {
+			flushStagedSlot(slotId, binding);
+		}
+		stagedInvalidatedSlots.clear();
+		reconcile();
+	}
+
+	function flushPendingStageSynchronously(): void {
+		if (stagedBindingsBySlot.size === 0 && stagedPreviewRange === undefined) {
+			return;
+		}
+		stagedFlushDriver.cancel();
+		flushStagedPreviewChanges();
+	}
+
 	function registerHost(slotId: string, element: HTMLElement): PreviewHostLease {
 		const slot = getOrCreateSlot(slotId);
 		if (slot.host?.element !== element) {
@@ -439,12 +539,14 @@ export function createVirtualPreviewSurface(
 
 	function syncBindingDelta(delta: RowPreviewBindingDelta): void {
 		if (disposed) return;
+		flushPendingStageSynchronously();
 		applyBindingDelta(delta);
 		reconcile();
 	}
 
 	function setPreviewWindow(window: RowPreviewWindow): void {
 		if (disposed) return;
+		flushPendingStageSynchronously();
 		previewRange = window.active ? window.previewRange : EMPTY_RANGE;
 		reconcile();
 	}
@@ -458,20 +560,25 @@ export function createVirtualPreviewSurface(
 			delta.enteredSlots.length > 0 ||
 			delta.reboundSlots.length > 0 ||
 			delta.releasedSlots.length > 0;
+		const currentRange = stagedPreviewRange ?? previewRange;
 		const nextRange = window.active ? window.previewRange : EMPTY_RANGE;
 		const windowChanged =
-			nextRange.start !== previewRange.start ||
-			nextRange.end !== previewRange.end;
+			nextRange.start !== currentRange.start ||
+			nextRange.end !== currentRange.end;
 		if (!hasBindingChanges && !windowChanged) return;
 
-		previewRange = nextRange;
-		applyBindingDelta(delta);
-		reconcile();
+		stagedPreviewRange = nextRange;
+		stageBindingDelta(delta);
+		stagedFlushDriver.schedule({ lane: "post-paint" });
 	}
 
 	function dispose(): void {
 		if (disposed) return;
 		disposed = true;
+		stagedFlushDriver.dispose();
+		stagedBindingsBySlot.clear();
+		stagedInvalidatedSlots.clear();
+		stagedPreviewRange = undefined;
 		for (const handle of pendingByIdentity.values()) handle.cancel();
 		pendingByIdentity.clear();
 		for (const slot of slotsById.values()) {
