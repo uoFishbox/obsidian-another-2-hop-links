@@ -22,6 +22,7 @@ import {
 	type RenderSlotKey,
 } from "ui/virtualization/types";
 import type { VirtualSurfaceMountedRow } from "ui/virtualization/svelte/VirtualSurfaceTypes";
+import { buildMountedSectionedGridRows } from "ui/virtualization/core/reconciliation/mountedSectionedGridRows";
 
 export interface TwoHopMountedCell extends MountedVirtualCell {
 	readonly cell: TwoHopLogicalCell;
@@ -86,100 +87,100 @@ export function buildTwoHopMountedRows(params: {
 		end,
 		layoutKey: rowModel.residentSlotLayoutKey,
 	});
-	const rowSlices: TwoHopMountedRow[] = [];
-	let flattenedCells: TwoHopMountedCell[] | undefined;
-	let reusableCellsByKey: Map<string, TwoHopMountedCell> | undefined;
 	const columns = rowModel.geometry.columns;
 	const rowScratch = createTwoHopResolvedRowBuffer();
 	const cellScratch = createTwoHopResolvedCellBuffer();
-
-	for (let rowIndex = start; rowIndex < end; rowIndex += 1) {
-		const slotIndex = allocator.resolveSlotIndex(rowIndex);
-		const previousRow = getPreviousRow(previousBuild, rowModel, rowIndex);
-		if (previousRow?.slotIndex === slotIndex) {
-			rowSlices.push(previousRow);
-			continue;
-		}
-		if (previousRow) {
-			rowSlices.push(rebindPreviousRow(previousRow, slotIndex, columns));
-			continue;
-		}
-
-		if (!resolveTwoHopRowInto(rowModel.geometry, rowIndex, rowScratch)) continue;
-		const section = rowModel.document.sections[rowScratch.sectionIndex];
-		if (!section) continue;
-
-		const rowCells: TwoHopMountedCell[] = [];
-		const sectionCellCount =
-			1 + section.visibleItemCount + (section.loadMore === null ? 0 : 1);
-		const rowCellCount = Math.min(
-			columns,
-			Math.max(0, sectionCellCount - rowScratch.rowInSection * columns),
-		);
-		for (let columnIndex = 0; columnIndex < rowCellCount; columnIndex += 1) {
+	type TwoHopResolvedMountedRow = {
+		readonly section: TwoHopDocumentSection;
+		readonly rowScratch: ReturnType<typeof createTwoHopResolvedRowBuffer>;
+	};
+	const mountedRows = buildMountedSectionedGridRows<
+		TwoHopMountedCell,
+		TwoHopMountedRow,
+		TwoHopResolvedMountedRow
+	>({
+		rowRange: { start, end },
+		columns,
+		slotCapacity: allocator.capacity,
+		resolveSlotIndex: (rowIndex) => allocator.resolveSlotIndex(rowIndex),
+		resolvePreviousRow: (rowIndex) =>
+			getPreviousRow(previousBuild, rowModel, rowIndex),
+		canReusePreviousRow: () => true,
+		resolveRow: (rowIndex) => {
+			if (!resolveTwoHopRowInto(rowModel.geometry, rowIndex, rowScratch)) {
+				return null;
+			}
+			const section = rowModel.document.sections[rowScratch.sectionIndex];
+			if (!section) return null;
+			const sectionCellCount =
+				1 + section.visibleItemCount + (section.loadMore === null ? 0 : 1);
+			const rowCellCount = Math.min(
+				columns,
+				Math.max(0, sectionCellCount - rowScratch.rowInSection * columns),
+			);
+			return {
+				top: rowScratch.top,
+				columnStart: 0,
+				columnEnd: rowCellCount,
+				metadata: {
+					section,
+					rowScratch,
+				},
+			};
+		},
+		resolveCell: ({ rowIndex, columnIndex, renderSlotIndex, row }) => {
 			const logicalCell = resolveLogicalCell({
 				rowModel,
-				rowScratch,
+				rowScratch: row.metadata.rowScratch,
 				cellScratch,
 				columnIndex,
 			});
-			if (!logicalCell) continue;
-			const renderSlotIndex = slotIndex * columns + columnIndex;
-			const mountedCell = resolveMountedCell({
+			if (!logicalCell) return null;
+			return resolveMountedCell({
 				previous: undefined,
 				logicalCell,
-				section,
+				section: row.metadata.section,
 				rowIndex,
 				columnIndex,
 				renderSlotIndex,
 			});
-			rowCells.push(mountedCell);
-		}
-
-		rowSlices.push({
+		},
+		rebindCell: ({ previous, rowIndex, columnIndex, renderSlotIndex }) =>
+			resolveMountedCell({
+				previous,
+				logicalCell: previous.cell,
+				section: previous.section,
+				rowIndex,
+				columnIndex,
+				renderSlotIndex,
+			}),
+		createRow: ({ rowIndex, slotIndex, cells, row }) => ({
 			key: rowIndex,
 			rowIndex,
-			top: rowScratch.top,
+			top: row.top,
 			slotIndex,
 			slotKey: slotIndex,
-			cells: rowCells,
-		});
-	}
-
-	const sparseRowsBySlot: Array<TwoHopMountedRow | undefined> = new Array(
-		allocator.capacity,
+			cells,
+		}),
+	});
+	const slotDelta = createMountedSlotDelta(
+		previousBuild,
+		mountedRows.rowsBySlot,
+		rowSlotDelta,
 	);
-	for (const row of rowSlices) sparseRowsBySlot[row.slotIndex] = row;
-	const rowsBySlot: TwoHopMountedRow[] = [];
-	for (const row of sparseRowsBySlot) {
-		if (row) rowsBySlot.push(row);
-	}
-	const slotDelta = createMountedSlotDelta(previousBuild, rowsBySlot, rowSlotDelta);
-	const rowDelta = createMountedRowDelta(previousBuild, rowsBySlot);
-	const getCells = (): TwoHopMountedCell[] => {
-		if (flattenedCells) return flattenedCells;
-		flattenedCells = [];
-		for (const row of rowSlices) flattenedCells.push(...row.cells);
-		return flattenedCells;
-	};
-	const getReusableCellsByKey = (): Map<string, TwoHopMountedCell> => {
-		if (reusableCellsByKey) return reusableCellsByKey;
-		reusableCellsByKey = new Map();
-		for (const cell of getCells()) reusableCellsByKey.set(cell.key, cell);
-		return reusableCellsByKey;
-	};
+	const rowDelta = createMountedRowDelta(previousBuild, mountedRows.rowsBySlot);
 	return {
 		get cells() {
-			return getCells();
+			return mountedRows.cells;
 		},
 		get reusableCellsByKey() {
-			return getReusableCellsByKey();
+			return mountedRows.reusableCellsByKey;
 		},
-		nextRenderSlotIndex: allocator.capacity * columns,
+		nextRenderSlotIndex: mountedRows.nextRenderSlotIndex,
 		rowModel,
 		rowRange: { start, end },
-		rowSlices,
-		rowsBySlot,
+		rowSlices: mountedRows.rowSlices,
+		rowsBySlot: mountedRows.rowsBySlot,
 		identity: nextMountedBuildIdentity++,
 		deltaBaseIdentity: previousBuild?.identity ?? null,
 		slotDelta,
@@ -246,31 +247,6 @@ function createMountedSlotDelta(
 		enteredSlots,
 		reboundSlots,
 		releasedSlots: [...previousCellsBySlot.keys()],
-	};
-}
-
-function rebindPreviousRow(
-	previousRow: TwoHopMountedRow,
-	slotIndex: number,
-	columns: number,
-): TwoHopMountedRow {
-	const cells = previousRow.cells.map((previous, columnIndex) =>
-		resolveMountedCell({
-			previous,
-			logicalCell: previous.cell,
-			section: previous.section,
-			rowIndex: previousRow.rowIndex,
-			columnIndex,
-			renderSlotIndex: slotIndex * columns + columnIndex,
-		}),
-	);
-	return {
-		key: previousRow.key,
-		rowIndex: previousRow.rowIndex,
-		top: previousRow.top,
-		slotIndex,
-		slotKey: slotIndex,
-		cells,
 	};
 }
 
