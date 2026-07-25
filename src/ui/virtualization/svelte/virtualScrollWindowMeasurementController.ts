@@ -188,7 +188,13 @@ export function createVirtualScrollWindowMeasurementController<TContext>({
 			precomputedRanges,
 		);
 		if (process.env.NODE_ENV !== "production" && result.kind === "stable") {
-			recordCCLDevMeasurement("virtualScroll.rangeMeasurementChanged");
+			// "changed" means the mounted build was actually recomputed; a reused
+			// build is counted separately so the counters stay interpretable.
+			recordCCLDevMeasurement(
+				result.updateKind === "reused"
+					? "virtualScroll.rangeMeasurementReused"
+					: "virtualScroll.rangeMeasurementChanged",
+			);
 		}
 
 		if (result.kind !== "stable") {

@@ -66,6 +66,9 @@ export function registerScrollBenchmarkCommand(plugin: PluginHost): void {
 
 			await runScrollFrames(scrollers, 1);
 			await runScrollFrames(scrollers, -1);
+			// Idle detection is timer-based, so the final idle measurement lands
+			// after the last scroll frame. Wait for it before taking the snapshot.
+			await waitForRenderSettle();
 
 			const measurements = getCCLDevMeasurementSnapshot();
 			logCCLDevMeasurements(scrollers.length, measurements);

@@ -1,6 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { resetScrollActivityForTests } from "ui/virtualization/scheduling/scrollActivity";
 import {
+	getCCLDevMeasurementSnapshot,
+	resetCCLDevMeasurements,
+} from "infrastructure/debug/CCLDevMeasurements";
+import {
 	installMutationObserverMock,
 	installResizeObserverMock,
 	mutationObserverRecords,
@@ -105,5 +109,76 @@ describe("VirtualListDomObserver performance contracts", () => {
 				(measurement) => measurement.mock.calls.length,
 			),
 		).toEqual([1, ...Array.from({ length: SCROLLER_COUNT - 1 }, () => 0)]);
+	});
+
+	it("bounds scroll task executions by coverage misses plus gesture count", async () => {
+		vi.useFakeTimers();
+
+		const SCROLL_FRAMES = 300;
+		const MISS_EVERY_N_FRAMES = 30;
+
+		const scroller = document.createElement("div");
+		scroller.style.overflow = "auto";
+		document.body.append(scroller);
+		const rootEl = document.createElement("div");
+		scroller.append(rootEl);
+
+		let scrollTop = 0;
+		Object.defineProperty(scroller, "scrollTop", {
+			get: () => scrollTop,
+			configurable: true,
+		});
+
+		let frame = 0;
+		stopObserving.push(
+			observeVirtualListViewport({
+				rootEl,
+				onWidthChange: vi.fn(),
+				getCachedViewportHeight: () => 240,
+				// Deterministic coverage: every Nth frame reports no coverage
+				// (miss); all other frames stay inside the open interval (hit).
+				getScrollMeasurementRange: () =>
+					frame % MISS_EVERY_N_FRAMES === 0
+						? null
+						: {
+								minScrollTopBeforeMeasurement: -1,
+								maxScrollTopBeforeMeasurement: Number.MAX_SAFE_INTEGER,
+							},
+				onScrollContainerChange: vi.fn(),
+				scheduleLayoutMeasurement: vi.fn(),
+				scheduleScrollMeasurement: vi.fn(),
+				runScrollMeasurement: vi.fn(),
+				runInitialLayoutMeasurement: vi.fn(),
+			}),
+		);
+		resetCCLDevMeasurements();
+
+		// rAF-driven programmatic scroll stream, one scroll event per frame
+		for (frame = 0; frame < SCROLL_FRAMES; frame += 1) {
+			scrollTop += 20;
+			scroller.dispatchEvent(new Event("scroll"));
+			await vi.advanceTimersByTimeAsync(16);
+		}
+
+		// Settle: idle debounce plus the final idle measurement task
+		await vi.advanceTimersByTimeAsync(140);
+		await vi.runAllTimersAsync();
+
+		const counters = getCCLDevMeasurementSnapshot().counters;
+		const scrollEvents = counters["virtualList.observer.scrollEvent"].count;
+		const coverageHits = counters["virtualList.observer.coverageHit"].count;
+		const coverageMisses = counters["virtualList.observer.coverageMiss"].count;
+		const scrollTasksExecuted =
+			counters["virtualList.observer.scrollTask.executed"].count;
+		const scrollGestureCount = 1;
+
+		expect(scrollEvents).toBe(SCROLL_FRAMES);
+		expect(coverageHits + coverageMisses).toBe(SCROLL_FRAMES);
+		expect(coverageMisses).toBe(SCROLL_FRAMES / MISS_EVERY_N_FRAMES);
+		// Contract: coverage hits never turn into scroll tasks; only misses
+		// and the per-gesture idle normalization may execute measurements.
+		expect(scrollTasksExecuted).toBeLessThanOrEqual(
+			coverageMisses + scrollGestureCount,
+		);
 	});
 });

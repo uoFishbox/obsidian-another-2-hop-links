@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
 	markScrollerViewportDependencyRefreshAfterScroll,
 	markScrollerViewportLayoutMeasurementAfterScroll,
+	markScrollerViewportScrollObserved,
 	reduceScrollerViewportPhase,
 } from "../scrollerViewportScrollPhase";
 
@@ -35,28 +36,22 @@ describe("reduceScrollerViewportPhase", () => {
 	});
 
 	it("records observer reconnect work during scroll", () => {
-		const transition = reduceScrollerViewportPhase(
-			{
-				type: "scrolling",
-				pendingAfterScroll: {
-					reconnectObserver: false,
-					refreshDependencies: false,
-					measureLayout: false,
-				},
+		const state = markScrollerViewportScrollObserved({
+			type: "scrolling",
+			pendingAfterScroll: {
+				reconnectObserver: false,
+				refreshDependencies: false,
+				measureLayout: false,
 			},
-			"scroll",
-		);
+		});
 
-		expect(transition).toEqual({
-			state: {
-				type: "scrolling",
-				pendingAfterScroll: {
-					reconnectObserver: true,
-					refreshDependencies: false,
-					measureLayout: false,
-				},
+		expect(state).toEqual({
+			type: "scrolling",
+			pendingAfterScroll: {
+				reconnectObserver: true,
+				refreshDependencies: false,
+				measureLayout: false,
 			},
-			effect: { type: "scroll-frame", measureScroll: true },
 		});
 	});
 

@@ -1,4 +1,5 @@
 import { markVirtualScrollMeasurementRun } from "ui/virtualization/scheduling/virtualScrollMeasurementFrame";
+import { recordCCLDevMeasurement } from "infrastructure/debug/CCLDevMeasurements";
 import type { VirtualListSharedScrollMetrics } from "./virtualListDomObserver";
 import { observeVirtualListViewport } from "./virtualListDomObserver";
 import {
@@ -47,12 +48,20 @@ export interface VirtualListStableMeasurementContext {
 	sharedScrollMetrics?: VirtualListSharedScrollMetrics;
 }
 
+export type VirtualScrollMeasurementReason =
+	| "scroll-coverage-miss"
+	| "scroll-idle"
+	| "data-change"
+	| "post-layout";
+
 export interface RunVirtualScrollMeasurementOptions {
 	/**
 	 * Publish even when the cached scroll geometry matches the last stable
 	 * measurement. Use this when non-scroll inputs, such as row data, changed.
 	 */
 	forcePublish?: boolean;
+	/** Dev-only reason for measurement classification. */
+	reason?: VirtualScrollMeasurementReason;
 }
 
 type MutableVirtualMeasurement = {
@@ -146,6 +155,7 @@ export function createVirtualMeasurementController({
 	let observedScrollGeneration = 0;
 	let hasPendingObservedScrollTop = false;
 	let isObservedScrollActive = false;
+	let pendingScrollMeasurementReason: VirtualScrollMeasurementReason | null = null;
 
 	const rememberPublishedScrollMeasurement = (
 		measurement: VirtualMeasurement,
@@ -226,8 +236,17 @@ export function createVirtualMeasurementController({
 
 	const runScrollMeasurement = (
 		sharedScrollMetrics?: VirtualListSharedScrollMetrics,
-		options: RunVirtualScrollMeasurementOptions = EMPTY_RUN_SCROLL_MEASUREMENT_OPTIONS,
+		optionsOrReason:
+			| RunVirtualScrollMeasurementOptions
+			| VirtualScrollMeasurementReason = EMPTY_RUN_SCROLL_MEASUREMENT_OPTIONS,
 	): VirtualMeasurementResult => {
+		const options: RunVirtualScrollMeasurementOptions =
+			typeof optionsOrReason === "string"
+				? { reason: optionsOrReason }
+				: optionsOrReason;
+		const resolvedReason =
+			options.reason ?? pendingScrollMeasurementReason ?? undefined;
+		pendingScrollMeasurementReason = null;
 		const rootEl = getRootEl();
 		if (!getOptionalOwnerWindow(rootEl ?? measurement.scrollContainerEl)) {
 			return SKIPPED_NO_WINDOW;
@@ -254,7 +273,26 @@ export function createVirtualMeasurementController({
 				scrollMeasurement.isScrollActive,
 			)
 		) {
+			if (process.env.NODE_ENV !== "production") {
+				recordCCLDevMeasurement(
+					"virtualScroll.applyScrollMeasurement.skippedUnchanged",
+				);
+			}
 			return SKIPPED_UNCHANGED_SCROLL;
+		}
+
+		// Recorded only for measurements that pass the unchanged gate, so reason
+		// counters reflect actually published measurements.
+		if (process.env.NODE_ENV !== "production" && resolvedReason) {
+			recordCCLDevMeasurement(
+				resolvedReason === "scroll-coverage-miss"
+					? "virtualScroll.applyScrollMeasurement.scrollCoverageMiss"
+					: resolvedReason === "scroll-idle"
+						? "virtualScroll.applyScrollMeasurement.scrollIdle"
+						: resolvedReason === "data-change"
+							? "virtualScroll.applyScrollMeasurement.dataChange"
+							: "virtualScroll.applyScrollMeasurement.postLayout",
+			);
 		}
 
 		markVirtualScrollMeasurementRun();
@@ -381,6 +419,7 @@ export function createVirtualMeasurementController({
 				return;
 			}
 
+			pendingScrollMeasurementReason = "post-layout";
 			scheduleScrollMeasurement();
 		},
 	};

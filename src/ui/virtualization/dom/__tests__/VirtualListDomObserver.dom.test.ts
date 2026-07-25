@@ -161,7 +161,6 @@ describe("observeVirtualListViewport", () => {
 		});
 
 		scrollContainer.dispatchEvent(new Event("scroll"));
-		scrollContainer.dispatchEvent(new Event("scrollend"));
 		triggerResize(sizer, 240, 600);
 
 		expect(scheduleLayoutMeasurement).not.toHaveBeenCalled();
@@ -261,6 +260,7 @@ describe("observeVirtualListViewport", () => {
 				isScrollActive: true,
 				scrollGeneration: 1,
 			}),
+			"scroll-coverage-miss",
 		);
 		expect(onScrollStateChange.mock.calls).toEqual([
 			[0, false, false],
@@ -316,7 +316,8 @@ describe("observeVirtualListViewport", () => {
 
 			expect(runScrollMeasurement).not.toHaveBeenCalled();
 			expect(requestAnimationFrame).not.toHaveBeenCalled();
-			expect(getScrollMeasurementRange).not.toHaveBeenCalled();
+			// Pull-based: getScrollMeasurementRange is called on every scroll event
+			expect(getScrollMeasurementRange).toHaveBeenCalledTimes(2);
 
 			scrollTop = 150;
 			scrollContainer.dispatchEvent(new Event("scroll"));
@@ -328,8 +329,8 @@ describe("observeVirtualListViewport", () => {
 			expect(runScrollMeasurement).toHaveBeenCalledTimes(1);
 			expect(runScrollMeasurement).toHaveBeenCalledWith(
 				expect.objectContaining({ scrollTop: 180 }),
+				"scroll-coverage-miss",
 			);
-			expect(getScrollMeasurementRange).toHaveBeenCalledTimes(1);
 		} finally {
 			stopObserving();
 			requestAnimationFrame.mockRestore();
@@ -525,5 +526,538 @@ describe("observeVirtualListViewport", () => {
 		expect(scheduleLayoutMeasurement).toHaveBeenCalledTimes(1);
 
 		stopObserving();
+	});
+
+	it("treats coverage boundary values as miss (open interval)", async () => {
+		installAnimationFrameMock();
+		const requestAnimationFrame = vi.spyOn(window, "requestAnimationFrame");
+
+		const scrollContainer = document.createElement("div");
+		const rootEl = document.createElement("div");
+		scrollContainer.style.overflow = "auto";
+		document.body.append(scrollContainer);
+		scrollContainer.append(rootEl);
+
+		let scrollTop = 100;
+		Object.defineProperty(scrollContainer, "scrollTop", {
+			get: () => scrollTop,
+			configurable: true,
+		});
+
+		const runScrollMeasurement = vi.fn();
+		const getScrollMeasurementRange = vi.fn(() => ({
+			minScrollTopBeforeMeasurement: 100,
+			maxScrollTopBeforeMeasurement: 200,
+		}));
+		const stopObserving = observeVirtualListViewport({
+			rootEl,
+			onWidthChange: vi.fn(),
+			getCachedViewportHeight: () => 240,
+			getScrollMeasurementRange,
+			onScrollContainerChange: vi.fn(),
+			scheduleLayoutMeasurement: vi.fn(),
+			scheduleScrollMeasurement: vi.fn(),
+			runScrollMeasurement,
+			runInitialLayoutMeasurement: vi.fn(),
+		});
+		requestAnimationFrame.mockClear();
+
+		try {
+			// scrollTop === min (100) → miss
+			scrollContainer.dispatchEvent(new Event("scroll"));
+			expect(requestAnimationFrame).toHaveBeenCalledTimes(1);
+			await flushFrames();
+			expect(runScrollMeasurement).toHaveBeenCalledTimes(1);
+
+			requestAnimationFrame.mockClear();
+			runScrollMeasurement.mockClear();
+
+			// scrollTop === max (200) → miss
+			scrollTop = 200;
+			scrollContainer.dispatchEvent(new Event("scroll"));
+			expect(requestAnimationFrame).toHaveBeenCalledTimes(1);
+			await flushFrames();
+			expect(runScrollMeasurement).toHaveBeenCalledTimes(1);
+
+			requestAnimationFrame.mockClear();
+			runScrollMeasurement.mockClear();
+
+			// scrollTop strictly inside (150) → hit
+			scrollTop = 150;
+			scrollContainer.dispatchEvent(new Event("scroll"));
+			expect(requestAnimationFrame).not.toHaveBeenCalled();
+			await flushFrames();
+			expect(runScrollMeasurement).not.toHaveBeenCalled();
+		} finally {
+			stopObserving();
+			requestAnimationFrame.mockRestore();
+			teardownAnimationFrameMock();
+		}
+	});
+
+	it("runs idle measurement after a coverage-hit-only scroll gesture", async () => {
+		vi.useFakeTimers();
+
+		const scrollContainer = document.createElement("div");
+		const rootEl = document.createElement("div");
+		scrollContainer.style.overflow = "auto";
+		document.body.append(scrollContainer);
+		scrollContainer.append(rootEl);
+
+		let scrollTop = 120;
+		Object.defineProperty(scrollContainer, "scrollTop", {
+			get: () => scrollTop,
+			configurable: true,
+		});
+
+		const runScrollMeasurement = vi.fn();
+		const getScrollMeasurementRange = vi.fn(() => ({
+			minScrollTopBeforeMeasurement: 100,
+			maxScrollTopBeforeMeasurement: 200,
+		}));
+		const stopObserving = observeVirtualListViewport({
+			rootEl,
+			onWidthChange: vi.fn(),
+			getCachedViewportHeight: () => 240,
+			getScrollMeasurementRange,
+			onScrollContainerChange: vi.fn(),
+			scheduleLayoutMeasurement: vi.fn(),
+			scheduleScrollMeasurement: vi.fn(),
+			runScrollMeasurement,
+			runInitialLayoutMeasurement: vi.fn(),
+		});
+		runScrollMeasurement.mockClear();
+
+		try {
+			// All scroll events are coverage hits
+			scrollTop = 130;
+			scrollContainer.dispatchEvent(new Event("scroll"));
+			scrollTop = 140;
+			scrollContainer.dispatchEvent(new Event("scroll"));
+			scrollTop = 150;
+			scrollContainer.dispatchEvent(new Event("scroll"));
+
+			expect(runScrollMeasurement).not.toHaveBeenCalled();
+
+			// The idle debounce timer triggers idle normalization
+			await vi.advanceTimersByTimeAsync(140);
+			await vi.runAllTimersAsync();
+
+			expect(runScrollMeasurement).toHaveBeenCalledTimes(1);
+			expect(runScrollMeasurement).toHaveBeenCalledWith(
+				expect.objectContaining({ scrollTop: 150 }),
+				"scroll-idle",
+			);
+		} finally {
+			stopObserving();
+		}
+	});
+
+	it("keeps a programmatic scroll stream active across per-frame scrollend events", async () => {
+		vi.useFakeTimers();
+
+		const scrollContainer = document.createElement("div");
+		const rootEl = document.createElement("div");
+		scrollContainer.style.overflow = "auto";
+		document.body.append(scrollContainer);
+		scrollContainer.append(rootEl);
+
+		let scrollTop = 110;
+		Object.defineProperty(scrollContainer, "scrollTop", {
+			get: () => scrollTop,
+			configurable: true,
+		});
+		// Simulate a scrollend-capable environment: per-frame programmatic
+		// scrolls fire scrollend after every scrollTop mutation.
+		Object.defineProperty(scrollContainer, "onscrollend", {
+			value: null,
+			writable: true,
+			configurable: true,
+		});
+
+		const runScrollMeasurement = vi.fn();
+		const getScrollMeasurementRange = vi.fn(() => ({
+			minScrollTopBeforeMeasurement: 100,
+			maxScrollTopBeforeMeasurement: 200,
+		}));
+		const stopObserving = observeVirtualListViewport({
+			rootEl,
+			onWidthChange: vi.fn(),
+			getCachedViewportHeight: () => 240,
+			getScrollMeasurementRange,
+			onScrollContainerChange: vi.fn(),
+			scheduleLayoutMeasurement: vi.fn(),
+			scheduleScrollMeasurement: vi.fn(),
+			runScrollMeasurement,
+			runInitialLayoutMeasurement: vi.fn(),
+		});
+		runScrollMeasurement.mockClear();
+
+		try {
+			// rAF-driven programmatic scroll: scroll + scrollend on every frame
+			for (let frame = 0; frame < 5; frame += 1) {
+				scrollTop += 10;
+				scrollContainer.dispatchEvent(new Event("scroll"));
+				scrollContainer.dispatchEvent(new Event("scrollend"));
+				await vi.advanceTimersByTimeAsync(16);
+			}
+
+			// Intermediate scrollend events must not run idle measurements
+			expect(runScrollMeasurement).not.toHaveBeenCalled();
+
+			await vi.advanceTimersByTimeAsync(140);
+			await vi.runAllTimersAsync();
+
+			// The whole stream settles as one gesture with one idle measurement
+			expect(runScrollMeasurement).toHaveBeenCalledTimes(1);
+			expect(runScrollMeasurement).toHaveBeenCalledWith(
+				expect.objectContaining({ scrollTop: 160 }),
+				"scroll-idle",
+			);
+		} finally {
+			stopObserving();
+		}
+	});
+
+	it("runs a single idle measurement only after the quiet period", async () => {
+		vi.useFakeTimers();
+
+		const scrollContainer = document.createElement("div");
+		const rootEl = document.createElement("div");
+		scrollContainer.style.overflow = "auto";
+		document.body.append(scrollContainer);
+		scrollContainer.append(rootEl);
+
+		let scrollTop = 120;
+		Object.defineProperty(scrollContainer, "scrollTop", {
+			get: () => scrollTop,
+			configurable: true,
+		});
+
+		const runScrollMeasurement = vi.fn();
+		const getScrollMeasurementRange = vi.fn(() => ({
+			minScrollTopBeforeMeasurement: 100,
+			maxScrollTopBeforeMeasurement: 200,
+		}));
+		const stopObserving = observeVirtualListViewport({
+			rootEl,
+			onWidthChange: vi.fn(),
+			getCachedViewportHeight: () => 240,
+			getScrollMeasurementRange,
+			onScrollContainerChange: vi.fn(),
+			scheduleLayoutMeasurement: vi.fn(),
+			scheduleScrollMeasurement: vi.fn(),
+			runScrollMeasurement,
+			runInitialLayoutMeasurement: vi.fn(),
+		});
+		runScrollMeasurement.mockClear();
+
+		try {
+			scrollTop = 130;
+			scrollContainer.dispatchEvent(new Event("scroll"));
+			scrollTop = 140;
+			scrollContainer.dispatchEvent(new Event("scroll"));
+
+			// One tick before the idle threshold: still active, no measurement
+			await vi.advanceTimersByTimeAsync(139);
+			expect(runScrollMeasurement).not.toHaveBeenCalled();
+
+			await vi.advanceTimersByTimeAsync(1);
+			await vi.runAllTimersAsync();
+
+			expect(runScrollMeasurement).toHaveBeenCalledTimes(1);
+			expect(runScrollMeasurement).toHaveBeenCalledWith(
+				expect.objectContaining({ scrollTop: 140 }),
+				"scroll-idle",
+			);
+		} finally {
+			stopObserving();
+		}
+	});
+
+	it("keeps the coverage-miss reason when idle fires before the task runs", async () => {
+		vi.useFakeTimers();
+		const rafQueue: FrameRequestCallback[] = [];
+		const rafSpy = vi
+			.spyOn(window, "requestAnimationFrame")
+			.mockImplementation((callback: FrameRequestCallback) => {
+				rafQueue.push(callback);
+				return rafQueue.length;
+			});
+
+		const scrollContainer = document.createElement("div");
+		const rootEl = document.createElement("div");
+		scrollContainer.style.overflow = "auto";
+		document.body.append(scrollContainer);
+		scrollContainer.append(rootEl);
+
+		let scrollTop = 300;
+		Object.defineProperty(scrollContainer, "scrollTop", {
+			get: () => scrollTop,
+			configurable: true,
+		});
+
+		const runScrollMeasurement = vi.fn();
+		const getScrollMeasurementRange = vi.fn(() => ({
+			minScrollTopBeforeMeasurement: 100,
+			maxScrollTopBeforeMeasurement: 200,
+		}));
+		const stopObserving = observeVirtualListViewport({
+			rootEl,
+			onWidthChange: vi.fn(),
+			getCachedViewportHeight: () => 240,
+			getScrollMeasurementRange,
+			onScrollContainerChange: vi.fn(),
+			scheduleLayoutMeasurement: vi.fn(),
+			scheduleScrollMeasurement: vi.fn(),
+			runScrollMeasurement,
+			runInitialLayoutMeasurement: vi.fn(),
+		});
+		runScrollMeasurement.mockClear();
+		rafQueue.length = 0;
+
+		try {
+			// Coverage miss schedules the task with reason "scroll-coverage-miss"
+			scrollContainer.dispatchEvent(new Event("scroll"));
+			expect(rafQueue).toHaveLength(1);
+
+			// Idle fires before the scheduled rAF task executes; it must not
+			// reclassify the pending task as "scroll-idle".
+			await vi.advanceTimersByTimeAsync(140);
+			expect(runScrollMeasurement).not.toHaveBeenCalled();
+
+			for (const callback of rafQueue.splice(0)) {
+				callback(0);
+			}
+
+			expect(runScrollMeasurement).toHaveBeenCalledTimes(1);
+			expect(runScrollMeasurement).toHaveBeenCalledWith(
+				expect.anything(),
+				"scroll-coverage-miss",
+			);
+		} finally {
+			stopObserving();
+			rafSpy.mockRestore();
+		}
+	});
+
+	it("reflects controller range changes immediately without stale cache", async () => {
+		installAnimationFrameMock();
+
+		const scrollContainer = document.createElement("div");
+		const rootEl = document.createElement("div");
+		scrollContainer.style.overflow = "auto";
+		document.body.append(scrollContainer);
+		scrollContainer.append(rootEl);
+
+		let scrollTop = 150;
+		Object.defineProperty(scrollContainer, "scrollTop", {
+			get: () => scrollTop,
+			configurable: true,
+		});
+
+		const runScrollMeasurement = vi.fn();
+		let rangeMin = 100;
+		let rangeMax = 200;
+		const getScrollMeasurementRange = vi.fn(() => ({
+			minScrollTopBeforeMeasurement: rangeMin,
+			maxScrollTopBeforeMeasurement: rangeMax,
+		}));
+		const stopObserving = observeVirtualListViewport({
+			rootEl,
+			onWidthChange: vi.fn(),
+			getCachedViewportHeight: () => 240,
+			getScrollMeasurementRange,
+			onScrollContainerChange: vi.fn(),
+			scheduleLayoutMeasurement: vi.fn(),
+			scheduleScrollMeasurement: vi.fn(),
+			runScrollMeasurement,
+			runInitialLayoutMeasurement: vi.fn(),
+		});
+		runScrollMeasurement.mockClear();
+
+		try {
+			// Initially 150 is inside [100, 200] → hit
+			scrollContainer.dispatchEvent(new Event("scroll"));
+			await flushFrames();
+			expect(runScrollMeasurement).not.toHaveBeenCalled();
+
+			// Controller range shrinks (simulating data/layout change)
+			rangeMin = 100;
+			rangeMax = 140;
+
+			// Now 150 is outside [100, 140] → miss (no stale cache)
+			scrollContainer.dispatchEvent(new Event("scroll"));
+			await flushFrames();
+			expect(runScrollMeasurement).toHaveBeenCalledTimes(1);
+			expect(runScrollMeasurement).toHaveBeenCalledWith(
+				expect.objectContaining({ scrollTop: 150 }),
+				"scroll-coverage-miss",
+			);
+		} finally {
+			stopObserving();
+			teardownAnimationFrameMock();
+		}
+	});
+
+	it("coalesces multiple coverage misses in the same frame into one measurement", async () => {
+		installAnimationFrameMock();
+		const requestAnimationFrame = vi.spyOn(window, "requestAnimationFrame");
+
+		const scrollContainer = document.createElement("div");
+		const rootEl = document.createElement("div");
+		scrollContainer.style.overflow = "auto";
+		document.body.append(scrollContainer);
+		scrollContainer.append(rootEl);
+
+		let scrollTop = 300;
+		Object.defineProperty(scrollContainer, "scrollTop", {
+			get: () => scrollTop,
+			configurable: true,
+		});
+
+		const runScrollMeasurement = vi.fn();
+		const getScrollMeasurementRange = vi.fn(() => ({
+			minScrollTopBeforeMeasurement: 100,
+			maxScrollTopBeforeMeasurement: 200,
+		}));
+		const stopObserving = observeVirtualListViewport({
+			rootEl,
+			onWidthChange: vi.fn(),
+			getCachedViewportHeight: () => 240,
+			getScrollMeasurementRange,
+			onScrollContainerChange: vi.fn(),
+			scheduleLayoutMeasurement: vi.fn(),
+			scheduleScrollMeasurement: vi.fn(),
+			runScrollMeasurement,
+			runInitialLayoutMeasurement: vi.fn(),
+		});
+		requestAnimationFrame.mockClear();
+		runScrollMeasurement.mockClear();
+
+		try {
+			// Multiple misses before frame fires
+			scrollTop = 300;
+			scrollContainer.dispatchEvent(new Event("scroll"));
+			scrollTop = 350;
+			scrollContainer.dispatchEvent(new Event("scroll"));
+			scrollTop = 400;
+			scrollContainer.dispatchEvent(new Event("scroll"));
+
+			// Only one rAF scheduled
+			expect(requestAnimationFrame).toHaveBeenCalledTimes(1);
+			await flushFrames();
+
+			// Single measurement with latest scrollTop
+			expect(runScrollMeasurement).toHaveBeenCalledTimes(1);
+			expect(runScrollMeasurement).toHaveBeenCalledWith(
+				expect.objectContaining({ scrollTop: 400 }),
+				"scroll-coverage-miss",
+			);
+		} finally {
+			stopObserving();
+			requestAnimationFrame.mockRestore();
+			teardownAnimationFrameMock();
+		}
+	});
+
+	it("schedules measurement on jump scroll beyond coverage", async () => {
+		installAnimationFrameMock();
+		const requestAnimationFrame = vi.spyOn(window, "requestAnimationFrame");
+
+		const scrollContainer = document.createElement("div");
+		const rootEl = document.createElement("div");
+		scrollContainer.style.overflow = "auto";
+		document.body.append(scrollContainer);
+		scrollContainer.append(rootEl);
+
+		let scrollTop = 150;
+		Object.defineProperty(scrollContainer, "scrollTop", {
+			get: () => scrollTop,
+			configurable: true,
+		});
+
+		const runScrollMeasurement = vi.fn();
+		const getScrollMeasurementRange = vi.fn(() => ({
+			minScrollTopBeforeMeasurement: 100,
+			maxScrollTopBeforeMeasurement: 200,
+		}));
+		const stopObserving = observeVirtualListViewport({
+			rootEl,
+			onWidthChange: vi.fn(),
+			getCachedViewportHeight: () => 240,
+			getScrollMeasurementRange,
+			onScrollContainerChange: vi.fn(),
+			scheduleLayoutMeasurement: vi.fn(),
+			scheduleScrollMeasurement: vi.fn(),
+			runScrollMeasurement,
+			runInitialLayoutMeasurement: vi.fn(),
+		});
+		requestAnimationFrame.mockClear();
+		runScrollMeasurement.mockClear();
+
+		try {
+			// Large jump far beyond coverage
+			scrollTop = 5000;
+			scrollContainer.dispatchEvent(new Event("scroll"));
+
+			expect(requestAnimationFrame).toHaveBeenCalledTimes(1);
+			await flushFrames();
+
+			expect(runScrollMeasurement).toHaveBeenCalledTimes(1);
+			expect(runScrollMeasurement).toHaveBeenCalledWith(
+				expect.objectContaining({ scrollTop: 5000 }),
+				"scroll-coverage-miss",
+			);
+		} finally {
+			stopObserving();
+			requestAnimationFrame.mockRestore();
+			teardownAnimationFrameMock();
+		}
+	});
+
+	it("schedules measurement when the controller range is unavailable", async () => {
+		installAnimationFrameMock();
+		const requestAnimationFrame = vi.spyOn(window, "requestAnimationFrame");
+
+		const scrollContainer = document.createElement("div");
+		const rootEl = document.createElement("div");
+		scrollContainer.style.overflow = "auto";
+		document.body.append(scrollContainer);
+		scrollContainer.append(rootEl);
+
+		let scrollTop = 150;
+		Object.defineProperty(scrollContainer, "scrollTop", {
+			get: () => scrollTop,
+			configurable: true,
+		});
+
+		const runScrollMeasurement = vi.fn();
+		const getScrollMeasurementRange = vi.fn(() => null);
+		const stopObserving = observeVirtualListViewport({
+			rootEl,
+			onWidthChange: vi.fn(),
+			getCachedViewportHeight: () => 240,
+			getScrollMeasurementRange,
+			onScrollContainerChange: vi.fn(),
+			scheduleLayoutMeasurement: vi.fn(),
+			scheduleScrollMeasurement: vi.fn(),
+			runScrollMeasurement,
+			runInitialLayoutMeasurement: vi.fn(),
+		});
+		requestAnimationFrame.mockClear();
+		runScrollMeasurement.mockClear();
+
+		try {
+			// null range → always miss
+			scrollContainer.dispatchEvent(new Event("scroll"));
+			expect(requestAnimationFrame).toHaveBeenCalledTimes(1);
+			await flushFrames();
+			expect(runScrollMeasurement).toHaveBeenCalledTimes(1);
+		} finally {
+			stopObserving();
+			requestAnimationFrame.mockRestore();
+			teardownAnimationFrameMock();
+		}
 	});
 });

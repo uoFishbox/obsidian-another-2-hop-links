@@ -13,9 +13,13 @@ export interface VirtualListScrollSnapshot {
 }
 
 export type MeasurementUpdateResult<TRange> =
-	| { kind: "stable"; range: TRange }
-	| { kind: "bootstrapped"; range: TRange }
-	| { kind: "skipped"; reason: "no-window" | "no-root" | "unstable" };
+	| { kind: "stable"; range: TRange; updateKind?: "reused" | "recomputed" }
+	| { kind: "bootstrapped"; range: TRange; updateKind?: "reused" | "recomputed" }
+	| {
+			kind: "skipped";
+			reason: "no-window" | "no-root" | "unstable";
+			updateKind?: "skipped";
+	  };
 
 export function readScrollSnapshot(
 	scrollContainer: HTMLElement | null,

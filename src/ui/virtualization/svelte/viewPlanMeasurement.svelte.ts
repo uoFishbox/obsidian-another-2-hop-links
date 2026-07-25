@@ -367,6 +367,7 @@ export function createViewPlanMeasurementRuntime<
 		try {
 			measurementController.runScrollMeasurement(undefined, {
 				forcePublish: true,
+				reason: "data-change",
 			});
 		} finally {
 			cachedRowModelOverride = null;

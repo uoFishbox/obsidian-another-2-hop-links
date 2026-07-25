@@ -1,4 +1,4 @@
-export type ScrollPhase = "start" | "scroll" | "idle";
+export type ScrollPhase = "start" | "idle";
 
 export interface ScrollerViewportScrollPendingAfterScroll {
 	readonly reconnectObserver: boolean;
@@ -16,7 +16,6 @@ export type ScrollerViewportScrollPhaseState =
 export type ScrollPhaseEffect =
 	| { readonly type: "none" }
 	| { readonly type: "scroll-start" }
-	| { readonly type: "scroll-frame"; readonly measureScroll: true }
 	| {
 			readonly type: "scroll-idle";
 			readonly refreshDependencies: boolean;
@@ -54,12 +53,6 @@ export function reduceScrollerViewportPhase(
 				},
 				effect:
 					state.type === "idle" ? { type: "scroll-start" } : { type: "none" },
-			};
-		}
-		case "scroll": {
-			return {
-				state: markScrollerViewportScrollObserved(state),
-				effect: { type: "scroll-frame", measureScroll: true },
 			};
 		}
 		case "idle": {

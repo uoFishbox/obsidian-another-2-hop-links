@@ -1,9 +1,15 @@
 export type CCLDevMeasurementName =
 	| "virtualScroll.applyScrollMeasurement"
+	| "virtualScroll.applyScrollMeasurement.scrollCoverageMiss"
+	| "virtualScroll.applyScrollMeasurement.scrollIdle"
+	| "virtualScroll.applyScrollMeasurement.dataChange"
+	| "virtualScroll.applyScrollMeasurement.postLayout"
+	| "virtualScroll.applyScrollMeasurement.skippedUnchanged"
 	| "virtualScroll.stableBandHit"
 	| "virtualScroll.sameMountedWindowHit"
 	| "virtualScroll.rangeMeasurementApplied"
 	| "virtualScroll.rangeMeasurementChanged"
+	| "virtualScroll.rangeMeasurementReused"
 	| "virtualList.observer.scrollEvent"
 	| "virtualList.observer.coverageHit"
 	| "virtualList.observer.coverageMiss"
@@ -44,10 +50,16 @@ export type CCLDevMeasurementName =
 
 export const CCL_DEV_MEASUREMENT_NAMES: readonly CCLDevMeasurementName[] = [
 	"virtualScroll.applyScrollMeasurement",
+	"virtualScroll.applyScrollMeasurement.scrollCoverageMiss",
+	"virtualScroll.applyScrollMeasurement.scrollIdle",
+	"virtualScroll.applyScrollMeasurement.dataChange",
+	"virtualScroll.applyScrollMeasurement.postLayout",
+	"virtualScroll.applyScrollMeasurement.skippedUnchanged",
 	"virtualScroll.stableBandHit",
 	"virtualScroll.sameMountedWindowHit",
 	"virtualScroll.rangeMeasurementApplied",
 	"virtualScroll.rangeMeasurementChanged",
+	"virtualScroll.rangeMeasurementReused",
 	"virtualList.observer.scrollEvent",
 	"virtualList.observer.coverageHit",
 	"virtualList.observer.coverageMiss",
