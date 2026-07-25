@@ -22,6 +22,7 @@ import { disposePreviewActivationScheduler } from "features/preview/scheduling/p
 import { disposePreviewDomCommitScheduler } from "features/preview/scheduling/previewDomCommitScheduler";
 import { installCCLDebugExposure } from "infrastructure/debug/CCLDebugExposure";
 import { registerBenchmarkCommand } from "infrastructure/debug/benchmarkCommandController";
+import { registerScrollBenchmarkCommand } from "infrastructure/debug/scrollBenchmarkCommandController";
 import { registerCardDragStateCleanup } from "ui/interactions/cardDragState";
 import { registerViews } from "infrastructure/registration/registerViews";
 import { registerCommands } from "infrastructure/registration/registerCommands";
@@ -125,6 +126,7 @@ export default class CosenseCardLinksPlugin extends Plugin implements PluginHost
 		});
 		if (process.env.NODE_ENV !== "production") {
 			registerBenchmarkCommand(this, runtime.indexingService);
+			registerScrollBenchmarkCommand(this);
 		}
 		registerEditorExtensions(this, {
 			linkStatusService: runtime.linkStatusService,
