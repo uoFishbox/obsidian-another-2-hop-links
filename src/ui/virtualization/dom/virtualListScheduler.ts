@@ -1,3 +1,4 @@
+import type { CCLDevMeasurementName } from "infrastructure/debug/CCLDevMeasurements";
 import { recordCCLDevMeasurement } from "infrastructure/debug/CCLDevMeasurements";
 
 export interface ScheduledVirtualListTask {
@@ -12,10 +13,24 @@ const getDefaultWindow = (): Window | null =>
 const resolveScheduledTaskWindow = (getWindow?: () => Window | null): Window | null =>
 	getWindow?.() ?? getDefaultWindow();
 
+export interface CreateScheduledVirtualListTaskOptions {
+	getWindow?: () => Window | null;
+	/** Per-task counter name. Falls back to the aggregate `virtualList.scheduler.animationFrame`. */
+	counterName?: CCLDevMeasurementName;
+}
+
 export const createScheduledVirtualListTask = (
 	callback: () => void,
-	getWindow?: () => Window | null,
+	getWindowOrOptions?: (() => Window | null) | CreateScheduledVirtualListTaskOptions,
 ): ScheduledVirtualListTask => {
+	const getWindow =
+		typeof getWindowOrOptions === "function"
+			? getWindowOrOptions
+			: getWindowOrOptions?.getWindow;
+	const counterName =
+		typeof getWindowOrOptions === "object" && getWindowOrOptions !== null
+			? getWindowOrOptions.counterName
+			: undefined;
 	let scheduled = false;
 	let handle = 0;
 	let usesAnimationFrame = false;
@@ -39,7 +54,9 @@ export const createScheduledVirtualListTask = (
 
 			if (typeof ownerWindow.requestAnimationFrame === "function") {
 				if (process.env.NODE_ENV !== "production") {
-					recordCCLDevMeasurement("virtualList.scheduler.animationFrame");
+					recordCCLDevMeasurement(
+						counterName ?? "virtualList.scheduler.animationFrame",
+					);
 				}
 				usesAnimationFrame = true;
 				handle = ownerWindow.requestAnimationFrame(fire);

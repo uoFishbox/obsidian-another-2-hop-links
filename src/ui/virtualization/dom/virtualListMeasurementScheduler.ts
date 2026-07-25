@@ -1,3 +1,4 @@
+import type { CCLDevMeasurementName } from "infrastructure/debug/CCLDevMeasurements";
 import {
 	createScheduledVirtualListTask,
 	type ScheduledVirtualListTask,
@@ -38,7 +39,11 @@ export const createVirtualListMeasurementScheduler = ({
 	frameCoordinator,
 }: VirtualListMeasurementSchedulerOptions): VirtualListMeasurementScheduler => {
 	let unstableMeasurementRetryCount = 0;
-	const createTask = (key: string, task: () => void): ScheduledVirtualListTask =>
+	const createTask = (
+		key: string,
+		task: () => void,
+		counterName?: CCLDevMeasurementName,
+	): ScheduledVirtualListTask =>
 		frameCoordinator
 			? createCoordinatedScheduledTask({
 					coordinator: frameCoordinator,
@@ -46,20 +51,26 @@ export const createVirtualListMeasurementScheduler = ({
 					key,
 					task,
 				})
-			: createScheduledVirtualListTask(task, getWindow);
+			: createScheduledVirtualListTask(task, { getWindow, counterName });
 	const layoutTask = createTask(
 		"virtual-list:layout-measurement",
 		runLayoutMeasurement,
+		"virtualList.scheduler.measurementLayout.animationFrame",
 	);
 	// Frame-align scroll measurements so wheel/scroll bursts coalesce before work runs.
 	const scrollTask = createTask(
 		"virtual-list:scroll-measurement",
 		runScrollMeasurement,
+		"virtualList.scheduler.measurementScroll.animationFrame",
 	);
-	const retryTask = createTask("virtual-list:unstable-measurement", () => {
-		unstableMeasurementRetryCount += 1;
-		runLayoutMeasurement();
-	});
+	const retryTask = createTask(
+		"virtual-list:unstable-measurement",
+		() => {
+			unstableMeasurementRetryCount += 1;
+			runLayoutMeasurement();
+		},
+		"virtualList.scheduler.unstableRetry.animationFrame",
+	);
 
 	return {
 		hasPendingLayoutMeasurement() {

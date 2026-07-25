@@ -153,6 +153,9 @@ export function createVirtualScrollWindowMeasurementController<TContext>({
 					mountedMeasurement.mounted,
 				)
 			) {
+				if (process.env.NODE_ENV !== "production") {
+					recordCCLDevMeasurement("virtualScroll.sameMountedWindowHit");
+				}
 				// Active-scroll preview follows mounted-window publications. Idle
 				// measurement normalizes it to the current viewport afterward.
 				lastMountedScrollWindow = updateMountedScrollWindow(
@@ -175,11 +178,19 @@ export function createVirtualScrollWindowMeasurementController<TContext>({
 			lastMountedScrollWindow = null;
 		}
 
+		if (process.env.NODE_ENV !== "production") {
+			recordCCLDevMeasurement("virtualScroll.rangeMeasurementApplied");
+		}
+
 		const result = applyRangeMeasurement(
 			nextMeasurement,
 			context,
 			precomputedRanges,
 		);
+		if (process.env.NODE_ENV !== "production" && result.kind === "stable") {
+			recordCCLDevMeasurement("virtualScroll.rangeMeasurementChanged");
+		}
+
 		if (result.kind !== "stable") {
 			lastStableScrollTop = null;
 			lastMountedScrollWindow = pendingMountedMeasurement

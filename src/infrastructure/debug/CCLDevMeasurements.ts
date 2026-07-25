@@ -1,6 +1,22 @@
 export type CCLDevMeasurementName =
 	| "virtualScroll.applyScrollMeasurement"
 	| "virtualScroll.stableBandHit"
+	| "virtualScroll.sameMountedWindowHit"
+	| "virtualScroll.rangeMeasurementApplied"
+	| "virtualScroll.rangeMeasurementChanged"
+	| "virtualList.observer.scrollEvent"
+	| "virtualList.observer.coverageHit"
+	| "virtualList.observer.coverageMiss"
+	| "virtualList.observer.scrollTask.scheduled"
+	| "virtualList.observer.scrollTask.executed"
+	| "virtualList.observer.layoutTask.scheduled"
+	| "virtualList.observer.dependencyTask.scheduled"
+	| "virtualList.scheduler.observerScroll.animationFrame"
+	| "virtualList.scheduler.observerLayout.animationFrame"
+	| "virtualList.scheduler.dependencyRefresh.animationFrame"
+	| "virtualList.scheduler.measurementScroll.animationFrame"
+	| "virtualList.scheduler.measurementLayout.animationFrame"
+	| "virtualList.scheduler.unstableRetry.animationFrame"
 	| "virtualGrid.buildMountedRows"
 	| "virtualGrid.contiguousSlotPool.apply"
 	| "virtualGrid.rowShellCreated"
@@ -29,6 +45,22 @@ export type CCLDevMeasurementName =
 export const CCL_DEV_MEASUREMENT_NAMES: readonly CCLDevMeasurementName[] = [
 	"virtualScroll.applyScrollMeasurement",
 	"virtualScroll.stableBandHit",
+	"virtualScroll.sameMountedWindowHit",
+	"virtualScroll.rangeMeasurementApplied",
+	"virtualScroll.rangeMeasurementChanged",
+	"virtualList.observer.scrollEvent",
+	"virtualList.observer.coverageHit",
+	"virtualList.observer.coverageMiss",
+	"virtualList.observer.scrollTask.scheduled",
+	"virtualList.observer.scrollTask.executed",
+	"virtualList.observer.layoutTask.scheduled",
+	"virtualList.observer.dependencyTask.scheduled",
+	"virtualList.scheduler.observerScroll.animationFrame",
+	"virtualList.scheduler.observerLayout.animationFrame",
+	"virtualList.scheduler.dependencyRefresh.animationFrame",
+	"virtualList.scheduler.measurementScroll.animationFrame",
+	"virtualList.scheduler.measurementLayout.animationFrame",
+	"virtualList.scheduler.unstableRetry.animationFrame",
 	"virtualGrid.buildMountedRows",
 	"virtualGrid.contiguousSlotPool.apply",
 	"virtualGrid.rowShellCreated",

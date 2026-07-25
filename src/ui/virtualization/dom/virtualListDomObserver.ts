@@ -5,6 +5,7 @@ import {
 } from "ui/virtualization/scheduling/scrollActivity";
 import { subscribeWindowResize } from "ui/virtualization/scheduling/windowResizeListeners";
 import { createScheduledVirtualListTask } from "./virtualListScheduler";
+import { recordCCLDevMeasurement } from "infrastructure/debug/CCLDevMeasurements";
 import {
 	collectPositionDependencyElements,
 	collectStructureDependencyTargets,
@@ -165,6 +166,9 @@ const scheduleLayoutMeasurement = (entry: ScrollerViewportEntry): void => {
 	entry.hasPendingLayoutMeasurement = true;
 	entry.coverageScrollTopMin = Number.NaN;
 	entry.coverageScrollTopMax = Number.NaN;
+	if (process.env.NODE_ENV !== "production") {
+		recordCCLDevMeasurement("virtualList.observer.layoutTask.scheduled");
+	}
 	entry.layoutMeasurementTask.schedule();
 };
 
@@ -179,6 +183,9 @@ const scheduleScrollMeasurement = (entry: ScrollerViewportEntry): void => {
 		return;
 	}
 
+	if (process.env.NODE_ENV !== "production") {
+		recordCCLDevMeasurement("virtualList.observer.scrollTask.scheduled");
+	}
 	entry.scrollMeasurementTask.schedule();
 };
 
@@ -550,6 +557,11 @@ const applyScrollPhaseEffect = (
 		case "scroll-idle":
 			markScrollActivityIdle(entry.scrollActivitySource);
 			if (effect.refreshDependencies) {
+				if (process.env.NODE_ENV !== "production") {
+					recordCCLDevMeasurement(
+						"virtualList.observer.dependencyTask.scheduled",
+					);
+				}
 				entry.refreshDependencyObserversTask.schedule();
 			}
 			if (effect.measureLayout) {
@@ -606,6 +618,9 @@ const handleNativeScroll = (
 ): void => {
 	const scrollTop = readScrollTop(entry.scrollTarget);
 
+	if (process.env.NODE_ENV !== "production") {
+		recordCCLDevMeasurement("virtualList.observer.scrollEvent");
+	}
 	if (entry.scrollPhaseState.type === "idle") {
 		handleScrollPhase(entry, "start");
 	}
@@ -623,9 +638,15 @@ const handleNativeScroll = (
 	}
 
 	if (isWithinCachedScrollMeasurementRange(entry, scrollTop)) {
+		if (process.env.NODE_ENV !== "production") {
+			recordCCLDevMeasurement("virtualList.observer.coverageHit");
+		}
 		return;
 	}
 
+	if (process.env.NODE_ENV !== "production") {
+		recordCCLDevMeasurement("virtualList.observer.coverageMiss");
+	}
 	scheduleScrollMeasurement(entry);
 };
 
@@ -722,7 +743,10 @@ const getScrollerViewportEntry = (
 		() => {
 			refreshDependencyObservers(entry);
 		},
-		() => getOptionalOwnerWindow(entry.registryKey),
+		{
+			getWindow: () => getOptionalOwnerWindow(entry.registryKey),
+			counterName: "virtualList.scheduler.dependencyRefresh.animationFrame",
+		},
 	);
 	entry.layoutMeasurementTask = createScheduledVirtualListTask(
 		() => {
@@ -733,7 +757,10 @@ const getScrollerViewportEntry = (
 			entry.hasPendingLayoutMeasurement = false;
 			getActiveSubscriber(entry)?.scheduleLayoutMeasurement();
 		},
-		() => getOptionalOwnerWindow(entry.registryKey),
+		{
+			getWindow: () => getOptionalOwnerWindow(entry.registryKey),
+			counterName: "virtualList.scheduler.observerLayout.animationFrame",
+		},
 	);
 	entry.scrollMeasurementTask = createScheduledVirtualListTask(
 		() => {
@@ -746,10 +773,16 @@ const getScrollerViewportEntry = (
 			if (!subscriber) {
 				return;
 			}
+			if (process.env.NODE_ENV !== "production") {
+				recordCCLDevMeasurement("virtualList.observer.scrollTask.executed");
+			}
 			subscriber.runScrollMeasurement(readSharedScrollMetrics(entry));
 			refreshCachedScrollMeasurementRange(entry);
 		},
-		() => getOptionalOwnerWindow(entry.registryKey),
+		{
+			getWindow: () => getOptionalOwnerWindow(entry.registryKey),
+			counterName: "virtualList.scheduler.observerScroll.animationFrame",
+		},
 	);
 	entry.scrollEndTarget = resolveScrollEndTarget(entry.scrollTarget);
 	entry.onNativeScroll = () => handleNativeScroll(entry, ownerWindow);
