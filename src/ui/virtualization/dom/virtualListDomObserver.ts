@@ -563,6 +563,11 @@ const applyScrollPhaseEffect = (
 					);
 				}
 				entry.refreshDependencyObserversTask.schedule();
+			} else if (effect.reconnectObserver) {
+				// The scroll ended without any observed structure mutation, so
+				// re-arm the existing structure observer targets instead of
+				// paying for a full dependency re-collection on every gesture.
+				connectStructureObserver(entry);
 			}
 			if (effect.measureLayout) {
 				scheduleLayoutMeasurement(entry);

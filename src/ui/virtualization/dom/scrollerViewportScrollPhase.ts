@@ -75,9 +75,11 @@ export function reduceScrollerViewportPhase(
 				state: { type: "idle" },
 				effect: {
 					type: "scroll-idle",
-					refreshDependencies:
-						pendingAfterScroll.refreshDependencies ||
-						pendingAfterScroll.reconnectObserver,
+					// Only an actual structure mutation observed during the scroll
+					// warrants re-collecting dependency targets. Merely having
+					// scrolled (reconnectObserver) only needs the cheaper
+					// observer-reconnect path below.
+					refreshDependencies: pendingAfterScroll.refreshDependencies,
 					measureLayout: pendingAfterScroll.measureLayout,
 					measureScroll: !pendingAfterScroll.measureLayout,
 					reconnectObserver: pendingAfterScroll.reconnectObserver,

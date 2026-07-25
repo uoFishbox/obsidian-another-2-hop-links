@@ -77,9 +77,34 @@ describe("reduceScrollerViewportPhase", () => {
 			state: { type: "idle" },
 			effect: {
 				type: "scroll-idle",
-				refreshDependencies: true,
+				refreshDependencies: false,
 				measureLayout: true,
 				measureScroll: false,
+				reconnectObserver: true,
+			},
+		});
+	});
+
+	it("requests full dependency refresh only when a structure mutation was observed", () => {
+		const transition = reduceScrollerViewportPhase(
+			{
+				type: "scrolling",
+				pendingAfterScroll: {
+					reconnectObserver: true,
+					refreshDependencies: true,
+					measureLayout: false,
+				},
+			},
+			"idle",
+		);
+
+		expect(transition).toEqual({
+			state: { type: "idle" },
+			effect: {
+				type: "scroll-idle",
+				refreshDependencies: true,
+				measureLayout: false,
+				measureScroll: true,
 				reconnectObserver: true,
 			},
 		});
