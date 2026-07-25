@@ -18,6 +18,7 @@ describe("createViewPlanCardVirtualListPolicyResolver", () => {
 	it("uses configured ahead rows when idle", () => {
 		const resolver = createViewPlanCardVirtualListPolicyResolver({
 			getPreviewActivationAheadRows: () => 1,
+			getMountedOverscanRows: () => 1,
 		});
 
 		expect(resolver.resolve(layout(), false)).toMatchObject({
@@ -29,6 +30,7 @@ describe("createViewPlanCardVirtualListPolicyResolver", () => {
 	it("keeps configured preview overscan during active scroll", () => {
 		const resolver = createViewPlanCardVirtualListPolicyResolver({
 			getPreviewActivationAheadRows: () => 1,
+			getMountedOverscanRows: () => 1,
 		});
 
 		expect(resolver.resolve(layout(), true)).toMatchObject({
@@ -40,6 +42,7 @@ describe("createViewPlanCardVirtualListPolicyResolver", () => {
 	it("keeps larger configured overscan during active scroll", () => {
 		const resolver = createViewPlanCardVirtualListPolicyResolver({
 			getPreviewActivationAheadRows: () => 3,
+			getMountedOverscanRows: () => 1,
 		});
 
 		expect(resolver.resolve(layout(), false)).toMatchObject({
@@ -55,6 +58,7 @@ describe("createViewPlanCardVirtualListPolicyResolver", () => {
 	it("returns the cached policy object for repeated identical inputs", () => {
 		const resolver = createViewPlanCardVirtualListPolicyResolver({
 			getPreviewActivationAheadRows: () => 2,
+			getMountedOverscanRows: () => 1,
 		});
 		const baseLayout = layout();
 
@@ -65,6 +69,7 @@ describe("createViewPlanCardVirtualListPolicyResolver", () => {
 	it("reuses the policy when only scroll activity flips", () => {
 		const resolver = createViewPlanCardVirtualListPolicyResolver({
 			getPreviewActivationAheadRows: () => 2,
+			getMountedOverscanRows: () => 1,
 		});
 		const baseLayout = layout();
 
@@ -79,6 +84,7 @@ describe("createViewPlanCardVirtualListPolicyResolver", () => {
 		let aheadRows = 1;
 		const resolver = createViewPlanCardVirtualListPolicyResolver({
 			getPreviewActivationAheadRows: () => aheadRows,
+			getMountedOverscanRows: () => 1,
 		});
 		const baseLayout = layout();
 
@@ -93,6 +99,7 @@ describe("createViewPlanCardVirtualListPolicyResolver", () => {
 	it("rebuilds the policy when row height changes", () => {
 		const resolver = createViewPlanCardVirtualListPolicyResolver({
 			getPreviewActivationAheadRows: () => 1,
+			getMountedOverscanRows: () => 1,
 		});
 
 		const first = resolver.resolve(layout({ rowHeight: 120 }), false);
@@ -100,5 +107,22 @@ describe("createViewPlanCardVirtualListPolicyResolver", () => {
 
 		expect(second).not.toBe(first);
 		expect(second.mountedOverscanPx).toBe(212);
+	});
+
+	it("rebuilds the policy when mounted overscan changes", () => {
+		let mountedOverscanRows: 1 | 2 = 1;
+		const resolver = createViewPlanCardVirtualListPolicyResolver({
+			getPreviewActivationAheadRows: () => 1,
+			getMountedOverscanRows: () => mountedOverscanRows,
+		});
+		const baseLayout = layout();
+
+		const first = resolver.resolve(baseLayout, false);
+		mountedOverscanRows = 2;
+		const second = resolver.resolve(baseLayout, false);
+
+		expect(second).not.toBe(first);
+		expect(second.mountedOverscanPx).toBe(264);
+		expect(second.previewOverscanPx).toBe(132);
 	});
 });

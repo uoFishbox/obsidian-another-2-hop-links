@@ -89,6 +89,8 @@ export type TranslationKey =
 	| "enableRipgrepContentSearchDesc"
 	| "ripgrepExecutablePath"
 	| "ripgrepExecutablePathDesc"
+	| "enableTwoRowMountedOverscan"
+	| "enableTwoRowMountedOverscanDesc"
 	| "belowEditor"
 	| "sidebar"
 	| "hybrid"
@@ -228,6 +230,9 @@ const translations: Record<Language, Record<TranslationKey, string>> = {
 			"Use ripgrep for content search on the desktop app. Falls back to the built-in search when unavailable.",
 		ripgrepExecutablePath: "ripgrep executable path",
 		ripgrepExecutablePathDesc: "Optional. Leave empty to use rg from PATH.",
+		enableTwoRowMountedOverscan: "Use two mounted overscan rows",
+		enableTwoRowMountedOverscanDesc:
+			"Keep two extra rows mounted above and below the viewport instead of one. This uses more resident DOM but reduces resident-window updates and row rebinds.",
 		belowEditor: "Below editor",
 		sidebar: "Sidebar",
 		hybrid: "Hybrid",
@@ -366,6 +371,9 @@ const translations: Record<Language, Record<TranslationKey, string>> = {
 			"デスクトップ版で content 検索に ripgrep を使用します。利用できない場合は内蔵検索にフォールバックします。",
 		ripgrepExecutablePath: "ripgrep 実行ファイルのパス",
 		ripgrepExecutablePathDesc: "任意です。空の場合は PATH 上の rg を使用します。",
+		enableTwoRowMountedOverscan: "mounted overscan を2行にする",
+		enableTwoRowMountedOverscanDesc:
+			"ビューポートの上下にマウントしておく追加行を1行から2行にします。resident DOM数は増えますが、resident windowの更新頻度とrow rebind回数は減ります。",
 		belowEditor: "エディタの下",
 		sidebar: "サイドバー",
 		hybrid: "ハイブリッド",

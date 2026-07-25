@@ -65,6 +65,7 @@ import { DEFAULT_SETTINGS } from "features/settings/model";
 interface FlatVirtualGridApplicationSettings extends CardLayoutSettings {
 	previewActivationAheadRows?: number;
 	previewDomCommitsPerSecond?: number;
+	enableTwoRowMountedOverscan?: boolean;
 }
 
 interface FlatVirtualGridApplicationStore extends SectionPaginationApplicationStore {
@@ -183,6 +184,7 @@ export function useFlatVirtualGridList<T>(
 	let lastResolvedActiveScrollPolicyRowHeight: number | undefined;
 	let lastResolvedActiveScrollPolicyGap: number | undefined;
 	let lastResolvedActiveScrollPolicyAheadRows: number | undefined;
+	let lastResolvedMountedOverscanRows: 1 | 2 | undefined;
 	let lastResolvedActiveScrollPolicyIsScrollActive: boolean | undefined;
 	let lastResolvedActiveScrollPolicy:
 		| ReturnType<typeof createCardVirtualListPolicy>
@@ -192,20 +194,24 @@ export function useFlatVirtualGridList<T>(
 		isScrollActive: boolean,
 	): ReturnType<typeof createCardVirtualListPolicy> => {
 		const effectiveAheadRows = isScrollActive ? 0 : previewActivationAheadRows;
+		const mountedOverscanRows = enableTwoRowMountedOverscan ? 2 : 1;
 		if (
 			!lastResolvedActiveScrollPolicy ||
 			lastResolvedActiveScrollPolicyRowHeight !== nextLayout.rowHeight ||
 			lastResolvedActiveScrollPolicyGap !== nextLayout.gap ||
 			lastResolvedActiveScrollPolicyAheadRows !== effectiveAheadRows ||
+			lastResolvedMountedOverscanRows !== mountedOverscanRows ||
 			lastResolvedActiveScrollPolicyIsScrollActive !== isScrollActive
 		) {
 			lastResolvedActiveScrollPolicyRowHeight = nextLayout.rowHeight;
 			lastResolvedActiveScrollPolicyGap = nextLayout.gap;
 			lastResolvedActiveScrollPolicyAheadRows = effectiveAheadRows;
+			lastResolvedMountedOverscanRows = mountedOverscanRows;
 			lastResolvedActiveScrollPolicyIsScrollActive = isScrollActive;
 			lastResolvedActiveScrollPolicy = createCardVirtualListPolicy({
 				layout: nextLayout,
 				previewActivationAheadRows,
+				mountedOverscanRows,
 				isScrollActive,
 			});
 		}
@@ -226,6 +232,9 @@ export function useFlatVirtualGridList<T>(
 	);
 	const previewActivationAheadRows = $derived(
 		applicationStore?.settings?.previewActivationAheadRows ?? 1,
+	);
+	const enableTwoRowMountedOverscan = $derived(
+		applicationStore?.settings?.enableTwoRowMountedOverscan ?? false,
 	);
 
 	const flatPaginationSectionId = $derived(sectionId ?? "link-list");

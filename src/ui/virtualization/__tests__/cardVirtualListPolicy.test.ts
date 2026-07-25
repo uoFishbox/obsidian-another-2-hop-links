@@ -35,6 +35,21 @@ describe("card virtual list policy", () => {
 		});
 	});
 
+	it("keeps two mounted overscan rows when configured", () => {
+		expect(
+			createCardVirtualListPolicy({
+				layout: {
+					rowHeight: 120,
+					gap: 12,
+				},
+				mountedOverscanRows: 2,
+			}),
+		).toMatchObject({
+			mountedOverscanPx: 264,
+			previewOverscanPx: 132,
+		});
+	});
+
 	it("keeps preview overscan configurable and within the mounted overscan", () => {
 		expect(
 			createCardVirtualListPolicy({

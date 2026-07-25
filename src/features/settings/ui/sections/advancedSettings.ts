@@ -8,6 +8,13 @@ import type { SettingDefinition } from "./settingDefinition";
 export const ADVANCED_SETTING_DEFINITIONS: ReadonlyArray<SettingDefinition> = [
 	{
 		section: "experimental",
+		settingKey: "enableTwoRowMountedOverscan",
+		controlType: "toggle",
+		translationKey: "enableTwoRowMountedOverscan",
+		descriptionKey: "enableTwoRowMountedOverscanDesc",
+	},
+	{
+		section: "experimental",
 		settingKey: "renderCodeBlockTypes",
 		controlType: "textarea",
 		translationKey: "codeBlocksToRender",

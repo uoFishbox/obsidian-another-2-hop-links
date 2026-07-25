@@ -484,6 +484,8 @@ export function useTwoHopVirtualList(
 	const policyResolver = createViewPlanCardVirtualListPolicyResolver({
 		getPreviewActivationAheadRows: () =>
 			applicationStore?.settings?.previewActivationAheadRows ?? 1,
+		getMountedOverscanRows: () =>
+			applicationStore?.settings?.enableTwoRowMountedOverscan ? 2 : 1,
 	});
 	const initialRowModel = resolveRowModel(measurementState.layout);
 	if (initialRowModel.rowCount > 0) {
