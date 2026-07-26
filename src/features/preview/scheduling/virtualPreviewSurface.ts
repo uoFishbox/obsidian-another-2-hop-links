@@ -73,12 +73,11 @@ interface PreviewHostState {
 	readonly hasContent: boolean;
 }
 
-interface PreviewRenderToken {
+interface PreviewOperationToken {
 	readonly slotId: string;
-	readonly hostEpoch: number;
-	readonly bindingEpoch: number;
-	readonly renderEpoch: number;
-	readonly identity: string;
+	readonly slotEpoch: number;
+	readonly host: HTMLElement;
+	readonly previewIdentity: string;
 }
 
 interface PreviewSlotRuntime {
@@ -88,12 +87,9 @@ interface PreviewSlotRuntime {
 	bindingRowIndex?: number;
 	host?: {
 		element: HTMLElement;
-		epoch: number;
 		appliedState?: PreviewHostState;
 	};
-	hostEpoch: number;
-	bindingEpoch: number;
-	renderEpoch: number;
+	operationEpoch: number;
 	renderCleanup?: () => void;
 	lifecycleCleanupHandle?: number;
 	renderer?: CardPreviewRenderer;
@@ -102,7 +98,7 @@ interface PreviewSlotRuntime {
 		identity: string;
 		contentType: PreviewData["type"] | undefined;
 		retention: CardPreviewRetention;
-		hostEpoch: number;
+		host: HTMLElement;
 	};
 	phase: PreviewHostPhase;
 }
@@ -140,9 +136,7 @@ export function createVirtualPreviewSurface(
 		if (existing) return existing;
 		const slot: PreviewSlotRuntime = {
 			slotId,
-			hostEpoch: 0,
-			bindingEpoch: 0,
-			renderEpoch: 0,
+			operationEpoch: 0,
 			resolveRenderRequest: createCardPreviewRenderRequestResolver(),
 			phase: "empty",
 		};
@@ -159,16 +153,19 @@ export function createVirtualPreviewSurface(
 		);
 	}
 
-	function isCurrent(slot: PreviewSlotRuntime, token: PreviewRenderToken): boolean {
+	function isCurrent(
+		slot: PreviewSlotRuntime,
+		token: PreviewOperationToken,
+	): boolean {
 		const desiredBinding = stagedBindingsBySlot.has(slot.slotId)
 			? stagedBindingsBySlot.get(slot.slotId)
 			: slot.binding;
 		return (
 			!disposed &&
-			slot.host?.epoch === token.hostEpoch &&
-			slot.bindingEpoch === token.bindingEpoch &&
-			slot.renderEpoch === token.renderEpoch &&
-			desiredBinding?.snapshot.identity === token.identity
+			slot.slotId === token.slotId &&
+			slot.operationEpoch === token.slotEpoch &&
+			slot.host?.element === token.host &&
+			desiredBinding?.snapshot.identity === token.previewIdentity
 		);
 	}
 
@@ -179,8 +176,7 @@ export function createVirtualPreviewSurface(
 		const nextState: PreviewHostState = {
 			phase: slot.phase,
 			contentType: slot.committed?.contentType,
-			hasContent:
-				slot.committed?.hostEpoch === host.epoch && !!element.firstChild,
+			hasContent: slot.committed?.host === element && !!element.firstChild,
 		};
 		applyHostState(element, host.appliedState, nextState);
 		host.appliedState = nextState;
@@ -193,7 +189,7 @@ export function createVirtualPreviewSurface(
 	}
 
 	function stopRender(slot: PreviewSlotRuntime): void {
-		slot.renderEpoch += 1;
+		slot.operationEpoch += 1;
 		slot.renderCleanup?.();
 		slot.renderCleanup = undefined;
 	}
@@ -206,16 +202,16 @@ export function createVirtualPreviewSurface(
 
 	function scheduleLifecycleCleanup(slot: PreviewSlotRuntime): void {
 		cancelLifecycleCleanup(slot);
-		const bindingEpoch = slot.bindingEpoch;
-		const hostEpoch = slot.host?.epoch;
+		const slotEpoch = slot.operationEpoch;
+		const host = slot.host?.element;
 		const identity = slot.committed?.identity;
-		if (hostEpoch === undefined || !identity) return;
+		if (!host || !identity) return;
 
 		slot.lifecycleCleanupHandle = window.requestIdleCallback(() => {
 			slot.lifecycleCleanupHandle = undefined;
 			if (disposed || isInPreviewRange(slot)) return;
-			if (slot.bindingEpoch !== bindingEpoch) return;
-			if (slot.host?.epoch !== hostEpoch) return;
+			if (slot.operationEpoch !== slotEpoch) return;
+			if (slot.host?.element !== host) return;
 			if (slot.committed?.identity !== identity) return;
 			clearCommittedDom(slot);
 			slot.phase = "dormant";
@@ -250,7 +246,7 @@ export function createVirtualPreviewSurface(
 		if (
 			slot.committed?.identity === binding.snapshot.identity &&
 			slot.committed.retention === "resident" &&
-			slot.committed.hostEpoch === host.epoch &&
+			slot.committed.host === host.element &&
 			slot.phase !== "dormant" &&
 			slot.phase !== "stale"
 		) {
@@ -261,12 +257,11 @@ export function createVirtualPreviewSurface(
 		if (!renderer) return;
 		cancelLifecycleCleanup(slot);
 		stopRender(slot);
-		const token: PreviewRenderToken = {
+		const token: PreviewOperationToken = {
 			slotId: slot.slotId,
-			hostEpoch: host.epoch,
-			bindingEpoch: slot.bindingEpoch,
-			renderEpoch: slot.renderEpoch,
-			identity: binding.snapshot.identity,
+			slotEpoch: slot.operationEpoch,
+			host: host.element,
+			previewIdentity: binding.snapshot.identity,
 		};
 		const request = slot.resolveRenderRequest(
 			binding.snapshot.file,
@@ -294,10 +289,10 @@ export function createVirtualPreviewSurface(
 				onCommitted: (contentType, retention) => {
 					if (!isCurrent(slot, token)) return;
 					slot.committed = {
-						identity: token.identity,
+						identity: token.previewIdentity,
 						contentType,
 						retention,
-						hostEpoch: token.hostEpoch,
+						host: token.host,
 					};
 					slot.phase = "committed";
 					applySlotState(slot);
@@ -305,12 +300,13 @@ export function createVirtualPreviewSurface(
 				onRendered: () => {},
 				onError: () => {
 					if (!isCurrent(slot, token)) return;
+					slot.operationEpoch += 1;
 					const cleanup = slot.renderCleanup;
 					slot.renderCleanup = undefined;
 					cleanup?.();
 					const hasCurrentResident =
 						slot.committed?.retention === "resident" &&
-						slot.committed.hostEpoch === token.hostEpoch;
+						slot.committed.host === token.host;
 					slot.phase = hasCurrentResident ? "stale" : "empty";
 					if (!hasCurrentResident) clearCommittedDom(slot);
 					applySlotState(slot);
@@ -363,7 +359,7 @@ export function createVirtualPreviewSurface(
 			const isReusableResident =
 				slot.committed?.identity === slot.binding.snapshot.identity &&
 				slot.committed.retention === "resident" &&
-				slot.committed.hostEpoch === slot.host?.epoch &&
+				slot.committed.host === slot.host?.element &&
 				slot.phase === "committed";
 			if (!isReusableResident && !slot.renderCleanup) {
 				activationIdentities.add(slot.binding.snapshot.identity);
@@ -390,7 +386,6 @@ export function createVirtualPreviewSurface(
 		}
 		cancelLifecycleCleanup(slot);
 		stopRender(slot);
-		slot.bindingEpoch += 1;
 		slot.binding = binding;
 		slot.bindingIdentity = binding.snapshot.identity;
 		slot.bindingRowIndex = binding.rowIndex;
@@ -407,7 +402,6 @@ export function createVirtualPreviewSurface(
 		if (!slot) return;
 		cancelLifecycleCleanup(slot);
 		stopRender(slot);
-		slot.bindingEpoch += 1;
 		slot.binding = undefined;
 		slot.bindingIdentity = undefined;
 		slot.bindingRowIndex = undefined;
@@ -442,7 +436,7 @@ export function createVirtualPreviewSurface(
 		if (!identityChanged && !rowChanged) return;
 
 		const slot = getOrCreateSlot(slotId);
-		slot.bindingEpoch += 1;
+		slot.operationEpoch += 1;
 		stagedInvalidatedSlots.add(slotId);
 		if (identityChanged) slot.host?.element.classList.add("is-stale");
 	}
@@ -514,23 +508,21 @@ export function createVirtualPreviewSurface(
 		if (slot.host?.element !== element) {
 			cancelLifecycleCleanup(slot);
 			stopRender(slot);
-			slot.hostEpoch += 1;
-			slot.host = { element, epoch: slot.hostEpoch };
+			slot.host = { element };
 			slot.committed = undefined;
 			slot.phase = "empty";
 			applySlotState(slot);
 			reconcile();
 		}
-		const leaseEpoch = slot.host.epoch;
+		const leasedHost = slot.host.element;
 		let leaseDisposed = false;
 		return {
 			dispose(): void {
 				if (leaseDisposed) return;
 				leaseDisposed = true;
-				if (slot.host?.epoch !== leaseEpoch) return;
+				if (slot.host?.element !== leasedHost) return;
 				cancelLifecycleCleanup(slot);
 				stopRender(slot);
-				slot.hostEpoch += 1;
 				slot.host = undefined;
 				slot.committed = undefined;
 			},

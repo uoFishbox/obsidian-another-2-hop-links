@@ -12,12 +12,14 @@ import type {
 	VirtualCardInteractionDelta,
 } from "ui/interactions/virtualCardInteractionController";
 import type { MountedVirtualCell } from "ui/virtualization/types";
+import type { ResidentSlotBindingToken } from "ui/virtualization/core/residentSlotBinding";
 
 /** Display, preview, and interaction data owned by one physical render slot. */
 export interface VirtualCardSlotBinding<
 	TMountedCell extends MountedVirtualCell,
 	TCardModel,
 > {
+	readonly bindingToken: ResidentSlotBindingToken;
 	readonly mountedCell: TMountedCell;
 	readonly cardModel?: TCardModel;
 	readonly preview?: CardPreviewSnapshot;
@@ -64,15 +66,25 @@ export function createVirtualCardSlotBindings<
 	readonly resolveBinding: (
 		mountedCell: TMountedCell,
 		bindingIdentity: TBindingIdentity,
-	) => VirtualCardSlotBinding<TMountedCell, TCardModel>;
+	) => Omit<VirtualCardSlotBinding<TMountedCell, TCardModel>, "bindingToken">;
 }): VirtualCardSlotBindings<TMountedCell, TCardModel, TBindingIdentity> {
 	const slotStates: VirtualCardSlotState<TMountedCell, TCardModel>[] = [];
 	const bindingIdentities: (TBindingIdentity | undefined)[] = [];
+	const bindingEpochs: number[] = [];
+	const bindingTokensByCell = new WeakMap<TMountedCell, ResidentSlotBindingToken>();
 
 	const ensureCapacity = (capacity: number): void => {
 		while (slotStates.length < capacity) {
+			const slotIndex = slotStates.length;
 			slotStates.push(createVirtualCardSlotState());
+			bindingEpochs[slotIndex] ??= 0;
 		}
+	};
+
+	const advanceBinding = (slotIndex: number): ResidentSlotBindingToken => {
+		const epoch = (bindingEpochs[slotIndex] ?? 0) + 1;
+		bindingEpochs[slotIndex] = epoch;
+		return Object.freeze({ slotIndex, epoch });
 	};
 
 	const sync = (params: {
@@ -97,6 +109,7 @@ export function createVirtualCardSlotBindings<
 			const slotId = String(previous.mountedCell.renderSlotKey);
 			if (previous.preview) releasedPreviewSlots.push(slotId);
 			if (previous.interaction) releasedInteractionSlots.push(slotId);
+			advanceBinding(slotIndex);
 			slotStates[slotIndex]!.binding = undefined;
 			bindingIdentities[slotIndex] = undefined;
 		};
@@ -108,13 +121,28 @@ export function createVirtualCardSlotBindings<
 			if (!slotState) continue;
 			const previous = slotState.binding;
 			if (
-				previous?.mountedCell === mountedCell &&
+				previous &&
+				hasSameMountedCellBinding(previous.mountedCell, mountedCell) &&
 				bindingIdentities[slotIndex] === params.bindingIdentity
 			) {
+				bindingTokensByCell.set(mountedCell, previous.bindingToken);
 				continue;
 			}
 
-			const next = options.resolveBinding(mountedCell, params.bindingIdentity);
+			const resolved = options.resolveBinding(
+				mountedCell,
+				params.bindingIdentity,
+			);
+			const retainsLogicalBinding =
+				previous &&
+				hasSameMountedCellBinding(previous.mountedCell, mountedCell);
+			const next: VirtualCardSlotBinding<TMountedCell, TCardModel> = {
+				...resolved,
+				bindingToken: retainsLogicalBinding
+					? previous.bindingToken
+					: advanceBinding(slotIndex),
+			};
+			bindingTokensByCell.set(mountedCell, next.bindingToken);
 			const slotId = String(mountedCell.renderSlotKey);
 			if (next.preview) {
 				const previewBinding = {
@@ -172,10 +200,26 @@ export function createVirtualCardSlotBindings<
 	return {
 		sync,
 		getSlotState(mountedCell) {
-			const state = slotStates[mountedCell.renderSlotIndex];
-			return state?.binding?.mountedCell === mountedCell ? state : undefined;
+			const token = bindingTokensByCell.get(mountedCell);
+			if (!token) return undefined;
+			const state = slotStates[token.slotIndex];
+			const current = state?.binding?.bindingToken;
+			if (!current || current.epoch !== token.epoch) return undefined;
+			return state;
 		},
 	};
+}
+
+function hasSameMountedCellBinding(
+	current: MountedVirtualCell,
+	next: MountedVirtualCell,
+): boolean {
+	return (
+		current.key === next.key &&
+		current.renderSlotIndex === next.renderSlotIndex &&
+		current.rowIndex === next.rowIndex &&
+		current.columnIndex === next.columnIndex
+	);
 }
 
 function createVirtualCardSlotState<

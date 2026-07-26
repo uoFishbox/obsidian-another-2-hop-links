@@ -56,6 +56,10 @@ import {
 	type VirtualCardSlotBinding,
 	type VirtualCardSlotState,
 } from "ui/virtualization/svelte/virtualCardSlotBindings.svelte";
+import {
+	createLayoutPublication,
+	type TwoHopLayoutPublication,
+} from "features/two-hop/ui/twoHopRevisions";
 
 export interface TwoHopVirtualListProps {
 	readonly sections: readonly TwoHopVirtualSectionDescriptor[];
@@ -151,31 +155,39 @@ export function useTwoHopVirtualList(
 	);
 
 	let cachedDocument: TwoHopDocument | undefined;
-	let cachedLayout: ViewPlanLayoutMetrics | undefined;
+	let cachedLayoutPublication: TwoHopLayoutPublication | undefined;
 	let cachedRowModel: TwoHopVirtualRowModel | undefined;
-	let residentSlotLayout: ViewPlanLayoutMetrics | undefined;
-	let residentSlotLayoutKey: object = {};
-	const resolveResidentSlotLayoutKey = (layout: ViewPlanLayoutMetrics): object => {
-		if (residentSlotLayout && isSameViewPlanLayout(residentSlotLayout, layout)) {
-			return residentSlotLayoutKey;
+	let layoutRevisionValue = 0;
+	let publishedLayout: ViewPlanLayoutMetrics | undefined;
+	let layoutPublication: TwoHopLayoutPublication | undefined;
+	const resolveLayoutPublication = (
+		layout: ViewPlanLayoutMetrics,
+	): TwoHopLayoutPublication => {
+		if (
+			publishedLayout &&
+			layoutPublication &&
+			isSameViewPlanLayout(publishedLayout, layout)
+		) {
+			return layoutPublication;
 		}
-		residentSlotLayout = { ...layout };
-		residentSlotLayoutKey = {};
-		return residentSlotLayoutKey;
+		publishedLayout = { ...layout };
+		layoutPublication = createLayoutPublication(layout, ++layoutRevisionValue);
+		return layoutPublication;
 	};
 	const resolveRowModel = (
 		layout: ViewPlanLayoutMetrics = measurementState.layout,
 	): TwoHopVirtualRowModel => {
-		if (cachedRowModel && cachedDocument === document && cachedLayout === layout) {
+		const nextLayoutPublication = resolveLayoutPublication(layout);
+		if (
+			cachedRowModel &&
+			cachedDocument?.revision === document.revision &&
+			cachedLayoutPublication?.revision === nextLayoutPublication.revision
+		) {
 			return cachedRowModel;
 		}
 		cachedDocument = document;
-		cachedLayout = layout;
-		cachedRowModel = createTwoHopVirtualRowModel(
-			document,
-			layout,
-			resolveResidentSlotLayoutKey(layout),
-		);
+		cachedLayoutPublication = nextLayoutPublication;
+		cachedRowModel = createTwoHopVirtualRowModel(document, nextLayoutPublication);
 		return cachedRowModel;
 	};
 	const rowModel = $derived(resolveRowModel());

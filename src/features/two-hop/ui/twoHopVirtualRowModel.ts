@@ -29,6 +29,10 @@ import {
 } from "ui/virtualization/types";
 import type { ViewPlanLayoutMetrics } from "ui/virtualization/svelte/viewPlanLayout";
 import type { VirtualScrollWindowRangeRowModel } from "ui/virtualization/core/scrollWindowMeasurement";
+import type {
+	LayoutRevision,
+	TwoHopLayoutPublication,
+} from "features/two-hop/ui/twoHopRevisions";
 
 export type TwoHopLogicalCell =
 	| (Extract<VirtualListLogicalCell<TwoHopVirtualListItem>, { kind: "header" }> & {
@@ -45,8 +49,7 @@ export type TwoHopVirtualRowModel = VirtualRowModel<TwoHopLogicalCell> &
 	VirtualScrollWindowRangeRowModel & {
 		readonly document: TwoHopDocument;
 		readonly geometry: TwoHopGeometry;
-		/** Stable allocator key for the layout that owns the physical row slots. */
-		readonly residentSlotLayoutKey: object;
+		readonly layoutRevision: LayoutRevision;
 		getDocumentSection(rowIndex: number): TwoHopDocumentSection | null;
 	};
 
@@ -66,9 +69,9 @@ interface ResolveRangesParams {
 /** Adapts the compact TwoHop document geometry to the shared virtual-list engine. */
 export function createTwoHopVirtualRowModel(
 	document: TwoHopDocument,
-	layout: ViewPlanLayoutMetrics,
-	residentSlotLayoutKey: object = layout,
+	layoutPublication: TwoHopLayoutPublication,
 ): TwoHopVirtualRowModel {
+	const layout: ViewPlanLayoutMetrics = layoutPublication.metrics;
 	const geometry = compileFixedGridLayout(document, layout);
 	const mountedScratch: RowRange = { start: 0, end: 0 };
 	const previewScratch: RowRange = { start: 0, end: 0 };
@@ -289,16 +292,10 @@ export function createTwoHopVirtualRowModel(
 	return {
 		document,
 		geometry,
-		residentSlotLayoutKey,
+		layoutRevision: layoutPublication.revision,
 		revision: createVirtualListRevision({
-			content: document,
-			layout: createVirtualListLayoutRevisionToken([
-				layout.columns,
-				layout.cellWidth,
-				layout.rowHeight,
-				layout.gap,
-				layout.sectionMarginBottom,
-			]),
+			content: document.revision,
+			layout: createVirtualListLayoutRevisionToken([layoutPublication.revision]),
 		}),
 		rowCount: geometry.rowCount,
 		totalHeight: geometry.totalHeight,

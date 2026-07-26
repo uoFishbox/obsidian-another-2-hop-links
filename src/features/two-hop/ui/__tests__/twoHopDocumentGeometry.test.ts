@@ -10,12 +10,19 @@ import {
 	resolveTwoHopVisibleRows,
 	resolveTwoHopVisibleRowsInto,
 } from "features/two-hop/ui/viewport/twoHopGeometry";
-import { createTwoHopDocument } from "features/two-hop/ui/twoHopDocument";
+import {
+	createTwoHopDocument,
+	createTwoHopDocumentProjection,
+} from "features/two-hop/ui/twoHopDocument";
 import { createTwoHopVirtualRowModel } from "features/two-hop/ui/twoHopVirtualRowModel";
 import type {
 	TwoHopVirtualListItem,
 	TwoHopVirtualSectionDescriptor,
 } from "features/two-hop/ui/twoHopVirtualListModel";
+import {
+	createLayoutPublication,
+	createSectionDataRevision,
+} from "features/two-hop/ui/twoHopRevisions";
 
 const createItem = (key: string): TwoHopVirtualListItem => ({
 	kind: "new-link",
@@ -30,6 +37,7 @@ function createSection(
 	loadedCount = items.length,
 ): TwoHopVirtualSectionDescriptor {
 	return {
+		sourceRevision: createSectionDataRevision(1),
 		section: {
 			kind: "new-links-section",
 			rawSectionId: sectionId,
@@ -96,6 +104,57 @@ describe("TwoHopDocument fixed-grid geometry", () => {
 			new Uint32Array([0, 1, 2, 3, 4]),
 		);
 		expect(expandedDocument.sections[0].getItem(4)).toBe(items[4]);
+	});
+
+	it("reuses section projections by explicit source revision", () => {
+		const descriptor = createSection("first", [createItem("a")]);
+		const initialDocument = createTwoHopDocument({
+			sections: [descriptor],
+			visibleCounts: {},
+			initialVisibleCount: 10,
+		});
+		const equivalentDescriptor = { ...descriptor };
+		const equivalentDocument = createTwoHopDocument({
+			sections: [equivalentDescriptor],
+			visibleCounts: {},
+			initialVisibleCount: 10,
+			previousDocument: initialDocument,
+		});
+		const changedDocument = createTwoHopDocument({
+			sections: [
+				{
+					...descriptor,
+					sourceRevision: createSectionDataRevision(2),
+				},
+			],
+			visibleCounts: {},
+			initialVisibleCount: 10,
+			previousDocument: equivalentDocument,
+		});
+
+		expect(equivalentDocument.sections[0]).toBe(initialDocument.sections[0]);
+		expect(changedDocument.sections[0]).not.toBe(initialDocument.sections[0]);
+		expect(equivalentDocument.revision).not.toBe(initialDocument.revision);
+	});
+
+	it("publishes a document revision only for semantic section changes", () => {
+		const descriptor = createSection("first", [createItem("a")]);
+		const projection = createTwoHopDocumentProjection({
+			sections: [descriptor],
+			initialVisibleCount: 10,
+		});
+		const initialDocument = projection.getDocument();
+
+		expect(projection.setSections([{ ...descriptor }])).toBe(initialDocument);
+
+		const changedDocument = projection.setSections([
+			{
+				...descriptor,
+				sourceRevision: createSectionDataRevision(2),
+			},
+		]);
+		expect(changedDocument).not.toBe(initialDocument);
+		expect(changedDocument.revision).not.toBe(initialDocument.revision);
 	});
 
 	it("resolves header, sparse items, and load-more without compiled cells", () => {
@@ -184,7 +243,10 @@ describe("TwoHopDocument fixed-grid geometry", () => {
 			visibleCounts: {},
 			initialVisibleCount: 10,
 		});
-		const rowModel = createTwoHopVirtualRowModel(document, layout);
+		const rowModel = createTwoHopVirtualRowModel(
+			document,
+			createLayoutPublication(layout, 1),
+		);
 		const expectedDown = rowModel.getRow(1)?.getCell(1);
 		const expectedRight = rowModel.getRow(1)?.getCell(0);
 
@@ -211,7 +273,10 @@ describe("TwoHopDocument fixed-grid geometry", () => {
 			visibleCounts: {},
 			initialVisibleCount: items.length,
 		});
-		const rowModel = createTwoHopVirtualRowModel(document, layout);
+		const rowModel = createTwoHopVirtualRowModel(
+			document,
+			createLayoutPublication(layout, 1),
+		);
 		const mounted = { start: 0, end: 0 };
 		rowModel.findVisibleRangeInto(mounted, {
 			scrollTop: 220,

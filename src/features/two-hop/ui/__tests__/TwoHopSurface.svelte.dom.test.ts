@@ -21,6 +21,7 @@ import type {
 	TwoHopVirtualListItem,
 	TwoHopVirtualSectionDescriptor,
 } from "features/two-hop/ui/twoHopVirtualListModel";
+import { createSectionDataRevision } from "features/two-hop/ui/twoHopRevisions";
 import type { CardRenderModel } from "ui/components/items/cardRenderModel";
 import type { LinkContext } from "ui/context/linkContext";
 import type { AppContext } from "ui/context/linkContext";
@@ -90,6 +91,7 @@ function createSection(count: number): TwoHopVirtualSectionDescriptor {
 		virtualKey: `item:${index}`,
 	})) as TwoHopVirtualListItem[];
 	return {
+		sourceRevision: createSectionDataRevision(1),
 		section: {
 			kind: "new-links-section",
 			rawSectionId: "section",

@@ -49,6 +49,8 @@ export function buildTwoHopMountedRows(params: {
 	const start = Math.max(0, params.rowRange.start);
 	const end = Math.min(rowModel.rowCount, params.rowRange.end);
 	const previousBuild = params.previousBuild;
+	// Reference equality is only a hot-path cache hit; a miss rebuilds the same
+	// publication and does not participate in slot ownership validation.
 	if (
 		previousBuild?.rowModel === rowModel &&
 		previousBuild.rowRange.start === start &&
@@ -61,7 +63,7 @@ export function buildTwoHopMountedRows(params: {
 	allocator.prepareRange({
 		start,
 		end,
-		layoutKey: rowModel.residentSlotLayoutKey,
+		layoutRevision: rowModel.layoutRevision,
 	});
 	const columns = rowModel.geometry.columns;
 	const rowScratch = createTwoHopResolvedRowBuffer();
@@ -159,6 +161,8 @@ function getPreviousRow(
 	rowModel: TwoHopVirtualRowModel,
 	rowIndex: number,
 ): TwoHopMountedRow | undefined {
+	// Row reuse is an allocation optimization. Binding correctness is enforced
+	// later by the resident slot binding token.
 	if (!previousBuild || previousBuild.rowModel !== rowModel) return undefined;
 	const offset = rowIndex - previousBuild.rowRange.start;
 	if (offset < 0 || offset >= previousBuild.rowSlices.length) return undefined;
@@ -191,6 +195,8 @@ function resolveMountedCell(params: {
 	readonly renderSlotIndex: number;
 }): TwoHopMountedCell {
 	const nextRenderSlotKey = renderSlotKey(params.renderSlotIndex);
+	// Reusing the shell object is optional; stale ownership is never inferred
+	// from this reference identity.
 	if (
 		params.previous &&
 		params.previous.cell === params.logicalCell &&

@@ -9,6 +9,13 @@ import type {
 	TwoHopVirtualListSection,
 	TwoHopVirtualSectionDescriptor,
 } from "features/two-hop/ui/twoHopVirtualListModel";
+import {
+	createDocumentRevision,
+	type DocumentRevision,
+	type SectionDataRevision,
+} from "features/two-hop/ui/twoHopRevisions";
+
+let nextStandaloneDocumentRevision = 1;
 
 export type TwoHopDocumentItem = TwoHopVirtualListItem;
 
@@ -28,6 +35,8 @@ export interface TwoHopLoadMoreNode {
 
 export interface TwoHopDocumentSection {
 	readonly key: string;
+	readonly sourceRevision: SectionDataRevision;
+	readonly projectedSourceCount: number;
 	readonly header: TwoHopHeaderNode;
 	readonly visibleItemCount: number;
 	readonly totalItemCount: number;
@@ -37,6 +46,7 @@ export interface TwoHopDocumentSection {
 }
 
 export interface TwoHopDocument {
+	readonly revision: DocumentRevision;
 	readonly sections: readonly TwoHopDocumentSection[];
 }
 
@@ -44,6 +54,7 @@ export interface CreateTwoHopDocumentParams {
 	readonly sections: readonly TwoHopVirtualSectionDescriptor[];
 	readonly visibleCounts: Readonly<Record<string, number>>;
 	readonly initialVisibleCount: number;
+	readonly revision?: DocumentRevision;
 	/** Reuses only the projection index map when a section is expanded. */
 	readonly previousDocument?: TwoHopDocument;
 }
@@ -61,16 +72,6 @@ export interface TwoHopDocumentProjection {
 	loadMore(sectionId: string): TwoHopDocument | null;
 }
 
-interface SectionProjectionSource {
-	readonly descriptor: TwoHopVirtualSectionDescriptor;
-	readonly visibleSourceCount: number;
-}
-
-const projectionSourceBySection = new WeakMap<
-	TwoHopDocumentSection,
-	SectionProjectionSource
->();
-
 /** Owns search/sort source identity and pagination as one document projection. */
 export function createTwoHopDocumentProjection(
 	params: TwoHopDocumentProjectionParams,
@@ -85,6 +86,7 @@ export function createTwoHopDocumentProjection(
 	});
 	const initialVisibleCount = params.initialVisibleCount ?? Number.POSITIVE_INFINITY;
 	let sources = params.sections;
+	let revisionValue = 0;
 	let document = project();
 
 	function project(previousDocument?: TwoHopDocument): TwoHopDocument {
@@ -95,13 +97,17 @@ export function createTwoHopDocumentProjection(
 			visibleCounts,
 			initialVisibleCount,
 			previousDocument,
+			revision: createDocumentRevision(++revisionValue),
 		});
 	}
 
 	return {
 		getDocument: () => document,
 		setSections(nextSections) {
-			if (sources === nextSections) return document;
+			if (hasSameSectionPublications(sources, nextSections)) {
+				sources = nextSections;
+				return document;
+			}
 			sources = nextSections;
 			document = project(document);
 			return document;
@@ -142,7 +148,31 @@ export function createTwoHopDocument(
 		return createDocumentSection(descriptor, visibleSourceCount, previousSection);
 	});
 
-	return Object.freeze({ sections: Object.freeze(sections) });
+	return Object.freeze({
+		revision:
+			params.revision ?? createDocumentRevision(nextStandaloneDocumentRevision++),
+		sections: Object.freeze(sections),
+	});
+}
+
+function hasSameSectionPublications(
+	current: readonly TwoHopVirtualSectionDescriptor[],
+	next: readonly TwoHopVirtualSectionDescriptor[],
+): boolean {
+	if (current === next) return true;
+	if (current.length !== next.length) return false;
+
+	for (let index = 0; index < current.length; index += 1) {
+		const currentSection = current[index];
+		const nextSection = next[index];
+		if (
+			currentSection.sectionId !== nextSection.sectionId ||
+			currentSection.sourceRevision !== nextSection.sourceRevision
+		) {
+			return false;
+		}
+	}
+	return true;
 }
 
 function createDocumentSection(
@@ -150,13 +180,10 @@ function createDocumentSection(
 	visibleSourceCount: number,
 	previousSection: TwoHopDocumentSection | undefined,
 ): TwoHopDocumentSection {
-	const previousSource = previousSection
-		? projectionSourceBySection.get(previousSection)
-		: undefined;
 	if (
 		previousSection &&
-		previousSource?.descriptor === descriptor &&
-		previousSource.visibleSourceCount === visibleSourceCount
+		previousSection.sourceRevision === descriptor.sourceRevision &&
+		previousSection.projectedSourceCount === visibleSourceCount
 	) {
 		return previousSection;
 	}
@@ -165,10 +192,11 @@ function createDocumentSection(
 		descriptor,
 		visibleSourceCount,
 		previousSection,
-		previousSource,
 	);
 	const section: TwoHopDocumentSection = Object.freeze({
 		key: descriptor.sectionId,
+		sourceRevision: descriptor.sourceRevision,
+		projectedSourceCount: visibleSourceCount,
 		header: Object.freeze({
 			kind: "header",
 			logicalKey: `header:${descriptor.sectionId}`,
@@ -192,7 +220,6 @@ function createDocumentSection(
 					})
 				: null,
 	});
-	projectionSourceBySection.set(section, { descriptor, visibleSourceCount });
 	return section;
 }
 
@@ -200,17 +227,16 @@ function projectVisibleSourceIndexes(
 	descriptor: TwoHopVirtualSectionDescriptor,
 	visibleSourceCount: number,
 	previousSection: TwoHopDocumentSection | undefined,
-	previousSource: SectionProjectionSource | undefined,
 ): Uint32Array {
 	const canReusePrevious =
-		previousSection !== undefined && previousSource?.descriptor === descriptor;
+		previousSection?.sourceRevision === descriptor.sourceRevision;
 	const sourceIndexes = canReusePrevious
 		? Array.from(previousSection.visibleSourceIndexes).filter(
 				(sourceIndex) => sourceIndex < visibleSourceCount,
 			)
 		: [];
 	const startSourceIndex = canReusePrevious
-		? Math.min(previousSource.visibleSourceCount, visibleSourceCount)
+		? Math.min(previousSection.projectedSourceCount, visibleSourceCount)
 		: 0;
 
 	for (

@@ -71,8 +71,6 @@
 					linkContext,
 					getPreviewRenderVersion,
 					applicationUpdateVersion: applicationStore.updateVersion,
-					previewGlobalVersion: applicationStore.previewGlobalVersion,
-					previewPathVersions: applicationStore.previewPathVersions,
 				}
 			: undefined,
 	);

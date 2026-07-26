@@ -40,8 +40,6 @@ describe("createTwoHopCardRenderModelCache", () => {
 			linkContext: context,
 			getPreviewRenderVersion,
 			applicationUpdateVersion: 0,
-			previewGlobalVersion: 0,
-			previewPathVersions: {},
 		};
 		const item: ViewItem = { type: "file", data: targetFile };
 		const row: TwoHopVirtualListItem = {
@@ -77,5 +75,61 @@ describe("createTwoHopCardRenderModelCache", () => {
 		counters = getCCLDevMeasurementSnapshot().counters;
 		expect(counters["twoHop.cardRenderModelCache.miss"].count).toBe(2);
 		expect(counters["twoHop.cardRenderModelCache.invalidate"].count).toBe(1);
+	});
+
+	it("does not invalidate an unrelated card for one path preview update", () => {
+		const sourceFile = createMockTFile("notes/source.md");
+		const firstFile = createMockTFile("notes/first.md");
+		const secondFile = createMockTFile("notes/second.md");
+		const context: LinkUtilitiesContext = {
+			getPreview: vi.fn(async () => ({
+				type: "text" as const,
+				content: "preview",
+			})),
+			resolveFile: vi.fn(() => null),
+			buildWikiLink: vi.fn(() => ""),
+			fileToLinktext: vi.fn((file) => file.basename),
+			sourceFile,
+			getMetadata: vi.fn(() => null),
+		};
+		const previewVersions: Record<string, string> = {
+			[firstFile.path]: "0:0",
+			[secondFile.path]: "0:0",
+		};
+		const revision: TwoHopCardModelRevision = {
+			settings: DEFAULT_SETTINGS,
+			searchQuery: "",
+			searchScope: "title-and-content",
+			matchedItemByKey: null,
+			linkContext: context,
+			getPreviewRenderVersion: (path) => previewVersions[path] ?? "0:0",
+			applicationUpdateVersion: 0,
+		};
+		const createRow = (
+			file: typeof firstFile,
+			key: string,
+		): TwoHopVirtualListItem => ({
+			kind: "primary-link",
+			item: { type: "file", data: file },
+			sourceSectionId: "outgoing",
+			searchKey: key,
+			virtualKey: key,
+		});
+		const presentation = {
+			sectionVariant: "outgoing",
+			resolution: "resolved",
+			attachment: false,
+			extension: null,
+		} as const;
+		const firstRow = createRow(firstFile, "first");
+		const secondRow = createRow(secondFile, "second");
+		const cache = createTwoHopCardRenderModelCache();
+		const firstModel = cache.resolve(firstRow, presentation, revision);
+		const secondModel = cache.resolve(secondRow, presentation, revision);
+
+		previewVersions[firstFile.path] = "0:1";
+
+		expect(cache.resolve(firstRow, presentation, revision)).not.toBe(firstModel);
+		expect(cache.resolve(secondRow, presentation, revision)).toBe(secondModel);
 	});
 });

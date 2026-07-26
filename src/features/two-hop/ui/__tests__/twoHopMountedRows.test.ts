@@ -7,6 +7,10 @@ import type {
 	TwoHopVirtualSectionDescriptor,
 } from "features/two-hop/ui/twoHopVirtualListModel";
 import { createResidentRowSlotAllocator } from "ui/virtualization/core/residentSlotAllocator";
+import {
+	createLayoutPublication,
+	createSectionDataRevision,
+} from "features/two-hop/ui/twoHopRevisions";
 
 const layout = {
 	containerWidth: 420,
@@ -25,6 +29,7 @@ function createSection(count: number): TwoHopVirtualSectionDescriptor {
 		virtualKey: `item:${index}`,
 	})) as TwoHopVirtualListItem[];
 	return {
+		sourceRevision: createSectionDataRevision(1),
 		section: {
 			kind: "new-links-section",
 			rawSectionId: "section",
@@ -51,7 +56,10 @@ describe("TwoHop keyed mounted rows", () => {
 			visibleCounts: {},
 			initialVisibleCount: 20,
 		});
-		const rowModel = createTwoHopVirtualRowModel(document, layout);
+		const rowModel = createTwoHopVirtualRowModel(
+			document,
+			createLayoutPublication(layout, 1),
+		);
 		const allocator = createResidentRowSlotAllocator();
 		const first = buildTwoHopMountedRows({
 			rowModel,
@@ -86,7 +94,10 @@ describe("TwoHop keyed mounted rows", () => {
 			visibleCounts: {},
 			initialVisibleCount: 20,
 		});
-		const rowModel = createTwoHopVirtualRowModel(document, layout);
+		const rowModel = createTwoHopVirtualRowModel(
+			document,
+			createLayoutPublication(layout, 1),
+		);
 		const allocator = createResidentRowSlotAllocator();
 		const first = buildTwoHopMountedRows({
 			rowModel,
@@ -110,7 +121,10 @@ describe("TwoHop keyed mounted rows", () => {
 			visibleCounts: {},
 			initialVisibleCount: 200,
 		});
-		const rowModel = createTwoHopVirtualRowModel(document, layout);
+		const rowModel = createTwoHopVirtualRowModel(
+			document,
+			createLayoutPublication(layout, 1),
+		);
 		const allocator = createResidentRowSlotAllocator();
 		const initial = buildTwoHopMountedRows({
 			rowModel,
@@ -137,7 +151,10 @@ describe("TwoHop keyed mounted rows", () => {
 			visibleCounts: {},
 			initialVisibleCount: 20,
 		});
-		const rowModel = createTwoHopVirtualRowModel(document, layout);
+		const rowModel = createTwoHopVirtualRowModel(
+			document,
+			createLayoutPublication(layout, 1),
+		);
 		const getRow = vi.spyOn(rowModel, "getRow");
 		const getDocumentSection = vi.spyOn(rowModel, "getDocumentSection");
 		const allocator = createResidentRowSlotAllocator();

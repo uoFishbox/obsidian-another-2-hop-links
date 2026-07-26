@@ -20,8 +20,6 @@ export interface TwoHopCardModelRevision {
 	readonly linkContext: LinkUtilitiesContext;
 	readonly getPreviewRenderVersion: (path: string) => string;
 	readonly applicationUpdateVersion: number;
-	readonly previewGlobalVersion: number;
-	readonly previewPathVersions: Readonly<Record<string, number>>;
 }
 
 export interface TwoHopCardRenderModelCache {
@@ -34,7 +32,13 @@ export interface TwoHopCardRenderModelCache {
 }
 
 interface CachedCardModel {
-	readonly revision: TwoHopCardModelRevision;
+	readonly settings: PluginSettings;
+	readonly searchQuery: string;
+	readonly searchScope: TwoHopCardModelRevision["searchScope"];
+	readonly matchedItem: SearchWorkerMatchedItem | undefined;
+	readonly linkContext: LinkUtilitiesContext;
+	readonly applicationUpdateVersion: number;
+	readonly previewVersion: string;
 	readonly presentation: TwoHopCardPresentationState;
 	readonly model: CardRenderModel;
 }
@@ -46,8 +50,18 @@ export function createTwoHopCardRenderModelCache(): TwoHopCardRenderModelCache {
 	return {
 		resolve(row, presentation, revision) {
 			const cached = entries.get(row);
+			const matchedItem = revision.matchedItemByKey?.get(row.searchKey);
+			const previewVersion = cached?.model.targetFile
+				? revision.getPreviewRenderVersion(cached.model.targetFile.path)
+				: "0:0";
 			if (
-				cached?.revision === revision &&
+				cached?.settings === revision.settings &&
+				cached.searchQuery === revision.searchQuery &&
+				cached.searchScope === revision.searchScope &&
+				cached.matchedItem === matchedItem &&
+				cached.linkContext === revision.linkContext &&
+				cached.applicationUpdateVersion === revision.applicationUpdateVersion &&
+				cached.previewVersion === previewVersion &&
 				isSamePresentation(cached.presentation, presentation)
 			) {
 				if (process.env.NODE_ENV !== "production") {
@@ -59,12 +73,15 @@ export function createTwoHopCardRenderModelCache(): TwoHopCardRenderModelCache {
 				recordCCLDevMeasurement("twoHop.cardRenderModelCache.miss");
 			}
 
-			const matchedItem = revision.matchedItemByKey?.get(row.searchKey);
+			let resolvedPreviewVersion = "0:0";
 			const model = createCardRenderModel({
 				item: row.item,
 				settings: revision.settings,
 				context: revision.linkContext,
-				getPreviewRenderVersion: revision.getPreviewRenderVersion,
+				getPreviewRenderVersion: (path) => {
+					resolvedPreviewVersion = revision.getPreviewRenderVersion(path);
+					return resolvedPreviewVersion;
+				},
 				searchQuery: revision.searchQuery,
 				searchScope: resolveTwoHopPageItemSearchScope(
 					row,
@@ -76,7 +93,17 @@ export function createTwoHopCardRenderModelCache(): TwoHopCardRenderModelCache {
 				interactionKey: row.interactionKey,
 				presentation,
 			});
-			entries.set(row, { revision, presentation, model });
+			entries.set(row, {
+				settings: revision.settings,
+				searchQuery: revision.searchQuery,
+				searchScope: revision.searchScope,
+				matchedItem,
+				linkContext: revision.linkContext,
+				applicationUpdateVersion: revision.applicationUpdateVersion,
+				previewVersion: resolvedPreviewVersion,
+				presentation,
+				model,
+			});
 			return model;
 		},
 		invalidate(): void {

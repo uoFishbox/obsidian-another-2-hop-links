@@ -5,8 +5,10 @@ import type {
 	TwoHopVirtualListSection,
 	TwoHopVirtualSectionDescriptor,
 } from "features/two-hop/ui/twoHopVirtualListModel";
+import { createSectionDataRevision } from "features/two-hop/ui/twoHopRevisions";
 
 const EMPTY_HEADER_PROPS: ClickableHeaderExtraProps = {};
+let nextSectionDataRevision = 1;
 
 export interface CachedVirtualItemAccessors {
 	readonly getItems: () => readonly TwoHopVirtualListItem[];
@@ -37,6 +39,7 @@ export function createDescriptor(
 ): TwoHopVirtualSectionDescriptor {
 	const immutableSection = Object.freeze(section);
 	return Object.freeze({
+		sourceRevision: createSectionDataRevision(nextSectionDataRevision++),
 		section: immutableSection,
 		sectionKey: immutableSection.sectionKey,
 		title: immutableSection.title,

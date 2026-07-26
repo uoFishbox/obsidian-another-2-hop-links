@@ -7,7 +7,7 @@ export interface ResidentRowSlotAllocator {
 	prepareRange(params: {
 		readonly start: number;
 		readonly end: number;
-		readonly layoutKey: unknown;
+		readonly layoutRevision: unknown;
 	}): void;
 	resolveSlotIndex(logicalRowIndex: number): number;
 	reset(reason: ResidentSlotResetReason): void;
@@ -20,33 +20,33 @@ export interface ResidentRowSlotAllocator {
 export function createResidentRowSlotAllocator(): ResidentRowSlotAllocator {
 	let capacity = 0;
 	let epoch = 0;
-	let layoutKey: unknown;
-	let hasLayoutKey = false;
+	let layoutRevision: unknown;
+	let hasLayoutRevision = false;
 	let disposed = false;
 
 	function reset(_reason: ResidentSlotResetReason): void {
 		capacity = 0;
-		layoutKey = undefined;
-		hasLayoutKey = false;
+		layoutRevision = undefined;
+		hasLayoutRevision = false;
 		epoch += 1;
 	}
 
 	function prepareRange(params: {
 		readonly start: number;
 		readonly end: number;
-		readonly layoutKey: unknown;
+		readonly layoutRevision: unknown;
 	}): void {
 		if (disposed) return;
 		recordCCLDevMeasurement("virtualGrid.contiguousSlotPool.apply");
 
 		let resetDuringPrepare = false;
-		if (hasLayoutKey && !Object.is(layoutKey, params.layoutKey)) {
+		if (hasLayoutRevision && !Object.is(layoutRevision, params.layoutRevision)) {
 			reset("layout");
 			resetDuringPrepare = true;
 		}
 
-		layoutKey = params.layoutKey;
-		hasLayoutKey = true;
+		layoutRevision = params.layoutRevision;
+		hasLayoutRevision = true;
 		const activeRows = Math.max(0, params.end - params.start);
 		const previousCapacity = capacity;
 		let nextCapacity = capacity;

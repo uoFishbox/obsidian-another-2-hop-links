@@ -97,6 +97,7 @@ describe("virtualCardSlotBindings", () => {
 			mountedCell: initial,
 			cardModel: "initial",
 		});
+		const initialToken = bindings.getSlotState(initial)?.binding?.bindingToken;
 		expect(
 			interactionController.provider.resolveInteractionDescriptor("initial"),
 		).toBeTruthy();
@@ -117,6 +118,9 @@ describe("virtualCardSlotBindings", () => {
 
 		expect(bindings.getSlotState(initial)).toBeUndefined();
 		expect(bindings.getSlotState(rebound)?.binding?.cardModel).toBe("rebound");
+		expect(
+			bindings.getSlotState(rebound)?.binding?.bindingToken.epoch,
+		).toBeGreaterThan(initialToken?.epoch ?? 0);
 		expect(
 			interactionController.provider.resolveInteractionDescriptor("initial"),
 		).toBeNull();
@@ -175,5 +179,37 @@ describe("virtualCardSlotBindings", () => {
 			{ enteredSlots: [], reboundSlots: [], releasedSlots: [] },
 			{ previewRange: { start: 0, end: 1 }, active: false },
 		);
+	});
+
+	it("keeps the binding epoch for a content-only refresh", () => {
+		const bindings = createVirtualCardSlotBindings({
+			previewSurface: createPreviewSurface(),
+			interactionController: createVirtualCardInteractionController(),
+			resolveBinding: (mountedCell: TestMountedCell, revision: number) => ({
+				mountedCell,
+				cardModel: `${mountedCell.label}:${revision}`,
+			}),
+		});
+		const initial = createMountedCell(0, 0, "retained");
+		bindings.sync({
+			mountedCells: [initial],
+			capacity: 1,
+			bindingIdentity: 1,
+			previewWindow: { previewRange: { start: 0, end: 1 }, active: true },
+		});
+		const initialToken = bindings.getSlotState(initial)?.binding?.bindingToken;
+		const refreshed = createMountedCell(0, 0, "retained");
+
+		bindings.sync({
+			mountedCells: [refreshed],
+			capacity: 1,
+			bindingIdentity: 2,
+			previewWindow: { previewRange: { start: 0, end: 1 }, active: true },
+		});
+
+		expect(bindings.getSlotState(refreshed)?.binding?.bindingToken).toBe(
+			initialToken,
+		);
+		expect(bindings.getSlotState(refreshed)?.binding?.cardModel).toBe("retained:2");
 	});
 });

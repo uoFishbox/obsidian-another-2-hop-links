@@ -7,6 +7,7 @@ import type {
 import type { SearchWorkerMatchScope } from "features/search/searchWorkerTypes";
 import { generateLinkKey } from "features/preview/text-processing/textUtils";
 import type { TagGroup, TaggedNote } from "types/domain";
+import type { SectionDataRevision } from "features/two-hop/ui/twoHopRevisions";
 
 export interface PrimarySectionSource {
 	sectionId: string;
@@ -86,6 +87,8 @@ export type TwoHopVirtualSectionDescriptor = SectionRenderDescriptor<
 	TwoHopVirtualListItem,
 	TwoHopVirtualListSection
 > & {
+	/** Semantic source revision used by document projection reuse. */
+	readonly sourceRevision: SectionDataRevision;
 	readonly getItem: (index: number) => TwoHopVirtualListItem | undefined;
 };
 
