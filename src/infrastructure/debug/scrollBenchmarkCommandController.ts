@@ -13,7 +13,7 @@ const TWO_HOP_VIRTUAL_LIST_SELECTOR = ".twohop-page-virtual-list";
 /** Fixed number of frames aligned with the workload metrics in PERFORMANCE.md. */
 const SCROLL_FRAMES = 300;
 /** Fixed scroll distance per frame (px). Speed follows the frequency of `requestAnimationFrame`. */
-const SCROLL_STEP_PX = 20;
+const SCROLL_STEP_PX = 10;
 
 /** Number of consecutive unchanged frames to determine that initial rendering and preview generation have settled. */
 const SETTLE_QUIET_FRAMES = 30;
