@@ -32,6 +32,12 @@ const interactionIdsByElement = new WeakMap<Element, string>();
 
 export type InteractionKind = "item" | "sectionHeader";
 
+/** Settings read by delegated card and section-header interactions. */
+export type InteractionSettings = Pick<
+	PluginSettings,
+	"highlightInPreviewOnHover" | "mobileLongPressAction"
+>;
+
 interface BaseInteractionDescriptor {
 	interactionId: string;
 	interactionKey?: string;
@@ -41,7 +47,7 @@ interface BaseInteractionDescriptor {
 	dragRawText?: string;
 	filePathForDrag?: string;
 	directory?: string | null;
-	settings?: PluginSettings;
+	settings?: InteractionSettings;
 	searchQuery?: string;
 }
 

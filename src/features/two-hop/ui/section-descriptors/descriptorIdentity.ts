@@ -1,5 +1,4 @@
 import type { ClickableHeaderExtraProps } from "ui/components/sections/types";
-import { buildScopedSectionId } from "ui/components/common/listPagination";
 import type {
 	TwoHopVirtualListItem,
 	TwoHopVirtualListSection,
@@ -13,7 +12,6 @@ let nextSectionDataRevision = 1;
 export interface CachedVirtualItemAccessors {
 	readonly getItems: () => readonly TwoHopVirtualListItem[];
 	readonly getItem: (index: number) => TwoHopVirtualListItem | undefined;
-	readonly reset: () => void;
 }
 
 export interface LazySortedVirtualItemAccessorsParams<T, TViewItem> {
@@ -30,7 +28,6 @@ export interface LazySortedVirtualItemAccessorsParams<T, TViewItem> {
 
 export function createDescriptor(
 	section: TwoHopVirtualListSection,
-	searchQuery: string,
 	totalCount: number,
 	getItems: () => readonly TwoHopVirtualListItem[],
 	getItem: (index: number) => TwoHopVirtualListItem | undefined = (index) =>
@@ -44,7 +41,6 @@ export function createDescriptor(
 		sectionKey: immutableSection.sectionKey,
 		title: immutableSection.title,
 		sectionId: immutableSection.rawSectionId,
-		paginationKey: buildScopedSectionId(immutableSection.rawSectionId, searchQuery),
 		totalCount,
 		loadedCount: totalCount,
 		getItems,
@@ -94,9 +90,6 @@ export function createLazyVirtualItemAccessors(params: {
 	return {
 		getItems,
 		getItem,
-		reset() {
-			itemsCache = undefined;
-		},
 	};
 }
 
@@ -127,17 +120,9 @@ export function createLazySortedVirtualItemAccessors<T, TViewItem>(
 			return params.createItem(viewItem, key, index);
 		},
 	});
-	const resetLazyAccessors = accessors.reset;
-
 	return {
 		getItems: accessors.getItems,
 		getItem: accessors.getItem,
-		reset() {
-			sortedItems = undefined;
-			viewItems = undefined;
-			keys = undefined;
-			resetLazyAccessors();
-		},
 	};
 }
 
@@ -148,15 +133,4 @@ export function pruneInactiveEntries<T>(
 	for (const key of entries.keys()) {
 		if (!activeIds.has(key)) entries.delete(key);
 	}
-}
-
-export function hasSameDescriptorRefs(
-	current: readonly TwoHopVirtualSectionDescriptor[],
-	next: readonly TwoHopVirtualSectionDescriptor[],
-): boolean {
-	if (current.length !== next.length) return false;
-	for (let index = 0; index < current.length; index += 1) {
-		if (current[index] !== next[index]) return false;
-	}
-	return true;
 }

@@ -1,6 +1,5 @@
 import type { Snippet } from "svelte";
 import type { SectionHeaderInteractionDescriptor } from "ui/interactions/interactionTypes";
-import type { PluginSettings } from "features/settings/model";
 import type { RenderRevision } from "ui/virtualization/renderRevision";
 
 export interface SectionConfig<T> {
@@ -15,7 +14,6 @@ export interface ClickableHeaderExtraProps {
 	className?: string;
 	draggable?: boolean;
 	directory?: string | null;
-	settings?: PluginSettings;
 	interactionId?: string;
 	interactionKind?: "sectionHeader";
 	interactionDescriptor?: SectionHeaderInteractionDescriptor;

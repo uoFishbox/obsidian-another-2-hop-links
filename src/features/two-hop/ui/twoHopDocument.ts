@@ -1,9 +1,9 @@
 import type { ClickableHeaderExtraProps } from "ui/components/sections/types";
 import {
 	createSectionVisibleCountsController,
-	getSectionPaginationKey,
 	type SectionPaginationApplicationStore,
 } from "ui/virtualization/pagination";
+import { buildScopedSectionId } from "ui/components/common/listPagination";
 import type {
 	TwoHopVirtualListItem,
 	TwoHopVirtualListSection,
@@ -55,6 +55,7 @@ export interface CreateTwoHopDocumentParams {
 	readonly revision?: DocumentRevision;
 	/** Reuses unchanged document sections across projections. */
 	readonly previousDocument?: TwoHopDocument;
+	readonly paginationScope?: string;
 }
 
 export interface TwoHopDocumentProjectionParams {
@@ -62,11 +63,17 @@ export interface TwoHopDocumentProjectionParams {
 	readonly applicationStore?: SectionPaginationApplicationStore;
 	readonly initialVisibleCount?: number;
 	readonly loadMoreIncrement?: number;
+	readonly paginationScope?: string;
+}
+
+export interface TwoHopDocumentProjectionInput {
+	readonly sections: readonly TwoHopVirtualSectionDescriptor[];
+	readonly paginationScope: string;
 }
 
 export interface TwoHopDocumentProjection {
 	getDocument(): TwoHopDocument;
-	setSections(sections: readonly TwoHopVirtualSectionDescriptor[]): TwoHopDocument;
+	setInput(input: TwoHopDocumentProjectionInput): TwoHopDocument;
 	loadMore(sectionId: string): TwoHopDocument | null;
 }
 
@@ -74,39 +81,58 @@ export interface TwoHopDocumentProjection {
 export function createTwoHopDocumentProjection(
 	params: TwoHopDocumentProjectionParams,
 ): TwoHopDocumentProjection {
-	const pagination = createSectionVisibleCountsController<
-		TwoHopVirtualListItem,
-		TwoHopVirtualSectionDescriptor["section"]
-	>({
-		applicationStore: params.applicationStore,
-		initialVisibleCount: params.initialVisibleCount,
-		loadMoreIncrement: params.loadMoreIncrement,
-	});
+	const createPagination = (scope: string) =>
+		createSectionVisibleCountsController<
+			TwoHopVirtualListItem,
+			TwoHopVirtualSectionDescriptor["section"]
+		>({
+			applicationStore: params.applicationStore,
+			initialVisibleCount: params.initialVisibleCount,
+			loadMoreIncrement: params.loadMoreIncrement,
+			resolvePaginationKey: (section) =>
+				buildScopedSectionId(section.sectionId, scope),
+		});
 	const initialVisibleCount = params.initialVisibleCount ?? Number.POSITIVE_INFINITY;
 	let sources = params.sections;
+	let paginationScope = params.paginationScope?.trim() ?? "";
+	let pagination = createPagination(paginationScope);
 	let revisionValue = 0;
 	let document = project();
 
 	function project(previousDocument?: TwoHopDocument): TwoHopDocument {
 		const visibleCounts =
 			pagination.resolveForInput(sources).snapshot.visibleCounts;
-		return createTwoHopDocument({
+		const nextDocument = createTwoHopDocument({
 			sections: sources,
 			visibleCounts,
 			initialVisibleCount,
+			paginationScope,
 			previousDocument,
 			revision: createDocumentRevision(++revisionValue),
 		});
+		if (
+			previousDocument &&
+			hasSameDocumentSectionRefs(previousDocument.sections, nextDocument.sections)
+		) {
+			return previousDocument;
+		}
+		return nextDocument;
 	}
 
 	return {
 		getDocument: () => document,
-		setSections(nextSections) {
-			if (hasSameSectionPublications(sources, nextSections)) {
-				sources = nextSections;
+		setInput(input) {
+			const nextScope = input.paginationScope.trim();
+			const scopeChanged = paginationScope !== nextScope;
+			if (!scopeChanged && hasSameSectionPublications(sources, input.sections)) {
+				sources = input.sections;
 				return document;
 			}
-			sources = nextSections;
+			sources = input.sections;
+			if (scopeChanged) {
+				paginationScope = nextScope;
+				pagination = createPagination(paginationScope);
+			}
 			document = project(document);
 			return document;
 		},
@@ -114,7 +140,7 @@ export function createTwoHopDocumentProjection(
 			const source = sources.find((section) => section.sectionId === sectionId);
 			if (!source) return null;
 			const result = pagination.loadMore(
-				getSectionPaginationKey(source),
+				buildScopedSectionId(source.sectionId, paginationScope),
 				source.loadedCount,
 			);
 			if (!result.changed) return null;
@@ -122,6 +148,17 @@ export function createTwoHopDocumentProjection(
 			return document;
 		},
 	};
+}
+
+function hasSameDocumentSectionRefs(
+	current: readonly TwoHopDocumentSection[],
+	next: readonly TwoHopDocumentSection[],
+): boolean {
+	if (current.length !== next.length) return false;
+	for (let index = 0; index < current.length; index += 1) {
+		if (current[index] !== next[index]) return false;
+	}
+	return true;
 }
 
 /**
@@ -138,7 +175,10 @@ export function createTwoHopDocument(
 		),
 	);
 	const sections = params.sections.map((descriptor) => {
-		const paginationKey = getSectionPaginationKey(descriptor);
+		const paginationKey = buildScopedSectionId(
+			descriptor.sectionId,
+			params.paginationScope,
+		);
 		const requestedVisibleCount =
 			params.visibleCounts[paginationKey] ?? params.initialVisibleCount;
 		const visibleSourceCount = clampVisibleCount(descriptor, requestedVisibleCount);

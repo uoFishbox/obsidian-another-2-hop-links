@@ -141,16 +141,47 @@ describe("TwoHopDocument fixed-grid geometry", () => {
 		});
 		const initialDocument = projection.getDocument();
 
-		expect(projection.setSections([{ ...descriptor }])).toBe(initialDocument);
+		expect(
+			projection.setInput({
+				sections: [{ ...descriptor }],
+				paginationScope: "",
+			}),
+		).toBe(initialDocument);
 
-		const changedDocument = projection.setSections([
-			{
-				...descriptor,
-				sourceRevision: createSectionDataRevision(2),
-			},
-		]);
+		const changedDocument = projection.setInput({
+			sections: [
+				{
+					...descriptor,
+					sourceRevision: createSectionDataRevision(2),
+				},
+			],
+			paginationScope: "",
+		});
 		expect(changedDocument).not.toBe(initialDocument);
 		expect(changedDocument.revision).not.toBe(initialDocument.revision);
+	});
+
+	it("resets pagination when the search scope changes", () => {
+		const descriptor = createSection("first", [
+			createItem("a"),
+			createItem("b"),
+			createItem("c"),
+		]);
+		const projection = createTwoHopDocumentProjection({
+			sections: [descriptor],
+			initialVisibleCount: 1,
+			loadMoreIncrement: 1,
+		});
+
+		expect(projection.getDocument().sections[0].visibleItemCount).toBe(1);
+		expect(projection.loadMore("first")?.sections[0].visibleItemCount).toBe(2);
+
+		const searched = projection.setInput({
+			sections: [descriptor],
+			paginationScope: "query",
+		});
+		expect(searched.sections[0].visibleItemCount).toBe(1);
+		expect(descriptor.paginationKey).toBeUndefined();
 	});
 
 	it("resolves header, dense items, and load-more without compiled cells", () => {

@@ -66,6 +66,7 @@ export interface TwoHopVirtualListProps {
 	readonly applicationStore?: ApplicationStore;
 	readonly initialVisibleCount?: number;
 	readonly loadMoreIncrement?: number;
+	readonly paginationScope?: string;
 	readonly previewActive?: boolean;
 	readonly resolveItemCardModel?: (
 		item: TwoHopVirtualListItem,
@@ -141,6 +142,7 @@ export function useTwoHopVirtualList(
 		applicationStore,
 		initialVisibleCount: props.initialVisibleCount,
 		loadMoreIncrement: props.loadMoreIncrement,
+		paginationScope: props.paginationScope,
 	});
 	let document = $state.raw<TwoHopDocument>(documentProjection.getDocument());
 	const measurementState = createViewPlanMeasurementState();
@@ -340,7 +342,12 @@ export function useTwoHopVirtualList(
 	};
 
 	$effect(() => {
-		publishDocument(documentProjection.setSections(props.sections));
+		publishDocument(
+			documentProjection.setInput({
+				sections: props.sections,
+				paginationScope: props.paginationScope ?? "",
+			}),
+		);
 	});
 
 	$effect(() => {

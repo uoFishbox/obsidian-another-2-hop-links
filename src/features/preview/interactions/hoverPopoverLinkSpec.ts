@@ -1,6 +1,6 @@
 import type { TFile } from "obsidian";
 import type { TwoHopIndexedLink } from "types";
-import type { PluginSettings } from "features/settings/model";
+import type { InteractionSettings } from "ui/interactions/interactionTypes";
 import type { HighlightMode } from "../public-types";
 import { isAdvancedCanvasPosition } from "core/rules/fileRules";
 
@@ -33,7 +33,7 @@ function resolveHoverLinktext(
 
 function resolveHoverHighlightEnabled(
 	highlightMode: HighlightMode,
-	settings?: PluginSettings,
+	settings?: Pick<InteractionSettings, "highlightInPreviewOnHover">,
 ): boolean {
 	if (highlightMode === "force") {
 		return true;
@@ -47,7 +47,7 @@ function resolveHoverHighlightEnabled(
 function resolveHoverState(
 	link: TwoHopIndexedLink,
 	targetFile: TFile,
-	settings: PluginSettings | undefined,
+	settings: Pick<InteractionSettings, "highlightInPreviewOnHover"> | undefined,
 	isOutgoingLink: boolean,
 	highlightMode: HighlightMode,
 ): unknown {
@@ -77,7 +77,7 @@ function resolveHoverState(
 export function buildHoverPopoverLinkSpec(
 	link: TwoHopIndexedLink,
 	targetFile: TFile,
-	settings?: PluginSettings,
+	settings?: Pick<InteractionSettings, "highlightInPreviewOnHover">,
 	isOutgoingLink = false,
 	highlightMode: HighlightMode = "auto",
 ): HoverPopoverLinkSpec {

@@ -134,11 +134,10 @@
 	const sourceFile = linkContext.sourceFile;
 	const fileToLinktext = linkContext.fileToLinktext;
 	const onTagClick = linkContext.onTagClick;
-	const dataIdentityCache = createTwoHopSectionDescriptorIdentityCache();
+	const sectionPublicationCache = createTwoHopSectionDescriptorIdentityCache();
 	const twoHopVirtualListSections = $derived.by(() =>
-		dataIdentityCache.resolve({
+		sectionPublicationCache.resolve({
 			displayData: filteredDisplayData,
-			searchQuery: appliedSearchQuery,
 			useMergedLinks,
 			showTags,
 			sourceFile,

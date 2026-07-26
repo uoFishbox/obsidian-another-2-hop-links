@@ -19,6 +19,7 @@
 		applicationStore?: ApplicationStore;
 		initialVisibleCount?: number;
 		loadMoreIncrement?: number;
+		paginationScope?: string;
 		resolveItemCardModel?: (
 			item: TwoHopVirtualListItem,
 			presentation: TwoHopCardPresentationState,

@@ -34,7 +34,6 @@ export type CCLDevMeasurementName =
 	| "twoHop.sectionDescriptorIdentityCache.exactHit"
 	| "twoHop.sectionDescriptorIdentityCache.hit"
 	| "twoHop.sectionDescriptorIdentityCache.miss"
-	| "twoHop.sectionDescriptorIdentityCache.invalidate"
 	| "twoHop.cardRenderModelCache.hit"
 	| "twoHop.cardRenderModelCache.miss"
 	| "twoHop.cardRenderModelCache.invalidate"
@@ -84,7 +83,6 @@ export const CCL_DEV_MEASUREMENT_NAMES: readonly CCLDevMeasurementName[] = [
 	"twoHop.sectionDescriptorIdentityCache.exactHit",
 	"twoHop.sectionDescriptorIdentityCache.hit",
 	"twoHop.sectionDescriptorIdentityCache.miss",
-	"twoHop.sectionDescriptorIdentityCache.invalidate",
 	"twoHop.cardRenderModelCache.hit",
 	"twoHop.cardRenderModelCache.miss",
 	"twoHop.cardRenderModelCache.invalidate",

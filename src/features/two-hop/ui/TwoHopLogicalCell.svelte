@@ -60,7 +60,6 @@
 			className={headerProps.className}
 			draggable={headerProps.draggable}
 			directory={headerProps.directory}
-			settings={headerProps.settings}
 			interactionId={headerProps.interactionId}
 			interactionKind="sectionHeader"
 			interactionDescriptor={headerProps.interactionDescriptor}

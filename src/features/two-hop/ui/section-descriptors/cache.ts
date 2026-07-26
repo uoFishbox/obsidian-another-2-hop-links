@@ -1,58 +1,38 @@
 import type { TFile } from "obsidian";
-import type {
-	DisplayData,
-	MergedLinkItem,
-} from "features/two-hop/application/displayDataBuilder";
-import {
-	createStableViewItemReconciler,
-	type StableViewItemReconciler,
-	type ViewItem,
-} from "application/presenters";
-import {
-	backlinksSectionConfig,
-	mergedLinksSectionConfig,
-	newLinksSectionConfig,
-	outgoingLinksSectionConfig,
-} from "ui/components/sections/sectionConfigs";
+import type { DisplayData } from "features/two-hop/application/displayDataBuilder";
 import {
 	createCompactSectionId,
 	SHOULD_VALIDATE_SECTION_IDS,
 } from "ui/components/common/listPagination";
+import { newLinksSectionConfig } from "ui/components/sections/sectionConfigs";
 import { generateBranchKey } from "features/preview/text-processing/textUtils";
-import type { TagGroup, TwoHopIndexedLink, TwoHopLinkBranch } from "types/domain";
 import type { PluginSettings, SortOption } from "features/settings/model";
 import type { ApplicationStore } from "ui/stores/ApplicationStore.svelte";
-import {
-	hasSameBacklinkIndexedLink,
-	hasSameTwoHopBranchCard,
-	hasSameTwoHopIndexedLink,
-} from "features/two-hop/shared/twoHopEquality";
+import type { InteractionSettings } from "ui/interactions/interactionTypes";
 import type { TwoHopVirtualSectionDescriptor } from "features/two-hop/ui/twoHopVirtualListModel";
-import type {
-	NewLinksSectionItemsDeps,
-	PrimaryLinkSection,
-	PrimarySectionItemsDeps,
-	TagSectionItemsDeps,
-} from "features/two-hop/ui/twoHopPageTypes";
-import {
-	getBacklinkSearchKey,
-	getMergedSearchKey,
-	getOutgoingSearchKey,
-} from "features/two-hop/ui/twoHopSearchAdapter";
-import { hasSameDescriptorRefs, pruneInactiveEntries } from "./descriptorIdentity";
 import {
 	createTwoHopInteractionTokenAllocator,
 	type TwoHopInteractionTokenAllocator,
 } from "./interactionTokenAllocator";
-import { resolveBranchSectionEntry, type BranchEntry } from "./createBranchEntries";
-import { resolveNewLinkSectionEntry, type NewLinksEntry } from "./createNewLinkEntries";
-import { resolvePrimarySectionEntry, type PrimaryEntry } from "./createPrimaryEntries";
-import { resolveTagSectionEntry, type TagEntry } from "./createTagEntries";
+import {
+	createBranchSectionDescriptor,
+	resolveBranchHeader,
+	type BranchSectionBuildInput,
+} from "./createBranchDescriptor";
+import {
+	createPrimarySectionDescriptor,
+	type PrimarySectionBuildInput,
+} from "./createPrimaryDescriptor";
+import {
+	createTagSectionDescriptor,
+	type TagSectionBuildInput,
+} from "./createTagDescriptor";
+import { createNewLinksSectionDescriptor } from "./createNewLinksDescriptor";
+import { hasSameSectionSignature, type SectionSignature } from "./sectionSignature";
 import { recordCCLDevMeasurement } from "infrastructure/debug/CCLDevMeasurements";
 
 export interface ResolveTwoHopSectionDescriptorIdentityParams {
 	readonly displayData: DisplayData;
-	readonly searchQuery: string;
 	readonly useMergedLinks: boolean;
 	readonly showTags: boolean;
 	readonly sourceFile: TFile;
@@ -69,29 +49,46 @@ export interface ResolveTwoHopSectionDescriptorIdentityParams {
 }
 
 /**
- * Page-owned cache preserving section, descriptor, and item identity.
+ * Page-owned section publication cache.
  *
- * Each resolve reconciles the current display/search/settings inputs and
- * evicts inactive section entries. Explicit invalidation clears entry maps,
- * reconcilers, interaction tokens, and the descriptor array. It is not read by
- * the scroll hot path and reports
- * `twoHop.sectionDescriptorIdentityCache.*` counters.
+ * Reconciliation stops at the section boundary: an equal semantic signature
+ * reuses the complete immutable descriptor, while a changed signature builds a
+ * fresh descriptor with its own lazy item materialization. Interaction tokens
+ * remain page-owned and are therefore stable across section publications.
  */
 export interface TwoHopSectionDescriptorIdentityCache {
 	resolve(
 		params: ResolveTwoHopSectionDescriptorIdentityParams,
 	): readonly TwoHopVirtualSectionDescriptor[];
-	invalidate(): void;
 }
 
-interface PrimarySectionFactoryParams {
-	readonly displayData: DisplayData;
-	readonly useMergedLinks: boolean;
+interface CachedSection {
+	readonly signature: SectionSignature;
+	readonly descriptor: TwoHopVirtualSectionDescriptor;
 }
+
+type SectionSpec =
+	| {
+			readonly kind: "primary";
+			readonly signature: Extract<SectionSignature, { kind: "primary" }>;
+	  }
+	| {
+			readonly kind: "branch";
+			readonly signature: Extract<SectionSignature, { kind: "branch" }>;
+			readonly buildInput: BranchSectionBuildInput;
+	  }
+	| {
+			readonly kind: "tag";
+			readonly signature: Extract<SectionSignature, { kind: "tag" }>;
+			readonly buildInput: TagSectionBuildInput;
+	  }
+	| {
+			readonly kind: "new-links";
+			readonly signature: Extract<SectionSignature, { kind: "new-links" }>;
+	  };
 
 interface ResolveInputSnapshot {
 	readonly displayData: DisplayData;
-	readonly searchQuery: string;
 	readonly useMergedLinks: boolean;
 	readonly showTags: boolean;
 	readonly sourcePath: string;
@@ -99,10 +96,8 @@ interface ResolveInputSnapshot {
 	readonly fileToLinktext: ResolveTwoHopSectionDescriptorIdentityParams["fileToLinktext"];
 	readonly currentSort: SortOption;
 	readonly sortContextVersion: number;
-	readonly currentSettings: PluginSettings;
-	readonly applicationStore: ApplicationStore;
-	readonly updateVersion: number;
-	readonly onTagClick: ResolveTwoHopSectionDescriptorIdentityParams["onTagClick"];
+	readonly mobileLongPressAction: PluginSettings["mobileLongPressAction"];
+	readonly highlightInPreviewOnHover: boolean;
 }
 
 function createResolveInputSnapshot(
@@ -110,7 +105,6 @@ function createResolveInputSnapshot(
 ): ResolveInputSnapshot {
 	return {
 		displayData: params.displayData,
-		searchQuery: params.searchQuery,
 		useMergedLinks: params.useMergedLinks,
 		showTags: params.showTags,
 		sourcePath: params.sourceFile.path,
@@ -118,10 +112,8 @@ function createResolveInputSnapshot(
 		fileToLinktext: params.fileToLinktext,
 		currentSort: params.currentSort,
 		sortContextVersion: params.applicationStore.getSortContextVersion?.() ?? 0,
-		currentSettings: params.currentSettings,
-		applicationStore: params.applicationStore,
-		updateVersion: params.applicationStore.updateVersion,
-		onTagClick: params.onTagClick,
+		mobileLongPressAction: params.currentSettings.mobileLongPressAction,
+		highlightInPreviewOnHover: params.currentSettings.highlightInPreviewOnHover,
 	};
 }
 
@@ -131,7 +123,6 @@ function hasSameResolveInputs(
 ): boolean {
 	return (
 		current.displayData === next.displayData &&
-		current.searchQuery === next.searchQuery &&
 		current.useMergedLinks === next.useMergedLinks &&
 		current.showTags === next.showTags &&
 		current.sourcePath === next.sourcePath &&
@@ -139,378 +130,333 @@ function hasSameResolveInputs(
 		current.fileToLinktext === next.fileToLinktext &&
 		current.currentSort === next.currentSort &&
 		current.sortContextVersion === next.sortContextVersion &&
-		current.currentSettings === next.currentSettings &&
-		current.applicationStore === next.applicationStore &&
-		current.updateVersion === next.updateVersion &&
-		current.onTagClick === next.onTagClick
+		current.mobileLongPressAction === next.mobileLongPressAction &&
+		current.highlightInPreviewOnHover === next.highlightInPreviewOnHover
 	);
 }
 
-const isBranchItem = (item: MergedLinkItem): item is TwoHopLinkBranch =>
-	"hop1" in item && "hop2" in item;
-
-const hasSameMergedItem = (current: MergedLinkItem, next: MergedLinkItem): boolean =>
-	isBranchItem(current)
-		? isBranchItem(next) && hasSameTwoHopBranchCard(current, next)
-		: !isBranchItem(next) && hasSameBacklinkIndexedLink(current, next);
-
-interface PrimarySectionReconcilers {
-	readonly outgoingItemsReconciler: StableViewItemReconciler<TwoHopLinkBranch>;
-	readonly backlinksItemsReconciler: StableViewItemReconciler<TwoHopIndexedLink>;
-	readonly mergedItemsReconciler: StableViewItemReconciler<MergedLinkItem>;
+function createInteractionSettings(settings: PluginSettings): InteractionSettings {
+	return Object.freeze({
+		mobileLongPressAction: settings.mobileLongPressAction,
+		highlightInPreviewOnHover: settings.highlightInPreviewOnHover,
+	});
 }
 
-function createPrimarySections(
-	params: PrimarySectionFactoryParams,
-	reconcilers: PrimarySectionReconcilers,
-): PrimaryLinkSection[] {
-	if (params.useMergedLinks) {
-		const items = reconcilers.mergedItemsReconciler.reconcile(
-			params.displayData.mergedItems,
-		);
-		return items.length === 0
-			? []
-			: [
-					{
-						title: mergedLinksSectionConfig.title,
-						sectionId: mergedLinksSectionConfig.sectionId,
-						className: mergedLinksSectionConfig.className,
-						items,
-						getKey: (item, index) =>
-							mergedLinksSectionConfig.getKey(
-								item.data as MergedLinkItem,
-								index,
-							),
-						getSearchKey: (item) =>
-							getMergedSearchKey(item.data as MergedLinkItem),
-					},
-				];
-	}
-
-	const sections: PrimaryLinkSection[] = [];
-	const outgoing = reconcilers.outgoingItemsReconciler.reconcile(
-		params.displayData.outgoing,
-	);
-	const backlinks = reconcilers.backlinksItemsReconciler.reconcile(
-		params.displayData.backlinks,
-	);
-	if (outgoing.length > 0) {
-		sections.push({
-			title: outgoingLinksSectionConfig.title,
-			sectionId: outgoingLinksSectionConfig.sectionId,
-			className: outgoingLinksSectionConfig.className,
-			items: outgoing,
-			getKey: (item, index) =>
-				outgoingLinksSectionConfig.getKey(item.data as TwoHopLinkBranch, index),
-			getSearchKey: (item) => getOutgoingSearchKey(item.data as TwoHopLinkBranch),
-		});
-	}
-	if (backlinks.length > 0) {
-		sections.push({
-			title: backlinksSectionConfig.title,
-			sectionId: backlinksSectionConfig.sectionId,
-			className: backlinksSectionConfig.className,
-			items: backlinks,
-			getKey: (item, index) =>
-				backlinksSectionConfig.getKey(item.data as TwoHopIndexedLink, index),
-			getSearchKey: (item) =>
-				getBacklinkSearchKey(item.data as TwoHopIndexedLink),
-		});
-	}
-	return sections;
+function createSectionSpecs(
+	params: ResolveTwoHopSectionDescriptorIdentityParams,
+	onTagClick: (tag: string) => void,
+): SectionSpec[] {
+	const specs: SectionSpec[] = [];
+	appendPrimarySpecs(specs, params);
+	appendBranchSpecs(specs, params);
+	appendTagSpecs(specs, params, onTagClick);
+	appendNewLinksSpec(specs, params);
+	return specs;
 }
 
-function appendDescriptor(
-	descriptors: TwoHopVirtualSectionDescriptor[],
-	seenFinalIds: Map<string, number> | null,
-	descriptor: TwoHopVirtualSectionDescriptor,
+function appendPrimarySpecs(
+	specs: SectionSpec[],
+	params: ResolveTwoHopSectionDescriptorIdentityParams,
 ): void {
-	if (descriptor.totalCount <= 0) return;
-	const previousIndex = seenFinalIds?.get(descriptor.sectionId);
-	if (previousIndex !== undefined) {
-		throw new Error(
-			`TwoHopSectionDescriptorIdentityCache: duplicate sectionId ${JSON.stringify(
-				descriptor.sectionId,
-			)} at indexes ${previousIndex} and ${descriptors.length}.`,
-		);
-	}
-	seenFinalIds?.set(descriptor.sectionId, descriptors.length);
-	descriptors.push(descriptor);
-}
-
-function createReconcilers(): PrimarySectionReconcilers & {
-	readonly newLinksItemsReconciler: StableViewItemReconciler<TwoHopIndexedLink>;
-} {
-	return {
-		outgoingItemsReconciler: createStableViewItemReconciler<TwoHopLinkBranch>({
-			getKey: (item, index) => outgoingLinksSectionConfig.getKey(item, index),
-			toViewItem: (item) => ({ type: "branch", data: item }),
-			canReuseSource: hasSameTwoHopBranchCard,
-		}),
-		backlinksItemsReconciler: createStableViewItemReconciler<TwoHopIndexedLink>({
-			getKey: (item, index) => backlinksSectionConfig.getKey(item, index),
-			toViewItem: (item) => ({ type: "backlink", data: item }),
-			canReuseSource: hasSameBacklinkIndexedLink,
-		}),
-		mergedItemsReconciler: createStableViewItemReconciler<MergedLinkItem>({
-			getKey: (item, index) => mergedLinksSectionConfig.getKey(item, index),
-			toViewItem: (item) =>
-				isBranchItem(item)
-					? { type: "branch", data: item }
-					: { type: "backlink", data: item },
-			canReuseSource: hasSameMergedItem,
-		}),
-		newLinksItemsReconciler: createStableViewItemReconciler<TwoHopIndexedLink>({
-			getKey: (item, index) => newLinksSectionConfig.getKey(item, index),
-			toViewItem: (item) => ({ type: "newLink", data: item }),
-			canReuseSource: hasSameTwoHopIndexedLink,
-		}),
-	};
-}
-
-function appendPrimarySections(params: {
-	readonly descriptors: TwoHopVirtualSectionDescriptor[];
-	readonly seenFinalIds: Map<string, number> | null;
-	readonly activePrimaryIds: Set<string>;
-	readonly primaryEntries: Map<string, PrimaryEntry>;
-	readonly resolveParams: ResolveTwoHopSectionDescriptorIdentityParams;
-	readonly reconcilers: PrimarySectionReconcilers;
-	readonly tokens: TwoHopInteractionTokenAllocator;
-}): void {
-	for (const source of createPrimarySections(
-		params.resolveParams,
-		params.reconcilers,
-	)) {
-		const rawSectionId = source.sectionId;
-		params.activePrimaryIds.add(rawSectionId);
-		const itemsDeps: PrimarySectionItemsDeps = {
-			items: source.items,
-			updateVersion: params.resolveParams.applicationStore.updateVersion,
-		};
-		const entry = resolvePrimarySectionEntry({
-			entry: params.primaryEntries.get(rawSectionId),
-			rawSectionId,
-			source,
-			itemsDeps,
-			searchQuery: params.resolveParams.searchQuery,
-			createItemInteractionToken: params.tokens.createItemInteractionToken,
+	if (params.useMergedLinks) {
+		if (params.displayData.mergedItems.length === 0) return;
+		specs.push({
+			kind: "primary",
+			signature: {
+				kind: "primary",
+				input: {
+					kind: "merged",
+					items: params.displayData.mergedItems,
+				},
+			},
 		});
-		params.primaryEntries.set(rawSectionId, entry);
-		appendDescriptor(params.descriptors, params.seenFinalIds, entry.descriptor);
+		return;
+	}
+
+	if (params.displayData.outgoing.length > 0) {
+		specs.push({
+			kind: "primary",
+			signature: {
+				kind: "primary",
+				input: {
+					kind: "outgoing",
+					items: params.displayData.outgoing,
+				},
+			},
+		});
+	}
+	if (params.displayData.backlinks.length > 0) {
+		specs.push({
+			kind: "primary",
+			signature: {
+				kind: "primary",
+				input: {
+					kind: "backlinks",
+					items: params.displayData.backlinks,
+				},
+			},
+		});
 	}
 }
 
-function appendBranchSections(params: {
-	readonly descriptors: TwoHopVirtualSectionDescriptor[];
-	readonly seenFinalIds: Map<string, number> | null;
-	readonly activeBranchIds: Set<string>;
-	readonly branchEntries: Map<string, BranchEntry>;
-	readonly resolveParams: ResolveTwoHopSectionDescriptorIdentityParams;
-	readonly tokens: TwoHopInteractionTokenAllocator;
-}): void {
-	for (const branch of params.resolveParams.displayData.twoHopBranches) {
+function appendBranchSpecs(
+	specs: SectionSpec[],
+	params: ResolveTwoHopSectionDescriptorIdentityParams,
+): void {
+	const interactionSettings = createInteractionSettings(params.currentSettings);
+	const sortContextVersion = params.applicationStore.getSortContextVersion?.() ?? 0;
+
+	for (const branch of params.displayData.twoHopBranches) {
 		const sectionKey = generateBranchKey(branch);
 		const rawSectionId = createCompactSectionId("twohop", sectionKey);
-		params.activeBranchIds.add(rawSectionId);
-		const entry = resolveBranchSectionEntry({
-			entry: params.branchEntries.get(rawSectionId),
+		const header = resolveBranchHeader({
+			branch,
+			sourceFile: params.sourceFile,
+			resolveFile: params.resolveFile,
+			fileToLinktext: params.fileToLinktext,
+		});
+		const signature: Extract<SectionSignature, { kind: "branch" }> = {
+			kind: "branch",
 			branch,
 			rawSectionId,
 			sectionKey,
-			searchQuery: params.resolveParams.searchQuery,
-			sourceFile: params.resolveParams.sourceFile,
-			resolveFile: params.resolveParams.resolveFile,
-			fileToLinktext: params.resolveParams.fileToLinktext,
-			currentSort: params.resolveParams.currentSort,
-			currentSettings: params.resolveParams.currentSettings,
-			applicationStore: params.resolveParams.applicationStore,
-			tokens: params.tokens,
-		});
-		params.branchEntries.set(rawSectionId, entry);
-		appendDescriptor(params.descriptors, params.seenFinalIds, entry.descriptor);
-	}
-}
-
-function appendTagSections(params: {
-	readonly descriptors: TwoHopVirtualSectionDescriptor[];
-	readonly seenFinalIds: Map<string, number> | null;
-	readonly activeTagIds: Set<string>;
-	readonly tagEntries: Map<string, TagEntry>;
-	readonly resolveParams: ResolveTwoHopSectionDescriptorIdentityParams;
-	readonly tokens: TwoHopInteractionTokenAllocator;
-}): void {
-	if (!params.resolveParams.showTags) return;
-
-	for (const source of params.resolveParams.displayData.tagGroups) {
-		const rawSectionId = `tags-${source.tag}`;
-		params.activeTagIds.add(rawSectionId);
-		const itemsDeps: TagSectionItemsDeps = {
-			notes: source.notes,
-			sortOption: params.resolveParams.currentSort,
-			updateVersion: params.resolveParams.applicationStore.updateVersion,
-			getSortedTagGroupItems:
-				params.resolveParams.applicationStore.getSortedTagGroupItems,
+			...header,
+			sortOption: params.currentSort,
+			sortContextVersion,
+			getSortedItems: params.applicationStore.getSortedTwoHopItems,
+			interactionSettings,
 		};
-		const entry = resolveTagSectionEntry({
-			entry: params.tagEntries.get(rawSectionId),
-			source,
-			rawSectionId,
-			searchQuery: params.resolveParams.searchQuery,
-			applicationStore: params.resolveParams.applicationStore,
-			itemsDeps,
-			onTagClick: params.resolveParams.onTagClick,
-			tokens: params.tokens,
+		specs.push({
+			kind: "branch",
+			signature,
+			buildInput: {
+				branch,
+				rawSectionId,
+				sectionKey,
+				sourceFile: params.sourceFile,
+				...header,
+				interactionSettings,
+				applicationStore: params.applicationStore,
+			},
 		});
-		params.tagEntries.set(rawSectionId, entry);
-		appendDescriptor(params.descriptors, params.seenFinalIds, entry.descriptor);
 	}
 }
 
-function appendNewLinksSection(params: {
-	readonly descriptors: TwoHopVirtualSectionDescriptor[];
-	readonly seenFinalIds: Map<string, number> | null;
-	readonly activeNewLinksIds: Set<string>;
-	readonly newLinksEntries: Map<string, NewLinksEntry>;
-	readonly resolveParams: ResolveTwoHopSectionDescriptorIdentityParams;
-	readonly newLinksItemsReconciler: StableViewItemReconciler<TwoHopIndexedLink>;
-	readonly tokens: TwoHopInteractionTokenAllocator;
-}): void {
-	const newLinks = params.newLinksItemsReconciler.reconcile(
-		params.resolveParams.displayData.newLinks,
-	);
-	if (newLinks.length === 0) return;
+function appendTagSpecs(
+	specs: SectionSpec[],
+	params: ResolveTwoHopSectionDescriptorIdentityParams,
+	onTagClick: (tag: string) => void,
+): void {
+	if (!params.showTags) return;
+	const sortContextVersion = params.applicationStore.getSortContextVersion?.() ?? 0;
 
-	const rawSectionId = newLinksSectionConfig.sectionId;
-	params.activeNewLinksIds.add(rawSectionId);
-	const itemsDeps: NewLinksSectionItemsDeps = {
-		items: newLinks,
-		updateVersion: params.resolveParams.applicationStore.updateVersion,
-	};
-	const entry = resolveNewLinkSectionEntry({
-		entry: params.newLinksEntries.get(rawSectionId),
-		rawSectionId,
-		searchQuery: params.resolveParams.searchQuery,
-		itemsDeps,
-		createItemInteractionToken: params.tokens.createItemInteractionToken,
+	for (const source of params.displayData.tagGroups) {
+		const rawSectionId = `tags-${source.tag}`;
+		specs.push({
+			kind: "tag",
+			signature: {
+				kind: "tag",
+				source,
+				rawSectionId,
+				sortOption: params.currentSort,
+				sortContextVersion,
+				getSortedItems: params.applicationStore.getSortedTagGroupItems,
+			},
+			buildInput: {
+				source,
+				rawSectionId,
+				applicationStore: params.applicationStore,
+				onTagClick,
+			},
+		});
+	}
+}
+
+function appendNewLinksSpec(
+	specs: SectionSpec[],
+	params: ResolveTwoHopSectionDescriptorIdentityParams,
+): void {
+	if (params.displayData.newLinks.length === 0) return;
+	specs.push({
+		kind: "new-links",
+		signature: {
+			kind: "new-links",
+			items: params.displayData.newLinks,
+		},
 	});
-	params.newLinksEntries.set(rawSectionId, entry);
-	appendDescriptor(params.descriptors, params.seenFinalIds, entry.descriptor);
+}
+
+function getSectionId(signature: SectionSignature): string {
+	switch (signature.kind) {
+		case "primary":
+			return signature.input.kind;
+		case "branch":
+		case "tag":
+			return signature.rawSectionId;
+		case "new-links":
+			return newLinksSectionConfig.sectionId;
+	}
+}
+
+function snapshotSpec(spec: SectionSpec): SectionSpec {
+	switch (spec.kind) {
+		case "primary": {
+			const input = {
+				...spec.signature.input,
+				items: [...spec.signature.input.items],
+			} as PrimarySectionBuildInput;
+			return {
+				kind: "primary",
+				signature: { kind: "primary", input },
+			};
+		}
+		case "branch": {
+			const branch = {
+				...spec.signature.branch,
+				hop2: [...spec.signature.branch.hop2],
+			};
+			return {
+				kind: "branch",
+				signature: {
+					...spec.signature,
+					branch,
+				},
+				buildInput: {
+					...spec.buildInput,
+					branch,
+				},
+			};
+		}
+		case "tag": {
+			const source = {
+				...spec.signature.source,
+				notes: [...spec.signature.source.notes],
+			};
+			return {
+				kind: "tag",
+				signature: {
+					...spec.signature,
+					source,
+				},
+				buildInput: {
+					...spec.buildInput,
+					source,
+				},
+			};
+		}
+		case "new-links":
+			return {
+				kind: "new-links",
+				signature: {
+					...spec.signature,
+					items: [...spec.signature.items],
+				},
+			};
+	}
+}
+
+function buildDescriptor(
+	spec: SectionSpec,
+	tokens: TwoHopInteractionTokenAllocator,
+): TwoHopVirtualSectionDescriptor {
+	switch (spec.kind) {
+		case "primary":
+			return createPrimarySectionDescriptor({
+				input: spec.signature.input,
+				createItemInteractionToken: tokens.createItemInteractionToken,
+			});
+		case "branch":
+			return createBranchSectionDescriptor(spec.buildInput, tokens);
+		case "tag":
+			return createTagSectionDescriptor(spec.buildInput, tokens);
+		case "new-links":
+			return createNewLinksSectionDescriptor({
+				items: spec.signature.items,
+				createItemInteractionToken: tokens.createItemInteractionToken,
+			});
+	}
 }
 
 export function createTwoHopSectionDescriptorIdentityCache(): TwoHopSectionDescriptorIdentityCache {
-	let reconcilers = createReconcilers();
-	const branchEntries = new Map<string, BranchEntry>();
-	const tagEntries = new Map<string, TagEntry>();
-	const primaryEntries = new Map<string, PrimaryEntry>();
-	const newLinksEntries = new Map<string, NewLinksEntry>();
-	let tokens = createTwoHopInteractionTokenAllocator();
+	const entries = new Map<string, CachedSection>();
+	const tokens = createTwoHopInteractionTokenAllocator();
+	let latestOnTagClick: (tag: string) => void = () => undefined;
+	const onTagClick = (tag: string): void => latestOnTagClick(tag);
 	let previousDescriptors: readonly TwoHopVirtualSectionDescriptor[] = [];
 	let previousInputs: ResolveInputSnapshot | undefined;
-	let initialized = false;
 
 	return {
 		resolve(params) {
+			latestOnTagClick = params.onTagClick;
 			const inputs = createResolveInputSnapshot(params);
-			if (
-				initialized &&
-				previousInputs &&
-				hasSameResolveInputs(previousInputs, inputs)
-			) {
-				if (process.env.NODE_ENV !== "production") {
-					recordCCLDevMeasurement(
-						"twoHop.sectionDescriptorIdentityCache.exactHit",
-					);
-					recordCCLDevMeasurement(
-						"twoHop.sectionDescriptorIdentityCache.hit",
-					);
-				}
+			if (previousInputs && hasSameResolveInputs(previousInputs, inputs)) {
+				recordCacheMeasurement("exactHit");
+				recordCacheMeasurement("hit");
 				return previousDescriptors;
 			}
 
-			const descriptors: TwoHopVirtualSectionDescriptor[] = [];
-			const activeBranchIds = new Set<string>();
-			const activeTagIds = new Set<string>();
-			const activePrimaryIds = new Set<string>();
-			const activeNewLinksIds = new Set<string>();
-			const seenFinalIds = SHOULD_VALIDATE_SECTION_IDS
+			const specs = createSectionSpecs(params, onTagClick);
+			const activeSectionIds = new Set<string>();
+			const seenSectionIds = SHOULD_VALIDATE_SECTION_IDS
 				? new Map<string, number>()
 				: null;
+			const descriptors: TwoHopVirtualSectionDescriptor[] = [];
+			let changed = false;
 
-			appendPrimarySections({
-				descriptors,
-				seenFinalIds,
-				activePrimaryIds,
-				primaryEntries,
-				resolveParams: params,
-				reconcilers,
-				tokens,
-			});
-			appendBranchSections({
-				descriptors,
-				seenFinalIds,
-				activeBranchIds,
-				branchEntries,
-				resolveParams: params,
-				tokens,
-			});
-			appendTagSections({
-				descriptors,
-				seenFinalIds,
-				activeTagIds,
-				tagEntries,
-				resolveParams: params,
-				tokens,
-			});
-			appendNewLinksSection({
-				descriptors,
-				seenFinalIds,
-				activeNewLinksIds,
-				newLinksEntries,
-				resolveParams: params,
-				newLinksItemsReconciler: reconcilers.newLinksItemsReconciler,
-				tokens,
-			});
-
-			pruneInactiveEntries(branchEntries, activeBranchIds);
-			pruneInactiveEntries(tagEntries, activeTagIds);
-			pruneInactiveEntries(primaryEntries, activePrimaryIds);
-			pruneInactiveEntries(newLinksEntries, activeNewLinksIds);
-
-			if (
-				initialized &&
-				hasSameDescriptorRefs(previousDescriptors, descriptors)
-			) {
-				if (process.env.NODE_ENV !== "production") {
-					recordCCLDevMeasurement(
-						"twoHop.sectionDescriptorIdentityCache.hit",
-					);
+			for (const spec of specs) {
+				const sectionId = getSectionId(spec.signature);
+				validateSectionId(sectionId, descriptors.length, seenSectionIds);
+				activeSectionIds.add(sectionId);
+				const cached = entries.get(sectionId);
+				if (
+					cached &&
+					hasSameSectionSignature(cached.signature, spec.signature)
+				) {
+					descriptors.push(cached.descriptor);
+					continue;
 				}
-				previousInputs = inputs;
-				return previousDescriptors;
+
+				const immutableSpec = snapshotSpec(spec);
+				const descriptor = buildDescriptor(immutableSpec, tokens);
+				entries.set(sectionId, {
+					signature: immutableSpec.signature,
+					descriptor,
+				});
+				descriptors.push(descriptor);
+				changed = true;
 			}
-			if (process.env.NODE_ENV !== "production") {
-				recordCCLDevMeasurement("twoHop.sectionDescriptorIdentityCache.miss");
+
+			for (const sectionId of entries.keys()) {
+				if (activeSectionIds.has(sectionId)) continue;
+				entries.delete(sectionId);
+				changed = true;
 			}
+
 			previousDescriptors = Object.freeze(descriptors);
 			previousInputs = inputs;
-			initialized = true;
+			recordCacheMeasurement(changed ? "miss" : "hit");
 			return previousDescriptors;
 		},
-		invalidate(): void {
-			reconcilers = createReconcilers();
-			branchEntries.clear();
-			tagEntries.clear();
-			primaryEntries.clear();
-			newLinksEntries.clear();
-			tokens = createTwoHopInteractionTokenAllocator();
-			previousDescriptors = [];
-			previousInputs = undefined;
-			initialized = false;
-			if (process.env.NODE_ENV !== "production") {
-				recordCCLDevMeasurement(
-					"twoHop.sectionDescriptorIdentityCache.invalidate",
-				);
-			}
-		},
 	};
+}
+
+function validateSectionId(
+	sectionId: string,
+	index: number,
+	seenSectionIds: Map<string, number> | null,
+): void {
+	const previousIndex = seenSectionIds?.get(sectionId);
+	if (previousIndex !== undefined) {
+		throw new Error(
+			`TwoHopSectionDescriptorIdentityCache: duplicate sectionId ${JSON.stringify(
+				sectionId,
+			)} at indexes ${previousIndex} and ${index}.`,
+		);
+	}
+	seenSectionIds?.set(sectionId, index);
+}
+
+function recordCacheMeasurement(result: "exactHit" | "hit" | "miss"): void {
+	if (process.env.NODE_ENV === "production") return;
+	recordCCLDevMeasurement(`twoHop.sectionDescriptorIdentityCache.${result}`);
 }

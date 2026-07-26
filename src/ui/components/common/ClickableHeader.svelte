@@ -1,6 +1,5 @@
 <script lang="ts">
 	import type { Snippet } from "svelte";
-	import type { PluginSettings } from "features/settings/model";
 	import {
 		interactionIdBinding,
 		type SectionHeaderInteractionDescriptor,
@@ -15,7 +14,6 @@
 		className?: string;
 		draggable?: boolean;
 		directory?: string | null;
-		settings?: PluginSettings;
 		interactionId: string;
 		interactionKind: "sectionHeader";
 		interactionDescriptor?: SectionHeaderInteractionDescriptor;
@@ -30,7 +28,6 @@
 		className = "",
 		draggable = false,
 		directory = null,
-		settings,
 		interactionId,
 		interactionKind,
 		interactionDescriptor,

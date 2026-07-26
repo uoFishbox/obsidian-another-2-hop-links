@@ -45,10 +45,12 @@ export interface SectionVisibleCountsController<T, G> {
 	loadMore(sectionId: string, loadedCount: number): SectionVisibleCountsUpdate;
 }
 
-export interface CreateSectionVisibleCountsControllerParams {
+export interface CreateSectionVisibleCountsControllerParams<T = unknown, G = unknown> {
 	applicationStore?: SectionPaginationApplicationStore;
 	initialVisibleCount?: number;
 	loadMoreIncrement?: number;
+	/** Resolves session-scoped pagination identity without changing the source. */
+	resolvePaginationKey?: (section: SectionRenderDescriptor<T, G>) => string;
 }
 
 const normalizeStoredVisibleCount = (count: number): number => {
@@ -109,10 +111,11 @@ export function createSectionVisibleCountsController<T, G>({
 	applicationStore,
 	initialVisibleCount,
 	loadMoreIncrement,
-}: CreateSectionVisibleCountsControllerParams = {}): SectionVisibleCountsController<
+	resolvePaginationKey,
+}: CreateSectionVisibleCountsControllerParams<
 	T,
 	G
-> {
+> = {}): SectionVisibleCountsController<T, G> {
 	let snapshot = EMPTY_SECTION_VISIBLE_COUNTS_SNAPSHOT;
 	let sourceExpandedLimits: Record<string, number> = {};
 
@@ -179,7 +182,10 @@ export function createSectionVisibleCountsController<T, G>({
 		section: SectionRenderDescriptor<T, G>,
 	): number =>
 		normalizeStoredVisibleCount(
-			resolveVisibleCount(getSectionPaginationKey(section), section.loadedCount),
+			resolveVisibleCount(
+				resolvePaginationKey?.(section) ?? getSectionPaginationKey(section),
+				section.loadedCount,
+			),
 		);
 
 	const clampVisibleCount = (
@@ -201,7 +207,8 @@ export function createSectionVisibleCountsController<T, G>({
 			const sectionIds = new Set<string>();
 
 			for (const section of sections) {
-				const paginationKey = getSectionPaginationKey(section);
+				const paginationKey =
+					resolvePaginationKey?.(section) ?? getSectionPaginationKey(section);
 				sectionIds.add(paginationKey);
 				const expandedLimit = resolveExpandedLimit(paginationKey);
 				if (expandedLimit !== undefined) {

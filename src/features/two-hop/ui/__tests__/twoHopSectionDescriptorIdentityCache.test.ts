@@ -55,7 +55,6 @@ const createHarness = () => {
 		getSortedTagGroupItems,
 	} as unknown as ApplicationStore;
 	const baseParams = {
-		searchQuery: "",
 		useMergedLinks: false,
 		showTags: true,
 		sourceFile,
@@ -107,13 +106,6 @@ describe("createTwoHopSectionDescriptorIdentityCache", () => {
 		expect(counters["twoHop.sectionDescriptorIdentityCache.exactHit"].count).toBe(
 			1,
 		);
-
-		cache.invalidate();
-		expect(cache.resolve(params)).not.toBe(first);
-		counters = getCCLDevMeasurementSnapshot().counters;
-		expect(counters["twoHop.sectionDescriptorIdentityCache.invalidate"].count).toBe(
-			1,
-		);
 	});
 
 	it("skips section traversal when every resolve input is unchanged", () => {
@@ -151,7 +143,7 @@ describe("createTwoHopSectionDescriptorIdentityCache", () => {
 		expect(baseParams.resolveFile).toHaveBeenCalledTimes(2);
 	});
 
-	it("replaces only changed sections and scopes pagination keys", () => {
+	it("replaces only changed section publications", () => {
 		const cache = createTwoHopSectionDescriptorIdentityCache();
 		const { baseParams } = createHarness();
 		const alpha = {
@@ -179,19 +171,6 @@ describe("createTwoHopSectionDescriptorIdentityCache", () => {
 		expect(changed[0]).toBe(first[0]);
 		expect(changed[1]).not.toBe(first[1]);
 		expect(changed[1]?.totalCount).toBe(2);
-
-		const scoped = cache.resolve({
-			...baseParams,
-			searchQuery: "query",
-			displayData: createDisplayData([alpha, changedBeta]),
-		});
-		expect(scoped[0]).not.toBe(changed[0]);
-		expect(scoped.map((section) => section.sectionId)).toEqual(
-			changed.map((section) => section.sectionId),
-		);
-		expect(scoped.map((section) => section.paginationKey)).not.toEqual(
-			changed.map((section) => section.paginationKey),
-		);
 	});
 
 	it("resolves tag getItem through the shared sorted item cache", () => {
@@ -314,7 +293,125 @@ describe("createTwoHopSectionDescriptorIdentityCache", () => {
 			]),
 		});
 
-		expect(equivalent).toBe(first);
+		expect(equivalent).not.toBe(first);
+		expect(equivalent[0]).toBe(first[0]);
+	});
+
+	it("ignores render-only version and layout-setting changes", () => {
+		const cache = createTwoHopSectionDescriptorIdentityCache();
+		const { baseParams } = createHarness();
+		const alpha = {
+			tag: "alpha",
+			notes: [createNote("alpha.md", "alpha")],
+		};
+		const params = {
+			...baseParams,
+			displayData: createDisplayData([alpha]),
+		};
+		const first = cache.resolve(params);
+
+		baseParams.applicationStore.updateVersion += 1;
+		const second = cache.resolve({
+			...params,
+			currentSettings: {
+				...params.currentSettings,
+				cardWidthPx: params.currentSettings.cardWidthPx + 10,
+			},
+		});
+
+		expect(second).toBe(first);
+		expect(second[0]).toBe(first[0]);
+	});
+
+	it("uses the latest tag callback without replacing the descriptor", () => {
+		const cache = createTwoHopSectionDescriptorIdentityCache();
+		const { baseParams } = createHarness();
+		const alpha = {
+			tag: "alpha",
+			notes: [createNote("alpha.md", "alpha")],
+		};
+		const firstCallback = vi.fn();
+		const secondCallback = vi.fn();
+		const params = {
+			...baseParams,
+			onTagClick: firstCallback,
+			displayData: createDisplayData([alpha]),
+		};
+		const first = cache.resolve(params);
+		const second = cache.resolve({
+			...params,
+			onTagClick: secondCallback,
+		});
+
+		expect(second).toBe(first);
+		second[0]?.headerProps.onClick?.();
+		expect(firstCallback).not.toHaveBeenCalled();
+		expect(secondCallback).toHaveBeenCalledWith("alpha");
+	});
+
+	it("replaces a branch when interaction settings change", () => {
+		const cache = createTwoHopSectionDescriptorIdentityCache();
+		const { baseParams } = createHarness();
+		const branch = createBranch("parent.md", [createLink("child.md")]);
+		const params = {
+			...baseParams,
+			displayData: createDisplayData([], [branch]),
+		};
+		const first = cache.resolve(params);
+		const firstInteractionId = first[0]?.getItem?.(0)?.interactionId;
+		const second = cache.resolve({
+			...params,
+			currentSettings: {
+				...params.currentSettings,
+				mobileLongPressAction:
+					params.currentSettings.mobileLongPressAction === "menu"
+						? "preview"
+						: "menu",
+			},
+		});
+
+		expect(second[0]).not.toBe(first[0]);
+		expect(second[0]?.getItem?.(0)?.interactionId).toBe(firstInteractionId);
+	});
+
+	it("reuses primary and new-links publications across equivalent render updates", () => {
+		const cache = createTwoHopSectionDescriptorIdentityCache();
+		const { baseParams } = createHarness();
+		const outgoing = createBranch("parent.md", [createLink("child.md")]);
+		const newLink = {
+			...createLink("missing.md"),
+			isUnresolved: true,
+		};
+		const displayData: DisplayData = {
+			...createDisplayData([]),
+			outgoing: [outgoing],
+			newLinks: [newLink],
+		};
+		const first = cache.resolve({
+			...baseParams,
+			showTags: false,
+			displayData,
+		});
+
+		baseParams.applicationStore.updateVersion += 1;
+		const equivalent = cache.resolve({
+			...baseParams,
+			showTags: false,
+			displayData: {
+				...displayData,
+				outgoing: [
+					{
+						hop1: { ...outgoing.hop1 },
+						hop2: outgoing.hop2.map((item) => ({ ...item })),
+					},
+				],
+				newLinks: [{ ...newLink }],
+			},
+		});
+
+		expect(equivalent).not.toBe(first);
+		expect(equivalent[0]).toBe(first[0]);
+		expect(equivalent[1]).toBe(first[1]);
 	});
 
 	it("drops removed section entries instead of reusing stale descriptors", () => {
