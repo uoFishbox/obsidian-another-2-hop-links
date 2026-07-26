@@ -13,19 +13,6 @@ export interface VirtualSurfaceResidentRowsAdapter<
 		TMountedRow
 	>[];
 	sync(rowsBySlot: readonly TMountedRow[], capacity: number): void;
-	applyDelta(
-		delta: VirtualSurfaceResidentRowsDelta<TMountedRow>,
-		capacity: number,
-	): void;
-}
-
-/** Row-slot changes applied without scanning the full resident capacity. */
-export interface VirtualSurfaceResidentRowsDelta<
-	TMountedRow extends { readonly slotIndex?: number },
-> {
-	readonly enteredRows: readonly TMountedRow[];
-	readonly reboundRows: readonly TMountedRow[];
-	readonly releasedSlotIndexes: readonly number[];
 }
 
 /**
@@ -70,32 +57,11 @@ export function createVirtualSurfaceResidentRowsAdapter<
 		residentRows = nextRows;
 	}
 
-	function applyDelta(
-		delta: VirtualSurfaceResidentRowsDelta<TMountedRow>,
-		capacity: number,
-	): void {
-		resize(capacity);
-		for (const slotIndex of delta.releasedSlotIndexes) {
-			const residentRow = residentRows[slotIndex];
-			if (residentRow?.row !== undefined) residentRow.row = undefined;
-		}
-		for (const row of delta.enteredRows) publishRow(row);
-		for (const row of delta.reboundRows) publishRow(row);
-	}
-
-	function publishRow(row: TMountedRow): void {
-		const slotIndex = row.slotIndex;
-		if (slotIndex === undefined) return;
-		const residentRow = residentRows[slotIndex];
-		if (residentRow && residentRow.row !== row) residentRow.row = row;
-	}
-
 	return {
 		get rows() {
 			return residentRows;
 		},
 		sync,
-		applyDelta,
 	};
 }
 

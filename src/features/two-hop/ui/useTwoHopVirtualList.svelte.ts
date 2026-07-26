@@ -19,10 +19,9 @@ import {
 	buildTwoHopMountedRows,
 	type TwoHopMountedCell,
 	type TwoHopMountedRow,
-	type TwoHopMountedRowDelta,
 	type TwoHopMountedRowsBuild,
 } from "features/two-hop/ui/twoHopMountedRows";
-import { createTwoHopResidentRowSlotAllocator } from "features/two-hop/ui/twoHopResidentRowSlotAllocator";
+import { createResidentRowSlotAllocator } from "ui/virtualization/core/residentSlotAllocator";
 import { createVirtualSurfaceResidentRowsAdapter } from "ui/virtualization/svelte/residentRowViewState.svelte";
 import { useVirtualList } from "ui/virtualization/svelte/useVirtualList.svelte";
 import {
@@ -141,7 +140,7 @@ export function useTwoHopVirtualList(
 	});
 	let document = $state.raw<TwoHopDocument>(documentProjection.getDocument());
 	const measurementState = createViewPlanMeasurementState();
-	const rowSlotAllocator = createTwoHopResidentRowSlotAllocator();
+	const rowSlotAllocator = createResidentRowSlotAllocator();
 	const residentRowsAdapter = createVirtualSurfaceResidentRowsAdapter<
 		TwoHopMountedCell,
 		TwoHopMountedRow
@@ -214,19 +213,12 @@ export function useTwoHopVirtualList(
 		},
 	});
 
-	const applyResidentRowDelta = (
-		build: TwoHopMountedRowsBuild | null,
-		delta: TwoHopMountedRowDelta | null,
-	): void => {
+	const syncResidentRows = (build: TwoHopMountedRowsBuild | null): void => {
 		if (residentRowsBuild === build) return;
-		if (build && delta) {
-			residentRowsAdapter.applyDelta(delta, rowSlotAllocator.capacity);
-		} else {
-			residentRowsAdapter.sync(
-				build?.rowsBySlot ?? EMPTY_MOUNTED_ROWS,
-				rowSlotAllocator.capacity,
-			);
-		}
+		residentRowsAdapter.sync(
+			build?.rowsBySlot ?? EMPTY_MOUNTED_ROWS,
+			rowSlotAllocator.capacity,
+		);
 		residentRowsBuild = build;
 	};
 
@@ -265,15 +257,7 @@ export function useTwoHopVirtualList(
 		},
 		onSnapshotUpdated: (snapshot, reconciliationState) => {
 			const mountedBuild = reconciliationState.mountedBuild;
-			const canApplyRowDelta =
-				mountedBuild !== null &&
-				mountedBuild !== residentRowsBuild &&
-				mountedBuild.deltaBaseIdentity ===
-					(residentRowsBuild?.identity ?? null);
-			applyResidentRowDelta(
-				mountedBuild,
-				canApplyRowDelta ? mountedBuild.rowDelta : null,
-			);
+			syncResidentRows(mountedBuild);
 			syncCardSlots(
 				mountedBuild,
 				untrack(() => props.resolveItemCardModel),

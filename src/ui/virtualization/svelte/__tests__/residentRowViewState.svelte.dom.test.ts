@@ -98,32 +98,6 @@ describe("residentRowViewState", () => {
 		expect(adapter.rows).toHaveLength(4);
 	});
 
-	it("applies only entered, rebound, and released row slots", () => {
-		const adapter = createVirtualSurfaceResidentRowsAdapter<
-			TestMountedCell,
-			TestMountedRow
-		>();
-		const retainedSlot0 = createRow(0, 10);
-		const releasedSlot1 = createRow(1, 11);
-		adapter.sync([retainedSlot0, releasedSlot1], 3);
-		const residentSlot0 = adapter.rows[0];
-		const reboundSlot2 = createRow(2, 12);
-
-		adapter.applyDelta(
-			{
-				enteredRows: [],
-				reboundRows: [reboundSlot2],
-				releasedSlotIndexes: [1],
-			},
-			3,
-		);
-
-		expect(adapter.rows[0]).toBe(residentSlot0);
-		expect(adapter.rows[0]?.row).toBe(retainedSlot0);
-		expect(adapter.rows[1]?.row).toBeUndefined();
-		expect(adapter.rows[2]?.row).toBe(reboundSlot2);
-	});
-
 	it("does not reevaluate retained row expressions when another slot changes", async () => {
 		const resolveCellClassName = vi.fn((cell: TestMountedCell) => cell.label);
 		const initialSlot0 = createRow(0, 0, "slot-0-initial");

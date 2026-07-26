@@ -23,7 +23,7 @@ Vault全体のベンチマークは、インデックス作成レイヤーやE2E
 
 - マウントされるDOM要素の数は、全体の `cardCount` ではなく「マウント範囲」によって制限されること。
 - `renderSlotIndex` は、単一のマウント済みスナップショット内で一意であること。
-- 保持された論理セルは、レイアウトが再利用可能な場合、そのレンダースロットを維持すること。
+- 保持された論理セルは、レイアウトとphysical slot poolのepochが再利用可能な場合、そのレンダースロットを維持すること。
 - `previewVisible` は、 `mounted` の範囲を超えて拡張されないこと。
 - スクロールの測定値は、スクロールのフラッシュごとに1回だけ読み取られ、activeなsubscriberに渡されること。
 - 構造のミューテーションは、同じスクロールコンテナのactive subscriberだけを更新し、他のスクロールコンテナのsubscriberを測定しないこと。
@@ -37,14 +37,35 @@ Vault全体のベンチマークは、インデックス作成レイヤーやE2E
 `TwoHopSurface.svelte` は共有 `VirtualSurface` のphysical row/cell shellとカードbodyを再利用する。
 
 - physical row/cell shellには位置とslot identityだけを保持する。
-- itemの `renderBodyKey` はphysical slot keyと一致させ、別カードへのrebindでもcard componentを維持する。
+- outer shellはphysical slot keyを維持し、itemの`renderBodyKey`はlogical cardに追従させてrebind時にbodyを更新する。
 - resident windowが同一ならmounted-row buildを同一参照で返し、Svelte state commitとDOM writeを行わない。
-- preview候補とrow visibility deltaはsurface所有の`VirtualPreviewSurface`で同期し、`ViewItemCard`は物理slot IDだけを`PreviewHost`へ渡す。
+- row slotには共有のarithmetic allocatorを使用し、`rowsBySlot`をresident adapterへ同期する。capacity増加は新しいpool epochであり、保持rowのslot変更を許容する。
+- preview候補とinteractionはmounted cellsから同期し、`ViewItemCard`は物理slot IDだけを`PreviewHost`へ渡す。
 - item interaction descriptorはphysical slot単位のresolver providerへ同期し、rebind時はentry内容だけを更新する。headerはlogical component lifecycleを使う。
 - load-more bodyは通常のbutton lifecycleを使い、クリック中に同じbodyを別カードへ書き換えない。
 - `TwoHopDocument` と固定grid geometryは全カード分のDOMやcell objectを生成せず、mounted rangeだけをmaterializeする。
 
 契約テストは `features/two-hop/ui/__tests__/TwoHopSurface.svelte.dom.test.ts` と `twoHopMountedRows.test.ts` に置く。`100`/`1,000`/`10,000` cardsと別scroller上の`1`/`8`/`32` surfacesでDOM数がboundedであること、physical slot再利用時にbody keyが変わること、resident hitでbuild identityを維持すること、load-more bodyが新しいlogical cardへremountされることを検証する。
+
+#### Two-hop row-slot allocator比較（2026-07-26）
+
+Two-hop専用のstable allocatorと、共有arithmetic allocator＋`rowsBySlot`通常同期を比較した。Vitest/jsdom上で4 columns、300連続フレーム、7回測定の中央値を使用した。旧方式には専用allocator、cell deltaの`Map`/`Set`差分、row delta差分、delta適用を含め、新方式には共有allocator、mounted row構築、resident capacity全体の同期を含めた。
+
+| `mountedRows` | `scrollerCount`  | 新方式 / 旧方式の実行時間 |
+| ------------- | ---------------- | ------------------------- |
+| `9`           | `1` / `8` / `32` | `0.27` / `0.43` / `0.43`  |
+| `32`          | `1` / `8` / `32` | `0.29` / `0.32` / `0.32`  |
+| `96`          | `1` / `8` / `32` | `0.22` / `0.25` / `0.26`  |
+
+測定範囲では損益分岐点は観測されず、共有allocator＋通常同期がすべての条件で速かった。1行スクロール時のrow writeは、旧方式が退出slotへのrebind 1回、新方式が退出slotのclearと空きslotへのenterの最大2回となる。300フレーム、1 scrollerではそれぞれ次の結果だった。
+
+| `mountedRows` | 旧方式のrow write | 新方式のrow write |
+| ------------- | ----------------- | ----------------- |
+| `9`           | `308`             | `607`             |
+| `32`          | `331`             | `630`             |
+| `96`          | `395`             | `694`             |
+
+新方式はreactive write数を増やす一方、複数の`Map`、`Set`、delta配列の構築を除去することで全体時間を短縮した。capacity増加テストでは共有allocatorにより保持3行のslotがすべて変化したため、capacity増加をpool epoch変更として扱う。この判断は実時間の固定しきい値にはせず、bounded DOM、同一resident windowのidentity維持、同一epoch内のslot一意性を契約テストで維持する。
 
 ## キャッシュ一覧（Cache Inventory）
 

@@ -2,11 +2,11 @@ import { describe, expect, it, vi } from "vitest";
 import { createTwoHopDocument } from "features/two-hop/ui/twoHopDocument";
 import { createTwoHopVirtualRowModel } from "features/two-hop/ui/twoHopVirtualRowModel";
 import { buildTwoHopMountedRows } from "features/two-hop/ui/twoHopMountedRows";
-import { createTwoHopResidentRowSlotAllocator } from "features/two-hop/ui/twoHopResidentRowSlotAllocator";
 import type {
 	TwoHopVirtualListItem,
 	TwoHopVirtualSectionDescriptor,
 } from "features/two-hop/ui/twoHopVirtualListModel";
+import { createResidentRowSlotAllocator } from "ui/virtualization/core/residentSlotAllocator";
 
 const layout = {
 	containerWidth: 420,
@@ -52,7 +52,7 @@ describe("TwoHop keyed mounted rows", () => {
 			initialVisibleCount: 20,
 		});
 		const rowModel = createTwoHopVirtualRowModel(document, layout);
-		const allocator = createTwoHopResidentRowSlotAllocator();
+		const allocator = createResidentRowSlotAllocator();
 		const first = buildTwoHopMountedRows({
 			rowModel,
 			rowRange: { start: 0, end: 2 },
@@ -87,7 +87,7 @@ describe("TwoHop keyed mounted rows", () => {
 			initialVisibleCount: 20,
 		});
 		const rowModel = createTwoHopVirtualRowModel(document, layout);
-		const allocator = createTwoHopResidentRowSlotAllocator();
+		const allocator = createResidentRowSlotAllocator();
 		const first = buildTwoHopMountedRows({
 			rowModel,
 			rowRange: { start: 2, end: 6 },
@@ -104,14 +104,14 @@ describe("TwoHop keyed mounted rows", () => {
 		).toBe(first);
 	});
 
-	it("orders recycled resident rows by physical slot without exposing pool holes", () => {
+	it("orders resident rows by physical slot without exposing pool holes", () => {
 		const document = createTwoHopDocument({
 			sections: [createSection(200)],
 			visibleCounts: {},
 			initialVisibleCount: 200,
 		});
 		const rowModel = createTwoHopVirtualRowModel(document, layout);
-		const allocator = createTwoHopResidentRowSlotAllocator();
+		const allocator = createResidentRowSlotAllocator();
 		const initial = buildTwoHopMountedRows({
 			rowModel,
 			rowRange: { start: 0, end: 3 },
@@ -124,15 +124,11 @@ describe("TwoHop keyed mounted rows", () => {
 			rowSlotAllocator: allocator,
 		});
 
-		expect(shifted.rowSlices.map((row) => row.slotIndex)).toEqual([1, 2, 0]);
-		expect(shifted.rowsBySlot.map((row) => row.slotIndex)).toEqual([0, 1, 2]);
+		expect(shifted.rowSlices.map((row) => row.slotIndex)).toEqual([1, 2, 3]);
+		expect(shifted.rowsBySlot.map((row) => row.slotIndex)).toEqual([1, 2, 3]);
 		expect(shifted.rowsBySlot).toHaveLength(shifted.rowSlices.length);
-		expect(shifted.slotDelta.enteredSlots).toEqual([]);
-		expect(shifted.slotDelta.reboundSlots).toHaveLength(layout.columns);
-		expect(shifted.slotDelta.releasedSlots).toEqual([]);
-		expect(shifted.rowDelta.enteredRows).toEqual([]);
-		expect(shifted.rowDelta.reboundRows).toHaveLength(1);
-		expect(shifted.rowDelta.releasedSlotIndexes).toEqual([]);
+		expect(shifted.rowSlices[0]).toBe(initial.rowSlices[1]);
+		expect(shifted.rowSlices[1]).toBe(initial.rowSlices[2]);
 	});
 
 	it("resolves entering rows through compact geometry and reuses overlapping rows", () => {
@@ -144,7 +140,7 @@ describe("TwoHop keyed mounted rows", () => {
 		const rowModel = createTwoHopVirtualRowModel(document, layout);
 		const getRow = vi.spyOn(rowModel, "getRow");
 		const getDocumentSection = vi.spyOn(rowModel, "getDocumentSection");
-		const allocator = createTwoHopResidentRowSlotAllocator();
+		const allocator = createResidentRowSlotAllocator();
 		const first = buildTwoHopMountedRows({
 			rowModel,
 			rowRange: { start: 1, end: 5 },
@@ -161,7 +157,7 @@ describe("TwoHop keyed mounted rows", () => {
 		expect(getDocumentSection).not.toHaveBeenCalled();
 		expect(shifted.rowSlices.slice(0, 3)).toEqual(first.rowSlices.slice(1, 4));
 		expect(shifted.rowSlices[0]).toBe(first.rowSlices[1]);
-		expect(shifted.rowSlices[3].slotIndex).toBe(first.rowSlices[0].slotIndex);
+		expect(shifted.rowSlices[3].slotIndex).not.toBe(first.rowSlices[0].slotIndex);
 		expect(shifted.cells).toBe(shifted.cells);
 		expect(shifted.reusableCellsByKey).toBe(shifted.reusableCellsByKey);
 	});
