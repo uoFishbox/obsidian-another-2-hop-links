@@ -76,7 +76,7 @@ describe("TwoHop keyed mounted rows", () => {
 		const firstPhysicalRow = first.rowsBySlot.find((row) => row.slotIndex === 0);
 		const jumpedPhysicalRow = jumped.rowsBySlot.find((row) => row.slotIndex === 0);
 		expect(firstPhysicalRow?.rowIndex).toBe(0);
-		expect(jumpedPhysicalRow?.rowIndex).toBe(5);
+		expect(jumpedPhysicalRow?.rowIndex).toBe(6);
 		expect(jumpedPhysicalRow?.slotKey).toBe(firstPhysicalRow?.slotKey);
 		expect(jumpedPhysicalRow?.cells[0].cellSlotKey).toBe(
 			firstPhysicalRow?.cells[0].cellSlotKey,
@@ -138,8 +138,8 @@ describe("TwoHop keyed mounted rows", () => {
 			rowSlotAllocator: allocator,
 		});
 
-		expect(shifted.rowSlices.map((row) => row.slotIndex)).toEqual([1, 2, 3]);
-		expect(shifted.rowsBySlot.map((row) => row.slotIndex)).toEqual([1, 2, 3]);
+		expect(shifted.rowSlices.map((row) => row.slotIndex)).toEqual([1, 2, 0]);
+		expect(shifted.rowsBySlot.map((row) => row.slotIndex)).toEqual([0, 1, 2]);
 		expect(shifted.rowsBySlot).toHaveLength(shifted.rowSlices.length);
 		expect(shifted.rowSlices[0]).toBe(initial.rowSlices[1]);
 		expect(shifted.rowSlices[1]).toBe(initial.rowSlices[2]);
@@ -174,8 +174,43 @@ describe("TwoHop keyed mounted rows", () => {
 		expect(getDocumentSection).not.toHaveBeenCalled();
 		expect(shifted.rowSlices.slice(0, 3)).toEqual(first.rowSlices.slice(1, 4));
 		expect(shifted.rowSlices[0]).toBe(first.rowSlices[1]);
-		expect(shifted.rowSlices[3].slotIndex).not.toBe(first.rowSlices[0].slotIndex);
+		expect(shifted.rowSlices[3].slotIndex).toBe(first.rowSlices[0].slotIndex);
 		expect(shifted.cells).toBe(shifted.cells);
 		expect(shifted.reusableCellsByKey).toBe(shifted.reusableCellsByKey);
+	});
+
+	it("keeps every resident slot defined and replaces only the leaving row", () => {
+		const document = createTwoHopDocument({
+			sections: [createSection(40)],
+			visibleCounts: {},
+			initialVisibleCount: 40,
+		});
+		const rowModel = createTwoHopVirtualRowModel(
+			document,
+			createLayoutPublication(layout, 1),
+		);
+		const allocator = createResidentRowSlotAllocator();
+		const first = buildTwoHopMountedRows({
+			rowModel,
+			rowRange: { start: 1, end: 5 },
+			rowSlotAllocator: allocator,
+		});
+		const shifted = buildTwoHopMountedRows({
+			rowModel,
+			rowRange: { start: 2, end: 6 },
+			previousBuild: first,
+			rowSlotAllocator: allocator,
+		});
+
+		expect(allocator.capacity).toBe(4);
+		expect(first.rowsBySlot).toHaveLength(allocator.capacity);
+		expect(shifted.rowsBySlot).toHaveLength(allocator.capacity);
+
+		const changedRows = shifted.rowsBySlot.filter(
+			(row, slotIndex) => row !== first.rowsBySlot[slotIndex],
+		);
+		expect(changedRows).toHaveLength(1);
+		expect(changedRows[0]?.rowIndex).toBe(5);
+		expect(changedRows[0]?.slotIndex).toBe(first.rowSlices[0]?.slotIndex);
 	});
 });

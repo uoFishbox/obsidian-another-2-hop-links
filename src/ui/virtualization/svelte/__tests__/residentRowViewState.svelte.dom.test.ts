@@ -128,4 +128,42 @@ describe("residentRowViewState", () => {
 			resolveCellClassName.mock.calls.map(([cell]) => cell.label),
 		).not.toContain("slot-1-retained");
 	});
+
+	it("keeps row and cell DOM shells when a resident slot changes logical row", async () => {
+		const adapter = createVirtualSurfaceResidentRowsAdapter<
+			TestMountedCell,
+			TestMountedRow
+		>();
+		adapter.sync([createRow(0, 100, "row-100")], 1);
+		const { container } = render(ResidentRowsSurfaceHarness, {
+			props: {
+				residentRows: adapter.rows,
+				getCellClassName: () => undefined,
+			},
+		});
+		await tick();
+
+		const host = container.querySelector(
+			".resident-rows-test-root",
+		) as HTMLElement | null;
+		const shadowRoot = host?.shadowRoot;
+		expect(shadowRoot).toBeTruthy();
+		if (!shadowRoot) return;
+
+		const previousRowElement = shadowRoot.querySelector("[data-ccl-row-slot='0']");
+		const previousCellElement = shadowRoot.querySelector("[data-ccl-cell-slot]");
+		expect(previousRowElement).toBeTruthy();
+		expect(previousCellElement).toBeTruthy();
+
+		adapter.sync([createRow(0, 101, "row-101")], 1);
+		await tick();
+
+		expect(shadowRoot.querySelector("[data-ccl-row-slot='0']")).toBe(
+			previousRowElement,
+		);
+		expect(shadowRoot.querySelector("[data-ccl-cell-slot]")).toBe(
+			previousCellElement,
+		);
+		expect(previousCellElement?.textContent).toContain("row-101");
+	});
 });

@@ -143,7 +143,7 @@ const expectUniqueRenderSlots = (
 };
 
 describe("VirtualListEngine contract", () => {
-	it("keeps DOM slots unique while logical cells scroll into headroom", () => {
+	it("keeps DOM slots unique and reuses them when logical cells scroll", () => {
 		const rowModel = createRowModel(12);
 		const initial = computeSnapshot({ rowModel, scrollTop: 0 });
 		const shifted = computeSnapshot({
@@ -166,7 +166,7 @@ describe("VirtualListEngine contract", () => {
 			0, 1, 2,
 		]);
 		expect(shifted.mountedCells.map((cell) => cell.renderSlotKey)).toEqual([
-			3, 4, 5,
+			0, 1, 2,
 		]);
 		expectUniqueRenderSlots(shifted.mountedCells);
 	});

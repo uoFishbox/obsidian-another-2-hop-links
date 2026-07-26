@@ -161,7 +161,7 @@ describe("linkListVirtualLayout", () => {
 			items,
 			visibleWindow: { start: 0, end: 30 },
 		});
-		expect(build.poolCapacity).toBe(15);
+		expect(build.poolCapacity).toBe(10);
 
 		for (const visibleWindow of [
 			{ start: 27, end: 30 },
@@ -170,7 +170,7 @@ describe("linkListVirtualLayout", () => {
 			{ start: 54, end: 84 },
 		]) {
 			build = buildCells({ items, visibleWindow, previousBuild: build });
-			expect(build.poolCapacity).toBe(15);
+			expect(build.poolCapacity).toBe(10);
 			expect(
 				Math.max(...build.rowSlices.map((row) => row.slotIndex)),
 			).toBeLessThan(build.poolCapacity);
@@ -387,7 +387,7 @@ describe("linkListVirtualLayout", () => {
 
 		expectSameSlotsForKeys(initial, shifted, [itemKey(3), itemKey(4), itemKey(5)]);
 		expect(shifted.rowSlices.map((row) => row.rowIndex)).toEqual([1, 2]);
-		expect(shifted.rowSlices.map((row) => row.slotIndex)).toEqual([1, 2]);
+		expect(shifted.rowSlices.map((row) => row.slotIndex)).toEqual([1, 0]);
 		expectUniqueRenderSlots(shifted.cells);
 	});
 
@@ -420,8 +420,8 @@ describe("linkListVirtualLayout", () => {
 
 		expect(shifted.rowSlices[0]).toBe(initial.rowSlices[1]);
 		expect(shifted.rowSlices[0].cells).toBe(initial.rowSlices[1].cells);
-		expect(shifted.rowSlices[1].slotIndex).toBe(2);
-		expect(shifted.rowSlices[1].slotIndex).not.toBe(initial.rowSlices[0].slotIndex);
+		expect(shifted.rowSlices[1].slotIndex).toBe(0);
+		expect(shifted.rowSlices[1].slotIndex).toBe(initial.rowSlices[0].slotIndex);
 	});
 
 	it("keeps item body keys stable when item render revisions are stable", () => {

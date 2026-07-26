@@ -52,7 +52,7 @@ export function createResidentRowSlotAllocator(): ResidentRowSlotAllocator {
 		let nextCapacity = capacity;
 
 		if (activeRows > capacity) {
-			nextCapacity = Math.max(activeRows, Math.ceil(activeRows * 1.25) + 2);
+			nextCapacity = activeRows;
 		}
 
 		if (nextCapacity === capacity) return;
