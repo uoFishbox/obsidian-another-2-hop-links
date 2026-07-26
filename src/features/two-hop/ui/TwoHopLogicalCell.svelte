@@ -8,7 +8,7 @@
 	import type { IconName } from "ui/shared/icons/iconRegistry";
 	import type { TwoHopMountedCell } from "features/two-hop/ui/twoHopMountedRows";
 	import {
-		resolveTwoHopItemStaticState,
+		resolveTwoHopCardPresentation,
 		resolveTwoHopSectionVariant,
 	} from "features/two-hop/ui/twoHopCellStaticState";
 
@@ -31,10 +31,10 @@
 	const itemPresentation = $derived.by(() => {
 		if (mountedCell.cell.kind !== "item") return null;
 		if (cardModel?.presentation) return cardModel.presentation;
-		return resolveTwoHopItemStaticState(
+		return resolveTwoHopCardPresentation(
 			mountedCell.cell.item,
 			mountedCell.section.header.section,
-		).presentation;
+		);
 	});
 	const resolveHeaderIcon = (): IconName => {
 		switch (mountedCell.section.header.section.kind) {

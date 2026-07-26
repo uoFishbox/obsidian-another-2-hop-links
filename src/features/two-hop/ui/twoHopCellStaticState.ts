@@ -1,5 +1,4 @@
 import { isAttachment } from "core/rules/fileRules";
-import { createItemInteractionKey } from "ui/interactions/interactionTypes";
 import type {
 	CardPresentationState,
 	CardSectionVariant,
@@ -11,16 +10,7 @@ import type {
 
 export type TwoHopCardSectionVariant = CardSectionVariant;
 
-export type TwoHopItemReuseFamily = "resolved-card" | "missing-branch" | "new-link";
-
 export type TwoHopCardPresentationState = CardPresentationState;
-
-/** Immutable display and interaction data shared by bindings for one logical cell. */
-export interface TwoHopCellStaticState {
-	readonly reuseFamily: TwoHopItemReuseFamily | null;
-	readonly presentation: TwoHopCardPresentationState | null;
-	readonly interactionId: string | null;
-}
 
 export function resolveTwoHopSectionVariant(
 	section: TwoHopVirtualListSection,
@@ -44,56 +34,31 @@ export function resolveTwoHopSectionVariant(
 	}
 }
 
-/** Resolves item data once while compiling a TwoHop view plan. */
-export function resolveTwoHopItemStaticState(
+/** Resolves the card presentation for a two-hop item within its section. */
+export function resolveTwoHopCardPresentation(
 	row: TwoHopVirtualListItem,
 	section: TwoHopVirtualListSection,
-): TwoHopCellStaticState {
+): TwoHopCardPresentationState | null {
 	const sectionVariant = resolveTwoHopSectionVariant(section);
 	const extension = resolveItemExtension(row.item);
-	const interactionId = row.interactionId ?? createItemInteractionKey(row.item);
 
 	switch (row.item.type) {
 		case "newLink":
-			return {
-				reuseFamily: "new-link",
-				presentation: createPresentationState(
-					sectionVariant,
-					extension,
-					"missing",
-				),
-				interactionId,
-			};
+			return createPresentationState(sectionVariant, extension, "missing");
 		case "branch": {
 			const missing = row.item.data.hop1.isUnresolved;
-			return {
-				reuseFamily: missing ? "missing-branch" : "resolved-card",
-				presentation: createPresentationState(
-					sectionVariant,
-					extension,
-					missing ? "missing" : "resolved",
-				),
-				interactionId,
-			};
+			return createPresentationState(
+				sectionVariant,
+				extension,
+				missing ? "missing" : "resolved",
+			);
 		}
 		case "taggedNote":
 		case "file":
 		case "backlink":
-			return {
-				reuseFamily: "resolved-card",
-				presentation: createPresentationState(
-					sectionVariant,
-					extension,
-					"resolved",
-				),
-				interactionId,
-			};
+			return createPresentationState(sectionVariant, extension, "resolved");
 		default:
-			return {
-				reuseFamily: null,
-				presentation: null,
-				interactionId: row.interactionId ?? null,
-			};
+			return null;
 	}
 }
 

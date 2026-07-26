@@ -39,7 +39,7 @@ import {
 	createVirtualPreviewSurface,
 	type RowPreviewWindow,
 } from "features/preview/scheduling/virtualPreviewSurface";
-import { resolveTwoHopItemStaticState } from "features/two-hop/ui/twoHopCellStaticState";
+import { resolveTwoHopCardPresentation } from "features/two-hop/ui/twoHopCellStaticState";
 import { createVirtualCardInteractionController } from "ui/interactions/virtualCardInteractionController";
 import { useAppContext, useLinkContext } from "ui/context/linkContext";
 import type { RowRange } from "ui/virtualization/rowRange";
@@ -199,10 +199,10 @@ export function useTwoHopVirtualList(
 		resolver: TwoHopVirtualListProps["resolveItemCardModel"],
 	) => {
 		if (cell.cell.kind !== "item" || !resolver) return undefined;
-		const presentation = resolveTwoHopItemStaticState(
+		const presentation = resolveTwoHopCardPresentation(
 			cell.cell.item,
 			cell.section.header.section,
-		).presentation;
+		);
 		if (!presentation) return undefined;
 		return resolver(cell.cell.item, presentation);
 	};
