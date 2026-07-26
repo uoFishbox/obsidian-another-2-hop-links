@@ -13,10 +13,12 @@
 		TwoHopVirtualListItem,
 		TwoHopVirtualSectionDescriptor,
 	} from "features/two-hop/ui/twoHopVirtualListModel";
+	import type { TwoHopPreviewDependencies } from "features/two-hop/ui/twoHopPreviewDependencies";
 
 	interface Props {
 		sections: readonly TwoHopVirtualSectionDescriptor[];
-		applicationStore?: ApplicationStore;
+		applicationStore: ApplicationStore;
+		previewDependencies?: TwoHopPreviewDependencies;
 		initialVisibleCount?: number;
 		loadMoreIncrement?: number;
 		paginationScope?: string;

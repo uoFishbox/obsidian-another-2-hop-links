@@ -22,6 +22,8 @@
 	import { createTwoHopSectionDescriptorIdentityCache } from "features/two-hop/ui/section-descriptors/cache";
 	import type { TwoHopLinksRootUiState } from "features/two-hop/ui/twoHopLinksRootUiState";
 	import { observePreviewSurfaceVisibility } from "features/preview/scheduling/previewSurfaceVisibility";
+	import type { TwoHopPreviewDependencies } from "features/two-hop/ui/twoHopPreviewDependencies";
+	import { resolvePreviewActivationsPerSecond } from "appConstants";
 
 	interface Props {
 		file: TFile;
@@ -164,6 +166,28 @@
 	setContext<ApplicationStore>("applicationStore", applicationStore);
 	setLazyLoaderCache(lazyLoaderCache);
 
+	const previewDependencies: TwoHopPreviewDependencies = {
+		app,
+		getPreview: linkContext.getPreview,
+		getSettings: () => applicationStore.settings,
+		getPreviewRenderVersion: (filePath) =>
+			applicationStore.getPreviewRenderVersion(filePath),
+		resolveSearchMatchPosition: (query, targetFile) =>
+			workerSearchSession.getFirstMatchPosition(query, targetFile),
+		getBackpressure: () => ({
+			queued: linkContext.getVisiblePreviewQueueSize?.() ?? 0,
+			active: linkContext.getActiveVisiblePreviewCount?.() ?? 0,
+		}),
+		subscribeBackpressure: linkContext.subscribeVisiblePreviewQueue,
+		schedulerIdentity: linkContext.previewSchedulingIdentity,
+		getActivationsPerSecond: () =>
+			resolvePreviewActivationsPerSecond(
+				applicationStore.settings.previewDomCommitsPerSecond,
+			),
+		getDomCommitsPerSecond: () =>
+			applicationStore.settings.previewDomCommitsPerSecond,
+	};
+
 	let rootEl = $state<HTMLDivElement | null>(null);
 	let previewSurfaceActive = $state(true);
 	let resultsContainerEl = $state<HTMLDivElement | null>(null);
@@ -293,6 +317,7 @@
 				{initialVisibleCount}
 				{loadMoreIncrement}
 				{linkContext}
+				{previewDependencies}
 				previewActive={previewSurfaceActive}
 			/>
 			{#if !filteredDisplayData.twoHopBranches.length && showTwoHopPlaceholder}

@@ -1,17 +1,48 @@
 <script lang="ts">
 	import ViewItemCard from "ui/components/items/ViewItemCard.svelte";
-	import type { PluginSettings } from "features/settings/model";
 	import type { TwoHopVirtualSectionDescriptor } from "features/two-hop/ui/twoHopVirtualListModel";
+	import type { ApplicationStore } from "ui/stores/ApplicationStore.svelte";
+	import type { TwoHopPreviewDependencies } from "features/two-hop/ui/twoHopPreviewDependencies";
+	import { captureTwoHopSurfacePageStubProps } from "./twoHopSurfacePageStubCapture";
 
 	interface Props {
 		sections: readonly TwoHopVirtualSectionDescriptor[];
-		applicationStore: { settings: PluginSettings };
+		applicationStore: ApplicationStore;
+		previewDependencies?: TwoHopPreviewDependencies;
+		previewActive?: boolean;
 	}
 
-	let { sections, applicationStore }: Props = $props();
+	let {
+		sections,
+		applicationStore,
+		previewDependencies = undefined,
+		previewActive = true,
+	}: Props = $props();
+
+	$effect(() => {
+		captureTwoHopSurfacePageStubProps({
+			applicationStore,
+			previewDependencies,
+			previewActive,
+		});
+	});
 </script>
 
-<div class="view-plan-virtual-list">
+<div
+	class="view-plan-virtual-list"
+	data-testid="two-hop-surface-stub"
+	data-has-preview-dependencies={String(previewDependencies !== undefined)}
+	data-has-preview-loader={String(
+		typeof previewDependencies?.getPreview === "function",
+	)}
+	data-settings-getter-matches={String(
+		previewDependencies?.getSettings() === applicationStore.settings,
+	)}
+	data-has-search-position-resolver={String(
+		typeof previewDependencies?.resolveSearchMatchPosition === "function",
+	)}
+	data-preview-active={String(previewActive)}
+>
 	{#each sections as descriptor}
 		<section data-section-id={descriptor.sectionId}>
 			{#each descriptor.getItems() as row}

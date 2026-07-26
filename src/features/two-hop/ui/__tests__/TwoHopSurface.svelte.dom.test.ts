@@ -24,14 +24,15 @@ import type {
 import { createSectionDataRevision } from "features/two-hop/ui/twoHopRevisions";
 import type { CardRenderModel } from "ui/components/items/cardRenderModel";
 import type { LinkContext } from "ui/context/linkContext";
-import type { AppContext } from "ui/context/linkContext";
 import type { App, TFile } from "obsidian";
+import type { TwoHopPreviewDependencies } from "features/two-hop/ui/twoHopPreviewDependencies";
 import {
 	getCCLDevMeasurementSnapshot,
 	resetCCLDevMeasurements,
 } from "infrastructure/debug/CCLDevMeasurements";
 
 const previewSurfaceCalls = vi.hoisted(() => ({
+	create: vi.fn(),
 	commitBindingDelta: vi.fn(),
 	syncBindingDelta: vi.fn(),
 }));
@@ -46,6 +47,7 @@ vi.mock("features/preview/scheduling/virtualPreviewSurface", async (importOrigin
 		createVirtualPreviewSurface: (
 			...args: Parameters<typeof actual.createVirtualPreviewSurface>
 		) => {
+			previewSurfaceCalls.create(...args);
 			const surface = actual.createVirtualPreviewSurface(...args);
 			return {
 				...surface,
@@ -67,6 +69,7 @@ vi.mock("features/preview/scheduling/virtualPreviewSurface", async (importOrigin
 });
 
 beforeEach(() => {
+	previewSurfaceCalls.create.mockClear();
 	previewSurfaceCalls.commitBindingDelta.mockClear();
 	previewSurfaceCalls.syncBindingDelta.mockClear();
 	resetRecords();
@@ -120,7 +123,28 @@ const applicationStore = {
 	},
 } as unknown as ApplicationStore;
 
-async function renderScrollableSurface(count: number): Promise<{
+function createPreviewDependencies(
+	getPreview: TwoHopPreviewDependencies["getPreview"] = vi.fn(async () => ({
+		type: "empty" as const,
+		content: "",
+	})),
+): TwoHopPreviewDependencies {
+	return {
+		app: { vault: {} } as App,
+		getPreview,
+		getSettings: () => applicationStore.settings,
+		getPreviewRenderVersion: () => "1:0",
+		resolveSearchMatchPosition: () => undefined,
+		getBackpressure: () => ({ queued: 0, active: 0 }),
+		getActivationsPerSecond: () => 60,
+		getDomCommitsPerSecond: () => 60,
+	};
+}
+
+async function renderScrollableSurface(
+	count: number,
+	previewDependencies?: TwoHopPreviewDependencies,
+): Promise<{
 	root: HTMLElement;
 	scroller: HTMLElement;
 }> {
@@ -138,6 +162,7 @@ async function renderScrollableSurface(count: number): Promise<{
 			sections: [createSection(count)],
 			applicationStore,
 			initialVisibleCount: count,
+			previewDependencies,
 		},
 	});
 	const root = scroller.querySelector<HTMLElement>(".twohop-keyed-surface");
@@ -177,7 +202,10 @@ async function scrollSurface(
 
 describe("TwoHopSurface", () => {
 	it("publishes each snapshot through the combined preview commit", async () => {
-		const { root, scroller } = await renderScrollableSurface(100);
+		const { root, scroller } = await renderScrollableSurface(
+			100,
+			createPreviewDependencies(),
+		);
 		previewSurfaceCalls.commitBindingDelta.mockClear();
 		previewSurfaceCalls.syncBindingDelta.mockClear();
 
@@ -210,16 +238,7 @@ describe("TwoHopSurface", () => {
 			fileToLinktext: () => "preview",
 			getMetadata: () => null,
 		} as unknown as LinkContext;
-		const appContext = {
-			app: { vault: {} } as App,
-			applicationStore,
-			linkContext,
-			bookmarks: {
-				filePaths: new Set(),
-				orderedFilePaths: [],
-				isBookmarked: () => false,
-			},
-		} as AppContext;
+		const previewDependencies = createPreviewDependencies(getPreview);
 		const resolveItemCardModel = (
 			item: TwoHopVirtualListItem,
 			presentation: CardRenderModel["presentation"],
@@ -250,28 +269,36 @@ describe("TwoHopSurface", () => {
 			},
 		});
 		resetCCLDevMeasurements();
-		const { container } = render(TwoHopSurfaceModelHarness, {
-			props: {
-				sections: [createSection(1)],
-				applicationStore,
-				linkContext,
-				appContext,
-				resolveItemCardModel,
-			},
+		const harnessProps = {
+			sections: [createSection(1)],
+			applicationStore,
+			linkContext,
+			previewDependencies,
+			previewActive: false,
+			resolveItemCardModel,
+		};
+		const { container, rerender } = render(TwoHopSurfaceModelHarness, {
+			props: harnessProps,
 		});
 		const root = container.querySelector<HTMLElement>(".twohop-keyed-surface");
 		const host = root?.shadowRoot?.querySelector<HTMLElement>(
 			'[data-preview-owner="virtual-surface"]',
 		);
 		expect(host).not.toBeNull();
-		const reevaluationsBefore =
-			getCCLDevMeasurementSnapshot().counters["component.ViewItemCard.reevaluate"]
-				.count;
 
 		for (let index = 0; index < 6; index += 1) {
 			await flushFrames();
 			await Promise.resolve();
 		}
+		expect(getPreview).not.toHaveBeenCalled();
+
+		await rerender({
+			...harnessProps,
+			previewActive: true,
+		});
+		const reevaluationsBefore =
+			getCCLDevMeasurementSnapshot().counters["component.ViewItemCard.reevaluate"]
+				.count;
 		await waitFor(() => expect(getPreview).toHaveBeenCalled());
 		for (let index = 0; index < 4; index += 1) {
 			await flushFrames();
@@ -284,6 +311,17 @@ describe("TwoHopSurface", () => {
 			getCCLDevMeasurementSnapshot().counters["component.ViewItemCard.reevaluate"]
 				.count,
 		).toBe(reevaluationsBefore);
+	});
+
+	it("does not create preview runtime when preview dependencies are omitted", () => {
+		render(TwoHopSurface, {
+			props: {
+				sections: [createSection(1)],
+				applicationStore,
+			},
+		});
+
+		expect(previewSurfaceCalls.create).not.toHaveBeenCalled();
 	});
 
 	it("shares each resolved card model with the rendered slot", () => {

@@ -1,4 +1,4 @@
-import { getContext, onDestroy, untrack } from "svelte";
+import { onDestroy, untrack } from "svelte";
 import type { ApplicationStore } from "ui/stores/ApplicationStore.svelte";
 import type {
 	TwoHopVirtualListItem,
@@ -34,23 +34,17 @@ import {
 	type ViewPlanLayoutMetrics,
 } from "ui/virtualization/svelte/viewPlanLayout";
 import { createResolvedCardLayoutSettingsMemo } from "ui/shared/layout/cardLayoutCssVars";
-import type { PreviewBackpressure } from "features/preview/scheduling/previewActivationScheduler";
 import {
 	createVirtualPreviewSurface,
 	type RowPreviewWindow,
+	type VirtualPreviewSurface,
 } from "features/preview/scheduling/virtualPreviewSurface";
 import { resolveTwoHopCardPresentation } from "features/two-hop/ui/twoHopCellStaticState";
 import { createVirtualCardInteractionController } from "ui/interactions/virtualCardInteractionController";
-import { useAppContext, useLinkContext } from "ui/context/linkContext";
 import type { RowRange } from "ui/virtualization/rowRange";
 import type { VirtualNavigationTarget } from "ui/virtualization/types";
 import type { ResultNavigationDirection } from "features/keyboard-navigation/resultFocus";
 import type { VirtualFrameCoordinator } from "ui/virtualization/scheduling/frameCoordinator";
-import {
-	DEFAULT_PREVIEW_DOM_COMMITS_PER_SECOND,
-	resolvePreviewActivationsPerSecond,
-} from "appConstants";
-import { DEFAULT_SETTINGS } from "features/settings/model";
 import {
 	createVirtualCardSlotBindings,
 	type VirtualCardSlotBinding,
@@ -60,10 +54,12 @@ import {
 	createLayoutPublication,
 	type TwoHopLayoutPublication,
 } from "features/two-hop/ui/twoHopRevisions";
+import type { TwoHopPreviewDependencies } from "features/two-hop/ui/twoHopPreviewDependencies";
 
 export interface TwoHopVirtualListProps {
 	readonly sections: readonly TwoHopVirtualSectionDescriptor[];
-	readonly applicationStore?: ApplicationStore;
+	readonly applicationStore: ApplicationStore;
+	readonly previewDependencies?: TwoHopPreviewDependencies;
 	readonly initialVisibleCount?: number;
 	readonly loadMoreIncrement?: number;
 	readonly paginationScope?: string;
@@ -86,56 +82,32 @@ export type TwoHopRenderSlotState = VirtualCardSlotState<
 const EMPTY_RANGE: RowRange = { start: 0, end: 0 };
 const EMPTY_MOUNTED_ROWS: readonly [] = [];
 
+function createDisabledVirtualPreviewSurface(): VirtualPreviewSurface {
+	return {
+		registerHost: () => ({
+			dispose: () => {},
+		}),
+		syncBindingDelta: () => {},
+		setPreviewWindow: () => {},
+		commitBindingDelta: () => {},
+		dispose: () => {},
+	};
+}
+
 /** Connects TwoHop geometry to the shared pooled-row virtual surface. */
 export function useTwoHopVirtualList(
 	props: TwoHopVirtualListProps,
 	frameCoordinator?: VirtualFrameCoordinator,
 ) {
-	let applicationStore = props.applicationStore;
-	if (!applicationStore) {
-		try {
-			applicationStore = getContext<ApplicationStore>("applicationStore");
-		} catch {
-			applicationStore = undefined;
-		}
-	}
-
-	let linkContext: ReturnType<typeof useLinkContext> | undefined;
-	try {
-		linkContext = useLinkContext();
-	} catch {
-		linkContext = undefined;
-	}
-	let appContext: ReturnType<typeof useAppContext> | undefined;
-	try {
-		appContext = useAppContext();
-	} catch {
-		appContext = undefined;
-	}
-	const previewApplicationStore = applicationStore ?? appContext?.applicationStore;
-	const previewSurface = createVirtualPreviewSurface({
-		app: appContext?.app,
-		getPreview: linkContext?.getPreview,
-		getSettings: () => previewApplicationStore?.settings ?? DEFAULT_SETTINGS,
-		getPreviewRenderVersion: (filePath) =>
-			previewApplicationStore?.getPreviewRenderVersion?.(filePath) ?? "0:0",
-		resolveSearchMatchPosition: appContext?.resolveSearchMatchPosition,
-		getBackpressure: (): PreviewBackpressure => ({
-			queued: linkContext?.getVisiblePreviewQueueSize?.() ?? 0,
-			active: linkContext?.getActiveVisiblePreviewCount?.() ?? 0,
-		}),
-		subscribeBackpressure: linkContext?.subscribeVisiblePreviewQueue,
-		schedulerIdentity: linkContext?.previewSchedulingIdentity,
-		frameCoordinator,
-		getActivationsPerSecond: () =>
-			resolvePreviewActivationsPerSecond(
-				previewApplicationStore?.settings.previewDomCommitsPerSecond ??
-					DEFAULT_PREVIEW_DOM_COMMITS_PER_SECOND,
-			),
-		getDomCommitsPerSecond: () =>
-			previewApplicationStore?.settings.previewDomCommitsPerSecond ??
-			DEFAULT_PREVIEW_DOM_COMMITS_PER_SECOND,
-	});
+	const applicationStore = props.applicationStore;
+	const previewSurface = props.previewDependencies
+		? createVirtualPreviewSurface({
+				...props.previewDependencies,
+				frameCoordinator,
+			})
+		: createDisabledVirtualPreviewSurface();
+	const isPreviewActive = () =>
+		props.previewDependencies !== undefined && props.previewActive !== false;
 	const interactionController = createVirtualCardInteractionController();
 	const documentProjection = createTwoHopDocumentProjection({
 		sections: props.sections,
@@ -153,7 +125,7 @@ export function useTwoHopVirtualList(
 	>();
 	const resolveConfiguredLayout = createResolvedCardLayoutSettingsMemo();
 	const configuredLayout = $derived(
-		resolveConfiguredLayout(applicationStore?.settings),
+		resolveConfiguredLayout(applicationStore.settings),
 	);
 
 	let cachedDocument: TwoHopDocument | undefined;
@@ -277,7 +249,7 @@ export function useTwoHopVirtualList(
 				untrack(() => props.resolveItemCardModel),
 				{
 					previewRange: snapshot.ranges.previewVisible,
-					active: untrack(() => props.previewActive !== false),
+					active: untrack(isPreviewActive),
 				},
 			);
 		},
@@ -285,9 +257,9 @@ export function useTwoHopVirtualList(
 
 	const policyResolver = createViewPlanCardVirtualListPolicyResolver({
 		getPreviewActivationAheadRows: () =>
-			applicationStore?.settings?.previewActivationAheadRows ?? 1,
+			applicationStore.settings.previewActivationAheadRows,
 		getMountedOverscanRows: () =>
-			applicationStore?.settings?.enableTwoRowMountedOverscan ? 2 : 1,
+			applicationStore.settings.enableTwoRowMountedOverscan ? 2 : 1,
 	});
 	const initialRowModel = resolveRowModel(measurementState.layout);
 	if (initialRowModel.rowCount > 0) {
@@ -315,7 +287,7 @@ export function useTwoHopVirtualList(
 				if (!snapshot) return;
 				previewSurface.setPreviewWindow({
 					previewRange: EMPTY_RANGE,
-					active: untrack(() => props.previewActive !== false),
+					active: untrack(isPreviewActive),
 				});
 			},
 		},
@@ -358,7 +330,7 @@ export function useTwoHopVirtualList(
 
 	$effect(() => {
 		const resolver = props.resolveItemCardModel;
-		const active = props.previewActive !== false;
+		const active = isPreviewActive();
 		const build = untrack(() => virtualList.getReconciliationState().mountedBuild);
 		const snapshot = untrack(() => virtualList.getSnapshot());
 		if (!snapshot) return;

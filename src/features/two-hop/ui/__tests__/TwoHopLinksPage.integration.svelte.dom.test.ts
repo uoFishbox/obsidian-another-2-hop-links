@@ -13,6 +13,10 @@ import type {
 } from "types/domain";
 import type { DisplayData } from "features/two-hop/application/displayDataBuilder";
 import TwoHopLinksPage from "../TwoHopLinksPage.svelte";
+import {
+	getTwoHopSurfacePageStubProps,
+	resetTwoHopSurfacePageStubProps,
+} from "./twoHopSurfacePageStubCapture";
 
 vi.mock("features/search/searchWorkerClient", async () => {
 	const { filterSearchWorkerDataset } =
@@ -310,6 +314,7 @@ async function flushAsyncUi(): Promise<void> {
 describe("TwoHopLinksPage descriptor plumbing", () => {
 	beforeEach(() => {
 		vi.useFakeTimers();
+		resetTwoHopSurfacePageStubProps();
 	});
 
 	afterEach(() => {
@@ -346,6 +351,49 @@ describe("TwoHopLinksPage descriptor plumbing", () => {
 		expect(screen.getByText("outgoing-parent")).toBeInTheDocument();
 		expect(screen.getByText("backlink-note")).toBeInTheDocument();
 		expect(screen.getByText("tagged-note")).toBeInTheDocument();
+	});
+
+	it("passes one explicit preview dependency set to the virtual surface", async () => {
+		const file = createMockTFile("notes/target.md");
+		const parentFile = createMockTFile("notes/outgoing-parent.md");
+		const displayData = {
+			...createDisplayData(),
+			outgoing: [createBranch(file, parentFile, [], "outgoing-parent")],
+		};
+		const settings = {
+			...DEFAULT_SETTINGS,
+			useMergedLinksSection: false,
+			showTagsSection: false,
+		};
+
+		const rootProps = createRootProps(displayData, settings, file);
+		render(TwoHopLinksPage, {
+			props: rootProps,
+		});
+		await flushAsyncUi();
+
+		const surface = screen.getByTestId("two-hop-surface-stub");
+		const capturedProps = getTwoHopSurfacePageStubProps();
+		expect(surface.dataset.hasPreviewDependencies).toBe("true");
+		expect(surface.dataset.hasPreviewLoader).toBe("true");
+		expect(surface.dataset.settingsGetterMatches).toBe("true");
+		expect(surface.dataset.hasSearchPositionResolver).toBe("true");
+		expect(surface.dataset.previewActive).toBe("true");
+		expect(capturedProps?.applicationStore).toBe(rootProps.applicationStore);
+		expect(capturedProps?.previewDependencies?.getPreview).toBe(
+			rootProps.linkContext.getPreview,
+		);
+		expect(capturedProps?.previewDependencies?.app).toBe(rootProps.app);
+		expect(capturedProps?.previewDependencies?.getSettings()).toBe(
+			rootProps.applicationStore.settings,
+		);
+
+		const nextSettings = {
+			...settings,
+			previewDomCommitsPerSecond: settings.previewDomCommitsPerSecond + 1,
+		};
+		rootProps.applicationStore.settings = nextSettings;
+		expect(capturedProps?.previewDependencies?.getSettings()).toBe(nextSettings);
 	});
 
 	it("propagates item count changes for the same sectionId (memo regression)", async () => {

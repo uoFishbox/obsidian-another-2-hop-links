@@ -1,5 +1,4 @@
 <script lang="ts">
-	import { getContext } from "svelte";
 	import TwoHopSurface from "features/two-hop/ui/TwoHopSurface.svelte";
 	import type { ApplicationStore } from "ui/stores/ApplicationStore.svelte";
 	import type {
@@ -10,7 +9,6 @@
 		TwoHopVirtualListItem,
 		TwoHopVirtualSectionDescriptor,
 	} from "features/two-hop/ui/twoHopVirtualListModel";
-	import { useLinkContext } from "ui/context/linkContext";
 	import type { TwoHopCardPresentationState } from "features/two-hop/ui/twoHopCellStaticState";
 	import {
 		createTwoHopCardRenderModelCache,
@@ -18,6 +16,7 @@
 	} from "features/two-hop/ui/twoHopCardRenderModelCache";
 	import type { CardRenderModel } from "ui/components/items/cardRenderModel";
 	import type { LinkUtilitiesContext } from "types/linkContext";
+	import type { TwoHopPreviewDependencies } from "features/two-hop/ui/twoHopPreviewDependencies";
 
 	interface Props {
 		sections: readonly TwoHopVirtualSectionDescriptor[];
@@ -27,7 +26,8 @@
 		matchedItemByKey?: Map<string, SearchWorkerMatchedItem> | null;
 		initialVisibleCount?: number;
 		loadMoreIncrement?: number;
-		linkContext?: LinkUtilitiesContext;
+		linkContext: LinkUtilitiesContext;
+		previewDependencies?: TwoHopPreviewDependencies;
 		previewActive?: boolean;
 	}
 
@@ -39,44 +39,29 @@
 		matchedItemByKey = null,
 		initialVisibleCount,
 		loadMoreIncrement,
-		linkContext: providedLinkContext = undefined,
+		linkContext,
+		previewDependencies = undefined,
 		previewActive = true,
 	}: Props = $props();
 
-	if (!applicationStore) {
-		applicationStore = getContext<ApplicationStore>("applicationStore");
-	}
-
 	const currentSettings = $derived(applicationStore.settings);
-	function resolveLinkContext(): LinkUtilitiesContext | undefined {
-		if (providedLinkContext) return providedLinkContext;
-		try {
-			return useLinkContext();
-		} catch {
-			return undefined;
-		}
-	}
-	const linkContext = resolveLinkContext();
 	const cardModelCache = createTwoHopCardRenderModelCache();
 	function getPreviewRenderVersion(path: string): string {
 		return applicationStore.getPreviewRenderVersion(path);
 	}
-	const cardModelRevision = $derived.by((): TwoHopCardModelRevision | undefined =>
-		linkContext
-			? {
-					settings: currentSettings,
-					searchQuery,
-					searchScope,
-					matchedItemByKey,
-					linkContext,
-					getPreviewRenderVersion,
-					applicationUpdateVersion: applicationStore.updateVersion,
-				}
-			: undefined,
+	const cardModelRevision = $derived.by(
+		(): TwoHopCardModelRevision => ({
+			settings: currentSettings,
+			searchQuery,
+			searchScope,
+			matchedItemByKey,
+			linkContext,
+			getPreviewRenderVersion,
+			applicationUpdateVersion: applicationStore.updateVersion,
+		}),
 	);
 	const resolveItemCardModel = $derived.by(() => {
 		const revision = cardModelRevision;
-		if (!revision) return undefined;
 		return (
 			row: TwoHopVirtualListItem,
 			presentation: TwoHopCardPresentationState,
@@ -91,5 +76,6 @@
 	{loadMoreIncrement}
 	paginationScope={searchQuery}
 	{resolveItemCardModel}
+	{previewDependencies}
 	{previewActive}
 />
