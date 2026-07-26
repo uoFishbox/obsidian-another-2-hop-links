@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
-import { createSparseStableVirtualItemAccessors } from "features/two-hop/ui/section-descriptors/descriptorIdentity";
+import { createLazySortedVirtualItemAccessors } from "features/two-hop/ui/section-descriptors/descriptorIdentity";
 
-describe("createSparseStableVirtualItemAccessors", () => {
+describe("createLazySortedVirtualItemAccessors", () => {
 	it("creates a ViewItem only for the requested sorted index", () => {
 		const sources = Array.from({ length: 2_000 }, (_, index) => ({ index }));
 		const getSortedItems = vi.fn(() => sources);
@@ -10,7 +10,7 @@ describe("createSparseStableVirtualItemAccessors", () => {
 			(item: { source: { index: number } }, key: string) =>
 				({ kind: "new-link", item, key }) as never,
 		);
-		const accessors = createSparseStableVirtualItemAccessors({
+		const accessors = createLazySortedVirtualItemAccessors({
 			getLength: () => sources.length,
 			getSortedItems,
 			getKey: (source) => `source-${source.index}`,

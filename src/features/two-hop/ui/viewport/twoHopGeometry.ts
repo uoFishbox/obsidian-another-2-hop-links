@@ -243,7 +243,6 @@ function resolveTwoHopCellForSectionInto(
 
 	const visibleItemOffset = cellIndex - 1;
 	if (visibleItemOffset < section.visibleItemCount) {
-		const itemIndex = section.visibleSourceIndexes[visibleItemOffset];
 		const item = section.getItem(visibleItemOffset);
 		if (!item) return null;
 		target.kind = "item";
@@ -251,7 +250,7 @@ function resolveTwoHopCellForSectionInto(
 		target.sectionIndex = sectionIndex;
 		target.rowIndex = rowIndex;
 		target.columnIndex = columnIndex;
-		target.itemIndex = itemIndex;
+		target.itemIndex = visibleItemOffset;
 		target.item = item;
 		return target as unknown as Extract<TwoHopResolvedCell, { kind: "item" }>;
 	}

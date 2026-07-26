@@ -16,7 +16,7 @@ export interface CachedVirtualItemAccessors {
 	readonly reset: () => void;
 }
 
-export interface SparseStableVirtualItemAccessorsParams<T, TViewItem> {
+export interface LazySortedVirtualItemAccessorsParams<T, TViewItem> {
 	readonly getLength: () => number;
 	readonly getSortedItems: () => readonly T[];
 	readonly getKey: (item: T, index: number) => string;
@@ -25,7 +25,7 @@ export interface SparseStableVirtualItemAccessorsParams<T, TViewItem> {
 		item: TViewItem,
 		key: string,
 		index: number,
-	) => TwoHopVirtualListItem | undefined;
+	) => TwoHopVirtualListItem;
 }
 
 export function createDescriptor(
@@ -53,34 +53,40 @@ export function createDescriptor(
 	});
 }
 
-export function createSparseVirtualItemAccessors(params: {
+/**
+ * Lazily creates items for a dense index range.
+ *
+ * `createItem` is called at most once for each index until `reset`. Indexes in
+ * `[0, getLength())` must always resolve to an item.
+ */
+export function createLazyVirtualItemAccessors(params: {
 	readonly getLength: () => number;
-	readonly createItem: (index: number) => TwoHopVirtualListItem | undefined;
+	readonly createItem: (index: number) => TwoHopVirtualListItem;
 }): CachedVirtualItemAccessors {
 	let itemsCache: TwoHopVirtualListItem[] | undefined;
+	const ensureItemsCache = (length: number): TwoHopVirtualListItem[] => {
+		if (!itemsCache || itemsCache.length !== length) {
+			itemsCache = new Array<TwoHopVirtualListItem>(length);
+		}
+		return itemsCache;
+	};
 	const getItem = (index: number): TwoHopVirtualListItem | undefined => {
 		const length = params.getLength();
 		if (index < 0 || index >= length) return undefined;
-		const cached = itemsCache?.[index];
-		if (cached) return cached;
+		const cache = ensureItemsCache(length);
+		const cached = cache[index];
+		if (cached !== undefined) return cached;
 
 		const item = params.createItem(index);
-		if (!item) return undefined;
-		itemsCache ??= new Array<TwoHopVirtualListItem>(length);
-		itemsCache[index] = item;
+		cache[index] = item;
 		return item;
 	};
 	const getItems = (): readonly TwoHopVirtualListItem[] => {
 		const length = params.getLength();
-		const cache =
-			itemsCache && itemsCache.length === length
-				? itemsCache
-				: new Array<TwoHopVirtualListItem>(length);
-		itemsCache = cache;
+		const cache = ensureItemsCache(length);
 		for (let index = 0; index < length; index += 1) {
-			if (cache[index]) continue;
-			const item = getItem(index);
-			if (item) cache[index] = item;
+			if (cache[index] !== undefined) continue;
+			cache[index] = params.createItem(index);
 		}
 		return cache;
 	};
@@ -95,23 +101,24 @@ export function createSparseVirtualItemAccessors(params: {
 }
 
 /**
- * Lazily wraps a sorted section without reconciling every source item on the
- * first random-access read. The sorted array is still prepared once, but
- * ViewItem and virtual-item allocation is limited to requested indexes.
+ * Lazily wraps items from a sorted, dense source.
+ *
+ * The first item access prepares the complete sorted source because arbitrary
+ * sorted-index access requires a stable order. ViewItem, key, and virtual-item
+ * allocation remains limited to requested indexes.
  */
-export function createSparseStableVirtualItemAccessors<T, TViewItem>(
-	params: SparseStableVirtualItemAccessorsParams<T, TViewItem>,
+export function createLazySortedVirtualItemAccessors<T, TViewItem>(
+	params: LazySortedVirtualItemAccessorsParams<T, TViewItem>,
 ): CachedVirtualItemAccessors {
 	let sortedItems: readonly T[] | undefined;
 	let viewItems: TViewItem[] | undefined;
 	let keys: string[] | undefined;
 	const ensureSortedItems = (): readonly T[] =>
 		(sortedItems ??= params.getSortedItems());
-	const accessors = createSparseVirtualItemAccessors({
+	const accessors = createLazyVirtualItemAccessors({
 		getLength: params.getLength,
 		createItem: (index) => {
 			const source = ensureSortedItems()[index];
-			if (!source) return undefined;
 			viewItems ??= [];
 			keys ??= [];
 			const viewItem =
@@ -120,7 +127,7 @@ export function createSparseStableVirtualItemAccessors<T, TViewItem>(
 			return params.createItem(viewItem, key, index);
 		},
 	});
-	const resetSparseAccessors = accessors.reset;
+	const resetLazyAccessors = accessors.reset;
 
 	return {
 		getItems: accessors.getItems,
@@ -129,7 +136,7 @@ export function createSparseStableVirtualItemAccessors<T, TViewItem>(
 			sortedItems = undefined;
 			viewItems = undefined;
 			keys = undefined;
-			resetSparseAccessors();
+			resetLazyAccessors();
 		},
 	};
 }

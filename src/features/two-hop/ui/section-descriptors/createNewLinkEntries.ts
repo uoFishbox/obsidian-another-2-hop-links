@@ -5,7 +5,7 @@ import { newLinksSectionConfig } from "ui/components/sections/sectionConfigs";
 import type { TwoHopIndexedLink } from "types/domain";
 import {
 	createDescriptor,
-	createSparseVirtualItemAccessors,
+	createLazyVirtualItemAccessors,
 	type CachedVirtualItemAccessors,
 } from "./descriptorIdentity";
 import { hasSameNewLinksItemsDeps } from "features/two-hop/ui/twoHopDataIdentityEquality";
@@ -62,11 +62,10 @@ function createNewLinkSectionEntry(
 	params: ResolveNewLinkSectionEntryParams,
 ): NewLinksEntry {
 	let itemsDeps = params.itemsDeps;
-	const itemsAccessors = createSparseVirtualItemAccessors({
+	const itemsAccessors = createLazyVirtualItemAccessors({
 		getLength: () => itemsDeps.items.length,
 		createItem: (index) => {
 			const item = itemsDeps.items[index];
-			if (!item) return undefined;
 			const key = getNewLinkViewItemKey(item, index);
 			const interactionKey = createItemInteractionKey(item, key);
 			const interactionId = params.createItemInteractionToken(interactionKey);

@@ -2,7 +2,7 @@ import { createItemInteractionKey } from "ui/interactions/interactionTypes";
 import { buildScopedSectionId } from "ui/components/common/listPagination";
 import {
 	createDescriptor,
-	createSparseVirtualItemAccessors,
+	createLazyVirtualItemAccessors,
 	type CachedVirtualItemAccessors,
 } from "./descriptorIdentity";
 import { hasSamePrimaryItemsDeps } from "features/two-hop/ui/twoHopDataIdentityEquality";
@@ -64,11 +64,10 @@ function createPrimarySectionEntry(
 	params: ResolvePrimarySectionEntryParams,
 ): PrimaryEntry {
 	let source = params.source;
-	const itemsAccessors = createSparseVirtualItemAccessors({
+	const itemsAccessors = createLazyVirtualItemAccessors({
 		getLength: () => source.items.length,
 		createItem: (index) => {
 			const item = source.items[index];
-			if (!item) return undefined;
 			const virtualKey = source.getKey(item, index);
 			const interactionKey = createItemInteractionKey(item, virtualKey);
 			const interactionId = params.createItemInteractionToken(interactionKey);

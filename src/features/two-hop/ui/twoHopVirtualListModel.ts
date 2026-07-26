@@ -89,6 +89,10 @@ export type TwoHopVirtualSectionDescriptor = SectionRenderDescriptor<
 > & {
 	/** Semantic source revision used by document projection reuse. */
 	readonly sourceRevision: SectionDataRevision;
+	/**
+	 * Returns the item at a dense loaded index, or `undefined` outside
+	 * `[0, loadedCount)`.
+	 */
 	readonly getItem: (index: number) => TwoHopVirtualListItem | undefined;
 };
 

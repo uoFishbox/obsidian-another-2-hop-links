@@ -13,7 +13,7 @@ import type { PluginSettings, SortOption } from "features/settings/model";
 import type { ApplicationStore } from "ui/stores/ApplicationStore.svelte";
 import {
 	createDescriptor,
-	createSparseStableVirtualItemAccessors,
+	createLazySortedVirtualItemAccessors,
 	type CachedVirtualItemAccessors,
 } from "./descriptorIdentity";
 import type { TwoHopInteractionTokenAllocator } from "./interactionTokenAllocator";
@@ -171,7 +171,7 @@ function createBranchSectionEntry(
 	let applicationStore = params.applicationStore;
 	let branch = params.branch;
 	let itemsDeps = params.itemsDeps;
-	const itemsAccessors = createSparseStableVirtualItemAccessors<
+	const itemsAccessors = createLazySortedVirtualItemAccessors<
 		TwoHopIndexedLink,
 		ViewItem
 	>({

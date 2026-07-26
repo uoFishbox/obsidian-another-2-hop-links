@@ -7,7 +7,7 @@ import type { TagGroup, TaggedNote } from "types/domain";
 import type { ApplicationStore } from "ui/stores/ApplicationStore.svelte";
 import {
 	createDescriptor,
-	createSparseStableVirtualItemAccessors,
+	createLazySortedVirtualItemAccessors,
 	type CachedVirtualItemAccessors,
 } from "./descriptorIdentity";
 import type { TwoHopInteractionTokenAllocator } from "./interactionTokenAllocator";
@@ -89,31 +89,29 @@ function createTagSectionEntry(params: ResolveTagSectionEntryParams): TagEntry {
 		interactionKind: "sectionHeader",
 		onClick: () => onTagClick(tag),
 	};
-	const itemsAccessors = createSparseStableVirtualItemAccessors<TaggedNote, ViewItem>(
-		{
-			getLength: () => source.notes.length,
-			getSortedItems: () =>
-				itemsDeps.getSortedTagGroupItems.call(applicationStore, source.notes),
-			getKey: (item) =>
-				generateLinkKey(item.file.path, item.file.basename, "tag-note"),
-			toViewItem: (item) => ({ type: "taggedNote", data: item }),
-			createItem: (item, baseKey, index) => {
-				const virtualKey = createTaggedNoteSectionItemKey(item, tag, index);
-				const interactionKey = createItemInteractionKey(item, virtualKey);
-				const interactionId =
-					params.tokens.createItemInteractionToken(interactionKey);
-				return {
-					kind: "tag-link",
-					item,
-					interactionId,
-					interactionKey,
-					tag,
-					searchKey: getTagNoteSearchKeyFromBaseKey(tag, baseKey),
-					virtualKey,
-				};
-			},
+	const itemsAccessors = createLazySortedVirtualItemAccessors<TaggedNote, ViewItem>({
+		getLength: () => source.notes.length,
+		getSortedItems: () =>
+			itemsDeps.getSortedTagGroupItems.call(applicationStore, source.notes),
+		getKey: (item) =>
+			generateLinkKey(item.file.path, item.file.basename, "tag-note"),
+		toViewItem: (item) => ({ type: "taggedNote", data: item }),
+		createItem: (item, baseKey, index) => {
+			const virtualKey = createTaggedNoteSectionItemKey(item, tag, index);
+			const interactionKey = createItemInteractionKey(item, virtualKey);
+			const interactionId =
+				params.tokens.createItemInteractionToken(interactionKey);
+			return {
+				kind: "tag-link",
+				item,
+				interactionId,
+				interactionKey,
+				tag,
+				searchKey: getTagNoteSearchKeyFromBaseKey(tag, baseKey),
+				virtualKey,
+			};
 		},
-	);
+	});
 
 	return {
 		get applicationStore() {

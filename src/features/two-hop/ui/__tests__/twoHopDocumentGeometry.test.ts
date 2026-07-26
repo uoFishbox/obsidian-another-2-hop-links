@@ -67,7 +67,7 @@ const layout = {
 };
 
 describe("TwoHopDocument fixed-grid geometry", () => {
-	it("retains only visible source indexes and extends them incrementally", () => {
+	it("projects dense item counts without materializing items", () => {
 		const items = Array.from({ length: 10 }, (_, index) =>
 			createItem(String(index)),
 		);
@@ -81,10 +81,7 @@ describe("TwoHopDocument fixed-grid geometry", () => {
 		});
 
 		expect(getItems).not.toHaveBeenCalled();
-		expect(getItem.mock.calls.map(([index]) => index)).toEqual([0, 1]);
-		expect(initialDocument.sections[0].visibleSourceIndexes).toEqual(
-			new Uint32Array([0, 1]),
-		);
+		expect(getItem).not.toHaveBeenCalled();
 		expect(initialDocument.sections[0].visibleItemCount).toBe(2);
 		expect("visibleItems" in initialDocument.sections[0]).toBe(false);
 		expect("visibleItemTitles" in initialDocument.sections[0]).toBe(false);
@@ -99,11 +96,10 @@ describe("TwoHopDocument fixed-grid geometry", () => {
 		});
 
 		expect(getItems).not.toHaveBeenCalled();
-		expect(getItem.mock.calls.map(([index]) => index)).toEqual([2, 3, 4]);
-		expect(expandedDocument.sections[0].visibleSourceIndexes).toEqual(
-			new Uint32Array([0, 1, 2, 3, 4]),
-		);
+		expect(getItem).not.toHaveBeenCalled();
+		expect(expandedDocument.sections[0].visibleItemCount).toBe(5);
 		expect(expandedDocument.sections[0].getItem(4)).toBe(items[4]);
+		expect(getItem.mock.calls.map(([index]) => index)).toEqual([4]);
 	});
 
 	it("reuses section projections by explicit source revision", () => {
@@ -157,23 +153,18 @@ describe("TwoHopDocument fixed-grid geometry", () => {
 		expect(changedDocument.revision).not.toBe(initialDocument.revision);
 	});
 
-	it("resolves header, sparse items, and load-more without compiled cells", () => {
-		const sparseItems: TwoHopVirtualListItem[] = [
-			createItem("a"),
-			undefined as unknown as TwoHopVirtualListItem,
-			createItem("c"),
-			createItem("d"),
-		];
+	it("resolves header, dense items, and load-more without compiled cells", () => {
+		const items = Array.from({ length: 6 }, (_, index) =>
+			createItem(String(index)),
+		);
 		const document = createTwoHopDocument({
-			sections: [createSection("first", sparseItems, 6)],
+			sections: [createSection("first", items)],
 			visibleCounts: { first: 4 },
 			initialVisibleCount: 2,
 		});
 		const geometry = compileFixedGridLayout(document, layout);
 
-		expect(document.sections[0].visibleSourceIndexes).toEqual(
-			new Uint32Array([0, 2, 3]),
-		);
+		expect(document.sections[0].visibleItemCount).toBe(4);
 		expect(geometry.rowCount).toBe(3);
 		expect(resolveTwoHopCell(document, geometry, 0, 0)?.kind).toBe("header");
 		expect(resolveTwoHopCell(document, geometry, 0, 1)).toMatchObject({
@@ -182,10 +173,13 @@ describe("TwoHopDocument fixed-grid geometry", () => {
 		});
 		expect(resolveTwoHopCell(document, geometry, 1, 0)).toMatchObject({
 			kind: "item",
-			itemIndex: 2,
+			itemIndex: 1,
 		});
-		expect(resolveTwoHopCell(document, geometry, 2, 0)?.kind).toBe("load-more");
-		expect(resolveTwoHopCell(document, geometry, 2, 1)).toBeNull();
+		expect(resolveTwoHopCell(document, geometry, 2, 0)).toMatchObject({
+			kind: "item",
+			itemIndex: 3,
+		});
+		expect(resolveTwoHopCell(document, geometry, 2, 1)?.kind).toBe("load-more");
 	});
 
 	it("uses section prefixes to resolve row positions and viewport ranges", () => {
