@@ -11,7 +11,7 @@ import {
 const TWO_HOP_VIRTUAL_LIST_SELECTOR = ".twohop-page-virtual-list";
 
 /** Fixed number of frames aligned with the workload metrics in PERFORMANCE.md. */
-const SCROLL_FRAMES = 300;
+const SCROLL_FRAMES = 600;
 /** Fixed scroll distance per frame (px). Speed follows the frequency of `requestAnimationFrame`. */
 const SCROLL_STEP_PX = 10;
 
@@ -25,7 +25,7 @@ export function registerScrollBenchmarkCommand(plugin: PluginHost): void {
 
 	plugin.addCommand({
 		id: "benchmark-two-hop-virtual-list-scroll",
-		name: "Benchmark two-hop virtual list scroll (300 frames down/up)",
+		name: "Benchmark two-hop virtual list scroll (600 frames down/up)",
 		callback: () => {
 			void runBenchmark();
 		},
