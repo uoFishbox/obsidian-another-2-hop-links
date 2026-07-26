@@ -50,6 +50,30 @@ function createSection(count: number): TwoHopVirtualSectionDescriptor {
 }
 
 describe("TwoHop keyed mounted rows", () => {
+	it("keeps fixed physical cell slots without publishing empty logical cells", () => {
+		const document = createTwoHopDocument({
+			sections: [createSection(2)],
+			visibleCounts: {},
+			initialVisibleCount: 2,
+		});
+		const rowModel = createTwoHopVirtualRowModel(
+			document,
+			createLayoutPublication(layout, 1),
+		);
+		const mounted = buildTwoHopMountedRows({
+			rowModel,
+			rowRange: { start: 0, end: 2 },
+		});
+
+		expect(mounted.rowSlices.map((row) => row.cellSlots.length)).toEqual([2, 2]);
+		expect(mounted.rowSlices.map((row) => row.cells.length)).toEqual([2, 1]);
+		expect(
+			mounted.rowSlices[1]?.cellSlots.map((slot) => slot.binding?.key ?? null),
+		).toEqual([mounted.rowSlices[1]?.cells[0]?.key, null]);
+		expect(mounted.cells).toHaveLength(3);
+		expect(mounted.reusableCellsByKey).toHaveLength(3);
+	});
+
 	it("reuses physical shells while changing logical body keys", () => {
 		const document = createTwoHopDocument({
 			sections: [createSection(20)],

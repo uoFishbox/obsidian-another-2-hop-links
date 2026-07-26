@@ -14,7 +14,10 @@ import type { MountedVirtualCellsBuild } from "ui/virtualization/core/virtualLis
 import type { RowRange } from "ui/virtualization/rowRange";
 import { renderSlotKey, type MountedVirtualCell } from "ui/virtualization/types";
 import type { VirtualSurfaceMountedRow } from "ui/virtualization/svelte/VirtualSurfaceTypes";
-import { buildMountedSectionedGridRows } from "ui/virtualization/core/reconciliation/mountedSectionedGridRows";
+import {
+	buildMountedSectionedGridRows,
+	type SectionedGridMountedCellSlot,
+} from "ui/virtualization/core/reconciliation/mountedSectionedGridRows";
 import {
 	createResidentRowSlotAllocator,
 	type ResidentRowSlotAllocator,
@@ -29,6 +32,7 @@ export interface TwoHopMountedRow extends VirtualSurfaceMountedRow<TwoHopMounted
 	readonly slotIndex: number;
 	readonly slotKey: number;
 	readonly cells: readonly TwoHopMountedCell[];
+	readonly cellSlots: readonly SectionedGridMountedCellSlot<TwoHopMountedCell>[];
 }
 
 export interface TwoHopMountedRowsBuild extends MountedVirtualCellsBuild<TwoHopMountedCell> {
@@ -132,13 +136,14 @@ export function buildTwoHopMountedRows(params: {
 				columnIndex,
 				renderSlotIndex,
 			}),
-		createRow: ({ rowIndex, slotIndex, cells, row }) => ({
+		createRow: ({ rowIndex, slotIndex, cells, cellSlots, row }) => ({
 			key: rowIndex,
 			rowIndex,
 			top: row.top,
 			slotIndex,
 			slotKey: slotIndex,
 			cells,
+			cellSlots,
 		}),
 	});
 	return {

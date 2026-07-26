@@ -27,7 +27,10 @@ import {
 	createResidentRowSlotAllocator,
 	type ResidentRowSlotAllocator,
 } from "ui/virtualization/core/residentSlotAllocator";
-import { buildMountedSectionedGridRows } from "ui/virtualization/core/reconciliation/mountedSectionedGridRows";
+import {
+	buildMountedSectionedGridRows,
+	type SectionedGridMountedCellSlot,
+} from "ui/virtualization/core/reconciliation/mountedSectionedGridRows";
 
 const ROW_SLOT_ALLOCATOR = Symbol("flat-grid-row-slot-allocator");
 
@@ -67,6 +70,7 @@ export interface MountedVirtualGridRowSlice<T> {
 	rowIndex: number;
 	top: number;
 	cells: MountedVirtualGridCell<T>[];
+	cellSlots: SectionedGridMountedCellSlot<MountedVirtualGridCell<T>>[];
 }
 
 export interface MountedVirtualGridCellsBuildResult<T> {
@@ -626,7 +630,7 @@ function buildMountedVirtualGridCellsFromCore<T>(params: {
 				},
 			});
 		},
-		createRow: ({ rowIndex, slotIndex, cells, row }) => {
+		createRow: ({ rowIndex, slotIndex, cells, cellSlots, row }) => {
 			recordCCLDevMeasurement("virtualGrid.rowShellCreated");
 			return {
 				key: rowIndex,
@@ -635,6 +639,7 @@ function buildMountedVirtualGridCellsFromCore<T>(params: {
 				rowIndex,
 				top: row.top,
 				cells,
+				cellSlots,
 			};
 		},
 	});

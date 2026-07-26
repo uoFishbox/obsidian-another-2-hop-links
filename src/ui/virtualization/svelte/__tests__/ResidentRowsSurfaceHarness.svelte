@@ -5,6 +5,7 @@
 		VirtualSurfaceMountedRow,
 		VirtualSurfaceResidentRowViewState,
 	} from "ui/virtualization/svelte/VirtualSurfaceTypes";
+	import type { VirtualCellRegistry } from "ui/virtualization/svelte/VirtualCellRegistry";
 
 	interface TestMountedCell extends MountedVirtualCell {
 		readonly label: string;
@@ -20,9 +21,18 @@
 			TestMountedRow
 		>[];
 		getCellClassName: (cell: TestMountedCell) => string | undefined;
+		onCellMount?: (cell: TestMountedCell) => void;
+		onCellDestroy?: (cell: TestMountedCell) => void;
+		cellRegistry?: VirtualCellRegistry;
 	}
 
-	let { residentRows, getCellClassName }: Props = $props();
+	let {
+		residentRows,
+		getCellClassName,
+		onCellMount,
+		onCellDestroy,
+		cellRegistry,
+	}: Props = $props();
 </script>
 
 <VirtualSurface
@@ -32,6 +42,9 @@
 	layoutMode="grid-rows"
 	{residentRows}
 	{getCellClassName}
+	{onCellMount}
+	{onCellDestroy}
+	{cellRegistry}
 >
 	{#snippet renderCell({ mountedCell })}
 		<span>{mountedCell.label}</span>

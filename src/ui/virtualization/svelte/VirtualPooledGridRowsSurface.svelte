@@ -5,6 +5,8 @@
 	import { IS_PROD } from "appConstants";
 	import type { Snippet } from "svelte";
 	import type { LogicalCellKey, MountedVirtualCell } from "../types";
+	import { renderSlotKey } from "../types";
+	import type { SectionedGridMountedCellSlot } from "../core/reconciliation/mountedSectionedGridRows";
 	import {
 		KEYED_VIRTUAL_CELL_BODY_LIFECYCLE,
 		resolveVirtualCellBodyKey,
@@ -97,6 +99,17 @@
 	const resolveCellSlotKey = (_row: TMountedRow, cell: TMountedCell): number =>
 		cell.cellSlotKey ?? cell.renderSlotIndex;
 
+	const resolveRowCellSlots = (
+		row: TMountedRow,
+	): readonly SectionedGridMountedCellSlot<TMountedCell>[] =>
+		row.cellSlots ??
+		row.cells.map((cell) => ({
+			renderSlotIndex: cell.renderSlotIndex,
+			renderSlotKey: renderSlotKey(cell.renderSlotIndex),
+			columnIndex: cell.columnIndex ?? 0,
+			binding: cell,
+		}));
+
 	const resolveMountedCellLogicalKey = (cell: TMountedCell): LogicalCellKey =>
 		cell.key;
 
@@ -145,35 +158,51 @@
 				data-ccl-row-index={!IS_PROD ? row.rowIndex : undefined}
 				use:setRowTransform={row.top}
 			>
-				{#each row.cells as mountedCell (resolveCellSlotKey(row, mountedCell))}
+				{#each resolveRowCellSlots(row) as cellSlot (cellSlot.renderSlotKey)}
+					{@const mountedCell = cellSlot.binding}
 					<VirtualGridLogicalCellMount
-						logicalKey={resolveMountedCellLogicalKey(mountedCell)}
-						className={resolveCellClassName(mountedCell)}
-						dataTestId={!IS_PROD
+						logicalKey={mountedCell
+							? resolveMountedCellLogicalKey(mountedCell)
+							: undefined}
+						className={mountedCell
+							? resolveCellClassName(mountedCell)
+							: cellClassName}
+						dataTestId={!IS_PROD && mountedCell
 							? getCellDataTestId?.(mountedCell)
 							: undefined}
-						cellSlotKey={resolveCellSlotKey(row, mountedCell)}
-						rowIndex={resolveMountedCellRowIndex(mountedCell)}
-						columnIndex={resolveMountedCellColumnIndex(mountedCell)}
-						{mountedCell}
+						cellSlotKey={mountedCell
+							? resolveCellSlotKey(row, mountedCell)
+							: cellSlot.renderSlotIndex}
+						rowIndex={mountedCell
+							? resolveMountedCellRowIndex(mountedCell)
+							: row.rowIndex}
+						columnIndex={mountedCell
+							? resolveMountedCellColumnIndex(mountedCell)
+							: cellSlot.columnIndex}
+						ariaHidden={mountedCell === null}
+						mountedCell={mountedCell ?? undefined}
 						{onLogicalCellAttach}
 						{onLogicalCellDetach}
 						{cellRegistry}
-						cellRegistrationOwner={getCellRegistrationOwner?.(mountedCell)}
+						cellRegistrationOwner={mountedCell
+							? getCellRegistrationOwner?.(mountedCell)
+							: undefined}
 						{surfaceTransaction}
 					>
-						{#if bodyLifecyclePolicy.type === "keyed"}
-							{#key resolveMountedCellBodyKey(mountedCell)}
+						{#if mountedCell}
+							{#if bodyLifecyclePolicy.type === "keyed"}
+								{#key resolveMountedCellBodyKey(mountedCell)}
+									{@render renderCell({
+										mountedCell,
+										observerRoot,
+									})}
+								{/key}
+							{:else}
 								{@render renderCell({
 									mountedCell,
 									observerRoot,
 								})}
-							{/key}
-						{:else}
-							{@render renderCell({
-								mountedCell,
-								observerRoot,
-							})}
+							{/if}
 						{/if}
 					</VirtualGridLogicalCellMount>
 				{/each}

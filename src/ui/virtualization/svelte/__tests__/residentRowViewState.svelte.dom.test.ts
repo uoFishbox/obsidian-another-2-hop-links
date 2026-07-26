@@ -8,7 +8,9 @@ import {
 	type MountedVirtualCell,
 } from "ui/virtualization/types";
 import type { VirtualSurfaceMountedRow } from "ui/virtualization/svelte/VirtualSurfaceTypes";
+import type { SectionedGridMountedCellSlot } from "ui/virtualization/core/reconciliation/mountedSectionedGridRows";
 import ResidentRowsSurfaceHarness from "./ResidentRowsSurfaceHarness.svelte";
+import { createSurfaceVirtualCellRegistry } from "ui/virtualization/svelte/VirtualCellRegistry";
 
 interface TestMountedCell extends MountedVirtualCell {
 	readonly label: string;
@@ -16,6 +18,7 @@ interface TestMountedCell extends MountedVirtualCell {
 
 interface TestMountedRow extends VirtualSurfaceMountedRow<TestMountedCell> {
 	readonly slotIndex: number;
+	readonly cellSlots: readonly SectionedGridMountedCellSlot<TestMountedCell>[];
 }
 
 function createRow(
@@ -23,26 +26,33 @@ function createRow(
 	rowIndex: number,
 	label?: string,
 ): TestMountedRow {
+	const binding: TestMountedCell | null =
+		label === undefined
+			? null
+			: {
+					key: logicalCellKey(label),
+					renderSlotKey: renderSlotKey(slotIndex),
+					renderSlotIndex: slotIndex,
+					cellSlotKey: slotIndex,
+					rowIndex,
+					columnIndex: 0,
+					label,
+				};
 	return {
 		key: rowIndex,
 		rowIndex,
 		top: rowIndex * 100,
 		slotIndex,
 		slotKey: slotIndex,
-		cells:
-			label === undefined
-				? []
-				: [
-						{
-							key: logicalCellKey(label),
-							renderSlotKey: renderSlotKey(slotIndex),
-							renderSlotIndex: slotIndex,
-							cellSlotKey: slotIndex,
-							rowIndex,
-							columnIndex: 0,
-							label,
-						},
-					],
+		cells: binding ? [binding] : [],
+		cellSlots: [
+			{
+				renderSlotIndex: slotIndex,
+				renderSlotKey: renderSlotKey(slotIndex),
+				columnIndex: 0,
+				binding,
+			},
+		],
 	};
 }
 
@@ -165,5 +175,58 @@ describe("residentRowViewState", () => {
 			previousCellElement,
 		);
 		expect(previousCellElement?.textContent).toContain("row-101");
+	});
+
+	it("keeps the cell DOM shell across occupied, empty, and occupied bindings", async () => {
+		const adapter = createVirtualSurfaceResidentRowsAdapter<
+			TestMountedCell,
+			TestMountedRow
+		>();
+		const registry = createSurfaceVirtualCellRegistry();
+		const onCellMount = vi.fn();
+		const onCellDestroy = vi.fn();
+		adapter.sync([createRow(0, 100, "row-100")], 1);
+		const { container } = render(ResidentRowsSurfaceHarness, {
+			props: {
+				residentRows: adapter.rows,
+				getCellClassName: () => undefined,
+				onCellMount,
+				onCellDestroy,
+				cellRegistry: registry,
+			},
+		});
+		await tick();
+
+		const host = container.querySelector(
+			".resident-rows-test-root",
+		) as HTMLElement | null;
+		const shadowRoot = host?.shadowRoot;
+		const cellShell = shadowRoot?.querySelector<HTMLElement>(
+			"[data-ccl-cell-slot='0']",
+		);
+		expect(cellShell?.textContent).toContain("row-100");
+		expect(onCellMount).toHaveBeenCalledTimes(1);
+		expect(registry.findByKey("row-100")).toBe(cellShell);
+
+		adapter.sync([createRow(0, 101)], 1);
+		await tick();
+
+		expect(shadowRoot?.querySelector("[data-ccl-cell-slot='0']")).toBe(cellShell);
+		expect(cellShell?.getAttribute("aria-hidden")).toBe("true");
+		expect(cellShell?.dataset.cclLogicalKey).toBeUndefined();
+		expect(cellShell?.textContent).toBe("");
+		expect(onCellDestroy).toHaveBeenCalledTimes(1);
+		expect(registry.findByKey("row-100")).toBeNull();
+		expect(registry.findClosest(cellShell ?? null)).toBeNull();
+
+		adapter.sync([createRow(0, 102, "row-102")], 1);
+		await tick();
+
+		expect(shadowRoot?.querySelector("[data-ccl-cell-slot='0']")).toBe(cellShell);
+		expect(cellShell?.hasAttribute("aria-hidden")).toBe(false);
+		expect(cellShell?.dataset.cclLogicalKey).toBe("row-102");
+		expect(cellShell?.textContent).toContain("row-102");
+		expect(onCellMount).toHaveBeenCalledTimes(2);
+		expect(registry.findByKey("row-102")).toBe(cellShell);
 	});
 });

@@ -203,23 +203,30 @@ export function createVirtualGridSurfaceTransaction(
 }
 
 /** Connects one physical cell element to its surface-owned transaction. */
-export const bindVirtualGridCell: Action<HTMLElement, VirtualGridCellActionParams> = (
-	element,
-	initial,
-) => {
-	let transaction = initial.transaction;
-	transaction.rebindCell({ element, ...initial.rebind });
+export const bindVirtualGridCell: Action<
+	HTMLElement,
+	VirtualGridCellActionParams | undefined
+> = (element, initial) => {
+	let transaction = initial?.transaction;
+	if (initial) {
+		initial.transaction.rebindCell({ element, ...initial.rebind });
+	}
 
 	return {
 		update(next): void {
+			if (!next) {
+				transaction?.releaseCell(element);
+				transaction = undefined;
+				return;
+			}
 			if (transaction !== next.transaction) {
-				transaction.releaseCell(element);
+				transaction?.releaseCell(element);
 				transaction = next.transaction;
 			}
-			transaction.rebindCell({ element, ...next.rebind });
+			next.transaction.rebindCell({ element, ...next.rebind });
 		},
 		destroy(): void {
-			transaction.releaseCell(element);
+			transaction?.releaseCell(element);
 		},
 	};
 };
