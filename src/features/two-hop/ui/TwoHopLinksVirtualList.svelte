@@ -86,13 +86,11 @@
 	});
 </script>
 
-{#if sections.length > 0}
-	<TwoHopSurface
-		{sections}
-		{applicationStore}
-		{initialVisibleCount}
-		{loadMoreIncrement}
-		{resolveItemCardModel}
-		{previewActive}
-	/>
-{/if}
+<TwoHopSurface
+	{sections}
+	{applicationStore}
+	{initialVisibleCount}
+	{loadMoreIncrement}
+	{resolveItemCardModel}
+	{previewActive}
+/>

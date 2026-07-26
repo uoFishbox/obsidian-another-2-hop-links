@@ -285,19 +285,17 @@
 		{#if loading}
 			<LoadingState message="Waiting for the initial index to finish building." />
 		{:else if linkResult}
-			{#if twoHopVirtualListSections.length}
-				<TwoHopPageVirtualList
-					sections={twoHopVirtualListSections}
-					{applicationStore}
-					searchQuery={appliedSearchQuery}
-					searchScope={appliedSearchScope}
-					{matchedItemByKey}
-					{initialVisibleCount}
-					{loadMoreIncrement}
-					{linkContext}
-					previewActive={previewSurfaceActive}
-				/>
-			{/if}
+			<TwoHopPageVirtualList
+				sections={twoHopVirtualListSections}
+				{applicationStore}
+				searchQuery={appliedSearchQuery}
+				searchScope={appliedSearchScope}
+				{matchedItemByKey}
+				{initialVisibleCount}
+				{loadMoreIncrement}
+				{linkContext}
+				previewActive={previewSurfaceActive}
+			/>
 			{#if !filteredDisplayData.twoHopBranches.length && showTwoHopPlaceholder}
 				<div class="cosense-card-links__phase-placeholder">
 					<LoadingState message="Loading two-hop links..." />

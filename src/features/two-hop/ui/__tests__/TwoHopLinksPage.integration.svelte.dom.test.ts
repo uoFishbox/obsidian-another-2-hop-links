@@ -383,4 +383,40 @@ describe("TwoHopLinksPage descriptor plumbing", () => {
 		expect(items()).toHaveLength(2);
 		expect(screen.getByText("outgoing-extra")).toBeInTheDocument();
 	});
+
+	it("keeps the virtual surface mounted while sections transition through empty", async () => {
+		const file = createMockTFile("notes/target.md");
+		const parentFile = createMockTFile("notes/outgoing-parent.md");
+		const settings = {
+			...DEFAULT_SETTINGS,
+			useMergedLinksSection: false,
+			showTagsSection: false,
+		};
+		const populatedDisplayData = {
+			...createDisplayData(),
+			outgoing: [createBranch(file, parentFile, [], "outgoing-parent")],
+		};
+		const { container, rerender } = renderRoot(
+			populatedDisplayData,
+			settings,
+			file,
+		);
+		await flushAsyncUi();
+
+		const initialSurface = container.querySelector(".view-plan-virtual-list");
+		expect(initialSurface).not.toBeNull();
+		expect(screen.getByText("outgoing-parent")).toBeInTheDocument();
+
+		await rerender(createRootProps(createDisplayData(), settings, file));
+		await flushAsyncUi();
+
+		expect(container.querySelector(".view-plan-virtual-list")).toBe(initialSurface);
+		expect(screen.queryByText("outgoing-parent")).not.toBeInTheDocument();
+
+		await rerender(createRootProps(populatedDisplayData, settings, file));
+		await flushAsyncUi();
+
+		expect(container.querySelector(".view-plan-virtual-list")).toBe(initialSurface);
+		expect(screen.getByText("outgoing-parent")).toBeInTheDocument();
+	});
 });
