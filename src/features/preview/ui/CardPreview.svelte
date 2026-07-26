@@ -1,7 +1,7 @@
 <script lang="ts">
 	import type { TFile } from "obsidian";
 	import { untrack } from "svelte";
-	import { DEBUG_DISABLE_CARD_DOM_PREVIEW } from "appConstants";
+	import { getDebugDisableCardDomPreview } from "appConstants";
 	import type { PreviewData } from "ui/context/linkContext";
 	import { useAppContext } from "ui/context/linkContext";
 	import { getVirtualFrameCoordinatorContext } from "ui/virtualization/svelte/frameCoordinatorContext.svelte";
@@ -156,7 +156,7 @@
 	$effect(() => cancelLifecycleCleanup);
 </script>
 
-{#if !DEBUG_DISABLE_CARD_DOM_PREVIEW}
+{#if !getDebugDisableCardDomPreview()}
 	{#if shouldShowInitialSkeleton}
 		<SkeletonPreview />
 	{/if}

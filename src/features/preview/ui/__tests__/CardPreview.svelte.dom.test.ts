@@ -57,9 +57,7 @@ vi.mock("appConstants", async (importOriginal) => {
 
 	return {
 		...actual,
-		get DEBUG_DISABLE_CARD_DOM_PREVIEW() {
-			return state.disableCardDomPreview;
-		},
+		getDebugDisableCardDomPreview: () => state.disableCardDomPreview,
 		get DEBUG_DISABLE_RENDERED_PREVIEW_CACHE() {
 			return state.disableRenderedPreviewCache;
 		},

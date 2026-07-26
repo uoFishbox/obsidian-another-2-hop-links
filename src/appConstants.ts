@@ -114,7 +114,14 @@ export function resolvePreviewActivationsPerSecond(
 
 export const DEFAULT_PREVIEW_ACTIVATIONS_PER_SECOND =
 	resolvePreviewActivationsPerSecond(DEFAULT_PREVIEW_DOM_COMMITS_PER_SECOND);
-export const DEBUG_DISABLE_CARD_DOM_PREVIEW = false;
+let _debugDisableCardDomPreview = false;
+export function getDebugDisableCardDomPreview(): boolean {
+	return _debugDisableCardDomPreview;
+}
+export function setDebugDisableCardDomPreview(value: boolean): boolean {
+	_debugDisableCardDomPreview = value;
+	return _debugDisableCardDomPreview;
+}
 export const DEBUG_DISABLE_RENDERED_PREVIEW_CACHE = true;
 export const UNRESOLVED_LINK_ATTRIBUTE = {
 	NAME: "data-twohop-link-state",

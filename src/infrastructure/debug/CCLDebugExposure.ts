@@ -1,5 +1,9 @@
 import type { PluginHost } from "types/pluginHost";
 import {
+	getDebugDisableCardDomPreview,
+	setDebugDisableCardDomPreview,
+} from "appConstants";
+import {
 	forceCloseShadowDesktopPopover,
 	getLastAssignedShadowDesktopPopoverForDebug,
 	getShadowDesktopExperimentalKeepAlive,
@@ -30,6 +34,8 @@ interface CCLDevMeasurementsApi {
 }
 
 interface CCLDebugApi {
+	readonly disableCardDomPreview: boolean;
+	toggleDisableCardDomPreview(value?: boolean): boolean;
 	readonly autoFreeze: boolean;
 	readonly lastSnapshot: ReturnType<typeof getCCLDebugLastSnapshot>;
 	readonly frozenPopover: unknown;
@@ -180,6 +186,15 @@ export function installCCLDebugExposure(plugin: PluginHost): void {
 		},
 	};
 	const api: CCLDebugApi = {
+		get disableCardDomPreview() {
+			return getDebugDisableCardDomPreview();
+		},
+		toggleDisableCardDomPreview(value?: boolean) {
+			const next = value ?? !getDebugDisableCardDomPreview();
+			const result = setDebugDisableCardDomPreview(next);
+			console.info(`[CCL] DEBUG_DISABLE_CARD_DOM_PREVIEW = ${result}`);
+			return result;
+		},
 		get autoFreeze() {
 			return getCCLDebugAutoFreeze();
 		},

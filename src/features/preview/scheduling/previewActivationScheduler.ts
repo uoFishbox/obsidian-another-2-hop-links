@@ -1,5 +1,5 @@
 import {
-	DEBUG_DISABLE_CARD_DOM_PREVIEW,
+	getDebugDisableCardDomPreview,
 	DEFAULT_PREVIEW_ACTIVATIONS_PER_SECOND,
 } from "../../../appConstants";
 import { recordCCLDevMeasurement } from "infrastructure/debug/CCLDevMeasurements";
@@ -624,7 +624,7 @@ export function requestQueuedPreviewActivation(
 	scope: PreviewActivationScope,
 	onActivated?: () => void,
 ): PreviewActivationHandle {
-	if (DEBUG_DISABLE_CARD_DOM_PREVIEW) {
+	if (getDebugDisableCardDomPreview()) {
 		return createActivationHandle(key, undefined);
 	}
 	return enqueuePreviewActivationRequest(key, scope, onActivated);

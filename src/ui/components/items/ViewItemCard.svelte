@@ -5,7 +5,7 @@
 	import CardPreview from "features/preview/ui/CardPreview.svelte";
 	import PreviewHost from "features/preview/ui/PreviewHost.svelte";
 	import UnresolvedPreviewPlaceholder from "features/preview/ui/UnresolvedPreviewPlaceholder.svelte";
-	import { ARIA_LABELS, DEBUG_DISABLE_CARD_DOM_PREVIEW } from "../../../appConstants";
+	import { ARIA_LABELS, getDebugDisableCardDomPreview } from "../../../appConstants";
 	import { formatLinkText } from "features/preview/text-processing/textUtils";
 	import { getItemStrategy } from "application/presenters";
 	import { getPriorityFrontmatterCardTitle } from "core/frontmatterCardTitle";
@@ -192,11 +192,11 @@
 		presentation={renderState.presentation}
 	>
 		{#snippet children()}
-			{#if !DEBUG_DISABLE_CARD_DOM_PREVIEW && renderState.item.type === "newLink" && !renderState.targetFile}
+			{#if !getDebugDisableCardDomPreview() && renderState.item.type === "newLink" && !renderState.targetFile}
 				<UnresolvedPreviewPlaceholder />
-			{:else if !DEBUG_DISABLE_CARD_DOM_PREVIEW && renderState.targetFile && previewSlotId}
+			{:else if !getDebugDisableCardDomPreview() && renderState.targetFile && previewSlotId}
 				<PreviewHost slotId={previewSlotId} />
-			{:else if !DEBUG_DISABLE_CARD_DOM_PREVIEW && renderState.targetFile}
+			{:else if !getDebugDisableCardDomPreview() && renderState.targetFile}
 				<CardPreview
 					bindingIdentity={renderState.previewActivationIdentity}
 					renderSnapshot={renderState.previewSnapshot}

@@ -6,9 +6,7 @@ const state = vi.hoisted(() => ({
 
 vi.mock("../../../../appConstants", () => ({
 	DEFAULT_PREVIEW_ACTIVATIONS_PER_SECOND: 64,
-	get DEBUG_DISABLE_CARD_DOM_PREVIEW() {
-		return state.disableCardDomPreview;
-	},
+	getDebugDisableCardDomPreview: () => state.disableCardDomPreview,
 }));
 
 import {
