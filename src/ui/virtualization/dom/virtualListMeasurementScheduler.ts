@@ -19,7 +19,7 @@ export interface VirtualListMeasurementSchedulerOptions {
 export interface VirtualListMeasurementScheduler {
 	hasPendingLayoutMeasurement(): boolean;
 	scheduleLayoutMeasurement(): void;
-	scheduleScrollMeasurement(): void;
+	scheduleScrollMeasurement(task?: () => void): void;
 	scheduleUnstableMeasurementRetry(): void;
 	resetUnstableMeasurementRetry(): void;
 	cancelAll(): void;
@@ -39,6 +39,7 @@ export const createVirtualListMeasurementScheduler = ({
 	frameCoordinator,
 }: VirtualListMeasurementSchedulerOptions): VirtualListMeasurementScheduler => {
 	let unstableMeasurementRetryCount = 0;
+	let pendingScrollMeasurementTask: (() => void) | undefined;
 	const createTask = (
 		key: string,
 		task: () => void,
@@ -55,13 +56,21 @@ export const createVirtualListMeasurementScheduler = ({
 	const layoutTask = createTask(
 		"virtual-list:layout-measurement",
 		runLayoutMeasurement,
-		"virtualList.scheduler.measurementLayout.animationFrame",
+		process.env.NODE_ENV !== "production"
+			? "virtualList.scheduler.measurementLayout.animationFrame"
+			: undefined,
 	);
 	// Frame-align scroll measurements so wheel/scroll bursts coalesce before work runs.
 	const scrollTask = createTask(
 		"virtual-list:scroll-measurement",
-		runScrollMeasurement,
-		"virtualList.scheduler.measurementScroll.animationFrame",
+		() => {
+			const task = pendingScrollMeasurementTask ?? runScrollMeasurement;
+			pendingScrollMeasurementTask = undefined;
+			task();
+		},
+		process.env.NODE_ENV !== "production"
+			? "virtualList.scheduler.measurementScroll.animationFrame"
+			: undefined,
 	);
 	const retryTask = createTask(
 		"virtual-list:unstable-measurement",
@@ -69,7 +78,9 @@ export const createVirtualListMeasurementScheduler = ({
 			unstableMeasurementRetryCount += 1;
 			runLayoutMeasurement();
 		},
-		"virtualList.scheduler.unstableRetry.animationFrame",
+		process.env.NODE_ENV !== "production"
+			? "virtualList.scheduler.unstableRetry.animationFrame"
+			: undefined,
 	);
 
 	return {
@@ -85,7 +96,10 @@ export const createVirtualListMeasurementScheduler = ({
 			scrollTask.cancel();
 			layoutTask.schedule();
 		},
-		scheduleScrollMeasurement() {
+		scheduleScrollMeasurement(task) {
+			if (task) {
+				pendingScrollMeasurementTask = task;
+			}
 			if (
 				!resolveScheduledTaskWindow(getWindow) ||
 				layoutTask.isScheduled() ||
@@ -116,6 +130,7 @@ export const createVirtualListMeasurementScheduler = ({
 			layoutTask.cancel();
 			scrollTask.cancel();
 			retryTask.cancel();
+			pendingScrollMeasurementTask = undefined;
 		},
 	};
 };

@@ -20,6 +20,11 @@ const flushScheduledMeasurements = async (): Promise<void> => {
 	await vi.runOnlyPendingTimersAsync();
 };
 
+const scheduleScrollMeasurement = (task?: () => void): void => {
+	if (!task) return;
+	window.requestAnimationFrame(task);
+};
+
 const createMutationRecord = (params: {
 	target: Node;
 	addedNodes: readonly Node[];
@@ -75,7 +80,7 @@ describe("VirtualListDomObserver performance contracts", () => {
 					onWidthChange: vi.fn(),
 					onScrollContainerChange: vi.fn(),
 					scheduleLayoutMeasurement: scheduleLayoutMeasurements[index],
-					scheduleScrollMeasurement: vi.fn(),
+					scheduleScrollMeasurement,
 					runScrollMeasurement: vi.fn(),
 					runInitialLayoutMeasurement: vi.fn(),
 				}),
@@ -130,31 +135,31 @@ describe("VirtualListDomObserver performance contracts", () => {
 		});
 
 		let frame = 0;
-		stopObserving.push(
-			observeVirtualListViewport({
-				rootEl,
-				onWidthChange: vi.fn(),
-				getCachedViewportHeight: () => 240,
-				// Deterministic coverage: every Nth frame reports no coverage
-				// (miss); all other frames stay inside the open interval (hit).
-				getScrollMeasurementRange: () =>
-					frame % MISS_EVERY_N_FRAMES === 0
-						? null
-						: {
-								minScrollTopBeforeMeasurement: -1,
-								maxScrollTopBeforeMeasurement: Number.MAX_SAFE_INTEGER,
-							},
-				onScrollContainerChange: vi.fn(),
-				scheduleLayoutMeasurement: vi.fn(),
-				scheduleScrollMeasurement: vi.fn(),
-				runScrollMeasurement: vi.fn(),
-				runInitialLayoutMeasurement: vi.fn(),
-			}),
-		);
+		const observation = observeVirtualListViewport({
+			rootEl,
+			onWidthChange: vi.fn(),
+			getCachedViewportHeight: () => 240,
+			onScrollContainerChange: vi.fn(),
+			scheduleLayoutMeasurement: vi.fn(),
+			scheduleScrollMeasurement,
+			runScrollMeasurement: vi.fn(),
+			runInitialLayoutMeasurement: vi.fn(),
+		});
+		stopObserving.push(observation);
 		resetCCLDevMeasurements();
 
 		// rAF-driven programmatic scroll stream, one scroll event per frame
 		for (frame = 0; frame < SCROLL_FRAMES; frame += 1) {
+			// Deterministic pushed coverage: every Nth frame publishes no
+			// coverage (miss); all other frames publish an open interval hit.
+			observation.publishScrollMeasurementRange(
+				frame % MISS_EVERY_N_FRAMES === 0
+					? null
+					: {
+							minScrollTopBeforeMeasurement: -1,
+							maxScrollTopBeforeMeasurement: Number.MAX_SAFE_INTEGER,
+						},
+			);
 			scrollTop += 20;
 			scroller.dispatchEvent(new Event("scroll"));
 			await vi.advanceTimersByTimeAsync(16);

@@ -105,10 +105,47 @@ describe("createVirtualListMeasurementScheduler", () => {
 		expect(frameCoordinator.schedule).toHaveBeenCalledWith(
 			"scroll-critical",
 			"virtual-list:scroll-measurement",
-			runScrollMeasurement,
+			expect.any(Function),
 		);
 		scheduledTasks.get("scroll-critical:virtual-list:scroll-measurement")?.();
 		expect(runScrollMeasurement).toHaveBeenCalledOnce();
+	});
+
+	it("retains an observer task while layout temporarily supersedes scroll", () => {
+		const scheduledTasks = new Map<string, () => void>();
+		const frameCoordinator: VirtualFrameCoordinator = {
+			schedule: vi.fn((lane, key, task) => {
+				const taskKey = `${lane}:${key}`;
+				if (scheduledTasks.has(taskKey)) return false;
+				scheduledTasks.set(taskKey, task);
+				return true;
+			}),
+			cancel: vi.fn((lane, key) => {
+				scheduledTasks.delete(`${lane}:${key}`);
+			}),
+			isScheduled: vi.fn((lane, key) => scheduledTasks.has(`${lane}:${key}`)),
+			dispose: vi.fn(),
+		};
+		const observerTask = vi.fn();
+		const scheduler = createVirtualListMeasurementScheduler({
+			runLayoutMeasurement: vi.fn(),
+			runScrollMeasurement: vi.fn(),
+			maxUnstableMeasurementRetries: 3,
+			frameCoordinator,
+		});
+
+		scheduler.scheduleScrollMeasurement(observerTask);
+		scheduler.scheduleLayoutMeasurement();
+		expect(
+			scheduledTasks.has("scroll-critical:virtual-list:scroll-measurement"),
+		).toBe(false);
+
+		scheduledTasks.get("scroll-critical:virtual-list:layout-measurement")?.();
+		scheduledTasks.delete("scroll-critical:virtual-list:layout-measurement");
+		scheduler.scheduleScrollMeasurement();
+		scheduledTasks.get("scroll-critical:virtual-list:scroll-measurement")?.();
+
+		expect(observerTask).toHaveBeenCalledOnce();
 	});
 });
 

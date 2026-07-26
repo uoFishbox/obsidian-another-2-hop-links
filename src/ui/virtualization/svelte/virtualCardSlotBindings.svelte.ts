@@ -40,6 +40,8 @@ export interface VirtualCardSlotBindings<
 	TCardModel,
 	TBindingIdentity,
 > {
+	/** Publishes only a preview-window change without scanning physical slots. */
+	syncPreviewWindow(previewWindow: RowPreviewWindow): void;
 	/** Reconciles card shells, preview bindings, interactions, and preview window. */
 	sync(params: {
 		readonly mountedCells: readonly TMountedCell[];
@@ -199,6 +201,9 @@ export function createVirtualCardSlotBindings<
 
 	return {
 		sync,
+		syncPreviewWindow(previewWindow) {
+			options.previewSurface.setPreviewWindow(previewWindow);
+		},
 		getSlotState(mountedCell) {
 			const token = bindingTokensByCell.get(mountedCell);
 			if (!token) return undefined;

@@ -20,6 +20,11 @@ import {
 	triggerResize,
 } from "testing/helpers/DOMObserverMock";
 
+const scheduleScrollMeasurement = (task?: () => void): void => {
+	if (!task) return;
+	window.requestAnimationFrame(task);
+};
+
 describe("observeVirtualListViewport", () => {
 	beforeEach(() => {
 		resetRecords();
@@ -60,7 +65,7 @@ describe("observeVirtualListViewport", () => {
 			onWidthChange,
 			onScrollContainerChange: vi.fn(),
 			scheduleLayoutMeasurement: vi.fn(),
-			scheduleScrollMeasurement: vi.fn(),
+			scheduleScrollMeasurement,
 			runScrollMeasurement: vi.fn(),
 			runInitialLayoutMeasurement: vi.fn(),
 		});
@@ -102,7 +107,7 @@ describe("observeVirtualListViewport", () => {
 			onWidthChange: vi.fn(),
 			onScrollContainerChange: vi.fn(),
 			scheduleLayoutMeasurement: vi.fn(),
-			scheduleScrollMeasurement: vi.fn(),
+			scheduleScrollMeasurement,
 			runScrollMeasurement: vi.fn(),
 			runInitialLayoutMeasurement: vi.fn(),
 		});
@@ -111,7 +116,7 @@ describe("observeVirtualListViewport", () => {
 			onWidthChange: vi.fn(),
 			onScrollContainerChange: vi.fn(),
 			scheduleLayoutMeasurement: vi.fn(),
-			scheduleScrollMeasurement: vi.fn(),
+			scheduleScrollMeasurement,
 			runScrollMeasurement: vi.fn(),
 			runInitialLayoutMeasurement: vi.fn(),
 		});
@@ -159,7 +164,7 @@ describe("observeVirtualListViewport", () => {
 			onWidthChange: vi.fn(),
 			onScrollContainerChange: vi.fn(),
 			scheduleLayoutMeasurement,
-			scheduleScrollMeasurement: vi.fn(),
+			scheduleScrollMeasurement,
 			runScrollMeasurement: vi.fn(),
 			runInitialLayoutMeasurement: vi.fn(),
 		});
@@ -228,7 +233,7 @@ describe("observeVirtualListViewport", () => {
 			getCachedViewportHeight: () => 240,
 			onScrollContainerChange,
 			scheduleLayoutMeasurement: vi.fn(),
-			scheduleScrollMeasurement: vi.fn(),
+			scheduleScrollMeasurement,
 			runScrollMeasurement,
 			runInitialLayoutMeasurement: vi.fn(),
 			onScrollStateChange,
@@ -305,7 +310,7 @@ describe("observeVirtualListViewport", () => {
 			getScrollMeasurementRange,
 			onScrollContainerChange: vi.fn(),
 			scheduleLayoutMeasurement: vi.fn(),
-			scheduleScrollMeasurement: vi.fn(),
+			scheduleScrollMeasurement,
 			runScrollMeasurement,
 			runInitialLayoutMeasurement: vi.fn(),
 		});
@@ -320,8 +325,8 @@ describe("observeVirtualListViewport", () => {
 
 			expect(runScrollMeasurement).not.toHaveBeenCalled();
 			expect(requestAnimationFrame).not.toHaveBeenCalled();
-			// Pull-based: getScrollMeasurementRange is called on every scroll event
-			expect(getScrollMeasurementRange).toHaveBeenCalledTimes(2);
+			// The published primitive gate avoids callbacks on the scroll path.
+			expect(getScrollMeasurementRange).not.toHaveBeenCalled();
 
 			scrollTop = 150;
 			scrollContainer.dispatchEvent(new Event("scroll"));
@@ -369,7 +374,7 @@ describe("observeVirtualListViewport", () => {
 			}),
 			onScrollContainerChange: vi.fn(),
 			scheduleLayoutMeasurement: vi.fn(),
-			scheduleScrollMeasurement: vi.fn(),
+			scheduleScrollMeasurement,
 			runScrollMeasurement,
 			runInitialLayoutMeasurement: vi.fn(),
 		});
@@ -417,7 +422,7 @@ describe("observeVirtualListViewport", () => {
 			onWidthChange: vi.fn(),
 			onScrollContainerChange: vi.fn(),
 			scheduleLayoutMeasurement: firstScheduleLayoutMeasurement,
-			scheduleScrollMeasurement: vi.fn(),
+			scheduleScrollMeasurement,
 			runScrollMeasurement: vi.fn(),
 			runInitialLayoutMeasurement: vi.fn(),
 		});
@@ -426,7 +431,7 @@ describe("observeVirtualListViewport", () => {
 			onWidthChange: vi.fn(),
 			onScrollContainerChange: vi.fn(),
 			scheduleLayoutMeasurement: secondScheduleLayoutMeasurement,
-			scheduleScrollMeasurement: vi.fn(),
+			scheduleScrollMeasurement,
 			runScrollMeasurement: vi.fn(),
 			runInitialLayoutMeasurement: vi.fn(),
 		});
@@ -504,7 +509,7 @@ describe("observeVirtualListViewport", () => {
 			onWidthChange: vi.fn(),
 			onScrollContainerChange: vi.fn(),
 			scheduleLayoutMeasurement: vi.fn(),
-			scheduleScrollMeasurement: vi.fn(),
+			scheduleScrollMeasurement,
 			runScrollMeasurement: vi.fn(),
 			runInitialLayoutMeasurement: vi.fn(),
 		});
@@ -555,7 +560,7 @@ describe("observeVirtualListViewport", () => {
 			onWidthChange: vi.fn(),
 			onScrollContainerChange,
 			scheduleLayoutMeasurement,
-			scheduleScrollMeasurement: vi.fn(),
+			scheduleScrollMeasurement,
 			runScrollMeasurement: vi.fn(),
 			runInitialLayoutMeasurement: vi.fn(),
 		});
@@ -610,7 +615,7 @@ describe("observeVirtualListViewport", () => {
 			getScrollMeasurementRange,
 			onScrollContainerChange: vi.fn(),
 			scheduleLayoutMeasurement: vi.fn(),
-			scheduleScrollMeasurement: vi.fn(),
+			scheduleScrollMeasurement,
 			runScrollMeasurement,
 			runInitialLayoutMeasurement: vi.fn(),
 		});
@@ -676,7 +681,7 @@ describe("observeVirtualListViewport", () => {
 			getScrollMeasurementRange,
 			onScrollContainerChange: vi.fn(),
 			scheduleLayoutMeasurement: vi.fn(),
-			scheduleScrollMeasurement: vi.fn(),
+			scheduleScrollMeasurement,
 			runScrollMeasurement,
 			runInitialLayoutMeasurement: vi.fn(),
 		});
@@ -741,7 +746,7 @@ describe("observeVirtualListViewport", () => {
 			getScrollMeasurementRange,
 			onScrollContainerChange: vi.fn(),
 			scheduleLayoutMeasurement: vi.fn(),
-			scheduleScrollMeasurement: vi.fn(),
+			scheduleScrollMeasurement,
 			runScrollMeasurement,
 			runInitialLayoutMeasurement: vi.fn(),
 		});
@@ -800,7 +805,7 @@ describe("observeVirtualListViewport", () => {
 			getScrollMeasurementRange,
 			onScrollContainerChange: vi.fn(),
 			scheduleLayoutMeasurement: vi.fn(),
-			scheduleScrollMeasurement: vi.fn(),
+			scheduleScrollMeasurement,
 			runScrollMeasurement,
 			runInitialLayoutMeasurement: vi.fn(),
 		});
@@ -864,7 +869,7 @@ describe("observeVirtualListViewport", () => {
 			getScrollMeasurementRange,
 			onScrollContainerChange: vi.fn(),
 			scheduleLayoutMeasurement: vi.fn(),
-			scheduleScrollMeasurement: vi.fn(),
+			scheduleScrollMeasurement,
 			runScrollMeasurement,
 			runInitialLayoutMeasurement: vi.fn(),
 		});
@@ -901,7 +906,7 @@ describe("observeVirtualListViewport", () => {
 		}
 	});
 
-	it("reflects controller range changes immediately without stale cache", async () => {
+	it("uses a newly published controller range without stale coverage", async () => {
 		installAnimationFrameMock();
 
 		const scrollContainer = document.createElement("div");
@@ -930,7 +935,7 @@ describe("observeVirtualListViewport", () => {
 			getScrollMeasurementRange,
 			onScrollContainerChange: vi.fn(),
 			scheduleLayoutMeasurement: vi.fn(),
-			scheduleScrollMeasurement: vi.fn(),
+			scheduleScrollMeasurement,
 			runScrollMeasurement,
 			runInitialLayoutMeasurement: vi.fn(),
 		});
@@ -945,8 +950,9 @@ describe("observeVirtualListViewport", () => {
 			// Controller range shrinks (simulating data/layout change)
 			rangeMin = 100;
 			rangeMax = 140;
+			stopObserving.publishScrollMeasurementRange(getScrollMeasurementRange());
 
-			// Now 150 is outside [100, 140] → miss (no stale cache)
+			// Now 150 is outside [100, 140] → miss.
 			scrollContainer.dispatchEvent(new Event("scroll"));
 			await flushFrames();
 			expect(runScrollMeasurement).toHaveBeenCalledTimes(1);
@@ -962,6 +968,7 @@ describe("observeVirtualListViewport", () => {
 
 	it("coalesces multiple coverage misses in the same frame into one measurement", async () => {
 		installAnimationFrameMock();
+		resetCCLDevMeasurements();
 		const requestAnimationFrame = vi.spyOn(window, "requestAnimationFrame");
 
 		const scrollContainer = document.createElement("div");
@@ -988,7 +995,7 @@ describe("observeVirtualListViewport", () => {
 			getScrollMeasurementRange,
 			onScrollContainerChange: vi.fn(),
 			scheduleLayoutMeasurement: vi.fn(),
-			scheduleScrollMeasurement: vi.fn(),
+			scheduleScrollMeasurement,
 			runScrollMeasurement,
 			runInitialLayoutMeasurement: vi.fn(),
 		});
@@ -1014,6 +1021,9 @@ describe("observeVirtualListViewport", () => {
 				expect.objectContaining({ scrollTop: 400 }),
 				"scroll-coverage-miss",
 			);
+			const counters = getCCLDevMeasurementSnapshot().counters;
+			expect(counters["virtualList.observer.coverageMiss"].count).toBe(1);
+			expect(counters["virtualList.observer.coverageHit"].count).toBe(0);
 		} finally {
 			stopObserving();
 			requestAnimationFrame.mockRestore();
@@ -1049,7 +1059,7 @@ describe("observeVirtualListViewport", () => {
 			getScrollMeasurementRange,
 			onScrollContainerChange: vi.fn(),
 			scheduleLayoutMeasurement: vi.fn(),
-			scheduleScrollMeasurement: vi.fn(),
+			scheduleScrollMeasurement,
 			runScrollMeasurement,
 			runInitialLayoutMeasurement: vi.fn(),
 		});
@@ -1101,7 +1111,7 @@ describe("observeVirtualListViewport", () => {
 			getScrollMeasurementRange,
 			onScrollContainerChange: vi.fn(),
 			scheduleLayoutMeasurement: vi.fn(),
-			scheduleScrollMeasurement: vi.fn(),
+			scheduleScrollMeasurement,
 			runScrollMeasurement,
 			runInitialLayoutMeasurement: vi.fn(),
 		});

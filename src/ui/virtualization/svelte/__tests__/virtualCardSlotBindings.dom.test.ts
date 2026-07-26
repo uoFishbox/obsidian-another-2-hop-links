@@ -181,6 +181,42 @@ describe("virtualCardSlotBindings", () => {
 		);
 	});
 
+	it("updates the preview window without reconciling unchanged bindings", () => {
+		const previewSurface = createPreviewSurface();
+		const resolver = vi.fn((mountedCell: TestMountedCell) => ({
+			mountedCell,
+			cardModel: mountedCell.label,
+		}));
+		const bindings = createVirtualCardSlotBindings({
+			previewSurface,
+			interactionController: createVirtualCardInteractionController(),
+			resolveBinding: resolver,
+		});
+		const mountedCell = createMountedCell(0, 0, "retained");
+
+		bindings.sync({
+			mountedCells: [mountedCell],
+			capacity: 1,
+			bindingIdentity: resolver,
+			previewWindow: {
+				previewRange: { start: 0, end: 1 },
+				active: true,
+			},
+		});
+		bindings.syncPreviewWindow({
+			previewRange: { start: 0, end: 1 },
+			active: true,
+		});
+		bindings.syncPreviewWindow({
+			previewRange: { start: 0, end: 1 },
+			active: false,
+		});
+
+		expect(resolver).toHaveBeenCalledTimes(1);
+		expect(previewSurface.setPreviewWindow).toHaveBeenCalledTimes(2);
+		expect(previewSurface.commitBindingDelta).toHaveBeenCalledTimes(1);
+	});
+
 	it("keeps the binding epoch for a content-only refresh", () => {
 		const bindings = createVirtualCardSlotBindings({
 			previewSurface: createPreviewSurface(),

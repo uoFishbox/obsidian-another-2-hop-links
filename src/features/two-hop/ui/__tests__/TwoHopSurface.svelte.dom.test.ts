@@ -35,6 +35,7 @@ const previewSurfaceCalls = vi.hoisted(() => ({
 	create: vi.fn(),
 	commitBindingDelta: vi.fn(),
 	syncBindingDelta: vi.fn(),
+	setPreviewWindow: vi.fn(),
 }));
 
 vi.mock("features/preview/scheduling/virtualPreviewSurface", async (importOriginal) => {
@@ -57,6 +58,12 @@ vi.mock("features/preview/scheduling/virtualPreviewSurface", async (importOrigin
 					previewSurfaceCalls.syncBindingDelta(...syncArgs);
 					surface.syncBindingDelta(...syncArgs);
 				},
+				setPreviewWindow: (
+					...windowArgs: Parameters<typeof surface.setPreviewWindow>
+				) => {
+					previewSurfaceCalls.setPreviewWindow(...windowArgs);
+					surface.setPreviewWindow(...windowArgs);
+				},
 				commitBindingDelta: (
 					...commitArgs: Parameters<typeof surface.commitBindingDelta>
 				) => {
@@ -72,6 +79,7 @@ beforeEach(() => {
 	previewSurfaceCalls.create.mockClear();
 	previewSurfaceCalls.commitBindingDelta.mockClear();
 	previewSurfaceCalls.syncBindingDelta.mockClear();
+	previewSurfaceCalls.setPreviewWindow.mockClear();
 	resetRecords();
 	installResizeObserverMock();
 	installIntersectionObserverMock();
@@ -201,13 +209,14 @@ async function scrollSurface(
 }
 
 describe("TwoHopSurface", () => {
-	it("publishes each snapshot through the combined preview commit", async () => {
+	it("publishes binding changes through the combined preview commit", async () => {
 		const { root, scroller } = await renderScrollableSurface(
 			100,
 			createPreviewDependencies(),
 		);
 		previewSurfaceCalls.commitBindingDelta.mockClear();
 		previewSurfaceCalls.syncBindingDelta.mockClear();
+		previewSurfaceCalls.setPreviewWindow.mockClear();
 
 		await scrollSurface(root, scroller, 600);
 
@@ -239,35 +248,37 @@ describe("TwoHopSurface", () => {
 			getMetadata: () => null,
 		} as unknown as LinkContext;
 		const previewDependencies = createPreviewDependencies(getPreview);
-		const resolveItemCardModel = (
-			item: TwoHopVirtualListItem,
-			presentation: CardRenderModel["presentation"],
-		): CardRenderModel => ({
-			item: item.item,
-			targetFile,
-			title: item.virtualKey,
-			ariaLabel: item.virtualKey,
-			className: null,
-			extension: "md",
-			directory: "notes",
-			interactionId: item.interactionId ?? item.virtualKey,
-			interactionKey: item.interactionId ?? item.virtualKey,
-			interactionDescriptor: null,
-			presentation,
-			searchQuery: "",
-			searchScope: "title-and-content",
-			contentPreview: undefined,
-			previewRefreshToken: 0,
-			previewActivationIdentity: `preview:${item.virtualKey}`,
-			previewOverride: null,
-			previewSnapshot: {
-				identity: `preview:${item.virtualKey}`,
-				file: targetFile,
+		const resolveItemCardModel = vi.fn(
+			(
+				item: TwoHopVirtualListItem,
+				presentation: CardRenderModel["presentation"],
+			): CardRenderModel => ({
+				item: item.item,
+				targetFile,
+				title: item.virtualKey,
+				ariaLabel: item.virtualKey,
+				className: null,
+				extension: "md",
+				directory: "notes",
+				interactionId: item.interactionId ?? item.virtualKey,
+				interactionKey: item.interactionId ?? item.virtualKey,
+				interactionDescriptor: null,
+				presentation,
 				searchQuery: "",
+				searchScope: "title-and-content",
+				contentPreview: undefined,
 				previewRefreshToken: 0,
+				previewActivationIdentity: `preview:${item.virtualKey}`,
 				previewOverride: null,
-			},
-		});
+				previewSnapshot: {
+					identity: `preview:${item.virtualKey}`,
+					file: targetFile,
+					searchQuery: "",
+					previewRefreshToken: 0,
+					previewOverride: null,
+				},
+			}),
+		);
 		resetCCLDevMeasurements();
 		const harnessProps = {
 			sections: [createSection(1)],
@@ -292,6 +303,9 @@ describe("TwoHopSurface", () => {
 		}
 		expect(getPreview).not.toHaveBeenCalled();
 
+		const resolverCallsBefore = resolveItemCardModel.mock.calls.length;
+		previewSurfaceCalls.commitBindingDelta.mockClear();
+		previewSurfaceCalls.setPreviewWindow.mockClear();
 		await rerender({
 			...harnessProps,
 			previewActive: true,
@@ -307,6 +321,11 @@ describe("TwoHopSurface", () => {
 
 		expect(host?.dataset.previewState).toBe("committed");
 		expect(host?.querySelector("img")).not.toBeNull();
+		expect(resolveItemCardModel).toHaveBeenCalledTimes(resolverCallsBefore);
+		expect(previewSurfaceCalls.commitBindingDelta).not.toHaveBeenCalled();
+		expect(previewSurfaceCalls.setPreviewWindow).toHaveBeenCalledWith(
+			expect.objectContaining({ active: true }),
+		);
 		expect(
 			getCCLDevMeasurementSnapshot().counters["component.ViewItemCard.reevaluate"]
 				.count,

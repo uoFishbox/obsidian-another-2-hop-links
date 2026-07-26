@@ -1,7 +1,10 @@
 import { markVirtualScrollMeasurementRun } from "ui/virtualization/scheduling/virtualScrollMeasurementFrame";
 import { recordCCLDevMeasurement } from "infrastructure/debug/CCLDevMeasurements";
 import type { VirtualListSharedScrollMetrics } from "./virtualListDomObserver";
-import { observeVirtualListViewport } from "./virtualListDomObserver";
+import {
+	observeVirtualListViewport,
+	type VirtualListViewportObservation,
+} from "./virtualListDomObserver";
 import {
 	readVirtualListCachedMeasurementInto,
 	type VirtualListCachedMeasurementInput,
@@ -77,7 +80,7 @@ export interface CreateVirtualMeasurementControllerOptions {
 	) => VirtualMeasurementApplicationResult | void;
 	onObservedWidthChange?: (width: number) => void;
 	onScrollContainerChange?: (element: HTMLElement | null) => void;
-	/** Returns the current open interval that does not require measurement. */
+	/** Returns the range to push after each applied measurement. */
 	getScrollMeasurementRange?: () => ScrollMeasurementRange | null;
 	enableBootstrapMeasurementSuppression?: boolean;
 	enableInitialStabilization?: boolean;
@@ -156,6 +159,7 @@ export function createVirtualMeasurementController({
 	let hasPendingObservedScrollTop = false;
 	let isObservedScrollActive = false;
 	let pendingScrollMeasurementReason: VirtualScrollMeasurementReason | null = null;
+	let activeViewportObservation: VirtualListViewportObservation | null = null;
 
 	const rememberPublishedScrollMeasurement = (
 		measurement: VirtualMeasurement,
@@ -186,8 +190,13 @@ export function createVirtualMeasurementController({
 
 	const publishMeasurement = (
 		nextMeasurement: VirtualMeasurement,
-	): VirtualMeasurementApplicationResult =>
-		onMeasurement?.(nextMeasurement) ?? "stable";
+	): VirtualMeasurementApplicationResult => {
+		const result = onMeasurement?.(nextMeasurement) ?? "stable";
+		activeViewportObservation?.publishScrollMeasurementRange(
+			getScrollMeasurementRange?.() ?? null,
+		);
+		return result;
+	};
 
 	const runLayoutMeasurement = (): VirtualMeasurementResult => {
 		const rootEl = getRootEl();
@@ -240,12 +249,12 @@ export function createVirtualMeasurementController({
 			| RunVirtualScrollMeasurementOptions
 			| VirtualScrollMeasurementReason = EMPTY_RUN_SCROLL_MEASUREMENT_OPTIONS,
 	): VirtualMeasurementResult => {
-		const options: RunVirtualScrollMeasurementOptions =
-			typeof optionsOrReason === "string"
-				? { reason: optionsOrReason }
-				: optionsOrReason;
+		const isReasonOnly = typeof optionsOrReason === "string";
+		const forcePublish = isReasonOnly ? false : optionsOrReason.forcePublish;
 		const resolvedReason =
-			options.reason ?? pendingScrollMeasurementReason ?? undefined;
+			(isReasonOnly ? optionsOrReason : optionsOrReason.reason) ??
+			pendingScrollMeasurementReason ??
+			undefined;
 		pendingScrollMeasurementReason = null;
 		const rootEl = getRootEl();
 		if (!getOptionalOwnerWindow(rootEl ?? measurement.scrollContainerEl)) {
@@ -264,7 +273,7 @@ export function createVirtualMeasurementController({
 		scrollMeasurement.scrollGeneration =
 			sharedScrollMetrics?.scrollGeneration ?? observedScrollGeneration;
 		if (
-			!options.forcePublish &&
+			!forcePublish &&
 			isUnchangedPublishedScrollMeasurement(
 				scrollMeasurement.scrollTop,
 				scrollMeasurement.viewportHeight,
@@ -342,7 +351,7 @@ export function createVirtualMeasurementController({
 		rootEl: HTMLElement,
 		runWithoutTracking: (callback: () => void) => void = (callback) => callback(),
 	): (() => void) => {
-		const stopObserving = observeVirtualListViewport({
+		const observation = observeVirtualListViewport({
 			rootEl,
 			onWidthChange: (width) => {
 				measurement.measuredWidth = width;
@@ -385,12 +394,16 @@ export function createVirtualMeasurementController({
 					}
 				: undefined,
 		});
+		activeViewportObservation = observation;
 
 		return () => {
+			if (activeViewportObservation === observation) {
+				activeViewportObservation = null;
+			}
 			bootstrapMeasurementSuppression.cancel();
 			initialStabilization.cancel();
 			cancelAll();
-			stopObserving();
+			observation();
 		};
 	};
 
