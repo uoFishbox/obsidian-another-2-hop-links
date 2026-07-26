@@ -2,6 +2,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { observeVirtualListViewport } from "../virtualListDomObserver";
 import { resetScrollActivityForTests } from "ui/virtualization/scheduling/scrollActivity";
 import {
+	getCCLDevMeasurementSnapshot,
+	resetCCLDevMeasurements,
+} from "infrastructure/debug/CCLDevMeasurements";
+import {
 	installMutationObserverMock,
 	installAnimationFrameMock,
 	installResizeObserverMock,
@@ -334,6 +338,56 @@ describe("observeVirtualListViewport", () => {
 		} finally {
 			stopObserving();
 			requestAnimationFrame.mockRestore();
+			teardownAnimationFrameMock();
+		}
+	});
+
+	it("skips a pending coverage-miss task when the latest position recovers", async () => {
+		installAnimationFrameMock();
+		resetCCLDevMeasurements();
+
+		const scrollContainer = document.createElement("div");
+		const rootEl = document.createElement("div");
+		scrollContainer.style.overflow = "auto";
+		document.body.append(scrollContainer);
+		scrollContainer.append(rootEl);
+
+		let scrollTop = 300;
+		Object.defineProperty(scrollContainer, "scrollTop", {
+			get: () => scrollTop,
+			configurable: true,
+		});
+
+		const runScrollMeasurement = vi.fn();
+		const stopObserving = observeVirtualListViewport({
+			rootEl,
+			onWidthChange: vi.fn(),
+			getCachedViewportHeight: () => 240,
+			getScrollMeasurementRange: () => ({
+				minScrollTopBeforeMeasurement: 100,
+				maxScrollTopBeforeMeasurement: 200,
+			}),
+			onScrollContainerChange: vi.fn(),
+			scheduleLayoutMeasurement: vi.fn(),
+			scheduleScrollMeasurement: vi.fn(),
+			runScrollMeasurement,
+			runInitialLayoutMeasurement: vi.fn(),
+		});
+
+		try {
+			scrollContainer.dispatchEvent(new Event("scroll"));
+			scrollTop = 150;
+			scrollContainer.dispatchEvent(new Event("scroll"));
+			await flushFrames();
+
+			expect(runScrollMeasurement).not.toHaveBeenCalled();
+			expect(
+				getCCLDevMeasurementSnapshot().counters[
+					"virtualList.observer.scrollTask.skippedRecoveredCoverage"
+				].count,
+			).toBe(1);
+		} finally {
+			stopObserving();
 			teardownAnimationFrameMock();
 		}
 	});
@@ -777,6 +831,7 @@ describe("observeVirtualListViewport", () => {
 
 	it("keeps the coverage-miss reason when idle fires before the task runs", async () => {
 		vi.useFakeTimers();
+		resetCCLDevMeasurements();
 		const rafQueue: FrameRequestCallback[] = [];
 		const rafSpy = vi
 			.spyOn(window, "requestAnimationFrame")
@@ -835,6 +890,11 @@ describe("observeVirtualListViewport", () => {
 				expect.anything(),
 				"scroll-coverage-miss",
 			);
+			expect(
+				getCCLDevMeasurementSnapshot().counters[
+					"virtualList.observer.scrollTask.skippedRecoveredCoverage"
+				].count,
+			).toBe(0);
 		} finally {
 			stopObserving();
 			rafSpy.mockRestore();

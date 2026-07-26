@@ -44,7 +44,6 @@ export function createVirtualScrollWindowMeasurementController<TContext>({
 	onStableMeasurement,
 }: CreateVirtualScrollWindowMeasurementControllerOptions<TContext>) {
 	let lastMountedScrollWindow: LastMountedScrollWindow | null = null;
-	let lastStableScrollTop: number | null = null;
 	const scrollMeasurementRange: {
 		-readonly [K in keyof ScrollMeasurementRange]: ScrollMeasurementRange[K];
 	} = {
@@ -59,16 +58,15 @@ export function createVirtualScrollWindowMeasurementController<TContext>({
 
 	const resetLastScrollWindow = (): void => {
 		lastMountedScrollWindow = null;
-		lastStableScrollTop = null;
 	};
 
 	const getScrollMeasurementRange = (): ScrollMeasurementRange | null => {
-		if (!lastMountedScrollWindow || lastStableScrollTop === null) {
-			return null;
-		}
 		if (
-			lastStableScrollTop <= lastMountedScrollWindow.coverageScrollTopMin ||
-			lastStableScrollTop >= lastMountedScrollWindow.coverageScrollTopMax
+			!lastMountedScrollWindow ||
+			!(
+				lastMountedScrollWindow.coverageScrollTopMin <
+				lastMountedScrollWindow.coverageScrollTopMax
+			)
 		) {
 			return null;
 		}
@@ -99,14 +97,12 @@ export function createVirtualScrollWindowMeasurementController<TContext>({
 			mountedMeasurement.stableMountedScrollTopBand,
 			mountedMeasurement.mountedCoverageScrollTopBand,
 		);
-		lastStableScrollTop = measurement.scrollTop;
 	};
 
 	const returnStableScrollMeasurement = (
 		measurement: VirtualMeasurement,
 		context: TContext,
 	): VirtualMeasurementApplicationResult => {
-		lastStableScrollTop = measurement.scrollTop;
 		onStableMeasurement(measurement, context);
 		return "stable";
 	};
@@ -121,7 +117,6 @@ export function createVirtualScrollWindowMeasurementController<TContext>({
 
 		if (!nextMeasurement.isStableMeasurement && !applyUnstableScrollMeasurement) {
 			lastMountedScrollWindow = null;
-			lastStableScrollTop = null;
 			return "unstable";
 		}
 
@@ -155,6 +150,12 @@ export function createVirtualScrollWindowMeasurementController<TContext>({
 			) {
 				if (process.env.NODE_ENV !== "production") {
 					recordCCLDevMeasurement("virtualScroll.sameMountedWindowHit");
+					recordCCLDevMeasurement(
+						mountedMeasurement.mounted.start >=
+							mountedMeasurement.mounted.end
+							? "virtualScroll.sameMountedWindowHit.empty"
+							: "virtualScroll.sameMountedWindowHit.nonEmpty",
+					);
 				}
 				// Active-scroll preview follows mounted-window publications. Idle
 				// measurement normalizes it to the current viewport afterward.
@@ -198,7 +199,6 @@ export function createVirtualScrollWindowMeasurementController<TContext>({
 		}
 
 		if (result.kind !== "stable") {
-			lastStableScrollTop = null;
 			lastMountedScrollWindow = pendingMountedMeasurement
 				? createMountedScrollWindow(
 						pendingMountedMeasurement.identity,
@@ -224,7 +224,6 @@ export function createVirtualScrollWindowMeasurementController<TContext>({
 		if (!nextMeasurement.isScrollActive) {
 			primeLastScrollWindow(nextMeasurement, context);
 		}
-		lastStableScrollTop = nextMeasurement.scrollTop;
 		onStableMeasurement(nextMeasurement, context);
 		return "stable";
 	};

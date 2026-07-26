@@ -7,6 +7,12 @@ export type CCLDevMeasurementName =
 	| "virtualScroll.applyScrollMeasurement.skippedUnchanged"
 	| "virtualScroll.stableBandHit"
 	| "virtualScroll.sameMountedWindowHit"
+	| "virtualScroll.sameMountedWindowHit.empty"
+	| "virtualScroll.sameMountedWindowHit.nonEmpty"
+	| "virtualScroll.coverageBand.emptyAbove"
+	| "virtualScroll.coverageBand.emptyBelow"
+	| "virtualScroll.coverageBand.emptyData"
+	| "virtualScroll.coverageBand.invalid"
 	| "virtualScroll.rangeMeasurementApplied"
 	| "virtualScroll.rangeMeasurementChanged"
 	| "virtualScroll.rangeMeasurementReused"
@@ -15,6 +21,8 @@ export type CCLDevMeasurementName =
 	| "virtualList.observer.coverageMiss"
 	| "virtualList.observer.scrollTask.scheduled"
 	| "virtualList.observer.scrollTask.executed"
+	| "virtualList.observer.scrollTask.skippedRecoveredCoverage"
+	| "virtualList.observer.scrollTask.cancelledRecoveredCoverage"
 	| "virtualList.observer.layoutTask.scheduled"
 	| "virtualList.observer.dependencyTask.scheduled"
 	| "virtualList.scheduler.observerScroll.animationFrame"
@@ -56,6 +64,12 @@ export const CCL_DEV_MEASUREMENT_NAMES: readonly CCLDevMeasurementName[] = [
 	"virtualScroll.applyScrollMeasurement.skippedUnchanged",
 	"virtualScroll.stableBandHit",
 	"virtualScroll.sameMountedWindowHit",
+	"virtualScroll.sameMountedWindowHit.empty",
+	"virtualScroll.sameMountedWindowHit.nonEmpty",
+	"virtualScroll.coverageBand.emptyAbove",
+	"virtualScroll.coverageBand.emptyBelow",
+	"virtualScroll.coverageBand.emptyData",
+	"virtualScroll.coverageBand.invalid",
 	"virtualScroll.rangeMeasurementApplied",
 	"virtualScroll.rangeMeasurementChanged",
 	"virtualScroll.rangeMeasurementReused",
@@ -64,6 +78,8 @@ export const CCL_DEV_MEASUREMENT_NAMES: readonly CCLDevMeasurementName[] = [
 	"virtualList.observer.coverageMiss",
 	"virtualList.observer.scrollTask.scheduled",
 	"virtualList.observer.scrollTask.executed",
+	"virtualList.observer.scrollTask.skippedRecoveredCoverage",
+	"virtualList.observer.scrollTask.cancelledRecoveredCoverage",
 	"virtualList.observer.layoutTask.scheduled",
 	"virtualList.observer.dependencyTask.scheduled",
 	"virtualList.scheduler.observerScroll.animationFrame",

@@ -1,6 +1,7 @@
 import type { RowRange } from "../rowRange";
 import type { VirtualRanges } from "../types";
 import type { VirtualVisibilityPolicy } from "./virtualListEngine";
+import { recordCCLDevMeasurement } from "infrastructure/debug/CCLDevMeasurements";
 import type {
 	MountedScrollWindowMeasurement,
 	RangedScrollWindowMeasurement,
@@ -13,6 +14,7 @@ type StableScrollTopBandMutable = {
 
 export interface VirtualScrollWindowRangeRowModel {
 	readonly rowCount: number;
+	readonly totalHeight: number;
 	findVisibleRangeInto(
 		out: RowRange,
 		params: {
@@ -164,24 +166,58 @@ export function createVirtualScrollWindowRangeResolver<
 		out: StableScrollTopBandMutable,
 		measurementRowModel: TRowModel,
 		sectionTop: number,
+		localScrollTop: number,
 		viewportHeight: number,
 		mounted: RowRange,
 	): StableScrollTopBand | undefined => {
 		if (!resolveStableMountedScrollTopBand) {
 			return undefined;
 		}
-		if (!measurementRowModel.findMountedCoverageScrollTopBandInto) {
-			return undefined;
-		}
 		if (mounted.start >= mounted.end) {
-			return undefined;
+			if (measurementRowModel.rowCount === 0) {
+				out.min = Number.NEGATIVE_INFINITY;
+				out.max = Number.POSITIVE_INFINITY;
+				if (process.env.NODE_ENV !== "production") {
+					recordCCLDevMeasurement("virtualScroll.coverageBand.emptyData");
+				}
+			} else if (viewportHeight > 0 && localScrollTop + viewportHeight <= 0) {
+				out.min = Number.NEGATIVE_INFINITY;
+				out.max = -viewportHeight;
+				if (process.env.NODE_ENV !== "production") {
+					recordCCLDevMeasurement("virtualScroll.coverageBand.emptyAbove");
+				}
+			} else if (
+				viewportHeight > 0 &&
+				localScrollTop >= measurementRowModel.totalHeight
+			) {
+				out.min = measurementRowModel.totalHeight;
+				out.max = Number.POSITIVE_INFINITY;
+				if (process.env.NODE_ENV !== "production") {
+					recordCCLDevMeasurement("virtualScroll.coverageBand.emptyBelow");
+				}
+			} else {
+				out.min = Number.POSITIVE_INFINITY;
+				out.max = Number.NEGATIVE_INFINITY;
+				if (process.env.NODE_ENV !== "production") {
+					recordCCLDevMeasurement("virtualScroll.coverageBand.invalid");
+				}
+			}
+		} else {
+			if (!measurementRowModel.findMountedCoverageScrollTopBandInto) {
+				if (process.env.NODE_ENV !== "production") {
+					recordCCLDevMeasurement("virtualScroll.coverageBand.invalid");
+				}
+				return undefined;
+			}
+			measurementRowModel.findMountedCoverageScrollTopBandInto(out, {
+				viewportHeight,
+				mounted,
+				requiredOverscanPx: 0,
+			});
+			if (process.env.NODE_ENV !== "production" && !(out.min < out.max)) {
+				recordCCLDevMeasurement("virtualScroll.coverageBand.invalid");
+			}
 		}
-
-		measurementRowModel.findMountedCoverageScrollTopBandInto(out, {
-			viewportHeight,
-			mounted,
-			requiredOverscanPx: 0,
-		});
 		out.min += sectionTop;
 		out.max += sectionTop;
 		return out;
@@ -235,6 +271,7 @@ export function createVirtualScrollWindowRangeResolver<
 				mountedCoverageBandScratch,
 				measurementRowModel,
 				sectionTop,
+				localScrollTop,
 				viewportHeight,
 				mountedScrollWindowMeasurement.mounted,
 			);

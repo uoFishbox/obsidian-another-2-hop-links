@@ -2,6 +2,10 @@ import { describe, expect, it, vi } from "vitest";
 import type { VirtualMeasurement } from "../../dom/virtualMeasurementController";
 import type { VirtualRanges } from "../../types";
 import { createVirtualScrollWindowMeasurementController } from "../virtualScrollWindowMeasurementController";
+import {
+	getCCLDevMeasurementSnapshot,
+	resetCCLDevMeasurements,
+} from "infrastructure/debug/CCLDevMeasurements";
 
 const IDENTITY = {};
 const STABLE_MEASUREMENT: VirtualMeasurement = {
@@ -79,6 +83,72 @@ describe("createVirtualScrollWindowMeasurementController", () => {
 
 		expect(resolveRanges).toHaveBeenCalledTimes(1);
 		expect(applyRanges).toHaveBeenCalledTimes(1);
+	});
+
+	it("classifies same mounted window hits by empty state", () => {
+		resetCCLDevMeasurements();
+		const controller = createVirtualScrollWindowMeasurementController({
+			resolveMountedScrollWindowMeasurement: () => ({
+				identity: IDENTITY,
+				mounted: { start: 0, end: 0 },
+				mountedCoverageScrollTopBand: {
+					min: Number.NEGATIVE_INFINITY,
+					max: 100,
+				},
+			}),
+			resolveScrollWindowMeasurement: () => ({
+				identity: IDENTITY,
+				ranges: {
+					mounted: { start: 0, end: 0 },
+					previewVisible: { start: 0, end: 0 },
+				},
+			}),
+			applyRangeMeasurement: () => ({
+				kind: "stable",
+				range: { start: 0, end: 0 },
+			}),
+			onStableMeasurement: vi.fn(),
+		});
+
+		controller.applyScrollMeasurement(STABLE_MEASUREMENT, undefined);
+		controller.applyScrollMeasurement(
+			{ ...STABLE_MEASUREMENT, scrollTop: 60 },
+			undefined,
+		);
+
+		const counters = getCCLDevMeasurementSnapshot().counters;
+		expect(counters["virtualScroll.sameMountedWindowHit"].count).toBe(1);
+		expect(counters["virtualScroll.sameMountedWindowHit.empty"].count).toBe(1);
+		expect(counters["virtualScroll.sameMountedWindowHit.nonEmpty"].count).toBe(0);
+	});
+
+	it("exposes a valid coverage band independently of the last measured position", () => {
+		const controller = createVirtualScrollWindowMeasurementController({
+			resolveMountedScrollWindowMeasurement: () => ({
+				identity: IDENTITY,
+				mounted: { start: 0, end: 10 },
+				mountedCoverageScrollTopBand: { min: 60, max: 80 },
+			}),
+			resolveScrollWindowMeasurement: () => ({
+				identity: IDENTITY,
+				ranges: {
+					mounted: { start: 0, end: 10 },
+					previewVisible: { start: 2, end: 8 },
+				},
+			}),
+			applyRangeMeasurement: () => ({
+				kind: "stable",
+				range: { start: 2, end: 8 },
+			}),
+			onStableMeasurement: vi.fn(),
+		});
+
+		controller.applyScrollMeasurement(STABLE_MEASUREMENT, undefined);
+
+		expect(controller.getScrollMeasurementRange()).toEqual({
+			minScrollTopBeforeMeasurement: 60,
+			maxScrollTopBeforeMeasurement: 80,
+		});
 	});
 
 	it("publishes the full range when the mounted range changes", () => {

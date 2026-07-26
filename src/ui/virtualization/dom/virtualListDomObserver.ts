@@ -778,6 +778,19 @@ const getScrollerViewportEntry = (
 			if (process.env.NODE_ENV !== "production") {
 				recordCCLDevMeasurement("virtualList.observer.scrollTask.executed");
 			}
+			if (
+				entry.scrollMeasurementReason === "scroll-coverage-miss" &&
+				entry.pendingScrollTop !== null &&
+				isWithinScrollMeasurementRange(entry, entry.pendingScrollTop)
+			) {
+				if (process.env.NODE_ENV !== "production") {
+					recordCCLDevMeasurement(
+						"virtualList.observer.scrollTask.skippedRecoveredCoverage",
+					);
+				}
+				notifyScrollStateChange(entry);
+				return;
+			}
 			subscriber.runScrollMeasurement(
 				readSharedScrollMetrics(entry),
 				entry.scrollMeasurementReason,
