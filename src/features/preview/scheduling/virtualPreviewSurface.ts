@@ -25,6 +25,7 @@ import type {
 	RowPreviewCardBinding,
 	RowPreviewWindow,
 } from "./rowPreviewTypes";
+import { recordCCLDevMeasurement } from "infrastructure/debug/CCLDevMeasurements";
 
 export type {
 	RowPreviewBindingDelta,
@@ -192,6 +193,9 @@ export function createVirtualPreviewSurface(
 		slot.operationEpoch += 1;
 		slot.renderCleanup?.();
 		slot.renderCleanup = undefined;
+		if (process.env.NODE_ENV !== "production") {
+			recordCCLDevMeasurement("twoHop.preview.stopRender");
+		}
 	}
 
 	function clearCommittedDom(slot: PreviewSlotRuntime): void {
@@ -414,6 +418,17 @@ export function createVirtualPreviewSurface(
 		for (const slotId of delta.releasedSlots) releaseSlot(slotId);
 		for (const binding of delta.enteredSlots) bindCard(binding);
 		for (const binding of delta.reboundSlots) bindCard(binding);
+		if (process.env.NODE_ENV !== "production") {
+			for (let i = 0; i < delta.enteredSlots.length; i++) {
+				recordCCLDevMeasurement("twoHop.preview.entered");
+			}
+			for (let i = 0; i < delta.reboundSlots.length; i++) {
+				recordCCLDevMeasurement("twoHop.preview.rebound");
+			}
+			for (let i = 0; i < delta.releasedSlots.length; i++) {
+				recordCCLDevMeasurement("twoHop.preview.released");
+			}
+		}
 	}
 
 	function getDesiredBinding(

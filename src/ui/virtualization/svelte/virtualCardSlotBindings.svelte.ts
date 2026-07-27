@@ -13,6 +13,7 @@ import type {
 } from "ui/interactions/virtualCardInteractionController";
 import type { MountedVirtualCell } from "ui/virtualization/types";
 import type { ResidentSlotBindingToken } from "ui/virtualization/core/residentSlotBinding";
+import { recordCCLDevMeasurement } from "infrastructure/debug/CCLDevMeasurements";
 
 /** Display, preview, and interaction data owned by one physical render slot. */
 export interface VirtualCardSlotBinding<
@@ -103,6 +104,7 @@ export function createVirtualCardSlotBindings<
 		const enteredInteractionSlots: VirtualCardInteractionBinding[] = [];
 		const reboundInteractionSlots: VirtualCardInteractionBinding[] = [];
 		const releasedInteractionSlots: string[] = [];
+		let changedSlotCount = 0;
 
 		const releaseBinding = (
 			slotIndex: number,
@@ -135,6 +137,7 @@ export function createVirtualCardSlotBindings<
 				mountedCell,
 				params.bindingIdentity,
 			);
+			changedSlotCount += 1;
 			const retainsLogicalBinding =
 				previous &&
 				hasSameMountedCellBinding(previous.mountedCell, mountedCell);
@@ -197,6 +200,16 @@ export function createVirtualCardSlotBindings<
 		};
 		options.interactionController.syncCardDelta(interactionDelta);
 		options.previewSurface.commitBindingDelta(previewDelta, params.previewWindow);
+
+		if (process.env.NODE_ENV !== "production") {
+			recordCCLDevMeasurement("twoHop.cardSlotBindings.sync");
+			for (let i = 0; i < params.mountedCells.length; i++) {
+				recordCCLDevMeasurement("twoHop.cardSlotBindings.scannedSlots");
+			}
+			for (let i = 0; i < changedSlotCount; i++) {
+				recordCCLDevMeasurement("twoHop.cardSlotBindings.changedSlots");
+			}
+		}
 	};
 
 	return {

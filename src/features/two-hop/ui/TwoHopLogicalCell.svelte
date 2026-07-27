@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { onMount } from "svelte";
 	import type { ApplicationStore } from "ui/stores/ApplicationStore.svelte";
 	import type { CardRenderModel } from "ui/components/items/cardRenderModel";
 	import ViewItemCard from "ui/components/items/ViewItemCard.svelte";
@@ -11,6 +12,7 @@
 		resolveTwoHopCardPresentation,
 		resolveTwoHopSectionVariant,
 	} from "features/two-hop/ui/twoHopCellStaticState";
+	import { recordCCLDevMeasurement } from "infrastructure/debug/CCLDevMeasurements";
 
 	interface Props {
 		mountedCell: TwoHopMountedCell;
@@ -47,6 +49,16 @@
 				return "Link";
 		}
 	};
+
+	if (process.env.NODE_ENV !== "production") {
+		const kind = mountedCell.cell.kind;
+		recordCCLDevMeasurement(`twoHop.body.mount.${kind}`);
+		onMount(() => {
+			return () => {
+				recordCCLDevMeasurement(`twoHop.body.unmount.${kind}`);
+			};
+		});
+	}
 </script>
 
 {#if mountedCell.cell.kind === "header"}

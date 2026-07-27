@@ -53,7 +53,21 @@ export type CCLDevMeasurementName =
 	| "preview.domCommitScheduler.animationFrame"
 	| "preview.activationDuringScroll"
 	| "preview.domCommitDuringScroll"
-	| "component.ViewItemCard.reevaluate";
+	| "component.ViewItemCard.reevaluate"
+	| "twoHop.body.mount.item"
+	| "twoHop.body.mount.header"
+	| "twoHop.body.mount.load-more"
+	| "twoHop.body.unmount.item"
+	| "twoHop.body.unmount.header"
+	| "twoHop.body.unmount.load-more"
+	| "twoHop.cardSlotBindings.sync"
+	| "twoHop.cardSlotBindings.scannedSlots"
+	| "twoHop.cardSlotBindings.changedSlots"
+	| "twoHop.preview.entered"
+	| "twoHop.preview.rebound"
+	| "twoHop.preview.released"
+	| "twoHop.preview.stopRender"
+	| "twoHop.resolveItemCardModel.call";
 
 export const CCL_DEV_MEASUREMENT_NAMES: readonly CCLDevMeasurementName[] = [
 	"virtualScroll.applyScrollMeasurement",
@@ -111,6 +125,20 @@ export const CCL_DEV_MEASUREMENT_NAMES: readonly CCLDevMeasurementName[] = [
 	"preview.activationDuringScroll",
 	"preview.domCommitDuringScroll",
 	"component.ViewItemCard.reevaluate",
+	"twoHop.body.mount.item",
+	"twoHop.body.mount.header",
+	"twoHop.body.mount.load-more",
+	"twoHop.body.unmount.item",
+	"twoHop.body.unmount.header",
+	"twoHop.body.unmount.load-more",
+	"twoHop.cardSlotBindings.sync",
+	"twoHop.cardSlotBindings.scannedSlots",
+	"twoHop.cardSlotBindings.changedSlots",
+	"twoHop.preview.entered",
+	"twoHop.preview.rebound",
+	"twoHop.preview.released",
+	"twoHop.preview.stopRender",
+	"twoHop.resolveItemCardModel.call",
 ];
 
 export interface CCLDevMeasurementCounter {

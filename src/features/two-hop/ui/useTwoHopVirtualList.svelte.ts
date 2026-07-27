@@ -55,6 +55,7 @@ import {
 	type TwoHopLayoutPublication,
 } from "features/two-hop/ui/twoHopRevisions";
 import type { TwoHopPreviewDependencies } from "features/two-hop/ui/twoHopPreviewDependencies";
+import { recordCCLDevMeasurement } from "infrastructure/debug/CCLDevMeasurements";
 
 export interface TwoHopVirtualListProps {
 	readonly sections: readonly TwoHopVirtualSectionDescriptor[];
@@ -185,6 +186,9 @@ export function useTwoHopVirtualList(
 			cell.section.header.section,
 		);
 		if (!presentation) return undefined;
+		if (process.env.NODE_ENV !== "production") {
+			recordCCLDevMeasurement("twoHop.resolveItemCardModel.call");
+		}
 		return resolver(cell.cell.item, presentation);
 	};
 
