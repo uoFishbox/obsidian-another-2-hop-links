@@ -15,7 +15,6 @@ import type { RowRange } from "ui/virtualization/rowRange";
 import { renderSlotKey, type MountedVirtualCell } from "ui/virtualization/types";
 import {
 	cellSlotIndex,
-	hasSameCellSlotIncarnation,
 	hasSameRowSlotLease,
 	type ResidentCellSlotIncarnation,
 	type ResidentRowSlotLease,
@@ -141,7 +140,6 @@ export function buildTwoHopMountedRows(params: {
 			});
 			if (!logicalCell) return null;
 			return resolveMountedCell({
-				previous: undefined,
 				logicalCell,
 				section: row.metadata.section,
 				rowLease: row.metadata.rowLease,
@@ -209,7 +207,6 @@ function resolveLogicalCell(params: {
 }
 
 function resolveMountedCell(params: {
-	readonly previous: TwoHopMountedCell | undefined;
 	readonly logicalCell: TwoHopLogicalCell;
 	readonly section: TwoHopDocumentSection;
 	readonly rowLease: ResidentRowSlotLease;
@@ -222,20 +219,6 @@ function resolveMountedCell(params: {
 		params.rowLease,
 		params.renderSlotIndex,
 	);
-	// Reusing the shell object is optional; stale ownership is never inferred
-	// from this reference identity.
-	if (
-		params.previous &&
-		params.previous.cell === params.logicalCell &&
-		params.previous.section === params.section &&
-		params.previous.rowIndex === params.rowIndex &&
-		params.previous.columnIndex === params.columnIndex &&
-		params.previous.renderSlotIndex === params.renderSlotIndex &&
-		params.previous.renderSlotKey === nextRenderSlotKey &&
-		hasSameCellSlotIncarnation(params.previous.slotIncarnation, slotIncarnation)
-	) {
-		return params.previous;
-	}
 
 	return {
 		key: params.logicalCell.key,
