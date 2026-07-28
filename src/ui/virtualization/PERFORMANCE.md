@@ -38,7 +38,8 @@ Vault全体のベンチマークは、インデックス作成レイヤーやE2E
 `TwoHopSurface.svelte` は共有 `VirtualSurface` のphysical row/cell shellとカードbodyを再利用する。
 
 - physical row/cell shellには位置とslot identityだけを保持する。
-- outer shellはphysical slot keyを維持し、itemの`renderBodyKey`はlogical cardに追従させてrebind時にbodyを更新する。
+- outer shellとitem body componentはphysical slot keyで維持される。item body componentはphysical slotに残存し、logical ownerが変わってもremountされない。ownerの変更はpropsとbinding publicationの再解決だけで反映する。したがってitem body（`ViewItemCard`以下）は前owner固有のローカル状態（非reactive state、非同期処理、action、subscription）を保持してはならない。保持すると別itemへの状態漏洩が起きる。
+- itemの`renderBodyKey`はlogical cardに追従するデータフィールドであり、item bodyのcomponent lifecycle keyではない。lifecycle keyとして使われるのは非item cell（load-moreなど）のbodyのみ。
 - resident windowが同一ならmounted-row buildを同一参照で返し、Svelte state commitとDOM writeを行わない。
 - row slotには共有のfree-list allocatorを使用する。retained rowはslot leaseを維持し、leaving slotは同一transactionのentering rowへrebindする。capacity増加は末尾slotの追加だけで、pool epochを変更しない。
 - allocatorは`poolId`、epoch、revision、capacityだけの軽量publicationを公開し、mounted buildの再利用可否を検証する。row/cellはallocator由来のleaseを参照し、resident/card adapterはpeak capacityではなくactive slotsだけを同期する。
@@ -47,7 +48,7 @@ Vault全体のベンチマークは、インデックス作成レイヤーやE2E
 - load-more bodyは通常のbutton lifecycleを使い、クリック中に同じbodyを別カードへ書き換えない。
 - `TwoHopDocument` と固定grid geometryは全カード分のDOMやcell objectを生成せず、mounted rangeだけをmaterializeする。
 
-契約テストは `features/two-hop/ui/__tests__/TwoHopSurface.svelte.dom.test.ts` と `twoHopMountedRows.test.ts` に置く。`100`/`1,000`/`10,000` cardsと別scroller上の`1`/`8`/`32` surfacesでDOM数がboundedであること、physical slot再利用時にbody keyが変わること、resident hitでbuild identityを維持すること、同一キーのpublication更新がcard bindingを再解決すること、load-more bodyが新しいlogical cardへremountされることを検証する。
+契約テストは `features/two-hop/ui/__tests__/TwoHopSurface.svelte.dom.test.ts` と `twoHopMountedRows.test.ts` に置く。`100`/`1,000`/`10,000` cardsと別scroller上の`1`/`8`/`32` surfacesでDOM数がboundedであること、physical slot再利用時にitem body componentがremountされず同一DOMのままlogical ownerの内容と`renderBodyKey`だけが追従し、前ownerのinteraction状態が漏れないこと、resident hitでbuild identityを維持すること、同一キーのpublication更新がcard bindingを再解決すること、load-more bodyが新しいlogical cardへremountされることを検証する。
 
 #### Two-hop row-slot allocator比較（2026-07-26）
 
