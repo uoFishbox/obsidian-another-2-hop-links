@@ -52,9 +52,9 @@ export interface ResolveTwoHopSectionDescriptorIdentityParams {
  * Page-owned section publication cache.
  *
  * Reconciliation stops at the section boundary: an equal semantic signature
- * reuses the complete immutable descriptor, while a changed signature builds a
- * fresh descriptor with its own lazy item materialization. Interaction tokens
- * remain page-owned and are therefore stable across section publications.
+ * reuses the complete immutable descriptor, while a changed signature eagerly
+ * builds a fresh item publication. Interaction tokens remain page-owned and
+ * are therefore stable across section publications.
  */
 export interface TwoHopSectionDescriptorIdentityCache {
 	resolve(

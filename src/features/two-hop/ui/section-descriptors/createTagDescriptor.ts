@@ -2,15 +2,16 @@ import type { ViewItem } from "application/presenters";
 import { createItemInteractionKey } from "ui/interactions/interactionTypes";
 import type { ClickableHeaderExtraProps } from "ui/components/sections/types";
 import { generateLinkKey } from "features/preview/text-processing/textUtils";
-import type { TagGroup, TaggedNote } from "types/domain";
+import type { TagGroup } from "types/domain";
 import type { ApplicationStore } from "ui/stores/ApplicationStore.svelte";
 import {
 	createTaggedNoteSectionItemKey,
+	type TwoHopVirtualListItem,
 	type TwoHopVirtualSectionDescriptor,
 } from "features/two-hop/ui/twoHopVirtualListModel";
 import {
 	createDescriptor,
-	createLazySortedVirtualItemAccessors,
+	createEagerVirtualItemAccessors,
 } from "./descriptorIdentity";
 import type { TwoHopInteractionTokenAllocator } from "./interactionTokenAllocator";
 import { getTagNoteSearchKeyFromBaseKey } from "features/two-hop/ui/twoHopSearchAdapter";
@@ -22,7 +23,7 @@ export interface TagSectionBuildInput {
 	readonly onTagClick: (tag: string) => void;
 }
 
-/** Builds one immutable tag publication with local lazy sorting and rows. */
+/** Builds one immutable tag publication with eager sorting and rows. */
 export function createTagSectionDescriptor(
 	input: TagSectionBuildInput,
 	tokens: TwoHopInteractionTokenAllocator,
@@ -36,14 +37,17 @@ export function createTagSectionDescriptor(
 		interactionKind: "sectionHeader",
 		onClick: () => input.onTagClick(input.source.tag),
 	};
-	const accessors = createLazySortedVirtualItemAccessors<TaggedNote, ViewItem>({
-		getLength: () => input.source.notes.length,
-		getSortedItems: () =>
-			input.applicationStore.getSortedTagGroupItems(input.source.notes),
-		getKey: (item) =>
-			generateLinkKey(item.file.path, item.file.basename, "tag-note"),
-		toViewItem: (item) => ({ type: "taggedNote", data: item }),
-		createItem: (item, baseKey, index) => {
+	const sortedItems = input.applicationStore.getSortedTagGroupItems(
+		input.source.notes,
+	);
+	const rows: readonly TwoHopVirtualListItem[] = sortedItems.map(
+		(source, index): TwoHopVirtualListItem => {
+			const item: ViewItem = { type: "taggedNote", data: source };
+			const baseKey = generateLinkKey(
+				source.file.path,
+				source.file.basename,
+				"tag-note",
+			);
 			const virtualKey = createTaggedNoteSectionItemKey(
 				item,
 				input.source.tag,
@@ -60,7 +64,8 @@ export function createTagSectionDescriptor(
 				virtualKey,
 			};
 		},
-	});
+	);
+	const accessors = createEagerVirtualItemAccessors(rows);
 
 	return createDescriptor(
 		{
@@ -73,7 +78,7 @@ export function createTagSectionDescriptor(
 			headerProps,
 			className: "twohop-links-tags",
 		},
-		input.source.notes.length,
+		rows.length,
 		accessors.getItems,
 		accessors.getItem,
 		headerProps,

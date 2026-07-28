@@ -74,7 +74,7 @@ const createHarness = () => {
 };
 
 describe("createTwoHopSectionDescriptorIdentityCache", () => {
-	it("reuses immutable descriptor output and resolves items lazily", () => {
+	it("reuses an eagerly materialized immutable descriptor output", () => {
 		resetCCLDevMeasurements();
 		const cache = createTwoHopSectionDescriptorIdentityCache();
 		const { baseParams, getSortedTagGroupItems } = createHarness();
@@ -94,7 +94,7 @@ describe("createTwoHopSectionDescriptorIdentityCache", () => {
 		expect(Object.isFrozen(first)).toBe(true);
 		expect(Object.isFrozen(first[0])).toBe(true);
 		expect(Object.isFrozen(first[0]?.section)).toBe(true);
-		expect(getSortedTagGroupItems).not.toHaveBeenCalled();
+		expect(getSortedTagGroupItems).toHaveBeenCalledTimes(1);
 
 		const firstItems = first[0]?.getItems();
 		expect(firstItems).toHaveLength(1);
@@ -194,7 +194,7 @@ describe("createTwoHopSectionDescriptorIdentityCache", () => {
 		expect(getSortedTagGroupItems).toHaveBeenCalledTimes(1);
 	});
 
-	it("materializes tag wrappers only for requested indexes", () => {
+	it("materializes tag wrappers in sorted order during descriptor creation", () => {
 		const cache = createTwoHopSectionDescriptorIdentityCache();
 		const { baseParams } = createHarness();
 		const alpha = {
@@ -209,11 +209,11 @@ describe("createTwoHopSectionDescriptorIdentityCache", () => {
 			displayData: createDisplayData([alpha]),
 		});
 
-		expect(section?.getItem?.(1)?.interactionId).toBe("i0");
-		expect(section?.getItem?.(0)?.interactionId).toBe("i1");
+		expect(section?.getItem?.(0)?.interactionId).toBe("i0");
+		expect(section?.getItem?.(1)?.interactionId).toBe("i1");
 	});
 
-	it("resolves branch getItem through the shared sorted item cache", () => {
+	it("eagerly resolves branch rows through the shared sorted item cache", () => {
 		const cache = createTwoHopSectionDescriptorIdentityCache();
 		const { baseParams, getSortedTwoHopItems } = createHarness();
 		const branch = createBranch("parent.md", [
@@ -225,13 +225,14 @@ describe("createTwoHopSectionDescriptorIdentityCache", () => {
 			displayData: createDisplayData([], [branch]),
 		});
 
+		expect(getSortedTwoHopItems).toHaveBeenCalledTimes(1);
 		expect(section?.getItem?.(0)?.virtualKey).toBeTruthy();
 		expect(section?.getItem?.(1)?.virtualKey).toBeTruthy();
 		expect(section?.getItems()).toHaveLength(2);
 		expect(getSortedTwoHopItems).toHaveBeenCalledTimes(1);
 	});
 
-	it("materializes branch wrappers only for requested indexes", () => {
+	it("materializes branch wrappers in sorted order during descriptor creation", () => {
 		const cache = createTwoHopSectionDescriptorIdentityCache();
 		const { baseParams } = createHarness();
 		const branch = createBranch("parent.md", [
@@ -243,8 +244,8 @@ describe("createTwoHopSectionDescriptorIdentityCache", () => {
 			displayData: createDisplayData([], [branch]),
 		});
 
-		expect(section?.getItem?.(1)?.interactionId).toBe("i0");
-		expect(section?.getItem?.(0)?.interactionId).toBe("i1");
+		expect(section?.getItem?.(0)?.interactionId).toBe("i0");
+		expect(section?.getItem?.(1)?.interactionId).toBe("i1");
 	});
 
 	it("does not reset branch sorting for a render-only updateVersion change", () => {

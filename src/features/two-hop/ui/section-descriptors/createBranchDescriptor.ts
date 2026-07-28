@@ -10,12 +10,15 @@ import {
 	formatLinkText,
 	generateBacklinkKey,
 } from "features/preview/text-processing/textUtils";
-import type { TwoHopIndexedLink, TwoHopLinkBranch } from "types/domain";
+import type { TwoHopLinkBranch } from "types/domain";
 import type { ApplicationStore } from "ui/stores/ApplicationStore.svelte";
-import type { TwoHopVirtualSectionDescriptor } from "features/two-hop/ui/twoHopVirtualListModel";
+import {
+	type TwoHopVirtualListItem,
+	type TwoHopVirtualSectionDescriptor,
+} from "features/two-hop/ui/twoHopVirtualListModel";
 import {
 	createDescriptor,
-	createLazySortedVirtualItemAccessors,
+	createEagerVirtualItemAccessors,
 } from "./descriptorIdentity";
 import type { TwoHopInteractionTokenAllocator } from "./interactionTokenAllocator";
 import {
@@ -67,36 +70,33 @@ export function resolveBranchHeader(params: {
 	};
 }
 
-/** Builds one immutable branch publication with local lazy sorting and rows. */
+/** Builds one immutable branch publication with eager sorting and rows. */
 export function createBranchSectionDescriptor(
 	input: BranchSectionBuildInput,
 	tokens: TwoHopInteractionTokenAllocator,
 ): TwoHopVirtualSectionDescriptor {
 	const branchBaseKey = getTwohopBranchSearchBaseKey(input.branch);
-	const accessors = createLazySortedVirtualItemAccessors<TwoHopIndexedLink, ViewItem>(
-		{
-			getLength: () => input.branch.hop2.length,
-			getSortedItems: () =>
-				input.applicationStore.getSortedTwoHopItems(input.branch.hop2),
-			getKey: (item) => generateBacklinkKey(item),
-			toViewItem: (item) => ({ type: "backlink", data: item }),
-			createItem: (item, virtualKey) => {
-				const interactionKey = createItemInteractionKey(item, virtualKey);
-				return {
-					kind: "two-hop-link",
-					item,
-					interactionId: tokens.createItemInteractionToken(interactionKey),
-					interactionKey,
-					branch: input.branch,
-					searchKey: createTwohopChildSearchKeyFromBaseKeys(
-						branchBaseKey,
-						virtualKey,
-					),
+	const sortedItems = input.applicationStore.getSortedTwoHopItems(input.branch.hop2);
+	const rows: readonly TwoHopVirtualListItem[] = sortedItems.map(
+		(source): TwoHopVirtualListItem => {
+			const item: ViewItem = { type: "backlink", data: source };
+			const virtualKey = generateBacklinkKey(source);
+			const interactionKey = createItemInteractionKey(item, virtualKey);
+			return {
+				kind: "two-hop-link",
+				item,
+				interactionId: tokens.createItemInteractionToken(interactionKey),
+				interactionKey,
+				branch: input.branch,
+				searchKey: createTwohopChildSearchKeyFromBaseKeys(
+					branchBaseKey,
 					virtualKey,
-				};
-			},
+				),
+				virtualKey,
+			};
 		},
 	);
+	const accessors = createEagerVirtualItemAccessors(rows);
 	const headerInteractionIdentity = tokens.createHeaderInteractionIdentity(
 		input.rawSectionId,
 	);
@@ -131,7 +131,7 @@ export function createBranchSectionDescriptor(
 			branch: input.branch,
 			headerProps,
 		},
-		input.branch.hop2.length,
+		rows.length,
 		accessors.getItems,
 		accessors.getItem,
 		headerProps,
