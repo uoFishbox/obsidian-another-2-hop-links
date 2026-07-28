@@ -228,12 +228,12 @@ describe("TwoHopDocument fixed-grid geometry", () => {
 		expect(geometry.topBySection).toEqual(new Float64Array([0, 230]));
 		expect(resolveTwoHopRowTop(geometry, 2)).toBe(230);
 		expect(resolveTwoHopVisibleRows(geometry, 225, 120)).toEqual({
-			start: 1,
+			start: 2,
 			end: 3,
 		});
 		const reusableRange = { start: 0, end: 0 };
 		resolveTwoHopVisibleRowsInto(reusableRange, geometry, 225, 120);
-		expect(reusableRange).toEqual({ start: 1, end: 3 });
+		expect(reusableRange).toEqual({ start: 2, end: 3 });
 		expect(resolveTwoHopCell(document, geometry, 2, 0)).toMatchObject({
 			kind: "header",
 			sectionIndex: 1,
@@ -254,6 +254,121 @@ describe("TwoHopDocument fixed-grid geometry", () => {
 			sectionIndex: 1,
 			itemIndex: 0,
 		});
+	});
+
+	it.each([
+		{ scrollTop: 10, expected: { start: 0, end: 1 } },
+		{ scrollTop: 10.1, expected: { start: 0, end: 2 } },
+		{ scrollTop: 10.5, expected: { start: 0, end: 2 } },
+		{ scrollTop: 11, expected: { start: 0, end: 2 } },
+	])(
+		"resolves fractional viewport edge at scrollTop=$scrollTop",
+		({ scrollTop, expected }) => {
+			const document = createTwoHopDocument({
+				sections: [createSection("first", [createItem("a"), createItem("b")])],
+				visibleCounts: {},
+				initialVisibleCount: 10,
+			});
+			const geometry = compileFixedGridLayout(document, {
+				...layout,
+				columns: 1,
+				sectionMarginBottom: 0,
+			});
+
+			expect(resolveTwoHopVisibleRows(geometry, scrollTop, 100)).toEqual(
+				expected,
+			);
+		},
+	);
+
+	it("uses half-open visibility with fractional row height and gap", () => {
+		const document = createTwoHopDocument({
+			sections: [createSection("first", [createItem("a"), createItem("b")])],
+			visibleCounts: {},
+			initialVisibleCount: 10,
+		});
+		const geometry = compileFixedGridLayout(document, {
+			...layout,
+			columns: 1,
+			rowHeight: 100.25,
+			gap: 10.5,
+			sectionMarginBottom: 0,
+		});
+
+		expect(resolveTwoHopVisibleRows(geometry, 10.75, 100)).toEqual({
+			start: 0,
+			end: 1,
+		});
+		expect(resolveTwoHopVisibleRows(geometry, 10.76, 100)).toEqual({
+			start: 0,
+			end: 2,
+		});
+		expect(resolveTwoHopVisibleRows(geometry, 100.25, 10.5)).toEqual({
+			start: 1,
+			end: 1,
+		});
+		expect(resolveTwoHopVisibleRows(geometry, 100.25, 10.51)).toEqual({
+			start: 1,
+			end: 2,
+		});
+	});
+
+	it("derives stable and coverage bands from exclusive fractional boundaries", () => {
+		const document = createTwoHopDocument({
+			sections: [createSection("first", [createItem("a"), createItem("b")])],
+			visibleCounts: {},
+			initialVisibleCount: 10,
+		});
+		const rowModel = createTwoHopVirtualRowModel(
+			document,
+			createLayoutPublication(
+				{
+					...layout,
+					columns: 1,
+					sectionMarginBottom: 0,
+				},
+				1,
+			),
+		);
+		const mounted = { start: 0, end: 0 };
+		rowModel.findVisibleRangeInto(mounted, {
+			scrollTop: 10.5,
+			viewportHeight: 100,
+			overscanPx: 0,
+		});
+		const stableBand = { min: Number.NaN, max: Number.NaN };
+		rowModel.findStableMountedScrollTopBandInto?.(stableBand, {
+			mountedOverscanPx: 0,
+			viewportHeight: 100,
+			mounted,
+		});
+		const coverageBand = { min: Number.NaN, max: Number.NaN };
+		rowModel.findMountedCoverageScrollTopBandInto?.(coverageBand, {
+			viewportHeight: 100,
+			mounted: { start: 0, end: 1 },
+			requiredOverscanPx: 0,
+		});
+
+		expect(mounted).toEqual({ start: 0, end: 2 });
+		expect(stableBand.min).toBeLessThan(10.5);
+		expect(stableBand.max).toBeGreaterThan(10.5);
+		expect(coverageBand.max).toBe(10);
+
+		const atCoverageEnd = { start: 0, end: 0 };
+		rowModel.findVisibleRangeInto(atCoverageEnd, {
+			scrollTop: coverageBand.max,
+			viewportHeight: 100,
+			overscanPx: 0,
+		});
+		const afterCoverageEnd = { start: 0, end: 0 };
+		rowModel.findVisibleRangeInto(afterCoverageEnd, {
+			scrollTop: coverageBand.max + 0.1,
+			viewportHeight: 100,
+			overscanPx: 0,
+		});
+
+		expect(atCoverageEnd).toEqual({ start: 0, end: 1 });
+		expect(afterCoverageEnd).toEqual({ start: 0, end: 2 });
 	});
 
 	it("resolves keyboard navigation from row-model geometry", () => {
@@ -324,7 +439,7 @@ describe("TwoHopDocument fixed-grid geometry", () => {
 		});
 		const requiredInsideBand = { start: 0, end: 0 };
 		rowModel.findVisibleRangeInto(requiredInsideBand, {
-			scrollTop: coverageBand.max - 1,
+			scrollTop: coverageBand.max - 0.1,
 			viewportHeight: 100,
 			overscanPx: 0,
 		});
@@ -334,10 +449,17 @@ describe("TwoHopDocument fixed-grid geometry", () => {
 			viewportHeight: 100,
 			overscanPx: 0,
 		});
+		const requiredAfterBandEnd = { start: 0, end: 0 };
+		rowModel.findVisibleRangeInto(requiredAfterBandEnd, {
+			scrollTop: coverageBand.max + 0.1,
+			viewportHeight: 100,
+			overscanPx: 0,
+		});
 
 		expect(requiredBeforeBand.start).toBeLessThan(mounted.start);
 		expect(requiredInsideBand.start).toBeGreaterThanOrEqual(mounted.start);
 		expect(requiredInsideBand.end).toBeLessThanOrEqual(mounted.end);
-		expect(requiredAtBandEnd.end).toBeGreaterThan(mounted.end);
+		expect(requiredAtBandEnd.end).toBeLessThanOrEqual(mounted.end);
+		expect(requiredAfterBandEnd.end).toBeGreaterThan(mounted.end);
 	});
 });

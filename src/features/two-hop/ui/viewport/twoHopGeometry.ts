@@ -286,20 +286,23 @@ export function resolveTwoHopVisibleRowsInto(
 	scrollOffset: number,
 	viewportHeight: number,
 ): void {
-	if (geometry.rowCount === 0 || viewportHeight <= 0) {
+	const viewportTop = Math.max(0, scrollOffset);
+	const viewportBottom = Math.min(
+		geometry.totalHeight,
+		scrollOffset + viewportHeight,
+	);
+	if (
+		geometry.rowCount === 0 ||
+		viewportHeight <= 0 ||
+		viewportBottom <= viewportTop
+	) {
 		target.start = 0;
 		target.end = 0;
 		return;
 	}
 
-	const start = resolveRowAtOffset(geometry, Math.max(0, scrollOffset));
-	const lastOffset = Math.max(0, scrollOffset + viewportHeight - 1);
-	const end = Math.min(
-		geometry.rowCount,
-		resolveRowAtOffset(geometry, lastOffset) + 1,
-	);
-	target.start = start;
-	target.end = end;
+	target.start = resolveFirstRowEndingAfter(geometry, viewportTop);
+	target.end = resolveFirstRowStartingAtOrAfter(geometry, viewportBottom);
 }
 
 export function resolveTwoHopRowTop(
@@ -337,34 +340,38 @@ export function resolveSectionIndexForRow(
 	return -1;
 }
 
-function resolveRowAtOffset(geometry: TwoHopGeometry, offset: number): number {
+function resolveFirstRowEndingAfter(geometry: TwoHopGeometry, offset: number): number {
 	let low = 0;
-	let high = geometry.topBySection.length - 1;
-	let sectionIndex = 0;
+	let high = geometry.rowCount;
 
-	while (low <= high) {
+	while (low < high) {
 		const middle = (low + high) >>> 1;
-		const top = geometry.topBySection[middle];
-		const bottom = top + geometry.heightBySection[middle];
-		if (offset < top) {
-			high = middle - 1;
-		} else if (offset >= bottom) {
-			sectionIndex = Math.min(middle + 1, geometry.topBySection.length - 1);
+		const rowBottom = resolveTwoHopRowTop(geometry, middle) + geometry.rowHeight;
+		if (rowBottom <= offset) {
 			low = middle + 1;
 		} else {
-			sectionIndex = middle;
-			break;
+			high = middle;
 		}
 	}
 
-	const firstRow = geometry.firstRowBySection[sectionIndex] ?? 0;
-	const sectionRowCount = geometry.rowCountBySection[sectionIndex] ?? 0;
-	const rowInSection = Math.floor(
-		Math.max(0, offset - (geometry.topBySection[sectionIndex] ?? 0)) /
-			geometry.rowStride,
-	);
-	return Math.min(
-		Math.max(0, geometry.rowCount - 1),
-		firstRow + Math.min(Math.max(0, sectionRowCount - 1), rowInSection),
-	);
+	return low;
+}
+
+function resolveFirstRowStartingAtOrAfter(
+	geometry: TwoHopGeometry,
+	offset: number,
+): number {
+	let low = 0;
+	let high = geometry.rowCount;
+
+	while (low < high) {
+		const middle = (low + high) >>> 1;
+		if (resolveTwoHopRowTop(geometry, middle) < offset) {
+			low = middle + 1;
+		} else {
+			high = middle;
+		}
+	}
+
+	return low;
 }

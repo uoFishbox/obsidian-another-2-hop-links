@@ -179,22 +179,24 @@ export function createTwoHopVirtualRowModel(
 			return;
 		}
 
-		const rowBoundary = (rowIndex: number): number => {
+		const rowTop = (rowIndex: number): number => {
 			if (rowIndex <= 0) return 0;
 			if (rowIndex >= geometry.rowCount) return geometry.totalHeight;
 			return resolveTwoHopRowTop(geometry, rowIndex);
 		};
+		const rowBottom = (rowIndex: number): number =>
+			resolveTwoHopRowTop(geometry, rowIndex) + geometry.rowHeight;
 		const overscan = Math.max(0, overscanPx);
 		const startMin =
 			range.start === 0
 				? Number.NEGATIVE_INFINITY
-				: rowBoundary(range.start) + overscan;
-		const startMax = rowBoundary(range.start + 1) + overscan;
-		const endMin = rowBoundary(range.end - 1) - viewportHeight - overscan + 1;
+				: rowBottom(range.start - 1) + overscan;
+		const startMax = rowBottom(range.start) + overscan;
+		const endMin = rowTop(range.end - 1) - viewportHeight - overscan;
 		const endMax =
 			range.end >= geometry.rowCount
 				? Number.POSITIVE_INFINITY
-				: rowBoundary(range.end) - viewportHeight - overscan + 1;
+				: rowTop(range.end) - viewportHeight - overscan;
 
 		out.min = Math.max(startMin, endMin, -viewportHeight);
 		out.max = Math.min(startMax, endMax, geometry.totalHeight);
@@ -215,7 +217,7 @@ export function createTwoHopVirtualRowModel(
 			return;
 		}
 
-		const rowBoundary = (rowIndex: number): number => {
+		const rowTop = (rowIndex: number): number => {
 			if (rowIndex <= 0) return 0;
 			if (rowIndex >= geometry.rowCount) return geometry.totalHeight;
 			return resolveTwoHopRowTop(geometry, rowIndex);
@@ -224,11 +226,13 @@ export function createTwoHopVirtualRowModel(
 		out.min =
 			range.start === 0
 				? -viewportHeight
-				: rowBoundary(range.start) + requiredOverscan;
+				: resolveTwoHopRowTop(geometry, range.start - 1) +
+					geometry.rowHeight +
+					requiredOverscan;
 		out.max =
 			range.end >= geometry.rowCount
 				? geometry.totalHeight
-				: rowBoundary(range.end) - viewportHeight - requiredOverscan + 1;
+				: rowTop(range.end) - viewportHeight - requiredOverscan;
 		if (out.min >= out.max) {
 			out.min = Number.POSITIVE_INFINITY;
 			out.max = Number.NEGATIVE_INFINITY;
