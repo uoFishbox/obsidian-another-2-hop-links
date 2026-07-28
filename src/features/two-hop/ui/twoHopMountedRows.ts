@@ -13,7 +13,13 @@ import {
 import type { MountedVirtualCellsBuild } from "ui/virtualization/core/virtualListEngine";
 import type { RowRange } from "ui/virtualization/rowRange";
 import { renderSlotKey, type MountedVirtualCell } from "ui/virtualization/types";
-import type { ResidentSlotLeaseToken } from "ui/virtualization/core/residentSlotBinding";
+import {
+	cellSlotIndex,
+	hasSameCellSlotIncarnation,
+	hasSameRowSlotLease,
+	type ResidentCellSlotIncarnation,
+	type ResidentRowSlotLease,
+} from "ui/virtualization/core/residentSlotBinding";
 import type { VirtualSurfaceMountedRow } from "ui/virtualization/svelte/VirtualSurfaceTypes";
 import {
 	buildMountedSectionedGridRows,
@@ -30,13 +36,13 @@ export interface TwoHopMountedCell extends MountedVirtualCell {
 	readonly cell: TwoHopLogicalCell;
 	readonly section: TwoHopDocumentSection;
 	readonly publicationRevision: SectionDataRevision;
-	readonly slotLease: ResidentSlotLeaseToken;
+	readonly slotIncarnation: ResidentCellSlotIncarnation;
 }
 
 export interface TwoHopMountedRow extends VirtualSurfaceMountedRow<TwoHopMountedCell> {
 	readonly slotIndex: number;
 	readonly slotKey: number;
-	readonly slotLease: ResidentSlotLeaseToken;
+	readonly slotLease: ResidentRowSlotLease;
 	readonly cells: readonly TwoHopMountedCell[];
 	readonly cellSlots: readonly SectionedGridMountedCellSlot<TwoHopMountedCell>[];
 }
@@ -82,7 +88,7 @@ export function buildTwoHopMountedRows(params: {
 	type TwoHopResolvedMountedRow = {
 		readonly section: TwoHopDocumentSection;
 		readonly rowScratch: ReturnType<typeof createTwoHopResolvedRowBuffer>;
-		readonly rowLease: ResidentSlotLeaseToken;
+		readonly rowLease: ResidentRowSlotLease;
 	};
 	const mountedRows = buildMountedSectionedGridRows<
 		TwoHopMountedCell,
@@ -98,7 +104,8 @@ export function buildTwoHopMountedRows(params: {
 		canReusePreviousRow: (row) => {
 			const currentLease = allocator.resolveSlotLease(row.rowIndex);
 			return (
-				currentLease !== undefined && hasSameLease(row.slotLease, currentLease)
+				currentLease !== undefined &&
+				hasSameRowSlotLease(row.slotLease, currentLease)
 			);
 		},
 		resolveRow: (rowIndex) => {
@@ -215,13 +222,16 @@ function resolveMountedCell(params: {
 	readonly previous: TwoHopMountedCell | undefined;
 	readonly logicalCell: TwoHopLogicalCell;
 	readonly section: TwoHopDocumentSection;
-	readonly rowLease: ResidentSlotLeaseToken;
+	readonly rowLease: ResidentRowSlotLease;
 	readonly rowIndex: number;
 	readonly columnIndex: number;
 	readonly renderSlotIndex: number;
 }): TwoHopMountedCell {
 	const nextRenderSlotKey = renderSlotKey(params.renderSlotIndex);
-	const slotLease = createCellLease(params.rowLease, params.renderSlotIndex);
+	const slotIncarnation = createCellIncarnation(
+		params.rowLease,
+		params.renderSlotIndex,
+	);
 	// Reusing the shell object is optional; stale ownership is never inferred
 	// from this reference identity.
 	if (
@@ -232,7 +242,7 @@ function resolveMountedCell(params: {
 		params.previous.columnIndex === params.columnIndex &&
 		params.previous.renderSlotIndex === params.renderSlotIndex &&
 		params.previous.renderSlotKey === nextRenderSlotKey &&
-		hasSameLease(params.previous.slotLease, slotLease)
+		hasSameCellSlotIncarnation(params.previous.slotIncarnation, slotIncarnation)
 	) {
 		return params.previous;
 	}
@@ -247,42 +257,28 @@ function resolveMountedCell(params: {
 		renderSlotKey: nextRenderSlotKey,
 		cellSlotKey: params.renderSlotIndex,
 		publicationRevision: params.section.sourceRevision,
-		slotLease,
+		slotIncarnation,
 		// The outer shell is physical-slot keyed; only the body follows this key.
 		renderBodyKey: String(params.logicalCell.key),
 	};
 }
 
 /**
- * Derives a cell-level lease from the owning row lease.
+ * Projects the owning row-slot incarnation onto a flattened cell coordinate.
  *
- * The returned token inherits the row's `slotGeneration` — it does **not**
+ * The returned incarnation carries the row lease unchanged — it does **not**
  * advance independently when only the cell owner changes (e.g. `load-more →
  * item` within the same logical row). Consumers that need to detect cell-owner
  * transitions must additionally compare the cell's logical key
- * (`MountedVirtualCell.key`) or publication revision; the lease alone is
+ * (`MountedVirtualCell.key`) or publication revision; the incarnation alone is
  * insufficient for that purpose.
  */
-function createCellLease(
-	rowLease: ResidentSlotLeaseToken,
+function createCellIncarnation(
+	rowLease: ResidentRowSlotLease,
 	renderSlotIndex: number,
-): ResidentSlotLeaseToken {
+): ResidentCellSlotIncarnation {
 	return Object.freeze({
-		poolId: rowLease.poolId,
-		poolEpoch: rowLease.poolEpoch,
-		slotIndex: renderSlotIndex,
-		slotGeneration: rowLease.slotGeneration,
+		rowLease,
+		cellSlotIndex: cellSlotIndex(renderSlotIndex),
 	});
-}
-
-function hasSameLease(
-	current: ResidentSlotLeaseToken,
-	next: ResidentSlotLeaseToken,
-): boolean {
-	return (
-		current.poolId === next.poolId &&
-		current.poolEpoch === next.poolEpoch &&
-		current.slotIndex === next.slotIndex &&
-		current.slotGeneration === next.slotGeneration
-	);
 }

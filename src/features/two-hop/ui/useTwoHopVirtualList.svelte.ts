@@ -198,7 +198,7 @@ export function useTwoHopVirtualList(
 	>({
 		previewSurface,
 		interactionController,
-		resolveSlotLease: (mountedCell) => mountedCell.slotLease,
+		resolveCellIncarnation: (mountedCell) => mountedCell.slotIncarnation,
 		resolvePublicationRevision: (mountedCell) => mountedCell.publicationRevision,
 		resolveBinding: (mountedCell, resolver) => {
 			const cardModel = resolveMountedCardModel(mountedCell, resolver);

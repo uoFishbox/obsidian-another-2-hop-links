@@ -2,7 +2,11 @@ import {
 	recordCCLDevMeasurement,
 	recordCCLDevMeasurementCount,
 } from "infrastructure/debug/CCLDevMeasurements";
-import type { ResidentSlotLeaseToken, ResidentSlotPoolId } from "./residentSlotBinding";
+import {
+	rowSlotIndex,
+	type ResidentRowSlotLease,
+	type ResidentSlotPoolId,
+} from "./residentSlotBinding";
 
 export type ResidentSlotResetReason = "empty" | "layout" | "source";
 
@@ -27,7 +31,7 @@ export interface ResidentRowSlotAllocator {
 		readonly layoutRevision: unknown;
 	}): ResidentSlotPoolPublication;
 	resolveSlotIndex(logicalRowIndex: number): number;
-	resolveSlotLease(logicalRowIndex: number): ResidentSlotLeaseToken | undefined;
+	resolveSlotLease(logicalRowIndex: number): ResidentRowSlotLease | undefined;
 	reset(reason: ResidentSlotResetReason): void;
 	dispose(): void;
 	readonly capacity: number;
@@ -49,7 +53,7 @@ export function createResidentRowSlotAllocator(): ResidentRowSlotAllocator {
 	let disposed = false;
 	const logicalRowToSlot = new Map<number, number>();
 	const slotGenerations: number[] = [];
-	const leasesBySlot: Array<ResidentSlotLeaseToken | undefined> = [];
+	const leasesBySlot: Array<ResidentRowSlotLease | undefined> = [];
 	const freeSlotIndices = new Set<number>();
 	let publication = createPublication();
 
@@ -156,7 +160,7 @@ export function createResidentRowSlotAllocator(): ResidentRowSlotAllocator {
 
 	function resolveSlotLease(
 		logicalRowIndex: number,
-	): ResidentSlotLeaseToken | undefined {
+	): ResidentRowSlotLease | undefined {
 		const slotIndex = logicalRowToSlot.get(logicalRowIndex);
 		return slotIndex === undefined ? undefined : leasesBySlot[slotIndex];
 	}
@@ -167,8 +171,8 @@ export function createResidentRowSlotAllocator(): ResidentRowSlotAllocator {
 		leasesBySlot[slotIndex] = Object.freeze({
 			poolId,
 			poolEpoch: epoch,
-			slotIndex,
-			slotGeneration,
+			rowSlotIndex: rowSlotIndex(slotIndex),
+			rowSlotGeneration: slotGeneration,
 		});
 		logicalRowToSlot.set(logicalRowIndex, slotIndex);
 	}

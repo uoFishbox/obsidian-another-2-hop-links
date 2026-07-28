@@ -5,9 +5,11 @@ import type { VirtualPreviewSurface } from "features/preview/scheduling/virtualP
 import type { ItemInteractionDescriptor } from "ui/interactions/interactionTypes";
 import { createVirtualCardInteractionController } from "ui/interactions/virtualCardInteractionController";
 import { createVirtualCardSlotBindings } from "ui/virtualization/svelte/virtualCardSlotBindings.svelte";
-import type {
-	ResidentSlotLeaseToken,
-	ResidentSlotPoolId,
+import {
+	cellSlotIndex,
+	rowSlotIndex,
+	type ResidentCellSlotIncarnation,
+	type ResidentSlotPoolId,
 } from "ui/virtualization/core/residentSlotBinding";
 import {
 	logicalCellKey,
@@ -18,7 +20,7 @@ import {
 interface TestMountedCell extends MountedVirtualCell {
 	readonly label: string;
 	readonly publicationRevision: number;
-	readonly slotLease: ResidentSlotLeaseToken;
+	readonly slotIncarnation: ResidentCellSlotIncarnation;
 }
 
 const TEST_POOL_ID = Object.freeze({}) as ResidentSlotPoolId;
@@ -38,11 +40,14 @@ function createMountedCell(
 		columnIndex: 0,
 		label,
 		publicationRevision,
-		slotLease: Object.freeze({
-			poolId: TEST_POOL_ID,
-			poolEpoch: 0,
-			slotIndex,
-			slotGeneration: rowIndex + 1,
+		slotIncarnation: Object.freeze({
+			rowLease: Object.freeze({
+				poolId: TEST_POOL_ID,
+				poolEpoch: 0,
+				rowSlotIndex: rowSlotIndex(slotIndex),
+				rowSlotGeneration: rowIndex + 1,
+			}),
+			cellSlotIndex: cellSlotIndex(slotIndex),
 		}),
 	};
 }
@@ -98,7 +103,7 @@ describe("virtualCardSlotBindings", () => {
 		const bindings = createVirtualCardSlotBindings({
 			previewSurface,
 			interactionController,
-			resolveSlotLease: (mountedCell) => mountedCell.slotLease,
+			resolveCellIncarnation: (mountedCell) => mountedCell.slotIncarnation,
 			resolvePublicationRevision: (mountedCell) =>
 				mountedCell.publicationRevision,
 			resolveBinding: resolver,
@@ -136,8 +141,9 @@ describe("virtualCardSlotBindings", () => {
 		expect(bindings.getSlotState(initial)).toBeUndefined();
 		expect(bindings.getSlotState(rebound)?.binding?.cardModel).toBe("rebound");
 		expect(
-			bindings.getSlotState(rebound)?.binding?.bindingToken.slotGeneration,
-		).toBeGreaterThan(initialToken?.slotGeneration ?? 0);
+			bindings.getSlotState(rebound)?.binding?.bindingToken.rowLease
+				.rowSlotGeneration,
+		).toBeGreaterThan(initialToken?.rowLease.rowSlotGeneration ?? 0);
 		expect(
 			interactionController.provider.resolveInteractionDescriptor("initial"),
 		).toBeNull();
@@ -172,7 +178,7 @@ describe("virtualCardSlotBindings", () => {
 		const bindings = createVirtualCardSlotBindings({
 			previewSurface,
 			interactionController: createVirtualCardInteractionController(),
-			resolveSlotLease: (mountedCell) => mountedCell.slotLease,
+			resolveCellIncarnation: (mountedCell) => mountedCell.slotIncarnation,
 			resolvePublicationRevision: (mountedCell) =>
 				mountedCell.publicationRevision,
 			resolveBinding: resolver,
@@ -208,7 +214,7 @@ describe("virtualCardSlotBindings", () => {
 		const bindings = createVirtualCardSlotBindings({
 			previewSurface,
 			interactionController: createVirtualCardInteractionController(),
-			resolveSlotLease: (mountedCell) => mountedCell.slotLease,
+			resolveCellIncarnation: (mountedCell) => mountedCell.slotIncarnation,
 			resolvePublicationRevision: (mountedCell) =>
 				mountedCell.publicationRevision,
 			resolveBinding: resolver,
@@ -245,7 +251,7 @@ describe("virtualCardSlotBindings", () => {
 		const bindings = createVirtualCardSlotBindings({
 			previewSurface: createPreviewSurface(),
 			interactionController: createVirtualCardInteractionController(),
-			resolveSlotLease: (mountedCell) => mountedCell.slotLease,
+			resolveCellIncarnation: (mountedCell) => mountedCell.slotIncarnation,
 			resolvePublicationRevision: (mountedCell) =>
 				mountedCell.publicationRevision,
 			resolveBinding: resolver,
@@ -288,7 +294,7 @@ describe("virtualCardSlotBindings", () => {
 		const bindings = createVirtualCardSlotBindings({
 			previewSurface,
 			interactionController,
-			resolveSlotLease: (mountedCell) => mountedCell.slotLease,
+			resolveCellIncarnation: (mountedCell) => mountedCell.slotIncarnation,
 			resolvePublicationRevision: (mountedCell) =>
 				mountedCell.publicationRevision,
 			resolveBinding: resolver,
@@ -332,7 +338,7 @@ describe("virtualCardSlotBindings", () => {
 		const bindings = createVirtualCardSlotBindings({
 			previewSurface: createPreviewSurface(),
 			interactionController: createVirtualCardInteractionController(),
-			resolveSlotLease: (mountedCell) => mountedCell.slotLease,
+			resolveCellIncarnation: (mountedCell) => mountedCell.slotIncarnation,
 			resolvePublicationRevision: (mountedCell) =>
 				mountedCell.publicationRevision,
 			resolveBinding: (mountedCell: TestMountedCell, revision: number) => ({
@@ -369,7 +375,7 @@ describe("virtualCardSlotBindings", () => {
 		const bindings = createVirtualCardSlotBindings({
 			previewSurface: createPreviewSurface(),
 			interactionController: createVirtualCardInteractionController(),
-			resolveSlotLease: (mountedCell) => mountedCell.slotLease,
+			resolveCellIncarnation: (mountedCell) => mountedCell.slotIncarnation,
 			resolvePublicationRevision: (mountedCell) =>
 				mountedCell.publicationRevision,
 			resolveBinding: resolver,
@@ -394,11 +400,14 @@ describe("virtualCardSlotBindings", () => {
 			columnIndex: 0,
 			label: "same-key",
 			publicationRevision: 1,
-			slotLease: Object.freeze({
-				poolId: foreignPoolId,
-				poolEpoch: 0,
-				slotIndex: 0,
-				slotGeneration: 1,
+			slotIncarnation: Object.freeze({
+				rowLease: Object.freeze({
+					poolId: foreignPoolId,
+					poolEpoch: 0,
+					rowSlotIndex: rowSlotIndex(0),
+					rowSlotGeneration: 1,
+				}),
+				cellSlotIndex: cellSlotIndex(0),
 			}),
 		};
 
@@ -413,8 +422,8 @@ describe("virtualCardSlotBindings", () => {
 		expect(bindings.getSlotState(foreignCell)?.binding?.mountedCell).toBe(
 			foreignCell,
 		);
-		expect(bindings.getSlotState(foreignCell)?.binding?.bindingToken.poolId).toBe(
-			foreignPoolId,
-		);
+		expect(
+			bindings.getSlotState(foreignCell)?.binding?.bindingToken.rowLease.poolId,
+		).toBe(foreignPoolId);
 	});
 });

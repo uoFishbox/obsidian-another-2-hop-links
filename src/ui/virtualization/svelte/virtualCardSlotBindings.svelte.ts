@@ -12,7 +12,10 @@ import type {
 	VirtualCardInteractionDelta,
 } from "ui/interactions/virtualCardInteractionController";
 import type { MountedVirtualCell } from "ui/virtualization/types";
-import type { ResidentSlotLeaseToken } from "ui/virtualization/core/residentSlotBinding";
+import {
+	hasSameCellSlotIncarnation,
+	type ResidentCellSlotIncarnation,
+} from "ui/virtualization/core/residentSlotBinding";
 import {
 	recordCCLDevMeasurement,
 	recordCCLDevMeasurementCount,
@@ -23,7 +26,7 @@ export interface VirtualCardSlotBinding<
 	TMountedCell extends MountedVirtualCell,
 	TCardModel,
 > {
-	readonly bindingToken: ResidentSlotLeaseToken;
+	readonly bindingToken: ResidentCellSlotIncarnation;
 	readonly mountedCell: TMountedCell;
 	readonly cardModel?: TCardModel;
 	readonly preview?: CardPreviewSnapshot;
@@ -68,7 +71,9 @@ export function createVirtualCardSlotBindings<
 >(options: {
 	readonly previewSurface: VirtualPreviewSurface;
 	readonly interactionController: VirtualCardInteractionController;
-	readonly resolveSlotLease: (mountedCell: TMountedCell) => ResidentSlotLeaseToken;
+	readonly resolveCellIncarnation: (
+		mountedCell: TMountedCell,
+	) => ResidentCellSlotIncarnation;
 	readonly resolvePublicationRevision: (mountedCell: TMountedCell) => unknown;
 	readonly resolveBinding: (
 		mountedCell: TMountedCell,
@@ -81,7 +86,10 @@ export function createVirtualCardSlotBindings<
 	>();
 	const bindingIdentities = new Map<number, TBindingIdentity>();
 	const publicationRevisions = new Map<number, unknown>();
-	const bindingTokensByCell = new WeakMap<TMountedCell, ResidentSlotLeaseToken>();
+	const bindingTokensByCell = new WeakMap<
+		TMountedCell,
+		ResidentCellSlotIncarnation
+	>();
 	let activeSlotIndices = new Set<number>();
 
 	const enteredPreviewSlots: RowPreviewCardBinding[] = [];
@@ -119,9 +127,9 @@ export function createVirtualCardSlotBindings<
 		};
 
 		for (const mountedCell of params.mountedCells) {
-			const bindingToken = options.resolveSlotLease(mountedCell);
-			const slotIndex = bindingToken.slotIndex;
-			assertCellLease(mountedCell, bindingToken, nextActiveSlotIndices);
+			const bindingToken = options.resolveCellIncarnation(mountedCell);
+			const slotIndex = bindingToken.cellSlotIndex;
+			assertCellIncarnation(mountedCell, bindingToken, nextActiveSlotIndices);
 			nextActiveSlotIndices.add(slotIndex);
 			let slotState = slotStates.get(slotIndex);
 			if (!slotState) {
@@ -132,7 +140,7 @@ export function createVirtualCardSlotBindings<
 			const publicationRevision = options.resolvePublicationRevision(mountedCell);
 			const retainsSlotLease =
 				previous !== undefined &&
-				hasSameSlotLease(previous.bindingToken, bindingToken);
+				hasSameCellSlotIncarnation(previous.bindingToken, bindingToken);
 			const retainsLogicalOwner =
 				previous !== undefined && previous.mountedCell.key === mountedCell.key;
 			const effectiveBindingToken = retainsSlotLease
@@ -238,40 +246,32 @@ export function createVirtualCardSlotBindings<
 		getSlotState(mountedCell) {
 			const token = bindingTokensByCell.get(mountedCell);
 			if (!token) return undefined;
-			const state = slotStates.get(token.slotIndex);
+			const state = slotStates.get(token.cellSlotIndex);
 			if (state?.binding?.mountedCell !== mountedCell) return undefined;
 			const current = state?.binding?.bindingToken;
-			if (!current || !hasSameSlotLease(current, token)) return undefined;
+			if (!current || !hasSameCellSlotIncarnation(current, token)) {
+				return undefined;
+			}
 			return state;
 		},
 	};
 }
 
-function hasSameSlotLease(
-	current: ResidentSlotLeaseToken,
-	next: ResidentSlotLeaseToken,
-): boolean {
-	return (
-		current.poolId === next.poolId &&
-		current.poolEpoch === next.poolEpoch &&
-		current.slotIndex === next.slotIndex &&
-		current.slotGeneration === next.slotGeneration
-	);
-}
-
-function assertCellLease(
+function assertCellIncarnation(
 	mountedCell: MountedVirtualCell,
-	lease: ResidentSlotLeaseToken,
+	incarnation: ResidentCellSlotIncarnation,
 	activeSlotIndices: ReadonlySet<number>,
 ): void {
 	if (process.env.NODE_ENV === "production") return;
-	if (lease.slotIndex !== mountedCell.renderSlotIndex) {
+	if (incarnation.cellSlotIndex !== mountedCell.renderSlotIndex) {
 		throw new Error(
-			`Card lease slot ${lease.slotIndex} does not match render slot ${mountedCell.renderSlotIndex}.`,
+			`Card incarnation slot ${incarnation.cellSlotIndex} does not match render slot ${mountedCell.renderSlotIndex}.`,
 		);
 	}
-	if (activeSlotIndices.has(lease.slotIndex)) {
-		throw new Error(`Duplicate active card slot lease: ${lease.slotIndex}.`);
+	if (activeSlotIndices.has(incarnation.cellSlotIndex)) {
+		throw new Error(
+			`Duplicate active card cell slot: ${incarnation.cellSlotIndex}.`,
+		);
 	}
 }
 

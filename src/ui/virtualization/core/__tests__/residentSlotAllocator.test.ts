@@ -22,7 +22,7 @@ describe("createResidentRowSlotAllocator", () => {
 		});
 		expect(allocator.resolveSlotIndex(120)).toBe(0);
 		expect(allocator.resolveSlotLease(101)).toBe(retainedLease);
-		expect(allocator.resolveSlotLease(120)?.slotGeneration).toBeGreaterThan(1);
+		expect(allocator.resolveSlotLease(120)?.rowSlotGeneration).toBeGreaterThan(1);
 		expect(shifted.revision).toBe(initial.revision + 1);
 	});
 
@@ -97,9 +97,9 @@ describe("createResidentRowSlotAllocator", () => {
 		allocator.prepareRange({ start: 1, end: 2, layoutRevision: "layout-a" });
 		const reboundLease = allocator.resolveSlotLease(1);
 		expect(reboundLease?.poolEpoch).toBe(initialLease?.poolEpoch);
-		expect(reboundLease?.slotIndex).toBe(initialLease?.slotIndex);
-		expect(reboundLease?.slotGeneration).toBeGreaterThan(
-			initialLease?.slotGeneration ?? 0,
+		expect(reboundLease?.rowSlotIndex).toBe(initialLease?.rowSlotIndex);
+		expect(reboundLease?.rowSlotGeneration).toBeGreaterThan(
+			initialLease?.rowSlotGeneration ?? 0,
 		);
 
 		allocator.prepareRange({ start: 1, end: 2, layoutRevision: "layout-b" });

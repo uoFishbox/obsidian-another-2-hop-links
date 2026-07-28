@@ -4,7 +4,8 @@ import type { ViewPlanLayoutMetrics } from "ui/virtualization/svelte/viewPlanLay
  * Official TwoHop change contracts.
  *
  * Logical keys identify a target, these revisions publish semantic data/layout
- * changes, and ResidentSlotLeaseToken is a captured ownership lease. Object
+ * changes, and ResidentRowSlotLease is a captured row-slot ownership lease
+ * (cells only carry its projection, ResidentCellSlotIncarnation). Object
  * references outside these contracts may only be used as cache fast paths.
  */
 export interface DocumentRevision {

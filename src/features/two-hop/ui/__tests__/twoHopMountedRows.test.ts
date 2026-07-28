@@ -159,7 +159,7 @@ describe("TwoHop keyed mounted rows", () => {
 			rowRange: { start: 1, end: 5 },
 			rowSlotAllocator: allocator,
 		});
-		const firstCellLease = first.cells[0]?.slotLease;
+		const firstCellLease = first.cells[0]?.slotIncarnation.rowLease;
 
 		allocator.reset("source");
 		const rebuilt = buildTwoHopMountedRows({
@@ -172,8 +172,10 @@ describe("TwoHop keyed mounted rows", () => {
 		expect(rebuilt).not.toBe(first);
 		expect(rebuilt.slotPool.poolEpoch).toBeGreaterThan(first.slotPool.poolEpoch);
 		expect(rebuilt.rowSlices[0]).not.toBe(first.rowSlices[0]);
-		expect(rebuilt.cells[0]?.slotLease.poolEpoch).toBe(rebuilt.slotPool.poolEpoch);
-		expect(rebuilt.cells[0]?.slotLease.poolEpoch).toBeGreaterThan(
+		expect(rebuilt.cells[0]?.slotIncarnation.rowLease.poolEpoch).toBe(
+			rebuilt.slotPool.poolEpoch,
+		);
+		expect(rebuilt.cells[0]?.slotIncarnation.rowLease.poolEpoch).toBeGreaterThan(
 			firstCellLease?.poolEpoch ?? 0,
 		);
 	});
