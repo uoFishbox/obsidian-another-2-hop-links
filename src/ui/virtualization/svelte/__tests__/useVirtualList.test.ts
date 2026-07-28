@@ -98,6 +98,29 @@ describe("useVirtualList", () => {
 		});
 	});
 
+	it("bootstraps mounted rows without publishing preview-visible rows", () => {
+		const rowModel = createRowModel(12);
+		const virtualList = createVirtualList();
+
+		const result = virtualList.bootstrap({
+			rowModel,
+			visibilityPolicy: {
+				bootstrapRows: 3,
+				mountedOverscanPx: 220,
+			},
+		});
+
+		expect(result).toEqual({
+			kind: "bootstrapped",
+			range: { start: 0, end: 3 },
+			updateKind: "recomputed",
+		});
+		expect(virtualList.getSnapshot()?.ranges).toEqual({
+			mounted: { start: 0, end: 3 },
+			previewVisible: { start: 0, end: 0 },
+		});
+	});
+
 	it("keeps the latest engine snapshot after measurement updates", () => {
 		const rowModel = createRowModel(12);
 		const virtualList = createVirtualList();

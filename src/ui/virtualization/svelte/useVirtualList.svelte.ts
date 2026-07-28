@@ -109,6 +109,7 @@ export function useVirtualList<
 		getTotalHeight(fallback: number) {
 			return totalHeightState ?? fallback;
 		},
+		bootstrap: runtime.bootstrap,
 		applyMeasurement: runtime.applyMeasurement,
 		recompute: runtime.recompute,
 		setEmpty: runtime.setEmpty,

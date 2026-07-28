@@ -296,14 +296,8 @@ export function useTwoHopVirtualList(
 	});
 	const initialRowModel = resolveRowModel(measurementState.layout);
 	if (initialRowModel.rowCount > 0) {
-		virtualList.applyMeasurement({
+		virtualList.bootstrap({
 			rowModel: initialRowModel,
-			scrollTop: 0,
-			viewportHeight: measurementState.layout.rowHeight * 3,
-			sectionTop: 0,
-			isStableMeasurement: false,
-			isScrollActive: false,
-			hasStableVisibleRange: false,
 			visibilityPolicy: policyResolver.resolve(measurementState.layout, false),
 		});
 	}

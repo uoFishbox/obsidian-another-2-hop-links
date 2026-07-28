@@ -189,7 +189,7 @@
 	};
 
 	let rootEl = $state<HTMLDivElement | null>(null);
-	let previewSurfaceActive = $state(true);
+	let previewSurfaceActive = $state(false);
 	let resultsContainerEl = $state<HTMLDivElement | null>(null);
 	let resultsMinHeight = $derived(search.normalized ? "100vh" : null);
 

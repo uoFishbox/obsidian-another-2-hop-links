@@ -11,18 +11,22 @@ export function observePreviewSurfaceVisibility(
 	const ownerDocument = surface.ownerDocument;
 	const ownerWindow = ownerDocument.defaultView;
 	const target = surface.closest<HTMLElement>(".workspace-leaf-content") ?? surface;
-	let intersectsViewport = true;
+	const IntersectionObserverConstructor = ownerWindow?.IntersectionObserver;
+	let intersectsViewport: boolean | undefined = IntersectionObserverConstructor
+		? undefined
+		: true;
 	let lastActive: boolean | undefined;
 
 	const emit = (): void => {
-		const active = ownerDocument.visibilityState !== "hidden" && intersectsViewport;
+		const active =
+			ownerDocument.visibilityState !== "hidden" && intersectsViewport === true;
 		if (active === lastActive) return;
 		lastActive = active;
 		listener(active);
 	};
 
-	const intersectionObserver = ownerWindow?.IntersectionObserver
-		? new ownerWindow.IntersectionObserver((entries) => {
+	const intersectionObserver = IntersectionObserverConstructor
+		? new IntersectionObserverConstructor((entries) => {
 				const entry = entries[entries.length - 1];
 				if (!entry) return;
 				intersectsViewport = entry.isIntersecting;

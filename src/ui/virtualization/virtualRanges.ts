@@ -238,7 +238,7 @@ export function computeVirtualRanges<TCell>(params: {
 			},
 			ranges: {
 				mounted: bootstrapRange,
-				previewVisible: bootstrapRange,
+				previewVisible: EMPTY_ROW_RANGE,
 			},
 		};
 	}

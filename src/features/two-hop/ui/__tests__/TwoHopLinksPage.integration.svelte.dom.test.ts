@@ -17,6 +17,11 @@ import {
 	getTwoHopSurfacePageStubProps,
 	resetTwoHopSurfacePageStubProps,
 } from "./twoHopSurfacePageStubCapture";
+import {
+	installIntersectionObserverMock,
+	teardownIntersectionObserverMock,
+	triggerIntersection,
+} from "testing/helpers/DOMObserverMock";
 
 vi.mock("features/search/searchWorkerClient", async () => {
 	const { filterSearchWorkerDataset } =
@@ -315,9 +320,11 @@ describe("TwoHopLinksPage descriptor plumbing", () => {
 	beforeEach(() => {
 		vi.useFakeTimers();
 		resetTwoHopSurfacePageStubProps();
+		installIntersectionObserverMock();
 	});
 
 	afterEach(() => {
+		teardownIntersectionObserverMock();
 		vi.useRealTimers();
 	});
 
@@ -367,7 +374,7 @@ describe("TwoHopLinksPage descriptor plumbing", () => {
 		};
 
 		const rootProps = createRootProps(displayData, settings, file);
-		render(TwoHopLinksPage, {
+		const { container } = render(TwoHopLinksPage, {
 			props: rootProps,
 		});
 		await flushAsyncUi();
@@ -378,7 +385,14 @@ describe("TwoHopLinksPage descriptor plumbing", () => {
 		expect(surface.dataset.hasPreviewLoader).toBe("true");
 		expect(surface.dataset.settingsGetterMatches).toBe("true");
 		expect(surface.dataset.hasSearchPositionResolver).toBe("true");
+		expect(surface.dataset.previewActive).toBe("false");
+
+		const root = container.querySelector<HTMLElement>(".cosense-card-links__root");
+		expect(root).not.toBeNull();
+		triggerIntersection(root!);
+		await flushAsyncUi();
 		expect(surface.dataset.previewActive).toBe("true");
+
 		expect(capturedProps?.applicationStore).toBe(rootProps.applicationStore);
 		expect(capturedProps?.previewDependencies?.getPreview).toBe(
 			rootProps.linkContext.getPreview,

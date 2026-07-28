@@ -98,7 +98,7 @@ describe("computeVirtualRanges", () => {
 		});
 	});
 
-	it("returns bootstrap range when measurement is not stable and no visible range exists", () => {
+	it("mounts bootstrap rows without exposing them as preview-visible", () => {
 		const rowModel = createMockRowModel(100, 50);
 		const result = computeVirtualRanges({
 			rowModel,
@@ -115,12 +115,12 @@ describe("computeVirtualRanges", () => {
 			mode: { kind: "bootstrapped", reason: "initial" },
 			ranges: {
 				mounted: { start: 0, end: 5 },
-				previewVisible: { start: 0, end: 5 },
+				previewVisible: { start: 0, end: 0 },
 			},
 		});
 	});
 
-	it("returns bootstrap range when unstable measurement has an out-of-bounds current range", () => {
+	it("keeps preview visibility empty when re-bootstrapping an invalid range", () => {
 		const rowModel = createMockRowModel(7, 50);
 		const result = computeVirtualRanges({
 			rowModel,
@@ -138,7 +138,7 @@ describe("computeVirtualRanges", () => {
 			mode: { kind: "bootstrapped", reason: "invalid-mounted-range" },
 			ranges: {
 				mounted: { start: 0, end: 3 },
-				previewVisible: { start: 0, end: 3 },
+				previewVisible: { start: 0, end: 0 },
 			},
 		});
 	});

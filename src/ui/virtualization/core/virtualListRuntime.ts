@@ -33,6 +33,14 @@ export interface ApplyVirtualListMeasurementParams<
 	visibilityPolicy: VirtualVisibilityPolicy;
 }
 
+export interface BootstrapVirtualListParams<
+	TCell,
+	TRowModel extends VirtualRowModel<TCell>,
+> {
+	rowModel: TRowModel;
+	visibilityPolicy: VirtualVisibilityPolicy;
+}
+
 export type VirtualListMeasurementUpdateKind = "skipped" | "reused" | "recomputed";
 
 export type VirtualListMeasurementUpdateResult<TRange> =
@@ -277,6 +285,22 @@ export function createVirtualListRuntime<
 		};
 	};
 
+	/**
+	 * Materializes the initial mounted rows before viewport geometry is available.
+	 */
+	const bootstrap = (
+		params: BootstrapVirtualListParams<TCell, TRowModel>,
+	): VirtualListMeasurementUpdateResult<RowRange> =>
+		applyMeasurement({
+			rowModel: params.rowModel,
+			scrollTop: 0,
+			viewportHeight: 0,
+			sectionTop: 0,
+			isStableMeasurement: false,
+			hasStableVisibleRange: false,
+			visibilityPolicy: params.visibilityPolicy,
+		});
+
 	const recompute = (params: { rowModel: TRowModel }): void => {
 		const previousSnapshot = runtimeState.snapshot;
 		if (!previousSnapshot) {
@@ -321,6 +345,7 @@ export function createVirtualListRuntime<
 		getState() {
 			return runtimeState;
 		},
+		bootstrap,
 		applyMeasurement,
 		recompute,
 		setEmpty,

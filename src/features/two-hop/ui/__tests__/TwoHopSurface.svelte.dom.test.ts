@@ -295,19 +295,33 @@ describe("TwoHopSurface", () => {
 			previewActive: false,
 			resolveItemCardModel,
 		};
-		const { container, rerender } = render(TwoHopSurfaceModelHarness, {
+		const scroller = document.createElement("div");
+		scroller.style.overflow = "auto";
+		setNumericProperty(scroller, "clientHeight", 120);
+		setNumericProperty(scroller, "scrollHeight", 10_000);
+		setNumericProperty(scroller, "scrollTop", 0);
+		setElementRect(scroller, { top: 0, width: 330, height: 120 });
+		document.body.append(scroller);
+		const { rerender } = render(TwoHopSurfaceModelHarness, {
+			target: scroller,
 			props: harnessProps,
 		});
-		const root = container.querySelector<HTMLElement>(".twohop-keyed-surface");
-		const host = root?.shadowRoot?.querySelector<HTMLElement>(
-			'[data-preview-owner="virtual-surface"]',
-		);
-		expect(host).not.toBeNull();
+		const root = scroller.querySelector<HTMLElement>(".twohop-keyed-surface");
+		if (!root) {
+			throw new Error("Two-hop virtual surface was not rendered");
+		}
+		setElementRect(root, { top: 0, width: 330, height: 10_000 });
+		triggerResize(root, 330, 10_000);
+		triggerResize(scroller, 330, 120);
 
 		for (let index = 0; index < 6; index += 1) {
 			await flushFrames();
 			await Promise.resolve();
 		}
+		const host = root.shadowRoot?.querySelector<HTMLElement>(
+			'[data-preview-owner="virtual-surface"]',
+		);
+		expect(host).not.toBeNull();
 		expect(getPreview).not.toHaveBeenCalled();
 
 		const resolverCallsBefore = resolveItemCardModel.mock.calls.length;
@@ -326,7 +340,7 @@ describe("TwoHopSurface", () => {
 			await Promise.resolve();
 		}
 
-		expect(host?.dataset.previewState).toBe("committed");
+		await waitFor(() => expect(host?.dataset.previewState).toBe("committed"));
 		expect(host?.querySelector("img")).not.toBeNull();
 		expect(resolveItemCardModel).toHaveBeenCalledTimes(resolverCallsBefore);
 		expect(previewSurfaceCalls.commitBindingDelta).not.toHaveBeenCalled();

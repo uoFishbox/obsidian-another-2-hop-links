@@ -36,7 +36,7 @@ describe("observePreviewSurfaceVisibility", () => {
 		const dispose = observePreviewSurfaceVisibility(surface, listener);
 		const observer = IntersectionObserverMock.latest;
 		expect(observer?.observe).toHaveBeenCalledWith(pane);
-		expect(listener).toHaveBeenLastCalledWith(true);
+		expect(listener).toHaveBeenLastCalledWith(false);
 
 		observer?.emit(false);
 		expect(listener).toHaveBeenLastCalledWith(false);
@@ -45,5 +45,18 @@ describe("observePreviewSurfaceVisibility", () => {
 
 		dispose();
 		expect(observer?.disconnect).toHaveBeenCalledOnce();
+	});
+
+	it("falls back to document visibility when IntersectionObserver is unavailable", () => {
+		Reflect.set(window, "IntersectionObserver", undefined);
+		const surface = document.createElement("div");
+		document.body.append(surface);
+		const listener = vi.fn();
+
+		const dispose = observePreviewSurfaceVisibility(surface, listener);
+
+		expect(listener).toHaveBeenCalledOnce();
+		expect(listener).toHaveBeenLastCalledWith(true);
+		dispose();
 	});
 });
