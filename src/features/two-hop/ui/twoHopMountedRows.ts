@@ -98,7 +98,7 @@ export function buildTwoHopMountedRows(params: {
 		rowRange: { start, end },
 		columns,
 		slotCapacity: allocator.capacity,
-		resolveSlotIndex: (rowIndex) => allocator.resolveSlotIndex(rowIndex),
+		resolveSlotLease: (rowIndex) => allocator.resolveSlotLease(rowIndex),
 		resolvePreviousRow: (rowIndex) =>
 			getPreviousRow(previousBuild, rowModel, rowIndex),
 		canReusePreviousRow: (row) => {

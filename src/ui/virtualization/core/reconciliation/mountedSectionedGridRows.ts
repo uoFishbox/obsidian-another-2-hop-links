@@ -1,5 +1,6 @@
 import type { RowRange } from "ui/virtualization/rowRange";
 import { renderSlotKey, type RenderSlotKey } from "ui/virtualization/types";
+import type { ResidentRowSlotLease } from "ui/virtualization/core/residentSlotBinding";
 
 export interface SectionedGridMountedCell {
 	readonly key: string;
@@ -54,7 +55,7 @@ export interface BuildMountedSectionedGridRowsParams<
 	readonly rowRange: RowRange;
 	readonly columns: number;
 	readonly slotCapacity: number;
-	resolveSlotIndex(rowIndex: number): number;
+	resolveSlotLease(rowIndex: number): ResidentRowSlotLease | undefined;
 	resolvePreviousRow(rowIndex: number): TRow | undefined;
 	canReusePreviousRow(row: TRow): boolean;
 	resolveRow(rowIndex: number): ResolvedSectionedGridRow<TRowMetadata> | null;
@@ -103,7 +104,11 @@ export function buildMountedSectionedGridRows<
 		rowIndex < params.rowRange.end;
 		rowIndex += 1
 	) {
-		const slotIndex = params.resolveSlotIndex(rowIndex);
+		const slotLease = params.resolveSlotLease(rowIndex);
+		if (!slotLease) {
+			throw new Error(`No resident slot assigned for row ${rowIndex}.`);
+		}
+		const slotIndex = slotLease.rowSlotIndex;
 		const previousRow = params.resolvePreviousRow(rowIndex);
 		const canReusePreviousRow =
 			previousRow !== undefined && params.canReusePreviousRow(previousRow);

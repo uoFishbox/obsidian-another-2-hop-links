@@ -30,7 +30,6 @@ export interface ResidentRowSlotAllocator {
 		readonly end: number;
 		readonly layoutRevision: unknown;
 	}): ResidentSlotPoolPublication;
-	resolveSlotIndex(logicalRowIndex: number): number;
 	resolveSlotLease(logicalRowIndex: number): ResidentRowSlotLease | undefined;
 	reset(reason: ResidentSlotResetReason): void;
 	dispose(): void;
@@ -154,10 +153,6 @@ export function createResidentRowSlotAllocator(): ResidentRowSlotAllocator {
 		return slotIndex;
 	}
 
-	function resolveSlotIndex(logicalRowIndex: number): number {
-		return logicalRowToSlot.get(logicalRowIndex) ?? 0;
-	}
-
 	function resolveSlotLease(
 		logicalRowIndex: number,
 	): ResidentRowSlotLease | undefined {
@@ -199,7 +194,6 @@ export function createResidentRowSlotAllocator(): ResidentRowSlotAllocator {
 
 	return {
 		prepareRange,
-		resolveSlotIndex,
 		resolveSlotLease,
 		reset,
 		dispose,

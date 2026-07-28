@@ -27,6 +27,7 @@ import {
 	createResidentRowSlotAllocator,
 	type ResidentRowSlotAllocator,
 } from "ui/virtualization/core/residentSlotAllocator";
+import type { ResidentRowSlotLease } from "ui/virtualization/core/residentSlotBinding";
 import {
 	buildMountedSectionedGridRows,
 	type SectionedGridMountedCellSlot,
@@ -37,7 +38,7 @@ const ROW_SLOT_ALLOCATOR = Symbol("flat-grid-row-slot-allocator");
 interface MountedRowSlotAllocation {
 	readonly capacity: number;
 	readonly epoch: number;
-	resolveSlotIndex(rowIndex: number, rangeOffset: number): number;
+	resolveSlotLease(rowIndex: number): ResidentRowSlotLease | undefined;
 }
 
 export interface MountedVirtualGridCellPosition {
@@ -456,7 +457,7 @@ function resolveMountedRowSlotAllocation(params: {
 		allocation: {
 			capacity: allocator.capacity,
 			epoch: allocator.epoch,
-			resolveSlotIndex: (rowIndex) => allocator.resolveSlotIndex(rowIndex),
+			resolveSlotLease: (rowIndex) => allocator.resolveSlotLease(rowIndex),
 		},
 	};
 }
@@ -536,8 +537,7 @@ function buildMountedVirtualGridCellsFromCore<T>(params: {
 		rowRange: visibleRows,
 		columns,
 		slotCapacity: slotAllocation.capacity,
-		resolveSlotIndex: (rowIndex) =>
-			slotAllocation.resolveSlotIndex(rowIndex, rowIndex - visibleRows.start),
+		resolveSlotLease: (rowIndex) => slotAllocation.resolveSlotLease(rowIndex),
 		resolvePreviousRow: (rowIndex) =>
 			hasCompatiblePreviousRowSlots
 				? getPreviousMountedVirtualGridRow(previousBuild, rowIndex)

@@ -5,6 +5,22 @@ import {
 	type SectionedGridMountedCellSlot,
 	type SectionedGridMountedRow,
 } from "ui/virtualization/core/reconciliation/mountedSectionedGridRows";
+import {
+	rowSlotIndex,
+	type ResidentRowSlotLease,
+	type ResidentSlotPoolId,
+} from "ui/virtualization/core/residentSlotBinding";
+
+const TEST_POOL_ID = Object.freeze({}) as ResidentSlotPoolId;
+
+function createTestLease(slotIndex: number): ResidentRowSlotLease {
+	return {
+		poolId: TEST_POOL_ID,
+		poolEpoch: 0,
+		rowSlotIndex: rowSlotIndex(slotIndex),
+		rowSlotGeneration: 1,
+	};
+}
 
 interface TestCell extends SectionedGridMountedCell {
 	readonly label: string;
@@ -46,7 +62,7 @@ function buildRows(params: {
 		rowRange: { start: 0, end: 1 },
 		columns: 4,
 		slotCapacity: 2,
-		resolveSlotIndex: () => params.slotIndex,
+		resolveSlotLease: () => createTestLease(params.slotIndex),
 		resolvePreviousRow: () => params.previousRow,
 		canReusePreviousRow: () => true,
 		resolveRow: () => ({
@@ -119,5 +135,26 @@ describe("buildMountedSectionedGridRows", () => {
 				(slot) => slot.binding !== null,
 			),
 		).toBe(true);
+	});
+
+	it("throws when a logical row has no resident slot lease", () => {
+		expect(() =>
+			buildMountedSectionedGridRows<TestCell, TestRow, null>({
+				rowRange: { start: 7, end: 8 },
+				columns: 1,
+				slotCapacity: 1,
+				resolveSlotLease: () => undefined,
+				resolvePreviousRow: () => undefined,
+				canReusePreviousRow: () => false,
+				resolveRow: () => null,
+				resolveCell: () => null,
+				createRow: ({ rowIndex, slotIndex, cells, cellSlots }) => ({
+					rowIndex,
+					slotIndex,
+					cells,
+					cellSlots,
+				}),
+			}),
+		).toThrowError("No resident slot assigned for row 7.");
 	});
 });

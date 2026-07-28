@@ -11,8 +11,8 @@ describe("createResidentRowSlotAllocator", () => {
 		});
 
 		expect(allocator.capacity).toBe(20);
-		expect(allocator.resolveSlotIndex(100)).toBe(0);
-		expect(allocator.resolveSlotIndex(119)).toBe(19);
+		expect(allocator.resolveSlotLease(100)?.rowSlotIndex).toBe(0);
+		expect(allocator.resolveSlotLease(119)?.rowSlotIndex).toBe(19);
 		const retainedLease = allocator.resolveSlotLease(101);
 
 		const shifted = allocator.prepareRange({
@@ -20,7 +20,7 @@ describe("createResidentRowSlotAllocator", () => {
 			end: 121,
 			layoutRevision: "four-columns",
 		});
-		expect(allocator.resolveSlotIndex(120)).toBe(0);
+		expect(allocator.resolveSlotLease(120)?.rowSlotIndex).toBe(0);
 		expect(allocator.resolveSlotLease(101)).toBe(retainedLease);
 		expect(allocator.resolveSlotLease(120)?.rowSlotGeneration).toBeGreaterThan(1);
 		expect(shifted.revision).toBe(initial.revision + 1);
@@ -55,7 +55,7 @@ describe("createResidentRowSlotAllocator", () => {
 		allocator.prepareRange({ start: 10, end: 17, layoutRevision: "layout" });
 		expect(allocator.capacity).toBe(7);
 		expect(allocator.epoch).toBe(previousEpoch);
-		expect(allocator.resolveSlotIndex(10)).toBe(0);
+		expect(allocator.resolveSlotLease(10)?.rowSlotIndex).toBe(0);
 	});
 
 	it("does not compact after sustained substantial under-utilization", () => {
@@ -84,9 +84,25 @@ describe("createResidentRowSlotAllocator", () => {
 		expect(allocator.capacity).toBe(4);
 		expect(
 			[3, 4, 5, 6]
-				.map((rowIndex) => allocator.resolveSlotIndex(rowIndex))
+				.map((rowIndex) => {
+					const lease = allocator.resolveSlotLease(rowIndex);
+					if (!lease) throw new Error(`Missing lease for row ${rowIndex}.`);
+					return lease.rowSlotIndex;
+				})
 				.sort((left, right) => left - right),
 		).toEqual([0, 1, 2, 3]);
+	});
+
+	it("does not resolve unassigned rows before prepare, outside the range, or after dispose", () => {
+		const allocator = createResidentRowSlotAllocator();
+
+		expect(allocator.resolveSlotLease(0)).toBeUndefined();
+		allocator.prepareRange({ start: 10, end: 12, layoutRevision: "layout" });
+		expect(allocator.resolveSlotLease(9)).toBeUndefined();
+		expect(allocator.resolveSlotLease(12)).toBeUndefined();
+
+		allocator.dispose();
+		expect(allocator.resolveSlotLease(10)).toBeUndefined();
 	});
 
 	it("advances slot generation on owner change and pool epoch on layout reset", () => {

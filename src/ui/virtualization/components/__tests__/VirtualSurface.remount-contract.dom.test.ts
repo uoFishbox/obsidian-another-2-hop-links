@@ -77,7 +77,11 @@ function buildRowCellsWithSlotReuse(
 	for (let r = 0; r < mountedRows; r += 1) {
 		const rowIndex = rowStart + r;
 
-		const slotIndex = allocator.resolveSlotIndex(rowIndex);
+		const slotLease = allocator.resolveSlotLease(rowIndex);
+		if (!slotLease) {
+			throw new Error(`No resident slot assigned for row ${rowIndex}.`);
+		}
+		const slotIndex = slotLease.rowSlotIndex;
 
 		const rowCells: TestMountedCell[] = [];
 		for (let c = 0; c < COLUMNS; c += 1) {
