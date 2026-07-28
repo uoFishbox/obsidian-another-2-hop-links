@@ -33,6 +33,12 @@ import type {
 	LayoutRevision,
 	TwoHopLayoutPublication,
 } from "features/two-hop/ui/twoHopRevisions";
+import {
+	createMutableVirtualRanges,
+	resolveVirtualRangesInto,
+	resolveVisibleRange,
+	type ResolveVirtualRangesParams,
+} from "ui/virtualization/virtualRanges";
 
 export type TwoHopLogicalCell =
 	| (Extract<VirtualListLogicalCell<TwoHopVirtualListItem>, { kind: "header" }> & {
@@ -58,14 +64,6 @@ type StableScrollTopBandMutable = {
 	max: number;
 };
 
-interface ResolveRangesParams {
-	readonly scrollTop: number;
-	readonly viewportHeight: number;
-	readonly mountedOverscanPx: number;
-	readonly previewOverscanPx?: number;
-	readonly mounted?: RowRange;
-}
-
 /** Adapts the compact TwoHop document geometry to the shared virtual-list engine. */
 export function createTwoHopVirtualRowModel(
 	document: TwoHopDocument,
@@ -73,8 +71,6 @@ export function createTwoHopVirtualRowModel(
 ): TwoHopVirtualRowModel {
 	const layout: ViewPlanLayoutMetrics = layoutPublication.metrics;
 	const geometry = compileFixedGridLayout(document, layout);
-	const mountedScratch: RowRange = { start: 0, end: 0 };
-	const previewScratch: RowRange = { start: 0, end: 0 };
 
 	const getDocumentSection = (rowIndex: number): TwoHopDocumentSection | null => {
 		const sectionIndex = resolveSectionIndexForRow(geometry, rowIndex);
@@ -103,7 +99,7 @@ export function createTwoHopVirtualRowModel(
 		return createTwoHopLogicalCell(resolved);
 	};
 
-	const writeVisibleRange = (
+	const writeVisibleRangeInto = (
 		out: RowRange,
 		scrollTop: number,
 		viewportHeight: number,
@@ -134,38 +130,10 @@ export function createTwoHopVirtualRowModel(
 		);
 	};
 
-	const writeRanges = (out: VirtualRanges, params: ResolveRangesParams): void => {
-		const mountedOverscanPx = Math.max(0, params.mountedOverscanPx);
-		const previewOverscanPx = Math.min(
-			mountedOverscanPx,
-			Math.max(0, params.previewOverscanPx ?? 0),
-		);
-
-		if (params.mounted) {
-			out.mounted.start = params.mounted.start;
-			out.mounted.end = params.mounted.end;
-		} else {
-			writeVisibleRange(
-				out.mounted,
-				params.scrollTop,
-				params.viewportHeight,
-				mountedOverscanPx,
-			);
-		}
-
-		if (previewOverscanPx >= mountedOverscanPx) {
-			out.previewVisible.start = out.mounted.start;
-			out.previewVisible.end = out.mounted.end;
-			return;
-		}
-
-		writeVisibleRange(
-			out.previewVisible,
-			params.scrollTop,
-			params.viewportHeight,
-			previewOverscanPx,
-		);
-	};
+	const resolveMountedAndPreviewRangesInto = (
+		out: VirtualRanges,
+		params: ResolveVirtualRangesParams,
+	): VirtualRanges => resolveVirtualRangesInto(out, params, writeVisibleRangeInto);
 
 	const writeStableBand = (
 		out: StableScrollTopBandMutable,
@@ -325,17 +293,10 @@ export function createTwoHopVirtualRowModel(
 		getRowTop: (rowIndex) => resolveTwoHopRowTop(geometry, rowIndex),
 		getRowEnd: (rowIndex) =>
 			resolveTwoHopRowTop(geometry, rowIndex) + geometry.rowHeight,
-		findVisibleRange(params) {
-			writeVisibleRange(
-				mountedScratch,
-				params.scrollTop,
-				params.viewportHeight,
-				params.overscanPx,
-			);
-			return { ...mountedScratch };
-		},
+		findVisibleRange: (params) =>
+			resolveVisibleRange(writeVisibleRangeInto, params),
 		findVisibleRangeInto: (out, params) => {
-			writeVisibleRange(
+			writeVisibleRangeInto(
 				out,
 				params.scrollTop,
 				params.viewportHeight,
@@ -343,23 +304,23 @@ export function createTwoHopVirtualRowModel(
 			);
 		},
 		findVisibleRanges(params) {
-			const ranges: VirtualRanges = {
-				mounted: { start: 0, end: 0 },
-				previewVisible: { start: 0, end: 0 },
-			};
-			writeRanges(ranges, params);
-			return ranges;
+			return resolveMountedAndPreviewRangesInto(createMutableVirtualRanges(), {
+				...params,
+				reuseMountedReference: true,
+			});
 		},
-		findVisibleRangesInto: (out, params) => writeRanges(out, params),
+		findVisibleRangesInto: (out, params) => {
+			resolveMountedAndPreviewRangesInto(out, params);
+		},
 		findVisibleRangesFromMounted(params) {
-			const ranges: VirtualRanges = {
-				mounted: { ...params.mounted },
-				previewVisible: { start: 0, end: 0 },
-			};
-			writeRanges(ranges, params);
-			return ranges;
+			return resolveMountedAndPreviewRangesInto(createMutableVirtualRanges(), {
+				...params,
+				reuseMountedReference: true,
+			});
 		},
-		findVisibleRangesFromMountedInto: (out, params) => writeRanges(out, params),
+		findVisibleRangesFromMountedInto: (out, params) => {
+			resolveMountedAndPreviewRangesInto(out, params);
+		},
 		findStableMountedScrollTopBandInto: (out, params) =>
 			writeStableBand(
 				out,

@@ -371,6 +371,71 @@ describe("TwoHopDocument fixed-grid geometry", () => {
 		expect(afterCoverageEnd).toEqual({ start: 0, end: 2 });
 	});
 
+	it("uses the shared mounted and preview range composition semantics", () => {
+		const items = Array.from({ length: 30 }, (_, index) =>
+			createItem(String(index)),
+		);
+		const document = createTwoHopDocument({
+			sections: [createSection("first", items)],
+			visibleCounts: {},
+			initialVisibleCount: items.length,
+		});
+		const rowModel = createTwoHopVirtualRowModel(
+			document,
+			createLayoutPublication(layout, 1),
+		);
+		const window = {
+			scrollTop: 220,
+			viewportHeight: 100,
+			mountedOverscanPx: 110,
+		};
+
+		const rangesWithNonFinitePreview = rowModel.findVisibleRanges?.({
+			...window,
+			previewOverscanPx: Number.NaN,
+		});
+		expect(rangesWithNonFinitePreview?.previewVisible).toEqual(
+			rowModel.findVisibleRange({
+				scrollTop: window.scrollTop,
+				viewportHeight: window.viewportHeight,
+				overscanPx: 0,
+			}),
+		);
+
+		const equalOverscanRanges = rowModel.findVisibleRanges?.({
+			...window,
+			previewOverscanPx: window.mountedOverscanPx,
+		});
+		expect(equalOverscanRanges?.previewVisible).toBe(equalOverscanRanges?.mounted);
+
+		const mounted = { start: 2, end: 5 };
+		const rangesFromMounted = rowModel.findVisibleRangesFromMounted?.({
+			...window,
+			mounted,
+			previewOverscanPx: window.mountedOverscanPx,
+		});
+		expect(rangesFromMounted?.mounted).toBe(mounted);
+		expect(rangesFromMounted?.previewVisible).toBe(mounted);
+
+		const mountedScratch = { start: -1, end: -1 };
+		const previewScratch = { start: -1, end: -1 };
+		const rangesScratch = {
+			mounted: mountedScratch,
+			previewVisible: previewScratch,
+		};
+		rowModel.findVisibleRangesFromMountedInto(rangesScratch, {
+			...window,
+			mounted,
+			previewOverscanPx: window.mountedOverscanPx,
+		});
+		expect(rangesScratch).toEqual({
+			mounted,
+			previewVisible: mounted,
+		});
+		expect(rangesScratch.mounted).toBe(mountedScratch);
+		expect(rangesScratch.previewVisible).toBe(previewScratch);
+	});
+
 	it("resolves keyboard navigation from row-model geometry", () => {
 		const document = createTwoHopDocument({
 			sections: [
