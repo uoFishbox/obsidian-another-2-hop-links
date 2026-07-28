@@ -340,38 +340,109 @@ export function resolveSectionIndexForRow(
 	return -1;
 }
 
+/**
+ * Finds the first row whose bottom exceeds the viewport top.
+ *
+ * Binary-searches section tops by pixel offset (O(log sectionCount)) and
+ * resolves the row within the section arithmetically (O(1)), avoiding the
+ * previous O(log rowCount × log sectionCount) nested binary search that
+ * called resolveTwoHopRowTop (and thus resolveSectionIndexForRow) per step.
+ */
 function resolveFirstRowEndingAfter(geometry: TwoHopGeometry, offset: number): number {
-	let low = 0;
-	let high = geometry.rowCount;
+	const pixelTarget = offset - geometry.rowHeight;
+	const sectionCount = geometry.topBySection.length;
 
+	let low = 0;
+	let high = sectionCount;
 	while (low < high) {
-		const middle = (low + high) >>> 1;
-		const rowBottom = resolveTwoHopRowTop(geometry, middle) + geometry.rowHeight;
-		if (rowBottom <= offset) {
-			low = middle + 1;
+		const mid = (low + high) >>> 1;
+		const lastRowTopInSection =
+			geometry.topBySection[mid] +
+			(geometry.rowCountBySection[mid] - 1) * geometry.rowStride;
+		if (lastRowTopInSection <= pixelTarget) {
+			low = mid + 1;
 		} else {
-			high = middle;
+			high = mid;
 		}
 	}
 
-	return low;
+	if (low >= sectionCount) return geometry.rowCount;
+
+	const sectionIndex = low;
+	const sectionTop = geometry.topBySection[sectionIndex];
+	const rowsInSection = geometry.rowCountBySection[sectionIndex];
+
+	let rowInSection = Math.max(
+		0,
+		Math.floor((pixelTarget - sectionTop) / geometry.rowStride) + 1,
+	);
+	rowInSection = Math.min(rowInSection, rowsInSection - 1);
+
+	// Absorb floating-point rounding from the division by verifying against
+	// the exact same multiplication used by resolveTwoHopRowTop.
+	if (rowInSection < rowsInSection - 1) {
+		const candidateBottom =
+			sectionTop + rowInSection * geometry.rowStride + geometry.rowHeight;
+		if (candidateBottom <= offset) rowInSection += 1;
+	}
+	if (rowInSection > 0) {
+		const prevBottom =
+			sectionTop + (rowInSection - 1) * geometry.rowStride + geometry.rowHeight;
+		if (prevBottom > offset) rowInSection -= 1;
+	}
+
+	return geometry.firstRowBySection[sectionIndex] + rowInSection;
 }
 
+/**
+ * Finds the first row whose top is at or above the viewport bottom.
+ *
+ * Binary-searches section tops by pixel offset (O(log sectionCount)) and
+ * resolves the row within the section arithmetically (O(1)), avoiding the
+ * previous O(log rowCount × log sectionCount) nested binary search.
+ */
 function resolveFirstRowStartingAtOrAfter(
 	geometry: TwoHopGeometry,
 	offset: number,
 ): number {
-	let low = 0;
-	let high = geometry.rowCount;
+	const sectionCount = geometry.topBySection.length;
 
+	let low = 0;
+	let high = sectionCount;
 	while (low < high) {
-		const middle = (low + high) >>> 1;
-		if (resolveTwoHopRowTop(geometry, middle) < offset) {
-			low = middle + 1;
+		const mid = (low + high) >>> 1;
+		const lastRowTopInSection =
+			geometry.topBySection[mid] +
+			(geometry.rowCountBySection[mid] - 1) * geometry.rowStride;
+		if (lastRowTopInSection < offset) {
+			low = mid + 1;
 		} else {
-			high = middle;
+			high = mid;
 		}
 	}
 
-	return low;
+	if (low >= sectionCount) return geometry.rowCount;
+
+	const sectionIndex = low;
+	const sectionTop = geometry.topBySection[sectionIndex];
+	const rowsInSection = geometry.rowCountBySection[sectionIndex];
+
+	let rowInSection = Math.max(
+		0,
+		Math.ceil((offset - sectionTop) / geometry.rowStride),
+	);
+	rowInSection = Math.min(rowInSection, rowsInSection - 1);
+
+	// Absorb floating-point rounding from the division by verifying against
+	// the exact same multiplication used by resolveTwoHopRowTop.
+	if (rowInSection < rowsInSection - 1) {
+		const candidateTop = sectionTop + rowInSection * geometry.rowStride;
+		if (candidateTop < offset) rowInSection += 1;
+	}
+	if (rowInSection > 0) {
+		const prevTop = sectionTop + (rowInSection - 1) * geometry.rowStride;
+		if (prevTop >= offset) rowInSection -= 1;
+	}
+
+	return geometry.firstRowBySection[sectionIndex] + rowInSection;
 }
