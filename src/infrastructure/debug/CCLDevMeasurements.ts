@@ -185,6 +185,32 @@ export function recordCCLDevMeasurement(name: CCLDevMeasurementName): void {
 	counter.lastUpdatedAt = nowIsoString();
 }
 
+/**
+ * Records `count` occurrences in a single call, generating only one
+ * timestamp. Prefer this over a loop of `recordCCLDevMeasurement` when the
+ * delta is known up front to avoid repeated Date/ISO allocation.
+ */
+export function recordCCLDevMeasurementCount(
+	name: CCLDevMeasurementName,
+	count: number,
+): void {
+	if (process.env.NODE_ENV === "production" || count <= 0) {
+		return;
+	}
+
+	const counter = counters.get(name);
+	if (!counter) {
+		counters.set(name, {
+			count,
+			lastUpdatedAt: nowIsoString(),
+		});
+		return;
+	}
+
+	counter.count += count;
+	counter.lastUpdatedAt = nowIsoString();
+}
+
 export function getCCLDevMeasurementSnapshot(): CCLDevMeasurementSnapshot {
 	const snapshot = {} as Record<CCLDevMeasurementName, CCLDevMeasurementCounter>;
 

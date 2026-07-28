@@ -253,6 +253,16 @@ function resolveMountedCell(params: {
 	};
 }
 
+/**
+ * Derives a cell-level lease from the owning row lease.
+ *
+ * The returned token inherits the row's `slotGeneration` — it does **not**
+ * advance independently when only the cell owner changes (e.g. `load-more →
+ * item` within the same logical row). Consumers that need to detect cell-owner
+ * transitions must additionally compare the cell's logical key
+ * (`MountedVirtualCell.key`) or publication revision; the lease alone is
+ * insufficient for that purpose.
+ */
 function createCellLease(
 	rowLease: ResidentSlotLeaseToken,
 	renderSlotIndex: number,

@@ -1,4 +1,7 @@
-import { recordCCLDevMeasurement } from "infrastructure/debug/CCLDevMeasurements";
+import {
+	recordCCLDevMeasurement,
+	recordCCLDevMeasurementCount,
+} from "infrastructure/debug/CCLDevMeasurements";
 import type { ResidentSlotLeaseToken, ResidentSlotPoolId } from "./residentSlotBinding";
 
 export type ResidentSlotResetReason = "empty" | "layout" | "source";
@@ -45,7 +48,6 @@ export function createResidentRowSlotAllocator(): ResidentRowSlotAllocator {
 	let hasActiveRange = false;
 	let disposed = false;
 	const logicalRowToSlot = new Map<number, number>();
-	const slotToLogicalRow: Array<number | undefined> = [];
 	const slotGenerations: number[] = [];
 	const leasesBySlot: Array<ResidentSlotLeaseToken | undefined> = [];
 	const freeSlotIndices = new Set<number>();
@@ -59,7 +61,6 @@ export function createResidentRowSlotAllocator(): ResidentRowSlotAllocator {
 		activeEnd = 0;
 		hasActiveRange = false;
 		logicalRowToSlot.clear();
-		slotToLogicalRow.length = 0;
 		slotGenerations.length = 0;
 		leasesBySlot.length = 0;
 		freeSlotIndices.clear();
@@ -99,7 +100,6 @@ export function createResidentRowSlotAllocator(): ResidentRowSlotAllocator {
 		for (const [logicalRowIndex, slotIndex] of logicalRowToSlot) {
 			if (logicalRowIndex >= start && logicalRowIndex < end) continue;
 			logicalRowToSlot.delete(logicalRowIndex);
-			slotToLogicalRow[slotIndex] = undefined;
 			leavingSlotIndices.push(slotIndex);
 		}
 
@@ -135,16 +135,16 @@ export function createResidentRowSlotAllocator(): ResidentRowSlotAllocator {
 		hasActiveRange = true;
 		revision += 1;
 		publication = createPublication();
-		for (let index = 0; index < changedSlotCount; index += 1) {
-			recordCCLDevMeasurement("virtualGrid.residentSlotPool.changedSlots");
-		}
+		recordCCLDevMeasurementCount(
+			"virtualGrid.residentSlotPool.changedSlots",
+			changedSlotCount,
+		);
 		return publication;
 	}
 
 	function allocateSlot(): number {
 		const slotIndex = capacity;
 		capacity += 1;
-		slotToLogicalRow.push(undefined);
 		slotGenerations.push(0);
 		leasesBySlot.push(undefined);
 		return slotIndex;
@@ -170,7 +170,6 @@ export function createResidentRowSlotAllocator(): ResidentRowSlotAllocator {
 			slotIndex,
 			slotGeneration,
 		});
-		slotToLogicalRow[slotIndex] = logicalRowIndex;
 		logicalRowToSlot.set(logicalRowIndex, slotIndex);
 	}
 

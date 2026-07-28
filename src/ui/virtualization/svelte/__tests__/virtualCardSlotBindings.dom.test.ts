@@ -360,4 +360,61 @@ describe("virtualCardSlotBindings", () => {
 		);
 		expect(bindings.getSlotState(refreshed)?.binding?.cardModel).toBe("retained:2");
 	});
+
+	it("re-executes the resolver when poolId differs despite identical key, generation, and publication", () => {
+		const resolver = vi.fn((mountedCell: TestMountedCell) => ({
+			mountedCell,
+			cardModel: mountedCell.label,
+		}));
+		const bindings = createVirtualCardSlotBindings({
+			previewSurface: createPreviewSurface(),
+			interactionController: createVirtualCardInteractionController(),
+			resolveSlotLease: (mountedCell) => mountedCell.slotLease,
+			resolvePublicationRevision: (mountedCell) =>
+				mountedCell.publicationRevision,
+			resolveBinding: resolver,
+		});
+		const initial = createMountedCell(0, 0, "same-key", 1);
+		bindings.sync({
+			mountedCells: [initial],
+			bindingIdentity: resolver,
+			previewWindow: { previewRange: { start: 0, end: 1 }, active: true },
+		});
+		expect(resolver).toHaveBeenCalledTimes(1);
+
+		// Same key, same slotIndex, same epoch, same generation, same publication
+		// — only poolId differs (simulates a new allocator instance).
+		const foreignPoolId = Object.freeze({}) as ResidentSlotPoolId;
+		const foreignCell: TestMountedCell = {
+			key: logicalCellKey("same-key"),
+			renderSlotKey: renderSlotKey(0),
+			renderSlotIndex: 0,
+			cellSlotKey: 0,
+			rowIndex: 0,
+			columnIndex: 0,
+			label: "same-key",
+			publicationRevision: 1,
+			slotLease: Object.freeze({
+				poolId: foreignPoolId,
+				poolEpoch: 0,
+				slotIndex: 0,
+				slotGeneration: 1,
+			}),
+		};
+
+		bindings.sync({
+			mountedCells: [foreignCell],
+			bindingIdentity: resolver,
+			previewWindow: { previewRange: { start: 0, end: 1 }, active: true },
+		});
+
+		expect(resolver).toHaveBeenCalledTimes(2);
+		expect(bindings.getSlotState(initial)).toBeUndefined();
+		expect(bindings.getSlotState(foreignCell)?.binding?.mountedCell).toBe(
+			foreignCell,
+		);
+		expect(bindings.getSlotState(foreignCell)?.binding?.bindingToken.poolId).toBe(
+			foreignPoolId,
+		);
+	});
 });

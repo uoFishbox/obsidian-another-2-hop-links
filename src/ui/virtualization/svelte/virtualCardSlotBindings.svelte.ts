@@ -13,7 +13,10 @@ import type {
 } from "ui/interactions/virtualCardInteractionController";
 import type { MountedVirtualCell } from "ui/virtualization/types";
 import type { ResidentSlotLeaseToken } from "ui/virtualization/core/residentSlotBinding";
-import { recordCCLDevMeasurement } from "infrastructure/debug/CCLDevMeasurements";
+import {
+	recordCCLDevMeasurement,
+	recordCCLDevMeasurementCount,
+} from "infrastructure/debug/CCLDevMeasurements";
 
 /** Display, preview, and interaction data owned by one physical render slot. */
 export interface VirtualCardSlotBinding<
@@ -216,12 +219,14 @@ export function createVirtualCardSlotBindings<
 
 		if (process.env.NODE_ENV !== "production") {
 			recordCCLDevMeasurement("twoHop.cardSlotBindings.sync");
-			for (let i = 0; i < params.mountedCells.length; i++) {
-				recordCCLDevMeasurement("twoHop.cardSlotBindings.scannedSlots");
-			}
-			for (let i = 0; i < changedSlotCount; i++) {
-				recordCCLDevMeasurement("twoHop.cardSlotBindings.changedSlots");
-			}
+			recordCCLDevMeasurementCount(
+				"twoHop.cardSlotBindings.scannedSlots",
+				params.mountedCells.length,
+			);
+			recordCCLDevMeasurementCount(
+				"twoHop.cardSlotBindings.changedSlots",
+				changedSlotCount,
+			);
 		}
 	};
 
