@@ -23,8 +23,8 @@ export interface VirtualSurfaceMountedRow<TMountedCell extends MountedVirtualCel
 /**
  * Reactive view state for one stable physical row slot.
  *
- * The containing array remains stable while capacity is unchanged. Adapters
- * replace only `row` when the logical row bound to this slot changes.
+ * The containing array remains stable while the active slot set is unchanged.
+ * Adapters replace only `row` when the logical row bound to this slot changes.
  */
 export interface VirtualSurfaceResidentRowViewState<
 	TMountedCell extends MountedVirtualCell,

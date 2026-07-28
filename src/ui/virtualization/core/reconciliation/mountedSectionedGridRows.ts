@@ -38,7 +38,11 @@ export interface MountedSectionedGridRows<
 	readonly cells: TCell[];
 	readonly reusableCellsByKey: Map<string, TCell>;
 	readonly rowSlices: TRow[];
+	readonly occupiedRowsInSlotOrder: TRow[];
+	/** @deprecated Use `occupiedRowsInSlotOrder`. */
 	readonly rowsBySlot: TRow[];
+	readonly cellSlotCapacity: number;
+	/** @deprecated Use `cellSlotCapacity`. */
 	readonly nextRenderSlotIndex: number;
 }
 
@@ -143,12 +147,14 @@ export function buildMountedSectionedGridRows<
 		);
 	}
 
-	const sparseRowsBySlot: Array<TRow | undefined> = new Array(params.slotCapacity);
-	for (const row of rowSlices) sparseRowsBySlot[row.slotIndex] = row;
-	const rowsBySlot: TRow[] = [];
-	for (const row of sparseRowsBySlot) {
-		if (row) rowsBySlot.push(row);
-	}
+	const occupiedRowsInSlotOrder = [...rowSlices].sort(
+		(left, right) => left.slotIndex - right.slotIndex,
+	);
+	assertMountedSectionedGridRows({
+		rows: occupiedRowsInSlotOrder,
+		slotCapacity: params.slotCapacity,
+		columns,
+	});
 
 	const getCells = (): TCell[] => {
 		if (flattenedCells) return flattenedCells;
@@ -171,9 +177,56 @@ export function buildMountedSectionedGridRows<
 			return getReusableCellsByKey();
 		},
 		rowSlices,
-		rowsBySlot,
+		occupiedRowsInSlotOrder,
+		rowsBySlot: occupiedRowsInSlotOrder,
+		cellSlotCapacity: params.slotCapacity * columns,
 		nextRenderSlotIndex: params.slotCapacity * columns,
 	};
+}
+
+function assertMountedSectionedGridRows<
+	TCell extends SectionedGridMountedCell,
+	TRow extends SectionedGridMountedRow<TCell>,
+>(params: {
+	readonly rows: readonly TRow[];
+	readonly slotCapacity: number;
+	readonly columns: number;
+}): void {
+	if (process.env.NODE_ENV === "production") return;
+
+	const logicalRows = new Set<number>();
+	const rowSlots = new Set<number>();
+	const cellSlots = new Set<number>();
+	for (const row of params.rows) {
+		if (logicalRows.has(row.rowIndex)) {
+			throw new Error(`Duplicate mounted logical row: ${row.rowIndex}.`);
+		}
+		if (
+			row.slotIndex < 0 ||
+			row.slotIndex >= params.slotCapacity ||
+			rowSlots.has(row.slotIndex)
+		) {
+			throw new Error(`Invalid or duplicate mounted row slot: ${row.slotIndex}.`);
+		}
+		logicalRows.add(row.rowIndex);
+		rowSlots.add(row.slotIndex);
+
+		for (const cellSlot of row.cellSlots) {
+			const expectedSlotIndex =
+				row.slotIndex * params.columns + cellSlot.columnIndex;
+			if (
+				cellSlot.renderSlotIndex !== expectedSlotIndex ||
+				cellSlot.renderSlotIndex < 0 ||
+				cellSlot.renderSlotIndex >= params.slotCapacity * params.columns ||
+				cellSlots.has(cellSlot.renderSlotIndex)
+			) {
+				throw new Error(
+					`Invalid or duplicate mounted cell slot: ${cellSlot.renderSlotIndex}.`,
+				);
+			}
+			cellSlots.add(cellSlot.renderSlotIndex);
+		}
+	}
 }
 
 function hasMatchingCellSlots<

@@ -16,6 +16,8 @@
 		linkContext: LinkContext;
 		previewDependencies?: TwoHopPreviewDependencies;
 		previewActive?: boolean;
+		initialVisibleCount?: number;
+		loadMoreIncrement?: number;
 		resolveItemCardModel: (
 			item: TwoHopVirtualListItem,
 			presentation: TwoHopCardPresentationState,
@@ -28,6 +30,8 @@
 		linkContext,
 		previewDependencies = undefined,
 		previewActive = true,
+		initialVisibleCount = sections[0]?.totalCount,
+		loadMoreIncrement = undefined,
 		resolveItemCardModel,
 	}: Props = $props();
 	setLinkContext(linkContext);
@@ -36,7 +40,8 @@
 <TwoHopSurface
 	{sections}
 	{applicationStore}
-	initialVisibleCount={sections[0]?.totalCount}
+	{initialVisibleCount}
+	{loadMoreIncrement}
 	{resolveItemCardModel}
 	{previewDependencies}
 	{previewActive}

@@ -97,10 +97,14 @@ describe("TwoHop keyed mounted rows", () => {
 			rowSlotAllocator: allocator,
 		});
 
-		const firstPhysicalRow = first.rowsBySlot.find((row) => row.slotIndex === 0);
-		const jumpedPhysicalRow = jumped.rowsBySlot.find((row) => row.slotIndex === 0);
+		const firstPhysicalRow = first.occupiedRowsInSlotOrder.find(
+			(row) => row.slotIndex === 0,
+		);
+		const jumpedPhysicalRow = jumped.occupiedRowsInSlotOrder.find(
+			(row) => row.slotIndex === 0,
+		);
 		expect(firstPhysicalRow?.rowIndex).toBe(0);
-		expect(jumpedPhysicalRow?.rowIndex).toBe(6);
+		expect(jumpedPhysicalRow?.rowIndex).toBe(5);
 		expect(jumpedPhysicalRow?.slotKey).toBe(firstPhysicalRow?.slotKey);
 		expect(jumpedPhysicalRow?.cells[0].cellSlotKey).toBe(
 			firstPhysicalRow?.cells[0].cellSlotKey,
@@ -108,7 +112,7 @@ describe("TwoHop keyed mounted rows", () => {
 		expect(jumpedPhysicalRow?.cells[0].renderBodyKey).not.toBe(
 			firstPhysicalRow?.cells[0].renderBodyKey,
 		);
-		expect(jumped.nextRenderSlotIndex).toBe(first.nextRenderSlotIndex);
+		expect(jumped.cellSlotCapacity).toBe(first.cellSlotCapacity);
 		expect(jumped.cells).toHaveLength(4);
 	});
 
@@ -139,6 +143,41 @@ describe("TwoHop keyed mounted rows", () => {
 		).toBe(first);
 	});
 
+	it("rebuilds row and cell leases after an allocator reset", () => {
+		const document = createTwoHopDocument({
+			sections: [createSection(20)],
+			visibleCounts: {},
+			initialVisibleCount: 20,
+		});
+		const rowModel = createTwoHopVirtualRowModel(
+			document,
+			createLayoutPublication(layout, 1),
+		);
+		const allocator = createResidentRowSlotAllocator();
+		const first = buildTwoHopMountedRows({
+			rowModel,
+			rowRange: { start: 1, end: 5 },
+			rowSlotAllocator: allocator,
+		});
+		const firstCellLease = first.cells[0]?.slotLease;
+
+		allocator.reset("source");
+		const rebuilt = buildTwoHopMountedRows({
+			rowModel,
+			rowRange: { start: 1, end: 5 },
+			previousBuild: first,
+			rowSlotAllocator: allocator,
+		});
+
+		expect(rebuilt).not.toBe(first);
+		expect(rebuilt.slotPool.poolEpoch).toBeGreaterThan(first.slotPool.poolEpoch);
+		expect(rebuilt.rowSlices[0]).not.toBe(first.rowSlices[0]);
+		expect(rebuilt.cells[0]?.slotLease.poolEpoch).toBe(rebuilt.slotPool.poolEpoch);
+		expect(rebuilt.cells[0]?.slotLease.poolEpoch).toBeGreaterThan(
+			firstCellLease?.poolEpoch ?? 0,
+		);
+	});
+
 	it("orders resident rows by physical slot without exposing pool holes", () => {
 		const document = createTwoHopDocument({
 			sections: [createSection(200)],
@@ -163,8 +202,10 @@ describe("TwoHop keyed mounted rows", () => {
 		});
 
 		expect(shifted.rowSlices.map((row) => row.slotIndex)).toEqual([1, 2, 0]);
-		expect(shifted.rowsBySlot.map((row) => row.slotIndex)).toEqual([0, 1, 2]);
-		expect(shifted.rowsBySlot).toHaveLength(shifted.rowSlices.length);
+		expect(shifted.occupiedRowsInSlotOrder.map((row) => row.slotIndex)).toEqual([
+			0, 1, 2,
+		]);
+		expect(shifted.occupiedRowsInSlotOrder).toHaveLength(shifted.rowSlices.length);
 		expect(shifted.rowSlices[0]).toBe(initial.rowSlices[1]);
 		expect(shifted.rowSlices[1]).toBe(initial.rowSlices[2]);
 	});
@@ -227,11 +268,11 @@ describe("TwoHop keyed mounted rows", () => {
 		});
 
 		expect(allocator.capacity).toBe(4);
-		expect(first.rowsBySlot).toHaveLength(allocator.capacity);
-		expect(shifted.rowsBySlot).toHaveLength(allocator.capacity);
+		expect(first.occupiedRowsInSlotOrder).toHaveLength(allocator.capacity);
+		expect(shifted.occupiedRowsInSlotOrder).toHaveLength(allocator.capacity);
 
-		const changedRows = shifted.rowsBySlot.filter(
-			(row, slotIndex) => row !== first.rowsBySlot[slotIndex],
+		const changedRows = shifted.occupiedRowsInSlotOrder.filter(
+			(row, slotIndex) => row !== first.occupiedRowsInSlotOrder[slotIndex],
 		);
 		expect(changedRows).toHaveLength(1);
 		expect(changedRows[0]?.rowIndex).toBe(5);

@@ -24,6 +24,7 @@ Vault全体のベンチマークは、インデックス作成レイヤーやE2E
 - マウントされるDOM要素の数は、全体の `cardCount` ではなく「マウント範囲」によって制限されること。
 - `renderSlotIndex` は、単一のマウント済みスナップショット内で一意であること。
 - 保持された論理セルは、レイアウトとphysical slot poolのepochが再利用可能な場合、そのレンダースロットを維持すること。
+- slot lease (`poolId`、`poolEpoch`、`slotIndex`、`slotGeneration`)、logical key、publication revisionを別々に比較すること。keyまたはpublicationが変わればbindingを再公開する。
 - `previewVisible` は、 `mounted` の範囲を超えて拡張されないこと。
 - スクロールの測定値は、スクロールのフラッシュごとに1回だけ読み取られ、activeなsubscriberに渡されること。
 - 構造のミューテーションは、同じスクロールコンテナのactive subscriberだけを更新し、他のスクロールコンテナのsubscriberを測定しないこと。
@@ -39,15 +40,18 @@ Vault全体のベンチマークは、インデックス作成レイヤーやE2E
 - physical row/cell shellには位置とslot identityだけを保持する。
 - outer shellはphysical slot keyを維持し、itemの`renderBodyKey`はlogical cardに追従させてrebind時にbodyを更新する。
 - resident windowが同一ならmounted-row buildを同一参照で返し、Svelte state commitとDOM writeを行わない。
-- row slotには共有のarithmetic allocatorを使用し、`rowsBySlot`をresident adapterへ同期する。capacity増加は新しいpool epochであり、保持rowのslot変更を許容する。
+- row slotには共有のfree-list allocatorを使用する。retained rowはslot leaseを維持し、leaving slotは同一transactionのentering rowへrebindする。capacity増加は末尾slotの追加だけで、pool epochを変更しない。
+- allocatorは`poolId`、epoch、revision、capacityだけの軽量publicationを公開し、mounted buildの再利用可否を検証する。row/cellはallocator由来のleaseを参照し、resident/card adapterはpeak capacityではなくactive slotsだけを同期する。
 - preview候補とinteractionはmounted cellsから同期し、`ViewItemCard`は物理slot IDだけを`PreviewHost`へ渡す。
 - item interaction descriptorはphysical slot単位のresolver providerへ同期し、rebind時はentry内容だけを更新する。headerはlogical component lifecycleを使う。
 - load-more bodyは通常のbutton lifecycleを使い、クリック中に同じbodyを別カードへ書き換えない。
 - `TwoHopDocument` と固定grid geometryは全カード分のDOMやcell objectを生成せず、mounted rangeだけをmaterializeする。
 
-契約テストは `features/two-hop/ui/__tests__/TwoHopSurface.svelte.dom.test.ts` と `twoHopMountedRows.test.ts` に置く。`100`/`1,000`/`10,000` cardsと別scroller上の`1`/`8`/`32` surfacesでDOM数がboundedであること、physical slot再利用時にbody keyが変わること、resident hitでbuild identityを維持すること、load-more bodyが新しいlogical cardへremountされることを検証する。
+契約テストは `features/two-hop/ui/__tests__/TwoHopSurface.svelte.dom.test.ts` と `twoHopMountedRows.test.ts` に置く。`100`/`1,000`/`10,000` cardsと別scroller上の`1`/`8`/`32` surfacesでDOM数がboundedであること、physical slot再利用時にbody keyが変わること、resident hitでbuild identityを維持すること、同一キーのpublication更新がcard bindingを再解決すること、load-more bodyが新しいlogical cardへremountされることを検証する。
 
 #### Two-hop row-slot allocator比較（2026-07-26）
+
+> 以下は旧arithmetic allocator採用時の履歴であり、現在の契約ではない。2026-07-28に、publication correctness、capacity増加時のretained-slot churn、peak-capacity依存の走査を解消するためfree-list allocatorへ置き換えた。
 
 Two-hop専用のstable allocatorと、共有arithmetic allocator＋`rowsBySlot`通常同期を比較した。Vitest/jsdom上で4 columns、300連続フレーム、7回測定の中央値を使用した。旧方式には専用allocator、cell deltaの`Map`/`Set`差分、row delta差分、delta適用を含め、新方式には共有allocator、mounted row構築、resident capacity全体の同期を含めた。
 
@@ -65,7 +69,11 @@ Two-hop専用のstable allocatorと、共有arithmetic allocator＋`rowsBySlot`�
 | `32`          | `331`             | `630`             |
 | `96`          | `395`             | `694`             |
 
-新方式はreactive write数を増やす一方、複数の`Map`、`Set`、delta配列の構築を除去することで全体時間を短縮した。capacity増加テストでは共有allocatorにより保持3行のslotがすべて変化したため、capacity増加をpool epoch変更として扱う。この判断は実時間の固定しきい値にはせず、bounded DOM、同一resident windowのidentity維持、同一epoch内のslot一意性を契約テストで維持する。
+当時のarithmetic方式はreactive write数を増やす一方、複数の`Map`、`Set`、delta配列の構築を除去することで測定上の全体時間を短縮した。しかしcapacity増加で保持rowをremapし、通常viewportへ戻った後もpeak capacityに同期コストが依存するため、現在はこの結果をallocator correctnessの根拠には使わない。
+
+#### Free-list allocator counter contract（2026-07-28）
+
+現行allocatorはactive assignment全体のimmutable deltaを生成しない。同一range/layoutは同じ軽量publicationを返し、1行ずつ300フレーム移動する契約テストでは`residentSlotPool.changedSlots`を300回、つまり1フレームにつき1 physical slot変更として記録する。実時間の旧方式比較は別途A/B測定し、このカウンター契約を実時間改善の証明として扱わない。
 
 ## キャッシュ一覧（Cache Inventory）
 

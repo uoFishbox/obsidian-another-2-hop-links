@@ -13,6 +13,7 @@ import {
 import type { MountedVirtualCellsBuild } from "ui/virtualization/core/virtualListEngine";
 import type { RowRange } from "ui/virtualization/rowRange";
 import { renderSlotKey, type MountedVirtualCell } from "ui/virtualization/types";
+import type { ResidentSlotLeaseToken } from "ui/virtualization/core/residentSlotBinding";
 import type { VirtualSurfaceMountedRow } from "ui/virtualization/svelte/VirtualSurfaceTypes";
 import {
 	buildMountedSectionedGridRows,
@@ -21,16 +22,21 @@ import {
 import {
 	createResidentRowSlotAllocator,
 	type ResidentRowSlotAllocator,
+	type ResidentSlotPoolPublication,
 } from "ui/virtualization/core/residentSlotAllocator";
+import type { SectionDataRevision } from "features/two-hop/ui/twoHopRevisions";
 
 export interface TwoHopMountedCell extends MountedVirtualCell {
 	readonly cell: TwoHopLogicalCell;
 	readonly section: TwoHopDocumentSection;
+	readonly publicationRevision: SectionDataRevision;
+	readonly slotLease: ResidentSlotLeaseToken;
 }
 
 export interface TwoHopMountedRow extends VirtualSurfaceMountedRow<TwoHopMountedCell> {
 	readonly slotIndex: number;
 	readonly slotKey: number;
+	readonly slotLease: ResidentSlotLeaseToken;
 	readonly cells: readonly TwoHopMountedCell[];
 	readonly cellSlots: readonly SectionedGridMountedCellSlot<TwoHopMountedCell>[];
 }
@@ -39,7 +45,9 @@ export interface TwoHopMountedRowsBuild extends MountedVirtualCellsBuild<TwoHopM
 	readonly rowModel: TwoHopVirtualRowModel;
 	readonly rowRange: RowRange;
 	readonly rowSlices: readonly TwoHopMountedRow[];
-	readonly rowsBySlot: readonly TwoHopMountedRow[];
+	readonly occupiedRowsInSlotOrder: readonly TwoHopMountedRow[];
+	readonly cellSlotCapacity: number;
+	readonly slotPool: ResidentSlotPoolPublication;
 }
 
 /** Builds bounded physical row/cell shells and exposes both slot and logical body keys. */
@@ -53,28 +61,28 @@ export function buildTwoHopMountedRows(params: {
 	const start = Math.max(0, params.rowRange.start);
 	const end = Math.min(rowModel.rowCount, params.rowRange.end);
 	const previousBuild = params.previousBuild;
-	// Reference equality is only a hot-path cache hit; a miss rebuilds the same
-	// publication and does not participate in slot ownership validation.
-	if (
-		previousBuild?.rowModel === rowModel &&
-		previousBuild.rowRange.start === start &&
-		previousBuild.rowRange.end === end
-	) {
-		return previousBuild;
-	}
-
 	const allocator = params.rowSlotAllocator ?? createResidentRowSlotAllocator();
-	allocator.prepareRange({
+	const slotPool = allocator.prepareRange({
 		start,
 		end,
 		layoutRevision: rowModel.layoutRevision,
 	});
+	if (
+		previousBuild?.rowModel === rowModel &&
+		previousBuild.rowRange.start === start &&
+		previousBuild.rowRange.end === end &&
+		previousBuild.slotPool === slotPool
+	) {
+		return previousBuild;
+	}
+
 	const columns = rowModel.geometry.columns;
 	const rowScratch = createTwoHopResolvedRowBuffer();
 	const cellScratch = createTwoHopResolvedCellBuffer();
 	type TwoHopResolvedMountedRow = {
 		readonly section: TwoHopDocumentSection;
 		readonly rowScratch: ReturnType<typeof createTwoHopResolvedRowBuffer>;
+		readonly rowLease: ResidentSlotLeaseToken;
 	};
 	const mountedRows = buildMountedSectionedGridRows<
 		TwoHopMountedCell,
@@ -87,13 +95,19 @@ export function buildTwoHopMountedRows(params: {
 		resolveSlotIndex: (rowIndex) => allocator.resolveSlotIndex(rowIndex),
 		resolvePreviousRow: (rowIndex) =>
 			getPreviousRow(previousBuild, rowModel, rowIndex),
-		canReusePreviousRow: () => true,
+		canReusePreviousRow: (row) => {
+			const currentLease = allocator.resolveSlotLease(row.rowIndex);
+			return (
+				currentLease !== undefined && hasSameLease(row.slotLease, currentLease)
+			);
+		},
 		resolveRow: (rowIndex) => {
 			if (!resolveTwoHopRowInto(rowModel.geometry, rowIndex, rowScratch)) {
 				return null;
 			}
 			const section = rowModel.document.sections[rowScratch.sectionIndex];
-			if (!section) return null;
+			const rowLease = allocator.resolveSlotLease(rowIndex);
+			if (!section || !rowLease) return null;
 			const sectionCellCount =
 				1 + section.visibleItemCount + (section.loadMore === null ? 0 : 1);
 			const rowCellCount = Math.min(
@@ -107,6 +121,7 @@ export function buildTwoHopMountedRows(params: {
 				metadata: {
 					section,
 					rowScratch,
+					rowLease,
 				},
 			};
 		},
@@ -122,16 +137,18 @@ export function buildTwoHopMountedRows(params: {
 				previous: undefined,
 				logicalCell,
 				section: row.metadata.section,
+				rowLease: row.metadata.rowLease,
 				rowIndex,
 				columnIndex,
 				renderSlotIndex,
 			});
 		},
-		rebindCell: ({ previous, rowIndex, columnIndex, renderSlotIndex }) =>
+		rebindCell: ({ previous, rowIndex, columnIndex, renderSlotIndex, row }) =>
 			resolveMountedCell({
 				previous,
 				logicalCell: previous.cell,
 				section: previous.section,
+				rowLease: row.metadata.rowLease,
 				rowIndex,
 				columnIndex,
 				renderSlotIndex,
@@ -142,6 +159,7 @@ export function buildTwoHopMountedRows(params: {
 			top: row.top,
 			slotIndex,
 			slotKey: slotIndex,
+			slotLease: row.metadata.rowLease,
 			cells,
 			cellSlots,
 		}),
@@ -154,10 +172,12 @@ export function buildTwoHopMountedRows(params: {
 			return mountedRows.reusableCellsByKey;
 		},
 		nextRenderSlotIndex: mountedRows.nextRenderSlotIndex,
+		cellSlotCapacity: mountedRows.cellSlotCapacity,
 		rowModel,
 		rowRange: { start, end },
 		rowSlices: mountedRows.rowSlices,
-		rowsBySlot: mountedRows.rowsBySlot,
+		occupiedRowsInSlotOrder: mountedRows.occupiedRowsInSlotOrder,
+		slotPool,
 	};
 }
 
@@ -195,11 +215,13 @@ function resolveMountedCell(params: {
 	readonly previous: TwoHopMountedCell | undefined;
 	readonly logicalCell: TwoHopLogicalCell;
 	readonly section: TwoHopDocumentSection;
+	readonly rowLease: ResidentSlotLeaseToken;
 	readonly rowIndex: number;
 	readonly columnIndex: number;
 	readonly renderSlotIndex: number;
 }): TwoHopMountedCell {
 	const nextRenderSlotKey = renderSlotKey(params.renderSlotIndex);
+	const slotLease = createCellLease(params.rowLease, params.renderSlotIndex);
 	// Reusing the shell object is optional; stale ownership is never inferred
 	// from this reference identity.
 	if (
@@ -209,7 +231,8 @@ function resolveMountedCell(params: {
 		params.previous.rowIndex === params.rowIndex &&
 		params.previous.columnIndex === params.columnIndex &&
 		params.previous.renderSlotIndex === params.renderSlotIndex &&
-		params.previous.renderSlotKey === nextRenderSlotKey
+		params.previous.renderSlotKey === nextRenderSlotKey &&
+		hasSameLease(params.previous.slotLease, slotLease)
 	) {
 		return params.previous;
 	}
@@ -223,7 +246,33 @@ function resolveMountedCell(params: {
 		renderSlotIndex: params.renderSlotIndex,
 		renderSlotKey: nextRenderSlotKey,
 		cellSlotKey: params.renderSlotIndex,
+		publicationRevision: params.section.sourceRevision,
+		slotLease,
 		// The outer shell is physical-slot keyed; only the body follows this key.
 		renderBodyKey: String(params.logicalCell.key),
 	};
+}
+
+function createCellLease(
+	rowLease: ResidentSlotLeaseToken,
+	renderSlotIndex: number,
+): ResidentSlotLeaseToken {
+	return Object.freeze({
+		poolId: rowLease.poolId,
+		poolEpoch: rowLease.poolEpoch,
+		slotIndex: renderSlotIndex,
+		slotGeneration: rowLease.slotGeneration,
+	});
+}
+
+function hasSameLease(
+	current: ResidentSlotLeaseToken,
+	next: ResidentSlotLeaseToken,
+): boolean {
+	return (
+		current.poolId === next.poolId &&
+		current.poolEpoch === next.poolEpoch &&
+		current.slotIndex === next.slotIndex &&
+		current.slotGeneration === next.slotGeneration
+	);
 }

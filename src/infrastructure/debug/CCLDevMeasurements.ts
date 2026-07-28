@@ -33,6 +33,8 @@ export type CCLDevMeasurementName =
 	| "virtualList.scheduler.unstableRetry.animationFrame"
 	| "virtualGrid.buildMountedRows"
 	| "virtualGrid.contiguousSlotPool.apply"
+	| "virtualGrid.residentSlotPool.rangeHit"
+	| "virtualGrid.residentSlotPool.changedSlots"
 	| "virtualGrid.rowShellCreated"
 	| "virtualGrid.cellShellCreated"
 	| "virtualGrid.cellShellRebound"
@@ -104,6 +106,8 @@ export const CCL_DEV_MEASUREMENT_NAMES: readonly CCLDevMeasurementName[] = [
 	"virtualList.scheduler.unstableRetry.animationFrame",
 	"virtualGrid.buildMountedRows",
 	"virtualGrid.contiguousSlotPool.apply",
+	"virtualGrid.residentSlotPool.rangeHit",
+	"virtualGrid.residentSlotPool.changedSlots",
 	"virtualGrid.rowShellCreated",
 	"virtualGrid.cellShellCreated",
 	"virtualGrid.cellShellRebound",

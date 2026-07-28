@@ -7,6 +7,10 @@ import {
 } from "testing/helpers/DOMObserverMock";
 import VirtualSurfaceRecyclingHarness from "./VirtualSurfaceRecyclingHarness.svelte";
 import type { MountedVirtualCell, LogicalCellKey, RenderSlotKey } from "../../types";
+import {
+	createResidentRowSlotAllocator,
+	type ResidentRowSlotAllocator,
+} from "../../core/residentSlotAllocator";
 
 // ---------------------------------------------------------------------------
 // Test model: grid cells over a fixed row stride
@@ -36,8 +40,7 @@ const TOTAL_ITEMS = 10_000;
 const MOUNTED_ROWS = 9; // 5 visible + 4 overscan (matches engine contract)
 
 // ---------------------------------------------------------------------------
-// Row-slot assignment model — mirrors the reconciliation in
-// linkListVirtualLayout.ts
+// Row-slot assignment uses the production allocator contract.
 // ---------------------------------------------------------------------------
 
 /**
@@ -62,61 +65,19 @@ function buildRowCellsWithSlotReuse(
 ): { cells: TestMountedCell[]; rows: TestRow[] } {
 	const rows: TestRow[] = [];
 	const cells: TestMountedCell[] = [];
-
-	// Collect slots that were used in the previous frame
-	const previousSlotByRow = new Map<number, number>();
-	if (previousRows) {
-		for (const row of previousRows) {
-			previousSlotByRow.set(row.rowIndex, row.slotIndex);
-		}
-	}
-
-	// Identify which slots are still used by retained rows and which are free
-	const retainedSlots = new Set<number>();
-	const allPreviousSlots = new Set<number>();
-	if (previousRows) {
-		for (const row of previousRows) {
-			allPreviousSlots.add(row.slotIndex);
-			if (row.rowIndex >= rowStart && row.rowIndex < rowStart + mountedRows) {
-				retainedSlots.add(row.slotIndex);
-			}
-		}
-	}
-
-	// Free slots = slots used by rows that exited
-	const freeSlots: number[] = [];
-	for (const slot of allPreviousSlots) {
-		if (!retainedSlots.has(slot)) {
-			freeSlots.push(slot);
-		}
-	}
-	freeSlots.sort((a, b) => a - b);
-	let freeSlotOffset = 0;
-
-	// Determine the next fresh slot index
-	let nextSlotIndex = 0;
-	if (previousRows) {
-		for (const row of previousRows) {
-			nextSlotIndex = Math.max(nextSlotIndex, row.slotIndex + 1);
-		}
-	}
+	const allocator =
+		(previousRows && allocatorByRows.get(previousRows)) ??
+		createResidentRowSlotAllocator();
+	allocator.prepareRange({
+		start: rowStart,
+		end: rowStart + mountedRows,
+		layoutRevision: "three-column-contract",
+	});
 
 	for (let r = 0; r < mountedRows; r += 1) {
 		const rowIndex = rowStart + r;
 
-		// Reuse the same slot if the row was present in the previous frame
-		let slotIndex = previousSlotByRow.get(rowIndex);
-		if (slotIndex === undefined) {
-			// Entering row: take a free slot or allocate a new one
-			const free = freeSlots[freeSlotOffset];
-			if (free !== undefined) {
-				freeSlotOffset += 1;
-				slotIndex = free;
-			} else {
-				slotIndex = nextSlotIndex;
-				nextSlotIndex += 1;
-			}
-		}
+		const slotIndex = allocator.resolveSlotIndex(rowIndex);
 
 		const rowCells: TestMountedCell[] = [];
 		for (let c = 0; c < COLUMNS; c += 1) {
@@ -140,8 +101,11 @@ function buildRowCellsWithSlotReuse(
 		rows.push({ slotIndex, rowIndex, top: rowIndex * ROW_STRIDE, cells: rowCells });
 	}
 
+	allocatorByRows.set(rows, allocator);
 	return { cells, rows };
 }
+
+const allocatorByRows = new WeakMap<TestRow[], ResidentRowSlotAllocator>();
 
 // ---------------------------------------------------------------------------
 // Helpers

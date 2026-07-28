@@ -66,46 +66,40 @@ describe("residentRowViewState", () => {
 		>();
 		const initialSlot0 = createRow(0, 10);
 		const retainedSlot1 = createRow(1, 11);
-		adapter.sync([initialSlot0, retainedSlot1], 3);
+		adapter.sync([initialSlot0, retainedSlot1]);
 
 		const residentRows = adapter.rows;
 		const residentSlot0 = residentRows[0];
 		const residentSlot1 = residentRows[1];
 		const replacementSlot0 = createRow(0, 12);
-		adapter.sync([replacementSlot0, retainedSlot1], 3);
+		adapter.sync([replacementSlot0, retainedSlot1]);
 
 		expect(adapter.rows).toBe(residentRows);
 		expect(adapter.rows[0]).toBe(residentSlot0);
 		expect(adapter.rows[1]).toBe(residentSlot1);
 		expect(adapter.rows[0]?.row).toBe(replacementSlot0);
 		expect(adapter.rows[1]?.row).toBe(retainedSlot1);
-		expect(adapter.rows[2]?.row).toBeUndefined();
 	});
 
-	it("preserves holes and recreates the slot array only when capacity changes", () => {
+	it("publishes only active slots and drops peak-capacity holes", () => {
 		const adapter = createVirtualSurfaceResidentRowsAdapter<
 			TestMountedCell,
 			TestMountedRow
 		>();
 		const rowInSlot2 = createRow(2, 20);
-		adapter.sync([rowInSlot2], 3);
+		adapter.sync([rowInSlot2]);
 		const initialRows = adapter.rows;
 
-		expect(initialRows.map((residentRow) => residentRow.row)).toEqual([
-			undefined,
-			undefined,
-			rowInSlot2,
-		]);
+		expect(initialRows).toHaveLength(1);
+		expect(initialRows[0]?.slotIndex).toBe(2);
+		expect(initialRows[0]?.row).toBe(rowInSlot2);
 
-		adapter.sync([], 3);
-		expect(adapter.rows).toBe(initialRows);
-		expect(adapter.rows.every((residentRow) => residentRow.row === undefined)).toBe(
-			true,
-		);
+		adapter.sync([]);
+		const emptyRows = adapter.rows;
+		expect(emptyRows).toHaveLength(0);
 
-		adapter.sync([], 4);
-		expect(adapter.rows).not.toBe(initialRows);
-		expect(adapter.rows).toHaveLength(4);
+		adapter.sync([]);
+		expect(adapter.rows).toBe(emptyRows);
 	});
 
 	it("does not reevaluate retained row expressions when another slot changes", async () => {
@@ -116,7 +110,7 @@ describe("residentRowViewState", () => {
 			TestMountedCell,
 			TestMountedRow
 		>();
-		adapter.sync([initialSlot0, retainedSlot1], 2);
+		adapter.sync([initialSlot0, retainedSlot1]);
 		render(ResidentRowsSurfaceHarness, {
 			props: {
 				residentRows: adapter.rows,
@@ -127,7 +121,7 @@ describe("residentRowViewState", () => {
 		resolveCellClassName.mockClear();
 
 		const replacementSlot0 = createRow(0, 2, "slot-0-replacement");
-		adapter.sync([replacementSlot0, retainedSlot1], 2);
+		adapter.sync([replacementSlot0, retainedSlot1]);
 		await tick();
 
 		expect(resolveCellClassName).toHaveBeenCalled();
@@ -144,7 +138,7 @@ describe("residentRowViewState", () => {
 			TestMountedCell,
 			TestMountedRow
 		>();
-		adapter.sync([createRow(0, 100, "row-100")], 1);
+		adapter.sync([createRow(0, 100, "row-100")]);
 		const { container } = render(ResidentRowsSurfaceHarness, {
 			props: {
 				residentRows: adapter.rows,
@@ -165,7 +159,7 @@ describe("residentRowViewState", () => {
 		expect(previousRowElement).toBeTruthy();
 		expect(previousCellElement).toBeTruthy();
 
-		adapter.sync([createRow(0, 101, "row-101")], 1);
+		adapter.sync([createRow(0, 101, "row-101")]);
 		await tick();
 
 		expect(shadowRoot.querySelector("[data-ccl-row-slot='0']")).toBe(
@@ -185,7 +179,7 @@ describe("residentRowViewState", () => {
 		const registry = createSurfaceVirtualCellRegistry();
 		const onCellMount = vi.fn();
 		const onCellDestroy = vi.fn();
-		adapter.sync([createRow(0, 100, "row-100")], 1);
+		adapter.sync([createRow(0, 100, "row-100")]);
 		const { container } = render(ResidentRowsSurfaceHarness, {
 			props: {
 				residentRows: adapter.rows,
@@ -208,7 +202,7 @@ describe("residentRowViewState", () => {
 		expect(onCellMount).toHaveBeenCalledTimes(1);
 		expect(registry.findByKey("row-100")).toBe(cellShell);
 
-		adapter.sync([createRow(0, 101)], 1);
+		adapter.sync([createRow(0, 101)]);
 		await tick();
 
 		expect(shadowRoot?.querySelector("[data-ccl-cell-slot='0']")).toBe(cellShell);
@@ -219,7 +213,7 @@ describe("residentRowViewState", () => {
 		expect(registry.findByKey("row-100")).toBeNull();
 		expect(registry.findClosest(cellShell ?? null)).toBeNull();
 
-		adapter.sync([createRow(0, 102, "row-102")], 1);
+		adapter.sync([createRow(0, 102, "row-102")]);
 		await tick();
 
 		expect(shadowRoot?.querySelector("[data-ccl-cell-slot='0']")).toBe(cellShell);

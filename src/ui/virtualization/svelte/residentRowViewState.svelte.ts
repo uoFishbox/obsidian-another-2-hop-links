@@ -6,55 +6,57 @@ import type {
 
 export interface VirtualSurfaceResidentRowsAdapter<
 	TMountedCell extends MountedVirtualCell,
-	TMountedRow extends VirtualSurfaceMountedRow<TMountedCell>,
+	TMountedRow extends VirtualSurfaceMountedRow<TMountedCell> & {
+		readonly slotIndex: number;
+	},
 > {
 	readonly rows: readonly VirtualSurfaceResidentRowViewState<
 		TMountedCell,
 		TMountedRow
 	>[];
-	sync(rowsBySlot: readonly TMountedRow[], capacity: number): void;
+	sync(occupiedRowsInSlotOrder: readonly TMountedRow[]): void;
 }
 
 /**
- * Creates a fixed-capacity reactive view over physical mounted-row slots.
- *
- * `rowsBySlot` must be ordered by ascending physical slot and may omit holes.
+ * Creates an active-slot reactive view over physical mounted-row slots.
  */
 export function createVirtualSurfaceResidentRowsAdapter<
 	TMountedCell extends MountedVirtualCell,
-	TMountedRow extends VirtualSurfaceMountedRow<TMountedCell>,
+	TMountedRow extends VirtualSurfaceMountedRow<TMountedCell> & {
+		readonly slotIndex: number;
+	},
 >(): VirtualSurfaceResidentRowsAdapter<TMountedCell, TMountedRow> {
 	type ResidentRow = VirtualSurfaceResidentRowViewState<TMountedCell, TMountedRow>;
 	let residentRows = $state.raw<readonly ResidentRow[]>([]);
+	const residentRowsBySlot = new Map<number, ResidentRow>();
 
-	function sync(rowsBySlot: readonly TMountedRow[], capacity: number): void {
-		resize(capacity);
-
-		let mountedRowOffset = 0;
-		for (const residentRow of residentRows) {
-			const candidate = rowsBySlot[mountedRowOffset];
-			const nextRow =
-				candidate?.slotIndex === residentRow.slotIndex ? candidate : undefined;
-			if (nextRow) mountedRowOffset += 1;
-			if (residentRow.row === nextRow) continue;
-			residentRow.row = nextRow;
+	function sync(occupiedRowsInSlotOrder: readonly TMountedRow[]): void {
+		const nextResidentRows: ResidentRow[] = [];
+		const nextActiveSlots = new Set<number>();
+		for (const row of occupiedRowsInSlotOrder) {
+			const slotIndex = row.slotIndex;
+			if (nextActiveSlots.has(slotIndex)) {
+				if (process.env.NODE_ENV !== "production") {
+					throw new Error(`Duplicate resident row slot: ${slotIndex}.`);
+				}
+				continue;
+			}
+			nextActiveSlots.add(slotIndex);
+			let residentRow = residentRowsBySlot.get(slotIndex);
+			if (!residentRow) {
+				residentRow = createResidentRowViewState(slotIndex);
+				residentRowsBySlot.set(slotIndex, residentRow);
+			}
+			if (residentRow.row !== row) residentRow.row = row;
+			nextResidentRows.push(residentRow);
 		}
-	}
 
-	function resize(capacity: number): void {
-		const normalizedCapacity = Math.max(0, Math.floor(capacity));
-		if (residentRows.length === normalizedCapacity) return;
-		const nextRows = residentRows.slice(0, normalizedCapacity);
-		for (
-			let slotIndex = nextRows.length;
-			slotIndex < normalizedCapacity;
-			slotIndex += 1
-		) {
-			nextRows.push(
-				createResidentRowViewState<TMountedCell, TMountedRow>(slotIndex),
-			);
+		for (const slotIndex of residentRowsBySlot.keys()) {
+			if (!nextActiveSlots.has(slotIndex)) residentRowsBySlot.delete(slotIndex);
 		}
-		residentRows = nextRows;
+		if (!hasSameResidentRows(residentRows, nextResidentRows)) {
+			residentRows = nextResidentRows;
+		}
 	}
 
 	return {
@@ -65,9 +67,19 @@ export function createVirtualSurfaceResidentRowsAdapter<
 	};
 }
 
+function hasSameResidentRows<T>(current: readonly T[], next: readonly T[]): boolean {
+	if (current.length !== next.length) return false;
+	for (let index = 0; index < current.length; index += 1) {
+		if (current[index] !== next[index]) return false;
+	}
+	return true;
+}
+
 function createResidentRowViewState<
 	TMountedCell extends MountedVirtualCell,
-	TMountedRow extends VirtualSurfaceMountedRow<TMountedCell>,
+	TMountedRow extends VirtualSurfaceMountedRow<TMountedCell> & {
+		readonly slotIndex: number;
+	},
 >(slotIndex: number): VirtualSurfaceResidentRowViewState<TMountedCell, TMountedRow> {
 	let row = $state.raw<TMountedRow | undefined>(undefined);
 	return {

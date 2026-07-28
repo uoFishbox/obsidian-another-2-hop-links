@@ -200,6 +200,9 @@ describe("VirtualListEngine performance contracts", () => {
 		expect(counters["virtualGrid.contiguousSlotPool.apply"].count).toBe(
 			NO_OP_MEASUREMENTS,
 		);
+		expect(counters["virtualGrid.residentSlotPool.changedSlots"].count).toBe(
+			NO_OP_MEASUREMENTS,
+		);
 		expect(counters["virtualGrid.rowShellCreated"].count).toBe(NO_OP_MEASUREMENTS);
 		expect(counters["virtualGrid.cellShellCreated"].count).toBe(
 			NO_OP_MEASUREMENTS * columns,

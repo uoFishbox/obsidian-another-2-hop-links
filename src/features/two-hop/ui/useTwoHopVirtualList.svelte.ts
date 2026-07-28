@@ -169,7 +169,6 @@ export function useTwoHopVirtualList(
 
 	let residentRowsBuild: TwoHopMountedRowsBuild | null = null;
 	let cardSlotsBuild: TwoHopMountedRowsBuild | null | undefined;
-	let cardSlotsCapacity = -1;
 	let cardSlotsBindingIdentity:
 		| TwoHopVirtualListProps["resolveItemCardModel"]
 		| undefined;
@@ -199,6 +198,8 @@ export function useTwoHopVirtualList(
 	>({
 		previewSurface,
 		interactionController,
+		resolveSlotLease: (mountedCell) => mountedCell.slotLease,
+		resolvePublicationRevision: (mountedCell) => mountedCell.publicationRevision,
 		resolveBinding: (mountedCell, resolver) => {
 			const cardModel = resolveMountedCardModel(mountedCell, resolver);
 			return {
@@ -212,10 +213,7 @@ export function useTwoHopVirtualList(
 
 	const syncResidentRows = (build: TwoHopMountedRowsBuild | null): void => {
 		if (residentRowsBuild === build) return;
-		residentRowsAdapter.sync(
-			build?.rowsBySlot ?? EMPTY_MOUNTED_ROWS,
-			rowSlotAllocator.capacity,
-		);
+		residentRowsAdapter.sync(build?.occupiedRowsInSlotOrder ?? EMPTY_MOUNTED_ROWS);
 		residentRowsBuild = build;
 	};
 
@@ -224,20 +222,13 @@ export function useTwoHopVirtualList(
 		resolver: TwoHopVirtualListProps["resolveItemCardModel"],
 		previewWindow: RowPreviewWindow,
 	): void => {
-		const capacity = build?.nextRenderSlotIndex ?? 0;
-		if (
-			cardSlotsBuild !== build ||
-			cardSlotsCapacity !== capacity ||
-			cardSlotsBindingIdentity !== resolver
-		) {
+		if (cardSlotsBuild !== build || cardSlotsBindingIdentity !== resolver) {
 			cardSlotBindings.sync({
 				mountedCells: build?.cells ?? EMPTY_MOUNTED_ROWS,
-				capacity,
 				bindingIdentity: resolver,
 				previewWindow,
 			});
 			cardSlotsBuild = build;
-			cardSlotsCapacity = capacity;
 			cardSlotsBindingIdentity = resolver;
 			cardSlotsPreviewRange = {
 				start: previewWindow.previewRange.start,

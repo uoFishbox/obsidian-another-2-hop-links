@@ -93,16 +93,23 @@ afterEach(() => {
 	teardownAnimationFrameMock();
 });
 
-function createSection(count: number): TwoHopVirtualSectionDescriptor {
+function createSection(
+	count: number,
+	options: {
+		readonly revision?: number;
+		readonly contentSuffix?: string;
+	} = {},
+): TwoHopVirtualSectionDescriptor {
+	const contentSuffix = options.contentSuffix ?? "";
 	const items = Array.from({ length: count }, (_, index) => ({
 		kind: "new-link",
 		item: { type: "newLink" },
 		interactionId: `item:${index}`,
-		searchKey: `item:${index}`,
+		searchKey: `item:${index}${contentSuffix}`,
 		virtualKey: `item:${index}`,
 	})) as TwoHopVirtualListItem[];
 	return {
-		sourceRevision: createSectionDataRevision(1),
+		sourceRevision: createSectionDataRevision(options.revision ?? 1),
 		section: {
 			kind: "new-links-section",
 			rawSectionId: "section",
@@ -386,6 +393,63 @@ describe("TwoHopSurface", () => {
 		expect(resolveItemCardModel).toHaveBeenCalledTimes(renderedCards ?? 0);
 	});
 
+	it("refreshes a same-key card when its section publication changes", async () => {
+		const resolveItemCardModel = vi.fn(
+			(item: TwoHopVirtualListItem, presentation): CardRenderModel => ({
+				item: item.item,
+				targetFile: null,
+				title: item.searchKey,
+				ariaLabel: item.searchKey,
+				className: null,
+				extension: null,
+				directory: null,
+				interactionId: item.interactionId ?? item.virtualKey,
+				interactionKey: item.interactionId ?? item.virtualKey,
+				interactionDescriptor: null,
+				presentation,
+				searchQuery: "",
+				searchScope: "title-and-content",
+				contentPreview: undefined,
+				previewRefreshToken: 0,
+				previewActivationIdentity: undefined,
+				previewOverride: null,
+				previewSnapshot: null,
+			}),
+		);
+		const linkContext = {
+			getPreview: vi.fn(),
+		} as unknown as LinkContext;
+		const baseProps = {
+			applicationStore,
+			linkContext,
+			resolveItemCardModel,
+		};
+		const { container, rerender } = render(TwoHopSurfaceModelHarness, {
+			props: {
+				...baseProps,
+				sections: [
+					createSection(1, { revision: 1, contentSuffix: ":initial" }),
+				],
+			},
+		});
+		const resolveSurfaceText = (): string =>
+			container.querySelector<HTMLElement>(".twohop-keyed-surface")?.shadowRoot
+				?.textContent ?? "";
+		await waitFor(() => expect(resolveSurfaceText()).toContain("item:0:initial"));
+		const callsBeforeRefresh = resolveItemCardModel.mock.calls.length;
+
+		await rerender({
+			...baseProps,
+			sections: [createSection(1, { revision: 2, contentSuffix: ":refreshed" })],
+		});
+
+		await waitFor(() => expect(resolveSurfaceText()).toContain("item:0:refreshed"));
+		expect(resolveSurfaceText()).not.toContain("item:0:initial");
+		expect(resolveItemCardModel.mock.calls.length).toBeGreaterThan(
+			callsBeforeRefresh,
+		);
+	});
+
 	it.each([100, 1_000, 10_000])(
 		"mounts %i logical cards with a bounded fixed pool",
 		(cardCount) => {
@@ -488,12 +552,39 @@ describe("TwoHopSurface", () => {
 	});
 
 	it("remounts a load-more body as the newly revealed logical card", async () => {
-		const { container } = render(TwoHopSurface, {
+		const resolveItemCardModel = vi.fn(
+			(item: TwoHopVirtualListItem, presentation): CardRenderModel => ({
+				item: item.item,
+				targetFile: null,
+				title: `resolved:${item.searchKey}`,
+				ariaLabel: `resolved:${item.searchKey}`,
+				className: null,
+				extension: null,
+				directory: null,
+				interactionId: item.interactionId ?? item.virtualKey,
+				interactionKey: item.interactionId ?? item.virtualKey,
+				interactionDescriptor: null,
+				presentation,
+				searchQuery: "",
+				searchScope: "title-and-content",
+				contentPreview: undefined,
+				previewRefreshToken: 0,
+				previewActivationIdentity: undefined,
+				previewOverride: null,
+				previewSnapshot: null,
+			}),
+		);
+		const linkContext = {
+			getPreview: vi.fn(),
+		} as unknown as LinkContext;
+		const { container } = render(TwoHopSurfaceModelHarness, {
 			props: {
 				sections: [createSection(10)],
 				applicationStore,
+				linkContext,
 				initialVisibleCount: 1,
 				loadMoreIncrement: 2,
+				resolveItemCardModel,
 			},
 		});
 		const root = container.querySelector<HTMLElement>(".twohop-keyed-surface");
@@ -516,6 +607,11 @@ describe("TwoHopSurface", () => {
 		).toBeNull();
 		const itemBody = loadMoreCell?.querySelector(".cosense-card-links__box");
 		expect(itemBody).not.toBe(loadMoreButton);
-		expect(itemBody?.textContent).toContain("item:1");
+		expect(itemBody?.textContent).toContain("resolved:item:1");
+		expect(
+			resolveItemCardModel.mock.calls.some(
+				([item]) => item.virtualKey === "item:1",
+			),
+		).toBe(true);
 	});
 });
