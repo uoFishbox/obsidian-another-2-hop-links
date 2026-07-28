@@ -64,7 +64,14 @@ export function createResidentRowSlotAllocator(): ResidentRowSlotAllocator {
 	const freeSlotIndices = new Set<number>();
 	let publication = createPublication();
 
+	function assertUsable(): void {
+		if (disposed) {
+			throw new Error("Resident row slot allocator has been disposed");
+		}
+	}
+
 	function reset(_reason: ResidentSlotResetReason): void {
+		assertUsable();
 		capacity = 0;
 		slotTopologyRevision = 0;
 		hasSlotTopologyRevision = false;
@@ -81,7 +88,7 @@ export function createResidentRowSlotAllocator(): ResidentRowSlotAllocator {
 	}
 
 	function prepareRange(params: ResidentRowSlotRange): ResidentSlotPoolPublication {
-		if (disposed) return publication;
+		assertUsable();
 		recordCCLDevMeasurement("virtualGrid.contiguousSlotPool.apply");
 
 		const start = Math.max(0, Math.floor(params.start));
@@ -163,6 +170,7 @@ export function createResidentRowSlotAllocator(): ResidentRowSlotAllocator {
 	function resolveSlotLease(
 		logicalRowIndex: number,
 	): ResidentRowSlotLease | undefined {
+		assertUsable();
 		const slotIndex = logicalRowToSlot.get(logicalRowIndex);
 		return slotIndex === undefined ? undefined : leasesBySlot[slotIndex];
 	}
@@ -195,8 +203,8 @@ export function createResidentRowSlotAllocator(): ResidentRowSlotAllocator {
 
 	function dispose(): void {
 		if (disposed) return;
-		disposed = true;
 		reset("empty");
+		disposed = true;
 	}
 
 	return {

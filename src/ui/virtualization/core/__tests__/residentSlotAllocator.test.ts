@@ -93,16 +93,30 @@ describe("createResidentRowSlotAllocator", () => {
 		).toEqual([0, 1, 2, 3]);
 	});
 
-	it("does not resolve unassigned rows before prepare, outside the range, or after dispose", () => {
+	it("does not resolve unassigned rows before prepare or outside the range", () => {
 		const allocator = createResidentRowSlotAllocator();
 
 		expect(allocator.resolveSlotLease(0)).toBeUndefined();
 		allocator.prepareRange({ start: 10, end: 12, slotTopologyRevision: 3 });
 		expect(allocator.resolveSlotLease(9)).toBeUndefined();
 		expect(allocator.resolveSlotLease(12)).toBeUndefined();
+	});
+
+	it("fails fast when used after dispose while keeping dispose idempotent", () => {
+		const allocator = createResidentRowSlotAllocator();
+		const disposedError = "Resident row slot allocator has been disposed";
 
 		allocator.dispose();
-		expect(allocator.resolveSlotLease(10)).toBeUndefined();
+		expect(() =>
+			allocator.prepareRange({
+				start: 10,
+				end: 12,
+				slotTopologyRevision: 3,
+			}),
+		).toThrowError(disposedError);
+		expect(() => allocator.resolveSlotLease(10)).toThrowError(disposedError);
+		expect(() => allocator.reset("empty")).toThrowError(disposedError);
+		expect(() => allocator.dispose()).not.toThrow();
 	});
 
 	it("advances slot generation on owner change and pool epoch on topology reset", () => {
