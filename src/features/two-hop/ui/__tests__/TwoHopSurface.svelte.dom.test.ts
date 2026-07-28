@@ -116,7 +116,6 @@ function createSection(
 			sectionId: "section",
 			sectionKey: "section",
 			title: "Section",
-			getKey: () => "",
 		},
 		sectionKey: "section",
 		sectionId: "section",

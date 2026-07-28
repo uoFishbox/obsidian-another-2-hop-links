@@ -9,15 +9,6 @@ import { generateLinkKey } from "features/preview/text-processing/textUtils";
 import type { TagGroup, TaggedNote } from "types/domain";
 import type { SectionDataRevision } from "features/two-hop/ui/twoHopRevisions";
 
-export interface PrimarySectionSource {
-	sectionId: string;
-	title: string;
-	className?: string;
-	items: readonly ViewItem[];
-	getKey: (item: ViewItem, index: number) => string;
-	getSearchKey: (item: ViewItem) => string;
-}
-
 interface TwoHopPageVirtualSectionBase {
 	rawSectionId: string;
 	sectionId: string;
@@ -29,7 +20,6 @@ interface TwoHopPageVirtualSectionBase {
 export type TwoHopVirtualListSection =
 	| (TwoHopPageVirtualSectionBase & {
 			kind: "primary-section";
-			source: PrimarySectionSource;
 	  })
 	| (TwoHopPageVirtualSectionBase & {
 			kind: "two-hop-branch";
@@ -43,7 +33,6 @@ export type TwoHopVirtualListSection =
 	  })
 	| (TwoHopPageVirtualSectionBase & {
 			kind: "new-links-section";
-			getKey: (item: ViewItem, index: number) => string;
 	  });
 
 export type TwoHopVirtualListItem =

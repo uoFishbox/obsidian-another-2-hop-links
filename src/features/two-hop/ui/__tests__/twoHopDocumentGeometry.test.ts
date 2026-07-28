@@ -44,7 +44,6 @@ function createSection(
 			sectionId,
 			sectionKey: sectionId,
 			title: sectionId,
-			getKey: (_item, index) => `${sectionId}:${index}`,
 		},
 		sectionKey: sectionId,
 		title: sectionId,

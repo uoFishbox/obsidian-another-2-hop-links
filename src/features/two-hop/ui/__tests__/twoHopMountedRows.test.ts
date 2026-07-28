@@ -36,7 +36,6 @@ function createSection(count: number): TwoHopVirtualSectionDescriptor {
 			sectionId: "section",
 			sectionKey: "section",
 			title: "Section",
-			getKey: (_item, index) => `item:${index}`,
 		},
 		sectionKey: "section",
 		sectionId: "section",

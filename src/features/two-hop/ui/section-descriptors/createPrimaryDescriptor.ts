@@ -3,6 +3,7 @@ import type {
 	MergedLinkItem,
 } from "features/two-hop/application/displayDataBuilder";
 import type { ViewItem } from "application/presenters";
+import type { SectionConfig } from "ui/components/sections/types";
 import {
 	backlinksSectionConfig,
 	mergedLinksSectionConfig,
@@ -14,9 +15,14 @@ import {
 	getMergedSearchKey,
 	getOutgoingSearchKey,
 } from "features/two-hop/ui/twoHopSearchAdapter";
-import type { TwoHopIndexedLink, TwoHopLinkBranch } from "types/domain";
-import type { TwoHopVirtualSectionDescriptor } from "features/two-hop/ui/twoHopVirtualListModel";
-import { createDescriptor, createLazyVirtualItemAccessors } from "./descriptorIdentity";
+import type {
+	TwoHopVirtualListItem,
+	TwoHopVirtualSectionDescriptor,
+} from "features/two-hop/ui/twoHopVirtualListModel";
+import {
+	createDescriptor,
+	createEagerVirtualItemAccessors,
+} from "./descriptorIdentity";
 
 export type PrimarySectionBuildInput =
 	| {
@@ -40,100 +46,83 @@ export interface CreatePrimarySectionDescriptorParams {
 /**
  * Builds one immutable primary-section publication.
  *
- * Item wrappers are local to the publication and remain lazy. A changed
- * section receives a fresh accessor cache; unchanged sections are reused by
- * the publication cache before this builder is called.
+ * Final virtual rows are materialized in one eager pass so viewport reads are
+ * allocation-free. Unchanged publications are reused by the section cache
+ * before this builder is called.
  */
 export function createPrimarySectionDescriptor(
 	params: CreatePrimarySectionDescriptorParams,
 ): TwoHopVirtualSectionDescriptor {
-	const source = createPrimarySource(params.input);
-	const accessors = createLazyVirtualItemAccessors({
-		getLength: () => source.items.length,
-		createItem: (index) => {
-			const item = source.items[index];
-			const virtualKey = source.getKey(item, index);
+	switch (params.input.kind) {
+		case "outgoing":
+			return createPrimaryDescriptor({
+				items: params.input.items,
+				config: outgoingLinksSectionConfig,
+				toViewItem: (item) => ({ type: "branch", data: item }),
+				getSearchKey: getOutgoingSearchKey,
+				createItemInteractionToken: params.createItemInteractionToken,
+			});
+		case "backlinks":
+			return createPrimaryDescriptor({
+				items: params.input.items,
+				config: backlinksSectionConfig,
+				toViewItem: (item) => ({ type: "backlink", data: item }),
+				getSearchKey: getBacklinkSearchKey,
+				createItemInteractionToken: params.createItemInteractionToken,
+			});
+		case "merged":
+			return createPrimaryDescriptor({
+				items: params.input.items,
+				config: mergedLinksSectionConfig,
+				toViewItem: toMergedViewItem,
+				getSearchKey: getMergedSearchKey,
+				createItemInteractionToken: params.createItemInteractionToken,
+			});
+	}
+}
+
+interface CreatePrimaryDescriptorParams<T> {
+	readonly items: readonly T[];
+	readonly config: SectionConfig<T>;
+	readonly toViewItem: (item: T) => ViewItem;
+	readonly getSearchKey: (item: T) => string;
+	readonly createItemInteractionToken: (interactionKey: string) => string;
+}
+
+function createPrimaryDescriptor<T>(
+	params: CreatePrimaryDescriptorParams<T>,
+): TwoHopVirtualSectionDescriptor {
+	const rows: readonly TwoHopVirtualListItem[] = params.items.map(
+		(source, index): TwoHopVirtualListItem => {
+			const item = params.toViewItem(source);
+			const virtualKey = params.config.getKey(source, index);
 			const interactionKey = createItemInteractionKey(item, virtualKey);
 			return {
 				kind: "primary-link",
 				item,
 				interactionId: params.createItemInteractionToken(interactionKey),
 				interactionKey,
-				sourceSectionId: source.sectionId,
-				searchKey: source.getSearchKey(item),
+				sourceSectionId: params.config.sectionId,
+				searchKey: params.getSearchKey(source),
 				virtualKey,
 			};
 		},
-	});
+	);
+	const accessors = createEagerVirtualItemAccessors(rows);
 
 	return createDescriptor(
 		{
 			kind: "primary-section",
-			rawSectionId: source.sectionId,
-			sectionId: source.sectionId,
-			sectionKey: source.sectionId,
-			title: source.title,
-			className: source.className,
-			source,
+			rawSectionId: params.config.sectionId,
+			sectionId: params.config.sectionId,
+			sectionKey: params.config.sectionId,
+			title: params.config.title,
+			className: params.config.className,
 		},
-		source.items.length,
+		rows.length,
 		accessors.getItems,
 		accessors.getItem,
 	);
-}
-
-function createPrimarySource(input: PrimarySectionBuildInput): {
-	readonly title: string;
-	readonly sectionId: string;
-	readonly className: string | undefined;
-	readonly items: readonly ViewItem[];
-	readonly getKey: (item: ViewItem, index: number) => string;
-	readonly getSearchKey: (item: ViewItem) => string;
-} {
-	switch (input.kind) {
-		case "outgoing":
-			return {
-				title: outgoingLinksSectionConfig.title,
-				sectionId: outgoingLinksSectionConfig.sectionId,
-				className: outgoingLinksSectionConfig.className,
-				items: input.items.map(
-					(item): ViewItem => ({ type: "branch", data: item }),
-				),
-				getKey: (item, index) =>
-					outgoingLinksSectionConfig.getKey(
-						item.data as TwoHopLinkBranch,
-						index,
-					),
-				getSearchKey: (item) =>
-					getOutgoingSearchKey(item.data as TwoHopLinkBranch),
-			};
-		case "backlinks":
-			return {
-				title: backlinksSectionConfig.title,
-				sectionId: backlinksSectionConfig.sectionId,
-				className: backlinksSectionConfig.className,
-				items: input.items.map(
-					(item): ViewItem => ({ type: "backlink", data: item }),
-				),
-				getKey: (item, index) =>
-					backlinksSectionConfig.getKey(
-						item.data as TwoHopIndexedLink,
-						index,
-					),
-				getSearchKey: (item) =>
-					getBacklinkSearchKey(item.data as TwoHopIndexedLink),
-			};
-		case "merged":
-			return {
-				title: mergedLinksSectionConfig.title,
-				sectionId: mergedLinksSectionConfig.sectionId,
-				className: mergedLinksSectionConfig.className,
-				items: input.items.map(toMergedViewItem),
-				getKey: (item, index) =>
-					mergedLinksSectionConfig.getKey(item.data as MergedLinkItem, index),
-				getSearchKey: (item) => getMergedSearchKey(item.data as MergedLinkItem),
-			};
-	}
 }
 
 function toMergedViewItem(item: MergedLinkItem): ViewItem {

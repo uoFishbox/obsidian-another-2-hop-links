@@ -26,6 +26,19 @@ export interface LazySortedVirtualItemAccessorsParams<T, TViewItem> {
 	) => TwoHopVirtualListItem;
 }
 
+/**
+ * Exposes an already materialized immutable publication through the descriptor
+ * accessor contract.
+ */
+export function createEagerVirtualItemAccessors(
+	items: readonly TwoHopVirtualListItem[],
+): CachedVirtualItemAccessors {
+	return {
+		getItems: () => items,
+		getItem: (index) => items[index],
+	};
+}
+
 export function createDescriptor(
 	section: TwoHopVirtualListSection,
 	totalCount: number,
