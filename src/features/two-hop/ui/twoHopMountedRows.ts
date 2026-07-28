@@ -150,16 +150,6 @@ export function buildTwoHopMountedRows(params: {
 				renderSlotIndex,
 			});
 		},
-		rebindCell: ({ previous, rowIndex, columnIndex, renderSlotIndex, row }) =>
-			resolveMountedCell({
-				previous,
-				logicalCell: previous.cell,
-				section: previous.section,
-				rowLease: row.metadata.rowLease,
-				rowIndex,
-				columnIndex,
-				renderSlotIndex,
-			}),
 		createRow: ({ rowIndex, slotIndex, cells, cellSlots, row }) => ({
 			key: rowIndex,
 			rowIndex,
