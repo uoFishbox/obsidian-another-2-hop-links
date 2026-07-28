@@ -145,6 +145,8 @@ describe("TwoHopDocument fixed-grid geometry", () => {
 			projection.setInput({
 				sections: [{ ...descriptor }],
 				paginationScope: "",
+				initialVisibleCount: 10,
+				loadMoreIncrement: undefined,
 			}),
 		).toBe(initialDocument);
 
@@ -156,6 +158,8 @@ describe("TwoHopDocument fixed-grid geometry", () => {
 				},
 			],
 			paginationScope: "",
+			initialVisibleCount: 10,
+			loadMoreIncrement: undefined,
 		});
 		expect(changedDocument).not.toBe(initialDocument);
 		expect(changedDocument.revision).not.toBe(initialDocument.revision);
@@ -179,9 +183,53 @@ describe("TwoHopDocument fixed-grid geometry", () => {
 		const searched = projection.setInput({
 			sections: [descriptor],
 			paginationScope: "query",
+			initialVisibleCount: 1,
+			loadMoreIncrement: 1,
 		});
 		expect(searched.sections[0].visibleItemCount).toBe(1);
 		expect(descriptor.paginationKey).toBeUndefined();
+	});
+
+	it("applies changed pagination options and restores the expanded limit", () => {
+		const descriptor = createSection(
+			"first",
+			Array.from({ length: 20 }, (_, index) => createItem(String(index))),
+		);
+		const expandedLimits = new Map<string, number>();
+		const applicationStore = {
+			getSectionExpandedLimit: (sectionId: string) =>
+				expandedLimits.get(sectionId),
+			setSectionExpandedLimit: (sectionId: string, limit: number) => {
+				expandedLimits.set(sectionId, limit);
+			},
+		};
+		const projection = createTwoHopDocumentProjection({
+			sections: [descriptor],
+			applicationStore,
+			initialVisibleCount: 2,
+			loadMoreIncrement: 2,
+		});
+
+		expect(projection.getDocument().sections[0].visibleItemCount).toBe(2);
+
+		const reconfigured = projection.setInput({
+			sections: [descriptor],
+			paginationScope: "",
+			initialVisibleCount: 3,
+			loadMoreIncrement: 4,
+		});
+		expect(reconfigured.sections[0].visibleItemCount).toBe(3);
+		expect(projection.loadMore("first")?.sections[0].visibleItemCount).toBe(7);
+		expect(expandedLimits.get("first")).toBe(7);
+
+		const restored = projection.setInput({
+			sections: [descriptor],
+			paginationScope: "",
+			initialVisibleCount: 1,
+			loadMoreIncrement: 5,
+		});
+		expect(restored.sections[0].visibleItemCount).toBe(7);
+		expect(projection.loadMore("first")?.sections[0].visibleItemCount).toBe(12);
 	});
 
 	it("resolves header, dense items, and load-more without compiled cells", () => {

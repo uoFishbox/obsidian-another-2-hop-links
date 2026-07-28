@@ -614,4 +614,54 @@ describe("TwoHopSurface", () => {
 			),
 		).toBe(true);
 	});
+
+	it("applies changed pagination settings without remounting the surface", async () => {
+		const baseProps = {
+			sections: [createSection(20)],
+			applicationStore,
+		};
+		const scroller = document.createElement("div");
+		scroller.style.overflow = "auto";
+		setNumericProperty(scroller, "clientHeight", 10_000);
+		setNumericProperty(scroller, "scrollHeight", 10_000);
+		setNumericProperty(scroller, "scrollTop", 0);
+		setElementRect(scroller, { top: 0, width: 330, height: 10_000 });
+		document.body.append(scroller);
+		const { rerender } = render(TwoHopSurface, {
+			target: scroller,
+			props: {
+				...baseProps,
+				initialVisibleCount: 1,
+				loadMoreIncrement: 2,
+			},
+		});
+		const root = scroller.querySelector<HTMLElement>(".twohop-keyed-surface");
+		if (!root) {
+			throw new Error("Two-hop virtual surface was not rendered");
+		}
+		setElementRect(root, { top: 0, width: 330, height: 10_000 });
+		triggerResize(root, 330, 10_000);
+		triggerResize(scroller, 330, 10_000);
+		await flushFrames();
+		const getRenderedItemCount = (): number =>
+			root.shadowRoot?.querySelectorAll("[data-testid='twohop-item-cell']")
+				.length ?? 0;
+
+		expect(getRenderedItemCount()).toBe(1);
+
+		await rerender({
+			...baseProps,
+			initialVisibleCount: 3,
+			loadMoreIncrement: 4,
+		});
+		await waitFor(() => expect(getRenderedItemCount()).toBe(3));
+
+		const loadMoreButton = root.shadowRoot?.querySelector<HTMLButtonElement>(
+			".cosense-card-links__load-more-button",
+		);
+		expect(loadMoreButton).not.toBeNull();
+		await fireEvent.click(loadMoreButton!);
+
+		await waitFor(() => expect(getRenderedItemCount()).toBe(7));
+	});
 });

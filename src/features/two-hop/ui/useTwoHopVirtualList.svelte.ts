@@ -351,6 +351,8 @@ export function useTwoHopVirtualList(
 			documentProjection.setInput({
 				sections: props.sections,
 				paginationScope: props.paginationScope ?? "",
+				initialVisibleCount: props.initialVisibleCount,
+				loadMoreIncrement: props.loadMoreIncrement,
 			}),
 		);
 	});

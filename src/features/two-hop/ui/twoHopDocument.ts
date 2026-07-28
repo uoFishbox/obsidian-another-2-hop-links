@@ -69,6 +69,8 @@ export interface TwoHopDocumentProjectionParams {
 export interface TwoHopDocumentProjectionInput {
 	readonly sections: readonly TwoHopVirtualSectionDescriptor[];
 	readonly paginationScope: string;
+	readonly initialVisibleCount: number | undefined;
+	readonly loadMoreIncrement: number | undefined;
 }
 
 export interface TwoHopDocumentProjection {
@@ -81,21 +83,30 @@ export interface TwoHopDocumentProjection {
 export function createTwoHopDocumentProjection(
 	params: TwoHopDocumentProjectionParams,
 ): TwoHopDocumentProjection {
-	const createPagination = (scope: string) =>
+	const createPagination = (
+		scope: string,
+		initialVisibleCount: number | undefined,
+		loadMoreIncrement: number | undefined,
+	) =>
 		createSectionVisibleCountsController<
 			TwoHopVirtualListItem,
 			TwoHopVirtualSectionDescriptor["section"]
 		>({
 			applicationStore: params.applicationStore,
-			initialVisibleCount: params.initialVisibleCount,
-			loadMoreIncrement: params.loadMoreIncrement,
+			initialVisibleCount,
+			loadMoreIncrement,
 			resolvePaginationKey: (section) =>
 				buildScopedSectionId(section.sectionId, scope),
 		});
-	const initialVisibleCount = params.initialVisibleCount ?? Number.POSITIVE_INFINITY;
 	let sources = params.sections;
 	let paginationScope = params.paginationScope?.trim() ?? "";
-	let pagination = createPagination(paginationScope);
+	let initialVisibleCount = params.initialVisibleCount;
+	let loadMoreIncrement = params.loadMoreIncrement;
+	let pagination = createPagination(
+		paginationScope,
+		initialVisibleCount,
+		loadMoreIncrement,
+	);
 	let revisionValue = 0;
 	let document = project();
 
@@ -105,7 +116,7 @@ export function createTwoHopDocumentProjection(
 		const nextDocument = createTwoHopDocument({
 			sections: sources,
 			visibleCounts,
-			initialVisibleCount,
+			initialVisibleCount: initialVisibleCount ?? Number.POSITIVE_INFINITY,
 			paginationScope,
 			previousDocument,
 			revision: createDocumentRevision(++revisionValue),
@@ -124,14 +135,27 @@ export function createTwoHopDocumentProjection(
 		setInput(input) {
 			const nextScope = input.paginationScope.trim();
 			const scopeChanged = paginationScope !== nextScope;
-			if (!scopeChanged && hasSameSectionPublications(sources, input.sections)) {
+			const paginationOptionsChanged =
+				!Object.is(initialVisibleCount, input.initialVisibleCount) ||
+				!Object.is(loadMoreIncrement, input.loadMoreIncrement);
+			if (
+				!scopeChanged &&
+				!paginationOptionsChanged &&
+				hasSameSectionPublications(sources, input.sections)
+			) {
 				sources = input.sections;
 				return document;
 			}
 			sources = input.sections;
-			if (scopeChanged) {
+			if (scopeChanged || paginationOptionsChanged) {
 				paginationScope = nextScope;
-				pagination = createPagination(paginationScope);
+				initialVisibleCount = input.initialVisibleCount;
+				loadMoreIncrement = input.loadMoreIncrement;
+				pagination = createPagination(
+					paginationScope,
+					initialVisibleCount,
+					loadMoreIncrement,
+				);
 			}
 			document = project(document);
 			return document;
