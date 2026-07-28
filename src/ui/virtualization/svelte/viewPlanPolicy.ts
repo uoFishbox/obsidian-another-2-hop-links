@@ -23,10 +23,11 @@ export function createViewPlanCardVirtualListPolicyResolver(params: {
 	let cachedPolicyGap: number | undefined;
 	let cachedPolicyAheadRows: number | undefined;
 	let cachedMountedOverscanRows: MountedOverscanRows | undefined;
+	let cachedPolicyIsScrollActive: boolean | undefined;
 	let cachedPolicy: ViewPlanCardVirtualListPolicy | undefined;
 
 	return {
-		resolve(layout, _isScrollActive) {
+		resolve(layout, isScrollActive) {
 			const configuredAheadRows = params.getPreviewActivationAheadRows();
 			const configuredMountedOverscanRows = params.getMountedOverscanRows();
 
@@ -35,7 +36,8 @@ export function createViewPlanCardVirtualListPolicyResolver(params: {
 				cachedPolicyRowHeight === layout.rowHeight &&
 				cachedPolicyGap === layout.gap &&
 				cachedPolicyAheadRows === configuredAheadRows &&
-				cachedMountedOverscanRows === configuredMountedOverscanRows
+				cachedMountedOverscanRows === configuredMountedOverscanRows &&
+				cachedPolicyIsScrollActive === isScrollActive
 			) {
 				return cachedPolicy;
 			}
@@ -44,10 +46,12 @@ export function createViewPlanCardVirtualListPolicyResolver(params: {
 			cachedPolicyGap = layout.gap;
 			cachedPolicyAheadRows = configuredAheadRows;
 			cachedMountedOverscanRows = configuredMountedOverscanRows;
+			cachedPolicyIsScrollActive = isScrollActive;
 			cachedPolicy = createCardVirtualListPolicy({
 				layout,
 				previewActivationAheadRows: configuredAheadRows,
 				mountedOverscanRows: configuredMountedOverscanRows,
+				isScrollActive,
 			});
 			return cachedPolicy;
 		},
