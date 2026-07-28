@@ -188,4 +188,36 @@ describe("flatLinkRowModel", () => {
 		});
 		expect(requiredAtUpperEdge.end).toBeGreaterThan(mounted.end);
 	});
+
+	it("ends preview coverage before the strict viewport can leave preview rows", () => {
+		const rowModel = createRowModel(30);
+		const ranges = rowModel.findVisibleRanges({
+			scrollTop: 0,
+			viewportHeight: 100,
+			mountedOverscanPx: 220,
+			previewOverscanPx: 110,
+		});
+		const previewCoverageBand = { min: Number.NaN, max: Number.NaN };
+
+		rowModel.findMountedCoverageScrollTopBandInto(previewCoverageBand, {
+			viewportHeight: 100,
+			mounted: ranges.previewVisible,
+			requiredOverscanPx: 0,
+		});
+
+		expect(ranges).toEqual({
+			mounted: { start: 0, end: 3 },
+			previewVisible: { start: 0, end: 2 },
+		});
+		expect(previewCoverageBand.max).toBe(121);
+
+		const strictAtBoundary = { start: 0, end: 0 };
+		rowModel.findVisibleRangeInto(strictAtBoundary, {
+			scrollTop: previewCoverageBand.max,
+			viewportHeight: 100,
+			overscanPx: 0,
+		});
+		expect(strictAtBoundary).toEqual({ start: 1, end: 3 });
+		expect(strictAtBoundary.end).toBeGreaterThan(ranges.previewVisible.end);
+	});
 });

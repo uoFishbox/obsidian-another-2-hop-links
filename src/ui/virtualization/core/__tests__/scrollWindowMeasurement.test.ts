@@ -96,6 +96,54 @@ describe("createVirtualScrollWindowRangeResolver", () => {
 		expect(findVisibleRangeInto).toHaveBeenCalledTimes(4);
 	});
 
+	it("derives preview coverage from the published preview range", () => {
+		const coverageRange = { start: -1, end: -1 };
+		const rowModel: VirtualScrollWindowRangeRowModel = {
+			rowCount: 100,
+			totalHeight: 10_000,
+			findVisibleRangeInto(out) {
+				out.start = 0;
+				out.end = 10;
+			},
+			findVisibleRangesInto() {},
+			findVisibleRangesFromMountedInto(out, params) {
+				out.mounted.start = params.mounted.start;
+				out.mounted.end = params.mounted.end;
+				out.previewVisible.start = 2;
+				out.previewVisible.end = 5;
+			},
+			findMountedCoverageScrollTopBandInto(out, params) {
+				coverageRange.start = params.mounted.start;
+				coverageRange.end = params.mounted.end;
+				out.min = params.mounted.start * 100;
+				out.max = params.mounted.end * 100;
+			},
+		};
+		const resolver = createVirtualScrollWindowRangeResolver({
+			resolveRowModel: () => rowModel,
+			resolveVisibilityPolicy: () => ({
+				bootstrapRows: 1,
+				mountedOverscanPx: 1_000,
+				previewOverscanPx: 0,
+			}),
+			resolveStableMountedScrollTopBand: true,
+		});
+
+		const measurement = resolver.resolveScrollWindowMeasurement(
+			121,
+			100,
+			0,
+			{},
+			{ start: 0, end: 10 },
+		);
+
+		expect(coverageRange).toEqual({ start: 2, end: 5 });
+		expect(measurement.previewCoverageScrollTopBand).toEqual({
+			min: 200,
+			max: 500,
+		});
+	});
+
 	it("publishes absolute coverage bands for empty mounted ranges", () => {
 		resetCCLDevMeasurements();
 		const rowModel = createEmptyRangeRowModel(10, 1_000);

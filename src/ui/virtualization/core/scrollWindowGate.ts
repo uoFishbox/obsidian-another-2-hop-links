@@ -45,6 +45,10 @@ export interface ScrollMeasurementRange {
 export type RangedScrollWindowMeasurement = {
 	identity: ScrollWindowIdentity;
 	ranges: VirtualRanges;
+	/**
+	 * Open interval in which the published preview rows cover the strict viewport.
+	 */
+	previewCoverageScrollTopBand?: StableScrollTopBand;
 };
 
 const INVALID_STABLE_SCROLL_TOP_MIN = Number.POSITIVE_INFINITY;

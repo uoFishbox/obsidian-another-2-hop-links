@@ -19,7 +19,7 @@ const STABLE_MEASUREMENT: VirtualMeasurement = {
 };
 
 describe("createVirtualScrollWindowMeasurementController", () => {
-	it("exposes the resident mounted coverage band", () => {
+	it("exposes the intersection of mounted and published preview coverage", () => {
 		const controller = createVirtualScrollWindowMeasurementController({
 			resolveMountedScrollWindowMeasurement: () => ({
 				identity: IDENTITY,
@@ -33,6 +33,7 @@ describe("createVirtualScrollWindowMeasurementController", () => {
 					mounted: { start: 0, end: 10 },
 					previewVisible: { start: 2, end: 8 },
 				},
+				previewCoverageScrollTopBand: { min: 30, max: 70 },
 			}),
 			applyRangeMeasurement: () => ({
 				kind: "stable",
@@ -44,26 +45,33 @@ describe("createVirtualScrollWindowMeasurementController", () => {
 		controller.applyScrollMeasurement(STABLE_MEASUREMENT, undefined);
 
 		expect(controller.getScrollMeasurementRange()).toEqual({
-			minScrollTopBeforeMeasurement: 20,
-			maxScrollTopBeforeMeasurement: 80,
+			minScrollTopBeforeMeasurement: 30,
+			maxScrollTopBeforeMeasurement: 70,
 		});
 
 		controller.resetLastScrollWindow();
 		expect(controller.getScrollMeasurementRange()).toBeNull();
 	});
 
-	it("does not resolve or publish preview changes while mounted range is unchanged", () => {
+	it("publishes preview changes while reusing an unchanged mounted range", () => {
 		const resolveRanges = vi.fn(() => ({
 			identity: IDENTITY,
 			ranges: {
 				mounted: { start: 0, end: 10 },
 				previewVisible: { start: 3, end: 9 },
 			},
+			previewCoverageScrollTopBand: { min: 60, max: 100 },
 		}));
-		const applyRanges = vi.fn(() => ({
-			kind: "stable" as const,
-			range: { start: 2, end: 8 },
-		}));
+		const applyRanges = vi.fn(
+			(
+				_measurement: VirtualMeasurement,
+				_context: undefined,
+				_precomputedRanges: VirtualRanges | undefined,
+			) => ({
+				kind: "stable" as const,
+				range: { start: 2, end: 8 },
+			}),
+		);
 		const controller = createVirtualScrollWindowMeasurementController({
 			resolveMountedScrollWindowMeasurement: () => ({
 				identity: IDENTITY,
@@ -81,8 +89,12 @@ describe("createVirtualScrollWindowMeasurementController", () => {
 			undefined,
 		);
 
-		expect(resolveRanges).toHaveBeenCalledTimes(1);
-		expect(applyRanges).toHaveBeenCalledTimes(1);
+		expect(resolveRanges).toHaveBeenCalledTimes(2);
+		expect(applyRanges).toHaveBeenCalledTimes(2);
+		expect(applyRanges.mock.calls[1]?.[2]).toEqual({
+			mounted: { start: 0, end: 10 },
+			previewVisible: { start: 3, end: 9 },
+		});
 	});
 
 	it("classifies same mounted window hits by empty state", () => {
@@ -122,7 +134,7 @@ describe("createVirtualScrollWindowMeasurementController", () => {
 		expect(counters["virtualScroll.sameMountedWindowHit.nonEmpty"].count).toBe(0);
 	});
 
-	it("exposes a valid coverage band independently of the last measured position", () => {
+	it("does not expose mounted coverage beyond published preview coverage", () => {
 		const controller = createVirtualScrollWindowMeasurementController({
 			resolveMountedScrollWindowMeasurement: () => ({
 				identity: IDENTITY,
@@ -135,6 +147,7 @@ describe("createVirtualScrollWindowMeasurementController", () => {
 					mounted: { start: 0, end: 10 },
 					previewVisible: { start: 2, end: 8 },
 				},
+				previewCoverageScrollTopBand: { min: 65, max: 75 },
 			}),
 			applyRangeMeasurement: () => ({
 				kind: "stable",
@@ -146,8 +159,8 @@ describe("createVirtualScrollWindowMeasurementController", () => {
 		controller.applyScrollMeasurement(STABLE_MEASUREMENT, undefined);
 
 		expect(controller.getScrollMeasurementRange()).toEqual({
-			minScrollTopBeforeMeasurement: 60,
-			maxScrollTopBeforeMeasurement: 80,
+			minScrollTopBeforeMeasurement: 65,
+			maxScrollTopBeforeMeasurement: 75,
 		});
 	});
 

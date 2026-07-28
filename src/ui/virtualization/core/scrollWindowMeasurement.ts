@@ -112,6 +112,10 @@ export function createVirtualScrollWindowRangeResolver<
 		min: 0,
 		max: 0,
 	};
+	const previewCoverageBandScratch: StableScrollTopBandMutable = {
+		min: 0,
+		max: 0,
+	};
 	let mountedStableBandViewportHeight: number | undefined;
 	let mountedStableBandSectionTop: number | undefined;
 	let mountedStableBandOverscanPx: number | undefined;
@@ -121,6 +125,7 @@ export function createVirtualScrollWindowRangeResolver<
 			mounted: { start: 0, end: 0 },
 			previewVisible: { start: 0, end: 0 },
 		},
+		previewCoverageScrollTopBand: undefined,
 	};
 	const committedScrollWindowMeasurement: RangedScrollWindowMeasurement = {
 		identity: {},
@@ -128,6 +133,7 @@ export function createVirtualScrollWindowRangeResolver<
 			mounted: { start: 0, end: 0 },
 			previewVisible: { start: 0, end: 0 },
 		},
+		previewCoverageScrollTopBand: undefined,
 	};
 
 	const resolveMeasurementRowModel = (
@@ -162,7 +168,7 @@ export function createVirtualScrollWindowRangeResolver<
 		out.max += sectionTop;
 		return out;
 	};
-	const updateMountedCoverageScrollTopBand = (
+	const updateCoverageScrollTopBand = (
 		out: StableScrollTopBandMutable,
 		measurementRowModel: TRowModel,
 		sectionTop: number,
@@ -267,7 +273,7 @@ export function createVirtualScrollWindowRangeResolver<
 				mountedScrollWindowMeasurement.mounted,
 			);
 		mountedScrollWindowMeasurement.mountedCoverageScrollTopBand =
-			updateMountedCoverageScrollTopBand(
+			updateCoverageScrollTopBand(
 				mountedCoverageBandScratch,
 				measurementRowModel,
 				sectionTop,
@@ -302,6 +308,15 @@ export function createVirtualScrollWindowRangeResolver<
 				committedScrollWindowMeasurement.ranges,
 				rangeParams,
 			);
+			committedScrollWindowMeasurement.previewCoverageScrollTopBand =
+				updateCoverageScrollTopBand(
+					previewCoverageBandScratch,
+					measurementRowModel,
+					sectionTop,
+					rangeParams.scrollTop,
+					viewportHeight,
+					committedScrollWindowMeasurement.ranges.previewVisible,
+				);
 			return committedScrollWindowMeasurement;
 		}
 
@@ -315,6 +330,15 @@ export function createVirtualScrollWindowRangeResolver<
 			scrollWindowMeasurement.ranges,
 			rangesFromMountedParams,
 		);
+		scrollWindowMeasurement.previewCoverageScrollTopBand =
+			updateCoverageScrollTopBand(
+				previewCoverageBandScratch,
+				measurementRowModel,
+				sectionTop,
+				rangeParams.scrollTop,
+				viewportHeight,
+				scrollWindowMeasurement.ranges.previewVisible,
+			);
 		return scrollWindowMeasurement;
 	};
 

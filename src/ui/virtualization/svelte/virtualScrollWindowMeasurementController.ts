@@ -11,6 +11,7 @@ import {
 	type MountedScrollWindowMeasurement,
 	type RangedScrollWindowMeasurement,
 	type ScrollMeasurementRange,
+	type StableScrollTopBand,
 	updateMountedScrollWindow,
 } from "../core/scrollWindowGate";
 import type { RowRange } from "../rowRange";
@@ -50,6 +51,12 @@ export function createVirtualScrollWindowMeasurementController<TContext>({
 		minScrollTopBeforeMeasurement: 0,
 		maxScrollTopBeforeMeasurement: 0,
 	};
+	const publishedCoverageBand: {
+		-readonly [K in keyof StableScrollTopBand]: StableScrollTopBand[K];
+	} = {
+		min: 0,
+		max: 0,
+	};
 
 	const toApplicationResult = (
 		result: MeasurementUpdateResult<RowRange>,
@@ -58,6 +65,34 @@ export function createVirtualScrollWindowMeasurementController<TContext>({
 
 	const resetLastScrollWindow = (): void => {
 		lastMountedScrollWindow = null;
+	};
+
+	const resolvePublishedCoverageBand = (
+		mountedMeasurement: MountedScrollWindowMeasurement,
+		rangedMeasurement: RangedScrollWindowMeasurement,
+	): StableScrollTopBand | undefined => {
+		const mountedBand = mountedMeasurement.mountedCoverageScrollTopBand;
+		const previewBand = rangedMeasurement.previewCoverageScrollTopBand;
+		if (
+			!mountedBand ||
+			!previewBand ||
+			mountedMeasurement.identity !== rangedMeasurement.identity ||
+			mountedMeasurement.mounted.start !==
+				rangedMeasurement.ranges.mounted.start ||
+			mountedMeasurement.mounted.end !== rangedMeasurement.ranges.mounted.end ||
+			rangedMeasurement.ranges.previewVisible.start <
+				rangedMeasurement.ranges.mounted.start ||
+			rangedMeasurement.ranges.previewVisible.end >
+				rangedMeasurement.ranges.mounted.end
+		) {
+			return undefined;
+		}
+
+		publishedCoverageBand.min = Math.max(mountedBand.min, previewBand.min);
+		publishedCoverageBand.max = Math.min(mountedBand.max, previewBand.max);
+		return publishedCoverageBand.min < publishedCoverageBand.max
+			? publishedCoverageBand
+			: undefined;
 	};
 
 	const getScrollMeasurementRange = (): ScrollMeasurementRange | null => {
@@ -91,11 +126,16 @@ export function createVirtualScrollWindowMeasurementController<TContext>({
 			measurement,
 			context,
 		);
+		const rangedMeasurement = resolveScrollWindowMeasurement(
+			measurement,
+			context,
+			mountedMeasurement.mounted,
+		);
 		lastMountedScrollWindow = createMountedScrollWindow(
 			mountedMeasurement.identity,
 			mountedMeasurement.mounted,
 			mountedMeasurement.stableMountedScrollTopBand,
-			mountedMeasurement.mountedCoverageScrollTopBand,
+			resolvePublishedCoverageBand(mountedMeasurement, rangedMeasurement),
 		);
 	};
 
@@ -121,6 +161,7 @@ export function createVirtualScrollWindowMeasurementController<TContext>({
 		}
 
 		let pendingMountedMeasurement: MountedScrollWindowMeasurement | null = null;
+		let pendingRangedMeasurement: RangedScrollWindowMeasurement | null = null;
 		let precomputedRanges: VirtualRanges | undefined;
 
 		if (nextMeasurement.isStableMeasurement && nextMeasurement.isScrollActive) {
@@ -128,26 +169,22 @@ export function createVirtualScrollWindowMeasurementController<TContext>({
 				nextMeasurement,
 				context,
 			);
-			if (
-				isWithinStableMountedScrollWindow(
-					lastMountedScrollWindow,
-					mountedMeasurement.identity,
-					mountedMeasurement.mounted,
-					nextMeasurement.scrollTop,
-				)
-			) {
+			const isStableMountedWindow = isWithinStableMountedScrollWindow(
+				lastMountedScrollWindow,
+				mountedMeasurement.identity,
+				mountedMeasurement.mounted,
+				nextMeasurement.scrollTop,
+			);
+			const isSameMountedWindow = isSameMountedScrollWindow(
+				lastMountedScrollWindow,
+				mountedMeasurement.identity,
+				mountedMeasurement.mounted,
+			);
+			if (isStableMountedWindow) {
 				if (process.env.NODE_ENV !== "production") {
 					recordCCLDevMeasurement("virtualScroll.stableBandHit");
 				}
-				return returnStableScrollMeasurement(nextMeasurement, context);
-			}
-			if (
-				isSameMountedScrollWindow(
-					lastMountedScrollWindow,
-					mountedMeasurement.identity,
-					mountedMeasurement.mounted,
-				)
-			) {
+			} else if (isSameMountedWindow) {
 				if (process.env.NODE_ENV !== "production") {
 					recordCCLDevMeasurement("virtualScroll.sameMountedWindowHit");
 					recordCCLDevMeasurement(
@@ -157,24 +194,15 @@ export function createVirtualScrollWindowMeasurementController<TContext>({
 							: "virtualScroll.sameMountedWindowHit.nonEmpty",
 					);
 				}
-				// Active-scroll preview follows mounted-window publications. Idle
-				// measurement normalizes it to the current viewport afterward.
-				lastMountedScrollWindow = updateMountedScrollWindow(
-					lastMountedScrollWindow,
-					mountedMeasurement.identity,
-					mountedMeasurement.mounted,
-					mountedMeasurement.stableMountedScrollTopBand,
-					mountedMeasurement.mountedCoverageScrollTopBand,
-				);
-				return returnStableScrollMeasurement(nextMeasurement, context);
 			}
 
 			pendingMountedMeasurement = mountedMeasurement;
-			precomputedRanges = resolveScrollWindowMeasurement(
+			pendingRangedMeasurement = resolveScrollWindowMeasurement(
 				nextMeasurement,
 				context,
 				mountedMeasurement.mounted,
-			).ranges;
+			);
+			precomputedRanges = pendingRangedMeasurement.ranges;
 		} else {
 			lastMountedScrollWindow = null;
 		}
@@ -199,12 +227,21 @@ export function createVirtualScrollWindowMeasurementController<TContext>({
 		}
 
 		if (result.kind !== "stable") {
+			if (result.kind === "skipped") {
+				lastMountedScrollWindow = null;
+				return toApplicationResult(result);
+			}
 			lastMountedScrollWindow = pendingMountedMeasurement
 				? createMountedScrollWindow(
 						pendingMountedMeasurement.identity,
 						pendingMountedMeasurement.mounted,
 						pendingMountedMeasurement.stableMountedScrollTopBand,
-						pendingMountedMeasurement.mountedCoverageScrollTopBand,
+						pendingRangedMeasurement
+							? resolvePublishedCoverageBand(
+									pendingMountedMeasurement,
+									pendingRangedMeasurement,
+								)
+							: undefined,
 					)
 				: null;
 			return toApplicationResult(result);
@@ -216,7 +253,12 @@ export function createVirtualScrollWindowMeasurementController<TContext>({
 				pendingMountedMeasurement.identity,
 				pendingMountedMeasurement.mounted,
 				pendingMountedMeasurement.stableMountedScrollTopBand,
-				pendingMountedMeasurement.mountedCoverageScrollTopBand,
+				pendingRangedMeasurement
+					? resolvePublishedCoverageBand(
+							pendingMountedMeasurement,
+							pendingRangedMeasurement,
+						)
+					: undefined,
 			);
 		} else {
 			lastMountedScrollWindow = null;
