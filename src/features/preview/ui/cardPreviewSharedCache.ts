@@ -28,7 +28,7 @@ import {
 	CACHE_KEY_SEPARATOR,
 	getPreviewSettingsSignatures,
 } from "features/preview/core/previewRenderKeys";
-import { DEBUG_DISABLE_RENDERED_PREVIEW_CACHE } from "../../../appConstants";
+import { getDebugDisableRenderedPreviewCache } from "../../../appConstants";
 import type { PluginSettings } from "features/settings/model";
 import { createSizedLRUCache, stringBytes } from "shared/cache/sizedLRUCache";
 
@@ -228,7 +228,7 @@ function resolveFirstMatchIndex(
 export function getRenderedPreviewCacheEntry(
 	cacheKey: string,
 ): RenderedTextPreviewCacheEntry | undefined {
-	if (DEBUG_DISABLE_RENDERED_PREVIEW_CACHE) {
+	if (getDebugDisableRenderedPreviewCache()) {
 		return undefined;
 	}
 
@@ -379,7 +379,7 @@ export async function getOrCreateRenderedTextPreviewEntry(params: {
 		);
 	}
 
-	if (DEBUG_DISABLE_RENDERED_PREVIEW_CACHE) {
+	if (getDebugDisableRenderedPreviewCache()) {
 		return renderTextPreviewEntry({
 			content,
 			app,

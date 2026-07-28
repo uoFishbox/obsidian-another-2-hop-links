@@ -122,7 +122,14 @@ export function setDebugDisableCardDomPreview(value: boolean): boolean {
 	_debugDisableCardDomPreview = value;
 	return _debugDisableCardDomPreview;
 }
-export const DEBUG_DISABLE_RENDERED_PREVIEW_CACHE = true;
+let _debugDisableRenderedPreviewCache = true;
+export function getDebugDisableRenderedPreviewCache(): boolean {
+	return _debugDisableRenderedPreviewCache;
+}
+export function setDebugDisableRenderedPreviewCache(value: boolean): boolean {
+	_debugDisableRenderedPreviewCache = value;
+	return _debugDisableRenderedPreviewCache;
+}
 export const UNRESOLVED_LINK_ATTRIBUTE = {
 	NAME: "data-twohop-link-state",
 	VALUE_SPECIAL: "special-unresolved",

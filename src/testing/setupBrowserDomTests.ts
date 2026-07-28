@@ -1,4 +1,7 @@
 import { vi } from "vitest";
+import { setDebugDisableRenderedPreviewCache } from "appConstants";
+
+setDebugDisableRenderedPreviewCache(false);
 
 if (typeof globalThis.requestAnimationFrame !== "function") {
 	let nextFrameId = 1;

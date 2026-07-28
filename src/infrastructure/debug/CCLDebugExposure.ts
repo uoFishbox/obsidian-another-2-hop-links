@@ -2,6 +2,8 @@ import type { PluginHost } from "types/pluginHost";
 import {
 	getDebugDisableCardDomPreview,
 	setDebugDisableCardDomPreview,
+	getDebugDisableRenderedPreviewCache,
+	setDebugDisableRenderedPreviewCache,
 } from "appConstants";
 import {
 	forceCloseShadowDesktopPopover,
@@ -36,6 +38,8 @@ interface CCLDevMeasurementsApi {
 interface CCLDebugApi {
 	readonly disableCardDomPreview: boolean;
 	toggleDisableCardDomPreview(value?: boolean): boolean;
+	readonly disableRenderedPreviewCache: boolean;
+	toggleDisableRenderedPreviewCache(value?: boolean): boolean;
 	readonly autoFreeze: boolean;
 	readonly lastSnapshot: ReturnType<typeof getCCLDebugLastSnapshot>;
 	readonly frozenPopover: unknown;
@@ -193,6 +197,15 @@ export function installCCLDebugExposure(plugin: PluginHost): void {
 			const next = value ?? !getDebugDisableCardDomPreview();
 			const result = setDebugDisableCardDomPreview(next);
 			console.info(`[CCL] DEBUG_DISABLE_CARD_DOM_PREVIEW = ${result}`);
+			return result;
+		},
+		get disableRenderedPreviewCache() {
+			return getDebugDisableRenderedPreviewCache();
+		},
+		toggleDisableRenderedPreviewCache(value?: boolean) {
+			const next = value ?? !getDebugDisableRenderedPreviewCache();
+			const result = setDebugDisableRenderedPreviewCache(next);
+			console.info(`[CCL] DEBUG_DISABLE_RENDERED_PREVIEW_CACHE = ${result}`);
 			return result;
 		},
 		get autoFreeze() {
