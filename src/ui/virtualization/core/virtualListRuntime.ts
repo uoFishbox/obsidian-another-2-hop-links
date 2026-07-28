@@ -16,6 +16,7 @@ import type {
 	VirtualListMode,
 } from "./VirtualListMode";
 import type { MountedVirtualCell, VirtualRanges, VirtualRowModel } from "../types";
+import type { ResidentSlotResetReason } from "./residentSlotAllocator";
 
 export interface ApplyVirtualListMeasurementParams<
 	TCell,
@@ -110,7 +111,7 @@ export interface CreateVirtualListRuntimeOptions<
 	providePreviousCellsByKey?: boolean;
 	trackMountedCellsForChange?: boolean;
 	mountedRowsReconciler?: {
-		reset(reason: "empty" | "layout" | "source"): void;
+		reset(reason: ResidentSlotResetReason): void;
 		dispose(): void;
 	};
 }

@@ -71,7 +71,7 @@ export function buildTwoHopMountedRows(params: {
 	const slotPool = allocator.prepareRange({
 		start,
 		end,
-		layoutRevision: rowModel.layoutRevision,
+		slotTopologyRevision: rowModel.geometry.columns,
 	});
 	if (
 		previousBuild?.rowModel === rowModel &&

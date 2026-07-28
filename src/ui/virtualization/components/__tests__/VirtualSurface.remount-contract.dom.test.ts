@@ -71,7 +71,7 @@ function buildRowCellsWithSlotReuse(
 	allocator.prepareRange({
 		start: rowStart,
 		end: rowStart + mountedRows,
-		layoutRevision: "three-column-contract",
+		slotTopologyRevision: 3,
 	});
 
 	for (let r = 0; r < mountedRows; r += 1) {

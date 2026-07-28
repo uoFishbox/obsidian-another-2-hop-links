@@ -8,7 +8,7 @@ import {
 	type ResidentSlotPoolId,
 } from "./residentSlotBinding";
 
-export type ResidentSlotResetReason = "empty" | "layout" | "source";
+export type ResidentSlotResetReason = "empty" | "source" | "topology";
 
 /**
  * Lightweight ownership publication used to validate mounted-build reuse.
@@ -23,13 +23,21 @@ export interface ResidentSlotPoolPublication {
 	readonly capacity: number;
 }
 
+export interface ResidentRowSlotRange {
+	readonly start: number;
+	readonly end: number;
+	/**
+	 * Revision of the mapping between a logical row and its physical cell slots.
+	 *
+	 * Grid consumers use their column count. Pure geometry changes such as row
+	 * height, gap, or cell width must not change this revision.
+	 */
+	readonly slotTopologyRevision: number;
+}
+
 export interface ResidentRowSlotAllocator {
 	/** Reconciles a bounded physical slot pool with a contiguous integer row range. */
-	prepareRange(params: {
-		readonly start: number;
-		readonly end: number;
-		readonly layoutRevision: unknown;
-	}): ResidentSlotPoolPublication;
+	prepareRange(params: ResidentRowSlotRange): ResidentSlotPoolPublication;
 	resolveSlotLease(logicalRowIndex: number): ResidentRowSlotLease | undefined;
 	reset(reason: ResidentSlotResetReason): void;
 	dispose(): void;
@@ -44,8 +52,8 @@ export function createResidentRowSlotAllocator(): ResidentRowSlotAllocator {
 	let capacity = 0;
 	let epoch = 0;
 	let revision = 0;
-	let layoutRevision: unknown;
-	let hasLayoutRevision = false;
+	let slotTopologyRevision = 0;
+	let hasSlotTopologyRevision = false;
 	let activeStart = 0;
 	let activeEnd = 0;
 	let hasActiveRange = false;
@@ -58,8 +66,8 @@ export function createResidentRowSlotAllocator(): ResidentRowSlotAllocator {
 
 	function reset(_reason: ResidentSlotResetReason): void {
 		capacity = 0;
-		layoutRevision = undefined;
-		hasLayoutRevision = false;
+		slotTopologyRevision = 0;
+		hasSlotTopologyRevision = false;
 		activeStart = 0;
 		activeEnd = 0;
 		hasActiveRange = false;
@@ -72,19 +80,15 @@ export function createResidentRowSlotAllocator(): ResidentRowSlotAllocator {
 		publication = createPublication();
 	}
 
-	function prepareRange(params: {
-		readonly start: number;
-		readonly end: number;
-		readonly layoutRevision: unknown;
-	}): ResidentSlotPoolPublication {
+	function prepareRange(params: ResidentRowSlotRange): ResidentSlotPoolPublication {
 		if (disposed) return publication;
 		recordCCLDevMeasurement("virtualGrid.contiguousSlotPool.apply");
 
 		const start = Math.max(0, Math.floor(params.start));
 		const end = Math.max(start, Math.floor(params.end));
 		if (
-			hasLayoutRevision &&
-			Object.is(layoutRevision, params.layoutRevision) &&
+			hasSlotTopologyRevision &&
+			Object.is(slotTopologyRevision, params.slotTopologyRevision) &&
 			hasActiveRange &&
 			activeStart === start &&
 			activeEnd === end
@@ -93,11 +97,14 @@ export function createResidentRowSlotAllocator(): ResidentRowSlotAllocator {
 			return publication;
 		}
 
-		if (hasLayoutRevision && !Object.is(layoutRevision, params.layoutRevision)) {
-			reset("layout");
+		if (
+			hasSlotTopologyRevision &&
+			!Object.is(slotTopologyRevision, params.slotTopologyRevision)
+		) {
+			reset("topology");
 		}
-		layoutRevision = params.layoutRevision;
-		hasLayoutRevision = true;
+		slotTopologyRevision = params.slotTopologyRevision;
+		hasSlotTopologyRevision = true;
 
 		const leavingSlotIndices: number[] = [];
 		for (const [logicalRowIndex, slotIndex] of logicalRowToSlot) {

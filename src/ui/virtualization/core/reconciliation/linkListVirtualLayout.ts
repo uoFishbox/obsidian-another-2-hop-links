@@ -435,7 +435,7 @@ const assertMountedVirtualGridBuildInvariants = <T>(
 
 function resolveMountedRowSlotAllocation(params: {
 	visibleRows: RowRange;
-	layoutRevision: unknown;
+	slotTopologyRevision: number;
 	previousBuildState?: MountedVirtualGridCellsBuildState<unknown>;
 	rowSlotAllocator?: ResidentRowSlotAllocator;
 }): {
@@ -449,7 +449,7 @@ function resolveMountedRowSlotAllocation(params: {
 	allocator.prepareRange({
 		start: params.visibleRows.start,
 		end: params.visibleRows.end,
-		layoutRevision: params.layoutRevision,
+		slotTopologyRevision: params.slotTopologyRevision,
 	});
 
 	return {
@@ -483,8 +483,6 @@ function buildMountedVirtualGridCellsFromCore<T>(params: {
 	const visibleRows = resolveVisibleRowWindow(visibleWindow, columns);
 	const rowStep = params.rowHeight + params.gap;
 	const colStep = params.cellWidth + params.gap;
-	const layoutRevision = `${columns}|${params.cellWidth}|${params.rowHeight}|${params.gap}`;
-
 	const hasCompatiblePreviousBuild = hasCompatibleMountedVirtualGridCellsBuild(
 		previousBuild,
 		previousBuildState,
@@ -518,7 +516,7 @@ function buildMountedVirtualGridCellsFromCore<T>(params: {
 	const { allocation: slotAllocation, allocator: rowSlotAllocator } =
 		resolveMountedRowSlotAllocation({
 			visibleRows,
-			layoutRevision,
+			slotTopologyRevision: columns,
 			previousBuildState: previousBuildState as
 				| MountedVirtualGridCellsBuildState<unknown>
 				| undefined,

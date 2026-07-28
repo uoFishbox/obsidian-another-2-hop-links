@@ -143,6 +143,96 @@ describe("TwoHop keyed mounted rows", () => {
 		).toBe(first);
 	});
 
+	it("updates row geometry without resetting slots when columns stay unchanged", () => {
+		const document = createTwoHopDocument({
+			sections: [createSection(20)],
+			visibleCounts: {},
+			initialVisibleCount: 20,
+		});
+		const initialRowModel = createTwoHopVirtualRowModel(
+			document,
+			createLayoutPublication(layout, 1),
+		);
+		const resizedRowModel = createTwoHopVirtualRowModel(
+			document,
+			createLayoutPublication(
+				{
+					...layout,
+					containerWidth: 400,
+					cellWidth: 190,
+					rowHeight: 140,
+					gap: 12,
+					sectionMarginBottom: 24,
+				},
+				2,
+			),
+		);
+		const allocator = createResidentRowSlotAllocator();
+		const first = buildTwoHopMountedRows({
+			rowModel: initialRowModel,
+			rowRange: { start: 1, end: 4 },
+			rowSlotAllocator: allocator,
+		});
+		const resized = buildTwoHopMountedRows({
+			rowModel: resizedRowModel,
+			rowRange: { start: 1, end: 4 },
+			previousBuild: first,
+			rowSlotAllocator: allocator,
+		});
+
+		expect(resized).not.toBe(first);
+		expect(resized.rowSlices[0]?.top).not.toBe(first.rowSlices[0]?.top);
+		expect(resized.slotPool).toBe(first.slotPool);
+		expect(resized.slotPool.poolEpoch).toBe(first.slotPool.poolEpoch);
+		for (let index = 0; index < resized.rowSlices.length; index += 1) {
+			expect(resized.rowSlices[index]?.slotLease).toBe(
+				first.rowSlices[index]?.slotLease,
+			);
+		}
+	});
+
+	it("resets slots when the column topology changes", () => {
+		const document = createTwoHopDocument({
+			sections: [createSection(20)],
+			visibleCounts: {},
+			initialVisibleCount: 20,
+		});
+		const initialRowModel = createTwoHopVirtualRowModel(
+			document,
+			createLayoutPublication(layout, 1),
+		);
+		const singleColumnRowModel = createTwoHopVirtualRowModel(
+			document,
+			createLayoutPublication(
+				{
+					...layout,
+					columns: 1,
+					cellWidth: 420,
+				},
+				2,
+			),
+		);
+		const allocator = createResidentRowSlotAllocator();
+		const first = buildTwoHopMountedRows({
+			rowModel: initialRowModel,
+			rowRange: { start: 1, end: 4 },
+			rowSlotAllocator: allocator,
+		});
+		const singleColumn = buildTwoHopMountedRows({
+			rowModel: singleColumnRowModel,
+			rowRange: { start: 1, end: 4 },
+			previousBuild: first,
+			rowSlotAllocator: allocator,
+		});
+
+		expect(singleColumn.slotPool.poolEpoch).toBeGreaterThan(
+			first.slotPool.poolEpoch,
+		);
+		expect(singleColumn.rowSlices[0]?.slotLease).not.toBe(
+			first.rowSlices[0]?.slotLease,
+		);
+	});
+
 	it("rebuilds row and cell leases after an allocator reset", () => {
 		const document = createTwoHopDocument({
 			sections: [createSection(20)],
