@@ -27,9 +27,9 @@ function createLinkResultWithBranch(
 				},
 				hop2: hop2Paths.map((p) => ({
 					rawText: createMockTFile(p).basename,
-					path: p,
+					path: branchTargetPath,
 					isUnresolved: false,
-					sourceFile: branchTargetFile,
+					sourceFile: createMockTFile(p),
 				})),
 			},
 		],

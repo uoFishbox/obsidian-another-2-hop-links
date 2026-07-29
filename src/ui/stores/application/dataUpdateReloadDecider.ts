@@ -137,9 +137,7 @@ function collectRelevantPaths(
 			paths.add(branch.hop1.path);
 		}
 		for (const hop2 of branch.hop2) {
-			if (hop2.path) {
-				paths.add(hop2.path);
-			}
+			paths.add(hop2.sourceFile.path);
 		}
 	}
 

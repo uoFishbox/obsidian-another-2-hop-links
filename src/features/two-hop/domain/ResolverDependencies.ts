@@ -30,9 +30,7 @@ export function collectResolverDependencies(
 			dependencyPaths.add(branch.hop1.path);
 		}
 		for (const hop2 of branch.hop2) {
-			if (hop2.path) {
-				dependencyPaths.add(hop2.path);
-			}
+			dependencyPaths.add(hop2.sourceFile.path);
 		}
 		const lookupPath = getLookupPathForLink(branch.hop1);
 		dependencyLookupKeys.add(toCaseInsensitiveLookupKey(lookupPath));
