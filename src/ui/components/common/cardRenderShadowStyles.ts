@@ -34,7 +34,6 @@ export const CARD_RENDER_SHADOW_CSS = String.raw`
 	min-width: 0;
 	width: var(--ccl-cell-width);
 	height: var(--ccl-box-height);
-	contain: layout paint;
 }
 
 .view-plan-flow-cell {
@@ -53,12 +52,13 @@ export const CARD_RENDER_SHADOW_CSS = String.raw`
 	height: var(--ccl-box-height);
 }
 
-.view-plan-virtual-list-cell {
-    contain: layout paint;
+.view-plan-virtual-list-cell,
+.view-plan-flow-cell {
+	contain: layout;
 }
 
 .cosense-card-links__virtual-grid-cell {
-    contain: layout;
+	contain: layout;
 }
 
 .view-plan-flow-row {
@@ -70,7 +70,7 @@ export const CARD_RENDER_SHADOW_CSS = String.raw`
 	height: var(--ccl-box-height);
 	display: flex;
 	gap: var(--ccl-box-gap);
-	contain: layout paint;
+	contain: layout;
 }
 
 .cosense-card-links__virtual-grid-row {
@@ -272,24 +272,6 @@ export const CARD_RENDER_SHADOW_CSS = String.raw`
 	z-index: 0;
 }
 
-.preview-mount-slot {
-	contain: layout style;
-	width: auto;
-	position: relative;
-	display: flex;
-	flex: 1 1 auto;
-	flex-direction: column;
-	min-height: inherit;
-	height: 100%;
-	overflow: visible;
-}
-
-
-.preview-mount-slot,
-.cosense-card-links__box-preview {
-	pointer-events: none !important;
-}
-
 .cosense-card-links__box-preview a,
 .cosense-card-links__box-preview img,
 .cosense-card-links__box-preview [draggable="true"] {
@@ -314,25 +296,17 @@ export const CARD_RENDER_SHADOW_CSS = String.raw`
 }
 
 .cosense-card-links__box-preview {
-	contain: layout;
+	pointer-events: none !important;
 	font-size: var(--ccl-preview-font-size);
 	color: var(--ccl-box-text-content);
 	white-space: pre-line;
 	user-select: none;
-	flex: 1 1 auto;
-	min-height: 1em;
-	min-width: 0;
-	overflow: clip;
-}
-
-
-.cosense-card-links__box-preview {
 	flex: 1 1 0;
+	min-width: 0;
 	min-height: 0;
-	contain: size layout;
 	overflow: clip;
+	contain: size layout paint;
 }
-
 
 .cosense-card-links__box-preview.hidden {
 	display: none;
@@ -437,10 +411,6 @@ export const CARD_RENDER_SHADOW_CSS = String.raw`
 
 .twohop-keyed-surface {
 	contain: layout paint style;
-}
-
-.twohop-keyed-row {
-	contain: layout paint;
 }
 
 @media (hover: hover) {
