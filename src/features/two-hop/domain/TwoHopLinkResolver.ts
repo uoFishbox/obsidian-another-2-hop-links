@@ -22,6 +22,8 @@ import {
 	freezeTwoHopLinkResult,
 } from "./immutableTwoHopLinkResult";
 
+let nextDisplaySnapshotRevision = 0;
+
 export interface ResolveOptions {
 	includeTaggedNotes?: boolean;
 }
@@ -175,6 +177,7 @@ export class TwoHopLinkResolver {
 				return cachedResult;
 			}
 
+			const displaySnapshotRevision = ++nextDisplaySnapshotRevision;
 			const cache = this.metadataCache.getFileCache(
 				targetFile,
 			) as CachedMetadataWithLinkReferences | null;
@@ -201,7 +204,10 @@ export class TwoHopLinkResolver {
 				branches: baseBranches,
 				backlinks: uniqueBacklinks,
 				taggedNotes: [],
-				displayVersions: this.createDisplayVersions(indexVersion, "base"),
+				displayVersions: this.createDisplayVersions(
+					displaySnapshotRevision,
+					"base",
+				),
 			});
 			onProgress?.({
 				phase: "base",
@@ -219,7 +225,10 @@ export class TwoHopLinkResolver {
 				branches: twoHopBranches,
 				backlinks: uniqueBacklinks,
 				taggedNotes: [],
-				displayVersions: this.createDisplayVersions(indexVersion, "twohop"),
+				displayVersions: this.createDisplayVersions(
+					displaySnapshotRevision,
+					"twohop",
+				),
 			});
 			onProgress?.({
 				phase: "twohop",
@@ -238,7 +247,7 @@ export class TwoHopLinkResolver {
 				backlinks: uniqueBacklinks,
 				taggedNotes,
 				displayVersions: this.createDisplayVersions(
-					indexVersion,
+					displaySnapshotRevision,
 					"complete",
 					resolveSettings.includeTaggedNotes,
 				),
@@ -321,11 +330,11 @@ export class TwoHopLinkResolver {
 	}
 
 	private createDisplayVersions(
-		indexVersion: number,
+		displaySnapshotRevision: number,
 		phase: ResolvePhase,
 		includeTaggedNotes = true,
 	): DisplayDataVersions {
-		const versionPrefix = String(indexVersion);
+		const versionPrefix = String(displaySnapshotRevision);
 		switch (phase) {
 			case "base":
 				return {

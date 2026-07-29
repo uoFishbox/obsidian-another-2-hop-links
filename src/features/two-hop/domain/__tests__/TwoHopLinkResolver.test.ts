@@ -292,6 +292,45 @@ describe("TwoHopLinkResolver", () => {
 	});
 
 	describe("cache and updates", () => {
+		test("display link revision changes when branch performance settings change at the same index version", async () => {
+			const env = await buildResolvedEnvironment([
+				{ path: "origin.md", links: ["note1", "note2"] },
+				{ path: "note1.md" },
+				{ path: "note2.md" },
+				{ path: "backlink1.md", links: ["note1"] },
+				{ path: "backlink2.md", links: ["note1"] },
+			]);
+			const performanceSettings: ResolverPerformanceSettings = {
+				enableProgressiveTwoHopBuild: true,
+				maxOutgoingToProcess: 1,
+				maxHop2PerBranch: 1,
+			};
+			const resolver = createResolver(env, env.service, {
+				performance: () => performanceSettings,
+			});
+			const indexVersion = env.service.getIndexVersion();
+
+			const outgoingLimited = await resolver.resolve(env.files["origin.md"]);
+			expect(outgoingLimited.branches).toHaveLength(1);
+			expect(outgoingLimited.branches[0].hop2).toHaveLength(1);
+
+			performanceSettings.maxOutgoingToProcess = 2;
+			const outgoingExpanded = await resolver.resolve(env.files["origin.md"]);
+			expect(env.service.getIndexVersion()).toBe(indexVersion);
+			expect(outgoingExpanded.branches).toHaveLength(2);
+			expect(outgoingExpanded.displayVersions?.links).not.toBe(
+				outgoingLimited.displayVersions?.links,
+			);
+
+			performanceSettings.maxHop2PerBranch = 2;
+			const hop2Expanded = await resolver.resolve(env.files["origin.md"]);
+			expect(env.service.getIndexVersion()).toBe(indexVersion);
+			expect(branchFor(hop2Expanded, "note1.md")?.hop2).toHaveLength(2);
+			expect(hop2Expanded.displayVersions?.links).not.toBe(
+				outgoingExpanded.displayVersions?.links,
+			);
+		});
+
 		test("concurrent same-file resolve shares the same in-flight result", async () => {
 			const env = await buildResolvedEnvironment([
 				{ path: "origin.md", links: ["note1"] },
