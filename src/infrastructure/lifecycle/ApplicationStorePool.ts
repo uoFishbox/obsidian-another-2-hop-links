@@ -118,19 +118,28 @@ export class ApplicationStorePool {
 	}
 
 	trimIdleStores(): void {
-		const idleEntries = Array.from(this.stores.entries())
-			.filter(([key]) => (this.refCounts.get(key) ?? 0) === 0)
-			.map(([key, store]) => ({
+		const idleEntries: Array<{
+			key: string;
+			store: ApplicationStore;
+			lastAccess: number;
+		}> = [];
+		for (const [key, store] of this.stores) {
+			if ((this.refCounts.get(key) ?? 0) !== 0) {
+				continue;
+			}
+			idleEntries.push({
 				key,
 				store,
 				lastAccess: this.lastAccess.get(key) ?? 0,
-			}));
+			});
+		}
 
 		if (idleEntries.length <= RECENT_APPLICATION_STORE_LIMIT) return;
 
 		idleEntries.sort((left, right) => left.lastAccess - right.lastAccess);
 		const evictionCount = idleEntries.length - RECENT_APPLICATION_STORE_LIMIT;
-		for (const { key, store } of idleEntries.slice(0, evictionCount)) {
+		for (let index = 0; index < evictionCount; index += 1) {
+			const { key, store } = idleEntries[index];
 			store.destroy();
 			this.deleteEntry(key);
 			this.maybeReleaseDisplayDataBuilder(readLeafId(key));

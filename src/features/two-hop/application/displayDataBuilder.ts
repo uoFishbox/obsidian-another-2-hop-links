@@ -528,10 +528,7 @@ function createSortCacheKey(
 	sortOption: SortOption,
 	sortContextVersion: number,
 ): string {
-	return createStructuredCacheKey({
-		sortOption,
-		sortContextVersion,
-	});
+	return `${sortContextVersion}\u0000${sortOption}`;
 }
 
 export function getSortedItemsWithCache<T extends SortableItem>(

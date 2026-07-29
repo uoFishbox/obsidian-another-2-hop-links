@@ -147,10 +147,10 @@ export class SortService implements ISortService {
 					tieBreakerKeys[rightIndex] = rightTieBreaker;
 				}
 
-				const tieBreakerCompare = this.collator.compare(
-					leftTieBreaker,
-					rightTieBreaker,
-				);
+				const tieBreakerCompare =
+					leftTieBreaker === rightTieBreaker
+						? 0
+						: this.collator.compare(leftTieBreaker, rightTieBreaker);
 
 				if (tieBreakerCompare !== 0) {
 					return tieBreakerCompare;
@@ -176,6 +176,10 @@ export class SortService implements ISortService {
 	}
 
 	private compareSortKeys(a: SortKey, b: SortKey): number {
+		if (a === b) {
+			return 0;
+		}
+
 		if (typeof a === "string" && typeof b === "string") {
 			return this.collator.compare(a, b);
 		}

@@ -2,6 +2,12 @@ import { App, Notice, TFile } from "obsidian";
 import { resolveFileByPath } from "shared/obsidian/resolveFileByPath";
 import type { TwoHopLinkResult } from "types/domain";
 
+const PAGE_TYPE_SORT_ORDER = {
+	mainpage: 0,
+	"1hopLink": 1,
+	"2hopLink": 2,
+} as const;
+
 interface ExportPageData {
 	file: TFile;
 	type: "mainpage" | "1hopLink" | "2hopLink";
@@ -116,10 +122,9 @@ async function generateExportContent(
 	lines.push("<PageList>");
 
 	// Sort order: mainpage -> 1hopLink -> 2hopLink
-	const sortedPages = Array.from(pagesMap.values()).sort((a, b) => {
-		const order = { mainpage: 0, "1hopLink": 1, "2hopLink": 2 };
-		return order[a.type] - order[b.type];
-	});
+	const sortedPages = Array.from(pagesMap.values()).sort(
+		(a, b) => PAGE_TYPE_SORT_ORDER[a.type] - PAGE_TYPE_SORT_ORDER[b.type],
+	);
 
 	for (const pageData of sortedPages) {
 		const { file, type } = pageData;

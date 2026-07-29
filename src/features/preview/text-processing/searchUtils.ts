@@ -57,13 +57,14 @@ function getCachedRegExpSource(query: string | undefined): string | null {
 	}
 
 	const terms = getSearchQueryTerms(query);
-	const source =
-		terms.length === 0
-			? null
-			: [...terms]
-					.sort((a, b) => b.length - a.length)
-					.map(escapeRegExp)
-					.join("|");
+	let source: string | null = null;
+	if (terms.length > 0) {
+		terms.sort((a, b) => b.length - a.length);
+		for (let index = 0; index < terms.length; index += 1) {
+			terms[index] = escapeRegExp(terms[index]);
+		}
+		source = terms.join("|");
+	}
 
 	regexpSourceCache.set(cacheKey, source);
 	if (regexpSourceCache.size > REGEXP_SOURCE_CACHE_MAX_SIZE) {

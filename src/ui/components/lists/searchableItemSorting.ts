@@ -6,6 +6,13 @@ import type { ISortService } from "types/services";
 
 export type ViewItemSortCache = Map<string, WeakMap<ViewItem[], ViewItem[]>>;
 
+interface DuplicateViewItemBucket {
+	readonly items: ViewItem[];
+	nextIndex: number;
+}
+
+type ViewItemBucket = ViewItem | DuplicateViewItemBucket;
+
 export interface BookmarkedViewItemOrder {
 	filePaths: { size: number };
 	orderedFilePaths: readonly string[];
@@ -50,20 +57,25 @@ function sortViewItems(
 		return viewItems;
 	}
 
-	const itemMap = new Map<SortableItem, ViewItem[]>();
+	const itemMap = new Map<SortableItem, ViewItemBucket>();
 	const rawItems: SortableItem[] = new Array(viewItems.length);
 
 	for (let index = 0; index < viewItems.length; index += 1) {
 		const viewItem = viewItems[index];
 		const raw = fromViewItem(viewItem);
 		rawItems[index] = raw;
-		const existing = itemMap.get(raw) ?? [];
-		existing.push(viewItem);
-		itemMap.set(raw, existing);
+		const existing = itemMap.get(raw);
+		if (!existing) {
+			itemMap.set(raw, viewItem);
+		} else if ("items" in existing) {
+			existing.items.push(viewItem);
+		} else {
+			itemMap.set(raw, { items: [existing, viewItem], nextIndex: 0 });
+		}
 	}
 
 	const sortedRaw = sortService.sort(rawItems, option);
-	if (hasSameRawItemOrder(rawItems, sortedRaw)) {
+	if (sortedRaw === rawItems || hasSameRawItemOrder(rawItems, sortedRaw)) {
 		return viewItems;
 	}
 
@@ -71,7 +83,7 @@ function sortViewItems(
 	for (let index = 0; index < sortedRaw.length; index += 1) {
 		const raw = sortedRaw[index];
 		const bucket = itemMap.get(raw);
-		if (!bucket || bucket.length === 0) {
+		if (!bucket) {
 			if (!fallbackFactory) {
 				throw new Error("Missing fallback view item factory");
 			}
@@ -79,13 +91,15 @@ function sortViewItems(
 			continue;
 		}
 
-		const next = bucket.shift();
-		if (bucket.length > 0) {
-			itemMap.set(raw, bucket);
+		if ("items" in bucket) {
+			sortedItems[index] = bucket.items[bucket.nextIndex++];
+			if (bucket.nextIndex >= bucket.items.length) {
+				itemMap.delete(raw);
+			}
 		} else {
+			sortedItems[index] = bucket;
 			itemMap.delete(raw);
 		}
-		sortedItems[index] = next!;
 	}
 	return sortedItems;
 }

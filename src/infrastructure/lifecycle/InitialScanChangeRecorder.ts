@@ -1,14 +1,12 @@
 import type { IncrementalFileChange } from "core/indexing/types/IndexTypes";
 
 interface InitialTouchedPath {
-	order: number;
 	structural: boolean;
 	metadataSensitiveGeneration?: number;
 }
 
 export class InitialScanChangeRecorder {
-	private readonly touched = new Map<string, InitialTouchedPath>();
-	private nextOrder = 0;
+	private touched = new Map<string, InitialTouchedPath>();
 
 	record(change: IncrementalFileChange, metadataGeneration: number): void {
 		switch (change.type) {
@@ -56,15 +54,12 @@ export class InitialScanChangeRecorder {
 		fileExists: (path: string) => boolean,
 		shouldIndexPath: (path: string) => boolean,
 	): IncrementalFileChange[] {
-		const entries = [...this.touched.entries()].sort(
-			([, a], [, b]) => a.order - b.order,
-		);
-
-		this.touched.clear();
+		const touched = this.touched;
+		this.touched = new Map();
 
 		const changes: IncrementalFileChange[] = [];
 
-		for (const [path, entry] of entries) {
+		for (const [path, entry] of touched) {
 			if (!shouldIndexPath(path)) {
 				changes.push({ type: "delete", path });
 				continue;
@@ -99,7 +94,6 @@ export class InitialScanChangeRecorder {
 		}
 
 		this.touched.set(path, {
-			order: this.nextOrder++,
 			structural,
 			metadataSensitiveGeneration,
 		});
