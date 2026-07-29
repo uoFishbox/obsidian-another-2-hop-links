@@ -56,6 +56,7 @@ import {
 } from "features/two-hop/ui/twoHopRevisions";
 import type { TwoHopPreviewDependencies } from "features/two-hop/ui/twoHopPreviewDependencies";
 import { recordCCLDevMeasurement } from "infrastructure/debug/CCLDevMeasurements";
+import { createTwoHopCardModelPrewarmer } from "features/two-hop/ui/twoHopCardModelPrewarmer";
 
 export interface TwoHopVirtualListProps {
 	readonly sections: readonly TwoHopVirtualSectionDescriptor[];
@@ -180,16 +181,24 @@ export function useTwoHopVirtualList(
 		resolver: TwoHopVirtualListProps["resolveItemCardModel"],
 	) => {
 		if (cell.cell.kind !== "item" || !resolver) return undefined;
-		const presentation = resolveTwoHopCardPresentation(
-			cell.cell.item,
-			cell.section.header.section,
-		);
+		return resolveCardModel(cell.cell.item, cell.section.header.section, resolver);
+	};
+
+	const resolveCardModel = (
+		item: TwoHopVirtualListItem,
+		section: TwoHopVirtualSectionDescriptor["section"],
+		resolver: NonNullable<TwoHopVirtualListProps["resolveItemCardModel"]>,
+	): CardRenderModel | undefined => {
+		const presentation = resolveTwoHopCardPresentation(item, section);
 		if (!presentation) return undefined;
 		if (process.env.NODE_ENV !== "production") {
 			recordCCLDevMeasurement("twoHop.resolveItemCardModel.call");
 		}
-		return resolver(cell.cell.item, presentation);
+		return resolver(item, presentation);
 	};
+	const cardModelPrewarmer = createTwoHopCardModelPrewarmer({
+		frameCoordinator,
+	});
 
 	const cardSlotBindings = createVirtualCardSlotBindings<
 		TwoHopMountedCell,
@@ -369,7 +378,20 @@ export function useTwoHopVirtualList(
 		});
 	});
 
+	$effect(() => {
+		const activeDocument = document;
+		const resolver = props.resolveItemCardModel;
+		if (!resolver) {
+			cardModelPrewarmer.cancel();
+			return;
+		}
+		cardModelPrewarmer.schedule(activeDocument, (item, section) => {
+			resolveCardModel(item, section, resolver);
+		});
+	});
+
 	onDestroy(() => {
+		cardModelPrewarmer.dispose();
 		previewSurface.dispose();
 		interactionController.clear();
 	});

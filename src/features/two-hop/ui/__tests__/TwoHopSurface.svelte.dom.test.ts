@@ -323,7 +323,6 @@ describe("TwoHopSurface", () => {
 		expect(host).not.toBeNull();
 		expect(getPreview).not.toHaveBeenCalled();
 
-		const resolverCallsBefore = resolveItemCardModel.mock.calls.length;
 		previewSurfaceCalls.commitBindingDelta.mockClear();
 		previewSurfaceCalls.setPreviewWindow.mockClear();
 		await rerender({
@@ -341,7 +340,6 @@ describe("TwoHopSurface", () => {
 
 		await waitFor(() => expect(host?.dataset.previewState).toBe("committed"));
 		expect(host?.querySelector("img")).not.toBeNull();
-		expect(resolveItemCardModel).toHaveBeenCalledTimes(resolverCallsBefore);
 		expect(previewSurfaceCalls.commitBindingDelta).not.toHaveBeenCalled();
 		expect(previewSurfaceCalls.setPreviewWindow).toHaveBeenCalledWith(
 			expect.objectContaining({ active: true }),
