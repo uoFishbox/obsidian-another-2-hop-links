@@ -1,6 +1,6 @@
 import type { InteractionDescriptor } from "ui/interactions/interactionTypes";
 import { dispatchVirtualCellWillRebind } from "ui/interactions/virtualCellRebind";
-import type { Action } from "svelte/action";
+import type { ActionReturn } from "svelte/action";
 import {
 	createVirtualCellElementRegistration,
 	type VirtualCellElementRegistration,
@@ -8,35 +8,44 @@ import {
 	type VirtualCellRegistry,
 } from "./VirtualCellRegistry";
 
-export interface VirtualGridCellLifecycle {
-	attach(): void;
-	detach(): void;
-}
-
-export interface VirtualGridCellRebind {
-	element: HTMLElement;
+export interface VirtualGridCellRebindMetadata {
 	previousLogicalKey?: string;
 	nextLogicalKey: string;
 	rowIndex?: number;
 	columnIndex?: number;
 	interactionDescriptor?: InteractionDescriptor | null;
-	lifecycle?: VirtualGridCellLifecycle;
 	cellRegistry?: VirtualCellRegistry;
 	cellRegistrationOwner?: VirtualCellRegistrationOwner;
 }
 
+export interface VirtualGridCellRebind<
+	TLifecycleValue = undefined,
+> extends VirtualGridCellRebindMetadata {
+	lifecycleValue?: TLifecycleValue;
+	onAttach?: (value: TLifecycleValue) => void;
+	onDetach?: (value: TLifecycleValue) => void;
+}
+
 export interface VirtualGridSurfaceTransaction {
-	rebindCell(rebind: VirtualGridCellRebind): void;
+	rebindCell<TLifecycleValue>(
+		element: HTMLElement,
+		rebind: VirtualGridCellRebind<TLifecycleValue>,
+	): void;
 	releaseCell(element: HTMLElement): void;
 }
 
 export interface VirtualGridSurfaceTransactionOptions {
-	onLogicalCellWillRebind?: (rebind: VirtualGridCellRebind) => void;
+	onLogicalCellWillRebind?: (
+		element: HTMLElement,
+		previousLogicalKey: string,
+		rebind: VirtualGridCellRebindMetadata,
+	) => void;
 }
 
-export interface VirtualGridCellActionParams {
+export interface VirtualGridCellActionParams<
+	TLifecycleValue = undefined,
+> extends VirtualGridCellRebind<TLifecycleValue> {
 	transaction: VirtualGridSurfaceTransaction;
-	rebind: Omit<VirtualGridCellRebind, "element">;
 }
 
 interface DirectRegistrationBinding {
@@ -58,7 +67,9 @@ interface CellBinding {
 	rowIndex?: number;
 	columnIndex?: number;
 	interactionDescriptor?: InteractionDescriptor | null;
-	lifecycle?: VirtualGridCellLifecycle;
+	lifecycleValue?: unknown;
+	onAttach?: (value: never) => void;
+	onDetach?: (value: never) => void;
 	registration: RegistrationBinding;
 }
 
@@ -84,7 +95,7 @@ export function createVirtualGridSurfaceTransaction(
 
 	const createRegistration = (
 		element: HTMLElement,
-		rebind: VirtualGridCellRebind,
+		rebind: VirtualGridCellRebindMetadata,
 	): RegistrationBinding => {
 		if (rebind.cellRegistrationOwner && rebind.cellRegistry) {
 			rebind.cellRegistrationOwner.attachElement(element, rebind.cellRegistry);
@@ -107,7 +118,7 @@ export function createVirtualGridSurfaceTransaction(
 
 	const matchesRegistrationOwner = (
 		registration: RegistrationBinding,
-		rebind: VirtualGridCellRebind,
+		rebind: VirtualGridCellRebindMetadata,
 	): boolean => {
 		if (registration.type === "owned") {
 			return (
@@ -125,7 +136,7 @@ export function createVirtualGridSurfaceTransaction(
 	const updateRegistration = (
 		element: HTMLElement,
 		previous: CellBinding | undefined,
-		rebind: VirtualGridCellRebind,
+		rebind: VirtualGridCellRebindMetadata,
 	): RegistrationBinding => {
 		let registration = previous?.registration;
 		if (registration && !matchesRegistrationOwner(registration, rebind)) {
@@ -152,37 +163,51 @@ export function createVirtualGridSurfaceTransaction(
 		return registration;
 	};
 
-	const rebindCell = (rebind: VirtualGridCellRebind): void => {
-		const previous = bindingByElement.get(rebind.element);
+	const rebindCell = <TLifecycleValue>(
+		element: HTMLElement,
+		rebind: VirtualGridCellRebind<TLifecycleValue>,
+	): void => {
+		const previous = bindingByElement.get(element);
 		const previousLogicalKey = previous?.logicalKey ?? rebind.previousLogicalKey;
 		const logicalKeyChanged =
 			previousLogicalKey !== undefined &&
 			previousLogicalKey !== rebind.nextLogicalKey;
 
 		if (logicalKeyChanged) {
-			options.onLogicalCellWillRebind?.({
-				...rebind,
-				previousLogicalKey,
-			});
-			dispatchVirtualCellWillRebind(rebind.element, {
+			options.onLogicalCellWillRebind?.(element, previousLogicalKey, rebind);
+			dispatchVirtualCellWillRebind(element, {
 				previousLogicalKey,
 				nextLogicalKey: rebind.nextLogicalKey,
 			});
-			previous?.lifecycle?.detach();
+			previous?.onDetach?.(previous.lifecycleValue as never);
 		}
 
-		const registration = updateRegistration(rebind.element, previous, rebind);
+		const registration = updateRegistration(element, previous, rebind);
 
 		if (!previous || logicalKeyChanged) {
-			rebind.lifecycle?.attach();
+			rebind.onAttach?.(rebind.lifecycleValue as TLifecycleValue);
 		}
 
-		bindingByElement.set(rebind.element, {
+		if (previous) {
+			previous.logicalKey = rebind.nextLogicalKey;
+			previous.rowIndex = rebind.rowIndex;
+			previous.columnIndex = rebind.columnIndex;
+			previous.interactionDescriptor = rebind.interactionDescriptor;
+			previous.lifecycleValue = rebind.lifecycleValue;
+			previous.onAttach = rebind.onAttach;
+			previous.onDetach = rebind.onDetach;
+			previous.registration = registration;
+			return;
+		}
+
+		bindingByElement.set(element, {
 			logicalKey: rebind.nextLogicalKey,
 			rowIndex: rebind.rowIndex,
 			columnIndex: rebind.columnIndex,
 			interactionDescriptor: rebind.interactionDescriptor,
-			lifecycle: rebind.lifecycle,
+			lifecycleValue: rebind.lifecycleValue,
+			onAttach: rebind.onAttach,
+			onDetach: rebind.onDetach,
 			registration,
 		});
 	};
@@ -191,7 +216,7 @@ export function createVirtualGridSurfaceTransaction(
 		const binding = bindingByElement.get(element);
 		if (!binding) return;
 
-		binding.lifecycle?.detach();
+		binding.onDetach?.(binding.lifecycleValue as never);
 		releaseRegistration(element, binding.registration);
 		bindingByElement.delete(element);
 	};
@@ -203,17 +228,17 @@ export function createVirtualGridSurfaceTransaction(
 }
 
 /** Connects one physical cell element to its surface-owned transaction. */
-export const bindVirtualGridCell: Action<
-	HTMLElement,
-	VirtualGridCellActionParams | undefined
-> = (element, initial) => {
+export function bindVirtualGridCell<TLifecycleValue>(
+	element: HTMLElement,
+	initial: VirtualGridCellActionParams<TLifecycleValue> | undefined,
+): ActionReturn<VirtualGridCellActionParams<TLifecycleValue> | undefined> {
 	let transaction = initial?.transaction;
 	if (initial) {
-		initial.transaction.rebindCell({ element, ...initial.rebind });
+		initial.transaction.rebindCell(element, initial);
 	}
 
 	return {
-		update(next): void {
+		update(next: VirtualGridCellActionParams<TLifecycleValue> | undefined): void {
 			if (!next) {
 				transaction?.releaseCell(element);
 				transaction = undefined;
@@ -223,10 +248,10 @@ export const bindVirtualGridCell: Action<
 				transaction?.releaseCell(element);
 				transaction = next.transaction;
 			}
-			next.transaction.rebindCell({ element, ...next.rebind });
+			next.transaction.rebindCell(element, next);
 		},
 		destroy(): void {
 			transaction?.releaseCell(element);
 		},
 	};
-};
+}

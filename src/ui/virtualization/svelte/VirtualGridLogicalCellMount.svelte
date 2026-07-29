@@ -53,20 +53,14 @@
 		? undefined
 		: {
 				transaction: surfaceTransaction,
-				rebind: {
-					nextLogicalKey: logicalKeyAttribute,
-					rowIndex,
-					columnIndex,
-					lifecycle:
-						mountedCell === undefined
-							? undefined
-							: {
-									attach: () => onLogicalCellAttach?.(mountedCell),
-									detach: () => onLogicalCellDetach?.(mountedCell),
-								},
-					cellRegistry,
-					cellRegistrationOwner,
-				},
+				nextLogicalKey: logicalKeyAttribute,
+				rowIndex,
+				columnIndex,
+				lifecycleValue: mountedCell,
+				onAttach: mountedCell === undefined ? undefined : onLogicalCellAttach,
+				onDetach: mountedCell === undefined ? undefined : onLogicalCellDetach,
+				cellRegistry,
+				cellRegistrationOwner,
 			}}
 	class={className}
 	data-ccl-logical-key={!IS_PROD ? logicalKeyAttribute : undefined}

@@ -53,11 +53,11 @@
 		appContext = undefined;
 	}
 
+	const lowerExtension = $derived(extension?.toLowerCase());
+
 	/** ファイル拡張子を正規化（mdは除外） */
 	const normalizedExtension = $derived(
-		extension && extension.toLowerCase() !== "md"
-			? extension.toLowerCase()
-			: undefined,
+		lowerExtension && lowerExtension !== "md" ? lowerExtension : undefined,
 	);
 
 	/** 拡張子に応じたアイコン名（ICONS のキー） */
@@ -77,7 +77,7 @@
 	}
 
 	const isAttachmentFile = $derived(isAttachment(extension));
-	const extensionClass = $derived(extension ? `ext-${extension.toLowerCase()}` : "");
+	const extensionClass = $derived(lowerExtension ? `ext-${lowerExtension}` : "");
 	const hasSearchQuery = $derived(searchQuery.trim().length > 0);
 	const bookmarkedPathSet = appContext?.bookmarks.filePaths;
 	const showBookmarkIcon = $derived(

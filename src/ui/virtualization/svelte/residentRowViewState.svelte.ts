@@ -31,6 +31,34 @@ export function createVirtualSurfaceResidentRowsAdapter<
 	const residentRowsBySlot = new Map<number, ResidentRow>();
 
 	function sync(occupiedRowsInSlotOrder: readonly TMountedRow[]): void {
+		if (residentRows.length === occupiedRowsInSlotOrder.length) {
+			let hasSameSlotTopology = true;
+			for (let index = 0; index < occupiedRowsInSlotOrder.length; index += 1) {
+				if (
+					residentRows[index]?.slotIndex !==
+					occupiedRowsInSlotOrder[index]?.slotIndex
+				) {
+					hasSameSlotTopology = false;
+					break;
+				}
+			}
+
+			if (hasSameSlotTopology) {
+				for (
+					let index = 0;
+					index < occupiedRowsInSlotOrder.length;
+					index += 1
+				) {
+					const residentRow = residentRows[index];
+					const row = occupiedRowsInSlotOrder[index];
+					if (residentRow && row && residentRow.row !== row) {
+						residentRow.row = row;
+					}
+				}
+				return;
+			}
+		}
+
 		const nextResidentRows: ResidentRow[] = [];
 		const nextActiveSlots = new Set<number>();
 		for (const row of occupiedRowsInSlotOrder) {

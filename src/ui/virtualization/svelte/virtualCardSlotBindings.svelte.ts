@@ -91,6 +91,7 @@ export function createVirtualCardSlotBindings<
 		ResidentCellSlotIncarnation
 	>();
 	let activeSlotIndices = new Set<number>();
+	let nextActiveSlotIndices = new Set<number>();
 
 	const enteredPreviewSlots: RowPreviewCardBinding[] = [];
 	const reboundPreviewSlots: RowPreviewCardBinding[] = [];
@@ -98,6 +99,29 @@ export function createVirtualCardSlotBindings<
 	const enteredInteractionSlots: VirtualCardInteractionBinding[] = [];
 	const reboundInteractionSlots: VirtualCardInteractionBinding[] = [];
 	const releasedInteractionSlots: string[] = [];
+	const previewDelta: RowPreviewBindingDelta = {
+		enteredSlots: enteredPreviewSlots,
+		reboundSlots: reboundPreviewSlots,
+		releasedSlots: releasedPreviewSlots,
+	};
+	const interactionDelta: VirtualCardInteractionDelta = {
+		enteredSlots: enteredInteractionSlots,
+		reboundSlots: reboundInteractionSlots,
+		releasedSlots: releasedInteractionSlots,
+	};
+
+	const releaseBinding = (
+		slotIndex: number,
+		previous: VirtualCardSlotBinding<TMountedCell, TCardModel>,
+	): void => {
+		const slotId = String(previous.mountedCell.renderSlotKey);
+		if (previous.preview) releasedPreviewSlots.push(slotId);
+		if (previous.interaction) releasedInteractionSlots.push(slotId);
+		slotStates.get(slotIndex)!.binding = undefined;
+		slotStates.delete(slotIndex);
+		bindingIdentities.delete(slotIndex);
+		publicationRevisions.delete(slotIndex);
+	};
 
 	const sync = (params: {
 		readonly mountedCells: readonly TMountedCell[];
@@ -111,20 +135,7 @@ export function createVirtualCardSlotBindings<
 		reboundInteractionSlots.length = 0;
 		releasedInteractionSlots.length = 0;
 		let changedSlotCount = 0;
-		const nextActiveSlotIndices = new Set<number>();
-
-		const releaseBinding = (
-			slotIndex: number,
-			previous: VirtualCardSlotBinding<TMountedCell, TCardModel>,
-		): void => {
-			const slotId = String(previous.mountedCell.renderSlotKey);
-			if (previous.preview) releasedPreviewSlots.push(slotId);
-			if (previous.interaction) releasedInteractionSlots.push(slotId);
-			slotStates.get(slotIndex)!.binding = undefined;
-			slotStates.delete(slotIndex);
-			bindingIdentities.delete(slotIndex);
-			publicationRevisions.delete(slotIndex);
-		};
+		nextActiveSlotIndices.clear();
 
 		for (const mountedCell of params.mountedCells) {
 			const bindingToken = options.resolveCellIncarnation(mountedCell);
@@ -210,18 +221,10 @@ export function createVirtualCardSlotBindings<
 			const previous = slotStates.get(slotIndex)?.binding;
 			if (previous) releaseBinding(slotIndex, previous);
 		}
+		const previousActiveSlotIndices = activeSlotIndices;
 		activeSlotIndices = nextActiveSlotIndices;
+		nextActiveSlotIndices = previousActiveSlotIndices;
 
-		const previewDelta: RowPreviewBindingDelta = {
-			enteredSlots: enteredPreviewSlots,
-			reboundSlots: reboundPreviewSlots,
-			releasedSlots: releasedPreviewSlots,
-		};
-		const interactionDelta: VirtualCardInteractionDelta = {
-			enteredSlots: enteredInteractionSlots,
-			reboundSlots: reboundInteractionSlots,
-			releasedSlots: releasedInteractionSlots,
-		};
 		options.interactionController.syncCardDelta(interactionDelta);
 		options.previewSurface.commitBindingDelta(previewDelta, params.previewWindow);
 

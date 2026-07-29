@@ -16,8 +16,9 @@
 	import type { CardPresentationState } from "ui/components/common/cardPresentation";
 	import type { PreviewData } from "features/preview/public-types";
 	import type { CardPreviewSnapshot } from "features/preview/ui/cardPreviewSnapshot";
+	import type { CardRenderModel } from "./cardRenderModel";
 
-	interface ViewItemCardRenderState {
+	interface LegacyViewItemCardRenderState {
 		readonly item: ViewItem;
 		readonly targetFile: TFile | null;
 		readonly title: string;
@@ -51,38 +52,26 @@
 
 	const context = useLinkContext();
 
-	const renderState = $derived.by((): ViewItemCardRenderState | null => {
-		if (model) {
-			const previewSnapshot = resolveActivePreviewSnapshot(
-				model.targetFile,
-				model.previewActivationIdentity,
-				model.previewSnapshot,
-			);
-			return {
-				item: model.item,
-				targetFile: model.targetFile,
-				title: model.title,
-				ariaLabel: model.ariaLabel,
-				className: model.className,
-				extension: model.extension,
-				directory: model.directory,
-				interactionId: model.interactionId,
-				searchQuery: model.searchQuery,
-				presentation: model.presentation,
-				previewActivationIdentity: model.previewActivationIdentity ?? "",
-				previewOverride: model.previewOverride,
-				previewSnapshot,
-				previewFile: undefined,
-			};
-		}
-
-		if (!item) return null;
+	const legacyRenderState = $derived.by((): LegacyViewItemCardRenderState | null => {
+		if (model || !item) return null;
 		return buildLegacyViewItemCardState(item);
 	});
+	const renderState = $derived<
+		CardRenderModel | LegacyViewItemCardRenderState | null
+	>(model ?? legacyRenderState);
+	const activePreviewSnapshot = $derived.by(() => {
+		if (!model) return legacyRenderState?.previewSnapshot;
+		return resolveActivePreviewSnapshot(
+			model.targetFile,
+			model.previewActivationIdentity,
+			model.previewSnapshot,
+		);
+	});
+	const previewFile = $derived(model ? undefined : legacyRenderState?.previewFile);
 
 	function buildLegacyViewItemCardState(
 		renderItem: ViewItem,
-	): ViewItemCardRenderState {
+	): LegacyViewItemCardRenderState {
 		const strategy = getItemStrategy(renderItem);
 		const targetFile = strategy?.getTargetFile(renderItem.data, context) ?? null;
 		const className = strategy?.getClassName(renderItem.data) ?? null;
@@ -170,7 +159,10 @@
 		void previewSlotId;
 		void presentation;
 		void model;
+		void legacyRenderState;
 		void renderState;
+		void activePreviewSnapshot;
+		void previewFile;
 		return markCCLComponentReevaluation("ViewItemCard");
 	});
 </script>
@@ -198,9 +190,9 @@
 				<PreviewHost slotId={previewSlotId} />
 			{:else if !getDebugDisableCardDomPreview() && renderState.targetFile}
 				<CardPreview
-					bindingIdentity={renderState.previewActivationIdentity}
-					renderSnapshot={renderState.previewSnapshot}
-					file={renderState.previewFile}
+					bindingIdentity={renderState.previewActivationIdentity ?? ""}
+					renderSnapshot={activePreviewSnapshot}
+					file={previewFile}
 					searchQuery={renderState.searchQuery}
 					{previewRefreshToken}
 					previewOverride={renderState.previewOverride}

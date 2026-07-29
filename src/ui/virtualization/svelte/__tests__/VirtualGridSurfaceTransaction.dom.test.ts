@@ -8,41 +8,41 @@ describe("VirtualGridSurfaceTransaction", () => {
 		const registry = createSurfaceVirtualCellRegistry();
 		const calls: string[] = [];
 		const transaction = createVirtualGridSurfaceTransaction({
-			onLogicalCellWillRebind: ({ previousLogicalKey, nextLogicalKey }) => {
+			onLogicalCellWillRebind: (
+				_reboundElement,
+				previousLogicalKey,
+				{ nextLogicalKey },
+			) => {
 				calls.push(`will:${previousLogicalKey}->${nextLogicalKey}`);
 				expect(registry.findByKey(previousLogicalKey)).toBe(element);
 			},
 		});
 
-		transaction.rebindCell({
-			element,
+		transaction.rebindCell(element, {
 			nextLogicalKey: "A",
 			rowIndex: 1,
 			columnIndex: 2,
 			cellRegistry: registry,
-			lifecycle: {
-				attach: () => {
-					calls.push("attach:A");
-					expect(registry.findByKey("A")).toBe(element);
-				},
-				detach: () => calls.push("detach:A"),
+			lifecycleValue: "A",
+			onAttach: (value) => {
+				calls.push(`attach:${value}`);
+				expect(registry.findByKey("A")).toBe(element);
 			},
+			onDetach: (value) => calls.push(`detach:${value}`),
 		});
-		transaction.rebindCell({
-			element,
+		transaction.rebindCell(element, {
 			previousLogicalKey: "A",
 			nextLogicalKey: "B",
 			rowIndex: 3,
 			columnIndex: 4,
 			cellRegistry: registry,
-			lifecycle: {
-				attach: () => {
-					calls.push("attach:B");
-					expect(registry.findByKey("A")).toBeNull();
-					expect(registry.findByKey("B")).toBe(element);
-				},
-				detach: () => calls.push("detach:B"),
+			lifecycleValue: "B",
+			onAttach: (value) => {
+				calls.push(`attach:${value}`);
+				expect(registry.findByKey("A")).toBeNull();
+				expect(registry.findByKey("B")).toBe(element);
 			},
+			onDetach: (value) => calls.push(`detach:${value}`),
 		});
 
 		expect(calls).toEqual(["attach:A", "will:A->B", "detach:A", "attach:B"]);
@@ -76,16 +76,17 @@ describe("VirtualGridSurfaceTransaction", () => {
 		const detach = vi.fn();
 		const transaction = createVirtualGridSurfaceTransaction();
 		const rebind = {
-			element,
 			nextLogicalKey: "A",
 			rowIndex: 1,
 			columnIndex: 2,
 			cellRegistry: registry,
-			lifecycle: { attach, detach },
+			lifecycleValue: "A",
+			onAttach: attach,
+			onDetach: detach,
 		};
 
-		transaction.rebindCell(rebind);
-		transaction.rebindCell(rebind);
+		transaction.rebindCell(element, rebind);
+		transaction.rebindCell(element, rebind);
 
 		expect(registry.createRegistration).toHaveBeenCalledTimes(1);
 		expect(update).toHaveBeenCalledTimes(1);

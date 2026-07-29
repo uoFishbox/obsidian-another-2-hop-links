@@ -114,8 +114,10 @@ export function createVirtualPreviewSurface(
 	const slotsById = new Map<string, PreviewSlotRuntime>();
 	const pendingByIdentity = new Map<string, PreviewActivationHandle>();
 	const activationIdentities = new Set<string>();
-	const stagedBindingsBySlot = new Map<string, RowPreviewCardBinding | null>();
-	const stagedInvalidatedSlots = new Set<string>();
+	let stagedBindingsBySlot = new Map<string, RowPreviewCardBinding | null>();
+	let flushingBindingsBySlot = new Map<string, RowPreviewCardBinding | null>();
+	let stagedInvalidatedSlots = new Set<string>();
+	let flushingInvalidatedSlots = new Set<string>();
 	const scope: PreviewActivationScope = createPreviewActivationScope({
 		getBackpressure: options.getBackpressure,
 		subscribeBackpressure: options.subscribeBackpressure,
@@ -469,9 +471,10 @@ export function createVirtualPreviewSurface(
 	function flushStagedSlot(
 		slotId: string,
 		binding: RowPreviewCardBinding | null,
+		invalidatedSlots: ReadonlySet<string>,
 	): void {
 		const slot = getOrCreateSlot(slotId);
-		const invalidated = stagedInvalidatedSlots.has(slotId);
+		const invalidated = invalidatedSlots.has(slotId);
 		if (invalidated) {
 			cancelLifecycleCleanup(slot);
 			stopRender(slot);
@@ -497,16 +500,21 @@ export function createVirtualPreviewSurface(
 
 	function flushStagedPreviewChanges(): void {
 		if (disposed) return;
-		const nextBindings = Array.from(stagedBindingsBySlot);
+		const bindings = stagedBindingsBySlot;
+		stagedBindingsBySlot = flushingBindingsBySlot;
+		flushingBindingsBySlot = bindings;
+		const invalidatedSlots = stagedInvalidatedSlots;
+		stagedInvalidatedSlots = flushingInvalidatedSlots;
+		flushingInvalidatedSlots = invalidatedSlots;
 		const nextRange = stagedPreviewRange;
-		stagedBindingsBySlot.clear();
 		stagedPreviewRange = undefined;
 
 		if (nextRange) previewRange = nextRange;
-		for (const [slotId, binding] of nextBindings) {
-			flushStagedSlot(slotId, binding);
+		for (const [slotId, binding] of bindings) {
+			flushStagedSlot(slotId, binding, invalidatedSlots);
 		}
-		stagedInvalidatedSlots.clear();
+		bindings.clear();
+		invalidatedSlots.clear();
 		reconcile();
 	}
 
@@ -584,7 +592,9 @@ export function createVirtualPreviewSurface(
 		disposed = true;
 		stagedFlushDriver.dispose();
 		stagedBindingsBySlot.clear();
+		flushingBindingsBySlot.clear();
 		stagedInvalidatedSlots.clear();
+		flushingInvalidatedSlots.clear();
 		stagedPreviewRange = undefined;
 		for (const handle of pendingByIdentity.values()) handle.cancel();
 		pendingByIdentity.clear();
