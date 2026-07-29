@@ -62,8 +62,8 @@ export interface LinkResolution {
 }
 
 export interface TwoHopLinkBranch {
-	hop1: TwoHopIndexedLink;
-	hop2: TwoHopIndexedLink[];
+	readonly hop1: TwoHopIndexedLink;
+	readonly hop2: IndexedLinkQueryResult;
 }
 
 export interface TagReference {
@@ -80,36 +80,36 @@ export interface TaggedNote {
 }
 
 export interface TagGroup {
-	tag: string;
-	notes: TaggedNote[];
+	readonly tag: string;
+	readonly notes: readonly TaggedNote[];
 }
 
 export interface DisplayDataVersions {
-	links: string;
-	tags: string;
+	readonly links: string;
+	readonly tags: string;
 }
 
 export interface TwoHopLinkResult {
 	/**
 	 * 起点のファイル
 	 */
-	originFile: TFile;
+	readonly originFile: TFile;
 	/**
 	 * 起点ファイルから辿れる1ホップ目のリンクと、それに紐づく2ホップ目のリンク
 	 */
-	branches: TwoHopLinkBranch[];
+	readonly branches: readonly Readonly<TwoHopLinkBranch>[];
 	/**
 	 * originFileに向かうバックリンク
 	 */
-	backlinks: TwoHopIndexedLink[];
+	readonly backlinks: IndexedLinkQueryResult;
 	/**
 	 * originFileと共通タグを持つノート
 	 */
-	taggedNotes: TaggedNote[];
+	readonly taggedNotes: readonly Readonly<TaggedNote>[];
 	/**
 	 * UI の display preprocessing を O(1) 判定で更新するための比較トークン
 	 */
-	displayVersions?: DisplayDataVersions;
+	readonly displayVersions?: Readonly<DisplayDataVersions>;
 }
 
 export type ResolvePhase = "base" | "twohop" | "complete";

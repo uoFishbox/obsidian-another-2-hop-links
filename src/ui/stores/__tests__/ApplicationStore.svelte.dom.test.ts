@@ -185,29 +185,29 @@ function createSplitStagedBuildDisplayDataMock() {
 		},
 	);
 
-	const sortCache = new Map<string, WeakMap<object, unknown[]>>();
+	const sortCache = new Map<string, WeakMap<object, readonly unknown[]>>();
 	let linkSortCalls = 0;
 	let tagSortCalls = 0;
 
 	const getSortedWithCache = <T>(
-		items: T[],
+		items: readonly T[],
 		sortOption: SortOption,
 		onCacheMiss: () => void,
-	): T[] => {
+	): readonly T[] => {
 		if (items.length <= 1) {
 			return items;
 		}
 
 		const sortCacheKey = sortOption;
 		const cachedSortedItemsByOption =
-			sortCache.get(sortCacheKey) ?? new WeakMap<object, unknown[]>();
+			sortCache.get(sortCacheKey) ?? new WeakMap<object, readonly unknown[]>();
 		if (!sortCache.has(sortCacheKey)) {
 			sortCache.set(sortCacheKey, cachedSortedItemsByOption);
 		}
 
 		const cachedSortedItems = cachedSortedItemsByOption.get(items as object);
 		if (cachedSortedItems) {
-			return cachedSortedItems as T[];
+			return cachedSortedItems as readonly T[];
 		}
 
 		onCacheMiss();
@@ -221,8 +221,8 @@ function createSplitStagedBuildDisplayDataMock() {
 			settings: PluginSettings,
 			sortOption: SortOption,
 		): DisplayData => {
-			let outgoing: TwoHopLinkBranch[] = [];
-			let backlinks: TwoHopIndexedLink[] = [];
+			let outgoing: readonly TwoHopLinkBranch[] = [];
+			let backlinks: readonly TwoHopIndexedLink[] = [];
 			let mergedItems: DisplayData["mergedItems"] = [];
 
 			if (settings.useMergedLinksSection) {

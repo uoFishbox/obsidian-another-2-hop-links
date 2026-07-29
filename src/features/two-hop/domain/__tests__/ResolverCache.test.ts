@@ -61,7 +61,14 @@ describe("ResolverCache", () => {
 		);
 
 		expect(cached).toEqual(result);
-		expect(cached).not.toBe(result);
+		expect(cached).toBe(result);
+		expect(
+			cache.get(
+				"origin.md",
+				defaultPerformanceSettings(),
+				defaultResolveSettings(),
+			),
+		).toBe(cached);
 	});
 
 	test("miss when performance settings differ", () => {
@@ -342,7 +349,7 @@ describe("ResolverCache", () => {
 		).toBeUndefined();
 	});
 
-	test("cached result and dependencies are isolated from caller mutations", () => {
+	test("freezes the cached snapshot and isolates copied dependencies", () => {
 		const cache = new ResolverCache();
 		const result = createMockResult();
 		const dependencies = {
@@ -359,12 +366,13 @@ describe("ResolverCache", () => {
 			result,
 		);
 
-		result.backlinks.push({
+		const externalLink = {
 			rawText: "mutated",
 			path: "mutated.md",
 			isUnresolved: false,
 			sourceFile: createMockTFile("mutated.md"),
-		});
+		};
+		expect(Reflect.set(result.backlinks, 0, externalLink)).toBe(false);
 		dependencies.dependencyPaths.clear();
 
 		const first = cache.get(
@@ -372,18 +380,15 @@ describe("ResolverCache", () => {
 			defaultPerformanceSettings(),
 			defaultResolveSettings(),
 		)!;
-		first.backlinks.push({
-			rawText: "external",
-			path: "external.md",
-			isUnresolved: false,
-			sourceFile: createMockTFile("external.md"),
-		});
+		expect(Object.isFrozen(first)).toBe(true);
+		expect(Object.isFrozen(first.backlinks)).toBe(true);
 
 		const second = cache.get(
 			"origin.md",
 			defaultPerformanceSettings(),
 			defaultResolveSettings(),
 		);
+		expect(second).toBe(first);
 		expect(second?.backlinks).toEqual([]);
 
 		cache.invalidate({
@@ -397,5 +402,75 @@ describe("ResolverCache", () => {
 				defaultResolveSettings(),
 			),
 		).toBeUndefined();
+	});
+
+	test("freezes resolver-owned values without freezing Obsidian-owned references", () => {
+		const cache = new ResolverCache();
+		const sourceFile = createMockTFile("source.md");
+		const position = {
+			start: { line: 0, col: 0, offset: 0 },
+			end: { line: 0, col: 4, offset: 4 },
+		};
+		const hop1 = {
+			rawText: "target",
+			path: "target.md",
+			isUnresolved: false,
+			sourceFile,
+			position,
+		};
+		const hop2 = [
+			{
+				rawText: "target",
+				path: "target.md",
+				isUnresolved: false,
+				sourceFile,
+			},
+		];
+		const commonTags = ["tag"];
+		const result: TwoHopLinkResult = {
+			originFile: createMockTFile("origin.md"),
+			branches: [{ hop1, hop2 }],
+			backlinks: hop2,
+			taggedNotes: [
+				{
+					file: sourceFile,
+					commonTags,
+					path: sourceFile.path,
+					position,
+				},
+			],
+			displayVersions: { links: "1:complete", tags: "1:tags" },
+		};
+
+		cache.set(
+			"origin.md",
+			1,
+			defaultPerformanceSettings(),
+			defaultResolveSettings(),
+			defaultDependencies(),
+			result,
+		);
+
+		const cached = cache.get(
+			"origin.md",
+			defaultPerformanceSettings(),
+			defaultResolveSettings(),
+		)!;
+		expect(cached).toBe(result);
+		expect(cached.branches[0].hop1).toBe(hop1);
+		expect(cached.branches[0].hop2).toBe(hop2);
+		expect(cached.backlinks).toBe(hop2);
+		expect(cached.taggedNotes[0].commonTags).toBe(commonTags);
+		expect(Object.isFrozen(cached.branches)).toBe(true);
+		expect(Object.isFrozen(cached.branches[0])).toBe(true);
+		expect(Object.isFrozen(hop1)).toBe(true);
+		expect(Object.isFrozen(hop2)).toBe(true);
+		expect(Object.isFrozen(hop2[0])).toBe(true);
+		expect(Object.isFrozen(cached.taggedNotes)).toBe(true);
+		expect(Object.isFrozen(cached.taggedNotes[0])).toBe(true);
+		expect(Object.isFrozen(commonTags)).toBe(true);
+		expect(Object.isFrozen(cached.displayVersions)).toBe(true);
+		expect(Object.isFrozen(sourceFile)).toBe(false);
+		expect(Object.isFrozen(position)).toBe(false);
 	});
 });

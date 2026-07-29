@@ -14,6 +14,6 @@ export type Comparator<T = SortableItem> = (a: T, b: T) => number;
 export type SortKey = string | number;
 
 export interface SortResult<T extends SortableItem> {
-	items: T[];
-	orderChanged: boolean;
+	readonly items: readonly T[];
+	readonly orderChanged: boolean;
 }

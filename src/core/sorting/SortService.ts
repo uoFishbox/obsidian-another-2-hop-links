@@ -15,12 +15,15 @@ export class SortService implements ISortService {
 		this.memoizedMetricProvider = this.createMemoizedMetricProvider();
 	}
 
-	sort<T extends SortableItem>(items: T[], sortOption: SortOption): T[] {
+	sort<T extends SortableItem>(
+		items: readonly T[],
+		sortOption: SortOption,
+	): readonly T[] {
 		return this.sortItems(items, sortOption);
 	}
 
 	sortWithResult<T extends SortableItem>(
-		items: T[],
+		items: readonly T[],
 		sortOption: SortOption,
 	): SortResult<T> {
 		const sortedItems = this.sortItems(items, sortOption);
@@ -30,7 +33,10 @@ export class SortService implements ISortService {
 		};
 	}
 
-	private sortItems<T extends SortableItem>(items: T[], sortOption: SortOption): T[] {
+	private sortItems<T extends SortableItem>(
+		items: readonly T[],
+		sortOption: SortOption,
+	): readonly T[] {
 		if (items.length <= 1) {
 			return items;
 		}
@@ -48,7 +54,10 @@ export class SortService implements ISortService {
 		return this.sortIndexed(items, sortPlan);
 	}
 
-	private sortPair<T extends SortableItem>(items: T[], sortPlan: SortPlan): T[] {
+	private sortPair<T extends SortableItem>(
+		items: readonly T[],
+		sortPlan: SortPlan,
+	): readonly T[] {
 		const left = items[0];
 		const right = items[1];
 
@@ -95,7 +104,10 @@ export class SortService implements ISortService {
 		return sortPlan;
 	}
 
-	private sortIndexed<T extends SortableItem>(items: T[], sortPlan: SortPlan): T[] {
+	private sortIndexed<T extends SortableItem>(
+		items: readonly T[],
+		sortPlan: SortPlan,
+	): readonly T[] {
 		const itemCount = items.length;
 		const indices = new Array<number>(itemCount);
 		const primaryKeys = new Array<SortKey>(itemCount);

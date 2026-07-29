@@ -57,7 +57,7 @@ function branchFor(result: TwoHopLinkResult, hop1Path: string) {
 	return result.branches.find((branch) => branch.hop1.path === hop1Path);
 }
 
-function sourcePaths(links: TwoHopIndexedLink[]): string[] {
+function sourcePaths(links: readonly TwoHopIndexedLink[]): string[] {
 	return links.map((link) => link.sourceFile.path).sort();
 }
 
@@ -332,7 +332,7 @@ describe("TwoHopLinkResolver", () => {
 			const secondResultPromise = resolver.resolve(env.files["origin.md"]);
 			await Promise.resolve();
 
-			await expect(secondResultPromise).resolves.toEqual(firstResult);
+			await expect(secondResultPromise).resolves.toBe(firstResult);
 		});
 
 		test("resolver without data update subscription returns warm cache after idle", async () => {
@@ -365,7 +365,7 @@ describe("TwoHopLinkResolver", () => {
 
 			idleDeferred.resolve();
 
-			await expect(secondResultPromise).resolves.toEqual(firstResult);
+			await expect(secondResultPromise).resolves.toBe(firstResult);
 		});
 
 		test("taggedNotes are updated after affectedTags update", async () => {

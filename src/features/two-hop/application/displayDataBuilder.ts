@@ -33,37 +33,37 @@ type DisplayAssemblySettings = SelectedSettingsDependencies<
 >;
 
 export interface DisplayData {
-	outgoing: TwoHopLinkBranch[];
-	backlinks: TwoHopIndexedLink[];
-	mergedItems: MergedLinkItem[];
-	twoHopBranches: TwoHopLinkBranch[];
-	tagGroups: TagGroup[];
-	newLinks: TwoHopIndexedLink[];
+	readonly outgoing: readonly TwoHopLinkBranch[];
+	readonly backlinks: readonly TwoHopIndexedLink[];
+	readonly mergedItems: readonly MergedLinkItem[];
+	readonly twoHopBranches: readonly TwoHopLinkBranch[];
+	readonly tagGroups: readonly TagGroup[];
+	readonly newLinks: readonly TwoHopIndexedLink[];
 }
 
 export interface PreprocessedDisplayData {
-	resolvedBranches: TwoHopLinkBranch[];
-	resolvedBacklinks: TwoHopIndexedLink[];
-	mergedBaseItems: MergedLinkItem[];
-	taggedNotes: TaggedNote[];
-	rawTagGroups: TagGroup[];
-	twoHopBranches: TwoHopLinkBranch[];
-	nonEmptyTwoHopBranches: TwoHopLinkBranch[];
-	newLinks: TwoHopIndexedLink[];
+	readonly resolvedBranches: readonly TwoHopLinkBranch[];
+	readonly resolvedBacklinks: readonly TwoHopIndexedLink[];
+	readonly mergedBaseItems: readonly MergedLinkItem[];
+	readonly taggedNotes: readonly TaggedNote[];
+	readonly rawTagGroups: readonly TagGroup[];
+	readonly twoHopBranches: readonly TwoHopLinkBranch[];
+	readonly nonEmptyTwoHopBranches: readonly TwoHopLinkBranch[];
+	readonly newLinks: readonly TwoHopIndexedLink[];
 }
 
 export interface LinkPreprocessedDisplayData {
-	resolvedBranches: TwoHopLinkBranch[];
-	resolvedBacklinks: TwoHopIndexedLink[];
-	mergedBaseItems: MergedLinkItem[];
-	twoHopBranches: TwoHopLinkBranch[];
-	nonEmptyTwoHopBranches: TwoHopLinkBranch[];
-	newLinks: TwoHopIndexedLink[];
+	readonly resolvedBranches: readonly TwoHopLinkBranch[];
+	readonly resolvedBacklinks: readonly TwoHopIndexedLink[];
+	readonly mergedBaseItems: readonly MergedLinkItem[];
+	readonly twoHopBranches: readonly TwoHopLinkBranch[];
+	readonly nonEmptyTwoHopBranches: readonly TwoHopLinkBranch[];
+	readonly newLinks: readonly TwoHopIndexedLink[];
 }
 
 export interface TagPreprocessedDisplayData {
-	taggedNotes: TaggedNote[];
-	rawTagGroups: TagGroup[];
+	readonly taggedNotes: readonly TaggedNote[];
+	readonly rawTagGroups: readonly TagGroup[];
 }
 
 export interface DisplayDataBuilder {
@@ -85,10 +85,13 @@ export interface DisplayDataBuilder {
 		sortOption: SortOption,
 	): DisplayData;
 	getSortedTwoHopItems(
-		items: TwoHopIndexedLink[],
+		items: readonly TwoHopIndexedLink[],
 		sortOption: SortOption,
-	): TwoHopIndexedLink[];
-	getSortedTagGroupItems(items: TaggedNote[], sortOption: SortOption): TaggedNote[];
+	): readonly TwoHopIndexedLink[];
+	getSortedTagGroupItems(
+		items: readonly TaggedNote[],
+		sortOption: SortOption,
+	): readonly TaggedNote[];
 	getSortContextVersion(): number;
 }
 
@@ -104,7 +107,7 @@ type SortItemsFunction = ISortService["sort"];
 
 type ItemSortCache = WeakMap<
 	SortItemsFunction,
-	Map<string, WeakMap<SortableItem[], SortableItem[]>>
+	Map<string, WeakMap<readonly SortableItem[], readonly SortableItem[]>>
 >;
 
 interface DeduplicationStageResult<T> {
@@ -193,8 +196,8 @@ function collectNewLink(
 }
 
 function collectDisplayBaseData(
-	branches: TwoHopLinkBranch[],
-	backlinks: TwoHopIndexedLink[],
+	branches: readonly TwoHopLinkBranch[],
+	backlinks: readonly TwoHopIndexedLink[],
 ): Pick<
 	LinkPreprocessedDisplayData,
 	"resolvedBranches" | "resolvedBacklinks" | "mergedBaseItems" | "newLinks"
@@ -244,8 +247,8 @@ function collectDisplayBaseData(
 }
 
 function filterNonEmptyTwoHopBranches(
-	branches: TwoHopLinkBranch[],
-): TwoHopLinkBranch[] {
+	branches: readonly TwoHopLinkBranch[],
+): readonly TwoHopLinkBranch[] {
 	let filteredBranches: TwoHopLinkBranch[] | undefined;
 
 	for (let index = 0; index < branches.length; index += 1) {
@@ -263,9 +266,9 @@ function filterNonEmptyTwoHopBranches(
 }
 
 function filterWithReferenceReuse<T>(
-	items: T[],
+	items: readonly T[],
 	shouldKeep: (item: T) => boolean,
-): T[] {
+): readonly T[] {
 	let filteredItems: T[] | undefined;
 
 	for (let index = 0; index < items.length; index += 1) {
@@ -306,9 +309,9 @@ function compareTwoHopBranchesByHop2Count(
 }
 
 function sortTwoHopBranchesIfNeeded(
-	branches: TwoHopLinkBranch[],
+	branches: readonly TwoHopLinkBranch[],
 	settings: LinkDisplayPreprocessSettings,
-): TwoHopLinkBranch[] {
+): readonly TwoHopLinkBranch[] {
 	if (settings.twoHopHeaderSortOrder !== "hop2-count-asc" || branches.length < 2) {
 		return branches;
 	}
@@ -355,9 +358,9 @@ function preprocessLinkData(
 		);
 	}
 
-	let branchesForProcessing: TwoHopLinkBranch[];
-	let backlinksForProcessing: TwoHopIndexedLink[];
-	let twoHopBranchesForProcessing: TwoHopLinkBranch[];
+	let branchesForProcessing: readonly TwoHopLinkBranch[];
+	let backlinksForProcessing: readonly TwoHopIndexedLink[];
+	let twoHopBranchesForProcessing: readonly TwoHopLinkBranch[];
 
 	if (deduplicationService) {
 		const service = deduplicationService;
@@ -470,10 +473,10 @@ function preprocessTagDisplayData(
 }
 
 function sortIfNeeded<T extends SortableItem>(
-	items: T[],
+	items: readonly T[],
 	sortService: ISortService,
 	sortOption: SortOption,
-): T[] {
+): readonly T[] {
 	if (items.length <= 1) {
 		return items;
 	}
@@ -481,10 +484,10 @@ function sortIfNeeded<T extends SortableItem>(
 }
 
 function sortWithOriginalOrderReuse<T extends SortableItem>(
-	items: T[],
+	items: readonly T[],
 	sortService: ISortService,
 	sortOption: SortOption,
-): T[] {
+): readonly T[] {
 	if (items.length <= 1) {
 		return items;
 	}
@@ -495,7 +498,7 @@ function sortWithOriginalOrderReuse<T extends SortableItem>(
 		: sortedResult;
 }
 
-function hasSameItemOrder<T>(original: T[], sorted: T[]): boolean {
+function hasSameItemOrder<T>(original: readonly T[], sorted: readonly T[]): boolean {
 	if (original.length !== sorted.length) {
 		return false;
 	}
@@ -532,12 +535,12 @@ function createSortCacheKey(
 }
 
 export function getSortedItemsWithCache<T extends SortableItem>(
-	items: T[],
+	items: readonly T[],
 	sortService: ISortService,
 	sortOption: SortOption,
 	itemSortCache: ItemSortCache,
 	sortContextVersion = 0,
-): T[] {
+): readonly T[] {
 	if (items.length <= 1) {
 		return items;
 	}
@@ -556,7 +559,7 @@ export function getSortedItemsWithCache<T extends SortableItem>(
 		itemSortCacheByKey.set(sortCacheKey, cachedSortedItemsByOption);
 	}
 
-	let sortedItems = cachedSortedItemsByOption.get(items) as T[] | undefined;
+	let sortedItems = cachedSortedItemsByOption.get(items) as readonly T[] | undefined;
 	if (!sortedItems) {
 		sortedItems = sortWithOriginalOrderReuse(items, sortService, sortOption);
 		cachedSortedItemsByOption.set(items, sortedItems);
@@ -626,9 +629,9 @@ export function sortAndAssembleDisplayData(
 		sortContextVersion,
 	);
 
-	let sortedOutgoing: TwoHopLinkBranch[] = [];
-	let sortedBacklinks: TwoHopIndexedLink[] = [];
-	let sortedMergedItems: MergedLinkItem[] = [];
+	let sortedOutgoing: readonly TwoHopLinkBranch[] = [];
+	let sortedBacklinks: readonly TwoHopIndexedLink[] = [];
+	let sortedMergedItems: readonly MergedLinkItem[] = [];
 
 	if (assemblySettings.useMergedLinksSection) {
 		sortedMergedItems = getSortedItemsWithCache(
@@ -655,7 +658,7 @@ export function sortAndAssembleDisplayData(
 		);
 	}
 
-	let tagGroups: TagGroup[] = [];
+	let tagGroups: readonly TagGroup[] = [];
 	if (assemblySettings.showTagsSection) {
 		tagGroups = preprocessed.rawTagGroups;
 	}
@@ -757,9 +760,9 @@ export function createDisplayDataBuilder(
 		preprocessTagDisplayData: preprocessTagStage,
 		sortAndAssembleDisplayData: sortAndAssembleStage,
 		getSortedTwoHopItems: (
-			items: TwoHopIndexedLink[],
+			items: readonly TwoHopIndexedLink[],
 			sortOption: SortOption,
-		): TwoHopIndexedLink[] => {
+		): readonly TwoHopIndexedLink[] => {
 			const sortContextVersion = syncSortContextCaches();
 			return getSortedItemsWithCache(
 				items,
@@ -770,9 +773,9 @@ export function createDisplayDataBuilder(
 			);
 		},
 		getSortedTagGroupItems: (
-			items: TaggedNote[],
+			items: readonly TaggedNote[],
 			sortOption: SortOption,
-		): TaggedNote[] => {
+		): readonly TaggedNote[] => {
 			const sortContextVersion = syncSortContextCaches();
 			return getSortedItemsWithCache(
 				items,

@@ -12,7 +12,7 @@ import type { DedupResult, DedupState } from "types/deduplication";
  */
 export function createDeduplicationService(): IDeduplicationService {
 	function createBranchMap(
-		branches: TwoHopLinkBranch[],
+		branches: readonly TwoHopLinkBranch[],
 	): Map<string, MergedBranchEntry> {
 		const branchMap = new Map<string, MergedBranchEntry>();
 		for (let index = 0; index < branches.length; index += 1) {
@@ -47,7 +47,7 @@ export function createDeduplicationService(): IDeduplicationService {
 	function appendUniqueHop2(
 		entries: TwoHopIndexedLink[],
 		usageKeys: string[],
-		links: TwoHopIndexedLink[],
+		links: readonly TwoHopIndexedLink[],
 	): void {
 		if (links.length === 0) return;
 
@@ -63,7 +63,7 @@ export function createDeduplicationService(): IDeduplicationService {
 
 	function collectUniqueBranches(
 		state: DedupState,
-		branches: TwoHopLinkBranch[],
+		branches: readonly TwoHopLinkBranch[],
 	): DedupResult<TwoHopLinkBranch> {
 		if (branches.length === 0) {
 			return { state, items: branches };
@@ -98,7 +98,7 @@ export function createDeduplicationService(): IDeduplicationService {
 
 	function collectUniqueBacklinks(
 		state: DedupState,
-		backlinks: TwoHopIndexedLink[],
+		backlinks: readonly TwoHopIndexedLink[],
 	): DedupResult<TwoHopIndexedLink> {
 		if (backlinks.length === 0) {
 			return { state, items: backlinks };
@@ -126,7 +126,7 @@ export function createDeduplicationService(): IDeduplicationService {
 
 	function buildFilteredTwoHopBranches(
 		state: DedupState,
-		branches: TwoHopLinkBranch[],
+		branches: readonly TwoHopLinkBranch[],
 	): DedupResult<TwoHopLinkBranch> {
 		if (branches.length === 0) {
 			return { state, items: branches };
@@ -142,7 +142,7 @@ export function createDeduplicationService(): IDeduplicationService {
 
 	function collectUniqueTaggedNotes(
 		state: DedupState,
-		taggedNotes: TaggedNote[],
+		taggedNotes: readonly TaggedNote[],
 	): DedupResult<TaggedNote> {
 		if (taggedNotes.length === 0) {
 			return { state, items: taggedNotes };

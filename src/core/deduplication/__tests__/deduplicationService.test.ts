@@ -580,21 +580,24 @@ function createScopedDeduplicationService() {
 	let state = createDedupState();
 
 	function apply<T>(
-		operation: (state: DedupState) => { state: DedupState; items: T[] },
-	): T[] {
+		operation: (state: DedupState) => {
+			state: DedupState;
+			items: readonly T[];
+		},
+	): readonly T[] {
 		const result = operation(state);
 		state = result.state;
 		return result.items;
 	}
 
 	return {
-		collectUniqueBranches: (branches: TwoHopLinkBranch[]) =>
+		collectUniqueBranches: (branches: readonly TwoHopLinkBranch[]) =>
 			apply((current) => service.collectUniqueBranches(current, branches)),
-		collectUniqueBacklinks: (backlinks: TwoHopIndexedLink[]) =>
+		collectUniqueBacklinks: (backlinks: readonly TwoHopIndexedLink[]) =>
 			apply((current) => service.collectUniqueBacklinks(current, backlinks)),
-		buildFilteredTwoHopBranches: (branches: TwoHopLinkBranch[]) =>
+		buildFilteredTwoHopBranches: (branches: readonly TwoHopLinkBranch[]) =>
 			apply((current) => service.buildFilteredTwoHopBranches(current, branches)),
-		collectUniqueTaggedNotes: (taggedNotes: TaggedNote[]) =>
+		collectUniqueTaggedNotes: (taggedNotes: readonly TaggedNote[]) =>
 			apply((current) => service.collectUniqueTaggedNotes(current, taggedNotes)),
 	};
 }

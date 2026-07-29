@@ -17,6 +17,10 @@ import { ResolverCache } from "./ResolverCache";
 import { collectResolverDependencies } from "./ResolverDependencies";
 import { TwoHopBranchBuilder } from "./TwoHopBranchBuilder";
 import type { ResolverDebugPolicy, ResolverPerformanceSettings } from "./ResolverTypes";
+import {
+	createImmutableTaggedNotes,
+	freezeTwoHopLinkResult,
+} from "./immutableTwoHopLinkResult";
 
 export interface ResolveOptions {
 	includeTaggedNotes?: boolean;
@@ -192,13 +196,13 @@ export class TwoHopLinkResolver {
 				outgoingLinks,
 				performanceSettings,
 			);
-			const baseResult: TwoHopLinkResult = {
+			const baseResult = freezeTwoHopLinkResult({
 				originFile: targetFile,
 				branches: baseBranches,
 				backlinks: uniqueBacklinks,
 				taggedNotes: [],
 				displayVersions: this.createDisplayVersions(indexVersion, "base"),
-			};
+			});
 			onProgress?.({
 				phase: "base",
 				data: baseResult,
@@ -210,23 +214,25 @@ export class TwoHopLinkResolver {
 				baseBranches,
 				performanceSettings,
 			);
-			const twoHopResult: TwoHopLinkResult = {
+			const twoHopResult = freezeTwoHopLinkResult({
 				originFile: targetFile,
 				branches: twoHopBranches,
 				backlinks: uniqueBacklinks,
 				taggedNotes: [],
 				displayVersions: this.createDisplayVersions(indexVersion, "twohop"),
-			};
+			});
 			onProgress?.({
 				phase: "twohop",
 				data: twoHopResult,
 			});
 
 			const taggedNotes = resolveSettings.includeTaggedNotes
-				? this.indexingService.peekNotesWithCommonTags(targetFile)
+				? createImmutableTaggedNotes(
+						this.indexingService.peekNotesWithCommonTags(targetFile),
+					)
 				: [];
 
-			const result: TwoHopLinkResult = {
+			const result = freezeTwoHopLinkResult({
 				originFile: targetFile,
 				branches: twoHopBranches,
 				backlinks: uniqueBacklinks,
@@ -236,7 +242,7 @@ export class TwoHopLinkResolver {
 					"complete",
 					resolveSettings.includeTaggedNotes,
 				),
-			};
+			});
 
 			if (this.indexingService.getIndexVersion() !== indexVersion) {
 				continue;

@@ -38,10 +38,16 @@ const mockSortService: ISortService = {
 };
 
 interface LegacyDeduplicationService {
-	collectUniqueBranches(branches: TwoHopLinkBranch[]): TwoHopLinkBranch[];
-	collectUniqueBacklinks(backlinks: TwoHopIndexedLink[]): TwoHopIndexedLink[];
-	buildFilteredTwoHopBranches(branches: TwoHopLinkBranch[]): TwoHopLinkBranch[];
-	collectUniqueTaggedNotes(taggedNotes: TaggedNote[]): TaggedNote[];
+	collectUniqueBranches(
+		branches: readonly TwoHopLinkBranch[],
+	): readonly TwoHopLinkBranch[];
+	collectUniqueBacklinks(
+		backlinks: readonly TwoHopIndexedLink[],
+	): readonly TwoHopIndexedLink[];
+	buildFilteredTwoHopBranches(
+		branches: readonly TwoHopLinkBranch[],
+	): readonly TwoHopLinkBranch[];
+	collectUniqueTaggedNotes(taggedNotes: readonly TaggedNote[]): readonly TaggedNote[];
 }
 
 function adaptDeduplicationService(

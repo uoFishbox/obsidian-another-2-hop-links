@@ -4,5 +4,5 @@ export interface DedupState {
 
 export interface DedupResult<T> {
 	readonly state: DedupState;
-	readonly items: T[];
+	readonly items: readonly T[];
 }

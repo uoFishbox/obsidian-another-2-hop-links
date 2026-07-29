@@ -103,8 +103,8 @@ function shouldRefreshDisplayData(changedKeys: Array<keyof PluginSettings>): boo
 }
 
 function areArraysEqualByRef<T>(
-	previous: T[] | undefined,
-	next: T[] | undefined,
+	previous: readonly T[] | undefined,
+	next: readonly T[] | undefined,
 ): boolean {
 	if (previous === next) {
 		return true;
@@ -489,11 +489,13 @@ export class ApplicationStore {
 		return this.sortOption;
 	}
 
-	getSortedTwoHopItems(items: TwoHopIndexedLink[]): TwoHopIndexedLink[] {
+	getSortedTwoHopItems(
+		items: readonly TwoHopIndexedLink[],
+	): readonly TwoHopIndexedLink[] {
 		return this.displayDataBuilder.getSortedTwoHopItems(items, this.sortOption);
 	}
 
-	getSortedTagGroupItems(items: TaggedNote[]): TaggedNote[] {
+	getSortedTagGroupItems(items: readonly TaggedNote[]): readonly TaggedNote[] {
 		return this.displayDataBuilder.getSortedTagGroupItems(items, this.sortOption);
 	}
 

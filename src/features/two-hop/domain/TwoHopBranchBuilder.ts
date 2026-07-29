@@ -112,7 +112,7 @@ export class TwoHopBranchBuilder {
 
 	public async populateHop2(
 		targetFile: TFile,
-		branches: TwoHopLinkBranch[],
+		branches: readonly TwoHopLinkBranch[],
 		performanceSettings: ResolverPerformanceSettings,
 	): Promise<TwoHopLinkBranch[]> {
 		let lastYieldAt = this.getNowMs();
@@ -127,13 +127,11 @@ export class TwoHopBranchBuilder {
 			const lookupPath = branch.hop1.path ?? getLookupPathForLink(branch.hop1);
 			populatedBranches[index] = {
 				hop1: branch.hop1,
-				// Query results are immutable at runtime. The branch model remains
-				// mutable for legacy consumers, which only read these indexed links.
 				hop2: this.indexingService.getUniqueBacklinkSourcesForLink(
 					lookupPath,
 					targetFile.path,
 					maxHop2,
-				) as TwoHopIndexedLink[],
+				),
 			};
 
 			if (

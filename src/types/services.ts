@@ -123,12 +123,15 @@ export interface IMetricProvider {
 }
 
 export interface ISortService {
-	sort<T extends SortableItem>(items: T[], sortOption: SortOption): T[];
+	sort<T extends SortableItem>(
+		items: readonly T[],
+		sortOption: SortOption,
+	): readonly T[];
 	sortWithResult?<T extends SortableItem>(
-		items: T[],
+		items: readonly T[],
 		sortOption: SortOption,
 	): {
-		items: T[];
+		items: readonly T[];
 		orderChanged: boolean;
 	};
 }
@@ -136,19 +139,19 @@ export interface ISortService {
 export interface IDeduplicationService {
 	collectUniqueBranches(
 		state: DedupState,
-		branches: TwoHopLinkBranch[],
+		branches: readonly TwoHopLinkBranch[],
 	): DedupResult<TwoHopLinkBranch>;
 	collectUniqueBacklinks(
 		state: DedupState,
-		backlinks: TwoHopIndexedLink[],
+		backlinks: readonly TwoHopIndexedLink[],
 	): DedupResult<TwoHopIndexedLink>;
 	buildFilteredTwoHopBranches(
 		state: DedupState,
-		branches: TwoHopLinkBranch[],
+		branches: readonly TwoHopLinkBranch[],
 	): DedupResult<TwoHopLinkBranch>;
 	collectUniqueTaggedNotes(
 		state: DedupState,
-		taggedNotes: TaggedNote[],
+		taggedNotes: readonly TaggedNote[],
 	): DedupResult<TaggedNote>;
 }
 

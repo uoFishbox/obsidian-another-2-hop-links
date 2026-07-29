@@ -1,10 +1,6 @@
 import type { DataUpdateContext } from "core/indexing/index-service/IndexEvents";
-import type {
-	TaggedNote,
-	TwoHopIndexedLink,
-	TwoHopLinkBranch,
-	TwoHopLinkResult,
-} from "types/domain";
+import type { TwoHopLinkResult } from "types/domain";
+import { freezeTwoHopLinkResult } from "./immutableTwoHopLinkResult";
 
 const MAX_RESOLVE_CACHE_SIZE = 64;
 
@@ -65,7 +61,7 @@ export class ResolverCache {
 			return undefined;
 		}
 
-		return this.cloneResult(cached.result);
+		return cached.result;
 	}
 
 	/**
@@ -93,7 +89,7 @@ export class ResolverCache {
 			dependencyPaths: new Set(dependencies.dependencyPaths),
 			dependencyLookupKeys: new Set(dependencies.dependencyLookupKeys),
 			dependencyTags: new Set(dependencies.dependencyTags),
-			result: this.cloneResult(result),
+			result: freezeTwoHopLinkResult(result),
 		});
 
 		// キャッシュサイズ制限を超えた場合、最も古いエントリを削除
@@ -177,49 +173,5 @@ export class ResolverCache {
 			}
 		}
 		return false;
-	}
-
-	private cloneResult(result: TwoHopLinkResult): TwoHopLinkResult {
-		return {
-			...result,
-			branches: this.cloneBranches(result.branches),
-			backlinks: this.cloneLinks(result.backlinks),
-			taggedNotes: this.cloneTaggedNotes(result.taggedNotes),
-			displayVersions: result.displayVersions
-				? { ...result.displayVersions }
-				: undefined,
-		};
-	}
-
-	private cloneBranches(branches: TwoHopLinkBranch[]): TwoHopLinkBranch[] {
-		const cloned = new Array<TwoHopLinkBranch>(branches.length);
-		for (let index = 0; index < branches.length; index++) {
-			const branch = branches[index];
-			cloned[index] = {
-				hop1: { ...branch.hop1 },
-				hop2: this.cloneLinks(branch.hop2),
-			};
-		}
-		return cloned;
-	}
-
-	private cloneLinks(links: TwoHopIndexedLink[]): TwoHopIndexedLink[] {
-		const cloned = new Array<TwoHopIndexedLink>(links.length);
-		for (let index = 0; index < links.length; index++) {
-			cloned[index] = { ...links[index] };
-		}
-		return cloned;
-	}
-
-	private cloneTaggedNotes(taggedNotes: TaggedNote[]): TaggedNote[] {
-		const cloned = new Array<TaggedNote>(taggedNotes.length);
-		for (let index = 0; index < taggedNotes.length; index++) {
-			const note = taggedNotes[index];
-			cloned[index] = {
-				...note,
-				commonTags: note.commonTags.slice(),
-			};
-		}
-		return cloned;
 	}
 }

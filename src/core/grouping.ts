@@ -5,7 +5,7 @@ function compareTagGroups(a: TagGroup, b: TagGroup): number {
 	return diff !== 0 ? diff : a.tag.localeCompare(b.tag);
 }
 
-export function groupNotesByTag(taggedNotes: TaggedNote[]): TagGroup[] {
+export function groupNotesByTag(taggedNotes: readonly TaggedNote[]): TagGroup[] {
 	if (taggedNotes.length === 0) return [];
 
 	// タグごとにノートをマッピング
