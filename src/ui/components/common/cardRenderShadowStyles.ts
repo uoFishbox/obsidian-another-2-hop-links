@@ -174,8 +174,7 @@ export const CARD_RENDER_SHADOW_CSS = String.raw`
 	padding: var(--ccl-box-padding);
 }
 
-.cosense-card-links__twohop-header.cosense-card-links__box--missing,
-.cosense-card-links__box--missing,
+.cosense-card-links__box.cosense-card-links__box--missing,
 .cosense-card-links__box[data-ccl-resolution="missing"] {
 	border: 1px dashed var(--color-base-40);
 }

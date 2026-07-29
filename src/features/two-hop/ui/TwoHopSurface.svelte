@@ -58,7 +58,6 @@
 	bodyLifecyclePolicy={TWO_HOP_BODY_LIFECYCLE}
 	bind:rootEl={list.rootEl}
 	observerRoot={list.observerRoot}
-	getCellClassName={list.getCellClassName}
 	getCellDataTestId={list.getCellDataTestId}
 	resolveNavigationTarget={list.resolveNavigationTarget}
 	flushVirtualScrollMeasurement={list.flushVirtualScrollMeasurement}

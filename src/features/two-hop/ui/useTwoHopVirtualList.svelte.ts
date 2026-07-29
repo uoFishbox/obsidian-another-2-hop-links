@@ -415,9 +415,6 @@ export function useTwoHopVirtualList(
 		getRenderSlotState(cell: TwoHopMountedCell) {
 			return cardSlotBindings.getSlotState(cell);
 		},
-		getCellClassName(cell: TwoHopMountedCell): string | undefined {
-			return cell.section.header.section.className;
-		},
 		getCellDataTestId(cell: TwoHopMountedCell): string | undefined {
 			switch (cell.cell.kind) {
 				case "header":
