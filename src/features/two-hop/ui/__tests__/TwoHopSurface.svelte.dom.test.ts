@@ -33,6 +33,7 @@ import {
 
 const previewSurfaceCalls = vi.hoisted(() => ({
 	create: vi.fn(),
+	acceptCommittedFrame: vi.fn(),
 	commitBindingDelta: vi.fn(),
 	syncBindingDelta: vi.fn(),
 	setPreviewWindow: vi.fn(),
@@ -52,6 +53,12 @@ vi.mock("features/preview/scheduling/virtualPreviewSurface", async (importOrigin
 			const surface = actual.createVirtualPreviewSurface(...args);
 			return {
 				...surface,
+				acceptCommittedFrame: (
+					...frameArgs: Parameters<typeof surface.acceptCommittedFrame>
+				) => {
+					previewSurfaceCalls.acceptCommittedFrame(...frameArgs);
+					surface.acceptCommittedFrame(...frameArgs);
+				},
 				syncBindingDelta: (
 					...syncArgs: Parameters<typeof surface.syncBindingDelta>
 				) => {
@@ -77,6 +84,7 @@ vi.mock("features/preview/scheduling/virtualPreviewSurface", async (importOrigin
 
 beforeEach(() => {
 	previewSurfaceCalls.create.mockClear();
+	previewSurfaceCalls.acceptCommittedFrame.mockClear();
 	previewSurfaceCalls.commitBindingDelta.mockClear();
 	previewSurfaceCalls.syncBindingDelta.mockClear();
 	previewSurfaceCalls.setPreviewWindow.mockClear();
@@ -215,23 +223,22 @@ async function scrollSurface(
 }
 
 describe("TwoHopSurface", () => {
-	it("publishes binding changes through the combined preview commit", async () => {
+	it("publishes binding changes through the committed frame source", async () => {
 		const { root, scroller } = await renderScrollableSurface(
 			100,
 			createPreviewDependencies(),
 		);
 		previewSurfaceCalls.commitBindingDelta.mockClear();
+		previewSurfaceCalls.acceptCommittedFrame.mockClear();
 		previewSurfaceCalls.syncBindingDelta.mockClear();
 		previewSurfaceCalls.setPreviewWindow.mockClear();
 
 		await scrollSurface(root, scroller, 600);
 
-		expect(previewSurfaceCalls.commitBindingDelta).toHaveBeenCalled();
+		expect(previewSurfaceCalls.acceptCommittedFrame).toHaveBeenCalled();
 		expect(previewSurfaceCalls.syncBindingDelta).not.toHaveBeenCalled();
-		for (const [previewDelta, previewWindow] of previewSurfaceCalls
-			.commitBindingDelta.mock.calls) {
-			expect(previewDelta).toBeDefined();
-			expect(previewWindow?.previewRange.start).toBeGreaterThan(0);
+		for (const [source] of previewSurfaceCalls.acceptCommittedFrame.mock.calls) {
+			expect(source.current.previewWindow.previewRange.start).toBeGreaterThan(0);
 		}
 	});
 
@@ -324,6 +331,7 @@ describe("TwoHopSurface", () => {
 		expect(getPreview).not.toHaveBeenCalled();
 
 		previewSurfaceCalls.commitBindingDelta.mockClear();
+		previewSurfaceCalls.acceptCommittedFrame.mockClear();
 		previewSurfaceCalls.setPreviewWindow.mockClear();
 		await rerender({
 			...harnessProps,
@@ -341,9 +349,11 @@ describe("TwoHopSurface", () => {
 		await waitFor(() => expect(host?.dataset.previewState).toBe("committed"));
 		expect(host?.querySelector("img")).not.toBeNull();
 		expect(previewSurfaceCalls.commitBindingDelta).not.toHaveBeenCalled();
-		expect(previewSurfaceCalls.setPreviewWindow).toHaveBeenCalledWith(
-			expect.objectContaining({ active: true }),
-		);
+		expect(previewSurfaceCalls.setPreviewWindow).not.toHaveBeenCalled();
+		expect(
+			previewSurfaceCalls.acceptCommittedFrame.mock.calls.at(-1)?.[0].current
+				.previewWindow.active,
+		).toBe(true);
 		expect(
 			getCCLDevMeasurementSnapshot().counters["component.ViewItemCard.reevaluate"]
 				.count,

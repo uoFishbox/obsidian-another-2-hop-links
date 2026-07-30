@@ -9,6 +9,7 @@ import type { VirtualFrameCoordinator } from "ui/virtualization/scheduling/frame
 import {
 	createVirtualPreviewSurface,
 	type RowPreviewCardBinding,
+	type VirtualPreviewCommittedFrame,
 } from "../virtualPreviewSurface";
 import { resetPreviewActivationSchedulerForTests } from "../previewActivationScheduler";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -43,6 +44,16 @@ function binding(
 	identity: string,
 ): RowPreviewCardBinding {
 	return { slotId, rowIndex, snapshot: snapshot(identity) };
+}
+
+function committedFrame(card: RowPreviewCardBinding): VirtualPreviewCommittedFrame {
+	return {
+		previewBindingsBySlot: new Map([[card.slotId, card]]),
+		previewWindow: {
+			previewRange: { start: card.rowIndex, end: card.rowIndex + 1 },
+			active: true,
+		},
+	};
 }
 
 function createHarness(frameCoordinator?: VirtualFrameCoordinator) {
@@ -168,6 +179,63 @@ describe("VirtualPreviewSurface", () => {
 		await flushActivation();
 		expect(commit(renders[1])).toBe(true);
 		expect(host.textContent).toBe("b");
+		surface.dispose();
+	});
+
+	it("uses the current committed frame to reject an old preview owner", async () => {
+		const { surface, renders } = createHarness();
+		const host = document.createElement("div");
+		surface.registerHost("slot-0", host);
+		const firstToken = {};
+		const secondToken = {};
+		const firstBinding = {
+			...binding("slot-0", 0, "same-cache-identity"),
+			currentnessToken: firstToken,
+		};
+		let current = committedFrame(firstBinding);
+		const source = {
+			get current() {
+				return current;
+			},
+		};
+		surface.acceptCommittedFrame(source);
+		await flushActivation();
+
+		const secondBinding = {
+			...binding("slot-0", 0, "same-cache-identity"),
+			currentnessToken: secondToken,
+		};
+		current = committedFrame(secondBinding);
+		surface.acceptCommittedFrame(source);
+
+		expect(renders[0].callbacks.isCurrent()).toBe(false);
+		await flushActivation();
+		expect(commit(renders[0])).toBe(false);
+		expect(commit(renders[1])).toBe(true);
+		surface.dispose();
+	});
+
+	it("rejects a committed-frame render after its host lease is remounted", async () => {
+		const { surface, renders } = createHarness();
+		const oldHost = document.createElement("div");
+		const hostLease = surface.registerHost("slot-0", oldHost);
+		const card = {
+			...binding("slot-0", 0, "a"),
+			currentnessToken: {},
+		};
+		const current = committedFrame(card);
+		surface.acceptCommittedFrame({ current });
+		await flushActivation();
+
+		hostLease.dispose();
+		const newHost = document.createElement("div");
+		surface.registerHost("slot-0", newHost);
+		await flushActivation();
+
+		expect(commit(renders[0])).toBe(false);
+		expect(commit(renders[1])).toBe(true);
+		expect(oldHost.childNodes).toHaveLength(0);
+		expect(newHost.textContent).toBe("a");
 		surface.dispose();
 	});
 

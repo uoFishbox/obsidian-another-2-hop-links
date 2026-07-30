@@ -8,7 +8,7 @@
 	import type { ApplicationStore } from "ui/stores/ApplicationStore.svelte";
 	import type { CardRenderModel } from "ui/components/items/cardRenderModel";
 	import type { TwoHopCardPresentationState } from "features/two-hop/ui/twoHopCellStaticState";
-	import type { TwoHopMountedCell } from "features/two-hop/ui/twoHopMountedRows";
+	import type { TwoHopCommittedCellBinding } from "features/two-hop/ui/twoHopVirtualFrame";
 	import type {
 		TwoHopVirtualListItem,
 		TwoHopVirtualSectionDescriptor,
@@ -31,15 +31,13 @@
 
 	const TWO_HOP_BODY_LIFECYCLE = {
 		type: "keyed",
-		resolveKey: (cell: TwoHopMountedCell): unknown =>
-			cell.cell.kind === "item"
-				? cell.renderSlotKey
-				: (cell.renderBodyKey ?? cell.key),
-	} satisfies VirtualCellBodyLifecyclePolicy<TwoHopMountedCell>;
+		resolveKey: (binding: TwoHopCommittedCellBinding): unknown => binding.body,
+	} satisfies VirtualCellBodyLifecyclePolicy<TwoHopCommittedCellBinding>;
 
 	const props: Props = $props();
 	const frameCoordinator = provideVirtualFrameCoordinator();
 	const list = useTwoHopVirtualList(props, frameCoordinator);
+	const frame = $derived(list.frame);
 	provideVirtualPreviewSurface(list.previewSurface);
 </script>
 
@@ -48,13 +46,13 @@
 	contentClassName="view-plan-virtual-list-content view-plan-flow-content twohop-keyed-content"
 	rowClassName="view-plan-flow-row twohop-keyed-row"
 	cellClassName="view-plan-virtual-list-cell view-plan-flow-cell"
-	contentHeight={list.contentHeight}
-	cellWidth={list.layout.cellWidth}
-	rowHeight={list.layout.rowHeight}
-	columns={list.layout.columns}
-	gap={list.layout.gap}
+	contentHeight={frame.contentHeight}
+	cellWidth={frame.layout.cellWidth}
+	rowHeight={frame.layout.rowHeight}
+	columns={frame.layout.columns}
+	gap={frame.layout.gap}
 	layoutMode="grid-rows"
-	residentRows={list.residentRows}
+	mountedRows={frame.rowSlots}
 	bodyLifecyclePolicy={TWO_HOP_BODY_LIFECYCLE}
 	bind:rootEl={list.rootEl}
 	observerRoot={list.observerRoot}
@@ -64,13 +62,12 @@
 	interactionDescriptorScopeId="two-hop-card-slots"
 	interactionDescriptorResolverProvider={list.interactionDescriptorResolverProvider}
 >
-	{#snippet renderCell({ mountedCell })}
-		{@const slotState = list.getRenderSlotState(mountedCell)}
+	{#snippet renderCell({ mountedCell: binding })}
 		<TwoHopLogicalCell
-			{mountedCell}
+			mountedCell={binding.mountedCell}
 			applicationStore={props.applicationStore}
-			cardModel={slotState?.binding?.cardModel}
-			previewSlotId={String(mountedCell.renderSlotKey)}
+			cardModel={binding.cardModel ?? undefined}
+			previewSlotId={binding.slot.hostId}
 			onLoadMore={list.loadMore}
 		/>
 	{/snippet}

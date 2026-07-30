@@ -24,6 +24,8 @@ import type {
 	RowPreviewBindingDelta,
 	RowPreviewCardBinding,
 	RowPreviewWindow,
+	VirtualPreviewCommittedFrame,
+	VirtualPreviewCommittedFrameSource,
 } from "./rowPreviewTypes";
 import { recordCCLDevMeasurement } from "infrastructure/debug/CCLDevMeasurements";
 
@@ -31,6 +33,8 @@ export type {
 	RowPreviewBindingDelta,
 	RowPreviewCardBinding,
 	RowPreviewWindow,
+	VirtualPreviewCommittedFrame,
+	VirtualPreviewCommittedFrameSource,
 } from "./rowPreviewTypes";
 
 export interface PreviewHostLease {
@@ -39,6 +43,11 @@ export interface PreviewHostLease {
 
 export interface VirtualPreviewSurface {
 	registerHost(slotId: string, element: HTMLElement): PreviewHostLease;
+	/**
+	 * Reconciles imperative preview resources against one atomic frame source.
+	 * The source, not the staged sidecar state, remains authoritative.
+	 */
+	acceptCommittedFrame(source: VirtualPreviewCommittedFrameSource): void;
 	syncBindingDelta(delta: RowPreviewBindingDelta): void;
 	setPreviewWindow(window: RowPreviewWindow): void;
 	commitBindingDelta(delta: RowPreviewBindingDelta, window: RowPreviewWindow): void;
@@ -75,16 +84,15 @@ interface PreviewHostState {
 }
 
 interface PreviewOperationToken {
-	readonly slotId: string;
-	readonly slotEpoch: number;
 	readonly host: HTMLElement;
-	readonly previewIdentity: string;
+	readonly currentnessToken: object;
 }
 
 interface PreviewSlotRuntime {
 	readonly slotId: string;
 	binding?: RowPreviewCardBinding;
 	bindingIdentity?: string;
+	bindingCurrentnessToken?: object;
 	bindingRowIndex?: number;
 	host?: {
 		element: HTMLElement;
@@ -127,6 +135,8 @@ export function createVirtualPreviewSurface(
 	});
 	let previewRange: RowRange = EMPTY_RANGE;
 	let stagedPreviewRange: RowRange | undefined;
+	let committedFrameSource: VirtualPreviewCommittedFrameSource | undefined;
+	let acceptedFrame: VirtualPreviewCommittedFrame | undefined;
 	let disposed = false;
 	const stagedFlushDriver = createPreviewFrameDriver({
 		coordinator: options.frameCoordinator,
@@ -160,15 +170,22 @@ export function createVirtualPreviewSurface(
 		slot: PreviewSlotRuntime,
 		token: PreviewOperationToken,
 	): boolean {
+		const committedBinding =
+			committedFrameSource?.current.previewBindingsBySlot.get(slot.slotId);
+		if (committedFrameSource) {
+			return (
+				!disposed &&
+				resolveCurrentnessToken(committedBinding) === token.currentnessToken &&
+				slot.host?.element === token.host
+			);
+		}
 		const desiredBinding = stagedBindingsBySlot.has(slot.slotId)
 			? stagedBindingsBySlot.get(slot.slotId)
 			: slot.binding;
 		return (
 			!disposed &&
-			slot.slotId === token.slotId &&
-			slot.operationEpoch === token.slotEpoch &&
 			slot.host?.element === token.host &&
-			desiredBinding?.snapshot.identity === token.previewIdentity
+			resolveCurrentnessToken(desiredBinding) === token.currentnessToken
 		);
 	}
 
@@ -264,10 +281,8 @@ export function createVirtualPreviewSurface(
 		cancelLifecycleCleanup(slot);
 		stopRender(slot);
 		const token: PreviewOperationToken = {
-			slotId: slot.slotId,
-			slotEpoch: slot.operationEpoch,
 			host: host.element,
-			previewIdentity: binding.snapshot.identity,
+			currentnessToken: resolveCurrentnessToken(binding)!,
 		};
 		const request = slot.resolveRenderRequest(
 			binding.snapshot.file,
@@ -295,7 +310,7 @@ export function createVirtualPreviewSurface(
 				onCommitted: (contentType, retention) => {
 					if (!isCurrent(slot, token)) return;
 					slot.committed = {
-						identity: token.previewIdentity,
+						identity: binding.snapshot.identity,
 						contentType,
 						retention,
 						host: token.host,
@@ -382,9 +397,8 @@ export function createVirtualPreviewSurface(
 
 	function bindCard(binding: RowPreviewCardBinding): void {
 		const slot = getOrCreateSlot(binding.slotId);
-		const previousIdentity = slot.bindingIdentity;
 		if (
-			previousIdentity === binding.snapshot.identity &&
+			slot.bindingCurrentnessToken === resolveCurrentnessToken(binding) &&
 			slot.bindingRowIndex === binding.rowIndex
 		) {
 			slot.binding = binding;
@@ -394,6 +408,7 @@ export function createVirtualPreviewSurface(
 		stopRender(slot);
 		slot.binding = binding;
 		slot.bindingIdentity = binding.snapshot.identity;
+		slot.bindingCurrentnessToken = resolveCurrentnessToken(binding);
 		slot.bindingRowIndex = binding.rowIndex;
 		if (slot.committed) {
 			slot.phase = "stale";
@@ -410,6 +425,7 @@ export function createVirtualPreviewSurface(
 		stopRender(slot);
 		slot.binding = undefined;
 		slot.bindingIdentity = undefined;
+		slot.bindingCurrentnessToken = undefined;
 		slot.bindingRowIndex = undefined;
 		clearCommittedDom(slot);
 		slot.phase = "empty";
@@ -446,16 +462,16 @@ export function createVirtualPreviewSurface(
 		const previous = getDesiredBinding(slotId);
 		if (!previous && !binding) return;
 
-		const identityChanged =
-			previous?.snapshot.identity !== binding?.snapshot.identity;
+		const ownershipChanged =
+			resolveCurrentnessToken(previous) !== resolveCurrentnessToken(binding);
 		const rowChanged = previous?.rowIndex !== binding?.rowIndex;
 		stagedBindingsBySlot.set(slotId, binding);
-		if (!identityChanged && !rowChanged) return;
+		if (!ownershipChanged && !rowChanged) return;
 
 		const slot = getOrCreateSlot(slotId);
 		slot.operationEpoch += 1;
 		stagedInvalidatedSlots.add(slotId);
-		if (identityChanged) slot.host?.element.classList.add("is-stale");
+		if (ownershipChanged) slot.host?.element.classList.add("is-stale");
 	}
 
 	function stageBindingDelta(delta: RowPreviewBindingDelta): void {
@@ -483,6 +499,7 @@ export function createVirtualPreviewSurface(
 		if (!binding) {
 			slot.binding = undefined;
 			slot.bindingIdentity = undefined;
+			slot.bindingCurrentnessToken = undefined;
 			slot.bindingRowIndex = undefined;
 			clearCommittedDom(slot);
 			slot.phase = "empty";
@@ -492,6 +509,7 @@ export function createVirtualPreviewSurface(
 
 		slot.binding = binding;
 		slot.bindingIdentity = binding.snapshot.identity;
+		slot.bindingCurrentnessToken = resolveCurrentnessToken(binding);
 		slot.bindingRowIndex = binding.rowIndex;
 		if (!invalidated) return;
 		slot.phase = slot.committed ? "stale" : "empty";
@@ -552,6 +570,37 @@ export function createVirtualPreviewSurface(
 		};
 	}
 
+	function acceptCommittedFrame(source: VirtualPreviewCommittedFrameSource): void {
+		if (disposed) return;
+		committedFrameSource = source;
+		const nextFrame = source.current;
+		if (acceptedFrame === nextFrame) return;
+
+		const enteredSlots: RowPreviewCardBinding[] = [];
+		const reboundSlots: RowPreviewCardBinding[] = [];
+		const releasedSlots: string[] = [];
+		const previousBindings = acceptedFrame?.previewBindingsBySlot;
+		for (const slotId of previousBindings?.keys() ?? []) {
+			if (!nextFrame.previewBindingsBySlot.has(slotId)) {
+				releasedSlots.push(slotId);
+			}
+		}
+		for (const [slotId, binding] of nextFrame.previewBindingsBySlot) {
+			const previous = previousBindings?.get(slotId);
+			if (!previous) {
+				enteredSlots.push(binding);
+			} else if (previous !== binding) {
+				reboundSlots.push(binding);
+			}
+		}
+
+		acceptedFrame = nextFrame;
+		commitBindingDelta(
+			{ enteredSlots, reboundSlots, releasedSlots },
+			nextFrame.previewWindow,
+		);
+	}
+
 	function syncBindingDelta(delta: RowPreviewBindingDelta): void {
 		if (disposed) return;
 		flushPendingStageSynchronously();
@@ -596,6 +645,8 @@ export function createVirtualPreviewSurface(
 		stagedInvalidatedSlots.clear();
 		flushingInvalidatedSlots.clear();
 		stagedPreviewRange = undefined;
+		committedFrameSource = undefined;
+		acceptedFrame = undefined;
 		for (const handle of pendingByIdentity.values()) handle.cancel();
 		pendingByIdentity.clear();
 		for (const slot of slotsById.values()) {
@@ -604,6 +655,7 @@ export function createVirtualPreviewSurface(
 			slot.host = undefined;
 			slot.binding = undefined;
 			slot.bindingIdentity = undefined;
+			slot.bindingCurrentnessToken = undefined;
 			slot.bindingRowIndex = undefined;
 			slot.committed = undefined;
 		}
@@ -614,6 +666,7 @@ export function createVirtualPreviewSurface(
 
 	return {
 		registerHost,
+		acceptCommittedFrame,
 		syncBindingDelta,
 		setPreviewWindow,
 		commitBindingDelta,
@@ -652,4 +705,10 @@ function applyHostState(
 			delete element.dataset.hasPreviewContent;
 		}
 	}
+}
+
+function resolveCurrentnessToken(
+	binding: RowPreviewCardBinding | null | undefined,
+): object | undefined {
+	return binding?.currentnessToken ?? binding?.snapshot;
 }

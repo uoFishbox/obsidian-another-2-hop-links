@@ -108,8 +108,8 @@ describe("TwoHop keyed mounted rows", () => {
 		expect(jumpedPhysicalRow?.cells[0].cellSlotKey).toBe(
 			firstPhysicalRow?.cells[0].cellSlotKey,
 		);
-		expect(jumpedPhysicalRow?.cells[0].renderBodyKey).not.toBe(
-			firstPhysicalRow?.cells[0].renderBodyKey,
+		expect(jumpedPhysicalRow?.cells[0].key).not.toBe(
+			firstPhysicalRow?.cells[0].key,
 		);
 		expect(jumped.cellSlotCapacity).toBe(first.cellSlotCapacity);
 		expect(jumped.cells).toHaveLength(4);
@@ -181,11 +181,9 @@ describe("TwoHop keyed mounted rows", () => {
 
 		expect(resized).not.toBe(first);
 		expect(resized.rowSlices[0]?.top).not.toBe(first.rowSlices[0]?.top);
-		expect(resized.slotPool).toBe(first.slotPool);
-		expect(resized.slotPool.poolEpoch).toBe(first.slotPool.poolEpoch);
 		for (let index = 0; index < resized.rowSlices.length; index += 1) {
-			expect(resized.rowSlices[index]?.slotLease).toBe(
-				first.rowSlices[index]?.slotLease,
+			expect(resized.rowSlices[index]?.slotIndex).toBe(
+				first.rowSlices[index]?.slotIndex,
 			);
 		}
 	});
@@ -224,12 +222,7 @@ describe("TwoHop keyed mounted rows", () => {
 			rowSlotAllocator: allocator,
 		});
 
-		expect(singleColumn.slotPool.poolEpoch).toBeGreaterThan(
-			first.slotPool.poolEpoch,
-		);
-		expect(singleColumn.rowSlices[0]?.slotLease).not.toBe(
-			first.rowSlices[0]?.slotLease,
-		);
+		expect(singleColumn.rowSlices[0]).not.toBe(first.rowSlices[0]);
 	});
 
 	it("rebuilds row and cell leases after an allocator reset", () => {
@@ -248,8 +241,6 @@ describe("TwoHop keyed mounted rows", () => {
 			rowRange: { start: 1, end: 5 },
 			rowSlotAllocator: allocator,
 		});
-		const firstCellLease = first.cells[0]?.slotIncarnation.rowLease;
-
 		allocator.reset("source");
 		const rebuilt = buildTwoHopMountedRows({
 			rowModel,
@@ -259,14 +250,8 @@ describe("TwoHop keyed mounted rows", () => {
 		});
 
 		expect(rebuilt).not.toBe(first);
-		expect(rebuilt.slotPool.poolEpoch).toBeGreaterThan(first.slotPool.poolEpoch);
 		expect(rebuilt.rowSlices[0]).not.toBe(first.rowSlices[0]);
-		expect(rebuilt.cells[0]?.slotIncarnation.rowLease.poolEpoch).toBe(
-			rebuilt.slotPool.poolEpoch,
-		);
-		expect(rebuilt.cells[0]?.slotIncarnation.rowLease.poolEpoch).toBeGreaterThan(
-			firstCellLease?.poolEpoch ?? 0,
-		);
+		expect(rebuilt.rowSlices[0]?.slotIndex).toBe(first.rowSlices[0]?.slotIndex);
 	});
 
 	it("orders resident rows by physical slot without exposing pool holes", () => {

@@ -18,11 +18,9 @@ import {
 import {
 	buildTwoHopMountedRows,
 	type TwoHopMountedCell,
-	type TwoHopMountedRow,
 	type TwoHopMountedRowsBuild,
 } from "features/two-hop/ui/twoHopMountedRows";
 import { createResidentRowSlotAllocator } from "ui/virtualization/core/residentSlotAllocator";
-import { createVirtualSurfaceResidentRowsAdapter } from "ui/virtualization/svelte/residentRowViewState.svelte";
 import { useVirtualList } from "ui/virtualization/svelte/useVirtualList.svelte";
 import {
 	createViewPlanMeasurementRuntime,
@@ -40,16 +38,10 @@ import {
 	type VirtualPreviewSurface,
 } from "features/preview/scheduling/virtualPreviewSurface";
 import { resolveTwoHopCardPresentation } from "features/two-hop/ui/twoHopCellStaticState";
-import { createVirtualCardInteractionController } from "ui/interactions/virtualCardInteractionController";
 import type { RowRange } from "ui/virtualization/rowRange";
 import type { VirtualNavigationTarget } from "ui/virtualization/types";
 import type { ResultNavigationDirection } from "features/keyboard-navigation/resultFocus";
 import type { VirtualFrameCoordinator } from "ui/virtualization/scheduling/frameCoordinator";
-import {
-	createVirtualCardSlotBindings,
-	type VirtualCardSlotBinding,
-	type VirtualCardSlotState,
-} from "ui/virtualization/svelte/virtualCardSlotBindings.svelte";
 import {
 	createLayoutPublication,
 	type TwoHopLayoutPublication,
@@ -57,6 +49,13 @@ import {
 import type { TwoHopPreviewDependencies } from "features/two-hop/ui/twoHopPreviewDependencies";
 import { recordCCLDevMeasurement } from "infrastructure/debug/CCLDevMeasurements";
 import { createTwoHopCardModelPrewarmer } from "features/two-hop/ui/twoHopCardModelPrewarmer";
+import {
+	compileTwoHopVirtualFrame,
+	createEmptyTwoHopVirtualFrame,
+	createTwoHopFrameInteractionProvider,
+	type CommittedTwoHopVirtualFrame,
+	type TwoHopCommittedCellBinding,
+} from "features/two-hop/ui/twoHopVirtualFrame";
 
 export interface TwoHopVirtualListProps {
 	readonly sections: readonly TwoHopVirtualSectionDescriptor[];
@@ -72,23 +71,14 @@ export interface TwoHopVirtualListProps {
 	) => CardRenderModel;
 }
 
-export type TwoHopRenderSlotBinding = VirtualCardSlotBinding<
-	TwoHopMountedCell,
-	CardRenderModel
->;
-export type TwoHopRenderSlotState = VirtualCardSlotState<
-	TwoHopMountedCell,
-	CardRenderModel
->;
-
 const EMPTY_RANGE: RowRange = { start: 0, end: 0 };
-const EMPTY_MOUNTED_ROWS: readonly [] = [];
 
 function createDisabledVirtualPreviewSurface(): VirtualPreviewSurface {
 	return {
 		registerHost: () => ({
 			dispose: () => {},
 		}),
+		acceptCommittedFrame: () => {},
 		syncBindingDelta: () => {},
 		setPreviewWindow: () => {},
 		commitBindingDelta: () => {},
@@ -110,7 +100,6 @@ export function useTwoHopVirtualList(
 		: createDisabledVirtualPreviewSurface();
 	const isPreviewActive = () =>
 		props.previewDependencies !== undefined && props.previewActive !== false;
-	const interactionController = createVirtualCardInteractionController();
 	const documentProjection = createTwoHopDocumentProjection({
 		sections: props.sections,
 		applicationStore,
@@ -121,10 +110,17 @@ export function useTwoHopVirtualList(
 	let document = $state.raw<TwoHopDocument>(documentProjection.getDocument());
 	const measurementState = createViewPlanMeasurementState();
 	const rowSlotAllocator = createResidentRowSlotAllocator();
-	const residentRowsAdapter = createVirtualSurfaceResidentRowsAdapter<
-		TwoHopMountedCell,
-		TwoHopMountedRow
-	>();
+	let committedFrame = $state.raw<CommittedTwoHopVirtualFrame>(
+		createEmptyTwoHopVirtualFrame(measurementState.layout),
+	);
+	const previewFrameSource = {
+		get current() {
+			return committedFrame;
+		},
+	};
+	const interactionDescriptorResolverProvider = createTwoHopFrameInteractionProvider(
+		() => committedFrame,
+	);
 	const resolveConfiguredLayout = createResolvedCardLayoutSettingsMemo();
 	const configuredLayout = $derived(
 		resolveConfiguredLayout(applicationStore.settings),
@@ -168,13 +164,12 @@ export function useTwoHopVirtualList(
 	};
 	const rowModel = $derived(resolveRowModel());
 
-	let residentRowsBuild: TwoHopMountedRowsBuild | null = null;
-	let cardSlotsBuild: TwoHopMountedRowsBuild | null | undefined;
-	let cardSlotsBindingIdentity:
+	let committedMountedBuild: TwoHopMountedRowsBuild | null | undefined;
+	let committedBindingIdentity:
 		| TwoHopVirtualListProps["resolveItemCardModel"]
 		| undefined;
-	let cardSlotsPreviewRange: RowRange | undefined;
-	let cardSlotsPreviewActive: boolean | undefined;
+	let committedPreviewRange: RowRange | undefined;
+	let committedPreviewActive: boolean | undefined;
 
 	const resolveMountedCardModel = (
 		cell: TwoHopMountedCell,
@@ -200,67 +195,44 @@ export function useTwoHopVirtualList(
 		frameCoordinator,
 	});
 
-	const cardSlotBindings = createVirtualCardSlotBindings<
-		TwoHopMountedCell,
-		CardRenderModel,
-		TwoHopVirtualListProps["resolveItemCardModel"]
-	>({
-		previewSurface,
-		interactionController,
-		resolveCellIncarnation: (mountedCell) => mountedCell.slotIncarnation,
-		resolvePublicationRevision: (mountedCell) => mountedCell.publicationRevision,
-		resolveBinding: (mountedCell, resolver) => {
-			const cardModel = resolveMountedCardModel(mountedCell, resolver);
-			return {
-				mountedCell,
-				cardModel,
-				preview: cardModel?.previewSnapshot ?? undefined,
-				interaction: cardModel?.interactionDescriptor ?? undefined,
-			};
-		},
-	});
-
-	const syncResidentRows = (build: TwoHopMountedRowsBuild | null): void => {
-		if (residentRowsBuild === build) return;
-		residentRowsAdapter.sync(build?.occupiedRowsInSlotOrder ?? EMPTY_MOUNTED_ROWS);
-		residentRowsBuild = build;
-	};
-
-	const syncCardSlots = (
+	const commitVirtualFrame = (
 		build: TwoHopMountedRowsBuild | null,
 		resolver: TwoHopVirtualListProps["resolveItemCardModel"],
 		previewWindow: RowPreviewWindow,
 	): void => {
-		if (cardSlotsBuild !== build || cardSlotsBindingIdentity !== resolver) {
-			cardSlotBindings.sync({
-				mountedCells: build?.cells ?? EMPTY_MOUNTED_ROWS,
-				bindingIdentity: resolver,
-				previewWindow,
-			});
-			cardSlotsBuild = build;
-			cardSlotsBindingIdentity = resolver;
-			cardSlotsPreviewRange = {
-				start: previewWindow.previewRange.start,
-				end: previewWindow.previewRange.end,
-			};
-			cardSlotsPreviewActive = previewWindow.active;
-			return;
-		}
-
 		const { previewRange, active } = previewWindow;
 		if (
-			cardSlotsPreviewActive === active &&
-			cardSlotsPreviewRange?.start === previewRange.start &&
-			cardSlotsPreviewRange.end === previewRange.end
+			committedMountedBuild === build &&
+			committedBindingIdentity === resolver &&
+			committedPreviewActive === active &&
+			committedPreviewRange?.start === previewRange.start &&
+			committedPreviewRange.end === previewRange.end &&
+			isSameViewPlanLayout(committedFrame.layout, measurementState.layout)
 		) {
 			return;
 		}
-		cardSlotBindings.syncPreviewWindow(previewWindow);
-		cardSlotsPreviewRange = {
+
+		const prepared = compileTwoHopVirtualFrame({
+			previous: committedFrame,
+			mountedBuild: build,
+			layout: measurementState.layout,
+			contentHeight:
+				build?.rowModel.totalHeight ??
+				resolveRowModel(measurementState.layout).totalHeight,
+			previewWindow,
+			bindingIdentity: resolver,
+			resolveCardModel: (mountedCell) =>
+				resolveMountedCardModel(mountedCell, resolver),
+		});
+		committedFrame = prepared.frame;
+		committedMountedBuild = build;
+		committedBindingIdentity = resolver;
+		committedPreviewRange = {
 			start: previewRange.start,
 			end: previewRange.end,
 		};
-		cardSlotsPreviewActive = active;
+		committedPreviewActive = active;
+		previewSurface.acceptCommittedFrame(previewFrameSource);
 	};
 
 	const virtualList = useVirtualList<
@@ -285,8 +257,7 @@ export function useTwoHopVirtualList(
 		},
 		onSnapshotUpdated: (snapshot, reconciliationState) => {
 			const mountedBuild = reconciliationState.mountedBuild;
-			syncResidentRows(mountedBuild);
-			syncCardSlots(
+			commitVirtualFrame(
 				mountedBuild,
 				untrack(() => props.resolveItemCardModel),
 				{
@@ -321,10 +292,14 @@ export function useTwoHopVirtualList(
 			cancelPreviewVisibleRangeSync() {
 				const snapshot = virtualList.getSnapshot();
 				if (!snapshot) return;
-				previewSurface.setPreviewWindow({
-					previewRange: EMPTY_RANGE,
-					active: untrack(isPreviewActive),
-				});
+				commitVirtualFrame(
+					virtualList.getReconciliationState().mountedBuild,
+					untrack(() => props.resolveItemCardModel),
+					{
+						previewRange: EMPTY_RANGE,
+						active: untrack(isPreviewActive),
+					},
+				);
 			},
 		},
 		getConfiguredCardLayout: () => configuredLayout,
@@ -372,7 +347,7 @@ export function useTwoHopVirtualList(
 		const build = untrack(() => virtualList.getReconciliationState().mountedBuild);
 		const snapshot = untrack(() => virtualList.getSnapshot());
 		if (!snapshot) return;
-		syncCardSlots(build, resolver, {
+		commitVirtualFrame(build, resolver, {
 			previewRange: snapshot.ranges.previewVisible,
 			active,
 		});
@@ -393,7 +368,6 @@ export function useTwoHopVirtualList(
 	onDestroy(() => {
 		cardModelPrewarmer.dispose();
 		previewSurface.dispose();
-		interactionController.clear();
 	});
 
 	const loadMore = (sectionId: string): void => {
@@ -419,32 +393,23 @@ export function useTwoHopVirtualList(
 		get observerRoot() {
 			return measurementState.measurement.scrollContainerEl;
 		},
-		get contentHeight() {
-			return virtualList.getTotalHeight(rowModel.totalHeight);
-		},
-		get layout() {
-			return measurementState.layout;
-		},
-		get residentRows() {
-			return residentRowsAdapter.rows;
+		get frame() {
+			return committedFrame;
 		},
 		get interactionDescriptorResolverProvider() {
-			return interactionController.provider;
+			return interactionDescriptorResolverProvider;
 		},
 		get previewSurface() {
 			return previewSurface;
 		},
-		getRenderSlotState(cell: TwoHopMountedCell) {
-			return cardSlotBindings.getSlotState(cell);
-		},
-		getCellDataTestId(cell: TwoHopMountedCell): string | undefined {
-			switch (cell.cell.kind) {
+		getCellDataTestId(binding: TwoHopCommittedCellBinding): string | undefined {
+			switch (binding.mountedCell.cell.kind) {
 				case "header":
-					return `section-block-${cell.section.key}`;
+					return `section-block-${binding.mountedCell.section.key}`;
 				case "item":
 					return "twohop-item-cell";
 				case "load-more":
-					return `load-more-${cell.section.key}`;
+					return `load-more-${binding.mountedCell.section.key}`;
 			}
 		},
 		loadMore,

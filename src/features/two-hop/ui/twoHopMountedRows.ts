@@ -15,6 +15,7 @@ import type { RowRange } from "ui/virtualization/rowRange";
 import { renderSlotKey, type MountedVirtualCell } from "ui/virtualization/types";
 import {
 	cellSlotIndex,
+	hasSameCellSlotIncarnation,
 	hasSameRowSlotLease,
 	type ResidentCellSlotIncarnation,
 	type ResidentRowSlotLease,
@@ -34,14 +35,11 @@ import type { SectionDataRevision } from "features/two-hop/ui/twoHopRevisions";
 export interface TwoHopMountedCell extends MountedVirtualCell {
 	readonly cell: TwoHopLogicalCell;
 	readonly section: TwoHopDocumentSection;
-	readonly publicationRevision: SectionDataRevision;
-	readonly slotIncarnation: ResidentCellSlotIncarnation;
 }
 
 export interface TwoHopMountedRow extends VirtualSurfaceMountedRow<TwoHopMountedCell> {
 	readonly slotIndex: number;
 	readonly slotKey: number;
-	readonly slotLease: ResidentRowSlotLease;
 	readonly cells: readonly TwoHopMountedCell[];
 	readonly cellSlots: readonly SectionedGridMountedCellSlot<TwoHopMountedCell>[];
 }
@@ -52,8 +50,22 @@ export interface TwoHopMountedRowsBuild extends MountedVirtualCellsBuild<TwoHopM
 	readonly rowSlices: readonly TwoHopMountedRow[];
 	readonly occupiedRowsInSlotOrder: readonly TwoHopMountedRow[];
 	readonly cellSlotCapacity: number;
-	readonly slotPool: ResidentSlotPoolPublication;
 }
+
+interface TwoHopMountedCellCompilerIdentity {
+	readonly publicationRevision: SectionDataRevision;
+	readonly slotIncarnation: ResidentCellSlotIncarnation;
+}
+
+const compilerIdentityByCell = new WeakMap<
+	TwoHopMountedCell,
+	TwoHopMountedCellCompilerIdentity
+>();
+const slotPoolByBuild = new WeakMap<
+	TwoHopMountedRowsBuild,
+	ResidentSlotPoolPublication
+>();
+const slotLeaseByRow = new WeakMap<TwoHopMountedRow, ResidentRowSlotLease>();
 
 /** Builds bounded physical row/cell shells and exposes both slot and logical body keys. */
 export function buildTwoHopMountedRows(params: {
@@ -76,7 +88,7 @@ export function buildTwoHopMountedRows(params: {
 		previousBuild?.rowModel === rowModel &&
 		previousBuild.rowRange.start === start &&
 		previousBuild.rowRange.end === end &&
-		previousBuild.slotPool === slotPool
+		slotPoolByBuild.get(previousBuild) === slotPool
 	) {
 		return previousBuild;
 	}
@@ -102,9 +114,11 @@ export function buildTwoHopMountedRows(params: {
 			getPreviousRow(previousBuild, rowModel, rowIndex),
 		canReusePreviousRow: (row) => {
 			const currentLease = allocator.resolveSlotLease(row.rowIndex);
+			const previousLease = slotLeaseByRow.get(row);
 			return (
 				currentLease !== undefined &&
-				hasSameRowSlotLease(row.slotLease, currentLease)
+				previousLease !== undefined &&
+				hasSameRowSlotLease(previousLease, currentLease)
 			);
 		},
 		resolveRow: (rowIndex) => {
@@ -148,18 +162,21 @@ export function buildTwoHopMountedRows(params: {
 				renderSlotIndex,
 			});
 		},
-		createRow: ({ rowIndex, slotIndex, cells, cellSlots, row }) => ({
-			key: rowIndex,
-			rowIndex,
-			top: row.top,
-			slotIndex,
-			slotKey: slotIndex,
-			slotLease: row.metadata.rowLease,
-			cells,
-			cellSlots,
-		}),
+		createRow: ({ rowIndex, slotIndex, cells, cellSlots, row }) => {
+			const mountedRow: TwoHopMountedRow = {
+				key: rowIndex,
+				rowIndex,
+				top: row.top,
+				slotIndex,
+				slotKey: slotIndex,
+				cells,
+				cellSlots,
+			};
+			slotLeaseByRow.set(mountedRow, row.metadata.rowLease);
+			return mountedRow;
+		},
 	});
-	return {
+	const build: TwoHopMountedRowsBuild = {
 		get cells() {
 			return mountedRows.cells;
 		},
@@ -172,8 +189,9 @@ export function buildTwoHopMountedRows(params: {
 		rowRange: { start, end },
 		rowSlices: mountedRows.rowSlices,
 		occupiedRowsInSlotOrder: mountedRows.occupiedRowsInSlotOrder,
-		slotPool,
 	};
+	slotPoolByBuild.set(build, slotPool);
+	return build;
 }
 
 function getPreviousRow(
@@ -220,7 +238,7 @@ function resolveMountedCell(params: {
 		params.renderSlotIndex,
 	);
 
-	return {
+	const mountedCell: TwoHopMountedCell = {
 		key: params.logicalCell.key,
 		cell: params.logicalCell,
 		section: params.section,
@@ -229,23 +247,50 @@ function resolveMountedCell(params: {
 		renderSlotIndex: params.renderSlotIndex,
 		renderSlotKey: nextRenderSlotKey,
 		cellSlotKey: params.renderSlotIndex,
+	};
+	compilerIdentityByCell.set(mountedCell, {
 		publicationRevision: params.section.sourceRevision,
 		slotIncarnation,
-		// The outer shell is physical-slot keyed; only the body follows this key.
-		renderBodyKey: String(params.logicalCell.key),
-	};
+	});
+	return mountedCell;
 }
 
 /**
- * Projects the owning row-slot incarnation onto a flattened cell coordinate.
- *
- * The returned incarnation carries the row lease unchanged — it does **not**
- * advance independently when only the cell owner changes (e.g. `load-more →
- * item` within the same logical row). Consumers that need to detect cell-owner
- * transitions must additionally compare the cell's logical key
- * (`MountedVirtualCell.key`) or publication revision; the incarnation alone is
- * insufficient for that purpose.
+ * Reports physical slot continuity for the frame compiler without exposing the
+ * allocator's generation coordinates to UI consumers.
  */
+export function hasContinuousTwoHopPhysicalCellSlot(
+	previous: TwoHopMountedCell,
+	next: TwoHopMountedCell,
+): boolean {
+	const previousIdentity = compilerIdentityByCell.get(previous);
+	const nextIdentity = compilerIdentityByCell.get(next);
+	return (
+		previousIdentity !== undefined &&
+		nextIdentity !== undefined &&
+		hasSameCellSlotIncarnation(
+			previousIdentity.slotIncarnation,
+			nextIdentity.slotIncarnation,
+		)
+	);
+}
+
+/**
+ * Reports semantic publication continuity exclusively for the frame compiler.
+ */
+export function hasSameTwoHopCellPublication(
+	previous: TwoHopMountedCell,
+	next: TwoHopMountedCell,
+): boolean {
+	const previousIdentity = compilerIdentityByCell.get(previous);
+	const nextIdentity = compilerIdentityByCell.get(next);
+	return (
+		previousIdentity !== undefined &&
+		nextIdentity !== undefined &&
+		previousIdentity.publicationRevision === nextIdentity.publicationRevision
+	);
+}
+
 function createCellIncarnation(
 	rowLease: ResidentRowSlotLease,
 	renderSlotIndex: number,

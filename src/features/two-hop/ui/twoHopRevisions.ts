@@ -3,10 +3,9 @@ import type { ViewPlanLayoutMetrics } from "ui/virtualization/svelte/viewPlanLay
 /**
  * Official TwoHop change contracts.
  *
- * Logical keys identify a target, these revisions publish semantic data/layout
- * changes, and ResidentRowSlotLease is a captured row-slot ownership lease
- * (cells only carry its projection, ResidentCellSlotIncarnation). Object
- * references outside these contracts may only be used as cache fast paths.
+ * Logical keys identify a target. These revisions are source/compiler
+ * dependencies and must not be combined by UI consumers to prove currentness;
+ * the committed virtual frame publishes that decision as immutable specs.
  */
 export interface DocumentRevision {
 	readonly kind: "two-hop-document";
