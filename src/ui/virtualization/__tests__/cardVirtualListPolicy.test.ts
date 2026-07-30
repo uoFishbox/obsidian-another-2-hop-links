@@ -5,31 +5,16 @@ import {
 } from "../cardVirtualListPolicy";
 
 describe("card virtual list policy", () => {
-	it("shrinks preview activation to the strict viewport while scrolling", () => {
+	it("uses one preview and mounted overscan row by default", () => {
 		expect(
 			createCardVirtualListPolicy({
 				layout: {
 					rowHeight: 120,
 					gap: 12,
 				},
-				isScrollActive: true,
 			}),
 		).toEqual({
 			bootstrapRows: 3,
-			mountedOverscanPx: 132,
-			previewOverscanPx: 0,
-		});
-	});
-
-	it("keeps one mounted overscan row while idle", () => {
-		expect(
-			createCardVirtualListPolicy({
-				layout: {
-					rowHeight: 120,
-					gap: 12,
-				},
-			}),
-		).toMatchObject({
 			mountedOverscanPx: 132,
 			previewOverscanPx: 132,
 		});
@@ -78,7 +63,7 @@ describe("card virtual list policy", () => {
 		});
 	});
 
-	it("keeps view-plan lists fully mounted when scrolling is inactive", () => {
+	it("keeps the mounted range large enough for preview overscan", () => {
 		expect(
 			createCardVirtualListPolicy({
 				layout: {

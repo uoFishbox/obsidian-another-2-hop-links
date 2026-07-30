@@ -27,7 +27,7 @@ describe("createViewPlanCardVirtualListPolicyResolver", () => {
 		});
 	});
 
-	it("disables preview overscan during active scroll", () => {
+	it("keeps configured preview overscan during active scroll", () => {
 		const resolver = createViewPlanCardVirtualListPolicyResolver({
 			getPreviewActivationAheadRows: () => 1,
 			getMountedOverscanRows: () => 1,
@@ -35,11 +35,11 @@ describe("createViewPlanCardVirtualListPolicyResolver", () => {
 
 		expect(resolver.resolve(layout(), true)).toMatchObject({
 			mountedOverscanPx: 132,
-			previewOverscanPx: 0,
+			previewOverscanPx: 132,
 		});
 	});
 
-	it("limits mounted overscan to the configured rows during active scroll", () => {
+	it("keeps larger configured overscan during active scroll", () => {
 		const resolver = createViewPlanCardVirtualListPolicyResolver({
 			getPreviewActivationAheadRows: () => 3,
 			getMountedOverscanRows: () => 1,
@@ -50,8 +50,8 @@ describe("createViewPlanCardVirtualListPolicyResolver", () => {
 			previewOverscanPx: 132 * 3,
 		});
 		expect(resolver.resolve(layout(), true)).toMatchObject({
-			mountedOverscanPx: 132,
-			previewOverscanPx: 0,
+			mountedOverscanPx: 132 * 3,
+			previewOverscanPx: 132 * 3,
 		});
 	});
 
@@ -66,7 +66,7 @@ describe("createViewPlanCardVirtualListPolicyResolver", () => {
 		expect(resolver.resolve(baseLayout, false)).toBe(idlePolicy);
 	});
 
-	it("rebuilds the policy when scroll activity flips", () => {
+	it("reuses the policy when only scroll activity flips", () => {
 		const resolver = createViewPlanCardVirtualListPolicyResolver({
 			getPreviewActivationAheadRows: () => 2,
 			getMountedOverscanRows: () => 1,
@@ -76,8 +76,8 @@ describe("createViewPlanCardVirtualListPolicyResolver", () => {
 		const idlePolicy = resolver.resolve(baseLayout, false);
 		const scrollPolicy = resolver.resolve(baseLayout, true);
 
-		expect(scrollPolicy).not.toBe(idlePolicy);
-		expect(scrollPolicy.previewOverscanPx).toBe(0);
+		expect(scrollPolicy).toBe(idlePolicy);
+		expect(scrollPolicy.previewOverscanPx).toBe(264);
 	});
 
 	it("rebuilds the policy when the configured ahead rows change", () => {

@@ -252,7 +252,7 @@ describe("TwoHopSurface", () => {
 		}
 	});
 
-	it("reevaluates at most one physical row when the mounted range shifts once", async () => {
+	it("reevaluates only changed physical rows when the mounted range shifts", async () => {
 		const { root, scroller } = await renderScrollableSurface(100);
 		let previousRows = getRowsByPhysicalSlot(root);
 		let verifiedRangeShift = false;
@@ -270,13 +270,13 @@ describe("TwoHopSurface", () => {
 				}
 			}
 
-			if (changedSlotCount === 1 && changedSlots === previousRows.size) {
+			if (changedSlotCount > 0 && changedSlots === previousRows.size) {
 				const reevaluations =
 					getCCLDevMeasurementSnapshot().counters[
 						"component.ViewItemCard.reevaluate"
 					].count;
 				expect(reevaluations).toBeLessThanOrEqual(
-					applicationStore.settings.cardMaxColumns,
+					applicationStore.settings.cardMaxColumns * changedSlotCount,
 				);
 				verifiedRangeShift = true;
 				break;

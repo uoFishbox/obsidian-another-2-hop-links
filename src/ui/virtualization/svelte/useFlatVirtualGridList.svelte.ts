@@ -181,41 +181,35 @@ export function useFlatVirtualGridList<T>(
 	const interactionController = createVirtualCardInteractionController();
 	const visibilityAdapter = createFlatGridVisibilityAdapter<T>({});
 	const rowSlotAllocator = createResidentRowSlotAllocator();
-	let lastResolvedActiveScrollPolicyRowHeight: number | undefined;
-	let lastResolvedActiveScrollPolicyGap: number | undefined;
-	let lastResolvedActiveScrollPolicyAheadRows: number | undefined;
+	let lastResolvedVisibilityPolicyRowHeight: number | undefined;
+	let lastResolvedVisibilityPolicyGap: number | undefined;
+	let lastResolvedVisibilityPolicyAheadRows: number | undefined;
 	let lastResolvedMountedOverscanRows: 1 | 2 | undefined;
-	let lastResolvedActiveScrollPolicyIsScrollActive: boolean | undefined;
-	let lastResolvedActiveScrollPolicy:
+	let lastResolvedVisibilityPolicy:
 		| ReturnType<typeof createCardVirtualListPolicy>
 		| undefined;
-	const resolveActiveScrollPolicy = (
+	const resolveVisibilityPolicy = (
 		nextLayout: VirtualGridLayout,
-		isScrollActive: boolean,
 	): ReturnType<typeof createCardVirtualListPolicy> => {
-		const effectiveAheadRows = isScrollActive ? 0 : previewActivationAheadRows;
 		const mountedOverscanRows = enableTwoRowMountedOverscan ? 2 : 1;
 		if (
-			!lastResolvedActiveScrollPolicy ||
-			lastResolvedActiveScrollPolicyRowHeight !== nextLayout.rowHeight ||
-			lastResolvedActiveScrollPolicyGap !== nextLayout.gap ||
-			lastResolvedActiveScrollPolicyAheadRows !== effectiveAheadRows ||
-			lastResolvedMountedOverscanRows !== mountedOverscanRows ||
-			lastResolvedActiveScrollPolicyIsScrollActive !== isScrollActive
+			!lastResolvedVisibilityPolicy ||
+			lastResolvedVisibilityPolicyRowHeight !== nextLayout.rowHeight ||
+			lastResolvedVisibilityPolicyGap !== nextLayout.gap ||
+			lastResolvedVisibilityPolicyAheadRows !== previewActivationAheadRows ||
+			lastResolvedMountedOverscanRows !== mountedOverscanRows
 		) {
-			lastResolvedActiveScrollPolicyRowHeight = nextLayout.rowHeight;
-			lastResolvedActiveScrollPolicyGap = nextLayout.gap;
-			lastResolvedActiveScrollPolicyAheadRows = effectiveAheadRows;
+			lastResolvedVisibilityPolicyRowHeight = nextLayout.rowHeight;
+			lastResolvedVisibilityPolicyGap = nextLayout.gap;
+			lastResolvedVisibilityPolicyAheadRows = previewActivationAheadRows;
 			lastResolvedMountedOverscanRows = mountedOverscanRows;
-			lastResolvedActiveScrollPolicyIsScrollActive = isScrollActive;
-			lastResolvedActiveScrollPolicy = createCardVirtualListPolicy({
+			lastResolvedVisibilityPolicy = createCardVirtualListPolicy({
 				layout: nextLayout,
 				previewActivationAheadRows,
 				mountedOverscanRows,
-				isScrollActive,
 			});
 		}
-		return lastResolvedActiveScrollPolicy!;
+		return lastResolvedVisibilityPolicy!;
 	};
 	let sectionExpandedLimits = $state.raw<Record<string, number>>({});
 	let sectionRootEl = $state<HTMLDivElement | null>(null);
@@ -413,7 +407,7 @@ export function useFlatVirtualGridList<T>(
 		VirtualGridLayout
 	>({
 		resolveRowModel: resolveFlatLinkRowModel,
-		resolveVisibilityPolicy: resolveActiveScrollPolicy,
+		resolveVisibilityPolicy,
 		applyMeasurement: ({
 			rowModel,
 			scrollTop,
