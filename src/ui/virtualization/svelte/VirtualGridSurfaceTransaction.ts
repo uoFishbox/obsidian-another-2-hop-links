@@ -168,6 +168,20 @@ export function createVirtualGridSurfaceTransaction(
 		rebind: VirtualGridCellRebind<TLifecycleValue>,
 	): void => {
 		const previous = bindingByElement.get(element);
+		if (
+			previous &&
+			previous.logicalKey === rebind.nextLogicalKey &&
+			previous.rowIndex === rebind.rowIndex &&
+			previous.columnIndex === rebind.columnIndex &&
+			previous.interactionDescriptor === rebind.interactionDescriptor &&
+			previous.lifecycleValue === rebind.lifecycleValue &&
+			previous.onAttach === rebind.onAttach &&
+			previous.onDetach === rebind.onDetach &&
+			matchesRegistrationOwner(previous.registration, rebind)
+		) {
+			return;
+		}
+
 		const previousLogicalKey = previous?.logicalKey ?? rebind.previousLogicalKey;
 		const logicalKeyChanged =
 			previousLogicalKey !== undefined &&

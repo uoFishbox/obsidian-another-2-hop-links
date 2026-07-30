@@ -207,6 +207,16 @@ function getPhysicalSlot(root: HTMLElement, slot: number): HTMLElement | null {
 	);
 }
 
+function getRowsByPhysicalSlot(root: HTMLElement): Map<string, string> {
+	const rows = root.shadowRoot?.querySelectorAll<HTMLElement>("[data-ccl-row-slot]");
+	return new Map(
+		[...(rows ?? [])].map((row) => [
+			row.dataset.cclRowSlot ?? "",
+			row.dataset.cclRowIndex ?? "",
+		]),
+	);
+}
+
 async function scrollSurface(
 	root: HTMLElement,
 	scroller: HTMLElement,
@@ -240,6 +250,41 @@ describe("TwoHopSurface", () => {
 		for (const [source] of previewSurfaceCalls.acceptCommittedFrame.mock.calls) {
 			expect(source.current.previewWindow.previewRange.start).toBeGreaterThan(0);
 		}
+	});
+
+	it("reevaluates at most one physical row when the mounted range shifts once", async () => {
+		const { root, scroller } = await renderScrollableSurface(100);
+		let previousRows = getRowsByPhysicalSlot(root);
+		let verifiedRangeShift = false;
+
+		for (let scrollTop = 20; scrollTop <= 1_000; scrollTop += 20) {
+			resetCCLDevMeasurements();
+			await scrollSurface(root, scroller, scrollTop);
+			const nextRows = getRowsByPhysicalSlot(root);
+			const changedSlots = new Set([...previousRows.keys(), ...nextRows.keys()])
+				.size;
+			let changedSlotCount = 0;
+			for (const slot of new Set([...previousRows.keys(), ...nextRows.keys()])) {
+				if (previousRows.get(slot) !== nextRows.get(slot)) {
+					changedSlotCount += 1;
+				}
+			}
+
+			if (changedSlotCount === 1 && changedSlots === previousRows.size) {
+				const reevaluations =
+					getCCLDevMeasurementSnapshot().counters[
+						"component.ViewItemCard.reevaluate"
+					].count;
+				expect(reevaluations).toBeLessThanOrEqual(
+					applicationStore.settings.cardMaxColumns,
+				);
+				verifiedRangeShift = true;
+				break;
+			}
+			previousRows = nextRows;
+		}
+
+		expect(verifiedRangeShift).toBe(true);
 	});
 
 	it("commits two-hop preview DOM without reevaluating ViewItemCard", async () => {

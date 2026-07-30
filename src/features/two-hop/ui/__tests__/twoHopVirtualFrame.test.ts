@@ -177,6 +177,59 @@ describe("compileTwoHopVirtualFrame", () => {
 		expect(diff.ownerEnded).toHaveLength(0);
 	});
 
+	it("replaces only the rebound physical row during a one-row range shift", () => {
+		const section = createSection({ count: 20, revision: 1 });
+		const document = createDocument({ section, visibleCount: 20 });
+		const rowModel = createTwoHopVirtualRowModel(
+			document,
+			createLayoutPublication(layout, 1),
+		);
+		const allocator = createResidentRowSlotAllocator();
+		const firstBuild = buildTwoHopMountedRows({
+			rowModel,
+			rowRange: { start: 0, end: 4 },
+			rowSlotAllocator: allocator,
+		});
+		const first = compileTwoHopVirtualFrame({
+			previous: createEmptyTwoHopVirtualFrame(layout),
+			mountedBuild: firstBuild,
+			layout,
+			previewWindow: { previewRange: { start: 0, end: 4 }, active: true },
+			bindingIdentity: undefined,
+			resolveCardModel: () => undefined,
+		});
+		const secondBuild = buildTwoHopMountedRows({
+			rowModel,
+			rowRange: { start: 1, end: 5 },
+			previousBuild: firstBuild,
+			rowSlotAllocator: allocator,
+		});
+		const second = compileTwoHopVirtualFrame({
+			previous: first,
+			mountedBuild: secondBuild,
+			layout,
+			previewWindow: { previewRange: { start: 1, end: 5 }, active: true },
+			bindingIdentity: undefined,
+			resolveCardModel: () => undefined,
+		});
+		const firstRowsBySlot = new Map(
+			first.rowSlots.map((row) => [row.slotIndex, row] as const),
+		);
+		const changedRows = second.rowSlots.filter(
+			(row) => firstRowsBySlot.get(row.slotIndex) !== row,
+		);
+
+		expect(second.rowSlots).not.toBe(first.rowSlots);
+		expect(changedRows).toHaveLength(1);
+		for (const row of second.rowSlots) {
+			if (changedRows.includes(row)) continue;
+			const previousRow = firstRowsBySlot.get(row.slotIndex);
+			expect(row).toBe(previousRow);
+			expect(row.cells).toBe(previousRow?.cells);
+			expect(row.cellSlots).toBe(previousRow?.cellSlots);
+		}
+	});
+
 	it("issues a new owner and body when load-more becomes an item", () => {
 		const section = createSection({ count: 5, revision: 1 });
 		const firstDocument = createDocument({ section, visibleCount: 1 });

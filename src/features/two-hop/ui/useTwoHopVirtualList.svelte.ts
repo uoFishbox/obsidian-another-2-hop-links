@@ -49,12 +49,14 @@ import {
 import type { TwoHopPreviewDependencies } from "features/two-hop/ui/twoHopPreviewDependencies";
 import { recordCCLDevMeasurement } from "infrastructure/debug/CCLDevMeasurements";
 import { createTwoHopCardModelPrewarmer } from "features/two-hop/ui/twoHopCardModelPrewarmer";
+import { createVirtualSurfaceResidentRowsAdapter } from "ui/virtualization/svelte/residentRowViewState.svelte";
 import {
 	compileTwoHopVirtualFrame,
 	createEmptyTwoHopVirtualFrame,
 	createTwoHopFrameInteractionProvider,
 	type CommittedTwoHopVirtualFrame,
 	type TwoHopCommittedCellBinding,
+	type TwoHopCommittedRow,
 } from "features/two-hop/ui/twoHopVirtualFrame";
 
 export interface TwoHopVirtualListProps {
@@ -113,6 +115,10 @@ export function useTwoHopVirtualList(
 	let committedFrame = $state.raw<CommittedTwoHopVirtualFrame>(
 		createEmptyTwoHopVirtualFrame(measurementState.layout),
 	);
+	const residentRowsAdapter = createVirtualSurfaceResidentRowsAdapter<
+		TwoHopCommittedCellBinding,
+		TwoHopCommittedRow
+	>();
 	const previewFrameSource = {
 		get current() {
 			return committedFrame;
@@ -225,6 +231,7 @@ export function useTwoHopVirtualList(
 			resolveCardModel: (mountedCell) =>
 				resolveMountedCardModel(mountedCell, resolver),
 		});
+		residentRowsAdapter.sync(nextFrame.rowSlots);
 		committedFrame = nextFrame;
 		committedMountedBuild = build;
 		committedBindingIdentity = resolver;
@@ -400,6 +407,9 @@ export function useTwoHopVirtualList(
 		},
 		get frame() {
 			return committedFrame;
+		},
+		get residentRows() {
+			return residentRowsAdapter.rows;
 		},
 		get interactionDescriptorResolverProvider() {
 			return interactionDescriptorResolverProvider;

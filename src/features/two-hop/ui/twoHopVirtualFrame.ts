@@ -210,6 +210,7 @@ export function compileTwoHopVirtualFrame(params: {
 	const rowSlots = compileRows(
 		params.mountedBuild?.occupiedRowsInSlotOrder ?? [],
 		nextBindingsBySlotIndex,
+		params.previous.rowSlots,
 	);
 	const layout = layoutUnchanged
 		? params.previous.layout
@@ -345,41 +346,128 @@ function resolveInteractionSpec(
 function compileRows(
 	rows: readonly TwoHopMountedRow[],
 	bindingsBySlotIndex: ReadonlyMap<number, TwoHopCommittedCellBinding>,
+	previousRows: readonly TwoHopCommittedRow[],
 ): readonly TwoHopCommittedRow[] {
-	return Object.freeze(
-		rows.map((row) => {
-			const cells = Object.freeze(
-				row.cells.flatMap((cell) => {
-					const binding = bindingsBySlotIndex.get(cell.renderSlotIndex);
-					return binding ? [binding] : [];
-				}),
-			);
-			const cellSlots = Object.freeze(
-				row.cellSlots.map((cellSlot) =>
-					Object.freeze({
-						renderSlotIndex: cellSlot.renderSlotIndex,
-						renderSlotKey: cellSlot.renderSlotKey,
-						columnIndex: cellSlot.columnIndex,
-						binding:
-							cellSlot.binding === null
-								? null
-								: (bindingsBySlotIndex.get(
-										cellSlot.binding.renderSlotIndex,
-									) ?? null),
-					}),
-				),
-			);
-			return Object.freeze({
-				key: row.key,
-				rowIndex: row.rowIndex,
-				top: row.top,
-				slotIndex: row.slotIndex,
-				slotKey: row.slotKey,
-				cells,
-				cellSlots,
-			});
-		}),
+	const previousRowsBySlot = new Map(
+		previousRows.map((row) => [row.slotIndex, row] as const),
 	);
+	const nextRows = rows.map((row) =>
+		compileRow(row, bindingsBySlotIndex, previousRowsBySlot.get(row.slotIndex)),
+	);
+	return hasSameReferences(previousRows, nextRows)
+		? previousRows
+		: Object.freeze(nextRows);
+}
+
+function compileRow(
+	row: TwoHopMountedRow,
+	bindingsBySlotIndex: ReadonlyMap<number, TwoHopCommittedCellBinding>,
+	previous: TwoHopCommittedRow | undefined,
+): TwoHopCommittedRow {
+	if (previous && canReuseCommittedRow(previous, row, bindingsBySlotIndex)) {
+		return previous;
+	}
+
+	const nextCells = row.cells.flatMap((cell) => {
+		const binding = bindingsBySlotIndex.get(cell.renderSlotIndex);
+		return binding ? [binding] : [];
+	});
+	const cells =
+		previous && hasSameReferences(previous.cells, nextCells)
+			? previous.cells
+			: Object.freeze(nextCells);
+	const nextCellSlots = row.cellSlots.map((cellSlot, index) => {
+		const binding = resolveCommittedCellSlotBinding(cellSlot, bindingsBySlotIndex);
+		const previousCellSlot = previous?.cellSlots[index];
+		if (
+			previousCellSlot?.renderSlotIndex === cellSlot.renderSlotIndex &&
+			previousCellSlot.renderSlotKey === cellSlot.renderSlotKey &&
+			previousCellSlot.columnIndex === cellSlot.columnIndex &&
+			previousCellSlot.binding === binding
+		) {
+			return previousCellSlot;
+		}
+		return Object.freeze({
+			renderSlotIndex: cellSlot.renderSlotIndex,
+			renderSlotKey: cellSlot.renderSlotKey,
+			columnIndex: cellSlot.columnIndex,
+			binding,
+		});
+	});
+	const cellSlots =
+		previous && hasSameReferences(previous.cellSlots, nextCellSlots)
+			? previous.cellSlots
+			: Object.freeze(nextCellSlots);
+
+	return Object.freeze({
+		key: row.key,
+		rowIndex: row.rowIndex,
+		top: row.top,
+		slotIndex: row.slotIndex,
+		slotKey: row.slotKey,
+		cells,
+		cellSlots,
+	});
+}
+
+function canReuseCommittedRow(
+	previous: TwoHopCommittedRow,
+	row: TwoHopMountedRow,
+	bindingsBySlotIndex: ReadonlyMap<number, TwoHopCommittedCellBinding>,
+): boolean {
+	if (
+		previous.key !== row.key ||
+		previous.rowIndex !== row.rowIndex ||
+		previous.top !== row.top ||
+		previous.slotIndex !== row.slotIndex ||
+		previous.slotKey !== row.slotKey ||
+		previous.cells.length !== row.cells.length ||
+		previous.cellSlots.length !== row.cellSlots.length
+	) {
+		return false;
+	}
+
+	for (let index = 0; index < row.cells.length; index += 1) {
+		const cell = row.cells[index];
+		if (
+			!cell ||
+			previous.cells[index] !== bindingsBySlotIndex.get(cell.renderSlotIndex)
+		) {
+			return false;
+		}
+	}
+	for (let index = 0; index < row.cellSlots.length; index += 1) {
+		const cellSlot = row.cellSlots[index];
+		const previousCellSlot = previous.cellSlots[index];
+		if (
+			!cellSlot ||
+			!previousCellSlot ||
+			previousCellSlot.renderSlotIndex !== cellSlot.renderSlotIndex ||
+			previousCellSlot.renderSlotKey !== cellSlot.renderSlotKey ||
+			previousCellSlot.columnIndex !== cellSlot.columnIndex ||
+			previousCellSlot.binding !==
+				resolveCommittedCellSlotBinding(cellSlot, bindingsBySlotIndex)
+		) {
+			return false;
+		}
+	}
+	return true;
+}
+
+function resolveCommittedCellSlotBinding(
+	cellSlot: SectionedGridMountedCellSlot<TwoHopMountedCell>,
+	bindingsBySlotIndex: ReadonlyMap<number, TwoHopCommittedCellBinding>,
+): TwoHopCommittedCellBinding | null {
+	if (cellSlot.binding === null) return null;
+	return bindingsBySlotIndex.get(cellSlot.binding.renderSlotIndex) ?? null;
+}
+
+function hasSameReferences<T>(previous: readonly T[], next: readonly T[]): boolean {
+	if (previous.length !== next.length) return false;
+	for (let index = 0; index < next.length; index += 1) {
+		if (previous[index] !== next[index]) return false;
+	}
+	return true;
 }
 
 function indexBindingsBySlot(

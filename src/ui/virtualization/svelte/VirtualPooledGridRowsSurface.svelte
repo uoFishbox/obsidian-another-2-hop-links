@@ -130,8 +130,14 @@
 			: cell.renderSlotKey;
 
 	const setRowTransform = (element: HTMLElement, top: number) => {
+		let committedTop = Number.NaN;
+
 		const update = (nextTop: number): void => {
-			element.style.transform = `translateY(${Math.max(0, nextTop)}px)`;
+			const normalizedTop = Math.max(0, nextTop);
+			if (normalizedTop === committedTop) return;
+
+			committedTop = normalizedTop;
+			element.style.transform = `translateY(${normalizedTop}px)`;
 		};
 		update(top);
 		return { update };

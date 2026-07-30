@@ -52,7 +52,7 @@
 	columns={frame.layout.columns}
 	gap={frame.layout.gap}
 	layoutMode="grid-rows"
-	mountedRows={frame.rowSlots}
+	residentRows={list.residentRows}
 	bodyLifecyclePolicy={TWO_HOP_BODY_LIFECYCLE}
 	bind:rootEl={list.rootEl}
 	observerRoot={list.observerRoot}
