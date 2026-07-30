@@ -98,13 +98,9 @@ export interface TwoHopVirtualFrameDiff {
 	readonly previewChanged: readonly TwoHopCommittedCellBinding[];
 }
 
-export interface PreparedTwoHopVirtualFrame {
-	readonly frame: CommittedTwoHopVirtualFrame;
-	readonly diff: TwoHopVirtualFrameDiff;
-}
-
 interface FrameCompilerMemo {
 	readonly bindingIdentity: unknown;
+	readonly mountedBuild: TwoHopMountedRowsBuild | null;
 }
 
 const compilerMemoByFrame = new WeakMap<
@@ -129,13 +125,17 @@ export function createEmptyTwoHopVirtualFrame(
 		}),
 		interactionsById: new Map(),
 	});
-	compilerMemoByFrame.set(frame, { bindingIdentity: undefined });
+	compilerMemoByFrame.set(frame, {
+		bindingIdentity: undefined,
+		mountedBuild: null,
+	});
 	return frame;
 }
 
 /**
  * Compiles every DOM, preview, and interaction binding without mutating the
- * previously published frame.
+ * previously published frame. When only the preview window changed, the stable
+ * render publication is reused without visiting mounted cells.
  */
 export function compileTwoHopVirtualFrame(params: {
 	readonly previous: CommittedTwoHopVirtualFrame;
@@ -147,9 +147,23 @@ export function compileTwoHopVirtualFrame(params: {
 	readonly resolveCardModel: (
 		mountedCell: TwoHopMountedCell,
 	) => CardRenderModel | undefined;
-}): PreparedTwoHopVirtualFrame {
-	const previousBySlotIndex = indexBindingsBySlot(params.previous);
+}): CommittedTwoHopVirtualFrame {
+	const contentHeight =
+		params.contentHeight ??
+		params.mountedBuild?.rowModel.totalHeight ??
+		params.previous.contentHeight;
 	const previousMemo = compilerMemoByFrame.get(params.previous);
+	const layoutUnchanged = isSameViewPlanLayout(params.previous.layout, params.layout);
+	const canReuseStablePublication =
+		previousMemo?.mountedBuild === params.mountedBuild &&
+		previousMemo.bindingIdentity === params.bindingIdentity &&
+		layoutUnchanged &&
+		params.previous.contentHeight === contentHeight;
+	if (canReuseStablePublication) {
+		return publishPreviewWindowOnly(params.previous, params.previewWindow);
+	}
+
+	const previousBySlotIndex = indexBindingsBySlot(params.previous);
 	const canReuseResolvedOutputs =
 		previousMemo?.bindingIdentity === params.bindingIdentity;
 	const nextBindingsBySlotIndex = new Map<number, TwoHopCommittedCellBinding>();
@@ -197,7 +211,7 @@ export function compileTwoHopVirtualFrame(params: {
 		params.mountedBuild?.occupiedRowsInSlotOrder ?? [],
 		nextBindingsBySlotIndex,
 	);
-	const layout = isSameViewPlanLayout(params.previous.layout, params.layout)
+	const layout = layoutUnchanged
 		? params.previous.layout
 		: Object.freeze({ ...params.layout });
 	const previewWindow = reusePreviewWindow(
@@ -207,10 +221,7 @@ export function compileTwoHopVirtualFrame(params: {
 	const frame: CommittedTwoHopVirtualFrame = Object.freeze({
 		sequence: params.previous.sequence + 1,
 		layout,
-		contentHeight:
-			params.contentHeight ??
-			params.mountedBuild?.rowModel.totalHeight ??
-			params.previous.contentHeight,
+		contentHeight,
 		rowSlots,
 		cellsBySlot,
 		previewBindingsBySlot,
@@ -219,12 +230,21 @@ export function compileTwoHopVirtualFrame(params: {
 	});
 	compilerMemoByFrame.set(frame, {
 		bindingIdentity: params.bindingIdentity,
+		mountedBuild: params.mountedBuild,
 	});
 
-	return {
-		frame,
-		diff: createFrameDiff(previousBySlotIndex, nextBindingsBySlotIndex),
-	};
+	return frame;
+}
+
+/**
+ * Computes optional diagnostics for callers that explicitly need to compare
+ * two committed publications. The render hot path does not pay this cost.
+ */
+export function diffTwoHopVirtualFrames(
+	previous: CommittedTwoHopVirtualFrame,
+	next: CommittedTwoHopVirtualFrame,
+): TwoHopVirtualFrameDiff {
+	return createFrameDiff(indexBindingsBySlot(previous), indexBindingsBySlot(next));
 }
 
 /** Creates a provider that always resolves descriptors from the current frame. */
@@ -390,6 +410,28 @@ function reusePreviewWindow(
 			end: next.previewRange.end,
 		}),
 	});
+}
+
+function publishPreviewWindowOnly(
+	previous: CommittedTwoHopVirtualFrame,
+	nextWindow: RowPreviewWindow,
+): CommittedTwoHopVirtualFrame {
+	const previewWindow = reusePreviewWindow(previous.previewWindow, nextWindow);
+	if (previewWindow === previous.previewWindow) return previous;
+
+	const frame: CommittedTwoHopVirtualFrame = Object.freeze({
+		sequence: previous.sequence + 1,
+		layout: previous.layout,
+		contentHeight: previous.contentHeight,
+		rowSlots: previous.rowSlots,
+		cellsBySlot: previous.cellsBySlot,
+		previewBindingsBySlot: previous.previewBindingsBySlot,
+		previewWindow,
+		interactionsById: previous.interactionsById,
+	});
+	const previousMemo = compilerMemoByFrame.get(previous);
+	if (previousMemo) compilerMemoByFrame.set(frame, previousMemo);
+	return frame;
 }
 
 function createFrameDiff(

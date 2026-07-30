@@ -212,8 +212,9 @@ export function useTwoHopVirtualList(
 			return;
 		}
 
-		const prepared = compileTwoHopVirtualFrame({
-			previous: committedFrame,
+		const previousFrame = committedFrame;
+		const nextFrame = compileTwoHopVirtualFrame({
+			previous: previousFrame,
 			mountedBuild: build,
 			layout: measurementState.layout,
 			contentHeight:
@@ -224,7 +225,7 @@ export function useTwoHopVirtualList(
 			resolveCardModel: (mountedCell) =>
 				resolveMountedCardModel(mountedCell, resolver),
 		});
-		committedFrame = prepared.frame;
+		committedFrame = nextFrame;
 		committedMountedBuild = build;
 		committedBindingIdentity = resolver;
 		committedPreviewRange = {
@@ -232,7 +233,11 @@ export function useTwoHopVirtualList(
 			end: previewRange.end,
 		};
 		committedPreviewActive = active;
-		previewSurface.acceptCommittedFrame(previewFrameSource);
+		if (nextFrame.previewBindingsBySlot === previousFrame.previewBindingsBySlot) {
+			previewSurface.setPreviewWindow(nextFrame.previewWindow);
+		} else {
+			previewSurface.acceptCommittedFrame(previewFrameSource);
+		}
 	};
 
 	const virtualList = useVirtualList<

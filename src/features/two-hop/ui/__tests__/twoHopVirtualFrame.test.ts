@@ -9,6 +9,7 @@ import {
 	compileTwoHopVirtualFrame,
 	createEmptyTwoHopVirtualFrame,
 	createTwoHopFrameInteractionProvider,
+	diffTwoHopVirtualFrames,
 	type CommittedTwoHopVirtualFrame,
 	type TwoHopCommittedCellBinding,
 } from "features/two-hop/ui/twoHopVirtualFrame";
@@ -153,8 +154,9 @@ describe("compileTwoHopVirtualFrame", () => {
 			rowModel,
 			rowRange: { start: 0, end: rowModel.rowCount },
 		});
-		const prepared = compileTwoHopVirtualFrame({
-			previous: createEmptyTwoHopVirtualFrame(layout),
+		const previous = createEmptyTwoHopVirtualFrame(layout);
+		const frame = compileTwoHopVirtualFrame({
+			previous,
 			mountedBuild,
 			layout,
 			previewWindow: {
@@ -164,14 +166,15 @@ describe("compileTwoHopVirtualFrame", () => {
 			bindingIdentity: undefined,
 			resolveCardModel: () => undefined,
 		});
+		const diff = diffTwoHopVirtualFrames(previous, frame);
 
-		for (const row of prepared.frame.rowSlots) {
+		for (const row of frame.rowSlots) {
 			for (const binding of row.cells) {
-				expect(prepared.frame.cellsBySlot.get(binding.slot)).toBe(binding);
+				expect(frame.cellsBySlot.get(binding.slot)).toBe(binding);
 			}
 		}
-		expect(prepared.diff.ownerStarted).toHaveLength(mountedBuild.cells.length);
-		expect(prepared.diff.ownerEnded).toHaveLength(0);
+		expect(diff.ownerStarted).toHaveLength(mountedBuild.cells.length);
+		expect(diff.ownerEnded).toHaveLength(0);
 	});
 
 	it("issues a new owner and body when load-more becomes an item", () => {
@@ -194,7 +197,7 @@ describe("compileTwoHopVirtualFrame", () => {
 			previewWindow: { previewRange: { start: 0, end: 2 }, active: true },
 			bindingIdentity: undefined,
 			resolveCardModel: () => undefined,
-		}).frame;
+		});
 		const loadMore = [...first.cellsBySlot.values()].find(
 			(binding) => binding.mountedCell.cell.kind === "load-more",
 		);
@@ -222,7 +225,7 @@ describe("compileTwoHopVirtualFrame", () => {
 			previewWindow: { previewRange: { start: 0, end: 3 }, active: true },
 			bindingIdentity: undefined,
 			resolveCardModel: () => undefined,
-		}).frame;
+		});
 		const replacement = [...next.cellsBySlot.values()].find(
 			(binding) => binding.slot === loadMore?.slot,
 		);
@@ -264,7 +267,7 @@ describe("compileTwoHopVirtualFrame", () => {
 			previewWindow: { previewRange: { start: 0, end: 2 }, active: true },
 			bindingIdentity: resolver,
 			resolveCardModel: resolver,
-		}).frame;
+		});
 		const initialItem = findItem(initial, "item:0");
 
 		const updatedSection = createSection({
@@ -294,7 +297,7 @@ describe("compileTwoHopVirtualFrame", () => {
 			previewWindow: { previewRange: { start: 0, end: 2 }, active: true },
 			bindingIdentity: resolver,
 			resolveCardModel: resolver,
-		}).frame;
+		});
 		const updatedItem = findItem(updated, "item:0");
 
 		expect(updatedItem.owner).toBe(initialItem.owner);
@@ -322,7 +325,7 @@ describe("compileTwoHopVirtualFrame", () => {
 			previewWindow: { previewRange: { start: 0, end: 5 }, active: true },
 			bindingIdentity: undefined,
 			resolveCardModel: () => undefined,
-		}).frame;
+		});
 		const singleColumnLayout = {
 			...layout,
 			columns: 1,
@@ -338,7 +341,7 @@ describe("compileTwoHopVirtualFrame", () => {
 			previousBuild: initialBuild,
 			rowSlotAllocator: allocator,
 		});
-		const prepared = compileTwoHopVirtualFrame({
+		const next = compileTwoHopVirtualFrame({
 			previous: initial,
 			mountedBuild: nextBuild,
 			layout: singleColumnLayout,
@@ -346,10 +349,11 @@ describe("compileTwoHopVirtualFrame", () => {
 			bindingIdentity: undefined,
 			resolveCardModel: () => undefined,
 		});
+		const diff = diffTwoHopVirtualFrames(initial, next);
 
-		expect(prepared.diff.ownerEnded.length).toBeGreaterThan(0);
-		expect(prepared.diff.ownerStarted.length).toBeGreaterThan(0);
-		for (const nextBinding of prepared.frame.cellsBySlot.values()) {
+		expect(diff.ownerEnded.length).toBeGreaterThan(0);
+		expect(diff.ownerStarted.length).toBeGreaterThan(0);
+		for (const nextBinding of next.cellsBySlot.values()) {
 			const previousBinding = [...initial.cellsBySlot.values()].find(
 				(candidate) =>
 					candidate.slot.debugIndex === nextBinding.slot.debugIndex,
@@ -381,7 +385,7 @@ describe("compileTwoHopVirtualFrame", () => {
 			bindingIdentity: firstResolver,
 			resolveCardModel: (cell) =>
 				cell.cell.kind === "item" ? firstResolver(cell.cell.item) : undefined,
-		}).frame;
+		});
 		const secondResolver = (cell: Parameters<typeof createCardModel>[0]) =>
 			createCardModel(cell, "second");
 		const second = compileTwoHopVirtualFrame({
@@ -392,7 +396,7 @@ describe("compileTwoHopVirtualFrame", () => {
 			bindingIdentity: secondResolver,
 			resolveCardModel: (cell) =>
 				cell.cell.kind === "item" ? secondResolver(cell.cell.item) : undefined,
-		}).frame;
+		});
 		const firstItem = findItem(first, "item:0");
 		const secondItem = findItem(second, "item:0");
 
@@ -420,7 +424,7 @@ describe("compileTwoHopVirtualFrame", () => {
 			previewWindow: { previewRange: { start: 0, end: 2 }, active: false },
 			bindingIdentity: resolver,
 			resolveCardModel: resolver,
-		}).frame;
+		});
 		resolver.mockClear();
 		const second = compileTwoHopVirtualFrame({
 			previous: first,
@@ -429,9 +433,15 @@ describe("compileTwoHopVirtualFrame", () => {
 			previewWindow: { previewRange: { start: 0, end: 2 }, active: true },
 			bindingIdentity: resolver,
 			resolveCardModel: resolver,
-		}).frame;
+		});
 
 		expect(second.previewWindow.active).toBe(true);
+		expect(second).not.toBe(first);
+		expect(second.layout).toBe(first.layout);
+		expect(second.rowSlots).toBe(first.rowSlots);
+		expect(second.cellsBySlot).toBe(first.cellsBySlot);
+		expect(second.previewBindingsBySlot).toBe(first.previewBindingsBySlot);
+		expect(second.interactionsById).toBe(first.interactionsById);
 		expect(resolver).not.toHaveBeenCalled();
 		for (const binding of second.cellsBySlot.values()) {
 			expect(first.cellsBySlot.get(binding.slot)).toBe(binding);
@@ -459,7 +469,7 @@ describe("compileTwoHopVirtualFrame", () => {
 				cell.cell.kind === "item"
 					? createCardModel(cell.cell.item, "item", true)
 					: undefined,
-		}).frame;
+		});
 		const provider = createTwoHopFrameInteractionProvider(() => current);
 
 		expect(provider.resolveInteractionDescriptor("item:0")).toBe(
@@ -475,7 +485,7 @@ describe("compileTwoHopVirtualFrame", () => {
 				cell.cell.kind === "item"
 					? createCardModel(cell.cell.item, "item")
 					: undefined,
-		}).frame;
+		});
 		expect(provider.resolveInteractionDescriptor("item:0")).toBeNull();
 	});
 });

@@ -349,11 +349,10 @@ describe("TwoHopSurface", () => {
 		await waitFor(() => expect(host?.dataset.previewState).toBe("committed"));
 		expect(host?.querySelector("img")).not.toBeNull();
 		expect(previewSurfaceCalls.commitBindingDelta).not.toHaveBeenCalled();
-		expect(previewSurfaceCalls.setPreviewWindow).not.toHaveBeenCalled();
-		expect(
-			previewSurfaceCalls.acceptCommittedFrame.mock.calls.at(-1)?.[0].current
-				.previewWindow.active,
-		).toBe(true);
+		expect(previewSurfaceCalls.acceptCommittedFrame).not.toHaveBeenCalled();
+		expect(previewSurfaceCalls.setPreviewWindow.mock.calls.at(-1)?.[0].active).toBe(
+			true,
+		);
 		expect(
 			getCCLDevMeasurementSnapshot().counters["component.ViewItemCard.reevaluate"]
 				.count,
