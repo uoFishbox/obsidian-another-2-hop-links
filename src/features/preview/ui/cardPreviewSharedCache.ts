@@ -17,14 +17,14 @@ import {
 } from "features/preview/core/previewContent";
 import { readRawContent } from "features/preview/core/rawContentReader";
 import {
-	buildPreviewContentSettingsSignature,
-	buildPreviewContentIdentityKey,
-	buildRenderCacheKey,
-	buildPreviewRenderKeys,
-	normalizePreviewQuery,
 	CACHE_KEY_SEPARATOR,
 	getPreviewSettingsSignatures,
 } from "features/preview/core/previewRenderKeys";
+import {
+	createAbortError,
+	isAbortError,
+	throwIfAborted,
+} from "features/preview/core/previewAbort";
 import { getDebugDisableRenderedPreviewCache } from "../../../appConstants";
 import type { PreviewRenderSettingsInput } from "features/preview/core/previewRenderSettings";
 import { createSizedLRUCache, stringBytes } from "shared/cache/sizedLRUCache";
@@ -52,14 +52,6 @@ type SharedInFlightRequest<T> = {
 	callerCount: number;
 	controller: AbortController;
 	promise: Promise<T>;
-};
-
-export {
-	buildPreviewContentSettingsSignature,
-	buildPreviewContentIdentityKey,
-	buildRenderCacheKey,
-	buildPreviewRenderKeys,
-	normalizePreviewQuery,
 };
 
 interface CardPreviewSharedCacheState {
@@ -145,16 +137,6 @@ function previewContentHasVisibleQuery(
 	return htmlVisibleTextContainsCaseInsensitive(previewContent, normalizedQuery);
 }
 
-function createAbortError(message: string): DOMException {
-	return new DOMException(message, "AbortError");
-}
-
-function throwIfAborted(signal: AbortSignal | undefined, message: string): void {
-	if (signal?.aborted) {
-		throw createAbortError(message);
-	}
-}
-
 function attachCallerToSharedRequest<T>(
 	request: SharedInFlightRequest<T>,
 	signal: AbortSignal | undefined,
@@ -226,12 +208,6 @@ function abortSharedRequests<T>(requests: Map<string, SharedInFlightRequest<T>>)
 		request.controller.abort();
 	}
 	requests.clear();
-}
-
-function isAbortError(error: unknown): boolean {
-	return error instanceof DOMException
-		? error.name === "AbortError"
-		: error instanceof Error && error.name === "AbortError";
 }
 
 function resolveFirstMatchIndex(
@@ -410,7 +386,7 @@ async function getOrCreateRenderedTextPreviewEntryForState(
 		signal,
 	} = params;
 	if (signal?.aborted) {
-		throw new DOMException("Preview render aborted", "AbortError");
+		throw createAbortError("Preview render aborted");
 	}
 	if (!canShareRenderedTextPreview(content)) {
 		throw new Error(

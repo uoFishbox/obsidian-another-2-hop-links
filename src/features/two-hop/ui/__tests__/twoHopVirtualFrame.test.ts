@@ -116,10 +116,6 @@ function createCardModel(
 			: null,
 		presentation: undefined,
 		searchQuery: "",
-		searchScope: "title-and-content",
-		contentPreview: undefined,
-		previewRefreshToken: 0,
-		previewOverride: null,
 		previewRequest: compileCardPreviewRequest({
 			file: targetFile,
 			searchQuery: "",

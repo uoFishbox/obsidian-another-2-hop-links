@@ -45,12 +45,11 @@ describe("PreviewSlotController", () => {
 	it("keeps errors separate from committed content and allows retry", () => {
 		const cleanups: Array<ReturnType<typeof vi.fn>> = [];
 		const callbacks: PreviewRenderCallbacks[] = [];
-		const render: CardPreviewRenderer = (_host, _request, _generation, next) => {
+		const render: CardPreviewRenderer = (_host, _request, next) => {
 			if (!next) throw new TypeError("Missing callbacks");
 			const cleanup = vi.fn();
 			callbacks.push(next);
 			cleanups.push(cleanup);
-			next.onLoadingChange(true);
 			next.onError?.();
 			return cleanup;
 		};
@@ -74,12 +73,10 @@ describe("PreviewSlotController", () => {
 		controller.dispose();
 	});
 
-	it("deduplicates equivalent state notifications", () => {
+	it("publishes the loading phase exactly once per activation", () => {
 		let callbacks: PreviewRenderCallbacks | undefined;
-		const render: CardPreviewRenderer = (_host, _request, _generation, next) => {
+		const render: CardPreviewRenderer = (_host, _request, next) => {
 			callbacks = next;
-			next?.onLoadingChange(true);
-			next?.onLoadingChange(true);
 			return vi.fn();
 		};
 		const onStateChange = vi.fn();

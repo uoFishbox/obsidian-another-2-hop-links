@@ -38,7 +38,6 @@
 	} from "./searchableItemSorting";
 	import { tick } from "svelte";
 	import {
-		createCardPreviewRequest,
 		createCardRenderModel,
 		type CardRenderModel,
 	} from "ui/components/items/cardRenderModel";
@@ -403,9 +402,7 @@
 		const revision = cardModelRevision;
 		return config.itemComponent === ViewItemCard
 			? (item: ViewItem, index: number) =>
-					createCardPreviewRequest(
-						resolveViewItemCardModel(item, index, revision),
-					)
+					resolveViewItemCardModel(item, index, revision).previewRequest
 			: undefined;
 	});
 	const resolveItemInteractionDescriptor = $derived.by(() => {

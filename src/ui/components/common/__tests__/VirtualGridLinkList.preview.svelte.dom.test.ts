@@ -63,10 +63,6 @@ function createModel(file: TFile): CardRenderModel {
 		interactionDescriptor: null,
 		presentation: undefined,
 		searchQuery: "",
-		searchScope: "title-and-content",
-		contentPreview: undefined,
-		previewRefreshToken: 0,
-		previewOverride: null,
 		previewRequest: {
 			renderKey: `preview:${file.path}`,
 			previewContentKey: `content:${file.path}`,

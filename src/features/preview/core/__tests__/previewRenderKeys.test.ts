@@ -3,11 +3,7 @@ import { describe, expect, test } from "vitest";
 import { DEFAULT_SETTINGS } from "features/settings/model";
 import { compileCardPreviewRequest } from "../cardPreviewRequest";
 import { createPreviewOverrideIdentity } from "../previewRenderIdentity";
-import {
-	buildRenderCacheKey,
-	buildRenderCacheKeyFromNormalizedQuery,
-	normalizePreviewQuery,
-} from "../previewRenderKeys";
+import { buildPreviewRenderKeys, normalizePreviewQuery } from "../previewRenderKeys";
 
 function createFile(path: string, extension = "md"): TFile {
 	const name = path.slice(path.lastIndexOf("/") + 1);
@@ -23,23 +19,6 @@ function createFile(path: string, extension = "md"): TFile {
 }
 
 describe("preview render keys", () => {
-	test("builds the same render cache key from a pre-normalized query", () => {
-		const file = createFile("Folder/Note.md");
-		const query = "  Alpha  ";
-		const renderVersionIdentity = "4:1:none";
-
-		expect(
-			buildRenderCacheKeyFromNormalizedQuery(
-				file,
-				normalizePreviewQuery(query),
-				DEFAULT_SETTINGS,
-				renderVersionIdentity,
-			),
-		).toBe(
-			buildRenderCacheKey(file, query, DEFAULT_SETTINGS, renderVersionIdentity),
-		);
-	});
-
 	test("uses the compiled render key as the complete semantic identity", () => {
 		const file = createFile("Folder/Note.md");
 		const renderVersion = "4:1";
@@ -59,12 +38,12 @@ describe("preview render keys", () => {
 				previewOverride: override,
 			}).renderKey,
 		).toBe(
-			buildRenderCacheKeyFromNormalizedQuery(
+			buildPreviewRenderKeys(
 				file,
 				normalizedQuery,
 				DEFAULT_SETTINGS,
 				renderVersionIdentity,
-			),
+			).renderCacheKey,
 		);
 	});
 });

@@ -32,10 +32,7 @@ export class PreviewService {
 
 	constructor(strategies?: PreviewStrategy[]) {
 		this.strategies = strategies ?? createDefaultPreviewStrategies();
-		this.ensureStarted();
 	}
-
-	public ensureStarted(): void {}
 
 	public dispose(): void {
 		this.shutdown();
@@ -77,7 +74,6 @@ export class PreviewService {
 		signal?: AbortSignal,
 		options: PreviewRequestOptions = {},
 	): Promise<PreviewData> {
-		this.ensureStarted();
 		if (signal?.aborted) {
 			throw createAbortError();
 		}

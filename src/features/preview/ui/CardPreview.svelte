@@ -11,7 +11,6 @@
 	import {
 		createPreviewSlotController,
 		type PreviewSlotController,
-		type PreviewSlotState,
 	} from "./previewSlotController";
 
 	interface Props {
@@ -22,11 +21,9 @@
 
 	let { request, previewRuntime: explicitPreviewRuntime }: Props = $props();
 	let container = $state<HTMLDivElement | undefined>(undefined);
-	let slotState = $state<PreviewSlotState>({
-		phase: "empty",
-		hasContent: false,
-		isMathRendering: false,
-	});
+	// The controller owns the host's data attributes and state classes; Svelte
+	// only tracks whether the MathJax initial skeleton should be visible.
+	let shouldShowInitialSkeleton = $state(false);
 	let controller: PreviewSlotController;
 
 	const {
@@ -52,21 +49,13 @@
 	const ownerToken = {};
 	controller = createPreviewSlotController({
 		createRenderer: () => renderPreview,
-		onStateChange: (nextState) => {
-			slotState = nextState;
+		onStateChange: (state) => {
+			const next = state.isMathRendering && !state.hasContent;
+			if (next !== shouldShowInitialSkeleton) {
+				shouldShowInitialSkeleton = next;
+			}
 		},
 	});
-	const shouldShowInitialSkeleton = $derived(
-		slotState.isMathRendering && !slotState.hasContent,
-	);
-	const previewTypeClass = $derived(
-		slotState.contentType
-			? `cosense-card-links__box-preview--${slotState.contentType}`
-			: "",
-	);
-	const isStale = $derived(
-		slotState.phase === "stale" || slotState.phase === "dormant",
-	);
 
 	$effect(() => {
 		if (!container) return;
@@ -90,9 +79,8 @@
 		<SkeletonPreview />
 	{/if}
 	<div
-		class="cosense-card-links__box-preview {previewTypeClass}"
+		class="cosense-card-links__box-preview"
 		bind:this={container}
 		class:hidden={shouldShowInitialSkeleton}
-		class:is-stale={isStale}
 	></div>
 {/if}

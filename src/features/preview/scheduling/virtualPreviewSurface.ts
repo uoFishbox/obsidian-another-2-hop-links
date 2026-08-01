@@ -181,7 +181,7 @@ export function createVirtualPreviewSurface(
 		);
 		desiredFrame = frame;
 		for (const slotId of delta.releasedSlots) {
-			getOrCreateSlot(slotId).controller.invalidate();
+			slotsById.get(slotId)?.controller.invalidate();
 		}
 		for (const binding of [...delta.enteredSlots, ...delta.reboundSlots]) {
 			const previousBinding = previousDesired?.previewBindingsBySlot.get(
@@ -190,7 +190,7 @@ export function createVirtualPreviewSurface(
 			if (previousBinding && isSameDesiredBinding(previousBinding, binding)) {
 				continue;
 			}
-			getOrCreateSlot(binding.slotId).controller.invalidate();
+			slotsById.get(binding.slotId)?.controller.invalidate();
 		}
 
 		const previousRange = previousDesired?.previewWindow.active

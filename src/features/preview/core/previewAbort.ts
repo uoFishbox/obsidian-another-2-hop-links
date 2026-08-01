@@ -1,11 +1,22 @@
-export function createAbortError(): DOMException | Error {
+export function createAbortError(
+	message = "Preview request aborted",
+): DOMException | Error {
 	if (typeof DOMException !== "undefined") {
-		return new DOMException("Preview request aborted", "AbortError");
+		return new DOMException(message, "AbortError");
 	}
 
-	const error = new Error("Preview request aborted");
+	const error = new Error(message);
 	error.name = "AbortError";
 	return error;
+}
+
+export function throwIfAborted(
+	signal: AbortSignal | undefined,
+	message = "Preview request aborted",
+): void {
+	if (signal?.aborted) {
+		throw createAbortError(message);
+	}
 }
 
 export function isAbortError(error: unknown): boolean {

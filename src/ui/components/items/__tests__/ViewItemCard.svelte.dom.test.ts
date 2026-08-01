@@ -67,10 +67,6 @@ describe("ViewItemCard", () => {
 			interactionDescriptor: null,
 			presentation: undefined,
 			searchQuery: "compiled",
-			searchScope: "title-only",
-			contentPreview: undefined,
-			previewRefreshToken: 0,
-			previewOverride: null,
 			previewRequest: compileCardPreviewRequest({
 				file: targetFile,
 				searchQuery: "compiled",

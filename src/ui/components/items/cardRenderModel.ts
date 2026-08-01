@@ -31,11 +31,6 @@ export interface CardRenderModel {
 	readonly interactionDescriptor: ItemInteractionDescriptor | null;
 	readonly presentation: CardPresentationState | undefined;
 	readonly searchQuery: string;
-	readonly searchScope: "title-only" | "title-and-content";
-	readonly contentPreview: string | undefined;
-	readonly previewRefreshToken: number;
-	readonly previewCacheRevision?: number | string;
-	readonly previewOverride: PreviewData | null;
 	readonly previewRequest: CardPreviewRequest | null;
 }
 
@@ -79,7 +74,6 @@ export function createCardRenderModel(
 	const previewRenderVersion = targetFile
 		? params.getPreviewRenderVersion(targetFile.path)
 		: "0:0";
-	const previewCacheRevision = `${previewRenderVersion}:${previewRefreshToken}`;
 	const interactionKey =
 		params.interactionKey ?? createItemInteractionKey(params.item);
 	const interactionId = params.interactionId ?? interactionKey;
@@ -119,20 +113,8 @@ export function createCardRenderModel(
 		interactionDescriptor,
 		presentation: params.presentation,
 		searchQuery,
-		searchScope,
-		contentPreview,
-		previewRefreshToken,
-		previewCacheRevision,
-		previewOverride,
 		previewRequest,
 	};
-}
-
-/** Builds the immutable preview input consumed by a physical slot controller. */
-export function createCardPreviewRequest(
-	model: CardRenderModel,
-): CardPreviewRequest | null {
-	return model.previewRequest;
 }
 
 /** Resolves only the file identity and display title needed by a card shell. */

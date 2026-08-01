@@ -299,10 +299,6 @@ describe("TwoHopSurface", () => {
 				interactionDescriptor: null,
 				presentation,
 				searchQuery: "",
-				searchScope: "title-and-content",
-				contentPreview: undefined,
-				previewRefreshToken: 0,
-				previewOverride: null,
 				previewRequest: compileCardPreviewRequest({
 					file: targetFile,
 					searchQuery: "",
@@ -403,10 +399,6 @@ describe("TwoHopSurface", () => {
 				interactionDescriptor: null,
 				presentation,
 				searchQuery: "",
-				searchScope: "title-and-content",
-				contentPreview: undefined,
-				previewRefreshToken: 0,
-				previewOverride: null,
 				previewRequest: null,
 			}),
 		);
@@ -445,10 +437,6 @@ describe("TwoHopSurface", () => {
 				interactionDescriptor: null,
 				presentation,
 				searchQuery: "",
-				searchScope: "title-and-content",
-				contentPreview: undefined,
-				previewRefreshToken: 0,
-				previewOverride: null,
 				previewRequest: null,
 			}),
 		);
@@ -602,10 +590,6 @@ describe("TwoHopSurface", () => {
 				interactionDescriptor: null,
 				presentation,
 				searchQuery: "",
-				searchScope: "title-and-content",
-				contentPreview: undefined,
-				previewRefreshToken: 0,
-				previewOverride: null,
 				previewRequest: null,
 			}),
 		);

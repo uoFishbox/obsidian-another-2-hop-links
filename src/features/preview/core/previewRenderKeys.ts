@@ -64,36 +64,6 @@ export function normalizePreviewQuery(query: string): string {
 	return query.trim().toLowerCase();
 }
 
-export function buildPreviewContentIdentityKey(
-	file: TFile,
-	settings: PreviewRenderSettingsInput,
-	previewRenderVersion: string,
-): string {
-	const { contentSignature } = getPreviewSettingsSignatures(settings);
-	return `${file.path}${CACHE_KEY_SEPARATOR}${file.stat.mtime}${CACHE_KEY_SEPARATOR}${previewRenderVersion}${CACHE_KEY_SEPARATOR}${contentSignature}`;
-}
-
-export function buildRenderCacheKey(
-	file: TFile,
-	query: string,
-	settings: PreviewRenderSettingsInput,
-	previewRenderVersion: string,
-): string {
-	const { searchSignature } = getPreviewSettingsSignatures(settings);
-	return `${buildPreviewContentIdentityKey(file, settings, previewRenderVersion)}${CACHE_KEY_SEPARATOR}${normalizePreviewQuery(query)}${CACHE_KEY_SEPARATOR}${searchSignature}`;
-}
-
-export function buildRenderCacheKeyFromNormalizedQuery(
-	file: TFile,
-	normalizedQuery: string,
-	settings: PreviewRenderSettingsInput,
-	previewRenderVersion: string,
-): string {
-	const { contentSignature, searchSignature } =
-		getPreviewSettingsSignatures(settings);
-	return `${file.path}${CACHE_KEY_SEPARATOR}${file.stat.mtime}${CACHE_KEY_SEPARATOR}${previewRenderVersion}${CACHE_KEY_SEPARATOR}${contentSignature}${CACHE_KEY_SEPARATOR}${normalizedQuery}${CACHE_KEY_SEPARATOR}${searchSignature}`;
-}
-
 export function buildPreviewRenderKeys(
 	file: TFile,
 	query: string,

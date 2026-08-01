@@ -74,7 +74,6 @@ export interface PreviewActivationScope {
 
 interface PreviewActivationScopeState {
 	readonly scope: PreviewActivationScope;
-	readonly runtime: PreviewActivationRuntime;
 	readonly partition: PreviewActivationPartition;
 	readonly queue: PreviewKeyedQueue<PreviewActivationRequest>;
 	disposed: boolean;
@@ -89,31 +88,16 @@ interface PreviewActivationRequest {
 	settled: boolean;
 }
 
-interface PreviewActivationRuntime {
-	readonly scopes: Set<PreviewActivationScopeState>;
-	readonly getBackpressure: () => PreviewBackpressure;
-	readonly subscribeBackpressure:
-		| ((listener: PreviewBackpressureListener) => () => void)
-		| undefined;
-	readonly getActivationsPerSecond: () => number;
-	readonly roundRobinCursorByPartition: Map<PreviewActivationPartition, number>;
-	readonly scrollingPolicy: PreviewActivationPolicy;
-	tokenState: PreviewScheduleTokenState;
-	blockedForBackpressure: boolean;
-	unsubscribeBackpressure: (() => void) | undefined;
-}
-
 interface PreviewActivationPartition {
 	readonly coordinator: VirtualFrameCoordinator | undefined;
 	readonly driver: PreviewFrameDriver;
 	readonly scopes: Set<PreviewActivationScopeState>;
-	readonly pendingRuntimesScratch: Set<PreviewActivationRuntime>;
 	readonly pendingScopesScratch: PreviewActivationScopeState[];
 	lastObservedMeasurementEpoch: number;
 }
 
 /**
- * Runtime-wide activation policy shared by every scope of one scheduler.
+ * Scheduler-wide activation policy shared by every scope of one scheduler.
  *
  * The plugin runtime configures these once per PreviewService; surfaces must
  * not override them per scope.
@@ -170,7 +154,18 @@ interface PreviewActivationHandleInternal extends PreviewActivationHandle {
 }
 
 interface PreviewActivationSchedulerState {
-	readonly runtime: PreviewActivationRuntime;
+	/** Every scope of this scheduler. */
+	readonly scopes: Set<PreviewActivationScopeState>;
+	readonly getBackpressure: () => PreviewBackpressure;
+	readonly subscribeBackpressure:
+		| ((listener: PreviewBackpressureListener) => () => void)
+		| undefined;
+	readonly getActivationsPerSecond: () => number;
+	readonly roundRobinCursorByPartition: Map<PreviewActivationPartition, number>;
+	readonly scrollingPolicy: PreviewActivationPolicy;
+	tokenState: PreviewScheduleTokenState;
+	blockedForBackpressure: boolean;
+	unsubscribeBackpressure: (() => void) | undefined;
 	readonly fallbackPartitionIdentity: object;
 	readonly scopeStates: WeakMap<PreviewActivationScope, PreviewActivationScopeState>;
 	readonly partitionsByIdentity: Map<object, PreviewActivationPartition>;
@@ -181,7 +176,7 @@ interface PreviewActivationSchedulerState {
 function createSchedulerState(
 	options: CreatePreviewActivationSchedulerOptions,
 ): PreviewActivationSchedulerState {
-	const runtime: PreviewActivationRuntime = {
+	return {
 		scopes: new Set(),
 		getBackpressure: options.getBackpressure ?? getEmptyBackpressure,
 		subscribeBackpressure: options.subscribeBackpressure,
@@ -192,9 +187,6 @@ function createSchedulerState(
 		tokenState: createEmptyPreviewScheduleTokenState(),
 		blockedForBackpressure: false,
 		unsubscribeBackpressure: undefined,
-	};
-	return {
-		runtime,
 		fallbackPartitionIdentity: {},
 		scopeStates: new WeakMap(),
 		partitionsByIdentity: new Map(),
@@ -263,7 +255,6 @@ function getOrCreatePartition(
 		coordinator,
 		driver,
 		scopes: new Set(),
-		pendingRuntimesScratch: new Set(),
 		pendingScopesScratch: [],
 		lastObservedMeasurementEpoch: readVirtualScrollMeasurementEpoch(),
 	};
@@ -275,18 +266,16 @@ function createPreviewActivationScopeForState(
 	schedulerState: PreviewActivationSchedulerState,
 	options: CreatePreviewActivationScopeOptions = {},
 ): PreviewActivationScope {
-	const runtime = schedulerState.runtime;
 	const partition = getOrCreatePartition(schedulerState, options.frameCoordinator);
 	const scope: PreviewActivationScope = { kind: "preview-activation-scope" };
 	const state: PreviewActivationScopeState = {
 		scope,
-		runtime,
 		partition,
 		queue: createPreviewKeyedQueue(),
 		disposed: false,
 	};
 	schedulerState.scopeStates.set(scope, state);
-	runtime.scopes.add(state);
+	schedulerState.scopes.add(state);
 	partition.scopes.add(state);
 	return scope;
 }
@@ -304,8 +293,8 @@ function hasPendingScope(scopeState: PreviewActivationScopeState): boolean {
 	return !scopeState.disposed && scopeState.queue.size > 0;
 }
 
-function hasPendingRuntime(runtime: PreviewActivationRuntime): boolean {
-	for (const scopeState of runtime.scopes) {
+function hasAnyPendingScope(schedulerState: PreviewActivationSchedulerState): boolean {
+	for (const scopeState of schedulerState.scopes) {
 		if (hasPendingScope(scopeState)) return true;
 	}
 	return false;
@@ -331,8 +320,8 @@ function settleRequest(
 	if (scopeState.queue.size === 0) scopeState.queue.clear();
 	if (activated) invokeActivated(request.onActivated);
 
-	if (!hasPendingRuntime(scopeState.runtime)) {
-		releaseRuntimeBackpressureSubscription(scopeState.runtime);
+	if (!hasAnyPendingScope(schedulerState)) {
+		releaseBackpressureSubscription(schedulerState);
 	}
 	if (!hasPendingPartition(scopeState.partition)) {
 		scopeState.partition.driver.cancel();
@@ -353,53 +342,52 @@ function ensureScrollActivitySubscription(
 	});
 }
 
-function hasAnyPendingActivation(
-	schedulerState: PreviewActivationSchedulerState,
-): boolean {
-	for (const partition of schedulerState.partitionsByIdentity.values()) {
-		if (hasPendingPartition(partition)) return true;
-	}
-	return false;
-}
-
 function releaseScrollActivitySubscriptionIfIdle(
 	schedulerState: PreviewActivationSchedulerState,
 ): void {
-	if (hasAnyPendingActivation(schedulerState)) return;
+	if (hasAnyPendingScope(schedulerState)) return;
 	schedulerState.unsubscribeScrollActivity?.();
 	schedulerState.unsubscribeScrollActivity = undefined;
 }
 
-function ensureRuntimeBackpressureSubscription(
+function ensureBackpressureSubscription(
 	schedulerState: PreviewActivationSchedulerState,
-	runtime: PreviewActivationRuntime,
 ): void {
-	if (runtime.unsubscribeBackpressure || !runtime.subscribeBackpressure) return;
+	if (
+		schedulerState.unsubscribeBackpressure ||
+		!schedulerState.subscribeBackpressure
+	) {
+		return;
+	}
 
-	runtime.unsubscribeBackpressure = runtime.subscribeBackpressure(() => {
-		runtime.blockedForBackpressure = false;
-		for (const scopeState of runtime.scopes) {
-			if (hasPendingScope(scopeState)) {
-				schedulePartition(schedulerState, scopeState.partition);
+	schedulerState.unsubscribeBackpressure = schedulerState.subscribeBackpressure(
+		() => {
+			schedulerState.blockedForBackpressure = false;
+			for (const scopeState of schedulerState.scopes) {
+				if (hasPendingScope(scopeState)) {
+					schedulePartition(schedulerState, scopeState.partition);
+				}
 			}
-		}
-	});
+		},
+	);
 }
 
-function releaseRuntimeBackpressureSubscription(
-	runtime: PreviewActivationRuntime,
+function releaseBackpressureSubscription(
+	schedulerState: PreviewActivationSchedulerState,
 ): void {
-	runtime.unsubscribeBackpressure?.();
-	runtime.unsubscribeBackpressure = undefined;
-	runtime.blockedForBackpressure = false;
+	schedulerState.unsubscribeBackpressure?.();
+	schedulerState.unsubscribeBackpressure = undefined;
+	schedulerState.blockedForBackpressure = false;
 }
 
-function canScheduleRuntime(runtime: PreviewActivationRuntime): boolean {
-	return !runtime.blockedForBackpressure || !runtime.subscribeBackpressure;
+function canSchedule(schedulerState: PreviewActivationSchedulerState): boolean {
+	return (
+		!schedulerState.blockedForBackpressure || !schedulerState.subscribeBackpressure
+	);
 }
 
 function schedulePartition(
-	_schedulerState: PreviewActivationSchedulerState,
+	schedulerState: PreviewActivationSchedulerState,
 	partition: PreviewActivationPartition,
 	delayMs = 0,
 	scrolling = isScrollActivityActive(),
@@ -410,7 +398,7 @@ function schedulePartition(
 
 	for (const scopeState of partition.scopes) {
 		if (!hasPendingScope(scopeState)) continue;
-		if (canScheduleRuntime(scopeState.runtime)) {
+		if (canSchedule(schedulerState)) {
 			partition.driver.schedule({
 				lane: scrolling ? "post-paint" : "idle",
 				delayMs,
@@ -446,19 +434,19 @@ function readNextQueuedRequest(
 }
 
 function readNextRoundRobinRequest(
-	runtime: PreviewActivationRuntime,
+	schedulerState: PreviewActivationSchedulerState,
 	partition: PreviewActivationPartition,
 	scopes: readonly PreviewActivationScopeState[],
 ): PreviewActivationRequest | undefined {
 	if (scopes.length === 0) return undefined;
-	const cursor = runtime.roundRobinCursorByPartition.get(partition) ?? 0;
+	const cursor = schedulerState.roundRobinCursorByPartition.get(partition) ?? 0;
 
 	for (let offset = 0; offset < scopes.length; offset += 1) {
 		const scopeIndex = (cursor + offset) % scopes.length;
 		const request = readNextQueuedRequest(scopes[scopeIndex]);
 		if (!request) continue;
 
-		runtime.roundRobinCursorByPartition.set(
+		schedulerState.roundRobinCursorByPartition.set(
 			partition,
 			(scopeIndex + 1) % scopes.length,
 		);
@@ -467,9 +455,8 @@ function readNextRoundRobinRequest(
 	return undefined;
 }
 
-function drainRuntimePartition(
+function drainPartitionScopes(
 	schedulerState: PreviewActivationSchedulerState,
-	runtime: PreviewActivationRuntime,
 	partition: PreviewActivationPartition,
 	frameTimestamp: number,
 	scrolling: boolean,
@@ -477,33 +464,31 @@ function drainRuntimePartition(
 ): number | null {
 	const scopes = partition.pendingScopesScratch;
 	for (const scopeState of partition.scopes) {
-		if (scopeState.runtime === runtime && hasPendingScope(scopeState)) {
-			scopes.push(scopeState);
-		}
+		if (hasPendingScope(scopeState)) scopes.push(scopeState);
 	}
 	if (scopes.length === 0) return null;
 
-	const pressure = runtime.getBackpressure();
+	const pressure = schedulerState.getBackpressure();
 	let policy = resolveActivationPolicy(pressure, scrolling);
 	if (scrolling) {
-		runtime.scrollingPolicy.ratePerSecond = resolvePositiveRate(
-			runtime.getActivationsPerSecond(),
+		schedulerState.scrollingPolicy.ratePerSecond = resolvePositiveRate(
+			schedulerState.getActivationsPerSecond(),
 			DEFAULT_PREVIEW_ACTIVATIONS_PER_SECOND,
 		);
-		policy = runtime.scrollingPolicy;
+		policy = schedulerState.scrollingPolicy;
 	}
-	runtime.tokenState = refillPreviewScheduleTokens(
-		runtime.tokenState,
+	schedulerState.tokenState = refillPreviewScheduleTokens(
+		schedulerState.tokenState,
 		frameTimestamp,
 		policy,
 	);
 
 	if (!hasPreviewAdmissionCapacity(pressure)) {
-		runtime.blockedForBackpressure = true;
-		ensureRuntimeBackpressureSubscription(schedulerState, runtime);
-		return runtime.subscribeBackpressure ? null : 0;
+		schedulerState.blockedForBackpressure = true;
+		ensureBackpressureSubscription(schedulerState);
+		return schedulerState.subscribeBackpressure ? null : 0;
 	}
-	runtime.blockedForBackpressure = false;
+	schedulerState.blockedForBackpressure = false;
 
 	let queueEntriesAvailableAtDrainStart = 0;
 	for (const scopeState of scopes) {
@@ -521,18 +506,18 @@ function drainRuntimePartition(
 	let drainedTasks = 0;
 
 	while (
-		canConsumePreviewScheduleToken(runtime.tokenState) &&
+		canConsumePreviewScheduleToken(schedulerState.tokenState) &&
 		drainedTasks < policy.maxTasksPerDrain &&
 		inspectedQueueEntries < maxInspectableQueueEntries &&
 		readPreviewSchedulingTime() <= deadline
 	) {
-		if (!hasPreviewAdmissionCapacity(runtime.getBackpressure())) {
-			runtime.blockedForBackpressure = true;
-			ensureRuntimeBackpressureSubscription(schedulerState, runtime);
+		if (!hasPreviewAdmissionCapacity(schedulerState.getBackpressure())) {
+			schedulerState.blockedForBackpressure = true;
+			ensureBackpressureSubscription(schedulerState);
 			break;
 		}
 
-		const request = readNextRoundRobinRequest(runtime, partition, scopes);
+		const request = readNextRoundRobinRequest(schedulerState, partition, scopes);
 		if (!request) break;
 		inspectedQueueEntries += 1;
 		if (request.settled) continue;
@@ -556,12 +541,16 @@ function drainRuntimePartition(
 		}
 
 		settleRequest(schedulerState, request, true);
-		runtime.tokenState = consumePreviewScheduleToken(runtime.tokenState);
+		schedulerState.tokenState = consumePreviewScheduleToken(
+			schedulerState.tokenState,
+		);
 		drainedTasks += 1;
 	}
 
 	for (const scopeState of scopes) compactScopeQueue(scopeState);
-	if (!hasPendingRuntime(runtime) || runtime.blockedForBackpressure) return null;
+	if (schedulerState.blockedForBackpressure || !hasPendingPartition(partition)) {
+		return null;
+	}
 	return 0;
 }
 
@@ -577,34 +566,21 @@ function drainPartition(
 			partition.lastObservedMeasurementEpoch,
 		);
 	partition.lastObservedMeasurementEpoch = measurementEpoch;
-	const runtimes = partition.pendingRuntimesScratch;
-	for (const scopeState of partition.scopes) {
-		if (hasPendingScope(scopeState)) runtimes.add(scopeState.runtime);
-	}
 
-	let nextDelayMs = Number.POSITIVE_INFINITY;
+	let nextDelayMs: number | null;
 	try {
-		for (const runtime of runtimes) {
-			let delayMs: number | null;
-			try {
-				delayMs = drainRuntimePartition(
-					schedulerState,
-					runtime,
-					partition,
-					frameTimestamp,
-					scrolling,
-					shouldDeferUndeferredRequests,
-				);
-			} finally {
-				partition.pendingScopesScratch.length = 0;
-			}
-			if (delayMs !== null) nextDelayMs = Math.min(nextDelayMs, delayMs);
-		}
+		nextDelayMs = drainPartitionScopes(
+			schedulerState,
+			partition,
+			frameTimestamp,
+			scrolling,
+			shouldDeferUndeferredRequests,
+		);
 	} finally {
-		runtimes.clear();
+		partition.pendingScopesScratch.length = 0;
 	}
 
-	if (Number.isFinite(nextDelayMs)) {
+	if (nextDelayMs !== null) {
 		schedulePartition(schedulerState, partition, nextDelayMs, scrolling);
 	}
 }
@@ -630,9 +606,9 @@ function enqueuePreviewActivationRequest(
 		settled: false,
 	};
 	scopeState.queue.enqueue(key, request);
-	scopeState.runtime.blockedForBackpressure = false;
+	schedulerState.blockedForBackpressure = false;
 	ensureScrollActivitySubscription(schedulerState);
-	ensureRuntimeBackpressureSubscription(schedulerState, scopeState.runtime);
+	ensureBackpressureSubscription(schedulerState);
 	schedulePartition(schedulerState, scopeState.partition);
 	return createActivationHandle(key, request);
 }
@@ -672,8 +648,8 @@ function disposePreviewActivationScopeForState(
 
 	resetScopeQueue(schedulerState, scopeState);
 	scopeState.disposed = true;
-	scopeState.runtime.scopes.delete(scopeState);
-	scopeState.runtime.roundRobinCursorByPartition.delete(scopeState.partition);
+	schedulerState.scopes.delete(scopeState);
+	schedulerState.roundRobinCursorByPartition.delete(scopeState.partition);
 	scopeState.partition.scopes.delete(scopeState);
 	schedulerState.scopeStates.delete(scope);
 
@@ -684,8 +660,8 @@ function disposePreviewActivationScopeForState(
 				schedulerState.fallbackPartitionIdentity,
 		);
 	}
-	if (scopeState.runtime.scopes.size === 0) {
-		releaseRuntimeBackpressureSubscription(scopeState.runtime);
+	if (schedulerState.scopes.size === 0) {
+		releaseBackpressureSubscription(schedulerState);
 	}
 	releaseScrollActivitySubscriptionIfIdle(schedulerState);
 }
@@ -693,10 +669,7 @@ function disposePreviewActivationScopeForState(
 function resetPreviewActivationSchedulerState(
 	schedulerState: PreviewActivationSchedulerState,
 ): void {
-	const scopes = Array.from(
-		schedulerState.runtime.scopes,
-		(scopeState) => scopeState.scope,
-	);
+	const scopes = Array.from(schedulerState.scopes, (scopeState) => scopeState.scope);
 	for (const scope of scopes) {
 		disposePreviewActivationScopeForState(schedulerState, scope);
 	}

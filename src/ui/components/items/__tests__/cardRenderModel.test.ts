@@ -3,11 +3,7 @@ import type { ViewItem } from "application/presenters";
 import { createMockTFile } from "testing/__mocks__/testHelpers";
 import type { LinkUtilitiesContext } from "types/linkContext";
 import { DEFAULT_SETTINGS } from "features/settings/model";
-import {
-	createCardPreviewRequest,
-	createCardRenderModel,
-	resolveCardTitleSnapshot,
-} from "../cardRenderModel";
+import { createCardRenderModel, resolveCardTitleSnapshot } from "../cardRenderModel";
 import type { CachedMetadata } from "obsidian";
 
 describe("createCardRenderModel", () => {
@@ -59,10 +55,8 @@ describe("createCardRenderModel", () => {
 			interactionId: "i0",
 			interactionKey: "item:file:report",
 			searchQuery: "needle",
-			searchScope: "title-only",
-			contentPreview: "matched content",
 		});
-		expect(model.previewCacheRevision).toBe("4:2:0");
+		expect(model.previewRequest?.previewCacheRevision).toBe("4:2:0");
 		expect(model.previewRequest).toMatchObject({
 			file: targetFile,
 			searchQuery: "",
@@ -70,7 +64,6 @@ describe("createCardRenderModel", () => {
 			previewOverride: { type: "text", content: "matched content" },
 		});
 		expect(model.previewRequest?.renderKey).toBeTruthy();
-		expect(createCardPreviewRequest(model)).toBe(model.previewRequest);
 		expect(getPreviewRenderVersion).toHaveBeenCalledWith(targetFile.path);
 		expect(fileToLinktext).not.toHaveBeenCalled();
 

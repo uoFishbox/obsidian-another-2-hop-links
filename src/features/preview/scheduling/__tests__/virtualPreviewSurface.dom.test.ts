@@ -96,7 +96,7 @@ function createHarness(frameCoordinator?: VirtualFrameCoordinator): {
 		activationScheduler,
 		hasCachedPreview: () => previewCacheState.entry !== undefined,
 		createRenderer: (): CardPreviewRenderer => {
-			return (container, previewRequest, _generation, callbacks) => {
+			return (container, previewRequest, callbacks) => {
 				if (!callbacks) throw new TypeError("Missing surface callbacks");
 				const cleanup = vi.fn();
 				renders.push({
@@ -105,7 +105,6 @@ function createHarness(frameCoordinator?: VirtualFrameCoordinator): {
 					callbacks,
 					cleanup,
 				});
-				callbacks.onLoadingChange(true);
 				return cleanup;
 			};
 		},
@@ -195,7 +194,6 @@ function commit(
 	content.textContent = record.identity;
 	record.container.replaceChildren(content);
 	record.callbacks.onCommitted("text", retention);
-	record.callbacks.onRendered();
 	return true;
 }
 

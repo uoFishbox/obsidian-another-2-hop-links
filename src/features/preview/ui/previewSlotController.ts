@@ -64,7 +64,6 @@ type SlotOperation =
 	| { readonly state: "idle" }
 	| {
 			readonly state: "rendering";
-			readonly generation: SlotGeneration;
 			readonly cancel: () => void;
 	  };
 
@@ -382,107 +381,72 @@ export function createPreviewSlotController(
 		};
 		operation = {
 			state: "rendering",
-			generation: expectedGeneration,
 			cancel,
 		};
+		// Publish the loading phase exactly once per activation; the renderer
+		// reports only the terminal state (committed or error).
+		publishState();
 
 		try {
-			cleanup = renderer(
-				expectedHost,
-				expectedBinding.request,
-				expectedGeneration,
-				{
-					isCurrent: () =>
-						isCurrent(
+			cleanup = renderer(expectedHost, expectedBinding.request, {
+				isCurrent: () =>
+					isCurrent(expectedGeneration, expectedHost, expectedHostGeneration),
+				onCommitted: (contentType, retention) => {
+					if (
+						!isCurrent(
 							expectedGeneration,
 							expectedHost,
 							expectedHostGeneration,
-						),
-					onLoadingChange: (nextLoading) => {
-						if (
-							!isCurrent(
-								expectedGeneration,
-								expectedHost,
-								expectedHostGeneration,
-							)
 						)
-							return;
-						if (!nextLoading && operation.state === "rendering") {
-							operation = { state: "idle" };
-						}
-						publishState();
-					},
-					onCommitted: (contentType, retention) => {
-						if (
-							!isCurrent(
-								expectedGeneration,
-								expectedHost,
-								expectedHostGeneration,
-							)
-						)
-							return;
-						content = {
-							state: "committed",
-							renderKey: expectedBinding.request.renderKey,
-							contentType,
-							retention,
-							host: expectedHost,
-							release: cancel,
-						};
-						operation = { state: "idle" };
-						publishState();
-					},
-					onRendered: () => {
-						if (
-							operation.state === "rendering" &&
-							operation.generation === expectedGeneration
-						) {
-							operation = { state: "idle" };
-						}
-					},
-					onError: () => {
-						if (
-							!isCurrent(
-								expectedGeneration,
-								expectedHost,
-								expectedHostGeneration,
-							)
-						)
-							return;
-						const errorElement = document.createElement("div");
-						errorElement.className = "error";
-						errorElement.textContent = "Preview not available.";
-						expectedHost.replaceChildren(errorElement);
-						content = {
-							state: "error",
-							renderKey: expectedBinding.request.renderKey,
-							host: expectedHost,
-							release: cancel,
-						};
-						operation = { state: "idle" };
-						publishState();
-					},
+					)
+						return;
+					content = {
+						state: "committed",
+						renderKey: expectedBinding.request.renderKey,
+						contentType,
+						retention,
+						host: expectedHost,
+						release: cancel,
+					};
+					operation = { state: "idle" };
+					publishState();
 				},
-			);
+				onError: () => {
+					if (
+						!isCurrent(
+							expectedGeneration,
+							expectedHost,
+							expectedHostGeneration,
+						)
+					)
+						return;
+					const errorElement = document.createElement("div");
+					errorElement.className = "error";
+					errorElement.textContent = "Preview not available.";
+					expectedHost.replaceChildren(errorElement);
+					content = {
+						state: "error",
+						renderKey: expectedBinding.request.renderKey,
+						host: expectedHost,
+						release: cancel,
+					};
+					operation = { state: "idle" };
+					publishState();
+				},
+			});
 		} catch (error) {
-			if (
-				operation.state === "rendering" &&
-				operation.generation === expectedGeneration
-			) {
+			if (operation.state === "rendering") {
 				operation = { state: "idle" };
+				publishState();
 			}
 			cancel();
 			throw error;
 		}
 		if (released) cleanup?.();
-		if (
-			!isCurrent(expectedGeneration, expectedHost, expectedHostGeneration)
-		) {
-			if (
-				operation.state === "rendering" &&
-				operation.generation === expectedGeneration
-			) {
+		if (!isCurrent(expectedGeneration, expectedHost, expectedHostGeneration)) {
+			if (operation.state === "rendering") {
 				operation = { state: "idle" };
+				publishState();
 			}
 			cancel();
 		}

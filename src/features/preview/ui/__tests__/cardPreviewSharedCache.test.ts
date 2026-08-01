@@ -1,10 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
-	buildPreviewContentIdentityKey,
-	buildRenderCacheKey,
 	canShareRenderedTextPreview,
 	createCardPreviewSharedCache,
 } from "../cardPreviewSharedCache";
+import { buildPreviewRenderKeys } from "features/preview/core/previewRenderKeys";
 import { DEFAULT_SETTINGS, type PluginSettings } from "features/settings/model";
 import { createMockTFile } from "testing/__mocks__/testHelpers";
 
@@ -156,24 +155,24 @@ describe("cardPreviewSharedCache search context", () => {
 
 	it("separates render cache keys by preview content settings", () => {
 		const file = createMockTFile("notes/render-settings.md");
-		const first = buildRenderCacheKey(
+		const first = buildPreviewRenderKeys(
 			file,
 			"alpha",
 			createSettings({ previewMaxChars: 100 }),
 			"render-v1",
-		);
-		const second = buildRenderCacheKey(
+		).renderCacheKey;
+		const second = buildPreviewRenderKeys(
 			file,
 			"alpha",
 			createSettings({ previewMaxChars: 200 }),
 			"render-v1",
-		);
-		const third = buildRenderCacheKey(
+		).renderCacheKey;
+		const third = buildPreviewRenderKeys(
 			file,
 			"alpha",
 			createSettings({ previewMaxChars: 200 }),
 			"render-v1",
-		);
+		).renderCacheKey;
 
 		expect(first).not.toBe(second);
 		expect(second).toBe(third);
@@ -196,11 +195,12 @@ describe("cardPreviewSharedCache search context", () => {
 		const secondSettings = createSettings({
 			searchPreviewSeekBufferChars: 30,
 		});
-		const previewContentIdentityKey = buildPreviewContentIdentityKey(
+		const previewContentIdentityKey = buildPreviewRenderKeys(
 			file,
+			"alpha",
 			firstSettings,
 			"render-v1",
-		);
+		).previewContentIdentityKey;
 
 		await applySharedSearchContextToTextPreview({
 			previewContent: "<p>fallback preview</p>",
