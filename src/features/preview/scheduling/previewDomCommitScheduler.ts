@@ -83,6 +83,7 @@ interface PreviewDomCommitPartition {
 
 const FALLBACK_PARTITION_IDENTITY = {};
 const pendingByTargetKey = new Map<string, QueuedPreviewDomCommitTask>();
+// Keep token state across idle gaps so sparse arrivals cannot regain initial credit.
 const partitionsByIdentity = new Map<object, PreviewDomCommitPartition>();
 let nextPartitionId = 0;
 let unsubscribeScrollActivity: (() => void) | undefined;
@@ -141,7 +142,6 @@ function settleTask(
 		task.partition.pendingByTargetKey.delete(task.targetKey);
 	}
 	task.resolve(result);
-	releasePartitionIfIdle(task.partition);
 	releaseScrollActivitySubscriptionIfIdle();
 }
 
@@ -156,7 +156,6 @@ function rejectTask(task: QueuedPreviewDomCommitTask, error: unknown): void {
 		task.partition.pendingByTargetKey.delete(task.targetKey);
 	}
 	task.reject(error);
-	releasePartitionIfIdle(task.partition);
 	releaseScrollActivitySubscriptionIfIdle();
 }
 
@@ -244,13 +243,6 @@ function schedulePendingPartition(
 			? SCROLLING_REEVALUATION_DELAY_MS
 			: readTokenAvailabilityDelayMs(partition.tokenState, policy.ratePerSecond);
 	schedulePartition(partition, delayMs, policy.mode === "scrolling");
-}
-
-function releasePartitionIfIdle(partition: PreviewDomCommitPartition): void {
-	if (partition.pendingByTargetKey.size > 0) return;
-
-	partition.driver.dispose();
-	partitionsByIdentity.delete(partition.coordinator ?? FALLBACK_PARTITION_IDENTITY);
 }
 
 function drainPartition(

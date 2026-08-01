@@ -221,6 +221,40 @@ describe("preview DOM commit scheduler", () => {
 		expect(requestAnimationFrame).not.toHaveBeenCalled();
 	});
 
+	it("keeps coordinator partition state after its queue drains", async () => {
+		let scheduledTask: (() => void) | undefined;
+		const frameCoordinator: VirtualFrameCoordinator = {
+			schedule: vi.fn((_lane, _key, task) => {
+				scheduledTask = task;
+				return true;
+			}),
+			cancel: vi.fn(),
+			isScheduled: vi.fn(() => false),
+			dispose: vi.fn(),
+		};
+
+		const first = enqueuePreviewDomCommit({
+			targetKey: "preview-persistent-first",
+			isStale: () => false,
+			commit: () => true,
+			frameCoordinator,
+		});
+		const firstDrainKey = vi.mocked(frameCoordinator.schedule).mock.calls[0]?.[1];
+		scheduledTask?.();
+		await expect(first).resolves.toEqual({ type: "committed" });
+
+		const second = enqueuePreviewDomCommit({
+			targetKey: "preview-persistent-second",
+			isStale: () => false,
+			commit: () => true,
+			frameCoordinator,
+		});
+		const secondDrainKey = vi.mocked(frameCoordinator.schedule).mock.calls[1]?.[1];
+		expect(secondDrainKey).toBe(firstDrainKey);
+		scheduledTask?.();
+		await expect(second).resolves.toEqual({ type: "committed" });
+	});
+
 	it("delegates scrolling DOM commits to the post-paint lane", async () => {
 		markScrollActivityActive(scrollSource);
 		let postPaintTask: (() => void) | undefined;

@@ -351,16 +351,17 @@ describe("VirtualPreviewSurface", () => {
 		surface.dispose();
 	});
 
-	it("detects rebind when the caller reuses a mutable binding object", async () => {
+	it("detects rebind when the caller publishes a new immutable binding object", async () => {
 		const { surface, renders } = createHarness();
 		const host = document.createElement("div");
 		surface.registerHost("slot-0", host);
-		const permanentBinding = binding("slot-0", 0, "a");
-		enter(surface, permanentBinding);
+		const firstBinding = binding("slot-0", 0, "a");
+		enter(surface, firstBinding);
 		await flushActivation();
 
-		permanentBinding.snapshot = snapshot("b");
-		rebind(surface, permanentBinding);
+		const reboundBinding = binding("slot-0", 0, "b");
+		rebind(surface, reboundBinding);
+		expect(firstBinding.snapshot.identity).toBe("a");
 		expect(renders[0].cleanup).toHaveBeenCalledOnce();
 		await flushActivation();
 		expect(commit(renders[0])).toBe(false);

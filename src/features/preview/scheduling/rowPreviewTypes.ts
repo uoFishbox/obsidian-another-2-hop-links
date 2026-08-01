@@ -3,8 +3,8 @@ import type { RowRange } from "ui/virtualization/rowRange";
 
 export interface RowPreviewCardBinding {
 	readonly slotId: string;
-	rowIndex: number;
-	snapshot: CardPreviewSnapshot;
+	readonly rowIndex: number;
+	readonly snapshot: CardPreviewSnapshot;
 	/**
 	 * Opaque desired-state reference. Preview cache identities must not be used
 	 * to prove ownership of a physical host.

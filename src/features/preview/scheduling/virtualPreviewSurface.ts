@@ -86,6 +86,18 @@ interface PreviewHostState {
 interface PreviewOperationToken {
 	readonly host: HTMLElement;
 	readonly currentnessToken: object;
+	readonly operationEpoch: number;
+}
+
+interface PreviewActiveJob {
+	readonly operationEpoch: number;
+	readonly cancel: () => void;
+}
+
+interface PreviewCommittedLease {
+	readonly identity: string;
+	readonly host: HTMLElement;
+	readonly dispose: () => void;
 }
 
 interface PreviewSlotRuntime {
@@ -99,7 +111,8 @@ interface PreviewSlotRuntime {
 		appliedState?: PreviewHostState;
 	};
 	operationEpoch: number;
-	renderCleanup?: () => void;
+	activeJob?: PreviewActiveJob;
+	committedLease?: PreviewCommittedLease;
 	lifecycleCleanupHandle?: number;
 	renderer?: CardPreviewRenderer;
 	resolveRenderRequest: ReturnType<typeof createCardPreviewRenderRequestResolver>;
@@ -175,6 +188,7 @@ export function createVirtualPreviewSurface(
 		if (committedFrameSource) {
 			return (
 				!disposed &&
+				slot.operationEpoch === token.operationEpoch &&
 				resolveCurrentnessToken(committedBinding) === token.currentnessToken &&
 				slot.host?.element === token.host
 			);
@@ -184,6 +198,7 @@ export function createVirtualPreviewSurface(
 			: slot.binding;
 		return (
 			!disposed &&
+			slot.operationEpoch === token.operationEpoch &&
 			slot.host?.element === token.host &&
 			resolveCurrentnessToken(desiredBinding) === token.currentnessToken
 		);
@@ -208,16 +223,29 @@ export function createVirtualPreviewSurface(
 		slot.lifecycleCleanupHandle = undefined;
 	}
 
+	function cancelActiveJob(slot: PreviewSlotRuntime): void {
+		const activeJob = slot.activeJob;
+		slot.activeJob = undefined;
+		activeJob?.cancel();
+	}
+
+	function disposeCommittedLease(slot: PreviewSlotRuntime): void {
+		const committedLease = slot.committedLease;
+		slot.committedLease = undefined;
+		committedLease?.dispose();
+	}
+
 	function stopRender(slot: PreviewSlotRuntime): void {
 		slot.operationEpoch += 1;
-		slot.renderCleanup?.();
-		slot.renderCleanup = undefined;
+		cancelActiveJob(slot);
+		disposeCommittedLease(slot);
 		if (process.env.NODE_ENV !== "production") {
 			recordCCLDevMeasurement("twoHop.preview.stopRender");
 		}
 	}
 
 	function clearCommittedDom(slot: PreviewSlotRuntime): void {
+		disposeCommittedLease(slot);
 		const element = slot.host?.element;
 		if (element) element.replaceChildren();
 		slot.committed = undefined;
@@ -283,6 +311,7 @@ export function createVirtualPreviewSurface(
 		const token: PreviewOperationToken = {
 			host: host.element,
 			currentnessToken: resolveCurrentnessToken(binding)!,
+			operationEpoch: slot.operationEpoch,
 		};
 		const request = slot.resolveRenderRequest(
 			binding.snapshot.file,
@@ -294,46 +323,79 @@ export function createVirtualPreviewSurface(
 		);
 		if (!request) return;
 
-		slot.renderCleanup = renderer(
-			host.element,
-			request,
-			binding.snapshot.identity,
-			{
-				isCurrent: () => isCurrent(slot, token),
-				onLoadingChange: (isLoading) => {
-					if (!isCurrent(slot, token)) return;
-					if (isLoading) {
-						slot.phase = slot.committed ? "stale" : "loading";
+		let rendererCleanup: (() => void) | undefined;
+		let renderResourceReleased = false;
+		const cancelRenderResource = (): void => {
+			if (renderResourceReleased) return;
+			renderResourceReleased = true;
+			rendererCleanup?.();
+		};
+		const activeJob: PreviewActiveJob = {
+			operationEpoch: token.operationEpoch,
+			cancel: cancelRenderResource,
+		};
+		slot.activeJob = activeJob;
+
+		try {
+			rendererCleanup = renderer(
+				host.element,
+				request,
+				binding.snapshot.identity,
+				{
+					isCurrent: () => isCurrent(slot, token),
+					onLoadingChange: (isLoading) => {
+						if (!isCurrent(slot, token)) return;
+						if (isLoading) {
+							slot.phase = slot.committed ? "stale" : "loading";
+							applySlotState(slot);
+						}
+					},
+					onCommitted: (contentType, retention) => {
+						if (!isCurrent(slot, token)) return;
+						slot.committed = {
+							identity: binding.snapshot.identity,
+							contentType,
+							retention,
+							host: token.host,
+						};
+						slot.committedLease = {
+							identity: binding.snapshot.identity,
+							host: token.host,
+							dispose: activeJob.cancel,
+						};
+						slot.phase = "committed";
 						applySlotState(slot);
-					}
+					},
+					onRendered: () => {
+						if (!isCurrent(slot, token)) return;
+						if (slot.activeJob === activeJob) {
+							slot.activeJob = undefined;
+						}
+					},
+					onError: () => {
+						if (!isCurrent(slot, token)) return;
+						slot.operationEpoch += 1;
+						cancelActiveJob(slot);
+						disposeCommittedLease(slot);
+						const hasCurrentResident =
+							slot.committed?.retention === "resident" &&
+							slot.committed.host === token.host;
+						slot.phase = hasCurrentResident ? "stale" : "empty";
+						if (!hasCurrentResident) clearCommittedDom(slot);
+						applySlotState(slot);
+					},
 				},
-				onCommitted: (contentType, retention) => {
-					if (!isCurrent(slot, token)) return;
-					slot.committed = {
-						identity: binding.snapshot.identity,
-						contentType,
-						retention,
-						host: token.host,
-					};
-					slot.phase = "committed";
-					applySlotState(slot);
-				},
-				onRendered: () => {},
-				onError: () => {
-					if (!isCurrent(slot, token)) return;
-					slot.operationEpoch += 1;
-					const cleanup = slot.renderCleanup;
-					slot.renderCleanup = undefined;
-					cleanup?.();
-					const hasCurrentResident =
-						slot.committed?.retention === "resident" &&
-						slot.committed.host === token.host;
-					slot.phase = hasCurrentResident ? "stale" : "empty";
-					if (!hasCurrentResident) clearCommittedDom(slot);
-					applySlotState(slot);
-				},
-			},
-		);
+			);
+		} catch (error) {
+			if (slot.activeJob === activeJob) slot.activeJob = undefined;
+			activeJob.cancel();
+			throw error;
+		}
+		if (renderResourceReleased) rendererCleanup?.();
+		if (!isCurrent(slot, token)) {
+			if (slot.activeJob === activeJob) slot.activeJob = undefined;
+			activeJob.cancel();
+		}
 	}
 
 	function activateIdentity(identity: string): void {
@@ -361,7 +423,7 @@ export function createVirtualPreviewSurface(
 			}
 			return;
 		}
-		if (!slot.committed && !slot.renderCleanup) return;
+		if (!slot.committed && !slot.activeJob && !slot.committedLease) return;
 		stopRender(slot);
 		slot.phase = "dormant";
 		applySlotState(slot);
@@ -382,7 +444,7 @@ export function createVirtualPreviewSurface(
 				slot.committed.retention === "resident" &&
 				slot.committed.host === slot.host?.element &&
 				slot.phase === "committed";
-			if (!isReusableResident && !slot.renderCleanup) {
+			if (!isReusableResident && !slot.activeJob) {
 				activationIdentities.add(slot.binding.snapshot.identity);
 			}
 		}
@@ -549,8 +611,8 @@ export function createVirtualPreviewSurface(
 		if (slot.host?.element !== element) {
 			cancelLifecycleCleanup(slot);
 			stopRender(slot);
+			clearCommittedDom(slot);
 			slot.host = { element };
-			slot.committed = undefined;
 			slot.phase = "empty";
 			applySlotState(slot);
 			reconcile();
@@ -564,8 +626,8 @@ export function createVirtualPreviewSurface(
 				if (slot.host?.element !== leasedHost) return;
 				cancelLifecycleCleanup(slot);
 				stopRender(slot);
+				clearCommittedDom(slot);
 				slot.host = undefined;
-				slot.committed = undefined;
 			},
 		};
 	}
@@ -652,12 +714,12 @@ export function createVirtualPreviewSurface(
 		for (const slot of slotsById.values()) {
 			cancelLifecycleCleanup(slot);
 			stopRender(slot);
+			clearCommittedDom(slot);
 			slot.host = undefined;
 			slot.binding = undefined;
 			slot.bindingIdentity = undefined;
 			slot.bindingCurrentnessToken = undefined;
 			slot.bindingRowIndex = undefined;
-			slot.committed = undefined;
 		}
 		slotsById.clear();
 		activationIdentities.clear();

@@ -315,10 +315,17 @@ export function useFlatVirtualGridList<T>(
 					} else {
 						const didRebind =
 							previous.rowIndex !== mountedCell.rowIndex ||
+							previous.snapshot !== previewSnapshot ||
 							previous.snapshot.identity !== previewSnapshot.identity;
-						previous.rowIndex = mountedCell.rowIndex;
-						previous.snapshot = previewSnapshot;
-						if (didRebind) reboundPreviewSlots.push(previous);
+						if (didRebind) {
+							const next = {
+								slotId,
+								rowIndex: mountedCell.rowIndex,
+								snapshot: previewSnapshot,
+							};
+							previewBindingsBySlot.set(slotId, next);
+							reboundPreviewSlots.push(next);
+						}
 					}
 				}
 				const descriptor = props.resolveItemInteractionDescriptor?.(
