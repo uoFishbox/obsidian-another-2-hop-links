@@ -64,6 +64,20 @@ describe("SettingsManager", () => {
 		expect(manager.settings).not.toHaveProperty("obsoleteSetting");
 	});
 
+	it("normalizes an invalid two-hop list mode", async () => {
+		const plugin = {
+			loadData: vi.fn().mockResolvedValue({
+				twoHopListMode: "legacy-mode",
+			}),
+			saveData: vi.fn(),
+		};
+		const manager = new SettingsManager(plugin as never);
+
+		await manager.load();
+
+		expect(manager.settings.twoHopListMode).toBe("precise-virtual");
+	});
+
 	it("does not share nested default settings between instances", () => {
 		const firstPlugin = {
 			loadData: vi.fn(),

@@ -11,6 +11,7 @@ import {
 export const DEFAULT_SETTINGS: PluginSettings = {
 	language: "en",
 	displayMode: "editor-inline",
+	twoHopListMode: "precise-virtual",
 	useMergedLinksSection: false,
 	dedupeCards: true,
 	enableTagFeatures: true,

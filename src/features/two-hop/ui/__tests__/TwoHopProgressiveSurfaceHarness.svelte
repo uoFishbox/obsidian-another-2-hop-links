@@ -1,0 +1,41 @@
+<script lang="ts">
+	import TwoHopProgressiveSurface from "features/two-hop/ui/TwoHopProgressiveSurface.svelte";
+	import { setLinkContext, type LinkContext } from "ui/context/linkContext";
+	import type { ApplicationStore } from "ui/stores/ApplicationStore.svelte";
+	import type { CardRenderModel } from "ui/components/items/cardRenderModel";
+	import type { TwoHopCardPresentationState } from "features/two-hop/ui/twoHopCellStaticState";
+	import type { TwoHopPreviewDependencies } from "features/two-hop/ui/twoHopPreviewDependencies";
+	import type {
+		TwoHopVirtualListItem,
+		TwoHopVirtualSectionDescriptor,
+	} from "features/two-hop/ui/twoHopVirtualListModel";
+
+	interface Props {
+		sections: readonly TwoHopVirtualSectionDescriptor[];
+		applicationStore: ApplicationStore;
+		linkContext: LinkContext;
+		previewDependencies?: TwoHopPreviewDependencies;
+		resolveItemCardModel: (
+			item: TwoHopVirtualListItem,
+			presentation: TwoHopCardPresentationState,
+		) => CardRenderModel;
+	}
+
+	const {
+		sections,
+		applicationStore,
+		linkContext,
+		previewDependencies = undefined,
+		resolveItemCardModel,
+	}: Props = $props();
+	setLinkContext(linkContext);
+</script>
+
+<TwoHopProgressiveSurface
+	{sections}
+	{applicationStore}
+	initialVisibleCount={sections[0]?.totalCount}
+	{resolveItemCardModel}
+	{previewDependencies}
+	previewActive={true}
+/>

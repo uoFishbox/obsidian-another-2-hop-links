@@ -3,7 +3,7 @@
 	import { setContext } from "svelte";
 	import LoadingState from "ui/components/common/LoadingState.svelte";
 	import ListControls from "ui/components/common/ListControls.svelte";
-	import TwoHopPageVirtualList from "./TwoHopLinksVirtualList.svelte";
+	import TwoHopLinksList from "./TwoHopLinksList.svelte";
 	import { useSearchQuery } from "ui/hooks/useSearchQuery.svelte";
 	import { useBookmarks } from "ui/hooks/useBookmarks.svelte";
 	import { useWorkerSearchSession } from "features/search/useWorkerSearchSession.svelte";
@@ -297,7 +297,7 @@
 		{#if loading}
 			<LoadingState message="Waiting for the initial index to finish building." />
 		{:else if linkResult}
-			<TwoHopPageVirtualList
+			<TwoHopLinksList
 				sections={twoHopVirtualListSections}
 				{applicationStore}
 				searchQuery={appliedSearchQuery}

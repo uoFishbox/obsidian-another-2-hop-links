@@ -44,11 +44,14 @@ export interface CreateVirtualPreviewSurfaceOptions {
 	readonly activationScheduler: PreviewActivationScheduler;
 	readonly createRenderer: () => CardPreviewRenderer;
 	readonly hasCachedPreview: (renderKey: string) => boolean;
+	/** Optional lifecycle probe invoked after a hostless, unbound slot is released. */
+	readonly onSlotDisposed?: (slotId: string) => void;
 }
 
 interface PreviewSlotRuntime {
 	readonly slotId: string;
 	readonly controller: PreviewSlotController;
+	hostLeaseCount: number;
 	binding?: RowPreviewCardBinding;
 	rowIndex?: number;
 }
@@ -82,6 +85,7 @@ export function createVirtualPreviewSurface(
 		if (existing) return existing;
 		const slot: PreviewSlotRuntime = {
 			slotId,
+			hostLeaseCount: 0,
 			controller: createPreviewSlotController({
 				createRenderer: options.createRenderer,
 				hasCachedPreview: options.hasCachedPreview,
@@ -89,6 +93,15 @@ export function createVirtualPreviewSurface(
 		};
 		slotsById.set(slotId, slot);
 		return slot;
+	}
+
+	function maybeDisposeSlot(slot: PreviewSlotRuntime): void {
+		if (slot.hostLeaseCount > 0) return;
+		if (slot.binding) return;
+		if (pendingBySlotId.has(slot.slotId)) return;
+		slot.controller.dispose();
+		slotsById.delete(slot.slotId);
+		options.onSlotDisposed?.(slot.slotId);
 	}
 
 	function isInPreviewRange(slot: PreviewSlotRuntime): boolean {
@@ -129,6 +142,7 @@ export function createVirtualPreviewSurface(
 		}
 		for (const slotId of activationSlotIds) enqueueActivation(slotId);
 		activationSlotIds.clear();
+		for (const slot of [...slotsById.values()]) maybeDisposeSlot(slot);
 	}
 
 	function applyDesiredFrame(): void {
@@ -165,8 +179,18 @@ export function createVirtualPreviewSurface(
 	function registerHost(slotId: string, element: HTMLElement): PreviewHostLease {
 		const slot = getOrCreateSlot(slotId);
 		const lease = slot.controller.attachHost(element);
+		slot.hostLeaseCount += 1;
 		reconcile();
-		return lease;
+		let disposedLease = false;
+		return {
+			dispose(): void {
+				if (disposedLease) return;
+				disposedLease = true;
+				lease.dispose();
+				slot.hostLeaseCount = Math.max(0, slot.hostLeaseCount - 1);
+				maybeDisposeSlot(slot);
+			},
+		};
 	}
 
 	function publish(frame: PreviewFrame): void {

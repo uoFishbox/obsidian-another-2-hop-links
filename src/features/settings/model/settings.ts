@@ -12,6 +12,8 @@ export type SortOption =
 
 export type DisplayMode = "editor-inline" | "sidebar-view" | "hybrid";
 
+export type TwoHopListMode = "precise-virtual" | "progressive-chunks";
+
 export type TwoHopHeaderSortOrder = "appearance" | "hop2-count-asc";
 
 export type HighlightOnOpen = "always" | "never";
@@ -40,6 +42,7 @@ export type CardLayoutSettingKey = (typeof CARD_LAYOUT_SETTING_KEYS)[number];
 export interface PluginSettings {
 	language: Language;
 	displayMode: DisplayMode;
+	twoHopListMode: TwoHopListMode;
 	useMergedLinksSection: boolean;
 	dedupeCards: boolean;
 	enableTagFeatures?: boolean;

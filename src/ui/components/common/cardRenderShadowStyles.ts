@@ -413,6 +413,41 @@ export const CARD_RENDER_SHADOW_CSS = String.raw`
 	contain: layout paint style;
 }
 
+.twohop-progressive-surface {
+	contain: layout paint style;
+}
+
+.twohop-progressive-content {
+	position: relative;
+	width: 100%;
+}
+
+.twohop-progressive-chunk {
+	position: relative;
+	width: 100%;
+	contain: layout paint style;
+	content-visibility: auto;
+}
+
+.twohop-progressive-row {
+	position: absolute;
+	left: 0;
+	width: 100%;
+	display: grid;
+	box-sizing: border-box;
+}
+
+.twohop-progressive-cell {
+	min-width: 0;
+	height: 100%;
+}
+
+.twohop-progressive-sentinel {
+	width: 100%;
+	height: 1px;
+	pointer-events: none;
+}
+
 @media (hover: hover) {
 	.cosense-card-links__load-more-button.cosense-card-links__box:hover {
 		color: var(--color-base-60);
