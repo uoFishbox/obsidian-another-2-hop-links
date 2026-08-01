@@ -6,11 +6,13 @@ import type { ApplicationStore } from "ui/stores/ApplicationStore.svelte";
 import type { ResolveTwoHopLinks } from "features/two-hop/application/TwoHopLinksLoader";
 import type { PluginHost } from "types/pluginHost";
 import type { PluginSettings } from "features/settings/model";
+import type { PreviewRuntime } from "features/preview/runtime/previewRuntime";
 
 export interface PluginHostUi extends PluginHost {
 	readonly forceRedrawEffect: StateEffectType<undefined>;
 	createDisplayDataBuilder(): DisplayDataBuilder;
 	getLinkContextFactory(): (file: TFile, settings: PluginSettings) => LinkContext;
+	getPreviewRuntime(): PreviewRuntime;
 	createApplicationStore(
 		settings: PluginSettings,
 		displayDataBuilder: DisplayDataBuilder,

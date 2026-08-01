@@ -23,10 +23,8 @@ import {
 	resetCCLDevMeasurements,
 } from "infrastructure/debug/CCLDevMeasurements";
 import {
-	createPreviewActivationScope,
-	disposePreviewActivationScheduler,
-	requestQueuedPreviewActivation,
-	resetPreviewActivationSchedulerForTests,
+	createPreviewActivationScheduler,
+	type CreatePreviewActivationScopeOptions,
 	type PreviewActivationHandle,
 	type PreviewActivationScope,
 } from "../previewActivationScheduler";
@@ -41,6 +39,30 @@ let visibleQueueSize = 0;
 let activeVisiblePreviewCount = 0;
 let activationScope: PreviewActivationScope;
 let results: string[];
+let defaultTestScheduler = createPreviewActivationScheduler();
+
+function createPreviewActivationScope(
+	options: CreatePreviewActivationScopeOptions = {},
+): PreviewActivationScope {
+	return defaultTestScheduler.createScope(options);
+}
+
+function requestQueuedPreviewActivation(
+	key: string,
+	scope: PreviewActivationScope,
+	onActivated?: () => void,
+): PreviewActivationHandle {
+	return defaultTestScheduler.request(key, scope, onActivated);
+}
+
+function disposePreviewActivationScheduler(): void {
+	defaultTestScheduler.dispose();
+}
+
+function resetPreviewActivationSchedulerForTests(): void {
+	defaultTestScheduler.dispose();
+	defaultTestScheduler = createPreviewActivationScheduler();
+}
 
 function requestActivation(
 	key: string,
@@ -130,6 +152,22 @@ afterEach(() => {
 });
 
 describe("preview activation scheduler", () => {
+	it("disposes only scopes owned by one scheduler instance", async () => {
+		const first = createPreviewActivationScheduler();
+		const second = createPreviewActivationScheduler();
+		const firstScope = first.createScope();
+		const secondScope = second.createScope();
+		const firstActivated = vi.fn();
+		const secondActivated = vi.fn();
+		first.request("same-key", firstScope, firstActivated);
+		second.request("same-key", secondScope, secondActivated);
+
+		first.dispose();
+		await flushAnimationFrame();
+		expect(firstActivated).not.toHaveBeenCalled();
+		expect(secondActivated).toHaveBeenCalledOnce();
+		second.dispose();
+	});
 	it("never activates synchronously through the queued path", async () => {
 		const activation = requestActivation("preview-queued");
 

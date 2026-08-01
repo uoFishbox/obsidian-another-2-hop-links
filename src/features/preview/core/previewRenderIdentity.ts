@@ -1,11 +1,11 @@
 import type { PreviewData } from "../public-types";
 
-type PreviewDomRenderer = Extract<PreviewData, { type: "dom" }>["render"];
+type DomPreviewOverride = Extract<PreviewData, { type: "dom" }>;
 
 const FNV1A32_OFFSET = 0x811c9dc5;
 const FNV1A32_PRIME = 0x01000193;
 
-const domPreviewOverrideIds = new WeakMap<PreviewDomRenderer, number>();
+const domPreviewOverrideIds = new WeakMap<DomPreviewOverride, number>();
 let nextDomPreviewOverrideId = 1;
 
 function hashString(content: string): string {
@@ -18,15 +18,15 @@ function hashString(content: string): string {
 	return `${content.length}:${(hash >>> 0).toString(36)}`;
 }
 
-function getDomPreviewOverrideId(render: PreviewDomRenderer): number {
-	const existing = domPreviewOverrideIds.get(render);
+function getDomPreviewOverrideId(preview: DomPreviewOverride): number {
+	const existing = domPreviewOverrideIds.get(preview);
 	if (existing !== undefined) {
 		return existing;
 	}
 
 	const nextId = nextDomPreviewOverrideId;
 	nextDomPreviewOverrideId += 1;
-	domPreviewOverrideIds.set(render, nextId);
+	domPreviewOverrideIds.set(preview, nextId);
 	return nextId;
 }
 
@@ -50,5 +50,5 @@ export function createPreviewOverrideIdentity(preview: PreviewData | null): stri
 		return `${preview.type}:${hashString(preview.content)}`;
 	}
 
-	return `${preview.type}:${getDomPreviewOverrideId(preview.render)}`;
+	return `${preview.type}:${getDomPreviewOverrideId(preview)}`;
 }

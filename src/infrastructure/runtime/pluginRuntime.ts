@@ -44,6 +44,10 @@ import {
 	type DisposablePreviewService,
 } from "features/preview/core/createPreviewService";
 import {
+	createPreviewRuntime,
+	type PreviewRuntime,
+} from "features/preview/runtime/previewRuntime";
+import {
 	createSettingsSideEffectController,
 	type SettingsSideEffectController,
 } from "features/settings/effects/settingsSideEffectController";
@@ -54,8 +58,8 @@ import {
 	type PluginSettings,
 	type SortOption,
 } from "features/settings/model";
-import { clearCardPreviewSharedCaches } from "features/preview/ui/cardPreviewSharedCache";
 import { getLazyLoadManager } from "infrastructure/observers/IntersectionObserverRegistry";
+import { resolvePreviewActivationsPerSecond } from "appConstants";
 
 export interface PluginRuntimeOptions {
 	app: App;
@@ -75,6 +79,7 @@ export interface PluginRuntimeOptions {
 export interface PluginRuntime {
 	frameScheduler: FrameScheduler;
 	previewService: DisposablePreviewService;
+	previewRuntime: PreviewRuntime;
 	indexingService: IndexingService;
 	twoHopLinkResolver: TwoHopLinkResolver;
 	sortService: SortService;
@@ -104,6 +109,21 @@ export function createPluginRuntime(options: PluginRuntimeOptions): PluginRuntim
 		metadataCache: options.app.metadataCache,
 		app: options.app,
 		getSettings: options.getSettings,
+	});
+	const previewRuntime = createPreviewRuntime({
+		app: options.app,
+		getPreview: previewService.getPreview,
+		getBackpressure: () => ({
+			queued: previewService.getVisibleQueueSize(),
+			active: previewService.getActiveVisiblePreviewCount(),
+		}),
+		subscribeBackpressure: previewService.subscribeVisiblePreviewQueue,
+		schedulerIdentity: previewService.getSchedulingIdentity(),
+		getActivationsPerSecond: () =>
+			resolvePreviewActivationsPerSecond(
+				options.getSettings().previewDomCommitsPerSecond,
+			),
+		getDomCommitsPerSecond: () => options.getSettings().previewDomCommitsPerSecond,
 	});
 	options.plugin.register(() => previewService.dispose());
 
@@ -210,7 +230,7 @@ export function createPluginRuntime(options: PluginRuntimeOptions): PluginRuntim
 		frameScheduler.destroy();
 		options.destroySettings();
 		indexUpdateQueue.destroy();
-		clearCardPreviewSharedCaches();
+		previewRuntime.dispose();
 		componentController.destroy();
 		twoHopLinkResolver.destroy();
 		displayModeController.destroy();
@@ -225,6 +245,7 @@ export function createPluginRuntime(options: PluginRuntimeOptions): PluginRuntim
 	return {
 		frameScheduler,
 		previewService,
+		previewRuntime,
 		indexingService,
 		twoHopLinkResolver,
 		sortService,

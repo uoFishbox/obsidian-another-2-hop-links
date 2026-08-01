@@ -1,10 +1,9 @@
 import type { TFile } from "obsidian";
 import { describe, expect, test } from "vitest";
 import { DEFAULT_SETTINGS } from "features/settings/model";
-import { buildCardPreviewActivationIdentity } from "../cardPreviewActivationIdentity";
+import { compileCardPreviewRequest } from "../cardPreviewRequest";
 import { createPreviewOverrideIdentity } from "../previewRenderIdentity";
 import {
-	CACHE_KEY_SEPARATOR,
 	buildRenderCacheKey,
 	buildRenderCacheKeyFromNormalizedQuery,
 	normalizePreviewQuery,
@@ -41,7 +40,7 @@ describe("preview render keys", () => {
 		);
 	});
 
-	test("builds activation identity from scalar inputs without changing key format", () => {
+	test("uses the compiled render key as the complete semantic identity", () => {
 		const file = createFile("Folder/Note.md");
 		const renderVersion = "4:1";
 		const refreshToken = 2;
@@ -51,21 +50,21 @@ describe("preview render keys", () => {
 		const renderVersionIdentity = `${renderVersion}:${refreshToken}:${overrideIdentity}`;
 
 		expect(
-			buildCardPreviewActivationIdentity(
+			compileCardPreviewRequest({
 				file,
-				DEFAULT_SETTINGS,
-				normalizedQuery,
-				renderVersion,
-				refreshToken,
-				override,
-			),
+				settings: DEFAULT_SETTINGS,
+				searchQuery: normalizedQuery,
+				previewRenderVersion: renderVersion,
+				previewRefreshToken: refreshToken,
+				previewOverride: override,
+			}).renderKey,
 		).toBe(
-			`${buildRenderCacheKeyFromNormalizedQuery(
+			buildRenderCacheKeyFromNormalizedQuery(
 				file,
 				normalizedQuery,
 				DEFAULT_SETTINGS,
 				renderVersionIdentity,
-			)}${CACHE_KEY_SEPARATOR}${file.extension}`,
+			),
 		);
 	});
 });

@@ -6,6 +6,7 @@
 	import type { ApplicationStore } from "ui/stores/ApplicationStore.svelte";
 	import type { ISortService } from "types/services";
 	import type { ViewItem } from "application/presenters";
+	import type { PreviewRuntime } from "features/preview/runtime/previewRuntime";
 
 	interface Props {
 		items: ViewItem[];
@@ -16,6 +17,7 @@
 		app: App;
 		autofocus?: boolean;
 		previewRefreshTokens?: Record<string, number>;
+		previewRuntime?: PreviewRuntime;
 	}
 
 	let {
@@ -27,6 +29,7 @@
 		app,
 		autofocus = true,
 		previewRefreshTokens = {},
+		previewRuntime = undefined,
 	}: Props = $props();
 
 	let currentItems = $state.raw<ViewItem[]>(items);
@@ -65,6 +68,7 @@
 	{applicationStore}
 	{sortService}
 	{app}
+	{previewRuntime}
 	{autofocus}
 	previewRefreshTokens={currentPreviewRefreshTokens}
 />

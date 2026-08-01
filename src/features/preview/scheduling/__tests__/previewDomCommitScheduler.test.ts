@@ -9,9 +9,8 @@ import {
 	resetCCLDevMeasurements,
 } from "infrastructure/debug/CCLDevMeasurements";
 import {
-	disposePreviewDomCommitScheduler,
-	enqueuePreviewDomCommit,
-	resetPreviewDomCommitSchedulerForTests,
+	createPreviewDomCommitScheduler,
+	type PreviewDomCommitTask,
 } from "../previewDomCommitScheduler";
 import type { VirtualFrameCoordinator } from "ui/virtualization/scheduling/frameCoordinator";
 
@@ -20,6 +19,20 @@ const DEFAULT_FRAME_INTERVAL_MS = 1000 / 60;
 let frameIntervalMs = DEFAULT_FRAME_INTERVAL_MS;
 let frameTimestamp = 0;
 let frameTimeOrigin = 0;
+let defaultTestScheduler = createPreviewDomCommitScheduler();
+
+function enqueuePreviewDomCommit(task: PreviewDomCommitTask) {
+	return defaultTestScheduler.enqueue(task);
+}
+
+function disposePreviewDomCommitScheduler(): void {
+	defaultTestScheduler.dispose();
+}
+
+function resetPreviewDomCommitSchedulerForTests(): void {
+	defaultTestScheduler.dispose();
+	defaultTestScheduler = createPreviewDomCommitScheduler();
+}
 
 async function flushAnimationFrame(): Promise<void> {
 	await vi.advanceTimersByTimeAsync(frameIntervalMs);
@@ -109,6 +122,33 @@ afterEach(() => {
 });
 
 describe("preview DOM commit scheduler", () => {
+	it("disposes one scheduler instance without settling another instance", async () => {
+		const first = createPreviewDomCommitScheduler();
+		const second = createPreviewDomCommitScheduler();
+		const firstCommit = vi.fn(() => true);
+		const secondCommit = vi.fn(() => true);
+		const firstResult = first.enqueue({
+			targetKey: "shared-target",
+			isStale: () => false,
+			commit: firstCommit,
+		});
+		const secondResult = second.enqueue({
+			targetKey: "shared-target",
+			isStale: () => false,
+			commit: secondCommit,
+		});
+
+		first.dispose();
+		await expect(firstResult).resolves.toEqual({
+			type: "skipped",
+			reason: "disposed",
+		});
+		await flushAnimationFrame();
+		await expect(secondResult).resolves.toEqual({ type: "committed" });
+		expect(firstCommit).not.toHaveBeenCalled();
+		expect(secondCommit).toHaveBeenCalledOnce();
+		second.dispose();
+	});
 	it("coalesces pending commits by target key", async () => {
 		const committed: string[] = [];
 

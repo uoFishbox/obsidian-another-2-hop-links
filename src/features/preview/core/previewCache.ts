@@ -1,12 +1,12 @@
 import type { TFile } from "obsidian";
 import type { PreviewData } from "../public-types";
-import type { PluginSettings } from "features/settings/model";
+import type { PreviewRenderSettingsInput } from "./previewRenderSettings";
+import { buildPreviewContentSettingsSignature } from "./previewRenderKeys";
 import { createSizedLRUCache, stringBytes } from "shared/cache/sizedLRUCache";
 import type { SizedLRUCache } from "shared/cache/sizedLRUCache";
 
 const VIDEO_THUMBNAIL_CACHE_MAX_COUNT = 80;
 const CACHE_KEY_SEPARATOR = "\0";
-const SIGNATURE_SEP = "\u001f";
 
 const PREVIEW_GENERATION_CACHE_MAX_BYTES = 2 * 1024 * 1024;
 
@@ -21,30 +21,15 @@ export function createPreviewGenerationCache(): PreviewGenerationCache {
 	return createSizedLRUCache<string, PreviewData>(PREVIEW_GENERATION_CACHE_MAX_BYTES);
 }
 
-function buildPreviewContentSettingsSignature(settings?: PluginSettings): string {
-	if (!settings) {
-		return "";
-	}
-
-	const renderCodeBlockTypes = settings.renderCodeBlockTypes ?? [];
-	return [
-		settings.cardWidthPx,
-		settings.cardHeightRatio,
-		settings.priorityFrontmatterKeyForPreview ?? "",
-		settings.previewMaxChars,
-		settings.previewMaxLines,
-		settings.previewVisualLineSafetyMargin,
-		renderCodeBlockTypes.length,
-		...renderCodeBlockTypes,
-	].join(SIGNATURE_SEP);
-}
-
 export function buildPreviewGenerationKey(
 	file: TFile,
-	settings?: PluginSettings,
+	settings?: PreviewRenderSettingsInput,
 	cacheRevision: number | string = "",
 ): string {
-	return `${file.path}${CACHE_KEY_SEPARATOR}${file.stat.mtime}${CACHE_KEY_SEPARATOR}${cacheRevision}${CACHE_KEY_SEPARATOR}${buildPreviewContentSettingsSignature(settings)}`;
+	const settingsSignature = settings
+		? buildPreviewContentSettingsSignature(settings)
+		: "";
+	return `${file.path}${CACHE_KEY_SEPARATOR}${file.stat.mtime}${CACHE_KEY_SEPARATOR}${cacheRevision}${CACHE_KEY_SEPARATOR}${settingsSignature}`;
 }
 
 export function getPreviewDataSize(data: PreviewData): number {

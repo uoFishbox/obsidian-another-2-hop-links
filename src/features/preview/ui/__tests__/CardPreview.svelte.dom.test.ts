@@ -1,13 +1,12 @@
 import { render, waitFor } from "@testing-library/svelte";
-import type { TFile } from "obsidian";
+import type { App, TFile } from "obsidian";
 import { tick } from "svelte";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { DEFAULT_SETTINGS, type PluginSettings } from "features/settings/model";
 import { ApplicationStore } from "ui/stores/ApplicationStore.svelte";
-import CardPreview from "../CardPreview.svelte";
-import { clearCardPreviewSharedCaches } from "../cardPreviewSharedCache";
+import CardPreview from "./CardPreviewHarness.svelte";
 import { createMockTFile } from "testing/__mocks__/testHelpers";
-import { resetPreviewDomCommitSchedulerForTests } from "features/preview/scheduling/previewDomCommitScheduler";
+import { createPreviewRuntime } from "features/preview/runtime/previewRuntime";
 
 const state = vi.hoisted(() => ({
 	appContext: {
@@ -133,7 +132,6 @@ describe("CardPreview", () => {
 			return element;
 		};
 
-		clearCardPreviewSharedCaches();
 		state.appContext.app = { vault: {} };
 		state.appContext.applicationStore = {
 			settings: createSettings(),
@@ -193,10 +191,6 @@ describe("CardPreview", () => {
 		state.syncMathJaxStylesForNode.mockReturnValue(true);
 
 		state.componentUnload.mockReset();
-	});
-
-	afterEach(() => {
-		resetPreviewDomCommitSchedulerForTests();
 	});
 
 	it("commits a preview while its card is temporarily detached", async () => {
@@ -266,7 +260,7 @@ describe("CardPreview", () => {
 			);
 			expect(preview).toBeTruthy();
 			expect(preview?.querySelector("img")).toBeTruthy();
-			expect(preview).toHaveClass("is-stale");
+			expect(preview).not.toHaveClass("is-stale");
 			expect(preview).not.toHaveClass("hidden");
 			expect(preview).toHaveClass("cosense-card-links__box-preview--image");
 		});
@@ -274,22 +268,15 @@ describe("CardPreview", () => {
 
 	it("retains and reuses resident DOM when the same binding leaves and re-enters the preview range", async () => {
 		const file = createMockTFile("notes/resident-preview.md");
-		const snapshot = {
-			identity: "resident-identity",
-			file,
-			searchQuery: "",
-			previewRefreshToken: 0,
-			previewOverride: null,
-		};
 		const getPreview = vi.fn(async () => ({
 			type: "text" as const,
 			content: "resident content",
 		}));
 		const rendered = render(CardPreview, {
 			props: {
-				bindingIdentity: snapshot.identity,
-				renderSnapshot: snapshot,
+				file,
 				getPreview,
+				searchQuery: "",
 			},
 		});
 
@@ -302,18 +289,18 @@ describe("CardPreview", () => {
 		const committedContent = preview?.firstChild;
 
 		await rendered.rerender({
-			bindingIdentity: snapshot.identity,
-			renderSnapshot: undefined,
+			file: undefined,
 			getPreview,
+			searchQuery: "",
 		});
 		expect(preview?.firstChild).toBe(committedContent);
 		expect(preview).not.toHaveClass("is-stale");
 		expect(preview).not.toHaveClass("hidden");
 
 		await rendered.rerender({
-			bindingIdentity: snapshot.identity,
-			renderSnapshot: snapshot,
+			file,
 			getPreview,
+			searchQuery: "",
 		});
 		await tick();
 		expect(preview?.firstChild).toBe(committedContent);
@@ -342,7 +329,7 @@ describe("CardPreview", () => {
 			getPreview,
 			searchQuery: "",
 		});
-		await waitFor(() => expect(preview).toHaveClass("is-stale"));
+		await waitFor(() => expect(preview).not.toHaveClass("is-stale"));
 		expect(preview?.textContent).toContain("rendered:notes/preview-a.md");
 		await rendered.rerender({ file: fileB, getPreview, searchQuery: "" });
 
@@ -473,9 +460,13 @@ describe("CardPreview", () => {
 			type: "text" as const,
 			content: "preview text",
 		}));
+		const previewRuntime = createPreviewRuntime({
+			app: state.appContext.app as App,
+			getPreview,
+		});
 
 		const firstRender = render(CardPreview, {
-			props: { file, getPreview, searchQuery: "" },
+			props: { file, getPreview, searchQuery: "", previewRuntime },
 		});
 
 		await waitFor(() => {
@@ -487,7 +478,7 @@ describe("CardPreview", () => {
 		firstRender.unmount();
 
 		render(CardPreview, {
-			props: { file, getPreview, searchQuery: "" },
+			props: { file, getPreview, searchQuery: "", previewRuntime },
 		});
 
 		await waitFor(() => {
@@ -496,6 +487,7 @@ describe("CardPreview", () => {
 			).toContain("rendered:preview text");
 		});
 		expect(state.processPreviewContent).toHaveBeenCalledTimes(1);
+		previewRuntime.dispose();
 	});
 
 	it("passes searchable text preview content through the shared cache path", async () => {

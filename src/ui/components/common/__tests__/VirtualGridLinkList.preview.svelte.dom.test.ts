@@ -2,6 +2,7 @@ import { cleanup, render, waitFor } from "@testing-library/svelte";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { App, TFile } from "obsidian";
 import { DEFAULT_SETTINGS } from "features/settings/model";
+import { createPreviewRenderSettings } from "features/preview/core/previewRenderSettings";
 import type { ApplicationStore } from "ui/stores/ApplicationStore.svelte";
 import type { AppContext, LinkContext } from "ui/context/linkContext";
 import type { ViewItem } from "application/presenters";
@@ -24,6 +25,12 @@ import {
 	triggerResize,
 } from "testing/helpers/DOMObserverMock";
 import VirtualGridPreviewHarness from "./VirtualGridPreviewHarness.svelte";
+import {
+	createPreviewRuntime,
+	type PreviewRuntime,
+} from "features/preview/runtime/previewRuntime";
+
+const previewRuntimes = new Set<PreviewRuntime>();
 
 beforeEach(() => {
 	resetRecords();
@@ -34,6 +41,8 @@ beforeEach(() => {
 
 afterEach(() => {
 	cleanup();
+	for (const runtime of previewRuntimes) runtime.dispose();
+	previewRuntimes.clear();
 	teardownResizeObserverMock();
 	teardownIntersectionObserverMock();
 	teardownAnimationFrameMock();
@@ -57,14 +66,15 @@ function createModel(file: TFile): CardRenderModel {
 		searchScope: "title-and-content",
 		contentPreview: undefined,
 		previewRefreshToken: 0,
-		previewActivationIdentity: `preview:${file.path}`,
 		previewOverride: null,
-		previewSnapshot: {
-			identity: `preview:${file.path}`,
+		previewRequest: {
+			renderKey: `preview:${file.path}`,
+			previewContentKey: `content:${file.path}`,
+			previewCacheRevision: "0:0",
 			file,
 			searchQuery: "",
-			previewRefreshToken: 0,
 			previewOverride: null,
+			settings: createPreviewRenderSettings(DEFAULT_SETTINGS),
 		},
 	};
 }
@@ -92,8 +102,11 @@ describe("VirtualGridLinkList preview surface", () => {
 			settings: DEFAULT_SETTINGS,
 			getPreviewRenderVersion: () => "0:0",
 		} as unknown as ApplicationStore;
+		const app = { vault: {} } as App;
+		const previewRuntime = createPreviewRuntime({ app, getPreview });
+		previewRuntimes.add(previewRuntime);
 		const appContext = {
-			app: { vault: {} } as App,
+			app,
 			applicationStore,
 			linkContext,
 			bookmarks: {
@@ -101,6 +114,7 @@ describe("VirtualGridLinkList preview surface", () => {
 				orderedFilePaths: [],
 				isBookmarked: () => false,
 			},
+			previewRuntime,
 		} as AppContext;
 		resetCCLDevMeasurements();
 		const { container } = render(VirtualGridPreviewHarness, {

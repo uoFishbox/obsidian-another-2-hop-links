@@ -14,7 +14,9 @@ import type { PluginSettings } from "features/settings/model";
 const INLINE_CODE_REGEX = /`([^`]+)`/g;
 const EMPTY_PROTECTED_SEGMENTS: ProtectedSegment[] = [];
 
-export type TextTransformSettings = Pick<PluginSettings, "renderCodeBlockTypes">;
+export interface TextTransformSettings {
+	readonly renderCodeBlockTypes: readonly string[];
+}
 
 interface ProtectedSegment {
 	token: string;

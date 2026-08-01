@@ -4,15 +4,18 @@ import type {
 	CardPreviewRenderer,
 	PreviewRenderCallbacks,
 } from "features/preview/ui/cardPreviewRenderer";
-import type { CardPreviewSnapshot } from "features/preview/ui/cardPreviewSnapshot";
+import type { CardPreviewRequest } from "features/preview/core/cardPreviewRequest";
+import { createPreviewRenderSettings } from "features/preview/core/previewRenderSettings";
 import type { VirtualFrameCoordinator } from "ui/virtualization/scheduling/frameCoordinator";
 import {
 	createVirtualPreviewSurface,
 	type RowPreviewCardBinding,
-	type VirtualPreviewCommittedFrame,
+	type PreviewFrame,
 } from "../virtualPreviewSurface";
-import { resetPreviewActivationSchedulerForTests } from "../previewActivationScheduler";
+import { createPreviewActivationScheduler } from "../previewActivationScheduler";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+const previewCacheState = vi.hoisted(() => ({ entry: undefined as unknown }));
 
 const FRAME_INTERVAL_MS = 1000 / 60;
 
@@ -23,9 +26,11 @@ interface RenderRecord {
 	readonly cleanup: ReturnType<typeof vi.fn>;
 }
 
-function snapshot(identity: string): CardPreviewSnapshot {
+function request(identity: string): CardPreviewRequest {
 	return {
-		identity,
+		renderKey: identity,
+		previewContentKey: `content:${identity}`,
+		previewCacheRevision: "0:0",
 		file: {
 			path: `${identity}.md`,
 			basename: identity,
@@ -33,8 +38,8 @@ function snapshot(identity: string): CardPreviewSnapshot {
 			stat: { mtime: 1 },
 		} as TFile,
 		searchQuery: "",
-		previewRefreshToken: 0,
 		previewOverride: null,
+		settings: createPreviewRenderSettings(DEFAULT_SETTINGS),
 	};
 }
 
@@ -43,11 +48,12 @@ function binding(
 	rowIndex: number,
 	identity: string,
 ): RowPreviewCardBinding {
-	return { slotId, rowIndex, snapshot: snapshot(identity) };
+	return { slotId, rowIndex, request: request(identity), ownerToken: {} };
 }
 
-function committedFrame(card: RowPreviewCardBinding): VirtualPreviewCommittedFrame {
+function committedFrame(card: RowPreviewCardBinding): PreviewFrame {
 	return {
+		generation: 0,
 		previewBindingsBySlot: new Map([[card.slotId, card]]),
 		previewWindow: {
 			previewRange: { start: card.rowIndex, end: card.rowIndex + 1 },
@@ -56,29 +62,116 @@ function committedFrame(card: RowPreviewCardBinding): VirtualPreviewCommittedFra
 	};
 }
 
-function createHarness(frameCoordinator?: VirtualFrameCoordinator) {
+type Surface = ReturnType<typeof createVirtualPreviewSurface> & {
+	commitBindingDelta(
+		delta: {
+			readonly enteredSlots: readonly RowPreviewCardBinding[];
+			readonly reboundSlots: readonly RowPreviewCardBinding[];
+			readonly releasedSlots: readonly string[];
+		},
+		window: {
+			readonly previewRange: { readonly start: number; readonly end: number };
+			readonly active: boolean;
+		},
+	): void;
+	syncBindingDelta(delta: {
+		readonly enteredSlots: readonly RowPreviewCardBinding[];
+		readonly reboundSlots: readonly RowPreviewCardBinding[];
+		readonly releasedSlots: readonly string[];
+	}): void;
+	setPreviewWindow(window: {
+		readonly previewRange: { readonly start: number; readonly end: number };
+		readonly active: boolean;
+	}): void;
+	acceptCommittedFrame(source: { readonly current: PreviewFrame }): void;
+};
+
+function createHarness(frameCoordinator?: VirtualFrameCoordinator): {
+	surface: Surface;
+	renders: RenderRecord[];
+} {
 	const renders: RenderRecord[] = [];
-	const surface = createVirtualPreviewSurface({
-		getSettings: () => DEFAULT_SETTINGS,
-		getPreviewRenderVersion: () => "0:0",
+	const activationScheduler = createPreviewActivationScheduler();
+	const actualSurface = createVirtualPreviewSurface({
 		frameCoordinator,
+		activationScheduler,
+		hasCachedPreview: () => previewCacheState.entry !== undefined,
 		createRenderer: (): CardPreviewRenderer => {
-			return (container, _request, identity, callbacks) => {
+			return (container, previewRequest, _generation, callbacks) => {
 				if (!callbacks) throw new TypeError("Missing surface callbacks");
 				const cleanup = vi.fn();
-				renders.push({ container, identity, callbacks, cleanup });
+				renders.push({
+					container,
+					identity: previewRequest.renderKey,
+					callbacks,
+					cleanup,
+				});
 				callbacks.onLoadingChange(true);
 				return cleanup;
 			};
 		},
 	});
+	let generation = 0;
+	let bindings = new Map<string, RowPreviewCardBinding>();
+	let previewWindow = {
+		previewRange: { start: 0, end: 0 },
+		active: false,
+	};
+	const publish = (
+		nextBindings: ReadonlyMap<string, RowPreviewCardBinding>,
+		nextWindow: typeof previewWindow,
+	): void => {
+		bindings = new Map(nextBindings);
+		previewWindow = nextWindow;
+		actualSurface.publish({
+			generation: ++generation,
+			previewBindingsBySlot: new Map(bindings),
+			previewWindow,
+		});
+	};
+	const applyDelta = (
+		delta: {
+			readonly enteredSlots: readonly RowPreviewCardBinding[];
+			readonly reboundSlots: readonly RowPreviewCardBinding[];
+			readonly releasedSlots: readonly string[];
+		},
+		nextWindow: typeof previewWindow,
+	): void => {
+		const nextBindings = new Map(bindings);
+		for (const slotId of delta.releasedSlots) nextBindings.delete(slotId);
+		for (const binding of [...delta.enteredSlots, ...delta.reboundSlots]) {
+			nextBindings.set(binding.slotId, binding);
+		}
+		publish(nextBindings, nextWindow);
+	};
+	const surface = {
+		...actualSurface,
+		commitBindingDelta: (
+			delta: Parameters<typeof applyDelta>[0],
+			window: typeof previewWindow,
+		) => applyDelta(delta, window),
+		syncBindingDelta: (delta: Parameters<typeof applyDelta>[0]) =>
+			applyDelta(delta, previewWindow),
+		setPreviewWindow: (window: typeof previewWindow) =>
+			applyDelta(
+				{ enteredSlots: [], reboundSlots: [], releasedSlots: [] },
+				window,
+			),
+		acceptCommittedFrame: (source: { readonly current: PreviewFrame }) => {
+			const frame = source.current;
+			bindings = new Map(frame.previewBindingsBySlot);
+			previewWindow = frame.previewWindow;
+			actualSurface.publish(frame);
+		},
+		dispose: () => {
+			actualSurface.dispose();
+			activationScheduler.dispose();
+		},
+	} as Surface;
 	return { surface, renders };
 }
 
-function enter(
-	surface: ReturnType<typeof createVirtualPreviewSurface>,
-	card: RowPreviewCardBinding,
-): void {
+function enter(surface: Surface, card: RowPreviewCardBinding): void {
 	surface.commitBindingDelta(
 		{ enteredSlots: [card], reboundSlots: [], releasedSlots: [] },
 		{
@@ -88,10 +181,7 @@ function enter(
 	);
 }
 
-function rebind(
-	surface: ReturnType<typeof createVirtualPreviewSurface>,
-	card: RowPreviewCardBinding,
-): void {
+function rebind(surface: Surface, card: RowPreviewCardBinding): void {
 	surface.syncBindingDelta({
 		enteredSlots: [],
 		reboundSlots: [card],
@@ -119,6 +209,7 @@ async function flushActivation(): Promise<void> {
 }
 
 beforeEach(() => {
+	previewCacheState.entry = undefined;
 	vi.useFakeTimers();
 	vi.stubGlobal(
 		"requestAnimationFrame",
@@ -130,7 +221,6 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-	resetPreviewActivationSchedulerForTests();
 	vi.restoreAllMocks();
 	vi.unstubAllGlobals();
 	vi.useRealTimers();
@@ -166,6 +256,21 @@ describe("VirtualPreviewSurface", () => {
 		surface.dispose();
 	});
 
+	it("activates a rendered cache hit without the activation queue", async () => {
+		const { surface, renders } = createHarness();
+		const host = document.createElement("div");
+		surface.registerHost("slot-0", host);
+		previewCacheState.entry = {};
+
+		enter(surface, binding("slot-0", 0, "cached"));
+		await vi.advanceTimersByTimeAsync(FRAME_INTERVAL_MS);
+		await vi.advanceTimersByTimeAsync(1);
+		await Promise.resolve();
+
+		expect(renders).toHaveLength(1);
+		surface.dispose();
+	});
+
 	it("rejects an old render after the physical slot is rebound", async () => {
 		const { surface, renders } = createHarness();
 		const host = document.createElement("div");
@@ -174,6 +279,7 @@ describe("VirtualPreviewSurface", () => {
 		await flushActivation();
 
 		rebind(surface, binding("slot-0", 0, "b"));
+		await flushActivation();
 		expect(renders[0].cleanup).toHaveBeenCalledOnce();
 		expect(commit(renders[0])).toBe(false);
 		await flushActivation();
@@ -190,7 +296,7 @@ describe("VirtualPreviewSurface", () => {
 		const secondToken = {};
 		const firstBinding = {
 			...binding("slot-0", 0, "same-cache-identity"),
-			currentnessToken: firstToken,
+			ownerToken: firstToken,
 		};
 		let current = committedFrame(firstBinding);
 		const source = {
@@ -203,7 +309,7 @@ describe("VirtualPreviewSurface", () => {
 
 		const secondBinding = {
 			...binding("slot-0", 0, "same-cache-identity"),
-			currentnessToken: secondToken,
+			ownerToken: secondToken,
 		};
 		current = committedFrame(secondBinding);
 		surface.acceptCommittedFrame(source);
@@ -221,7 +327,7 @@ describe("VirtualPreviewSurface", () => {
 		const hostLease = surface.registerHost("slot-0", oldHost);
 		const card = {
 			...binding("slot-0", 0, "a"),
-			currentnessToken: {},
+			ownerToken: {},
 		};
 		const current = committedFrame(card);
 		surface.acceptCommittedFrame({ current });
@@ -265,7 +371,7 @@ describe("VirtualPreviewSurface", () => {
 		);
 
 		expect(renders[0].callbacks.isCurrent()).toBe(false);
-		expect(renders[0].cleanup).not.toHaveBeenCalled();
+		expect(renders[0].cleanup).toHaveBeenCalledOnce();
 		expect(host.textContent).toBe("a");
 		expect(host.classList.contains("is-stale")).toBe(true);
 
@@ -361,12 +467,51 @@ describe("VirtualPreviewSurface", () => {
 
 		const reboundBinding = binding("slot-0", 0, "b");
 		rebind(surface, reboundBinding);
-		expect(firstBinding.snapshot.identity).toBe("a");
+		expect(firstBinding.request.renderKey).toBe("a");
+		await flushActivation();
 		expect(renders[0].cleanup).toHaveBeenCalledOnce();
 		await flushActivation();
 		expect(commit(renders[0])).toBe(false);
 		expect(commit(renders[1])).toBe(true);
 		expect(host.textContent).toBe("b");
+		surface.dispose();
+	});
+
+	it("rejects mutation of a previously published binding in development", () => {
+		const { surface } = createHarness();
+		const card = binding("slot-0", 0, "immutable");
+		const frame = committedFrame(card);
+		surface.publish(frame);
+
+		(card as { rowIndex: number }).rowIndex = 1;
+
+		expect(() => surface.publish(frame)).toThrow(
+			"RowPreviewCardBinding must not be mutated after publication",
+		);
+		surface.dispose();
+	});
+
+	it("does not restart rendering for a new request object with the same owner and render key", async () => {
+		const { surface, renders } = createHarness();
+		const host = document.createElement("div");
+		const ownerToken = {};
+		const first = {
+			...binding("slot-0", 0, "stable-render"),
+			ownerToken,
+		};
+		surface.registerHost("slot-0", host);
+		enter(surface, first);
+		await flushActivation();
+
+		const next = {
+			...first,
+			request: { ...first.request },
+		};
+		rebind(surface, next);
+		await flushActivation();
+
+		expect(renders).toHaveLength(1);
+		expect(renders[0].cleanup).not.toHaveBeenCalled();
 		surface.dispose();
 	});
 
@@ -409,25 +554,25 @@ describe("VirtualPreviewSurface", () => {
 	it("skips slot reconciliation when bindings and preview range are unchanged", () => {
 		const { surface } = createHarness();
 		const card = binding("slot-0", 0, "a");
-		const cardSnapshot = card.snapshot;
-		let snapshotReads = 0;
-		Object.defineProperty(card, "snapshot", {
+		const cardRequest = card.request;
+		let requestReads = 0;
+		Object.defineProperty(card, "request", {
 			configurable: true,
 			get() {
-				snapshotReads += 1;
-				return cardSnapshot;
+				requestReads += 1;
+				return cardRequest;
 			},
 		});
 		surface.registerHost("slot-0", document.createElement("div"));
 		enter(surface, card);
-		snapshotReads = 0;
+		requestReads = 0;
 
 		surface.commitBindingDelta(
 			{ enteredSlots: [], reboundSlots: [], releasedSlots: [] },
 			{ previewRange: { start: 0, end: 1 }, active: true },
 		);
 
-		expect(snapshotReads).toBe(0);
+		expect(requestReads).toBe(0);
 		surface.dispose();
 	});
 
@@ -491,6 +636,7 @@ describe("VirtualPreviewSurface", () => {
 			previewRange: { start: 1, end: 2 },
 			active: true,
 		});
+		await flushActivation();
 		expect(renders[0].cleanup).toHaveBeenCalledOnce();
 		expect(host.dataset.previewState).toBe("dormant");
 
@@ -519,7 +665,7 @@ describe("VirtualPreviewSurface", () => {
 		await flushActivation();
 
 		expect(host.textContent).toBe("a");
-		expect(renders).toHaveLength(2);
+		expect(renders).toHaveLength(1);
 		surface.dispose();
 	});
 

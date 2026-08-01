@@ -1,6 +1,7 @@
 import { cleanup, fireEvent, render, waitFor } from "@testing-library/svelte";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { DEFAULT_SETTINGS } from "features/settings/model";
+import { compileCardPreviewRequest } from "features/preview/core/cardPreviewRequest";
 import type { ApplicationStore } from "ui/stores/ApplicationStore.svelte";
 import TwoHopSurface from "features/two-hop/ui/TwoHopSurface.svelte";
 import TwoHopSurfaceModelHarness from "./TwoHopSurfaceModelHarness.svelte";
@@ -26,6 +27,11 @@ import type { CardRenderModel } from "ui/components/items/cardRenderModel";
 import type { LinkContext } from "ui/context/linkContext";
 import type { App, TFile } from "obsidian";
 import type { TwoHopPreviewDependencies } from "features/two-hop/ui/twoHopPreviewDependencies";
+import type { CardPreviewLoader } from "features/preview/ui/cardPreviewRenderer";
+import {
+	createPreviewRuntime,
+	type PreviewRuntime,
+} from "features/preview/runtime/previewRuntime";
 import {
 	getCCLDevMeasurementSnapshot,
 	resetCCLDevMeasurements,
@@ -33,11 +39,9 @@ import {
 
 const previewSurfaceCalls = vi.hoisted(() => ({
 	create: vi.fn(),
-	acceptCommittedFrame: vi.fn(),
-	commitBindingDelta: vi.fn(),
-	syncBindingDelta: vi.fn(),
-	setPreviewWindow: vi.fn(),
+	publish: vi.fn(),
 }));
+const previewRuntimes = new Set<PreviewRuntime>();
 
 vi.mock("features/preview/scheduling/virtualPreviewSurface", async (importOriginal) => {
 	const actual =
@@ -53,29 +57,9 @@ vi.mock("features/preview/scheduling/virtualPreviewSurface", async (importOrigin
 			const surface = actual.createVirtualPreviewSurface(...args);
 			return {
 				...surface,
-				acceptCommittedFrame: (
-					...frameArgs: Parameters<typeof surface.acceptCommittedFrame>
-				) => {
-					previewSurfaceCalls.acceptCommittedFrame(...frameArgs);
-					surface.acceptCommittedFrame(...frameArgs);
-				},
-				syncBindingDelta: (
-					...syncArgs: Parameters<typeof surface.syncBindingDelta>
-				) => {
-					previewSurfaceCalls.syncBindingDelta(...syncArgs);
-					surface.syncBindingDelta(...syncArgs);
-				},
-				setPreviewWindow: (
-					...windowArgs: Parameters<typeof surface.setPreviewWindow>
-				) => {
-					previewSurfaceCalls.setPreviewWindow(...windowArgs);
-					surface.setPreviewWindow(...windowArgs);
-				},
-				commitBindingDelta: (
-					...commitArgs: Parameters<typeof surface.commitBindingDelta>
-				) => {
-					previewSurfaceCalls.commitBindingDelta(...commitArgs);
-					surface.commitBindingDelta(...commitArgs);
+				publish: (...frameArgs: Parameters<typeof surface.publish>) => {
+					previewSurfaceCalls.publish(...frameArgs);
+					surface.publish(...frameArgs);
 				},
 			};
 		},
@@ -84,10 +68,7 @@ vi.mock("features/preview/scheduling/virtualPreviewSurface", async (importOrigin
 
 beforeEach(() => {
 	previewSurfaceCalls.create.mockClear();
-	previewSurfaceCalls.acceptCommittedFrame.mockClear();
-	previewSurfaceCalls.commitBindingDelta.mockClear();
-	previewSurfaceCalls.syncBindingDelta.mockClear();
-	previewSurfaceCalls.setPreviewWindow.mockClear();
+	previewSurfaceCalls.publish.mockClear();
 	resetRecords();
 	installResizeObserverMock();
 	installIntersectionObserverMock();
@@ -96,6 +77,8 @@ beforeEach(() => {
 
 afterEach(() => {
 	cleanup();
+	for (const runtime of previewRuntimes) runtime.dispose();
+	previewRuntimes.clear();
 	teardownResizeObserverMock();
 	teardownIntersectionObserverMock();
 	teardownAnimationFrameMock();
@@ -146,16 +129,16 @@ const applicationStore = {
 } as unknown as ApplicationStore;
 
 function createPreviewDependencies(
-	getPreview: TwoHopPreviewDependencies["getPreview"] = vi.fn(async () => ({
+	getPreview: CardPreviewLoader = vi.fn(async () => ({
 		type: "empty" as const,
 		content: "",
 	})),
 ): TwoHopPreviewDependencies {
+	const app = { vault: {} } as App;
+	const previewRuntime = createPreviewRuntime({ app, getPreview });
+	previewRuntimes.add(previewRuntime);
 	return {
-		app: { vault: {} } as App,
-		getPreview,
-		getSettings: () => applicationStore.settings,
-		getPreviewRenderVersion: () => "1:0",
+		previewRuntime,
 		resolveSearchMatchPosition: () => undefined,
 		getBackpressure: () => ({ queued: 0, active: 0 }),
 		getActivationsPerSecond: () => 60,
@@ -233,22 +216,18 @@ async function scrollSurface(
 }
 
 describe("TwoHopSurface", () => {
-	it("publishes binding changes through the committed frame source", async () => {
+	it("publishes binding changes through one immutable preview frame", async () => {
 		const { root, scroller } = await renderScrollableSurface(
 			100,
 			createPreviewDependencies(),
 		);
-		previewSurfaceCalls.commitBindingDelta.mockClear();
-		previewSurfaceCalls.acceptCommittedFrame.mockClear();
-		previewSurfaceCalls.syncBindingDelta.mockClear();
-		previewSurfaceCalls.setPreviewWindow.mockClear();
+		previewSurfaceCalls.publish.mockClear();
 
 		await scrollSurface(root, scroller, 600);
 
-		expect(previewSurfaceCalls.acceptCommittedFrame).toHaveBeenCalled();
-		expect(previewSurfaceCalls.syncBindingDelta).not.toHaveBeenCalled();
-		for (const [source] of previewSurfaceCalls.acceptCommittedFrame.mock.calls) {
-			expect(source.current.previewWindow.previewRange.start).toBeGreaterThan(0);
+		expect(previewSurfaceCalls.publish).toHaveBeenCalled();
+		for (const [frame] of previewSurfaceCalls.publish.mock.calls) {
+			expect(frame.previewWindow.previewRange.start).toBeGreaterThan(0);
 		}
 	});
 
@@ -326,15 +305,15 @@ describe("TwoHopSurface", () => {
 				searchScope: "title-and-content",
 				contentPreview: undefined,
 				previewRefreshToken: 0,
-				previewActivationIdentity: `preview:${item.virtualKey}`,
 				previewOverride: null,
-				previewSnapshot: {
-					identity: `preview:${item.virtualKey}`,
+				previewRequest: compileCardPreviewRequest({
 					file: targetFile,
 					searchQuery: "",
 					previewRefreshToken: 0,
 					previewOverride: null,
-				},
+					previewRenderVersion: `preview:${item.virtualKey}`,
+					settings: DEFAULT_SETTINGS,
+				}),
 			}),
 		);
 		resetCCLDevMeasurements();
@@ -375,9 +354,7 @@ describe("TwoHopSurface", () => {
 		expect(host).not.toBeNull();
 		expect(getPreview).not.toHaveBeenCalled();
 
-		previewSurfaceCalls.commitBindingDelta.mockClear();
-		previewSurfaceCalls.acceptCommittedFrame.mockClear();
-		previewSurfaceCalls.setPreviewWindow.mockClear();
+		previewSurfaceCalls.publish.mockClear();
 		await rerender({
 			...harnessProps,
 			previewActive: true,
@@ -393,11 +370,10 @@ describe("TwoHopSurface", () => {
 
 		await waitFor(() => expect(host?.dataset.previewState).toBe("committed"));
 		expect(host?.querySelector("img")).not.toBeNull();
-		expect(previewSurfaceCalls.commitBindingDelta).not.toHaveBeenCalled();
-		expect(previewSurfaceCalls.acceptCommittedFrame).not.toHaveBeenCalled();
-		expect(previewSurfaceCalls.setPreviewWindow.mock.calls.at(-1)?.[0].active).toBe(
-			true,
-		);
+		expect(previewSurfaceCalls.publish).toHaveBeenCalled();
+		expect(
+			previewSurfaceCalls.publish.mock.calls.at(-1)?.[0].previewWindow.active,
+		).toBe(true);
 		expect(
 			getCCLDevMeasurementSnapshot().counters["component.ViewItemCard.reevaluate"]
 				.count,
@@ -433,9 +409,8 @@ describe("TwoHopSurface", () => {
 				searchScope: "title-and-content",
 				contentPreview: undefined,
 				previewRefreshToken: 0,
-				previewActivationIdentity: undefined,
 				previewOverride: null,
-				previewSnapshot: null,
+				previewRequest: null,
 			}),
 		);
 		const linkContext = {
@@ -476,9 +451,8 @@ describe("TwoHopSurface", () => {
 				searchScope: "title-and-content",
 				contentPreview: undefined,
 				previewRefreshToken: 0,
-				previewActivationIdentity: undefined,
 				previewOverride: null,
-				previewSnapshot: null,
+				previewRequest: null,
 			}),
 		);
 		const linkContext = {
@@ -634,9 +608,8 @@ describe("TwoHopSurface", () => {
 				searchScope: "title-and-content",
 				contentPreview: undefined,
 				previewRefreshToken: 0,
-				previewActivationIdentity: undefined,
 				previewOverride: null,
-				previewSnapshot: null,
+				previewRequest: null,
 			}),
 		);
 		const linkContext = {

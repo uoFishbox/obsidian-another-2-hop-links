@@ -6,19 +6,17 @@ import {
 } from "./fencedCodeBlocks";
 import { findCaseInsensitiveIndex } from "./searchUtils";
 import type { TextTransformContext } from "./types";
-import type { PluginSettings } from "features/settings/model";
 
-export type PreviewSnippetSettings = Pick<
-	PluginSettings,
-	| "cardWidthPx"
-	| "cardHeightRatio"
-	| "previewMaxLines"
-	| "previewMaxChars"
-	| "previewVisualLineSafetyMargin"
-	| "searchPreviewSeekThresholdChars"
-	| "searchPreviewSeekBufferChars"
-	| "renderCodeBlockTypes"
->;
+export interface PreviewSnippetSettings {
+	readonly cardWidthPx: number;
+	readonly cardHeightRatio: number;
+	readonly previewMaxLines: number;
+	readonly previewMaxChars: number;
+	readonly previewVisualLineSafetyMargin: number;
+	readonly searchPreviewSeekThresholdChars?: number;
+	readonly searchPreviewSeekBufferChars?: number;
+	readonly renderCodeBlockTypes: readonly string[];
+}
 
 export interface GetContentSnippetOptions {
 	firstMatchIndex?: number;
@@ -821,7 +819,7 @@ export function renderPreparedContentSnippet(
 
 export function getContentSnippet(
 	content: string,
-	settings?: PluginSettings,
+	settings?: PreviewSnippetSettings,
 	searchQuery?: string,
 	searchOptions?: GetContentSnippetOptions,
 ): string {

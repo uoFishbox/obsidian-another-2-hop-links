@@ -1,159 +1,90 @@
 <script lang="ts">
-	import type { TFile } from "obsidian";
-	import { untrack } from "svelte";
 	import { getDebugDisableCardDomPreview } from "appConstants";
-	import type { PreviewData } from "ui/context/linkContext";
 	import { useAppContext } from "ui/context/linkContext";
 	import { getVirtualFrameCoordinatorContext } from "ui/virtualization/svelte/frameCoordinatorContext.svelte";
-	import type { CardPreviewSnapshot } from "./cardPreviewSnapshot";
-	import {
-		createCardPreviewRenderer,
-		type CardPreviewLoader,
-		type CardPreviewRetention,
-	} from "./cardPreviewRenderer";
-	import { createCardPreviewRenderRequestResolver } from "./cardPreviewRenderRequest";
+	import type { CardPreviewRequest } from "features/preview/core/cardPreviewRequest";
+	import type {
+		PreviewRuntime,
+		PreviewRuntimeRendererOptions,
+	} from "features/preview/runtime/previewRuntime";
 	import SkeletonPreview from "./SkeletonPreview.svelte";
+	import {
+		createPreviewSlotController,
+		type PreviewSlotController,
+		type PreviewSlotState,
+	} from "./previewSlotController";
 
 	interface Props {
-		bindingIdentity?: string;
-		renderSnapshot?: CardPreviewSnapshot;
-		getPreview: CardPreviewLoader;
-		/** @deprecated Use renderSnapshot. Retained for non-virtual callers. */
-		file?: TFile;
-		/** @deprecated Use renderSnapshot. */
-		searchQuery?: string;
-		/** @deprecated Use renderSnapshot. */
-		previewRefreshToken?: number;
-		/** @deprecated Use renderSnapshot. */
-		previewOverride?: PreviewData | null;
+		request: CardPreviewRequest | null;
+		/** Explicit runtime boundary used by isolated consumers and tests. */
+		previewRuntime?: PreviewRuntime;
 	}
 
-	let {
-		bindingIdentity = undefined,
-		renderSnapshot = undefined,
-		getPreview,
-		file = undefined,
-		searchQuery = "",
-		previewRefreshToken = 0,
-		previewOverride = null,
-	}: Props = $props();
+	let { request, previewRuntime: explicitPreviewRuntime }: Props = $props();
 	let container = $state<HTMLDivElement | undefined>(undefined);
-	let isMathRendering = $state(false);
-	let hasRenderedContent = $state(false);
-	let previewContentType = $state<PreviewData["type"] | undefined>(undefined);
-	let committedIdentity = $state<string | undefined>(undefined);
-	let committedRetention = $state<CardPreviewRetention | undefined>(undefined);
-	let isCommittedDormant = $state(false);
-	let lifecycleCleanupHandle: number | undefined;
-
-	const { app, applicationStore, resolveSearchMatchPosition } = useAppContext();
-	const resolveRenderRequest = createCardPreviewRenderRequestResolver();
-	const effectiveBindingIdentity = $derived(
-		bindingIdentity ?? renderSnapshot?.identity ?? file?.path ?? "",
-	);
-	const effectiveRenderSnapshot = $derived.by(() => {
-		if (renderSnapshot) return renderSnapshot;
-		if (!file) return undefined;
-		return {
-			identity: effectiveBindingIdentity,
-			file,
-			searchQuery,
-			previewRefreshToken,
-			previewOverride,
-		} satisfies CardPreviewSnapshot;
+	let slotState = $state<PreviewSlotState>({
+		phase: "empty",
+		hasContent: false,
+		isMathRendering: false,
 	});
-	const renderPreview = createCardPreviewRenderer({
-		app,
-		getPreview: (targetFile, signal, options) =>
-			getPreview(targetFile, signal, options),
+	let controller: PreviewSlotController;
+
+	const {
+		applicationStore,
+		previewRuntime: contextPreviewRuntime,
+		resolveSearchMatchPosition,
+	} = useAppContext();
+	const previewRuntime = explicitPreviewRuntime ?? contextPreviewRuntime;
+	if (!previewRuntime) {
+		throw new TypeError("CardPreview requires a PreviewRuntime");
+	}
+	const rendererOptions: PreviewRuntimeRendererOptions = {
 		frameCoordinator: getVirtualFrameCoordinatorContext(),
 		getDomCommitsPerSecond: () =>
 			applicationStore.settings.previewDomCommitsPerSecond,
 		resolveSearchMatchPosition,
 		onMathRenderingChange: (isRendering) => {
-			isMathRendering = isRendering;
+			controller?.setMathRendering(isRendering);
 		},
-		onCommitted: (identity, contentType, retention) => {
-			committedIdentity = identity;
-			committedRetention = retention;
-			previewContentType = contentType;
-			isCommittedDormant = false;
-		},
-		onRendered: () => {
-			hasRenderedContent = true;
+		onCommitted: () => {},
+		onRendered: () => {},
+	};
+	const renderPreview = previewRuntime.createRenderer(rendererOptions);
+
+	const ownerToken = {};
+	controller = createPreviewSlotController({
+		createRenderer: () => renderPreview,
+		onStateChange: (nextState) => {
+			slotState = nextState;
 		},
 	});
-
-	const shouldShowInitialSkeleton = $derived(isMathRendering && !hasRenderedContent);
+	const shouldShowInitialSkeleton = $derived(
+		slotState.isMathRendering && !slotState.hasContent,
+	);
 	const previewTypeClass = $derived(
-		previewContentType
-			? `cosense-card-links__box-preview--${previewContentType}`
+		slotState.contentType
+			? `cosense-card-links__box-preview--${slotState.contentType}`
 			: "",
 	);
-	const previewRenderRequest = $derived.by(() => {
-		const snapshot = effectiveRenderSnapshot;
-		if (!snapshot) return null;
-
-		return resolveRenderRequest(
-			snapshot.file,
-			snapshot.previewRefreshToken,
-			snapshot.previewOverride,
-			applicationStore.getPreviewRenderVersion?.(snapshot.file.path) ?? "0:0",
-			snapshot.searchQuery,
-			applicationStore.settings,
-		);
-	});
 	const isStale = $derived(
-		committedIdentity !== effectiveBindingIdentity || isCommittedDormant,
+		slotState.phase === "stale" || slotState.phase === "dormant",
 	);
-
-	function cancelLifecycleCleanup(): void {
-		if (lifecycleCleanupHandle === undefined) return;
-		cancelIdleCallback(lifecycleCleanupHandle);
-		lifecycleCleanupHandle = undefined;
-	}
-
-	function scheduleLifecycleCleanup(identity: string): void {
-		cancelLifecycleCleanup();
-		lifecycleCleanupHandle = requestIdleCallback(() => {
-			lifecycleCleanupHandle = undefined;
-			if (!container || committedIdentity !== identity) return;
-			if (effectiveRenderSnapshot?.identity === identity) return;
-			container.replaceChildren();
-		});
-	}
 
 	$effect(() => {
 		if (!container) return;
-
-		const request = previewRenderRequest;
-		const identity = effectiveBindingIdentity;
-		if (!request) {
-			isMathRendering = false;
-			const retention = untrack(() => committedRetention);
-			const committed = untrack(() => committedIdentity);
-			if (retention === "lifecycle-bound" && committed) {
-				isCommittedDormant = true;
-				scheduleLifecycleCleanup(committed);
-			}
-			return;
-		}
-
-		cancelLifecycleCleanup();
-		const committed = untrack(() => committedIdentity);
-		const retention = untrack(() => committedRetention);
-		if (
-			bindingIdentity !== undefined &&
-			committed === identity &&
-			retention === "resident"
-		) {
-			return;
-		}
-
-		return renderPreview(container, request, identity);
+		return controller.attachHost(container).dispose;
 	});
 
-	$effect(() => cancelLifecycleCleanup);
+	$effect(() => {
+		controller.bind(request ? { ownerToken, request } : null);
+		controller.setActive(request !== null);
+		// This component is the immediate path for a single or small number of
+		// cards. Bulk surfaces must use PreviewHost and VirtualPreviewSurface so
+		// activation remains subject to runtime admission and fairness.
+		if (request) controller.activate();
+	});
+
+	$effect(() => controller.dispose);
 </script>
 
 {#if !getDebugDisableCardDomPreview()}

@@ -22,6 +22,12 @@ import {
 	teardownIntersectionObserverMock,
 	triggerIntersection,
 } from "testing/helpers/DOMObserverMock";
+import {
+	createPreviewRuntime,
+	type PreviewRuntime,
+} from "features/preview/runtime/previewRuntime";
+
+const previewRuntimes = new Set<PreviewRuntime>();
 
 vi.mock("features/search/searchWorkerClient", async () => {
 	const { filterSearchWorkerDataset } =
@@ -289,12 +295,19 @@ function createRootProps(
 		onHop2Click: vi.fn(),
 		onTagClick: vi.fn(),
 	};
+	const app = {} as never;
+	const previewRuntime = createPreviewRuntime({
+		app,
+		getPreview: linkContext.getPreview,
+	});
+	previewRuntimes.add(previewRuntime);
 
 	return {
 		file: originFile,
 		linkContext,
 		applicationStore,
-		app: {} as never,
+		app,
+		previewRuntime,
 		lazyLoaderCache: new Set<string>(),
 		isSidebar: false,
 	} as unknown as ComponentProps<typeof TwoHopLinksPage>;
@@ -324,6 +337,8 @@ describe("TwoHopLinksPage descriptor plumbing", () => {
 	});
 
 	afterEach(() => {
+		for (const runtime of previewRuntimes) runtime.dispose();
+		previewRuntimes.clear();
 		teardownIntersectionObserverMock();
 		vi.useRealTimers();
 	});
@@ -382,8 +397,7 @@ describe("TwoHopLinksPage descriptor plumbing", () => {
 		const surface = screen.getByTestId("two-hop-surface-stub");
 		const capturedProps = getTwoHopSurfacePageStubProps();
 		expect(surface.dataset.hasPreviewDependencies).toBe("true");
-		expect(surface.dataset.hasPreviewLoader).toBe("true");
-		expect(surface.dataset.settingsGetterMatches).toBe("true");
+		expect(surface.dataset.hasPreviewRuntime).toBe("true");
 		expect(surface.dataset.hasSearchPositionResolver).toBe("true");
 		expect(surface.dataset.previewActive).toBe("false");
 
@@ -394,20 +408,9 @@ describe("TwoHopLinksPage descriptor plumbing", () => {
 		expect(surface.dataset.previewActive).toBe("true");
 
 		expect(capturedProps?.applicationStore).toBe(rootProps.applicationStore);
-		expect(capturedProps?.previewDependencies?.getPreview).toBe(
-			rootProps.linkContext.getPreview,
+		expect(capturedProps?.previewDependencies?.previewRuntime).toBe(
+			rootProps.previewRuntime,
 		);
-		expect(capturedProps?.previewDependencies?.app).toBe(rootProps.app);
-		expect(capturedProps?.previewDependencies?.getSettings()).toBe(
-			rootProps.applicationStore.settings,
-		);
-
-		const nextSettings = {
-			...settings,
-			previewDomCommitsPerSecond: settings.previewDomCommitsPerSecond + 1,
-		};
-		rootProps.applicationStore.settings = nextSettings;
-		expect(capturedProps?.previewDependencies?.getSettings()).toBe(nextSettings);
 	});
 
 	it("propagates item count changes for the same sectionId (memo regression)", async () => {

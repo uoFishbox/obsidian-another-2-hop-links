@@ -33,7 +33,7 @@
 		getKey={(model) => model.interactionKey}
 		initialVisibleCount={models.length}
 		{applicationStore}
-		resolveItemPreviewSnapshot={(model) => model.previewSnapshot}
+		resolveItemPreviewRequest={(model) => model.previewRequest}
 		resolveItemInteractionDescriptor={(model) => model.interactionDescriptor}
 		remountCellBodyOnKeyChange={false}
 	>

@@ -1,15 +1,15 @@
-import type { CardPreviewSnapshot } from "features/preview/ui/cardPreviewSnapshot";
+import type { CardPreviewRequest } from "features/preview/core/cardPreviewRequest";
 import type { RowRange } from "ui/virtualization/rowRange";
 
 export interface RowPreviewCardBinding {
 	readonly slotId: string;
 	readonly rowIndex: number;
-	readonly snapshot: CardPreviewSnapshot;
+	readonly request: CardPreviewRequest;
 	/**
 	 * Opaque desired-state reference. Preview cache identities must not be used
 	 * to prove ownership of a physical host.
 	 */
-	readonly currentnessToken?: object;
+	readonly ownerToken: object;
 }
 
 export interface RowPreviewBindingDelta {
@@ -23,13 +23,10 @@ export interface RowPreviewWindow {
 	readonly active: boolean;
 }
 
-/** Preview projection published as part of an atomic virtual frame. */
-export interface VirtualPreviewCommittedFrame {
+/** Immutable preview projection published as part of one atomic frame. */
+export interface PreviewFrame {
+	/** Monotonic publication number used for diagnostics and currentness traces. */
+	readonly generation: number;
 	readonly previewBindingsBySlot: ReadonlyMap<string, RowPreviewCardBinding>;
 	readonly previewWindow: RowPreviewWindow;
-}
-
-/** Stable source whose current frame changes through one reference assignment. */
-export interface VirtualPreviewCommittedFrameSource {
-	readonly current: VirtualPreviewCommittedFrame;
 }

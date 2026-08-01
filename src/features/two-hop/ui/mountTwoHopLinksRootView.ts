@@ -59,6 +59,7 @@ export function mountTwoHopLinksRootView(
 			linkContext,
 			applicationStore,
 			app: plugin.app,
+			previewRuntime: plugin.getPreviewRuntime?.(),
 			lazyLoaderCache,
 			isSidebar,
 			updateSetting,

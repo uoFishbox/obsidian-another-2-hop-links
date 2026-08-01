@@ -1,41 +1,34 @@
-import type { App, Pos, TFile } from "obsidian";
 import {
-	createPreviewActivationScope,
-	disposePreviewActivationScope,
-	requestQueuedPreviewActivation,
 	type PreviewActivationHandle,
+	type PreviewActivationScheduler,
 	type PreviewActivationScope,
 	type PreviewBackpressure,
 	type PreviewBackpressureListener,
-} from "features/preview/scheduling/previewActivationScheduler";
-import { createPreviewFrameDriver } from "features/preview/scheduling/previewFrameDriver";
+} from "./previewActivationScheduler";
+import { createPreviewFrameDriver } from "./previewFrameDriver";
+import type { CardPreviewRenderer } from "features/preview/ui/cardPreviewRenderer";
+import type { CardPreviewRequest } from "features/preview/core/cardPreviewRequest";
 import {
-	createCardPreviewRenderer,
-	type CardPreviewLoader,
-	type CardPreviewRenderer,
-	type CardPreviewRetention,
-} from "features/preview/ui/cardPreviewRenderer";
-import { createCardPreviewRenderRequestResolver } from "features/preview/ui/cardPreviewRenderRequest";
-import type { PreviewData } from "features/preview/public-types";
-import type { PluginSettings } from "features/settings/model";
+	createPreviewSlotController,
+	type PreviewSlotController,
+	type PreviewSlotPhase,
+} from "features/preview/ui/previewSlotController";
 import type { RowRange } from "ui/virtualization/rowRange";
 import type { VirtualFrameCoordinator } from "ui/virtualization/scheduling/frameCoordinator";
 import type {
+	PreviewFrame,
 	RowPreviewBindingDelta,
 	RowPreviewCardBinding,
 	RowPreviewWindow,
-	VirtualPreviewCommittedFrame,
-	VirtualPreviewCommittedFrameSource,
 } from "./rowPreviewTypes";
-import { recordCCLDevMeasurement } from "infrastructure/debug/CCLDevMeasurements";
 
 export type {
+	PreviewFrame,
 	RowPreviewBindingDelta,
 	RowPreviewCardBinding,
 	RowPreviewWindow,
-	VirtualPreviewCommittedFrame,
-	VirtualPreviewCommittedFrameSource,
 } from "./rowPreviewTypes";
+export type PreviewHostPhase = PreviewSlotPhase;
 
 export interface PreviewHostLease {
 	dispose(): void;
@@ -43,26 +36,12 @@ export interface PreviewHostLease {
 
 export interface VirtualPreviewSurface {
 	registerHost(slotId: string, element: HTMLElement): PreviewHostLease;
-	/**
-	 * Reconciles imperative preview resources against one atomic frame source.
-	 * The source, not the staged sidecar state, remains authoritative.
-	 */
-	acceptCommittedFrame(source: VirtualPreviewCommittedFrameSource): void;
-	syncBindingDelta(delta: RowPreviewBindingDelta): void;
-	setPreviewWindow(window: RowPreviewWindow): void;
-	commitBindingDelta(delta: RowPreviewBindingDelta, window: RowPreviewWindow): void;
+	/** Publishes one immutable desired frame for the whole surface. */
+	publish(frame: PreviewFrame): void;
 	dispose(): void;
 }
 
 export interface CreateVirtualPreviewSurfaceOptions {
-	readonly app?: App;
-	readonly getPreview?: CardPreviewLoader;
-	readonly getSettings: () => PluginSettings;
-	readonly getPreviewRenderVersion: (filePath: string) => string;
-	readonly resolveSearchMatchPosition?: (
-		query: string,
-		file: TFile | null | undefined,
-	) => Pos | undefined;
 	readonly getBackpressure?: () => PreviewBackpressure;
 	readonly subscribeBackpressure?: (
 		listener: PreviewBackpressureListener,
@@ -70,76 +49,30 @@ export interface CreateVirtualPreviewSurfaceOptions {
 	readonly schedulerIdentity?: object;
 	readonly frameCoordinator?: VirtualFrameCoordinator;
 	readonly getActivationsPerSecond?: () => number;
-	readonly getDomCommitsPerSecond?: () => number;
-	/** Optional renderer boundary used by isolated surface tests. */
-	readonly createRenderer?: () => CardPreviewRenderer;
-}
-
-export type PreviewHostPhase = "empty" | "loading" | "committed" | "dormant" | "stale";
-
-interface PreviewHostState {
-	readonly phase: PreviewHostPhase;
-	readonly contentType?: PreviewData["type"];
-	readonly hasContent: boolean;
-}
-
-interface PreviewOperationToken {
-	readonly host: HTMLElement;
-	readonly currentnessToken: object;
-	readonly operationEpoch: number;
-}
-
-interface PreviewActiveJob {
-	readonly operationEpoch: number;
-	readonly cancel: () => void;
-}
-
-interface PreviewCommittedLease {
-	readonly identity: string;
-	readonly host: HTMLElement;
-	readonly dispose: () => void;
+	readonly activationScheduler: PreviewActivationScheduler;
+	readonly createRenderer: () => CardPreviewRenderer;
+	readonly hasCachedPreview: (renderKey: string) => boolean;
 }
 
 interface PreviewSlotRuntime {
 	readonly slotId: string;
+	readonly controller: PreviewSlotController;
 	binding?: RowPreviewCardBinding;
-	bindingIdentity?: string;
-	bindingCurrentnessToken?: object;
-	bindingRowIndex?: number;
-	host?: {
-		element: HTMLElement;
-		appliedState?: PreviewHostState;
-	};
-	operationEpoch: number;
-	activeJob?: PreviewActiveJob;
-	committedLease?: PreviewCommittedLease;
-	lifecycleCleanupHandle?: number;
-	renderer?: CardPreviewRenderer;
-	resolveRenderRequest: ReturnType<typeof createCardPreviewRenderRequestResolver>;
-	committed?: {
-		identity: string;
-		contentType: PreviewData["type"] | undefined;
-		retention: CardPreviewRetention;
-		host: HTMLElement;
-	};
-	phase: PreviewHostPhase;
+	rowIndex?: number;
 }
 
 const EMPTY_RANGE: RowRange = { start: 0, end: 0 };
 const PREVIEW_SIDECAR_FLUSH_KEY = "two-hop:preview-sidecar-flush";
 
-/** Owns imperative preview DOM and lifecycle for one virtual surface. */
+/** Owns frame reconciliation and activation policy for one virtual surface. */
 export function createVirtualPreviewSurface(
 	options: CreateVirtualPreviewSurfaceOptions,
 ): VirtualPreviewSurface {
 	const slotsById = new Map<string, PreviewSlotRuntime>();
-	const pendingByIdentity = new Map<string, PreviewActivationHandle>();
-	const activationIdentities = new Set<string>();
-	let stagedBindingsBySlot = new Map<string, RowPreviewCardBinding | null>();
-	let flushingBindingsBySlot = new Map<string, RowPreviewCardBinding | null>();
-	let stagedInvalidatedSlots = new Set<string>();
-	let flushingInvalidatedSlots = new Set<string>();
-	const scope: PreviewActivationScope = createPreviewActivationScope({
+	const pendingBySlotId = new Map<string, PreviewActivationHandle>();
+	const activationSlotIds = new Set<string>();
+	const activationScheduler = options.activationScheduler;
+	const scope: PreviewActivationScope = activationScheduler.createScope({
 		getBackpressure: options.getBackpressure,
 		subscribeBackpressure: options.subscribeBackpressure,
 		schedulerIdentity: options.schedulerIdentity,
@@ -147,14 +80,13 @@ export function createVirtualPreviewSurface(
 		getActivationsPerSecond: options.getActivationsPerSecond,
 	});
 	let previewRange: RowRange = EMPTY_RANGE;
-	let stagedPreviewRange: RowRange | undefined;
-	let committedFrameSource: VirtualPreviewCommittedFrameSource | undefined;
-	let acceptedFrame: VirtualPreviewCommittedFrame | undefined;
+	let desiredFrame: PreviewFrame | undefined;
+	let appliedFrame: PreviewFrame | undefined;
 	let disposed = false;
-	const stagedFlushDriver = createPreviewFrameDriver({
+	const frameFlushDriver = createPreviewFrameDriver({
 		coordinator: options.frameCoordinator,
 		taskKey: PREVIEW_SIDECAR_FLUSH_KEY,
-		onFrame: flushStagedPreviewChanges,
+		onFrame: applyDesiredFrame,
 	});
 
 	function getOrCreateSlot(slotId: string): PreviewSlotRuntime {
@@ -162,615 +94,263 @@ export function createVirtualPreviewSurface(
 		if (existing) return existing;
 		const slot: PreviewSlotRuntime = {
 			slotId,
-			operationEpoch: 0,
-			resolveRenderRequest: createCardPreviewRenderRequestResolver(),
-			phase: "empty",
+			controller: createPreviewSlotController({
+				createRenderer: options.createRenderer,
+				hasCachedPreview: options.hasCachedPreview,
+			}),
 		};
 		slotsById.set(slotId, slot);
 		return slot;
 	}
 
 	function isInPreviewRange(slot: PreviewSlotRuntime): boolean {
-		const rowIndex = slot.bindingRowIndex;
 		return (
-			rowIndex !== undefined &&
-			rowIndex >= previewRange.start &&
-			rowIndex < previewRange.end
+			slot.rowIndex !== undefined &&
+			slot.rowIndex >= previewRange.start &&
+			slot.rowIndex < previewRange.end
 		);
 	}
 
-	function isCurrent(
-		slot: PreviewSlotRuntime,
-		token: PreviewOperationToken,
-	): boolean {
-		const committedBinding =
-			committedFrameSource?.current.previewBindingsBySlot.get(slot.slotId);
-		if (committedFrameSource) {
-			return (
-				!disposed &&
-				slot.operationEpoch === token.operationEpoch &&
-				resolveCurrentnessToken(committedBinding) === token.currentnessToken &&
-				slot.host?.element === token.host
-			);
-		}
-		const desiredBinding = stagedBindingsBySlot.has(slot.slotId)
-			? stagedBindingsBySlot.get(slot.slotId)
-			: slot.binding;
-		return (
-			!disposed &&
-			slot.operationEpoch === token.operationEpoch &&
-			slot.host?.element === token.host &&
-			resolveCurrentnessToken(desiredBinding) === token.currentnessToken
-		);
-	}
-
-	function applySlotState(slot: PreviewSlotRuntime): void {
-		const host = slot.host;
-		if (!host) return;
-		const element = host.element;
-		const nextState: PreviewHostState = {
-			phase: slot.phase,
-			contentType: slot.committed?.contentType,
-			hasContent: slot.committed?.host === element && !!element.firstChild,
-		};
-		applyHostState(element, host.appliedState, nextState);
-		host.appliedState = nextState;
-	}
-
-	function cancelLifecycleCleanup(slot: PreviewSlotRuntime): void {
-		if (slot.lifecycleCleanupHandle === undefined) return;
-		window.cancelIdleCallback(slot.lifecycleCleanupHandle);
-		slot.lifecycleCleanupHandle = undefined;
-	}
-
-	function cancelActiveJob(slot: PreviewSlotRuntime): void {
-		const activeJob = slot.activeJob;
-		slot.activeJob = undefined;
-		activeJob?.cancel();
-	}
-
-	function disposeCommittedLease(slot: PreviewSlotRuntime): void {
-		const committedLease = slot.committedLease;
-		slot.committedLease = undefined;
-		committedLease?.dispose();
-	}
-
-	function stopRender(slot: PreviewSlotRuntime): void {
-		slot.operationEpoch += 1;
-		cancelActiveJob(slot);
-		disposeCommittedLease(slot);
-		if (process.env.NODE_ENV !== "production") {
-			recordCCLDevMeasurement("twoHop.preview.stopRender");
-		}
-	}
-
-	function clearCommittedDom(slot: PreviewSlotRuntime): void {
-		disposeCommittedLease(slot);
-		const element = slot.host?.element;
-		if (element) element.replaceChildren();
-		slot.committed = undefined;
-	}
-
-	function scheduleLifecycleCleanup(slot: PreviewSlotRuntime): void {
-		cancelLifecycleCleanup(slot);
-		const slotEpoch = slot.operationEpoch;
-		const host = slot.host?.element;
-		const identity = slot.committed?.identity;
-		if (!host || !identity) return;
-
-		slot.lifecycleCleanupHandle = window.requestIdleCallback(() => {
-			slot.lifecycleCleanupHandle = undefined;
-			if (disposed || isInPreviewRange(slot)) return;
-			if (slot.operationEpoch !== slotEpoch) return;
-			if (slot.host?.element !== host) return;
-			if (slot.committed?.identity !== identity) return;
-			clearCommittedDom(slot);
-			slot.phase = "dormant";
-			applySlotState(slot);
-		});
-	}
-
-	function createRenderer(slot: PreviewSlotRuntime): CardPreviewRenderer | undefined {
-		if (slot.renderer) return slot.renderer;
-		if (options.createRenderer) {
-			slot.renderer = options.createRenderer();
-			return slot.renderer;
-		}
-		if (!options.app || !options.getPreview) return undefined;
-		slot.renderer = createCardPreviewRenderer({
-			app: options.app,
-			getPreview: options.getPreview,
-			frameCoordinator: options.frameCoordinator,
-			getDomCommitsPerSecond: options.getDomCommitsPerSecond,
-			resolveSearchMatchPosition: options.resolveSearchMatchPosition,
-			onMathRenderingChange: () => {},
-			onCommitted: () => {},
-			onRendered: () => {},
-		});
-		return slot.renderer;
-	}
-
-	function activateSlot(slot: PreviewSlotRuntime): void {
-		const binding = slot.binding;
-		const host = slot.host;
-		if (!binding || !host || !isInPreviewRange(slot)) return;
-		if (
-			slot.committed?.identity === binding.snapshot.identity &&
-			slot.committed.retention === "resident" &&
-			slot.committed.host === host.element &&
-			slot.phase !== "dormant" &&
-			slot.phase !== "stale"
-		) {
-			return;
-		}
-
-		const renderer = createRenderer(slot);
-		if (!renderer) return;
-		cancelLifecycleCleanup(slot);
-		stopRender(slot);
-		const token: PreviewOperationToken = {
-			host: host.element,
-			currentnessToken: resolveCurrentnessToken(binding)!,
-			operationEpoch: slot.operationEpoch,
-		};
-		const request = slot.resolveRenderRequest(
-			binding.snapshot.file,
-			binding.snapshot.previewRefreshToken,
-			binding.snapshot.previewOverride,
-			options.getPreviewRenderVersion(binding.snapshot.file.path),
-			binding.snapshot.searchQuery,
-			options.getSettings(),
-		);
-		if (!request) return;
-
-		let rendererCleanup: (() => void) | undefined;
-		let renderResourceReleased = false;
-		const cancelRenderResource = (): void => {
-			if (renderResourceReleased) return;
-			renderResourceReleased = true;
-			rendererCleanup?.();
-		};
-		const activeJob: PreviewActiveJob = {
-			operationEpoch: token.operationEpoch,
-			cancel: cancelRenderResource,
-		};
-		slot.activeJob = activeJob;
-
-		try {
-			rendererCleanup = renderer(
-				host.element,
-				request,
-				binding.snapshot.identity,
-				{
-					isCurrent: () => isCurrent(slot, token),
-					onLoadingChange: (isLoading) => {
-						if (!isCurrent(slot, token)) return;
-						if (isLoading) {
-							slot.phase = slot.committed ? "stale" : "loading";
-							applySlotState(slot);
-						}
-					},
-					onCommitted: (contentType, retention) => {
-						if (!isCurrent(slot, token)) return;
-						slot.committed = {
-							identity: binding.snapshot.identity,
-							contentType,
-							retention,
-							host: token.host,
-						};
-						slot.committedLease = {
-							identity: binding.snapshot.identity,
-							host: token.host,
-							dispose: activeJob.cancel,
-						};
-						slot.phase = "committed";
-						applySlotState(slot);
-					},
-					onRendered: () => {
-						if (!isCurrent(slot, token)) return;
-						if (slot.activeJob === activeJob) {
-							slot.activeJob = undefined;
-						}
-					},
-					onError: () => {
-						if (!isCurrent(slot, token)) return;
-						slot.operationEpoch += 1;
-						cancelActiveJob(slot);
-						disposeCommittedLease(slot);
-						const hasCurrentResident =
-							slot.committed?.retention === "resident" &&
-							slot.committed.host === token.host;
-						slot.phase = hasCurrentResident ? "stale" : "empty";
-						if (!hasCurrentResident) clearCommittedDom(slot);
-						applySlotState(slot);
-					},
-				},
-			);
-		} catch (error) {
-			if (slot.activeJob === activeJob) slot.activeJob = undefined;
-			activeJob.cancel();
-			throw error;
-		}
-		if (renderResourceReleased) rendererCleanup?.();
-		if (!isCurrent(slot, token)) {
-			if (slot.activeJob === activeJob) slot.activeJob = undefined;
-			activeJob.cancel();
-		}
-	}
-
-	function activateIdentity(identity: string): void {
+	function activateQueuedSlot(slotId: string): void {
 		if (disposed) return;
-		for (const slot of slotsById.values()) {
-			if (slot.binding?.snapshot.identity !== identity) continue;
-			activateSlot(slot);
-		}
+		pendingBySlotId.delete(slotId);
+		slotsById.get(slotId)?.controller.activate();
 	}
 
-	function enqueueActivation(identity: string): void {
-		if (pendingByIdentity.has(identity)) return;
-		const handle = requestQueuedPreviewActivation(identity, scope, () => {
-			pendingByIdentity.delete(identity);
-			activateIdentity(identity);
+	function enqueueActivation(slotId: string): void {
+		if (pendingBySlotId.has(slotId)) return;
+		const handle = activationScheduler.request(slotId, scope, () => {
+			activateQueuedSlot(slotId);
 		});
-		pendingByIdentity.set(identity, handle);
-	}
-
-	function deactivateSlot(slot: PreviewSlotRuntime): void {
-		if (slot.committed?.retention === "resident") {
-			if (slot.committed.identity === slot.binding?.snapshot.identity) {
-				slot.phase = "committed";
-				applySlotState(slot);
-			}
-			return;
-		}
-		if (!slot.committed && !slot.activeJob && !slot.committedLease) return;
-		stopRender(slot);
-		slot.phase = "dormant";
-		applySlotState(slot);
-		scheduleLifecycleCleanup(slot);
+		pendingBySlotId.set(slotId, handle);
 	}
 
 	function reconcile(): void {
-		activationIdentities.clear();
+		activationSlotIds.clear();
 		for (const slot of slotsById.values()) {
-			if (!slot.binding) continue;
-			if (!isInPreviewRange(slot)) {
-				deactivateSlot(slot);
-				continue;
-			}
-			cancelLifecycleCleanup(slot);
-			const isReusableResident =
-				slot.committed?.identity === slot.binding.snapshot.identity &&
-				slot.committed.retention === "resident" &&
-				slot.committed.host === slot.host?.element &&
-				slot.phase === "committed";
-			if (!isReusableResident && !slot.activeJob) {
-				activationIdentities.add(slot.binding.snapshot.identity);
-			}
+			const isActive = Boolean(slot.binding && isInPreviewRange(slot));
+			slot.controller.setActive(isActive);
+			if (!isActive || !slot.controller.needsActivation()) continue;
+			if (slot.controller.hasCachedPreview()) slot.controller.activate();
+			else activationSlotIds.add(slot.slotId);
 		}
-		for (const [identity, handle] of pendingByIdentity) {
-			if (activationIdentities.has(identity)) continue;
+		for (const [slotId, handle] of pendingBySlotId) {
+			if (activationSlotIds.has(slotId)) continue;
 			handle.cancel();
-			pendingByIdentity.delete(identity);
+			pendingBySlotId.delete(slotId);
 		}
-		for (const identity of activationIdentities) enqueueActivation(identity);
-		activationIdentities.clear();
+		for (const slotId of activationSlotIds) enqueueActivation(slotId);
+		activationSlotIds.clear();
 	}
 
-	function bindCard(binding: RowPreviewCardBinding): void {
-		const slot = getOrCreateSlot(binding.slotId);
-		if (
-			slot.bindingCurrentnessToken === resolveCurrentnessToken(binding) &&
-			slot.bindingRowIndex === binding.rowIndex
-		) {
-			slot.binding = binding;
-			return;
-		}
-		cancelLifecycleCleanup(slot);
-		stopRender(slot);
-		slot.binding = binding;
-		slot.bindingIdentity = binding.snapshot.identity;
-		slot.bindingCurrentnessToken = resolveCurrentnessToken(binding);
-		slot.bindingRowIndex = binding.rowIndex;
-		if (slot.committed) {
-			slot.phase = "stale";
-		} else {
-			slot.phase = "empty";
-		}
-		applySlotState(slot);
-	}
-
-	function releaseSlot(slotId: string): void {
-		const slot = slotsById.get(slotId);
-		if (!slot) return;
-		cancelLifecycleCleanup(slot);
-		stopRender(slot);
-		slot.binding = undefined;
-		slot.bindingIdentity = undefined;
-		slot.bindingCurrentnessToken = undefined;
-		slot.bindingRowIndex = undefined;
-		clearCommittedDom(slot);
-		slot.phase = "empty";
-		applySlotState(slot);
-	}
-
-	function applyBindingDelta(delta: RowPreviewBindingDelta): void {
-		for (const slotId of delta.releasedSlots) releaseSlot(slotId);
-		for (const binding of delta.enteredSlots) bindCard(binding);
-		for (const binding of delta.reboundSlots) bindCard(binding);
-		if (process.env.NODE_ENV !== "production") {
-			for (let i = 0; i < delta.enteredSlots.length; i++) {
-				recordCCLDevMeasurement("twoHop.preview.entered");
-			}
-			for (let i = 0; i < delta.reboundSlots.length; i++) {
-				recordCCLDevMeasurement("twoHop.preview.rebound");
-			}
-			for (let i = 0; i < delta.releasedSlots.length; i++) {
-				recordCCLDevMeasurement("twoHop.preview.released");
-			}
-		}
-	}
-
-	function getDesiredBinding(
-		slotId: string,
-	): RowPreviewCardBinding | null | undefined {
-		if (stagedBindingsBySlot.has(slotId)) {
-			return stagedBindingsBySlot.get(slotId);
-		}
-		return slotsById.get(slotId)?.binding;
-	}
-
-	function stageBinding(slotId: string, binding: RowPreviewCardBinding | null): void {
-		const previous = getDesiredBinding(slotId);
-		if (!previous && !binding) return;
-
-		const ownershipChanged =
-			resolveCurrentnessToken(previous) !== resolveCurrentnessToken(binding);
-		const rowChanged = previous?.rowIndex !== binding?.rowIndex;
-		stagedBindingsBySlot.set(slotId, binding);
-		if (!ownershipChanged && !rowChanged) return;
-
-		const slot = getOrCreateSlot(slotId);
-		slot.operationEpoch += 1;
-		stagedInvalidatedSlots.add(slotId);
-		if (ownershipChanged) slot.host?.element.classList.add("is-stale");
-	}
-
-	function stageBindingDelta(delta: RowPreviewBindingDelta): void {
-		for (const slotId of delta.releasedSlots) stageBinding(slotId, null);
-		for (const binding of delta.enteredSlots) {
-			stageBinding(binding.slotId, binding);
-		}
-		for (const binding of delta.reboundSlots) {
-			stageBinding(binding.slotId, binding);
-		}
-	}
-
-	function flushStagedSlot(
-		slotId: string,
-		binding: RowPreviewCardBinding | null,
-		invalidatedSlots: ReadonlySet<string>,
-	): void {
-		const slot = getOrCreateSlot(slotId);
-		const invalidated = invalidatedSlots.has(slotId);
-		if (invalidated) {
-			cancelLifecycleCleanup(slot);
-			stopRender(slot);
-		}
-
-		if (!binding) {
-			slot.binding = undefined;
-			slot.bindingIdentity = undefined;
-			slot.bindingCurrentnessToken = undefined;
-			slot.bindingRowIndex = undefined;
-			clearCommittedDom(slot);
-			slot.phase = "empty";
-			applySlotState(slot);
-			return;
-		}
-
-		slot.binding = binding;
-		slot.bindingIdentity = binding.snapshot.identity;
-		slot.bindingCurrentnessToken = resolveCurrentnessToken(binding);
-		slot.bindingRowIndex = binding.rowIndex;
-		if (!invalidated) return;
-		slot.phase = slot.committed ? "stale" : "empty";
-		applySlotState(slot);
-	}
-
-	function flushStagedPreviewChanges(): void {
+	function applyDesiredFrame(): void {
 		if (disposed) return;
-		const bindings = stagedBindingsBySlot;
-		stagedBindingsBySlot = flushingBindingsBySlot;
-		flushingBindingsBySlot = bindings;
-		const invalidatedSlots = stagedInvalidatedSlots;
-		stagedInvalidatedSlots = flushingInvalidatedSlots;
-		flushingInvalidatedSlots = invalidatedSlots;
-		const nextRange = stagedPreviewRange;
-		stagedPreviewRange = undefined;
+		const frame = desiredFrame;
+		if (!frame || frame === appliedFrame) return;
+		const delta = diffPreviewBindings(
+			appliedFrame?.previewBindingsBySlot,
+			frame.previewBindingsBySlot,
+		);
+		previewRange = frame.previewWindow.active
+			? frame.previewWindow.previewRange
+			: EMPTY_RANGE;
 
-		if (nextRange) previewRange = nextRange;
-		for (const [slotId, binding] of bindings) {
-			flushStagedSlot(slotId, binding, invalidatedSlots);
+		for (const slotId of delta.releasedSlots) {
+			const slot = getOrCreateSlot(slotId);
+			slot.binding = undefined;
+			slot.rowIndex = undefined;
+			slot.controller.clear();
 		}
-		bindings.clear();
-		invalidatedSlots.clear();
+		for (const binding of [...delta.enteredSlots, ...delta.reboundSlots]) {
+			const slot = getOrCreateSlot(binding.slotId);
+			slot.binding = binding;
+			slot.rowIndex = binding.rowIndex;
+			slot.controller.bind({
+				ownerToken: binding.ownerToken,
+				request: binding.request,
+			});
+		}
+		appliedFrame = frame;
 		reconcile();
-	}
-
-	function flushPendingStageSynchronously(): void {
-		if (stagedBindingsBySlot.size === 0 && stagedPreviewRange === undefined) {
-			return;
-		}
-		stagedFlushDriver.cancel();
-		flushStagedPreviewChanges();
 	}
 
 	function registerHost(slotId: string, element: HTMLElement): PreviewHostLease {
 		const slot = getOrCreateSlot(slotId);
-		if (slot.host?.element !== element) {
-			cancelLifecycleCleanup(slot);
-			stopRender(slot);
-			clearCommittedDom(slot);
-			slot.host = { element };
-			slot.phase = "empty";
-			applySlotState(slot);
-			reconcile();
-		}
-		const leasedHost = slot.host.element;
-		let leaseDisposed = false;
-		return {
-			dispose(): void {
-				if (leaseDisposed) return;
-				leaseDisposed = true;
-				if (slot.host?.element !== leasedHost) return;
-				cancelLifecycleCleanup(slot);
-				stopRender(slot);
-				clearCommittedDom(slot);
-				slot.host = undefined;
-			},
-		};
+		const lease = slot.controller.attachHost(element);
+		reconcile();
+		return lease;
 	}
 
-	function acceptCommittedFrame(source: VirtualPreviewCommittedFrameSource): void {
+	function publish(frame: PreviewFrame): void {
 		if (disposed) return;
-		committedFrameSource = source;
-		const nextFrame = source.current;
-		if (acceptedFrame === nextFrame) return;
+		assertImmutablePreviewFrame(frame);
+		if (desiredFrame === frame) return;
 
-		const enteredSlots: RowPreviewCardBinding[] = [];
-		const reboundSlots: RowPreviewCardBinding[] = [];
-		const releasedSlots: string[] = [];
-		const previousBindings = acceptedFrame?.previewBindingsBySlot;
-		for (const slotId of previousBindings?.keys() ?? []) {
-			if (!nextFrame.previewBindingsBySlot.has(slotId)) {
-				releasedSlots.push(slotId);
-			}
-		}
-		for (const [slotId, binding] of nextFrame.previewBindingsBySlot) {
-			const previous = previousBindings?.get(slotId);
-			if (!previous) {
-				enteredSlots.push(binding);
-			} else if (previous !== binding) {
-				reboundSlots.push(binding);
-			}
-		}
-
-		acceptedFrame = nextFrame;
-		commitBindingDelta(
-			{ enteredSlots, reboundSlots, releasedSlots },
-			nextFrame.previewWindow,
+		const previousDesired = desiredFrame;
+		const delta = diffPreviewBindings(
+			previousDesired?.previewBindingsBySlot,
+			frame.previewBindingsBySlot,
 		);
-	}
+		desiredFrame = frame;
+		for (const slotId of delta.releasedSlots) {
+			getOrCreateSlot(slotId).controller.invalidate();
+		}
+		for (const binding of [...delta.enteredSlots, ...delta.reboundSlots]) {
+			const previousBinding = previousDesired?.previewBindingsBySlot.get(
+				binding.slotId,
+			);
+			if (previousBinding && isSameDesiredBinding(previousBinding, binding)) {
+				continue;
+			}
+			getOrCreateSlot(binding.slotId).controller.invalidate();
+		}
 
-	function syncBindingDelta(delta: RowPreviewBindingDelta): void {
-		if (disposed) return;
-		flushPendingStageSynchronously();
-		applyBindingDelta(delta);
-		reconcile();
-	}
-
-	function setPreviewWindow(window: RowPreviewWindow): void {
-		if (disposed) return;
-		flushPendingStageSynchronously();
-		previewRange = window.active ? window.previewRange : EMPTY_RANGE;
-		reconcile();
-	}
-
-	function commitBindingDelta(
-		delta: RowPreviewBindingDelta,
-		window: RowPreviewWindow,
-	): void {
-		if (disposed) return;
-		const hasBindingChanges =
+		const previousRange = previousDesired?.previewWindow.active
+			? previousDesired.previewWindow.previewRange
+			: EMPTY_RANGE;
+		const nextRange = frame.previewWindow.active
+			? frame.previewWindow.previewRange
+			: EMPTY_RANGE;
+		const hasChanges =
 			delta.enteredSlots.length > 0 ||
 			delta.reboundSlots.length > 0 ||
-			delta.releasedSlots.length > 0;
-		const currentRange = stagedPreviewRange ?? previewRange;
-		const nextRange = window.active ? window.previewRange : EMPTY_RANGE;
-		const windowChanged =
-			nextRange.start !== currentRange.start ||
-			nextRange.end !== currentRange.end;
-		if (!hasBindingChanges && !windowChanged) return;
-
-		stagedPreviewRange = nextRange;
-		stageBindingDelta(delta);
-		stagedFlushDriver.schedule({ lane: "post-paint" });
+			delta.releasedSlots.length > 0 ||
+			nextRange.start !== previousRange.start ||
+			nextRange.end !== previousRange.end;
+		if (!hasChanges) return;
+		frameFlushDriver.schedule({ lane: "post-paint" });
 	}
 
 	function dispose(): void {
 		if (disposed) return;
 		disposed = true;
-		stagedFlushDriver.dispose();
-		stagedBindingsBySlot.clear();
-		flushingBindingsBySlot.clear();
-		stagedInvalidatedSlots.clear();
-		flushingInvalidatedSlots.clear();
-		stagedPreviewRange = undefined;
-		committedFrameSource = undefined;
-		acceptedFrame = undefined;
-		for (const handle of pendingByIdentity.values()) handle.cancel();
-		pendingByIdentity.clear();
-		for (const slot of slotsById.values()) {
-			cancelLifecycleCleanup(slot);
-			stopRender(slot);
-			clearCommittedDom(slot);
-			slot.host = undefined;
-			slot.binding = undefined;
-			slot.bindingIdentity = undefined;
-			slot.bindingCurrentnessToken = undefined;
-			slot.bindingRowIndex = undefined;
-		}
+		frameFlushDriver.dispose();
+		desiredFrame = undefined;
+		appliedFrame = undefined;
+		for (const handle of pendingBySlotId.values()) handle.cancel();
+		pendingBySlotId.clear();
+		for (const slot of slotsById.values()) slot.controller.dispose();
 		slotsById.clear();
-		activationIdentities.clear();
-		disposePreviewActivationScope(scope);
+		activationSlotIds.clear();
+		activationScheduler.disposeScope(scope);
 	}
 
-	return {
-		registerHost,
-		acceptCommittedFrame,
-		syncBindingDelta,
-		setPreviewWindow,
-		commitBindingDelta,
-		dispose,
-	};
+	return { registerHost, publish, dispose };
 }
 
-function applyHostState(
-	element: HTMLElement,
-	previous: PreviewHostState | undefined,
-	next: PreviewHostState,
-): void {
-	if (previous?.phase !== next.phase) {
-		element.dataset.previewState = next.phase;
-		element.classList.toggle("is-stale", next.phase === "stale");
+function diffPreviewBindings(
+	previous: ReadonlyMap<string, RowPreviewCardBinding> | undefined,
+	next: ReadonlyMap<string, RowPreviewCardBinding>,
+): RowPreviewBindingDelta {
+	const enteredSlots: RowPreviewCardBinding[] = [];
+	const reboundSlots: RowPreviewCardBinding[] = [];
+	const releasedSlots: string[] = [];
+	for (const slotId of previous?.keys() ?? []) {
+		if (!next.has(slotId)) releasedSlots.push(slotId);
+	}
+	for (const [slotId, binding] of next) {
+		const previousBinding = previous?.get(slotId);
+		if (!previousBinding) enteredSlots.push(binding);
+		else if (previousBinding !== binding) reboundSlots.push(binding);
+	}
+	return { enteredSlots, reboundSlots, releasedSlots };
+}
+
+function isSameDesiredBinding(
+	left: RowPreviewCardBinding,
+	right: RowPreviewCardBinding,
+): boolean {
+	return (
+		left.ownerToken === right.ownerToken &&
+		left.request.renderKey === right.request.renderKey &&
+		left.rowIndex === right.rowIndex
+	);
+}
+
+interface PreviewBindingSnapshot {
+	readonly ownerToken: object;
+	readonly request: CardPreviewRequest;
+	readonly renderKey: string;
+	readonly rowIndex: number;
+	readonly slotId: string;
+}
+
+interface PreviewFrameSnapshot {
+	readonly bindings: ReadonlyMap<string, RowPreviewCardBinding>;
+	readonly entries: readonly (readonly [string, RowPreviewCardBinding])[];
+	readonly generation: number;
+	readonly window: RowPreviewWindow;
+	readonly active: boolean;
+	readonly rangeStart: number;
+	readonly rangeEnd: number;
+}
+
+const bindingSnapshots = new WeakMap<RowPreviewCardBinding, PreviewBindingSnapshot>();
+const frameSnapshots = new WeakMap<PreviewFrame, PreviewFrameSnapshot>();
+
+function assertImmutablePreviewFrame(frame: PreviewFrame): void {
+	if (process.env.NODE_ENV === "production") return;
+
+	const previousFrame = frameSnapshots.get(frame);
+	if (previousFrame) {
+		const entries = Array.from(frame.previewBindingsBySlot.entries());
+		const entriesChanged =
+			entries.length !== previousFrame.entries.length ||
+			entries.some(
+				(entry, index) =>
+					entry[0] !== previousFrame.entries[index]?.[0] ||
+					entry[1] !== previousFrame.entries[index]?.[1],
+			);
+		if (
+			frame.generation !== previousFrame.generation ||
+			frame.previewBindingsBySlot !== previousFrame.bindings ||
+			frame.previewWindow !== previousFrame.window ||
+			frame.previewWindow.active !== previousFrame.active ||
+			frame.previewWindow.previewRange.start !== previousFrame.rangeStart ||
+			frame.previewWindow.previewRange.end !== previousFrame.rangeEnd ||
+			entriesChanged
+		) {
+			throw new TypeError("PreviewFrame must not be mutated after publication");
+		}
 	}
 
-	if (!previous || previous.contentType !== next.contentType) {
-		if (next.contentType) {
-			element.dataset.previewType = next.contentType;
-		} else {
-			delete element.dataset.previewType;
+	for (const [slotId, binding] of frame.previewBindingsBySlot) {
+		if (binding.slotId !== slotId) {
+			throw new TypeError("Preview binding slotId must match its frame key");
 		}
-		for (const type of ["text", "image", "empty", "dom"] as const) {
-			element.classList.toggle(
-				`cosense-card-links__box-preview--${type}`,
-				next.contentType === type,
+		const previousBinding = bindingSnapshots.get(binding);
+		const requestDescriptor = Object.getOwnPropertyDescriptor(binding, "request");
+		const currentRequest =
+			requestDescriptor && "value" in requestDescriptor
+				? (requestDescriptor.value as CardPreviewRequest)
+				: (previousBinding?.request ?? binding.request);
+		if (
+			previousBinding &&
+			(previousBinding.ownerToken !== binding.ownerToken ||
+				previousBinding.request !== currentRequest ||
+				previousBinding.renderKey !== currentRequest.renderKey ||
+				previousBinding.rowIndex !== binding.rowIndex ||
+				previousBinding.slotId !== binding.slotId)
+		) {
+			throw new TypeError(
+				"RowPreviewCardBinding must not be mutated after publication",
 			);
 		}
+		bindingSnapshots.set(binding, {
+			ownerToken: binding.ownerToken,
+			request: currentRequest,
+			renderKey: currentRequest.renderKey,
+			rowIndex: binding.rowIndex,
+			slotId: binding.slotId,
+		});
 	}
-
-	if (!previous || previous.hasContent !== next.hasContent) {
-		if (next.hasContent) {
-			element.dataset.hasPreviewContent = "true";
-		} else {
-			delete element.dataset.hasPreviewContent;
-		}
-	}
-}
-
-function resolveCurrentnessToken(
-	binding: RowPreviewCardBinding | null | undefined,
-): object | undefined {
-	return binding?.currentnessToken ?? binding?.snapshot;
+	frameSnapshots.set(frame, {
+		bindings: frame.previewBindingsBySlot,
+		entries: Array.from(frame.previewBindingsBySlot.entries()),
+		generation: frame.generation,
+		window: frame.previewWindow,
+		active: frame.previewWindow.active,
+		rangeStart: frame.previewWindow.previewRange.start,
+		rangeEnd: frame.previewWindow.previewRange.end,
+	});
 }

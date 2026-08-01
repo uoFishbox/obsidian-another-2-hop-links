@@ -24,12 +24,14 @@
 	import { observePreviewSurfaceVisibility } from "features/preview/scheduling/previewSurfaceVisibility";
 	import type { TwoHopPreviewDependencies } from "features/two-hop/ui/twoHopPreviewDependencies";
 	import { resolvePreviewActivationsPerSecond } from "appConstants";
+	import type { PreviewRuntime } from "features/preview/runtime/previewRuntime";
 
 	interface Props {
 		file: TFile;
 		linkContext: LinkContext;
 		applicationStore: ApplicationStore;
 		app: App;
+		previewRuntime?: PreviewRuntime;
 		lazyLoaderCache: Set<string>;
 		isSidebar?: boolean;
 		updateSetting?: <K extends string>(key: K, value: unknown) => Promise<void>;
@@ -41,6 +43,7 @@
 		linkContext,
 		applicationStore,
 		app,
+		previewRuntime = undefined,
 		lazyLoaderCache,
 		isSidebar = false,
 		updateSetting,
@@ -156,6 +159,7 @@
 		linkContext,
 		applicationStore,
 		app,
+		previewRuntime,
 		bookmarks,
 		resolveSearchMatchPosition: (query, targetFile) =>
 			workerSearchSession.getFirstMatchPosition(query, targetFile),
@@ -166,27 +170,25 @@
 	setContext<ApplicationStore>("applicationStore", applicationStore);
 	setLazyLoaderCache(lazyLoaderCache);
 
-	const previewDependencies: TwoHopPreviewDependencies = {
-		app,
-		getPreview: linkContext.getPreview,
-		getSettings: () => applicationStore.settings,
-		getPreviewRenderVersion: (filePath) =>
-			applicationStore.getPreviewRenderVersion(filePath),
-		resolveSearchMatchPosition: (query, targetFile) =>
-			workerSearchSession.getFirstMatchPosition(query, targetFile),
-		getBackpressure: () => ({
-			queued: linkContext.getVisiblePreviewQueueSize?.() ?? 0,
-			active: linkContext.getActiveVisiblePreviewCount?.() ?? 0,
-		}),
-		subscribeBackpressure: linkContext.subscribeVisiblePreviewQueue,
-		schedulerIdentity: linkContext.previewSchedulingIdentity,
-		getActivationsPerSecond: () =>
-			resolvePreviewActivationsPerSecond(
-				applicationStore.settings.previewDomCommitsPerSecond,
-			),
-		getDomCommitsPerSecond: () =>
-			applicationStore.settings.previewDomCommitsPerSecond,
-	};
+	const previewDependencies: TwoHopPreviewDependencies | undefined = previewRuntime
+		? {
+				previewRuntime,
+				resolveSearchMatchPosition: (query, targetFile) =>
+					workerSearchSession.getFirstMatchPosition(query, targetFile),
+				getBackpressure: () => ({
+					queued: linkContext.getVisiblePreviewQueueSize?.() ?? 0,
+					active: linkContext.getActiveVisiblePreviewCount?.() ?? 0,
+				}),
+				subscribeBackpressure: linkContext.subscribeVisiblePreviewQueue,
+				schedulerIdentity: linkContext.previewSchedulingIdentity,
+				getActivationsPerSecond: () =>
+					resolvePreviewActivationsPerSecond(
+						applicationStore.settings.previewDomCommitsPerSecond,
+					),
+				getDomCommitsPerSecond: () =>
+					applicationStore.settings.previewDomCommitsPerSecond,
+			}
+		: undefined;
 
 	let rootEl = $state<HTMLDivElement | null>(null);
 	let previewSurfaceActive = $state(false);

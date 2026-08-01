@@ -7,6 +7,7 @@ import type {
 	PreviewData,
 	PreviewRequestOptions,
 } from "features/preview/public-types";
+import type { PreviewRuntime } from "features/preview/runtime/previewRuntime";
 export type {
 	HighlightMode,
 	PreviewData,
@@ -61,6 +62,8 @@ export interface AppContext {
 	applicationStore: ApplicationStore;
 	app: App;
 	bookmarks: BookmarksState;
+	/** Runtime-owned preview factory; optional for isolated Svelte consumers. */
+	previewRuntime?: PreviewRuntime;
 	resolveSearchMatchPosition?: (
 		query: string,
 		file: TFile | null | undefined,

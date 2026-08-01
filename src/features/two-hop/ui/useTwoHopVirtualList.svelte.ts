@@ -33,10 +33,10 @@ import {
 } from "ui/virtualization/svelte/viewPlanLayout";
 import { createResolvedCardLayoutSettingsMemo } from "ui/shared/layout/cardLayoutCssVars";
 import {
-	createVirtualPreviewSurface,
 	type RowPreviewWindow,
 	type VirtualPreviewSurface,
 } from "features/preview/scheduling/virtualPreviewSurface";
+import { DISABLED_PREVIEW_SURFACE } from "features/preview/runtime/previewRuntime";
 import { resolveTwoHopCardPresentation } from "features/two-hop/ui/twoHopCellStaticState";
 import type { RowRange } from "ui/virtualization/rowRange";
 import type { VirtualNavigationTarget } from "ui/virtualization/types";
@@ -75,19 +75,6 @@ export interface TwoHopVirtualListProps {
 
 const EMPTY_RANGE: RowRange = { start: 0, end: 0 };
 
-function createDisabledVirtualPreviewSurface(): VirtualPreviewSurface {
-	return {
-		registerHost: () => ({
-			dispose: () => {},
-		}),
-		acceptCommittedFrame: () => {},
-		syncBindingDelta: () => {},
-		setPreviewWindow: () => {},
-		commitBindingDelta: () => {},
-		dispose: () => {},
-	};
-}
-
 /** Connects TwoHop geometry to the shared pooled-row virtual surface. */
 export function useTwoHopVirtualList(
 	props: TwoHopVirtualListProps,
@@ -95,11 +82,11 @@ export function useTwoHopVirtualList(
 ) {
 	const applicationStore = props.applicationStore;
 	const previewSurface = props.previewDependencies
-		? createVirtualPreviewSurface({
+		? props.previewDependencies.previewRuntime.createSurface({
 				...props.previewDependencies,
 				frameCoordinator,
 			})
-		: createDisabledVirtualPreviewSurface();
+		: DISABLED_PREVIEW_SURFACE;
 	const isPreviewActive = () =>
 		props.previewDependencies !== undefined && props.previewActive !== false;
 	const documentProjection = createTwoHopDocumentProjection({
@@ -119,11 +106,6 @@ export function useTwoHopVirtualList(
 		TwoHopCommittedCellBinding,
 		TwoHopCommittedRow
 	>();
-	const previewFrameSource = {
-		get current() {
-			return committedFrame;
-		},
-	};
 	const interactionDescriptorResolverProvider = createTwoHopFrameInteractionProvider(
 		() => committedFrame,
 	);
@@ -240,11 +222,7 @@ export function useTwoHopVirtualList(
 			end: previewRange.end,
 		};
 		committedPreviewActive = active;
-		if (nextFrame.previewBindingsBySlot === previousFrame.previewBindingsBySlot) {
-			previewSurface.setPreviewWindow(nextFrame.previewWindow);
-		} else {
-			previewSurface.acceptCommittedFrame(previewFrameSource);
-		}
+		previewSurface.publish(nextFrame);
 	};
 
 	const virtualList = useVirtualList<

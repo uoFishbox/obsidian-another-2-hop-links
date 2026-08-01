@@ -18,8 +18,6 @@ import {
 import { createDeduplicationService } from "core/deduplication/deduplicationService";
 import { setEnableLogging } from "shared/logging/logger";
 import type { ResolveTwoHopLinks } from "features/two-hop/application/TwoHopLinksLoader";
-import { disposePreviewActivationScheduler } from "features/preview/scheduling/previewActivationScheduler";
-import { disposePreviewDomCommitScheduler } from "features/preview/scheduling/previewDomCommitScheduler";
 import { installCCLDebugExposure } from "infrastructure/debug/CCLDebugExposure";
 import { registerBenchmarkCommand } from "infrastructure/debug/benchmarkCommandController";
 import { registerScrollBenchmarkCommand } from "infrastructure/debug/scrollBenchmarkCommandController";
@@ -181,8 +179,6 @@ export default class CosenseCardLinksPlugin extends Plugin implements PluginHost
 
 	onunload(): void {
 		this.isUnloaded = true;
-		disposePreviewActivationScheduler();
-		disposePreviewDomCommitScheduler();
 		this.runtime?.destroy();
 	}
 
@@ -253,6 +249,10 @@ export default class CosenseCardLinksPlugin extends Plugin implements PluginHost
 
 	public getLinkContextFactory() {
 		return this.runtime.linkContextFactory;
+	}
+
+	public getPreviewRuntime() {
+		return this.runtime.previewRuntime;
 	}
 
 	public createApplicationStore(

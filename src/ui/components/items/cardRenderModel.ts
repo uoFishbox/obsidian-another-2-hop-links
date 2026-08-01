@@ -3,8 +3,10 @@ import type { ViewItem } from "application/presenters";
 import { getItemStrategy } from "application/presenters";
 import { ARIA_LABELS } from "../../../appConstants";
 import { getPriorityFrontmatterCardTitle } from "core/frontmatterCardTitle";
-import { buildCardPreviewActivationIdentity } from "features/preview/core/cardPreviewActivationIdentity";
-import { normalizePreviewQuery } from "features/preview/core/previewRenderKeys";
+import {
+	compileCardPreviewRequest,
+	type CardPreviewRequest,
+} from "features/preview/core/cardPreviewRequest";
 import type { PreviewData } from "features/preview/public-types";
 import { formatLinkText } from "features/preview/text-processing/textUtils";
 import type { LinkUtilitiesContext } from "types/linkContext";
@@ -15,7 +17,6 @@ import {
 	createItemInteractionKey,
 	type ItemInteractionDescriptor,
 } from "ui/interactions/interactionTypes";
-import type { CardPreviewSnapshot } from "features/preview/ui/cardPreviewSnapshot";
 
 export interface CardRenderModel {
 	readonly item: ViewItem;
@@ -34,9 +35,8 @@ export interface CardRenderModel {
 	readonly contentPreview: string | undefined;
 	readonly previewRefreshToken: number;
 	readonly previewCacheRevision?: number | string;
-	readonly previewActivationIdentity: string | undefined;
 	readonly previewOverride: PreviewData | null;
-	readonly previewSnapshot: CardPreviewSnapshot | null;
+	readonly previewRequest: CardPreviewRequest | null;
 }
 
 export interface CardTitleSnapshot {
@@ -85,26 +85,16 @@ export function createCardRenderModel(
 	const interactionId = params.interactionId ?? interactionKey;
 	const previewOverride = createTextPreviewOverride(targetFile, contentPreview);
 	const effectiveSearchQuery = searchScope === "title-only" ? "" : searchQuery;
-	const previewActivationIdentity = targetFile
-		? buildCardPreviewActivationIdentity(
-				targetFile,
-				params.settings,
-				normalizePreviewQuery(effectiveSearchQuery),
-				previewRenderVersion,
+	const previewRequest = targetFile
+		? compileCardPreviewRequest({
+				file: targetFile,
+				searchQuery: effectiveSearchQuery,
 				previewRefreshToken,
 				previewOverride,
-			)
-		: undefined;
-	const previewSnapshot =
-		targetFile && previewActivationIdentity
-			? {
-					identity: previewActivationIdentity,
-					file: targetFile,
-					searchQuery: effectiveSearchQuery,
-					previewRefreshToken,
-					previewOverride,
-				}
-			: null;
+				previewRenderVersion,
+				settings: params.settings,
+			})
+		: null;
 	const interactionDescriptor = createItemInteractionDescriptor(
 		params.item,
 		params.settings,
@@ -133,17 +123,16 @@ export function createCardRenderModel(
 		contentPreview,
 		previewRefreshToken,
 		previewCacheRevision,
-		previewActivationIdentity,
 		previewOverride,
-		previewSnapshot,
+		previewRequest,
 	};
 }
 
 /** Builds the immutable preview input consumed by a physical slot controller. */
-export function createCardPreviewSnapshot(
+export function createCardPreviewRequest(
 	model: CardRenderModel,
-): CardPreviewSnapshot | null {
-	return model.previewSnapshot;
+): CardPreviewRequest | null {
+	return model.previewRequest;
 }
 
 /** Resolves only the file identity and display title needed by a card shell. */

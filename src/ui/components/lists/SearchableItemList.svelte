@@ -38,11 +38,12 @@
 	} from "./searchableItemSorting";
 	import { tick } from "svelte";
 	import {
-		createCardPreviewSnapshot,
+		createCardPreviewRequest,
 		createCardRenderModel,
 		type CardRenderModel,
 	} from "ui/components/items/cardRenderModel";
 	import { createItemInteractionKey } from "ui/interactions/interactionTypes";
+	import type { PreviewRuntime } from "features/preview/runtime/previewRuntime";
 
 	interface Props {
 		items: ViewItem[];
@@ -51,6 +52,7 @@
 		applicationStore: ApplicationStore;
 		sortService: ISortService;
 		app: App;
+		previewRuntime?: PreviewRuntime;
 		autofocus?: boolean;
 		previewRefreshTokens?: Record<string, number>;
 	}
@@ -62,6 +64,7 @@
 		applicationStore,
 		sortService,
 		app,
+		previewRuntime = undefined,
 		autofocus = true,
 		previewRefreshTokens = {},
 	}: Props = $props();
@@ -250,6 +253,7 @@
 		applicationStore,
 		app,
 		bookmarks,
+		previewRuntime,
 		resolveSearchMatchPosition: (query, file) =>
 			workerSearchSession.getFirstMatchPosition(query, file),
 	});
@@ -395,11 +399,11 @@
 		return model;
 	}
 
-	const resolveItemPreviewSnapshot = $derived.by(() => {
+	const resolveItemPreviewRequest = $derived.by(() => {
 		const revision = cardModelRevision;
 		return config.itemComponent === ViewItemCard
 			? (item: ViewItem, index: number) =>
-					createCardPreviewSnapshot(
+					createCardPreviewRequest(
 						resolveViewItemCardModel(item, index, revision),
 					)
 			: undefined;
@@ -469,7 +473,7 @@
 			{loadMoreIncrement}
 			paginationMode={config.paginationMode ?? "button"}
 			{visibilityConsumption}
-			{resolveItemPreviewSnapshot}
+			{resolveItemPreviewRequest}
 			{resolveItemInteractionDescriptor}
 			remountCellBodyOnKeyChange={config.itemComponent !== ViewItemCard}
 			header={config.showSectionHeader ? sectionHeader : undefined}

@@ -1,5 +1,8 @@
 import type { TFile } from "obsidian";
-import type { PluginSettings } from "features/settings/model";
+import type {
+	PreviewRenderSettings,
+	PreviewRenderSettingsInput,
+} from "./previewRenderSettings";
 
 export const CACHE_KEY_SEPARATOR = "\0";
 const SIGNATURE_SEP = "\u001f";
@@ -9,9 +12,11 @@ export interface PreviewSettingsSignatures {
 	readonly searchSignature: string;
 }
 
-const settingsSignatureCache = new WeakMap<PluginSettings, PreviewSettingsSignatures>();
+const settingsSignatureCache = new WeakMap<object, PreviewSettingsSignatures>();
 
-export function buildPreviewContentSettingsSignature(settings: PluginSettings): string {
+export function buildPreviewContentSettingsSignature(
+	settings: PreviewRenderSettingsInput,
+): string {
 	const renderCodeBlockTypes = settings.renderCodeBlockTypes ?? [];
 	return [
 		settings.cardWidthPx,
@@ -25,7 +30,9 @@ export function buildPreviewContentSettingsSignature(settings: PluginSettings): 
 	].join(SIGNATURE_SEP);
 }
 
-function buildSearchContextSettingsSignature(settings: PluginSettings): string {
+function buildSearchContextSettingsSignature(
+	settings: PreviewRenderSettingsInput,
+): string {
 	return [
 		settings.cardWidthPx,
 		settings.cardHeightRatio,
@@ -38,7 +45,7 @@ function buildSearchContextSettingsSignature(settings: PluginSettings): string {
 }
 
 export function getPreviewSettingsSignatures(
-	settings: PluginSettings,
+	settings: PreviewRenderSettingsInput,
 ): PreviewSettingsSignatures {
 	const cached = settingsSignatureCache.get(settings);
 	if (cached) {
@@ -59,7 +66,7 @@ export function normalizePreviewQuery(query: string): string {
 
 export function buildPreviewContentIdentityKey(
 	file: TFile,
-	settings: PluginSettings,
+	settings: PreviewRenderSettingsInput,
 	previewRenderVersion: string,
 ): string {
 	const { contentSignature } = getPreviewSettingsSignatures(settings);
@@ -69,7 +76,7 @@ export function buildPreviewContentIdentityKey(
 export function buildRenderCacheKey(
 	file: TFile,
 	query: string,
-	settings: PluginSettings,
+	settings: PreviewRenderSettingsInput,
 	previewRenderVersion: string,
 ): string {
 	const { searchSignature } = getPreviewSettingsSignatures(settings);
@@ -79,7 +86,7 @@ export function buildRenderCacheKey(
 export function buildRenderCacheKeyFromNormalizedQuery(
 	file: TFile,
 	normalizedQuery: string,
-	settings: PluginSettings,
+	settings: PreviewRenderSettingsInput,
 	previewRenderVersion: string,
 ): string {
 	const { contentSignature, searchSignature } =
@@ -90,7 +97,7 @@ export function buildRenderCacheKeyFromNormalizedQuery(
 export function buildPreviewRenderKeys(
 	file: TFile,
 	query: string,
-	settings: PluginSettings,
+	settings: PreviewRenderSettingsInput,
 	previewRenderVersion: string,
 ): {
 	previewContentIdentityKey: string;

@@ -26,7 +26,7 @@ function shouldUsePreviewTextWorker(content: string): boolean {
 }
 
 function selectPreviewSnippetSettings(
-	settings: PluginSettings | undefined,
+	settings: PreviewSnippetSettings | undefined,
 ): PreviewSnippetSettings | undefined {
 	if (!settings) {
 		return undefined;
@@ -71,7 +71,7 @@ async function runWithFallback<T>(
 
 export async function getContentSnippetAsync(
 	content: string,
-	settings?: PluginSettings,
+	settings?: PreviewSnippetSettings,
 	searchQuery?: string,
 	searchOptions?: GetContentSnippetOptions,
 	signal?: AbortSignal,

@@ -1,13 +1,15 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
-	cloneRenderedPreviewContent,
-	clearCardPreviewSharedCaches,
-	getOrCreateRenderedTextPreviewEntry,
+	createCardPreviewSharedCache,
 } from "../cardPreviewSharedCache";
 
 const state = vi.hoisted(() => ({
 	processPreviewContent: vi.fn(),
 }));
+const sharedCache = createCardPreviewSharedCache();
+const { cloneRenderedPreviewContent, getOrCreateRenderedTextPreviewEntry } =
+	sharedCache;
+const clearCardPreviewSharedCaches = sharedCache.clear;
 
 vi.mock("features/preview/renderers/markdownPreviewRenderer", () => ({
 	processPreviewContent: state.processPreviewContent,
@@ -99,6 +101,53 @@ describe("cardPreviewSharedCache render entries", () => {
 		expect(state.processPreviewContent).toHaveBeenCalledTimes(2);
 	});
 
+	it("keeps a replacement request registered when an aborted predecessor settles", async () => {
+		const firstFinished = createDeferred<void>();
+		const secondFinished = createDeferred<void>();
+		const firstController = new AbortController();
+		let invocation = 0;
+
+		state.processPreviewContent.mockImplementation(
+			async (element: HTMLElement, content: string) => {
+				invocation += 1;
+				if (invocation === 1) await firstFinished.promise;
+				if (invocation === 2) await secondFinished.promise;
+				element.innerHTML = `<p>rendered:${content}</p>`;
+			},
+		);
+
+		const params = {
+			cacheKey: "render-cache:replacement-identity",
+			content: "preview text",
+			app: {} as never,
+			sourcePath: "notes/replacement-render.md",
+			enableMathRendering: false,
+		};
+		const first = getOrCreateRenderedTextPreviewEntry({
+			...params,
+			signal: firstController.signal,
+		});
+		const firstRejection = expect(first).rejects.toMatchObject({
+			name: "AbortError",
+		});
+
+		await vi.waitFor(() => expect(invocation).toBe(1));
+		firstController.abort();
+		await firstRejection;
+		const second = getOrCreateRenderedTextPreviewEntry(params);
+		firstFinished.resolve();
+		await vi.waitFor(() => expect(invocation).toBe(2));
+
+		const third = getOrCreateRenderedTextPreviewEntry(params);
+		await Promise.resolve();
+		expect(invocation).toBe(2);
+		secondFinished.resolve();
+
+		const [secondEntry, thirdEntry] = await Promise.all([second, third]);
+		expect(thirdEntry).toBe(secondEntry);
+		expect(state.processPreviewContent).toHaveBeenCalledTimes(2);
+	});
+
 	it("aborts in-flight render work when shared caches are cleared", async () => {
 		const renderFinished = createDeferred<void>();
 		let sharedSignal: AbortSignal | undefined;
@@ -158,6 +207,7 @@ describe("cardPreviewSharedCache render entries", () => {
 			sourcePath: "notes/static-html.md",
 			enableMathRendering: false,
 		});
+		const createElement = vi.spyOn(document, "createElement");
 
 		const first = cloneRenderedPreviewContent(entry);
 		const second = cloneRenderedPreviewContent(entry);
@@ -166,5 +216,8 @@ describe("cardPreviewSharedCache render entries", () => {
 		expect(first.firstChild).not.toBe(second.firstChild);
 		expect(first.textContent).toBe("rendered:preview text");
 		expect(second.textContent).toBe("rendered:preview text");
+		expect(createElement).toHaveBeenCalledOnce();
+		expect(createElement).toHaveBeenCalledWith("template");
+		createElement.mockRestore();
 	});
 });

@@ -25,6 +25,8 @@ import type {
 import type { CardRenderModel } from "ui/components/items/cardRenderModel";
 import { createResidentRowSlotAllocator } from "ui/virtualization/core/residentSlotAllocator";
 import type { ViewPlanLayoutMetrics } from "ui/virtualization/svelte/viewPlanLayout";
+import { DEFAULT_SETTINGS } from "features/settings/model";
+import { compileCardPreviewRequest } from "features/preview/core/cardPreviewRequest";
 
 const layout: ViewPlanLayoutMetrics = {
 	containerWidth: 420,
@@ -117,15 +119,15 @@ function createCardModel(
 		searchScope: "title-and-content",
 		contentPreview: undefined,
 		previewRefreshToken: 0,
-		previewActivationIdentity: `preview:${title}`,
 		previewOverride: null,
-		previewSnapshot: {
-			identity: `preview:${title}`,
+		previewRequest: compileCardPreviewRequest({
 			file: targetFile,
 			searchQuery: "",
 			previewRefreshToken: 0,
 			previewOverride: null,
-		},
+			previewRenderVersion: `preview:${title}`,
+			settings: DEFAULT_SETTINGS,
+		}),
 	};
 }
 

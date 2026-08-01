@@ -7,6 +7,7 @@ import { DEFAULT_SETTINGS } from "features/settings/model";
 import ViewItemCardHarness from "./ViewItemCardHarness.svelte";
 import { getLazyLoadManager } from "infrastructure/observers/IntersectionObserverRegistry";
 import type { CardRenderModel } from "../cardRenderModel";
+import { compileCardPreviewRequest } from "features/preview/core/cardPreviewRequest";
 
 vi.mock("features/preview/ui/CardPreview.svelte", async () => {
 	const component = await import("./CardPreviewMountProbe.svelte");
@@ -69,15 +70,15 @@ describe("ViewItemCard", () => {
 			searchScope: "title-only",
 			contentPreview: undefined,
 			previewRefreshToken: 0,
-			previewActivationIdentity: "compiled-preview",
 			previewOverride: null,
-			previewSnapshot: {
-				identity: "compiled-preview",
+			previewRequest: compileCardPreviewRequest({
 				file: targetFile,
 				searchQuery: "compiled",
 				previewRefreshToken: 0,
 				previewOverride: null,
-			},
+				previewRenderVersion: "compiled-preview",
+				settings: DEFAULT_SETTINGS,
+			}),
 		};
 
 		render(ViewItemCardHarness, {
@@ -132,7 +133,7 @@ describe("ViewItemCard", () => {
 		expect(linkContext.getPreview).not.toHaveBeenCalled();
 	});
 
-	it("passes direct non-virtual preview inputs to CardPreview", () => {
+	it("passes the direct non-virtual preview request to CardPreview", () => {
 		const sourceFile = createMockTFile("notes/source.md");
 		const targetFile = createMockTFile("notes/target.md");
 		const item = { type: "file", data: targetFile } as ViewItem;
@@ -151,6 +152,6 @@ describe("ViewItemCard", () => {
 		const preview = screen.getByTestId("card-preview-probe");
 		expect(preview).toHaveAttribute("data-file-path", targetFile.path);
 		expect(preview).toHaveAttribute("data-search-query", "needle");
-		expect(preview).toHaveAttribute("data-preview-refresh-token", "4");
+		expect(preview).toHaveAttribute("data-preview-refresh-token", "0:0:4");
 	});
 });

@@ -178,6 +178,7 @@ export abstract class AbstractSvelteListView<
 				applicationStore,
 				sortService: this.plugin.sortService,
 				app: this.app,
+				previewRuntime: this.plugin.getPreviewRuntime?.(),
 				autofocus: options.autofocus,
 				previewRefreshTokens: this.previewRefreshTokens,
 			},

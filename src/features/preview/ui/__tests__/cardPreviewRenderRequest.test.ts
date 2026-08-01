@@ -1,7 +1,22 @@
 import { describe, expect, it } from "vitest";
 import { DEFAULT_SETTINGS, type PluginSettings } from "features/settings/model";
 import { createMockTFile } from "testing/__mocks__/testHelpers";
-import { createCardPreviewRenderRequestResolver } from "../cardPreviewRenderRequest";
+import { compileCardPreviewRequest } from "features/preview/core/cardPreviewRequest";
+
+function compile(
+	file: ReturnType<typeof createMockTFile>,
+	settings: PluginSettings,
+	searchQuery: string,
+) {
+	return compileCardPreviewRequest({
+		file,
+		settings,
+		searchQuery,
+		previewRefreshToken: 0,
+		previewOverride: null,
+		previewRenderVersion: "0",
+	});
+}
 
 function createSettings(overrides: Partial<PluginSettings> = {}): PluginSettings {
 	return {
@@ -11,14 +26,13 @@ function createSettings(overrides: Partial<PluginSettings> = {}): PluginSettings
 	};
 }
 
-describe("createCardPreviewRenderRequestResolver", () => {
+describe("compileCardPreviewRequest", () => {
 	it("reuses projected preview settings for the same settings object", () => {
-		const resolve = createCardPreviewRenderRequestResolver();
 		const file = createMockTFile("notes/cached-preview-settings.md");
 		const settings = createSettings();
 
-		const first = resolve(file, 0, null, "0", "first", settings);
-		const second = resolve(file, 0, null, "0", "second", settings);
+		const first = compile(file, settings, "first");
+		const second = compile(file, settings, "second");
 
 		expect(first).not.toBeNull();
 		expect(second).not.toBeNull();
@@ -26,14 +40,13 @@ describe("createCardPreviewRenderRequestResolver", () => {
 	});
 
 	it("invalidates the projection after an in-place relevant setting update", () => {
-		const resolve = createCardPreviewRenderRequestResolver();
 		const file = createMockTFile("notes/updated-preview-settings.md");
 		const settings = createSettings({ renderCodeBlockTypes: ["dataview"] });
 
-		const first = resolve(file, 0, null, "0", "first", settings);
+		const first = compile(file, settings, "first");
 		settings.previewMaxChars += 1;
 		settings.renderCodeBlockTypes.push("query");
-		const second = resolve(file, 0, null, "0", "second", settings);
+		const second = compile(file, settings, "second");
 
 		expect(second?.settings).not.toBe(first?.settings);
 		expect(second?.settings.previewMaxChars).toBe(settings.previewMaxChars);
@@ -42,13 +55,12 @@ describe("createCardPreviewRenderRequestResolver", () => {
 	});
 
 	it("keeps the projection after an unrelated in-place setting update", () => {
-		const resolve = createCardPreviewRenderRequestResolver();
 		const file = createMockTFile("notes/unrelated-preview-settings.md");
 		const settings = createSettings();
 
-		const first = resolve(file, 0, null, "0", "first", settings);
+		const first = compile(file, settings, "first");
 		settings.language = settings.language === "en" ? "ja" : "en";
-		const second = resolve(file, 0, null, "0", "second", settings);
+		const second = compile(file, settings, "second");
 
 		expect(second?.settings).toBe(first?.settings);
 	});

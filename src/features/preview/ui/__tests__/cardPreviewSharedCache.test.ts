@@ -1,10 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
-	applySharedSearchContextToTextPreview,
 	buildPreviewContentIdentityKey,
 	buildRenderCacheKey,
 	canShareRenderedTextPreview,
-	clearCardPreviewSharedCaches,
+	createCardPreviewSharedCache,
 } from "../cardPreviewSharedCache";
 import { DEFAULT_SETTINGS, type PluginSettings } from "features/settings/model";
 import { createMockTFile } from "testing/__mocks__/testHelpers";
@@ -16,6 +15,9 @@ const state = vi.hoisted(() => ({
 	getFileContent: vi.fn(),
 	analyzePreviewContent: vi.fn(),
 }));
+const sharedCache = createCardPreviewSharedCache();
+const { applySharedSearchContextToTextPreview } = sharedCache;
+const clearCardPreviewSharedCaches = sharedCache.clear;
 
 vi.mock("features/preview/text-processing/searchHighlighter", () => ({
 	highlightSearchMatchesInHtml: state.highlightSearchMatchesInHtml,

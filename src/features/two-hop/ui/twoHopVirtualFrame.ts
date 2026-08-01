@@ -1,8 +1,8 @@
-import type { CardPreviewSnapshot } from "features/preview/ui/cardPreviewSnapshot";
+import type { CardPreviewRequest } from "features/preview/core/cardPreviewRequest";
 import type {
 	RowPreviewCardBinding,
 	RowPreviewWindow,
-	VirtualPreviewCommittedFrame,
+	PreviewFrame,
 } from "features/preview/scheduling/rowPreviewTypes";
 import {
 	hasContinuousTwoHopPhysicalCellSlot,
@@ -52,7 +52,7 @@ export interface TwoHopRenderBodySpec {
 
 /** Immutable preview input whose reference proves preview ownership. */
 export interface TwoHopPreviewSpec {
-	readonly snapshot: CardPreviewSnapshot;
+	readonly request: CardPreviewRequest;
 }
 
 /** Immutable interaction input published by the frame. */
@@ -81,7 +81,7 @@ export interface TwoHopCommittedRow extends VirtualSurfaceMountedRow<TwoHopCommi
 }
 
 /** One atomic, immutable publication of the TwoHop virtual surface. */
-export interface CommittedTwoHopVirtualFrame extends VirtualPreviewCommittedFrame {
+export interface CommittedTwoHopVirtualFrame extends PreviewFrame {
 	/** Diagnostics and measurement only. Never use this value for invalidation. */
 	readonly sequence: number;
 	readonly layout: ViewPlanLayoutMetrics;
@@ -113,6 +113,7 @@ export function createEmptyTwoHopVirtualFrame(
 	layout: ViewPlanLayoutMetrics,
 ): CommittedTwoHopVirtualFrame {
 	const frame: CommittedTwoHopVirtualFrame = Object.freeze({
+		generation: 0,
 		sequence: 0,
 		layout: Object.freeze({ ...layout }),
 		contentHeight: 0,
@@ -188,14 +189,14 @@ export function compileTwoHopVirtualFrame(params: {
 				binding.slot.hostId,
 			);
 			const previewBinding =
-				previousPreviewBinding?.currentnessToken === binding.preview &&
+				previousPreviewBinding?.ownerToken === binding.preview &&
 				previousPreviewBinding.rowIndex === binding.rowIndex
 					? previousPreviewBinding
 					: Object.freeze({
 							slotId: binding.slot.hostId,
 							rowIndex: binding.rowIndex,
-							snapshot: binding.preview.snapshot,
-							currentnessToken: binding.preview,
+							request: binding.preview.request,
+							ownerToken: binding.preview,
 						});
 			previewBindingsBySlot.set(binding.slot.hostId, previewBinding);
 		}
@@ -220,6 +221,7 @@ export function compileTwoHopVirtualFrame(params: {
 		params.previewWindow,
 	);
 	const frame: CommittedTwoHopVirtualFrame = Object.freeze({
+		generation: params.previous.generation + 1,
 		sequence: params.previous.sequence + 1,
 		layout,
 		contentHeight,
@@ -329,8 +331,8 @@ function resolvePreviewSpec(
 	canReuseOutputs: boolean,
 ): TwoHopPreviewSpec | null {
 	if (canReuseOutputs) return previous?.preview ?? null;
-	const snapshot = cardModel?.previewSnapshot;
-	return snapshot ? Object.freeze({ snapshot }) : null;
+	const request = cardModel?.previewRequest;
+	return request ? Object.freeze({ request }) : null;
 }
 
 function resolveInteractionSpec(
@@ -508,6 +510,7 @@ function publishPreviewWindowOnly(
 	if (previewWindow === previous.previewWindow) return previous;
 
 	const frame: CommittedTwoHopVirtualFrame = Object.freeze({
+		generation: previous.generation + 1,
 		sequence: previous.sequence + 1,
 		layout: previous.layout,
 		contentHeight: previous.contentHeight,

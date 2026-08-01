@@ -11,6 +11,7 @@
 	import type { ApplicationStore } from "ui/stores/ApplicationStore.svelte";
 	import { getCardLayoutCssText } from "ui/shared/layout/cardLayoutCssVars";
 	import { getFileCardTitleSearchText } from "core/frontmatterCardTitle";
+	import type { PreviewRuntime } from "features/preview/runtime/previewRuntime";
 
 	interface Props {
 		app: App;
@@ -18,9 +19,17 @@
 		sortService: ISortService;
 		linkContext: LinkContext;
 		applicationStore: ApplicationStore;
+		previewRuntime?: PreviewRuntime;
 	}
 
-	let { app, settings, sortService, linkContext, applicationStore }: Props = $props();
+	let {
+		app,
+		settings,
+		sortService,
+		linkContext,
+		applicationStore,
+		previewRuntime = undefined,
+	}: Props = $props();
 
 	let notesVersion = $state(0);
 	let cardLayoutCssText = $derived(getCardLayoutCssText(settings));
@@ -182,6 +191,7 @@
 		{applicationStore}
 		{sortService}
 		{app}
+		{previewRuntime}
 		autofocus={false}
 	/>
 </div>

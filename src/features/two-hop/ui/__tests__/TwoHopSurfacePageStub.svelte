@@ -32,11 +32,8 @@
 	class="view-plan-virtual-list"
 	data-testid="two-hop-surface-stub"
 	data-has-preview-dependencies={String(previewDependencies !== undefined)}
-	data-has-preview-loader={String(
-		typeof previewDependencies?.getPreview === "function",
-	)}
-	data-settings-getter-matches={String(
-		previewDependencies?.getSettings() === applicationStore.settings,
+	data-has-preview-runtime={String(
+		typeof previewDependencies?.previewRuntime?.createSurface === "function",
 	)}
 	data-has-search-position-resolver={String(
 		typeof previewDependencies?.resolveSearchMatchPosition === "function",

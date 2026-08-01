@@ -1,10 +1,7 @@
 import { Component } from "obsidian";
 import type { App, TFile, Vault } from "obsidian";
 import { processPreviewContent } from "features/preview/renderers/markdownPreviewRenderer";
-import {
-	clearPreviewRenderQueue,
-	enqueuePreviewRender,
-} from "features/preview/renderers/previewRenderQueue";
+import { enqueuePreviewRender } from "features/preview/renderers/previewRenderQueue";
 import {
 	getContentSnippetAsync,
 	highlightSearchMatchesInHtmlAsync,
@@ -29,7 +26,7 @@ import {
 	getPreviewSettingsSignatures,
 } from "features/preview/core/previewRenderKeys";
 import { getDebugDisableRenderedPreviewCache } from "../../../appConstants";
-import type { PluginSettings } from "features/settings/model";
+import type { PreviewRenderSettingsInput } from "features/preview/core/previewRenderSettings";
 import { createSizedLRUCache, stringBytes } from "shared/cache/sizedLRUCache";
 
 export type RenderedTextPreviewCacheEntry = {
@@ -65,20 +62,50 @@ export {
 	normalizePreviewQuery,
 };
 
-const renderedPreviewCache = createSizedLRUCache<string, RenderedTextPreviewCacheEntry>(
-	RENDERED_PREVIEW_CACHE_MAX_BYTES,
-);
-const renderedPreviewInFlight = new Map<
-	string,
-	SharedInFlightRequest<RenderedTextPreviewCacheEntry>
->();
-const searchContextPreviewCache = createSizedLRUCache<string, string>(
-	SEARCH_CONTEXT_CACHE_MAX_BYTES,
-);
-const searchContextPreviewInFlight = new Map<string, SharedInFlightRequest<string>>();
-const previewAnalysisCache = createSizedLRUCache<string, PreviewContentAnalysis>(
-	PREVIEW_ANALYSIS_CACHE_MAX_BYTES,
-);
+interface CardPreviewSharedCacheState {
+	readonly renderedPreviewCache: ReturnType<typeof createRenderedPreviewCache>;
+	readonly renderedPreviewTemplates: WeakMap<
+		RenderedTextPreviewCacheEntry,
+		HTMLTemplateElement
+	>;
+	readonly renderedPreviewInFlight: Map<
+		string,
+		SharedInFlightRequest<RenderedTextPreviewCacheEntry>
+	>;
+	readonly searchContextPreviewCache: ReturnType<
+		typeof createSearchContextPreviewCache
+	>;
+	readonly searchContextPreviewInFlight: Map<string, SharedInFlightRequest<string>>;
+	readonly previewAnalysisCache: ReturnType<typeof createPreviewAnalysisCache>;
+}
+
+function createRenderedPreviewCache() {
+	return createSizedLRUCache<string, RenderedTextPreviewCacheEntry>(
+		RENDERED_PREVIEW_CACHE_MAX_BYTES,
+	);
+}
+
+function createSearchContextPreviewCache() {
+	return createSizedLRUCache<string, string>(SEARCH_CONTEXT_CACHE_MAX_BYTES);
+}
+
+function createPreviewAnalysisCache() {
+	return createSizedLRUCache<string, PreviewContentAnalysis>(
+		PREVIEW_ANALYSIS_CACHE_MAX_BYTES,
+	);
+}
+
+function createCacheState(): CardPreviewSharedCacheState {
+	return {
+		renderedPreviewCache: createRenderedPreviewCache(),
+		renderedPreviewTemplates: new WeakMap(),
+		renderedPreviewInFlight: new Map(),
+		searchContextPreviewCache: createSearchContextPreviewCache(),
+		searchContextPreviewInFlight: new Map(),
+		previewAnalysisCache: createPreviewAnalysisCache(),
+	};
+}
+
 const EMPTY_PREVIEW_PROTECTED_SEGMENTS: PreviewContentAnalysis["protectedSegments"] =
 	[];
 
@@ -101,7 +128,7 @@ function estimatePreviewAnalysisSize(analysis: PreviewContentAnalysis): number {
 function buildSearchContextCacheKey(
 	previewContentIdentityKey: string,
 	normalizedQuery: string,
-	settings: PluginSettings,
+	settings: PreviewRenderSettingsInput,
 ): string {
 	const { searchSignature } = getPreviewSettingsSignatures(settings);
 	return `${previewContentIdentityKey}${CACHE_KEY_SEPARATOR}${normalizedQuery}${CACHE_KEY_SEPARATOR}${searchSignature}`;
@@ -225,38 +252,47 @@ function resolveFirstMatchIndex(
 	return findCaseInsensitiveIndex(rawContent, normalizedQuery);
 }
 
-export function getRenderedPreviewCacheEntry(
+function getRenderedPreviewCacheEntryForState(
+	state: CardPreviewSharedCacheState,
 	cacheKey: string,
 ): RenderedTextPreviewCacheEntry | undefined {
 	if (getDebugDisableRenderedPreviewCache()) {
 		return undefined;
 	}
 
-	return renderedPreviewCache.get(cacheKey);
+	return state.renderedPreviewCache.get(cacheKey);
 }
 
-export function cloneRenderedPreviewContent(
+function cloneRenderedPreviewContentForState(
+	state: CardPreviewSharedCacheState,
 	entry: RenderedTextPreviewCacheEntry,
 ): DocumentFragment {
-	const template = document.createElement("template");
-	template.innerHTML = entry.html;
-	return template.content;
+	let template = state.renderedPreviewTemplates.get(entry);
+	if (!template) {
+		template = document.createElement("template");
+		template.innerHTML = entry.html;
+		state.renderedPreviewTemplates.set(entry, template);
+	}
+	return template.content.cloneNode(true) as DocumentFragment;
 }
 
 export function canShareRenderedTextPreview(content: string): boolean {
 	return !content.includes("twohop-render-block");
 }
 
-export async function applySharedSearchContextToTextPreview(params: {
-	previewContent: string;
-	previewContentIdentityKey: string;
-	targetFile: TFile;
-	normalizedQuery: string;
-	searchContext?: PreviewSearchContext | (() => PreviewSearchContext | undefined);
-	settings: PluginSettings;
-	vault: Vault;
-	signal?: AbortSignal;
-}): Promise<string> {
+async function applySharedSearchContextToTextPreviewForState(
+	state: CardPreviewSharedCacheState,
+	params: {
+		previewContent: string;
+		previewContentIdentityKey: string;
+		targetFile: TFile;
+		normalizedQuery: string;
+		searchContext?: PreviewSearchContext | (() => PreviewSearchContext | undefined);
+		settings: PreviewRenderSettingsInput;
+		vault: Vault;
+		signal?: AbortSignal;
+	},
+): Promise<string> {
 	const {
 		previewContent,
 		previewContentIdentityKey,
@@ -272,12 +308,12 @@ export async function applySharedSearchContextToTextPreview(params: {
 		normalizedQuery,
 		settings,
 	);
-	const cached = searchContextPreviewCache.get(cacheKey);
+	const cached = state.searchContextPreviewCache.get(cacheKey);
 	if (cached !== undefined) {
 		return cached;
 	}
 
-	const existingRequest = searchContextPreviewInFlight.get(cacheKey);
+	const existingRequest = state.searchContextPreviewInFlight.get(cacheKey);
 	if (existingRequest && !existingRequest.controller.signal.aborted) {
 		return attachCallerToSharedRequest(
 			existingRequest,
@@ -286,7 +322,7 @@ export async function applySharedSearchContextToTextPreview(params: {
 		);
 	}
 	if (existingRequest) {
-		searchContextPreviewInFlight.delete(cacheKey);
+		state.searchContextPreviewInFlight.delete(cacheKey);
 	}
 
 	const request: SharedInFlightRequest<string> = {
@@ -334,7 +370,7 @@ export async function applySharedSearchContextToTextPreview(params: {
 			sharedSignal,
 		);
 		throwIfAborted(sharedSignal, "Preview request aborted");
-		searchContextPreviewCache.set(
+		state.searchContextPreviewCache.set(
 			cacheKey,
 			highlightedContent,
 			stringBytes(highlightedContent),
@@ -343,24 +379,27 @@ export async function applySharedSearchContextToTextPreview(params: {
 	})();
 
 	request.promise = buildPromise;
-	searchContextPreviewInFlight.set(cacheKey, request);
-	buildPromise.then(
-		() => searchContextPreviewInFlight.delete(cacheKey),
-		() => searchContextPreviewInFlight.delete(cacheKey),
+	state.searchContextPreviewInFlight.set(cacheKey, request);
+	void buildPromise.then(
+		() => finalizeSharedRequest(state.searchContextPreviewInFlight, request),
+		() => finalizeSharedRequest(state.searchContextPreviewInFlight, request),
 	);
 
 	return attachCallerToSharedRequest(request, signal, "Preview request aborted");
 }
 
-export async function getOrCreateRenderedTextPreviewEntry(params: {
-	cacheKey: string;
-	content: string;
-	app: App;
-	sourcePath: string;
-	enableMathRendering: boolean;
-	analysis?: PreviewContentAnalysis;
-	signal?: AbortSignal;
-}): Promise<RenderedTextPreviewCacheEntry> {
+async function getOrCreateRenderedTextPreviewEntryForState(
+	state: CardPreviewSharedCacheState,
+	params: {
+		cacheKey: string;
+		content: string;
+		app: App;
+		sourcePath: string;
+		enableMathRendering: boolean;
+		analysis?: PreviewContentAnalysis;
+		signal?: AbortSignal;
+	},
+): Promise<RenderedTextPreviewCacheEntry> {
 	const {
 		cacheKey,
 		content,
@@ -390,12 +429,12 @@ export async function getOrCreateRenderedTextPreviewEntry(params: {
 		});
 	}
 
-	const cached = renderedPreviewCache.get(cacheKey);
+	const cached = state.renderedPreviewCache.get(cacheKey);
 	if (cached) {
 		return cached;
 	}
 
-	const existingRequest = renderedPreviewInFlight.get(cacheKey);
+	const existingRequest = state.renderedPreviewInFlight.get(cacheKey);
 	if (existingRequest && !existingRequest.controller.signal.aborted) {
 		return attachCallerToSharedRequest(
 			existingRequest,
@@ -404,7 +443,7 @@ export async function getOrCreateRenderedTextPreviewEntry(params: {
 		);
 	}
 	if (existingRequest) {
-		renderedPreviewInFlight.delete(cacheKey);
+		state.renderedPreviewInFlight.delete(cacheKey);
 	}
 
 	const request: SharedInFlightRequest<RenderedTextPreviewCacheEntry> = {
@@ -422,7 +461,7 @@ export async function getOrCreateRenderedTextPreviewEntry(params: {
 		analysis,
 		signal: sharedSignal,
 	}).then((renderedEntry) => {
-		renderedPreviewCache.set(
+		state.renderedPreviewCache.set(
 			cacheKey,
 			renderedEntry,
 			renderedEntry.estimatedBytes + stringBytes(cacheKey),
@@ -431,13 +470,22 @@ export async function getOrCreateRenderedTextPreviewEntry(params: {
 	});
 
 	request.promise = renderPromise;
-	renderedPreviewInFlight.set(cacheKey, request);
-	renderPromise.then(
-		() => renderedPreviewInFlight.delete(cacheKey),
-		() => renderedPreviewInFlight.delete(cacheKey),
+	state.renderedPreviewInFlight.set(cacheKey, request);
+	void renderPromise.then(
+		() => finalizeSharedRequest(state.renderedPreviewInFlight, request),
+		() => finalizeSharedRequest(state.renderedPreviewInFlight, request),
 	);
 
 	return attachCallerToSharedRequest(request, signal, "Preview render aborted");
+}
+
+function finalizeSharedRequest<T>(
+	map: Map<string, SharedInFlightRequest<T>>,
+	request: SharedInFlightRequest<T>,
+): void {
+	if (map.get(request.cacheKey) === request) {
+		map.delete(request.cacheKey);
+	}
 }
 
 function renderTextPreviewEntry(params: {
@@ -486,7 +534,8 @@ function renderTextPreviewEntry(params: {
 	}, signal);
 }
 
-export function getSharedPreviewAnalysis(
+function getSharedPreviewAnalysisForState(
+	state: CardPreviewSharedCacheState,
 	cacheKey: string,
 	content: string,
 ): PreviewContentAnalysis {
@@ -499,22 +548,63 @@ export function getSharedPreviewAnalysis(
 		};
 	}
 
-	const cached = previewAnalysisCache.get(cacheKey);
+	const cached = state.previewAnalysisCache.get(cacheKey);
 	if (cached) {
 		return cached;
 	}
 
 	const analysis = analyzePreviewContent(content);
-	previewAnalysisCache.set(cacheKey, analysis, estimatePreviewAnalysisSize(analysis));
+	state.previewAnalysisCache.set(
+		cacheKey,
+		analysis,
+		estimatePreviewAnalysisSize(analysis),
+	);
 	return analysis;
 }
 
 // Used by tests to isolate module-scope caches.
-export function clearCardPreviewSharedCaches(): void {
-	renderedPreviewCache.clear();
-	abortSharedRequests(renderedPreviewInFlight);
-	clearPreviewRenderQueue();
-	searchContextPreviewCache.clear();
-	abortSharedRequests(searchContextPreviewInFlight);
-	previewAnalysisCache.clear();
+function clearCacheState(state: CardPreviewSharedCacheState): void {
+	state.renderedPreviewCache.clear();
+	abortSharedRequests(state.renderedPreviewInFlight);
+	state.searchContextPreviewCache.clear();
+	abortSharedRequests(state.searchContextPreviewInFlight);
+	state.previewAnalysisCache.clear();
+}
+
+/** Runtime-owned rendered preview, search context, and analysis caches. */
+export interface CardPreviewSharedCache {
+	getRenderedPreviewCacheEntry(
+		cacheKey: string,
+	): RenderedTextPreviewCacheEntry | undefined;
+	cloneRenderedPreviewContent(entry: RenderedTextPreviewCacheEntry): DocumentFragment;
+	applySharedSearchContextToTextPreview(
+		params: Parameters<typeof applySharedSearchContextToTextPreviewForState>[1],
+	): Promise<string>;
+	getOrCreateRenderedTextPreviewEntry(
+		params: Parameters<typeof getOrCreateRenderedTextPreviewEntryForState>[1],
+	): Promise<RenderedTextPreviewCacheEntry>;
+	getSharedPreviewAnalysis(cacheKey: string, content: string): PreviewContentAnalysis;
+	clear(): void;
+}
+
+/** Creates caches isolated to one PreviewRuntime. */
+export function createCardPreviewSharedCache(): CardPreviewSharedCache {
+	const state = createCacheState();
+	return createCacheFacade(state);
+}
+
+function createCacheFacade(state: CardPreviewSharedCacheState): CardPreviewSharedCache {
+	return {
+		getRenderedPreviewCacheEntry: (cacheKey) =>
+			getRenderedPreviewCacheEntryForState(state, cacheKey),
+		cloneRenderedPreviewContent: (entry) =>
+			cloneRenderedPreviewContentForState(state, entry),
+		applySharedSearchContextToTextPreview: (params) =>
+			applySharedSearchContextToTextPreviewForState(state, params),
+		getOrCreateRenderedTextPreviewEntry: (params) =>
+			getOrCreateRenderedTextPreviewEntryForState(state, params),
+		getSharedPreviewAnalysis: (cacheKey, content) =>
+			getSharedPreviewAnalysisForState(state, cacheKey, content),
+		clear: () => clearCacheState(state),
+	};
 }

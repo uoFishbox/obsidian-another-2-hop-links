@@ -114,6 +114,7 @@ export function createEmptyViewController(
 				sortService: plugin.sortService,
 				linkContext,
 				applicationStore,
+				previewRuntime: plugin.getPreviewRuntime?.(),
 			},
 		}) as ComponentInstance;
 

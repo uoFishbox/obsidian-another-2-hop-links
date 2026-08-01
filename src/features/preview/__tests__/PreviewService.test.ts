@@ -3,7 +3,7 @@ import { MarkdownRenderer } from "obsidian";
 import { PreviewService as PreviewServiceClass } from "../core/createPreviewService";
 import { generateVideoPreview } from "../renderers/videoPreviewRenderer";
 import { generateCanvasPreview } from "../renderers/canvasPreviewRenderer";
-import { applySharedSearchContextToTextPreview } from "features/preview/ui/cardPreviewSharedCache";
+import { createCardPreviewSharedCache } from "features/preview/ui/cardPreviewSharedCache";
 import { DEFAULT_SETTINGS } from "features/settings/model";
 import type { IVault, IMetadataCache } from "types/obsidian";
 import {
@@ -42,11 +42,13 @@ describe("PreviewService.getPreview", () => {
 	let vault: IVault;
 	let metadataCache: IMetadataCache;
 	let previewService: PreviewServiceClass;
+	const previewSharedCache = createCardPreviewSharedCache();
 
 	beforeEach(() => {
 		vault = createMockVault();
 		metadataCache = createMockMetadataCache();
 		previewService = new PreviewServiceClass();
+		previewSharedCache.clear();
 		vi.clearAllMocks();
 	});
 
@@ -184,7 +186,7 @@ describe("PreviewService.getPreview", () => {
 		expect(result.type).toBe("text");
 
 		await expect(
-			applySharedSearchContextToTextPreview({
+			previewSharedCache.applySharedSearchContextToTextPreview({
 				previewContent: "<p>fallback preview</p>",
 				previewContentIdentityKey: "preview-id:shared-raw",
 				targetFile: file,
