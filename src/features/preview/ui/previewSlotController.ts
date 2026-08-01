@@ -35,7 +35,6 @@ export interface PreviewSlotController {
 	setMathRendering(isRendering: boolean): void;
 	invalidate(): void;
 	needsActivation(): boolean;
-	hasCachedPreview(): boolean;
 	activate(): void;
 	clear(): void;
 	dispose(): void;
@@ -43,7 +42,6 @@ export interface PreviewSlotController {
 
 export interface CreatePreviewSlotControllerOptions {
 	readonly createRenderer: () => CardPreviewRenderer;
-	readonly hasCachedPreview?: (renderKey: string) => boolean;
 	readonly onStateChange?: (state: PreviewSlotState) => void;
 }
 
@@ -356,12 +354,6 @@ export function createPreviewSlotController(
 		return content.retention !== "resident" && !content.release;
 	}
 
-	function hasCachedPreview(): boolean {
-		return binding.state === "bound"
-			? (options.hasCachedPreview?.(binding.value.request.renderKey) ?? false)
-			: false;
-	}
-
 	function activate(): void {
 		if (!needsActivation() || binding.state !== "bound" || !host) return;
 		renderer ??= options.createRenderer();
@@ -476,7 +468,6 @@ export function createPreviewSlotController(
 		setMathRendering,
 		invalidate,
 		needsActivation,
-		hasCachedPreview,
 		activate,
 		clear,
 		dispose,

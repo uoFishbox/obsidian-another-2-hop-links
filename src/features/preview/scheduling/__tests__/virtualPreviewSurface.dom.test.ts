@@ -15,8 +15,6 @@ import {
 import { createPreviewActivationScheduler } from "../previewActivationScheduler";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const previewCacheState = vi.hoisted(() => ({ entry: undefined as unknown }));
-
 const FRAME_INTERVAL_MS = 1000 / 60;
 
 interface RenderRecord {
@@ -94,7 +92,6 @@ function createHarness(frameCoordinator?: VirtualFrameCoordinator): {
 	const actualSurface = createVirtualPreviewSurface({
 		frameCoordinator,
 		activationScheduler,
-		hasCachedPreview: () => previewCacheState.entry !== undefined,
 		createRenderer: (): CardPreviewRenderer => {
 			return (container, previewRequest, callbacks) => {
 				if (!callbacks) throw new TypeError("Missing surface callbacks");
@@ -204,7 +201,6 @@ async function flushActivation(): Promise<void> {
 }
 
 beforeEach(() => {
-	previewCacheState.entry = undefined;
 	vi.useFakeTimers();
 	vi.stubGlobal(
 		"requestAnimationFrame",
@@ -248,21 +244,6 @@ describe("VirtualPreviewSurface", () => {
 			"two-hop:preview-sidecar-flush",
 			expect.any(Function),
 		);
-		surface.dispose();
-	});
-
-	it("activates a rendered cache hit without the activation queue", async () => {
-		const { surface, renders } = createHarness();
-		const host = document.createElement("div");
-		surface.registerHost("slot-0", host);
-		previewCacheState.entry = {};
-
-		enter(surface, binding("slot-0", 0, "cached"));
-		await vi.advanceTimersByTimeAsync(FRAME_INTERVAL_MS);
-		await vi.advanceTimersByTimeAsync(1);
-		await Promise.resolve();
-
-		expect(renders).toHaveLength(1);
 		surface.dispose();
 	});
 

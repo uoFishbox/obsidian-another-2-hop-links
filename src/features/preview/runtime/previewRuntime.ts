@@ -83,8 +83,6 @@ export function createPreviewRuntime(options: PreviewRuntimeOptions): PreviewRun
 		const surface = createVirtualPreviewSurface({
 			frameCoordinator: surfaceOptions.frameCoordinator,
 			activationScheduler,
-			hasCachedPreview: (renderKey) =>
-				sharedCache.getRenderedPreviewCacheEntry(renderKey) !== undefined,
 			createRenderer: () =>
 				createCardPreviewRenderer({
 					app: options.app,

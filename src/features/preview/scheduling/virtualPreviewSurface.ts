@@ -43,7 +43,6 @@ export interface CreateVirtualPreviewSurfaceOptions {
 	readonly frameCoordinator?: VirtualFrameCoordinator;
 	readonly activationScheduler: PreviewActivationScheduler;
 	readonly createRenderer: () => CardPreviewRenderer;
-	readonly hasCachedPreview: (renderKey: string) => boolean;
 	/** Optional lifecycle probe invoked after a hostless, unbound slot is released. */
 	readonly onSlotDisposed?: (slotId: string) => void;
 }
@@ -88,7 +87,6 @@ export function createVirtualPreviewSurface(
 			hostLeaseCount: 0,
 			controller: createPreviewSlotController({
 				createRenderer: options.createRenderer,
-				hasCachedPreview: options.hasCachedPreview,
 			}),
 		};
 		slotsById.set(slotId, slot);
@@ -132,8 +130,7 @@ export function createVirtualPreviewSurface(
 			const isActive = Boolean(slot.binding && isInPreviewRange(slot));
 			slot.controller.setActive(isActive);
 			if (!isActive || !slot.controller.needsActivation()) continue;
-			if (slot.controller.hasCachedPreview()) slot.controller.activate();
-			else activationSlotIds.add(slot.slotId);
+			activationSlotIds.add(slot.slotId);
 		}
 		for (const [slotId, handle] of pendingBySlotId) {
 			if (activationSlotIds.has(slotId)) continue;

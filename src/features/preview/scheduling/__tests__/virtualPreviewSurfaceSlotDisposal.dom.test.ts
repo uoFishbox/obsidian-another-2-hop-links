@@ -15,7 +15,6 @@ function createSurface() {
 	const surface = createVirtualPreviewSurface({
 		activationScheduler,
 		createRenderer: () => renderer,
-		hasCachedPreview: () => false,
 		onSlotDisposed: (slotId) => disposedSlotIds.push(slotId),
 	});
 	return {

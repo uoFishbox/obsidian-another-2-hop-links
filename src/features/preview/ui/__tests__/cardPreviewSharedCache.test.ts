@@ -1,8 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import {
-	canShareRenderedTextPreview,
-	createCardPreviewSharedCache,
-} from "../cardPreviewSharedCache";
+import { createCardPreviewSharedCache } from "../cardPreviewSharedCache";
 import { buildPreviewRenderKeys } from "features/preview/core/previewRenderKeys";
 import { DEFAULT_SETTINGS, type PluginSettings } from "features/settings/model";
 import { createMockTFile } from "testing/__mocks__/testHelpers";
@@ -176,15 +173,6 @@ describe("cardPreviewSharedCache search context", () => {
 
 		expect(first).not.toBe(second);
 		expect(second).toBe(third);
-	});
-
-	it("does not share rendered previews that contain Obsidian-rendered blocks", () => {
-		expect(canShareRenderedTextPreview("plain preview")).toBe(true);
-		expect(
-			canShareRenderedTextPreview(
-				'<div class="twohop-render-block" data-lang="js"></div>',
-			),
-		).toBe(false);
 	});
 
 	it("separates search context cache keys by query settings", async () => {

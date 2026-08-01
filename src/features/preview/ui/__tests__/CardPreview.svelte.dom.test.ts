@@ -28,7 +28,6 @@ const state = vi.hoisted(() => ({
 	syncMathJaxStylesForNode: vi.fn(),
 	componentUnload: vi.fn(),
 	disableCardDomPreview: false,
-	disableRenderedPreviewCache: false,
 }));
 
 vi.mock("ui/context/linkContext", () => ({
@@ -57,7 +56,6 @@ vi.mock("appConstants", async (importOriginal) => {
 	return {
 		...actual,
 		getDebugDisableCardDomPreview: () => state.disableCardDomPreview,
-		getDebugDisableRenderedPreviewCache: () => state.disableRenderedPreviewCache,
 	};
 });
 
@@ -139,7 +137,6 @@ describe("CardPreview", () => {
 			getPreviewRenderVersion: vi.fn(() => "0:0"),
 		} as unknown as ApplicationStore;
 		state.disableCardDomPreview = false;
-		state.disableRenderedPreviewCache = false;
 
 		state.processPreviewContent.mockReset();
 		state.processPreviewContent.mockImplementation(async (element, content) => {
@@ -216,7 +213,7 @@ describe("CardPreview", () => {
 	});
 
 	it("displays rendered text preview", async () => {
-		const file = createMockTFile("notes/render-cache.md");
+		const file = createMockTFile("notes/rendered-preview.md");
 		const getPreview = vi.fn(async () => ({
 			type: "text" as const,
 			content: "preview text",
@@ -454,8 +451,8 @@ describe("CardPreview", () => {
 		});
 	});
 
-	it("reuses cached preview on remount for the same file", async () => {
-		const file = createMockTFile("notes/render-cache.md");
+	it("renders the preview again after remounting the same file", async () => {
+		const file = createMockTFile("notes/remounted-preview.md");
 		const getPreview = vi.fn(async () => ({
 			type: "text" as const,
 			content: "preview text",
@@ -486,7 +483,7 @@ describe("CardPreview", () => {
 				document.querySelector(".cosense-card-links__box-preview")?.textContent,
 			).toContain("rendered:preview text");
 		});
-		expect(state.processPreviewContent).toHaveBeenCalledTimes(1);
+		expect(state.processPreviewContent).toHaveBeenCalledTimes(2);
 		previewRuntime.dispose();
 	});
 
