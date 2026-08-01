@@ -152,7 +152,12 @@ export function useTwoHopProgressiveList(
 	const modelConsumersByLogicalKey = new Map<string, Set<CardModelConsumer>>();
 	const previewBindingByLogicalKey = new Map<string, RowPreviewCardBinding>();
 	const pendingHydration: HydrationEntry[] = [];
+	let pendingHydrationHead = 0;
 	const pendingHydrationKeys = new Set<string>();
+
+	function hasPendingHydration(): boolean {
+		return pendingHydrationHead < pendingHydration.length;
+	}
 	const observedChunks = new Map<Element, number>();
 	const previewRowConsumers = new Map<number, (active: boolean) => void>();
 	const activePreviewRange: TwoHopRowRange = { start: 0, end: 0 };
@@ -202,6 +207,7 @@ export function useTwoHopProgressiveList(
 		cancelHydrationDrain?.();
 		cancelHydrationDrain = undefined;
 		pendingHydration.length = 0;
+		pendingHydrationHead = 0;
 		pendingHydrationKeys.clear();
 		hydrationGeneration += 1;
 	}
@@ -251,7 +257,7 @@ export function useTwoHopProgressiveList(
 	}
 
 	function scheduleHydrationDrain(): void {
-		if (disposed || cancelHydrationDrain || pendingHydration.length === 0) return;
+		if (disposed || cancelHydrationDrain || !hasPendingHydration()) return;
 		const expectedGeneration = hydrationGeneration;
 		const run = (): void => {
 			cancelHydrationDrain = undefined;
@@ -271,6 +277,7 @@ export function useTwoHopProgressiveList(
 		const resolver = untrack(() => props.resolveItemCardModel);
 		if (!resolver) {
 			pendingHydration.length = 0;
+			pendingHydrationHead = 0;
 			pendingHydrationKeys.clear();
 			return;
 		}
@@ -278,13 +285,13 @@ export function useTwoHopProgressiveList(
 		let resolvedCount = 0;
 		let activePreviewHydrationChanged = false;
 		while (
-			pendingHydration.length > 0 &&
+			hasPendingHydration() &&
 			resolvedCount < MAX_MODELS_PER_DRAIN &&
 			(resolvedCount === 0 ||
 				performance.now() - startedAt < MAX_HYDRATION_CPU_MS)
 		) {
-			const entry = pendingHydration.shift();
-			if (!entry) break;
+			const entry = pendingHydration[pendingHydrationHead];
+			pendingHydrationHead += 1;
 			pendingHydrationKeys.delete(entry.logicalKey);
 			const presentation = resolveTwoHopCardPresentation(
 				entry.cell.item,
@@ -318,6 +325,18 @@ export function useTwoHopProgressiveList(
 			}
 			resolvedCount += 1;
 		}
+		// Compact the consumed prefix once it is at least half of the array;
+		// earlier compaction would copy more elements than entries consumed.
+		if (pendingHydrationHead > 0) {
+			const remaining = pendingHydration.length - pendingHydrationHead;
+			if (remaining === 0) {
+				pendingHydration.length = 0;
+				pendingHydrationHead = 0;
+			} else if (pendingHydrationHead >= remaining) {
+				pendingHydration.splice(0, pendingHydrationHead);
+				pendingHydrationHead = 0;
+			}
+		}
 		if (
 			activePreviewHydrationChanged &&
 			props.previewDependencies !== undefined &&
@@ -325,7 +344,7 @@ export function useTwoHopProgressiveList(
 		) {
 			schedulePreviewPublication();
 		}
-		if (pendingHydration.length > 0) scheduleHydrationDrain();
+		if (hasPendingHydration()) scheduleHydrationDrain();
 	}
 
 	function flushScheduledPreviewPublication(): void {
