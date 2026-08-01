@@ -13,6 +13,7 @@ import {
 } from "features/two-hop/ui/twoHopDocument";
 import {
 	compileFixedGridLayout,
+	type TwoHopRowRange,
 	type TwoHopGeometry,
 } from "features/two-hop/ui/viewport/twoHopGeometry";
 import {
@@ -44,7 +45,12 @@ import {
 	type ViewPlanLayoutMetrics,
 } from "ui/virtualization/svelte/viewPlanLayout";
 import { findNearestScrollContainer } from "ui/virtualization/dom/scrollContainer";
+import {
+	markScrollActivityActive,
+	markScrollActivityIdle,
+} from "ui/virtualization/scheduling/scrollActivity";
 import { recordCCLDevMeasurement } from "infrastructure/debug/CCLDevMeasurements";
+import { resolveProgressivePreviewRangeInto } from "features/two-hop/ui/progressivePreviewRange";
 
 export interface TwoHopProgressiveListProps {
 	readonly sections: readonly TwoHopVirtualSectionDescriptor[];
@@ -65,11 +71,6 @@ interface HydrationEntry {
 	readonly cell: Extract<TwoHopProgressiveCell, { kind: "item" }>;
 }
 
-interface ObservedRow {
-	readonly rowIndex: number;
-	readonly setPreviewCandidate: (active: boolean) => void;
-}
-
 interface LayoutAnchor {
 	readonly logicalKey: string;
 	readonly viewportOffset: number;
@@ -80,6 +81,8 @@ type CardModelConsumer = (model: CardRenderModel | undefined) => void;
 const MAX_MODELS_PER_DRAIN = 8;
 const MAX_HYDRATION_CPU_MS = 1;
 const EMPTY_PREVIEW_RANGE = Object.freeze({ start: 0, end: 0 });
+const PREVIEW_SCROLL_TASK_KEY = "two-hop-progressive-preview-window";
+const PREVIEW_SCROLL_IDLE_MS = 140;
 
 export function resolveProgressivePreviewSlotId(logicalKey: string): string {
 	return `two-hop-progressive:${logicalKey}`;
@@ -151,12 +154,18 @@ export function useTwoHopProgressiveList(
 	const pendingHydration: HydrationEntry[] = [];
 	const pendingHydrationKeys = new Set<string>();
 	const observedChunks = new Map<Element, number>();
-	const observedRows = new Map<Element, ObservedRow>();
-	const activePreviewRows = new Set<number>();
+	const previewRowConsumers = new Map<number, (active: boolean) => void>();
+	const activePreviewRange: TwoHopRowRange = { start: 0, end: 0 };
+	const nextPreviewRange: TwoHopRowRange = { start: 0, end: 0 };
 	let hydrationObserver: IntersectionObserver | undefined;
-	let previewObserver: IntersectionObserver | undefined;
 	let sentinelObserver: IntersectionObserver | undefined;
 	let cancelHydrationDrain: (() => void) | undefined;
+	let previewRangeAnimationFrame: number | undefined;
+	let previewScrollIdleTimer: number | undefined;
+	let previewScrollContainer: HTMLElement | null = null;
+	let previewOwnerWindow: Window | null = null;
+	let contentTopInScrollSpace = 0;
+	let previewViewportHeight = 0;
 	let hydrationGeneration = 0;
 	let previewPublicationScheduled = false;
 	let lastInputDocumentRevision = initialDocument.revision;
@@ -288,7 +297,11 @@ export function useTwoHopProgressiveList(
 			const model = resolver(entry.cell.item, presentation);
 			modelsByLogicalKey.set(entry.logicalKey, model);
 			notifyModelConsumers(entry.logicalKey, model);
-			if (model.previewRequest && activePreviewRows.has(entry.cell.rowIndex)) {
+			if (
+				model.previewRequest &&
+				entry.cell.rowIndex >= activePreviewRange.start &&
+				entry.cell.rowIndex < activePreviewRange.end
+			) {
 				activePreviewHydrationChanged = true;
 			}
 			if (model.interactionDescriptor) {
@@ -336,9 +349,13 @@ export function useTwoHopProgressiveList(
 
 		if (active) {
 			const activePlan = untrack(() => plan);
-			for (const rowIndex of activePreviewRows) {
-				rangeStart = Math.min(rangeStart, rowIndex);
-				rangeEnd = Math.max(rangeEnd, rowIndex + 1);
+			rangeStart = activePreviewRange.start;
+			rangeEnd = activePreviewRange.end;
+			for (
+				let rowIndex = activePreviewRange.start;
+				rowIndex < activePreviewRange.end;
+				rowIndex += 1
+			) {
 				const row = resolveMountedProgressiveRow(activePlan, rowIndex);
 				if (!row) continue;
 				for (const cell of row.cells) {
@@ -383,30 +400,106 @@ export function useTwoHopProgressiveList(
 		previewSurface.publish(frame);
 	}
 
-	function setRowPreviewCandidate(rowIndex: number, active: boolean): void {
-		const changed = active
-			? !activePreviewRows.has(rowIndex)
-			: activePreviewRows.has(rowIndex);
-		if (!changed) return;
-		if (active) activePreviewRows.add(rowIndex);
-		else activePreviewRows.delete(rowIndex);
-		schedulePreviewPublication();
-	}
-
-	function observePreviewRow(
-		element: HTMLElement,
+	function registerPreviewRow(
 		rowIndex: number,
 		setPreviewCandidate: (active: boolean) => void,
 	): () => void {
-		const observed: ObservedRow = { rowIndex, setPreviewCandidate };
-		observedRows.set(element, observed);
-		previewObserver?.observe(element);
+		previewRowConsumers.set(rowIndex, setPreviewCandidate);
+		setPreviewCandidate(
+			rowIndex >= activePreviewRange.start && rowIndex < activePreviewRange.end,
+		);
 		return () => {
-			previewObserver?.unobserve(element);
-			observedRows.delete(element);
+			if (previewRowConsumers.get(rowIndex) === setPreviewCandidate) {
+				previewRowConsumers.delete(rowIndex);
+			}
 			setPreviewCandidate(false);
-			setRowPreviewCandidate(rowIndex, false);
 		};
+	}
+
+	function publishPreviewRange(next: TwoHopRowRange): void {
+		const previousStart = activePreviewRange.start;
+		const previousEnd = activePreviewRange.end;
+		if (previousStart === next.start && previousEnd === next.end) return;
+
+		for (let rowIndex = previousStart; rowIndex < previousEnd; rowIndex += 1) {
+			if (rowIndex >= next.start && rowIndex < next.end) continue;
+			previewRowConsumers.get(rowIndex)?.(false);
+		}
+		for (let rowIndex = next.start; rowIndex < next.end; rowIndex += 1) {
+			if (rowIndex >= previousStart && rowIndex < previousEnd) continue;
+			previewRowConsumers.get(rowIndex)?.(true);
+		}
+
+		activePreviewRange.start = next.start;
+		activePreviewRange.end = next.end;
+		schedulePreviewPublication();
+	}
+
+	function readPreviewScrollTop(): number {
+		return previewScrollContainer?.scrollTop ?? previewOwnerWindow?.scrollY ?? 0;
+	}
+
+	function measurePreviewViewportGeometry(): void {
+		if (!contentEl || !previewOwnerWindow) return;
+		const contentRect = contentEl.getBoundingClientRect();
+		if (previewScrollContainer) {
+			const scrollerRect = previewScrollContainer.getBoundingClientRect();
+			contentTopInScrollSpace =
+				contentRect.top - scrollerRect.top + previewScrollContainer.scrollTop;
+			previewViewportHeight = previewScrollContainer.clientHeight;
+			return;
+		}
+		contentTopInScrollSpace = contentRect.top + previewOwnerWindow.scrollY;
+		previewViewportHeight = previewOwnerWindow.innerHeight;
+	}
+
+	function flushPreviewRangeFromScroll(): void {
+		previewRangeAnimationFrame = undefined;
+		if (disposed) return;
+		const activeGeometry = untrack(() => geometry);
+		const mountedRowEnd = untrack(() => plan.mountedRowEnd);
+		resolveProgressivePreviewRangeInto(
+			nextPreviewRange,
+			activeGeometry,
+			readPreviewScrollTop() - contentTopInScrollSpace,
+			previewViewportHeight,
+			mountedRowEnd,
+		);
+		publishPreviewRange(nextPreviewRange);
+	}
+
+	function schedulePreviewRangeUpdate(): void {
+		if (disposed) return;
+		if (frameCoordinator) {
+			frameCoordinator.schedule(
+				"scroll-critical",
+				PREVIEW_SCROLL_TASK_KEY,
+				flushPreviewRangeFromScroll,
+			);
+			return;
+		}
+		if (previewRangeAnimationFrame !== undefined || !previewOwnerWindow) return;
+		previewRangeAnimationFrame = previewOwnerWindow.requestAnimationFrame(
+			flushPreviewRangeFromScroll,
+		);
+	}
+
+	function schedulePreviewScrollIdle(): void {
+		if (!previewOwnerWindow) return;
+		if (previewScrollIdleTimer !== undefined) {
+			previewOwnerWindow.clearTimeout(previewScrollIdleTimer);
+		}
+		previewScrollIdleTimer = previewOwnerWindow.setTimeout(() => {
+			previewScrollIdleTimer = undefined;
+			markScrollActivityIdle(previewScrollActivitySource);
+		}, PREVIEW_SCROLL_IDLE_MS);
+	}
+
+	const previewScrollActivitySource = {};
+	function handlePreviewScroll(): void {
+		markScrollActivityActive(previewScrollActivitySource);
+		schedulePreviewRangeUpdate();
+		schedulePreviewScrollIdle();
 	}
 
 	function observeHydrationChunk(
@@ -423,10 +516,8 @@ export function useTwoHopProgressiveList(
 
 	function rebuildIntersectionObservers(): void {
 		hydrationObserver?.disconnect();
-		previewObserver?.disconnect();
 		sentinelObserver?.disconnect();
 		hydrationObserver = undefined;
-		previewObserver = undefined;
 		sentinelObserver = undefined;
 		if (!rootEl || typeof IntersectionObserver === "undefined") {
 			for (const chunkIndex of observedChunks.values()) {
@@ -451,20 +542,6 @@ export function useTwoHopProgressiveList(
 				rootMargin: `0px 0px ${chunkPreloadDistancePx}px 0px`,
 			},
 		);
-		previewObserver = new IntersectionObserver(
-			(entries) => {
-				for (const entry of entries) {
-					const observed = observedRows.get(entry.target);
-					if (!observed) continue;
-					observed.setPreviewCandidate(entry.isIntersecting);
-					setRowPreviewCandidate(observed.rowIndex, entry.isIntersecting);
-				}
-			},
-			{
-				root: observerRoot,
-				rootMargin: `${geometry.rowStride}px 0px`,
-			},
-		);
 		sentinelObserver = new IntersectionObserver(
 			(entries) => {
 				if (entries.some((entry) => entry.isIntersecting)) loadNextChunk();
@@ -477,7 +554,6 @@ export function useTwoHopProgressiveList(
 		for (const element of observedChunks.keys()) {
 			hydrationObserver.observe(element);
 		}
-		for (const element of observedRows.keys()) previewObserver.observe(element);
 		if (sentinelEl) sentinelObserver.observe(sentinelEl);
 	}
 
@@ -612,13 +688,55 @@ export function useTwoHopProgressiveList(
 
 	$effect(() => {
 		const element = rootEl;
+		const content = contentEl;
 		void configuredLayout;
-		if (!element) return;
+		if (!element || !content) return;
+		previewScrollContainer = findNearestScrollContainer(element);
+		previewOwnerWindow = element.ownerDocument.defaultView;
 		measureLayout();
+		measurePreviewViewportGeometry();
+		flushPreviewRangeFromScroll();
 		if (typeof ResizeObserver === "undefined") return;
-		const observer = new ResizeObserver(() => measureLayout());
+		const observer = new ResizeObserver(() => {
+			measureLayout();
+			measurePreviewViewportGeometry();
+			flushPreviewRangeFromScroll();
+		});
 		observer.observe(element);
+		observer.observe(content);
+		if (previewScrollContainer) observer.observe(previewScrollContainer);
 		return () => observer.disconnect();
+	});
+
+	$effect(() => {
+		const element = rootEl;
+		const content = contentEl;
+		if (!element || !content) return;
+		const ownerWindow = element.ownerDocument.defaultView;
+		if (!ownerWindow) return;
+		const scrollContainer = findNearestScrollContainer(element);
+		const scrollTarget: HTMLElement | Window = scrollContainer ?? ownerWindow;
+		previewScrollContainer = scrollContainer;
+		previewOwnerWindow = ownerWindow;
+		measurePreviewViewportGeometry();
+		flushPreviewRangeFromScroll();
+		scrollTarget.addEventListener("scroll", handlePreviewScroll, { passive: true });
+		return () => {
+			scrollTarget.removeEventListener("scroll", handlePreviewScroll);
+			if (previewScrollIdleTimer !== undefined) {
+				ownerWindow.clearTimeout(previewScrollIdleTimer);
+				previewScrollIdleTimer = undefined;
+			}
+			markScrollActivityIdle(previewScrollActivitySource);
+		};
+	});
+
+	$effect(() => {
+		void geometry;
+		void plan.mountedRowEnd;
+		if (!contentEl) return;
+		measurePreviewViewportGeometry();
+		flushPreviewRangeFromScroll();
 	});
 
 	$effect(() => {
@@ -629,7 +747,6 @@ export function useTwoHopProgressiveList(
 		rebuildIntersectionObservers();
 		return () => {
 			hydrationObserver?.disconnect();
-			previewObserver?.disconnect();
 			sentinelObserver?.disconnect();
 		};
 	});
@@ -643,14 +760,18 @@ export function useTwoHopProgressiveList(
 		disposed = true;
 		cancelPendingHydration();
 		hydrationObserver?.disconnect();
-		previewObserver?.disconnect();
 		sentinelObserver?.disconnect();
-		for (const observed of observedRows.values()) {
-			observed.setPreviewCandidate(false);
+		frameCoordinator?.cancel("scroll-critical", PREVIEW_SCROLL_TASK_KEY);
+		if (previewRangeAnimationFrame !== undefined && previewOwnerWindow) {
+			previewOwnerWindow.cancelAnimationFrame(previewRangeAnimationFrame);
 		}
-		observedRows.clear();
+		if (previewScrollIdleTimer !== undefined && previewOwnerWindow) {
+			previewOwnerWindow.clearTimeout(previewScrollIdleTimer);
+		}
+		markScrollActivityIdle(previewScrollActivitySource);
+		for (const consumer of previewRowConsumers.values()) consumer(false);
+		previewRowConsumers.clear();
 		observedChunks.clear();
-		activePreviewRows.clear();
 		interactionController.clear();
 		previewSurface.dispose();
 	});
@@ -695,7 +816,7 @@ export function useTwoHopProgressiveList(
 			return interactionController.provider;
 		},
 		registerCardModelConsumer,
-		observePreviewRow,
+		registerPreviewRow,
 		observeHydrationChunk,
 		loadNextChunk,
 		loadMore,

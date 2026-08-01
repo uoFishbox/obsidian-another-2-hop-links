@@ -49,7 +49,7 @@
 							layout={list.layout}
 							applicationStore={props.applicationStore}
 							registerCardModelConsumer={list.registerCardModelConsumer}
-							observePreviewRow={list.observePreviewRow}
+							registerPreviewRow={list.registerPreviewRow}
 							onLoadMore={list.loadMore}
 						/>
 					{/each}

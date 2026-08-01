@@ -13,8 +13,7 @@
 			logicalKey: string,
 			consumer: (model: CardRenderModel | undefined) => void,
 		) => () => void;
-		observePreviewRow: (
-			element: HTMLElement,
+		registerPreviewRow: (
 			rowIndex: number,
 			setPreviewCandidate: (active: boolean) => void,
 		) => () => void;
@@ -26,23 +25,19 @@
 		layout,
 		applicationStore,
 		registerCardModelConsumer,
-		observePreviewRow,
+		registerPreviewRow,
 		onLoadMore,
 	}: Props = $props();
-	let rowEl = $state<HTMLDivElement | null>(null);
 	let previewCandidate = $state(false);
 
 	$effect(() => {
-		const element = rowEl;
-		if (!element) return;
-		return observePreviewRow(element, row.rowIndex, (active) => {
+		return registerPreviewRow(row.rowIndex, (active) => {
 			previewCandidate = active;
 		});
 	});
 </script>
 
 <div
-	bind:this={rowEl}
 	class="twohop-progressive-row"
 	data-ccl-progressive-row={row.rowIndex}
 	style={`top:${row.top}px;height:${layout.rowHeight}px;grid-template-columns:repeat(${layout.columns},minmax(0,1fr));gap:${layout.gap}px;`}

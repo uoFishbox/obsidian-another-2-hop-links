@@ -15,9 +15,13 @@ import type {
 	TwoHopVirtualSectionDescriptor,
 } from "features/two-hop/ui/twoHopVirtualListModel";
 import { createSectionDataRevision } from "features/two-hop/ui/twoHopRevisions";
+import { findNearestScrollContainer } from "ui/virtualization/dom/scrollContainer";
+import {
+	isScrollActivityActive,
+	resetScrollActivityForTests,
+} from "ui/virtualization/scheduling/scrollActivity";
 import {
 	flushFrames,
-	createDomRect,
 	intersectionObserverRecords,
 	installIntersectionObserverMock,
 	installResizeObserverMock,
@@ -61,17 +65,20 @@ function createSection(count: number): TwoHopVirtualSectionDescriptor {
 
 beforeEach(() => {
 	resetRecords();
+	resetScrollActivityForTests();
+	setNumericProperty(window, "scrollY", 0);
 	installResizeObserverMock();
 	installIntersectionObserverMock();
 });
 
 afterEach(() => {
+	resetScrollActivityForTests();
 	teardownResizeObserverMock();
 	teardownIntersectionObserverMock();
 });
 
 describe("TwoHopProgressiveSurface", () => {
-	it("hydrates lazily, appends one chunk, and does no work for ordinary scroll events", async () => {
+	it("hydrates lazily, appends one chunk, and coalesces ordinary scroll events", async () => {
 		const targetFile = {
 			path: "notes/preview.md",
 			basename: "preview",
@@ -172,21 +179,18 @@ describe("TwoHopProgressiveSurface", () => {
 		).toHaveLength((chunkCount ?? 0) + 1);
 
 		expect(
-			root.shadowRoot?.querySelectorAll("[data-preview-owner='virtual-surface']"),
-		).toHaveLength(0);
-		const firstRow = root.shadowRoot?.querySelector<HTMLElement>(
-			".twohop-progressive-row",
-		);
-		if (!firstRow) throw new Error("Progressive row was not rendered");
-		triggerIntersection(firstRow);
-		await flushFrames();
-		expect(
 			root.shadowRoot?.querySelectorAll("[data-preview-owner='virtual-surface']")
 				.length,
 		).toBeGreaterThan(0);
+		const rows = root.shadowRoot?.querySelectorAll(".twohop-progressive-row") ?? [];
+		expect(
+			intersectionObserverRecords.every((record) =>
+				[...rows].every((row) => !record.elements.has(row)),
+			),
+		).toBe(true);
 	});
 
-	it("skips offscreen hydration publications and coalesces preview row intersections", async () => {
+	it("skips offscreen hydration publications and publishes one range per scroll frame", async () => {
 		const publish = vi.fn();
 		const previewDependencies = {
 			previewRuntime: {
@@ -231,7 +235,14 @@ describe("TwoHopProgressiveSurface", () => {
 				} as CardPreviewRequest,
 			}),
 		);
+		const scroller = document.createElement("div");
+		scroller.style.overflow = "auto";
+		setNumericProperty(scroller, "clientHeight", 300);
+		setNumericProperty(scroller, "scrollHeight", 20_000);
+		setElementRect(scroller, { top: 0, width: 320, height: 300 });
+		document.body.append(scroller);
 		const { container } = render(TwoHopProgressiveSurfaceHarness, {
+			target: scroller,
 			props: {
 				sections: [createSection(100)],
 				applicationStore,
@@ -245,6 +256,8 @@ describe("TwoHopProgressiveSurface", () => {
 		);
 		if (!root) throw new Error("Progressive surface was not rendered");
 		await flushFrames();
+		const initialFrame = publish.mock.lastCall?.[0] as PreviewFrame | undefined;
+		if (!initialFrame) throw new Error("Initial preview frame was not published");
 		publish.mockClear();
 		const sentinel = root.shadowRoot?.querySelector<HTMLElement>(
 			".twohop-progressive-sentinel",
@@ -273,54 +286,36 @@ describe("TwoHopProgressiveSurface", () => {
 				".twohop-progressive-row",
 			) ?? []),
 		];
-		const rows = allRows.slice(0, 4);
-		const previewObserver = intersectionObserverRecords.find((record) =>
-			rows.some((row) => record.elements.has(row)),
-		);
-		if (!previewObserver) throw new Error("Preview row observer was not installed");
-		const createIntersectionEntry = (row: HTMLElement): IntersectionObserverEntry =>
-			({
-				target: row,
-				isIntersecting: true,
-				intersectionRatio: 1,
-				boundingClientRect: createDomRect({
-					top: 0,
-					width: 100,
-					height: 100,
-				}),
-				intersectionRect: createDomRect({
-					top: 0,
-					width: 100,
-					height: 100,
-				}),
-				rootBounds: null,
-				time: 0,
-			}) as IntersectionObserverEntry;
-
-		previewObserver.callback(
-			rows.map(createIntersectionEntry),
-			{} as IntersectionObserver,
-		);
-
+		expect(
+			intersectionObserverRecords.every((record) =>
+				allRows.every((row) => !record.elements.has(row)),
+			),
+		).toBe(true);
+		const previewScrollTarget = findNearestScrollContainer(root) ?? window;
+		const dispatchScroll = (scrollTop: number): void => {
+			setNumericProperty(previewScrollTarget, "scrollTop", scrollTop);
+			if (previewScrollTarget === window) {
+				setNumericProperty(window, "scrollY", scrollTop);
+			}
+			previewScrollTarget.dispatchEvent(new Event("scroll"));
+		};
+		dispatchScroll(350);
+		dispatchScroll(400);
+		dispatchScroll(450);
 		expect(publish).not.toHaveBeenCalled();
-		await Promise.resolve();
-		expect(publish).toHaveBeenCalledOnce();
-		const firstFrame = publish.mock.calls[0]?.[0] as PreviewFrame;
-		expect(firstFrame.previewBindingsBySlot.size).toBeGreaterThan(0);
-		publish.mockClear();
-		const adjacentRow = allRows[4];
-		if (!adjacentRow) throw new Error("Adjacent progressive row was not rendered");
-
-		previewObserver.callback(
-			[createIntersectionEntry(adjacentRow)],
-			{} as IntersectionObserver,
+		expect(isScrollActivityActive()).toBe(true);
+		await vi.waitFor(() => expect(publish).toHaveBeenCalledOnce());
+		const scrolledFrame = publish.mock.calls[0]?.[0] as PreviewFrame;
+		expect(scrolledFrame.previewWindow.previewRange.start).toBeGreaterThan(
+			initialFrame.previewWindow.previewRange.start,
 		);
-		await Promise.resolve();
-
-		expect(publish).toHaveBeenCalledOnce();
-		const secondFrame = publish.mock.calls[0]?.[0] as PreviewFrame;
-		for (const [slotId, binding] of firstFrame.previewBindingsBySlot) {
-			expect(secondFrame.previewBindingsBySlot.get(slotId)).toBe(binding);
+		let preservedBindingCount = 0;
+		for (const [slotId, binding] of initialFrame.previewBindingsBySlot) {
+			if (!scrolledFrame.previewBindingsBySlot.has(slotId)) continue;
+			expect(scrolledFrame.previewBindingsBySlot.get(slotId)).toBe(binding);
+			preservedBindingCount += 1;
 		}
+		expect(preservedBindingCount).toBeGreaterThan(0);
+		await vi.waitFor(() => expect(isScrollActivityActive()).toBe(false));
 	});
 });
