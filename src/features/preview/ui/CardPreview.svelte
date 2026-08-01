@@ -46,8 +46,6 @@
 		onMathRenderingChange: (isRendering) => {
 			controller?.setMathRendering(isRendering);
 		},
-		onCommitted: () => {},
-		onRendered: () => {},
 	};
 	const renderPreview = previewRuntime.createRenderer(rendererOptions);
 

@@ -113,7 +113,6 @@ export function createEmptyTwoHopVirtualFrame(
 	layout: ViewPlanLayoutMetrics,
 ): CommittedTwoHopVirtualFrame {
 	const frame: CommittedTwoHopVirtualFrame = Object.freeze({
-		generation: 0,
 		sequence: 0,
 		layout: Object.freeze({ ...layout }),
 		contentHeight: 0,
@@ -221,7 +220,6 @@ export function compileTwoHopVirtualFrame(params: {
 		params.previewWindow,
 	);
 	const frame: CommittedTwoHopVirtualFrame = Object.freeze({
-		generation: params.previous.generation + 1,
 		sequence: params.previous.sequence + 1,
 		layout,
 		contentHeight,
@@ -510,7 +508,6 @@ function publishPreviewWindowOnly(
 	if (previewWindow === previous.previewWindow) return previous;
 
 	const frame: CommittedTwoHopVirtualFrame = Object.freeze({
-		generation: previous.generation + 1,
 		sequence: previous.sequence + 1,
 		layout: previous.layout,
 		contentHeight: previous.contentHeight,

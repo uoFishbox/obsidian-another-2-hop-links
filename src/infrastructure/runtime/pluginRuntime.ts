@@ -118,7 +118,6 @@ export function createPluginRuntime(options: PluginRuntimeOptions): PluginRuntim
 			active: previewService.getActiveVisiblePreviewCount(),
 		}),
 		subscribeBackpressure: previewService.subscribeVisiblePreviewQueue,
-		schedulerIdentity: previewService.getSchedulingIdentity(),
 		getActivationsPerSecond: () =>
 			resolvePreviewActivationsPerSecond(
 				options.getSettings().previewDomCommitsPerSecond,

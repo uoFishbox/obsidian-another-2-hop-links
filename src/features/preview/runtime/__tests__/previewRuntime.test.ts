@@ -48,11 +48,7 @@ describe("PreviewRuntime", () => {
 		createRenderer();
 		expect(state.rendererOptions.at(-1)?.getPreview).toBe(runtimeLoader);
 
-		runtime.createRenderer({
-			onMathRenderingChange: () => {},
-			onCommitted: () => {},
-			onRendered: () => {},
-		});
+		runtime.createRenderer({});
 		expect(state.rendererOptions.at(-1)?.getPreview).toBe(runtimeLoader);
 		runtime.dispose();
 	});
@@ -65,11 +61,7 @@ describe("PreviewRuntime", () => {
 			});
 		const first = createRuntime();
 		const second = createRuntime();
-		const rendererOptions = {
-			onMathRenderingChange: () => {},
-			onCommitted: () => {},
-			onRendered: () => {},
-		};
+		const rendererOptions = {};
 		first.createRenderer(rendererOptions);
 		const firstCache = state.rendererOptions.at(-1)
 			?.sharedCache as CardPreviewSharedCache;

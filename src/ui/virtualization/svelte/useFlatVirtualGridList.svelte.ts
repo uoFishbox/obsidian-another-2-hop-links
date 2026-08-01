@@ -43,22 +43,15 @@ import {
 import { createFlatGridVisibilityAdapter } from "./flatGridVisibilityAdapter";
 import { createFlatGridControllerAdapter } from "./flatGridControllerAdapter";
 import { createResidentRowSlotAllocator } from "ui/virtualization/core/residentSlotAllocator";
-import {
-	type RowPreviewCardBinding,
-} from "features/preview/scheduling/virtualPreviewSurface";
+import { type RowPreviewCardBinding } from "features/preview/scheduling/virtualPreviewSurface";
 import { DISABLED_PREVIEW_SURFACE } from "features/preview/runtime/previewRuntime";
-import type { PreviewBackpressure } from "features/preview/scheduling/previewActivationScheduler";
 import type { CardPreviewRequest } from "features/preview/core/cardPreviewRequest";
 import type { ItemInteractionDescriptor } from "ui/interactions/interactionTypes";
 import {
 	createVirtualCardInteractionController,
 	type VirtualCardInteractionBinding,
 } from "ui/interactions/virtualCardInteractionController";
-import { useAppContext, useLinkContext } from "ui/context/linkContext";
-import {
-	DEFAULT_PREVIEW_DOM_COMMITS_PER_SECOND,
-	resolvePreviewActivationsPerSecond,
-} from "appConstants";
+import { useAppContext } from "ui/context/linkContext";
 import type { VirtualFrameCoordinator } from "ui/virtualization/scheduling/frameCoordinator";
 import { DEFAULT_SETTINGS } from "features/settings/model";
 
@@ -142,36 +135,15 @@ export function useFlatVirtualGridList<T>(
 	const visibilityConsumption = $derived(
 		props.visibilityConsumption ?? "reactive-state",
 	);
-	let linkContext: ReturnType<typeof useLinkContext> | undefined;
-	try {
-		linkContext = useLinkContext();
-	} catch {
-		linkContext = undefined;
-	}
 	let appContext: ReturnType<typeof useAppContext> | undefined;
 	try {
 		appContext = useAppContext();
 	} catch {
 		appContext = undefined;
 	}
-	const previewApplicationStore = appContext?.applicationStore;
 	const previewSurfaceOptions = {
 		resolveSearchMatchPosition: appContext?.resolveSearchMatchPosition,
-		getBackpressure: (): PreviewBackpressure => ({
-			queued: linkContext?.getVisiblePreviewQueueSize?.() ?? 0,
-			active: linkContext?.getActiveVisiblePreviewCount?.() ?? 0,
-		}),
-		subscribeBackpressure: linkContext?.subscribeVisiblePreviewQueue,
-		schedulerIdentity: linkContext?.previewSchedulingIdentity,
 		frameCoordinator,
-		getActivationsPerSecond: () =>
-			resolvePreviewActivationsPerSecond(
-				applicationStore?.settings?.previewDomCommitsPerSecond ??
-					DEFAULT_PREVIEW_DOM_COMMITS_PER_SECOND,
-			),
-		getDomCommitsPerSecond: () =>
-			applicationStore?.settings?.previewDomCommitsPerSecond ??
-			DEFAULT_PREVIEW_DOM_COMMITS_PER_SECOND,
 	};
 	const previewSurface =
 		appContext?.previewRuntime?.createSurface(previewSurfaceOptions) ??
@@ -281,7 +253,6 @@ export function useFlatVirtualGridList<T>(
 		});
 	const rowModel = $derived(resolveFlatLinkRowModel(layout));
 	const previewBindingsBySlot = new Map<string, RowPreviewCardBinding>();
-	let previewFrameGeneration = 0;
 	const syncCardSlots = (
 		rows: readonly MountedVirtualGridRowSlice<T>[],
 		previewRange: RowRange,
@@ -337,7 +308,6 @@ export function useFlatVirtualGridList<T>(
 			previewBindingsBySlot.delete(slotId);
 		}
 		previewSurface.publish({
-			generation: ++previewFrameGeneration,
 			previewBindingsBySlot: new Map(previewBindingsBySlot),
 			previewWindow: Object.freeze({
 				previewRange: Object.freeze({

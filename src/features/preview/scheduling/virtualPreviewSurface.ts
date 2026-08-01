@@ -2,8 +2,6 @@ import {
 	type PreviewActivationHandle,
 	type PreviewActivationScheduler,
 	type PreviewActivationScope,
-	type PreviewBackpressure,
-	type PreviewBackpressureListener,
 } from "./previewActivationScheduler";
 import { createPreviewFrameDriver } from "./previewFrameDriver";
 import type { CardPreviewRenderer } from "features/preview/ui/cardPreviewRenderer";
@@ -42,13 +40,7 @@ export interface VirtualPreviewSurface {
 }
 
 export interface CreateVirtualPreviewSurfaceOptions {
-	readonly getBackpressure?: () => PreviewBackpressure;
-	readonly subscribeBackpressure?: (
-		listener: PreviewBackpressureListener,
-	) => () => void;
-	readonly schedulerIdentity?: object;
 	readonly frameCoordinator?: VirtualFrameCoordinator;
-	readonly getActivationsPerSecond?: () => number;
 	readonly activationScheduler: PreviewActivationScheduler;
 	readonly createRenderer: () => CardPreviewRenderer;
 	readonly hasCachedPreview: (renderKey: string) => boolean;
@@ -73,11 +65,7 @@ export function createVirtualPreviewSurface(
 	const activationSlotIds = new Set<string>();
 	const activationScheduler = options.activationScheduler;
 	const scope: PreviewActivationScope = activationScheduler.createScope({
-		getBackpressure: options.getBackpressure,
-		subscribeBackpressure: options.subscribeBackpressure,
-		schedulerIdentity: options.schedulerIdentity,
 		frameCoordinator: options.frameCoordinator,
-		getActivationsPerSecond: options.getActivationsPerSecond,
 	});
 	let previewRange: RowRange = EMPTY_RANGE;
 	let desiredFrame: PreviewFrame | undefined;
@@ -278,7 +266,6 @@ interface PreviewBindingSnapshot {
 interface PreviewFrameSnapshot {
 	readonly bindings: ReadonlyMap<string, RowPreviewCardBinding>;
 	readonly entries: readonly (readonly [string, RowPreviewCardBinding])[];
-	readonly generation: number;
 	readonly window: RowPreviewWindow;
 	readonly active: boolean;
 	readonly rangeStart: number;
@@ -302,7 +289,6 @@ function assertImmutablePreviewFrame(frame: PreviewFrame): void {
 					entry[1] !== previousFrame.entries[index]?.[1],
 			);
 		if (
-			frame.generation !== previousFrame.generation ||
 			frame.previewBindingsBySlot !== previousFrame.bindings ||
 			frame.previewWindow !== previousFrame.window ||
 			frame.previewWindow.active !== previousFrame.active ||
@@ -347,7 +333,6 @@ function assertImmutablePreviewFrame(frame: PreviewFrame): void {
 	frameSnapshots.set(frame, {
 		bindings: frame.previewBindingsBySlot,
 		entries: Array.from(frame.previewBindingsBySlot.entries()),
-		generation: frame.generation,
 		window: frame.previewWindow,
 		active: frame.previewWindow.active,
 		rangeStart: frame.previewWindow.previewRange.start,

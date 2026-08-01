@@ -25,8 +25,6 @@ export interface RowPreviewWindow {
 
 /** Immutable preview projection published as part of one atomic frame. */
 export interface PreviewFrame {
-	/** Monotonic publication number used for diagnostics and currentness traces. */
-	readonly generation: number;
 	readonly previewBindingsBySlot: ReadonlyMap<string, RowPreviewCardBinding>;
 	readonly previewWindow: RowPreviewWindow;
 }

@@ -33,9 +33,7 @@ function createBaseLink(sourceFile: TFile): TwoHopIndexedLink {
 }
 
 function createPreviewServiceMock() {
-	return {
-		getSchedulingIdentity: vi.fn(() => ({})),
-	};
+	return {};
 }
 
 describe("createLinkContextFactory", () => {

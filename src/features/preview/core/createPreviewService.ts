@@ -29,7 +29,6 @@ export class PreviewService {
 	private cache = createPreviewGenerationCache();
 	private inFlightRequests = new Map<string, InFlightRequest>();
 	private queue = createPreviewQueue();
-	private readonly schedulingIdentity = {};
 
 	constructor(strategies?: PreviewStrategy[]) {
 		this.strategies = strategies ?? createDefaultPreviewStrategies();
@@ -48,10 +47,6 @@ export class PreviewService {
 
 	public getActiveVisiblePreviewCount(): number {
 		return this.queue.getActiveCount();
-	}
-
-	public getSchedulingIdentity(): object {
-		return this.schedulingIdentity;
 	}
 
 	public subscribeVisiblePreviewQueue(listener: PreviewQueueListener): () => void {
@@ -301,7 +296,6 @@ export function createPreviewService(
 			),
 		getVisibleQueueSize: () => service.getVisibleQueueSize(),
 		getActiveVisiblePreviewCount: () => service.getActiveVisiblePreviewCount(),
-		getSchedulingIdentity: () => service.getSchedulingIdentity(),
 		subscribeVisiblePreviewQueue: (listener) =>
 			service.subscribeVisiblePreviewQueue(listener),
 		clearCache: () => service.clearCache(),

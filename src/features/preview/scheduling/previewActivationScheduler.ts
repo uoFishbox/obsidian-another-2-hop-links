@@ -24,10 +24,7 @@ import {
 	refillPreviewScheduleTokens,
 	type PreviewScheduleTokenState,
 } from "./previewScheduleTokenBucket";
-import {
-	createPreviewKeyedQueue,
-	type PreviewKeyedQueue,
-} from "./previewKeyedQueue";
+import { createPreviewKeyedQueue, type PreviewKeyedQueue } from "./previewKeyedQueue";
 
 const MAX_QUEUE_ENTRIES_PER_DRAIN = 256;
 const MAX_OUTSTANDING_PREVIEW_JOBS = 3;
@@ -93,7 +90,6 @@ interface PreviewActivationRequest {
 }
 
 interface PreviewActivationRuntime {
-	readonly identity: object;
 	readonly scopes: Set<PreviewActivationScopeState>;
 	readonly getBackpressure: () => PreviewBackpressure;
 	readonly subscribeBackpressure:
@@ -116,15 +112,22 @@ interface PreviewActivationPartition {
 	lastObservedMeasurementEpoch: number;
 }
 
-export interface CreatePreviewActivationScopeOptions {
+/**
+ * Runtime-wide activation policy shared by every scope of one scheduler.
+ *
+ * The plugin runtime configures these once per PreviewService; surfaces must
+ * not override them per scope.
+ */
+export interface CreatePreviewActivationSchedulerOptions {
 	readonly getBackpressure?: () => PreviewBackpressure;
 	readonly subscribeBackpressure?: (
 		listener: PreviewBackpressureListener,
 	) => () => void;
 	/** Maximum preview activations admitted per second while scrolling. */
 	readonly getActivationsPerSecond?: () => number;
-	/** Stable identity of the PreviewService whose admission limit is shared. */
-	readonly schedulerIdentity?: object;
+}
+
+export interface CreatePreviewActivationScopeOptions {
 	readonly frameCoordinator?: VirtualFrameCoordinator;
 }
 
@@ -147,8 +150,10 @@ export interface PreviewActivationScheduler {
 }
 
 /** Creates the scheduler facade used by PreviewRuntime. */
-export function createPreviewActivationScheduler(): PreviewActivationScheduler {
-	const state = createSchedulerState();
+export function createPreviewActivationScheduler(
+	options: CreatePreviewActivationSchedulerOptions = {},
+): PreviewActivationScheduler {
+	const state = createSchedulerState(options);
 	return {
 		createScope: (options) => createPreviewActivationScopeForState(state, options),
 		request: (key, scope, onActivated) =>
@@ -165,21 +170,33 @@ interface PreviewActivationHandleInternal extends PreviewActivationHandle {
 }
 
 interface PreviewActivationSchedulerState {
-	readonly defaultRuntimeIdentity: object;
+	readonly runtime: PreviewActivationRuntime;
 	readonly fallbackPartitionIdentity: object;
 	readonly scopeStates: WeakMap<PreviewActivationScope, PreviewActivationScopeState>;
-	readonly runtimesByIdentity: Map<object, PreviewActivationRuntime>;
 	readonly partitionsByIdentity: Map<object, PreviewActivationPartition>;
 	nextPartitionId: number;
 	unsubscribeScrollActivity?: () => void;
 }
 
-function createSchedulerState(): PreviewActivationSchedulerState {
+function createSchedulerState(
+	options: CreatePreviewActivationSchedulerOptions,
+): PreviewActivationSchedulerState {
+	const runtime: PreviewActivationRuntime = {
+		scopes: new Set(),
+		getBackpressure: options.getBackpressure ?? getEmptyBackpressure,
+		subscribeBackpressure: options.subscribeBackpressure,
+		getActivationsPerSecond:
+			options.getActivationsPerSecond ?? getDefaultActivationsPerSecond,
+		roundRobinCursorByPartition: new Map(),
+		scrollingPolicy: { ...SCROLLING_POLICY },
+		tokenState: createEmptyPreviewScheduleTokenState(),
+		blockedForBackpressure: false,
+		unsubscribeBackpressure: undefined,
+	};
 	return {
-		defaultRuntimeIdentity: {},
+		runtime,
 		fallbackPartitionIdentity: {},
 		scopeStates: new WeakMap(),
-		runtimesByIdentity: new Map(),
 		partitionsByIdentity: new Map(),
 		nextPartitionId: 0,
 	};
@@ -222,42 +239,6 @@ function resolvePositiveRate(value: number, fallback: number): number {
 	return Number.isFinite(value) && value > 0 ? value : fallback;
 }
 
-function resolveRuntimeIdentity(
-	state: PreviewActivationSchedulerState,
-	options: CreatePreviewActivationScopeOptions,
-): object {
-	if (options.schedulerIdentity) return options.schedulerIdentity;
-	if (options.getBackpressure) return options.getBackpressure;
-	if (options.subscribeBackpressure) return options.subscribeBackpressure;
-	if (options.getActivationsPerSecond) return options.getActivationsPerSecond;
-	return state.defaultRuntimeIdentity;
-}
-
-function getOrCreateRuntime(
-	state: PreviewActivationSchedulerState,
-	options: CreatePreviewActivationScopeOptions,
-): PreviewActivationRuntime {
-	const identity = resolveRuntimeIdentity(state, options);
-	const existing = state.runtimesByIdentity.get(identity);
-	if (existing) return existing;
-
-	const runtime: PreviewActivationRuntime = {
-		identity,
-		scopes: new Set(),
-		getBackpressure: options.getBackpressure ?? getEmptyBackpressure,
-		subscribeBackpressure: options.subscribeBackpressure,
-		getActivationsPerSecond:
-			options.getActivationsPerSecond ?? getDefaultActivationsPerSecond,
-		roundRobinCursorByPartition: new Map(),
-		scrollingPolicy: { ...SCROLLING_POLICY },
-		tokenState: createEmptyPreviewScheduleTokenState(),
-		blockedForBackpressure: false,
-		unsubscribeBackpressure: undefined,
-	};
-	state.runtimesByIdentity.set(identity, runtime);
-	return runtime;
-}
-
 function getOrCreatePartition(
 	state: PreviewActivationSchedulerState,
 	coordinator: VirtualFrameCoordinator | undefined,
@@ -294,7 +275,7 @@ function createPreviewActivationScopeForState(
 	schedulerState: PreviewActivationSchedulerState,
 	options: CreatePreviewActivationScopeOptions = {},
 ): PreviewActivationScope {
-	const runtime = getOrCreateRuntime(schedulerState, options);
+	const runtime = schedulerState.runtime;
 	const partition = getOrCreatePartition(schedulerState, options.frameCoordinator);
 	const scope: PreviewActivationScope = { kind: "preview-activation-scope" };
 	const state: PreviewActivationScopeState = {
@@ -705,7 +686,6 @@ function disposePreviewActivationScopeForState(
 	}
 	if (scopeState.runtime.scopes.size === 0) {
 		releaseRuntimeBackpressureSubscription(scopeState.runtime);
-		schedulerState.runtimesByIdentity.delete(scopeState.runtime.identity);
 	}
 	releaseScrollActivitySubscriptionIfIdle(schedulerState);
 }
@@ -713,8 +693,9 @@ function disposePreviewActivationScopeForState(
 function resetPreviewActivationSchedulerState(
 	schedulerState: PreviewActivationSchedulerState,
 ): void {
-	const scopes = Array.from(schedulerState.runtimesByIdentity.values()).flatMap(
-		(runtime) => Array.from(runtime.scopes, (scopeState) => scopeState.scope),
+	const scopes = Array.from(
+		schedulerState.runtime.scopes,
+		(scopeState) => scopeState.scope,
 	);
 	for (const scope of scopes) {
 		disposePreviewActivationScopeForState(schedulerState, scope);
@@ -724,7 +705,6 @@ function resetPreviewActivationSchedulerState(
 		partition.driver.dispose();
 	}
 	schedulerState.partitionsByIdentity.clear();
-	schedulerState.runtimesByIdentity.clear();
 	schedulerState.unsubscribeScrollActivity?.();
 	schedulerState.unsubscribeScrollActivity = undefined;
 }

@@ -83,8 +83,9 @@ export function useTwoHopVirtualList(
 	const applicationStore = props.applicationStore;
 	const previewSurface = props.previewDependencies
 		? props.previewDependencies.previewRuntime.createSurface({
-				...props.previewDependencies,
 				frameCoordinator,
+				resolveSearchMatchPosition:
+					props.previewDependencies.resolveSearchMatchPosition,
 			})
 		: DISABLED_PREVIEW_SURFACE;
 	const isPreviewActive = () =>

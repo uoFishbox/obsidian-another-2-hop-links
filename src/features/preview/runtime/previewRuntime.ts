@@ -11,9 +11,9 @@ import {
 } from "features/preview/scheduling/previewDomCommitScheduler";
 import {
 	createVirtualPreviewSurface,
-	type CreateVirtualPreviewSurfaceOptions,
 	type VirtualPreviewSurface,
 } from "features/preview/scheduling/virtualPreviewSurface";
+import type { VirtualFrameCoordinator } from "ui/virtualization/scheduling/frameCoordinator";
 import {
 	createCardPreviewRenderer,
 	type CardPreviewLoader,
@@ -30,23 +30,14 @@ export interface PreviewRuntimeOptions {
 	readonly subscribeBackpressure?: (
 		listener: PreviewBackpressureListener,
 	) => () => void;
-	readonly schedulerIdentity?: object;
 	readonly getActivationsPerSecond?: () => number;
 	readonly getDomCommitsPerSecond?: () => number;
 }
 
 /** Per-surface values which are expected to vary with the current view. */
-export interface PreviewRuntimeSurfaceOptions extends Omit<
-	CreateVirtualPreviewSurfaceOptions,
-	"activationScheduler" | "createRenderer" | "hasCachedPreview"
-> {
+export interface PreviewRuntimeSurfaceOptions {
+	readonly frameCoordinator?: VirtualFrameCoordinator;
 	readonly resolveSearchMatchPosition?: CardPreviewRendererOptions["resolveSearchMatchPosition"];
-	readonly getDomCommitsPerSecond?: () => number;
-	readonly getBackpressure?: () => PreviewBackpressure;
-	readonly subscribeBackpressure?: (
-		listener: PreviewBackpressureListener,
-	) => () => void;
-	readonly schedulerIdentity?: object;
 }
 
 export type PreviewRuntimeRendererOptions = Omit<
@@ -57,9 +48,10 @@ export type PreviewRuntimeRendererOptions = Omit<
 /**
  * Plugin-owned entry point for all preview surfaces and renderers.
  *
- * The runtime gives every consumer the same preview data source, scheduler
- * identity, and teardown boundary. View-specific search and render revision
- * inputs remain explicit surface options because they belong to the view.
+ * The runtime gives every consumer the same preview data source, shared
+ * backpressure/admission policy, and teardown boundary. View-specific search
+ * and render revision inputs remain explicit surface options because they
+ * belong to the view.
  */
 export interface PreviewRuntime {
 	createSurface(options: PreviewRuntimeSurfaceOptions): VirtualPreviewSurface;
@@ -69,9 +61,12 @@ export interface PreviewRuntime {
 
 /** Creates the preview runtime for one plugin load. */
 export function createPreviewRuntime(options: PreviewRuntimeOptions): PreviewRuntime {
-	const schedulerIdentity = options.schedulerIdentity ?? {};
 	const activationScheduler: PreviewActivationScheduler =
-		createPreviewActivationScheduler();
+		createPreviewActivationScheduler({
+			getBackpressure: options.getBackpressure,
+			subscribeBackpressure: options.subscribeBackpressure,
+			getActivationsPerSecond: options.getActivationsPerSecond,
+		});
 	const domCommitScheduler: PreviewDomCommitScheduler =
 		createPreviewDomCommitScheduler();
 	const sharedCache = createCardPreviewSharedCache();
@@ -86,14 +81,7 @@ export function createPreviewRuntime(options: PreviewRuntimeOptions): PreviewRun
 		}
 
 		const surface = createVirtualPreviewSurface({
-			...surfaceOptions,
-			getBackpressure: surfaceOptions.getBackpressure ?? options.getBackpressure,
-			subscribeBackpressure:
-				surfaceOptions.subscribeBackpressure ?? options.subscribeBackpressure,
-			schedulerIdentity: surfaceOptions.schedulerIdentity ?? schedulerIdentity,
-			getActivationsPerSecond:
-				surfaceOptions.getActivationsPerSecond ??
-				options.getActivationsPerSecond,
+			frameCoordinator: surfaceOptions.frameCoordinator,
 			activationScheduler,
 			hasCachedPreview: (renderKey) =>
 				sharedCache.getRenderedPreviewCacheEntry(renderKey) !== undefined,
@@ -103,15 +91,10 @@ export function createPreviewRuntime(options: PreviewRuntimeOptions): PreviewRun
 					getPreview: options.getPreview,
 					sharedCache,
 					frameCoordinator: surfaceOptions.frameCoordinator,
-					getDomCommitsPerSecond:
-						surfaceOptions.getDomCommitsPerSecond ??
-						options.getDomCommitsPerSecond,
+					getDomCommitsPerSecond: options.getDomCommitsPerSecond,
 					resolveSearchMatchPosition:
 						surfaceOptions.resolveSearchMatchPosition,
 					domCommitScheduler,
-					onMathRenderingChange: () => {},
-					onCommitted: () => {},
-					onRendered: () => {},
 				}),
 		});
 		let managedSurface!: VirtualPreviewSurface;

@@ -45,13 +45,13 @@ export interface CardPreviewRendererOptions {
 		query: string,
 		file: TFile | null | undefined,
 	) => Pos | undefined;
-	onMathRenderingChange: (isRendering: boolean) => void;
-	onCommitted: (
+	onMathRenderingChange?: (isRendering: boolean) => void;
+	onCommitted?: (
 		generation: number,
 		contentType: PreviewData["type"] | undefined,
 		retention: CardPreviewRetention,
 	) => void;
-	onRendered: () => void;
+	onRendered?: () => void;
 }
 
 export interface PreviewRenderCallbacks {
@@ -130,7 +130,7 @@ export function createCardPreviewRenderer(
 				if (!didRender || isRenderStale(abortController.signal, renderToken)) {
 					return;
 				}
-				options.onRendered();
+				options.onRendered?.();
 				callbacks?.onRendered();
 			})
 			.finally(() => {
@@ -164,7 +164,7 @@ export function createCardPreviewRenderer(
 					renderToken,
 				)
 			) {
-				options.onMathRenderingChange(false);
+				options.onMathRenderingChange?.(false);
 				return true;
 			}
 
@@ -203,7 +203,7 @@ export function createCardPreviewRenderer(
 			);
 
 			if (!shouldDelayMathCardRendering) {
-				options.onMathRenderingChange(false);
+				options.onMathRenderingChange?.(false);
 
 				if (
 					previewForRender.type === "text" &&
@@ -286,7 +286,7 @@ export function createCardPreviewRenderer(
 				return didReplace;
 			}
 
-			options.onMathRenderingChange(true);
+			options.onMathRenderingChange?.(true);
 			await enqueueMathRender(
 				async () => {
 					if (isRenderStale(signal, renderToken)) return;
@@ -317,10 +317,10 @@ export function createCardPreviewRenderer(
 							shouldSyncMathStyles,
 						);
 						if (!didCommit) {
-							options.onMathRenderingChange(false);
+							options.onMathRenderingChange?.(false);
 							return;
 						}
-						options.onMathRenderingChange(false);
+						options.onMathRenderingChange?.(false);
 						return;
 					}
 
@@ -350,7 +350,7 @@ export function createCardPreviewRenderer(
 							resolvePreviewRetention(previewForRender),
 						)
 					) {
-						options.onMathRenderingChange(false);
+						options.onMathRenderingChange?.(false);
 					}
 				},
 				{
@@ -504,7 +504,7 @@ export function createCardPreviewRenderer(
 		contentType: PreviewData["type"] | undefined,
 		retention: CardPreviewRetention,
 	): void {
-		options.onCommitted(generation, contentType, retention);
+		options.onCommitted?.(generation, contentType, retention);
 		const callbacks = callbacksByRenderToken.get(renderToken);
 		if (!callbacks?.isCurrent()) return;
 		callbacks.onLoadingChange(false);

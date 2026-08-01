@@ -53,7 +53,6 @@ function binding(
 
 function committedFrame(card: RowPreviewCardBinding): PreviewFrame {
 	return {
-		generation: 0,
 		previewBindingsBySlot: new Map([[card.slotId, card]]),
 		previewWindow: {
 			previewRange: { start: card.rowIndex, end: card.rowIndex + 1 },
@@ -111,7 +110,6 @@ function createHarness(frameCoordinator?: VirtualFrameCoordinator): {
 			};
 		},
 	});
-	let generation = 0;
 	let bindings = new Map<string, RowPreviewCardBinding>();
 	let previewWindow = {
 		previewRange: { start: 0, end: 0 },
@@ -124,7 +122,6 @@ function createHarness(frameCoordinator?: VirtualFrameCoordinator): {
 		bindings = new Map(nextBindings);
 		previewWindow = nextWindow;
 		actualSurface.publish({
-			generation: ++generation,
 			previewBindingsBySlot: new Map(bindings),
 			previewWindow,
 		});

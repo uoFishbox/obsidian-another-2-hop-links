@@ -24,6 +24,7 @@ import {
 } from "infrastructure/debug/CCLDevMeasurements";
 import {
 	createPreviewActivationScheduler,
+	type CreatePreviewActivationSchedulerOptions,
 	type CreatePreviewActivationScopeOptions,
 	type PreviewActivationHandle,
 	type PreviewActivationScope,
@@ -46,7 +47,6 @@ function createPreviewActivationScope(
 ): PreviewActivationScope {
 	return defaultTestScheduler.createScope(options);
 }
-
 function requestQueuedPreviewActivation(
 	key: string,
 	scope: PreviewActivationScope,
@@ -59,9 +59,11 @@ function disposePreviewActivationScheduler(): void {
 	defaultTestScheduler.dispose();
 }
 
-function resetPreviewActivationSchedulerForTests(): void {
+function resetPreviewActivationSchedulerForTests(
+	options?: CreatePreviewActivationSchedulerOptions,
+): void {
 	defaultTestScheduler.dispose();
-	defaultTestScheduler = createPreviewActivationScheduler();
+	defaultTestScheduler = createPreviewActivationScheduler(options);
 }
 
 function requestActivation(
@@ -90,11 +92,12 @@ async function countScrollingActivations(params: {
 	resetScrollActivityForTests();
 	frameIntervalMs = params.intervalMs;
 	const activationsPerSecond = params.activationsPerSecond;
-	const scope = createPreviewActivationScope({
+	resetPreviewActivationSchedulerForTests({
 		getActivationsPerSecond: activationsPerSecond
 			? () => activationsPerSecond
 			: undefined,
 	});
+	const scope = createPreviewActivationScope();
 	let activated = 0;
 
 	markScrollActivityActive(scrollSource);
@@ -116,12 +119,13 @@ beforeEach(() => {
 	activeVisiblePreviewCount = 0;
 	results = [];
 	resetCCLDevMeasurements();
-	activationScope = createPreviewActivationScope({
+	defaultTestScheduler = createPreviewActivationScheduler({
 		getBackpressure: () => ({
 			queued: visibleQueueSize,
 			active: activeVisiblePreviewCount,
 		}),
 	});
+	activationScope = defaultTestScheduler.createScope();
 	vi.useFakeTimers();
 	frameTimeOrigin = Date.now();
 	vi.stubGlobal(
@@ -359,12 +363,13 @@ describe("preview activation scheduler", () => {
 	it("holds activation while the outstanding preview admission limit is full", async () => {
 		let queuedPreviewJobs = 2;
 		let activePreviewJobs = 1;
-		const scope = createPreviewActivationScope({
+		resetPreviewActivationSchedulerForTests({
 			getBackpressure: () => ({
 				queued: queuedPreviewJobs,
 				active: activePreviewJobs,
 			}),
 		});
+		const scope = createPreviewActivationScope();
 		const activation = requestActivation("preview-blocked", scope);
 		await flushAnimationFrame();
 		expect(activation.onActivated).not.toHaveBeenCalled();
@@ -512,36 +517,30 @@ describe("preview activation scheduler", () => {
 		expect(second.onActivated).toHaveBeenCalledOnce();
 	});
 
-	it("does not combine backpressure from independent preview services", async () => {
-		const blockedScope = createPreviewActivationScope({
-			schedulerIdentity: {},
+	it("blocks every scope while the shared backpressure is full", async () => {
+		resetPreviewActivationSchedulerForTests({
 			getBackpressure: () => ({ queued: 2, active: 1 }),
 		});
-		const availableScope = createPreviewActivationScope({
-			schedulerIdentity: {},
-			getBackpressure: () => ({ queued: 0, active: 0 }),
-		});
-		const blocked = requestActivation("preview-blocked", blockedScope);
-		const available = requestActivation("preview-available", availableScope);
+		const scope = createPreviewActivationScope();
+		const blocked = requestActivation("preview-blocked", scope);
 
 		await flushAnimationFrame();
 
 		expect(blocked.onActivated).not.toHaveBeenCalled();
-		expect(available.onActivated).toHaveBeenCalledOnce();
 	});
 
 	it("waits for a backpressure notification instead of polling every frame", async () => {
 		let pressure = { queued: 2, active: 1 };
 		let notifyPressureChanged: (() => void) | undefined;
 		const unsubscribe = vi.fn();
-		const scope = createPreviewActivationScope({
-			schedulerIdentity: {},
+		resetPreviewActivationSchedulerForTests({
 			getBackpressure: () => pressure,
 			subscribeBackpressure: (listener) => {
 				notifyPressureChanged = () => listener(pressure);
 				return unsubscribe;
 			},
 		});
+		const scope = createPreviewActivationScope();
 		const activation = requestActivation("preview-event-driven", scope);
 
 		await flushAnimationFrame();

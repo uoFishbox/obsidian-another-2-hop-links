@@ -140,9 +140,6 @@ function createPreviewDependencies(
 	return {
 		previewRuntime,
 		resolveSearchMatchPosition: () => undefined,
-		getBackpressure: () => ({ queued: 0, active: 0 }),
-		getActivationsPerSecond: () => 60,
-		getDomCommitsPerSecond: () => 60,
 	};
 }
 

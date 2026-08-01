@@ -23,7 +23,6 @@
 	import type { TwoHopLinksRootUiState } from "features/two-hop/ui/twoHopLinksRootUiState";
 	import { observePreviewSurfaceVisibility } from "features/preview/scheduling/previewSurfaceVisibility";
 	import type { TwoHopPreviewDependencies } from "features/two-hop/ui/twoHopPreviewDependencies";
-	import { resolvePreviewActivationsPerSecond } from "appConstants";
 	import type { PreviewRuntime } from "features/preview/runtime/previewRuntime";
 
 	interface Props {
@@ -175,18 +174,6 @@
 				previewRuntime,
 				resolveSearchMatchPosition: (query, targetFile) =>
 					workerSearchSession.getFirstMatchPosition(query, targetFile),
-				getBackpressure: () => ({
-					queued: linkContext.getVisiblePreviewQueueSize?.() ?? 0,
-					active: linkContext.getActiveVisiblePreviewCount?.() ?? 0,
-				}),
-				subscribeBackpressure: linkContext.subscribeVisiblePreviewQueue,
-				schedulerIdentity: linkContext.previewSchedulingIdentity,
-				getActivationsPerSecond: () =>
-					resolvePreviewActivationsPerSecond(
-						applicationStore.settings.previewDomCommitsPerSecond,
-					),
-				getDomCommitsPerSecond: () =>
-					applicationStore.settings.previewDomCommitsPerSecond,
 			}
 		: undefined;
 
