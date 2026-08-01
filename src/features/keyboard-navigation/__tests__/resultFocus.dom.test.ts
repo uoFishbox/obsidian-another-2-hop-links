@@ -50,7 +50,7 @@ function createVirtualCell({
 	height?: number;
 }): HTMLElement {
 	const cell = document.createElement("div");
-	cell.className = "view-plan-virtual-list-cell";
+	cell.className = "cosense-card-links__virtual-grid-cell";
 	cell.style.transform = `translate(${left}px, ${top}px)`;
 	cell.style.width = `${width}px`;
 	cell.style.height = `${height}px`;
@@ -92,7 +92,7 @@ describe("moveFocusBetweenResults", () => {
 
 	it("uses the virtual cell transform when the card rect is unavailable", () => {
 		const root = document.createElement("div");
-		root.className = "view-plan-virtual-list";
+		root.className = "cosense-card-links__virtual-grid";
 
 		const currentCell = createVirtualResult({
 			id: "current",

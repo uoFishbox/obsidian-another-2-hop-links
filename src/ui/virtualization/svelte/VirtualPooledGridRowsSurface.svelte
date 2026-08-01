@@ -18,10 +18,7 @@
 		VirtualCellRegistry,
 	} from "./VirtualCellRegistry";
 	import type { VirtualGridSurfaceTransaction } from "./VirtualGridSurfaceTransaction";
-	import type {
-		VirtualSurfaceMountedRow,
-		VirtualSurfaceResidentRowViewState,
-	} from "./VirtualSurfaceTypes";
+	import type { VirtualSurfaceMountedRow } from "./VirtualSurfaceTypes";
 
 	interface Props<
 		TMountedCell extends MountedVirtualCell,
@@ -35,8 +32,7 @@
 		rowHeight: number;
 		columns?: number;
 		gap?: number;
-		mountedRows?: readonly TMountedRow[];
-		residentRows?: readonly VirtualSurfaceResidentRowViewState<TMountedCell>[];
+		mountedRows: readonly TMountedRow[];
 		contentEl?: HTMLDivElement | null;
 		observerRoot?: HTMLElement | null;
 		getCellClassName?: (cell: TMountedCell) => string | undefined;
@@ -69,8 +65,7 @@
 		rowHeight,
 		columns = 1,
 		gap = undefined,
-		mountedRows = undefined,
-		residentRows = undefined,
+		mountedRows,
 		contentEl = $bindable<HTMLDivElement | null>(null),
 		observerRoot = null,
 		getCellClassName,
@@ -142,21 +137,12 @@
 		update(top);
 		return { update };
 	};
-
-	const directRowViewStates = $derived(
-		(mountedRows ?? []).map((row) => ({
-			slotIndex: row.slotIndex ?? row.key,
-			row,
-		})),
-	);
-	const rowViewStates = $derived(residentRows ?? directRowViewStates);
 </script>
 
 <div class={contentClassName} bind:this={contentEl} style={contentStyle}>
 	<div data-ccl-virtual-flow-spacer="top" style:height="0px" aria-hidden="true"></div>
-	{#each rowViewStates as rowViewState (rowViewState.slotIndex)}
-		{@const row = rowViewState.row as TMountedRow | undefined}
-		{#if row && (!isRowActive || isRowActive(row))}
+	{#each mountedRows as row (row.slotIndex ?? row.key)}
+		{#if !isRowActive || isRowActive(row)}
 			<div
 				{...row.attributes}
 				class={rowClassName}

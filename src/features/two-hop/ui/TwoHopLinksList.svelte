@@ -1,5 +1,4 @@
 <script lang="ts">
-	import TwoHopSurface from "features/two-hop/ui/TwoHopSurface.svelte";
 	import TwoHopProgressiveSurface from "features/two-hop/ui/TwoHopProgressiveSurface.svelte";
 	import type { ApplicationStore } from "ui/stores/ApplicationStore.svelte";
 	import type {
@@ -70,26 +69,13 @@
 	});
 </script>
 
-{#if currentSettings.twoHopListMode === "progressive-chunks"}
-	<TwoHopProgressiveSurface
-		{sections}
-		{applicationStore}
-		{initialVisibleCount}
-		{loadMoreIncrement}
-		paginationScope={searchQuery}
-		{resolveItemCardModel}
-		{previewDependencies}
-		{previewActive}
-	/>
-{:else}
-	<TwoHopSurface
-		{sections}
-		{applicationStore}
-		{initialVisibleCount}
-		{loadMoreIncrement}
-		paginationScope={searchQuery}
-		{resolveItemCardModel}
-		{previewDependencies}
-		{previewActive}
-	/>
-{/if}
+<TwoHopProgressiveSurface
+	{sections}
+	{applicationStore}
+	{initialVisibleCount}
+	{loadMoreIncrement}
+	paginationScope={searchQuery}
+	{resolveItemCardModel}
+	{previewDependencies}
+	{previewActive}
+/>

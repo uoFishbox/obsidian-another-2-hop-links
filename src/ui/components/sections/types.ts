@@ -1,6 +1,5 @@
 import type { Snippet } from "svelte";
 import type { SectionHeaderInteractionDescriptor } from "ui/interactions/interactionTypes";
-import type { RenderRevision } from "ui/virtualization/renderRevision";
 
 export interface SectionConfig<T> {
 	title: string;
@@ -31,5 +30,4 @@ export interface SectionRenderDescriptor<T, G> {
 	readonly getItems: () => readonly T[];
 	readonly getItem?: (index: number) => T | undefined;
 	readonly headerProps: ClickableHeaderExtraProps;
-	readonly headerRenderRevision?: RenderRevision;
 }

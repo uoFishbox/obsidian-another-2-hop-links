@@ -1,6 +1,5 @@
 <script lang="ts">
 	import VirtualInteractiveSurface from "ui/virtualization/svelte/VirtualInteractiveSurface.svelte";
-	import type { MountedVirtualCell } from "ui/virtualization/types";
 	import { provideVirtualFrameCoordinator } from "ui/virtualization/svelte/frameCoordinatorContext.svelte";
 	import { provideVirtualPreviewSurface } from "features/preview/ui/virtualPreviewSurfaceContext";
 	import TwoHopProgressiveRow from "features/two-hop/ui/TwoHopProgressiveRow.svelte";
@@ -9,7 +8,6 @@
 		type TwoHopProgressiveListProps,
 	} from "features/two-hop/ui/useTwoHopProgressiveList.svelte";
 
-	const EMPTY_MOUNTED_CELLS: readonly MountedVirtualCell[] = Object.freeze([]);
 	const props: TwoHopProgressiveListProps = $props();
 	const frameCoordinator = provideVirtualFrameCoordinator();
 	const list = useTwoHopProgressiveList(props, frameCoordinator);
@@ -27,7 +25,6 @@
 	bind:contentEl={list.contentEl}
 	observerRoot={list.observerRoot}
 	rowHeight={list.layout.rowHeight}
-	mountedCells={EMPTY_MOUNTED_CELLS}
 	interactionDescriptorScopeId="two-hop-progressive-card-slots"
 	interactionDescriptorResolverProvider={list.interactionDescriptorResolverProvider}
 >

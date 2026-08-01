@@ -1,6 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
 import {
-	computeCellPosition,
 	computeColumnCount,
 	computeVirtualGridLayout,
 	computeVisibleRowRange,
@@ -253,51 +252,6 @@ describe("linkListLayout", () => {
 				overscanRows: 2,
 			});
 			expect(outside.start).toBe(outside.end);
-		});
-	});
-
-	describe("computeCellPosition", () => {
-		it("no duplicates, monotonic, decimal tolerance", () => {
-			const columns = 3;
-			const cellWidth = 103.33333333333333;
-			const gap = 10;
-			const rowHeight = 124;
-			const cellCount = 9;
-
-			const positions: Array<{
-				row: number;
-				column: number;
-				top: number;
-				left: number;
-			}> = [];
-			for (let i = 0; i < cellCount; i++) {
-				positions.push(
-					computeCellPosition({
-						index: i,
-						columns,
-						cellWidth,
-						rowHeight,
-						gap,
-					}),
-				);
-			}
-
-			// no overlapping positions
-			const keys = new Set<string>();
-			for (const p of positions) {
-				const k = `${p.top.toFixed(2)},${p.left.toFixed(2)}`;
-				expect(keys.has(k)).toBe(false);
-				keys.add(k);
-			}
-
-			// monotonic: row * 1000 + column strictly increases with index
-			for (let i = 1; i < positions.length; i++) {
-				const prev = positions[i - 1];
-				const curr = positions[i];
-				expect(curr.row * 1000 + curr.column).toBeGreaterThan(
-					prev.row * 1000 + prev.column,
-				);
-			}
 		});
 	});
 });

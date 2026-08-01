@@ -13,63 +13,18 @@ export const CARD_RENDER_SHADOW_CSS = String.raw`
     background-color: var(--text-highlight-bg)
 }
 
-.view-plan-virtual-list-content {
-	position: relative;
-	width: 100%;
-	contain: content;
-	overflow-anchor: none;
-}
-
 .cosense-card-links__virtual-grid-content {
 	position: relative;
 	width: 100%;
 	contain: layout;
 }
 
-.view-plan-virtual-list-cell {
-	position: absolute;
-	top: 0;
-	left: 0;
-	box-sizing: border-box;
-	min-width: 0;
-	width: var(--ccl-cell-width);
-	height: var(--ccl-box-height);
-}
-
-.view-plan-flow-cell {
-	position: relative;
-	top: auto;
-	left: auto;
-	flex: 0 0 var(--ccl-cell-width);
-}
-
-.view-plan-virtual-list-cell,
 .cosense-card-links__virtual-grid-cell {
 	box-sizing: border-box;
 	min-width: 0;
 	width: var(--ccl-cell-width);
 	flex: 0 0 var(--ccl-cell-width);
 	height: var(--ccl-box-height);
-}
-
-.view-plan-virtual-list-cell,
-.view-plan-flow-cell {
-	contain: layout;
-}
-
-.cosense-card-links__virtual-grid-cell {
-	contain: layout;
-}
-
-.view-plan-flow-row {
-	position: absolute;
-	inset-inline: 0;
-	top: 0;
-	margin-bottom: 0;
-	width: 100%;
-	height: var(--ccl-box-height);
-	display: flex;
-	gap: var(--ccl-box-gap);
 	contain: layout;
 }
 
@@ -407,10 +362,6 @@ export const CARD_RENDER_SHADOW_CSS = String.raw`
 
 .cosense-card-links__load-more-button > .cosense-card-links__box-title-wrapper {
 	display: contents;
-}
-
-.twohop-keyed-surface {
-	contain: layout paint style;
 }
 
 .twohop-progressive-surface {

@@ -743,8 +743,6 @@ export function useFlatVirtualGridList<T>(
 		get canLoadMore() {
 			return canLoadMore;
 		},
-		getCellPosition: (mountedCell: MountedVirtualGridCell<T>) =>
-			mountedCell.position,
 		resolveNavigationTarget,
 		flushVirtualScrollMeasurement,
 		createItemRenderArgs,

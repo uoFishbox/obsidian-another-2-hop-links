@@ -1,26 +1,26 @@
 import type { TwoHopPreviewDependencies } from "features/two-hop/ui/twoHopPreviewDependencies";
 import type { ApplicationStore } from "ui/stores/ApplicationStore.svelte";
 
-interface TwoHopSurfacePageStubProps {
+interface TwoHopProgressiveSurfacePageStubProps {
 	readonly applicationStore: ApplicationStore;
 	readonly previewDependencies: TwoHopPreviewDependencies | undefined;
 	readonly previewActive: boolean;
 }
 
-let latestProps: TwoHopSurfacePageStubProps | undefined;
+let latestProps: TwoHopProgressiveSurfacePageStubProps | undefined;
 
-export function captureTwoHopSurfacePageStubProps(
-	props: TwoHopSurfacePageStubProps,
+export function captureTwoHopProgressiveSurfacePageStubProps(
+	props: TwoHopProgressiveSurfacePageStubProps,
 ): void {
 	latestProps = props;
 }
 
-export function getTwoHopSurfacePageStubProps():
-	| TwoHopSurfacePageStubProps
+export function getTwoHopProgressiveSurfacePageStubProps():
+	| TwoHopProgressiveSurfacePageStubProps
 	| undefined {
 	return latestProps;
 }
 
-export function resetTwoHopSurfacePageStubProps(): void {
+export function resetTwoHopProgressiveSurfacePageStubProps(): void {
 	latestProps = undefined;
 }

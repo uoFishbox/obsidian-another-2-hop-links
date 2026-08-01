@@ -89,7 +89,6 @@ describe("TwoHopProgressiveSurface", () => {
 		const applicationStore = {
 			settings: {
 				...DEFAULT_SETTINGS,
-				twoHopListMode: "progressive-chunks",
 				cardWidthPx: 100,
 				cardHeightRatio: 1,
 				cardMaxColumns: 3,

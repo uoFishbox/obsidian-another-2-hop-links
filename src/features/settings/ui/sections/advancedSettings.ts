@@ -8,25 +8,6 @@ import type { SettingDefinition } from "./settingDefinition";
 export const ADVANCED_SETTING_DEFINITIONS: ReadonlyArray<SettingDefinition> = [
 	{
 		section: "experimental",
-		settingKey: "twoHopListMode",
-		controlType: "dropdown",
-		translationKey: "twoHopListMode",
-		descriptionKey: "twoHopListModeDesc",
-		options: [
-			{
-				value: "precise-virtual",
-				label: "preciseVirtualList",
-				isTranslationKey: true,
-			},
-			{
-				value: "progressive-chunks",
-				label: "progressiveChunkList",
-				isTranslationKey: true,
-			},
-		],
-	},
-	{
-		section: "experimental",
 		settingKey: "enableTwoRowMountedOverscan",
 		controlType: "toggle",
 		translationKey: "enableTwoRowMountedOverscan",

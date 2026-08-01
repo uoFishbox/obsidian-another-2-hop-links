@@ -33,49 +33,6 @@ Vault全体のベンチマークは、インデックス作成レイヤーやE2E
 
 振る舞いのテストは、実装と同じ場所に配置されている。パフォーマンステストでは実行時間のしきい値ではなく、関数呼び出し回数やスパイカウンターを使用すること。
 
-### Two-hop keyed pooled surface
-
-`TwoHopSurface.svelte` は共有 `VirtualSurface` のphysical row/cell shellとカードbodyを再利用する。
-
-- physical row/cell shellには位置とslot identityだけを保持する。
-- outer shellとitem body componentはphysical slot keyで維持される。item body componentはphysical slotに残存し、logical ownerが変わってもremountされない。ownerの変更はpropsとbinding publicationの再解決だけで反映する。したがってitem body（`ViewItemCard`以下）は前owner固有のローカル状態（非reactive state、非同期処理、action、subscription）を保持してはならない。保持すると別itemへの状態漏洩が起きる。
-- body lifecycleはframe内のimmutable `RenderBodySpec`参照で決まる。item→itemではphysical shell上のspecを共有し、load-more→itemなどcomponent種別が変わるときだけ新しいspecを発行する。
-- resident windowが同一ならmounted-row buildを同一参照で返し、Svelte state commitとDOM writeを行わない。
-- row slotには共有のfree-list allocatorを使用する。retained rowはslot leaseを維持し、leaving slotは同一transactionのentering rowへrebindする。capacity増加は末尾slotの追加だけで、pool epochを変更しない。
-- allocatorのpool/epoch/generationはmounted-row compiler内部に閉じ、UIには公開しない。公開ownershipはframe compilerが発行するopaque `OwnerLease`だけで表現する。
-- preview候補とinteractionは`CommittedTwoHopVirtualFrame`のcell bindingから同時に公開し、`ViewItemCard`は物理host IDだけを`PreviewHost`へ渡す。
-- item interaction descriptor providerはmutable registryを持たずcurrent frameの`interactionsById`を直接参照する。headerはlogical component lifecycleを使う。
-- load-more bodyは通常のbutton lifecycleを使い、クリック中に同じbodyを別カードへ書き換えない。
-- `TwoHopDocument` と固定grid geometryは全カード分のDOMやcell objectを生成せず、mounted rangeだけをmaterializeする。
-
-契約テストは `features/two-hop/ui/__tests__/TwoHopSurface.svelte.dom.test.ts`、`twoHopMountedRows.test.ts`、`twoHopVirtualFrame.test.ts` に置く。`100`/`1,000`/`10,000` cardsと別scroller上の`1`/`8`/`32` surfacesでDOM数がboundedであること、physical slot再利用時にitem body componentがremountされず同一DOMのままlogical ownerの内容が追従すること、resident hitでbuild identityを維持すること、同一キーのpublication更新がspecを再解決すること、load-more bodyが新しいlogical cardへremountされること、旧owner/preview specの非同期commitが拒否されることを検証する。
-
-#### Two-hop row-slot allocator比較（2026-07-26）
-
-> 以下は旧arithmetic allocator採用時の履歴であり、現在の契約ではない。2026-07-28に、publication correctness、capacity増加時のretained-slot churn、peak-capacity依存の走査を解消するためfree-list allocatorへ置き換えた。
-
-Two-hop専用のstable allocatorと、共有arithmetic allocator＋`rowsBySlot`通常同期を比較した。Vitest/jsdom上で4 columns、300連続フレーム、7回測定の中央値を使用した。旧方式には専用allocator、cell deltaの`Map`/`Set`差分、row delta差分、delta適用を含め、新方式には共有allocator、mounted row構築、resident capacity全体の同期を含めた。
-
-| `mountedRows` | `scrollerCount`  | 新方式 / 旧方式の実行時間 |
-| ------------- | ---------------- | ------------------------- |
-| `9`           | `1` / `8` / `32` | `0.27` / `0.43` / `0.43`  |
-| `32`          | `1` / `8` / `32` | `0.29` / `0.32` / `0.32`  |
-| `96`          | `1` / `8` / `32` | `0.22` / `0.25` / `0.26`  |
-
-測定範囲では損益分岐点は観測されず、共有allocator＋通常同期がすべての条件で速かった。1行スクロール時のrow writeは、旧方式が退出slotへのrebind 1回、新方式が退出slotのclearと空きslotへのenterの最大2回となる。300フレーム、1 scrollerではそれぞれ次の結果だった。
-
-| `mountedRows` | 旧方式のrow write | 新方式のrow write |
-| ------------- | ----------------- | ----------------- |
-| `9`           | `308`             | `607`             |
-| `32`          | `331`             | `630`             |
-| `96`          | `395`             | `694`             |
-
-当時のarithmetic方式はreactive write数を増やす一方、複数の`Map`、`Set`、delta配列の構築を除去することで測定上の全体時間を短縮した。しかしcapacity増加で保持rowをremapし、通常viewportへ戻った後もpeak capacityに同期コストが依存するため、現在はこの結果をallocator correctnessの根拠には使わない。
-
-#### Free-list allocator counter contract（2026-07-28）
-
-現行allocatorはactive assignment全体のimmutable deltaを生成しない。同一range/layoutは同じ軽量publicationを返し、1行ずつ300フレーム移動する契約テストでは`residentSlotPool.changedSlots`を300回、つまり1フレームにつき1 physical slot変更として記録する。実時間の旧方式比較は別途A/B測定し、このカウンター契約を実時間改善の証明として扱わない。
-
 ## キャッシュ一覧（Cache Inventory）
 
 ### 直近のスクロールコンテナ（Nearest Scroll Container）

@@ -2,7 +2,7 @@ import type { Pos, TFile } from "obsidian";
 import type { PreviewRuntime } from "features/preview/runtime/previewRuntime";
 
 /**
- * Dependencies required to enable previews on a Two-hop virtual surface.
+ * Dependencies required to enable previews on the Two-hop progressive surface.
  *
  * Omitting this object disables preview runtime creation for the surface.
  * Backpressure, activation rate, and DOM commit rate are configured once on

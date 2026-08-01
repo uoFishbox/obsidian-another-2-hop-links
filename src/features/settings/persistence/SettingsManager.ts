@@ -70,12 +70,6 @@ function mergeSettings(raw: RawSettings): PluginSettings {
 		settings.previewDomCommitsPerSecond,
 		DEFAULT_SETTINGS.previewDomCommitsPerSecond,
 	);
-	settings.twoHopListMode =
-		settings.twoHopListMode === "precise-virtual" ||
-		settings.twoHopListMode === "progressive-chunks"
-			? settings.twoHopListMode
-			: DEFAULT_SETTINGS.twoHopListMode;
-
 	return settings as PluginSettings;
 }
 

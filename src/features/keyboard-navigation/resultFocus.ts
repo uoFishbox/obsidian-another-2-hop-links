@@ -16,8 +16,7 @@ export const LOAD_MORE_SELECTOR =
 	"button.cosense-card-links__load-more-button.cosense-card-links__box";
 export const RESULT_FOCUS_SELECTOR = `${CARD_SELECTOR}, ${LOAD_MORE_SELECTOR}`;
 export const SEARCH_INPUT_SELECTOR = ".twohop-search-input";
-const NAVIGATION_CELL_SELECTOR =
-	".cosense-card-links__virtual-grid-cell, .view-plan-virtual-list-cell";
+const NAVIGATION_CELL_SELECTOR = ".cosense-card-links__virtual-grid-cell";
 const NAVIGATION_EPSILON_PX = 1;
 
 interface NavigationRect {
@@ -38,8 +37,7 @@ interface NavigationTarget {
 	navigationRoot: HTMLElement | null;
 }
 
-const NAVIGATION_ROOT_SELECTOR =
-	".cosense-card-links__virtual-grid, .view-plan-virtual-list";
+const NAVIGATION_ROOT_SELECTOR = ".cosense-card-links__virtual-grid";
 
 type WindowWithEventConstructor = Window & {
 	Event: typeof Event;

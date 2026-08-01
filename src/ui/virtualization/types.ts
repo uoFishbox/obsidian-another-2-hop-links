@@ -1,5 +1,4 @@
 import type { RowRange } from "./rowRange";
-import type { RowNumberLookup } from "./layout/viewPlanRowTypes";
 import type { VirtualRowLayoutMetrics } from "./layoutMetrics";
 import type { RenderBodyKey, RenderRevision } from "./renderRevision";
 import type { RowKey } from "./rowKey";
@@ -10,6 +9,12 @@ export type VisibilityConsumption = "none" | "value" | "reactive-state";
 
 export interface VirtualizedItemVisibilityState {
 	readonly visibility: VirtualizedItemVisibility | undefined;
+}
+
+export interface RowNumberLookup {
+	readonly length: number;
+	readonly [index: number]: number;
+	[Symbol.iterator](): IterableIterator<number>;
 }
 
 declare const brand: unique symbol;

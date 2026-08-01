@@ -3,7 +3,6 @@ import { computeColumnCount } from "../core/gridLayout";
 
 export { computeColumnCount } from "../core/gridLayout";
 export { computeVisibleCellWindow, computeVisibleRowRange } from "./flatGridRanges";
-export { computeCellPosition } from "./flatGridPosition";
 export type { VisibleCellWindow } from "./flatGridRanges";
 
 export interface VirtualGridLayoutInput {

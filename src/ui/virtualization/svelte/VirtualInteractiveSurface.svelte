@@ -4,7 +4,6 @@
 	import type { VirtualSurfaceCommonProps } from "./VirtualSurfaceProps";
 	import { createVirtualSurfaceInteractions } from "./VirtualSurfaceInteractions.svelte";
 	import { watchVirtualSurfaceMountedCellsChange } from "./VirtualSurfaceMountedCellsChange.svelte";
-	import type { VirtualSurfaceMountedRow } from "./VirtualSurfaceTypes";
 	import { createVirtualGridSurfaceTransaction } from "./VirtualGridSurfaceTransaction";
 
 	type Props<TMountedCell extends MountedVirtualCell> = Pick<
@@ -26,9 +25,6 @@
 		interactionShadowRoot?: ShadowRoot | null;
 		observerRoot?: HTMLElement | null;
 		rowHeight: number;
-		layoutMode?: "absolute-cells" | "grid-rows";
-		mountedCells?: readonly TMountedCell[];
-		mountedRows?: readonly VirtualSurfaceMountedRow<TMountedCell>[];
 		children?: Snippet<[ReturnType<typeof createVirtualGridSurfaceTransaction>]>;
 	};
 
@@ -39,9 +35,6 @@
 		interactionShadowRoot = $bindable<ShadowRoot | null>(null),
 		observerRoot = null,
 		rowHeight,
-		layoutMode = "absolute-cells",
-		mountedCells = undefined,
-		mountedRows = undefined,
 		mountedCellsForChange,
 		interactionDescriptorScopeId,
 		interactionDescriptors = [],
@@ -76,16 +69,6 @@
 	});
 
 	watchVirtualSurfaceMountedCellsChange<TMountedCell>({
-		getRenderInput: () =>
-			layoutMode === "grid-rows"
-				? {
-						layoutMode,
-						mountedRows: mountedRows ?? [],
-					}
-				: {
-						layoutMode: "absolute-cells",
-						mountedCells: mountedCells ?? [],
-					},
 		getMountedCellsForChange: () => mountedCellsForChange,
 		onMountedCellsChange,
 	});

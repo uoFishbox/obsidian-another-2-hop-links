@@ -5,17 +5,12 @@
 		KEYED_VIRTUAL_CELL_BODY_LIFECYCLE,
 		type VirtualCellBodyLifecyclePolicy,
 	} from "ui/virtualization/core/bodyLifecycle";
-	import VirtualAbsoluteCellSurface from "./VirtualAbsoluteCellSurface.svelte";
 	import VirtualPooledGridRowsSurface from "./VirtualPooledGridRowsSurface.svelte";
-	import type {
-		VirtualSurfaceCellPosition,
-		VirtualSurfaceMountedRow,
-		VirtualSurfaceResidentRowViewState,
-	} from "./VirtualSurfaceTypes";
+	import type { VirtualSurfaceMountedRow } from "./VirtualSurfaceTypes";
 	import type { VirtualCellRegistry } from "./VirtualCellRegistry";
 	import type { VirtualGridSurfaceTransaction } from "./VirtualGridSurfaceTransaction";
 
-	interface CommonProps<TMountedCell extends MountedVirtualCell> {
+	interface Props<TMountedCell extends MountedVirtualCell> {
 		contentClassName?: string;
 		rowClassName?: string;
 		cellClassName?: string;
@@ -24,9 +19,9 @@
 		rowHeight: number;
 		columns?: number;
 		gap?: number;
+		mountedRows: readonly VirtualSurfaceMountedRow<TMountedCell>[];
 		contentEl?: HTMLDivElement | null;
 		observerRoot?: HTMLElement | null;
-		getCellPosition?: (cell: TMountedCell) => VirtualSurfaceCellPosition;
 		getCellClassName?: (cell: TMountedCell) => string | undefined;
 		getCellDataTestId?: (cell: TMountedCell) => string | undefined;
 		onCellMount?: (cell: TMountedCell) => void;
@@ -44,13 +39,6 @@
 		>;
 	}
 
-	type Props<TMountedCell extends MountedVirtualCell> = CommonProps<TMountedCell> & {
-		layoutMode?: "absolute-cells" | "grid-rows";
-		mountedCells?: readonly TMountedCell[];
-		mountedRows?: readonly VirtualSurfaceMountedRow<TMountedCell>[];
-		residentRows?: readonly VirtualSurfaceResidentRowViewState<TMountedCell>[];
-	};
-
 	let {
 		contentClassName = "",
 		rowClassName = "",
@@ -60,13 +48,9 @@
 		rowHeight,
 		columns = 1,
 		gap = undefined,
-		layoutMode = "absolute-cells",
-		mountedCells = undefined,
-		mountedRows = undefined,
-		residentRows = undefined,
+		mountedRows,
 		contentEl = $bindable<HTMLDivElement | null>(null),
 		observerRoot = null,
-		getCellPosition,
 		getCellClassName,
 		getCellDataTestId,
 		onCellMount,
@@ -78,44 +62,24 @@
 	}: Props<TMountedCell> = $props();
 </script>
 
-{#if layoutMode === "grid-rows"}
-	<VirtualPooledGridRowsSurface
-		{contentClassName}
-		{rowClassName}
-		{cellClassName}
-		{contentHeight}
-		{cellWidth}
-		{rowHeight}
-		{columns}
-		{gap}
-		{mountedRows}
-		{residentRows}
-		bind:contentEl
-		{observerRoot}
-		{getCellClassName}
-		{getCellDataTestId}
-		onLogicalCellAttach={onCellMount}
-		onLogicalCellDetach={onCellDestroy}
-		{bodyLifecyclePolicy}
-		{cellRegistry}
-		{surfaceTransaction}
-		{renderCell}
-	/>
-{:else}
-	<VirtualAbsoluteCellSurface
-		{contentClassName}
-		{cellClassName}
-		{contentHeight}
-		{cellWidth}
-		{rowHeight}
-		mountedCells={mountedCells ?? []}
-		bind:contentEl
-		{observerRoot}
-		{getCellPosition}
-		{getCellClassName}
-		{getCellDataTestId}
-		{onCellMount}
-		{onCellDestroy}
-		{renderCell}
-	/>
-{/if}
+<VirtualPooledGridRowsSurface
+	{contentClassName}
+	{rowClassName}
+	{cellClassName}
+	{contentHeight}
+	{cellWidth}
+	{rowHeight}
+	{columns}
+	{gap}
+	{mountedRows}
+	bind:contentEl
+	{observerRoot}
+	{getCellClassName}
+	{getCellDataTestId}
+	onLogicalCellAttach={onCellMount}
+	onLogicalCellDetach={onCellDestroy}
+	{bodyLifecyclePolicy}
+	{cellRegistry}
+	{surfaceTransaction}
+	{renderCell}
+/>

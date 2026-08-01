@@ -3,7 +3,7 @@
 	import type { TwoHopVirtualSectionDescriptor } from "features/two-hop/ui/twoHopVirtualListModel";
 	import type { ApplicationStore } from "ui/stores/ApplicationStore.svelte";
 	import type { TwoHopPreviewDependencies } from "features/two-hop/ui/twoHopPreviewDependencies";
-	import { captureTwoHopSurfacePageStubProps } from "./twoHopSurfacePageStubCapture";
+	import { captureTwoHopProgressiveSurfacePageStubProps } from "./twoHopProgressiveSurfacePageStubCapture";
 
 	interface Props {
 		sections: readonly TwoHopVirtualSectionDescriptor[];
@@ -20,7 +20,7 @@
 	}: Props = $props();
 
 	$effect(() => {
-		captureTwoHopSurfacePageStubProps({
+		captureTwoHopProgressiveSurfacePageStubProps({
 			applicationStore,
 			previewDependencies,
 			previewActive,
@@ -29,8 +29,8 @@
 </script>
 
 <div
-	class="view-plan-virtual-list"
-	data-testid="two-hop-surface-stub"
+	class="twohop-page-progressive-list"
+	data-testid="two-hop-progressive-surface-stub"
 	data-has-preview-dependencies={String(previewDependencies !== undefined)}
 	data-has-preview-runtime={String(
 		typeof previewDependencies?.previewRuntime?.createSurface === "function",

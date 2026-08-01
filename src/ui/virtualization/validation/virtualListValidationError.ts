@@ -1,18 +1,8 @@
-import type { SectionRenderDescriptor } from "ui/components/sections/types";
-
 export type Result<T, E> =
 	| { readonly ok: true; readonly value: T }
 	| { readonly ok: false; readonly error: E };
 
-export type VirtualListInputError<T = unknown, G = unknown> =
-	| {
-			readonly type: "duplicate-section-id";
-			readonly sectionId: string;
-			readonly firstIndex: number;
-			readonly secondIndex: number;
-			readonly firstSection: SectionRenderDescriptor<T, G>;
-			readonly secondSection: SectionRenderDescriptor<T, G>;
-	  }
+export type VirtualListInputError =
 	| {
 			readonly type: "missing-array-source-key-resolver";
 	  }
@@ -22,20 +12,8 @@ export type VirtualListInputError<T = unknown, G = unknown> =
 			readonly cellKey: string;
 	  };
 
-export function formatVirtualListInputError<T, G>(
-	error: VirtualListInputError<T, G>,
-): string {
+export function formatVirtualListInputError(error: VirtualListInputError): string {
 	switch (error.type) {
-		case "duplicate-section-id":
-			return (
-				`ViewPlan: duplicate sectionId ${JSON.stringify(error.sectionId)}. ` +
-				`first index=${error.firstIndex}, first sectionKey=${JSON.stringify(
-					error.firstSection.sectionKey,
-				)}; ` +
-				`second index=${error.secondIndex}, second sectionKey=${JSON.stringify(
-					error.secondSection.sectionKey,
-				)}.`
-			);
 		case "missing-array-source-key-resolver":
 			return "getKey is required for array-backed sources.";
 		case "missing-item-render-revision":

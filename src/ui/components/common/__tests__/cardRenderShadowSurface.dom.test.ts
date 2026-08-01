@@ -44,7 +44,7 @@ describe("cardRenderShadowSurface", () => {
 			host.shadowRoot?.querySelector(
 				"style[data-ccl-card-render-shadow-base-style]",
 			)?.textContent,
-		).toContain(".view-plan-virtual-list-content");
+		).toContain(".cosense-card-links__virtual-grid-content");
 
 		first?.dispose();
 		second?.dispose();

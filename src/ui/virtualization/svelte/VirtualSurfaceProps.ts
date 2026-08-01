@@ -10,10 +10,7 @@ import type { ProgrammaticScrollSnapshot } from "../dom/flushVirtualScrollMeasur
 import type { VirtualSurfaceNavigationContext } from "./VirtualSurfaceNavigation";
 import type { VirtualCellRegistry } from "./VirtualCellRegistry";
 import type { VirtualCellBodyLifecyclePolicy } from "ui/virtualization/core/bodyLifecycle";
-import type {
-	VirtualSurfaceCellPosition,
-	VirtualSurfaceRenderInput,
-} from "./VirtualSurfaceTypes";
+import type { VirtualSurfaceMountedRow } from "./VirtualSurfaceTypes";
 
 export interface VirtualSurfaceCommonProps<TMountedCell extends MountedVirtualCell> {
 	className?: string;
@@ -43,7 +40,6 @@ export interface VirtualSurfaceCommonProps<TMountedCell extends MountedVirtualCe
 	contentEl?: HTMLDivElement | null;
 	interactionShadowRoot?: ShadowRoot | null;
 	observerRoot?: HTMLElement | null;
-	getCellPosition?: (cell: TMountedCell) => VirtualSurfaceCellPosition;
 	getCellClassName?: (cell: TMountedCell) => string | undefined;
 	getCellDataTestId?: (cell: TMountedCell) => string | undefined;
 	onCellMount?: (cell: TMountedCell) => void;
@@ -68,4 +64,6 @@ export interface VirtualSurfaceCommonProps<TMountedCell extends MountedVirtualCe
 }
 
 export type VirtualSurfaceProps<TMountedCell extends MountedVirtualCell> =
-	VirtualSurfaceCommonProps<TMountedCell> & VirtualSurfaceRenderInput<TMountedCell>;
+	VirtualSurfaceCommonProps<TMountedCell> & {
+		mountedRows: readonly VirtualSurfaceMountedRow<TMountedCell>[];
+	};

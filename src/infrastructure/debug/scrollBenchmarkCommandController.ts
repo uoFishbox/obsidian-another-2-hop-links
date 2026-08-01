@@ -7,8 +7,8 @@ import {
 	type CCLDevMeasurementSnapshot,
 } from "./CCLDevMeasurements";
 
-/** Class name that identifies the virtual list root element of `TwoHopSurface.svelte`. */
-const TWO_HOP_VIRTUAL_LIST_SELECTOR = ".twohop-page-virtual-list";
+/** Class name that identifies the progressive two-hop list root element. */
+const TWO_HOP_LIST_SELECTOR = ".twohop-page-progressive-list";
 
 /** Fixed number of frames aligned with the workload metrics in PERFORMANCE.md. */
 const SCROLL_FRAMES = 600;
@@ -83,9 +83,10 @@ export function registerScrollBenchmarkCommand(plugin: PluginHost): void {
 }
 
 function findTwoHopScrollers(plugin: PluginHost): HTMLElement[] {
-	const roots = plugin.app.workspace.containerEl.querySelectorAll<HTMLElement>(
-		TWO_HOP_VIRTUAL_LIST_SELECTOR,
-	);
+	const roots =
+		plugin.app.workspace.containerEl.querySelectorAll<HTMLElement>(
+			TWO_HOP_LIST_SELECTOR,
+		);
 
 	const scrollers = new Set<HTMLElement>();
 	for (const root of roots) {

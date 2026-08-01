@@ -8,7 +8,6 @@ const commonRoot = join(sourceRoot, "ui", "components", "common");
 const compatModules = new Set(
 	[
 		"virtualGridLinkListLayout.ts",
-		"VirtualListCellMount.svelte",
 		"virtualListHelpers.svelte.ts",
 		"virtualListKeyboard.ts",
 		"virtualListMeasurement.ts",
@@ -17,8 +16,6 @@ const compatModules = new Set(
 		"virtualListScroll.ts",
 		"rowRange.ts",
 		"VirtualGridLinkListCellMount.svelte",
-		"ViewPlanVirtualListCellMount.svelte",
-		"ViewPlanVirtualListItemCell.svelte",
 		"virtual-list/providers/flatLinkRowProvider.ts",
 	].map((fileName) => normalize(join(commonRoot, fileName))),
 );

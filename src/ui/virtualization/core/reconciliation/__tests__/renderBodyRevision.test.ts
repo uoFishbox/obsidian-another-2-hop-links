@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest";
 import {
 	encodeResolvedItemRenderRevisionToken,
 	encodeRenderRevisionToken,
-	resolveHeaderRenderRevisionToken,
 	resolveItemRenderRevisionToken,
 	tryResolveItemRenderRevisionToken,
 } from "../renderBodyRevision";
@@ -74,43 +73,6 @@ describe("renderBodyRevision", () => {
 				sourceKey: "item-0",
 				cellKey: "item-0::item:0",
 			},
-		});
-	});
-
-	it("resolves explicit header render revisions", () => {
-		const descriptor = {
-			section: { id: "section-0" },
-			sectionKey: "section-0",
-			title: "Initial",
-			sectionId: "section-0",
-			totalCount: 1,
-			loadedCount: 1,
-			getItems: () => [],
-			headerProps: { interactionKind: "sectionHeader" as const },
-			headerRenderRevision: false,
-		};
-
-		expect(resolveHeaderRenderRevisionToken(descriptor)).toEqual({
-			kind: "render",
-			revision: false,
-		});
-	});
-
-	it("uses a source-key-only header revision when header render revision is missing", () => {
-		const descriptor = {
-			section: { id: "section-0" },
-			sectionKey: "section-0",
-			title: "Initial",
-			sectionId: "section-0",
-			totalCount: 1,
-			loadedCount: 1,
-			getItems: () => [],
-			headerProps: { interactionKind: "sectionHeader" as const },
-		};
-
-		expect(resolveHeaderRenderRevisionToken(descriptor)).toEqual({
-			kind: "render",
-			revision: null,
 		});
 	});
 });

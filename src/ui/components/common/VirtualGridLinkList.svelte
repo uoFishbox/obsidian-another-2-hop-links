@@ -30,14 +30,12 @@
 		cellWidth={list.layout.cellWidth}
 		rowHeight={list.layout.rowHeight}
 		columns={list.layout.columns}
-		layoutMode="grid-rows"
 		mountedRows={list.mountedRows}
 		mountedCellsForChange={list.mountedCellsForChange}
 		bind:rootEl={list.sectionRootEl}
 		bind:contentEl={list.contentEl}
 		bind:interactionShadowRoot={list.interactionShadowRoot}
 		observerRoot={list.observerRoot}
-		getCellPosition={list.getCellPosition}
 		onMountedCellsChange={props.onMountedCellsChange}
 		bodyLifecyclePolicy={props.remountCellBodyOnKeyChange === false
 			? PHYSICAL_SLOT_BODY_LIFECYCLE

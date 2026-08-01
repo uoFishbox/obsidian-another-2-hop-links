@@ -14,9 +14,9 @@ import type {
 import type { DisplayData } from "features/two-hop/application/displayDataBuilder";
 import TwoHopLinksPage from "../TwoHopLinksPage.svelte";
 import {
-	getTwoHopSurfacePageStubProps,
-	resetTwoHopSurfacePageStubProps,
-} from "./twoHopSurfacePageStubCapture";
+	getTwoHopProgressiveSurfacePageStubProps,
+	resetTwoHopProgressiveSurfacePageStubProps,
+} from "./twoHopProgressiveSurfacePageStubCapture";
 import {
 	installIntersectionObserverMock,
 	teardownIntersectionObserverMock,
@@ -103,8 +103,8 @@ vi.mock("ui/components/items/ViewItemCard.svelte", async () => {
 	return { default: component.default };
 });
 
-vi.mock("features/two-hop/ui/TwoHopSurface.svelte", async () => {
-	const component = await import("./TwoHopSurfacePageStub.svelte");
+vi.mock("features/two-hop/ui/TwoHopProgressiveSurface.svelte", async () => {
+	const component = await import("./TwoHopProgressiveSurfacePageStub.svelte");
 	return { default: component.default };
 });
 
@@ -332,7 +332,7 @@ async function flushAsyncUi(): Promise<void> {
 describe("TwoHopLinksPage descriptor plumbing", () => {
 	beforeEach(() => {
 		vi.useFakeTimers();
-		resetTwoHopSurfacePageStubProps();
+		resetTwoHopProgressiveSurfacePageStubProps();
 		installIntersectionObserverMock();
 	});
 
@@ -369,13 +369,15 @@ describe("TwoHopLinksPage descriptor plumbing", () => {
 
 		await flushAsyncUi();
 
-		expect(container.querySelectorAll(".view-plan-virtual-list")).toHaveLength(1);
+		expect(
+			container.querySelectorAll(".twohop-page-progressive-list"),
+		).toHaveLength(1);
 		expect(screen.getByText("outgoing-parent")).toBeInTheDocument();
 		expect(screen.getByText("backlink-note")).toBeInTheDocument();
 		expect(screen.getByText("tagged-note")).toBeInTheDocument();
 	});
 
-	it("passes one explicit preview dependency set to the virtual surface", async () => {
+	it("passes one explicit preview dependency set to the progressive surface", async () => {
 		const file = createMockTFile("notes/target.md");
 		const parentFile = createMockTFile("notes/outgoing-parent.md");
 		const displayData = {
@@ -394,8 +396,8 @@ describe("TwoHopLinksPage descriptor plumbing", () => {
 		});
 		await flushAsyncUi();
 
-		const surface = screen.getByTestId("two-hop-surface-stub");
-		const capturedProps = getTwoHopSurfacePageStubProps();
+		const surface = screen.getByTestId("two-hop-progressive-surface-stub");
+		const capturedProps = getTwoHopProgressiveSurfacePageStubProps();
 		expect(surface.dataset.hasPreviewDependencies).toBe("true");
 		expect(surface.dataset.hasPreviewRuntime).toBe("true");
 		expect(surface.dataset.hasSearchPositionResolver).toBe("true");
@@ -449,7 +451,7 @@ describe("TwoHopLinksPage descriptor plumbing", () => {
 		expect(screen.getByText("outgoing-extra")).toBeInTheDocument();
 	});
 
-	it("keeps the virtual surface mounted while sections transition through empty", async () => {
+	it("keeps the progressive surface mounted while sections transition through empty", async () => {
 		const file = createMockTFile("notes/target.md");
 		const parentFile = createMockTFile("notes/outgoing-parent.md");
 		const settings = {
@@ -468,20 +470,24 @@ describe("TwoHopLinksPage descriptor plumbing", () => {
 		);
 		await flushAsyncUi();
 
-		const initialSurface = container.querySelector(".view-plan-virtual-list");
+		const initialSurface = container.querySelector(".twohop-page-progressive-list");
 		expect(initialSurface).not.toBeNull();
 		expect(screen.getByText("outgoing-parent")).toBeInTheDocument();
 
 		await rerender(createRootProps(createDisplayData(), settings, file));
 		await flushAsyncUi();
 
-		expect(container.querySelector(".view-plan-virtual-list")).toBe(initialSurface);
+		expect(container.querySelector(".twohop-page-progressive-list")).toBe(
+			initialSurface,
+		);
 		expect(screen.queryByText("outgoing-parent")).not.toBeInTheDocument();
 
 		await rerender(createRootProps(populatedDisplayData, settings, file));
 		await flushAsyncUi();
 
-		expect(container.querySelector(".view-plan-virtual-list")).toBe(initialSurface);
+		expect(container.querySelector(".twohop-page-progressive-list")).toBe(
+			initialSurface,
+		);
 		expect(screen.getByText("outgoing-parent")).toBeInTheDocument();
 	});
 });

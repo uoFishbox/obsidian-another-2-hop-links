@@ -1,5 +1,5 @@
-import { cleanup, fireEvent, render, waitFor } from "@testing-library/svelte";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { cleanup, render } from "@testing-library/svelte";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
 	flushFrames,
 	installAnimationFrameMock,
@@ -7,8 +7,6 @@ import {
 } from "testing/helpers/DOMObserverMock";
 import VirtualSurfaceRecyclingHarness from "./VirtualSurfaceRecyclingHarness.svelte";
 import type { MountedVirtualCell, LogicalCellKey, RenderSlotKey } from "../../types";
-import type { ViewItem } from "application/presenters";
-import type { ItemInteractionDescriptor } from "ui/interactions/interactionTypes";
 
 interface TestMountedCell extends MountedVirtualCell {
 	columnIndex: number;
@@ -62,7 +60,7 @@ function createRows(
 	return [row];
 }
 
-describe("VirtualSurface recycling", () => {
+describe("VirtualSurface grid-row recycling", () => {
 	beforeEach(() => {
 		installAnimationFrameMock();
 	});
@@ -70,214 +68,6 @@ describe("VirtualSurface recycling", () => {
 	afterEach(() => {
 		cleanup();
 		teardownAnimationFrameMock();
-	});
-
-	it("shows correct visible items after scrolling", async () => {
-		const cells1 = createCells(["A", "B", "C", "D"]);
-		const { container, rerender } = render(VirtualSurfaceRecyclingHarness, {
-			props: {
-				mountedCells: cells1,
-				contentHeight: 200,
-				rowHeight: 50,
-			},
-		});
-		await flushFrames();
-
-		const cells2 = createCells(["E", "F"]);
-		await rerender({
-			mountedCells: cells2,
-			contentHeight: 200,
-			rowHeight: 50,
-		});
-		await flushFrames();
-
-		const host2 = container.querySelector(
-			".recycling-test-root",
-		) as HTMLElement | null;
-		const shadowRoot2 = host2?.shadowRoot;
-		expect(shadowRoot2).toBeTruthy();
-		if (!shadowRoot2) return;
-
-		const cells = Array.from(
-			shadowRoot2.querySelectorAll('[data-testid="probe-cell"]'),
-		);
-		const keys = cells.map((el) => el.getAttribute("data-key"));
-		expect(keys).toEqual(["E", "F"]);
-	});
-
-	it("keeps mounted cell count bounded by unmounting cells that leave the viewport", async () => {
-		const cells4 = createCells(["A", "B", "C", "D"]);
-		const { container, rerender } = render(VirtualSurfaceRecyclingHarness, {
-			props: {
-				mountedCells: cells4,
-				contentHeight: 200,
-				rowHeight: 50,
-			},
-		});
-		await flushFrames();
-
-		const host = container.querySelector(
-			".recycling-test-root",
-		) as HTMLElement | null;
-		const shadowRoot = host?.shadowRoot;
-		expect(shadowRoot).toBeTruthy();
-		if (!shadowRoot) return;
-
-		expect(shadowRoot.querySelectorAll('[data-testid="probe-cell"]').length).toBe(
-			4,
-		);
-
-		const cells2 = createCells(["E", "F"]);
-		await rerender({
-			mountedCells: cells2,
-			contentHeight: 200,
-			rowHeight: 50,
-		});
-		await flushFrames();
-
-		expect(shadowRoot.querySelectorAll('[data-testid="probe-cell"]').length).toBe(
-			2,
-		);
-	});
-
-	it("does not remount existing visible items on a noop rerender", async () => {
-		const mountedKeys: string[] = [];
-		const cells = createCells(["A", "B"]);
-		const { rerender } = render(VirtualSurfaceRecyclingHarness, {
-			props: {
-				mountedCells: cells,
-				contentHeight: 100,
-				rowHeight: 50,
-				onCellMount: (key: string) => mountedKeys.push(key),
-			},
-		});
-		await flushFrames();
-		expect(mountedKeys.length).toBe(2);
-
-		mountedKeys.length = 0;
-		await rerender({
-			mountedCells: cells,
-			contentHeight: 100,
-			rowHeight: 50,
-			onCellMount: (key: string) => mountedKeys.push(key),
-		});
-		await flushFrames();
-
-		expect(mountedKeys).toStrictEqual([]);
-	});
-
-	it("keeps a resolved interaction descriptor cached across resolver array updates", async () => {
-		const interactionId = "item:A";
-		const descriptor = {
-			interactionId,
-			kind: "item",
-			item: { type: "link" } as unknown as ViewItem,
-			targetFile: null,
-		} satisfies ItemInteractionDescriptor;
-		const resolve = vi.fn(() => descriptor);
-		const resolver = { interactionId, resolve };
-		const cells = createCells(["A"]);
-		const { container, rerender } = render(VirtualSurfaceRecyclingHarness, {
-			props: {
-				mountedCells: cells,
-				contentHeight: 100,
-				rowHeight: 50,
-				interactionId,
-				interactionDescriptorResolvers: [resolver],
-			},
-		});
-		await flushFrames();
-
-		const probe = container
-			.querySelector<HTMLElement>(".recycling-test-root")
-			?.shadowRoot?.querySelector<HTMLElement>('[data-testid="probe-cell"]');
-		expect(probe).toBeTruthy();
-		if (!probe) return;
-
-		await fireEvent.click(probe);
-		expect(resolve).toHaveBeenCalledTimes(1);
-
-		await rerender({
-			mountedCells: cells,
-			contentHeight: 100,
-			rowHeight: 50,
-			interactionId,
-			interactionDescriptorResolvers: [resolver],
-		});
-		await flushFrames();
-		await fireEvent.click(probe);
-
-		expect(resolve).toHaveBeenCalledTimes(1);
-	});
-
-	it("does not remount a body when only cell metadata changes", async () => {
-		const mountedKeys: string[] = [];
-		const renderBodyKey = "body:A";
-		const cells = createCells(["A"]).map((cell) => ({
-			...cell,
-			cellMetadataKey: ["metadata", 1],
-			renderBodyKey,
-		}));
-		const { rerender } = render(VirtualSurfaceRecyclingHarness, {
-			props: {
-				mountedCells: cells,
-				contentHeight: 100,
-				rowHeight: 50,
-				onCellMount: (key: string) => mountedKeys.push(key),
-			},
-		});
-		await flushFrames();
-		expect(mountedKeys).toStrictEqual(["A"]);
-
-		mountedKeys.length = 0;
-		await rerender({
-			mountedCells: cells.map((cell) => ({
-				...cell,
-				top: 25,
-				cellMetadataKey: ["metadata", 2],
-				renderBodyKey,
-			})),
-			contentHeight: 100,
-			rowHeight: 50,
-			onCellMount: (key: string) => mountedKeys.push(key),
-		});
-		await flushFrames();
-
-		expect(mountedKeys).toStrictEqual([]);
-	});
-
-	it("remounts a body when the render body key changes", async () => {
-		const mountedKeys: string[] = [];
-		const cells = createCells(["A"]).map((cell) => ({
-			...cell,
-			cellMetadataKey: ["metadata", 1],
-			renderBodyKey: "body:A:1",
-		}));
-		const { rerender } = render(VirtualSurfaceRecyclingHarness, {
-			props: {
-				mountedCells: cells,
-				contentHeight: 100,
-				rowHeight: 50,
-				onCellMount: (key: string) => mountedKeys.push(key),
-			},
-		});
-		await flushFrames();
-		expect(mountedKeys).toStrictEqual(["A"]);
-
-		mountedKeys.length = 0;
-		await rerender({
-			mountedCells: cells.map((cell) => ({
-				...cell,
-				cellMetadataKey: ["metadata", 2],
-				renderBodyKey: "body:A:2",
-			})),
-			contentHeight: 100,
-			rowHeight: 50,
-			onCellMount: (key: string) => mountedKeys.push(key),
-		});
-		await flushFrames();
-
-		expect(mountedKeys).toStrictEqual(["A"]);
 	});
 
 	it("updates grid-row content when a same-slot replacement changes body key", async () => {
@@ -288,11 +78,9 @@ describe("VirtualSurface recycling", () => {
 		}));
 		const { container, rerender } = render(VirtualSurfaceRecyclingHarness, {
 			props: {
-				mountedCells: cells,
 				mountedRows: createRows(cells),
 				contentHeight: 100,
 				rowHeight: 50,
-				layoutMode: "grid-rows",
 				onCellMount: (key: string) => mountedKeys.push(key),
 			},
 		});
@@ -305,11 +93,9 @@ describe("VirtualSurface recycling", () => {
 		}));
 		mountedKeys.length = 0;
 		await rerender({
-			mountedCells: updatedCells,
 			mountedRows: createRows(updatedCells),
 			contentHeight: 100,
 			rowHeight: 50,
-			layoutMode: "grid-rows",
 			onCellMount: (key: string) => mountedKeys.push(key),
 		});
 		await flushFrames();
@@ -335,7 +121,6 @@ describe("VirtualSurface recycling", () => {
 		}));
 		const { container, rerender } = render(VirtualSurfaceRecyclingHarness, {
 			props: {
-				mountedCells: cells,
 				mountedRows: createRows(cells, {
 					key: 0,
 					rowIndex: 0,
@@ -344,7 +129,6 @@ describe("VirtualSurface recycling", () => {
 				}),
 				contentHeight: 100,
 				rowHeight: 50,
-				layoutMode: "grid-rows",
 			},
 		});
 		await flushFrames();
@@ -367,7 +151,6 @@ describe("VirtualSurface recycling", () => {
 			columnIndex: 0,
 		}));
 		await rerender({
-			mountedCells: updatedCells,
 			mountedRows: createRows(updatedCells, {
 				key: 12,
 				rowIndex: 12,
@@ -377,7 +160,6 @@ describe("VirtualSurface recycling", () => {
 			}),
 			contentHeight: 1000,
 			rowHeight: 50,
-			layoutMode: "grid-rows",
 		});
 		await flushFrames();
 
@@ -402,7 +184,6 @@ describe("VirtualSurface recycling", () => {
 		}));
 		const { container, rerender } = render(VirtualSurfaceRecyclingHarness, {
 			props: {
-				mountedCells: cells,
 				mountedRows: createRows(cells, {
 					key: 0,
 					rowIndex: 0,
@@ -411,7 +192,6 @@ describe("VirtualSurface recycling", () => {
 				}),
 				contentHeight: 100,
 				rowHeight: 50,
-				layoutMode: "grid-rows",
 				remountCellBodyOnKeyChange: false,
 				onCellMount: (key: string) => mountedKeys.push(key),
 				onCellUpdate: (key: string) => updatedKeys.push(key),
@@ -428,7 +208,6 @@ describe("VirtualSurface recycling", () => {
 			columnIndex: 0,
 		}));
 		await rerender({
-			mountedCells: updatedCells,
 			mountedRows: createRows(updatedCells, {
 				key: 12,
 				rowIndex: 12,
@@ -438,7 +217,6 @@ describe("VirtualSurface recycling", () => {
 			}),
 			contentHeight: 1000,
 			rowHeight: 50,
-			layoutMode: "grid-rows",
 			remountCellBodyOnKeyChange: false,
 			onCellMount: (key: string) => mountedKeys.push(key),
 			onCellUpdate: (key: string) => updatedKeys.push(key),

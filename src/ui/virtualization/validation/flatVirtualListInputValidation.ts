@@ -20,7 +20,7 @@ export type ValidatedFlatLogicalCellSourceInput<T> =
 
 export function validateFlatLogicalCellSourceInput<T>(
 	input: FlatLogicalCellSourceInput<T>,
-): Result<ValidatedFlatLogicalCellSourceInput<T>, VirtualListInputError<T, unknown>> {
+): Result<ValidatedFlatLogicalCellSourceInput<T>, VirtualListInputError> {
 	if (input.dataSource) {
 		return {
 			ok: true,

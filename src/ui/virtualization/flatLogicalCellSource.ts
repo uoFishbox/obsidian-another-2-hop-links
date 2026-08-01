@@ -71,7 +71,7 @@ export function tryCreateFlatLogicalCellSource<T>(params: {
 	getKey?: (item: T, index: number) => string;
 	sectionId?: string;
 	revision?: unknown;
-}): Result<FlatLogicalCellSource<T>, VirtualListInputError<T, unknown>> {
+}): Result<FlatLogicalCellSource<T>, VirtualListInputError> {
 	const validation = validateFlatLogicalCellSourceInput(params);
 	if (!validation.ok) {
 		return validation;

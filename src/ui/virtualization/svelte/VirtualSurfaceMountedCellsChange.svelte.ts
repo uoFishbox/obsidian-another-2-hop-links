@@ -1,11 +1,9 @@
 import { untrack } from "svelte";
 import type { MountedVirtualCell } from "../types";
-import type { VirtualSurfaceRenderInput } from "./VirtualSurfaceTypes";
 
 export interface VirtualSurfaceMountedCellsChangeOptions<
 	TMountedCell extends MountedVirtualCell,
 > {
-	getRenderInput(): VirtualSurfaceRenderInput<TMountedCell>;
 	getMountedCellsForChange(): readonly TMountedCell[] | undefined;
 	onMountedCellsChange?: (cells: readonly TMountedCell[]) => void;
 }
@@ -13,7 +11,6 @@ export interface VirtualSurfaceMountedCellsChangeOptions<
 export function watchVirtualSurfaceMountedCellsChange<
 	TMountedCell extends MountedVirtualCell,
 >({
-	getRenderInput,
 	getMountedCellsForChange,
 	onMountedCellsChange,
 }: VirtualSurfaceMountedCellsChangeOptions<TMountedCell>): void {
@@ -21,12 +18,7 @@ export function watchVirtualSurfaceMountedCellsChange<
 
 	function notifyMountedCellsChange(): void {
 		if (!onMountedCellsChange) return;
-		const renderInput = getRenderInput();
-		const cells =
-			getMountedCellsForChange() ??
-			(renderInput.layoutMode === "grid-rows"
-				? undefined
-				: renderInput.mountedCells);
+		const cells = getMountedCellsForChange();
 		if (!cells) return;
 		if (cells === lastNotifiedCells) return;
 		lastNotifiedCells = cells;

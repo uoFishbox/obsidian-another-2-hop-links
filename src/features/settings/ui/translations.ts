@@ -91,10 +91,6 @@ export type TranslationKey =
 	| "ripgrepExecutablePathDesc"
 	| "enableTwoRowMountedOverscan"
 	| "enableTwoRowMountedOverscanDesc"
-	| "twoHopListMode"
-	| "twoHopListModeDesc"
-	| "preciseVirtualList"
-	| "progressiveChunkList"
 	| "belowEditor"
 	| "sidebar"
 	| "hybrid"
@@ -237,11 +233,6 @@ const translations: Record<Language, Record<TranslationKey, string>> = {
 		enableTwoRowMountedOverscan: "Use two mounted overscan rows",
 		enableTwoRowMountedOverscanDesc:
 			"Keep two extra rows mounted above and below the viewport instead of one. This uses more resident DOM but reduces resident-window updates and row rebinds.",
-		twoHopListMode: "2-hop list implementation",
-		twoHopListModeDesc:
-			"Choose the precise bounded virtual list or the append-only progressive chunk list.",
-		preciseVirtualList: "Precise virtual list",
-		progressiveChunkList: "Progressive chunk list",
 		belowEditor: "Below editor",
 		sidebar: "Sidebar",
 		hybrid: "Hybrid",
@@ -383,11 +374,6 @@ const translations: Record<Language, Record<TranslationKey, string>> = {
 		enableTwoRowMountedOverscan: "mounted overscan を2行にする",
 		enableTwoRowMountedOverscanDesc:
 			"ビューポートの上下にマウントしておく追加行を1行から2行にします。resident DOM数は増えますが、resident windowの更新頻度とrow rebind回数は減ります。",
-		twoHopListMode: "2ホップリストの実装方式",
-		twoHopListModeDesc:
-			"精密な仮想リスト、または追加済み要素を維持する progressive chunk list を選択します。",
-		preciseVirtualList: "Precise virtual list",
-		progressiveChunkList: "Progressive chunk list",
 		belowEditor: "エディタの下",
 		sidebar: "サイドバー",
 		hybrid: "ハイブリッド",
