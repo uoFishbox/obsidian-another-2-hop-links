@@ -87,6 +87,7 @@ type HydrationPriority = "visible" | "preload";
 
 const MAX_MODELS_PER_DRAIN = 8;
 const MAX_HYDRATION_CPU_MS = 1;
+const MAX_PRELOAD_HYDRATION_CHUNK_COUNT = 3;
 const HYDRATION_POST_PAINT_TASK_KEY = "two-hop-progressive-hydration-visible";
 const HYDRATION_IDLE_TASK_KEY = "two-hop-progressive-hydration-preload";
 const EMPTY_PREVIEW_RANGE = Object.freeze({ start: 0, end: 0 });
@@ -127,6 +128,39 @@ function compactHydrationQueue(queue: HydrationQueue): void {
 	if (queue.head < remaining) return;
 	queue.entries.splice(0, queue.head);
 	queue.head = 0;
+}
+
+function trimHydrationQueueToChunkLimit(
+	queue: HydrationQueue,
+	maxChunkCount: number,
+): void {
+	const pendingEntryCountByChunk = new Map<number, number>();
+	for (let index = queue.head; index < queue.entries.length; index += 1) {
+		const entry = queue.entries[index];
+		if (!entry) continue;
+		const chunkIndex = Math.floor(
+			entry.cell.rowIndex / TWO_HOP_PROGRESSIVE_ROWS_PER_CHUNK,
+		);
+		pendingEntryCountByChunk.set(
+			chunkIndex,
+			(pendingEntryCountByChunk.get(chunkIndex) ?? 0) + 1,
+		);
+	}
+
+	while (pendingEntryCountByChunk.size > maxChunkCount) {
+		const entry = takeNextHydrationEntry(queue);
+		if (!entry) break;
+		const chunkIndex = Math.floor(
+			entry.cell.rowIndex / TWO_HOP_PROGRESSIVE_ROWS_PER_CHUNK,
+		);
+		const remainingEntryCount = (pendingEntryCountByChunk.get(chunkIndex) ?? 1) - 1;
+		if (remainingEntryCount === 0) {
+			pendingEntryCountByChunk.delete(chunkIndex);
+		} else {
+			pendingEntryCountByChunk.set(chunkIndex, remainingEntryCount);
+		}
+	}
+	compactHydrationQueue(queue);
 }
 
 export function resolveProgressivePreviewSlotId(logicalKey: string): string {
@@ -297,6 +331,10 @@ export function useTwoHopProgressiveList(
 				}
 			}
 		}
+		trimHydrationQueueToChunkLimit(
+			preloadHydrationQueue,
+			MAX_PRELOAD_HYDRATION_CHUNK_COUNT,
+		);
 		scheduleHydrationDrain();
 	}
 
@@ -310,6 +348,11 @@ export function useTwoHopProgressiveList(
 			}
 		}
 		scheduleHydrationDrain();
+	}
+
+	function replaceVisibleHydrationRange(range: TwoHopRowRange): void {
+		clearHydrationQueue(visibleHydrationQueue);
+		enqueueHydrationForRowRange(range);
 	}
 
 	function scheduleHydrationDrain(): void {
@@ -503,7 +546,7 @@ export function useTwoHopProgressiveList(
 		const previousStart = activePreviewRange.start;
 		const previousEnd = activePreviewRange.end;
 		if (previousStart === next.start && previousEnd === next.end) return;
-		enqueueHydrationForRowRange(next);
+		replaceVisibleHydrationRange(next);
 
 		for (let rowIndex = previousStart; rowIndex < previousEnd; rowIndex += 1) {
 			if (rowIndex >= next.start && rowIndex < next.end) continue;
