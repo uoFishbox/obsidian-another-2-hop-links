@@ -6,6 +6,7 @@
 	import { captureTwoHopProgressiveSurfacePageStubProps } from "./twoHopProgressiveSurfacePageStubCapture";
 
 	interface Props {
+		documentIdentity: string;
 		sections: readonly TwoHopVirtualSectionDescriptor[];
 		applicationStore: ApplicationStore;
 		previewDependencies?: TwoHopPreviewDependencies;
@@ -13,6 +14,7 @@
 	}
 
 	let {
+		documentIdentity,
 		sections,
 		applicationStore,
 		previewDependencies = undefined,
@@ -21,6 +23,7 @@
 
 	$effect(() => {
 		captureTwoHopProgressiveSurfacePageStubProps({
+			documentIdentity,
 			applicationStore,
 			previewDependencies,
 			previewActive,

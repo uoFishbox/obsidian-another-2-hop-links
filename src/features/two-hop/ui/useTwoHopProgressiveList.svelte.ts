@@ -57,6 +57,8 @@ import { recordCCLDevMeasurement } from "infrastructure/debug/CCLDevMeasurements
 import { resolveProgressivePreviewRangeInto } from "features/two-hop/ui/progressivePreviewRange";
 
 export interface TwoHopProgressiveListProps {
+	/** Stable identity of the displayed file and search scope. */
+	readonly documentIdentity: string;
 	readonly sections: readonly TwoHopVirtualSectionDescriptor[];
 	readonly applicationStore: ApplicationStore;
 	readonly previewDependencies?: TwoHopPreviewDependencies;
@@ -88,6 +90,7 @@ interface LayoutAnchor {
 
 type CardModelConsumer = (model: CardRenderModel | undefined) => void;
 type HydrationPriority = "visible" | "preload";
+type DocumentPublicationKind = "identity-reset" | "data-revision";
 
 const MAX_MODELS_PER_DRAIN = 8;
 const MAX_HYDRATION_CPU_MS = 1;
@@ -232,6 +235,7 @@ export function useTwoHopProgressiveList(
 		: DISABLED_PREVIEW_SURFACE;
 	const interactionController = createVirtualCardInteractionController();
 	const modelsByLogicalKey = new Map<string, CardRenderModel>();
+	const modelSourceItemsByLogicalKey = new Map<string, TwoHopVirtualListItem>();
 	const modelConsumersByLogicalKey = new Map<string, Set<CardModelConsumer>>();
 	const previewBindingByLogicalKey = new Map<string, RowPreviewCardBinding>();
 	const visibleHydrationQueue = createHydrationQueue();
@@ -255,6 +259,7 @@ export function useTwoHopProgressiveList(
 	let hydrationGeneration = 0;
 	let previewPublicationScheduled = false;
 	let lastInputDocumentRevision = initialDocument.revision;
+	let lastDocumentIdentity = props.documentIdentity;
 
 	function notifyModelConsumers(
 		logicalKey: string,
@@ -299,6 +304,7 @@ export function useTwoHopProgressiveList(
 			notifyModelConsumers(logicalKey, undefined);
 		}
 		modelsByLogicalKey.clear();
+		modelSourceItemsByLogicalKey.clear();
 		previewBindingByLogicalKey.clear();
 		interactionController.clear();
 		enqueueHydrationForRowRange(activePreviewRange);
@@ -424,6 +430,7 @@ export function useTwoHopProgressiveList(
 			}
 			const model = resolver(entry.cell.item, presentation);
 			modelsByLogicalKey.set(entry.logicalKey, model);
+			modelSourceItemsByLogicalKey.set(entry.logicalKey, entry.cell.item);
 			notifyModelConsumers(entry.logicalKey, model);
 			if (
 				model.previewRequest &&
@@ -809,41 +816,97 @@ export function useTwoHopProgressiveList(
 		void restoreLayoutAnchor(anchor);
 	}
 
+	function reconcileHydratedModels(nextPlan: TwoHopProgressivePlan): void {
+		cancelPendingHydration();
+		const staleLogicalKeys = new Set(modelsByLogicalKey.keys());
+		for (const chunk of nextPlan.chunks) {
+			for (const row of chunk.rows) {
+				for (const cell of row.cells) {
+					if (
+						cell.kind !== "item" ||
+						!staleLogicalKeys.has(cell.logicalKey)
+					) {
+						continue;
+					}
+					if (
+						modelSourceItemsByLogicalKey.get(cell.logicalKey) === cell.item
+					) {
+						staleLogicalKeys.delete(cell.logicalKey);
+					}
+				}
+			}
+		}
+
+		const releasedSlots: string[] = [];
+		for (const logicalKey of staleLogicalKeys) {
+			notifyModelConsumers(logicalKey, undefined);
+			modelsByLogicalKey.delete(logicalKey);
+			modelSourceItemsByLogicalKey.delete(logicalKey);
+			previewBindingByLogicalKey.delete(logicalKey);
+			releasedSlots.push(logicalKey);
+		}
+		if (releasedSlots.length > 0) {
+			interactionController.syncCardDelta({
+				enteredSlots: [],
+				reboundSlots: [],
+				releasedSlots,
+			});
+		}
+		enqueueHydrationForRowRange(activePreviewRange);
+		schedulePreviewPublication();
+	}
+
 	function publishDocument(
 		nextDocument: TwoHopDocument,
-		resetMountedPrefix: boolean,
+		kind: DocumentPublicationKind,
 	): void {
-		if (nextDocument === document) return;
+		if (nextDocument === document && kind === "data-revision") return;
+		const anchor = kind === "data-revision" ? captureLayoutAnchor() : null;
 		const nextGeometry = compileFixedGridLayout(nextDocument, layout);
-		const nextMountedRowEnd = resetMountedPrefix
-			? resolveInitialProgressiveMountedRowEnd(nextGeometry.rowCount)
-			: Math.min(
-					nextGeometry.rowCount,
-					Math.max(
-						plan.mountedRowEnd,
-						resolveInitialProgressiveMountedRowEnd(nextGeometry.rowCount),
-					),
-				);
+		const nextMountedRowEnd =
+			kind === "identity-reset"
+				? resolveInitialProgressiveMountedRowEnd(nextGeometry.rowCount)
+				: Math.min(
+						nextGeometry.rowCount,
+						Math.max(
+							plan.mountedRowEnd,
+							resolveInitialProgressiveMountedRowEnd(
+								nextGeometry.rowCount,
+							),
+						),
+					);
 		document = nextDocument;
 		geometry = nextGeometry;
-		plan = compileTwoHopProgressivePlan(
+		const nextPlan = compileTwoHopProgressivePlan(
 			nextDocument,
 			nextGeometry,
 			nextMountedRowEnd,
 		);
-		if (resetMountedPrefix) clearHydratedModels();
+		plan = nextPlan;
+		if (kind === "identity-reset") {
+			clearHydratedModels();
+			return;
+		}
+		reconcileHydratedModels(nextPlan);
+		void restoreLayoutAnchor(anchor);
 	}
 
 	$effect(() => {
+		const nextDocumentIdentity = props.documentIdentity;
 		const nextDocument = documentProjection.setInput({
 			sections: props.sections,
 			paginationScope: props.paginationScope ?? "",
 			initialVisibleCount: props.initialVisibleCount,
 			loadMoreIncrement: props.loadMoreIncrement,
 		});
-		if (nextDocument.revision !== lastInputDocumentRevision) {
+		const identityChanged = nextDocumentIdentity !== lastDocumentIdentity;
+		if (identityChanged || nextDocument.revision !== lastInputDocumentRevision) {
+			lastDocumentIdentity = nextDocumentIdentity;
 			lastInputDocumentRevision = nextDocument.revision;
-			publishDocument(nextDocument, true);
+			publishDocument(
+				nextDocument,
+				identityChanged ? "identity-reset" : "data-revision",
+			);
 		}
 	});
 
@@ -1000,7 +1063,7 @@ export function useTwoHopProgressiveList(
 
 	function loadMore(sectionId: string): void {
 		const nextDocument = documentProjection.loadMore(sectionId);
-		if (nextDocument) publishDocument(nextDocument, false);
+		if (nextDocument) publishDocument(nextDocument, "data-revision");
 	}
 
 	return {

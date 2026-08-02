@@ -11,6 +11,7 @@
 	} from "features/two-hop/ui/twoHopVirtualListModel";
 
 	interface Props {
+		documentIdentity?: string;
 		sections: readonly TwoHopVirtualSectionDescriptor[];
 		applicationStore: ApplicationStore;
 		linkContext: LinkContext;
@@ -22,6 +23,7 @@
 	}
 
 	const {
+		documentIdentity = "test-document",
 		sections,
 		applicationStore,
 		linkContext,
@@ -32,6 +34,7 @@
 </script>
 
 <TwoHopProgressiveSurface
+	{documentIdentity}
 	{sections}
 	{applicationStore}
 	initialVisibleCount={sections[0]?.totalCount}

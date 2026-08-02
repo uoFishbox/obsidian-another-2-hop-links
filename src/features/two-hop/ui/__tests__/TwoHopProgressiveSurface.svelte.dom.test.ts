@@ -82,6 +82,115 @@ afterEach(() => {
 });
 
 describe("TwoHopProgressiveSurface", () => {
+	it("preserves the resident prefix and anchor for data revisions, then resets for a new identity", async () => {
+		const applicationStore = {
+			settings: {
+				...DEFAULT_SETTINGS,
+				cardWidthPx: 100,
+				cardHeightRatio: 1,
+				cardMaxColumns: 3,
+			},
+		} as unknown as ApplicationStore;
+		const resolveItemCardModel = vi.fn(
+			(
+				item: TwoHopVirtualListItem,
+				presentation: TwoHopCardPresentationState,
+			): CardRenderModel => ({
+				item: item.item,
+				targetFile: null,
+				title: item.virtualKey,
+				ariaLabel: item.virtualKey,
+				className: null,
+				extension: null,
+				directory: null,
+				interactionId: item.virtualKey,
+				interactionKey: item.virtualKey,
+				interactionDescriptor: null,
+				presentation,
+				searchQuery: "",
+				previewRequest: null,
+			}),
+		);
+		const scroller = document.createElement("div");
+		scroller.style.overflow = "auto";
+		setNumericProperty(scroller, "clientWidth", 320);
+		setNumericProperty(scroller, "clientHeight", 300);
+		setNumericProperty(scroller, "scrollHeight", 20_000);
+		setNumericProperty(scroller, "scrollTop", 500);
+		setElementRect(scroller, { top: 0, width: 320, height: 300 });
+		document.body.append(scroller);
+		const section = createSection(300);
+		const linkContext = { getPreview: vi.fn() } as unknown as LinkContext;
+		const rendered = render(TwoHopProgressiveSurfaceHarness, {
+			target: scroller,
+			props: {
+				documentIdentity: "first",
+				sections: [section],
+				applicationStore,
+				linkContext,
+				resolveItemCardModel,
+			},
+		});
+		const root = rendered.container.querySelector<HTMLElement>(
+			".twohop-progressive-surface",
+		);
+		if (!root) throw new Error("Progressive surface was not rendered");
+
+		await flushFrames();
+		await vi.waitFor(() => expect(resolveItemCardModel).toHaveBeenCalled());
+		for (let index = 0; index < 2; index += 1) {
+			const sentinel = root.shadowRoot?.querySelector<HTMLElement>(
+				".twohop-progressive-sentinel",
+			);
+			if (!sentinel) throw new Error("Progressive sentinel was not rendered");
+			triggerIntersection(sentinel);
+			await flushFrames();
+		}
+		expect(
+			root.shadowRoot?.querySelectorAll(".twohop-progressive-chunk"),
+		).toHaveLength(4);
+
+		const anchorCell = root.shadowRoot?.querySelector<HTMLElement>(
+			"[data-testid='twohop-progressive-item-cell']",
+		);
+		if (!anchorCell) throw new Error("Progressive anchor cell was not rendered");
+		vi.spyOn(anchorCell, "getBoundingClientRect")
+			.mockReturnValueOnce(createDomRect({ top: 20, width: 100, height: 100 }))
+			.mockReturnValue(createDomRect({ top: 50, width: 100, height: 100 }));
+		const hydratedCount = resolveItemCardModel.mock.calls.length;
+		await rendered.rerender({
+			documentIdentity: "first",
+			sections: [
+				{
+					...section,
+					sourceRevision: createSectionDataRevision(2),
+				},
+			],
+			applicationStore,
+			linkContext,
+			resolveItemCardModel,
+		});
+		await flushFrames();
+
+		expect(
+			root.shadowRoot?.querySelectorAll(".twohop-progressive-chunk"),
+		).toHaveLength(4);
+		expect(resolveItemCardModel).toHaveBeenCalledTimes(hydratedCount);
+		expect(scroller.scrollTop).toBe(530);
+
+		await rendered.rerender({
+			documentIdentity: "second",
+			sections: [section],
+			applicationStore,
+			linkContext,
+			resolveItemCardModel,
+		});
+		await flushFrames();
+		expect(
+			root.shadowRoot?.querySelectorAll(".twohop-progressive-chunk"),
+		).toHaveLength(2);
+	});
+
 	it("measures only root width and scroll viewport size changes", async () => {
 		const applicationStore = {
 			settings: {

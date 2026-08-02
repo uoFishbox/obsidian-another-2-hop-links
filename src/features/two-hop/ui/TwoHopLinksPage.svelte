@@ -126,6 +126,9 @@
 	let appliedSearchScope = $derived(
 		matchedKeySet === null ? searchScope : workerSearchSession.matchedScope,
 	);
+	let documentIdentity = $derived(
+		JSON.stringify([file.path, appliedSearchQuery, appliedSearchScope]),
+	);
 
 	let filteredDisplayData = $derived.by(() => {
 		return searchAdapter.filterDisplayData(
@@ -298,6 +301,7 @@
 			<LoadingState message="Waiting for the initial index to finish building." />
 		{:else if linkResult}
 			<TwoHopLinksList
+				{documentIdentity}
 				sections={twoHopVirtualListSections}
 				{applicationStore}
 				searchQuery={appliedSearchQuery}

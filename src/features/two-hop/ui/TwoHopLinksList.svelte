@@ -19,6 +19,7 @@
 	import type { TwoHopPreviewDependencies } from "features/two-hop/ui/twoHopPreviewDependencies";
 
 	interface Props {
+		documentIdentity: string;
 		sections: readonly TwoHopVirtualSectionDescriptor[];
 		applicationStore: ApplicationStore;
 		searchQuery?: string;
@@ -32,6 +33,7 @@
 	}
 
 	let {
+		documentIdentity,
 		sections,
 		applicationStore,
 		searchQuery = "",
@@ -70,6 +72,7 @@
 </script>
 
 <TwoHopProgressiveSurface
+	{documentIdentity}
 	{sections}
 	{applicationStore}
 	{initialVisibleCount}

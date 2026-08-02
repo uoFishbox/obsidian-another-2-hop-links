@@ -2,6 +2,7 @@ import type { TwoHopPreviewDependencies } from "features/two-hop/ui/twoHopPrevie
 import type { ApplicationStore } from "ui/stores/ApplicationStore.svelte";
 
 interface TwoHopProgressiveSurfacePageStubProps {
+	readonly documentIdentity: string;
 	readonly applicationStore: ApplicationStore;
 	readonly previewDependencies: TwoHopPreviewDependencies | undefined;
 	readonly previewActive: boolean;
