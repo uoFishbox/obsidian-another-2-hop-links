@@ -228,6 +228,8 @@ export function useTwoHopProgressiveList(
 	let previewViewportRefreshAnimationFrame: number | undefined;
 	let previewViewportRefreshOwnerWindow: Window | null = null;
 	let previewScrollIdleTimer: number | undefined;
+	let lastPreviewScrollAt = 0;
+	let previewScrollActive = false;
 	let previewScrollContainer: HTMLElement | null = null;
 	let previewOwnerWindow: Window | null = null;
 	let contentTopInScrollSpace = 0;
@@ -712,24 +714,52 @@ export function useTwoHopProgressiveList(
 		);
 	}
 
-	function schedulePreviewScrollIdle(): void {
-		if (!previewOwnerWindow) return;
-		if (previewScrollIdleTimer !== undefined) {
+	function ensurePreviewScrollIdleTimer(): void {
+		if (previewScrollIdleTimer !== undefined) return;
+		const ownerWindow = previewOwnerWindow;
+		if (!ownerWindow) return;
+		previewScrollIdleTimer = ownerWindow.setTimeout(
+			checkPreviewScrollIdle,
+			PREVIEW_SCROLL_IDLE_MS,
+		);
+	}
+
+	function checkPreviewScrollIdle(): void {
+		previewScrollIdleTimer = undefined;
+		if (disposed) return;
+		const remaining =
+			PREVIEW_SCROLL_IDLE_MS - (performance.now() - lastPreviewScrollAt);
+		const ownerWindow = previewOwnerWindow;
+		if (remaining > 0 && ownerWindow) {
+			previewScrollIdleTimer = ownerWindow.setTimeout(
+				checkPreviewScrollIdle,
+				remaining,
+			);
+			return;
+		}
+		previewScrollActive = false;
+		markScrollActivityIdle(previewScrollActivitySource);
+	}
+
+	function cancelPreviewScrollIdle(): void {
+		if (previewScrollIdleTimer !== undefined && previewOwnerWindow) {
 			previewOwnerWindow.clearTimeout(previewScrollIdleTimer);
 		}
-		previewScrollIdleTimer = previewOwnerWindow.setTimeout(() => {
-			previewScrollIdleTimer = undefined;
-			markScrollActivityIdle(previewScrollActivitySource);
-		}, PREVIEW_SCROLL_IDLE_MS);
+		previewScrollIdleTimer = undefined;
+		previewScrollActive = false;
+		markScrollActivityIdle(previewScrollActivitySource);
 	}
 
 	const previewScrollActivitySource = {};
 	function handlePreviewScroll(): void {
+		lastPreviewScrollAt = performance.now();
 		schedulePreviewRangeUpdate();
-		if (isPreviewControlActive()) {
+		if (!isPreviewControlActive()) return;
+		if (!previewScrollActive) {
+			previewScrollActive = true;
 			markScrollActivityActive(previewScrollActivitySource);
-			schedulePreviewScrollIdle();
 		}
+		ensurePreviewScrollIdleTimer();
 	}
 
 	function rebuildSentinelObserver(): void {
@@ -1039,11 +1069,7 @@ export function useTwoHopProgressiveList(
 		scrollTarget.addEventListener("scroll", handlePreviewScroll, { passive: true });
 		return () => {
 			scrollTarget.removeEventListener("scroll", handlePreviewScroll);
-			if (previewScrollIdleTimer !== undefined) {
-				ownerWindow.clearTimeout(previewScrollIdleTimer);
-				previewScrollIdleTimer = undefined;
-			}
-			markScrollActivityIdle(previewScrollActivitySource);
+			cancelPreviewScrollIdle();
 		};
 	});
 
@@ -1068,11 +1094,7 @@ export function useTwoHopProgressiveList(
 	$effect(() => {
 		const active = isPreviewControlActive();
 		if (!active) {
-			if (previewScrollIdleTimer !== undefined && previewOwnerWindow) {
-				previewOwnerWindow.clearTimeout(previewScrollIdleTimer);
-				previewScrollIdleTimer = undefined;
-			}
-			markScrollActivityIdle(previewScrollActivitySource);
+			cancelPreviewScrollIdle();
 			deactivatePreviewControl();
 			schedulePreviewPublication();
 			return;
@@ -1102,10 +1124,7 @@ export function useTwoHopProgressiveList(
 				previewViewportRefreshAnimationFrame,
 			);
 		}
-		if (previewScrollIdleTimer !== undefined && previewOwnerWindow) {
-			previewOwnerWindow.clearTimeout(previewScrollIdleTimer);
-		}
-		markScrollActivityIdle(previewScrollActivitySource);
+		cancelPreviewScrollIdle();
 		for (const consumer of previewHostRowConsumers.values()) consumer(false);
 		previewHostRowConsumers.clear();
 		interactionController.clear();
