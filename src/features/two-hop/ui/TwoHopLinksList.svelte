@@ -78,6 +78,7 @@
 	{initialVisibleCount}
 	{loadMoreIncrement}
 	paginationScope={searchQuery}
+	{cardModelRevision}
 	{resolveItemCardModel}
 	{previewDependencies}
 	{previewActive}

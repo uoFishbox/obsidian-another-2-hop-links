@@ -72,6 +72,8 @@ export interface TwoHopProgressiveListProps {
 	readonly loadMoreIncrement?: number;
 	readonly paginationScope?: string;
 	readonly previewActive?: boolean;
+	/** Explicit invalidation value for card models resolved by resolveItemCardModel. */
+	readonly cardModelRevision: unknown;
 	readonly resolveItemCardModel?: (
 		item: TwoHopVirtualListItem,
 		presentation: TwoHopCardPresentationState,
@@ -99,6 +101,13 @@ interface LayoutAnchor {
 type CardModelConsumer = (model: CardShellModel | undefined) => void;
 type HydrationPriority = "visible" | "preload";
 type DocumentPublicationKind = "identity-reset" | "data-revision";
+
+interface CardModelPresentationIdentity {
+	readonly title: string;
+	readonly path: string;
+	readonly previewRenderKey: string | undefined;
+	readonly interactionKey: string | undefined;
+}
 
 const MAX_MODELS_PER_DRAIN = 8;
 const MAX_HYDRATION_CPU_MS = 1;
@@ -142,6 +151,29 @@ function compactHydrationQueue(queue: HydrationQueue): void {
 	if (queue.head < remaining) return;
 	queue.entries.splice(0, queue.head);
 	queue.head = 0;
+}
+
+function resolveCardModelPresentationIdentity(
+	model: CardRenderModel,
+): CardModelPresentationIdentity {
+	return {
+		title: model.title,
+		path: model.targetFile?.path ?? "",
+		previewRenderKey: model.previewRequest?.renderKey,
+		interactionKey: model.interactionKey,
+	};
+}
+
+function isSameCardModelPresentation(
+	current: CardModelPresentationIdentity,
+	next: CardModelPresentationIdentity,
+): boolean {
+	return (
+		current.title === next.title &&
+		current.path === next.path &&
+		current.previewRenderKey === next.previewRenderKey &&
+		current.interactionKey === next.interactionKey
+	);
 }
 
 export function resolveProgressivePreviewSlotId(logicalKey: string): string {
@@ -209,6 +241,7 @@ export function useTwoHopProgressiveList(
 		: DISABLED_PREVIEW_SURFACE;
 	const interactionController = createVirtualCardInteractionController();
 	const modelsByLogicalKey = new Map<string, CardRenderModel>();
+	const modelRevisionByLogicalKey = new Map<string, unknown>();
 	const activatedModelKeys = new Set<string>();
 	const modelSourceItemsByLogicalKey = new Map<string, TwoHopVirtualListItem>();
 	const modelConsumersByLogicalKey = new Map<string, Set<CardModelConsumer>>();
@@ -238,6 +271,7 @@ export function useTwoHopProgressiveList(
 	let previewPublicationScheduled = false;
 	let lastInputDocumentRevision = initialDocument.revision;
 	let lastDocumentIdentity = props.documentIdentity;
+	let activeCardModelRevision = props.cardModelRevision;
 
 	function isPreviewControlActive(): boolean {
 		return props.previewActive !== false;
@@ -290,6 +324,7 @@ export function useTwoHopProgressiveList(
 			notifyModelConsumers(logicalKey, undefined);
 		}
 		modelsByLogicalKey.clear();
+		modelRevisionByLogicalKey.clear();
 		activatedModelKeys.clear();
 		modelSourceItemsByLogicalKey.clear();
 		previewBindingByLogicalKey.clear();
@@ -301,10 +336,23 @@ export function useTwoHopProgressiveList(
 	function enqueueHydrationCell(
 		cell: Extract<TwoHopProgressiveCell, { kind: "item" }>,
 		priority: HydrationPriority,
+		refreshExisting = false,
 	): void {
+		const hasModel = modelsByLogicalKey.has(cell.logicalKey);
+		const hasCurrentModel =
+			hasModel &&
+			modelRevisionByLogicalKey.get(cell.logicalKey) === activeCardModelRevision;
 		if (
-			modelsByLogicalKey.has(cell.logicalKey) &&
+			hasCurrentModel &&
 			(priority === "preload" || activatedModelKeys.has(cell.logicalKey))
+		) {
+			return;
+		}
+		if (
+			hasModel &&
+			!hasCurrentModel &&
+			priority === "preload" &&
+			!refreshExisting
 		) {
 			return;
 		}
@@ -315,7 +363,10 @@ export function useTwoHopProgressiveList(
 			return;
 		}
 		queue.keys.add(cell.logicalKey);
-		queue.entries.push({ logicalKey: cell.logicalKey, cell });
+		queue.entries.push({
+			logicalKey: cell.logicalKey,
+			cell,
+		});
 	}
 
 	function enqueueHydrationForChunk(chunkIndex: number): void {
@@ -329,12 +380,22 @@ export function useTwoHopProgressiveList(
 	}
 
 	function enqueueHydrationForRowRange(range: TwoHopRowRange): void {
+		enqueueHydrationForRowRangeWithPriority(range, "visible", false);
+	}
+
+	function enqueueHydrationForRowRangeWithPriority(
+		range: TwoHopRowRange,
+		priority: HydrationPriority,
+		refreshExisting: boolean,
+	): void {
 		const activePlan = untrack(() => plan);
 		for (let rowIndex = range.start; rowIndex < range.end; rowIndex += 1) {
 			const row = resolveMountedProgressiveRow(activePlan, rowIndex);
 			if (!row) continue;
 			for (const cell of row.cells) {
-				if (cell.kind === "item") enqueueHydrationCell(cell, "visible");
+				if (cell.kind === "item") {
+					enqueueHydrationCell(cell, priority, refreshExisting);
+				}
 			}
 		}
 		scheduleHydrationDrain();
@@ -349,6 +410,12 @@ export function useTwoHopProgressiveList(
 			range.end / TWO_HOP_PROGRESSIVE_ROWS_PER_CHUNK,
 		);
 		enqueueHydrationForChunk(nextChunkIndex);
+	}
+
+	function refreshResidentHydratedModels(): void {
+		cancelPendingHydration();
+		enqueueHydrationForRowRangeWithPriority(visibleHydrationRange, "visible", true);
+		enqueueHydrationForRowRangeWithPriority(residentPreviewRange, "preload", true);
 	}
 
 	function scheduleHydrationDrain(): void {
@@ -394,6 +461,8 @@ export function useTwoHopProgressiveList(
 		let processedCount = 0;
 		let activePreviewHydrationChanged = false;
 		const enteredInteractionSlots: VirtualCardInteractionBinding[] = [];
+		const reboundInteractionSlots: VirtualCardInteractionBinding[] = [];
+		const releasedInteractionSlots: string[] = [];
 		while (
 			hasPendingHydration(queue) &&
 			processedCount < MAX_MODELS_PER_DRAIN &&
@@ -403,8 +472,15 @@ export function useTwoHopProgressiveList(
 			const entry = takeNextHydrationEntry(queue);
 			if (!entry) break;
 			processedCount += 1;
-			let model = modelsByLogicalKey.get(entry.logicalKey);
-			if (!model) {
+			const currentModel = modelsByLogicalKey.get(entry.logicalKey);
+			let model = currentModel;
+			let presentationChanged = false;
+			let previewRenderKeyChanged = false;
+			if (
+				!currentModel ||
+				modelRevisionByLogicalKey.get(entry.logicalKey) !==
+					activeCardModelRevision
+			) {
 				const presentation = resolveTwoHopCardPresentation(
 					entry.cell.item,
 					entry.cell.section.header.section,
@@ -413,29 +489,75 @@ export function useTwoHopProgressiveList(
 				if (process.env.NODE_ENV !== "production") {
 					recordCCLDevMeasurement("twoHop.resolveItemCardModel.call");
 				}
-				model = resolver(entry.cell.item, presentation);
-				modelsByLogicalKey.set(entry.logicalKey, model);
+				const resolvedModel = resolver(entry.cell.item, presentation);
+				modelRevisionByLogicalKey.set(
+					entry.logicalKey,
+					activeCardModelRevision,
+				);
 				modelSourceItemsByLogicalKey.set(entry.logicalKey, entry.cell.item);
-				notifyModelConsumers(entry.logicalKey, model);
+				if (!currentModel) {
+					model = resolvedModel;
+					modelsByLogicalKey.set(entry.logicalKey, resolvedModel);
+					notifyModelConsumers(entry.logicalKey, resolvedModel);
+				} else {
+					const currentIdentity =
+						resolveCardModelPresentationIdentity(currentModel);
+					const nextIdentity =
+						resolveCardModelPresentationIdentity(resolvedModel);
+					presentationChanged = !isSameCardModelPresentation(
+						currentIdentity,
+						nextIdentity,
+					);
+					previewRenderKeyChanged =
+						currentIdentity.previewRenderKey !==
+						nextIdentity.previewRenderKey;
+					if (presentationChanged) {
+						model = resolvedModel;
+						modelsByLogicalKey.set(entry.logicalKey, resolvedModel);
+						notifyModelConsumers(entry.logicalKey, resolvedModel);
+					}
+				}
 			}
-			if (priority === "preload") continue;
-			activatedModelKeys.add(entry.logicalKey);
-			if (isPreviewControlActive() && model.previewRequest) {
+			if (!model) continue;
+			const wasActivated = activatedModelKeys.has(entry.logicalKey);
+			if (priority === "visible") activatedModelKeys.add(entry.logicalKey);
+			const isActivated =
+				wasActivated || activatedModelKeys.has(entry.logicalKey);
+			if (!isActivated) continue;
+			if (
+				isPreviewControlActive() &&
+				(!wasActivated
+					? Boolean(model.previewRequest)
+					: previewRenderKeyChanged)
+			) {
 				activePreviewHydrationChanged = true;
 			}
 			const interactionDescriptor = model.interactionDescriptor;
-			if (interactionDescriptor) {
+			if (!wasActivated && interactionDescriptor) {
 				enteredInteractionSlots.push({
 					slotId: entry.logicalKey,
 					descriptor: interactionDescriptor,
 				});
+			} else if (wasActivated && presentationChanged) {
+				if (interactionDescriptor) {
+					reboundInteractionSlots.push({
+						slotId: entry.logicalKey,
+						descriptor: interactionDescriptor,
+					});
+				} else {
+					releasedInteractionSlots.push(entry.logicalKey);
+				}
 			}
 		}
-		if (enteredInteractionSlots.length > 0) {
+		if (
+			enteredInteractionSlots.length > 0 ||
+			reboundInteractionSlots.length > 0 ||
+			releasedInteractionSlots.length > 0
+		) {
 			interactionController.syncCardDelta({
 				enteredSlots: enteredInteractionSlots,
-				reboundSlots: [],
-				releasedSlots: [],
+				reboundSlots: reboundInteractionSlots,
+				releasedSlots: releasedInteractionSlots,
 			});
 		}
 		compactHydrationQueue(queue);
@@ -909,6 +1031,7 @@ export function useTwoHopProgressiveList(
 		for (const logicalKey of staleLogicalKeys) {
 			notifyModelConsumers(logicalKey, undefined);
 			modelsByLogicalKey.delete(logicalKey);
+			modelRevisionByLogicalKey.delete(logicalKey);
 			activatedModelKeys.delete(logicalKey);
 			modelSourceItemsByLogicalKey.delete(logicalKey);
 			previewBindingByLogicalKey.delete(logicalKey);
@@ -979,12 +1102,11 @@ export function useTwoHopProgressiveList(
 		}
 	});
 
-	let previousResolver = props.resolveItemCardModel;
 	$effect(() => {
-		const resolver = props.resolveItemCardModel;
-		if (resolver === previousResolver) return;
-		previousResolver = resolver;
-		clearHydratedModels();
+		const revision = props.cardModelRevision;
+		if (revision === activeCardModelRevision) return;
+		activeCardModelRevision = revision;
+		refreshResidentHydratedModels();
 	});
 
 	$effect(() => {

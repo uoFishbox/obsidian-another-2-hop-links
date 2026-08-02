@@ -108,6 +108,13 @@ interface HydrationSchedulingFixture {
 	readonly resolvePreviewRequest: ReturnType<typeof vi.fn>;
 	readonly root: HTMLElement;
 	readonly scrollTarget: HTMLElement | Window;
+	rerenderCardModels(
+		revision: unknown,
+		resolver: (
+			item: TwoHopVirtualListItem,
+			presentation: TwoHopCardPresentationState,
+		) => CardRenderModel,
+	): Promise<void>;
 }
 
 interface PreviewControlFixture {
@@ -118,6 +125,13 @@ interface PreviewControlFixture {
 	readonly root: HTMLElement;
 	readonly scrollTarget: HTMLElement | Window;
 	rerenderPreviewActive(active: boolean): Promise<void>;
+	rerenderCardModels(
+		revision: unknown,
+		resolver: (
+			item: TwoHopVirtualListItem,
+			presentation: TwoHopCardPresentationState,
+		) => CardRenderModel,
+	): Promise<void>;
 }
 
 async function renderPreviewControlFixture(
@@ -232,6 +246,14 @@ async function renderPreviewControlFixture(
 			await Promise.resolve();
 			await drainPostPaintTasks();
 		},
+		async rerenderCardModels(revision, resolver): Promise<void> {
+			await rendered.rerender({
+				...baseProps,
+				cardModelRevision: revision,
+				resolveItemCardModel: resolver,
+			});
+			await Promise.resolve();
+		},
 	};
 }
 
@@ -278,16 +300,23 @@ async function renderHydrationSchedulingFixture(
 	setNumericProperty(scroller, "scrollHeight", 20_000);
 	setElementRect(scroller, { top: 0, width: 320, height: 300 });
 	document.body.append(scroller);
-	const { container } = render(TwoHopProgressiveSurfaceHarness, {
+	const linkContext = { getPreview: vi.fn() } as unknown as LinkContext;
+	const baseProps = {
+		sections: [createSection(itemCount)],
+		applicationStore,
+		linkContext,
+	};
+	const rendered = render(TwoHopProgressiveSurfaceHarness, {
 		target: scroller,
 		props: {
-			sections: [createSection(itemCount)],
-			applicationStore,
-			linkContext: { getPreview: vi.fn() } as unknown as LinkContext,
+			...baseProps,
+			cardModelRevision: 0,
 			resolveItemCardModel,
 		},
 	});
-	const root = container.querySelector<HTMLElement>(".twohop-progressive-surface");
+	const root = rendered.container.querySelector<HTMLElement>(
+		".twohop-progressive-surface",
+	);
 	if (!root) throw new Error("Progressive surface was not rendered");
 	setElementRect(root, { top: 0, width: 320, height: 20_000 });
 	triggerResize(root, 320, 20_000);
@@ -300,6 +329,14 @@ async function renderHydrationSchedulingFixture(
 		resolvePreviewRequest,
 		root,
 		scrollTarget: findNearestScrollContainer(root) ?? window,
+		async rerenderCardModels(revision, resolver): Promise<void> {
+			await rendered.rerender({
+				...baseProps,
+				cardModelRevision: revision,
+				resolveItemCardModel: resolver,
+			});
+			await Promise.resolve();
+		},
 	};
 }
 
@@ -407,6 +444,190 @@ describe("TwoHop progressive preview scheduling", () => {
 		expect(readResolvedItemIndexes(fixture.resolveItemCardModel)).toEqual(
 			initialResolvedIndexes,
 		);
+	});
+
+	it("keeps stale cards rendered and publishes only changed presentation identities", async () => {
+		const fixture = await renderHydrationSchedulingFixture();
+		await drainPostPaintTasks();
+		const itemCells = Array.from(
+			fixture.root.shadowRoot?.querySelectorAll<HTMLElement>(
+				"[data-testid='twohop-progressive-item-cell']",
+			) ?? [],
+		);
+		const firstCell = itemCells[0];
+		const secondCell = itemCells[1];
+		if (!firstCell || !secondCell) {
+			throw new Error("Progressive item cells were not rendered");
+		}
+		const firstCard = firstCell.querySelector<HTMLElement>(
+			".cosense-card-links__box",
+		);
+		if (!firstCard) throw new Error("First card was not hydrated");
+
+		const equivalentResolver = vi.fn(
+			(
+				item: TwoHopVirtualListItem,
+				presentation: TwoHopCardPresentationState,
+			): CardRenderModel => ({
+				item: item.item,
+				targetFile: null,
+				title: item.virtualKey,
+				ariaLabel: `revised:${item.virtualKey}`,
+				className: null,
+				extension: null,
+				directory: null,
+				interactionId: item.virtualKey,
+				interactionKey: item.virtualKey,
+				interactionDescriptor: null,
+				presentation,
+				searchQuery: "",
+				previewRequest: null,
+			}),
+		);
+		await fixture.rerenderCardModels(1, equivalentResolver);
+
+		expect(firstCell.querySelector(".is-skeleton")).toBeNull();
+		expect(firstCell.querySelector(".cosense-card-links__box")).toBe(firstCard);
+		expect(firstCard).toHaveAttribute("aria-label", "item:0");
+		await drainPostPaintTasks();
+		expect(equivalentResolver).toHaveBeenCalled();
+		expect(firstCard).toHaveAttribute("aria-label", "item:0");
+
+		const changedResolver = vi.fn(
+			(
+				item: TwoHopVirtualListItem,
+				presentation: TwoHopCardPresentationState,
+			): CardRenderModel => ({
+				item: item.item,
+				targetFile: null,
+				title: item.virtualKey === "item:0" ? "changed-title" : item.virtualKey,
+				ariaLabel: item.virtualKey,
+				className: null,
+				extension: null,
+				directory: null,
+				interactionId: item.virtualKey,
+				interactionKey: item.virtualKey,
+				interactionDescriptor: null,
+				presentation,
+				searchQuery: "",
+				previewRequest: null,
+			}),
+		);
+		const secondCard = secondCell.querySelector<HTMLElement>(
+			".cosense-card-links__box",
+		);
+		await fixture.rerenderCardModels(2, changedResolver);
+		expect(firstCell.querySelector(".is-skeleton")).toBeNull();
+		await drainPostPaintTasks();
+
+		expect(
+			firstCell.querySelector(".cosense-card-links__box-title"),
+		).toHaveTextContent("changed-title");
+		expect(secondCell.querySelector(".cosense-card-links__box")).toBe(secondCard);
+	});
+
+	it("retains preview bindings until their render key changes", async () => {
+		const fixture = await renderPreviewControlFixture(true);
+		await vi.waitFor(() => expect(fixture.registerHost).toHaveBeenCalled());
+		const targetFile = {
+			path: "notes/preview.md",
+			basename: "preview",
+			extension: "md",
+			parent: { path: "notes" },
+			stat: { ctime: 1, mtime: 1, size: 1 },
+		} as TFile;
+		function createResolver(changedItemKey?: string) {
+			return vi.fn(
+				(
+					item: TwoHopVirtualListItem,
+					presentation: TwoHopCardPresentationState,
+				): CardRenderModel => ({
+					item: item.item,
+					targetFile,
+					title: item.virtualKey,
+					ariaLabel: item.virtualKey,
+					className: null,
+					extension: "md",
+					directory: "notes",
+					interactionId: item.virtualKey,
+					interactionKey: item.virtualKey,
+					interactionDescriptor: null,
+					presentation,
+					searchQuery: "",
+					previewRequest: {
+						renderKey:
+							item.virtualKey === changedItemKey
+								? `changed:${item.virtualKey}`
+								: `preview:${item.virtualKey}`,
+					} as CardPreviewRequest,
+				}),
+			);
+		}
+
+		fixture.publish.mockClear();
+		fixture.disposeHost.mockClear();
+		const equivalentResolver = createResolver();
+		await fixture.rerenderCardModels(1, equivalentResolver);
+		await drainPostPaintTasks();
+		await drainIdleTasks();
+		expect(equivalentResolver).toHaveBeenCalled();
+		expect(fixture.publish).not.toHaveBeenCalled();
+		expect(fixture.disposeHost).not.toHaveBeenCalled();
+
+		const changedResolver = createResolver("item:0");
+		await fixture.rerenderCardModels(2, changedResolver);
+		await drainPostPaintTasks();
+		await Promise.resolve();
+		expect(fixture.publish).toHaveBeenCalled();
+		const frame = fixture.publish.mock.lastCall?.[0] as PreviewFrame | undefined;
+		expect(
+			Array.from(frame?.previewBindingsBySlot.values() ?? []).some(
+				(binding) => binding.request.renderKey === "changed:item:0",
+			),
+		).toBe(true);
+		expect(fixture.disposeHost).not.toHaveBeenCalled();
+	});
+
+	it("refreshes stale offscreen models only after they become visible again", async () => {
+		const fixture = await renderHydrationSchedulingFixture();
+		await drainPostPaintTasks();
+		await applyScrollRange(fixture.scrollTarget, 2_000);
+		await drainPostPaintTasks();
+		await applyScrollRange(fixture.scrollTarget, 0);
+		await drainPostPaintTasks();
+
+		const refreshedResolver = vi.fn(
+			(
+				item: TwoHopVirtualListItem,
+				presentation: TwoHopCardPresentationState,
+			): CardRenderModel => ({
+				item: item.item,
+				targetFile: null,
+				title: item.virtualKey,
+				ariaLabel: item.virtualKey,
+				className: null,
+				extension: null,
+				directory: null,
+				interactionId: item.virtualKey,
+				interactionKey: item.virtualKey,
+				interactionDescriptor: null,
+				presentation,
+				searchQuery: "",
+				previewRequest: null,
+			}),
+		);
+		await fixture.rerenderCardModels(1, refreshedResolver);
+		await drainPostPaintTasks();
+		await drainIdleTasks();
+
+		expect(
+			readResolvedItemIndexes(refreshedResolver).every((index) => index < 20),
+		).toBe(true);
+		await applyScrollRange(fixture.scrollTarget, 2_000);
+		await drainPostPaintTasks();
+		expect(
+			readResolvedItemIndexes(refreshedResolver).some((index) => index >= 20),
+		).toBe(true);
 	});
 
 	it("preloads only the one chunk immediately after the visible range", async () => {

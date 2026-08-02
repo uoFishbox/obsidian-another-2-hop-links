@@ -17,6 +17,7 @@
 		linkContext: LinkContext;
 		previewDependencies?: TwoHopPreviewDependencies;
 		previewActive?: boolean;
+		cardModelRevision?: unknown;
 		resolveItemCardModel: (
 			item: TwoHopVirtualListItem,
 			presentation: TwoHopCardPresentationState,
@@ -30,6 +31,7 @@
 		linkContext,
 		previewDependencies = undefined,
 		previewActive = true,
+		cardModelRevision = 0,
 		resolveItemCardModel,
 	}: Props = $props();
 	setLinkContext(linkContext);
@@ -43,4 +45,5 @@
 	{resolveItemCardModel}
 	{previewDependencies}
 	{previewActive}
+	{cardModelRevision}
 />
