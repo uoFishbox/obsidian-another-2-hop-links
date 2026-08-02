@@ -844,13 +844,40 @@ export function useTwoHopProgressiveList(
 		measurePreviewViewportGeometry();
 		flushPreviewRangeFromScroll();
 		if (typeof ResizeObserver === "undefined") return;
-		const observer = new ResizeObserver(() => {
-			measureLayout();
+		let previousRootInlineSize = element.clientWidth;
+		let previousViewportClientWidth = previewScrollContainer?.clientWidth;
+		let previousViewportClientHeight = previewScrollContainer?.clientHeight;
+		const observer = new ResizeObserver((entries) => {
+			let viewportSizeChanged = false;
+			for (const entry of entries) {
+				if (entry.target === element) {
+					const inlineSize =
+						entry.borderBoxSize?.[0]?.inlineSize ?? entry.contentRect.width;
+					if (inlineSize !== previousRootInlineSize) {
+						previousRootInlineSize = inlineSize;
+						measureLayout();
+					}
+				}
+
+				if (entry.target !== previewScrollContainer) continue;
+				const clientWidth = previewScrollContainer.clientWidth;
+				const clientHeight = previewScrollContainer.clientHeight;
+				if (
+					clientWidth === previousViewportClientWidth &&
+					clientHeight === previousViewportClientHeight
+				) {
+					continue;
+				}
+				previousViewportClientWidth = clientWidth;
+				previousViewportClientHeight = clientHeight;
+				viewportSizeChanged = true;
+			}
+
+			if (!viewportSizeChanged) return;
 			measurePreviewViewportGeometry();
 			flushPreviewRangeFromScroll();
 		});
 		observer.observe(element);
-		observer.observe(content);
 		if (previewScrollContainer) observer.observe(previewScrollContainer);
 		return () => observer.disconnect();
 	});
@@ -882,7 +909,6 @@ export function useTwoHopProgressiveList(
 		void geometry;
 		void plan.mountedRowEnd;
 		if (!contentEl) return;
-		measurePreviewViewportGeometry();
 		flushPreviewRangeFromScroll();
 	});
 

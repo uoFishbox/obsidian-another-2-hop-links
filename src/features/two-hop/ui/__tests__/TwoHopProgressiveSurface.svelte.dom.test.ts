@@ -23,11 +23,13 @@ import {
 	resetScrollActivityForTests,
 } from "ui/virtualization/scheduling/scrollActivity";
 import {
+	createDomRect,
 	flushFrames,
 	intersectionObserverRecords,
 	installIntersectionObserverMock,
 	installResizeObserverMock,
 	resetRecords,
+	resizeObserverRecords,
 	setElementRect,
 	setNumericProperty,
 	teardownIntersectionObserverMock,
@@ -80,6 +82,112 @@ afterEach(() => {
 });
 
 describe("TwoHopProgressiveSurface", () => {
+	it("measures only root width and scroll viewport size changes", async () => {
+		const applicationStore = {
+			settings: {
+				...DEFAULT_SETTINGS,
+				cardWidthPx: 100,
+				cardHeightRatio: 1,
+				cardMaxColumns: 3,
+			},
+		} as unknown as ApplicationStore;
+		const scroller = document.createElement("div");
+		scroller.style.overflow = "auto";
+		setNumericProperty(scroller, "clientWidth", 320);
+		setNumericProperty(scroller, "clientHeight", 300);
+		setNumericProperty(scroller, "scrollHeight", 20_000);
+		setElementRect(scroller, { top: 0, width: 320, height: 300 });
+		document.body.append(scroller);
+		const { container } = render(TwoHopProgressiveSurfaceHarness, {
+			target: scroller,
+			props: {
+				sections: [createSection(300)],
+				applicationStore,
+				linkContext: { getPreview: vi.fn() } as unknown as LinkContext,
+				resolveItemCardModel: (
+					item: TwoHopVirtualListItem,
+					presentation: TwoHopCardPresentationState,
+				): CardRenderModel => ({
+					item: item.item,
+					targetFile: null,
+					title: item.virtualKey,
+					ariaLabel: item.virtualKey,
+					className: null,
+					extension: null,
+					directory: null,
+					interactionId: item.virtualKey,
+					interactionKey: item.virtualKey,
+					interactionDescriptor: null,
+					presentation,
+					searchQuery: "",
+					previewRequest: null,
+				}),
+			},
+		});
+		const root = container.querySelector<HTMLElement>(
+			".twohop-progressive-surface",
+		);
+		const content = root?.shadowRoot?.querySelector<HTMLElement>(
+			".twohop-progressive-content",
+		);
+		if (!root || !content) throw new Error("Progressive surface was not rendered");
+
+		let rootWidth = 320;
+		const rootRect = vi
+			.spyOn(root, "getBoundingClientRect")
+			.mockImplementation(() =>
+				createDomRect({ top: 0, width: rootWidth, height: 20_000 }),
+			);
+		const contentRect = vi.spyOn(content, "getBoundingClientRect");
+		const scrollerRect = vi.spyOn(scroller, "getBoundingClientRect");
+		triggerResize(root, rootWidth, 20_000);
+		rootRect.mockClear();
+		contentRect.mockClear();
+		scrollerRect.mockClear();
+
+		const observer = resizeObserverRecords.find((record) =>
+			record.elements.has(root),
+		);
+		expect(observer?.elements.has(content)).toBe(false);
+		expect(observer?.elements.has(scroller)).toBe(true);
+
+		triggerResize(root, rootWidth, 30_000);
+		expect(rootRect).not.toHaveBeenCalled();
+		expect(contentRect).not.toHaveBeenCalled();
+		expect(scrollerRect).not.toHaveBeenCalled();
+
+		rootWidth = 400;
+		triggerResize(root, rootWidth, 30_000);
+		expect(rootRect).toHaveBeenCalledOnce();
+		expect(contentRect).not.toHaveBeenCalled();
+		await flushFrames();
+		rootRect.mockClear();
+		contentRect.mockClear();
+		scrollerRect.mockClear();
+
+		triggerResize(scroller, 320, 300);
+		expect(contentRect).not.toHaveBeenCalled();
+		expect(scrollerRect).not.toHaveBeenCalled();
+
+		setNumericProperty(scroller, "clientHeight", 400);
+		triggerResize(scroller, 320, 400);
+		expect(contentRect).toHaveBeenCalledOnce();
+		expect(scrollerRect).toHaveBeenCalledOnce();
+		rootRect.mockClear();
+		contentRect.mockClear();
+		scrollerRect.mockClear();
+
+		const sentinel = root.shadowRoot?.querySelector<HTMLElement>(
+			".twohop-progressive-sentinel",
+		);
+		if (!sentinel) throw new Error("Progressive sentinel was not rendered");
+		triggerIntersection(sentinel);
+		await flushFrames();
+		expect(rootRect).not.toHaveBeenCalled();
+		expect(contentRect).not.toHaveBeenCalled();
+		expect(scrollerRect).not.toHaveBeenCalled();
+	});
+
 	it("hydrates visible cards through post-paint while scrolling blocks idle work", async () => {
 		const originalRequestIdleCallback = window.requestIdleCallback;
 		const originalCancelIdleCallback = window.cancelIdleCallback;
