@@ -48,6 +48,7 @@ import {
 	type ViewPlanLayoutMetrics,
 } from "ui/virtualization/svelte/viewPlanLayout";
 import { findNearestScrollContainer } from "ui/virtualization/dom/scrollContainer";
+import { collectPositionDependencyElements } from "ui/virtualization/dom/scrollContainerDependencies";
 import {
 	markScrollActivityActive,
 	markScrollActivityIdle,
@@ -244,6 +245,8 @@ export function useTwoHopProgressiveList(
 	let cancelHydrationDrain: (() => void) | undefined;
 	let scheduledHydrationPriority: HydrationPriority | undefined;
 	let previewRangeAnimationFrame: number | undefined;
+	let previewViewportRefreshAnimationFrame: number | undefined;
+	let previewViewportRefreshOwnerWindow: Window | null = null;
 	let previewScrollIdleTimer: number | undefined;
 	let previewScrollContainer: HTMLElement | null = null;
 	let previewOwnerWindow: Window | null = null;
@@ -585,6 +588,31 @@ export function useTwoHopProgressiveList(
 		previewViewportHeight = previewOwnerWindow.innerHeight;
 	}
 
+	function refreshPreviewViewportGeometry(): void {
+		previewViewportRefreshAnimationFrame = undefined;
+		previewViewportRefreshOwnerWindow = null;
+		if (disposed || !rootEl || !contentEl) return;
+		measurePreviewViewportGeometry();
+		flushPreviewRangeFromScroll();
+	}
+
+	function schedulePreviewViewportRefresh(): void {
+		if (
+			disposed ||
+			previewViewportRefreshAnimationFrame !== undefined ||
+			!rootEl ||
+			!contentEl
+		) {
+			return;
+		}
+		const ownerWindow = rootEl.ownerDocument.defaultView;
+		if (!ownerWindow) return;
+		previewViewportRefreshOwnerWindow = ownerWindow;
+		previewViewportRefreshAnimationFrame = ownerWindow.requestAnimationFrame(
+			refreshPreviewViewportGeometry,
+		);
+	}
+
 	function flushPreviewRangeFromScroll(): void {
 		previewRangeAnimationFrame = undefined;
 		if (disposed) return;
@@ -838,18 +866,26 @@ export function useTwoHopProgressiveList(
 		const content = contentEl;
 		void configuredLayout;
 		if (!element || !content) return;
-		previewScrollContainer = findNearestScrollContainer(element);
+		const scrollContainer = findNearestScrollContainer(element);
+		previewScrollContainer = scrollContainer;
 		previewOwnerWindow = element.ownerDocument.defaultView;
 		measureLayout();
 		measurePreviewViewportGeometry();
 		flushPreviewRangeFromScroll();
 		if (typeof ResizeObserver === "undefined") return;
 		let previousRootInlineSize = element.clientWidth;
-		let previousViewportClientWidth = previewScrollContainer?.clientWidth;
-		let previousViewportClientHeight = previewScrollContainer?.clientHeight;
+		let previousViewportClientWidth = scrollContainer?.clientWidth;
+		let previousViewportClientHeight = scrollContainer?.clientHeight;
+		const positionDependencyElements = new Set<Element>(
+			collectPositionDependencyElements(element, scrollContainer),
+		);
 		const observer = new ResizeObserver((entries) => {
 			let viewportSizeChanged = false;
+			let positionDependencyChanged = false;
 			for (const entry of entries) {
+				if (positionDependencyElements.has(entry.target)) {
+					positionDependencyChanged = true;
+				}
 				if (entry.target === element) {
 					const inlineSize =
 						entry.borderBoxSize?.[0]?.inlineSize ?? entry.contentRect.width;
@@ -859,9 +895,9 @@ export function useTwoHopProgressiveList(
 					}
 				}
 
-				if (entry.target !== previewScrollContainer) continue;
-				const clientWidth = previewScrollContainer.clientWidth;
-				const clientHeight = previewScrollContainer.clientHeight;
+				if (entry.target !== scrollContainer) continue;
+				const clientWidth = scrollContainer.clientWidth;
+				const clientHeight = scrollContainer.clientHeight;
 				if (
 					clientWidth === previousViewportClientWidth &&
 					clientHeight === previousViewportClientHeight
@@ -873,12 +909,16 @@ export function useTwoHopProgressiveList(
 				viewportSizeChanged = true;
 			}
 
+			if (positionDependencyChanged) schedulePreviewViewportRefresh();
 			if (!viewportSizeChanged) return;
 			measurePreviewViewportGeometry();
 			flushPreviewRangeFromScroll();
 		});
 		observer.observe(element);
-		if (previewScrollContainer) observer.observe(previewScrollContainer);
+		if (scrollContainer) observer.observe(scrollContainer);
+		for (const dependencyElement of positionDependencyElements) {
+			observer.observe(dependencyElement);
+		}
 		return () => observer.disconnect();
 	});
 
@@ -938,6 +978,14 @@ export function useTwoHopProgressiveList(
 		frameCoordinator.cancel("post-paint", PREVIEW_RANGE_APPLY_TASK_KEY);
 		if (previewRangeAnimationFrame !== undefined && previewOwnerWindow) {
 			previewOwnerWindow.cancelAnimationFrame(previewRangeAnimationFrame);
+		}
+		if (
+			previewViewportRefreshAnimationFrame !== undefined &&
+			previewViewportRefreshOwnerWindow
+		) {
+			previewViewportRefreshOwnerWindow.cancelAnimationFrame(
+				previewViewportRefreshAnimationFrame,
+			);
 		}
 		if (previewScrollIdleTimer !== undefined && previewOwnerWindow) {
 			previewOwnerWindow.clearTimeout(previewScrollIdleTimer);

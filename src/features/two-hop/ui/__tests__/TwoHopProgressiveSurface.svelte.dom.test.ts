@@ -377,6 +377,104 @@ describe("TwoHopProgressiveSurface", () => {
 		).toBe(true);
 	});
 
+	it("remeasures preview geometry after inline sizer movement", async () => {
+		const targetFile = {
+			path: "notes/preview.md",
+			basename: "preview",
+			extension: "md",
+			parent: { path: "notes" },
+			stat: { mtime: 1 },
+		} as TFile;
+		const applicationStore = {
+			settings: {
+				...DEFAULT_SETTINGS,
+				cardWidthPx: 100,
+				cardHeightRatio: 1,
+				cardMaxColumns: 3,
+			},
+		} as unknown as ApplicationStore;
+		const resolveItemCardModel = (
+			item: TwoHopVirtualListItem,
+			presentation: TwoHopCardPresentationState,
+		): CardRenderModel => ({
+			item: item.item,
+			targetFile,
+			title: item.virtualKey,
+			ariaLabel: item.virtualKey,
+			className: null,
+			extension: "md",
+			directory: "notes",
+			interactionId: item.virtualKey,
+			interactionKey: item.virtualKey,
+			interactionDescriptor: null,
+			presentation,
+			searchQuery: "",
+			previewRequest: {
+				renderKey: `preview:${item.virtualKey}`,
+			} as CardPreviewRequest,
+		});
+		const scroller = document.createElement("div");
+		scroller.style.overflow = "auto";
+		setNumericProperty(scroller, "clientHeight", 300);
+		setNumericProperty(scroller, "scrollHeight", 20_000);
+		setElementRect(scroller, { top: 0, width: 320, height: 300 });
+		scroller.classList.add("cm-scroller", "ccl-inline-card-host");
+		document.body.append(scroller);
+		const sizer = document.createElement("div");
+		sizer.classList.add("cm-sizer");
+		const surfaceContainer = document.createElement("div");
+		scroller.append(sizer, surfaceContainer);
+		const props = {
+			sections: [createSection(100)],
+			applicationStore,
+			linkContext: { getPreview: vi.fn() } as unknown as LinkContext,
+			resolveItemCardModel,
+		};
+		const rendered = render(TwoHopProgressiveSurfaceHarness, {
+			target: surfaceContainer,
+			props,
+		});
+		const root = rendered.container.querySelector<HTMLElement>(
+			".twohop-progressive-surface",
+		);
+		const content = root?.shadowRoot?.querySelector<HTMLElement>(
+			".twohop-progressive-content",
+		);
+		if (!root || !content) throw new Error("Progressive surface was not rendered");
+		setElementRect(content, { top: 0, width: 320, height: 20_000 });
+
+		await flushFrames();
+		await vi.waitFor(() =>
+			expect(
+				root.shadowRoot?.querySelectorAll(
+					"[data-preview-owner='virtual-surface']",
+				).length,
+			).toBeGreaterThan(0),
+		);
+
+		setElementRect(content, { top: 1_000, width: 320, height: 20_000 });
+		triggerResize(sizer, 320, 1_000);
+		await flushFrames();
+		await vi.waitFor(() =>
+			expect(
+				root.shadowRoot?.querySelectorAll(
+					"[data-preview-owner='virtual-surface']",
+				),
+			).toHaveLength(0),
+		);
+
+		setElementRect(content, { top: 0, width: 320, height: 20_000 });
+		triggerResize(sizer, 320, 0);
+		await flushFrames();
+		await vi.waitFor(() =>
+			expect(
+				root.shadowRoot?.querySelectorAll(
+					"[data-preview-owner='virtual-surface']",
+				).length,
+			).toBeGreaterThan(0),
+		);
+	});
+
 	it("skips offscreen hydration publications and publishes one range per scroll frame", async () => {
 		const publish = vi.fn();
 		const previewDependencies = {
