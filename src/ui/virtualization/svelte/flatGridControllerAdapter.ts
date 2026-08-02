@@ -1,4 +1,7 @@
 import { CARD_VIRTUAL_LIST_MAX_UNSTABLE_MEASUREMENT_RETRIES } from "../cardVirtualListPolicy";
+import { createVirtualScrollWindowRangeResolver } from "../core/scrollWindowMeasurement";
+import type { VirtualVisibilityPolicy } from "../core/virtualListEngine";
+import type { MeasurementUpdateResult } from "../dom/virtualListMeasurementAdapter";
 import type { VirtualListMeasurementStateHandle } from "../dom/virtualListMeasurementState";
 import {
 	createVirtualMeasurementController,
@@ -12,10 +15,23 @@ import {
 	type ConfiguredCardLayout,
 	type VirtualGridLayout,
 } from "../dom/flatGridLayoutMeasurement";
-import type { createFlatGridMeasurementAdapter } from "./flatGridMeasurementAdapter";
+import type { FlatLinkRowModel } from "../row-models/flatLinkRowModel";
+import type { RowRange } from "../rowRange";
+import type { VirtualRanges } from "../types";
 import { createVirtualScrollWindowMeasurementController } from "./virtualScrollWindowMeasurementController";
 
-export interface CreateFlatGridControllerAdapterOptions<T> {
+interface FlatGridMeasurement<T> {
+	rowModel: FlatLinkRowModel<T>;
+	scrollTop: number;
+	viewportHeight: number;
+	sectionTop: number;
+	isStableMeasurement: boolean;
+	isScrollActive: boolean;
+	precomputedRanges?: VirtualRanges;
+	visibilityPolicy: VirtualVisibilityPolicy;
+}
+
+interface CreateFlatGridControllerAdapterOptions<T> {
 	getRootEl(): HTMLElement | null;
 	measurement: VirtualListMeasurementStateHandle;
 	getLayout(): VirtualGridLayout;
@@ -23,9 +39,11 @@ export interface CreateFlatGridControllerAdapterOptions<T> {
 	getConfiguredCardLayout(): ConfiguredCardLayout | null;
 	getLogicalCellCount(): number;
 	getItemCount(): number;
-	measurementAdapter: ReturnType<
-		typeof createFlatGridMeasurementAdapter<T, VirtualGridLayout>
-	>;
+	resolveRowModel(layout: VirtualGridLayout): FlatLinkRowModel<T>;
+	resolveVisibilityPolicy(layout: VirtualGridLayout): VirtualVisibilityPolicy;
+	applyVirtualListMeasurement(
+		measurement: FlatGridMeasurement<T>,
+	): MeasurementUpdateResult<RowRange>;
 	onStableMeasurement(context: VirtualListStableMeasurementContext): void;
 }
 
@@ -37,7 +55,9 @@ export function createFlatGridControllerAdapter<T>({
 	getConfiguredCardLayout,
 	getLogicalCellCount,
 	getItemCount,
-	measurementAdapter,
+	resolveRowModel,
+	resolveVisibilityPolicy,
+	applyVirtualListMeasurement,
 	onStableMeasurement,
 }: CreateFlatGridControllerAdapterOptions<T>) {
 	const stableMeasurementContext: VirtualListStableMeasurementContext = {
@@ -56,11 +76,34 @@ export function createFlatGridControllerAdapter<T>({
 		stableMeasurementContext.sharedScrollMetrics = measurement.sharedScrollMetrics;
 		onStableMeasurement(stableMeasurementContext);
 	};
+	const rangeResolver = createVirtualScrollWindowRangeResolver<
+		FlatLinkRowModel<T>,
+		VirtualGridLayout
+	>({
+		resolveRowModel,
+		resolveVisibilityPolicy,
+		resolveStableMountedScrollTopBand: true,
+	});
+	const applyRangeMeasurement = (
+		nextMeasurement: VirtualMeasurement,
+		nextLayout: VirtualGridLayout,
+		precomputedRanges?: VirtualRanges,
+	): MeasurementUpdateResult<RowRange> =>
+		applyVirtualListMeasurement({
+			rowModel: resolveRowModel(nextLayout),
+			scrollTop: nextMeasurement.scrollTop,
+			viewportHeight: nextMeasurement.viewportHeight,
+			sectionTop: nextMeasurement.sectionTop,
+			isStableMeasurement: nextMeasurement.isStableMeasurement,
+			isScrollActive: nextMeasurement.isScrollActive,
+			precomputedRanges,
+			visibilityPolicy: resolveVisibilityPolicy(nextLayout),
+		});
 
 	const scrollWindowMeasurementController =
 		createVirtualScrollWindowMeasurementController<VirtualGridLayout>({
 			resolveMountedScrollWindowMeasurement(measurement, layout) {
-				return measurementAdapter.resolveMountedScrollWindowMeasurement(
+				return rangeResolver.resolveMountedScrollWindowMeasurement(
 					measurement.scrollTop,
 					measurement.viewportHeight,
 					measurement.sectionTop,
@@ -72,7 +115,7 @@ export function createFlatGridControllerAdapter<T>({
 				layout,
 				precomputedMountedRange,
 			) {
-				return measurementAdapter.resolveScrollWindowMeasurement(
+				return rangeResolver.resolveScrollWindowMeasurement(
 					measurement.scrollTop,
 					measurement.viewportHeight,
 					measurement.sectionTop,
@@ -81,15 +124,7 @@ export function createFlatGridControllerAdapter<T>({
 				);
 			},
 			applyRangeMeasurement(measurement, layout, precomputedRanges) {
-				return measurementAdapter.applyRangeMeasurement(
-					measurement.scrollTop,
-					measurement.viewportHeight,
-					measurement.sectionTop,
-					measurement.isStableMeasurement,
-					measurement.isScrollActive,
-					layout,
-					precomputedRanges,
-				);
+				return applyRangeMeasurement(measurement, layout, precomputedRanges);
 			},
 			onStableMeasurement(measurement) {
 				notifyStableMeasurement(measurement);
@@ -118,12 +153,8 @@ export function createFlatGridControllerAdapter<T>({
 			setLayout(layoutMeasurement.layout);
 		}
 
-		const result = measurementAdapter.applyRangeMeasurement(
-			nextMeasurement.scrollTop,
-			nextMeasurement.viewportHeight,
-			nextMeasurement.sectionTop,
-			nextMeasurement.isStableMeasurement,
-			false,
+		const result = applyRangeMeasurement(
+			{ ...nextMeasurement, isScrollActive: false },
 			layoutMeasurement.layout,
 		);
 		if (result.kind !== "stable" || !layoutMeasurement.hasStableLayout) {

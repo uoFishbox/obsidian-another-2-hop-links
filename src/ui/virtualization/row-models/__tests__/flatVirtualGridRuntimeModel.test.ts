@@ -16,18 +16,18 @@ const layout: FlatGridLayoutMetrics = {
 describe("flatVirtualGridRuntimeModel", () => {
 	it("reuses the logical cell source while declared content inputs are stable", () => {
 		const runtime = createFlatVirtualGridRuntimeModel<string>();
-		const dataSource = runtime.createDataSource({
-			items: ["a", "b"],
-			getKey: (item) => item,
-		});
+		const items = ["a", "b"];
+		const getKey = (item: string) => item;
 		const first = runtime.resolveLogicalCellSource({
-			dataSource,
+			items,
+			getKey,
 			visibleCount: 2,
 			hasHeader: false,
 			showLoadMore: false,
 		});
 		const second = runtime.resolveLogicalCellSource({
-			dataSource,
+			items,
+			getKey,
 			visibleCount: 2,
 			hasHeader: false,
 			showLoadMore: false,
@@ -38,18 +38,18 @@ describe("flatVirtualGridRuntimeModel", () => {
 
 	it("invalidates the logical cell source when the visible shape changes", () => {
 		const runtime = createFlatVirtualGridRuntimeModel<string>();
-		const dataSource = runtime.createDataSource({
-			items: ["a", "b"],
-			getKey: (item) => item,
-		});
+		const items = ["a", "b"];
+		const getKey = (item: string) => item;
 		const first = runtime.resolveLogicalCellSource({
-			dataSource,
+			items,
+			getKey,
 			visibleCount: 1,
 			hasHeader: false,
 			showLoadMore: true,
 		});
 		const second = runtime.resolveLogicalCellSource({
-			dataSource,
+			items,
+			getKey,
 			visibleCount: 2,
 			hasHeader: false,
 			showLoadMore: false,
@@ -60,12 +60,9 @@ describe("flatVirtualGridRuntimeModel", () => {
 
 	it("reuses the row model for an equivalent layout key", () => {
 		const runtime = createFlatVirtualGridRuntimeModel<string>();
-		const dataSource = runtime.createDataSource({
+		const cellSource = runtime.resolveLogicalCellSource({
 			items: ["a", "b"],
 			getKey: (item) => item,
-		});
-		const cellSource = runtime.resolveLogicalCellSource({
-			dataSource,
 			visibleCount: 2,
 			hasHeader: false,
 			showLoadMore: false,
@@ -81,12 +78,9 @@ describe("flatVirtualGridRuntimeModel", () => {
 
 	it("invalidates the row model when a layout-key field changes", () => {
 		const runtime = createFlatVirtualGridRuntimeModel<string>();
-		const dataSource = runtime.createDataSource({
+		const cellSource = runtime.resolveLogicalCellSource({
 			items: ["a", "b"],
 			getKey: (item) => item,
-		});
-		const cellSource = runtime.resolveLogicalCellSource({
-			dataSource,
 			visibleCount: 2,
 			hasHeader: false,
 			showLoadMore: false,

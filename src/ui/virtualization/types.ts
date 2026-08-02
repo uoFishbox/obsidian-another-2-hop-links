@@ -1,6 +1,6 @@
 import type { RowRange } from "./rowRange";
 import type { VirtualRowLayoutMetrics } from "./layoutMetrics";
-import type { RenderBodyKey, RenderRevision } from "./renderRevision";
+import type { RenderBodyKey } from "./renderRevision";
 import type { RowKey } from "./rowKey";
 
 export type VirtualizedItemVisibility = "visible" | "mounted";
@@ -119,13 +119,4 @@ export interface MountedVirtualCell {
 	readonly cellMetadataKey?: unknown;
 	readonly renderBodyKey?: RenderBodyKey;
 	readonly cellSlotKey?: number;
-}
-
-export interface VirtualGridDataSource<T> {
-	readonly count: number;
-	readonly revision: unknown;
-	readonly keyRevision: unknown;
-	getItem(index: number): T | undefined;
-	getKey(item: T, index: number): string;
-	getItemRenderRevision?(item: T, index: number): RenderRevision | undefined;
 }

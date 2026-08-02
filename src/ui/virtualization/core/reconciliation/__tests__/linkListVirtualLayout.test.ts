@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 import {
-	createArrayVirtualGridDataSource,
 	createFlatLogicalCellSource,
 	type FlatLogicalCellSource,
 } from "../../../flatLogicalCellSource";
@@ -49,14 +48,11 @@ function createLogicalCellSource(params: {
 		index: number,
 	) => RenderRevision | undefined;
 }): FlatLogicalCellSource<TestItem> {
-	const dataSource = createArrayVirtualGridDataSource({
+	return createFlatLogicalCellSource({
+		header: params.header,
 		items: params.items,
 		getKey: params.getKey,
 		getItemRenderRevision: params.getItemRenderRevision,
-	});
-	return createFlatLogicalCellSource({
-		header: params.header,
-		dataSource,
 		visibleCount: params.visibleCount,
 		showLoadMore: params.showLoadMore,
 		sectionId: params.sectionId,

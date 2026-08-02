@@ -1,24 +1,23 @@
 import {
-	createArrayVirtualGridDataSource,
 	createFlatLogicalCellSource,
 	type FlatLogicalCellSource,
 } from "../flatLogicalCellSource";
-import type { VirtualGridDataSource } from "../types";
 import type { FlatGridLayoutMetrics } from "../layoutMetrics";
 import type { RenderRevision } from "../renderRevision";
 import { createFlatLinkRowModel, type FlatLinkRowModel } from "./flatLinkRowModel";
 import { resolveVirtualListKeyRevision } from "./virtualListKeyRevision";
 
-export interface FlatListContentRevision {
+interface FlatListContentRevision {
 	readonly data: unknown;
 	readonly key: unknown;
+	readonly itemRender: unknown;
 	readonly visibleCount: number;
 	readonly hasHeader: boolean;
 	readonly showLoadMore: boolean;
 	readonly sectionId?: string;
 }
 
-export type FlatGridLayoutMemoKey = readonly [
+type FlatGridLayoutMemoKey = readonly [
 	columns: number,
 	cellWidth: number,
 	rowHeight: number,
@@ -40,6 +39,7 @@ interface FlatLinkRowModelMemoEntry<T> {
 function createFlatListContentRevision(params: {
 	dataRevision: unknown;
 	keyRevision: unknown;
+	itemRenderRevision: unknown;
 	visibleCount: number;
 	hasHeader: boolean;
 	showLoadMore: boolean;
@@ -48,6 +48,7 @@ function createFlatListContentRevision(params: {
 	return {
 		data: params.dataRevision,
 		key: params.keyRevision,
+		itemRender: params.itemRenderRevision,
 		visibleCount: params.visibleCount,
 		hasHeader: params.hasHeader,
 		showLoadMore: params.showLoadMore,
@@ -62,6 +63,7 @@ function hasSameFlatListContentRevision(
 	return (
 		Object.is(current.data, next.data) &&
 		Object.is(current.key, next.key) &&
+		Object.is(current.itemRender, next.itemRender) &&
 		current.visibleCount === next.visibleCount &&
 		current.hasHeader === next.hasHeader &&
 		current.showLoadMore === next.showLoadMore &&
@@ -81,7 +83,7 @@ function createFlatGridLayoutMemoKey(
 	];
 }
 
-export function hasSameFlatGridLayoutMemoKey(
+function hasSameFlatGridLayoutMemoKey(
 	current: FlatGridLayoutMemoKey,
 	next: FlatGridLayoutMemoKey,
 ): boolean {
@@ -98,7 +100,7 @@ export function createFlatVirtualGridRuntimeModel<T>() {
 	let rowModelMemo: FlatLinkRowModelMemoEntry<T> | null = null;
 
 	return {
-		createDataSource(params: {
+		resolveLogicalCellSource(params: {
 			items: readonly T[];
 			getKey: (item: T, index: number) => string;
 			itemsRevision?: unknown;
@@ -108,34 +110,20 @@ export function createFlatVirtualGridRuntimeModel<T>() {
 				item: T,
 				index: number,
 			) => RenderRevision | undefined;
-		}): VirtualGridDataSource<T> {
-			const keyRevision = resolveVirtualListKeyRevision({
-				explicitRevision: params.keyRevision,
-				resolver: params.getKey,
-			});
-			return createArrayVirtualGridDataSource({
-				items: params.items,
-				getKey: params.getKey,
-				revision: {
-					data: params.itemsRevision ?? params.items,
-					itemRenderRevisionResolver:
-						params.itemRenderRevisionToken ?? params.getItemRenderRevision,
-				},
-				keyRevision,
-				getItemRenderRevision: params.getItemRenderRevision,
-			});
-		},
-
-		resolveLogicalCellSource(params: {
-			dataSource: VirtualGridDataSource<T>;
 			visibleCount: number;
 			hasHeader: boolean;
 			showLoadMore: boolean;
 			sectionId?: string;
 		}): FlatLogicalCellSource<T> {
+			const keyRevision = resolveVirtualListKeyRevision({
+				explicitRevision: params.keyRevision,
+				resolver: params.getKey,
+			});
 			const revision = createFlatListContentRevision({
-				dataRevision: params.dataSource.revision,
-				keyRevision: params.dataSource.keyRevision,
+				dataRevision: params.itemsRevision ?? params.items,
+				keyRevision,
+				itemRenderRevision:
+					params.itemRenderRevisionToken ?? params.getItemRenderRevision,
 				visibleCount: params.visibleCount,
 				hasHeader: params.hasHeader,
 				showLoadMore: params.showLoadMore,
@@ -148,7 +136,9 @@ export function createFlatVirtualGridRuntimeModel<T>() {
 
 			const source = createFlatLogicalCellSource({
 				header: params.hasHeader,
-				dataSource: params.dataSource,
+				items: params.items,
+				getKey: params.getKey,
+				getItemRenderRevision: params.getItemRenderRevision,
 				visibleCount: params.visibleCount,
 				showLoadMore: params.showLoadMore,
 				sectionId: params.sectionId,

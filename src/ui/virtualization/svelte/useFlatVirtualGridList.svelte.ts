@@ -34,14 +34,13 @@ import type { RenderRevision, RenderRevisionFallbackPolicy } from "../renderRevi
 import type { VisibilityConsumption, VirtualNavigationTarget } from "../types";
 import type { VirtualListItemRenderArgs } from "./renderArgs";
 import { flushVirtualScrollMeasurement as flushCachedVirtualScrollMeasurement } from "../dom/flushVirtualScrollMeasurement";
-import { createFlatGridMeasurementAdapter } from "./flatGridMeasurementAdapter";
 import {
 	DEFAULT_FLAT_GRID_LAYOUT,
 	type ConfiguredCardLayout,
 	type VirtualGridLayout,
 } from "../dom/flatGridLayoutMeasurement";
-import { createFlatGridVisibilityAdapter } from "./flatGridVisibilityAdapter";
 import { createFlatGridControllerAdapter } from "./flatGridControllerAdapter";
+import { createVirtualizedItemVisibilityStateController } from "./virtualizedItemVisibilityState.svelte";
 import { createResidentRowSlotAllocator } from "ui/virtualization/core/residentSlotAllocator";
 import { type RowPreviewCardBinding } from "features/preview/scheduling/virtualPreviewSurface";
 import { DISABLED_PREVIEW_SURFACE } from "features/preview/runtime/previewRuntime";
@@ -149,7 +148,8 @@ export function useFlatVirtualGridList<T>(
 		appContext?.previewRuntime?.createSurface(previewSurfaceOptions) ??
 		DISABLED_PREVIEW_SURFACE;
 	const interactionController = createVirtualCardInteractionController();
-	const visibilityAdapter = createFlatGridVisibilityAdapter<T>({});
+	const visibilityStates =
+		createVirtualizedItemVisibilityStateController<MountedVirtualGridCell<T>>();
 	const rowSlotAllocator = createResidentRowSlotAllocator();
 	let lastResolvedVisibilityPolicyRowHeight: number | undefined;
 	let lastResolvedVisibilityPolicyGap: number | undefined;
@@ -224,19 +224,14 @@ export function useFlatVirtualGridList<T>(
 	);
 	const showLoadMoreButton = $derived(canLoadMore && !shouldUseInfiniteScroll);
 	const flatGridModel = createFlatVirtualGridRuntimeModel<T>();
-	const dataSource = $derived(
-		flatGridModel.createDataSource({
+	const logicalCellSource = $derived.by(() => {
+		return flatGridModel.resolveLogicalCellSource({
 			items,
 			getKey: props.getKey,
 			itemsRevision: props.itemsRevision,
 			keyRevision: props.keyRevision,
 			itemRenderRevisionToken: props.itemRenderRevisionToken,
 			getItemRenderRevision: props.getItemRenderRevision,
-		}),
-	);
-	const logicalCellSource = $derived.by(() => {
-		return flatGridModel.resolveLogicalCellSource({
-			dataSource,
 			visibleCount,
 			hasHeader: Boolean(props.header),
 			showLoadMore: showLoadMoreButton,
@@ -349,12 +344,12 @@ export function useFlatVirtualGridList<T>(
 				reconciliationState.mountedBuild?.rowSlices ?? EMPTY_MOUNTED_ROWS,
 				snapshot.ranges.previewVisible,
 			);
-			visibilityAdapter.syncVisibilityStates({
+			visibilityStates.commit({
+				rowModelRevision: snapshot.rowModel,
 				mountedRows:
 					reconciliationState.mountedBuild?.rowSlices ?? EMPTY_MOUNTED_ROWS,
 				mountedRange: snapshot.ranges.mounted,
-				previewRange: snapshot.ranges.previewVisible,
-				rowModel: snapshot.rowModel,
+				previewActiveRange: snapshot.ranges.previewVisible,
 			});
 		},
 		trackMountedCellsForChange: props.onMountedCellsChange !== undefined,
@@ -378,13 +373,19 @@ export function useFlatVirtualGridList<T>(
 		return virtualList.getMountedCellsForChange();
 	});
 	let lastEmptyMountedCellsNotification: unknown = null;
-	const flatGridMeasurementAdapter = createFlatGridMeasurementAdapter<
-		T,
-		VirtualGridLayout
-	>({
+	const virtualListController = createFlatGridControllerAdapter<T>({
+		getRootEl: () => sectionRootEl,
+		measurement,
+		getLayout: () => layout,
+		setLayout: (nextLayout) => {
+			layout = nextLayout;
+		},
+		getConfiguredCardLayout: () => configuredCardLayout,
+		getLogicalCellCount: () => logicalCellCount,
+		getItemCount: () => itemCount,
 		resolveRowModel: resolveFlatLinkRowModel,
 		resolveVisibilityPolicy,
-		applyMeasurement: ({
+		applyVirtualListMeasurement: ({
 			rowModel,
 			scrollTop,
 			viewportHeight,
@@ -405,19 +406,6 @@ export function useFlatVirtualGridList<T>(
 				precomputedRanges,
 				visibilityPolicy,
 			}),
-	});
-
-	const virtualListController = createFlatGridControllerAdapter<T>({
-		getRootEl: () => sectionRootEl,
-		measurement,
-		getLayout: () => layout,
-		setLayout: (nextLayout) => {
-			layout = nextLayout;
-		},
-		getConfiguredCardLayout: () => configuredCardLayout,
-		getLogicalCellCount: () => logicalCellCount,
-		getItemCount: () => itemCount,
-		measurementAdapter: flatGridMeasurementAdapter,
 		onStableMeasurement: maybeScheduleInfiniteScrollLoad,
 	});
 
@@ -661,10 +649,7 @@ export function useFlatVirtualGridList<T>(
 		});
 		const visibilityState =
 			visibilityConsumption === "reactive-state"
-				? visibilityAdapter.visibilityStates.getOrCreateState(
-						itemCell,
-						visibility,
-					)
+				? visibilityStates.getOrCreateState(itemCell, visibility)
 				: undefined;
 
 		return {

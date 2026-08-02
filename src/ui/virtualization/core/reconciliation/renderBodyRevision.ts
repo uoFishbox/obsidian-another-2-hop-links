@@ -3,18 +3,23 @@ import type {
 	RenderRevision,
 	RenderRevisionFallbackPolicy,
 } from "../../renderRevision";
-import {
-	formatVirtualListInputError,
-	type Result,
-	type VirtualListInputError,
-} from "../../validation/virtualListValidationError";
-
 type ItemLogicalCell<T> = Extract<VirtualListLogicalCell<T>, { kind: "item" }>;
 
 export type ResolvedItemRenderRevisionToken = {
 	readonly kind: "render";
 	readonly revision: RenderRevision;
 };
+
+export type ItemRenderRevisionResolution =
+	| { readonly ok: true; readonly value: ResolvedItemRenderRevisionToken }
+	| {
+			readonly ok: false;
+			readonly error: {
+				readonly type: "missing-item-render-revision";
+				readonly sourceKey: string;
+				readonly cellKey: string;
+			};
+	  };
 
 const DEFAULT_RENDER_REVISION_FALLBACK_POLICY: RenderRevisionFallbackPolicy =
 	"source-key-only";
@@ -48,7 +53,11 @@ export function resolveItemRenderRevisionToken<T>(
 ): ResolvedItemRenderRevisionToken {
 	const result = tryResolveItemRenderRevisionToken(cell, fallbackPolicy);
 	if (!result.ok) {
-		throw new Error(formatVirtualListInputError(result.error));
+		throw new Error(
+			`Missing item render revision for sourceKey=${JSON.stringify(
+				result.error.sourceKey,
+			)} cellKey=${JSON.stringify(result.error.cellKey)}.`,
+		);
 	}
 
 	return result.value;
@@ -57,7 +66,7 @@ export function resolveItemRenderRevisionToken<T>(
 export function tryResolveItemRenderRevisionToken<T>(
 	cell: ItemLogicalCell<T>,
 	fallbackPolicy: RenderRevisionFallbackPolicy = DEFAULT_RENDER_REVISION_FALLBACK_POLICY,
-): Result<ResolvedItemRenderRevisionToken, VirtualListInputError> {
+): ItemRenderRevisionResolution {
 	if (cell.itemRenderRevision !== undefined) {
 		return {
 			ok: true,
