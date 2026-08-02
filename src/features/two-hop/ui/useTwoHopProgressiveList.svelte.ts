@@ -1,6 +1,9 @@
 import { onDestroy, tick, untrack } from "svelte";
 import type { ApplicationStore } from "ui/stores/ApplicationStore.svelte";
-import type { CardRenderModel } from "ui/components/items/cardRenderModel";
+import type {
+	CardRenderModel,
+	CardShellModel,
+} from "ui/components/items/cardRenderModel";
 import type { TwoHopCardPresentationState } from "features/two-hop/ui/twoHopCellStaticState";
 import { resolveTwoHopCardPresentation } from "features/two-hop/ui/twoHopCellStaticState";
 import type {
@@ -22,7 +25,6 @@ import {
 	compileTwoHopProgressivePlan,
 	resolveInitialProgressiveMountedRowEnd,
 	resolveNextProgressiveMountedRowEnd,
-	TWO_HOP_PROGRESSIVE_PRELOAD_CHUNK_COUNT,
 	TWO_HOP_PROGRESSIVE_ROWS_PER_CHUNK,
 	type TwoHopProgressiveCell,
 	type TwoHopProgressivePlan,
@@ -89,13 +91,12 @@ interface LayoutAnchor {
 	readonly viewportOffset: number;
 }
 
-type CardModelConsumer = (model: CardRenderModel | undefined) => void;
+type CardModelConsumer = (model: CardShellModel | undefined) => void;
 type HydrationPriority = "visible" | "preload";
 type DocumentPublicationKind = "identity-reset" | "data-revision";
 
 const MAX_MODELS_PER_DRAIN = 8;
 const MAX_HYDRATION_CPU_MS = 1;
-const MAX_PRELOAD_HYDRATION_CHUNK_COUNT = 3;
 const HYDRATION_POST_PAINT_TASK_KEY = "two-hop-progressive-hydration-visible";
 const HYDRATION_IDLE_TASK_KEY = "two-hop-progressive-hydration-preload";
 const EMPTY_PREVIEW_RANGE = Object.freeze({ start: 0, end: 0 });
@@ -136,39 +137,6 @@ function compactHydrationQueue(queue: HydrationQueue): void {
 	if (queue.head < remaining) return;
 	queue.entries.splice(0, queue.head);
 	queue.head = 0;
-}
-
-function trimHydrationQueueToChunkLimit(
-	queue: HydrationQueue,
-	maxChunkCount: number,
-): void {
-	const pendingEntryCountByChunk = new Map<number, number>();
-	for (let index = queue.head; index < queue.entries.length; index += 1) {
-		const entry = queue.entries[index];
-		if (!entry) continue;
-		const chunkIndex = Math.floor(
-			entry.cell.rowIndex / TWO_HOP_PROGRESSIVE_ROWS_PER_CHUNK,
-		);
-		pendingEntryCountByChunk.set(
-			chunkIndex,
-			(pendingEntryCountByChunk.get(chunkIndex) ?? 0) + 1,
-		);
-	}
-
-	while (pendingEntryCountByChunk.size > maxChunkCount) {
-		const entry = takeNextHydrationEntry(queue);
-		if (!entry) break;
-		const chunkIndex = Math.floor(
-			entry.cell.rowIndex / TWO_HOP_PROGRESSIVE_ROWS_PER_CHUNK,
-		);
-		const remainingEntryCount = (pendingEntryCountByChunk.get(chunkIndex) ?? 1) - 1;
-		if (remainingEntryCount === 0) {
-			pendingEntryCountByChunk.delete(chunkIndex);
-		} else {
-			pendingEntryCountByChunk.set(chunkIndex, remainingEntryCount);
-		}
-	}
-	compactHydrationQueue(queue);
 }
 
 export function resolveProgressivePreviewSlotId(logicalKey: string): string {
@@ -236,16 +204,15 @@ export function useTwoHopProgressiveList(
 		: DISABLED_PREVIEW_SURFACE;
 	const interactionController = createVirtualCardInteractionController();
 	const modelsByLogicalKey = new Map<string, CardRenderModel>();
+	const activatedModelKeys = new Set<string>();
 	const modelSourceItemsByLogicalKey = new Map<string, TwoHopVirtualListItem>();
 	const modelConsumersByLogicalKey = new Map<string, Set<CardModelConsumer>>();
 	const previewBindingByLogicalKey = new Map<string, RowPreviewCardBinding>();
 	const visibleHydrationQueue = createHydrationQueue();
 	const preloadHydrationQueue = createHydrationQueue();
-	const observedChunks = new Map<Element, number>();
 	const previewRowConsumers = new Map<number, (active: boolean) => void>();
 	const activePreviewRange: TwoHopRowRange = { start: 0, end: 0 };
 	const nextPreviewRange: TwoHopRowRange = { start: 0, end: 0 };
-	let hydrationObserver: IntersectionObserver | undefined;
 	let sentinelObserver: IntersectionObserver | undefined;
 	let cancelHydrationDrain: (() => void) | undefined;
 	let scheduledHydrationPriority: HydrationPriority | undefined;
@@ -264,7 +231,7 @@ export function useTwoHopProgressiveList(
 
 	function notifyModelConsumers(
 		logicalKey: string,
-		model: CardRenderModel | undefined,
+		model: CardShellModel | undefined,
 	): void {
 		for (const consumer of modelConsumersByLogicalKey.get(logicalKey) ?? []) {
 			consumer(model);
@@ -305,10 +272,11 @@ export function useTwoHopProgressiveList(
 			notifyModelConsumers(logicalKey, undefined);
 		}
 		modelsByLogicalKey.clear();
+		activatedModelKeys.clear();
 		modelSourceItemsByLogicalKey.clear();
 		previewBindingByLogicalKey.clear();
 		interactionController.clear();
-		enqueueHydrationForRowRange(activePreviewRange);
+		replaceHydrationRange(activePreviewRange);
 		schedulePreviewPublication();
 	}
 
@@ -316,7 +284,12 @@ export function useTwoHopProgressiveList(
 		cell: Extract<TwoHopProgressiveCell, { kind: "item" }>,
 		priority: HydrationPriority,
 	): void {
-		if (modelsByLogicalKey.has(cell.logicalKey)) return;
+		if (
+			modelsByLogicalKey.has(cell.logicalKey) &&
+			(priority === "preload" || activatedModelKeys.has(cell.logicalKey))
+		) {
+			return;
+		}
 		const queue =
 			priority === "visible" ? visibleHydrationQueue : preloadHydrationQueue;
 		if (queue.keys.has(cell.logicalKey)) return;
@@ -329,25 +302,11 @@ export function useTwoHopProgressiveList(
 
 	function enqueueHydrationForChunk(chunkIndex: number): void {
 		const activePlan = untrack(() => plan);
-		const startIndex = Math.max(
-			0,
-			chunkIndex - TWO_HOP_PROGRESSIVE_PRELOAD_CHUNK_COUNT,
-		);
-		const endIndex = Math.min(
-			activePlan.chunks.length - 1,
-			chunkIndex + TWO_HOP_PROGRESSIVE_PRELOAD_CHUNK_COUNT,
-		);
-		for (let index = startIndex; index <= endIndex; index += 1) {
-			for (const row of activePlan.chunks[index]?.rows ?? []) {
-				for (const cell of row.cells) {
-					if (cell.kind === "item") enqueueHydrationCell(cell, "preload");
-				}
+		for (const row of activePlan.chunks[chunkIndex]?.rows ?? []) {
+			for (const cell of row.cells) {
+				if (cell.kind === "item") enqueueHydrationCell(cell, "preload");
 			}
 		}
-		trimHydrationQueueToChunkLimit(
-			preloadHydrationQueue,
-			MAX_PRELOAD_HYDRATION_CHUNK_COUNT,
-		);
 		scheduleHydrationDrain();
 	}
 
@@ -363,9 +322,15 @@ export function useTwoHopProgressiveList(
 		scheduleHydrationDrain();
 	}
 
-	function replaceVisibleHydrationRange(range: TwoHopRowRange): void {
+	function replaceHydrationRange(range: TwoHopRowRange): void {
 		clearHydrationQueue(visibleHydrationQueue);
+		clearHydrationQueue(preloadHydrationQueue);
 		enqueueHydrationForRowRange(range);
+		if (range.end <= range.start) return;
+		const nextChunkIndex = Math.ceil(
+			range.end / TWO_HOP_PROGRESSIVE_ROWS_PER_CHUNK,
+		);
+		enqueueHydrationForChunk(nextChunkIndex);
 	}
 
 	function scheduleHydrationDrain(): void {
@@ -420,30 +385,29 @@ export function useTwoHopProgressiveList(
 			const entry = takeNextHydrationEntry(queue);
 			if (!entry) break;
 			processedCount += 1;
-			if (modelsByLogicalKey.has(entry.logicalKey)) continue;
-			const presentation = resolveTwoHopCardPresentation(
-				entry.cell.item,
-				entry.cell.section.header.section,
-			);
-			if (!presentation) continue;
-			if (process.env.NODE_ENV !== "production") {
-				recordCCLDevMeasurement("twoHop.resolveItemCardModel.call");
+			let model = modelsByLogicalKey.get(entry.logicalKey);
+			if (!model) {
+				const presentation = resolveTwoHopCardPresentation(
+					entry.cell.item,
+					entry.cell.section.header.section,
+				);
+				if (!presentation) continue;
+				if (process.env.NODE_ENV !== "production") {
+					recordCCLDevMeasurement("twoHop.resolveItemCardModel.call");
+				}
+				model = resolver(entry.cell.item, presentation);
+				modelsByLogicalKey.set(entry.logicalKey, model);
+				modelSourceItemsByLogicalKey.set(entry.logicalKey, entry.cell.item);
+				notifyModelConsumers(entry.logicalKey, model);
 			}
-			const model = resolver(entry.cell.item, presentation);
-			modelsByLogicalKey.set(entry.logicalKey, model);
-			modelSourceItemsByLogicalKey.set(entry.logicalKey, entry.cell.item);
-			notifyModelConsumers(entry.logicalKey, model);
-			if (
-				model.previewRequest &&
-				entry.cell.rowIndex >= activePreviewRange.start &&
-				entry.cell.rowIndex < activePreviewRange.end
-			) {
-				activePreviewHydrationChanged = true;
-			}
-			if (model.interactionDescriptor) {
+			if (priority === "preload") continue;
+			activatedModelKeys.add(entry.logicalKey);
+			if (model.previewRequest) activePreviewHydrationChanged = true;
+			const interactionDescriptor = model.interactionDescriptor;
+			if (interactionDescriptor) {
 				enteredInteractionSlots.push({
 					slotId: entry.logicalKey,
-					descriptor: model.interactionDescriptor,
+					descriptor: interactionDescriptor,
 				});
 			}
 		}
@@ -562,7 +526,7 @@ export function useTwoHopProgressiveList(
 		const previousStart = activePreviewRange.start;
 		const previousEnd = activePreviewRange.end;
 		if (previousStart === next.start && previousEnd === next.end) return;
-		replaceVisibleHydrationRange(next);
+		replaceHydrationRange(next);
 
 		for (let rowIndex = previousStart; rowIndex < previousEnd; rowIndex += 1) {
 			if (rowIndex >= next.start && rowIndex < next.end) continue;
@@ -685,46 +649,14 @@ export function useTwoHopProgressiveList(
 		schedulePreviewScrollIdle();
 	}
 
-	function observeHydrationChunk(
-		element: HTMLElement,
-		chunkIndex: number,
-	): () => void {
-		observedChunks.set(element, chunkIndex);
-		hydrationObserver?.observe(element);
-		return () => {
-			hydrationObserver?.unobserve(element);
-			observedChunks.delete(element);
-		};
-	}
-
-	function rebuildIntersectionObservers(): void {
-		hydrationObserver?.disconnect();
+	function rebuildSentinelObserver(): void {
 		sentinelObserver?.disconnect();
-		hydrationObserver = undefined;
 		sentinelObserver = undefined;
-		if (!rootEl || typeof IntersectionObserver === "undefined") {
-			for (const chunkIndex of observedChunks.values()) {
-				enqueueHydrationForChunk(chunkIndex);
-			}
-			return;
-		}
+		if (!rootEl || typeof IntersectionObserver === "undefined") return;
 
 		const observerRoot = findNearestScrollContainer(rootEl);
 		const chunkPreloadDistancePx =
 			geometry.rowStride * TWO_HOP_PROGRESSIVE_ROWS_PER_CHUNK;
-		hydrationObserver = new IntersectionObserver(
-			(entries) => {
-				for (const entry of entries) {
-					if (!entry.isIntersecting) continue;
-					const chunkIndex = observedChunks.get(entry.target);
-					if (chunkIndex !== undefined) enqueueHydrationForChunk(chunkIndex);
-				}
-			},
-			{
-				root: observerRoot,
-				rootMargin: `${chunkPreloadDistancePx}px 0px ${chunkPreloadDistancePx}px 0px`,
-			},
-		);
 		sentinelObserver = new IntersectionObserver(
 			(entries) => {
 				if (entries.some((entry) => entry.isIntersecting)) loadNextChunk();
@@ -734,9 +666,6 @@ export function useTwoHopProgressiveList(
 				rootMargin: `0px 0px ${chunkPreloadDistancePx}px 0px`,
 			},
 		);
-		for (const element of observedChunks.keys()) {
-			hydrationObserver.observe(element);
-		}
 		if (sentinelEl) sentinelObserver.observe(sentinelEl);
 	}
 
@@ -748,6 +677,7 @@ export function useTwoHopProgressiveList(
 		);
 		if (nextEnd === currentMountedRowEnd) return;
 		plan = appendTwoHopProgressivePlan(document, geometry, plan, nextEnd);
+		replaceHydrationRange(activePreviewRange);
 	}
 
 	function captureLayoutAnchor(): LayoutAnchor | null {
@@ -851,6 +781,7 @@ export function useTwoHopProgressiveList(
 		for (const logicalKey of staleLogicalKeys) {
 			notifyModelConsumers(logicalKey, undefined);
 			modelsByLogicalKey.delete(logicalKey);
+			activatedModelKeys.delete(logicalKey);
 			modelSourceItemsByLogicalKey.delete(logicalKey);
 			previewBindingByLogicalKey.delete(logicalKey);
 			releasedSlots.push(logicalKey);
@@ -862,7 +793,7 @@ export function useTwoHopProgressiveList(
 				releasedSlots,
 			});
 		}
-		enqueueHydrationForRowRange(activePreviewRange);
+		replaceHydrationRange(activePreviewRange);
 		schedulePreviewPublication();
 	}
 
@@ -926,12 +857,6 @@ export function useTwoHopProgressiveList(
 		if (resolver === previousResolver) return;
 		previousResolver = resolver;
 		clearHydratedModels();
-	});
-
-	$effect(() => {
-		const activePlan = plan;
-		if (activePlan.chunks.length === 0) return;
-		enqueueHydrationForChunk(0);
 	});
 
 	$effect(() => {
@@ -1030,9 +955,8 @@ export function useTwoHopProgressiveList(
 		void contentEl;
 		void sentinelEl;
 		void geometry.rowStride;
-		rebuildIntersectionObservers();
+		rebuildSentinelObserver();
 		return () => {
-			hydrationObserver?.disconnect();
 			sentinelObserver?.disconnect();
 		};
 	});
@@ -1045,7 +969,6 @@ export function useTwoHopProgressiveList(
 	onDestroy(() => {
 		disposed = true;
 		cancelPendingHydration();
-		hydrationObserver?.disconnect();
 		sentinelObserver?.disconnect();
 		frameCoordinator.cancel("scroll-critical", PREVIEW_SCROLL_TASK_KEY);
 		frameCoordinator.cancel("post-paint", PREVIEW_RANGE_APPLY_TASK_KEY);
@@ -1066,7 +989,6 @@ export function useTwoHopProgressiveList(
 		markScrollActivityIdle(previewScrollActivitySource);
 		for (const consumer of previewRowConsumers.values()) consumer(false);
 		previewRowConsumers.clear();
-		observedChunks.clear();
 		interactionController.clear();
 		previewSurface.dispose();
 	});
@@ -1112,7 +1034,6 @@ export function useTwoHopProgressiveList(
 		},
 		registerCardModelConsumer,
 		registerPreviewRow,
-		observeHydrationChunk,
 		loadNextChunk,
 		loadMore,
 	};

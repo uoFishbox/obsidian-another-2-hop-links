@@ -18,7 +18,7 @@ import {
 	type ItemInteractionDescriptor,
 } from "ui/interactions/interactionTypes";
 
-export interface CardRenderModel {
+export interface CardShellModel {
 	readonly item: ViewItem;
 	readonly targetFile: TFile | null;
 	readonly title: string;
@@ -28,11 +28,20 @@ export interface CardRenderModel {
 	readonly directory: string | null;
 	readonly interactionId: string;
 	readonly interactionKey: string;
-	readonly interactionDescriptor: ItemInteractionDescriptor | null;
 	readonly presentation: CardPresentationState | undefined;
 	readonly searchQuery: string;
+}
+
+export interface PreviewModel {
 	readonly previewRequest: CardPreviewRequest | null;
 }
+
+export interface InteractionModel {
+	readonly interactionDescriptor: ItemInteractionDescriptor | null;
+}
+
+export interface CardRenderModel
+	extends CardShellModel, PreviewModel, InteractionModel {}
 
 export interface CardTitleSnapshot {
 	readonly title: string;
@@ -53,7 +62,7 @@ export interface CreateCardRenderModelParams {
 	readonly presentation?: CardPresentationState;
 }
 
-/** Compiles all display-only values needed to render one item card. */
+/** Creates the card shell and memoizes preview/interaction models on first access. */
 export function createCardRenderModel(
 	params: CreateCardRenderModelParams,
 ): CardRenderModel {
@@ -71,31 +80,40 @@ export function createCardRenderModel(
 	const searchScope = params.searchScope ?? "title-and-content";
 	const contentPreview = params.contentPreview;
 	const previewRefreshToken = params.previewRefreshToken ?? 0;
-	const previewRenderVersion = targetFile
-		? params.getPreviewRenderVersion(targetFile.path)
-		: "0:0";
 	const interactionKey =
 		params.interactionKey ?? createItemInteractionKey(params.item);
 	const interactionId = params.interactionId ?? interactionKey;
-	const previewOverride = createTextPreviewOverride(targetFile, contentPreview);
-	const effectiveSearchQuery = searchScope === "title-only" ? "" : searchQuery;
-	const previewRequest = targetFile
-		? compileCardPreviewRequest({
-				file: targetFile,
-				searchQuery: effectiveSearchQuery,
-				previewRefreshToken,
-				previewOverride,
-				previewRenderVersion,
-				settings: params.settings,
-			})
-		: null;
-	const interactionDescriptor = createItemInteractionDescriptor(
-		params.item,
-		params.settings,
-		searchQuery,
-		params.context,
-		{ interactionId, interactionKey },
-	);
+	let previewRequest: CardPreviewRequest | null | undefined;
+	let interactionDescriptor: ItemInteractionDescriptor | null | undefined;
+
+	function resolvePreviewRequest(): CardPreviewRequest | null {
+		if (previewRequest !== undefined) return previewRequest;
+		if (!targetFile) {
+			previewRequest = null;
+			return previewRequest;
+		}
+		previewRequest = compileCardPreviewRequest({
+			file: targetFile,
+			searchQuery: searchScope === "title-only" ? "" : searchQuery,
+			previewRefreshToken,
+			previewOverride: createTextPreviewOverride(targetFile, contentPreview),
+			previewRenderVersion: params.getPreviewRenderVersion(targetFile.path),
+			settings: params.settings,
+		});
+		return previewRequest;
+	}
+
+	function resolveInteractionDescriptor(): ItemInteractionDescriptor | null {
+		if (interactionDescriptor !== undefined) return interactionDescriptor;
+		interactionDescriptor = createItemInteractionDescriptor(
+			params.item,
+			params.settings,
+			searchQuery,
+			params.context,
+			{ interactionId, interactionKey },
+		);
+		return interactionDescriptor;
+	}
 
 	return {
 		item: params.item,
@@ -110,10 +128,14 @@ export function createCardRenderModel(
 		directory: targetFile?.parent?.path ?? null,
 		interactionId,
 		interactionKey,
-		interactionDescriptor,
+		get interactionDescriptor() {
+			return resolveInteractionDescriptor();
+		},
 		presentation: params.presentation,
 		searchQuery,
-		previewRequest,
+		get previewRequest() {
+			return resolvePreviewRequest();
+		},
 	};
 }
 

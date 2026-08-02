@@ -103,6 +103,8 @@ function createSection(count: number): TwoHopVirtualSectionDescriptor {
 
 interface HydrationSchedulingFixture {
 	readonly resolveItemCardModel: ReturnType<typeof vi.fn>;
+	readonly resolveInteractionDescriptor: ReturnType<typeof vi.fn>;
+	readonly resolvePreviewRequest: ReturnType<typeof vi.fn>;
 	readonly root: HTMLElement;
 	readonly scrollTarget: HTMLElement | Window;
 }
@@ -118,6 +120,8 @@ async function renderHydrationSchedulingFixture(
 			cardMaxColumns: 3,
 		},
 	} as unknown as ApplicationStore;
+	const resolveInteractionDescriptor = vi.fn((_item: TwoHopVirtualListItem) => null);
+	const resolvePreviewRequest = vi.fn((_item: TwoHopVirtualListItem) => null);
 	const resolveItemCardModel = vi.fn(
 		(
 			item: TwoHopVirtualListItem,
@@ -132,10 +136,14 @@ async function renderHydrationSchedulingFixture(
 			directory: null,
 			interactionId: item.virtualKey,
 			interactionKey: item.virtualKey,
-			interactionDescriptor: null,
+			get interactionDescriptor() {
+				return resolveInteractionDescriptor(item);
+			},
 			presentation,
 			searchQuery: "",
-			previewRequest: null,
+			get previewRequest() {
+				return resolvePreviewRequest(item);
+			},
 		}),
 	);
 	const scroller = document.createElement("div");
@@ -162,6 +170,8 @@ async function renderHydrationSchedulingFixture(
 
 	return {
 		resolveItemCardModel,
+		resolveInteractionDescriptor,
+		resolvePreviewRequest,
 		root,
 		scrollTarget: findNearestScrollContainer(root) ?? window,
 	};
@@ -273,10 +283,12 @@ describe("TwoHop progressive preview scheduling", () => {
 		);
 	});
 
-	it("bounds pending preload hydration to the latest three chunks", async () => {
+	it("preloads only the one chunk immediately after the visible range", async () => {
 		const fixture = await renderHydrationSchedulingFixture(600);
 		await drainPostPaintTasks();
 		fixture.resolveItemCardModel.mockClear();
+		fixture.resolveInteractionDescriptor.mockClear();
+		fixture.resolvePreviewRequest.mockClear();
 
 		for (
 			let expectedChunkCount = 3;
@@ -297,12 +309,6 @@ describe("TwoHop progressive preview scheduling", () => {
 			);
 		}
 
-		const latestObservedChunk = fixture.root.shadowRoot?.querySelector<HTMLElement>(
-			"[data-ccl-progressive-chunk='5']",
-		);
-		if (!latestObservedChunk)
-			throw new Error("Latest preload chunk was not rendered");
-		triggerIntersection(latestObservedChunk);
 		await drainIdleTasks();
 
 		const resolvedItemIndexes = readResolvedItemIndexes(
@@ -314,13 +320,20 @@ describe("TwoHop progressive preview scheduling", () => {
 		if (!columnCount) throw new Error("Progressive grid columns were not rendered");
 		expect(resolvedItemIndexes.length).toBeGreaterThan(0);
 		expect(resolvedItemIndexes).toHaveLength(
-			TWO_HOP_PROGRESSIVE_ROWS_PER_CHUNK * 3 * columnCount,
+			TWO_HOP_PROGRESSIVE_ROWS_PER_CHUNK * columnCount,
 		);
-		const firstLatestItemIndex =
-			TWO_HOP_PROGRESSIVE_ROWS_PER_CHUNK * 4 * columnCount - 1;
+		const firstPreloadedItemIndex =
+			TWO_HOP_PROGRESSIVE_ROWS_PER_CHUNK * columnCount - 1;
+		const afterPreloadedItemIndex =
+			TWO_HOP_PROGRESSIVE_ROWS_PER_CHUNK * 2 * columnCount - 1;
 		expect(
-			resolvedItemIndexes.every((index) => index >= firstLatestItemIndex),
+			resolvedItemIndexes.every(
+				(index) =>
+					index >= firstPreloadedItemIndex && index < afterPreloadedItemIndex,
+			),
 		).toBe(true);
+		expect(fixture.resolveInteractionDescriptor).not.toHaveBeenCalled();
+		expect(fixture.resolvePreviewRequest).not.toHaveBeenCalled();
 	});
 
 	it("applies the range only after the scroll-critical calculation reaches post-paint", async () => {

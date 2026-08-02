@@ -14,7 +14,6 @@ import {
 
 export const TWO_HOP_PROGRESSIVE_ROWS_PER_CHUNK = 16;
 export const TWO_HOP_PROGRESSIVE_INITIAL_CHUNK_COUNT = 2;
-export const TWO_HOP_PROGRESSIVE_PRELOAD_CHUNK_COUNT = 1;
 
 interface ProgressiveCellBase {
 	readonly logicalKey: string;

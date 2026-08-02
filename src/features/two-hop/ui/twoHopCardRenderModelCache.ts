@@ -73,13 +73,13 @@ export function createTwoHopCardRenderModelCache(): TwoHopCardRenderModelCache {
 				recordCCLDevMeasurement("twoHop.cardRenderModelCache.miss");
 			}
 
-			let resolvedPreviewVersion = "0:0";
+			let resolvedPreviewVersion: string | undefined;
 			const model = createCardRenderModel({
 				item: row.item,
 				settings: revision.settings,
 				context: revision.linkContext,
 				getPreviewRenderVersion: (path) => {
-					resolvedPreviewVersion = revision.getPreviewRenderVersion(path);
+					resolvedPreviewVersion ??= revision.getPreviewRenderVersion(path);
 					return resolvedPreviewVersion;
 				},
 				searchQuery: revision.searchQuery,
@@ -93,6 +93,9 @@ export function createTwoHopCardRenderModelCache(): TwoHopCardRenderModelCache {
 				interactionKey: row.interactionKey,
 				presentation,
 			});
+			resolvedPreviewVersion ??= model.targetFile
+				? revision.getPreviewRenderVersion(model.targetFile.path)
+				: "0:0";
 			entries.set(row, {
 				settings: revision.settings,
 				searchQuery: revision.searchQuery,

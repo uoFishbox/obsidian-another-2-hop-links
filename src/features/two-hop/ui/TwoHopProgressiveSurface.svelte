@@ -12,11 +12,6 @@
 	const frameCoordinator = provideVirtualFrameCoordinator();
 	const list = useTwoHopProgressiveList(props, frameCoordinator);
 	provideVirtualPreviewSurface(list.previewSurface);
-
-	function observeChunk(element: HTMLElement, chunkIndex: number) {
-		const dispose = list.observeHydrationChunk(element, chunkIndex);
-		return { destroy: dispose };
-	}
 </script>
 
 <VirtualInteractiveSurface
@@ -38,7 +33,6 @@
 					class="twohop-progressive-chunk"
 					data-ccl-progressive-chunk={chunk.chunkIndex}
 					style={`height:${chunk.height}px;contain-intrinsic-size:auto ${chunk.height}px;`}
-					use:observeChunk={chunk.chunkIndex}
 				>
 					{#each chunk.rows as row (row.key)}
 						<TwoHopProgressiveRow

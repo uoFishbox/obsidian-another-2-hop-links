@@ -5,7 +5,7 @@
 	import VirtualListLoadMoreButton from "ui/virtualization/components/VirtualListLoadMoreButton.svelte";
 	import PreviewHost from "features/preview/ui/PreviewHost.svelte";
 	import UnresolvedPreviewPlaceholder from "features/preview/ui/UnresolvedPreviewPlaceholder.svelte";
-	import type { CardRenderModel } from "ui/components/items/cardRenderModel";
+	import type { CardShellModel } from "ui/components/items/cardRenderModel";
 	import type { IconName } from "ui/shared/icons/iconRegistry";
 	import type { TwoHopProgressiveCell } from "features/two-hop/ui/twoHopProgressivePlan";
 	import { resolveTwoHopSectionVariant } from "features/two-hop/ui/twoHopCellStaticState";
@@ -17,14 +17,14 @@
 		previewCandidate: boolean;
 		registerCardModelConsumer: (
 			logicalKey: string,
-			consumer: (model: CardRenderModel | undefined) => void,
+			consumer: (model: CardShellModel | undefined) => void,
 		) => () => void;
 		onLoadMore: (sectionId: string) => void;
 	}
 
 	let { cell, previewCandidate, registerCardModelConsumer, onLoadMore }: Props =
 		$props();
-	let cardModel = $state.raw<CardRenderModel | undefined>(undefined);
+	let cardModel = $state.raw<CardShellModel | undefined>(undefined);
 
 	$effect(() => {
 		if (cell.kind !== "item") {

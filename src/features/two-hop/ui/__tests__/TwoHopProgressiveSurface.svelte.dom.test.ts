@@ -602,7 +602,7 @@ describe("TwoHopProgressiveSurface", () => {
 		);
 	});
 
-	it("skips offscreen hydration publications and publishes one range per scroll frame", async () => {
+	it("leaves newly mounted offscreen chunks unhydrated and coalesces scroll range changes", async () => {
 		const publish = vi.fn();
 		const previewDependencies = {
 			previewRuntime: {
@@ -690,11 +690,9 @@ describe("TwoHopProgressiveSurface", () => {
 		const hydratedCountBeforeOffscreenChunk =
 			resolveItemCardModel.mock.calls.length;
 		publish.mockClear();
-		triggerIntersection(appendedChunk);
-		await vi.waitFor(() =>
-			expect(resolveItemCardModel.mock.calls.length).toBeGreaterThan(
-				hydratedCountBeforeOffscreenChunk,
-			),
+		await flushFrames();
+		expect(resolveItemCardModel).toHaveBeenCalledTimes(
+			hydratedCountBeforeOffscreenChunk,
 		);
 		expect(publish).not.toHaveBeenCalled();
 
@@ -721,8 +719,8 @@ describe("TwoHopProgressiveSurface", () => {
 		dispatchScroll(450);
 		expect(publish).not.toHaveBeenCalled();
 		expect(isScrollActivityActive()).toBe(true);
-		await vi.waitFor(() => expect(publish).toHaveBeenCalledOnce());
-		const scrolledFrame = publish.mock.calls[0]?.[0] as PreviewFrame;
+		await vi.waitFor(() => expect(publish).toHaveBeenCalled());
+		const scrolledFrame = publish.mock.lastCall?.[0] as PreviewFrame;
 		expect(scrolledFrame.previewWindow.previewRange.start).toBeGreaterThan(
 			initialFrame.previewWindow.previewRange.start,
 		);

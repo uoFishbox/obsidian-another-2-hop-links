@@ -56,6 +56,7 @@ describe("createCardRenderModel", () => {
 			interactionKey: "item:file:report",
 			searchQuery: "needle",
 		});
+		expect(getPreviewRenderVersion).not.toHaveBeenCalled();
 		expect(model.previewRequest?.previewCacheRevision).toBe("4:2:0");
 		expect(model.previewRequest).toMatchObject({
 			file: targetFile,
