@@ -59,6 +59,11 @@ export const CARD_RENDER_SHADOW_CSS = String.raw`
 	touch-action: manipulation;
 }
 
+.twohop-progressive-cell > .cosense-card-links__box {
+	height: 100%;
+	min-height: 0;
+}
+
 .twohop-card-shell.is-skeleton {
 	pointer-events: none;
 }
