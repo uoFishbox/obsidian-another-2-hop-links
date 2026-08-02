@@ -13,6 +13,7 @@ import {
 } from "features/two-hop/ui/twoHopDocument";
 import {
 	compileFixedGridLayout,
+	resolveTwoHopRowFromScrollOffset,
 	type TwoHopRowRange,
 	type TwoHopGeometry,
 } from "features/two-hop/ui/viewport/twoHopGeometry";
@@ -751,19 +752,28 @@ export function useTwoHopProgressiveList(
 
 	function captureLayoutAnchor(): LayoutAnchor | null {
 		if (!rootEl?.shadowRoot) return null;
+		const anchorRowIndex = resolveTwoHopRowFromScrollOffset(
+			geometry,
+			readPreviewScrollTop() - contentTopInScrollSpace,
+		);
+		if (anchorRowIndex === null || anchorRowIndex >= plan.mountedRowEnd) {
+			return null;
+		}
+		const rowElement = rootEl.shadowRoot.querySelector<HTMLElement>(
+			`[data-ccl-progressive-row="${anchorRowIndex}"]`,
+		);
+		const element = rowElement?.querySelector<HTMLElement>(
+			"[data-ccl-logical-key]",
+		);
+		if (!element) return null;
 		const scrollRoot = findNearestScrollContainer(rootEl);
 		const viewportTop = scrollRoot?.getBoundingClientRect().top ?? 0;
-		for (const element of rootEl.shadowRoot.querySelectorAll<HTMLElement>(
-			"[data-ccl-logical-key]",
-		)) {
-			const rect = element.getBoundingClientRect();
-			if (rect.bottom <= viewportTop) continue;
-			return {
-				logicalKey: element.dataset.cclLogicalKey ?? "",
-				viewportOffset: rect.top - viewportTop,
-			};
-		}
-		return null;
+		const rect = element.getBoundingClientRect();
+		if (rect.bottom <= viewportTop) return null;
+		return {
+			logicalKey: element.dataset.cclLogicalKey ?? "",
+			viewportOffset: rect.top - viewportTop,
+		};
 	}
 
 	async function restoreLayoutAnchor(anchor: LayoutAnchor | null): Promise<void> {

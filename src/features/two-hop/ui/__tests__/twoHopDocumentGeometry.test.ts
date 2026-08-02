@@ -6,6 +6,7 @@ import {
 	resolveTwoHopCell,
 	resolveTwoHopCellInRowInto,
 	resolveTwoHopRowInto,
+	resolveTwoHopRowFromScrollOffset,
 	resolveTwoHopRowTop,
 	resolveTwoHopVisibleRows,
 	resolveTwoHopVisibleRowsInto,
@@ -297,6 +298,25 @@ describe("TwoHopDocument fixed-grid geometry", () => {
 			sectionIndex: 1,
 			itemIndex: 0,
 		});
+	});
+
+	it("resolves an anchor row directly from the local scroll offset", () => {
+		const document = createTwoHopDocument({
+			sections: [
+				createSection("first", [createItem("a"), createItem("b")]),
+				createSection("second", [createItem("c")]),
+			],
+			visibleCounts: {},
+			initialVisibleCount: 10,
+		});
+		const geometry = compileFixedGridLayout(document, layout);
+
+		expect(resolveTwoHopRowFromScrollOffset(geometry, 0)).toBe(0);
+		expect(resolveTwoHopRowFromScrollOffset(geometry, 100)).toBe(1);
+		expect(resolveTwoHopRowFromScrollOffset(geometry, 225)).toBe(2);
+		expect(
+			resolveTwoHopRowFromScrollOffset(geometry, geometry.totalHeight),
+		).toBeNull();
 	});
 
 	it.each([

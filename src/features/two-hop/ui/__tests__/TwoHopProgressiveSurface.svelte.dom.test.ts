@@ -116,7 +116,7 @@ describe("TwoHopProgressiveSurface", () => {
 		setNumericProperty(scroller, "clientWidth", 320);
 		setNumericProperty(scroller, "clientHeight", 300);
 		setNumericProperty(scroller, "scrollHeight", 20_000);
-		setNumericProperty(scroller, "scrollTop", 500);
+		setNumericProperty(scroller, "scrollTop", 0);
 		setElementRect(scroller, { top: 0, width: 320, height: 300 });
 		document.body.append(scroller);
 		const section = createSection(300);
@@ -150,11 +150,24 @@ describe("TwoHopProgressiveSurface", () => {
 			root.shadowRoot?.querySelectorAll(".twohop-progressive-chunk"),
 		).toHaveLength(4);
 
+		setNumericProperty(scroller, "scrollTop", 2_500);
+		await fireEvent.scroll(scroller);
+		await flushFrames();
+		const cells = Array.from(
+			root.shadowRoot?.querySelectorAll<HTMLElement>("[data-ccl-logical-key]") ??
+				[],
+		);
+		const rectSpies = cells.map((cell) =>
+			vi
+				.spyOn(cell, "getBoundingClientRect")
+				.mockReturnValue(createDomRect({ top: 0, width: 100, height: 100 })),
+		);
 		const anchorCell = root.shadowRoot?.querySelector<HTMLElement>(
-			"[data-testid='twohop-progressive-item-cell']",
+			"[data-ccl-row-index='22'][data-ccl-column-index='0']",
 		);
 		if (!anchorCell) throw new Error("Progressive anchor cell was not rendered");
-		vi.spyOn(anchorCell, "getBoundingClientRect")
+		const anchorRect = vi
+			.spyOn(anchorCell, "getBoundingClientRect")
 			.mockReturnValueOnce(createDomRect({ top: 20, width: 100, height: 100 }))
 			.mockReturnValue(createDomRect({ top: 50, width: 100, height: 100 }));
 		const hydratedCount = resolveItemCardModel.mock.calls.length;
@@ -176,7 +189,12 @@ describe("TwoHopProgressiveSurface", () => {
 			root.shadowRoot?.querySelectorAll(".twohop-progressive-chunk"),
 		).toHaveLength(4);
 		expect(resolveItemCardModel).toHaveBeenCalledTimes(hydratedCount);
-		expect(scroller.scrollTop).toBe(530);
+		expect(scroller.scrollTop).toBe(2_530);
+		expect(anchorRect).toHaveBeenCalledTimes(2);
+		expect(rectSpies.filter((rectSpy) => rectSpy !== anchorRect)).toSatisfy(
+			(spies: typeof rectSpies) =>
+				spies.every((rectSpy) => rectSpy.mock.calls.length === 0),
+		);
 
 		await rendered.rerender({
 			documentIdentity: "second",

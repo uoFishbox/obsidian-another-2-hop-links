@@ -305,6 +305,16 @@ export function resolveTwoHopVisibleRowsInto(
 	target.end = resolveFirstRowStartingAtOrAfter(geometry, viewportBottom);
 }
 
+/** Resolves the first row whose bottom is below the supplied local scroll offset. */
+export function resolveTwoHopRowFromScrollOffset(
+	geometry: TwoHopGeometry,
+	scrollOffset: number,
+): number | null {
+	if (geometry.rowCount === 0) return null;
+	const rowIndex = resolveFirstRowEndingAfter(geometry, Math.max(0, scrollOffset));
+	return rowIndex < geometry.rowCount ? rowIndex : null;
+}
+
 export function resolveTwoHopRowTop(
 	geometry: TwoHopGeometry,
 	rowIndex: number,
