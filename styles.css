@@ -81,6 +81,7 @@
 	width: auto;
 	max-width: none;
 	margin: var(--ccl-container-margin-top) 0 0;
+	padding: var(--file-margins);
 	contain: layout paint style;
 }
 
