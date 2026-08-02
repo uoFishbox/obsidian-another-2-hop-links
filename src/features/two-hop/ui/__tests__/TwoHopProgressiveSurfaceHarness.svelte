@@ -16,6 +16,7 @@
 		applicationStore: ApplicationStore;
 		linkContext: LinkContext;
 		previewDependencies?: TwoHopPreviewDependencies;
+		previewActive?: boolean;
 		resolveItemCardModel: (
 			item: TwoHopVirtualListItem,
 			presentation: TwoHopCardPresentationState,
@@ -28,6 +29,7 @@
 		applicationStore,
 		linkContext,
 		previewDependencies = undefined,
+		previewActive = true,
 		resolveItemCardModel,
 	}: Props = $props();
 	setLinkContext(linkContext);
@@ -40,5 +42,5 @@
 	initialVisibleCount={sections[0]?.totalCount}
 	{resolveItemCardModel}
 	{previewDependencies}
-	previewActive={true}
+	{previewActive}
 />

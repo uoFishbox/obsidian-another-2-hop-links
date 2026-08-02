@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { resolveProgressivePreviewRangeInto } from "features/two-hop/ui/progressivePreviewRange";
+import {
+	resolveProgressivePreviewRangeInto,
+	resolveProgressiveResidentRangeInto,
+} from "features/two-hop/ui/progressivePreviewRange";
 import type {
 	TwoHopGeometry,
 	TwoHopRowRange,
@@ -39,6 +42,62 @@ describe("resolveProgressivePreviewRangeInto", () => {
 
 		resolveProgressivePreviewRangeInto(range, GEOMETRY, -500, 200, 4);
 
+		expect(range).toEqual({ start: 0, end: 0 });
+	});
+});
+
+describe("resolveProgressiveResidentRangeInto", () => {
+	it("adds two bounded resident rows on each side of the active range", () => {
+		const range: TwoHopRowRange = { start: 0, end: 0 };
+
+		resolveProgressiveResidentRangeInto(
+			range,
+			{ start: 4, end: 8 },
+			{ start: 0, end: 0 },
+			20,
+		);
+
+		expect(range).toEqual({ start: 2, end: 10 });
+	});
+
+	it("preserves the resident range while active rows remain inside its guard", () => {
+		const range: TwoHopRowRange = { start: 0, end: 0 };
+
+		resolveProgressiveResidentRangeInto(
+			range,
+			{ start: 9, end: 15 },
+			{ start: 8, end: 16 },
+			20,
+		);
+
+		expect(range).toEqual({ start: 8, end: 16 });
+	});
+
+	it("moves the resident range after the active range crosses the guard", () => {
+		const range: TwoHopRowRange = { start: 0, end: 0 };
+
+		resolveProgressiveResidentRangeInto(
+			range,
+			{ start: 10, end: 16 },
+			{ start: 8, end: 16 },
+			20,
+		);
+
+		expect(range).toEqual({ start: 8, end: 18 });
+	});
+
+	it("clamps at mounted boundaries and empties with the active range", () => {
+		const range: TwoHopRowRange = { start: 0, end: 0 };
+
+		resolveProgressiveResidentRangeInto(
+			range,
+			{ start: 0, end: 3 },
+			{ start: 0, end: 0 },
+			4,
+		);
+		expect(range).toEqual({ start: 0, end: 4 });
+
+		resolveProgressiveResidentRangeInto(range, { start: 0, end: 0 }, range, 4);
 		expect(range).toEqual({ start: 0, end: 0 });
 	});
 });

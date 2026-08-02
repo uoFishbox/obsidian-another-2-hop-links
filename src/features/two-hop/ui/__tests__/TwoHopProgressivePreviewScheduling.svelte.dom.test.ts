@@ -14,6 +14,7 @@ import { TWO_HOP_PROGRESSIVE_ROWS_PER_CHUNK } from "features/two-hop/ui/twoHopPr
 import type { ApplicationStore } from "ui/stores/ApplicationStore.svelte";
 import type { CardRenderModel } from "ui/components/items/cardRenderModel";
 import type { LinkContext } from "ui/context/linkContext";
+import type { TFile } from "obsidian";
 import { findNearestScrollContainer } from "ui/virtualization/dom/scrollContainer";
 import {
 	installIntersectionObserverMock,
@@ -107,6 +108,131 @@ interface HydrationSchedulingFixture {
 	readonly resolvePreviewRequest: ReturnType<typeof vi.fn>;
 	readonly root: HTMLElement;
 	readonly scrollTarget: HTMLElement | Window;
+}
+
+interface PreviewControlFixture {
+	readonly disposeHost: ReturnType<typeof vi.fn>;
+	readonly publish: ReturnType<typeof vi.fn>;
+	readonly registerHost: ReturnType<typeof vi.fn>;
+	readonly resolvePreviewRequest: ReturnType<typeof vi.fn>;
+	readonly root: HTMLElement;
+	readonly scrollTarget: HTMLElement | Window;
+	rerenderPreviewActive(active: boolean): Promise<void>;
+}
+
+async function renderPreviewControlFixture(
+	previewActive: boolean,
+	initialScrollTop = 0,
+): Promise<PreviewControlFixture> {
+	const applicationStore = {
+		settings: {
+			...DEFAULT_SETTINGS,
+			cardWidthPx: 100,
+			cardHeightRatio: 1,
+			cardMaxColumns: 3,
+		},
+	} as unknown as ApplicationStore;
+	const targetFile = {
+		path: "notes/preview.md",
+		basename: "preview",
+		extension: "md",
+		parent: { path: "notes" },
+		stat: { ctime: 1, mtime: 1, size: 1 },
+	} as TFile;
+	const requestsByKey = new Map<string, CardPreviewRequest>();
+	const resolvePreviewRequest = vi.fn((item: TwoHopVirtualListItem) => {
+		const existing = requestsByKey.get(item.virtualKey);
+		if (existing) return existing;
+		const request = {
+			renderKey: `preview:${item.virtualKey}`,
+		} as CardPreviewRequest;
+		requestsByKey.set(item.virtualKey, request);
+		return request;
+	});
+	const resolveItemCardModel = (
+		item: TwoHopVirtualListItem,
+		presentation: TwoHopCardPresentationState,
+	): CardRenderModel => ({
+		item: item.item,
+		targetFile,
+		title: item.virtualKey,
+		ariaLabel: item.virtualKey,
+		className: null,
+		extension: "md",
+		directory: "notes",
+		interactionId: item.virtualKey,
+		interactionKey: item.virtualKey,
+		interactionDescriptor: null,
+		presentation,
+		searchQuery: "",
+		get previewRequest() {
+			return resolvePreviewRequest(item);
+		},
+	});
+	const disposeHost = vi.fn();
+	const registerHost = vi.fn(() => ({ dispose: disposeHost }));
+	const publish = vi.fn();
+	const previewDependencies = {
+		previewRuntime: {
+			createSurface: () => ({
+				registerHost,
+				publish,
+				dispose: () => {},
+			}),
+		},
+		resolveSearchMatchPosition: () => undefined,
+	} as unknown as TwoHopPreviewDependencies;
+	const scroller = document.createElement("div");
+	scroller.style.overflow = "auto";
+	setNumericProperty(scroller, "clientHeight", 300);
+	setNumericProperty(scroller, "scrollHeight", 20_000);
+	setNumericProperty(scroller, "scrollTop", initialScrollTop);
+	setElementRect(scroller, { top: 0, width: 320, height: 300 });
+	document.body.append(scroller);
+	const baseProps = {
+		sections: [createSection(300)],
+		applicationStore,
+		linkContext: { getPreview: vi.fn() } as unknown as LinkContext,
+		previewDependencies,
+		resolveItemCardModel,
+	};
+	const rendered = render(TwoHopProgressiveSurfaceHarness, {
+		target: scroller,
+		props: { ...baseProps, previewActive },
+	});
+	const root = rendered.container.querySelector<HTMLElement>(
+		".twohop-progressive-surface",
+	);
+	if (!root) throw new Error("Progressive surface was not rendered");
+	setElementRect(root, { top: 0, width: 320, height: 20_000 });
+	const content = root.shadowRoot?.querySelector<HTMLElement>(
+		".twohop-progressive-content",
+	);
+	if (!content) throw new Error("Progressive content was not rendered");
+	setElementRect(content, {
+		top: -initialScrollTop,
+		width: 320,
+		height: 20_000,
+	});
+	triggerResize(root, 320, 20_000);
+	setNumericProperty(scroller, "clientHeight", 301);
+	triggerResize(scroller, 320, 301);
+	await Promise.resolve();
+	await drainPostPaintTasks();
+
+	return {
+		disposeHost,
+		publish,
+		registerHost,
+		resolvePreviewRequest,
+		root,
+		scrollTarget: findNearestScrollContainer(root) ?? window,
+		async rerenderPreviewActive(active: boolean): Promise<void> {
+			await rendered.rerender({ ...baseProps, previewActive: active });
+			await Promise.resolve();
+			await drainPostPaintTasks();
+		},
+	};
 }
 
 async function renderHydrationSchedulingFixture(
@@ -426,5 +552,100 @@ describe("TwoHop progressive preview scheduling", () => {
 		expect(nextFrame.previewWindow.previewRange.start).toBeGreaterThan(
 			initialFrame.previewWindow.previewRange.start,
 		);
+	});
+
+	it("keeps resident hosts and bindings when active rows move inside the guard", async () => {
+		const initialScrollTop = 1_000;
+		const fixture = await renderPreviewControlFixture(true, initialScrollTop);
+		await vi.waitFor(() => expect(fixture.registerHost).toHaveBeenCalled());
+		const initialFrame = fixture.publish.mock.lastCall?.[0] as
+			| PreviewFrame
+			| undefined;
+		if (!initialFrame) throw new Error("Initial preview frame was not published");
+		const activeRowCount =
+			initialFrame.previewWindow.previewRange.end -
+			initialFrame.previewWindow.previewRange.start;
+		const columnCount = fixture.root.shadowRoot?.querySelector(
+			"[data-ccl-progressive-row]",
+		)?.childElementCount;
+		if (!columnCount) throw new Error("Progressive grid columns were not rendered");
+		expect(fixture.registerHost.mock.calls.length).toBeLessThanOrEqual(
+			(activeRowCount + 4) * columnCount,
+		);
+		const rows = [
+			...(fixture.root.shadowRoot?.querySelectorAll<HTMLElement>(
+				".twohop-progressive-row",
+			) ?? []),
+		];
+		const firstRowTop = Number.parseFloat(rows[0]?.style.top ?? "0");
+		const secondRowTop = Number.parseFloat(rows[1]?.style.top ?? "0");
+		const rowStride = secondRowTop - firstRowTop;
+		expect(rowStride).toBeGreaterThan(0);
+		fixture.disposeHost.mockClear();
+
+		await applyScrollRange(fixture.scrollTarget, initialScrollTop + rowStride);
+		await drainPostPaintTasks();
+		const nextFrame = fixture.publish.mock.lastCall?.[0] as PreviewFrame;
+
+		expect(nextFrame.previewWindow.previewRange.start).toBe(
+			initialFrame.previewWindow.previewRange.start + 1,
+		);
+		expect(fixture.disposeHost).not.toHaveBeenCalled();
+		const retainedInactiveBindings = [
+			...nextFrame.previewBindingsBySlot.values(),
+		].filter(
+			(binding) => binding.rowIndex < nextFrame.previewWindow.previewRange.start,
+		);
+		expect(retainedInactiveBindings.length).toBeGreaterThan(0);
+		for (const binding of retainedInactiveBindings) {
+			expect(initialFrame.previewBindingsBySlot.get(binding.slotId)).toBe(
+				binding,
+			);
+		}
+	});
+
+	it("stops preview lazy work and hosts while inactive, then rebuilds from current scroll", async () => {
+		const fixture = await renderPreviewControlFixture(false, 1_000);
+
+		expect(fixture.resolvePreviewRequest).not.toHaveBeenCalled();
+		expect(fixture.registerHost).not.toHaveBeenCalled();
+		expect(
+			fixture.root.shadowRoot?.querySelectorAll(
+				"[data-preview-owner='virtual-surface']",
+			),
+		).toHaveLength(0);
+		const inactiveFrame = fixture.publish.mock.lastCall?.[0] as PreviewFrame;
+		expect(inactiveFrame.previewWindow.active).toBe(false);
+		expect(inactiveFrame.previewBindingsBySlot.size).toBe(0);
+		const inactivePublishCount = fixture.publish.mock.calls.length;
+
+		setNumericProperty(fixture.scrollTarget, "scrollTop", 1_500);
+		fixture.scrollTarget.dispatchEvent(new Event("scroll"));
+		await runTask("scroll-critical", PREVIEW_SCROLL_TASK_KEY);
+		await runTask("post-paint", PREVIEW_RANGE_APPLY_TASK_KEY);
+		expect(fixture.resolvePreviewRequest).not.toHaveBeenCalled();
+		expect(fixture.registerHost).not.toHaveBeenCalled();
+		expect(fixture.publish).toHaveBeenCalledTimes(inactivePublishCount);
+
+		await fixture.rerenderPreviewActive(true);
+		await vi.waitFor(() => expect(fixture.registerHost).toHaveBeenCalled());
+		const activeFrame = fixture.publish.mock.lastCall?.[0] as PreviewFrame;
+		expect(activeFrame.previewWindow.active).toBe(true);
+		expect(activeFrame.previewWindow.previewRange.start).toBeGreaterThan(0);
+		expect(fixture.resolvePreviewRequest).toHaveBeenCalled();
+
+		fixture.disposeHost.mockClear();
+		await fixture.rerenderPreviewActive(false);
+		await vi.waitFor(() =>
+			expect(
+				fixture.root.shadowRoot?.querySelectorAll(
+					"[data-preview-owner='virtual-surface']",
+				),
+			).toHaveLength(0),
+		);
+		expect(fixture.disposeHost).toHaveBeenCalled();
+		const finalFrame = fixture.publish.mock.lastCall?.[0] as PreviewFrame;
+		expect(finalFrame.previewWindow.active).toBe(false);
+		expect(finalFrame.previewBindingsBySlot.size).toBe(0);
 	});
 });

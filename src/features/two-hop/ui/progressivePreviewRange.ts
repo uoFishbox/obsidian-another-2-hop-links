@@ -4,6 +4,9 @@ import {
 	type TwoHopRowRange,
 } from "features/two-hop/ui/viewport/twoHopGeometry";
 
+const PREVIEW_RESIDENT_OVERSCAN_ROWS = 2;
+const PREVIEW_RESIDENT_GUARD_ROWS = 1;
+
 /** Resolves the mounted preview window with one row of logical overscan. */
 export function resolveProgressivePreviewRangeInto(
 	target: TwoHopRowRange,
@@ -26,4 +29,50 @@ export function resolveProgressivePreviewRangeInto(
 	);
 	target.end = Math.min(target.end, mountedEnd);
 	target.start = Math.min(target.start, target.end);
+}
+
+/** Resolves a bounded host range and preserves it while active rows remain in its guard area. */
+export function resolveProgressiveResidentRangeInto(
+	target: TwoHopRowRange,
+	activeRange: TwoHopRowRange,
+	currentResidentRange: TwoHopRowRange,
+	mountedRowEnd: number,
+): void {
+	const mountedEnd = Math.max(0, Math.floor(mountedRowEnd));
+	if (activeRange.end <= activeRange.start || mountedEnd === 0) {
+		target.start = 0;
+		target.end = 0;
+		return;
+	}
+
+	const activeStart = Math.min(Math.max(0, activeRange.start), mountedEnd);
+	const activeEnd = Math.min(Math.max(activeStart, activeRange.end), mountedEnd);
+	if (activeEnd <= activeStart) {
+		target.start = 0;
+		target.end = 0;
+		return;
+	}
+	const residentStart = Math.min(Math.max(0, currentResidentRange.start), mountedEnd);
+	const residentEnd = Math.min(
+		Math.max(residentStart, currentResidentRange.end),
+		mountedEnd,
+	);
+	const guardedStart =
+		residentStart === 0
+			? residentStart
+			: residentStart + PREVIEW_RESIDENT_GUARD_ROWS;
+	const guardedEnd =
+		residentEnd === mountedEnd
+			? residentEnd
+			: residentEnd - PREVIEW_RESIDENT_GUARD_ROWS;
+	const activeFitsGuardArea = activeStart >= guardedStart && activeEnd <= guardedEnd;
+
+	if (activeFitsGuardArea) {
+		target.start = residentStart;
+		target.end = residentEnd;
+		return;
+	}
+
+	target.start = Math.max(0, activeStart - PREVIEW_RESIDENT_OVERSCAN_ROWS);
+	target.end = Math.min(mountedEnd, activeEnd + PREVIEW_RESIDENT_OVERSCAN_ROWS);
 }

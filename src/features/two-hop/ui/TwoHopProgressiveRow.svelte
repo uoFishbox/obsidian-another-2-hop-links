@@ -13,7 +13,7 @@
 		) => () => void;
 		registerPreviewRow: (
 			rowIndex: number,
-			setPreviewCandidate: (active: boolean) => void,
+			setPreviewHostCandidate: (resident: boolean) => void,
 		) => () => void;
 		onLoadMore: (sectionId: string) => void;
 	}
@@ -25,11 +25,11 @@
 		registerPreviewRow,
 		onLoadMore,
 	}: Props = $props();
-	let previewCandidate = $state(false);
+	let previewHostCandidate = $state(false);
 
 	$effect(() => {
-		return registerPreviewRow(row.rowIndex, (active) => {
-			previewCandidate = active;
+		return registerPreviewRow(row.rowIndex, (resident) => {
+			previewHostCandidate = resident;
 		});
 	});
 </script>
@@ -51,7 +51,7 @@
 		>
 			<TwoHopProgressiveCell
 				{cell}
-				{previewCandidate}
+				{previewHostCandidate}
 				{registerCardModelConsumer}
 				{onLoadMore}
 			/>

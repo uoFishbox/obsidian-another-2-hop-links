@@ -57,7 +57,10 @@ import {
 	markScrollActivityIdle,
 } from "ui/virtualization/scheduling/scrollActivity";
 import { recordCCLDevMeasurement } from "infrastructure/debug/CCLDevMeasurements";
-import { resolveProgressivePreviewRangeInto } from "features/two-hop/ui/progressivePreviewRange";
+import {
+	resolveProgressivePreviewRangeInto,
+	resolveProgressiveResidentRangeInto,
+} from "features/two-hop/ui/progressivePreviewRange";
 
 export interface TwoHopProgressiveListProps {
 	/** Stable identity of the displayed file and search scope. */
@@ -210,9 +213,12 @@ export function useTwoHopProgressiveList(
 	const previewBindingByLogicalKey = new Map<string, RowPreviewCardBinding>();
 	const visibleHydrationQueue = createHydrationQueue();
 	const preloadHydrationQueue = createHydrationQueue();
-	const previewRowConsumers = new Map<number, (active: boolean) => void>();
+	const previewHostRowConsumers = new Map<number, (resident: boolean) => void>();
+	const visibleHydrationRange: TwoHopRowRange = { start: 0, end: 0 };
 	const activePreviewRange: TwoHopRowRange = { start: 0, end: 0 };
-	const nextPreviewRange: TwoHopRowRange = { start: 0, end: 0 };
+	const residentPreviewRange: TwoHopRowRange = { start: 0, end: 0 };
+	const nextVisibleHydrationRange: TwoHopRowRange = { start: 0, end: 0 };
+	const nextResidentPreviewRange: TwoHopRowRange = { start: 0, end: 0 };
 	let sentinelObserver: IntersectionObserver | undefined;
 	let cancelHydrationDrain: (() => void) | undefined;
 	let scheduledHydrationPriority: HydrationPriority | undefined;
@@ -228,6 +234,14 @@ export function useTwoHopProgressiveList(
 	let previewPublicationScheduled = false;
 	let lastInputDocumentRevision = initialDocument.revision;
 	let lastDocumentIdentity = props.documentIdentity;
+
+	function isPreviewControlActive(): boolean {
+		return props.previewActive !== false;
+	}
+
+	function isPreviewSurfaceActive(): boolean {
+		return props.previewDependencies !== undefined && isPreviewControlActive();
+	}
 
 	function notifyModelConsumers(
 		logicalKey: string,
@@ -276,7 +290,7 @@ export function useTwoHopProgressiveList(
 		modelSourceItemsByLogicalKey.clear();
 		previewBindingByLogicalKey.clear();
 		interactionController.clear();
-		replaceHydrationRange(activePreviewRange);
+		replaceHydrationRange(visibleHydrationRange);
 		schedulePreviewPublication();
 	}
 
@@ -402,7 +416,9 @@ export function useTwoHopProgressiveList(
 			}
 			if (priority === "preload") continue;
 			activatedModelKeys.add(entry.logicalKey);
-			if (model.previewRequest) activePreviewHydrationChanged = true;
+			if (isPreviewControlActive() && model.previewRequest) {
+				activePreviewHydrationChanged = true;
+			}
 			const interactionDescriptor = model.interactionDescriptor;
 			if (interactionDescriptor) {
 				enteredInteractionSlots.push({
@@ -419,11 +435,7 @@ export function useTwoHopProgressiveList(
 			});
 		}
 		compactHydrationQueue(queue);
-		if (
-			activePreviewHydrationChanged &&
-			props.previewDependencies !== undefined &&
-			props.previewActive !== false
-		) {
+		if (activePreviewHydrationChanged) {
 			schedulePreviewPublication();
 		}
 		if (
@@ -447,25 +459,21 @@ export function useTwoHopProgressiveList(
 	}
 
 	function publishPreviewFrame(): void {
-		const active =
-			props.previewDependencies !== undefined && props.previewActive !== false;
+		const active = isPreviewSurfaceActive();
 		const bindings = new Map<string, RowPreviewCardBinding>();
-		let rangeStart = Number.POSITIVE_INFINITY;
-		let rangeEnd = 0;
 
 		if (active) {
 			const activePlan = untrack(() => plan);
-			rangeStart = activePreviewRange.start;
-			rangeEnd = activePreviewRange.end;
 			for (
-				let rowIndex = activePreviewRange.start;
-				rowIndex < activePreviewRange.end;
+				let rowIndex = residentPreviewRange.start;
+				rowIndex < residentPreviewRange.end;
 				rowIndex += 1
 			) {
 				const row = resolveMountedProgressiveRow(activePlan, rowIndex);
 				if (!row) continue;
 				for (const cell of row.cells) {
 					if (cell.kind !== "item") continue;
+					if (!activatedModelKeys.has(cell.logicalKey)) continue;
 					const model = modelsByLogicalKey.get(cell.logicalKey);
 					if (!model?.previewRequest) continue;
 					const previousBinding = previewBindingByLogicalKey.get(
@@ -496,8 +504,11 @@ export function useTwoHopProgressiveList(
 			previewBindingByLogicalKey.delete(logicalKey);
 		}
 
-		const previewRange = Number.isFinite(rangeStart)
-			? Object.freeze({ start: rangeStart, end: rangeEnd })
+		const previewRange = active
+			? Object.freeze({
+					start: activePreviewRange.start,
+					end: activePreviewRange.end,
+				})
 			: EMPTY_PREVIEW_RANGE;
 		const frame: PreviewFrame = Object.freeze({
 			previewBindingsBySlot: bindings,
@@ -508,38 +519,77 @@ export function useTwoHopProgressiveList(
 
 	function registerPreviewRow(
 		rowIndex: number,
-		setPreviewCandidate: (active: boolean) => void,
+		setPreviewHostCandidate: (resident: boolean) => void,
 	): () => void {
-		previewRowConsumers.set(rowIndex, setPreviewCandidate);
-		setPreviewCandidate(
-			rowIndex >= activePreviewRange.start && rowIndex < activePreviewRange.end,
+		previewHostRowConsumers.set(rowIndex, setPreviewHostCandidate);
+		setPreviewHostCandidate(
+			rowIndex >= residentPreviewRange.start &&
+				rowIndex < residentPreviewRange.end,
 		);
 		return () => {
-			if (previewRowConsumers.get(rowIndex) === setPreviewCandidate) {
-				previewRowConsumers.delete(rowIndex);
+			if (previewHostRowConsumers.get(rowIndex) === setPreviewHostCandidate) {
+				previewHostRowConsumers.delete(rowIndex);
 			}
-			setPreviewCandidate(false);
+			setPreviewHostCandidate(false);
 		};
 	}
 
-	function publishPreviewRange(next: TwoHopRowRange): void {
-		const previousStart = activePreviewRange.start;
-		const previousEnd = activePreviewRange.end;
-		if (previousStart === next.start && previousEnd === next.end) return;
-		replaceHydrationRange(next);
-
-		for (let rowIndex = previousStart; rowIndex < previousEnd; rowIndex += 1) {
-			if (rowIndex >= next.start && rowIndex < next.end) continue;
-			previewRowConsumers.get(rowIndex)?.(false);
+	function applyPreviewRanges(
+		nextActive: TwoHopRowRange,
+		nextResident: TwoHopRowRange,
+	): void {
+		const activeChanged =
+			activePreviewRange.start !== nextActive.start ||
+			activePreviewRange.end !== nextActive.end;
+		const residentChanged =
+			residentPreviewRange.start !== nextResident.start ||
+			residentPreviewRange.end !== nextResident.end;
+		if (!activeChanged && !residentChanged) return;
+		for (
+			let rowIndex = residentPreviewRange.start;
+			rowIndex < residentPreviewRange.end;
+			rowIndex += 1
+		) {
+			if (rowIndex >= nextResident.start && rowIndex < nextResident.end) continue;
+			previewHostRowConsumers.get(rowIndex)?.(false);
 		}
-		for (let rowIndex = next.start; rowIndex < next.end; rowIndex += 1) {
-			if (rowIndex >= previousStart && rowIndex < previousEnd) continue;
-			previewRowConsumers.get(rowIndex)?.(true);
+		for (
+			let rowIndex = nextResident.start;
+			rowIndex < nextResident.end;
+			rowIndex += 1
+		) {
+			if (
+				rowIndex >= residentPreviewRange.start &&
+				rowIndex < residentPreviewRange.end
+			) {
+				continue;
+			}
+			previewHostRowConsumers.get(rowIndex)?.(true);
 		}
 
-		activePreviewRange.start = next.start;
-		activePreviewRange.end = next.end;
+		activePreviewRange.start = nextActive.start;
+		activePreviewRange.end = nextActive.end;
+		residentPreviewRange.start = nextResident.start;
+		residentPreviewRange.end = nextResident.end;
 		schedulePreviewPublication();
+	}
+
+	function applyVisibleHydrationRange(next: TwoHopRowRange): void {
+		if (
+			visibleHydrationRange.start === next.start &&
+			visibleHydrationRange.end === next.end
+		) {
+			return;
+		}
+		visibleHydrationRange.start = next.start;
+		visibleHydrationRange.end = next.end;
+		replaceHydrationRange(next);
+	}
+
+	function deactivatePreviewControl(): void {
+		nextResidentPreviewRange.start = 0;
+		nextResidentPreviewRange.end = 0;
+		applyPreviewRanges(EMPTY_PREVIEW_RANGE, EMPTY_PREVIEW_RANGE);
 	}
 
 	function readPreviewScrollTop(): number {
@@ -591,15 +641,33 @@ export function useTwoHopProgressiveList(
 		const activeGeometry = untrack(() => geometry);
 		const mountedRowEnd = untrack(() => plan.mountedRowEnd);
 		resolveProgressivePreviewRangeInto(
-			nextPreviewRange,
+			nextVisibleHydrationRange,
 			activeGeometry,
 			readPreviewScrollTop() - contentTopInScrollSpace,
 			previewViewportHeight,
 			mountedRowEnd,
 		);
+		if (isPreviewControlActive()) {
+			resolveProgressiveResidentRangeInto(
+				nextResidentPreviewRange,
+				nextVisibleHydrationRange,
+				residentPreviewRange,
+				mountedRowEnd,
+			);
+		} else {
+			nextResidentPreviewRange.start = 0;
+			nextResidentPreviewRange.end = 0;
+		}
+		const nextActivePreviewRange = isPreviewControlActive()
+			? nextVisibleHydrationRange
+			: EMPTY_PREVIEW_RANGE;
 		if (
-			nextPreviewRange.start === activePreviewRange.start &&
-			nextPreviewRange.end === activePreviewRange.end
+			nextVisibleHydrationRange.start === visibleHydrationRange.start &&
+			nextVisibleHydrationRange.end === visibleHydrationRange.end &&
+			nextActivePreviewRange.start === activePreviewRange.start &&
+			nextActivePreviewRange.end === activePreviewRange.end &&
+			nextResidentPreviewRange.start === residentPreviewRange.start &&
+			nextResidentPreviewRange.end === residentPreviewRange.end
 		) {
 			return;
 		}
@@ -612,7 +680,18 @@ export function useTwoHopProgressiveList(
 
 	function applyPendingPreviewRange(): void {
 		if (disposed) return;
-		publishPreviewRange(nextPreviewRange);
+		applyVisibleHydrationRange(nextVisibleHydrationRange);
+		if (!isPreviewControlActive()) {
+			deactivatePreviewControl();
+			return;
+		}
+		resolveProgressiveResidentRangeInto(
+			nextResidentPreviewRange,
+			nextVisibleHydrationRange,
+			residentPreviewRange,
+			untrack(() => plan.mountedRowEnd),
+		);
+		applyPreviewRanges(nextVisibleHydrationRange, nextResidentPreviewRange);
 	}
 
 	function schedulePreviewRangeUpdate(): void {
@@ -644,9 +723,11 @@ export function useTwoHopProgressiveList(
 
 	const previewScrollActivitySource = {};
 	function handlePreviewScroll(): void {
-		markScrollActivityActive(previewScrollActivitySource);
 		schedulePreviewRangeUpdate();
-		schedulePreviewScrollIdle();
+		if (isPreviewControlActive()) {
+			markScrollActivityActive(previewScrollActivitySource);
+			schedulePreviewScrollIdle();
+		}
 	}
 
 	function rebuildSentinelObserver(): void {
@@ -677,7 +758,7 @@ export function useTwoHopProgressiveList(
 		);
 		if (nextEnd === currentMountedRowEnd) return;
 		plan = appendTwoHopProgressivePlan(document, geometry, plan, nextEnd);
-		replaceHydrationRange(activePreviewRange);
+		replaceHydrationRange(visibleHydrationRange);
 	}
 
 	function captureLayoutAnchor(): LayoutAnchor | null {
@@ -793,7 +874,7 @@ export function useTwoHopProgressiveList(
 				releasedSlots,
 			});
 		}
-		replaceHydrationRange(activePreviewRange);
+		replaceHydrationRange(visibleHydrationRange);
 		schedulePreviewPublication();
 	}
 
@@ -962,8 +1043,23 @@ export function useTwoHopProgressiveList(
 	});
 
 	$effect(() => {
-		void props.previewActive;
-		schedulePreviewPublication();
+		const active = isPreviewControlActive();
+		if (!active) {
+			if (previewScrollIdleTimer !== undefined && previewOwnerWindow) {
+				previewOwnerWindow.clearTimeout(previewScrollIdleTimer);
+				previewScrollIdleTimer = undefined;
+			}
+			markScrollActivityIdle(previewScrollActivitySource);
+			deactivatePreviewControl();
+			schedulePreviewPublication();
+			return;
+		}
+		if (!rootEl || !contentEl) {
+			schedulePreviewPublication();
+			return;
+		}
+		measurePreviewViewportGeometry();
+		flushPreviewRangeFromScroll();
 	});
 
 	onDestroy(() => {
@@ -987,8 +1083,8 @@ export function useTwoHopProgressiveList(
 			previewOwnerWindow.clearTimeout(previewScrollIdleTimer);
 		}
 		markScrollActivityIdle(previewScrollActivitySource);
-		for (const consumer of previewRowConsumers.values()) consumer(false);
-		previewRowConsumers.clear();
+		for (const consumer of previewHostRowConsumers.values()) consumer(false);
+		previewHostRowConsumers.clear();
 		interactionController.clear();
 		previewSurface.dispose();
 	});
