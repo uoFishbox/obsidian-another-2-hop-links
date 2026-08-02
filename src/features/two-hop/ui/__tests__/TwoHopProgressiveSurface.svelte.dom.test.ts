@@ -67,6 +67,95 @@ function createSection(count: number): TwoHopVirtualSectionDescriptor {
 	};
 }
 
+function createCardModelResolver() {
+	return vi.fn(
+		(
+			item: TwoHopVirtualListItem,
+			presentation: TwoHopCardPresentationState,
+		): CardRenderModel => ({
+			item: item.item,
+			targetFile: null,
+			title: item.virtualKey,
+			ariaLabel: item.virtualKey,
+			className: null,
+			extension: null,
+			directory: null,
+			interactionId: item.virtualKey,
+			interactionKey: item.virtualKey,
+			interactionDescriptor: null,
+			presentation,
+			searchQuery: "",
+			previewRequest: null,
+		}),
+	);
+}
+
+async function renderAnchorTestSurface() {
+	const applicationStore = {
+		settings: {
+			...DEFAULT_SETTINGS,
+			cardWidthPx: 100,
+			cardHeightRatio: 1,
+			cardMaxColumns: 3,
+		},
+	} as unknown as ApplicationStore;
+	const resolveItemCardModel = createCardModelResolver();
+	const scroller = document.createElement("div");
+	scroller.style.overflow = "auto";
+	setNumericProperty(scroller, "clientWidth", 320);
+	setNumericProperty(scroller, "clientHeight", 300);
+	setNumericProperty(scroller, "scrollHeight", 20_000);
+	setNumericProperty(scroller, "scrollTop", 0);
+	setElementRect(scroller, { top: 0, width: 320, height: 300 });
+	document.body.append(scroller);
+	const section = createSection(300);
+	const linkContext = { getPreview: vi.fn() } as unknown as LinkContext;
+	const rendered = render(TwoHopProgressiveSurfaceHarness, {
+		target: scroller,
+		props: {
+			documentIdentity: "anchor-test",
+			sections: [section],
+			applicationStore,
+			linkContext,
+			resolveItemCardModel,
+		},
+	});
+	const root = rendered.container.querySelector<HTMLElement>(
+		".twohop-progressive-surface",
+	);
+	if (!root) throw new Error("Progressive surface was not rendered");
+
+	await flushFrames();
+	await vi.waitFor(() => expect(resolveItemCardModel).toHaveBeenCalled());
+	for (let index = 0; index < 2; index += 1) {
+		const sentinel = root.shadowRoot?.querySelector<HTMLElement>(
+			".twohop-progressive-sentinel",
+		);
+		if (!sentinel) throw new Error("Progressive sentinel was not rendered");
+		triggerIntersection(sentinel);
+		await flushFrames();
+	}
+	setNumericProperty(scroller, "scrollTop", 2_500);
+	await fireEvent.scroll(scroller);
+	await flushFrames();
+
+	const anchorCell = root.shadowRoot?.querySelector<HTMLElement>(
+		"[data-ccl-row-index='22'][data-ccl-column-index='0']",
+	);
+	if (!anchorCell) throw new Error("Progressive anchor cell was not rendered");
+
+	return {
+		anchorCell,
+		applicationStore,
+		linkContext,
+		rendered,
+		resolveItemCardModel,
+		root,
+		scroller,
+		section,
+	};
+}
+
 beforeEach(() => {
 	resetRecords();
 	resetScrollActivityForTests();
@@ -207,6 +296,92 @@ describe("TwoHopProgressiveSurface", () => {
 		expect(
 			root.shadowRoot?.querySelectorAll(".twohop-progressive-chunk"),
 		).toHaveLength(2);
+	});
+
+	it("does not preserve an anchor below the viewport", async () => {
+		const {
+			anchorCell,
+			applicationStore,
+			linkContext,
+			rendered,
+			resolveItemCardModel,
+			scroller,
+			section,
+		} = await renderAnchorTestSurface();
+		const anchorRect = vi
+			.spyOn(anchorCell, "getBoundingClientRect")
+			.mockReturnValueOnce(createDomRect({ top: 300, width: 100, height: 100 }))
+			.mockReturnValue(createDomRect({ top: 350, width: 100, height: 100 }));
+
+		await rendered.rerender({
+			documentIdentity: "anchor-test",
+			sections: [
+				{
+					...section,
+					sourceRevision: createSectionDataRevision(2),
+				},
+			],
+			applicationStore,
+			linkContext,
+			resolveItemCardModel,
+		});
+		await flushFrames();
+
+		expect(scroller.scrollTop).toBe(2_500);
+		expect(anchorRect).toHaveBeenCalledOnce();
+	});
+
+	it("does not preserve an anchor when scrollTop changes before restoration", async () => {
+		const {
+			anchorCell,
+			applicationStore,
+			linkContext,
+			rendered,
+			resolveItemCardModel,
+			scroller,
+			section,
+		} = await renderAnchorTestSurface();
+		const anchorRect = vi
+			.spyOn(anchorCell, "getBoundingClientRect")
+			.mockImplementationOnce(() => {
+				queueMicrotask(() => setNumericProperty(scroller, "scrollTop", 2_600));
+				return createDomRect({ top: 20, width: 100, height: 100 });
+			})
+			.mockReturnValue(createDomRect({ top: 50, width: 100, height: 100 }));
+
+		await rendered.rerender({
+			documentIdentity: "anchor-test",
+			sections: [
+				{
+					...section,
+					sourceRevision: createSectionDataRevision(2),
+				},
+			],
+			applicationStore,
+			linkContext,
+			resolveItemCardModel,
+		});
+		await flushFrames();
+
+		expect(scroller.scrollTop).toBe(2_600);
+		expect(anchorRect).toHaveBeenCalledOnce();
+	});
+
+	it("does not preserve an anchor when root width recovers from zero", async () => {
+		const { anchorCell, root, scroller } = await renderAnchorTestSurface();
+		const anchorRect = vi
+			.spyOn(anchorCell, "getBoundingClientRect")
+			.mockReturnValueOnce(createDomRect({ top: 20, width: 100, height: 100 }))
+			.mockReturnValue(createDomRect({ top: 50, width: 100, height: 100 }));
+		vi.spyOn(root, "getBoundingClientRect").mockReturnValue(
+			createDomRect({ top: 0, width: 320, height: 20_000 }),
+		);
+
+		triggerResize(root, 320, 20_000);
+		await flushFrames();
+
+		expect(scroller.scrollTop).toBe(2_500);
+		expect(anchorRect).not.toHaveBeenCalled();
 	});
 
 	it("measures only root width and scroll viewport size changes", async () => {

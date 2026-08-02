@@ -92,6 +92,8 @@ interface HydrationQueue {
 interface LayoutAnchor {
 	readonly logicalKey: string;
 	readonly viewportOffset: number;
+	readonly scrollTop: number;
+	readonly scrollRoot: HTMLElement | null;
 }
 
 type CardModelConsumer = (model: CardShellModel | undefined) => void;
@@ -778,12 +780,25 @@ export function useTwoHopProgressiveList(
 		);
 		if (!element) return null;
 		const scrollRoot = findNearestScrollContainer(rootEl);
+		const viewportHeight =
+			scrollRoot?.clientHeight ?? previewOwnerWindow?.innerHeight ?? 0;
+		if (viewportHeight <= 0) return null;
 		const viewportTop = scrollRoot?.getBoundingClientRect().top ?? 0;
+		const viewportBottom = viewportTop + viewportHeight;
 		const rect = element.getBoundingClientRect();
-		if (rect.bottom <= viewportTop) return null;
+		if (
+			rect.width <= 0 ||
+			rect.height <= 0 ||
+			rect.bottom <= viewportTop ||
+			rect.top >= viewportBottom
+		) {
+			return null;
+		}
 		return {
 			logicalKey: element.dataset.cclLogicalKey ?? "",
 			viewportOffset: rect.top - viewportTop,
+			scrollTop: readPreviewScrollTop(),
+			scrollRoot,
 		};
 	}
 
@@ -796,6 +811,8 @@ export function useTwoHopProgressiveList(
 		);
 		if (!element) return;
 		const scrollRoot = findNearestScrollContainer(rootEl);
+		if (scrollRoot !== anchor.scrollRoot) return;
+		if (Math.abs(readPreviewScrollTop() - anchor.scrollTop) >= 0.5) return;
 		const viewportTop = scrollRoot?.getBoundingClientRect().top ?? 0;
 		const delta =
 			element.getBoundingClientRect().top - viewportTop - anchor.viewportOffset;
@@ -804,7 +821,7 @@ export function useTwoHopProgressiveList(
 		else window.scrollBy({ top: delta });
 	}
 
-	function measureLayout(): void {
+	function measureLayout(preserveAnchor = true): void {
 		if (!rootEl) return;
 		const rect = rootEl.getBoundingClientRect();
 		const layoutBase = resolveCachedCardGridLayoutBase({
@@ -828,7 +845,7 @@ export function useTwoHopProgressiveList(
 			),
 		};
 		if (isSameViewPlanLayout(layout, nextLayout)) return;
-		const anchor = captureLayoutAnchor();
+		const anchor = preserveAnchor ? captureLayoutAnchor() : null;
 		const nextGeometry = compileFixedGridLayout(document, nextLayout);
 		const nextMountedRowEnd = Math.min(plan.mountedRowEnd, nextGeometry.rowCount);
 		layout = nextLayout;
@@ -959,6 +976,10 @@ export function useTwoHopProgressiveList(
 			collectPositionDependencyElements(element, scrollContainer),
 		);
 		const observer = new ResizeObserver((entries) => {
+			const wasMeasurable =
+				previousRootInlineSize > 0 &&
+				(previousViewportClientHeight === undefined ||
+					previousViewportClientHeight > 0);
 			let viewportSizeChanged = false;
 			let positionDependencyChanged = false;
 			for (const entry of entries) {
@@ -970,7 +991,9 @@ export function useTwoHopProgressiveList(
 						entry.borderBoxSize?.[0]?.inlineSize ?? entry.contentRect.width;
 					if (inlineSize !== previousRootInlineSize) {
 						previousRootInlineSize = inlineSize;
-						measureLayout();
+						if (inlineSize > 0) {
+							measureLayout(wasMeasurable);
+						}
 					}
 				}
 
