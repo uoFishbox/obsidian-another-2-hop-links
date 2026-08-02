@@ -42,8 +42,11 @@ export interface PreviewRuntimeSurfaceOptions {
 
 export type PreviewRuntimeRendererOptions = Omit<
 	CardPreviewRendererOptions,
-	"app" | "getPreview" | "sharedCache" | "domCommitScheduler"
->;
+	"app" | "getPreview" | "sharedCache" | "domCommitScope"
+> & {
+	readonly frameCoordinator?: VirtualFrameCoordinator;
+	readonly getDomCommitsPerSecond?: () => number;
+};
 
 /**
  * Plugin-owned entry point for all preview surfaces and renderers.
@@ -80,6 +83,10 @@ export function createPreviewRuntime(options: PreviewRuntimeOptions): PreviewRun
 			return DISABLED_PREVIEW_SURFACE;
 		}
 
+		const domCommitScope = domCommitScheduler.createScope({
+			frameCoordinator: surfaceOptions.frameCoordinator,
+			getCommitsPerSecond: options.getDomCommitsPerSecond,
+		});
 		const surface = createVirtualPreviewSurface({
 			frameCoordinator: surfaceOptions.frameCoordinator,
 			activationScheduler,
@@ -88,11 +95,9 @@ export function createPreviewRuntime(options: PreviewRuntimeOptions): PreviewRun
 					app: options.app,
 					getPreview: options.getPreview,
 					sharedCache,
-					frameCoordinator: surfaceOptions.frameCoordinator,
-					getDomCommitsPerSecond: options.getDomCommitsPerSecond,
 					resolveSearchMatchPosition:
 						surfaceOptions.resolveSearchMatchPosition,
-					domCommitScheduler,
+					domCommitScope,
 				}),
 		});
 		let managedSurface!: VirtualPreviewSurface;
@@ -101,6 +106,7 @@ export function createPreviewRuntime(options: PreviewRuntimeOptions): PreviewRun
 			dispose: () => {
 				if (!surfaces.delete(managedSurface)) return;
 				surface.dispose();
+				domCommitScope.dispose();
 			},
 		};
 		surfaces.add(managedSurface);
@@ -111,15 +117,18 @@ export function createPreviewRuntime(options: PreviewRuntimeOptions): PreviewRun
 		rendererOptions: PreviewRuntimeRendererOptions,
 	): CardPreviewRenderer {
 		if (disposed) return DISABLED_CARD_PREVIEW_RENDERER;
+		const { frameCoordinator, getDomCommitsPerSecond, ...rest } = rendererOptions;
+		const domCommitScope = domCommitScheduler.createScope({
+			frameCoordinator,
+			getCommitsPerSecond:
+				getDomCommitsPerSecond ?? options.getDomCommitsPerSecond,
+		});
 		return createCardPreviewRenderer({
-			...rendererOptions,
+			...rest,
 			app: options.app,
 			getPreview: options.getPreview,
 			sharedCache,
-			getDomCommitsPerSecond:
-				rendererOptions.getDomCommitsPerSecond ??
-				options.getDomCommitsPerSecond,
-			domCommitScheduler,
+			domCommitScope,
 		});
 	}
 

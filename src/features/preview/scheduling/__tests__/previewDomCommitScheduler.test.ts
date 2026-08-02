@@ -10,6 +10,7 @@ import {
 } from "infrastructure/debug/CCLDevMeasurements";
 import {
 	createPreviewDomCommitScheduler,
+	type PreviewDomCommitScope,
 	type PreviewDomCommitTask,
 } from "../previewDomCommitScheduler";
 import type { VirtualFrameCoordinator } from "ui/virtualization/scheduling/frameCoordinator";
@@ -20,18 +21,20 @@ let frameIntervalMs = DEFAULT_FRAME_INTERVAL_MS;
 let frameTimestamp = 0;
 let frameTimeOrigin = 0;
 let defaultTestScheduler = createPreviewDomCommitScheduler();
+let defaultTestScope = defaultTestScheduler.createScope();
 
 function enqueuePreviewDomCommit(task: PreviewDomCommitTask) {
-	return defaultTestScheduler.enqueue(task);
+	return defaultTestScope.schedule(task);
 }
 
 function disposePreviewDomCommitScheduler(): void {
 	defaultTestScheduler.dispose();
 }
 
-function resetPreviewDomCommitSchedulerForTests(): void {
+function resetPreviewDomCommitSchedulerForTests(commitsPerSecond?: number): void {
 	defaultTestScheduler.dispose();
 	defaultTestScheduler = createPreviewDomCommitScheduler();
+	defaultTestScope = createTestScope(commitsPerSecond);
 }
 
 async function flushAnimationFrame(): Promise<void> {
@@ -45,11 +48,15 @@ interface EnqueueTestCommitOptions {
 	readonly isStale?: () => boolean;
 	readonly didMutateDom?: boolean;
 	readonly onCommit?: () => void;
-	readonly commitsPerSecond?: number;
+}
+
+function createTestScope(commitsPerSecond: number | undefined): PreviewDomCommitScope {
+	return defaultTestScheduler.createScope({
+		getCommitsPerSecond: commitsPerSecond ? () => commitsPerSecond : undefined,
+	});
 }
 
 function enqueueTestCommit(options: EnqueueTestCommitOptions): Promise<boolean> {
-	const commitsPerSecond = options.commitsPerSecond;
 	return enqueuePreviewDomCommit({
 		targetKey: options.targetKey,
 		isStale: options.isStale ?? (() => false),
@@ -57,8 +64,21 @@ function enqueueTestCommit(options: EnqueueTestCommitOptions): Promise<boolean> 
 			options.onCommit?.();
 			return options.didMutateDom ?? true;
 		},
-		getCommitsPerSecond: commitsPerSecond ? () => commitsPerSecond : undefined,
 	}).then((result) => result.type === "committed");
+}
+
+function createTestFrameCoordinator(scheduledTask: {
+	current: (() => void) | undefined;
+}): VirtualFrameCoordinator {
+	return {
+		schedule: vi.fn((_lane: string, _key: string, task: () => void) => {
+			scheduledTask.current = task;
+			return true;
+		}),
+		cancel: vi.fn(),
+		isScheduled: vi.fn(() => false),
+		dispose: vi.fn(),
+	};
 }
 
 async function countCommits(params: {
@@ -67,7 +87,7 @@ async function countCommits(params: {
 	readonly scrolling: boolean;
 	readonly commitsPerSecond?: number;
 }): Promise<number> {
-	resetPreviewDomCommitSchedulerForTests();
+	resetPreviewDomCommitSchedulerForTests(params.commitsPerSecond);
 	resetScrollActivityForTests();
 	frameIntervalMs = params.intervalMs;
 	let committed = 0;
@@ -76,12 +96,13 @@ async function countCommits(params: {
 		markScrollActivityActive(scrollSource);
 	}
 	for (let index = 0; index < 500; index += 1) {
-		void enqueueTestCommit({
+		void enqueuePreviewDomCommit({
 			targetKey: `preview-${index}`,
-			onCommit: () => {
+			isStale: () => false,
+			commit: () => {
 				committed += 1;
+				return true;
 			},
-			commitsPerSecond: params.commitsPerSecond,
 		});
 	}
 
@@ -125,14 +146,16 @@ describe("preview DOM commit scheduler", () => {
 	it("disposes one scheduler instance without settling another instance", async () => {
 		const first = createPreviewDomCommitScheduler();
 		const second = createPreviewDomCommitScheduler();
+		const firstScope = first.createScope();
+		const secondScope = second.createScope();
 		const firstCommit = vi.fn(() => true);
 		const secondCommit = vi.fn(() => true);
-		const firstResult = first.enqueue({
+		const firstResult = firstScope.schedule({
 			targetKey: "shared-target",
 			isStale: () => false,
 			commit: firstCommit,
 		});
-		const secondResult = second.enqueue({
+		const secondResult = secondScope.schedule({
 			targetKey: "shared-target",
 			isStale: () => false,
 			commit: secondCommit,
@@ -155,8 +178,9 @@ describe("preview DOM commit scheduler", () => {
 		const commit = vi.fn(() => true);
 		scheduler.dispose();
 
+		const scope = scheduler.createScope();
 		await expect(
-			scheduler.enqueue({
+			scope.schedule({
 				targetKey: "disposed-target",
 				isStale: () => false,
 				commit,
@@ -248,21 +272,15 @@ describe("preview DOM commit scheduler", () => {
 	});
 
 	it("delegates idle DOM commits to the surface frame coordinator", async () => {
-		let idleTask: (() => void) | undefined;
-		const frameCoordinator: VirtualFrameCoordinator = {
-			schedule: vi.fn((_lane, _key, task) => {
-				idleTask = task;
-				return true;
-			}),
-			cancel: vi.fn(),
-			isScheduled: vi.fn(() => false),
-			dispose: vi.fn(),
+		const scheduledTask: { current: (() => void) | undefined } = {
+			current: undefined,
 		};
-		const commit = enqueuePreviewDomCommit({
+		const frameCoordinator = createTestFrameCoordinator(scheduledTask);
+		const scope = defaultTestScheduler.createScope({ frameCoordinator });
+		const commit = scope.schedule({
 			targetKey: "preview-coordinated",
 			isStale: () => false,
 			commit: () => true,
-			frameCoordinator,
 		});
 
 		expect(frameCoordinator.schedule).toHaveBeenCalledWith(
@@ -271,63 +289,50 @@ describe("preview DOM commit scheduler", () => {
 			expect.any(Function),
 		);
 		expect(requestAnimationFrame).not.toHaveBeenCalled();
-		idleTask?.();
+		scheduledTask.current?.();
 
 		await expect(commit).resolves.toEqual({ type: "committed" });
 		expect(requestAnimationFrame).not.toHaveBeenCalled();
 	});
 
 	it("keeps coordinator partition state after its queue drains", async () => {
-		let scheduledTask: (() => void) | undefined;
-		const frameCoordinator: VirtualFrameCoordinator = {
-			schedule: vi.fn((_lane, _key, task) => {
-				scheduledTask = task;
-				return true;
-			}),
-			cancel: vi.fn(),
-			isScheduled: vi.fn(() => false),
-			dispose: vi.fn(),
+		const scheduledTask: { current: (() => void) | undefined } = {
+			current: undefined,
 		};
+		const frameCoordinator = createTestFrameCoordinator(scheduledTask);
+		const scope = defaultTestScheduler.createScope({ frameCoordinator });
 
-		const first = enqueuePreviewDomCommit({
+		const first = scope.schedule({
 			targetKey: "preview-persistent-first",
 			isStale: () => false,
 			commit: () => true,
-			frameCoordinator,
 		});
 		const firstDrainKey = vi.mocked(frameCoordinator.schedule).mock.calls[0]?.[1];
-		scheduledTask?.();
+		scheduledTask.current?.();
 		await expect(first).resolves.toEqual({ type: "committed" });
 
-		const second = enqueuePreviewDomCommit({
+		const second = scope.schedule({
 			targetKey: "preview-persistent-second",
 			isStale: () => false,
 			commit: () => true,
-			frameCoordinator,
 		});
 		const secondDrainKey = vi.mocked(frameCoordinator.schedule).mock.calls[1]?.[1];
 		expect(secondDrainKey).toBe(firstDrainKey);
-		scheduledTask?.();
+		scheduledTask.current?.();
 		await expect(second).resolves.toEqual({ type: "committed" });
 	});
 
 	it("delegates scrolling DOM commits to the post-paint lane", async () => {
 		markScrollActivityActive(scrollSource);
-		let postPaintTask: (() => void) | undefined;
-		const frameCoordinator: VirtualFrameCoordinator = {
-			schedule: vi.fn((_lane, _key, task) => {
-				postPaintTask = task;
-				return true;
-			}),
-			cancel: vi.fn(),
-			isScheduled: vi.fn(() => false),
-			dispose: vi.fn(),
+		const scheduledTask: { current: (() => void) | undefined } = {
+			current: undefined,
 		};
-		const commit = enqueuePreviewDomCommit({
+		const frameCoordinator = createTestFrameCoordinator(scheduledTask);
+		const scope = defaultTestScheduler.createScope({ frameCoordinator });
+		const commit = scope.schedule({
 			targetKey: "preview-coordinated-scroll",
 			isStale: () => false,
 			commit: () => true,
-			frameCoordinator,
 		});
 
 		expect(frameCoordinator.schedule).toHaveBeenCalledWith(
@@ -335,34 +340,28 @@ describe("preview DOM commit scheduler", () => {
 			expect.stringMatching(/^preview:dom-commit-drain:/),
 			expect.any(Function),
 		);
-		postPaintTask?.();
+		scheduledTask.current?.();
 
 		await expect(commit).resolves.toEqual({ type: "committed" });
 	});
 
 	it("does not immediately reschedule a scrolling partition only because its queue remains", () => {
 		markScrollActivityActive(scrollSource);
-		let postPaintTask: (() => void) | undefined;
-		const frameCoordinator: VirtualFrameCoordinator = {
-			schedule: vi.fn((_lane, _key, task) => {
-				postPaintTask = task;
-				return true;
-			}),
-			cancel: vi.fn(),
-			isScheduled: vi.fn(() => false),
-			dispose: vi.fn(),
+		const scheduledTask: { current: (() => void) | undefined } = {
+			current: undefined,
 		};
+		const frameCoordinator = createTestFrameCoordinator(scheduledTask);
+		const scope = defaultTestScheduler.createScope({ frameCoordinator });
 
 		for (const key of ["a", "b"]) {
-			void enqueuePreviewDomCommit({
+			void scope.schedule({
 				targetKey: `preview-${key}`,
 				isStale: () => false,
 				commit: () => true,
-				frameCoordinator,
 			});
 		}
 
-		postPaintTask?.();
+		scheduledTask.current?.();
 		expect(frameCoordinator.schedule).toHaveBeenCalledTimes(1);
 
 		vi.advanceTimersByTime(32);
@@ -378,24 +377,18 @@ describe("preview DOM commit scheduler", () => {
 		vi.stubGlobal("navigator", {
 			scheduling: { isInputPending },
 		});
-		let postPaintTask: (() => void) | undefined;
-		const frameCoordinator: VirtualFrameCoordinator = {
-			schedule: vi.fn((_lane, _key, task) => {
-				postPaintTask = task;
-				return true;
-			}),
-			cancel: vi.fn(),
-			isScheduled: vi.fn(() => false),
-			dispose: vi.fn(),
+		const scheduledTask: { current: (() => void) | undefined } = {
+			current: undefined,
 		};
+		const frameCoordinator = createTestFrameCoordinator(scheduledTask);
+		const scope = defaultTestScheduler.createScope({ frameCoordinator });
 
-		void enqueuePreviewDomCommit({
+		void scope.schedule({
 			targetKey: "preview-input-pending",
 			isStale: () => false,
 			commit: () => true,
-			frameCoordinator,
 		});
-		postPaintTask?.();
+		scheduledTask.current?.();
 
 		expect(isInputPending).toHaveBeenCalledOnce();
 		expect(frameCoordinator.schedule).toHaveBeenCalledTimes(1);
@@ -612,47 +605,39 @@ describe("preview DOM commit scheduler", () => {
 	});
 
 	it("keeps coordinator drains isolated to their own surface", async () => {
-		let firstIdleTask: (() => void) | undefined;
-		let secondIdleTask: (() => void) | undefined;
-		const firstCoordinator: VirtualFrameCoordinator = {
-			schedule: vi.fn((_lane, _key, task) => {
-				firstIdleTask = task;
-				return true;
-			}),
-			cancel: vi.fn(),
-			isScheduled: vi.fn(() => false),
-			dispose: vi.fn(),
+		const firstScheduled: { current: (() => void) | undefined } = {
+			current: undefined,
 		};
-		const secondCoordinator: VirtualFrameCoordinator = {
-			schedule: vi.fn((_lane, _key, task) => {
-				secondIdleTask = task;
-				return true;
-			}),
-			cancel: vi.fn(),
-			isScheduled: vi.fn(() => false),
-			dispose: vi.fn(),
+		const secondScheduled: { current: (() => void) | undefined } = {
+			current: undefined,
 		};
+		const firstCoordinator = createTestFrameCoordinator(firstScheduled);
+		const secondCoordinator = createTestFrameCoordinator(secondScheduled);
+		const firstScope = defaultTestScheduler.createScope({
+			frameCoordinator: firstCoordinator,
+		});
+		const secondScope = defaultTestScheduler.createScope({
+			frameCoordinator: secondCoordinator,
+		});
 		const committed: string[] = [];
-		const first = enqueuePreviewDomCommit({
+		const first = firstScope.schedule({
 			targetKey: "preview-first",
 			isStale: () => false,
 			commit: () => {
 				committed.push("first");
 				return true;
 			},
-			frameCoordinator: firstCoordinator,
 		});
-		const second = enqueuePreviewDomCommit({
+		const second = secondScope.schedule({
 			targetKey: "preview-second",
 			isStale: () => false,
 			commit: () => {
 				committed.push("second");
 				return true;
 			},
-			frameCoordinator: secondCoordinator,
 		});
 
-		firstIdleTask?.();
+		firstScheduled.current?.();
 		await expect(first).resolves.toEqual({ type: "committed" });
 		expect(committed).toEqual(["first"]);
 		let secondSettled = false;
@@ -662,9 +647,123 @@ describe("preview DOM commit scheduler", () => {
 		await Promise.resolve();
 		expect(secondSettled).toBe(false);
 
-		secondIdleTask?.();
+		secondScheduled.current?.();
 		await expect(second).resolves.toEqual({ type: "committed" });
 		expect(committed).toEqual(["first", "second"]);
+	});
+
+	it("settles pending commits when its scope is disposed", async () => {
+		const commit = enqueueTestCommit({ targetKey: "preview-pending" });
+
+		defaultTestScope.dispose();
+
+		await expect(commit).resolves.toBe(false);
+	});
+
+	it("does not settle another scope's pending commits", async () => {
+		const firstScope = defaultTestScheduler.createScope();
+		const secondScope = defaultTestScheduler.createScope();
+		const firstCommit = firstScope.schedule({
+			targetKey: "preview-disposed",
+			isStale: () => false,
+			commit: () => true,
+		});
+		const secondCommit = secondScope.schedule({
+			targetKey: "preview-kept",
+			isStale: () => false,
+			commit: () => true,
+		});
+
+		firstScope.dispose();
+		await expect(firstCommit).resolves.toEqual({
+			type: "skipped",
+			reason: "disposed",
+		});
+		await flushAnimationFrame();
+		await expect(secondCommit).resolves.toEqual({ type: "committed" });
+	});
+
+	it("releases a coordinator partition when its last scope is disposed", async () => {
+		const scheduledTask: { current: (() => void) | undefined } = {
+			current: undefined,
+		};
+		const frameCoordinator = createTestFrameCoordinator(scheduledTask);
+		const firstScope = defaultTestScheduler.createScope({ frameCoordinator });
+		firstScope.schedule({
+			targetKey: "preview-released",
+			isStale: () => false,
+			commit: () => true,
+		});
+		const firstDrainKey = vi.mocked(frameCoordinator.schedule).mock.calls[0]?.[1];
+
+		firstScope.dispose();
+		expect(frameCoordinator.cancel).toHaveBeenCalled();
+
+		const secondScope = defaultTestScheduler.createScope({ frameCoordinator });
+		secondScope.schedule({
+			targetKey: "preview-recreated",
+			isStale: () => false,
+			commit: () => true,
+		});
+		const secondDrainKey = vi.mocked(frameCoordinator.schedule).mock.calls[1]?.[1];
+		expect(secondDrainKey).not.toBe(firstDrainKey);
+	});
+
+	it("keeps a shared coordinator partition alive while one scope remains", async () => {
+		const scheduledTask: { current: (() => void) | undefined } = {
+			current: undefined,
+		};
+		const frameCoordinator = createTestFrameCoordinator(scheduledTask);
+		const firstScope = defaultTestScheduler.createScope({ frameCoordinator });
+		const secondScope = defaultTestScheduler.createScope({ frameCoordinator });
+		const first = firstScope.schedule({
+			targetKey: "preview-disposed-first",
+			isStale: () => false,
+			commit: () => true,
+		});
+		const second = secondScope.schedule({
+			targetKey: "preview-kept-second",
+			isStale: () => false,
+			commit: () => true,
+		});
+		const drainKey = vi.mocked(frameCoordinator.schedule).mock.calls[0]?.[1];
+
+		firstScope.dispose();
+		expect(frameCoordinator.cancel).not.toHaveBeenCalled();
+		await expect(first).resolves.toEqual({
+			type: "skipped",
+			reason: "disposed",
+		});
+
+		scheduledTask.current?.();
+		await expect(second).resolves.toEqual({ type: "committed" });
+
+		const third = secondScope.schedule({
+			targetKey: "preview-kept-third",
+			isStale: () => false,
+			commit: () => true,
+		});
+		const secondDrainKey = vi.mocked(frameCoordinator.schedule).mock.calls[1]?.[1];
+		expect(secondDrainKey).toBe(drainKey);
+		scheduledTask.current?.();
+		await expect(third).resolves.toEqual({ type: "committed" });
+	});
+
+	it("releases the fallback partition when its last scope is disposed", async () => {
+		enqueueTestCommit({ targetKey: "preview-fallback" });
+		expect(requestAnimationFrame).toHaveBeenCalledTimes(1);
+
+		defaultTestScope.dispose();
+		await flushAnimationFrame();
+		expect(requestAnimationFrame).toHaveBeenCalledTimes(1);
+
+		const recreatedScope = defaultTestScheduler.createScope();
+		recreatedScope.schedule({
+			targetKey: "preview-recreated-fallback",
+			isStale: () => false,
+			commit: () => true,
+		});
+		expect(requestAnimationFrame).toHaveBeenCalledTimes(2);
 	});
 
 	it("reports why a DOM commit was skipped", async () => {

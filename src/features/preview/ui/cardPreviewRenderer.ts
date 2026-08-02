@@ -3,14 +3,13 @@ import { enqueueMathRender } from "features/preview/renderers/mathRenderQueue";
 import { enqueuePreviewRender } from "features/preview/renderers/previewRenderQueue";
 import { processPreviewContent } from "features/preview/renderers/markdownPreviewRenderer";
 import {
-	type PreviewDomCommitScheduler,
+	type PreviewDomCommitScope,
 	type PreviewDomCommitTask,
 } from "features/preview/scheduling/previewDomCommitScheduler";
 import { toPreviewImageSrc } from "features/preview/renderers/externalImageSource";
 import type { PreviewContentAnalysis } from "features/preview/core/previewContent";
 import type { PreviewData, PreviewRequestOptions } from "features/preview/public-types";
 import { syncMathJaxStylesForNode } from "ui/shared/dom/mathJaxShadowStyles";
-import type { VirtualFrameCoordinator } from "ui/virtualization/scheduling/frameCoordinator";
 import { isAbortError, throwIfAborted } from "features/preview/core/previewAbort";
 import { normalizePreviewQuery } from "features/preview/core/previewRenderKeys";
 import {
@@ -40,10 +39,7 @@ export type CardPreviewLoader = (
 export interface CardPreviewRendererOptions {
 	app: App;
 	getPreview: CardPreviewLoader;
-	frameCoordinator?: VirtualFrameCoordinator;
-	/** Resolves the scrolling DOM commit rate dynamically. */
-	getDomCommitsPerSecond?: () => number;
-	domCommitScheduler: PreviewDomCommitScheduler;
+	domCommitScope: PreviewDomCommitScope;
 	sharedCache: CardPreviewSharedCache;
 	resolveSearchMatchPosition?: (
 		query: string,
@@ -82,11 +78,7 @@ export function createCardPreviewRenderer(
 	const enqueueCoordinatedDomCommit = async (
 		task: PreviewDomCommitTask,
 	): Promise<boolean> => {
-		const result = await options.domCommitScheduler.enqueue({
-			...task,
-			frameCoordinator: options.frameCoordinator,
-			getCommitsPerSecond: options.getDomCommitsPerSecond,
-		});
+		const result = await options.domCommitScope.schedule(task);
 		return result.type === "committed";
 	};
 
