@@ -1,5 +1,4 @@
 <script lang="ts">
-	import type { PluginSettings } from "features/settings/model";
 	import { type TFile } from "obsidian";
 	import Icon from "ui/components/common/Icon.svelte";
 	import { type IconName } from "ui/shared/icons/iconRegistry";
@@ -23,7 +22,6 @@
 		children?: Snippet;
 		className?: string;
 		extension?: string;
-		settings: PluginSettings;
 		directory?: string | null;
 		file?: TFile | null;
 		searchQuery?: string;
@@ -39,7 +37,6 @@
 		children,
 		className = "",
 		extension,
-		settings,
 		directory = null,
 		file = null,
 		searchQuery = "",

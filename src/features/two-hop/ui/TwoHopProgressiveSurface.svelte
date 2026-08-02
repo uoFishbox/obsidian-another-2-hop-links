@@ -44,7 +44,6 @@
 						<TwoHopProgressiveRow
 							{row}
 							layout={list.layout}
-							applicationStore={props.applicationStore}
 							registerCardModelConsumer={list.registerCardModelConsumer}
 							registerPreviewRow={list.registerPreviewRow}
 							onLoadMore={list.loadMore}

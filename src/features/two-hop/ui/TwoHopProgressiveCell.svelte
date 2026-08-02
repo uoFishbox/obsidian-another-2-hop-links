@@ -5,7 +5,6 @@
 	import VirtualListLoadMoreButton from "ui/virtualization/components/VirtualListLoadMoreButton.svelte";
 	import PreviewHost from "features/preview/ui/PreviewHost.svelte";
 	import UnresolvedPreviewPlaceholder from "features/preview/ui/UnresolvedPreviewPlaceholder.svelte";
-	import type { ApplicationStore } from "ui/stores/ApplicationStore.svelte";
 	import type { CardRenderModel } from "ui/components/items/cardRenderModel";
 	import type { IconName } from "ui/shared/icons/iconRegistry";
 	import type { TwoHopProgressiveCell } from "features/two-hop/ui/twoHopProgressivePlan";
@@ -15,7 +14,6 @@
 
 	interface Props {
 		cell: TwoHopProgressiveCell;
-		applicationStore: ApplicationStore;
 		previewCandidate: boolean;
 		registerCardModelConsumer: (
 			logicalKey: string,
@@ -24,13 +22,8 @@
 		onLoadMore: (sectionId: string) => void;
 	}
 
-	let {
-		cell,
-		applicationStore,
-		previewCandidate,
-		registerCardModelConsumer,
-		onLoadMore,
-	}: Props = $props();
+	let { cell, previewCandidate, registerCardModelConsumer, onLoadMore }: Props =
+		$props();
 	let cardModel = $state.raw<CardRenderModel | undefined>(undefined);
 
 	$effect(() => {
@@ -116,7 +109,6 @@
 		draggable={true}
 		className={model.className ?? undefined}
 		directory={model.directory}
-		settings={applicationStore.settings}
 		searchQuery={model.searchQuery}
 		presentation={model.presentation}
 	>

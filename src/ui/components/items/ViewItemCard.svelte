@@ -39,7 +39,6 @@
 		{draggable}
 		className={renderState.className ?? undefined}
 		directory={renderState.directory}
-		{settings}
 		searchQuery={renderState.searchQuery}
 		presentation={renderState.presentation}
 	>

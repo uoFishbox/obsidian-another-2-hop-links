@@ -1,7 +1,6 @@
 import { render, screen } from "@testing-library/svelte";
 import { describe, expect, it, vi } from "vitest";
 import LinkItem from "../LinkItem.svelte";
-import { DEFAULT_SETTINGS } from "features/settings/model";
 
 vi.mock("obsidian", () => ({
 	Platform: {
@@ -18,7 +17,6 @@ describe("LinkItem", () => {
 				ariaLabel: "alpha",
 				interactionId: "item:file:notes/alpha.md",
 				interactionKind: "item",
-				settings: DEFAULT_SETTINGS,
 				searchQuery: "",
 			},
 		});
@@ -37,7 +35,6 @@ describe("LinkItem", () => {
 				ariaLabel: "search result",
 				interactionId: "item:file:notes/search.md",
 				interactionKind: "item",
-				settings: DEFAULT_SETTINGS,
 				searchQuery: "search",
 			},
 		});
@@ -57,7 +54,6 @@ describe("LinkItem", () => {
 				ariaLabel: "diagram",
 				interactionId: "item:file:notes/diagram.canvas",
 				interactionKind: "item",
-				settings: DEFAULT_SETTINGS,
 				extension: "canvas",
 			},
 		});
@@ -74,7 +70,6 @@ describe("LinkItem", () => {
 				ariaLabel: "alpha",
 				interactionId: "item:file:notes/alpha.md",
 				interactionKind: "item",
-				settings: DEFAULT_SETTINGS,
 			},
 		});
 
@@ -90,7 +85,6 @@ describe("LinkItem", () => {
 				ariaLabel: "alpha",
 				interactionId: "item:file:notes/alpha.md",
 				interactionKind: "item",
-				settings: DEFAULT_SETTINGS,
 				draggable: false,
 			},
 		});
@@ -107,7 +101,6 @@ describe("LinkItem", () => {
 			ariaLabel: "alpha",
 			interactionId: "item:new-link:alpha",
 			interactionKind: "item" as const,
-			settings: DEFAULT_SETTINGS,
 		};
 		const { container, rerender } = render(LinkItem, {
 			props: {

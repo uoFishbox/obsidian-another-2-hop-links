@@ -1,5 +1,4 @@
 <script lang="ts">
-	import type { ApplicationStore } from "ui/stores/ApplicationStore.svelte";
 	import type { CardRenderModel } from "ui/components/items/cardRenderModel";
 	import type { ViewPlanLayoutMetrics } from "ui/virtualization/svelte/viewPlanLayout";
 	import type { TwoHopProgressiveRow } from "features/two-hop/ui/twoHopProgressivePlan";
@@ -8,7 +7,6 @@
 	interface Props {
 		row: TwoHopProgressiveRow;
 		layout: ViewPlanLayoutMetrics;
-		applicationStore: ApplicationStore;
 		registerCardModelConsumer: (
 			logicalKey: string,
 			consumer: (model: CardRenderModel | undefined) => void,
@@ -23,7 +21,6 @@
 	let {
 		row,
 		layout,
-		applicationStore,
 		registerCardModelConsumer,
 		registerPreviewRow,
 		onLoadMore,
@@ -54,7 +51,6 @@
 		>
 			<TwoHopProgressiveCell
 				{cell}
-				{applicationStore}
 				{previewCandidate}
 				{registerCardModelConsumer}
 				{onLoadMore}
