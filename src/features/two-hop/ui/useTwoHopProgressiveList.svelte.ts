@@ -35,7 +35,10 @@ import type {
 	VirtualPreviewSurface,
 } from "features/preview/scheduling/virtualPreviewSurface";
 import type { VirtualFrameCoordinator } from "ui/virtualization/scheduling/frameCoordinator";
-import { createVirtualCardInteractionController } from "ui/interactions/virtualCardInteractionController";
+import {
+	createVirtualCardInteractionController,
+	type VirtualCardInteractionBinding,
+} from "ui/interactions/virtualCardInteractionController";
 import { createResolvedCardLayoutSettingsMemo } from "ui/shared/layout/cardLayoutCssVars";
 import { resolveCachedCardGridLayoutBase } from "ui/virtualization/dom/virtualListCardLayout";
 import {
@@ -397,6 +400,7 @@ export function useTwoHopProgressiveList(
 		const startedAt = performance.now();
 		let processedCount = 0;
 		let activePreviewHydrationChanged = false;
+		const enteredInteractionSlots: VirtualCardInteractionBinding[] = [];
 		while (
 			hasPendingHydration(queue) &&
 			processedCount < MAX_MODELS_PER_DRAIN &&
@@ -426,17 +430,18 @@ export function useTwoHopProgressiveList(
 				activePreviewHydrationChanged = true;
 			}
 			if (model.interactionDescriptor) {
-				interactionController.syncCardDelta({
-					enteredSlots: [
-						{
-							slotId: entry.logicalKey,
-							descriptor: model.interactionDescriptor,
-						},
-					],
-					reboundSlots: [],
-					releasedSlots: [],
+				enteredInteractionSlots.push({
+					slotId: entry.logicalKey,
+					descriptor: model.interactionDescriptor,
 				});
 			}
+		}
+		if (enteredInteractionSlots.length > 0) {
+			interactionController.syncCardDelta({
+				enteredSlots: enteredInteractionSlots,
+				reboundSlots: [],
+				releasedSlots: [],
+			});
 		}
 		compactHydrationQueue(queue);
 		if (
