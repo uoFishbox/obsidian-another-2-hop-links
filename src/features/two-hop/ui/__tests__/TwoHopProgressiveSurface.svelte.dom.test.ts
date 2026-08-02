@@ -18,6 +18,8 @@ import { createSectionDataRevision } from "features/two-hop/ui/twoHopRevisions";
 import { findNearestScrollContainer } from "ui/virtualization/dom/scrollContainer";
 import {
 	isScrollActivityActive,
+	markScrollActivityActive,
+	markScrollActivityIdle,
 	resetScrollActivityForTests,
 } from "ui/virtualization/scheduling/scrollActivity";
 import {
@@ -78,6 +80,84 @@ afterEach(() => {
 });
 
 describe("TwoHopProgressiveSurface", () => {
+	it("hydrates visible cards through post-paint while scrolling blocks idle work", async () => {
+		const originalRequestIdleCallback = window.requestIdleCallback;
+		const originalCancelIdleCallback = window.cancelIdleCallback;
+		const requestIdleCallback = vi.fn(() => 41);
+		window.requestIdleCallback = requestIdleCallback;
+		window.cancelIdleCallback = vi.fn();
+		const scrollSource = {};
+		markScrollActivityActive(scrollSource);
+		const applicationStore = {
+			settings: {
+				...DEFAULT_SETTINGS,
+				cardWidthPx: 100,
+				cardHeightRatio: 1,
+				cardMaxColumns: 3,
+			},
+		} as unknown as ApplicationStore;
+		const resolveItemCardModel = vi.fn(
+			(
+				item: TwoHopVirtualListItem,
+				presentation: TwoHopCardPresentationState,
+			): CardRenderModel => ({
+				item: item.item,
+				targetFile: null,
+				title: item.virtualKey,
+				ariaLabel: item.virtualKey,
+				className: null,
+				extension: null,
+				directory: null,
+				interactionId: item.virtualKey,
+				interactionKey: item.virtualKey,
+				interactionDescriptor: null,
+				presentation,
+				searchQuery: "",
+				previewRequest: null,
+			}),
+		);
+		const scroller = document.createElement("div");
+		scroller.style.overflow = "auto";
+		setNumericProperty(scroller, "clientHeight", 300);
+		setNumericProperty(scroller, "scrollHeight", 20_000);
+		setElementRect(scroller, { top: 0, width: 320, height: 300 });
+		document.body.append(scroller);
+
+		let unmount: (() => void) | undefined;
+		try {
+			const rendered = render(TwoHopProgressiveSurfaceHarness, {
+				target: scroller,
+				props: {
+					sections: [createSection(100)],
+					applicationStore,
+					linkContext: { getPreview: vi.fn() } as unknown as LinkContext,
+					resolveItemCardModel,
+				},
+			});
+			unmount = rendered.unmount;
+			const { container } = rendered;
+			const root = container.querySelector<HTMLElement>(
+				".twohop-progressive-surface",
+			);
+			if (!root) throw new Error("Progressive surface was not rendered");
+			setElementRect(root, { top: 0, width: 320, height: 20_000 });
+			triggerResize(root, 320, 20_000);
+
+			await flushFrames();
+			await vi.waitFor(() => expect(resolveItemCardModel).toHaveBeenCalled());
+
+			expect(requestIdleCallback).not.toHaveBeenCalled();
+			expect(
+				root.shadowRoot?.querySelectorAll(".twohop-card-shell").length,
+			).toBeLessThan(100);
+		} finally {
+			unmount?.();
+			markScrollActivityIdle(scrollSource);
+			window.requestIdleCallback = originalRequestIdleCallback;
+			window.cancelIdleCallback = originalCancelIdleCallback;
+		}
+	});
+
 	it("hydrates lazily, appends one chunk, and coalesces ordinary scroll events", async () => {
 		const targetFile = {
 			path: "notes/preview.md",
@@ -152,7 +232,7 @@ describe("TwoHopProgressiveSurface", () => {
 		setElementRect(root, { top: 0, width: 320, height: 20_000 });
 		triggerResize(root, 320, 20_000);
 		await flushFrames();
-		expect(resolveItemCardModel).toHaveBeenCalled();
+		await vi.waitFor(() => expect(resolveItemCardModel).toHaveBeenCalled());
 		const hydratedCount = resolveItemCardModel.mock.calls.length;
 		const chunkCount = root.shadowRoot?.querySelectorAll(
 			".twohop-progressive-chunk",
@@ -255,6 +335,10 @@ describe("TwoHopProgressiveSurface", () => {
 		);
 		if (!root) throw new Error("Progressive surface was not rendered");
 		await flushFrames();
+		await vi.waitFor(() => {
+			const frame = publish.mock.lastCall?.[0] as PreviewFrame | undefined;
+			expect(frame?.previewBindingsBySlot.size).toBeGreaterThan(0);
+		});
 		const initialFrame = publish.mock.lastCall?.[0] as PreviewFrame | undefined;
 		if (!initialFrame) throw new Error("Initial preview frame was not published");
 		publish.mockClear();
@@ -274,9 +358,10 @@ describe("TwoHopProgressiveSurface", () => {
 			resolveItemCardModel.mock.calls.length;
 		publish.mockClear();
 		triggerIntersection(appendedChunk);
-		await flushFrames();
-		expect(resolveItemCardModel.mock.calls.length).toBeGreaterThan(
-			hydratedCountBeforeOffscreenChunk,
+		await vi.waitFor(() =>
+			expect(resolveItemCardModel.mock.calls.length).toBeGreaterThan(
+				hydratedCountBeforeOffscreenChunk,
+			),
 		);
 		expect(publish).not.toHaveBeenCalled();
 

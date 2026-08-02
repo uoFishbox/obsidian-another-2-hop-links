@@ -133,4 +133,32 @@ describe("createVirtualFrameCoordinator", () => {
 		expect(task).toHaveBeenCalledOnce();
 		coordinator.dispose();
 	});
+
+	it("runs idle work through the watchdog when idle callbacks starve", async () => {
+		vi.useFakeTimers();
+		const requestIdleCallback = vi.fn(() => 17);
+		const cancelIdleCallback = vi.fn();
+		const ownerWindow = {
+			requestIdleCallback,
+			cancelIdleCallback,
+			setTimeout: window.setTimeout.bind(window),
+			clearTimeout: window.clearTimeout.bind(window),
+		} as unknown as Window;
+		const coordinator = createVirtualFrameCoordinator({
+			getWindow: () => ownerWindow,
+		});
+		const task = vi.fn();
+
+		coordinator.schedule("idle", "hydration", task);
+		await vi.advanceTimersByTimeAsync(49);
+		expect(task).not.toHaveBeenCalled();
+		await vi.advanceTimersByTimeAsync(1);
+
+		expect(requestIdleCallback).toHaveBeenCalledWith(expect.any(Function), {
+			timeout: 50,
+		});
+		expect(cancelIdleCallback).toHaveBeenCalledWith(17);
+		expect(task).toHaveBeenCalledOnce();
+		coordinator.dispose();
+	});
 });

@@ -22,6 +22,7 @@ export interface CoordinatedScheduledTask {
 const CRITICAL_BUDGET_MS = 2;
 const POST_PAINT_BUDGET_MS = 2;
 const IDLE_BUDGET_MS = 2;
+const IDLE_CALLBACK_TIMEOUT_MS = 50;
 
 /** Creates one scheduler boundary for all work owned by a virtual surface. */
 export function createVirtualFrameCoordinator(
@@ -40,6 +41,7 @@ export function createVirtualFrameCoordinator(
 	let postPaintUsesAnimationFrame = false;
 	let postPaintTaskHandle: number | null = null;
 	let idleHandle: number | null = null;
+	let idleWatchdogHandle: number | null = null;
 	let idleUsesCallback = false;
 	let disposed = false;
 	const scheduledKeysScratch: string[] = [];
@@ -138,25 +140,52 @@ export function createVirtualFrameCoordinator(
 		}
 		const ownerWindow = resolveWindow();
 		if (!ownerWindow) return;
-		const drain = (): void => {
-			idleHandle = null;
+		const runIdleTasks = (): void => {
 			if (isScrollActivityActive()) return;
 			runLane("idle", IDLE_BUDGET_MS, 1);
 			if (queues.idle.size > 0) scheduleIdleDrain();
 		};
 		if (typeof ownerWindow.requestIdleCallback === "function") {
 			idleUsesCallback = true;
-			idleHandle = ownerWindow.requestIdleCallback(drain, { timeout: 50 });
+			let requestHandle: number | undefined;
+			const drainFromIdleCallback = (): void => {
+				if (requestHandle === undefined || idleHandle !== requestHandle) return;
+				idleHandle = null;
+				if (idleWatchdogHandle !== null) {
+					ownerWindow.clearTimeout(idleWatchdogHandle);
+					idleWatchdogHandle = null;
+				}
+				runIdleTasks();
+			};
+			requestHandle = ownerWindow.requestIdleCallback(drainFromIdleCallback, {
+				timeout: IDLE_CALLBACK_TIMEOUT_MS,
+			});
+			idleHandle = requestHandle;
+			const watchdogHandle = ownerWindow.setTimeout(() => {
+				if (
+					idleWatchdogHandle !== watchdogHandle ||
+					idleHandle !== requestHandle
+				) {
+					return;
+				}
+				idleWatchdogHandle = null;
+				ownerWindow.cancelIdleCallback(requestHandle);
+				idleHandle = null;
+				runIdleTasks();
+			}, IDLE_CALLBACK_TIMEOUT_MS);
+			idleWatchdogHandle = watchdogHandle;
 			return;
 		}
 		idleUsesCallback = false;
-		idleHandle = ownerWindow.setTimeout(drain, 0);
+		idleHandle = ownerWindow.setTimeout(() => {
+			idleHandle = null;
+			runIdleTasks();
+		}, 0);
 	}
 
 	function cancelIdleDrain(): void {
-		if (idleHandle === null) return;
 		const ownerWindow = resolveWindow();
-		if (ownerWindow) {
+		if (ownerWindow && idleHandle !== null) {
 			if (
 				idleUsesCallback &&
 				typeof ownerWindow.cancelIdleCallback === "function"
@@ -166,7 +195,11 @@ export function createVirtualFrameCoordinator(
 				ownerWindow.clearTimeout(idleHandle);
 			}
 		}
+		if (ownerWindow && idleWatchdogHandle !== null) {
+			ownerWindow.clearTimeout(idleWatchdogHandle);
+		}
 		idleHandle = null;
+		idleWatchdogHandle = null;
 	}
 
 	const unsubscribeScrollActivity = subscribeScrollActivity((isActive) => {
