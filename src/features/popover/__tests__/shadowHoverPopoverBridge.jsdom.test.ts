@@ -28,7 +28,7 @@ const {
 	),
 }));
 
-vi.mock("features/preview/shadow-hover/controller", () => ({
+vi.mock("features/popover/shadow-hover/controller", () => ({
 	ShadowHoverControllerImpl: class MockShadowHoverControllerImpl {
 		handleDelegatedEnter = handleDelegatedEnterMock;
 		handleDelegatedAnchorSync = handleDelegatedAnchorSyncMock;

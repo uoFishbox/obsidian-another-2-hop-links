@@ -29,5 +29,3 @@ export type PreviewData =
 export interface PreviewRequestOptions {
 	cacheRevision?: number | string;
 }
-
-export type HighlightMode = "auto" | "force" | "suppress";

@@ -10,7 +10,7 @@ import {
 	getShadowDesktopHoverDebugState,
 	getShadowDesktopHoverParentForDebug,
 	setShadowDesktopExperimentalKeepAlive,
-} from "features/preview/interactions/mobilePopover";
+} from "features/popover/mobilePopover";
 import {
 	freezePopoverForDebug,
 	getCCLDebugAutoFreeze,

@@ -3,7 +3,7 @@ import { CANVAS_NOTE_DRAG_FORMAT } from "../../appConstants";
 import { dispatchItemClick, dispatchItemHover } from "ui/handlers/linkItemHandlers";
 import type { AppContext, LinkContext } from "ui/context/linkContext";
 import { handleKeyboardActivation } from "ui/shared/input/keyboard";
-import { createHoverPreviewMouseEvent } from "features/preview/interactions/hoverPopoverTarget";
+import { createHoverPreviewMouseEvent } from "features/popover/hoverPopoverTarget";
 import type { InteractionRegistry } from "./interactionRegistry";
 import {
 	clearInteractionLongPressed,

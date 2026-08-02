@@ -3,13 +3,11 @@ import type { TwoHopIndexedLink } from "types/domain";
 import { createContext } from "svelte";
 import type { ApplicationStore } from "ui/stores/ApplicationStore.svelte";
 import type {
-	HighlightMode,
 	PreviewData,
 	PreviewRequestOptions,
 } from "features/preview/public-types";
 import type { PreviewRuntime } from "features/preview/runtime/previewRuntime";
 export type {
-	HighlightMode,
 	PreviewData,
 	PreviewDomRenderer,
 	PreviewRequestOptions,
@@ -22,6 +20,8 @@ export interface BookmarksState {
 	orderedFilePaths: string[];
 	isBookmarked: (path: string | null | undefined) => boolean;
 }
+
+export type HighlightMode = "auto" | "force" | "suppress";
 
 export interface LinkInteractionOptions {
 	highlightMode?: HighlightMode;

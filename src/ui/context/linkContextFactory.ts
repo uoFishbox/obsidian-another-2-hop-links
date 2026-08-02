@@ -9,9 +9,9 @@ import type {
 } from "types";
 import type { HighlightMode, LinkContext, LinkInteractionOptions } from "./linkContext";
 import type { PluginSettings } from "features/settings/model";
-import { triggerHoverPopover } from "features/preview/interactions/mobilePopover";
+import { triggerHoverPopover } from "features/popover/mobilePopover";
 import type { PluginHost } from "types/pluginHost";
-import { shouldHighlight } from "features/preview/interactions/highlightUtils";
+import { shouldHighlight } from "ui/interactions/highlightUtils";
 import { buildDragLinkFormat } from "application/presenters/linkHelper";
 import { handleTagClick } from "ui/handlers/viewHandlers";
 import { hydrateRuntimeBacklinkLink } from "./runtimeBacklinkPositionResolver";

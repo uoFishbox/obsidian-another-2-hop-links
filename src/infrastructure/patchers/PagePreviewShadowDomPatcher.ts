@@ -2,7 +2,7 @@ import type { PluginHost } from "types/pluginHost";
 import {
 	disposeShadowHoverPopoverProxies,
 	normalizeHoverPopoverTargetEl,
-} from "features/preview/interactions/hoverPopoverTarget";
+} from "features/popover/hoverPopoverTarget";
 import { enableLogging, logger } from "shared/logging/logger";
 import { ObsidianInternalFacade } from "infrastructure/capabilities/ObsidianInternalFacade";
 import type { PatchRegistry } from "infrastructure/capabilities/PatchRegistry";

@@ -5,7 +5,7 @@ import { resolveDescriptorInteractionOptions } from "ui/interactions/interaction
 import {
 	buildHoverPopoverLinkSpec,
 	type HoverPopoverLinkSpec,
-} from "features/preview/interactions/hoverPopoverLinkSpec";
+} from "features/popover/hoverPopoverLinkSpec";
 import { hydrateRuntimeBacklinkLink } from "ui/context/runtimeBacklinkPositionResolver";
 
 export function buildShadowHoverLinkSpec(

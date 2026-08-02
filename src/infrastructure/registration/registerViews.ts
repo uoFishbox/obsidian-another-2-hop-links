@@ -11,7 +11,7 @@ import { TagNotesView, VIEW_TYPE_TAG_NOTES } from "features/tag-notes/ui/TagNote
 import {
 	COSENSE_CARD_LINKS_HOVER_SOURCE_DISPLAY,
 	COSENSE_CARD_LINKS_HOVER_SOURCE_ID,
-} from "features/preview/interactions/hoverPopoverLinkSpec";
+} from "features/popover/hoverPopoverLinkSpec";
 
 export function registerViews(plugin: PluginHostUi): void {
 	plugin.registerView(

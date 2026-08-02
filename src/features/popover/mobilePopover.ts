@@ -3,7 +3,7 @@ import { type TFile, Platform, type Workspace } from "obsidian";
 import type { TwoHopIndexedLink } from "types";
 import type { PluginSettings } from "features/settings/model";
 import type { PluginHost } from "types/pluginHost";
-import type { HighlightMode } from "../public-types";
+import type { HighlightMode } from "ui/context/linkContext";
 import {
 	normalizeHoverPopoverTargetEl,
 	resolveHoverPopoverTargetElement,

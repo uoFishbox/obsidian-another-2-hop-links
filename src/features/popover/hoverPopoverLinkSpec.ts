@@ -1,7 +1,7 @@
 import type { TFile } from "obsidian";
 import type { TwoHopIndexedLink } from "types";
 import type { InteractionSettings } from "ui/interactions/interactionTypes";
-import type { HighlightMode } from "../public-types";
+import type { HighlightMode } from "ui/context/linkContext";
 import { isAdvancedCanvasPosition } from "core/rules/fileRules";
 
 export const COSENSE_CARD_LINKS_HOVER_SOURCE_ID = "cosense-card-links";

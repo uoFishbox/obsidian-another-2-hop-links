@@ -10,9 +10,9 @@ import {
 	findMatchingElementInComposedPath,
 } from "ui/shared/dom/shadowDom";
 import { enableLogging, logger } from "shared/logging/logger";
-import { ShadowHoverControllerImpl } from "features/preview/shadow-hover/controller";
-import { WorkspaceTriggerPopoverLauncher } from "features/preview/shadow-hover/launcher";
-import { COSENSE_CARD_LINKS_HOVER_SOURCE_ID } from "features/preview/interactions/hoverPopoverLinkSpec";
+import { ShadowHoverControllerImpl } from "features/popover/shadow-hover/controller";
+import { WorkspaceTriggerPopoverLauncher } from "features/popover/shadow-hover/launcher";
+import { COSENSE_CARD_LINKS_HOVER_SOURCE_ID } from "features/popover/hoverPopoverLinkSpec";
 import { isHTMLElementLike, isNodeLike } from "ui/shared/dom/realmSafeDom";
 import { VIRTUAL_CELL_WILL_REBIND_EVENT } from "ui/interactions/virtualCellRebind";
 import {

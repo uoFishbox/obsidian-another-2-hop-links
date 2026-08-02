@@ -92,7 +92,7 @@ src/
 
 ## Shadow DOM hover popovers
 
-- Implementation lives in `src/features/preview/shadow-hover/`. See that directory's `README.md` for architecture, mechanisms, and invariants.
+- Implementation lives in `src/features/popover/shadow-hover/`. See that directory's `README.md` for architecture, mechanisms, and invariants.
 
 ## Release workflow
 
@@ -110,7 +110,7 @@ src/
 - **Store caching**: `ComponentController` maintains an LRU of `ApplicationStore` instances keyed by `leafId:filePath`. Any change to store lifetime or keying must respect ref-counting and trimming logic.
 - **Worker**: Search filter runs in an inlined worker. If you add imports inside `searchFilter.worker.ts`, ensure esbuild inlines them correctly.
 - **Styles**: `styles.css` is shipped with the plugin; it uses CSS custom properties prefixed with `--ccl-`.
-- **Shadow hover state**: See `src/features/preview/shadow-hover/README.md` for the invariants (pure reducers, no parallel lifecycle/interaction fields).
+- **Shadow hover state**: See `src/features/popover/shadow-hover/README.md` for the invariants (pure reducers, no parallel lifecycle/interaction fields).
 
 ## Command Output
 

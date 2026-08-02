@@ -3,13 +3,13 @@ import { TFile } from "obsidian";
 import { createMockTFile } from "testing/__mocks__/testHelpers";
 import { createLinkContextFactory } from "ui/context/linkContextFactory";
 import type { TwoHopIndexedLink } from "types";
-import { triggerHoverPopover } from "features/preview/interactions/mobilePopover";
+import { triggerHoverPopover } from "features/popover/mobilePopover";
 
 vi.mock("ui/handlers/viewHandlers", () => ({
 	handleTagClick: vi.fn(),
 }));
 
-vi.mock("features/preview/interactions/mobilePopover", () => ({
+vi.mock("features/popover/mobilePopover", () => ({
 	triggerHoverPopover: vi.fn(),
 }));
 
