@@ -358,6 +358,29 @@ describe("VirtualPreviewSurface", () => {
 		surface.dispose();
 	});
 
+	it("restores an invalidated binding after a staged A to B to A rollback", async () => {
+		const { surface, renders } = createHarness();
+		const host = document.createElement("div");
+		const originalBinding = binding("slot-0", 0, "a");
+		const originalFrame = committedFrame(originalBinding);
+		surface.registerHost("slot-0", host);
+		surface.publish(originalFrame);
+		await flushActivation();
+		expect(renders.map((record) => record.identity)).toEqual(["a"]);
+
+		surface.publish(committedFrame(binding("slot-0", 0, "b")));
+		surface.publish(originalFrame);
+		expect(renders[0].callbacks.isCurrent()).toBe(false);
+
+		await flushActivation();
+		await flushActivation();
+		expect(renders.map((record) => record.identity)).toEqual(["a", "a"]);
+		expect(commit(renders[0])).toBe(false);
+		expect(commit(renders[1])).toBe(true);
+		expect(host.textContent).toBe("a");
+		surface.dispose();
+	});
+
 	it("coalesces staged deltas per slot without losing an earlier release", async () => {
 		const { surface, renders } = createHarness();
 		const firstHost = document.createElement("div");
@@ -677,6 +700,18 @@ describe("VirtualPreviewSurface", () => {
 		active.surface.dispose();
 		expect(active.renders[0].cleanup).toHaveBeenCalledOnce();
 		expect(commit(active.renders[0])).toBe(false);
+		expect(host.childNodes).toHaveLength(0);
+	});
+
+	it("does not touch a host registered after disposal", () => {
+		const { surface } = createHarness();
+		const host = document.createElement("div");
+		surface.dispose();
+
+		const lease = surface.registerHost("slot-after-dispose", host);
+		lease.dispose();
+
+		expect(host.attributes).toHaveLength(0);
 		expect(host.childNodes).toHaveLength(0);
 	});
 });

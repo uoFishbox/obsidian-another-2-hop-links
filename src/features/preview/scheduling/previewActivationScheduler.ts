@@ -171,6 +171,7 @@ interface PreviewActivationSchedulerState {
 	readonly partitionsByIdentity: Map<object, PreviewActivationPartition>;
 	nextPartitionId: number;
 	unsubscribeScrollActivity?: () => void;
+	disposed: boolean;
 }
 
 function createSchedulerState(
@@ -191,6 +192,7 @@ function createSchedulerState(
 		scopeStates: new WeakMap(),
 		partitionsByIdentity: new Map(),
 		nextPartitionId: 0,
+		disposed: false,
 	};
 }
 
@@ -266,6 +268,9 @@ function createPreviewActivationScopeForState(
 	schedulerState: PreviewActivationSchedulerState,
 	options: CreatePreviewActivationScopeOptions = {},
 ): PreviewActivationScope {
+	if (schedulerState.disposed) {
+		return { kind: "preview-activation-scope" };
+	}
 	const partition = getOrCreatePartition(schedulerState, options.frameCoordinator);
 	const scope: PreviewActivationScope = { kind: "preview-activation-scope" };
 	const state: PreviewActivationScopeState = {
@@ -622,7 +627,7 @@ function requestQueuedPreviewActivationForState(
 	scope: PreviewActivationScope,
 	onActivated?: () => void,
 ): PreviewActivationHandle {
-	if (getDebugDisableCardDomPreview()) {
+	if (schedulerState.disposed || getDebugDisableCardDomPreview()) {
 		return createActivationHandle(key, undefined);
 	}
 	return enqueuePreviewActivationRequest(schedulerState, key, scope, onActivated);
@@ -669,6 +674,8 @@ function disposePreviewActivationScopeForState(
 function resetPreviewActivationSchedulerState(
 	schedulerState: PreviewActivationSchedulerState,
 ): void {
+	if (schedulerState.disposed) return;
+	schedulerState.disposed = true;
 	const scopes = Array.from(schedulerState.scopes, (scopeState) => scopeState.scope);
 	for (const scope of scopes) {
 		disposePreviewActivationScopeForState(schedulerState, scope);

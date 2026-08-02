@@ -3,6 +3,7 @@ import type { App } from "obsidian";
 import { DEFAULT_SETTINGS } from "features/settings/model";
 import type { CardPreviewLoader } from "features/preview/ui/cardPreviewRenderer";
 import type { CardPreviewSharedCache } from "features/preview/ui/cardPreviewSharedCache";
+import type { CardPreviewRequest } from "features/preview/core/cardPreviewRequest";
 
 const state = vi.hoisted(() => ({
 	surfaceOptions: [] as Array<Record<string, unknown>>,
@@ -77,5 +78,22 @@ describe("PreviewRuntime", () => {
 		expect(secondClear).not.toHaveBeenCalled();
 		second.dispose();
 		expect(secondClear).toHaveBeenCalledOnce();
+	});
+
+	it("returns disabled surfaces and renderers after disposal", () => {
+		const runtime = createPreviewRuntime({
+			app: {} as App,
+			getPreview: vi.fn() as unknown as CardPreviewLoader,
+		});
+		runtime.dispose();
+
+		const surface = runtime.createSurface({});
+		const renderer = runtime.createRenderer({});
+		const cleanup = renderer({} as HTMLElement, {} as CardPreviewRequest);
+
+		expect(state.surfaceOptions).toHaveLength(0);
+		expect(state.rendererOptions).toHaveLength(0);
+		expect(() => surface.publish({} as never)).not.toThrow();
+		expect(() => cleanup()).not.toThrow();
 	});
 });

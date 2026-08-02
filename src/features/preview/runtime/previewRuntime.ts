@@ -110,6 +110,7 @@ export function createPreviewRuntime(options: PreviewRuntimeOptions): PreviewRun
 	function createRenderer(
 		rendererOptions: PreviewRuntimeRendererOptions,
 	): CardPreviewRenderer {
+		if (disposed) return DISABLED_CARD_PREVIEW_RENDERER;
 		return createCardPreviewRenderer({
 			...rendererOptions,
 			app: options.app,
@@ -143,3 +144,5 @@ export const DISABLED_PREVIEW_SURFACE: VirtualPreviewSurface = {
 	publish: () => {},
 	dispose: () => {},
 };
+
+const DISABLED_CARD_PREVIEW_RENDERER: CardPreviewRenderer = () => () => {};

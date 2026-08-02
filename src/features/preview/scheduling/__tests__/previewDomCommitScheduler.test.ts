@@ -149,6 +149,22 @@ describe("preview DOM commit scheduler", () => {
 		expect(secondCommit).toHaveBeenCalledOnce();
 		second.dispose();
 	});
+
+	it("skips work enqueued after disposal", async () => {
+		const scheduler = createPreviewDomCommitScheduler();
+		const commit = vi.fn(() => true);
+		scheduler.dispose();
+
+		await expect(
+			scheduler.enqueue({
+				targetKey: "disposed-target",
+				isStale: () => false,
+				commit,
+			}),
+		).resolves.toEqual({ type: "skipped", reason: "disposed" });
+		expect(commit).not.toHaveBeenCalled();
+	});
+
 	it("coalesces pending commits by target key", async () => {
 		const committed: string[] = [];
 

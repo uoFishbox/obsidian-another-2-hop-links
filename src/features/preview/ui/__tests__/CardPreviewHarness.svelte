@@ -29,6 +29,7 @@
 	}: Props = $props();
 
 	const { app, applicationStore } = useAppContext();
+	const ownsPreviewRuntime = explicitPreviewRuntime === undefined;
 	const previewRuntime =
 		explicitPreviewRuntime ?? createPreviewRuntime({ app, getPreview });
 	const request = $derived(
@@ -46,7 +47,7 @@
 	);
 
 	$effect(() => {
-		if (explicitPreviewRuntime) return;
+		if (!ownsPreviewRuntime) return;
 		return previewRuntime.dispose;
 	});
 </script>

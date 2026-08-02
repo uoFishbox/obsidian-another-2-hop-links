@@ -18,10 +18,7 @@ import {
 	refillPreviewScheduleTokens,
 	type PreviewScheduleTokenState,
 } from "./previewScheduleTokenBucket";
-import {
-	createPreviewKeyedQueue,
-	type PreviewKeyedQueue,
-} from "./previewKeyedQueue";
+import { createPreviewKeyedQueue, type PreviewKeyedQueue } from "./previewKeyedQueue";
 
 const MAX_QUEUE_ENTRIES_PER_DRAIN = 256;
 const EXPECTED_FRAME_INTERVAL_MS = 1000 / 60;
@@ -95,6 +92,7 @@ interface PreviewDomCommitSchedulerState {
 	readonly partitionsByIdentity: Map<object, PreviewDomCommitPartition>;
 	nextPartitionId: number;
 	unsubscribeScrollActivity?: () => void;
+	disposed: boolean;
 }
 
 function createSchedulerState(): PreviewDomCommitSchedulerState {
@@ -103,6 +101,7 @@ function createSchedulerState(): PreviewDomCommitSchedulerState {
 		pendingByTargetKey: new Map(),
 		partitionsByIdentity: new Map(),
 		nextPartitionId: 0,
+		disposed: false,
 	};
 }
 
@@ -337,6 +336,9 @@ function enqueuePreviewDomCommitForState(
 	state: PreviewDomCommitSchedulerState,
 	task: PreviewDomCommitTask,
 ): Promise<PreviewDomCommitResult> {
+	if (state.disposed) {
+		return Promise.resolve({ type: "skipped", reason: "disposed" });
+	}
 	return new Promise<PreviewDomCommitResult>((resolve, reject) => {
 		const existingTask = state.pendingByTargetKey.get(task.targetKey);
 		if (existingTask) {
@@ -367,6 +369,8 @@ function enqueuePreviewDomCommitForState(
 }
 
 function disposeSchedulerState(state: PreviewDomCommitSchedulerState): void {
+	if (state.disposed) return;
+	state.disposed = true;
 	for (const task of Array.from(state.pendingByTargetKey.values())) {
 		settleTask(state, task, { type: "skipped", reason: "disposed" });
 	}

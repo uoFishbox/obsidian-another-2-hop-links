@@ -91,6 +91,7 @@ const HYDRATION_POST_PAINT_TASK_KEY = "two-hop-progressive-hydration-visible";
 const HYDRATION_IDLE_TASK_KEY = "two-hop-progressive-hydration-preload";
 const EMPTY_PREVIEW_RANGE = Object.freeze({ start: 0, end: 0 });
 const PREVIEW_SCROLL_TASK_KEY = "two-hop-progressive-preview-window";
+const PREVIEW_RANGE_APPLY_TASK_KEY = "two-hop-progressive-preview-window-apply";
 const PREVIEW_SCROLL_IDLE_MS = 140;
 
 function createHydrationQueue(): HydrationQueue {
@@ -548,6 +549,21 @@ export function useTwoHopProgressiveList(
 			previewViewportHeight,
 			mountedRowEnd,
 		);
+		if (
+			nextPreviewRange.start === activePreviewRange.start &&
+			nextPreviewRange.end === activePreviewRange.end
+		) {
+			return;
+		}
+		frameCoordinator.schedule(
+			"post-paint",
+			PREVIEW_RANGE_APPLY_TASK_KEY,
+			applyPendingPreviewRange,
+		);
+	}
+
+	function applyPendingPreviewRange(): void {
+		if (disposed) return;
 		publishPreviewRange(nextPreviewRange);
 	}
 
@@ -845,6 +861,7 @@ export function useTwoHopProgressiveList(
 		hydrationObserver?.disconnect();
 		sentinelObserver?.disconnect();
 		frameCoordinator.cancel("scroll-critical", PREVIEW_SCROLL_TASK_KEY);
+		frameCoordinator.cancel("post-paint", PREVIEW_RANGE_APPLY_TASK_KEY);
 		if (previewRangeAnimationFrame !== undefined && previewOwnerWindow) {
 			previewOwnerWindow.cancelAnimationFrame(previewRangeAnimationFrame);
 		}

@@ -57,6 +57,7 @@ interface PreviewSlotRuntime {
 
 const EMPTY_RANGE: RowRange = { start: 0, end: 0 };
 const PREVIEW_SIDECAR_FLUSH_KEY = "two-hop:preview-sidecar-flush";
+const DISABLED_PREVIEW_HOST_LEASE: PreviewHostLease = { dispose: () => {} };
 
 /** Owns frame reconciliation and activation policy for one virtual surface. */
 export function createVirtualPreviewSurface(
@@ -64,7 +65,6 @@ export function createVirtualPreviewSurface(
 ): VirtualPreviewSurface {
 	const slotsById = new Map<string, PreviewSlotRuntime>();
 	const pendingBySlotId = new Map<string, PreviewActivationHandle>();
-	const activationSlotIds = new Set<string>();
 	const activationScheduler = options.activationScheduler;
 	const scope: PreviewActivationScope = activationScheduler.createScope({
 		frameCoordinator: options.frameCoordinator,
@@ -124,28 +124,32 @@ export function createVirtualPreviewSurface(
 		pendingBySlotId.set(slotId, handle);
 	}
 
+	function cancelPendingActivation(slotId: string): void {
+		const handle = pendingBySlotId.get(slotId);
+		if (!handle) return;
+		handle.cancel();
+		pendingBySlotId.delete(slotId);
+	}
+
+	function reconcileSlot(slot: PreviewSlotRuntime): void {
+		const isActive = Boolean(slot.binding && isInPreviewRange(slot));
+		slot.controller.setActive(isActive);
+		if (isActive && slot.controller.needsActivation()) {
+			enqueueActivation(slot.slotId);
+			return;
+		}
+		cancelPendingActivation(slot.slotId);
+	}
+
 	function reconcile(): void {
-		activationSlotIds.clear();
-		for (const slot of slotsById.values()) {
-			const isActive = Boolean(slot.binding && isInPreviewRange(slot));
-			slot.controller.setActive(isActive);
-			if (!isActive || !slot.controller.needsActivation()) continue;
-			activationSlotIds.add(slot.slotId);
-		}
-		for (const [slotId, handle] of pendingBySlotId) {
-			if (activationSlotIds.has(slotId)) continue;
-			handle.cancel();
-			pendingBySlotId.delete(slotId);
-		}
-		for (const slotId of activationSlotIds) enqueueActivation(slotId);
-		activationSlotIds.clear();
+		for (const slot of slotsById.values()) reconcileSlot(slot);
 		for (const slot of [...slotsById.values()]) maybeDisposeSlot(slot);
 	}
 
 	function applyDesiredFrame(): void {
 		if (disposed) return;
 		const frame = desiredFrame;
-		if (!frame || frame === appliedFrame) return;
+		if (!frame) return;
 		const delta = diffPreviewBindings(
 			appliedFrame?.previewBindingsBySlot,
 			frame.previewBindingsBySlot,
@@ -160,7 +164,9 @@ export function createVirtualPreviewSurface(
 			slot.rowIndex = undefined;
 			slot.controller.clear();
 		}
-		for (const binding of [...delta.enteredSlots, ...delta.reboundSlots]) {
+		// Bind every final desired slot idempotently. A staged A -> B -> A sequence
+		// invalidates A before this flush even though its final reference is unchanged.
+		for (const binding of frame.previewBindingsBySlot.values()) {
 			const slot = getOrCreateSlot(binding.slotId);
 			slot.binding = binding;
 			slot.rowIndex = binding.rowIndex;
@@ -174,10 +180,11 @@ export function createVirtualPreviewSurface(
 	}
 
 	function registerHost(slotId: string, element: HTMLElement): PreviewHostLease {
+		if (disposed) return DISABLED_PREVIEW_HOST_LEASE;
 		const slot = getOrCreateSlot(slotId);
 		const lease = slot.controller.attachHost(element);
 		slot.hostLeaseCount += 1;
-		reconcile();
+		reconcileSlot(slot);
 		let disposedLease = false;
 		return {
 			dispose(): void {
@@ -185,6 +192,7 @@ export function createVirtualPreviewSurface(
 				disposedLease = true;
 				lease.dispose();
 				slot.hostLeaseCount = Math.max(0, slot.hostLeaseCount - 1);
+				reconcileSlot(slot);
 				maybeDisposeSlot(slot);
 			},
 		};
@@ -240,7 +248,6 @@ export function createVirtualPreviewSurface(
 		pendingBySlotId.clear();
 		for (const slot of slotsById.values()) slot.controller.dispose();
 		slotsById.clear();
-		activationSlotIds.clear();
 		activationScheduler.disposeScope(scope);
 	}
 

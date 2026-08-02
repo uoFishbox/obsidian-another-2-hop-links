@@ -397,6 +397,29 @@ describe("preview activation scheduler", () => {
 		expect(activation.onActivated).not.toHaveBeenCalled();
 	});
 
+	it("does not recreate scopes or queue work after disposal", async () => {
+		const scheduler = createPreviewActivationScheduler();
+		const existingScope = scheduler.createScope();
+		const existingScopeCallback = vi.fn();
+		scheduler.dispose();
+
+		expect(() =>
+			scheduler.request("existing", existingScope, existingScopeCallback),
+		).not.toThrow();
+		const disposedScope = scheduler.createScope();
+		const disposedScopeCallback = vi.fn();
+		const handle = scheduler.request(
+			"disposed",
+			disposedScope,
+			disposedScopeCallback,
+		);
+		handle.cancel();
+		await flushAnimationFrame();
+
+		expect(existingScopeCallback).not.toHaveBeenCalled();
+		expect(disposedScopeCallback).not.toHaveBeenCalled();
+	});
+
 	it("uses one global animation-frame callback for multiple scopes", () => {
 		const firstScope = createPreviewActivationScope();
 		const secondScope = createPreviewActivationScope();
