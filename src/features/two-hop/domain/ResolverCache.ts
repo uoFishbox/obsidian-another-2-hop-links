@@ -146,13 +146,6 @@ export class ResolverCache {
 		this.cache.clear();
 	}
 
-	/**
-	 * キャッシュサイズを取得する（テスト用）
-	 */
-	private get size(): number {
-		return this.cache.size;
-	}
-
 	private intersects(
 		cachedValues: ReadonlySet<string>,
 		affectedValues: ReadonlySet<string> | undefined,

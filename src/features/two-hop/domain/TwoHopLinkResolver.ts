@@ -11,7 +11,7 @@ import type {
 	TwoHopIndexedLink,
 	TwoHopLinkResult,
 } from "types/domain";
-import type { IMetadataCache, IVault } from "types/obsidian";
+import type { IMetadataCache } from "types/obsidian";
 import { enableLogging, logger } from "shared/logging/logger";
 import { ResolverCache } from "./ResolverCache";
 import { collectResolverDependencies } from "./ResolverDependencies";
@@ -23,6 +23,13 @@ import {
 } from "./immutableTwoHopLinkResult";
 
 let nextDisplaySnapshotRevision = 0;
+
+/**
+ * Maximum number of times `resolveInternal` retries when the index version
+ * changes mid-build. Prevents an unbounded loop when the index is updated
+ * continuously; the last built snapshot is returned as a consistent fallback.
+ */
+const MAX_RESOLVE_RETRY_COUNT = 4;
 
 export interface ResolveOptions {
 	includeTaggedNotes?: boolean;
@@ -45,7 +52,6 @@ export class TwoHopLinkResolver {
 
 	constructor(
 		private readonly metadataCache: IMetadataCache,
-		private readonly _vault: IVault,
 		private readonly indexingService: IIndexingService,
 		private readonly getPerformanceSettingsOverride?: () => Partial<ResolverPerformanceSettings>,
 		private readonly getDebugPolicy?: () => ResolverDebugPolicy,
@@ -135,7 +141,7 @@ export class TwoHopLinkResolver {
 		resolveSettings: Required<ResolveOptions>,
 		onProgress?: (progress: ResolveProgress) => void,
 	): Promise<TwoHopLinkResult> {
-		for (;;) {
+		for (let retryCount = 0; ; retryCount += 1) {
 			if (this.supportsDataUpdateSubscription) {
 				const cachedResult = this.cache.get(
 					targetFile.path,
@@ -254,6 +260,16 @@ export class TwoHopLinkResolver {
 			});
 
 			if (this.indexingService.getIndexVersion() !== indexVersion) {
+				if (retryCount >= MAX_RESOLVE_RETRY_COUNT) {
+					// The index kept changing during the build. Return the last
+					// consistent snapshot without caching, since it was built
+					// against a stale index version.
+					onProgress?.({
+						phase: "complete",
+						data: result,
+					});
+					return result;
+				}
 				continue;
 			}
 

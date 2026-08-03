@@ -239,9 +239,9 @@ export class TwoHopBranchBuilder {
 		}
 
 		if (isUnresolved) {
-			const lookupPath = getLookupPathForLink(link);
+			const resolvedLookupPath = getLookupPathForLink(link);
 			link.backlinkCount =
-				this.indexingService.getBacklinkCountForLink(lookupPath);
+				this.indexingService.getBacklinkCountForLink(resolvedLookupPath);
 		}
 
 		return link;

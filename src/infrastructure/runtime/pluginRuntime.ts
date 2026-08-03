@@ -133,7 +133,6 @@ export function createPluginRuntime(options: PluginRuntimeOptions): PluginRuntim
 	);
 	const twoHopLinkResolver = new TwoHopLinkResolver(
 		options.app.metadataCache,
-		options.app.vault,
 		indexingService,
 		() => ({
 			enableProgressiveTwoHopBuild:

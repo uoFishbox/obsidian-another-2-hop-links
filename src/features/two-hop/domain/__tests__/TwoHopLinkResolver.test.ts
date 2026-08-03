@@ -35,7 +35,6 @@ function createResolver(
 ): TwoHopLinkResolver {
 	return new TwoHopLinkResolver(
 		env.mockMetadataCache,
-		env.mockVault,
 		indexingService,
 		options?.performance,
 		options?.debug,

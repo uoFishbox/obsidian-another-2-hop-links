@@ -20,8 +20,6 @@ import {
 } from "features/two-hop/application/displayCacheDependencies";
 import type { SelectedSettingsDependencies } from "features/two-hop/application/displayCacheDependencies";
 
-const DEBUG_CANVAS_BACKLINKS = false;
-
 export type MergedLinkItem = TwoHopLinkBranch | TwoHopIndexedLink;
 
 type LinkDisplayPreprocessSettings = SelectedSettingsDependencies<
@@ -570,13 +568,6 @@ export function preprocessDisplayData(
 	settings: PluginSettings,
 	deduplicationService?: IDeduplicationService,
 ): PreprocessedDisplayData {
-	if (
-		DEBUG_CANVAS_BACKLINKS &&
-		linkResult &&
-		linkResult.originFile.extension === "canvas"
-	) {
-	}
-
 	const linkResultData = preprocessLinkData(
 		linkResult,
 		settings,
