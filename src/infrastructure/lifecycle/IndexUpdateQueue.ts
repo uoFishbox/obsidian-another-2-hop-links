@@ -265,17 +265,31 @@ export class IndexUpdateQueue {
 	}
 
 	private recordObservedChange(change: IncrementalFileChange): void {
-		if (this.destroyed) {
+		this.recordObservedChanges([change]);
+	}
+
+	private recordObservedChanges(changes: readonly IncrementalFileChange[]): void {
+		if (this.destroyed || changes.length === 0) {
 			return;
 		}
 
 		if (this.initialFullScanState === "running") {
-			this.initialChangeRecorder.record(change, this.metadataResolveGeneration);
+			for (const change of changes) {
+				this.initialChangeRecorder.record(
+					change,
+					this.metadataResolveGeneration,
+				);
+			}
 			return;
 		}
 
 		if (this.initialFullScanState === "failed") {
-			this.initialChangeRecorder.record(change, this.metadataResolveGeneration);
+			for (const change of changes) {
+				this.initialChangeRecorder.record(
+					change,
+					this.metadataResolveGeneration,
+				);
+			}
 			this.retryInitialFullScan();
 			return;
 		}
@@ -285,15 +299,18 @@ export class IndexUpdateQueue {
 		}
 
 		this.hasAttemptedAutomaticRecovery = false;
-		this.changeQueue.recordChange(change);
+		this.changeQueue.recordChanges(changes);
 
-		if (change.type === "create" || change.type === "rename") {
+		const hasMetadataDependentChange = changes.some(
+			(change) => change.type === "create" || change.type === "rename",
+		);
+		if (hasMetadataDependentChange) {
 			this.waitsForMetadataResolve = true;
 		}
 
 		this.syncMetadataResolveGate();
 
-		if (change.type === "create" || change.type === "rename") {
+		if (hasMetadataDependentChange) {
 			return;
 		}
 
@@ -312,6 +329,7 @@ export class IndexUpdateQueue {
 		const oldPrefix =
 			normalizedOldFolderPath.length > 0 ? `${normalizedOldFolderPath}/` : "";
 		const newPrefixLength = newPrefix.length;
+		const changes: IncrementalFileChange[] = [];
 
 		for (const currentFile of this.plugin.app.vault.getFiles()) {
 			if (
@@ -326,12 +344,14 @@ export class IndexUpdateQueue {
 			}
 
 			const oldFilePath = `${oldPrefix}${newFilePath.slice(newPrefixLength)}`;
-			this.recordObservedChange({
+			changes.push({
 				type: "rename",
 				oldPath: oldFilePath,
 				newPath: newFilePath,
 			});
 		}
+
+		this.recordObservedChanges(changes);
 	}
 
 	private async runInitialFullScan(): Promise<void> {

@@ -36,7 +36,7 @@ vi.mock("obsidian", () => {
 	};
 });
 
-import { TFile } from "obsidian";
+import { TFile, TFolder } from "obsidian";
 import { createMockTFile } from "testing/__mocks__/testHelpers";
 import type { DataUpdateContext } from "core/indexing/index-service/IndexEvents";
 import { IndexUpdateQueue } from "../IndexUpdateQueue";
@@ -231,6 +231,43 @@ describe("IndexUpdateQueue", () => {
 		).toHaveBeenCalledTimes(1);
 		expect(harness.indexingService.applyFileChangesTimeSliced).toHaveBeenCalledWith(
 			[{ type: "modify", path: "notes/existing.md" }],
+		);
+	});
+
+	test("folder rename batches descendant changes behind one metadata gate", async () => {
+		const harness = createHarness();
+		await initializeQueue(harness);
+		const firstFile = createMockTFile("new-folder/first.md");
+		const secondFile = createMockTFile("new-folder/second.md");
+		harness.setVaultFile(firstFile);
+		harness.setVaultFile(secondFile);
+		const folder = new TFolder();
+		folder.path = "new-folder";
+
+		harness.emitVaultEvent("rename", folder, "old-folder");
+		expect(
+			harness.indexingService.applyFileChangesTimeSliced,
+		).not.toHaveBeenCalled();
+
+		harness.emitMetadataEvent("resolved");
+		await flushAsyncTasks();
+
+		expect(
+			harness.indexingService.applyFileChangesTimeSliced,
+		).toHaveBeenCalledTimes(1);
+		expect(harness.indexingService.applyFileChangesTimeSliced).toHaveBeenCalledWith(
+			[
+				{
+					type: "rename",
+					oldPath: "old-folder/first.md",
+					newPath: "new-folder/first.md",
+				},
+				{
+					type: "rename",
+					oldPath: "old-folder/second.md",
+					newPath: "new-folder/second.md",
+				},
+			],
 		);
 	});
 

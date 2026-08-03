@@ -184,6 +184,22 @@ const normalizationCases: NormalizationCase[] = [
 			{ type: "rename", oldPath: "notes/old.md", newPath: "notes/new.md" },
 		],
 	},
+	{
+		name: "multiple deleted tracks retain their original order",
+		changes: [
+			{ type: "delete", path: "notes/old.md" },
+			{ type: "rename", oldPath: "notes/old.md", newPath: "notes/moved.md" },
+			{ type: "create", path: "notes/old.md" },
+			{ type: "rename", oldPath: "notes/moved.md", newPath: "notes/old.md" },
+			{ type: "delete", path: "notes/old.md" },
+			{ type: "delete", path: "notes/moved.md" },
+			{ type: "create", path: "notes/old.md" },
+		],
+		expected: [
+			{ type: "create", path: "notes/old.md" },
+			{ type: "delete", path: "notes/old.md" },
+		],
+	},
 ];
 
 describe("FileChangeQueue normalization", () => {
@@ -194,6 +210,22 @@ describe("FileChangeQueue normalization", () => {
 		}
 		const { changes: result } = queue.drain();
 		expect(result).toEqual(expected);
+	});
+});
+
+describe("FileChangeQueue batching", () => {
+	test("recordChanges preserves order while ignoring removed tracks", () => {
+		const queue = new FileChangeQueue();
+
+		queue.recordChanges([
+			{ type: "create", path: "notes/temp.md" },
+			{ type: "delete", path: "notes/temp.md" },
+			{ type: "rename", oldPath: "notes/old.md", newPath: "notes/new.md" },
+		]);
+
+		expect(queue.drain().changes).toEqual([
+			{ type: "rename", oldPath: "notes/old.md", newPath: "notes/new.md" },
+		]);
 	});
 });
 
@@ -216,6 +248,17 @@ describe("FileChangeQueue flags", () => {
 
 		queue.recordChange({ type: "create", path: "notes/new.md" });
 		expect(queue.hasPendingCreateChanges()).toBe(true);
+	});
+
+	test("pending counts return to zero after a change is canceled", () => {
+		const queue = new FileChangeQueue();
+		queue.recordChange({ type: "create", path: "notes/temp.md" });
+		expect(queue.hasPending()).toBe(true);
+		expect(queue.hasPendingCreateChanges()).toBe(true);
+
+		queue.recordChange({ type: "delete", path: "notes/temp.md" });
+		expect(queue.hasPending()).toBe(false);
+		expect(queue.hasPendingCreateChanges()).toBe(false);
 	});
 
 	test("requiresFullRebuild reflects trigger flags", () => {

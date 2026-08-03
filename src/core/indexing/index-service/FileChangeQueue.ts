@@ -2,6 +2,7 @@ import type { IncrementalFileChange } from "../types/IndexTypes";
 
 interface QueuedFileTrack {
 	order: number;
+	slot: number;
 	initialPath?: string;
 	currentPath?: string;
 	modified: boolean;
@@ -9,8 +10,12 @@ interface QueuedFileTrack {
 }
 
 export class FileChangeQueue {
-	private readonly tracks: QueuedFileTrack[] = [];
+	private readonly tracks: Array<QueuedFileTrack | undefined> = [];
 	private readonly trackByCurrentPath = new Map<string, QueuedFileTrack>();
+	/** Tracks that currently represent deletions, indexed by their initial path. */
+	private readonly trackByInitialPath = new Map<string, Set<QueuedFileTrack>>();
+	private pendingTrackCount = 0;
+	private pendingCreateTrackCount = 0;
 	private requiresBacklinkRebuild = false;
 	private requiresTagRebuild = false;
 	private nextTrackOrder = 0;
@@ -32,6 +37,12 @@ export class FileChangeQueue {
 		}
 	}
 
+	recordChanges(changes: readonly IncrementalFileChange[]): void {
+		for (const change of changes) {
+			this.recordChange(change);
+		}
+	}
+
 	triggerBacklinkRebuild(): void {
 		this.requiresBacklinkRebuild = true;
 	}
@@ -50,12 +61,12 @@ export class FileChangeQueue {
 		return (
 			this.requiresBacklinkRebuild ||
 			this.requiresTagRebuild ||
-			this.tracks.some((track) => this.hasPendingTrack(track))
+			this.pendingTrackCount > 0
 		);
 	}
 
 	hasPendingCreateChanges(): boolean {
-		return this.tracks.some((track) => this.hasPendingCreateTrack(track));
+		return this.pendingCreateTrackCount > 0;
 	}
 
 	requiresFullRebuild(): boolean {
@@ -68,6 +79,9 @@ export class FileChangeQueue {
 		const needsTagRebuild = this.requiresTagRebuild;
 		this.tracks.length = 0;
 		this.trackByCurrentPath.clear();
+		this.trackByInitialPath.clear();
+		this.pendingTrackCount = 0;
+		this.pendingCreateTrackCount = 0;
 		this.requiresBacklinkRebuild = false;
 		this.requiresTagRebuild = false;
 		return {
@@ -85,8 +99,11 @@ export class FileChangeQueue {
 
 		const deletedTrack = this.findDeletedTrackByInitialPath(path);
 		if (deletedTrack) {
-			deletedTrack.currentPath = path;
-			deletedTrack.createSemantics = true;
+			this.removeDeletedTrack(deletedTrack);
+			this.updateTrack(deletedTrack, () => {
+				deletedTrack.currentPath = path;
+				deletedTrack.createSemantics = true;
+			});
 			this.trackByCurrentPath.set(path, deletedTrack);
 			return;
 		}
@@ -107,7 +124,9 @@ export class FileChangeQueue {
 				track.initialPath === track.currentPath &&
 				!track.createSemantics
 			) {
-				track.modified = true;
+				this.updateTrack(track, () => {
+					track.modified = true;
+				});
 			}
 			return;
 		}
@@ -133,7 +152,10 @@ export class FileChangeQueue {
 				return;
 			}
 
-			track.currentPath = undefined;
+			this.updateTrack(track, () => {
+				track.currentPath = undefined;
+			});
+			this.addDeletedTrack(track);
 			return;
 		}
 
@@ -168,37 +190,98 @@ export class FileChangeQueue {
 		}
 
 		this.trackByCurrentPath.delete(oldPath);
-		sourceTrack.currentPath = newPath;
+		this.updateTrack(sourceTrack, () => {
+			sourceTrack.currentPath = newPath;
+		});
 		this.trackByCurrentPath.set(newPath, sourceTrack);
 		this.cleanupTrackIfNoLongerNeeded(sourceTrack);
 	}
 
-	private addTrack(track: Omit<QueuedFileTrack, "order">): QueuedFileTrack {
+	private addTrack(track: Omit<QueuedFileTrack, "order" | "slot">): QueuedFileTrack {
 		const queuedTrack: QueuedFileTrack = {
 			order: this.nextTrackOrder++,
+			slot: this.tracks.length,
 			...track,
 		};
 		this.tracks.push(queuedTrack);
-		if (queuedTrack.currentPath) {
+		if (queuedTrack.currentPath !== undefined) {
 			this.trackByCurrentPath.set(queuedTrack.currentPath, queuedTrack);
+		} else {
+			this.addDeletedTrack(queuedTrack);
 		}
+		this.addPendingCounts(queuedTrack);
 		return queuedTrack;
 	}
 
 	private removeTrack(target: QueuedFileTrack): void {
-		const index = this.tracks.indexOf(target);
-		if (index !== -1) {
-			this.tracks.splice(index, 1);
+		if (this.tracks[target.slot] !== target) {
+			return;
 		}
-		if (target.currentPath) {
+
+		this.tracks[target.slot] = undefined;
+		if (
+			target.currentPath !== undefined &&
+			this.trackByCurrentPath.get(target.currentPath) === target
+		) {
 			this.trackByCurrentPath.delete(target.currentPath);
 		}
+		this.removeDeletedTrack(target);
+		this.removePendingCounts(target);
 	}
 
 	private findDeletedTrackByInitialPath(path: string): QueuedFileTrack | undefined {
-		return this.tracks.find(
-			(track) => track.initialPath === path && track.currentPath === undefined,
-		);
+		return this.trackByInitialPath.get(path)?.values().next().value;
+	}
+
+	private addDeletedTrack(track: QueuedFileTrack): void {
+		if (track.initialPath === undefined) {
+			return;
+		}
+
+		const tracks = this.trackByInitialPath.get(track.initialPath);
+		if (tracks) {
+			tracks.add(track);
+			return;
+		}
+
+		this.trackByInitialPath.set(track.initialPath, new Set([track]));
+	}
+
+	private removeDeletedTrack(track: QueuedFileTrack): void {
+		if (track.initialPath === undefined) {
+			return;
+		}
+
+		const tracks = this.trackByInitialPath.get(track.initialPath);
+		if (!tracks) {
+			return;
+		}
+
+		tracks.delete(track);
+		if (tracks.size === 0) {
+			this.trackByInitialPath.delete(track.initialPath);
+		}
+	}
+
+	private updateTrack(track: QueuedFileTrack, update: () => void): void {
+		const wasPending = this.hasPendingTrack(track);
+		const wasPendingCreate = this.hasPendingCreateTrack(track);
+		update();
+		const isPending = this.hasPendingTrack(track);
+		const isPendingCreate = this.hasPendingCreateTrack(track);
+		this.pendingTrackCount += Number(isPending) - Number(wasPending);
+		this.pendingCreateTrackCount +=
+			Number(isPendingCreate) - Number(wasPendingCreate);
+	}
+
+	private addPendingCounts(track: QueuedFileTrack): void {
+		this.pendingTrackCount += Number(this.hasPendingTrack(track));
+		this.pendingCreateTrackCount += Number(this.hasPendingCreateTrack(track));
+	}
+
+	private removePendingCounts(track: QueuedFileTrack): void {
+		this.pendingTrackCount -= Number(this.hasPendingTrack(track));
+		this.pendingCreateTrackCount -= Number(this.hasPendingCreateTrack(track));
 	}
 
 	private cleanupTrackIfNoLongerNeeded(track: QueuedFileTrack): void {
@@ -237,7 +320,11 @@ export class FileChangeQueue {
 	private getNormalizedChanges(): IncrementalFileChange[] {
 		const result: IncrementalFileChange[] = [];
 		for (let i = 0; i < this.tracks.length; i++) {
-			const change = this.materializeTrack(this.tracks[i]);
+			const track = this.tracks[i];
+			if (track === undefined) {
+				continue;
+			}
+			const change = this.materializeTrack(track);
 			if (change !== null) {
 				result.push(change);
 			}
