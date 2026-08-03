@@ -11,10 +11,10 @@ import type { TwoHopCardPresentationState } from "features/two-hop/ui/twoHopCell
 import type { CardPreviewRequest } from "features/preview/core/cardPreviewRequest";
 import type { PreviewFrame } from "features/preview/scheduling/virtualPreviewSurface";
 import type {
-	TwoHopVirtualListItem,
-	TwoHopVirtualSectionDescriptor,
-} from "features/two-hop/ui/twoHopVirtualListModel";
-import { createSectionDataRevision } from "features/two-hop/ui/twoHopRevisions";
+	TwoHopItemModel,
+	TwoHopSectionModel,
+} from "features/two-hop/ui/twoHopSectionModel";
+import { createTwoHopSectionModel } from "features/two-hop/ui/twoHopSectionModel";
 import { findNearestScrollContainer } from "ui/virtualization/dom/scrollContainer";
 import {
 	isScrollActivityActive,
@@ -39,49 +39,38 @@ import {
 } from "testing/helpers/DOMObserverMock";
 import TwoHopProgressiveSurfaceHarness from "./TwoHopProgressiveSurfaceHarness.svelte";
 
-function createSection(count: number): TwoHopVirtualSectionDescriptor {
+function createSection(count: number): TwoHopSectionModel {
 	const items = Array.from({ length: count }, (_, index) => ({
 		kind: "new-link",
 		item: { type: "newLink" },
 		interactionId: `item:${index}`,
 		searchKey: `item:${index}`,
-		virtualKey: `item:${index}`,
-	})) as TwoHopVirtualListItem[];
-	return {
-		sourceRevision: createSectionDataRevision(1),
-		section: {
-			kind: "new-links-section",
-			rawSectionId: "section",
-			sectionId: "section",
-			sectionKey: "section",
-			title: "Section",
-		},
-		sectionKey: "section",
-		sectionId: "section",
+		key: `item:${index}`,
+	})) as TwoHopItemModel[];
+	return createTwoHopSectionModel({
+		id: "section",
+		key: "section",
+		kind: "new-links-section",
 		title: "Section",
-		totalCount: count,
-		loadedCount: count,
-		getItems: () => items,
-		getItem: (index) => items[index],
-		headerProps: {},
-	};
+		items,
+	});
 }
 
 function createCardModelResolver() {
 	return vi.fn(
 		(
-			item: TwoHopVirtualListItem,
+			item: TwoHopItemModel,
 			presentation: TwoHopCardPresentationState,
 		): CardRenderModel => ({
 			item: item.item,
 			targetFile: null,
-			title: item.virtualKey,
-			ariaLabel: item.virtualKey,
+			title: item.key,
+			ariaLabel: item.key,
 			className: null,
 			extension: null,
 			directory: null,
-			interactionId: item.virtualKey,
-			interactionKey: item.virtualKey,
+			interactionId: item.key,
+			interactionKey: item.key,
 			interactionDescriptor: null,
 			presentation,
 			searchQuery: "",
@@ -182,18 +171,18 @@ describe("TwoHopProgressiveSurface", () => {
 		} as unknown as ApplicationStore;
 		const resolveItemCardModel = vi.fn(
 			(
-				item: TwoHopVirtualListItem,
+				item: TwoHopItemModel,
 				presentation: TwoHopCardPresentationState,
 			): CardRenderModel => ({
 				item: item.item,
 				targetFile: null,
-				title: item.virtualKey,
-				ariaLabel: item.virtualKey,
+				title: item.key,
+				ariaLabel: item.key,
 				className: null,
 				extension: null,
 				directory: null,
-				interactionId: item.virtualKey,
-				interactionKey: item.virtualKey,
+				interactionId: item.key,
+				interactionKey: item.key,
 				interactionDescriptor: null,
 				presentation,
 				searchQuery: "",
@@ -265,7 +254,7 @@ describe("TwoHopProgressiveSurface", () => {
 			sections: [
 				{
 					...section,
-					sourceRevision: createSectionDataRevision(2),
+					items: [...section.items],
 				},
 			],
 			applicationStore,
@@ -318,7 +307,7 @@ describe("TwoHopProgressiveSurface", () => {
 			sections: [
 				{
 					...section,
-					sourceRevision: createSectionDataRevision(2),
+					items: [...section.items],
 				},
 			],
 			applicationStore,
@@ -354,7 +343,7 @@ describe("TwoHopProgressiveSurface", () => {
 			sections: [
 				{
 					...section,
-					sourceRevision: createSectionDataRevision(2),
+					items: [...section.items],
 				},
 			],
 			applicationStore,
@@ -407,18 +396,18 @@ describe("TwoHopProgressiveSurface", () => {
 				applicationStore,
 				linkContext: { getPreview: vi.fn() } as unknown as LinkContext,
 				resolveItemCardModel: (
-					item: TwoHopVirtualListItem,
+					item: TwoHopItemModel,
 					presentation: TwoHopCardPresentationState,
 				): CardRenderModel => ({
 					item: item.item,
 					targetFile: null,
-					title: item.virtualKey,
-					ariaLabel: item.virtualKey,
+					title: item.key,
+					ariaLabel: item.key,
 					className: null,
 					extension: null,
 					directory: null,
-					interactionId: item.virtualKey,
-					interactionKey: item.virtualKey,
+					interactionId: item.key,
+					interactionKey: item.key,
 					interactionDescriptor: null,
 					presentation,
 					searchQuery: "",
@@ -508,18 +497,18 @@ describe("TwoHopProgressiveSurface", () => {
 		} as unknown as ApplicationStore;
 		const resolveItemCardModel = vi.fn(
 			(
-				item: TwoHopVirtualListItem,
+				item: TwoHopItemModel,
 				presentation: TwoHopCardPresentationState,
 			): CardRenderModel => ({
 				item: item.item,
 				targetFile: null,
-				title: item.virtualKey,
-				ariaLabel: item.virtualKey,
+				title: item.key,
+				ariaLabel: item.key,
 				className: null,
 				extension: null,
 				directory: null,
-				interactionId: item.virtualKey,
-				interactionKey: item.virtualKey,
+				interactionId: item.key,
+				interactionKey: item.key,
 				interactionDescriptor: null,
 				presentation,
 				searchQuery: "",
@@ -591,16 +580,16 @@ describe("TwoHopProgressiveSurface", () => {
 			getMetadata: () => null,
 		} as unknown as LinkContext;
 		const resolveItemCardModel = vi.fn(
-			(item: TwoHopVirtualListItem, presentation): CardRenderModel => ({
+			(item: TwoHopItemModel, presentation): CardRenderModel => ({
 				item: item.item,
 				targetFile,
-				title: item.virtualKey,
-				ariaLabel: item.virtualKey,
+				title: item.key,
+				ariaLabel: item.key,
 				className: null,
 				extension: "md",
 				directory: "notes",
-				interactionId: item.interactionId ?? item.virtualKey,
-				interactionKey: item.interactionId ?? item.virtualKey,
+				interactionId: item.interactionId ?? item.key,
+				interactionKey: item.interactionId ?? item.key,
 				interactionDescriptor: null,
 				presentation,
 				searchQuery: "",
@@ -609,7 +598,7 @@ describe("TwoHopProgressiveSurface", () => {
 					searchQuery: "",
 					previewRefreshToken: 0,
 					previewOverride: null,
-					previewRenderVersion: `preview:${item.virtualKey}`,
+					previewRenderVersion: `preview:${item.key}`,
 					settings: DEFAULT_SETTINGS,
 				}),
 			}),
@@ -696,23 +685,23 @@ describe("TwoHopProgressiveSurface", () => {
 			},
 		} as unknown as ApplicationStore;
 		const resolveItemCardModel = (
-			item: TwoHopVirtualListItem,
+			item: TwoHopItemModel,
 			presentation: TwoHopCardPresentationState,
 		): CardRenderModel => ({
 			item: item.item,
 			targetFile,
-			title: item.virtualKey,
-			ariaLabel: item.virtualKey,
+			title: item.key,
+			ariaLabel: item.key,
 			className: null,
 			extension: "md",
 			directory: "notes",
-			interactionId: item.virtualKey,
-			interactionKey: item.virtualKey,
+			interactionId: item.key,
+			interactionKey: item.key,
 			interactionDescriptor: null,
 			presentation,
 			searchQuery: "",
 			previewRequest: {
-				renderKey: `preview:${item.virtualKey}`,
+				renderKey: `preview:${item.key}`,
 			} as CardPreviewRequest,
 		});
 		const scroller = document.createElement("div");
@@ -802,23 +791,23 @@ describe("TwoHopProgressiveSurface", () => {
 		} as unknown as LinkContext;
 		const resolveItemCardModel = vi.fn(
 			(
-				item: TwoHopVirtualListItem,
+				item: TwoHopItemModel,
 				presentation: TwoHopCardPresentationState,
 			): CardRenderModel => ({
 				item: item.item,
 				targetFile: null,
-				title: item.virtualKey,
-				ariaLabel: item.virtualKey,
+				title: item.key,
+				ariaLabel: item.key,
 				className: null,
 				extension: null,
 				directory: null,
-				interactionId: item.virtualKey,
-				interactionKey: item.virtualKey,
+				interactionId: item.key,
+				interactionKey: item.key,
 				interactionDescriptor: null,
 				presentation,
 				searchQuery: "",
 				previewRequest: {
-					renderKey: `preview:${item.virtualKey}`,
+					renderKey: `preview:${item.key}`,
 				} as CardPreviewRequest,
 			}),
 		);

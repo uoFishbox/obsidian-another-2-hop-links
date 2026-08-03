@@ -12,23 +12,14 @@ import type { DedupState } from "types/deduplication";
 import { groupNotesByTag } from "core/grouping";
 import { isAttachment } from "core/rules/fileRules";
 import {
-	createStructuredCacheKey,
-	DISPLAY_ASSEMBLY_SETTING_DEPENDENCIES,
-	LINK_DISPLAY_PREPROCESS_SETTING_DEPENDENCIES,
-	selectSettingsDependencies,
-	TAG_DISPLAY_PREPROCESS_SETTING_DEPENDENCIES,
+	createDisplayAssemblyCacheKey,
+	selectDisplayAssemblySettings,
+	selectLinkDisplayPreprocessSettings,
+	selectTagDisplayPreprocessSettings,
+	type LinkDisplayPreprocessSettings,
 } from "features/two-hop/application/displayCacheDependencies";
-import type { SelectedSettingsDependencies } from "features/two-hop/application/displayCacheDependencies";
 
 export type MergedLinkItem = TwoHopLinkBranch | TwoHopIndexedLink;
-
-type LinkDisplayPreprocessSettings = SelectedSettingsDependencies<
-	typeof LINK_DISPLAY_PREPROCESS_SETTING_DEPENDENCIES
->;
-
-type DisplayAssemblySettings = SelectedSettingsDependencies<
-	typeof DISPLAY_ASSEMBLY_SETTING_DEPENDENCIES
->;
 
 export interface DisplayData {
 	readonly outgoing: readonly TwoHopLinkBranch[];
@@ -101,11 +92,9 @@ export interface DisplayDataBuilderDependencies {
 	getSortContextVersion?: () => number;
 }
 
-type SortItemsFunction = ISortService["sort"];
-
-type ItemSortCache = WeakMap<
-	SortItemsFunction,
-	Map<string, WeakMap<readonly SortableItem[], readonly SortableItem[]>>
+type ItemSortCache = Map<
+	string,
+	WeakMap<readonly SortableItem[], readonly SortableItem[]>
 >;
 
 interface DeduplicationStageResult<T> {
@@ -141,11 +130,11 @@ function createEmptyTagPreprocessedDisplayData(): TagPreprocessedDisplayData {
 }
 
 export function createHop2SortCache(): Hop2SortCache {
-	return new WeakMap();
+	return new Map();
 }
 
 function createTagItemSortCache(): TagItemSortCache {
-	return new WeakMap();
+	return new Map();
 }
 
 export function createDisplayAssemblyCache(): DisplayAssemblyCache {
@@ -338,10 +327,7 @@ function preprocessLinkData(
 		};
 	}
 
-	const preprocessSettings = selectSettingsDependencies(
-		settings,
-		LINK_DISPLAY_PREPROCESS_SETTING_DEPENDENCIES,
-	);
+	const preprocessSettings = selectLinkDisplayPreprocessSettings(settings);
 	let { branches: originalBranches, backlinks: originalBacklinks } = linkResult;
 
 	if (preprocessSettings.excludeAttachments) {
@@ -413,10 +399,7 @@ function preprocessTagData(
 	deduplicationService?: IDeduplicationService,
 	initialState: DedupState = createDedupState(),
 ): DeduplicationStageResult<TagPreprocessedDisplayData> {
-	const preprocessSettings = selectSettingsDependencies(
-		settings,
-		TAG_DISPLAY_PREPROCESS_SETTING_DEPENDENCIES,
-	);
+	const preprocessSettings = selectTagDisplayPreprocessSettings(settings);
 	if (
 		!linkResult ||
 		!preprocessSettings.tagFeaturesEnabled ||
@@ -510,18 +493,6 @@ function hasSameItemOrder<T>(original: readonly T[], sorted: readonly T[]): bool
 	return true;
 }
 
-function createDisplayAssemblyKey(
-	settings: DisplayAssemblySettings,
-	sortOption: SortOption,
-	sortContextVersion: number,
-): string {
-	return createStructuredCacheKey({
-		settings,
-		sortOption,
-		sortContextVersion,
-	});
-}
-
 function createSortCacheKey(
 	sortOption: SortOption,
 	sortContextVersion: number,
@@ -540,18 +511,11 @@ export function getSortedItemsWithCache<T extends SortableItem>(
 		return items;
 	}
 
-	const sortItems = sortService.sort;
-	let itemSortCacheByKey = itemSortCache.get(sortItems);
-	if (!itemSortCacheByKey) {
-		itemSortCacheByKey = new Map();
-		itemSortCache.set(sortItems, itemSortCacheByKey);
-	}
-
 	const sortCacheKey = createSortCacheKey(sortOption, sortContextVersion);
-	let cachedSortedItemsByOption = itemSortCacheByKey.get(sortCacheKey);
+	let cachedSortedItemsByOption = itemSortCache.get(sortCacheKey);
 	if (!cachedSortedItemsByOption) {
 		cachedSortedItemsByOption = new WeakMap();
-		itemSortCacheByKey.set(sortCacheKey, cachedSortedItemsByOption);
+		itemSortCache.set(sortCacheKey, cachedSortedItemsByOption);
 	}
 
 	let sortedItems = cachedSortedItemsByOption.get(items) as readonly T[] | undefined;
@@ -595,12 +559,9 @@ export function sortAndAssembleDisplayData(
 	displayAssemblyCache: DisplayAssemblyCache = createDisplayAssemblyCache(),
 	sortContextVersion = 0,
 ): DisplayData {
-	const assemblySettings = selectSettingsDependencies(
+	const assemblySettings = selectDisplayAssemblySettings(settings);
+	const assemblyKey = createDisplayAssemblyCacheKey(
 		settings,
-		DISPLAY_ASSEMBLY_SETTING_DEPENDENCIES,
-	);
-	const assemblyKey = createDisplayAssemblyKey(
-		assemblySettings,
 		sortOption,
 		sortContextVersion,
 	);

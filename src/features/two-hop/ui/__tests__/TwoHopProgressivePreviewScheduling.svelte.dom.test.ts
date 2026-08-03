@@ -6,10 +6,10 @@ import type { PreviewFrame } from "features/preview/scheduling/virtualPreviewSur
 import type { TwoHopPreviewDependencies } from "features/two-hop/ui/twoHopPreviewDependencies";
 import type { TwoHopCardPresentationState } from "features/two-hop/ui/twoHopCellStaticState";
 import type {
-	TwoHopVirtualListItem,
-	TwoHopVirtualSectionDescriptor,
-} from "features/two-hop/ui/twoHopVirtualListModel";
-import { createSectionDataRevision } from "features/two-hop/ui/twoHopRevisions";
+	TwoHopItemModel,
+	TwoHopSectionModel,
+} from "features/two-hop/ui/twoHopSectionModel";
+import { createTwoHopSectionModel } from "features/two-hop/ui/twoHopSectionModel";
 import { TWO_HOP_PROGRESSIVE_ROWS_PER_CHUNK } from "features/two-hop/ui/twoHopProgressivePlan";
 import type { ApplicationStore } from "ui/stores/ApplicationStore.svelte";
 import type { CardRenderModel } from "ui/components/items/cardRenderModel";
@@ -74,32 +74,21 @@ const PREVIEW_SCROLL_TASK_KEY = "two-hop-progressive-preview-window";
 const PREVIEW_RANGE_APPLY_TASK_KEY = "two-hop-progressive-preview-window-apply";
 const HYDRATION_POST_PAINT_TASK_KEY = "two-hop-progressive-hydration-visible";
 
-function createSection(count: number): TwoHopVirtualSectionDescriptor {
+function createSection(count: number): TwoHopSectionModel {
 	const items = Array.from({ length: count }, (_, index) => ({
 		kind: "new-link",
 		item: { type: "newLink" },
 		interactionId: `item:${index}`,
 		searchKey: `item:${index}`,
-		virtualKey: `item:${index}`,
-	})) as TwoHopVirtualListItem[];
-	return {
-		sourceRevision: createSectionDataRevision(1),
-		section: {
-			kind: "new-links-section",
-			rawSectionId: "section",
-			sectionId: "section",
-			sectionKey: "section",
-			title: "Section",
-		},
-		sectionKey: "section",
-		sectionId: "section",
+		key: `item:${index}`,
+	})) as TwoHopItemModel[];
+	return createTwoHopSectionModel({
+		id: "section",
+		key: "section",
+		kind: "new-links-section",
 		title: "Section",
-		totalCount: count,
-		loadedCount: count,
-		getItems: () => items,
-		getItem: (index) => items[index],
-		headerProps: {},
-	};
+		items,
+	});
 }
 
 interface HydrationSchedulingFixture {
@@ -111,7 +100,7 @@ interface HydrationSchedulingFixture {
 	rerenderCardModels(
 		revision: unknown,
 		resolver: (
-			item: TwoHopVirtualListItem,
+			item: TwoHopItemModel,
 			presentation: TwoHopCardPresentationState,
 		) => CardRenderModel,
 	): Promise<void>;
@@ -128,7 +117,7 @@ interface PreviewControlFixture {
 	rerenderCardModels(
 		revision: unknown,
 		resolver: (
-			item: TwoHopVirtualListItem,
+			item: TwoHopItemModel,
 			presentation: TwoHopCardPresentationState,
 		) => CardRenderModel,
 	): Promise<void>;
@@ -154,28 +143,28 @@ async function renderPreviewControlFixture(
 		stat: { ctime: 1, mtime: 1, size: 1 },
 	} as TFile;
 	const requestsByKey = new Map<string, CardPreviewRequest>();
-	const resolvePreviewRequest = vi.fn((item: TwoHopVirtualListItem) => {
-		const existing = requestsByKey.get(item.virtualKey);
+	const resolvePreviewRequest = vi.fn((item: TwoHopItemModel) => {
+		const existing = requestsByKey.get(item.key);
 		if (existing) return existing;
 		const request = {
-			renderKey: `preview:${item.virtualKey}`,
+			renderKey: `preview:${item.key}`,
 		} as CardPreviewRequest;
-		requestsByKey.set(item.virtualKey, request);
+		requestsByKey.set(item.key, request);
 		return request;
 	});
 	const resolveItemCardModel = (
-		item: TwoHopVirtualListItem,
+		item: TwoHopItemModel,
 		presentation: TwoHopCardPresentationState,
 	): CardRenderModel => ({
 		item: item.item,
 		targetFile,
-		title: item.virtualKey,
-		ariaLabel: item.virtualKey,
+		title: item.key,
+		ariaLabel: item.key,
 		className: null,
 		extension: "md",
 		directory: "notes",
-		interactionId: item.virtualKey,
-		interactionKey: item.virtualKey,
+		interactionId: item.key,
+		interactionKey: item.key,
 		interactionDescriptor: null,
 		presentation,
 		searchQuery: "",
@@ -268,22 +257,22 @@ async function renderHydrationSchedulingFixture(
 			cardMaxColumns: 3,
 		},
 	} as unknown as ApplicationStore;
-	const resolveInteractionDescriptor = vi.fn((_item: TwoHopVirtualListItem) => null);
-	const resolvePreviewRequest = vi.fn((_item: TwoHopVirtualListItem) => null);
+	const resolveInteractionDescriptor = vi.fn((_item: TwoHopItemModel) => null);
+	const resolvePreviewRequest = vi.fn((_item: TwoHopItemModel) => null);
 	const resolveItemCardModel = vi.fn(
 		(
-			item: TwoHopVirtualListItem,
+			item: TwoHopItemModel,
 			presentation: TwoHopCardPresentationState,
 		): CardRenderModel => ({
 			item: item.item,
 			targetFile: null,
-			title: item.virtualKey,
-			ariaLabel: item.virtualKey,
+			title: item.key,
+			ariaLabel: item.key,
 			className: null,
 			extension: null,
 			directory: null,
-			interactionId: item.virtualKey,
-			interactionKey: item.virtualKey,
+			interactionId: item.key,
+			interactionKey: item.key,
 			get interactionDescriptor() {
 				return resolveInteractionDescriptor(item);
 			},
@@ -355,8 +344,8 @@ function readResolvedItemIndexes(
 	resolveItemCardModel: ReturnType<typeof vi.fn>,
 ): number[] {
 	return resolveItemCardModel.mock.calls.map(([item]) => {
-		const virtualItem = item as TwoHopVirtualListItem;
-		return Number(virtualItem.virtualKey.slice("item:".length));
+		const twoHopItem = item as TwoHopItemModel;
+		return Number(twoHopItem.key.slice("item:".length));
 	});
 }
 
@@ -446,7 +435,7 @@ describe("TwoHop progressive preview scheduling", () => {
 		);
 	});
 
-	it("keeps stale cards rendered and publishes only changed presentation identities", async () => {
+	it("keeps stale cards rendered until the revised model is hydrated", async () => {
 		const fixture = await renderHydrationSchedulingFixture();
 		await drainPostPaintTasks();
 		const itemCells = Array.from(
@@ -466,18 +455,18 @@ describe("TwoHop progressive preview scheduling", () => {
 
 		const equivalentResolver = vi.fn(
 			(
-				item: TwoHopVirtualListItem,
+				item: TwoHopItemModel,
 				presentation: TwoHopCardPresentationState,
 			): CardRenderModel => ({
 				item: item.item,
 				targetFile: null,
-				title: item.virtualKey,
-				ariaLabel: `revised:${item.virtualKey}`,
+				title: item.key,
+				ariaLabel: `revised:${item.key}`,
 				className: null,
 				extension: null,
 				directory: null,
-				interactionId: item.virtualKey,
-				interactionKey: item.virtualKey,
+				interactionId: item.key,
+				interactionKey: item.key,
 				interactionDescriptor: null,
 				presentation,
 				searchQuery: "",
@@ -491,22 +480,22 @@ describe("TwoHop progressive preview scheduling", () => {
 		expect(firstCard).toHaveAttribute("aria-label", "item:0");
 		await drainPostPaintTasks();
 		expect(equivalentResolver).toHaveBeenCalled();
-		expect(firstCard).toHaveAttribute("aria-label", "item:0");
+		expect(firstCard).toHaveAttribute("aria-label", "revised:item:0");
 
 		const changedResolver = vi.fn(
 			(
-				item: TwoHopVirtualListItem,
+				item: TwoHopItemModel,
 				presentation: TwoHopCardPresentationState,
 			): CardRenderModel => ({
 				item: item.item,
 				targetFile: null,
-				title: item.virtualKey === "item:0" ? "changed-title" : item.virtualKey,
-				ariaLabel: item.virtualKey,
+				title: item.key === "item:0" ? "changed-title" : item.key,
+				ariaLabel: item.key,
 				className: null,
 				extension: null,
 				directory: null,
-				interactionId: item.virtualKey,
-				interactionKey: item.virtualKey,
+				interactionId: item.key,
+				interactionKey: item.key,
 				interactionDescriptor: null,
 				presentation,
 				searchQuery: "",
@@ -539,26 +528,26 @@ describe("TwoHop progressive preview scheduling", () => {
 		function createResolver(changedItemKey?: string) {
 			return vi.fn(
 				(
-					item: TwoHopVirtualListItem,
+					item: TwoHopItemModel,
 					presentation: TwoHopCardPresentationState,
 				): CardRenderModel => ({
 					item: item.item,
 					targetFile,
-					title: item.virtualKey,
-					ariaLabel: item.virtualKey,
+					title: item.key,
+					ariaLabel: item.key,
 					className: null,
 					extension: "md",
 					directory: "notes",
-					interactionId: item.virtualKey,
-					interactionKey: item.virtualKey,
+					interactionId: item.key,
+					interactionKey: item.key,
 					interactionDescriptor: null,
 					presentation,
 					searchQuery: "",
 					previewRequest: {
 						renderKey:
-							item.virtualKey === changedItemKey
-								? `changed:${item.virtualKey}`
-								: `preview:${item.virtualKey}`,
+							item.key === changedItemKey
+								? `changed:${item.key}`
+								: `preview:${item.key}`,
 					} as CardPreviewRequest,
 				}),
 			);
@@ -598,18 +587,18 @@ describe("TwoHop progressive preview scheduling", () => {
 
 		const refreshedResolver = vi.fn(
 			(
-				item: TwoHopVirtualListItem,
+				item: TwoHopItemModel,
 				presentation: TwoHopCardPresentationState,
 			): CardRenderModel => ({
 				item: item.item,
 				targetFile: null,
-				title: item.virtualKey,
-				ariaLabel: item.virtualKey,
+				title: item.key,
+				ariaLabel: item.key,
 				className: null,
 				extension: null,
 				directory: null,
-				interactionId: item.virtualKey,
-				interactionKey: item.virtualKey,
+				interactionId: item.key,
+				interactionKey: item.key,
 				interactionDescriptor: null,
 				presentation,
 				searchQuery: "",
@@ -704,23 +693,23 @@ describe("TwoHop progressive preview scheduling", () => {
 			},
 		} as unknown as ApplicationStore;
 		const resolveItemCardModel = (
-			item: TwoHopVirtualListItem,
+			item: TwoHopItemModel,
 			presentation: TwoHopCardPresentationState,
 		): CardRenderModel => ({
 			item: item.item,
 			targetFile: null,
-			title: item.virtualKey,
-			ariaLabel: item.virtualKey,
+			title: item.key,
+			ariaLabel: item.key,
 			className: null,
 			extension: null,
 			directory: null,
-			interactionId: item.virtualKey,
-			interactionKey: item.virtualKey,
+			interactionId: item.key,
+			interactionKey: item.key,
 			interactionDescriptor: null,
 			presentation,
 			searchQuery: "",
 			previewRequest: {
-				renderKey: `preview:${item.virtualKey}`,
+				renderKey: `preview:${item.key}`,
 			} as CardPreviewRequest,
 		});
 		const scroller = document.createElement("div");

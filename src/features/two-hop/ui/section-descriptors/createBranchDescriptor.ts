@@ -13,13 +13,10 @@ import {
 import type { TwoHopLinkBranch } from "types/domain";
 import type { ApplicationStore } from "ui/stores/ApplicationStore.svelte";
 import {
-	type TwoHopVirtualListItem,
-	type TwoHopVirtualSectionDescriptor,
-} from "features/two-hop/ui/twoHopVirtualListModel";
-import {
-	createDescriptor,
-	createEagerVirtualItemAccessors,
-} from "./descriptorIdentity";
+	createTwoHopSectionModel,
+	type TwoHopItemModel,
+	type TwoHopSectionModel,
+} from "features/two-hop/ui/twoHopSectionModel";
 import type { TwoHopInteractionTokenAllocator } from "./interactionTokenAllocator";
 import {
 	createTwohopChildSearchKeyFromBaseKeys,
@@ -74,11 +71,11 @@ export function resolveBranchHeader(params: {
 export function createBranchSectionDescriptor(
 	input: BranchSectionBuildInput,
 	tokens: TwoHopInteractionTokenAllocator,
-): TwoHopVirtualSectionDescriptor {
+): TwoHopSectionModel {
 	const branchBaseKey = getTwohopBranchSearchBaseKey(input.branch);
 	const sortedItems = input.applicationStore.getSortedTwoHopItems(input.branch.hop2);
-	const rows: readonly TwoHopVirtualListItem[] = sortedItems.map(
-		(source): TwoHopVirtualListItem => {
+	const rows: readonly TwoHopItemModel[] = sortedItems.map(
+		(source): TwoHopItemModel => {
 			const item: ViewItem = { type: "backlink", data: source };
 			const virtualKey = generateBacklinkKey(source);
 			const interactionKey = createItemInteractionKey(item, virtualKey);
@@ -92,11 +89,10 @@ export function createBranchSectionDescriptor(
 					branchBaseKey,
 					virtualKey,
 				),
-				virtualKey,
+				key: virtualKey,
 			};
 		},
 	);
-	const accessors = createEagerVirtualItemAccessors(rows);
 	const headerInteractionIdentity = tokens.createHeaderInteractionIdentity(
 		input.rawSectionId,
 	);
@@ -121,19 +117,14 @@ export function createBranchSectionDescriptor(
 		interactionDescriptor: headerInteractionDescriptor,
 	};
 
-	return createDescriptor(
-		{
-			kind: "two-hop-branch",
-			rawSectionId: input.rawSectionId,
-			sectionId: input.rawSectionId,
-			sectionKey: input.sectionKey,
-			title: input.title,
-			branch: input.branch,
-			headerProps,
-		},
-		rows.length,
-		accessors.getItems,
-		accessors.getItem,
+	return createTwoHopSectionModel({
+		kind: "two-hop-branch",
+		id: input.rawSectionId,
+		key: input.sectionKey,
+		title: input.title,
+		className: input.className,
+		branch: input.branch,
 		headerProps,
-	);
+		items: rows,
+	});
 }

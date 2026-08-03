@@ -1,40 +1,47 @@
 import { describe, expect, it } from "vitest";
 import {
-	createSettingsCacheKey,
-	DISPLAY_ASSEMBLY_SETTING_DEPENDENCIES,
-	selectSettingsDependencies,
-	TAG_PREPROCESS_CACHE_SETTING_DEPENDENCIES,
+	createDisplayAssemblyCacheKey,
+	createTagPreprocessCacheKey,
+	selectDisplayAssemblySettings,
 } from "../displayCacheDependencies";
 import { DEFAULT_SETTINGS } from "features/settings/model";
 
-describe("displayCacheDependencies", () => {
-	it("selects only the declared assembly settings", () => {
-		expect(
-			selectSettingsDependencies(
-				DEFAULT_SETTINGS,
-				DISPLAY_ASSEMBLY_SETTING_DEPENDENCIES,
-			),
-		).toEqual({
+describe("display cache keys", () => {
+	it("selects the fixed assembly settings", () => {
+		expect(selectDisplayAssemblySettings(DEFAULT_SETTINGS)).toEqual({
 			useMergedLinksSection: false,
 			showTagsSection: true,
 		});
 	});
 
-	it("normalizes the optional tag feature setting before keying", () => {
-		const enabledKey = createSettingsCacheKey(
-			{ ...DEFAULT_SETTINGS, enableTagFeatures: true },
-			TAG_PREPROCESS_CACHE_SETTING_DEPENDENCIES,
+	it("keys assembly settings, sort option, and sort context", () => {
+		const first = createDisplayAssemblyCacheKey(
+			DEFAULT_SETTINGS,
+			"alphabetical",
+			1,
 		);
-		const defaultEnabledKey = createSettingsCacheKey(
-			{ ...DEFAULT_SETTINGS, enableTagFeatures: undefined },
-			TAG_PREPROCESS_CACHE_SETTING_DEPENDENCIES,
+		const changed = createDisplayAssemblyCacheKey(
+			{ ...DEFAULT_SETTINGS, showTagsSection: false },
+			"alphabetical",
+			1,
 		);
-		const disabledKey = createSettingsCacheKey(
-			{ ...DEFAULT_SETTINGS, enableTagFeatures: false },
-			TAG_PREPROCESS_CACHE_SETTING_DEPENDENCIES,
-		);
+		expect(changed).not.toBe(first);
+	});
 
-		expect(defaultEnabledKey).toBe(enabledKey);
-		expect(disabledKey).not.toBe(enabledKey);
+	it("normalizes the optional tag feature setting", () => {
+		const enabled = createTagPreprocessCacheKey({
+			...DEFAULT_SETTINGS,
+			enableTagFeatures: true,
+		});
+		const defaultEnabled = createTagPreprocessCacheKey({
+			...DEFAULT_SETTINGS,
+			enableTagFeatures: undefined,
+		});
+		const disabled = createTagPreprocessCacheKey({
+			...DEFAULT_SETTINGS,
+			enableTagFeatures: false,
+		});
+		expect(defaultEnabled).toBe(enabled);
+		expect(disabled).not.toBe(enabled);
 	});
 });

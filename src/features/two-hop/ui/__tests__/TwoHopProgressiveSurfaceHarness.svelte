@@ -6,21 +6,22 @@
 	import type { TwoHopCardPresentationState } from "features/two-hop/ui/twoHopCellStaticState";
 	import type { TwoHopPreviewDependencies } from "features/two-hop/ui/twoHopPreviewDependencies";
 	import type {
-		TwoHopVirtualListItem,
-		TwoHopVirtualSectionDescriptor,
-	} from "features/two-hop/ui/twoHopVirtualListModel";
+		TwoHopItemModel,
+		TwoHopSectionModel,
+	} from "features/two-hop/ui/twoHopSectionModel";
 
 	interface Props {
 		documentIdentity?: string;
-		sections: readonly TwoHopVirtualSectionDescriptor[];
+		sections: readonly TwoHopSectionModel[];
 		applicationStore: ApplicationStore;
 		linkContext: LinkContext;
 		previewDependencies?: TwoHopPreviewDependencies;
 		previewActive?: boolean;
 		cardModelRevision?: unknown;
 		resolveItemCardModel: (
-			item: TwoHopVirtualListItem,
+			item: TwoHopItemModel,
 			presentation: TwoHopCardPresentationState,
+			revision: unknown,
 		) => CardRenderModel;
 	}
 

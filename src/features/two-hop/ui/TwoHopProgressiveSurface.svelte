@@ -1,5 +1,5 @@
 <script lang="ts">
-	import VirtualInteractiveSurface from "ui/virtualization/svelte/VirtualInteractiveSurface.svelte";
+	import DelegatedInteractionSurface from "ui/interactions/DelegatedInteractionSurface.svelte";
 	import { provideVirtualFrameCoordinator } from "ui/virtualization/svelte/frameCoordinatorContext.svelte";
 	import { provideVirtualPreviewSurface } from "features/preview/ui/virtualPreviewSurfaceContext";
 	import TwoHopProgressiveRow from "features/two-hop/ui/TwoHopProgressiveRow.svelte";
@@ -14,7 +14,7 @@
 	provideVirtualPreviewSurface(list.previewSurface);
 </script>
 
-<VirtualInteractiveSurface
+<DelegatedInteractionSurface
 	className="cosense-card-links__section twohop-page-progressive-list twohop-progressive-surface"
 	bind:rootEl={list.rootEl}
 	bind:contentEl={list.contentEl}
@@ -54,4 +54,4 @@
 			{/if}
 		</div>
 	{/snippet}
-</VirtualInteractiveSurface>
+</DelegatedInteractionSurface>

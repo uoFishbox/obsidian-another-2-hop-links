@@ -9,8 +9,8 @@ import type {
 } from "types/domain";
 import type { DisplayData } from "features/two-hop/application/displayDataBuilder";
 import {
-	collectTwohopSearchableFiles,
 	createTwohopSearchAdapter,
+	type TwohopSearchAdapterOptions,
 	type TwohopSearchRenderMode,
 } from "features/two-hop/ui/twoHopSearchAdapter";
 
@@ -29,6 +29,15 @@ vi.mock("obsidian", () => {
 		normalizePath: vi.fn((path: string) => path.replace(/\\/g, "/")),
 	};
 });
+
+function createSearchAdapterHarness() {
+	const adapter = createTwohopSearchAdapter();
+	return {
+		...adapter,
+		buildDataset: (options: TwohopSearchAdapterOptions) =>
+			adapter.buildSnapshot(options).workerItems,
+	};
+}
 
 function createBacklink(sourceFile: TFile, rawText: string): TwoHopIndexedLink {
 	return {
@@ -140,7 +149,7 @@ function createAdapterOptions(
 }
 
 describe("TwohopSearchAdapter.buildDataset", () => {
-	const searchAdapter = createTwohopSearchAdapter();
+	const searchAdapter = createSearchAdapterHarness();
 
 	it("builds snapshot from resolved outgoing branch with frontmatter title", () => {
 		const sourceFile = createMockTFile("notes/source.md");
@@ -297,7 +306,7 @@ describe("TwohopSearchAdapter.buildDataset", () => {
 });
 
 describe("TwohopSearchAdapter.filterDisplayData", () => {
-	const searchAdapter = createTwohopSearchAdapter();
+	const searchAdapter = createSearchAdapterHarness();
 
 	it("returns original displayData when query is empty", () => {
 		const sourceFile = createMockTFile("notes/source.md");
@@ -479,7 +488,7 @@ describe("TwohopSearchAdapter.filterDisplayData", () => {
 		const displayData = createDisplayData({
 			backlinks: [backlink],
 		});
-		const adapter = createTwohopSearchAdapter();
+		const adapter = createSearchAdapterHarness();
 		const snapshots = adapter.buildDataset(
 			createAdapterOptions(displayData, sourceFile),
 		);
@@ -503,7 +512,7 @@ describe("TwohopSearchAdapter.filterDisplayData", () => {
 		const firstDisplayData = createDisplayData({
 			backlinks: [backlink],
 		});
-		const adapter = createTwohopSearchAdapter();
+		const adapter = createSearchAdapterHarness();
 		const firstKey = adapter.buildDataset(
 			createAdapterOptions(firstDisplayData, sourceFile),
 		)[0]?.key;
@@ -584,7 +593,7 @@ describe("TwohopSearchAdapter.filterDisplayData", () => {
 });
 
 describe("TwohopSearchAdapter.buildSnapshot", () => {
-	it("builds worker items, unique files, and source locations in one snapshot", () => {
+	it("builds worker items and unique files in one snapshot", () => {
 		const sourceFile = createMockTFile("notes/source.md");
 		const repeatedFile = createMockTFile("notes/repeated.md");
 		const displayData = createDisplayData({
@@ -600,36 +609,17 @@ describe("TwohopSearchAdapter.buildSnapshot", () => {
 			],
 		});
 		const options = createAdapterOptions(displayData, sourceFile);
-		const adapter = createTwohopSearchAdapter();
+		const adapter = createSearchAdapterHarness();
 
 		const snapshot = adapter.buildSnapshot(options);
-		const backlinkItems = snapshot.workerItems.filter((item) =>
-			item.key.startsWith("b"),
-		);
-		const tagGroupItem = snapshot.workerItems.find((item) =>
-			item.key.startsWith("g"),
-		);
-
 		expect(snapshot.searchableFiles).toEqual([repeatedFile]);
 		expect(snapshot.workerItems).toHaveLength(4);
 		expect(options.fileToLinktext).toHaveBeenCalledTimes(1);
 		expect(options.getMetadata).toHaveBeenCalledTimes(1);
-		expect(snapshot.locationByKey.get(backlinkItems[0].key)).toEqual({
-			sectionId: "backlinks",
-			sourceIndex: 0,
-		});
-		expect(snapshot.locationByKey.get(backlinkItems[1].key)).toEqual({
-			sectionId: "backlinks",
-			sourceIndex: 1,
-		});
-		expect(snapshot.locationByKey.get(tagGroupItem?.key ?? "")).toEqual({
-			sectionId: "tags-alpha",
-			sourceIndex: -1,
-		});
 	});
 });
 
-describe("collectTwohopSearchableFiles", () => {
+describe("TwohopSearchAdapter searchable files", () => {
 	it("collects files from visible sections", () => {
 		const sourceFile = createMockTFile("notes/source.md");
 		const outgoingTarget = createMockTFile("notes/outgoing-target.md");
@@ -662,7 +652,8 @@ describe("collectTwohopSearchableFiles", () => {
 		};
 		const options = createAdapterOptions(displayData, sourceFile);
 
-		const files = collectTwohopSearchableFiles(options);
+		const files =
+			createTwohopSearchAdapter().buildSnapshot(options).searchableFiles;
 		const filePaths = files.map((f) => f.path);
 
 		expect(filePaths).toEqual(
@@ -706,7 +697,8 @@ describe("collectTwohopSearchableFiles", () => {
 			showTags: false,
 		});
 
-		const files = collectTwohopSearchableFiles(options);
+		const files =
+			createTwohopSearchAdapter().buildSnapshot(options).searchableFiles;
 		const filePaths = files.map((f) => f.path);
 
 		expect(filePaths).toEqual(

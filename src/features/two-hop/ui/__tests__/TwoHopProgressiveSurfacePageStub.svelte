@@ -1,13 +1,13 @@
 <script lang="ts">
 	import ViewItemCard from "ui/components/items/ViewItemCard.svelte";
-	import type { TwoHopVirtualSectionDescriptor } from "features/two-hop/ui/twoHopVirtualListModel";
+	import type { TwoHopSectionModel } from "features/two-hop/ui/twoHopSectionModel";
 	import type { ApplicationStore } from "ui/stores/ApplicationStore.svelte";
 	import type { TwoHopPreviewDependencies } from "features/two-hop/ui/twoHopPreviewDependencies";
 	import { captureTwoHopProgressiveSurfacePageStubProps } from "./twoHopProgressiveSurfacePageStubCapture";
 
 	interface Props {
 		documentIdentity: string;
-		sections: readonly TwoHopVirtualSectionDescriptor[];
+		sections: readonly TwoHopSectionModel[];
 		applicationStore: ApplicationStore;
 		previewDependencies?: TwoHopPreviewDependencies;
 		previewActive?: boolean;
@@ -43,9 +43,9 @@
 	)}
 	data-preview-active={String(previewActive)}
 >
-	{#each sections as descriptor}
-		<section data-section-id={descriptor.sectionId}>
-			{#each descriptor.getItems() as row}
+	{#each sections as section}
+		<section data-section-id={section.id}>
+			{#each section.items as row}
 				<ViewItemCard item={row.item} settings={applicationStore.settings} />
 			{/each}
 		</section>

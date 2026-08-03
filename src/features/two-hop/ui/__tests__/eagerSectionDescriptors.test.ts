@@ -24,15 +24,15 @@ describe("eager section descriptors", () => {
 				`i${createItemInteractionToken.mock.calls.length}`,
 		);
 
-		const descriptor = createPrimarySectionDescriptor({
+		const section = createPrimarySectionDescriptor({
 			input: { kind: "outgoing", items: branches },
 			createItemInteractionToken,
 		});
 
 		expect(createItemInteractionToken).toHaveBeenCalledTimes(2);
-		const rows = descriptor.getItems();
-		expect(descriptor.getItems()).toBe(rows);
-		expect(descriptor.getItem(1)).toBe(rows[1]);
+		const rows = section.items;
+		expect(Object.isFrozen(rows)).toBe(true);
+		expect(section.items[1]).toBe(rows[1]);
 		expect(rows.map((row) => row.item.type)).toEqual(["branch", "branch"]);
 	});
 
@@ -46,15 +46,15 @@ describe("eager section descriptors", () => {
 				`i${createItemInteractionToken.mock.calls.length}`,
 		);
 
-		const descriptor = createNewLinksSectionDescriptor({
+		const section = createNewLinksSectionDescriptor({
 			items: links,
 			createItemInteractionToken,
 		});
 
 		expect(createItemInteractionToken).toHaveBeenCalledTimes(2);
-		const rows = descriptor.getItems();
-		expect(descriptor.getItems()).toBe(rows);
-		expect(descriptor.getItem(1)).toBe(rows[1]);
+		const rows = section.items;
+		expect(Object.isFrozen(rows)).toBe(true);
+		expect(section.items[1]).toBe(rows[1]);
 		expect(rows.map((row) => row.item.type)).toEqual(["newLink", "newLink"]);
 	});
 });

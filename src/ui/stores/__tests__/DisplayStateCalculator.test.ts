@@ -12,7 +12,6 @@ import {
 	computePreprocessedDisplayDataState,
 	createPreprocessedDisplayDataCache,
 } from "ui/stores/application/DisplayStateCalculator";
-import { PREPROCESS_CACHE_SETTING_DEPENDENCIES } from "features/two-hop/application/displayCacheDependencies";
 
 function createBacklink(path: string): TwoHopIndexedLink {
 	return {
@@ -105,9 +104,20 @@ const PREPROCESS_DEPENDENCY_SETTING_OVERRIDES = {
 	tagFeaturesEnabled: { enableTagFeatures: false },
 	showTagsSection: { showTagsSection: false },
 } satisfies Record<
-	(typeof PREPROCESS_CACHE_SETTING_DEPENDENCIES)[number]["key"],
+	| "excludeAttachments"
+	| "twoHopHeaderSortOrder"
+	| "dedupeCards"
+	| "tagFeaturesEnabled"
+	| "showTagsSection",
 	Partial<PluginSettings>
 >;
+const PREPROCESS_SETTING_KEYS = [
+	"excludeAttachments",
+	"twoHopHeaderSortOrder",
+	"dedupeCards",
+	"tagFeaturesEnabled",
+	"showTagsSection",
+] as const;
 
 function createCacheProbeBuilder() {
 	const preprocessLinkDisplayData = vi.fn(
@@ -203,9 +213,9 @@ describe("DisplayStateCalculator", () => {
 		]);
 	});
 
-	it.each(PREPROCESS_CACHE_SETTING_DEPENDENCIES)(
-		"invalidates the declared $key preprocessing dependency",
-		(dependency) => {
+	it.each(PREPROCESS_SETTING_KEYS)(
+		"invalidates the $s preprocessing dependency",
+		(settingKey) => {
 			const { builder, preprocessLinkDisplayData, preprocessTagDisplayData } =
 				createCacheProbeBuilder();
 			const cache = createPreprocessedDisplayDataCache();
@@ -224,7 +234,7 @@ describe("DisplayStateCalculator", () => {
 				linkResult,
 				{
 					...DEFAULT_SETTINGS,
-					...PREPROCESS_DEPENDENCY_SETTING_OVERRIDES[dependency.key],
+					...PREPROCESS_DEPENDENCY_SETTING_OVERRIDES[settingKey],
 				},
 				cache,
 			);

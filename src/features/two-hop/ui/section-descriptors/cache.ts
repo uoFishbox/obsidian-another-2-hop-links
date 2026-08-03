@@ -4,34 +4,25 @@ import {
 	createCompactSectionId,
 	SHOULD_VALIDATE_SECTION_IDS,
 } from "ui/components/common/listPagination";
-import { newLinksSectionConfig } from "ui/components/sections/sectionConfigs";
 import { generateBranchKey } from "features/preview/text-processing/textUtils";
 import type { PluginSettings, SortOption } from "features/settings/model";
 import type { ApplicationStore } from "ui/stores/ApplicationStore.svelte";
 import type { InteractionSettings } from "ui/interactions/interactionTypes";
-import type { TwoHopVirtualSectionDescriptor } from "features/two-hop/ui/twoHopVirtualListModel";
-import {
-	createTwoHopInteractionTokenAllocator,
-	type TwoHopInteractionTokenAllocator,
-} from "./interactionTokenAllocator";
+import type { TwoHopSectionModel } from "features/two-hop/ui/twoHopSectionModel";
+import { createTwoHopInteractionTokenAllocator } from "./interactionTokenAllocator";
 import {
 	createBranchSectionDescriptor,
 	resolveBranchHeader,
-	type BranchSectionBuildInput,
 } from "./createBranchDescriptor";
 import {
 	createPrimarySectionDescriptor,
 	type PrimarySectionBuildInput,
 } from "./createPrimaryDescriptor";
-import {
-	createTagSectionDescriptor,
-	type TagSectionBuildInput,
-} from "./createTagDescriptor";
+import { createTagSectionDescriptor } from "./createTagDescriptor";
 import { createNewLinksSectionDescriptor } from "./createNewLinksDescriptor";
-import { hasSameSectionSignature, type SectionSignature } from "./sectionSignature";
 import { recordCCLDevMeasurement } from "infrastructure/debug/CCLDevMeasurements";
 
-export interface ResolveTwoHopSectionDescriptorIdentityParams {
+export interface ResolveTwoHopSectionsParams {
 	readonly displayData: DisplayData;
 	readonly useMergedLinks: boolean;
 	readonly showTags: boolean;
@@ -48,61 +39,238 @@ export interface ResolveTwoHopSectionDescriptorIdentityParams {
 	readonly onTagClick: (tag: string) => void;
 }
 
-/**
- * Page-owned section publication cache.
- *
- * Reconciliation stops at the section boundary: an equal semantic signature
- * reuses the complete immutable descriptor, while a changed signature eagerly
- * builds a fresh item publication. Interaction tokens remain page-owned and
- * are therefore stable across section publications.
- */
-export interface TwoHopSectionDescriptorIdentityCache {
-	resolve(
-		params: ResolveTwoHopSectionDescriptorIdentityParams,
-	): readonly TwoHopVirtualSectionDescriptor[];
+export interface TwoHopSectionPublicationCache {
+	resolve(params: ResolveTwoHopSectionsParams): readonly TwoHopSectionModel[];
 }
 
 interface CachedSection {
-	readonly signature: SectionSignature;
-	readonly descriptor: TwoHopVirtualSectionDescriptor;
+	readonly dependencies: readonly unknown[];
+	readonly section: TwoHopSectionModel;
 }
 
-type SectionSpec =
-	| {
-			readonly kind: "primary";
-			readonly signature: Extract<SectionSignature, { kind: "primary" }>;
-	  }
-	| {
-			readonly kind: "branch";
-			readonly signature: Extract<SectionSignature, { kind: "branch" }>;
-			readonly buildInput: BranchSectionBuildInput;
-	  }
-	| {
-			readonly kind: "tag";
-			readonly signature: Extract<SectionSignature, { kind: "tag" }>;
-			readonly buildInput: TagSectionBuildInput;
-	  }
-	| {
-			readonly kind: "new-links";
-			readonly signature: Extract<SectionSignature, { kind: "new-links" }>;
-	  };
-
-interface ResolveInputSnapshot {
+interface ResolveSnapshot {
 	readonly displayData: DisplayData;
 	readonly useMergedLinks: boolean;
 	readonly showTags: boolean;
 	readonly sourcePath: string;
-	readonly resolveFile: ResolveTwoHopSectionDescriptorIdentityParams["resolveFile"];
-	readonly fileToLinktext: ResolveTwoHopSectionDescriptorIdentityParams["fileToLinktext"];
+	readonly resolveFile: ResolveTwoHopSectionsParams["resolveFile"];
+	readonly fileToLinktext: ResolveTwoHopSectionsParams["fileToLinktext"];
 	readonly currentSort: SortOption;
 	readonly sortContextVersion: number;
 	readonly mobileLongPressAction: PluginSettings["mobileLongPressAction"];
 	readonly highlightInPreviewOnHover: boolean;
 }
 
-function createResolveInputSnapshot(
-	params: ResolveTwoHopSectionDescriptorIdentityParams,
-): ResolveInputSnapshot {
+/**
+ * Publishes immutable sections and reuses a section only while its direct
+ * inputs retain identity. Resolver results are already immutable at this
+ * boundary, so no semantic snapshots or deep comparisons are needed.
+ */
+export function createTwoHopSectionPublicationCache(): TwoHopSectionPublicationCache {
+	const entries = new Map<string, CachedSection>();
+	const tokens = createTwoHopInteractionTokenAllocator();
+	let previousSnapshot: ResolveSnapshot | undefined;
+	let previousSections: readonly TwoHopSectionModel[] = [];
+	let latestOnTagClick: (tag: string) => void = () => undefined;
+	const onTagClick = (tag: string): void => latestOnTagClick(tag);
+
+	function resolveSection(
+		id: string,
+		dependencies: readonly unknown[],
+		build: () => TwoHopSectionModel,
+	): TwoHopSectionModel {
+		const cached = entries.get(id);
+		if (cached && hasSameDependencies(cached.dependencies, dependencies)) {
+			return cached.section;
+		}
+
+		const section = build();
+		entries.set(id, { dependencies, section });
+		return section;
+	}
+
+	return {
+		resolve(params) {
+			latestOnTagClick = params.onTagClick;
+			const sortContextVersion =
+				params.applicationStore.getSortContextVersion?.() ?? 0;
+			const snapshot = createResolveSnapshot(params, sortContextVersion);
+			if (
+				previousSnapshot &&
+				hasSameResolveSnapshot(previousSnapshot, snapshot)
+			) {
+				recordCacheMeasurement("exactHit");
+				return previousSections;
+			}
+
+			const sections: TwoHopSectionModel[] = [];
+			const activeIds = new Set<string>();
+			const seenIds = SHOULD_VALIDATE_SECTION_IDS ? new Set<string>() : null;
+			const append = (
+				id: string,
+				dependencies: readonly unknown[],
+				build: () => TwoHopSectionModel,
+			): void => {
+				if (seenIds?.has(id)) return;
+				seenIds?.add(id);
+				activeIds.add(id);
+				sections.push(resolveSection(id, dependencies, build));
+			};
+
+			appendPrimarySections(params, append, tokens.createItemInteractionToken);
+			appendBranchSections(params, sortContextVersion, append, tokens);
+			appendTagSections(params, sortContextVersion, append, tokens, onTagClick);
+			appendNewLinksSection(params, append, tokens.createItemInteractionToken);
+
+			for (const id of entries.keys()) {
+				if (!activeIds.has(id)) entries.delete(id);
+			}
+
+			const nextSections = Object.freeze(sections);
+			const changed = !hasSameSectionRefs(previousSections, nextSections);
+			previousSnapshot = snapshot;
+			previousSections = changed ? nextSections : previousSections;
+			recordCacheMeasurement(changed ? "miss" : "hit");
+			return previousSections;
+		},
+	};
+}
+
+type AppendSection = (
+	id: string,
+	dependencies: readonly unknown[],
+	build: () => TwoHopSectionModel,
+) => void;
+
+function appendPrimarySections(
+	params: ResolveTwoHopSectionsParams,
+	append: AppendSection,
+	createItemInteractionToken: (interactionKey: string) => string,
+): void {
+	const inputs: PrimarySectionBuildInput[] = params.useMergedLinks
+		? params.displayData.mergedItems.length > 0
+			? [{ kind: "merged", items: params.displayData.mergedItems }]
+			: []
+		: [
+				...(params.displayData.outgoing.length > 0
+					? ([
+							{ kind: "outgoing", items: params.displayData.outgoing },
+						] as const)
+					: []),
+				...(params.displayData.backlinks.length > 0
+					? ([
+							{ kind: "backlinks", items: params.displayData.backlinks },
+						] as const)
+					: []),
+			];
+
+	for (const input of inputs) {
+		append(input.kind, [input.items], () =>
+			createPrimarySectionDescriptor({ input, createItemInteractionToken }),
+		);
+	}
+}
+
+function appendBranchSections(
+	params: ResolveTwoHopSectionsParams,
+	sortContextVersion: number,
+	append: AppendSection,
+	tokens: ReturnType<typeof createTwoHopInteractionTokenAllocator>,
+): void {
+	const interactionSettings: InteractionSettings = Object.freeze({
+		mobileLongPressAction: params.currentSettings.mobileLongPressAction,
+		highlightInPreviewOnHover: params.currentSettings.highlightInPreviewOnHover,
+	});
+
+	for (const branch of params.displayData.twoHopBranches) {
+		const sectionKey = generateBranchKey(branch);
+		const id = createCompactSectionId("twohop", sectionKey);
+		const header = resolveBranchHeader({
+			branch,
+			sourceFile: params.sourceFile,
+			resolveFile: params.resolveFile,
+			fileToLinktext: params.fileToLinktext,
+		});
+		append(
+			id,
+			[
+				branch,
+				params.sourceFile,
+				header.targetFile,
+				header.title,
+				header.className,
+				header.directory,
+				params.currentSort,
+				sortContextVersion,
+				params.applicationStore.getSortedTwoHopItems,
+				interactionSettings.mobileLongPressAction,
+				interactionSettings.highlightInPreviewOnHover,
+			],
+			() =>
+				createBranchSectionDescriptor(
+					{
+						branch,
+						rawSectionId: id,
+						sectionKey,
+						sourceFile: params.sourceFile,
+						...header,
+						interactionSettings,
+						applicationStore: params.applicationStore,
+					},
+					tokens,
+				),
+		);
+	}
+}
+
+function appendTagSections(
+	params: ResolveTwoHopSectionsParams,
+	sortContextVersion: number,
+	append: AppendSection,
+	tokens: ReturnType<typeof createTwoHopInteractionTokenAllocator>,
+	onTagClick: (tag: string) => void,
+): void {
+	if (!params.showTags) return;
+	for (const source of params.displayData.tagGroups) {
+		const id = `tags-${source.tag}`;
+		append(
+			id,
+			[
+				source,
+				params.currentSort,
+				sortContextVersion,
+				params.applicationStore.getSortedTagGroupItems,
+			],
+			() =>
+				createTagSectionDescriptor(
+					{
+						source,
+						rawSectionId: id,
+						applicationStore: params.applicationStore,
+						onTagClick,
+					},
+					tokens,
+				),
+		);
+	}
+}
+
+function appendNewLinksSection(
+	params: ResolveTwoHopSectionsParams,
+	append: AppendSection,
+	createItemInteractionToken: (interactionKey: string) => string,
+): void {
+	const items = params.displayData.newLinks;
+	if (items.length === 0) return;
+	append("new-links", [items], () =>
+		createNewLinksSectionDescriptor({ items, createItemInteractionToken }),
+	);
+}
+
+function createResolveSnapshot(
+	params: ResolveTwoHopSectionsParams,
+	sortContextVersion: number,
+): ResolveSnapshot {
 	return {
 		displayData: params.displayData,
 		useMergedLinks: params.useMergedLinks,
@@ -111,349 +279,42 @@ function createResolveInputSnapshot(
 		resolveFile: params.resolveFile,
 		fileToLinktext: params.fileToLinktext,
 		currentSort: params.currentSort,
-		sortContextVersion: params.applicationStore.getSortContextVersion?.() ?? 0,
+		sortContextVersion,
 		mobileLongPressAction: params.currentSettings.mobileLongPressAction,
 		highlightInPreviewOnHover: params.currentSettings.highlightInPreviewOnHover,
 	};
 }
 
-function hasSameResolveInputs(
-	current: ResolveInputSnapshot,
-	next: ResolveInputSnapshot,
+function hasSameResolveSnapshot(
+	current: ResolveSnapshot,
+	next: ResolveSnapshot,
 ): boolean {
-	return (
-		current.displayData === next.displayData &&
-		current.useMergedLinks === next.useMergedLinks &&
-		current.showTags === next.showTags &&
-		current.sourcePath === next.sourcePath &&
-		current.resolveFile === next.resolveFile &&
-		current.fileToLinktext === next.fileToLinktext &&
-		current.currentSort === next.currentSort &&
-		current.sortContextVersion === next.sortContextVersion &&
-		current.mobileLongPressAction === next.mobileLongPressAction &&
-		current.highlightInPreviewOnHover === next.highlightInPreviewOnHover
+	return Object.keys(current).every((key) =>
+		Object.is(
+			current[key as keyof ResolveSnapshot],
+			next[key as keyof ResolveSnapshot],
+		),
 	);
 }
 
-function createInteractionSettings(settings: PluginSettings): InteractionSettings {
-	return Object.freeze({
-		mobileLongPressAction: settings.mobileLongPressAction,
-		highlightInPreviewOnHover: settings.highlightInPreviewOnHover,
-	});
+function hasSameDependencies(
+	current: readonly unknown[],
+	next: readonly unknown[],
+): boolean {
+	return (
+		current.length === next.length &&
+		current.every((value, index) => Object.is(value, next[index]))
+	);
 }
 
-function createSectionSpecs(
-	params: ResolveTwoHopSectionDescriptorIdentityParams,
-	onTagClick: (tag: string) => void,
-): SectionSpec[] {
-	const specs: SectionSpec[] = [];
-	appendPrimarySpecs(specs, params);
-	appendBranchSpecs(specs, params);
-	appendTagSpecs(specs, params, onTagClick);
-	appendNewLinksSpec(specs, params);
-	return specs;
-}
-
-function appendPrimarySpecs(
-	specs: SectionSpec[],
-	params: ResolveTwoHopSectionDescriptorIdentityParams,
-): void {
-	if (params.useMergedLinks) {
-		if (params.displayData.mergedItems.length === 0) return;
-		specs.push({
-			kind: "primary",
-			signature: {
-				kind: "primary",
-				input: {
-					kind: "merged",
-					items: params.displayData.mergedItems,
-				},
-			},
-		});
-		return;
-	}
-
-	if (params.displayData.outgoing.length > 0) {
-		specs.push({
-			kind: "primary",
-			signature: {
-				kind: "primary",
-				input: {
-					kind: "outgoing",
-					items: params.displayData.outgoing,
-				},
-			},
-		});
-	}
-	if (params.displayData.backlinks.length > 0) {
-		specs.push({
-			kind: "primary",
-			signature: {
-				kind: "primary",
-				input: {
-					kind: "backlinks",
-					items: params.displayData.backlinks,
-				},
-			},
-		});
-	}
-}
-
-function appendBranchSpecs(
-	specs: SectionSpec[],
-	params: ResolveTwoHopSectionDescriptorIdentityParams,
-): void {
-	const interactionSettings = createInteractionSettings(params.currentSettings);
-	const sortContextVersion = params.applicationStore.getSortContextVersion?.() ?? 0;
-
-	for (const branch of params.displayData.twoHopBranches) {
-		const sectionKey = generateBranchKey(branch);
-		const rawSectionId = createCompactSectionId("twohop", sectionKey);
-		const header = resolveBranchHeader({
-			branch,
-			sourceFile: params.sourceFile,
-			resolveFile: params.resolveFile,
-			fileToLinktext: params.fileToLinktext,
-		});
-		const signature: Extract<SectionSignature, { kind: "branch" }> = {
-			kind: "branch",
-			branch,
-			rawSectionId,
-			sectionKey,
-			...header,
-			sortOption: params.currentSort,
-			sortContextVersion,
-			getSortedItems: params.applicationStore.getSortedTwoHopItems,
-			interactionSettings,
-		};
-		specs.push({
-			kind: "branch",
-			signature,
-			buildInput: {
-				branch,
-				rawSectionId,
-				sectionKey,
-				sourceFile: params.sourceFile,
-				...header,
-				interactionSettings,
-				applicationStore: params.applicationStore,
-			},
-		});
-	}
-}
-
-function appendTagSpecs(
-	specs: SectionSpec[],
-	params: ResolveTwoHopSectionDescriptorIdentityParams,
-	onTagClick: (tag: string) => void,
-): void {
-	if (!params.showTags) return;
-	const sortContextVersion = params.applicationStore.getSortContextVersion?.() ?? 0;
-
-	for (const source of params.displayData.tagGroups) {
-		const rawSectionId = `tags-${source.tag}`;
-		specs.push({
-			kind: "tag",
-			signature: {
-				kind: "tag",
-				source,
-				rawSectionId,
-				sortOption: params.currentSort,
-				sortContextVersion,
-				getSortedItems: params.applicationStore.getSortedTagGroupItems,
-			},
-			buildInput: {
-				source,
-				rawSectionId,
-				applicationStore: params.applicationStore,
-				onTagClick,
-			},
-		});
-	}
-}
-
-function appendNewLinksSpec(
-	specs: SectionSpec[],
-	params: ResolveTwoHopSectionDescriptorIdentityParams,
-): void {
-	if (params.displayData.newLinks.length === 0) return;
-	specs.push({
-		kind: "new-links",
-		signature: {
-			kind: "new-links",
-			items: params.displayData.newLinks,
-		},
-	});
-}
-
-function getSectionId(signature: SectionSignature): string {
-	switch (signature.kind) {
-		case "primary":
-			return signature.input.kind;
-		case "branch":
-		case "tag":
-			return signature.rawSectionId;
-		case "new-links":
-			return newLinksSectionConfig.sectionId;
-	}
-}
-
-function snapshotSpec(spec: SectionSpec): SectionSpec {
-	switch (spec.kind) {
-		case "primary": {
-			const input = {
-				...spec.signature.input,
-				items: [...spec.signature.input.items],
-			} as PrimarySectionBuildInput;
-			return {
-				kind: "primary",
-				signature: { kind: "primary", input },
-			};
-		}
-		case "branch": {
-			const branch = {
-				...spec.signature.branch,
-				hop2: [...spec.signature.branch.hop2],
-			};
-			return {
-				kind: "branch",
-				signature: {
-					...spec.signature,
-					branch,
-				},
-				buildInput: {
-					...spec.buildInput,
-					branch,
-				},
-			};
-		}
-		case "tag": {
-			const source = {
-				...spec.signature.source,
-				notes: [...spec.signature.source.notes],
-			};
-			return {
-				kind: "tag",
-				signature: {
-					...spec.signature,
-					source,
-				},
-				buildInput: {
-					...spec.buildInput,
-					source,
-				},
-			};
-		}
-		case "new-links":
-			return {
-				kind: "new-links",
-				signature: {
-					...spec.signature,
-					items: [...spec.signature.items],
-				},
-			};
-	}
-}
-
-function buildDescriptor(
-	spec: SectionSpec,
-	tokens: TwoHopInteractionTokenAllocator,
-): TwoHopVirtualSectionDescriptor {
-	switch (spec.kind) {
-		case "primary":
-			return createPrimarySectionDescriptor({
-				input: spec.signature.input,
-				createItemInteractionToken: tokens.createItemInteractionToken,
-			});
-		case "branch":
-			return createBranchSectionDescriptor(spec.buildInput, tokens);
-		case "tag":
-			return createTagSectionDescriptor(spec.buildInput, tokens);
-		case "new-links":
-			return createNewLinksSectionDescriptor({
-				items: spec.signature.items,
-				createItemInteractionToken: tokens.createItemInteractionToken,
-			});
-	}
-}
-
-export function createTwoHopSectionDescriptorIdentityCache(): TwoHopSectionDescriptorIdentityCache {
-	const entries = new Map<string, CachedSection>();
-	const tokens = createTwoHopInteractionTokenAllocator();
-	let latestOnTagClick: (tag: string) => void = () => undefined;
-	const onTagClick = (tag: string): void => latestOnTagClick(tag);
-	let previousDescriptors: readonly TwoHopVirtualSectionDescriptor[] = [];
-	let previousInputs: ResolveInputSnapshot | undefined;
-
-	return {
-		resolve(params) {
-			latestOnTagClick = params.onTagClick;
-			const inputs = createResolveInputSnapshot(params);
-			if (previousInputs && hasSameResolveInputs(previousInputs, inputs)) {
-				recordCacheMeasurement("exactHit");
-				recordCacheMeasurement("hit");
-				return previousDescriptors;
-			}
-
-			const specs = createSectionSpecs(params, onTagClick);
-			const activeSectionIds = new Set<string>();
-			const seenSectionIds = SHOULD_VALIDATE_SECTION_IDS
-				? new Map<string, number>()
-				: null;
-			const descriptors: TwoHopVirtualSectionDescriptor[] = [];
-			let changed = false;
-
-			for (const spec of specs) {
-				const sectionId = getSectionId(spec.signature);
-				validateSectionId(sectionId, descriptors.length, seenSectionIds);
-				activeSectionIds.add(sectionId);
-				const cached = entries.get(sectionId);
-				if (
-					cached &&
-					hasSameSectionSignature(cached.signature, spec.signature)
-				) {
-					descriptors.push(cached.descriptor);
-					continue;
-				}
-
-				const immutableSpec = snapshotSpec(spec);
-				const descriptor = buildDescriptor(immutableSpec, tokens);
-				entries.set(sectionId, {
-					signature: immutableSpec.signature,
-					descriptor,
-				});
-				descriptors.push(descriptor);
-				changed = true;
-			}
-
-			for (const sectionId of entries.keys()) {
-				if (activeSectionIds.has(sectionId)) continue;
-				entries.delete(sectionId);
-				changed = true;
-			}
-
-			previousDescriptors = Object.freeze(descriptors);
-			previousInputs = inputs;
-			recordCacheMeasurement(changed ? "miss" : "hit");
-			return previousDescriptors;
-		},
-	};
-}
-
-function validateSectionId(
-	sectionId: string,
-	index: number,
-	seenSectionIds: Map<string, number> | null,
-): void {
-	const previousIndex = seenSectionIds?.get(sectionId);
-	if (previousIndex !== undefined) {
-		throw new Error(
-			`TwoHopSectionDescriptorIdentityCache: duplicate sectionId ${JSON.stringify(
-				sectionId,
-			)} at indexes ${previousIndex} and ${index}.`,
-		);
-	}
-	seenSectionIds?.set(sectionId, index);
+function hasSameSectionRefs(
+	current: readonly TwoHopSectionModel[],
+	next: readonly TwoHopSectionModel[],
+): boolean {
+	return (
+		current.length === next.length &&
+		current.every((section, index) => section === next[index])
+	);
 }
 
 function recordCacheMeasurement(result: "exactHit" | "hit" | "miss"): void {

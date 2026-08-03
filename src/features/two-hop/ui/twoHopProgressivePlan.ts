@@ -1,13 +1,9 @@
 import type {
-	TwoHopDocument,
-	TwoHopDocumentItem,
-	TwoHopDocumentSection,
-} from "features/two-hop/ui/twoHopDocument";
+	TwoHopItemModel,
+	TwoHopSectionModel,
+} from "features/two-hop/ui/twoHopSectionModel";
 import {
-	createTwoHopResolvedCellBuffer,
-	createTwoHopResolvedRowBuffer,
-	resolveTwoHopCellInRowInto,
-	resolveTwoHopRowInto,
+	resolveSectionIndexForRow,
 	resolveTwoHopRowTop,
 	type TwoHopGeometry,
 } from "features/two-hop/ui/viewport/twoHopGeometry";
@@ -17,7 +13,7 @@ export const TWO_HOP_PROGRESSIVE_INITIAL_CHUNK_COUNT = 2;
 
 interface ProgressiveCellBase {
 	readonly logicalKey: string;
-	readonly section: TwoHopDocumentSection;
+	readonly section: TwoHopSectionModel;
 	readonly rowIndex: number;
 	readonly columnIndex: number;
 }
@@ -27,7 +23,7 @@ export type TwoHopProgressiveCell =
 	| (ProgressiveCellBase & {
 			readonly kind: "item";
 			readonly itemIndex: number;
-			readonly item: TwoHopDocumentItem;
+			readonly item: TwoHopItemModel;
 	  })
 	| (ProgressiveCellBase & { readonly kind: "load-more" });
 
@@ -48,20 +44,26 @@ export interface TwoHopProgressiveChunk {
 }
 
 export interface TwoHopProgressivePlan {
+	readonly sections: readonly TwoHopSectionModel[];
+	readonly geometry: TwoHopGeometry;
 	readonly mountedRowEnd: number;
 	readonly totalRowCount: number;
 	readonly hasMoreRows: boolean;
 	readonly chunks: readonly TwoHopProgressiveChunk[];
 }
 
-interface ProgressivePlanSource {
-	readonly document: TwoHopDocument;
-	readonly geometry: TwoHopGeometry;
+export function resolveMountedProgressiveRow(
+	plan: TwoHopProgressivePlan,
+	rowIndex: number,
+): TwoHopProgressiveRow | null {
+	if (rowIndex < 0 || rowIndex >= plan.mountedRowEnd) return null;
+	const chunkIndex = Math.floor(rowIndex / TWO_HOP_PROGRESSIVE_ROWS_PER_CHUNK);
+	const chunk = plan.chunks[chunkIndex];
+	if (!chunk) return null;
+	const row = chunk.rows[rowIndex - chunk.rowStart];
+	return row?.rowIndex === rowIndex ? row : null;
 }
 
-const sourceByPlan = new WeakMap<TwoHopProgressivePlan, ProgressivePlanSource>();
-
-/** Returns the append-only prefix mounted when a progressive document opens. */
 export function resolveInitialProgressiveMountedRowEnd(rowCount: number): number {
 	return Math.min(
 		Math.max(0, Math.floor(rowCount)),
@@ -69,7 +71,6 @@ export function resolveInitialProgressiveMountedRowEnd(rowCount: number): number
 	);
 }
 
-/** Appends at most one chunk to an existing mounted prefix. */
 export function resolveNextProgressiveMountedRowEnd(
 	mountedRowEnd: number,
 	rowCount: number,
@@ -85,9 +86,8 @@ export function resolveNextProgressiveMountedRowEnd(
 	);
 }
 
-/** Compiles only the currently mounted prefix into fixed-height chunk shells. */
 export function compileTwoHopProgressivePlan(
-	document: TwoHopDocument,
+	sections: readonly TwoHopSectionModel[],
 	geometry: TwoHopGeometry,
 	mountedRowEnd: number,
 ): TwoHopProgressivePlan {
@@ -96,7 +96,6 @@ export function compileTwoHopProgressivePlan(
 		Math.max(0, Math.floor(mountedRowEnd)),
 	);
 	const chunks: TwoHopProgressiveChunk[] = [];
-
 	for (
 		let rowStart = 0;
 		rowStart < normalizedMountedEnd;
@@ -106,15 +105,13 @@ export function compileTwoHopProgressivePlan(
 			normalizedMountedEnd,
 			rowStart + TWO_HOP_PROGRESSIVE_ROWS_PER_CHUNK,
 		);
-		chunks.push(compileChunk(document, geometry, rowStart, rowEnd));
+		chunks.push(buildProgressiveChunk(sections, geometry, rowStart, rowEnd));
 	}
-
-	return createPlan(document, geometry, normalizedMountedEnd, chunks);
+	return createPlan(sections, geometry, normalizedMountedEnd, chunks);
 }
 
-/** Appends newly mounted chunks while preserving every existing publication. */
 export function appendTwoHopProgressivePlan(
-	document: TwoHopDocument,
+	sections: readonly TwoHopSectionModel[],
 	geometry: TwoHopGeometry,
 	previous: TwoHopProgressivePlan,
 	mountedRowEnd: number,
@@ -123,16 +120,14 @@ export function appendTwoHopProgressivePlan(
 		geometry.rowCount,
 		Math.max(0, Math.floor(mountedRowEnd)),
 	);
-	const source = sourceByPlan.get(previous);
 	if (
-		source?.document !== document ||
-		source.geometry !== geometry ||
-		previous.totalRowCount !== geometry.rowCount ||
+		previous.sections !== sections ||
+		previous.geometry !== geometry ||
 		previous.mountedRowEnd > normalizedMountedEnd ||
 		(previous.mountedRowEnd < geometry.rowCount &&
 			previous.mountedRowEnd % TWO_HOP_PROGRESSIVE_ROWS_PER_CHUNK !== 0)
 	) {
-		return compileTwoHopProgressivePlan(document, geometry, normalizedMountedEnd);
+		return compileTwoHopProgressivePlan(sections, geometry, normalizedMountedEnd);
 	}
 	if (previous.mountedRowEnd === normalizedMountedEnd) return previous;
 
@@ -146,30 +141,30 @@ export function appendTwoHopProgressivePlan(
 			normalizedMountedEnd,
 			rowStart + TWO_HOP_PROGRESSIVE_ROWS_PER_CHUNK,
 		);
-		chunks.push(compileChunk(document, geometry, rowStart, rowEnd));
+		chunks.push(buildProgressiveChunk(sections, geometry, rowStart, rowEnd));
 	}
-
-	return createPlan(document, geometry, normalizedMountedEnd, chunks);
+	return createPlan(sections, geometry, normalizedMountedEnd, chunks);
 }
 
 function createPlan(
-	document: TwoHopDocument,
+	sections: readonly TwoHopSectionModel[],
 	geometry: TwoHopGeometry,
 	mountedRowEnd: number,
-	chunks: TwoHopProgressiveChunk[],
+	chunks: readonly TwoHopProgressiveChunk[],
 ): TwoHopProgressivePlan {
-	const plan: TwoHopProgressivePlan = Object.freeze({
+	return Object.freeze({
+		sections,
+		geometry,
 		mountedRowEnd,
 		totalRowCount: geometry.rowCount,
 		hasMoreRows: mountedRowEnd < geometry.rowCount,
 		chunks: Object.freeze(chunks),
 	});
-	sourceByPlan.set(plan, { document, geometry });
-	return plan;
 }
 
-function compileChunk(
-	document: TwoHopDocument,
+/** Materializes one append-only chunk directly from section arrays. */
+export function buildProgressiveChunk(
+	sections: readonly TwoHopSectionModel[],
 	geometry: TwoHopGeometry,
 	rowStart: number,
 	rowEnd: number,
@@ -180,69 +175,79 @@ function compileChunk(
 			? resolveTwoHopRowTop(geometry, rowEnd)
 			: geometry.totalHeight;
 	const rows: TwoHopProgressiveRow[] = [];
-	const rowBuffer = createTwoHopResolvedRowBuffer();
-	const cellBuffer = createTwoHopResolvedCellBuffer();
 
 	for (let rowIndex = rowStart; rowIndex < rowEnd; rowIndex += 1) {
-		if (!resolveTwoHopRowInto(geometry, rowIndex, rowBuffer)) continue;
-		const section = document.sections[rowBuffer.sectionIndex];
+		const sectionIndex = resolveSectionIndexForRow(geometry, rowIndex);
+		const section = sections[sectionIndex];
 		if (!section) continue;
+		const rowInSection = rowIndex - geometry.firstRowBySection[sectionIndex];
+		const rowTop =
+			geometry.topBySection[sectionIndex] + rowInSection * geometry.rowStride;
 		const cells: TwoHopProgressiveCell[] = [];
 
 		for (let columnIndex = 0; columnIndex < geometry.columns; columnIndex += 1) {
-			const resolved = resolveTwoHopCellInRowInto(
-				document,
-				geometry,
-				rowBuffer,
-				columnIndex,
-				cellBuffer,
-			);
-			if (!resolved) continue;
-
-			if (resolved.kind === "item") {
-				cells.push(
-					Object.freeze({
-						kind: "item",
-						logicalKey: resolved.logicalKey,
-						section,
-						rowIndex,
-						columnIndex,
-						itemIndex: resolved.itemIndex,
-						item: resolved.item,
-					}),
-				);
-				continue;
-			}
-
-			cells.push(
-				Object.freeze({
-					kind: resolved.kind,
-					logicalKey: resolved.logicalKey,
-					section,
-					rowIndex,
-					columnIndex,
-				}),
-			);
+			const cellIndex = rowInSection * geometry.columns + columnIndex;
+			const cell = buildCell(section, rowIndex, columnIndex, cellIndex);
+			if (cell) cells.push(cell);
 		}
 
 		rows.push(
 			Object.freeze({
 				key: `progressive-row:${rowIndex}`,
 				rowIndex,
-				top: rowBuffer.top - chunkTop,
+				top: rowTop - chunkTop,
 				cells: Object.freeze(cells),
 			}),
 		);
 	}
 
 	return Object.freeze({
-		key: `progressive-chunk:${Math.floor(
-			rowStart / TWO_HOP_PROGRESSIVE_ROWS_PER_CHUNK,
-		)}`,
+		key: `progressive-chunk:${Math.floor(rowStart / TWO_HOP_PROGRESSIVE_ROWS_PER_CHUNK)}`,
 		chunkIndex: Math.floor(rowStart / TWO_HOP_PROGRESSIVE_ROWS_PER_CHUNK),
 		rowStart,
 		rowEnd,
 		height: Math.max(0, chunkBottom - chunkTop),
 		rows: Object.freeze(rows),
 	});
+}
+
+function buildCell(
+	section: TwoHopSectionModel,
+	rowIndex: number,
+	columnIndex: number,
+	cellIndex: number,
+): TwoHopProgressiveCell | null {
+	const base = { section, rowIndex, columnIndex };
+	if (cellIndex === 0) {
+		return Object.freeze({
+			...base,
+			kind: "header",
+			logicalKey: section.header.logicalKey,
+		});
+	}
+
+	const itemIndex = cellIndex - 1;
+	if (itemIndex < section.visibleCount) {
+		const item = section.items[itemIndex];
+		if (!item) return null;
+		return Object.freeze({
+			...base,
+			kind: "item",
+			logicalKey: `item:${section.id}:${item.key}`,
+			itemIndex,
+			item,
+		});
+	}
+
+	if (
+		itemIndex === section.visibleCount &&
+		section.visibleCount < section.items.length
+	) {
+		return Object.freeze({
+			...base,
+			kind: "load-more",
+			logicalKey: `load-more:${section.id}`,
+		});
+	}
+	return null;
 }

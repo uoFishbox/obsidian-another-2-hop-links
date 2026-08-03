@@ -1,7 +1,4 @@
-import {
-	createSectionHeaderInteractionKey,
-	type SectionHeaderInteractionDescriptor,
-} from "ui/interactions/interactionTypes";
+import { createSectionHeaderInteractionKey } from "ui/interactions/interactionTypes";
 import { createInteractionTokenAllocator } from "ui/interactions/interactionRegistry";
 
 export interface HeaderInteractionIdentity {
@@ -14,16 +11,6 @@ export interface TwoHopInteractionTokenAllocator {
 	readonly createHeaderInteractionIdentity: (
 		sectionId: string,
 	) => HeaderInteractionIdentity;
-}
-
-export interface HeaderInteractionDescriptorFactoryParams<TSnapshot> {
-	readonly sectionId: string;
-	readonly snapshot: TSnapshot;
-	readonly createDescriptor: (
-		sectionId: string,
-		snapshot: TSnapshot,
-		options: HeaderInteractionIdentity,
-	) => SectionHeaderInteractionDescriptor;
 }
 
 export function createTwoHopInteractionTokenAllocator(): TwoHopInteractionTokenAllocator {

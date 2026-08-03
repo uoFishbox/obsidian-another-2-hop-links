@@ -8,10 +8,9 @@ import type {
 import type { TwoHopLinkResult } from "types";
 import type { PluginSettings, SortOption } from "features/settings/model";
 import {
-	createSettingsCacheKey,
-	LINK_PREPROCESS_CACHE_SETTING_DEPENDENCIES,
-	PREPROCESS_CACHE_SETTING_DEPENDENCIES,
-	TAG_PREPROCESS_CACHE_SETTING_DEPENDENCIES,
+	createLinkPreprocessCacheKey,
+	createPreprocessCacheKey,
+	createTagPreprocessCacheKey,
 } from "features/two-hop/application/displayCacheDependencies";
 
 export interface ComputedDisplayData {
@@ -61,15 +60,15 @@ export function createPreprocessedDisplayDataCache(): PreprocessedDisplayDataCac
 }
 
 function createPreprocessSettingsKey(settings: PluginSettings): string {
-	return createSettingsCacheKey(settings, PREPROCESS_CACHE_SETTING_DEPENDENCIES);
+	return createPreprocessCacheKey(settings);
 }
 
 function createLinkPreprocessSettingsKey(settings: PluginSettings): string {
-	return createSettingsCacheKey(settings, LINK_PREPROCESS_CACHE_SETTING_DEPENDENCIES);
+	return createLinkPreprocessCacheKey(settings);
 }
 
 function createTagPreprocessSettingsKey(settings: PluginSettings): string {
-	return createSettingsCacheKey(settings, TAG_PREPROCESS_CACHE_SETTING_DEPENDENCIES);
+	return createTagPreprocessCacheKey(settings);
 }
 
 function getLinkPreprocessedDisplayData(

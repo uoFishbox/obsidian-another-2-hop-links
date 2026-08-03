@@ -4,16 +4,16 @@ import type {
 	CardSectionVariant,
 } from "ui/components/common/cardPresentation";
 import type {
-	TwoHopVirtualListItem,
-	TwoHopVirtualListSection,
-} from "features/two-hop/ui/twoHopVirtualListModel";
+	TwoHopItemModel,
+	TwoHopSectionModel,
+} from "features/two-hop/ui/twoHopSectionModel";
 
 export type TwoHopCardSectionVariant = CardSectionVariant;
 
 export type TwoHopCardPresentationState = CardPresentationState;
 
 export function resolveTwoHopSectionVariant(
-	section: TwoHopVirtualListSection,
+	section: TwoHopSectionModel,
 ): TwoHopCardSectionVariant {
 	switch (section.kind) {
 		case "new-links-section":
@@ -23,7 +23,7 @@ export function resolveTwoHopSectionVariant(
 		case "two-hop-branch":
 			return "two-hop";
 		case "primary-section":
-			switch (section.rawSectionId) {
+			switch (section.id) {
 				case "outgoing":
 					return "outgoing";
 				case "merged":
@@ -36,8 +36,8 @@ export function resolveTwoHopSectionVariant(
 
 /** Resolves the card presentation for a two-hop item within its section. */
 export function resolveTwoHopCardPresentation(
-	row: TwoHopVirtualListItem,
-	section: TwoHopVirtualListSection,
+	row: TwoHopItemModel,
+	section: TwoHopSectionModel,
 ): TwoHopCardPresentationState | null {
 	const sectionVariant = resolveTwoHopSectionVariant(section);
 	const extension = resolveItemExtension(row.item);
@@ -89,7 +89,7 @@ function resolvePathExtension(path: string | undefined): string | null {
 	return normalizeExtension(path.slice(extensionIndex + 1));
 }
 
-function resolveItemExtension(item: TwoHopVirtualListItem["item"]): string | null {
+function resolveItemExtension(item: TwoHopItemModel["item"]): string | null {
 	switch (item.type) {
 		case "newLink":
 			return null;

@@ -22,8 +22,6 @@ import type {
 	TwoHopLinkBranch,
 } from "types/domain";
 import { getFileCardTitleSearchText } from "core/frontmatterCardTitle";
-import { generateBranchKey } from "features/preview/text-processing/textUtils";
-import { createCompactSectionId } from "ui/components/common/listPagination";
 
 const SEARCH_KEY_SEPARATOR = "\u001f";
 const OUTGOING_SEARCH_PREFIX = "o";
@@ -32,9 +30,6 @@ const MERGED_SEARCH_PREFIX = "m";
 const TWOHOP_CHILD_SEARCH_PREFIX = "h";
 const TAG_GROUP_SEARCH_PREFIX = "g";
 const TAG_NOTE_SEARCH_PREFIX = "n";
-const OUTGOING_SECTION_ID = "outgoing";
-const BACKLINK_SECTION_ID = "backlinks";
-const MERGED_SECTION_ID = "merged";
 
 interface SearchKeyCache {
 	branchBaseKeys: WeakMap<TwoHopLinkBranch, string>;
@@ -45,7 +40,6 @@ interface SearchKeyCache {
 export interface TwohopSearchAdapter {
 	/** Builds all inputs needed by a search session in one display-data traversal. */
 	buildSnapshot(options: TwohopSearchAdapterOptions): TwoHopSearchSnapshot;
-	buildDataset(options: TwohopSearchAdapterOptions): SearchWorkerItemSnapshot[];
 	filterDisplayData(
 		displayData: DisplayData,
 		query: string,
@@ -54,21 +48,12 @@ export interface TwohopSearchAdapter {
 	): DisplayData;
 }
 
-/** Identifies the unfiltered display-data position represented by a search key. */
-export interface SearchLocation {
-	readonly sectionId: string;
-	/** The index in the section's unfiltered source array. Header matches use -1. */
-	readonly sourceIndex: number;
-}
-
 /** Immutable inputs derived together for one Two-hop search session. */
 export interface TwoHopSearchSnapshot {
 	/** Lower-cased title snapshots sent to the search Worker. */
 	readonly workerItems: readonly SearchWorkerItemSnapshot[];
 	/** Unique target files eligible for content search. */
 	readonly searchableFiles: readonly TFile[];
-	/** Display-data position for every Worker item key. */
-	readonly locationByKey: ReadonlyMap<string, SearchLocation>;
 }
 
 function filterWithReferenceReuse<T>(
@@ -129,14 +114,6 @@ export function createTwohopSearchAdapter(): TwohopSearchAdapter {
 				getSearchKeyCache(options.displayData),
 			);
 		},
-		buildDataset(options) {
-			return Array.from(
-				buildTwoHopSearchSnapshotWithCache(
-					options,
-					getSearchKeyCache(options.displayData),
-				).workerItems,
-			);
-		},
 		filterDisplayData(displayData, query, matchedKeySet, renderMode) {
 			return filterTwohopDisplayDataWithCache(
 				displayData,
@@ -149,19 +126,12 @@ export function createTwohopSearchAdapter(): TwohopSearchAdapter {
 	};
 }
 
-export function collectTwohopSearchableFiles(
-	options: TwohopSearchAdapterOptions,
-): TFile[] {
-	return Array.from(buildTwoHopSearchSnapshotWithCache(options).searchableFiles);
-}
-
 function buildTwoHopSearchSnapshotWithCache(
 	options: TwohopSearchAdapterOptions,
 	searchKeyCache?: SearchKeyCache,
 ): TwoHopSearchSnapshot {
 	const snapshots: SearchWorkerItemSnapshot[] = [];
 	const filesByPath = new Map<string, TFile>();
-	const locationByKey = new Map<string, SearchLocation>();
 	const titleTextByFile = new Map<TFile, string>();
 	const { displayData, resolveFile } = options;
 
@@ -186,13 +156,11 @@ function buildTwoHopSearchSnapshotWithCache(
 		key: string,
 		searchText: string,
 		targetFile: TFile | null,
-		location: SearchLocation,
 	): void => {
 		addFile(targetFile);
 		snapshots.push(
 			buildSearchWorkerItemSnapshot(key, searchText, targetFile?.path ?? null),
 		);
-		locationByKey.set(key, location);
 	};
 
 	const getBranchTitleSearchText = (
@@ -211,15 +179,13 @@ function buildTwoHopSearchSnapshotWithCache(
 	};
 
 	if (options.renderMode.useMergedLinks) {
-		for (let index = 0; index < displayData.mergedItems.length; index += 1) {
-			const item = displayData.mergedItems[index];
+		for (const item of displayData.mergedItems) {
 			if (isBranchItem(item)) {
 				const targetFile = getBranchTargetFile(item, resolveFile);
 				appendSnapshot(
 					createMergedSearchKey(item, searchKeyCache),
 					getBranchTitleSearchText(item, targetFile),
 					targetFile,
-					{ sectionId: MERGED_SECTION_ID, sourceIndex: index },
 				);
 				continue;
 			}
@@ -228,28 +194,23 @@ function buildTwoHopSearchSnapshotWithCache(
 				createMergedSearchKey(item, searchKeyCache),
 				getFileTitleSearchText(item.sourceFile),
 				item.sourceFile,
-				{ sectionId: MERGED_SECTION_ID, sourceIndex: index },
 			);
 		}
 	} else {
-		for (let index = 0; index < displayData.outgoing.length; index += 1) {
-			const branch = displayData.outgoing[index];
+		for (const branch of displayData.outgoing) {
 			const targetFile = getBranchTargetFile(branch, resolveFile);
 			appendSnapshot(
 				createOutgoingSearchKey(branch, searchKeyCache),
 				getBranchTitleSearchText(branch, targetFile),
 				targetFile,
-				{ sectionId: OUTGOING_SECTION_ID, sourceIndex: index },
 			);
 		}
 
-		for (let index = 0; index < displayData.backlinks.length; index += 1) {
-			const link = displayData.backlinks[index];
+		for (const link of displayData.backlinks) {
 			appendSnapshot(
 				createBacklinkSearchKey(link, searchKeyCache),
 				getFileTitleSearchText(link.sourceFile),
 				link.sourceFile,
-				{ sectionId: BACKLINK_SECTION_ID, sourceIndex: index },
 			);
 		}
 	}
@@ -258,9 +219,7 @@ function buildTwoHopSearchSnapshotWithCache(
 		const targetFile = getBranchTargetFile(branch, resolveFile);
 		addFile(targetFile);
 		const branchBaseKey = getBranchBaseKey(branch, searchKeyCache);
-		const sectionId = createCompactSectionId("twohop", generateBranchKey(branch));
-		for (let index = 0; index < branch.hop2.length; index += 1) {
-			const link = branch.hop2[index];
+		for (const link of branch.hop2) {
 			appendSnapshot(
 				createTwohopChildSearchKeyFromBranchBaseKey(
 					branchBaseKey,
@@ -269,28 +228,23 @@ function buildTwoHopSearchSnapshotWithCache(
 				),
 				getFileTitleSearchText(link.sourceFile),
 				link.sourceFile,
-				{ sectionId, sourceIndex: index },
 			);
 		}
 	}
 
 	if (options.renderMode.showTags) {
 		for (const section of displayData.tagGroups) {
-			const sectionId = `tags-${section.tag}`;
 			appendSnapshot(
 				getTagGroupSearchKey(section),
 				getTagGroupSearchText(section.tag),
 				null,
-				{ sectionId, sourceIndex: -1 },
 			);
 
-			for (let index = 0; index < section.notes.length; index += 1) {
-				const note = section.notes[index];
+			for (const note of section.notes) {
 				appendSnapshot(
 					createTagNoteSearchKey(section, note, searchKeyCache),
 					getFileTitleSearchText(note.file),
 					note.file,
-					{ sectionId, sourceIndex: index },
 				);
 			}
 		}
@@ -299,7 +253,6 @@ function buildTwoHopSearchSnapshotWithCache(
 	return {
 		workerItems: snapshots,
 		searchableFiles: Array.from(filesByPath.values()),
-		locationByKey,
 	};
 }
 

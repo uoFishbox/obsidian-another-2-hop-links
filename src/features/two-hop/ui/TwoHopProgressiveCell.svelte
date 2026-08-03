@@ -37,7 +37,7 @@
 	});
 
 	function resolveHeaderIcon(): IconName {
-		switch (cell.section.header.section.kind) {
+		switch (cell.section.kind) {
 			case "new-links-section":
 				return "Unlink";
 			case "tag-section":
@@ -52,11 +52,11 @@
 {#if cell.kind === "header"}
 	{@const section = cell.section}
 	{@const headerProps = section.header.props}
-	{@const sectionVariant = resolveTwoHopSectionVariant(section.header.section)}
+	{@const sectionVariant = resolveTwoHopSectionVariant(section)}
 	{#if headerProps.interactionId}
 		<ClickableHeader
-			title={section.header.section.title}
-			count={section.totalItemCount}
+			title={section.title}
+			count={section.totalCount}
 			className={headerProps.className}
 			draggable={headerProps.draggable}
 			directory={headerProps.directory}
@@ -79,12 +79,12 @@
 		<div
 			class="cosense-card-links__box cosense-card-links__connected-links-header {headerProps.className ??
 				''}"
-			aria-label={`${section.totalItemCount} notes`}
+			aria-label={`${section.totalCount} notes`}
 			data-ccl-section-variant={sectionVariant}
 		>
 			<div class="cosense-card-links__title-container">
 				<span class="cosense-card-links__header-title">
-					{section.header.section.title}
+					{section.title}
 				</span>
 				<Icon
 					name={resolveHeaderIcon()}
@@ -96,7 +96,7 @@
 		</div>
 	{/if}
 {:else if cell.kind === "load-more"}
-	<VirtualListLoadMoreButton onClick={() => onLoadMore(cell.section.key)} />
+	<VirtualListLoadMoreButton onClick={() => onLoadMore(cell.section.id)} />
 {:else if cardModel}
 	{@const model = cardModel}
 	<LinkItem

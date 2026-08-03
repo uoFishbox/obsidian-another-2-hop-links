@@ -1,19 +1,12 @@
 import { onDestroy, tick, untrack } from "svelte";
 import type { ApplicationStore } from "ui/stores/ApplicationStore.svelte";
-import type {
-	CardRenderModel,
-	CardShellModel,
-} from "ui/components/items/cardRenderModel";
+import type { CardRenderModel } from "ui/components/items/cardRenderModel";
 import type { TwoHopCardPresentationState } from "features/two-hop/ui/twoHopCellStaticState";
-import { resolveTwoHopCardPresentation } from "features/two-hop/ui/twoHopCellStaticState";
 import type {
-	TwoHopVirtualListItem,
-	TwoHopVirtualSectionDescriptor,
-} from "features/two-hop/ui/twoHopVirtualListModel";
-import {
-	createTwoHopDocumentProjection,
-	type TwoHopDocument,
-} from "features/two-hop/ui/twoHopDocument";
+	TwoHopItemModel,
+	TwoHopSectionModel,
+} from "features/two-hop/ui/twoHopSectionModel";
+import { createTwoHopSectionProjection } from "features/two-hop/ui/twoHopSectionProjection";
 import {
 	compileFixedGridLayout,
 	resolveTwoHopRowFromScrollOffset,
@@ -25,10 +18,9 @@ import {
 	compileTwoHopProgressivePlan,
 	resolveInitialProgressiveMountedRowEnd,
 	resolveNextProgressiveMountedRowEnd,
+	resolveMountedProgressiveRow,
 	TWO_HOP_PROGRESSIVE_ROWS_PER_CHUNK,
-	type TwoHopProgressiveCell,
 	type TwoHopProgressivePlan,
-	type TwoHopProgressiveRow,
 } from "features/two-hop/ui/twoHopProgressivePlan";
 import type { TwoHopPreviewDependencies } from "features/two-hop/ui/twoHopPreviewDependencies";
 import { DISABLED_PREVIEW_SURFACE } from "features/preview/runtime/previewRuntime";
@@ -38,10 +30,6 @@ import type {
 	VirtualPreviewSurface,
 } from "features/preview/scheduling/virtualPreviewSurface";
 import type { VirtualFrameCoordinator } from "ui/virtualization/scheduling/frameCoordinator";
-import {
-	createVirtualCardInteractionController,
-	type VirtualCardInteractionBinding,
-} from "ui/interactions/virtualCardInteractionController";
 import { createResolvedCardLayoutSettingsMemo } from "ui/shared/layout/cardLayoutCssVars";
 import { resolveCachedCardGridLayoutBase } from "ui/virtualization/dom/virtualListCardLayout";
 import {
@@ -56,16 +44,17 @@ import {
 	markScrollActivityActive,
 	markScrollActivityIdle,
 } from "ui/virtualization/scheduling/scrollActivity";
-import { recordCCLDevMeasurement } from "infrastructure/debug/CCLDevMeasurements";
 import {
 	resolveProgressivePreviewRangeInto,
 	resolveProgressiveResidentRangeInto,
 } from "features/two-hop/ui/progressivePreviewRange";
+import { createTwoHopCardHydrator } from "features/two-hop/ui/twoHopCardHydrator";
+import { createTwoHopPreviewWindowController } from "features/two-hop/ui/twoHopPreviewWindowController";
 
 export interface TwoHopProgressiveListProps {
 	/** Stable identity of the displayed file and search scope. */
 	readonly documentIdentity: string;
-	readonly sections: readonly TwoHopVirtualSectionDescriptor[];
+	readonly sections: readonly TwoHopSectionModel[];
 	readonly applicationStore: ApplicationStore;
 	readonly previewDependencies?: TwoHopPreviewDependencies;
 	readonly initialVisibleCount?: number;
@@ -75,20 +64,10 @@ export interface TwoHopProgressiveListProps {
 	/** Explicit invalidation value for card models resolved by resolveItemCardModel. */
 	readonly cardModelRevision: unknown;
 	readonly resolveItemCardModel?: (
-		item: TwoHopVirtualListItem,
+		item: TwoHopItemModel,
 		presentation: TwoHopCardPresentationState,
+		revision: unknown,
 	) => CardRenderModel;
-}
-
-interface HydrationEntry {
-	readonly logicalKey: string;
-	readonly cell: Extract<TwoHopProgressiveCell, { kind: "item" }>;
-}
-
-interface HydrationQueue {
-	readonly entries: HydrationEntry[];
-	readonly keys: Set<string>;
-	head: number;
 }
 
 interface LayoutAnchor {
@@ -98,98 +77,14 @@ interface LayoutAnchor {
 	readonly scrollRoot: HTMLElement | null;
 }
 
-type CardModelConsumer = (model: CardShellModel | undefined) => void;
-type HydrationPriority = "visible" | "preload";
-type DocumentPublicationKind = "identity-reset" | "data-revision";
-
-interface CardModelPresentationIdentity {
-	readonly title: string;
-	readonly path: string;
-	readonly previewRenderKey: string | undefined;
-	readonly interactionKey: string | undefined;
-}
-
-const MAX_MODELS_PER_DRAIN = 8;
-const MAX_HYDRATION_CPU_MS = 1;
-const HYDRATION_POST_PAINT_TASK_KEY = "two-hop-progressive-hydration-visible";
-const HYDRATION_IDLE_TASK_KEY = "two-hop-progressive-hydration-preload";
+type SectionPublicationKind = "identity-reset" | "data-revision";
 const EMPTY_PREVIEW_RANGE = Object.freeze({ start: 0, end: 0 });
 const PREVIEW_SCROLL_TASK_KEY = "two-hop-progressive-preview-window";
 const PREVIEW_RANGE_APPLY_TASK_KEY = "two-hop-progressive-preview-window-apply";
 const PREVIEW_SCROLL_IDLE_MS = 140;
 
-function createHydrationQueue(): HydrationQueue {
-	return { entries: [], keys: new Set(), head: 0 };
-}
-
-function hasPendingHydration(queue: HydrationQueue): boolean {
-	return queue.head < queue.entries.length;
-}
-
-function clearHydrationQueue(queue: HydrationQueue): void {
-	queue.entries.length = 0;
-	queue.keys.clear();
-	queue.head = 0;
-}
-
-function takeNextHydrationEntry(queue: HydrationQueue): HydrationEntry | undefined {
-	const entry = queue.entries[queue.head];
-	if (!entry) return undefined;
-	queue.head += 1;
-	queue.keys.delete(entry.logicalKey);
-	return entry;
-}
-
-function compactHydrationQueue(queue: HydrationQueue): void {
-	if (queue.head === 0) return;
-	const remaining = queue.entries.length - queue.head;
-	if (remaining === 0) {
-		queue.entries.length = 0;
-		queue.head = 0;
-		return;
-	}
-	if (queue.head < remaining) return;
-	queue.entries.splice(0, queue.head);
-	queue.head = 0;
-}
-
-function resolveCardModelPresentationIdentity(
-	model: CardRenderModel,
-): CardModelPresentationIdentity {
-	return {
-		title: model.title,
-		path: model.targetFile?.path ?? "",
-		previewRenderKey: model.previewRequest?.renderKey,
-		interactionKey: model.interactionKey,
-	};
-}
-
-function isSameCardModelPresentation(
-	current: CardModelPresentationIdentity,
-	next: CardModelPresentationIdentity,
-): boolean {
-	return (
-		current.title === next.title &&
-		current.path === next.path &&
-		current.previewRenderKey === next.previewRenderKey &&
-		current.interactionKey === next.interactionKey
-	);
-}
-
 export function resolveProgressivePreviewSlotId(logicalKey: string): string {
 	return `two-hop-progressive:${logicalKey}`;
-}
-
-function resolveMountedProgressiveRow(
-	plan: TwoHopProgressivePlan,
-	rowIndex: number,
-): TwoHopProgressiveRow | null {
-	if (rowIndex < 0 || rowIndex >= plan.mountedRowEnd) return null;
-	const chunkIndex = Math.floor(rowIndex / TWO_HOP_PROGRESSIVE_ROWS_PER_CHUNK);
-	const chunk = plan.chunks[chunkIndex];
-	if (!chunk) return null;
-	const row = chunk.rows[rowIndex - chunk.rowStart];
-	return row?.rowIndex === rowIndex ? row : null;
 }
 
 /** Owns append-only chunk publication, lazy model hydration, and bounded preview state. */
@@ -198,27 +93,27 @@ export function useTwoHopProgressiveList(
 	frameCoordinator: VirtualFrameCoordinator,
 ) {
 	const applicationStore = props.applicationStore;
-	const documentProjection = createTwoHopDocumentProjection({
+	const sectionProjection = createTwoHopSectionProjection({
 		sections: props.sections,
 		applicationStore,
 		initialVisibleCount: props.initialVisibleCount,
 		loadMoreIncrement: props.loadMoreIncrement,
 		paginationScope: props.paginationScope,
 	});
-	const initialDocument = documentProjection.getDocument();
+	const initialSections = sectionProjection.getSections();
 	const initialGeometry = compileFixedGridLayout(
-		initialDocument,
+		initialSections,
 		DEFAULT_VIEW_PLAN_LAYOUT,
 	);
 	const initialMountedRowEnd = resolveInitialProgressiveMountedRowEnd(
 		initialGeometry.rowCount,
 	);
-	let document = $state.raw<TwoHopDocument>(initialDocument);
+	let sections = $state.raw<readonly TwoHopSectionModel[]>(initialSections);
 	let layout = $state.raw<ViewPlanLayoutMetrics>(DEFAULT_VIEW_PLAN_LAYOUT);
 	let geometry = $state.raw<TwoHopGeometry>(initialGeometry);
 	let plan = $state.raw<TwoHopProgressivePlan>(
 		compileTwoHopProgressivePlan(
-			initialDocument,
+			initialSections,
 			initialGeometry,
 			initialMountedRowEnd,
 		),
@@ -239,24 +134,14 @@ export function useTwoHopProgressiveList(
 					props.previewDependencies.resolveSearchMatchPosition,
 			})
 		: DISABLED_PREVIEW_SURFACE;
-	const interactionController = createVirtualCardInteractionController();
-	const modelsByLogicalKey = new Map<string, CardRenderModel>();
-	const modelRevisionByLogicalKey = new Map<string, unknown>();
-	const activatedModelKeys = new Set<string>();
-	const modelSourceItemsByLogicalKey = new Map<string, TwoHopVirtualListItem>();
-	const modelConsumersByLogicalKey = new Map<string, Set<CardModelConsumer>>();
 	const previewBindingByLogicalKey = new Map<string, RowPreviewCardBinding>();
-	const visibleHydrationQueue = createHydrationQueue();
-	const preloadHydrationQueue = createHydrationQueue();
-	const previewHostRowConsumers = new Map<number, (resident: boolean) => void>();
 	const visibleHydrationRange: TwoHopRowRange = { start: 0, end: 0 };
-	const activePreviewRange: TwoHopRowRange = { start: 0, end: 0 };
-	const residentPreviewRange: TwoHopRowRange = { start: 0, end: 0 };
+	const previewWindow = createTwoHopPreviewWindowController(
+		schedulePreviewPublication,
+	);
 	const nextVisibleHydrationRange: TwoHopRowRange = { start: 0, end: 0 };
 	const nextResidentPreviewRange: TwoHopRowRange = { start: 0, end: 0 };
 	let sentinelObserver: IntersectionObserver | undefined;
-	let cancelHydrationDrain: (() => void) | undefined;
-	let scheduledHydrationPriority: HydrationPriority | undefined;
 	let previewRangeAnimationFrame: number | undefined;
 	let previewViewportRefreshAnimationFrame: number | undefined;
 	let previewViewportRefreshOwnerWindow: Window | null = null;
@@ -267,11 +152,17 @@ export function useTwoHopProgressiveList(
 	let previewOwnerWindow: Window | null = null;
 	let contentTopInScrollSpace = 0;
 	let previewViewportHeight = 0;
-	let hydrationGeneration = 0;
 	let previewPublicationScheduled = false;
-	let lastInputDocumentRevision = initialDocument.revision;
 	let lastDocumentIdentity = props.documentIdentity;
-	let activeCardModelRevision = props.cardModelRevision;
+	let lastCardModelRevision = props.cardModelRevision;
+	const cardHydrator = createTwoHopCardHydrator({
+		frameCoordinator,
+		getPlan: () => untrack(() => plan),
+		getRevision: () => untrack(() => props.cardModelRevision),
+		getResolver: () => untrack(() => props.resolveItemCardModel),
+		isPreviewActive: isPreviewControlActive,
+		onPreviewModelsChanged: schedulePreviewPublication,
+	});
 
 	function isPreviewControlActive(): boolean {
 		return props.previewActive !== false;
@@ -279,297 +170,6 @@ export function useTwoHopProgressiveList(
 
 	function isPreviewSurfaceActive(): boolean {
 		return props.previewDependencies !== undefined && isPreviewControlActive();
-	}
-
-	function notifyModelConsumers(
-		logicalKey: string,
-		model: CardShellModel | undefined,
-	): void {
-		for (const consumer of modelConsumersByLogicalKey.get(logicalKey) ?? []) {
-			consumer(model);
-		}
-	}
-
-	function registerCardModelConsumer(
-		logicalKey: string,
-		consumer: CardModelConsumer,
-	): () => void {
-		let consumers = modelConsumersByLogicalKey.get(logicalKey);
-		if (!consumers) {
-			consumers = new Set();
-			modelConsumersByLogicalKey.set(logicalKey, consumers);
-		}
-		consumers.add(consumer);
-		consumer(modelsByLogicalKey.get(logicalKey));
-		return () => {
-			consumers?.delete(consumer);
-			if (consumers?.size === 0) {
-				modelConsumersByLogicalKey.delete(logicalKey);
-			}
-		};
-	}
-
-	function cancelPendingHydration(): void {
-		cancelHydrationDrain?.();
-		cancelHydrationDrain = undefined;
-		scheduledHydrationPriority = undefined;
-		clearHydrationQueue(visibleHydrationQueue);
-		clearHydrationQueue(preloadHydrationQueue);
-		hydrationGeneration += 1;
-	}
-
-	function clearHydratedModels(): void {
-		cancelPendingHydration();
-		for (const logicalKey of modelsByLogicalKey.keys()) {
-			notifyModelConsumers(logicalKey, undefined);
-		}
-		modelsByLogicalKey.clear();
-		modelRevisionByLogicalKey.clear();
-		activatedModelKeys.clear();
-		modelSourceItemsByLogicalKey.clear();
-		previewBindingByLogicalKey.clear();
-		interactionController.clear();
-		replaceHydrationRange(visibleHydrationRange);
-		schedulePreviewPublication();
-	}
-
-	function enqueueHydrationCell(
-		cell: Extract<TwoHopProgressiveCell, { kind: "item" }>,
-		priority: HydrationPriority,
-		refreshExisting = false,
-	): void {
-		const hasModel = modelsByLogicalKey.has(cell.logicalKey);
-		const hasCurrentModel =
-			hasModel &&
-			modelRevisionByLogicalKey.get(cell.logicalKey) === activeCardModelRevision;
-		if (
-			hasCurrentModel &&
-			(priority === "preload" || activatedModelKeys.has(cell.logicalKey))
-		) {
-			return;
-		}
-		if (
-			hasModel &&
-			!hasCurrentModel &&
-			priority === "preload" &&
-			!refreshExisting
-		) {
-			return;
-		}
-		const queue =
-			priority === "visible" ? visibleHydrationQueue : preloadHydrationQueue;
-		if (queue.keys.has(cell.logicalKey)) return;
-		if (priority === "preload" && visibleHydrationQueue.keys.has(cell.logicalKey)) {
-			return;
-		}
-		queue.keys.add(cell.logicalKey);
-		queue.entries.push({
-			logicalKey: cell.logicalKey,
-			cell,
-		});
-	}
-
-	function enqueueHydrationForChunk(chunkIndex: number): void {
-		const activePlan = untrack(() => plan);
-		for (const row of activePlan.chunks[chunkIndex]?.rows ?? []) {
-			for (const cell of row.cells) {
-				if (cell.kind === "item") enqueueHydrationCell(cell, "preload");
-			}
-		}
-		scheduleHydrationDrain();
-	}
-
-	function enqueueHydrationForRowRange(range: TwoHopRowRange): void {
-		enqueueHydrationForRowRangeWithPriority(range, "visible", false);
-	}
-
-	function enqueueHydrationForRowRangeWithPriority(
-		range: TwoHopRowRange,
-		priority: HydrationPriority,
-		refreshExisting: boolean,
-	): void {
-		const activePlan = untrack(() => plan);
-		for (let rowIndex = range.start; rowIndex < range.end; rowIndex += 1) {
-			const row = resolveMountedProgressiveRow(activePlan, rowIndex);
-			if (!row) continue;
-			for (const cell of row.cells) {
-				if (cell.kind === "item") {
-					enqueueHydrationCell(cell, priority, refreshExisting);
-				}
-			}
-		}
-		scheduleHydrationDrain();
-	}
-
-	function replaceHydrationRange(range: TwoHopRowRange): void {
-		clearHydrationQueue(visibleHydrationQueue);
-		clearHydrationQueue(preloadHydrationQueue);
-		enqueueHydrationForRowRange(range);
-		if (range.end <= range.start) return;
-		const nextChunkIndex = Math.ceil(
-			range.end / TWO_HOP_PROGRESSIVE_ROWS_PER_CHUNK,
-		);
-		enqueueHydrationForChunk(nextChunkIndex);
-	}
-
-	function refreshResidentHydratedModels(): void {
-		cancelPendingHydration();
-		enqueueHydrationForRowRangeWithPriority(visibleHydrationRange, "visible", true);
-		enqueueHydrationForRowRangeWithPriority(residentPreviewRange, "preload", true);
-	}
-
-	function scheduleHydrationDrain(): void {
-		if (disposed) return;
-		const priority: HydrationPriority | undefined = hasPendingHydration(
-			visibleHydrationQueue,
-		)
-			? "visible"
-			: hasPendingHydration(preloadHydrationQueue)
-				? "preload"
-				: undefined;
-		if (!priority) return;
-		if (cancelHydrationDrain && scheduledHydrationPriority === priority) return;
-		cancelHydrationDrain?.();
-		cancelHydrationDrain = undefined;
-		scheduledHydrationPriority = priority;
-		const expectedGeneration = hydrationGeneration;
-		const run = (): void => {
-			cancelHydrationDrain = undefined;
-			scheduledHydrationPriority = undefined;
-			if (disposed || expectedGeneration !== hydrationGeneration) return;
-			drainHydrationQueue(priority);
-		};
-		const lane = priority === "visible" ? "post-paint" : "idle";
-		const taskKey =
-			priority === "visible"
-				? HYDRATION_POST_PAINT_TASK_KEY
-				: HYDRATION_IDLE_TASK_KEY;
-		frameCoordinator.schedule(lane, taskKey, run);
-		cancelHydrationDrain = () => frameCoordinator.cancel(lane, taskKey);
-	}
-
-	function drainHydrationQueue(priority: HydrationPriority): void {
-		const resolver = untrack(() => props.resolveItemCardModel);
-		if (!resolver) {
-			clearHydrationQueue(visibleHydrationQueue);
-			clearHydrationQueue(preloadHydrationQueue);
-			return;
-		}
-		const queue =
-			priority === "visible" ? visibleHydrationQueue : preloadHydrationQueue;
-		const startedAt = performance.now();
-		let processedCount = 0;
-		let activePreviewHydrationChanged = false;
-		const enteredInteractionSlots: VirtualCardInteractionBinding[] = [];
-		const reboundInteractionSlots: VirtualCardInteractionBinding[] = [];
-		const releasedInteractionSlots: string[] = [];
-		while (
-			hasPendingHydration(queue) &&
-			processedCount < MAX_MODELS_PER_DRAIN &&
-			(processedCount === 0 ||
-				performance.now() - startedAt < MAX_HYDRATION_CPU_MS)
-		) {
-			const entry = takeNextHydrationEntry(queue);
-			if (!entry) break;
-			processedCount += 1;
-			const currentModel = modelsByLogicalKey.get(entry.logicalKey);
-			let model = currentModel;
-			let presentationChanged = false;
-			let previewRenderKeyChanged = false;
-			if (
-				!currentModel ||
-				modelRevisionByLogicalKey.get(entry.logicalKey) !==
-					activeCardModelRevision
-			) {
-				const presentation = resolveTwoHopCardPresentation(
-					entry.cell.item,
-					entry.cell.section.header.section,
-				);
-				if (!presentation) continue;
-				if (process.env.NODE_ENV !== "production") {
-					recordCCLDevMeasurement("twoHop.resolveItemCardModel.call");
-				}
-				const resolvedModel = resolver(entry.cell.item, presentation);
-				modelRevisionByLogicalKey.set(
-					entry.logicalKey,
-					activeCardModelRevision,
-				);
-				modelSourceItemsByLogicalKey.set(entry.logicalKey, entry.cell.item);
-				if (!currentModel) {
-					model = resolvedModel;
-					modelsByLogicalKey.set(entry.logicalKey, resolvedModel);
-					notifyModelConsumers(entry.logicalKey, resolvedModel);
-				} else {
-					const currentIdentity =
-						resolveCardModelPresentationIdentity(currentModel);
-					const nextIdentity =
-						resolveCardModelPresentationIdentity(resolvedModel);
-					presentationChanged = !isSameCardModelPresentation(
-						currentIdentity,
-						nextIdentity,
-					);
-					previewRenderKeyChanged =
-						currentIdentity.previewRenderKey !==
-						nextIdentity.previewRenderKey;
-					if (presentationChanged) {
-						model = resolvedModel;
-						modelsByLogicalKey.set(entry.logicalKey, resolvedModel);
-						notifyModelConsumers(entry.logicalKey, resolvedModel);
-					}
-				}
-			}
-			if (!model) continue;
-			const wasActivated = activatedModelKeys.has(entry.logicalKey);
-			if (priority === "visible") activatedModelKeys.add(entry.logicalKey);
-			const isActivated =
-				wasActivated || activatedModelKeys.has(entry.logicalKey);
-			if (!isActivated) continue;
-			if (
-				isPreviewControlActive() &&
-				(!wasActivated
-					? Boolean(model.previewRequest)
-					: previewRenderKeyChanged)
-			) {
-				activePreviewHydrationChanged = true;
-			}
-			const interactionDescriptor = model.interactionDescriptor;
-			if (!wasActivated && interactionDescriptor) {
-				enteredInteractionSlots.push({
-					slotId: entry.logicalKey,
-					descriptor: interactionDescriptor,
-				});
-			} else if (wasActivated && presentationChanged) {
-				if (interactionDescriptor) {
-					reboundInteractionSlots.push({
-						slotId: entry.logicalKey,
-						descriptor: interactionDescriptor,
-					});
-				} else {
-					releasedInteractionSlots.push(entry.logicalKey);
-				}
-			}
-		}
-		if (
-			enteredInteractionSlots.length > 0 ||
-			reboundInteractionSlots.length > 0 ||
-			releasedInteractionSlots.length > 0
-		) {
-			interactionController.syncCardDelta({
-				enteredSlots: enteredInteractionSlots,
-				reboundSlots: reboundInteractionSlots,
-				releasedSlots: releasedInteractionSlots,
-			});
-		}
-		compactHydrationQueue(queue);
-		if (activePreviewHydrationChanged) {
-			schedulePreviewPublication();
-		}
-		if (
-			hasPendingHydration(visibleHydrationQueue) ||
-			hasPendingHydration(preloadHydrationQueue)
-		) {
-			scheduleHydrationDrain();
-		}
 	}
 
 	function flushScheduledPreviewPublication(): void {
@@ -591,16 +191,15 @@ export function useTwoHopProgressiveList(
 		if (active) {
 			const activePlan = untrack(() => plan);
 			for (
-				let rowIndex = residentPreviewRange.start;
-				rowIndex < residentPreviewRange.end;
+				let rowIndex = previewWindow.residentRange.start;
+				rowIndex < previewWindow.residentRange.end;
 				rowIndex += 1
 			) {
 				const row = resolveMountedProgressiveRow(activePlan, rowIndex);
 				if (!row) continue;
 				for (const cell of row.cells) {
 					if (cell.kind !== "item") continue;
-					if (!activatedModelKeys.has(cell.logicalKey)) continue;
-					const model = modelsByLogicalKey.get(cell.logicalKey);
+					const model = cardHydrator.getActivatedModel(cell.logicalKey);
 					if (!model?.previewRequest) continue;
 					const previousBinding = previewBindingByLogicalKey.get(
 						cell.logicalKey,
@@ -632,8 +231,8 @@ export function useTwoHopProgressiveList(
 
 		const previewRange = active
 			? Object.freeze({
-					start: activePreviewRange.start,
-					end: activePreviewRange.end,
+					start: previewWindow.activeRange.start,
+					end: previewWindow.activeRange.end,
 				})
 			: EMPTY_PREVIEW_RANGE;
 		const frame: PreviewFrame = Object.freeze({
@@ -641,63 +240,6 @@ export function useTwoHopProgressiveList(
 			previewWindow: Object.freeze({ previewRange, active }),
 		});
 		previewSurface.publish(frame);
-	}
-
-	function registerPreviewRow(
-		rowIndex: number,
-		setPreviewHostCandidate: (resident: boolean) => void,
-	): () => void {
-		previewHostRowConsumers.set(rowIndex, setPreviewHostCandidate);
-		setPreviewHostCandidate(
-			rowIndex >= residentPreviewRange.start &&
-				rowIndex < residentPreviewRange.end,
-		);
-		return () => {
-			if (previewHostRowConsumers.get(rowIndex) === setPreviewHostCandidate) {
-				previewHostRowConsumers.delete(rowIndex);
-			}
-			setPreviewHostCandidate(false);
-		};
-	}
-
-	function applyPreviewRanges(
-		nextActive: TwoHopRowRange,
-		nextResident: TwoHopRowRange,
-	): void {
-		const activeChanged =
-			activePreviewRange.start !== nextActive.start ||
-			activePreviewRange.end !== nextActive.end;
-		const residentChanged =
-			residentPreviewRange.start !== nextResident.start ||
-			residentPreviewRange.end !== nextResident.end;
-		if (!activeChanged && !residentChanged) return;
-		for (
-			let rowIndex = residentPreviewRange.start;
-			rowIndex < residentPreviewRange.end;
-			rowIndex += 1
-		) {
-			if (rowIndex >= nextResident.start && rowIndex < nextResident.end) continue;
-			previewHostRowConsumers.get(rowIndex)?.(false);
-		}
-		for (
-			let rowIndex = nextResident.start;
-			rowIndex < nextResident.end;
-			rowIndex += 1
-		) {
-			if (
-				rowIndex >= residentPreviewRange.start &&
-				rowIndex < residentPreviewRange.end
-			) {
-				continue;
-			}
-			previewHostRowConsumers.get(rowIndex)?.(true);
-		}
-
-		activePreviewRange.start = nextActive.start;
-		activePreviewRange.end = nextActive.end;
-		residentPreviewRange.start = nextResident.start;
-		residentPreviewRange.end = nextResident.end;
-		schedulePreviewPublication();
 	}
 
 	function applyVisibleHydrationRange(next: TwoHopRowRange): void {
@@ -709,13 +251,13 @@ export function useTwoHopProgressiveList(
 		}
 		visibleHydrationRange.start = next.start;
 		visibleHydrationRange.end = next.end;
-		replaceHydrationRange(next);
+		cardHydrator.replaceRange(next);
 	}
 
 	function deactivatePreviewControl(): void {
 		nextResidentPreviewRange.start = 0;
 		nextResidentPreviewRange.end = 0;
-		applyPreviewRanges(EMPTY_PREVIEW_RANGE, EMPTY_PREVIEW_RANGE);
+		previewWindow.clear();
 	}
 
 	function readPreviewScrollTop(): number {
@@ -777,7 +319,7 @@ export function useTwoHopProgressiveList(
 			resolveProgressiveResidentRangeInto(
 				nextResidentPreviewRange,
 				nextVisibleHydrationRange,
-				residentPreviewRange,
+				previewWindow.residentRange,
 				mountedRowEnd,
 			);
 		} else {
@@ -790,10 +332,10 @@ export function useTwoHopProgressiveList(
 		if (
 			nextVisibleHydrationRange.start === visibleHydrationRange.start &&
 			nextVisibleHydrationRange.end === visibleHydrationRange.end &&
-			nextActivePreviewRange.start === activePreviewRange.start &&
-			nextActivePreviewRange.end === activePreviewRange.end &&
-			nextResidentPreviewRange.start === residentPreviewRange.start &&
-			nextResidentPreviewRange.end === residentPreviewRange.end
+			nextActivePreviewRange.start === previewWindow.activeRange.start &&
+			nextActivePreviewRange.end === previewWindow.activeRange.end &&
+			nextResidentPreviewRange.start === previewWindow.residentRange.start &&
+			nextResidentPreviewRange.end === previewWindow.residentRange.end
 		) {
 			return;
 		}
@@ -814,10 +356,10 @@ export function useTwoHopProgressiveList(
 		resolveProgressiveResidentRangeInto(
 			nextResidentPreviewRange,
 			nextVisibleHydrationRange,
-			residentPreviewRange,
+			previewWindow.residentRange,
 			untrack(() => plan.mountedRowEnd),
 		);
-		applyPreviewRanges(nextVisibleHydrationRange, nextResidentPreviewRange);
+		previewWindow.apply(nextVisibleHydrationRange, nextResidentPreviewRange);
 	}
 
 	function schedulePreviewRangeUpdate(): void {
@@ -911,8 +453,8 @@ export function useTwoHopProgressiveList(
 			geometry.rowCount,
 		);
 		if (nextEnd === currentMountedRowEnd) return;
-		plan = appendTwoHopProgressivePlan(document, geometry, plan, nextEnd);
-		replaceHydrationRange(visibleHydrationRange);
+		plan = appendTwoHopProgressivePlan(sections, geometry, plan, nextEnd);
+		cardHydrator.replaceRange(visibleHydrationRange);
 	}
 
 	function captureLayoutAnchor(): LayoutAnchor | null {
@@ -998,63 +540,21 @@ export function useTwoHopProgressiveList(
 		};
 		if (isSameViewPlanLayout(layout, nextLayout)) return;
 		const anchor = preserveAnchor ? captureLayoutAnchor() : null;
-		const nextGeometry = compileFixedGridLayout(document, nextLayout);
+		const nextGeometry = compileFixedGridLayout(sections, nextLayout);
 		const nextMountedRowEnd = Math.min(plan.mountedRowEnd, nextGeometry.rowCount);
 		layout = nextLayout;
 		geometry = nextGeometry;
-		plan = compileTwoHopProgressivePlan(document, nextGeometry, nextMountedRowEnd);
+		plan = compileTwoHopProgressivePlan(sections, nextGeometry, nextMountedRowEnd);
 		void restoreLayoutAnchor(anchor);
 	}
 
-	function reconcileHydratedModels(nextPlan: TwoHopProgressivePlan): void {
-		cancelPendingHydration();
-		const staleLogicalKeys = new Set(modelsByLogicalKey.keys());
-		for (const chunk of nextPlan.chunks) {
-			for (const row of chunk.rows) {
-				for (const cell of row.cells) {
-					if (
-						cell.kind !== "item" ||
-						!staleLogicalKeys.has(cell.logicalKey)
-					) {
-						continue;
-					}
-					if (
-						modelSourceItemsByLogicalKey.get(cell.logicalKey) === cell.item
-					) {
-						staleLogicalKeys.delete(cell.logicalKey);
-					}
-				}
-			}
-		}
-
-		const releasedSlots: string[] = [];
-		for (const logicalKey of staleLogicalKeys) {
-			notifyModelConsumers(logicalKey, undefined);
-			modelsByLogicalKey.delete(logicalKey);
-			modelRevisionByLogicalKey.delete(logicalKey);
-			activatedModelKeys.delete(logicalKey);
-			modelSourceItemsByLogicalKey.delete(logicalKey);
-			previewBindingByLogicalKey.delete(logicalKey);
-			releasedSlots.push(logicalKey);
-		}
-		if (releasedSlots.length > 0) {
-			interactionController.syncCardDelta({
-				enteredSlots: [],
-				reboundSlots: [],
-				releasedSlots,
-			});
-		}
-		replaceHydrationRange(visibleHydrationRange);
-		schedulePreviewPublication();
-	}
-
-	function publishDocument(
-		nextDocument: TwoHopDocument,
-		kind: DocumentPublicationKind,
+	function publishSections(
+		nextSections: readonly TwoHopSectionModel[],
+		kind: SectionPublicationKind,
 	): void {
-		if (nextDocument === document && kind === "data-revision") return;
+		if (nextSections === sections && kind === "data-revision") return;
 		const anchor = kind === "data-revision" ? captureLayoutAnchor() : null;
-		const nextGeometry = compileFixedGridLayout(nextDocument, layout);
+		const nextGeometry = compileFixedGridLayout(nextSections, layout);
 		const nextMountedRowEnd =
 			kind === "identity-reset"
 				? resolveInitialProgressiveMountedRowEnd(nextGeometry.rowCount)
@@ -1067,36 +567,37 @@ export function useTwoHopProgressiveList(
 							),
 						),
 					);
-		document = nextDocument;
+		sections = nextSections;
 		geometry = nextGeometry;
 		const nextPlan = compileTwoHopProgressivePlan(
-			nextDocument,
+			nextSections,
 			nextGeometry,
 			nextMountedRowEnd,
 		);
 		plan = nextPlan;
 		if (kind === "identity-reset") {
-			clearHydratedModels();
+			previewBindingByLogicalKey.clear();
+			cardHydrator.clear();
+			cardHydrator.replaceRange(visibleHydrationRange);
 			return;
 		}
-		reconcileHydratedModels(nextPlan);
+		cardHydrator.reconcile(nextPlan, visibleHydrationRange);
 		void restoreLayoutAnchor(anchor);
 	}
 
 	$effect(() => {
 		const nextDocumentIdentity = props.documentIdentity;
-		const nextDocument = documentProjection.setInput({
+		const nextSections = sectionProjection.setInput({
 			sections: props.sections,
 			paginationScope: props.paginationScope ?? "",
 			initialVisibleCount: props.initialVisibleCount,
 			loadMoreIncrement: props.loadMoreIncrement,
 		});
 		const identityChanged = nextDocumentIdentity !== lastDocumentIdentity;
-		if (identityChanged || nextDocument.revision !== lastInputDocumentRevision) {
+		if (identityChanged || nextSections !== sections) {
 			lastDocumentIdentity = nextDocumentIdentity;
-			lastInputDocumentRevision = nextDocument.revision;
-			publishDocument(
-				nextDocument,
+			publishSections(
+				nextSections,
 				identityChanged ? "identity-reset" : "data-revision",
 			);
 		}
@@ -1104,9 +605,9 @@ export function useTwoHopProgressiveList(
 
 	$effect(() => {
 		const revision = props.cardModelRevision;
-		if (revision === activeCardModelRevision) return;
-		activeCardModelRevision = revision;
-		refreshResidentHydratedModels();
+		if (revision === lastCardModelRevision) return;
+		lastCardModelRevision = revision;
+		cardHydrator.refreshRanges(visibleHydrationRange, previewWindow.residentRange);
 	});
 
 	$effect(() => {
@@ -1231,7 +732,7 @@ export function useTwoHopProgressiveList(
 
 	onDestroy(() => {
 		disposed = true;
-		cancelPendingHydration();
+		cardHydrator.dispose();
 		sentinelObserver?.disconnect();
 		frameCoordinator.cancel("scroll-critical", PREVIEW_SCROLL_TASK_KEY);
 		frameCoordinator.cancel("post-paint", PREVIEW_RANGE_APPLY_TASK_KEY);
@@ -1247,15 +748,13 @@ export function useTwoHopProgressiveList(
 			);
 		}
 		cancelPreviewScrollIdle();
-		for (const consumer of previewHostRowConsumers.values()) consumer(false);
-		previewHostRowConsumers.clear();
-		interactionController.clear();
+		previewWindow.dispose();
 		previewSurface.dispose();
 	});
 
 	function loadMore(sectionId: string): void {
-		const nextDocument = documentProjection.loadMore(sectionId);
-		if (nextDocument) publishDocument(nextDocument, "data-revision");
+		const nextSections = sectionProjection.loadMore(sectionId);
+		if (nextSections) publishSections(nextSections, "data-revision");
 	}
 
 	return {
@@ -1290,10 +789,10 @@ export function useTwoHopProgressiveList(
 			return previewSurface;
 		},
 		get interactionDescriptorResolverProvider() {
-			return interactionController.provider;
+			return cardHydrator.interactionDescriptorResolverProvider;
 		},
-		registerCardModelConsumer,
-		registerPreviewRow,
+		registerCardModelConsumer: cardHydrator.registerConsumer,
+		registerPreviewRow: previewWindow.registerRow,
 		loadNextChunk,
 		loadMore,
 	};

@@ -20,7 +20,7 @@
 	import { getCardLayoutCssText } from "ui/shared/layout/cardLayoutCssVars";
 	import { createTwohopSearchAdapter } from "features/two-hop/ui/twoHopSearchAdapter";
 	import { tick } from "svelte";
-	import { createTwoHopSectionDescriptorIdentityCache } from "features/two-hop/ui/section-descriptors/cache";
+	import { createTwoHopSectionPublicationCache } from "features/two-hop/ui/section-descriptors/cache";
 	import type { TwoHopLinksRootUiState } from "features/two-hop/ui/twoHopLinksRootUiState";
 	import { observePreviewSurfaceVisibility } from "features/preview/scheduling/previewSurfaceVisibility";
 	import type { TwoHopPreviewDependencies } from "features/two-hop/ui/twoHopPreviewDependencies";
@@ -145,7 +145,7 @@
 	const sourceFile = linkContext.sourceFile;
 	const fileToLinktext = linkContext.fileToLinktext;
 	const onTagClick = linkContext.onTagClick;
-	const sectionPublicationCache = createTwoHopSectionDescriptorIdentityCache();
+	const sectionPublicationCache = createTwoHopSectionPublicationCache();
 	const twoHopVirtualListSections = $derived.by(() =>
 		sectionPublicationCache.resolve({
 			displayData: filteredDisplayData,

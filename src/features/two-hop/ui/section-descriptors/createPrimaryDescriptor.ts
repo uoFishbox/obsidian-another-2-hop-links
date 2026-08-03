@@ -16,13 +16,10 @@ import {
 	getOutgoingSearchKey,
 } from "features/two-hop/ui/twoHopSearchAdapter";
 import type {
-	TwoHopVirtualListItem,
-	TwoHopVirtualSectionDescriptor,
-} from "features/two-hop/ui/twoHopVirtualListModel";
-import {
-	createDescriptor,
-	createEagerVirtualItemAccessors,
-} from "./descriptorIdentity";
+	TwoHopItemModel,
+	TwoHopSectionModel,
+} from "features/two-hop/ui/twoHopSectionModel";
+import { createTwoHopSectionModel } from "features/two-hop/ui/twoHopSectionModel";
 
 export type PrimarySectionBuildInput =
 	| {
@@ -52,7 +49,7 @@ export interface CreatePrimarySectionDescriptorParams {
  */
 export function createPrimarySectionDescriptor(
 	params: CreatePrimarySectionDescriptorParams,
-): TwoHopVirtualSectionDescriptor {
+): TwoHopSectionModel {
 	switch (params.input.kind) {
 		case "outgoing":
 			return createPrimaryDescriptor({
@@ -91,9 +88,9 @@ interface CreatePrimaryDescriptorParams<T> {
 
 function createPrimaryDescriptor<T>(
 	params: CreatePrimaryDescriptorParams<T>,
-): TwoHopVirtualSectionDescriptor {
-	const rows: readonly TwoHopVirtualListItem[] = params.items.map(
-		(source, index): TwoHopVirtualListItem => {
+): TwoHopSectionModel {
+	const rows: readonly TwoHopItemModel[] = params.items.map(
+		(source, index): TwoHopItemModel => {
 			const item = params.toViewItem(source);
 			const virtualKey = params.config.getKey(source, index);
 			const interactionKey = createItemInteractionKey(item, virtualKey);
@@ -104,25 +101,18 @@ function createPrimaryDescriptor<T>(
 				interactionKey,
 				sourceSectionId: params.config.sectionId,
 				searchKey: params.getSearchKey(source),
-				virtualKey,
+				key: virtualKey,
 			};
 		},
 	);
-	const accessors = createEagerVirtualItemAccessors(rows);
-
-	return createDescriptor(
-		{
-			kind: "primary-section",
-			rawSectionId: params.config.sectionId,
-			sectionId: params.config.sectionId,
-			sectionKey: params.config.sectionId,
-			title: params.config.title,
-			className: params.config.className,
-		},
-		rows.length,
-		accessors.getItems,
-		accessors.getItem,
-	);
+	return createTwoHopSectionModel({
+		kind: "primary-section",
+		id: params.config.sectionId,
+		key: params.config.sectionId,
+		title: params.config.title,
+		className: params.config.className,
+		items: rows,
+	});
 }
 
 function toMergedViewItem(item: MergedLinkItem): ViewItem {

@@ -5,22 +5,17 @@
 		SearchWorkerMatchedItem,
 		SearchWorkerMatchScope,
 	} from "features/search/searchWorkerTypes";
-	import type {
-		TwoHopVirtualListItem,
-		TwoHopVirtualSectionDescriptor,
-	} from "features/two-hop/ui/twoHopVirtualListModel";
-	import type { TwoHopCardPresentationState } from "features/two-hop/ui/twoHopCellStaticState";
+	import type { TwoHopSectionModel } from "features/two-hop/ui/twoHopSectionModel";
 	import {
-		createTwoHopCardRenderModelCache,
+		buildTwoHopCardModel,
 		type TwoHopCardModelRevision,
-	} from "features/two-hop/ui/twoHopCardRenderModelCache";
-	import type { CardRenderModel } from "ui/components/items/cardRenderModel";
+	} from "features/two-hop/ui/twoHopCardModel";
 	import type { LinkUtilitiesContext } from "types/linkContext";
 	import type { TwoHopPreviewDependencies } from "features/two-hop/ui/twoHopPreviewDependencies";
 
 	interface Props {
 		documentIdentity: string;
-		sections: readonly TwoHopVirtualSectionDescriptor[];
+		sections: readonly TwoHopSectionModel[];
 		applicationStore: ApplicationStore;
 		searchQuery?: string;
 		searchScope?: SearchWorkerMatchScope;
@@ -47,7 +42,6 @@
 	}: Props = $props();
 
 	const currentSettings = $derived(applicationStore.settings);
-	const cardModelCache = createTwoHopCardRenderModelCache();
 	function getPreviewRenderVersion(path: string): string {
 		return applicationStore.getPreviewRenderVersion(path);
 	}
@@ -62,13 +56,11 @@
 			applicationUpdateVersion: applicationStore.updateVersion,
 		}),
 	);
-	const resolveItemCardModel = $derived.by(() => {
-		const revision = cardModelRevision;
-		return (
-			row: TwoHopVirtualListItem,
-			presentation: TwoHopCardPresentationState,
-		): CardRenderModel => cardModelCache.resolve(row, presentation, revision);
-	});
+	const resolveItemCardModel = (
+		item: Parameters<typeof buildTwoHopCardModel>[0],
+		presentation: Parameters<typeof buildTwoHopCardModel>[1],
+		revision: unknown,
+	) => buildTwoHopCardModel(item, presentation, revision as TwoHopCardModelRevision);
 </script>
 
 <TwoHopProgressiveSurface

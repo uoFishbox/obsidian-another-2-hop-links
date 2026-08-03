@@ -1,5 +1,4 @@
 import { describe, expect, it } from "vitest";
-import { createTwoHopDocument } from "features/two-hop/ui/twoHopDocument";
 import { compileFixedGridLayout } from "features/two-hop/ui/viewport/twoHopGeometry";
 import {
 	appendTwoHopProgressivePlan,
@@ -8,123 +7,74 @@ import {
 	resolveNextProgressiveMountedRowEnd,
 	TWO_HOP_PROGRESSIVE_ROWS_PER_CHUNK,
 } from "features/two-hop/ui/twoHopProgressivePlan";
-import type {
-	TwoHopVirtualListItem,
-	TwoHopVirtualSectionDescriptor,
-} from "features/two-hop/ui/twoHopVirtualListModel";
-import { createSectionDataRevision } from "features/two-hop/ui/twoHopRevisions";
+import {
+	createTwoHopSectionModel,
+	type TwoHopItemModel,
+} from "features/two-hop/ui/twoHopSectionModel";
 
-function createSection(count: number): TwoHopVirtualSectionDescriptor {
+function createSections(count: number, visibleCount = count) {
 	const items = Array.from({ length: count }, (_, index) => ({
 		kind: "new-link",
 		item: { type: "newLink" },
-		searchKey: `item:${index}`,
-		virtualKey: `item:${index}`,
-	})) as TwoHopVirtualListItem[];
-	return {
-		sourceRevision: createSectionDataRevision(1),
-		section: {
-			kind: "new-links-section",
-			rawSectionId: "section",
-			sectionId: "section",
-			sectionKey: "section",
-			title: "Section",
-		},
-		sectionKey: "section",
-		sectionId: "section",
+		searchKey: `item-${index}`,
+		key: `item-${index}`,
+	})) as TwoHopItemModel[];
+	const section = createTwoHopSectionModel({
+		id: "section",
+		key: "section",
+		kind: "new-links-section",
 		title: "Section",
-		totalCount: count,
-		loadedCount: count,
-		getItems: () => items,
-		getItem: (index) => items[index],
-		headerProps: {},
-	};
+		items,
+	});
+	return [
+		visibleCount === count ? section : Object.freeze({ ...section, visibleCount }),
+	];
 }
 
 const layout = {
-	containerWidth: 320,
-	columns: 3,
+	containerWidth: 100,
+	columns: 1,
 	cellWidth: 100,
 	rowHeight: 100,
 	gap: 10,
-	sectionMarginBottom: 20,
+	sectionMarginBottom: 10,
 };
 
-describe("TwoHop progressive chunk plan", () => {
-	it("mounts two initial chunks and appends exactly one chunk", () => {
-		const document = createTwoHopDocument({
-			sections: [createSection(200)],
-			visibleCounts: {},
-			initialVisibleCount: 200,
-		});
-		const geometry = compileFixedGridLayout(document, layout);
-		const initialEnd = resolveInitialProgressiveMountedRowEnd(geometry.rowCount);
-		const initial = compileTwoHopProgressivePlan(document, geometry, initialEnd);
-
-		expect(initialEnd).toBe(TWO_HOP_PROGRESSIVE_ROWS_PER_CHUNK * 2);
-		expect(initial.chunks).toHaveLength(2);
-		expect(initial.hasMoreRows).toBe(true);
-
-		const nextEnd = resolveNextProgressiveMountedRowEnd(
-			initial.mountedRowEnd,
+describe("two-hop progressive plan", () => {
+	it("builds header, item, and load-more cells directly from sections", () => {
+		const sections = createSections(3, 2);
+		const geometry = compileFixedGridLayout(sections, layout);
+		const plan = compileTwoHopProgressivePlan(
+			sections,
+			geometry,
 			geometry.rowCount,
 		);
-		const appended = appendTwoHopProgressivePlan(
-			document,
-			geometry,
-			initial,
-			nextEnd,
+		const cells = plan.chunks.flatMap((chunk) =>
+			chunk.rows.flatMap((row) => row.cells),
 		);
-		expect(appended.chunks).toHaveLength(3);
-		expect(appended.mountedRowEnd - initial.mountedRowEnd).toBe(
-			TWO_HOP_PROGRESSIVE_ROWS_PER_CHUNK,
-		);
-		expect(appended.chunks[0]).toBe(initial.chunks[0]);
-		expect(appended.chunks[1]).toBe(initial.chunks[1]);
-		expect(appended.chunks[0]?.rows[0]).toBe(initial.chunks[0]?.rows[0]);
-		expect(appended.chunks[0]?.rows[0]?.cells[0]).toBe(
-			initial.chunks[0]?.rows[0]?.cells[0],
-		);
+
+		expect(cells.map((cell) => cell.kind)).toEqual([
+			"header",
+			"item",
+			"item",
+			"load-more",
+		]);
+		expect(cells[1]?.logicalKey).toBe("item:section:item-0");
 	});
 
-	it("preserves fixed row geometry across chunk boundaries", () => {
-		const document = createTwoHopDocument({
-			sections: [createSection(200)],
-			visibleCounts: {},
-			initialVisibleCount: 200,
-		});
-		const geometry = compileFixedGridLayout(document, layout);
-		const plan = compileTwoHopProgressivePlan(
-			document,
-			geometry,
-			resolveInitialProgressiveMountedRowEnd(geometry.rowCount),
-		);
-		const first = plan.chunks[0];
-		const second = plan.chunks[1];
-
-		expect(first.rowStart).toBe(0);
-		expect(first.rowEnd).toBe(16);
-		expect(first.height).toBe(16 * layout.rowHeight + 16 * layout.gap);
-		expect(second.rowStart).toBe(16);
-		expect(second.rows[0].top).toBe(0);
-		expect(second.rows.at(-1)?.top).toBe(15 * (layout.rowHeight + layout.gap));
-	});
-
-	it("stops at the final partial chunk", () => {
-		const document = createTwoHopDocument({
-			sections: [createSection(4)],
-			visibleCounts: {},
-			initialVisibleCount: 4,
-		});
-		const geometry = compileFixedGridLayout(document, layout);
+	it("appends one chunk while preserving existing publications", () => {
+		const sections = createSections(TWO_HOP_PROGRESSIVE_ROWS_PER_CHUNK * 3);
+		const geometry = compileFixedGridLayout(sections, layout);
 		const initialEnd = resolveInitialProgressiveMountedRowEnd(geometry.rowCount);
-		const plan = compileTwoHopProgressivePlan(document, geometry, initialEnd);
+		const first = compileTwoHopProgressivePlan(sections, geometry, initialEnd);
+		const nextEnd = resolveNextProgressiveMountedRowEnd(
+			first.mountedRowEnd,
+			geometry.rowCount,
+		);
+		const second = appendTwoHopProgressivePlan(sections, geometry, first, nextEnd);
 
-		expect(plan.chunks).toHaveLength(1);
-		expect(plan.mountedRowEnd).toBe(geometry.rowCount);
-		expect(plan.hasMoreRows).toBe(false);
-		expect(
-			resolveNextProgressiveMountedRowEnd(plan.mountedRowEnd, geometry.rowCount),
-		).toBe(plan.mountedRowEnd);
+		expect(second.chunks.slice(0, first.chunks.length)).toEqual(first.chunks);
+		expect(second.chunks[0]).toBe(first.chunks[0]);
+		expect(second.mountedRowEnd).toBe(nextEnd);
 	});
 });

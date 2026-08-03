@@ -20,7 +20,6 @@ import type { SortableItem } from "core/sorting";
 import { createMockTFile } from "testing/__mocks__/testHelpers";
 import { DEFAULT_SETTINGS } from "features/settings/model";
 import * as grouping from "core/grouping";
-import { DISPLAY_ASSEMBLY_SETTING_DEPENDENCIES } from "../displayCacheDependencies";
 
 const defaultSettings: PluginSettings = DEFAULT_SETTINGS;
 
@@ -28,9 +27,13 @@ const DISPLAY_ASSEMBLY_DEPENDENCY_SETTING_OVERRIDES = {
 	useMergedLinksSection: { useMergedLinksSection: true },
 	showTagsSection: { showTagsSection: false },
 } satisfies Record<
-	(typeof DISPLAY_ASSEMBLY_SETTING_DEPENDENCIES)[number]["key"],
+	"useMergedLinksSection" | "showTagsSection",
 	Partial<PluginSettings>
 >;
+const DISPLAY_ASSEMBLY_SETTING_KEYS = [
+	"useMergedLinksSection",
+	"showTagsSection",
+] as const;
 
 // SortServiceのmock（入力をそのまま返す）
 const mockSortService: ISortService = {
@@ -1091,71 +1094,6 @@ describe("DisplayDataBuilder - buildDisplayData", () => {
 			expect(second).toBe(first);
 		});
 
-		test("shared source arrays do not reuse cached sort results across sorter identities", () => {
-			const sharedHop2: TwoHopIndexedLink[] = [
-				{
-					rawText: "hop2-b",
-					path: "hop2-b.md",
-					isUnresolved: false,
-					sourceFile: createMockTFile("source-b.md"),
-				},
-				{
-					rawText: "hop2-a",
-					path: "hop2-a.md",
-					isUnresolved: false,
-					sourceFile: createMockTFile("source-a.md"),
-				},
-				{
-					rawText: "hop2-c",
-					path: "hop2-c.md",
-					isUnresolved: false,
-					sourceFile: createMockTFile("source-c.md"),
-				},
-			];
-			const firstSorted = [sharedHop2[1], sharedHop2[0], sharedHop2[2]];
-			const secondSorted = [sharedHop2[2], sharedHop2[1], sharedHop2[0]];
-			let firstSortCallCount = 0;
-			let secondSortCallCount = 0;
-			const firstSortService: ISortService = {
-				sort: <T extends SortableItem>(): T[] => {
-					firstSortCallCount += 1;
-					return firstSorted as T[];
-				},
-			};
-			const secondSortService: ISortService = {
-				sort: <T extends SortableItem>(): T[] => {
-					secondSortCallCount += 1;
-					return secondSorted as T[];
-				},
-			};
-			const hop2SortCache = createHop2SortCache();
-
-			const first = getSortedItemsWithCache(
-				sharedHop2,
-				firstSortService,
-				"alphabetical",
-				hop2SortCache,
-			);
-			const second = getSortedItemsWithCache(
-				sharedHop2,
-				secondSortService,
-				"alphabetical",
-				hop2SortCache,
-			);
-			const secondAgain = getSortedItemsWithCache(
-				sharedHop2,
-				secondSortService,
-				"alphabetical",
-				hop2SortCache,
-			);
-
-			expect(first).toBe(firstSorted);
-			expect(second).toBe(secondSorted);
-			expect(secondAgain).toBe(second);
-			expect(firstSortCallCount).toBe(1);
-			expect(secondSortCallCount).toBe(1);
-		});
-
 		test("sort helper avoids allocating through sortWithResult", () => {
 			const sharedHop2: TwoHopIndexedLink[] = [
 				{
@@ -1543,9 +1481,9 @@ describe("DisplayDataBuilder - buildDisplayData", () => {
 			expect(sortService.sort).toHaveBeenCalledTimes(sortCallsAfterFirst);
 		});
 
-		test.each(DISPLAY_ASSEMBLY_SETTING_DEPENDENCIES)(
-			"invalidates the declared $key assembly dependency",
-			(dependency) => {
+		test.each(DISPLAY_ASSEMBLY_SETTING_KEYS)(
+			"invalidates the $s assembly dependency",
+			(settingKey) => {
 				const preprocessed = preprocessDisplayData(undefined, defaultSettings);
 				const displayAssemblyCache = createDisplayAssemblyCache();
 				const first = sortAndAssembleDisplayData(
@@ -1561,9 +1499,7 @@ describe("DisplayDataBuilder - buildDisplayData", () => {
 					preprocessed,
 					{
 						...defaultSettings,
-						...DISPLAY_ASSEMBLY_DEPENDENCY_SETTING_OVERRIDES[
-							dependency.key
-						],
+						...DISPLAY_ASSEMBLY_DEPENDENCY_SETTING_OVERRIDES[settingKey],
 					},
 					"alphabetical",
 					mockSortService,

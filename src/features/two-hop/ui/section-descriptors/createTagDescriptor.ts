@@ -6,13 +6,10 @@ import type { TagGroup } from "types/domain";
 import type { ApplicationStore } from "ui/stores/ApplicationStore.svelte";
 import {
 	createTaggedNoteSectionItemKey,
-	type TwoHopVirtualListItem,
-	type TwoHopVirtualSectionDescriptor,
-} from "features/two-hop/ui/twoHopVirtualListModel";
-import {
-	createDescriptor,
-	createEagerVirtualItemAccessors,
-} from "./descriptorIdentity";
+	createTwoHopSectionModel,
+	type TwoHopItemModel,
+	type TwoHopSectionModel,
+} from "features/two-hop/ui/twoHopSectionModel";
 import type { TwoHopInteractionTokenAllocator } from "./interactionTokenAllocator";
 import { getTagNoteSearchKeyFromBaseKey } from "features/two-hop/ui/twoHopSearchAdapter";
 
@@ -27,7 +24,7 @@ export interface TagSectionBuildInput {
 export function createTagSectionDescriptor(
 	input: TagSectionBuildInput,
 	tokens: TwoHopInteractionTokenAllocator,
-): TwoHopVirtualSectionDescriptor {
+): TwoHopSectionModel {
 	const headerInteraction = tokens.createHeaderInteractionIdentity(
 		input.rawSectionId,
 	);
@@ -40,8 +37,8 @@ export function createTagSectionDescriptor(
 	const sortedItems = input.applicationStore.getSortedTagGroupItems(
 		input.source.notes,
 	);
-	const rows: readonly TwoHopVirtualListItem[] = sortedItems.map(
-		(source, index): TwoHopVirtualListItem => {
+	const rows: readonly TwoHopItemModel[] = sortedItems.map(
+		(source, index): TwoHopItemModel => {
 			const item: ViewItem = { type: "taggedNote", data: source };
 			const baseKey = generateLinkKey(
 				source.file.path,
@@ -61,26 +58,18 @@ export function createTagSectionDescriptor(
 				interactionKey,
 				tag: input.source.tag,
 				searchKey: getTagNoteSearchKeyFromBaseKey(input.source.tag, baseKey),
-				virtualKey,
+				key: virtualKey,
 			};
 		},
 	);
-	const accessors = createEagerVirtualItemAccessors(rows);
-
-	return createDescriptor(
-		{
-			kind: "tag-section",
-			rawSectionId: input.rawSectionId,
-			sectionId: input.rawSectionId,
-			sectionKey: `tag-${input.source.tag}`,
-			title: `#${input.source.tag}`,
-			tag: input.source.tag,
-			headerProps,
-			className: "twohop-links-tags",
-		},
-		rows.length,
-		accessors.getItems,
-		accessors.getItem,
+	return createTwoHopSectionModel({
+		kind: "tag-section",
+		id: input.rawSectionId,
+		key: `tag-${input.source.tag}`,
+		title: `#${input.source.tag}`,
+		tag: input.source.tag,
 		headerProps,
-	);
+		className: "twohop-links-tags",
+		items: rows,
+	});
 }
