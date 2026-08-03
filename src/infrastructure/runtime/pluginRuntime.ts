@@ -113,11 +113,12 @@ export function createPluginRuntime(options: PluginRuntimeOptions): PluginRuntim
 	const previewRuntime = createPreviewRuntime({
 		app: options.app,
 		getPreview: previewService.getPreview,
-		getBackpressure: () => ({
-			queued: previewService.getVisibleQueueSize(),
-			active: previewService.getActiveVisiblePreviewCount(),
-		}),
-		subscribeBackpressure: previewService.subscribeVisiblePreviewQueue,
+		getOutstandingPreviewJobCount: () =>
+			previewService.getOutstandingVisiblePreviewCount(),
+		subscribeBackpressure: (listener) =>
+			previewService.subscribeVisiblePreviewQueue(() => {
+				listener();
+			}),
 		getActivationsPerSecond: () =>
 			resolvePreviewActivationsPerSecond(
 				options.getSettings().previewDomCommitsPerSecond,

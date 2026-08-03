@@ -46,6 +46,10 @@ export class PreviewService {
 		return this.queue.getActiveCount();
 	}
 
+	public getOutstandingVisiblePreviewCount(): number {
+		return this.queue.getOutstandingCount();
+	}
+
 	public subscribeVisiblePreviewQueue(listener: PreviewQueueListener): () => void {
 		return this.queue.subscribe(listener);
 	}
@@ -292,6 +296,8 @@ export function createPreviewService(
 			),
 		getVisibleQueueSize: () => service.getVisibleQueueSize(),
 		getActiveVisiblePreviewCount: () => service.getActiveVisiblePreviewCount(),
+		getOutstandingVisiblePreviewCount: () =>
+			service.getOutstandingVisiblePreviewCount(),
 		subscribeVisiblePreviewQueue: (listener) =>
 			service.subscribeVisiblePreviewQueue(listener),
 		clearCache: () => service.clearCache(),

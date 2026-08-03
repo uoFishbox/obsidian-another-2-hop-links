@@ -1,8 +1,7 @@
 import type { App } from "obsidian";
 import {
 	createPreviewActivationScheduler,
-	type PreviewBackpressure,
-	type PreviewBackpressureListener,
+	type PreviewBackpressureChangeListener,
 	type PreviewActivationScheduler,
 } from "features/preview/scheduling/previewActivationScheduler";
 import {
@@ -26,9 +25,9 @@ import { createCardPreviewSharedCache } from "features/preview/ui/cardPreviewSha
 export interface PreviewRuntimeOptions {
 	readonly app: App;
 	readonly getPreview: CardPreviewLoader;
-	readonly getBackpressure?: () => PreviewBackpressure;
+	readonly getOutstandingPreviewJobCount?: () => number;
 	readonly subscribeBackpressure?: (
-		listener: PreviewBackpressureListener,
+		listener: PreviewBackpressureChangeListener,
 	) => () => void;
 	readonly getActivationsPerSecond?: () => number;
 	readonly getDomCommitsPerSecond?: () => number;
@@ -66,7 +65,7 @@ export interface PreviewRuntime {
 export function createPreviewRuntime(options: PreviewRuntimeOptions): PreviewRuntime {
 	const activationScheduler: PreviewActivationScheduler =
 		createPreviewActivationScheduler({
-			getBackpressure: options.getBackpressure,
+			getOutstandingPreviewJobCount: options.getOutstandingPreviewJobCount,
 			subscribeBackpressure: options.subscribeBackpressure,
 			getActivationsPerSecond: options.getActivationsPerSecond,
 		});

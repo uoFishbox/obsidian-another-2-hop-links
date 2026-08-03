@@ -91,6 +91,7 @@ export interface IPreviewService {
 	): Promise<PreviewData>;
 	getVisibleQueueSize(): number;
 	getActiveVisiblePreviewCount(): number;
+	getOutstandingVisiblePreviewCount(): number;
 	subscribeVisiblePreviewQueue(
 		listener: (metrics: PreviewQueueMetrics) => void,
 	): () => void;

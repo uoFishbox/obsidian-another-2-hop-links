@@ -23,6 +23,7 @@ export type PreviewQueueListener = (snapshot: PreviewQueueSnapshot) => void;
 export interface PreviewQueue {
 	enqueue: (task: PreviewQueueTask) => Promise<PreviewData>;
 	getActiveCount: () => number;
+	getOutstandingCount: () => number;
 	getSize: () => number;
 	shutdown: () => void;
 	subscribe: (listener: PreviewQueueListener) => () => void;
@@ -40,6 +41,10 @@ export function createPreviewQueue(): PreviewQueue {
 
 	function getActiveCount(): number {
 		return activeVisiblePreviews;
+	}
+
+	function getOutstandingCount(): number {
+		return visibleQueue.length + activeVisiblePreviews;
 	}
 
 	function notifyIfChanged(): void {
@@ -177,6 +182,7 @@ export function createPreviewQueue(): PreviewQueue {
 	return {
 		enqueue,
 		getActiveCount,
+		getOutstandingCount,
 		getSize,
 		shutdown,
 		subscribe,

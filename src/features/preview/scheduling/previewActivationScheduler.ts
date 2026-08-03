@@ -61,12 +61,7 @@ const SCROLLING_POLICY: PreviewActivationPolicy = {
 	maxDrainCpuMs: 0.5,
 };
 
-export interface PreviewBackpressure {
-	readonly queued: number;
-	readonly active: number;
-}
-
-export type PreviewBackpressureListener = (pressure: PreviewBackpressure) => void;
+export type PreviewBackpressureChangeListener = () => void;
 
 export interface PreviewActivationScope {
 	readonly kind: "preview-activation-scope";
@@ -103,9 +98,9 @@ interface PreviewActivationPartition {
  * not override them per scope.
  */
 export interface CreatePreviewActivationSchedulerOptions {
-	readonly getBackpressure?: () => PreviewBackpressure;
+	readonly getOutstandingPreviewJobCount?: () => number;
 	readonly subscribeBackpressure?: (
-		listener: PreviewBackpressureListener,
+		listener: PreviewBackpressureChangeListener,
 	) => () => void;
 	/** Maximum preview activations admitted per second while scrolling. */
 	readonly getActivationsPerSecond?: () => number;
@@ -156,9 +151,9 @@ interface PreviewActivationHandleInternal extends PreviewActivationHandle {
 interface PreviewActivationSchedulerState {
 	/** Every scope of this scheduler. */
 	readonly scopes: Set<PreviewActivationScopeState>;
-	readonly getBackpressure: () => PreviewBackpressure;
+	readonly getOutstandingPreviewJobCount: () => number;
 	readonly subscribeBackpressure:
-		| ((listener: PreviewBackpressureListener) => () => void)
+		| ((listener: PreviewBackpressureChangeListener) => () => void)
 		| undefined;
 	readonly getActivationsPerSecond: () => number;
 	readonly roundRobinCursorByPartition: Map<PreviewActivationPartition, number>;
@@ -179,7 +174,8 @@ function createSchedulerState(
 ): PreviewActivationSchedulerState {
 	return {
 		scopes: new Set(),
-		getBackpressure: options.getBackpressure ?? getEmptyBackpressure,
+		getOutstandingPreviewJobCount:
+			options.getOutstandingPreviewJobCount ?? getEmptyOutstandingPreviewJobCount,
 		subscribeBackpressure: options.subscribeBackpressure,
 		getActivationsPerSecond:
 			options.getActivationsPerSecond ?? getDefaultActivationsPerSecond,
@@ -221,8 +217,8 @@ function invokeActivated(onActivated: (() => void) | undefined): void {
 	}
 }
 
-function getEmptyBackpressure(): PreviewBackpressure {
-	return { queued: 0, active: 0 };
+function getEmptyOutstandingPreviewJobCount(): number {
+	return 0;
 }
 
 function getDefaultActivationsPerSecond(): number {
@@ -355,6 +351,11 @@ function releaseScrollActivitySubscriptionIfIdle(
 	schedulerState.unsubscribeScrollActivity = undefined;
 }
 
+function blockForBackpressure(schedulerState: PreviewActivationSchedulerState): void {
+	schedulerState.blockedForBackpressure = true;
+	ensureBackpressureSubscription(schedulerState);
+}
+
 function ensureBackpressureSubscription(
 	schedulerState: PreviewActivationSchedulerState,
 ): void {
@@ -414,18 +415,18 @@ function schedulePartition(
 }
 
 function resolveActivationPolicy(
-	pressure: PreviewBackpressure,
+	outstandingPreviewJobCount: number,
 	scrolling: boolean,
 ): PreviewActivationPolicy {
 	if (scrolling) return SCROLLING_POLICY;
-	if (pressure.queued > 0 || pressure.active > 0) {
+	if (outstandingPreviewJobCount > 0) {
 		return BACKPRESSURED_POLICY;
 	}
 	return IDLE_POLICY;
 }
 
-function hasPreviewAdmissionCapacity(pressure: PreviewBackpressure): boolean {
-	return pressure.queued + pressure.active < MAX_OUTSTANDING_PREVIEW_JOBS;
+function hasPreviewAdmissionCapacity(outstandingPreviewJobCount: number): boolean {
+	return outstandingPreviewJobCount < MAX_OUTSTANDING_PREVIEW_JOBS;
 }
 
 function compactScopeQueue(scopeState: PreviewActivationScopeState): void {
@@ -473,8 +474,8 @@ function drainPartitionScopes(
 	}
 	if (scopes.length === 0) return null;
 
-	const pressure = schedulerState.getBackpressure();
-	let policy = resolveActivationPolicy(pressure, scrolling);
+	let outstandingPreviewJobCount = schedulerState.getOutstandingPreviewJobCount();
+	let policy = resolveActivationPolicy(outstandingPreviewJobCount, scrolling);
 	if (scrolling) {
 		schedulerState.scrollingPolicy.ratePerSecond = resolvePositiveRate(
 			schedulerState.getActivationsPerSecond(),
@@ -488,9 +489,8 @@ function drainPartitionScopes(
 		policy,
 	);
 
-	if (!hasPreviewAdmissionCapacity(pressure)) {
-		schedulerState.blockedForBackpressure = true;
-		ensureBackpressureSubscription(schedulerState);
+	if (!hasPreviewAdmissionCapacity(outstandingPreviewJobCount)) {
+		blockForBackpressure(schedulerState);
 		return schedulerState.subscribeBackpressure ? null : 0;
 	}
 	schedulerState.blockedForBackpressure = false;
@@ -516,9 +516,8 @@ function drainPartitionScopes(
 		inspectedQueueEntries < maxInspectableQueueEntries &&
 		readPreviewSchedulingTime() <= deadline
 	) {
-		if (!hasPreviewAdmissionCapacity(schedulerState.getBackpressure())) {
-			schedulerState.blockedForBackpressure = true;
-			ensureBackpressureSubscription(schedulerState);
+		if (!hasPreviewAdmissionCapacity(outstandingPreviewJobCount)) {
+			blockForBackpressure(schedulerState);
 			break;
 		}
 
@@ -550,6 +549,7 @@ function drainPartitionScopes(
 			schedulerState.tokenState,
 		);
 		drainedTasks += 1;
+		outstandingPreviewJobCount = schedulerState.getOutstandingPreviewJobCount();
 	}
 
 	for (const scopeState of scopes) compactScopeQueue(scopeState);

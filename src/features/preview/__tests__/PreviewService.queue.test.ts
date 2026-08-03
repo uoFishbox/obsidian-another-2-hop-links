@@ -37,6 +37,7 @@ describe("PreviewService queue behavior", () => {
 
 		expect(service.getVisibleQueueSize()).toBe(0);
 		expect(service.getActiveVisiblePreviewCount()).toBe(0);
+		expect(service.getOutstandingVisiblePreviewCount()).toBe(0);
 	});
 
 	test("queue metrics report active and queued visible previews", async () => {
@@ -61,6 +62,7 @@ describe("PreviewService queue behavior", () => {
 
 		expect(service.getActiveVisiblePreviewCount()).toBe(1);
 		expect(service.getVisibleQueueSize()).toBe(1);
+		expect(service.getOutstandingVisiblePreviewCount()).toBe(2);
 
 		deferredByPath.get(firstFile.path)?.resolve({
 			type: "text",
@@ -74,6 +76,7 @@ describe("PreviewService queue behavior", () => {
 
 		expect(service.getActiveVisiblePreviewCount()).toBe(1);
 		expect(service.getVisibleQueueSize()).toBe(0);
+		expect(service.getOutstandingVisiblePreviewCount()).toBe(1);
 
 		deferredByPath.get(secondFile.path)?.resolve({
 			type: "text",
@@ -87,6 +90,7 @@ describe("PreviewService queue behavior", () => {
 
 		expect(service.getActiveVisiblePreviewCount()).toBe(0);
 		expect(service.getVisibleQueueSize()).toBe(0);
+		expect(service.getOutstandingVisiblePreviewCount()).toBe(0);
 	});
 
 	test("queue metrics update when a queued visible preview is aborted", async () => {
@@ -112,12 +116,14 @@ describe("PreviewService queue behavior", () => {
 
 		expect(service.getActiveVisiblePreviewCount()).toBe(1);
 		expect(service.getVisibleQueueSize()).toBe(1);
+		expect(service.getOutstandingVisiblePreviewCount()).toBe(2);
 
 		secondController.abort();
 		await expect(secondPromise).rejects.toMatchObject({ name: "AbortError" });
 
 		expect(service.getActiveVisiblePreviewCount()).toBe(1);
 		expect(service.getVisibleQueueSize()).toBe(0);
+		expect(service.getOutstandingVisiblePreviewCount()).toBe(1);
 
 		firstDeferred.resolve({ type: "text", content: "first" });
 		await expect(firstPromise).resolves.toEqual({
@@ -128,6 +134,7 @@ describe("PreviewService queue behavior", () => {
 
 		expect(service.getActiveVisiblePreviewCount()).toBe(0);
 		expect(service.getVisibleQueueSize()).toBe(0);
+		expect(service.getOutstandingVisiblePreviewCount()).toBe(0);
 	});
 
 	test("shutdown resets queue metrics", () => {
@@ -144,11 +151,13 @@ describe("PreviewService queue behavior", () => {
 
 		expect(service.getActiveVisiblePreviewCount()).toBe(1);
 		expect(service.getVisibleQueueSize()).toBe(1);
+		expect(service.getOutstandingVisiblePreviewCount()).toBe(2);
 
 		service.shutdown();
 
 		expect(service.getActiveVisiblePreviewCount()).toBe(0);
 		expect(service.getVisibleQueueSize()).toBe(0);
+		expect(service.getOutstandingVisiblePreviewCount()).toBe(0);
 	});
 
 	test("already aborted preview is not executed", async () => {

@@ -36,8 +36,7 @@ const DEFAULT_FRAME_INTERVAL_MS = 1000 / 60;
 let frameIntervalMs = DEFAULT_FRAME_INTERVAL_MS;
 let frameTimestamp = 0;
 let frameTimeOrigin = 0;
-let visibleQueueSize = 0;
-let activeVisiblePreviewCount = 0;
+let outstandingPreviewJobCount = 0;
 let activationScope: PreviewActivationScope;
 let results: string[];
 let defaultTestScheduler = createPreviewActivationScheduler();
@@ -115,15 +114,11 @@ beforeEach(() => {
 	state.disableCardDomPreview = false;
 	frameIntervalMs = DEFAULT_FRAME_INTERVAL_MS;
 	frameTimestamp = 0;
-	visibleQueueSize = 0;
-	activeVisiblePreviewCount = 0;
+	outstandingPreviewJobCount = 0;
 	results = [];
 	resetCCLDevMeasurements();
 	defaultTestScheduler = createPreviewActivationScheduler({
-		getBackpressure: () => ({
-			queued: visibleQueueSize,
-			active: activeVisiblePreviewCount,
-		}),
+		getOutstandingPreviewJobCount: () => outstandingPreviewJobCount,
 	});
 	activationScope = defaultTestScheduler.createScope();
 	vi.useFakeTimers();
@@ -343,7 +338,7 @@ describe("preview activation scheduler", () => {
 	});
 
 	it("limits backpressured activations to a lower time-based rate", async () => {
-		visibleQueueSize = 1;
+		outstandingPreviewJobCount = 1;
 		requestActivation("preview-a");
 		requestActivation("preview-b");
 		requestActivation("preview-c");
@@ -355,28 +350,60 @@ describe("preview activation scheduler", () => {
 		await flushAnimationFrame();
 		expect(results).toEqual(["preview-a", "preview-b", "preview-c"]);
 
-		visibleQueueSize = 0;
+		outstandingPreviewJobCount = 0;
 		await flushAnimationFrame();
 		expect(results).toEqual(["preview-a", "preview-b", "preview-c"]);
 	});
 
 	it("holds activation while the outstanding preview admission limit is full", async () => {
-		let queuedPreviewJobs = 2;
-		let activePreviewJobs = 1;
+		let outstandingPreviewJobCount = 3;
 		resetPreviewActivationSchedulerForTests({
-			getBackpressure: () => ({
-				queued: queuedPreviewJobs,
-				active: activePreviewJobs,
-			}),
+			getOutstandingPreviewJobCount: () => outstandingPreviewJobCount,
 		});
 		const scope = createPreviewActivationScope();
 		const activation = requestActivation("preview-blocked", scope);
 		await flushAnimationFrame();
 		expect(activation.onActivated).not.toHaveBeenCalled();
 
-		queuedPreviewJobs = 1;
+		outstandingPreviewJobCount = 2;
 		await flushAnimationFrame();
 		expect(activation.onActivated).toHaveBeenCalledOnce();
+	});
+
+	it("refreshes outstanding count only after an activation callback", async () => {
+		let outstandingPreviewJobCount = 0;
+		const getOutstandingPreviewJobCount = vi.fn(() => outstandingPreviewJobCount);
+		resetPreviewActivationSchedulerForTests({
+			getOutstandingPreviewJobCount,
+			subscribeBackpressure: () => vi.fn(),
+		});
+		const scope = createPreviewActivationScope();
+		const first = requestActivation("preview-first", scope);
+		first.onActivated.mockImplementation(() => {
+			outstandingPreviewJobCount = 3;
+		});
+		const second = requestActivation("preview-second", scope);
+
+		await flushAnimationFrame();
+
+		expect(first.onActivated).toHaveBeenCalledOnce();
+		expect(second.onActivated).not.toHaveBeenCalled();
+		expect(getOutstandingPreviewJobCount).toHaveBeenCalledTimes(2);
+	});
+
+	it("does not poll outstanding count for stale replacement entries", async () => {
+		const getOutstandingPreviewJobCount = vi.fn(() => 0);
+		resetPreviewActivationSchedulerForTests({ getOutstandingPreviewJobCount });
+		const scope = createPreviewActivationScope();
+
+		for (let index = 0; index < 100; index += 1) {
+			requestActivation("same-key", scope);
+		}
+
+		await flushAnimationFrame();
+
+		expect(results).toEqual(["same-key"]);
+		expect(getOutstandingPreviewJobCount).toHaveBeenCalledTimes(2);
 	});
 
 	it("uses a timeout fallback when requestAnimationFrame is unavailable", async () => {
@@ -542,7 +569,7 @@ describe("preview activation scheduler", () => {
 
 	it("blocks every scope while the shared backpressure is full", async () => {
 		resetPreviewActivationSchedulerForTests({
-			getBackpressure: () => ({ queued: 2, active: 1 }),
+			getOutstandingPreviewJobCount: () => 3,
 		});
 		const scope = createPreviewActivationScope();
 		const blocked = requestActivation("preview-blocked", scope);
@@ -553,13 +580,13 @@ describe("preview activation scheduler", () => {
 	});
 
 	it("waits for a backpressure notification instead of polling every frame", async () => {
-		let pressure = { queued: 2, active: 1 };
+		let outstandingPreviewJobCount = 3;
 		let notifyPressureChanged: (() => void) | undefined;
 		const unsubscribe = vi.fn();
 		resetPreviewActivationSchedulerForTests({
-			getBackpressure: () => pressure,
+			getOutstandingPreviewJobCount: () => outstandingPreviewJobCount,
 			subscribeBackpressure: (listener) => {
-				notifyPressureChanged = () => listener(pressure);
+				notifyPressureChanged = listener;
 				return unsubscribe;
 			},
 		});
@@ -573,7 +600,7 @@ describe("preview activation scheduler", () => {
 		await vi.advanceTimersByTimeAsync(1_000);
 		expect(requestAnimationFrame).toHaveBeenCalledTimes(1);
 
-		pressure = { queued: 1, active: 1 };
+		outstandingPreviewJobCount = 2;
 		notifyPressureChanged?.();
 		await flushAnimationFrame();
 		expect(activation.onActivated).toHaveBeenCalledOnce();
