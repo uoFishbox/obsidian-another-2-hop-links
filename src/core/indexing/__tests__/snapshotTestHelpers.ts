@@ -119,7 +119,6 @@ function serializeNestedBacklinkMap(map: Map<string, BacklinkSourceMap>) {
 								sourcePath,
 								{
 									count: getBacklinkCollectionCount(bucket),
-									length: bucket.length,
 									hasResolved: hasResolvedBacklink(bucket),
 								},
 							] as const;

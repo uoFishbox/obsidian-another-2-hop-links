@@ -44,9 +44,7 @@ describe("index snapshot builders", () => {
 
 		const snapshot = await buildIndexSnapshotAsync(mockVault, mockMetadataCache);
 
-		expect(snapshot.backlinksMap.get("target.md")?.get("origin.md")?.length).toBe(
-			2,
-		);
+		expect(snapshot.backlinksMap.get("target.md")?.get("origin.md")?.count).toBe(2);
 		expect(getDestinationPaths(snapshot.sourceSummaries.get("origin.md"))).toEqual([
 			"target.md",
 		]);

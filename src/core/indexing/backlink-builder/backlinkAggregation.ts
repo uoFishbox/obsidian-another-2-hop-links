@@ -140,7 +140,6 @@ export function createBacklinkBucketForSource(
 ): BacklinkBucket {
 	return {
 		count: aggregate.count,
-		length: aggregate.count,
 		hasResolved: aggregate.hasResolved,
 	};
 }

@@ -499,14 +499,12 @@ export class IndexQueryEngine {
 					const count = existing.count + infoCollection.count;
 					target.set(sourcePath, {
 						count,
-						length: count,
 						hasResolved: existing.hasResolved || infoCollection.hasResolved,
 					});
 					sharedKeys.delete(sourcePath);
 				} else {
 					// existing is already an owned bucket — safe to mutate
 					existing.count += infoCollection.count;
-					existing.length = existing.count;
 					existing.hasResolved ||= infoCollection.hasResolved;
 				}
 			} else {

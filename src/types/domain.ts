@@ -37,7 +37,6 @@ export type IndexedLinkQueryResult = readonly Readonly<TwoHopIndexedLink>[];
 
 export interface BacklinkBucket {
 	count: number;
-	length: number;
 	hasResolved: boolean;
 }
 

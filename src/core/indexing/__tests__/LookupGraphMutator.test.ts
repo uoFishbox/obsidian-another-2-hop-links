@@ -145,7 +145,6 @@ describe("LookupGraphMutator", () => {
 function bucket(): BacklinkBucket {
 	return {
 		count: 1,
-		length: 1,
 		hasResolved: false,
 	};
 }

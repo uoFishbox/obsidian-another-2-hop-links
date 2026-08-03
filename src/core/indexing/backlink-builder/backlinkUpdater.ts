@@ -269,13 +269,11 @@ export function createBacklinkUpdater(
 		let after: BacklinkBucket;
 		if (before) {
 			before.count += destinationSummary.count;
-			before.length = before.count;
 			before.hasResolved ||= destinationSummary.hasResolved;
 			after = before;
 		} else {
 			after = {
 				count: destinationSummary.count,
-				length: destinationSummary.count,
 				hasResolved: destinationSummary.hasResolved,
 			};
 			sourceMap.set(sourcePath, after);
