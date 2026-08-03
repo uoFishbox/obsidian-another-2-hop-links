@@ -402,6 +402,7 @@ describe("TwoHopLinksPage descriptor plumbing", () => {
 		expect(surface.dataset.hasPreviewRuntime).toBe("true");
 		expect(surface.dataset.hasSearchPositionResolver).toBe("true");
 		expect(surface.dataset.previewActive).toBe("false");
+		expect(surface.dataset.offscreenBootstrapPreviewRows).toBe("4");
 
 		const root = container.querySelector<HTMLElement>(".cosense-card-links__root");
 		expect(root).not.toBeNull();
@@ -410,9 +411,32 @@ describe("TwoHopLinksPage descriptor plumbing", () => {
 		expect(surface.dataset.previewActive).toBe("true");
 
 		expect(capturedProps?.applicationStore).toBe(rootProps.applicationStore);
+		expect(capturedProps?.offscreenBootstrapPreviewRows).toBe(4);
 		expect(capturedProps?.previewDependencies?.previewRuntime).toBe(
 			rootProps.previewRuntime,
 		);
+	});
+
+	it("does not bootstrap offscreen preview rows in sidebar mode", async () => {
+		const file = createMockTFile("notes/target.md");
+		const parentFile = createMockTFile("notes/outgoing-parent.md");
+		const displayData = {
+			...createDisplayData(),
+			outgoing: [createBranch(file, parentFile, [], "outgoing-parent")],
+		};
+		const settings = {
+			...DEFAULT_SETTINGS,
+			useMergedLinksSection: false,
+			showTagsSection: false,
+		};
+		const rootProps = createRootProps(displayData, settings, file);
+		rootProps.isSidebar = true;
+
+		render(TwoHopLinksPage, { props: rootProps });
+		await flushAsyncUi();
+
+		const surface = screen.getByTestId("two-hop-progressive-surface-stub");
+		expect(surface.dataset.offscreenBootstrapPreviewRows).toBe("0");
 	});
 
 	it("propagates item count changes for the same sectionId (memo regression)", async () => {

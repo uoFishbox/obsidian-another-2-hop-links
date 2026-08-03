@@ -391,6 +391,79 @@ afterEach(() => {
 });
 
 describe("TwoHop progressive preview scheduling", () => {
+	it("hydrates offscreen bootstrap rows on mount while preview control is inactive", async () => {
+		const applicationStore = {
+			settings: {
+				...DEFAULT_SETTINGS,
+				cardWidthPx: 100,
+				cardHeightRatio: 1,
+				cardMaxColumns: 3,
+			},
+		} as unknown as ApplicationStore;
+		const resolvePreviewRequest = vi.fn(() => null);
+		const resolveItemCardModel = vi.fn(
+			(
+				item: TwoHopItemModel,
+				presentation: TwoHopCardPresentationState,
+			): CardRenderModel => ({
+				item: item.item,
+				targetFile: null,
+				title: item.key,
+				ariaLabel: item.key,
+				className: null,
+				extension: null,
+				directory: null,
+				interactionId: item.key,
+				interactionKey: item.key,
+				interactionDescriptor: null,
+				presentation,
+				searchQuery: "",
+				get previewRequest() {
+					return resolvePreviewRequest();
+				},
+			}),
+		);
+		const scroller = document.createElement("div");
+		scroller.style.overflow = "auto";
+		setNumericProperty(scroller, "clientHeight", 300);
+		setNumericProperty(scroller, "scrollHeight", 20_000);
+		setElementRect(scroller, { top: 0, width: 320, height: 300 });
+		document.body.append(scroller);
+
+		const rendered = render(TwoHopProgressiveSurfaceHarness, {
+			target: scroller,
+			props: {
+				sections: [createSection(100)],
+				applicationStore,
+				linkContext: { getPreview: vi.fn() } as unknown as LinkContext,
+				previewActive: false,
+				offscreenBootstrapPreviewRows: 4,
+				resolveItemCardModel,
+			},
+		});
+		const root = rendered.container.querySelector<HTMLElement>(
+			".twohop-progressive-surface",
+		);
+		if (!root) throw new Error("Progressive surface was not rendered");
+		const content = root.shadowRoot?.querySelector<HTMLElement>(
+			".twohop-progressive-content",
+		);
+		if (!content) throw new Error("Progressive content was not rendered");
+		setElementRect(root, { top: 1_000, width: 320, height: 20_000 });
+		setElementRect(content, { top: 1_000, width: 320, height: 20_000 });
+		triggerResize(root, 320, 20_000);
+		setNumericProperty(scroller, "clientHeight", 301);
+		triggerResize(scroller, 320, 301);
+
+		await Promise.resolve();
+		await drainPostPaintTasks();
+
+		const resolvedItemIndexes = readResolvedItemIndexes(resolveItemCardModel);
+		expect(resolvedItemIndexes.length).toBeGreaterThan(0);
+		expect(resolvedItemIndexes.every((index) => index < 11)).toBe(true);
+		expect(resolvePreviewRequest).not.toHaveBeenCalled();
+	});
+
 	it("hydrates range B first when the visible range changes before range A drains", async () => {
 		const fixture = await renderHydrationSchedulingFixture();
 

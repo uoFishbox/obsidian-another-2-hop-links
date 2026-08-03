@@ -61,6 +61,8 @@ export interface TwoHopProgressiveListProps {
 	readonly loadMoreIncrement?: number;
 	readonly paginationScope?: string;
 	readonly previewActive?: boolean;
+	/** Rows to hydrate from the start while the whole list is below the viewport. */
+	readonly offscreenBootstrapPreviewRows?: number;
 	/** Explicit invalidation value for card models resolved by resolveItemCardModel. */
 	readonly cardModelRevision: unknown;
 	readonly resolveItemCardModel?: (
@@ -332,6 +334,7 @@ export function useTwoHopProgressiveList(
 			readPreviewScrollTop() - contentTopInScrollSpace,
 			previewViewportHeight,
 			mountedRowEnd,
+			props.offscreenBootstrapPreviewRows ?? 0,
 		);
 		if (isPreviewControlActive()) {
 			resolveProgressiveResidentRangeInto(

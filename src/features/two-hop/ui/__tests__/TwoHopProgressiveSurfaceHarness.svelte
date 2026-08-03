@@ -17,6 +17,7 @@
 		linkContext: LinkContext;
 		previewDependencies?: TwoHopPreviewDependencies;
 		previewActive?: boolean;
+		offscreenBootstrapPreviewRows?: number;
 		cardModelRevision?: unknown;
 		resolveItemCardModel: (
 			item: TwoHopItemModel,
@@ -32,6 +33,7 @@
 		linkContext,
 		previewDependencies = undefined,
 		previewActive = true,
+		offscreenBootstrapPreviewRows = 0,
 		cardModelRevision = 0,
 		resolveItemCardModel,
 	}: Props = $props();
@@ -46,5 +48,6 @@
 	{resolveItemCardModel}
 	{previewDependencies}
 	{previewActive}
+	{offscreenBootstrapPreviewRows}
 	{cardModelRevision}
 />

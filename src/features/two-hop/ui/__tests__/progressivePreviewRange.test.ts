@@ -44,6 +44,22 @@ describe("resolveProgressivePreviewRangeInto", () => {
 
 		expect(range).toEqual({ start: 0, end: 0 });
 	});
+
+	it("returns the bounded bootstrap prefix while content is below the viewport", () => {
+		const range: TwoHopRowRange = { start: 0, end: 0 };
+
+		resolveProgressivePreviewRangeInto(range, GEOMETRY, -500, 200, 4, 4);
+
+		expect(range).toEqual({ start: 0, end: 4 });
+	});
+
+	it("clamps the offscreen bootstrap prefix to mounted rows", () => {
+		const range: TwoHopRowRange = { start: 0, end: 0 };
+
+		resolveProgressivePreviewRangeInto(range, GEOMETRY, -500, 200, 2, 4);
+
+		expect(range).toEqual({ start: 0, end: 2 });
+	});
 });
 
 describe("resolveProgressiveResidentRangeInto", () => {

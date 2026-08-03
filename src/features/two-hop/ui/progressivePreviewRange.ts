@@ -7,14 +7,35 @@ import {
 const PREVIEW_RESIDENT_OVERSCAN_ROWS = 2;
 const PREVIEW_RESIDENT_GUARD_ROWS = 1;
 
-/** Resolves the mounted preview window with one row of logical overscan. */
+/**
+ * Resolves the mounted preview window with one row of logical overscan.
+ * An optional prefix can remain active while the entire content starts below
+ * the viewport so its previews can be prepared before the first downward scroll.
+ */
 export function resolveProgressivePreviewRangeInto(
 	target: TwoHopRowRange,
 	geometry: TwoHopGeometry,
 	localViewportTop: number,
 	viewportHeight: number,
 	mountedRowEnd: number,
+	offscreenBootstrapRows = 0,
 ): void {
+	const mountedEnd = Math.min(
+		geometry.rowCount,
+		Math.max(0, Math.floor(mountedRowEnd)),
+	);
+	const bootstrapRowCount = Math.min(
+		mountedEnd,
+		Math.max(0, Math.floor(offscreenBootstrapRows)),
+	);
+	const contentStartsBelowViewport =
+		viewportHeight > 0 && localViewportTop <= -viewportHeight;
+	if (contentStartsBelowViewport && bootstrapRowCount > 0) {
+		target.start = 0;
+		target.end = bootstrapRowCount;
+		return;
+	}
+
 	const overscan = geometry.rowStride;
 	resolveTwoHopVisibleRowsInto(
 		target,
@@ -23,10 +44,6 @@ export function resolveProgressivePreviewRangeInto(
 		viewportHeight + overscan * 2,
 	);
 
-	const mountedEnd = Math.min(
-		geometry.rowCount,
-		Math.max(0, Math.floor(mountedRowEnd)),
-	);
 	target.end = Math.min(target.end, mountedEnd);
 	target.start = Math.min(target.start, target.end);
 }

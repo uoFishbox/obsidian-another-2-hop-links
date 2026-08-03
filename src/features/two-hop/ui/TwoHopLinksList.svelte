@@ -25,6 +25,7 @@
 		linkContext: LinkUtilitiesContext;
 		previewDependencies?: TwoHopPreviewDependencies;
 		previewActive?: boolean;
+		offscreenBootstrapPreviewRows?: number;
 	}
 
 	let {
@@ -39,6 +40,7 @@
 		linkContext,
 		previewDependencies = undefined,
 		previewActive = true,
+		offscreenBootstrapPreviewRows = 0,
 	}: Props = $props();
 
 	const currentSettings = $derived(applicationStore.settings);
@@ -74,4 +76,5 @@
 	{resolveItemCardModel}
 	{previewDependencies}
 	{previewActive}
+	{offscreenBootstrapPreviewRows}
 />
