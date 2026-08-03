@@ -12,8 +12,6 @@ type RegisteredWidgetRecord = {
 	path: string;
 };
 
-type WidgetRef = WeakRef<HTMLElement>;
-
 export interface PropertyWidgetStyler {
 	register(el: HTMLElement, sourceFile: TFile): void;
 	unregister(el: HTMLElement): void;
@@ -27,82 +25,75 @@ export interface PropertyWidgetStyler {
 export function createPropertyWidgetStyler(
 	stylingService: StylingService,
 ): PropertyWidgetStyler {
-	const activeWidgets = new WeakMap<HTMLElement, RegisteredWidgetRecord>();
-	const widgetsByPath = new Map<string, Set<WidgetRef>>();
+	const recordByElement = new Map<HTMLElement, RegisteredWidgetRecord>();
+	const elementsByPath = new Map<string, Set<HTMLElement>>();
 
-	function getOrCreateWidgetsForPath(path: string): Set<WidgetRef> {
-		let widgets = widgetsByPath.get(path);
-		if (!widgets) {
-			widgets = new Set<WidgetRef>();
-			widgetsByPath.set(path, widgets);
+	function getOrCreateElementsForPath(path: string): Set<HTMLElement> {
+		let elements = elementsByPath.get(path);
+		if (!elements) {
+			elements = new Set<HTMLElement>();
+			elementsByPath.set(path, elements);
 		}
-		return widgets;
+		return elements;
 	}
 
 	function removeFromPathIndex(el: HTMLElement, path: string): void {
-		const widgets = widgetsByPath.get(path);
-		if (!widgets) {
+		const elements = elementsByPath.get(path);
+		if (!elements) {
 			return;
 		}
 
-		for (const ref of widgets) {
-			const widget = ref.deref();
-			if (!widget || widget === el) {
-				widgets.delete(ref);
-			}
-		}
+		elements.delete(el);
 
-		if (widgets.size === 0) {
-			widgetsByPath.delete(path);
+		if (elements.size === 0) {
+			elementsByPath.delete(path);
 		}
 	}
 
-	function compactPath(path: string): void {
-		const widgets = widgetsByPath.get(path);
-		if (!widgets) {
-			return;
-		}
+	function pruneDisconnected(paths?: Iterable<string>): void {
+		const pathSet = paths ? (paths instanceof Set ? paths : new Set(paths)) : null;
+		const affectedPaths = pathSet ? [...pathSet] : [...elementsByPath.keys()];
 
-		for (const ref of widgets) {
-			const widget = ref.deref();
-			if (!widget || !widget.isConnected) {
-				widgets.delete(ref);
+		for (const path of affectedPaths) {
+			const elements = elementsByPath.get(path);
+			if (!elements) {
+				continue;
 			}
-		}
 
-		if (widgets.size === 0) {
-			widgetsByPath.delete(path);
+			for (const el of elements) {
+				if (!el.isConnected) {
+					elements.delete(el);
+					recordByElement.delete(el);
+				}
+			}
+
+			if (elements.size === 0) {
+				elementsByPath.delete(path);
+			}
 		}
 	}
 
 	function styleLiveWidgets(path: string): void {
-		const widgets = widgetsByPath.get(path);
-		if (!widgets) {
+		const elements = elementsByPath.get(path);
+		if (!elements) {
 			return;
 		}
 
-		for (const ref of widgets) {
-			const el = ref.deref();
-			if (!el || !el.isConnected) {
-				widgets.delete(ref);
+		for (const el of elements) {
+			if (!el.isConnected) {
 				continue;
 			}
-
-			const record = activeWidgets.get(el);
+			const record = recordByElement.get(el);
 			if (!record) {
 				continue;
 			}
 			styleElement(el, record.sourceFile);
 		}
-
-		if (widgets.size === 0) {
-			widgetsByPath.delete(path);
-		}
 	}
 
 	function register(el: HTMLElement, sourceFile: TFile): void {
 		const path = sourceFile.path;
-		const existing = activeWidgets.get(el);
+		const existing = recordByElement.get(el);
 		if (existing) {
 			if (existing.path === path && existing.sourceFile === sourceFile) {
 				return;
@@ -110,36 +101,22 @@ export function createPropertyWidgetStyler(
 			removeFromPathIndex(el, existing.path);
 		}
 
-		activeWidgets.set(el, { sourceFile, path });
-		getOrCreateWidgetsForPath(path).add(new WeakRef(el));
+		recordByElement.set(el, { sourceFile, path });
+		getOrCreateElementsForPath(path).add(el);
 	}
 
 	function unregister(el: HTMLElement): void {
-		const record = activeWidgets.get(el);
+		const record = recordByElement.get(el);
 		if (!record) {
 			return;
 		}
 
-		activeWidgets.delete(el);
+		recordByElement.delete(el);
 		removeFromPathIndex(el, record.path);
 	}
 
-	function pruneDisconnected(paths?: Iterable<string>): void {
-		if (!paths) {
-			for (const path of widgetsByPath.keys()) {
-				compactPath(path);
-			}
-			return;
-		}
-
-		const pathSet = paths instanceof Set ? paths : new Set(paths);
-		for (const path of pathSet) {
-			compactPath(path);
-		}
-	}
-
 	function updateAll(): void {
-		for (const path of widgetsByPath.keys()) {
+		for (const path of elementsByPath.keys()) {
 			styleLiveWidgets(path);
 		}
 	}
@@ -160,7 +137,7 @@ export function createPropertyWidgetStyler(
 	}
 
 	function registerAndStyleNewWidget(el: HTMLElement, file: TFile): boolean {
-		if (activeWidgets.has(el)) {
+		if (recordByElement.has(el)) {
 			return false;
 		}
 
