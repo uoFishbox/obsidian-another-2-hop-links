@@ -89,21 +89,10 @@ describe("createYieldScheduler", () => {
 });
 
 describe("defaultYieldToMainThread", () => {
-	test("prioritizes scheduler.yield when available", async () => {
-		const schedulerYield = vi.fn(() => Promise.resolve());
-		vi.stubGlobal("scheduler", { yield: schedulerYield });
-
-		try {
-			await expect(defaultYieldToMainThread()).resolves.toBeUndefined();
-			expect(schedulerYield).toHaveBeenCalledTimes(1);
-		} finally {
-			vi.unstubAllGlobals();
-		}
-	});
-
-	test("prioritizes requestIdleCallback when available", async () => {
+	test("prioritizes requestIdleCallback over scheduler.yield", async () => {
 		const originalRequestIdleCallback = window.requestIdleCallback;
 		const originalCancelIdleCallback = window.cancelIdleCallback;
+		const schedulerYield = vi.fn(() => Promise.resolve());
 		const requestIdleCallback = vi.fn(
 			(callback: IdleRequestCallback, _options?: IdleRequestOptions) => {
 				queueMicrotask(() => {
@@ -117,6 +106,7 @@ describe("defaultYieldToMainThread", () => {
 		const clearTimeoutSpy = vi.spyOn(window, "clearTimeout");
 
 		try {
+			vi.stubGlobal("scheduler", { yield: schedulerYield });
 			window.requestIdleCallback =
 				requestIdleCallback as typeof window.requestIdleCallback;
 			window.cancelIdleCallback =
@@ -127,11 +117,13 @@ describe("defaultYieldToMainThread", () => {
 			).resolves.toBeUndefined();
 
 			expect(requestIdleCallback).toHaveBeenCalledTimes(1);
+			expect(schedulerYield).not.toHaveBeenCalled();
 			expect(requestIdleCallback.mock.calls[0][1]).toEqual({ timeout: 25 });
 			expect(setTimeoutSpy).toHaveBeenCalledTimes(1);
 			expect(clearTimeoutSpy).toHaveBeenCalledTimes(1);
 			expect(cancelIdleCallback).not.toHaveBeenCalled();
 		} finally {
+			vi.unstubAllGlobals();
 			window.requestIdleCallback = originalRequestIdleCallback;
 			window.cancelIdleCallback = originalCancelIdleCallback;
 			setTimeoutSpy.mockRestore();

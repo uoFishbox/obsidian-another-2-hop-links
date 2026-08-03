@@ -8,10 +8,6 @@ interface BrowserScheduling {
 	isInputPending?: (options?: { includeContinuous?: boolean }) => boolean;
 }
 
-interface BrowserScheduler {
-	yield?: () => Promise<void>;
-}
-
 export interface YieldScheduler {
 	checkpoint(iteration: number, cadence: number): Promise<void> | undefined;
 }
@@ -35,11 +31,6 @@ export function hasPendingBrowserInput(): boolean {
 	const scheduling = (navigator as Navigator & { scheduling?: BrowserScheduling })
 		.scheduling;
 	return scheduling?.isInputPending?.({ includeContinuous: true }) ?? false;
-}
-
-function getBrowserScheduler(): BrowserScheduler | undefined {
-	return (globalThis as typeof globalThis & { scheduler?: BrowserScheduler })
-		.scheduler;
 }
 
 const idleRequestOptions: IdleRequestOptions = { timeout: 0 };
@@ -102,11 +93,6 @@ function schedulePause(resolve: () => void, maxDelayMs: number): void {
 export function yieldToMainThreadIdleAware(
 	options: YieldToMainThreadOptions = {},
 ): Promise<void> {
-	const browserScheduler = getBrowserScheduler();
-	if (browserScheduler?.yield) {
-		return browserScheduler.yield();
-	}
-
 	const maxDelayMs = options.maxDelayMs ?? DEFAULT_MAX_YIELD_DELAY_MS;
 
 	return new Promise((resolve) => {
