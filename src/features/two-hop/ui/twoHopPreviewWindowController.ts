@@ -13,7 +13,7 @@ export interface TwoHopPreviewWindowController {
 
 /** Owns preview active/resident ranges and row host publication. */
 export function createTwoHopPreviewWindowController(
-	onChanged: () => void,
+	onChanged: (activeChanged: boolean, residentChanged: boolean) => void,
 ): TwoHopPreviewWindowController {
 	const consumers = new Map<number, PreviewRowConsumer>();
 	const activeRange: TwoHopRowRange = { start: 0, end: 0 };
@@ -58,7 +58,7 @@ export function createTwoHopPreviewWindowController(
 
 		copyRange(activeRange, nextActiveRange);
 		copyRange(residentRange, nextResidentRange);
-		onChanged();
+		onChanged(activeChanged, residentChanged);
 	}
 
 	function clear(): void {

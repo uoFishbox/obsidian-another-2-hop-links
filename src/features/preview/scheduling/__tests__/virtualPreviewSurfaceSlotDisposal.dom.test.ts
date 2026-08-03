@@ -43,10 +43,14 @@ afterEach(() => {
 });
 
 describe("VirtualPreviewSurface slot disposal", () => {
-	it("disposes a logical slot after both its host and binding are released", async () => {
+	it("disposes multiple logical slots after their hosts and bindings are released", async () => {
 		const harness = createSurface();
-		const lease = harness.surface.registerHost(
+		const firstLease = harness.surface.registerHost(
 			"logical-slot",
+			document.createElement("div"),
+		);
+		const secondLease = harness.surface.registerHost(
+			"logical-slot-2",
 			document.createElement("div"),
 		);
 		harness.surface.publish({
@@ -60,14 +64,24 @@ describe("VirtualPreviewSurface slot disposal", () => {
 						ownerToken: {},
 					},
 				],
+				[
+					"logical-slot-2",
+					{
+						slotId: "logical-slot-2",
+						rowIndex: 1,
+						request,
+						ownerToken: {},
+					},
+				],
 			]),
 			previewWindow: {
-				previewRange: { start: 0, end: 1 },
+				previewRange: { start: 0, end: 2 },
 				active: true,
 			},
 		});
 		await vi.advanceTimersByTimeAsync(32);
-		lease.dispose();
+		firstLease.dispose();
+		secondLease.dispose();
 
 		expect(harness.disposedSlotIds).toEqual([]);
 
@@ -80,7 +94,7 @@ describe("VirtualPreviewSurface slot disposal", () => {
 		});
 		await vi.advanceTimersByTimeAsync(32);
 
-		expect(harness.disposedSlotIds).toEqual(["logical-slot"]);
+		expect(harness.disposedSlotIds).toEqual(["logical-slot", "logical-slot-2"]);
 		harness.dispose();
 	});
 });

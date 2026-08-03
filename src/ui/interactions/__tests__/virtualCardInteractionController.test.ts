@@ -42,23 +42,15 @@ describe("virtualCardInteractionController", () => {
 		expect(controller.provider.resolveInteractionDescriptor("item-a")).toBeNull();
 	});
 
-	it("updates and releases only slots included in a delta", () => {
+	it("updates and releases cards through direct slot operations", () => {
 		const controller = createVirtualCardInteractionController();
 		const first = createDescriptor("item-a", "notes/a.md");
 		const second = createDescriptor("item-b", "notes/b.md");
 		const retained = createDescriptor("item-c", "notes/c.md");
-		const permanentBinding = { slotId: "slot-0", descriptor: first };
-		controller.syncCards([
-			permanentBinding,
-			{ slotId: "slot-1", descriptor: retained },
-		]);
 
-		permanentBinding.descriptor = second;
-		controller.syncCardDelta({
-			enteredSlots: [],
-			reboundSlots: [permanentBinding],
-			releasedSlots: [],
-		});
+		controller.setCard("slot-0", first);
+		controller.setCard("slot-1", retained);
+		controller.setCard("slot-0", second);
 
 		expect(controller.provider.resolveInteractionDescriptor("item-a")).toBeNull();
 		expect(controller.provider.resolveInteractionDescriptor("item-b")).toBe(second);
@@ -66,11 +58,7 @@ describe("virtualCardInteractionController", () => {
 			retained,
 		);
 
-		controller.syncCardDelta({
-			enteredSlots: [],
-			reboundSlots: [],
-			releasedSlots: [permanentBinding.slotId],
-		});
+		controller.setCard("slot-0", null);
 		expect(controller.provider.resolveInteractionDescriptor("item-b")).toBeNull();
 		expect(controller.provider.resolveInteractionDescriptor("item-c")).toBe(
 			retained,

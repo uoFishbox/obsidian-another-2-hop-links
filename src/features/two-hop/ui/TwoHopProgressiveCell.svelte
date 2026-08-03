@@ -9,7 +9,6 @@
 	import type { IconName } from "ui/shared/icons/iconRegistry";
 	import type { TwoHopProgressiveCell } from "features/two-hop/ui/twoHopProgressivePlan";
 	import { resolveTwoHopSectionVariant } from "features/two-hop/ui/twoHopCellStaticState";
-	import { resolveProgressivePreviewSlotId } from "features/two-hop/ui/useTwoHopProgressiveList.svelte";
 	import { getDebugDisableCardDomPreview } from "../../../appConstants";
 
 	interface Props {
@@ -117,7 +116,7 @@
 				<UnresolvedPreviewPlaceholder />
 			{:else if !getDebugDisableCardDomPreview() && model.targetFile && previewHostCandidate}
 				<div
-					use:previewHost={resolveProgressivePreviewSlotId(cell.logicalKey)}
+					use:previewHost={cell.logicalKey}
 					class="cosense-card-links__box-preview"
 					data-preview-owner="virtual-surface"
 				></div>

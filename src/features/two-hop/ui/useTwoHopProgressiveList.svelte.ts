@@ -79,13 +79,10 @@ interface LayoutAnchor {
 
 type SectionPublicationKind = "identity-reset" | "data-revision";
 const EMPTY_PREVIEW_RANGE = Object.freeze({ start: 0, end: 0 });
+const EMPTY_BINDINGS: ReadonlyMap<string, RowPreviewCardBinding> = new Map();
 const PREVIEW_SCROLL_TASK_KEY = "two-hop-progressive-preview-window";
 const PREVIEW_RANGE_APPLY_TASK_KEY = "two-hop-progressive-preview-window-apply";
 const PREVIEW_SCROLL_IDLE_MS = 140;
-
-export function resolveProgressivePreviewSlotId(logicalKey: string): string {
-	return `two-hop-progressive:${logicalKey}`;
-}
 
 /** Owns append-only chunk publication, lazy model hydration, and bounded preview state. */
 export function useTwoHopProgressiveList(
@@ -135,9 +132,11 @@ export function useTwoHopProgressiveList(
 			})
 		: DISABLED_PREVIEW_SURFACE;
 	const previewBindingByLogicalKey = new Map<string, RowPreviewCardBinding>();
+	let publishedBindings: ReadonlyMap<string, RowPreviewCardBinding> = EMPTY_BINDINGS;
+	let previewBindingsDirty = true;
 	const visibleHydrationRange: TwoHopRowRange = { start: 0, end: 0 };
 	const previewWindow = createTwoHopPreviewWindowController(
-		schedulePreviewPublication,
+		handlePreviewWindowChanged,
 	);
 	const nextVisibleHydrationRange: TwoHopRowRange = { start: 0, end: 0 };
 	const nextResidentPreviewRange: TwoHopRowRange = { start: 0, end: 0 };
@@ -153,6 +152,7 @@ export function useTwoHopProgressiveList(
 	let contentTopInScrollSpace = 0;
 	let previewViewportHeight = 0;
 	let previewPublicationScheduled = false;
+	let lastPreviewSurfaceActive = isPreviewSurfaceActive();
 	let lastDocumentIdentity = props.documentIdentity;
 	let lastCardModelRevision = props.cardModelRevision;
 	const cardHydrator = createTwoHopCardHydrator({
@@ -161,7 +161,7 @@ export function useTwoHopProgressiveList(
 		getRevision: () => untrack(() => props.cardModelRevision),
 		getResolver: () => untrack(() => props.resolveItemCardModel),
 		isPreviewActive: isPreviewControlActive,
-		onPreviewModelsChanged: schedulePreviewPublication,
+		onPreviewModelsChanged: markPreviewBindingsDirty,
 	});
 
 	function isPreviewControlActive(): boolean {
@@ -184,49 +184,67 @@ export function useTwoHopProgressiveList(
 		queueMicrotask(flushScheduledPreviewPublication);
 	}
 
+	function markPreviewBindingsDirty(): void {
+		previewBindingsDirty = true;
+		schedulePreviewPublication();
+	}
+
+	function handlePreviewWindowChanged(
+		_activeChanged: boolean,
+		residentChanged: boolean,
+	): void {
+		if (residentChanged) previewBindingsDirty = true;
+		schedulePreviewPublication();
+	}
+
 	function publishPreviewFrame(): void {
 		const active = isPreviewSurfaceActive();
-		const bindings = new Map<string, RowPreviewCardBinding>();
 
-		if (active) {
-			const activePlan = untrack(() => plan);
-			for (
-				let rowIndex = previewWindow.residentRange.start;
-				rowIndex < previewWindow.residentRange.end;
-				rowIndex += 1
-			) {
-				const row = resolveMountedProgressiveRow(activePlan, rowIndex);
-				if (!row) continue;
-				for (const cell of row.cells) {
-					if (cell.kind !== "item") continue;
-					const model = cardHydrator.getActivatedModel(cell.logicalKey);
-					if (!model?.previewRequest) continue;
-					const previousBinding = previewBindingByLogicalKey.get(
-						cell.logicalKey,
-					);
-					const slotId =
-						previousBinding?.slotId ??
-						resolveProgressivePreviewSlotId(cell.logicalKey);
-					const binding =
-						previousBinding?.rowIndex === rowIndex &&
-						previousBinding.ownerToken === cell &&
-						previousBinding.request.renderKey ===
-							model.previewRequest.renderKey
-							? previousBinding
-							: Object.freeze({
-									slotId,
-									rowIndex,
-									request: model.previewRequest,
-									ownerToken: cell,
-								});
-					previewBindingByLogicalKey.set(cell.logicalKey, binding);
-					bindings.set(slotId, binding);
+		if (previewBindingsDirty) {
+			if (!active) {
+				previewBindingByLogicalKey.clear();
+				publishedBindings = EMPTY_BINDINGS;
+			} else {
+				const bindings = new Map<string, RowPreviewCardBinding>();
+				const activePlan = untrack(() => plan);
+				for (
+					let rowIndex = previewWindow.residentRange.start;
+					rowIndex < previewWindow.residentRange.end;
+					rowIndex += 1
+				) {
+					const row = resolveMountedProgressiveRow(activePlan, rowIndex);
+					if (!row) continue;
+					for (const cell of row.cells) {
+						if (cell.kind !== "item") continue;
+						const model = cardHydrator.getActivatedModel(cell.logicalKey);
+						if (!model?.previewRequest) continue;
+						const previousBinding = previewBindingByLogicalKey.get(
+							cell.logicalKey,
+						);
+						const slotId = previousBinding?.slotId ?? cell.logicalKey;
+						const binding =
+							previousBinding?.rowIndex === rowIndex &&
+							previousBinding.ownerToken === cell &&
+							previousBinding.request.renderKey ===
+								model.previewRequest.renderKey
+								? previousBinding
+								: Object.freeze({
+										slotId,
+										rowIndex,
+										request: model.previewRequest,
+										ownerToken: cell,
+									});
+						previewBindingByLogicalKey.set(cell.logicalKey, binding);
+						bindings.set(slotId, binding);
+					}
 				}
+				for (const [logicalKey, binding] of previewBindingByLogicalKey) {
+					if (bindings.has(binding.slotId)) continue;
+					previewBindingByLogicalKey.delete(logicalKey);
+				}
+				publishedBindings = bindings;
 			}
-		}
-		for (const [logicalKey, binding] of previewBindingByLogicalKey) {
-			if (bindings.has(binding.slotId)) continue;
-			previewBindingByLogicalKey.delete(logicalKey);
+			previewBindingsDirty = false;
 		}
 
 		const previewRange = active
@@ -236,7 +254,7 @@ export function useTwoHopProgressiveList(
 				})
 			: EMPTY_PREVIEW_RANGE;
 		const frame: PreviewFrame = Object.freeze({
-			previewBindingsBySlot: bindings,
+			previewBindingsBySlot: publishedBindings,
 			previewWindow: Object.freeze({ previewRange, active }),
 		});
 		previewSurface.publish(frame);
@@ -553,6 +571,7 @@ export function useTwoHopProgressiveList(
 		kind: SectionPublicationKind,
 	): void {
 		if (nextSections === sections && kind === "data-revision") return;
+		previewBindingsDirty = true;
 		const anchor = kind === "data-revision" ? captureLayoutAnchor() : null;
 		const nextGeometry = compileFixedGridLayout(nextSections, layout);
 		const nextMountedRowEnd =
@@ -715,7 +734,11 @@ export function useTwoHopProgressiveList(
 	});
 
 	$effect(() => {
-		const active = isPreviewControlActive();
+		const active = isPreviewSurfaceActive();
+		if (active !== lastPreviewSurfaceActive) {
+			lastPreviewSurfaceActive = active;
+			previewBindingsDirty = true;
+		}
 		if (!active) {
 			cancelPreviewScrollIdle();
 			deactivatePreviewControl();

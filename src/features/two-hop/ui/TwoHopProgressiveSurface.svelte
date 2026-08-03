@@ -28,13 +28,13 @@
 			bind:this={list.contentEl}
 			class="view-plan-flow-content twohop-progressive-content"
 		>
-			{#each list.plan.chunks as chunk (chunk.key)}
+			{#each list.plan.chunks as chunk (chunk.chunkIndex)}
 				<div
 					class="twohop-progressive-chunk"
 					data-ccl-progressive-chunk={chunk.chunkIndex}
 					style={`height:${chunk.height}px;contain-intrinsic-size:auto ${chunk.height}px;`}
 				>
-					{#each chunk.rows as row (row.key)}
+					{#each chunk.rows as row (row.rowIndex)}
 						<TwoHopProgressiveRow
 							{row}
 							layout={list.layout}

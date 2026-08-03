@@ -6,16 +6,10 @@ export interface VirtualCardInteractionBinding {
 	descriptor: ItemInteractionDescriptor;
 }
 
-export interface VirtualCardInteractionDelta {
-	readonly enteredSlots: readonly VirtualCardInteractionBinding[];
-	readonly reboundSlots: readonly VirtualCardInteractionBinding[];
-	readonly releasedSlots: readonly string[];
-}
-
 export interface VirtualCardInteractionController {
 	readonly provider: InteractionDescriptorResolverProvider;
 	syncCards(cards: readonly VirtualCardInteractionBinding[]): void;
-	syncCardDelta(delta: VirtualCardInteractionDelta): void;
+	setCard(slotId: string, descriptor: ItemInteractionDescriptor | null): void;
 	clear(): void;
 }
 
@@ -35,14 +29,14 @@ export function createVirtualCardInteractionController(): VirtualCardInteraction
 		descriptorsBySlot.delete(slotId);
 	}
 
-	function bindCard(card: VirtualCardInteractionBinding): void {
-		const prevId = interactionIdBySlot.get(card.slotId);
-		if (prevId !== undefined && prevId !== card.descriptor.interactionId) {
+	function bindCard(slotId: string, descriptor: ItemInteractionDescriptor): void {
+		const prevId = interactionIdBySlot.get(slotId);
+		if (prevId !== undefined && prevId !== descriptor.interactionId) {
 			descriptorByInteractionId.delete(prevId);
 		}
-		descriptorsBySlot.set(card.slotId, card.descriptor);
-		interactionIdBySlot.set(card.slotId, card.descriptor.interactionId);
-		descriptorByInteractionId.set(card.descriptor.interactionId, card.descriptor);
+		descriptorsBySlot.set(slotId, descriptor);
+		interactionIdBySlot.set(slotId, descriptor.interactionId);
+		descriptorByInteractionId.set(descriptor.interactionId, descriptor);
 	}
 
 	const provider: InteractionDescriptorResolverProvider = {
@@ -57,17 +51,19 @@ export function createVirtualCardInteractionController(): VirtualCardInteraction
 			retainedSlots.clear();
 			for (const card of cards) {
 				retainedSlots.add(card.slotId);
-				bindCard(card);
+				bindCard(card.slotId, card.descriptor);
 			}
 			for (const slotId of descriptorsBySlot.keys()) {
 				if (!retainedSlots.has(slotId)) removeSlot(slotId);
 			}
 			retainedSlots.clear();
 		},
-		syncCardDelta(delta) {
-			for (const slotId of delta.releasedSlots) removeSlot(slotId);
-			for (const card of delta.enteredSlots) bindCard(card);
-			for (const card of delta.reboundSlots) bindCard(card);
+		setCard(slotId, descriptor) {
+			if (descriptor) {
+				bindCard(slotId, descriptor);
+			} else {
+				removeSlot(slotId);
+			}
 		},
 		clear() {
 			descriptorsBySlot.clear();

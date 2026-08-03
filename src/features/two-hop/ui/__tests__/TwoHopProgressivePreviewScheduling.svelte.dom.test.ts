@@ -768,13 +768,14 @@ describe("TwoHop progressive preview scheduling", () => {
 		const initialScrollTop = 1_000;
 		const fixture = await renderPreviewControlFixture(true, initialScrollTop);
 		await vi.waitFor(() => expect(fixture.registerHost).toHaveBeenCalled());
-		const initialFrame = fixture.publish.mock.lastCall?.[0] as
+		await drainIdleTasks();
+		const firstFrame = fixture.publish.mock.lastCall?.[0] as
 			| PreviewFrame
 			| undefined;
-		if (!initialFrame) throw new Error("Initial preview frame was not published");
+		if (!firstFrame) throw new Error("Initial preview frame was not published");
 		const activeRowCount =
-			initialFrame.previewWindow.previewRange.end -
-			initialFrame.previewWindow.previewRange.start;
+			firstFrame.previewWindow.previewRange.end -
+			firstFrame.previewWindow.previewRange.start;
 		const columnCount = fixture.root.shadowRoot?.querySelector(
 			"[data-ccl-progressive-row]",
 		)?.childElementCount;
@@ -791,14 +792,24 @@ describe("TwoHop progressive preview scheduling", () => {
 		const secondRowTop = Number.parseFloat(rows[1]?.style.top ?? "0");
 		const rowStride = secondRowTop - firstRowTop;
 		expect(rowStride).toBeGreaterThan(0);
+		await applyScrollRange(fixture.scrollTarget, initialScrollTop - rowStride);
+		await drainPostPaintTasks();
+		await drainIdleTasks();
+		const initialFrame = fixture.publish.mock.lastCall?.[0] as
+			| PreviewFrame
+			| undefined;
+		if (!initialFrame) throw new Error("Initial preview frame was not published");
 		fixture.disposeHost.mockClear();
 
-		await applyScrollRange(fixture.scrollTarget, initialScrollTop + rowStride);
+		await applyScrollRange(fixture.scrollTarget, initialScrollTop);
 		await drainPostPaintTasks();
 		const nextFrame = fixture.publish.mock.lastCall?.[0] as PreviewFrame;
 
 		expect(nextFrame.previewWindow.previewRange.start).toBe(
 			initialFrame.previewWindow.previewRange.start + 1,
+		);
+		expect(nextFrame.previewBindingsBySlot).toBe(
+			initialFrame.previewBindingsBySlot,
 		);
 		expect(fixture.disposeHost).not.toHaveBeenCalled();
 		const retainedInactiveBindings = [

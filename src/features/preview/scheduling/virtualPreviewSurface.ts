@@ -15,14 +15,12 @@ import type { RowRange } from "ui/virtualization/rowRange";
 import type { VirtualFrameCoordinator } from "ui/virtualization/scheduling/frameCoordinator";
 import type {
 	PreviewFrame,
-	RowPreviewBindingDelta,
 	RowPreviewCardBinding,
 	RowPreviewWindow,
 } from "./rowPreviewTypes";
 
 export type {
 	PreviewFrame,
-	RowPreviewBindingDelta,
 	RowPreviewCardBinding,
 	RowPreviewWindow,
 } from "./rowPreviewTypes";
@@ -143,30 +141,32 @@ export function createVirtualPreviewSurface(
 
 	function reconcile(): void {
 		for (const slot of slotsById.values()) reconcileSlot(slot);
-		for (const slot of [...slotsById.values()]) maybeDisposeSlot(slot);
+		for (const slot of slotsById.values()) maybeDisposeSlot(slot);
 	}
 
 	function applyDesiredFrame(): void {
 		if (disposed) return;
 		const frame = desiredFrame;
 		if (!frame) return;
-		const delta = diffPreviewBindings(
-			appliedFrame?.previewBindingsBySlot,
-			frame.previewBindingsBySlot,
-		);
+		const desiredBindings = frame.previewBindingsBySlot;
+		const appliedBindings = appliedFrame?.previewBindingsBySlot;
 		previewRange = frame.previewWindow.active
 			? frame.previewWindow.previewRange
 			: EMPTY_RANGE;
 
-		for (const slotId of delta.releasedSlots) {
-			const slot = getOrCreateSlot(slotId);
-			slot.binding = undefined;
-			slot.rowIndex = undefined;
-			slot.controller.clear();
+		if (appliedBindings) {
+			for (const slotId of appliedBindings.keys()) {
+				if (desiredBindings.has(slotId)) continue;
+				const slot = slotsById.get(slotId);
+				if (!slot) continue;
+				slot.binding = undefined;
+				slot.rowIndex = undefined;
+				slot.controller.clear();
+			}
 		}
 		// Bind every final desired slot idempotently. A staged A -> B -> A sequence
 		// invalidates A before this flush even though its final reference is unchanged.
-		for (const binding of frame.previewBindingsBySlot.values()) {
+		for (const binding of desiredBindings.values()) {
 			const slot = getOrCreateSlot(binding.slotId);
 			slot.binding = binding;
 			slot.rowIndex = binding.rowIndex;
@@ -204,23 +204,26 @@ export function createVirtualPreviewSurface(
 		if (desiredFrame === frame) return;
 
 		const previousDesired = desiredFrame;
-		const delta = diffPreviewBindings(
-			previousDesired?.previewBindingsBySlot,
-			frame.previewBindingsBySlot,
-		);
-		desiredFrame = frame;
-		for (const slotId of delta.releasedSlots) {
-			slotsById.get(slotId)?.controller.invalidate();
-		}
-		for (const binding of [...delta.enteredSlots, ...delta.reboundSlots]) {
-			const previousBinding = previousDesired?.previewBindingsBySlot.get(
-				binding.slotId,
-			);
-			if (previousBinding && isSameDesiredBinding(previousBinding, binding)) {
-				continue;
+		const previousBindings = previousDesired?.previewBindingsBySlot;
+		const nextBindings = frame.previewBindingsBySlot;
+		let bindingsChanged = false;
+		if (previousBindings) {
+			for (const slotId of previousBindings.keys()) {
+				if (nextBindings.has(slotId)) continue;
+				bindingsChanged = true;
+				slotsById.get(slotId)?.controller.invalidate();
 			}
-			slotsById.get(binding.slotId)?.controller.invalidate();
 		}
+		for (const [slotId, binding] of nextBindings) {
+			const previousBinding = previousBindings?.get(slotId);
+			if (previousBinding === binding) continue;
+
+			bindingsChanged = true;
+			if (!previousBinding || !isSameDesiredBinding(previousBinding, binding)) {
+				slotsById.get(slotId)?.controller.invalidate();
+			}
+		}
+		desiredFrame = frame;
 
 		const previousRange = previousDesired?.previewWindow.active
 			? previousDesired.previewWindow.previewRange
@@ -229,9 +232,7 @@ export function createVirtualPreviewSurface(
 			? frame.previewWindow.previewRange
 			: EMPTY_RANGE;
 		const hasChanges =
-			delta.enteredSlots.length > 0 ||
-			delta.reboundSlots.length > 0 ||
-			delta.releasedSlots.length > 0 ||
+			bindingsChanged ||
 			nextRange.start !== previousRange.start ||
 			nextRange.end !== previousRange.end;
 		if (!hasChanges) return;
@@ -252,24 +253,6 @@ export function createVirtualPreviewSurface(
 	}
 
 	return { registerHost, publish, dispose };
-}
-
-function diffPreviewBindings(
-	previous: ReadonlyMap<string, RowPreviewCardBinding> | undefined,
-	next: ReadonlyMap<string, RowPreviewCardBinding>,
-): RowPreviewBindingDelta {
-	const enteredSlots: RowPreviewCardBinding[] = [];
-	const reboundSlots: RowPreviewCardBinding[] = [];
-	const releasedSlots: string[] = [];
-	for (const slotId of previous?.keys() ?? []) {
-		if (!next.has(slotId)) releasedSlots.push(slotId);
-	}
-	for (const [slotId, binding] of next) {
-		const previousBinding = previous?.get(slotId);
-		if (!previousBinding) enteredSlots.push(binding);
-		else if (previousBinding !== binding) reboundSlots.push(binding);
-	}
-	return { enteredSlots, reboundSlots, releasedSlots };
 }
 
 function isSameDesiredBinding(

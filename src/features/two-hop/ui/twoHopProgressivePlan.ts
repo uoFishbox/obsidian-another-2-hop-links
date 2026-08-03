@@ -28,14 +28,12 @@ export type TwoHopProgressiveCell =
 	| (ProgressiveCellBase & { readonly kind: "load-more" });
 
 export interface TwoHopProgressiveRow {
-	readonly key: string;
 	readonly rowIndex: number;
 	readonly top: number;
 	readonly cells: readonly TwoHopProgressiveCell[];
 }
 
 export interface TwoHopProgressiveChunk {
-	readonly key: string;
 	readonly chunkIndex: number;
 	readonly rowStart: number;
 	readonly rowEnd: number;
@@ -193,7 +191,6 @@ export function buildProgressiveChunk(
 
 		rows.push(
 			Object.freeze({
-				key: `progressive-row:${rowIndex}`,
 				rowIndex,
 				top: rowTop - chunkTop,
 				cells: Object.freeze(cells),
@@ -202,7 +199,6 @@ export function buildProgressiveChunk(
 	}
 
 	return Object.freeze({
-		key: `progressive-chunk:${Math.floor(rowStart / TWO_HOP_PROGRESSIVE_ROWS_PER_CHUNK)}`,
 		chunkIndex: Math.floor(rowStart / TWO_HOP_PROGRESSIVE_ROWS_PER_CHUNK),
 		rowStart,
 		rowEnd,
@@ -217,10 +213,11 @@ function buildCell(
 	columnIndex: number,
 	cellIndex: number,
 ): TwoHopProgressiveCell | null {
-	const base = { section, rowIndex, columnIndex };
 	if (cellIndex === 0) {
 		return Object.freeze({
-			...base,
+			section,
+			rowIndex,
+			columnIndex,
 			kind: "header",
 			logicalKey: section.header.logicalKey,
 		});
@@ -231,7 +228,9 @@ function buildCell(
 		const item = section.items[itemIndex];
 		if (!item) return null;
 		return Object.freeze({
-			...base,
+			section,
+			rowIndex,
+			columnIndex,
 			kind: "item",
 			logicalKey: `item:${section.id}:${item.key}`,
 			itemIndex,
@@ -244,7 +243,9 @@ function buildCell(
 		section.visibleCount < section.items.length
 	) {
 		return Object.freeze({
-			...base,
+			section,
+			rowIndex,
+			columnIndex,
 			kind: "load-more",
 			logicalKey: `load-more:${section.id}`,
 		});

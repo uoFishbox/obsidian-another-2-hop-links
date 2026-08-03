@@ -23,6 +23,8 @@ describe("createTwoHopPreviewWindowController", () => {
 			expect(consumers[rowIndex]).not.toHaveBeenCalled();
 		}
 		expect(onChanged).toHaveBeenCalledTimes(2);
+		expect(onChanged).toHaveBeenNthCalledWith(1, true, true);
+		expect(onChanged).toHaveBeenNthCalledWith(2, true, true);
 	});
 
 	it("notifies both bounded ranges when the resident window jumps", () => {
@@ -59,5 +61,6 @@ describe("createTwoHopPreviewWindowController", () => {
 
 		expect(consumer).not.toHaveBeenCalled();
 		expect(onChanged).toHaveBeenCalledTimes(2);
+		expect(onChanged).toHaveBeenLastCalledWith(true, false);
 	});
 });

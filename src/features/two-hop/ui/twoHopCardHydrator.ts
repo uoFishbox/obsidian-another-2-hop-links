@@ -13,10 +13,7 @@ import {
 } from "features/two-hop/ui/twoHopProgressivePlan";
 import type { TwoHopRowRange } from "features/two-hop/ui/viewport/twoHopGeometry";
 import type { VirtualFrameCoordinator } from "ui/virtualization/scheduling/frameCoordinator";
-import {
-	createVirtualCardInteractionController,
-	type VirtualCardInteractionBinding,
-} from "ui/interactions/virtualCardInteractionController";
+import { createVirtualCardInteractionController } from "ui/interactions/virtualCardInteractionController";
 import { recordCCLDevMeasurement } from "infrastructure/debug/CCLDevMeasurements";
 
 type CardModelConsumer = (model: CardShellModel | undefined) => void;
@@ -28,10 +25,7 @@ interface HydratedCardEntry {
 	readonly model: CardRenderModel;
 }
 
-interface HydrationEntry {
-	readonly logicalKey: string;
-	readonly cell: Extract<TwoHopProgressiveCell, { kind: "item" }>;
-}
+type HydrationEntry = Extract<TwoHopProgressiveCell, { kind: "item" }>;
 
 interface HydrationQueue {
 	readonly entries: HydrationEntry[];
@@ -142,7 +136,7 @@ export function createTwoHopCardHydrator(
 		if (queue.keys.has(cell.logicalKey)) return;
 		if (priority === "preload" && visibleQueue.keys.has(cell.logicalKey)) return;
 		queue.keys.add(cell.logicalKey);
-		queue.entries.push({ logicalKey: cell.logicalKey, cell });
+		queue.entries.push(cell);
 	}
 
 	function enqueueRange(
@@ -221,9 +215,6 @@ export function createTwoHopCardHydrator(
 		const startedAt = performance.now();
 		let processed = 0;
 		let previewChanged = false;
-		const entered: VirtualCardInteractionBinding[] = [];
-		const rebound: VirtualCardInteractionBinding[] = [];
-		const released: string[] = [];
 		while (
 			hasPendingHydration(queue) &&
 			processed < MAX_MODELS_PER_DRAIN &&
@@ -237,19 +228,16 @@ export function createTwoHopCardHydrator(
 			let changed = false;
 			let previewRenderKeyChanged = false;
 			const revision = params.getRevision();
-			if (
-				current?.item !== hydration.cell.item ||
-				current.revision !== revision
-			) {
+			if (current?.item !== hydration.item || current.revision !== revision) {
 				const presentation = resolveTwoHopCardPresentation(
-					hydration.cell.item,
-					hydration.cell.section,
+					hydration.item,
+					hydration.section,
 				);
 				if (!presentation) continue;
 				if (process.env.NODE_ENV !== "production") {
 					recordCCLDevMeasurement("twoHop.resolveItemCardModel.call");
 				}
-				model = resolver(hydration.cell.item, presentation, revision);
+				model = resolver(hydration.item, presentation, revision);
 				changed = current?.model !== model;
 				previewRenderKeyChanged =
 					current !== undefined &&
@@ -257,7 +245,7 @@ export function createTwoHopCardHydrator(
 					current.model.previewRequest?.renderKey !==
 						model.previewRequest?.renderKey;
 				entries.set(hydration.logicalKey, {
-					item: hydration.cell.item,
+					item: hydration.item,
 					revision,
 					model,
 				});
@@ -278,20 +266,10 @@ export function createTwoHopCardHydrator(
 			}
 			const descriptor = model.interactionDescriptor;
 			if (!wasActivated && descriptor) {
-				entered.push({ slotId: hydration.logicalKey, descriptor });
+				interactionController.setCard(hydration.logicalKey, descriptor);
 			} else if (wasActivated && changed) {
-				if (descriptor)
-					rebound.push({ slotId: hydration.logicalKey, descriptor });
-				else released.push(hydration.logicalKey);
+				interactionController.setCard(hydration.logicalKey, descriptor);
 			}
-		}
-
-		if (entered.length > 0 || rebound.length > 0 || released.length > 0) {
-			interactionController.syncCardDelta({
-				enteredSlots: entered,
-				reboundSlots: rebound,
-				releasedSlots: released,
-			});
 		}
 		compactHydrationQueue(queue);
 		if (previewChanged) params.onPreviewModelsChanged();
@@ -323,19 +301,11 @@ export function createTwoHopCardHydrator(
 				}
 			}
 		}
-		const released: string[] = [];
 		for (const logicalKey of staleKeys) {
 			notify(logicalKey, undefined);
 			entries.delete(logicalKey);
 			activatedKeys.delete(logicalKey);
-			released.push(logicalKey);
-		}
-		if (released.length > 0) {
-			interactionController.syncCardDelta({
-				enteredSlots: [],
-				reboundSlots: [],
-				releasedSlots: released,
-			});
+			interactionController.setCard(logicalKey, null);
 		}
 		replaceRange(visibleRange);
 		params.onPreviewModelsChanged();

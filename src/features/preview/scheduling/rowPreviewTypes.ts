@@ -12,12 +12,6 @@ export interface RowPreviewCardBinding {
 	readonly ownerToken: object;
 }
 
-export interface RowPreviewBindingDelta {
-	readonly enteredSlots: readonly RowPreviewCardBinding[];
-	readonly reboundSlots: readonly RowPreviewCardBinding[];
-	readonly releasedSlots: readonly string[];
-}
-
 export interface RowPreviewWindow {
 	readonly previewRange: RowRange;
 	readonly active: boolean;
