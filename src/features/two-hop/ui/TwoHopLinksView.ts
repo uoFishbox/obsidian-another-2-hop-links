@@ -86,8 +86,7 @@ export class TwoHopLinksView extends ItemView {
 				lazyLoaderCache: this.lazyLoaderCache,
 				isSidebar: true,
 				wrapForView: false,
-				updateSetting: (key, value) =>
-					this.plugin.updateSetting(key as any, value),
+				updateSetting: (key, value) => this.plugin.updateSetting(key, value),
 			}));
 	}
 

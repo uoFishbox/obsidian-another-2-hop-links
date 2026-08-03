@@ -2,10 +2,8 @@ import type { TFile, Pos, CachedMetadata, App } from "obsidian";
 import type { TwoHopIndexedLink } from "types/domain";
 import { createContext } from "svelte";
 import type { ApplicationStore } from "ui/stores/ApplicationStore.svelte";
-import type {
-	PreviewData,
-	PreviewRequestOptions,
-} from "features/preview/public-types";
+import type { PluginSettings } from "features/settings/model";
+import type { PreviewData, PreviewRequestOptions } from "features/preview/public-types";
 import type { PreviewRuntime } from "features/preview/runtime/previewRuntime";
 export type {
 	PreviewData,
@@ -68,7 +66,10 @@ export interface AppContext {
 		query: string,
 		file: TFile | null | undefined,
 	) => Pos | undefined;
-	updateSetting?: <K extends string>(key: K, value: unknown) => Promise<void>;
+	updateSetting?: <K extends keyof PluginSettings>(
+		key: K,
+		value: PluginSettings[K],
+	) => Promise<void>;
 }
 
 export const [useAppContext, setAppContext] = createContext<AppContext>();

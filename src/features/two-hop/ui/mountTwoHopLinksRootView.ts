@@ -20,7 +20,10 @@ export interface MountTwoHopLinksRootViewOptions {
 	isSidebar?: boolean;
 	wrapForView?: boolean;
 	getApplicationStore?: () => ApplicationStore;
-	updateSetting?: <K extends string>(key: K, value: unknown) => Promise<void>;
+	updateSetting?: <K extends keyof PluginSettings>(
+		key: K,
+		value: PluginSettings[K],
+	) => Promise<void>;
 	uiState?: TwoHopLinksRootUiState;
 }
 

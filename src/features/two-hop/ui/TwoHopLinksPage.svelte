@@ -16,6 +16,7 @@
 		setLazyLoaderCache,
 	} from "ui/context/linkContext";
 	import type { ApplicationStore } from "ui/stores/ApplicationStore.svelte";
+	import type { PluginSettings } from "features/settings/model";
 	import { getCardLayoutCssText } from "ui/shared/layout/cardLayoutCssVars";
 	import { createTwohopSearchAdapter } from "features/two-hop/ui/twoHopSearchAdapter";
 	import { tick } from "svelte";
@@ -33,7 +34,10 @@
 		previewRuntime?: PreviewRuntime;
 		lazyLoaderCache: Set<string>;
 		isSidebar?: boolean;
-		updateSetting?: <K extends string>(key: K, value: unknown) => Promise<void>;
+		updateSetting?: <K extends keyof PluginSettings>(
+			key: K,
+			value: PluginSettings[K],
+		) => Promise<void>;
 		uiState?: TwoHopLinksRootUiState;
 	}
 

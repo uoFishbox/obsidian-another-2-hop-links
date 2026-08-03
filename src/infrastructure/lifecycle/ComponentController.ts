@@ -286,8 +286,7 @@ export class ComponentController implements IComponentManager {
 				settings,
 				lazyLoaderCache,
 				getApplicationStore: () => applicationStore!,
-				updateSetting: (key, value) =>
-					this.plugin.updateSetting(key as any, value),
+				updateSetting: (key, value) => this.plugin.updateSetting(key, value),
 				uiState: this.getInlineUiState(view, file.path),
 			});
 
