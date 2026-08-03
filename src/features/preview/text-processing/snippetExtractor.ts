@@ -106,7 +106,7 @@ function resolvePreviewVisualMetrics(settings: PreviewSnippetSettings): {
 	};
 }
 
-function normalizeSearchQuery(searchQuery?: string): string {
+export function normalizeSearchQuery(searchQuery?: string): string {
 	return searchQuery?.trim().toLowerCase() ?? "";
 }
 

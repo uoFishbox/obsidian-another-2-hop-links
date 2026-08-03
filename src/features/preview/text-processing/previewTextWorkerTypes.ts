@@ -15,7 +15,7 @@ export type PreviewTextWorkerRequest =
 			type: "get-content-snippet";
 			requestId: number;
 			content: string;
-			settings?: PluginSettings;
+			settings?: PreviewSnippetSettings;
 			searchQuery?: string;
 			searchOptions?: GetContentSnippetOptions;
 	  }

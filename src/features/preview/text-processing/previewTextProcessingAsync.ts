@@ -6,6 +6,8 @@ import {
 } from "./fencedCodeBlocks";
 import { extractFirstEmbeddedMedia, type ParsedEmbed } from "./mediaExtractor";
 import {
+	getContentSnippet,
+	normalizeSearchQuery,
 	prepareContentSnippet,
 	renderPreparedContentSnippet,
 	type GetContentSnippetOptions,
@@ -13,6 +15,7 @@ import {
 } from "./snippetExtractor";
 import { highlightSearchMatchesInHtml } from "./searchHighlighter";
 import { transformContentForPreview } from "./textTransformUtils";
+import { findCaseInsensitiveIndex } from "./searchUtils";
 import type { TransformContentForPreviewOptions } from "./types";
 import {
 	PREVIEW_TEXT_WORKER_MIN_CONTENT_LENGTH,
@@ -69,6 +72,37 @@ async function runWithFallback<T>(
 	}
 }
 
+function resolveContentSnippetFirstMatchIndex(
+	content: string,
+	normalizedSearchQuery: string,
+	searchOptions?: GetContentSnippetOptions,
+): number {
+	if (typeof searchOptions?.firstMatchIndex === "number") {
+		return searchOptions.firstMatchIndex;
+	}
+
+	if (!normalizedSearchQuery) {
+		return -1;
+	}
+
+	return findCaseInsensitiveIndex(content, normalizedSearchQuery);
+}
+
+function shouldRunContentSnippetWorker(
+	content: string,
+	normalizedSearchQuery: string,
+	firstMatchIndex: number,
+): boolean {
+	if (!normalizedSearchQuery) {
+		return false;
+	}
+
+	return (
+		content.length > PREVIEW_TEXT_WORKER_MIN_CONTENT_LENGTH ||
+		firstMatchIndex > PREVIEW_TEXT_WORKER_MIN_CONTENT_LENGTH
+	);
+}
+
 export async function getContentSnippetAsync(
 	content: string,
 	settings?: PreviewSnippetSettings,
@@ -76,6 +110,31 @@ export async function getContentSnippetAsync(
 	searchOptions?: GetContentSnippetOptions,
 	signal?: AbortSignal,
 ): Promise<string> {
+	const normalizedSearchQuery = normalizeSearchQuery(searchQuery);
+	const firstMatchIndex = resolveContentSnippetFirstMatchIndex(
+		content,
+		normalizedSearchQuery,
+		searchOptions,
+	);
+
+	if (
+		shouldRunContentSnippetWorker(content, normalizedSearchQuery, firstMatchIndex)
+	) {
+		return await runWithFallback<string>(
+			runPreviewTextWorker(
+				{
+					type: "get-content-snippet",
+					content,
+					settings: selectPreviewSnippetSettings(settings),
+					searchQuery,
+					searchOptions,
+				},
+				signal,
+			),
+			() => getContentSnippet(content, settings, searchQuery, searchOptions),
+		);
+	}
+
 	const prepared = prepareContentSnippet(
 		content,
 		settings,

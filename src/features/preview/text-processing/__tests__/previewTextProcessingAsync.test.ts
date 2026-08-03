@@ -79,6 +79,76 @@ describe("preview text processing async wrappers", () => {
 		);
 	});
 
+	test("keeps small search content on the main thread", async () => {
+		const result = await getContentSnippetAsync(
+			"Hello [[World]] target",
+			undefined,
+			"target",
+		);
+
+		expect(result).toBe(
+			'Hello <span class="cosense-card-links__wikilink">World</span> target',
+		);
+		expect(state.runPreviewTextWorker).not.toHaveBeenCalled();
+	});
+
+	test("routes large search content end-to-end through the worker", async () => {
+		state.runPreviewTextWorker.mockResolvedValue("worker-result");
+		const content = "x".repeat(200000) + " target needle";
+		const settings = {
+			...DEFAULT_SETTINGS,
+			previewMaxChars: 20000,
+			previewMaxLines: 0,
+		};
+
+		await expect(getContentSnippetAsync(content, settings, "target")).resolves.toBe(
+			"worker-result",
+		);
+		expect(state.runPreviewTextWorker).toHaveBeenCalledWith(
+			expect.objectContaining({
+				type: "get-content-snippet",
+				content,
+				searchQuery: "target",
+				settings: expect.not.objectContaining({
+					language: expect.any(String),
+				}),
+			}),
+			undefined,
+		);
+	});
+
+	test("does not pre-slice search content before sending it to the worker", async () => {
+		state.runPreviewTextWorker.mockResolvedValue("worker-result");
+		const content = "x".repeat(50000) + " target";
+		const searchOptions = { firstMatchIndex: 50000 };
+
+		await expect(
+			getContentSnippetAsync(content, undefined, "target", searchOptions),
+		).resolves.toBe("worker-result");
+		expect(state.runPreviewTextWorker).toHaveBeenCalledWith(
+			expect.objectContaining({
+				type: "get-content-snippet",
+				content,
+				searchOptions,
+			}),
+			undefined,
+		);
+	});
+
+	test("falls back to synchronous search snippet when worker is unavailable", async () => {
+		state.runPreviewTextWorker.mockReturnValue(undefined);
+		const content = "a".repeat(60000) + "\n\n# target note\n[[World]]";
+		const settings = {
+			...DEFAULT_SETTINGS,
+			previewMaxChars: 20000,
+			previewMaxLines: 0,
+		};
+
+		await expect(
+			getContentSnippetAsync(content, settings, "target"),
+		).resolves.toContain('<span class="cosense-card-links__wikilink">');
+	});
+
 	test("propagates abort errors instead of falling back", async () => {
 		const error = new DOMException("aborted", "AbortError");
 		state.runPreviewTextWorker.mockRejectedValue(error);
