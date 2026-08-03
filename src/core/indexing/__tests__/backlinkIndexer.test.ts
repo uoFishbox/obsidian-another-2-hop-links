@@ -468,6 +468,26 @@ describe("buildDetailedBacklinksArtifactsChunked", () => {
 		expect(artifacts.unresolvedLookupToSources.size).toBe(256);
 	});
 
+	test("aborts a stale rebuild at a yield boundary", async () => {
+		const { mockVault, mockMetadataCache } = new VaultEnvironmentBuilder([
+			{
+				path: "source.md",
+				links: Array.from({ length: 256 }, (_, index) => `missing-${index}`),
+			},
+		]).build();
+		const abortController = new AbortController();
+
+		await expect(
+			buildDetailedBacklinksArtifactsChunked(mockVault, mockMetadataCache, {
+				signal: abortController.signal,
+				yieldIntervalMs: 0,
+				yieldFn: async () => {
+					abortController.abort();
+				},
+			}),
+		).rejects.toMatchObject({ name: "AbortError" });
+	});
+
 	test("visitResolvedBacklinkRefsUnorderedAsync pauses traversal at yield boundaries", async () => {
 		const totalLinks = 256;
 		const { mockVault, mockMetadataCache } = new VaultEnvironmentBuilder([

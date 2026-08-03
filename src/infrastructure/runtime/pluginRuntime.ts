@@ -220,7 +220,6 @@ export function createPluginRuntime(options: PluginRuntimeOptions): PluginRuntim
 		sortService,
 		indexingService,
 		workspace: options.app.workspace,
-		getSettings: options.getSettings,
 		bumpSortContextVersion: options.bumpSortContextVersion,
 		setLoggingEnabled: options.setLoggingEnabled,
 	});

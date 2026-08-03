@@ -3,7 +3,7 @@ import {
 	applySettingsSideEffects,
 	type SettingsSideEffectHandlers,
 } from "./settingsSideEffects";
-import { areTagFeaturesEnabled, type PluginSettings } from "features/settings/model";
+import type { PluginSettings } from "features/settings/model";
 import type { IndexingService } from "core/indexing/index-service/IndexingService";
 import type { SortService } from "core/sorting/SortService";
 import type { DisplayModeController } from "features/display-mode/DisplayModeController";
@@ -42,7 +42,6 @@ export interface SettingsSideEffectControllerDeps {
 	readonly sortService: SortService;
 	readonly indexingService: IndexingService;
 	readonly workspace: Workspace;
-	readonly getSettings: () => PluginSettings;
 	readonly bumpSortContextVersion: () => void;
 	readonly setLoggingEnabled: (enabled: boolean) => void;
 }
@@ -71,9 +70,7 @@ export function createSettingsSideEffectController(
 		deps.emptyViewController.refresh();
 	}
 
-	function buildHandlers(
-		snapshotSettings: PluginSettings,
-	): SettingsSideEffectHandlers {
+	function buildHandlers(): SettingsSideEffectHandlers {
 		return {
 			setLoggingEnabled: (enabled) => {
 				deps.setLoggingEnabled(enabled);
@@ -86,22 +83,14 @@ export function createSettingsSideEffectController(
 			},
 			syncTagFeatureSettings: () => {
 				deps.indexingService.invalidateAll();
-				if (areTagFeaturesEnabled(snapshotSettings)) {
-					void (async () => {
-						await deps.indexingService.awaitIdle();
-						// Re-check against the latest settings in case the user
-						// toggled the feature again while awaiting idle.
-						if (!areTagFeaturesEnabled(deps.getSettings())) {
-							return;
-						}
-						await deps.indexingService.rebuildIndexesTimeSliced();
-					})().catch((error) => {
+				void deps.indexingService
+					.enqueueRebuild("settings-change")
+					.catch((error) => {
 						console.error(
 							"[Cosense card links] Failed to rebuild indexes after tag feature change:",
 							error,
 						);
 					});
-				}
 			},
 			invalidateSortCache: () => {
 				deps.sortService.invalidateCache();
@@ -120,7 +109,7 @@ export function createSettingsSideEffectController(
 		changedKeys: Iterable<keyof PluginSettings>,
 		settings: PluginSettings,
 	): void {
-		applySettingsSideEffects(changedKeys, settings, buildHandlers(settings));
+		applySettingsSideEffects(changedKeys, settings, buildHandlers());
 	}
 
 	return {

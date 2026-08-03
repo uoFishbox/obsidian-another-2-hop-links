@@ -23,15 +23,14 @@ import { enableLogging, logger } from "shared/logging/logger";
 import {
 	createEmptyIndexSnapshot,
 	type IncrementalFileChange,
-	type IncrementalFileChangeType,
 	type IndexSnapshot,
 	type RebuildOptions,
 	type TagIndex,
-	type TagIndexEntry,
+	type TimeSlicingOptions,
 } from "../types/IndexTypes";
 import { createEmptyTagIndex } from "../tag-index/tagIndexMutations";
-import { type DataUpdateContext, type DataUpdateListener } from "./IndexEvents";
-import { IndexingRunState } from "./IndexingRunState";
+import type { DataUpdateListener } from "./IndexEvents";
+import { IndexWriteCoordinator, type RebuildReason } from "./IndexWriteCoordinator";
 import { IndexUpdateEmitter } from "./IndexUpdateEmitter";
 import { defaultYieldToMainThread } from "../timeSlicing";
 import {
@@ -54,7 +53,7 @@ export class IndexingService implements IIndexingService {
 	private readonly ambiguityDetector: MutableLinkResolutionAmbiguityDetector;
 	private readonly queryEngine: IndexQueryEngine;
 	private readonly tagIndexStore: TagIndexStore;
-	private readonly runState = new IndexingRunState();
+	private readonly writeCoordinator: IndexWriteCoordinator;
 	private readonly updateEmitter = new IndexUpdateEmitter();
 	private commonTagsCache:
 		| {
@@ -82,6 +81,12 @@ export class IndexingService implements IIndexingService {
 			metadataCache,
 			isTagFeatureEnabled,
 		);
+		this.writeCoordinator = new IndexWriteCoordinator({
+			applyIncremental: (changes, options) =>
+				this.executeFileChangesTimeSliced(changes, options),
+			rebuild: (context) =>
+				this.executeRebuildTimeSliced(context.options, context.isCurrent),
+		});
 	}
 
 	public onDataUpdate(listener: DataUpdateListener): () => void {
@@ -93,11 +98,11 @@ export class IndexingService implements IIndexingService {
 	}
 
 	public async awaitIdle(): Promise<void> {
-		await this.runState.awaitIdle();
+		await this.writeCoordinator.awaitIdle();
 	}
 
 	public registerIdleWaiter(waiter: () => Promise<void>): () => void {
-		return this.runState.registerIdleWaiter(waiter);
+		return this.writeCoordinator.registerIdleWaiter(waiter);
 	}
 
 	public getBacklinksMap(): BacklinksMap {
@@ -262,13 +267,7 @@ export class IndexingService implements IIndexingService {
 
 	public invalidateAll(): void {
 		this.queryEngine.invalidate();
-		this.tagIndexStore.clear();
-	}
-
-	public replaceSnapshot(snapshot: IndexSnapshot, tagIndex: TagIndex): void {
-		this.snapshot = snapshot;
-		this.tagIndexStore.replace(tagIndex);
-		this.queryEngine.invalidate();
+		this.commonTagsCache = undefined;
 	}
 
 	public async rebuildBacklinksMapChunked(
@@ -278,127 +277,133 @@ export class IndexingService implements IIndexingService {
 	}
 
 	public async rebuildIndexesTimeSliced(options: RebuildOptions = {}): Promise<void> {
-		if (enableLogging)
+		await this.enqueueRebuild("requested", options);
+	}
+
+	public async enqueueRebuild(
+		reason: RebuildReason,
+		options: RebuildOptions = {},
+	): Promise<void> {
+		await this.writeCoordinator.enqueueRebuild(reason, options);
+	}
+
+	private async executeRebuildTimeSliced(
+		options: RebuildOptions,
+		isCurrent: () => boolean,
+	): Promise<void> {
+		if (enableLogging) {
 			logger(
 				"[IndexingService.rebuildBacklinksMapChunked] Starting backlinks map rebuild",
 			);
-		this.beginIndexing();
+		}
 		this.queryEngine.invalidate();
 		this.commonTagsCache = undefined;
 		const shouldLogRebuildTiming =
 			process.env.NODE_ENV !== "production" || enableLogging;
 		const startTime = shouldLogRebuildTiming ? performance.now() : undefined;
+		const includeTagIndex = this.isTagFeatureEnabled();
+		const result = await buildIndexesAsync(
+			this.vault,
+			this.metadataCache,
+			options,
+			includeTagIndex,
+			this.ambiguityDetector,
+		);
 
-		try {
-			const includeTagIndex = this.isTagFeatureEnabled();
-			const result = await buildIndexesAsync(
-				this.vault,
-				this.metadataCache,
-				options,
-				includeTagIndex,
-				this.ambiguityDetector,
-			);
-			this.snapshot = result.snapshot;
-			this.tagIndexStore.replace(
-				includeTagIndex ? result.tagIndex : createEmptyTagIndex(),
-			);
-			this.logRebuildComplete(
-				"[IndexingService.rebuildBacklinksMapChunked] Rebuilt backlinks map with",
-				startTime,
-			);
-			await this.finishFullRebuildTimeSliced(
-				options.yieldFn ?? defaultYieldToMainThread,
-			);
-		} finally {
-			this.endIndexing();
+		if (!isCurrent()) {
+			return;
 		}
+
+		this.snapshot = result.snapshot;
+		this.tagIndexStore.replace(
+			includeTagIndex ? result.tagIndex : createEmptyTagIndex(),
+		);
+		this.logRebuildComplete(
+			"[IndexingService.rebuildBacklinksMapChunked] Rebuilt backlinks map with",
+			startTime,
+		);
+		await this.finishFullRebuildTimeSliced(
+			options.yieldFn ?? defaultYieldToMainThread,
+		);
 	}
 
 	public async applyFileChangesTimeSliced(
 		changes: IncrementalFileChange[],
-		options: {
-			yieldFn?: () => Promise<void>;
-			yieldIntervalMs?: number;
-		} = {},
+		options: TimeSlicingOptions = {},
 	): Promise<void> {
-		if (changes.length === 0) {
-			return;
-		}
+		await this.writeCoordinator.enqueueIncremental(changes, options);
+	}
 
-		if (enableLogging)
+	private async executeFileChangesTimeSliced(
+		changes: IncrementalFileChange[],
+		options: TimeSlicingOptions,
+	): Promise<void> {
+		if (enableLogging) {
 			logger(
 				`[IndexingService.applyFileChangesTimeSliced] Applying ${changes.length} file changes`,
 			);
-		this.beginIndexing();
-
+		}
 		const sourceContentChangedPaths = new Set<string>();
+		const timeSlicingOptions = {
+			yieldFn: options.yieldFn ?? defaultYieldToMainThread,
+			yieldIntervalMs: options.yieldIntervalMs ?? INDEXING_YIELD_INTERVAL_MS,
+		};
+		const result = await this.incrementalUpdater.applyAsync(
+			this.snapshot,
+			changes,
+			timeSlicingOptions,
+		);
+		this.snapshot = result.snapshot;
+		const tagResult = this.isTagFeatureEnabled()
+			? await this.tagIndexStore.applyFileChangesAsync(
+					changes,
+					timeSlicingOptions,
+				)
+			: EMPTY_TAG_MUTATION_RESULT;
+		const affectedPaths = result.affectedPaths;
+		const affectedLookupKeys = result.affectedLookupKeys;
+		const affectedTags = tagResult.affectedTags;
+		const affectedLinkSourcePaths = result.affectedLinkSourcePaths;
+		const affectedTagSourcePaths = tagResult.affectedTagSourcePaths;
 
-		try {
-			const timeSlicingOptions = {
-				yieldFn: options.yieldFn ?? defaultYieldToMainThread,
-				yieldIntervalMs: options.yieldIntervalMs ?? INDEXING_YIELD_INTERVAL_MS,
-			};
-			const result = await this.incrementalUpdater.applyAsync(
-				this.snapshot,
-				changes,
-				timeSlicingOptions,
+		for (const change of changes) {
+			if (change.type === "rename") {
+				sourceContentChangedPaths.add(change.oldPath);
+				sourceContentChangedPaths.add(change.newPath);
+			} else {
+				sourceContentChangedPaths.add(change.path);
+			}
+		}
+
+		const linkIndexChanged = result.linkIndexChanged;
+		const tagIndexChanged = tagResult.tagIndexChanged;
+		const sourceContentChanged = sourceContentChangedPaths.size > 0;
+		const shouldNotifyDataUpdate =
+			sourceContentChanged || linkIndexChanged || tagIndexChanged;
+
+		if (linkIndexChanged) {
+			this.queryEngine.invalidate(result.cacheInvalidationPaths);
+		}
+
+		if (enableLogging) {
+			logger(
+				"[IndexingService.applyFileChangesTimeSliced] Applied changes complete",
 			);
-			this.snapshot = result.snapshot;
-			const tagResult = this.isTagFeatureEnabled()
-				? await this.tagIndexStore.applyFileChangesAsync(
-						changes,
-						timeSlicingOptions,
-					)
-				: EMPTY_TAG_MUTATION_RESULT;
-			const affectedPaths = result.affectedPaths;
-			const affectedLookupKeys = result.affectedLookupKeys;
-			const affectedTags = tagResult.affectedTags;
-			const affectedLinkSourcePaths = result.affectedLinkSourcePaths;
-			const affectedTagSourcePaths = tagResult.affectedTagSourcePaths;
+		}
 
-			for (const change of changes) {
-				if (change.type === "rename") {
-					sourceContentChangedPaths.add(change.oldPath);
-					sourceContentChangedPaths.add(change.newPath);
-				} else {
-					sourceContentChangedPaths.add(change.path);
-				}
-			}
-
-			const linkIndexChanged = result.linkIndexChanged;
-			const tagIndexChanged = tagResult.tagIndexChanged;
-			const sourceContentChanged = sourceContentChangedPaths.size > 0;
-
-			const shouldInvalidateQueryCache = linkIndexChanged;
-
-			const shouldNotifyDataUpdate =
-				sourceContentChanged || linkIndexChanged || tagIndexChanged;
-
-			if (shouldInvalidateQueryCache) {
-				this.queryEngine.invalidate(result.cacheInvalidationPaths);
-			}
-
-			if (enableLogging)
-				logger(
-					"[IndexingService.applyFileChangesTimeSliced] Applied changes complete",
-				);
-
-			if (shouldNotifyDataUpdate) {
-				this.bumpIndexVersion();
-				this.notifyDataUpdate({
-					affectedPaths,
-					affectedLookupKeys,
-					affectedTags,
-					affectedLinkSourcePaths,
-					affectedTagSourcePaths,
-					affectedSourceContentPaths: sourceContentChangedPaths,
-					linkIndexChanged,
-					tagIndexChanged,
-					sourceContentChanged,
-				});
-			}
-		} finally {
-			this.endIndexing();
+		if (shouldNotifyDataUpdate) {
+			this.bumpIndexVersion();
+			this.notifyDataUpdate({
+				affectedPaths,
+				affectedLookupKeys,
+				affectedTags,
+				affectedLinkSourcePaths,
+				affectedTagSourcePaths,
+				affectedSourceContentPaths: sourceContentChangedPaths,
+				linkIndexChanged,
+				tagIndexChanged,
+				sourceContentChanged,
+			});
 		}
 	}
 
@@ -440,14 +445,6 @@ export class IndexingService implements IIndexingService {
 		} = {},
 	): void {
 		this.updateEmitter.notifyDataUpdate(context);
-	}
-
-	private beginIndexing(): void {
-		this.runState.begin();
-	}
-
-	private endIndexing(): void {
-		this.runState.end();
 	}
 }
 

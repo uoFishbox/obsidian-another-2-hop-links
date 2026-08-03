@@ -12,13 +12,13 @@ import type {
 	TwoHopIndexedLink,
 } from "types/domain";
 import type { IVault, IMetadataCache } from "types/obsidian";
-import { logger } from "shared/logging/logger";
+
 import { extractTags, countLinkReferences } from "../metadata/metadataExtractor";
 import {
 	INDEXING_YIELD_INTERVAL_MS,
 	INDEX_LINK_CAPABLE_EXTENSIONS,
 } from "../../../appConstants";
-import type { RebuildOptions, SourceSummary, TagIndex } from "../types/IndexTypes";
+import type { RebuildOptions, SourceSummary } from "../types/IndexTypes";
 import {
 	addFileTagsToTagIndex,
 	createEmptyTagIndex,
@@ -54,7 +54,7 @@ import type { BacklinksBuildArtifacts } from "./backlinkBuildArtifacts";
 
 type MutableBacklinksBuildArtifacts = BacklinksBuildArtifacts;
 
-export interface ChunkedBacklinksBuildOptions extends RebuildOptions {}
+export type ChunkedBacklinksBuildOptions = RebuildOptions;
 
 export function dedupeBySourceFile(
 	links: readonly Readonly<TwoHopIndexedLink>[],
@@ -336,8 +336,14 @@ export async function buildDetailedBacklinksArtifactsChunked(
 	includeTagIndex = true,
 	ambiguityDetector?: LinkResolutionAmbiguityDetector,
 ): Promise<BacklinksBuildArtifacts> {
+	throwIfRebuildAborted(options.signal);
 	const allFiles = vault.getFiles();
-	const yieldFn = options.yieldFn ?? defaultYieldToMainThread;
+	const configuredYieldFn = options.yieldFn ?? defaultYieldToMainThread;
+	const yieldFn = async (): Promise<void> => {
+		throwIfRebuildAborted(options.signal);
+		await configuredYieldFn();
+		throwIfRebuildAborted(options.signal);
+	};
 	const yieldIntervalMs = options.yieldIntervalMs ?? INDEXING_YIELD_INTERVAL_MS;
 	const yieldScheduler = createYieldScheduler(yieldFn, yieldIntervalMs);
 	const execution = createBacklinksBuildExecution(
@@ -354,5 +360,12 @@ export async function buildDetailedBacklinksArtifactsChunked(
 		execution.destinationBuildStates,
 		yieldScheduler,
 	);
+	throwIfRebuildAborted(options.signal);
 	return execution.artifacts;
+}
+
+function throwIfRebuildAborted(signal: AbortSignal | undefined): void {
+	if (signal?.aborted) {
+		throw new DOMException("Index rebuild was superseded", "AbortError");
+	}
 }

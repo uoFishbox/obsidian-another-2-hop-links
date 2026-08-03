@@ -115,7 +115,9 @@ export interface TimeSlicingOptions {
 	yieldIntervalMs?: number;
 }
 
-export interface RebuildOptions extends TimeSlicingOptions {}
+export interface RebuildOptions extends TimeSlicingOptions {
+	signal?: AbortSignal;
+}
 
 export function createEmptyIndexSnapshot(): IndexSnapshot {
 	return {
