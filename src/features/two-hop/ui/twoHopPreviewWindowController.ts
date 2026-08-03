@@ -37,10 +37,22 @@ export function createTwoHopPreviewWindowController(
 		if (!activeChanged && !residentChanged) return;
 
 		if (residentChanged) {
-			for (const [rowIndex, consumer] of consumers) {
-				const wasResident = isRowInRange(rowIndex, residentRange);
-				const isResident = isRowInRange(rowIndex, nextResidentRange);
-				if (wasResident !== isResident) consumer(isResident);
+			for (
+				let rowIndex = residentRange.start;
+				rowIndex < residentRange.end;
+				rowIndex += 1
+			) {
+				if (isRowInRange(rowIndex, nextResidentRange)) continue;
+				consumers.get(rowIndex)?.(false);
+			}
+
+			for (
+				let rowIndex = nextResidentRange.start;
+				rowIndex < nextResidentRange.end;
+				rowIndex += 1
+			) {
+				if (isRowInRange(rowIndex, residentRange)) continue;
+				consumers.get(rowIndex)?.(true);
 			}
 		}
 
