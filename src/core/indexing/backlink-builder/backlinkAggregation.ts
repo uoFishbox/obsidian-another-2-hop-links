@@ -169,27 +169,41 @@ export function createSourceSummaryFromAggregation(
 		return undefined;
 	}
 
-	const destinations = new Map<string, SourceDestinationSummary>();
 	const orderedReferences: OrderedBacklinkRef[] = [];
-	for (const [destinationPath, aggregate] of localAggregation.destinationBuckets) {
+
+	// Take ownership of the scratch maps and rewrite values in place instead
+	// of copying every entry into new persistent maps. The scratch slots are
+	// replaced with empty maps for the next file.
+	const destinationAggregates = localAggregation.destinationBuckets;
+	localAggregation.destinationBuckets = new Map();
+	const destinations = destinationAggregates as unknown as Map<
+		string,
+		SourceDestinationSummary
+	>;
+	for (const [destinationPath, aggregate] of destinationAggregates) {
 		destinations.set(destinationPath, {
 			count: aggregate.count,
 			hasResolved: aggregate.hasResolved,
 			firstRefIndex: addRepresentativeRef(orderedReferences, aggregate.firstRef),
 		});
 	}
-	const firstRefIndexByLookupKey = new Map<string, number>();
-	for (const [lookupKey, representative] of localAggregation.firstRefByLookupKey) {
+	const representatives = localAggregation.firstRefByLookupKey;
+	localAggregation.firstRefByLookupKey = new Map();
+	const firstRefIndexByLookupKey = representatives as unknown as Map<string, number>;
+	for (const [lookupKey, representative] of representatives) {
 		firstRefIndexByLookupKey.set(
 			lookupKey,
 			addRepresentativeRef(orderedReferences, representative),
 		);
 	}
-	const lookupKeyToRawLinkPaths = new Map<string, string | string[]>();
-	for (const [lookupKey, rawLinkPaths] of localAggregation.lookupKeyToRawLinkPaths) {
-		if (typeof rawLinkPaths === "string") {
-			lookupKeyToRawLinkPaths.set(lookupKey, rawLinkPaths);
-		} else {
+	const rawLinkPathAccumulators = localAggregation.lookupKeyToRawLinkPaths;
+	localAggregation.lookupKeyToRawLinkPaths = new Map();
+	const lookupKeyToRawLinkPaths = rawLinkPathAccumulators as unknown as Map<
+		string,
+		string | string[]
+	>;
+	for (const [lookupKey, rawLinkPaths] of rawLinkPathAccumulators) {
+		if (typeof rawLinkPaths !== "string") {
 			lookupKeyToRawLinkPaths.set(lookupKey, Array.from(rawLinkPaths));
 		}
 	}
@@ -217,11 +231,19 @@ export function* createSourceSummaryFromAggregationChunked(
 		return undefined;
 	}
 
-	const destinations = new Map<string, SourceDestinationSummary>();
 	const orderedReferences: OrderedBacklinkRef[] = [];
 	let operationCount = 0;
 
-	for (const [destinationPath, aggregate] of localAggregation.destinationBuckets) {
+	// Take ownership of the scratch maps and rewrite values in place instead
+	// of copying every entry into new persistent maps. The scratch slots are
+	// replaced with empty maps for the next file.
+	const destinationAggregates = localAggregation.destinationBuckets;
+	localAggregation.destinationBuckets = new Map();
+	const destinations = destinationAggregates as unknown as Map<
+		string,
+		SourceDestinationSummary
+	>;
+	for (const [destinationPath, aggregate] of destinationAggregates) {
 		destinations.set(destinationPath, {
 			count: aggregate.count,
 			hasResolved: aggregate.hasResolved,
@@ -239,8 +261,10 @@ export function* createSourceSummaryFromAggregationChunked(
 		}
 	}
 
-	const firstRefIndexByLookupKey = new Map<string, number>();
-	for (const [lookupKey, representative] of localAggregation.firstRefByLookupKey) {
+	const representatives = localAggregation.firstRefByLookupKey;
+	localAggregation.firstRefByLookupKey = new Map();
+	const firstRefIndexByLookupKey = representatives as unknown as Map<string, number>;
+	for (const [lookupKey, representative] of representatives) {
 		firstRefIndexByLookupKey.set(
 			lookupKey,
 			addRepresentativeRef(orderedReferences, representative),
@@ -256,11 +280,14 @@ export function* createSourceSummaryFromAggregationChunked(
 		}
 	}
 
-	const lookupKeyToRawLinkPaths = new Map<string, string | string[]>();
-	for (const [lookupKey, rawLinkPaths] of localAggregation.lookupKeyToRawLinkPaths) {
-		if (typeof rawLinkPaths === "string") {
-			lookupKeyToRawLinkPaths.set(lookupKey, rawLinkPaths);
-		} else {
+	const rawLinkPathAccumulators = localAggregation.lookupKeyToRawLinkPaths;
+	localAggregation.lookupKeyToRawLinkPaths = new Map();
+	const lookupKeyToRawLinkPaths = rawLinkPathAccumulators as unknown as Map<
+		string,
+		string | string[]
+	>;
+	for (const [lookupKey, rawLinkPaths] of rawLinkPathAccumulators) {
+		if (typeof rawLinkPaths !== "string") {
 			lookupKeyToRawLinkPaths.set(lookupKey, Array.from(rawLinkPaths));
 		}
 

@@ -47,6 +47,41 @@ describe("backlinkAggregation", () => {
 			aggregation.unresolvedLookupKeys,
 		);
 	});
+
+	test("transfers scratch map ownership into the source summary", () => {
+		const aggregation = createAggregationWithResolvedLookupKey("target.md");
+		const representative = aggregation.firstRefByLookupKey.get("target.md")!;
+		aggregation.destinationBuckets.set("target.md", {
+			count: 2,
+			hasResolved: true,
+			firstRef: representative,
+		});
+		aggregation.lookupKeyToRawLinkPaths.set("target.md", "target.md");
+
+		const destinationBuckets = aggregation.destinationBuckets;
+		const firstRefByLookupKey = aggregation.firstRefByLookupKey;
+		const lookupKeyToRawLinkPaths = aggregation.lookupKeyToRawLinkPaths;
+
+		const summary = createChunkedSummary(aggregation);
+
+		expect(summary).toBeDefined();
+		// The scratch maps themselves become the persistent summary maps.
+		expect(summary?.destinations).toBe(destinationBuckets);
+		expect(summary?.firstRefIndexByLookupKey).toBe(firstRefByLookupKey);
+		expect(summary?.lookupKeyToRawLinkPaths).toBe(lookupKeyToRawLinkPaths);
+		// The scratch slots are replaced with empty maps for the next file.
+		expect(aggregation.destinationBuckets.size).toBe(0);
+		expect(aggregation.firstRefByLookupKey.size).toBe(0);
+		expect(aggregation.lookupKeyToRawLinkPaths.size).toBe(0);
+
+		expect(summary?.destinations.get("target.md")).toEqual({
+			count: 2,
+			hasResolved: true,
+			firstRefIndex: 0,
+		});
+		expect(summary?.firstRefIndexByLookupKey.get("target.md")).toBe(0);
+		expect(summary?.lookupKeyToRawLinkPaths.get("target.md")).toBe("target.md");
+	});
 });
 
 function createAggregationWithResolvedLookupKey(
