@@ -49,11 +49,6 @@ export interface ILinkStatusService {
 	 * （設定を考慮しない低レベルAPI）
 	 */
 	isUnresolvedWithSingleBacklink(lookupPath: string): boolean;
-
-	/**
-	 * キャッシュを無効化
-	 */
-	invalidateCache(): void;
 }
 
 export interface IIndexingService {
