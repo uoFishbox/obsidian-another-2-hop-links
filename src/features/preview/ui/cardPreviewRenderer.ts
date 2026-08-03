@@ -162,7 +162,7 @@ export function createCardPreviewRenderer(
 					previewForRender.type === "text" &&
 					canDetachRenderedTextPreview(previewForRender.content)
 				) {
-					const renderedHtml = await renderDetachedTextPreviewHtml({
+					const renderedFragment = await renderDetachedTextPreviewFragment({
 						content: previewForRender.content,
 						app: options.app,
 						sourcePath: file.path,
@@ -176,7 +176,7 @@ export function createCardPreviewRenderer(
 						request,
 						callbacks,
 						signal,
-						renderedHtml,
+						renderedFragment,
 						shouldSyncMathStyles,
 					);
 				}
@@ -239,14 +239,15 @@ export function createCardPreviewRenderer(
 						previewForRender.type === "text" &&
 						canDetachRenderedTextPreview(previewForRender.content)
 					) {
-						const renderedHtml = await renderDetachedTextPreviewHtml({
-							content: previewForRender.content,
-							app: options.app,
-							sourcePath: file.path,
-							enableMathRendering: true,
-							analysis: previewAnalysis,
-							signal,
-						});
+						const renderedFragment =
+							await renderDetachedTextPreviewFragment({
+								content: previewForRender.content,
+								app: options.app,
+								sourcePath: file.path,
+								enableMathRendering: true,
+								analysis: previewAnalysis,
+								signal,
+							});
 
 						if (isRenderStale(signal)) return;
 						const didCommit = await commitDetachedTextPreview(
@@ -254,7 +255,7 @@ export function createCardPreviewRenderer(
 							request,
 							callbacks,
 							signal,
-							renderedHtml,
+							renderedFragment,
 							shouldSyncMathStyles,
 						);
 						if (!didCommit) {
@@ -320,7 +321,7 @@ export function createCardPreviewRenderer(
 		request: CardPreviewRequest,
 		callbacks: PreviewRenderCallbacks | undefined,
 		signal: AbortSignal,
-		renderedHtml: string,
+		fragment: DocumentFragment,
 		shouldSyncMathStyles: boolean,
 	): Promise<boolean> {
 		return enqueueCoordinatedDomCommit({
@@ -328,9 +329,7 @@ export function createCardPreviewRenderer(
 			isStale: () => isRenderStale(signal),
 			commit: () => {
 				if (!shouldSkipDomApply(container, request)) {
-					const template = document.createElement("template");
-					template.innerHTML = renderedHtml;
-					container.replaceChildren(template.content);
+					container.replaceChildren(fragment);
 				}
 				lastAppliedRenderKey = request.renderKey;
 				if (shouldSyncMathStyles) {
@@ -435,14 +434,14 @@ function resolvePreviewRetention(preview: PreviewData): CardPreviewRetention {
 	return "resident";
 }
 
-function renderDetachedTextPreviewHtml(params: {
+function renderDetachedTextPreviewFragment(params: {
 	content: string;
 	app: App;
 	sourcePath: string;
 	enableMathRendering: boolean;
 	analysis?: PreviewContentAnalysis;
 	signal?: AbortSignal;
-}): Promise<string> {
+}): Promise<DocumentFragment> {
 	const { content, app, sourcePath, enableMathRendering, analysis, signal } = params;
 
 	return enqueuePreviewRender(async () => {
@@ -466,7 +465,7 @@ function renderDetachedTextPreviewHtml(params: {
 				},
 			);
 			throwIfAborted(signal, "Preview render aborted");
-			return tempContainer.innerHTML;
+			return moveChildrenToFragment(tempContainer);
 		} finally {
 			renderComponent.unload();
 		}
