@@ -50,12 +50,12 @@ describe("StylingService", () => {
 		const service = createStylingService(linkStatusService as never);
 		const linkEl = document.querySelector<HTMLElement>(".internal-link");
 
-		service.reconcileLinkElementsInContainer(linkEl!.parentElement!, [linkEl!]);
+		service.decorateLinkElementsInContainer(linkEl!.parentElement!, [linkEl!]);
 
 		expect(getDecoratedState(linkEl)).toBe(UNRESOLVED_LINK_ATTRIBUTE.VALUE_SPECIAL);
 
 		unresolved = false;
-		service.reconcileLinkElementsInContainer(linkEl!.parentElement!, [linkEl!]);
+		service.decorateLinkElementsInContainer(linkEl!.parentElement!, [linkEl!]);
 
 		expect(linkEl?.hasAttribute(UNRESOLVED_LINK_ATTRIBUTE.NAME)).toBe(false);
 	});
@@ -79,7 +79,7 @@ describe("StylingService", () => {
 		const metadataLink =
 			document.querySelector<HTMLElement>(".metadata-link-inner");
 
-		service.reconcileLinkElementsInContainer(
+		service.decorateLinkElementsInContainer(
 			metadataLink!.parentElement!,
 			[metadataLink!],
 			undefined,

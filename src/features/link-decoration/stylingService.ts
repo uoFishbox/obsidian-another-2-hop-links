@@ -12,7 +12,7 @@ export interface StylingService {
 	isDecorationEnabled(): boolean;
 	decorateLinksInContainer(containerEl: HTMLElement, sourcePath: string): void;
 	decoratePropertiesPane(propertiesEl: HTMLElement, sourceFile?: TFile): void;
-	reconcileLinkElementsInContainer(
+	decorateLinkElementsInContainer(
 		containerEl: HTMLElement,
 		linkElements: HTMLElement[],
 		sourceFile?: TFile,
@@ -73,7 +73,7 @@ export function createStylingService(
 		});
 	}
 
-	function reconcileLinkElementsInContainer(
+	function decorateLinkElementsInContainer(
 		containerEl: HTMLElement,
 		linkElements: HTMLElement[],
 		sourceFile?: TFile,
@@ -102,7 +102,7 @@ export function createStylingService(
 		isDecorationEnabled,
 		decorateLinksInContainer,
 		decoratePropertiesPane,
-		reconcileLinkElementsInContainer,
+		decorateLinkElementsInContainer,
 		clearAttributeFromContainer: clearContainerAttribute,
 	};
 }

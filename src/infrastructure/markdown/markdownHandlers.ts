@@ -108,7 +108,7 @@ export function processBasesPane(
 		return;
 	}
 
-	stylingService.reconcileLinkElementsInContainer(
+	stylingService.decorateLinkElementsInContainer(
 		basesEl,
 		linkElements,
 		undefined,

@@ -27,18 +27,8 @@ export interface LinkDecorationRequest {
 	targetSelectors?: string[];
 	hrefExtractor?: LinkHrefExtractor;
 	mode?: DecorationTargetMode;
-	clearRemoved?: boolean;
 	shouldLogCanvas?: boolean;
 }
-
-type LinkDecorationState = {
-	href: string | undefined;
-	lookupPath: string | undefined;
-	shouldDecorate: boolean;
-	targets: HTMLElement[] | null;
-};
-
-type ContainerState = Map<HTMLElement, LinkDecorationState>;
 
 const EMPTY_TARGET_SELECTORS: string[] = [];
 const APPLY_UNRESOLVED_LINK_ATTRIBUTE_OPTIONS = {
@@ -63,12 +53,9 @@ export interface LinkDecorationReconciler {
 export function createLinkDecorationReconciler(
 	linkStatusService: LinkStatusService,
 ): LinkDecorationReconciler {
-	const containerStates = new WeakMap<HTMLElement, ContainerState>();
-
 	function reconcile(request: LinkDecorationRequest): void {
 		const mode = request.mode ?? "rendered";
 		const targetSelectors = request.targetSelectors ?? EMPTY_TARGET_SELECTORS;
-		const clearRemoved = request.clearRemoved ?? true;
 		const shouldLogCanvas = request.shouldLogCanvas ?? false;
 
 		if (shouldLogCanvas && enableLogging) {
@@ -79,32 +66,22 @@ export function createLinkDecorationReconciler(
 				`[DEBUG_CANVAS] Found ${request.linkElements.length} internal links in container.`,
 			);
 		}
-		const containerState = getOrCreateContainerState(
-			containerStates,
-			request.containerEl,
-		);
 		const targetCollectionOptions = {
 			mode,
 			targetSelectors,
 		};
-		const { nextStates, lookupPaths } = buildNextStates(
+		const { decorationRecords, lookupPaths } = collectDecorationRecords(
 			linkStatusService,
 			request,
 			targetCollectionOptions,
-			containerState,
 		);
 
 		logCanvasLookupPaths(shouldLogCanvas, lookupPaths);
 		const resolutionResults = resolveLookupPaths(linkStatusService, lookupPaths);
 		logCanvasResolutionResults(shouldLogCanvas, resolutionResults);
 
-		if (clearRemoved) {
-			clearRemovedLinkStates(request.containerEl, nextStates, containerState);
-		}
-
-		const appliedCount = applyNextStates(
-			nextStates,
-			containerState,
+		const appliedCount = applyDecorationRecords(
+			decorationRecords,
 			resolutionResults,
 			shouldLogCanvas,
 		);
@@ -123,68 +100,41 @@ export function createLinkDecorationReconciler(
 	};
 }
 
-function buildNextStates(
+interface DecorationRecord {
+	linkEl: HTMLElement;
+	lookupPath: string | undefined;
+	targets: HTMLElement[] | null;
+}
+
+function collectDecorationRecords(
 	linkStatusService: LinkStatusService,
 	request: Required<Pick<LinkDecorationRequest, "containerEl" | "linkElements">> &
 		Pick<LinkDecorationRequest, "hrefExtractor" | "sourceFile">,
 	targetCollectionOptions: DecorationTargetCollectionOptions,
-	containerState: ContainerState,
 ): {
-	nextStates: Map<HTMLElement, LinkDecorationState>;
+	decorationRecords: DecorationRecord[];
 	lookupPaths: Set<string>;
 } {
 	const lookupPaths = new Set<string>();
-	const nextStates = new Map<HTMLElement, LinkDecorationState>();
+	const decorationRecords: DecorationRecord[] = [];
 
 	for (const linkEl of request.linkElements) {
-		const prevState = containerState.get(linkEl);
-		const state = reconcileNextState(
-			linkStatusService,
-			linkEl,
-			request,
-			targetCollectionOptions,
-			prevState,
-		);
-		if (state.lookupPath) {
-			lookupPaths.add(state.lookupPath);
+		const href = request.hrefExtractor
+			? request.hrefExtractor(linkEl)
+			: linkStatusService.extractHref(linkEl);
+		const normalizedPath = href ? linkStatusService.normalizeHref(href) : undefined;
+		const lookupPath = normalizedPath
+			? linkStatusService.generateLookupPath(normalizedPath, request.sourceFile)
+			: undefined;
+		const targets = collectDecorationTargets(linkEl, targetCollectionOptions);
+
+		if (lookupPath) {
+			lookupPaths.add(lookupPath);
 		}
-		nextStates.set(linkEl, state);
+		decorationRecords.push({ linkEl, lookupPath, targets });
 	}
 
-	return { nextStates, lookupPaths };
-}
-
-function reconcileNextState(
-	linkStatusService: LinkStatusService,
-	linkEl: HTMLElement,
-	request: Pick<LinkDecorationRequest, "hrefExtractor" | "sourceFile">,
-	targetCollectionOptions: DecorationTargetCollectionOptions,
-	prevState: LinkDecorationState | undefined,
-): LinkDecorationState {
-	const href = request.hrefExtractor
-		? request.hrefExtractor(linkEl)
-		: linkStatusService.extractHref(linkEl);
-	const normalizedPath = href ? linkStatusService.normalizeHref(href) : undefined;
-	const lookupPath = normalizedPath
-		? linkStatusService.generateLookupPath(normalizedPath, request.sourceFile)
-		: undefined;
-
-	if (
-		prevState &&
-		prevState.href === href &&
-		prevState.lookupPath === lookupPath &&
-		prevState.targets === null &&
-		linkEl.isConnected
-	) {
-		return prevState;
-	}
-
-	return {
-		href,
-		lookupPath,
-		shouldDecorate: false,
-		targets: collectDecorationTargets(linkEl, targetCollectionOptions),
-	};
+	return { decorationRecords, lookupPaths };
 }
 
 function resolveLookupPaths(
@@ -198,24 +148,19 @@ function resolveLookupPaths(
 	return linkStatusService.shouldDecorateLinkBatch(lookupPaths);
 }
 
-function applyNextStates(
-	nextStates: Map<HTMLElement, LinkDecorationState>,
-	containerState: ContainerState,
+function applyDecorationRecords(
+	decorationRecords: DecorationRecord[],
 	resolutionResults: ReadonlyMap<string, boolean>,
 	shouldLogCanvas: boolean,
 ): number {
 	let appliedCount = 0;
 
-	for (const [el, nextState] of nextStates) {
-		const shouldDecorate = nextState.lookupPath
-			? (resolutionResults.get(nextState.lookupPath) ?? false)
+	for (const record of decorationRecords) {
+		const shouldDecorate = record.lookupPath
+			? (resolutionResults.get(record.lookupPath) ?? false)
 			: false;
-		const prevState = containerState.get(el);
-		const prevShouldDecorate = prevState?.shouldDecorate ?? false;
 
-		nextState.shouldDecorate = shouldDecorate;
-		applyLinkState(el, prevState, nextState, prevShouldDecorate);
-		containerState.set(el, nextState);
+		applyUnresolvedLinkAttribute(record.linkEl, record.targets, shouldDecorate);
 
 		if (!shouldDecorate) {
 			continue;
@@ -224,43 +169,12 @@ function applyNextStates(
 		appliedCount++;
 		if (shouldLogCanvas && enableLogging) {
 			logger(
-				`[DEBUG_CANVAS] Applied attribute to ${nextState.targets ? nextState.targets.length : 1} elements: (path: ${nextState.lookupPath})`,
+				`[DEBUG_CANVAS] Applied attribute to ${record.targets ? record.targets.length : 1} elements: (path: ${record.lookupPath})`,
 			);
 		}
 	}
 
 	return appliedCount;
-}
-
-function getOrCreateContainerState(
-	containerStates: WeakMap<HTMLElement, ContainerState>,
-	containerEl: HTMLElement,
-): ContainerState {
-	let state = containerStates.get(containerEl);
-	if (!state) {
-		state = new Map<HTMLElement, LinkDecorationState>();
-		containerStates.set(containerEl, state);
-	}
-	return state;
-}
-
-function clearRemovedLinkStates(
-	containerEl: HTMLElement,
-	nextStates: Map<HTMLElement, LinkDecorationState>,
-	containerState: ContainerState,
-): void {
-	for (const [linkEl, state] of containerState) {
-		if (
-			nextStates.has(linkEl) &&
-			linkEl.isConnected &&
-			containerEl.contains(linkEl)
-		) {
-			continue;
-		}
-
-		applyUnresolvedLinkAttribute(linkEl, state.targets, false);
-		containerState.delete(linkEl);
-	}
 }
 
 function logCanvasLookupPaths(
@@ -291,53 +205,6 @@ function logCanvasResolutionResults(
 		);
 }
 
-function applyLinkState(
-	linkEl: HTMLElement,
-	prevState: LinkDecorationState | undefined,
-	nextState: LinkDecorationState,
-	prevShouldDecorate: boolean,
-): void {
-	if (
-		prevState &&
-		prevState.href === nextState.href &&
-		prevState.lookupPath === nextState.lookupPath &&
-		prevShouldDecorate === nextState.shouldDecorate &&
-		haveSameTargets(linkEl, prevState.targets, nextState.targets)
-	) {
-		return;
-	}
-
-	if (prevState) {
-		const removedTargets = collectMissingTargets(
-			linkEl,
-			prevState.targets,
-			nextState.targets,
-		);
-		if (removedTargets) {
-			applyAttributeToElements(
-				removedTargets,
-				REMOVE_UNRESOLVED_LINK_ATTRIBUTE_OPTIONS,
-			);
-		}
-	}
-
-	applyUnresolvedLinkAttribute(linkEl, nextState.targets, nextState.shouldDecorate);
-
-	if (!nextState.shouldDecorate && prevState) {
-		const addedTargets = collectMissingTargets(
-			linkEl,
-			nextState.targets,
-			prevState.targets,
-		);
-		if (addedTargets) {
-			applyAttributeToElements(
-				addedTargets,
-				REMOVE_UNRESOLVED_LINK_ATTRIBUTE_OPTIONS,
-			);
-		}
-	}
-}
-
 function applyUnresolvedLinkAttribute(
 	linkEl: HTMLElement,
 	targets: HTMLElement[] | null,
@@ -353,70 +220,4 @@ function applyUnresolvedLinkAttribute(
 	}
 
 	applyAttributeToElements(targets, options);
-}
-
-function collectMissingTargets(
-	linkEl: HTMLElement,
-	candidates: HTMLElement[] | null,
-	existingTargets: HTMLElement[] | null,
-): HTMLElement[] | undefined {
-	let missingTargets: HTMLElement[] | undefined;
-
-	if (candidates === null) {
-		if (!targetExists(linkEl, existingTargets, linkEl)) {
-			missingTargets ??= [];
-			missingTargets.push(linkEl);
-		}
-		return missingTargets;
-	}
-
-	for (const target of candidates) {
-		if (targetExists(target, existingTargets, linkEl)) {
-			continue;
-		}
-
-		missingTargets ??= [];
-		missingTargets.push(target);
-	}
-
-	return missingTargets;
-}
-
-function targetExists(
-	target: HTMLElement,
-	existingTargets: HTMLElement[] | null,
-	linkEl: HTMLElement,
-): boolean {
-	if (existingTargets === null) {
-		return target === linkEl;
-	}
-
-	return existingTargets.includes(target);
-}
-
-function haveSameTargets(
-	linkEl: HTMLElement,
-	left: HTMLElement[] | null,
-	right: HTMLElement[] | null,
-): boolean {
-	if (left === null && right === null) {
-		return true;
-	}
-	if (left === null) {
-		return right !== null && right.length === 1 && right[0] === linkEl;
-	}
-	if (right === null) {
-		return left.length === 1 && left[0] === linkEl;
-	}
-	if (left.length !== right.length) {
-		return false;
-	}
-
-	for (let i = 0; i < left.length; i++) {
-		if (left[i] !== right[i]) {
-			return false;
-		}
-	}
-
-	return true;
 }
