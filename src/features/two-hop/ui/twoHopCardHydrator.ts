@@ -118,10 +118,10 @@ export function createTwoHopCardHydrator(
 		cell: Extract<TwoHopProgressiveCell, { kind: "item" }>,
 		priority: HydrationPriority,
 		refreshExisting: boolean,
+		revision: unknown,
 	): void {
 		const current = entries.get(cell.logicalKey);
-		const hasCurrent =
-			current?.item === cell.item && current.revision === params.getRevision();
+		const hasCurrent = current?.item === cell.item && current.revision === revision;
 		if (
 			hasCurrent &&
 			(priority === "preload" || activatedKeys.has(cell.logicalKey))
@@ -145,20 +145,23 @@ export function createTwoHopCardHydrator(
 		refreshExisting: boolean,
 	): void {
 		const plan = params.getPlan();
+		const revision = params.getRevision();
 		for (let rowIndex = range.start; rowIndex < range.end; rowIndex += 1) {
 			const row = resolveMountedProgressiveRow(plan, rowIndex);
 			if (!row) continue;
 			for (const cell of row.cells) {
-				if (cell.kind === "item") enqueueCell(cell, priority, refreshExisting);
+				if (cell.kind === "item")
+					enqueueCell(cell, priority, refreshExisting, revision);
 			}
 		}
 		scheduleDrain();
 	}
 
 	function enqueueChunk(chunkIndex: number): void {
+		const revision = params.getRevision();
 		for (const row of params.getPlan().chunks[chunkIndex]?.rows ?? []) {
 			for (const cell of row.cells) {
-				if (cell.kind === "item") enqueueCell(cell, "preload", false);
+				if (cell.kind === "item") enqueueCell(cell, "preload", false, revision);
 			}
 		}
 		scheduleDrain();
@@ -211,6 +214,8 @@ export function createTwoHopCardHydrator(
 			clearHydrationQueue(preloadQueue);
 			return;
 		}
+		const revision = params.getRevision();
+		const previewActive = params.isPreviewActive();
 		const queue = priority === "visible" ? visibleQueue : preloadQueue;
 		const startedAt = performance.now();
 		let processed = 0;
@@ -227,7 +232,6 @@ export function createTwoHopCardHydrator(
 			let model = current?.model;
 			let changed = false;
 			let previewRenderKeyChanged = false;
-			const revision = params.getRevision();
 			if (current?.item !== hydration.item || current.revision !== revision) {
 				const presentation = resolveTwoHopCardPresentation(
 					hydration.item,
@@ -257,7 +261,7 @@ export function createTwoHopCardHydrator(
 			if (priority === "visible") activatedKeys.add(hydration.logicalKey);
 			if (!wasActivated && !activatedKeys.has(hydration.logicalKey)) continue;
 			if (
-				params.isPreviewActive() &&
+				previewActive &&
 				(!wasActivated
 					? Boolean(model.previewRequest)
 					: previewRenderKeyChanged)
