@@ -294,7 +294,10 @@
 			}
 
 			if (!keySet) {
-				filteredItems = [];
+				// Stale-while-search: keep the previous results while the
+				// search worker has not produced a result for the current
+				// query yet. Clearing `filteredItems` here would unmount
+				// LinkList and destroy the preview host with it.
 				return;
 			}
 

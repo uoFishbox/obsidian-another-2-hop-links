@@ -603,6 +603,42 @@ describe("SearchableItemList worker integration", () => {
 		}
 	}, 10000);
 
+	it("keeps previous results mounted while a new search is in flight", async () => {
+		workerHarness.setAutoReleaseFilters(false);
+
+		render(SearchableItemList, { props: createTestProps() });
+		await flushAsyncUi();
+
+		const input = screen.getByRole("searchbox");
+		expect(getAllSearchableItems()).toHaveLength(2);
+
+		// First search: the worker response is held back, so matchedKeySet
+		// stays null and the unfiltered list must remain visible instead of
+		// unmounting LinkList.
+		await fireEvent.input(input, { target: { value: "alpha" } });
+		await vi.advanceTimersByTimeAsync(150);
+		await flushAsyncUi();
+		expect(getAllSearchableItems()).toHaveLength(2);
+
+		workerHarness.releasePendingFilter(0);
+		await flushAsyncUi();
+		await waitFor(() => expect(getAllSearchableItems()).toHaveLength(1));
+		expect(getAllSearchableItems()[0]).toHaveTextContent("alpha");
+
+		// Query change: matchedKeySet is reset to null until the new result
+		// arrives, so the previous result set must stay mounted.
+		await fireEvent.input(input, { target: { value: "beta" } });
+		await vi.advanceTimersByTimeAsync(150);
+		await flushAsyncUi();
+		expect(getAllSearchableItems()).toHaveLength(1);
+		expect(getAllSearchableItems()[0]).toHaveTextContent("alpha");
+
+		workerHarness.releasePendingFilter(0);
+		await flushAsyncUi();
+		await waitFor(() => expect(getAllSearchableItems()).toHaveLength(1));
+		expect(getAllSearchableItems()[0]).toHaveTextContent("beta");
+	});
+
 	it("applies bookmark pinning to the final filtered result", async () => {
 		mockBookmarksState.filePaths.add("notes/beta.md");
 		mockBookmarksState.orderedFilePaths.push("notes/beta.md");
