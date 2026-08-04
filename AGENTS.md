@@ -650,3 +650,5 @@ Review the following when examining a pull request or an LLM patch:
 ## Final Instruction for Agents
 
 When writing code, first secure the boundaries with types, then implement using small functions. If in doubt, prefer file-scoped private helpers and explicit union types over adding abstractions. Code that is safe for LLMs is also safe for humans.
+
+Always respond to users in Japanese.
