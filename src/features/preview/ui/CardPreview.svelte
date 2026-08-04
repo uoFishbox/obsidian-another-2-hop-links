@@ -46,7 +46,9 @@
 	};
 	const renderPreview = previewRuntime.createRenderer(rendererOptions);
 
-	const ownerToken = {};
+	// A single-preview host owns exactly one card, so a constant owner key is
+	// sufficient: rebind is driven by the request render key.
+	const ownerKey = "card-preview-single";
 	controller = createPreviewSlotController({
 		createRenderer: () => renderPreview,
 		onStateChange: (state) => {
@@ -63,7 +65,7 @@
 	});
 
 	$effect(() => {
-		controller.bind(request ? { ownerToken, request } : null);
+		controller.bind(request ? { ownerKey, request } : null);
 		controller.setActive(request !== null);
 		// This component is the immediate path for a single or small number of
 		// cards. Bulk surfaces must use PreviewHost and VirtualPreviewSurface so

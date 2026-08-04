@@ -3,7 +3,7 @@ import type { CardPreviewRequest } from "features/preview/core/cardPreviewReques
 import type { CardPreviewRenderer, CardPreviewRetention } from "./cardPreviewRenderer";
 
 export interface PreviewBinding {
-	readonly ownerToken: object;
+	readonly ownerKey: string;
 	readonly request: CardPreviewRequest;
 }
 
@@ -284,7 +284,7 @@ export function createPreviewSlotController(
 	function bind(next: PreviewBinding | null): void {
 		const unchanged =
 			binding.state === "bound" &&
-			binding.value.ownerToken === next?.ownerToken &&
+			binding.value.ownerKey === next?.ownerKey &&
 			binding.value.request.renderKey === next?.request.renderKey;
 		if (unchanged) return;
 		nextGeneration += 1;

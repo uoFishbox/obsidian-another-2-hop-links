@@ -226,7 +226,7 @@ export function useTwoHopProgressiveList(
 						const slotId = previousBinding?.slotId ?? cell.logicalKey;
 						const binding =
 							previousBinding?.rowIndex === rowIndex &&
-							previousBinding.ownerToken === cell &&
+							previousBinding.ownerKey === cell.logicalKey &&
 							previousBinding.request.renderKey ===
 								model.previewRequest.renderKey
 								? previousBinding
@@ -234,7 +234,7 @@ export function useTwoHopProgressiveList(
 										slotId,
 										rowIndex,
 										request: model.previewRequest,
-										ownerToken: cell,
+										ownerKey: cell.logicalKey,
 									});
 						previewBindingByLogicalKey.set(cell.logicalKey, binding);
 						bindings.set(slotId, binding);

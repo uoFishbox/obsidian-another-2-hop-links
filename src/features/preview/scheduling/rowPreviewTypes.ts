@@ -6,10 +6,12 @@ export interface RowPreviewCardBinding {
 	readonly rowIndex: number;
 	readonly request: CardPreviewRequest;
 	/**
-	 * Opaque desired-state reference. Preview cache identities must not be used
-	 * to prove ownership of a physical host.
+	 * Stable logical identity of the card owning this slot. Must survive
+	 * source regeneration (e.g. `load more`) so an unchanged card does not
+	 * rebind its preview host. Preview cache identities must not be used to
+	 * prove ownership of a physical host.
 	 */
-	readonly ownerToken: object;
+	readonly ownerKey: string;
 }
 
 export interface RowPreviewWindow {

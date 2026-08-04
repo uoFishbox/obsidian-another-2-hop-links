@@ -171,7 +171,7 @@ export function createVirtualPreviewSurface(
 			slot.binding = binding;
 			slot.rowIndex = binding.rowIndex;
 			slot.controller.bind({
-				ownerToken: binding.ownerToken,
+				ownerKey: binding.ownerKey,
 				request: binding.request,
 			});
 		}
@@ -260,14 +260,14 @@ function isSameDesiredBinding(
 	right: RowPreviewCardBinding,
 ): boolean {
 	return (
-		left.ownerToken === right.ownerToken &&
+		left.ownerKey === right.ownerKey &&
 		left.request.renderKey === right.request.renderKey &&
 		left.rowIndex === right.rowIndex
 	);
 }
 
 interface PreviewBindingSnapshot {
-	readonly ownerToken: object;
+	readonly ownerKey: string;
 	readonly request: CardPreviewRequest;
 	readonly renderKey: string;
 	readonly rowIndex: number;
@@ -323,7 +323,7 @@ function assertImmutablePreviewFrame(frame: PreviewFrame): void {
 				: (previousBinding?.request ?? binding.request);
 		if (
 			previousBinding &&
-			(previousBinding.ownerToken !== binding.ownerToken ||
+			(previousBinding.ownerKey !== binding.ownerKey ||
 				previousBinding.request !== currentRequest ||
 				previousBinding.renderKey !== currentRequest.renderKey ||
 				previousBinding.rowIndex !== binding.rowIndex ||
@@ -334,7 +334,7 @@ function assertImmutablePreviewFrame(frame: PreviewFrame): void {
 			);
 		}
 		bindingSnapshots.set(binding, {
-			ownerToken: binding.ownerToken,
+			ownerKey: binding.ownerKey,
 			request: currentRequest,
 			renderKey: currentRequest.renderKey,
 			rowIndex: binding.rowIndex,

@@ -266,26 +266,26 @@ export function useFlatVirtualGridList<T>(
 				if (previewRequest) {
 					retainedPreviewSlots.add(slotId);
 					const previous = previewBindingsBySlot.get(slotId);
-					const ownerToken = mountedCell.cell;
+					const ownerKey = mountedCell.key;
 					if (!previous) {
 						const next = {
 							slotId,
 							rowIndex: mountedCell.rowIndex,
 							request: previewRequest,
-							ownerToken,
+							ownerKey,
 						};
 						previewBindingsBySlot.set(slotId, next);
 					} else {
 						const didRebind =
 							previous.rowIndex !== mountedCell.rowIndex ||
-							previous.ownerToken !== ownerToken ||
+							previous.ownerKey !== ownerKey ||
 							previous.request.renderKey !== previewRequest.renderKey;
 						if (didRebind) {
 							const next = {
 								slotId,
 								rowIndex: mountedCell.rowIndex,
 								request: previewRequest,
-								ownerToken,
+								ownerKey,
 							};
 							previewBindingsBySlot.set(slotId, next);
 						}

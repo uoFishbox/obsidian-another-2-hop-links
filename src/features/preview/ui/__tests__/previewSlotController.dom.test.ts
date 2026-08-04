@@ -32,7 +32,7 @@ describe("PreviewSlotController", () => {
 		const secondLease = controller.attachHost(host);
 
 		firstLease.dispose();
-		controller.bind({ ownerToken: {}, request: request("current") });
+		controller.bind({ ownerKey: "owner", request: request("current") });
 		controller.setActive(true);
 		controller.activate();
 
@@ -59,7 +59,7 @@ describe("PreviewSlotController", () => {
 			onStateChange: (state) => states.push(state.phase),
 		});
 		controller.attachHost(document.createElement("div"));
-		controller.bind({ ownerToken: {}, request: request("retry") });
+		controller.bind({ ownerKey: "owner", request: request("retry") });
 		controller.setActive(true);
 
 		controller.activate();
@@ -85,7 +85,7 @@ describe("PreviewSlotController", () => {
 			onStateChange,
 		});
 		controller.attachHost(document.createElement("div"));
-		controller.bind({ ownerToken: {}, request: request("dedupe") });
+		controller.bind({ ownerKey: "owner", request: request("dedupe") });
 		controller.setActive(true);
 		controller.activate();
 

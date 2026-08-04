@@ -46,7 +46,7 @@ function binding(
 	rowIndex: number,
 	identity: string,
 ): RowPreviewCardBinding {
-	return { slotId, rowIndex, request: request(identity), ownerToken: {} };
+	return { slotId, rowIndex, request: request(identity), ownerKey: identity };
 }
 
 function committedFrame(card: RowPreviewCardBinding): PreviewFrame {
@@ -268,11 +268,11 @@ describe("VirtualPreviewSurface", () => {
 		const { surface, renders } = createHarness();
 		const host = document.createElement("div");
 		surface.registerHost("slot-0", host);
-		const firstToken = {};
-		const secondToken = {};
+		const firstOwnerKey = "owner-a";
+		const secondOwnerKey = "owner-b";
 		const firstBinding = {
 			...binding("slot-0", 0, "same-cache-identity"),
-			ownerToken: firstToken,
+			ownerKey: firstOwnerKey,
 		};
 		let current = committedFrame(firstBinding);
 		const source = {
@@ -285,7 +285,7 @@ describe("VirtualPreviewSurface", () => {
 
 		const secondBinding = {
 			...binding("slot-0", 0, "same-cache-identity"),
-			ownerToken: secondToken,
+			ownerKey: secondOwnerKey,
 		};
 		current = committedFrame(secondBinding);
 		surface.acceptCommittedFrame(source);
@@ -303,7 +303,7 @@ describe("VirtualPreviewSurface", () => {
 		const hostLease = surface.registerHost("slot-0", oldHost);
 		const card = {
 			...binding("slot-0", 0, "a"),
-			ownerToken: {},
+			ownerKey: "a",
 		};
 		const current = committedFrame(card);
 		surface.acceptCommittedFrame({ current });
@@ -493,10 +493,10 @@ describe("VirtualPreviewSurface", () => {
 	it("does not restart rendering for a new request object with the same owner and render key", async () => {
 		const { surface, renders } = createHarness();
 		const host = document.createElement("div");
-		const ownerToken = {};
+		const ownerKey = "stable-owner";
 		const first = {
 			...binding("slot-0", 0, "stable-render"),
-			ownerToken,
+			ownerKey,
 		};
 		surface.registerHost("slot-0", host);
 		enter(surface, first);

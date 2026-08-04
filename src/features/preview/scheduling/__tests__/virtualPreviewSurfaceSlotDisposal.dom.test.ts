@@ -61,7 +61,7 @@ describe("VirtualPreviewSurface slot disposal", () => {
 						slotId: "logical-slot",
 						rowIndex: 0,
 						request,
-						ownerToken: {},
+						ownerKey: "owner-a",
 					},
 				],
 				[
@@ -70,7 +70,7 @@ describe("VirtualPreviewSurface slot disposal", () => {
 						slotId: "logical-slot-2",
 						rowIndex: 1,
 						request,
-						ownerToken: {},
+						ownerKey: "owner-b",
 					},
 				],
 			]),
