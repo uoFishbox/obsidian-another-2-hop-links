@@ -53,45 +53,20 @@ describe("VirtualPreviewSurface slot disposal", () => {
 			"logical-slot-2",
 			document.createElement("div"),
 		);
-		harness.surface.publish({
-			previewBindingsBySlot: new Map([
-				[
-					"logical-slot",
-					{
-						slotId: "logical-slot",
-						rowIndex: 0,
-						request,
-						ownerKey: "owner-a",
-					},
-				],
-				[
-					"logical-slot-2",
-					{
-						slotId: "logical-slot-2",
-						rowIndex: 1,
-						request,
-						ownerKey: "owner-b",
-					},
-				],
-			]),
-			previewWindow: {
-				previewRange: { start: 0, end: 2 },
-				active: true,
-			},
-		});
+		harness.surface.beginBindings();
+		harness.surface.bindSlot("logical-slot", 0, "owner-a", request);
+		harness.surface.bindSlot("logical-slot-2", 1, "owner-b", request);
+		harness.surface.endBindings();
+		harness.surface.setActiveRange(0, 2, true);
 		await vi.advanceTimersByTimeAsync(32);
 		firstLease.dispose();
 		secondLease.dispose();
 
 		expect(harness.disposedSlotIds).toEqual([]);
 
-		harness.surface.publish({
-			previewBindingsBySlot: new Map(),
-			previewWindow: {
-				previewRange: { start: 0, end: 0 },
-				active: true,
-			},
-		});
+		harness.surface.beginBindings();
+		harness.surface.endBindings();
+		harness.surface.setActiveRange(0, 0, true);
 		await vi.advanceTimersByTimeAsync(32);
 
 		expect(harness.disposedSlotIds).toEqual(["logical-slot", "logical-slot-2"]);

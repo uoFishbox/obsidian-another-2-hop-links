@@ -8,6 +8,7 @@ const state = vi.hoisted(() => ({
 	highlightSearchMatchesInHtml: vi.fn(),
 	getContentSnippet: vi.fn(),
 	findCaseInsensitiveIndex: vi.fn(),
+	htmlVisibleTextContainsCaseInsensitive: vi.fn(),
 	getFileContent: vi.fn(),
 	analyzePreviewContent: vi.fn(),
 }));
@@ -30,6 +31,8 @@ vi.mock("features/card-preview/text-processing/previewTextProcessingAsync", () =
 
 vi.mock("features/card-preview/text-processing/searchUtils", () => ({
 	findCaseInsensitiveIndex: state.findCaseInsensitiveIndex,
+	htmlVisibleTextContainsCaseInsensitive:
+		state.htmlVisibleTextContainsCaseInsensitive,
 }));
 
 vi.mock("features/card-preview/core/previewContent", () => ({
@@ -77,6 +80,12 @@ describe("cardPreviewSharedCache search context", () => {
 		state.findCaseInsensitiveIndex.mockReset();
 		state.findCaseInsensitiveIndex.mockImplementation(
 			(content: string, query: string) => content.toLowerCase().indexOf(query),
+		);
+
+		state.htmlVisibleTextContainsCaseInsensitive.mockReset();
+		state.htmlVisibleTextContainsCaseInsensitive.mockImplementation(
+			(html: string, query: string) =>
+				html.toLowerCase().includes(query.toLowerCase()),
 		);
 
 		state.getFileContent.mockReset();

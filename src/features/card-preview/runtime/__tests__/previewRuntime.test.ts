@@ -93,7 +93,11 @@ describe("PreviewRuntime", () => {
 
 		expect(state.surfaceOptions).toHaveLength(0);
 		expect(state.rendererOptions).toHaveLength(0);
-		expect(() => surface.publish({} as never)).not.toThrow();
+		expect(() => {
+			surface.beginBindings();
+			surface.endBindings();
+			surface.setActiveRange(0, 0, false);
+		}).not.toThrow();
 		expect(() => cleanup()).not.toThrow();
 	});
 });

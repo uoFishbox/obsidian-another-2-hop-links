@@ -9,7 +9,6 @@ import type { TFile } from "obsidian";
 import type { TwoHopPreviewDependencies } from "features/two-hop/ui/twoHopPreviewDependencies";
 import type { TwoHopCardPresentationState } from "features/two-hop/ui/twoHopCellStaticState";
 import type { CardPreviewRequest } from "features/card-preview/core/cardPreviewRequest";
-import type { PreviewFrame } from "features/card-preview/scheduling/virtualPreviewSurface";
 import type {
 	TwoHopItemModel,
 	TwoHopSectionModel,
@@ -38,6 +37,7 @@ import {
 	triggerResize,
 } from "testing/helpers/DOMObserverMock";
 import TwoHopProgressiveSurfaceHarness from "./TwoHopProgressiveSurfaceHarness.svelte";
+import { createPreviewSurfaceProbe, type PreviewFrame } from "./previewSurfaceProbe";
 
 function createSection(count: number): TwoHopSectionModel {
 	const items = Array.from({ length: count }, (_, index) => ({
@@ -529,7 +529,9 @@ describe("TwoHopProgressiveSurface", () => {
 				props: {
 					sections: [createSection(100)],
 					applicationStore,
-					linkContext: { getPreview: vi.fn() } as unknown as LinkContext,
+					linkContext: {
+						getPreview: vi.fn(),
+					} as unknown as LinkContext,
 					resolveItemCardModel,
 				},
 			});
@@ -767,14 +769,11 @@ describe("TwoHopProgressiveSurface", () => {
 	});
 
 	it("leaves newly mounted offscreen chunks unhydrated and coalesces scroll range changes", async () => {
-		const publish = vi.fn();
+		const surfaceProbe = createPreviewSurfaceProbe();
+		const publish = surfaceProbe.publish;
 		const previewDependencies = {
 			previewRuntime: {
-				createSurface: () => ({
-					registerHost: () => ({ dispose: () => {} }),
-					publish,
-					dispose: () => {},
-				}),
+				createSurface: () => surfaceProbe.surface,
 			},
 			resolveSearchMatchPosition: () => undefined,
 		} as unknown as TwoHopPreviewDependencies;

@@ -42,7 +42,6 @@ import {
 import { createFlatGridControllerAdapter } from "./flatGridControllerAdapter";
 import { createVirtualizedItemVisibilityStateController } from "./virtualizedItemVisibilityState.svelte";
 import { createResidentRowSlotAllocator } from "ui/virtualization/core/residentSlotAllocator";
-import { type RowPreviewCardBinding } from "features/card-preview/scheduling/virtualPreviewSurface";
 import { DISABLED_PREVIEW_SURFACE } from "features/card-preview/runtime/previewRuntime";
 import type { CardPreviewRequest } from "features/card-preview/core/cardPreviewRequest";
 import type { ItemInteractionDescriptor } from "ui/interactions/interactionTypes";
@@ -247,71 +246,41 @@ export function useFlatVirtualGridList<T>(
 			layout: nextLayout,
 		});
 	const rowModel = $derived(resolveFlatLinkRowModel(layout));
-	const previewBindingsBySlot = new Map<string, RowPreviewCardBinding>();
 	const syncCardSlots = (
 		rows: readonly MountedVirtualGridRowSlice<T>[],
 		previewRange: RowRange,
 	): void => {
-		const retainedPreviewSlots = new Set<string>();
 		const interactionCards: VirtualCardInteractionBinding[] = [];
-		for (const row of rows) {
-			for (const mountedCell of row.cells) {
-				if (mountedCell.cell.kind !== "item") continue;
-				const { item, itemIndex } = mountedCell.cell;
-				const slotId = String(mountedCell.renderSlotKey);
-				const previewRequest = props.resolveItemPreviewRequest?.(
-					item,
-					itemIndex,
-				);
-				if (previewRequest) {
-					retainedPreviewSlots.add(slotId);
-					const previous = previewBindingsBySlot.get(slotId);
-					const ownerKey = mountedCell.key;
-					if (!previous) {
-						const next = {
+		previewSurface.beginBindings();
+		try {
+			for (const row of rows) {
+				for (const mountedCell of row.cells) {
+					if (mountedCell.cell.kind !== "item") continue;
+					const { item, itemIndex } = mountedCell.cell;
+					const slotId = String(mountedCell.renderSlotKey);
+					const previewRequest = props.resolveItemPreviewRequest?.(
+						item,
+						itemIndex,
+					);
+					if (previewRequest) {
+						previewSurface.bindSlot(
 							slotId,
-							rowIndex: mountedCell.rowIndex,
-							request: previewRequest,
-							ownerKey,
-						};
-						previewBindingsBySlot.set(slotId, next);
-					} else {
-						const didRebind =
-							previous.rowIndex !== mountedCell.rowIndex ||
-							previous.ownerKey !== ownerKey ||
-							previous.request.renderKey !== previewRequest.renderKey;
-						if (didRebind) {
-							const next = {
-								slotId,
-								rowIndex: mountedCell.rowIndex,
-								request: previewRequest,
-								ownerKey,
-							};
-							previewBindingsBySlot.set(slotId, next);
-						}
+							mountedCell.rowIndex,
+							mountedCell.key,
+							previewRequest,
+						);
 					}
+					const descriptor = props.resolveItemInteractionDescriptor?.(
+						item,
+						itemIndex,
+					);
+					if (descriptor) interactionCards.push({ slotId, descriptor });
 				}
-				const descriptor = props.resolveItemInteractionDescriptor?.(
-					item,
-					itemIndex,
-				);
-				if (descriptor) interactionCards.push({ slotId, descriptor });
 			}
+		} finally {
+			previewSurface.endBindings();
 		}
-		for (const slotId of previewBindingsBySlot.keys()) {
-			if (retainedPreviewSlots.has(slotId)) continue;
-			previewBindingsBySlot.delete(slotId);
-		}
-		previewSurface.publish({
-			previewBindingsBySlot: new Map(previewBindingsBySlot),
-			previewWindow: Object.freeze({
-				previewRange: Object.freeze({
-					start: previewRange.start,
-					end: previewRange.end,
-				}),
-				active: true,
-			}),
-		});
+		previewSurface.setActiveRange(previewRange.start, previewRange.end, true);
 		interactionController.syncCards(interactionCards);
 	};
 	const virtualList = useVirtualList<

@@ -5,8 +5,8 @@ import { getVirtualPreviewSurface } from "features/card-preview/ui/virtualPrevie
 /**
  * Registers the bound element as a preview host on the virtual preview surface.
  *
- * Replaces the {@link PreviewHost} component on hot paths where mounting a
- * Svelte component per host is avoidable. The host element is registered on
+ * Avoids a Svelte component boundary for each virtualized preview host. The
+ * host element is registered on
  * mount, re-registered only when the slot ID changes, and released on destroy.
  */
 export function previewHost(node: HTMLElement, slotId: string): ActionReturn<string> {

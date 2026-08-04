@@ -68,7 +68,7 @@
 		controller.bind(request ? { ownerKey, request } : null);
 		controller.setActive(request !== null);
 		// This component is the immediate path for a single or small number of
-		// cards. Bulk surfaces must use PreviewHost and VirtualPreviewSurface so
+		// cards. Bulk surfaces must register hosts with VirtualPreviewSurface so
 		// activation remains subject to runtime admission and fairness.
 		if (request) controller.activate();
 	});

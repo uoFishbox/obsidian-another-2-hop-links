@@ -2,7 +2,6 @@ import { render } from "@testing-library/svelte";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { DEFAULT_SETTINGS } from "features/settings/model";
 import type { CardPreviewRequest } from "features/card-preview/core/cardPreviewRequest";
-import type { PreviewFrame } from "features/card-preview/scheduling/virtualPreviewSurface";
 import type { TwoHopPreviewDependencies } from "features/two-hop/ui/twoHopPreviewDependencies";
 import type { TwoHopCardPresentationState } from "features/two-hop/ui/twoHopCellStaticState";
 import type {
@@ -28,6 +27,7 @@ import {
 	triggerResize,
 } from "testing/helpers/DOMObserverMock";
 import TwoHopProgressiveSurfaceHarness from "./TwoHopProgressiveSurfaceHarness.svelte";
+import { createPreviewSurfaceProbe, type PreviewFrame } from "./previewSurfaceProbe";
 
 type TestLane = "scroll-critical" | "post-paint" | "idle";
 
@@ -174,14 +174,11 @@ async function renderPreviewControlFixture(
 	});
 	const disposeHost = vi.fn();
 	const registerHost = vi.fn(() => ({ dispose: disposeHost }));
-	const publish = vi.fn();
+	const surfaceProbe = createPreviewSurfaceProbe(registerHost);
+	const publish = surfaceProbe.publish;
 	const previewDependencies = {
 		previewRuntime: {
-			createSurface: () => ({
-				registerHost,
-				publish,
-				dispose: () => {},
-			}),
+			createSurface: () => surfaceProbe.surface,
 		},
 		resolveSearchMatchPosition: () => undefined,
 	} as unknown as TwoHopPreviewDependencies;
@@ -746,14 +743,11 @@ describe("TwoHop progressive preview scheduling", () => {
 	});
 
 	it("applies the range only after the scroll-critical calculation reaches post-paint", async () => {
-		const publish = vi.fn();
+		const surfaceProbe = createPreviewSurfaceProbe();
+		const publish = surfaceProbe.publish;
 		const previewDependencies = {
 			previewRuntime: {
-				createSurface: () => ({
-					registerHost: () => ({ dispose: () => {} }),
-					publish,
-					dispose: () => {},
-				}),
+				createSurface: () => surfaceProbe.surface,
 			},
 			resolveSearchMatchPosition: () => undefined,
 		} as unknown as TwoHopPreviewDependencies;
