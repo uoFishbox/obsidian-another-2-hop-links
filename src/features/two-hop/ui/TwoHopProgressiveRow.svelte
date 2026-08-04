@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { IS_PROD } from "appConstants";
 	import type { CardShellModel } from "ui/components/items/cardRenderModel";
 	import type { ViewPlanLayoutMetrics } from "ui/virtualization/svelte/viewPlanLayout";
 	import type { TwoHopProgressiveRow } from "features/two-hop/ui/twoHopProgressivePlan";
@@ -43,9 +44,9 @@
 		<div
 			class="twohop-progressive-cell"
 			data-ccl-logical-key={cell.logicalKey}
-			data-ccl-row-index={cell.rowIndex}
-			data-ccl-column-index={cell.columnIndex}
-			data-testid={cell.kind === "item"
+			data-ccl-row-index={!IS_PROD ? cell.rowIndex : undefined}
+			data-ccl-column-index={!IS_PROD ? cell.columnIndex : undefined}
+			data-testid={!IS_PROD && cell.kind === "item"
 				? "twohop-progressive-item-cell"
 				: undefined}
 		>

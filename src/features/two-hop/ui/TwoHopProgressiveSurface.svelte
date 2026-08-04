@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { IS_PROD } from "appConstants";
 	import DelegatedInteractionSurface from "ui/interactions/DelegatedInteractionSurface.svelte";
 	import { provideVirtualFrameCoordinator } from "ui/virtualization/svelte/frameCoordinatorContext.svelte";
 	import { provideVirtualPreviewSurface } from "features/preview/ui/virtualPreviewSurfaceContext";
@@ -31,7 +32,7 @@
 			{#each list.plan.chunks as chunk (chunk.chunkIndex)}
 				<div
 					class="twohop-progressive-chunk"
-					data-ccl-progressive-chunk={chunk.chunkIndex}
+					data-ccl-progressive-chunk={!IS_PROD ? chunk.chunkIndex : undefined}
 					style={`height:${chunk.height}px;contain-intrinsic-size:auto ${chunk.height}px;`}
 				>
 					{#each chunk.rows as row (row.rowIndex)}
