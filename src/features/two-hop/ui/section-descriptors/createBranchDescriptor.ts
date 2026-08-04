@@ -9,7 +9,7 @@ import {
 import {
 	formatLinkText,
 	generateBacklinkKey,
-} from "features/preview/text-processing/textUtils";
+} from "features/card-preview/text-processing/textUtils";
 import type { TwoHopLinkBranch } from "types/domain";
 import type { ApplicationStore } from "ui/stores/ApplicationStore.svelte";
 import {

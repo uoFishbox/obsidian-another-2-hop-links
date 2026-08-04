@@ -10,7 +10,7 @@
 	import { AUDIO_EXTENSIONS, IMAGE_EXTENSIONS } from "../../../appConstants";
 	import { type Snippet } from "svelte";
 	import { useAppContext } from "ui/context/linkContext";
-	import { highlightTextForSearch } from "features/preview/text-processing/searchHighlighter";
+	import { highlightTextForSearch } from "features/card-preview/text-processing/searchHighlighter";
 	import type { CardPresentationState } from "./cardPresentation";
 
 	interface Props {

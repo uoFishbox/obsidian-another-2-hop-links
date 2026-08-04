@@ -3,9 +3,9 @@ import { DEFAULT_SETTINGS } from "features/settings/model";
 import type {
 	CardPreviewRenderer,
 	PreviewRenderCallbacks,
-} from "features/preview/ui/cardPreviewRenderer";
-import type { CardPreviewRequest } from "features/preview/core/cardPreviewRequest";
-import { createPreviewRenderSettings } from "features/preview/core/previewRenderSettings";
+} from "features/card-preview/ui/cardPreviewRenderer";
+import type { CardPreviewRequest } from "features/card-preview/core/cardPreviewRequest";
+import { createPreviewRenderSettings } from "features/card-preview/core/previewRenderSettings";
 import type { VirtualFrameCoordinator } from "ui/virtualization/scheduling/frameCoordinator";
 import {
 	createVirtualPreviewSurface,

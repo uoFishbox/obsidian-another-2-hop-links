@@ -6,7 +6,7 @@ import type { ApplicationStore } from "ui/stores/ApplicationStore.svelte";
 import type { ResolveTwoHopLinks } from "features/two-hop/application/TwoHopLinksLoader";
 import type { PluginHost } from "types/pluginHost";
 import type { PluginSettings } from "features/settings/model";
-import type { PreviewRuntime } from "features/preview/runtime/previewRuntime";
+import type { PreviewRuntime } from "features/card-preview/runtime/previewRuntime";
 
 export interface PluginHostUi extends PluginHost {
 	readonly forceRedrawEffect: StateEffectType<undefined>;

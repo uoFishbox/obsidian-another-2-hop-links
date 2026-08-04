@@ -22,9 +22,9 @@
 	import { tick } from "svelte";
 	import { createTwoHopSectionPublicationCache } from "features/two-hop/ui/section-descriptors/cache";
 	import type { TwoHopLinksRootUiState } from "features/two-hop/ui/twoHopLinksRootUiState";
-	import { observePreviewSurfaceVisibility } from "features/preview/scheduling/previewSurfaceVisibility";
+	import { observePreviewSurfaceVisibility } from "features/card-preview/scheduling/previewSurfaceVisibility";
 	import type { TwoHopPreviewDependencies } from "features/two-hop/ui/twoHopPreviewDependencies";
-	import type { PreviewRuntime } from "features/preview/runtime/previewRuntime";
+	import type { PreviewRuntime } from "features/card-preview/runtime/previewRuntime";
 
 	const INLINE_OFFSCREEN_BOOTSTRAP_PREVIEW_ROWS = 6;
 

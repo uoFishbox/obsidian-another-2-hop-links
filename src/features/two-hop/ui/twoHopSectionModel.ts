@@ -1,6 +1,6 @@
 import type { ViewItem } from "application/presenters";
 import type { SearchWorkerMatchScope } from "features/search/searchWorkerTypes";
-import { generateLinkKey } from "features/preview/text-processing/textUtils";
+import { generateLinkKey } from "features/card-preview/text-processing/textUtils";
 import type { ClickableHeaderExtraProps } from "ui/components/sections/types";
 import type { TwoHopLinkBranch } from "types/domain";
 

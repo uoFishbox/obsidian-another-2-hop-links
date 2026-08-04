@@ -9,7 +9,7 @@
 		KEYED_VIRTUAL_CELL_BODY_LIFECYCLE,
 		PHYSICAL_SLOT_BODY_LIFECYCLE,
 	} from "ui/virtualization/core/bodyLifecycle";
-	import { provideVirtualPreviewSurface } from "features/preview/ui/virtualPreviewSurfaceContext";
+	import { provideVirtualPreviewSurface } from "features/card-preview/ui/virtualPreviewSurfaceContext";
 	import { provideVirtualFrameCoordinator } from "ui/virtualization/svelte/frameCoordinatorContext.svelte";
 
 	const props: FlatVirtualGridListProps<T> = $props();

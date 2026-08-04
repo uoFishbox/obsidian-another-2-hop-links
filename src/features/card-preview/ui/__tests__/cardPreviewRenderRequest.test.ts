@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { DEFAULT_SETTINGS, type PluginSettings } from "features/settings/model";
 import { createMockTFile } from "testing/__mocks__/testHelpers";
-import { compileCardPreviewRequest } from "features/preview/core/cardPreviewRequest";
+import { compileCardPreviewRequest } from "features/card-preview/core/cardPreviewRequest";
 
 function compile(
 	file: ReturnType<typeof createMockTFile>,

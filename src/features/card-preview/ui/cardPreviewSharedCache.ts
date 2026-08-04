@@ -2,27 +2,27 @@ import type { TFile, Vault } from "obsidian";
 import {
 	getContentSnippetAsync,
 	highlightSearchMatchesInHtmlAsync,
-} from "features/preview/text-processing/previewTextProcessingAsync";
-import { type GetContentSnippetOptions } from "features/preview/text-processing/snippetExtractor";
+} from "features/card-preview/text-processing/previewTextProcessingAsync";
+import { type GetContentSnippetOptions } from "features/card-preview/text-processing/snippetExtractor";
 import {
 	findCaseInsensitiveIndex,
 	htmlVisibleTextContainsCaseInsensitive,
-} from "features/preview/text-processing/searchUtils";
+} from "features/card-preview/text-processing/searchUtils";
 import {
 	analyzePreviewContent,
 	type PreviewContentAnalysis,
-} from "features/preview/core/previewContent";
-import { readRawContent } from "features/preview/core/rawContentReader";
+} from "features/card-preview/core/previewContent";
+import { readRawContent } from "features/card-preview/core/rawContentReader";
 import {
 	CACHE_KEY_SEPARATOR,
 	getPreviewSettingsSignatures,
-} from "features/preview/core/previewRenderKeys";
+} from "features/card-preview/core/previewRenderKeys";
 import {
 	createAbortError,
 	isAbortError,
 	throwIfAborted,
-} from "features/preview/core/previewAbort";
-import type { PreviewRenderSettingsInput } from "features/preview/core/previewRenderSettings";
+} from "features/card-preview/core/previewAbort";
+import type { PreviewRenderSettingsInput } from "features/card-preview/core/previewRenderSettings";
 import { createSizedLRUCache, stringBytes } from "shared/cache/sizedLRUCache";
 
 export type PreviewSearchContext = {

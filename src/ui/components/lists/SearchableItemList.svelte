@@ -42,7 +42,7 @@
 		type CardRenderModel,
 	} from "ui/components/items/cardRenderModel";
 	import { createItemInteractionKey } from "ui/interactions/interactionTypes";
-	import type { PreviewRuntime } from "features/preview/runtime/previewRuntime";
+	import type { PreviewRuntime } from "features/card-preview/runtime/previewRuntime";
 
 	interface Props {
 		items: ViewItem[];

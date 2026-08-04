@@ -1,6 +1,6 @@
 import type { TFile } from "obsidian";
 import type { PluginSettings } from "features/settings/model";
-import type { PreviewData } from "features/preview/public-types";
+import type { PreviewData } from "features/card-preview/public-types";
 import { createPreviewOverrideIdentity } from "./previewRenderIdentity";
 import { buildPreviewRenderKeys } from "./previewRenderKeys";
 import {

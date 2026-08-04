@@ -1,16 +1,16 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { App } from "obsidian";
 import { DEFAULT_SETTINGS } from "features/settings/model";
-import type { CardPreviewLoader } from "features/preview/ui/cardPreviewRenderer";
-import type { CardPreviewSharedCache } from "features/preview/ui/cardPreviewSharedCache";
-import type { CardPreviewRequest } from "features/preview/core/cardPreviewRequest";
+import type { CardPreviewLoader } from "features/card-preview/ui/cardPreviewRenderer";
+import type { CardPreviewSharedCache } from "features/card-preview/ui/cardPreviewSharedCache";
+import type { CardPreviewRequest } from "features/card-preview/core/cardPreviewRequest";
 
 const state = vi.hoisted(() => ({
 	surfaceOptions: [] as Array<Record<string, unknown>>,
 	rendererOptions: [] as Array<Record<string, unknown>>,
 }));
 
-vi.mock("features/preview/scheduling/virtualPreviewSurface", () => ({
+vi.mock("features/card-preview/scheduling/virtualPreviewSurface", () => ({
 	createVirtualPreviewSurface: (options: Record<string, unknown>) => {
 		state.surfaceOptions.push(options);
 		return {
@@ -21,7 +21,7 @@ vi.mock("features/preview/scheduling/virtualPreviewSurface", () => ({
 	},
 }));
 
-vi.mock("features/preview/ui/cardPreviewRenderer", () => ({
+vi.mock("features/card-preview/ui/cardPreviewRenderer", () => ({
 	createCardPreviewRenderer: (options: Record<string, unknown>) => {
 		state.rendererOptions.push(options);
 		return vi.fn(() => vi.fn());

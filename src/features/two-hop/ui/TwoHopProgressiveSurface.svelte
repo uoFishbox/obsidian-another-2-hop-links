@@ -2,7 +2,7 @@
 	import { IS_PROD } from "appConstants";
 	import DelegatedInteractionSurface from "ui/interactions/DelegatedInteractionSurface.svelte";
 	import { provideVirtualFrameCoordinator } from "ui/virtualization/svelte/frameCoordinatorContext.svelte";
-	import { provideVirtualPreviewSurface } from "features/preview/ui/virtualPreviewSurfaceContext";
+	import { provideVirtualPreviewSurface } from "features/card-preview/ui/virtualPreviewSurfaceContext";
 	import TwoHopProgressiveRow from "features/two-hop/ui/TwoHopProgressiveRow.svelte";
 	import {
 		useTwoHopProgressiveList,

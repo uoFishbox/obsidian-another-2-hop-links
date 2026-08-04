@@ -1,7 +1,7 @@
 import type { ViewItem } from "application/presenters";
 import { createItemInteractionKey } from "ui/interactions/interactionTypes";
 import type { ClickableHeaderExtraProps } from "ui/components/sections/types";
-import { generateLinkKey } from "features/preview/text-processing/textUtils";
+import { generateLinkKey } from "features/card-preview/text-processing/textUtils";
 import type { TagGroup } from "types/domain";
 import type { ApplicationStore } from "ui/stores/ApplicationStore.svelte";
 import {

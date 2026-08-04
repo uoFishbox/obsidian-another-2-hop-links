@@ -1,15 +1,15 @@
 import { fireEvent, render } from "@testing-library/svelte";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { DEFAULT_SETTINGS } from "features/settings/model";
-import { compileCardPreviewRequest } from "features/preview/core/cardPreviewRequest";
+import { compileCardPreviewRequest } from "features/card-preview/core/cardPreviewRequest";
 import type { ApplicationStore } from "ui/stores/ApplicationStore.svelte";
 import type { CardRenderModel } from "ui/components/items/cardRenderModel";
 import type { LinkContext } from "ui/context/linkContext";
 import type { TFile } from "obsidian";
 import type { TwoHopPreviewDependencies } from "features/two-hop/ui/twoHopPreviewDependencies";
 import type { TwoHopCardPresentationState } from "features/two-hop/ui/twoHopCellStaticState";
-import type { CardPreviewRequest } from "features/preview/core/cardPreviewRequest";
-import type { PreviewFrame } from "features/preview/scheduling/virtualPreviewSurface";
+import type { CardPreviewRequest } from "features/card-preview/core/cardPreviewRequest";
+import type { PreviewFrame } from "features/card-preview/scheduling/virtualPreviewSurface";
 import type {
 	TwoHopItemModel,
 	TwoHopSectionModel,

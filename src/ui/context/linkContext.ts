@@ -3,13 +3,16 @@ import type { TwoHopIndexedLink } from "types/domain";
 import { createContext } from "svelte";
 import type { ApplicationStore } from "ui/stores/ApplicationStore.svelte";
 import type { PluginSettings } from "features/settings/model";
-import type { PreviewData, PreviewRequestOptions } from "features/preview/public-types";
-import type { PreviewRuntime } from "features/preview/runtime/previewRuntime";
+import type {
+	PreviewData,
+	PreviewRequestOptions,
+} from "features/card-preview/public-types";
+import type { PreviewRuntime } from "features/card-preview/runtime/previewRuntime";
 export type {
 	PreviewData,
 	PreviewDomRenderer,
 	PreviewRequestOptions,
-} from "features/preview/public-types";
+} from "features/card-preview/public-types";
 export type { LinkUtilitiesContext } from "types/linkContext";
 import type { LinkUtilitiesContext } from "types/linkContext";
 

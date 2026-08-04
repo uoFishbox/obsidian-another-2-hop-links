@@ -1,13 +1,13 @@
 <script lang="ts">
 	import type { TFile } from "obsidian";
 	import { useAppContext } from "ui/context/linkContext";
-	import type { PreviewData } from "features/preview/public-types";
+	import type { PreviewData } from "features/card-preview/public-types";
 	import type { CardPreviewLoader } from "../cardPreviewRenderer";
-	import { compileCardPreviewRequest } from "features/preview/core/cardPreviewRequest";
+	import { compileCardPreviewRequest } from "features/card-preview/core/cardPreviewRequest";
 	import {
 		createPreviewRuntime,
 		type PreviewRuntime,
-	} from "features/preview/runtime/previewRuntime";
+	} from "features/card-preview/runtime/previewRuntime";
 	import CardPreview from "../CardPreview.svelte";
 
 	interface Props {

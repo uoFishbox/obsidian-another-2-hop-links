@@ -25,7 +25,7 @@ import {
 import {
 	createPreviewRuntime,
 	type PreviewRuntime,
-} from "features/preview/runtime/previewRuntime";
+} from "features/card-preview/runtime/previewRuntime";
 
 const previewRuntimes = new Set<PreviewRuntime>();
 

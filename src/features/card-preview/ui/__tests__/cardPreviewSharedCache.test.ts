@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createCardPreviewSharedCache } from "../cardPreviewSharedCache";
-import { buildPreviewRenderKeys } from "features/preview/core/previewRenderKeys";
+import { buildPreviewRenderKeys } from "features/card-preview/core/previewRenderKeys";
 import { DEFAULT_SETTINGS, type PluginSettings } from "features/settings/model";
 import { createMockTFile } from "testing/__mocks__/testHelpers";
 
@@ -15,28 +15,24 @@ const sharedCache = createCardPreviewSharedCache();
 const { applySharedSearchContextToTextPreview } = sharedCache;
 const clearCardPreviewSharedCaches = sharedCache.clear;
 
-vi.mock("features/preview/text-processing/searchHighlighter", () => ({
+vi.mock("features/card-preview/text-processing/searchHighlighter", () => ({
 	highlightSearchMatchesInHtml: state.highlightSearchMatchesInHtml,
 }));
 
-vi.mock("features/preview/text-processing/snippetExtractor", () => ({
+vi.mock("features/card-preview/text-processing/snippetExtractor", () => ({
 	getContentSnippet: state.getContentSnippet,
 }));
 
-vi.mock("features/preview/text-processing/previewTextProcessingAsync", () => ({
+vi.mock("features/card-preview/text-processing/previewTextProcessingAsync", () => ({
 	getContentSnippetAsync: state.getContentSnippet,
 	highlightSearchMatchesInHtmlAsync: state.highlightSearchMatchesInHtml,
 }));
 
-vi.mock("features/preview/text-processing/searchUtils", () => ({
+vi.mock("features/card-preview/text-processing/searchUtils", () => ({
 	findCaseInsensitiveIndex: state.findCaseInsensitiveIndex,
-	htmlVisibleTextContainsCaseInsensitive: (html: string, query: string) => {
-		const stripped = html.replace(/<[^>]*>/g, "");
-		return stripped.toLowerCase().includes(query);
-	},
 }));
 
-vi.mock("features/preview/core/previewContent", () => ({
+vi.mock("features/card-preview/core/previewContent", () => ({
 	getFileContent: state.getFileContent,
 	analyzePreviewContent: state.analyzePreviewContent,
 }));

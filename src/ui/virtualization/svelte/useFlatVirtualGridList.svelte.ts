@@ -42,9 +42,9 @@ import {
 import { createFlatGridControllerAdapter } from "./flatGridControllerAdapter";
 import { createVirtualizedItemVisibilityStateController } from "./virtualizedItemVisibilityState.svelte";
 import { createResidentRowSlotAllocator } from "ui/virtualization/core/residentSlotAllocator";
-import { type RowPreviewCardBinding } from "features/preview/scheduling/virtualPreviewSurface";
-import { DISABLED_PREVIEW_SURFACE } from "features/preview/runtime/previewRuntime";
-import type { CardPreviewRequest } from "features/preview/core/cardPreviewRequest";
+import { type RowPreviewCardBinding } from "features/card-preview/scheduling/virtualPreviewSurface";
+import { DISABLED_PREVIEW_SURFACE } from "features/card-preview/runtime/previewRuntime";
+import type { CardPreviewRequest } from "features/card-preview/core/cardPreviewRequest";
 import type { ItemInteractionDescriptor } from "ui/interactions/interactionTypes";
 import {
 	createVirtualCardInteractionController,

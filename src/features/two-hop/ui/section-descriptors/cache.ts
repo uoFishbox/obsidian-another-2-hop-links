@@ -4,7 +4,7 @@ import {
 	createCompactSectionId,
 	SHOULD_VALIDATE_SECTION_IDS,
 } from "ui/components/common/listPagination";
-import { generateBranchKey } from "features/preview/text-processing/textUtils";
+import { generateBranchKey } from "features/card-preview/text-processing/textUtils";
 import type { PluginSettings, SortOption } from "features/settings/model";
 import type { ApplicationStore } from "ui/stores/ApplicationStore.svelte";
 import type { InteractionSettings } from "ui/interactions/interactionTypes";

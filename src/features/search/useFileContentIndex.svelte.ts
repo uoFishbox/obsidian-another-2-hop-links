@@ -18,7 +18,7 @@
 import { TFile, type App, type Pos, type Vault } from "obsidian";
 import { untrack } from "svelte";
 import { SvelteMap, SvelteSet } from "svelte/reactivity";
-import { getFileContent } from "features/preview/core/previewContent";
+import { getFileContent } from "features/card-preview/core/previewContent";
 import {
 	applyLoadedFileContentEntry,
 	reconcileFileContentIndex,

@@ -1,5 +1,5 @@
-import type { PreviewData } from "features/preview/public-types";
-import type { CardPreviewRequest } from "features/preview/core/cardPreviewRequest";
+import type { PreviewData } from "features/card-preview/public-types";
+import type { CardPreviewRequest } from "features/card-preview/core/cardPreviewRequest";
 import type { CardPreviewRenderer, CardPreviewRetention } from "./cardPreviewRenderer";
 
 export interface PreviewBinding {

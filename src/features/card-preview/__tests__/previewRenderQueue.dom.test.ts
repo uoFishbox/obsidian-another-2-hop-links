@@ -42,7 +42,8 @@ afterEach(() => {
 
 describe("enqueuePreviewRender", () => {
 	test("counts animation-frame fallback scheduling", async () => {
-		window.requestIdleCallback = undefined as unknown as Window["requestIdleCallback"];
+		window.requestIdleCallback =
+			undefined as unknown as Window["requestIdleCallback"];
 		const requestAnimationFrame = vi
 			.spyOn(window, "requestAnimationFrame")
 			.mockImplementation((callback) => {
@@ -50,9 +51,8 @@ describe("enqueuePreviewRender", () => {
 				return 1;
 			});
 		const { enqueuePreviewRender } = await loadQueueModule();
-		const { getCCLDevMeasurementSnapshot } = await import(
-			"infrastructure/debug/CCLDevMeasurements"
-		);
+		const { getCCLDevMeasurementSnapshot } =
+			await import("infrastructure/debug/CCLDevMeasurements");
 
 		const result = enqueuePreviewRender(async () => "rendered");
 		await vi.runAllTimersAsync();

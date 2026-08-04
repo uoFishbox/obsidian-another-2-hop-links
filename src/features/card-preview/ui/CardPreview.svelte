@@ -2,11 +2,11 @@
 	import { getDebugDisableCardDomPreview } from "appConstants";
 	import { useAppContext } from "ui/context/linkContext";
 	import { getVirtualFrameCoordinatorContext } from "ui/virtualization/svelte/frameCoordinatorContext.svelte";
-	import type { CardPreviewRequest } from "features/preview/core/cardPreviewRequest";
+	import type { CardPreviewRequest } from "features/card-preview/core/cardPreviewRequest";
 	import type {
 		PreviewRuntime,
 		PreviewRuntimeRendererOptions,
-	} from "features/preview/runtime/previewRuntime";
+	} from "features/card-preview/runtime/previewRuntime";
 	import SkeletonPreview from "./SkeletonPreview.svelte";
 	import {
 		createPreviewSlotController,

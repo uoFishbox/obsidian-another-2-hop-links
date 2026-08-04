@@ -4,13 +4,13 @@ import {
 	type PreviewActivationScope,
 } from "./previewActivationScheduler";
 import { createPreviewFrameDriver } from "./previewFrameDriver";
-import type { CardPreviewRenderer } from "features/preview/ui/cardPreviewRenderer";
-import type { CardPreviewRequest } from "features/preview/core/cardPreviewRequest";
+import type { CardPreviewRenderer } from "features/card-preview/ui/cardPreviewRenderer";
+import type { CardPreviewRequest } from "features/card-preview/core/cardPreviewRequest";
 import {
 	createPreviewSlotController,
 	type PreviewSlotController,
 	type PreviewSlotPhase,
-} from "features/preview/ui/previewSlotController";
+} from "features/card-preview/ui/previewSlotController";
 import type { RowRange } from "ui/virtualization/rowRange";
 import type { VirtualFrameCoordinator } from "ui/virtualization/scheduling/frameCoordinator";
 import type {

@@ -1,6 +1,6 @@
 import type { ActionReturn } from "svelte/action";
-import type { PreviewHostLease } from "features/preview/scheduling/virtualPreviewSurface";
-import { getVirtualPreviewSurface } from "features/preview/ui/virtualPreviewSurfaceContext";
+import type { PreviewHostLease } from "features/card-preview/scheduling/virtualPreviewSurface";
+import { getVirtualPreviewSurface } from "features/card-preview/ui/virtualPreviewSurfaceContext";
 
 /**
  * Registers the bound element as a preview host on the virtual preview surface.

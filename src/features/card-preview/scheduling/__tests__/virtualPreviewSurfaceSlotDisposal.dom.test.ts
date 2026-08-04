@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { createPreviewActivationScheduler } from "features/preview/scheduling/previewActivationScheduler";
-import { createVirtualPreviewSurface } from "features/preview/scheduling/virtualPreviewSurface";
-import type { CardPreviewRenderer } from "features/preview/ui/cardPreviewRenderer";
-import type { CardPreviewRequest } from "features/preview/core/cardPreviewRequest";
+import { createPreviewActivationScheduler } from "features/card-preview/scheduling/previewActivationScheduler";
+import { createVirtualPreviewSurface } from "features/card-preview/scheduling/virtualPreviewSurface";
+import type { CardPreviewRenderer } from "features/card-preview/ui/cardPreviewRenderer";
+import type { CardPreviewRequest } from "features/card-preview/core/cardPreviewRequest";
 
 const request = {
 	renderKey: "preview-key",

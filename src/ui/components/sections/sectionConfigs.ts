@@ -4,7 +4,7 @@ import {
 	generateBranchCardKey,
 	generateBacklinkKey,
 	generateIndexedLinkKey,
-} from "features/preview/text-processing/textUtils";
+} from "features/card-preview/text-processing/textUtils";
 import type { SectionConfig } from "./types";
 
 export const backlinksSectionConfig: SectionConfig<TwoHopIndexedLink> = {

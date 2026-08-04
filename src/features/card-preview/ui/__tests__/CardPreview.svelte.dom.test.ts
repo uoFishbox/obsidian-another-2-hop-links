@@ -6,7 +6,7 @@ import { DEFAULT_SETTINGS, type PluginSettings } from "features/settings/model";
 import { ApplicationStore } from "ui/stores/ApplicationStore.svelte";
 import CardPreview from "./CardPreviewHarness.svelte";
 import { createMockTFile } from "testing/__mocks__/testHelpers";
-import { createPreviewRuntime } from "features/preview/runtime/previewRuntime";
+import { createPreviewRuntime } from "features/card-preview/runtime/previewRuntime";
 
 const state = vi.hoisted(() => ({
 	appContext: {
@@ -59,34 +59,34 @@ vi.mock("appConstants", async (importOriginal) => {
 	};
 });
 
-vi.mock("features/preview/renderers/mathRenderQueue", () => ({
+vi.mock("features/card-preview/renderers/mathRenderQueue", () => ({
 	enqueueMathRender: state.enqueueMathRender,
 }));
 
-vi.mock("features/preview/renderers/markdownPreviewRenderer", () => ({
+vi.mock("features/card-preview/renderers/markdownPreviewRenderer", () => ({
 	processPreviewContent: state.processPreviewContent,
 }));
 
-vi.mock("features/preview/text-processing/searchHighlighter", () => ({
+vi.mock("features/card-preview/text-processing/searchHighlighter", () => ({
 	highlightSearchMatchesInHtml: state.highlightSearchMatchesInHtml,
 }));
 
-vi.mock("features/preview/text-processing/snippetExtractor", () => ({
+vi.mock("features/card-preview/text-processing/snippetExtractor", () => ({
 	getContentSnippet: state.getContentSnippet,
 }));
 
-vi.mock("features/preview/text-processing/previewTextProcessingAsync", () => ({
+vi.mock("features/card-preview/text-processing/previewTextProcessingAsync", () => ({
 	getContentSnippetAsync: state.getContentSnippet,
 	highlightSearchMatchesInHtmlAsync: state.highlightSearchMatchesInHtml,
 }));
 
-vi.mock("features/preview/text-processing/searchUtils", () => ({
+vi.mock("features/card-preview/text-processing/searchUtils", () => ({
 	findCaseInsensitiveIndex: state.findCaseInsensitiveIndex,
 	htmlVisibleTextContainsCaseInsensitive:
 		state.htmlVisibleTextContainsCaseInsensitive,
 }));
 
-vi.mock("features/preview/core/previewContent", () => ({
+vi.mock("features/card-preview/core/previewContent", () => ({
 	getFileContent: state.getFileContent,
 	analyzePreviewContent: state.analyzePreviewContent,
 }));

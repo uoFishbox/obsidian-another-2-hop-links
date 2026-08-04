@@ -3,7 +3,7 @@
 </script>
 
 <script lang="ts">
-	import type { CardPreviewRequest } from "features/preview/core/cardPreviewRequest";
+	import type { CardPreviewRequest } from "features/card-preview/core/cardPreviewRequest";
 
 	interface Props {
 		request: CardPreviewRequest;

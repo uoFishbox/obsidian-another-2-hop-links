@@ -1,5 +1,5 @@
 import { createContext } from "svelte";
-import type { VirtualPreviewSurface } from "features/preview/scheduling/virtualPreviewSurface";
+import type { VirtualPreviewSurface } from "features/card-preview/scheduling/virtualPreviewSurface";
 
 const [getVirtualPreviewSurface, provideVirtualPreviewSurface] =
 	createContext<VirtualPreviewSurface>();

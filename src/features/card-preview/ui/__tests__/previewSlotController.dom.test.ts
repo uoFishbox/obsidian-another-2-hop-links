@@ -1,7 +1,7 @@
 import type { TFile } from "obsidian";
 import { DEFAULT_SETTINGS } from "features/settings/model";
-import type { CardPreviewRequest } from "features/preview/core/cardPreviewRequest";
-import { createPreviewRenderSettings } from "features/preview/core/previewRenderSettings";
+import type { CardPreviewRequest } from "features/card-preview/core/cardPreviewRequest";
+import { createPreviewRenderSettings } from "features/card-preview/core/previewRenderSettings";
 import type {
 	CardPreviewRenderer,
 	PreviewRenderCallbacks,

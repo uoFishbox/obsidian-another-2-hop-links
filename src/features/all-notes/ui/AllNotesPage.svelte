@@ -11,7 +11,7 @@
 	import type { ApplicationStore } from "ui/stores/ApplicationStore.svelte";
 	import { getCardLayoutCssText } from "ui/shared/layout/cardLayoutCssVars";
 	import { getFileCardTitleSearchText } from "core/frontmatterCardTitle";
-	import type { PreviewRuntime } from "features/preview/runtime/previewRuntime";
+	import type { PreviewRuntime } from "features/card-preview/runtime/previewRuntime";
 
 	interface Props {
 		app: App;

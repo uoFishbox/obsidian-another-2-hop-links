@@ -1,22 +1,25 @@
 import { Component, type App, type Pos, type TFile } from "obsidian";
-import { enqueueMathRender } from "features/preview/renderers/mathRenderQueue";
-import { enqueuePreviewRender } from "features/preview/renderers/previewRenderQueue";
-import { processPreviewContent } from "features/preview/renderers/markdownPreviewRenderer";
+import { enqueueMathRender } from "features/card-preview/renderers/mathRenderQueue";
+import { enqueuePreviewRender } from "features/card-preview/renderers/previewRenderQueue";
+import { processPreviewContent } from "features/card-preview/renderers/markdownPreviewRenderer";
 import {
 	type PreviewDomCommitScope,
 	type PreviewDomCommitTask,
-} from "features/preview/scheduling/previewDomCommitScheduler";
-import { toPreviewImageSrc } from "features/preview/renderers/externalImageSource";
-import type { PreviewContentAnalysis } from "features/preview/core/previewContent";
-import type { PreviewData, PreviewRequestOptions } from "features/preview/public-types";
+} from "features/card-preview/scheduling/previewDomCommitScheduler";
+import { toPreviewImageSrc } from "features/card-preview/renderers/externalImageSource";
+import type { PreviewContentAnalysis } from "features/card-preview/core/previewContent";
+import type {
+	PreviewData,
+	PreviewRequestOptions,
+} from "features/card-preview/public-types";
 import { syncMathJaxStylesForNode } from "ui/shared/dom/mathJaxShadowStyles";
-import { isAbortError, throwIfAborted } from "features/preview/core/previewAbort";
-import { normalizePreviewQuery } from "features/preview/core/previewRenderKeys";
+import { isAbortError, throwIfAborted } from "features/card-preview/core/previewAbort";
+import { normalizePreviewQuery } from "features/card-preview/core/previewRenderKeys";
 import {
 	type CardPreviewSharedCache,
 	type PreviewSearchContext,
 } from "./cardPreviewSharedCache";
-import type { CardPreviewRequest } from "features/preview/core/cardPreviewRequest";
+import type { CardPreviewRequest } from "features/card-preview/core/cardPreviewRequest";
 
 function moveChildrenToFragment(source: HTMLElement): DocumentFragment {
 	const fragment = document.createDocumentFragment();

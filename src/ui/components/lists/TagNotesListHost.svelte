@@ -6,7 +6,7 @@
 	import type { ApplicationStore } from "ui/stores/ApplicationStore.svelte";
 	import type { ISortService } from "types/services";
 	import type { ViewItem } from "application/presenters";
-	import type { PreviewRuntime } from "features/preview/runtime/previewRuntime";
+	import type { PreviewRuntime } from "features/card-preview/runtime/previewRuntime";
 
 	interface Props {
 		items: ViewItem[];

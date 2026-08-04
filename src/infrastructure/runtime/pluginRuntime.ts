@@ -42,11 +42,11 @@ import { KeyboardCardNavigator } from "features/keyboard-navigation/KeyboardCard
 import {
 	createPreviewService,
 	type DisposablePreviewService,
-} from "features/preview/core/createPreviewService";
+} from "features/card-preview/core/createPreviewService";
 import {
 	createPreviewRuntime,
 	type PreviewRuntime,
-} from "features/preview/runtime/previewRuntime";
+} from "features/card-preview/runtime/previewRuntime";
 import {
 	createSettingsSideEffectController,
 	type SettingsSideEffectController,

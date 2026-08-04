@@ -6,9 +6,9 @@ import { getPriorityFrontmatterCardTitle } from "core/frontmatterCardTitle";
 import {
 	compileCardPreviewRequest,
 	type CardPreviewRequest,
-} from "features/preview/core/cardPreviewRequest";
-import type { PreviewData } from "features/preview/public-types";
-import { formatLinkText } from "features/preview/text-processing/textUtils";
+} from "features/card-preview/core/cardPreviewRequest";
+import type { PreviewData } from "features/card-preview/public-types";
+import { formatLinkText } from "features/card-preview/text-processing/textUtils";
 import type { LinkUtilitiesContext } from "types/linkContext";
 import type { PluginSettings } from "features/settings/model";
 import type { CardPresentationState } from "ui/components/common/cardPresentation";

@@ -7,9 +7,9 @@ import { DEFAULT_SETTINGS } from "features/settings/model";
 import ViewItemCardHarness from "./ViewItemCardHarness.svelte";
 import { getLazyLoadManager } from "infrastructure/observers/IntersectionObserverRegistry";
 import type { CardRenderModel } from "../cardRenderModel";
-import { compileCardPreviewRequest } from "features/preview/core/cardPreviewRequest";
+import { compileCardPreviewRequest } from "features/card-preview/core/cardPreviewRequest";
 
-vi.mock("features/preview/ui/CardPreview.svelte", async () => {
+vi.mock("features/card-preview/ui/CardPreview.svelte", async () => {
 	const component = await import("./CardPreviewMountProbe.svelte");
 	return { default: component.default };
 });

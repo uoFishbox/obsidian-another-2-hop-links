@@ -1,4 +1,4 @@
-import type { CardPreviewRequest } from "features/preview/core/cardPreviewRequest";
+import type { CardPreviewRequest } from "features/card-preview/core/cardPreviewRequest";
 import type { RowRange } from "ui/virtualization/rowRange";
 
 export interface RowPreviewCardBinding {

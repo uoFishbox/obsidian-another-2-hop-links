@@ -3,23 +3,23 @@ import {
 	createPreviewActivationScheduler,
 	type PreviewBackpressureChangeListener,
 	type PreviewActivationScheduler,
-} from "features/preview/scheduling/previewActivationScheduler";
+} from "features/card-preview/scheduling/previewActivationScheduler";
 import {
 	createPreviewDomCommitScheduler,
 	type PreviewDomCommitScheduler,
-} from "features/preview/scheduling/previewDomCommitScheduler";
+} from "features/card-preview/scheduling/previewDomCommitScheduler";
 import {
 	createVirtualPreviewSurface,
 	type VirtualPreviewSurface,
-} from "features/preview/scheduling/virtualPreviewSurface";
+} from "features/card-preview/scheduling/virtualPreviewSurface";
 import type { VirtualFrameCoordinator } from "ui/virtualization/scheduling/frameCoordinator";
 import {
 	createCardPreviewRenderer,
 	type CardPreviewLoader,
 	type CardPreviewRenderer,
 	type CardPreviewRendererOptions,
-} from "features/preview/ui/cardPreviewRenderer";
-import { createCardPreviewSharedCache } from "features/preview/ui/cardPreviewSharedCache";
+} from "features/card-preview/ui/cardPreviewRenderer";
+import { createCardPreviewSharedCache } from "features/card-preview/ui/cardPreviewSharedCache";
 
 /** Configuration shared by every preview surface owned by one plugin load. */
 export interface PreviewRuntimeOptions {

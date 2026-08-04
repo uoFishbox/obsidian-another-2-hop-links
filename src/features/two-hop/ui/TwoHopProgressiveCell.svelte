@@ -3,8 +3,8 @@
 	import Icon from "ui/components/common/Icon.svelte";
 	import LinkItem from "ui/components/common/LinkItem.svelte";
 	import VirtualListLoadMoreButton from "ui/virtualization/components/VirtualListLoadMoreButton.svelte";
-	import UnresolvedPreviewPlaceholder from "features/preview/ui/UnresolvedPreviewPlaceholder.svelte";
-	import { previewHost } from "features/preview/ui/previewHostAction";
+	import UnresolvedPreviewPlaceholder from "features/card-preview/ui/UnresolvedPreviewPlaceholder.svelte";
+	import { previewHost } from "features/card-preview/ui/previewHostAction";
 	import type { CardShellModel } from "ui/components/items/cardRenderModel";
 	import type { IconName } from "ui/shared/icons/iconRegistry";
 	import type { TwoHopProgressiveCell } from "features/two-hop/ui/twoHopProgressivePlan";

@@ -1,5 +1,5 @@
 import type { Pos, TFile } from "obsidian";
-import type { PreviewRuntime } from "features/preview/runtime/previewRuntime";
+import type { PreviewRuntime } from "features/card-preview/runtime/previewRuntime";
 
 /**
  * Dependencies required to enable previews on the Two-hop progressive surface.

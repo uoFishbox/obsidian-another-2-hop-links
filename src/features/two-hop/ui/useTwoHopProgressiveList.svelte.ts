@@ -23,12 +23,12 @@ import {
 	type TwoHopProgressivePlan,
 } from "features/two-hop/ui/twoHopProgressivePlan";
 import type { TwoHopPreviewDependencies } from "features/two-hop/ui/twoHopPreviewDependencies";
-import { DISABLED_PREVIEW_SURFACE } from "features/preview/runtime/previewRuntime";
+import { DISABLED_PREVIEW_SURFACE } from "features/card-preview/runtime/previewRuntime";
 import type {
 	PreviewFrame,
 	RowPreviewCardBinding,
 	VirtualPreviewSurface,
-} from "features/preview/scheduling/virtualPreviewSurface";
+} from "features/card-preview/scheduling/virtualPreviewSurface";
 import type { VirtualFrameCoordinator } from "ui/virtualization/scheduling/frameCoordinator";
 import { createResolvedCardLayoutSettingsMemo } from "ui/shared/layout/cardLayoutCssVars";
 import { resolveCachedCardGridLayoutBase } from "ui/virtualization/dom/virtualListCardLayout";

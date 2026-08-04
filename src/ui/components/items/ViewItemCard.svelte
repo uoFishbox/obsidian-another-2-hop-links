@@ -1,9 +1,9 @@
 <script lang="ts">
 	import type { ItemProps } from "./types";
 	import LinkItem from "ui/components/common/LinkItem.svelte";
-	import CardPreview from "features/preview/ui/CardPreview.svelte";
-	import PreviewHost from "features/preview/ui/PreviewHost.svelte";
-	import UnresolvedPreviewPlaceholder from "features/preview/ui/UnresolvedPreviewPlaceholder.svelte";
+	import CardPreview from "features/card-preview/ui/CardPreview.svelte";
+	import PreviewHost from "features/card-preview/ui/PreviewHost.svelte";
+	import UnresolvedPreviewPlaceholder from "features/card-preview/ui/UnresolvedPreviewPlaceholder.svelte";
 	import { getDebugDisableCardDomPreview } from "../../../appConstants";
 	import { markCCLComponentReevaluation } from "infrastructure/debug/CCLDevMeasurements";
 
