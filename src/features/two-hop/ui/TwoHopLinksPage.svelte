@@ -26,7 +26,7 @@
 	import type { TwoHopPreviewDependencies } from "features/two-hop/ui/twoHopPreviewDependencies";
 	import type { PreviewRuntime } from "features/card-preview/runtime/previewRuntime";
 
-	const INLINE_OFFSCREEN_BOOTSTRAP_PREVIEW_ROWS = 6;
+	const INLINE_OFFSCREEN_BOOTSTRAP_PREVIEW_ROWS = 4;
 
 	interface Props {
 		file: TFile;
