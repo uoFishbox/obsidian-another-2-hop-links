@@ -5,6 +5,7 @@
 .codex/
 .opencode/
 .agents/
+.reasonix/
 
 # Intellij
 *.iml
