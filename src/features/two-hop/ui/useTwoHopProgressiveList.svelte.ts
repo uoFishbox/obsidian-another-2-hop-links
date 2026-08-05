@@ -197,9 +197,13 @@ export function useTwoHopProgressiveList(
 		activeChanged: boolean,
 		residentChanged: boolean,
 	): void {
-		// 公開は bindings 同期と同じ microtask に統合し、1回の変更で
-		// range と bindings が1フレームにまとめて publish されるようにする。
-		if (residentChanged || activeChanged) markPreviewBindingsDirty();
+		if (residentChanged) {
+			markPreviewBindingsDirty();
+			return;
+		}
+		if (activeChanged) {
+			syncPreviewActiveRange();
+		}
 	}
 
 	function syncPreviewBindings(): void {
