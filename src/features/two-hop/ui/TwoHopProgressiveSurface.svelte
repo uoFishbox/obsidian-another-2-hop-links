@@ -28,6 +28,11 @@
 		<div
 			bind:this={list.contentEl}
 			class="view-plan-flow-content twohop-progressive-content"
+			style={`
+				--twohop-row-height:${list.layout.rowHeight}px;
+				--twohop-columns:${list.layout.columns};
+				--twohop-gap:${list.layout.gap}px;
+			`}
 		>
 			{#each list.plan.chunks as chunk (chunk.chunkIndex)}
 				<div
@@ -38,7 +43,6 @@
 					{#each chunk.rows as row (row.rowIndex)}
 						<TwoHopProgressiveRow
 							{row}
-							layout={list.layout}
 							registerCardModelConsumer={list.registerCardModelConsumer}
 							registerPreviewRow={list.registerPreviewRow}
 							onLoadMore={list.loadMore}

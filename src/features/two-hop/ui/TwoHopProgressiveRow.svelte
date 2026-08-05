@@ -1,13 +1,11 @@
 <script lang="ts">
 	import { IS_PROD } from "appConstants";
 	import type { CardShellModel } from "ui/components/items/cardRenderModel";
-	import type { ViewPlanLayoutMetrics } from "ui/virtualization/svelte/viewPlanLayout";
 	import type { TwoHopProgressiveRow } from "features/two-hop/ui/twoHopProgressivePlan";
 	import TwoHopProgressiveCell from "features/two-hop/ui/TwoHopProgressiveCell.svelte";
 
 	interface Props {
 		row: TwoHopProgressiveRow;
-		layout: ViewPlanLayoutMetrics;
 		registerCardModelConsumer: (
 			logicalKey: string,
 			consumer: (model: CardShellModel | undefined) => void,
@@ -19,13 +17,8 @@
 		onLoadMore: (sectionId: string) => void;
 	}
 
-	let {
-		row,
-		layout,
-		registerCardModelConsumer,
-		registerPreviewRow,
-		onLoadMore,
-	}: Props = $props();
+	let { row, registerCardModelConsumer, registerPreviewRow, onLoadMore }: Props =
+		$props();
 	let previewHostCandidate = $state(false);
 
 	$effect(() => {
@@ -38,7 +31,7 @@
 <div
 	class="twohop-progressive-row"
 	data-ccl-progressive-row={row.rowIndex}
-	style={`top:${row.top}px;height:${layout.rowHeight}px;grid-template-columns:repeat(${layout.columns},minmax(0,1fr));gap:${layout.gap}px;`}
+	style:top={`${row.top}px`}
 >
 	{#each row.cells as cell (cell.logicalKey)}
 		<div

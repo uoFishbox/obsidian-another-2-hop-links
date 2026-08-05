@@ -391,6 +391,9 @@ export const CARD_RENDER_SHADOW_CSS = String.raw`
 	width: 100%;
 	display: grid;
 	box-sizing: border-box;
+	height: var(--twohop-row-height);
+	grid-template-columns: repeat(var(--twohop-columns), minmax(0, 1fr));
+	gap: var(--twohop-gap);
 }
 
 .twohop-progressive-cell {
