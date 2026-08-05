@@ -95,6 +95,49 @@ describe("LinkItem", () => {
 		);
 	});
 
+	it("reuses a non-interactive shell root when interaction is enabled", async () => {
+		const baseProps = {
+			title: "",
+			ariaLabel: "",
+			interactionId: "item:file:notes/alpha.md",
+			interactionKind: "item" as const,
+			className: "twohop-card-shell is-skeleton",
+		};
+		const { container, rerender } = render(LinkItem, {
+			props: {
+				...baseProps,
+				interactive: false,
+			},
+		});
+		const card = container.querySelector<HTMLElement>(
+			".cosense-card-links__box",
+		);
+
+		expect(card).toHaveAttribute("aria-hidden", "true");
+		expect(card).not.toHaveAttribute("role");
+		expect(card).not.toHaveAttribute("tabindex");
+		expect(card).not.toHaveAttribute("data-ccl-interaction-id");
+		expect(card).toHaveAttribute("draggable", "false");
+
+		await rerender({
+			...baseProps,
+			title: "Alpha",
+			ariaLabel: "alpha",
+			className: "",
+			interactive: true,
+		});
+
+		expect(container.querySelector(".cosense-card-links__box")).toBe(card);
+		expect(card).not.toHaveAttribute("aria-hidden");
+		expect(card).toHaveAttribute("role", "button");
+		expect(card).toHaveAttribute("tabindex", "0");
+		expect(card).toHaveAttribute(
+			"data-ccl-interaction-id",
+			"item:file:notes/alpha.md",
+		);
+		expect(card).toHaveAttribute("draggable", "true");
+	});
+
 	it("commits section and resolution presentation on the reused card root", async () => {
 		const baseProps = {
 			title: "Alpha",

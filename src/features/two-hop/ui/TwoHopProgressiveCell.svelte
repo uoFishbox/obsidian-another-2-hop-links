@@ -96,25 +96,28 @@
 	{/if}
 {:else if cell.kind === "load-more"}
 	<VirtualListLoadMoreButton onClick={() => onLoadMore(cell.section.id)} />
-{:else if cardModel}
+{:else}
 	{@const model = cardModel}
 	<LinkItem
-		title={model.title}
-		ariaLabel={model.ariaLabel}
-		file={model.targetFile}
-		extension={model.extension ?? undefined}
-		interactionId={model.interactionId}
+		title={model?.title ?? ""}
+		ariaLabel={model?.ariaLabel ?? ""}
+		file={model?.targetFile ?? null}
+		extension={model?.extension ?? undefined}
+		interactionId={model?.interactionId ?? cell.logicalKey}
 		interactionKind="item"
-		draggable={true}
-		className={model.className ?? undefined}
-		directory={model.directory}
-		searchQuery={model.searchQuery}
-		presentation={model.presentation}
+		interactive={Boolean(model)}
+		draggable={Boolean(model)}
+		className={model
+			? (model.className ?? undefined)
+			: "twohop-card-shell is-skeleton"}
+		directory={model?.directory ?? null}
+		searchQuery={model?.searchQuery ?? ""}
+		presentation={model?.presentation}
 	>
 		{#snippet children()}
-			{#if !getDebugDisableCardDomPreview() && model.item.type === "newLink" && !model.targetFile}
+			{#if model && !getDebugDisableCardDomPreview() && model.item.type === "newLink" && !model.targetFile}
 				<UnresolvedPreviewPlaceholder />
-			{:else if !getDebugDisableCardDomPreview() && model.targetFile && previewHostCandidate}
+			{:else if model && !getDebugDisableCardDomPreview() && model.targetFile && previewHostCandidate}
 				<div
 					use:previewHost={cell.logicalKey}
 					class="cosense-card-links__box-preview"
@@ -123,11 +126,4 @@
 			{/if}
 		{/snippet}
 	</LinkItem>
-{:else}
-	<div
-		class="cosense-card-links__box twohop-card-shell is-skeleton"
-		aria-hidden="true"
-	>
-		<div class="cosense-card-links__box-title-wrapper"></div>
-	</div>
 {/if}

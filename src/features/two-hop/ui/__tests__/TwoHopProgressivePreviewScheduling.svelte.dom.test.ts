@@ -489,6 +489,30 @@ describe("TwoHop progressive preview scheduling", () => {
 		expect(rangeAIndexes).toContain(0);
 	});
 
+	it("reuses the skeleton card root when the first model is hydrated", async () => {
+		const fixture = await renderHydrationSchedulingFixture();
+		const firstCell = fixture.root.shadowRoot?.querySelector<HTMLElement>(
+			"[data-testid='twohop-progressive-item-cell']",
+		);
+		if (!firstCell) throw new Error("Progressive item cell was not rendered");
+		const card = firstCell.querySelector<HTMLElement>(
+			".cosense-card-links__box",
+		);
+		if (!card) throw new Error("Progressive card shell was not rendered");
+
+		expect(card).toHaveClass("is-skeleton");
+		expect(card).toHaveAttribute("aria-hidden", "true");
+		expect(card).not.toHaveAttribute("role");
+
+		await runTask("post-paint", HYDRATION_POST_PAINT_TASK_KEY);
+
+		expect(firstCell.querySelector(".cosense-card-links__box")).toBe(card);
+		expect(card).not.toHaveClass("is-skeleton");
+		expect(card).not.toHaveAttribute("aria-hidden");
+		expect(card).toHaveAttribute("role", "button");
+		expect(card).toHaveAttribute("aria-label", "item:0");
+	});
+
 	it("does not regenerate hydrated models when returning to their range", async () => {
 		const fixture = await renderHydrationSchedulingFixture();
 		await drainPostPaintTasks();

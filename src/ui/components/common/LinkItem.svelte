@@ -18,6 +18,7 @@
 		ariaLabel: string;
 		interactionId: string;
 		interactionKind: InteractionKind;
+		interactive?: boolean;
 		draggable?: boolean;
 		children?: Snippet;
 		className?: string;
@@ -33,6 +34,7 @@
 		ariaLabel,
 		interactionId,
 		interactionKind,
+		interactive = true,
 		draggable = true,
 		children,
 		className = "",
@@ -86,23 +88,25 @@
 	}
 </script>
 
+<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
 <div
 	class="cosense-card-links__box {className} {extensionClass}"
 	class:is-attachment={isAttachmentFile}
-	role="button"
-	tabindex="0"
-	aria-label={ariaLabel}
-	data-ccl-interaction-id={interactionId}
-	data-ccl-interaction-kind={interactionKind}
-	data-directory={directory}
+	role={interactive ? "button" : undefined}
+	tabindex={interactive ? 0 : undefined}
+	aria-label={interactive ? ariaLabel : undefined}
+	aria-hidden={interactive ? undefined : "true"}
+	data-ccl-interaction-id={interactive ? interactionId : undefined}
+	data-ccl-interaction-kind={interactive ? interactionKind : undefined}
+	data-directory={interactive ? directory : undefined}
 	data-ccl-section-variant={presentation?.sectionVariant}
 	data-ccl-resolution={presentation?.resolution}
 	data-ccl-attachment={(presentation?.attachment ?? isAttachmentFile)
 		? "true"
 		: "false"}
 	data-ccl-extension={presentation?.extension ?? normalizedExtension ?? ""}
-	{draggable}
-	use:interactionIdBinding={interactionId}
+	draggable={interactive && draggable}
+	use:interactionIdBinding={interactive ? interactionId : ""}
 >
 	<div class="cosense-card-links__box-title-wrapper">
 		<div class="cosense-card-links__box-title">
