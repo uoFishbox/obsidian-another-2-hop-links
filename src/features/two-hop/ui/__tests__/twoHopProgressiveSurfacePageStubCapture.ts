@@ -3,6 +3,7 @@ import type { ApplicationStore } from "ui/stores/ApplicationStore.svelte";
 
 interface TwoHopProgressiveSurfacePageStubProps {
 	readonly documentIdentity: string;
+	readonly paginationScope: string;
 	readonly applicationStore: ApplicationStore;
 	readonly previewDependencies: TwoHopPreviewDependencies | undefined;
 	readonly previewActive: boolean;

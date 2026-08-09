@@ -1,7 +1,9 @@
 <script lang="ts">
 	import type { Snippet } from "svelte";
+	import type { ResultNavigationDirection } from "features/keyboard-navigation/resultFocus";
 	import type { InteractionDescriptorResolverProvider } from "ui/interactions/interactionRegistry";
 	import { createVirtualSurfaceInteractions } from "ui/virtualization/svelte/VirtualSurfaceInteractions.svelte";
+	import type { VirtualSurfaceNavigationContext } from "ui/virtualization/svelte/VirtualSurfaceNavigation";
 
 	interface Props {
 		className?: string;
@@ -11,6 +13,11 @@
 		rowHeight: number;
 		interactionDescriptorScopeId?: string;
 		interactionDescriptorResolverProvider?: InteractionDescriptorResolverProvider;
+		moveFocusWithinList?: (
+			currentTarget: HTMLElement,
+			direction: ResultNavigationDirection,
+			context: VirtualSurfaceNavigationContext,
+		) => Promise<boolean>;
 		children?: Snippet;
 	}
 
@@ -22,6 +29,7 @@
 		rowHeight,
 		interactionDescriptorScopeId,
 		interactionDescriptorResolverProvider,
+		moveFocusWithinList,
 		children,
 	}: Props = $props();
 	let interactionShadowRoot = $state<ShadowRoot | null>(null);
@@ -40,6 +48,7 @@
 		getInteractionDescriptorResolvers: () => [],
 		getInteractionDescriptorResolverProvider: () =>
 			interactionDescriptorResolverProvider,
+		moveFocusWithinList,
 	});
 </script>
 

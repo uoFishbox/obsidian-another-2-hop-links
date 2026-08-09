@@ -71,7 +71,7 @@
 	{applicationStore}
 	{initialVisibleCount}
 	{loadMoreIncrement}
-	paginationScope={searchQuery}
+	paginationScope={documentIdentity}
 	{cardModelRevision}
 	{resolveItemCardModel}
 	{previewDependencies}

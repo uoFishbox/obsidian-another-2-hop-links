@@ -23,6 +23,7 @@
 	rowHeight={list.layout.rowHeight}
 	interactionDescriptorScopeId="two-hop-progressive-card-slots"
 	interactionDescriptorResolverProvider={list.interactionDescriptorResolverProvider}
+	moveFocusWithinList={list.moveFocusWithinList}
 >
 	{#snippet children()}
 		<div

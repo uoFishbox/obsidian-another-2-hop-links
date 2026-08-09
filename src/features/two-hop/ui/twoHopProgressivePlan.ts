@@ -185,7 +185,12 @@ export function buildProgressiveChunk(
 
 		for (let columnIndex = 0; columnIndex < geometry.columns; columnIndex += 1) {
 			const cellIndex = rowInSection * geometry.columns + columnIndex;
-			const cell = buildCell(section, rowIndex, columnIndex, cellIndex);
+			const cell = resolveTwoHopProgressiveCell(
+				section,
+				rowIndex,
+				columnIndex,
+				cellIndex,
+			);
 			if (cell) cells.push(cell);
 		}
 
@@ -207,7 +212,8 @@ export function buildProgressiveChunk(
 	});
 }
 
-function buildCell(
+/** Resolves one logical cell without materializing its containing row or chunk. */
+export function resolveTwoHopProgressiveCell(
 	section: TwoHopSectionModel,
 	rowIndex: number,
 	columnIndex: number,

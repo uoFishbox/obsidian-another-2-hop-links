@@ -72,6 +72,7 @@ export interface TwoHopCardHydrator {
 const EMPTY_RANGE = Object.freeze({ start: 0, end: 0 });
 const MAX_MODELS_PER_DRAIN = 8;
 const MAX_HYDRATION_CPU_MS = 1;
+const MAX_RETAINED_CARD_MODELS = 64;
 const HYDRATION_POST_PAINT_TASK_KEY = "two-hop-progressive-hydration-visible";
 const HYDRATION_IDLE_TASK_KEY = "two-hop-progressive-hydration-preload";
 
@@ -142,9 +143,65 @@ export function createTwoHopCardHydrator(
 			cancelScheduledDrain();
 		}
 		reconcilePendingPriorities();
+		const previewChanged = reconcileModelRetention();
 		enqueueRange(demand.background, "background", false);
 		enqueueRange(demand.foreground, "foreground", false);
 		scheduleDrain();
+		if (previewChanged) params.onPreviewModelsChanged();
+	}
+
+	function reconcileModelRetention(): boolean {
+		const foregroundKeys = collectItemKeys(demand.foreground);
+		const retainedKeys = collectItemKeys(demand.background, foregroundKeys);
+		let retainedEntryCount = 0;
+		let previewChanged = false;
+
+		for (const logicalKey of retainedKeys) {
+			const entry = entries.get(logicalKey);
+			if (!entry) continue;
+			entries.delete(logicalKey);
+			entries.set(logicalKey, entry);
+		}
+
+		for (const logicalKey of entries.keys()) {
+			if (retainedKeys.has(logicalKey)) {
+				retainedEntryCount += 1;
+				if (!foregroundKeys.has(logicalKey)) {
+					interactionController.setCard(logicalKey, null);
+				}
+				continue;
+			}
+			interactionController.setCard(logicalKey, null);
+		}
+
+		let retainedCacheSize = entries.size - retainedEntryCount;
+		if (retainedCacheSize <= MAX_RETAINED_CARD_MODELS) return false;
+
+		for (const logicalKey of entries.keys()) {
+			if (retainedKeys.has(logicalKey)) continue;
+			notify(logicalKey, undefined);
+			entries.delete(logicalKey);
+			previewChanged = true;
+			retainedCacheSize -= 1;
+			if (retainedCacheSize <= MAX_RETAINED_CARD_MODELS) break;
+		}
+
+		return previewChanged;
+	}
+
+	function collectItemKeys(
+		range: Readonly<TwoHopRowRange>,
+		target: Set<string> = new Set(),
+	): Set<string> {
+		const plan = params.getPlan();
+		for (let rowIndex = range.start; rowIndex < range.end; rowIndex += 1) {
+			const row = resolveMountedProgressiveRow(plan, rowIndex);
+			if (!row) continue;
+			for (const cell of row.cells) {
+				if (cell.kind === "item") target.add(cell.logicalKey);
+			}
+		}
+		return target;
 	}
 
 	function refreshDemand(): void {
@@ -303,7 +360,10 @@ export function createTwoHopCardHydrator(
 			if (previewActive && previewRenderKeyChanged) previewChanged = true;
 		}
 		compactHydrationQueue(queue);
-		if (previewChanged) params.onPreviewModelsChanged();
+		const retainedModelsEvicted = reconcileModelRetention();
+		if (previewChanged || retainedModelsEvicted) {
+			params.onPreviewModelsChanged();
+		}
 		if (hasPendingPriority("foreground") || hasPendingPriority("background")) {
 			scheduleDrain();
 		}

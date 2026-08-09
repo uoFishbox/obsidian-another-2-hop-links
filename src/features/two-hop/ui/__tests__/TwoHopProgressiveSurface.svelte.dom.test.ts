@@ -15,6 +15,7 @@ import type {
 } from "features/two-hop/ui/twoHopSectionModel";
 import { createTwoHopSectionModel } from "features/two-hop/ui/twoHopSectionModel";
 import { findNearestScrollContainer } from "ui/virtualization/dom/scrollContainer";
+import { RESULT_FOCUS_SELECTOR } from "features/keyboard-navigation/resultFocus";
 import {
 	isScrollActivityActive,
 	markScrollActivityActive,
@@ -696,9 +697,8 @@ describe("TwoHopProgressiveSurface", () => {
 		).toHaveLength((chunkCount ?? 0) + 1);
 
 		expect(
-			root.shadowRoot?.querySelectorAll("[data-preview-owner='virtual-surface']")
-				.length,
-		).toBeGreaterThan(0);
+			root.shadowRoot?.querySelectorAll("[data-preview-owner='virtual-surface']"),
+		).toHaveLength(0);
 		const rows = root.shadowRoot?.querySelectorAll(".twohop-progressive-row") ?? [];
 		expect(
 			intersectionObserverRecords.every((record) =>
@@ -707,7 +707,194 @@ describe("TwoHopProgressiveSurface", () => {
 		).toBe(true);
 	});
 
+	it("mounts and focuses the next chunk when ArrowDown reaches the mounted boundary", async () => {
+		const applicationStore = {
+			settings: {
+				...DEFAULT_SETTINGS,
+				cardWidthPx: 100,
+				cardHeightRatio: 1,
+				cardMaxColumns: 1,
+			},
+		} as unknown as ApplicationStore;
+		const resolveItemCardModel = createCardModelResolver();
+		const scroller = document.createElement("div");
+		scroller.style.overflow = "auto";
+		setNumericProperty(scroller, "clientWidth", 100);
+		setNumericProperty(scroller, "clientHeight", 300);
+		setNumericProperty(scroller, "scrollHeight", 20_000);
+		setNumericProperty(scroller, "scrollTop", 3_300);
+		setElementRect(scroller, { top: 0, width: 100, height: 300 });
+		document.body.append(scroller);
+		const { container } = render(TwoHopProgressiveSurfaceHarness, {
+			target: scroller,
+			props: {
+				sections: [createSection(80)],
+				applicationStore,
+				linkContext: { getPreview: vi.fn() } as unknown as LinkContext,
+				resolveItemCardModel,
+			},
+		});
+		const root = container.querySelector<HTMLElement>(
+			".twohop-progressive-surface",
+		);
+		const content = root?.shadowRoot?.querySelector<HTMLElement>(
+			".twohop-progressive-content",
+		);
+		if (!root || !content) {
+			throw new Error("Progressive surface was not rendered");
+		}
+		setElementRect(root, { top: -3_300, width: 100, height: 20_000 });
+		setElementRect(content, { top: -3_300, width: 100, height: 20_000 });
+		triggerResize(root, 100, 20_000);
+		triggerResize(scroller, 100, 300);
+		await fireEvent.scroll(scroller);
+		await flushFrames();
+
+		const currentCell = root.shadowRoot?.querySelector<HTMLElement>(
+			"[data-ccl-row-index='31'][data-ccl-column-index='0']",
+		);
+		if (!currentCell) throw new Error("Mounted boundary cell was not rendered");
+		await vi.waitFor(() =>
+			expect(currentCell.querySelector(RESULT_FOCUS_SELECTOR)).not.toBeNull(),
+		);
+		const currentTarget =
+			currentCell.querySelector<HTMLElement>(RESULT_FOCUS_SELECTOR);
+		if (!currentTarget) throw new Error("Mounted boundary card was not hydrated");
+		currentTarget.focus();
+
+		await fireEvent.keyDown(currentTarget, { key: "ArrowDown" });
+		await vi.waitFor(() => {
+			expect(
+				root.shadowRoot?.querySelectorAll(".twohop-progressive-chunk"),
+			).toHaveLength(3);
+			const targetCell = root.shadowRoot?.querySelector<HTMLElement>(
+				"[data-ccl-row-index='32'][data-ccl-column-index='0']",
+			);
+			expect(targetCell?.contains(root.shadowRoot?.activeElement ?? null)).toBe(
+				true,
+			);
+		});
+	});
+
+	it("creates and replaces the preview surface when dependencies change", async () => {
+		const targetFile = {
+			path: "notes/preview.md",
+			basename: "preview",
+			extension: "md",
+			parent: { path: "notes" },
+			stat: { mtime: 1 },
+		} as TFile;
+		const applicationStore = {
+			settings: {
+				...DEFAULT_SETTINGS,
+				cardWidthPx: 100,
+				cardHeightRatio: 1,
+				cardMaxColumns: 3,
+			},
+		} as unknown as ApplicationStore;
+		const firstProbe = createPreviewSurfaceProbe();
+		const secondProbe = createPreviewSurfaceProbe();
+		const firstCreateSurface = vi.fn(() => firstProbe.surface);
+		const secondCreateSurface = vi.fn(() => secondProbe.surface);
+		const resolveItemCardModel = (
+			item: TwoHopItemModel,
+			presentation: TwoHopCardPresentationState,
+		): CardRenderModel => ({
+			item: item.item,
+			targetFile,
+			title: item.key,
+			ariaLabel: item.key,
+			className: null,
+			extension: "md",
+			directory: "notes",
+			interactionId: item.key,
+			interactionKey: item.key,
+			interactionDescriptor: null,
+			presentation,
+			searchQuery: "",
+			previewRequest: {
+				renderKey: `preview:${item.key}`,
+			} as CardPreviewRequest,
+		});
+		const scroller = document.createElement("div");
+		scroller.style.overflow = "auto";
+		setNumericProperty(scroller, "clientHeight", 300);
+		setNumericProperty(scroller, "scrollHeight", 20_000);
+		setElementRect(scroller, { top: 0, width: 320, height: 300 });
+		document.body.append(scroller);
+		const commonProps = {
+			sections: [createSection(100)],
+			applicationStore,
+			linkContext: { getPreview: vi.fn() } as unknown as LinkContext,
+			resolveItemCardModel,
+		};
+		const rendered = render(TwoHopProgressiveSurfaceHarness, {
+			target: scroller,
+			props: commonProps,
+		});
+		const root = rendered.container.querySelector<HTMLElement>(
+			".twohop-progressive-surface",
+		);
+		if (!root) throw new Error("Progressive surface was not rendered");
+		setElementRect(root, { top: 0, width: 320, height: 20_000 });
+		triggerResize(root, 320, 20_000);
+		await flushFrames();
+
+		expect(
+			root.shadowRoot?.querySelectorAll("[data-preview-owner='virtual-surface']"),
+		).toHaveLength(0);
+
+		await rendered.rerender({
+			...commonProps,
+			previewDependencies: {
+				previewRuntime: { createSurface: firstCreateSurface },
+				resolveSearchMatchPosition: () => undefined,
+			} as unknown as TwoHopPreviewDependencies,
+		});
+		await flushFrames();
+		await vi.waitFor(() =>
+			expect(firstProbe.surface.registerHost).toHaveBeenCalled(),
+		);
+
+		await rendered.rerender({
+			...commonProps,
+			previewDependencies: {
+				previewRuntime: { createSurface: secondCreateSurface },
+				resolveSearchMatchPosition: () => undefined,
+			} as unknown as TwoHopPreviewDependencies,
+		});
+		await flushFrames();
+		await vi.waitFor(() =>
+			expect(secondProbe.surface.registerHost).toHaveBeenCalled(),
+		);
+
+		expect(firstCreateSurface).toHaveBeenCalledOnce();
+		expect(firstProbe.surface.dispose).toHaveBeenCalledOnce();
+		expect(secondCreateSurface).toHaveBeenCalledOnce();
+
+		await rendered.rerender({
+			...commonProps,
+			previewDependencies: undefined,
+		});
+		await flushFrames();
+		await vi.waitFor(() => {
+			expect(secondProbe.surface.dispose).toHaveBeenCalledOnce();
+			expect(
+				root.shadowRoot?.querySelectorAll(
+					"[data-preview-owner='virtual-surface']",
+				),
+			).toHaveLength(0);
+		});
+	});
+
 	it("remeasures preview geometry after inline sizer movement", async () => {
+		const surfaceProbe = createPreviewSurfaceProbe();
+		const previewDependencies = {
+			previewRuntime: {
+				createSurface: () => surfaceProbe.surface,
+			},
+			resolveSearchMatchPosition: () => undefined,
+		} as unknown as TwoHopPreviewDependencies;
 		const targetFile = {
 			path: "notes/preview.md",
 			basename: "preview",
@@ -758,6 +945,7 @@ describe("TwoHopProgressiveSurface", () => {
 			sections: [createSection(100)],
 			applicationStore,
 			linkContext: { getPreview: vi.fn() } as unknown as LinkContext,
+			previewDependencies,
 			resolveItemCardModel,
 		};
 		const rendered = render(TwoHopProgressiveSurfaceHarness, {

@@ -27,6 +27,7 @@ import type {
 	VirtualPreviewBinding,
 	VirtualPreviewSurface,
 } from "features/card-preview/scheduling/virtualPreviewSurface";
+import { createReplaceableVirtualPreviewSurface } from "features/card-preview/scheduling/replaceableVirtualPreviewSurface";
 import type { VirtualFrameCoordinator } from "ui/virtualization/scheduling/frameCoordinator";
 import { createResolvedCardLayoutSettingsMemo } from "ui/shared/layout/cardLayoutCssVars";
 import { resolveCachedCardGridLayoutBase } from "ui/virtualization/dom/virtualListCardLayout";
@@ -48,6 +49,14 @@ import {
 	observeTwoHopViewport,
 	type TwoHopViewportObservation,
 } from "features/two-hop/ui/twoHopViewportObservation";
+import { getOptionalOwnerWindow } from "ui/shared/dom/realmSafeDom";
+import type { ResultNavigationDirection } from "features/keyboard-navigation/resultFocus";
+import { RESULT_FOCUS_SELECTOR } from "features/keyboard-navigation/resultFocus";
+import type { VirtualSurfaceNavigationContext } from "ui/virtualization/svelte/VirtualSurfaceNavigation";
+import { scrollElementIntoVirtualViewport } from "ui/virtualization/svelte/VirtualSurfaceNavigation";
+import { invalidateScrollGeometry } from "ui/virtualization/dom/virtualListScrollGeometryInvalidation";
+import { waitForNextAnimationFrame } from "ui/shared/scheduling/frame";
+import { resolveTwoHopProgressiveNavigationTarget } from "features/two-hop/ui/twoHopProgressiveNavigation";
 
 export interface TwoHopProgressiveListProps {
 	/** Stable identity of the displayed file and search scope. */
@@ -120,13 +129,19 @@ export function useTwoHopProgressiveList(
 	const configuredLayout = $derived(
 		resolveConfiguredLayout(applicationStore.settings),
 	);
-	const previewSurface: VirtualPreviewSurface = props.previewDependencies
-		? props.previewDependencies.previewRuntime.createSurface({
-				frameCoordinator,
-				resolveSearchMatchPosition:
-					props.previewDependencies.resolveSearchMatchPosition,
-			})
-		: DISABLED_PREVIEW_SURFACE;
+	let currentPreviewDependencies = props.previewDependencies;
+	const createPreviewSurface = (
+		dependencies: TwoHopPreviewDependencies | undefined,
+	): VirtualPreviewSurface =>
+		dependencies
+			? dependencies.previewRuntime.createSurface({
+					frameCoordinator,
+					resolveSearchMatchPosition: dependencies.resolveSearchMatchPosition,
+				})
+			: DISABLED_PREVIEW_SURFACE;
+	const previewSurface = createReplaceableVirtualPreviewSurface(
+		createPreviewSurface(currentPreviewDependencies),
+	);
 	let committedWindow: TwoHopWindowSnapshot = EMPTY_TWO_HOP_WINDOW;
 	let pendingWindow: TwoHopWindowSnapshot | null = null;
 	let sentinelObserver: IntersectionObserver | undefined;
@@ -159,7 +174,7 @@ export function useTwoHopProgressiveList(
 	}
 
 	function isPreviewSurfaceActive(): boolean {
-		return props.previewDependencies !== undefined && isPreviewControlActive();
+		return currentPreviewDependencies !== undefined && isPreviewControlActive();
 	}
 
 	function readPreviewScrollTop(): number {
@@ -207,7 +222,7 @@ export function useTwoHopProgressiveList(
 	}
 
 	function syncPreviewHostRows(): void {
-		if (!isPreviewControlActive()) {
+		if (!isPreviewSurfaceActive()) {
 			previewHostRows = new Set();
 			return;
 		}
@@ -266,7 +281,7 @@ export function useTwoHopProgressiveList(
 			contentTopInScrollSpace,
 			viewportHeight,
 			offscreenBootstrapRows: props.offscreenBootstrapPreviewRows ?? 0,
-			previewEnabled: isPreviewControlActive(),
+			previewEnabled: isPreviewSurfaceActive(),
 			previous: committedWindow,
 		});
 		previewViewportObservation?.publishScrollCoverage(nextWindow.coverage);
@@ -327,12 +342,16 @@ export function useTwoHopProgressiveList(
 	function rebuildSentinelObserver(): void {
 		sentinelObserver?.disconnect();
 		sentinelObserver = undefined;
-		if (!rootEl || typeof IntersectionObserver === "undefined") return;
+		if (!rootEl) return;
+		const ownerWindow = getOptionalOwnerWindow(rootEl);
+		const ownerGlobal = ownerWindow as (Window & typeof globalThis) | null;
+		const IntersectionObserverConstructor = ownerGlobal?.IntersectionObserver;
+		if (!IntersectionObserverConstructor) return;
 
 		const observerRoot = findNearestScrollContainer(rootEl);
 		const chunkPreloadDistancePx =
 			geometry.rowStride * TWO_HOP_PROGRESSIVE_ROWS_PER_CHUNK;
-		sentinelObserver = new IntersectionObserver(
+		const observer = new IntersectionObserverConstructor(
 			(entries) => {
 				if (entries.some((entry) => entry.isIntersecting)) loadNextChunk();
 			},
@@ -341,7 +360,8 @@ export function useTwoHopProgressiveList(
 				rootMargin: `0px 0px ${chunkPreloadDistancePx}px 0px`,
 			},
 		);
-		if (sentinelEl) sentinelObserver.observe(sentinelEl);
+		sentinelObserver = observer;
+		if (sentinelEl) observer.observe(sentinelEl);
 	}
 
 	function loadNextChunk(): void {
@@ -353,6 +373,81 @@ export function useTwoHopProgressiveList(
 		if (nextEnd === currentMountedRowEnd) return;
 		plan = appendTwoHopProgressivePlan(sections, geometry, plan, nextEnd);
 		flushPreviewRangeFromScroll();
+	}
+
+	function ensureNavigationRowMounted(rowIndex: number): void {
+		if (rowIndex < plan.mountedRowEnd) return;
+		const nextMountedRowEnd = Math.min(
+			geometry.rowCount,
+			Math.ceil((rowIndex + 1) / TWO_HOP_PROGRESSIVE_ROWS_PER_CHUNK) *
+				TWO_HOP_PROGRESSIVE_ROWS_PER_CHUNK,
+		);
+		plan = appendTwoHopProgressivePlan(sections, geometry, plan, nextMountedRowEnd);
+	}
+
+	async function moveFocusWithinList(
+		currentTarget: HTMLElement,
+		direction: ResultNavigationDirection,
+		context: VirtualSurfaceNavigationContext,
+	): Promise<boolean> {
+		const currentCell = currentTarget.closest<HTMLElement>(
+			"[data-ccl-logical-key]",
+		);
+		const currentKey = currentCell?.dataset.cclLogicalKey;
+		const rowIndex = Number(currentCell?.dataset.cclRowIndex);
+		const columnIndex = Number(currentCell?.dataset.cclColumnIndex);
+		if (
+			!currentKey ||
+			!Number.isInteger(rowIndex) ||
+			!Number.isInteger(columnIndex)
+		) {
+			return false;
+		}
+
+		const target = resolveTwoHopProgressiveNavigationTarget(
+			untrack(() => plan),
+			currentKey,
+			direction,
+			{ rowIndex, columnIndex },
+		);
+		if (!target) return false;
+		ensureNavigationRowMounted(target.rowIndex);
+		await tick();
+
+		const element = rootEl;
+		if (!element) return false;
+		const snapshot = scrollElementIntoVirtualViewport({
+			rootEl: element,
+			scrollContainerEl:
+				context.scrollContainerEl ?? findNearestScrollContainer(element),
+			targetTop: target.rowTop,
+			targetHeight: layout.rowHeight,
+		});
+		if (snapshot.didScroll) {
+			invalidateScrollGeometry(element, "navigation-scroll");
+		}
+		runObservedScrollMeasurement({
+			scrollTop: snapshot.scrollTop,
+			viewportHeight: snapshot.viewportHeight,
+		});
+		commitPendingWindow();
+
+		for (let attempt = 0; attempt < 4; attempt += 1) {
+			await waitForNextAnimationFrame();
+			await new Promise<void>((resolve) => {
+				const ownerWindow = getOptionalOwnerWindow(element);
+				if (ownerWindow) ownerWindow.setTimeout(resolve, 0);
+				else globalThis.setTimeout(resolve, 0);
+			});
+			await context.flushMountedState();
+			const focusTarget = context
+				.getMountedElementByKey(target.key)
+				?.querySelector<HTMLElement>(RESULT_FOCUS_SELECTOR);
+			if (!focusTarget) continue;
+			focusTarget.focus({ preventScroll: true });
+			return true;
+		}
+		return false;
 	}
 
 	function captureLayoutAnchor(): LayoutAnchor | null {
@@ -396,13 +491,20 @@ export function useTwoHopProgressiveList(
 
 	async function restoreLayoutAnchor(anchor: LayoutAnchor | null): Promise<void> {
 		if (!anchor?.logicalKey || !rootEl?.shadowRoot) return;
+		const expectedRoot = rootEl;
 		await tick();
-		const escapedKey = CSS.escape(anchor.logicalKey);
-		const element = rootEl.shadowRoot.querySelector<HTMLElement>(
+		if (disposed) return;
+		const currentRoot = rootEl;
+		if (currentRoot !== expectedRoot || !currentRoot?.shadowRoot) return;
+		const ownerWindow = getOptionalOwnerWindow(currentRoot);
+		if (!ownerWindow) return;
+		const ownerGlobal = ownerWindow as Window & typeof globalThis;
+		const escapedKey = ownerGlobal.CSS.escape(anchor.logicalKey);
+		const element = currentRoot.shadowRoot.querySelector<HTMLElement>(
 			`[data-ccl-logical-key="${escapedKey}"]`,
 		);
 		if (!element) return;
-		const scrollRoot = findNearestScrollContainer(rootEl);
+		const scrollRoot = findNearestScrollContainer(currentRoot);
 		if (scrollRoot !== anchor.scrollRoot) return;
 		if (Math.abs(readPreviewScrollTop() - anchor.scrollTop) >= 0.5) return;
 		const viewportTop = scrollRoot?.getBoundingClientRect().top ?? 0;
@@ -410,7 +512,7 @@ export function useTwoHopProgressiveList(
 			element.getBoundingClientRect().top - viewportTop - anchor.viewportOffset;
 		if (Math.abs(delta) < 0.5) return;
 		if (scrollRoot) scrollRoot.scrollTop += delta;
-		else rootEl.ownerDocument.defaultView?.scrollBy({ top: delta });
+		else ownerWindow.scrollBy({ top: delta });
 	}
 
 	function measureLayout(preserveAnchor = true): boolean {
@@ -576,6 +678,23 @@ export function useTwoHopProgressiveList(
 	});
 
 	$effect(() => {
+		const nextPreviewDependencies = props.previewDependencies;
+		if (nextPreviewDependencies === currentPreviewDependencies) return;
+		currentPreviewDependencies = nextPreviewDependencies;
+		previewSurface.replace(createPreviewSurface(nextPreviewDependencies));
+		lastPreviewSurfaceActive = isPreviewSurfaceActive();
+		previewSnapshotPublished = false;
+		if (rootEl && contentEl) {
+			measurePreviewViewportGeometry();
+			flushPreviewRangeFromScroll(true);
+			commitPendingWindow();
+		}
+		syncPreviewHostRows();
+		publishCardDemand();
+		publishPreviewSnapshot(true);
+	});
+
+	$effect(() => {
 		const active = isPreviewSurfaceActive();
 		if (active === lastPreviewSurfaceActive) return;
 		lastPreviewSurfaceActive = active;
@@ -635,12 +754,13 @@ export function useTwoHopProgressiveList(
 			return previewSurface;
 		},
 		isPreviewHostEnabled(rowIndex: number): boolean {
-			return isPreviewControlActive() && previewHostRows.has(rowIndex);
+			return isPreviewSurfaceActive() && previewHostRows.has(rowIndex);
 		},
 		get interactionDescriptorResolverProvider() {
 			return cardHydrator.interactionDescriptorResolverProvider;
 		},
 		registerCardModelConsumer: cardHydrator.registerConsumer,
+		moveFocusWithinList,
 		loadNextChunk,
 		loadMore,
 	};
