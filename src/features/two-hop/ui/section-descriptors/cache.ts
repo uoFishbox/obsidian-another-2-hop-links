@@ -211,7 +211,6 @@ function appendBranchSections(
 					{
 						branch,
 						rawSectionId: id,
-						sectionKey,
 						sourceFile: params.sourceFile,
 						...header,
 						interactionSettings,

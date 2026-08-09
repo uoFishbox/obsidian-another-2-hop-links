@@ -8,11 +8,9 @@ import { createTwoHopSectionProjection } from "features/two-hop/ui/twoHopSection
 function createSection(count: number) {
 	return createTwoHopSectionModel({
 		id: "section",
-		key: "section",
 		kind: "new-links-section",
 		title: "Section",
 		items: Array.from({ length: count }, (_, index) => ({
-			kind: "new-link",
 			item: { type: "newLink" },
 			searchKey: `item-${index}`,
 			key: `item-${index}`,

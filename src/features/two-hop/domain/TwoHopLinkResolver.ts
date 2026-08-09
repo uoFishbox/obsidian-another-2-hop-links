@@ -373,7 +373,6 @@ export class TwoHopLinkResolver {
 			const snapshot = createTwoHopResolveSnapshot(result, dependencies);
 			this.cache.set(
 				targetFile.path,
-				indexVersion,
 				performanceSettings,
 				resolveSettings,
 				dependencies,

@@ -1,14 +1,16 @@
 import type { ViewItem } from "application/presenters";
-import type { SearchWorkerMatchScope } from "features/search/searchWorkerTypes";
 import { generateLinkKey } from "features/card-preview/text-processing/textUtils";
 import type { ClickableHeaderExtraProps } from "ui/components/sections/types";
-import type { TwoHopLinkBranch } from "types/domain";
 
-interface TwoHopSectionBase {
+/** Immutable section data consumed by two-hop layout and rendering. */
+export interface TwoHopSectionModel {
 	readonly id: string;
-	readonly key: string;
+	readonly kind:
+		| "primary-section"
+		| "two-hop-branch"
+		| "tag-section"
+		| "new-links-section";
 	readonly title: string;
-	readonly className?: string;
 	readonly header: TwoHopHeaderModel;
 	readonly items: readonly TwoHopItemModel[];
 	readonly totalCount: number;
@@ -20,87 +22,33 @@ export interface TwoHopHeaderModel {
 	readonly props: ClickableHeaderExtraProps;
 }
 
-export type TwoHopSectionModel =
-	| (TwoHopSectionBase & { readonly kind: "primary-section" })
-	| (TwoHopSectionBase & {
-			readonly kind: "two-hop-branch";
-			readonly branch: TwoHopLinkBranch;
-	  })
-	| (TwoHopSectionBase & {
-			readonly kind: "tag-section";
-			readonly tag: string;
-	  })
-	| (TwoHopSectionBase & { readonly kind: "new-links-section" });
-
-export type TwoHopItemModel =
-	| {
-			readonly kind: "primary-link";
-			readonly item: ViewItem;
-			readonly interactionId?: string;
-			readonly interactionKey?: string;
-			readonly sourceSectionId: string;
-			readonly searchKey: string;
-			readonly key: string;
-	  }
-	| {
-			readonly kind: "two-hop-link";
-			readonly item: ViewItem;
-			readonly interactionId?: string;
-			readonly interactionKey?: string;
-			readonly branch: TwoHopLinkBranch;
-			readonly searchKey: string;
-			readonly key: string;
-	  }
-	| {
-			readonly kind: "tag-link";
-			readonly item: ViewItem;
-			readonly interactionId?: string;
-			readonly interactionKey?: string;
-			readonly tag: string;
-			readonly searchKey: string;
-			readonly key: string;
-	  }
-	| {
-			readonly kind: "new-link";
-			readonly item: ViewItem;
-			readonly interactionId?: string;
-			readonly interactionKey?: string;
-			readonly searchKey: string;
-			readonly key: string;
-	  };
-
-interface CreateTwoHopSectionModelBase {
-	readonly id: string;
+/** Minimal immutable item data shared by every two-hop section kind. */
+export interface TwoHopItemModel {
+	readonly item: ViewItem;
+	readonly interactionId?: string;
+	readonly interactionKey?: string;
+	readonly searchKey: string;
 	readonly key: string;
+}
+
+/** Input required to publish a two-hop section model. */
+export interface CreateTwoHopSectionModelParams {
+	readonly id: string;
+	readonly kind: TwoHopSectionModel["kind"];
 	readonly title: string;
-	readonly className?: string;
 	readonly headerProps?: ClickableHeaderExtraProps;
 	readonly items: readonly TwoHopItemModel[];
 }
-
-export type CreateTwoHopSectionModelParams =
-	| (CreateTwoHopSectionModelBase & { readonly kind: "primary-section" })
-	| (CreateTwoHopSectionModelBase & {
-			readonly kind: "two-hop-branch";
-			readonly branch: TwoHopLinkBranch;
-	  })
-	| (CreateTwoHopSectionModelBase & {
-			readonly kind: "tag-section";
-			readonly tag: string;
-	  })
-	| (CreateTwoHopSectionModelBase & { readonly kind: "new-links-section" });
 
 /** Publishes one immutable section consumed directly by geometry and chunks. */
 export function createTwoHopSectionModel(
 	params: CreateTwoHopSectionModelParams,
 ): TwoHopSectionModel {
 	const items = Object.freeze(params.items);
-	const base = {
+	return Object.freeze({
 		id: params.id,
-		key: params.key,
 		kind: params.kind,
 		title: params.title,
-		className: params.className,
 		header: Object.freeze({
 			logicalKey: `header:${params.id}`,
 			props: params.headerProps ?? {},
@@ -108,17 +56,7 @@ export function createTwoHopSectionModel(
 		items,
 		totalCount: items.length,
 		visibleCount: items.length,
-	};
-
-	switch (params.kind) {
-		case "two-hop-branch":
-			return Object.freeze({ ...base, kind: params.kind, branch: params.branch });
-		case "tag-section":
-			return Object.freeze({ ...base, kind: params.kind, tag: params.tag });
-		case "primary-section":
-		case "new-links-section":
-			return Object.freeze({ ...base, kind: params.kind });
-	}
+	});
 }
 
 export function createTaggedNoteSectionItemKey(
@@ -133,14 +71,4 @@ export function createTaggedNoteSectionItemKey(
 	const endOffset = data.position?.end.offset ?? "";
 	const suffix = `tag-note:${tag}:${data.usageKey ?? ""}:${startOffset}:${endOffset}`;
 	return generateLinkKey(data.path, data.file.basename, suffix);
-}
-
-export function resolveTwoHopPageItemSearchScope(
-	row: TwoHopItemModel,
-	searchScope: SearchWorkerMatchScope,
-	contentMatched: boolean | undefined,
-): SearchWorkerMatchScope {
-	return searchScope === "title-and-content" && (contentMatched ?? true)
-		? "title-and-content"
-		: "title-only";
 }

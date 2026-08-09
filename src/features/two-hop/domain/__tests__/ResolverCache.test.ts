@@ -48,7 +48,6 @@ describe("ResolverCache", () => {
 
 		cache.set(
 			"origin.md",
-			1,
 			defaultPerformanceSettings(),
 			defaultResolveSettings(),
 			defaultDependencies(),
@@ -78,7 +77,6 @@ describe("ResolverCache", () => {
 
 		cache.set(
 			"origin.md",
-			1,
 			defaultPerformanceSettings(),
 			defaultResolveSettings(),
 			defaultDependencies(),
@@ -100,7 +98,6 @@ describe("ResolverCache", () => {
 
 		cache.set(
 			"origin.md",
-			1,
 			defaultPerformanceSettings(),
 			defaultResolveSettings(),
 			defaultDependencies(),
@@ -121,7 +118,6 @@ describe("ResolverCache", () => {
 
 		cache.set(
 			"a.md",
-			1,
 			defaultPerformanceSettings(),
 			defaultResolveSettings(),
 			{
@@ -132,7 +128,6 @@ describe("ResolverCache", () => {
 		);
 		cache.set(
 			"b.md",
-			1,
 			defaultPerformanceSettings(),
 			defaultResolveSettings(),
 			{
@@ -162,7 +157,6 @@ describe("ResolverCache", () => {
 
 		cache.set(
 			"a.md",
-			1,
 			defaultPerformanceSettings(),
 			defaultResolveSettings(),
 			{
@@ -173,7 +167,6 @@ describe("ResolverCache", () => {
 		);
 		cache.set(
 			"b.md",
-			1,
 			defaultPerformanceSettings(),
 			defaultResolveSettings(),
 			{
@@ -203,7 +196,6 @@ describe("ResolverCache", () => {
 
 		cache.set(
 			"a.md",
-			1,
 			defaultPerformanceSettings(),
 			defaultResolveSettings(),
 			{
@@ -214,7 +206,6 @@ describe("ResolverCache", () => {
 		);
 		cache.set(
 			"b.md",
-			1,
 			defaultPerformanceSettings(),
 			defaultResolveSettings(),
 			{
@@ -243,7 +234,6 @@ describe("ResolverCache", () => {
 
 		cache.set(
 			"origin.md",
-			1,
 			defaultPerformanceSettings(),
 			defaultResolveSettings(),
 			{
@@ -277,7 +267,6 @@ describe("ResolverCache", () => {
 
 		cache.set(
 			"origin.md",
-			1,
 			defaultPerformanceSettings(),
 			defaultResolveSettings(),
 			defaultDependencies(),
@@ -304,7 +293,6 @@ describe("ResolverCache", () => {
 
 		cache.set(
 			"origin.md",
-			1,
 			defaultPerformanceSettings(),
 			defaultResolveSettings(),
 			defaultDependencies(),
@@ -328,7 +316,6 @@ describe("ResolverCache", () => {
 
 		cache.set(
 			"origin.md",
-			1,
 			defaultPerformanceSettings(),
 			defaultResolveSettings(),
 			defaultDependencies(),
@@ -361,7 +348,6 @@ describe("ResolverCache", () => {
 
 		cache.set(
 			"origin.md",
-			1,
 			defaultPerformanceSettings(),
 			defaultResolveSettings(),
 			dependencies,
@@ -446,7 +432,6 @@ describe("ResolverCache", () => {
 
 		cache.set(
 			"origin.md",
-			1,
 			defaultPerformanceSettings(),
 			defaultResolveSettings(),
 			defaultDependencies(),

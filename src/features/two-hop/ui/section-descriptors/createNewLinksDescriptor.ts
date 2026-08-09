@@ -23,7 +23,6 @@ export function createNewLinksSectionDescriptor(
 			const virtualKey = newLinksSectionConfig.getKey(source, index);
 			const interactionKey = createItemInteractionKey(item, virtualKey);
 			return {
-				kind: "new-link",
 				item,
 				interactionId: params.createItemInteractionToken(interactionKey),
 				interactionKey,
@@ -35,9 +34,7 @@ export function createNewLinksSectionDescriptor(
 	return createTwoHopSectionModel({
 		kind: "new-links-section",
 		id: newLinksSectionConfig.sectionId,
-		key: newLinksSectionConfig.sectionId,
 		title: newLinksSectionConfig.title,
-		className: newLinksSectionConfig.className,
 		items: rows,
 	});
 }

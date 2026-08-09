@@ -17,7 +17,6 @@ const GEOMETRY: TwoHopGeometry = {
 	firstRowBySection: new Uint32Array([0, 2]),
 	rowCountBySection: new Uint32Array([2, 2]),
 	topBySection: new Float64Array([0, 250]),
-	heightBySection: new Float64Array([250, 250]),
 };
 
 describe("resolveProgressivePreviewRangeInto", () => {

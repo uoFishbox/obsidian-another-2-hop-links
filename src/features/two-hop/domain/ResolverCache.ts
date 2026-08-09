@@ -18,7 +18,6 @@ interface ResolverResolveSettings {
 }
 
 export interface CachedResolveResult {
-	indexVersionAtBuild: number;
 	enableProgressiveTwoHopBuild: boolean;
 	maxOutgoingToProcess: number;
 	includeTaggedNotes: boolean;
@@ -75,7 +74,6 @@ export class ResolverCache {
 	 */
 	set(
 		filePath: string,
-		indexVersion: number,
 		performanceSettings: ResolverPerformanceSettings,
 		resolveSettings: ResolverResolveSettings,
 		dependencies: TwoHopResolverDependencies,
@@ -89,7 +87,6 @@ export class ResolverCache {
 			structuralSourcePaths: new Set(dependencies.structuralSourcePaths),
 		});
 		this.cache.set(filePath, {
-			indexVersionAtBuild: indexVersion,
 			enableProgressiveTwoHopBuild:
 				performanceSettings.enableProgressiveTwoHopBuild,
 			maxOutgoingToProcess: performanceSettings.maxOutgoingToProcess,

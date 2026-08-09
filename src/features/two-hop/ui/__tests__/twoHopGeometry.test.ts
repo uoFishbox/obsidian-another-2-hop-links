@@ -23,7 +23,6 @@ const layout = {
 
 function createItem(key: string): TwoHopItemModel {
 	return {
-		kind: "new-link",
 		item: { type: "newLink" } as TwoHopItemModel["item"],
 		searchKey: key,
 		key,
@@ -37,7 +36,6 @@ function createSection(
 ): TwoHopSectionModel {
 	const section = createTwoHopSectionModel({
 		id,
-		key: id,
 		kind: "new-links-section",
 		title: id,
 		items: Array.from({ length: count }, (_, index) =>

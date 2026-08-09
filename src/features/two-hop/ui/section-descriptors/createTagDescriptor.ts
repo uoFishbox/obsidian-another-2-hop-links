@@ -52,11 +52,9 @@ export function createTagSectionDescriptor(
 			);
 			const interactionKey = createItemInteractionKey(item, virtualKey);
 			return {
-				kind: "tag-link",
 				item,
 				interactionId: tokens.createItemInteractionToken(interactionKey),
 				interactionKey,
-				tag: input.source.tag,
 				searchKey: getTagNoteSearchKeyFromBaseKey(input.source.tag, baseKey),
 				key: virtualKey,
 			};
@@ -65,11 +63,8 @@ export function createTagSectionDescriptor(
 	return createTwoHopSectionModel({
 		kind: "tag-section",
 		id: input.rawSectionId,
-		key: `tag-${input.source.tag}`,
 		title: `#${input.source.tag}`,
-		tag: input.source.tag,
 		headerProps,
-		className: "twohop-links-tags",
 		items: rows,
 	});
 }

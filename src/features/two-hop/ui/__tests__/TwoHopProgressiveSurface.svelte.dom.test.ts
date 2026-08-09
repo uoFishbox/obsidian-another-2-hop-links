@@ -42,7 +42,6 @@ import { createPreviewSurfaceProbe, type PreviewFrame } from "./previewSurfacePr
 
 function createSection(count: number): TwoHopSectionModel {
 	const items = Array.from({ length: count }, (_, index) => ({
-		kind: "new-link",
 		item: { type: "newLink" },
 		interactionId: `item:${index}`,
 		searchKey: `item:${index}`,
@@ -50,7 +49,6 @@ function createSection(count: number): TwoHopSectionModel {
 	})) as TwoHopItemModel[];
 	return createTwoHopSectionModel({
 		id: "section",
-		key: "section",
 		kind: "new-links-section",
 		title: "Section",
 		items,

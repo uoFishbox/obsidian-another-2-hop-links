@@ -26,7 +26,6 @@ import {
 export interface BranchSectionBuildInput {
 	readonly branch: TwoHopLinkBranch;
 	readonly rawSectionId: string;
-	readonly sectionKey: string;
 	readonly sourceFile: TFile;
 	readonly targetFile: TFile | null;
 	readonly title: string;
@@ -80,11 +79,9 @@ export function createBranchSectionDescriptor(
 			const virtualKey = generateBacklinkKey(source);
 			const interactionKey = createItemInteractionKey(item, virtualKey);
 			return {
-				kind: "two-hop-link",
 				item,
 				interactionId: tokens.createItemInteractionToken(interactionKey),
 				interactionKey,
-				branch: input.branch,
 				searchKey: createTwohopChildSearchKeyFromBaseKeys(
 					branchBaseKey,
 					virtualKey,
@@ -120,10 +117,7 @@ export function createBranchSectionDescriptor(
 	return createTwoHopSectionModel({
 		kind: "two-hop-branch",
 		id: input.rawSectionId,
-		key: input.sectionKey,
 		title: input.title,
-		className: input.className,
-		branch: input.branch,
 		headerProps,
 		items: rows,
 	});

@@ -6,10 +6,7 @@ import {
 	type CardRenderModel,
 } from "ui/components/items/cardRenderModel";
 import type { TwoHopCardPresentationState } from "features/two-hop/ui/twoHopCellStaticState";
-import {
-	resolveTwoHopPageItemSearchScope,
-	type TwoHopItemModel,
-} from "features/two-hop/ui/twoHopSectionModel";
+import type { TwoHopItemModel } from "features/two-hop/ui/twoHopSectionModel";
 
 export interface TwoHopCardModelRevision {
 	readonly settings: PluginSettings;
@@ -34,11 +31,11 @@ export function buildTwoHopCardModel(
 		context: revision.linkContext,
 		getPreviewRenderVersion: revision.getPreviewRenderVersion,
 		searchQuery: revision.searchQuery,
-		searchScope: resolveTwoHopPageItemSearchScope(
-			row,
-			revision.searchScope,
-			matchedItem?.contentMatched,
-		),
+		searchScope:
+			revision.searchScope === "title-and-content" &&
+			(matchedItem?.contentMatched ?? true)
+				? "title-and-content"
+				: "title-only",
 		contentPreview: matchedItem?.contentPreview,
 		interactionId: row.interactionId,
 		interactionKey: row.interactionKey,

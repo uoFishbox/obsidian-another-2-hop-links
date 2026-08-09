@@ -53,7 +53,6 @@ function createTestFrameCoordinator(): TestFrameCoordinator {
 
 function createItem(index: number): TwoHopItemModel {
 	return {
-		kind: "new-link",
 		item: { type: "newLink" },
 		interactionId: `interaction:${index}`,
 		interactionKey: `interaction:${index}`,
@@ -67,7 +66,6 @@ describe("createTwoHopCardHydrator", () => {
 		const items = Array.from({ length: 70 }, (_, index) => createItem(index));
 		const section = createTwoHopSectionModel({
 			id: "section",
-			key: "section",
 			kind: "new-links-section",
 			title: "Section",
 			items,

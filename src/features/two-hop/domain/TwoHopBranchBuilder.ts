@@ -17,27 +17,6 @@ export class TwoHopBranchBuilder {
 		private readonly indexingService: IIndexingService,
 	) {}
 
-	public async build(
-		targetFile: TFile,
-		outgoingLinks: readonly LinkReference[],
-		performanceSettings: ResolverPerformanceSettings,
-		signal?: AbortSignal,
-	): Promise<TwoHopLinkBranch[]> {
-		const baseBranches = await this.buildHop1OnlyBranches(
-			targetFile,
-			outgoingLinks,
-			performanceSettings,
-			signal,
-		);
-		const result = await this.populateHop2(
-			targetFile,
-			baseBranches,
-			performanceSettings,
-			signal,
-		);
-		return result;
-	}
-
 	public async buildHop1OnlyBranches(
 		targetFile: TFile,
 		outgoingLinks: readonly LinkReference[],

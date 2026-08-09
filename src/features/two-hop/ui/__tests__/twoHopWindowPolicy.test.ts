@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
 	EMPTY_TWO_HOP_WINDOW,
-	isScrollTopCovered,
 	resolveTwoHopWindow,
 } from "features/two-hop/ui/twoHopWindowPolicy";
 import type { TwoHopGeometry } from "features/two-hop/ui/viewport/twoHopGeometry";
@@ -15,7 +14,6 @@ const GEOMETRY: TwoHopGeometry = {
 	firstRowBySection: new Uint32Array([0]),
 	rowCountBySection: new Uint32Array([20]),
 	topBySection: new Float64Array([0]),
-	heightBySection: new Float64Array([2_200]),
 };
 
 describe("resolveTwoHopWindow", () => {
@@ -35,12 +33,13 @@ describe("resolveTwoHopWindow", () => {
 		expect(snapshot.prepared.start).toBeLessThanOrEqual(snapshot.active.start);
 		expect(snapshot.prepared.end).toBeGreaterThanOrEqual(snapshot.active.end);
 		expect(snapshot.coverage).not.toBeNull();
-		expect(isScrollTopCovered(snapshot.coverage, 500)).toBe(true);
 		if (!snapshot.coverage) throw new Error("Coverage was not resolved");
+		expect(500).toBeGreaterThan(snapshot.coverage.minScrollTopBeforeMeasurement);
+		expect(500).toBeLessThan(snapshot.coverage.maxScrollTopBeforeMeasurement);
 
 		for (const scrollTop of [
-			(snapshot.coverage.min + 500) / 2,
-			(snapshot.coverage.max + 500) / 2,
+			(snapshot.coverage.minScrollTopBeforeMeasurement + 500) / 2,
+			(snapshot.coverage.maxScrollTopBeforeMeasurement + 500) / 2,
 		]) {
 			const covered = resolveTwoHopWindow({
 				geometry: GEOMETRY,

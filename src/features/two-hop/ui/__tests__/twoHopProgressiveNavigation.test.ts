@@ -14,11 +14,9 @@ import {
 function createPlan(itemCount: number) {
 	const section = createTwoHopSectionModel({
 		id: "section",
-		key: "section",
 		kind: "new-links-section",
 		title: "Section",
 		items: Array.from({ length: itemCount }, (_, index) => ({
-			kind: "new-link",
 			item: { type: "newLink" },
 			searchKey: `item:${index}`,
 			key: `item:${index}`,

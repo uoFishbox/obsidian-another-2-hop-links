@@ -6,16 +6,12 @@ import type {
 	TwoHopGeometry,
 	TwoHopRowRange,
 } from "features/two-hop/ui/viewport/twoHopGeometry";
-
-export interface TwoHopScrollCoverage {
-	readonly min: number;
-	readonly max: number;
-}
+import type { ScrollMeasurementRange } from "ui/virtualization/core/scrollWindowGate";
 
 export interface TwoHopWindowSnapshot {
 	readonly active: Readonly<TwoHopRowRange>;
 	readonly prepared: Readonly<TwoHopRowRange>;
-	readonly coverage: TwoHopScrollCoverage | null;
+	readonly coverage: ScrollMeasurementRange | null;
 }
 
 export interface ResolveTwoHopWindowInput {
@@ -60,13 +56,6 @@ export function isSameTwoHopWindow(
 	);
 }
 
-export function isScrollTopCovered(
-	coverage: TwoHopScrollCoverage | null,
-	scrollTop: number,
-): boolean {
-	return Boolean(coverage && scrollTop > coverage.min && scrollTop < coverage.max);
-}
-
 function resolveRanges(
 	input: ResolveTwoHopWindowInput,
 	scrollTop: number,
@@ -99,7 +88,7 @@ function resolveCoverage(
 	input: ResolveTwoHopWindowInput,
 	active: Readonly<TwoHopRowRange>,
 	prepared: Readonly<TwoHopRowRange>,
-): TwoHopScrollCoverage | null {
+): ScrollMeasurementRange | null {
 	if (input.viewportHeight <= 0 || input.geometry.rowCount === 0) return null;
 
 	const matches = (scrollTop: number): boolean => {
@@ -111,8 +100,18 @@ function resolveCoverage(
 	};
 	const initialStep = Math.max(1, input.geometry.rowStride / 2);
 	return {
-		min: findCoverageBoundary(input.scrollTop, -1, initialStep, matches),
-		max: findCoverageBoundary(input.scrollTop, 1, initialStep, matches),
+		minScrollTopBeforeMeasurement: findCoverageBoundary(
+			input.scrollTop,
+			-1,
+			initialStep,
+			matches,
+		),
+		maxScrollTopBeforeMeasurement: findCoverageBoundary(
+			input.scrollTop,
+			1,
+			initialStep,
+			matches,
+		),
 	};
 }
 

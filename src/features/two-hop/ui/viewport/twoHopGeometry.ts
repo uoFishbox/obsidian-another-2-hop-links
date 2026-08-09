@@ -10,7 +10,6 @@ export interface TwoHopGeometry {
 	readonly firstRowBySection: Uint32Array;
 	readonly rowCountBySection: Uint32Array;
 	readonly topBySection: Float64Array;
-	readonly heightBySection: Float64Array;
 }
 
 export interface TwoHopRowRange {
@@ -30,7 +29,6 @@ export function compileFixedGridLayout(
 	const firstRowBySection = new Uint32Array(sectionCount);
 	const rowCountBySection = new Uint32Array(sectionCount);
 	const topBySection = new Float64Array(sectionCount);
-	const heightBySection = new Float64Array(sectionCount);
 	const sectionMarginBottom = Math.max(0, layout.sectionMarginBottom);
 	let rowCount = 0;
 	let top = 0;
@@ -50,7 +48,6 @@ export function compileFixedGridLayout(
 		firstRowBySection[sectionIndex] = rowCount;
 		rowCountBySection[sectionIndex] = sectionRowCount;
 		topBySection[sectionIndex] = top;
-		heightBySection[sectionIndex] = sectionHeight;
 		rowCount += sectionRowCount;
 		top += sectionHeight;
 	}
@@ -64,7 +61,6 @@ export function compileFixedGridLayout(
 		firstRowBySection,
 		rowCountBySection,
 		topBySection,
-		heightBySection,
 	};
 }
 

@@ -28,7 +28,10 @@ import type {
 	VirtualPreviewSurface,
 } from "features/card-preview/scheduling/virtualPreviewSurface";
 import { createReplaceableVirtualPreviewSurface } from "features/card-preview/scheduling/replaceableVirtualPreviewSurface";
-import type { VirtualFrameCoordinator } from "ui/virtualization/scheduling/frameCoordinator";
+import {
+	createCoordinatedScheduledTask,
+	type VirtualFrameCoordinator,
+} from "ui/virtualization/scheduling/frameCoordinator";
 import { createResolvedCardLayoutSettingsMemo } from "ui/shared/layout/cardLayoutCssVars";
 import { resolveCachedCardGridLayoutBase } from "ui/virtualization/dom/virtualListCardLayout";
 import {
@@ -46,9 +49,9 @@ import {
 	type TwoHopWindowSnapshot,
 } from "features/two-hop/ui/twoHopWindowPolicy";
 import {
-	observeTwoHopViewport,
-	type TwoHopViewportObservation,
-} from "features/two-hop/ui/twoHopViewportObservation";
+	observeVirtualListViewport,
+	type VirtualListViewportObservation,
+} from "ui/virtualization/dom/virtualListDomObserver";
 import { getOptionalOwnerWindow } from "ui/shared/dom/realmSafeDom";
 import type { ResultNavigationDirection } from "features/keyboard-navigation/resultFocus";
 import { RESULT_FOCUS_SELECTOR } from "features/keyboard-navigation/resultFocus";
@@ -87,6 +90,7 @@ interface LayoutAnchor {
 }
 
 type SectionPublicationKind = "identity-reset" | "data-revision";
+const PREVIEW_SCROLL_MEASUREMENT_TASK_KEY = "two-hop-progressive-preview-window";
 const PREVIEW_WINDOW_COMMIT_TASK_KEY = "two-hop-progressive-preview-window-apply";
 
 /** Owns append-only chunk publication, lazy model hydration, and bounded preview state. */
@@ -146,7 +150,8 @@ export function useTwoHopProgressiveList(
 	let pendingWindow: TwoHopWindowSnapshot | null = null;
 	let sentinelObserver: IntersectionObserver | undefined;
 	let previewScrollActive = false;
-	let previewViewportObservation: TwoHopViewportObservation | null = null;
+	let previewViewportObservation: VirtualListViewportObservation | null = null;
+	let pendingPreviewScrollMeasurement: (() => void) | null = null;
 	let previewScrollContainer: HTMLElement | null = null;
 	let previewOwnerWindow: Window | null = null;
 	let contentTopInScrollSpace = 0;
@@ -167,6 +172,16 @@ export function useTwoHopProgressiveList(
 		getResolver: () => untrack(() => props.resolveItemCardModel),
 		isPreviewActive: isPreviewSurfaceActive,
 		onPreviewModelsChanged: publishPreviewSnapshot,
+	});
+	const previewScrollMeasurementTask = createCoordinatedScheduledTask({
+		coordinator: frameCoordinator,
+		lane: "scroll-critical",
+		key: PREVIEW_SCROLL_MEASUREMENT_TASK_KEY,
+		task: () => {
+			const measurement = pendingPreviewScrollMeasurement;
+			pendingPreviewScrollMeasurement = null;
+			measurement?.();
+		},
 	});
 
 	function isPreviewControlActive(): boolean {
@@ -284,7 +299,7 @@ export function useTwoHopProgressiveList(
 			previewEnabled: isPreviewSurfaceActive(),
 			previous: committedWindow,
 		});
-		previewViewportObservation?.publishScrollCoverage(nextWindow.coverage);
+		previewViewportObservation?.publishScrollMeasurementRange(nextWindow.coverage);
 		if (!forceCommit && isSameTwoHopWindow(committedWindow, nextWindow)) {
 			committedWindow = nextWindow;
 			pendingWindow = null;
@@ -624,26 +639,41 @@ export function useTwoHopProgressiveList(
 
 		previewOwnerWindow = ownerWindow;
 		const observation = untrack(() =>
-			observeTwoHopViewport({
+			observeVirtualListViewport({
 				rootEl: element,
-				frameCoordinator,
-				getCachedViewportHeight: () => previewViewportHeight,
-				getScrollCoverage: () => (pendingWindow ?? committedWindow).coverage,
-				onRootWidthChange: (width) => {
+				onWidthChange: (width) => {
 					preserveAnchorForNextLayout =
 						lastMeasuredRootWidth > 0 && previewViewportHeight > 0;
 					if (width <= 0) lastMeasuredRootWidth = 0;
 					pendingRootWidth = width;
 					skipViewportGeometryForNextLayout = true;
 				},
+				measureOnRootHeightChange: false,
+				getCachedViewportHeight: () => previewViewportHeight,
+				getScrollMeasurementRange: () =>
+					(pendingWindow ?? committedWindow).coverage,
 				onScrollContainerChange: (scrollContainer) => {
 					previewScrollContainer = scrollContainer;
 					previewOwnerWindow = element.ownerDocument.defaultView;
 				},
-				onScrollActiveChange: setPreviewScrollActive,
+				onScrollStateChange: (
+					_generation,
+					_hasPendingScrollTop,
+					isScrollActive,
+				) => {
+					setPreviewScrollActive(isScrollActive);
+				},
+				scheduleLayoutMeasurement: runObservedLayoutMeasurement,
+				scheduleScrollMeasurement: (task) => {
+					if (!task) return;
+					pendingPreviewScrollMeasurement = task;
+					previewScrollMeasurementTask.schedule();
+				},
+				runScrollMeasurement: (metrics) => {
+					if (!metrics) return;
+					runObservedScrollMeasurement(metrics);
+				},
 				runInitialLayoutMeasurement: runObservedLayoutMeasurement,
-				runLayoutMeasurement: runObservedLayoutMeasurement,
-				runScrollMeasurement: runObservedScrollMeasurement,
 			}),
 		);
 		previewViewportObservation = observation;
@@ -652,7 +682,9 @@ export function useTwoHopProgressiveList(
 			if (previewViewportObservation === observation) {
 				previewViewportObservation = null;
 			}
-			observation.dispose();
+			pendingPreviewScrollMeasurement = null;
+			previewScrollMeasurementTask.cancel();
+			observation();
 			previewScrollContainer = null;
 			previewOwnerWindow = null;
 			setPreviewScrollActive(false);

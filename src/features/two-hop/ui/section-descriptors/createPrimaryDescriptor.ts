@@ -95,11 +95,9 @@ function createPrimaryDescriptor<T>(
 			const virtualKey = params.config.getKey(source, index);
 			const interactionKey = createItemInteractionKey(item, virtualKey);
 			return {
-				kind: "primary-link",
 				item,
 				interactionId: params.createItemInteractionToken(interactionKey),
 				interactionKey,
-				sourceSectionId: params.config.sectionId,
 				searchKey: params.getSearchKey(source),
 				key: virtualKey,
 			};
@@ -108,9 +106,7 @@ function createPrimaryDescriptor<T>(
 	return createTwoHopSectionModel({
 		kind: "primary-section",
 		id: params.config.sectionId,
-		key: params.config.sectionId,
 		title: params.config.title,
-		className: params.config.className,
 		items: rows,
 	});
 }
