@@ -20,6 +20,7 @@ import type { SortableItem } from "core/sorting";
 import { createMockTFile } from "testing/__mocks__/testHelpers";
 import { DEFAULT_SETTINGS } from "features/settings/model";
 import * as grouping from "core/grouping";
+import { createDeduplicationService } from "core/deduplication/deduplicationService";
 
 const defaultSettings: PluginSettings = DEFAULT_SETTINGS;
 
@@ -672,6 +673,71 @@ describe("DisplayDataBuilder - buildDisplayData", () => {
 
 			expect(result.outgoing).toHaveLength(1);
 			expect(result.outgoing[0].hop1.rawText).toBe("note-branch");
+		});
+
+		test("filters hop2 attachments before dedupe and removes empty two-hop branches", () => {
+			const attachmentOnlyBranch: TwoHopLinkBranch = {
+				hop1: {
+					rawText: "attachment-only",
+					path: "attachment-only.md",
+					isUnresolved: false,
+					sourceFile: createMockTFile("origin.md"),
+				},
+				hop2: [
+					{
+						rawText: "attachment-only",
+						path: "attachment-only.md",
+						isUnresolved: false,
+						sourceFile: createMockTFile("image.png", "png"),
+					},
+				],
+			};
+			const mixedBranch: TwoHopLinkBranch = {
+				hop1: {
+					rawText: "mixed",
+					path: "mixed.md",
+					isUnresolved: false,
+					sourceFile: createMockTFile("origin.md"),
+				},
+				hop2: [
+					{
+						rawText: "mixed",
+						path: "mixed.md",
+						isUnresolved: false,
+						sourceFile: createMockTFile("document.pdf", "pdf"),
+					},
+					{
+						rawText: "mixed",
+						path: "mixed.md",
+						isUnresolved: false,
+						sourceFile: createMockTFile("note.md"),
+					},
+				],
+			};
+
+			const result = buildDisplayData(
+				{
+					originFile: createMockTFile("origin.md"),
+					branches: [attachmentOnlyBranch, mixedBranch],
+					backlinks: [],
+					taggedNotes: [],
+				},
+				{
+					...defaultSettings,
+					excludeAttachments: true,
+					dedupeCards: true,
+				},
+				"alphabetical",
+				mockSortService,
+				createDeduplicationService(),
+			);
+
+			expect(result.outgoing).toHaveLength(2);
+			expect(result.twoHopBranches).toHaveLength(1);
+			expect(result.twoHopBranches[0].hop1.rawText).toBe("mixed");
+			expect(
+				result.twoHopBranches[0].hop2.map((link) => link.sourceFile.path),
+			).toEqual(["note.md"]);
 		});
 
 		test("reuses source arrays when excludeAttachments removes nothing", () => {

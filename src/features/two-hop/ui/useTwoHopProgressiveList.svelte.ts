@@ -410,7 +410,7 @@ export function useTwoHopProgressiveList(
 			element.getBoundingClientRect().top - viewportTop - anchor.viewportOffset;
 		if (Math.abs(delta) < 0.5) return;
 		if (scrollRoot) scrollRoot.scrollTop += delta;
-		else window.scrollBy({ top: delta });
+		else rootEl.ownerDocument.defaultView?.scrollBy({ top: delta });
 	}
 
 	function measureLayout(preserveAnchor = true): boolean {

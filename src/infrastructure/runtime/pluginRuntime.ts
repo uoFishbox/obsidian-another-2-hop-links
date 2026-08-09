@@ -139,7 +139,6 @@ export function createPluginRuntime(options: PluginRuntimeOptions): PluginRuntim
 			enableProgressiveTwoHopBuild:
 				options.getSettings().enableProgressiveTwoHopBuild,
 			maxOutgoingToProcess: options.getSettings().maxOutgoingToProcess,
-			maxHop2PerBranch: options.getSettings().maxHop2PerBranch,
 		}),
 	);
 	const metricProvider = new MetricProvider(

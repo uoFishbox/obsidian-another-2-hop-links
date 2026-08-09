@@ -86,7 +86,6 @@ export interface PluginSettings {
 	priorityFrontmatterKeyForPreview?: string;
 	priorityFrontmatterKeyForTitle?: string;
 	maxOutgoingToProcess?: number;
-	maxHop2PerBranch?: number;
 }
 
 export function areTagFeaturesEnabled(

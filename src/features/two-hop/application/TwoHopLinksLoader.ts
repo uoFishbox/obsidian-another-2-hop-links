@@ -5,15 +5,22 @@ type LoadOptions = {
 	force?: boolean;
 };
 
-export interface LoadPreparation {
-	shouldLoad: boolean;
-	isBackgroundRefresh: boolean;
-	requestId?: number;
-}
+export type LoadPreparation =
+	| {
+			shouldLoad: false;
+			isBackgroundRefresh: false;
+	  }
+	| {
+			shouldLoad: true;
+			isBackgroundRefresh: boolean;
+			requestId: number;
+			signal: AbortSignal;
+	  };
 
 export type ResolveTwoHopLinks = (
 	file: TFile,
 	onProgress?: (progress: ResolveProgress) => void,
+	signal?: AbortSignal,
 ) => Promise<TwoHopLinkResult>;
 
 export type LoadExecutionResult =
@@ -33,6 +40,7 @@ export type LoadExecutionResult =
 export class TwoHopLinksLoader {
 	private loadRequestSequence = 0;
 	private currentFile: TFile | undefined = undefined;
+	private activeAbortController: AbortController | undefined;
 
 	constructor(private readonly resolveTwoHopLinks: ResolveTwoHopLinks) {}
 
@@ -54,12 +62,16 @@ export class TwoHopLinksLoader {
 		}
 
 		const isBackgroundRefresh = !!options.force && isSameFile && hasExistingData;
+		this.activeAbortController?.abort();
+		const abortController = new AbortController();
+		this.activeAbortController = abortController;
 		this.currentFile = file;
 
 		return {
 			shouldLoad: true,
 			isBackgroundRefresh,
 			requestId: ++this.loadRequestSequence,
+			signal: abortController.signal,
 		};
 	}
 
@@ -67,15 +79,20 @@ export class TwoHopLinksLoader {
 		file: TFile,
 		requestId: number,
 		isBackgroundRefresh: boolean,
+		signal: AbortSignal,
 		onProgress?: (progress: ResolveProgress) => void,
 	): Promise<LoadExecutionResult> {
 		try {
-			const data = await this.resolveTwoHopLinks(file, (progress) => {
-				if (!this.isCurrentRequest(requestId, file.path)) {
-					return;
-				}
-				onProgress?.(progress);
-			});
+			const data = await this.resolveTwoHopLinks(
+				file,
+				(progress) => {
+					if (!this.isCurrentRequest(requestId, file.path)) {
+						return;
+					}
+					onProgress?.(progress);
+				},
+				signal,
+			);
 			if (!this.isCurrentRequest(requestId, file.path)) {
 				return { kind: "stale" };
 			}
@@ -92,10 +109,16 @@ export class TwoHopLinksLoader {
 				error: this.toError(error),
 				isBackgroundRefresh,
 			};
+		} finally {
+			if (this.activeAbortController?.signal === signal) {
+				this.activeAbortController = undefined;
+			}
 		}
 	}
 
 	reset(): void {
+		this.activeAbortController?.abort();
+		this.activeAbortController = undefined;
 		this.currentFile = undefined;
 	}
 

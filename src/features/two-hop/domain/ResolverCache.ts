@@ -7,7 +7,6 @@ const MAX_RESOLVE_CACHE_SIZE = 64;
 interface ResolverPerformanceSettings {
 	enableProgressiveTwoHopBuild: boolean;
 	maxOutgoingToProcess: number;
-	maxHop2PerBranch: number;
 }
 
 interface ResolverResolveSettings {
@@ -18,7 +17,6 @@ export interface CachedResolveResult {
 	indexVersionAtBuild: number;
 	enableProgressiveTwoHopBuild: boolean;
 	maxOutgoingToProcess: number;
-	maxHop2PerBranch: number;
 	includeTaggedNotes: boolean;
 	dependencyPaths: ReadonlySet<string>;
 	dependencyLookupKeys: ReadonlySet<string>;
@@ -55,7 +53,6 @@ export class ResolverCache {
 			cached.enableProgressiveTwoHopBuild !==
 				performanceSettings.enableProgressiveTwoHopBuild ||
 			cached.maxOutgoingToProcess !== performanceSettings.maxOutgoingToProcess ||
-			cached.maxHop2PerBranch !== performanceSettings.maxHop2PerBranch ||
 			cached.includeTaggedNotes !== resolveSettings.includeTaggedNotes
 		) {
 			return undefined;
@@ -84,7 +81,6 @@ export class ResolverCache {
 			enableProgressiveTwoHopBuild:
 				performanceSettings.enableProgressiveTwoHopBuild,
 			maxOutgoingToProcess: performanceSettings.maxOutgoingToProcess,
-			maxHop2PerBranch: performanceSettings.maxHop2PerBranch,
 			includeTaggedNotes: resolveSettings.includeTaggedNotes,
 			dependencyPaths: new Set(dependencies.dependencyPaths),
 			dependencyLookupKeys: new Set(dependencies.dependencyLookupKeys),

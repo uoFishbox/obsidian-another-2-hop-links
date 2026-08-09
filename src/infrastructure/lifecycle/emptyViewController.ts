@@ -98,11 +98,12 @@ export function createEmptyViewController(
 		const applicationStore = plugin.createApplicationStore(
 			plugin.settings,
 			displayDataBuilder,
-			(file: TFile) =>
+			(file: TFile, _onProgress, signal) =>
 				plugin.getTwoHopLinkResult(file, undefined, {
 					includeTaggedNotes:
 						areTagFeaturesEnabled(plugin.settings) &&
 						plugin.settings.showTagsSection,
+					signal,
 				}),
 		);
 

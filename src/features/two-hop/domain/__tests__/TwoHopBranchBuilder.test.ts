@@ -34,10 +34,39 @@ describe("TwoHopBranchBuilder", () => {
 			{
 				enableProgressiveTwoHopBuild: true,
 				maxOutgoingToProcess: 0,
-				maxHop2PerBranch: 0,
 			},
 		);
 
 		expect(branches).toHaveLength(128);
+	});
+
+	test("stops while walking outgoing links when the resolve is aborted", async () => {
+		const { service, files } = new VaultEnvironmentBuilder(
+			createOriginDefinitions(2),
+		).build();
+		await service.rebuildIndexesTimeSliced();
+		const builder = new TwoHopBranchBuilder(service["metadataCache"], service);
+		let checkpointCount = 0;
+		const signal = {
+			get aborted() {
+				checkpointCount += 1;
+				return checkpointCount === 2;
+			},
+		} as unknown as AbortSignal;
+
+		await expect(
+			builder.buildHop1OnlyBranches(
+				files["origin.md"],
+				collectLinkReferences(
+					service["metadataCache"].getFileCache(files["origin.md"]),
+				),
+				{
+					enableProgressiveTwoHopBuild: true,
+					maxOutgoingToProcess: 0,
+				},
+				signal,
+			),
+		).rejects.toMatchObject({ name: "AbortError" });
+		expect(checkpointCount).toBe(2);
 	});
 });

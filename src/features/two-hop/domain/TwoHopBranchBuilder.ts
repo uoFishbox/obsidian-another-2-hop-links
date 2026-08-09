@@ -6,6 +6,7 @@ import { defaultYieldToMainThread } from "core/indexing/timeSlicing";
 import { getLookupPathForLink } from "core/indexing/link-resolution/linkResolution";
 import { resolveLinkDestination } from "core/indexing/link-resolution/linkResolution";
 import type { ResolverPerformanceSettings } from "./ResolverTypes";
+import { throwIfResolveAborted } from "./resolveCancellation";
 
 const BUILD_YIELD_INTERVAL_MS = 8;
 const BUILD_YIELD_CHECK_CADENCE = 32;
@@ -20,16 +21,19 @@ export class TwoHopBranchBuilder {
 		targetFile: TFile,
 		outgoingLinks: readonly LinkReference[],
 		performanceSettings: ResolverPerformanceSettings,
+		signal?: AbortSignal,
 	): Promise<TwoHopLinkBranch[]> {
 		const baseBranches = await this.buildHop1OnlyBranches(
 			targetFile,
 			outgoingLinks,
 			performanceSettings,
+			signal,
 		);
 		const result = await this.populateHop2(
 			targetFile,
 			baseBranches,
 			performanceSettings,
+			signal,
 		);
 		return result;
 	}
@@ -38,6 +42,7 @@ export class TwoHopBranchBuilder {
 		targetFile: TFile,
 		outgoingLinks: readonly LinkReference[],
 		performanceSettings: ResolverPerformanceSettings,
+		signal?: AbortSignal,
 	): Promise<TwoHopLinkBranch[]> {
 		let lastYieldAt = this.getNowMs();
 		let processedCount = 0;
@@ -53,6 +58,7 @@ export class TwoHopBranchBuilder {
 		);
 
 		for (let i = 0; i < effectiveCount; i += 1) {
+			throwIfResolveAborted(signal);
 			const linkReference = outgoingLinks[i];
 			const resolution = this.getResolvedOutgoingLink(
 				targetFile.path,
@@ -79,6 +85,7 @@ export class TwoHopBranchBuilder {
 					)
 				) {
 					await this.yieldToMainThread();
+					throwIfResolveAborted(signal);
 					lastYieldAt = this.getNowMs();
 				}
 				continue;
@@ -103,6 +110,7 @@ export class TwoHopBranchBuilder {
 				)
 			) {
 				await this.yieldToMainThread();
+				throwIfResolveAborted(signal);
 				lastYieldAt = this.getNowMs();
 			}
 		}
@@ -114,15 +122,13 @@ export class TwoHopBranchBuilder {
 		targetFile: TFile,
 		branches: readonly TwoHopLinkBranch[],
 		performanceSettings: ResolverPerformanceSettings,
+		signal?: AbortSignal,
 	): Promise<TwoHopLinkBranch[]> {
 		let lastYieldAt = this.getNowMs();
 		const populatedBranches = new Array<TwoHopLinkBranch>(branches.length);
-		const maxHop2 =
-			performanceSettings.maxHop2PerBranch > 0
-				? performanceSettings.maxHop2PerBranch
-				: undefined;
 
 		for (let index = 0; index < branches.length; index += 1) {
+			throwIfResolveAborted(signal);
 			const branch = branches[index];
 			const lookupPath = branch.hop1.path ?? getLookupPathForLink(branch.hop1);
 			populatedBranches[index] = {
@@ -130,7 +136,6 @@ export class TwoHopBranchBuilder {
 				hop2: this.indexingService.getUniqueBacklinkSourcesForLink(
 					lookupPath,
 					targetFile.path,
-					maxHop2,
 				),
 			};
 
@@ -142,6 +147,7 @@ export class TwoHopBranchBuilder {
 				)
 			) {
 				await this.yieldToMainThread();
+				throwIfResolveAborted(signal);
 				lastYieldAt = this.getNowMs();
 			}
 		}

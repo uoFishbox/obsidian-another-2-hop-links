@@ -365,6 +365,7 @@ export class ApplicationStore {
 	 * クリーンアップ
 	 */
 	destroy(): void {
+		this.loader.reset();
 		if (this.unsubscribeDataUpdate) {
 			this.unsubscribeDataUpdate();
 			this.unsubscribeDataUpdate = undefined;
@@ -401,9 +402,7 @@ export class ApplicationStore {
 			options,
 			this.data !== undefined,
 		);
-		if (!preparation.shouldLoad || preparation.requestId === undefined) {
-			return;
-		}
+		if (!preparation.shouldLoad) return;
 
 		if (!preparation.isBackgroundRefresh) {
 			this.mutableLoadState = {
@@ -425,6 +424,7 @@ export class ApplicationStore {
 			file,
 			preparation.requestId,
 			preparation.isBackgroundRefresh,
+			preparation.signal,
 			preparation.isBackgroundRefresh
 				? undefined
 				: (progress) => this.applyResolveProgress(progress),

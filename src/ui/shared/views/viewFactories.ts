@@ -14,11 +14,12 @@ export function createDefaultApplicationStore(
 	return plugin.createApplicationStore(
 		settings,
 		displayDataBuilder,
-		(file: TFile, onProgress) =>
+		(file: TFile, onProgress, signal) =>
 			plugin.getTwoHopLinkResult(file, onProgress, {
 				includeTaggedNotes:
 					areTagFeaturesEnabled(plugin.settings) &&
 					plugin.settings.showTagsSection,
+				signal,
 			}),
 	);
 }

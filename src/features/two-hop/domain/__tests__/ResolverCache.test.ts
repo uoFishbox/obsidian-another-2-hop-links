@@ -22,7 +22,6 @@ function defaultPerformanceSettings() {
 	return {
 		enableProgressiveTwoHopBuild: true,
 		maxOutgoingToProcess: 0,
-		maxHop2PerBranch: 0,
 	};
 }
 

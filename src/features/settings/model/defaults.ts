@@ -56,5 +56,4 @@ export const DEFAULT_SETTINGS: PluginSettings = {
 	enableContentSearch: false,
 	ripgrepExecutablePath: "",
 	maxOutgoingToProcess: 0,
-	maxHop2PerBranch: 0,
 };

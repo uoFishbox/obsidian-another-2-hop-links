@@ -794,6 +794,7 @@ describe("ApplicationStore (Runes)", () => {
 	it("ignores stale response in competing requests", async () => {
 		const fileA = createMockTFile("A.md");
 		const fileB = createMockTFile("B.md");
+		const signals: AbortSignal[] = [];
 
 		let resolveA!: (value: TwoHopLinkResult) => void;
 		let resolveB!: (value: TwoHopLinkResult) => void;
@@ -807,13 +808,22 @@ describe("ApplicationStore (Runes)", () => {
 
 		const resolveTwoHopLinks = vi
 			.fn<ResolveTwoHopLinks>()
-			.mockImplementationOnce(async () => promiseA)
-			.mockImplementationOnce(async () => promiseB);
+			.mockImplementationOnce(async (_file, _onProgress, signal) => {
+				if (signal) signals.push(signal);
+				return promiseA;
+			})
+			.mockImplementationOnce(async (_file, _onProgress, signal) => {
+				if (signal) signals.push(signal);
+				return promiseB;
+			});
 
 		const { store } = createStore({ resolveTwoHopLinks });
 
 		const loadA = store.load(fileA);
 		const loadB = store.load(fileB);
+		expect(signals).toHaveLength(2);
+		expect(signals[0].aborted).toBe(true);
+		expect(signals[1].aborted).toBe(false);
 
 		const latestResult = createLinkResult(fileB.path);
 		resolveB(latestResult);

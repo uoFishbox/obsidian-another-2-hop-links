@@ -291,7 +291,7 @@ describe("TwoHopLinkResolver", () => {
 	});
 
 	describe("cache and updates", () => {
-		test("display link revision changes when branch performance settings change at the same index version", async () => {
+		test("display link revision changes when the outgoing branch limit changes at the same index version", async () => {
 			const env = await buildResolvedEnvironment([
 				{ path: "origin.md", links: ["note1", "note2"] },
 				{ path: "note1.md" },
@@ -302,7 +302,6 @@ describe("TwoHopLinkResolver", () => {
 			const performanceSettings: ResolverPerformanceSettings = {
 				enableProgressiveTwoHopBuild: true,
 				maxOutgoingToProcess: 1,
-				maxHop2PerBranch: 1,
 			};
 			const resolver = createResolver(env, env.service, {
 				performance: () => performanceSettings,
@@ -311,7 +310,7 @@ describe("TwoHopLinkResolver", () => {
 
 			const outgoingLimited = await resolver.resolve(env.files["origin.md"]);
 			expect(outgoingLimited.branches).toHaveLength(1);
-			expect(outgoingLimited.branches[0].hop2).toHaveLength(1);
+			expect(outgoingLimited.branches[0].hop2).toHaveLength(2);
 
 			performanceSettings.maxOutgoingToProcess = 2;
 			const outgoingExpanded = await resolver.resolve(env.files["origin.md"]);
@@ -319,14 +318,6 @@ describe("TwoHopLinkResolver", () => {
 			expect(outgoingExpanded.branches).toHaveLength(2);
 			expect(outgoingExpanded.displayVersions?.links).not.toBe(
 				outgoingLimited.displayVersions?.links,
-			);
-
-			performanceSettings.maxHop2PerBranch = 2;
-			const hop2Expanded = await resolver.resolve(env.files["origin.md"]);
-			expect(env.service.getIndexVersion()).toBe(indexVersion);
-			expect(branchFor(hop2Expanded, "note1.md")?.hop2).toHaveLength(2);
-			expect(hop2Expanded.displayVersions?.links).not.toBe(
-				outgoingExpanded.displayVersions?.links,
 			);
 		});
 
@@ -353,6 +344,67 @@ describe("TwoHopLinkResolver", () => {
 			idleDeferred.resolve();
 			const [firstResult, secondResult] = await Promise.all([first, second]);
 			expect(firstResult).toBe(secondResult);
+		});
+
+		test("aborting one consumer keeps a shared same-file resolve alive for another", async () => {
+			const env = await buildResolvedEnvironment([
+				{ path: "origin.md", links: ["note1"] },
+				{ path: "note1.md" },
+			]);
+			const idleDeferred = createDeferred<void>();
+			const awaitIdleSpy = vi
+				.spyOn(env.service, "awaitIdle")
+				.mockReturnValue(idleDeferred.promise);
+			const firstController = new AbortController();
+			const secondController = new AbortController();
+			const resolver = createResolver(env);
+			const first = resolver.resolve(env.files["origin.md"], undefined, {
+				signal: firstController.signal,
+			});
+			const second = resolver.resolve(env.files["origin.md"], undefined, {
+				signal: secondController.signal,
+			});
+			const firstRejection = expect(first).rejects.toMatchObject({
+				name: "AbortError",
+			});
+
+			firstController.abort();
+			await firstRejection;
+			expect(awaitIdleSpy).toHaveBeenCalledTimes(1);
+
+			idleDeferred.resolve();
+			await expect(second).resolves.toMatchObject({
+				originFile: env.files["origin.md"],
+			});
+		});
+
+		test("stops a resolve after idle when its only consumer aborts", async () => {
+			const env = await buildResolvedEnvironment([
+				{ path: "origin.md", links: ["note1"] },
+				{ path: "note1.md" },
+			]);
+			const idleDeferred = createDeferred<void>();
+			vi.spyOn(env.service, "awaitIdle").mockReturnValue(idleDeferred.promise);
+			const backlinkQuerySpy = vi.spyOn(
+				env.service,
+				"getUniqueBacklinkSourcesForLink",
+			);
+			const abortController = new AbortController();
+			const resolver = createResolver(env);
+			const request = resolver.resolve(env.files["origin.md"], undefined, {
+				signal: abortController.signal,
+			});
+			const rejection = expect(request).rejects.toMatchObject({
+				name: "AbortError",
+			});
+
+			abortController.abort();
+			await rejection;
+			idleDeferred.resolve();
+			await Promise.resolve();
+			await Promise.resolve();
+
+			expect(backlinkQuerySpy).not.toHaveBeenCalled();
 		});
 
 		test("resolver with data update subscription can return warm cache before idle", async () => {

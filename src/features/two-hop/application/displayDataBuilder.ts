@@ -284,6 +284,33 @@ function shouldKeepNonAttachmentBranch(branch: TwoHopLinkBranch): boolean {
 	return !isAttachment(extension);
 }
 
+function filterBranchHop2Attachments(
+	branches: readonly TwoHopLinkBranch[],
+): readonly TwoHopLinkBranch[] {
+	let filteredBranches: TwoHopLinkBranch[] | undefined;
+
+	for (let index = 0; index < branches.length; index += 1) {
+		const branch = branches[index];
+		const hop2 = filterWithReferenceReuse(
+			branch.hop2,
+			shouldKeepNonAttachmentBacklink,
+		);
+
+		if (hop2 === branch.hop2) {
+			filteredBranches?.push(branch);
+			continue;
+		}
+
+		filteredBranches ??= branches.slice(0, index);
+		filteredBranches.push({
+			hop1: branch.hop1,
+			hop2,
+		});
+	}
+
+	return filteredBranches ?? branches;
+}
+
 function shouldKeepNonAttachmentTaggedNote(note: TaggedNote): boolean {
 	return !isAttachment(note.file.extension);
 }
@@ -340,6 +367,7 @@ function preprocessLinkData(
 			originalBranches,
 			shouldKeepNonAttachmentBranch,
 		);
+		originalBranches = filterBranchHop2Attachments(originalBranches);
 	}
 
 	let branchesForProcessing: readonly TwoHopLinkBranch[];
@@ -372,9 +400,9 @@ function preprocessLinkData(
 
 	const { resolvedBranches, resolvedBacklinks, mergedBaseItems, newLinks } =
 		collectDisplayBaseData(branchesForProcessing, backlinksForProcessing);
-	const nonEmptyTwoHopBranches = deduplicationService
-		? twoHopBranchesForProcessing
-		: filterNonEmptyTwoHopBranches(twoHopBranchesForProcessing);
+	const nonEmptyTwoHopBranches = filterNonEmptyTwoHopBranches(
+		twoHopBranchesForProcessing,
+	);
 	const sortedNonEmptyTwoHopBranches = sortTwoHopBranchesIfNeeded(
 		nonEmptyTwoHopBranches,
 		preprocessSettings,

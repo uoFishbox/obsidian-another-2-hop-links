@@ -21,6 +21,7 @@ import {
 	createImmutableTaggedNotes,
 	freezeTwoHopLinkResult,
 } from "./immutableTwoHopLinkResult";
+import { createResolveAbortError, throwIfResolveAborted } from "./resolveCancellation";
 
 let nextDisplaySnapshotRevision = 0;
 
@@ -33,19 +34,27 @@ const MAX_RESOLVE_RETRY_COUNT = 4;
 
 export interface ResolveOptions {
 	includeTaggedNotes?: boolean;
+	signal?: AbortSignal;
+}
+
+interface ResolveSettings {
+	readonly includeTaggedNotes: boolean;
+}
+
+interface InFlightResolve {
+	readonly requestKey: string;
+	readonly controller: AbortController;
+	readonly promise: Promise<TwoHopLinkResult>;
+	readonly consumers: Set<symbol>;
+	readonly listeners: Map<symbol, (progress: ResolveProgress) => void>;
+	lastProgress: ResolveProgress | undefined;
+	settled: boolean;
 }
 
 export class TwoHopLinkResolver {
 	private readonly cache: ResolverCache;
 	private readonly branchBuilder: TwoHopBranchBuilder;
-	private readonly inFlightResolves = new Map<
-		string,
-		{
-			promise: Promise<TwoHopLinkResult>;
-			listeners: Set<(progress: ResolveProgress) => void>;
-			lastProgress: ResolveProgress | undefined;
-		}
-	>();
+	private readonly inFlightResolves = new Map<string, InFlightResolve>();
 	private readonly supportsDataUpdateSubscription: boolean;
 	private unsubscribeDataUpdate: (() => void) | undefined;
 	private lastIndexVersion: number | undefined;
@@ -71,11 +80,14 @@ export class TwoHopLinkResolver {
 	}
 
 	public destroy(): void {
-		if (!this.unsubscribeDataUpdate) {
-			return;
+		for (const inFlight of this.inFlightResolves.values()) {
+			inFlight.controller.abort();
 		}
-		this.unsubscribeDataUpdate();
-		this.unsubscribeDataUpdate = undefined;
+		this.inFlightResolves.clear();
+		if (this.unsubscribeDataUpdate) {
+			this.unsubscribeDataUpdate();
+			this.unsubscribeDataUpdate = undefined;
+		}
 	}
 
 	public async resolve(
@@ -83,6 +95,7 @@ export class TwoHopLinkResolver {
 		onProgress?: (progress: ResolveProgress) => void,
 		options?: ResolveOptions,
 	): Promise<TwoHopLinkResult> {
+		throwIfResolveAborted(options?.signal);
 		const performanceSettings = this.getPerformanceSettings();
 		const resolveSettings = this.getResolveSettings(options);
 		const requestKey = this.createResolveRequestKey(
@@ -92,19 +105,11 @@ export class TwoHopLinkResolver {
 		);
 		const inFlight = this.inFlightResolves.get(requestKey);
 		if (inFlight) {
-			if (onProgress) {
-				if (inFlight.lastProgress) {
-					onProgress(inFlight.lastProgress);
-				}
-				inFlight.listeners.add(onProgress);
-			}
-			return inFlight.promise;
+			return this.joinInFlightResolve(inFlight, onProgress, options?.signal);
 		}
 
-		const listeners = new Set<(progress: ResolveProgress) => void>();
-		if (onProgress) {
-			listeners.add(onProgress);
-		}
+		const controller = new AbortController();
+		let progressBeforeRegistration: ResolveProgress | undefined;
 		const resolvePromise = this.resolveInternal(
 			targetFile,
 			performanceSettings,
@@ -112,36 +117,105 @@ export class TwoHopLinkResolver {
 			(progress) => {
 				const current = this.inFlightResolves.get(requestKey);
 				if (!current) {
+					progressBeforeRegistration = progress;
 					return;
 				}
 				current.lastProgress = progress;
-				for (const listener of current.listeners) {
+				for (const listener of current.listeners.values()) {
 					listener(progress);
 				}
 			},
+			controller.signal,
 		);
-		this.inFlightResolves.set(requestKey, {
+		const createdInFlight: InFlightResolve = {
+			requestKey,
+			controller,
 			promise: resolvePromise,
-			listeners,
-			lastProgress: undefined,
-		});
+			consumers: new Set(),
+			listeners: new Map(),
+			lastProgress: progressBeforeRegistration,
+			settled: false,
+		};
+		this.inFlightResolves.set(requestKey, createdInFlight);
+		void resolvePromise.then(
+			() => {
+				createdInFlight.settled = true;
+				if (this.inFlightResolves.get(requestKey) === createdInFlight) {
+					this.inFlightResolves.delete(requestKey);
+				}
+			},
+			() => {
+				createdInFlight.settled = true;
+				if (this.inFlightResolves.get(requestKey) === createdInFlight) {
+					this.inFlightResolves.delete(requestKey);
+				}
+			},
+		);
 
-		try {
-			return await resolvePromise;
-		} finally {
-			if (this.inFlightResolves.get(requestKey)?.promise === resolvePromise) {
-				this.inFlightResolves.delete(requestKey);
+		return this.joinInFlightResolve(createdInFlight, onProgress, options?.signal);
+	}
+
+	private joinInFlightResolve(
+		inFlight: InFlightResolve,
+		onProgress: ((progress: ResolveProgress) => void) | undefined,
+		signal: AbortSignal | undefined,
+	): Promise<TwoHopLinkResult> {
+		throwIfResolveAborted(signal);
+		const consumerId = Symbol("two-hop-resolve-consumer");
+		inFlight.consumers.add(consumerId);
+		if (onProgress) {
+			inFlight.listeners.set(consumerId, onProgress);
+			if (inFlight.lastProgress) {
+				onProgress(inFlight.lastProgress);
 			}
 		}
+
+		return new Promise<TwoHopLinkResult>((resolve, reject) => {
+			let consumerSettled = false;
+			const releaseConsumer = (): void => {
+				if (consumerSettled) return;
+				consumerSettled = true;
+				signal?.removeEventListener("abort", handleAbort);
+				inFlight.consumers.delete(consumerId);
+				inFlight.listeners.delete(consumerId);
+				if (inFlight.settled || inFlight.consumers.size > 0) return;
+				if (this.inFlightResolves.get(inFlight.requestKey) === inFlight) {
+					this.inFlightResolves.delete(inFlight.requestKey);
+				}
+				inFlight.controller.abort();
+			};
+			const handleAbort = (): void => {
+				releaseConsumer();
+				reject(createResolveAbortError());
+			};
+
+			signal?.addEventListener("abort", handleAbort, { once: true });
+			if (signal?.aborted) {
+				handleAbort();
+				return;
+			}
+			void inFlight.promise.then(
+				(result) => {
+					releaseConsumer();
+					resolve(result);
+				},
+				(error: unknown) => {
+					releaseConsumer();
+					reject(error);
+				},
+			);
+		});
 	}
 
 	private async resolveInternal(
 		targetFile: TFile,
 		performanceSettings: ResolverPerformanceSettings,
-		resolveSettings: Required<ResolveOptions>,
+		resolveSettings: ResolveSettings,
 		onProgress?: (progress: ResolveProgress) => void,
+		signal?: AbortSignal,
 	): Promise<TwoHopLinkResult> {
 		for (let retryCount = 0; ; retryCount += 1) {
+			throwIfResolveAborted(signal);
 			if (this.supportsDataUpdateSubscription) {
 				const cachedResult = this.cache.get(
 					targetFile.path,
@@ -158,6 +232,7 @@ export class TwoHopLinkResolver {
 			}
 
 			await this.indexingService.awaitIdle();
+			throwIfResolveAborted(signal);
 			const indexVersion = this.indexingService.getIndexVersion();
 
 			if (!this.supportsDataUpdateSubscription) {
@@ -204,6 +279,7 @@ export class TwoHopLinkResolver {
 				targetFile,
 				outgoingLinks,
 				performanceSettings,
+				signal,
 			);
 			const baseResult = freezeTwoHopLinkResult({
 				originFile: targetFile,
@@ -219,12 +295,15 @@ export class TwoHopLinkResolver {
 				phase: "base",
 				data: baseResult,
 			});
+			throwIfResolveAborted(signal);
 
 			await Promise.resolve();
+			throwIfResolveAborted(signal);
 			const twoHopBranches = await this.branchBuilder.populateHop2(
 				targetFile,
 				baseBranches,
 				performanceSettings,
+				signal,
 			);
 			const twoHopResult = freezeTwoHopLinkResult({
 				originFile: targetFile,
@@ -240,6 +319,7 @@ export class TwoHopLinkResolver {
 				phase: "twohop",
 				data: twoHopResult,
 			});
+			throwIfResolveAborted(signal);
 
 			const taggedNotes = resolveSettings.includeTaggedNotes
 				? createImmutableTaggedNotes(
@@ -258,6 +338,7 @@ export class TwoHopLinkResolver {
 					resolveSettings.includeTaggedNotes,
 				),
 			});
+			throwIfResolveAborted(signal);
 
 			if (this.indexingService.getIndexVersion() !== indexVersion) {
 				if (retryCount >= MAX_RESOLVE_RETRY_COUNT) {
@@ -323,11 +404,10 @@ export class TwoHopLinkResolver {
 				0,
 				Math.floor(override?.maxOutgoingToProcess ?? 0),
 			),
-			maxHop2PerBranch: Math.max(0, Math.floor(override?.maxHop2PerBranch ?? 0)),
 		};
 	}
 
-	private getResolveSettings(options?: ResolveOptions): Required<ResolveOptions> {
+	private getResolveSettings(options?: ResolveOptions): ResolveSettings {
 		return {
 			includeTaggedNotes: options?.includeTaggedNotes ?? true,
 		};
@@ -336,13 +416,13 @@ export class TwoHopLinkResolver {
 	private createResolveRequestKey(
 		filePath: string,
 		performanceSettings: ResolverPerformanceSettings,
-		resolveSettings: Required<ResolveOptions>,
+		resolveSettings: ResolveSettings,
 	): string {
 		return `${filePath}\u0000${
 			performanceSettings.enableProgressiveTwoHopBuild ? "1" : "0"
 		}\u0000${performanceSettings.maxOutgoingToProcess}\u0000${
-			performanceSettings.maxHop2PerBranch
-		}\u0000${resolveSettings.includeTaggedNotes ? "1" : "0"}`;
+			resolveSettings.includeTaggedNotes ? "1" : "0"
+		}`;
 	}
 
 	private createDisplayVersions(
