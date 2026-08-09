@@ -31,6 +31,29 @@ export function createPreviewSurfaceProbe(
 
 	const surface = {
 		registerHost,
+		commit: vi.fn(
+			(frame: {
+				readonly active: boolean;
+				readonly activeRange: { readonly start: number; readonly end: number };
+				readonly bindings: readonly TestPreviewBinding[];
+			}): void => {
+				surface.beginBindings();
+				for (const binding of frame.bindings) {
+					surface.bindSlot(
+						binding.slotId,
+						binding.rowIndex,
+						binding.ownerKey,
+						binding.request,
+					);
+				}
+				surface.endBindings();
+				surface.setActiveRange(
+					frame.activeRange.start,
+					frame.activeRange.end,
+					frame.active,
+				);
+			},
+		),
 		beginBindings: vi.fn(() => {
 			stagedBindings = new Map();
 		}),

@@ -13,7 +13,7 @@
 
 	interface Props {
 		cell: TwoHopProgressiveCell;
-		previewHostCandidate: boolean;
+		previewHostEnabled: boolean;
 		registerCardModelConsumer: (
 			logicalKey: string,
 			consumer: (model: CardShellModel | undefined) => void,
@@ -21,7 +21,7 @@
 		onLoadMore: (sectionId: string) => void;
 	}
 
-	let { cell, previewHostCandidate, registerCardModelConsumer, onLoadMore }: Props =
+	let { cell, previewHostEnabled, registerCardModelConsumer, onLoadMore }: Props =
 		$props();
 	let cardModel = $state.raw<CardShellModel | undefined>(undefined);
 
@@ -117,7 +117,7 @@
 		{#snippet children()}
 			{#if model && !getDebugDisableCardDomPreview() && model.item.type === "newLink" && !model.targetFile}
 				<UnresolvedPreviewPlaceholder />
-			{:else if model && !getDebugDisableCardDomPreview() && model.targetFile && previewHostCandidate}
+			{:else if model && !getDebugDisableCardDomPreview() && model.targetFile && previewHostEnabled}
 				<div
 					use:previewHost={cell.logicalKey}
 					class="cosense-card-links__box-preview"

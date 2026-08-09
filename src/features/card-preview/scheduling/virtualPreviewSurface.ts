@@ -20,8 +20,23 @@ export interface PreviewHostLease {
 	dispose(): void;
 }
 
+export interface VirtualPreviewBinding {
+	readonly slotId: string;
+	readonly rowIndex: number;
+	readonly ownerKey: string;
+	readonly request: CardPreviewRequest;
+}
+
+export interface VirtualPreviewSurfaceSnapshot {
+	readonly active: boolean;
+	readonly activeRange: { readonly start: number; readonly end: number };
+	readonly bindings: readonly VirtualPreviewBinding[];
+}
+
 export interface VirtualPreviewSurface {
 	registerHost(slotId: string, element: HTMLElement): PreviewHostLease;
+	/** Atomically publishes the desired range and complete binding set. */
+	commit(snapshot: VirtualPreviewSurfaceSnapshot): void;
 	/** Starts publication of the complete desired binding set for this surface. */
 	beginBindings(): void;
 	/** Stages one desired slot binding in the current publication pass. */
@@ -42,14 +57,18 @@ export interface CreateVirtualPreviewSurfaceOptions {
 	readonly frameCoordinator?: VirtualFrameCoordinator;
 	readonly activationScheduler: PreviewActivationScheduler;
 	readonly createRenderer: () => CardPreviewRenderer;
-	/** Optional lifecycle probe invoked after a hostless, unbound slot is released. */
+	/** Optional lifecycle probe invoked after an unbound slot runtime is released. */
 	readonly onSlotDisposed?: (slotId: string) => void;
+}
+
+interface PreviewHostRegistration {
+	readonly element: HTMLElement;
+	controllerLease?: PreviewHostLease;
 }
 
 interface PreviewSlotRuntime {
 	readonly slotId: string;
 	readonly controller: PreviewSlotController;
-	hostLeaseCount: number;
 	binding?: PreviewBinding;
 	rowIndex?: number;
 	desiredBinding?: PreviewBinding;
@@ -66,6 +85,8 @@ export function createVirtualPreviewSurface(
 	options: CreateVirtualPreviewSurfaceOptions,
 ): VirtualPreviewSurface {
 	const slotsById = new Map<string, PreviewSlotRuntime>();
+	const slotIdsByRow = new Map<number, Set<string>>();
+	const hostsBySlotId = new Map<string, Set<PreviewHostRegistration>>();
 	const dirtySlots = new Set<PreviewSlotRuntime>();
 	const pendingBySlotId = new Map<string, PreviewActivationHandle>();
 	const activationScheduler = options.activationScheduler;
@@ -92,7 +113,6 @@ export function createVirtualPreviewSurface(
 		if (existing) return existing;
 		const slot: PreviewSlotRuntime = {
 			slotId,
-			hostLeaseCount: 0,
 			controller: createPreviewSlotController({
 				createRenderer: options.createRenderer,
 			}),
@@ -100,6 +120,11 @@ export function createVirtualPreviewSurface(
 			dirty: false,
 		};
 		slotsById.set(slotId, slot);
+		for (const registration of hostsBySlotId.get(slotId) ?? []) {
+			registration.controllerLease = slot.controller.attachHost(
+				registration.element,
+			);
+		}
 		return slot;
 	}
 
@@ -114,10 +139,14 @@ export function createVirtualPreviewSurface(
 	}
 
 	function maybeDisposeSlot(slot: PreviewSlotRuntime): void {
-		if (slot.hostLeaseCount > 0) return;
 		if (slot.binding || slot.desiredBinding) return;
 		if (slot.dirty) return;
 		if (pendingBySlotId.has(slot.slotId)) return;
+		removeSlotFromRow(slot.slotId, slot.rowIndex);
+		for (const registration of hostsBySlotId.get(slot.slotId) ?? []) {
+			registration.controllerLease?.dispose();
+			registration.controllerLease = undefined;
+		}
 		slot.controller.dispose();
 		slotsById.delete(slot.slotId);
 		options.onSlotDisposed?.(slot.slotId);
@@ -163,7 +192,26 @@ export function createVirtualPreviewSurface(
 		cancelPendingActivation(slot.slotId);
 	}
 
+	function addSlotToRow(slotId: string, rowIndex: number | undefined): void {
+		if (rowIndex === undefined) return;
+		let slotIds = slotIdsByRow.get(rowIndex);
+		if (!slotIds) {
+			slotIds = new Set();
+			slotIdsByRow.set(rowIndex, slotIds);
+		}
+		slotIds.add(slotId);
+	}
+
+	function removeSlotFromRow(slotId: string, rowIndex: number | undefined): void {
+		if (rowIndex === undefined) return;
+		const slotIds = slotIdsByRow.get(rowIndex);
+		if (!slotIds) return;
+		slotIds.delete(slotId);
+		if (slotIds.size === 0) slotIdsByRow.delete(rowIndex);
+	}
+
 	function applyDirtyBinding(slot: PreviewSlotRuntime): void {
+		const previousRowIndex = slot.rowIndex;
 		if (slot.desiredBinding) {
 			slot.controller.bind(slot.desiredBinding);
 			slot.binding = slot.desiredBinding;
@@ -173,49 +221,111 @@ export function createVirtualPreviewSurface(
 			slot.binding = undefined;
 			slot.rowIndex = undefined;
 		}
+		if (previousRowIndex !== slot.rowIndex) {
+			removeSlotFromRow(slot.slotId, previousRowIndex);
+			addSlotToRow(slot.slotId, slot.rowIndex);
+		}
 		slot.dirty = false;
+	}
+
+	function reconcileRow(rowIndex: number): void {
+		for (const slotId of slotIdsByRow.get(rowIndex) ?? []) {
+			const slot = slotsById.get(slotId);
+			if (slot) reconcileSlot(slot);
+		}
+	}
+
+	function reconcileRangeDifference(
+		leftStart: number,
+		leftEnd: number,
+		rightStart: number,
+		rightEnd: number,
+	): void {
+		for (let rowIndex = leftStart; rowIndex < leftEnd; rowIndex += 1) {
+			if (rowIndex >= rightStart && rowIndex < rightEnd) continue;
+			reconcileRow(rowIndex);
+		}
 	}
 
 	function applyDesiredState(): void {
 		if (disposed) return;
+		const previousRangeActive = appliedRangeActive;
+		const previousRangeStart = appliedRangeStart;
+		const previousRangeEnd = appliedRangeEnd;
 		const rangeChanged =
-			desiredRangeActive !== appliedRangeActive ||
-			desiredRangeStart !== appliedRangeStart ||
-			desiredRangeEnd !== appliedRangeEnd;
+			desiredRangeActive !== previousRangeActive ||
+			desiredRangeStart !== previousRangeStart ||
+			desiredRangeEnd !== previousRangeEnd;
+		const dirtySnapshot = [...dirtySlots];
 
 		appliedRangeActive = desiredRangeActive;
 		appliedRangeStart = desiredRangeStart;
 		appliedRangeEnd = desiredRangeEnd;
 
-		for (const slot of dirtySlots) applyDirtyBinding(slot);
+		for (const slot of dirtySnapshot) applyDirtyBinding(slot);
 
 		if (rangeChanged) {
-			for (const slot of slotsById.values()) reconcileSlot(slot);
-		} else {
-			for (const slot of dirtySlots) reconcileSlot(slot);
+			const oldStart = previousRangeActive ? previousRangeStart : 0;
+			const oldEnd = previousRangeActive ? previousRangeEnd : 0;
+			const nextStart = desiredRangeActive ? desiredRangeStart : 0;
+			const nextEnd = desiredRangeActive ? desiredRangeEnd : 0;
+			reconcileRangeDifference(oldStart, oldEnd, nextStart, nextEnd);
+			reconcileRangeDifference(nextStart, nextEnd, oldStart, oldEnd);
 		}
+		for (const slot of dirtySnapshot) reconcileSlot(slot);
 
-		for (const slot of dirtySlots) maybeDisposeSlot(slot);
+		for (const slot of dirtySnapshot) maybeDisposeSlot(slot);
 		dirtySlots.clear();
 	}
 
 	function registerHost(slotId: string, element: HTMLElement): PreviewHostLease {
 		if (disposed) return DISABLED_PREVIEW_HOST_LEASE;
-		const slot = getOrCreateSlot(slotId);
-		const lease = slot.controller.attachHost(element);
-		slot.hostLeaseCount += 1;
-		reconcileSlot(slot);
+		const registration: PreviewHostRegistration = { element };
+		let registrations = hostsBySlotId.get(slotId);
+		if (!registrations) {
+			registrations = new Set();
+			hostsBySlotId.set(slotId, registrations);
+		}
+		registrations.add(registration);
+		const slot = slotsById.get(slotId);
+		if (slot) {
+			registration.controllerLease = slot.controller.attachHost(element);
+			reconcileSlot(slot);
+		}
 		let disposedLease = false;
 		return {
 			dispose(): void {
 				if (disposedLease) return;
 				disposedLease = true;
-				lease.dispose();
-				slot.hostLeaseCount = Math.max(0, slot.hostLeaseCount - 1);
-				reconcileSlot(slot);
-				maybeDisposeSlot(slot);
+				registration.controllerLease?.dispose();
+				registration.controllerLease = undefined;
+				registrations?.delete(registration);
+				if (registrations?.size === 0) hostsBySlotId.delete(slotId);
+				const activeSlot = slotsById.get(slotId);
+				if (!activeSlot) return;
+				reconcileSlot(activeSlot);
+				maybeDisposeSlot(activeSlot);
 			},
 		};
+	}
+
+	function commit(snapshot: VirtualPreviewSurfaceSnapshot): void {
+		if (disposed) return;
+		beginBindings();
+		for (const binding of snapshot.bindings) {
+			bindSlot(
+				binding.slotId,
+				binding.rowIndex,
+				binding.ownerKey,
+				binding.request,
+			);
+		}
+		endBindings();
+		setActiveRange(
+			snapshot.activeRange.start,
+			snapshot.activeRange.end,
+			snapshot.active,
+		);
 	}
 
 	function beginBindings(): void {
@@ -288,13 +398,21 @@ export function createVirtualPreviewSurface(
 		for (const handle of pendingBySlotId.values()) handle.cancel();
 		pendingBySlotId.clear();
 		dirtySlots.clear();
+		for (const registrations of hostsBySlotId.values()) {
+			for (const registration of registrations) {
+				registration.controllerLease?.dispose();
+			}
+		}
+		hostsBySlotId.clear();
 		for (const slot of slotsById.values()) slot.controller.dispose();
 		slotsById.clear();
+		slotIdsByRow.clear();
 		activationScheduler.disposeScope(scope);
 	}
 
 	return {
 		registerHost,
+		commit,
 		beginBindings,
 		bindSlot,
 		endBindings,

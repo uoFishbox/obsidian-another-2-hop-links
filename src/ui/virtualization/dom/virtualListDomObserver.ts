@@ -41,6 +41,8 @@ export type { VirtualListSharedScrollMetrics } from "./sharedScrollMetrics";
 export interface ObserveVirtualListViewportOptions {
 	rootEl: HTMLElement;
 	onWidthChange: (width: number) => void;
+	/** Whether root height-only resize entries should schedule layout work. */
+	measureOnRootHeightChange?: boolean;
 	getCachedViewportHeight?: () => number;
 	/**
 	 * Returns the initial open interval that does not require measurement.
@@ -594,6 +596,9 @@ const handleRootResizeEntry = (
 	}
 
 	if (heightChanged) {
+		if (subscriber.measureOnRootHeightChange === false) {
+			return;
+		}
 		subscriber.scheduleLayoutMeasurement();
 		return;
 	}

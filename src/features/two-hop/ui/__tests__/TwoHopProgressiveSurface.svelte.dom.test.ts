@@ -79,6 +79,36 @@ function createCardModelResolver() {
 	);
 }
 
+async function waitForCardHydrationToSettle(
+	resolver: ReturnType<typeof vi.fn>,
+): Promise<void> {
+	let previousCallCount = resolver.mock.calls.length;
+	let stableFrameCount = 0;
+	for (let attempt = 0; attempt < 50; attempt += 1) {
+		await waitForNextAnimationFrame();
+		const currentCallCount = resolver.mock.calls.length;
+		if (currentCallCount === previousCallCount) {
+			stableFrameCount += 1;
+			if (stableFrameCount >= 2) return;
+			continue;
+		}
+		previousCallCount = currentCallCount;
+		stableFrameCount = 0;
+	}
+	throw new Error("Card hydration did not settle");
+}
+
+async function waitForNextAnimationFrame(): Promise<void> {
+	await new Promise<void>((resolve) => {
+		if (typeof window.requestAnimationFrame === "function") {
+			window.requestAnimationFrame(() => resolve());
+			return;
+		}
+		window.setTimeout(resolve, 0);
+	});
+	await Promise.resolve();
+}
+
 async function renderAnchorTestSurface() {
 	const applicationStore = {
 		settings: {
@@ -216,6 +246,7 @@ describe("TwoHopProgressiveSurface", () => {
 
 		await flushFrames();
 		await vi.waitFor(() => expect(resolveItemCardModel).toHaveBeenCalled());
+		await waitForCardHydrationToSettle(resolveItemCardModel);
 		for (let index = 0; index < 2; index += 1) {
 			const sentinel = root.shadowRoot?.querySelector<HTMLElement>(
 				".twohop-progressive-sentinel",
@@ -436,11 +467,14 @@ describe("TwoHopProgressiveSurface", () => {
 		contentRect.mockClear();
 		scrollerRect.mockClear();
 
-		const observer = resizeObserverRecords.find((record) =>
+		const rootObserver = resizeObserverRecords.find((record) =>
 			record.elements.has(root),
 		);
-		expect(observer?.elements.has(content)).toBe(false);
-		expect(observer?.elements.has(scroller)).toBe(true);
+		const scrollerObserver = resizeObserverRecords.find((record) =>
+			record.elements.has(scroller),
+		);
+		expect(rootObserver?.elements.has(content)).toBe(false);
+		expect(scrollerObserver).toBeDefined();
 
 		triggerResize(root, rootWidth, 30_000);
 		expect(rootRect).not.toHaveBeenCalled();
@@ -462,8 +496,10 @@ describe("TwoHopProgressiveSurface", () => {
 
 		setNumericProperty(scroller, "clientHeight", 400);
 		triggerResize(scroller, 320, 400);
-		expect(contentRect).toHaveBeenCalledOnce();
-		expect(scrollerRect).toHaveBeenCalledOnce();
+		await vi.waitFor(() => {
+			expect(contentRect).toHaveBeenCalledOnce();
+			expect(scrollerRect).toHaveBeenCalledOnce();
+		});
 		rootRect.mockClear();
 		contentRect.mockClear();
 		scrollerRect.mockClear();
@@ -634,6 +670,7 @@ describe("TwoHopProgressiveSurface", () => {
 		triggerResize(root, 320, 20_000);
 		await flushFrames();
 		await vi.waitFor(() => expect(resolveItemCardModel).toHaveBeenCalled());
+		await waitForCardHydrationToSettle(resolveItemCardModel);
 		const hydratedCount = resolveItemCardModel.mock.calls.length;
 		const chunkCount = root.shadowRoot?.querySelectorAll(
 			".twohop-progressive-chunk",
@@ -835,6 +872,7 @@ describe("TwoHopProgressiveSurface", () => {
 			const frame = publish.mock.lastCall?.[0] as PreviewFrame | undefined;
 			expect(frame?.previewBindingsBySlot.size).toBeGreaterThan(0);
 		});
+		await waitForCardHydrationToSettle(resolveItemCardModel);
 		const initialFrame = publish.mock.lastCall?.[0] as PreviewFrame | undefined;
 		if (!initialFrame) throw new Error("Initial preview frame was not published");
 		publish.mockClear();

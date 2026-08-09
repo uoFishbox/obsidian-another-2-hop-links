@@ -6,26 +6,16 @@
 
 	interface Props {
 		row: TwoHopProgressiveRow;
+		previewHostEnabled: boolean;
 		registerCardModelConsumer: (
 			logicalKey: string,
 			consumer: (model: CardShellModel | undefined) => void,
 		) => () => void;
-		registerPreviewRow: (
-			rowIndex: number,
-			setPreviewHostCandidate: (resident: boolean) => void,
-		) => () => void;
 		onLoadMore: (sectionId: string) => void;
 	}
 
-	let { row, registerCardModelConsumer, registerPreviewRow, onLoadMore }: Props =
+	let { row, previewHostEnabled, registerCardModelConsumer, onLoadMore }: Props =
 		$props();
-	let previewHostCandidate = $state(false);
-
-	$effect(() => {
-		return registerPreviewRow(row.rowIndex, (resident) => {
-			previewHostCandidate = resident;
-		});
-	});
 </script>
 
 <div
@@ -45,7 +35,7 @@
 		>
 			<TwoHopProgressiveCell
 				{cell}
-				{previewHostCandidate}
+				{previewHostEnabled}
 				{registerCardModelConsumer}
 				{onLoadMore}
 			/>

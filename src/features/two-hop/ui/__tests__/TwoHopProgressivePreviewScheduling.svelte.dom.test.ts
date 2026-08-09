@@ -9,13 +9,13 @@ import type {
 	TwoHopSectionModel,
 } from "features/two-hop/ui/twoHopSectionModel";
 import { createTwoHopSectionModel } from "features/two-hop/ui/twoHopSectionModel";
-import { TWO_HOP_PROGRESSIVE_ROWS_PER_CHUNK } from "features/two-hop/ui/twoHopProgressivePlan";
 import type { ApplicationStore } from "ui/stores/ApplicationStore.svelte";
 import type { CardRenderModel } from "ui/components/items/cardRenderModel";
 import type { LinkContext } from "ui/context/linkContext";
 import type { TFile } from "obsidian";
 import { findNearestScrollContainer } from "ui/virtualization/dom/scrollContainer";
 import {
+	flushFrames,
 	installIntersectionObserverMock,
 	installResizeObserverMock,
 	resetRecords,
@@ -217,7 +217,7 @@ async function renderPreviewControlFixture(
 	triggerResize(root, 320, 20_000);
 	setNumericProperty(scroller, "clientHeight", 301);
 	triggerResize(scroller, 320, 301);
-	await Promise.resolve();
+	await flushFrames();
 	await drainPostPaintTasks();
 
 	return {
@@ -495,9 +495,7 @@ describe("TwoHop progressive preview scheduling", () => {
 			"[data-testid='twohop-progressive-item-cell']",
 		);
 		if (!firstCell) throw new Error("Progressive item cell was not rendered");
-		const card = firstCell.querySelector<HTMLElement>(
-			".cosense-card-links__box",
-		);
+		const card = firstCell.querySelector<HTMLElement>(".cosense-card-links__box");
 		if (!card) throw new Error("Progressive card shell was not rendered");
 
 		expect(card).toHaveClass("is-skeleton");
@@ -713,7 +711,7 @@ describe("TwoHop progressive preview scheduling", () => {
 		).toBe(true);
 	});
 
-	it("preloads only the one chunk immediately after the visible range", async () => {
+	it("does not couple progressive chunk mounting to card-model preload", async () => {
 		const fixture = await renderHydrationSchedulingFixture(600);
 		await drainPostPaintTasks();
 		fixture.resolveItemCardModel.mockClear();
@@ -741,27 +739,7 @@ describe("TwoHop progressive preview scheduling", () => {
 
 		await drainIdleTasks();
 
-		const resolvedItemIndexes = readResolvedItemIndexes(
-			fixture.resolveItemCardModel,
-		);
-		const columnCount = fixture.root.shadowRoot?.querySelector(
-			"[data-ccl-progressive-row='0']",
-		)?.childElementCount;
-		if (!columnCount) throw new Error("Progressive grid columns were not rendered");
-		expect(resolvedItemIndexes.length).toBeGreaterThan(0);
-		expect(resolvedItemIndexes).toHaveLength(
-			TWO_HOP_PROGRESSIVE_ROWS_PER_CHUNK * columnCount,
-		);
-		const firstPreloadedItemIndex =
-			TWO_HOP_PROGRESSIVE_ROWS_PER_CHUNK * columnCount - 1;
-		const afterPreloadedItemIndex =
-			TWO_HOP_PROGRESSIVE_ROWS_PER_CHUNK * 2 * columnCount - 1;
-		expect(
-			resolvedItemIndexes.every(
-				(index) =>
-					index >= firstPreloadedItemIndex && index < afterPreloadedItemIndex,
-			),
-		).toBe(true);
+		expect(fixture.resolveItemCardModel).not.toHaveBeenCalled();
 		expect(fixture.resolveInteractionDescriptor).not.toHaveBeenCalled();
 		expect(fixture.resolvePreviewRequest).not.toHaveBeenCalled();
 	});
@@ -855,7 +833,7 @@ describe("TwoHop progressive preview scheduling", () => {
 		);
 	});
 
-	it("keeps resident hosts and bindings when active rows move inside the guard", async () => {
+	it("keeps prepared hosts and bindings when active rows move inside the guard", async () => {
 		const initialScrollTop = 1_000;
 		const fixture = await renderPreviewControlFixture(true, initialScrollTop);
 		await vi.waitFor(() => expect(fixture.registerHost).toHaveBeenCalled());

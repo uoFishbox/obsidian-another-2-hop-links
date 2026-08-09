@@ -7,7 +7,6 @@ import { resolveTwoHopCardPresentation } from "features/two-hop/ui/twoHopCellSta
 import type { TwoHopItemModel } from "features/two-hop/ui/twoHopSectionModel";
 import {
 	resolveMountedProgressiveRow,
-	TWO_HOP_PROGRESSIVE_ROWS_PER_CHUNK,
 	type TwoHopProgressiveCell,
 	type TwoHopProgressivePlan,
 } from "features/two-hop/ui/twoHopProgressivePlan";
@@ -17,7 +16,8 @@ import { createVirtualCardInteractionController } from "ui/interactions/virtualC
 import { recordCCLDevMeasurement } from "infrastructure/debug/CCLDevMeasurements";
 
 type CardModelConsumer = (model: CardShellModel | undefined) => void;
-type HydrationPriority = "visible" | "preload";
+type HydrationPriority = "foreground" | "background";
+type HydrationEntry = Extract<TwoHopProgressiveCell, { kind: "item" }>;
 
 interface HydratedCardEntry {
 	readonly item: TwoHopItemModel;
@@ -25,12 +25,20 @@ interface HydratedCardEntry {
 	readonly model: CardRenderModel;
 }
 
-type HydrationEntry = Extract<TwoHopProgressiveCell, { kind: "item" }>;
+interface PendingHydration {
+	readonly cell: HydrationEntry;
+	priority: HydrationPriority;
+}
 
 interface HydrationQueue {
 	readonly entries: HydrationEntry[];
-	readonly keys: Set<string>;
 	head: number;
+}
+
+export interface TwoHopCardDemand {
+	readonly foreground: Readonly<TwoHopRowRange>;
+	readonly background: Readonly<TwoHopRowRange>;
+	readonly scrollActive: boolean;
 }
 
 export interface TwoHopCardHydratorParams {
@@ -53,29 +61,35 @@ export interface TwoHopCardHydrator {
 		typeof createVirtualCardInteractionController
 	>["provider"];
 	registerConsumer(logicalKey: string, consumer: CardModelConsumer): () => void;
-	replaceRange(range: TwoHopRowRange): void;
-	refreshRanges(visible: TwoHopRowRange, resident: TwoHopRowRange): void;
-	getActivatedModel(logicalKey: string): CardRenderModel | undefined;
-	reconcile(plan: TwoHopProgressivePlan, visibleRange: TwoHopRowRange): void;
+	setDemand(demand: TwoHopCardDemand): void;
+	refreshDemand(): void;
+	getModel(logicalKey: string): CardRenderModel | undefined;
+	reconcile(plan: TwoHopProgressivePlan): void;
 	clear(): void;
 	dispose(): void;
 }
 
+const EMPTY_RANGE = Object.freeze({ start: 0, end: 0 });
 const MAX_MODELS_PER_DRAIN = 8;
 const MAX_HYDRATION_CPU_MS = 1;
 const HYDRATION_POST_PAINT_TASK_KEY = "two-hop-progressive-hydration-visible";
 const HYDRATION_IDLE_TASK_KEY = "two-hop-progressive-hydration-preload";
 
-/** Owns the single logical-key card cache and its visible/preload lanes. */
+/** Owns a key-addressed card cache and derives work from the latest window demand. */
 export function createTwoHopCardHydrator(
 	params: TwoHopCardHydratorParams,
 ): TwoHopCardHydrator {
 	const entries = new Map<string, HydratedCardEntry>();
-	const activatedKeys = new Set<string>();
 	const consumers = new Map<string, CardModelConsumer>();
-	const visibleQueue = createHydrationQueue();
-	const preloadQueue = createHydrationQueue();
+	const pendingByKey = new Map<string, PendingHydration>();
+	const foregroundQueue = createHydrationQueue();
+	const backgroundQueue = createHydrationQueue();
 	const interactionController = createVirtualCardInteractionController();
+	let demand: TwoHopCardDemand = {
+		foreground: EMPTY_RANGE,
+		background: EMPTY_RANGE,
+		scrollActive: false,
+	};
 	let cancelDrain: (() => void) | undefined;
 	let scheduledPriority: HydrationPriority | undefined;
 	let generation = 0;
@@ -96,51 +110,105 @@ export function createTwoHopCardHydrator(
 		};
 	}
 
-	function cancelPending(): void {
+	function cancelScheduledDrain(): void {
 		cancelDrain?.();
 		cancelDrain = undefined;
 		scheduledPriority = undefined;
-		clearHydrationQueue(visibleQueue);
-		clearHydrationQueue(preloadQueue);
 		generation += 1;
 	}
 
+	function clearPending(): void {
+		cancelScheduledDrain();
+		pendingByKey.clear();
+		clearHydrationQueue(foregroundQueue);
+		clearHydrationQueue(backgroundQueue);
+	}
+
 	function clear(): void {
-		cancelPending();
+		clearPending();
 		for (const logicalKey of entries.keys()) notify(logicalKey, undefined);
 		entries.clear();
-		activatedKeys.clear();
 		interactionController.clear();
 		params.onPreviewModelsChanged();
 	}
 
+	function setDemand(nextDemand: TwoHopCardDemand): void {
+		demand = {
+			foreground: copyRange(nextDemand.foreground),
+			background: copyRange(nextDemand.background),
+			scrollActive: nextDemand.scrollActive,
+		};
+		if (demand.scrollActive && scheduledPriority === "background") {
+			cancelScheduledDrain();
+		}
+		reconcilePendingPriorities();
+		enqueueRange(demand.background, "background", false);
+		enqueueRange(demand.foreground, "foreground", false);
+		scheduleDrain();
+	}
+
+	function refreshDemand(): void {
+		clearPending();
+		enqueueRange(demand.background, "background", true);
+		enqueueRange(demand.foreground, "foreground", true);
+		scheduleDrain();
+	}
+
+	function reconcilePendingPriorities(): void {
+		for (const [logicalKey, pending] of pendingByKey) {
+			const nextPriority = resolveDemandPriority(pending.cell.rowIndex);
+			if (!nextPriority) {
+				pendingByKey.delete(logicalKey);
+				continue;
+			}
+			if (nextPriority === pending.priority) continue;
+			pending.priority = nextPriority;
+			queueFor(nextPriority).entries.push(pending.cell);
+		}
+	}
+
+	function resolveDemandPriority(rowIndex: number): HydrationPriority | null {
+		if (isRowInRange(rowIndex, demand.foreground)) return "foreground";
+		if (isRowInRange(rowIndex, demand.background)) return "background";
+		return null;
+	}
+
 	function enqueueCell(
-		cell: Extract<TwoHopProgressiveCell, { kind: "item" }>,
+		cell: HydrationEntry,
 		priority: HydrationPriority,
 		refreshExisting: boolean,
 		revision: unknown,
 	): void {
 		const current = entries.get(cell.logicalKey);
 		const hasCurrent = current?.item === cell.item && current.revision === revision;
-		if (
-			hasCurrent &&
-			(priority === "preload" || activatedKeys.has(cell.logicalKey))
-		) {
-			return;
-		}
-		if (current && !hasCurrent && priority === "preload" && !refreshExisting) {
+		if (hasCurrent && !refreshExisting) {
+			if (priority === "foreground" && current) {
+				interactionController.setCard(
+					cell.logicalKey,
+					current.model.interactionDescriptor,
+				);
+			}
 			return;
 		}
 
-		const queue = priority === "visible" ? visibleQueue : preloadQueue;
-		if (queue.keys.has(cell.logicalKey)) return;
-		if (priority === "preload" && visibleQueue.keys.has(cell.logicalKey)) return;
-		queue.keys.add(cell.logicalKey);
-		queue.entries.push(cell);
+		const existing = pendingByKey.get(cell.logicalKey);
+		if (existing) {
+			if (priority === "foreground" && existing.priority !== "foreground") {
+				existing.priority = "foreground";
+				foregroundQueue.entries.push(cell);
+			}
+			return;
+		}
+
+		pendingByKey.set(cell.logicalKey, {
+			cell,
+			priority,
+		});
+		queueFor(priority).entries.push(cell);
 	}
 
 	function enqueueRange(
-		range: TwoHopRowRange,
+		range: Readonly<TwoHopRowRange>,
 		priority: HydrationPriority,
 		refreshExisting: boolean,
 	): void {
@@ -150,52 +218,31 @@ export function createTwoHopCardHydrator(
 			const row = resolveMountedProgressiveRow(plan, rowIndex);
 			if (!row) continue;
 			for (const cell of row.cells) {
-				if (cell.kind === "item")
+				if (cell.kind === "item") {
 					enqueueCell(cell, priority, refreshExisting, revision);
+				}
 			}
 		}
-		scheduleDrain();
-	}
-
-	function enqueueChunk(chunkIndex: number): void {
-		const revision = params.getRevision();
-		for (const row of params.getPlan().chunks[chunkIndex]?.rows ?? []) {
-			for (const cell of row.cells) {
-				if (cell.kind === "item") enqueueCell(cell, "preload", false, revision);
-			}
-		}
-		scheduleDrain();
-	}
-
-	function replaceRange(range: TwoHopRowRange): void {
-		clearHydrationQueue(visibleQueue);
-		clearHydrationQueue(preloadQueue);
-		enqueueRange(range, "visible", false);
-		if (range.end <= range.start) return;
-		enqueueChunk(Math.ceil(range.end / TWO_HOP_PROGRESSIVE_ROWS_PER_CHUNK));
-	}
-
-	function refreshRanges(visible: TwoHopRowRange, resident: TwoHopRowRange): void {
-		cancelPending();
-		enqueueRange(visible, "visible", true);
-		enqueueRange(resident, "preload", true);
 	}
 
 	function scheduleDrain(): void {
 		if (disposed) return;
-		const priority = hasPendingHydration(visibleQueue)
-			? "visible"
-			: hasPendingHydration(preloadQueue)
-				? "preload"
+		const priority = hasPendingPriority("foreground")
+			? "foreground"
+			: !demand.scrollActive && hasPendingPriority("background")
+				? "background"
 				: undefined;
-		if (!priority) return;
+		if (!priority) {
+			if (cancelDrain) cancelScheduledDrain();
+			return;
+		}
 		if (cancelDrain && scheduledPriority === priority) return;
 		cancelDrain?.();
 		scheduledPriority = priority;
 		const expectedGeneration = generation;
-		const lane = priority === "visible" ? "post-paint" : "idle";
+		const lane = priority === "foreground" ? "post-paint" : "idle";
 		const taskKey =
-			priority === "visible"
+			priority === "foreground"
 				? HYDRATION_POST_PAINT_TASK_KEY
 				: HYDRATION_IDLE_TASK_KEY;
 		params.frameCoordinator.schedule(lane, taskKey, () => {
@@ -210,89 +257,92 @@ export function createTwoHopCardHydrator(
 	function drain(priority: HydrationPriority): void {
 		const resolver = params.getResolver();
 		if (!resolver) {
-			clearHydrationQueue(visibleQueue);
-			clearHydrationQueue(preloadQueue);
+			clearPending();
 			return;
 		}
 		const revision = params.getRevision();
 		const previewActive = params.isPreviewActive();
-		const queue = priority === "visible" ? visibleQueue : preloadQueue;
+		const queue = queueFor(priority);
 		const startedAt = performance.now();
 		let processed = 0;
 		let previewChanged = false;
 		while (
-			hasPendingHydration(queue) &&
 			processed < MAX_MODELS_PER_DRAIN &&
 			(processed === 0 || performance.now() - startedAt < MAX_HYDRATION_CPU_MS)
 		) {
-			const hydration = takeNextHydrationEntry(queue);
+			const hydration = takeNextPending(queue, priority);
 			if (!hydration) break;
 			processed += 1;
 			const current = entries.get(hydration.logicalKey);
-			let model = current?.model;
-			let changed = false;
-			let previewRenderKeyChanged = false;
-			if (current?.item !== hydration.item || current.revision !== revision) {
-				const presentation = resolveTwoHopCardPresentation(
-					hydration.item,
-					hydration.section,
-				);
-				if (!presentation) continue;
-				if (process.env.NODE_ENV !== "production") {
-					recordCCLDevMeasurement("twoHop.resolveItemCardModel.call");
-				}
-				model = resolver(hydration.item, presentation, revision);
-				changed = current?.model !== model;
-				previewRenderKeyChanged =
-					current !== undefined &&
-					activatedKeys.has(hydration.logicalKey) &&
-					current.model.previewRequest?.renderKey !==
-						model.previewRequest?.renderKey;
-				entries.set(hydration.logicalKey, {
-					item: hydration.item,
-					revision,
-					model,
-				});
-				notify(hydration.logicalKey, model);
+			const presentation = resolveTwoHopCardPresentation(
+				hydration.item,
+				hydration.section,
+			);
+			if (!presentation) continue;
+			if (process.env.NODE_ENV !== "production") {
+				recordCCLDevMeasurement("twoHop.resolveItemCardModel.call");
 			}
-			if (!model) continue;
-
-			const wasActivated = activatedKeys.has(hydration.logicalKey);
-			if (priority === "visible") activatedKeys.add(hydration.logicalKey);
-			if (!wasActivated && !activatedKeys.has(hydration.logicalKey)) continue;
-			if (
+			const model = resolver(hydration.item, presentation, revision);
+			const previewRenderKeyChanged =
 				previewActive &&
-				(!wasActivated
-					? Boolean(model.previewRequest)
-					: previewRenderKeyChanged)
-			) {
-				previewChanged = true;
+				(priority === "foreground" || current !== undefined) &&
+				current?.model.previewRequest?.renderKey !==
+					model.previewRequest?.renderKey;
+			entries.set(hydration.logicalKey, {
+				item: hydration.item,
+				revision,
+				model,
+			});
+			notify(hydration.logicalKey, model);
+			if (priority === "foreground") {
+				interactionController.setCard(
+					hydration.logicalKey,
+					model.interactionDescriptor,
+				);
 			}
-			const descriptor = model.interactionDescriptor;
-			if (!wasActivated && descriptor) {
-				interactionController.setCard(hydration.logicalKey, descriptor);
-			} else if (wasActivated && changed) {
-				interactionController.setCard(hydration.logicalKey, descriptor);
-			}
+			if (previewActive && previewRenderKeyChanged) previewChanged = true;
 		}
 		compactHydrationQueue(queue);
 		if (previewChanged) params.onPreviewModelsChanged();
-		if (hasPendingHydration(visibleQueue) || hasPendingHydration(preloadQueue)) {
+		if (hasPendingPriority("foreground") || hasPendingPriority("background")) {
 			scheduleDrain();
 		}
 	}
 
-	function getActivatedModel(logicalKey: string): CardRenderModel | undefined {
-		return activatedKeys.has(logicalKey)
-			? entries.get(logicalKey)?.model
-			: undefined;
+	function takeNextPending(
+		queue: HydrationQueue,
+		priority: HydrationPriority,
+	): HydrationEntry | undefined {
+		while (queue.head < queue.entries.length) {
+			const cell = queue.entries[queue.head];
+			queue.head += 1;
+			if (!cell) continue;
+			const pending = pendingByKey.get(cell.logicalKey);
+			if (!pending || pending.cell !== cell || pending.priority !== priority)
+				continue;
+			if (resolveDemandPriority(cell.rowIndex) !== priority) {
+				pendingByKey.delete(cell.logicalKey);
+				continue;
+			}
+			pendingByKey.delete(cell.logicalKey);
+			return cell;
+		}
+		return undefined;
 	}
 
-	function reconcile(
-		plan: TwoHopProgressivePlan,
-		visibleRange: TwoHopRowRange,
-	): void {
-		cancelPending();
+	function hasPendingPriority(priority: HydrationPriority): boolean {
+		for (const pending of pendingByKey.values()) {
+			if (pending.priority === priority) return true;
+		}
+		return false;
+	}
+
+	function getModel(logicalKey: string): CardRenderModel | undefined {
+		return entries.get(logicalKey)?.model;
+	}
+
+	function reconcile(plan: TwoHopProgressivePlan): void {
+		clearPending();
 		const staleKeys = new Set(entries.keys());
 		for (const chunk of plan.chunks) {
 			for (const row of chunk.rows) {
@@ -308,26 +358,29 @@ export function createTwoHopCardHydrator(
 		for (const logicalKey of staleKeys) {
 			notify(logicalKey, undefined);
 			entries.delete(logicalKey);
-			activatedKeys.delete(logicalKey);
 			interactionController.setCard(logicalKey, null);
 		}
-		replaceRange(visibleRange);
+		setDemand(demand);
 		params.onPreviewModelsChanged();
 	}
 
 	function dispose(): void {
 		disposed = true;
-		cancelPending();
+		clearPending();
 		consumers.clear();
 		interactionController.clear();
+	}
+
+	function queueFor(priority: HydrationPriority): HydrationQueue {
+		return priority === "foreground" ? foregroundQueue : backgroundQueue;
 	}
 
 	return {
 		interactionDescriptorResolverProvider: interactionController.provider,
 		registerConsumer,
-		replaceRange,
-		refreshRanges,
-		getActivatedModel,
+		setDemand,
+		refreshDemand,
+		getModel,
 		reconcile,
 		clear,
 		dispose,
@@ -335,36 +388,30 @@ export function createTwoHopCardHydrator(
 }
 
 function createHydrationQueue(): HydrationQueue {
-	return { entries: [], keys: new Set(), head: 0 };
-}
-
-function hasPendingHydration(queue: HydrationQueue): boolean {
-	return queue.head < queue.entries.length;
+	return { entries: [], head: 0 };
 }
 
 function clearHydrationQueue(queue: HydrationQueue): void {
 	queue.entries.length = 0;
-	queue.keys.clear();
 	queue.head = 0;
-}
-
-function takeNextHydrationEntry(queue: HydrationQueue): HydrationEntry | undefined {
-	const entry = queue.entries[queue.head];
-	if (!entry) return undefined;
-	queue.head += 1;
-	queue.keys.delete(entry.logicalKey);
-	return entry;
 }
 
 function compactHydrationQueue(queue: HydrationQueue): void {
 	if (queue.head === 0) return;
 	const remaining = queue.entries.length - queue.head;
 	if (remaining === 0) {
-		queue.entries.length = 0;
-		queue.head = 0;
+		clearHydrationQueue(queue);
 		return;
 	}
 	if (queue.head < remaining) return;
 	queue.entries.splice(0, queue.head);
 	queue.head = 0;
+}
+
+function isRowInRange(rowIndex: number, range: Readonly<TwoHopRowRange>): boolean {
+	return rowIndex >= range.start && rowIndex < range.end;
+}
+
+function copyRange(range: Readonly<TwoHopRowRange>): Readonly<TwoHopRowRange> {
+	return Object.freeze({ start: range.start, end: range.end });
 }

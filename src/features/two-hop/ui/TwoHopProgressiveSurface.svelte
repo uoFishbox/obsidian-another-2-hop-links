@@ -43,8 +43,8 @@
 					{#each chunk.rows as row (row.rowIndex)}
 						<TwoHopProgressiveRow
 							{row}
+							previewHostEnabled={list.isPreviewHostEnabled(row.rowIndex)}
 							registerCardModelConsumer={list.registerCardModelConsumer}
-							registerPreviewRow={list.registerPreviewRow}
 							onLoadMore={list.loadMore}
 						/>
 					{/each}

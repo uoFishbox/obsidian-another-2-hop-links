@@ -10,7 +10,6 @@ import { createTwoHopSectionProjection } from "features/two-hop/ui/twoHopSection
 import {
 	compileFixedGridLayout,
 	resolveTwoHopRowFromScrollOffset,
-	type TwoHopRowRange,
 	type TwoHopGeometry,
 } from "features/two-hop/ui/viewport/twoHopGeometry";
 import {
@@ -24,7 +23,10 @@ import {
 } from "features/two-hop/ui/twoHopProgressivePlan";
 import type { TwoHopPreviewDependencies } from "features/two-hop/ui/twoHopPreviewDependencies";
 import { DISABLED_PREVIEW_SURFACE } from "features/card-preview/runtime/previewRuntime";
-import type { VirtualPreviewSurface } from "features/card-preview/scheduling/virtualPreviewSurface";
+import type {
+	VirtualPreviewBinding,
+	VirtualPreviewSurface,
+} from "features/card-preview/scheduling/virtualPreviewSurface";
 import type { VirtualFrameCoordinator } from "ui/virtualization/scheduling/frameCoordinator";
 import { createResolvedCardLayoutSettingsMemo } from "ui/shared/layout/cardLayoutCssVars";
 import { resolveCachedCardGridLayoutBase } from "ui/virtualization/dom/virtualListCardLayout";
@@ -35,17 +37,17 @@ import {
 	type ViewPlanLayoutMetrics,
 } from "ui/virtualization/svelte/viewPlanLayout";
 import { findNearestScrollContainer } from "ui/virtualization/dom/scrollContainer";
-import { collectPositionDependencyElements } from "ui/virtualization/dom/scrollContainerDependencies";
-import {
-	markScrollActivityActive,
-	markScrollActivityIdle,
-} from "ui/virtualization/scheduling/scrollActivity";
-import {
-	resolveProgressivePreviewRangeInto,
-	resolveProgressiveResidentRangeInto,
-} from "features/two-hop/ui/progressivePreviewRange";
 import { createTwoHopCardHydrator } from "features/two-hop/ui/twoHopCardHydrator";
-import { createTwoHopPreviewWindowController } from "features/two-hop/ui/twoHopPreviewWindowController";
+import {
+	EMPTY_TWO_HOP_WINDOW,
+	isSameTwoHopWindow,
+	resolveTwoHopWindow,
+	type TwoHopWindowSnapshot,
+} from "features/two-hop/ui/twoHopWindowPolicy";
+import {
+	observeTwoHopViewport,
+	type TwoHopViewportObservation,
+} from "features/two-hop/ui/twoHopViewportObservation";
 
 export interface TwoHopProgressiveListProps {
 	/** Stable identity of the displayed file and search scope. */
@@ -76,10 +78,7 @@ interface LayoutAnchor {
 }
 
 type SectionPublicationKind = "identity-reset" | "data-revision";
-const EMPTY_PREVIEW_RANGE = Object.freeze({ start: 0, end: 0 });
-const PREVIEW_SCROLL_TASK_KEY = "two-hop-progressive-preview-window";
-const PREVIEW_RANGE_APPLY_TASK_KEY = "two-hop-progressive-preview-window-apply";
-const PREVIEW_SCROLL_IDLE_MS = 140;
+const PREVIEW_WINDOW_COMMIT_TASK_KEY = "two-hop-progressive-preview-window-apply";
 
 /** Owns append-only chunk publication, lazy model hydration, and bounded preview state. */
 export function useTwoHopProgressiveList(
@@ -128,26 +127,22 @@ export function useTwoHopProgressiveList(
 					props.previewDependencies.resolveSearchMatchPosition,
 			})
 		: DISABLED_PREVIEW_SURFACE;
-	let previewBindingsDirty = true;
-	const visibleHydrationRange: TwoHopRowRange = { start: 0, end: 0 };
-	const previewWindow = createTwoHopPreviewWindowController(
-		handlePreviewWindowChanged,
-	);
-	const nextVisibleHydrationRange: TwoHopRowRange = { start: 0, end: 0 };
-	const nextResidentPreviewRange: TwoHopRowRange = { start: 0, end: 0 };
+	let committedWindow: TwoHopWindowSnapshot = EMPTY_TWO_HOP_WINDOW;
+	let pendingWindow: TwoHopWindowSnapshot | null = null;
 	let sentinelObserver: IntersectionObserver | undefined;
-	let previewRangeAnimationFrame: number | undefined;
-	let previewViewportRefreshAnimationFrame: number | undefined;
-	let previewViewportRefreshOwnerWindow: Window | null = null;
-	let previewScrollIdleTimer: number | undefined;
-	let lastPreviewScrollAt = 0;
 	let previewScrollActive = false;
+	let previewViewportObservation: TwoHopViewportObservation | null = null;
 	let previewScrollContainer: HTMLElement | null = null;
 	let previewOwnerWindow: Window | null = null;
 	let contentTopInScrollSpace = 0;
 	let previewViewportHeight = 0;
-	let previewBindingSyncScheduled = false;
+	let lastMeasuredRootWidth = 0;
+	let pendingRootWidth: number | null = null;
+	let preserveAnchorForNextLayout: boolean | null = null;
+	let skipViewportGeometryForNextLayout = false;
+	let previewHostRows = $state.raw<ReadonlySet<number>>(new Set());
 	let lastPreviewSurfaceActive = isPreviewSurfaceActive();
+	let previewSnapshotPublished = false;
 	let lastDocumentIdentity = props.documentIdentity;
 	let lastCardModelRevision = props.cardModelRevision;
 	const cardHydrator = createTwoHopCardHydrator({
@@ -155,8 +150,8 @@ export function useTwoHopProgressiveList(
 		getPlan: () => untrack(() => plan),
 		getRevision: () => untrack(() => props.cardModelRevision),
 		getResolver: () => untrack(() => props.resolveItemCardModel),
-		isPreviewActive: isPreviewControlActive,
-		onPreviewModelsChanged: markPreviewBindingsDirty,
+		isPreviewActive: isPreviewSurfaceActive,
+		onPreviewModelsChanged: publishPreviewSnapshot,
 	});
 
 	function isPreviewControlActive(): boolean {
@@ -165,96 +160,6 @@ export function useTwoHopProgressiveList(
 
 	function isPreviewSurfaceActive(): boolean {
 		return props.previewDependencies !== undefined && isPreviewControlActive();
-	}
-
-	function flushScheduledPreviewBindingSync(): void {
-		previewBindingSyncScheduled = false;
-		if (disposed || !previewBindingsDirty) return;
-		syncPreviewBindings();
-	}
-
-	function schedulePreviewBindingSync(): void {
-		if (disposed || previewBindingSyncScheduled) return;
-		previewBindingSyncScheduled = true;
-		queueMicrotask(flushScheduledPreviewBindingSync);
-	}
-
-	function markPreviewBindingsDirty(): void {
-		previewBindingsDirty = true;
-		schedulePreviewBindingSync();
-	}
-
-	function syncPreviewActiveRange(): void {
-		const active = isPreviewSurfaceActive();
-		previewSurface.setActiveRange(
-			previewWindow.activeRange.start,
-			previewWindow.activeRange.end,
-			active,
-		);
-	}
-
-	function handlePreviewWindowChanged(
-		activeChanged: boolean,
-		residentChanged: boolean,
-	): void {
-		if (residentChanged) {
-			markPreviewBindingsDirty();
-			return;
-		}
-		if (activeChanged) {
-			syncPreviewActiveRange();
-		}
-	}
-
-	function syncPreviewBindings(): void {
-		const active = isPreviewSurfaceActive();
-		previewBindingsDirty = false;
-		previewSurface.beginBindings();
-		try {
-			if (active) {
-				const activePlan = untrack(() => plan);
-				for (
-					let rowIndex = previewWindow.residentRange.start;
-					rowIndex < previewWindow.residentRange.end;
-					rowIndex += 1
-				) {
-					const row = resolveMountedProgressiveRow(activePlan, rowIndex);
-					if (!row) continue;
-					for (const cell of row.cells) {
-						if (cell.kind !== "item") continue;
-						const model = cardHydrator.getActivatedModel(cell.logicalKey);
-						if (!model?.previewRequest) continue;
-						previewSurface.bindSlot(
-							cell.logicalKey,
-							rowIndex,
-							cell.logicalKey,
-							model.previewRequest,
-						);
-					}
-				}
-			}
-		} finally {
-			previewSurface.endBindings();
-		}
-		syncPreviewActiveRange();
-	}
-
-	function applyVisibleHydrationRange(next: TwoHopRowRange): void {
-		if (
-			visibleHydrationRange.start === next.start &&
-			visibleHydrationRange.end === next.end
-		) {
-			return;
-		}
-		visibleHydrationRange.start = next.start;
-		visibleHydrationRange.end = next.end;
-		cardHydrator.replaceRange(next);
-	}
-
-	function deactivatePreviewControl(): void {
-		nextResidentPreviewRange.start = 0;
-		nextResidentPreviewRange.end = 0;
-		previewWindow.clear();
 	}
 
 	function readPreviewScrollTop(): number {
@@ -275,153 +180,148 @@ export function useTwoHopProgressiveList(
 		previewViewportHeight = previewOwnerWindow.innerHeight;
 	}
 
-	function refreshPreviewViewportGeometry(): void {
-		previewViewportRefreshAnimationFrame = undefined;
-		previewViewportRefreshOwnerWindow = null;
-		if (disposed || !rootEl || !contentEl) return;
-		measurePreviewViewportGeometry();
-		flushPreviewRangeFromScroll();
+	function collectPreviewBindings(): VirtualPreviewBinding[] {
+		if (!isPreviewSurfaceActive()) return [];
+		const bindings: VirtualPreviewBinding[] = [];
+		const activePlan = untrack(() => plan);
+		for (
+			let rowIndex = committedWindow.prepared.start;
+			rowIndex < committedWindow.prepared.end;
+			rowIndex += 1
+		) {
+			const row = resolveMountedProgressiveRow(activePlan, rowIndex);
+			if (!row) continue;
+			for (const cell of row.cells) {
+				if (cell.kind !== "item") continue;
+				const request = cardHydrator.getModel(cell.logicalKey)?.previewRequest;
+				if (!request) continue;
+				bindings.push({
+					slotId: cell.logicalKey,
+					rowIndex,
+					ownerKey: cell.logicalKey,
+					request,
+				});
+			}
+		}
+		return bindings;
 	}
 
-	function schedulePreviewViewportRefresh(): void {
-		if (
-			disposed ||
-			previewViewportRefreshAnimationFrame !== undefined ||
-			!rootEl ||
-			!contentEl
-		) {
+	function syncPreviewHostRows(): void {
+		if (!isPreviewControlActive()) {
+			previewHostRows = new Set();
 			return;
 		}
-		const ownerWindow = rootEl.ownerDocument.defaultView;
-		if (!ownerWindow) return;
-		previewViewportRefreshOwnerWindow = ownerWindow;
-		previewViewportRefreshAnimationFrame = ownerWindow.requestAnimationFrame(
-			refreshPreviewViewportGeometry,
-		);
+		const rows = new Set<number>();
+		for (
+			let rowIndex = committedWindow.prepared.start;
+			rowIndex < committedWindow.prepared.end;
+			rowIndex += 1
+		) {
+			rows.add(rowIndex);
+		}
+		previewHostRows = rows;
 	}
 
-	function flushPreviewRangeFromScroll(): void {
-		previewRangeAnimationFrame = undefined;
+	function publishPreviewSnapshot(force = false): void {
 		if (disposed) return;
-		const activeGeometry = untrack(() => geometry);
-		const mountedRowEnd = untrack(() => plan.mountedRowEnd);
-		resolveProgressivePreviewRangeInto(
-			nextVisibleHydrationRange,
-			activeGeometry,
-			readPreviewScrollTop() - contentTopInScrollSpace,
-			previewViewportHeight,
-			mountedRowEnd,
-			props.offscreenBootstrapPreviewRows ?? 0,
-		);
-		if (isPreviewControlActive()) {
-			resolveProgressiveResidentRangeInto(
-				nextResidentPreviewRange,
-				nextVisibleHydrationRange,
-				previewWindow.residentRange,
-				mountedRowEnd,
-			);
-		} else {
-			nextResidentPreviewRange.start = 0;
-			nextResidentPreviewRange.end = 0;
-		}
-		const nextActivePreviewRange = isPreviewControlActive()
-			? nextVisibleHydrationRange
-			: EMPTY_PREVIEW_RANGE;
-		if (
-			nextVisibleHydrationRange.start === visibleHydrationRange.start &&
-			nextVisibleHydrationRange.end === visibleHydrationRange.end &&
-			nextActivePreviewRange.start === previewWindow.activeRange.start &&
-			nextActivePreviewRange.end === previewWindow.activeRange.end &&
-			nextResidentPreviewRange.start === previewWindow.residentRange.start &&
-			nextResidentPreviewRange.end === previewWindow.residentRange.end
-		) {
+		const active = isPreviewSurfaceActive();
+		if (!active && previewSnapshotPublished && !force) return;
+		previewSnapshotPublished = true;
+		previewSurface.commit({
+			active,
+			activeRange: committedWindow.active,
+			bindings: collectPreviewBindings(),
+		});
+	}
+
+	function publishCardDemand(): void {
+		cardHydrator.setDemand({
+			foreground: committedWindow.active,
+			background: isPreviewSurfaceActive()
+				? committedWindow.prepared
+				: EMPTY_TWO_HOP_WINDOW.prepared,
+			scrollActive: previewScrollActive,
+		});
+	}
+
+	function commitPendingWindow(): void {
+		if (disposed || !pendingWindow) return;
+		committedWindow = pendingWindow;
+		pendingWindow = null;
+		syncPreviewHostRows();
+		publishCardDemand();
+		publishPreviewSnapshot();
+	}
+
+	function flushPreviewRangeFromScroll(
+		forceCommit = false,
+		scrollTop = readPreviewScrollTop(),
+		viewportHeight = previewViewportHeight,
+	): void {
+		if (disposed) return;
+		const nextWindow = resolveTwoHopWindow({
+			geometry: untrack(() => geometry),
+			mountedRowEnd: untrack(() => plan.mountedRowEnd),
+			scrollTop,
+			contentTopInScrollSpace,
+			viewportHeight,
+			offscreenBootstrapRows: props.offscreenBootstrapPreviewRows ?? 0,
+			previewEnabled: isPreviewControlActive(),
+			previous: committedWindow,
+		});
+		previewViewportObservation?.publishScrollCoverage(nextWindow.coverage);
+		if (!forceCommit && isSameTwoHopWindow(committedWindow, nextWindow)) {
+			committedWindow = nextWindow;
+			pendingWindow = null;
+			frameCoordinator.cancel("post-paint", PREVIEW_WINDOW_COMMIT_TASK_KEY);
 			return;
 		}
+		pendingWindow = nextWindow;
 		frameCoordinator.schedule(
 			"post-paint",
-			PREVIEW_RANGE_APPLY_TASK_KEY,
-			applyPendingPreviewRange,
+			PREVIEW_WINDOW_COMMIT_TASK_KEY,
+			commitPendingWindow,
 		);
 	}
 
-	function applyPendingPreviewRange(): void {
-		if (disposed) return;
-		applyVisibleHydrationRange(nextVisibleHydrationRange);
-		if (!isPreviewControlActive()) {
-			deactivatePreviewControl();
+	function setPreviewScrollActive(active: boolean): void {
+		if (previewScrollActive === active) return;
+		previewScrollActive = active;
+		publishCardDemand();
+	}
+
+	function runObservedScrollMeasurement(metrics: {
+		readonly scrollTop: number;
+		readonly viewportHeight: number;
+	}): void {
+		previewViewportHeight = metrics.viewportHeight;
+		flushPreviewRangeFromScroll(false, metrics.scrollTop, metrics.viewportHeight);
+	}
+
+	function runObservedLayoutMeasurement(): void {
+		if (disposed || !rootEl || !contentEl) return;
+		if (pendingRootWidth !== null && pendingRootWidth <= 0) {
+			lastMeasuredRootWidth = 0;
+			pendingRootWidth = null;
+			preserveAnchorForNextLayout = null;
 			return;
 		}
-		resolveProgressiveResidentRangeInto(
-			nextResidentPreviewRange,
-			nextVisibleHydrationRange,
-			previewWindow.residentRange,
-			untrack(() => plan.mountedRowEnd),
-		);
-		previewWindow.apply(nextVisibleHydrationRange, nextResidentPreviewRange);
-	}
-
-	function schedulePreviewRangeUpdate(): void {
-		if (disposed) return;
-		if (frameCoordinator) {
-			frameCoordinator.schedule(
-				"scroll-critical",
-				PREVIEW_SCROLL_TASK_KEY,
-				flushPreviewRangeFromScroll,
-			);
+		const preserveAnchor =
+			preserveAnchorForNextLayout ??
+			(lastMeasuredRootWidth > 0 && previewViewportHeight > 0);
+		preserveAnchorForNextLayout = null;
+		const layoutChanged = measureLayout(preserveAnchor);
+		if (pendingRootWidth !== null) {
+			lastMeasuredRootWidth = Math.max(0, pendingRootWidth);
+			pendingRootWidth = null;
+		}
+		if (skipViewportGeometryForNextLayout) {
+			skipViewportGeometryForNextLayout = false;
+			flushPreviewRangeFromScroll(layoutChanged);
 			return;
 		}
-		if (previewRangeAnimationFrame !== undefined || !previewOwnerWindow) return;
-		previewRangeAnimationFrame = previewOwnerWindow.requestAnimationFrame(
-			flushPreviewRangeFromScroll,
-		);
-	}
-
-	function ensurePreviewScrollIdleTimer(): void {
-		if (previewScrollIdleTimer !== undefined) return;
-		const ownerWindow = previewOwnerWindow;
-		if (!ownerWindow) return;
-		previewScrollIdleTimer = ownerWindow.setTimeout(
-			checkPreviewScrollIdle,
-			PREVIEW_SCROLL_IDLE_MS,
-		);
-	}
-
-	function checkPreviewScrollIdle(): void {
-		previewScrollIdleTimer = undefined;
-		if (disposed) return;
-		const remaining =
-			PREVIEW_SCROLL_IDLE_MS - (performance.now() - lastPreviewScrollAt);
-		const ownerWindow = previewOwnerWindow;
-		if (remaining > 0 && ownerWindow) {
-			previewScrollIdleTimer = ownerWindow.setTimeout(
-				checkPreviewScrollIdle,
-				remaining,
-			);
-			return;
-		}
-		previewScrollActive = false;
-		markScrollActivityIdle(previewScrollActivitySource);
-	}
-
-	function cancelPreviewScrollIdle(): void {
-		if (previewScrollIdleTimer !== undefined && previewOwnerWindow) {
-			previewOwnerWindow.clearTimeout(previewScrollIdleTimer);
-		}
-		previewScrollIdleTimer = undefined;
-		previewScrollActive = false;
-		markScrollActivityIdle(previewScrollActivitySource);
-	}
-
-	const previewScrollActivitySource = {};
-	function handlePreviewScroll(): void {
-		lastPreviewScrollAt = performance.now();
-		schedulePreviewRangeUpdate();
-		if (!isPreviewControlActive()) return;
-		if (!previewScrollActive) {
-			previewScrollActive = true;
-			markScrollActivityActive(previewScrollActivitySource);
-		}
-		ensurePreviewScrollIdleTimer();
+		measurePreviewViewportGeometry();
+		flushPreviewRangeFromScroll(layoutChanged);
 	}
 
 	function rebuildSentinelObserver(): void {
@@ -452,7 +352,7 @@ export function useTwoHopProgressiveList(
 		);
 		if (nextEnd === currentMountedRowEnd) return;
 		plan = appendTwoHopProgressivePlan(sections, geometry, plan, nextEnd);
-		cardHydrator.replaceRange(visibleHydrationRange);
+		flushPreviewRangeFromScroll();
 	}
 
 	function captureLayoutAnchor(): LayoutAnchor | null {
@@ -513,9 +413,10 @@ export function useTwoHopProgressiveList(
 		else window.scrollBy({ top: delta });
 	}
 
-	function measureLayout(preserveAnchor = true): void {
-		if (!rootEl) return;
+	function measureLayout(preserveAnchor = true): boolean {
+		if (!rootEl) return false;
 		const rect = rootEl.getBoundingClientRect();
+		lastMeasuredRootWidth = Math.max(0, rect.width);
 		const layoutBase = resolveCachedCardGridLayoutBase({
 			rootEl,
 			rootRect: rect,
@@ -536,15 +437,15 @@ export function useTwoHopProgressiveList(
 				layoutBase.cardLayout.sectionMarginBottomPx,
 			),
 		};
-		if (isSameViewPlanLayout(layout, nextLayout)) return;
+		if (isSameViewPlanLayout(layout, nextLayout)) return false;
 		const anchor = preserveAnchor ? captureLayoutAnchor() : null;
 		const nextGeometry = compileFixedGridLayout(sections, nextLayout);
 		const nextMountedRowEnd = Math.min(plan.mountedRowEnd, nextGeometry.rowCount);
 		layout = nextLayout;
 		geometry = nextGeometry;
 		plan = compileTwoHopProgressivePlan(sections, nextGeometry, nextMountedRowEnd);
-		markPreviewBindingsDirty();
 		void restoreLayoutAnchor(anchor);
+		return true;
 	}
 
 	function publishSections(
@@ -552,7 +453,6 @@ export function useTwoHopProgressiveList(
 		kind: SectionPublicationKind,
 	): void {
 		if (nextSections === sections && kind === "data-revision") return;
-		markPreviewBindingsDirty();
 		const anchor = kind === "data-revision" ? captureLayoutAnchor() : null;
 		const nextGeometry = compileFixedGridLayout(nextSections, layout);
 		const nextMountedRowEnd =
@@ -576,11 +476,14 @@ export function useTwoHopProgressiveList(
 		);
 		plan = nextPlan;
 		if (kind === "identity-reset") {
+			committedWindow = EMPTY_TWO_HOP_WINDOW;
+			pendingWindow = null;
+			frameCoordinator.cancel("post-paint", PREVIEW_WINDOW_COMMIT_TASK_KEY);
 			cardHydrator.clear();
-			cardHydrator.replaceRange(visibleHydrationRange);
-			return;
+		} else {
+			cardHydrator.reconcile(nextPlan);
 		}
-		cardHydrator.reconcile(nextPlan, visibleHydrationRange);
+		flushPreviewRangeFromScroll(true);
 		void restoreLayoutAnchor(anchor);
 	}
 
@@ -606,7 +509,7 @@ export function useTwoHopProgressiveList(
 		const revision = props.cardModelRevision;
 		if (revision === lastCardModelRevision) return;
 		lastCardModelRevision = revision;
-		cardHydrator.refreshRanges(visibleHydrationRange, previewWindow.residentRange);
+		cardHydrator.refreshDemand();
 	});
 
 	$effect(() => {
@@ -614,84 +517,43 @@ export function useTwoHopProgressiveList(
 		const content = contentEl;
 		void configuredLayout;
 		if (!element || !content) return;
-		const scrollContainer = findNearestScrollContainer(element);
-		previewScrollContainer = scrollContainer;
-		previewOwnerWindow = element.ownerDocument.defaultView;
-		measureLayout();
-		measurePreviewViewportGeometry();
-		flushPreviewRangeFromScroll();
-		if (typeof ResizeObserver === "undefined") return;
-		let previousRootInlineSize = element.clientWidth;
-		let previousViewportClientWidth = scrollContainer?.clientWidth;
-		let previousViewportClientHeight = scrollContainer?.clientHeight;
-		const positionDependencyElements = new Set<Element>(
-			collectPositionDependencyElements(element, scrollContainer),
-		);
-		const observer = new ResizeObserver((entries) => {
-			const wasMeasurable =
-				previousRootInlineSize > 0 &&
-				(previousViewportClientHeight === undefined ||
-					previousViewportClientHeight > 0);
-			let viewportSizeChanged = false;
-			let positionDependencyChanged = false;
-			for (const entry of entries) {
-				if (positionDependencyElements.has(entry.target)) {
-					positionDependencyChanged = true;
-				}
-				if (entry.target === element) {
-					const inlineSize =
-						entry.borderBoxSize?.[0]?.inlineSize ?? entry.contentRect.width;
-					if (inlineSize !== previousRootInlineSize) {
-						previousRootInlineSize = inlineSize;
-						if (inlineSize > 0) {
-							measureLayout(wasMeasurable);
-						}
-					}
-				}
-
-				if (entry.target !== scrollContainer) continue;
-				const clientWidth = scrollContainer.clientWidth;
-				const clientHeight = scrollContainer.clientHeight;
-				if (
-					clientWidth === previousViewportClientWidth &&
-					clientHeight === previousViewportClientHeight
-				) {
-					continue;
-				}
-				previousViewportClientWidth = clientWidth;
-				previousViewportClientHeight = clientHeight;
-				viewportSizeChanged = true;
-			}
-
-			if (positionDependencyChanged) schedulePreviewViewportRefresh();
-			if (!viewportSizeChanged) return;
-			measurePreviewViewportGeometry();
-			flushPreviewRangeFromScroll();
-		});
-		observer.observe(element);
-		if (scrollContainer) observer.observe(scrollContainer);
-		for (const dependencyElement of positionDependencyElements) {
-			observer.observe(dependencyElement);
-		}
-		return () => observer.disconnect();
-	});
-
-	$effect(() => {
-		const element = rootEl;
-		const content = contentEl;
-		if (!element || !content) return;
 		const ownerWindow = element.ownerDocument.defaultView;
 		if (!ownerWindow) return;
-		const scrollContainer = findNearestScrollContainer(element);
-		const scrollTarget: HTMLElement | Window = scrollContainer ?? ownerWindow;
-		previewScrollContainer = scrollContainer;
+
 		previewOwnerWindow = ownerWindow;
-		measurePreviewViewportGeometry();
-		flushPreviewRangeFromScroll();
-		scrollTarget.addEventListener("scroll", handlePreviewScroll, { passive: true });
+		const observation = untrack(() =>
+			observeTwoHopViewport({
+				rootEl: element,
+				frameCoordinator,
+				getCachedViewportHeight: () => previewViewportHeight,
+				getScrollCoverage: () => (pendingWindow ?? committedWindow).coverage,
+				onRootWidthChange: (width) => {
+					preserveAnchorForNextLayout =
+						lastMeasuredRootWidth > 0 && previewViewportHeight > 0;
+					if (width <= 0) lastMeasuredRootWidth = 0;
+					pendingRootWidth = width;
+					skipViewportGeometryForNextLayout = true;
+				},
+				onScrollContainerChange: (scrollContainer) => {
+					previewScrollContainer = scrollContainer;
+					previewOwnerWindow = element.ownerDocument.defaultView;
+				},
+				onScrollActiveChange: setPreviewScrollActive,
+				runInitialLayoutMeasurement: runObservedLayoutMeasurement,
+				runLayoutMeasurement: runObservedLayoutMeasurement,
+				runScrollMeasurement: runObservedScrollMeasurement,
+			}),
+		);
+		previewViewportObservation = observation;
+
 		return () => {
-			scrollTarget.removeEventListener("scroll", handlePreviewScroll);
-			cancelPreviewScrollIdle();
+			if (previewViewportObservation === observation) {
+				previewViewportObservation = null;
+			}
+			observation.dispose();
+			previewScrollContainer = null;
+			previewOwnerWindow = null;
+			setPreviewScrollActive(false);
 		};
 	});
 
@@ -715,43 +577,24 @@ export function useTwoHopProgressiveList(
 
 	$effect(() => {
 		const active = isPreviewSurfaceActive();
-		if (active !== lastPreviewSurfaceActive) {
-			lastPreviewSurfaceActive = active;
-			markPreviewBindingsDirty();
-		}
-		if (!active) {
-			cancelPreviewScrollIdle();
-			deactivatePreviewControl();
-			markPreviewBindingsDirty();
-			return;
-		}
+		if (active === lastPreviewSurfaceActive) return;
+		lastPreviewSurfaceActive = active;
 		if (!rootEl || !contentEl) {
-			markPreviewBindingsDirty();
+			publishPreviewSnapshot(true);
 			return;
 		}
 		measurePreviewViewportGeometry();
 		flushPreviewRangeFromScroll();
+		syncPreviewHostRows();
+		publishCardDemand();
+		publishPreviewSnapshot(true);
 	});
 
 	onDestroy(() => {
 		disposed = true;
 		cardHydrator.dispose();
 		sentinelObserver?.disconnect();
-		frameCoordinator.cancel("scroll-critical", PREVIEW_SCROLL_TASK_KEY);
-		frameCoordinator.cancel("post-paint", PREVIEW_RANGE_APPLY_TASK_KEY);
-		if (previewRangeAnimationFrame !== undefined && previewOwnerWindow) {
-			previewOwnerWindow.cancelAnimationFrame(previewRangeAnimationFrame);
-		}
-		if (
-			previewViewportRefreshAnimationFrame !== undefined &&
-			previewViewportRefreshOwnerWindow
-		) {
-			previewViewportRefreshOwnerWindow.cancelAnimationFrame(
-				previewViewportRefreshAnimationFrame,
-			);
-		}
-		cancelPreviewScrollIdle();
-		previewWindow.dispose();
+		frameCoordinator.cancel("post-paint", PREVIEW_WINDOW_COMMIT_TASK_KEY);
 		previewSurface.dispose();
 	});
 
@@ -791,11 +634,13 @@ export function useTwoHopProgressiveList(
 		get previewSurface() {
 			return previewSurface;
 		},
+		isPreviewHostEnabled(rowIndex: number): boolean {
+			return isPreviewControlActive() && previewHostRows.has(rowIndex);
+		},
 		get interactionDescriptorResolverProvider() {
 			return cardHydrator.interactionDescriptorResolverProvider;
 		},
 		registerCardModelConsumer: cardHydrator.registerConsumer,
-		registerPreviewRow: previewWindow.registerRow,
 		loadNextChunk,
 		loadMore,
 	};

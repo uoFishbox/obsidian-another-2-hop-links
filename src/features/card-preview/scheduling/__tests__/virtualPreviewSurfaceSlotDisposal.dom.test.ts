@@ -72,4 +72,53 @@ describe("VirtualPreviewSurface slot disposal", () => {
 		expect(harness.disposedSlotIds).toEqual(["logical-slot", "logical-slot-2"]);
 		harness.dispose();
 	});
+
+	it("releases an unbound runtime while retaining its stable host registration", async () => {
+		const harness = createSurface();
+		const hostLease = harness.surface.registerHost(
+			"logical-slot",
+			document.createElement("div"),
+		);
+
+		harness.surface.commit({
+			active: true,
+			activeRange: { start: 0, end: 1 },
+			bindings: [
+				{
+					slotId: "logical-slot",
+					rowIndex: 0,
+					ownerKey: "owner-a",
+					request,
+				},
+			],
+		});
+		await vi.advanceTimersByTimeAsync(32);
+
+		harness.surface.commit({
+			active: true,
+			activeRange: { start: 1, end: 2 },
+			bindings: [],
+		});
+		await vi.advanceTimersByTimeAsync(32);
+
+		expect(harness.disposedSlotIds).toEqual(["logical-slot"]);
+
+		harness.surface.commit({
+			active: true,
+			activeRange: { start: 0, end: 1 },
+			bindings: [
+				{
+					slotId: "logical-slot",
+					rowIndex: 0,
+					ownerKey: "owner-a",
+					request,
+				},
+			],
+		});
+		await vi.advanceTimersByTimeAsync(32);
+
+		expect(harness.disposedSlotIds).toEqual(["logical-slot"]);
+		hostLease.dispose();
+		harness.dispose();
+	});
 });

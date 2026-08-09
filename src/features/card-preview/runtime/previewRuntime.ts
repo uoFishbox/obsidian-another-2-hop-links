@@ -149,6 +149,7 @@ export function createPreviewRuntime(options: PreviewRuntimeOptions): PreviewRun
 /** Stateless preview surface used when preview rendering is unavailable. */
 export const DISABLED_PREVIEW_SURFACE: VirtualPreviewSurface = {
 	registerHost: () => ({ dispose: () => {} }),
+	commit: () => {},
 	beginBindings: () => {},
 	bindSlot: () => {},
 	endBindings: () => {},
