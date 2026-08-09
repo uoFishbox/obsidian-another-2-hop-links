@@ -34,6 +34,11 @@ export type StableScrollTopBand = {
 	readonly max: number;
 };
 
+/** Caller-owned storage for allocation-conscious stable-band resolution. */
+export type MutableStableScrollTopBand = {
+	-readonly [K in keyof StableScrollTopBand]: StableScrollTopBand[K];
+};
+
 /**
  * Open scrollTop interval in which a scroll-window measurement can be skipped.
  */

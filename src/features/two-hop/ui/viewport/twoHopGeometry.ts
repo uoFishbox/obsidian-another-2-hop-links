@@ -1,5 +1,6 @@
 import type { ViewPlanLayoutMetrics } from "ui/virtualization/svelte/viewPlanLayout";
 import type { TwoHopSectionModel } from "features/two-hop/ui/twoHopSectionModel";
+import type { MutableStableScrollTopBand } from "ui/virtualization/core/scrollWindowGate";
 
 export interface TwoHopGeometry {
 	readonly columns: number;
@@ -64,9 +65,10 @@ export function compileFixedGridLayout(
 	};
 }
 
-/** Resolves visible rows into caller-owned storage for the scroll hot path. */
-export function resolveTwoHopVisibleRowsInto(
-	target: TwoHopRowRange,
+/** Resolves visible rows and their open stable interval into caller-owned storage. */
+export function resolveTwoHopVisibleWindowInto(
+	rangeTarget: TwoHopRowRange,
+	stableBandTarget: MutableStableScrollTopBand,
 	geometry: TwoHopGeometry,
 	scrollOffset: number,
 	viewportHeight: number,
@@ -76,18 +78,73 @@ export function resolveTwoHopVisibleRowsInto(
 		geometry.totalHeight,
 		scrollOffset + viewportHeight,
 	);
-	if (
-		geometry.rowCount === 0 ||
-		viewportHeight <= 0 ||
-		viewportBottom <= viewportTop
-	) {
-		target.start = 0;
-		target.end = 0;
+	if (geometry.rowCount === 0 || viewportHeight <= 0) {
+		writeEmptyRange(rangeTarget);
+		writeInvalidStableBand(stableBandTarget);
+		return;
+	}
+	if (viewportBottom <= viewportTop) {
+		writeEmptyRange(rangeTarget);
+		if (scrollOffset + viewportHeight <= 0) {
+			stableBandTarget.min = Number.NEGATIVE_INFINITY;
+			stableBandTarget.max = -viewportHeight;
+			return;
+		}
+		if (scrollOffset >= geometry.totalHeight) {
+			stableBandTarget.min = geometry.totalHeight;
+			stableBandTarget.max = Number.POSITIVE_INFINITY;
+			return;
+		}
+		writeInvalidStableBand(stableBandTarget);
 		return;
 	}
 
-	target.start = resolveFirstRowEndingAfter(geometry, viewportTop);
-	target.end = resolveFirstRowStartingAtOrAfter(geometry, viewportBottom);
+	rangeTarget.start = resolveFirstRowEndingAfter(geometry, viewportTop);
+	rangeTarget.end = resolveFirstRowStartingAtOrAfter(geometry, viewportBottom);
+	writeVisibleRangeStableBand(
+		stableBandTarget,
+		geometry,
+		rangeTarget,
+		viewportHeight,
+	);
+}
+
+function writeVisibleRangeStableBand(
+	target: MutableStableScrollTopBand,
+	geometry: TwoHopGeometry,
+	range: Readonly<TwoHopRowRange>,
+	viewportHeight: number,
+): void {
+	const startMin =
+		range.start === 0
+			? Number.NEGATIVE_INFINITY
+			: resolveTwoHopRowTop(geometry, range.start - 1) + geometry.rowHeight;
+	const startMax =
+		range.start >= geometry.rowCount
+			? Number.POSITIVE_INFINITY
+			: resolveTwoHopRowTop(geometry, range.start) + geometry.rowHeight;
+	const endMin =
+		range.end === 0
+			? Number.NEGATIVE_INFINITY
+			: resolveTwoHopRowTop(geometry, range.end - 1) - viewportHeight;
+	const endMax =
+		range.end >= geometry.rowCount
+			? Number.POSITIVE_INFINITY
+			: resolveTwoHopRowTop(geometry, range.end) - viewportHeight;
+
+	target.min = Math.max(startMin, endMin, -viewportHeight);
+	target.max = Math.min(startMax, endMax, geometry.totalHeight);
+	if (target.min >= target.max) writeInvalidStableBand(target);
+}
+
+function writeEmptyRange(target: TwoHopRowRange): void {
+	target.start = 0;
+	target.end = 0;
+}
+
+function writeInvalidStableBand(target: MutableStableScrollTopBand): void {
+	target.min = Number.POSITIVE_INFINITY;
+	target.max = Number.NEGATIVE_INFINITY;
 }
 
 export function resolveTwoHopRowFromScrollOffset(

@@ -4,7 +4,7 @@ import {
 	resolveSectionIndexForRow,
 	resolveTwoHopRowFromScrollOffset,
 	resolveTwoHopRowTop,
-	resolveTwoHopVisibleRowsInto,
+	resolveTwoHopVisibleWindowInto,
 } from "features/two-hop/ui/viewport/twoHopGeometry";
 import {
 	createTwoHopSectionModel,
@@ -66,9 +66,11 @@ describe("two-hop geometry", () => {
 			layout,
 		);
 		const range = { start: 0, end: 0 };
-		resolveTwoHopVisibleRowsInto(range, geometry, 225, 120);
+		const stableBand = { min: 0, max: 0 };
+		resolveTwoHopVisibleWindowInto(range, stableBand, geometry, 225, 120);
 
 		expect(range).toEqual({ start: 2, end: 3 });
+		expect(stableBand).toEqual({ min: 210, max: 320 });
 		expect(resolveTwoHopRowFromScrollOffset(geometry, 0)).toBe(0);
 		expect(resolveTwoHopRowFromScrollOffset(geometry, 225)).toBe(2);
 		expect(
@@ -85,9 +87,40 @@ describe("two-hop geometry", () => {
 			sectionMarginBottom: 0,
 		});
 		const range = { start: 0, end: 0 };
-		resolveTwoHopVisibleRowsInto(range, geometry, 100.25, 10.5);
+		const stableBand = { min: 0, max: 0 };
+		resolveTwoHopVisibleWindowInto(range, stableBand, geometry, 100.25, 10.5);
 		expect(range).toEqual({ start: 1, end: 1 });
-		resolveTwoHopVisibleRowsInto(range, geometry, 100.25, 10.51);
+		expect(stableBand.min).toBe(Number.POSITIVE_INFINITY);
+		expect(stableBand.max).toBe(Number.NEGATIVE_INFINITY);
+
+		resolveTwoHopVisibleWindowInto(range, stableBand, geometry, 100.25, 10.51);
 		expect(range).toEqual({ start: 1, end: 2 });
+		expect(stableBand).toEqual({ min: 100.25, max: 210.99 });
+	});
+
+	it("returns one-sided stable bands while the viewport is outside the content", () => {
+		const geometry = compileFixedGridLayout([createSection("first", 2)], layout);
+		const range = { start: 0, end: 0 };
+		const stableBand = { min: 0, max: 0 };
+
+		resolveTwoHopVisibleWindowInto(range, stableBand, geometry, -200, 100);
+		expect(range).toEqual({ start: 0, end: 0 });
+		expect(stableBand).toEqual({
+			min: Number.NEGATIVE_INFINITY,
+			max: -100,
+		});
+
+		resolveTwoHopVisibleWindowInto(
+			range,
+			stableBand,
+			geometry,
+			geometry.totalHeight,
+			100,
+		);
+		expect(range).toEqual({ start: 0, end: 0 });
+		expect(stableBand).toEqual({
+			min: geometry.totalHeight,
+			max: Number.POSITIVE_INFINITY,
+		});
 	});
 });

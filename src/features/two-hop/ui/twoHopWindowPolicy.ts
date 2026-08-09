@@ -1,12 +1,16 @@
 import {
-	resolveProgressivePreviewRangeInto,
+	resolveProgressivePreviewWindowInto,
 	resolveProgressiveResidentRangeInto,
 } from "features/two-hop/ui/progressivePreviewRange";
 import type {
 	TwoHopGeometry,
 	TwoHopRowRange,
 } from "features/two-hop/ui/viewport/twoHopGeometry";
-import type { ScrollMeasurementRange } from "ui/virtualization/core/scrollWindowGate";
+import type {
+	MutableStableScrollTopBand,
+	ScrollMeasurementRange,
+	StableScrollTopBand,
+} from "ui/virtualization/core/scrollWindowGate";
 
 export interface TwoHopWindowSnapshot {
 	readonly active: Readonly<TwoHopRowRange>;
@@ -26,9 +30,6 @@ export interface ResolveTwoHopWindowInput {
 }
 
 const EMPTY_RANGE = Object.freeze({ start: 0, end: 0 });
-const MAX_COVERAGE_EXPANSIONS = 32;
-const COVERAGE_BINARY_SEARCH_STEPS = 14;
-
 export const EMPTY_TWO_HOP_WINDOW: TwoHopWindowSnapshot = Object.freeze({
 	active: EMPTY_RANGE,
 	prepared: EMPTY_RANGE,
@@ -39,10 +40,33 @@ export const EMPTY_TWO_HOP_WINDOW: TwoHopWindowSnapshot = Object.freeze({
 export function resolveTwoHopWindow(
 	input: ResolveTwoHopWindowInput,
 ): TwoHopWindowSnapshot {
-	const ranges = resolveRanges(input, input.scrollTop);
-	const active = freezeRange(ranges.active);
-	const prepared = freezeRange(ranges.prepared);
-	const coverage = resolveCoverage(input, active, prepared);
+	const active: TwoHopRowRange = { start: 0, end: 0 };
+	const stableBand: MutableStableScrollTopBand = { min: 0, max: 0 };
+	resolveProgressivePreviewWindowInto(
+		active,
+		stableBand,
+		input.geometry,
+		input.scrollTop - input.contentTopInScrollSpace,
+		input.viewportHeight,
+		input.mountedRowEnd,
+		input.offscreenBootstrapRows,
+	);
+
+	const prepared: TwoHopRowRange = { start: 0, end: 0 };
+	if (input.previewEnabled) {
+		resolveProgressiveResidentRangeInto(
+			prepared,
+			active,
+			input.previous?.prepared ?? EMPTY_RANGE,
+			input.mountedRowEnd,
+		);
+	}
+	const coverage =
+		input.viewportHeight > 0 && input.geometry.rowCount > 0
+			? resolveScrollMeasurementRange(stableBand, input.contentTopInScrollSpace)
+			: null;
+	Object.freeze(active);
+	Object.freeze(prepared);
 	return Object.freeze({ active, prepared, coverage });
 }
 
@@ -56,102 +80,15 @@ export function isSameTwoHopWindow(
 	);
 }
 
-function resolveRanges(
-	input: ResolveTwoHopWindowInput,
-	scrollTop: number,
-): { active: TwoHopRowRange; prepared: TwoHopRowRange } {
-	const active: TwoHopRowRange = { start: 0, end: 0 };
-	resolveProgressivePreviewRangeInto(
-		active,
-		input.geometry,
-		scrollTop - input.contentTopInScrollSpace,
-		input.viewportHeight,
-		input.mountedRowEnd,
-		input.offscreenBootstrapRows,
-	);
-
-	if (!input.previewEnabled) {
-		return { active, prepared: { start: 0, end: 0 } };
-	}
-
-	const prepared: TwoHopRowRange = { start: 0, end: 0 };
-	resolveProgressiveResidentRangeInto(
-		prepared,
-		active,
-		input.previous?.prepared ?? EMPTY_RANGE,
-		input.mountedRowEnd,
-	);
-	return { active, prepared };
-}
-
-function resolveCoverage(
-	input: ResolveTwoHopWindowInput,
-	active: Readonly<TwoHopRowRange>,
-	prepared: Readonly<TwoHopRowRange>,
+function resolveScrollMeasurementRange(
+	stableBand: StableScrollTopBand,
+	contentTopInScrollSpace: number,
 ): ScrollMeasurementRange | null {
-	if (input.viewportHeight <= 0 || input.geometry.rowCount === 0) return null;
-
-	const matches = (scrollTop: number): boolean => {
-		const candidate = resolveRanges(input, scrollTop);
-		return (
-			isSameRange(candidate.active, active) &&
-			isSameRange(candidate.prepared, prepared)
-		);
-	};
-	const initialStep = Math.max(1, input.geometry.rowStride / 2);
+	if (stableBand.min >= stableBand.max) return null;
 	return {
-		minScrollTopBeforeMeasurement: findCoverageBoundary(
-			input.scrollTop,
-			-1,
-			initialStep,
-			matches,
-		),
-		maxScrollTopBeforeMeasurement: findCoverageBoundary(
-			input.scrollTop,
-			1,
-			initialStep,
-			matches,
-		),
+		minScrollTopBeforeMeasurement: stableBand.min + contentTopInScrollSpace,
+		maxScrollTopBeforeMeasurement: stableBand.max + contentTopInScrollSpace,
 	};
-}
-
-function findCoverageBoundary(
-	origin: number,
-	direction: -1 | 1,
-	initialStep: number,
-	matches: (scrollTop: number) => boolean,
-): number {
-	let matching = origin;
-	let step = initialStep;
-	for (let index = 0; index < MAX_COVERAGE_EXPANSIONS; index += 1) {
-		const candidate = origin + direction * step;
-		if (matches(candidate)) {
-			matching = candidate;
-			step *= 2;
-			continue;
-		}
-		return bisectCoverageBoundary(matching, candidate, matches);
-	}
-	return direction < 0 ? Number.NEGATIVE_INFINITY : Number.POSITIVE_INFINITY;
-}
-
-function bisectCoverageBoundary(
-	matching: number,
-	nonMatching: number,
-	matches: (scrollTop: number) => boolean,
-): number {
-	let inside = matching;
-	let outside = nonMatching;
-	for (let index = 0; index < COVERAGE_BINARY_SEARCH_STEPS; index += 1) {
-		const middle = (inside + outside) / 2;
-		if (matches(middle)) inside = middle;
-		else outside = middle;
-	}
-	return outside;
-}
-
-function freezeRange(range: TwoHopRowRange): Readonly<TwoHopRowRange> {
-	return Object.freeze({ start: range.start, end: range.end });
 }
 
 function isSameRange(

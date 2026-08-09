@@ -17,7 +17,7 @@ const GEOMETRY: TwoHopGeometry = {
 };
 
 describe("resolveTwoHopWindow", () => {
-	it("publishes active, prepared, and a stable scroll coverage band together", () => {
+	it("calculates the exact open coverage band directly from row geometry", () => {
 		const snapshot = resolveTwoHopWindow({
 			geometry: GEOMETRY,
 			mountedRowEnd: 20,
@@ -29,18 +29,15 @@ describe("resolveTwoHopWindow", () => {
 			previous: EMPTY_TWO_HOP_WINDOW,
 		});
 
-		expect(snapshot.active.start).toBeLessThan(snapshot.active.end);
+		expect(snapshot.active).toEqual({ start: 3, end: 9 });
 		expect(snapshot.prepared.start).toBeLessThanOrEqual(snapshot.active.start);
 		expect(snapshot.prepared.end).toBeGreaterThanOrEqual(snapshot.active.end);
-		expect(snapshot.coverage).not.toBeNull();
-		if (!snapshot.coverage) throw new Error("Coverage was not resolved");
-		expect(500).toBeGreaterThan(snapshot.coverage.minScrollTopBeforeMeasurement);
-		expect(500).toBeLessThan(snapshot.coverage.maxScrollTopBeforeMeasurement);
+		expect(snapshot.coverage).toEqual({
+			minScrollTopBeforeMeasurement: 470,
+			maxScrollTopBeforeMeasurement: 540,
+		});
 
-		for (const scrollTop of [
-			(snapshot.coverage.minScrollTopBeforeMeasurement + 500) / 2,
-			(snapshot.coverage.maxScrollTopBeforeMeasurement + 500) / 2,
-		]) {
+		for (const scrollTop of [470.001, 539.999]) {
 			const covered = resolveTwoHopWindow({
 				geometry: GEOMETRY,
 				mountedRowEnd: 20,
@@ -54,6 +51,54 @@ describe("resolveTwoHopWindow", () => {
 			expect(covered.active).toEqual(snapshot.active);
 			expect(covered.prepared).toEqual(snapshot.prepared);
 		}
+
+		for (const scrollTop of [470, 540]) {
+			const boundary = resolveTwoHopWindow({
+				geometry: GEOMETRY,
+				mountedRowEnd: 20,
+				scrollTop,
+				contentTopInScrollSpace: 0,
+				viewportHeight: 300,
+				offscreenBootstrapRows: 0,
+				previewEnabled: true,
+				previous: snapshot,
+			});
+			expect(boundary.active).not.toEqual(snapshot.active);
+		}
+	});
+
+	it("translates local coverage boundaries into scroll-container space", () => {
+		const snapshot = resolveTwoHopWindow({
+			geometry: GEOMETRY,
+			mountedRowEnd: 20,
+			scrollTop: 600,
+			contentTopInScrollSpace: 100,
+			viewportHeight: 300,
+			offscreenBootstrapRows: 0,
+			previewEnabled: true,
+			previous: EMPTY_TWO_HOP_WINDOW,
+		});
+
+		expect(snapshot.active).toEqual({ start: 3, end: 9 });
+		expect(snapshot.coverage).toEqual({
+			minScrollTopBeforeMeasurement: 570,
+			maxScrollTopBeforeMeasurement: 640,
+		});
+	});
+
+	it("does not publish coverage for an invalid viewport", () => {
+		const snapshot = resolveTwoHopWindow({
+			geometry: GEOMETRY,
+			mountedRowEnd: 20,
+			scrollTop: 500,
+			contentTopInScrollSpace: 0,
+			viewportHeight: 0,
+			offscreenBootstrapRows: 0,
+			previewEnabled: true,
+			previous: EMPTY_TWO_HOP_WINDOW,
+		});
+
+		expect(snapshot.coverage).toBeNull();
 	});
 
 	it("keeps card hydration active while disabling preview preparation", () => {
