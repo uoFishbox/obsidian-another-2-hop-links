@@ -33,9 +33,11 @@ function defaultResolveSettings() {
 
 function defaultDependencies() {
 	return {
-		dependencyPaths: new Set<string>(),
-		dependencyLookupKeys: new Set<string>(),
-		dependencyTags: new Set<string>(),
+		originPath: "origin.md",
+		relevantPaths: new Set<string>(),
+		relevantLookupKeys: new Set<string>(),
+		relevantTags: new Set<string>(),
+		structuralSourcePaths: new Set<string>(),
 	};
 }
 
@@ -124,7 +126,7 @@ describe("ResolverCache", () => {
 			defaultResolveSettings(),
 			{
 				...defaultDependencies(),
-				dependencyPaths: new Set(["note1.md"]),
+				relevantPaths: new Set(["note1.md"]),
 			},
 			resultA,
 		);
@@ -135,7 +137,7 @@ describe("ResolverCache", () => {
 			defaultResolveSettings(),
 			{
 				...defaultDependencies(),
-				dependencyPaths: new Set(["note2.md"]),
+				relevantPaths: new Set(["note2.md"]),
 			},
 			resultB,
 		);
@@ -165,7 +167,7 @@ describe("ResolverCache", () => {
 			defaultResolveSettings(),
 			{
 				...defaultDependencies(),
-				dependencyLookupKeys: new Set(["missing-note.md"]),
+				relevantLookupKeys: new Set(["missing-note.md"]),
 			},
 			resultA,
 		);
@@ -176,7 +178,7 @@ describe("ResolverCache", () => {
 			defaultResolveSettings(),
 			{
 				...defaultDependencies(),
-				dependencyLookupKeys: new Set(["other-missing.md"]),
+				relevantLookupKeys: new Set(["other-missing.md"]),
 			},
 			resultB,
 		);
@@ -206,7 +208,7 @@ describe("ResolverCache", () => {
 			defaultResolveSettings(),
 			{
 				...defaultDependencies(),
-				dependencyTags: new Set(["tag1"]),
+				relevantTags: new Set(["tag1"]),
 			},
 			resultA,
 		);
@@ -217,7 +219,7 @@ describe("ResolverCache", () => {
 			defaultResolveSettings(),
 			{
 				...defaultDependencies(),
-				dependencyTags: new Set(["tag2"]),
+				relevantTags: new Set(["tag2"]),
 			},
 			resultB,
 		);
@@ -245,9 +247,10 @@ describe("ResolverCache", () => {
 			defaultPerformanceSettings(),
 			defaultResolveSettings(),
 			{
-				dependencyPaths: new Set(["note1.md"]),
-				dependencyLookupKeys: new Set(["lookup1.md"]),
-				dependencyTags: new Set(["tag1"]),
+				...defaultDependencies(),
+				relevantPaths: new Set(["note1.md"]),
+				relevantLookupKeys: new Set(["lookup1.md"]),
+				relevantTags: new Set(["tag1"]),
 			},
 			result,
 		);
@@ -353,7 +356,7 @@ describe("ResolverCache", () => {
 		const result = createMockResult();
 		const dependencies = {
 			...defaultDependencies(),
-			dependencyPaths: new Set(["note1.md"]),
+			relevantPaths: new Set(["note1.md"]),
 		};
 
 		cache.set(
@@ -372,7 +375,7 @@ describe("ResolverCache", () => {
 			sourceFile: createMockTFile("mutated.md"),
 		};
 		expect(Reflect.set(result.backlinks, 0, externalLink)).toBe(false);
-		dependencies.dependencyPaths.clear();
+		dependencies.relevantPaths.clear();
 
 		const first = cache.get(
 			"origin.md",

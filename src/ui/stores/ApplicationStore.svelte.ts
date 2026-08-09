@@ -11,6 +11,10 @@ import type {
 	DisplayDataBuilder,
 } from "features/two-hop/application/displayDataBuilder";
 import type { DataUpdateContext } from "core/indexing/index-service/IndexEvents";
+import type {
+	TwoHopResolveSnapshot,
+	TwoHopResolverDependencies,
+} from "features/two-hop/domain/ResolverDependencies";
 import {
 	computePreprocessedDisplayDataState,
 	computeSortedDisplayDataState,
@@ -56,6 +60,7 @@ export interface LoadedApplicationData {
 	phase: LoadedPhase;
 	data: TwoHopLinkResult;
 	displaySourceData: TwoHopLinkResult;
+	dependencies: TwoHopResolverDependencies | undefined;
 }
 
 export type ApplicationLoadState =
@@ -341,7 +346,7 @@ export class ApplicationStore {
 
 		const reloadDecisionInput = {
 			currentFile,
-			data: this.data,
+			dependencies: getLoadedApplicationData(this.mutableLoadState)?.dependencies,
 			context,
 		};
 
@@ -434,7 +439,7 @@ export class ApplicationStore {
 		}
 
 		if (result.kind === "success") {
-			this.applyResolvedData(result.data, "complete");
+			this.applyResolvedSnapshot(result.snapshot);
 			return;
 		}
 
@@ -571,10 +576,18 @@ export class ApplicationStore {
 
 	private applyResolveProgress(progress: ResolveProgress): void {
 		const nextPhase = this.getLoadingPhaseForResolvePhase(progress.phase);
-		this.applyResolvedData(progress.data, nextPhase);
+		this.applyResolvedData(progress.data, nextPhase, undefined);
 	}
 
-	private applyResolvedData(data: TwoHopLinkResult, loadingPhase: LoadedPhase): void {
+	private applyResolvedSnapshot(snapshot: TwoHopResolveSnapshot): void {
+		this.applyResolvedData(snapshot.result, "complete", snapshot.dependencies);
+	}
+
+	private applyResolvedData(
+		data: TwoHopLinkResult,
+		loadingPhase: LoadedPhase,
+		dependencies: TwoHopResolverDependencies | undefined,
+	): void {
 		const previousLoadedData = getLoadedApplicationData(this.mutableLoadState);
 		const previousDisplaySource = previousLoadedData?.displaySourceData;
 		const nextDisplaySource = resolveNextDisplaySource(
@@ -587,6 +600,7 @@ export class ApplicationStore {
 		if (
 			previousLoadedData?.data === data &&
 			previousLoadedData.phase === loadingPhase &&
+			previousLoadedData.dependencies === dependencies &&
 			this.mutableLoadState.type === "loaded"
 		) {
 			if (nextDisplaySource) {
@@ -605,6 +619,7 @@ export class ApplicationStore {
 			phase: loadingPhase,
 			data,
 			displaySourceData: nextDisplaySource ?? previousDisplaySource ?? data,
+			dependencies,
 		};
 		if (nextDisplaySource) {
 			this.updateVersion += 1;

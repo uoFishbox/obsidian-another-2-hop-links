@@ -15,7 +15,7 @@ export function createDefaultApplicationStore(
 		settings,
 		displayDataBuilder,
 		(file: TFile, onProgress, signal) =>
-			plugin.getTwoHopLinkResult(file, onProgress, {
+			plugin.getTwoHopResolveSnapshot(file, onProgress, {
 				includeTaggedNotes:
 					areTagFeaturesEnabled(plugin.settings) &&
 					plugin.settings.showTagsSection,

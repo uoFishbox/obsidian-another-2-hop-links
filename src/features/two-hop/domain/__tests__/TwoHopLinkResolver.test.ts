@@ -137,6 +137,22 @@ describe("TwoHopLinkResolver", () => {
 			expect(taggedPaths).toEqual(["tagged1.md", "tagged2.md"]);
 		});
 
+		test("resolveSnapshot retains normalized origin tags when no tagged notes exist", async () => {
+			const { resolver, files } = await buildResolvedEnvironment([
+				{ path: "origin.md", tags: ["#Project", "Nested/Tag"] },
+				{ path: "candidate.md" },
+			]);
+
+			const snapshot = await resolver.resolveSnapshot(files["origin.md"]);
+
+			expect(snapshot.result.taggedNotes).toEqual([]);
+			expect(snapshot.dependencies.originPath).toBe("origin.md");
+			expect(snapshot.dependencies.relevantTags).toEqual(
+				new Set(["project", "nested/tag"]),
+			);
+			expect(Object.isFrozen(snapshot)).toBe(true);
+		});
+
 		test("hop1 / hop2 pointing to origin itself are excluded", async () => {
 			const { resolver, files } = await buildResolvedEnvironment([
 				{ path: "origin.md", links: ["origin", "other"] },

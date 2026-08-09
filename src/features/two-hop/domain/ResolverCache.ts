@@ -1,5 +1,9 @@
 import type { DataUpdateContext } from "core/indexing/index-service/IndexEvents";
 import type { TwoHopLinkResult } from "types/domain";
+import type {
+	TwoHopResolveSnapshot,
+	TwoHopResolverDependencies,
+} from "./ResolverDependencies";
 import { freezeTwoHopLinkResult } from "./immutableTwoHopLinkResult";
 
 const MAX_RESOLVE_CACHE_SIZE = 64;
@@ -18,10 +22,7 @@ export interface CachedResolveResult {
 	enableProgressiveTwoHopBuild: boolean;
 	maxOutgoingToProcess: number;
 	includeTaggedNotes: boolean;
-	dependencyPaths: ReadonlySet<string>;
-	dependencyLookupKeys: ReadonlySet<string>;
-	dependencyTags: ReadonlySet<string>;
-	result: TwoHopLinkResult;
+	snapshot: TwoHopResolveSnapshot;
 }
 
 /**
@@ -43,6 +44,14 @@ export class ResolverCache {
 		performanceSettings: ResolverPerformanceSettings,
 		resolveSettings: ResolverResolveSettings,
 	): TwoHopLinkResult | undefined {
+		return this.getSnapshot(filePath, performanceSettings, resolveSettings)?.result;
+	}
+
+	getSnapshot(
+		filePath: string,
+		performanceSettings: ResolverPerformanceSettings,
+		resolveSettings: ResolverResolveSettings,
+	): TwoHopResolveSnapshot | undefined {
 		const cached = this.cache.get(filePath);
 		if (!cached) {
 			return undefined;
@@ -58,7 +67,7 @@ export class ResolverCache {
 			return undefined;
 		}
 
-		return cached.result;
+		return cached.snapshot;
 	}
 
 	/**
@@ -69,23 +78,26 @@ export class ResolverCache {
 		indexVersion: number,
 		performanceSettings: ResolverPerformanceSettings,
 		resolveSettings: ResolverResolveSettings,
-		dependencies: {
-			dependencyPaths: Set<string>;
-			dependencyLookupKeys: Set<string>;
-			dependencyTags: Set<string>;
-		},
+		dependencies: TwoHopResolverDependencies,
 		result: TwoHopLinkResult,
 	): void {
+		const cachedDependencies: TwoHopResolverDependencies = Object.freeze({
+			originPath: dependencies.originPath,
+			relevantPaths: new Set(dependencies.relevantPaths),
+			relevantLookupKeys: new Set(dependencies.relevantLookupKeys),
+			relevantTags: new Set(dependencies.relevantTags),
+			structuralSourcePaths: new Set(dependencies.structuralSourcePaths),
+		});
 		this.cache.set(filePath, {
 			indexVersionAtBuild: indexVersion,
 			enableProgressiveTwoHopBuild:
 				performanceSettings.enableProgressiveTwoHopBuild,
 			maxOutgoingToProcess: performanceSettings.maxOutgoingToProcess,
 			includeTaggedNotes: resolveSettings.includeTaggedNotes,
-			dependencyPaths: new Set(dependencies.dependencyPaths),
-			dependencyLookupKeys: new Set(dependencies.dependencyLookupKeys),
-			dependencyTags: new Set(dependencies.dependencyTags),
-			result: freezeTwoHopLinkResult(result),
+			snapshot: Object.freeze({
+				result: freezeTwoHopLinkResult(result),
+				dependencies: cachedDependencies,
+			}),
 		});
 
 		// キャッシュサイズ制限を超えた場合、最も古いエントリを削除
@@ -125,10 +137,14 @@ export class ResolverCache {
 		}
 
 		for (const [filePath, cached] of this.cache.entries()) {
+			const dependencies = cached.snapshot.dependencies;
 			if (
-				this.intersects(cached.dependencyLookupKeys, affectedLookupKeySet) ||
-				this.intersects(cached.dependencyPaths, affectedPathSet) ||
-				this.intersects(cached.dependencyTags, affectedTagSet)
+				this.intersects(
+					dependencies.relevantLookupKeys,
+					affectedLookupKeySet,
+				) ||
+				this.intersects(dependencies.relevantPaths, affectedPathSet) ||
+				this.intersects(dependencies.relevantTags, affectedTagSet)
 			) {
 				this.cache.delete(filePath);
 			}

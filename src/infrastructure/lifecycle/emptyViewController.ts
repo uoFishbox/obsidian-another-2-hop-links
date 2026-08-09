@@ -99,7 +99,7 @@ export function createEmptyViewController(
 			plugin.settings,
 			displayDataBuilder,
 			(file: TFile, _onProgress, signal) =>
-				plugin.getTwoHopLinkResult(file, undefined, {
+				plugin.getTwoHopResolveSnapshot(file, undefined, {
 					includeTaggedNotes:
 						areTagFeaturesEnabled(plugin.settings) &&
 						plugin.settings.showTagsSection,

@@ -14,7 +14,11 @@ import type {
 import type { IMetadataCache } from "types/obsidian";
 import { enableLogging, logger } from "shared/logging/logger";
 import { ResolverCache } from "./ResolverCache";
-import { collectResolverDependencies } from "./ResolverDependencies";
+import {
+	collectResolverDependencies,
+	createTwoHopResolveSnapshot,
+	type TwoHopResolveSnapshot,
+} from "./ResolverDependencies";
 import { TwoHopBranchBuilder } from "./TwoHopBranchBuilder";
 import type { ResolverDebugPolicy, ResolverPerformanceSettings } from "./ResolverTypes";
 import {
@@ -44,7 +48,7 @@ interface ResolveSettings {
 interface InFlightResolve {
 	readonly requestKey: string;
 	readonly controller: AbortController;
-	readonly promise: Promise<TwoHopLinkResult>;
+	readonly promise: Promise<TwoHopResolveSnapshot>;
 	readonly consumers: Set<symbol>;
 	readonly listeners: Map<symbol, (progress: ResolveProgress) => void>;
 	lastProgress: ResolveProgress | undefined;
@@ -95,6 +99,15 @@ export class TwoHopLinkResolver {
 		onProgress?: (progress: ResolveProgress) => void,
 		options?: ResolveOptions,
 	): Promise<TwoHopLinkResult> {
+		const snapshot = await this.resolveSnapshot(targetFile, onProgress, options);
+		return snapshot.result;
+	}
+
+	public async resolveSnapshot(
+		targetFile: TFile,
+		onProgress?: (progress: ResolveProgress) => void,
+		options?: ResolveOptions,
+	): Promise<TwoHopResolveSnapshot> {
 		throwIfResolveAborted(options?.signal);
 		const performanceSettings = this.getPerformanceSettings();
 		const resolveSettings = this.getResolveSettings(options);
@@ -159,7 +172,7 @@ export class TwoHopLinkResolver {
 		inFlight: InFlightResolve,
 		onProgress: ((progress: ResolveProgress) => void) | undefined,
 		signal: AbortSignal | undefined,
-	): Promise<TwoHopLinkResult> {
+	): Promise<TwoHopResolveSnapshot> {
 		throwIfResolveAborted(signal);
 		const consumerId = Symbol("two-hop-resolve-consumer");
 		inFlight.consumers.add(consumerId);
@@ -170,7 +183,7 @@ export class TwoHopLinkResolver {
 			}
 		}
 
-		return new Promise<TwoHopLinkResult>((resolve, reject) => {
+		return new Promise<TwoHopResolveSnapshot>((resolve, reject) => {
 			let consumerSettled = false;
 			const releaseConsumer = (): void => {
 				if (consumerSettled) return;
@@ -213,21 +226,21 @@ export class TwoHopLinkResolver {
 		resolveSettings: ResolveSettings,
 		onProgress?: (progress: ResolveProgress) => void,
 		signal?: AbortSignal,
-	): Promise<TwoHopLinkResult> {
+	): Promise<TwoHopResolveSnapshot> {
 		for (let retryCount = 0; ; retryCount += 1) {
 			throwIfResolveAborted(signal);
 			if (this.supportsDataUpdateSubscription) {
-				const cachedResult = this.cache.get(
+				const cachedSnapshot = this.cache.getSnapshot(
 					targetFile.path,
 					performanceSettings,
 					resolveSettings,
 				);
-				if (cachedResult) {
+				if (cachedSnapshot) {
 					onProgress?.({
 						phase: "complete",
-						data: cachedResult,
+						data: cachedSnapshot.result,
 					});
-					return cachedResult;
+					return cachedSnapshot;
 				}
 			}
 
@@ -245,17 +258,17 @@ export class TwoHopLinkResolver {
 				this.lastIndexVersion = indexVersion;
 			}
 
-			const cachedResult = this.cache.get(
+			const cachedSnapshot = this.cache.getSnapshot(
 				targetFile.path,
 				performanceSettings,
 				resolveSettings,
 			);
-			if (cachedResult) {
+			if (cachedSnapshot) {
 				onProgress?.({
 					phase: "complete",
-					data: cachedResult,
+					data: cachedSnapshot.result,
 				});
-				return cachedResult;
+				return cachedSnapshot;
 			}
 
 			const displaySnapshotRevision = ++nextDisplaySnapshotRevision;
@@ -345,19 +358,19 @@ export class TwoHopLinkResolver {
 					// The index kept changing during the build. Return the last
 					// consistent snapshot without caching, since it was built
 					// against a stale index version.
+					const dependencies = collectResolverDependencies(cache, result);
+					const snapshot = createTwoHopResolveSnapshot(result, dependencies);
 					onProgress?.({
 						phase: "complete",
 						data: result,
 					});
-					return result;
+					return snapshot;
 				}
 				continue;
 			}
 
-			const dependencies = collectResolverDependencies(
-				this.metadataCache,
-				result,
-			);
+			const dependencies = collectResolverDependencies(cache, result);
+			const snapshot = createTwoHopResolveSnapshot(result, dependencies);
 			this.cache.set(
 				targetFile.path,
 				indexVersion,
@@ -371,7 +384,7 @@ export class TwoHopLinkResolver {
 				data: result,
 			});
 
-			return result;
+			return snapshot;
 		}
 	}
 

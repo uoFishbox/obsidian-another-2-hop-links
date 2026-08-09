@@ -10,6 +10,7 @@ import {
 } from "features/two-hop/ui/TwoHopLinksView";
 import type { ResolveProgress, TwoHopLinkResult } from "types/domain";
 import type { ResolveOptions } from "features/two-hop/domain/TwoHopLinkResolver";
+import type { TwoHopResolveSnapshot } from "features/two-hop/domain/ResolverDependencies";
 import { forceRedrawEffect } from "infrastructure/markdown/livePreview";
 import {
 	createDisplayDataBuilder,
@@ -241,6 +242,18 @@ export default class CosenseCardLinksPlugin extends Plugin implements PluginHost
 		options?: ResolveOptions,
 	): Promise<TwoHopLinkResult> {
 		return this.runtime.twoHopLinkResolver.resolve(file, onProgress, options);
+	}
+
+	public async getTwoHopResolveSnapshot(
+		file: TFile,
+		onProgress?: (progress: ResolveProgress) => void,
+		options?: ResolveOptions,
+	): Promise<TwoHopResolveSnapshot> {
+		return this.runtime.twoHopLinkResolver.resolveSnapshot(
+			file,
+			onProgress,
+			options,
+		);
 	}
 
 	public processUnresolvedLinksInElement(el: HTMLElement, sourcePath: string): void {

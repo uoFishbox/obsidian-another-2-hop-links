@@ -270,12 +270,16 @@ export class ComponentController implements IComponentManager {
 				this.applicationStorePool.getOrCreateDisplayDataBuilder(leafId),
 				(targetFile: TFile, onProgress, signal) => {
 					const currentSettings = this.getSettings();
-					return this.plugin.getTwoHopLinkResult(targetFile, onProgress, {
-						includeTaggedNotes:
-							areTagFeaturesEnabled(currentSettings) &&
-							currentSettings.showTagsSection,
-						signal,
-					});
+					return this.plugin.getTwoHopResolveSnapshot(
+						targetFile,
+						onProgress,
+						{
+							includeTaggedNotes:
+								areTagFeaturesEnabled(currentSettings) &&
+								currentSettings.showTagsSection,
+							signal,
+						},
+					);
 				},
 			);
 			shouldReleaseStoreOnError = true;

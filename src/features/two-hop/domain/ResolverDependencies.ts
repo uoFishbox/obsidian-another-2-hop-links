@@ -1,48 +1,80 @@
+import type { CachedMetadata } from "obsidian";
 import { extractTags } from "core/indexing/metadata/metadataExtractor";
 import {
 	getLookupPathForLink,
 	toCaseInsensitiveLookupKey,
 } from "core/indexing/link-resolution/linkResolution";
 import type { TwoHopLinkResult } from "types/domain";
-import type { IMetadataCache } from "types/obsidian";
 
+/** Inputs whose current index state must remain valid for a two-hop result. */
+export interface TwoHopResolverDependencies {
+	readonly originPath: string;
+	readonly relevantPaths: ReadonlySet<string>;
+	readonly relevantLookupKeys: ReadonlySet<string>;
+	readonly relevantTags: ReadonlySet<string>;
+	readonly structuralSourcePaths: ReadonlySet<string>;
+}
+
+/** A resolver result and the dependency generation against which it was built. */
+export interface TwoHopResolveSnapshot {
+	readonly result: TwoHopLinkResult;
+	readonly dependencies: TwoHopResolverDependencies;
+}
+
+/**
+ * Builds the shared dependency model used by resolver cache invalidation and UI reloads.
+ */
 export function collectResolverDependencies(
-	metadataCache: IMetadataCache,
+	originMetadata: CachedMetadata | null,
 	result: TwoHopLinkResult,
-): {
-	dependencyPaths: Set<string>;
-	dependencyLookupKeys: Set<string>;
-	dependencyTags: Set<string>;
-} {
-	const dependencyPaths = new Set<string>();
-	const dependencyLookupKeys = new Set<string>();
-	const dependencyTags = new Set<string>();
+): TwoHopResolverDependencies {
+	const relevantPaths = new Set<string>();
+	const relevantLookupKeys = new Set<string>();
+	const relevantTags = new Set<string>();
+	const structuralSourcePaths = new Set<string>();
 
-	dependencyPaths.add(result.originFile.path);
-	dependencyLookupKeys.add(toCaseInsensitiveLookupKey(result.originFile.path));
-	const originCache = metadataCache.getFileCache(result.originFile);
-	for (const tag of extractTags(originCache)) {
-		dependencyTags.add(tag.tag);
+	relevantPaths.add(result.originFile.path);
+	relevantLookupKeys.add(toCaseInsensitiveLookupKey(result.originFile.path));
+	structuralSourcePaths.add(result.originFile.path);
+	for (const tag of extractTags(originMetadata)) {
+		relevantTags.add(tag.tag);
 	}
 
 	for (const branch of result.branches) {
 		if (branch.hop1.path) {
-			dependencyPaths.add(branch.hop1.path);
+			relevantPaths.add(branch.hop1.path);
+			structuralSourcePaths.add(branch.hop1.path);
 		}
 		for (const hop2 of branch.hop2) {
-			dependencyPaths.add(hop2.sourceFile.path);
+			relevantPaths.add(hop2.sourceFile.path);
 		}
 		const lookupPath = getLookupPathForLink(branch.hop1);
-		dependencyLookupKeys.add(toCaseInsensitiveLookupKey(lookupPath));
+		relevantLookupKeys.add(toCaseInsensitiveLookupKey(lookupPath));
 	}
 
 	for (const backlink of result.backlinks) {
-		dependencyPaths.add(backlink.sourceFile.path);
+		relevantPaths.add(backlink.sourceFile.path);
+		structuralSourcePaths.add(backlink.sourceFile.path);
 	}
 
 	for (const taggedNote of result.taggedNotes) {
-		dependencyPaths.add(taggedNote.path);
+		relevantPaths.add(taggedNote.path);
+		structuralSourcePaths.add(taggedNote.path);
 	}
 
-	return { dependencyPaths, dependencyLookupKeys, dependencyTags };
+	return Object.freeze({
+		originPath: result.originFile.path,
+		relevantPaths,
+		relevantLookupKeys,
+		relevantTags,
+		structuralSourcePaths,
+	});
+}
+
+/** Creates one immutable generation boundary for result publication. */
+export function createTwoHopResolveSnapshot(
+	result: TwoHopLinkResult,
+	dependencies: TwoHopResolverDependencies,
+): TwoHopResolveSnapshot {
+	return Object.freeze({ result, dependencies });
 }

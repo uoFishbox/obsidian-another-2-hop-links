@@ -108,10 +108,19 @@ function createController() {
 	};
 	const app = { workspace } as any;
 	const resolveTwoHopLinks = vi.fn(async (file: TFile) => ({
-		originFile: file,
-		branches: [],
-		backlinks: [],
-		taggedNotes: [],
+		result: {
+			originFile: file,
+			branches: [],
+			backlinks: [],
+			taggedNotes: [],
+		},
+		dependencies: {
+			originPath: file.path,
+			relevantPaths: new Set([file.path]),
+			relevantLookupKeys: new Set([file.path.toLowerCase()]),
+			relevantTags: new Set<string>(),
+			structuralSourcePaths: new Set([file.path]),
+		},
 	}));
 	const buildDisplayData = vi.fn(() => ({
 		outgoing: [],
@@ -129,7 +138,7 @@ function createController() {
 		app,
 		createDisplayDataBuilder: vi.fn(() => buildDisplayData),
 		getLinkContextFactory: vi.fn(() => linkContextFactory),
-		getTwoHopLinkResult: resolveTwoHopLinks,
+		getTwoHopResolveSnapshot: resolveTwoHopLinks,
 	};
 
 	const controller = new ComponentController(

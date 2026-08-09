@@ -6,6 +6,10 @@ import {
 	type DisplayDataBuilder,
 } from "ui/stores/ApplicationStore.svelte";
 import type { ResolveTwoHopLinks } from "features/two-hop/application/TwoHopLinksLoader";
+import {
+	collectResolverDependencies,
+	createTwoHopResolveSnapshot,
+} from "features/two-hop/domain/ResolverDependencies";
 import type {
 	DisplayData,
 	PreprocessedDisplayData,
@@ -22,6 +26,9 @@ import {
 	type PluginSettings,
 	type SortOption,
 } from "features/settings/model";
+import { buildDetailedBacklinksArtifactsChunked } from "core/indexing/backlink-builder/backlinkIndexer";
+import { TagIndexStore } from "core/indexing/tag-index/TagIndexStore";
+import { VaultEnvironmentBuilder } from "testing/helpers/VaultEnvironmentBuilder";
 
 function createEmptyDisplayData(): DisplayData {
 	return {
@@ -89,6 +96,32 @@ function createLinkResultWithBranch(
 		taggedNotes: [],
 	};
 }
+
+function createLinkResultWithTaggedPath(
+	originPath: string,
+	taggedPath?: string,
+): TwoHopLinkResult {
+	const result = createLinkResult(originPath);
+	return {
+		...result,
+		backlinks: [],
+		taggedNotes: taggedPath
+			? [
+					{
+						file: createMockTFile(taggedPath),
+						path: taggedPath,
+						commonTags: ["project"],
+					},
+				]
+			: [],
+	};
+}
+
+type TestResolveTwoHopLinks = (
+	file: TFile,
+	onProgress?: (progress: ResolveProgress) => void,
+	signal?: AbortSignal,
+) => Promise<TwoHopLinkResult>;
 
 function createBuildDisplayDataMock() {
 	return createStagedBuildDisplayDataMock().builder;
@@ -305,7 +338,8 @@ function createStore(
 	params: {
 		settings?: PluginSettings;
 		buildDisplayDataMock?: DisplayDataBuilder;
-		resolveTwoHopLinks?: ResolveTwoHopLinks;
+		resolveTwoHopLinks?: TestResolveTwoHopLinks;
+		originTags?: string[];
 		onSortChange?: (option: SortOption) => void;
 	} = {},
 ) {
@@ -316,11 +350,21 @@ function createStore(
 		params.resolveTwoHopLinks ??
 		(async (file: TFile) => createLinkResult(file.path));
 	const onSortChange = params.onSortChange ?? vi.fn();
+	const resolveSnapshot: ResolveTwoHopLinks = async (file, onProgress, signal) => {
+		const result = await resolveTwoHopLinks(file, onProgress, signal);
+		const dependencies = collectResolverDependencies(
+			params.originTags
+				? ({ frontmatter: { tags: params.originTags } } as never)
+				: null,
+			result,
+		);
+		return createTwoHopResolveSnapshot(result, dependencies);
+	};
 
 	const store = new ApplicationStore(
 		settings,
 		buildDisplayDataMock,
-		resolveTwoHopLinks,
+		resolveSnapshot,
 		onSortChange,
 	);
 
@@ -342,7 +386,7 @@ describe("ApplicationStore (Runes)", () => {
 		const file = createMockTFile("target.md");
 		const expected = createLinkResult(file.path);
 		const resolveTwoHopLinks = vi
-			.fn<ResolveTwoHopLinks>()
+			.fn<TestResolveTwoHopLinks>()
 			.mockResolvedValue(expected);
 		const { store } = createStore({ resolveTwoHopLinks });
 
@@ -421,7 +465,7 @@ describe("ApplicationStore (Runes)", () => {
 		let onProgress: ((progress: ResolveProgress) => void) | undefined;
 		let resolveLoad!: (value: TwoHopLinkResult) => void;
 		const resolveTwoHopLinks = vi
-			.fn<ResolveTwoHopLinks>()
+			.fn<TestResolveTwoHopLinks>()
 			.mockImplementation(async (_file, progress) => {
 				onProgress = progress;
 				return await new Promise<TwoHopLinkResult>((resolve) => {
@@ -523,7 +567,7 @@ describe("ApplicationStore (Runes)", () => {
 		let onProgress: ((progress: ResolveProgress) => void) | undefined;
 		let resolveLoad!: (value: TwoHopLinkResult) => void;
 		const resolveTwoHopLinks = vi
-			.fn<ResolveTwoHopLinks>()
+			.fn<TestResolveTwoHopLinks>()
 			.mockImplementation(async (_file, progress) => {
 				onProgress = progress;
 				return await new Promise<TwoHopLinkResult>((resolve) => {
@@ -628,7 +672,7 @@ describe("ApplicationStore (Runes)", () => {
 		let onProgress: ((progress: ResolveProgress) => void) | undefined;
 		let resolveLoad!: (value: TwoHopLinkResult) => void;
 		const resolveTwoHopLinks = vi
-			.fn<ResolveTwoHopLinks>()
+			.fn<TestResolveTwoHopLinks>()
 			.mockImplementation(async (_file, progress) => {
 				onProgress = progress;
 				return await new Promise<TwoHopLinkResult>((resolve) => {
@@ -665,7 +709,7 @@ describe("ApplicationStore (Runes)", () => {
 	it("clears data and retains error on normal load failure", async () => {
 		const file = createMockTFile("target.md");
 		const resolveTwoHopLinks = vi
-			.fn<ResolveTwoHopLinks>()
+			.fn<TestResolveTwoHopLinks>()
 			.mockRejectedValue(new Error("load failed"));
 		const { store } = createStore({ resolveTwoHopLinks });
 
@@ -680,7 +724,7 @@ describe("ApplicationStore (Runes)", () => {
 	it("shares an in-flight load for the same file", async () => {
 		const file = createMockTFile("target.md");
 		let resolveLoad!: (value: TwoHopLinkResult) => void;
-		const resolveTwoHopLinks = vi.fn<ResolveTwoHopLinks>().mockImplementation(
+		const resolveTwoHopLinks = vi.fn<TestResolveTwoHopLinks>().mockImplementation(
 			async () =>
 				await new Promise<TwoHopLinkResult>((resolve) => {
 					resolveLoad = resolve;
@@ -701,7 +745,7 @@ describe("ApplicationStore (Runes)", () => {
 	it("starts a new in-flight load when force is true", async () => {
 		const file = createMockTFile("target.md");
 		const resolvers: Array<(value: TwoHopLinkResult) => void> = [];
-		const resolveTwoHopLinks = vi.fn<ResolveTwoHopLinks>().mockImplementation(
+		const resolveTwoHopLinks = vi.fn<TestResolveTwoHopLinks>().mockImplementation(
 			async () =>
 				await new Promise<TwoHopLinkResult>((resolve) => {
 					resolvers.push(resolve);
@@ -725,7 +769,7 @@ describe("ApplicationStore (Runes)", () => {
 		const firstFile = createMockTFile("first.md");
 		const secondFile = createMockTFile("second.md");
 		const resolvers: Array<(value: TwoHopLinkResult) => void> = [];
-		const resolveTwoHopLinks = vi.fn<ResolveTwoHopLinks>().mockImplementation(
+		const resolveTwoHopLinks = vi.fn<TestResolveTwoHopLinks>().mockImplementation(
 			async () =>
 				await new Promise<TwoHopLinkResult>((resolve) => {
 					resolvers.push(resolve);
@@ -764,7 +808,7 @@ describe("ApplicationStore (Runes)", () => {
 		const file = createMockTFile("target.md");
 		const firstResult = createLinkResult(file.path);
 		const resolveTwoHopLinks = vi
-			.fn<ResolveTwoHopLinks>()
+			.fn<TestResolveTwoHopLinks>()
 			.mockResolvedValueOnce(firstResult)
 			.mockRejectedValueOnce(new Error("refresh failed"));
 		const { store } = createStore({ resolveTwoHopLinks });
@@ -807,7 +851,7 @@ describe("ApplicationStore (Runes)", () => {
 		});
 
 		const resolveTwoHopLinks = vi
-			.fn<ResolveTwoHopLinks>()
+			.fn<TestResolveTwoHopLinks>()
 			.mockImplementationOnce(async (_file, _onProgress, signal) => {
 				if (signal) signals.push(signal);
 				return promiseA;
@@ -903,7 +947,7 @@ describe("ApplicationStore (Runes)", () => {
 	});
 
 	it("handleDataUpdate only advances updateVersion for global list store without current file", async () => {
-		const resolveTwoHopLinks = vi.fn<ResolveTwoHopLinks>();
+		const resolveTwoHopLinks = vi.fn<TestResolveTwoHopLinks>();
 		const { store } = createStore({ resolveTwoHopLinks });
 		const previousVersion = store.updateVersion;
 
@@ -919,7 +963,7 @@ describe("ApplicationStore (Runes)", () => {
 	it("handleDataUpdate does not reload on unrelated update", async () => {
 		const file = createMockTFile("current.md");
 		const resolveTwoHopLinks = vi
-			.fn<ResolveTwoHopLinks>()
+			.fn<TestResolveTwoHopLinks>()
 			.mockResolvedValue(createLinkResultWithBranch(file.path, "target.md"));
 		const { store } = createStore({ resolveTwoHopLinks });
 
@@ -938,10 +982,61 @@ describe("ApplicationStore (Runes)", () => {
 		expect(resolveTwoHopLinks).toHaveBeenCalledTimes(1);
 	});
 
+	it("reloads when TagIndex creates a relation absent from the current result", async () => {
+		const environment = new VaultEnvironmentBuilder([
+			{ path: "origin.md", tags: ["#project"] },
+			{ path: "candidate.md", tags: [] },
+		]).build();
+		const tagIndexStore = new TagIndexStore(
+			environment.mockVault,
+			environment.mockMetadataCache,
+		);
+		const initialArtifacts = await buildDetailedBacklinksArtifactsChunked(
+			environment.mockVault,
+			environment.mockMetadataCache,
+			{},
+		);
+		tagIndexStore.replace(initialArtifacts.tagIndex);
+
+		const originFile = environment.files["origin.md"];
+		const resolveTwoHopLinks = vi
+			.fn<TestResolveTwoHopLinks>()
+			.mockResolvedValueOnce(createLinkResultWithTaggedPath(originFile.path))
+			.mockResolvedValueOnce(
+				createLinkResultWithTaggedPath(originFile.path, "candidate.md"),
+			);
+		const { store } = createStore({
+			resolveTwoHopLinks,
+			originTags: ["project"],
+		});
+		await store.load(originFile);
+
+		environment.builder.addFile({
+			path: "candidate.md",
+			tags: ["#project"],
+		});
+		const mutation = await tagIndexStore.applyFileChangesAsync([
+			{ type: "modify", path: "candidate.md" },
+		]);
+		await store.handleDataUpdate({
+			indexVersion: 2,
+			affectedPaths: ["candidate.md"],
+			affectedLookupKeys: [],
+			affectedTags: Array.from(mutation.affectedTags),
+			affectedLinkSourcePaths: [],
+			affectedTagSourcePaths: Array.from(mutation.affectedTagSourcePaths),
+		});
+
+		expect(resolveTwoHopLinks).toHaveBeenCalledTimes(2);
+		expect(store.data?.taggedNotes.map((note) => note.path)).toEqual([
+			"candidate.md",
+		]);
+	});
+
 	it("handleDataUpdate reloads on related lookup update", async () => {
 		const file = createMockTFile("current.md");
 		const resolveTwoHopLinks = vi
-			.fn<ResolveTwoHopLinks>()
+			.fn<TestResolveTwoHopLinks>()
 			.mockResolvedValue(createLinkResultWithBranch(file.path, "target.md"));
 		const { store } = createStore({ resolveTwoHopLinks });
 
@@ -959,7 +1054,7 @@ describe("ApplicationStore (Runes)", () => {
 	it("handleDataUpdate invalidates related preview even with content-only update", async () => {
 		const file = createMockTFile("current.md");
 		const resolveTwoHopLinks = vi
-			.fn<ResolveTwoHopLinks>()
+			.fn<TestResolveTwoHopLinks>()
 			.mockResolvedValue(createLinkResultWithBranch(file.path, "target.md"));
 		const { store } = createStore({ resolveTwoHopLinks });
 
@@ -985,7 +1080,7 @@ describe("ApplicationStore (Runes)", () => {
 	it("handleDataUpdate reloads on link source update", async () => {
 		const file = createMockTFile("current.md");
 		const resolveTwoHopLinks = vi
-			.fn<ResolveTwoHopLinks>()
+			.fn<TestResolveTwoHopLinks>()
 			.mockResolvedValue(createLinkResultWithBranch(file.path, "target.md"));
 		const { store } = createStore({ resolveTwoHopLinks });
 
@@ -1006,7 +1101,7 @@ describe("ApplicationStore (Runes)", () => {
 	it("handleDataUpdate only advances preview version without load on preview-only update", async () => {
 		const file = createMockTFile("current.md");
 		const resolveTwoHopLinks = vi
-			.fn<ResolveTwoHopLinks>()
+			.fn<TestResolveTwoHopLinks>()
 			.mockResolvedValue(createLinkResultWithBranch(file.path, "target.md"));
 		const { store } = createStore({ resolveTwoHopLinks });
 

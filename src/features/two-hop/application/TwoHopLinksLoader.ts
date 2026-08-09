@@ -1,5 +1,6 @@
 import type { TFile } from "obsidian";
-import type { ResolveProgress, TwoHopLinkResult } from "types";
+import type { ResolveProgress } from "types";
+import type { TwoHopResolveSnapshot } from "features/two-hop/domain/ResolverDependencies";
 
 type LoadOptions = {
 	force?: boolean;
@@ -21,12 +22,12 @@ export type ResolveTwoHopLinks = (
 	file: TFile,
 	onProgress?: (progress: ResolveProgress) => void,
 	signal?: AbortSignal,
-) => Promise<TwoHopLinkResult>;
+) => Promise<TwoHopResolveSnapshot>;
 
 export type LoadExecutionResult =
 	| {
 			kind: "success";
-			data: TwoHopLinkResult;
+			snapshot: TwoHopResolveSnapshot;
 	  }
 	| {
 			kind: "error";
@@ -83,7 +84,7 @@ export class TwoHopLinksLoader {
 		onProgress?: (progress: ResolveProgress) => void,
 	): Promise<LoadExecutionResult> {
 		try {
-			const data = await this.resolveTwoHopLinks(
+			const snapshot = await this.resolveTwoHopLinks(
 				file,
 				(progress) => {
 					if (!this.isCurrentRequest(requestId, file.path)) {
@@ -98,7 +99,7 @@ export class TwoHopLinksLoader {
 			}
 			return {
 				kind: "success",
-				data,
+				snapshot,
 			};
 		} catch (error) {
 			if (!this.isCurrentRequest(requestId, file.path)) {

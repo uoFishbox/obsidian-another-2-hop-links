@@ -4,6 +4,7 @@ import type { SortService } from "core/sorting/SortService";
 import type { PluginSettings } from "features/settings/model";
 import type { ResolveProgress, TwoHopLinkResult } from "types/domain";
 import type { ResolveOptions } from "features/two-hop/domain/TwoHopLinkResolver";
+import type { TwoHopResolveSnapshot } from "features/two-hop/domain/ResolverDependencies";
 
 export interface PluginSettingsManager {
 	readonly settings: PluginSettings;
@@ -69,6 +70,11 @@ export interface PluginHost extends Plugin {
 		onProgress?: (progress: ResolveProgress) => void,
 		options?: ResolveOptions,
 	): Promise<TwoHopLinkResult>;
+	getTwoHopResolveSnapshot(
+		file: TFile,
+		onProgress?: (progress: ResolveProgress) => void,
+		options?: ResolveOptions,
+	): Promise<TwoHopResolveSnapshot>;
 	clearStore(leafId: string, filePath: string): void;
 	processUnresolvedLinksInElement(el: HTMLElement, sourcePath: string): void;
 	updateSetting<K extends keyof PluginSettings>(

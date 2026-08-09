@@ -1,11 +1,10 @@
+import type { CachedMetadata, TFile } from "obsidian";
 import { describe, expect, it } from "vitest";
+import type { DataUpdateContext } from "core/indexing/index-service/IndexEvents";
+import { collectResolverDependencies } from "features/two-hop/domain/ResolverDependencies";
 import { createMockTFile } from "testing/__mocks__/testHelpers";
 import type { TwoHopIndexedLink, TwoHopLinkResult } from "types/domain";
-import {
-	decideDataUpdateAction,
-	getPreviewInvalidation,
-	shouldReloadForUpdate,
-} from "../dataUpdateReloadDecider";
+import { decideDataUpdateAction } from "../dataUpdateReloadDecider";
 
 function createLinkResultWithBranch(
 	originPath: string,
@@ -95,92 +94,70 @@ function createFullContext(
 	};
 }
 
+interface TestReloadDecisionInput {
+	currentFile: TFile | undefined;
+	data: TwoHopLinkResult | undefined;
+	context?: DataUpdateContext;
+	originTags?: string[];
+}
+
+function createDependencyInput(input: TestReloadDecisionInput) {
+	const { currentFile, data, context, originTags = [] } = input;
+	const originMetadata = {
+		frontmatter: { tags: originTags },
+	} as unknown as CachedMetadata;
+
+	return {
+		currentFile,
+		dependencies: data
+			? collectResolverDependencies(originMetadata, data)
+			: undefined,
+		context,
+	};
+}
+
 describe("dataUpdateReloadDecider", () => {
 	const decider = {
-		decide: decideDataUpdateAction,
-		getPreviewInvalidation,
-		shouldReloadForUpdate,
+		decide: (input: TestReloadDecisionInput) =>
+			decideDataUpdateAction(createDependencyInput(input)),
 	};
 
-	it("does not reload for unrelated path and lookup updates", () => {
-		const currentFile = createMockTFile("current.md");
-		const data = createLinkResultWithBranch(currentFile.path, "target.md");
-
-		expect(
-			decider.shouldReloadForUpdate({
-				currentFile,
-				data,
-				context: {
-					indexVersion: 2,
-					affectedPaths: ["other.md"],
-					affectedLookupKeys: ["other.md"],
-				},
-			}),
-		).toBe(false);
-		expect(
-			decider.getPreviewInvalidation({
-				currentFile,
-				data,
-				context: {
-					indexVersion: 2,
-					affectedPaths: ["other.md"],
-					affectedLookupKeys: ["other.md"],
-				},
-			}),
-		).toBeUndefined();
-	});
-
-	it("reloads for affected branch lookup keys", () => {
-		const currentFile = createMockTFile("current.md");
-		const data = createLinkResultWithBranch(currentFile.path, "target.md");
-
-		expect(
-			decider.shouldReloadForUpdate({
-				currentFile,
-				data,
-				context: {
-					indexVersion: 3,
-					affectedLookupKeys: ["target.md"],
-				},
-			}),
-		).toBe(true);
-	});
-
-	it("reloads and invalidates previews for displayed target path updates", () => {
-		const currentFile = createMockTFile("current.md");
-		const data = createLinkResultWithBranch(currentFile.path, "target.md");
-		const input = {
-			currentFile,
-			data,
-			context: {
-				indexVersion: 4,
-				affectedPaths: ["target.md"],
-				affectedLookupKeys: ["unrelated.md"],
-			},
-		};
-
-		expect(decider.shouldReloadForUpdate(input)).toBe(true);
-		expect(decider.getPreviewInvalidation(input)).toEqual(new Set(["target.md"]));
-	});
-
-	it("reloads when a displayed backlink source path changes", () => {
-		const currentFile = createMockTFile("current.md");
-		const data = createLinkResultWithBacklink(currentFile.path, "src-current.md");
-
-		expect(
-			decider.shouldReloadForUpdate({
-				currentFile,
-				data,
-				context: {
-					indexVersion: 5,
-					affectedPaths: ["src-current.md"],
-					affectedLookupKeys: ["unrelated.md"],
-				},
-			}),
-		).toBe(true);
-	});
-
 	describe("decide()", () => {
+		it("reloads conservatively when the dependency snapshot is unavailable", () => {
+			const currentFile = createMockTFile("origin.md");
+			const action = decideDataUpdateAction({
+				currentFile,
+				dependencies: undefined,
+				context: createFullContext({
+					affectedPaths: ["unrelated.md"],
+				}),
+			});
+
+			expect(action).toEqual({
+				kind: "reload",
+				previewInvalidation: "all",
+			});
+		});
+
+		it("returns reload when an unknown note newly acquires an origin tag", () => {
+			const currentFile = createMockTFile("origin.md");
+			const data = createLinkResultWithTags(currentFile.path, []);
+
+			const action = decider.decide({
+				currentFile,
+				data,
+				originTags: ["project"],
+				context: createFullContext({
+					affectedPaths: ["candidate.md"],
+					affectedTags: ["project"],
+					affectedLinkSourcePaths: [],
+					affectedTagSourcePaths: ["candidate.md"],
+				}),
+			});
+
+			expect(action.kind).toBe("reload");
+		});
+
 		it("returns preview-only for displayed hop2 card body change", () => {
 			const currentFile = createMockTFile("current.md");
 			const data = createLinkResultWithBranch(currentFile.path, "target.md", [
@@ -400,6 +377,7 @@ describe("dataUpdateReloadDecider", () => {
 			const action = decider.decide({
 				currentFile,
 				data,
+				originTags: ["project"],
 				context: createFullContext({
 					affectedPaths: ["note.md"],
 					affectedTags: ["project"],
@@ -420,6 +398,7 @@ describe("dataUpdateReloadDecider", () => {
 			const action = decider.decide({
 				currentFile,
 				data,
+				originTags: ["project"],
 				context: createFullContext({
 					affectedPaths: ["other.md"],
 					affectedTags: ["unrelated"],
@@ -429,6 +408,71 @@ describe("dataUpdateReloadDecider", () => {
 			});
 
 			expect(action.kind).toBe("none");
+		});
+
+		it("returns reload when a displayed note loses an origin tag", () => {
+			const currentFile = createMockTFile("origin.md");
+			const data = createLinkResultWithTags(currentFile.path, [
+				{ path: "candidate.md", tags: ["project"] },
+			]);
+
+			const action = decider.decide({
+				currentFile,
+				data,
+				originTags: ["project"],
+				context: createFullContext({
+					affectedPaths: ["candidate.md"],
+					affectedTags: ["project"],
+					affectedTagSourcePaths: ["candidate.md"],
+				}),
+			});
+
+			expect(action.kind).toBe("reload");
+		});
+
+		it("keeps all origin tags when a candidate acquires one of multiple tags", () => {
+			const currentFile = createMockTFile("origin.md");
+			const data = createLinkResultWithTags(currentFile.path, []);
+
+			const action = decider.decide({
+				currentFile,
+				data,
+				originTags: ["project", "typescript"],
+				context: createFullContext({
+					affectedPaths: ["candidate.md"],
+					affectedTags: ["typescript"],
+					affectedTagSourcePaths: ["candidate.md"],
+				}),
+			});
+
+			expect(action.kind).toBe("reload");
+		});
+
+		it("uses TagIndex normalization for case, hash, and nested tags", () => {
+			const currentFile = createMockTFile("origin.md");
+			const data = createLinkResultWithTags(currentFile.path, []);
+
+			const projectAction = decider.decide({
+				currentFile,
+				data,
+				originTags: ["#Project", "Nested/Tag"],
+				context: createFullContext({
+					affectedTags: ["project"],
+					affectedTagSourcePaths: ["candidate.md"],
+				}),
+			});
+			const nestedAction = decider.decide({
+				currentFile,
+				data,
+				originTags: ["#Project", "Nested/Tag"],
+				context: createFullContext({
+					affectedTags: ["nested/tag"],
+					affectedTagSourcePaths: ["candidate.md"],
+				}),
+			});
+
+			expect(projectAction.kind).toBe("reload");
+			expect(nestedAction.kind).toBe("reload");
 		});
 
 		it("returns reload when tag membership changes and tagSourcePaths intersects relevant paths", () => {

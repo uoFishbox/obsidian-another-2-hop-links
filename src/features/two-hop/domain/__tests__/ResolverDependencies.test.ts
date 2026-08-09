@@ -1,7 +1,7 @@
-import { describe, expect, test, vi } from "vitest";
+import type { CachedMetadata } from "obsidian";
+import { describe, expect, test } from "vitest";
 import { collectResolverDependencies } from "../ResolverDependencies";
 import { createMockTFile } from "testing/__mocks__/testHelpers";
-import type { IMetadataCache } from "types/obsidian";
 
 describe("collectResolverDependencies", () => {
 	test("expands origin, branches, backlinks, and tags into dependency sets", () => {
@@ -10,15 +10,13 @@ describe("collectResolverDependencies", () => {
 		const hop2File = createMockTFile("hop2.md");
 		const backlinkSource = createMockTFile("backlink.md");
 		const taggedFile = createMockTFile("tagged.md");
-		const metadataCache = {
-			getFileCache: vi.fn((file) =>
-				file === originFile
-					? { tags: [{ tag: "tag/origin" }], embeds: [], links: [] }
-					: null,
-			),
-		} as unknown as IMetadataCache;
+		const originMetadata = {
+			tags: [{ tag: "#Tag/Origin" }],
+			embeds: [],
+			links: [],
+		} as unknown as CachedMetadata;
 
-		const dependencies = collectResolverDependencies(metadataCache, {
+		const dependencies = collectResolverDependencies(originMetadata, {
 			originFile,
 			branches: [
 				{
@@ -64,12 +62,16 @@ describe("collectResolverDependencies", () => {
 			],
 		});
 
-		expect(dependencies.dependencyPaths).toEqual(
+		expect(dependencies.originPath).toBe("origin.md");
+		expect(dependencies.relevantPaths).toEqual(
 			new Set(["origin.md", "target.md", "hop2.md", "backlink.md", "tagged.md"]),
 		);
-		expect(dependencies.dependencyLookupKeys).toEqual(
+		expect(dependencies.relevantLookupKeys).toEqual(
 			new Set(["origin.md", "target.md", "missing.md"]),
 		);
-		expect(dependencies.dependencyTags).toEqual(new Set(["tag/origin"]));
+		expect(dependencies.relevantTags).toEqual(new Set(["tag/origin"]));
+		expect(dependencies.structuralSourcePaths).toEqual(
+			new Set(["origin.md", "target.md", "backlink.md", "tagged.md"]),
+		);
 	});
 });
