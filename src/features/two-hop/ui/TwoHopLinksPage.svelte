@@ -139,7 +139,7 @@
 	let appliedSearchScope = $derived(
 		matchedKeySet === null ? searchScope : workerSearchSession.matchedScope,
 	);
-	let documentIdentity = $derived(
+	let paginationScope = $derived(
 		JSON.stringify([file.path, appliedSearchQuery, appliedSearchScope]),
 	);
 
@@ -167,7 +167,6 @@
 			store.getSortedTagGroupItems(items);
 	});
 	let getSectionVisibleCount = $derived.by(() => {
-		const paginationScope = documentIdentity;
 		const expandedLimits = applicationStore.sectionExpandedLimits ?? {};
 		const requestedDefaultLimit = Math.floor(
 			currentSettings.defaultVisibleLinkCount,
@@ -218,7 +217,7 @@
 			increment === Number.POSITIVE_INFINITY
 				? section.totalCount
 				: Math.min(section.totalCount, visibleCount + increment);
-		const paginationId = buildScopedSectionId(sectionId, documentIdentity);
+		const paginationId = buildScopedSectionId(sectionId, paginationScope);
 		applicationStore.setSectionExpandedLimit(
 			paginationId,
 			Math.max(
@@ -393,7 +392,6 @@
 			<LoadingState message="Waiting for the initial index to finish building." />
 		{:else if linkResult}
 			<TwoHopVirtualSurface
-				{documentIdentity}
 				sections={twoHopVirtualListSections}
 				{applicationStore}
 				{loadMoreSection}

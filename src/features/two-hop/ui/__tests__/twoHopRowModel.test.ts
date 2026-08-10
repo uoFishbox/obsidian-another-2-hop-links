@@ -41,13 +41,24 @@ function createSection(
 
 function createModel(sections: readonly TwoHopSectionModel[]) {
 	return createTwoHopRowModel({
-		documentIdentity: "test",
 		sections,
 		layout,
 	});
 }
 
 describe("TwoHopRowModel", () => {
+	it("uses sections as the sole logical content publication", () => {
+		const sections = [createSection("first", 2)];
+		const model = createModel(sections);
+		const otherModel = createModel([createSection("second", 1)]);
+		if ("kind" in model.revision || "kind" in otherModel.revision) {
+			throw new Error("Expected structured virtual-list revisions");
+		}
+
+		expect(model.revision.content).toBe(sections);
+		expect(model.revision.pagination).toBe(otherModel.revision.pagination);
+	});
+
 	it("compiles section prefixes including header and load-more cells", () => {
 		const model = createModel([
 			createSection("first", 4, 3),
@@ -87,7 +98,6 @@ describe("TwoHopRowModel", () => {
 	it("preserves half-open visibility with fractional row metrics", () => {
 		const section = createSection("first", 2);
 		const model = createTwoHopRowModel({
-			documentIdentity: "test",
 			sections: [section],
 			layout: {
 				...layout,
@@ -139,7 +149,6 @@ describe("TwoHopRowModel", () => {
 	it("resolves navigation against rows that are not resident", () => {
 		const section = createSection("section", 80);
 		const model = createTwoHopRowModel({
-			documentIdentity: "test",
 			sections: [section],
 			layout: { ...layout, columns: 1 },
 		});
@@ -158,7 +167,6 @@ describe("TwoHopRowModel", () => {
 	it("resolves a logical cell after a column-count change for anchoring", () => {
 		const section = createSection("section", 10);
 		const oneColumn = createTwoHopRowModel({
-			documentIdentity: "test",
 			sections: [section],
 			layout: { ...layout, columns: 1 },
 		});

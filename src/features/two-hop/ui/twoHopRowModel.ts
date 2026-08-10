@@ -98,7 +98,6 @@ export interface TwoHopRowModel extends VirtualRowModel<TwoHopVirtualCell> {
 }
 
 export interface CreateTwoHopRowModelParams {
-	readonly documentIdentity: string;
 	readonly sections: readonly TwoHopSectionModel[];
 	readonly layout: ViewPlanLayoutMetrics;
 }
@@ -145,7 +144,6 @@ export function createTwoHopRowModel(
 		rowStride,
 		sectionMarginBottom,
 	};
-	const contentRevision = [params.documentIdentity, sections] as const;
 	const layoutRevision = createVirtualListLayoutRevisionToken([
 		layout.containerWidth,
 		layout.columns,
@@ -393,9 +391,8 @@ export function createTwoHopRowModel(
 
 	const rowModel: TwoHopRowModel = {
 		revision: createVirtualListRevision({
-			content: contentRevision,
+			content: sections,
 			layout: layoutRevision,
-			pagination: sections,
 		}),
 		rowCount,
 		totalHeight,

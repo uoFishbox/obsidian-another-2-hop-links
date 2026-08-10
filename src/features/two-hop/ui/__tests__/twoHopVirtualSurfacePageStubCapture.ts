@@ -2,7 +2,6 @@ import type { TwoHopPreviewDependencies } from "features/two-hop/ui/useTwoHopVir
 import type { ApplicationStore } from "ui/stores/ApplicationStore.svelte";
 
 interface TwoHopVirtualSurfacePageStubProps {
-	readonly documentIdentity: string;
 	readonly applicationStore: ApplicationStore;
 	readonly loadMoreSection: ((sectionId: string) => void) | undefined;
 	readonly previewDependencies: TwoHopPreviewDependencies | undefined;

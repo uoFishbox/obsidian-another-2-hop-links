@@ -124,7 +124,6 @@ describe("createTwoHopCardHydrator", () => {
 		});
 		const layout = { ...DEFAULT_VIEW_PLAN_LAYOUT, columns: 1 };
 		const rowModel = createTwoHopRowModel({
-			documentIdentity: "test",
 			sections: [section],
 			layout,
 		});
@@ -208,7 +207,6 @@ describe("createTwoHopCardHydrator", () => {
 		const replacementItem = createItem(0);
 		const createModel = (item: TwoHopItemModel) =>
 			createTwoHopRowModel({
-				documentIdentity: "test",
 				sections: [
 					createTwoHopSectionModel({
 						id: "section",
@@ -255,7 +253,6 @@ describe("createTwoHopCardHydrator", () => {
 	it("schedules background hydration on idle and promotes it to post-paint", () => {
 		const item = createItem(0);
 		const rowModel = createTwoHopRowModel({
-			documentIdentity: "test",
 			sections: [
 				createTwoHopSectionModel({
 					id: "section",

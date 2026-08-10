@@ -11,7 +11,6 @@
 	} from "features/two-hop/ui/twoHopSectionModel";
 
 	interface Props {
-		documentIdentity?: string;
 		sections: readonly TwoHopSectionModel[];
 		applicationStore: ApplicationStore;
 		linkContext: LinkContext;
@@ -28,7 +27,6 @@
 	}
 
 	const {
-		documentIdentity = "test-document",
 		sections,
 		applicationStore,
 		linkContext,
@@ -43,7 +41,6 @@
 </script>
 
 <TwoHopVirtualSurface
-	{documentIdentity}
 	{sections}
 	{applicationStore}
 	{loadMoreSection}

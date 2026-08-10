@@ -62,7 +62,6 @@ export interface TwoHopPreviewDependencies {
 }
 
 export interface TwoHopVirtualListProps {
-	readonly documentIdentity: string;
 	readonly sections: readonly TwoHopSectionModel[];
 	readonly applicationStore: ApplicationStore;
 	/** Fixed for the lifetime of the virtual surface. */
@@ -98,7 +97,6 @@ export function useTwoHopVirtualList(
 	let layout = $state.raw<ViewPlanLayoutMetrics>(DEFAULT_VIEW_PLAN_LAYOUT);
 	let rowModel = $state.raw<TwoHopRowModel>(
 		createTwoHopRowModel({
-			documentIdentity: props.documentIdentity,
 			sections: props.sections,
 			layout: DEFAULT_VIEW_PLAN_LAYOUT,
 		}),
@@ -107,7 +105,6 @@ export function useTwoHopVirtualList(
 	let contentEl = $state<HTMLDivElement | null>(null);
 	let interactionShadowRoot = $state<ShadowRoot | null>(null);
 	let measurement = $state(createVirtualListMeasurementState());
-	let lastDocumentIdentity = props.documentIdentity;
 	let lastSections = props.sections;
 	let lastCardModelRevision = props.cardModelRevision;
 	let widthWasZero = false;
@@ -402,7 +399,6 @@ export function useTwoHopVirtualList(
 			const anchor = widthWasZero ? null : captureLayoutAnchor();
 			layout = nextLayout;
 			const nextRowModel = createTwoHopRowModel({
-				documentIdentity: props.documentIdentity,
 				sections: props.sections,
 				layout: nextLayout,
 			});
@@ -444,18 +440,9 @@ export function useTwoHopVirtualList(
 		frameCoordinator,
 	});
 
-	function publishSections(
-		nextDocumentIdentity: string,
-		nextSections: readonly TwoHopSectionModel[],
-		identityChanged: boolean,
-	): void {
-		const anchor = identityChanged ? null : captureLayoutAnchor();
-		if (identityChanged) {
-			rowSlotAllocator.reset("source");
-			cardHydrator.clear();
-		}
+	function publishSections(nextSections: readonly TwoHopSectionModel[]): void {
+		const anchor = captureLayoutAnchor();
 		const nextRowModel = createTwoHopRowModel({
-			documentIdentity: nextDocumentIdentity,
 			sections: nextSections,
 			layout,
 		});
@@ -476,20 +463,10 @@ export function useTwoHopVirtualList(
 	}
 
 	$effect(() => {
-		const nextDocumentIdentity = props.documentIdentity;
 		const nextSections = props.sections;
-		if (
-			nextDocumentIdentity === lastDocumentIdentity &&
-			nextSections === lastSections
-		) {
-			return;
-		}
-		const identityChanged = nextDocumentIdentity !== lastDocumentIdentity;
-		lastDocumentIdentity = nextDocumentIdentity;
+		if (nextSections === lastSections) return;
 		lastSections = nextSections;
-		untrack(() =>
-			publishSections(nextDocumentIdentity, nextSections, identityChanged),
-		);
+		untrack(() => publishSections(nextSections));
 	});
 
 	$effect(() => {

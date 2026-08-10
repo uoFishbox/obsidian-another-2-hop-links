@@ -6,7 +6,6 @@
 	import { captureTwoHopVirtualSurfacePageStubProps } from "./twoHopVirtualSurfacePageStubCapture";
 
 	interface Props {
-		documentIdentity: string;
 		sections: readonly TwoHopSectionModel[];
 		applicationStore: ApplicationStore;
 		loadMoreSection?: (sectionId: string) => void;
@@ -16,7 +15,6 @@
 	}
 
 	let {
-		documentIdentity,
 		sections,
 		applicationStore,
 		loadMoreSection,
@@ -27,7 +25,6 @@
 
 	$effect(() => {
 		captureTwoHopVirtualSurfacePageStubProps({
-			documentIdentity,
 			applicationStore,
 			loadMoreSection,
 			previewDependencies,

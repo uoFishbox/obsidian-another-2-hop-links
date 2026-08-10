@@ -8,7 +8,7 @@ import {
 	type ResidentSlotPoolId,
 } from "./residentSlotBinding";
 
-export type ResidentSlotResetReason = "empty" | "source" | "topology";
+export type ResidentSlotResetReason = "empty" | "topology";
 
 /**
  * Lightweight ownership publication used to validate mounted-build reuse.

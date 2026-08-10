@@ -70,7 +70,6 @@ export interface TwoHopCardHydrator {
 	setDemand(demand: TwoHopCardDemand): void;
 	refreshDemand(): void;
 	getModel(logicalKey: string): CardRenderModel | undefined;
-	clear(): void;
 	dispose(): void;
 }
 
@@ -123,15 +122,6 @@ export function createTwoHopCardHydrator(
 		pendingByKey.clear();
 		clearHydrationQueue(foregroundQueue);
 		clearHydrationQueue(backgroundQueue);
-	}
-
-	function clear(): void {
-		clearPending();
-		demandByKey.clear();
-		for (const logicalKey of entries.keys()) notify(logicalKey, undefined);
-		entries.clear();
-		interactionController.clear();
-		params.onPreviewModelsChanged();
 	}
 
 	function setDemand(nextDemand: TwoHopCardDemand): void {
@@ -385,7 +375,6 @@ export function createTwoHopCardHydrator(
 		setDemand,
 		refreshDemand,
 		getModel,
-		clear,
 		dispose,
 	};
 }

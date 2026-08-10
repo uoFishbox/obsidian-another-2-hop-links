@@ -42,6 +42,7 @@ function createCardModelResolver() {
 		(
 			item: TwoHopItemModel,
 			presentation: TwoHopCardPresentationState,
+			_revision: unknown,
 		): CardRenderModel => ({
 			item: item.item,
 			targetFile: null,
@@ -64,6 +65,10 @@ interface SurfaceFixture {
 	readonly root: HTMLElement;
 	readonly scroller: HTMLElement;
 	readonly rerender: ReturnType<typeof render>["rerender"];
+	readonly publishSection: (
+		section: TwoHopSectionModel,
+		cardModelRevision?: unknown,
+	) => Promise<void>;
 }
 
 async function renderSurface(params: {
@@ -72,6 +77,7 @@ async function renderSurface(params: {
 	loadMoreSection?: (sectionId: string) => void;
 	rootTop?: number;
 	offscreenBootstrapPreviewRows?: number;
+	cardModelRevision?: unknown;
 }): Promise<SurfaceFixture> {
 	const applicationStore = {
 		settings: {
@@ -90,16 +96,18 @@ async function renderSurface(params: {
 	setElementRect(scroller, { top: 0, width: 320, height: 300 });
 	document.body.append(scroller);
 
+	const baseProps = {
+		sections: [params.section],
+		applicationStore,
+		linkContext: { getPreview: vi.fn() } as unknown as LinkContext,
+		loadMoreSection: params.loadMoreSection,
+		resolveItemCardModel: params.resolveItemCardModel,
+		offscreenBootstrapPreviewRows: params.offscreenBootstrapPreviewRows ?? 0,
+		cardModelRevision: params.cardModelRevision ?? 0,
+	};
 	const rendered = render(TwoHopVirtualSurfaceHarness, {
 		target: scroller,
-		props: {
-			sections: [params.section],
-			applicationStore,
-			linkContext: { getPreview: vi.fn() } as unknown as LinkContext,
-			loadMoreSection: params.loadMoreSection,
-			resolveItemCardModel: params.resolveItemCardModel,
-			offscreenBootstrapPreviewRows: params.offscreenBootstrapPreviewRows ?? 0,
-		},
+		props: baseProps,
 	});
 	const root = rendered.container.querySelector<HTMLElement>(
 		".twohop-virtual-surface",
@@ -113,7 +121,17 @@ async function renderSurface(params: {
 	triggerResize(root, 320, 40_000);
 	for (let index = 0; index < 4; index += 1) await flushFrames();
 
-	return { root, scroller, rerender: rendered.rerender };
+	return {
+		root,
+		scroller,
+		rerender: rendered.rerender,
+		publishSection: (section, cardModelRevision = baseProps.cardModelRevision) =>
+			rendered.rerender({
+				...baseProps,
+				sections: [section],
+				cardModelRevision,
+			}),
+	};
 }
 
 function getRows(root: HTMLElement): HTMLElement[] {
@@ -182,6 +200,43 @@ describe("TwoHopVirtualSurface", () => {
 		expect(
 			root.shadowRoot?.querySelector("[data-ccl-interaction-id='item:0']"),
 		).not.toBeNull();
+	});
+
+	it("retains valid hydrated models across filtered publications and invalidates precise changes", async () => {
+		const resolver = createCardModelResolver();
+		const fullSection = createSection(20);
+		const { publishSection } = await renderSurface({
+			section: fullSection,
+			resolveItemCardModel: resolver,
+		});
+
+		await vi.waitFor(() => expect(resolver).toHaveBeenCalled());
+		const filteredItems = fullSection.items.slice(0, 5);
+		const createFilteredSection = (items: readonly TwoHopItemModel[]) =>
+			createTwoHopSectionModel({
+				id: fullSection.id,
+				kind: fullSection.kind,
+				title: fullSection.title,
+				items,
+				totalCount: items.length,
+			});
+
+		resolver.mockClear();
+		await publishSection(createFilteredSection(filteredItems));
+		for (let index = 0; index < 4; index += 1) await flushFrames();
+		expect(resolver).not.toHaveBeenCalled();
+
+		const replacement = { ...filteredItems[0]! };
+		await publishSection(
+			createFilteredSection([replacement, ...filteredItems.slice(1)]),
+		);
+		await vi.waitFor(() => expect(resolver).toHaveBeenCalledTimes(1));
+		expect(resolver.mock.calls[0]?.[0]).toBe(replacement);
+
+		resolver.mockClear();
+		await publishSection(createFilteredSection(filteredItems), 1);
+		await vi.waitFor(() => expect(resolver).toHaveBeenCalled());
+		expect(resolver.mock.calls.every((call) => call[2] === 1)).toBe(true);
 	});
 
 	it("renders load-more as a virtual cell and accepts the expanded publication", async () => {

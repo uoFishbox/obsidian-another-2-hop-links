@@ -14,7 +14,6 @@ function createModel(itemCount: number) {
 		key: `item:${index}`,
 	})) as TwoHopItemModel[];
 	return createTwoHopRowModel({
-		documentIdentity: "test",
 		sections: [
 			createTwoHopSectionModel({
 				id: "section",
