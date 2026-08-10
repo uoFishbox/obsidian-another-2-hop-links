@@ -6,8 +6,6 @@ import {
 
 import {
 	createMountedScrollWindow,
-	isSameMountedScrollWindow,
-	isWithinStableMountedScrollWindow,
 	updateMountedScrollWindow,
 	type LastMountedScrollWindow,
 	type MountedScrollWindowMeasurement,
@@ -260,9 +258,6 @@ export function createVirtualListControllerAdapter<
 			mountedMeasurement.mounted,
 		);
 		lastMountedScrollWindow = createMountedScrollWindow(
-			mountedMeasurement.identity,
-			mountedMeasurement.mounted,
-			mountedMeasurement.stableMountedScrollTopBand,
 			resolvePublishedCoverageBand(mountedMeasurement, rangedMeasurement),
 		);
 	}
@@ -284,32 +279,6 @@ export function createVirtualListControllerAdapter<
 				nextMeasurement,
 				context,
 			);
-			const isStableMountedWindow = isWithinStableMountedScrollWindow(
-				lastMountedScrollWindow,
-				mountedMeasurement.identity,
-				mountedMeasurement.mounted,
-				nextMeasurement.scrollTop,
-			);
-			const isSameMountedWindow = isSameMountedScrollWindow(
-				lastMountedScrollWindow,
-				mountedMeasurement.identity,
-				mountedMeasurement.mounted,
-			);
-			if (isStableMountedWindow) {
-				if (process.env.NODE_ENV !== "production") {
-					recordCCLDevMeasurement("virtualScroll.stableBandHit");
-				}
-			} else if (isSameMountedWindow) {
-				if (process.env.NODE_ENV !== "production") {
-					recordCCLDevMeasurement("virtualScroll.sameMountedWindowHit");
-					recordCCLDevMeasurement(
-						mountedMeasurement.mounted.start >=
-							mountedMeasurement.mounted.end
-							? "virtualScroll.sameMountedWindowHit.empty"
-							: "virtualScroll.sameMountedWindowHit.nonEmpty",
-					);
-				}
-			}
 
 			pendingMountedMeasurement = mountedMeasurement;
 			pendingRangedMeasurement = resolveRangedScrollWindowMeasurement(
@@ -346,9 +315,6 @@ export function createVirtualListControllerAdapter<
 			}
 			lastMountedScrollWindow = pendingMountedMeasurement
 				? createMountedScrollWindow(
-						pendingMountedMeasurement.identity,
-						pendingMountedMeasurement.mounted,
-						pendingMountedMeasurement.stableMountedScrollTopBand,
 						pendingRangedMeasurement
 							? resolvePublishedCoverageBand(
 									pendingMountedMeasurement,
@@ -363,9 +329,6 @@ export function createVirtualListControllerAdapter<
 		if (pendingMountedMeasurement) {
 			lastMountedScrollWindow = updateMountedScrollWindow(
 				lastMountedScrollWindow,
-				pendingMountedMeasurement.identity,
-				pendingMountedMeasurement.mounted,
-				pendingMountedMeasurement.stableMountedScrollTopBand,
 				pendingRangedMeasurement
 					? resolvePublishedCoverageBand(
 							pendingMountedMeasurement,

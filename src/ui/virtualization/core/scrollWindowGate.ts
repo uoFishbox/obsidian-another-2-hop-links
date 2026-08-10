@@ -12,11 +12,6 @@ import type { VirtualRanges } from "../types";
 export type ScrollWindowIdentity = object | string | number | symbol;
 
 export type LastMountedScrollWindow = {
-	identity: ScrollWindowIdentity;
-	mountedStart: number;
-	mountedEnd: number;
-	stableScrollTopMin: number;
-	stableScrollTopMax: number;
 	coverageScrollTopMin: number;
 	coverageScrollTopMax: number;
 };
@@ -56,22 +51,14 @@ export type RangedScrollWindowMeasurement = {
 	previewCoverageScrollTopBand?: StableScrollTopBand;
 };
 
-const INVALID_STABLE_SCROLL_TOP_MIN = Number.POSITIVE_INFINITY;
-const INVALID_STABLE_SCROLL_TOP_MAX = Number.NEGATIVE_INFINITY;
+const INVALID_SCROLL_TOP_MIN = Number.POSITIVE_INFINITY;
+const INVALID_SCROLL_TOP_MAX = Number.NEGATIVE_INFINITY;
 
 export const createMountedScrollWindow = (
-	identity: ScrollWindowIdentity,
-	mounted: RowRange,
-	stableScrollTopBand?: StableScrollTopBand,
 	coverageScrollTopBand?: StableScrollTopBand,
 ): LastMountedScrollWindow => ({
-	identity,
-	mountedStart: mounted.start,
-	mountedEnd: mounted.end,
-	stableScrollTopMin: stableScrollTopBand?.min ?? INVALID_STABLE_SCROLL_TOP_MIN,
-	stableScrollTopMax: stableScrollTopBand?.max ?? INVALID_STABLE_SCROLL_TOP_MAX,
-	coverageScrollTopMin: coverageScrollTopBand?.min ?? INVALID_STABLE_SCROLL_TOP_MIN,
-	coverageScrollTopMax: coverageScrollTopBand?.max ?? INVALID_STABLE_SCROLL_TOP_MAX,
+	coverageScrollTopMin: coverageScrollTopBand?.min ?? INVALID_SCROLL_TOP_MIN,
+	coverageScrollTopMax: coverageScrollTopBand?.max ?? INVALID_SCROLL_TOP_MAX,
 });
 
 /**
@@ -80,51 +67,15 @@ export const createMountedScrollWindow = (
  */
 export const updateMountedScrollWindow = (
 	previous: LastMountedScrollWindow | null,
-	identity: ScrollWindowIdentity,
-	mounted: RowRange,
-	stableScrollTopBand?: StableScrollTopBand,
 	coverageScrollTopBand?: StableScrollTopBand,
 ): LastMountedScrollWindow => {
 	if (!previous) {
-		return createMountedScrollWindow(
-			identity,
-			mounted,
-			stableScrollTopBand,
-			coverageScrollTopBand,
-		);
+		return createMountedScrollWindow(coverageScrollTopBand);
 	}
 
-	previous.identity = identity;
-	previous.mountedStart = mounted.start;
-	previous.mountedEnd = mounted.end;
-	previous.stableScrollTopMin =
-		stableScrollTopBand?.min ?? INVALID_STABLE_SCROLL_TOP_MIN;
-	previous.stableScrollTopMax =
-		stableScrollTopBand?.max ?? INVALID_STABLE_SCROLL_TOP_MAX;
 	previous.coverageScrollTopMin =
-		coverageScrollTopBand?.min ?? INVALID_STABLE_SCROLL_TOP_MIN;
+		coverageScrollTopBand?.min ?? INVALID_SCROLL_TOP_MIN;
 	previous.coverageScrollTopMax =
-		coverageScrollTopBand?.max ?? INVALID_STABLE_SCROLL_TOP_MAX;
+		coverageScrollTopBand?.max ?? INVALID_SCROLL_TOP_MAX;
 	return previous;
 };
-
-export const isSameMountedScrollWindow = (
-	previous: LastMountedScrollWindow | null,
-	identity: ScrollWindowIdentity,
-	mounted: RowRange,
-): boolean =>
-	previous !== null &&
-	previous.identity === identity &&
-	previous.mountedStart === mounted.start &&
-	previous.mountedEnd === mounted.end;
-
-export const isWithinStableMountedScrollWindow = (
-	previous: LastMountedScrollWindow | null,
-	identity: ScrollWindowIdentity,
-	mounted: RowRange,
-	scrollTop: number,
-): boolean =>
-	previous !== null &&
-	isSameMountedScrollWindow(previous, identity, mounted) &&
-	scrollTop > previous.stableScrollTopMin &&
-	scrollTop < previous.stableScrollTopMax;

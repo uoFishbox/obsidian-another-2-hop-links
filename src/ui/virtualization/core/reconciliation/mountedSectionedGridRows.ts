@@ -39,11 +39,7 @@ export interface MountedSectionedGridRows<
 	readonly cells: TCell[];
 	readonly reusableCellsByKey: Map<string, TCell>;
 	readonly rowSlices: TRow[];
-	readonly occupiedRowsInSlotOrder: TRow[];
-	/** @deprecated Use `occupiedRowsInSlotOrder`. */
 	readonly rowsBySlot: TRow[];
-	readonly cellSlotCapacity: number;
-	/** @deprecated Use `cellSlotCapacity`. */
 	readonly nextRenderSlotIndex: number;
 }
 
@@ -152,11 +148,11 @@ export function buildMountedSectionedGridRows<
 		);
 	}
 
-	const occupiedRowsInSlotOrder = [...rowSlices].sort(
+	const rowsBySlot = [...rowSlices].sort(
 		(left, right) => left.slotIndex - right.slotIndex,
 	);
 	assertMountedSectionedGridRows({
-		rows: occupiedRowsInSlotOrder,
+		rows: rowsBySlot,
 		slotCapacity: params.slotCapacity,
 		columns,
 	});
@@ -182,9 +178,7 @@ export function buildMountedSectionedGridRows<
 			return getReusableCellsByKey();
 		},
 		rowSlices,
-		occupiedRowsInSlotOrder,
-		rowsBySlot: occupiedRowsInSlotOrder,
-		cellSlotCapacity: params.slotCapacity * columns,
+		rowsBySlot,
 		nextRenderSlotIndex: params.slotCapacity * columns,
 	};
 }

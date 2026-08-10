@@ -5,10 +5,6 @@ export type CCLDevMeasurementName =
 	| "virtualScroll.applyScrollMeasurement.dataChange"
 	| "virtualScroll.applyScrollMeasurement.postLayout"
 	| "virtualScroll.applyScrollMeasurement.skippedUnchanged"
-	| "virtualScroll.stableBandHit"
-	| "virtualScroll.sameMountedWindowHit"
-	| "virtualScroll.sameMountedWindowHit.empty"
-	| "virtualScroll.sameMountedWindowHit.nonEmpty"
 	| "virtualScroll.coverageBand.emptyAbove"
 	| "virtualScroll.coverageBand.emptyBelow"
 	| "virtualScroll.coverageBand.emptyData"
@@ -78,10 +74,6 @@ export const CCL_DEV_MEASUREMENT_NAMES: readonly CCLDevMeasurementName[] = [
 	"virtualScroll.applyScrollMeasurement.dataChange",
 	"virtualScroll.applyScrollMeasurement.postLayout",
 	"virtualScroll.applyScrollMeasurement.skippedUnchanged",
-	"virtualScroll.stableBandHit",
-	"virtualScroll.sameMountedWindowHit",
-	"virtualScroll.sameMountedWindowHit.empty",
-	"virtualScroll.sameMountedWindowHit.nonEmpty",
 	"virtualScroll.coverageBand.emptyAbove",
 	"virtualScroll.coverageBand.emptyBelow",
 	"virtualScroll.coverageBand.emptyData",

@@ -13,10 +13,6 @@ import type {
 } from "../../dom/virtualMeasurementController";
 import type { RowRange } from "../../rowRange";
 import type { VirtualRanges } from "../../types";
-import {
-	getCCLDevMeasurementSnapshot,
-	resetCCLDevMeasurements,
-} from "infrastructure/debug/CCLDevMeasurements";
 
 const measurementControllerHarness = vi.hoisted(() => ({
 	options: null as CreateVirtualMeasurementControllerOptions | null,
@@ -221,24 +217,6 @@ describe("createVirtualListControllerAdapter scroll-window orchestration", () =>
 			mounted: { start: 0, end: 10 },
 			previewVisible: { start: 3, end: 9 },
 		});
-	});
-
-	it("classifies same mounted window hits by empty state", () => {
-		resetCCLDevMeasurements();
-		const harness = createAdapterHarness({
-			rowCount: 0,
-			totalHeight: 0,
-			mounted: { start: 0, end: 0 },
-			previewVisible: { start: 0, end: 0 },
-		});
-
-		harness.applyScrollMeasurement();
-		harness.applyScrollMeasurement({ ...STABLE_MEASUREMENT, scrollTop: 60 });
-
-		const counters = getCCLDevMeasurementSnapshot().counters;
-		expect(counters["virtualScroll.sameMountedWindowHit"].count).toBe(1);
-		expect(counters["virtualScroll.sameMountedWindowHit.empty"].count).toBe(1);
-		expect(counters["virtualScroll.sameMountedWindowHit.nonEmpty"].count).toBe(0);
 	});
 
 	it("does not expose mounted coverage beyond published preview coverage", () => {
