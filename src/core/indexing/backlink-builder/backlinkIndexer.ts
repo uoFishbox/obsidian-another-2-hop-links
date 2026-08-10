@@ -83,7 +83,6 @@ function createArtifactsAccumulator(): MutableBacklinksBuildArtifacts {
 		linkLookupToSources: new Map(),
 		unresolvedLinkLookupToSources: new Map(),
 		lookupKeyToLookupPaths: new Map(),
-		unresolvedLookupToSources: new Map(),
 		lookupPathResolvedSourceCount: new Map(),
 		lookupKeyDirectResolvedPathCount: new Map(),
 		lookupKeyToSources: new Map(),

@@ -68,7 +68,6 @@ function createSnapshot(artifacts: BacklinksBuildArtifacts): IndexSnapshot {
 		linkLookupToSources: artifacts.linkLookupToSources,
 		unresolvedLinkLookupToSources: artifacts.unresolvedLinkLookupToSources,
 		lookupKeyToLookupPaths: artifacts.lookupKeyToLookupPaths,
-		unresolvedLookupToSources: artifacts.unresolvedLookupToSources,
 		lookupPathResolvedSourceCount: artifacts.lookupPathResolvedSourceCount,
 		lookupKeyDirectResolvedPathCount: artifacts.lookupKeyDirectResolvedPathCount,
 		lookupKeyToSources: artifacts.lookupKeyToSources,

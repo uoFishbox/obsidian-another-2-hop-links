@@ -14,7 +14,6 @@ export function serializeSnapshot(snapshot: IndexSnapshot) {
 			snapshot.unresolvedLinkLookupToSources,
 		),
 		lookupKeyToLookupPaths: serializeSetMap(snapshot.lookupKeyToLookupPaths),
-		unresolvedLookupToSources: serializeSetMap(snapshot.unresolvedLookupToSources),
 		lookupPathResolvedSourceCount: serializeNumberMap(
 			snapshot.lookupPathResolvedSourceCount,
 		),

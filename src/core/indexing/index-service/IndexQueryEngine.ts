@@ -134,9 +134,11 @@ export class IndexQueryEngine {
 			);
 		}
 
-		const unresolvedSources = snapshot.unresolvedLookupToSources.get(
-			toCaseInsensitiveLookupKey(linkPath),
-		);
+		const lookupKey = toCaseInsensitiveLookupKey(linkPath);
+		const unresolvedSources =
+			(snapshot.lookupKeyDirectResolvedPathCount.get(lookupKey) ?? 0) === 0
+				? snapshot.lookupKeyToSources.get(lookupKey)
+				: undefined;
 		if (unresolvedSources && unresolvedSources.size > 0) {
 			return this.hasAtLeastFromSourcePaths(unresolvedSources, minCount, options);
 		}
@@ -158,7 +160,10 @@ export class IndexQueryEngine {
 	): boolean {
 		this.ensureSnapshotCacheScope(snapshot);
 		const key = toCaseInsensitiveLookupKey(lookupPath);
-		return (snapshot.unresolvedLookupToSources.get(key)?.size ?? 0) === 1;
+		if ((snapshot.lookupKeyDirectResolvedPathCount.get(key) ?? 0) > 0) {
+			return false;
+		}
+		return (snapshot.lookupKeyToSources.get(key)?.size ?? 0) === 1;
 	}
 
 	public isUnresolvedWithSingleBacklinkBatch(
@@ -422,7 +427,10 @@ export class IndexQueryEngine {
 			return cached;
 		}
 
-		if (!snapshot.unresolvedLookupToSources.has(lookupKey)) {
+		if (
+			(snapshot.lookupKeyDirectResolvedPathCount.get(lookupKey) ?? 0) > 0 ||
+			!snapshot.lookupKeyToSources.has(lookupKey)
+		) {
 			return undefined;
 		}
 
@@ -430,10 +438,6 @@ export class IndexQueryEngine {
 		if (!lookupPaths || lookupPaths.size === 0) {
 			return undefined;
 		}
-		if (this.hasDirectResolvedLookupPathIn(snapshot, lookupPaths)) {
-			return undefined;
-		}
-
 		// Single lookup path: no merge needed — share the existing sourceMap
 		// directly. Callers only read buckets (count, hasResolved) and never
 		// mutate them, so sharing the snapshot reference is safe.
@@ -462,18 +466,6 @@ export class IndexQueryEngine {
 
 		this.unresolvedMergedCache.set(lookupKey, mergedSourceMap);
 		return mergedSourceMap;
-	}
-
-	private hasDirectResolvedLookupPathIn(
-		snapshot: IndexSnapshot,
-		lookupPaths: Iterable<string>,
-	): boolean {
-		for (const lookupPath of lookupPaths) {
-			if ((snapshot.lookupPathResolvedSourceCount.get(lookupPath) ?? 0) > 0) {
-				return true;
-			}
-		}
-		return false;
 	}
 
 	/**

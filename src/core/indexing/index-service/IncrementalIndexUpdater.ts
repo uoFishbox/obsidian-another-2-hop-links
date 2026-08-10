@@ -18,7 +18,7 @@ import {
 	collectCacheInvalidationPathsAsync,
 	onAddEdge,
 	onRemoveSourceFromLookupPath,
-	refreshUnresolvedLookupForKeyAsync,
+	refreshLookupKeySourcesAsync,
 	removeLookupPathAsync,
 	replaceSourceSummaryAsync,
 } from "../backlink-builder/lookupGraphMutator";
@@ -117,7 +117,7 @@ export class IncrementalIndexUpdater {
 		await this.applyDeletesAsync(run);
 		await this.applyFastRenamesAsync(run);
 		await this.applySourceUpdatesAsync(run);
-		await this.flushTouchedUnresolvedLookupsAsync(
+		await this.flushTouchedLookupSourcesAsync(
 			run.snapshot,
 			run.touchedLookupKeys,
 			run.yieldScheduler,
@@ -383,18 +383,14 @@ export class IncrementalIndexUpdater {
 		);
 	}
 
-	private async flushTouchedUnresolvedLookupsAsync(
+	private async flushTouchedLookupSourcesAsync(
 		snapshot: IndexSnapshot,
 		touchedLookupKeys: Set<string>,
 		yieldScheduler: YieldScheduler,
 	): Promise<void> {
 		let lookupCount = 0;
 		for (const lookupKey of touchedLookupKeys) {
-			await refreshUnresolvedLookupForKeyAsync(
-				snapshot,
-				lookupKey,
-				yieldScheduler,
-			);
+			await refreshLookupKeySourcesAsync(snapshot, lookupKey, yieldScheduler);
 
 			lookupCount++;
 			const pendingYield = maybeYield(yieldScheduler, lookupCount, 16);

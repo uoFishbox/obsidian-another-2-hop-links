@@ -1,7 +1,6 @@
 import {
 	drainYieldSteps,
 	HEAVY_YIELD_CHECK_INTERVAL,
-	YIELD_CHECK_INTERVAL,
 	type YieldScheduler,
 	type YieldStepGenerator,
 } from "../timeSlicing";
@@ -38,7 +37,6 @@ function* finalizePhaseTwoArtifacts(
 		yieldScheduler,
 	);
 	destinationBuildStates.clear();
-	yield* finalizeUnresolvedLookupArtifacts(artifacts, yieldScheduler);
 }
 
 function* finalizeDestinationLookupArtifacts(
@@ -66,27 +64,6 @@ function* finalizeDestinationLookupArtifacts(
 		);
 		if (pendingYield) {
 			yield pendingYield;
-		}
-	}
-}
-
-function* finalizeUnresolvedLookupArtifacts(
-	artifacts: MutableBacklinksBuildArtifacts,
-	yieldScheduler: YieldScheduler,
-): YieldStepGenerator {
-	let lookupKeyCount = 0;
-	for (const [lookupKey, sources] of artifacts.lookupKeyToSources) {
-		if ((artifacts.lookupKeyDirectResolvedPathCount.get(lookupKey) ?? 0) === 0) {
-			artifacts.unresolvedLookupToSources.set(lookupKey, sources);
-		}
-
-		lookupKeyCount++;
-		const lookupKeyPendingYield = yieldScheduler.checkpoint(
-			lookupKeyCount,
-			YIELD_CHECK_INTERVAL,
-		);
-		if (lookupKeyPendingYield) {
-			yield lookupKeyPendingYield;
 		}
 	}
 }

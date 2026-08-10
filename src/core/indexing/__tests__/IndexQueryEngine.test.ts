@@ -280,6 +280,23 @@ describe("IndexQueryEngine", () => {
 			);
 		});
 
+		test("returns false when the lookup key has a directly resolved path", async () => {
+			const env = createQueryEnvironment([
+				{ path: "source.md", links: ["Note"] },
+				{ path: "Note.md" },
+			]);
+
+			const snapshot = await env.snapshotBuilder.buildAsync();
+
+			expect(snapshot.lookupKeyToSources.get("note.md")).toEqual(
+				new Set(["source.md"]),
+			);
+			expect(snapshot.lookupKeyDirectResolvedPathCount.get("note.md")).toBe(1);
+			expect(env.engine.isUnresolvedWithSingleBacklink(snapshot, "Note.md")).toBe(
+				false,
+			);
+		});
+
 		test("updates query cache even on representative change of sibling lookupPaths", async () => {
 			const env = createQueryEnvironment([{ path: "source.md" }]);
 

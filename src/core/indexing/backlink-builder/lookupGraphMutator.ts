@@ -213,7 +213,7 @@ export async function removeLookupPathAsync(
 	removeLookupPathRegistration(snapshot, lookupPath, lookupKey);
 }
 
-export async function refreshUnresolvedLookupForKeyAsync(
+export async function refreshLookupKeySourcesAsync(
 	snapshot: IndexSnapshot,
 	lookupKey: string,
 	yieldScheduler: YieldScheduler,
@@ -221,7 +221,6 @@ export async function refreshUnresolvedLookupForKeyAsync(
 	const lookupPaths = snapshot.lookupKeyToLookupPaths.get(lookupKey);
 	if (!lookupPaths || lookupPaths.size === 0) {
 		snapshot.lookupKeyToSources.delete(lookupKey);
-		snapshot.unresolvedLookupToSources.delete(lookupKey);
 		return;
 	}
 
@@ -231,17 +230,10 @@ export async function refreshUnresolvedLookupForKeyAsync(
 	await collectLookupKeySourcesAsync(snapshot, lookupPaths, sources, yieldScheduler);
 	if (sources.size === 0) {
 		snapshot.lookupKeyToSources.delete(lookupKey);
-		snapshot.unresolvedLookupToSources.delete(lookupKey);
 		return;
 	}
 
 	snapshot.lookupKeyToSources.set(lookupKey, sources);
-	if ((snapshot.lookupKeyDirectResolvedPathCount.get(lookupKey) ?? 0) > 0) {
-		snapshot.unresolvedLookupToSources.delete(lookupKey);
-		return;
-	}
-
-	snapshot.unresolvedLookupToSources.set(lookupKey, sources);
 }
 
 function ensureLookupPathRegistered(

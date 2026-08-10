@@ -353,7 +353,7 @@ describe("buildDetailedBacklinksArtifactsChunked", () => {
 		expect(artifacts.lookupKeyToSources.get("note.md")).toEqual(
 			new Set(["source.md"]),
 		);
-		expect(artifacts.unresolvedLookupToSources.has("note.md")).toBe(false);
+		expect(artifacts.lookupKeyDirectResolvedPathCount.get("note.md")).toBe(1);
 	});
 
 	test("keeps source-dependent ambiguous links resolved per source path", async () => {
@@ -465,7 +465,8 @@ describe("buildDetailedBacklinksArtifactsChunked", () => {
 
 		expect(yieldCount).toBeGreaterThan(0);
 		expect(artifacts.detailedMap.size).toBe(256);
-		expect(artifacts.unresolvedLookupToSources.size).toBe(256);
+		expect(artifacts.lookupKeyToSources.size).toBe(256);
+		expect(artifacts.lookupKeyDirectResolvedPathCount.size).toBe(0);
 	});
 
 	test("aborts a stale rebuild at a yield boundary", async () => {

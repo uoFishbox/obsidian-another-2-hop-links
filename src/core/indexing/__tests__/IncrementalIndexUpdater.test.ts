@@ -4,6 +4,7 @@ import { buildIndexSnapshotAsync } from "../index-service/indexSnapshotBuilder";
 import { VaultEnvironmentBuilder } from "testing/helpers/VaultEnvironmentBuilder";
 import { serializeSnapshot } from "./snapshotTestHelpers";
 import type { CachedMetadata, TFile } from "obsidian";
+import type { IndexSnapshot } from "../types/IndexTypes";
 
 function createPosition(offset: number) {
 	return {
@@ -716,11 +717,10 @@ describe("IncrementalIndexUpdater - unresolved link correctness", () => {
 	});
 });
 
-function checkUnresolvedSingle(snapshot: any, lookupPath: string): boolean {
+function checkUnresolvedSingle(snapshot: IndexSnapshot, lookupPath: string): boolean {
 	const key = lookupPath.toLowerCase().replace(/\\/g, "/");
-	const unresolved = snapshot.unresolvedLookupToSources.get(key);
-	if (!unresolved) {
+	if ((snapshot.lookupKeyDirectResolvedPathCount.get(key) ?? 0) > 0) {
 		return false;
 	}
-	return unresolved.size === 1;
+	return (snapshot.lookupKeyToSources.get(key)?.size ?? 0) === 1;
 }
