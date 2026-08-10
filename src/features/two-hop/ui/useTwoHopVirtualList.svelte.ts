@@ -450,16 +450,16 @@ export function useTwoHopVirtualList(
 		restoreLayoutAnchor(anchor, nextRowModel);
 		if (nextRowModel.rowCount === 0) {
 			virtualList.setEmpty({ rowModel: nextRowModel });
-		} else if (virtualList.getSnapshot()) {
-			virtualList.recompute({ rowModel: nextRowModel });
+			return;
 		}
-		applyRangeEffects();
-		virtualListController.resetScrollWindow();
-		virtualListController.runScrollMeasurement(undefined, {
+
+		const publication = virtualListController.runScrollMeasurement(undefined, {
 			forcePublish: true,
 			reason: "data-change",
 		});
-		virtualListController.scheduleLayoutMeasurement();
+		if (publication.kind !== "measured") {
+			virtualListController.scheduleLayoutMeasurement();
+		}
 	}
 
 	$effect(() => {
@@ -491,7 +491,7 @@ export function useTwoHopVirtualList(
 
 	$effect(() => {
 		void props.previewActive;
-		untrack(applyRangeEffects);
+		untrack(scheduleRangeEffects);
 	});
 
 	onDestroy(() => {

@@ -1,6 +1,10 @@
 import { fireEvent, render } from "@testing-library/svelte";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { DEFAULT_SETTINGS } from "features/settings/model";
+import {
+	getCCLDevMeasurementSnapshot,
+	resetCCLDevMeasurements,
+} from "infrastructure/debug/CCLDevMeasurements";
 import type { ApplicationStore } from "ui/stores/ApplicationStore.svelte";
 import type { CardRenderModel } from "ui/components/items/cardRenderModel";
 import type { LinkContext } from "ui/context/linkContext";
@@ -20,6 +24,28 @@ import {
 	triggerResize,
 } from "testing/helpers/DOMObserverMock";
 import TwoHopVirtualSurfaceHarness from "./TwoHopVirtualSurfaceHarness.svelte";
+
+const cardDemandProbe = vi.hoisted(() => ({ setDemand: vi.fn() }));
+
+vi.mock("features/two-hop/ui/twoHopCardHydrator", async (importOriginal) => {
+	const actual =
+		await importOriginal<typeof import("features/two-hop/ui/twoHopCardHydrator")>();
+	return {
+		...actual,
+		createTwoHopCardHydrator: (
+			params: Parameters<typeof actual.createTwoHopCardHydrator>[0],
+		) => {
+			const hydrator = actual.createTwoHopCardHydrator(params);
+			return {
+				...hydrator,
+				setDemand(demand: Parameters<typeof hydrator.setDemand>[0]): void {
+					cardDemandProbe.setDemand(demand);
+					hydrator.setDemand(demand);
+				},
+			};
+		},
+	};
+});
 
 function createSection(count: number, totalCount = count): TwoHopSectionModel {
 	const items = Array.from({ length: count }, (_, index) => ({
@@ -142,6 +168,8 @@ function getRows(root: HTMLElement): HTMLElement[] {
 
 beforeEach(() => {
 	resetRecords();
+	resetCCLDevMeasurements();
+	cardDemandProbe.setDemand.mockClear();
 	installResizeObserverMock();
 	setNumericProperty(window, "scrollY", 0);
 });
@@ -237,6 +265,80 @@ describe("TwoHopVirtualSurface", () => {
 		await publishSection(createFilteredSection(filteredItems), 1);
 		await vi.waitFor(() => expect(resolver).toHaveBeenCalled());
 		expect(resolver.mock.calls.every((call) => call[2] === 1)).toBe(true);
+	});
+
+	it("publishes card demand once for one section publication", async () => {
+		const resolver = createCardModelResolver();
+		const section = createSection(20);
+		const { publishSection } = await renderSurface({
+			section,
+			resolveItemCardModel: resolver,
+		});
+		cardDemandProbe.setDemand.mockClear();
+		resetCCLDevMeasurements();
+
+		const replacement = { ...section.items[0]! };
+		await publishSection(
+			createTwoHopSectionModel({
+				id: section.id,
+				kind: section.kind,
+				title: section.title,
+				items: [replacement, ...section.items.slice(1)],
+				totalCount: section.totalCount,
+			}),
+		);
+		const demandAfterRerender = cardDemandProbe.setDemand.mock.calls.length;
+		for (let index = 0; index < 4; index += 1) await flushFrames();
+
+		expect(demandAfterRerender).toBe(0);
+		expect(cardDemandProbe.setDemand).toHaveBeenCalledTimes(1);
+		const counters = getCCLDevMeasurementSnapshot().counters;
+		expect(counters["virtualScroll.applyScrollMeasurement.dataChange"].count).toBe(
+			1,
+		);
+		expect(counters["virtualScroll.rangeMeasurementApplied"].count).toBe(1);
+		expect(
+			counters["virtualList.scheduler.measurementLayout.animationFrame"].count,
+		).toBe(0);
+	});
+
+	it("preserves the visible anchor while prepending one row of items", async () => {
+		const resolver = createCardModelResolver();
+		const section = createSection(100);
+		const { publishSection, root, scroller } = await renderSurface({
+			section,
+			resolveItemCardModel: resolver,
+		});
+		setNumericProperty(scroller, "scrollTop", 1_000);
+		await fireEvent.scroll(scroller);
+		await vi.waitFor(() => {
+			const rowIndexes = getRows(root).map((row) =>
+				Number(row.dataset.cclRowIndex),
+			);
+			expect(Math.min(...rowIndexes)).toBeGreaterThan(0);
+		});
+		const scrollTopBeforePublication = scroller.scrollTop;
+		const prependedItems: TwoHopItemModel[] = Array.from(
+			{ length: 3 },
+			(_, index) => ({
+				...section.items[index]!,
+				interactionId: `prepended:${index}`,
+				searchKey: `prepended:${index}`,
+				key: `prepended:${index}`,
+			}),
+		);
+
+		await publishSection(
+			createTwoHopSectionModel({
+				id: section.id,
+				kind: section.kind,
+				title: section.title,
+				items: [...prependedItems, ...section.items],
+				totalCount: section.totalCount + prependedItems.length,
+			}),
+		);
+
+		expect(scroller.scrollTop).toBeGreaterThan(scrollTopBeforePublication);
 	});
 
 	it("renders load-more as a virtual cell and accepts the expanded publication", async () => {
