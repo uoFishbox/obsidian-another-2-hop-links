@@ -54,6 +54,7 @@ export class IndexingService implements IIndexingService {
 	private readonly queryEngine: IndexQueryEngine;
 	private readonly tagIndexStore: TagIndexStore;
 	private readonly writeCoordinator: IndexWriteCoordinator;
+	private readonly externalIdleWaiters = new Set<() => Promise<void>>();
 	private readonly updateEmitter = new IndexUpdateEmitter();
 	private commonTagsCache:
 		| {
@@ -98,11 +99,30 @@ export class IndexingService implements IIndexingService {
 	}
 
 	public async awaitIdle(): Promise<void> {
-		await this.writeCoordinator.awaitIdle();
+		for (;;) {
+			const activityGeneration = this.writeCoordinator.getActivityGeneration();
+			if (!this.writeCoordinator.isIdleAtActivityGeneration(activityGeneration)) {
+				await this.writeCoordinator.awaitIdle();
+			}
+
+			const externalWaits = Array.from(this.externalIdleWaiters, (waiter) =>
+				waiter(),
+			);
+			if (externalWaits.length > 0) {
+				await Promise.all(externalWaits);
+			}
+
+			if (this.writeCoordinator.isIdleAtActivityGeneration(activityGeneration)) {
+				return;
+			}
+		}
 	}
 
 	public registerIdleWaiter(waiter: () => Promise<void>): () => void {
-		return this.writeCoordinator.registerIdleWaiter(waiter);
+		this.externalIdleWaiters.add(waiter);
+		return () => {
+			this.externalIdleWaiters.delete(waiter);
+		};
 	}
 
 	public getBacklinksMap(): BacklinksMap {

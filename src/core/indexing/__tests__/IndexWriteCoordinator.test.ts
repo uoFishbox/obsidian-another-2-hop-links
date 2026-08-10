@@ -34,7 +34,7 @@ function createExecutor(
 }
 
 describe("IndexWriteCoordinator", () => {
-	test("coalesces pending incremental changes into one batch", async () => {
+	test("coalesces pending normalized batches without normalizing them again", async () => {
 		const executor = createExecutor();
 		const coordinator = new IndexWriteCoordinator(executor);
 
@@ -51,6 +51,7 @@ describe("IndexWriteCoordinator", () => {
 		expect(executor.applyIncremental).toHaveBeenCalledTimes(1);
 		expect(executor.applyIncremental).toHaveBeenCalledWith(
 			[
+				{ type: "modify", path: "notes/a.md" },
 				{ type: "modify", path: "notes/a.md" },
 				{ type: "create", path: "notes/b.md" },
 			],

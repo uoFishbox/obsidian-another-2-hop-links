@@ -3,7 +3,6 @@ import type {
 	RebuildOptions,
 	TimeSlicingOptions,
 } from "../types/IndexTypes";
-import { FileChangeQueue } from "./FileChangeQueue";
 
 export type RebuildReason =
 	| "requested"
@@ -47,8 +46,7 @@ interface ActiveRebuild extends PendingRebuild {
 
 /** Serializes all index mutations and coalesces writes waiting for execution. */
 export class IndexWriteCoordinator {
-	private readonly pendingChanges = new FileChangeQueue();
-	private readonly externalIdleWaiters = new Set<() => Promise<void>>();
+	private pendingIncrementalChanges: IncrementalFileChange[] = [];
 	private pendingIncrementalOptions: TimeSlicingOptions = {};
 	private pendingIncrementalWaiters: DeferredWrite[] = [];
 	private pendingRebuild: PendingRebuild | undefined;
@@ -57,6 +55,7 @@ export class IndexWriteCoordinator {
 	private processing = false;
 	private rebuildGeneration = 0;
 	private idle = true;
+	private activityGeneration = 0;
 	private idlePromise: Promise<void> = Promise.resolve();
 	private resolveIdle: () => void = () => {};
 
@@ -71,9 +70,7 @@ export class IndexWriteCoordinator {
 		}
 
 		this.markBusy();
-		for (const change of changes) {
-			this.pendingChanges.recordChange(change);
-		}
+		this.pendingIncrementalChanges.push(...changes);
 		this.pendingIncrementalOptions = options;
 		const deferred = createDeferredWrite();
 		this.pendingIncrementalWaiters.push(deferred);
@@ -98,7 +95,7 @@ export class IndexWriteCoordinator {
 		}
 
 		if (this.pendingIncrementalWaiters.length > 0) {
-			this.pendingChanges.drain();
+			this.pendingIncrementalChanges = [];
 			waiters.push(...this.pendingIncrementalWaiters);
 			this.pendingIncrementalWaiters = [];
 			this.pendingIncrementalOptions = {};
@@ -119,25 +116,20 @@ export class IndexWriteCoordinator {
 		for (;;) {
 			const currentIdlePromise = this.idlePromise;
 			await currentIdlePromise;
-
-			const externalWaits = Array.from(this.externalIdleWaiters, (waiter) =>
-				waiter(),
-			);
-			if (externalWaits.length > 0) {
-				await Promise.all(externalWaits);
-			}
-
 			if (this.idle && currentIdlePromise === this.idlePromise) {
 				return;
 			}
 		}
 	}
 
-	public registerIdleWaiter(waiter: () => Promise<void>): () => void {
-		this.externalIdleWaiters.add(waiter);
-		return () => {
-			this.externalIdleWaiters.delete(waiter);
-		};
+	/** Returns the current writer activity generation for idle coordination. */
+	public getActivityGeneration(): number {
+		return this.activityGeneration;
+	}
+
+	/** Returns whether no writer activity started since the supplied generation. */
+	public isIdleAtActivityGeneration(generation: number): boolean {
+		return this.idle && generation === this.activityGeneration;
 	}
 
 	private scheduleProcessing(): void {
@@ -231,9 +223,10 @@ export class IndexWriteCoordinator {
 	}
 
 	private async processIncremental(): Promise<void> {
-		const { changes } = this.pendingChanges.drain();
+		const changes = this.pendingIncrementalChanges;
 		const options = this.pendingIncrementalOptions;
 		const waiters = this.pendingIncrementalWaiters;
+		this.pendingIncrementalChanges = [];
 		this.pendingIncrementalOptions = {};
 		this.pendingIncrementalWaiters = [];
 
@@ -262,6 +255,7 @@ export class IndexWriteCoordinator {
 		}
 
 		this.idle = false;
+		this.activityGeneration++;
 		this.idlePromise = new Promise((resolve) => {
 			this.resolveIdle = resolve;
 		});

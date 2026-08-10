@@ -284,6 +284,27 @@ describe("IndexingService", () => {
 			await idlePromise;
 			expect(completed).toBe(true);
 		});
+
+		test("awaitIdle checks external queues again after they trigger writer activity", async () => {
+			const { service } = new VaultEnvironmentBuilder([
+				{ path: "file1.md" },
+			]).build();
+			let waiterCalls = 0;
+
+			service.registerIdleWaiter(async () => {
+				waiterCalls++;
+				if (waiterCalls !== 1) {
+					return;
+				}
+				await service.applyFileChangesTimeSliced([
+					{ type: "modify", path: "file1.md" },
+				]);
+			});
+
+			await service.awaitIdle();
+
+			expect(waiterCalls).toBe(2);
+		});
 	});
 
 	describe("onDataUpdate", () => {
