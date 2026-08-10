@@ -31,6 +31,8 @@ Vault全体のベンチマークは、インデックス作成レイヤーやE2E
 - active subscriberに影響する構造のミューテーションは、スクロールコンテナのキャッシュを無効化すること。
 - 公開されたスナップショットやビルド結果は、返された後は厳密に immutable として扱われること。
 
+two-hop surface も同じ不変条件に従う。section margin、header、load-more、複数列の配置は `TwoHopRowModel` が表現し、DOM residency は shared engine の `mounted` 範囲と resident slot pool だけで決める。section の materialized prefix やスクロール履歴を理由に、row/cell shell を追加保持してはならない。card model の off-window cache は `TwoHopCardHydrator` 内で最大 `64` 件に制限する。
+
 振る舞いのテストは、実装と同じ場所に配置されている。パフォーマンステストでは実行時間のしきい値ではなく、関数呼び出し回数やスパイカウンターを使用すること。
 
 ## キャッシュ一覧（Cache Inventory）

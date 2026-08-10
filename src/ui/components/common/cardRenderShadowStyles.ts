@@ -59,7 +59,7 @@ export const CARD_RENDER_SHADOW_CSS = String.raw`
 	touch-action: manipulation;
 }
 
-.twohop-progressive-cell > .cosense-card-links__box {
+.twohop-virtual-cell > .cosense-card-links__box {
 	height: 100%;
 	min-height: 0;
 }
@@ -369,42 +369,30 @@ export const CARD_RENDER_SHADOW_CSS = String.raw`
 	display: contents;
 }
 
-.twohop-progressive-surface {
+.twohop-virtual-surface {
 	contain: layout paint style;
 }
 
-.twohop-progressive-content {
+.twohop-virtual-content {
 	position: relative;
 	width: 100%;
 }
 
-.twohop-progressive-chunk {
-	position: relative;
-	width: 100%;
-	contain: layout paint style;
-	content-visibility: auto;
-}
-
-.twohop-progressive-row {
+.twohop-virtual-row {
 	position: absolute;
 	left: 0;
 	width: 100%;
 	display: grid;
 	box-sizing: border-box;
-	height: var(--twohop-row-height);
-	grid-template-columns: repeat(var(--twohop-columns), minmax(0, 1fr));
-	gap: var(--twohop-gap);
+	height: var(--ccl-box-height);
+	grid-template-columns: repeat(var(--ccl-columns), minmax(0, 1fr));
+	gap: var(--ccl-box-gap);
+	contain: layout;
 }
 
-.twohop-progressive-cell {
+.twohop-virtual-cell {
 	min-width: 0;
 	height: 100%;
-}
-
-.twohop-progressive-sentinel {
-	width: 100%;
-	height: 1px;
-	pointer-events: none;
 }
 
 @media (hover: hover) {

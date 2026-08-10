@@ -1,0 +1,260 @@
+import { fireEvent, render } from "@testing-library/svelte";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { DEFAULT_SETTINGS } from "features/settings/model";
+import type { ApplicationStore } from "ui/stores/ApplicationStore.svelte";
+import type { CardRenderModel } from "ui/components/items/cardRenderModel";
+import type { LinkContext } from "ui/context/linkContext";
+import type { TwoHopCardPresentationState } from "features/two-hop/ui/twoHopCellStaticState";
+import type {
+	TwoHopItemModel,
+	TwoHopSectionModel,
+} from "features/two-hop/ui/twoHopSectionModel";
+import { createTwoHopSectionModel } from "features/two-hop/ui/twoHopSectionModel";
+import {
+	flushFrames,
+	installResizeObserverMock,
+	resetRecords,
+	setElementRect,
+	setNumericProperty,
+	teardownResizeObserverMock,
+	triggerResize,
+} from "testing/helpers/DOMObserverMock";
+import TwoHopVirtualSurfaceHarness from "./TwoHopVirtualSurfaceHarness.svelte";
+
+function createSection(count: number, totalCount = count): TwoHopSectionModel {
+	const items = Array.from({ length: count }, (_, index) => ({
+		item: { type: "newLink" },
+		interactionId: `item:${index}`,
+		searchKey: `item:${index}`,
+		key: `item:${index}`,
+	})) as TwoHopItemModel[];
+	return createTwoHopSectionModel({
+		id: "section",
+		kind: "new-links-section",
+		title: "Section",
+		items,
+		totalCount,
+	});
+}
+
+function createCardModelResolver() {
+	return vi.fn(
+		(
+			item: TwoHopItemModel,
+			presentation: TwoHopCardPresentationState,
+		): CardRenderModel => ({
+			item: item.item,
+			targetFile: null,
+			title: item.key,
+			ariaLabel: item.key,
+			className: null,
+			extension: null,
+			directory: null,
+			interactionId: item.key,
+			interactionKey: item.key,
+			interactionDescriptor: null,
+			presentation,
+			searchQuery: "",
+			previewRequest: null,
+		}),
+	);
+}
+
+interface SurfaceFixture {
+	readonly root: HTMLElement;
+	readonly scroller: HTMLElement;
+	readonly rerender: ReturnType<typeof render>["rerender"];
+}
+
+async function renderSurface(params: {
+	section: TwoHopSectionModel;
+	resolveItemCardModel: ReturnType<typeof createCardModelResolver>;
+	loadMoreSection?: (sectionId: string) => void;
+	rootTop?: number;
+	offscreenBootstrapPreviewRows?: number;
+}): Promise<SurfaceFixture> {
+	const applicationStore = {
+		settings: {
+			...DEFAULT_SETTINGS,
+			cardWidthPx: 100,
+			cardHeightRatio: 1,
+			cardMaxColumns: 3,
+		},
+	} as unknown as ApplicationStore;
+	const scroller = document.createElement("div");
+	scroller.style.overflow = "auto";
+	setNumericProperty(scroller, "clientWidth", 320);
+	setNumericProperty(scroller, "clientHeight", 300);
+	setNumericProperty(scroller, "scrollHeight", 40_000);
+	setNumericProperty(scroller, "scrollTop", 0);
+	setElementRect(scroller, { top: 0, width: 320, height: 300 });
+	document.body.append(scroller);
+
+	const rendered = render(TwoHopVirtualSurfaceHarness, {
+		target: scroller,
+		props: {
+			sections: [params.section],
+			applicationStore,
+			linkContext: { getPreview: vi.fn() } as unknown as LinkContext,
+			loadMoreSection: params.loadMoreSection,
+			resolveItemCardModel: params.resolveItemCardModel,
+			offscreenBootstrapPreviewRows: params.offscreenBootstrapPreviewRows ?? 0,
+		},
+	});
+	const root = rendered.container.querySelector<HTMLElement>(
+		".twohop-virtual-surface",
+	);
+	if (!root) throw new Error("Two-hop virtual surface was not rendered");
+	setElementRect(root, {
+		top: params.rootTop ?? 0,
+		width: 320,
+		height: 40_000,
+	});
+	triggerResize(root, 320, 40_000);
+	for (let index = 0; index < 4; index += 1) await flushFrames();
+
+	return { root, scroller, rerender: rendered.rerender };
+}
+
+function getRows(root: HTMLElement): HTMLElement[] {
+	return Array.from(
+		root.shadowRoot?.querySelectorAll<HTMLElement>(".twohop-virtual-row") ?? [],
+	);
+}
+
+beforeEach(() => {
+	resetRecords();
+	installResizeObserverMock();
+	setNumericProperty(window, "scrollY", 0);
+});
+
+afterEach(() => {
+	teardownResizeObserverMock();
+});
+
+describe("TwoHopVirtualSurface", () => {
+	it("keeps resident DOM bounded and reuses physical row slots across a long scroll", async () => {
+		const resolver = createCardModelResolver();
+		const { root, scroller } = await renderSurface({
+			section: createSection(10_000),
+			resolveItemCardModel: resolver,
+		});
+
+		await vi.waitFor(() => expect(getRows(root).length).toBeGreaterThan(0));
+		const initialRows = getRows(root);
+		const initialBySlot = new Map(
+			initialRows.map((row) => [row.dataset.cclRowSlot, row]),
+		);
+		expect(initialRows.length).toBeLessThanOrEqual(12);
+
+		setNumericProperty(scroller, "scrollTop", 20_000);
+		await fireEvent.scroll(scroller);
+		await vi.waitFor(() => {
+			const rowIndexes = getRows(root).map((row) =>
+				Number(row.dataset.cclRowIndex),
+			);
+			expect(Math.min(...rowIndexes)).toBeGreaterThan(100);
+		});
+
+		const scrolledRows = getRows(root);
+		expect(scrolledRows.length).toBeLessThanOrEqual(12);
+		const reusedRows = scrolledRows.filter(
+			(row) => initialBySlot.get(row.dataset.cclRowSlot) === row,
+		);
+		expect(reusedRows.length).toBe(initialRows.length);
+		expect(
+			root.shadowRoot?.querySelector(".twohop-progressive-sentinel"),
+		).toBeNull();
+		expect(root.shadowRoot?.querySelector(".twohop-progressive-chunk")).toBeNull();
+	});
+
+	it("hydrates mounted cards after measurement without synchronously resolving the full source", async () => {
+		const resolver = createCardModelResolver();
+		const fixturePromise = renderSurface({
+			section: createSection(10_000),
+			resolveItemCardModel: resolver,
+		});
+		expect(resolver).not.toHaveBeenCalled();
+		const { root } = await fixturePromise;
+
+		await vi.waitFor(() => expect(resolver).toHaveBeenCalled());
+		expect(resolver.mock.calls.length).toBeLessThan(40);
+		expect(
+			root.shadowRoot?.querySelector("[data-ccl-interaction-id='item:0']"),
+		).not.toBeNull();
+	});
+
+	it("renders load-more as a virtual cell and accepts the expanded publication", async () => {
+		const resolver = createCardModelResolver();
+		const loadMoreSection = vi.fn();
+		const applicationStore = {
+			settings: {
+				...DEFAULT_SETTINGS,
+				cardWidthPx: 100,
+				cardHeightRatio: 1,
+				cardMaxColumns: 3,
+			},
+		} as unknown as ApplicationStore;
+		const scroller = document.createElement("div");
+		scroller.style.overflow = "auto";
+		setNumericProperty(scroller, "clientWidth", 320);
+		setNumericProperty(scroller, "clientHeight", 300);
+		setNumericProperty(scroller, "scrollHeight", 2_000);
+		setNumericProperty(scroller, "scrollTop", 0);
+		setElementRect(scroller, { top: 0, width: 320, height: 300 });
+		document.body.append(scroller);
+		const baseProps = {
+			sections: [createSection(2, 3)],
+			applicationStore,
+			linkContext: { getPreview: vi.fn() } as unknown as LinkContext,
+			loadMoreSection,
+			resolveItemCardModel: resolver,
+		};
+		const rendered = render(TwoHopVirtualSurfaceHarness, {
+			target: scroller,
+			props: baseProps,
+		});
+		const root = rendered.container.querySelector<HTMLElement>(
+			".twohop-virtual-surface",
+		);
+		if (!root) throw new Error("Two-hop virtual surface was not rendered");
+		setElementRect(root, { top: 0, width: 320, height: 2_000 });
+		triggerResize(root, 320, 2_000);
+
+		const button = await vi.waitFor(() => {
+			const candidate = root.shadowRoot?.querySelector<HTMLButtonElement>(
+				".cosense-card-links__load-more-button",
+			);
+			expect(candidate).not.toBeNull();
+			return candidate!;
+		});
+		await fireEvent.click(button);
+		expect(loadMoreSection).toHaveBeenCalledWith("section");
+
+		await rendered.rerender({
+			...baseProps,
+			sections: [createSection(3)],
+		});
+		await vi.waitFor(() =>
+			expect(
+				root.shadowRoot?.querySelector(".cosense-card-links__load-more-button"),
+			).toBeNull(),
+		);
+	});
+
+	it("bootstraps only the requested leading rows while the surface is offscreen", async () => {
+		const resolver = createCardModelResolver();
+		await renderSurface({
+			section: createSection(10_000),
+			resolveItemCardModel: resolver,
+			rootTop: 1_000,
+			offscreenBootstrapPreviewRows: 2,
+		});
+
+		await vi.waitFor(() => expect(resolver).toHaveBeenCalled());
+		const resolvedIndexes = resolver.mock.calls.map(([item]) =>
+			Number((item as TwoHopItemModel).key.split(":")[1]),
+		);
+		expect(Math.max(...resolvedIndexes)).toBeLessThan(6);
+	});
+});

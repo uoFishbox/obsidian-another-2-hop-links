@@ -7,12 +7,11 @@ import type {
 } from "ui/virtualization/scheduling/frameCoordinator";
 import { DEFAULT_VIEW_PLAN_LAYOUT } from "ui/virtualization/svelte/viewPlanLayout";
 import { createTwoHopCardHydrator } from "features/two-hop/ui/twoHopCardHydrator";
-import { compileTwoHopProgressivePlan } from "features/two-hop/ui/twoHopProgressivePlan";
+import { createTwoHopRowModel } from "features/two-hop/ui/twoHopRowModel";
 import {
 	createTwoHopSectionModel,
 	type TwoHopItemModel,
 } from "features/two-hop/ui/twoHopSectionModel";
-import { compileFixedGridLayout } from "features/two-hop/ui/viewport/twoHopGeometry";
 
 interface TestFrameCoordinator {
 	readonly coordinator: VirtualFrameCoordinator;
@@ -72,12 +71,11 @@ describe("createTwoHopCardHydrator", () => {
 			totalCount: items.length,
 		});
 		const layout = { ...DEFAULT_VIEW_PLAN_LAYOUT, columns: 1 };
-		const geometry = compileFixedGridLayout([section], layout);
-		const plan = compileTwoHopProgressivePlan(
-			[section],
-			geometry,
-			geometry.rowCount,
-		);
+		const rowModel = createTwoHopRowModel({
+			documentIdentity: "test",
+			sections: [section],
+			layout,
+		});
 		const frames = createTestFrameCoordinator();
 		const previewChanged = vi.fn();
 		const resolver = vi.fn((item: TwoHopItemModel): CardRenderModel => {
@@ -107,7 +105,7 @@ describe("createTwoHopCardHydrator", () => {
 		});
 		const hydrator = createTwoHopCardHydrator({
 			frameCoordinator: frames.coordinator,
-			getPlan: () => plan,
+			getRowModel: () => rowModel,
 			getRevision: () => 0,
 			getResolver: () => resolver,
 			isPreviewActive: () => true,
@@ -166,7 +164,7 @@ describe("createTwoHopCardHydrator", () => {
 		expect(hydrator.getModel(firstKey)).toBeDefined();
 		expect(resolver.mock.calls.length).toBe(resolverCallsBeforeReturn);
 
-		for (let rowIndex = 3; rowIndex < geometry.rowCount; rowIndex += 1) {
+		for (let rowIndex = 3; rowIndex < rowModel.rowCount; rowIndex += 1) {
 			hydrator.setDemand({
 				foreground: { start: rowIndex, end: rowIndex + 1 },
 				background: { start: rowIndex, end: rowIndex + 1 },

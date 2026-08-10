@@ -12,7 +12,7 @@ export interface TwoHopSectionModel {
 		| "new-links-section";
 	readonly title: string;
 	readonly header: TwoHopHeaderModel;
-	/** Materialized prefix consumed by geometry and progressive chunks. */
+	/** Materialized item prefix consumed by the virtual row model. */
 	readonly items: readonly TwoHopItemModel[];
 	/** Total source item count, including the unpublished suffix. */
 	readonly totalCount: number;
@@ -43,7 +43,7 @@ export interface CreateTwoHopSectionModelParams {
 	readonly totalCount: number;
 }
 
-/** Publishes one immutable section consumed directly by geometry and chunks. */
+/** Publishes one immutable section consumed directly by the virtual row model. */
 export function createTwoHopSectionModel(
 	params: CreateTwoHopSectionModelParams,
 ): TwoHopSectionModel {

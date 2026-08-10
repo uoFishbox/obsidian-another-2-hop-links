@@ -7,13 +7,14 @@
 	import { previewHost } from "features/card-preview/ui/previewHostAction";
 	import type { CardShellModel } from "ui/components/items/cardRenderModel";
 	import type { IconName } from "ui/shared/icons/iconRegistry";
-	import type { TwoHopProgressiveCell } from "features/two-hop/ui/twoHopProgressivePlan";
+	import type { TwoHopVirtualCell } from "features/two-hop/ui/twoHopRowModel";
 	import { resolveTwoHopSectionVariant } from "features/two-hop/ui/twoHopCellStaticState";
 	import { getDebugDisableCardDomPreview } from "../../../appConstants";
 
 	interface Props {
-		cell: TwoHopProgressiveCell;
+		cell: TwoHopVirtualCell;
 		previewHostEnabled: boolean;
+		previewSlotId: string;
 		registerCardModelConsumer: (
 			logicalKey: string,
 			consumer: (model: CardShellModel | undefined) => void,
@@ -21,8 +22,13 @@
 		onLoadMore: (sectionId: string) => void;
 	}
 
-	let { cell, previewHostEnabled, registerCardModelConsumer, onLoadMore }: Props =
-		$props();
+	let {
+		cell,
+		previewHostEnabled,
+		previewSlotId,
+		registerCardModelConsumer,
+		onLoadMore,
+	}: Props = $props();
 	let cardModel = $state.raw<CardShellModel | undefined>(undefined);
 
 	$effect(() => {
@@ -82,9 +88,7 @@
 			data-ccl-section-variant={sectionVariant}
 		>
 			<div class="cosense-card-links__title-container">
-				<span class="cosense-card-links__header-title">
-					{section.title}
-				</span>
+				<span class="cosense-card-links__header-title">{section.title}</span>
 				<Icon
 					name={resolveHeaderIcon()}
 					width={26}
@@ -119,7 +123,7 @@
 				<UnresolvedPreviewPlaceholder />
 			{:else if model && !getDebugDisableCardDomPreview() && model.targetFile && previewHostEnabled}
 				<div
-					use:previewHost={cell.logicalKey}
+					use:previewHost={previewSlotId}
 					class="cosense-card-links__box-preview"
 					data-preview-owner="virtual-surface"
 				></div>

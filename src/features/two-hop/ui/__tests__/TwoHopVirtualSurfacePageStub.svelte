@@ -2,8 +2,8 @@
 	import ViewItemCard from "ui/components/items/ViewItemCard.svelte";
 	import type { TwoHopSectionModel } from "features/two-hop/ui/twoHopSectionModel";
 	import type { ApplicationStore } from "ui/stores/ApplicationStore.svelte";
-	import type { TwoHopPreviewDependencies } from "features/two-hop/ui/useTwoHopProgressiveList.svelte";
-	import { captureTwoHopProgressiveSurfacePageStubProps } from "./twoHopProgressiveSurfacePageStubCapture";
+	import type { TwoHopPreviewDependencies } from "features/two-hop/ui/useTwoHopVirtualList.svelte";
+	import { captureTwoHopVirtualSurfacePageStubProps } from "./twoHopVirtualSurfacePageStubCapture";
 
 	interface Props {
 		documentIdentity: string;
@@ -26,7 +26,7 @@
 	}: Props = $props();
 
 	$effect(() => {
-		captureTwoHopProgressiveSurfacePageStubProps({
+		captureTwoHopVirtualSurfacePageStubProps({
 			documentIdentity,
 			applicationStore,
 			loadMoreSection,
@@ -38,8 +38,8 @@
 </script>
 
 <div
-	class="twohop-page-progressive-list"
-	data-testid="two-hop-progressive-surface-stub"
+	class="twohop-page-virtual-list"
+	data-testid="two-hop-virtual-surface-stub"
 	data-has-preview-dependencies={String(previewDependencies !== undefined)}
 	data-has-preview-runtime={String(
 		typeof previewDependencies?.previewRuntime?.createSurface === "function",

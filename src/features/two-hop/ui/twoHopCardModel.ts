@@ -18,7 +18,7 @@ export interface TwoHopCardModelRevision {
 	readonly applicationUpdateVersion: number;
 }
 
-/** Builds a card model. Reuse is owned by the progressive hydrator. */
+/** Builds a card model. Reuse is owned by the bounded-range hydrator. */
 export function buildTwoHopCardModel(
 	row: TwoHopItemModel,
 	presentation: TwoHopCardPresentationState,

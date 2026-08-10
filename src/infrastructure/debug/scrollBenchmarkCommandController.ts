@@ -7,8 +7,8 @@ import {
 	type CCLDevMeasurementSnapshot,
 } from "./CCLDevMeasurements";
 
-/** Class name that identifies the progressive two-hop list root element. */
-const TWO_HOP_LIST_SELECTOR = ".twohop-page-progressive-list";
+/** Class name that identifies the virtualized two-hop list root element. */
+const TWO_HOP_LIST_SELECTOR = ".twohop-page-virtual-list";
 
 /** Fixed number of frames aligned with the workload metrics in PERFORMANCE.md. */
 const SCROLL_FRAMES = 600;

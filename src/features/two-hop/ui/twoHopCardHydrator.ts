@@ -6,18 +6,17 @@ import type { TwoHopCardPresentationState } from "features/two-hop/ui/twoHopCell
 import { resolveTwoHopCardPresentation } from "features/two-hop/ui/twoHopCellStaticState";
 import type { TwoHopItemModel } from "features/two-hop/ui/twoHopSectionModel";
 import {
-	resolveMountedProgressiveRow,
-	type TwoHopProgressiveCell,
-	type TwoHopProgressivePlan,
-} from "features/two-hop/ui/twoHopProgressivePlan";
-import type { TwoHopRowRange } from "features/two-hop/ui/viewport/twoHopGeometry";
+	type TwoHopRowModel,
+	type TwoHopVirtualCell,
+} from "features/two-hop/ui/twoHopRowModel";
+import type { RowRange } from "ui/virtualization/rowRange";
 import type { VirtualFrameCoordinator } from "ui/virtualization/scheduling/frameCoordinator";
 import { createVirtualCardInteractionController } from "ui/interactions/virtualCardInteractionController";
 import { recordCCLDevMeasurement } from "infrastructure/debug/CCLDevMeasurements";
 
 type CardModelConsumer = (model: CardShellModel | undefined) => void;
 type HydrationPriority = "foreground" | "background";
-type HydrationEntry = Extract<TwoHopProgressiveCell, { kind: "item" }>;
+type HydrationEntry = Extract<TwoHopVirtualCell, { kind: "item" }>;
 
 interface HydratedCardEntry {
 	readonly item: TwoHopItemModel;
@@ -36,13 +35,13 @@ interface HydrationQueue {
 }
 
 export interface TwoHopCardDemand {
-	readonly foreground: Readonly<TwoHopRowRange>;
-	readonly background: Readonly<TwoHopRowRange>;
+	readonly foreground: Readonly<RowRange>;
+	readonly background: Readonly<RowRange>;
 }
 
 export interface TwoHopCardHydratorParams {
 	readonly frameCoordinator: VirtualFrameCoordinator;
-	readonly getPlan: () => TwoHopProgressivePlan;
+	readonly getRowModel: () => TwoHopRowModel;
 	readonly getRevision: () => unknown;
 	readonly getResolver: () =>
 		| ((
@@ -63,7 +62,7 @@ export interface TwoHopCardHydrator {
 	setDemand(demand: TwoHopCardDemand): void;
 	refreshDemand(): void;
 	getModel(logicalKey: string): CardRenderModel | undefined;
-	reconcile(plan: TwoHopProgressivePlan): void;
+	reconcileSource(): void;
 	clear(): void;
 	dispose(): void;
 }
@@ -72,8 +71,8 @@ const EMPTY_RANGE = Object.freeze({ start: 0, end: 0 });
 const MAX_MODELS_PER_DRAIN = 8;
 const MAX_HYDRATION_CPU_MS = 1;
 const MAX_RETAINED_CARD_MODELS = 64;
-const HYDRATION_POST_PAINT_TASK_KEY = "two-hop-progressive-hydration-visible";
-const HYDRATION_IDLE_TASK_KEY = "two-hop-progressive-hydration-preload";
+const HYDRATION_POST_PAINT_TASK_KEY = "two-hop-virtual-hydration-visible";
+const HYDRATION_IDLE_TASK_KEY = "two-hop-virtual-hydration-preload";
 
 /** Owns a key-addressed card cache and derives work from the latest window demand. */
 export function createTwoHopCardHydrator(
@@ -184,14 +183,16 @@ export function createTwoHopCardHydrator(
 	}
 
 	function collectItemKeys(
-		range: Readonly<TwoHopRowRange>,
+		range: Readonly<RowRange>,
 		target: Set<string> = new Set(),
 	): Set<string> {
-		const plan = params.getPlan();
+		const rowModel = params.getRowModel();
 		for (let rowIndex = range.start; rowIndex < range.end; rowIndex += 1) {
-			const row = resolveMountedProgressiveRow(plan, rowIndex);
+			const row = rowModel.getRow(rowIndex);
 			if (!row) continue;
-			for (const cell of row.cells) {
+			for (let columnIndex = 0; columnIndex < row.cellCount; columnIndex += 1) {
+				const cell = row.getCell(columnIndex);
+				if (!cell) continue;
 				if (cell.kind === "item") target.add(cell.logicalKey);
 			}
 		}
@@ -246,7 +247,7 @@ export function createTwoHopCardHydrator(
 		if (existing) {
 			if (priority === "foreground" && existing.priority !== "foreground") {
 				existing.priority = "foreground";
-				foregroundQueue.entries.push(cell);
+				foregroundQueue.entries.push(existing.cell);
 			}
 			return;
 		}
@@ -259,16 +260,18 @@ export function createTwoHopCardHydrator(
 	}
 
 	function enqueueRange(
-		range: Readonly<TwoHopRowRange>,
+		range: Readonly<RowRange>,
 		priority: HydrationPriority,
 		refreshExisting: boolean,
 	): void {
-		const plan = params.getPlan();
+		const rowModel = params.getRowModel();
 		const revision = params.getRevision();
 		for (let rowIndex = range.start; rowIndex < range.end; rowIndex += 1) {
-			const row = resolveMountedProgressiveRow(plan, rowIndex);
+			const row = rowModel.getRow(rowIndex);
 			if (!row) continue;
-			for (const cell of row.cells) {
+			for (let columnIndex = 0; columnIndex < row.cellCount; columnIndex += 1) {
+				const cell = row.getCell(columnIndex);
+				if (!cell) continue;
 				if (cell.kind === "item") {
 					enqueueCell(cell, priority, refreshExisting, revision);
 				}
@@ -372,8 +375,7 @@ export function createTwoHopCardHydrator(
 			queue.head += 1;
 			if (!cell) continue;
 			const pending = pendingByKey.get(cell.logicalKey);
-			if (!pending || pending.cell !== cell || pending.priority !== priority)
-				continue;
+			if (!pending || pending.priority !== priority) continue;
 			if (resolveDemandPriority(cell.rowIndex) !== priority) {
 				pendingByKey.delete(cell.logicalKey);
 				continue;
@@ -395,25 +397,8 @@ export function createTwoHopCardHydrator(
 		return entries.get(logicalKey)?.model;
 	}
 
-	function reconcile(plan: TwoHopProgressivePlan): void {
+	function reconcileSource(): void {
 		clearPending();
-		const staleKeys = new Set(entries.keys());
-		for (const chunk of plan.chunks) {
-			for (const row of chunk.rows) {
-				for (const cell of row.cells) {
-					if (cell.kind !== "item" || !staleKeys.has(cell.logicalKey))
-						continue;
-					if (entries.get(cell.logicalKey)?.item === cell.item) {
-						staleKeys.delete(cell.logicalKey);
-					}
-				}
-			}
-		}
-		for (const logicalKey of staleKeys) {
-			notify(logicalKey, undefined);
-			entries.delete(logicalKey);
-			interactionController.setCard(logicalKey, null);
-		}
 		setDemand(demand);
 		params.onPreviewModelsChanged();
 	}
@@ -435,7 +420,7 @@ export function createTwoHopCardHydrator(
 		setDemand,
 		refreshDemand,
 		getModel,
-		reconcile,
+		reconcileSource,
 		clear,
 		dispose,
 	};
@@ -462,10 +447,10 @@ function compactHydrationQueue(queue: HydrationQueue): void {
 	queue.head = 0;
 }
 
-function isRowInRange(rowIndex: number, range: Readonly<TwoHopRowRange>): boolean {
+function isRowInRange(rowIndex: number, range: Readonly<RowRange>): boolean {
 	return rowIndex >= range.start && rowIndex < range.end;
 }
 
-function copyRange(range: Readonly<TwoHopRowRange>): Readonly<TwoHopRowRange> {
+function copyRange(range: Readonly<RowRange>): Readonly<RowRange> {
 	return Object.freeze({ start: range.start, end: range.end });
 }

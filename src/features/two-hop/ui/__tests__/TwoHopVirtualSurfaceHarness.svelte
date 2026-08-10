@@ -1,10 +1,10 @@
 <script lang="ts">
-	import TwoHopProgressiveSurface from "features/two-hop/ui/TwoHopProgressiveSurface.svelte";
+	import TwoHopVirtualSurface from "features/two-hop/ui/TwoHopVirtualSurface.svelte";
 	import { setLinkContext, type LinkContext } from "ui/context/linkContext";
 	import type { ApplicationStore } from "ui/stores/ApplicationStore.svelte";
 	import type { CardRenderModel } from "ui/components/items/cardRenderModel";
 	import type { TwoHopCardPresentationState } from "features/two-hop/ui/twoHopCellStaticState";
-	import type { TwoHopPreviewDependencies } from "features/two-hop/ui/useTwoHopProgressiveList.svelte";
+	import type { TwoHopPreviewDependencies } from "features/two-hop/ui/useTwoHopVirtualList.svelte";
 	import type {
 		TwoHopItemModel,
 		TwoHopSectionModel,
@@ -42,7 +42,7 @@
 	setLinkContext(linkContext);
 </script>
 
-<TwoHopProgressiveSurface
+<TwoHopVirtualSurface
 	{documentIdentity}
 	{sections}
 	{applicationStore}

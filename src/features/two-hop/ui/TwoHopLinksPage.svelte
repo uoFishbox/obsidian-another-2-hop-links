@@ -3,7 +3,7 @@
 	import { setContext } from "svelte";
 	import LoadingState from "ui/components/common/LoadingState.svelte";
 	import ListControls from "ui/components/common/ListControls.svelte";
-	import TwoHopProgressiveSurface from "features/two-hop/ui/TwoHopProgressiveSurface.svelte";
+	import TwoHopVirtualSurface from "features/two-hop/ui/TwoHopVirtualSurface.svelte";
 	import { useSearchQuery } from "ui/hooks/useSearchQuery.svelte";
 	import { useBookmarks } from "ui/hooks/useBookmarks.svelte";
 	import { useWorkerSearchSession } from "features/search/useWorkerSearchSession.svelte";
@@ -23,7 +23,7 @@
 	import { createTwoHopSectionPublicationCache } from "features/two-hop/ui/section-descriptors/cache";
 	import type { TwoHopLinksRootUiState } from "features/two-hop/ui/twoHopLinksRootUiState";
 	import { observePreviewSurfaceVisibility } from "features/card-preview/scheduling/previewSurfaceVisibility";
-	import type { TwoHopPreviewDependencies } from "features/two-hop/ui/useTwoHopProgressiveList.svelte";
+	import type { TwoHopPreviewDependencies } from "features/two-hop/ui/useTwoHopVirtualList.svelte";
 	import type { PreviewRuntime } from "features/card-preview/runtime/previewRuntime";
 	import {
 		buildTwoHopCardModel,
@@ -332,7 +332,7 @@
 		{#if loading}
 			<LoadingState message="Waiting for the initial index to finish building." />
 		{:else if linkResult}
-			<TwoHopProgressiveSurface
+			<TwoHopVirtualSurface
 				{documentIdentity}
 				sections={twoHopVirtualListSections}
 				{applicationStore}
