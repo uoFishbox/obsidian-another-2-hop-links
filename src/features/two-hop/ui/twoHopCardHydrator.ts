@@ -38,7 +38,6 @@ interface HydrationQueue {
 export interface TwoHopCardDemand {
 	readonly foreground: Readonly<TwoHopRowRange>;
 	readonly background: Readonly<TwoHopRowRange>;
-	readonly scrollActive: boolean;
 }
 
 export interface TwoHopCardHydratorParams {
@@ -89,7 +88,6 @@ export function createTwoHopCardHydrator(
 	let demand: TwoHopCardDemand = {
 		foreground: EMPTY_RANGE,
 		background: EMPTY_RANGE,
-		scrollActive: false,
 	};
 	let cancelDrain: (() => void) | undefined;
 	let scheduledPriority: HydrationPriority | undefined;
@@ -137,11 +135,7 @@ export function createTwoHopCardHydrator(
 		demand = {
 			foreground: copyRange(nextDemand.foreground),
 			background: copyRange(nextDemand.background),
-			scrollActive: nextDemand.scrollActive,
 		};
-		if (demand.scrollActive && scheduledPriority === "background") {
-			cancelScheduledDrain();
-		}
 		reconcilePendingPriorities();
 		const previewChanged = reconcileModelRetention();
 		enqueueRange(demand.background, "background", false);
@@ -286,7 +280,7 @@ export function createTwoHopCardHydrator(
 		if (disposed) return;
 		const priority = hasPendingPriority("foreground")
 			? "foreground"
-			: !demand.scrollActive && hasPendingPriority("background")
+			: hasPendingPriority("background")
 				? "background"
 				: undefined;
 		if (!priority) {

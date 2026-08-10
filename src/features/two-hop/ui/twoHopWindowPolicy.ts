@@ -15,7 +15,11 @@ import type {
 export interface TwoHopWindowSnapshot {
 	readonly active: Readonly<TwoHopRowRange>;
 	readonly prepared: Readonly<TwoHopRowRange>;
-	readonly coverage: ScrollMeasurementRange | null;
+}
+
+/** Caller-owned storage for the independently published measurement gate. */
+export interface TwoHopWindowMeasurement {
+	measurementRange: ScrollMeasurementRange | null;
 }
 
 export interface ResolveTwoHopWindowInput {
@@ -33,12 +37,12 @@ const EMPTY_RANGE = Object.freeze({ start: 0, end: 0 });
 export const EMPTY_TWO_HOP_WINDOW: TwoHopWindowSnapshot = Object.freeze({
 	active: EMPTY_RANGE,
 	prepared: EMPTY_RANGE,
-	coverage: null,
 });
 
-/** Resolves all scroll-derived two-hop preview state as one immutable value. */
+/** Resolves the committed preview window and writes the immediate measurement gate separately. */
 export function resolveTwoHopWindow(
 	input: ResolveTwoHopWindowInput,
+	measurement: TwoHopWindowMeasurement,
 ): TwoHopWindowSnapshot {
 	const active: TwoHopRowRange = { start: 0, end: 0 };
 	const stableBand: MutableStableScrollTopBand = { min: 0, max: 0 };
@@ -61,13 +65,15 @@ export function resolveTwoHopWindow(
 			input.mountedRowEnd,
 		);
 	}
-	const coverage =
-		input.viewportHeight > 0 && input.geometry.rowCount > 0
-			? resolveScrollMeasurementRange(stableBand, input.contentTopInScrollSpace)
-			: null;
+	writeScrollMeasurementRange(
+		measurement,
+		stableBand,
+		input.contentTopInScrollSpace,
+		input.viewportHeight > 0 && input.geometry.rowCount > 0,
+	);
 	Object.freeze(active);
 	Object.freeze(prepared);
-	return Object.freeze({ active, prepared, coverage });
+	return Object.freeze({ active, prepared });
 }
 
 export function isSameTwoHopWindow(
@@ -80,16 +86,33 @@ export function isSameTwoHopWindow(
 	);
 }
 
-function resolveScrollMeasurementRange(
+function writeScrollMeasurementRange(
+	measurement: TwoHopWindowMeasurement,
 	stableBand: StableScrollTopBand,
 	contentTopInScrollSpace: number,
-): ScrollMeasurementRange | null {
-	if (stableBand.min >= stableBand.max) return null;
-	return {
+	valid: boolean,
+): void {
+	if (!valid || stableBand.min >= stableBand.max) {
+		measurement.measurementRange = null;
+		return;
+	}
+	const range = measurement.measurementRange;
+	if (range) {
+		(range as MutableScrollMeasurementRange).minScrollTopBeforeMeasurement =
+			stableBand.min + contentTopInScrollSpace;
+		(range as MutableScrollMeasurementRange).maxScrollTopBeforeMeasurement =
+			stableBand.max + contentTopInScrollSpace;
+		return;
+	}
+	measurement.measurementRange = {
 		minScrollTopBeforeMeasurement: stableBand.min + contentTopInScrollSpace,
 		maxScrollTopBeforeMeasurement: stableBand.max + contentTopInScrollSpace,
 	};
 }
+
+type MutableScrollMeasurementRange = {
+	-readonly [K in keyof ScrollMeasurementRange]: ScrollMeasurementRange[K];
+};
 
 function isSameRange(
 	left: Readonly<TwoHopRowRange>,

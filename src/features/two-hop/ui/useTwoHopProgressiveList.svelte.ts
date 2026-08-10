@@ -28,10 +28,7 @@ import type {
 	VirtualPreviewSurface,
 } from "features/card-preview/scheduling/virtualPreviewSurface";
 import { createReplaceableVirtualPreviewSurface } from "features/card-preview/scheduling/replaceableVirtualPreviewSurface";
-import {
-	createCoordinatedScheduledTask,
-	type VirtualFrameCoordinator,
-} from "ui/virtualization/scheduling/frameCoordinator";
+import type { VirtualFrameCoordinator } from "ui/virtualization/scheduling/frameCoordinator";
 import { createResolvedCardLayoutSettingsMemo } from "ui/shared/layout/cardLayoutCssVars";
 import { resolveCachedCardGridLayoutBase } from "ui/virtualization/dom/virtualListCardLayout";
 import {
@@ -46,6 +43,7 @@ import {
 	EMPTY_TWO_HOP_WINDOW,
 	isSameTwoHopWindow,
 	resolveTwoHopWindow,
+	type TwoHopWindowMeasurement,
 	type TwoHopWindowSnapshot,
 } from "features/two-hop/ui/twoHopWindowPolicy";
 import {
@@ -146,12 +144,13 @@ export function useTwoHopProgressiveList(
 	const previewSurface = createReplaceableVirtualPreviewSurface(
 		createPreviewSurface(currentPreviewDependencies),
 	);
-	let committedWindow: TwoHopWindowSnapshot = EMPTY_TWO_HOP_WINDOW;
+	let committedWindow = $state.raw<TwoHopWindowSnapshot>(EMPTY_TWO_HOP_WINDOW);
 	let pendingWindow: TwoHopWindowSnapshot | null = null;
+	const windowMeasurement: TwoHopWindowMeasurement = {
+		measurementRange: null,
+	};
 	let sentinelObserver: IntersectionObserver | undefined;
-	let previewScrollActive = false;
 	let previewViewportObservation: VirtualListViewportObservation | null = null;
-	let pendingPreviewScrollMeasurement: (() => void) | null = null;
 	let previewScrollContainer: HTMLElement | null = null;
 	let previewOwnerWindow: Window | null = null;
 	let contentTopInScrollSpace = 0;
@@ -160,7 +159,6 @@ export function useTwoHopProgressiveList(
 	let pendingRootWidth: number | null = null;
 	let preserveAnchorForNextLayout: boolean | null = null;
 	let skipViewportGeometryForNextLayout = false;
-	let previewHostRows = $state.raw<ReadonlySet<number>>(new Set());
 	let lastPreviewSurfaceActive = isPreviewSurfaceActive();
 	let previewSnapshotPublished = false;
 	let lastDocumentIdentity = props.documentIdentity;
@@ -173,17 +171,6 @@ export function useTwoHopProgressiveList(
 		isPreviewActive: isPreviewSurfaceActive,
 		onPreviewModelsChanged: publishPreviewSnapshot,
 	});
-	const previewScrollMeasurementTask = createCoordinatedScheduledTask({
-		coordinator: frameCoordinator,
-		lane: "scroll-critical",
-		key: PREVIEW_SCROLL_MEASUREMENT_TASK_KEY,
-		task: () => {
-			const measurement = pendingPreviewScrollMeasurement;
-			pendingPreviewScrollMeasurement = null;
-			measurement?.();
-		},
-	});
-
 	function isPreviewControlActive(): boolean {
 		return props.previewActive !== false;
 	}
@@ -236,22 +223,6 @@ export function useTwoHopProgressiveList(
 		return bindings;
 	}
 
-	function syncPreviewHostRows(): void {
-		if (!isPreviewSurfaceActive()) {
-			previewHostRows = new Set();
-			return;
-		}
-		const rows = new Set<number>();
-		for (
-			let rowIndex = committedWindow.prepared.start;
-			rowIndex < committedWindow.prepared.end;
-			rowIndex += 1
-		) {
-			rows.add(rowIndex);
-		}
-		previewHostRows = rows;
-	}
-
 	function publishPreviewSnapshot(force = false): void {
 		if (disposed) return;
 		const active = isPreviewSurfaceActive();
@@ -270,7 +241,6 @@ export function useTwoHopProgressiveList(
 			background: isPreviewSurfaceActive()
 				? committedWindow.prepared
 				: EMPTY_TWO_HOP_WINDOW.prepared,
-			scrollActive: previewScrollActive,
 		});
 	}
 
@@ -278,7 +248,6 @@ export function useTwoHopProgressiveList(
 		if (disposed || !pendingWindow) return;
 		committedWindow = pendingWindow;
 		pendingWindow = null;
-		syncPreviewHostRows();
 		publishCardDemand();
 		publishPreviewSnapshot();
 	}
@@ -289,19 +258,23 @@ export function useTwoHopProgressiveList(
 		viewportHeight = previewViewportHeight,
 	): void {
 		if (disposed) return;
-		const nextWindow = resolveTwoHopWindow({
-			geometry: untrack(() => geometry),
-			mountedRowEnd: untrack(() => plan.mountedRowEnd),
-			scrollTop,
-			contentTopInScrollSpace,
-			viewportHeight,
-			offscreenBootstrapRows: props.offscreenBootstrapPreviewRows ?? 0,
-			previewEnabled: isPreviewSurfaceActive(),
-			previous: committedWindow,
-		});
-		previewViewportObservation?.publishScrollMeasurementRange(nextWindow.coverage);
+		const nextWindow = resolveTwoHopWindow(
+			{
+				geometry: untrack(() => geometry),
+				mountedRowEnd: untrack(() => plan.mountedRowEnd),
+				scrollTop,
+				contentTopInScrollSpace,
+				viewportHeight,
+				offscreenBootstrapRows: props.offscreenBootstrapPreviewRows ?? 0,
+				previewEnabled: isPreviewSurfaceActive(),
+				previous: committedWindow,
+			},
+			windowMeasurement,
+		);
+		previewViewportObservation?.publishScrollMeasurementRange(
+			windowMeasurement.measurementRange,
+		);
 		if (!forceCommit && isSameTwoHopWindow(committedWindow, nextWindow)) {
-			committedWindow = nextWindow;
 			pendingWindow = null;
 			frameCoordinator.cancel("post-paint", PREVIEW_WINDOW_COMMIT_TASK_KEY);
 			return;
@@ -312,12 +285,6 @@ export function useTwoHopProgressiveList(
 			PREVIEW_WINDOW_COMMIT_TASK_KEY,
 			commitPendingWindow,
 		);
-	}
-
-	function setPreviewScrollActive(active: boolean): void {
-		if (previewScrollActive === active) return;
-		previewScrollActive = active;
-		publishCardDemand();
 	}
 
 	function runObservedScrollMeasurement(metrics: {
@@ -595,6 +562,7 @@ export function useTwoHopProgressiveList(
 		if (kind === "identity-reset") {
 			committedWindow = EMPTY_TWO_HOP_WINDOW;
 			pendingWindow = null;
+			windowMeasurement.measurementRange = null;
 			frameCoordinator.cancel("post-paint", PREVIEW_WINDOW_COMMIT_TASK_KEY);
 			cardHydrator.clear();
 		} else {
@@ -650,24 +618,19 @@ export function useTwoHopProgressiveList(
 				},
 				measureOnRootHeightChange: false,
 				getCachedViewportHeight: () => previewViewportHeight,
-				getScrollMeasurementRange: () =>
-					(pendingWindow ?? committedWindow).coverage,
+				getScrollMeasurementRange: () => windowMeasurement.measurementRange,
 				onScrollContainerChange: (scrollContainer) => {
 					previewScrollContainer = scrollContainer;
 					previewOwnerWindow = element.ownerDocument.defaultView;
 				},
-				onScrollStateChange: (
-					_generation,
-					_hasPendingScrollTop,
-					isScrollActive,
-				) => {
-					setPreviewScrollActive(isScrollActive);
-				},
 				scheduleLayoutMeasurement: runObservedLayoutMeasurement,
 				scheduleScrollMeasurement: (task) => {
 					if (!task) return;
-					pendingPreviewScrollMeasurement = task;
-					previewScrollMeasurementTask.schedule();
+					frameCoordinator.schedule(
+						"scroll-critical",
+						PREVIEW_SCROLL_MEASUREMENT_TASK_KEY,
+						task,
+					);
 				},
 				runScrollMeasurement: (metrics) => {
 					if (!metrics) return;
@@ -682,12 +645,13 @@ export function useTwoHopProgressiveList(
 			if (previewViewportObservation === observation) {
 				previewViewportObservation = null;
 			}
-			pendingPreviewScrollMeasurement = null;
-			previewScrollMeasurementTask.cancel();
+			frameCoordinator.cancel(
+				"scroll-critical",
+				PREVIEW_SCROLL_MEASUREMENT_TASK_KEY,
+			);
 			observation();
 			previewScrollContainer = null;
 			previewOwnerWindow = null;
-			setPreviewScrollActive(false);
 		};
 	});
 
@@ -721,7 +685,6 @@ export function useTwoHopProgressiveList(
 			flushPreviewRangeFromScroll(true);
 			commitPendingWindow();
 		}
-		syncPreviewHostRows();
 		publishCardDemand();
 		publishPreviewSnapshot(true);
 	});
@@ -736,7 +699,6 @@ export function useTwoHopProgressiveList(
 		}
 		measurePreviewViewportGeometry();
 		flushPreviewRangeFromScroll();
-		syncPreviewHostRows();
 		publishCardDemand();
 		publishPreviewSnapshot(true);
 	});
@@ -786,7 +748,12 @@ export function useTwoHopProgressiveList(
 			return previewSurface;
 		},
 		isPreviewHostEnabled(rowIndex: number): boolean {
-			return isPreviewSurfaceActive() && previewHostRows.has(rowIndex);
+			const prepared = committedWindow.prepared;
+			return (
+				isPreviewSurfaceActive() &&
+				rowIndex >= prepared.start &&
+				rowIndex < prepared.end
+			);
 		},
 		get interactionDescriptorResolverProvider() {
 			return cardHydrator.interactionDescriptorResolverProvider;

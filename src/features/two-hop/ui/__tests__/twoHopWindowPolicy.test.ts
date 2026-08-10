@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import {
 	EMPTY_TWO_HOP_WINDOW,
 	resolveTwoHopWindow,
+	type ResolveTwoHopWindowInput,
+	type TwoHopWindowMeasurement,
 } from "features/two-hop/ui/twoHopWindowPolicy";
 import type { TwoHopGeometry } from "features/two-hop/ui/viewport/twoHopGeometry";
 
@@ -16,9 +18,20 @@ const GEOMETRY: TwoHopGeometry = {
 	topBySection: new Float64Array([0]),
 };
 
+function createWindowResolver() {
+	const measurement: TwoHopWindowMeasurement = { measurementRange: null };
+	return {
+		measurement,
+		resolve(input: ResolveTwoHopWindowInput) {
+			return resolveTwoHopWindow(input, measurement);
+		},
+	};
+}
+
 describe("resolveTwoHopWindow", () => {
 	it("calculates the exact open coverage band directly from row geometry", () => {
-		const snapshot = resolveTwoHopWindow({
+		const { measurement, resolve } = createWindowResolver();
+		const snapshot = resolve({
 			geometry: GEOMETRY,
 			mountedRowEnd: 20,
 			scrollTop: 500,
@@ -32,13 +45,13 @@ describe("resolveTwoHopWindow", () => {
 		expect(snapshot.active).toEqual({ start: 3, end: 9 });
 		expect(snapshot.prepared.start).toBeLessThanOrEqual(snapshot.active.start);
 		expect(snapshot.prepared.end).toBeGreaterThanOrEqual(snapshot.active.end);
-		expect(snapshot.coverage).toEqual({
+		expect(measurement.measurementRange).toEqual({
 			minScrollTopBeforeMeasurement: 470,
 			maxScrollTopBeforeMeasurement: 540,
 		});
 
 		for (const scrollTop of [470.001, 539.999]) {
-			const covered = resolveTwoHopWindow({
+			const covered = resolve({
 				geometry: GEOMETRY,
 				mountedRowEnd: 20,
 				scrollTop,
@@ -53,7 +66,7 @@ describe("resolveTwoHopWindow", () => {
 		}
 
 		for (const scrollTop of [470, 540]) {
-			const boundary = resolveTwoHopWindow({
+			const boundary = resolve({
 				geometry: GEOMETRY,
 				mountedRowEnd: 20,
 				scrollTop,
@@ -68,7 +81,8 @@ describe("resolveTwoHopWindow", () => {
 	});
 
 	it("translates local coverage boundaries into scroll-container space", () => {
-		const snapshot = resolveTwoHopWindow({
+		const { measurement, resolve } = createWindowResolver();
+		const snapshot = resolve({
 			geometry: GEOMETRY,
 			mountedRowEnd: 20,
 			scrollTop: 600,
@@ -80,14 +94,15 @@ describe("resolveTwoHopWindow", () => {
 		});
 
 		expect(snapshot.active).toEqual({ start: 3, end: 9 });
-		expect(snapshot.coverage).toEqual({
+		expect(measurement.measurementRange).toEqual({
 			minScrollTopBeforeMeasurement: 570,
 			maxScrollTopBeforeMeasurement: 640,
 		});
 	});
 
 	it("does not publish coverage for an invalid viewport", () => {
-		const snapshot = resolveTwoHopWindow({
+		const { measurement, resolve } = createWindowResolver();
+		resolve({
 			geometry: GEOMETRY,
 			mountedRowEnd: 20,
 			scrollTop: 500,
@@ -98,11 +113,12 @@ describe("resolveTwoHopWindow", () => {
 			previous: EMPTY_TWO_HOP_WINDOW,
 		});
 
-		expect(snapshot.coverage).toBeNull();
+		expect(measurement.measurementRange).toBeNull();
 	});
 
 	it("keeps card hydration active while disabling preview preparation", () => {
-		const snapshot = resolveTwoHopWindow({
+		const { resolve } = createWindowResolver();
+		const snapshot = resolve({
 			geometry: GEOMETRY,
 			mountedRowEnd: 20,
 			scrollTop: 500,
@@ -118,7 +134,8 @@ describe("resolveTwoHopWindow", () => {
 	});
 
 	it("reuses the previous prepared range while active rows stay in its guard", () => {
-		const first = resolveTwoHopWindow({
+		const { resolve } = createWindowResolver();
+		const first = resolve({
 			geometry: GEOMETRY,
 			mountedRowEnd: 20,
 			scrollTop: 500,
@@ -128,7 +145,7 @@ describe("resolveTwoHopWindow", () => {
 			previewEnabled: true,
 			previous: EMPTY_TWO_HOP_WINDOW,
 		});
-		const second = resolveTwoHopWindow({
+		const second = resolve({
 			geometry: GEOMETRY,
 			mountedRowEnd: 20,
 			scrollTop: 510,

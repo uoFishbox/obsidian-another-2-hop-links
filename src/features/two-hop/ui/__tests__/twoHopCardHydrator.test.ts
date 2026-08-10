@@ -120,7 +120,6 @@ describe("createTwoHopCardHydrator", () => {
 		hydrator.setDemand({
 			foreground: { start: 1, end: 2 },
 			background: { start: 1, end: 3 },
-			scrollActive: false,
 		});
 		frames.drain();
 
@@ -140,7 +139,6 @@ describe("createTwoHopCardHydrator", () => {
 		hydrator.setDemand({
 			foreground: { start: 2, end: 3 },
 			background: { start: 2, end: 4 },
-			scrollActive: false,
 		});
 		frames.drain();
 
@@ -161,7 +159,6 @@ describe("createTwoHopCardHydrator", () => {
 		hydrator.setDemand({
 			foreground: { start: 1, end: 2 },
 			background: { start: 1, end: 2 },
-			scrollActive: false,
 		});
 		frames.drain();
 
@@ -172,7 +169,6 @@ describe("createTwoHopCardHydrator", () => {
 			hydrator.setDemand({
 				foreground: { start: rowIndex, end: rowIndex + 1 },
 				background: { start: rowIndex, end: rowIndex + 1 },
-				scrollActive: false,
 			});
 			frames.drain();
 		}
