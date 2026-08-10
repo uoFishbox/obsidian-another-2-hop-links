@@ -24,11 +24,7 @@ import {
 } from "features/two-hop/ui/twoHopCardHydrator";
 import type { PreviewRuntime } from "features/card-preview/runtime/previewRuntime";
 import { DISABLED_PREVIEW_SURFACE } from "features/card-preview/runtime/previewRuntime";
-import type {
-	VirtualPreviewBinding,
-	VirtualPreviewSurface,
-} from "features/card-preview/scheduling/virtualPreviewSurface";
-import { createReplaceableVirtualPreviewSurface } from "features/card-preview/scheduling/replaceableVirtualPreviewSurface";
+import type { VirtualPreviewBinding } from "features/card-preview/scheduling/virtualPreviewSurface";
 import type { VirtualFrameCoordinator } from "ui/virtualization/scheduling/frameCoordinator";
 import { createResolvedCardLayoutSettingsMemo } from "ui/shared/layout/cardLayoutCssVars";
 import { resolveCachedCardGridLayoutBase } from "ui/virtualization/dom/virtualListCardLayout";
@@ -69,6 +65,7 @@ export interface TwoHopVirtualListProps {
 	readonly documentIdentity: string;
 	readonly sections: readonly TwoHopSectionModel[];
 	readonly applicationStore: ApplicationStore;
+	/** Fixed for the lifetime of the virtual surface. */
 	readonly previewDependencies?: TwoHopPreviewDependencies;
 	readonly loadMoreSection?: (sectionId: string) => void;
 	readonly previewActive?: boolean;
@@ -110,7 +107,6 @@ export function useTwoHopVirtualList(
 	let contentEl = $state<HTMLDivElement | null>(null);
 	let interactionShadowRoot = $state<ShadowRoot | null>(null);
 	let measurement = $state(createVirtualListMeasurementState());
-	let currentPreviewDependencies = props.previewDependencies;
 	let lastDocumentIdentity = props.documentIdentity;
 	let lastSections = props.sections;
 	let lastCardModelRevision = props.cardModelRevision;
@@ -122,23 +118,17 @@ export function useTwoHopVirtualList(
 	const configuredLayout = $derived(
 		resolveConfiguredLayout(applicationStore.settings),
 	);
-	const createPreviewSurface = (
-		dependencies: TwoHopPreviewDependencies | undefined,
-	): VirtualPreviewSurface =>
-		dependencies
-			? dependencies.previewRuntime.createSurface({
-					frameCoordinator,
-					resolveSearchMatchPosition: dependencies.resolveSearchMatchPosition,
-				})
-			: DISABLED_PREVIEW_SURFACE;
-	const previewSurface = createReplaceableVirtualPreviewSurface(
-		createPreviewSurface(currentPreviewDependencies),
-	);
+	const previewDependencies = props.previewDependencies;
+	const previewSurface = previewDependencies
+		? previewDependencies.previewRuntime.createSurface({
+				frameCoordinator,
+				resolveSearchMatchPosition:
+					previewDependencies.resolveSearchMatchPosition,
+			})
+		: DISABLED_PREVIEW_SURFACE;
 
 	function isPreviewSurfaceActive(): boolean {
-		return (
-			currentPreviewDependencies !== undefined && props.previewActive !== false
-		);
+		return previewDependencies !== undefined && props.previewActive !== false;
 	}
 
 	function resolveVisibilityPolicy(model: TwoHopRowModel): VirtualVisibilityPolicy {
@@ -520,14 +510,6 @@ export function useTwoHopVirtualList(
 		if (revision === lastCardModelRevision) return;
 		lastCardModelRevision = revision;
 		untrack(() => cardHydrator.refreshDemand());
-	});
-
-	$effect(() => {
-		const nextDependencies = props.previewDependencies;
-		if (nextDependencies === currentPreviewDependencies) return;
-		currentPreviewDependencies = nextDependencies;
-		previewSurface.replace(createPreviewSurface(nextDependencies));
-		untrack(applyRangeEffects);
 	});
 
 	$effect(() => {
