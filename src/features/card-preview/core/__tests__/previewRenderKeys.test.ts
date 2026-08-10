@@ -22,11 +22,10 @@ describe("preview render keys", () => {
 	test("uses the compiled render key as the complete semantic identity", () => {
 		const file = createFile("Folder/Note.md");
 		const renderVersion = "4:1";
-		const refreshToken = 2;
 		const override = { type: "text", content: "preview text" } as const;
 		const normalizedQuery = normalizePreviewQuery(" Alpha ");
 		const overrideIdentity = createPreviewOverrideIdentity(override);
-		const renderVersionIdentity = `${renderVersion}:${refreshToken}:${overrideIdentity}`;
+		const renderVersionIdentity = `${renderVersion}:${overrideIdentity}`;
 
 		expect(
 			compileCardPreviewRequest({
@@ -34,7 +33,6 @@ describe("preview render keys", () => {
 				settings: DEFAULT_SETTINGS,
 				searchQuery: normalizedQuery,
 				previewRenderVersion: renderVersion,
-				previewRefreshToken: refreshToken,
 				previewOverride: override,
 			}).renderKey,
 		).toBe(

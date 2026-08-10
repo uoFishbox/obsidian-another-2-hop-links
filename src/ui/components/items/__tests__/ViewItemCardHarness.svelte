@@ -18,7 +18,6 @@
 		sourceFile: TFile;
 		app?: App;
 		settings?: PluginSettings;
-		previewRefreshToken?: number;
 		bookmarks?: BookmarksState;
 		model?: CardRenderModel;
 	}
@@ -31,7 +30,6 @@
 		sourceFile,
 		app = {} as App,
 		settings = DEFAULT_SETTINGS,
-		previewRefreshToken = 0,
 		bookmarks = {
 			filePaths: new Set<string>(),
 			orderedFilePaths: [],
@@ -63,16 +61,9 @@
 						getPreviewRenderVersion: (path) =>
 							applicationStore.getPreviewRenderVersion?.(path) ?? "0:0",
 						searchQuery,
-						previewRefreshToken,
 					})
 				: undefined),
 	);
 </script>
 
-<ViewItemCard
-	{item}
-	{settings}
-	{searchQuery}
-	{previewRefreshToken}
-	model={effectiveModel}
-/>
+<ViewItemCard {item} {settings} {searchQuery} model={effectiveModel} />

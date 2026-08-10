@@ -1,6 +1,6 @@
 import type { TFile } from "obsidian";
 import type { IMetadataCache, IVault } from "types/obsidian";
-import type { PreviewContext } from "./PreviewStrategy";
+import type { PreviewContext } from "./previewResolver";
 import type { ProtectedSegment } from "../text-processing/protectedHtml";
 import { buildProtectedSegmentToken } from "../text-processing/protectedHtml";
 

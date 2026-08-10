@@ -10,7 +10,7 @@ import {
 	createMockTFileAsPlainObject,
 	createMockVault,
 } from "testing/__mocks__/testHelpers";
-import type { PreviewStrategy } from "../core/PreviewStrategy";
+import type { PreviewResolver } from "../core/previewResolver";
 
 vi.mock("../renderers/videoPreviewRenderer", () => ({
 	clearVideoPreviewQueue: vi.fn(),
@@ -28,6 +28,7 @@ vi.mock("obsidian", () => ({
 		load() {}
 		unload() {}
 	},
+	TFile: class {},
 	MarkdownRenderer: { render: vi.fn().mockResolvedValue(undefined) },
 }));
 
@@ -199,7 +200,7 @@ describe("PreviewService.getPreview", () => {
 		expect(vault.cachedRead).toHaveBeenCalledTimes(2);
 	});
 
-	test("first embed extraction result is shared between strategies", async () => {
+	test("first embed extraction is memoized within one generation", async () => {
 		const file = createMockTFileAsPlainObject("note.md");
 		(vault.cachedRead as Mock).mockResolvedValue(
 			"```md\n![[ignored.png]]\n```\n![[shared.png]]",
@@ -207,25 +208,13 @@ describe("PreviewService.getPreview", () => {
 		(metadataCache.getFileCache as Mock).mockReturnValue({});
 
 		const observedTargets: Array<string | undefined> = [];
-		const strategies: PreviewStrategy[] = [
-			{
-				canHandle: () => true,
-				generate: async (_file, context) => {
-					const embedded = await context.getFirstEmbeddedMedia?.();
-					observedTargets.push(embedded?.target);
-					return undefined;
-				},
-			},
-			{
-				canHandle: () => true,
-				generate: async (_file, context) => {
-					const embedded = await context.getFirstEmbeddedMedia?.();
-					observedTargets.push(embedded?.target);
-					return { type: "text" as const, content: embedded?.target ?? "" };
-				},
-			},
-		];
-		const service = new PreviewServiceClass(strategies);
+		const resolvePreview: PreviewResolver = async (_file, context) => {
+			const first = await context.getFirstEmbeddedMedia?.();
+			const second = await context.getFirstEmbeddedMedia?.();
+			observedTargets.push(first?.target, second?.target);
+			return { type: "text", content: second?.target ?? "" };
+		};
+		const service = new PreviewServiceClass(resolvePreview);
 
 		const result = await service.getPreview(file, vault, metadataCache);
 		expect(vault.cachedRead).toHaveBeenCalledTimes(1);
@@ -233,49 +222,12 @@ describe("PreviewService.getPreview", () => {
 		expect(result).toEqual({ type: "text", content: "shared.png" });
 	});
 
-	test("strategy fallback order is preserved", async () => {
-		const calls: string[] = [];
-		const strategies: PreviewStrategy[] = [
-			{
-				canHandle: () => true,
-				generate: vi.fn(async () => {
-					calls.push("first");
-					return undefined;
-				}),
-			},
-			{
-				canHandle: () => true,
-				generate: vi.fn(async () => {
-					calls.push("second");
-					return { type: "text" as const, content: "second" };
-				}),
-			},
-			{
-				canHandle: () => true,
-				generate: vi.fn(async () => {
-					calls.push("third");
-					return { type: "text" as const, content: "third" };
-				}),
-			},
-		];
-		const service = new PreviewServiceClass(strategies);
-		const file = createMockTFileAsPlainObject("note.md");
-		(vault.cachedRead as Mock).mockResolvedValue("plain text only");
-
-		const result = await service.getPreview(file, vault, metadataCache);
-		expect(calls).toEqual(["first", "second"]);
-		expect(result).toEqual({ type: "text", content: "second" });
-	});
-
 	test("preview generation cache is separated by settings affecting generation", async () => {
-		const strategy: PreviewStrategy = {
-			canHandle: () => true,
-			generate: vi.fn(async (_file, context) => ({
-				type: "text" as const,
-				content: String(context.settings?.previewMaxChars ?? ""),
-			})),
-		};
-		const service = new PreviewServiceClass([strategy]);
+		const resolvePreview = vi.fn<PreviewResolver>(async (_file, context) => ({
+			type: "text" as const,
+			content: String(context.settings?.previewMaxChars ?? ""),
+		}));
+		const service = new PreviewServiceClass(resolvePreview);
 		const file = createMockTFileAsPlainObject("note.md");
 
 		const first = await service.getPreview(file, vault, metadataCache, undefined, {
@@ -291,7 +243,7 @@ describe("PreviewService.getPreview", () => {
 		expect(first).toEqual({ type: "text", content: "100" });
 		expect(second).toEqual({ type: "text", content: "200" });
 		expect(third).toEqual({ type: "text", content: "200" });
-		expect(strategy.generate).toHaveBeenCalledTimes(2);
+		expect(resolvePreview).toHaveBeenCalledTimes(2);
 	});
 
 	test("Blob URL image previews are evicted from cache by byteSize and count-limit-equivalent size", async () => {
@@ -302,15 +254,12 @@ describe("PreviewService.getPreview", () => {
 			value: revokeObjectURL,
 		});
 
-		const strategy: PreviewStrategy = {
-			canHandle: () => true,
-			generate: vi.fn(async (file) => ({
-				type: "image" as const,
-				content: `blob:${file.path}`,
-				byteSize: 1,
-			})),
-		};
-		const service = new PreviewServiceClass([strategy]);
+		const resolvePreview = vi.fn<PreviewResolver>(async (file) => ({
+			type: "image" as const,
+			content: `blob:${file.path}`,
+			byteSize: 1,
+		}));
+		const service = new PreviewServiceClass(resolvePreview);
 
 		try {
 			for (let index = 0; index < 81; index++) {

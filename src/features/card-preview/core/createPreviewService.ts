@@ -3,7 +3,7 @@ import type { IMetadataCache, IVault } from "types/obsidian";
 import type { IPreviewService } from "types/services";
 import type { PluginSettings } from "features/settings/model";
 import type { PreviewData, PreviewRequestOptions } from "../public-types";
-import type { PreviewStrategy } from "./PreviewStrategy";
+import type { PreviewResolver } from "./previewResolver";
 import type { PreviewQueueListener, PreviewQueueTask } from "./previewQueue";
 import {
 	buildPreviewGenerationKey,
@@ -12,10 +12,10 @@ import {
 import { clearMathRenderQueue } from "../renderers/mathRenderQueue";
 import { clearVideoPreviewQueue } from "../renderers/videoPreviewRenderer";
 import { createAbortError, isAbortError } from "./previewAbort";
-import { createDefaultPreviewStrategies } from "./defaultPreviewStrategies";
 import { createPreviewContext } from "./previewContext";
 import { createPreviewQueue } from "./previewQueue";
-import { runPreviewPipeline } from "./previewPipeline";
+import { resolvePreview as resolveDefaultPreview } from "./previewPipeline";
+import { disposePreviewData, getPreviewDataSize } from "./previewCache";
 
 interface InFlightRequest {
 	cacheKey: string;
@@ -25,13 +25,13 @@ interface InFlightRequest {
 }
 
 export class PreviewService {
-	private strategies: PreviewStrategy[];
+	private readonly resolvePreview: PreviewResolver;
 	private cache = createPreviewGenerationCache();
 	private inFlightRequests = new Map<string, InFlightRequest>();
 	private queue = createPreviewQueue();
 
-	constructor(strategies?: PreviewStrategy[]) {
-		this.strategies = strategies ?? createDefaultPreviewStrategies();
+	constructor(resolvePreview: PreviewResolver = resolveDefaultPreview) {
+		this.resolvePreview = resolvePreview;
 	}
 
 	public dispose(): void {
@@ -134,14 +134,12 @@ export class PreviewService {
 			signal,
 		);
 
-		return runPreviewPipeline(
-			file,
-			context,
-			this.strategies,
-			this.cache,
-			cacheKey,
-			signal,
+		const result = await this.resolvePreview(file, context, signal);
+		if (signal?.aborted) throw createAbortError();
+		this.cache.set(cacheKey, result, getPreviewDataSize(result), () =>
+			disposePreviewData(result),
 		);
+		return result;
 	}
 
 	private createInFlightRequest(
@@ -267,7 +265,6 @@ export interface PreviewServiceOptions {
 	metadataCache: IMetadataCache;
 	app: App;
 	getSettings(): PluginSettings;
-	strategies?: PreviewStrategy[];
 }
 
 export interface DisposablePreviewService extends IPreviewService {
@@ -281,7 +278,7 @@ export interface DisposablePreviewService extends IPreviewService {
 export function createPreviewService(
 	options: PreviewServiceOptions,
 ): DisposablePreviewService {
-	const service = new PreviewService(options.strategies);
+	const service = new PreviewService();
 
 	return {
 		getPreview: (file, signal, requestOptions) =>

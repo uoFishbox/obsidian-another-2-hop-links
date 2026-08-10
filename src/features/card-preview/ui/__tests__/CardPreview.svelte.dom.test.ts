@@ -106,7 +106,7 @@ function createReactiveApplicationStore(settings = createSettings()): Applicatio
 	return new ApplicationStore(settings, {} as never, vi.fn() as never, vi.fn());
 }
 
-describe("CardPreview", () => {
+describe("virtual card preview rendering", () => {
 	beforeEach(() => {
 		(HTMLElement.prototype as any).createEl = function (
 			tagName: string,
@@ -249,7 +249,7 @@ describe("CardPreview", () => {
 			expect(preview).toHaveClass("cosense-card-links__box-preview--image");
 		});
 
-		await rendered.rerender({ file: undefined, getPreview, searchQuery: "" });
+		await rendered.rerender({ file, getPreview, searchQuery: "", active: false });
 
 		await waitFor(() => {
 			const preview = rendered.container.querySelector(
@@ -286,9 +286,10 @@ describe("CardPreview", () => {
 		const committedContent = preview?.firstChild;
 
 		await rendered.rerender({
-			file: undefined,
+			file,
 			getPreview,
 			searchQuery: "",
+			active: false,
 		});
 		expect(preview?.firstChild).toBe(committedContent);
 		expect(preview).not.toHaveClass("is-stale");
@@ -298,6 +299,7 @@ describe("CardPreview", () => {
 			file,
 			getPreview,
 			searchQuery: "",
+			active: true,
 		});
 		await tick();
 		expect(preview?.firstChild).toBe(committedContent);
@@ -322,13 +324,19 @@ describe("CardPreview", () => {
 			expect(preview?.textContent).toContain("rendered:notes/preview-a.md");
 		});
 		await rendered.rerender({
-			file: undefined,
+			file: fileA,
 			getPreview,
 			searchQuery: "",
+			active: false,
 		});
 		await waitFor(() => expect(preview).not.toHaveClass("is-stale"));
 		expect(preview?.textContent).toContain("rendered:notes/preview-a.md");
-		await rendered.rerender({ file: fileB, getPreview, searchQuery: "" });
+		await rendered.rerender({
+			file: fileB,
+			getPreview,
+			searchQuery: "",
+			active: true,
+		});
 
 		await waitFor(() => {
 			expect(preview?.textContent).toContain("rendered:notes/preview-b.md");
@@ -354,9 +362,9 @@ describe("CardPreview", () => {
 		});
 
 		await waitFor(() => expect(requestSignal).toBeInstanceOf(AbortSignal));
-		await rendered.rerender({ file: undefined, getPreview, searchQuery: "" });
+		await rendered.rerender({ file, getPreview, searchQuery: "", active: false });
 
-		expect(requestSignal?.aborted).toBe(true);
+		await waitFor(() => expect(requestSignal?.aborted).toBe(true));
 		resolvePreview?.({ type: "text", content: "stale content" });
 		await tick();
 		await tick();
@@ -384,7 +392,7 @@ describe("CardPreview", () => {
 			expect(preview?.textContent).toBe("active dom");
 			expect(preview).toHaveClass("cosense-card-links__box-preview--dom");
 		});
-		await rendered.rerender({ file: undefined, getPreview, searchQuery: "" });
+		await rendered.rerender({ file, getPreview, searchQuery: "", active: false });
 
 		await waitFor(() => {
 			const preview = rendered.container.querySelector(
@@ -397,7 +405,7 @@ describe("CardPreview", () => {
 		});
 	});
 
-	it("removes a MathJax skeleton when inactive and renders cleanly after reactivation", async () => {
+	it("cancels pending MathJax work when inactive and renders cleanly after reactivation", async () => {
 		const mathFile = createMockTFile("notes/math-pending.md");
 		const textFile = createMockTFile("notes/plain-after-math.md");
 		let releaseMathQueue: (() => void) | undefined;
@@ -422,16 +430,18 @@ describe("CardPreview", () => {
 		});
 
 		await waitFor(() => {
-			expect(rendered.container.querySelector(".skeleton-loader")).toBeTruthy();
+			expect(
+				rendered.container.querySelector(".cosense-card-links__box-preview"),
+			).toHaveAttribute("data-preview-state", "loading");
 		});
 		await rendered.rerender({
-			file: undefined,
+			file: mathFile,
 			getPreview,
 			searchQuery: "",
+			active: false,
 		});
 
 		await waitFor(() => {
-			expect(rendered.container.querySelector(".skeleton-loader")).toBeNull();
 			expect(
 				rendered.container.querySelector(".cosense-card-links__box-preview"),
 			).toHaveClass("is-stale");
@@ -440,10 +450,14 @@ describe("CardPreview", () => {
 		state.enqueueMathRender.mockImplementation(async (task) => {
 			await task();
 		});
-		await rendered.rerender({ file: textFile, getPreview, searchQuery: "" });
+		await rendered.rerender({
+			file: textFile,
+			getPreview,
+			searchQuery: "",
+			active: true,
+		});
 
 		await waitFor(() => {
-			expect(rendered.container.querySelector(".skeleton-loader")).toBeNull();
 			expect(
 				rendered.container.querySelector(".cosense-card-links__box-preview")
 					?.textContent,
@@ -545,7 +559,7 @@ describe("CardPreview", () => {
 		});
 	});
 
-	it("rerenders when an image preview override changes without a refresh token bump", async () => {
+	it("rerenders when an image preview override changes", async () => {
 		const file = createMockTFile("notes/image-override.md");
 		const getPreview = vi.fn(async () => ({
 			type: "empty" as const,
@@ -557,7 +571,6 @@ describe("CardPreview", () => {
 				file,
 				getPreview,
 				searchQuery: "",
-				previewRefreshToken: 0,
 				previewOverride: {
 					type: "image" as const,
 					content: "app://first-image.png",
@@ -574,7 +587,6 @@ describe("CardPreview", () => {
 			file,
 			getPreview,
 			searchQuery: "",
-			previewRefreshToken: 0,
 			previewOverride: {
 				type: "image" as const,
 				content: "app://second-image.png",
@@ -604,7 +616,6 @@ describe("CardPreview", () => {
 				file,
 				getPreview,
 				searchQuery: "",
-				previewRefreshToken: 0,
 				previewOverride: {
 					type: "dom" as const,
 					render: domRender,
@@ -624,7 +635,6 @@ describe("CardPreview", () => {
 			file,
 			getPreview,
 			searchQuery: "",
-			previewRefreshToken: 0,
 			previewOverride: {
 				type: "dom" as const,
 				render: domRender,
@@ -729,10 +739,10 @@ describe("CardPreview", () => {
 			).toContain("rendered:updated preview");
 		});
 		expect(getPreview).toHaveBeenNthCalledWith(1, file, expect.any(AbortSignal), {
-			cacheRevision: "0:0:0",
+			cacheRevision: "0:0",
 		});
 		expect(getPreview).toHaveBeenNthCalledWith(2, file, expect.any(AbortSignal), {
-			cacheRevision: "0:1:0",
+			cacheRevision: "0:1",
 		});
 	});
 

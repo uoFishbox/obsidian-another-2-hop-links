@@ -77,8 +77,6 @@ function buildWorkerRequest(
 				allowedTypes: request.allowedTypes,
 				maxScanChars: request.maxScanChars,
 			};
-		case "dispose":
-			return { type: "dispose" };
 	}
 }
 
@@ -167,7 +165,7 @@ export function runPreviewTextWorker(
 	signal?: AbortSignal,
 ): Promise<PreviewTextWorkerResult> | undefined {
 	const activeWorker = getWorker();
-	if (!activeWorker || request.type === "dispose") {
+	if (!activeWorker) {
 		return undefined;
 	}
 

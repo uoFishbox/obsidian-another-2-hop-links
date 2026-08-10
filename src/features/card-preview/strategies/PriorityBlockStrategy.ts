@@ -1,6 +1,6 @@
 import type { TFile } from "obsidian";
 import type { PreviewData } from "../public-types";
-import type { PreviewContext, PreviewStrategy } from "../core/PreviewStrategy";
+import type { PreviewContext } from "../core/previewResolver";
 import { readPreviewContent } from "../core/previewContent";
 import {
 	findFirstAllowedFencedCodeBlockAsync,
@@ -8,59 +8,46 @@ import {
 } from "../text-processing/previewTextProcessingAsync";
 import { getNormalizedCodeBlockTypes } from "../text-processing/textTransformUtils";
 
-export function createCustomBlockStrategy(): PreviewStrategy {
+export async function resolvePriorityBlockPreview(
+	file: TFile,
+	context: PreviewContext,
+	signal?: AbortSignal,
+): Promise<PreviewData | undefined> {
+	const renderCodeBlockTypes = context.settings?.renderCodeBlockTypes;
+	if (
+		file.extension !== "md" ||
+		!Array.isArray(renderCodeBlockTypes) ||
+		renderCodeBlockTypes.length === 0
+	) {
+		return undefined;
+	}
+	const content = await readPreviewContent(file, context, signal);
+	if (!content || (!content.includes("```") && !content.includes("~~~"))) {
+		return undefined;
+	}
+
+	const normalizedTypes = getNormalizedCodeBlockTypes(renderCodeBlockTypes);
+	if (!normalizedTypes) return undefined;
+	const block = await findFirstAllowedFencedCodeBlockAsync(
+		content,
+		normalizedTypes.set,
+		{
+			maxScanChars: context.scanBudgetChars,
+			signal,
+			yieldToMainThread: context.yieldToMainThread,
+		},
+		normalizedTypes.array,
+	);
+	if (!block) return undefined;
+
+	const rawBlock = content.slice(block.blockStart, block.blockEnd);
 	return {
-		canHandle(file: TFile, context?: PreviewContext) {
-			// Markdownファイル、かつ設定が存在し、レンダリング対象リストが空でない場合のみ処理
-			return (
-				file.extension === "md" &&
-				!!context?.settings &&
-				Array.isArray(context.settings.renderCodeBlockTypes) &&
-				context.settings.renderCodeBlockTypes.length > 0
-			);
-		},
-
-		async generate(
-			file: TFile,
-			context: PreviewContext,
-			signal?: AbortSignal,
-		): Promise<PreviewData | undefined> {
-			const content = await readPreviewContent(file, context, signal);
-			if (!content) return undefined;
-			if (!content.includes("```") && !content.includes("~~~")) {
-				return undefined;
-			}
-
-			const normalizedTypes = getNormalizedCodeBlockTypes(
-				context.settings!.renderCodeBlockTypes,
-			);
-			if (!normalizedTypes) {
-				return undefined;
-			}
-			const block = await findFirstAllowedFencedCodeBlockAsync(
-				content,
-				normalizedTypes.set,
-				{
-					maxScanChars: context.scanBudgetChars,
-					signal,
-					yieldToMainThread: context.yieldToMainThread,
-				},
-				normalizedTypes.array,
-			);
-			if (!block) return undefined;
-
-			const rawBlock = content.slice(block.blockStart, block.blockEnd);
-			return {
-				type: "text",
-				content: await transformContentForPreviewAsync(
-					rawBlock,
-					context.settings,
-					undefined,
-					signal,
-				),
-			};
-		},
+		type: "text",
+		content: await transformContentForPreviewAsync(
+			rawBlock,
+			context.settings,
+			undefined,
+			signal,
+		),
 	};
 }
-
-export default createCustomBlockStrategy;

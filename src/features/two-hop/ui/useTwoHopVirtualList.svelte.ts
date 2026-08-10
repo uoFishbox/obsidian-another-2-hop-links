@@ -24,7 +24,6 @@ import {
 } from "features/two-hop/ui/twoHopCardHydrator";
 import type { PreviewRuntime } from "features/card-preview/runtime/previewRuntime";
 import { DISABLED_PREVIEW_SURFACE } from "features/card-preview/runtime/previewRuntime";
-import type { VirtualPreviewBinding } from "features/card-preview/scheduling/virtualPreviewSurface";
 import type { VirtualFrameCoordinator } from "ui/virtualization/scheduling/frameCoordinator";
 import { createResolvedCardLayoutSettingsMemo } from "ui/shared/layout/cardLayoutCssVars";
 import { resolveCachedCardGridLayoutBase } from "ui/virtualization/dom/virtualListCardLayout";
@@ -180,9 +179,12 @@ export function useTwoHopVirtualList(
 		);
 	}
 
-	function collectPreviewBindings(): VirtualPreviewBinding[] {
-		if (!isPreviewSurfaceActive()) return [];
-		const bindings: VirtualPreviewBinding[] = [];
+	function publishPreviewBindings(): void {
+		previewSurface.beginBindings();
+		if (!isPreviewSurfaceActive()) {
+			previewSurface.endBindings();
+			return;
+		}
 		for (const row of getMountedRows()) {
 			for (const mountedCell of row.cells) {
 				if (mountedCell.cell.kind !== "item") continue;
@@ -190,15 +192,15 @@ export function useTwoHopVirtualList(
 					mountedCell.cell.logicalKey,
 				)?.previewRequest;
 				if (!request) continue;
-				bindings.push({
-					slotId: String(mountedCell.renderSlotKey),
-					rowIndex: mountedCell.rowIndex,
-					ownerKey: mountedCell.cell.logicalKey,
+				previewSurface.bindSlot(
+					String(mountedCell.renderSlotKey),
+					mountedCell.rowIndex,
+					mountedCell.cell.logicalKey,
 					request,
-				});
+				);
 			}
 		}
-		return bindings;
+		previewSurface.endBindings();
 	}
 
 	function collectCardDemand(
@@ -226,11 +228,10 @@ export function useTwoHopVirtualList(
 	function publishPreviewSnapshot(): void {
 		if (disposed) return;
 		const snapshot = virtualList.getSnapshot();
-		previewSurface.commit({
-			active: isPreviewSurfaceActive(),
-			activeRange: snapshot?.ranges.previewVisible ?? EMPTY_RANGE,
-			bindings: collectPreviewBindings(),
-		});
+		const active = isPreviewSurfaceActive();
+		const range = snapshot?.ranges.previewVisible ?? EMPTY_RANGE;
+		publishPreviewBindings();
+		previewSurface.setActiveRange(range.start, range.end, active);
 	}
 
 	function applyRangeEffects(): void {

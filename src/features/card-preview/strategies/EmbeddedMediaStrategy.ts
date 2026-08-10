@@ -1,6 +1,6 @@
 import type { TFile } from "obsidian";
 import type { PreviewData } from "../public-types";
-import type { PreviewContext, PreviewStrategy } from "../core/PreviewStrategy";
+import type { PreviewContext } from "../core/previewResolver";
 import {
 	parseEmbeddedMedia,
 	type ParsedEmbed,
@@ -31,25 +31,15 @@ function shouldUseTextPreviewForEmbedUrl(url: URL): boolean {
 	);
 }
 
-export function createEmbeddedMediaStrategy(): PreviewStrategy {
-	return {
-		canHandle(file: TFile, context?: PreviewContext): boolean {
-			return file.extension === "md" && !!context?.metadataCache;
-		},
-
-		async generate(
-			file: TFile,
-			context: PreviewContext,
-			signal?: AbortSignal,
-		): Promise<PreviewData | undefined> {
-			if (signal?.aborted) return undefined;
-
-			const embedded = await resolveFirstEmbed(file, context, signal);
-			if (signal?.aborted || !embedded) return undefined;
-
-			return resolveEmbeddedMedia(file.path, embedded, context, signal);
-		},
-	};
+export async function resolveEmbeddedMediaPreview(
+	file: TFile,
+	context: PreviewContext,
+	signal?: AbortSignal,
+): Promise<PreviewData | undefined> {
+	if (file.extension !== "md" || signal?.aborted) return undefined;
+	const embedded = await resolveFirstEmbed(file, context, signal);
+	if (signal?.aborted || !embedded) return undefined;
+	return resolveEmbeddedMedia(file.path, embedded, context, signal);
 }
 
 async function resolveFirstEmbed(
@@ -121,5 +111,3 @@ async function resolveEmbeddedMedia(
 
 	return undefined;
 }
-
-export default createEmbeddedMediaStrategy;

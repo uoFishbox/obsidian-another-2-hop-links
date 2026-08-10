@@ -9,7 +9,6 @@ export interface ItemProps {
 	searchQuery?: string;
 	searchScope?: "title-only" | "title-and-content";
 	draggable?: boolean;
-	previewRefreshToken?: number;
 	contentPreview?: string;
 	interactionId?: string;
 	interactionKey?: string;

@@ -14,7 +14,7 @@ export {};
 
 type ExecutablePreviewTextWorkerRequest = Exclude<
 	PreviewTextWorkerRequest,
-	{ type: "cancel" } | { type: "dispose" }
+	{ type: "cancel" }
 >;
 
 const queuedRequests: ExecutablePreviewTextWorkerRequest[] = [];
@@ -152,13 +152,6 @@ function processQueuedRequests(): void {
 if (typeof self !== "undefined") {
 	self.onmessage = (event: MessageEvent<PreviewTextWorkerRequest>): void => {
 		const message = event.data;
-
-		if (message.type === "dispose") {
-			queuedRequests.length = 0;
-			cancelledRequestIds.clear();
-			close();
-			return;
-		}
 
 		if (message.type === "cancel") {
 			cancelledRequestIds.add(message.requestId);

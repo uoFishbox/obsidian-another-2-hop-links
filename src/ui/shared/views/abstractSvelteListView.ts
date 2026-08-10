@@ -17,10 +17,7 @@ import {
 import { applyCardLayoutCssVars } from "ui/shared/layout/cardLayoutCssVars";
 
 interface ListHostComponent extends ComponentInstance {
-	updateItems?: (
-		nextItems: ViewItem[],
-		previewRefreshTokens?: Record<string, number>,
-	) => void;
+	updateItems?: (nextItems: ViewItem[]) => void;
 }
 
 type MountListSectionOptions = {
@@ -57,7 +54,6 @@ export abstract class AbstractSvelteListView<
 	private applicationStore: ApplicationStore | undefined = undefined;
 	private currentItems: TItem[] = [];
 	private currentItemKeySet = new Set<string>();
-	private previewRefreshTokens: Record<string, number> = {};
 	private unsubscribeFromIndex: (() => void) | undefined = undefined;
 
 	private readonly guardedIndexUpdateHandler = createGuardedIndexUpdateHandler({
@@ -180,7 +176,6 @@ export abstract class AbstractSvelteListView<
 				app: this.app,
 				previewRuntime: this.plugin.getPreviewRuntime?.(),
 				autofocus: options.autofocus,
-				previewRefreshTokens: this.previewRefreshTokens,
 			},
 		}) as ListHostComponent;
 	}
@@ -190,57 +185,24 @@ export abstract class AbstractSvelteListView<
 			return;
 		}
 
-		const previousItems = this.currentItems;
 		const changedKeys = this.getChangedKeys(context);
-		const mergedItems = mergeItemsPreservingUnchanged(previousItems, nextItems, {
-			getKey: (item) => this.getItemKey(item),
-			getVersion: (item) => this.getItemVersion(item),
-			changedKeys,
-		});
+		const mergedItems = mergeItemsPreservingUnchanged(
+			this.currentItems,
+			nextItems,
+			{
+				getKey: (item) => this.getItemKey(item),
+				getVersion: (item) => this.getItemVersion(item),
+				changedKeys,
+			},
+		);
 
 		if (hasSameItemReferences(this.currentItems, mergedItems)) {
 			return;
 		}
 
-		this.incrementPreviewRefreshTokens(
-			this.getReplacedItemKeys(previousItems, mergedItems),
-		);
 		this.setCurrentItems(mergedItems);
-		this.listHostComponent?.updateItems?.(
-			toViewItems(mergedItems),
-			this.previewRefreshTokens,
-		);
+		this.listHostComponent?.updateItems?.(toViewItems(mergedItems));
 		this.applicationStore?.triggerUpdate?.();
-	}
-
-	private getReplacedItemKeys(previousItems: TItem[], nextItems: TItem[]): string[] {
-		const previousByKey = new Map<string, TItem>();
-		for (const item of previousItems) {
-			previousByKey.set(this.getItemKey(item), item);
-		}
-		const replacedKeys: string[] = [];
-
-		for (const item of nextItems) {
-			const key = this.getItemKey(item);
-			const previous = previousByKey.get(key);
-			if (previous && previous !== item) {
-				replacedKeys.push(key);
-			}
-		}
-
-		return replacedKeys;
-	}
-
-	private incrementPreviewRefreshTokens(keys: string[]): void {
-		if (keys.length === 0) {
-			return;
-		}
-
-		const nextTokens = { ...this.previewRefreshTokens };
-		for (const key of keys) {
-			nextTokens[key] = (nextTokens[key] ?? 0) + 1;
-		}
-		this.previewRefreshTokens = nextTokens;
 	}
 
 	private destroyListHost(): void {
@@ -250,7 +212,6 @@ export abstract class AbstractSvelteListView<
 		);
 		this.currentItems = [];
 		this.currentItemKeySet.clear();
-		this.previewRefreshTokens = {};
 	}
 
 	protected abstract render(): void;

@@ -3,7 +3,6 @@ import type { App } from "obsidian";
 import { DEFAULT_SETTINGS } from "features/settings/model";
 import type { CardPreviewLoader } from "features/card-preview/ui/cardPreviewRenderer";
 import type { CardPreviewSharedCache } from "features/card-preview/ui/cardPreviewSharedCache";
-import type { CardPreviewRequest } from "features/card-preview/core/cardPreviewRequest";
 
 const state = vi.hoisted(() => ({
 	surfaceOptions: [] as Array<Record<string, unknown>>,
@@ -15,7 +14,6 @@ vi.mock("features/card-preview/scheduling/virtualPreviewSurface", () => ({
 		state.surfaceOptions.push(options);
 		return {
 			registerHost: () => ({ dispose: () => {} }),
-			commit: () => {},
 			beginBindings: () => {},
 			bindSlot: () => {},
 			endBindings: () => {},
@@ -40,7 +38,7 @@ describe("PreviewRuntime", () => {
 		state.rendererOptions.length = 0;
 	});
 
-	it("uses the runtime preview loader for surfaces and standalone renderers", () => {
+	it("uses the runtime preview loader for surfaces", () => {
 		const runtimeLoader = vi.fn() as unknown as CardPreviewLoader;
 		const runtime = createPreviewRuntime({
 			app: {} as App,
@@ -51,9 +49,6 @@ describe("PreviewRuntime", () => {
 		const surfaceOptions = state.surfaceOptions.at(-1);
 		const createRenderer = surfaceOptions?.createRenderer as () => unknown;
 		createRenderer();
-		expect(state.rendererOptions.at(-1)?.getPreview).toBe(runtimeLoader);
-
-		runtime.createRenderer({});
 		expect(state.rendererOptions.at(-1)?.getPreview).toBe(runtimeLoader);
 		runtime.dispose();
 	});
@@ -66,11 +61,18 @@ describe("PreviewRuntime", () => {
 			});
 		const first = createRuntime();
 		const second = createRuntime();
-		const rendererOptions = {};
-		first.createRenderer(rendererOptions);
+		const firstSurfaceOptions = first.createSurface({});
+		void firstSurfaceOptions;
+		const firstCreateRenderer = state.surfaceOptions.at(-1)
+			?.createRenderer as () => unknown;
+		firstCreateRenderer();
 		const firstCache = state.rendererOptions.at(-1)
 			?.sharedCache as CardPreviewSharedCache;
-		second.createRenderer(rendererOptions);
+		const secondSurfaceOptions = second.createSurface({});
+		void secondSurfaceOptions;
+		const secondCreateRenderer = state.surfaceOptions.at(-1)
+			?.createRenderer as () => unknown;
+		secondCreateRenderer();
 		const secondCache = state.rendererOptions.at(-1)
 			?.sharedCache as CardPreviewSharedCache;
 		const firstClear = vi.spyOn(firstCache, "clear");
@@ -84,7 +86,7 @@ describe("PreviewRuntime", () => {
 		expect(secondClear).toHaveBeenCalledOnce();
 	});
 
-	it("returns disabled surfaces and renderers after disposal", () => {
+	it("returns disabled surfaces after disposal", () => {
 		const runtime = createPreviewRuntime({
 			app: {} as App,
 			getPreview: vi.fn() as unknown as CardPreviewLoader,
@@ -92,21 +94,13 @@ describe("PreviewRuntime", () => {
 		runtime.dispose();
 
 		const surface = runtime.createSurface({});
-		const renderer = runtime.createRenderer({});
-		const cleanup = renderer({} as HTMLElement, {} as CardPreviewRequest);
 
 		expect(state.surfaceOptions).toHaveLength(0);
 		expect(state.rendererOptions).toHaveLength(0);
 		expect(() => {
-			surface.commit({
-				active: false,
-				activeRange: { start: 0, end: 0 },
-				bindings: [],
-			});
 			surface.beginBindings();
 			surface.endBindings();
 			surface.setActiveRange(0, 0, false);
 		}).not.toThrow();
-		expect(() => cleanup()).not.toThrow();
 	});
 });

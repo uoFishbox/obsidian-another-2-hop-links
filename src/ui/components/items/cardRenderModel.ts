@@ -56,7 +56,6 @@ export interface CreateCardRenderModelParams {
 	readonly searchQuery?: string;
 	readonly searchScope?: "title-only" | "title-and-content";
 	readonly contentPreview?: string;
-	readonly previewRefreshToken?: number;
 	readonly interactionId?: string;
 	readonly interactionKey?: string;
 	readonly presentation?: CardPresentationState;
@@ -79,7 +78,6 @@ export function createCardRenderModel(
 	const searchQuery = params.searchQuery ?? "";
 	const searchScope = params.searchScope ?? "title-and-content";
 	const contentPreview = params.contentPreview;
-	const previewRefreshToken = params.previewRefreshToken ?? 0;
 	const interactionKey =
 		params.interactionKey ?? createItemInteractionKey(params.item);
 	const interactionId = params.interactionId ?? interactionKey;
@@ -95,7 +93,6 @@ export function createCardRenderModel(
 		previewRequest = compileCardPreviewRequest({
 			file: targetFile,
 			searchQuery: searchScope === "title-only" ? "" : searchQuery,
-			previewRefreshToken,
 			previewOverride: createTextPreviewOverride(targetFile, contentPreview),
 			previewRenderVersion: params.getPreviewRenderVersion(targetFile.path),
 			settings: params.settings,

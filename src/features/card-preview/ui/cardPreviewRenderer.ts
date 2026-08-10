@@ -52,7 +52,6 @@ export interface CardPreviewRendererOptions {
 }
 
 export interface PreviewRenderCallbacks {
-	isCurrent(): boolean;
 	onCommitted(
 		contentType: PreviewData["type"] | undefined,
 		retention: CardPreviewRetention,

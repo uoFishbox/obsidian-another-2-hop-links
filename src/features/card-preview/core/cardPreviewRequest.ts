@@ -22,7 +22,6 @@ export interface CardPreviewRequest {
 export interface CompileCardPreviewRequestParams {
 	readonly file: TFile;
 	readonly searchQuery: string;
-	readonly previewRefreshToken: number;
 	readonly previewOverride: PreviewData | null;
 	readonly previewRenderVersion: string;
 	readonly settings: PluginSettings;
@@ -36,7 +35,7 @@ export function compileCardPreviewRequest(
 	const previewOverrideIdentity = createPreviewOverrideIdentity(
 		params.previewOverride,
 	);
-	const previewCacheRevision = `${params.previewRenderVersion}:${params.previewRefreshToken}`;
+	const previewCacheRevision = params.previewRenderVersion;
 	const renderRevision = `${previewCacheRevision}:${previewOverrideIdentity}`;
 	const keys = buildPreviewRenderKeys(
 		params.file,

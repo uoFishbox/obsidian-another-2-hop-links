@@ -5,7 +5,8 @@ import {
 	createMockTFileAsPlainObject,
 	createMockVault,
 } from "testing/__mocks__/testHelpers";
-import type { PreviewStrategy, PreviewData } from "../core/PreviewStrategy";
+import type { PreviewResolver } from "../core/previewResolver";
+import type { PreviewData } from "../public-types";
 
 function createDeferred<T>() {
 	let resolve!: (value: T) => void;
@@ -33,7 +34,7 @@ describe("PreviewService queue behavior", () => {
 	});
 
 	test("queue metrics start at zero", () => {
-		const service = new PreviewServiceClass([]);
+		const service = new PreviewServiceClass();
 
 		expect(service.getVisibleQueueSize()).toBe(0);
 		expect(service.getActiveVisiblePreviewCount()).toBe(0);
@@ -45,15 +46,12 @@ describe("PreviewService queue behavior", () => {
 			string,
 			ReturnType<typeof createDeferred<PreviewData>>
 		>();
-		const strategy: PreviewStrategy = {
-			canHandle: () => true,
-			generate: vi.fn((file) => {
-				const deferred = createDeferred<PreviewData>();
-				deferredByPath.set(file.path, deferred);
-				return deferred.promise;
-			}),
-		};
-		const service = new PreviewServiceClass([strategy]);
+		const resolvePreview = vi.fn<PreviewResolver>((file) => {
+			const deferred = createDeferred<PreviewData>();
+			deferredByPath.set(file.path, deferred);
+			return deferred.promise;
+		});
+		const service = new PreviewServiceClass(resolvePreview);
 		const firstFile = createMockTFileAsPlainObject("first.md");
 		const secondFile = createMockTFileAsPlainObject("second.md");
 
@@ -95,11 +93,8 @@ describe("PreviewService queue behavior", () => {
 
 	test("queue metrics update when a queued visible preview is aborted", async () => {
 		const firstDeferred = createDeferred<PreviewData>();
-		const strategy: PreviewStrategy = {
-			canHandle: () => true,
-			generate: vi.fn(() => firstDeferred.promise),
-		};
-		const service = new PreviewServiceClass([strategy]);
+		const resolvePreview = vi.fn<PreviewResolver>(() => firstDeferred.promise);
+		const service = new PreviewServiceClass(resolvePreview);
 		const firstFile = createMockTFileAsPlainObject("first.md");
 		const secondFile = createMockTFileAsPlainObject("second.md");
 		const secondController = new AbortController();
@@ -138,11 +133,10 @@ describe("PreviewService queue behavior", () => {
 	});
 
 	test("shutdown resets queue metrics", () => {
-		const strategy: PreviewStrategy = {
-			canHandle: () => true,
-			generate: vi.fn(() => new Promise<PreviewData>(() => {})),
-		};
-		const service = new PreviewServiceClass([strategy]);
+		const resolvePreview = vi.fn<PreviewResolver>(
+			() => new Promise<PreviewData>(() => {}),
+		);
+		const service = new PreviewServiceClass(resolvePreview);
 		const firstFile = createMockTFileAsPlainObject("first.md");
 		const secondFile = createMockTFileAsPlainObject("second.md");
 
@@ -161,14 +155,11 @@ describe("PreviewService queue behavior", () => {
 	});
 
 	test("already aborted preview is not executed", async () => {
-		const strategy: PreviewStrategy = {
-			canHandle: () => true,
-			generate: vi.fn(async () => ({
-				type: "empty" as const,
-				content: "generated",
-			})),
-		};
-		const service = new PreviewServiceClass([strategy]);
+		const resolvePreview = vi.fn<PreviewResolver>(async () => ({
+			type: "empty" as const,
+			content: "generated",
+		}));
+		const service = new PreviewServiceClass(resolvePreview);
 		const file = createMockTFileAsPlainObject("first.md");
 		const controller = new AbortController();
 		controller.abort();
@@ -183,16 +174,13 @@ describe("PreviewService queue behavior", () => {
 		);
 
 		await expect(promise).rejects.toMatchObject({ name: "AbortError" });
-		expect(strategy.generate).not.toHaveBeenCalled();
+		expect(resolvePreview).not.toHaveBeenCalled();
 	});
 
 	test("in-flight preview for the same file is shared", async () => {
 		const deferred = createDeferred<PreviewData>();
-		const strategy: PreviewStrategy = {
-			canHandle: () => true,
-			generate: vi.fn(() => deferred.promise),
-		};
-		const service = new PreviewServiceClass([strategy]);
+		const resolvePreview = vi.fn<PreviewResolver>(() => deferred.promise);
+		const service = new PreviewServiceClass(resolvePreview);
 		const file = createMockTFileAsPlainObject("shared.md");
 		const firstController = new AbortController();
 		const secondController = new AbortController();
@@ -215,7 +203,7 @@ describe("PreviewService queue behavior", () => {
 			secondController.signal,
 		);
 
-		expect(strategy.generate).toHaveBeenCalledTimes(1);
+		expect(resolvePreview).toHaveBeenCalledTimes(1);
 
 		secondController.abort();
 		deferred.resolve({ type: "text", content: "shared" });
@@ -228,9 +216,8 @@ describe("PreviewService queue behavior", () => {
 	});
 
 	test("shutdown aborts in-flight requests", async () => {
-		const strategy: PreviewStrategy = {
-			canHandle: () => true,
-			generate: vi.fn((_file, _context, signal): Promise<PreviewData> => {
+		const resolvePreview = vi.fn<PreviewResolver>(
+			(_file, _context, signal): Promise<PreviewData> => {
 				return new Promise<PreviewData>((_, reject) => {
 					const onAbort = () => {
 						reject(
@@ -243,15 +230,15 @@ describe("PreviewService queue behavior", () => {
 					}
 					signal?.addEventListener("abort", onAbort, { once: true });
 				});
-			}),
-		};
-		const service = new PreviewServiceClass([strategy]);
+			},
+		);
+		const service = new PreviewServiceClass(resolvePreview);
 		const file = createMockTFileAsPlainObject("visible.md");
 
 		const request = service.getPreview(file, vault, metadataCache);
 
 		await Promise.resolve();
-		expect(strategy.generate).toHaveBeenCalledTimes(1);
+		expect(resolvePreview).toHaveBeenCalledTimes(1);
 
 		service.shutdown();
 
@@ -263,15 +250,12 @@ describe("PreviewService queue behavior", () => {
 			string,
 			ReturnType<typeof createDeferred<PreviewData>>
 		>();
-		const strategy: PreviewStrategy = {
-			canHandle: () => true,
-			generate: vi.fn((file) => {
-				const deferred = createDeferred<PreviewData>();
-				deferredByPath.set(file.path, deferred);
-				return deferred.promise;
-			}),
-		};
-		const service = new PreviewServiceClass([strategy]);
+		const resolvePreview = vi.fn<PreviewResolver>((file) => {
+			const deferred = createDeferred<PreviewData>();
+			deferredByPath.set(file.path, deferred);
+			return deferred.promise;
+		});
+		const service = new PreviewServiceClass(resolvePreview);
 		const snapshots: Array<{ queued: number; active: number }> = [];
 		const unsubscribe = service.subscribeVisiblePreviewQueue((snapshot) => {
 			snapshots.push(snapshot);

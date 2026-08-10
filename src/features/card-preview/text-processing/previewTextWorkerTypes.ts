@@ -59,9 +59,6 @@ export type PreviewTextWorkerRequest =
 	| {
 			type: "cancel";
 			requestId: number;
-	  }
-	| {
-			type: "dispose";
 	  };
 
 export type PreviewTextWorkerResult =

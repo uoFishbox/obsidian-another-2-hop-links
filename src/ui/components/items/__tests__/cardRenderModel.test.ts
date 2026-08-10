@@ -57,11 +57,11 @@ describe("createCardRenderModel", () => {
 			searchQuery: "needle",
 		});
 		expect(getPreviewRenderVersion).not.toHaveBeenCalled();
-		expect(model.previewRequest?.previewCacheRevision).toBe("4:2:0");
+		expect(model.previewRequest?.previewCacheRevision).toBe("4:2");
 		expect(model.previewRequest).toMatchObject({
 			file: targetFile,
 			searchQuery: "",
-			previewCacheRevision: "4:2:0",
+			previewCacheRevision: "4:2",
 			previewOverride: { type: "text", content: "matched content" },
 		});
 		expect(model.previewRequest?.renderKey).toBeTruthy();

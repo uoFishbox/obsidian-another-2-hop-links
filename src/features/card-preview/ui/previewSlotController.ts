@@ -381,8 +381,6 @@ export function createPreviewSlotController(
 
 		try {
 			cleanup = renderer(expectedHost, expectedBinding.request, {
-				isCurrent: () =>
-					isCurrent(expectedGeneration, expectedHost, expectedHostGeneration),
 				onCommitted: (contentType, retention) => {
 					if (
 						!isCurrent(

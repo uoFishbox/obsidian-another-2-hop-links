@@ -12,7 +12,6 @@ function compile(
 		file,
 		settings,
 		searchQuery,
-		previewRefreshToken: 0,
 		previewOverride: null,
 		previewRenderVersion: "0",
 	});

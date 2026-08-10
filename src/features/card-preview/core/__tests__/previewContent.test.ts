@@ -1,6 +1,5 @@
 import { describe, expect, test, vi, type Mock } from "vitest";
-import { createEmbeddedMediaStrategy } from "../../strategies/EmbeddedMediaStrategy";
-import { createFrontmatterImageStrategy } from "../../strategies/FrontmatterImageStrategy";
+import { resolveEmbeddedMediaPreview } from "../../strategies/EmbeddedMediaStrategy";
 import { canvasToSearchText } from "../../text-processing/canvasText";
 import { analyzePreviewContent, readPreviewContent } from "../previewContent";
 import {
@@ -8,6 +7,10 @@ import {
 	createMockVault,
 } from "testing/__mocks__/testHelpers";
 import type { IMetadataCache } from "types/obsidian";
+
+function createEmbeddedMediaStrategy() {
+	return { generate: resolveEmbeddedMediaPreview };
+}
 
 describe("canvasToSearchText", () => {
 	test("converts Canvas nodes to search text in order", () => {
@@ -115,62 +118,6 @@ describe("analyzePreviewContent", () => {
 		expect(analysis.protectedSegments).toHaveLength(1);
 		expect(analysis.contentForMathParsing).toContain("outside $x^2$");
 		expect(analysis.contentForMathParsing).not.toContain("$test$");
-	});
-});
-
-describe("preview strategy canHandle", () => {
-	test("EmbeddedMediaStrategy only handles Markdown files with metadataCache", () => {
-		const strategy = createEmbeddedMediaStrategy();
-		const metadataCache = {
-			getFileCache: vi.fn(),
-			getFirstLinkpathDest: vi.fn(),
-		} as unknown as IMetadataCache;
-
-		expect(
-			strategy.canHandle(createMockTFileAsPlainObject("note.md"), {
-				metadataCache,
-			} as any),
-		).toBe(true);
-		expect(
-			strategy.canHandle(createMockTFileAsPlainObject("snippet.ts", "ts"), {
-				metadataCache,
-			} as any),
-		).toBe(false);
-		expect(
-			strategy.canHandle(createMockTFileAsPlainObject("image.png", "png"), {
-				metadataCache,
-			} as any),
-		).toBe(false);
-		expect(
-			strategy.canHandle(createMockTFileAsPlainObject("note.md"), {} as any),
-		).toBe(false);
-	});
-
-	test("FrontmatterImageStrategy only handles md with image frontmatter", () => {
-		const strategy = createFrontmatterImageStrategy();
-		const file = createMockTFileAsPlainObject("note.md");
-		const metadataCache = {
-			getFileCache: vi.fn(),
-		} as unknown as IMetadataCache;
-
-		(metadataCache.getFileCache as Mock).mockReturnValue({
-			frontmatter: {
-				image: "cover.png",
-			},
-		});
-
-		expect(strategy.canHandle(file, { metadataCache } as any)).toBe(true);
-
-		(metadataCache.getFileCache as Mock).mockReturnValue({
-			frontmatter: {},
-		});
-
-		expect(strategy.canHandle(file, { metadataCache } as any)).toBe(false);
-		expect(
-			strategy.canHandle(createMockTFileAsPlainObject("image.png", "png"), {
-				metadataCache,
-			} as any),
-		).toBe(false);
 	});
 });
 

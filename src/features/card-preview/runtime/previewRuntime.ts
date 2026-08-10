@@ -16,7 +16,6 @@ import type { VirtualFrameCoordinator } from "ui/virtualization/scheduling/frame
 import {
 	createCardPreviewRenderer,
 	type CardPreviewLoader,
-	type CardPreviewRenderer,
 	type CardPreviewRendererOptions,
 } from "features/card-preview/ui/cardPreviewRenderer";
 import { createCardPreviewSharedCache } from "features/card-preview/ui/cardPreviewSharedCache";
@@ -39,16 +38,8 @@ export interface PreviewRuntimeSurfaceOptions {
 	readonly resolveSearchMatchPosition?: CardPreviewRendererOptions["resolveSearchMatchPosition"];
 }
 
-export type PreviewRuntimeRendererOptions = Omit<
-	CardPreviewRendererOptions,
-	"app" | "getPreview" | "sharedCache" | "domCommitScope"
-> & {
-	readonly frameCoordinator?: VirtualFrameCoordinator;
-	readonly getDomCommitsPerSecond?: () => number;
-};
-
 /**
- * Plugin-owned entry point for all preview surfaces and renderers.
+ * Plugin-owned entry point for all preview surfaces.
  *
  * The runtime gives every consumer the same preview data source, shared
  * backpressure/admission policy, and teardown boundary. View-specific search
@@ -57,7 +48,6 @@ export type PreviewRuntimeRendererOptions = Omit<
  */
 export interface PreviewRuntime {
 	createSurface(options: PreviewRuntimeSurfaceOptions): VirtualPreviewSurface;
-	createRenderer(options: PreviewRuntimeRendererOptions): CardPreviewRenderer;
 	dispose(): void;
 }
 
@@ -112,25 +102,6 @@ export function createPreviewRuntime(options: PreviewRuntimeOptions): PreviewRun
 		return managedSurface;
 	}
 
-	function createRenderer(
-		rendererOptions: PreviewRuntimeRendererOptions,
-	): CardPreviewRenderer {
-		if (disposed) return DISABLED_CARD_PREVIEW_RENDERER;
-		const { frameCoordinator, getDomCommitsPerSecond, ...rest } = rendererOptions;
-		const domCommitScope = domCommitScheduler.createScope({
-			frameCoordinator,
-			getCommitsPerSecond:
-				getDomCommitsPerSecond ?? options.getDomCommitsPerSecond,
-		});
-		return createCardPreviewRenderer({
-			...rest,
-			app: options.app,
-			getPreview: options.getPreview,
-			sharedCache,
-			domCommitScope,
-		});
-	}
-
 	function dispose(): void {
 		if (disposed) return;
 		disposed = true;
@@ -143,18 +114,15 @@ export function createPreviewRuntime(options: PreviewRuntimeOptions): PreviewRun
 		domCommitScheduler.dispose();
 	}
 
-	return { createSurface, createRenderer, dispose };
+	return { createSurface, dispose };
 }
 
 /** Stateless preview surface used when preview rendering is unavailable. */
 export const DISABLED_PREVIEW_SURFACE: VirtualPreviewSurface = {
 	registerHost: () => ({ dispose: () => {} }),
-	commit: () => {},
 	beginBindings: () => {},
 	bindSlot: () => {},
 	endBindings: () => {},
 	setActiveRange: () => {},
 	dispose: () => {},
 };
-
-const DISABLED_CARD_PREVIEW_RENDERER: CardPreviewRenderer = () => () => {};

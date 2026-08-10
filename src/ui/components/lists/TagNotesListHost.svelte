@@ -16,7 +16,6 @@
 		sortService: ISortService;
 		app: App;
 		autofocus?: boolean;
-		previewRefreshTokens?: Record<string, number>;
 		previewRuntime?: PreviewRuntime;
 	}
 
@@ -28,36 +27,21 @@
 		sortService,
 		app,
 		autofocus = true,
-		previewRefreshTokens = {},
 		previewRuntime = undefined,
 	}: Props = $props();
 
 	let currentItems = $state.raw<ViewItem[]>(items);
-	let currentPreviewRefreshTokens =
-		$state.raw<Record<string, number>>(previewRefreshTokens);
 
 	function syncItemsFromProps(): void {
 		currentItems = items;
-	}
-
-	function syncPreviewRefreshTokensFromProps(): void {
-		currentPreviewRefreshTokens = previewRefreshTokens;
 	}
 
 	$effect(() => {
 		syncItemsFromProps();
 	});
 
-	$effect(() => {
-		syncPreviewRefreshTokensFromProps();
-	});
-
-	export function updateItems(
-		nextItems: ViewItem[],
-		nextPreviewRefreshTokens: Record<string, number> = {},
-	): void {
+	export function updateItems(nextItems: ViewItem[]): void {
 		currentItems = nextItems;
-		currentPreviewRefreshTokens = nextPreviewRefreshTokens;
 	}
 </script>
 
@@ -70,5 +54,4 @@
 	{app}
 	{previewRuntime}
 	{autofocus}
-	previewRefreshTokens={currentPreviewRefreshTokens}
 />

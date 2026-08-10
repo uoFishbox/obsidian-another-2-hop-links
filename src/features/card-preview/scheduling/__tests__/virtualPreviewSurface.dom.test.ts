@@ -18,6 +18,7 @@ interface RenderRecord {
 	readonly identity: string;
 	readonly callbacks: PreviewRenderCallbacks;
 	readonly cleanup: ReturnType<typeof vi.fn>;
+	readonly isCancelled: () => boolean;
 }
 
 interface RowPreviewCardBinding {
@@ -110,12 +111,16 @@ function createHarness(frameCoordinator?: VirtualFrameCoordinator): {
 		createRenderer: (): CardPreviewRenderer => {
 			return (container, previewRequest, callbacks) => {
 				if (!callbacks) throw new TypeError("Missing surface callbacks");
-				const cleanup = vi.fn();
+				let cancelled = false;
+				const cleanup = vi.fn(() => {
+					cancelled = true;
+				});
 				renders.push({
 					container,
 					identity: previewRequest.renderKey,
 					callbacks,
 					cleanup,
+					isCancelled: () => cancelled,
 				});
 				return cleanup;
 			};
@@ -215,7 +220,7 @@ function commit(
 	record: RenderRecord,
 	retention: "resident" | "lifecycle-bound" = "resident",
 ): boolean {
-	if (!record.callbacks.isCurrent()) return false;
+	if (record.isCancelled()) return false;
 	const content = document.createElement("span");
 	content.textContent = record.identity;
 	record.container.replaceChildren(content);
@@ -319,7 +324,6 @@ describe("VirtualPreviewSurface", () => {
 		current = committedFrame(secondBinding);
 		surface.acceptCommittedFrame(source);
 
-		expect(renders[0].callbacks.isCurrent()).toBe(false);
 		await flushActivation();
 		expect(commit(renders[0])).toBe(false);
 		expect(commit(renders[1])).toBe(true);
@@ -375,7 +379,6 @@ describe("VirtualPreviewSurface", () => {
 			{ previewRange: { start: 0, end: 1 }, active: true },
 		);
 
-		expect(renders[0].callbacks.isCurrent()).toBe(false);
 		expect(renders[0].cleanup).toHaveBeenCalledOnce();
 		expect(host.textContent).toBe("a");
 		expect(host.classList.contains("is-stale")).toBe(true);
@@ -399,8 +402,6 @@ describe("VirtualPreviewSurface", () => {
 
 		surface.publish(committedFrame(binding("slot-0", 0, "b")));
 		surface.publish(originalFrame);
-		expect(renders[0].callbacks.isCurrent()).toBe(false);
-
 		await flushActivation();
 		await flushActivation();
 		expect(renders.map((record) => record.identity)).toEqual(["a", "a"]);
@@ -689,7 +690,6 @@ describe("VirtualPreviewSurface", () => {
 
 		rebind(surface, binding("slot-0", 0, "settings:v2"));
 		await flushActivation();
-		expect(renders[0].callbacks.isCurrent()).toBe(false);
 		expect(commit(renders[0])).toBe(false);
 		expect(commit(renders[1])).toBe(true);
 		expect(host.textContent).toBe("settings:v2");

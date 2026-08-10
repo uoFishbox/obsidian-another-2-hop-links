@@ -27,16 +27,8 @@ export interface VirtualPreviewBinding {
 	readonly request: CardPreviewRequest;
 }
 
-export interface VirtualPreviewSurfaceSnapshot {
-	readonly active: boolean;
-	readonly activeRange: { readonly start: number; readonly end: number };
-	readonly bindings: readonly VirtualPreviewBinding[];
-}
-
 export interface VirtualPreviewSurface {
 	registerHost(slotId: string, element: HTMLElement): PreviewHostLease;
-	/** Atomically publishes the desired range and complete binding set. */
-	commit(snapshot: VirtualPreviewSurfaceSnapshot): void;
 	/** Starts publication of the complete desired binding set for this surface. */
 	beginBindings(): void;
 	/** Stages one desired slot binding in the current publication pass. */
@@ -309,25 +301,6 @@ export function createVirtualPreviewSurface(
 		};
 	}
 
-	function commit(snapshot: VirtualPreviewSurfaceSnapshot): void {
-		if (disposed) return;
-		beginBindings();
-		for (const binding of snapshot.bindings) {
-			bindSlot(
-				binding.slotId,
-				binding.rowIndex,
-				binding.ownerKey,
-				binding.request,
-			);
-		}
-		endBindings();
-		setActiveRange(
-			snapshot.activeRange.start,
-			snapshot.activeRange.end,
-			snapshot.active,
-		);
-	}
-
 	function beginBindings(): void {
 		if (disposed) return;
 		bindingEpoch += 1;
@@ -412,7 +385,6 @@ export function createVirtualPreviewSurface(
 
 	return {
 		registerHost,
-		commit,
 		beginBindings,
 		bindSlot,
 		endBindings,

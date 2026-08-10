@@ -53,7 +53,6 @@
 		app: App;
 		previewRuntime?: PreviewRuntime;
 		autofocus?: boolean;
-		previewRefreshTokens?: Record<string, number>;
 	}
 
 	let {
@@ -65,7 +64,6 @@
 		app,
 		previewRuntime = undefined,
 		autofocus = true,
-		previewRefreshTokens = {},
 	}: Props = $props();
 
 	let sortOption = $derived(applicationStore.sortOption);
@@ -359,7 +357,6 @@
 		contentSearchEnabled,
 		allowContentSearch,
 		matchedItemByKey,
-		previewRefreshTokens,
 		applicationUpdateVersion: applicationStore.updateVersion,
 		previewGlobalVersion: applicationStore.previewGlobalVersion,
 		previewPathVersions: applicationStore.previewPathVersions,
@@ -393,7 +390,6 @@
 			searchQuery: revision.searchQuery,
 			searchScope,
 			contentPreview: matchedItem?.contentPreview,
-			previewRefreshToken: revision.previewRefreshTokens[itemKey] ?? 0,
 			interactionId: interactionKey,
 			interactionKey,
 		});
@@ -488,8 +484,6 @@
 				previewSlotId,
 			})}
 				{@const ItemComponent = config.itemComponent}
-				{@const previewRefreshToken =
-					previewRefreshTokens[config.getItemKey(item)] ?? 0}
 				{@const renderedItemKey = config.getItemKey(item, index)}
 				{@const matchedItem = matchedItemByKey?.get(renderedItemKey) ?? null}
 				{#if ItemComponent === ViewItemCard}
@@ -512,7 +506,6 @@
 						contentPreview={matchedItem?.contentPreview}
 						{observerRoot}
 						{visibility}
-						{previewRefreshToken}
 						{rowIndex}
 						{activationCandidateId}
 					/>
@@ -526,7 +519,6 @@
 							? "title-and-content"
 							: "title-only"}
 						contentPreview={matchedItem?.contentPreview}
-						{previewRefreshToken}
 						{rowIndex}
 						{activationCandidateId}
 					/>
