@@ -17,7 +17,11 @@ import {
 	type MountedTwoHopCell,
 	type MountedTwoHopRow,
 } from "features/two-hop/ui/twoHopMountedRows";
-import { createTwoHopCardHydrator } from "features/two-hop/ui/twoHopCardHydrator";
+import {
+	createTwoHopCardHydrator,
+	type TwoHopCardDemand,
+	type TwoHopCardHydrationCell,
+} from "features/two-hop/ui/twoHopCardHydrator";
 import type { PreviewRuntime } from "features/card-preview/runtime/previewRuntime";
 import { DISABLED_PREVIEW_SURFACE } from "features/card-preview/runtime/previewRuntime";
 import type {
@@ -182,12 +186,12 @@ export function useTwoHopVirtualList(
 
 	const cardHydrator = createTwoHopCardHydrator({
 		frameCoordinator,
-		getRowModel: () => untrack(() => rowModel),
 		getRevision: () => untrack(() => props.cardModelRevision),
 		getResolver: () => untrack(() => props.resolveItemCardModel),
 		isPreviewActive: isPreviewSurfaceActive,
 		onPreviewModelsChanged: publishPreviewSnapshot,
 	});
+	let mountedItemCells: readonly MountedTwoHopCell[] = [];
 
 	function getMountedRows(): readonly MountedTwoHopRow[] {
 		return (
@@ -199,22 +203,44 @@ export function useTwoHopVirtualList(
 	function collectPreviewBindings(): VirtualPreviewBinding[] {
 		if (!isPreviewSurfaceActive()) return [];
 		const bindings: VirtualPreviewBinding[] = [];
+		for (const mountedCell of mountedItemCells) {
+			const request = cardHydrator.getModel(
+				mountedCell.cell.logicalKey,
+			)?.previewRequest;
+			if (!request) continue;
+			bindings.push({
+				slotId: String(mountedCell.renderSlotKey),
+				rowIndex: mountedCell.rowIndex,
+				ownerKey: mountedCell.cell.logicalKey,
+				request,
+			});
+		}
+		return bindings;
+	}
+
+	function collectCardDemand(
+		foregroundRange: Readonly<RowRange>,
+		includeBackground: boolean,
+	): TwoHopCardDemand {
+		const foreground: TwoHopCardHydrationCell[] = [];
+		const background: TwoHopCardHydrationCell[] = [];
+		const nextMountedItemCells: MountedTwoHopCell[] = [];
 		for (const row of getMountedRows()) {
 			for (const mountedCell of row.cells) {
 				if (mountedCell.cell.kind !== "item") continue;
-				const request = cardHydrator.getModel(
-					mountedCell.cell.logicalKey,
-				)?.previewRequest;
-				if (!request) continue;
-				bindings.push({
-					slotId: String(mountedCell.renderSlotKey),
-					rowIndex: mountedCell.rowIndex,
-					ownerKey: mountedCell.cell.logicalKey,
-					request,
-				});
+				nextMountedItemCells.push(mountedCell);
+				if (
+					mountedCell.rowIndex >= foregroundRange.start &&
+					mountedCell.rowIndex < foregroundRange.end
+				) {
+					foreground.push(mountedCell.cell);
+				} else if (includeBackground) {
+					background.push(mountedCell.cell);
+				}
 			}
 		}
-		return bindings;
+		mountedItemCells = nextMountedItemCells;
+		return { foreground, background };
 	}
 
 	function publishPreviewSnapshot(): void {
@@ -231,12 +257,7 @@ export function useTwoHopVirtualList(
 		if (disposed) return;
 		const snapshot = virtualList.getSnapshot();
 		const foreground = snapshot?.ranges.previewVisible ?? EMPTY_RANGE;
-		cardHydrator.setDemand({
-			foreground,
-			background: isPreviewSurfaceActive()
-				? (snapshot?.ranges.mounted ?? EMPTY_RANGE)
-				: EMPTY_RANGE,
-		});
+		cardHydrator.setDemand(collectCardDemand(foreground, isPreviewSurfaceActive()));
 		publishPreviewSnapshot();
 	}
 
@@ -455,7 +476,7 @@ export function useTwoHopVirtualList(
 		} else if (virtualList.getSnapshot()) {
 			virtualList.recompute({ rowModel: nextRowModel });
 		}
-		cardHydrator.reconcileSource();
+		applyRangeEffects();
 		virtualListController.resetScrollWindow();
 		virtualListController.runScrollMeasurement(undefined, {
 			forcePublish: true,

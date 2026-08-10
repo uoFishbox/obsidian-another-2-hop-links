@@ -5,18 +5,21 @@ import type {
 import type { TwoHopCardPresentationState } from "features/two-hop/ui/twoHopCellStaticState";
 import { resolveTwoHopCardPresentation } from "features/two-hop/ui/twoHopCellStaticState";
 import type { TwoHopItemModel } from "features/two-hop/ui/twoHopSectionModel";
-import {
-	type TwoHopRowModel,
-	type TwoHopVirtualCell,
-} from "features/two-hop/ui/twoHopRowModel";
-import type { RowRange } from "ui/virtualization/rowRange";
+import type { TwoHopVirtualCell } from "features/two-hop/ui/twoHopRowModel";
 import type { VirtualFrameCoordinator } from "ui/virtualization/scheduling/frameCoordinator";
 import { createVirtualCardInteractionController } from "ui/interactions/virtualCardInteractionController";
 import { recordCCLDevMeasurement } from "infrastructure/debug/CCLDevMeasurements";
 
 type CardModelConsumer = (model: CardShellModel | undefined) => void;
 type HydrationPriority = "foreground" | "background";
-type HydrationEntry = Extract<TwoHopVirtualCell, { kind: "item" }>;
+
+/** Item-cell payload published by the resident two-hop virtual list. */
+export type TwoHopCardHydrationCell = Extract<TwoHopVirtualCell, { kind: "item" }>;
+
+interface DemandedHydration {
+	readonly cell: TwoHopCardHydrationCell;
+	readonly priority: HydrationPriority;
+}
 
 interface HydratedCardEntry {
 	readonly item: TwoHopItemModel;
@@ -25,23 +28,27 @@ interface HydratedCardEntry {
 }
 
 interface PendingHydration {
-	readonly cell: HydrationEntry;
+	cell: TwoHopCardHydrationCell;
 	priority: HydrationPriority;
 }
 
 interface HydrationQueue {
-	readonly entries: HydrationEntry[];
+	readonly entries: TwoHopCardHydrationCell[];
 	head: number;
 }
 
+/**
+ * Resident item cells to hydrate, split by scheduling priority.
+ * Foreground wins when a logical key appears in both collections.
+ */
 export interface TwoHopCardDemand {
-	readonly foreground: Readonly<RowRange>;
-	readonly background: Readonly<RowRange>;
+	readonly foreground: readonly TwoHopCardHydrationCell[];
+	readonly background: readonly TwoHopCardHydrationCell[];
 }
 
+/** External services required by the bounded card hydrator. */
 export interface TwoHopCardHydratorParams {
 	readonly frameCoordinator: VirtualFrameCoordinator;
-	readonly getRowModel: () => TwoHopRowModel;
 	readonly getRevision: () => unknown;
 	readonly getResolver: () =>
 		| ((
@@ -54,6 +61,7 @@ export interface TwoHopCardHydratorParams {
 	readonly onPreviewModelsChanged: () => void;
 }
 
+/** Bounded asynchronous hydration and card-model cache for resident cells. */
 export interface TwoHopCardHydrator {
 	readonly interactionDescriptorResolverProvider: ReturnType<
 		typeof createVirtualCardInteractionController
@@ -62,12 +70,10 @@ export interface TwoHopCardHydrator {
 	setDemand(demand: TwoHopCardDemand): void;
 	refreshDemand(): void;
 	getModel(logicalKey: string): CardRenderModel | undefined;
-	reconcileSource(): void;
 	clear(): void;
 	dispose(): void;
 }
 
-const EMPTY_RANGE = Object.freeze({ start: 0, end: 0 });
 const MAX_MODELS_PER_DRAIN = 8;
 const MAX_HYDRATION_CPU_MS = 1;
 const MAX_RETAINED_CARD_MODELS = 64;
@@ -84,10 +90,7 @@ export function createTwoHopCardHydrator(
 	const foregroundQueue = createHydrationQueue();
 	const backgroundQueue = createHydrationQueue();
 	const interactionController = createVirtualCardInteractionController();
-	let demand: TwoHopCardDemand = {
-		foreground: EMPTY_RANGE,
-		background: EMPTY_RANGE,
-	};
+	let demandByKey = new Map<string, DemandedHydration>();
 	let cancelDrain: (() => void) | undefined;
 	let scheduledPriority: HydrationPriority | undefined;
 	let generation = 0;
@@ -124,6 +127,7 @@ export function createTwoHopCardHydrator(
 
 	function clear(): void {
 		clearPending();
+		demandByKey.clear();
 		for (const logicalKey of entries.keys()) notify(logicalKey, undefined);
 		entries.clear();
 		interactionController.clear();
@@ -131,25 +135,19 @@ export function createTwoHopCardHydrator(
 	}
 
 	function setDemand(nextDemand: TwoHopCardDemand): void {
-		demand = {
-			foreground: copyRange(nextDemand.foreground),
-			background: copyRange(nextDemand.background),
-		};
+		demandByKey = indexDemand(nextDemand);
 		reconcilePendingPriorities();
 		const previewChanged = reconcileModelRetention();
-		enqueueRange(demand.background, "background", false);
-		enqueueRange(demand.foreground, "foreground", false);
+		enqueueDemand(false);
 		scheduleDrain();
 		if (previewChanged) params.onPreviewModelsChanged();
 	}
 
 	function reconcileModelRetention(): boolean {
-		const foregroundKeys = collectItemKeys(demand.foreground);
-		const retainedKeys = collectItemKeys(demand.background, foregroundKeys);
 		let retainedEntryCount = 0;
 		let previewChanged = false;
 
-		for (const logicalKey of retainedKeys) {
+		for (const logicalKey of demandByKey.keys()) {
 			const entry = entries.get(logicalKey);
 			if (!entry) continue;
 			entries.delete(logicalKey);
@@ -157,9 +155,10 @@ export function createTwoHopCardHydrator(
 		}
 
 		for (const logicalKey of entries.keys()) {
-			if (retainedKeys.has(logicalKey)) {
+			const demanded = demandByKey.get(logicalKey);
+			if (demanded) {
 				retainedEntryCount += 1;
-				if (!foregroundKeys.has(logicalKey)) {
+				if (demanded.priority !== "foreground") {
 					interactionController.setCard(logicalKey, null);
 				}
 				continue;
@@ -171,7 +170,7 @@ export function createTwoHopCardHydrator(
 		if (retainedCacheSize <= MAX_RETAINED_CARD_MODELS) return false;
 
 		for (const logicalKey of entries.keys()) {
-			if (retainedKeys.has(logicalKey)) continue;
+			if (demandByKey.has(logicalKey)) continue;
 			notify(logicalKey, undefined);
 			entries.delete(logicalKey);
 			previewChanged = true;
@@ -182,51 +181,33 @@ export function createTwoHopCardHydrator(
 		return previewChanged;
 	}
 
-	function collectItemKeys(
-		range: Readonly<RowRange>,
-		target: Set<string> = new Set(),
-	): Set<string> {
-		const rowModel = params.getRowModel();
-		for (let rowIndex = range.start; rowIndex < range.end; rowIndex += 1) {
-			const row = rowModel.getRow(rowIndex);
-			if (!row) continue;
-			for (let columnIndex = 0; columnIndex < row.cellCount; columnIndex += 1) {
-				const cell = row.getCell(columnIndex);
-				if (!cell) continue;
-				if (cell.kind === "item") target.add(cell.logicalKey);
-			}
-		}
-		return target;
-	}
-
 	function refreshDemand(): void {
 		clearPending();
-		enqueueRange(demand.background, "background", true);
-		enqueueRange(demand.foreground, "foreground", true);
+		enqueueDemand(true);
 		scheduleDrain();
 	}
 
 	function reconcilePendingPriorities(): void {
 		for (const [logicalKey, pending] of pendingByKey) {
-			const nextPriority = resolveDemandPriority(pending.cell.rowIndex);
-			if (!nextPriority) {
+			const demanded = demandByKey.get(logicalKey);
+			if (!demanded) {
 				pendingByKey.delete(logicalKey);
 				continue;
 			}
-			if (nextPriority === pending.priority) continue;
-			pending.priority = nextPriority;
-			queueFor(nextPriority).entries.push(pending.cell);
+			if (
+				demanded.priority === pending.priority &&
+				demanded.cell === pending.cell
+			) {
+				continue;
+			}
+			pending.cell = demanded.cell;
+			pending.priority = demanded.priority;
+			queueFor(demanded.priority).entries.push(demanded.cell);
 		}
 	}
 
-	function resolveDemandPriority(rowIndex: number): HydrationPriority | null {
-		if (isRowInRange(rowIndex, demand.foreground)) return "foreground";
-		if (isRowInRange(rowIndex, demand.background)) return "background";
-		return null;
-	}
-
 	function enqueueCell(
-		cell: HydrationEntry,
+		cell: TwoHopCardHydrationCell,
 		priority: HydrationPriority,
 		refreshExisting: boolean,
 		revision: unknown,
@@ -259,23 +240,10 @@ export function createTwoHopCardHydrator(
 		queueFor(priority).entries.push(cell);
 	}
 
-	function enqueueRange(
-		range: Readonly<RowRange>,
-		priority: HydrationPriority,
-		refreshExisting: boolean,
-	): void {
-		const rowModel = params.getRowModel();
+	function enqueueDemand(refreshExisting: boolean): void {
 		const revision = params.getRevision();
-		for (let rowIndex = range.start; rowIndex < range.end; rowIndex += 1) {
-			const row = rowModel.getRow(rowIndex);
-			if (!row) continue;
-			for (let columnIndex = 0; columnIndex < row.cellCount; columnIndex += 1) {
-				const cell = row.getCell(columnIndex);
-				if (!cell) continue;
-				if (cell.kind === "item") {
-					enqueueCell(cell, priority, refreshExisting, revision);
-				}
-			}
+		for (const demanded of demandByKey.values()) {
+			enqueueCell(demanded.cell, demanded.priority, refreshExisting, revision);
 		}
 	}
 
@@ -369,14 +337,17 @@ export function createTwoHopCardHydrator(
 	function takeNextPending(
 		queue: HydrationQueue,
 		priority: HydrationPriority,
-	): HydrationEntry | undefined {
+	): TwoHopCardHydrationCell | undefined {
 		while (queue.head < queue.entries.length) {
 			const cell = queue.entries[queue.head];
 			queue.head += 1;
 			if (!cell) continue;
 			const pending = pendingByKey.get(cell.logicalKey);
-			if (!pending || pending.priority !== priority) continue;
-			if (resolveDemandPriority(cell.rowIndex) !== priority) {
+			if (!pending || pending.priority !== priority || pending.cell !== cell) {
+				continue;
+			}
+			const demanded = demandByKey.get(cell.logicalKey);
+			if (!demanded || demanded.priority !== priority || demanded.cell !== cell) {
 				pendingByKey.delete(cell.logicalKey);
 				continue;
 			}
@@ -397,12 +368,6 @@ export function createTwoHopCardHydrator(
 		return entries.get(logicalKey)?.model;
 	}
 
-	function reconcileSource(): void {
-		clearPending();
-		setDemand(demand);
-		params.onPreviewModelsChanged();
-	}
-
 	function dispose(): void {
 		disposed = true;
 		clearPending();
@@ -420,10 +385,20 @@ export function createTwoHopCardHydrator(
 		setDemand,
 		refreshDemand,
 		getModel,
-		reconcileSource,
 		clear,
 		dispose,
 	};
+}
+
+function indexDemand(demand: TwoHopCardDemand): Map<string, DemandedHydration> {
+	const demandByKey = new Map<string, DemandedHydration>();
+	for (const cell of demand.background) {
+		demandByKey.set(cell.logicalKey, { cell, priority: "background" });
+	}
+	for (const cell of demand.foreground) {
+		demandByKey.set(cell.logicalKey, { cell, priority: "foreground" });
+	}
+	return demandByKey;
 }
 
 function createHydrationQueue(): HydrationQueue {
@@ -445,12 +420,4 @@ function compactHydrationQueue(queue: HydrationQueue): void {
 	if (queue.head < remaining) return;
 	queue.entries.splice(0, queue.head);
 	queue.head = 0;
-}
-
-function isRowInRange(rowIndex: number, range: Readonly<RowRange>): boolean {
-	return rowIndex >= range.start && rowIndex < range.end;
-}
-
-function copyRange(range: Readonly<RowRange>): Readonly<RowRange> {
-	return Object.freeze({ start: range.start, end: range.end });
 }

@@ -6,8 +6,14 @@ import type {
 	VirtualFrameLane,
 } from "ui/virtualization/scheduling/frameCoordinator";
 import { DEFAULT_VIEW_PLAN_LAYOUT } from "ui/virtualization/svelte/viewPlanLayout";
-import { createTwoHopCardHydrator } from "features/two-hop/ui/twoHopCardHydrator";
-import { createTwoHopRowModel } from "features/two-hop/ui/twoHopRowModel";
+import {
+	createTwoHopCardHydrator,
+	type TwoHopCardHydrationCell,
+} from "features/two-hop/ui/twoHopCardHydrator";
+import {
+	createTwoHopRowModel,
+	type TwoHopRowModel,
+} from "features/two-hop/ui/twoHopRowModel";
 import {
 	createTwoHopSectionModel,
 	type TwoHopItemModel,
@@ -15,6 +21,7 @@ import {
 
 interface TestFrameCoordinator {
 	readonly coordinator: VirtualFrameCoordinator;
+	isScheduled(lane: VirtualFrameLane): boolean;
 	drain(): void;
 }
 
@@ -37,6 +44,8 @@ function createTestFrameCoordinator(): TestFrameCoordinator {
 
 	return {
 		coordinator,
+		isScheduled: (lane) =>
+			Array.from(tasks.keys()).some((key) => key.startsWith(`${lane}:`)),
 		drain() {
 			while (tasks.size > 0) {
 				const next = tasks.entries().next().value as
@@ -60,6 +69,49 @@ function createItem(index: number): TwoHopItemModel {
 	} as TwoHopItemModel;
 }
 
+function resolveCardModel(item: TwoHopItemModel): CardRenderModel {
+	const interactionId = item.interactionId ?? item.key;
+	const interactionDescriptor: ItemInteractionDescriptor = {
+		interactionId,
+		interactionKey: item.interactionKey,
+		kind: "item",
+		item: item.item,
+		targetFile: null,
+	};
+	return {
+		item: item.item,
+		targetFile: null,
+		title: item.key,
+		ariaLabel: item.key,
+		className: null,
+		extension: null,
+		directory: null,
+		interactionId,
+		interactionKey: item.interactionKey ?? item.key,
+		interactionDescriptor,
+		presentation: undefined,
+		searchQuery: "",
+		previewRequest: null,
+	};
+}
+
+function collectItemCells(
+	rowModel: TwoHopRowModel,
+	start: number,
+	end: number,
+): TwoHopCardHydrationCell[] {
+	const cells: TwoHopCardHydrationCell[] = [];
+	for (let rowIndex = start; rowIndex < end; rowIndex += 1) {
+		const row = rowModel.getRow(rowIndex);
+		if (!row) continue;
+		for (let columnIndex = 0; columnIndex < row.cellCount; columnIndex += 1) {
+			const cell = row.getCell(columnIndex);
+			if (cell?.kind === "item") cells.push(cell);
+		}
+	}
+	return cells;
+}
+
 describe("createTwoHopCardHydrator", () => {
 	it("bounds retained models and keeps interactions only for foreground cards", () => {
 		const items = Array.from({ length: 70 }, (_, index) => createItem(index));
@@ -78,34 +130,9 @@ describe("createTwoHopCardHydrator", () => {
 		});
 		const frames = createTestFrameCoordinator();
 		const previewChanged = vi.fn();
-		const resolver = vi.fn((item: TwoHopItemModel): CardRenderModel => {
-			const interactionId = item.interactionId ?? item.key;
-			const interactionDescriptor: ItemInteractionDescriptor = {
-				interactionId,
-				interactionKey: item.interactionKey,
-				kind: "item",
-				item: item.item,
-				targetFile: null,
-			};
-			return {
-				item: item.item,
-				targetFile: null,
-				title: item.key,
-				ariaLabel: item.key,
-				className: null,
-				extension: null,
-				directory: null,
-				interactionId,
-				interactionKey: item.interactionKey ?? item.key,
-				interactionDescriptor,
-				presentation: undefined,
-				searchQuery: "",
-				previewRequest: null,
-			};
-		});
+		const resolver = vi.fn(resolveCardModel);
 		const hydrator = createTwoHopCardHydrator({
 			frameCoordinator: frames.coordinator,
-			getRowModel: () => rowModel,
 			getRevision: () => 0,
 			getResolver: () => resolver,
 			isPreviewActive: () => true,
@@ -117,8 +144,8 @@ describe("createTwoHopCardHydrator", () => {
 		hydrator.registerConsumer(firstKey, firstConsumer);
 
 		hydrator.setDemand({
-			foreground: { start: 1, end: 2 },
-			background: { start: 1, end: 3 },
+			foreground: collectItemCells(rowModel, 1, 2),
+			background: collectItemCells(rowModel, 2, 3),
 		});
 		frames.drain();
 
@@ -136,8 +163,8 @@ describe("createTwoHopCardHydrator", () => {
 		).toBeNull();
 
 		hydrator.setDemand({
-			foreground: { start: 2, end: 3 },
-			background: { start: 2, end: 4 },
+			foreground: collectItemCells(rowModel, 2, 3),
+			background: collectItemCells(rowModel, 3, 4),
 		});
 		frames.drain();
 
@@ -156,8 +183,8 @@ describe("createTwoHopCardHydrator", () => {
 
 		const resolverCallsBeforeReturn = resolver.mock.calls.length;
 		hydrator.setDemand({
-			foreground: { start: 1, end: 2 },
-			background: { start: 1, end: 2 },
+			foreground: collectItemCells(rowModel, 1, 2),
+			background: [],
 		});
 		frames.drain();
 
@@ -166,13 +193,95 @@ describe("createTwoHopCardHydrator", () => {
 
 		for (let rowIndex = 3; rowIndex < rowModel.rowCount; rowIndex += 1) {
 			hydrator.setDemand({
-				foreground: { start: rowIndex, end: rowIndex + 1 },
-				background: { start: rowIndex, end: rowIndex + 1 },
+				foreground: collectItemCells(rowModel, rowIndex, rowIndex + 1),
+				background: [],
 			});
 			frames.drain();
 		}
 
 		expect(hydrator.getModel(firstKey)).toBeUndefined();
 		expect(firstConsumer).toHaveBeenLastCalledWith(undefined);
+	});
+
+	it("replaces stale pending cells and refreshes resident cells on revision changes", () => {
+		const firstItem = createItem(0);
+		const replacementItem = createItem(0);
+		const createModel = (item: TwoHopItemModel) =>
+			createTwoHopRowModel({
+				documentIdentity: "test",
+				sections: [
+					createTwoHopSectionModel({
+						id: "section",
+						kind: "new-links-section",
+						title: "Section",
+						items: [item],
+						totalCount: 1,
+					}),
+				],
+				layout: { ...DEFAULT_VIEW_PLAN_LAYOUT, columns: 1 },
+			});
+		const firstCell = collectItemCells(createModel(firstItem), 1, 2)[0]!;
+		const replacementCell = collectItemCells(
+			createModel(replacementItem),
+			1,
+			2,
+		)[0]!;
+		const frames = createTestFrameCoordinator();
+		const resolver = vi.fn(resolveCardModel);
+		let revision = 0;
+		const hydrator = createTwoHopCardHydrator({
+			frameCoordinator: frames.coordinator,
+			getRevision: () => revision,
+			getResolver: () => resolver,
+			isPreviewActive: () => false,
+			onPreviewModelsChanged: vi.fn(),
+		});
+
+		hydrator.setDemand({ foreground: [firstCell], background: [] });
+		hydrator.setDemand({ foreground: [replacementCell], background: [] });
+		frames.drain();
+
+		expect(resolver).toHaveBeenCalledTimes(1);
+		expect(resolver.mock.calls[0]?.[0]).toBe(replacementItem);
+
+		revision = 1;
+		hydrator.refreshDemand();
+		frames.drain();
+
+		expect(resolver).toHaveBeenCalledTimes(2);
+		expect(hydrator.getModel(replacementCell.logicalKey)).toBeDefined();
+	});
+
+	it("schedules background hydration on idle and promotes it to post-paint", () => {
+		const item = createItem(0);
+		const rowModel = createTwoHopRowModel({
+			documentIdentity: "test",
+			sections: [
+				createTwoHopSectionModel({
+					id: "section",
+					kind: "new-links-section",
+					title: "Section",
+					items: [item],
+					totalCount: 1,
+				}),
+			],
+			layout: { ...DEFAULT_VIEW_PLAN_LAYOUT, columns: 1 },
+		});
+		const cell = collectItemCells(rowModel, 1, 2)[0]!;
+		const frames = createTestFrameCoordinator();
+		const hydrator = createTwoHopCardHydrator({
+			frameCoordinator: frames.coordinator,
+			getRevision: () => 0,
+			getResolver: () => resolveCardModel,
+			isPreviewActive: () => false,
+			onPreviewModelsChanged: vi.fn(),
+		});
+
+		hydrator.setDemand({ foreground: [], background: [cell] });
+		expect(frames.isScheduled("idle")).toBe(true);
+
+		hydrator.setDemand({ foreground: [cell], background: [] });
+		expect(frames.isScheduled("idle")).toBe(false);
+		expect(frames.isScheduled("post-paint")).toBe(true);
 	});
 });
