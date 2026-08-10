@@ -3,10 +3,8 @@ import type {
 	BacklinksMap,
 	IndexedLinkQueryResult,
 	TaggedNote,
-	TwoHopLinkBranch,
 	TwoHopIndexedLink,
 } from "./domain";
-import type { DedupResult, DedupState } from "./deduplication";
 import type { SortOption } from "features/settings/model";
 import type { SortableItem } from "core/sorting/types";
 import type {
@@ -132,25 +130,6 @@ export interface ISortService {
 		items: readonly T[];
 		orderChanged: boolean;
 	};
-}
-
-export interface IDeduplicationService {
-	collectUniqueBranches(
-		state: DedupState,
-		branches: readonly TwoHopLinkBranch[],
-	): DedupResult<TwoHopLinkBranch>;
-	collectUniqueBacklinks(
-		state: DedupState,
-		backlinks: readonly TwoHopIndexedLink[],
-	): DedupResult<TwoHopIndexedLink>;
-	buildFilteredTwoHopBranches(
-		state: DedupState,
-		branches: readonly TwoHopLinkBranch[],
-	): DedupResult<TwoHopLinkBranch>;
-	collectUniqueTaggedNotes(
-		state: DedupState,
-		taggedNotes: readonly TaggedNote[],
-	): DedupResult<TaggedNote>;
 }
 
 export interface IComponentManager {

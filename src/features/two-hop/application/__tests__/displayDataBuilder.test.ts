@@ -4,7 +4,6 @@ import {
 	createDisplayAssemblyCache,
 	createHop2SortCache,
 	getSortedItemsWithCache,
-	preprocessDisplayData,
 	sortAndAssembleDisplayData,
 } from "../displayDataBuilder";
 import type { DisplayData, PreprocessedDisplayData } from "../displayDataBuilder";
@@ -15,12 +14,11 @@ import type {
 	TwoHopLinkResult,
 } from "types/domain";
 import type { PluginSettings, SortOption } from "features/settings/model";
-import type { ISortService, IDeduplicationService } from "types/services";
+import type { ISortService } from "types/services";
 import type { SortableItem } from "core/sorting";
 import { createMockTFile } from "testing/__mocks__/testHelpers";
 import { DEFAULT_SETTINGS } from "features/settings/model";
 import * as grouping from "core/grouping";
-import { createDeduplicationService } from "core/deduplication/deduplicationService";
 
 const defaultSettings: PluginSettings = DEFAULT_SETTINGS;
 
@@ -41,40 +39,18 @@ const mockSortService: ISortService = {
 	sort: vi.fn((items) => [...items]),
 };
 
-interface LegacyDeduplicationService {
-	collectUniqueBranches(
-		branches: readonly TwoHopLinkBranch[],
-	): readonly TwoHopLinkBranch[];
-	collectUniqueBacklinks(
-		backlinks: readonly TwoHopIndexedLink[],
-	): readonly TwoHopIndexedLink[];
-	buildFilteredTwoHopBranches(
-		branches: readonly TwoHopLinkBranch[],
-	): readonly TwoHopLinkBranch[];
-	collectUniqueTaggedNotes(taggedNotes: readonly TaggedNote[]): readonly TaggedNote[];
-}
-
-function adaptDeduplicationService(
-	service: LegacyDeduplicationService,
-): IDeduplicationService {
-	return {
-		collectUniqueBranches: (state, branches) => ({
-			state,
-			items: service.collectUniqueBranches(branches),
-		}),
-		collectUniqueBacklinks: (state, backlinks) => ({
-			state,
-			items: service.collectUniqueBacklinks(backlinks),
-		}),
-		buildFilteredTwoHopBranches: (state, branches) => ({
-			state,
-			items: service.buildFilteredTwoHopBranches(branches),
-		}),
-		collectUniqueTaggedNotes: (state, taggedNotes) => ({
-			state,
-			items: service.collectUniqueTaggedNotes(taggedNotes),
-		}),
-	};
+function preprocessDisplayData(
+	linkResult: TwoHopLinkResult | undefined,
+	settings: PluginSettings,
+): PreprocessedDisplayData {
+	const builder = createDisplayDataBuilder({ sortService: mockSortService });
+	const linkResultData = builder.preprocessLinkDisplayData(linkResult, settings);
+	const tagPreprocessed = builder.preprocessTagDisplayData(
+		linkResult,
+		settings,
+		linkResultData.state,
+	);
+	return { ...linkResultData.data, ...tagPreprocessed };
 }
 
 function buildDisplayData(
@@ -82,13 +58,8 @@ function buildDisplayData(
 	settings: PluginSettings,
 	sortOption: SortOption,
 	sortService: ISortService,
-	deduplicationService?: IDeduplicationService,
 ): DisplayData {
-	const preprocessed = preprocessDisplayData(
-		linkResult,
-		settings,
-		deduplicationService,
-	);
+	const preprocessed = preprocessDisplayData(linkResult, settings);
 	return sortAndAssembleDisplayData(preprocessed, settings, sortOption, sortService);
 }
 
@@ -532,7 +503,6 @@ describe("DisplayDataBuilder - buildDisplayData", () => {
 				settings,
 				"alphabetical",
 				mockSortService,
-				undefined, // deduplicationService なし
 			);
 
 			// Assert
@@ -541,7 +511,7 @@ describe("DisplayDataBuilder - buildDisplayData", () => {
 			expect(result.outgoing[1].hop1.path).toBe("duplicate.md");
 		});
 
-		test("when deduplicationService is provided, deduplication runs and is reflected in results", () => {
+		test("when dedupe is enabled, duplicates are removed across display sections", () => {
 			// Arrange
 			const branch1 = {
 				hop1: {
@@ -556,7 +526,7 @@ describe("DisplayDataBuilder - buildDisplayData", () => {
 			const branch2 = {
 				hop1: {
 					rawText: "link2",
-					path: "link2.md",
+					path: "link1.md",
 					isUnresolved: false,
 					sourceFile: createMockTFile("origin.md"),
 				},
@@ -587,41 +557,17 @@ describe("DisplayDataBuilder - buildDisplayData", () => {
 				dedupeCards: true,
 			};
 
-			// mockの deduplicationService
-			const mockDeduplicationService: LegacyDeduplicationService = {
-				collectUniqueBranches: vi.fn((branches) => [branches[0]]), // 1つ目だけ返す
-				collectUniqueBacklinks: vi.fn((backlinks) => backlinks),
-				buildFilteredTwoHopBranches: vi.fn(() => []),
-				collectUniqueTaggedNotes: vi.fn((notes) => notes),
-			};
-
 			// Act
 			const result = buildDisplayData(
 				linkResult,
 				settings,
 				"alphabetical",
 				mockSortService,
-				adaptDeduplicationService(mockDeduplicationService),
 			);
 
 			// Assert
-			// mock関数が呼ばれたことを確認
-			expect(mockDeduplicationService.collectUniqueBranches).toHaveBeenCalledWith(
-				[branch1, branch2],
-			);
-			expect(
-				mockDeduplicationService.collectUniqueBacklinks,
-			).toHaveBeenCalledWith([backlink]);
-			expect(
-				mockDeduplicationService.collectUniqueTaggedNotes,
-			).toHaveBeenCalledWith([taggedNote]);
-			expect(
-				mockDeduplicationService.buildFilteredTwoHopBranches,
-			).toHaveBeenCalled();
-
-			// 重複排除が反映されていることを確認
 			expect(result.outgoing).toHaveLength(1);
-			expect(result.outgoing[0].hop1.rawText).toBe("link1"); // collectUniqueBranches が [branch1] を返したため
+			expect(result.outgoing[0].hop1.rawText).toBe("link1");
 			expect(result.backlinks).toHaveLength(1);
 			expect(result.backlinks[0].rawText).toBe("backlink");
 			expect(result.tagGroups).toHaveLength(1);
@@ -729,7 +675,6 @@ describe("DisplayDataBuilder - buildDisplayData", () => {
 				},
 				"alphabetical",
 				mockSortService,
-				createDeduplicationService(),
 			);
 
 			expect(result.outgoing).toHaveLength(2);
@@ -740,7 +685,7 @@ describe("DisplayDataBuilder - buildDisplayData", () => {
 			).toEqual(["note.md"]);
 		});
 
-		test("reuses source arrays when excludeAttachments removes nothing", () => {
+		test("keeps non-attachments when excludeAttachments removes nothing", () => {
 			const branch = {
 				hop1: {
 					rawText: "note-branch",
@@ -771,14 +716,8 @@ describe("DisplayDataBuilder - buildDisplayData", () => {
 			const branches = [branch];
 			const backlinks = [backlink];
 			const taggedNotes = [taggedNote];
-			const mockDeduplicationService: LegacyDeduplicationService = {
-				collectUniqueBranches: vi.fn((items) => items),
-				collectUniqueBacklinks: vi.fn((items) => items),
-				buildFilteredTwoHopBranches: vi.fn((items) => items),
-				collectUniqueTaggedNotes: vi.fn((items) => items),
-			};
 
-			preprocessDisplayData(
+			const preprocessed = preprocessDisplayData(
 				{
 					originFile: createMockTFile("origin.md"),
 					branches,
@@ -789,21 +728,11 @@ describe("DisplayDataBuilder - buildDisplayData", () => {
 					...defaultSettings,
 					excludeAttachments: true,
 				},
-				adaptDeduplicationService(mockDeduplicationService),
 			);
 
-			expect(mockDeduplicationService.collectUniqueBranches).toHaveBeenCalledWith(
-				branches,
-			);
-			expect(
-				mockDeduplicationService.collectUniqueBacklinks,
-			).toHaveBeenCalledWith(backlinks);
-			expect(
-				mockDeduplicationService.buildFilteredTwoHopBranches,
-			).toHaveBeenCalledWith(branches);
-			expect(
-				mockDeduplicationService.collectUniqueTaggedNotes,
-			).toHaveBeenCalledWith(taggedNotes);
+			expect(preprocessed.resolvedBranches).toEqual(branches);
+			expect(preprocessed.resolvedBacklinks).toEqual(backlinks);
+			expect(preprocessed.taggedNotes).toEqual(taggedNotes);
 		});
 	});
 
@@ -859,6 +788,7 @@ describe("DisplayDataBuilder - buildDisplayData", () => {
 
 			const settings = {
 				...defaultSettings,
+				dedupeCards: false,
 				twoHopHeaderSortOrder: "appearance" as const,
 			};
 
@@ -934,6 +864,7 @@ describe("DisplayDataBuilder - buildDisplayData", () => {
 
 			const settings = {
 				...defaultSettings,
+				dedupeCards: false,
 				twoHopHeaderSortOrder: "hop2-count-asc" as const,
 			};
 
@@ -1005,6 +936,7 @@ describe("DisplayDataBuilder - buildDisplayData", () => {
 				},
 				{
 					...defaultSettings,
+					dedupeCards: false,
 					twoHopHeaderSortOrder: "hop2-count-asc",
 				},
 			);
@@ -1051,7 +983,7 @@ describe("DisplayDataBuilder - buildDisplayData", () => {
 			// Act
 			const result = buildDisplayData(
 				linkResult,
-				defaultSettings,
+				{ ...defaultSettings, dedupeCards: false },
 				"alphabetical",
 				mockSortService,
 			);
@@ -1267,10 +1199,7 @@ describe("DisplayDataBuilder - buildDisplayData", () => {
 				backlinks: [],
 				taggedNotes: [],
 			};
-			const preprocessed = builder.preprocessDisplayData(
-				linkResult,
-				defaultSettings,
-			);
+			const preprocessed = preprocessDisplayData(linkResult, defaultSettings);
 
 			const first = builder.sortAndAssembleDisplayData(
 				preprocessed,
@@ -1372,7 +1301,7 @@ describe("DisplayDataBuilder - buildDisplayData", () => {
 
 			const result = buildDisplayData(
 				linkResult,
-				defaultSettings,
+				{ ...defaultSettings, dedupeCards: false },
 				"alphabetical",
 				sortService,
 			);
@@ -1725,6 +1654,7 @@ describe("DisplayDataBuilder - buildDisplayData", () => {
 			};
 			const settings = {
 				...defaultSettings,
+				dedupeCards: false,
 				useMergedLinksSection: true,
 				showTagsSection: false,
 			};
@@ -1962,25 +1892,15 @@ describe("DisplayDataBuilder - buildDisplayData", () => {
 			};
 
 			const groupNotesByTagSpy = vi.spyOn(grouping, "groupNotesByTag");
-			const mockDeduplicationService: LegacyDeduplicationService = {
-				collectUniqueBranches: vi.fn((branches) => branches),
-				collectUniqueBacklinks: vi.fn((backlinks) => backlinks),
-				buildFilteredTwoHopBranches: vi.fn((branches) => branches),
-				collectUniqueTaggedNotes: vi.fn((notes) => notes),
-			};
 
 			const result = buildDisplayData(
 				linkResult,
 				settings,
 				"alphabetical",
 				mockSortService,
-				adaptDeduplicationService(mockDeduplicationService),
 			);
 
 			expect(result.tagGroups).toHaveLength(0);
-			expect(
-				mockDeduplicationService.collectUniqueTaggedNotes,
-			).not.toHaveBeenCalled();
 			expect(groupNotesByTagSpy).not.toHaveBeenCalled();
 		});
 
@@ -2040,19 +1960,19 @@ describe("DisplayDataBuilder - buildDisplayData", () => {
 						rawText: "hop2-1",
 						path: "hop2-1.md",
 						isUnresolved: false,
-						sourceFile: createMockTFile("duplicate.md"),
+						sourceFile: createMockTFile("hop2-source-1.md"),
 					},
 					{
 						rawText: "hop2-2",
 						path: "hop2-2.md",
 						isUnresolved: false,
-						sourceFile: createMockTFile("duplicate.md"),
+						sourceFile: createMockTFile("hop2-source-2.md"),
 					},
 					{
 						rawText: "hop2-3",
 						path: "hop2-3.md",
 						isUnresolved: false,
-						sourceFile: createMockTFile("duplicate.md"),
+						sourceFile: createMockTFile("hop2-source-3.md"),
 					},
 				],
 			};
@@ -2068,7 +1988,7 @@ describe("DisplayDataBuilder - buildDisplayData", () => {
 						rawText: "hop2-4",
 						path: "hop2-4.md",
 						isUnresolved: false,
-						sourceFile: createMockTFile("duplicate.md"),
+						sourceFile: createMockTFile("hop2-source-4.md"),
 					},
 				],
 			};
@@ -2084,13 +2004,13 @@ describe("DisplayDataBuilder - buildDisplayData", () => {
 						rawText: "hop2-5",
 						path: "hop2-5.md",
 						isUnresolved: false,
-						sourceFile: createMockTFile("distinct.md"),
+						sourceFile: createMockTFile("hop2-source-5.md"),
 					},
 					{
 						rawText: "hop2-6",
 						path: "hop2-6.md",
 						isUnresolved: false,
-						sourceFile: createMockTFile("distinct.md"),
+						sourceFile: createMockTFile("hop2-source-6.md"),
 					},
 				],
 			};
@@ -2099,19 +2019,6 @@ describe("DisplayDataBuilder - buildDisplayData", () => {
 				hop2: [...duplicateBranchLarge.hop2, ...duplicateBranchSmall.hop2],
 			};
 			const filteredTwoHopBranches = [dedupedBranch, distinctBranch];
-			const mockDeduplicationService: LegacyDeduplicationService = {
-				collectUniqueBranches: vi.fn(() => [dedupedBranch, distinctBranch]),
-				collectUniqueBacklinks: vi.fn(() => []),
-				buildFilteredTwoHopBranches: vi.fn((branches) => {
-					expect(branches).toEqual([
-						duplicateBranchLarge,
-						duplicateBranchSmall,
-						distinctBranch,
-					]);
-					return filteredTwoHopBranches;
-				}),
-				collectUniqueTaggedNotes: vi.fn(() => []),
-			};
 
 			const preprocessed = preprocessDisplayData(
 				{
@@ -2129,17 +2036,16 @@ describe("DisplayDataBuilder - buildDisplayData", () => {
 					dedupeCards: true,
 					twoHopHeaderSortOrder: "hop2-count-asc" as const,
 				},
-				adaptDeduplicationService(mockDeduplicationService),
 			);
 
-			expect(preprocessed.twoHopBranches).toBe(filteredTwoHopBranches);
+			expect(preprocessed.twoHopBranches).toEqual(filteredTwoHopBranches);
 			expect(preprocessed.nonEmptyTwoHopBranches).toEqual([
 				distinctBranch,
 				dedupedBranch,
 			]);
 		});
 
-		test("when dedupe is enabled, buildFilteredTwoHopBranches result is used directly for nonEmptyTwoHopBranches", () => {
+		test("when dedupe is enabled, unresolved links remain in newLinks", () => {
 			const resolvedBranch = {
 				hop1: {
 					rawText: "resolved-branch",
@@ -2172,34 +2078,6 @@ describe("DisplayDataBuilder - buildDisplayData", () => {
 				sourceFile: createMockTFile("unresolved-backlink.md"),
 				backlinkCount: 0,
 			};
-			const filteredTwoHopBranches = [
-				{
-					hop1: {
-						rawText: "two-hop",
-						path: "two-hop.md",
-						isUnresolved: false,
-						sourceFile: createMockTFile("origin.md"),
-					},
-					hop2: [
-						{
-							rawText: "hop2",
-							path: "hop2.md",
-							isUnresolved: false,
-							sourceFile: createMockTFile("hop2-source.md"),
-						},
-					],
-				},
-			];
-			const mockDeduplicationService: LegacyDeduplicationService = {
-				collectUniqueBranches: vi.fn(() => [resolvedBranch, unresolvedBranch]),
-				collectUniqueBacklinks: vi.fn(() => [
-					resolvedBacklink,
-					unresolvedBacklink,
-				]),
-				buildFilteredTwoHopBranches: vi.fn(() => filteredTwoHopBranches),
-				collectUniqueTaggedNotes: vi.fn(() => []),
-			};
-
 			const preprocessed = preprocessDisplayData(
 				{
 					originFile: createMockTFile("origin.md"),
@@ -2211,7 +2089,6 @@ describe("DisplayDataBuilder - buildDisplayData", () => {
 					...defaultSettings,
 					dedupeCards: true,
 				},
-				adaptDeduplicationService(mockDeduplicationService),
 			);
 
 			expect(preprocessed.resolvedBranches).toEqual([resolvedBranch]);
@@ -2224,8 +2101,8 @@ describe("DisplayDataBuilder - buildDisplayData", () => {
 				unresolvedBranch.hop1,
 				unresolvedBacklink,
 			]);
-			expect(preprocessed.twoHopBranches).toBe(filteredTwoHopBranches);
-			expect(preprocessed.nonEmptyTwoHopBranches).toBe(filteredTwoHopBranches);
+			expect(preprocessed.twoHopBranches).toEqual([]);
+			expect(preprocessed.nonEmptyTwoHopBranches).toEqual([]);
 		});
 
 		test("nonEmptyTwoHopBranches and mergedBaseItems are determined in preprocessing", () => {
@@ -2268,7 +2145,7 @@ describe("DisplayDataBuilder - buildDisplayData", () => {
 					backlinks: [backlink],
 					taggedNotes: [],
 				},
-				defaultSettings,
+				{ ...defaultSettings, dedupeCards: false },
 			);
 
 			expect(preprocessed.nonEmptyTwoHopBranches).toEqual([branchWithHop2]);
@@ -2342,6 +2219,7 @@ describe("DisplayDataBuilder - buildDisplayData", () => {
 
 			const settings = {
 				...defaultSettings,
+				dedupeCards: false,
 				useMergedLinksSection: true,
 				twoHopHeaderSortOrder: "hop2-count-asc" as const,
 			};

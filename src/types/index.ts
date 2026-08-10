@@ -21,7 +21,6 @@ export type {
 	IMetricProvider,
 	SortMetricKind,
 	ISortService,
-	IDeduplicationService,
 } from "./services";
 
 export type { DedupResult, DedupState } from "./deduplication";

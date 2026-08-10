@@ -6,6 +6,8 @@ import type {
 	LinkPreprocessedDisplayData,
 	TagPreprocessedDisplayData,
 } from "features/two-hop/application/displayDataBuilder";
+import { createDedupState } from "core/deduplication/usageTracker";
+import type { DedupState } from "types/deduplication";
 import type { TaggedNote, TwoHopIndexedLink, TwoHopLinkResult } from "types/domain";
 import { DEFAULT_SETTINGS, type PluginSettings } from "features/settings/model";
 import {
@@ -43,34 +45,44 @@ function createLinkResult(
 }
 
 function createFullDedupeBuilder() {
-	const preprocessLinkDisplayData = vi.fn();
-	const preprocessTagDisplayData = vi.fn();
-	const preprocessDisplayData = vi.fn(
-		(linkResult: TwoHopLinkResult | undefined, settings: PluginSettings) => {
-			const usedKeys = new Set<string>();
-			const resolvedBacklinks =
-				linkResult?.backlinks.filter((backlink) => {
-					const key = backlink.path ?? backlink.rawText;
-					if (usedKeys.has(key)) return false;
-					usedKeys.add(key);
-					return true;
-				}) ?? [];
+	const preprocessLinkDisplayData = vi.fn(
+		(linkResult: TwoHopLinkResult | undefined) => {
+			const resolvedBacklinks = linkResult?.backlinks ?? [];
+			return {
+				state: {
+					usedKeys: new Set(
+						resolvedBacklinks.map(
+							(backlink) => `f:${backlink.sourceFile.path.toLowerCase()}`,
+						),
+					),
+				},
+				data: {
+					resolvedBranches: [],
+					resolvedBacklinks,
+					mergedBaseItems: [...resolvedBacklinks],
+					twoHopBranches: [],
+					nonEmptyTwoHopBranches: [],
+					newLinks: [],
+				},
+			};
+		},
+	);
+	const preprocessTagDisplayData = vi.fn(
+		(
+			linkResult: TwoHopLinkResult | undefined,
+			settings: PluginSettings,
+			initialState: DedupState,
+		) => {
 			const taggedNotes =
 				settings.showTagsSection && linkResult
-					? linkResult.taggedNotes.filter((taggedNote) => {
-							if (usedKeys.has(taggedNote.path)) return false;
-							usedKeys.add(taggedNote.path);
-							return true;
-						})
+					? linkResult.taggedNotes.filter(
+							(note) =>
+								!initialState.usedKeys.has(
+									`f:${note.path.toLowerCase()}`,
+								),
+						)
 					: [];
-
 			return {
-				resolvedBranches: [],
-				resolvedBacklinks,
-				mergedBaseItems: [...resolvedBacklinks],
-				twoHopBranches: [],
-				nonEmptyTwoHopBranches: [],
-				newLinks: [],
 				taggedNotes,
 				rawTagGroups: taggedNotes.length
 					? [{ tag: "#tag", notes: taggedNotes }]
@@ -80,7 +92,6 @@ function createFullDedupeBuilder() {
 	);
 
 	const builder: DisplayDataBuilder = {
-		preprocessDisplayData,
 		preprocessLinkDisplayData,
 		preprocessTagDisplayData,
 		sortAndAssembleDisplayData: vi.fn(),
@@ -91,7 +102,6 @@ function createFullDedupeBuilder() {
 
 	return {
 		builder,
-		preprocessDisplayData,
 		preprocessLinkDisplayData,
 		preprocessTagDisplayData,
 	};
@@ -121,16 +131,16 @@ const PREPROCESS_SETTING_KEYS = [
 
 function createCacheProbeBuilder() {
 	const preprocessLinkDisplayData = vi.fn(
-		(
-			_linkResult: TwoHopLinkResult | undefined,
-			_settings: PluginSettings,
-		): LinkPreprocessedDisplayData => ({
-			resolvedBranches: [],
-			resolvedBacklinks: [],
-			mergedBaseItems: [],
-			twoHopBranches: [],
-			nonEmptyTwoHopBranches: [],
-			newLinks: [],
+		(_linkResult: TwoHopLinkResult | undefined, _settings: PluginSettings) => ({
+			state: createDedupState(),
+			data: {
+				resolvedBranches: [],
+				resolvedBacklinks: [],
+				mergedBaseItems: [],
+				twoHopBranches: [],
+				nonEmptyTwoHopBranches: [],
+				newLinks: [],
+			} satisfies LinkPreprocessedDisplayData,
 		}),
 	);
 	const preprocessTagDisplayData = vi.fn(
@@ -142,12 +152,7 @@ function createCacheProbeBuilder() {
 			rawTagGroups: [],
 		}),
 	);
-	const preprocessDisplayData = vi.fn((linkResult, settings) => ({
-		...preprocessLinkDisplayData(linkResult, settings),
-		...preprocessTagDisplayData(linkResult, settings),
-	}));
 	const builder: DisplayDataBuilder = {
-		preprocessDisplayData,
 		preprocessLinkDisplayData,
 		preprocessTagDisplayData,
 		sortAndAssembleDisplayData: vi.fn(),
@@ -158,7 +163,6 @@ function createCacheProbeBuilder() {
 
 	return {
 		builder,
-		preprocessDisplayData,
 		preprocessLinkDisplayData,
 		preprocessTagDisplayData,
 	};
@@ -189,12 +193,8 @@ describe("DisplayStateCalculator", () => {
 	])(
 		"ignores taggedNotes identity with dedupeCards=$dedupeCards when $inactiveReason",
 		({ dedupeCards, inactiveTagSetting }) => {
-			const {
-				builder,
-				preprocessDisplayData,
-				preprocessLinkDisplayData,
-				preprocessTagDisplayData,
-			} = createCacheProbeBuilder();
+			const { builder, preprocessLinkDisplayData, preprocessTagDisplayData } =
+				createCacheProbeBuilder();
 			const cache = createPreprocessedDisplayDataCache();
 			const settings = {
 				...DEFAULT_SETTINGS,
@@ -220,19 +220,14 @@ describe("DisplayStateCalculator", () => {
 			);
 
 			expect(second).toBe(first);
-			expect(preprocessDisplayData).toHaveBeenCalledTimes(dedupeCards ? 1 : 0);
 			expect(preprocessLinkDisplayData).toHaveBeenCalledTimes(1);
 			expect(preprocessTagDisplayData).toHaveBeenCalledTimes(1);
 		},
 	);
 
-	it("uses full preprocessing when dedupeCards is enabled", () => {
-		const {
-			builder,
-			preprocessDisplayData,
-			preprocessLinkDisplayData,
-			preprocessTagDisplayData,
-		} = createFullDedupeBuilder();
+	it("reuses link preprocessing for a tag-only update with dedupe enabled", () => {
+		const { builder, preprocessLinkDisplayData, preprocessTagDisplayData } =
+			createFullDedupeBuilder();
 		const backlinks = [createBacklink("shared.md")];
 		const cache = createPreprocessedDisplayDataCache();
 		const settings = {
@@ -259,18 +254,21 @@ describe("DisplayStateCalculator", () => {
 		);
 
 		expect(cached.preprocessed).toBe(first.preprocessed);
-		expect(preprocessDisplayData).toHaveBeenCalledTimes(1);
-		expect(preprocessLinkDisplayData).not.toHaveBeenCalled();
-		expect(preprocessTagDisplayData).not.toHaveBeenCalled();
+		expect(preprocessLinkDisplayData).toHaveBeenCalledTimes(1);
+		expect(preprocessTagDisplayData).toHaveBeenCalledTimes(1);
 
 		const next = computePreprocessedDisplayDataState(
 			builder,
-			createLinkResult(backlinks, [createTaggedNote("unique.md")]),
+			{
+				...linkResult,
+				taggedNotes: [createTaggedNote("unique.md")],
+			},
 			settings,
 			cache,
 		);
 
-		expect(preprocessDisplayData).toHaveBeenCalledTimes(2);
+		expect(preprocessLinkDisplayData).toHaveBeenCalledTimes(1);
+		expect(preprocessTagDisplayData).toHaveBeenCalledTimes(2);
 		expect(next.preprocessed?.taggedNotes.map((note) => note.path)).toEqual([
 			"unique.md",
 		]);
@@ -303,7 +301,11 @@ describe("DisplayStateCalculator", () => {
 			);
 
 			expect(second.preprocessed).not.toBe(first.preprocessed);
-			expect(preprocessLinkDisplayData).toHaveBeenCalledTimes(1);
+			expect(preprocessLinkDisplayData).toHaveBeenCalledTimes(
+				settingKey === "tagFeaturesEnabled" || settingKey === "showTagsSection"
+					? 0
+					: 1,
+			);
 			expect(preprocessTagDisplayData).toHaveBeenCalledTimes(1);
 		},
 	);

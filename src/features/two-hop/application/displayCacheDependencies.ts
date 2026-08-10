@@ -68,16 +68,6 @@ export function createTagPreprocessCacheKey(settings: PluginSettings): string {
 	]);
 }
 
-export function createPreprocessCacheKey(settings: PluginSettings): string {
-	return JSON.stringify([
-		settings.excludeAttachments,
-		settings.twoHopHeaderSortOrder,
-		settings.dedupeCards,
-		areTagFeaturesEnabled(settings),
-		settings.showTagsSection,
-	]);
-}
-
 export function createDisplayAssemblyCacheKey(
 	settings: PluginSettings,
 	sortOption: SortOption,

@@ -16,7 +16,6 @@ import {
 	createDisplayDataBuilder,
 	type DisplayDataBuilder,
 } from "features/two-hop/application/displayDataBuilder";
-import { createDeduplicationService } from "core/deduplication/deduplicationService";
 import { setEnableLogging } from "shared/logging/logger";
 import type { ResolveTwoHopLinks } from "features/two-hop/application/TwoHopLinksLoader";
 import { installCCLDebugExposure } from "infrastructure/debug/CCLDebugExposure";
@@ -186,10 +185,6 @@ export default class CosenseCardLinksPlugin extends Plugin implements PluginHost
 	public createDisplayDataBuilder(): DisplayDataBuilder {
 		return createDisplayDataBuilder({
 			sortService: this.sortService,
-			createDeduplicationService: (settings: PluginSettings) => {
-				const dedupeEnabled = settings?.dedupeCards ?? true;
-				return dedupeEnabled ? createDeduplicationService() : undefined;
-			},
 			getSortContextVersion: () => this.getSortContextVersion(),
 		});
 	}

@@ -27,6 +27,7 @@ import {
 } from "features/settings/model";
 import { buildDetailedBacklinksArtifactsChunked } from "core/indexing/backlink-builder/backlinkIndexer";
 import { TagIndexStore } from "core/indexing/tag-index/TagIndexStore";
+import { createDedupState } from "core/deduplication/usageTracker";
 import { VaultEnvironmentBuilder } from "testing/helpers/VaultEnvironmentBuilder";
 
 function createEmptyDisplayData(): DisplayData {
@@ -148,10 +149,20 @@ function createStagedBuildDisplayDataMock() {
 	);
 
 	const builder: DisplayDataBuilder = {
-		preprocessDisplayData,
-		preprocessLinkDisplayData: vi.fn((linkResult, settings) =>
-			preprocessDisplayData(linkResult, settings),
-		),
+		preprocessLinkDisplayData: vi.fn((linkResult, settings) => {
+			const preprocessed = preprocessDisplayData(linkResult, settings);
+			return {
+				state: createDedupState(),
+				data: {
+					resolvedBranches: preprocessed.resolvedBranches,
+					resolvedBacklinks: preprocessed.resolvedBacklinks,
+					mergedBaseItems: preprocessed.mergedBaseItems,
+					twoHopBranches: preprocessed.twoHopBranches,
+					nonEmptyTwoHopBranches: preprocessed.nonEmptyTwoHopBranches,
+					newLinks: preprocessed.newLinks,
+				},
+			};
+		}),
 		preprocessTagDisplayData: vi.fn((linkResult, settings) => ({
 			taggedNotes: preprocessDisplayData(linkResult, settings).taggedNotes,
 			rawTagGroups: preprocessDisplayData(linkResult, settings).rawTagGroups,
@@ -175,14 +186,17 @@ function createSplitStagedBuildDisplayDataMock() {
 			const resolvedBranches = linkResult?.branches ?? [];
 			const resolvedBacklinks = linkResult?.backlinks ?? [];
 			return {
-				resolvedBranches,
-				resolvedBacklinks,
-				mergedBaseItems: [...resolvedBranches, ...resolvedBacklinks],
-				twoHopBranches: resolvedBranches,
-				nonEmptyTwoHopBranches: resolvedBranches.filter(
-					(branch) => branch.hop2.length > 0,
-				),
-				newLinks: [],
+				state: createDedupState(),
+				data: {
+					resolvedBranches,
+					resolvedBacklinks,
+					mergedBaseItems: [...resolvedBranches, ...resolvedBacklinks],
+					twoHopBranches: resolvedBranches,
+					nonEmptyTwoHopBranches: resolvedBranches.filter(
+						(branch) => branch.hop2.length > 0,
+					),
+					newLinks: [],
+				},
 			};
 		},
 	);
@@ -293,12 +307,6 @@ function createSplitStagedBuildDisplayDataMock() {
 	);
 
 	const builder: DisplayDataBuilder = {
-		preprocessDisplayData: vi.fn(
-			(linkResult: TwoHopLinkResult | undefined, settings: PluginSettings) => ({
-				...preprocessLinkDisplayData(linkResult, settings),
-				...preprocessTagDisplayData(linkResult, settings),
-			}),
-		),
 		preprocessLinkDisplayData,
 		preprocessTagDisplayData,
 		sortAndAssembleDisplayData,

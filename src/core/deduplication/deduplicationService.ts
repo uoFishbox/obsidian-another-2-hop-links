@@ -1,178 +1,152 @@
-import type { TwoHopLinkBranch, TwoHopIndexedLink } from "types/domain";
-import type { TaggedNote } from "types/domain";
-import type { IDeduplicationService } from "types";
-import * as keyGenerator from "./keyGenerator";
-import { type MergedBranchEntry, filterMergedBranchHop2 } from "./branchMerge";
-import { createUsageTracker } from "./usageTracker";
+import type { TaggedNote, TwoHopIndexedLink, TwoHopLinkBranch } from "types/domain";
 import type { DedupResult, DedupState } from "types/deduplication";
+import * as keyGenerator from "./keyGenerator";
+import { createUsageTracker } from "./usageTracker";
+
+interface CanonicalBranchEntry {
+	hop1: TwoHopIndexedLink;
+	hop2: TwoHopIndexedLink[];
+	hop2UsageKeys: string[];
+	seenHop2UsageKeys: Set<string>;
+}
+
+export interface DeduplicatedLinkData {
+	readonly branches: readonly TwoHopLinkBranch[];
+	readonly backlinks: readonly TwoHopIndexedLink[];
+	readonly twoHopBranches: readonly TwoHopLinkBranch[];
+}
+
+export interface DeduplicatedLinkResult {
+	readonly data: DeduplicatedLinkData;
+	readonly state: DedupState;
+}
 
 /**
- * Creates stateless deduplication operations. Each operation returns its
- * consumption state explicitly so callers control cross-domain precedence.
+ * Deduplicates link sections in branch, backlink, then hop2 precedence order.
+ * Branch keys and merged hop2 entries are collected in one branch walk.
  */
-export function createDeduplicationService(): IDeduplicationService {
-	function createBranchMap(
-		branches: readonly TwoHopLinkBranch[],
-	): Map<string, MergedBranchEntry> {
-		const branchMap = new Map<string, MergedBranchEntry>();
-		for (let index = 0; index < branches.length; index += 1) {
-			const branch = branches[index];
-			const keys = keyGenerator.getBranchKeys(branch);
-			mergeBranchIntoMap(branchMap, branch, keys.displayKey);
+export function deduplicateLinks(
+	state: DedupState,
+	branches: readonly TwoHopLinkBranch[],
+	backlinks: readonly TwoHopIndexedLink[],
+): DeduplicatedLinkResult {
+	const tracker = createUsageTracker(state);
+	const canonicalBranches = new Map<string, CanonicalBranchEntry>();
+	const seenPrimaryDisplayKeys = new Set<string>();
+	let uniqueBranches: TwoHopLinkBranch[] | undefined;
+
+	for (let index = 0; index < branches.length; index += 1) {
+		const branch = branches[index];
+		const keys = keyGenerator.getBranchKeys(branch);
+		mergeCanonicalBranch(canonicalBranches, branch, keys.displayKey);
+
+		if (
+			seenPrimaryDisplayKeys.has(keys.displayKey) ||
+			!tracker.tryMarkUsed(keys.usageKey)
+		) {
+			uniqueBranches ??= branches.slice(0, index);
+			continue;
 		}
-		return branchMap;
+
+		seenPrimaryDisplayKeys.add(keys.displayKey);
+		uniqueBranches?.push(branch);
 	}
 
-	function mergeBranchIntoMap(
-		branchMap: Map<string, MergedBranchEntry>,
-		branch: TwoHopLinkBranch,
-		displayKey: string,
-	): void {
-		const existing = branchMap.get(displayKey);
-		if (existing) {
-			appendUniqueHop2(existing.hop2, existing.hop2UsageKeys, branch.hop2);
-			return;
+	let uniqueBacklinks: TwoHopIndexedLink[] | undefined;
+	for (let index = 0; index < backlinks.length; index += 1) {
+		const backlink = backlinks[index];
+		if (!tracker.tryMarkUsed(keyGenerator.getLinkUsageKey(backlink))) {
+			uniqueBacklinks ??= backlinks.slice(0, index);
+			continue;
 		}
 
-		const hop2: TwoHopIndexedLink[] = [];
-		const hop2UsageKeys: string[] = [];
-		appendUniqueHop2(hop2, hop2UsageKeys, branch.hop2);
-		branchMap.set(displayKey, {
-			hop1: branch.hop1,
-			hop2,
-			hop2UsageKeys,
-		});
-	}
-
-	function appendUniqueHop2(
-		entries: TwoHopIndexedLink[],
-		usageKeys: string[],
-		links: readonly TwoHopIndexedLink[],
-	): void {
-		if (links.length === 0) return;
-
-		const seen = new Set(usageKeys);
-		for (const link of links) {
-			const usageKey = keyGenerator.getLinkUsageKey(link);
-			if (seen.has(usageKey)) continue;
-			seen.add(usageKey);
-			entries.push(link);
-			usageKeys.push(usageKey);
-		}
-	}
-
-	function collectUniqueBranches(
-		state: DedupState,
-		branches: readonly TwoHopLinkBranch[],
-	): DedupResult<TwoHopLinkBranch> {
-		if (branches.length === 0) {
-			return { state, items: branches };
-		}
-
-		const tracker = createUsageTracker(state);
-		const seenDisplayKeys = new Set<string>();
-		let filteredItems: TwoHopLinkBranch[] | undefined;
-
-		for (let index = 0; index < branches.length; index += 1) {
-			const branch = branches[index];
-			const keys = keyGenerator.getBranchKeys(branch);
-			if (seenDisplayKeys.has(keys.displayKey)) {
-				filteredItems ??= branches.slice(0, index);
-				continue;
-			}
-
-			if (!tracker.tryMarkUsed(keys.usageKey)) {
-				filteredItems ??= branches.slice(0, index);
-				continue;
-			}
-
-			seenDisplayKeys.add(keys.displayKey);
-			filteredItems?.push(branch);
-		}
-
-		return {
-			state: tracker.getState(),
-			items: filteredItems ?? branches,
-		};
-	}
-
-	function collectUniqueBacklinks(
-		state: DedupState,
-		backlinks: readonly TwoHopIndexedLink[],
-	): DedupResult<TwoHopIndexedLink> {
-		if (backlinks.length === 0) {
-			return { state, items: backlinks };
-		}
-
-		const tracker = createUsageTracker(state);
-		let filteredItems: TwoHopIndexedLink[] | undefined;
-
-		for (let index = 0; index < backlinks.length; index += 1) {
-			const backlink = backlinks[index];
-			const usageKey = keyGenerator.getLinkUsageKey(backlink);
-			if (!tracker.tryMarkUsed(usageKey)) {
-				filteredItems ??= backlinks.slice(0, index);
-				continue;
-			}
-
-			filteredItems?.push(backlink);
-		}
-
-		return {
-			state: tracker.getState(),
-			items: filteredItems ?? backlinks,
-		};
-	}
-
-	function buildFilteredTwoHopBranches(
-		state: DedupState,
-		branches: readonly TwoHopLinkBranch[],
-	): DedupResult<TwoHopLinkBranch> {
-		if (branches.length === 0) {
-			return { state, items: branches };
-		}
-
-		const tracker = createUsageTracker(state);
-		const items = filterMergedBranchHop2(
-			createBranchMap(branches),
-			tracker.tryMarkUsed,
-		);
-		return { state: tracker.getState(), items };
-	}
-
-	function collectUniqueTaggedNotes(
-		state: DedupState,
-		taggedNotes: readonly TaggedNote[],
-	): DedupResult<TaggedNote> {
-		if (taggedNotes.length === 0) {
-			return { state, items: taggedNotes };
-		}
-
-		const tracker = createUsageTracker(state);
-		let filteredItems: TaggedNote[] | undefined;
-
-		for (let index = 0; index < taggedNotes.length; index += 1) {
-			const taggedNote = taggedNotes[index];
-			const usageKey =
-				taggedNote.usageKey ?? keyGenerator.getTaggedNoteKey(taggedNote);
-			if (!tracker.tryMarkUsed(usageKey)) {
-				filteredItems ??= taggedNotes.slice(0, index);
-				continue;
-			}
-
-			filteredItems?.push(taggedNote);
-		}
-
-		return {
-			state: tracker.getState(),
-			items: filteredItems ?? taggedNotes,
-		};
+		uniqueBacklinks?.push(backlink);
 	}
 
 	return {
-		collectUniqueBranches,
-		collectUniqueBacklinks,
-		buildFilteredTwoHopBranches,
-		collectUniqueTaggedNotes,
+		data: {
+			branches: uniqueBranches ?? branches,
+			backlinks: uniqueBacklinks ?? backlinks,
+			twoHopBranches: consumeCanonicalHop2(
+				canonicalBranches,
+				tracker.tryMarkUsed,
+			),
+		},
+		state: tracker.getState(),
 	};
+}
+
+/** Deduplicates tagged notes after all previously consumed sections. */
+export function deduplicateTaggedNotes(
+	state: DedupState,
+	taggedNotes: readonly TaggedNote[],
+): DedupResult<TaggedNote> {
+	if (taggedNotes.length === 0) {
+		return { state, items: taggedNotes };
+	}
+
+	const tracker = createUsageTracker(state);
+	let filteredItems: TaggedNote[] | undefined;
+
+	for (let index = 0; index < taggedNotes.length; index += 1) {
+		const taggedNote = taggedNotes[index];
+		const usageKey =
+			taggedNote.usageKey ?? keyGenerator.getTaggedNoteKey(taggedNote);
+		if (!tracker.tryMarkUsed(usageKey)) {
+			filteredItems ??= taggedNotes.slice(0, index);
+			continue;
+		}
+
+		filteredItems?.push(taggedNote);
+	}
+
+	return {
+		state: tracker.getState(),
+		items: filteredItems ?? taggedNotes,
+	};
+}
+
+function mergeCanonicalBranch(
+	canonicalBranches: Map<string, CanonicalBranchEntry>,
+	branch: TwoHopLinkBranch,
+	displayKey: string,
+): void {
+	let entry = canonicalBranches.get(displayKey);
+	if (!entry) {
+		entry = {
+			hop1: branch.hop1,
+			hop2: [],
+			hop2UsageKeys: [],
+			seenHop2UsageKeys: new Set<string>(),
+		};
+		canonicalBranches.set(displayKey, entry);
+	}
+
+	for (const link of branch.hop2) {
+		const usageKey = keyGenerator.getLinkUsageKey(link);
+		if (entry.seenHop2UsageKeys.has(usageKey)) continue;
+		entry.seenHop2UsageKeys.add(usageKey);
+		entry.hop2.push(link);
+		entry.hop2UsageKeys.push(usageKey);
+	}
+}
+
+function consumeCanonicalHop2(
+	canonicalBranches: ReadonlyMap<string, CanonicalBranchEntry>,
+	tryMarkUsed: (usageKey: string) => boolean,
+): TwoHopLinkBranch[] {
+	const result: TwoHopLinkBranch[] = [];
+
+	for (const entry of canonicalBranches.values()) {
+		const filteredHop2: TwoHopIndexedLink[] = [];
+		for (let index = 0; index < entry.hop2.length; index += 1) {
+			if (!tryMarkUsed(entry.hop2UsageKeys[index])) continue;
+			filteredHop2.push(entry.hop2[index]);
+		}
+
+		if (filteredHop2.length === 0) continue;
+		result.push({ hop1: entry.hop1, hop2: filteredHop2 });
+	}
+
+	return result;
 }

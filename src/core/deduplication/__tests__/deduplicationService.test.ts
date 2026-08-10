@@ -1,603 +1,169 @@
-import { describe, test, expect, beforeEach } from "vitest";
-import { createDeduplicationService } from "../deduplicationService";
+import { describe, expect, test, vi } from "vitest";
+import type { TFile } from "obsidian";
+import type { TaggedNote, TwoHopIndexedLink, TwoHopLinkBranch } from "types/domain";
+import { deduplicateLinks, deduplicateTaggedNotes } from "../deduplicationService";
 import { createDedupState } from "../usageTracker";
-import type { DedupState } from "types/deduplication";
-import type { TwoHopLinkBranch, TwoHopIndexedLink, TaggedNote } from "types/domain";
-import { type TFile } from "obsidian";
+import * as keyGenerator from "../keyGenerator";
 
 vi.mock("obsidian", () => ({
 	normalizePath: vi.fn((path: string) => path.replace(/\\/g, "/")),
 }));
 
-describe("DeduplicationService", () => {
-	let service: ReturnType<typeof createScopedDeduplicationService>;
+function createLink(
+	path: string | undefined,
+	sourcePath: string,
+	isUnresolved = false,
+): TwoHopIndexedLink {
+	return {
+		rawText: path ?? "Unresolved Link",
+		path,
+		isUnresolved,
+		sourceFile: { path: sourcePath } as TFile,
+	};
+}
 
-	beforeEach(() => {
-		vi.restoreAllMocks();
-		service = createScopedDeduplicationService();
+function createBranch(
+	path: string | undefined,
+	hop2: readonly TwoHopIndexedLink[] = [],
+	isUnresolved = false,
+): TwoHopLinkBranch {
+	return {
+		hop1: createLink(path, "origin.md", isUnresolved),
+		hop2,
+	};
+}
+
+function createTaggedNote(path: string, usageKey?: string): TaggedNote {
+	return {
+		file: { path } as TFile,
+		commonTags: ["#tag"],
+		path,
+		usageKey,
+	};
+}
+
+describe("deduplicateLinks", () => {
+	test("keeps unique branch and backlink arrays by reference", () => {
+		const branches = [createBranch("one.md"), createBranch("two.md")];
+		const backlinks = [createLink("target.md", "backlink.md")];
+
+		const result = deduplicateLinks(createDedupState(), branches, backlinks);
+
+		expect(result.data.branches).toBe(branches);
+		expect(result.data.backlinks).toBe(backlinks);
 	});
 
-	describe("collectUniqueBranches", () => {
-		test("all non-duplicate branches are kept", () => {
-			const branches: TwoHopLinkBranch[] = [
-				{
-					hop1: {
-						rawText: "[[Note1]]",
-						path: "note1.md",
-						isUnresolved: false,
-						sourceFile: { path: "source.md" } as TFile,
-					},
-					hop2: [],
-				},
-				{
-					hop1: {
-						rawText: "[[Note2]]",
-						path: "note2.md",
-						isUnresolved: false,
-						sourceFile: { path: "source.md" } as TFile,
-					},
-					hop2: [],
-				},
-			];
+	test("keeps the first hop1 and merges duplicate branch hop2 in source order", () => {
+		const firstHop2 = createLink("first-target.md", "first-source.md");
+		const repeatedHop2 = createLink("repeat-target.md", "first-source.md");
+		const secondHop2 = createLink("second-target.md", "second-source.md");
+		const first = createBranch("Note.md", [firstHop2]);
+		const duplicate = createBranch("note.md", [repeatedHop2, secondHop2]);
 
-			const result = service.collectUniqueBranches(branches);
+		const result = deduplicateLinks(createDedupState(), [first, duplicate], []);
 
-			expect(result).toHaveLength(2);
-			expect(result[0].hop1.path).toBe("note1.md");
-			expect(result[1].hop1.path).toBe("note2.md");
-		});
-
-		test("only the first branch with same path is kept", () => {
-			const branches: TwoHopLinkBranch[] = [
-				{
-					hop1: {
-						rawText: "[[Note]]",
-						path: "note.md",
-						isUnresolved: false,
-						sourceFile: { path: "source.md" } as TFile,
-					},
-					hop2: [],
-				},
-				{
-					hop1: {
-						rawText: "[[Note]]",
-						path: "note.md",
-						isUnresolved: false,
-						sourceFile: { path: "source.md" } as TFile,
-					},
-					hop2: [],
-				},
-			];
-
-			const result = service.collectUniqueBranches(branches);
-
-			expect(result).toHaveLength(1);
-			expect(result[0].hop1.path).toBe("note.md");
-		});
-
-		test("same path with different casing is treated as duplicate", () => {
-			const branches: TwoHopLinkBranch[] = [
-				{
-					hop1: {
-						rawText: "[[Note]]",
-						path: "Note.md",
-						isUnresolved: false,
-						sourceFile: { path: "source.md" } as TFile,
-					},
-					hop2: [],
-				},
-				{
-					hop1: {
-						rawText: "[[note]]",
-						path: "note.md",
-						isUnresolved: false,
-						sourceFile: { path: "source.md" } as TFile,
-					},
-					hop2: [],
-				},
-			];
-
-			const result = service.collectUniqueBranches(branches);
-
-			expect(result).toHaveLength(1);
-		});
-
-		test("paths differing only in separators are treated as duplicates", () => {
-			const branches: TwoHopLinkBranch[] = [
-				{
-					hop1: {
-						rawText: "[[Note]]",
-						path: "folder/note.md",
-						isUnresolved: false,
-						sourceFile: { path: "source.md" } as TFile,
-					},
-					hop2: [],
-				},
-				{
-					hop1: {
-						rawText: "[[Note]]",
-						path: "folder\\note.md",
-						isUnresolved: false,
-						sourceFile: { path: "source.md" } as TFile,
-					},
-					hop2: [],
-				},
-			];
-
-			const result = service.collectUniqueBranches(branches);
-
-			expect(result).toHaveLength(1);
-		});
-
-		test("unresolved links are also deduplicated", () => {
-			const branches: TwoHopLinkBranch[] = [
-				{
-					hop1: {
-						rawText: "Unresolved Link",
-						path: undefined,
-						isUnresolved: true,
-						sourceFile: { path: "source.md" } as TFile,
-					},
-					hop2: [],
-				},
-				{
-					hop1: {
-						rawText: "unresolved link",
-						path: undefined,
-						isUnresolved: true,
-						sourceFile: { path: "source.md" } as TFile,
-					},
-					hop2: [],
-				},
-			];
-
-			const result = service.collectUniqueBranches(branches);
-
-			expect(result).toHaveLength(1);
-		});
-
-		test("passing an empty array returns an empty array", () => {
-			const result = service.collectUniqueBranches([]);
-			expect(result).toHaveLength(0);
-		});
+		expect(result.data.branches).toEqual([first]);
+		expect(result.data.twoHopBranches).toEqual([
+			{ hop1: first.hop1, hop2: [firstHop2, secondHop2] },
+		]);
 	});
 
-	describe("collectUniqueBacklinks", () => {
-		test("all non-duplicate backlinks are kept", () => {
-			const backlinks: TwoHopIndexedLink[] = [
-				{
-					rawText: "[[Target]]",
-					path: "target.md",
-					isUnresolved: false,
-					sourceFile: { path: "source1.md" } as TFile,
-				},
-				{
-					rawText: "[[Target]]",
-					path: "target.md",
-					isUnresolved: false,
-					sourceFile: { path: "source2.md" } as TFile,
-				},
-			];
+	test("uses branch then backlink then hop2 precedence", () => {
+		const blockedByBacklink = createLink("hop-target.md", "backlink.md");
+		const remainingHop2 = createLink("hop-target-2.md", "hop-only.md");
+		const branch = createBranch("branch.md", [blockedByBacklink, remainingHop2]);
+		const blockedByBranch = createLink("target.md", "branch.md");
+		const backlink = createLink("target-2.md", "backlink.md");
 
-			const result = service.collectUniqueBacklinks(backlinks);
+		const result = deduplicateLinks(
+			createDedupState(),
+			[branch],
+			[blockedByBranch, backlink],
+		);
 
-			expect(result).toHaveLength(2);
-			expect(result[0].sourceFile.path).toBe("source1.md");
-			expect(result[1].sourceFile.path).toBe("source2.md");
-		});
-
-		test("only the first backlink from the same source file is kept", () => {
-			const backlinks: TwoHopIndexedLink[] = [
-				{
-					rawText: "[[Target]]",
-					path: "target.md",
-					isUnresolved: false,
-					sourceFile: { path: "source.md" } as TFile,
-				},
-				{
-					rawText: "[[Target]]",
-					path: "target.md",
-					isUnresolved: false,
-					sourceFile: { path: "source.md" } as TFile,
-				},
-			];
-
-			const result = service.collectUniqueBacklinks(backlinks);
-
-			expect(result).toHaveLength(1);
-			expect(result[0].sourceFile.path).toBe("source.md");
-		});
-
-		test("passing an empty array returns an empty array", () => {
-			const result = service.collectUniqueBacklinks([]);
-			expect(result).toHaveLength(0);
-		});
+		expect(result.data.branches).toEqual([branch]);
+		expect(result.data.backlinks).toEqual([backlink]);
+		expect(result.data.twoHopBranches).toEqual([
+			{ hop1: branch.hop1, hop2: [remainingHop2] },
+		]);
 	});
 
-	describe("buildFilteredTwoHopBranches", () => {
-		test("branches with the same displayKey are merged", () => {
-			const branches: TwoHopLinkBranch[] = [
-				{
-					hop1: {
-						rawText: "[[Note1]]",
-						path: "note1.md",
-						isUnresolved: false,
-						sourceFile: { path: "source.md" } as TFile,
-					},
-					hop2: [
-						{
-							rawText: "[[Hop2-1]]",
-							path: "hop2-1.md",
-							isUnresolved: false,
-							sourceFile: { path: "hop2-1-source.md" } as TFile,
-						},
-					],
-				},
-				{
-					hop1: {
-						rawText: "[[note1]]",
-						path: "Note1.md",
-						isUnresolved: false,
-						sourceFile: { path: "source.md" } as TFile,
-					},
-					hop2: [
-						{
-							rawText: "[[Hop2-2]]",
-							path: "hop2-2.md",
-							isUnresolved: false,
-							sourceFile: { path: "hop2-2-source.md" } as TFile,
-						},
-					],
-				},
-			];
+	test("computes branch keys once per input branch", () => {
+		const getBranchKeys = vi.spyOn(keyGenerator, "getBranchKeys");
+		const branches = [createBranch("one.md"), createBranch("one.md")];
 
-			const result = service.buildFilteredTwoHopBranches(branches);
+		deduplicateLinks(createDedupState(), branches, []);
 
-			expect(result).toHaveLength(1);
-			expect(result[0].hop2).toHaveLength(2);
-		});
-
-		test("results are stable across multiple calls with the same input", () => {
-			const branches: TwoHopLinkBranch[] = [
-				{
-					hop1: {
-						rawText: "[[Note1]]",
-						path: "note1.md",
-						isUnresolved: false,
-						sourceFile: { path: "source.md" } as TFile,
-					},
-					hop2: [
-						{
-							rawText: "[[Hop2-1]]",
-							path: "hop2-1.md",
-							isUnresolved: false,
-							sourceFile: { path: "hop2-1-source.md" } as TFile,
-						},
-					],
-				},
-				{
-					hop1: {
-						rawText: "[[Note2]]",
-						path: "note2.md",
-						isUnresolved: false,
-						sourceFile: { path: "source.md" } as TFile,
-					},
-					hop2: [
-						{
-							rawText: "[[Hop2-2]]",
-							path: "hop2-2.md",
-							isUnresolved: false,
-							sourceFile: { path: "hop2-2-source.md" } as TFile,
-						},
-					],
-				},
-			];
-
-			const service1 = createScopedDeduplicationService();
-			const service2 = createScopedDeduplicationService();
-
-			const result1 = service1.buildFilteredTwoHopBranches(branches);
-			const result2 = service2.buildFilteredTwoHopBranches(branches);
-
-			expect(result2).toHaveLength(result1.length);
-			expect(result2.map((b) => b.hop1.path)).toEqual(
-				result1.map((b) => b.hop1.path),
-			);
-		});
-
-		test("passing an empty array returns an empty array", () => {
-			const result = service.buildFilteredTwoHopBranches([]);
-			expect(result).toHaveLength(0);
-		});
+		expect(getBranchKeys).toHaveBeenCalledTimes(branches.length);
 	});
 
-	describe("collectUniqueTaggedNotes", () => {
-		test("all non-duplicate tagged notes are kept", () => {
-			const taggedNotes: TaggedNote[] = [
-				{
-					file: { path: "note1.md" } as TFile,
-					commonTags: ["#tag1"],
-					path: "note1.md",
-				},
-				{
-					file: { path: "note2.md" } as TFile,
-					commonTags: ["#tag1"],
-					path: "note2.md",
-				},
-			];
+	test("preserves displayKey and usageKey distinction for unresolved branches", () => {
+		const resolved = createBranch("shared.md");
+		const unresolved = createBranch("shared.md", [], true);
+		const initialState = { usedKeys: new Set(["f:shared.md"]) };
 
-			const result = service.collectUniqueTaggedNotes(taggedNotes);
+		const result = deduplicateLinks(initialState, [resolved, unresolved], []);
 
-			expect(result).toHaveLength(2);
-			expect(result[0].path).toBe("note1.md");
-			expect(result[1].path).toBe("note2.md");
-		});
-
-		test("only the first tagged note with the same path is kept", () => {
-			const taggedNotes: TaggedNote[] = [
-				{
-					file: { path: "note.md" } as TFile,
-					commonTags: ["#tag1"],
-					path: "note.md",
-				},
-				{
-					file: { path: "note.md" } as TFile,
-					commonTags: ["#tag2"],
-					path: "note.md",
-				},
-			];
-
-			const result = service.collectUniqueTaggedNotes(taggedNotes);
-
-			expect(result).toHaveLength(1);
-			expect(result[0].path).toBe("note.md");
-		});
-
-		test("tagged notes with pre-set usageKey are correctly deduplicated", () => {
-			const taggedNotes: TaggedNote[] = [
-				{
-					file: { path: "note.md" } as TFile,
-					commonTags: ["#tag1"],
-					path: "note.md",
-					usageKey: "f:note.md",
-				},
-				{
-					file: { path: "note.md" } as TFile,
-					commonTags: ["#tag2"],
-					path: "note.md",
-					usageKey: "f:note.md",
-				},
-			];
-
-			const result = service.collectUniqueTaggedNotes(taggedNotes);
-
-			expect(result).toHaveLength(1);
-			expect(result[0].path).toBe("note.md");
-		});
-
-		test("passing an empty array returns an empty array", () => {
-			const result = service.collectUniqueTaggedNotes([]);
-			expect(result).toHaveLength(0);
-		});
+		expect(result.data.branches).toEqual([unresolved]);
+		expect(result.data.twoHopBranches).toEqual([]);
 	});
 
-	describe("tests for side effects from call order", () => {
-		test("cross-domain consumption only occurs when returned state is passed explicitly", () => {
-			const explicitService = createDeduplicationService();
-			const initialState = createDedupState();
-			const branches: TwoHopLinkBranch[] = [
-				{
-					hop1: {
-						rawText: "[[SharedFile]]",
-						path: "shared.md",
-						isUnresolved: false,
-						sourceFile: { path: "source.md" } as TFile,
-					},
-					hop2: [],
-				},
-			];
-			const backlinks: TwoHopIndexedLink[] = [
-				{
-					rawText: "[[Target]]",
-					path: "target.md",
-					isUnresolved: false,
-					sourceFile: { path: "shared.md" } as TFile,
-				},
-			];
+	test("does not mutate the supplied state", () => {
+		const initialState = createDedupState();
 
-			const branchResult = explicitService.collectUniqueBranches(
-				initialState,
-				branches,
-			);
-			const independentBacklinks = explicitService.collectUniqueBacklinks(
-				initialState,
-				backlinks,
-			);
-			const transitionedBacklinks = explicitService.collectUniqueBacklinks(
-				branchResult.state,
-				backlinks,
-			);
+		const result = deduplicateLinks(initialState, [createBranch("branch.md")], []);
 
-			expect(independentBacklinks.items).toHaveLength(1);
-			expect(transitionedBacklinks.items).toHaveLength(0);
-			expect(initialState.usedKeys).toHaveLength(0);
-		});
-
-		test("same file is deduplicated across different domains", () => {
-			const branches: TwoHopLinkBranch[] = [
-				{
-					hop1: {
-						rawText: "[[SharedFile]]",
-						path: "shared.md",
-						isUnresolved: false,
-						sourceFile: { path: "source1.md" } as TFile,
-					},
-					hop2: [],
-				},
-			];
-
-			const backlinks: TwoHopIndexedLink[] = [
-				{
-					rawText: "[[Target]]",
-					path: "target.md",
-					isUnresolved: false,
-					sourceFile: { path: "shared.md" } as TFile,
-				},
-			];
-
-			const service1 = createScopedDeduplicationService();
-			const uniqueBacklinks1 = service1.collectUniqueBacklinks(backlinks);
-			const uniqueBranches1 = service1.collectUniqueBranches(branches);
-			expect(uniqueBacklinks1).toHaveLength(1);
-			expect(uniqueBranches1).toHaveLength(0);
-
-			const service2 = createScopedDeduplicationService();
-			const uniqueBranches2 = service2.collectUniqueBranches(branches);
-			const uniqueBacklinks2 = service2.collectUniqueBacklinks(backlinks);
-			expect(uniqueBranches2).toHaveLength(1);
-			expect(uniqueBacklinks2).toHaveLength(0);
-		});
-
-		test("hop2 from buildFilteredTwoHopBranches is excluded from subsequent backlink collection", () => {
-			const branches: TwoHopLinkBranch[] = [
-				{
-					hop1: {
-						rawText: "[[Note1]]",
-						path: "note1.md",
-						isUnresolved: false,
-						sourceFile: { path: "source.md" } as TFile,
-					},
-					hop2: [
-						{
-							rawText: "[[Hop2]]",
-							path: "hop2.md",
-							isUnresolved: false,
-							sourceFile: { path: "hop2-source.md" } as TFile,
-						},
-					],
-				},
-			];
-
-			const backlinks: TwoHopIndexedLink[] = [
-				{
-					rawText: "[[Target]]",
-					path: "target.md",
-					isUnresolved: false,
-					sourceFile: { path: "hop2-source.md" } as TFile,
-				},
-			];
-
-			const filteredBranches = service.buildFilteredTwoHopBranches(branches);
-			expect(filteredBranches).toHaveLength(1);
-
-			const uniqueBacklinks = service.collectUniqueBacklinks(backlinks);
-			expect(uniqueBacklinks).toHaveLength(0);
-		});
+		expect(initialState.usedKeys.size).toBe(0);
+		expect(result.state).not.toBe(initialState);
+		expect(result.state.usedKeys).toContain("f:branch.md");
 	});
 
-	describe("real usage scenario", () => {
-		test("processing multiple domains in order produces no duplicates and keeps what is needed", () => {
-			const branches: TwoHopLinkBranch[] = [
-				{
-					hop1: {
-						rawText: "[[Note1]]",
-						path: "note1.md",
-						isUnresolved: false,
-						sourceFile: { path: "source1.md" } as TFile,
-					},
-					hop2: [
-						{
-							rawText: "[[Hop2-1]]",
-							path: "hop2-1.md",
-							isUnresolved: false,
-							sourceFile: { path: "source2.md" } as TFile,
-						},
-					],
-				},
-				{
-					hop1: {
-						rawText: "[[Note2]]",
-						path: "note2.md",
-						isUnresolved: false,
-						sourceFile: { path: "source3.md" } as TFile,
-					},
-					hop2: [],
-				},
-			];
+	test("returns empty input arrays by reference", () => {
+		const branches: TwoHopLinkBranch[] = [];
+		const backlinks: TwoHopIndexedLink[] = [];
 
-			const backlinks: TwoHopIndexedLink[] = [
-				{
-					rawText: "[[Target]]",
-					path: "target.md",
-					isUnresolved: false,
-					sourceFile: { path: "note1.md" } as TFile,
-				},
-				{
-					rawText: "[[Target]]",
-					path: "target.md",
-					isUnresolved: false,
-					sourceFile: { path: "source4.md" } as TFile,
-				},
-			];
+		const result = deduplicateLinks(createDedupState(), branches, backlinks);
 
-			const taggedNotes: TaggedNote[] = [
-				{
-					file: { path: "note1.md" } as TFile,
-					commonTags: ["#tag1"],
-					path: "note1.md",
-				},
-				{
-					file: { path: "note2.md" } as TFile,
-					commonTags: ["#tag1"],
-					path: "note2.md",
-				},
-				{
-					file: { path: "note3.md" } as TFile,
-					commonTags: ["#tag1"],
-					path: "note3.md",
-				},
-			];
-
-			const uniqueBranches = service.collectUniqueBranches(branches);
-			expect(uniqueBranches).toHaveLength(2);
-
-			const filteredBranches = service.buildFilteredTwoHopBranches(branches);
-			expect(filteredBranches).toHaveLength(1);
-
-			const uniqueBacklinks = service.collectUniqueBacklinks(backlinks);
-			expect(uniqueBacklinks).toHaveLength(1);
-			expect(uniqueBacklinks[0].sourceFile.path).toBe("source4.md");
-
-			const uniqueTaggedNotes = service.collectUniqueTaggedNotes(taggedNotes);
-			expect(uniqueTaggedNotes).toHaveLength(1);
-			expect(uniqueTaggedNotes[0].path).toBe("note3.md");
-		});
+		expect(result.data.branches).toBe(branches);
+		expect(result.data.backlinks).toBe(backlinks);
+		expect(result.data.twoHopBranches).toEqual([]);
 	});
 });
 
-function createScopedDeduplicationService() {
-	const service = createDeduplicationService();
-	let state = createDedupState();
+describe("deduplicateTaggedNotes", () => {
+	test("deduplicates within tags and against prior link state", () => {
+		const state = { usedKeys: new Set(["f:link.md"]) };
+		const first = createTaggedNote("tag.md");
+		const duplicate = createTaggedNote("tag.md");
 
-	function apply<T>(
-		operation: (state: DedupState) => {
-			state: DedupState;
-			items: readonly T[];
-		},
-	): readonly T[] {
-		const result = operation(state);
-		state = result.state;
-		return result.items;
-	}
+		const result = deduplicateTaggedNotes(state, [
+			createTaggedNote("link.md"),
+			first,
+			duplicate,
+		]);
 
-	return {
-		collectUniqueBranches: (branches: readonly TwoHopLinkBranch[]) =>
-			apply((current) => service.collectUniqueBranches(current, branches)),
-		collectUniqueBacklinks: (backlinks: readonly TwoHopIndexedLink[]) =>
-			apply((current) => service.collectUniqueBacklinks(current, backlinks)),
-		buildFilteredTwoHopBranches: (branches: readonly TwoHopLinkBranch[]) =>
-			apply((current) => service.buildFilteredTwoHopBranches(current, branches)),
-		collectUniqueTaggedNotes: (taggedNotes: readonly TaggedNote[]) =>
-			apply((current) => service.collectUniqueTaggedNotes(current, taggedNotes)),
-	};
-}
+		expect(result.items).toEqual([first]);
+		expect(state.usedKeys).toEqual(new Set(["f:link.md"]));
+	});
+
+	test("honors a precomputed usageKey", () => {
+		const state = { usedKeys: new Set(["custom:key"]) };
+
+		const result = deduplicateTaggedNotes(state, [
+			createTaggedNote("tag.md", "custom:key"),
+		]);
+
+		expect(result.items).toEqual([]);
+		expect(result.state).toBe(state);
+	});
+
+	test("returns an empty input by reference without changing state", () => {
+		const state = createDedupState();
+		const notes: TaggedNote[] = [];
+
+		const result = deduplicateTaggedNotes(state, notes);
+
+		expect(result.items).toBe(notes);
+		expect(result.state).toBe(state);
+	});
+});
