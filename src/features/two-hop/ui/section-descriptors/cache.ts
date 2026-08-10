@@ -3,6 +3,7 @@ import type { DisplayData } from "features/two-hop/application/displayDataBuilde
 import {
 	buildScopedSectionId,
 	createCompactSectionId,
+	normalizeIncrement,
 	SHOULD_VALIDATE_SECTION_IDS,
 } from "ui/components/common/listPagination";
 import { generateBranchKey } from "features/card-preview/text-processing/textUtils";
@@ -25,10 +26,6 @@ import {
 import { createTagSectionDescriptor } from "./createTagDescriptor";
 import { createNewLinksSectionDescriptor } from "./createNewLinksDescriptor";
 import { recordCCLDevMeasurement } from "infrastructure/debug/CCLDevMeasurements";
-import {
-	createSectionPaginationState,
-	type SectionPaginationState,
-} from "ui/virtualization/pagination";
 
 export interface ResolveTwoHopSectionsParams {
 	readonly displayData: DisplayData;
@@ -45,14 +42,12 @@ export interface ResolveTwoHopSectionsParams {
 	readonly currentSettings: PluginSettings;
 	readonly applicationStore: ApplicationStore;
 	readonly onTagClick: (tag: string) => void;
-	readonly initialVisibleCount: number | undefined;
-	readonly loadMoreIncrement: number | undefined;
 	readonly paginationScope: string;
 }
 
 export interface TwoHopSectionPublicationCache {
 	resolve(params: ResolveTwoHopSectionsParams): readonly TwoHopSectionModel[];
-	loadMore(sectionId: string): readonly TwoHopSectionModel[] | null;
+	loadMore(sectionId: string): void;
 }
 
 interface CachedSection {
@@ -78,9 +73,8 @@ interface ResolveSnapshot {
 	readonly sortContextVersion: number;
 	readonly mobileLongPressAction: PluginSettings["mobileLongPressAction"];
 	readonly highlightInPreviewOnHover: boolean;
-	readonly initialVisibleCount: number | undefined;
-	readonly loadMoreIncrement: number | undefined;
 	readonly paginationScope: string;
+	readonly sectionExpandedLimits: ApplicationStore["sectionExpandedLimits"];
 	readonly applicationStore: ApplicationStore;
 }
 
@@ -96,43 +90,25 @@ export function createTwoHopSectionPublicationCache(): TwoHopSectionPublicationC
 	let previousSections: readonly TwoHopSectionModel[] = [];
 	let latestOnTagClick: (tag: string) => void = () => undefined;
 	let paginationScope = "";
-	let initialVisibleCount: number | undefined;
-	let loadMoreIncrement: number | undefined;
 	let paginationApplicationStore: ApplicationStore | undefined;
-	let expandedLimits: Record<string, number> = {};
-	let pagination: SectionPaginationState | null = null;
 	const onTagClick = (tag: string): void => latestOnTagClick(tag);
-
-	function configurePagination(params: ResolveTwoHopSectionsParams): void {
-		const nextScope = params.paginationScope.trim();
-		if (
-			pagination &&
-			nextScope === paginationScope &&
-			Object.is(params.initialVisibleCount, initialVisibleCount) &&
-			Object.is(params.loadMoreIncrement, loadMoreIncrement) &&
-			params.applicationStore === paginationApplicationStore
-		) {
-			return;
-		}
-
-		paginationScope = nextScope;
-		initialVisibleCount = params.initialVisibleCount;
-		loadMoreIncrement = params.loadMoreIncrement;
-		paginationApplicationStore = params.applicationStore;
-		expandedLimits = {};
-		pagination = createSectionPaginationState({
-			getExpandedLimits: () => expandedLimits,
-			setExpandedLimits: (next) => {
-				expandedLimits = next;
-			},
-			applicationStore: params.applicationStore,
-			initialVisibleCount,
-			loadMoreIncrement,
-		});
-	}
 
 	function getPaginationId(sectionId: string): string {
 		return buildScopedSectionId(sectionId, paginationScope);
+	}
+
+	function getVisibleCount(sectionId: string, totalCount: number): number {
+		const store = paginationApplicationStore;
+		if (!store) return totalCount;
+		const defaultLimit = Math.max(
+			0,
+			Math.floor(store.getDefaultSectionVisibleLimit()),
+		);
+		const expandedLimit = Math.max(
+			0,
+			Math.floor(store.getSectionExpandedLimit(sectionId) ?? 0),
+		);
+		return Math.min(totalCount, Math.max(defaultLimit, expandedLimit));
 	}
 
 	function resolveSection(
@@ -141,10 +117,7 @@ export function createTwoHopSectionPublicationCache(): TwoHopSectionPublicationC
 		totalCount: number,
 		build: SectionBuilder,
 	): TwoHopSectionModel {
-		const visibleCount = pagination!.getVisibleCount(
-			getPaginationId(id),
-			totalCount,
-		);
+		const visibleCount = getVisibleCount(getPaginationId(id), totalCount);
 		const cached = entries.get(id);
 		const canReuseItems =
 			cached !== undefined &&
@@ -171,7 +144,8 @@ export function createTwoHopSectionPublicationCache(): TwoHopSectionPublicationC
 	return {
 		resolve(params) {
 			latestOnTagClick = params.onTagClick;
-			configurePagination(params);
+			paginationScope = params.paginationScope.trim();
+			paginationApplicationStore = params.applicationStore;
 			const sortContextVersion =
 				params.applicationStore.getSortContextVersion?.() ?? 0;
 			const snapshot = createResolveSnapshot(params, sortContextVersion);
@@ -216,25 +190,20 @@ export function createTwoHopSectionPublicationCache(): TwoHopSectionPublicationC
 		},
 		loadMore(sectionId) {
 			const cached = entries.get(sectionId);
-			if (!cached || !pagination) return null;
+			const store = paginationApplicationStore;
+			if (!cached || !store) return;
 			const paginationId = getPaginationId(sectionId);
-			pagination.loadMore(paginationId, cached.totalCount);
-			const nextCount = pagination.getVisibleCount(
+			const visibleCount = getVisibleCount(paginationId, cached.totalCount);
+			if (visibleCount >= cached.totalCount) return;
+			const increment = normalizeIncrement(store.loadMoreIncrement);
+			const nextCount =
+				increment === Number.POSITIVE_INFINITY
+					? cached.totalCount
+					: Math.min(cached.totalCount, visibleCount + increment);
+			store.setSectionExpandedLimit(
 				paginationId,
-				cached.totalCount,
+				Math.max(store.getSectionExpandedLimit(paginationId) ?? 0, nextCount),
 			);
-			if (nextCount === cached.section.items.length) return null;
-
-			const section = cached.build(nextCount, cached.section.items);
-			entries.set(sectionId, { ...cached, section });
-			const sectionIndex = previousSections.findIndex(
-				(candidate) => candidate.id === sectionId,
-			);
-			if (sectionIndex < 0) return null;
-			const nextSections = [...previousSections];
-			nextSections[sectionIndex] = section;
-			previousSections = Object.freeze(nextSections);
-			return previousSections;
 		},
 	};
 }
@@ -415,9 +384,8 @@ function createResolveSnapshot(
 		sortContextVersion,
 		mobileLongPressAction: params.currentSettings.mobileLongPressAction,
 		highlightInPreviewOnHover: params.currentSettings.highlightInPreviewOnHover,
-		initialVisibleCount: params.initialVisibleCount,
-		loadMoreIncrement: params.loadMoreIncrement,
 		paginationScope: params.paginationScope,
+		sectionExpandedLimits: params.applicationStore.sectionExpandedLimits,
 		applicationStore: params.applicationStore,
 	};
 }

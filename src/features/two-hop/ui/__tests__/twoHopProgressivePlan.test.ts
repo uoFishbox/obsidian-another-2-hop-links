@@ -59,18 +59,21 @@ describe("two-hop progressive plan", () => {
 		expect(cells[1]?.logicalKey).toBe("item:section:item-0");
 	});
 
-	it("appends one chunk while preserving existing publications", () => {
+	it("appends in place without copying the chunk buffer", () => {
 		const sections = createSections(TWO_HOP_PROGRESSIVE_ROWS_PER_CHUNK * 3);
 		const geometry = compileFixedGridLayout(sections, layout);
 		const initialEnd = resolveInitialProgressiveMountedRowEnd(geometry.rowCount);
 		const first = compileTwoHopProgressivePlan(sections, geometry, initialEnd);
+		const firstChunkCount = first.chunks.length;
 		const nextEnd = resolveNextProgressiveMountedRowEnd(
 			first.mountedRowEnd,
 			geometry.rowCount,
 		);
 		const second = appendTwoHopProgressivePlan(sections, geometry, first, nextEnd);
 
-		expect(second.chunks.slice(0, first.chunks.length)).toEqual(first.chunks);
+		expect(second).not.toBe(first);
+		expect(second.chunks).toBe(first.chunks);
+		expect(second.chunks).toHaveLength(firstChunkCount + 1);
 		expect(second.chunks[0]).toBe(first.chunks[0]);
 		expect(second.mountedRowEnd).toBe(nextEnd);
 	});

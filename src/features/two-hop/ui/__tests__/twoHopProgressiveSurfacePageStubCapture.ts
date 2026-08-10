@@ -5,9 +5,7 @@ import type { TwoHopSectionModel } from "features/two-hop/ui/twoHopSectionModel"
 interface TwoHopProgressiveSurfacePageStubProps {
 	readonly documentIdentity: string;
 	readonly applicationStore: ApplicationStore;
-	readonly loadMoreSection:
-		| ((sectionId: string) => readonly TwoHopSectionModel[] | null)
-		| undefined;
+	readonly loadMoreSection: ((sectionId: string) => void) | undefined;
 	readonly previewDependencies: TwoHopPreviewDependencies | undefined;
 	readonly previewActive: boolean;
 	readonly offscreenBootstrapPreviewRows: number;

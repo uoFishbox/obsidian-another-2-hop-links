@@ -19,7 +19,7 @@
 		previewActive?: boolean;
 		offscreenBootstrapPreviewRows?: number;
 		cardModelRevision?: unknown;
-		loadMoreSection?: (sectionId: string) => readonly TwoHopSectionModel[] | null;
+		loadMoreSection?: (sectionId: string) => void;
 		resolveItemCardModel: (
 			item: TwoHopItemModel,
 			presentation: TwoHopCardPresentationState,

@@ -108,6 +108,7 @@ export function compileTwoHopProgressivePlan(
 	return createPlan(sections, geometry, normalizedMountedEnd, chunks);
 }
 
+/** Extends an owned append-only plan without copying its published chunk buffer. */
 export function appendTwoHopProgressivePlan(
 	sections: readonly TwoHopSectionModel[],
 	geometry: TwoHopGeometry,
@@ -129,7 +130,7 @@ export function appendTwoHopProgressivePlan(
 	}
 	if (previous.mountedRowEnd === normalizedMountedEnd) return previous;
 
-	const chunks = [...previous.chunks];
+	const chunks = previous.chunks as TwoHopProgressiveChunk[];
 	for (
 		let rowStart = previous.mountedRowEnd;
 		rowStart < normalizedMountedEnd;
@@ -150,14 +151,14 @@ function createPlan(
 	mountedRowEnd: number,
 	chunks: readonly TwoHopProgressiveChunk[],
 ): TwoHopProgressivePlan {
-	return Object.freeze({
+	return {
 		sections,
 		geometry,
 		mountedRowEnd,
 		totalRowCount: geometry.rowCount,
 		hasMoreRows: mountedRowEnd < geometry.rowCount,
-		chunks: Object.freeze(chunks),
-	});
+		chunks,
+	};
 }
 
 /** Materializes one append-only chunk directly from section arrays. */

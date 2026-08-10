@@ -64,9 +64,7 @@ export interface TwoHopProgressiveListProps {
 	readonly sections: readonly TwoHopSectionModel[];
 	readonly applicationStore: ApplicationStore;
 	readonly previewDependencies?: TwoHopPreviewDependencies;
-	readonly loadMoreSection?: (
-		sectionId: string,
-	) => readonly TwoHopSectionModel[] | null;
+	readonly loadMoreSection?: (sectionId: string) => void;
 	readonly previewActive?: boolean;
 	/** Rows to hydrate from the start while the whole list is below the viewport. */
 	readonly offscreenBootstrapPreviewRows?: number;
@@ -104,7 +102,6 @@ export function useTwoHopProgressiveList(
 	const initialMountedRowEnd = resolveInitialProgressiveMountedRowEnd(
 		initialGeometry.rowCount,
 	);
-	let sections = $state.raw<readonly TwoHopSectionModel[]>(initialSections);
 	let layout = $state.raw<ViewPlanLayoutMetrics>(DEFAULT_VIEW_PLAN_LAYOUT);
 	let geometry = $state.raw<TwoHopGeometry>(initialGeometry);
 	let plan = $state.raw<TwoHopProgressivePlan>(
@@ -346,7 +343,7 @@ export function useTwoHopProgressiveList(
 			geometry.rowCount,
 		);
 		if (nextEnd === currentMountedRowEnd) return;
-		plan = appendTwoHopProgressivePlan(sections, geometry, plan, nextEnd);
+		plan = appendTwoHopProgressivePlan(plan.sections, geometry, plan, nextEnd);
 		flushPreviewRangeFromScroll();
 	}
 
@@ -357,7 +354,12 @@ export function useTwoHopProgressiveList(
 			Math.ceil((rowIndex + 1) / TWO_HOP_PROGRESSIVE_ROWS_PER_CHUNK) *
 				TWO_HOP_PROGRESSIVE_ROWS_PER_CHUNK,
 		);
-		plan = appendTwoHopProgressivePlan(sections, geometry, plan, nextMountedRowEnd);
+		plan = appendTwoHopProgressivePlan(
+			plan.sections,
+			geometry,
+			plan,
+			nextMountedRowEnd,
+		);
 	}
 
 	async function moveFocusWithinList(
@@ -516,11 +518,16 @@ export function useTwoHopProgressiveList(
 		};
 		if (isSameViewPlanLayout(layout, nextLayout)) return false;
 		const anchor = preserveAnchor ? captureLayoutAnchor() : null;
-		const nextGeometry = compileFixedGridLayout(sections, nextLayout);
+		const nextSections = plan.sections;
+		const nextGeometry = compileFixedGridLayout(nextSections, nextLayout);
 		const nextMountedRowEnd = Math.min(plan.mountedRowEnd, nextGeometry.rowCount);
 		layout = nextLayout;
 		geometry = nextGeometry;
-		plan = compileTwoHopProgressivePlan(sections, nextGeometry, nextMountedRowEnd);
+		plan = compileTwoHopProgressivePlan(
+			nextSections,
+			nextGeometry,
+			nextMountedRowEnd,
+		);
 		void restoreLayoutAnchor(anchor);
 		return true;
 	}
@@ -529,7 +536,7 @@ export function useTwoHopProgressiveList(
 		nextSections: readonly TwoHopSectionModel[],
 		kind: SectionPublicationKind,
 	): void {
-		if (nextSections === sections && kind === "data-revision") return;
+		if (nextSections === plan.sections && kind === "data-revision") return;
 		const anchor = kind === "data-revision" ? captureLayoutAnchor() : null;
 		const nextGeometry = compileFixedGridLayout(nextSections, layout);
 		const nextMountedRowEnd =
@@ -544,7 +551,6 @@ export function useTwoHopProgressiveList(
 							),
 						),
 					);
-		sections = nextSections;
 		geometry = nextGeometry;
 		const nextPlan = compileTwoHopProgressivePlan(
 			nextSections,
@@ -702,8 +708,7 @@ export function useTwoHopProgressiveList(
 	});
 
 	function loadMore(sectionId: string): void {
-		const nextSections = props.loadMoreSection?.(sectionId) ?? null;
-		if (nextSections) publishSections(nextSections, "data-revision");
+		props.loadMoreSection?.(sectionId);
 	}
 
 	return {

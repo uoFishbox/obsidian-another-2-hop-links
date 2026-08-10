@@ -66,8 +66,6 @@
 	let showTwoHopPlaceholder = $derived(
 		loadingPhase === "base-ready" && (linkResult?.branches.length ?? 0) > 0,
 	);
-	let initialVisibleCount = $derived(applicationStore.initialVisibleCount);
-	let loadMoreIncrement = $derived(applicationStore.loadMoreIncrement);
 	let currentSettings = $derived(applicationStore.settings);
 	let useMergedLinks = $derived(currentSettings.useMergedLinksSection);
 	let showTags = $derived(currentSettings.showTagsSection);
@@ -160,8 +158,6 @@
 			currentSettings,
 			applicationStore,
 			onTagClick,
-			initialVisibleCount,
-			loadMoreIncrement,
 			paginationScope: documentIdentity,
 		}),
 	);

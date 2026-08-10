@@ -9,7 +9,7 @@
 		documentIdentity: string;
 		sections: readonly TwoHopSectionModel[];
 		applicationStore: ApplicationStore;
-		loadMoreSection?: (sectionId: string) => readonly TwoHopSectionModel[] | null;
+		loadMoreSection?: (sectionId: string) => void;
 		previewDependencies?: TwoHopPreviewDependencies;
 		previewActive?: boolean;
 		offscreenBootstrapPreviewRows?: number;

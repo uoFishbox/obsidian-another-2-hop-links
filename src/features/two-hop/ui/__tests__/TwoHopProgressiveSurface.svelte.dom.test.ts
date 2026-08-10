@@ -190,19 +190,20 @@ afterEach(() => {
 });
 
 describe("TwoHopProgressiveSurface", () => {
-	it("publishes an expanded section returned by the load-more owner", async () => {
+	it("requests load-more and accepts the expanded parent publication", async () => {
 		const applicationStore = {
 			settings: DEFAULT_SETTINGS,
 		} as unknown as ApplicationStore;
-		const loadMoreSection = vi.fn(() => [createSection(3)]);
-		const { container } = render(TwoHopProgressiveSurfaceHarness, {
-			props: {
-				sections: [createSection(2, 3)],
-				applicationStore,
-				linkContext: { getPreview: vi.fn() } as unknown as LinkContext,
-				loadMoreSection,
-				resolveItemCardModel: createCardModelResolver(),
-			},
+		const loadMoreSection = vi.fn();
+		const props = {
+			sections: [createSection(2, 3)],
+			applicationStore,
+			linkContext: { getPreview: vi.fn() } as unknown as LinkContext,
+			loadMoreSection,
+			resolveItemCardModel: createCardModelResolver(),
+		};
+		const { container, rerender } = render(TwoHopProgressiveSurfaceHarness, {
+			props,
 		});
 		const root = container.querySelector<HTMLElement>(
 			".twohop-progressive-surface",
@@ -218,6 +219,8 @@ describe("TwoHopProgressiveSurface", () => {
 			),
 		).toHaveLength(2);
 		await fireEvent.click(button);
+		expect(loadMoreSection).toHaveBeenCalledWith("section");
+		await rerender({ ...props, sections: [createSection(3)] });
 
 		await vi.waitFor(() =>
 			expect(
@@ -226,7 +229,6 @@ describe("TwoHopProgressiveSurface", () => {
 				),
 			).toHaveLength(3),
 		);
-		expect(loadMoreSection).toHaveBeenCalledWith("section");
 		expect(
 			root.shadowRoot?.querySelector(".cosense-card-links__load-more-button"),
 		).toBeNull();
@@ -505,6 +507,16 @@ describe("TwoHopProgressiveSurface", () => {
 		const contentRect = vi.spyOn(content, "getBoundingClientRect");
 		const scrollerRect = vi.spyOn(scroller, "getBoundingClientRect");
 		triggerResize(root, rootWidth, 20_000);
+		await flushFrames();
+		const measuredColumns = Number(
+			content.style.getPropertyValue("--twohop-columns"),
+		);
+		expect(measuredColumns).toBeGreaterThan(1);
+		expect(
+			root.shadowRoot?.querySelectorAll(
+				"[data-ccl-progressive-row='0'] .twohop-progressive-cell",
+			),
+		).toHaveLength(measuredColumns);
 		rootRect.mockClear();
 		contentRect.mockClear();
 		scrollerRect.mockClear();

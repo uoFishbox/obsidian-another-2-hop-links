@@ -20,7 +20,7 @@
 		searchQuery?: string;
 		searchScope?: SearchWorkerMatchScope;
 		matchedItemByKey?: Map<string, SearchWorkerMatchedItem> | null;
-		loadMoreSection?: (sectionId: string) => readonly TwoHopSectionModel[] | null;
+		loadMoreSection?: (sectionId: string) => void;
 		linkContext: LinkUtilitiesContext;
 		previewDependencies?: TwoHopPreviewDependencies;
 		previewActive?: boolean;

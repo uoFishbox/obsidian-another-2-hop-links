@@ -34,13 +34,31 @@ function createDisplayData(
 	};
 }
 
-function createHarness() {
+function createHarness(defaultVisibleLimit = 20, loadMoreIncrement = 20) {
 	let sortContextVersion = 0;
+	const paginationState: {
+		expandedLimits: Record<string, number>;
+	} = {
+		expandedLimits: {},
+	};
 	const applicationStore = {
+		get sectionExpandedLimits() {
+			return paginationState.expandedLimits;
+		},
+		loadMoreIncrement,
 		getSortContextVersion: () => sortContextVersion,
 		getSortedTagGroupItems: vi.fn((items: readonly TaggedNote[]) => items),
 		getSortedTwoHopItems: vi.fn((items: readonly TwoHopIndexedLink[]) => items),
-		setSectionExpandedLimit: vi.fn(),
+		getDefaultSectionVisibleLimit: vi.fn(() => defaultVisibleLimit),
+		getSectionExpandedLimit: vi.fn(
+			(sectionId: string) => paginationState.expandedLimits[sectionId],
+		),
+		setSectionExpandedLimit: vi.fn((sectionId: string, limit: number) => {
+			paginationState.expandedLimits = {
+				...paginationState.expandedLimits,
+				[sectionId]: limit,
+			};
+		}),
 	} as unknown as ApplicationStore;
 	const params = {
 		displayData: createDisplayData(),
@@ -53,13 +71,14 @@ function createHarness() {
 		currentSettings: DEFAULT_SETTINGS,
 		applicationStore,
 		onTagClick: vi.fn(),
-		initialVisibleCount: 20,
-		loadMoreIncrement: 20,
 		paginationScope: "",
 	};
 	return {
 		applicationStore,
 		params,
+		clearExpandedLimits: () => {
+			paginationState.expandedLimits = {};
+		},
 		incrementSortContext: () => {
 			sortContextVersion += 1;
 		},
@@ -126,7 +145,7 @@ describe("createTwoHopSectionPublicationCache", () => {
 
 	it("expands only the requested prefix while preserving item identity and sorting", () => {
 		const cache = createTwoHopSectionPublicationCache();
-		const { params, applicationStore } = createHarness();
+		const { params, applicationStore, clearExpandedLimits } = createHarness(1, 1);
 		const group = {
 			tag: "alpha",
 			notes: [
@@ -138,25 +157,28 @@ describe("createTwoHopSectionPublicationCache", () => {
 		const input = {
 			...params,
 			displayData: createDisplayData([group]),
-			initialVisibleCount: 1,
-			loadMoreIncrement: 1,
 			paginationScope: "query",
 		};
 		const first = cache.resolve(input);
 		const firstItem = first[0]?.items[0];
-		const second = cache.loadMore("tags-alpha");
+		cache.loadMore("tags-alpha");
+		const second = cache.resolve(input);
 		const resolvedAgain = cache.resolve(input);
 
 		expect(first[0]?.items).toHaveLength(1);
 		expect(first[0]?.totalCount).toBe(3);
-		expect(second?.[0]?.items).toHaveLength(2);
-		expect(second?.[0]?.items[0]).toBe(firstItem);
+		expect(second[0]?.items).toHaveLength(2);
+		expect(second[0]?.items[0]).toBe(firstItem);
 		expect(resolvedAgain).toBe(second);
 		expect(applicationStore.getSortedTagGroupItems).toHaveBeenCalledTimes(1);
 		expect(applicationStore.setSectionExpandedLimit).toHaveBeenCalledWith(
 			expect.stringMatching(/^s:/),
 			2,
 		);
+
+		clearExpandedLimits();
+		const collapsed = cache.resolve(input);
+		expect(collapsed[0]?.items).toHaveLength(1);
 	});
 
 	it("uses the latest tag callback without replacing the section", () => {
