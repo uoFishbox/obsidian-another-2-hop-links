@@ -106,14 +106,12 @@ const measureWorkload = (cardCount: number) => {
 				rowModel: nextRowModel,
 				rowRange,
 				previousBuild,
-				previousCellsByKey,
 			}) => {
 				mountedCellBuilds += 1;
 				return buildMountedVirtualGridCellsFromRowModel({
 					rowModel: nextRowModel as FlatLinkRowModel<TestItem>,
 					rowRange,
 					previousBuild,
-					previousCellsByKey,
 				});
 			},
 		});

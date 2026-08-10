@@ -52,7 +52,6 @@ export interface BuildMountedTwoHopRowsParams {
 	readonly rowRange: RowRange;
 	readonly rowSlotAllocator: ResidentRowSlotAllocator;
 	readonly previousBuild?: MountedTwoHopBuild;
-	readonly previousCellsByKey?: ReadonlyMap<string, MountedTwoHopCell>;
 }
 
 /** Builds only the resident two-hop rows while reusing shared physical slots. */
@@ -72,7 +71,6 @@ export function buildMountedTwoHopRows(
 	}
 	const previousCellsByKey =
 		params.previousBuild?.reusableCellsByKey ??
-		params.previousCellsByKey ??
 		new Map<string, MountedTwoHopCell>();
 	const canReuseRows = params.previousBuild?.rowModel === rowModel;
 

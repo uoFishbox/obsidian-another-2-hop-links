@@ -24,19 +24,6 @@ interface MutableVisibilityState {
 	visibility: VirtualizedItemVisibility;
 }
 
-export interface RowVisibilityDelta {
-	readonly activatedRows: readonly number[];
-	readonly deactivatedRows: readonly number[];
-	readonly clearedRows: readonly number[];
-}
-
-/** A conflict-free view over controller-owned scratch sets. */
-export interface NormalizedRowVisibilityDelta {
-	readonly activatedRows: ReadonlySet<number>;
-	readonly deactivatedRows: ReadonlySet<number>;
-	readonly clearedRows: ReadonlySet<number>;
-}
-
 export interface VirtualCardDisplaySnapshot<TCell extends VisibilityCell> {
 	readonly rowModelRevision: unknown;
 	readonly mountedRows: readonly VisibilityRow<TCell>[];
@@ -59,29 +46,9 @@ export const resolveVirtualizedItemVisibilityForPreviewRange = (
 	return "mounted";
 };
 
-export interface VirtualizedItemVisibilityStateControllerOptions<
-	TCell extends VisibilityCell = VisibilityCell,
-> {
-	readonly getStateKey?: (cell: TCell) => string;
-	readonly onRowVisibilityChanged?: (
-		rowIndex: number,
-		visibility: VirtualizedItemVisibility,
-	) => void;
-	readonly onRowCleared?: (rowIndex: number) => void;
-	/**
-	 * Internal synchronous path over the controller's normalized scratch sets.
-	 * The callback must consume the sets immediately and must not retain them.
-	 */
-	readonly onNormalizedVisibilityDelta?: (
-		delta: NormalizedRowVisibilityDelta,
-	) => void;
-	/** Receives one notification after all internal maps and states are committed. */
-	readonly onVisibilityDelta?: (delta: RowVisibilityDelta) => void;
-}
-
 export function createVirtualizedItemVisibilityStateController<
 	TCell extends VisibilityCell,
->(options: VirtualizedItemVisibilityStateControllerOptions<TCell> = {}) {
+>() {
 	interface TrackedState {
 		readonly state: VirtualizedItemResolvedVisibilityState;
 		readonly mutableState: MutableVisibilityState;
@@ -95,76 +62,11 @@ export function createVirtualizedItemVisibilityStateController<
 	let hasPreviousPreviewVisible = false;
 	let rowsByIndex = new Map<number, VisibilityRow<TCell>>();
 	const mountedItemKeyCounts = new Map<string, number>();
-	const rowVisibilityByIndex = new Map<number, VirtualizedItemVisibility>();
-	const nextRowIndicesScratch = new Set<number>();
-	const activatedRowsScratch = new Set<number>();
-	const deactivatedRowsScratch = new Set<number>();
-	const clearedRowsScratch = new Set<number>();
-	const normalizedVisibilityDelta: NormalizedRowVisibilityDelta = {
-		activatedRows: activatedRowsScratch,
-		deactivatedRows: deactivatedRowsScratch,
-		clearedRows: clearedRowsScratch,
-	};
-	let visibilityCommitDepth = 0;
 	let committedRowModelRevision: unknown;
 	let hasCommittedSnapshot = false;
 	let committedMountedRows: readonly VisibilityRow<TCell>[] = [];
 	const committedMountedRange: RowRange = { start: 0, end: 0 };
-	const getStateKey = options.getStateKey ?? ((cell: TCell) => cell.key);
-
-	const flushVisibilityDelta = (): void => {
-		if (
-			activatedRowsScratch.size === 0 &&
-			deactivatedRowsScratch.size === 0 &&
-			clearedRowsScratch.size === 0
-		) {
-			return;
-		}
-
-		const hasExternalCallbacks =
-			options.onVisibilityDelta !== undefined ||
-			options.onRowVisibilityChanged !== undefined ||
-			options.onRowCleared !== undefined;
-		const delta: RowVisibilityDelta | undefined = hasExternalCallbacks
-			? {
-					activatedRows: Array.from(activatedRowsScratch),
-					deactivatedRows: Array.from(deactivatedRowsScratch),
-					clearedRows: Array.from(clearedRowsScratch),
-				}
-			: undefined;
-
-		try {
-			options.onNormalizedVisibilityDelta?.(normalizedVisibilityDelta);
-		} finally {
-			activatedRowsScratch.clear();
-			deactivatedRowsScratch.clear();
-			clearedRowsScratch.clear();
-		}
-
-		if (!delta) return;
-		options.onVisibilityDelta?.(delta);
-		for (const rowIndex of delta.activatedRows) {
-			options.onRowVisibilityChanged?.(rowIndex, "visible");
-		}
-		for (const rowIndex of delta.deactivatedRows) {
-			options.onRowVisibilityChanged?.(rowIndex, "mounted");
-		}
-		for (const rowIndex of delta.clearedRows) {
-			options.onRowCleared?.(rowIndex);
-		}
-	};
-
-	const runVisibilityCommit = (commit: () => void): void => {
-		visibilityCommitDepth += 1;
-		try {
-			commit();
-		} finally {
-			visibilityCommitDepth -= 1;
-			if (visibilityCommitDepth === 0) {
-				flushVisibilityDelta();
-			}
-		}
-	};
+	const getStateKey = (cell: TCell): string => cell.key;
 
 	const rememberPreviousPreviewVisible = (previewRange: RowRange): void => {
 		previousPreviewVisible.start = previewRange.start;
@@ -230,34 +132,6 @@ export function createVirtualizedItemVisibilityStateController<
 		return state;
 	};
 
-	const notifyRowVisibilityIfChanged = (
-		rowIndex: number,
-		nextVisibility: VirtualizedItemVisibility,
-	): void => {
-		const previous = rowVisibilityByIndex.get(rowIndex);
-		if (previous === nextVisibility) {
-			return;
-		}
-
-		rowVisibilityByIndex.set(rowIndex, nextVisibility);
-		clearedRowsScratch.delete(rowIndex);
-		if (nextVisibility === "visible") {
-			deactivatedRowsScratch.delete(rowIndex);
-			activatedRowsScratch.add(rowIndex);
-			return;
-		}
-
-		activatedRowsScratch.delete(rowIndex);
-		deactivatedRowsScratch.add(rowIndex);
-	};
-
-	const notifyRowCleared = (rowIndex: number): void => {
-		rowVisibilityByIndex.delete(rowIndex);
-		activatedRowsScratch.delete(rowIndex);
-		deactivatedRowsScratch.delete(rowIndex);
-		clearedRowsScratch.add(rowIndex);
-	};
-
 	const applyVisibilityToRow = (
 		row: VisibilityRow<TCell>,
 		nextVisibility: VirtualizedItemVisibility,
@@ -277,8 +151,6 @@ export function createVirtualizedItemVisibilityStateController<
 				tracked.mutableState.visibility = nextVisibility;
 			}
 		}
-
-		notifyRowVisibilityIfChanged(row.rowIndex, nextVisibility);
 	};
 
 	const applyVisibilityToRowRange = (
@@ -317,18 +189,6 @@ export function createVirtualizedItemVisibilityStateController<
 		rowSlices: readonly VisibilityRow<TCell>[],
 		previewVisible: RowRange,
 	): void => {
-		nextRowIndicesScratch.clear();
-		for (const row of rowSlices) {
-			nextRowIndicesScratch.add(row.rowIndex);
-		}
-
-		for (const rowIndex of rowsByIndex.keys()) {
-			if (!nextRowIndicesScratch.has(rowIndex)) {
-				notifyRowCleared(rowIndex);
-			}
-		}
-		nextRowIndicesScratch.clear();
-
 		mountedItemKeyCounts.clear();
 		for (const row of rowSlices) {
 			const nextVisibility = resolveVirtualizedItemVisibilityForPreviewRange(
@@ -353,7 +213,6 @@ export function createVirtualizedItemVisibilityStateController<
 					tracked.mutableState.visibility = nextVisibility;
 				}
 			}
-			notifyRowVisibilityIfChanged(row.rowIndex, nextVisibility);
 		}
 
 		for (const [key, tracked] of states) {
@@ -376,8 +235,6 @@ export function createVirtualizedItemVisibilityStateController<
 		rowsByIndex.delete(row.rowIndex);
 		updateMountedItemKeyCount(row, -1);
 		pruneUnmountedRowState(row);
-		rowVisibilityByIndex.delete(row.rowIndex);
-		notifyRowCleared(row.rowIndex);
 	};
 
 	const addMountedRow = (row: VisibilityRow<TCell>, previewRange: RowRange): void => {
@@ -550,83 +407,40 @@ export function createVirtualizedItemVisibilityStateController<
 		rememberPreviousPreviewVisible(nextPreviewRange);
 	};
 
-	const syncInternal = (
-		mountedRows: readonly VisibilityRow<TCell>[],
-		previewRange: RowRange,
-	): void => {
-		if (!hasPreviousPreviewVisible || mountedRows !== previousRowSlices) {
-			syncMountedRowsInternal({ mountedRows, previewRange });
-			return;
+	const commit = (snapshot: VirtualCardDisplaySnapshot<TCell>): void => {
+		if (
+			!hasCommittedSnapshot ||
+			snapshot.rowModelRevision !== committedRowModelRevision
+		) {
+			syncMountedRowsInternal({
+				mountedRows: snapshot.mountedRows,
+				previewRange: snapshot.previewActiveRange,
+			});
+		} else if (snapshot.mountedRows !== committedMountedRows) {
+			syncMountedRowRangeDeltaInternal({
+				previousRows: committedMountedRows,
+				nextRows: snapshot.mountedRows,
+				previousRowRange: committedMountedRange,
+				nextRowRange: snapshot.mountedRange,
+				previewRange: snapshot.previewActiveRange,
+			});
+		} else {
+			syncPreviewRangeDeltaInternal({
+				previousPreviewRange: previousPreviewVisible,
+				nextPreviewRange: snapshot.previewActiveRange,
+				mountedRows: snapshot.mountedRows,
+			});
 		}
 
-		syncPreviewRangeDeltaInternal({
-			previousPreviewRange: previousPreviewVisible,
-			nextPreviewRange: previewRange,
-			mountedRows,
-		});
-	};
-
-	const syncMountedRows = (
-		params: Parameters<typeof syncMountedRowsInternal>[0],
-	): void => runVisibilityCommit(() => syncMountedRowsInternal(params));
-
-	const syncMountedRowRangeDelta = (
-		params: Parameters<typeof syncMountedRowRangeDeltaInternal>[0],
-	): void => runVisibilityCommit(() => syncMountedRowRangeDeltaInternal(params));
-
-	const syncPreviewRangeDelta = (
-		params: Parameters<typeof syncPreviewRangeDeltaInternal>[0],
-	): void => runVisibilityCommit(() => syncPreviewRangeDeltaInternal(params));
-
-	const sync = (
-		mountedRows: readonly VisibilityRow<TCell>[],
-		previewRange: RowRange,
-	): void => runVisibilityCommit(() => syncInternal(mountedRows, previewRange));
-
-	const commit = (snapshot: VirtualCardDisplaySnapshot<TCell>): void => {
-		runVisibilityCommit(() => {
-			if (
-				!hasCommittedSnapshot ||
-				snapshot.rowModelRevision !== committedRowModelRevision
-			) {
-				syncMountedRowsInternal({
-					mountedRows: snapshot.mountedRows,
-					previewRange: snapshot.previewActiveRange,
-				});
-			} else if (snapshot.mountedRows !== committedMountedRows) {
-				syncMountedRowRangeDeltaInternal({
-					previousRows: committedMountedRows,
-					nextRows: snapshot.mountedRows,
-					previousRowRange: committedMountedRange,
-					nextRowRange: snapshot.mountedRange,
-					previewRange: snapshot.previewActiveRange,
-				});
-			} else {
-				syncPreviewRangeDeltaInternal({
-					previousPreviewRange: previousPreviewVisible,
-					nextPreviewRange: snapshot.previewActiveRange,
-					mountedRows: snapshot.mountedRows,
-				});
-			}
-
-			committedRowModelRevision = snapshot.rowModelRevision;
-			committedMountedRows = snapshot.mountedRows;
-			committedMountedRange.start = snapshot.mountedRange.start;
-			committedMountedRange.end = snapshot.mountedRange.end;
-			hasCommittedSnapshot = true;
-		});
+		committedRowModelRevision = snapshot.rowModelRevision;
+		committedMountedRows = snapshot.mountedRows;
+		committedMountedRange.start = snapshot.mountedRange.start;
+		committedMountedRange.end = snapshot.mountedRange.end;
+		hasCommittedSnapshot = true;
 	};
 
 	return {
 		getOrCreateState,
 		commit,
-		getCommittedMountedRows: () => committedMountedRows,
-		getCommittedMountedRange: () => committedMountedRange,
-		getCommittedRowModelRevision: () =>
-			hasCommittedSnapshot ? committedRowModelRevision : null,
-		syncMountedRows,
-		syncMountedRowRangeDelta,
-		syncPreviewRangeDelta,
-		sync,
 	};
 }

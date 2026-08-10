@@ -4,7 +4,6 @@ import {
 	type ComputeVirtualRangesResult,
 } from "../virtualRanges";
 import {
-	renderSlotKey,
 	type MountedVirtualCell,
 	type VirtualListRevision,
 	type VirtualRanges,
@@ -16,7 +15,6 @@ import {
 	type MaterializedVirtualListMode,
 	type VirtualListMeasurementKind,
 } from "./VirtualListMode";
-import type { VirtualizedItemVisibility } from "ui/components/common/virtualizedItemVisibility";
 import {
 	hasSameVirtualListRevisionDependency,
 	type VirtualListRevisionDependency,
@@ -39,10 +37,6 @@ export interface VirtualVisibilityPolicy {
 	previewOverscanPx?: number;
 }
 
-export type VirtualCellVisibilityMetadataPolicy =
-	| { readonly type: "engine-managed" }
-	| { readonly type: "caller-managed" };
-
 export interface MountedVirtualCellsBuild<TMountedCell extends MountedVirtualCell> {
 	/**
 	 * Builders may mutate this array while constructing the result. Treat it as
@@ -55,7 +49,6 @@ export interface MountedVirtualCellsBuild<TMountedCell extends MountedVirtualCel
 	 */
 	reusableCellsByKey: Map<string, TMountedCell>;
 	mountedCellCount?: number;
-	mountedCellsByKey?: ReadonlyMap<string, TMountedCell>;
 	nextRenderSlotIndex: number;
 }
 
@@ -73,7 +66,6 @@ export interface VirtualListSnapshot<
 	rowModel: VirtualRowModel<TCell>;
 	ranges: VirtualRanges;
 	mountedCells: readonly TMountedCell[];
-	mountedCellsByKey: ReadonlyMap<string, TMountedCell>;
 	totalHeight: number;
 	mode: MaterializedVirtualListMode;
 }
@@ -98,21 +90,11 @@ export interface VirtualListInput<
 	visibilityPolicy: VirtualVisibilityPolicy;
 	previous?: VirtualListSnapshot<TCell, TMountedCell, TMountedBuild> | null;
 	previousState?: VirtualListReconciliationState<TMountedBuild> | null;
-	visibilityMetadataPolicy?: VirtualCellVisibilityMetadataPolicy;
-	/**
-	 * Provide the previous mounted-cell key index to mounted-cell builders and
-	 * engine-managed metadata reconciliation.
-	 *
-	 * @default true
-	 */
-	providePreviousCellsByKey?: boolean;
 	buildMountedCells(params: {
 		rowModel: VirtualRowModel<TCell>;
 		rowRange: RowRange;
 		ranges: VirtualRanges;
 		previousBuild?: TMountedBuild;
-		previousCells?: readonly TMountedCell[];
-		previousCellsByKey?: ReadonlyMap<string, TMountedCell>;
 	}): TMountedBuild;
 }
 
@@ -124,21 +106,11 @@ export interface VirtualListRecomputeInput<
 	rowModel: VirtualRowModel<TCell>;
 	previous: VirtualListSnapshot<TCell, TMountedCell, TMountedBuild>;
 	previousState?: VirtualListReconciliationState<TMountedBuild> | null;
-	visibilityMetadataPolicy?: VirtualCellVisibilityMetadataPolicy;
-	/**
-	 * Provide the previous mounted-cell key index to mounted-cell builders and
-	 * engine-managed metadata reconciliation.
-	 *
-	 * @default true
-	 */
-	providePreviousCellsByKey?: boolean;
 	buildMountedCells(params: {
 		rowModel: VirtualRowModel<TCell>;
 		rowRange: RowRange;
 		ranges: VirtualRanges;
 		previousBuild?: TMountedBuild;
-		previousCells?: readonly TMountedCell[];
-		previousCellsByKey?: ReadonlyMap<string, TMountedCell>;
 	}): TMountedBuild;
 }
 
@@ -159,145 +131,7 @@ const MOUNTED_CELL_ROW_MODEL_REVISION_DEPENDENCY = {
 	pagination: true,
 } as const satisfies VirtualListRevisionDependency;
 
-const DEFAULT_VISIBILITY_METADATA_POLICY: VirtualCellVisibilityMetadataPolicy = {
-	type: "engine-managed",
-};
-
-const shouldApplyVisibilityMetadata = (
-	policy: VirtualCellVisibilityMetadataPolicy = DEFAULT_VISIBILITY_METADATA_POLICY,
-): boolean => policy.type === "engine-managed";
-
-const shouldProvidePreviousCellsByKey = (
-	providePreviousCellsByKey: boolean | undefined,
-): boolean => providePreviousCellsByKey !== false;
-
-const resolvePreviousCellsByKey = <
-	TCell,
-	TMountedCell extends MountedVirtualCell,
-	TMountedBuild extends MountedVirtualCellsBuild<TMountedCell>,
->(
-	previous:
-		| VirtualListSnapshot<TCell, TMountedCell, TMountedBuild>
-		| null
-		| undefined,
-	providePreviousCellsByKey: boolean | undefined,
-): ReadonlyMap<string, TMountedCell> | undefined => {
-	if (!shouldProvidePreviousCellsByKey(providePreviousCellsByKey)) {
-		return undefined;
-	}
-	return previous?.mountedCellsByKey;
-};
-
-export const resolveVirtualizedItemVisibility = (
-	rowIndex: number | undefined,
-	ranges: VirtualRanges,
-): VirtualizedItemVisibility => {
-	if (
-		rowIndex !== undefined &&
-		rowIndex >= ranges.previewVisible.start &&
-		rowIndex < ranges.previewVisible.end
-	) {
-		return "visible";
-	}
-
-	return "mounted";
-};
-
-const withVirtualCellMetadata = <TMountedCell extends MountedVirtualCell>(
-	cell: TMountedCell,
-	ranges: VirtualRanges,
-	previousCellsByKey?: ReadonlyMap<string, TMountedCell>,
-	options?: {
-		visibilityMetadataPolicy?: VirtualCellVisibilityMetadataPolicy;
-	},
-): TMountedCell => {
-	const nextRenderSlotKey = renderSlotKey(cell.renderSlotKey);
-	const appliesVisibilityMetadata = shouldApplyVisibilityMetadata(
-		options?.visibilityMetadataPolicy,
-	);
-	const nextVisibility = appliesVisibilityMetadata
-		? resolveVirtualizedItemVisibility(cell.rowIndex, ranges)
-		: undefined;
-	const previous = previousCellsByKey?.get(cell.key);
-
-	if (
-		previous === cell &&
-		previous.renderSlotIndex === cell.renderSlotIndex &&
-		previous.renderSlotKey === nextRenderSlotKey &&
-		(!appliesVisibilityMetadata || previous.visibility === nextVisibility)
-	) {
-		return previous;
-	}
-
-	if (
-		cell.renderSlotKey === nextRenderSlotKey &&
-		(!appliesVisibilityMetadata || cell.visibility === nextVisibility)
-	) {
-		return cell;
-	}
-
-	if (!appliesVisibilityMetadata) {
-		return {
-			...cell,
-			renderSlotKey: nextRenderSlotKey,
-		};
-	}
-	return {
-		...cell,
-		renderSlotKey: nextRenderSlotKey,
-		visibility: nextVisibility,
-	};
-};
-
-const applyVirtualCellMetadata = <TMountedCell extends MountedVirtualCell>(
-	cells: readonly TMountedCell[],
-	ranges: VirtualRanges,
-	previousCellsByKey?: ReadonlyMap<string, TMountedCell>,
-	options?: {
-		visibilityMetadataPolicy?: VirtualCellVisibilityMetadataPolicy;
-	},
-): readonly TMountedCell[] => {
-	let next: TMountedCell[] | null = null;
-
-	for (let i = 0; i < cells.length; i += 1) {
-		const cell = cells[i];
-		const resolved = withVirtualCellMetadata(
-			cell,
-			ranges,
-			previousCellsByKey,
-			options,
-		);
-
-		if (resolved !== cell && next === null) {
-			next = cells.slice(0, i);
-		}
-
-		if (next) {
-			next.push(resolved);
-		}
-	}
-
-	return next ?? cells;
-};
-
-const hasSameRefs = <T>(
-	previous: readonly T[] | undefined,
-	next: readonly T[],
-): boolean => {
-	if (!previous || previous.length !== next.length) {
-		return false;
-	}
-
-	for (let index = 0; index < previous.length; index += 1) {
-		if (previous[index] !== next[index]) {
-			return false;
-		}
-	}
-
-	return true;
-};
-
-const createCallerManagedSnapshot = <
+const createSnapshot = <
 	TCell,
 	TMountedCell extends MountedVirtualCell,
 	TMountedBuild extends MountedVirtualCellsBuild<TMountedCell>,
@@ -308,23 +142,10 @@ const createCallerManagedSnapshot = <
 	totalHeight: number;
 	mode: MaterializedVirtualListMode;
 }): VirtualListSnapshot<TCell, TMountedCell, TMountedBuild> => {
-	let mountedCells: readonly TMountedCell[] | undefined;
-	let mountedCellsByKey: ReadonlyMap<string, TMountedCell> | undefined;
 	return {
 		rowModel: params.rowModel,
 		ranges: params.ranges,
-		get mountedCells() {
-			mountedCells ??= params.mountedBuild.cells;
-			return mountedCells;
-		},
-		get mountedCellsByKey() {
-			if (!mountedCellsByKey) {
-				mountedCellsByKey =
-					params.mountedBuild.mountedCellsByKey ??
-					params.mountedBuild.reusableCellsByKey;
-			}
-			return mountedCellsByKey;
-		},
+		mountedCells: params.mountedBuild.cells,
 		totalHeight: params.totalHeight,
 		mode: params.mode,
 	};
@@ -342,65 +163,10 @@ const cloneSnapshotWithOverrides = <
 		totalHeight?: number;
 		mode?: MaterializedVirtualListMode;
 	},
-): VirtualListSnapshot<TCell, TMountedCell, TMountedBuild> => {
-	const descriptors = Object.getOwnPropertyDescriptors(snapshot);
-	if (overrides.rowModel !== undefined) {
-		descriptors.rowModel = {
-			value: overrides.rowModel,
-			enumerable: true,
-			configurable: true,
-			writable: true,
-		};
-	}
-	if (overrides.ranges !== undefined) {
-		descriptors.ranges = {
-			value: overrides.ranges,
-			enumerable: true,
-			configurable: true,
-			writable: true,
-		};
-	}
-	if (overrides.totalHeight !== undefined) {
-		descriptors.totalHeight = {
-			value: overrides.totalHeight,
-			enumerable: true,
-			configurable: true,
-			writable: true,
-		};
-	}
-	if (overrides.mode !== undefined) {
-		descriptors.mode = {
-			value: overrides.mode,
-			enumerable: true,
-			configurable: true,
-			writable: true,
-		};
-	}
-	return Object.defineProperties({}, descriptors) as VirtualListSnapshot<
-		TCell,
-		TMountedCell,
-		TMountedBuild
-	>;
-};
-
-const createCallerManagedReuseSnapshot = <
-	TCell,
-	TMountedCell extends MountedVirtualCell,
-	TMountedBuild extends MountedVirtualCellsBuild<TMountedCell>,
->(params: {
-	rowModel: VirtualRowModel<TCell>;
-	ranges: VirtualRanges;
-	mountedBuild: TMountedBuild;
-	totalHeight: number;
-	mode: MaterializedVirtualListMode;
-}): VirtualListSnapshot<TCell, TMountedCell, TMountedBuild> =>
-	createCallerManagedSnapshot({
-		rowModel: params.rowModel,
-		ranges: params.ranges,
-		mountedBuild: params.mountedBuild,
-		totalHeight: params.totalHeight,
-		mode: params.mode,
-	});
+): VirtualListSnapshot<TCell, TMountedCell, TMountedBuild> => ({
+	...snapshot,
+	...overrides,
+});
 
 const didRangesChange = (
 	previous: VirtualRanges | undefined,
@@ -414,11 +180,6 @@ const didMountedRangeChange = (
 	previous: VirtualRanges | undefined,
 	next: VirtualRanges,
 ): boolean => !previous || !sameRange(previous.mounted, next.mounted);
-
-const didPreviewVisibleRangeChange = (
-	previous: VirtualRanges | undefined,
-	next: VirtualRanges,
-): boolean => !previous || !sameRange(previous.previewVisible, next.previewVisible);
 
 const clampVirtualRanges = (ranges: VirtualRanges, rowCount: number): VirtualRanges => {
 	const mounted = clampRange(ranges.mounted, rowCount);
@@ -486,21 +247,6 @@ const withFastPathReuseSnapshot = <
 	});
 };
 
-const indexMountedCells = <TMountedCell extends MountedVirtualCell>(
-	mountedCells: readonly TMountedCell[],
-): {
-	mountedCellsByKey: ReadonlyMap<string, TMountedCell>;
-} => {
-	const mountedCellsByKey = new Map<string, TMountedCell>();
-
-	for (const cell of mountedCells) {
-		mountedCellsByKey.set(cell.key, cell);
-	}
-	return {
-		mountedCellsByKey,
-	};
-};
-
 export const createEmptyVirtualListComputation = <
 	TCell,
 	TMountedCell extends MountedVirtualCell,
@@ -519,7 +265,6 @@ export const createEmptyVirtualListComputation = <
 			rowModel: params.rowModel,
 			ranges: EMPTY_VIRTUAL_RANGES,
 			mountedCells,
-			mountedCellsByKey: new Map(),
 			totalHeight: params.rowModel.totalHeight,
 			mode: params.mode,
 		},
@@ -614,8 +359,6 @@ export function computeVirtualListSnapshotWithState<
 				rowModel: input.rowModel,
 				previous,
 				previousState: input.previousState,
-				visibilityMetadataPolicy: input.visibilityMetadataPolicy,
-				providePreviousCellsByKey: input.providePreviousCellsByKey,
 				buildMountedCells: input.buildMountedCells,
 			});
 			return {
@@ -632,7 +375,6 @@ export function computeVirtualListSnapshotWithState<
 				rowModel: input.rowModel,
 				ranges: EMPTY_VIRTUAL_RANGES,
 				mountedCells: [],
-				mountedCellsByKey: new Map(),
 				totalHeight: input.rowModel.totalHeight,
 				mode: rangesResult.mode,
 			},
@@ -652,13 +394,6 @@ export function computeVirtualListSnapshotWithState<
 		previous?.ranges,
 		rangesResult.ranges,
 	);
-	const previewVisibleRangeChanged = didPreviewVisibleRangeChange(
-		previous?.ranges,
-		rangesResult.ranges,
-	);
-	const callerManagesVisibilityMetadata = !shouldApplyVisibilityMetadata(
-		input.visibilityMetadataPolicy,
-	);
 	if (
 		previous &&
 		hasSameMountedCellRowModelRevision(previous.rowModel, input.rowModel) &&
@@ -679,37 +414,13 @@ export function computeVirtualListSnapshotWithState<
 
 	if (
 		previous &&
-		callerManagesVisibilityMetadata &&
-		input.measurement.isScrollActive &&
-		previous.rowModel === input.rowModel &&
-		!mountedRangeChanged &&
-		previewVisibleRangeChanged &&
-		previous.totalHeight === input.rowModel.totalHeight &&
-		input.previousState?.mountedBuild
-	) {
-		return {
-			snapshot: createCallerManagedReuseSnapshot({
-				rowModel: input.rowModel,
-				ranges: rangesResult.ranges,
-				mountedBuild: input.previousState.mountedBuild,
-				totalHeight: input.rowModel.totalHeight,
-				mode: rangesResult.mode,
-			}),
-			reconciliationState: input.previousState,
-			measurementKind: getMeasurementKindForMode(rangesResult.mode),
-		};
-	}
-
-	if (
-		previous &&
-		callerManagesVisibilityMetadata &&
 		hasSameMountedCellRowModelRevision(previous.rowModel, input.rowModel) &&
 		!mountedRangeChanged &&
 		previous.totalHeight === input.rowModel.totalHeight &&
 		input.previousState?.mountedBuild
 	) {
 		return {
-			snapshot: createCallerManagedReuseSnapshot({
+			snapshot: createSnapshot({
 				rowModel: input.rowModel,
 				ranges: rangesResult.ranges,
 				mountedBuild: input.previousState.mountedBuild,
@@ -721,75 +432,21 @@ export function computeVirtualListSnapshotWithState<
 		};
 	}
 
-	const previousCellsByKey = resolvePreviousCellsByKey(
-		previous,
-		input.providePreviousCellsByKey,
-	);
 	const mountedBuild = input.buildMountedCells({
 		rowModel: input.rowModel,
 		rowRange: rangesResult.ranges.mounted,
 		ranges: rangesResult.ranges,
 		previousBuild: previousMountedBuild ?? undefined,
-		previousCells: callerManagesVisibilityMetadata
-			? undefined
-			: previous?.mountedCells,
-		previousCellsByKey,
 	});
-	if (callerManagesVisibilityMetadata) {
-		return {
-			snapshot: createCallerManagedSnapshot({
-				rowModel: input.rowModel,
-				ranges: rangesResult.ranges,
-				mountedBuild,
-				totalHeight: input.rowModel.totalHeight,
-				mode: rangesResult.mode,
-			}),
-			reconciliationState: {
-				mountedBuild,
-			},
-			measurementKind: getMeasurementKindForMode(rangesResult.mode),
-		};
-	}
-	const mountedCells = applyVirtualCellMetadata(
-		mountedBuild.cells,
-		rangesResult.ranges,
-		previousCellsByKey,
-		{
-			visibilityMetadataPolicy: input.visibilityMetadataPolicy,
-		},
-	);
-	if (
-		previous &&
-		hasSameMountedCellRowModelRevision(previous.rowModel, input.rowModel) &&
-		!rangeChanged &&
-		previous.totalHeight === input.rowModel.totalHeight &&
-		hasSameRefs(previous.mountedCells, mountedCells)
-	) {
-		const snapshot = withFastPathReuseSnapshot(previous, {
-			rowModel: input.rowModel,
-			mode: rangesResult.mode,
-		});
-		return {
-			snapshot,
-			reconciliationState:
-				mountedBuild === previousMountedBuild && input.previousState
-					? input.previousState
-					: { mountedBuild },
-			measurementKind: getMeasurementKindForMode(rangesResult.mode),
-		};
-	}
-
-	const { mountedCellsByKey } = indexMountedCells(mountedCells);
 
 	return {
-		snapshot: {
+		snapshot: createSnapshot({
 			rowModel: input.rowModel,
 			ranges: rangesResult.ranges,
-			mountedCells,
-			mountedCellsByKey,
+			mountedBuild,
 			totalHeight: input.rowModel.totalHeight,
 			mode: rangesResult.mode,
-		},
+		}),
 		reconciliationState: {
 			mountedBuild,
 		},
@@ -814,82 +471,40 @@ export function recomputeVirtualListSnapshotWithState<
 
 	const previousMountedBuild = input.previousState?.mountedBuild ?? null;
 	const ranges = clampVirtualRanges(input.previous.ranges, input.rowModel.rowCount);
-	const rangeChanged = didRangesChange(input.previous.ranges, ranges);
-	const callerManagesVisibilityMetadata = !shouldApplyVisibilityMetadata(
-		input.visibilityMetadataPolicy,
-	);
-	const previousCellsByKey = resolvePreviousCellsByKey(
-		input.previous,
-		input.providePreviousCellsByKey,
-	);
+	if (
+		previousMountedBuild &&
+		hasSameMountedCellRowModelRevision(input.previous.rowModel, input.rowModel) &&
+		sameRange(input.previous.ranges.mounted, ranges.mounted)
+	) {
+		return {
+			snapshot: createSnapshot({
+				rowModel: input.rowModel,
+				ranges,
+				mountedBuild: previousMountedBuild,
+				totalHeight: input.rowModel.totalHeight,
+				mode: input.previous.mode,
+			}),
+			reconciliationState: input.previousState ?? {
+				mountedBuild: previousMountedBuild,
+			},
+			measurementKind: getMeasurementKindForMode(input.previous.mode),
+		};
+	}
 	const mountedBuild = input.buildMountedCells({
 		rowModel: input.rowModel,
 		rowRange: ranges.mounted,
 		ranges,
 		previousBuild: previousMountedBuild ?? undefined,
-		previousCells: callerManagesVisibilityMetadata
-			? undefined
-			: input.previous.mountedCells,
-		previousCellsByKey,
 	});
-	if (callerManagesVisibilityMetadata) {
-		return {
-			snapshot: createCallerManagedSnapshot({
-				rowModel: input.rowModel,
-				ranges,
-				mountedBuild,
-				totalHeight: input.rowModel.totalHeight,
-				mode: input.previous.mode,
-			}),
-			reconciliationState: {
-				mountedBuild,
-			},
-			measurementKind: getMeasurementKindForMode(input.previous.mode),
-		};
-	}
-	const mountedCells = applyVirtualCellMetadata(
-		mountedBuild.cells,
-		ranges,
-		previousCellsByKey,
-		{
-			visibilityMetadataPolicy: input.visibilityMetadataPolicy,
-		},
-	);
-	if (
-		(input.previous.rowModel === input.rowModel ||
-			hasSameMountedCellRowModelRevision(
-				input.previous.rowModel,
-				input.rowModel,
-			)) &&
-		input.previous.totalHeight === input.rowModel.totalHeight &&
-		!rangeChanged &&
-		mountedBuild === previousMountedBuild &&
-		hasSameRefs(input.previous.mountedCells, mountedCells)
-	) {
-		const snapshot = withFastPathReuseSnapshot(input.previous, {
-			rowModel: input.rowModel,
-			mode: input.previous.mode,
-		});
-		return {
-			snapshot,
-			reconciliationState: input.previousState ?? {
-				mountedBuild,
-			},
-			measurementKind: getMeasurementKindForMode(input.previous.mode),
-		};
-	}
-
-	const { mountedCellsByKey } = indexMountedCells(mountedCells);
 
 	return {
-		snapshot: {
+		snapshot: createSnapshot({
 			rowModel: input.rowModel,
 			ranges,
-			mountedCells,
-			mountedCellsByKey,
+			mountedBuild,
 			totalHeight: input.rowModel.totalHeight,
 			mode: input.previous.mode,
-		},
+		}),
 		reconciliationState: {
 			mountedBuild,
 		},

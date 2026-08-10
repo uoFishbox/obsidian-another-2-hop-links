@@ -60,8 +60,6 @@ const createVirtualList = (
 			typeof buildMountedVirtualGridCellsFromRowModel
 		>[0]["rowRange"];
 		previousBuild?: MountedVirtualGridCellsBuildResult<TestItem>;
-		previousCells?: readonly MountedVirtualGridCell<TestItem>[];
-		previousCellsByKey?: ReadonlyMap<string, MountedVirtualGridCell<TestItem>>;
 	}) => MountedVirtualGridCellsBuildResult<TestItem> = buildMountedVirtualGridCellsFromRowModel,
 ) =>
 	useVirtualList<
@@ -70,19 +68,11 @@ const createVirtualList = (
 		MountedVirtualGridCell<TestItem>,
 		MountedVirtualGridCellsBuildResult<TestItem>
 	>({
-		buildMountedCells: ({
-			rowModel,
-			rowRange,
-			previousBuild,
-			previousCells,
-			previousCellsByKey,
-		}) =>
+		buildMountedCells: ({ rowModel, rowRange, previousBuild }) =>
 			buildMountedCells({
 				rowModel,
 				rowRange,
 				previousBuild,
-				previousCells,
-				previousCellsByKey,
 			}),
 		onSnapshotUpdated,
 	});
@@ -147,17 +137,11 @@ describe("useVirtualList", () => {
 		expect(snapshot?.mode.kind).toBe("stable");
 		expect(virtualList.getMountedCells()).toBe(snapshot?.mountedCells);
 		expect(virtualList.getTotalHeight(123)).toBe(snapshot?.totalHeight);
-		expect(snapshot?.mountedCells.map((cell) => cell.visibility)).toEqual([
-			"visible",
-			"visible",
-			"visible",
-			"mounted",
-			"mounted",
-			"mounted",
-			"mounted",
-			"mounted",
-			"mounted",
-		]);
+		expect(
+			snapshot?.mountedCells.every(
+				(cell) => !Object.prototype.hasOwnProperty.call(cell, "visibility"),
+			),
+		).toBe(true);
 		expect(virtualList.getMountedCellsForChange()).toEqual(snapshot?.mountedCells);
 	});
 
@@ -340,7 +324,6 @@ describe("useVirtualList", () => {
 			MountedVirtualGridCellsBuildResult<TestItem>
 		>({
 			buildMountedCells: buildMountedVirtualGridCellsFromRowModel,
-			visibilityMetadataPolicy: { type: "caller-managed" },
 			onMountedBuildChanged,
 			onPreviewRangeChanged,
 			onModeChanged,

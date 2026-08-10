@@ -150,17 +150,11 @@ export function useTwoHopVirtualList(
 		MountedTwoHopCell,
 		MountedTwoHopBuild
 	>({
-		buildMountedCells: ({
-			rowModel: nextRowModel,
-			rowRange,
-			previousBuild,
-			previousCellsByKey,
-		}) =>
+		buildMountedCells: ({ rowModel: nextRowModel, rowRange, previousBuild }) =>
 			buildMountedTwoHopRows({
 				rowModel: nextRowModel,
 				rowRange,
 				previousBuild,
-				previousCellsByKey,
 				rowSlotAllocator,
 			}),
 		mountedRowsReconciler: rowSlotAllocator,

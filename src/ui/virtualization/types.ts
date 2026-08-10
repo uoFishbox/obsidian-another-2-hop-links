@@ -115,7 +115,6 @@ export interface MountedVirtualCell {
 	readonly renderSlotIndex: number;
 	readonly rowIndex: number;
 	readonly columnIndex?: number;
-	readonly visibility?: VirtualizedItemVisibility;
 	readonly cellMetadataKey?: unknown;
 	readonly renderBodyKey?: RenderBodyKey;
 	readonly cellSlotKey?: number;

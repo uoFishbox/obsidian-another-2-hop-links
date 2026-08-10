@@ -4,7 +4,6 @@ import {
 	createEmptyVirtualListComputation,
 	recomputeVirtualListSnapshotWithState,
 	type MountedVirtualCellsBuild,
-	type VirtualCellVisibilityMetadataPolicy,
 	type VirtualListComputation,
 	type VirtualListReconciliationState,
 	type VirtualListSnapshot,
@@ -98,8 +97,6 @@ export interface CreateVirtualListRuntimeOptions<
 		rowRange: RowRange;
 		ranges: VirtualRanges;
 		previousBuild?: TMountedBuild;
-		previousCells?: readonly TMountedCell[];
-		previousCellsByKey?: ReadonlyMap<string, TMountedCell>;
 	}): TMountedBuild;
 	onSnapshotUpdated?: (
 		snapshot: VirtualListSnapshot<TCell, TMountedCell, TMountedBuild>,
@@ -109,14 +106,6 @@ export interface CreateVirtualListRuntimeOptions<
 	onStateChanged?: (
 		state: VirtualListRuntimeState<TCell, TMountedCell, TMountedBuild>,
 	) => void;
-	visibilityMetadataPolicy?: VirtualCellVisibilityMetadataPolicy;
-	/**
-	 * Provide the previous mounted-cell key index to mounted-cell builders and
-	 * engine-managed metadata reconciliation.
-	 *
-	 * @default true
-	 */
-	providePreviousCellsByKey?: boolean;
 	trackMountedCellsForChange?: boolean;
 	mountedRowsReconciler?: {
 		reset(reason: ResidentSlotResetReason): void;
@@ -246,8 +235,6 @@ export function createVirtualListRuntime<
 			visibilityPolicy: params.visibilityPolicy,
 			previous: previousSnapshot,
 			previousState: previousReconciliationState,
-			visibilityMetadataPolicy: options.visibilityMetadataPolicy,
-			providePreviousCellsByKey: options.providePreviousCellsByKey,
 			buildMountedCells: options.buildMountedCells,
 		});
 		const nextSnapshot = result.snapshot;
@@ -311,8 +298,6 @@ export function createVirtualListRuntime<
 			rowModel: params.rowModel,
 			previous: previousSnapshot,
 			previousState: runtimeState.reconciliationState,
-			visibilityMetadataPolicy: options.visibilityMetadataPolicy,
-			providePreviousCellsByKey: options.providePreviousCellsByKey,
 			buildMountedCells: options.buildMountedCells,
 		});
 		if (

@@ -472,7 +472,6 @@ function buildMountedVirtualGridCellsFromCore<T>(params: {
 	rowHeight: number;
 	gap: number;
 	previousBuild?: MountedVirtualGridCellsBuildResult<T>;
-	previousCellsByKey?: ReadonlyMap<string, MountedVirtualGridCell<T>>;
 	renderRevisionFallbackPolicy?: RenderRevisionFallbackPolicy;
 	rowSlotAllocator?: ResidentRowSlotAllocator;
 }): MountedVirtualGridCellsBuildResult<T> {
@@ -524,9 +523,7 @@ function buildMountedVirtualGridCellsFromCore<T>(params: {
 		});
 
 	const previousCellsByKey =
-		previousBuild?.reusableCellsByKey ??
-		params.previousCellsByKey ??
-		EMPTY_PREVIOUS_MOUNTED_GRID_CELLS;
+		previousBuild?.reusableCellsByKey ?? EMPTY_PREVIOUS_MOUNTED_GRID_CELLS;
 	const mountedRows = buildMountedSectionedGridRows<
 		MountedVirtualGridCell<T>,
 		MountedVirtualGridRowSlice<T>,
@@ -674,7 +671,6 @@ export function buildMountedVirtualGridCellsFromRowModel<T>(params: {
 	rowModel: FlatLinkRowModel<T>;
 	rowRange: RowRange;
 	previousBuild?: MountedVirtualGridCellsBuildResult<T>;
-	previousCellsByKey?: ReadonlyMap<string, MountedVirtualGridCell<T>>;
 	renderRevisionFallbackPolicy?: RenderRevisionFallbackPolicy;
 	rowSlotAllocator?: ResidentRowSlotAllocator;
 }): MountedVirtualGridCellsBuildResult<T> {
@@ -695,7 +691,6 @@ export function buildMountedVirtualGridCellsFromRowModel<T>(params: {
 		rowHeight: rowModel.layout.rowHeight,
 		gap: rowModel.layout.gap,
 		previousBuild: params.previousBuild,
-		previousCellsByKey: params.previousCellsByKey,
 		renderRevisionFallbackPolicy: params.renderRevisionFallbackPolicy,
 		rowSlotAllocator: params.rowSlotAllocator,
 	});

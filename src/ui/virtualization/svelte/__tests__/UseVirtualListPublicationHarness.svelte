@@ -36,7 +36,6 @@
 	const rowModel = createFlatLinkRowModel({ cellSource, layout });
 	const virtualList = useVirtualList({
 		buildMountedCells: buildMountedVirtualGridCellsFromRowModel<TestItem>,
-		visibilityMetadataPolicy: { type: "caller-managed" },
 	});
 
 	const applyMeasurement = (

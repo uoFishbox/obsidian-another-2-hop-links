@@ -291,17 +291,11 @@ export function useFlatVirtualGridList<T>(
 		MountedVirtualGridCell<T>,
 		MountedVirtualGridCellsBuildResult<T>
 	>({
-		buildMountedCells: ({
-			rowModel,
-			rowRange,
-			previousBuild,
-			previousCellsByKey,
-		}) =>
+		buildMountedCells: ({ rowModel, rowRange, previousBuild }) =>
 			buildMountedVirtualGridCellsFromRowModel({
 				rowModel,
 				rowRange,
 				previousBuild,
-				previousCellsByKey,
 				renderRevisionFallbackPolicy: props.renderRevisionFallbackPolicy,
 				rowSlotAllocator,
 			}),
@@ -309,7 +303,6 @@ export function useFlatVirtualGridList<T>(
 		onStableVisibleRange: () => {
 			measurement.hasStableVisibleRange = true;
 		},
-		visibilityMetadataPolicy: { type: "caller-managed" },
 		onSnapshotUpdated: (snapshot, reconciliationState) => {
 			syncCardSlots(
 				reconciliationState.mountedBuild?.rowSlices ?? EMPTY_MOUNTED_ROWS,
