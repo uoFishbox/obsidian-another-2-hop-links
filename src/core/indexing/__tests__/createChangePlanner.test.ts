@@ -73,6 +73,33 @@ describe("CreateChangePlanner", () => {
 		expect(env.mockMetadataCache.getFileCache).not.toHaveBeenCalled();
 	});
 
+	test("create falls back to metadata when a reverse-index source has no summary", async () => {
+		const env = new VaultEnvironmentBuilder([
+			{ path: "origin.md", links: ["missing"] },
+		]).build();
+		const snapshot = await buildIndexSnapshotAsync(
+			env.mockVault,
+			env.mockMetadataCache,
+		);
+		const planner = createCreateChangePlanner(env.mockVault, env.mockMetadataCache);
+
+		snapshot.sourceSummaries.delete("origin.md");
+		env.builder.addFile({ path: "missing.md" });
+		env.mockMetadataCache.getFileCache.mockClear();
+
+		const pathsToUpdate = new Set<string>();
+		await planner.collectPathsForCreateEventAsync(
+			snapshot,
+			"missing.md",
+			pathsToUpdate,
+			createCreateEventEvaluationCache(),
+			createImmediateYieldScheduler(),
+		);
+
+		expect(pathsToUpdate).toEqual(new Set(["missing.md", "origin.md"]));
+		expect(env.mockMetadataCache.getFileCache).toHaveBeenCalledTimes(1);
+	});
+
 	test("create shadowing detection shares resolved destination cache within the same directory", async () => {
 		const env = new VaultEnvironmentBuilder([
 			{ path: "team-a/one.md", links: ["Dashboard"] },

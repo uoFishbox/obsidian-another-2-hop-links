@@ -71,77 +71,40 @@ export function createCreateChangePlanner(
 
 		const candidates = generateCandidateLookupPaths(newFilePath);
 
-		let unresolvedCount = 0;
-		let scheduledFromUnresolved = 0;
-		for (const candidate of candidates) {
-			const unresolvedSources =
-				snapshot.unresolvedLinkLookupToSources.get(candidate);
-			if (!unresolvedSources) {
-				continue;
-			}
-
-			for (const sourcePath of unresolvedSources) {
-				if (!pathsToUpdate.has(sourcePath)) {
-					scheduledFromUnresolved++;
-					pathsToUpdate.add(sourcePath);
-				}
-
-				unresolvedCount++;
-				const pendingYield = maybeYield(
-					yieldScheduler,
-					unresolvedCount,
-					HEAVY_YIELD_CHECK_INTERVAL,
-				);
-				if (pendingYield) {
-					await pendingYield;
-				}
-			}
-		}
-
-		let evaluatedShadowSources: Set<string> | undefined;
-		let shadowingCount = 0;
-		let scheduledFromShadowing = 0;
+		let evaluatedSources: Set<string> | undefined;
+		let sourceCount = 0;
 		for (const candidate of candidates) {
 			const sources = snapshot.linkLookupToSources.get(candidate);
 			if (!sources) {
 				continue;
 			}
 			for (const sourcePath of sources) {
-				if (
-					pathsToUpdate.has(sourcePath) ||
-					evaluatedShadowSources?.has(sourcePath)
-				) {
-					shadowingCount++;
-					const pendingYield = maybeYield(
-						yieldScheduler,
-						shadowingCount,
-						HEAVY_YIELD_CHECK_INTERVAL,
-					);
-					if (pendingYield) {
-						await pendingYield;
+				if (!pathsToUpdate.has(sourcePath)) {
+					const sourceSummary = snapshot.sourceSummaries.get(sourcePath);
+					if (sourceSummary?.unresolvedLookupKeys.has(candidate)) {
+						pathsToUpdate.add(sourcePath);
+					} else if (!evaluatedSources?.has(sourcePath)) {
+						(evaluatedSources ??= new Set<string>()).add(sourcePath);
+
+						if (
+							await sourceHasLinkResolvingToCreatedFileAsync(
+								snapshot,
+								sourcePath,
+								newFilePath,
+								candidates,
+								createEventEvaluationCache,
+								yieldScheduler,
+							)
+						) {
+							pathsToUpdate.add(sourcePath);
+						}
 					}
-					continue;
-				}
-				(evaluatedShadowSources ??= new Set<string>()).add(sourcePath);
-
-				if (
-					await sourceHasLinkResolvingToCreatedFileAsync(
-						snapshot,
-						sourcePath,
-						newFilePath,
-						candidates,
-						createEventEvaluationCache,
-						yieldScheduler,
-					)
-				) {
-					scheduledFromShadowing++;
-					pathsToUpdate.add(sourcePath);
 				}
 
-				shadowingCount++;
+				sourceCount++;
 				const pendingYield = maybeYield(
 					yieldScheduler,
-					shadowingCount,
+					sourceCount,
 					HEAVY_YIELD_CHECK_INTERVAL,
 				);
 				if (pendingYield) {

@@ -11,7 +11,6 @@ export interface BacklinksBuildArtifacts {
 	detailedMap: BacklinksMap;
 	sourceSummaries: Map<string, SourceSummary>;
 	linkLookupToSources: Map<string, Set<string>>;
-	unresolvedLinkLookupToSources: Map<string, Set<string>>;
 	lookupKeyToLookupPaths: Map<string, Set<string>>;
 	lookupPathResolvedSourceCount: Map<string, number>;
 	lookupKeyDirectResolvedPathCount: Map<string, number>;

@@ -343,9 +343,9 @@ describe("IncrementalIndexUpdater", () => {
 			snapshot.backlinksMap.get("src/new-name.md")?.has("shadow-source.md"),
 		).toBe(true);
 		expect(snapshot.backlinksMap.get("archive/new-name.md")).toBeUndefined();
-		expect(snapshot.unresolvedLinkLookupToSources.get("old-name.md")).toEqual(
-			new Set(["old-source.md"]),
-		);
+		expect(
+			snapshot.sourceSummaries.get("old-source.md")?.unresolvedLookupKeys,
+		).toEqual(new Set(["old-name.md"]));
 		expect(serializeSnapshot(snapshot)).toEqual(
 			serializeSnapshot(await final.snapshotBuilder.buildAsync()),
 		);
@@ -382,9 +382,9 @@ describe("IncrementalIndexUpdater", () => {
 			new Set(["folderA/note.md", "src/note.md"]),
 		);
 		expect(snapshot.backlinksMap.get("src/note.md")).toBeUndefined();
-		expect(snapshot.unresolvedLinkLookupToSources.get("foldera/note.md")).toEqual(
-			new Set(["src/note.md"]),
-		);
+		expect(
+			snapshot.sourceSummaries.get("src/note.md")?.unresolvedLookupKeys,
+		).toEqual(new Set(["foldera/note.md"]));
 
 		expect(serializeSnapshot(snapshot)).toEqual(
 			serializeSnapshot(await final.snapshotBuilder.buildAsync()),
@@ -488,7 +488,7 @@ describe("IncrementalIndexUpdater", () => {
 		expect([...result.cacheInvalidationPaths].sort()).toEqual(["Foo.md", "foo.md"]);
 	});
 
-	test("modify updates unresolved reverse index to resolved state", async () => {
+	test("modify updates unresolved source summary to resolved state", async () => {
 		const env = createUpdaterEnvironment([
 			{ path: "origin.md", links: ["missing"] },
 			{ path: "target.md" },
@@ -498,20 +498,15 @@ describe("IncrementalIndexUpdater", () => {
 		expect(snapshot.sourceSummaries.get("origin.md")?.unresolvedLookupKeys).toEqual(
 			new Set(["missing.md"]),
 		);
-		expect(snapshot.unresolvedLinkLookupToSources.get("missing.md")).toEqual(
-			new Set(["origin.md"]),
-		);
-
 		env.builder.addFile({ path: "origin.md", links: ["target"] });
 		await env.updater.applyAsync(snapshot, [{ type: "modify", path: "origin.md" }]);
 
 		expect(
 			snapshot.sourceSummaries.get("origin.md")?.unresolvedLookupKeys.size ?? 0,
 		).toBe(0);
-		expect(snapshot.unresolvedLinkLookupToSources.has("missing.md")).toBe(false);
 	});
 
-	test("delete removes source from unresolved reverse index", async () => {
+	test("delete removes an unresolved source summary", async () => {
 		const env = createUpdaterEnvironment([
 			{ path: "origin.md", links: ["missing"] },
 		]);
@@ -529,7 +524,6 @@ describe("IncrementalIndexUpdater", () => {
 			new Set(["origin.md", "missing.md"]),
 		);
 		expect(snapshot.sourceSummaries.has("origin.md")).toBe(false);
-		expect(snapshot.unresolvedLinkLookupToSources.has("missing.md")).toBe(false);
 	});
 });
 

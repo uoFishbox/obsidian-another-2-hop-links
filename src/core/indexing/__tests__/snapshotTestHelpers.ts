@@ -10,9 +10,6 @@ export function serializeSnapshot(snapshot: IndexSnapshot) {
 		backlinksMap: serializeNestedBacklinkMap(snapshot.backlinksMap),
 		sourceSummaries: serializeSourceSummaryMap(snapshot.sourceSummaries),
 		linkLookupToSources: serializeSetMap(snapshot.linkLookupToSources),
-		unresolvedLinkLookupToSources: serializeSetMap(
-			snapshot.unresolvedLinkLookupToSources,
-		),
 		lookupKeyToLookupPaths: serializeSetMap(snapshot.lookupKeyToLookupPaths),
 		lookupPathResolvedSourceCount: serializeNumberMap(
 			snapshot.lookupPathResolvedSourceCount,

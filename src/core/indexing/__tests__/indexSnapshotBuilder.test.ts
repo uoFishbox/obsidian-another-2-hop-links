@@ -57,7 +57,7 @@ describe("index snapshot builders", () => {
 		).toEqual(new Set(["target.md"]));
 	});
 
-	test("reverse index from unresolved links is consistent between sync and async builds", async () => {
+	test("unresolved source summaries are consistent between sync and async builds", async () => {
 		const { mockVault, mockMetadataCache } = new VaultEnvironmentBuilder([
 			{ path: "origin.md", links: ["missing", "target"] },
 			{ path: "peer.md", links: ["missing"] },
@@ -77,7 +77,10 @@ describe("index snapshot builders", () => {
 		expect(
 			syncSnapshot.sourceSummaries.get("origin.md")?.unresolvedLookupKeys,
 		).toEqual(new Set(["missing.md"]));
-		expect(syncSnapshot.unresolvedLinkLookupToSources.get("missing.md")).toEqual(
+		expect(
+			syncSnapshot.sourceSummaries.get("peer.md")?.unresolvedLookupKeys,
+		).toEqual(new Set(["missing.md"]));
+		expect(syncSnapshot.linkLookupToSources.get("missing.md")).toEqual(
 			new Set(["origin.md", "peer.md"]),
 		);
 		expect(serializeSnapshot(asyncSnapshot)).toEqual(

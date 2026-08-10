@@ -63,13 +63,6 @@ export async function replaceSourceSummaryAsync(
 		nextSummary?.firstRefIndexByLookupKey,
 		yieldScheduler,
 	);
-	await syncLookupIndexForSourceAsync(
-		snapshot.unresolvedLinkLookupToSources,
-		sourcePath,
-		previousSummary?.unresolvedLookupKeys,
-		nextSummary?.unresolvedLookupKeys,
-		yieldScheduler,
-	);
 
 	if (
 		nextSummary &&

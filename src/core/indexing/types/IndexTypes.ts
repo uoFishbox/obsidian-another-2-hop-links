@@ -82,7 +82,6 @@ export interface IndexSnapshot {
 	backlinksMap: BacklinksMap;
 	sourceSummaries: Map<string, SourceSummary>;
 	linkLookupToSources: Map<string, Set<string>>;
-	unresolvedLinkLookupToSources: Map<string, Set<string>>;
 	lookupKeyToLookupPaths: Map<string, Set<string>>;
 	lookupPathResolvedSourceCount: Map<string, number>;
 	lookupKeyDirectResolvedPathCount: Map<string, number>;
@@ -122,7 +121,6 @@ export function createEmptyIndexSnapshot(): IndexSnapshot {
 		backlinksMap: new Map(),
 		sourceSummaries: new Map(),
 		linkLookupToSources: new Map(),
-		unresolvedLinkLookupToSources: new Map(),
 		lookupKeyToLookupPaths: new Map(),
 		lookupPathResolvedSourceCount: new Map(),
 		lookupKeyDirectResolvedPathCount: new Map(),

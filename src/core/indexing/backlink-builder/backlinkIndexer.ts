@@ -81,7 +81,6 @@ function createArtifactsAccumulator(): MutableBacklinksBuildArtifacts {
 		detailedMap: new Map(),
 		sourceSummaries: new Map(),
 		linkLookupToSources: new Map(),
-		unresolvedLinkLookupToSources: new Map(),
 		lookupKeyToLookupPaths: new Map(),
 		lookupPathResolvedSourceCount: new Map(),
 		lookupKeyDirectResolvedPathCount: new Map(),
@@ -100,15 +99,6 @@ function addSourceLookupIndexes(
 		if (!sources) {
 			sources = new Set<string>();
 			artifacts.linkLookupToSources.set(lookupKey, sources);
-		}
-		sources.add(sourcePath);
-	}
-
-	for (const lookupKey of sourceSummary.unresolvedLookupKeys) {
-		let sources = artifacts.unresolvedLinkLookupToSources.get(lookupKey);
-		if (!sources) {
-			sources = new Set<string>();
-			artifacts.unresolvedLinkLookupToSources.set(lookupKey, sources);
 		}
 		sources.add(sourcePath);
 	}
