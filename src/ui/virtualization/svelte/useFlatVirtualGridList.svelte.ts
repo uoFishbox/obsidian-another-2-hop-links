@@ -36,10 +36,12 @@ import type { VirtualListItemRenderArgs } from "./renderArgs";
 import { flushVirtualScrollMeasurement as flushCachedVirtualScrollMeasurement } from "../dom/flushVirtualScrollMeasurement";
 import {
 	DEFAULT_FLAT_GRID_LAYOUT,
+	isSameFlatGridLayout,
+	resolveFlatGridLayoutMeasurement,
 	type ConfiguredCardLayout,
 	type VirtualGridLayout,
 } from "../dom/flatGridLayoutMeasurement";
-import { createFlatGridControllerAdapter } from "./flatGridControllerAdapter";
+import { createVirtualListControllerAdapter } from "./virtualListControllerAdapter";
 import { createVirtualizedItemVisibilityStateController } from "./virtualizedItemVisibilityState.svelte";
 import { createResidentRowSlotAllocator } from "ui/virtualization/core/residentSlotAllocator";
 import { DISABLED_PREVIEW_SURFACE } from "features/card-preview/runtime/previewRuntime";
@@ -342,39 +344,47 @@ export function useFlatVirtualGridList<T>(
 		return virtualList.getMountedCellsForChange();
 	});
 	let lastEmptyMountedCellsNotification: unknown = null;
-	const virtualListController = createFlatGridControllerAdapter<T>({
+	const virtualListController = createVirtualListControllerAdapter<
+		FlatLinkRowModel<T>,
+		VirtualGridLayout
+	>({
 		getRootEl: () => sectionRootEl,
 		measurement,
-		getLayout: () => layout,
-		setLayout: (nextLayout) => {
-			layout = nextLayout;
-		},
-		getConfiguredCardLayout: () => configuredCardLayout,
-		getLogicalCellCount: () => logicalCellCount,
-		getItemCount: () => itemCount,
+		getContext: () => layout,
+		hasRenderableContent: () => itemCount > 0,
 		resolveRowModel: resolveFlatLinkRowModel,
 		resolveVisibilityPolicy,
-		applyVirtualListMeasurement: ({
-			rowModel,
-			scrollTop,
-			viewportHeight,
-			sectionTop,
-			isStableMeasurement,
-			isScrollActive,
-			precomputedRanges,
-			visibilityPolicy,
-		}) =>
+		applyRangeMeasurement: (nextMeasurement, nextLayout, precomputedRanges) =>
 			virtualList.applyMeasurement({
-				rowModel,
-				scrollTop,
-				viewportHeight,
-				sectionTop,
-				isStableMeasurement,
-				isScrollActive,
+				rowModel: resolveFlatLinkRowModel(nextLayout),
+				scrollTop: nextMeasurement.scrollTop,
+				viewportHeight: nextMeasurement.viewportHeight,
+				sectionTop: nextMeasurement.sectionTop,
+				isStableMeasurement: nextMeasurement.isStableMeasurement,
+				isScrollActive: nextMeasurement.isScrollActive,
 				hasStableVisibleRange: measurement.hasStableVisibleRange,
 				precomputedRanges,
-				visibilityPolicy,
+				visibilityPolicy: resolveVisibilityPolicy(nextLayout),
 			}),
+		resolveLayoutMeasurement: (nextMeasurement, rootEl) => {
+			const layoutMeasurement = resolveFlatGridLayoutMeasurement({
+				rootEl,
+				rootRect: nextMeasurement.sectionRect,
+				measuredWidth: measurement.measuredWidth,
+				scrollContainerEl: measurement.scrollContainerEl,
+				configuredLayout: configuredCardLayout,
+				logicalCellCount,
+				hasRenderableItems: itemCount > 0,
+			});
+			if (!isSameFlatGridLayout(layout, layoutMeasurement.layout)) {
+				layout = layoutMeasurement.layout;
+			}
+			return {
+				context: layoutMeasurement.layout,
+				measurement: nextMeasurement,
+				isStable: layoutMeasurement.hasStableLayout,
+			};
+		},
 		onStableMeasurement: maybeScheduleInfiniteScrollLoad,
 	});
 

@@ -28,7 +28,6 @@ import { createReplaceableVirtualPreviewSurface } from "features/card-preview/sc
 import type { VirtualFrameCoordinator } from "ui/virtualization/scheduling/frameCoordinator";
 import { createResolvedCardLayoutSettingsMemo } from "ui/shared/layout/cardLayoutCssVars";
 import { resolveCachedCardGridLayoutBase } from "ui/virtualization/dom/virtualListCardLayout";
-import { CARD_VIRTUAL_LIST_MAX_UNSTABLE_MEASUREMENT_RETRIES } from "ui/virtualization/cardVirtualListPolicy";
 import {
 	DEFAULT_VIEW_PLAN_CARD_LAYOUT,
 	DEFAULT_VIEW_PLAN_LAYOUT,
@@ -40,17 +39,12 @@ import { getOptionalOwnerWindow } from "ui/shared/dom/realmSafeDom";
 import { createResidentRowSlotAllocator } from "ui/virtualization/core/residentSlotAllocator";
 import { useVirtualList } from "ui/virtualization/svelte/useVirtualList.svelte";
 import { createVirtualListMeasurementState } from "ui/virtualization/dom/virtualListMeasurementState";
-import {
-	createVirtualMeasurementController,
-	type VirtualMeasurement,
-	type VirtualMeasurementApplicationResult,
-} from "ui/virtualization/dom/virtualMeasurementController";
-import { createVirtualScrollWindowRangeResolver } from "ui/virtualization/core/scrollWindowMeasurement";
+import { type VirtualMeasurement } from "ui/virtualization/dom/virtualMeasurementController";
 import type {
 	MountedScrollWindowMeasurement,
 	RangedScrollWindowMeasurement,
 } from "ui/virtualization/core/scrollWindowGate";
-import { createVirtualScrollWindowMeasurementController } from "ui/virtualization/svelte/virtualScrollWindowMeasurementController";
+import { createVirtualListControllerAdapter } from "ui/virtualization/svelte/virtualListControllerAdapter";
 import type { VirtualVisibilityPolicy } from "ui/virtualization/core/virtualListEngine";
 import type { RowRange } from "ui/virtualization/rowRange";
 import type { VirtualRanges } from "ui/virtualization/types";
@@ -254,15 +248,6 @@ export function useTwoHopVirtualList(
 		);
 	}
 
-	const rangeResolver = createVirtualScrollWindowRangeResolver<
-		TwoHopRowModel,
-		TwoHopRowModel
-	>({
-		resolveRowModel: (model) => model,
-		resolveVisibilityPolicy,
-		resolveStableMountedScrollTopBand: true,
-	});
-
 	function shouldUseOffscreenBootstrap(
 		nextMeasurement: VirtualMeasurement,
 		model: TwoHopRowModel,
@@ -286,32 +271,20 @@ export function useTwoHopVirtualList(
 		};
 	}
 
-	function resolveMountedMeasurement(
+	function transformMountedMeasurement(
+		resolved: MountedScrollWindowMeasurement,
 		nextMeasurement: VirtualMeasurement,
 		model: TwoHopRowModel,
 	): MountedScrollWindowMeasurement {
-		const resolved = rangeResolver.resolveMountedScrollWindowMeasurement(
-			nextMeasurement.scrollTop,
-			nextMeasurement.viewportHeight,
-			nextMeasurement.sectionTop,
-			model,
-		);
 		if (!shouldUseOffscreenBootstrap(nextMeasurement, model)) return resolved;
 		return { ...resolved, mounted: resolveOffscreenBootstrapRange(model) };
 	}
 
-	function resolveRangedMeasurement(
+	function transformRangedMeasurement(
+		resolved: RangedScrollWindowMeasurement,
 		nextMeasurement: VirtualMeasurement,
 		model: TwoHopRowModel,
-		precomputedMountedRange?: RowRange,
 	): RangedScrollWindowMeasurement {
-		const resolved = rangeResolver.resolveScrollWindowMeasurement(
-			nextMeasurement.scrollTop,
-			nextMeasurement.viewportHeight,
-			nextMeasurement.sectionTop,
-			model,
-			precomputedMountedRange,
-		);
 		if (!shouldUseOffscreenBootstrap(nextMeasurement, model)) return resolved;
 		const bootstrap = resolveOffscreenBootstrapRange(model);
 		return {
@@ -340,15 +313,6 @@ export function useTwoHopVirtualList(
 			visibilityPolicy: resolveVisibilityPolicy(model),
 		});
 	}
-
-	const scrollWindowController =
-		createVirtualScrollWindowMeasurementController<TwoHopRowModel>({
-			resolveMountedScrollWindowMeasurement: resolveMountedMeasurement,
-			resolveScrollWindowMeasurement: resolveRangedMeasurement,
-			applyRangeMeasurement: (nextMeasurement, model, precomputedRanges) =>
-				applyVirtualMeasurement(nextMeasurement, model, precomputedRanges),
-			onStableMeasurement: () => {},
-		});
 
 	function captureLayoutAnchor(): LayoutAnchor | null {
 		if (!rootEl || measurement.viewportHeight <= 0) return null;
@@ -418,13 +382,9 @@ export function useTwoHopVirtualList(
 		};
 	}
 
-	function applyLayoutMeasurement(
-		nextMeasurement: VirtualMeasurement,
-	): VirtualMeasurementApplicationResult {
-		if (!rootEl || !nextMeasurement.sectionRect) {
-			scrollWindowController.resetLastScrollWindow();
-			return "skipped";
-		}
+	function resolveLayoutMeasurement(
+		nextMeasurement: VirtualMeasurement & { readonly sectionRect: DOMRect },
+	) {
 		const nextLayout = resolveMeasuredLayout(nextMeasurement.sectionRect);
 		let effectiveMeasurement = nextMeasurement;
 		if (!isSameViewPlanLayout(layout, nextLayout)) {
@@ -445,45 +405,31 @@ export function useTwoHopVirtualList(
 			}
 		}
 		widthWasZero = false;
-		const ranged = resolveRangedMeasurement(effectiveMeasurement, rowModel);
-		const result = applyVirtualMeasurement(
-			{ ...effectiveMeasurement, isScrollActive: false },
-			rowModel,
-			ranged.ranges,
-		);
-		if (result.kind !== "stable" || !effectiveMeasurement.isStableMeasurement) {
-			scrollWindowController.resetLastScrollWindow();
-			return "unstable";
-		}
-		scrollWindowController.primeLastScrollWindow(effectiveMeasurement, rowModel);
-		measurementController.scheduleScrollMeasurementAfterLayout(
-			effectiveMeasurement,
-		);
-		return "stable";
+		return {
+			context: rowModel,
+			measurement: effectiveMeasurement,
+			isStable: effectiveMeasurement.isStableMeasurement,
+			precomputeRanges: true,
+		};
 	}
 
-	function applyMeasurement(
-		nextMeasurement: VirtualMeasurement,
-	): VirtualMeasurementApplicationResult {
-		return nextMeasurement.source === "layout"
-			? applyLayoutMeasurement(nextMeasurement)
-			: scrollWindowController.applyScrollMeasurement(nextMeasurement, rowModel);
-	}
-
-	const measurementController = createVirtualMeasurementController({
+	const virtualListController = createVirtualListControllerAdapter<
+		TwoHopRowModel,
+		TwoHopRowModel
+	>({
 		getRootEl: () => rootEl,
 		measurement,
+		getContext: () => rowModel,
 		hasRenderableContent: () => rowModel.rowCount > 0,
-		onMeasurement: applyMeasurement,
+		resolveRowModel: (model) => model,
+		resolveVisibilityPolicy,
+		applyRangeMeasurement: applyVirtualMeasurement,
+		resolveLayoutMeasurement,
+		transformMountedScrollWindowMeasurement: transformMountedMeasurement,
+		transformRangedScrollWindowMeasurement: transformRangedMeasurement,
 		onObservedWidthChange: (width) => {
 			if (width <= 0) widthWasZero = true;
 		},
-		getScrollMeasurementRange: scrollWindowController.getScrollMeasurementRange,
-		enableBootstrapMeasurementSuppression: true,
-		enableInitialStabilization: true,
-		primeUnstableScrollStart: true,
-		maxUnstableMeasurementRetries:
-			CARD_VIRTUAL_LIST_MAX_UNSTABLE_MEASUREMENT_RETRIES,
 		frameCoordinator,
 	});
 
@@ -510,12 +456,12 @@ export function useTwoHopVirtualList(
 			virtualList.recompute({ rowModel: nextRowModel });
 		}
 		cardHydrator.reconcileSource();
-		scrollWindowController.resetLastScrollWindow();
-		measurementController.runScrollMeasurement(undefined, {
+		virtualListController.resetScrollWindow();
+		virtualListController.runScrollMeasurement(undefined, {
 			forcePublish: true,
 			reason: "data-change",
 		});
-		measurementController.scheduleLayoutMeasurement();
+		virtualListController.scheduleLayoutMeasurement();
 	}
 
 	$effect(() => {
@@ -537,13 +483,13 @@ export function useTwoHopVirtualList(
 
 	$effect(() => {
 		void configuredLayout;
-		measurementController.scheduleLayoutMeasurement();
+		virtualListController.scheduleLayoutMeasurement();
 	});
 
 	$effect(() => {
 		const element = rootEl;
 		if (!element) return;
-		return measurementController.observeRoot(element, (callback) =>
+		return virtualListController.observeRoot(element, (callback) =>
 			untrack(callback),
 		);
 	});
@@ -580,7 +526,7 @@ export function useTwoHopVirtualList(
 			measurement,
 			snapshot,
 			updateFromCachedMeasurement: (metrics) => {
-				measurementController.runScrollMeasurement(metrics, {
+				virtualListController.runScrollMeasurement(metrics, {
 					forcePublish: true,
 				});
 			},
