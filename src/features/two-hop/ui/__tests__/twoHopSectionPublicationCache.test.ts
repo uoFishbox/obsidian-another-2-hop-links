@@ -4,7 +4,9 @@ import type { DisplayData } from "features/two-hop/application/displayDataBuilde
 import type { ApplicationStore } from "ui/stores/ApplicationStore.svelte";
 import { DEFAULT_SETTINGS } from "features/settings/model";
 import type { TaggedNote, TwoHopIndexedLink, TwoHopLinkBranch } from "types/domain";
-import { createTwoHopSectionPublicationCache } from "features/two-hop/ui/section-descriptors/cache";
+import { createTwoHopSectionPublicationMemo } from "features/two-hop/ui/section-descriptors/cache";
+import { createTwoHopInteractionTokenAllocator } from "features/two-hop/ui/section-descriptors/interactionTokenAllocator";
+import { buildScopedSectionId } from "ui/components/common/listPagination";
 
 const sourceFile = { path: "source.md" } as TFile;
 
@@ -60,6 +62,20 @@ function createHarness(defaultVisibleLimit = 20, loadMoreIncrement = 20) {
 			};
 		}),
 	} as unknown as ApplicationStore;
+	const createVisibleCountResolver =
+		(scope = "") =>
+		(sectionId: string, totalCount: number): number => {
+			const paginationId = buildScopedSectionId(sectionId, scope);
+			const defaultLimit = Math.max(
+				0,
+				Math.floor(applicationStore.getDefaultSectionVisibleLimit()),
+			);
+			const expandedLimit = Math.max(
+				0,
+				Math.floor(applicationStore.getSectionExpandedLimit(paginationId) ?? 0),
+			);
+			return Math.min(totalCount, Math.max(defaultLimit, expandedLimit));
+		};
 	const params = {
 		displayData: createDisplayData(),
 		useMergedLinks: false,
@@ -69,9 +85,14 @@ function createHarness(defaultVisibleLimit = 20, loadMoreIncrement = 20) {
 		fileToLinktext: vi.fn(() => ""),
 		currentSort: DEFAULT_SETTINGS.lastUsedSortOption,
 		currentSettings: DEFAULT_SETTINGS,
-		applicationStore,
+		sortContextVersion,
+		getSortedTwoHopItems: (items: readonly TwoHopIndexedLink[]) =>
+			applicationStore.getSortedTwoHopItems(items),
+		getSortedTagGroupItems: (items: readonly TaggedNote[]) =>
+			applicationStore.getSortedTagGroupItems(items),
+		getVisibleCount: createVisibleCountResolver(),
+		interactionTokens: createTwoHopInteractionTokenAllocator(),
 		onTagClick: vi.fn(),
-		paginationScope: "",
 	};
 	return {
 		applicationStore,
@@ -79,15 +100,17 @@ function createHarness(defaultVisibleLimit = 20, loadMoreIncrement = 20) {
 		clearExpandedLimits: () => {
 			paginationState.expandedLimits = {};
 		},
+		createVisibleCountResolver,
 		incrementSortContext: () => {
 			sortContextVersion += 1;
+			return sortContextVersion;
 		},
 	};
 }
 
-describe("createTwoHopSectionPublicationCache", () => {
+describe("createTwoHopSectionPublicationMemo", () => {
 	it("publishes frozen eager sections and reuses exact inputs", () => {
-		const cache = createTwoHopSectionPublicationCache();
+		const cache = createTwoHopSectionPublicationMemo();
 		const { params, applicationStore } = createHarness();
 		const group = { tag: "alpha", notes: [createNote("alpha.md", "alpha")] };
 		const input = { ...params, displayData: createDisplayData([group]) };
@@ -104,7 +127,7 @@ describe("createTwoHopSectionPublicationCache", () => {
 	});
 
 	it("replaces only a section whose source identity changes", () => {
-		const cache = createTwoHopSectionPublicationCache();
+		const cache = createTwoHopSectionPublicationMemo();
 		const { params } = createHarness();
 		const alpha = { tag: "alpha", notes: [createNote("alpha.md", "alpha")] };
 		const beta = { tag: "beta", notes: [createNote("beta.md", "beta")] };
@@ -126,7 +149,7 @@ describe("createTwoHopSectionPublicationCache", () => {
 	});
 
 	it("republishes sorted branches after a sort-context change", () => {
-		const cache = createTwoHopSectionPublicationCache();
+		const cache = createTwoHopSectionPublicationMemo();
 		const { params, incrementSortContext } = createHarness();
 		const branch: TwoHopLinkBranch = {
 			hop1: createLink("parent.md"),
@@ -134,8 +157,10 @@ describe("createTwoHopSectionPublicationCache", () => {
 		};
 		const input = { ...params, displayData: createDisplayData([], [branch]) };
 		const first = cache.resolve(input);
-		incrementSortContext();
-		const second = cache.resolve(input);
+		const second = cache.resolve({
+			...input,
+			sortContextVersion: incrementSortContext(),
+		});
 
 		expect(second[0]).not.toBe(first[0]);
 		expect(second[0]?.items[0]?.interactionId).toBe(
@@ -144,8 +169,13 @@ describe("createTwoHopSectionPublicationCache", () => {
 	});
 
 	it("expands only the requested prefix while preserving item identity and sorting", () => {
-		const cache = createTwoHopSectionPublicationCache();
-		const { params, applicationStore, clearExpandedLimits } = createHarness(1, 1);
+		const cache = createTwoHopSectionPublicationMemo();
+		const {
+			params,
+			applicationStore,
+			clearExpandedLimits,
+			createVisibleCountResolver,
+		} = createHarness(1, 1);
 		const group = {
 			tag: "alpha",
 			notes: [
@@ -157,13 +187,20 @@ describe("createTwoHopSectionPublicationCache", () => {
 		const input = {
 			...params,
 			displayData: createDisplayData([group]),
-			paginationScope: "query",
+			getVisibleCount: createVisibleCountResolver("query"),
 		};
 		const first = cache.resolve(input);
 		const firstItem = first[0]?.items[0];
-		cache.loadMore("tags-alpha");
-		const second = cache.resolve(input);
-		const resolvedAgain = cache.resolve(input);
+		applicationStore.setSectionExpandedLimit(
+			buildScopedSectionId("tags-alpha", "query"),
+			2,
+		);
+		const expandedInput = {
+			...input,
+			getVisibleCount: createVisibleCountResolver("query"),
+		};
+		const second = cache.resolve(expandedInput);
+		const resolvedAgain = cache.resolve(expandedInput);
 
 		expect(first[0]?.items).toHaveLength(1);
 		expect(first[0]?.totalCount).toBe(3);
@@ -177,12 +214,15 @@ describe("createTwoHopSectionPublicationCache", () => {
 		);
 
 		clearExpandedLimits();
-		const collapsed = cache.resolve(input);
+		const collapsed = cache.resolve({
+			...input,
+			getVisibleCount: createVisibleCountResolver("query"),
+		});
 		expect(collapsed[0]?.items).toHaveLength(1);
 	});
 
-	it("uses the latest tag callback without replacing the section", () => {
-		const cache = createTwoHopSectionPublicationCache();
+	it("republishes a tag section when its callback identity changes", () => {
+		const cache = createTwoHopSectionPublicationMemo();
 		const { params } = createHarness();
 		const group = { tag: "alpha", notes: [createNote("alpha.md", "alpha")] };
 		const firstCallback = vi.fn();
@@ -195,7 +235,8 @@ describe("createTwoHopSectionPublicationCache", () => {
 		const first = cache.resolve(input);
 		const second = cache.resolve({ ...input, onTagClick: secondCallback });
 
-		expect(second).toBe(first);
+		expect(second).not.toBe(first);
+		expect(second[0]).not.toBe(first[0]);
 		second[0]?.header.props.onClick?.();
 		expect(firstCallback).not.toHaveBeenCalled();
 		expect(secondCallback).toHaveBeenCalledWith("alpha");

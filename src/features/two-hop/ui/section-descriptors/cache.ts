@@ -1,20 +1,18 @@
 import type { TFile } from "obsidian";
 import type { DisplayData } from "features/two-hop/application/displayDataBuilder";
 import {
-	buildScopedSectionId,
 	createCompactSectionId,
-	normalizeIncrement,
 	SHOULD_VALIDATE_SECTION_IDS,
 } from "ui/components/common/listPagination";
 import { generateBranchKey } from "features/card-preview/text-processing/textUtils";
 import type { PluginSettings, SortOption } from "features/settings/model";
-import type { ApplicationStore } from "ui/stores/ApplicationStore.svelte";
 import type { InteractionSettings } from "ui/interactions/interactionTypes";
+import type { TaggedNote, TwoHopIndexedLink } from "types/domain";
 import type {
 	TwoHopItemModel,
 	TwoHopSectionModel,
 } from "features/two-hop/ui/twoHopSectionModel";
-import { createTwoHopInteractionTokenAllocator } from "./interactionTokenAllocator";
+import type { TwoHopInteractionTokenAllocator } from "./interactionTokenAllocator";
 import {
 	createBranchSectionDescriptor,
 	resolveBranchHeader,
@@ -40,14 +38,25 @@ export interface ResolveTwoHopSectionsParams {
 	) => string;
 	readonly currentSort: SortOption;
 	readonly currentSettings: PluginSettings;
-	readonly applicationStore: ApplicationStore;
+	readonly sortContextVersion: number;
+	readonly getSortedTwoHopItems: (
+		items: readonly TwoHopIndexedLink[],
+	) => readonly TwoHopIndexedLink[];
+	readonly getSortedTagGroupItems: (
+		items: readonly TaggedNote[],
+	) => readonly TaggedNote[];
+	/**
+	 * Resolves the materialized prefix length for one section. Replace this
+	 * function when pagination inputs change so exact-hit memoization stays valid.
+	 */
+	readonly getVisibleCount: (sectionId: string, totalCount: number) => number;
+	readonly interactionTokens: TwoHopInteractionTokenAllocator;
 	readonly onTagClick: (tag: string) => void;
-	readonly paginationScope: string;
 }
 
-export interface TwoHopSectionPublicationCache {
+/** Memoizes immutable two-hop section publications by explicit input identity. */
+export interface TwoHopSectionPublicationMemo {
 	resolve(params: ResolveTwoHopSectionsParams): readonly TwoHopSectionModel[];
-	loadMore(sectionId: string): void;
 }
 
 interface CachedSection {
@@ -71,11 +80,13 @@ interface ResolveSnapshot {
 	readonly fileToLinktext: ResolveTwoHopSectionsParams["fileToLinktext"];
 	readonly currentSort: SortOption;
 	readonly sortContextVersion: number;
+	readonly getSortedTwoHopItems: ResolveTwoHopSectionsParams["getSortedTwoHopItems"];
+	readonly getSortedTagGroupItems: ResolveTwoHopSectionsParams["getSortedTagGroupItems"];
+	readonly getVisibleCount: ResolveTwoHopSectionsParams["getVisibleCount"];
+	readonly interactionTokens: TwoHopInteractionTokenAllocator;
+	readonly onTagClick: ResolveTwoHopSectionsParams["onTagClick"];
 	readonly mobileLongPressAction: PluginSettings["mobileLongPressAction"];
 	readonly highlightInPreviewOnHover: boolean;
-	readonly paginationScope: string;
-	readonly sectionExpandedLimits: ApplicationStore["sectionExpandedLimits"];
-	readonly applicationStore: ApplicationStore;
 }
 
 /**
@@ -83,41 +94,18 @@ interface ResolveSnapshot {
  * inputs retain identity. Resolver results are already immutable at this
  * boundary, so no semantic snapshots or deep comparisons are needed.
  */
-export function createTwoHopSectionPublicationCache(): TwoHopSectionPublicationCache {
+export function createTwoHopSectionPublicationMemo(): TwoHopSectionPublicationMemo {
 	const entries = new Map<string, CachedSection>();
-	const tokens = createTwoHopInteractionTokenAllocator();
 	let previousSnapshot: ResolveSnapshot | undefined;
 	let previousSections: readonly TwoHopSectionModel[] = [];
-	let latestOnTagClick: (tag: string) => void = () => undefined;
-	let paginationScope = "";
-	let paginationApplicationStore: ApplicationStore | undefined;
-	const onTagClick = (tag: string): void => latestOnTagClick(tag);
-
-	function getPaginationId(sectionId: string): string {
-		return buildScopedSectionId(sectionId, paginationScope);
-	}
-
-	function getVisibleCount(sectionId: string, totalCount: number): number {
-		const store = paginationApplicationStore;
-		if (!store) return totalCount;
-		const defaultLimit = Math.max(
-			0,
-			Math.floor(store.getDefaultSectionVisibleLimit()),
-		);
-		const expandedLimit = Math.max(
-			0,
-			Math.floor(store.getSectionExpandedLimit(sectionId) ?? 0),
-		);
-		return Math.min(totalCount, Math.max(defaultLimit, expandedLimit));
-	}
 
 	function resolveSection(
 		id: string,
 		dependencies: readonly unknown[],
 		totalCount: number,
+		visibleCount: number,
 		build: SectionBuilder,
 	): TwoHopSectionModel {
-		const visibleCount = getVisibleCount(getPaginationId(id), totalCount);
 		const cached = entries.get(id);
 		const canReuseItems =
 			cached !== undefined &&
@@ -143,12 +131,7 @@ export function createTwoHopSectionPublicationCache(): TwoHopSectionPublicationC
 
 	return {
 		resolve(params) {
-			latestOnTagClick = params.onTagClick;
-			paginationScope = params.paginationScope.trim();
-			paginationApplicationStore = params.applicationStore;
-			const sortContextVersion =
-				params.applicationStore.getSortContextVersion?.() ?? 0;
-			const snapshot = createResolveSnapshot(params, sortContextVersion);
+			const snapshot = createResolveSnapshot(params);
 			if (
 				previousSnapshot &&
 				hasSameResolveSnapshot(previousSnapshot, snapshot)
@@ -169,13 +152,19 @@ export function createTwoHopSectionPublicationCache(): TwoHopSectionPublicationC
 				if (seenIds?.has(id)) return;
 				seenIds?.add(id);
 				activeIds.add(id);
-				sections.push(resolveSection(id, dependencies, totalCount, build));
+				const visibleCount = normalizeVisibleCount(
+					params.getVisibleCount(id, totalCount),
+					totalCount,
+				);
+				sections.push(
+					resolveSection(id, dependencies, totalCount, visibleCount, build),
+				);
 			};
 
-			appendPrimarySections(params, append, tokens.createItemInteractionToken);
-			appendBranchSections(params, sortContextVersion, append, tokens);
-			appendTagSections(params, sortContextVersion, append, tokens, onTagClick);
-			appendNewLinksSection(params, append, tokens.createItemInteractionToken);
+			appendPrimarySections(params, append);
+			appendBranchSections(params, append);
+			appendTagSections(params, append);
+			appendNewLinksSection(params, append);
 
 			for (const id of entries.keys()) {
 				if (!activeIds.has(id)) entries.delete(id);
@@ -187,23 +176,6 @@ export function createTwoHopSectionPublicationCache(): TwoHopSectionPublicationC
 			previousSections = changed ? nextSections : previousSections;
 			recordCacheMeasurement(changed ? "miss" : "hit");
 			return previousSections;
-		},
-		loadMore(sectionId) {
-			const cached = entries.get(sectionId);
-			const store = paginationApplicationStore;
-			if (!cached || !store) return;
-			const paginationId = getPaginationId(sectionId);
-			const visibleCount = getVisibleCount(paginationId, cached.totalCount);
-			if (visibleCount >= cached.totalCount) return;
-			const increment = normalizeIncrement(store.loadMoreIncrement);
-			const nextCount =
-				increment === Number.POSITIVE_INFINITY
-					? cached.totalCount
-					: Math.min(cached.totalCount, visibleCount + increment);
-			store.setSectionExpandedLimit(
-				paginationId,
-				Math.max(store.getSectionExpandedLimit(paginationId) ?? 0, nextCount),
-			);
 		},
 	};
 }
@@ -218,8 +190,9 @@ type AppendSection = (
 function appendPrimarySections(
 	params: ResolveTwoHopSectionsParams,
 	append: AppendSection,
-	createItemInteractionToken: (interactionKey: string) => string,
 ): void {
+	const createItemInteractionToken =
+		params.interactionTokens.createItemInteractionToken;
 	const inputs: PrimarySectionBuildInput[] = params.useMergedLinks
 		? params.displayData.mergedItems.length > 0
 			? [{ kind: "merged", items: params.displayData.mergedItems }]
@@ -240,7 +213,7 @@ function appendPrimarySections(
 	for (const input of inputs) {
 		append(
 			input.kind,
-			[input.items],
+			[input.items, params.interactionTokens],
 			input.items.length,
 			(itemLimit, previousItems) =>
 				createPrimarySectionDescriptor({
@@ -255,9 +228,7 @@ function appendPrimarySections(
 
 function appendBranchSections(
 	params: ResolveTwoHopSectionsParams,
-	sortContextVersion: number,
 	append: AppendSection,
-	tokens: ReturnType<typeof createTwoHopInteractionTokenAllocator>,
 ): void {
 	const interactionSettings: InteractionSettings = Object.freeze({
 		mobileLongPressAction: params.currentSettings.mobileLongPressAction,
@@ -265,10 +236,9 @@ function appendBranchSections(
 	});
 
 	for (const branch of params.displayData.twoHopBranches) {
-		let sortedItems: ReturnType<ApplicationStore["getSortedTwoHopItems"]> | null =
-			null;
+		let sortedItems: readonly TwoHopIndexedLink[] | null = null;
 		const getSortedItems = () =>
-			(sortedItems ??= params.applicationStore.getSortedTwoHopItems(branch.hop2));
+			(sortedItems ??= params.getSortedTwoHopItems(branch.hop2));
 		const sectionKey = generateBranchKey(branch);
 		const id = createCompactSectionId("twohop", sectionKey);
 		const header = resolveBranchHeader({
@@ -287,8 +257,9 @@ function appendBranchSections(
 				header.className,
 				header.directory,
 				params.currentSort,
-				sortContextVersion,
-				params.applicationStore.getSortedTwoHopItems,
+				params.sortContextVersion,
+				params.getSortedTwoHopItems,
+				params.interactionTokens,
 				interactionSettings.mobileLongPressAction,
 				interactionSettings.highlightInPreviewOnHover,
 			],
@@ -305,7 +276,7 @@ function appendBranchSections(
 						itemLimit,
 						previousItems,
 					},
-					tokens,
+					params.interactionTokens,
 				),
 		);
 	}
@@ -313,27 +284,23 @@ function appendBranchSections(
 
 function appendTagSections(
 	params: ResolveTwoHopSectionsParams,
-	sortContextVersion: number,
 	append: AppendSection,
-	tokens: ReturnType<typeof createTwoHopInteractionTokenAllocator>,
-	onTagClick: (tag: string) => void,
 ): void {
 	if (!params.showTags) return;
 	for (const source of params.displayData.tagGroups) {
-		let sortedItems: ReturnType<ApplicationStore["getSortedTagGroupItems"]> | null =
-			null;
+		let sortedItems: readonly TaggedNote[] | null = null;
 		const getSortedItems = () =>
-			(sortedItems ??= params.applicationStore.getSortedTagGroupItems(
-				source.notes,
-			));
+			(sortedItems ??= params.getSortedTagGroupItems(source.notes));
 		const id = `tags-${source.tag}`;
 		append(
 			id,
 			[
 				source,
 				params.currentSort,
-				sortContextVersion,
-				params.applicationStore.getSortedTagGroupItems,
+				params.sortContextVersion,
+				params.getSortedTagGroupItems,
+				params.interactionTokens,
+				params.onTagClick,
 			],
 			source.notes.length,
 			(itemLimit, previousItems) =>
@@ -344,9 +311,9 @@ function appendTagSections(
 						sortedItems: getSortedItems(),
 						itemLimit,
 						previousItems,
-						onTagClick,
+						onTagClick: params.onTagClick,
 					},
-					tokens,
+					params.interactionTokens,
 				),
 		);
 	}
@@ -355,24 +322,25 @@ function appendTagSections(
 function appendNewLinksSection(
 	params: ResolveTwoHopSectionsParams,
 	append: AppendSection,
-	createItemInteractionToken: (interactionKey: string) => string,
 ): void {
 	const items = params.displayData.newLinks;
 	if (items.length === 0) return;
-	append("new-links", [items], items.length, (itemLimit, previousItems) =>
-		createNewLinksSectionDescriptor({
-			items,
-			itemLimit,
-			previousItems,
-			createItemInteractionToken,
-		}),
+	append(
+		"new-links",
+		[items, params.interactionTokens],
+		items.length,
+		(itemLimit, previousItems) =>
+			createNewLinksSectionDescriptor({
+				items,
+				itemLimit,
+				previousItems,
+				createItemInteractionToken:
+					params.interactionTokens.createItemInteractionToken,
+			}),
 	);
 }
 
-function createResolveSnapshot(
-	params: ResolveTwoHopSectionsParams,
-	sortContextVersion: number,
-): ResolveSnapshot {
+function createResolveSnapshot(params: ResolveTwoHopSectionsParams): ResolveSnapshot {
 	return {
 		displayData: params.displayData,
 		useMergedLinks: params.useMergedLinks,
@@ -381,13 +349,21 @@ function createResolveSnapshot(
 		resolveFile: params.resolveFile,
 		fileToLinktext: params.fileToLinktext,
 		currentSort: params.currentSort,
-		sortContextVersion,
+		sortContextVersion: params.sortContextVersion,
+		getSortedTwoHopItems: params.getSortedTwoHopItems,
+		getSortedTagGroupItems: params.getSortedTagGroupItems,
+		getVisibleCount: params.getVisibleCount,
+		interactionTokens: params.interactionTokens,
+		onTagClick: params.onTagClick,
 		mobileLongPressAction: params.currentSettings.mobileLongPressAction,
 		highlightInPreviewOnHover: params.currentSettings.highlightInPreviewOnHover,
-		paginationScope: params.paginationScope,
-		sectionExpandedLimits: params.applicationStore.sectionExpandedLimits,
-		applicationStore: params.applicationStore,
 	};
+}
+
+function normalizeVisibleCount(value: number, totalCount: number): number {
+	const normalized = Math.floor(value);
+	if (!Number.isFinite(normalized)) return totalCount;
+	return Math.min(totalCount, Math.max(0, normalized));
 }
 
 function hasSameResolveSnapshot(

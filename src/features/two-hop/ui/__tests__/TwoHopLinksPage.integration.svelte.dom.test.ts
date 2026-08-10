@@ -416,6 +416,33 @@ describe("TwoHopLinksPage descriptor plumbing", () => {
 		);
 	});
 
+	it("owns the scoped load-more action outside the publication memo", async () => {
+		const file = createMockTFile("notes/target.md");
+		const notes = Array.from({ length: 20 }, (_, index) =>
+			createTaggedNote(createMockTFile(`notes/tagged-${index}.md`), "alpha"),
+		);
+		const displayData = {
+			...createDisplayData(),
+			tagGroups: [{ tag: "alpha", notes } satisfies TagGroup],
+		};
+		const settings = {
+			...DEFAULT_SETTINGS,
+			defaultVisibleLinkCount: 1,
+			useMergedLinksSection: false,
+			showTagsSection: true,
+		};
+		const rootProps = createRootProps(displayData, settings, file);
+
+		render(TwoHopLinksPage, { props: rootProps });
+		await flushAsyncUi();
+		getTwoHopVirtualSurfacePageStubProps()?.loadMoreSection?.("tags-alpha");
+
+		expect(rootProps.applicationStore.setSectionExpandedLimit).toHaveBeenCalledWith(
+			expect.stringMatching(/^s:/),
+			11,
+		);
+	});
+
 	it("does not bootstrap offscreen preview rows in sidebar mode", async () => {
 		const file = createMockTFile("notes/target.md");
 		const parentFile = createMockTFile("notes/outgoing-parent.md");

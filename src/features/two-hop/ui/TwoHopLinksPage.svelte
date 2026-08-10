@@ -20,7 +20,12 @@
 	import { getCardLayoutCssText } from "ui/shared/layout/cardLayoutCssVars";
 	import { createTwohopSearchAdapter } from "features/two-hop/ui/twoHopSearchAdapter";
 	import { tick } from "svelte";
-	import { createTwoHopSectionPublicationCache } from "features/two-hop/ui/section-descriptors/cache";
+	import { createTwoHopSectionPublicationMemo } from "features/two-hop/ui/section-descriptors/cache";
+	import { createTwoHopInteractionTokenAllocator } from "features/two-hop/ui/section-descriptors/interactionTokenAllocator";
+	import {
+		buildScopedSectionId,
+		normalizeIncrement,
+	} from "ui/components/common/listPagination";
 	import type { TwoHopLinksRootUiState } from "features/two-hop/ui/twoHopLinksRootUiState";
 	import { observePreviewSurfaceVisibility } from "features/card-preview/scheduling/previewSurfaceVisibility";
 	import type { TwoHopPreviewDependencies } from "features/two-hop/ui/useTwoHopVirtualList.svelte";
@@ -149,9 +154,40 @@
 	const sourceFile = linkContext.sourceFile;
 	const fileToLinktext = linkContext.fileToLinktext;
 	const onTagClick = linkContext.onTagClick;
-	const sectionPublicationCache = createTwoHopSectionPublicationCache();
+	const interactionTokens = createTwoHopInteractionTokenAllocator();
+	const sectionPublicationMemo = createTwoHopSectionPublicationMemo();
+	let getSortedTwoHopItems = $derived.by(() => {
+		const store = applicationStore;
+		return (items: Parameters<ApplicationStore["getSortedTwoHopItems"]>[0]) =>
+			store.getSortedTwoHopItems(items);
+	});
+	let getSortedTagGroupItems = $derived.by(() => {
+		const store = applicationStore;
+		return (items: Parameters<ApplicationStore["getSortedTagGroupItems"]>[0]) =>
+			store.getSortedTagGroupItems(items);
+	});
+	let getSectionVisibleCount = $derived.by(() => {
+		const paginationScope = documentIdentity;
+		const expandedLimits = applicationStore.sectionExpandedLimits ?? {};
+		const requestedDefaultLimit = Math.floor(
+			currentSettings.defaultVisibleLinkCount,
+		);
+		const defaultLimit = Number.isFinite(requestedDefaultLimit)
+			? Math.max(0, requestedDefaultLimit)
+			: 0;
+		return (sectionId: string, totalCount: number): number => {
+			const paginationId = buildScopedSectionId(sectionId, paginationScope);
+			const requestedExpandedLimit = Math.floor(
+				expandedLimits[paginationId] ?? 0,
+			);
+			const expandedLimit = Number.isFinite(requestedExpandedLimit)
+				? Math.max(0, requestedExpandedLimit)
+				: 0;
+			return Math.min(totalCount, Math.max(defaultLimit, expandedLimit));
+		};
+	});
 	const twoHopVirtualListSections = $derived.by(() =>
-		sectionPublicationCache.resolve({
+		sectionPublicationMemo.resolve({
 			displayData: filteredDisplayData,
 			useMergedLinks,
 			showTags,
@@ -160,13 +196,37 @@
 			fileToLinktext,
 			currentSort,
 			currentSettings,
-			applicationStore,
+			sortContextVersion: applicationStore.getSortContextVersion?.() ?? 0,
+			getSortedTwoHopItems,
+			getSortedTagGroupItems,
+			getVisibleCount: getSectionVisibleCount,
+			interactionTokens,
 			onTagClick,
-			paginationScope: documentIdentity,
 		}),
 	);
-	const loadMoreSection = (sectionId: string) =>
-		sectionPublicationCache.loadMore(sectionId);
+	function loadMoreSection(sectionId: string): void {
+		const section = twoHopVirtualListSections.find(
+			(candidate) => candidate.id === sectionId,
+		);
+		if (!section) return;
+
+		const visibleCount = getSectionVisibleCount(sectionId, section.totalCount);
+		if (visibleCount >= section.totalCount) return;
+
+		const increment = normalizeIncrement(applicationStore.loadMoreIncrement);
+		const nextCount =
+			increment === Number.POSITIVE_INFINITY
+				? section.totalCount
+				: Math.min(section.totalCount, visibleCount + increment);
+		const paginationId = buildScopedSectionId(sectionId, documentIdentity);
+		applicationStore.setSectionExpandedLimit(
+			paginationId,
+			Math.max(
+				applicationStore.getSectionExpandedLimit(paginationId) ?? 0,
+				nextCount,
+			),
+		);
+	}
 
 	setAppContext({
 		linkContext,
