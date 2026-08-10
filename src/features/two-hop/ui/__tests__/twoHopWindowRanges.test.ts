@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
 	resolveProgressivePreviewWindowInto,
 	resolveProgressiveResidentRangeInto,
-} from "features/two-hop/ui/progressivePreviewRange";
+} from "features/two-hop/ui/twoHopWindowPolicy";
 import type {
 	TwoHopGeometry,
 	TwoHopRowRange,

@@ -20,7 +20,8 @@ import {
 	TWO_HOP_PROGRESSIVE_ROWS_PER_CHUNK,
 	type TwoHopProgressivePlan,
 } from "features/two-hop/ui/twoHopProgressivePlan";
-import type { TwoHopPreviewDependencies } from "features/two-hop/ui/twoHopPreviewDependencies";
+import type { Pos, TFile } from "obsidian";
+import type { PreviewRuntime } from "features/card-preview/runtime/previewRuntime";
 import { DISABLED_PREVIEW_SURFACE } from "features/card-preview/runtime/previewRuntime";
 import type {
 	VirtualPreviewBinding,
@@ -57,6 +58,15 @@ import { scrollElementIntoVirtualViewport } from "ui/virtualization/svelte/Virtu
 import { invalidateScrollGeometry } from "ui/virtualization/dom/virtualListScrollGeometryInvalidation";
 import { waitForNextAnimationFrame } from "ui/shared/scheduling/frame";
 import { resolveTwoHopProgressiveNavigationTarget } from "features/two-hop/ui/twoHopProgressiveNavigation";
+
+/** Dependencies required to enable previews on the progressive two-hop surface. */
+export interface TwoHopPreviewDependencies {
+	readonly previewRuntime: PreviewRuntime;
+	readonly resolveSearchMatchPosition: (
+		query: string,
+		file: TFile | null | undefined,
+	) => Pos | undefined;
+}
 
 export interface TwoHopProgressiveListProps {
 	/** Stable identity of the displayed file and search scope. */

@@ -1,4 +1,4 @@
-import type { TwoHopPreviewDependencies } from "features/two-hop/ui/twoHopPreviewDependencies";
+import type { TwoHopPreviewDependencies } from "features/two-hop/ui/useTwoHopProgressiveList.svelte";
 import type { ApplicationStore } from "ui/stores/ApplicationStore.svelte";
 import type { TwoHopSectionModel } from "features/two-hop/ui/twoHopSectionModel";
 

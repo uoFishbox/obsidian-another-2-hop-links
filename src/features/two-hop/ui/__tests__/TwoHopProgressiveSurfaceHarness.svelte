@@ -4,7 +4,7 @@
 	import type { ApplicationStore } from "ui/stores/ApplicationStore.svelte";
 	import type { CardRenderModel } from "ui/components/items/cardRenderModel";
 	import type { TwoHopCardPresentationState } from "features/two-hop/ui/twoHopCellStaticState";
-	import type { TwoHopPreviewDependencies } from "features/two-hop/ui/twoHopPreviewDependencies";
+	import type { TwoHopPreviewDependencies } from "features/two-hop/ui/useTwoHopProgressiveList.svelte";
 	import type {
 		TwoHopItemModel,
 		TwoHopSectionModel,

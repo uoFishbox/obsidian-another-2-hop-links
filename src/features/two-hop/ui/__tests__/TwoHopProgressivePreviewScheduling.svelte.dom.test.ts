@@ -2,7 +2,7 @@ import { render } from "@testing-library/svelte";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { DEFAULT_SETTINGS } from "features/settings/model";
 import type { CardPreviewRequest } from "features/card-preview/core/cardPreviewRequest";
-import type { TwoHopPreviewDependencies } from "features/two-hop/ui/twoHopPreviewDependencies";
+import type { TwoHopPreviewDependencies } from "features/two-hop/ui/useTwoHopProgressiveList.svelte";
 import type { TwoHopCardPresentationState } from "features/two-hop/ui/twoHopCellStaticState";
 import type {
 	TwoHopItemModel,

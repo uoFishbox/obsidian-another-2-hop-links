@@ -3,7 +3,7 @@
 	import DelegatedInteractionSurface from "ui/interactions/DelegatedInteractionSurface.svelte";
 	import { provideVirtualFrameCoordinator } from "ui/virtualization/svelte/frameCoordinatorContext.svelte";
 	import { provideVirtualPreviewSurface } from "features/card-preview/ui/virtualPreviewSurfaceContext";
-	import TwoHopProgressiveRow from "features/two-hop/ui/TwoHopProgressiveRow.svelte";
+	import TwoHopProgressiveCell from "features/two-hop/ui/TwoHopProgressiveCell.svelte";
 	import {
 		useTwoHopProgressiveList,
 		type TwoHopProgressiveListProps,
@@ -42,12 +42,34 @@
 					style={`height:${chunk.height}px;contain-intrinsic-size:auto ${chunk.height}px;`}
 				>
 					{#each chunk.rows as row (row.rowIndex)}
-						<TwoHopProgressiveRow
-							{row}
-							previewHostEnabled={list.isPreviewHostEnabled(row.rowIndex)}
-							registerCardModelConsumer={list.registerCardModelConsumer}
-							onLoadMore={list.loadMore}
-						/>
+						{@const previewHostEnabled = list.isPreviewHostEnabled(
+							row.rowIndex,
+						)}
+						<div
+							class="twohop-progressive-row"
+							data-ccl-progressive-row={row.rowIndex}
+							style:top={`${row.top}px`}
+						>
+							{#each row.cells as cell (cell.logicalKey)}
+								<div
+									class="twohop-progressive-cell"
+									data-ccl-logical-key={cell.logicalKey}
+									data-ccl-row-index={cell.rowIndex}
+									data-ccl-column-index={cell.columnIndex}
+									data-testid={process.env.NODE_ENV !==
+										"production" && cell.kind === "item"
+										? "twohop-progressive-item-cell"
+										: undefined}
+								>
+									<TwoHopProgressiveCell
+										{cell}
+										{previewHostEnabled}
+										registerCardModelConsumer={list.registerCardModelConsumer}
+										onLoadMore={list.loadMore}
+									/>
+								</div>
+							{/each}
+						</div>
 					{/each}
 				</div>
 			{/each}

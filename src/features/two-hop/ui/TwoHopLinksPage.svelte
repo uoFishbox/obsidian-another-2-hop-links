@@ -3,7 +3,7 @@
 	import { setContext } from "svelte";
 	import LoadingState from "ui/components/common/LoadingState.svelte";
 	import ListControls from "ui/components/common/ListControls.svelte";
-	import TwoHopLinksList from "./TwoHopLinksList.svelte";
+	import TwoHopProgressiveSurface from "features/two-hop/ui/TwoHopProgressiveSurface.svelte";
 	import { useSearchQuery } from "ui/hooks/useSearchQuery.svelte";
 	import { useBookmarks } from "ui/hooks/useBookmarks.svelte";
 	import { useWorkerSearchSession } from "features/search/useWorkerSearchSession.svelte";
@@ -23,8 +23,12 @@
 	import { createTwoHopSectionPublicationCache } from "features/two-hop/ui/section-descriptors/cache";
 	import type { TwoHopLinksRootUiState } from "features/two-hop/ui/twoHopLinksRootUiState";
 	import { observePreviewSurfaceVisibility } from "features/card-preview/scheduling/previewSurfaceVisibility";
-	import type { TwoHopPreviewDependencies } from "features/two-hop/ui/twoHopPreviewDependencies";
+	import type { TwoHopPreviewDependencies } from "features/two-hop/ui/useTwoHopProgressiveList.svelte";
 	import type { PreviewRuntime } from "features/card-preview/runtime/previewRuntime";
+	import {
+		buildTwoHopCardModel,
+		type TwoHopCardModelRevision,
+	} from "features/two-hop/ui/twoHopCardModel";
 
 	const INLINE_OFFSCREEN_BOOTSTRAP_PREVIEW_ROWS = 4;
 
@@ -187,6 +191,27 @@
 			}
 		: undefined;
 
+	function getPreviewRenderVersion(path: string): string {
+		return applicationStore.getPreviewRenderVersion(path);
+	}
+
+	const cardModelRevision = $derived.by(
+		(): TwoHopCardModelRevision => ({
+			settings: currentSettings,
+			searchQuery: appliedSearchQuery,
+			searchScope: appliedSearchScope,
+			matchedItemByKey,
+			linkContext,
+			getPreviewRenderVersion,
+			applicationUpdateVersion: applicationStore.updateVersion,
+		}),
+	);
+	const resolveItemCardModel = (
+		item: Parameters<typeof buildTwoHopCardModel>[0],
+		presentation: Parameters<typeof buildTwoHopCardModel>[1],
+		revision: unknown,
+	) => buildTwoHopCardModel(item, presentation, revision as TwoHopCardModelRevision);
+
 	let rootEl = $state<HTMLDivElement | null>(null);
 	let previewSurfaceActive = $state(false);
 	let resultsContainerEl = $state<HTMLDivElement | null>(null);
@@ -307,15 +332,13 @@
 		{#if loading}
 			<LoadingState message="Waiting for the initial index to finish building." />
 		{:else if linkResult}
-			<TwoHopLinksList
+			<TwoHopProgressiveSurface
 				{documentIdentity}
 				sections={twoHopVirtualListSections}
 				{applicationStore}
-				searchQuery={appliedSearchQuery}
-				searchScope={appliedSearchScope}
-				{matchedItemByKey}
 				{loadMoreSection}
-				{linkContext}
+				{cardModelRevision}
+				{resolveItemCardModel}
 				{previewDependencies}
 				previewActive={previewSurfaceActive}
 				offscreenBootstrapPreviewRows={isSidebar

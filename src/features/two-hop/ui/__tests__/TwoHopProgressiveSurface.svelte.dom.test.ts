@@ -6,7 +6,7 @@ import type { ApplicationStore } from "ui/stores/ApplicationStore.svelte";
 import type { CardRenderModel } from "ui/components/items/cardRenderModel";
 import type { LinkContext } from "ui/context/linkContext";
 import type { TFile } from "obsidian";
-import type { TwoHopPreviewDependencies } from "features/two-hop/ui/twoHopPreviewDependencies";
+import type { TwoHopPreviewDependencies } from "features/two-hop/ui/useTwoHopProgressiveList.svelte";
 import type { TwoHopCardPresentationState } from "features/two-hop/ui/twoHopCellStaticState";
 import type { CardPreviewRequest } from "features/card-preview/core/cardPreviewRequest";
 import type {

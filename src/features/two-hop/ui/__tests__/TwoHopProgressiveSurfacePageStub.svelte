@@ -2,7 +2,7 @@
 	import ViewItemCard from "ui/components/items/ViewItemCard.svelte";
 	import type { TwoHopSectionModel } from "features/two-hop/ui/twoHopSectionModel";
 	import type { ApplicationStore } from "ui/stores/ApplicationStore.svelte";
-	import type { TwoHopPreviewDependencies } from "features/two-hop/ui/twoHopPreviewDependencies";
+	import type { TwoHopPreviewDependencies } from "features/two-hop/ui/useTwoHopProgressiveList.svelte";
 	import { captureTwoHopProgressiveSurfacePageStubProps } from "./twoHopProgressiveSurfacePageStubCapture";
 
 	interface Props {
