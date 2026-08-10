@@ -15,7 +15,6 @@ export interface VirtualCardInteractionController {
 
 /** Keeps one interaction registry entry per bounded physical card slot. */
 export function createVirtualCardInteractionController(): VirtualCardInteractionController {
-	const descriptorsBySlot = new Map<string, ItemInteractionDescriptor>();
 	const interactionIdBySlot = new Map<string, string>();
 	const descriptorByInteractionId = new Map<string, ItemInteractionDescriptor>();
 	const retainedSlots = new Set<string>();
@@ -26,7 +25,6 @@ export function createVirtualCardInteractionController(): VirtualCardInteraction
 			descriptorByInteractionId.delete(prevId);
 			interactionIdBySlot.delete(slotId);
 		}
-		descriptorsBySlot.delete(slotId);
 	}
 
 	function bindCard(slotId: string, descriptor: ItemInteractionDescriptor): void {
@@ -34,7 +32,6 @@ export function createVirtualCardInteractionController(): VirtualCardInteraction
 		if (prevId !== undefined && prevId !== descriptor.interactionId) {
 			descriptorByInteractionId.delete(prevId);
 		}
-		descriptorsBySlot.set(slotId, descriptor);
 		interactionIdBySlot.set(slotId, descriptor.interactionId);
 		descriptorByInteractionId.set(descriptor.interactionId, descriptor);
 	}
@@ -53,7 +50,7 @@ export function createVirtualCardInteractionController(): VirtualCardInteraction
 				retainedSlots.add(card.slotId);
 				bindCard(card.slotId, card.descriptor);
 			}
-			for (const slotId of descriptorsBySlot.keys()) {
+			for (const slotId of interactionIdBySlot.keys()) {
 				if (!retainedSlots.has(slotId)) removeSlot(slotId);
 			}
 			retainedSlots.clear();
@@ -66,7 +63,6 @@ export function createVirtualCardInteractionController(): VirtualCardInteraction
 			}
 		},
 		clear() {
-			descriptorsBySlot.clear();
 			interactionIdBySlot.clear();
 			descriptorByInteractionId.clear();
 			retainedSlots.clear();
