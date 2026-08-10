@@ -12,9 +12,10 @@ export interface TwoHopSectionModel {
 		| "new-links-section";
 	readonly title: string;
 	readonly header: TwoHopHeaderModel;
+	/** Materialized prefix consumed by geometry and progressive chunks. */
 	readonly items: readonly TwoHopItemModel[];
+	/** Total source item count, including the unpublished suffix. */
 	readonly totalCount: number;
-	readonly visibleCount: number;
 }
 
 export interface TwoHopHeaderModel {
@@ -38,6 +39,8 @@ export interface CreateTwoHopSectionModelParams {
 	readonly title: string;
 	readonly headerProps?: ClickableHeaderExtraProps;
 	readonly items: readonly TwoHopItemModel[];
+	/** Must be greater than or equal to items.length. */
+	readonly totalCount: number;
 }
 
 /** Publishes one immutable section consumed directly by geometry and chunks. */
@@ -45,6 +48,10 @@ export function createTwoHopSectionModel(
 	params: CreateTwoHopSectionModelParams,
 ): TwoHopSectionModel {
 	const items = Object.freeze(params.items);
+	const requestedTotalCount = Math.floor(params.totalCount);
+	const totalCount = Number.isFinite(requestedTotalCount)
+		? Math.max(items.length, requestedTotalCount)
+		: items.length;
 	return Object.freeze({
 		id: params.id,
 		kind: params.kind,
@@ -54,8 +61,7 @@ export function createTwoHopSectionModel(
 			props: params.headerProps ?? {},
 		}),
 		items,
-		totalCount: items.length,
-		visibleCount: items.length,
+		totalCount,
 	});
 }
 

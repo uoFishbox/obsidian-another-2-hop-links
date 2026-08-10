@@ -7,9 +7,9 @@
 
 	interface Props {
 		documentIdentity: string;
-		paginationScope: string;
 		sections: readonly TwoHopSectionModel[];
 		applicationStore: ApplicationStore;
+		loadMoreSection?: (sectionId: string) => readonly TwoHopSectionModel[] | null;
 		previewDependencies?: TwoHopPreviewDependencies;
 		previewActive?: boolean;
 		offscreenBootstrapPreviewRows?: number;
@@ -17,9 +17,9 @@
 
 	let {
 		documentIdentity,
-		paginationScope,
 		sections,
 		applicationStore,
+		loadMoreSection,
 		previewDependencies = undefined,
 		previewActive = true,
 		offscreenBootstrapPreviewRows = 0,
@@ -28,8 +28,8 @@
 	$effect(() => {
 		captureTwoHopProgressiveSurfacePageStubProps({
 			documentIdentity,
-			paginationScope,
 			applicationStore,
+			loadMoreSection,
 			previewDependencies,
 			previewActive,
 			offscreenBootstrapPreviewRows,

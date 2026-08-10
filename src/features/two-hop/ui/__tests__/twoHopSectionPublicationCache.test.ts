@@ -40,6 +40,7 @@ function createHarness() {
 		getSortContextVersion: () => sortContextVersion,
 		getSortedTagGroupItems: vi.fn((items: readonly TaggedNote[]) => items),
 		getSortedTwoHopItems: vi.fn((items: readonly TwoHopIndexedLink[]) => items),
+		setSectionExpandedLimit: vi.fn(),
 	} as unknown as ApplicationStore;
 	const params = {
 		displayData: createDisplayData(),
@@ -52,6 +53,9 @@ function createHarness() {
 		currentSettings: DEFAULT_SETTINGS,
 		applicationStore,
 		onTagClick: vi.fn(),
+		initialVisibleCount: 20,
+		loadMoreIncrement: 20,
+		paginationScope: "",
 	};
 	return {
 		applicationStore,
@@ -117,6 +121,41 @@ describe("createTwoHopSectionPublicationCache", () => {
 		expect(second[0]).not.toBe(first[0]);
 		expect(second[0]?.items[0]?.interactionId).toBe(
 			first[0]?.items[0]?.interactionId,
+		);
+	});
+
+	it("expands only the requested prefix while preserving item identity and sorting", () => {
+		const cache = createTwoHopSectionPublicationCache();
+		const { params, applicationStore } = createHarness();
+		const group = {
+			tag: "alpha",
+			notes: [
+				createNote("one.md", "alpha"),
+				createNote("two.md", "alpha"),
+				createNote("three.md", "alpha"),
+			],
+		};
+		const input = {
+			...params,
+			displayData: createDisplayData([group]),
+			initialVisibleCount: 1,
+			loadMoreIncrement: 1,
+			paginationScope: "query",
+		};
+		const first = cache.resolve(input);
+		const firstItem = first[0]?.items[0];
+		const second = cache.loadMore("tags-alpha");
+		const resolvedAgain = cache.resolve(input);
+
+		expect(first[0]?.items).toHaveLength(1);
+		expect(first[0]?.totalCount).toBe(3);
+		expect(second?.[0]?.items).toHaveLength(2);
+		expect(second?.[0]?.items[0]).toBe(firstItem);
+		expect(resolvedAgain).toBe(second);
+		expect(applicationStore.getSortedTagGroupItems).toHaveBeenCalledTimes(1);
+		expect(applicationStore.setSectionExpandedLimit).toHaveBeenCalledWith(
+			expect.stringMatching(/^s:/),
+			2,
 		);
 	});
 

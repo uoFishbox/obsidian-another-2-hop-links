@@ -3,7 +3,6 @@ import { createItemInteractionKey } from "ui/interactions/interactionTypes";
 import type { ClickableHeaderExtraProps } from "ui/components/sections/types";
 import { generateLinkKey } from "features/card-preview/text-processing/textUtils";
 import type { TagGroup } from "types/domain";
-import type { ApplicationStore } from "ui/stores/ApplicationStore.svelte";
 import {
 	createTaggedNoteSectionItemKey,
 	createTwoHopSectionModel,
@@ -12,15 +11,19 @@ import {
 } from "features/two-hop/ui/twoHopSectionModel";
 import type { TwoHopInteractionTokenAllocator } from "./interactionTokenAllocator";
 import { getTagNoteSearchKeyFromBaseKey } from "features/two-hop/ui/twoHopSearchAdapter";
+import type { TaggedNote } from "types/domain";
+import { materializeItemPrefix } from "./materializeItemPrefix";
 
 export interface TagSectionBuildInput {
 	readonly source: TagGroup;
 	readonly rawSectionId: string;
-	readonly applicationStore: ApplicationStore;
+	readonly sortedItems: readonly TaggedNote[];
+	readonly itemLimit: number;
+	readonly previousItems: readonly TwoHopItemModel[];
 	readonly onTagClick: (tag: string) => void;
 }
 
-/** Builds one immutable tag publication with eager sorting and rows. */
+/** Builds one immutable tag publication from a sorted, bounded prefix. */
 export function createTagSectionDescriptor(
 	input: TagSectionBuildInput,
 	tokens: TwoHopInteractionTokenAllocator,
@@ -34,10 +37,10 @@ export function createTagSectionDescriptor(
 		interactionKind: "sectionHeader",
 		onClick: () => input.onTagClick(input.source.tag),
 	};
-	const sortedItems = input.applicationStore.getSortedTagGroupItems(
-		input.source.notes,
-	);
-	const rows: readonly TwoHopItemModel[] = sortedItems.map(
+	const rows = materializeItemPrefix(
+		input.sortedItems,
+		input.itemLimit,
+		input.previousItems,
 		(source, index): TwoHopItemModel => {
 			const item: ViewItem = { type: "taggedNote", data: source };
 			const baseKey = generateLinkKey(
@@ -66,5 +69,6 @@ export function createTagSectionDescriptor(
 		title: `#${input.source.tag}`,
 		headerProps,
 		items: rows,
+		totalCount: input.sortedItems.length,
 	});
 }

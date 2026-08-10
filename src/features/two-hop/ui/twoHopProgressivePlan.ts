@@ -230,7 +230,7 @@ export function resolveTwoHopProgressiveCell(
 	}
 
 	const itemIndex = cellIndex - 1;
-	if (itemIndex < section.visibleCount) {
+	if (itemIndex < section.items.length) {
 		const item = section.items[itemIndex];
 		if (!item) return null;
 		return Object.freeze({
@@ -245,8 +245,8 @@ export function resolveTwoHopProgressiveCell(
 	}
 
 	if (
-		itemIndex === section.visibleCount &&
-		section.visibleCount < section.items.length
+		itemIndex === section.items.length &&
+		section.items.length < section.totalCount
 	) {
 		return Object.freeze({
 			section,

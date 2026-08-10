@@ -86,6 +86,7 @@ function createSection(count: number): TwoHopSectionModel {
 		kind: "new-links-section",
 		title: "Section",
 		items,
+		totalCount: items.length,
 	});
 }
 

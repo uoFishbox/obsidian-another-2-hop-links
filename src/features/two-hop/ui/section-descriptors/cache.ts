@@ -1,6 +1,7 @@
 import type { TFile } from "obsidian";
 import type { DisplayData } from "features/two-hop/application/displayDataBuilder";
 import {
+	buildScopedSectionId,
 	createCompactSectionId,
 	SHOULD_VALIDATE_SECTION_IDS,
 } from "ui/components/common/listPagination";
@@ -8,7 +9,10 @@ import { generateBranchKey } from "features/card-preview/text-processing/textUti
 import type { PluginSettings, SortOption } from "features/settings/model";
 import type { ApplicationStore } from "ui/stores/ApplicationStore.svelte";
 import type { InteractionSettings } from "ui/interactions/interactionTypes";
-import type { TwoHopSectionModel } from "features/two-hop/ui/twoHopSectionModel";
+import type {
+	TwoHopItemModel,
+	TwoHopSectionModel,
+} from "features/two-hop/ui/twoHopSectionModel";
 import { createTwoHopInteractionTokenAllocator } from "./interactionTokenAllocator";
 import {
 	createBranchSectionDescriptor,
@@ -21,6 +25,10 @@ import {
 import { createTagSectionDescriptor } from "./createTagDescriptor";
 import { createNewLinksSectionDescriptor } from "./createNewLinksDescriptor";
 import { recordCCLDevMeasurement } from "infrastructure/debug/CCLDevMeasurements";
+import {
+	createSectionPaginationState,
+	type SectionPaginationState,
+} from "ui/virtualization/pagination";
 
 export interface ResolveTwoHopSectionsParams {
 	readonly displayData: DisplayData;
@@ -37,16 +45,27 @@ export interface ResolveTwoHopSectionsParams {
 	readonly currentSettings: PluginSettings;
 	readonly applicationStore: ApplicationStore;
 	readonly onTagClick: (tag: string) => void;
+	readonly initialVisibleCount: number | undefined;
+	readonly loadMoreIncrement: number | undefined;
+	readonly paginationScope: string;
 }
 
 export interface TwoHopSectionPublicationCache {
 	resolve(params: ResolveTwoHopSectionsParams): readonly TwoHopSectionModel[];
+	loadMore(sectionId: string): readonly TwoHopSectionModel[] | null;
 }
 
 interface CachedSection {
 	readonly dependencies: readonly unknown[];
+	readonly totalCount: number;
+	readonly build: SectionBuilder;
 	readonly section: TwoHopSectionModel;
 }
+
+type SectionBuilder = (
+	itemLimit: number,
+	previousItems: readonly TwoHopItemModel[],
+) => TwoHopSectionModel;
 
 interface ResolveSnapshot {
 	readonly displayData: DisplayData;
@@ -59,6 +78,10 @@ interface ResolveSnapshot {
 	readonly sortContextVersion: number;
 	readonly mobileLongPressAction: PluginSettings["mobileLongPressAction"];
 	readonly highlightInPreviewOnHover: boolean;
+	readonly initialVisibleCount: number | undefined;
+	readonly loadMoreIncrement: number | undefined;
+	readonly paginationScope: string;
+	readonly applicationStore: ApplicationStore;
 }
 
 /**
@@ -72,26 +95,83 @@ export function createTwoHopSectionPublicationCache(): TwoHopSectionPublicationC
 	let previousSnapshot: ResolveSnapshot | undefined;
 	let previousSections: readonly TwoHopSectionModel[] = [];
 	let latestOnTagClick: (tag: string) => void = () => undefined;
+	let paginationScope = "";
+	let initialVisibleCount: number | undefined;
+	let loadMoreIncrement: number | undefined;
+	let paginationApplicationStore: ApplicationStore | undefined;
+	let expandedLimits: Record<string, number> = {};
+	let pagination: SectionPaginationState | null = null;
 	const onTagClick = (tag: string): void => latestOnTagClick(tag);
+
+	function configurePagination(params: ResolveTwoHopSectionsParams): void {
+		const nextScope = params.paginationScope.trim();
+		if (
+			pagination &&
+			nextScope === paginationScope &&
+			Object.is(params.initialVisibleCount, initialVisibleCount) &&
+			Object.is(params.loadMoreIncrement, loadMoreIncrement) &&
+			params.applicationStore === paginationApplicationStore
+		) {
+			return;
+		}
+
+		paginationScope = nextScope;
+		initialVisibleCount = params.initialVisibleCount;
+		loadMoreIncrement = params.loadMoreIncrement;
+		paginationApplicationStore = params.applicationStore;
+		expandedLimits = {};
+		pagination = createSectionPaginationState({
+			getExpandedLimits: () => expandedLimits,
+			setExpandedLimits: (next) => {
+				expandedLimits = next;
+			},
+			applicationStore: params.applicationStore,
+			initialVisibleCount,
+			loadMoreIncrement,
+		});
+	}
+
+	function getPaginationId(sectionId: string): string {
+		return buildScopedSectionId(sectionId, paginationScope);
+	}
 
 	function resolveSection(
 		id: string,
 		dependencies: readonly unknown[],
-		build: () => TwoHopSectionModel,
+		totalCount: number,
+		build: SectionBuilder,
 	): TwoHopSectionModel {
+		const visibleCount = pagination!.getVisibleCount(
+			getPaginationId(id),
+			totalCount,
+		);
 		const cached = entries.get(id);
-		if (cached && hasSameDependencies(cached.dependencies, dependencies)) {
+		const canReuseItems =
+			cached !== undefined &&
+			cached.totalCount === totalCount &&
+			hasSameDependencies(cached.dependencies, dependencies);
+		if (canReuseItems && cached.section.items.length === visibleCount) {
 			return cached.section;
 		}
 
-		const section = build();
-		entries.set(id, { dependencies, section });
+		const activeBuild = canReuseItems ? cached.build : build;
+		const section = activeBuild(
+			visibleCount,
+			canReuseItems ? cached.section.items : [],
+		);
+		entries.set(id, {
+			dependencies,
+			totalCount,
+			build: activeBuild,
+			section,
+		});
 		return section;
 	}
 
 	return {
 		resolve(params) {
 			latestOnTagClick = params.onTagClick;
+			configurePagination(params);
 			const sortContextVersion =
 				params.applicationStore.getSortContextVersion?.() ?? 0;
 			const snapshot = createResolveSnapshot(params, sortContextVersion);
@@ -109,12 +189,13 @@ export function createTwoHopSectionPublicationCache(): TwoHopSectionPublicationC
 			const append = (
 				id: string,
 				dependencies: readonly unknown[],
-				build: () => TwoHopSectionModel,
+				totalCount: number,
+				build: SectionBuilder,
 			): void => {
 				if (seenIds?.has(id)) return;
 				seenIds?.add(id);
 				activeIds.add(id);
-				sections.push(resolveSection(id, dependencies, build));
+				sections.push(resolveSection(id, dependencies, totalCount, build));
 			};
 
 			appendPrimarySections(params, append, tokens.createItemInteractionToken);
@@ -133,13 +214,36 @@ export function createTwoHopSectionPublicationCache(): TwoHopSectionPublicationC
 			recordCacheMeasurement(changed ? "miss" : "hit");
 			return previousSections;
 		},
+		loadMore(sectionId) {
+			const cached = entries.get(sectionId);
+			if (!cached || !pagination) return null;
+			const paginationId = getPaginationId(sectionId);
+			pagination.loadMore(paginationId, cached.totalCount);
+			const nextCount = pagination.getVisibleCount(
+				paginationId,
+				cached.totalCount,
+			);
+			if (nextCount === cached.section.items.length) return null;
+
+			const section = cached.build(nextCount, cached.section.items);
+			entries.set(sectionId, { ...cached, section });
+			const sectionIndex = previousSections.findIndex(
+				(candidate) => candidate.id === sectionId,
+			);
+			if (sectionIndex < 0) return null;
+			const nextSections = [...previousSections];
+			nextSections[sectionIndex] = section;
+			previousSections = Object.freeze(nextSections);
+			return previousSections;
+		},
 	};
 }
 
 type AppendSection = (
 	id: string,
 	dependencies: readonly unknown[],
-	build: () => TwoHopSectionModel,
+	totalCount: number,
+	build: SectionBuilder,
 ) => void;
 
 function appendPrimarySections(
@@ -165,8 +269,17 @@ function appendPrimarySections(
 			];
 
 	for (const input of inputs) {
-		append(input.kind, [input.items], () =>
-			createPrimarySectionDescriptor({ input, createItemInteractionToken }),
+		append(
+			input.kind,
+			[input.items],
+			input.items.length,
+			(itemLimit, previousItems) =>
+				createPrimarySectionDescriptor({
+					input,
+					itemLimit,
+					previousItems,
+					createItemInteractionToken,
+				}),
 		);
 	}
 }
@@ -183,6 +296,10 @@ function appendBranchSections(
 	});
 
 	for (const branch of params.displayData.twoHopBranches) {
+		let sortedItems: ReturnType<ApplicationStore["getSortedTwoHopItems"]> | null =
+			null;
+		const getSortedItems = () =>
+			(sortedItems ??= params.applicationStore.getSortedTwoHopItems(branch.hop2));
 		const sectionKey = generateBranchKey(branch);
 		const id = createCompactSectionId("twohop", sectionKey);
 		const header = resolveBranchHeader({
@@ -206,7 +323,8 @@ function appendBranchSections(
 				interactionSettings.mobileLongPressAction,
 				interactionSettings.highlightInPreviewOnHover,
 			],
-			() =>
+			branch.hop2.length,
+			(itemLimit, previousItems) =>
 				createBranchSectionDescriptor(
 					{
 						branch,
@@ -214,7 +332,9 @@ function appendBranchSections(
 						sourceFile: params.sourceFile,
 						...header,
 						interactionSettings,
-						applicationStore: params.applicationStore,
+						sortedItems: getSortedItems(),
+						itemLimit,
+						previousItems,
 					},
 					tokens,
 				),
@@ -231,6 +351,12 @@ function appendTagSections(
 ): void {
 	if (!params.showTags) return;
 	for (const source of params.displayData.tagGroups) {
+		let sortedItems: ReturnType<ApplicationStore["getSortedTagGroupItems"]> | null =
+			null;
+		const getSortedItems = () =>
+			(sortedItems ??= params.applicationStore.getSortedTagGroupItems(
+				source.notes,
+			));
 		const id = `tags-${source.tag}`;
 		append(
 			id,
@@ -240,12 +366,15 @@ function appendTagSections(
 				sortContextVersion,
 				params.applicationStore.getSortedTagGroupItems,
 			],
-			() =>
+			source.notes.length,
+			(itemLimit, previousItems) =>
 				createTagSectionDescriptor(
 					{
 						source,
 						rawSectionId: id,
-						applicationStore: params.applicationStore,
+						sortedItems: getSortedItems(),
+						itemLimit,
+						previousItems,
 						onTagClick,
 					},
 					tokens,
@@ -261,8 +390,13 @@ function appendNewLinksSection(
 ): void {
 	const items = params.displayData.newLinks;
 	if (items.length === 0) return;
-	append("new-links", [items], () =>
-		createNewLinksSectionDescriptor({ items, createItemInteractionToken }),
+	append("new-links", [items], items.length, (itemLimit, previousItems) =>
+		createNewLinksSectionDescriptor({
+			items,
+			itemLimit,
+			previousItems,
+			createItemInteractionToken,
+		}),
 	);
 }
 
@@ -281,6 +415,10 @@ function createResolveSnapshot(
 		sortContextVersion,
 		mobileLongPressAction: params.currentSettings.mobileLongPressAction,
 		highlightInPreviewOnHover: params.currentSettings.highlightInPreviewOnHover,
+		initialVisibleCount: params.initialVisibleCount,
+		loadMoreIncrement: params.loadMoreIncrement,
+		paginationScope: params.paginationScope,
+		applicationStore: params.applicationStore,
 	};
 }
 

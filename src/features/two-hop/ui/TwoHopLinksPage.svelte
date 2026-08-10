@@ -160,8 +160,13 @@
 			currentSettings,
 			applicationStore,
 			onTagClick,
+			initialVisibleCount,
+			loadMoreIncrement,
+			paginationScope: documentIdentity,
 		}),
 	);
+	const loadMoreSection = (sectionId: string) =>
+		sectionPublicationCache.loadMore(sectionId);
 
 	setAppContext({
 		linkContext,
@@ -313,8 +318,7 @@
 				searchQuery={appliedSearchQuery}
 				searchScope={appliedSearchScope}
 				{matchedItemByKey}
-				{initialVisibleCount}
-				{loadMoreIncrement}
+				{loadMoreSection}
 				{linkContext}
 				{previewDependencies}
 				previewActive={previewSurfaceActive}

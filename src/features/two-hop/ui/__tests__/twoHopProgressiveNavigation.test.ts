@@ -21,6 +21,7 @@ function createPlan(itemCount: number) {
 			searchKey: `item:${index}`,
 			key: `item:${index}`,
 		})) as TwoHopItemModel[],
+		totalCount: itemCount,
 	});
 	const layout = { ...DEFAULT_VIEW_PLAN_LAYOUT, columns: 1 };
 	const geometry = compileFixedGridLayout([section], layout);

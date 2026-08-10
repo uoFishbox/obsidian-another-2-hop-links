@@ -20,8 +20,7 @@
 		searchQuery?: string;
 		searchScope?: SearchWorkerMatchScope;
 		matchedItemByKey?: Map<string, SearchWorkerMatchedItem> | null;
-		initialVisibleCount?: number;
-		loadMoreIncrement?: number;
+		loadMoreSection?: (sectionId: string) => readonly TwoHopSectionModel[] | null;
 		linkContext: LinkUtilitiesContext;
 		previewDependencies?: TwoHopPreviewDependencies;
 		previewActive?: boolean;
@@ -35,8 +34,7 @@
 		searchQuery = "",
 		searchScope = "title-and-content",
 		matchedItemByKey = null,
-		initialVisibleCount,
-		loadMoreIncrement,
+		loadMoreSection,
 		linkContext,
 		previewDependencies = undefined,
 		previewActive = true,
@@ -69,9 +67,7 @@
 	{documentIdentity}
 	{sections}
 	{applicationStore}
-	{initialVisibleCount}
-	{loadMoreIncrement}
-	paginationScope={documentIdentity}
+	{loadMoreSection}
 	{cardModelRevision}
 	{resolveItemCardModel}
 	{previewDependencies}

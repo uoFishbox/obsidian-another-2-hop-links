@@ -19,6 +19,7 @@
 		previewActive?: boolean;
 		offscreenBootstrapPreviewRows?: number;
 		cardModelRevision?: unknown;
+		loadMoreSection?: (sectionId: string) => readonly TwoHopSectionModel[] | null;
 		resolveItemCardModel: (
 			item: TwoHopItemModel,
 			presentation: TwoHopCardPresentationState,
@@ -35,6 +36,7 @@
 		previewActive = true,
 		offscreenBootstrapPreviewRows = 0,
 		cardModelRevision = 0,
+		loadMoreSection = undefined,
 		resolveItemCardModel,
 	}: Props = $props();
 	setLinkContext(linkContext);
@@ -44,7 +46,7 @@
 	{documentIdentity}
 	{sections}
 	{applicationStore}
-	initialVisibleCount={sections[0]?.totalCount}
+	{loadMoreSection}
 	{resolveItemCardModel}
 	{previewDependencies}
 	{previewActive}

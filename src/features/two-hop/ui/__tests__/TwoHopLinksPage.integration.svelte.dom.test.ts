@@ -411,7 +411,7 @@ describe("TwoHopLinksPage descriptor plumbing", () => {
 		expect(surface.dataset.previewActive).toBe("true");
 
 		expect(capturedProps?.applicationStore).toBe(rootProps.applicationStore);
-		expect(capturedProps?.paginationScope).toBe(capturedProps?.documentIdentity);
+		expect(capturedProps?.loadMoreSection).toEqual(expect.any(Function));
 		expect(capturedProps?.offscreenBootstrapPreviewRows).toBe(4);
 		expect(capturedProps?.previewDependencies?.previewRuntime).toBe(
 			rootProps.previewRuntime,

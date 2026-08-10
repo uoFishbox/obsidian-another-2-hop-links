@@ -11,13 +11,14 @@ import {
 	generateBacklinkKey,
 } from "features/card-preview/text-processing/textUtils";
 import type { TwoHopLinkBranch } from "types/domain";
-import type { ApplicationStore } from "ui/stores/ApplicationStore.svelte";
+import type { TwoHopIndexedLink } from "types/domain";
 import {
 	createTwoHopSectionModel,
 	type TwoHopItemModel,
 	type TwoHopSectionModel,
 } from "features/two-hop/ui/twoHopSectionModel";
 import type { TwoHopInteractionTokenAllocator } from "./interactionTokenAllocator";
+import { materializeItemPrefix } from "./materializeItemPrefix";
 import {
 	createTwohopChildSearchKeyFromBaseKeys,
 	getTwohopBranchSearchBaseKey,
@@ -32,7 +33,9 @@ export interface BranchSectionBuildInput {
 	readonly className: string;
 	readonly directory: string | null;
 	readonly interactionSettings: InteractionSettings;
-	readonly applicationStore: ApplicationStore;
+	readonly sortedItems: readonly TwoHopIndexedLink[];
+	readonly itemLimit: number;
+	readonly previousItems: readonly TwoHopItemModel[];
 }
 
 /**
@@ -66,14 +69,16 @@ export function resolveBranchHeader(params: {
 	};
 }
 
-/** Builds one immutable branch publication with eager sorting and rows. */
+/** Builds one immutable branch publication from a sorted, bounded prefix. */
 export function createBranchSectionDescriptor(
 	input: BranchSectionBuildInput,
 	tokens: TwoHopInteractionTokenAllocator,
 ): TwoHopSectionModel {
 	const branchBaseKey = getTwohopBranchSearchBaseKey(input.branch);
-	const sortedItems = input.applicationStore.getSortedTwoHopItems(input.branch.hop2);
-	const rows: readonly TwoHopItemModel[] = sortedItems.map(
+	const rows = materializeItemPrefix(
+		input.sortedItems,
+		input.itemLimit,
+		input.previousItems,
 		(source): TwoHopItemModel => {
 			const item: ViewItem = { type: "backlink", data: source };
 			const virtualKey = generateBacklinkKey(source);
@@ -120,5 +125,6 @@ export function createBranchSectionDescriptor(
 		title: input.title,
 		headerProps,
 		items: rows,
+		totalCount: input.sortedItems.length,
 	});
 }

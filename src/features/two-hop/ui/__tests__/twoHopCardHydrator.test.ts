@@ -69,6 +69,7 @@ describe("createTwoHopCardHydrator", () => {
 			kind: "new-links-section",
 			title: "Section",
 			items,
+			totalCount: items.length,
 		});
 		const layout = { ...DEFAULT_VIEW_PLAN_LAYOUT, columns: 1 };
 		const geometry = compileFixedGridLayout([section], layout);

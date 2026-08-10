@@ -7,9 +7,12 @@ import type {
 	TwoHopSectionModel,
 } from "features/two-hop/ui/twoHopSectionModel";
 import { createTwoHopSectionModel } from "features/two-hop/ui/twoHopSectionModel";
+import { materializeItemPrefix } from "./materializeItemPrefix";
 
 export interface CreateNewLinksSectionDescriptorParams {
 	readonly items: readonly TwoHopIndexedLink[];
+	readonly itemLimit: number;
+	readonly previousItems: readonly TwoHopItemModel[];
 	readonly createItemInteractionToken: (interactionKey: string) => string;
 }
 
@@ -17,7 +20,10 @@ export interface CreateNewLinksSectionDescriptorParams {
 export function createNewLinksSectionDescriptor(
 	params: CreateNewLinksSectionDescriptorParams,
 ): TwoHopSectionModel {
-	const rows: readonly TwoHopItemModel[] = params.items.map(
+	const rows = materializeItemPrefix(
+		params.items,
+		params.itemLimit,
+		params.previousItems,
 		(source, index): TwoHopItemModel => {
 			const item: ViewItem = { type: "newLink", data: source };
 			const virtualKey = newLinksSectionConfig.getKey(source, index);
@@ -36,5 +42,6 @@ export function createNewLinksSectionDescriptor(
 		id: newLinksSectionConfig.sectionId,
 		title: newLinksSectionConfig.title,
 		items: rows,
+		totalCount: params.items.length,
 	});
 }

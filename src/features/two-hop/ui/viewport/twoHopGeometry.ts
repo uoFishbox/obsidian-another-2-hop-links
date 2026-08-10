@@ -36,8 +36,8 @@ export function compileFixedGridLayout(
 
 	for (let sectionIndex = 0; sectionIndex < sectionCount; sectionIndex += 1) {
 		const section = sections[sectionIndex];
-		const hasLoadMore = section.visibleCount < section.items.length;
-		const cellCount = 1 + section.visibleCount + (hasLoadMore ? 1 : 0);
+		const hasLoadMore = section.items.length < section.totalCount;
+		const cellCount = 1 + section.items.length + (hasLoadMore ? 1 : 0);
 		const sectionRowCount = Math.ceil(cellCount / columns);
 		const contentHeight =
 			sectionRowCount > 0

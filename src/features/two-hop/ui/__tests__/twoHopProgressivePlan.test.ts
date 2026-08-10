@@ -13,7 +13,7 @@ import {
 } from "features/two-hop/ui/twoHopSectionModel";
 
 function createSections(count: number, visibleCount = count) {
-	const items = Array.from({ length: count }, (_, index) => ({
+	const items = Array.from({ length: visibleCount }, (_, index) => ({
 		item: { type: "newLink" },
 		searchKey: `item-${index}`,
 		key: `item-${index}`,
@@ -23,10 +23,9 @@ function createSections(count: number, visibleCount = count) {
 		kind: "new-links-section",
 		title: "Section",
 		items,
+		totalCount: count,
 	});
-	return [
-		visibleCount === count ? section : Object.freeze({ ...section, visibleCount }),
-	];
+	return [section];
 }
 
 const layout = {

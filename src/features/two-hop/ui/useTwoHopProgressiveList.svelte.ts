@@ -6,7 +6,6 @@ import type {
 	TwoHopItemModel,
 	TwoHopSectionModel,
 } from "features/two-hop/ui/twoHopSectionModel";
-import { createTwoHopSectionProjection } from "features/two-hop/ui/twoHopSectionProjection";
 import {
 	compileFixedGridLayout,
 	resolveTwoHopRowFromScrollOffset,
@@ -65,9 +64,9 @@ export interface TwoHopProgressiveListProps {
 	readonly sections: readonly TwoHopSectionModel[];
 	readonly applicationStore: ApplicationStore;
 	readonly previewDependencies?: TwoHopPreviewDependencies;
-	readonly initialVisibleCount?: number;
-	readonly loadMoreIncrement?: number;
-	readonly paginationScope?: string;
+	readonly loadMoreSection?: (
+		sectionId: string,
+	) => readonly TwoHopSectionModel[] | null;
 	readonly previewActive?: boolean;
 	/** Rows to hydrate from the start while the whole list is below the viewport. */
 	readonly offscreenBootstrapPreviewRows?: number;
@@ -97,14 +96,7 @@ export function useTwoHopProgressiveList(
 	frameCoordinator: VirtualFrameCoordinator,
 ) {
 	const applicationStore = props.applicationStore;
-	const sectionProjection = createTwoHopSectionProjection({
-		sections: props.sections,
-		applicationStore,
-		initialVisibleCount: props.initialVisibleCount,
-		loadMoreIncrement: props.loadMoreIncrement,
-		paginationScope: props.paginationScope,
-	});
-	const initialSections = sectionProjection.getSections();
+	const initialSections = props.sections;
 	const initialGeometry = compileFixedGridLayout(
 		initialSections,
 		DEFAULT_VIEW_PLAN_LAYOUT,
@@ -162,6 +154,7 @@ export function useTwoHopProgressiveList(
 	let lastPreviewSurfaceActive = isPreviewSurfaceActive();
 	let previewSnapshotPublished = false;
 	let lastDocumentIdentity = props.documentIdentity;
+	let lastInputSections = props.sections;
 	let lastCardModelRevision = props.cardModelRevision;
 	const cardHydrator = createTwoHopCardHydrator({
 		frameCoordinator,
@@ -574,15 +567,12 @@ export function useTwoHopProgressiveList(
 
 	$effect(() => {
 		const nextDocumentIdentity = props.documentIdentity;
-		const nextSections = sectionProjection.setInput({
-			sections: props.sections,
-			paginationScope: props.paginationScope ?? "",
-			initialVisibleCount: props.initialVisibleCount,
-			loadMoreIncrement: props.loadMoreIncrement,
-		});
+		const nextSections = props.sections;
 		const identityChanged = nextDocumentIdentity !== lastDocumentIdentity;
-		if (identityChanged || nextSections !== sections) {
+		const inputChanged = nextSections !== lastInputSections;
+		if (identityChanged || inputChanged) {
 			lastDocumentIdentity = nextDocumentIdentity;
+			lastInputSections = nextSections;
 			publishSections(
 				nextSections,
 				identityChanged ? "identity-reset" : "data-revision",
@@ -712,7 +702,7 @@ export function useTwoHopProgressiveList(
 	});
 
 	function loadMore(sectionId: string): void {
-		const nextSections = sectionProjection.loadMore(sectionId);
+		const nextSections = props.loadMoreSection?.(sectionId) ?? null;
 		if (nextSections) publishSections(nextSections, "data-revision");
 	}
 

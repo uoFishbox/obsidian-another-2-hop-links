@@ -40,7 +40,7 @@ import {
 import TwoHopProgressiveSurfaceHarness from "./TwoHopProgressiveSurfaceHarness.svelte";
 import { createPreviewSurfaceProbe, type PreviewFrame } from "./previewSurfaceProbe";
 
-function createSection(count: number): TwoHopSectionModel {
+function createSection(count: number, totalCount = count): TwoHopSectionModel {
 	const items = Array.from({ length: count }, (_, index) => ({
 		item: { type: "newLink" },
 		interactionId: `item:${index}`,
@@ -52,6 +52,7 @@ function createSection(count: number): TwoHopSectionModel {
 		kind: "new-links-section",
 		title: "Section",
 		items,
+		totalCount,
 	});
 }
 
@@ -189,6 +190,48 @@ afterEach(() => {
 });
 
 describe("TwoHopProgressiveSurface", () => {
+	it("publishes an expanded section returned by the load-more owner", async () => {
+		const applicationStore = {
+			settings: DEFAULT_SETTINGS,
+		} as unknown as ApplicationStore;
+		const loadMoreSection = vi.fn(() => [createSection(3)]);
+		const { container } = render(TwoHopProgressiveSurfaceHarness, {
+			props: {
+				sections: [createSection(2, 3)],
+				applicationStore,
+				linkContext: { getPreview: vi.fn() } as unknown as LinkContext,
+				loadMoreSection,
+				resolveItemCardModel: createCardModelResolver(),
+			},
+		});
+		const root = container.querySelector<HTMLElement>(
+			".twohop-progressive-surface",
+		);
+		const button = root?.shadowRoot?.querySelector<HTMLButtonElement>(
+			".cosense-card-links__load-more-button",
+		);
+		if (!root || !button) throw new Error("Load-more cell was not rendered");
+
+		expect(
+			root.shadowRoot?.querySelectorAll(
+				"[data-testid='twohop-progressive-item-cell']",
+			),
+		).toHaveLength(2);
+		await fireEvent.click(button);
+
+		await vi.waitFor(() =>
+			expect(
+				root.shadowRoot?.querySelectorAll(
+					"[data-testid='twohop-progressive-item-cell']",
+				),
+			).toHaveLength(3),
+		);
+		expect(loadMoreSection).toHaveBeenCalledWith("section");
+		expect(
+			root.shadowRoot?.querySelector(".cosense-card-links__load-more-button"),
+		).toBeNull();
+	});
+
 	it("preserves the resident prefix and anchor for data revisions, then resets for a new identity", async () => {
 		const applicationStore = {
 			settings: {

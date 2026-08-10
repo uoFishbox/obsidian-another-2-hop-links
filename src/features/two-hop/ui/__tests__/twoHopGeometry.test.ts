@@ -38,13 +38,12 @@ function createSection(
 		id,
 		kind: "new-links-section",
 		title: id,
-		items: Array.from({ length: count }, (_, index) =>
+		items: Array.from({ length: visibleCount }, (_, index) =>
 			createItem(`${id}-${index}`),
 		),
+		totalCount: count,
 	});
-	return visibleCount === count
-		? section
-		: (Object.freeze({ ...section, visibleCount }) as TwoHopSectionModel);
+	return section;
 }
 
 describe("two-hop geometry", () => {

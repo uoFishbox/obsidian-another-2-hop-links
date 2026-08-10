@@ -20,6 +20,7 @@ import type {
 	TwoHopSectionModel,
 } from "features/two-hop/ui/twoHopSectionModel";
 import { createTwoHopSectionModel } from "features/two-hop/ui/twoHopSectionModel";
+import { materializeItemPrefix } from "./materializeItemPrefix";
 
 export type PrimarySectionBuildInput =
 	| {
@@ -37,15 +38,16 @@ export type PrimarySectionBuildInput =
 
 export interface CreatePrimarySectionDescriptorParams {
 	readonly input: PrimarySectionBuildInput;
+	readonly itemLimit: number;
+	readonly previousItems: readonly TwoHopItemModel[];
 	readonly createItemInteractionToken: (interactionKey: string) => string;
 }
 
 /**
  * Builds one immutable primary-section publication.
  *
- * Final virtual rows are materialized in one eager pass so viewport reads are
- * allocation-free. Unchanged publications are reused by the section cache
- * before this builder is called.
+ * Only the published prefix is materialized; viewport reads remain
+ * allocation-free and later expansions reuse existing item models.
  */
 export function createPrimarySectionDescriptor(
 	params: CreatePrimarySectionDescriptorParams,
@@ -54,6 +56,8 @@ export function createPrimarySectionDescriptor(
 		case "outgoing":
 			return createPrimaryDescriptor({
 				items: params.input.items,
+				itemLimit: params.itemLimit,
+				previousItems: params.previousItems,
 				config: outgoingLinksSectionConfig,
 				toViewItem: (item) => ({ type: "branch", data: item }),
 				getSearchKey: getOutgoingSearchKey,
@@ -62,6 +66,8 @@ export function createPrimarySectionDescriptor(
 		case "backlinks":
 			return createPrimaryDescriptor({
 				items: params.input.items,
+				itemLimit: params.itemLimit,
+				previousItems: params.previousItems,
 				config: backlinksSectionConfig,
 				toViewItem: (item) => ({ type: "backlink", data: item }),
 				getSearchKey: getBacklinkSearchKey,
@@ -70,6 +76,8 @@ export function createPrimarySectionDescriptor(
 		case "merged":
 			return createPrimaryDescriptor({
 				items: params.input.items,
+				itemLimit: params.itemLimit,
+				previousItems: params.previousItems,
 				config: mergedLinksSectionConfig,
 				toViewItem: toMergedViewItem,
 				getSearchKey: getMergedSearchKey,
@@ -80,6 +88,8 @@ export function createPrimarySectionDescriptor(
 
 interface CreatePrimaryDescriptorParams<T> {
 	readonly items: readonly T[];
+	readonly itemLimit: number;
+	readonly previousItems: readonly TwoHopItemModel[];
 	readonly config: SectionConfig<T>;
 	readonly toViewItem: (item: T) => ViewItem;
 	readonly getSearchKey: (item: T) => string;
@@ -89,7 +99,10 @@ interface CreatePrimaryDescriptorParams<T> {
 function createPrimaryDescriptor<T>(
 	params: CreatePrimaryDescriptorParams<T>,
 ): TwoHopSectionModel {
-	const rows: readonly TwoHopItemModel[] = params.items.map(
+	const rows = materializeItemPrefix(
+		params.items,
+		params.itemLimit,
+		params.previousItems,
 		(source, index): TwoHopItemModel => {
 			const item = params.toViewItem(source);
 			const virtualKey = params.config.getKey(source, index);
@@ -108,6 +121,7 @@ function createPrimaryDescriptor<T>(
 		id: params.config.sectionId,
 		title: params.config.title,
 		items: rows,
+		totalCount: params.items.length,
 	});
 }
 
