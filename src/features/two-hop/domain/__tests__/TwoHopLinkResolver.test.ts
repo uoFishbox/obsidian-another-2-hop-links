@@ -271,6 +271,8 @@ describe("TwoHopLinkResolver", () => {
 			expect(events[1].data.taggedNotes).toEqual([]);
 
 			expect(events[2].data).toBe(result);
+			expect(events[2].data.branches).toBe(events[1].data.branches);
+			expect(events[2].data.backlinks).toBe(events[1].data.backlinks);
 			expect(events[2].data.taggedNotes.map((note) => note.path)).toEqual([
 				"tagged.md",
 			]);

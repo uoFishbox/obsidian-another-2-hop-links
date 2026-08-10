@@ -11,6 +11,7 @@ import {
 	createLinkPreprocessCacheKey,
 	createPreprocessCacheKey,
 	createTagPreprocessCacheKey,
+	selectTagDisplayPreprocessSettings,
 } from "features/two-hop/application/displayCacheDependencies";
 
 export interface ComputedDisplayData {
@@ -36,7 +37,7 @@ interface LinkPreprocessedDisplayDataCacheEntry {
 }
 
 interface TagPreprocessedDisplayDataCacheEntry {
-	taggedNotesRef: TwoHopLinkResult["taggedNotes"] | undefined;
+	taggedNotesInputRef: TwoHopLinkResult["taggedNotes"] | undefined;
 	preprocessSettingsKey: string;
 	preprocessed: TagPreprocessedDisplayData;
 }
@@ -44,11 +45,11 @@ interface TagPreprocessedDisplayDataCacheEntry {
 interface CombinedPreprocessedDisplayDataCacheEntry {
 	branchesRef: TwoHopLinkResult["branches"] | undefined;
 	backlinksRef: TwoHopLinkResult["backlinks"] | undefined;
-	taggedNotesRef: TwoHopLinkResult["taggedNotes"] | undefined;
+	taggedNotesInputRef: TwoHopLinkResult["taggedNotes"] | undefined;
 	linkPreprocessed: LinkPreprocessedDisplayData;
 	tagPreprocessed: TagPreprocessedDisplayData;
 	preprocessSettingsKey: string;
-	preprocessed: PreprocessedDisplayData;
+	computed: ComputedPreprocessedDisplayData;
 }
 
 export function createPreprocessedDisplayDataCache(): PreprocessedDisplayDataCache {
@@ -69,6 +70,17 @@ function createLinkPreprocessSettingsKey(settings: PluginSettings): string {
 
 function createTagPreprocessSettingsKey(settings: PluginSettings): string {
 	return createTagPreprocessCacheKey(settings);
+}
+
+function getTaggedNotesInputRef(
+	linkResult: TwoHopLinkResult | undefined,
+	settings: PluginSettings,
+): TwoHopLinkResult["taggedNotes"] | undefined {
+	const tagSettings = selectTagDisplayPreprocessSettings(settings);
+	if (!tagSettings.tagFeaturesEnabled || !tagSettings.showTagsSection) {
+		return undefined;
+	}
+	return linkResult?.taggedNotes;
 }
 
 function getLinkPreprocessedDisplayData(
@@ -113,12 +125,12 @@ function getTagPreprocessedDisplayData(
 	cache: PreprocessedDisplayDataCache,
 ): TagPreprocessedDisplayData {
 	const preprocessSettingsKey = createTagPreprocessSettingsKey(settings);
-	const taggedNotesRef = linkResult?.taggedNotes;
+	const taggedNotesInputRef = getTaggedNotesInputRef(linkResult, settings);
 	const cached = cache.tagEntry;
 
 	if (
 		cached &&
-		cached.taggedNotesRef === taggedNotesRef &&
+		cached.taggedNotesInputRef === taggedNotesInputRef &&
 		cached.preprocessSettingsKey === preprocessSettingsKey
 	) {
 		return cached.preprocessed;
@@ -130,7 +142,7 @@ function getTagPreprocessedDisplayData(
 	);
 
 	cache.tagEntry = {
-		taggedNotesRef,
+		taggedNotesInputRef,
 		preprocessSettingsKey,
 		preprocessed,
 	};
@@ -144,35 +156,36 @@ function getDedupePreprocessedDisplayData(
 	settings: PluginSettings,
 	cache: PreprocessedDisplayDataCache,
 	preprocessSettingsKey: string,
-): PreprocessedDisplayData {
+): ComputedPreprocessedDisplayData {
 	const branchesRef = linkResult?.branches;
 	const backlinksRef = linkResult?.backlinks;
-	const taggedNotesRef = linkResult?.taggedNotes;
+	const taggedNotesInputRef = getTaggedNotesInputRef(linkResult, settings);
 	const cached = cache.combinedEntry;
 
 	if (
 		cached &&
 		cached.branchesRef === branchesRef &&
 		cached.backlinksRef === backlinksRef &&
-		cached.taggedNotesRef === taggedNotesRef &&
+		cached.taggedNotesInputRef === taggedNotesInputRef &&
 		cached.preprocessSettingsKey === preprocessSettingsKey
 	) {
-		return cached.preprocessed;
+		return cached.computed;
 	}
 
 	const preprocessed = displayDataBuilder.preprocessDisplayData(linkResult, settings);
 
+	const computed = { preprocessed };
 	cache.combinedEntry = {
 		branchesRef,
 		backlinksRef,
-		taggedNotesRef,
+		taggedNotesInputRef,
 		linkPreprocessed: preprocessed,
 		tagPreprocessed: preprocessed,
 		preprocessSettingsKey,
-		preprocessed,
+		computed,
 	};
 
-	return preprocessed;
+	return computed;
 }
 
 export function computePreprocessedDisplayDataState(
@@ -182,6 +195,7 @@ export function computePreprocessedDisplayDataState(
 	cache: PreprocessedDisplayDataCache,
 ): ComputedPreprocessedDisplayData {
 	const preprocessSettingsKey = createPreprocessSettingsKey(settings);
+	const taggedNotesInputRef = getTaggedNotesInputRef(linkResult, settings);
 	const cachedCombined = cache.combinedEntry;
 	let preprocessed: PreprocessedDisplayData;
 
@@ -189,24 +203,20 @@ export function computePreprocessedDisplayDataState(
 		cachedCombined &&
 		cachedCombined.branchesRef === linkResult?.branches &&
 		cachedCombined.backlinksRef === linkResult?.backlinks &&
-		cachedCombined.taggedNotesRef === linkResult?.taggedNotes &&
+		cachedCombined.taggedNotesInputRef === taggedNotesInputRef &&
 		cachedCombined.preprocessSettingsKey === preprocessSettingsKey
 	) {
-		return {
-			preprocessed: cachedCombined.preprocessed,
-		};
+		return cachedCombined.computed;
 	}
 
 	if (settings.dedupeCards) {
-		return {
-			preprocessed: getDedupePreprocessedDisplayData(
-				displayDataBuilder,
-				linkResult,
-				settings,
-				cache,
-				preprocessSettingsKey,
-			),
-		};
+		return getDedupePreprocessedDisplayData(
+			displayDataBuilder,
+			linkResult,
+			settings,
+			cache,
+			preprocessSettingsKey,
+		);
 	}
 
 	const linkPreprocessed = getLinkPreprocessedDisplayData(
@@ -229,9 +239,7 @@ export function computePreprocessedDisplayDataState(
 		cached.tagPreprocessed === tagPreprocessed &&
 		cached.preprocessSettingsKey === preprocessSettingsKey
 	) {
-		return {
-			preprocessed: cached.preprocessed,
-		};
+		return cached.computed;
 	}
 
 	preprocessed = {
@@ -239,19 +247,18 @@ export function computePreprocessedDisplayDataState(
 		...tagPreprocessed,
 	};
 
+	const computed = { preprocessed };
 	cache.combinedEntry = {
 		branchesRef: linkResult?.branches,
 		backlinksRef: linkResult?.backlinks,
-		taggedNotesRef: linkResult?.taggedNotes,
+		taggedNotesInputRef,
 		linkPreprocessed,
 		tagPreprocessed,
 		preprocessSettingsKey,
-		preprocessed,
+		computed,
 	};
 
-	return {
-		preprocessed,
-	};
+	return computed;
 }
 
 export function computeSortedDisplayDataState(

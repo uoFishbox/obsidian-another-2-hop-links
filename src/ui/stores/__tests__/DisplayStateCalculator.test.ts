@@ -142,11 +142,12 @@ function createCacheProbeBuilder() {
 			rawTagGroups: [],
 		}),
 	);
+	const preprocessDisplayData = vi.fn((linkResult, settings) => ({
+		...preprocessLinkDisplayData(linkResult, settings),
+		...preprocessTagDisplayData(linkResult, settings),
+	}));
 	const builder: DisplayDataBuilder = {
-		preprocessDisplayData: vi.fn((linkResult, settings) => ({
-			...preprocessLinkDisplayData(linkResult, settings),
-			...preprocessTagDisplayData(linkResult, settings),
-		})),
+		preprocessDisplayData,
 		preprocessLinkDisplayData,
 		preprocessTagDisplayData,
 		sortAndAssembleDisplayData: vi.fn(),
@@ -157,12 +158,74 @@ function createCacheProbeBuilder() {
 
 	return {
 		builder,
+		preprocessDisplayData,
 		preprocessLinkDisplayData,
 		preprocessTagDisplayData,
 	};
 }
 
 describe("DisplayStateCalculator", () => {
+	it.each([
+		{
+			dedupeCards: false,
+			inactiveReason: "tags hidden",
+			inactiveTagSetting: { showTagsSection: false },
+		},
+		{
+			dedupeCards: true,
+			inactiveReason: "tags hidden",
+			inactiveTagSetting: { showTagsSection: false },
+		},
+		{
+			dedupeCards: false,
+			inactiveReason: "tag features disabled",
+			inactiveTagSetting: { enableTagFeatures: false },
+		},
+		{
+			dedupeCards: true,
+			inactiveReason: "tag features disabled",
+			inactiveTagSetting: { enableTagFeatures: false },
+		},
+	])(
+		"ignores taggedNotes identity with dedupeCards=$dedupeCards when $inactiveReason",
+		({ dedupeCards, inactiveTagSetting }) => {
+			const {
+				builder,
+				preprocessDisplayData,
+				preprocessLinkDisplayData,
+				preprocessTagDisplayData,
+			} = createCacheProbeBuilder();
+			const cache = createPreprocessedDisplayDataCache();
+			const settings = {
+				...DEFAULT_SETTINGS,
+				dedupeCards,
+				...inactiveTagSetting,
+			};
+			const firstResult = createLinkResult([], []);
+			const first = computePreprocessedDisplayDataState(
+				builder,
+				firstResult,
+				settings,
+				cache,
+			);
+
+			const second = computePreprocessedDisplayDataState(
+				builder,
+				{
+					...firstResult,
+					taggedNotes: [createTaggedNote("new-tagged-note.md")],
+				},
+				settings,
+				cache,
+			);
+
+			expect(second).toBe(first);
+			expect(preprocessDisplayData).toHaveBeenCalledTimes(dedupeCards ? 1 : 0);
+			expect(preprocessLinkDisplayData).toHaveBeenCalledTimes(1);
+			expect(preprocessTagDisplayData).toHaveBeenCalledTimes(1);
+		},
+	);
+
 	it("uses full preprocessing when dedupeCards is enabled", () => {
 		const {
 			builder,

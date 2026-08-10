@@ -15,7 +15,6 @@ import type {
 	PreprocessedDisplayData,
 } from "features/two-hop/application/displayDataBuilder";
 import type {
-	DisplayDataVersions,
 	ResolveProgress,
 	TwoHopIndexedLink,
 	TwoHopLinkBranch,
@@ -38,18 +37,6 @@ function createEmptyDisplayData(): DisplayData {
 		twoHopBranches: [],
 		tagGroups: [],
 		newLinks: [],
-	};
-}
-
-function createDisplayVersions(
-	versionSeed: number | string,
-	links: string,
-	tags: string,
-): DisplayDataVersions {
-	const prefix = String(versionSeed);
-	return {
-		links: `${prefix}:${links}`,
-		tags: `${prefix}:${tags}`,
 	};
 }
 
@@ -408,7 +395,6 @@ describe("ApplicationStore (Runes)", () => {
 			type: "loaded",
 			phase: "complete",
 			data: expected,
-			displaySourceData: expected,
 		});
 		expect(store.data).toStrictEqual(expected);
 		expect(store.error).toBeUndefined();
@@ -528,7 +514,7 @@ describe("ApplicationStore (Runes)", () => {
 				},
 			],
 			taggedNotes: [],
-			displayVersions: createDisplayVersions(1, "base", "pending"),
+			displayVersions: { links: "1:base", tags: "1:pending" },
 		};
 		const twohopResult: TwoHopLinkResult = {
 			...baseResult,
@@ -545,15 +531,10 @@ describe("ApplicationStore (Runes)", () => {
 					],
 				},
 			],
-			displayVersions: createDisplayVersions(1, "twohop", "pending"),
+			displayVersions: { links: "1:twohop", tags: "1:pending" },
 		};
 		const completeResult: TwoHopLinkResult = {
 			...twohopResult,
-			branches: twohopResult.branches.map((branch) => ({
-				...branch,
-				hop2: [...branch.hop2],
-			})),
-			backlinks: [...twohopResult.backlinks],
 			taggedNotes: [
 				{
 					file: createMockTFile("tagged.md"),
@@ -561,7 +542,7 @@ describe("ApplicationStore (Runes)", () => {
 					path: "tagged.md",
 				},
 			],
-			displayVersions: createDisplayVersions(1, "twohop", "tags"),
+			displayVersions: { links: "1:twohop", tags: "1:tags" },
 		};
 
 		let onProgress: ((progress: ResolveProgress) => void) | undefined;
@@ -628,7 +609,6 @@ describe("ApplicationStore (Runes)", () => {
 				},
 			],
 			taggedNotes: [],
-			displayVersions: createDisplayVersions(2, "base", "pending"),
 		};
 		const twohopResult: TwoHopLinkResult = {
 			...baseResult,
@@ -645,15 +625,9 @@ describe("ApplicationStore (Runes)", () => {
 					],
 				},
 			],
-			displayVersions: createDisplayVersions(2, "twohop", "pending"),
 		};
 		const completeResult: TwoHopLinkResult = {
 			...twohopResult,
-			branches: twohopResult.branches.map((branch) => ({
-				...branch,
-				hop2: [...branch.hop2],
-			})),
-			backlinks: [...twohopResult.backlinks],
 			taggedNotes: [
 				{
 					file: createMockTFile("tagged-a.md"),
@@ -666,7 +640,6 @@ describe("ApplicationStore (Runes)", () => {
 					path: "tagged-b.md",
 				},
 			],
-			displayVersions: createDisplayVersions(2, "twohop", "tags"),
 		};
 
 		let onProgress: ((progress: ResolveProgress) => void) | undefined;
@@ -800,7 +773,6 @@ describe("ApplicationStore (Runes)", () => {
 		expect(store.loading).toBe(false);
 		expect(store.loadingPhase).toBe("idle");
 		expect(store.data).toBeUndefined();
-		expect(store.displaySourceData).toBeUndefined();
 		expect(store.error).toBeUndefined();
 	});
 
@@ -830,7 +802,6 @@ describe("ApplicationStore (Runes)", () => {
 			previousData: {
 				phase: "complete",
 				data: firstResult,
-				displaySourceData: firstResult,
 			},
 		});
 	});

@@ -59,7 +59,6 @@ export interface ViewUiState {
 export interface LoadedApplicationData {
 	phase: LoadedPhase;
 	data: TwoHopLinkResult;
-	displaySourceData: TwoHopLinkResult;
 	dependencies: TwoHopResolverDependencies | undefined;
 }
 
@@ -107,91 +106,6 @@ function shouldRefreshDisplayData(changedKeys: Array<keyof PluginSettings>): boo
 	return changedKeys.some((key) => !DISPLAY_REFRESH_EXCLUDED_SETTINGS.has(key));
 }
 
-function areArraysEqualByRef<T>(
-	previous: readonly T[] | undefined,
-	next: readonly T[] | undefined,
-): boolean {
-	if (previous === next) {
-		return true;
-	}
-	if (!previous || !next || previous.length !== next.length) {
-		return false;
-	}
-	for (let index = 0; index < previous.length; index += 1) {
-		if (previous[index] !== next[index]) {
-			return false;
-		}
-	}
-	return true;
-}
-
-function resolveNextDisplaySource(
-	previousDisplaySource: TwoHopLinkResult | undefined,
-	nextData: TwoHopLinkResult,
-	loadingPhase: LoadedPhase,
-	settings: PluginSettings,
-): TwoHopLinkResult | undefined {
-	if (loadingPhase === "base-ready" || loadingPhase === "twohop-ready") {
-		return nextData;
-	}
-
-	if (!previousDisplaySource) {
-		return nextData;
-	}
-
-	const previousDisplayVersions = previousDisplaySource.displayVersions;
-	const nextDisplayVersions = nextData.displayVersions;
-	if (previousDisplayVersions && nextDisplayVersions) {
-		const sameLinks = previousDisplayVersions.links === nextDisplayVersions.links;
-		if (!sameLinks) {
-			return nextData;
-		}
-		if (!settings.showTagsSection) {
-			return undefined;
-		}
-		if (previousDisplayVersions.tags === nextDisplayVersions.tags) {
-			return undefined;
-		}
-		return {
-			...nextData,
-			branches: previousDisplaySource.branches,
-			backlinks: previousDisplaySource.backlinks,
-		};
-	}
-
-	const sameBranches = areArraysEqualByRef(
-		previousDisplaySource.branches,
-		nextData.branches,
-	);
-	const sameBacklinks = areArraysEqualByRef(
-		previousDisplaySource.backlinks,
-		nextData.backlinks,
-	);
-
-	if (!settings.showTagsSection) {
-		return sameBranches && sameBacklinks ? undefined : nextData;
-	}
-
-	const sameTaggedNotes = areArraysEqualByRef(
-		previousDisplaySource.taggedNotes,
-		nextData.taggedNotes,
-	);
-
-	if (!sameBranches || !sameBacklinks) {
-		return nextData;
-	}
-
-	if (sameTaggedNotes) {
-		return undefined;
-	}
-
-	return {
-		...nextData,
-		branches: previousDisplaySource.branches,
-		backlinks: previousDisplaySource.backlinks,
-	};
-}
-
 function getLoadedApplicationData(
 	state: ApplicationLoadState,
 ): LoadedApplicationData | undefined {
@@ -232,7 +146,6 @@ export class ApplicationStore {
 	declare readonly loading: boolean;
 	declare readonly loadingPhase: LoadingPhase;
 	declare readonly data: TwoHopLinkResult | undefined;
-	declare readonly displaySourceData: TwoHopLinkResult | undefined;
 	declare readonly error: Error | undefined;
 	declare sortOption: SortOption;
 	declare settings: PluginSettings;
@@ -275,9 +188,6 @@ export class ApplicationStore {
 		this.loading = $derived(this.loadState.type === "loading");
 		this.loadingPhase = $derived(getLoadingPhase(this.loadState));
 		this.data = $derived(getLoadedApplicationData(this.loadState)?.data);
-		this.displaySourceData = $derived(
-			getLoadedApplicationData(this.loadState)?.displaySourceData,
-		);
 		this.error = $derived(getLoadError(this.loadState));
 		this.sortOption = $state<SortOption>(initialSettings.lastUsedSortOption);
 		this.settings = $state.raw<PluginSettings>(initialSettings);
@@ -291,7 +201,7 @@ export class ApplicationStore {
 			(): ComputedPreprocessedDisplayData =>
 				computePreprocessedDisplayDataState(
 					this.displayDataBuilder,
-					this.displaySourceData,
+					this.data,
 					this.settings,
 					this.preprocessedDisplayDataCache,
 				),
@@ -526,23 +436,6 @@ export class ApplicationStore {
 		const shouldRefreshDisplay = shouldRefreshDisplayData(changedKeys);
 		this.settings = settings;
 		if (shouldRefreshDisplay) {
-			const loadedData = getLoadedApplicationData(this.mutableLoadState);
-			if (loadedData) {
-				const nextLoadedData = {
-					...loadedData,
-					displaySourceData: loadedData.data,
-				};
-				this.mutableLoadState =
-					this.mutableLoadState.type === "error"
-						? {
-								...this.mutableLoadState,
-								previousData: nextLoadedData,
-							}
-						: {
-								type: "loaded",
-								...nextLoadedData,
-							};
-			}
 			this.updateVersion += 1;
 		}
 	}
@@ -589,13 +482,6 @@ export class ApplicationStore {
 		dependencies: TwoHopResolverDependencies | undefined,
 	): void {
 		const previousLoadedData = getLoadedApplicationData(this.mutableLoadState);
-		const previousDisplaySource = previousLoadedData?.displaySourceData;
-		const nextDisplaySource = resolveNextDisplaySource(
-			previousDisplaySource,
-			data,
-			loadingPhase,
-			this.settings,
-		);
 
 		if (
 			previousLoadedData?.data === data &&
@@ -603,14 +489,6 @@ export class ApplicationStore {
 			previousLoadedData.dependencies === dependencies &&
 			this.mutableLoadState.type === "loaded"
 		) {
-			if (nextDisplaySource) {
-				this.mutableLoadState = {
-					type: "loaded",
-					...previousLoadedData,
-					displaySourceData: nextDisplaySource,
-				};
-				this.updateVersion += 1;
-			}
 			return;
 		}
 
@@ -618,10 +496,9 @@ export class ApplicationStore {
 			type: "loaded",
 			phase: loadingPhase,
 			data,
-			displaySourceData: nextDisplaySource ?? previousDisplaySource ?? data,
 			dependencies,
 		};
-		if (nextDisplaySource) {
+		if (previousLoadedData?.data !== data) {
 			this.updateVersion += 1;
 		}
 	}
