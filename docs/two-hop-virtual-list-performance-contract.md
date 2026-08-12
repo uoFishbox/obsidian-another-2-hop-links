@@ -65,6 +65,15 @@ The relevant development counters are:
 - `twoHop.reboundRowSlot`
 - `twoHop.reboundCellSlot`
 
+## Performance recording range
+
+The development command `Benchmark two-hop virtual list scroll (600 frames
+down/up)` emits `twohop-start` and `twohop-end` marks. It also emits a
+`twohop-benchmark` measure spanning only the down/up scroll loops. In the
+Performance panel, select this custom timing range when collecting figures so
+that pre-benchmark settling, post-benchmark settling, console work, and unrelated
+DevTools activity are excluded.
+
 The checked-in baseline is the contract encoded by the tests rather than a
 machine-specific duration. Before the staged refactor, `bun run check`, the 65
 two-hop unit/DOM tests, and the 14 two-hop perf tests passed on 2026-07-14.

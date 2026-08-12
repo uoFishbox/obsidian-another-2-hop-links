@@ -50,6 +50,7 @@ import type { VirtualRanges } from "ui/virtualization/types";
 import type { ResultNavigationDirection } from "features/keyboard-navigation/resultFocus";
 import type { ProgrammaticScrollSnapshot } from "ui/virtualization/dom/flushVirtualScrollMeasurement";
 import { flushVirtualScrollMeasurement as flushCachedVirtualScrollMeasurement } from "ui/virtualization/dom/flushVirtualScrollMeasurement";
+import { publishTwoHopCardCounts } from "infrastructure/debug/twoHopCardCountRegistry";
 
 /** Dependencies required to enable previews on the two-hop virtual surface. */
 export interface TwoHopPreviewDependencies {
@@ -441,6 +442,7 @@ export function useTwoHopVirtualList(
 			layout,
 		});
 		rowModel = nextRowModel;
+		if (rootEl) publishTwoHopCardCounts(rootEl, nextRowModel.cardCounts);
 		restoreLayoutAnchor(anchor, nextRowModel);
 		if (nextRowModel.rowCount === 0) {
 			virtualList.setEmpty({ rowModel: nextRowModel });
@@ -527,6 +529,7 @@ export function useTwoHopVirtualList(
 		},
 		set rootEl(next: HTMLDivElement | null) {
 			rootEl = next;
+			if (next) publishTwoHopCardCounts(next, rowModel.cardCounts);
 		},
 		get contentEl() {
 			return contentEl;

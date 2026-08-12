@@ -36,6 +36,14 @@ export type TwoHopVirtualCell =
 	  })
 	| (TwoHopCellBase & { readonly kind: "load-more" });
 
+/** Logical card counts represented by a complete two-hop row model. */
+export interface TwoHopLogicalCardCounts {
+	readonly header: number;
+	readonly item: number;
+	readonly loadMore: number;
+	readonly total: number;
+}
+
 export interface TwoHopRowLayoutMetrics extends VirtualRowLayoutMetrics {
 	readonly rowStride: number;
 	readonly sectionMarginBottom: number;
@@ -47,6 +55,7 @@ type MutableStableScrollTopBand = {
 
 export interface TwoHopRowModel extends VirtualRowModel<TwoHopVirtualCell> {
 	readonly sections: readonly TwoHopSectionModel[];
+	readonly cardCounts: TwoHopLogicalCardCounts;
 	readonly layout: TwoHopRowLayoutMetrics;
 	readonly firstRowBySection: Uint32Array;
 	readonly rowCountBySection: Uint32Array;
@@ -117,9 +126,13 @@ export function createTwoHopRowModel(
 	const topBySection = new Float64Array(sections.length);
 	let rowCount = 0;
 	let totalHeight = 0;
+	let itemCount = 0;
+	let loadMoreCount = 0;
 
 	for (let sectionIndex = 0; sectionIndex < sections.length; sectionIndex += 1) {
 		const section = sections[sectionIndex]!;
+		itemCount += section.items.length;
+		if (section.items.length < section.totalCount) loadMoreCount += 1;
 		const cellCount = resolveSectionCellCount(section);
 		const sectionRowCount = Math.ceil(cellCount / columns);
 		const contentHeight =
@@ -152,6 +165,12 @@ export function createTwoHopRowModel(
 		layout.gap,
 		layout.sectionMarginBottom,
 	]);
+	const cardCounts: TwoHopLogicalCardCounts = Object.freeze({
+		header: sections.length,
+		item: itemCount,
+		loadMore: loadMoreCount,
+		total: sections.length + itemCount + loadMoreCount,
+	});
 
 	const resolveSectionIndexForRow = (rowIndex: number): number => {
 		let low = 0;
@@ -398,6 +417,7 @@ export function createTwoHopRowModel(
 		totalHeight,
 		layout,
 		sections,
+		cardCounts,
 		firstRowBySection,
 		rowCountBySection,
 		topBySection,

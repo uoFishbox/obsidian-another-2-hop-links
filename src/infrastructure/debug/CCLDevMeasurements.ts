@@ -18,10 +18,8 @@ export type CCLDevMeasurementName =
 	| "virtualList.observer.scrollTask.scheduled"
 	| "virtualList.observer.scrollTask.executed"
 	| "virtualList.observer.scrollTask.skippedRecoveredCoverage"
-	| "virtualList.observer.scrollTask.cancelledRecoveredCoverage"
 	| "virtualList.observer.layoutTask.scheduled"
 	| "virtualList.observer.dependencyTask.scheduled"
-	| "virtualList.scheduler.observerScroll.animationFrame"
 	| "virtualList.scheduler.observerLayout.animationFrame"
 	| "virtualList.scheduler.dependencyRefresh.animationFrame"
 	| "virtualList.scheduler.measurementScroll.animationFrame"
@@ -40,31 +38,14 @@ export type CCLDevMeasurementName =
 	| "twoHop.sectionDescriptorIdentityCache.exactHit"
 	| "twoHop.sectionDescriptorIdentityCache.hit"
 	| "twoHop.sectionDescriptorIdentityCache.miss"
-	| "twoHop.cardRenderModelCache.hit"
-	| "twoHop.cardRenderModelCache.miss"
-	| "twoHop.cardRenderModelCache.invalidate"
 	| "virtualList.scheduler.animationFrame"
 	| "virtualList.postPaintScheduler.animationFrame"
-	| "virtualScroll.measurementMarker.animationFrame"
 	| "preview.activationScheduler.animationFrame"
 	| "preview.renderScheduler.animationFrame"
 	| "preview.domCommitScheduler.animationFrame"
 	| "preview.activationDuringScroll"
 	| "preview.domCommitDuringScroll"
 	| "component.ViewItemCard.reevaluate"
-	| "twoHop.body.mount.item"
-	| "twoHop.body.mount.header"
-	| "twoHop.body.mount.load-more"
-	| "twoHop.body.unmount.item"
-	| "twoHop.body.unmount.header"
-	| "twoHop.body.unmount.load-more"
-	| "twoHop.cardSlotBindings.sync"
-	| "twoHop.cardSlotBindings.scannedSlots"
-	| "twoHop.cardSlotBindings.changedSlots"
-	| "twoHop.preview.entered"
-	| "twoHop.preview.rebound"
-	| "twoHop.preview.released"
-	| "twoHop.preview.stopRender"
 	| "twoHop.resolveItemCardModel.call";
 
 export const CCL_DEV_MEASUREMENT_NAMES: readonly CCLDevMeasurementName[] = [
@@ -87,10 +68,8 @@ export const CCL_DEV_MEASUREMENT_NAMES: readonly CCLDevMeasurementName[] = [
 	"virtualList.observer.scrollTask.scheduled",
 	"virtualList.observer.scrollTask.executed",
 	"virtualList.observer.scrollTask.skippedRecoveredCoverage",
-	"virtualList.observer.scrollTask.cancelledRecoveredCoverage",
 	"virtualList.observer.layoutTask.scheduled",
 	"virtualList.observer.dependencyTask.scheduled",
-	"virtualList.scheduler.observerScroll.animationFrame",
 	"virtualList.scheduler.observerLayout.animationFrame",
 	"virtualList.scheduler.dependencyRefresh.animationFrame",
 	"virtualList.scheduler.measurementScroll.animationFrame",
@@ -109,31 +88,14 @@ export const CCL_DEV_MEASUREMENT_NAMES: readonly CCLDevMeasurementName[] = [
 	"twoHop.sectionDescriptorIdentityCache.exactHit",
 	"twoHop.sectionDescriptorIdentityCache.hit",
 	"twoHop.sectionDescriptorIdentityCache.miss",
-	"twoHop.cardRenderModelCache.hit",
-	"twoHop.cardRenderModelCache.miss",
-	"twoHop.cardRenderModelCache.invalidate",
 	"virtualList.scheduler.animationFrame",
 	"virtualList.postPaintScheduler.animationFrame",
-	"virtualScroll.measurementMarker.animationFrame",
 	"preview.activationScheduler.animationFrame",
 	"preview.renderScheduler.animationFrame",
 	"preview.domCommitScheduler.animationFrame",
 	"preview.activationDuringScroll",
 	"preview.domCommitDuringScroll",
 	"component.ViewItemCard.reevaluate",
-	"twoHop.body.mount.item",
-	"twoHop.body.mount.header",
-	"twoHop.body.mount.load-more",
-	"twoHop.body.unmount.item",
-	"twoHop.body.unmount.header",
-	"twoHop.body.unmount.load-more",
-	"twoHop.cardSlotBindings.sync",
-	"twoHop.cardSlotBindings.scannedSlots",
-	"twoHop.cardSlotBindings.changedSlots",
-	"twoHop.preview.entered",
-	"twoHop.preview.rebound",
-	"twoHop.preview.released",
-	"twoHop.preview.stopRender",
 	"twoHop.resolveItemCardModel.call",
 ];
 

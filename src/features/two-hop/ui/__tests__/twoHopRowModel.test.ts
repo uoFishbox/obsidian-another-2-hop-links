@@ -71,6 +71,12 @@ describe("TwoHopRowModel", () => {
 		expect(model.rowCount).toBe(4);
 		expect(model.getRow(3)?.top).toBe(330);
 		expect(model.getRow(2)?.getCell(0)?.kind).toBe("load-more");
+		expect(model.cardCounts).toEqual({
+			header: 2,
+			item: 4,
+			loadMore: 1,
+			total: 7,
+		});
 	});
 
 	it("resolves half-open visible ranges across section margins", () => {

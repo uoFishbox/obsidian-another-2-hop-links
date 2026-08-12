@@ -6,6 +6,7 @@ import {
 	resetCCLDevMeasurements,
 	type CCLDevMeasurementSnapshot,
 } from "./CCLDevMeasurements";
+import { getTwoHopCardCounts } from "./twoHopCardCountRegistry";
 
 /** Class name that identifies the virtualized two-hop list root element. */
 const TWO_HOP_LIST_SELECTOR = ".twohop-page-virtual-list";
@@ -15,10 +16,28 @@ const SCROLL_FRAMES = 600;
 /** Fixed scroll distance per frame (px). Speed follows the frequency of `requestAnimationFrame`. */
 const SCROLL_STEP_PX = 10;
 
+const BENCHMARK_START_MARK = "twohop-start";
+const BENCHMARK_END_MARK = "twohop-end";
+const BENCHMARK_MEASURE = "twohop-benchmark";
+
 /** Number of consecutive unchanged frames to determine that initial rendering and preview generation have settled. */
 const SETTLE_QUIET_FRAMES = 30;
 /** Maximum wait time for settling (ms). Upper bound to avoid infinite waiting. */
 const MAX_SETTLE_WAIT_MS = 8000;
+
+interface BenchmarkTargets {
+	readonly roots: readonly HTMLElement[];
+	readonly scrollers: readonly HTMLElement[];
+}
+
+interface PageCardCounts {
+	readonly header: number;
+	readonly item: number;
+	readonly loadMore: number;
+	readonly total: number;
+	readonly surfaceCount: number;
+	readonly unavailableSurfaceCount: number;
+}
 
 export function registerScrollBenchmarkCommand(plugin: PluginHost): void {
 	let benchmarkPromise: Promise<void> | null = null;
@@ -50,28 +69,40 @@ export function registerScrollBenchmarkCommand(plugin: PluginHost): void {
 	}
 
 	async function executeBenchmark(): Promise<void> {
-		const scrollers = findTwoHopScrollers(plugin);
-		if (scrollers.length === 0) {
+		const targets = findBenchmarkTargets(plugin);
+		if (targets.scrollers.length === 0) {
 			new Notice("No two-hop virtual list found to benchmark.");
 			return;
 		}
 
 		new Notice(
-			`Benchmarking two-hop virtual list scroll (${SCROLL_FRAMES} frames down/up, ${scrollers.length} scroller(s))...`,
+			`Benchmarking two-hop virtual list scroll (${SCROLL_FRAMES} frames down/up, ${targets.scrollers.length} scroller(s))...`,
 		);
 
 		try {
 			await waitForRenderSettle();
 			resetCCLDevMeasurements();
+			performance.clearMarks(BENCHMARK_START_MARK);
+			performance.clearMarks(BENCHMARK_END_MARK);
+			performance.clearMeasures(BENCHMARK_MEASURE);
+			performance.mark(BENCHMARK_START_MARK);
 
-			await runScrollFrames(scrollers, 1);
-			await runScrollFrames(scrollers, -1);
+			await runScrollFrames(targets.scrollers, 1);
+			await runScrollFrames(targets.scrollers, -1);
+
+			performance.mark(BENCHMARK_END_MARK);
+			performance.measure(
+				BENCHMARK_MEASURE,
+				BENCHMARK_START_MARK,
+				BENCHMARK_END_MARK,
+			);
 			// Idle detection is timer-based, so the final idle measurement lands
 			// after the last scroll frame. Wait for it before taking the snapshot.
 			await waitForRenderSettle();
 
 			const measurements = getCCLDevMeasurementSnapshot();
-			logCCLDevMeasurements(scrollers.length, measurements);
+			const cardCounts = collectPageCardCounts(targets.roots);
+			logCCLDevMeasurements(targets.scrollers.length, measurements, cardCounts);
 			new Notice(
 				"Scroll benchmark completed. Check console for CCLDevMeasurements.",
 			);
@@ -82,13 +113,14 @@ export function registerScrollBenchmarkCommand(plugin: PluginHost): void {
 	}
 }
 
-function findTwoHopScrollers(plugin: PluginHost): HTMLElement[] {
+function findBenchmarkTargets(plugin: PluginHost): BenchmarkTargets {
 	const roots =
 		plugin.app.workspace.containerEl.querySelectorAll<HTMLElement>(
 			TWO_HOP_LIST_SELECTOR,
 		);
 
 	const scrollers = new Set<HTMLElement>();
+	const visibleRoots: HTMLElement[] = [];
 	for (const root of roots) {
 		if (root.clientHeight === 0 && root.clientWidth === 0) {
 			continue;
@@ -96,11 +128,42 @@ function findTwoHopScrollers(plugin: PluginHost): HTMLElement[] {
 
 		const scroller = findNearestScrollContainerCached(root);
 		if (scroller) {
+			visibleRoots.push(root);
 			scrollers.add(scroller);
 		}
 	}
 
-	return Array.from(scrollers);
+	return {
+		roots: visibleRoots,
+		scrollers: Array.from(scrollers),
+	};
+}
+
+function collectPageCardCounts(roots: readonly HTMLElement[]): PageCardCounts {
+	let header = 0;
+	let item = 0;
+	let loadMore = 0;
+	let unavailableSurfaceCount = 0;
+
+	for (const root of roots) {
+		const counts = getTwoHopCardCounts(root);
+		if (!counts) {
+			unavailableSurfaceCount += 1;
+			continue;
+		}
+		header += counts.header;
+		item += counts.item;
+		loadMore += counts.loadMore;
+	}
+
+	return {
+		header,
+		item,
+		loadMore,
+		total: header + item + loadMore,
+		surfaceCount: roots.length,
+		unavailableSurfaceCount,
+	};
 }
 
 function sumMeasurementCounts(snapshot: CCLDevMeasurementSnapshot): number {
@@ -177,6 +240,7 @@ function runScrollFrames(
 function logCCLDevMeasurements(
 	scrollerCount: number,
 	measurements: CCLDevMeasurementSnapshot,
+	cardCounts: PageCardCounts,
 ): void {
 	console.group("[Cosense card links] two-hop virtual list scroll benchmark");
 	console.log("Summary", {
@@ -184,6 +248,14 @@ function logCCLDevMeasurements(
 		scrollStepPx: SCROLL_STEP_PX,
 		scrollerCount,
 		measurementsEnabled: measurements.enabled,
+	});
+	console.log("Logical card counts after scroll", {
+		total: cardCounts.total,
+		header: cardCounts.header,
+		item: cardCounts.item,
+		"load-more": cardCounts.loadMore,
+		surfaceCount: cardCounts.surfaceCount,
+		unavailableSurfaceCount: cardCounts.unavailableSurfaceCount,
 	});
 	console.table(
 		Object.entries(measurements.counters).map(([name, counter]) => ({

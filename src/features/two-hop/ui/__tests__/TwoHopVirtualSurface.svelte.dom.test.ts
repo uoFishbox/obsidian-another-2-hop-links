@@ -5,6 +5,7 @@ import {
 	getCCLDevMeasurementSnapshot,
 	resetCCLDevMeasurements,
 } from "infrastructure/debug/CCLDevMeasurements";
+import { getTwoHopCardCounts } from "infrastructure/debug/twoHopCardCountRegistry";
 import type { ApplicationStore } from "ui/stores/ApplicationStore.svelte";
 import type { CardRenderModel } from "ui/components/items/cardRenderModel";
 import type { LinkContext } from "ui/context/linkContext";
@@ -385,6 +386,12 @@ describe("TwoHopVirtualSurface", () => {
 			expect(candidate).not.toBeNull();
 			return candidate!;
 		});
+		expect(getTwoHopCardCounts(root)).toEqual({
+			header: 1,
+			item: 2,
+			loadMore: 1,
+			total: 4,
+		});
 		await fireEvent.click(button);
 		expect(loadMoreSection).toHaveBeenCalledWith("section");
 
@@ -397,6 +404,12 @@ describe("TwoHopVirtualSurface", () => {
 				root.shadowRoot?.querySelector(".cosense-card-links__load-more-button"),
 			).toBeNull(),
 		);
+		expect(getTwoHopCardCounts(root)).toEqual({
+			header: 1,
+			item: 3,
+			loadMore: 0,
+			total: 4,
+		});
 	});
 
 	it("bootstraps only the requested leading rows while the surface is offscreen", async () => {
