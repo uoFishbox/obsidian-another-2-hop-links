@@ -34,7 +34,7 @@
 	}: Props = $props();
 	let interactionShadowRoot = $state<ShadowRoot | null>(null);
 
-	const { delegatedInteractions, handleKeyDown } = createVirtualSurfaceInteractions({
+	const surfaceInteractions = createVirtualSurfaceInteractions({
 		getRootEl: () => rootEl,
 		getContentEl: () => contentEl,
 		getShadowRoot: () => interactionShadowRoot,
@@ -50,6 +50,8 @@
 			interactionDescriptorResolverProvider,
 		moveFocusWithinList,
 	});
+	const { delegatedInteractions, handleKeyDown, touchEventHandlers } =
+		surfaceInteractions;
 </script>
 
 <!-- svelte-ignore a11y_no_static_element_interactions a11y_mouse_events_have_key_events -->
@@ -61,10 +63,7 @@
 	oncontextmenu={delegatedInteractions.handleContextMenu}
 	onkeydown={handleKeyDown}
 	ondragstart={delegatedInteractions.handleDragStart}
-	ontouchstart={delegatedInteractions.handleTouchStart}
-	ontouchmove={delegatedInteractions.handleTouchMove}
-	ontouchend={delegatedInteractions.handleTouchEnd}
-	ontouchcancel={delegatedInteractions.handleTouchEnd}
+	{...touchEventHandlers}
 >
 	{@render children?.()}
 </div>

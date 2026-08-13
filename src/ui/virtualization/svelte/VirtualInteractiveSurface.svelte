@@ -48,7 +48,7 @@
 		children,
 	}: Props<TMountedCell> = $props();
 
-	const { delegatedInteractions, handleKeyDown } = createVirtualSurfaceInteractions({
+	const surfaceInteractions = createVirtualSurfaceInteractions({
 		getRootEl: () => rootEl,
 		getContentEl: () => contentEl,
 		getShadowRoot: () => interactionShadowRoot,
@@ -67,6 +67,8 @@
 		flushVirtualScrollMeasurement,
 		cellRegistry,
 	});
+	const { delegatedInteractions, handleKeyDown, touchEventHandlers } =
+		surfaceInteractions;
 
 	watchVirtualSurfaceMountedCellsChange<TMountedCell>({
 		getMountedCellsForChange: () => mountedCellsForChange,
@@ -89,10 +91,7 @@
 	oncontextmenu={delegatedInteractions.handleContextMenu}
 	onkeydown={handleKeyDown}
 	ondragstart={delegatedInteractions.handleDragStart}
-	ontouchstart={delegatedInteractions.handleTouchStart}
-	ontouchmove={delegatedInteractions.handleTouchMove}
-	ontouchend={delegatedInteractions.handleTouchEnd}
-	ontouchcancel={delegatedInteractions.handleTouchEnd}
+	{...touchEventHandlers}
 >
 	{@render children?.(surfaceTransaction)}
 </div>

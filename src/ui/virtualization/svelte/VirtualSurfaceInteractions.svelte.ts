@@ -1,4 +1,5 @@
 import { onDestroy, tick } from "svelte";
+import { Platform } from "obsidian";
 import { createDelegatedInteractionDispatcher } from "ui/interactions/delegatedDispatcher";
 import {
 	createInteractionRegistry,
@@ -89,6 +90,14 @@ export function createVirtualSurfaceInteractions<
 		linkContext,
 		appContext,
 	});
+	const touchEventHandlers = Platform.isMobile
+		? {
+				ontouchstart: delegatedInteractions.handleTouchStart,
+				ontouchmove: delegatedInteractions.handleTouchMove,
+				ontouchend: delegatedInteractions.handleTouchEnd,
+				ontouchcancel: delegatedInteractions.handleTouchEnd,
+			}
+		: {};
 
 	const flushMountedState = async (): Promise<void> => {
 		await tick();
@@ -182,5 +191,6 @@ export function createVirtualSurfaceInteractions<
 	return {
 		delegatedInteractions,
 		handleKeyDown,
+		touchEventHandlers,
 	};
 }
