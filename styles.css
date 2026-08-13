@@ -375,3 +375,12 @@ span[data-twohop-link-state="special-unresolved"] > .is-unresolved,
 .cosense-card-links__box-preview.is-stale {
 	visibility: hidden;
 }
+
+/*! --- 非常に重要 --- */
+/* .view-contentがrootScroller側へsquashされ、その広いpaint/hit-test stateをスクロールごとにLayerizeすることがボトルネックになる。.view-contentにcompositing boundaryを強制すると更新範囲が局所化され、スクロールパフォーマンスが大幅に改善される。.cm-scroller, .markdown-preview-viewも同様。 */
+.workspace-leaf-content[data-type="cosense-card-links-view"] > .view-content,
+.cm-scroller.ccl-inline-card-host,
+.markdown-preview-view
+{
+    transform: translateZ(0);
+}
