@@ -17,7 +17,10 @@ import type {
 	TwoHopRowModel,
 	TwoHopVirtualCell,
 } from "features/two-hop/ui/twoHopRowModel";
-import { recordCCLDevMeasurement } from "infrastructure/debug/CCLDevMeasurements";
+import {
+	markCCLDevPerformance,
+	recordCCLDevMeasurement,
+} from "infrastructure/debug/CCLDevMeasurements";
 
 export interface MountedTwoHopCell extends MountedVirtualCell {
 	readonly key: LogicalCellKey;
@@ -58,6 +61,7 @@ export interface BuildMountedTwoHopRowsParams {
 export function buildMountedTwoHopRows(
 	params: BuildMountedTwoHopRowsParams,
 ): MountedTwoHopBuild {
+	markCCLDevPerformance("ccl:range-build-start");
 	const { rowModel, rowSlotAllocator } = params;
 	const columns = rowModel.layout.columns;
 	const slotPublication = rowSlotAllocator.prepareRange({
@@ -124,7 +128,7 @@ export function buildMountedTwoHopRows(
 	});
 
 	recordCCLDevMeasurement("virtualGrid.buildMountedRows");
-	return {
+	const build: MountedTwoHopBuild = {
 		get cells() {
 			return mountedRows.cells;
 		},
@@ -139,6 +143,8 @@ export function buildMountedTwoHopRows(
 		rowModel,
 		columns,
 	};
+	markCCLDevPerformance("ccl:range-build-end");
+	return build;
 }
 
 function createMountedCell(

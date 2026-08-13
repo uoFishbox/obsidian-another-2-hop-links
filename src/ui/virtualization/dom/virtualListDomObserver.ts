@@ -5,7 +5,10 @@ import {
 } from "ui/virtualization/scheduling/scrollActivity";
 import { subscribeWindowResize } from "ui/virtualization/scheduling/windowResizeListeners";
 import { createScheduledVirtualListTask } from "./virtualListScheduler";
-import { recordCCLDevMeasurement } from "infrastructure/debug/CCLDevMeasurements";
+import {
+	markCCLDevPerformance,
+	recordCCLDevMeasurement,
+} from "infrastructure/debug/CCLDevMeasurements";
 import {
 	collectPositionDependencyElements,
 	collectStructureDependencyTargets,
@@ -735,6 +738,7 @@ const handleNativeScroll = (
 
 	if (process.env.NODE_ENV !== "production") {
 		recordCCLDevMeasurement("virtualList.observer.coverageMiss");
+		markCCLDevPerformance("ccl:coverage-miss");
 	}
 	scheduleScrollMeasurement(entry);
 };

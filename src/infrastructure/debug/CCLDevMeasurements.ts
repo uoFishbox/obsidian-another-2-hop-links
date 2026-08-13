@@ -46,7 +46,15 @@ export type CCLDevMeasurementName =
 	| "preview.activationDuringScroll"
 	| "preview.domCommitDuringScroll"
 	| "component.ViewItemCard.reevaluate"
+	| "twoHop.cellBody.mount"
+	| "twoHop.cellBody.unmount"
+	| "twoHop.cellBody.rebind"
 	| "twoHop.resolveItemCardModel.call";
+
+export type CCLDevPerformanceMarkName =
+	| "ccl:coverage-miss"
+	| "ccl:range-build-start"
+	| "ccl:range-build-end";
 
 export const CCL_DEV_MEASUREMENT_NAMES: readonly CCLDevMeasurementName[] = [
 	"virtualScroll.applyScrollMeasurement",
@@ -96,6 +104,9 @@ export const CCL_DEV_MEASUREMENT_NAMES: readonly CCLDevMeasurementName[] = [
 	"preview.activationDuringScroll",
 	"preview.domCommitDuringScroll",
 	"component.ViewItemCard.reevaluate",
+	"twoHop.cellBody.mount",
+	"twoHop.cellBody.unmount",
+	"twoHop.cellBody.rebind",
 	"twoHop.resolveItemCardModel.call",
 ];
 
@@ -137,6 +148,17 @@ export function recordCCLDevMeasurement(name: CCLDevMeasurementName): void {
 
 	counter.count += 1;
 	counter.lastUpdatedAt = nowIsoString();
+}
+
+/** Adds a development-only User Timing mark for Performance trace analysis. */
+export function markCCLDevPerformance(
+	name: CCLDevPerformanceMarkName,
+): void {
+	if (process.env.NODE_ENV === "production") {
+		return;
+	}
+
+	globalThis.performance?.mark?.(name);
 }
 
 /**

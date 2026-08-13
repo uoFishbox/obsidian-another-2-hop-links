@@ -427,4 +427,29 @@ describe("TwoHopVirtualSurface", () => {
 		);
 		expect(Math.max(...resolvedIndexes)).toBeLessThan(6);
 	});
+
+	it("counts keyed cell-body replacements across a long scroll", async () => {
+		const resolver = createCardModelResolver();
+		const { root, scroller } = await renderSurface({
+			section: createSection(10_000),
+			resolveItemCardModel: resolver,
+		});
+
+		await vi.waitFor(() => expect(getRows(root).length).toBeGreaterThan(0));
+		resetCCLDevMeasurements();
+
+		setNumericProperty(scroller, "scrollTop", 20_000);
+		await fireEvent.scroll(scroller);
+		await vi.waitFor(() => {
+			const rowIndexes = getRows(root).map((row) =>
+				Number(row.dataset.cclRowIndex),
+			);
+			expect(Math.min(...rowIndexes)).toBeGreaterThan(100);
+		});
+
+		const counters = getCCLDevMeasurementSnapshot().counters;
+		expect(counters["twoHop.cellBody.mount"].count).toBeGreaterThan(0);
+		expect(counters["twoHop.cellBody.unmount"].count).toBeGreaterThan(0);
+		expect(counters["twoHop.cellBody.rebind"].count).toBe(0);
+	});
 });

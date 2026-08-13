@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { onDestroy, onMount } from "svelte";
 	import ClickableHeader from "ui/components/common/ClickableHeader.svelte";
 	import Icon from "ui/components/common/Icon.svelte";
 	import LinkItem from "ui/components/common/LinkItem.svelte";
@@ -9,6 +10,7 @@
 	import type { IconName } from "ui/shared/icons/iconRegistry";
 	import type { TwoHopVirtualCell } from "features/two-hop/ui/twoHopRowModel";
 	import { resolveTwoHopSectionVariant } from "features/two-hop/ui/twoHopCellStaticState";
+	import { recordCCLDevMeasurement } from "infrastructure/debug/CCLDevMeasurements";
 	import { getDebugDisableCardDomPreview } from "../../../appConstants";
 
 	interface Props {
@@ -30,13 +32,28 @@
 		onLoadMore,
 	}: Props = $props();
 	let cardModel = $state.raw<CardShellModel | undefined>(undefined);
+	let boundLogicalKey = cell.logicalKey;
+
+	onMount(() => {
+		recordCCLDevMeasurement("twoHop.cellBody.mount");
+	});
+
+	onDestroy(() => {
+		recordCCLDevMeasurement("twoHop.cellBody.unmount");
+	});
 
 	$effect(() => {
+		const nextLogicalKey = cell.logicalKey;
+		if (nextLogicalKey !== boundLogicalKey) {
+			boundLogicalKey = nextLogicalKey;
+			recordCCLDevMeasurement("twoHop.cellBody.rebind");
+		}
+
 		if (cell.kind !== "item") {
 			cardModel = undefined;
 			return;
 		}
-		return registerCardModelConsumer(cell.logicalKey, (nextModel) => {
+		return registerCardModelConsumer(nextLogicalKey, (nextModel) => {
 			cardModel = nextModel;
 		});
 	});
