@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ShadowHoverControllerImpl } from "../controller";
+import type { HoverPopoverLike } from "../internal-types";
 import type { ShadowPopoverLaunchRequest } from "../launcher";
 import { createRequestHoverParent } from "../session";
 
@@ -181,6 +182,80 @@ describe("ShadowHoverControllerImpl", () => {
 
 		expect(launch).toHaveBeenCalledTimes(1);
 		expect(resolveLink).toHaveBeenCalledTimes(1);
+		controller.destroy();
+	});
+
+	it("keeps a hovered popover alive when the delegated anchor is released", () => {
+		const originalHide = vi.fn();
+		const popover: HoverPopoverLike = {
+			hoverEl: document.createElement("div"),
+			onHover: true,
+			hide: originalHide,
+			state: 1,
+			transition() {
+				popover.hide?.();
+			},
+		};
+		document.body.append(popover.hoverEl!);
+		const launch = vi.fn((request: ShadowPopoverLaunchRequest) => {
+			createRequestHoverParent(
+				request.session,
+				request.requestSeq,
+				request.proxyAnchorEl,
+				request.actualAnchorEl,
+			).hoverPopover = popover;
+		});
+		const controller = new ShadowHoverControllerImpl({ launch }, () => ({
+			linktext: "note",
+			sourcePath: "note.md",
+		}));
+		const anchorEl = createAnchor();
+
+		controller.handleDelegatedEnter(
+			anchorEl,
+			"item:first",
+			new MouseEvent("mouseover", { bubbles: true }),
+		);
+		controller.handleDelegatedLeave(anchorEl);
+
+		expect(originalHide).not.toHaveBeenCalled();
+		controller.destroy();
+	});
+
+	it("allows an unhovered popover to close when the delegated anchor is released", () => {
+		const originalHide = vi.fn();
+		const popover: HoverPopoverLike = {
+			hoverEl: document.createElement("div"),
+			onHover: false,
+			hide: originalHide,
+			state: 1,
+			transition() {
+				popover.hide?.();
+			},
+		};
+		document.body.append(popover.hoverEl!);
+		const launch = vi.fn((request: ShadowPopoverLaunchRequest) => {
+			createRequestHoverParent(
+				request.session,
+				request.requestSeq,
+				request.proxyAnchorEl,
+				request.actualAnchorEl,
+			).hoverPopover = popover;
+		});
+		const controller = new ShadowHoverControllerImpl({ launch }, () => ({
+			linktext: "note",
+			sourcePath: "note.md",
+		}));
+		const anchorEl = createAnchor();
+
+		controller.handleDelegatedEnter(
+			anchorEl,
+			"item:first",
+			new MouseEvent("mouseover", { bubbles: true }),
+		);
+		controller.handleDelegatedLeave(anchorEl);
+
+		expect(originalHide).toHaveBeenCalledTimes(1);
 		controller.destroy();
 	});
 

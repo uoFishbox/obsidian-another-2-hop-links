@@ -430,8 +430,8 @@ function createHandle({
 			delete handle.hoveredAnchorEl.dataset.cclHovered;
 			handle.hoveredAnchorEl = null;
 		}
+
 		leaveActiveAnchor(handle);
-		handle.controller.closeActivePopover();
 	});
 	const onVirtualCellWillRebind: EventListener = (event) => {
 		const target = event.target;

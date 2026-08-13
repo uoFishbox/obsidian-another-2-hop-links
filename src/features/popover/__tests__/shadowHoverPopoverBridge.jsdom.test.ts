@@ -242,7 +242,7 @@ describe("shadowHoverPopoverBridge", () => {
 		dispose();
 	});
 
-	it("closes active hover on scroll and resumes on a later mouseover", () => {
+	it("releases the anchor on scroll without force-closing the active popover", () => {
 		const { shadowRoot, dispose } = installBridge();
 		const interaction = createInteractionElement("item:first");
 		shadowRoot.append(interaction);
@@ -255,7 +255,7 @@ describe("shadowHoverPopoverBridge", () => {
 
 		expect(interaction.dataset.cclHovered).toBeUndefined();
 		expect(handleDelegatedLeaveMock).toHaveBeenCalledWith(interaction);
-		expect(closeActivePopoverMock).toHaveBeenCalledTimes(1);
+		expect(closeActivePopoverMock).not.toHaveBeenCalled();
 
 		interaction.dispatchEvent(
 			new MouseEvent("mouseover", { bubbles: true, composed: true }),
