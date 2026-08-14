@@ -26,9 +26,6 @@ export function freezeTwoHopLinkResult(result: TwoHopLinkResult): TwoHopLinkResu
 	}
 	Object.freeze(result.taggedNotes);
 
-	if (result.displayVersions) {
-		Object.freeze(result.displayVersions);
-	}
 	return Object.freeze(result);
 }
 

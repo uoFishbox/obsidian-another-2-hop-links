@@ -5,19 +5,15 @@ import type {
 	TwoHopResolverDependencies,
 } from "./ResolverDependencies";
 import { freezeTwoHopLinkResult } from "./immutableTwoHopLinkResult";
+import type { ResolverPerformanceSettings } from "./ResolverTypes";
 
 const MAX_RESOLVE_CACHE_SIZE = 64;
-
-interface ResolverPerformanceSettings {
-	enableProgressiveTwoHopBuild: boolean;
-	maxOutgoingToProcess: number;
-}
 
 interface ResolverResolveSettings {
 	includeTaggedNotes: boolean;
 }
 
-export interface CachedResolveResult {
+interface CachedResolveResult {
 	enableProgressiveTwoHopBuild: boolean;
 	maxOutgoingToProcess: number;
 	includeTaggedNotes: boolean;
@@ -33,18 +29,6 @@ export class ResolverCache {
 	private readonly cache = new Map<string, CachedResolveResult>();
 
 	constructor(private readonly maxCacheSize: number = MAX_RESOLVE_CACHE_SIZE) {}
-
-	/**
-	 * キャッシュから結果を取得する
-	 * @returns キャッシュが有効な場合は結果、無効な場合は undefined
-	 */
-	get(
-		filePath: string,
-		performanceSettings: ResolverPerformanceSettings,
-		resolveSettings: ResolverResolveSettings,
-	): TwoHopLinkResult | undefined {
-		return this.getSnapshot(filePath, performanceSettings, resolveSettings)?.result;
-	}
 
 	getSnapshot(
 		filePath: string,

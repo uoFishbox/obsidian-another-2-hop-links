@@ -9,6 +9,7 @@ import type { TaggedNote, TwoHopIndexedLink } from "types/domain";
 import type {
 	DisplayData,
 	DisplayDataBuilder,
+	PreprocessedDisplayData,
 } from "features/two-hop/application/displayDataBuilder";
 import type { DataUpdateContext } from "core/indexing/index-service/IndexEvents";
 import type {
@@ -20,7 +21,6 @@ import {
 	computeSortedDisplayDataState,
 	createPreprocessedDisplayDataCache,
 	type ComputedDisplayData,
-	type ComputedPreprocessedDisplayData,
 	type PreprocessedDisplayDataCache,
 } from "ui/stores/application/DisplayStateCalculator";
 import {
@@ -159,7 +159,7 @@ export class ApplicationStore {
 	declare initialVisibleCount: number;
 	declare loadMoreIncrement: number;
 
-	declare private preprocessedDisplayData: ComputedPreprocessedDisplayData;
+	declare private preprocessedDisplayData: PreprocessedDisplayData;
 	declare private computedDisplayData: ComputedDisplayData;
 	declare private displayDataBuilder: DisplayDataBuilder;
 	declare private mutableLoadState: ApplicationLoadState;
@@ -198,7 +198,7 @@ export class ApplicationStore {
 
 		// data/settings 依存の前処理を先に計算し、sortOption 変更時は再利用する
 		this.preprocessedDisplayData = $derived.by(
-			(): ComputedPreprocessedDisplayData =>
+			(): PreprocessedDisplayData =>
 				computePreprocessedDisplayDataState(
 					this.displayDataBuilder,
 					this.data,

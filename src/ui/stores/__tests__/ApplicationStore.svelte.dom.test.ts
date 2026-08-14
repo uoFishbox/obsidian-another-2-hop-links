@@ -127,9 +127,7 @@ function createStagedBuildDisplayDataMock() {
 				resolvedBranches,
 				resolvedBacklinks,
 				mergedBaseItems: [...resolvedBranches, ...resolvedBacklinks],
-				taggedNotes: [],
 				rawTagGroups: [],
-				twoHopBranches: [],
 				nonEmptyTwoHopBranches: [],
 				newLinks: [],
 			};
@@ -157,14 +155,12 @@ function createStagedBuildDisplayDataMock() {
 					resolvedBranches: preprocessed.resolvedBranches,
 					resolvedBacklinks: preprocessed.resolvedBacklinks,
 					mergedBaseItems: preprocessed.mergedBaseItems,
-					twoHopBranches: preprocessed.twoHopBranches,
 					nonEmptyTwoHopBranches: preprocessed.nonEmptyTwoHopBranches,
 					newLinks: preprocessed.newLinks,
 				},
 			};
 		}),
 		preprocessTagDisplayData: vi.fn((linkResult, settings) => ({
-			taggedNotes: preprocessDisplayData(linkResult, settings).taggedNotes,
 			rawTagGroups: preprocessDisplayData(linkResult, settings).rawTagGroups,
 		})),
 		sortAndAssembleDisplayData,
@@ -191,7 +187,6 @@ function createSplitStagedBuildDisplayDataMock() {
 					resolvedBranches,
 					resolvedBacklinks,
 					mergedBaseItems: [...resolvedBranches, ...resolvedBacklinks],
-					twoHopBranches: resolvedBranches,
 					nonEmptyTwoHopBranches: resolvedBranches.filter(
 						(branch) => branch.hop2.length > 0,
 					),
@@ -206,7 +201,6 @@ function createSplitStagedBuildDisplayDataMock() {
 			const taggedNotes =
 				settings.showTagsSection && linkResult ? linkResult.taggedNotes : [];
 			return {
-				taggedNotes,
 				rawTagGroups: taggedNotes.length
 					? [
 							{
@@ -522,7 +516,6 @@ describe("ApplicationStore (Runes)", () => {
 				},
 			],
 			taggedNotes: [],
-			displayVersions: { links: "1:base", tags: "1:pending" },
 		};
 		const twohopResult: TwoHopLinkResult = {
 			...baseResult,
@@ -539,7 +532,6 @@ describe("ApplicationStore (Runes)", () => {
 					],
 				},
 			],
-			displayVersions: { links: "1:twohop", tags: "1:pending" },
 		};
 		const completeResult: TwoHopLinkResult = {
 			...twohopResult,
@@ -550,7 +542,6 @@ describe("ApplicationStore (Runes)", () => {
 					path: "tagged.md",
 				},
 			],
-			displayVersions: { links: "1:twohop", tags: "1:tags" },
 		};
 
 		let onProgress: ((progress: ResolveProgress) => void) | undefined;

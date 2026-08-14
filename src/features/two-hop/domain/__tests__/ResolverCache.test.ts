@@ -14,7 +14,6 @@ function createMockResult(): TwoHopLinkResult {
 		branches: [],
 		backlinks: [],
 		taggedNotes: [],
-		displayVersions: { links: "1:twohop", tags: "1:tags" },
 	};
 }
 
@@ -41,6 +40,15 @@ function defaultDependencies() {
 	};
 }
 
+function getCachedResult(
+	cache: ResolverCache,
+	filePath: string,
+	performanceSettings: ReturnType<typeof defaultPerformanceSettings>,
+	resolveSettings: ReturnType<typeof defaultResolveSettings>,
+): TwoHopLinkResult | undefined {
+	return cache.getSnapshot(filePath, performanceSettings, resolveSettings)?.result;
+}
+
 describe("ResolverCache", () => {
 	test("returns cached result when settings match", () => {
 		const cache = new ResolverCache();
@@ -54,7 +62,8 @@ describe("ResolverCache", () => {
 			result,
 		);
 
-		const cached = cache.get(
+		const cached = getCachedResult(
+			cache,
 			"origin.md",
 			defaultPerformanceSettings(),
 			defaultResolveSettings(),
@@ -63,7 +72,8 @@ describe("ResolverCache", () => {
 		expect(cached).toEqual(result);
 		expect(cached).toBe(result);
 		expect(
-			cache.get(
+			getCachedResult(
+				cache,
 				"origin.md",
 				defaultPerformanceSettings(),
 				defaultResolveSettings(),
@@ -83,7 +93,8 @@ describe("ResolverCache", () => {
 			result,
 		);
 
-		const cached = cache.get(
+		const cached = getCachedResult(
+			cache,
 			"origin.md",
 			{ ...defaultPerformanceSettings(), enableProgressiveTwoHopBuild: false },
 			defaultResolveSettings(),
@@ -104,9 +115,12 @@ describe("ResolverCache", () => {
 			result,
 		);
 
-		const cached = cache.get("origin.md", defaultPerformanceSettings(), {
-			includeTaggedNotes: false,
-		});
+		const cached = getCachedResult(
+			cache,
+			"origin.md",
+			defaultPerformanceSettings(),
+			{ includeTaggedNotes: false },
+		);
 
 		expect(cached).toBeUndefined();
 	});
@@ -143,10 +157,20 @@ describe("ResolverCache", () => {
 		});
 
 		expect(
-			cache.get("a.md", defaultPerformanceSettings(), defaultResolveSettings()),
+			getCachedResult(
+				cache,
+				"a.md",
+				defaultPerformanceSettings(),
+				defaultResolveSettings(),
+			),
 		).toBeUndefined();
 		expect(
-			cache.get("b.md", defaultPerformanceSettings(), defaultResolveSettings()),
+			getCachedResult(
+				cache,
+				"b.md",
+				defaultPerformanceSettings(),
+				defaultResolveSettings(),
+			),
 		).toEqual(resultB);
 	});
 
@@ -182,10 +206,20 @@ describe("ResolverCache", () => {
 		});
 
 		expect(
-			cache.get("a.md", defaultPerformanceSettings(), defaultResolveSettings()),
+			getCachedResult(
+				cache,
+				"a.md",
+				defaultPerformanceSettings(),
+				defaultResolveSettings(),
+			),
 		).toBeUndefined();
 		expect(
-			cache.get("b.md", defaultPerformanceSettings(), defaultResolveSettings()),
+			getCachedResult(
+				cache,
+				"b.md",
+				defaultPerformanceSettings(),
+				defaultResolveSettings(),
+			),
 		).toEqual(resultB);
 	});
 
@@ -221,10 +255,20 @@ describe("ResolverCache", () => {
 		});
 
 		expect(
-			cache.get("a.md", defaultPerformanceSettings(), defaultResolveSettings()),
+			getCachedResult(
+				cache,
+				"a.md",
+				defaultPerformanceSettings(),
+				defaultResolveSettings(),
+			),
 		).toBeUndefined();
 		expect(
-			cache.get("b.md", defaultPerformanceSettings(), defaultResolveSettings()),
+			getCachedResult(
+				cache,
+				"b.md",
+				defaultPerformanceSettings(),
+				defaultResolveSettings(),
+			),
 		).toEqual(resultB);
 	});
 
@@ -252,7 +296,8 @@ describe("ResolverCache", () => {
 			affectedTags: ["unrelated-tag"],
 		});
 
-		const cached = cache.get(
+		const cached = getCachedResult(
+			cache,
 			"origin.md",
 			defaultPerformanceSettings(),
 			defaultResolveSettings(),
@@ -279,7 +324,8 @@ describe("ResolverCache", () => {
 		});
 
 		expect(
-			cache.get(
+			getCachedResult(
+				cache,
 				"origin.md",
 				defaultPerformanceSettings(),
 				defaultResolveSettings(),
@@ -302,7 +348,8 @@ describe("ResolverCache", () => {
 		cache.invalidate();
 
 		expect(
-			cache.get(
+			getCachedResult(
+				cache,
 				"origin.md",
 				defaultPerformanceSettings(),
 				defaultResolveSettings(),
@@ -330,7 +377,8 @@ describe("ResolverCache", () => {
 		});
 
 		expect(
-			cache.get(
+			getCachedResult(
+				cache,
 				"origin.md",
 				defaultPerformanceSettings(),
 				defaultResolveSettings(),
@@ -363,7 +411,8 @@ describe("ResolverCache", () => {
 		expect(Reflect.set(result.backlinks, 0, externalLink)).toBe(false);
 		dependencies.relevantPaths.clear();
 
-		const first = cache.get(
+		const first = getCachedResult(
+			cache,
 			"origin.md",
 			defaultPerformanceSettings(),
 			defaultResolveSettings(),
@@ -371,7 +420,8 @@ describe("ResolverCache", () => {
 		expect(Object.isFrozen(first)).toBe(true);
 		expect(Object.isFrozen(first.backlinks)).toBe(true);
 
-		const second = cache.get(
+		const second = getCachedResult(
+			cache,
 			"origin.md",
 			defaultPerformanceSettings(),
 			defaultResolveSettings(),
@@ -384,7 +434,8 @@ describe("ResolverCache", () => {
 			affectedPaths: ["note1.md"],
 		});
 		expect(
-			cache.get(
+			getCachedResult(
+				cache,
 				"origin.md",
 				defaultPerformanceSettings(),
 				defaultResolveSettings(),
@@ -427,7 +478,6 @@ describe("ResolverCache", () => {
 					position,
 				},
 			],
-			displayVersions: { links: "1:complete", tags: "1:tags" },
 		};
 
 		cache.set(
@@ -438,7 +488,8 @@ describe("ResolverCache", () => {
 			result,
 		);
 
-		const cached = cache.get(
+		const cached = getCachedResult(
+			cache,
 			"origin.md",
 			defaultPerformanceSettings(),
 			defaultResolveSettings(),
@@ -456,7 +507,6 @@ describe("ResolverCache", () => {
 		expect(Object.isFrozen(cached.taggedNotes)).toBe(true);
 		expect(Object.isFrozen(cached.taggedNotes[0])).toBe(true);
 		expect(Object.isFrozen(commonTags)).toBe(true);
-		expect(Object.isFrozen(cached.displayVersions)).toBe(true);
 		expect(Object.isFrozen(sourceFile)).toBe(false);
 		expect(Object.isFrozen(position)).toBe(false);
 	});

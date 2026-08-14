@@ -277,39 +277,10 @@ describe("TwoHopLinkResolver", () => {
 				"tagged.md",
 			]);
 		});
-
-		test("displayVersions shows links and tags readiness state per phase", async () => {
-			const { resolver, files } = await buildResolvedEnvironment([
-				{ path: "origin.md", links: ["note1"], tags: ["tag1"] },
-				{ path: "note1.md" },
-				{ path: "backlink.md", links: ["note1"] },
-				{ path: "tagged.md", tags: ["tag1"] },
-			]);
-
-			const events: ResolveProgress[] = [];
-			await resolver.resolve(files["origin.md"], (progress) => {
-				events.push(progress);
-			});
-
-			expect(events[0].data.displayVersions).toMatchObject({
-				links: expect.stringMatching(/:base$/),
-				tags: expect.stringMatching(/:pending$/),
-			});
-
-			expect(events[1].data.displayVersions).toMatchObject({
-				links: expect.stringMatching(/:twohop$/),
-				tags: expect.stringMatching(/:pending$/),
-			});
-
-			expect(events[2].data.displayVersions).toMatchObject({
-				links: expect.stringMatching(/:twohop$/),
-				tags: expect.stringMatching(/:tags$/),
-			});
-		});
 	});
 
 	describe("cache and updates", () => {
-		test("display link revision changes when the outgoing branch limit changes at the same index version", async () => {
+		test("rebuilds when the outgoing branch limit changes at the same index version", async () => {
 			const env = await buildResolvedEnvironment([
 				{ path: "origin.md", links: ["note1", "note2"] },
 				{ path: "note1.md" },
@@ -334,9 +305,6 @@ describe("TwoHopLinkResolver", () => {
 			const outgoingExpanded = await resolver.resolve(env.files["origin.md"]);
 			expect(env.service.getIndexVersion()).toBe(indexVersion);
 			expect(outgoingExpanded.branches).toHaveLength(2);
-			expect(outgoingExpanded.displayVersions?.links).not.toBe(
-				outgoingLimited.displayVersions?.links,
-			);
 		});
 
 		test("concurrent same-file resolve shares the same in-flight result", async () => {

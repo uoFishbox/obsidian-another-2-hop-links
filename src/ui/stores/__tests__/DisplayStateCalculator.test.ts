@@ -60,7 +60,6 @@ function createFullDedupeBuilder() {
 					resolvedBranches: [],
 					resolvedBacklinks,
 					mergedBaseItems: [...resolvedBacklinks],
-					twoHopBranches: [],
 					nonEmptyTwoHopBranches: [],
 					newLinks: [],
 				},
@@ -83,7 +82,6 @@ function createFullDedupeBuilder() {
 						)
 					: [];
 			return {
-				taggedNotes,
 				rawTagGroups: taggedNotes.length
 					? [{ tag: "#tag", notes: taggedNotes }]
 					: [],
@@ -137,7 +135,6 @@ function createCacheProbeBuilder() {
 				resolvedBranches: [],
 				resolvedBacklinks: [],
 				mergedBaseItems: [],
-				twoHopBranches: [],
 				nonEmptyTwoHopBranches: [],
 				newLinks: [],
 			} satisfies LinkPreprocessedDisplayData,
@@ -148,7 +145,6 @@ function createCacheProbeBuilder() {
 			_linkResult: TwoHopLinkResult | undefined,
 			_settings: PluginSettings,
 		): TagPreprocessedDisplayData => ({
-			taggedNotes: [],
 			rawTagGroups: [],
 		}),
 	);
@@ -243,8 +239,8 @@ describe("DisplayStateCalculator", () => {
 			settings,
 			cache,
 		);
-		expect(first.preprocessed?.resolvedBacklinks).toHaveLength(1);
-		expect(first.preprocessed?.taggedNotes).toHaveLength(0);
+		expect(first.resolvedBacklinks).toHaveLength(1);
+		expect(first.rawTagGroups).toHaveLength(0);
 
 		const cached = computePreprocessedDisplayDataState(
 			builder,
@@ -253,7 +249,7 @@ describe("DisplayStateCalculator", () => {
 			cache,
 		);
 
-		expect(cached.preprocessed).toBe(first.preprocessed);
+		expect(cached).toBe(first);
 		expect(preprocessLinkDisplayData).toHaveBeenCalledTimes(1);
 		expect(preprocessTagDisplayData).toHaveBeenCalledTimes(1);
 
@@ -269,7 +265,7 @@ describe("DisplayStateCalculator", () => {
 
 		expect(preprocessLinkDisplayData).toHaveBeenCalledTimes(1);
 		expect(preprocessTagDisplayData).toHaveBeenCalledTimes(2);
-		expect(next.preprocessed?.taggedNotes.map((note) => note.path)).toEqual([
+		expect(next.rawTagGroups[0]?.notes.map((note) => note.path)).toEqual([
 			"unique.md",
 		]);
 	});
@@ -300,7 +296,7 @@ describe("DisplayStateCalculator", () => {
 				cache,
 			);
 
-			expect(second.preprocessed).not.toBe(first.preprocessed);
+			expect(second).not.toBe(first);
 			expect(preprocessLinkDisplayData).toHaveBeenCalledTimes(
 				settingKey === "tagFeaturesEnabled" || settingKey === "showTagsSection"
 					? 0

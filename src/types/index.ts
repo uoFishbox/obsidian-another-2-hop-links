@@ -2,7 +2,6 @@ export type {
 	FrontMatterLinkReference,
 	LinkReference,
 	CachedMetadataWithLinkReferences,
-	DisplayDataVersions,
 	TwoHopIndexedLink,
 	BacklinksMap as DetailedBacklinksMap,
 	IndexedFile,

@@ -20,10 +20,6 @@ export interface ComputedDisplayData {
 	hasDisplayableItems: boolean;
 }
 
-export interface ComputedPreprocessedDisplayData {
-	preprocessed: PreprocessedDisplayData;
-}
-
 export interface PreprocessedDisplayDataCache {
 	linkEntry: LinkPreprocessedDisplayDataCacheEntry | undefined;
 	tagEntry: TagPreprocessedDisplayDataCacheEntry | undefined;
@@ -47,7 +43,7 @@ interface TagPreprocessedDisplayDataCacheEntry {
 interface PreprocessedDisplayDataAssemblyCacheEntry {
 	linkPreprocessed: LinkPreprocessedDisplayData;
 	tagPreprocessed: TagPreprocessedDisplayData;
-	computed: ComputedPreprocessedDisplayData;
+	preprocessed: PreprocessedDisplayData;
 }
 
 export function createPreprocessedDisplayDataCache(): PreprocessedDisplayDataCache {
@@ -56,14 +52,6 @@ export function createPreprocessedDisplayDataCache(): PreprocessedDisplayDataCac
 		tagEntry: undefined,
 		assemblyEntry: undefined,
 	};
-}
-
-function createLinkPreprocessSettingsKey(settings: PluginSettings): string {
-	return createLinkPreprocessCacheKey(settings);
-}
-
-function createTagPreprocessSettingsKey(settings: PluginSettings): string {
-	return createTagPreprocessCacheKey(settings);
 }
 
 function getTaggedNotesInputRef(
@@ -83,7 +71,7 @@ function getLinkPreprocessedDisplayData(
 	settings: PluginSettings,
 	cache: PreprocessedDisplayDataCache,
 ): LinkPreprocessingResult {
-	const preprocessSettingsKey = createLinkPreprocessSettingsKey(settings);
+	const preprocessSettingsKey = createLinkPreprocessCacheKey(settings);
 	const branchesRef = linkResult?.branches;
 	const backlinksRef = linkResult?.backlinks;
 	const cached = cache.linkEntry;
@@ -116,7 +104,7 @@ function getTagPreprocessedDisplayData(
 	cache: PreprocessedDisplayDataCache,
 	linkResultData: LinkPreprocessingResult,
 ): TagPreprocessedDisplayData {
-	const preprocessSettingsKey = createTagPreprocessSettingsKey(settings);
+	const preprocessSettingsKey = createTagPreprocessCacheKey(settings);
 	const taggedNotesInputRef = getTaggedNotesInputRef(linkResult, settings);
 	const dedupStateRef =
 		settings.dedupeCards && taggedNotesInputRef ? linkResultData.state : undefined;
@@ -152,7 +140,7 @@ export function computePreprocessedDisplayDataState(
 	linkResult: TwoHopLinkResult | undefined,
 	settings: PluginSettings,
 	cache: PreprocessedDisplayDataCache,
-): ComputedPreprocessedDisplayData {
+): PreprocessedDisplayData {
 	const linkResultData = getLinkPreprocessedDisplayData(
 		displayDataBuilder,
 		linkResult,
@@ -174,7 +162,7 @@ export function computePreprocessedDisplayDataState(
 		cached.linkPreprocessed === linkPreprocessed &&
 		cached.tagPreprocessed === tagPreprocessed
 	) {
-		return cached.computed;
+		return cached.preprocessed;
 	}
 
 	const preprocessed: PreprocessedDisplayData = {
@@ -182,24 +170,23 @@ export function computePreprocessedDisplayDataState(
 		...tagPreprocessed,
 	};
 
-	const computed = { preprocessed };
 	cache.assemblyEntry = {
 		linkPreprocessed,
 		tagPreprocessed,
-		computed,
+		preprocessed,
 	};
 
-	return computed;
+	return preprocessed;
 }
 
 export function computeSortedDisplayDataState(
 	displayDataBuilder: DisplayDataBuilder,
-	preprocessedState: ComputedPreprocessedDisplayData,
+	preprocessed: PreprocessedDisplayData,
 	settings: PluginSettings,
 	sortOption: SortOption,
 ): ComputedDisplayData {
 	const displayData = displayDataBuilder.sortAndAssembleDisplayData(
-		preprocessedState.preprocessed,
+		preprocessed,
 		settings,
 		sortOption,
 	);

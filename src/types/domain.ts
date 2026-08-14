@@ -83,11 +83,6 @@ export interface TagGroup {
 	readonly notes: readonly TaggedNote[];
 }
 
-export interface DisplayDataVersions {
-	readonly links: string;
-	readonly tags: string;
-}
-
 export interface TwoHopLinkResult {
 	/**
 	 * 起点のファイル
@@ -105,10 +100,6 @@ export interface TwoHopLinkResult {
 	 * originFileと共通タグを持つノート
 	 */
 	readonly taggedNotes: readonly Readonly<TaggedNote>[];
-	/**
-	 * UI の display preprocessing を O(1) 判定で更新するための比較トークン
-	 */
-	readonly displayVersions?: Readonly<DisplayDataVersions>;
 }
 
 export type ResolvePhase = "base" | "twohop" | "complete";

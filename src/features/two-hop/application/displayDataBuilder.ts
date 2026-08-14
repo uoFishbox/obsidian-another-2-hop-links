@@ -38,9 +38,7 @@ export interface PreprocessedDisplayData {
 	readonly resolvedBranches: readonly TwoHopLinkBranch[];
 	readonly resolvedBacklinks: readonly TwoHopIndexedLink[];
 	readonly mergedBaseItems: readonly MergedLinkItem[];
-	readonly taggedNotes: readonly TaggedNote[];
 	readonly rawTagGroups: readonly TagGroup[];
-	readonly twoHopBranches: readonly TwoHopLinkBranch[];
 	readonly nonEmptyTwoHopBranches: readonly TwoHopLinkBranch[];
 	readonly newLinks: readonly TwoHopIndexedLink[];
 }
@@ -49,13 +47,11 @@ export interface LinkPreprocessedDisplayData {
 	readonly resolvedBranches: readonly TwoHopLinkBranch[];
 	readonly resolvedBacklinks: readonly TwoHopIndexedLink[];
 	readonly mergedBaseItems: readonly MergedLinkItem[];
-	readonly twoHopBranches: readonly TwoHopLinkBranch[];
 	readonly nonEmptyTwoHopBranches: readonly TwoHopLinkBranch[];
 	readonly newLinks: readonly TwoHopIndexedLink[];
 }
 
 export interface TagPreprocessedDisplayData {
-	readonly taggedNotes: readonly TaggedNote[];
 	readonly rawTagGroups: readonly TagGroup[];
 }
 
@@ -101,11 +97,6 @@ type ItemSortCache = Map<
 	WeakMap<readonly SortableItem[], readonly SortableItem[]>
 >;
 
-interface DeduplicationStageResult<T> {
-	data: T;
-	state: DedupState;
-}
-
 export type Hop2SortCache = ItemSortCache;
 
 export type TagItemSortCache = ItemSortCache;
@@ -120,7 +111,6 @@ function createEmptyLinkPreprocessedDisplayData(): LinkPreprocessedDisplayData {
 		resolvedBranches: [],
 		resolvedBacklinks: [],
 		mergedBaseItems: [],
-		twoHopBranches: [],
 		nonEmptyTwoHopBranches: [],
 		newLinks: [],
 	};
@@ -128,7 +118,6 @@ function createEmptyLinkPreprocessedDisplayData(): LinkPreprocessedDisplayData {
 
 function createEmptyTagPreprocessedDisplayData(): TagPreprocessedDisplayData {
 	return {
-		taggedNotes: [],
 		rawTagGroups: [],
 	};
 }
@@ -349,7 +338,7 @@ function preprocessLinkData(
 	linkResult: TwoHopLinkResult | undefined,
 	settings: PluginSettings,
 	initialState: DedupState = createDedupState(),
-): DeduplicationStageResult<LinkPreprocessedDisplayData> {
+): LinkPreprocessingResult {
 	if (!linkResult) {
 		return {
 			data: createEmptyLinkPreprocessedDisplayData(),
@@ -408,7 +397,6 @@ function preprocessLinkData(
 			resolvedBranches,
 			resolvedBacklinks,
 			mergedBaseItems,
-			twoHopBranches: twoHopBranchesForProcessing,
 			nonEmptyTwoHopBranches: sortedNonEmptyTwoHopBranches,
 			newLinks,
 		},
@@ -419,18 +407,15 @@ function preprocessLinkData(
 function preprocessTagData(
 	linkResult: TwoHopLinkResult | undefined,
 	settings: PluginSettings,
-	initialState: DedupState = createDedupState(),
-): DeduplicationStageResult<TagPreprocessedDisplayData> {
+	initialState: DedupState,
+): TagPreprocessedDisplayData {
 	const preprocessSettings = selectTagDisplayPreprocessSettings(settings);
 	if (
 		!linkResult ||
 		!preprocessSettings.tagFeaturesEnabled ||
 		!preprocessSettings.showTagsSection
 	) {
-		return {
-			data: createEmptyTagPreprocessedDisplayData(),
-			state: initialState,
-		};
+		return createEmptyTagPreprocessedDisplayData();
 	}
 
 	let taggedNotes = linkResult.taggedNotes;
@@ -444,31 +429,11 @@ function preprocessTagData(
 	if (settings.dedupeCards) {
 		const result = deduplicateTaggedNotes(initialState, taggedNotes);
 		taggedNotes = result.items;
-		initialState = result.state;
 	}
 
 	return {
-		data: {
-			taggedNotes,
-			rawTagGroups: groupNotesByTag(taggedNotes),
-		},
-		state: initialState,
+		rawTagGroups: groupNotesByTag(taggedNotes),
 	};
-}
-
-function preprocessLinkDisplayData(
-	linkResult: TwoHopLinkResult | undefined,
-	settings: PluginSettings,
-): LinkPreprocessingResult {
-	return preprocessLinkData(linkResult, settings);
-}
-
-function preprocessTagDisplayData(
-	linkResult: TwoHopLinkResult | undefined,
-	settings: PluginSettings,
-	initialState: DedupState,
-): TagPreprocessedDisplayData {
-	return preprocessTagData(linkResult, settings, initialState).data;
 }
 
 function sortIfNeeded<T extends SortableItem>(
@@ -646,18 +611,6 @@ export function createDisplayDataBuilder(
 		tagItemSortCache = createTagItemSortCache();
 		return currentSortContextVersion;
 	};
-	const preprocessLinkStage = (
-		linkResult: TwoHopLinkResult | undefined,
-		settings: PluginSettings,
-	): LinkPreprocessingResult => preprocessLinkDisplayData(linkResult, settings);
-
-	const preprocessTagStage = (
-		linkResult: TwoHopLinkResult | undefined,
-		settings: PluginSettings,
-		initialState: DedupState,
-	): TagPreprocessedDisplayData =>
-		preprocessTagDisplayData(linkResult, settings, initialState);
-
 	const sortAndAssembleStage = (
 		preprocessed: PreprocessedDisplayData,
 		settings: PluginSettings,
@@ -676,8 +629,8 @@ export function createDisplayDataBuilder(
 	};
 
 	return {
-		preprocessLinkDisplayData: preprocessLinkStage,
-		preprocessTagDisplayData: preprocessTagStage,
+		preprocessLinkDisplayData: preprocessLinkData,
+		preprocessTagDisplayData: preprocessTagData,
 		sortAndAssembleDisplayData: sortAndAssembleStage,
 		getSortedTwoHopItems: (
 			items: readonly TwoHopIndexedLink[],

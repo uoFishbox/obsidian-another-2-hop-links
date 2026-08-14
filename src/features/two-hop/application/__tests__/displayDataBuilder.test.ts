@@ -732,7 +732,9 @@ describe("DisplayDataBuilder - buildDisplayData", () => {
 
 			expect(preprocessed.resolvedBranches).toEqual(branches);
 			expect(preprocessed.resolvedBacklinks).toEqual(backlinks);
-			expect(preprocessed.taggedNotes).toEqual(taggedNotes);
+			expect(preprocessed.rawTagGroups).toEqual([
+				{ tag: "#tag", notes: taggedNotes },
+			]);
 		});
 	});
 
@@ -2018,8 +2020,6 @@ describe("DisplayDataBuilder - buildDisplayData", () => {
 				hop1: duplicateBranchLarge.hop1,
 				hop2: [...duplicateBranchLarge.hop2, ...duplicateBranchSmall.hop2],
 			};
-			const filteredTwoHopBranches = [dedupedBranch, distinctBranch];
-
 			const preprocessed = preprocessDisplayData(
 				{
 					originFile: createMockTFile("origin.md"),
@@ -2038,7 +2038,6 @@ describe("DisplayDataBuilder - buildDisplayData", () => {
 				},
 			);
 
-			expect(preprocessed.twoHopBranches).toEqual(filteredTwoHopBranches);
 			expect(preprocessed.nonEmptyTwoHopBranches).toEqual([
 				distinctBranch,
 				dedupedBranch,
@@ -2101,7 +2100,6 @@ describe("DisplayDataBuilder - buildDisplayData", () => {
 				unresolvedBranch.hop1,
 				unresolvedBacklink,
 			]);
-			expect(preprocessed.twoHopBranches).toEqual([]);
 			expect(preprocessed.nonEmptyTwoHopBranches).toEqual([]);
 		});
 

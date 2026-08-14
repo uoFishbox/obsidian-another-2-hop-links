@@ -5,8 +5,6 @@ import { getLookupPathForLink } from "core/indexing/link-resolution/linkResoluti
 import type { IIndexingService } from "types/services";
 import type {
 	CachedMetadataWithLinkReferences,
-	DisplayDataVersions,
-	ResolvePhase,
 	ResolveProgress,
 	TwoHopIndexedLink,
 	TwoHopLinkResult,
@@ -26,8 +24,6 @@ import {
 	freezeTwoHopLinkResult,
 } from "./immutableTwoHopLinkResult";
 import { createResolveAbortError, throwIfResolveAborted } from "./resolveCancellation";
-
-let nextDisplaySnapshotRevision = 0;
 
 /**
  * Maximum number of times `resolveInternal` retries when the index version
@@ -271,7 +267,6 @@ export class TwoHopLinkResolver {
 				return cachedSnapshot;
 			}
 
-			const displaySnapshotRevision = ++nextDisplaySnapshotRevision;
 			const cache = this.metadataCache.getFileCache(
 				targetFile,
 			) as CachedMetadataWithLinkReferences | null;
@@ -299,10 +294,6 @@ export class TwoHopLinkResolver {
 				branches: baseBranches,
 				backlinks: uniqueBacklinks,
 				taggedNotes: [],
-				displayVersions: this.createDisplayVersions(
-					displaySnapshotRevision,
-					"base",
-				),
 			});
 			onProgress?.({
 				phase: "base",
@@ -323,10 +314,6 @@ export class TwoHopLinkResolver {
 				branches: twoHopBranches,
 				backlinks: uniqueBacklinks,
 				taggedNotes: [],
-				displayVersions: this.createDisplayVersions(
-					displaySnapshotRevision,
-					"twohop",
-				),
 			});
 			onProgress?.({
 				phase: "twohop",
@@ -345,11 +332,6 @@ export class TwoHopLinkResolver {
 				branches: twoHopBranches,
 				backlinks: uniqueBacklinks,
 				taggedNotes,
-				displayVersions: this.createDisplayVersions(
-					displaySnapshotRevision,
-					"complete",
-					resolveSettings.includeTaggedNotes,
-				),
 			});
 			throwIfResolveAborted(signal);
 
@@ -435,31 +417,6 @@ export class TwoHopLinkResolver {
 		}\u0000${performanceSettings.maxOutgoingToProcess}\u0000${
 			resolveSettings.includeTaggedNotes ? "1" : "0"
 		}`;
-	}
-
-	private createDisplayVersions(
-		displaySnapshotRevision: number,
-		phase: ResolvePhase,
-		includeTaggedNotes = true,
-	): DisplayDataVersions {
-		const versionPrefix = String(displaySnapshotRevision);
-		switch (phase) {
-			case "base":
-				return {
-					links: `${versionPrefix}:base`,
-					tags: `${versionPrefix}:pending`,
-				};
-			case "twohop":
-				return {
-					links: `${versionPrefix}:twohop`,
-					tags: `${versionPrefix}:pending`,
-				};
-			case "complete":
-				return {
-					links: `${versionPrefix}:twohop`,
-					tags: `${versionPrefix}:${includeTaggedNotes ? "tags" : "hidden"}`,
-				};
-		}
 	}
 
 	private logCanvasDebugHeader(
