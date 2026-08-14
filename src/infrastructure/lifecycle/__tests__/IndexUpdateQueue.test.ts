@@ -27,17 +27,24 @@ vi.mock("obsidian", () => {
 			.replace(/^\/+|\/+$/g, "");
 	}
 
+	function getLinkpath(linkText: string): string {
+		return linkText.split(/[#^]/, 1)[0] ?? "";
+	}
+
 	return {
 		TFile,
 		TFolder,
 		WorkspaceLeaf,
 		debounce,
+		getLinkpath,
 		normalizePath,
 	};
 });
 
 import { TFile, TFolder } from "obsidian";
+import type { DataUpdateContext } from "core/indexing/index-service/IndexEvents";
 import { createMockTFile } from "testing/__mocks__/testHelpers";
+import { VaultEnvironmentBuilder } from "testing/helpers/VaultEnvironmentBuilder";
 import { IndexUpdateQueue } from "../IndexUpdateQueue";
 
 type EventCallback = (...args: unknown[]) => void;
@@ -205,6 +212,65 @@ describe("IndexUpdateQueue", () => {
 		expect(harness.indexingService.applyFileChangesTimeSliced).toHaveBeenCalledWith(
 			[{ type: "modify", path: "notes/existing.md" }],
 		);
+	});
+
+	test("markdown metadata change repairs an index update that used stale metadata", async () => {
+		const environment = new VaultEnvironmentBuilder([
+			{ path: "origin.md", links: [] },
+			{ path: "target.md" },
+		]).build();
+		const harness = createHarness();
+		harness.indexingService.rebuildIndexesTimeSliced.mockImplementation(() =>
+			environment.service.rebuildIndexesTimeSliced(),
+		);
+		harness.indexingService.applyFileChangesTimeSliced.mockImplementation(
+			(changes) => environment.service.applyFileChangesTimeSliced(changes),
+		);
+		await initializeQueue(harness);
+		await harness.waitForIndexIdle();
+		const contexts: DataUpdateContext[] = [];
+		environment.service.onDataUpdate((context) => contexts.push(context));
+		const staleOrigin = environment.mockVault.getAbstractFileByPath(
+			"origin.md",
+		) as TFile;
+
+		harness.emitVaultEvent("modify", staleOrigin);
+		await harness.queue.awaitQueueIdle();
+
+		expect(contexts).toHaveLength(1);
+		expect(contexts[0]?.affectedLinkSourcePaths).toEqual([]);
+		expect(environment.service.getBacklinksForLink("target.md")).toEqual([]);
+
+		environment.builder.addFile({ path: "origin.md", links: ["target"] });
+		const currentOrigin = environment.mockVault.getAbstractFileByPath(
+			"origin.md",
+		) as TFile;
+		harness.emitMetadataEvent("changed", currentOrigin);
+		await harness.queue.awaitQueueIdle();
+
+		expect(contexts).toHaveLength(2);
+		expect(contexts[1]?.affectedLinkSourcePaths).toEqual(["origin.md"]);
+		expect(
+			environment.service
+				.getBacklinksForLink("target.md")
+				.map((link) => link.sourceFile.path),
+		).toEqual(["origin.md"]);
+		expect(harness.indexingService.applyFileChangesTimeSliced).toHaveBeenCalledWith(
+			[{ type: "modify", path: "origin.md" }],
+		);
+	});
+
+	test("metadata change ignores files that cannot contain indexed links", async () => {
+		const harness = createHarness();
+		await initializeQueue(harness);
+		const attachment = createMockTFile("attachments/image.png", "png");
+
+		harness.emitMetadataEvent("changed", attachment);
+		await flushAsyncTasks();
+
+		expect(
+			harness.indexingService.applyFileChangesTimeSliced,
+		).not.toHaveBeenCalled();
 	});
 
 	test("folder rename batches descendant changes behind one metadata gate", async () => {

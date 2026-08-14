@@ -125,16 +125,20 @@ export class IndexUpdateQueue {
 				if (this.destroyed) {
 					return;
 				}
-				if (file instanceof TFile && file.extension === "canvas") {
-					if (enableLogging)
-						logger(
-							`[EventManager] Canvas ${file.path}: Link structure changed, queueing index update`,
-						);
-					this.recordObservedChange({
-						type: "modify",
-						path: file.path,
-					});
+				if (!(file instanceof TFile)) {
+					return;
 				}
+				if (!INDEX_LINK_CAPABLE_EXTENSIONS.has(file.extension.toLowerCase())) {
+					return;
+				}
+				if (enableLogging)
+					logger(
+						`[EventManager] ${file.path}: Metadata changed, queueing index update`,
+					);
+				this.recordObservedChange({
+					type: "modify",
+					path: file.path,
+				});
 			}),
 		);
 	}
