@@ -1,14 +1,8 @@
 import type { Snippet } from "svelte";
 import type { ResultNavigationDirection } from "features/keyboard-navigation/resultFocus";
-import type { InteractionDescriptor } from "ui/interactions/interactionTypes";
-import type {
-	InteractionDescriptorResolver,
-	InteractionDescriptorResolverProvider,
-} from "ui/interactions/interactionRegistry";
+import type { InteractionDescriptorResolverProvider } from "ui/interactions/interactionRegistry";
 import type { MountedVirtualCell, VirtualNavigationTarget } from "../types";
 import type { ProgrammaticScrollSnapshot } from "../dom/flushVirtualScrollMeasurement";
-import type { VirtualSurfaceNavigationContext } from "./VirtualSurfaceNavigation";
-import type { VirtualCellRegistry } from "./VirtualCellRegistry";
 import type { VirtualCellBodyLifecyclePolicy } from "ui/virtualization/core/bodyLifecycle";
 import type { VirtualSurfaceMountedRow } from "./VirtualSurfaceTypes";
 
@@ -22,10 +16,7 @@ export interface VirtualSurfaceCommonProps<TMountedCell extends MountedVirtualCe
 	rowHeight: number;
 	columns?: number;
 	gap?: number;
-	mountedCellsForChange?: readonly TMountedCell[];
 	interactionDescriptorScopeId?: string;
-	interactionDescriptors?: readonly InteractionDescriptor[];
-	interactionDescriptorResolvers?: readonly InteractionDescriptorResolver[];
 	interactionDescriptorResolverProvider?: InteractionDescriptorResolverProvider;
 	renderCell: Snippet<
 		[
@@ -42,9 +33,6 @@ export interface VirtualSurfaceCommonProps<TMountedCell extends MountedVirtualCe
 	observerRoot?: HTMLElement | null;
 	getCellClassName?: (cell: TMountedCell) => string | undefined;
 	getCellDataTestId?: (cell: TMountedCell) => string | undefined;
-	onCellMount?: (cell: TMountedCell) => void;
-	onCellDestroy?: (cell: TMountedCell) => void;
-	onMountedCellsChange?: (cells: readonly TMountedCell[]) => void;
 	bodyLifecyclePolicy?: VirtualCellBodyLifecyclePolicy<TMountedCell>;
 	resolveNavigationTarget?: (
 		currentKey: string,
@@ -54,13 +42,7 @@ export interface VirtualSurfaceCommonProps<TMountedCell extends MountedVirtualCe
 			columnIndex: number;
 		},
 	) => VirtualNavigationTarget | null;
-	moveFocusWithinList?: (
-		currentTarget: HTMLElement,
-		direction: ResultNavigationDirection,
-		context: VirtualSurfaceNavigationContext,
-	) => Promise<boolean>;
 	flushVirtualScrollMeasurement?: (snapshot: ProgrammaticScrollSnapshot) => void;
-	cellRegistry?: VirtualCellRegistry;
 }
 
 export type VirtualSurfaceProps<TMountedCell extends MountedVirtualCell> =

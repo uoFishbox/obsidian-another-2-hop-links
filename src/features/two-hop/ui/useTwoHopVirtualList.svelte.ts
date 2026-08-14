@@ -162,7 +162,6 @@ export function useTwoHopVirtualList(
 			measurement.hasStableVisibleRange = true;
 		},
 		onSnapshotUpdated: () => scheduleRangeEffects(),
-		trackMountedCellsForChange: false,
 	});
 
 	const cardHydrator = createTwoHopCardHydrator({

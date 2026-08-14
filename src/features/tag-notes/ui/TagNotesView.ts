@@ -338,7 +338,6 @@ export class TagNotesView extends AbstractSvelteListView<TaggedNote> {
 			paginationMode: "infinite-scroll",
 			preserveResultsHeightOnSearch: false,
 			itemComponent: ViewItemCard,
-			visibilityConsumption: "none",
 			getItemProps: (item: ViewItem) => ({
 				item,
 				settings: this.plugin.settings,

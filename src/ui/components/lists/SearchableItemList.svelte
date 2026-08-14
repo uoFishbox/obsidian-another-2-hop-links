@@ -344,9 +344,6 @@
 	let preserveResultsHeightOnSearch = $derived(
 		config.preserveResultsHeightOnSearch ?? true,
 	);
-	let visibilityConsumption = $derived(
-		config.visibilityConsumption ?? "reactive-state",
-	);
 	const cardModelCache = new WeakMap<
 		ViewItem,
 		{ revision: object; itemKey: string; model: CardRenderModel }
@@ -468,7 +465,6 @@
 			{initialVisibleCount}
 			{loadMoreIncrement}
 			paginationMode={config.paginationMode ?? "button"}
-			{visibilityConsumption}
 			{resolveItemPreviewRequest}
 			{resolveItemInteractionDescriptor}
 			remountCellBodyOnKeyChange={config.itemComponent !== ViewItemCard}
@@ -478,7 +474,6 @@
 				item,
 				index,
 				observerRoot,
-				visibility,
 				rowIndex,
 				activationCandidateId,
 				previewSlotId,
@@ -494,21 +489,6 @@
 						model={resolveViewItemCardModel(item, index)}
 						{previewSlotId}
 					/>
-				{:else if visibilityConsumption !== "none"}
-					<ItemComponent
-						{...config.getItemProps(item)}
-						searchQuery={search.normalized}
-						searchScope={allowContentSearch &&
-						contentSearchEnabled &&
-						(matchedItem?.contentMatched ?? true)
-							? "title-and-content"
-							: "title-only"}
-						contentPreview={matchedItem?.contentPreview}
-						{observerRoot}
-						{visibility}
-						{rowIndex}
-						{activationCandidateId}
-					/>
 				{:else}
 					<ItemComponent
 						{...config.getItemProps(item)}
@@ -519,6 +499,7 @@
 							? "title-and-content"
 							: "title-only"}
 						contentPreview={matchedItem?.contentPreview}
+						{observerRoot}
 						{rowIndex}
 						{activationCandidateId}
 					/>

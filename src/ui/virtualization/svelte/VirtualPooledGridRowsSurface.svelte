@@ -13,10 +13,6 @@
 		type VirtualCellBodyLifecyclePolicy,
 	} from "ui/virtualization/core/bodyLifecycle";
 	import VirtualGridLogicalCellMount from "./VirtualGridLogicalCellMount.svelte";
-	import type {
-		VirtualCellRegistrationOwner,
-		VirtualCellRegistry,
-	} from "./VirtualCellRegistry";
 	import type { VirtualGridSurfaceTransaction } from "./VirtualGridSurfaceTransaction";
 	import type { VirtualSurfaceMountedRow } from "./VirtualSurfaceTypes";
 
@@ -37,14 +33,8 @@
 		observerRoot?: HTMLElement | null;
 		getCellClassName?: (cell: TMountedCell) => string | undefined;
 		getCellDataTestId?: (cell: TMountedCell) => string | undefined;
-		onLogicalCellAttach?: (cell: TMountedCell) => void;
-		onLogicalCellDetach?: (cell: TMountedCell) => void;
 		bodyLifecyclePolicy?: VirtualCellBodyLifecyclePolicy<TMountedCell>;
 		isRowActive?: (row: TMountedRow) => boolean;
-		cellRegistry?: VirtualCellRegistry;
-		getCellRegistrationOwner?: (
-			cell: TMountedCell,
-		) => VirtualCellRegistrationOwner | undefined;
 		surfaceTransaction: VirtualGridSurfaceTransaction;
 		renderCell: Snippet<
 			[
@@ -70,12 +60,8 @@
 		observerRoot = null,
 		getCellClassName,
 		getCellDataTestId,
-		onLogicalCellAttach,
-		onLogicalCellDetach,
 		bodyLifecyclePolicy = KEYED_VIRTUAL_CELL_BODY_LIFECYCLE,
 		isRowActive,
-		cellRegistry,
-		getCellRegistrationOwner,
 		surfaceTransaction,
 		renderCell,
 	}: Props<TMountedCell, TMountedRow> = $props();
@@ -172,13 +158,6 @@
 							? resolveMountedCellColumnIndex(mountedCell)
 							: cellSlot.columnIndex}
 						ariaHidden={mountedCell === null}
-						mountedCell={mountedCell ?? undefined}
-						{onLogicalCellAttach}
-						{onLogicalCellDetach}
-						{cellRegistry}
-						cellRegistrationOwner={mountedCell
-							? getCellRegistrationOwner?.(mountedCell)
-							: undefined}
 						{surfaceTransaction}
 					>
 						{#if mountedCell}

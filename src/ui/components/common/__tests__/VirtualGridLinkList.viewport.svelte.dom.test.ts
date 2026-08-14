@@ -144,28 +144,4 @@ describe("VirtualGridLinkList viewport", () => {
 		expect(after).not.toContain(10);
 		expect(after.length).toBeLessThan(before.length);
 	});
-
-	it("passes virtualizer visibility to flat item renderers", async () => {
-		const driver = renderVirtualGridList({
-			items: createItems(20),
-			initialVisibleCount: 20,
-		});
-
-		await driver.setViewport({
-			rootHeight: 120,
-			width: 330,
-		});
-
-		const cells = Array.from(
-			driver
-				.getShadowRoot()
-				?.querySelectorAll<HTMLElement>("[data-testid='item-cell']") ?? [],
-		);
-		const visibilityByIndex = new Map(
-			cells.map((cell) => [Number(cell.dataset.index), cell.dataset.visibility]),
-		);
-
-		expect(visibilityByIndex.get(0)).toBe("visible");
-		expect(visibilityByIndex.get(3)).toBe("visible");
-	});
 });

@@ -31,12 +31,10 @@
 		rowHeight={list.layout.rowHeight}
 		columns={list.layout.columns}
 		mountedRows={list.mountedRows}
-		mountedCellsForChange={list.mountedCellsForChange}
 		bind:rootEl={list.sectionRootEl}
 		bind:contentEl={list.contentEl}
 		bind:interactionShadowRoot={list.interactionShadowRoot}
 		observerRoot={list.observerRoot}
-		onMountedCellsChange={props.onMountedCellsChange}
 		bodyLifecyclePolicy={props.remountCellBodyOnKeyChange === false
 			? PHYSICAL_SLOT_BODY_LIFECYCLE
 			: KEYED_VIRTUAL_CELL_BODY_LIFECYCLE}

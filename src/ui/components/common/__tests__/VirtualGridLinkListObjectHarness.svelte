@@ -18,7 +18,6 @@
 		renderRevisionFallbackPolicy?: RenderRevisionFallbackPolicy;
 		initialVisibleCount?: number;
 		loadMoreIncrement?: number;
-		onMountedCellsChange?: (cells: readonly unknown[]) => void;
 		useItemRenderRevision?: boolean;
 	}
 
@@ -29,7 +28,6 @@
 		renderRevisionFallbackPolicy,
 		initialVisibleCount = items.length,
 		loadMoreIncrement = items.length,
-		onMountedCellsChange,
 		useItemRenderRevision = false,
 	}: Props = $props();
 </script>
@@ -55,7 +53,6 @@
 				: undefined}
 			{initialVisibleCount}
 			{loadMoreIncrement}
-			{onMountedCellsChange}
 		>
 			{#snippet item({ item, index })}
 				<div

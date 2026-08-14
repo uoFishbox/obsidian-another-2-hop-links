@@ -7,7 +7,6 @@
 	} from "ui/virtualization/core/bodyLifecycle";
 	import VirtualPooledGridRowsSurface from "./VirtualPooledGridRowsSurface.svelte";
 	import type { VirtualSurfaceMountedRow } from "./VirtualSurfaceTypes";
-	import type { VirtualCellRegistry } from "./VirtualCellRegistry";
 	import type { VirtualGridSurfaceTransaction } from "./VirtualGridSurfaceTransaction";
 
 	interface Props<TMountedCell extends MountedVirtualCell> {
@@ -24,10 +23,7 @@
 		observerRoot?: HTMLElement | null;
 		getCellClassName?: (cell: TMountedCell) => string | undefined;
 		getCellDataTestId?: (cell: TMountedCell) => string | undefined;
-		onCellMount?: (cell: TMountedCell) => void;
-		onCellDestroy?: (cell: TMountedCell) => void;
 		bodyLifecyclePolicy?: VirtualCellBodyLifecyclePolicy<TMountedCell>;
-		cellRegistry?: VirtualCellRegistry;
 		surfaceTransaction: VirtualGridSurfaceTransaction;
 		renderCell: Snippet<
 			[
@@ -53,10 +49,7 @@
 		observerRoot = null,
 		getCellClassName,
 		getCellDataTestId,
-		onCellMount,
-		onCellDestroy,
 		bodyLifecyclePolicy = KEYED_VIRTUAL_CELL_BODY_LIFECYCLE,
-		cellRegistry,
 		surfaceTransaction,
 		renderCell,
 	}: Props<TMountedCell> = $props();
@@ -76,10 +69,7 @@
 	{observerRoot}
 	{getCellClassName}
 	{getCellDataTestId}
-	onLogicalCellAttach={onCellMount}
-	onLogicalCellDetach={onCellDestroy}
 	{bodyLifecyclePolicy}
-	{cellRegistry}
 	{surfaceTransaction}
 	{renderCell}
 />

@@ -17,6 +17,7 @@ vi.mock("obsidian", () => {
 
 	return {
 		TFile,
+		Platform: { isMobile: false },
 	};
 });
 

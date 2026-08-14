@@ -58,14 +58,9 @@
 					<div class="test-cell" data-testid="header-cell">Header</div>
 				{/snippet}
 
-				{#snippet item({ item, index, visibility })}
+				{#snippet item({ item, index })}
 					<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
-					<div
-						class="test-cell"
-						data-testid="item-cell"
-						data-index={index}
-						data-visibility={visibility}
-					>
+					<div class="test-cell" data-testid="item-cell" data-index={index}>
 						<div
 							class="cosense-card-links__box"
 							data-testid="item-focus-target"
@@ -93,14 +88,9 @@
 				{paginationMode}
 				{infiniteScrollRootMargin}
 			>
-				{#snippet item({ item, index, visibility })}
+				{#snippet item({ item, index })}
 					<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
-					<div
-						class="test-cell"
-						data-testid="item-cell"
-						data-index={index}
-						data-visibility={visibility}
-					>
+					<div class="test-cell" data-testid="item-cell" data-index={index}>
 						<div
 							class="cosense-card-links__box"
 							data-testid="item-focus-target"

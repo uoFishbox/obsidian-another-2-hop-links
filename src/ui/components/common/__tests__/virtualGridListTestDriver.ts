@@ -476,7 +476,6 @@ export interface RenderVirtualGridListObjectOptions {
 	initialVisibleCount?: number;
 	loadMoreIncrement?: number;
 	useItemRenderRevision?: boolean;
-	onMountedCellsChange?: (cells: readonly unknown[]) => void;
 }
 
 export interface VirtualGridListObjectDriver {
@@ -514,7 +513,6 @@ export function renderVirtualGridListObject(
 		initialVisibleCount = items.length,
 		loadMoreIncrement = items.length,
 		useItemRenderRevision = false,
-		onMountedCellsChange,
 	} = options;
 
 	const view = render(LinkListObjectHarness, {
@@ -526,7 +524,6 @@ export function renderVirtualGridListObject(
 			initialVisibleCount,
 			loadMoreIncrement,
 			useItemRenderRevision,
-			onMountedCellsChange,
 		},
 	});
 

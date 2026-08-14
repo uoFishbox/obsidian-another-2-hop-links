@@ -96,7 +96,6 @@
 		allowContentSearch: true,
 		searchPlaceholder: "Search note titles...",
 		itemComponent: ViewItemCard,
-		visibilityConsumption: "none",
 		getSearchText: (item: ViewItem, ctx) => {
 			if (item.type !== "file") return "";
 			return getFileCardTitleSearchText(

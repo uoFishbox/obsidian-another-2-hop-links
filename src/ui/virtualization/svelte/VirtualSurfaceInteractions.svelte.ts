@@ -4,24 +4,16 @@ import { createDelegatedInteractionDispatcher } from "ui/interactions/delegatedD
 import {
 	createInteractionRegistry,
 	setInteractionRegistryContext,
-	type InteractionDescriptorResolver,
 	type InteractionDescriptorResolverProvider,
 } from "ui/interactions/interactionRegistry";
 import { useAppContext, useLinkContext } from "ui/context/linkContext";
 import type { ResultNavigationDirection } from "features/keyboard-navigation/resultFocus";
-import type { InteractionDescriptor } from "ui/interactions/interactionTypes";
-import type { MountedVirtualCell, VirtualNavigationTarget } from "../types";
+import type { VirtualNavigationTarget } from "../types";
 import type { ProgrammaticScrollSnapshot } from "../dom/flushVirtualScrollMeasurement";
-import type { VirtualCellRegistry } from "./VirtualCellRegistry";
 import { installVirtualListInteractions } from "./VirtualListInteractions.svelte";
-import {
-	createVirtualSurfaceNavigation,
-	type VirtualSurfaceNavigationContext,
-} from "./VirtualSurfaceNavigation";
+import { createVirtualSurfaceNavigation } from "./VirtualSurfaceNavigation";
 
-export interface VirtualSurfaceInteractionParams<
-	TMountedCell extends MountedVirtualCell,
-> {
+export interface VirtualSurfaceInteractionParams {
 	getRootEl(): HTMLDivElement | null;
 	getContentEl(): HTMLDivElement | null;
 	getShadowRoot(): ShadowRoot | null;
@@ -29,8 +21,6 @@ export interface VirtualSurfaceInteractionParams<
 	getObserverRoot(): HTMLElement | null;
 	getRowHeight(): number;
 	getInteractionDescriptorScopeId(): string | undefined;
-	getInteractionDescriptors(): readonly InteractionDescriptor[];
-	getInteractionDescriptorResolvers(): readonly InteractionDescriptorResolver[];
 	getInteractionDescriptorResolverProvider():
 		| InteractionDescriptorResolverProvider
 		| undefined;
@@ -42,18 +32,10 @@ export interface VirtualSurfaceInteractionParams<
 			columnIndex: number;
 		},
 	) => VirtualNavigationTarget | null;
-	moveFocusWithinList?: (
-		currentTarget: HTMLElement,
-		direction: ResultNavigationDirection,
-		context: VirtualSurfaceNavigationContext,
-	) => Promise<boolean>;
 	flushVirtualScrollMeasurement?: (snapshot: ProgrammaticScrollSnapshot) => void;
-	cellRegistry?: VirtualCellRegistry;
 }
 
-export function createVirtualSurfaceInteractions<
-	TMountedCell extends MountedVirtualCell,
->({
+export function createVirtualSurfaceInteractions({
 	getRootEl,
 	getContentEl,
 	getShadowRoot,
@@ -61,14 +43,10 @@ export function createVirtualSurfaceInteractions<
 	getObserverRoot,
 	getRowHeight,
 	getInteractionDescriptorScopeId,
-	getInteractionDescriptors,
-	getInteractionDescriptorResolvers,
 	getInteractionDescriptorResolverProvider,
 	resolveNavigationTarget,
-	moveFocusWithinList,
 	flushVirtualScrollMeasurement,
-	cellRegistry,
-}: VirtualSurfaceInteractionParams<TMountedCell>) {
+}: VirtualSurfaceInteractionParams) {
 	const interactionRegistry = createInteractionRegistry();
 	setInteractionRegistryContext(interactionRegistry);
 
@@ -110,10 +88,8 @@ export function createVirtualSurfaceInteractions<
 		getRowHeight,
 		delegatedInteractions,
 		resolveNavigationTarget,
-		moveFocusWithinList,
 		flushVirtualScrollMeasurement,
 		flushMountedState,
-		cellRegistry,
 	});
 
 	installVirtualListInteractions({
@@ -128,16 +104,6 @@ export function createVirtualSurfaceInteractions<
 	});
 
 	let syncedInteractionDescriptorScopeId: string | undefined;
-	let syncedInteractionDescriptorResolverProviderScopeId: string | undefined;
-
-	function clearInteractionDescriptorScope(scopeId: string): void {
-		interactionRegistry.syncInteractionDescriptors(scopeId, []);
-		interactionRegistry.syncInteractionDescriptorResolvers(scopeId, []);
-		interactionRegistry.syncInteractionDescriptorResolverProvider(
-			scopeId,
-			undefined,
-		);
-	}
 
 	$effect(() => {
 		const interactionDescriptorScopeId = getInteractionDescriptorScopeId();
@@ -147,45 +113,26 @@ export function createVirtualSurfaceInteractions<
 			syncedInteractionDescriptorScopeId &&
 			syncedInteractionDescriptorScopeId !== interactionDescriptorScopeId
 		) {
-			clearInteractionDescriptorScope(syncedInteractionDescriptorScopeId);
-		}
-		if (
-			syncedInteractionDescriptorResolverProviderScopeId &&
-			(syncedInteractionDescriptorResolverProviderScopeId !==
-				interactionDescriptorScopeId ||
-				!interactionDescriptorResolverProvider)
-		) {
 			interactionRegistry.syncInteractionDescriptorResolverProvider(
-				syncedInteractionDescriptorResolverProviderScopeId,
+				syncedInteractionDescriptorScopeId,
 				undefined,
 			);
-			syncedInteractionDescriptorResolverProviderScopeId = undefined;
 		}
 		syncedInteractionDescriptorScopeId = interactionDescriptorScopeId;
 
 		if (!interactionDescriptorScopeId) return;
-
-		interactionRegistry.syncInteractionDescriptors(
+		interactionRegistry.syncInteractionDescriptorResolverProvider(
 			interactionDescriptorScopeId,
-			getInteractionDescriptors(),
+			interactionDescriptorResolverProvider,
 		);
-		interactionRegistry.syncInteractionDescriptorResolvers(
-			interactionDescriptorScopeId,
-			getInteractionDescriptorResolvers(),
-		);
-		if (interactionDescriptorResolverProvider) {
-			interactionRegistry.syncInteractionDescriptorResolverProvider(
-				interactionDescriptorScopeId,
-				interactionDescriptorResolverProvider,
-			);
-			syncedInteractionDescriptorResolverProviderScopeId =
-				interactionDescriptorScopeId;
-		}
 	});
 
 	onDestroy(() => {
 		if (!syncedInteractionDescriptorScopeId) return;
-		clearInteractionDescriptorScope(syncedInteractionDescriptorScopeId);
+		interactionRegistry.syncInteractionDescriptorResolverProvider(
+			syncedInteractionDescriptorScopeId,
+			undefined,
+		);
 	});
 
 	return {

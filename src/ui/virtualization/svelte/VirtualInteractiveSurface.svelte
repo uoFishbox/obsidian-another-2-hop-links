@@ -3,21 +3,14 @@
 	import type { MountedVirtualCell } from "../types";
 	import type { VirtualSurfaceCommonProps } from "./VirtualSurfaceProps";
 	import { createVirtualSurfaceInteractions } from "./VirtualSurfaceInteractions.svelte";
-	import { watchVirtualSurfaceMountedCellsChange } from "./VirtualSurfaceMountedCellsChange.svelte";
 	import { createVirtualGridSurfaceTransaction } from "./VirtualGridSurfaceTransaction";
 
 	type Props<TMountedCell extends MountedVirtualCell> = Pick<
 		VirtualSurfaceCommonProps<TMountedCell>,
-		| "mountedCellsForChange"
 		| "interactionDescriptorScopeId"
-		| "interactionDescriptors"
-		| "interactionDescriptorResolvers"
 		| "interactionDescriptorResolverProvider"
-		| "onMountedCellsChange"
 		| "resolveNavigationTarget"
-		| "moveFocusWithinList"
 		| "flushVirtualScrollMeasurement"
-		| "cellRegistry"
 	> & {
 		className?: string;
 		rootEl?: HTMLDivElement | null;
@@ -35,16 +28,10 @@
 		interactionShadowRoot = $bindable<ShadowRoot | null>(null),
 		observerRoot = null,
 		rowHeight,
-		mountedCellsForChange,
 		interactionDescriptorScopeId,
-		interactionDescriptors = [],
-		interactionDescriptorResolvers = [],
 		interactionDescriptorResolverProvider = undefined,
-		onMountedCellsChange,
 		resolveNavigationTarget,
-		moveFocusWithinList,
 		flushVirtualScrollMeasurement,
-		cellRegistry,
 		children,
 	}: Props<TMountedCell> = $props();
 
@@ -58,22 +45,13 @@
 		getObserverRoot: () => observerRoot,
 		getRowHeight: () => rowHeight,
 		getInteractionDescriptorScopeId: () => interactionDescriptorScopeId,
-		getInteractionDescriptors: () => interactionDescriptors,
-		getInteractionDescriptorResolvers: () => interactionDescriptorResolvers,
 		getInteractionDescriptorResolverProvider: () =>
 			interactionDescriptorResolverProvider,
 		resolveNavigationTarget,
-		moveFocusWithinList,
 		flushVirtualScrollMeasurement,
-		cellRegistry,
 	});
 	const { delegatedInteractions, handleKeyDown, touchEventHandlers } =
 		surfaceInteractions;
-
-	watchVirtualSurfaceMountedCellsChange<TMountedCell>({
-		getMountedCellsForChange: () => mountedCellsForChange,
-		onMountedCellsChange,
-	});
 
 	const surfaceTransaction = createVirtualGridSurfaceTransaction({
 		onLogicalCellWillRebind: () => {

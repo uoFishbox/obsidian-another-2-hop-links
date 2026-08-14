@@ -16,10 +16,7 @@
 		columns = 1,
 		gap = undefined,
 		mountedRows,
-		mountedCellsForChange,
 		interactionDescriptorScopeId,
-		interactionDescriptors = [],
-		interactionDescriptorResolvers = [],
 		interactionDescriptorResolverProvider = undefined,
 		renderCell,
 		afterContent,
@@ -29,14 +26,9 @@
 		observerRoot = null,
 		getCellClassName,
 		getCellDataTestId,
-		onCellMount,
-		onCellDestroy,
-		onMountedCellsChange,
 		bodyLifecyclePolicy = KEYED_VIRTUAL_CELL_BODY_LIFECYCLE,
 		resolveNavigationTarget,
-		moveFocusWithinList,
 		flushVirtualScrollMeasurement,
-		cellRegistry,
 	}: VirtualSurfaceProps<TMountedCell> = $props();
 </script>
 
@@ -47,16 +39,10 @@
 	bind:interactionShadowRoot
 	{observerRoot}
 	{rowHeight}
-	{mountedCellsForChange}
 	{interactionDescriptorScopeId}
-	{interactionDescriptors}
-	{interactionDescriptorResolvers}
 	{interactionDescriptorResolverProvider}
-	{onMountedCellsChange}
 	{resolveNavigationTarget}
-	{moveFocusWithinList}
 	{flushVirtualScrollMeasurement}
-	{cellRegistry}
 >
 	{#snippet children(surfaceTransaction)}
 		<VirtualSurfaceCells
@@ -73,10 +59,7 @@
 			{observerRoot}
 			{getCellClassName}
 			{getCellDataTestId}
-			{onCellMount}
-			{onCellDestroy}
 			{bodyLifecyclePolicy}
-			{cellRegistry}
 			{surfaceTransaction}
 			{renderCell}
 		/>

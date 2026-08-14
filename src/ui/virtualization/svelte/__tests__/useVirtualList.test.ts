@@ -142,7 +142,6 @@ describe("useVirtualList", () => {
 				(cell) => !Object.prototype.hasOwnProperty.call(cell, "visibility"),
 			),
 		).toBe(true);
-		expect(virtualList.getMountedCellsForChange()).toEqual(snapshot?.mountedCells);
 	});
 
 	it("reflects active scrolling in stable mode", () => {
@@ -433,7 +432,6 @@ describe("useVirtualList", () => {
 			reason: "no-renderable-content",
 		});
 		expect(virtualList.getMountedCells()).toEqual([]);
-		expect(virtualList.getMountedCellsForChange()).toEqual([]);
 		expect(virtualList.getSnapshot()?.mountedCells).toEqual([]);
 		expect(virtualList.getReconciliationState().mountedBuild).toBeNull();
 		expect(onSnapshotUpdated).toHaveBeenCalledTimes(2);

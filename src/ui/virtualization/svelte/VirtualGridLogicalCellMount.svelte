@@ -1,11 +1,7 @@
-<script lang="ts" generics="TMountedCell">
+<script lang="ts">
 	import { IS_PROD } from "appConstants";
 	import type { Snippet } from "svelte";
 	import type { LogicalCellKey } from "../types";
-	import type {
-		VirtualCellRegistry,
-		VirtualCellRegistrationOwner,
-	} from "./VirtualCellRegistry";
 	import type { VirtualGridSurfaceTransaction } from "./VirtualGridSurfaceTransaction";
 	import { bindVirtualGridCell } from "./VirtualGridSurfaceTransaction";
 
@@ -17,12 +13,7 @@
 		rowIndex?: number;
 		columnIndex?: number;
 		ariaHidden?: boolean;
-		mountedCell?: TMountedCell;
-		onLogicalCellAttach?: (cell: TMountedCell) => void;
-		onLogicalCellDetach?: (cell: TMountedCell) => void;
 		children?: Snippet;
-		cellRegistry?: VirtualCellRegistry;
-		cellRegistrationOwner?: VirtualCellRegistrationOwner;
 		surfaceTransaction: VirtualGridSurfaceTransaction;
 	}
 
@@ -34,12 +25,7 @@
 		rowIndex,
 		columnIndex,
 		ariaHidden = false,
-		mountedCell,
-		onLogicalCellAttach,
-		onLogicalCellDetach,
 		children,
-		cellRegistry,
-		cellRegistrationOwner,
 		surfaceTransaction,
 	}: Props = $props();
 
@@ -56,11 +42,6 @@
 				nextLogicalKey: logicalKeyAttribute,
 				rowIndex,
 				columnIndex,
-				lifecycleValue: mountedCell,
-				onAttach: mountedCell === undefined ? undefined : onLogicalCellAttach,
-				onDetach: mountedCell === undefined ? undefined : onLogicalCellDetach,
-				cellRegistry,
-				cellRegistrationOwner,
 			}}
 	class={className}
 	data-ccl-logical-key={!IS_PROD ? logicalKeyAttribute : undefined}

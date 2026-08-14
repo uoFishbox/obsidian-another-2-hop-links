@@ -1,14 +1,5 @@
 <script lang="ts" generics="T">
 	import { type Snippet } from "svelte";
-	import type { VirtualizedItemVisibility } from "ui/components/common/virtualizedItemVisibility";
-
-	type MountedItemCell = {
-		cell: {
-			kind: "item";
-			item: T;
-			itemIndex: number;
-		};
-	};
 
 	interface Props<T> {
 		items?: readonly T[];
@@ -18,26 +9,12 @@
 					item: T;
 					index: number;
 					observerRoot: HTMLElement | null;
-					visibility: VirtualizedItemVisibility;
 				},
 			]
 		>;
-		onMountedCellsChange?: (cells: readonly MountedItemCell[]) => void;
 	}
 
-	let { items = [], item, onMountedCellsChange }: Props<T> = $props();
-
-	$effect(() => {
-		onMountedCellsChange?.(
-			items.map((entry, index) => ({
-				cell: {
-					kind: "item",
-					item: entry,
-					itemIndex: index,
-				},
-			})),
-		);
-	});
+	let { items = [], item }: Props<T> = $props();
 </script>
 
 <div data-testid="filtered-count">{items.length}</div>
@@ -47,6 +24,5 @@
 		item: entry,
 		index,
 		observerRoot: null,
-		visibility: "visible",
 	})}
 {/each}

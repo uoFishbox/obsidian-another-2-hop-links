@@ -17,7 +17,6 @@ import {
 	renderSlotKey,
 	type LogicalCellKey,
 	type RenderSlotKey,
-	type VirtualizedItemVisibility,
 } from "../../types";
 import {
 	assertVirtualListInvariant,
@@ -56,7 +55,6 @@ export interface MountedVirtualGridCell<T> {
 	readonly renderSlotKey: RenderSlotKey;
 	readonly rowIndex: number;
 	readonly columnIndex: number;
-	readonly visibility?: VirtualizedItemVisibility;
 	readonly cell: VirtualListLogicalCell<T>;
 	readonly cellIndex: number;
 	readonly renderBodyKey?: RenderBodyKey;

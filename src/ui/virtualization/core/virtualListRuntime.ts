@@ -64,13 +64,11 @@ export type VirtualListRuntimeState<
 			mode: { kind: "uninitialized" };
 			snapshot: null;
 			reconciliationState: VirtualListReconciliationState<TMountedBuild>;
-			mountedCellsForChange: readonly TMountedCell[];
 	  }
 	| {
 			mode: MaterializedVirtualListMode;
 			snapshot: VirtualListSnapshot<TCell, TMountedCell, TMountedBuild>;
 			reconciliationState: VirtualListReconciliationState<TMountedBuild>;
-			mountedCellsForChange: readonly TMountedCell[];
 	  };
 
 /** Publishes independently observable virtual-list state changes. */
@@ -106,30 +104,11 @@ export interface CreateVirtualListRuntimeOptions<
 	onStateChanged?: (
 		state: VirtualListRuntimeState<TCell, TMountedCell, TMountedBuild>,
 	) => void;
-	trackMountedCellsForChange?: boolean;
 	mountedRowsReconciler?: {
 		reset(reason: ResidentSlotResetReason): void;
 		dispose(): void;
 	};
 }
-
-const hasSameRefs = <T>(current: readonly T[], next: readonly T[]): boolean => {
-	if (current === next) {
-		return true;
-	}
-
-	if (current.length !== next.length) {
-		return false;
-	}
-
-	for (let index = 0; index < current.length; index += 1) {
-		if (current[index] !== next[index]) {
-			return false;
-		}
-	}
-
-	return true;
-};
 
 export function createVirtualListRuntime<
 	TCell,
@@ -151,18 +130,6 @@ export function createVirtualListRuntime<
 		mode: { kind: "uninitialized" },
 		snapshot: null,
 		reconciliationState: initialReconciliationState,
-		mountedCellsForChange: [],
-	};
-
-	const updateMountedCellsForChange = (
-		nextSnapshot: VirtualListSnapshot<TCell, TMountedCell, TMountedBuild>,
-		previousCellsForChange: readonly TMountedCell[],
-	): readonly TMountedCell[] => {
-		const nextCells = nextSnapshot.mountedCells;
-		if (!hasSameRefs(previousCellsForChange, nextCells)) {
-			return nextCells;
-		}
-		return previousCellsForChange;
 	};
 
 	const commitComputation = (
@@ -183,13 +150,6 @@ export function createVirtualListRuntime<
 			mode: nextSnapshot.mode,
 			snapshot: nextSnapshot,
 			reconciliationState: nextReconciliationState,
-			mountedCellsForChange:
-				snapshotChanged && options.trackMountedCellsForChange !== false
-					? updateMountedCellsForChange(
-							nextSnapshot,
-							previousState.mountedCellsForChange,
-						)
-					: previousState.mountedCellsForChange,
 		};
 		const previousMountedBuild = previousState.reconciliationState.mountedBuild;
 		const nextMountedBuild = nextReconciliationState.mountedBuild;

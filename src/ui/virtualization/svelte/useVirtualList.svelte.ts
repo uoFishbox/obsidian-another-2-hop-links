@@ -46,7 +46,6 @@ export function useVirtualList<
 >(options: UseVirtualListOptions<TCell, TRowModel, TMountedCell, TMountedBuild>) {
 	let latestSnapshot: VirtualListSnapshot<TCell, TMountedCell, TMountedBuild> | null =
 		null;
-	let latestMountedCellsForChange: readonly TMountedCell[] = [];
 	let mountedBuildState = $state.raw<VirtualListReconciliationState<TMountedBuild>>({
 		mountedBuild: null,
 	});
@@ -57,7 +56,6 @@ export function useVirtualList<
 		nextState: VirtualListRuntimeState<TCell, TMountedCell, TMountedBuild>,
 	): void => {
 		latestSnapshot = nextState.snapshot;
-		latestMountedCellsForChange = nextState.mountedCellsForChange;
 
 		const nextMountedBuild = nextState.reconciliationState.mountedBuild;
 		if (mountedBuildState.mountedBuild !== nextMountedBuild) {
@@ -97,11 +95,6 @@ export function useVirtualList<
 			return modeState.kind === "empty" || modeState.kind === "uninitialized"
 				? []
 				: (latestSnapshot?.mountedCells ?? []);
-		},
-		getMountedCellsForChange() {
-			void mountedBuildState;
-			void modeState;
-			return latestMountedCellsForChange;
 		},
 		getReconciliationState() {
 			return mountedBuildState;

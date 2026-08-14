@@ -497,7 +497,6 @@ export class PreCreationView extends AbstractSvelteListView<TwoHopIndexedLink> {
 			paginationMode: "infinite-scroll",
 			preserveResultsHeightOnSearch: false,
 			itemComponent: ViewItemCard,
-			visibilityConsumption: "none",
 			getItemProps: (item: ViewItem) => ({
 				item,
 				settings: this.plugin.settings,

@@ -3,14 +3,6 @@ import type { VirtualRowLayoutMetrics } from "./layoutMetrics";
 import type { RenderBodyKey } from "./renderRevision";
 import type { RowKey } from "./rowKey";
 
-export type VirtualizedItemVisibility = "visible" | "mounted";
-
-export type VisibilityConsumption = "none" | "value" | "reactive-state";
-
-export interface VirtualizedItemVisibilityState {
-	readonly visibility: VirtualizedItemVisibility | undefined;
-}
-
 export interface RowNumberLookup {
 	readonly length: number;
 	readonly [index: number]: number;
