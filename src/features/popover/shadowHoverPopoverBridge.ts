@@ -110,6 +110,16 @@ function leaveActiveAnchor(handle: SharedShadowHoverBridgeHandle): void {
 	handle.lastPointerModState = null;
 }
 
+function releaseActiveAnchor(handle: SharedShadowHoverBridgeHandle): void {
+	if (handle.activeAnchorEl) {
+		delete handle.activeAnchorEl.dataset.cclHovered;
+	}
+	handle.controller.releaseActivePopover();
+	handle.activeAnchorEl = null;
+	handle.activeInteractionId = null;
+	handle.lastPointerModState = null;
+}
+
 function enterLogicalHover(
 	handle: SharedShadowHoverBridgeHandle,
 	element: HTMLElement,
@@ -127,10 +137,7 @@ function relaunchActiveAnchorForInteraction(
 	interactionId: string,
 	event: MouseEvent,
 ): void {
-	handle.controller.closeActivePopover();
-	if (handle.activeAnchorEl && handle.activeAnchorEl !== anchorEl) {
-		delete handle.activeAnchorEl.dataset.cclHovered;
-	}
+	releaseActiveAnchor(handle);
 	enterLogicalHover(handle, anchorEl);
 	handle.activeAnchorEl = anchorEl;
 	handle.activeInteractionId = interactionId;
@@ -441,7 +448,7 @@ function createHandle({
 			handle.hoveredAnchorEl = null;
 		}
 		if (handle.activeAnchorEl && target.contains(handle.activeAnchorEl)) {
-			leaveActiveAnchor(handle);
+			releaseActiveAnchor(handle);
 		}
 	};
 	const doc = shadowRoot.ownerDocument;

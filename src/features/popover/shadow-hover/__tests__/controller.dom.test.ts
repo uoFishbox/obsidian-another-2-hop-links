@@ -33,6 +33,75 @@ describe("ShadowHoverControllerImpl", () => {
 		expect(resolveLink).toHaveBeenCalledTimes(1);
 	});
 
+	it("relays delegated anchor enter and leave to the geometry proxy", () => {
+		const controller = new ShadowHoverControllerImpl({ launch: vi.fn() }, () => ({
+			linktext: "note",
+			sourcePath: "note.md",
+		}));
+		const anchorEl = createAnchor();
+		const proxy = controller
+			.getDebugSession()
+			.anchorRegistry.syncProxyRectForActual(anchorEl);
+		const onEnter = vi.fn();
+		const onLeave = vi.fn();
+		proxy.addEventListener("mouseover", onEnter);
+		proxy.addEventListener("mouseout", onLeave);
+
+		controller.handleDelegatedEnter(
+			anchorEl,
+			"item:first",
+			new MouseEvent("mouseover", { bubbles: true }),
+		);
+		controller.handleDelegatedLeave(anchorEl);
+
+		expect(onEnter).toHaveBeenCalledTimes(1);
+		expect(onLeave).toHaveBeenCalledTimes(1);
+		controller.destroy();
+	});
+
+	it("releases an accepted focused popover on destroy without forcing close", () => {
+		const hide = vi.fn();
+		const nativeTransition = vi.fn(function (this: HoverPopoverLike) {
+			if (!this.onTarget && !this.isFocused) {
+				this.hide?.();
+			}
+		});
+		const popover: HoverPopoverLike = {
+			hoverEl: document.createElement("div"),
+			hide,
+			isFocused: true,
+			transition: nativeTransition,
+		};
+		document.body.append(popover.hoverEl!);
+		const launch = vi.fn((request: ShadowPopoverLaunchRequest) => {
+			createRequestHoverParent(
+				request.session,
+				request.requestSeq,
+				request.proxyAnchorEl,
+				request.actualAnchorEl,
+			).hoverPopover = popover;
+		});
+		const controller = new ShadowHoverControllerImpl({ launch }, () => ({
+			linktext: "note",
+			sourcePath: "note.md",
+		}));
+		const anchorEl = createAnchor();
+
+		controller.handleDelegatedEnter(
+			anchorEl,
+			"item:first",
+			new MouseEvent("mouseover", { bubbles: true }),
+		);
+		controller.destroy();
+
+		expect(hide).not.toHaveBeenCalled();
+		expect(nativeTransition).toHaveBeenCalledTimes(2);
+		expect(popover.onTarget).toBe(false);
+		expect(popover.isFocused).toBe(true);
+		expect(popover.transition).toBe(nativeTransition);
+		expect(controller.getDebugPopover()).toBeNull();
+	});
+
 	it("relaunches on modifier-key pointermove transitions through delegated handlers", () => {
 		const launch = vi.fn();
 		const resolveLink = vi.fn(() => ({
@@ -121,6 +190,84 @@ describe("ShadowHoverControllerImpl", () => {
 		expect(resolveLink).not.toHaveBeenCalled();
 	});
 
+	it("relays leave and enter when the active anchor node is replaced", () => {
+		const controller = new ShadowHoverControllerImpl({ launch: vi.fn() }, () => ({
+			linktext: "note",
+			sourcePath: "note.md",
+		}));
+		const firstAnchorEl = createAnchor(10);
+		const secondAnchorEl = createAnchor(80);
+		const registry = controller.getDebugSession().anchorRegistry;
+		const firstProxy = registry.syncProxyRectForActual(firstAnchorEl);
+		const secondProxy = registry.syncProxyRectForActual(secondAnchorEl);
+		const onFirstLeave = vi.fn();
+		const onSecondEnter = vi.fn();
+		firstProxy.addEventListener("mouseout", onFirstLeave);
+		secondProxy.addEventListener("mouseover", onSecondEnter);
+
+		controller.handleDelegatedEnter(
+			firstAnchorEl,
+			"item:first",
+			new MouseEvent("mouseover", { bubbles: true }),
+		);
+		controller.handleDelegatedAnchorSync(secondAnchorEl);
+
+		expect(onFirstLeave).toHaveBeenCalledTimes(1);
+		expect(onSecondEnter).toHaveBeenCalledTimes(1);
+		controller.destroy();
+	});
+
+	it("releases the old accepted popover before relaunching a replaced anchor", () => {
+		const hideA = vi.fn();
+		const onTargetValuesA: Array<boolean | undefined> = [];
+		const transitionA = vi.fn(function (this: HoverPopoverLike) {
+			onTargetValuesA.push(this.onTarget);
+			if (!this.onTarget && !this.isFocused) {
+				this.hide?.();
+			}
+		});
+		const popoverA: HoverPopoverLike = {
+			hoverEl: document.createElement("div"),
+			hide: hideA,
+			isFocused: true,
+			transition: transitionA,
+		};
+		const popoverB: HoverPopoverLike = {
+			hoverEl: document.createElement("div"),
+			transition: vi.fn(),
+		};
+		document.body.append(popoverA.hoverEl!, popoverB.hoverEl!);
+		const launch = vi.fn((request: ShadowPopoverLaunchRequest) => {
+			createRequestHoverParent(
+				request.session,
+				request.requestSeq,
+				request.proxyAnchorEl,
+				request.actualAnchorEl,
+			).hoverPopover = request.requestSeq === 1 ? popoverA : popoverB;
+		});
+		const resolveLink = vi.fn(() => ({
+			linktext: "note",
+			sourcePath: "note.md",
+		}));
+		const controller = new ShadowHoverControllerImpl({ launch }, resolveLink);
+		const firstAnchorEl = createAnchor(10);
+		const replacementAnchorEl = createAnchor(80);
+
+		controller.handleDelegatedEnter(
+			firstAnchorEl,
+			"item:first",
+			new MouseEvent("mouseover", { bubbles: true }),
+		);
+		controller.handleDelegatedAnchorSync(replacementAnchorEl, "item:first");
+
+		expect(launch).toHaveBeenCalledTimes(2);
+		expect(hideA).not.toHaveBeenCalled();
+		expect(onTargetValuesA.at(-1)).toBe(false);
+		expect(popoverA.isFocused).toBe(true);
+		expect(controller.getDebugPopover()).toBe(popoverB);
+		controller.destroy();
+	});
+
 	it("relaunches from anchor sync when the active anchor has no live popover", () => {
 		vi.useFakeTimers();
 		try {
@@ -193,7 +340,9 @@ describe("ShadowHoverControllerImpl", () => {
 			hide: originalHide,
 			state: 1,
 			transition() {
-				popover.hide?.();
+				if (!popover.onTarget && !popover.onHover && !popover.isFocused) {
+					popover.hide?.();
+				}
 			},
 		};
 		document.body.append(popover.hoverEl!);
@@ -230,7 +379,9 @@ describe("ShadowHoverControllerImpl", () => {
 			hide: originalHide,
 			state: 1,
 			transition() {
-				popover.hide?.();
+				if (!popover.onTarget && !popover.onHover && !popover.isFocused) {
+					popover.hide?.();
+				}
 			},
 		};
 		document.body.append(popover.hoverEl!);
@@ -289,10 +440,24 @@ describe("ShadowHoverControllerImpl", () => {
 		expect(resolveLink).not.toHaveBeenCalled();
 	});
 
-	it("keeps the old popover during handoff and closes it on timeout when replacement is not assigned", () => {
+	it("releases a focused handoff popover on timeout without forcing close", () => {
 		vi.useFakeTimers();
 		try {
 			const hide = vi.fn();
+			const onTargetValues: Array<boolean | undefined> = [];
+			const nativeTransition = vi.fn(function (this: HoverPopoverLike) {
+				onTargetValues.push(this.onTarget);
+				if (!this.onTarget && !this.isFocused) {
+					this.hide?.();
+				}
+			});
+			const popover: HoverPopoverLike = {
+				hoverEl: document.createElement("div"),
+				hide,
+				isFocused: true,
+				state: 1,
+				transition: nativeTransition,
+			};
 			const launch = vi.fn((request: ShadowPopoverLaunchRequest) => {
 				if (request.requestSeq !== 1) {
 					return;
@@ -302,11 +467,7 @@ describe("ShadowHoverControllerImpl", () => {
 					request.requestSeq,
 					request.proxyAnchorEl,
 					request.actualAnchorEl,
-				).hoverPopover = {
-					hoverEl: document.createElement("div"),
-					hide,
-					state: 1,
-				};
+				).hoverPopover = popover;
 			});
 			const resolveLink = vi.fn(() => ({
 				linktext: "note",
@@ -331,7 +492,12 @@ describe("ShadowHoverControllerImpl", () => {
 
 			vi.advanceTimersByTime(600);
 
-			expect(hide).toHaveBeenCalledTimes(1);
+			expect(hide).not.toHaveBeenCalled();
+			expect(nativeTransition).toHaveBeenCalledTimes(3);
+			expect(onTargetValues.at(-1)).toBe(false);
+			expect(popover.onTarget).toBe(false);
+			expect(popover.isFocused).toBe(true);
+			expect(controller.getDebugPopover()).toBeNull();
 			controller.destroy();
 		} finally {
 			vi.useRealTimers();

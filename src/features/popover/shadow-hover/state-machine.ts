@@ -18,12 +18,11 @@ export function createInitialHoverSessionInteractionState(): HoverSessionInterac
 	return {
 		overAnchor: false,
 		overPopover: false,
-		outsideInteractionUntil: 0,
 	};
 }
 
 // Hot path: this reducer mutates `state` in place.
-// `HoverSessionInteractionState` is a fixed-shape flag bag (three scalar fields)
+// `HoverSessionInteractionState` is a fixed-shape flag bag (two boolean fields)
 // shared across all hover/pointermove events. Returning a fresh object here
 // (via object spread on every interaction event) was the dominant allocation
 // source during hover/scroll bursts. Mutating in place eliminates the per-event
@@ -48,13 +47,9 @@ export function transitionHoverSessionInteraction(
 		case "popover-hover-sync":
 			state.overPopover = event.overPopover;
 			return state;
-		case "outside-interaction":
-			state.outsideInteractionUntil = event.until;
-			return state;
 		case "interaction-reset":
 			state.overAnchor = false;
 			state.overPopover = false;
-			state.outsideInteractionUntil = 0;
 			return state;
 		default: {
 			const _exhaustive: never = event;
@@ -126,50 +121,17 @@ export function transitionHoverSession(
 			};
 		case "popover-cleared":
 			return clearAssignedPopover(state, event.popover, event.hoverParent);
+		case "popover-released":
+			return releaseAssignedPopover(state, event.popover);
 		case "handoff-timeout":
 			if (state.type !== "handoff" || state.requestSeq !== event.requestSeq) {
 				return state;
 			}
 			return {
-				type: "closing",
+				type: "hovering-anchor",
 				anchor: state.to,
 				requestSeq: state.requestSeq,
-				popover: state.from.popover,
-				hoverParent: state.from.hoverParent,
-				reason: "handoff-timeout",
 			};
-		case "close-start":
-			if (getSessionPopover(state) !== event.popover) {
-				return state;
-			}
-			if (state.type === "closing") {
-				return {
-					...state,
-					reason: event.reason,
-				};
-			}
-			return {
-				type: "closing",
-				anchor: getSessionAnchor(state),
-				requestSeq: state.requestSeq,
-				popover: event.popover,
-				hoverParent: getSessionOpenPopover(state)?.hoverParent ?? null,
-				reason: event.reason,
-			};
-		case "close-finish":
-			if (state.type !== "closing" || state.popover !== event.popover) {
-				return state;
-			}
-			return state.anchor
-				? {
-						type: "hovering-anchor",
-						anchor: state.anchor,
-						requestSeq: state.requestSeq,
-					}
-				: {
-						type: "idle",
-						requestSeq: state.requestSeq,
-					};
 		case "destroy":
 			return {
 				type: "destroyed",
@@ -190,8 +152,6 @@ export function getSessionAnchor(state: HoverSessionState): HoverAnchorTarget | 
 			return state.anchor;
 		case "handoff":
 			return state.to;
-		case "closing":
-			return state.anchor;
 		case "idle":
 		case "destroyed":
 			return null;
@@ -214,7 +174,6 @@ export function getSessionOpenPopover(
 			return state.from;
 		case "idle":
 		case "hovering-anchor":
-		case "closing":
 		case "destroyed":
 			return null;
 		default: {
@@ -227,21 +186,7 @@ export function getSessionOpenPopover(
 export function getSessionPopover(
 	state: HoverSessionState,
 ): HoverSessionOpenPopover["popover"] | null {
-	if (state.type === "closing") {
-		return state.popover;
-	}
 	return getSessionOpenPopover(state)?.popover ?? null;
-}
-
-export function getSessionPopoverHoverParent(
-	state: HoverSessionState,
-	popover: HoverSessionOpenPopover["popover"],
-): HoverSessionOpenPopover["hoverParent"] {
-	if (state.type === "closing") {
-		return state.popover === popover ? state.hoverParent : null;
-	}
-	const openPopover = getSessionOpenPopover(state);
-	return openPopover?.popover === popover ? openPopover.hoverParent : null;
 }
 
 function syncAnchor(
@@ -266,11 +211,6 @@ function syncAnchor(
 			return {
 				...state,
 				to: anchor,
-			};
-		case "closing":
-			return {
-				...state,
-				anchor,
 			};
 		default: {
 			const _exhaustive: never = state;
@@ -322,7 +262,48 @@ function clearAssignedPopover(
 			};
 		case "idle":
 		case "hovering-anchor":
-		case "closing":
+		case "destroyed":
+			return state;
+		default: {
+			const _exhaustive: never = state;
+			return _exhaustive;
+		}
+	}
+}
+
+function releaseAssignedPopover(
+	state: HoverSessionState,
+	popover: HoverSessionOpenPopover["popover"],
+): HoverSessionState {
+	switch (state.type) {
+		case "open":
+			if (state.assigned.popover !== popover) {
+				return state;
+			}
+			return {
+				type: "hovering-anchor",
+				anchor: state.anchor,
+				requestSeq: state.requestSeq,
+			};
+		case "opening":
+			if (state.previous?.popover !== popover) {
+				return state;
+			}
+			return {
+				...state,
+				previous: null,
+			};
+		case "handoff":
+			if (state.from.popover !== popover) {
+				return state;
+			}
+			return {
+				type: "hovering-anchor",
+				anchor: state.to,
+				requestSeq: state.requestSeq,
+			};
+		case "idle":
+		case "hovering-anchor":
 		case "destroyed":
 			return state;
 		default: {

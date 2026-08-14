@@ -3,18 +3,14 @@ import {
 	createHoverPreviewMouseEvent,
 	resolveHoverPreviewTargetElement,
 } from "./hoverPopoverEvents";
-import {
-	deactivateShadowHoverPopoverProxyElement,
-	disposeShadowHoverPopoverProxies,
-	getShadowHoverPopoverProxyElement,
-	relayShadowHoverPopoverLeave,
-	resolveShadowHoverPopoverTarget,
-} from "./shadowHoverPopoverProxy";
+import { createShadowGeometryProxyStore } from "./shadow-hover/geometry-proxy";
 import {
 	isHTMLElementLike,
 	isMouseEventLike,
 	isShadowRootLike,
 } from "ui/shared/dom/realmSafeDom";
+
+const hoverTargetProxyStore = createShadowGeometryProxyStore();
 
 function resolveCandidateTarget(
 	targetEl: HTMLElement | ShadowRoot | null | undefined,
@@ -35,11 +31,25 @@ export {
 	createHoverPreviewMouseEvent,
 	resolveHoverPreviewTargetElement,
 	type HoverTargetAugmentedMouseEvent,
-	getShadowHoverPopoverProxyElement,
-	deactivateShadowHoverPopoverProxyElement,
-	relayShadowHoverPopoverLeave,
-	disposeShadowHoverPopoverProxies,
 };
+
+export function getShadowHoverPopoverProxyElement(
+	actual: HTMLElement,
+): HTMLElement | null {
+	return hoverTargetProxyStore.get(actual);
+}
+
+export function disposeShadowHoverPopoverProxies(documentRef?: Document): void {
+	hoverTargetProxyStore.destroy(documentRef);
+}
+
+function resolveShadowHoverPopoverTarget(resolvedTarget: HTMLElement): HTMLElement {
+	const root = resolvedTarget.getRootNode();
+	if (!isShadowRootLike(root)) {
+		return resolvedTarget;
+	}
+	return hoverTargetProxyStore.sync(resolvedTarget);
+}
 
 export function normalizeHoverPopoverTargetEl(
 	targetEl: HTMLElement | ShadowRoot | null | undefined,

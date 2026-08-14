@@ -1,86 +1,16 @@
-import { PROXY_CLASS_NAME } from "./internal-constants";
-
-type ProxyEntry = {
-	proxy: HTMLElement;
-	actual: HTMLElement;
-	lastRect: {
-		left: number;
-		top: number;
-		width: number;
-		height: number;
-	} | null;
-};
+import { createShadowGeometryProxyStore } from "./geometry-proxy";
+import { createOwnerMouseEvent } from "ui/shared/dom/realmSafeDom";
 
 export class ShadowAnchorRegistry {
-	private readonly proxiesByActual = new Map<HTMLElement, ProxyEntry>();
-	private readonly actualByProxy = new WeakMap<HTMLElement, HTMLElement>();
+	private readonly proxyStore = createShadowGeometryProxyStore();
 	private readonly hoveredActuals = new Set<HTMLElement>();
 
-	private createProxy(actual: HTMLElement): HTMLElement {
-		const doc = actual.ownerDocument;
-		const proxy = doc.createElement("div");
-		proxy.className = PROXY_CLASS_NAME;
-		proxy.setAttribute("aria-hidden", "true");
-		proxy.style.position = "fixed";
-		proxy.style.left = "0px";
-		proxy.style.top = "0px";
-		proxy.style.width = "0px";
-		proxy.style.height = "0px";
-		proxy.style.pointerEvents = "none";
-		proxy.style.visibility = "hidden";
-		proxy.style.opacity = "0";
-		proxy.style.margin = "0";
-		proxy.style.padding = "0";
-		proxy.style.border = "0";
-		proxy.style.zIndex = "-1";
-		(doc.body ?? doc.documentElement).appendChild(proxy);
-		return proxy;
-	}
-
-	private resetProxyRect(entry: ProxyEntry): void {
-		this.applyProxyRect(entry, 0, 0, 0, 0);
-	}
-
-	private applyProxyRect(
-		entry: ProxyEntry,
-		left: number,
-		top: number,
-		width: number,
-		height: number,
-	): void {
-		const lastRect = entry.lastRect;
-		if (
-			lastRect &&
-			lastRect.left === left &&
-			lastRect.top === top &&
-			lastRect.width === width &&
-			lastRect.height === height
-		) {
-			return;
-		}
-
-		entry.proxy.style.left = `${left}px`;
-		entry.proxy.style.top = `${top}px`;
-		entry.proxy.style.width = `${width}px`;
-		entry.proxy.style.height = `${height}px`;
-
-		if (!entry.lastRect) {
-			entry.lastRect = { left, top, width, height };
-			return;
-		}
-
-		entry.lastRect.left = left;
-		entry.lastRect.top = top;
-		entry.lastRect.width = width;
-		entry.lastRect.height = height;
-	}
-
 	getActual(proxy: HTMLElement): HTMLElement | null {
-		return this.actualByProxy.get(proxy) ?? null;
+		return this.proxyStore.getActual(proxy);
 	}
 
 	resolveActual(element: HTMLElement): HTMLElement | null {
-		return this.actualByProxy.get(element) ?? element;
+		return this.proxyStore.resolveActual(element);
 	}
 
 	syncProxyRect(element: HTMLElement): HTMLElement | null {
@@ -89,35 +19,15 @@ export class ShadowAnchorRegistry {
 	}
 
 	syncProxyRectForActual(actual: HTMLElement): HTMLElement {
-		let entry = this.proxiesByActual.get(actual);
-		if (!entry || entry.proxy.ownerDocument !== actual.ownerDocument) {
-			entry?.proxy.remove();
-			const proxy = this.createProxy(actual);
-			entry = {
-				proxy,
-				actual,
-				lastRect: null,
-			};
-			this.proxiesByActual.set(actual, entry);
-			this.actualByProxy.set(proxy, actual);
-		}
-
-		if (!actual.isConnected) {
-			this.resetProxyRect(entry);
-			const proxy = entry.proxy;
-			this.releaseActual(actual);
-			return proxy;
-		}
-
-		const rect = actual.getBoundingClientRect();
-		if (rect.width <= 0 || rect.height <= 0) {
+		const proxy = this.proxyStore.sync(actual);
+		if (
+			!actual.isConnected ||
+			proxy.style.width === "0px" ||
+			proxy.style.height === "0px"
+		) {
 			this.hoveredActuals.delete(actual);
-			this.resetProxyRect(entry);
-			return entry.proxy;
 		}
-
-		this.applyProxyRect(entry, rect.left, rect.top, rect.width, rect.height);
-		return entry.proxy;
+		return proxy;
 	}
 
 	setHovered(actual: HTMLElement, hovered: boolean): void {
@@ -137,20 +47,32 @@ export class ShadowAnchorRegistry {
 		return this.hoveredActuals.has(actual);
 	}
 
+	relayHoverToProxy(actual: HTMLElement, hovered: boolean): boolean {
+		const proxy = this.proxyStore.get(actual);
+		if (!proxy) {
+			return false;
+		}
+
+		const rect = actual.getBoundingClientRect();
+		const event = createOwnerMouseEvent(proxy, hovered ? "mouseover" : "mouseout", {
+			bubbles: true,
+			cancelable: true,
+			composed: true,
+			clientX: rect.left + rect.width / 2,
+			clientY: rect.top + rect.height / 2,
+			relatedTarget: null,
+		});
+		proxy.dispatchEvent(event);
+		return true;
+	}
+
 	releaseActual(actual: HTMLElement): void {
 		this.hoveredActuals.delete(actual);
-		const entry = this.proxiesByActual.get(actual);
-		if (entry) {
-			entry.proxy.remove();
-			this.proxiesByActual.delete(actual);
-		}
+		this.proxyStore.release(actual);
 	}
 
 	destroy(): void {
-		for (const entry of this.proxiesByActual.values()) {
-			entry.proxy.remove();
-		}
-		this.proxiesByActual.clear();
+		this.proxyStore.destroy();
 		this.hoveredActuals.clear();
 	}
 }

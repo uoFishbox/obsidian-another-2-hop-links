@@ -1,13 +1,14 @@
 import { afterEach, describe, expect, it } from "vitest";
 import {
 	createHoverPreviewMouseEvent,
-	deactivateShadowHoverPopoverProxyElement,
+	disposeShadowHoverPopoverProxies,
 	getShadowHoverPopoverProxyElement,
 	normalizeHoverPopoverTargetEl,
 	resolveHoverPreviewTargetElement,
 } from "../hoverPopoverTarget";
 
 afterEach(() => {
+	disposeShadowHoverPopoverProxies();
 	document.body.innerHTML = "";
 });
 
@@ -36,11 +37,19 @@ describe("hoverPopoverTarget", () => {
 
 		expect(proxy).not.toBe(target);
 		expect(proxy.parentElement).toBe(document.body);
-		expect(proxy.getAttribute("data-ccl-shadow-hover-proxy-active")).toBe("1");
+		expect(proxy.getAttribute("data-ccl-shadow-hover-proxy")).toBe("1");
+		expect(proxy.classList.contains("ccl-shadow-hover-proxy-anchor")).toBe(true);
+		expect(proxy.style.pointerEvents).toBe("none");
+		expect(proxy.style.visibility).toBe("hidden");
+		expect(proxy.style.zIndex).toBe("-1");
+		expect(proxy.style.left).toBe("12px");
+		expect(proxy.style.top).toBe("34px");
+		expect(proxy.style.width).toBe("56px");
+		expect(proxy.style.height).toBe("78px");
 		expect(getShadowHoverPopoverProxyElement(target)).toBe(proxy);
 	});
 
-	it("relays click and middle-mousedown from the active proxy back to the source element", () => {
+	it("does not relay pointer activation from the geometry proxy", () => {
 		const host = document.createElement("div");
 		document.body.append(host);
 		const shadowRoot = host.attachShadow({ mode: "open" });
@@ -79,7 +88,6 @@ describe("hoverPopoverTarget", () => {
 			buttons: 4,
 		});
 		proxy.dispatchEvent(middleDown);
-		expect(middleDown.defaultPrevented).toBe(true);
 
 		proxy.dispatchEvent(
 			new MouseEvent("click", {
@@ -89,38 +97,38 @@ describe("hoverPopoverTarget", () => {
 			}),
 		);
 
-		expect(relayedEvents).toEqual([
-			{ type: "mousedown", button: 1 },
-			{ type: "click", button: 0 },
-		]);
+		expect(middleDown.defaultPrevented).toBe(false);
+		expect(relayedEvents).toEqual([]);
 	});
 
-	it("deactivates the shadow proxy without removing it", () => {
+	it("reuses the proxy and refreshes its geometry", () => {
 		const host = document.createElement("div");
 		document.body.append(host);
 		const shadowRoot = host.attachShadow({ mode: "open" });
 
 		const target = document.createElement("div");
+		let left = 20;
 		target.getBoundingClientRect = () =>
 			({
-				left: 20,
+				left,
 				top: 40,
 				width: 60,
 				height: 80,
-				right: 80,
+				right: left + 60,
 				bottom: 120,
-				x: 20,
+				x: left,
 				y: 40,
 				toJSON: () => ({}),
 			}) as DOMRect;
 		shadowRoot.append(target);
 
 		const proxy = normalizeHoverPopoverTargetEl(target) as HTMLDivElement;
-		expect(proxy.getAttribute("data-ccl-shadow-hover-proxy-active")).toBe("1");
+		expect(proxy.style.left).toBe("20px");
 
-		expect(deactivateShadowHoverPopoverProxyElement(target)).toBe(true);
-		expect(proxy.getAttribute("data-ccl-shadow-hover-proxy-active")).toBeNull();
-		expect(proxy.isConnected).toBe(true);
+		left = 120;
+		const refreshed = normalizeHoverPopoverTargetEl(target);
+		expect(refreshed).toBe(proxy);
+		expect(proxy.style.left).toBe("120px");
 	});
 
 	it("uses the event-resolved element when called with a ShadowRoot", () => {

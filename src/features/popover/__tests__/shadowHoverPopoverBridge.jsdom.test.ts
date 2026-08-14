@@ -7,7 +7,7 @@ const {
 	handleDelegatedModifierKeyMock,
 	handleDelegatedLeaveMock,
 	handleDelegatedPointerMoveMock,
-	closeActivePopoverMock,
+	releaseActivePopoverMock,
 	destroyMock,
 	buildShadowHoverLinkSpecMock,
 } = vi.hoisted(() => ({
@@ -16,7 +16,7 @@ const {
 	handleDelegatedModifierKeyMock: vi.fn(),
 	handleDelegatedLeaveMock: vi.fn(),
 	handleDelegatedPointerMoveMock: vi.fn(),
-	closeActivePopoverMock: vi.fn(),
+	releaseActivePopoverMock: vi.fn(),
 	destroyMock: vi.fn(),
 	buildShadowHoverLinkSpecMock: vi.fn((descriptor?: { interactionId?: string }) =>
 		descriptor?.interactionId
@@ -35,7 +35,7 @@ vi.mock("features/popover/shadow-hover/controller", () => ({
 		handleDelegatedModifierKey = handleDelegatedModifierKeyMock;
 		handleDelegatedLeave = handleDelegatedLeaveMock;
 		handleDelegatedPointerMove = handleDelegatedPointerMoveMock;
-		closeActivePopover = closeActivePopoverMock;
+		releaseActivePopover = releaseActivePopoverMock;
 		syncActivePopover = vi.fn();
 		destroy = destroyMock;
 	},
@@ -60,7 +60,7 @@ describe("shadowHoverPopoverBridge", () => {
 		handleDelegatedModifierKeyMock.mockReset();
 		handleDelegatedLeaveMock.mockReset();
 		handleDelegatedPointerMoveMock.mockReset();
-		closeActivePopoverMock.mockReset();
+		releaseActivePopoverMock.mockReset();
 		destroyMock.mockReset();
 		buildShadowHoverLinkSpecMock.mockClear();
 	});
@@ -255,7 +255,7 @@ describe("shadowHoverPopoverBridge", () => {
 
 		expect(interaction.dataset.cclHovered).toBeUndefined();
 		expect(handleDelegatedLeaveMock).toHaveBeenCalledWith(interaction);
-		expect(closeActivePopoverMock).not.toHaveBeenCalled();
+		expect(releaseActivePopoverMock).not.toHaveBeenCalled();
 
 		interaction.dispatchEvent(
 			new MouseEvent("mouseover", { bubbles: true, composed: true }),
@@ -329,7 +329,7 @@ describe("shadowHoverPopoverBridge", () => {
 			}),
 		);
 
-		expect(closeActivePopoverMock).toHaveBeenCalledTimes(1);
+		expect(releaseActivePopoverMock).toHaveBeenCalledTimes(1);
 		expect(handleDelegatedAnchorSyncMock).not.toHaveBeenCalled();
 		expect(handleDelegatedEnterMock).toHaveBeenCalledTimes(2);
 		expect(handleDelegatedEnterMock).toHaveBeenLastCalledWith(
@@ -341,7 +341,7 @@ describe("shadowHoverPopoverBridge", () => {
 		dispose();
 	});
 
-	it("ends logical hover and the active popover before a stationary-pointer rebind", () => {
+	it("releases logical hover ownership before a stationary-pointer rebind", () => {
 		const { shadowRoot, dispose } = installBridge();
 		const physicalCell = document.createElement("div");
 		const interaction = createInteractionElement("item:first");
@@ -362,7 +362,8 @@ describe("shadowHoverPopoverBridge", () => {
 
 		expect(interaction.dataset.cclHovered).toBeUndefined();
 		expect(subtreeQuery).toHaveBeenCalledTimes(1);
-		expect(handleDelegatedLeaveMock).toHaveBeenCalledWith(interaction);
+		expect(handleDelegatedLeaveMock).not.toHaveBeenCalled();
+		expect(releaseActivePopoverMock).toHaveBeenCalledTimes(1);
 		expect(handleDelegatedEnterMock).toHaveBeenCalledTimes(1);
 
 		dispose();
@@ -387,7 +388,7 @@ describe("shadowHoverPopoverBridge", () => {
 			}),
 		);
 
-		expect(closeActivePopoverMock).toHaveBeenCalledTimes(1);
+		expect(releaseActivePopoverMock).toHaveBeenCalledTimes(1);
 		expect(handleDelegatedPointerMoveMock).not.toHaveBeenCalled();
 		expect(handleDelegatedEnterMock).toHaveBeenCalledTimes(2);
 		expect(handleDelegatedEnterMock).toHaveBeenLastCalledWith(

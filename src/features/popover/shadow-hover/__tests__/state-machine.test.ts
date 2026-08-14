@@ -55,7 +55,7 @@ describe("transitionHoverSession", () => {
 		expect(stale).toBe(opening);
 	});
 
-	it("moves a current handoff timeout into closing", () => {
+	it("releases a current handoff timeout back to the target anchor", () => {
 		const from = createAnchor();
 		const to = createAnchor();
 		const popover = {};
@@ -71,19 +71,44 @@ describe("transitionHoverSession", () => {
 			type: "handoff-timeout",
 			requestSeq: 2,
 		});
-		const closing = transitionHoverSession(handoff, {
+		const released = transitionHoverSession(handoff, {
 			type: "handoff-timeout",
 			requestSeq: 3,
 		});
 
 		expect(staleTimeout).toBe(handoff);
-		expect(closing).toEqual({
-			type: "closing",
+		expect(released).toEqual({
+			type: "hovering-anchor",
 			anchor: to,
 			requestSeq: 3,
-			popover,
+		});
+	});
+
+	it("detaches a released accepted popover without entering a close state", () => {
+		const anchor = createAnchor();
+		const popover = {};
+		const open = transitionHoverSession(createInitialHoverSessionState(), {
+			type: "request-open",
+			anchor,
+			requestSeq: 1,
+		});
+		const assigned = transitionHoverSession(open, {
+			type: "popover-assigned",
+			anchor,
 			hoverParent: {},
-			reason: "handoff-timeout",
+			popover,
+			requestSeq: 1,
+		});
+
+		expect(
+			transitionHoverSession(assigned, {
+				type: "popover-released",
+				popover,
+			}),
+		).toEqual({
+			type: "hovering-anchor",
+			anchor,
+			requestSeq: 1,
 		});
 	});
 
@@ -105,7 +130,7 @@ describe("transitionHoverSessionInteraction", () => {
 	// and returns the same object reference (allocation-free hot path for
 	// hover/pointermove events). Verify each transition by inspecting the
 	// shared state after every event rather than holding independent snapshots.
-	it("tracks hover and outside interaction state independently", () => {
+	it("tracks anchor and popover hover state independently", () => {
 		const state = createInitialHoverSessionInteractionState();
 
 		transitionHoverSessionInteraction(state, {
@@ -116,17 +141,6 @@ describe("transitionHoverSessionInteraction", () => {
 		expect(state).toEqual({
 			overAnchor: true,
 			overPopover: false,
-			outsideInteractionUntil: 0,
-		});
-
-		transitionHoverSessionInteraction(state, {
-			type: "outside-interaction",
-			until: 120,
-		});
-		expect(state).toEqual({
-			overAnchor: true,
-			overPopover: false,
-			outsideInteractionUntil: 120,
 		});
 
 		transitionHoverSessionInteraction(state, {

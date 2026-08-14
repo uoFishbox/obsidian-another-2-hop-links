@@ -14,9 +14,9 @@ import {
 	getBoundPopoverAnchor,
 	isSessionDestroyed,
 	nextSessionRequestSeq,
-	reallyClosePopover,
+	releasePopoverToNativeLifecycle,
 	syncSessionAnchor,
-	syncPopoverKeepAlive,
+	syncPopoverTargetAndTransition,
 	transitionSession,
 	transitionSessionInteraction,
 } from "./session";
@@ -62,12 +62,29 @@ export class ShadowHoverControllerImpl implements ShadowHoverController {
 		}
 
 		const previousAnchorEl = getActiveSessionAnchor(this.session)?.actualEl;
+		const wasHovered = this.session.anchorRegistry.isActualHovered(anchorEl);
 		if (previousAnchorEl && previousAnchorEl !== anchorEl) {
+			const wasPreviousHovered =
+				this.session.anchorRegistry.isActualHovered(previousAnchorEl);
 			this.session.anchorRegistry.setHovered(previousAnchorEl, false);
+			if (wasPreviousHovered) {
+				this.session.anchorRegistry.relayHoverToProxy(previousAnchorEl, false);
+			}
+			const previousPopover = getActiveSessionPopover(this.session);
+			if (previousPopover) {
+				releasePopoverToNativeLifecycle(
+					previousPopover,
+					this.session,
+					"anchor-rebind",
+				);
+			}
 		}
 		this.session.anchorRegistry.setHovered(anchorEl, true);
 		this.syncActiveAnchor(anchorEl);
-		syncPopoverKeepAlive(this.session, "anchor-sync");
+		if (!wasHovered || previousAnchorEl !== anchorEl) {
+			this.session.anchorRegistry.relayHoverToProxy(anchorEl, true);
+		}
+		syncPopoverTargetAndTransition(this.session, "anchor-sync");
 		if (
 			interactionId &&
 			this.shouldRecoverMissingPopover(anchorEl, interactionId)
@@ -124,8 +141,12 @@ export class ShadowHoverControllerImpl implements ShadowHoverController {
 			return;
 		}
 
+		const wasHovered = this.session.anchorRegistry.isActualHovered(anchorEl);
 		this.session.anchorRegistry.setHovered(anchorEl, false);
 		if (getActiveSessionAnchor(this.session)?.actualEl === anchorEl) {
+			if (wasHovered) {
+				this.session.anchorRegistry.relayHoverToProxy(anchorEl, false);
+			}
 			transitionSessionInteraction(this.session, {
 				type: "anchor-hover-sync",
 				overAnchor: false,
@@ -136,11 +157,11 @@ export class ShadowHoverControllerImpl implements ShadowHoverController {
 					this.describeAnchor(anchorEl),
 				);
 			}
-			syncPopoverKeepAlive(this.session, "anchor-leave");
+			syncPopoverTargetAndTransition(this.session, "anchor-leave");
 		}
 	}
 
-	closeActivePopover(): void {
+	releaseActivePopover(): void {
 		if (isSessionDestroyed(this.session)) {
 			return;
 		}
@@ -149,7 +170,7 @@ export class ShadowHoverControllerImpl implements ShadowHoverController {
 		if (!popover) {
 			return;
 		}
-		reallyClosePopover(popover, this.session);
+		releasePopoverToNativeLifecycle(popover, this.session, "bridge-release");
 	}
 
 	syncActivePopover(): void {
@@ -162,7 +183,7 @@ export class ShadowHoverControllerImpl implements ShadowHoverController {
 				summarizeSession(this.session),
 			);
 		}
-		syncPopoverKeepAlive(this.session, "debug-sync");
+		syncPopoverTargetAndTransition(this.session, "debug-sync");
 	}
 
 	destroy(): void {
@@ -283,7 +304,7 @@ export class ShadowHoverControllerImpl implements ShadowHoverController {
 				...details,
 			}));
 		}
-		syncPopoverKeepAlive(this.session, `${reason}-retrigger`);
+		syncPopoverTargetAndTransition(this.session, `${reason}-retrigger`);
 		const requestSeq = nextSessionRequestSeq(this.session);
 		transitionSession(this.session, {
 			type: "request-open",
@@ -330,6 +351,7 @@ export class ShadowHoverControllerImpl implements ShadowHoverController {
 				: null;
 		const wantsPreview = mouseEvent ? this.getPointerModState(mouseEvent) : true;
 		const proxy = this.syncActiveAnchor(anchorEl);
+		this.session.anchorRegistry.relayHoverToProxy(anchorEl, true);
 		if (
 			currentPopover &&
 			previousActualAnchor &&
@@ -369,7 +391,7 @@ export class ShadowHoverControllerImpl implements ShadowHoverController {
 				if (!handoff) {
 					return;
 				}
-				reallyClosePopover(
+				releasePopoverToNativeLifecycle(
 					handoff.fromPopover,
 					this.session,
 					"handoff-timeout",
@@ -398,7 +420,7 @@ export class ShadowHoverControllerImpl implements ShadowHoverController {
 					() => this.describeAnchor(anchorEl),
 				);
 			}
-			syncPopoverKeepAlive(this.session, "anchor-enter-no-link");
+			syncPopoverTargetAndTransition(this.session, "anchor-enter-no-link");
 			return;
 		}
 
@@ -416,7 +438,7 @@ export class ShadowHoverControllerImpl implements ShadowHoverController {
 				}),
 			);
 		}
-		syncPopoverKeepAlive(this.session, "anchor-enter");
+		syncPopoverTargetAndTransition(this.session, "anchor-enter");
 		this.markLaunch(anchorEl, interactionId);
 		this.launcher.launch({
 			session: this.session,
@@ -455,13 +477,11 @@ export class ShadowHoverControllerImpl implements ShadowHoverController {
 		clearPendingHandoffTimer(this.session);
 		const popover = getActiveSessionPopover(this.session);
 		if (popover) {
-			reallyClosePopover(popover, this.session, "destroy");
+			releasePopoverToNativeLifecycle(popover, this.session, "destroy");
 		}
 		transitionSession(this.session, { type: "destroy" });
 		this.session.teardownPopoverListeners?.();
 		this.session.teardownPopoverListeners = null;
-		this.session.teardownInteractionListeners?.();
-		this.session.teardownInteractionListeners = null;
 		this.session.anchorRegistry.destroy();
 	}
 }

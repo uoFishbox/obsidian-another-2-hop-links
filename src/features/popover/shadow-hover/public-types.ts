@@ -30,7 +30,7 @@ export type ShadowHoverController = {
 		event: PointerEvent,
 	): void;
 	handleDelegatedLeave(anchorEl: HTMLElement): void;
-	closeActivePopover(): void;
+	releaseActivePopover(): void;
 	syncActivePopover(): void;
 	destroy(): void;
 };
