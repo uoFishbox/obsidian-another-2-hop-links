@@ -12,26 +12,6 @@ export interface BuiltIndexesResult {
 	tagIndex: TagIndex;
 }
 
-export async function buildIndexSnapshotAsync(
-	vault: IVault,
-	metadataCache: IMetadataCache,
-	options: RebuildOptions = {},
-	includeTagIndex = true,
-	ambiguityDetector: MutableLinkResolutionAmbiguityDetector = createLinkResolutionAmbiguityDetector(
-		vault,
-	),
-): Promise<IndexSnapshot> {
-	return (
-		await buildIndexesAsync(
-			vault,
-			metadataCache,
-			options,
-			includeTagIndex,
-			ambiguityDetector,
-		)
-	).snapshot;
-}
-
 export async function buildIndexesAsync(
 	vault: IVault,
 	metadataCache: IMetadataCache,

@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 import { IndexQueryEngine } from "../index-service/IndexQueryEngine";
-import { buildIndexSnapshotAsync } from "../index-service/indexSnapshotBuilder";
+import { buildIndexSnapshotAsync } from "./snapshotTestHelpers";
 import { VaultEnvironmentBuilder } from "testing/helpers/VaultEnvironmentBuilder";
 import type { CachedMetadata, TFile } from "obsidian";
 

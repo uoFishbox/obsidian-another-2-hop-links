@@ -96,11 +96,6 @@ export interface IndexMutationResult {
 	affectedLinkSourcePaths: Set<string>;
 	cacheInvalidationPaths: Iterable<string>;
 	/**
-	 * @deprecated Use linkIndexChanged instead.
-	 * Kept for temporary compatibility.
-	 */
-	changesApplied: boolean;
-	/**
 	 * Link index (backlink / unresolved / lookup graph) に意味的差分があったか.
 	 * 本文のみの変更では false になる.
 	 */

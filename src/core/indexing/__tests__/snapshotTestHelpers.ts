@@ -1,9 +1,16 @@
-import {
-	getBacklinkCollectionCount,
-	hasResolvedBacklink,
-} from "../backlink-builder/backlinkBuckets";
+import { hasResolvedBacklink } from "../backlink-builder/backlinkBuckets";
+import { buildIndexesAsync } from "../index-service/indexSnapshotBuilder";
 import type { BacklinkSourceMap } from "types/domain";
-import type { IndexSnapshot, TagIndex } from "../types/IndexTypes";
+import type { IMetadataCache, IVault } from "types/obsidian";
+import type { IndexSnapshot, RebuildOptions, TagIndex } from "../types/IndexTypes";
+
+export async function buildIndexSnapshotAsync(
+	vault: IVault,
+	metadataCache: IMetadataCache,
+	options: RebuildOptions = {},
+): Promise<IndexSnapshot> {
+	return (await buildIndexesAsync(vault, metadataCache, options)).snapshot;
+}
 
 export function serializeSnapshot(snapshot: IndexSnapshot) {
 	return {
@@ -114,7 +121,7 @@ function serializeNestedBacklinkMap(map: Map<string, BacklinkSourceMap>) {
 							return [
 								sourcePath,
 								{
-									count: getBacklinkCollectionCount(bucket),
+									count: bucket.count,
 									hasResolved: hasResolvedBacklink(bucket),
 								},
 							] as const;

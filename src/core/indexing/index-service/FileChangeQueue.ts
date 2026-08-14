@@ -1,12 +1,16 @@
 import type { IncrementalFileChange } from "../types/IndexTypes";
 
 interface QueuedFileTrack {
-	order: number;
 	slot: number;
 	initialPath?: string;
 	currentPath?: string;
 	modified: boolean;
 	createSemantics: boolean;
+}
+
+interface FileChangeQueueDrainResult {
+	changes: IncrementalFileChange[];
+	requiresFullRebuild: boolean;
 }
 
 export class FileChangeQueue {
@@ -16,9 +20,7 @@ export class FileChangeQueue {
 	private readonly trackByInitialPath = new Map<string, Set<QueuedFileTrack>>();
 	private pendingTrackCount = 0;
 	private pendingCreateTrackCount = 0;
-	private requiresBacklinkRebuild = false;
-	private requiresTagRebuild = false;
-	private nextTrackOrder = 0;
+	private fullRebuildRequested = false;
 
 	recordChange(change: IncrementalFileChange): void {
 		switch (change.type) {
@@ -43,26 +45,13 @@ export class FileChangeQueue {
 		}
 	}
 
-	triggerBacklinkRebuild(): void {
-		this.requiresBacklinkRebuild = true;
-	}
-
-	triggerTagRebuild(): void {
-		this.requiresTagRebuild = true;
-	}
-
 	/** Marks all queued changes for recovery through a full index rebuild. */
 	requestFullRebuild(): void {
-		this.requiresBacklinkRebuild = true;
-		this.requiresTagRebuild = true;
+		this.fullRebuildRequested = true;
 	}
 
 	hasPending(): boolean {
-		return (
-			this.requiresBacklinkRebuild ||
-			this.requiresTagRebuild ||
-			this.pendingTrackCount > 0
-		);
+		return this.fullRebuildRequested || this.pendingTrackCount > 0;
 	}
 
 	hasPendingCreateChanges(): boolean {
@@ -70,24 +59,21 @@ export class FileChangeQueue {
 	}
 
 	requiresFullRebuild(): boolean {
-		return this.requiresBacklinkRebuild || this.requiresTagRebuild;
+		return this.fullRebuildRequested;
 	}
 
-	drain() {
+	drain(): FileChangeQueueDrainResult {
 		const pending = this.getNormalizedChanges();
-		const needsBacklinkRebuild = this.requiresBacklinkRebuild;
-		const needsTagRebuild = this.requiresTagRebuild;
+		const requiresFullRebuild = this.fullRebuildRequested;
 		this.tracks.length = 0;
 		this.trackByCurrentPath.clear();
 		this.trackByInitialPath.clear();
 		this.pendingTrackCount = 0;
 		this.pendingCreateTrackCount = 0;
-		this.requiresBacklinkRebuild = false;
-		this.requiresTagRebuild = false;
+		this.fullRebuildRequested = false;
 		return {
 			changes: pending,
-			requiresBacklinkRebuild: needsBacklinkRebuild,
-			requiresTagRebuild: needsTagRebuild,
+			requiresFullRebuild,
 		};
 	}
 
@@ -197,9 +183,8 @@ export class FileChangeQueue {
 		this.cleanupTrackIfNoLongerNeeded(sourceTrack);
 	}
 
-	private addTrack(track: Omit<QueuedFileTrack, "order" | "slot">): QueuedFileTrack {
+	private addTrack(track: Omit<QueuedFileTrack, "slot">): QueuedFileTrack {
 		const queuedTrack: QueuedFileTrack = {
-			order: this.nextTrackOrder++,
 			slot: this.tracks.length,
 			...track,
 		};

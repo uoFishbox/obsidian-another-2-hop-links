@@ -922,7 +922,6 @@ describe("ApplicationStore (Runes)", () => {
 		const previousVersion = store.updateVersion;
 
 		await store.handleDataUpdate({
-			indexVersion: 2,
 			affectedPaths: ["note.md"],
 		});
 
@@ -941,7 +940,6 @@ describe("ApplicationStore (Runes)", () => {
 		expect(resolveTwoHopLinks).toHaveBeenCalledTimes(1);
 
 		await store.handleDataUpdate({
-			indexVersion: 2,
 			affectedPaths: ["other.md"],
 			affectedLookupKeys: ["other.md"],
 			affectedTags: [],
@@ -989,7 +987,6 @@ describe("ApplicationStore (Runes)", () => {
 			{ type: "modify", path: "candidate.md" },
 		]);
 		await store.handleDataUpdate({
-			indexVersion: 2,
 			affectedPaths: ["candidate.md"],
 			affectedLookupKeys: [],
 			affectedTags: Array.from(mutation.affectedTags),
@@ -1014,7 +1011,6 @@ describe("ApplicationStore (Runes)", () => {
 		expect(resolveTwoHopLinks).toHaveBeenCalledTimes(1);
 
 		await store.handleDataUpdate({
-			indexVersion: 3,
 			affectedLookupKeys: ["target.md"],
 		});
 
@@ -1032,7 +1028,6 @@ describe("ApplicationStore (Runes)", () => {
 		const previousPreviewVersion = store.getPreviewRenderVersion("target.md");
 
 		await store.handleDataUpdate({
-			indexVersion: 6,
 			affectedPaths: ["target.md"],
 			affectedLookupKeys: ["unrelated.md"],
 			affectedTags: [],
@@ -1057,7 +1052,6 @@ describe("ApplicationStore (Runes)", () => {
 		await store.load(file);
 
 		await store.handleDataUpdate({
-			indexVersion: 7,
 			affectedPaths: ["target.md"],
 			affectedLookupKeys: ["new-child.md"],
 			affectedTags: [],
@@ -1079,7 +1073,6 @@ describe("ApplicationStore (Runes)", () => {
 		const previousPreviewVersion = store.getPreviewRenderVersion("target.md");
 
 		await store.handleDataUpdate({
-			indexVersion: 8,
 			affectedPaths: ["target.md"],
 			affectedLookupKeys: [],
 			affectedTags: [],

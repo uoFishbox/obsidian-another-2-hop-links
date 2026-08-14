@@ -1,10 +1,11 @@
 import { describe, expect, test } from "vitest";
-import {
-	buildIndexesAsync,
-	buildIndexSnapshotAsync,
-} from "../index-service/indexSnapshotBuilder";
+import { buildIndexesAsync } from "../index-service/indexSnapshotBuilder";
 import { VaultEnvironmentBuilder } from "testing/helpers/VaultEnvironmentBuilder";
-import { serializeSnapshot, serializeTagIndex } from "./snapshotTestHelpers";
+import {
+	buildIndexSnapshotAsync,
+	serializeSnapshot,
+	serializeTagIndex,
+} from "./snapshotTestHelpers";
 
 function getDestinationPaths(
 	summary: { destinations: ReadonlyMap<string, unknown> } | undefined,

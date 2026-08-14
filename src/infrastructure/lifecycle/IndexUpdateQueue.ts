@@ -4,7 +4,6 @@ import {
 	INDEXING_DEBOUNCE_DELAY,
 	INDEX_LINK_CAPABLE_EXTENSIONS,
 } from "../../appConstants";
-import type { DataUpdateContext } from "core/indexing/index-service/IndexEvents";
 import type { IncrementalFileChange } from "core/indexing/types/IndexTypes";
 import { FileChangeQueue } from "core/indexing/index-service/FileChangeQueue";
 import type { IndexingService } from "core/indexing/index-service/IndexingService";
@@ -12,12 +11,9 @@ import type { PluginHost } from "types/pluginHost";
 import { enableLogging, logger } from "shared/logging/logger";
 import { InitialScanChangeRecorder } from "./InitialScanChangeRecorder";
 
-export type DataUpdateListener = (context: DataUpdateContext) => void;
-
 type InitialFullScanState = "pending" | "running" | "failed" | "completed";
 
 export class IndexUpdateQueue {
-	private dataUpdateListeners: Set<DataUpdateListener> = new Set();
 	private debouncedProcessPending: () => void;
 	private readonly changeQueue = new FileChangeQueue();
 	private readonly initialChangeRecorder = new InitialScanChangeRecorder();
@@ -27,7 +23,6 @@ export class IndexUpdateQueue {
 	private resolveInitialFullScanReady: (() => void) | undefined;
 	private initialFullScanTimer: number | undefined;
 	private unsubscribeIndexIdleWaiter: (() => void) | undefined;
-	private unsubscribeIndexDataUpdate: (() => void) | undefined;
 	private isProcessingPendingChanges = false;
 	private hasAttemptedAutomaticRecovery = false;
 	private initialFullScanState: InitialFullScanState = "pending";
@@ -60,51 +55,23 @@ export class IndexUpdateQueue {
 				await this.initialFullScanReady;
 			},
 		);
-		this.unsubscribeIndexDataUpdate = this.indexingService.onDataUpdate(
-			(context) => {
-				this.notifyDataUpdate(context);
-			},
-		);
 	}
 
 	public destroy(): void {
 		this.destroyed = true;
 		this.unsubscribeIndexIdleWaiter?.();
 		this.unsubscribeIndexIdleWaiter = undefined;
-		this.unsubscribeIndexDataUpdate?.();
-		this.unsubscribeIndexDataUpdate = undefined;
 		if (this.initialFullScanTimer !== undefined) {
 			window.clearTimeout(this.initialFullScanTimer);
 			this.initialFullScanTimer = undefined;
 		}
 		(this.debouncedProcessPending as { cancel?: () => void }).cancel?.();
-		this.dataUpdateListeners.clear();
 		this.queueIdleWaiters.forEach((resolve) => resolve());
 		this.queueIdleWaiters.clear();
 		this.metadataResolveWaiters.forEach((resolve) => resolve());
 		this.metadataResolveWaiters.clear();
 		this.resolveInitialFullScanReady?.();
 		this.resolveInitialFullScanReady = undefined;
-	}
-
-	public onDataUpdate(listener: DataUpdateListener): () => void {
-		this.dataUpdateListeners.add(listener);
-		return () => {
-			this.dataUpdateListeners.delete(listener);
-		};
-	}
-
-	private notifyDataUpdate(context: DataUpdateContext): void {
-		if (this.destroyed) {
-			return;
-		}
-		this.dataUpdateListeners.forEach((listener) => {
-			try {
-				listener(context);
-			} catch (error) {
-				console.error("Error in data update listener:", error);
-			}
-		});
 	}
 
 	public async awaitQueueIdle(): Promise<void> {
@@ -470,17 +437,14 @@ export class IndexUpdateQueue {
 					break;
 				}
 
-				const { changes, requiresBacklinkRebuild, requiresTagRebuild } =
-					this.changeQueue.drain();
+				const { changes, requiresFullRebuild } = this.changeQueue.drain();
 				this.syncMetadataResolveGate();
 
-				const needsFullRebuild = requiresBacklinkRebuild || requiresTagRebuild;
-
-				if (needsFullRebuild) {
+				if (requiresFullRebuild) {
 					await this.indexingService.rebuildIndexesTimeSliced();
 				}
 
-				if (changes.length > 0 && !needsFullRebuild) {
+				if (changes.length > 0 && !requiresFullRebuild) {
 					await this.indexingService.applyFileChangesTimeSliced(changes);
 				}
 			}

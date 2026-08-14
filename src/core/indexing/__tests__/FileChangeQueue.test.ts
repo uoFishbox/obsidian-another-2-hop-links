@@ -261,29 +261,25 @@ describe("FileChangeQueue flags", () => {
 		expect(queue.hasPendingCreateChanges()).toBe(false);
 	});
 
-	test("requiresFullRebuild reflects trigger flags", () => {
+	test("requiresFullRebuild reflects a full rebuild request", () => {
 		const queue = new FileChangeQueue();
 		expect(queue.requiresFullRebuild()).toBe(false);
 
-		queue.triggerBacklinkRebuild();
+		queue.requestFullRebuild();
 		expect(queue.requiresFullRebuild()).toBe(true);
 
 		queue.drain();
 		expect(queue.requiresFullRebuild()).toBe(false);
-
-		queue.triggerTagRebuild();
-		expect(queue.requiresFullRebuild()).toBe(true);
 	});
 
 	test("drain clears all state", () => {
 		const queue = new FileChangeQueue();
 		queue.recordChange({ type: "create", path: "notes/new.md" });
-		queue.triggerBacklinkRebuild();
+		queue.requestFullRebuild();
 
 		const result = queue.drain();
 		expect(result.changes).toHaveLength(1);
-		expect(result.requiresBacklinkRebuild).toBe(true);
-		expect(result.requiresTagRebuild).toBe(false);
+		expect(result.requiresFullRebuild).toBe(true);
 
 		expect(queue.hasPending()).toBe(false);
 		expect(queue.requiresFullRebuild()).toBe(false);

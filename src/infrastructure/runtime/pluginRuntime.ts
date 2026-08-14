@@ -205,7 +205,7 @@ export function createPluginRuntime(options: PluginRuntimeOptions): PluginRuntim
 	const emptyViewController = createEmptyViewController(options.app, options.plugin);
 	const keyboardCardNavigator = new KeyboardCardNavigator(options.app);
 
-	indexUpdateQueue.onDataUpdate((context) => {
+	const unsubscribeIndexDataUpdate = indexingService.onDataUpdate((context) => {
 		sortService.invalidateCache();
 		options.bumpSortContextVersion();
 		viewUpdateOrchestrator.updateForContext(context);
@@ -226,6 +226,7 @@ export function createPluginRuntime(options: PluginRuntimeOptions): PluginRuntim
 	function destroy(): void {
 		frameScheduler.destroy();
 		options.destroySettings();
+		unsubscribeIndexDataUpdate();
 		indexUpdateQueue.destroy();
 		previewRuntime.dispose();
 		componentController.destroy();

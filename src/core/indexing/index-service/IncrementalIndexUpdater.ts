@@ -136,7 +136,6 @@ export class IncrementalIndexUpdater {
 				run.yieldScheduler,
 			),
 			linkIndexChanged: run.linkIndexChanged,
-			changesApplied: run.linkIndexChanged,
 		};
 	}
 

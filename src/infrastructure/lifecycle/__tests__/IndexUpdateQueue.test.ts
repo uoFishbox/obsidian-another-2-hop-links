@@ -38,7 +38,6 @@ vi.mock("obsidian", () => {
 
 import { TFile, TFolder } from "obsidian";
 import { createMockTFile } from "testing/__mocks__/testHelpers";
-import type { DataUpdateContext } from "core/indexing/index-service/IndexEvents";
 import { IndexUpdateQueue } from "../IndexUpdateQueue";
 
 type EventCallback = (...args: unknown[]) => void;
@@ -92,39 +91,13 @@ function createHarness(): Harness {
 		registerEvent: vi.fn((eventRef: unknown) => eventRef),
 	};
 
-	let dataUpdateListener: ((context: DataUpdateContext) => void) | undefined;
 	let indexIdleWaiter: (() => Promise<void>) | undefined;
-	let indexVersion = 0;
 
 	const indexingService = {
 		rebuildIndexesTimeSliced: vi.fn(async () => undefined),
-		applyFileChangesTimeSliced: vi.fn(
-			async (
-				changes: Array<{
-					path?: string;
-					oldPath?: string;
-					newPath?: string;
-				}>,
-			) => {
-				const paths = changes
-					.map((c) => c.path ?? c.oldPath ?? c.newPath ?? "")
-					.filter(Boolean);
-				const lookupKeys = paths.map((p) => p.toLowerCase());
-				if (dataUpdateListener) {
-					dataUpdateListener({
-						indexVersion: ++indexVersion,
-						affectedPaths: paths,
-						affectedLookupKeys: lookupKeys,
-					});
-				}
-			},
-		),
+		applyFileChangesTimeSliced: vi.fn(async () => undefined),
 		registerIdleWaiter: vi.fn((waiter: () => Promise<void>) => {
 			indexIdleWaiter = waiter;
-			return vi.fn();
-		}),
-		onDataUpdate: vi.fn((listener: (context: DataUpdateContext) => void) => {
-			dataUpdateListener = listener;
 			return vi.fn();
 		}),
 	};
@@ -283,24 +256,6 @@ describe("IndexUpdateQueue", () => {
 		).toHaveBeenCalledTimes(1);
 		expect(harness.indexingService.applyFileChangesTimeSliced).toHaveBeenCalledWith(
 			[{ type: "delete", path: "notes/old.md" }],
-		);
-	});
-
-	test("data update context is forwarded to listeners", async () => {
-		const harness = createHarness();
-		await initializeQueue(harness);
-		const listener = vi.fn();
-		harness.queue.onDataUpdate(listener);
-
-		harness.emitVaultEvent("modify", createMockTFile("notes/target.md"));
-		await flushAsyncTasks();
-
-		expect(listener).toHaveBeenCalledTimes(1);
-		expect(listener).toHaveBeenCalledWith(
-			expect.objectContaining({
-				affectedPaths: ["notes/target.md"],
-				affectedLookupKeys: ["notes/target.md"],
-			}),
 		);
 	});
 

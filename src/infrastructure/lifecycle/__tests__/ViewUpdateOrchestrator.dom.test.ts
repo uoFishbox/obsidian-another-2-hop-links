@@ -250,7 +250,6 @@ describe("ViewUpdateOrchestrator", () => {
 		const orchestrator = createOrchestrator(mocks);
 
 		orchestrator.updateForContext({
-			indexVersion: 1,
 			affectedPaths: ["notes/match.md"],
 			affectedLookupKeys: [],
 		});
@@ -290,9 +289,7 @@ describe("ViewUpdateOrchestrator", () => {
 
 		const orchestrator = createOrchestrator(mocks);
 
-		orchestrator.updateForContext({
-			indexVersion: 1,
-		});
+		orchestrator.updateForContext({});
 
 		expect(mocks.markdownRenderManager.reprocessDecorations).toHaveBeenCalledWith(
 			"notes/source.md",
@@ -322,7 +319,6 @@ describe("ViewUpdateOrchestrator", () => {
 		const orchestrator = createOrchestrator(mocks);
 
 		orchestrator.updateForContext({
-			indexVersion: 1,
 			affectedPaths: ["notes/match.md", "boards/board.canvas"],
 			affectedLookupKeys: [],
 		});
@@ -363,7 +359,6 @@ describe("ViewUpdateOrchestrator", () => {
 		const orchestrator = createOrchestrator(mocks);
 
 		orchestrator.updateForContext({
-			indexVersion: 1,
 			affectedPaths: [],
 			affectedLookupKeys: ["target.md"],
 		});
@@ -403,7 +398,6 @@ describe("ViewUpdateOrchestrator", () => {
 		const orchestrator = createOrchestrator(mocks);
 
 		orchestrator.updateForContext({
-			indexVersion: 1,
 			affectedPaths: [],
 			affectedLookupKeys: ["match.md"],
 		});
@@ -440,7 +434,6 @@ describe("ViewUpdateOrchestrator", () => {
 		const orchestrator = createOrchestrator(mocks);
 
 		orchestrator.updateForContext({
-			indexVersion: 1,
 			affectedPaths: [],
 			affectedLookupKeys: ["match.md"],
 		});
@@ -466,7 +459,6 @@ describe("ViewUpdateOrchestrator", () => {
 		const orchestrator = createOrchestrator(mocks);
 
 		orchestrator.updateForContext({
-			indexVersion: 1,
 			affectedPaths: [],
 			affectedLookupKeys: [],
 			affectedTags: ["#tag1", "#tag2"],

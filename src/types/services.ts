@@ -65,13 +65,12 @@ export interface IIndexingService {
 	getBacklinkCountForLink(linkPath: string): number;
 	getIndexVersion(): number;
 	peekNotesWithCommonTags(file: TFile): TaggedNote[];
-	getNotesWithCommonTags(file: TFile): Promise<TaggedNote[]>;
 	getNotesWithTag(tag: string, sourcePath?: string): Promise<TaggedNote[]>;
-	peekNotesWithTag?(tag: string, sourcePath?: string): TaggedNote[];
+	peekNotesWithTag(tag: string, sourcePath?: string): TaggedNote[];
 	awaitIdle(): Promise<void>;
 	isUnresolvedWithSingleBacklink(lookupPath: string): boolean;
 	isUnresolvedWithSingleBacklinkBatch(lookupPaths: string[]): Map<string, boolean>;
-	onDataUpdate?(listener: (context: DataUpdateContext) => void): () => void;
+	onDataUpdate(listener: (context: DataUpdateContext) => void): () => void;
 }
 
 export interface PreviewQueueMetrics {

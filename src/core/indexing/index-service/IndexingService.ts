@@ -7,10 +7,7 @@ import { extractTags } from "core/indexing/metadata/metadataExtractor";
 import { buildIndexesAsync } from "core/indexing/index-service/indexSnapshotBuilder";
 import { IncrementalIndexUpdater } from "core/indexing/index-service/IncrementalIndexUpdater";
 import { IndexQueryEngine } from "core/indexing/index-service/IndexQueryEngine";
-import {
-	EMPTY_TAG_MUTATION_RESULT,
-	TagIndexStore,
-} from "core/indexing/tag-index/TagIndexStore";
+import { TagIndexStore } from "core/indexing/tag-index/TagIndexStore";
 import type { TaggedNote, TagReference, BacklinksMap } from "types/domain";
 import type { IVault, IMetadataCache } from "types/obsidian";
 import type { IIndexingService } from "types/services";
@@ -25,7 +22,6 @@ import {
 	type IncrementalFileChange,
 	type IndexSnapshot,
 	type RebuildOptions,
-	type TagIndex,
 	type TimeSlicingOptions,
 } from "../types/IndexTypes";
 import { createEmptyTagIndex } from "../tag-index/tagIndexMutations";
@@ -153,18 +149,6 @@ export class IndexingService implements IIndexingService {
 		return this.tagIndexStore.getSnapshot().fileEntries.size;
 	}
 
-	public exportPersistableState(): {
-		snapshot: IndexSnapshot;
-		tagIndex: TagIndex;
-	} {
-		return {
-			snapshot: this.snapshot,
-			tagIndex: this.isTagFeatureEnabled()
-				? this.tagIndexStore.getSnapshot()
-				: createEmptyTagIndex(),
-		};
-	}
-
 	public getBacklinksForLink(linkPath: string) {
 		return this.queryEngine.getBacklinksForLink(this.snapshot, linkPath);
 	}
@@ -254,15 +238,6 @@ export class IndexingService implements IIndexingService {
 			result,
 		};
 		return result;
-	}
-
-	public async getNotesWithCommonTags(file: TFile): Promise<TaggedNote[]> {
-		if (!this.isTagFeatureEnabled()) {
-			return [];
-		}
-
-		await this.awaitIdle();
-		return this.peekNotesWithCommonTags(file);
 	}
 
 	public peekNotesWithTag(tag: string, _sourcePath?: string): TaggedNote[] {
@@ -363,7 +338,6 @@ export class IndexingService implements IIndexingService {
 				`[IndexingService.applyFileChangesTimeSliced] Applying ${changes.length} file changes`,
 			);
 		}
-		const sourceContentChangedPaths = new Set<string>();
 		const timeSlicingOptions = {
 			yieldFn: options.yieldFn ?? defaultYieldToMainThread,
 			yieldIntervalMs: options.yieldIntervalMs ?? INDEXING_YIELD_INTERVAL_MS,
@@ -374,32 +348,16 @@ export class IndexingService implements IIndexingService {
 			timeSlicingOptions,
 		);
 		this.snapshot = result.snapshot;
-		const tagResult = this.isTagFeatureEnabled()
-			? await this.tagIndexStore.applyFileChangesAsync(
-					changes,
-					timeSlicingOptions,
-				)
-			: EMPTY_TAG_MUTATION_RESULT;
+		const tagResult = await this.tagIndexStore.applyFileChangesAsync(
+			changes,
+			timeSlicingOptions,
+		);
 		const affectedPaths = result.affectedPaths;
 		const affectedLookupKeys = result.affectedLookupKeys;
 		const affectedTags = tagResult.affectedTags;
 		const affectedLinkSourcePaths = result.affectedLinkSourcePaths;
 		const affectedTagSourcePaths = tagResult.affectedTagSourcePaths;
-
-		for (const change of changes) {
-			if (change.type === "rename") {
-				sourceContentChangedPaths.add(change.oldPath);
-				sourceContentChangedPaths.add(change.newPath);
-			} else {
-				sourceContentChangedPaths.add(change.path);
-			}
-		}
-
 		const linkIndexChanged = result.linkIndexChanged;
-		const tagIndexChanged = tagResult.tagIndexChanged;
-		const sourceContentChanged = sourceContentChangedPaths.size > 0;
-		const shouldNotifyDataUpdate =
-			sourceContentChanged || linkIndexChanged || tagIndexChanged;
 
 		if (linkIndexChanged) {
 			this.queryEngine.invalidate(result.cacheInvalidationPaths);
@@ -411,20 +369,14 @@ export class IndexingService implements IIndexingService {
 			);
 		}
 
-		if (shouldNotifyDataUpdate) {
-			this.bumpIndexVersion();
-			this.notifyDataUpdate({
-				affectedPaths,
-				affectedLookupKeys,
-				affectedTags,
-				affectedLinkSourcePaths,
-				affectedTagSourcePaths,
-				affectedSourceContentPaths: sourceContentChangedPaths,
-				linkIndexChanged,
-				tagIndexChanged,
-				sourceContentChanged,
-			});
-		}
+		this.bumpIndexVersion();
+		this.notifyDataUpdate({
+			affectedPaths,
+			affectedLookupKeys,
+			affectedTags,
+			affectedLinkSourcePaths,
+			affectedTagSourcePaths,
+		});
 	}
 
 	private async finishFullRebuildTimeSliced(
@@ -458,10 +410,6 @@ export class IndexingService implements IIndexingService {
 			affectedTags?: Iterable<string>;
 			affectedLinkSourcePaths?: Iterable<string>;
 			affectedTagSourcePaths?: Iterable<string>;
-			affectedSourceContentPaths?: Iterable<string>;
-			linkIndexChanged?: boolean;
-			tagIndexChanged?: boolean;
-			sourceContentChanged?: boolean;
 		} = {},
 	): void {
 		this.updateEmitter.notifyDataUpdate(context);

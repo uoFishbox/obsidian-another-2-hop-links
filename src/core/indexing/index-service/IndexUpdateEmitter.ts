@@ -28,10 +28,6 @@ export class IndexUpdateEmitter {
 			affectedTags?: Iterable<string>;
 			affectedLinkSourcePaths?: Iterable<string>;
 			affectedTagSourcePaths?: Iterable<string>;
-			affectedSourceContentPaths?: Iterable<string>;
-			linkIndexChanged?: boolean;
-			tagIndexChanged?: boolean;
-			sourceContentChanged?: boolean;
 		} = {},
 	): void {
 		if (this.dataUpdateListeners.size === 0) {
@@ -39,7 +35,6 @@ export class IndexUpdateEmitter {
 		}
 
 		const payload: DataUpdateContext = {
-			indexVersion: this.indexVersion,
 			affectsAll: context.affectsAll,
 			affectedPaths: context.affectedPaths
 				? Array.from(context.affectedPaths)
@@ -56,12 +51,6 @@ export class IndexUpdateEmitter {
 			affectedTagSourcePaths: context.affectedTagSourcePaths
 				? Array.from(context.affectedTagSourcePaths)
 				: undefined,
-			affectedSourceContentPaths: context.affectedSourceContentPaths
-				? Array.from(context.affectedSourceContentPaths)
-				: undefined,
-			linkIndexChanged: context.linkIndexChanged,
-			tagIndexChanged: context.tagIndexChanged,
-			sourceContentChanged: context.sourceContentChanged,
 		};
 
 		if (enableLogging)

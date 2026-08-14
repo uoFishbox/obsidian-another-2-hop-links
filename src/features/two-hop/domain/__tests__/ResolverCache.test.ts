@@ -152,7 +152,6 @@ describe("ResolverCache", () => {
 		);
 
 		cache.invalidate({
-			indexVersion: 2,
 			affectedPaths: ["note1.md"],
 		});
 
@@ -201,7 +200,6 @@ describe("ResolverCache", () => {
 		);
 
 		cache.invalidate({
-			indexVersion: 2,
 			affectedLookupKeys: ["missing-note.md"],
 		});
 
@@ -250,7 +248,6 @@ describe("ResolverCache", () => {
 		);
 
 		cache.invalidate({
-			indexVersion: 2,
 			affectedTags: ["tag1"],
 		});
 
@@ -290,7 +287,6 @@ describe("ResolverCache", () => {
 		);
 
 		cache.invalidate({
-			indexVersion: 2,
 			affectedPaths: ["unrelated.md"],
 			affectedLookupKeys: ["unrelated-lookup.md"],
 			affectedTags: ["unrelated-tag"],
@@ -319,7 +315,6 @@ describe("ResolverCache", () => {
 		);
 
 		cache.invalidate({
-			indexVersion: 2,
 			affectsAll: true,
 		});
 
@@ -370,7 +365,6 @@ describe("ResolverCache", () => {
 		);
 
 		cache.invalidate({
-			indexVersion: 2,
 			affectedPaths: [],
 			affectedLookupKeys: [],
 			affectedTags: [],
@@ -430,7 +424,6 @@ describe("ResolverCache", () => {
 		expect(second?.backlinks).toEqual([]);
 
 		cache.invalidate({
-			indexVersion: 2,
 			affectedPaths: ["note1.md"],
 		});
 		expect(

@@ -1,6 +1,5 @@
 import { describe, test, expect, vi } from "vitest";
 import { TwoHopLinkResolver } from "../TwoHopLinkResolver";
-import { IndexingService } from "core/indexing/index-service/IndexingService";
 import { VaultEnvironmentBuilder } from "testing/helpers/VaultEnvironmentBuilder";
 import type {
 	ResolveProgress,
@@ -58,31 +57,6 @@ function branchFor(result: TwoHopLinkResult, hop1Path: string) {
 
 function sourcePaths(links: readonly TwoHopIndexedLink[]): string[] {
 	return links.map((link) => link.sourceFile.path).sort();
-}
-
-function createIndexingServiceWithoutSubscription(
-	service: IndexingService,
-): IIndexingService {
-	return {
-		getBacklinksMap: () => service.getBacklinksMap(),
-		invalidateAll: () => service.invalidateAll(),
-		getSourcePathsForLookupKeys: (lookupKeys) =>
-			service.getSourcePathsForLookupKeys(lookupKeys),
-		getBacklinksForLink: (linkPath) => service.getBacklinksForLink(linkPath),
-		getUniqueBacklinkSourcesForLink: (linkPath, excludePath, limit) =>
-			service.getUniqueBacklinkSourcesForLink(linkPath, excludePath, limit),
-		getBacklinkCountForLink: (linkPath) =>
-			service.getBacklinkCountForLink(linkPath),
-		getIndexVersion: () => service.getIndexVersion(),
-		peekNotesWithCommonTags: (file) => service.peekNotesWithCommonTags(file),
-		getNotesWithCommonTags: (file) => service.getNotesWithCommonTags(file),
-		getNotesWithTag: (tag, sourcePath) => service.getNotesWithTag(tag, sourcePath),
-		awaitIdle: () => service.awaitIdle(),
-		isUnresolvedWithSingleBacklink: (lookupPath) =>
-			service.isUnresolvedWithSingleBacklink(lookupPath),
-		isUnresolvedWithSingleBacklinkBatch: (lookupPaths) =>
-			service.isUnresolvedWithSingleBacklinkBatch(lookupPaths),
-	} as IIndexingService;
 }
 
 describe("TwoHopLinkResolver", () => {
@@ -407,39 +381,6 @@ describe("TwoHopLinkResolver", () => {
 
 			const secondResultPromise = resolver.resolve(env.files["origin.md"]);
 			await Promise.resolve();
-
-			await expect(secondResultPromise).resolves.toBe(firstResult);
-		});
-
-		test("resolver without data update subscription returns warm cache after idle", async () => {
-			const env = await buildResolvedEnvironment([
-				{ path: "origin.md", links: ["note1"] },
-				{ path: "note1.md" },
-			]);
-
-			const indexingService = createIndexingServiceWithoutSubscription(
-				env.service,
-			);
-			const resolver = createResolver(env, indexingService);
-
-			const firstResult = await resolver.resolve(env.files["origin.md"]);
-
-			const idleDeferred = createDeferred<void>();
-			vi.spyOn(indexingService, "awaitIdle").mockReturnValueOnce(
-				idleDeferred.promise,
-			);
-
-			const secondResultPromise = resolver.resolve(env.files["origin.md"]);
-
-			let settled = false;
-			void secondResultPromise.then(() => {
-				settled = true;
-			});
-
-			await Promise.resolve();
-			expect(settled).toBe(false);
-
-			idleDeferred.resolve();
 
 			await expect(secondResultPromise).resolves.toBe(firstResult);
 		});

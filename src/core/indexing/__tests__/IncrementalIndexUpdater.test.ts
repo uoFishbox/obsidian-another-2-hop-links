@@ -1,8 +1,7 @@
 import { describe, expect, test } from "vitest";
 import { IncrementalIndexUpdater } from "../index-service/IncrementalIndexUpdater";
-import { buildIndexSnapshotAsync } from "../index-service/indexSnapshotBuilder";
 import { VaultEnvironmentBuilder } from "testing/helpers/VaultEnvironmentBuilder";
-import { serializeSnapshot } from "./snapshotTestHelpers";
+import { buildIndexSnapshotAsync, serializeSnapshot } from "./snapshotTestHelpers";
 import type { CachedMetadata, TFile } from "obsidian";
 import type { IndexSnapshot } from "../types/IndexTypes";
 

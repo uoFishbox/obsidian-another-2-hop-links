@@ -16,16 +16,14 @@ import { createYieldScheduler, defaultYieldToMainThread } from "../timeSlicing";
 export interface TagMutationResult {
 	readonly affectedTags: ReadonlySet<string>;
 	readonly affectedTagSourcePaths: ReadonlySet<string>;
-	readonly tagIndexChanged: boolean;
 }
 
 const EMPTY_STRING_SET: ReadonlySet<string> = new Set<string>();
 
 /** Shared result for updates that cannot change the tag index. */
-export const EMPTY_TAG_MUTATION_RESULT: TagMutationResult = {
+const EMPTY_TAG_MUTATION_RESULT: TagMutationResult = {
 	affectedTags: EMPTY_STRING_SET,
 	affectedTagSourcePaths: EMPTY_STRING_SET,
-	tagIndexChanged: false,
 };
 
 export class TagIndexStore {
@@ -42,10 +40,6 @@ export class TagIndexStore {
 			return createEmptyTagIndex();
 		}
 		return this.tagIndex;
-	}
-
-	public clear(): void {
-		this.tagIndex = createEmptyTagIndex();
 	}
 
 	public replace(tagIndex: TagIndex): void {
@@ -151,8 +145,6 @@ export class TagIndexStore {
 		return {
 			affectedTags: affectedTags ?? EMPTY_STRING_SET,
 			affectedTagSourcePaths: affectedTagSourcePaths ?? EMPTY_STRING_SET,
-			tagIndexChanged:
-				affectedTags !== undefined || affectedTagSourcePaths !== undefined,
 		};
 	}
 }

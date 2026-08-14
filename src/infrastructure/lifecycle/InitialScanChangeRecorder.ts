@@ -30,10 +30,6 @@ export class InitialScanChangeRecorder {
 		return this.touched.size > 0;
 	}
 
-	clear(): void {
-		this.touched.clear();
-	}
-
 	needsMetadataResolve(
 		currentGeneration: number,
 		fileExists: (path: string) => boolean,

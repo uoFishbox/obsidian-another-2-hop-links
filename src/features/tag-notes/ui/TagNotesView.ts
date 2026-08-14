@@ -295,17 +295,11 @@ export class TagNotesView extends AbstractSvelteListView<TaggedNote> {
 		}
 
 		const indexingService = this.plugin.indexingService;
-		const peekNotesWithTag = indexingService.peekNotesWithTag;
-		if (typeof peekNotesWithTag !== "function") {
-			void this.loadNotes({ reset: false });
-			return;
-		}
-
 		if (!this.tag) {
 			return;
 		}
 
-		const notes = peekNotesWithTag.call(indexingService, this.tag, this.sourcePath);
+		const notes = indexingService.peekNotesWithTag(this.tag, this.sourcePath);
 
 		this.notes = notes;
 		this.hasLoadedNotes = true;

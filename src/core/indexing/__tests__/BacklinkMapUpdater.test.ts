@@ -3,7 +3,6 @@ import {
 	createBacklinkUpdater,
 	type BacklinkUpdater,
 } from "../backlink-builder/backlinkUpdater";
-import { getBacklinkCollectionCount } from "../backlink-builder/backlinkBuckets";
 import { VaultEnvironmentBuilder } from "testing/helpers/VaultEnvironmentBuilder";
 import type { CachedMetadata, TFile } from "obsidian";
 
@@ -270,11 +269,7 @@ describe("BacklinkMapUpdater", () => {
 		expect(result.representativeChangedLookupKeys).toEqual(new Set());
 		expect(removals).toEqual([]);
 		expect(additions).toEqual([]);
-		expect(
-			getBacklinkCollectionCount(
-				backlinksMap.get("target.md")?.get("source.md")!,
-			),
-		).toBe(1);
+		expect(backlinksMap.get("target.md")?.get("source.md")?.count).toBe(1);
 	});
 
 	test("reconcileBacklinksBySource adds to affectedDestinations on order-only changes", async () => {

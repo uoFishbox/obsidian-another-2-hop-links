@@ -208,7 +208,6 @@ class TagNotesViewHarness extends TagNotesView {
 	}
 
 	public refreshForTest(context?: {
-		indexVersion: number;
 		affectsAll?: boolean;
 		affectedPaths?: string[];
 		affectedTags?: string[];
@@ -217,7 +216,6 @@ class TagNotesViewHarness extends TagNotesView {
 	}
 
 	public shouldRefreshForContextForTest(context?: {
-		indexVersion: number;
 		affectsAll?: boolean;
 		affectedPaths?: string[];
 		affectedTags?: string[];
@@ -329,9 +327,7 @@ describe("TagNotesView", () => {
 	});
 
 	it("refreshes loaded notes from an index update after onOpen", async () => {
-		let onDataUpdate:
-			| ((context: { indexVersion: number; affectedTags?: string[] }) => void)
-			| undefined;
+		let onDataUpdate: ((context: { affectedTags?: string[] }) => void) | undefined;
 		const initialNote = createTaggedNote("notes/alpha-a.md", 1);
 		const nextNotes = [
 			createTaggedNote("notes/alpha-a.md", 2),
@@ -361,7 +357,6 @@ describe("TagNotesView", () => {
 		);
 
 		onDataUpdate?.({
-			indexVersion: 2,
 			affectedTags: ["alpha"],
 		});
 
@@ -458,7 +453,6 @@ describe("TagNotesView", () => {
 
 		expect(
 			view.shouldRefreshForContextForTest({
-				indexVersion: 1,
 				affectedTags: ["beta"],
 				affectedPaths: ["notes/other.md"],
 			}),
@@ -466,7 +460,6 @@ describe("TagNotesView", () => {
 
 		expect(
 			view.shouldRefreshForContextForTest({
-				indexVersion: 1,
 				affectedTags: ["alpha"],
 			}),
 		).toBe(true);
@@ -499,7 +492,6 @@ describe("TagNotesView", () => {
 		expect(host).toHaveAttribute("data-item-count", "1");
 
 		view.refreshForTest({
-			indexVersion: 2,
 			affectedTags: ["alpha"],
 		});
 
@@ -534,7 +526,6 @@ describe("TagNotesView", () => {
 		triggerUpdateMock.mockClear();
 
 		view.refreshForTest({
-			indexVersion: 2,
 			affectedTags: ["alpha"],
 		});
 

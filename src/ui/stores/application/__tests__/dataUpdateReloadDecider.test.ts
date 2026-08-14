@@ -85,7 +85,6 @@ function createFullContext(
 	} = {},
 ) {
 	return {
-		indexVersion: 1,
 		affectedPaths: overrides.affectedPaths ?? [],
 		affectedLookupKeys: overrides.affectedLookupKeys ?? [],
 		affectedTags: overrides.affectedTags ?? [],
@@ -298,7 +297,6 @@ describe("dataUpdateReloadDecider", () => {
 				currentFile,
 				data,
 				context: {
-					indexVersion: 1,
 					affectedPaths: ["target.md"],
 					affectedLookupKeys: [],
 					affectedTags: [],

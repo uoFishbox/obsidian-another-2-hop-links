@@ -55,9 +55,7 @@ export class TwoHopLinkResolver {
 	private readonly cache: ResolverCache;
 	private readonly branchBuilder: TwoHopBranchBuilder;
 	private readonly inFlightResolves = new Map<string, InFlightResolve>();
-	private readonly supportsDataUpdateSubscription: boolean;
 	private unsubscribeDataUpdate: (() => void) | undefined;
-	private lastIndexVersion: number | undefined;
 
 	constructor(
 		private readonly metadataCache: IMetadataCache,
@@ -68,15 +66,9 @@ export class TwoHopLinkResolver {
 		this.cache = new ResolverCache();
 		this.branchBuilder = new TwoHopBranchBuilder(metadataCache, indexingService);
 
-		if (typeof indexingService.onDataUpdate === "function") {
-			this.supportsDataUpdateSubscription = true;
-			this.unsubscribeDataUpdate = indexingService.onDataUpdate((context) => {
-				this.cache.invalidate(context);
-			});
-		} else {
-			this.supportsDataUpdateSubscription = false;
-			this.unsubscribeDataUpdate = undefined;
-		}
+		this.unsubscribeDataUpdate = indexingService.onDataUpdate((context) => {
+			this.cache.invalidate(context);
+		});
 	}
 
 	public destroy(): void {
@@ -225,34 +217,22 @@ export class TwoHopLinkResolver {
 	): Promise<TwoHopResolveSnapshot> {
 		for (let retryCount = 0; ; retryCount += 1) {
 			throwIfResolveAborted(signal);
-			if (this.supportsDataUpdateSubscription) {
-				const cachedSnapshot = this.cache.getSnapshot(
-					targetFile.path,
-					performanceSettings,
-					resolveSettings,
-				);
-				if (cachedSnapshot) {
-					onProgress?.({
-						phase: "complete",
-						data: cachedSnapshot.result,
-					});
-					return cachedSnapshot;
-				}
+			const warmSnapshot = this.cache.getSnapshot(
+				targetFile.path,
+				performanceSettings,
+				resolveSettings,
+			);
+			if (warmSnapshot) {
+				onProgress?.({
+					phase: "complete",
+					data: warmSnapshot.result,
+				});
+				return warmSnapshot;
 			}
 
 			await this.indexingService.awaitIdle();
 			throwIfResolveAborted(signal);
 			const indexVersion = this.indexingService.getIndexVersion();
-
-			if (!this.supportsDataUpdateSubscription) {
-				if (
-					this.lastIndexVersion !== undefined &&
-					this.lastIndexVersion !== indexVersion
-				) {
-					this.cache.clear();
-				}
-				this.lastIndexVersion = indexVersion;
-			}
 
 			const cachedSnapshot = this.cache.getSnapshot(
 				targetFile.path,

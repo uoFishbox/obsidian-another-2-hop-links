@@ -3,7 +3,7 @@ import {
 	createCreateChangePlanner,
 	createCreateEventEvaluationCache,
 } from "../index-service/createChangePlanner";
-import { buildIndexSnapshotAsync } from "../index-service/indexSnapshotBuilder";
+import { buildIndexSnapshotAsync } from "./snapshotTestHelpers";
 import { VaultEnvironmentBuilder } from "testing/helpers/VaultEnvironmentBuilder";
 
 describe("CreateChangePlanner", () => {
