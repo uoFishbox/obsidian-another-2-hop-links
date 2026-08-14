@@ -50,13 +50,11 @@ export interface TwoHopCardDemand {
 export interface TwoHopCardHydratorParams {
 	readonly frameCoordinator: VirtualFrameCoordinator;
 	readonly getRevision: () => unknown;
-	readonly getResolver: () =>
-		| ((
-				item: TwoHopItemModel,
-				presentation: TwoHopCardPresentationState,
-				revision: unknown,
-		  ) => CardRenderModel)
-		| undefined;
+	readonly resolveCardModel: (
+		item: TwoHopItemModel,
+		presentation: TwoHopCardPresentationState,
+		revision: unknown,
+	) => CardRenderModel;
 	readonly isPreviewActive: () => boolean;
 	readonly onPreviewModelsChanged: () => void;
 }
@@ -267,11 +265,6 @@ export function createTwoHopCardHydrator(
 	}
 
 	function drain(priority: HydrationPriority): void {
-		const resolver = params.getResolver();
-		if (!resolver) {
-			clearPending();
-			return;
-		}
 		const revision = params.getRevision();
 		const previewActive = params.isPreviewActive();
 		const queue = queueFor(priority);
@@ -294,7 +287,11 @@ export function createTwoHopCardHydrator(
 			if (process.env.NODE_ENV !== "production") {
 				recordCCLDevMeasurement("twoHop.resolveItemCardModel.call");
 			}
-			const model = resolver(hydration.item, presentation, revision);
+			const model = params.resolveCardModel(
+				hydration.item,
+				presentation,
+				revision,
+			);
 			const previewRenderKeyChanged =
 				previewActive &&
 				(priority === "foreground" || current !== undefined) &&

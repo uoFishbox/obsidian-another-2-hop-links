@@ -133,7 +133,7 @@ describe("createTwoHopCardHydrator", () => {
 		const hydrator = createTwoHopCardHydrator({
 			frameCoordinator: frames.coordinator,
 			getRevision: () => 0,
-			getResolver: () => resolver,
+			resolveCardModel: resolver,
 			isPreviewActive: () => true,
 			onPreviewModelsChanged: previewChanged,
 		});
@@ -230,7 +230,7 @@ describe("createTwoHopCardHydrator", () => {
 		const hydrator = createTwoHopCardHydrator({
 			frameCoordinator: frames.coordinator,
 			getRevision: () => revision,
-			getResolver: () => resolver,
+			resolveCardModel: resolver,
 			isPreviewActive: () => false,
 			onPreviewModelsChanged: vi.fn(),
 		});
@@ -269,7 +269,7 @@ describe("createTwoHopCardHydrator", () => {
 		const hydrator = createTwoHopCardHydrator({
 			frameCoordinator: frames.coordinator,
 			getRevision: () => 0,
-			getResolver: () => resolveCardModel,
+			resolveCardModel,
 			isPreviewActive: () => false,
 			onPreviewModelsChanged: vi.fn(),
 		});

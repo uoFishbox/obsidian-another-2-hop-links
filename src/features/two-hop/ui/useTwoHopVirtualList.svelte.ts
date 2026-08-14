@@ -70,7 +70,7 @@ export interface TwoHopVirtualListProps {
 	readonly previewActive?: boolean;
 	readonly offscreenBootstrapPreviewRows?: number;
 	readonly cardModelRevision: unknown;
-	readonly resolveItemCardModel?: (
+	readonly resolveItemCardModel: (
 		item: TwoHopItemModel,
 		presentation: TwoHopCardPresentationState,
 		revision: unknown,
@@ -102,8 +102,6 @@ export function useTwoHopVirtualList(
 		}),
 	);
 	let rootEl = $state<HTMLDivElement | null>(null);
-	let contentEl = $state<HTMLDivElement | null>(null);
-	let interactionShadowRoot = $state<ShadowRoot | null>(null);
 	let measurement = $state(createVirtualListMeasurementState());
 	let lastSections = props.sections;
 	let lastCardModelRevision = props.cardModelRevision;
@@ -167,7 +165,7 @@ export function useTwoHopVirtualList(
 	const cardHydrator = createTwoHopCardHydrator({
 		frameCoordinator,
 		getRevision: () => untrack(() => props.cardModelRevision),
-		getResolver: () => untrack(() => props.resolveItemCardModel),
+		resolveCardModel: props.resolveItemCardModel,
 		isPreviewActive: isPreviewSurfaceActive,
 		onPreviewModelsChanged: publishPreviewSnapshot,
 	});
@@ -529,18 +527,6 @@ export function useTwoHopVirtualList(
 		set rootEl(next: HTMLDivElement | null) {
 			rootEl = next;
 			if (next) publishTwoHopCardCounts(next, rowModel.cardCounts);
-		},
-		get contentEl() {
-			return contentEl;
-		},
-		set contentEl(next: HTMLDivElement | null) {
-			contentEl = next;
-		},
-		get interactionShadowRoot() {
-			return interactionShadowRoot;
-		},
-		set interactionShadowRoot(next: ShadowRoot | null) {
-			interactionShadowRoot = next;
 		},
 		get layout() {
 			return layout;

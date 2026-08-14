@@ -45,9 +45,7 @@ export interface MountedTwoHopBuild extends MountedVirtualCellsBuild<MountedTwoH
 	readonly rowSlices: readonly MountedTwoHopRow[];
 	readonly rowsBySlot: readonly MountedTwoHopRow[];
 	readonly poolCapacity: number;
-	readonly poolEpoch: number;
 	readonly rowModel: TwoHopRowModel;
-	readonly columns: number;
 }
 
 export interface BuildMountedTwoHopRowsParams {
@@ -139,9 +137,7 @@ export function buildMountedTwoHopRows(
 		rowsBySlot: mountedRows.rowsBySlot,
 		nextRenderSlotIndex: mountedRows.nextRenderSlotIndex,
 		poolCapacity: slotPublication.capacity,
-		poolEpoch: slotPublication.poolEpoch,
 		rowModel,
-		columns,
 	};
 	markCCLDevPerformance("ccl:range-build-end");
 	return build;

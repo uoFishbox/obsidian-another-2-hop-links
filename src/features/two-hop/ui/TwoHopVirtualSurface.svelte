@@ -26,8 +26,6 @@
 	gap={list.layout.gap}
 	mountedRows={list.mountedRows}
 	bind:rootEl={list.rootEl}
-	bind:contentEl={list.contentEl}
-	bind:interactionShadowRoot={list.interactionShadowRoot}
 	observerRoot={list.observerRoot}
 	resolveNavigationTarget={list.resolveNavigationTarget}
 	flushVirtualScrollMeasurement={list.flushVirtualScrollMeasurement}

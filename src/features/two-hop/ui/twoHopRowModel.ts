@@ -53,14 +53,12 @@ type MutableStableScrollTopBand = {
 	-readonly [K in keyof StableScrollTopBand]: StableScrollTopBand[K];
 };
 
-export interface TwoHopRowModel extends VirtualRowModel<TwoHopVirtualCell> {
-	readonly sections: readonly TwoHopSectionModel[];
+export interface TwoHopRowModel extends Omit<
+	VirtualRowModel<TwoHopVirtualCell>,
+	"getRowCellCount" | "findVisibleRangesFromMounted"
+> {
 	readonly cardCounts: TwoHopLogicalCardCounts;
 	readonly layout: TwoHopRowLayoutMetrics;
-	readonly firstRowBySection: Uint32Array;
-	readonly rowCountBySection: Uint32Array;
-	readonly topBySection: Float64Array;
-	getRowCellCount(rowIndex: number): number;
 	findVisibleRangeInto(
 		out: RowRange,
 		params: { scrollTop: number; viewportHeight: number; overscanPx: number },
@@ -416,13 +414,8 @@ export function createTwoHopRowModel(
 		rowCount,
 		totalHeight,
 		layout,
-		sections,
 		cardCounts,
-		firstRowBySection,
-		rowCountBySection,
-		topBySection,
 		getRow,
-		getRowCellCount,
 		getRowTop: resolveRowTop,
 		getRowEnd: (rowIndex) => resolveRowTop(rowIndex) + rowHeight,
 		findVisibleRange(params) {
@@ -442,14 +435,6 @@ export function createTwoHopRowModel(
 		},
 		findVisibleRangesInto(out, rangeParams) {
 			resolveVirtualRangesInto(out, rangeParams, writeVisibleRange);
-		},
-		findVisibleRangesFromMounted(rangeParams) {
-			const ranges = createMutableVirtualRanges();
-			return resolveVirtualRangesInto(
-				ranges,
-				{ ...rangeParams, reuseMountedReference: true },
-				writeVisibleRange,
-			);
 		},
 		findVisibleRangesFromMountedInto(out, rangeParams) {
 			resolveVirtualRangesInto(out, rangeParams, writeVisibleRange);

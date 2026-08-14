@@ -65,10 +65,9 @@ describe("TwoHopRowModel", () => {
 			createSection("second", 1),
 		]);
 
-		expect(model.firstRowBySection).toEqual(new Uint32Array([0, 3]));
-		expect(model.rowCountBySection).toEqual(new Uint32Array([3, 1]));
-		expect(model.topBySection).toEqual(new Float64Array([0, 330]));
 		expect(model.rowCount).toBe(4);
+		expect(model.getRow(0)?.top).toBe(0);
+		expect(model.getRow(0)?.cellCount).toBe(2);
 		expect(model.getRow(3)?.top).toBe(330);
 		expect(model.getRow(2)?.getCell(0)?.kind).toBe("load-more");
 		expect(model.cardCounts).toEqual({
