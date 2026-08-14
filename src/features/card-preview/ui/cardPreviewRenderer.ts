@@ -185,18 +185,19 @@ export function createCardPreviewRenderer(
 
 				if (previewForRender.type === "image") {
 					if (isRenderStale(signal)) return false;
+					const imageSrc = toPreviewImageSrc(previewForRender.content);
 					const image = document.createElement("img");
 					image.alt = `preview for ${file.basename}`;
 					image.loading = "lazy";
 					image.decoding = "async";
 					image.fetchPriority = "low";
-					image.src = toPreviewImageSrc(previewForRender.content);
 
 					return enqueueCoordinatedDomCommit({
 						targetKey: domCommitScopeKey,
 						isStale: () => isRenderStale(signal),
 						commit: () => {
 							if (!shouldSkipDomApply(container, request)) {
+								image.src = imageSrc;
 								container.replaceChildren(image);
 							}
 							lastAppliedRenderKey = renderKey;
