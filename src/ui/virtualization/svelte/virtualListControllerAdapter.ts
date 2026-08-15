@@ -53,16 +53,6 @@ export interface CreateVirtualListControllerAdapterOptions<
 		measurement: VirtualMeasurement & { readonly sectionRect: DOMRect },
 		rootEl: HTMLElement,
 	): VirtualListLayoutMeasurementResolution<TContext>;
-	transformMountedScrollWindowMeasurement?(
-		resolved: MountedScrollWindowMeasurement,
-		measurement: VirtualMeasurement,
-		context: TContext,
-	): MountedScrollWindowMeasurement;
-	transformRangedScrollWindowMeasurement?(
-		resolved: RangedScrollWindowMeasurement,
-		measurement: VirtualMeasurement,
-		context: TContext,
-	): RangedScrollWindowMeasurement;
 	onStableMeasurement?(context: VirtualListStableMeasurementContext): void;
 	onObservedWidthChange?(width: number): void;
 	frameCoordinator?: VirtualFrameCoordinator;
@@ -102,8 +92,6 @@ export function createVirtualListControllerAdapter<
 	resolveVisibilityPolicy,
 	applyRangeMeasurement,
 	resolveLayoutMeasurement,
-	transformMountedScrollWindowMeasurement,
-	transformRangedScrollWindowMeasurement,
 	onStableMeasurement,
 	onObservedWidthChange,
 	frameCoordinator,
@@ -153,18 +141,11 @@ export function createVirtualListControllerAdapter<
 		nextMeasurement: VirtualMeasurement,
 		context: TContext,
 	): MountedScrollWindowMeasurement {
-		const resolved = rangeResolver.resolveMountedScrollWindowMeasurement(
+		return rangeResolver.resolveMountedScrollWindowMeasurement(
 			nextMeasurement.scrollTop,
 			nextMeasurement.viewportHeight,
 			nextMeasurement.sectionTop,
 			context,
-		);
-		return (
-			transformMountedScrollWindowMeasurement?.(
-				resolved,
-				nextMeasurement,
-				context,
-			) ?? resolved
 		);
 	}
 
@@ -173,19 +154,12 @@ export function createVirtualListControllerAdapter<
 		context: TContext,
 		precomputedMountedRange?: RowRange,
 	): RangedScrollWindowMeasurement {
-		const resolved = rangeResolver.resolveScrollWindowMeasurement(
+		return rangeResolver.resolveScrollWindowMeasurement(
 			nextMeasurement.scrollTop,
 			nextMeasurement.viewportHeight,
 			nextMeasurement.sectionTop,
 			context,
 			precomputedMountedRange,
-		);
-		return (
-			transformRangedScrollWindowMeasurement?.(
-				resolved,
-				nextMeasurement,
-				context,
-			) ?? resolved
 		);
 	}
 

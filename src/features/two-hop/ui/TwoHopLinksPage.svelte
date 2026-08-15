@@ -35,8 +35,6 @@
 		type TwoHopCardModelRevision,
 	} from "features/two-hop/ui/twoHopCardModel";
 
-	const INLINE_OFFSCREEN_BOOTSTRAP_PREVIEW_ROWS = 4;
-
 	interface Props {
 		file: TFile;
 		linkContext: LinkContext;
@@ -398,9 +396,6 @@
 				{resolveItemCardModel}
 				{previewDependencies}
 				previewActive={previewSurfaceActive}
-				offscreenBootstrapPreviewRows={isSidebar
-					? 0
-					: INLINE_OFFSCREEN_BOOTSTRAP_PREVIEW_ROWS}
 			/>
 			{#if !filteredDisplayData.twoHopBranches.length && showTwoHopPlaceholder}
 				<div class="cosense-card-links__phase-placeholder">

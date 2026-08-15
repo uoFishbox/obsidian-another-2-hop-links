@@ -37,11 +37,7 @@ import { getOptionalOwnerWindow } from "ui/shared/dom/realmSafeDom";
 import { createResidentRowSlotAllocator } from "ui/virtualization/core/residentSlotAllocator";
 import { useVirtualList } from "ui/virtualization/svelte/useVirtualList.svelte";
 import { createVirtualListMeasurementState } from "ui/virtualization/dom/virtualListMeasurementState";
-import { type VirtualMeasurement } from "ui/virtualization/dom/virtualMeasurementController";
-import type {
-	MountedScrollWindowMeasurement,
-	RangedScrollWindowMeasurement,
-} from "ui/virtualization/core/scrollWindowGate";
+import type { VirtualMeasurement } from "ui/virtualization/dom/virtualMeasurementController";
 import { createVirtualListControllerAdapter } from "ui/virtualization/svelte/virtualListControllerAdapter";
 import type { VirtualVisibilityPolicy } from "ui/virtualization/core/virtualListEngine";
 import type { RowRange } from "ui/virtualization/rowRange";
@@ -67,7 +63,6 @@ export interface TwoHopVirtualListProps {
 	readonly previewDependencies?: TwoHopPreviewDependencies;
 	readonly loadMoreSection?: (sectionId: string) => void;
 	readonly previewActive?: boolean;
-	readonly offscreenBootstrapPreviewRows?: number;
 	readonly cardModelRevision: unknown;
 	readonly resolveItemCardModel: (
 		item: TwoHopItemModel,
@@ -127,10 +122,7 @@ export function useTwoHopVirtualList(
 	function resolveVisibilityPolicy(model: TwoHopRowModel): VirtualVisibilityPolicy {
 		const rowStride = model.layout.rowStride;
 		return {
-			bootstrapRows: Math.max(
-				3,
-				Math.max(0, Math.floor(props.offscreenBootstrapPreviewRows ?? 0)),
-			),
+			bootstrapRows: 3,
 			mountedOverscanPx: rowStride * 3,
 			previewOverscanPx: rowStride,
 		};
@@ -244,54 +236,6 @@ export function useTwoHopVirtualList(
 			RANGE_EFFECT_TASK_KEY,
 			applyRangeEffects,
 		);
-	}
-
-	function shouldUseOffscreenBootstrap(
-		nextMeasurement: VirtualMeasurement,
-		model: TwoHopRowModel,
-	): boolean {
-		return (
-			model.rowCount > 0 &&
-			nextMeasurement.viewportHeight > 0 &&
-			nextMeasurement.scrollTop - nextMeasurement.sectionTop <=
-				-nextMeasurement.viewportHeight &&
-			(props.offscreenBootstrapPreviewRows ?? 0) > 0
-		);
-	}
-
-	function resolveOffscreenBootstrapRange(model: TwoHopRowModel): RowRange {
-		return {
-			start: 0,
-			end: Math.min(
-				model.rowCount,
-				Math.max(0, Math.floor(props.offscreenBootstrapPreviewRows ?? 0)),
-			),
-		};
-	}
-
-	function transformMountedMeasurement(
-		resolved: MountedScrollWindowMeasurement,
-		nextMeasurement: VirtualMeasurement,
-		model: TwoHopRowModel,
-	): MountedScrollWindowMeasurement {
-		if (!shouldUseOffscreenBootstrap(nextMeasurement, model)) return resolved;
-		return { ...resolved, mounted: resolveOffscreenBootstrapRange(model) };
-	}
-
-	function transformRangedMeasurement(
-		resolved: RangedScrollWindowMeasurement,
-		nextMeasurement: VirtualMeasurement,
-		model: TwoHopRowModel,
-	): RangedScrollWindowMeasurement {
-		if (!shouldUseOffscreenBootstrap(nextMeasurement, model)) return resolved;
-		const bootstrap = resolveOffscreenBootstrapRange(model);
-		return {
-			...resolved,
-			ranges: {
-				mounted: bootstrap,
-				previewVisible: { ...bootstrap },
-			},
-		};
 	}
 
 	function applyVirtualMeasurement(
@@ -422,8 +366,6 @@ export function useTwoHopVirtualList(
 		resolveVisibilityPolicy,
 		applyRangeMeasurement: applyVirtualMeasurement,
 		resolveLayoutMeasurement,
-		transformMountedScrollWindowMeasurement: transformMountedMeasurement,
-		transformRangedScrollWindowMeasurement: transformRangedMeasurement,
 		onObservedWidthChange: (width) => {
 			if (width <= 0) widthWasZero = true;
 		},

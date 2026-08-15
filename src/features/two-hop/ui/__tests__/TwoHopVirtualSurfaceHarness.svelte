@@ -15,7 +15,6 @@
 		linkContext: LinkContext;
 		previewDependencies?: TwoHopPreviewDependencies;
 		previewActive?: boolean;
-		offscreenBootstrapPreviewRows?: number;
 		cardModelRevision?: unknown;
 		loadMoreSection?: (sectionId: string) => void;
 		resolveItemCardModel: (
@@ -30,7 +29,6 @@
 		linkContext,
 		previewDependencies = undefined,
 		previewActive = true,
-		offscreenBootstrapPreviewRows = 0,
 		cardModelRevision = 0,
 		loadMoreSection = undefined,
 		resolveItemCardModel,
@@ -45,6 +43,5 @@
 	{resolveItemCardModel}
 	{previewDependencies}
 	{previewActive}
-	{offscreenBootstrapPreviewRows}
 	{cardModelRevision}
 />

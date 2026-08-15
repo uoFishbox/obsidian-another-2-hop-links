@@ -98,7 +98,6 @@ async function renderSurface(params: {
 	resolveItemCardModel: ReturnType<typeof createCardModelResolver>;
 	loadMoreSection?: (sectionId: string) => void;
 	rootTop?: number;
-	offscreenBootstrapPreviewRows?: number;
 	cardModelRevision?: unknown;
 }): Promise<SurfaceFixture> {
 	const applicationStore = {
@@ -124,7 +123,6 @@ async function renderSurface(params: {
 		linkContext: { getPreview: vi.fn() } as unknown as LinkContext,
 		loadMoreSection: params.loadMoreSection,
 		resolveItemCardModel: params.resolveItemCardModel,
-		offscreenBootstrapPreviewRows: params.offscreenBootstrapPreviewRows ?? 0,
 		cardModelRevision: params.cardModelRevision ?? 0,
 	};
 	const rendered = render(TwoHopVirtualSurfaceHarness, {
@@ -407,22 +405,6 @@ describe("TwoHopVirtualSurface", () => {
 			loadMore: 0,
 			total: 4,
 		});
-	});
-
-	it("bootstraps only the requested leading rows while the surface is offscreen", async () => {
-		const resolver = createCardModelResolver();
-		await renderSurface({
-			section: createSection(10_000),
-			resolveItemCardModel: resolver,
-			rootTop: 1_000,
-			offscreenBootstrapPreviewRows: 2,
-		});
-
-		await vi.waitFor(() => expect(resolver).toHaveBeenCalled());
-		const resolvedIndexes = resolver.mock.calls.map(([item]) =>
-			Number((item as TwoHopItemModel).key.split(":")[1]),
-		);
-		expect(Math.max(...resolvedIndexes)).toBeLessThan(6);
 	});
 
 	it("counts keyed cell-body replacements across a long scroll", async () => {

@@ -11,7 +11,6 @@
 		loadMoreSection?: (sectionId: string) => void;
 		previewDependencies?: TwoHopPreviewDependencies;
 		previewActive?: boolean;
-		offscreenBootstrapPreviewRows?: number;
 	}
 
 	let {
@@ -20,7 +19,6 @@
 		loadMoreSection,
 		previewDependencies = undefined,
 		previewActive = true,
-		offscreenBootstrapPreviewRows = 0,
 	}: Props = $props();
 
 	$effect(() => {
@@ -29,7 +27,6 @@
 			loadMoreSection,
 			previewDependencies,
 			previewActive,
-			offscreenBootstrapPreviewRows,
 		});
 	});
 </script>
@@ -45,7 +42,6 @@
 		typeof previewDependencies?.resolveSearchMatchPosition === "function",
 	)}
 	data-preview-active={String(previewActive)}
-	data-offscreen-bootstrap-preview-rows={String(offscreenBootstrapPreviewRows)}
 >
 	{#each sections as section}
 		<section data-section-id={section.id}>

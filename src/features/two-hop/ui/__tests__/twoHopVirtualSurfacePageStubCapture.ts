@@ -6,7 +6,6 @@ interface TwoHopVirtualSurfacePageStubProps {
 	readonly loadMoreSection: ((sectionId: string) => void) | undefined;
 	readonly previewDependencies: TwoHopPreviewDependencies | undefined;
 	readonly previewActive: boolean;
-	readonly offscreenBootstrapPreviewRows: number;
 }
 
 let latestProps: TwoHopVirtualSurfacePageStubProps | undefined;
