@@ -301,9 +301,11 @@ describe("createLinkContextFactory", () => {
 
 		expect(handleOpenFile).toHaveBeenCalledWith(
 			sourceFile,
-			expect.anything(),
+			expect.objectContaining({
+				start: expect.objectContaining({ line: 1 }),
+			}),
 			"tab",
-			expect.anything(),
+			undefined,
 		);
 	});
 
