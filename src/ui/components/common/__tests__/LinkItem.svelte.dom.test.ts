@@ -21,10 +21,9 @@ describe("LinkItem", () => {
 		});
 
 		const title = container.querySelector(".cosense-card-links__box-title");
-		const titleText = title?.querySelector(".cosense-card-links__box-title-text");
 		expect(title).not.toBeNull();
 		expect(title?.querySelector(".ccl-search-highlight")).toBeNull();
-		expect(titleText).toHaveTextContent("Alpha <Beta>");
+		expect(title).toHaveTextContent("Alpha <Beta>");
 		expect(title?.innerHTML).not.toContain("ccl-search-highlight");
 	});
 
@@ -62,9 +61,8 @@ describe("LinkItem", () => {
 
 		const title = container.querySelector(".cosense-card-links__box-title");
 		expect(title).toHaveClass("has-file-icon");
-		expect(title?.children).toHaveLength(2);
+		expect(title?.children).toHaveLength(1);
 		expect(title?.children[0]).toHaveClass("cosense-card-links__file-icon");
-		expect(title?.children[1]).toHaveClass("cosense-card-links__box-title-text");
 	});
 
 	it("makes card body draggable", () => {

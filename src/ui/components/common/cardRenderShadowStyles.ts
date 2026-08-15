@@ -168,8 +168,6 @@ export const CARD_RENDER_SHADOW_CSS = String.raw`
 	padding: var(--ccl-box-padding);
 	display: block;
 	flex: 0 0 auto;
-	flex-direction: column;
-	align-items: flex-start;
 	position: relative;
 	z-index: 1;
 	pointer-events: none;

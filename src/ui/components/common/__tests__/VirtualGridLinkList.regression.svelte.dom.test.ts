@@ -48,15 +48,6 @@ describe("VirtualGridLinkList regression", () => {
 				".cosense-card-links__virtual-grid-row",
 			),
 		);
-		const topSpacer = shadowRoot.querySelector<HTMLElement>(
-			"[data-ccl-virtual-flow-spacer='top']",
-		);
-		const bottomSpacer = shadowRoot.querySelector<HTMLElement>(
-			"[data-ccl-virtual-flow-spacer='bottom']",
-		);
-		expect(topSpacer?.style.height).toBe("0px");
-		expect(bottomSpacer).not.toBeNull();
-		expect(bottomSpacer?.style.height).toBe("0px");
 		expect(rows[0].style.position).toBe("");
 		expect(rows[0].style.top).toBe("");
 		expect(rows[0].style.transform).toBe("translateY(0px)");

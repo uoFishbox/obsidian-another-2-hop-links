@@ -100,13 +100,11 @@
 					<Icon name={fileIconName} width={16} height={16} />
 				</span>
 			{/if}
-			<span class="cosense-card-links__box-title-text">
-				{#if hasSearchQuery}
-					{@html renderHighlightedTitle()}
-				{:else}
-					{title}
-				{/if}
-			</span>
+			{#if hasSearchQuery}
+				{@html renderHighlightedTitle()}
+			{:else}
+				{title}
+			{/if}
 		</div>
 		{#if normalizedExtension}
 			<span class="cosense-card-links__box-extension">

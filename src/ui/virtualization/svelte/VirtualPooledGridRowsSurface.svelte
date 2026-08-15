@@ -126,7 +126,6 @@
 </script>
 
 <div class={contentClassName} bind:this={contentEl} style={contentStyle}>
-	<div data-ccl-virtual-flow-spacer="top" style:height="0px" aria-hidden="true"></div>
 	{#each mountedRows as row (row.slotIndex ?? row.key)}
 		{#if !isRowActive || isRowActive(row)}
 			<div
@@ -180,9 +179,4 @@
 			</div>
 		{/if}
 	{/each}
-	<div
-		data-ccl-virtual-flow-spacer="bottom"
-		style:height="0px"
-		aria-hidden="true"
-	></div>
 </div>
