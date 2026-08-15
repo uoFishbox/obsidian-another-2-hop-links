@@ -1,7 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 
-let originalRequestIdleCallback: Window["requestIdleCallback"] | undefined;
-
 function createDeferred<T = void>() {
 	let resolve!: (value: T | PromiseLike<T>) => void;
 	let reject!: (reason?: unknown) => void;
@@ -21,29 +19,16 @@ async function loadQueueModule() {
 beforeEach(() => {
 	vi.resetModules();
 	vi.useFakeTimers();
-	originalRequestIdleCallback = window.requestIdleCallback;
-	window.requestIdleCallback = vi.fn((callback: IdleRequestCallback) => {
-		setTimeout(
-			() =>
-				callback({
-					didTimeout: false,
-					timeRemaining: () => 50,
-				}),
-			0,
-		);
-		return 1;
-	}) as Window["requestIdleCallback"];
 });
 
 afterEach(() => {
-	window.requestIdleCallback = originalRequestIdleCallback!;
+	vi.restoreAllMocks();
 	vi.useRealTimers();
 });
 
 describe("enqueuePreviewRender", () => {
-	test("counts animation-frame fallback scheduling", async () => {
-		window.requestIdleCallback =
-			undefined as unknown as Window["requestIdleCallback"];
+	test("schedules preview rendering on the next animation frame", async () => {
+		const requestIdleCallback = vi.spyOn(window, "requestIdleCallback");
 		const requestAnimationFrame = vi
 			.spyOn(window, "requestAnimationFrame")
 			.mockImplementation((callback) => {
@@ -58,6 +43,7 @@ describe("enqueuePreviewRender", () => {
 		await vi.runAllTimersAsync();
 
 		await expect(result).resolves.toBe("rendered");
+		expect(requestIdleCallback).not.toHaveBeenCalled();
 		expect(requestAnimationFrame).toHaveBeenCalledTimes(1);
 		expect(
 			getCCLDevMeasurementSnapshot().counters[

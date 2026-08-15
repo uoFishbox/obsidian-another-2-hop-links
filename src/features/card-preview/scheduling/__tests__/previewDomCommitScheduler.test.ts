@@ -371,7 +371,7 @@ describe("preview DOM commit scheduler", () => {
 		expect(frameCoordinator.schedule).toHaveBeenCalledTimes(2);
 	});
 
-	it("backs off instead of polling every frame while browser input is pending", () => {
+	it("commits during scrolling even when browser input is pending", async () => {
 		markScrollActivityActive(scrollSource);
 		const isInputPending = vi.fn(() => true);
 		vi.stubGlobal("navigator", {
@@ -382,20 +382,18 @@ describe("preview DOM commit scheduler", () => {
 		};
 		const frameCoordinator = createTestFrameCoordinator(scheduledTask);
 		const scope = defaultTestScheduler.createScope({ frameCoordinator });
+		const commit = vi.fn(() => true);
 
-		void scope.schedule({
+		const result = scope.schedule({
 			targetKey: "preview-input-pending",
 			isStale: () => false,
-			commit: () => true,
+			commit,
 		});
 		scheduledTask.current?.();
 
-		expect(isInputPending).toHaveBeenCalledOnce();
-		expect(frameCoordinator.schedule).toHaveBeenCalledTimes(1);
-		vi.advanceTimersByTime(32);
-		expect(frameCoordinator.schedule).toHaveBeenCalledTimes(1);
-		vi.advanceTimersByTime(2);
-		expect(frameCoordinator.schedule).toHaveBeenCalledTimes(2);
+		await expect(result).resolves.toEqual({ type: "committed" });
+		expect(commit).toHaveBeenCalledOnce();
+		expect(isInputPending).not.toHaveBeenCalled();
 	});
 
 	it("allows an idle burst of four commits", async () => {

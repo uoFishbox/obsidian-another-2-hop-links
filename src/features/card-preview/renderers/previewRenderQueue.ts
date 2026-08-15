@@ -10,7 +10,6 @@ type RenderTask<T> = {
 };
 
 const MAX_CONCURRENT_PREVIEW_RENDERS = 1;
-const IDLE_TIMEOUT_MS = 80;
 let activePreviewRenders = 0;
 const pendingTasks: RenderTask<unknown>[] = [];
 const scheduledTasks = new Set<RenderTask<unknown>>();
@@ -21,12 +20,6 @@ function createAbortError(): DOMException {
 
 function scheduleTask(task: () => void): void {
 	if (typeof window !== "undefined") {
-		const requestIdleCallback = window.requestIdleCallback;
-		if (typeof requestIdleCallback === "function") {
-			requestIdleCallback(task, { timeout: IDLE_TIMEOUT_MS });
-			return;
-		}
-
 		if (process.env.NODE_ENV !== "production") {
 			recordCCLDevMeasurement("preview.renderScheduler.animationFrame");
 		}

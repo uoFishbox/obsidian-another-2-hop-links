@@ -1,6 +1,5 @@
 import { recordCCLDevMeasurement } from "infrastructure/debug/CCLDevMeasurements";
 import { DEFAULT_PREVIEW_DOM_COMMITS_PER_SECOND } from "appConstants";
-import { hasPendingBrowserInput } from "core/indexing/timeSlicing";
 import {
 	isScrollActivityActive,
 	subscribeScrollActivity,
@@ -268,11 +267,6 @@ function drainPartition(
 	frameTimestamp: number,
 ): void {
 	const scrolling = isScrollActivityActive();
-	if (scrolling && hasPendingBrowserInput()) {
-		schedulePartition(state, partition, SCROLLING_REEVALUATION_DELAY_MS, true);
-		return;
-	}
-
 	const policy = scrolling
 		? {
 				...SCROLLING_POLICY,
