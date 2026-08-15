@@ -56,7 +56,7 @@ export const CARD_RENDER_SHADOW_CSS = String.raw`
 	cursor: pointer;
 	overflow: visible;
 	word-break: break-word;
-	touch-action: manipulation;
+	touch-action: auto;
 }
 
 .twohop-virtual-cell > .cosense-card-links__box {
