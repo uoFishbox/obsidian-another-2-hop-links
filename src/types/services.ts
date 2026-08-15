@@ -63,6 +63,14 @@ export interface IIndexingService {
 		limit?: number,
 	): IndexedLinkQueryResult;
 	getBacklinkCountForLink(linkPath: string): number;
+	hasAtLeastUniqueBacklinkSources(
+		linkPath: string,
+		minCount: number,
+		options?: {
+			excludePath?: string;
+			requireExistingSourceFile?: boolean;
+		},
+	): boolean;
 	getIndexVersion(): number;
 	peekNotesWithCommonTags(file: TFile): TaggedNote[];
 	getNotesWithTag(tag: string, sourcePath?: string): Promise<TaggedNote[]>;

@@ -1,4 +1,5 @@
 import type { App, TFile } from "obsidian";
+import type { StateEffectType } from "@codemirror/state";
 import { createEventHandlers } from "infrastructure/workspace/eventHandlers";
 import { createWorkspaceViewQueries } from "infrastructure/workspace/workspaceViewQueries";
 import { IndexUpdateQueue } from "infrastructure/lifecycle/IndexUpdateQueue";
@@ -22,6 +23,8 @@ import {
 } from "infrastructure/lifecycle/emptyViewController";
 import { IndexingService } from "core/indexing/index-service/IndexingService";
 import { TwoHopLinkResolver } from "features/two-hop/domain/TwoHopLinkResolver";
+import type { ResolveTwoHopLinks } from "features/two-hop/application/TwoHopLinksLoader";
+import { createDisplayDataBuilder } from "features/two-hop/application/displayDataBuilder";
 import { createLinkContextFactory } from "ui/context/linkContextFactory";
 import type { LinkContext } from "ui/context/linkContext";
 import { SortService } from "core/sorting/SortService";
@@ -52,7 +55,8 @@ import {
 	type SettingsSideEffectController,
 } from "features/settings/effects/settingsSideEffectController";
 import type { SettingsManager } from "features/settings/persistence/SettingsManager";
-import type { PluginHostUi } from "types/pluginHostUi";
+import type { PluginHost } from "types/pluginHost";
+import type { ViewServices } from "ui/shared/views/viewServices";
 import {
 	areTagFeaturesEnabled,
 	type PluginSettings,
@@ -63,12 +67,14 @@ import { resolvePreviewActivationsPerSecond } from "appConstants";
 
 export interface PluginRuntimeOptions {
 	app: App;
-	plugin: PluginHostUi;
+	plugin: PluginHost;
+	forceRedrawEffect: StateEffectType<undefined>;
 	settingsManager: SettingsManager;
 	getSettings: () => PluginSettings;
 	getSettingsSnapshot: () => PluginSettings;
 	isUnloaded: () => boolean;
 	bumpSortContextVersion: () => void;
+	getSortContextVersion: () => number;
 	updateSortOption: (option: SortOption) => void;
 	updateContentSearch: (enabled: boolean) => void;
 	updateSidebarView: (file: TFile) => void;
@@ -98,6 +104,7 @@ export interface PluginRuntime {
 	stylingService: StylingService;
 	propertyWidgetStyler: PropertyWidgetStyler;
 	linkContextFactory: (file: TFile, settings: PluginSettings) => LinkContext;
+	viewServices: ViewServices;
 	destroy(): void;
 }
 
@@ -171,14 +178,42 @@ export function createPluginRuntime(options: PluginRuntimeOptions): PluginRuntim
 		options.app,
 		previewService,
 	);
+	const createPluginDisplayDataBuilder = () =>
+		createDisplayDataBuilder({
+			sortService,
+			getSortContextVersion: options.getSortContextVersion,
+		});
+	const resolveTwoHopLinks: ResolveTwoHopLinks = (file, onProgress, signal) => {
+		const settings = options.getSettings();
+		return options.plugin.getTwoHopResolveSnapshot(file, onProgress, {
+			includeTaggedNotes:
+				areTagFeaturesEnabled(settings) && settings.showTagsSection,
+			signal,
+		});
+	};
 	const componentController = new ComponentController(
 		options.app,
 		options.plugin,
 		options.getSettingsSnapshot,
 		indexingService,
 		options.updateSortOption,
+		{
+			createDisplayDataBuilder: createPluginDisplayDataBuilder,
+			createLinkContext: linkContextFactory,
+			previewRuntime,
+		},
 		options.updateContentSearch,
 	);
+	const viewServices: ViewServices = {
+		createApplicationStore: (settings) =>
+			componentController.createApplicationStore(
+				settings,
+				createPluginDisplayDataBuilder(),
+				resolveTwoHopLinks,
+			),
+		createLinkContext: linkContextFactory,
+		previewRuntime,
+	};
 	const domMutationObserver = new DOMMutationObserver(options.plugin, stylingService);
 	const indexUpdateQueue = new IndexUpdateQueue(options.plugin, indexingService);
 	const displayModeController = new DisplayModeController(
@@ -197,12 +232,17 @@ export function createPluginRuntime(options: PluginRuntimeOptions): PluginRuntim
 	const viewUpdateOrchestrator = createViewUpdateOrchestrator({
 		app: options.app,
 		plugin: options.plugin,
+		forceRedrawEffect: options.forceRedrawEffect,
 		stylingService,
 		markdownRenderManager: renderedMdElementsRegistry,
 		propertyStyleManager: propertyWidgetStyler,
 	});
 	const scrollManager = new ScrollManager();
-	const emptyViewController = createEmptyViewController(options.app, options.plugin);
+	const emptyViewController = createEmptyViewController(
+		options.app,
+		options.plugin,
+		viewServices,
+	);
 	const keyboardCardNavigator = new KeyboardCardNavigator(options.app);
 
 	const unsubscribeIndexDataUpdate = indexingService.onDataUpdate((context) => {
@@ -262,6 +302,7 @@ export function createPluginRuntime(options: PluginRuntimeOptions): PluginRuntim
 		stylingService,
 		propertyWidgetStyler,
 		linkContextFactory,
+		viewServices,
 		destroy,
 	};
 }

@@ -1,11 +1,12 @@
 import { MarkdownView } from "obsidian";
 import type { App } from "obsidian";
+import type { StateEffectType } from "@codemirror/state";
 import type { CanvasView } from "obsidian-typings";
 import type { DataUpdateContext } from "core/indexing/index-service/IndexEvents";
 import type { StylingService } from "features/link-decoration/stylingService";
 import type { RenderedMdElementsRegistry } from "../markdown/RenderedMdElementsRegistry";
 import type { PropertyWidgetStyler } from "../../features/link-decoration/propertyWidgetStyler";
-import type { PluginHostUi } from "types/pluginHostUi";
+import type { PluginHost } from "types/pluginHost";
 import {
 	getBasesLinkLookupKey,
 	processBasesPane,
@@ -23,7 +24,8 @@ export interface ViewUpdateOrchestrator {
 
 export interface ViewUpdateOrchestratorDeps {
 	app: App;
-	plugin: PluginHostUi;
+	plugin: PluginHost;
+	forceRedrawEffect: StateEffectType<undefined>;
 	stylingService: StylingService;
 	markdownRenderManager: RenderedMdElementsRegistry;
 	propertyStyleManager: PropertyWidgetStyler;
@@ -32,8 +34,14 @@ export interface ViewUpdateOrchestratorDeps {
 export function createViewUpdateOrchestrator(
 	deps: ViewUpdateOrchestratorDeps,
 ): ViewUpdateOrchestrator {
-	const { app, plugin, stylingService, markdownRenderManager, propertyStyleManager } =
-		deps;
+	const {
+		app,
+		plugin,
+		forceRedrawEffect,
+		stylingService,
+		markdownRenderManager,
+		propertyStyleManager,
+	} = deps;
 
 	function updateAllViews(): void {
 		reprocessTrackedMarkdownDecorations(collectTrackedMarkdownSourcePaths());
@@ -99,7 +107,7 @@ export function createViewUpdateOrchestrator(
 			const cm = activeView.editor?.cm;
 			if (cm) {
 				cm.dispatch({
-					effects: plugin.forceRedrawEffect.of(undefined),
+					effects: forceRedrawEffect.of(undefined),
 				});
 			}
 
@@ -139,7 +147,7 @@ export function createViewUpdateOrchestrator(
 			const cm = leaf.view.editor?.cm;
 			if (cm) {
 				cm.dispatch({
-					effects: plugin.forceRedrawEffect.of(undefined),
+					effects: forceRedrawEffect.of(undefined),
 				});
 			}
 
@@ -262,7 +270,7 @@ export function createViewUpdateOrchestrator(
 				const cm = anyNode.child?.editMode?.cm;
 				if (cm) {
 					cm.dispatch({
-						effects: plugin.forceRedrawEffect.of(undefined),
+						effects: forceRedrawEffect.of(undefined),
 					});
 					continue;
 				}

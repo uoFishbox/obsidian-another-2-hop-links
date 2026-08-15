@@ -255,6 +255,10 @@ function createPlugin(): any {
 	};
 }
 
+function createViewServices(): any {
+	return { previewRuntime: {} };
+}
+
 function createTaggedNote(
 	path: string,
 	mtime: number,
@@ -289,13 +293,17 @@ describe("TagNotesView", () => {
 	it("loads and renders tag notes through setState", async () => {
 		const deferredNotes = createDeferred<ReturnType<typeof createTaggedNote>[]>();
 		const getNotesWithTag = vi.fn(() => deferredNotes.promise);
-		const view = new TagNotesView(createLeaf(), {
-			...createPlugin(),
-			indexingService: {
-				...createPlugin().indexingService,
-				getNotesWithTag,
+		const view = new TagNotesView(
+			createLeaf(),
+			{
+				...createPlugin(),
+				indexingService: {
+					...createPlugin().indexingService,
+					getNotesWithTag,
+				},
 			},
-		});
+			createViewServices(),
+		);
 		const result = { history: false };
 
 		await view.setState(
@@ -334,17 +342,21 @@ describe("TagNotesView", () => {
 			createTaggedNote("notes/alpha-b.md", 3),
 		];
 		const peekNotesWithTag = vi.fn(() => nextNotes);
-		const view = new TagNotesView(createLeaf(), {
-			...createPlugin(),
-			indexingService: {
-				peekNotesWithTag,
-				getNotesWithTag: vi.fn(async () => [initialNote]),
-				onDataUpdate: vi.fn((callback) => {
-					onDataUpdate = callback;
-					return vi.fn();
-				}),
+		const view = new TagNotesView(
+			createLeaf(),
+			{
+				...createPlugin(),
+				indexingService: {
+					peekNotesWithTag,
+					getNotesWithTag: vi.fn(async () => [initialNote]),
+					onDataUpdate: vi.fn((callback) => {
+						onDataUpdate = callback;
+						return vi.fn();
+					}),
+				},
 			},
-		});
+			createViewServices(),
+		);
 
 		await view.setState({ tag: "alpha" }, { history: false });
 		await Promise.resolve();
@@ -373,7 +385,11 @@ describe("TagNotesView", () => {
 	});
 
 	it("autofocuses on initial list render even when loading was interleaved", () => {
-		const view = new TagNotesViewHarness(createLeaf(), createPlugin());
+		const view = new TagNotesViewHarness(
+			createLeaf(),
+			createPlugin(),
+			createViewServices(),
+		);
 
 		view.setTag("alpha");
 		(
@@ -443,7 +459,11 @@ describe("TagNotesView", () => {
 	});
 
 	it("does not request re-render for updates unrelated to affectedTags", () => {
-		const view = new TagNotesViewHarness(createLeaf(), createPlugin());
+		const view = new TagNotesViewHarness(
+			createLeaf(),
+			createPlugin(),
+			createViewServices(),
+		);
 
 		view.setTag("alpha", "source.md");
 		(view as unknown as { hasLoadedNotes: boolean }).hasLoadedNotes = true;
@@ -470,12 +490,16 @@ describe("TagNotesView", () => {
 			createTaggedNote("notes/alpha-a.md", 2),
 			createTaggedNote("notes/alpha-b.md", 3),
 		]);
-		const view = new TagNotesViewHarness(createLeaf(), {
-			...createPlugin(),
-			indexingService: {
-				peekNotesWithTag,
+		const view = new TagNotesViewHarness(
+			createLeaf(),
+			{
+				...createPlugin(),
+				indexingService: {
+					peekNotesWithTag,
+				},
 			},
-		});
+			createViewServices(),
+		);
 
 		view.setTag("alpha");
 		(view as unknown as { hasLoadedNotes: boolean }).hasLoadedNotes = true;
@@ -507,12 +531,16 @@ describe("TagNotesView", () => {
 	it("skips update when diff result is same reference array as previous", () => {
 		const alpha = createTaggedNote("notes/alpha-a.md", 1);
 		const peekNotesWithTag = vi.fn(() => [alpha]);
-		const view = new TagNotesViewHarness(createLeaf(), {
-			...createPlugin(),
-			indexingService: {
-				peekNotesWithTag,
+		const view = new TagNotesViewHarness(
+			createLeaf(),
+			{
+				...createPlugin(),
+				indexingService: {
+					peekNotesWithTag,
+				},
 			},
-		});
+			createViewServices(),
+		);
 
 		view.setTag("alpha");
 		(view as unknown as { hasLoadedNotes: boolean }).hasLoadedNotes = true;

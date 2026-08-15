@@ -134,10 +134,9 @@ function createController() {
 		onDataUpdate: vi.fn(() => vi.fn()),
 	};
 	const linkContextFactory = vi.fn(() => ({}));
+	const createDisplayDataBuilder = vi.fn(() => buildDisplayData);
 	const plugin = {
 		app,
-		createDisplayDataBuilder: vi.fn(() => buildDisplayData),
-		getLinkContextFactory: vi.fn(() => linkContextFactory),
 		getTwoHopResolveSnapshot: resolveTwoHopLinks,
 	};
 
@@ -147,10 +146,16 @@ function createController() {
 		() => DEFAULT_SETTINGS,
 		indexingService as any,
 		vi.fn(),
+		{
+			createDisplayDataBuilder,
+			createLinkContext: linkContextFactory,
+			previewRuntime: {},
+		} as never,
 	);
 
 	return {
 		controller,
+		createDisplayDataBuilder,
 		plugin,
 		resolveTwoHopLinks,
 		view,
@@ -399,7 +404,8 @@ describe("ComponentController mountComponentsForView", () => {
 	});
 
 	it("reuses a recent store and builder when revisiting a file in the same leaf", async () => {
-		const { controller, plugin, resolveTwoHopLinks, view } = createController();
+		const { controller, createDisplayDataBuilder, resolveTwoHopLinks, view } =
+			createController();
 		const alpha = createMockTFile("notes/alpha.md");
 		const beta = createMockTFile("notes/beta.md");
 
@@ -414,7 +420,7 @@ describe("ComponentController mountComponentsForView", () => {
 		controller.mountComponentsForView(view, alpha);
 		await flushMicrotasks();
 
-		expect(plugin.createDisplayDataBuilder).toHaveBeenCalledTimes(1);
+		expect(createDisplayDataBuilder).toHaveBeenCalledTimes(1);
 		expect(resolveTwoHopLinks).toHaveBeenCalledTimes(2);
 
 		const allStores = getStoresFromMountCalls();

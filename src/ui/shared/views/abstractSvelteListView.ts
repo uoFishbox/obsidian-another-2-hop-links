@@ -4,7 +4,8 @@ import type { DataUpdateContext } from "core/indexing/index-service/IndexEvents"
 import type { SortableItem } from "core/sorting";
 import { toViewItems, type ViewItem } from "application/presenters";
 import type { ComponentInstance } from "infrastructure/lifecycle/ComponentController";
-import type { PluginHostUi } from "types/pluginHostUi";
+import type { PluginHost } from "types/pluginHost";
+import type { ViewServices } from "ui/shared/views/viewServices";
 import type { ListConfig } from "ui/components/lists/types";
 import type { ApplicationStore } from "ui/stores/ApplicationStore.svelte";
 import { createGuardedIndexUpdateHandler } from "ui/shared/views/indexUpdateLifecycle";
@@ -64,7 +65,8 @@ export abstract class AbstractSvelteListView<
 
 	constructor(
 		leaf: WorkspaceLeaf,
-		protected readonly plugin: PluginHostUi,
+		protected readonly plugin: PluginHost,
+		protected readonly viewServices: ViewServices,
 	) {
 		super(leaf);
 		this.navigation = true;
@@ -151,7 +153,7 @@ export abstract class AbstractSvelteListView<
 		applyCardLayoutCssVars(sectionEl, this.plugin.settings);
 
 		const linkContext = createLinkContextForView(
-			this.plugin,
+			this.viewServices,
 			options.sourceFile,
 			this.plugin.settings,
 			options.wrapForView === undefined
@@ -159,7 +161,10 @@ export abstract class AbstractSvelteListView<
 				: { wrapForView: options.wrapForView },
 		);
 
-		this.applicationStore = createDefaultApplicationStore(this.plugin);
+		this.applicationStore = createDefaultApplicationStore(
+			this.viewServices,
+			this.plugin.settings,
+		);
 		const applicationStore = this.applicationStore;
 		if (!applicationStore) {
 			return;
@@ -174,7 +179,7 @@ export abstract class AbstractSvelteListView<
 				applicationStore,
 				sortService: this.plugin.sortService,
 				app: this.app,
-				previewRuntime: this.plugin.getPreviewRuntime?.(),
+				previewRuntime: this.viewServices.previewRuntime,
 				autofocus: options.autofocus,
 			},
 		}) as ListHostComponent;

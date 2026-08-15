@@ -12,12 +12,7 @@ import type { ResolveProgress, TwoHopLinkResult } from "types/domain";
 import type { ResolveOptions } from "features/two-hop/domain/TwoHopLinkResolver";
 import type { TwoHopResolveSnapshot } from "features/two-hop/domain/ResolverDependencies";
 import { forceRedrawEffect } from "infrastructure/markdown/livePreview";
-import {
-	createDisplayDataBuilder,
-	type DisplayDataBuilder,
-} from "features/two-hop/application/displayDataBuilder";
 import { setEnableLogging } from "shared/logging/logger";
-import type { ResolveTwoHopLinks } from "features/two-hop/application/TwoHopLinksLoader";
 import { installCCLDebugExposure } from "infrastructure/debug/CCLDebugExposure";
 import { registerBenchmarkCommand } from "infrastructure/debug/benchmarkCommandController";
 import { registerScrollBenchmarkCommand } from "infrastructure/debug/scrollBenchmarkCommandController";
@@ -34,15 +29,15 @@ import {
 	createPluginRuntime,
 	type PluginRuntime,
 } from "infrastructure/runtime/pluginRuntime";
-import type { PluginHostUi } from "types/pluginHostUi";
+import type { PluginHost } from "types/pluginHost";
 
-export default class CosenseCardLinksPlugin extends Plugin implements PluginHostUi {
+export default class CosenseCardLinksPlugin extends Plugin implements PluginHost {
 	public settings: PluginSettings = { ...DEFAULT_SETTINGS };
 	public settingsManager!: SettingsManager;
 	private readonly patchRegistry = new PatchRegistry();
 	private runtime!: PluginRuntime;
 
-	public readonly forceRedrawEffect = forceRedrawEffect;
+	private readonly forceRedrawEffect = forceRedrawEffect;
 	private sortContextVersion = 0;
 	private isUnloaded = false;
 
@@ -82,11 +77,13 @@ export default class CosenseCardLinksPlugin extends Plugin implements PluginHost
 		return createPluginRuntime({
 			app: this.app,
 			plugin: this,
+			forceRedrawEffect: this.forceRedrawEffect,
 			settingsManager: this.settingsManager,
 			getSettings: () => this.settings,
 			getSettingsSnapshot: () => this.settingsManager.getSnapshot(),
 			isUnloaded: () => this.isUnloaded,
 			bumpSortContextVersion: () => this.bumpSortContextVersion(),
+			getSortContextVersion: () => this.getSortContextVersion(),
 			updateSortOption: (option: SortOption) => {
 				void this.updateSetting("lastUsedSortOption", option).catch((error) => {
 					console.error("設定の更新に失敗しました:", error);
@@ -117,7 +114,7 @@ export default class CosenseCardLinksPlugin extends Plugin implements PluginHost
 		}
 
 		this.addSettingTab(new CosenseCardLinksSettingTab(this.app, this));
-		registerViews(this);
+		registerViews(this, runtime.viewServices);
 		registerCommands(this, {
 			scrollManager: runtime.scrollManager,
 			keyboardCardNavigator: runtime.keyboardCardNavigator,
@@ -182,18 +179,11 @@ export default class CosenseCardLinksPlugin extends Plugin implements PluginHost
 		this.runtime?.destroy();
 	}
 
-	public createDisplayDataBuilder(): DisplayDataBuilder {
-		return createDisplayDataBuilder({
-			sortService: this.sortService,
-			getSortContextVersion: () => this.getSortContextVersion(),
-		});
-	}
-
 	private bumpSortContextVersion(): void {
 		this.sortContextVersion += 1;
 	}
 
-	public getSortContextVersion(): number {
+	private getSortContextVersion(): number {
 		return this.sortContextVersion;
 	}
 
@@ -253,45 +243,5 @@ export default class CosenseCardLinksPlugin extends Plugin implements PluginHost
 
 	public processUnresolvedLinksInElement(el: HTMLElement, sourcePath: string): void {
 		this.runtime.stylingService.decorateLinksInContainer(el, sourcePath);
-	}
-
-	public getLinkContextFactory() {
-		return this.runtime.linkContextFactory;
-	}
-
-	public getPreviewRuntime() {
-		return this.runtime.previewRuntime;
-	}
-
-	public createApplicationStore(
-		settings: PluginSettings,
-		displayDataBuilder: DisplayDataBuilder,
-		resolveTwoHopLinks: ResolveTwoHopLinks,
-	) {
-		return this.componentController.createApplicationStore(
-			settings,
-			displayDataBuilder,
-			resolveTwoHopLinks,
-		);
-	}
-
-	public getOrCreateApplicationStore(
-		leafId: string,
-		filePath: string,
-		settings: PluginSettings,
-		displayDataBuilder: DisplayDataBuilder,
-		resolveTwoHopLinks: ResolveTwoHopLinks,
-	) {
-		return this.componentController.getOrCreateApplicationStore(
-			leafId,
-			filePath,
-			settings,
-			displayDataBuilder,
-			resolveTwoHopLinks,
-		);
-	}
-
-	public clearStore(leafId: string, filePath: string): void {
-		this.componentController.clearStore(leafId, filePath);
 	}
 }

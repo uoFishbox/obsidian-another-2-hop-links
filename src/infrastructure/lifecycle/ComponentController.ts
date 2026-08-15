@@ -15,10 +15,13 @@ import type {
 	ApplicationStore,
 	DisplayDataBuilder,
 } from "ui/stores/ApplicationStore.svelte";
-import type { IndexingService } from "core/indexing/index-service/IndexingService";
-import type { PluginHostUi } from "types/pluginHostUi";
+import type { IIndexingService } from "types/services";
+import type { PluginHost } from "types/pluginHost";
 import type { ResolveTwoHopLinks } from "features/two-hop/application/TwoHopLinksLoader";
 import { mountTwoHopLinksRootView } from "features/two-hop/ui/mountTwoHopLinksRootView";
+import type { LinkContext } from "ui/context/linkContext";
+import type { PreviewRuntime } from "features/card-preview/runtime/previewRuntime";
+import { createViewLinkContext } from "ui/shared/views/createViewLinkContext";
 import type { TwoHopLinksRootUiState } from "features/two-hop/ui/twoHopLinksRootUiState";
 import type { SvelteComponentInstance } from "ui/shared/views/svelteLifecycle";
 import { createInlineSurfaceLayoutController } from "ui/shared/dom/inlineSurfaceLayoutController";
@@ -43,6 +46,12 @@ interface InlineViewUiState {
 	uiState: TwoHopLinksRootUiState;
 }
 
+export interface ComponentControllerViewDeps {
+	createDisplayDataBuilder(): DisplayDataBuilder;
+	createLinkContext(file: TFile, settings: PluginSettings): LinkContext;
+	readonly previewRuntime: PreviewRuntime;
+}
+
 export class ComponentController implements IComponentManager {
 	private readonly mountedComponents = new WeakMap<
 		MarkdownView,
@@ -55,15 +64,16 @@ export class ComponentController implements IComponentManager {
 
 	constructor(
 		private readonly app: App,
-		private readonly plugin: PluginHostUi,
+		private readonly plugin: PluginHost,
 		private readonly getSettings: () => PluginSettings,
-		indexingService: IndexingService,
+		indexingService: IIndexingService,
 		updateSortOption: (option: SortOption) => void,
+		private readonly viewDeps: ComponentControllerViewDeps,
 		updateContentSearch: (enabled: boolean) => void = () => {},
 	) {
 		this.applicationStorePool = new ApplicationStorePool({
 			indexingService,
-			createDisplayDataBuilder: () => this.plugin.createDisplayDataBuilder(),
+			createDisplayDataBuilder: viewDeps.createDisplayDataBuilder,
 			updateSortOption,
 			updateContentSearch,
 		});
@@ -284,13 +294,19 @@ export class ComponentController implements IComponentManager {
 			);
 			shouldReleaseStoreOnError = true;
 
+			const linkContext = createViewLinkContext(
+				this.viewDeps.createLinkContext(file, settings),
+				() => {},
+			);
 			const { component } = mountTwoHopLinksRootView({
 				target: container,
-				plugin: this.plugin,
+				app: this.app,
 				file,
 				settings,
+				applicationStore,
+				linkContext,
+				previewRuntime: this.viewDeps.previewRuntime,
 				lazyLoaderCache,
-				getApplicationStore: () => applicationStore!,
 				updateSetting: (key, value) => this.plugin.updateSetting(key, value),
 				uiState: this.getInlineUiState(view, file.path),
 			});

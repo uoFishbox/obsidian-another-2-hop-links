@@ -1,11 +1,15 @@
 import { TFile, type App, type WorkspaceLeaf } from "obsidian";
 import { mount, unmount } from "svelte";
-import type { PluginHostUi } from "types/pluginHostUi";
+import type { PluginHost } from "types/pluginHost";
 import type { ApplicationStore } from "ui/stores/ApplicationStore.svelte";
+import type { ViewServices } from "ui/shared/views/viewServices";
+import {
+	createDefaultApplicationStore,
+	createLinkContextForView,
+} from "ui/shared/views/viewFactories";
 import type { ComponentInstance } from "infrastructure/lifecycle/ComponentController";
 import AllNotesPage from "features/all-notes/ui/AllNotesPage.svelte";
 import { getLeafId } from "infrastructure/workspace/workspaceLeafIdentity";
-import { areTagFeaturesEnabled } from "features/settings/model";
 
 interface MountedEmptyView {
 	component: ComponentInstance | undefined;
@@ -22,7 +26,8 @@ export interface EmptyViewController {
 
 export function createEmptyViewController(
 	app: App,
-	plugin: PluginHostUi,
+	plugin: PluginHost,
+	viewServices: ViewServices,
 ): EmptyViewController {
 	const mountedByLeafId = new Map<string, MountedEmptyView>();
 
@@ -91,20 +96,14 @@ export function createEmptyViewController(
 		hostEl.appendChild(rootEl);
 
 		const sourceFile = createSourceFileForContext();
-		const linkContextFactory = plugin.getLinkContextFactory();
-		const linkContext = linkContextFactory(sourceFile, plugin.settings);
-
-		const displayDataBuilder = plugin.createDisplayDataBuilder();
-		const applicationStore = plugin.createApplicationStore(
+		const linkContext = createLinkContextForView(
+			viewServices,
+			sourceFile,
 			plugin.settings,
-			displayDataBuilder,
-			(file: TFile, _onProgress, signal) =>
-				plugin.getTwoHopResolveSnapshot(file, undefined, {
-					includeTaggedNotes:
-						areTagFeaturesEnabled(plugin.settings) &&
-						plugin.settings.showTagsSection,
-					signal,
-				}),
+		);
+		const applicationStore = createDefaultApplicationStore(
+			viewServices,
+			plugin.settings,
 		);
 
 		const component = mount(AllNotesPage, {
@@ -115,7 +114,7 @@ export function createEmptyViewController(
 				sortService: plugin.sortService,
 				linkContext,
 				applicationStore,
-				previewRuntime: plugin.getPreviewRuntime?.(),
+				previewRuntime: viewServices.previewRuntime,
 			},
 		}) as ComponentInstance;
 

@@ -1,25 +1,23 @@
-import type { TFile } from "obsidian";
+import type { App, TFile } from "obsidian";
 import { mount } from "svelte";
-import type { PluginHostUi } from "types/pluginHostUi";
 import type { PluginSettings } from "features/settings/model";
 import type { ApplicationStore } from "ui/stores/ApplicationStore.svelte";
-import {
-	createDefaultApplicationStore,
-	createLinkContextForView,
-} from "ui/shared/views/viewFactories";
+import type { LinkContext } from "ui/context/linkContext";
+import type { PreviewRuntime } from "features/card-preview/runtime/previewRuntime";
 import type { SvelteComponentInstance } from "ui/shared/views/svelteLifecycle";
 import TwoHopLinksPage from "./TwoHopLinksPage.svelte";
 import type { TwoHopLinksRootUiState } from "./twoHopLinksRootUiState";
 
 export interface MountTwoHopLinksRootViewOptions {
 	target: Element;
-	plugin: PluginHostUi;
+	app: App;
 	file: TFile;
 	settings: PluginSettings;
+	applicationStore: ApplicationStore;
+	linkContext: LinkContext;
+	previewRuntime: PreviewRuntime;
 	lazyLoaderCache: Set<string>;
 	isSidebar?: boolean;
-	wrapForView?: boolean;
-	getApplicationStore?: () => ApplicationStore;
 	updateSetting?: <K extends keyof PluginSettings>(
 		key: K,
 		value: PluginSettings[K],
@@ -38,22 +36,18 @@ export function mountTwoHopLinksRootView(
 ): MountedTwoHopLinksRootView {
 	const {
 		target,
-		plugin,
+		app,
 		file,
 		settings,
+		applicationStore,
+		linkContext,
+		previewRuntime,
 		lazyLoaderCache,
 		isSidebar = false,
-		wrapForView = true,
-		getApplicationStore,
 		updateSetting,
 		uiState,
 	} = options;
-	const applicationStore =
-		getApplicationStore?.() ?? createDefaultApplicationStore(plugin, settings);
 	applicationStore.setSettings(settings);
-	const linkContext = createLinkContextForView(plugin, file, settings, {
-		wrapForView,
-	});
 
 	const component = mount(TwoHopLinksPage, {
 		target,
@@ -61,8 +55,8 @@ export function mountTwoHopLinksRootView(
 			file,
 			linkContext,
 			applicationStore,
-			app: plugin.app,
-			previewRuntime: plugin.getPreviewRuntime?.(),
+			app,
+			previewRuntime,
 			lazyLoaderCache,
 			isSidebar,
 			updateSetting,

@@ -1,10 +1,9 @@
 import type { MarkdownView, Plugin, TFile } from "obsidian";
-import type { IndexingService } from "core/indexing/index-service/IndexingService";
-import type { SortService } from "core/sorting/SortService";
 import type { PluginSettings } from "features/settings/model";
 import type { ResolveProgress, TwoHopLinkResult } from "types/domain";
 import type { ResolveOptions } from "features/two-hop/domain/TwoHopLinkResolver";
 import type { TwoHopResolveSnapshot } from "features/two-hop/domain/ResolverDependencies";
+import type { IIndexingService, ISortService } from "types/services";
 
 export interface PluginSettingsManager {
 	readonly settings: PluginSettings;
@@ -51,20 +50,18 @@ export interface PluginComponentController {
  * `registerHoverLinkSource`, `loadData`, `saveData` など）は
  * `extends Plugin` により再定義不要。
  *
- * なお `settingsManager`, `indexUpdateQueue`, `componentController` は
- * 具象クラスではなく構造的インターフェースで型付けしている。
- * これらの具象クラスは本インターフェースを import するため、
- * 逆方向の import（本ファイル → 各クラス）を行うと型のみの循環が再発する。
+ * 公開する collaborator はすべて構造的インターフェースで型付けする。
+ * UI 固有の生成・共有 capability はこの host に含めず、UI composition root
+ * から `ViewServices` として別に注入する。
  */
 export interface PluginHost extends Plugin {
 	settings: PluginSettings;
 	settingsManager: PluginSettingsManager;
-	indexingService: IndexingService;
-	sortService: SortService;
+	indexingService: IIndexingService;
+	sortService: ISortService;
 	indexUpdateQueue: PluginIndexUpdateQueue;
 	componentController: PluginComponentController;
 
-	getSortContextVersion(): number;
 	getTwoHopLinkResult(
 		file: TFile,
 		onProgress?: (progress: ResolveProgress) => void,
@@ -75,7 +72,6 @@ export interface PluginHost extends Plugin {
 		onProgress?: (progress: ResolveProgress) => void,
 		options?: ResolveOptions,
 	): Promise<TwoHopResolveSnapshot>;
-	clearStore(leafId: string, filePath: string): void;
 	processUnresolvedLinksInElement(el: HTMLElement, sourcePath: string): void;
 	updateSetting<K extends keyof PluginSettings>(
 		key: K,

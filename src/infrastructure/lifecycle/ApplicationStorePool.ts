@@ -1,4 +1,4 @@
-import type { IndexingService } from "core/indexing/index-service/IndexingService";
+import type { IIndexingService } from "types/services";
 import type { PluginSettings, SortOption } from "features/settings/model";
 import type { DisplayDataBuilder } from "ui/stores/ApplicationStore.svelte";
 import { ApplicationStore } from "ui/stores/ApplicationStore.svelte";
@@ -7,7 +7,7 @@ import type { ResolveTwoHopLinks } from "features/two-hop/application/TwoHopLink
 export const RECENT_APPLICATION_STORE_LIMIT = 6;
 
 export interface ApplicationStorePoolOptions {
-	indexingService: IndexingService;
+	indexingService: IIndexingService;
 	createDisplayDataBuilder: () => DisplayDataBuilder;
 	updateSortOption: (option: SortOption) => void;
 	updateContentSearch?: (enabled: boolean) => void;

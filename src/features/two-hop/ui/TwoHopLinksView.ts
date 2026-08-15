@@ -1,6 +1,11 @@
 import { ItemView, WorkspaceLeaf, TFile, type IconName } from "obsidian";
-import type { PluginHostUi } from "types/pluginHostUi";
+import type { PluginHost } from "types/pluginHost";
 import type { ApplicationStore } from "ui/stores/ApplicationStore.svelte";
+import type { ViewServices } from "ui/shared/views/viewServices";
+import {
+	createDefaultApplicationStore,
+	createLinkContextForView,
+} from "ui/shared/views/viewFactories";
 import {
 	cleanupSvelteAndStore,
 	type SvelteComponentInstance,
@@ -17,7 +22,8 @@ export class TwoHopLinksView extends ItemView {
 
 	constructor(
 		leaf: WorkspaceLeaf,
-		private plugin: PluginHostUi,
+		private readonly plugin: PluginHost,
+		private readonly viewServices: ViewServices,
 	) {
 		super(leaf);
 	}
@@ -77,15 +83,28 @@ export class TwoHopLinksView extends ItemView {
 			this.resetSidebarScrollPosition();
 		}
 
+		const applicationStore = createDefaultApplicationStore(
+			this.viewServices,
+			this.plugin.settings,
+		);
+		const linkContext = createLinkContextForView(
+			this.viewServices,
+			file,
+			this.plugin.settings,
+			{ wrapForView: false },
+		);
+
 		({ component: this.component, applicationStore: this.applicationStore } =
 			mountTwoHopLinksRootView({
 				target: container,
-				plugin: this.plugin,
+				app: this.plugin.app,
 				file,
 				settings: this.plugin.settings,
+				applicationStore,
+				linkContext,
+				previewRuntime: this.viewServices.previewRuntime,
 				lazyLoaderCache: this.lazyLoaderCache,
 				isSidebar: true,
-				wrapForView: false,
 				updateSetting: (key, value) => this.plugin.updateSetting(key, value),
 			}));
 	}

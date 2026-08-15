@@ -1,4 +1,5 @@
-import type { PluginHostUi } from "types/pluginHostUi";
+import type { PluginHost } from "types/pluginHost";
+import type { ViewServices } from "ui/shared/views/viewServices";
 import {
 	TwoHopLinksView,
 	TWO_HOP_LINKS_VIEW_TYPE,
@@ -13,16 +14,19 @@ import {
 	COSENSE_CARD_LINKS_HOVER_SOURCE_ID,
 } from "features/popover/hoverPopoverLinkSpec";
 
-export function registerViews(plugin: PluginHostUi): void {
+export function registerViews(plugin: PluginHost, viewServices: ViewServices): void {
 	plugin.registerView(
 		TWO_HOP_LINKS_VIEW_TYPE,
-		(leaf) => new TwoHopLinksView(leaf, plugin),
+		(leaf) => new TwoHopLinksView(leaf, plugin, viewServices),
 	);
 	plugin.registerView(
 		VIEW_TYPE_PRE_CREATE,
-		(leaf) => new PreCreationView(leaf, plugin),
+		(leaf) => new PreCreationView(leaf, plugin, viewServices),
 	);
-	plugin.registerView(VIEW_TYPE_TAG_NOTES, (leaf) => new TagNotesView(leaf, plugin));
+	plugin.registerView(
+		VIEW_TYPE_TAG_NOTES,
+		(leaf) => new TagNotesView(leaf, plugin, viewServices),
+	);
 	plugin.registerHoverLinkSource(COSENSE_CARD_LINKS_HOVER_SOURCE_ID, {
 		display: COSENSE_CARD_LINKS_HOVER_SOURCE_DISPLAY,
 		defaultMod: true,

@@ -204,6 +204,7 @@ function createOrchestrator(mockDeps: ReturnType<typeof createMocks>) {
 	return createViewUpdateOrchestrator({
 		app: mockDeps.app as never,
 		plugin: mockDeps.plugin as never,
+		forceRedrawEffect: mockDeps.plugin.forceRedrawEffect as never,
 		stylingService: mockDeps.stylingService as never,
 		markdownRenderManager: mockDeps.markdownRenderManager as never,
 		propertyStyleManager: mockDeps.propertyStyleManager as never,
