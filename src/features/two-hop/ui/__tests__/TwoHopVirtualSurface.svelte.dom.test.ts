@@ -16,10 +16,12 @@ import type {
 import { createTwoHopSectionModel } from "features/two-hop/ui/twoHopSectionModel";
 import {
 	flushFrames,
+	installAnimationFrameMock,
 	installResizeObserverMock,
 	resetRecords,
 	setElementRect,
 	setNumericProperty,
+	teardownAnimationFrameMock,
 	teardownResizeObserverMock,
 	triggerResize,
 } from "testing/helpers/DOMObserverMock";
@@ -165,10 +167,12 @@ beforeEach(() => {
 	resetCCLDevMeasurements();
 	cardDemandProbe.setDemand.mockClear();
 	installResizeObserverMock();
+	installAnimationFrameMock();
 	setNumericProperty(window, "scrollY", 0);
 });
 
 afterEach(() => {
+	teardownAnimationFrameMock();
 	teardownResizeObserverMock();
 });
 
