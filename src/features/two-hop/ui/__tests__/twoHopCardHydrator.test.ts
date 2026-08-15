@@ -85,11 +85,9 @@ function resolveCardModel(item: TwoHopItemModel): CardRenderModel {
 		ariaLabel: item.key,
 		className: null,
 		extension: null,
-		directory: null,
 		interactionId,
 		interactionKey: item.interactionKey ?? item.key,
 		interactionDescriptor,
-		presentation: undefined,
 		searchQuery: "",
 		previewRequest: null,
 	};

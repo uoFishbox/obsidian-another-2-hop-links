@@ -2,7 +2,6 @@ import { onDestroy, untrack } from "svelte";
 import type { Pos, TFile } from "obsidian";
 import type { ApplicationStore } from "ui/stores/ApplicationStore.svelte";
 import type { CardRenderModel } from "ui/components/items/cardRenderModel";
-import type { TwoHopCardPresentationState } from "features/two-hop/ui/twoHopCellStaticState";
 import type {
 	TwoHopItemModel,
 	TwoHopSectionModel,
@@ -72,7 +71,6 @@ export interface TwoHopVirtualListProps {
 	readonly cardModelRevision: unknown;
 	readonly resolveItemCardModel: (
 		item: TwoHopItemModel,
-		presentation: TwoHopCardPresentationState,
 		revision: unknown,
 	) => CardRenderModel;
 }

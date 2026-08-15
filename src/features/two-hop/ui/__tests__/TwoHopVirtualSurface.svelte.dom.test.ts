@@ -9,7 +9,6 @@ import { getTwoHopCardCounts } from "infrastructure/debug/twoHopCardCountRegistr
 import type { ApplicationStore } from "ui/stores/ApplicationStore.svelte";
 import type { CardRenderModel } from "ui/components/items/cardRenderModel";
 import type { LinkContext } from "ui/context/linkContext";
-import type { TwoHopCardPresentationState } from "features/two-hop/ui/twoHopCellStaticState";
 import type {
 	TwoHopItemModel,
 	TwoHopSectionModel,
@@ -66,22 +65,16 @@ function createSection(count: number, totalCount = count): TwoHopSectionModel {
 
 function createCardModelResolver() {
 	return vi.fn(
-		(
-			item: TwoHopItemModel,
-			presentation: TwoHopCardPresentationState,
-			_revision: unknown,
-		): CardRenderModel => ({
+		(item: TwoHopItemModel, _revision: unknown): CardRenderModel => ({
 			item: item.item,
 			targetFile: null,
 			title: item.key,
 			ariaLabel: item.key,
 			className: null,
 			extension: null,
-			directory: null,
 			interactionId: item.key,
 			interactionKey: item.key,
 			interactionDescriptor: null,
-			presentation,
 			searchQuery: "",
 			previewRequest: null,
 		}),
@@ -265,7 +258,7 @@ describe("TwoHopVirtualSurface", () => {
 		resolver.mockClear();
 		await publishSection(createFilteredSection(filteredItems), 1);
 		await vi.waitFor(() => expect(resolver).toHaveBeenCalled());
-		expect(resolver.mock.calls.every((call) => call[2] === 1)).toBe(true);
+		expect(resolver.mock.calls.every((call) => call[1] === 1)).toBe(true);
 	});
 
 	it("publishes card demand once for one section publication", async () => {

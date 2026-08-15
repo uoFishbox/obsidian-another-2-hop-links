@@ -267,9 +267,8 @@
 	);
 	const resolveItemCardModel = (
 		item: Parameters<typeof buildTwoHopCardModel>[0],
-		presentation: Parameters<typeof buildTwoHopCardModel>[1],
 		revision: unknown,
-	) => buildTwoHopCardModel(item, presentation, revision as TwoHopCardModelRevision);
+	) => buildTwoHopCardModel(item, revision as TwoHopCardModelRevision);
 
 	let rootEl = $state<HTMLDivElement | null>(null);
 	let previewSurfaceActive = $state(false);

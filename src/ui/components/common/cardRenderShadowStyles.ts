@@ -134,15 +134,13 @@ export const CARD_RENDER_SHADOW_CSS = String.raw`
 	padding: var(--ccl-box-padding);
 }
 
-.cosense-card-links__box.cosense-card-links__box--missing,
-.cosense-card-links__box[data-ccl-resolution="missing"] {
+.cosense-card-links__box.cosense-card-links__box--missing {
 	border: 1px dashed var(--color-base-40);
 }
 
 @media (hover: hover) {
 	.cosense-card-links__twohop-header.cosense-card-links__box--missing:hover,
-	.cosense-card-links__box.cosense-card-links__box--missing[data-ccl-hovered="true"],
-	.cosense-card-links__box[data-ccl-resolution="missing"][data-ccl-hovered="true"] {
+	.cosense-card-links__box.cosense-card-links__box--missing[data-ccl-hovered="true"] {
 		border-color: var(--background-modifier-border-hover);
 	}
 }
@@ -218,8 +216,7 @@ export const CARD_RENDER_SHADOW_CSS = String.raw`
 }
 
 
-.cosense-card-links__box[data-ccl-resolution="missing"] .cosense-card-links__box-title,
-.cosense-card-links__box[data-ccl-section-variant="new-links"] .cosense-card-links__box-title {
+.cosense-card-links__box.cosense-card-links__box--missing .cosense-card-links__box-title {
 	color: var(--color-base-50);
 }
 

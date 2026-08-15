@@ -98,7 +98,6 @@ function createItemDescriptor(item: ViewItem, file: TFile): ItemInteractionDescr
 		targetFile: file,
 		dragRawText: "alpha",
 		filePathForDrag: file.path,
-		directory: file.parent?.path ?? null,
 		settings: {
 			mobileLongPressAction: "preview",
 		} as any,
@@ -120,7 +119,6 @@ function createSectionDescriptor(file: TFile): SectionHeaderInteractionDescripto
 		targetFile: file,
 		dragRawText: "alpha",
 		filePathForDrag: file.path,
-		directory: file.parent?.path ?? null,
 		settings: {
 			mobileLongPressAction: "preview",
 		} as any,

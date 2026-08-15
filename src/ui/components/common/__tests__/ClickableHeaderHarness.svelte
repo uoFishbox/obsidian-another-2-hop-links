@@ -27,7 +27,6 @@
 	{title}
 	{count}
 	className=""
-	interactionKind="sectionHeader"
 	{interactionId}
 	interactionDescriptor={descriptor}
 >

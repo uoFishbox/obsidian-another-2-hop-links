@@ -5,7 +5,6 @@ import {
 	createCardRenderModel,
 	type CardRenderModel,
 } from "ui/components/items/cardRenderModel";
-import type { TwoHopCardPresentationState } from "features/two-hop/ui/twoHopCellStaticState";
 import type { TwoHopItemModel } from "features/two-hop/ui/twoHopSectionModel";
 
 export interface TwoHopCardModelRevision {
@@ -21,7 +20,6 @@ export interface TwoHopCardModelRevision {
 /** Builds a card model. Reuse is owned by the bounded-range hydrator. */
 export function buildTwoHopCardModel(
 	row: TwoHopItemModel,
-	presentation: TwoHopCardPresentationState,
 	revision: TwoHopCardModelRevision,
 ): CardRenderModel {
 	const matchedItem = revision.matchedItemByKey?.get(row.searchKey);
@@ -39,6 +37,5 @@ export function buildTwoHopCardModel(
 		contentPreview: matchedItem?.contentPreview,
 		interactionId: row.interactionId,
 		interactionKey: row.interactionKey,
-		presentation,
 	});
 }

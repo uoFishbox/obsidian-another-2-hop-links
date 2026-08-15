@@ -81,9 +81,7 @@
 			count={section.totalCount}
 			className={headerProps.className}
 			draggable={headerProps.draggable}
-			directory={headerProps.directory}
 			interactionId={headerProps.interactionId}
-			interactionKind="sectionHeader"
 			interactionDescriptor={headerProps.interactionDescriptor}
 			onClick={headerProps.onClick}
 			{sectionVariant}
@@ -125,15 +123,12 @@
 		file={model?.targetFile ?? null}
 		extension={model?.extension ?? undefined}
 		interactionId={model?.interactionId ?? cell.logicalKey}
-		interactionKind="item"
 		interactive={Boolean(model)}
 		draggable={Boolean(model)}
 		className={model
 			? (model.className ?? undefined)
 			: "twohop-card-shell is-skeleton"}
-		directory={model?.directory ?? null}
 		searchQuery={model?.searchQuery ?? ""}
-		presentation={model?.presentation}
 	>
 		{#snippet children()}
 			{#if model && !getDebugDisableCardDomPreview() && model.item.type === "newLink" && !model.targetFile}
@@ -142,7 +137,6 @@
 				<div
 					use:previewHost={previewSlotId}
 					class="cosense-card-links__box-preview"
-					data-preview-owner="virtual-surface"
 				></div>
 			{/if}
 		{/snippet}

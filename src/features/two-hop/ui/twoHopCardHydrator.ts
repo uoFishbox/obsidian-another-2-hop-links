@@ -2,8 +2,6 @@ import type {
 	CardRenderModel,
 	CardShellModel,
 } from "ui/components/items/cardRenderModel";
-import type { TwoHopCardPresentationState } from "features/two-hop/ui/twoHopCellStaticState";
-import { resolveTwoHopCardPresentation } from "features/two-hop/ui/twoHopCellStaticState";
 import type { TwoHopItemModel } from "features/two-hop/ui/twoHopSectionModel";
 import type { TwoHopVirtualCell } from "features/two-hop/ui/twoHopRowModel";
 import type { VirtualFrameCoordinator } from "ui/virtualization/scheduling/frameCoordinator";
@@ -52,7 +50,6 @@ export interface TwoHopCardHydratorParams {
 	readonly getRevision: () => unknown;
 	readonly resolveCardModel: (
 		item: TwoHopItemModel,
-		presentation: TwoHopCardPresentationState,
 		revision: unknown,
 	) => CardRenderModel;
 	readonly isPreviewActive: () => boolean;
@@ -279,19 +276,10 @@ export function createTwoHopCardHydrator(
 			if (!hydration) break;
 			processed += 1;
 			const current = entries.get(hydration.logicalKey);
-			const presentation = resolveTwoHopCardPresentation(
-				hydration.item,
-				hydration.section,
-			);
-			if (!presentation) continue;
 			if (process.env.NODE_ENV !== "production") {
 				recordCCLDevMeasurement("twoHop.resolveItemCardModel.call");
 			}
-			const model = params.resolveCardModel(
-				hydration.item,
-				presentation,
-				revision,
-			);
+			const model = params.resolveCardModel(hydration.item, revision);
 			const previewRenderKeyChanged =
 				previewActive &&
 				(priority === "foreground" || current !== undefined) &&

@@ -30,11 +30,6 @@
 	});
 </script>
 
-<div
-	data-testid="probe-cell"
-	data-key={key}
-	data-ccl-interaction-id={interactionId}
-	data-ccl-interaction-kind={interactionId ? "item" : undefined}
->
+<div data-testid="probe-cell" data-key={key} data-ccl-interaction-id={interactionId}>
 	{key}
 </div>

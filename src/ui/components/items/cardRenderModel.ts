@@ -11,7 +11,6 @@ import type { PreviewData } from "features/card-preview/public-types";
 import { formatLinkText } from "features/card-preview/text-processing/textUtils";
 import type { LinkUtilitiesContext } from "types/linkContext";
 import type { PluginSettings } from "features/settings/model";
-import type { CardPresentationState } from "ui/components/common/cardPresentation";
 import {
 	createItemInteractionDescriptor,
 	createItemInteractionKey,
@@ -25,10 +24,8 @@ export interface CardShellModel {
 	readonly ariaLabel: string;
 	readonly className: string | null;
 	readonly extension: string | null;
-	readonly directory: string | null;
 	readonly interactionId: string;
 	readonly interactionKey: string;
-	readonly presentation: CardPresentationState | undefined;
 	readonly searchQuery: string;
 }
 
@@ -58,7 +55,6 @@ export interface CreateCardRenderModelParams {
 	readonly contentPreview?: string;
 	readonly interactionId?: string;
 	readonly interactionKey?: string;
-	readonly presentation?: CardPresentationState;
 }
 
 /** Creates the card shell and memoizes preview/interaction models on first access. */
@@ -122,13 +118,11 @@ export function createCardRenderModel(
 				: ARIA_LABELS.OPEN_LINK(title),
 		className,
 		extension: targetFile?.extension ?? null,
-		directory: targetFile?.parent?.path ?? null,
 		interactionId,
 		interactionKey,
 		get interactionDescriptor() {
 			return resolveInteractionDescriptor();
 		},
-		presentation: params.presentation,
 		searchQuery,
 		get previewRequest() {
 			return resolvePreviewRequest();

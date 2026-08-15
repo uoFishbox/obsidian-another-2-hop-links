@@ -255,7 +255,6 @@ function appendBranchSections(
 				header.targetFile,
 				header.title,
 				header.className,
-				header.directory,
 				params.currentSort,
 				params.sortContextVersion,
 				params.getSortedTwoHopItems,

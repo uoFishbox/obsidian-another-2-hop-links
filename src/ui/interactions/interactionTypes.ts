@@ -22,7 +22,6 @@ import {
 } from "ui/shared/dom/realmSafeDom";
 
 export const INTERACTION_ID_ATTRIBUTE = "data-ccl-interaction-id";
-export const INTERACTION_KIND_ATTRIBUTE = "data-ccl-interaction-kind";
 export const LONG_PRESSED_ATTRIBUTE = "data-ccl-long-pressed";
 export const INTERACTION_SELECTOR = `[${INTERACTION_ID_ATTRIBUTE}]`;
 const CARD_INTERACTION_SELECTOR = `.cosense-card-links__box${INTERACTION_SELECTOR}`;
@@ -46,7 +45,6 @@ interface BaseInteractionDescriptor {
 	hoverPreviewEnabled?: boolean;
 	dragRawText?: string;
 	filePathForDrag?: string;
-	directory?: string | null;
 	settings?: InteractionSettings;
 	searchQuery?: string;
 }
@@ -65,16 +63,6 @@ export interface SectionHeaderInteractionDescriptor extends BaseInteractionDescr
 export type InteractionDescriptor =
 	| ItemInteractionDescriptor
 	| SectionHeaderInteractionDescriptor;
-
-export function buildInteractionDataAttributes(
-	interactionId: string,
-	kind: InteractionKind,
-): Record<string, string> {
-	return {
-		[INTERACTION_ID_ATTRIBUTE]: interactionId,
-		[INTERACTION_KIND_ATTRIBUTE]: kind,
-	};
-}
 
 function bindInteractionId(element: Element, interactionId: string): void {
 	interactionIdsByElement.set(element, interactionId);
@@ -151,7 +139,6 @@ export function createItemInteractionDescriptor(
 		hoverPreviewEnabled: item.type !== "newLink" && !!targetFile,
 		dragRawText: rawText,
 		filePathForDrag: targetFile?.path,
-		directory: targetFile?.parent?.path ?? null,
 		settings,
 		searchQuery,
 	};

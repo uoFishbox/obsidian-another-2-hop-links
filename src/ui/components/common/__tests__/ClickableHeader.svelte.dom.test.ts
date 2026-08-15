@@ -50,6 +50,13 @@ describe("ClickableHeader", () => {
 		expect(registry.resolve(initialDescriptor.interactionId)).toStrictEqual(
 			initialDescriptor,
 		);
+		const header = view.container.querySelector(".cosense-card-links__box");
+		expect(header).toHaveAttribute(
+			"data-ccl-interaction-id",
+			initialDescriptor.interactionId,
+		);
+		expect(header).not.toHaveAttribute("data-ccl-interaction-kind");
+		expect(header).not.toHaveAttribute("data-directory");
 
 		await view.rerender({
 			registry,

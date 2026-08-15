@@ -51,7 +51,6 @@ describe("createCardRenderModel", () => {
 			title: "Quarterly report",
 			className: null,
 			extension: "pdf",
-			directory: null,
 			interactionId: "i0",
 			interactionKey: "item:file:report",
 			searchQuery: "needle",

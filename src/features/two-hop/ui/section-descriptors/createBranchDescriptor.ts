@@ -31,7 +31,6 @@ export interface BranchSectionBuildInput {
 	readonly targetFile: TFile | null;
 	readonly title: string;
 	readonly className: string;
-	readonly directory: string | null;
 	readonly interactionSettings: InteractionSettings;
 	readonly sortedItems: readonly TwoHopIndexedLink[];
 	readonly itemLimit: number;
@@ -51,7 +50,7 @@ export function resolveBranchHeader(params: {
 		sourcePath: string,
 		omitMdExtension?: boolean,
 	) => string;
-}): Pick<BranchSectionBuildInput, "targetFile" | "title" | "className" | "directory"> {
+}): Pick<BranchSectionBuildInput, "targetFile" | "title" | "className"> {
 	const targetFile =
 		!params.branch.hop1.isUnresolved && params.branch.hop1.path
 			? params.resolveFile(params.branch.hop1.path)
@@ -65,7 +64,6 @@ export function resolveBranchHeader(params: {
 		className: params.branch.hop1.isUnresolved
 			? "cosense-card-links__box--missing"
 			: "cosense-card-links__box--existing",
-		directory: targetFile?.parent?.path ?? null,
 	};
 }
 
@@ -107,15 +105,12 @@ export function createBranchSectionDescriptor(
 		hoverPreviewEnabled: !!input.targetFile,
 		dragRawText: input.branch.hop1.rawText,
 		filePathForDrag: input.targetFile?.path,
-		directory: input.directory,
 		settings: input.interactionSettings,
 	};
 	const headerProps: ClickableHeaderExtraProps = {
 		className: input.className,
-		directory: input.directory,
 		draggable: true,
 		interactionId: headerInteractionDescriptor.interactionId,
-		interactionKind: "sectionHeader",
 		interactionDescriptor: headerInteractionDescriptor,
 	};
 

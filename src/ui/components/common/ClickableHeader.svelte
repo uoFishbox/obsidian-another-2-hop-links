@@ -13,9 +13,7 @@
 		icon: Snippet;
 		className?: string;
 		draggable?: boolean;
-		directory?: string | null;
 		interactionId: string;
-		interactionKind: "sectionHeader";
 		interactionDescriptor?: SectionHeaderInteractionDescriptor;
 		onClick?: () => void;
 		sectionVariant?: CardSectionVariant;
@@ -27,9 +25,7 @@
 		icon,
 		className = "",
 		draggable = false,
-		directory = null,
 		interactionId,
-		interactionKind,
 		interactionDescriptor,
 		onClick,
 		sectionVariant,
@@ -62,8 +58,6 @@
 	aria-label={ariaLabel}
 	{draggable}
 	data-ccl-interaction-id={interactionId}
-	data-ccl-interaction-kind={interactionKind}
-	data-directory={directory}
 	data-ccl-section-variant={sectionVariant}
 	use:interactionIdBinding={interactionId}
 	onclick={() => onClick?.()}

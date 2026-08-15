@@ -2,47 +2,37 @@
 	import { type TFile } from "obsidian";
 	import Icon from "ui/components/common/Icon.svelte";
 	import { type IconName } from "ui/shared/icons/iconRegistry";
-	import {
-		interactionIdBinding,
-		type InteractionKind,
-	} from "ui/interactions/interactionTypes";
+	import { interactionIdBinding } from "ui/interactions/interactionTypes";
 	import { isAttachment } from "core/rules/fileRules";
 	import { AUDIO_EXTENSIONS, IMAGE_EXTENSIONS } from "../../../appConstants";
 	import { type Snippet } from "svelte";
 	import { useAppContext } from "ui/context/linkContext";
 	import { highlightTextForSearch } from "features/card-preview/text-processing/searchHighlighter";
-	import type { CardPresentationState } from "./cardPresentation";
 
 	interface Props {
 		title: string;
 		ariaLabel: string;
 		interactionId: string;
-		interactionKind: InteractionKind;
 		interactive?: boolean;
 		draggable?: boolean;
 		children?: Snippet;
 		className?: string;
 		extension?: string;
-		directory?: string | null;
 		file?: TFile | null;
 		searchQuery?: string;
-		presentation?: CardPresentationState;
 	}
 
 	let {
 		title,
 		ariaLabel,
 		interactionId,
-		interactionKind,
 		interactive = true,
 		draggable = true,
 		children,
 		className = "",
 		extension,
-		directory = null,
 		file = null,
 		searchQuery = "",
-		presentation,
 	}: Props = $props();
 
 	let appContext: ReturnType<typeof useAppContext> | undefined;
@@ -97,15 +87,7 @@
 	aria-label={interactive ? ariaLabel : undefined}
 	aria-hidden={interactive ? undefined : "true"}
 	data-ccl-interaction-id={interactive ? interactionId : undefined}
-	data-ccl-interaction-kind={interactive ? interactionKind : undefined}
-	data-directory={interactive ? directory : undefined}
-	data-ccl-section-variant={presentation?.sectionVariant}
-	data-ccl-resolution={presentation?.resolution}
-	data-ccl-attachment={(presentation?.attachment ?? isAttachmentFile)
-		? "true"
-		: "false"}
-	data-ccl-extension={presentation?.extension ?? normalizedExtension ?? ""}
-	draggable={interactive && draggable}
+	draggable={interactive && draggable ? true : undefined}
 	use:interactionIdBinding={interactive ? interactionId : ""}
 >
 	<div class="cosense-card-links__box-title-wrapper">
@@ -152,13 +134,6 @@
 	}
 
 	.cosense-card-links__box--missing .cosense-card-links__box-title {
-		color: var(--color-base-50);
-	}
-
-	.cosense-card-links__box[data-ccl-resolution="missing"]
-		.cosense-card-links__box-title,
-	.cosense-card-links__box[data-ccl-section-variant="new-links"]
-		.cosense-card-links__box-title {
 		color: var(--color-base-50);
 	}
 </style>

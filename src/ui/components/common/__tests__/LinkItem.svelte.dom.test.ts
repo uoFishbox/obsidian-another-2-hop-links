@@ -16,7 +16,6 @@ describe("LinkItem", () => {
 				title: "Alpha <Beta>",
 				ariaLabel: "alpha",
 				interactionId: "item:file:notes/alpha.md",
-				interactionKind: "item",
 				searchQuery: "",
 			},
 		});
@@ -35,7 +34,6 @@ describe("LinkItem", () => {
 				title: "Notebook Search Result",
 				ariaLabel: "search result",
 				interactionId: "item:file:notes/search.md",
-				interactionKind: "item",
 				searchQuery: "search",
 			},
 		});
@@ -54,7 +52,6 @@ describe("LinkItem", () => {
 				title: "diagram",
 				ariaLabel: "diagram",
 				interactionId: "item:file:notes/diagram.canvas",
-				interactionKind: "item",
 				extension: "canvas",
 			},
 		});
@@ -76,7 +73,6 @@ describe("LinkItem", () => {
 				title: "Alpha",
 				ariaLabel: "alpha",
 				interactionId: "item:file:notes/alpha.md",
-				interactionKind: "item",
 			},
 		});
 
@@ -91,14 +87,12 @@ describe("LinkItem", () => {
 				title: "Alpha",
 				ariaLabel: "alpha",
 				interactionId: "item:file:notes/alpha.md",
-				interactionKind: "item",
 				draggable: false,
 			},
 		});
 
-		expect(container.querySelector(".cosense-card-links__box")).toHaveAttribute(
+		expect(container.querySelector(".cosense-card-links__box")).not.toHaveAttribute(
 			"draggable",
-			"false",
 		);
 	});
 
@@ -107,7 +101,6 @@ describe("LinkItem", () => {
 			title: "",
 			ariaLabel: "",
 			interactionId: "item:file:notes/alpha.md",
-			interactionKind: "item" as const,
 			className: "twohop-card-shell is-skeleton",
 		};
 		const { container, rerender } = render(LinkItem, {
@@ -122,7 +115,7 @@ describe("LinkItem", () => {
 		expect(card).not.toHaveAttribute("role");
 		expect(card).not.toHaveAttribute("tabindex");
 		expect(card).not.toHaveAttribute("data-ccl-interaction-id");
-		expect(card).toHaveAttribute("draggable", "false");
+		expect(card).not.toHaveAttribute("draggable");
 
 		await rerender({
 			...baseProps,
@@ -143,42 +136,29 @@ describe("LinkItem", () => {
 		expect(card).toHaveAttribute("draggable", "true");
 	});
 
-	it("commits section and resolution presentation on the reused card root", async () => {
-		const baseProps = {
-			title: "Alpha",
-			ariaLabel: "alpha",
-			interactionId: "item:new-link:alpha",
-			interactionKind: "item" as const,
-		};
-		const { container, rerender } = render(LinkItem, {
+	it("keeps class state while omitting redundant card metadata", () => {
+		const { container } = render(LinkItem, {
 			props: {
-				...baseProps,
-				presentation: {
-					sectionVariant: "new-links" as const,
-					resolution: "missing" as const,
-					attachment: false,
-					extension: null,
-				},
+				title: "Missing PDF",
+				ariaLabel: "missing PDF",
+				interactionId: "item:new-link:missing-pdf",
+				className: "cosense-card-links__box--missing",
+				extension: "pdf",
 			},
 		});
 		const card = container.querySelector<HTMLElement>(".cosense-card-links__box");
 
-		expect(card).toHaveAttribute("data-ccl-section-variant", "new-links");
-		expect(card).toHaveAttribute("data-ccl-resolution", "missing");
-
-		await rerender({
-			...baseProps,
-			interactionId: "item:file:alpha",
-			presentation: {
-				sectionVariant: "backlinks",
-				resolution: "resolved",
-				attachment: false,
-				extension: null,
-			},
-		});
-
-		expect(container.querySelector(".cosense-card-links__box")).toBe(card);
-		expect(card).toHaveAttribute("data-ccl-section-variant", "backlinks");
-		expect(card).toHaveAttribute("data-ccl-resolution", "resolved");
+		expect(card).toHaveClass("cosense-card-links__box--missing");
+		expect(card).toHaveClass("is-attachment");
+		for (const attribute of [
+			"data-ccl-interaction-kind",
+			"data-directory",
+			"data-ccl-section-variant",
+			"data-ccl-resolution",
+			"data-ccl-attachment",
+			"data-ccl-extension",
+		]) {
+			expect(card).not.toHaveAttribute(attribute);
+		}
 	});
 });

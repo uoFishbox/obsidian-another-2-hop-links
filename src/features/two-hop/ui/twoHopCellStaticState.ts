@@ -1,16 +1,7 @@
-import { isAttachment } from "core/rules/fileRules";
-import type {
-	CardPresentationState,
-	CardSectionVariant,
-} from "ui/components/common/cardPresentation";
-import type {
-	TwoHopItemModel,
-	TwoHopSectionModel,
-} from "features/two-hop/ui/twoHopSectionModel";
+import type { CardSectionVariant } from "ui/components/common/cardPresentation";
+import type { TwoHopSectionModel } from "features/two-hop/ui/twoHopSectionModel";
 
 export type TwoHopCardSectionVariant = CardSectionVariant;
-
-export type TwoHopCardPresentationState = CardPresentationState;
 
 export function resolveTwoHopSectionVariant(
 	section: TwoHopSectionModel,
@@ -31,77 +22,5 @@ export function resolveTwoHopSectionVariant(
 				default:
 					return "backlinks";
 			}
-	}
-}
-
-/** Resolves the card presentation for a two-hop item within its section. */
-export function resolveTwoHopCardPresentation(
-	row: TwoHopItemModel,
-	section: TwoHopSectionModel,
-): TwoHopCardPresentationState | null {
-	const sectionVariant = resolveTwoHopSectionVariant(section);
-	const extension = resolveItemExtension(row.item);
-
-	switch (row.item.type) {
-		case "newLink":
-			return createPresentationState(sectionVariant, extension, "missing");
-		case "branch": {
-			const missing = row.item.data.hop1.isUnresolved;
-			return createPresentationState(
-				sectionVariant,
-				extension,
-				missing ? "missing" : "resolved",
-			);
-		}
-		case "taggedNote":
-		case "file":
-		case "backlink":
-			return createPresentationState(sectionVariant, extension, "resolved");
-		default:
-			return null;
-	}
-}
-
-function createPresentationState(
-	sectionVariant: TwoHopCardSectionVariant,
-	extension: string | null,
-	resolution: TwoHopCardPresentationState["resolution"],
-): TwoHopCardPresentationState {
-	return {
-		sectionVariant,
-		resolution,
-		attachment: isAttachment(extension ?? undefined),
-		extension,
-	};
-}
-
-function normalizeExtension(extension: string | undefined): string | null {
-	if (!extension || extension.toLowerCase() === "md") return null;
-	return extension.toLowerCase();
-}
-
-function resolvePathExtension(path: string | undefined): string | null {
-	if (!path) return null;
-	const separatorIndex = path.lastIndexOf("/");
-	const fileNameStart = separatorIndex < 0 ? 0 : separatorIndex + 1;
-	const extensionIndex = path.lastIndexOf(".");
-	if (extensionIndex <= fileNameStart) return null;
-	return normalizeExtension(path.slice(extensionIndex + 1));
-}
-
-function resolveItemExtension(item: TwoHopItemModel["item"]): string | null {
-	switch (item.type) {
-		case "newLink":
-			return null;
-		case "branch":
-			return resolvePathExtension(item.data.hop1.path);
-		case "backlink":
-			return normalizeExtension(item.data.sourceFile.extension);
-		case "taggedNote":
-			return normalizeExtension(item.data.file.extension);
-		case "file":
-			return normalizeExtension(item.data.extension);
-		default:
-			return null;
 	}
 }

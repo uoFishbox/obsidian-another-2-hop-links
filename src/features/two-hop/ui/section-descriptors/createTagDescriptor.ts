@@ -34,7 +34,6 @@ export function createTagSectionDescriptor(
 	const headerProps: ClickableHeaderExtraProps = {
 		className: "cosense-card-links__box--tag",
 		interactionId: headerInteraction.interactionId,
-		interactionKind: "sectionHeader",
 		onClick: () => input.onTagClick(input.source.tag),
 	};
 	const rows = materializeItemPrefix(

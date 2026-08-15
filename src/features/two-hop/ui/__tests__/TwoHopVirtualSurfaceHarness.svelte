@@ -3,7 +3,6 @@
 	import { setLinkContext, type LinkContext } from "ui/context/linkContext";
 	import type { ApplicationStore } from "ui/stores/ApplicationStore.svelte";
 	import type { CardRenderModel } from "ui/components/items/cardRenderModel";
-	import type { TwoHopCardPresentationState } from "features/two-hop/ui/twoHopCellStaticState";
 	import type { TwoHopPreviewDependencies } from "features/two-hop/ui/useTwoHopVirtualList.svelte";
 	import type {
 		TwoHopItemModel,
@@ -21,7 +20,6 @@
 		loadMoreSection?: (sectionId: string) => void;
 		resolveItemCardModel: (
 			item: TwoHopItemModel,
-			presentation: TwoHopCardPresentationState,
 			revision: unknown,
 		) => CardRenderModel;
 	}

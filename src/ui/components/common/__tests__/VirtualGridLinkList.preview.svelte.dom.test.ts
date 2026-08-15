@@ -57,11 +57,9 @@ function createModel(file: TFile): CardRenderModel {
 		ariaLabel: file.basename,
 		className: null,
 		extension: "md",
-		directory: "notes",
 		interactionId: file.path,
 		interactionKey: file.path,
 		interactionDescriptor: null,
-		presentation: undefined,
 		searchQuery: "",
 		previewRequest: {
 			renderKey: `preview:${file.path}`,
@@ -145,7 +143,7 @@ describe("VirtualGridLinkList preview surface", () => {
 			await Promise.resolve();
 		}
 		const host = gridRoot.shadowRoot?.querySelector<HTMLElement>(
-			'[data-preview-owner="virtual-surface"]',
+			".cosense-card-links__box-preview",
 		);
 		expect(host).not.toBeNull();
 		const reevaluationsBefore =

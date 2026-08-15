@@ -34,12 +34,9 @@
 		file={renderState.targetFile}
 		extension={renderState.extension ?? undefined}
 		interactionId={renderState.interactionId}
-		interactionKind="item"
 		{draggable}
 		className={renderState.className ?? undefined}
-		directory={renderState.directory}
 		searchQuery={renderState.searchQuery}
-		presentation={renderState.presentation}
 	>
 		{#snippet children()}
 			{#if !getDebugDisableCardDomPreview() && renderState.item.type === "newLink" && !renderState.targetFile}
@@ -48,7 +45,6 @@
 				<div
 					use:previewHost={previewSlotId}
 					class="cosense-card-links__box-preview"
-					data-preview-owner="virtual-surface"
 				></div>
 			{/if}
 		{/snippet}
