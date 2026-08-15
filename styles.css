@@ -55,7 +55,7 @@
 }
 
 .cm-scroller.ccl-inline-card-host > .cm-sizer {
-	min-height: 0% !important;
+	min-height: 0%;
 }
 
 .cm-scroller.ccl-inline-card-host .cm-content {

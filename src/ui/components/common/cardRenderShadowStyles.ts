@@ -282,10 +282,9 @@ export const CARD_RENDER_SHADOW_CSS = String.raw`
 	max-height: 120px;
 }
 
-.cosense-card-links__box-preview img {
+.cosense-card-links__box-preview--image img {
 	width: 100%;
 	height: auto;
-	object-fit: cover;
 	border-radius: var(--radius-s);
 	-webkit-user-drag: none;
 }
@@ -402,21 +401,11 @@ export const CARD_RENDER_SHADOW_CSS = String.raw`
 	}
 }
 
-.cosense-card-links__box.is-attachment .cosense-card-links__box-preview {
-	margin-left: calc(var(--ccl-box-padding) * -1);
-	margin-right: calc(var(--ccl-box-padding) * -1);
-	margin-bottom: calc(var(--ccl-box-padding) * -1);
-	width: calc(100% + (var(--ccl-box-padding) * 2));
-	padding-top: 0;
-	margin-top: 8px;
-}
-
-.cosense-card-links__box.is-attachment .cosense-card-links__box-preview img {
+.cosense-card-links__box.is-attachment .cosense-card-links__box-preview--image img {
 	border-radius: 0;
 	display: block;
 	width: 100%;
 	height: auto;
-	object-fit: cover;
 }
 
 .mod-canvas-color-1 {
