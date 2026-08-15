@@ -29,6 +29,7 @@ import { createLinkContextFactory } from "ui/context/linkContextFactory";
 import type { LinkContext } from "ui/context/linkContext";
 import { SortService } from "core/sorting/SortService";
 import { MetricProvider } from "core/sorting/MetricProvider";
+import type { SortOption } from "core/sorting";
 import {
 	createStylingService,
 	type StylingService,
@@ -57,11 +58,7 @@ import {
 import type { SettingsManager } from "features/settings/persistence/SettingsManager";
 import type { PluginHost } from "types/pluginHost";
 import type { ViewServices } from "ui/shared/views/viewServices";
-import {
-	areTagFeaturesEnabled,
-	type PluginSettings,
-	type SortOption,
-} from "features/settings/model";
+import { areTagFeaturesEnabled, type PluginSettings } from "features/settings/model";
 import { getLazyLoadManager } from "infrastructure/observers/IntersectionObserverRegistry";
 import { resolvePreviewActivationsPerSecond } from "appConstants";
 
@@ -152,7 +149,14 @@ export function createPluginRuntime(options: PluginRuntimeOptions): PluginRuntim
 		options.app.metadataCache,
 		options.app.vault,
 		indexingService,
-		options.getSettings,
+		() => {
+			const settings = options.getSettings();
+			return {
+				frontmatterKeyCreatedDate: settings.frontmatterKeyCreatedDate,
+				frontmatterKeyModifiedDate: settings.frontmatterKeyModifiedDate,
+				priorityFrontmatterKeyForTitle: settings.priorityFrontmatterKeyForTitle,
+			};
+		},
 	);
 	const sortService = new SortService(metricProvider);
 	const eventHandlers = createEventHandlers(

@@ -2,8 +2,7 @@ import { describe, expect, beforeEach, vi, type MockedObject } from "vitest";
 import { SortService } from "../SortService";
 import { TFile } from "obsidian";
 import type { TwoHopLinkBranch } from "types/domain";
-import type { IMetricProvider } from "types/services";
-import type { SortableItem } from "../types";
+import type { IMetricProvider, SortableItem } from "../types";
 
 describe("SortService Performance", () => {
 	let mockMetricProvider: MockedObject<IMetricProvider>;

@@ -9,8 +9,12 @@ import type {
 } from "types/domain";
 import type { IIndexingService } from "types/services";
 import type { IMetadataCache, IVault } from "types/obsidian";
-import { DEFAULT_SETTINGS, type PluginSettings } from "features/settings/model";
-import type { SortableItem } from "../types";
+import type { SortableItem, SortingConfiguration } from "../types";
+
+const DEFAULT_SORTING_CONFIGURATION: SortingConfiguration = {
+	frontmatterKeyCreatedDate: "",
+	frontmatterKeyModifiedDate: "",
+};
 
 describe("ObsidianMetricProvider", () => {
 	let mockMetadataCache: MockedObject<IMetadataCache>;
@@ -33,9 +37,9 @@ describe("ObsidianMetricProvider", () => {
 		return file;
 	};
 
-	const createProvider = (overrides: Partial<PluginSettings> = {}) =>
+	const createProvider = (overrides: Partial<SortingConfiguration> = {}) =>
 		new MetricProvider(mockMetadataCache, mockVault, mockIndexingService, () => ({
-			...DEFAULT_SETTINGS,
+			...DEFAULT_SORTING_CONFIGURATION,
 			...overrides,
 		}));
 

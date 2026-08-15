@@ -9,7 +9,7 @@ import type { ViewItem } from "application/presenters";
 import type { ListConfig } from "../types";
 import type { LinkContext } from "ui/context/linkContext";
 import type { ApplicationStore } from "ui/stores/ApplicationStore.svelte";
-import type { ISortService } from "types/services";
+import type { ISortService } from "core/sorting";
 
 type WorkerMessage =
 	| {

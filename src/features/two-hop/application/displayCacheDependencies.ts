@@ -1,8 +1,5 @@
-import {
-	areTagFeaturesEnabled,
-	type PluginSettings,
-	type SortOption,
-} from "features/settings/model";
+import { areTagFeaturesEnabled, type PluginSettings } from "features/settings/model";
+import type { SortOption } from "core/sorting";
 
 export interface LinkDisplayPreprocessSettings {
 	readonly excludeAttachments: boolean;

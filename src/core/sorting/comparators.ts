@@ -1,6 +1,10 @@
-import type { SortOption } from "features/settings/model";
-import type { SortableItem, Comparator, SortKey } from "./types";
-import type { IMetricProvider } from "types/services";
+import type {
+	Comparator,
+	IMetricProvider,
+	SortableItem,
+	SortKey,
+	SortOption,
+} from "./types";
 
 const collator = new Intl.Collator(undefined, {
 	numeric: true,

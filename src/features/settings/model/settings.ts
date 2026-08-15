@@ -1,14 +1,4 @@
-export type SortOption =
-	| "alphabetical"
-	| "alphabetical-reverse"
-	| "created-date"
-	| "created-date-reverse"
-	| "modified-date"
-	| "modified-date-reverse"
-	| "backlink-count"
-	| "backlink-count-reverse"
-	| "file-size"
-	| "file-size-reverse";
+import type { SortOption } from "core/sorting";
 
 export type DisplayMode = "editor-inline" | "sidebar-view" | "hybrid";
 

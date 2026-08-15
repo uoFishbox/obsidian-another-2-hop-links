@@ -8,7 +8,8 @@ import type {
 } from "features/two-hop/application/displayDataBuilder";
 import type { TwoHopLinkResult } from "types";
 import type { DedupState } from "types/deduplication";
-import type { PluginSettings, SortOption } from "features/settings/model";
+import type { PluginSettings } from "features/settings/model";
+import type { SortOption } from "core/sorting";
 import {
 	createLinkPreprocessCacheKey,
 	createTagPreprocessCacheKey,

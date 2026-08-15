@@ -7,7 +7,8 @@ import {
 } from "ui/shared/dom/domUtils";
 import { getLeafId } from "infrastructure/workspace/workspaceLeafIdentity";
 import * as ErrorHandler from "shared/errors/errorHandler";
-import type { PluginSettings, SortOption } from "features/settings/model";
+import type { PluginSettings } from "features/settings/model";
+import type { SortOption } from "core/sorting";
 import { areTagFeaturesEnabled } from "features/settings/model";
 import type { IComponentManager } from "types/services";
 import type { TwoHopLinkResult } from "types/domain";

@@ -3,7 +3,8 @@ import { installMathJaxShadowPatch } from "ui/shared/dom/mathJaxShadowStyles";
 import { SettingsManager } from "features/settings/persistence/SettingsManager";
 import { CosenseCardLinksSettingTab } from "features/settings/ui/SettingTab";
 import { DEFAULT_SETTINGS } from "features/settings/model";
-import type { PluginSettings, SortOption } from "features/settings/model";
+import type { PluginSettings } from "features/settings/model";
+import type { SortOption } from "core/sorting";
 import {
 	TwoHopLinksView,
 	TWO_HOP_LINKS_VIEW_TYPE,

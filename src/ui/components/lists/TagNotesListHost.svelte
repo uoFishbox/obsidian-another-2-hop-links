@@ -4,7 +4,7 @@
 	import type { ListConfig } from "ui/components/lists/types";
 	import type { LinkContext } from "ui/context/linkContext";
 	import type { ApplicationStore } from "ui/stores/ApplicationStore.svelte";
-	import type { ISortService } from "types/services";
+	import type { ISortService } from "core/sorting";
 	import type { ViewItem } from "application/presenters";
 	import type { PreviewRuntime } from "features/card-preview/runtime/previewRuntime";
 

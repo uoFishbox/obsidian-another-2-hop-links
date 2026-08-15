@@ -5,8 +5,6 @@ import type {
 	TaggedNote,
 	TwoHopIndexedLink,
 } from "./domain";
-import type { SortOption } from "features/settings/model";
-import type { SortableItem } from "core/sorting/types";
 import type {
 	PreviewData,
 	PreviewRequestOptions,
@@ -98,45 +96,6 @@ export interface IPreviewService {
 	subscribeVisiblePreviewQueue(
 		listener: (metrics: PreviewQueueMetrics) => void,
 	): () => void;
-}
-
-export type SortMetricKind =
-	| "displayName"
-	| "outgoingLinkCount"
-	| "createdTime"
-	| "modifiedTime"
-	| "backlinkCount"
-	| "fileSize";
-
-export interface IMetricProvider {
-	getDisplayName(item: SortableItem): string;
-	getOutgoingLinkCount(item: SortableItem): number;
-	getCreatedTime(item: SortableItem): number;
-	getModifiedTime(item: SortableItem): number;
-	getBacklinkCount(item: SortableItem): number;
-	getFileSize(item: SortableItem): number;
-	/**
-	 * Returns the stable object identity shared by items whose metric value
-	 * can be reused until the sort cache is invalidated.
-	 */
-	getMetricCacheIdentity?(
-		metricKind: SortMetricKind,
-		item: SortableItem,
-	): object | undefined;
-}
-
-export interface ISortService {
-	sort<T extends SortableItem>(
-		items: readonly T[],
-		sortOption: SortOption,
-	): readonly T[];
-	sortWithResult?<T extends SortableItem>(
-		items: readonly T[],
-		sortOption: SortOption,
-	): {
-		items: readonly T[];
-		orderChanged: boolean;
-	};
 }
 
 export interface IComponentManager {

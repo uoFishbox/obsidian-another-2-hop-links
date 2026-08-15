@@ -5,7 +5,8 @@ import {
 	SHOULD_VALIDATE_SECTION_IDS,
 } from "ui/components/common/listPagination";
 import { generateBranchKey } from "features/card-preview/text-processing/textUtils";
-import type { PluginSettings, SortOption } from "features/settings/model";
+import type { PluginSettings } from "features/settings/model";
+import type { SortOption } from "core/sorting";
 import type { InteractionSettings } from "ui/interactions/interactionTypes";
 import type { TaggedNote, TwoHopIndexedLink } from "types/domain";
 import type {

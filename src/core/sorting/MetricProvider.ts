@@ -5,13 +5,16 @@ import type {
 	TwoHopIndexedLink,
 	TaggedNote,
 } from "types/domain";
-import type { SortableItem } from "./types";
-import type { IMetricProvider, SortMetricKind } from "types/services";
+import type {
+	IMetricProvider,
+	SortingConfiguration,
+	SortableItem,
+	SortMetricKind,
+} from "./types";
 import { countLinkReferences } from "core/indexing/metadata/metadataExtractor";
 import { resolveFileByPath } from "shared/obsidian/resolveFileByPath";
 import type { IIndexingService } from "types/services";
 import type { IMetadataCache, IVault } from "types/obsidian";
-import type { PluginSettings } from "features/settings/model";
 import { resolveFrontmatterDate } from "./frontmatterDate";
 import { getPriorityFrontmatterCardTitle } from "core/frontmatterCardTitle";
 
@@ -35,12 +38,12 @@ export class MetricProvider implements IMetricProvider {
 		private metadataCache: IMetadataCache,
 		private vault: IVault,
 		private indexingService: IIndexingService,
-		private getSettings: () => PluginSettings,
+		private getConfiguration: () => SortingConfiguration,
 	) {}
 
 	getDisplayName(item: SortableItem): string {
-		const settings = this.getSettings();
-		const titleKey = settings.priorityFrontmatterKeyForTitle?.trim();
+		const configuration = this.getConfiguration();
+		const titleKey = configuration.priorityFrontmatterKeyForTitle?.trim();
 
 		if (titleKey) {
 			const targetFile = this.getTargetFile(item);
@@ -84,11 +87,11 @@ export class MetricProvider implements IMetricProvider {
 		const file = this.getTargetFile(item);
 		if (!file) return 0;
 
-		const settings = this.getSettings();
-		if (settings.frontmatterKeyCreatedDate) {
+		const configuration = this.getConfiguration();
+		if (configuration.frontmatterKeyCreatedDate) {
 			const fmDate = this.getDateFromFrontmatter(
 				file,
-				settings.frontmatterKeyCreatedDate,
+				configuration.frontmatterKeyCreatedDate,
 			);
 			if (fmDate !== null) return fmDate;
 		}
@@ -100,11 +103,11 @@ export class MetricProvider implements IMetricProvider {
 		const file = this.getTargetFile(item);
 		if (!file) return 0;
 
-		const settings = this.getSettings();
-		if (settings.frontmatterKeyModifiedDate) {
+		const configuration = this.getConfiguration();
+		if (configuration.frontmatterKeyModifiedDate) {
 			const fmDate = this.getDateFromFrontmatter(
 				file,
-				settings.frontmatterKeyModifiedDate,
+				configuration.frontmatterKeyModifiedDate,
 			);
 			if (fmDate !== null) return fmDate;
 		}

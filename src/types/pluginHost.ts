@@ -3,7 +3,8 @@ import type { PluginSettings } from "features/settings/model";
 import type { ResolveProgress, TwoHopLinkResult } from "types/domain";
 import type { ResolveOptions } from "features/two-hop/domain/TwoHopLinkResolver";
 import type { TwoHopResolveSnapshot } from "features/two-hop/domain/ResolverDependencies";
-import type { IIndexingService, ISortService } from "types/services";
+import type { IIndexingService } from "types/services";
+import type { ISortService } from "core/sorting";
 
 export interface PluginSettingsManager {
 	readonly settings: PluginSettings;

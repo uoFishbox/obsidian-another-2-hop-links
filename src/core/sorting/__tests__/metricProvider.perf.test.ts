@@ -4,7 +4,12 @@ import { TFile } from "obsidian";
 import type { TwoHopLinkBranch, CachedMetadataWithLinkReferences } from "types/domain";
 import type { IIndexingService } from "types/services";
 import type { IMetadataCache, IVault } from "types/obsidian";
-import { DEFAULT_SETTINGS, type PluginSettings } from "features/settings/model";
+import type { SortingConfiguration } from "../types";
+
+const DEFAULT_SORTING_CONFIGURATION: SortingConfiguration = {
+	frontmatterKeyCreatedDate: "",
+	frontmatterKeyModifiedDate: "",
+};
 
 describe("MetricProvider Performance", () => {
 	let mockMetadataCache: MockedObject<IMetadataCache>;
@@ -23,9 +28,9 @@ describe("MetricProvider Performance", () => {
 		return file;
 	};
 
-	const createProvider = (overrides: Partial<PluginSettings> = {}) =>
+	const createProvider = (overrides: Partial<SortingConfiguration> = {}) =>
 		new MetricProvider(mockMetadataCache, mockVault, mockIndexingService, () => ({
-			...DEFAULT_SETTINGS,
+			...DEFAULT_SORTING_CONFIGURATION,
 			...overrides,
 		}));
 

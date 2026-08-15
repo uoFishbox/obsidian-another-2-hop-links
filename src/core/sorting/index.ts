@@ -1,4 +1,13 @@
 export { SortService } from "./SortService";
 export { getComparator } from "./comparators";
 
-export type { SortableItem, SortContext, Comparator } from "./types";
+export type {
+	Comparator,
+	IMetricProvider,
+	ISortService,
+	SortingConfiguration,
+	SortMetricKind,
+	SortOption,
+	SortResult,
+	SortableItem,
+} from "./types";

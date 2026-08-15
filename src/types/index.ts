@@ -14,12 +14,6 @@ export type {
 } from "./domain";
 
 // サービスインターフェースをエクスポート
-export type {
-	IIndexingService,
-	IPreviewService,
-	IMetricProvider,
-	SortMetricKind,
-	ISortService,
-} from "./services";
+export type { IIndexingService, IPreviewService } from "./services";
 
 export type { DedupResult, DedupState } from "./deduplication";

@@ -20,11 +20,8 @@ import type {
 	TwoHopLinkBranch,
 	TwoHopLinkResult,
 } from "types/domain";
-import {
-	DEFAULT_SETTINGS,
-	type PluginSettings,
-	type SortOption,
-} from "features/settings/model";
+import { DEFAULT_SETTINGS, type PluginSettings } from "features/settings/model";
+import type { SortOption } from "core/sorting";
 import { buildDetailedBacklinksArtifactsChunked } from "core/indexing/backlink-builder/backlinkIndexer";
 import { TagIndexStore } from "core/indexing/tag-index/TagIndexStore";
 import { createDedupState } from "core/deduplication/usageTracker";

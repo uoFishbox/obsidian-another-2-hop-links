@@ -19,9 +19,8 @@
 		setAppContext,
 		setLazyLoaderCache,
 	} from "ui/context/linkContext";
-	import type { SortOption } from "features/settings/model";
+	import type { ISortService, SortOption } from "core/sorting";
 	import type { ApplicationStore } from "ui/stores/ApplicationStore.svelte";
-	import type { ISortService } from "types/services";
 	import type { App, TFile } from "obsidian";
 	import {
 		createStableViewItemReconciler,

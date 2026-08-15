@@ -1,9 +1,6 @@
 import type { TFile } from "obsidian";
-import {
-	CARD_LAYOUT_SETTING_KEYS,
-	type PluginSettings,
-	type SortOption,
-} from "features/settings/model";
+import { CARD_LAYOUT_SETTING_KEYS, type PluginSettings } from "features/settings/model";
+import type { SortOption } from "core/sorting";
 import type { ResolveProgress, TwoHopLinkResult } from "types";
 import type { TaggedNote, TwoHopIndexedLink } from "types/domain";
 import type {

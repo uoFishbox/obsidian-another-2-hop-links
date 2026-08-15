@@ -1,7 +1,7 @@
 import type { Component } from "svelte";
 import type { LinkContext } from "ui/context/linkContext";
 import type { ApplicationStore } from "ui/stores/ApplicationStore.svelte";
-import type { ISortService } from "types";
+import type { ISortService } from "core/sorting";
 import type { App } from "obsidian";
 import type { ViewItem } from "application/presenters";
 

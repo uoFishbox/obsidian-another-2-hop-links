@@ -7,7 +7,7 @@
 	import type { ListConfig } from "ui/components/lists/types";
 	import type { LinkContext } from "ui/context/linkContext";
 	import type { PluginSettings } from "features/settings/model";
-	import type { ISortService } from "types/services";
+	import type { ISortService } from "core/sorting";
 	import type { ApplicationStore } from "ui/stores/ApplicationStore.svelte";
 	import { getCardLayoutCssText } from "ui/shared/layout/cardLayoutCssVars";
 	import { getFileCardTitleSearchText } from "core/frontmatterCardTitle";

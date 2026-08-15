@@ -13,9 +13,8 @@ import type {
 	TwoHopLinkBranch,
 	TwoHopLinkResult,
 } from "types/domain";
-import type { PluginSettings, SortOption } from "features/settings/model";
-import type { ISortService } from "types/services";
-import type { SortableItem } from "core/sorting";
+import type { PluginSettings } from "features/settings/model";
+import type { ISortService, SortableItem, SortOption } from "core/sorting";
 import { createMockTFile } from "testing/__mocks__/testHelpers";
 import { DEFAULT_SETTINGS } from "features/settings/model";
 import * as grouping from "core/grouping";
