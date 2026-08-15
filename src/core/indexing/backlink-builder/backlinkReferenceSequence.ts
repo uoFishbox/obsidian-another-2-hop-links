@@ -1,4 +1,4 @@
-import { getLinkpath, type Pos, type TFile } from "obsidian";
+import { getLinkpath, type TFile } from "obsidian";
 
 import type { CachedMetadataWithLinkReferences, LinkReference } from "types/domain";
 import type { IMetadataCache } from "types/obsidian";
@@ -8,15 +8,8 @@ import {
 	type LinkResolutionAmbiguityDetector,
 	type ResolvedLinkInfo,
 } from "../link-resolution/linkResolution";
-import {
-	forEachLinkReferenceUnordered,
-	collectLinkReferences,
-} from "../metadata/metadataExtractor";
+import { forEachLinkReferenceUnordered } from "../metadata/metadataExtractor";
 import type { YieldScheduler, YieldStepGenerator } from "../timeSlicing";
-
-export interface RuntimeOrderedBacklinkRef extends OrderedBacklinkRef {
-	position?: Pos;
-}
 
 export interface ResolvedLinkMemo {
 	globalResolvedMemo: Map<string, ResolvedLinkInfo>;
@@ -129,7 +122,6 @@ export function createOrderedBacklinkRef(
 		isUnresolved: resolved.isUnresolved,
 		rawText: link.link,
 		displayText: "displayText" in link ? link.displayText : undefined,
-		key: "key" in link ? link.key : undefined,
 	};
 }
 
@@ -273,25 +265,4 @@ export async function visitResolvedBacklinkRefsUnorderedAsync(
 	)) {
 		await step;
 	}
-}
-
-export function buildRuntimeOrderedBacklinkRefs(
-	cache: CachedMetadataWithLinkReferences | null,
-): RuntimeOrderedBacklinkRef[] {
-	const orderedReferences = collectLinkReferences(cache);
-	const refs = new Array<RuntimeOrderedBacklinkRef>(orderedReferences.length);
-	for (let index = 0; index < orderedReferences.length; index += 1) {
-		const link = orderedReferences[index];
-		const ref: RuntimeOrderedBacklinkRef = {
-			destinationPath: "",
-			rawLookupKey: "",
-			isUnresolved: false,
-			rawText: link.link,
-			displayText: link.displayText ?? undefined,
-		};
-		if ("key" in link) ref.key = link.key ?? undefined;
-		if ("position" in link) ref.position = link.position ?? undefined;
-		refs[index] = ref;
-	}
-	return refs;
 }

@@ -253,6 +253,17 @@ describe("buildDetailedBacklinksArtifactsChunked", () => {
 		).toEqual(
 			new Set(["target-link.md", "target-embed.md", "target-frontmatter.md"]),
 		);
+
+		const sourceSummary = artifacts.sourceSummaries.get("source.md");
+		const frontmatterDestination = sourceSummary?.destinations.get(
+			"target-frontmatter.md",
+		);
+		const frontmatterRef =
+			frontmatterDestination && sourceSummary
+				? sourceSummary.orderedReferences[frontmatterDestination.firstRefIndex]
+				: undefined;
+		expect(frontmatterRef).toBeDefined();
+		expect(frontmatterRef).not.toHaveProperty("key");
 	});
 
 	test("normalizes resolved lookup keys from destination paths", async () => {

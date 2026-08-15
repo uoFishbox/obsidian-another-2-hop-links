@@ -186,7 +186,76 @@ describe("createLinkContextFactory", () => {
 				start: expect.objectContaining({ line: 4 }),
 			}),
 			false,
-			"prop.key",
+			undefined,
+		);
+	});
+
+	it("onHop2Click: focuses the first target property and prefers it over body links", () => {
+		const sourceFile = createMockTFile("notes/source.md");
+		const targetFile = createMockTFile("notes/target.md");
+		const otherFile = createMockTFile("notes/other.md");
+		const handleOpenFile = vi.fn();
+		const metadataCache = {
+			fileToLinktext: vi.fn((f: TFile) => f.basename),
+			getFileCache: vi.fn(() => ({
+				links: [
+					{
+						link: "target",
+						original: "[[target]]",
+						position: createPosition(4),
+					},
+				],
+				embeds: [],
+				frontmatterLinks: [
+					{ key: "other", link: "other", original: "[[other]]" },
+					{
+						key: "first",
+						link: "alias-to-target",
+						original: "[[alias-to-target]]",
+					},
+					{ key: "second", link: "target", original: "[[target]]" },
+				],
+			})),
+			getFirstLinkpathDest: vi.fn((linkpath: string) => {
+				if (linkpath === "target" || linkpath === "alias-to-target") {
+					return targetFile;
+				}
+				if (linkpath === "other") return otherFile;
+				return null;
+			}),
+		} as any;
+		const factory = createLinkContextFactory(
+			metadataCache,
+			{
+				handleResolveFile: vi.fn(),
+				handleOpenFile,
+				handleOpenLinkDestination: vi.fn(),
+				handleGetMetadata: vi.fn(),
+				handleShowFileMenu: vi.fn(),
+			} as any,
+			{} as any,
+			{} as any,
+			{} as any,
+			{} as any,
+			{} as any,
+			createPreviewServiceMock() as any,
+		);
+		const context = factory(sourceFile, { highlightOnOpen: "always" } as any);
+		const link: TwoHopIndexedLink = {
+			rawText: "target",
+			path: targetFile.path,
+			lookupPath: targetFile.path,
+			isUnresolved: false,
+			sourceFile,
+		};
+
+		context.onHop2Click(new MouseEvent("click"), link);
+
+		expect(handleOpenFile).toHaveBeenCalledWith(
+			sourceFile,
+			undefined,
+			false,
+			"first",
 		);
 	});
 

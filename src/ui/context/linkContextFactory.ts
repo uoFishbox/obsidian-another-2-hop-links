@@ -14,7 +14,10 @@ import type { PluginHost } from "types/pluginHost";
 import { shouldHighlight } from "ui/interactions/highlightUtils";
 import { buildDragLinkFormat } from "application/presenters/linkHelper";
 import { handleTagClick } from "ui/handlers/viewHandlers";
-import { hydrateRuntimeBacklinkLink } from "./runtimeBacklinkPositionResolver";
+import {
+	hydrateRuntimeBacklinkHoverLink,
+	hydrateRuntimeBacklinkLink,
+} from "./runtimeBacklinkPositionResolver";
 import { isMouseEventLike } from "ui/shared/dom/realmSafeDom";
 
 export function createLinkContextFactory(
@@ -96,6 +99,7 @@ export function createLinkContextFactory(
 								link.sourceFile,
 							) as CachedMetadataWithLinkReferences | null,
 							link,
+							metadataCache,
 						);
 				eventHandlers.handleOpenFile(
 					link.sourceFile,
@@ -107,11 +111,12 @@ export function createLinkContextFactory(
 			onLinkHover: (event, link, targetFile, isOutgoingLink, options) => {
 				const hydratedLink = options?.preferredPosition
 					? { ...link, position: options.preferredPosition }
-					: hydrateRuntimeBacklinkLink(
+					: hydrateRuntimeBacklinkHoverLink(
 							metadataCache.getFileCache(
 								link.sourceFile,
 							) as CachedMetadataWithLinkReferences | null,
 							link,
+							metadataCache,
 						);
 				return triggerHoverPopover(
 					workspace,

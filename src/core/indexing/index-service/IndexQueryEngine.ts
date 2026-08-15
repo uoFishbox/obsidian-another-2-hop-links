@@ -336,7 +336,6 @@ export class IndexQueryEngine {
 			displayText: ref.displayText,
 			isUnresolved: ref.isUnresolved,
 			sourceFile,
-			key: ref.key,
 			position: undefined,
 			backlinkCount: bucket.count,
 		};
@@ -376,7 +375,6 @@ export class IndexQueryEngine {
 			displayText: ref.displayText,
 			isUnresolved: ref.isUnresolved,
 			sourceFile,
-			key: ref.key,
 			position: undefined,
 			backlinkCount: bucket.count,
 		};

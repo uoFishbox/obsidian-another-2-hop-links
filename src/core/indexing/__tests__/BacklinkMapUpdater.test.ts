@@ -463,7 +463,6 @@ function createSourceSummaryWithLookupKeys(
 		isUnresolved: boolean;
 		rawText: string;
 		displayText: string;
-		key?: string;
 	}> = [],
 	firstRefIndexByLookupKey: Map<string, number> = new Map(),
 ) {

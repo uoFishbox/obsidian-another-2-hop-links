@@ -6,7 +6,7 @@ import {
 	buildHoverPopoverLinkSpec,
 	type HoverPopoverLinkSpec,
 } from "features/popover/hoverPopoverLinkSpec";
-import { hydrateRuntimeBacklinkLink } from "ui/context/runtimeBacklinkPositionResolver";
+import { hydrateRuntimeBacklinkHoverLink } from "ui/context/runtimeBacklinkPositionResolver";
 
 export function buildShadowHoverLinkSpec(
 	descriptor: InteractionDescriptor | undefined,
@@ -67,11 +67,12 @@ export function buildShadowHoverLinkSpec(
 							...descriptor.item.data,
 							position: preferredPosition,
 						}
-					: hydrateRuntimeBacklinkLink(
+					: hydrateRuntimeBacklinkHoverLink(
 							(appContext?.linkContext.getMetadata(
 								descriptor.item.data.sourceFile,
 							) as CachedMetadataWithLinkReferences | null) ?? null,
 							descriptor.item.data,
+							appContext?.app?.metadataCache,
 						),
 				descriptor.targetFile,
 				descriptor.settings,

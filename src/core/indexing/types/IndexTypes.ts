@@ -51,7 +51,6 @@ export interface OrderedBacklinkRef {
 	isUnresolved: boolean;
 	rawText: string;
 	displayText?: string;
-	key?: string;
 }
 
 export interface SourceDestinationSummary {
