@@ -22,9 +22,10 @@ describe("LinkItem", () => {
 		});
 
 		const title = container.querySelector(".cosense-card-links__box-title");
+		const titleText = title?.querySelector(".cosense-card-links__box-title-text");
 		expect(title).not.toBeNull();
 		expect(title?.querySelector(".ccl-search-highlight")).toBeNull();
-		expect(title?.textContent).toContain("Alpha <Beta>");
+		expect(titleText).toHaveTextContent("Alpha <Beta>");
 		expect(title?.innerHTML).not.toContain("ccl-search-highlight");
 	});
 
@@ -61,6 +62,12 @@ describe("LinkItem", () => {
 		expect(
 			container.querySelector(".cosense-card-links__box-extension"),
 		).toHaveTextContent("canvas");
+
+		const title = container.querySelector(".cosense-card-links__box-title");
+		expect(title).toHaveClass("has-file-icon");
+		expect(title?.children).toHaveLength(2);
+		expect(title?.children[0]).toHaveClass("cosense-card-links__file-icon");
+		expect(title?.children[1]).toHaveClass("cosense-card-links__box-title-text");
 	});
 
 	it("makes card body draggable", () => {
@@ -109,9 +116,7 @@ describe("LinkItem", () => {
 				interactive: false,
 			},
 		});
-		const card = container.querySelector<HTMLElement>(
-			".cosense-card-links__box",
-		);
+		const card = container.querySelector<HTMLElement>(".cosense-card-links__box");
 
 		expect(card).toHaveAttribute("aria-hidden", "true");
 		expect(card).not.toHaveAttribute("role");

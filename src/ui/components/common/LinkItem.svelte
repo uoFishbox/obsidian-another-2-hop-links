@@ -109,17 +109,22 @@
 	use:interactionIdBinding={interactive ? interactionId : ""}
 >
 	<div class="cosense-card-links__box-title-wrapper">
-		<div class="cosense-card-links__box-title">
+		<div
+			class="cosense-card-links__box-title"
+			class:has-file-icon={fileIconName !== null}
+		>
 			{#if fileIconName}
 				<span class="cosense-card-links__file-icon">
 					<Icon name={fileIconName} width={16} height={16} />
 				</span>
 			{/if}
-			{#if hasSearchQuery}
-				{@html renderHighlightedTitle()}
-			{:else}
-				{title}
-			{/if}
+			<span class="cosense-card-links__box-title-text">
+				{#if hasSearchQuery}
+					{@html renderHighlightedTitle()}
+				{:else}
+					{title}
+				{/if}
+			</span>
 		</div>
 		{#if normalizedExtension}
 			<span class="cosense-card-links__box-extension">

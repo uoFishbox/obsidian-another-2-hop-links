@@ -181,6 +181,7 @@ export const CARD_RENDER_SHADOW_CSS = String.raw`
 	color: var(--ccl-title-box);
 	font-weight: 600;
 	font-size: 0.85em;
+	position: relative;
 	display: -webkit-box;
 	-webkit-box-orient: vertical;
 	-webkit-line-clamp: 3;
@@ -189,15 +190,22 @@ export const CARD_RENDER_SHADOW_CSS = String.raw`
 	line-height: 1.3;
 }
 
+.cosense-card-links__box-title.has-file-icon {
+	text-indent: calc(1em + 4px);
+}
+
 .cosense-card-links__file-icon {
 	display: inline-flex;
+	position: absolute;
+	inset-inline-start: 0;
+	top: 0;
+	height: 1.3em;
 	align-items: center;
-	vertical-align: middle;
-	margin-right: 4px;
 	color: var(--text-muted);
 }
 
 .cosense-card-links__file-icon svg {
+	display: block;
 	width: 1em;
 	height: 1em;
 }
