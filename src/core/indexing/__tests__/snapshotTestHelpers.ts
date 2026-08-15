@@ -21,10 +21,6 @@ export function serializeSnapshot(snapshot: IndexSnapshot) {
 		lookupPathResolvedSourceCount: serializeNumberMap(
 			snapshot.lookupPathResolvedSourceCount,
 		),
-		lookupKeyDirectResolvedPathCount: serializeNumberMap(
-			snapshot.lookupKeyDirectResolvedPathCount,
-		),
-		lookupKeyToSources: serializeSetMap(snapshot.lookupKeyToSources),
 	};
 }
 

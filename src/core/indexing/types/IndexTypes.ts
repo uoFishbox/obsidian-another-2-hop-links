@@ -28,9 +28,7 @@ export type IncrementalFileChange =
  *
  * Derived lookup indexes:
  * - lookupKeyToLookupPaths
- * - lookupKeyToSources
  * - lookupPathResolvedSourceCount
- * - lookupKeyDirectResolvedPathCount
  *
  * Query caches:
  * - should not live here
@@ -82,8 +80,6 @@ export interface IndexSnapshot {
 	linkLookupToSources: Map<string, Set<string>>;
 	lookupKeyToLookupPaths: Map<string, Set<string>>;
 	lookupPathResolvedSourceCount: Map<string, number>;
-	lookupKeyDirectResolvedPathCount: Map<string, number>;
-	lookupKeyToSources: Map<string, Set<string>>;
 }
 
 export interface IndexMutationResult {
@@ -116,7 +112,5 @@ export function createEmptyIndexSnapshot(): IndexSnapshot {
 		linkLookupToSources: new Map(),
 		lookupKeyToLookupPaths: new Map(),
 		lookupPathResolvedSourceCount: new Map(),
-		lookupKeyDirectResolvedPathCount: new Map(),
-		lookupKeyToSources: new Map(),
 	};
 }

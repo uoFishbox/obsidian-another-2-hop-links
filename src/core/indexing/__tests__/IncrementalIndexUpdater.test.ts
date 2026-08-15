@@ -1,5 +1,9 @@
 import { describe, expect, test } from "vitest";
 import { IncrementalIndexUpdater } from "../index-service/IncrementalIndexUpdater";
+import {
+	collectSourcePathsForLookupKeys,
+	hasDirectResolvedLookupKey,
+} from "../backlink-builder/lookupGraphQueries";
 import { VaultEnvironmentBuilder } from "testing/helpers/VaultEnvironmentBuilder";
 import { buildIndexSnapshotAsync, serializeSnapshot } from "./snapshotTestHelpers";
 import type { CachedMetadata, TFile } from "obsidian";
@@ -758,8 +762,8 @@ describe("IncrementalIndexUpdater - unresolved link correctness", () => {
 
 function checkUnresolvedSingle(snapshot: IndexSnapshot, lookupPath: string): boolean {
 	const key = lookupPath.toLowerCase().replace(/\\/g, "/");
-	if ((snapshot.lookupKeyDirectResolvedPathCount.get(key) ?? 0) > 0) {
+	if (hasDirectResolvedLookupKey(snapshot, key)) {
 		return false;
 	}
-	return (snapshot.lookupKeyToSources.get(key)?.size ?? 0) === 1;
+	return collectSourcePathsForLookupKeys(snapshot, [key]).size === 1;
 }

@@ -11,8 +11,6 @@ type MutableBacklinksBuildArtifacts = BacklinksBuildArtifacts;
 
 export interface DestinationBuildState {
 	sourceMap: BacklinkSourceMap;
-	lookupKey: string;
-	lookupSources: Set<string>;
 	resolvedSourceCount: number;
 }
 
@@ -51,10 +49,6 @@ function* finalizeDestinationLookupArtifacts(
 				lookupPath,
 				state.resolvedSourceCount,
 			);
-			incrementLookupKeyDirectResolvedPathCount(
-				artifacts.lookupKeyDirectResolvedPathCount,
-				state.lookupKey,
-			);
 		}
 
 		destinationCount++;
@@ -66,12 +60,4 @@ function* finalizeDestinationLookupArtifacts(
 			yield pendingYield;
 		}
 	}
-}
-
-function incrementLookupKeyDirectResolvedPathCount(
-	lookupKeyDirectResolvedPathCount: Map<string, number>,
-	lookupKey: string,
-): void {
-	const next = (lookupKeyDirectResolvedPathCount.get(lookupKey) ?? 0) + 1;
-	lookupKeyDirectResolvedPathCount.set(lookupKey, next);
 }

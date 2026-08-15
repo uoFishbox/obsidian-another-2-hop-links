@@ -288,10 +288,10 @@ describe("IndexQueryEngine", () => {
 
 			const snapshot = await env.snapshotBuilder.buildAsync();
 
-			expect(snapshot.lookupKeyToSources.get("note.md")).toEqual(
-				new Set(["source.md"]),
+			expect(snapshot.lookupKeyToLookupPaths.get("note.md")).toEqual(
+				new Set(["Note.md"]),
 			);
-			expect(snapshot.lookupKeyDirectResolvedPathCount.get("note.md")).toBe(1);
+			expect(snapshot.lookupPathResolvedSourceCount.get("Note.md")).toBe(1);
 			expect(env.engine.isUnresolvedWithSingleBacklink(snapshot, "Note.md")).toBe(
 				false,
 			);

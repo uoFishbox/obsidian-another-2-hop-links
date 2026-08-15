@@ -6,6 +6,7 @@ import {
 import { extractTags } from "core/indexing/metadata/metadataExtractor";
 import { buildIndexesAsync } from "core/indexing/index-service/indexSnapshotBuilder";
 import { IncrementalIndexUpdater } from "core/indexing/index-service/IncrementalIndexUpdater";
+import { collectSourcePathsForLookupKeys } from "core/indexing/backlink-builder/lookupGraphQueries";
 import { IndexQueryEngine } from "core/indexing/index-service/IndexQueryEngine";
 import { TagIndexStore } from "core/indexing/tag-index/TagIndexStore";
 import type { TaggedNote, TagReference, BacklinksMap } from "types/domain";
@@ -126,20 +127,7 @@ export class IndexingService implements IIndexingService {
 	}
 
 	public getSourcePathsForLookupKeys(lookupKeys: Iterable<string>): Set<string> {
-		const result = new Set<string>();
-
-		for (const lookupKey of lookupKeys) {
-			const sources = this.snapshot.lookupKeyToSources.get(lookupKey);
-			if (!sources) {
-				continue;
-			}
-
-			for (const sourcePath of sources) {
-				result.add(sourcePath);
-			}
-		}
-
-		return result;
+		return collectSourcePathsForLookupKeys(this.snapshot, lookupKeys);
 	}
 
 	public getTagIndexFileCount(): number {

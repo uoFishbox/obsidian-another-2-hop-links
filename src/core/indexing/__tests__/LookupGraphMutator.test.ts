@@ -1,65 +1,47 @@
 import { describe, expect, test } from "vitest";
+import { replaceSourceSummaryAsync } from "../backlink-builder/lookupGraphMutator";
 import {
-	refreshLookupKeySourcesAsync,
-	replaceSourceSummaryAsync,
-} from "../backlink-builder/lookupGraphMutator";
+	collectSourcePathsForLookupKeys,
+	hasDirectResolvedLookupKey,
+} from "../backlink-builder/lookupGraphQueries";
 import { createEmptyIndexSnapshot } from "../types/IndexTypes";
 import type { BacklinkBucket } from "types/domain";
 import type { SourceSummary } from "../types/IndexTypes";
 
 describe("LookupGraphMutator", () => {
-	test("refreshLookupKeySources aggregates sources of sibling lookupPaths", async () => {
+	test("collectSourcePathsForLookupKeys aggregates sources of sibling lookupPaths", () => {
 		const snapshot = createEmptyIndexSnapshot();
 
 		snapshot.lookupKeyToLookupPaths.set("foo.md", new Set(["Foo.md", "foo.md"]));
 		snapshot.backlinksMap.set("Foo.md", new Map([["source-a.md", bucket()]]));
 		snapshot.backlinksMap.set("foo.md", new Map([["source-b.md", bucket()]]));
 
-		await refreshLookupKeySourcesAsync(
-			snapshot,
-			"foo.md",
-			createImmediateYieldScheduler(),
-		);
-
-		expect(snapshot.lookupKeyToSources.get("foo.md")).toEqual(
+		expect(collectSourcePathsForLookupKeys(snapshot, ["foo.md"])).toEqual(
 			new Set(["source-a.md", "source-b.md"]),
 		);
 	});
 
-	test("refreshLookupKeySources reuses existing lookup source set", async () => {
-		const snapshot = createEmptyIndexSnapshot();
-		const sources = new Set(["stale-source.md"]);
-
-		snapshot.lookupKeyToSources.set("foo.md", sources);
-		snapshot.lookupKeyToLookupPaths.set("foo.md", new Set(["foo.md"]));
-		snapshot.backlinksMap.set("foo.md", new Map([["source-a.md", bucket()]]));
-
-		await refreshLookupKeySourcesAsync(
-			snapshot,
-			"foo.md",
-			createImmediateYieldScheduler(),
-		);
-
-		expect(snapshot.lookupKeyToSources.get("foo.md")).toBe(sources);
-		expect(sources).toEqual(new Set(["source-a.md"]));
-	});
-
-	test("refreshLookupKeySources preserves sources for lookupKeys with resolved paths", async () => {
+	test("collectSourcePathsForLookupKeys deduplicates sources across sibling lookupPaths", () => {
 		const snapshot = createEmptyIndexSnapshot();
 
-		snapshot.lookupKeyToLookupPaths.set("foo.md", new Set(["foo.md"]));
+		snapshot.lookupKeyToLookupPaths.set("foo.md", new Set(["Foo.md", "foo.md"]));
+		snapshot.backlinksMap.set("Foo.md", new Map([["source-a.md", bucket()]]));
 		snapshot.backlinksMap.set("foo.md", new Map([["source-a.md", bucket()]]));
-		snapshot.lookupKeyDirectResolvedPathCount.set("foo.md", 1);
 
-		await refreshLookupKeySourcesAsync(
-			snapshot,
-			"foo.md",
-			createImmediateYieldScheduler(),
-		);
-
-		expect(snapshot.lookupKeyToSources.get("foo.md")).toEqual(
+		expect(collectSourcePathsForLookupKeys(snapshot, ["foo.md"])).toEqual(
 			new Set(["source-a.md"]),
 		);
+	});
+
+	test("hasDirectResolvedLookupKey derives direct resolution from sibling paths", () => {
+		const snapshot = createEmptyIndexSnapshot();
+
+		snapshot.lookupKeyToLookupPaths.set("foo.md", new Set(["Foo.md", "foo.md"]));
+		snapshot.lookupPathResolvedSourceCount.set("Foo.md", 1);
+
+		expect(hasDirectResolvedLookupKey(snapshot, "foo.md")).toBe(true);
+		snapshot.lookupPathResolvedSourceCount.delete("Foo.md");
+		expect(hasDirectResolvedLookupKey(snapshot, "foo.md")).toBe(false);
 	});
 
 	test("replaceSourceSummaryAsync yields during previous key removal", async () => {
@@ -140,12 +122,6 @@ function bucket(): BacklinkBucket {
 	return {
 		count: 1,
 		hasResolved: false,
-	};
-}
-
-function createImmediateYieldScheduler() {
-	return {
-		checkpoint: () => undefined,
 	};
 }
 

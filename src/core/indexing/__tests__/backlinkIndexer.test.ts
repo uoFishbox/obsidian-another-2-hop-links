@@ -318,9 +318,7 @@ describe("buildDetailedBacklinksArtifactsChunked", () => {
 		expect(artifacts.lookupKeyToLookupPaths.get("target.md")).toEqual(
 			new Set(["target.md"]),
 		);
-		expect(artifacts.lookupKeyToSources.get("target.md")).toEqual(
-			new Set(["source.md"]),
-		);
+		expect(artifacts.detailedMap.get("target.md")?.has("source.md")).toBe(true);
 	});
 
 	test("shares representative refs between destination and lookup key summaries", async () => {
@@ -362,10 +360,10 @@ describe("buildDetailedBacklinksArtifactsChunked", () => {
 			{},
 		);
 
-		expect(artifacts.lookupKeyToSources.get("note.md")).toEqual(
-			new Set(["source.md"]),
+		expect(artifacts.lookupKeyToLookupPaths.get("note.md")).toEqual(
+			new Set(["Note.md", "note.md"]),
 		);
-		expect(artifacts.lookupKeyDirectResolvedPathCount.get("note.md")).toBe(1);
+		expect(artifacts.lookupPathResolvedSourceCount.get("Note.md")).toBe(1);
 	});
 
 	test("keeps source-dependent ambiguous links resolved per source path", async () => {
@@ -477,8 +475,8 @@ describe("buildDetailedBacklinksArtifactsChunked", () => {
 
 		expect(yieldCount).toBeGreaterThan(0);
 		expect(artifacts.detailedMap.size).toBe(256);
-		expect(artifacts.lookupKeyToSources.size).toBe(256);
-		expect(artifacts.lookupKeyDirectResolvedPathCount.size).toBe(0);
+		expect(artifacts.lookupKeyToLookupPaths.size).toBe(256);
+		expect(artifacts.lookupPathResolvedSourceCount.size).toBe(0);
 	});
 
 	test("aborts a stale rebuild at a yield boundary", async () => {

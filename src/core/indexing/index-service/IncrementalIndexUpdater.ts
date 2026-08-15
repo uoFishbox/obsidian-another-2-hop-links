@@ -18,8 +18,7 @@ import {
 	collectCacheInvalidationPathsAsync,
 	onAddEdge,
 	onRemoveSourceFromLookupPath,
-	refreshLookupKeySourcesAsync,
-	removeLookupPathAsync,
+	removeLookupPath,
 	replaceSourceSummaryAsync,
 } from "../backlink-builder/lookupGraphMutator";
 import {
@@ -64,7 +63,6 @@ interface IncrementalUpdateRunState {
 	affectedPaths: Set<string>;
 	affectedLookupKeys: Set<string>;
 	affectedLinkSourcePaths: Set<string>;
-	touchedLookupKeys: Set<string>;
 	linkIndexChanged: boolean;
 	resolvedMemo: ResolvedLinkMemo;
 	localScratch: FileLocalAggregation;
@@ -117,11 +115,6 @@ export class IncrementalIndexUpdater {
 		await this.applyDeletesAsync(run);
 		await this.applyFastRenamesAsync(run);
 		await this.applySourceUpdatesAsync(run);
-		await this.flushTouchedLookupSourcesAsync(
-			run.snapshot,
-			run.touchedLookupKeys,
-			run.yieldScheduler,
-		);
 
 		return {
 			snapshot: run.snapshot,
@@ -239,13 +232,10 @@ export class IncrementalIndexUpdater {
 						await pendingYield;
 					}
 				}
-				await removeLookupPathAsync(
+				removeLookupPath(
 					run.snapshot,
 					path,
-					incomingSourceMap,
 					run.affectedLookupKeys,
-					run.touchedLookupKeys,
-					run.yieldScheduler,
 				);
 			}
 
@@ -380,23 +370,6 @@ export class IncrementalIndexUpdater {
 			createEventEvaluationCache,
 			yieldScheduler,
 		);
-	}
-
-	private async flushTouchedLookupSourcesAsync(
-		snapshot: IndexSnapshot,
-		touchedLookupKeys: Set<string>,
-		yieldScheduler: YieldScheduler,
-	): Promise<void> {
-		let lookupCount = 0;
-		for (const lookupKey of touchedLookupKeys) {
-			await refreshLookupKeySourcesAsync(snapshot, lookupKey, yieldScheduler);
-
-			lookupCount++;
-			const pendingYield = maybeYield(yieldScheduler, lookupCount, 16);
-			if (pendingYield) {
-				await pendingYield;
-			}
-		}
 	}
 
 	private async planRenameFastPathAsync(
@@ -540,7 +513,6 @@ function createIncrementalUpdateRunState(
 ): IncrementalUpdateRunState {
 	const affectedLookupPaths = new Set<string>();
 	const affectedLookupKeys = new Set<string>();
-	const touchedLookupKeys = new Set<string>();
 
 	return {
 		snapshot,
@@ -549,7 +521,6 @@ function createIncrementalUpdateRunState(
 		affectedPaths: new Set(),
 		affectedLookupKeys,
 		affectedLinkSourcePaths: new Set(),
-		touchedLookupKeys,
 		linkIndexChanged: false,
 		resolvedMemo: createResolvedLinkMemo(),
 		localScratch: createFileLocalAggregation(),
@@ -558,7 +529,7 @@ function createIncrementalUpdateRunState(
 		backlinkRemovalMutationCallback(
 			lookupPath,
 			lookupKey,
-			sourcePath,
+			_sourcePath,
 			hadResolved,
 			isLookupPathEmptyAfter,
 		) {
@@ -566,18 +537,16 @@ function createIncrementalUpdateRunState(
 				snapshot,
 				lookupPath,
 				lookupKey,
-				sourcePath,
 				hadResolved,
 				isLookupPathEmptyAfter,
 				affectedLookupKeys,
-				touchedLookupKeys,
 			);
 		},
 		backlinkAdditionMutationCallback(
 			lookupPath,
 			lookupKey,
-			sourcePath,
-			isNewSource,
+			_sourcePath,
+			_isNewSource,
 			hadResolved,
 			hasResolved,
 		) {
@@ -585,12 +554,9 @@ function createIncrementalUpdateRunState(
 				snapshot,
 				lookupPath,
 				lookupKey,
-				sourcePath,
-				isNewSource,
 				hadResolved,
 				hasResolved,
 				affectedLookupKeys,
-				touchedLookupKeys,
 			);
 		},
 		backlinkReconcileSink: {
@@ -599,7 +565,6 @@ function createIncrementalUpdateRunState(
 			},
 			markRepresentativeChangedLookupKey(lookupKey) {
 				affectedLookupKeys.add(lookupKey);
-				touchedLookupKeys.add(lookupKey);
 			},
 		},
 	};

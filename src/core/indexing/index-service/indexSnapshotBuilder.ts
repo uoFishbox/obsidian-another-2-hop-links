@@ -48,7 +48,5 @@ function createSnapshot(artifacts: BacklinksBuildArtifacts): IndexSnapshot {
 		linkLookupToSources: artifacts.linkLookupToSources,
 		lookupKeyToLookupPaths: artifacts.lookupKeyToLookupPaths,
 		lookupPathResolvedSourceCount: artifacts.lookupPathResolvedSourceCount,
-		lookupKeyDirectResolvedPathCount: artifacts.lookupKeyDirectResolvedPathCount,
-		lookupKeyToSources: artifacts.lookupKeyToSources,
 	};
 }

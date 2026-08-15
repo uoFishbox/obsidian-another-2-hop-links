@@ -1,4 +1,5 @@
 import { toCaseInsensitiveLookupKey } from "core/indexing/link-resolution/linkResolution";
+import { hasDirectResolvedLookupKey } from "core/indexing/backlink-builder/lookupGraphQueries";
 import { resolveFileByPath } from "shared/obsidian/resolveFileByPath";
 import type {
 	BacklinkBucket,
@@ -135,12 +136,16 @@ export class IndexQueryEngine {
 		}
 
 		const lookupKey = toCaseInsensitiveLookupKey(linkPath);
-		const unresolvedSources =
-			(snapshot.lookupKeyDirectResolvedPathCount.get(lookupKey) ?? 0) === 0
-				? snapshot.lookupKeyToSources.get(lookupKey)
-				: undefined;
-		if (unresolvedSources && unresolvedSources.size > 0) {
-			return this.hasAtLeastFromSourcePaths(unresolvedSources, minCount, options);
+		const unresolvedSourceMap = this.getOrBuildUnresolvedMergedSourceMap(
+			snapshot,
+			lookupKey,
+		);
+		if (unresolvedSourceMap && unresolvedSourceMap.size > 0) {
+			return this.hasAtLeastFromSourcePaths(
+				unresolvedSourceMap.keys(),
+				minCount,
+				options,
+			);
 		}
 
 		if (!directSourceMap || directSourceMap.size === 0) {
@@ -160,10 +165,7 @@ export class IndexQueryEngine {
 	): boolean {
 		this.ensureSnapshotCacheScope(snapshot);
 		const key = toCaseInsensitiveLookupKey(lookupPath);
-		if ((snapshot.lookupKeyDirectResolvedPathCount.get(key) ?? 0) > 0) {
-			return false;
-		}
-		return (snapshot.lookupKeyToSources.get(key)?.size ?? 0) === 1;
+		return this.getOrBuildUnresolvedMergedSourceMap(snapshot, key)?.size === 1;
 	}
 
 	public isUnresolvedWithSingleBacklinkBatch(
@@ -423,10 +425,7 @@ export class IndexQueryEngine {
 			return cached;
 		}
 
-		if (
-			(snapshot.lookupKeyDirectResolvedPathCount.get(lookupKey) ?? 0) > 0 ||
-			!snapshot.lookupKeyToSources.has(lookupKey)
-		) {
+		if (hasDirectResolvedLookupKey(snapshot, lookupKey)) {
 			return undefined;
 		}
 

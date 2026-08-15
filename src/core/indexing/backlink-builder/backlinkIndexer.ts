@@ -83,8 +83,6 @@ function createArtifactsAccumulator(): MutableBacklinksBuildArtifacts {
 		linkLookupToSources: new Map(),
 		lookupKeyToLookupPaths: new Map(),
 		lookupPathResolvedSourceCount: new Map(),
-		lookupKeyDirectResolvedPathCount: new Map(),
-		lookupKeyToSources: new Map(),
 		tagIndex: createEmptyTagIndex(),
 	};
 }
@@ -116,16 +114,9 @@ function getOrCreateDestinationBuildState(
 
 	const lookupKey = toCaseInsensitiveLookupKey(lookupPath);
 	addLookupKeyPath(artifacts.lookupKeyToLookupPaths, lookupKey, lookupPath);
-	let lookupSources = artifacts.lookupKeyToSources.get(lookupKey);
-	if (!lookupSources) {
-		lookupSources = new Set<string>();
-		artifacts.lookupKeyToSources.set(lookupKey, lookupSources);
-	}
 
 	const state: DestinationBuildState = {
 		sourceMap: new Map(),
-		lookupKey,
-		lookupSources,
 		resolvedSourceCount: 0,
 	};
 	destinationBuildStates.set(lookupPath, state);
@@ -285,7 +276,6 @@ function* createBacklinksBuildSteps(
 			currentSourcePath,
 			createBacklinkBucketForSource(aggregate),
 		);
-		destinationState.lookupSources.add(currentSourcePath);
 		if (aggregate.hasResolved) {
 			destinationState.resolvedSourceCount++;
 		}

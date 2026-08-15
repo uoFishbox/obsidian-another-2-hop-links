@@ -1,5 +1,4 @@
 import { toCaseInsensitiveLookupKey } from "../link-resolution/linkResolution";
-import type { BacklinkSourceMap } from "types/domain";
 import type { IndexSnapshot, SourceSummary } from "../types/IndexTypes";
 import {
 	HEAVY_YIELD_CHECK_INTERVAL,
@@ -81,39 +80,17 @@ export function onAddEdge(
 	snapshot: IndexSnapshot,
 	lookupPath: string,
 	lookupKey: string,
-	sourcePath: string,
-	isNewSource: boolean,
 	hadResolved: boolean,
 	hasResolved: boolean,
 	affectedLookupKeys: Set<string>,
-	touchedLookupKeys: Set<string>,
 ): void {
 	affectedLookupKeys.add(lookupKey);
-	touchedLookupKeys.add(lookupKey);
 	ensureLookupPathRegistered(snapshot, lookupPath, lookupKey);
-
-	if (isNewSource) {
-		let sources = snapshot.lookupKeyToSources.get(lookupKey);
-		if (!sources) {
-			sources = new Set<string>();
-			snapshot.lookupKeyToSources.set(lookupKey, sources);
-		}
-		sources.add(sourcePath);
-	}
 
 	if (!hadResolved && hasResolved) {
 		const resolvedSourceCount =
 			(snapshot.lookupPathResolvedSourceCount.get(lookupPath) ?? 0) + 1;
 		snapshot.lookupPathResolvedSourceCount.set(lookupPath, resolvedSourceCount);
-
-		if (resolvedSourceCount === 1) {
-			const directResolvedPathCount =
-				(snapshot.lookupKeyDirectResolvedPathCount.get(lookupKey) ?? 0) + 1;
-			snapshot.lookupKeyDirectResolvedPathCount.set(
-				lookupKey,
-				directResolvedPathCount,
-			);
-		}
 	}
 }
 
@@ -121,14 +98,11 @@ export function onRemoveSourceFromLookupPath(
 	snapshot: IndexSnapshot,
 	lookupPath: string,
 	lookupKey: string,
-	_sourcePath: string,
 	hadResolved: boolean,
 	isLookupPathEmptyAfter: boolean,
 	affectedLookupKeys: Set<string>,
-	touchedLookupKeys: Set<string>,
 ): void {
 	affectedLookupKeys.add(lookupKey);
-	touchedLookupKeys.add(lookupKey);
 
 	if (hadResolved) {
 		const nextResolvedSourceCount =
@@ -136,16 +110,6 @@ export function onRemoveSourceFromLookupPath(
 
 		if (nextResolvedSourceCount <= 0) {
 			snapshot.lookupPathResolvedSourceCount.delete(lookupPath);
-			const nextDirectResolvedPathCount =
-				(snapshot.lookupKeyDirectResolvedPathCount.get(lookupKey) ?? 1) - 1;
-			if (nextDirectResolvedPathCount <= 0) {
-				snapshot.lookupKeyDirectResolvedPathCount.delete(lookupKey);
-			} else {
-				snapshot.lookupKeyDirectResolvedPathCount.set(
-					lookupKey,
-					nextDirectResolvedPathCount,
-				);
-			}
 		} else {
 			snapshot.lookupPathResolvedSourceCount.set(
 				lookupPath,
@@ -159,74 +123,15 @@ export function onRemoveSourceFromLookupPath(
 	}
 }
 
-export async function removeLookupPathAsync(
+export function removeLookupPath(
 	snapshot: IndexSnapshot,
 	lookupPath: string,
-	sourceMap: BacklinkSourceMap,
 	affectedLookupKeys: Set<string>,
-	touchedLookupKeys: Set<string>,
-	yieldScheduler: YieldScheduler,
-): Promise<void> {
+): void {
 	const lookupKey = toCaseInsensitiveLookupKey(lookupPath);
 	affectedLookupKeys.add(lookupKey);
-	touchedLookupKeys.add(lookupKey);
-
-	let sourceCount = 0;
-	for (const sourcePath of sourceMap.keys()) {
-		const sources = snapshot.lookupKeyToSources.get(lookupKey);
-		sources?.delete(sourcePath);
-
-		sourceCount++;
-		const pendingYield = maybeYield(
-			yieldScheduler,
-			sourceCount,
-			HEAVY_YIELD_CHECK_INTERVAL,
-		);
-		if (pendingYield) {
-			await pendingYield;
-		}
-	}
-
-	const resolvedSourceCount =
-		snapshot.lookupPathResolvedSourceCount.get(lookupPath) ?? 0;
-	if (resolvedSourceCount > 0) {
-		snapshot.lookupPathResolvedSourceCount.delete(lookupPath);
-		const nextDirectResolvedPathCount =
-			(snapshot.lookupKeyDirectResolvedPathCount.get(lookupKey) ?? 1) - 1;
-		if (nextDirectResolvedPathCount <= 0) {
-			snapshot.lookupKeyDirectResolvedPathCount.delete(lookupKey);
-		} else {
-			snapshot.lookupKeyDirectResolvedPathCount.set(
-				lookupKey,
-				nextDirectResolvedPathCount,
-			);
-		}
-	}
-
+	snapshot.lookupPathResolvedSourceCount.delete(lookupPath);
 	removeLookupPathRegistration(snapshot, lookupPath, lookupKey);
-}
-
-export async function refreshLookupKeySourcesAsync(
-	snapshot: IndexSnapshot,
-	lookupKey: string,
-	yieldScheduler: YieldScheduler,
-): Promise<void> {
-	const lookupPaths = snapshot.lookupKeyToLookupPaths.get(lookupKey);
-	if (!lookupPaths || lookupPaths.size === 0) {
-		snapshot.lookupKeyToSources.delete(lookupKey);
-		return;
-	}
-
-	const sources = snapshot.lookupKeyToSources.get(lookupKey) ?? new Set<string>();
-	sources.clear();
-
-	await collectLookupKeySourcesAsync(snapshot, lookupPaths, sources, yieldScheduler);
-	if (sources.size === 0) {
-		snapshot.lookupKeyToSources.delete(lookupKey);
-		return;
-	}
-
-	snapshot.lookupKeyToSources.set(lookupKey, sources);
 }
 
 function ensureLookupPathRegistered(
@@ -254,34 +159,6 @@ function removeLookupPathRegistration(
 	lookupPaths.delete(lookupPath);
 	if (lookupPaths.size === 0) {
 		snapshot.lookupKeyToLookupPaths.delete(lookupKey);
-	}
-}
-
-async function collectLookupKeySourcesAsync(
-	snapshot: IndexSnapshot,
-	lookupPaths: ReadonlySet<string>,
-	sources: Set<string>,
-	yieldScheduler: YieldScheduler,
-): Promise<void> {
-	let sourceCount = 0;
-	for (const lookupPath of lookupPaths) {
-		const sourceMap = snapshot.backlinksMap.get(lookupPath);
-		if (!sourceMap) {
-			continue;
-		}
-		for (const sourcePath of sourceMap.keys()) {
-			sources.add(sourcePath);
-
-			sourceCount++;
-			const pendingYield = maybeYield(
-				yieldScheduler,
-				sourceCount,
-				HEAVY_YIELD_CHECK_INTERVAL,
-			);
-			if (pendingYield) {
-				await pendingYield;
-			}
-		}
 	}
 }
 
