@@ -20,22 +20,7 @@ describe("card virtual list policy", () => {
 		});
 	});
 
-	it("keeps two mounted overscan rows when configured", () => {
-		expect(
-			createCardVirtualListPolicy({
-				layout: {
-					rowHeight: 120,
-					gap: 12,
-				},
-				mountedOverscanRows: 2,
-			}),
-		).toMatchObject({
-			mountedOverscanPx: 264,
-			previewOverscanPx: 132,
-		});
-	});
-
-	it("keeps preview overscan configurable and within the mounted overscan", () => {
+	it("uses one mounted overscan row as the minimum", () => {
 		expect(
 			createCardVirtualListPolicy({
 				layout: {
@@ -48,7 +33,9 @@ describe("card virtual list policy", () => {
 			mountedOverscanPx: 132,
 			previewOverscanPx: 0,
 		});
+	});
 
+	it("expands mounted overscan when preview overscan is larger", () => {
 		expect(
 			createCardVirtualListPolicy({
 				layout: {
@@ -60,19 +47,6 @@ describe("card virtual list policy", () => {
 		).toMatchObject({
 			mountedOverscanPx: 264,
 			previewOverscanPx: 264,
-		});
-	});
-
-	it("keeps the mounted range large enough for preview overscan", () => {
-		expect(
-			createCardVirtualListPolicy({
-				layout: {
-					rowHeight: 120,
-					gap: 12,
-				},
-			}),
-		).toMatchObject({
-			mountedOverscanPx: 132,
 		});
 	});
 

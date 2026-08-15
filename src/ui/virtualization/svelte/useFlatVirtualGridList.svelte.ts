@@ -56,7 +56,6 @@ import { DEFAULT_SETTINGS } from "features/settings/model";
 interface FlatVirtualGridApplicationSettings extends CardLayoutSettings {
 	previewActivationAheadRows?: number;
 	previewDomCommitsPerSecond?: number;
-	enableTwoRowMountedOverscan?: boolean;
 }
 
 interface FlatVirtualGridApplicationStore extends SectionPaginationApplicationStore {
@@ -145,29 +144,24 @@ export function useFlatVirtualGridList<T>(
 	let lastResolvedVisibilityPolicyRowHeight: number | undefined;
 	let lastResolvedVisibilityPolicyGap: number | undefined;
 	let lastResolvedVisibilityPolicyAheadRows: number | undefined;
-	let lastResolvedMountedOverscanRows: 1 | 2 | undefined;
 	let lastResolvedVisibilityPolicy:
 		| ReturnType<typeof createCardVirtualListPolicy>
 		| undefined;
 	const resolveVisibilityPolicy = (
 		nextLayout: VirtualGridLayout,
 	): ReturnType<typeof createCardVirtualListPolicy> => {
-		const mountedOverscanRows = enableTwoRowMountedOverscan ? 2 : 1;
 		if (
 			!lastResolvedVisibilityPolicy ||
 			lastResolvedVisibilityPolicyRowHeight !== nextLayout.rowHeight ||
 			lastResolvedVisibilityPolicyGap !== nextLayout.gap ||
-			lastResolvedVisibilityPolicyAheadRows !== previewActivationAheadRows ||
-			lastResolvedMountedOverscanRows !== mountedOverscanRows
+			lastResolvedVisibilityPolicyAheadRows !== previewActivationAheadRows
 		) {
 			lastResolvedVisibilityPolicyRowHeight = nextLayout.rowHeight;
 			lastResolvedVisibilityPolicyGap = nextLayout.gap;
 			lastResolvedVisibilityPolicyAheadRows = previewActivationAheadRows;
-			lastResolvedMountedOverscanRows = mountedOverscanRows;
 			lastResolvedVisibilityPolicy = createCardVirtualListPolicy({
 				layout: nextLayout,
 				previewActivationAheadRows,
-				mountedOverscanRows,
 			});
 		}
 		return lastResolvedVisibilityPolicy!;
@@ -187,9 +181,6 @@ export function useFlatVirtualGridList<T>(
 	);
 	const previewActivationAheadRows = $derived(
 		applicationStore?.settings?.previewActivationAheadRows ?? 1,
-	);
-	const enableTwoRowMountedOverscan = $derived(
-		applicationStore?.settings?.enableTwoRowMountedOverscan ?? false,
 	);
 
 	const flatPaginationSectionId = $derived(sectionId ?? "link-list");

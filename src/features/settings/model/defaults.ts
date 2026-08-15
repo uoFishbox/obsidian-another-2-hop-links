@@ -30,7 +30,6 @@ export const DEFAULT_SETTINGS: PluginSettings = {
 	previewMaxChars: 500,
 	previewVisualLineSafetyMargin: 0,
 	previewActivationAheadRows: 1,
-	enableTwoRowMountedOverscan: false,
 	previewDomCommitsPerSecond: DEFAULT_PREVIEW_DOM_COMMITS_PER_SECOND,
 	searchPreviewSeekThresholdChars: 0,
 	searchPreviewSeekBufferChars: 15,

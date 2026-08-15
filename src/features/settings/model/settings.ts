@@ -59,7 +59,6 @@ export interface PluginSettings {
 	previewMaxChars: number;
 	previewVisualLineSafetyMargin: number;
 	previewActivationAheadRows: number;
-	enableTwoRowMountedOverscan: boolean;
 	/** Maximum preview DOM updates committed per second while scrolling. */
 	previewDomCommitsPerSecond: number;
 	searchPreviewSeekThresholdChars?: number;
