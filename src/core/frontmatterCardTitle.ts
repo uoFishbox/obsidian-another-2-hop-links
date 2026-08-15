@@ -51,6 +51,23 @@ export function getPriorityFrontmatterCardTitle(
 	return frontmatterValueToCardTitle(frontmatter[key]);
 }
 
+/** Resolves the title used by cards for an existing target file. */
+export function resolveFileCardTitle(
+	file: TFile,
+	sourcePath: string,
+	fileToLinktext: FileToLinktext,
+	getMetadata: GetFileMetadata,
+	priorityFrontmatterKeyForTitle: string | null | undefined,
+): string {
+	return (
+		getPriorityFrontmatterCardTitle(
+			file,
+			priorityFrontmatterKeyForTitle,
+			getMetadata,
+		) ?? fileToLinktext(file, sourcePath, true)
+	);
+}
+
 export function getFileCardTitleSearchText(
 	file: TFile,
 	sourcePath: string,

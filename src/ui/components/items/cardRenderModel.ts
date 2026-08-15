@@ -2,7 +2,7 @@ import type { TFile } from "obsidian";
 import type { ViewItem } from "application/presenters";
 import { getItemStrategy } from "application/presenters";
 import { ARIA_LABELS } from "../../../appConstants";
-import { getPriorityFrontmatterCardTitle } from "core/frontmatterCardTitle";
+import { resolveFileCardTitle } from "core/frontmatterCardTitle";
 import {
 	compileCardPreviewRequest,
 	type CardPreviewRequest,
@@ -152,12 +152,12 @@ function resolveCardTitle(
 	context: LinkUtilitiesContext,
 ): string {
 	if (targetFile) {
-		return (
-			getPriorityFrontmatterCardTitle(
-				targetFile,
-				settings.priorityFrontmatterKeyForTitle,
-				context.getMetadata,
-			) ?? context.fileToLinktext(targetFile, context.sourceFile.path, true)
+		return resolveFileCardTitle(
+			targetFile,
+			context.sourceFile.path,
+			context.fileToLinktext,
+			context.getMetadata,
+			settings.priorityFrontmatterKeyForTitle,
 		);
 	}
 

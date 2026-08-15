@@ -34,7 +34,6 @@ export const hasSameBacklinkIndexedLink = (
 		current.rawText === next.rawText &&
 		(current.path ?? "") === (next.path ?? "") &&
 		(current.lookupPath ?? "") === (next.lookupPath ?? "") &&
-		(current.displayText ?? "") === (next.displayText ?? "") &&
 		(current.key ?? "") === (next.key ?? "") &&
 		(current.backlinkCount ?? -1) === (next.backlinkCount ?? -1) &&
 		Boolean(current.isUnresolved) === Boolean(next.isUnresolved)

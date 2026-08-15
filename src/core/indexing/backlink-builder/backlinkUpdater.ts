@@ -107,8 +107,7 @@ function areOrderedBacklinkRefsEqual(
 		left.destinationPath === right.destinationPath &&
 		left.rawLookupKey === right.rawLookupKey &&
 		left.isUnresolved === right.isUnresolved &&
-		left.rawText === right.rawText &&
-		left.displayText === right.displayText
+		left.rawText === right.rawText
 	);
 }
 

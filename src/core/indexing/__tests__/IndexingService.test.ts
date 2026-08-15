@@ -90,6 +90,51 @@ describe("IndexingService", () => {
 			expect(listener).toHaveBeenCalledTimes(1);
 		});
 
+		test("alias-only modify preserves backlink query cache and emits no structural link source", async () => {
+			const env = new VaultEnvironmentBuilder([
+				{ path: "source.md" },
+				{ path: "target.md" },
+			]).build();
+			const sourceFile = env.mockVault.getAbstractFileByPath(
+				"source.md",
+			) as TFile;
+
+			(env.mockMetadataCache.getFileCache as any).mockImplementation(
+				(file: TFile) =>
+					file.path === sourceFile.path
+						? createCachedMetadata([createLinkCache("target", "AAA")])
+						: createCachedMetadata(),
+			);
+			await env.service.rebuildIndexesTimeSliced();
+
+			const cachedBefore = env.service.getBacklinksForLink("target.md");
+			expect(cachedBefore).toHaveLength(1);
+			expect(cachedBefore[0].displayText).toBeUndefined();
+
+			const listener = vi.fn();
+			env.service.onDataUpdate(listener);
+			(env.mockMetadataCache.getFileCache as any).mockImplementation(
+				(file: TFile) =>
+					file.path === sourceFile.path
+						? createCachedMetadata([createLinkCache("target", "BBB")])
+						: createCachedMetadata(),
+			);
+
+			await env.service.applyFileChangesTimeSliced([
+				{ type: "modify", path: "source.md" },
+			]);
+
+			expect(listener).toHaveBeenCalledTimes(1);
+			expect(listener).toHaveBeenCalledWith(
+				expect.objectContaining({
+					affectedPaths: ["source.md"],
+					affectedLookupKeys: [],
+					affectedLinkSourcePaths: [],
+				}),
+			);
+			expect(env.service.getBacklinksForLink("target.md")).toBe(cachedBefore);
+		});
+
 		test("onDataUpdate is called only once even with multiple change events", async () => {
 			const { service } = new VaultEnvironmentBuilder([
 				{ path: "file1.md" },

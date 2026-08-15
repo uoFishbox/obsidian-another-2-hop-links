@@ -121,6 +121,14 @@ describe("twohopEquality", () => {
 		expect(hasSameTwoHopIndexedLinks(current, different)).toBe(false);
 	});
 
+	it("treats backlink displayText changes as equal", () => {
+		const sourceFile = createMockTFile("source.md");
+		const current = createLink({ sourceFile, displayText: "AAA" });
+		const next = createLink({ sourceFile, displayText: "BBB" });
+
+		expect(hasSameBacklinkIndexedLink(current, next)).toBe(true);
+	});
+
 	it("treats backlinks with moved positions as equal", () => {
 		const sourceFile = createMockTFile("source.md");
 		const current = createLink({

@@ -112,7 +112,7 @@ describe("keySignatures", () => {
 		expect(createIndexedLinkUsageSignature(renamedDisplay)).toEqual(
 			createIndexedLinkUsageSignature(link),
 		);
-		expect(createBacklinkIdentitySignature(renamedDisplay)).not.toBe(
+		expect(createBacklinkIdentitySignature(renamedDisplay)).toBe(
 			createBacklinkIdentitySignature(link),
 		);
 	});
@@ -128,7 +128,7 @@ describe("keySignatures", () => {
 		};
 
 		expect(createBacklinkIdentitySignature(link, "branch:2")).toBe(
-			"9:Source.md|3:Raw|41:Path.md\u001flookup\u001f\u001ffrontmatter\u001f-1\u001f1\u001fbranch:2",
+			"9:Source.md|3:Raw|40:Path.md\u001flookup\u001ffrontmatter\u001f-1\u001f1\u001fbranch:2",
 		);
 	});
 

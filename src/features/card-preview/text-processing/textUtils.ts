@@ -68,7 +68,6 @@ export function generateBacklinkKey(
 		| "rawText"
 		| "path"
 		| "lookupPath"
-		| "displayText"
 		| "key"
 		| "backlinkCount"
 		| "isUnresolved"

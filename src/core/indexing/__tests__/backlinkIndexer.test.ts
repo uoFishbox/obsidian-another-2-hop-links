@@ -155,6 +155,10 @@ describe("buildDetailedBacklinksArtifactsChunked", () => {
 		expect(collection).toBeDefined();
 		expect(collection?.count).toBe(2);
 		expect(hasResolvedBacklink(collection!)).toBe(true);
+		const representative =
+			artifacts.sourceSummaries.get("source.md")?.orderedReferences[0];
+		expect(representative).toMatchObject({ rawText: "target" });
+		expect(representative).not.toHaveProperty("displayText");
 	});
 
 	test("indexes links, embeds, and frontmatter links", async () => {

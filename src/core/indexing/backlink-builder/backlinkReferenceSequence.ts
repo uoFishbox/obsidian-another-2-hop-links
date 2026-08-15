@@ -121,7 +121,6 @@ export function createOrderedBacklinkRef(
 		rawLookupKey: resolved.rawLookupKey,
 		isUnresolved: resolved.isUnresolved,
 		rawText: link.link,
-		displayText: "displayText" in link ? link.displayText : undefined,
 	};
 }
 

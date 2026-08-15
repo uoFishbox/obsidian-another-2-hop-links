@@ -160,6 +160,7 @@ describe("getItemSearchText", () => {
 				data: {
 					hop1: {
 						rawText: "branch raw",
+						displayText: "Hidden Alias",
 						path: branchTarget.path,
 						isUnresolved: false,
 						sourceFile,
@@ -175,6 +176,7 @@ describe("getItemSearchText", () => {
 		expect(resolvedSearchText).toContain("branch link");
 		expect(resolvedSearchText).toContain("branch raw");
 		expect(resolvedSearchText).toContain("notes/branch-target.md");
+		expect(resolvedSearchText).not.toContain("hidden alias");
 
 		const unresolvedContext = createLinkContext({
 			sourceFile,

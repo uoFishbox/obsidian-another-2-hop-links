@@ -272,7 +272,7 @@ describe("BacklinkMapUpdater", () => {
 		expect(backlinksMap.get("target.md")?.get("source.md")?.count).toBe(1);
 	});
 
-	test("reconcileBacklinksBySource adds to affectedDestinations on order-only changes", async () => {
+	test("reconcileBacklinksBySource ignores alias representative order-only changes", async () => {
 		const customBuilder = new VaultEnvironmentBuilder([
 			{ path: "source.md" },
 			{ path: "target.md" },
@@ -344,15 +344,11 @@ describe("BacklinkMapUpdater", () => {
 			(lookupPath) => additions.push(lookupPath),
 		);
 
-		expect(result.affectedDestinations).toEqual(new Set(["target.md"]));
-		expect(result.representativeChangedLookupKeys).toEqual(new Set(["target.md"]));
+		expect(result.affectedDestinations).toEqual(new Set());
+		expect(result.representativeChangedLookupKeys).toEqual(new Set());
+		expect(result.sourceSummaryChanged).toBe(false);
 		expect(removals).toEqual([]);
 		expect(additions).toEqual([]);
-		expect(
-			nextSummary?.orderedReferences[
-				nextSummary.destinations.get("target.md")!.firstRefIndex
-			]?.displayText,
-		).toBe("late");
 	});
 
 	test("reconcileBacklinksBySource detects representative changes across sibling lookupPaths by lookupKey", async () => {
@@ -462,7 +458,6 @@ function createSourceSummaryWithLookupKeys(
 		rawLookupKey: string;
 		isUnresolved: boolean;
 		rawText: string;
-		displayText: string;
 	}> = [],
 	firstRefIndexByLookupKey: Map<string, number> = new Map(),
 ) {
@@ -498,7 +493,6 @@ describe("BacklinkMapUpdater yield behavior", () => {
 			rawLookupKey: string;
 			isUnresolved: boolean;
 			rawText: string;
-			displayText: string;
 		}> = [];
 
 		for (let i = 0; i < lookupKeyCount; i++) {
@@ -510,7 +504,6 @@ describe("BacklinkMapUpdater yield behavior", () => {
 				rawLookupKey: key,
 				isUnresolved: false,
 				rawText: key,
-				displayText: `ref-${i}`,
 			});
 		}
 
@@ -532,7 +525,7 @@ describe("BacklinkMapUpdater yield behavior", () => {
 
 		const nextOrderedReferences = orderedReferences.map((ref, i) => ({
 			...ref,
-			displayText: i === 0 ? "changed" : ref.displayText,
+			rawText: i === 0 ? "Changed" : ref.rawText,
 		}));
 		const nextSummary = createSourceSummaryWithLookupKeys(
 			lookupKeys,

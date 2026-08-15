@@ -16,7 +16,10 @@ import { resolveFileByPath } from "shared/obsidian/resolveFileByPath";
 import type { IIndexingService } from "types/services";
 import type { IMetadataCache, IVault } from "types/obsidian";
 import { resolveFrontmatterDate } from "./frontmatterDate";
-import { getPriorityFrontmatterCardTitle } from "core/frontmatterCardTitle";
+import {
+	getPriorityFrontmatterCardTitle,
+	resolveFileCardTitle,
+} from "core/frontmatterCardTitle";
 
 export function isBranch(item: SortableItem): item is TwoHopLinkBranch {
 	return "hop1" in item && "hop2" in item;
@@ -45,6 +48,21 @@ export class MetricProvider implements IMetricProvider {
 		const configuration = this.getConfiguration();
 		const titleKey = configuration.priorityFrontmatterKeyForTitle?.trim();
 
+		if (isBranch(item)) {
+			const targetFile = this.getTargetFile(item);
+			if (!targetFile) {
+				return item.hop1.rawText || "";
+			}
+
+			return resolveFileCardTitle(
+				targetFile,
+				item.hop1.sourceFile.path,
+				this.metadataCache.fileToLinktext.bind(this.metadataCache),
+				this.getFileMetadata,
+				configuration.priorityFrontmatterKeyForTitle,
+			);
+		}
+
 		if (titleKey) {
 			const targetFile = this.getTargetFile(item);
 			const frontmatterTitle = getPriorityFrontmatterCardTitle(
@@ -58,9 +76,6 @@ export class MetricProvider implements IMetricProvider {
 			}
 		}
 
-		if (isBranch(item)) {
-			return item.hop1.displayText || item.hop1.rawText || "";
-		}
 		if (isBacklink(item)) {
 			return item.sourceFile.basename;
 		}

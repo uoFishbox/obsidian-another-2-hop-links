@@ -72,7 +72,10 @@ describe("ObsidianMetricProvider", () => {
 	});
 
 	beforeEach(() => {
-		mockMetadataCache = { getFileCache: vi.fn() } as any;
+		mockMetadataCache = {
+			getFileCache: vi.fn(),
+			fileToLinktext: vi.fn((file: TFile) => file.basename),
+		} as any;
 		mockVault = { getAbstractFileByPath: vi.fn() } as any;
 		mockIndexingService = { getBacklinkCountForLink: vi.fn() } as any;
 	});
@@ -101,12 +104,12 @@ describe("ObsidianMetricProvider", () => {
 	describe("getDisplayName", () => {
 		it.each([
 			{
-				name: "Branch - displayText priority",
+				name: "Branch - missing target file ignores displayText and falls back to rawText",
 				item: makeBranch("note.md", "raw", "Display Text"),
-				expected: "Display Text",
+				expected: "raw",
 			},
 			{
-				name: "Branch - fallback to rawText if no displayText",
+				name: "Branch - missing target file falls back to rawText",
 				item: makeBranch("note.md", "RawText"),
 				expected: "RawText",
 			},
@@ -133,6 +136,22 @@ describe("ObsidianMetricProvider", () => {
 		])("$name", ({ item, expected }) => {
 			const provider = createProvider();
 			expect(provider.getDisplayName(item as SortableItem)).toBe(expected);
+		});
+
+		it("uses the resolved card title instead of alias for branch alphabetical metrics", () => {
+			const targetFile = createMockFile("Apple.md", "Apple");
+			mockVault.getAbstractFileByPath.mockReturnValue(targetFile);
+			mockMetadataCache.fileToLinktext.mockReturnValue("Apple");
+
+			const provider = createProvider();
+			expect(
+				provider.getDisplayName(makeBranch("Apple.md", "Apple", "ZZZ")),
+			).toBe("Apple");
+			expect(mockMetadataCache.fileToLinktext).toHaveBeenCalledWith(
+				targetFile,
+				"source.md",
+				true,
+			);
 		});
 
 		it.each([

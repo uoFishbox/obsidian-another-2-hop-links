@@ -15,13 +15,17 @@ function createPosition(offset: number) {
 function createCachedMetadata(
 	links: Array<{
 		link: string;
+		displayText?: string;
 		offset: number;
 	}>,
 ): CachedMetadata {
 	return {
 		links: links.map((link) => ({
 			link: link.link,
-			original: `[[${link.link}]]`,
+			original: link.displayText
+				? `[[${link.link}|${link.displayText}]]`
+				: `[[${link.link}]]`,
+			displayText: link.displayText,
 			position: createPosition(link.offset),
 		})),
 		embeds: [],
@@ -448,6 +452,48 @@ describe("IncrementalIndexUpdater", () => {
 		expect(serializeSnapshot(snapshot)).toEqual(
 			serializeSnapshot(await final.snapshotBuilder.buildAsync()),
 		);
+	});
+
+	test("alias-only modify does not mark the link index as changed", async () => {
+		const env = createUpdaterEnvironment([
+			{ path: "source.md" },
+			{ path: "target.md" },
+		]);
+
+		(env.mockMetadataCache.getFileCache as any).mockImplementation(
+			(file: TFile) => {
+				if (file.path === "source.md") {
+					return createCachedMetadata([
+						{ link: "target", displayText: "AAA", offset: 0 },
+					]);
+				}
+				return null;
+			},
+		);
+
+		const snapshot = await env.snapshotBuilder.buildAsync();
+
+		(env.mockMetadataCache.getFileCache as any).mockImplementation(
+			(file: TFile) => {
+				if (file.path === "source.md") {
+					return createCachedMetadata([
+						{ link: "target", displayText: "BBB", offset: 0 },
+					]);
+				}
+				return null;
+			},
+		);
+
+		const result = await env.updater.applyAsync(snapshot, [
+			{ type: "modify", path: "source.md" },
+		]);
+
+		expect(result.affectedPaths).toEqual(new Set(["source.md"]));
+		expect(result.affectedLookupPaths).toEqual(new Set());
+		expect(result.affectedLookupKeys).toEqual(new Set());
+		expect(result.affectedLinkSourcePaths).toEqual(new Set());
+		expect(result.linkIndexChanged).toBe(false);
+		expect([...result.cacheInvalidationPaths]).toEqual([]);
 	});
 
 	test("modify returns cache invalidation on representative change across sibling lookupPaths", async () => {

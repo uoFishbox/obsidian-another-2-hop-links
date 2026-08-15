@@ -3,7 +3,7 @@ import { normalizePath } from "obsidian";
 import type { TwoHopIndexedLink, TwoHopLinkBranch } from "types/domain";
 
 const BACKLINK_IDENTITY_PART_SEPARATOR = "\u001f";
-const BACKLINK_IDENTITY_SEPARATOR_COUNT = 6;
+const BACKLINK_IDENTITY_SEPARATOR_COUNT = 5;
 
 export type UsageSignature =
 	| { kind: "file"; value: string }
@@ -96,7 +96,6 @@ export function createBacklinkIdentitySignature(
 		| "rawText"
 		| "path"
 		| "lookupPath"
-		| "displayText"
 		| "key"
 		| "backlinkCount"
 		| "isUnresolved"
@@ -105,7 +104,6 @@ export function createBacklinkIdentitySignature(
 ): string {
 	const path = link.path ?? "";
 	const lookupPath = link.lookupPath ?? "";
-	const displayText = link.displayText ?? "";
 	const key = link.key ?? "";
 	const backlinkCount = String(link.backlinkCount ?? -1);
 	const unresolved = link.isUnresolved ? "1" : "0";
@@ -114,14 +112,13 @@ export function createBacklinkIdentitySignature(
 	const metadataLength =
 		path.length +
 		lookupPath.length +
-		displayText.length +
 		key.length +
 		backlinkCount.length +
 		unresolved.length +
 		suffix.length +
 		BACKLINK_IDENTITY_SEPARATOR_COUNT;
 
-	return `${sourcePath.length}:${sourcePath}|${rawText.length}:${rawText}|${metadataLength}:${path}${BACKLINK_IDENTITY_PART_SEPARATOR}${lookupPath}${BACKLINK_IDENTITY_PART_SEPARATOR}${displayText}${BACKLINK_IDENTITY_PART_SEPARATOR}${key}${BACKLINK_IDENTITY_PART_SEPARATOR}${backlinkCount}${BACKLINK_IDENTITY_PART_SEPARATOR}${unresolved}${BACKLINK_IDENTITY_PART_SEPARATOR}${suffix}`;
+	return `${sourcePath.length}:${sourcePath}|${rawText.length}:${rawText}|${metadataLength}:${path}${BACKLINK_IDENTITY_PART_SEPARATOR}${lookupPath}${BACKLINK_IDENTITY_PART_SEPARATOR}${key}${BACKLINK_IDENTITY_PART_SEPARATOR}${backlinkCount}${BACKLINK_IDENTITY_PART_SEPARATOR}${unresolved}${BACKLINK_IDENTITY_PART_SEPARATOR}${suffix}`;
 }
 
 export function createBranchIdentitySignature(

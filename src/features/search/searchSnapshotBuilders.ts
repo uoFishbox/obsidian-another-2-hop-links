@@ -35,9 +35,9 @@ export function getFileSearchText(
 }
 
 export function getBranchSearchText(
-	link: Pick<TwoHopIndexedLink, "displayText" | "rawText" | "path">,
+	link: Pick<TwoHopIndexedLink, "rawText" | "path">,
 ): string {
-	return link.displayText ?? link.rawText ?? link.path ?? "";
+	return link.rawText ?? link.path ?? "";
 }
 
 export function getTagGroupSearchText(tag: string): string {

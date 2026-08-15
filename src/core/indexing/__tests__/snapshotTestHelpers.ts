@@ -53,7 +53,6 @@ function serializeSourceSummaryMap(map: IndexSnapshot["sourceSummaries"]) {
 							rawLookupKey: ref.rawLookupKey,
 							isUnresolved: ref.isUnresolved,
 							rawText: ref.rawText,
-							displayText: ref.displayText,
 						})),
 						firstRefIndexByLookupKey: Array.from(
 							summary.firstRefIndexByLookupKey.entries(),

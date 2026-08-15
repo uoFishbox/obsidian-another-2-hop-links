@@ -493,10 +493,11 @@ describe("IndexQueryEngine", () => {
 
 			expect(backlinks).toHaveLength(1);
 			expect(backlinks[0]).toMatchObject({
-				displayText: "early",
+				rawText: "target",
 				backlinkCount: 2,
 				position: undefined,
 			});
+			expect(backlinks[0].displayText).toBeUndefined();
 		});
 
 		test("restores representative backlink by lookupKey even for unresolved merged lookups", async () => {
