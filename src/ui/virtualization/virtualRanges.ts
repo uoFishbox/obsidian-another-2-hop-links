@@ -70,19 +70,6 @@ const EMPTY_VIRTUAL_RANGES: VirtualRanges = {
 	previewVisible: EMPTY_ROW_RANGE,
 };
 
-function copyVirtualRanges(ranges: VirtualRanges): VirtualRanges {
-	return {
-		mounted: {
-			start: ranges.mounted.start,
-			end: ranges.mounted.end,
-		},
-		previewVisible: {
-			start: ranges.previewVisible.start,
-			end: ranges.previewVisible.end,
-		},
-	};
-}
-
 /**
  * Creates mutable range storage for row models that expose allocated range APIs.
  */
@@ -200,6 +187,11 @@ export function computeVirtualRanges<TCell>(params: {
 	mountedOverscanPx: number;
 	previewOverscanPx?: number;
 	isScrollActive?: boolean;
+	/**
+	 * Value-stable ranges published by the scroll-window resolver. They are
+	 * retained by reference, so callers must not mutate them after passing
+	 * them here.
+	 */
 	precomputedRanges?: VirtualRanges;
 }): ComputeVirtualRangesResult {
 	if (params.rowModel.rowCount <= 0) {
@@ -245,7 +237,7 @@ export function computeVirtualRanges<TCell>(params: {
 
 	const relativeScrollTop = params.scrollTop - params.sectionTop;
 	const measuredRanges: VirtualRanges = params.precomputedRanges
-		? copyVirtualRanges(params.precomputedRanges)
+		? params.precomputedRanges
 		: (params.rowModel.findVisibleRanges?.({
 				scrollTop: relativeScrollTop,
 				viewportHeight: params.viewportHeight,

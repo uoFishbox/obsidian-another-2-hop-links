@@ -119,13 +119,21 @@ export function useTwoHopVirtualList(
 		return previewDependencies !== undefined && props.previewActive !== false;
 	}
 
+	// The policy derives only from rowStride, so the same object is reused
+	// across scroll measurements instead of allocating one per measurement.
+	let cachedVisibilityPolicyRowStride: number | undefined;
+	let cachedVisibilityPolicy: VirtualVisibilityPolicy | undefined;
 	function resolveVisibilityPolicy(model: TwoHopRowModel): VirtualVisibilityPolicy {
 		const rowStride = model.layout.rowStride;
-		return {
-			bootstrapRows: 3,
-			mountedOverscanPx: rowStride * 3,
-			previewOverscanPx: rowStride,
-		};
+		if (rowStride !== cachedVisibilityPolicyRowStride || !cachedVisibilityPolicy) {
+			cachedVisibilityPolicyRowStride = rowStride;
+			cachedVisibilityPolicy = {
+				bootstrapRows: 3,
+				mountedOverscanPx: rowStride * 3,
+				previewOverscanPx: rowStride,
+			};
+		}
+		return cachedVisibilityPolicy;
 	}
 
 	const virtualList = useVirtualList<

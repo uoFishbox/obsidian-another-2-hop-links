@@ -159,7 +159,8 @@
 						ariaHidden={currentBinding === null}
 						{surfaceTransaction}
 					>
-						{#each currentBinding ? [currentBinding] : [] as mountedCell}
+						{#if currentBinding}
+							{@const mountedCell = currentBinding}
 							{#if bodyLifecyclePolicy.type === "keyed"}
 								{#key resolveMountedCellBodyKey(mountedCell)}
 									{@render renderCell({
@@ -173,7 +174,7 @@
 									observerRoot,
 								})}
 							{/if}
-						{/each}
+						{/if}
 					</VirtualGridLogicalCellMount>
 				{/each}
 			</div>

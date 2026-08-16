@@ -137,6 +137,40 @@ describe("buildMountedSectionedGridRows", () => {
 		).toBe(true);
 	});
 
+	it("orders rowsBySlot by physical slot independently of logical row order", () => {
+		const slotByRowIndex = [2, 0, 3, 1];
+		const build = buildMountedSectionedGridRows<TestCell, TestRow, null>({
+			rowRange: { start: 0, end: 4 },
+			columns: 1,
+			slotCapacity: 4,
+			resolveSlotLease: (rowIndex) =>
+				createTestLease(slotByRowIndex[rowIndex] ?? 0),
+			resolvePreviousRow: () => undefined,
+			canReusePreviousRow: () => false,
+			resolveRow: (rowIndex) => ({
+				top: rowIndex,
+				columnStart: 0,
+				columnEnd: 1,
+				metadata: null,
+			}),
+			resolveCell: ({ columnIndex, renderSlotIndex }) => ({
+				key: `cell:${renderSlotIndex}`,
+				columnIndex,
+				renderSlotIndex,
+				label: `cell:${renderSlotIndex}`,
+			}),
+			createRow: ({ rowIndex, slotIndex, cells, cellSlots }) => ({
+				rowIndex,
+				slotIndex,
+				cells,
+				cellSlots,
+			}),
+		});
+
+		expect(build.rowsBySlot.map((row) => row.slotIndex)).toEqual([0, 1, 2, 3]);
+		expect(build.rowsBySlot.map((row) => row.rowIndex)).toEqual([1, 3, 0, 2]);
+	});
+
 	it("throws when a logical row has no resident slot lease", () => {
 		expect(() =>
 			buildMountedSectionedGridRows<TestCell, TestRow, null>({

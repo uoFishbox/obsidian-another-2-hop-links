@@ -119,21 +119,49 @@ export function createVirtualScrollWindowRangeResolver<
 	let mountedStableBandViewportHeight: number | undefined;
 	let mountedStableBandSectionTop: number | undefined;
 	let mountedStableBandOverscanPx: number | undefined;
+	// Row models write ranges in place, so the writable scratch stays private and
+	// only value-stable published snapshots are exposed on the measurements.
+	const scrollRangesScratch: VirtualRanges = {
+		mounted: { start: 0, end: 0 },
+		previewVisible: { start: 0, end: 0 },
+	};
+	const committedRangesScratch: VirtualRanges = {
+		mounted: { start: 0, end: 0 },
+		previewVisible: { start: 0, end: 0 },
+	};
 	const scrollWindowMeasurement: RangedScrollWindowMeasurement = {
 		identity: {},
-		ranges: {
-			mounted: { start: 0, end: 0 },
-			previewVisible: { start: 0, end: 0 },
-		},
+		ranges: scrollRangesScratch,
 		previewCoverageScrollTopBand: undefined,
 	};
 	const committedScrollWindowMeasurement: RangedScrollWindowMeasurement = {
 		identity: {},
-		ranges: {
-			mounted: { start: 0, end: 0 },
-			previewVisible: { start: 0, end: 0 },
-		},
+		ranges: committedRangesScratch,
 		previewCoverageScrollTopBand: undefined,
+	};
+	let lastPublishedScrollRanges: VirtualRanges | undefined;
+	let lastPublishedCommittedRanges: VirtualRanges | undefined;
+
+	const publishStableRanges = (
+		scratch: VirtualRanges,
+		previous: VirtualRanges | undefined,
+	): VirtualRanges => {
+		if (
+			previous &&
+			previous.mounted.start === scratch.mounted.start &&
+			previous.mounted.end === scratch.mounted.end &&
+			previous.previewVisible.start === scratch.previewVisible.start &&
+			previous.previewVisible.end === scratch.previewVisible.end
+		) {
+			return previous;
+		}
+		return {
+			mounted: { start: scratch.mounted.start, end: scratch.mounted.end },
+			previewVisible: {
+				start: scratch.previewVisible.start,
+				end: scratch.previewVisible.end,
+			},
+		};
 	};
 
 	const resolveMeasurementRowModel = (
@@ -305,9 +333,14 @@ export function createVirtualScrollWindowRangeResolver<
 		if (!precomputedMountedRange) {
 			committedScrollWindowMeasurement.identity = measurementRowModel;
 			measurementRowModel.findVisibleRangesInto(
-				committedScrollWindowMeasurement.ranges,
+				committedRangesScratch,
 				rangeParams,
 			);
+			lastPublishedCommittedRanges = publishStableRanges(
+				committedRangesScratch,
+				lastPublishedCommittedRanges,
+			);
+			committedScrollWindowMeasurement.ranges = lastPublishedCommittedRanges;
 			committedScrollWindowMeasurement.previewCoverageScrollTopBand =
 				updateCoverageScrollTopBand(
 					previewCoverageBandScratch,
@@ -315,7 +348,7 @@ export function createVirtualScrollWindowRangeResolver<
 					sectionTop,
 					rangeParams.scrollTop,
 					viewportHeight,
-					committedScrollWindowMeasurement.ranges.previewVisible,
+					lastPublishedCommittedRanges.previewVisible,
 				);
 			return committedScrollWindowMeasurement;
 		}
@@ -327,9 +360,14 @@ export function createVirtualScrollWindowRangeResolver<
 		rangesFromMountedParams.mountedOverscanPx = rangeParams.mountedOverscanPx;
 		rangesFromMountedParams.previewOverscanPx = rangeParams.previewOverscanPx;
 		measurementRowModel.findVisibleRangesFromMountedInto(
-			scrollWindowMeasurement.ranges,
+			scrollRangesScratch,
 			rangesFromMountedParams,
 		);
+		lastPublishedScrollRanges = publishStableRanges(
+			scrollRangesScratch,
+			lastPublishedScrollRanges,
+		);
+		scrollWindowMeasurement.ranges = lastPublishedScrollRanges;
 		scrollWindowMeasurement.previewCoverageScrollTopBand =
 			updateCoverageScrollTopBand(
 				previewCoverageBandScratch,
@@ -337,7 +375,7 @@ export function createVirtualScrollWindowRangeResolver<
 				sectionTop,
 				rangeParams.scrollTop,
 				viewportHeight,
-				scrollWindowMeasurement.ranges.previewVisible,
+				lastPublishedScrollRanges.previewVisible,
 			);
 		return scrollWindowMeasurement;
 	};

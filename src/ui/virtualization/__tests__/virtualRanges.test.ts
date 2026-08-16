@@ -260,7 +260,7 @@ describe("computeVirtualRanges", () => {
 		expect(ranges).toEqual(precomputedRanges);
 	});
 
-	it("copies precomputed ranges before reusable scratch is overwritten", () => {
+	it("retains precomputed ranges by reference without copying", () => {
 		const precomputedRanges = {
 			mounted: { start: 3, end: 11 },
 			previewVisible: { start: 4, end: 10 },
@@ -279,15 +279,7 @@ describe("computeVirtualRanges", () => {
 		});
 		const ranges = expectComputedRanges(result);
 
-		precomputedRanges.mounted.start = 20;
-		precomputedRanges.mounted.end = 30;
-		precomputedRanges.previewVisible.start = 21;
-		precomputedRanges.previewVisible.end = 29;
-
-		expect(ranges).toEqual({
-			mounted: { start: 3, end: 11 },
-			previewVisible: { start: 4, end: 10 },
-		});
+		expect(ranges).toBe(precomputedRanges);
 	});
 
 	it("bounds mounted range to row count", () => {

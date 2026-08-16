@@ -67,13 +67,10 @@ export function buildMountedTwoHopRows(
 		end: params.rowRange.end,
 		slotTopologyRevision: columns,
 	});
-	const previousRowsByIndex = new Map<number, MountedTwoHopRow>();
-	for (const row of params.previousBuild?.rowSlices ?? []) {
-		previousRowsByIndex.set(row.rowIndex, row);
-	}
-	const previousCellsByKey =
-		params.previousBuild?.reusableCellsByKey ??
-		new Map<string, MountedTwoHopCell>();
+	// rowSlices stay in ascending contiguous rowIndex order, so an overlapping
+	// previous row resolves with one direct lookup instead of a resident-wide Map.
+	const previousRowSlices = params.previousBuild?.rowSlices;
+	const previousFirstRowIndex = previousRowSlices?.[0]?.rowIndex ?? 0;
 	const canReuseRows = params.previousBuild?.rowModel === rowModel;
 
 	const mountedRows = buildMountedSectionedGridRows<
@@ -87,7 +84,10 @@ export function buildMountedTwoHopRows(
 		columns,
 		slotCapacity: slotPublication.capacity,
 		resolveSlotLease: (rowIndex) => rowSlotAllocator.resolveSlotLease(rowIndex),
-		resolvePreviousRow: (rowIndex) => previousRowsByIndex.get(rowIndex),
+		resolvePreviousRow: (rowIndex) => {
+			const previousRow = previousRowSlices?.[rowIndex - previousFirstRowIndex];
+			return previousRow?.rowIndex === rowIndex ? previousRow : undefined;
+		},
 		canReusePreviousRow: () => canReuseRows,
 		resolveRow: (rowIndex) => {
 			const row = rowModel.getRow(rowIndex);
@@ -100,17 +100,9 @@ export function buildMountedTwoHopRows(
 			};
 		},
 		resolveCell: ({ columnIndex, renderSlotIndex, row }) =>
-			createMountedCell(
-				row.metadata.getCell(columnIndex),
-				renderSlotIndex,
-				previousCellsByKey,
-			),
+			createMountedCell(row.metadata.getCell(columnIndex), renderSlotIndex),
 		rebindCell: ({ columnIndex, renderSlotIndex, row }) =>
-			createMountedCell(
-				row.metadata.getCell(columnIndex),
-				renderSlotIndex,
-				previousCellsByKey,
-			)!,
+			createMountedCell(row.metadata.getCell(columnIndex), renderSlotIndex)!,
 		createRow: ({ rowIndex, slotIndex, cells, cellSlots, row }) => {
 			recordCCLDevMeasurement("virtualGrid.rowShellCreated");
 			return {
@@ -130,6 +122,8 @@ export function buildMountedTwoHopRows(
 		get cells() {
 			return mountedRows.cells;
 		},
+		// Two-hop reuses cells only through whole-row reuse; no consumer reads this
+		// map, so the lazy build below must stay off the scroll hot path.
 		get reusableCellsByKey() {
 			return mountedRows.reusableCellsByKey;
 		},
@@ -146,25 +140,13 @@ export function buildMountedTwoHopRows(
 function createMountedCell(
 	cell: TwoHopVirtualCell | null,
 	renderSlotIndex: number,
-	previousCellsByKey: ReadonlyMap<string, MountedTwoHopCell>,
 ): MountedTwoHopCell | null {
 	if (!cell) return null;
-	const key = logicalCellKey(cell.logicalKey);
-	const previous = previousCellsByKey.get(key);
-	const nextRenderSlotKey = renderSlotKey(renderSlotIndex);
-	if (
-		previous?.cell === cell &&
-		previous.rowIndex === cell.rowIndex &&
-		previous.columnIndex === cell.columnIndex &&
-		previous.renderSlotIndex === renderSlotIndex
-	) {
-		return previous;
-	}
 	recordCCLDevMeasurement("virtualGrid.cellShellCreated");
 	return {
-		key,
+		key: logicalCellKey(cell.logicalKey),
 		renderSlotIndex,
-		renderSlotKey: nextRenderSlotKey,
+		renderSlotKey: renderSlotKey(renderSlotIndex),
 		rowIndex: cell.rowIndex,
 		columnIndex: cell.columnIndex,
 		cell,

@@ -62,6 +62,8 @@ export function createResidentRowSlotAllocator(): ResidentRowSlotAllocator {
 	const slotGenerations: number[] = [];
 	const leasesBySlot: Array<ResidentRowSlotLease | undefined> = [];
 	const freeSlotIndices = new Set<number>();
+	// Reused across range shifts so prepareRange stays allocation-free.
+	const leavingSlotIndicesScratch: number[] = [];
 	let publication = createPublication();
 
 	function assertUsable(): void {
@@ -113,7 +115,8 @@ export function createResidentRowSlotAllocator(): ResidentRowSlotAllocator {
 		slotTopologyRevision = params.slotTopologyRevision;
 		hasSlotTopologyRevision = true;
 
-		const leavingSlotIndices: number[] = [];
+		const leavingSlotIndices = leavingSlotIndicesScratch;
+		leavingSlotIndices.length = 0;
 		for (const [logicalRowIndex, slotIndex] of logicalRowToSlot) {
 			if (logicalRowIndex >= start && logicalRowIndex < end) continue;
 			logicalRowToSlot.delete(logicalRowIndex);

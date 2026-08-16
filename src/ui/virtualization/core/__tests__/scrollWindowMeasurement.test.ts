@@ -261,4 +261,117 @@ describe("createVirtualScrollWindowRangeResolver", () => {
 			].count,
 		).toBe(1);
 	});
+
+	it("publishes value-stable ranges without reallocating unchanged snapshots", () => {
+		const rowModel: VirtualScrollWindowRangeRowModel = {
+			rowCount: 100,
+			totalHeight: 10_000,
+			findVisibleRangeInto() {},
+			findVisibleRangesInto(out, params) {
+				out.mounted.start = params.scrollTop;
+				out.mounted.end = params.scrollTop + 10;
+				out.previewVisible.start = params.scrollTop + 1;
+				out.previewVisible.end = params.scrollTop + 5;
+			},
+			findVisibleRangesFromMountedInto(out, params) {
+				out.mounted.start = params.mounted.start;
+				out.mounted.end = params.mounted.end;
+				out.previewVisible.start = params.mounted.start + 1;
+				out.previewVisible.end = params.mounted.end - 1;
+			},
+		};
+		const resolver = createVirtualScrollWindowRangeResolver({
+			resolveRowModel: () => rowModel,
+			resolveVisibilityPolicy: () => ({
+				bootstrapRows: 1,
+				mountedOverscanPx: 0,
+				previewOverscanPx: 0,
+			}),
+		});
+
+		const first = resolver.resolveScrollWindowMeasurement(10, 100, 0, {}).ranges;
+		const unchanged = resolver.resolveScrollWindowMeasurement(
+			10,
+			100,
+			0,
+			{},
+		).ranges;
+		expect(unchanged).toBe(first);
+
+		const second = resolver.resolveScrollWindowMeasurement(20, 100, 0, {}).ranges;
+		expect(second).not.toBe(first);
+		expect(second).toEqual({
+			mounted: { start: 20, end: 30 },
+			previewVisible: { start: 21, end: 25 },
+		});
+		expect(first).toEqual({
+			mounted: { start: 10, end: 20 },
+			previewVisible: { start: 11, end: 15 },
+		});
+	});
+
+	it("keeps scroll-branch and committed-branch published ranges isolated", () => {
+		const rowModel: VirtualScrollWindowRangeRowModel = {
+			rowCount: 100,
+			totalHeight: 10_000,
+			findVisibleRangeInto() {},
+			findVisibleRangesInto() {},
+			findVisibleRangesFromMountedInto(out, params) {
+				out.mounted.start = params.mounted.start;
+				out.mounted.end = params.mounted.end;
+				out.previewVisible.start = params.mounted.start + 1;
+				out.previewVisible.end = params.mounted.end - 1;
+			},
+		};
+		const resolver = createVirtualScrollWindowRangeResolver({
+			resolveRowModel: () => rowModel,
+			resolveVisibilityPolicy: () => ({
+				bootstrapRows: 1,
+				mountedOverscanPx: 0,
+				previewOverscanPx: 0,
+			}),
+		});
+
+		const fromMountedFirst = resolver.resolveScrollWindowMeasurement(
+			0,
+			100,
+			0,
+			{},
+			{
+				start: 30,
+				end: 40,
+			},
+		).ranges;
+		const fromMountedUnchanged = resolver.resolveScrollWindowMeasurement(
+			0,
+			100,
+			0,
+			{},
+			{
+				start: 30,
+				end: 40,
+			},
+		).ranges;
+		expect(fromMountedUnchanged).toBe(fromMountedFirst);
+
+		const fromMountedShifted = resolver.resolveScrollWindowMeasurement(
+			0,
+			100,
+			0,
+			{},
+			{
+				start: 35,
+				end: 45,
+			},
+		).ranges;
+		expect(fromMountedShifted).not.toBe(fromMountedFirst);
+		expect(fromMountedShifted).toEqual({
+			mounted: { start: 35, end: 45 },
+			previewVisible: { start: 36, end: 44 },
+		});
+		expect(fromMountedFirst).toEqual({
+			mounted: { start: 30, end: 40 },
+			previewVisible: { start: 31, end: 39 },
+		});
+	});
 });

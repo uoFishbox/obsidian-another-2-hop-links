@@ -148,9 +148,7 @@ export function buildMountedSectionedGridRows<
 		);
 	}
 
-	const rowsBySlot = [...rowSlices].sort(
-		(left, right) => left.slotIndex - right.slotIndex,
-	);
+	const rowsBySlot = orderRowsBySlotIndex(rowSlices);
 	assertMountedSectionedGridRows({
 		rows: rowsBySlot,
 		slotCapacity: params.slotCapacity,
@@ -181,6 +179,30 @@ export function buildMountedSectionedGridRows<
 		rowsBySlot,
 		nextRenderSlotIndex: params.slotCapacity * columns,
 	};
+}
+
+/**
+ * Orders mounted rows by physical slot without copying and sorting the resident
+ * rows on every range shift: slot indices are unique, so each row is written
+ * directly at its slot position and the holes are compacted in place.
+ */
+function orderRowsBySlotIndex<
+	TCell extends SectionedGridMountedCell,
+	TRow extends SectionedGridMountedRow<TCell>,
+>(rows: readonly TRow[]): TRow[] {
+	const rowsBySlot: (TRow | undefined)[] = [];
+	for (const row of rows) {
+		rowsBySlot[row.slotIndex] = row;
+	}
+	let writeIndex = 0;
+	for (let readIndex = 0; readIndex < rowsBySlot.length; readIndex += 1) {
+		const row = rowsBySlot[readIndex];
+		if (row === undefined) continue;
+		rowsBySlot[writeIndex] = row;
+		writeIndex += 1;
+	}
+	rowsBySlot.length = writeIndex;
+	return rowsBySlot as TRow[];
 }
 
 function assertMountedSectionedGridRows<

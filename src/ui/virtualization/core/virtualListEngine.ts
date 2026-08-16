@@ -28,6 +28,11 @@ export interface VirtualListMeasurement {
 	hasStableVisibleRange: boolean;
 	currentMountedRange: RowRange;
 	isScrollActive?: boolean;
+	/**
+	 * Value-stable ranges published by the scroll-window resolver. They are
+	 * retained by reference, so callers must not mutate them after passing
+	 * them here.
+	 */
 	precomputedRanges?: VirtualRanges;
 }
 

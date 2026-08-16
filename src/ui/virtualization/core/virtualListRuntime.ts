@@ -28,6 +28,7 @@ export interface ApplyVirtualListMeasurementParams<
 	isStableMeasurement: boolean;
 	hasStableVisibleRange: boolean;
 	isScrollActive?: boolean;
+	/** Value-stable ranges; retained by reference and never mutated afterwards. */
 	precomputedRanges?: VirtualRanges;
 	visibilityPolicy: VirtualVisibilityPolicy;
 }
