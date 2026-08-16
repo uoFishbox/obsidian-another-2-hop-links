@@ -2,6 +2,7 @@
 	import VirtualSurface from "../VirtualSurface.svelte";
 	import VirtualSurfaceRecyclingProbe from "./VirtualSurfaceRecyclingProbe.svelte";
 	import type { MountedVirtualCell } from "../../types";
+	import type { SectionedGridMountedCellSlot } from "ui/virtualization/core/reconciliation/mountedSectionedGridRows";
 	import {
 		KEYED_VIRTUAL_CELL_BODY_LIFECYCLE,
 		PHYSICAL_SLOT_BODY_LIFECYCLE,
@@ -18,6 +19,7 @@
 		slotIndex?: number;
 		slotKey?: number;
 		cells: TestMountedCell[];
+		cellSlots?: SectionedGridMountedCellSlot<TestMountedCell>[];
 	}
 
 	interface Props {
@@ -28,6 +30,7 @@
 		interactionId?: string;
 		onCellMount?: (key: string) => void;
 		onCellUpdate?: (key: string) => void;
+		onCellUnmount?: (key: string) => void;
 	}
 
 	let {
@@ -38,6 +41,7 @@
 		interactionId,
 		onCellMount,
 		onCellUpdate,
+		onCellUnmount,
 	}: Props = $props();
 </script>
 
@@ -59,6 +63,7 @@
 			{interactionId}
 			{onCellMount}
 			{onCellUpdate}
+			{onCellUnmount}
 		/>
 	{/snippet}
 </VirtualSurface>

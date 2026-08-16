@@ -6,9 +6,11 @@
 		interactionId?: string;
 		onCellMount?: (key: string) => void;
 		onCellUpdate?: (key: string) => void;
+		onCellUnmount?: (key: string) => void;
 	}
 
-	let { key, interactionId, onCellMount, onCellUpdate }: Props = $props();
+	let { key, interactionId, onCellMount, onCellUpdate, onCellUnmount }: Props =
+		$props();
 
 	let mounted = $state(false);
 	let initialEffectDone = $state(false);
@@ -27,6 +29,13 @@
 			return;
 		}
 		onCellUpdate?.(key);
+	});
+
+	$effect(() => {
+		key;
+		return () => {
+			onCellUnmount?.(key);
+		};
 	});
 </script>
 

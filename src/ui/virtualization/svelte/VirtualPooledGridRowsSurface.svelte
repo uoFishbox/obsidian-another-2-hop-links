@@ -136,30 +136,30 @@
 				use:setRowTransform={row.top}
 			>
 				{#each resolveRowCellSlots(row) as cellSlot (cellSlot.renderSlotKey)}
-					{@const mountedCell = cellSlot.binding}
+					{@const currentBinding = cellSlot.binding}
 					<VirtualGridLogicalCellMount
-						logicalKey={mountedCell
-							? resolveMountedCellLogicalKey(mountedCell)
+						logicalKey={currentBinding
+							? resolveMountedCellLogicalKey(currentBinding)
 							: undefined}
-						className={mountedCell
-							? resolveCellClassName(mountedCell)
+						className={currentBinding
+							? resolveCellClassName(currentBinding)
 							: cellClassName}
-						dataTestId={!IS_PROD && mountedCell
-							? getCellDataTestId?.(mountedCell)
+						dataTestId={!IS_PROD && currentBinding
+							? getCellDataTestId?.(currentBinding)
 							: undefined}
-						cellSlotKey={mountedCell
-							? resolveCellSlotKey(row, mountedCell)
+						cellSlotKey={currentBinding
+							? resolveCellSlotKey(row, currentBinding)
 							: cellSlot.renderSlotIndex}
-						rowIndex={mountedCell
-							? resolveMountedCellRowIndex(mountedCell)
+						rowIndex={currentBinding
+							? resolveMountedCellRowIndex(currentBinding)
 							: row.rowIndex}
-						columnIndex={mountedCell
-							? resolveMountedCellColumnIndex(mountedCell)
+						columnIndex={currentBinding
+							? resolveMountedCellColumnIndex(currentBinding)
 							: cellSlot.columnIndex}
-						ariaHidden={mountedCell === null}
+						ariaHidden={currentBinding === null}
 						{surfaceTransaction}
 					>
-						{#if mountedCell}
+						{#each currentBinding ? [currentBinding] : [] as mountedCell}
 							{#if bodyLifecyclePolicy.type === "keyed"}
 								{#key resolveMountedCellBodyKey(mountedCell)}
 									{@render renderCell({
@@ -173,7 +173,7 @@
 									observerRoot,
 								})}
 							{/if}
-						{/if}
+						{/each}
 					</VirtualGridLogicalCellMount>
 				{/each}
 			</div>

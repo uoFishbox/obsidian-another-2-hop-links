@@ -6,7 +6,13 @@ import {
 	teardownAnimationFrameMock,
 } from "testing/helpers/DOMObserverMock";
 import VirtualSurfaceRecyclingHarness from "./VirtualSurfaceRecyclingHarness.svelte";
-import type { MountedVirtualCell, LogicalCellKey, RenderSlotKey } from "../../types";
+import {
+	renderSlotKey,
+	type MountedVirtualCell,
+	type LogicalCellKey,
+	type RenderSlotKey,
+} from "../../types";
+import type { SectionedGridMountedCellSlot } from "../../core/reconciliation/mountedSectionedGridRows";
 
 interface TestMountedCell extends MountedVirtualCell {
 	columnIndex: number;
@@ -23,6 +29,7 @@ interface TestMountedRow {
 	slotIndex?: number;
 	slotKey?: number;
 	cells: TestMountedCell[];
+	cellSlots?: SectionedGridMountedCellSlot<TestMountedCell>[];
 }
 
 function createCells(keys: string[], slotOffset: number = 0): TestMountedCell[] {
@@ -58,6 +65,17 @@ function createRows(
 		cells,
 	};
 	return [row];
+}
+
+function createCellSlots(
+	bindings: Array<TestMountedCell | null>,
+): SectionedGridMountedCellSlot<TestMountedCell>[] {
+	return bindings.map((binding, columnIndex) => ({
+		binding,
+		columnIndex,
+		renderSlotIndex: columnIndex,
+		renderSlotKey: renderSlotKey(columnIndex),
+	}));
 }
 
 describe("VirtualSurface grid-row recycling", () => {
@@ -231,4 +249,84 @@ describe("VirtualSurface grid-row recycling", () => {
 		expect(mountedKeys).toStrictEqual(["A"]);
 		expect(updatedKeys).toStrictEqual(["B"]);
 	});
+
+	it.each([
+		["keyed", true],
+		["physical-slot", false],
+	])(
+		"keeps the occupied → empty → occupied transition on one physical slot safe (%s policy)",
+		async (_policyName, remountCellBodyOnKeyChange) => {
+			const mountedKeys: string[] = [];
+			const unmountedKeys: string[] = [];
+			const createRow = (binding: TestMountedCell | null): TestMountedRow[] => [
+				{
+					key: 0,
+					rowIndex: 0,
+					top: 0,
+					slotIndex: 0,
+					slotKey: 0,
+					cells: binding ? [binding] : [],
+					cellSlots: createCellSlots([binding]),
+				},
+			];
+			const rerenderProps = (binding: TestMountedCell | null) => ({
+				mountedRows: createRow(binding),
+				contentHeight: 100,
+				rowHeight: 50,
+				remountCellBodyOnKeyChange,
+				onCellMount: (key: string) => mountedKeys.push(key),
+				onCellUnmount: (key: string) => unmountedKeys.push(key),
+			});
+
+			const { container, rerender } = render(VirtualSurfaceRecyclingHarness, {
+				props: rerenderProps(createCells(["A"])[0]),
+			});
+			await flushFrames();
+			expect(mountedKeys).toStrictEqual(["A"]);
+
+			const host = container.querySelector(
+				".recycling-test-root",
+			) as HTMLElement | null;
+			const shadowRoot = host?.shadowRoot;
+			expect(shadowRoot).toBeTruthy();
+			if (!shadowRoot) return;
+
+			const rowShell = shadowRoot.querySelector("[data-ccl-row-slot='0']");
+			const cellShell = shadowRoot.querySelector("[data-ccl-cell-slot]");
+			expect(rowShell).toBeTruthy();
+			expect(cellShell).toBeTruthy();
+			expect(
+				cellShell
+					?.querySelector('[data-testid="probe-cell"]')
+					?.getAttribute("data-key"),
+			).toBe("A");
+
+			await rerender(rerenderProps(null));
+			await flushFrames();
+
+			expect(shadowRoot.querySelector("[data-ccl-row-slot='0']")).toBe(rowShell);
+			expect(shadowRoot.querySelector("[data-ccl-cell-slot]")).toBe(cellShell);
+			expect(cellShell?.querySelector('[data-testid="probe-cell"]')).toBeNull();
+			expect(cellShell?.getAttribute("aria-hidden")).toBe("true");
+			expect((cellShell as HTMLElement | null)?.dataset.cclLogicalKey).toBe(
+				undefined,
+			);
+			expect(unmountedKeys).toStrictEqual(["A"]);
+
+			await rerender(rerenderProps(createCells(["B"])[0]));
+			await flushFrames();
+
+			expect(shadowRoot.querySelector("[data-ccl-row-slot='0']")).toBe(rowShell);
+			expect(shadowRoot.querySelector("[data-ccl-cell-slot]")).toBe(cellShell);
+			expect(
+				cellShell
+					?.querySelector('[data-testid="probe-cell"]')
+					?.getAttribute("data-key"),
+			).toBe("B");
+			expect(cellShell?.getAttribute("aria-hidden")).toBeNull();
+			expect((cellShell as HTMLElement | null)?.dataset.cclLogicalKey).toBe("B");
+			expect(mountedKeys).toStrictEqual(["A", "B"]);
+			expect(unmountedKeys).toStrictEqual(["A"]);
+		},
+	);
 });
