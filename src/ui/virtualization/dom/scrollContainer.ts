@@ -94,9 +94,10 @@ export function findNearestScrollContainerCached(
 	const cached = nearestScrollContainerCache.get(element);
 	if (
 		cached &&
+		cached.scroller !== null &&
 		cached.parent === parent &&
 		cached.rootNode === rootNode &&
-		(!cached.scroller || isWithinComposedTree(cached.scroller, element))
+		isWithinComposedTree(cached.scroller, element)
 	) {
 		return cached.scroller;
 	}

@@ -1,7 +1,17 @@
-export function nextAnimationFrame(): Promise<void> {
+function resolveFrameWindow(targetWindow?: Window | null): Window | null {
+	return targetWindow ?? (typeof window === "undefined" ? null : window);
+}
+
+export function nextAnimationFrame(targetWindow?: Window | null): Promise<void> {
 	return new Promise<void>((resolve) => {
-		if (typeof requestAnimationFrame === "function") {
-			requestAnimationFrame(() => resolve());
+		const ownerWindow = resolveFrameWindow(targetWindow);
+		if (ownerWindow && typeof ownerWindow.requestAnimationFrame === "function") {
+			ownerWindow.requestAnimationFrame(() => resolve());
+			return;
+		}
+
+		if (ownerWindow) {
+			ownerWindow.setTimeout(resolve, 0);
 			return;
 		}
 
@@ -9,10 +19,19 @@ export function nextAnimationFrame(): Promise<void> {
 	});
 }
 
-export function scheduleAnimationFrame(callback: () => void): () => void {
-	if (typeof requestAnimationFrame === "function") {
-		const frameId = requestAnimationFrame(() => callback());
-		return () => cancelAnimationFrame(frameId);
+export function scheduleAnimationFrame(
+	callback: () => void,
+	targetWindow?: Window | null,
+): () => void {
+	const ownerWindow = resolveFrameWindow(targetWindow);
+	if (ownerWindow && typeof ownerWindow.requestAnimationFrame === "function") {
+		const frameId = ownerWindow.requestAnimationFrame(() => callback());
+		return () => ownerWindow.cancelAnimationFrame(frameId);
+	}
+
+	if (ownerWindow) {
+		const timeoutId = ownerWindow.setTimeout(callback, 0);
+		return () => ownerWindow.clearTimeout(timeoutId);
 	}
 
 	const timeoutId = globalThis.setTimeout(callback, 0);

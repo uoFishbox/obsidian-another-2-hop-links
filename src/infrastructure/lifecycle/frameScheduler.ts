@@ -10,10 +10,19 @@ export interface FrameScheduler {
 	destroy(): void;
 }
 
-export function createFrameScheduler(isUnloaded: () => boolean): FrameScheduler {
-	const animationFrameIds = new Set<number>();
-	const idleCallbackIds = new Set<number>();
-	const timeoutIds = new Set<number>();
+interface ScheduledHandle {
+	readonly id: number;
+	readonly ownerWindow: Window;
+}
+
+export function createFrameScheduler(
+	isUnloaded: () => boolean,
+	getWindow: () => Window | null = () =>
+		typeof window === "undefined" ? null : window,
+): FrameScheduler {
+	const animationFrameHandles = new Set<ScheduledHandle>();
+	const idleCallbackHandles = new Set<ScheduledHandle>();
+	const timeoutHandles = new Set<ScheduledHandle>();
 	let isDestroyed = false;
 
 	function shouldSkipCallback(): boolean {
@@ -21,81 +30,121 @@ export function createFrameScheduler(isUnloaded: () => boolean): FrameScheduler 
 	}
 
 	function runIfActive(callback: FrameSchedulerCallback): void {
-		if (shouldSkipCallback()) {
-			return;
-		}
+		if (shouldSkipCallback()) return;
 		callback();
 	}
 
-	function scheduleTimeout(callback: FrameSchedulerCallback, timeout: number): void {
+	function deleteHandle(
+		handles: Set<ScheduledHandle>,
+		ownerWindow: Window,
+		id: number,
+	): void {
+		for (const handle of handles) {
+			if (handle.ownerWindow === ownerWindow && handle.id === id) {
+				handles.delete(handle);
+				return;
+			}
+		}
+	}
+
+	function scheduleTimeoutOnWindow(
+		ownerWindow: Window,
+		callback: FrameSchedulerCallback,
+		timeout: number,
+	): void {
 		let timeoutId = 0;
-		timeoutId = window.setTimeout(() => {
-			timeoutIds.delete(timeoutId);
+		timeoutId = ownerWindow.setTimeout(() => {
+			deleteHandle(timeoutHandles, ownerWindow, timeoutId);
 			runIfActive(callback);
 		}, timeout);
-		timeoutIds.add(timeoutId);
+		timeoutHandles.add({ id: timeoutId, ownerWindow });
+	}
+
+	function scheduleFrameOnWindow(
+		ownerWindow: Window,
+		callback: FrameSchedulerCallback,
+	): void {
+		if (typeof ownerWindow.requestAnimationFrame === "function") {
+			let animationFrameId = 0;
+			animationFrameId = ownerWindow.requestAnimationFrame(() => {
+				deleteHandle(animationFrameHandles, ownerWindow, animationFrameId);
+				runIfActive(callback);
+			});
+			animationFrameHandles.add({ id: animationFrameId, ownerWindow });
+			return;
+		}
+
+		scheduleTimeoutOnWindow(ownerWindow, callback, 0);
 	}
 
 	function scheduleOnNextFrame(callback: FrameSchedulerCallback): void {
-		if (shouldSkipCallback()) {
+		if (shouldSkipCallback()) return;
+		const ownerWindow = getWindow();
+		if (!ownerWindow) {
+			if (!shouldSkipCallback()) callback();
 			return;
 		}
-
-		if (typeof window.requestAnimationFrame === "function") {
-			let animationFrameId = 0;
-			animationFrameId = window.requestAnimationFrame(() => {
-				animationFrameIds.delete(animationFrameId);
-				runIfActive(callback);
-			});
-			animationFrameIds.add(animationFrameId);
-			return;
-		}
-
-		scheduleTimeout(callback, 0);
+		scheduleFrameOnWindow(ownerWindow, callback);
 	}
 
 	function scheduleAfterFirstPaint(callback: FrameSchedulerCallback): void {
-		scheduleOnNextFrame(() => scheduleOnNextFrame(callback));
+		if (shouldSkipCallback()) return;
+		const ownerWindow = getWindow();
+		if (!ownerWindow) {
+			if (!shouldSkipCallback()) callback();
+			return;
+		}
+
+		// Keep both frames in the same realm. If focus migrates between frames,
+		// cancellation and paint ordering still belong to the originating window.
+		scheduleFrameOnWindow(ownerWindow, () =>
+			scheduleFrameOnWindow(ownerWindow, callback),
+		);
 	}
 
 	function scheduleIdleOrNextFrame(
 		callback: FrameSchedulerCallback,
 		options?: IdleRequestOptions,
 	): void {
-		if (shouldSkipCallback()) {
+		if (shouldSkipCallback()) return;
+		const ownerWindow = getWindow();
+		if (!ownerWindow) {
+			if (!shouldSkipCallback()) callback();
 			return;
 		}
 
-		if (typeof window.requestIdleCallback === "function") {
+		if (typeof ownerWindow.requestIdleCallback === "function") {
 			let idleCallbackId = 0;
-			idleCallbackId = window.requestIdleCallback(() => {
-				idleCallbackIds.delete(idleCallbackId);
+			idleCallbackId = ownerWindow.requestIdleCallback(() => {
+				deleteHandle(idleCallbackHandles, ownerWindow, idleCallbackId);
 				runIfActive(callback);
 			}, options);
-			idleCallbackIds.add(idleCallbackId);
+			idleCallbackHandles.add({ id: idleCallbackId, ownerWindow });
 			return;
 		}
 
-		scheduleOnNextFrame(callback);
+		scheduleFrameOnWindow(ownerWindow, callback);
 	}
 
 	function destroy(): void {
 		isDestroyed = true;
 
-		animationFrameIds.forEach((animationFrameId) =>
-			window.cancelAnimationFrame(animationFrameId),
-		);
-		animationFrameIds.clear();
-
-		if (typeof window.cancelIdleCallback === "function") {
-			idleCallbackIds.forEach((idleCallbackId) =>
-				window.cancelIdleCallback(idleCallbackId),
-			);
+		for (const { ownerWindow, id } of animationFrameHandles) {
+			ownerWindow.cancelAnimationFrame(id);
 		}
-		idleCallbackIds.clear();
+		animationFrameHandles.clear();
 
-		timeoutIds.forEach((timeoutId) => window.clearTimeout(timeoutId));
-		timeoutIds.clear();
+		for (const { ownerWindow, id } of idleCallbackHandles) {
+			if (typeof ownerWindow.cancelIdleCallback === "function") {
+				ownerWindow.cancelIdleCallback(id);
+			}
+		}
+		idleCallbackHandles.clear();
+
+		for (const { ownerWindow, id } of timeoutHandles) {
+			ownerWindow.clearTimeout(id);
+		}
+		timeoutHandles.clear();
 	}
 
 	return {

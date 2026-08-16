@@ -5,6 +5,7 @@ import type { CanvasNodeData } from "types/obsidian";
 import type { SettingsManager } from "features/settings/persistence/SettingsManager";
 import type { IComponentManager } from "types/services";
 import type { WorkspaceViewQueries } from "infrastructure/workspace/workspaceViewQueries";
+import { resolveWorkspaceWindow } from "infrastructure/workspace/workspaceDocuments";
 import type { DisplayModeStrategy } from "features/display-mode/createDisplayModeStrategy";
 import type { DisplayModeStrategyContext } from "features/display-mode/DisplayModeStrategyContext";
 import { createDisplayModeStrategy } from "features/display-mode/createDisplayModeStrategy";
@@ -241,16 +242,21 @@ export class DisplayModeController {
 		const activeFile = this.getActiveFile?.();
 		if (activeFile && this.updateSidebarView) {
 			const capturedPath = activeFile.path;
-			requestAnimationFrame(() => {
+			const ownerWindow = resolveWorkspaceWindow(this.app.workspace);
+			const update = () => {
 				// rAF待機中にアクティブファイルが変わった場合は旧ファイル描画を抑止
 				const latestActiveFile = this.getActiveFile?.();
 				if (!latestActiveFile || latestActiveFile.path !== capturedPath) {
 					return;
 				}
-				if (this.updateSidebarView) {
-					this.updateSidebarView(latestActiveFile);
-				}
-			});
+				this.updateSidebarView?.(latestActiveFile);
+			};
+
+			if (ownerWindow?.requestAnimationFrame) {
+				ownerWindow.requestAnimationFrame(update);
+			} else {
+				update();
+			}
 		}
 	}
 

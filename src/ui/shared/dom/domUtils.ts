@@ -1,5 +1,6 @@
 import { MarkdownView } from "obsidian";
 import { CONTAINER_CLASS } from "../../../appConstants";
+import { getOptionalOwnerWindow } from "./realmSafeDom";
 
 export type InlineMarkdownSurface = "source" | "preview";
 
@@ -26,7 +27,9 @@ export function isElementVisible(element: HTMLElement): boolean {
 		return true;
 	}
 
-	const style = window.getComputedStyle(element);
+	const ownerWindow = getOptionalOwnerWindow(element);
+	if (!ownerWindow) return false;
+	const style = ownerWindow.getComputedStyle(element);
 	return style.display !== "none" && style.visibility !== "hidden";
 }
 

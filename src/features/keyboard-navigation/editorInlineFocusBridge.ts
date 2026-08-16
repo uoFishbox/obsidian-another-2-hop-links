@@ -2,6 +2,7 @@ import { Prec } from "@codemirror/state";
 import { keymap, type EditorView } from "@codemirror/view";
 import { SEARCH_INPUT_SELECTOR } from "./resultFocus";
 import type { PluginHost } from "types/pluginHost";
+import { getOptionalOwnerWindow } from "ui/shared/dom/realmSafeDom";
 
 const INLINE_SURFACE_SELECTOR =
 	'.cosense-card-links__root[data-ccl-card-surface="inline"]';
@@ -20,7 +21,9 @@ function isVisible(element: HTMLElement | null): element is VisibleElement {
 		return true;
 	}
 
-	const style = window.getComputedStyle(element);
+	const ownerWindow = getOptionalOwnerWindow(element);
+	if (!ownerWindow) return false;
+	const style = ownerWindow.getComputedStyle(element);
 	return style.display !== "none" && style.visibility !== "hidden";
 }
 

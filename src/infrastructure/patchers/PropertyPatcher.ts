@@ -9,6 +9,7 @@ import {
 	type PropertyWidgetLike,
 } from "infrastructure/capabilities/ObsidianInternalFacade";
 import type { PatchRegistry } from "infrastructure/capabilities/PatchRegistry";
+import { getOwnerWindow, isHTMLElementLike } from "ui/shared/dom/realmSafeDom";
 const widgetPatchIds = new WeakMap<object, string>();
 let nextWidgetPatchId = 1;
 
@@ -81,7 +82,7 @@ function patchPropertyWidgets(
 						ctx,
 					) as PropertyWidgetComponentLike;
 
-					if (!(el instanceof HTMLElement) || !isPropertyContext(ctx)) {
+					if (!isHTMLElementLike(el) || !isPropertyContext(ctx)) {
 						return component;
 					}
 
@@ -136,11 +137,12 @@ function patchPropertyWidgets(
 
 					if (!scheduledElements.has(el)) {
 						scheduledElements.add(el);
+						const ownerWindow = getOwnerWindow(el);
 						const schedule =
-							typeof window.requestAnimationFrame === "function"
-								? window.requestAnimationFrame
+							typeof ownerWindow.requestAnimationFrame === "function"
+								? ownerWindow.requestAnimationFrame.bind(ownerWindow)
 								: (cb: FrameRequestCallback) =>
-										window.setTimeout(() => cb(0), 0);
+										ownerWindow.setTimeout(() => cb(0), 0);
 
 						schedule(() => {
 							scheduledElements.delete(el);
@@ -177,7 +179,7 @@ function asWidgetInstance(
 
 	const candidate = value as { el?: unknown; sourcePath?: unknown };
 	return {
-		el: candidate.el instanceof HTMLElement ? candidate.el : undefined,
+		el: isHTMLElementLike(candidate.el) ? candidate.el : undefined,
 		sourcePath:
 			typeof candidate.sourcePath === "string" ? candidate.sourcePath : undefined,
 	};

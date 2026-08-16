@@ -6,6 +6,12 @@ import {
 import { enableLogging, logger } from "shared/logging/logger";
 import { ObsidianInternalFacade } from "infrastructure/capabilities/ObsidianInternalFacade";
 import type { PatchRegistry } from "infrastructure/capabilities/PatchRegistry";
+import {
+	isEventLike,
+	isHTMLElementLike,
+	isMouseEventLike,
+	isShadowRootLike,
+} from "ui/shared/dom/realmSafeDom";
 
 interface PagePreviewLike {
 	onLinkHover: (
@@ -28,7 +34,7 @@ let hoverTriggerSequence = 0;
 function describeTargetEl(
 	targetEl: HTMLElement | ShadowRoot | null | undefined,
 ): string {
-	return targetEl instanceof HTMLElement
+	return isHTMLElementLike(targetEl)
 		? [
 				targetEl.tagName.toLowerCase(),
 				targetEl.id ? `#${targetEl.id}` : "",
@@ -36,7 +42,7 @@ function describeTargetEl(
 					? `[${targetEl.dataset.cclInteractionId}]`
 					: "",
 			].join("")
-		: targetEl instanceof ShadowRoot
+		: isShadowRootLike(targetEl)
 			? `<shadow-root:${targetEl.host.tagName.toLowerCase()}>`
 			: String(targetEl ?? "<null>");
 }
@@ -61,10 +67,10 @@ function describeHoverEvent(event: Event | undefined): Record<string, unknown> {
 							| null,
 					)
 				: undefined,
-		ctrlKey: event instanceof MouseEvent ? event.ctrlKey : undefined,
-		metaKey: event instanceof MouseEvent ? event.metaKey : undefined,
-		altKey: event instanceof MouseEvent ? event.altKey : undefined,
-		shiftKey: event instanceof MouseEvent ? event.shiftKey : undefined,
+		ctrlKey: isMouseEventLike(event) ? event.ctrlKey : undefined,
+		metaKey: isMouseEventLike(event) ? event.metaKey : undefined,
+		altKey: isMouseEventLike(event) ? event.altKey : undefined,
+		shiftKey: isMouseEventLike(event) ? event.shiftKey : undefined,
 		isTrusted: event.isTrusted,
 	};
 }
@@ -87,7 +93,7 @@ function describeHoverLinkPayload(payload: unknown): Record<string, unknown> {
 		state?: unknown;
 		hoverParent?: unknown;
 	};
-	const event = hoverPayload?.event instanceof Event ? hoverPayload.event : undefined;
+	const event = isEventLike(hoverPayload?.event) ? hoverPayload.event : undefined;
 	return {
 		source: hoverPayload?.source ?? null,
 		linktext: hoverPayload?.linktext ?? null,
@@ -154,8 +160,8 @@ function patchPagePreviewInstance(
 				...args: unknown[]
 			) {
 				const callId = ++hoverCallSequence;
-				const eventArg = args.find(
-					(entry): entry is Event => entry instanceof Event,
+				const eventArg = args.find((entry): entry is Event =>
+					isEventLike(entry),
 				);
 
 				if (enableLogging)

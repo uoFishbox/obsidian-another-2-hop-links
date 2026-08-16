@@ -102,6 +102,8 @@ interface PreviewDomCommitPartition {
 
 interface PreviewDomCommitSchedulerState {
 	readonly fallbackPartitionIdentity: object;
+	/** Realm used by partitions whose coordinator cannot accept a task. */
+	readonly getWindow?: () => Window | null;
 	readonly pendingByTargetKey: Map<string, QueuedPreviewDomCommitTask>;
 	readonly partitionsByIdentity: Map<object, PreviewDomCommitPartition>;
 	nextPartitionId: number;
@@ -109,9 +111,12 @@ interface PreviewDomCommitSchedulerState {
 	disposed: boolean;
 }
 
-function createSchedulerState(): PreviewDomCommitSchedulerState {
+function createSchedulerState(
+	getWindow?: () => Window | null,
+): PreviewDomCommitSchedulerState {
 	return {
 		fallbackPartitionIdentity: {},
+		getWindow,
 		pendingByTargetKey: new Map(),
 		partitionsByIdentity: new Map(),
 		nextPartitionId: 0,
@@ -140,6 +145,7 @@ function getOrCreatePartition(
 	const driver = createPreviewFrameDriver({
 		coordinator,
 		taskKey: `preview:dom-commit-drain:${++state.nextPartitionId}`,
+		getWindow: state.getWindow,
 		onAnimationFrameScheduled: () => {
 			if (process.env.NODE_ENV !== "production") {
 				recordCCLDevMeasurement("preview.domCommitScheduler.animationFrame");
@@ -446,8 +452,10 @@ function disposeSchedulerState(state: PreviewDomCommitSchedulerState): void {
 }
 
 /** Creates an isolated scheduler owned by one PreviewRuntime. */
-export function createPreviewDomCommitScheduler(): PreviewDomCommitScheduler {
-	const state = createSchedulerState();
+export function createPreviewDomCommitScheduler(
+	getWindow?: () => Window | null,
+): PreviewDomCommitScheduler {
+	const state = createSchedulerState(getWindow);
 	return {
 		createScope: (options) => createPreviewDomCommitScopeForState(state, options),
 		dispose: () => disposeSchedulerState(state),

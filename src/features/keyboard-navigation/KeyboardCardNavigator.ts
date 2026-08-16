@@ -76,6 +76,7 @@ export class KeyboardCardNavigator {
 	private scrollFrameId: number | null = null;
 	private scrollFrameWindow: Window | null = null;
 	private keydownDocument: Document | null = null;
+	private unregisterWindowMigration: (() => void) | null = null;
 	private cachedScrollContainer: HTMLElement | null = null;
 	private readonly handleDocumentKeydownBound = this.handleDocumentKeydown.bind(this);
 
@@ -108,12 +109,19 @@ export class KeyboardCardNavigator {
 		this.rootEl.classList.add("ccl-kb-nav-active");
 		this.rootEl.dataset.cclKbNavHost = host;
 
-		this.keydownDocument = this.rootEl.ownerDocument;
-		this.keydownDocument.addEventListener(
-			"keydown",
-			this.handleDocumentKeydownBound,
-			true,
-		);
+		this.bindKeydownDocument();
+		if (typeof this.rootEl.onWindowMigrated === "function") {
+			this.unregisterWindowMigration = this.rootEl.onWindowMigrated(() => {
+				this.bindKeydownDocument();
+				if (this.scrollFrameId !== null) {
+					this.scrollFrameWindow?.cancelAnimationFrame(this.scrollFrameId);
+					this.scrollFrameId = null;
+					this.scrollFrameWindow = null;
+				}
+				this.cachedScrollContainer = null;
+				this.refreshRows(false);
+			});
+		}
 
 		this.rootEl.focus({ preventScroll: true });
 
@@ -124,12 +132,9 @@ export class KeyboardCardNavigator {
 	}
 
 	public deactivate(): void {
-		this.keydownDocument?.removeEventListener(
-			"keydown",
-			this.handleDocumentKeydownBound,
-			true,
-		);
-		this.keydownDocument = null;
+		this.unregisterWindowMigration?.();
+		this.unregisterWindowMigration = null;
+		this.unbindKeydownDocument();
 
 		if (this.scrollFrameId !== null) {
 			this.scrollFrameWindow?.cancelAnimationFrame(this.scrollFrameId);
@@ -149,6 +154,27 @@ export class KeyboardCardNavigator {
 		this.rows = [];
 		this.selectedRowIndex = -1;
 		this.cachedScrollContainer = null;
+	}
+
+	private unbindKeydownDocument(): void {
+		this.keydownDocument?.removeEventListener(
+			"keydown",
+			this.handleDocumentKeydownBound,
+			true,
+		);
+		this.keydownDocument = null;
+	}
+
+	private bindKeydownDocument(): void {
+		const nextDocument = this.rootEl?.ownerDocument ?? null;
+		if (this.keydownDocument === nextDocument) return;
+		this.unbindKeydownDocument();
+		this.keydownDocument = nextDocument;
+		this.keydownDocument?.addEventListener(
+			"keydown",
+			this.handleDocumentKeydownBound,
+			true,
+		);
 	}
 
 	public resolveTargetSurface(): KeyboardNavigationTargetSurface | null {
@@ -473,8 +499,9 @@ export class KeyboardCardNavigator {
 		}
 
 		if (this.scrollFrameId !== null) {
-			cancelAnimationFrame(this.scrollFrameId);
+			this.scrollFrameWindow?.cancelAnimationFrame(this.scrollFrameId);
 			this.scrollFrameId = null;
+			this.scrollFrameWindow = null;
 		}
 
 		const currentRow = this.rows[this.selectedRowIndex];

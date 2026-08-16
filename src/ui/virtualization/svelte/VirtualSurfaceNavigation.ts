@@ -73,8 +73,8 @@ const scrollElementIntoVirtualViewport = (params: {
 
 	if (params.scrollContainerEl) {
 		params.scrollContainerEl.scrollTop = resolvedScrollTop;
-	} else if (typeof window !== "undefined") {
-		window.scrollTo({
+	} else {
+		params.rootEl.ownerDocument.defaultView?.scrollTo({
 			top: resolvedScrollTop,
 		});
 	}
@@ -146,7 +146,7 @@ export const createVirtualSurfaceNavigation = (options: {
 			return true;
 		}
 
-		await waitForNextAnimationFrame();
+		await waitForNextAnimationFrame(rootEl.ownerDocument.defaultView);
 		options.flushVirtualScrollMeasurement?.(scrollSnapshot);
 		await options.flushMountedState();
 

@@ -18,56 +18,85 @@ export interface YieldToMainThreadOptions {
 	maxDelayMs?: number;
 }
 
-function hasWindow(): boolean {
-	return typeof window !== "undefined";
+type YieldSchedulingWindowResolver = () => Window | null;
+let yieldSchedulingWindowResolver: YieldSchedulingWindowResolver | null = null;
+
+/**
+ * Binds background cooperative scheduling to the workspace realm currently
+ * receiving input. Returns a scoped reset function for plugin teardown/tests.
+ */
+export function setYieldSchedulingWindowResolver(
+	resolver: YieldSchedulingWindowResolver | null,
+): () => void {
+	const previous = yieldSchedulingWindowResolver;
+	yieldSchedulingWindowResolver = resolver;
+	return () => {
+		if (yieldSchedulingWindowResolver === resolver) {
+			yieldSchedulingWindowResolver = previous;
+		}
+	};
+}
+
+function resolveSchedulingWindow(): Window | null {
+	return (
+		yieldSchedulingWindowResolver?.() ??
+		(typeof window === "undefined" ? null : window)
+	);
 }
 
 /** Returns whether the browser reports queued discrete or continuous input. */
 export function hasPendingBrowserInput(): boolean {
-	if (typeof navigator === "undefined") {
+	const ownerNavigator =
+		resolveSchedulingWindow()?.navigator ??
+		(typeof navigator === "undefined" ? null : navigator);
+	if (!ownerNavigator) {
 		return false;
 	}
 
-	const scheduling = (navigator as Navigator & { scheduling?: BrowserScheduling })
-		.scheduling;
+	const scheduling = (
+		ownerNavigator as Navigator & {
+			scheduling?: BrowserScheduling;
+		}
+	).scheduling;
 	return scheduling?.isInputPending?.({ includeContinuous: true }) ?? false;
 }
 
 const idleRequestOptions: IdleRequestOptions = { timeout: 0 };
 
 function schedulePause(resolve: () => void, maxDelayMs: number): void {
+	const ownerWindow = resolveSchedulingWindow();
 	if (
-		hasWindow() &&
+		ownerWindow &&
 		maxDelayMs > 0 &&
-		typeof window.requestIdleCallback === "function"
+		typeof ownerWindow.requestIdleCallback === "function"
 	) {
 		let finished = false;
 		let idleId: number | undefined;
-		const timeoutId = window.setTimeout(() => {
+		const timeoutId = ownerWindow.setTimeout(() => {
 			if (finished) {
 				return;
 			}
 			finished = true;
 			if (idleId !== undefined) {
-				window.cancelIdleCallback(idleId);
+				ownerWindow.cancelIdleCallback(idleId);
 			}
 			resolve();
 		}, maxDelayMs);
 
 		idleRequestOptions.timeout = maxDelayMs;
-		idleId = window.requestIdleCallback(() => {
+		idleId = ownerWindow.requestIdleCallback(() => {
 			if (finished) {
 				return;
 			}
 			finished = true;
-			window.clearTimeout(timeoutId);
+			ownerWindow.clearTimeout(timeoutId);
 			resolve();
 		}, idleRequestOptions);
 		return;
 	}
 
-	if (hasWindow() && typeof window.requestAnimationFrame === "function") {
-		window.requestAnimationFrame(() => resolve());
+	if (ownerWindow && typeof ownerWindow.requestAnimationFrame === "function") {
+		ownerWindow.requestAnimationFrame(() => resolve());
 		return;
 	}
 

@@ -35,6 +35,15 @@ export function isHTMLElementLike(value: unknown): value is HTMLElement {
 	);
 }
 
+export function isHtmlStyleElementLike(value: unknown): value is HTMLStyleElement {
+	return (
+		isHTMLElementLike(value) &&
+		value.tagName.toLowerCase() === "style" &&
+		"sheet" in value &&
+		"media" in value
+	);
+}
+
 export function isShadowRootLike(value: unknown): value is ShadowRoot {
 	return (
 		isNodeLike(value) &&

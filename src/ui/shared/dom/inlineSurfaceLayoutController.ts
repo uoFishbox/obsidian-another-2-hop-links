@@ -29,22 +29,38 @@ export function createInlineSurfaceLayoutController(
 		return createInactiveController();
 	}
 
-	updateInlineSurfacePosition(sizer, target.container);
+	let observer: ResizeObserver | null = null;
+	let disposed = false;
 
-	const ownerWindow = target.container.ownerDocument.defaultView;
-	const ResizeObserverConstructor = ownerWindow?.ResizeObserver;
-	if (!ResizeObserverConstructor) {
-		return createCleanupController(target.container);
-	}
+	const bindObserverToCurrentWindow = (): void => {
+		observer?.disconnect();
+		observer = null;
+		if (disposed) return;
 
-	const observer = new ResizeObserverConstructor(() => {
 		updateInlineSurfacePosition(sizer, target.container);
-	});
-	observer.observe(sizer);
+		const ownerWindow = target.container.ownerDocument.defaultView;
+		const ResizeObserverConstructor = ownerWindow?.ResizeObserver;
+		if (!ResizeObserverConstructor) return;
+
+		observer = new ResizeObserverConstructor(() => {
+			updateInlineSurfacePosition(sizer, target.container);
+		});
+		observer.observe(sizer);
+	};
+
+	bindObserverToCurrentWindow();
+	const unregisterWindowMigration =
+		typeof target.container.onWindowMigrated === "function"
+			? target.container.onWindowMigrated(() => bindObserverToCurrentWindow())
+			: () => {};
 
 	return {
 		dispose: () => {
-			observer.disconnect();
+			if (disposed) return;
+			disposed = true;
+			unregisterWindowMigration();
+			observer?.disconnect();
+			observer = null;
 			clearInlineSurfacePosition(target.container);
 		},
 	};
@@ -74,14 +90,6 @@ function updateInlineSurfacePosition(sizer: HTMLElement, container: HTMLElement)
 function clearInlineSurfacePosition(container: HTMLElement): void {
 	delete container.dataset.inlineSurfaceTop;
 	container.style.removeProperty(INLINE_SURFACE_TOP_PROPERTY);
-}
-
-function createCleanupController(
-	container: HTMLElement,
-): InlineSurfaceLayoutController {
-	return {
-		dispose: () => clearInlineSurfacePosition(container),
-	};
 }
 
 function createInactiveController(): InlineSurfaceLayoutController {

@@ -40,6 +40,70 @@ describe("observeVirtualListViewport", () => {
 		teardownMutationObserverMock();
 	});
 
+	it("rebinds from window to an element scroller attached after the initial bind", async () => {
+		installAnimationFrameMock();
+
+		const wrapper = document.createElement("div");
+		const rootEl = document.createElement("div");
+		wrapper.append(rootEl);
+		document.body.append(wrapper);
+
+		setElementRect(rootEl, {
+			top: 10,
+			width: 200,
+			height: 100,
+		});
+
+		const onScrollContainerChange = vi.fn();
+		const runScrollMeasurement = vi.fn();
+		const stopObserving = observeVirtualListViewport({
+			rootEl,
+			onWidthChange: vi.fn(),
+			getCachedViewportHeight: () => 240,
+			onScrollContainerChange,
+			scheduleLayoutMeasurement: vi.fn(),
+			scheduleScrollMeasurement,
+			runScrollMeasurement,
+			runInitialLayoutMeasurement: vi.fn(),
+		});
+
+		const scrollContainer = document.createElement("div");
+		scrollContainer.style.overflow = "auto";
+		Object.defineProperty(scrollContainer, "scrollHeight", {
+			configurable: true,
+			value: 1000,
+		});
+		Object.defineProperty(scrollContainer, "clientHeight", {
+			configurable: true,
+			value: 240,
+		});
+		Object.defineProperty(scrollContainer, "scrollTop", {
+			configurable: true,
+			value: 320,
+		});
+		document.body.append(scrollContainer);
+		scrollContainer.append(wrapper);
+
+		try {
+			expect(onScrollContainerChange).toHaveBeenNthCalledWith(1, null);
+
+			await flushFrames();
+
+			expect(onScrollContainerChange).toHaveBeenNthCalledWith(2, scrollContainer);
+
+			scrollContainer.dispatchEvent(new Event("scroll"));
+			await flushFrames();
+
+			expect(runScrollMeasurement).toHaveBeenCalledWith(
+				expect.objectContaining({ scrollTop: 320 }),
+				"scroll-coverage-miss",
+			);
+		} finally {
+			stopObserving();
+			teardownAnimationFrameMock();
+		}
+	});
+
 	it("keeps the root resize observation active", () => {
 		const scrollContainer = document.createElement("div");
 		const rootEl = document.createElement("div");

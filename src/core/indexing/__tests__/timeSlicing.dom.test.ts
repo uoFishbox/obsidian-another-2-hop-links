@@ -3,6 +3,7 @@ import {
 	createYieldScheduler,
 	defaultYieldToMainThread,
 	maybeYield,
+	setYieldSchedulingWindowResolver,
 	yieldToMainThreadIdleAware,
 } from "../timeSlicing";
 
@@ -89,6 +90,41 @@ describe("createYieldScheduler", () => {
 });
 
 describe("defaultYieldToMainThread", () => {
+	test("uses the configured popout scheduling window", async () => {
+		const frame = document.createElement("iframe");
+		document.body.appendChild(frame);
+		const foreignWindow = frame.contentWindow;
+		expect(foreignWindow).not.toBeNull();
+		if (!foreignWindow) return;
+
+		const originalForeignIdle = foreignWindow.requestIdleCallback;
+		const originalForeignRaf = foreignWindow.requestAnimationFrame;
+		const mainRaf = vi.spyOn(window, "requestAnimationFrame");
+		const foreignRaf = vi.fn((callback: FrameRequestCallback) => {
+			queueMicrotask(() => callback(0));
+			return 77;
+		});
+		const resetResolver = setYieldSchedulingWindowResolver(() => foreignWindow);
+
+		try {
+			foreignWindow.requestIdleCallback =
+				undefined as unknown as typeof foreignWindow.requestIdleCallback;
+			foreignWindow.requestAnimationFrame =
+				foreignRaf as typeof foreignWindow.requestAnimationFrame;
+
+			await expect(defaultYieldToMainThread()).resolves.toBeUndefined();
+
+			expect(foreignRaf).toHaveBeenCalledTimes(1);
+			expect(mainRaf).not.toHaveBeenCalled();
+		} finally {
+			resetResolver();
+			foreignWindow.requestIdleCallback = originalForeignIdle;
+			foreignWindow.requestAnimationFrame = originalForeignRaf;
+			mainRaf.mockRestore();
+			frame.remove();
+		}
+	});
+
 	test("prioritizes requestIdleCallback over scheduler.yield", async () => {
 		const originalRequestIdleCallback = window.requestIdleCallback;
 		const originalCancelIdleCallback = window.cancelIdleCallback;

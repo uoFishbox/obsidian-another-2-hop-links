@@ -7,6 +7,7 @@ import {
 	type CCLDevMeasurementSnapshot,
 } from "./CCLDevMeasurements";
 import { getTwoHopCardCounts } from "./twoHopCardCountRegistry";
+import { collectWorkspaceDocuments } from "infrastructure/workspace/workspaceDocuments";
 
 /** Class name that identifies the virtualized two-hop list root element. */
 const TWO_HOP_LIST_SELECTOR = ".twohop-page-virtual-list";
@@ -80,25 +81,30 @@ export function registerScrollBenchmarkCommand(plugin: PluginHost): void {
 		);
 
 		try {
-			await waitForRenderSettle();
+			const ownerWindow = targets.scrollers[0]?.ownerDocument.defaultView ?? null;
+			if (!ownerWindow) {
+				throw new Error("Benchmark target has no owner window");
+			}
+			const ownerPerformance = ownerWindow.performance;
+			await waitForRenderSettle(ownerWindow);
 			resetCCLDevMeasurements();
-			performance.clearMarks(BENCHMARK_START_MARK);
-			performance.clearMarks(BENCHMARK_END_MARK);
-			performance.clearMeasures(BENCHMARK_MEASURE);
-			performance.mark(BENCHMARK_START_MARK);
+			ownerPerformance.clearMarks(BENCHMARK_START_MARK);
+			ownerPerformance.clearMarks(BENCHMARK_END_MARK);
+			ownerPerformance.clearMeasures(BENCHMARK_MEASURE);
+			ownerPerformance.mark(BENCHMARK_START_MARK);
 
-			await runScrollFrames(targets.scrollers, 1);
-			await runScrollFrames(targets.scrollers, -1);
+			await runScrollFrames(targets.scrollers, 1, ownerWindow);
+			await runScrollFrames(targets.scrollers, -1, ownerWindow);
 
-			performance.mark(BENCHMARK_END_MARK);
-			performance.measure(
+			ownerPerformance.mark(BENCHMARK_END_MARK);
+			ownerPerformance.measure(
 				BENCHMARK_MEASURE,
 				BENCHMARK_START_MARK,
 				BENCHMARK_END_MARK,
 			);
 			// Idle detection is timer-based, so the final idle measurement lands
 			// after the last scroll frame. Wait for it before taking the snapshot.
-			await waitForRenderSettle();
+			await waitForRenderSettle(ownerWindow);
 
 			const measurements = getCCLDevMeasurementSnapshot();
 			const cardCounts = collectPageCardCounts(targets.roots);
@@ -114,22 +120,21 @@ export function registerScrollBenchmarkCommand(plugin: PluginHost): void {
 }
 
 function findBenchmarkTargets(plugin: PluginHost): BenchmarkTargets {
-	const roots =
-		plugin.app.workspace.containerEl.querySelectorAll<HTMLElement>(
-			TWO_HOP_LIST_SELECTOR,
-		);
-
 	const scrollers = new Set<HTMLElement>();
 	const visibleRoots: HTMLElement[] = [];
-	for (const root of roots) {
-		if (root.clientHeight === 0 && root.clientWidth === 0) {
-			continue;
-		}
+	for (const ownerDocument of collectWorkspaceDocuments(plugin.app.workspace)) {
+		const roots =
+			ownerDocument.querySelectorAll<HTMLElement>(TWO_HOP_LIST_SELECTOR);
+		for (const root of roots) {
+			if (root.clientHeight === 0 && root.clientWidth === 0) {
+				continue;
+			}
 
-		const scroller = findNearestScrollContainerCached(root);
-		if (scroller) {
-			visibleRoots.push(root);
-			scrollers.add(scroller);
+			const scroller = findNearestScrollContainerCached(root);
+			if (scroller) {
+				visibleRoots.push(root);
+				scrollers.add(scroller);
+			}
 		}
 	}
 
@@ -179,9 +184,9 @@ function sumMeasurementCounts(snapshot: CCLDevMeasurementSnapshot): number {
  * the total of dev measurement counters has not changed for `SETTLE_QUIET_FRAMES`
  * consecutive frames, or when `MAX_SETTLE_WAIT_MS` has been exceeded.
  */
-function waitForRenderSettle(): Promise<void> {
+function waitForRenderSettle(ownerWindow: Window): Promise<void> {
 	return new Promise((resolve) => {
-		const startedAt = performance.now();
+		const startedAt = ownerWindow.performance.now();
 		let quietStreak = 0;
 		let lastTotal = sumMeasurementCounts(getCCLDevMeasurementSnapshot());
 
@@ -194,16 +199,16 @@ function waitForRenderSettle(): Promise<void> {
 				lastTotal = currentTotal;
 			}
 
-			const elapsedMs = performance.now() - startedAt;
+			const elapsedMs = ownerWindow.performance.now() - startedAt;
 			if (quietStreak >= SETTLE_QUIET_FRAMES || elapsedMs >= MAX_SETTLE_WAIT_MS) {
 				resolve();
 				return;
 			}
 
-			requestAnimationFrame(step);
+			ownerWindow.requestAnimationFrame(step);
 		}
 
-		requestAnimationFrame(step);
+		ownerWindow.requestAnimationFrame(step);
 	});
 }
 
@@ -215,6 +220,7 @@ function waitForRenderSettle(): Promise<void> {
 function runScrollFrames(
 	scrollers: readonly HTMLElement[],
 	direction: 1 | -1,
+	ownerWindow: Window,
 ): Promise<void> {
 	return new Promise((resolve) => {
 		let framesDone = 0;
@@ -230,10 +236,10 @@ function runScrollFrames(
 				return;
 			}
 
-			requestAnimationFrame(step);
+			ownerWindow.requestAnimationFrame(step);
 		}
 
-		requestAnimationFrame(step);
+		ownerWindow.requestAnimationFrame(step);
 	});
 }
 

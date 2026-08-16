@@ -99,11 +99,12 @@ export class ScrollManager {
 
 		// 同期で一度適用し、次フレームでも再適用して自動スクロールの上書きを防ぐ
 		applySavedScrollTop();
-		if (typeof window.requestAnimationFrame === "function") {
-			window.requestAnimationFrame(() => applySavedScrollTop());
+		const ownerWindow = view.containerEl.ownerDocument.defaultView;
+		if (ownerWindow?.requestAnimationFrame) {
+			ownerWindow.requestAnimationFrame(() => applySavedScrollTop());
 			return;
 		}
 
-		window.setTimeout(() => applySavedScrollTop(), 0);
+		ownerWindow?.setTimeout(() => applySavedScrollTop(), 0);
 	}
 }

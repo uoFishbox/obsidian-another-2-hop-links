@@ -15,6 +15,8 @@ import {
 	normalizeHrefToLookupPath,
 	toCaseInsensitiveLookupKey,
 } from "core/indexing/link-resolution/linkResolution";
+import { isHTMLElementLike } from "ui/shared/dom/realmSafeDom";
+import { collectWorkspaceDocuments } from "infrastructure/workspace/workspaceDocuments";
 
 export interface ViewUpdateOrchestrator {
 	updateAllViews(): void;
@@ -332,16 +334,19 @@ export function createViewUpdateOrchestrator(
 			return;
 		}
 
-		const basesPanes = document.querySelectorAll<HTMLElement>(".bases-view");
-		basesPanes.forEach((pane) => {
-			if (affectedLookupKeys) {
-				const links = collectBasesLinksIfAffected(pane, affectedLookupKeys);
-				if (links === null) return;
-				processBasesPane(pane as HTMLElement, stylingService, links);
-			} else {
-				processBasesPane(pane as HTMLElement, stylingService);
-			}
-		});
+		for (const ownerDocument of collectWorkspaceDocuments(app.workspace)) {
+			const basesPanes =
+				ownerDocument.querySelectorAll<HTMLElement>(".bases-view");
+			basesPanes.forEach((pane) => {
+				if (affectedLookupKeys) {
+					const links = collectBasesLinksIfAffected(pane, affectedLookupKeys);
+					if (links === null) return;
+					processBasesPane(pane, stylingService, links);
+				} else {
+					processBasesPane(pane, stylingService);
+				}
+			});
+		}
 	}
 
 	return {
@@ -373,7 +378,7 @@ function getPreviewContainerForReadingView(view: MarkdownView): HTMLElement | nu
 				containerEl?: HTMLElement;
 		  }
 		| undefined;
-	if (previewMode?.containerEl instanceof HTMLElement) {
+	if (isHTMLElementLike(previewMode?.containerEl)) {
 		return previewMode.containerEl;
 	}
 

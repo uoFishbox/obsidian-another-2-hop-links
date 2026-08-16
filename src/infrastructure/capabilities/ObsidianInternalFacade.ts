@@ -1,6 +1,7 @@
 import type { App, TFile, WorkspaceLeaf } from "obsidian";
 import type { CanvasViewCanvas, GlobalSearchPluginInstance } from "obsidian-typings";
 import type { CanvasNodeData } from "types/obsidian";
+import { isHTMLElementLike } from "ui/shared/dom/realmSafeDom";
 
 export type InternalCapability =
 	| "page-preview:onLinkHover"
@@ -264,7 +265,7 @@ export function getMetadataEditorContentEl(view: unknown): HTMLElement | null {
 		return null;
 	}
 
-	return view.metadataEditor.contentEl instanceof HTMLElement
+	return isHTMLElementLike(view.metadataEditor.contentEl)
 		? view.metadataEditor.contentEl
 		: null;
 }

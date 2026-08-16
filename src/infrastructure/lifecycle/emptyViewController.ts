@@ -10,6 +10,7 @@ import {
 import type { ComponentInstance } from "infrastructure/lifecycle/ComponentController";
 import AllNotesPage from "features/all-notes/ui/AllNotesPage.svelte";
 import { getLeafId } from "infrastructure/workspace/workspaceLeafIdentity";
+import { isHTMLElementLike } from "ui/shared/dom/realmSafeDom";
 
 interface MountedEmptyView {
 	component: ComponentInstance | undefined;
@@ -45,12 +46,12 @@ export function createEmptyViewController(
 		}
 
 		const directChild = containerEl.querySelector(":scope > .view-content");
-		if (directChild instanceof HTMLElement) {
+		if (isHTMLElementLike(directChild)) {
 			return directChild;
 		}
 
 		const fallback = containerEl.querySelector(".view-content");
-		return fallback instanceof HTMLElement ? fallback : null;
+		return isHTMLElementLike(fallback) ? fallback : null;
 	}
 
 	function createSourceFileForContext(): TFile {
@@ -91,7 +92,7 @@ export function createEmptyViewController(
 
 		hostEl.classList.add("cosense-card-links-empty-view-host");
 
-		const rootEl = document.createElement("div");
+		const rootEl = hostEl.ownerDocument.createElement("div");
 		rootEl.className = "cosense-card-links-empty-view-root";
 		hostEl.appendChild(rootEl);
 

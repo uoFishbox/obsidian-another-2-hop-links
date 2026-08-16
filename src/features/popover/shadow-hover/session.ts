@@ -25,7 +25,11 @@ import {
 	transitionHoverSession,
 	transitionHoverSessionInteraction,
 } from "./state-machine";
-import { isElementLike, isHTMLElementLike } from "ui/shared/dom/realmSafeDom";
+import {
+	getOptionalOwnerWindow,
+	isElementLike,
+	isHTMLElementLike,
+} from "ui/shared/dom/realmSafeDom";
 
 type PopoverPositionPatchState = {
 	ownerSession: ShadowHoverSession;
@@ -205,6 +209,7 @@ export function createShadowHoverSession(
 		teardownPopoverListeners: null,
 		lastHoverPath: null,
 		handoffTimer: null,
+		handoffTimerWindow: null,
 		logs: [],
 		logSeq: 0,
 	};
@@ -570,7 +575,10 @@ export function scheduleAttachPopoverHoverListeners(
 			}
 			return;
 		}
-		window.requestAnimationFrame(() =>
+		const anchor = getActiveSessionAnchor(session)?.actualEl;
+		const ownerWindow = getOptionalOwnerWindow(anchor);
+		if (!ownerWindow) return;
+		ownerWindow.requestAnimationFrame(() =>
 			scheduleAttachPopoverHoverListeners(popover, session, retries - 1),
 		);
 		return;
@@ -706,7 +714,8 @@ export function expirePendingPopoverHandoff(
 
 export function clearPendingHandoffTimer(session: ShadowHoverSession): void {
 	if (session.handoffTimer != null) {
-		window.clearTimeout(session.handoffTimer);
+		session.handoffTimerWindow?.clearTimeout(session.handoffTimer);
 		session.handoffTimer = null;
+		session.handoffTimerWindow = null;
 	}
 }

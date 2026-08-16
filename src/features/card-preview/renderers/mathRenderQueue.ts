@@ -6,12 +6,14 @@ type QueueTask = {
 	resolve: () => void;
 	run: () => Promise<void>;
 	signal?: AbortSignal;
+	ownerWindow?: Window | null;
 };
 
 interface EnqueueMathRenderOptions {
 	key?: string;
 	priority?: "high" | "normal";
 	signal?: AbortSignal;
+	ownerWindow?: Window | null;
 }
 
 const MAX_CONCURRENT_MATH_RENDERS = 1;
@@ -22,7 +24,7 @@ const pendingTasks: QueueTask[] = [];
 const scheduledTasks = new Set<QueueTask>();
 const queuedTaskByKey = new Map<string, QueueTask>();
 
-function scheduleTask(task: () => void): void {
+function scheduleTask(task: () => void, ownerWindow?: Window | null): void {
 	let hasRun = false;
 	const runTask = () => {
 		if (hasRun) return;
@@ -30,33 +32,28 @@ function scheduleTask(task: () => void): void {
 		task();
 	};
 
-	if (typeof window !== "undefined") {
-		const requestIdleCallback = (
-			window as Window & {
-				requestIdleCallback?: (
-					callback: () => void,
-					options?: { timeout: number },
-				) => number;
-			}
-		).requestIdleCallback;
-
-		if (typeof requestIdleCallback === "function") {
-			const fallbackTimer = window.setTimeout(
+	const targetWindow = ownerWindow ?? (typeof window === "undefined" ? null : window);
+	if (targetWindow) {
+		if (typeof targetWindow.requestIdleCallback === "function") {
+			const fallbackTimer = targetWindow.setTimeout(
 				runTask,
 				IDLE_TIMEOUT_MS + IDLE_FALLBACK_BUFFER_MS,
 			);
-			requestIdleCallback(
+			targetWindow.requestIdleCallback(
 				() => {
-					window.clearTimeout(fallbackTimer);
+					targetWindow.clearTimeout(fallbackTimer);
 					runTask();
 				},
 				{ timeout: IDLE_TIMEOUT_MS },
 			);
 			return;
 		}
+
+		targetWindow.setTimeout(runTask, 0);
+		return;
 	}
 
-	setTimeout(runTask, 0);
+	globalThis.setTimeout(runTask, 0);
 }
 
 function removePendingTask(task: QueueTask): boolean {
@@ -115,7 +112,7 @@ function processQueue(): void {
 					cleanupKeyMapping(nextTask);
 					processQueue();
 				});
-		});
+		}, nextTask.ownerWindow);
 
 		break;
 	}
@@ -125,7 +122,7 @@ export function enqueueMathRender(
 	task: () => Promise<void>,
 	options: EnqueueMathRenderOptions = {},
 ): Promise<void> {
-	const { signal, key, priority = "normal" } = options;
+	const { signal, key, priority = "normal", ownerWindow } = options;
 
 	return new Promise((resolve, reject) => {
 		let settled = false;
@@ -147,6 +144,7 @@ export function enqueueMathRender(
 			resolve: () => settle(() => resolve()),
 			run: task,
 			signal,
+			ownerWindow,
 		};
 
 		if (signal?.aborted) {

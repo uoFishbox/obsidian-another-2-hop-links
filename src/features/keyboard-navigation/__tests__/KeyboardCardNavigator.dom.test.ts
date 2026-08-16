@@ -609,4 +609,55 @@ describe("KeyboardCardNavigator", () => {
 			expect(getSelectedCard(root)).toBeNull();
 		});
 	});
+	describe("window migration", () => {
+		it("rebinds the keydown listener to the migrated surface document", () => {
+			const root = createSurface("inline", [
+				createCard("row-1-a", { top: 10, left: 20 }),
+			]);
+			document.body.append(root);
+			let migrate: ((ownerWindow: Window) => void) | undefined;
+			const unregister = vi.fn();
+			Object.defineProperty(root, "onWindowMigrated", {
+				configurable: true,
+				value: vi.fn((listener: (ownerWindow: Window) => void) => {
+					migrate = listener;
+					return unregister;
+				}),
+			});
+			const navigator = new KeyboardCardNavigator(
+				{ workspace: createWorkspace({}) },
+				vi.fn(),
+			);
+			navigator.activate(root, "inline");
+
+			const frame = document.createElement("iframe");
+			document.body.append(frame);
+			const foreignDocument = frame.contentDocument;
+			const foreignWindow = frame.contentWindow;
+			expect(foreignDocument).toBeTruthy();
+			expect(foreignWindow).toBeTruthy();
+			if (!foreignDocument || !foreignWindow) return;
+
+			foreignDocument.body.append(root);
+			migrate?.(foreignWindow);
+
+			const foreignEventWindow = foreignWindow as Window & {
+				KeyboardEvent: typeof KeyboardEvent;
+			};
+
+			document.dispatchEvent(
+				new KeyboardEvent("keydown", { key: "Escape", bubbles: true }),
+			);
+			expect(root.classList.contains("ccl-kb-nav-active")).toBe(true);
+
+			foreignDocument.dispatchEvent(
+				new foreignEventWindow.KeyboardEvent("keydown", {
+					key: "Escape",
+					bubbles: true,
+				}),
+			);
+			expect(root.classList.contains("ccl-kb-nav-active")).toBe(false);
+			expect(unregister).toHaveBeenCalledOnce();
+		});
+	});
 });

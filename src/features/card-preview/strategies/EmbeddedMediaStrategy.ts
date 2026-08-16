@@ -12,6 +12,7 @@ import {
 	toObsidianResourceUrl,
 } from "../renderers/externalImageSource";
 import { generateVideoPreview } from "../renderers/videoPreviewRenderer";
+import { resolveWorkspaceDocument } from "infrastructure/workspace/workspaceDocuments";
 
 const TEXT_PREVIEW_EMBED_HOSTS = ["x.com", "twitter.com", "youtube.com", "youtu.be"];
 
@@ -90,7 +91,11 @@ async function resolveEmbeddedMedia(
 	}
 
 	if (resolved && isVideo(resolved)) {
-		return await generateVideoPreview(resolved, signal);
+		return await generateVideoPreview(
+			resolved,
+			signal,
+			context.app ? resolveWorkspaceDocument(context.app.workspace) : undefined,
+		);
 	}
 
 	if (embedded.syntax !== "markdown") {

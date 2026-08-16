@@ -1,6 +1,7 @@
 import { App, Notice, TFile } from "obsidian";
 import { resolveFileByPath } from "shared/obsidian/resolveFileByPath";
 import type { TwoHopLinkResult } from "types/domain";
+import { resolveWorkspaceDocument } from "infrastructure/workspace/workspaceDocuments";
 
 const PAGE_TYPE_SORT_ORDER = {
 	mainpage: 0,
@@ -19,7 +20,9 @@ export async function exportToClipboard(
 ): Promise<void> {
 	try {
 		const content = await generateExportContent(app, result);
-		await navigator.clipboard.writeText(content);
+		const ownerWindow = resolveWorkspaceDocument(app.workspace)?.defaultView;
+		if (!ownerWindow) throw new Error("No active workspace window");
+		await ownerWindow.navigator.clipboard.writeText(content);
 		new Notice("2-hop links exported to clipboard!");
 	} catch (error) {
 		console.error("Failed to export 2-hop links:", error);
@@ -34,21 +37,26 @@ export async function downloadAsFile(
 	try {
 		const content = await generateExportContent(app, result);
 		const fileName = `2-Hop Links - ${result.originFile.basename}.txt`;
+		const ownerDocument = resolveWorkspaceDocument(app.workspace);
+		const ownerWindow = ownerDocument?.defaultView;
+		if (!ownerDocument || !ownerWindow) {
+			throw new Error("No active workspace window");
+		}
+
 		const blob = new Blob([content], {
 			type: "text/plain;charset=utf-8",
 		});
-
 		const url = URL.createObjectURL(blob);
 
-		const link = document.createElement("a");
+		const link = ownerDocument.createElement("a");
 		link.href = url;
 		link.download = fileName;
 		link.style.display = "none";
-		document.body.appendChild(link);
+		ownerDocument.body.appendChild(link);
 
 		link.click();
-		document.body.removeChild(link);
-		setTimeout(() => URL.revokeObjectURL(url), 100);
+		link.remove();
+		ownerWindow.setTimeout(() => URL.revokeObjectURL(url), 100);
 	} catch (error) {
 		console.error("Failed to download file:", error);
 		new Notice("Failed to download file. Check console for details.");

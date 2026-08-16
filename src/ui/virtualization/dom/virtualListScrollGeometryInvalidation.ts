@@ -5,7 +5,9 @@ export type ScrollGeometryInvalidationReason =
 	| "structure-mutation"
 	| "subscriber-cleanup"
 	| "scroller-changed"
-	| "navigation-scroll";
+	| "navigation-scroll"
+	| "window-migration"
+	| "observer-bind";
 
 type VirtualListDebugCounterName = "scrollGeometryInvalidation";
 

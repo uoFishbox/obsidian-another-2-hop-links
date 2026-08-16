@@ -10,6 +10,12 @@ export interface VirtualFrameCoordinator {
 	schedule(lane: VirtualFrameLane, key: string, task: () => void): boolean;
 	cancel(lane: VirtualFrameLane, key: string): void;
 	isScheduled(lane: VirtualFrameLane, key: string): boolean;
+	/**
+	 * Binds this surface scheduler to its actual DOM realm. The implementation
+	 * follows Obsidian's onWindowMigrated hook so popout moves rebind queued work.
+	 * Optional to keep lightweight test doubles/source-compatible consumers valid.
+	 */
+	bindOwnerElement?(element: HTMLElement | null): void;
 	dispose(): void;
 }
 
@@ -35,13 +41,22 @@ export function createVirtualFrameCoordinator(
 		"post-paint": new Map(),
 		idle: new Map(),
 	};
+	let boundOwnerWindow: Window | null = null;
+	let boundOwnerElement: HTMLElement | null = null;
+	let unregisterWindowMigration: (() => void) | null = null;
+
 	let criticalHandle: number | null = null;
+	let criticalHandleWindow: Window | null = null;
 	let criticalUsesAnimationFrame = false;
 	let postPaintFrameHandle: number | null = null;
+	let postPaintFrameWindow: Window | null = null;
 	let postPaintUsesAnimationFrame = false;
 	let postPaintTaskHandle: number | null = null;
+	let postPaintTaskWindow: Window | null = null;
 	let idleHandle: number | null = null;
+	let idleHandleWindow: Window | null = null;
 	let idleWatchdogHandle: number | null = null;
+	let idleWatchdogWindow: Window | null = null;
 	let idleUsesCallback = false;
 	let disposed = false;
 	const scheduledKeysScratch: string[] = [];
@@ -52,11 +67,17 @@ export function createVirtualFrameCoordinator(
 	};
 
 	const resolveWindow = (): Window | null =>
-		params.getWindow?.() ?? (typeof window === "undefined" ? null : window);
-	const readNow = (): number =>
-		typeof globalThis.performance?.now === "function"
-			? globalThis.performance.now()
-			: Date.now();
+		boundOwnerWindow ??
+		params.getWindow?.() ??
+		(typeof window === "undefined" ? null : window);
+	const readNow = (): number => {
+		const ownerWindow = resolveWindow();
+		return typeof ownerWindow?.performance?.now === "function"
+			? ownerWindow.performance.now()
+			: typeof globalThis.performance?.now === "function"
+				? globalThis.performance.now()
+				: Date.now();
+	};
 
 	function runLane(lane: VirtualFrameLane, budgetMs: number, maxTasks: number): void {
 		const queue = queues[lane];
@@ -94,9 +115,11 @@ export function createVirtualFrameCoordinator(
 		if (!ownerWindow) return;
 		const drain = (): void => {
 			criticalHandle = null;
+			criticalHandleWindow = null;
 			runLane("scroll-critical", CRITICAL_BUDGET_MS, Number.POSITIVE_INFINITY);
 			if (queues["scroll-critical"].size > 0) scheduleCriticalDrain();
 		};
+		criticalHandleWindow = ownerWindow;
 		if (typeof ownerWindow.requestAnimationFrame === "function") {
 			criticalUsesAnimationFrame = true;
 			criticalHandle = ownerWindow.requestAnimationFrame(drain);
@@ -114,12 +137,16 @@ export function createVirtualFrameCoordinator(
 		if (!ownerWindow) return;
 		const afterFrame = (): void => {
 			postPaintFrameHandle = null;
+			postPaintFrameWindow = null;
+			postPaintTaskWindow = ownerWindow;
 			postPaintTaskHandle = ownerWindow.setTimeout(() => {
 				postPaintTaskHandle = null;
+				postPaintTaskWindow = null;
 				runLane("post-paint", POST_PAINT_BUDGET_MS, 1);
 				if (queues["post-paint"].size > 0) schedulePostPaintDrain();
 			}, 0);
 		};
+		postPaintFrameWindow = ownerWindow;
 		if (typeof ownerWindow.requestAnimationFrame === "function") {
 			postPaintUsesAnimationFrame = true;
 			postPaintFrameHandle = ownerWindow.requestAnimationFrame(afterFrame);
@@ -145,15 +172,18 @@ export function createVirtualFrameCoordinator(
 			runLane("idle", IDLE_BUDGET_MS, 1);
 			if (queues.idle.size > 0) scheduleIdleDrain();
 		};
+		idleHandleWindow = ownerWindow;
 		if (typeof ownerWindow.requestIdleCallback === "function") {
 			idleUsesCallback = true;
 			let requestHandle: number | undefined;
 			const drainFromIdleCallback = (): void => {
 				if (requestHandle === undefined || idleHandle !== requestHandle) return;
 				idleHandle = null;
+				idleHandleWindow = null;
 				if (idleWatchdogHandle !== null) {
-					ownerWindow.clearTimeout(idleWatchdogHandle);
+					idleWatchdogWindow?.clearTimeout(idleWatchdogHandle);
 					idleWatchdogHandle = null;
+					idleWatchdogWindow = null;
 				}
 				runIdleTasks();
 			};
@@ -169,37 +199,42 @@ export function createVirtualFrameCoordinator(
 					return;
 				}
 				idleWatchdogHandle = null;
+				idleWatchdogWindow = null;
 				ownerWindow.cancelIdleCallback(requestHandle);
 				idleHandle = null;
+				idleHandleWindow = null;
 				runIdleTasks();
 			}, IDLE_CALLBACK_TIMEOUT_MS);
 			idleWatchdogHandle = watchdogHandle;
+			idleWatchdogWindow = ownerWindow;
 			return;
 		}
 		idleUsesCallback = false;
 		idleHandle = ownerWindow.setTimeout(() => {
 			idleHandle = null;
+			idleHandleWindow = null;
 			runIdleTasks();
 		}, 0);
 	}
 
 	function cancelIdleDrain(): void {
-		const ownerWindow = resolveWindow();
-		if (ownerWindow && idleHandle !== null) {
+		if (idleHandle !== null && idleHandleWindow) {
 			if (
 				idleUsesCallback &&
-				typeof ownerWindow.cancelIdleCallback === "function"
+				typeof idleHandleWindow.cancelIdleCallback === "function"
 			) {
-				ownerWindow.cancelIdleCallback(idleHandle);
+				idleHandleWindow.cancelIdleCallback(idleHandle);
 			} else {
-				ownerWindow.clearTimeout(idleHandle);
+				idleHandleWindow.clearTimeout(idleHandle);
 			}
 		}
-		if (ownerWindow && idleWatchdogHandle !== null) {
-			ownerWindow.clearTimeout(idleWatchdogHandle);
+		if (idleWatchdogHandle !== null && idleWatchdogWindow) {
+			idleWatchdogWindow.clearTimeout(idleWatchdogHandle);
 		}
 		idleHandle = null;
+		idleHandleWindow = null;
 		idleWatchdogHandle = null;
+		idleWatchdogWindow = null;
 	}
 
 	const unsubscribeScrollActivity = subscribeScrollActivity((isActive) => {
@@ -211,34 +246,64 @@ export function createVirtualFrameCoordinator(
 	});
 
 	function cancelAllHandles(): void {
-		const ownerWindow = resolveWindow();
-		if (ownerWindow && criticalHandle !== null) {
+		if (criticalHandle !== null && criticalHandleWindow) {
 			if (
 				criticalUsesAnimationFrame &&
-				typeof ownerWindow.cancelAnimationFrame === "function"
+				typeof criticalHandleWindow.cancelAnimationFrame === "function"
 			) {
-				ownerWindow.cancelAnimationFrame(criticalHandle);
+				criticalHandleWindow.cancelAnimationFrame(criticalHandle);
 			} else {
-				ownerWindow.clearTimeout(criticalHandle);
+				criticalHandleWindow.clearTimeout(criticalHandle);
 			}
 		}
-		if (ownerWindow && postPaintFrameHandle !== null) {
+		if (postPaintFrameHandle !== null && postPaintFrameWindow) {
 			if (
 				postPaintUsesAnimationFrame &&
-				typeof ownerWindow.cancelAnimationFrame === "function"
+				typeof postPaintFrameWindow.cancelAnimationFrame === "function"
 			) {
-				ownerWindow.cancelAnimationFrame(postPaintFrameHandle);
+				postPaintFrameWindow.cancelAnimationFrame(postPaintFrameHandle);
 			} else {
-				ownerWindow.clearTimeout(postPaintFrameHandle);
+				postPaintFrameWindow.clearTimeout(postPaintFrameHandle);
 			}
 		}
-		if (ownerWindow && postPaintTaskHandle !== null) {
-			ownerWindow.clearTimeout(postPaintTaskHandle);
+		if (postPaintTaskHandle !== null && postPaintTaskWindow) {
+			postPaintTaskWindow.clearTimeout(postPaintTaskHandle);
 		}
 		criticalHandle = null;
+		criticalHandleWindow = null;
 		postPaintFrameHandle = null;
+		postPaintFrameWindow = null;
 		postPaintTaskHandle = null;
+		postPaintTaskWindow = null;
 		cancelIdleDrain();
+	}
+
+	function schedulePendingLanes(): void {
+		if (disposed) return;
+		if (queues["scroll-critical"].size > 0) scheduleCriticalDrain();
+		if (queues["post-paint"].size > 0) schedulePostPaintDrain();
+		if (queues.idle.size > 0) scheduleIdleDrain();
+	}
+
+	function setBoundOwnerWindow(nextWindow: Window | null): void {
+		if (boundOwnerWindow === nextWindow) return;
+		cancelAllHandles();
+		boundOwnerWindow = nextWindow;
+		schedulePendingLanes();
+	}
+
+	function bindOwnerElement(element: HTMLElement | null): void {
+		if (disposed || boundOwnerElement === element) return;
+		unregisterWindowMigration?.();
+		unregisterWindowMigration = null;
+		boundOwnerElement = element;
+		setBoundOwnerWindow(element?.ownerDocument.defaultView ?? null);
+
+		if (element && typeof element.onWindowMigrated === "function") {
+			unregisterWindowMigration = element.onWindowMigrated((ownerWindow) => {
+				setBoundOwnerWindow(ownerWindow);
+			});
+		}
 	}
 
 	return {
@@ -254,9 +319,13 @@ export function createVirtualFrameCoordinator(
 			queues[lane].delete(key);
 		},
 		isScheduled: (lane, key) => queues[lane].has(key),
+		bindOwnerElement,
 		dispose(): void {
 			if (disposed) return;
 			disposed = true;
+			unregisterWindowMigration?.();
+			unregisterWindowMigration = null;
+			boundOwnerElement = null;
 			cancelAllHandles();
 			for (const queue of Object.values(queues)) queue.clear();
 			unsubscribeScrollActivity();

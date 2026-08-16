@@ -451,8 +451,24 @@ function createHandle({
 			releaseActiveAnchor(handle);
 		}
 	};
-	const doc = shadowRoot.ownerDocument;
-	const win = doc.defaultView;
+	let boundDocument: Document | null = null;
+	let boundWindow: Window | null = null;
+	const unbindRealmListeners = (): void => {
+		boundDocument?.removeEventListener("keydown", onKeyDown, true);
+		boundDocument?.removeEventListener("keyup", onKeyUp, true);
+		boundWindow?.removeEventListener("blur", onWindowBlur);
+		boundDocument = null;
+		boundWindow = null;
+	};
+	const bindRealmListeners = (): void => {
+		unbindRealmListeners();
+		boundDocument = shadowRoot.ownerDocument;
+		boundWindow = boundDocument.defaultView;
+		boundDocument.addEventListener("keydown", onKeyDown, true);
+		boundDocument.addEventListener("keyup", onKeyUp, true);
+		boundWindow?.addEventListener("blur", onWindowBlur);
+	};
+
 	shadowRoot.addEventListener("mouseover", onMouseOver);
 	shadowRoot.addEventListener("mouseout", onMouseOut);
 	shadowRoot.addEventListener("pointermove", onPointerMove);
@@ -460,11 +476,23 @@ function createHandle({
 		VIRTUAL_CELL_WILL_REBIND_EVENT,
 		onVirtualCellWillRebind,
 	);
-	doc.addEventListener("keydown", onKeyDown, true);
-	doc.addEventListener("keyup", onKeyUp, true);
-	win?.addEventListener("blur", onWindowBlur);
+	bindRealmListeners();
+	const shadowHost = isHTMLElementLike(shadowRoot.host) ? shadowRoot.host : null;
+	const unregisterWindowMigration =
+		shadowHost && typeof shadowHost.onWindowMigrated === "function"
+			? shadowHost.onWindowMigrated(() => {
+					if (handle.hoveredAnchorEl) {
+						delete handle.hoveredAnchorEl.dataset.cclHovered;
+						handle.hoveredAnchorEl = null;
+					}
+					releaseActiveAnchor(handle);
+					bindRealmListeners();
+				})
+			: null;
+
 	handle.disposeListeners = () => {
 		unsubscribeScrollActivity();
+		unregisterWindowMigration?.();
 		shadowRoot.removeEventListener("mouseover", onMouseOver);
 		shadowRoot.removeEventListener("mouseout", onMouseOut);
 		shadowRoot.removeEventListener("pointermove", onPointerMove);
@@ -472,9 +500,7 @@ function createHandle({
 			VIRTUAL_CELL_WILL_REBIND_EVENT,
 			onVirtualCellWillRebind,
 		);
-		doc.removeEventListener("keydown", onKeyDown, true);
-		doc.removeEventListener("keyup", onKeyUp, true);
-		win?.removeEventListener("blur", onWindowBlur);
+		unbindRealmListeners();
 	};
 	return handle;
 }

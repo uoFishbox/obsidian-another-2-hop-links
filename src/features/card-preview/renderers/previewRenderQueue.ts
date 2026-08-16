@@ -7,6 +7,7 @@ type RenderTask<T> = {
 	resolve: (value: T) => void;
 	run: () => Promise<T>;
 	signal?: AbortSignal;
+	ownerWindow?: Window | null;
 };
 
 const MAX_CONCURRENT_PREVIEW_RENDERS = 1;
@@ -18,16 +19,21 @@ function createAbortError(): DOMException {
 	return new DOMException("Preview render aborted", "AbortError");
 }
 
-function scheduleTask(task: () => void): void {
-	if (typeof window !== "undefined") {
+function scheduleTask(task: () => void, ownerWindow?: Window | null): void {
+	const targetWindow = ownerWindow ?? (typeof window === "undefined" ? null : window);
+	if (targetWindow) {
 		if (process.env.NODE_ENV !== "production") {
 			recordCCLDevMeasurement("preview.renderScheduler.animationFrame");
 		}
-		window.requestAnimationFrame(() => task());
+		if (typeof targetWindow.requestAnimationFrame === "function") {
+			targetWindow.requestAnimationFrame(() => task());
+		} else {
+			targetWindow.setTimeout(task, 0);
+		}
 		return;
 	}
 
-	setTimeout(task, 0);
+	globalThis.setTimeout(task, 0);
 }
 
 function removePendingTask(task: RenderTask<unknown>): boolean {
@@ -76,12 +82,13 @@ function drainPreviewRenderQueue(): void {
 				activePreviewRenders = Math.max(activePreviewRenders - 1, 0);
 				drainPreviewRenderQueue();
 			});
-	});
+	}, nextTask.ownerWindow);
 }
 
 export function enqueuePreviewRender<T>(
 	run: () => Promise<T>,
 	signal?: AbortSignal,
+	ownerWindow?: Window | null,
 ): Promise<T> {
 	return new Promise<T>((resolve, reject) => {
 		let settled = false;
@@ -102,6 +109,7 @@ export function enqueuePreviewRender<T>(
 			resolve: (value) => settle(() => resolve(value)),
 			run,
 			signal,
+			ownerWindow,
 		};
 
 		if (signal?.aborted) {

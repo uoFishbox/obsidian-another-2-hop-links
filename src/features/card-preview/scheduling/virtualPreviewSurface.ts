@@ -47,6 +47,8 @@ export interface VirtualPreviewSurface {
 
 export interface CreateVirtualPreviewSurfaceOptions {
 	readonly frameCoordinator?: VirtualFrameCoordinator;
+	/** Realm used by the flush driver when no coordinator accepts the task. */
+	readonly getWindow?: () => Window | null;
 	readonly activationScheduler: PreviewActivationScheduler;
 	readonly createRenderer: () => CardPreviewRenderer;
 	/** Optional lifecycle probe invoked after an unbound slot runtime is released. */
@@ -97,6 +99,7 @@ export function createVirtualPreviewSurface(
 	const frameFlushDriver = createPreviewFrameDriver({
 		coordinator: options.frameCoordinator,
 		taskKey: PREVIEW_SURFACE_FLUSH_KEY,
+		getWindow: options.getWindow,
 		onFrame: applyDesiredState,
 	});
 

@@ -22,7 +22,7 @@ import {
 import type { CardPreviewRequest } from "features/card-preview/core/cardPreviewRequest";
 
 function moveChildrenToFragment(source: HTMLElement): DocumentFragment {
-	const fragment = document.createDocumentFragment();
+	const fragment = source.ownerDocument.createDocumentFragment();
 	while (source.firstChild) {
 		fragment.appendChild(source.firstChild);
 	}
@@ -165,6 +165,7 @@ export function createCardPreviewRenderer(
 					canDetachRenderedTextPreview(previewForRender.content)
 				) {
 					const renderedFragment = await renderDetachedTextPreviewFragment({
+						document: container.ownerDocument,
 						content: previewForRender.content,
 						app: options.app,
 						sourcePath: file.path,
@@ -186,7 +187,7 @@ export function createCardPreviewRenderer(
 				if (previewForRender.type === "image") {
 					if (isRenderStale(signal)) return false;
 					const imageSrc = toPreviewImageSrc(previewForRender.content);
-					const image = document.createElement("img");
+					const image = container.ownerDocument.createElement("img");
 					image.alt = `preview for ${file.basename}`;
 					image.loading = "lazy";
 					image.decoding = "async";
@@ -207,7 +208,7 @@ export function createCardPreviewRenderer(
 					});
 				}
 
-				const tempContainer = document.createElement("div");
+				const tempContainer = container.ownerDocument.createElement("div");
 				await renderPreviewContent(
 					tempContainer,
 					previewForRender,
@@ -244,6 +245,7 @@ export function createCardPreviewRenderer(
 					) {
 						const renderedFragment =
 							await renderDetachedTextPreviewFragment({
+								document: container.ownerDocument,
 								content: previewForRender.content,
 								app: options.app,
 								sourcePath: file.path,
@@ -269,7 +271,7 @@ export function createCardPreviewRenderer(
 						return;
 					}
 
-					const mathContainer = document.createElement("div");
+					const mathContainer = container.ownerDocument.createElement("div");
 					await renderPreviewContent(
 						mathContainer,
 						previewForRender,
@@ -301,6 +303,7 @@ export function createCardPreviewRenderer(
 					key: `${file.path}:${file.stat.mtime}:${searchQuery}`,
 					priority: "high",
 					signal,
+					ownerWindow: container.ownerDocument.defaultView,
 				},
 			);
 
@@ -438,6 +441,7 @@ function resolvePreviewRetention(preview: PreviewData): CardPreviewRetention {
 }
 
 function renderDetachedTextPreviewFragment(params: {
+	document: Document;
 	content: string;
 	app: App;
 	sourcePath: string;
@@ -445,34 +449,46 @@ function renderDetachedTextPreviewFragment(params: {
 	analysis?: PreviewContentAnalysis;
 	signal?: AbortSignal;
 }): Promise<DocumentFragment> {
-	const { content, app, sourcePath, enableMathRendering, analysis, signal } = params;
+	const {
+		document: ownerDocument,
+		content,
+		app,
+		sourcePath,
+		enableMathRendering,
+		analysis,
+		signal,
+	} = params;
 
-	return enqueuePreviewRender(async () => {
-		const tempContainer = document.createElement("div");
-		const renderComponent = new Component();
-		renderComponent.load();
+	return enqueuePreviewRender(
+		async () => {
+			const tempContainer = ownerDocument.createElement("div");
+			const renderComponent = new Component();
+			renderComponent.load();
 
-		try {
-			throwIfAborted(signal, "Preview render aborted");
-			await processPreviewContent(
-				tempContainer,
-				content,
-				app,
-				sourcePath,
-				renderComponent,
-				{
-					enableMathRendering,
-					analysis,
-					syncShadowRootMathStyles: false,
-					signal,
-				},
-			);
-			throwIfAborted(signal, "Preview render aborted");
-			return moveChildrenToFragment(tempContainer);
-		} finally {
-			renderComponent.unload();
-		}
-	}, signal);
+			try {
+				throwIfAborted(signal, "Preview render aborted");
+				await processPreviewContent(
+					tempContainer,
+					content,
+					app,
+					sourcePath,
+					renderComponent,
+					{
+						enableMathRendering,
+						analysis,
+						syncShadowRootMathStyles: false,
+						signal,
+					},
+				);
+				throwIfAborted(signal, "Preview render aborted");
+				return moveChildrenToFragment(tempContainer);
+			} finally {
+				renderComponent.unload();
+			}
+		},
+		signal,
+		ownerDocument.defaultView,
+	);
 }
 
 async function renderPreviewContent(

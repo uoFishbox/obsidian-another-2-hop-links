@@ -57,6 +57,32 @@ describe("virtual-list cache performance contracts", () => {
 		expect(getComputedStyle.mock.calls.length).toBeGreaterThan(readsAfterMiss);
 	});
 
+	it("does not reuse a cached null result after a scrollable ancestor is attached", () => {
+		const wrapper = document.createElement("div");
+		const root = document.createElement("div");
+		wrapper.append(root);
+		document.body.append(wrapper);
+
+		expect(findNearestScrollContainerCached(root)).toBeNull();
+
+		const scrollContainer = document.createElement("div");
+		scrollContainer.style.overflow = "auto";
+		Object.defineProperty(scrollContainer, "scrollHeight", {
+			configurable: true,
+			value: 1000,
+		});
+		Object.defineProperty(scrollContainer, "clientHeight", {
+			configurable: true,
+			value: 500,
+		});
+		document.body.append(scrollContainer);
+		scrollContainer.append(wrapper);
+
+		// The root keeps the same direct parent and document root. The cache must
+		// still retry a previous negative lookup because higher ancestors changed.
+		expect(findNearestScrollContainerCached(root)).toBe(scrollContainer);
+	});
+
 	it("finds a scroll container in another document realm", () => {
 		const iframe = document.createElement("iframe");
 		document.body.append(iframe);

@@ -479,7 +479,7 @@ export function useFlatVirtualGridList<T>(
 				chainedInfiniteScrollLoads += 1;
 				scheduleLoadNextPage();
 			}
-		});
+		}, sectionRootEl?.ownerDocument.defaultView);
 	};
 
 	function getCurrentPreloadMetrics(): VirtualListStableMeasurementContext | null {
@@ -571,6 +571,7 @@ export function useFlatVirtualGridList<T>(
 		},
 		set sectionRootEl(nextRootEl: HTMLDivElement | null) {
 			sectionRootEl = nextRootEl;
+			frameCoordinator?.bindOwnerElement?.(nextRootEl);
 		},
 		get contentEl() {
 			return contentEl;

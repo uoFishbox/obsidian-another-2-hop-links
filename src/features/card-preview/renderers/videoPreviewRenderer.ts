@@ -11,13 +11,14 @@ interface VideoThumbnailResult {
 
 interface GenerationQueueTask {
 	cancelled: boolean;
+	ownerWindow: Window;
 	resolve: (value: unknown) => void;
 	run: () => Promise<void>;
 }
 const generationQueue: GenerationQueueTask[] = [];
 const scheduledGenerationTasks = new Set<GenerationQueueTask>();
 
-function processQueue() {
+function processQueue(): void {
 	if (
 		activeGenerations + scheduledGenerationTasks.size >=
 			MAX_CONCURRENT_GENERATIONS ||
@@ -26,16 +27,12 @@ function processQueue() {
 		return;
 	}
 
-	// ブラウザのアイドル時間を待ってから実行する
-	// requestIdleCallbackの型定義がない環境へのフォールバック付き
-	const schedule = (window as any).requestIdleCallback || window.setTimeout;
 	const nextTask = generationQueue.shift();
-	if (!nextTask) {
-		return;
-	}
+	if (!nextTask) return;
 	scheduledGenerationTasks.add(nextTask);
 
-	schedule(() => {
+	const { ownerWindow } = nextTask;
+	const runScheduledTask = (): void => {
 		scheduledGenerationTasks.delete(nextTask);
 		if (nextTask.cancelled) {
 			processQueue();
@@ -43,12 +40,20 @@ function processQueue() {
 		}
 		activeGenerations++;
 		void nextTask.run();
-	});
+	};
+
+	// Schedule in the realm that owns the preview request instead of always
+	// using the main Electron window, which may be throttled behind a popout.
+	if (typeof ownerWindow.requestIdleCallback === "function") {
+		ownerWindow.requestIdleCallback(runScheduledTask);
+	} else {
+		ownerWindow.setTimeout(runScheduledTask, 0);
+	}
 }
 
-function enqueue<T>(task: () => Promise<T>): Promise<T> {
+function enqueue<T>(task: () => Promise<T>, ownerWindow: Window): Promise<T> {
 	return new Promise((resolve, reject) => {
-		const run = async () => {
+		const run = async (): Promise<void> => {
 			try {
 				const result = await task();
 				resolve(result);
@@ -59,8 +64,9 @@ function enqueue<T>(task: () => Promise<T>): Promise<T> {
 				processQueue();
 			}
 		};
-		const queueTask = {
+		const queueTask: GenerationQueueTask = {
 			cancelled: false,
+			ownerWindow,
 			resolve: resolve as (value: unknown) => void,
 			run,
 		};
@@ -84,19 +90,31 @@ export function clearVideoPreviewQueue(): void {
 
 async function generateVideoThumbnail(
 	file: TFile,
+	ownerDocument: Document,
 	seekTo = 0.0,
-	maxThumbnailWidth = 150, // サムネイル用の幅制限。これを指定すると劇的に速くなる。
+	maxThumbnailWidth = 150,
 	signal?: AbortSignal,
 ): Promise<VideoThumbnailResult | undefined> {
 	if (signal?.aborted) return undefined;
-	// キュー経由で実行
-	return enqueue(() =>
-		generateVideoThumbnailInternal(file, seekTo, maxThumbnailWidth, signal),
+	const ownerWindow = ownerDocument.defaultView;
+	if (!ownerWindow) return undefined;
+
+	return enqueue(
+		() =>
+			generateVideoThumbnailInternal(
+				file,
+				ownerDocument,
+				seekTo,
+				maxThumbnailWidth,
+				signal,
+			),
+		ownerWindow,
 	);
 }
 
 async function generateVideoThumbnailInternal(
 	file: TFile,
+	ownerDocument: Document,
 	seekTo: number,
 	maxWidth: number,
 	signal?: AbortSignal,
@@ -107,17 +125,21 @@ async function generateVideoThumbnailInternal(
 			return;
 		}
 
+		const ownerWindow = ownerDocument.defaultView;
+		if (!ownerWindow) {
+			resolve(undefined);
+			return;
+		}
+
 		const videoUrl = file.vault.getResourcePath(file);
-		const video = document.createElement("video");
-		const canvas = document.createElement("canvas");
-		let timeoutId: number;
+		const video = ownerDocument.createElement("video");
+		const canvas = ownerDocument.createElement("canvas");
+		let timeoutId = 0;
 		let settled = false;
 
-		const cleanup = () => {
-			if (signal) {
-				signal.removeEventListener("abort", onAbort);
-			}
-			clearTimeout(timeoutId);
+		const cleanup = (): void => {
+			if (signal) signal.removeEventListener("abort", onAbort);
+			ownerWindow.clearTimeout(timeoutId);
 			video.pause();
 			if (video.src.startsWith("blob:")) {
 				URL.revokeObjectURL(video.src);
@@ -128,23 +150,15 @@ async function generateVideoThumbnailInternal(
 			canvas.remove();
 		};
 
-		const finish = (value: VideoThumbnailResult | undefined) => {
-			if (settled) {
-				return;
-			}
+		const finish = (value: VideoThumbnailResult | undefined): void => {
+			if (settled) return;
 			settled = true;
 			cleanup();
 			resolve(value);
 		};
 
-		// キャンセルイベントのハンドリング
-		const onAbort = () => {
-			finish(undefined);
-		};
-
-		if (signal) {
-			signal.addEventListener("abort", onAbort);
-		}
+		const onAbort = (): void => finish(undefined);
+		if (signal) signal.addEventListener("abort", onAbort);
 
 		video.preload = "metadata";
 		video.src = videoUrl;
@@ -152,22 +166,11 @@ async function generateVideoThumbnailInternal(
 		video.muted = true;
 		video.playsInline = true;
 
-		video.addEventListener("error", () => {
-			// エラー時は reject せず undefined で解決し、UI側でフォールバックさせる
-			finish(undefined);
-		});
+		video.addEventListener("error", () => finish(undefined));
 
 		video.addEventListener("loadedmetadata", () => {
-			if (settled || signal?.aborted) {
-				return;
-			}
-
-			// 指定時間が動画長を超えている場合のガード
-			if (video.duration < seekTo) {
-				video.currentTime = 0;
-			} else {
-				video.currentTime = seekTo;
-			}
+			if (settled || signal?.aborted) return;
+			video.currentTime = video.duration < seekTo ? 0 : seekTo;
 		});
 
 		video.addEventListener("seeked", () => {
@@ -177,18 +180,11 @@ async function generateVideoThumbnailInternal(
 			}
 
 			try {
-				const ctx = canvas.getContext("2d", {
-					alpha: false, // アルファチャンネル不要を明示して高速化
-				});
+				const ctx = canvas.getContext("2d", { alpha: false });
+				if (!ctx) throw new Error("Could not get canvas context");
 
-				if (!ctx) {
-					throw new Error("Could not get canvas context");
-				}
-
-				// アスペクト比を維持しつつリサイズ計算
 				let width = video.videoWidth;
 				let height = video.videoHeight;
-
 				if (width > maxWidth) {
 					height = (height * maxWidth) / width;
 					width = maxWidth;
@@ -196,8 +192,6 @@ async function generateVideoThumbnailInternal(
 
 				canvas.width = width;
 				canvas.height = height;
-
-				// リサイズして描画
 				ctx.drawImage(video, 0, 0, width, height);
 
 				canvas.toBlob(
@@ -206,21 +200,20 @@ async function generateVideoThumbnailInternal(
 							finish(undefined);
 							return;
 						}
-
 						finish({
 							url: URL.createObjectURL(blob),
 							byteSize: blob.size,
 						});
 					},
 					"image/jpeg",
-					0.7, // 画質を少し下げることでも高速化とメモリ節約を図る
+					0.7,
 				);
-			} catch (e) {
+			} catch {
 				finish(undefined);
 			}
 		});
 
-		timeoutId = window.setTimeout(() => {
+		timeoutId = ownerWindow.setTimeout(() => {
 			console.warn(`Thumbnail generation timed out for ${file.path}`);
 			finish(undefined);
 		}, 3000);
@@ -230,11 +223,17 @@ async function generateVideoThumbnailInternal(
 export async function generateVideoPreview(
 	file: TFile,
 	signal?: AbortSignal,
+	ownerDocument: Document | null = typeof document === "undefined" ? null : document,
 ): Promise<PreviewData | undefined> {
 	try {
-		if (signal?.aborted) return undefined;
-		// maxWidthを指定して呼び出し
-		const thumbnail = await generateVideoThumbnail(file, 0.1, 320, signal);
+		if (signal?.aborted || !ownerDocument) return undefined;
+		const thumbnail = await generateVideoThumbnail(
+			file,
+			ownerDocument,
+			0.1,
+			320,
+			signal,
+		);
 		if (thumbnail) {
 			return {
 				type: "image",

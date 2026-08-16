@@ -153,6 +153,9 @@ export function createShadowGeometryProxyStore(): ShadowGeometryProxyStore {
 			release(actual);
 			return null;
 		}
+		if (entry.proxy.ownerDocument !== actual.ownerDocument) {
+			return sync(actual);
+		}
 		return entry.proxy;
 	}
 

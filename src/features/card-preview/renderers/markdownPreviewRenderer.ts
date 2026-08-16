@@ -102,7 +102,9 @@ export async function processPreviewContent(
 					);
 					containerEl.appendChild(renderMath(mathContent, false));
 				} else if (matchedString === "\\$") {
-					containerEl.appendChild(document.createTextNode("$"));
+					containerEl.appendChild(
+						containerEl.ownerDocument.createTextNode("$"),
+					);
 				}
 
 				lastIndex = MATH_SPLIT_REGEX.lastIndex;

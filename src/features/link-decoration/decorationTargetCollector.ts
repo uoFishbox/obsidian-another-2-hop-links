@@ -1,3 +1,5 @@
+import { isHTMLElementLike } from "ui/shared/dom/realmSafeDom";
+
 export type DecorationTargetMode = "rendered" | "codemirror" | "properties" | "bases";
 
 export interface DecorationTargetCollectionOptions {
@@ -59,11 +61,11 @@ function collectCodeMirrorTargets(linkEl: HTMLElement, targets: HTMLElement[]): 
 	addUniqueTarget(targets, aliasOwner);
 
 	const pipe = aliasOwner.nextElementSibling;
-	if (pipe instanceof HTMLElement && pipe.matches(".cm-link-alias-pipe")) {
+	if (isHTMLElementLike(pipe) && pipe.matches(".cm-link-alias-pipe")) {
 		addUniqueTarget(targets, pipe);
 
 		const alias = pipe.nextElementSibling;
-		if (alias instanceof HTMLElement && alias.matches(".cm-link-alias")) {
+		if (isHTMLElementLike(alias) && alias.matches(".cm-link-alias")) {
 			addUniqueTarget(targets, alias);
 		}
 	}

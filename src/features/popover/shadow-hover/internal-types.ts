@@ -150,6 +150,7 @@ export type ShadowHoverSession = {
 	teardownPopoverListeners: (() => void) | null;
 	lastHoverPath: string | null;
 	handoffTimer: number | null;
+	handoffTimerWindow?: Window | null;
 	logs: DebugLogEntry[];
 	logSeq: number;
 };

@@ -161,4 +161,47 @@ describe("createVirtualFrameCoordinator", () => {
 		expect(task).toHaveBeenCalledOnce();
 		coordinator.dispose();
 	});
+	it("cancels old-realm work and reschedules it after a window migration", () => {
+		const firstFrames: FrameRequestCallback[] = [];
+		const secondFrames: FrameRequestCallback[] = [];
+		const firstWindow = {
+			requestAnimationFrame: vi.fn((callback: FrameRequestCallback) => {
+				firstFrames.push(callback);
+				return 11;
+			}),
+			cancelAnimationFrame: vi.fn(),
+		} as unknown as Window;
+		const secondWindow = {
+			requestAnimationFrame: vi.fn((callback: FrameRequestCallback) => {
+				secondFrames.push(callback);
+				return 22;
+			}),
+			cancelAnimationFrame: vi.fn(),
+		} as unknown as Window;
+		let migrate: ((ownerWindow: Window) => void) | undefined;
+		const unregister = vi.fn();
+		const element = {
+			ownerDocument: { defaultView: firstWindow },
+			onWindowMigrated: vi.fn((listener: (ownerWindow: Window) => void) => {
+				migrate = listener;
+				return unregister;
+			}),
+		} as unknown as HTMLElement;
+		const coordinator = createVirtualFrameCoordinator();
+		const task = vi.fn();
+
+		coordinator.bindOwnerElement?.(element);
+		coordinator.schedule("scroll-critical", "measurement", task);
+		expect(firstWindow.requestAnimationFrame).toHaveBeenCalledOnce();
+
+		migrate?.(secondWindow);
+		expect(firstWindow.cancelAnimationFrame).toHaveBeenCalledWith(11);
+		expect(secondWindow.requestAnimationFrame).toHaveBeenCalledOnce();
+		expect(task).not.toHaveBeenCalled();
+
+		secondFrames[0]?.(0);
+		expect(task).toHaveBeenCalledOnce();
+		coordinator.dispose();
+		expect(unregister).toHaveBeenCalledOnce();
+	});
 });

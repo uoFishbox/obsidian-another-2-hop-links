@@ -207,14 +207,16 @@ export function createDelegatedInteractionDispatcher({
 	const resolvedLinkContext = linkContext ?? appContext?.linkContext;
 	let activeHoverInteractionId: string | null = null;
 	let longPressTimer: number | undefined = undefined;
+	let longPressTimerWindow: Window | null = null;
 	let longPressElement: HTMLElement | null = null;
 	let longPressStartX = 0;
 	let longPressStartY = 0;
 
 	function clearLongPressTimer(): void {
 		if (longPressTimer !== undefined) {
-			clearTimeout(longPressTimer);
+			longPressTimerWindow?.clearTimeout(longPressTimer);
 			longPressTimer = undefined;
+			longPressTimerWindow = null;
 		}
 	}
 
@@ -431,8 +433,11 @@ export function createDelegatedInteractionDispatcher({
 			markInteractionTouched(element);
 			clearInteractionLongPressed(element);
 
-			longPressTimer = window.setTimeout(() => {
+			const ownerWindow = getOwnerWindow(element);
+			longPressTimerWindow = ownerWindow;
+			longPressTimer = ownerWindow.setTimeout(() => {
 				longPressTimer = undefined;
+				longPressTimerWindow = null;
 				const targetElement = longPressElement;
 				if (!targetElement?.isConnected) {
 					return;
@@ -446,8 +451,8 @@ export function createDelegatedInteractionDispatcher({
 					screenY: touch.screenY,
 				});
 
-				if (navigator.vibrate) {
-					navigator.vibrate(VIBRATION_DURATION);
+				if (ownerWindow.navigator.vibrate) {
+					ownerWindow.navigator.vibrate(VIBRATION_DURATION);
 				}
 			}, LONG_PRESS_DURATION);
 		},

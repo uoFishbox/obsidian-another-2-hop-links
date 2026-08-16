@@ -99,6 +99,7 @@ interface VirtualListViewportSubscriber extends Omit<
 	"rootEl"
 > {
 	rootEl: HTMLElement;
+	ownerWindow: Window;
 	entry: ScrollerViewportEntry;
 	lastObservedWidth: number | null;
 	lastObservedHeight: number | null;
@@ -113,6 +114,7 @@ interface VirtualListViewportSubscriber extends Omit<
 interface ScrollerViewportEntry {
 	registryKey: HTMLElement;
 	scroller: HTMLElement | null;
+	ownerWindow: Window;
 	structureMutationObserver: MutationObserver;
 	subscriber: VirtualListViewportSubscriber | null;
 	hasPendingScrollMeasurement: boolean;
@@ -420,24 +422,15 @@ const getSharedLayoutDependencyResizeObserver = (
 };
 
 const observeRootResizeTarget = (subscriber: VirtualListViewportSubscriber): void => {
-	const ownerWindow = getOptionalOwnerWindow(subscriber.rootEl);
-	if (!ownerWindow) {
-		return;
-	}
-
-	const sharedObserver = getSharedRootResizeObserver(ownerWindow);
+	const sharedObserver = getSharedRootResizeObserver(subscriber.ownerWindow);
 	observeSharedResizeTarget(sharedObserver, subscriber.rootEl, subscriber);
 };
 
 const unobserveRootResizeTarget = (subscriber: VirtualListViewportSubscriber): void => {
-	const ownerWindow = getOptionalOwnerWindow(subscriber.rootEl);
-	const sharedObserver = ownerWindow
-		? (sharedRootResizeObservers.get(ownerWindow) ?? null)
-		: null;
+	const ownerWindow = subscriber.ownerWindow;
+	const sharedObserver = sharedRootResizeObservers.get(ownerWindow) ?? null;
 	unobserveSharedResizeTarget(sharedObserver, subscriber.rootEl, subscriber, () => {
-		if (ownerWindow) {
-			sharedRootResizeObservers.delete(ownerWindow);
-		}
+		sharedRootResizeObservers.delete(ownerWindow);
 	});
 };
 
@@ -445,12 +438,7 @@ const observeLayoutDependencyTarget = (
 	entry: ScrollerViewportEntry,
 	target: HTMLElement,
 ): void => {
-	const ownerWindow = getOptionalOwnerWindow(target);
-	if (!ownerWindow) {
-		return;
-	}
-
-	const sharedObserver = getSharedLayoutDependencyResizeObserver(ownerWindow);
+	const sharedObserver = getSharedLayoutDependencyResizeObserver(entry.ownerWindow);
 	observeSharedResizeTarget(sharedObserver, target, entry);
 };
 
@@ -458,14 +446,11 @@ const unobserveLayoutDependencyTarget = (
 	entry: ScrollerViewportEntry,
 	target: HTMLElement,
 ): void => {
-	const ownerWindow = getOptionalOwnerWindow(target);
-	const sharedObserver = ownerWindow
-		? (sharedLayoutDependencyResizeObservers.get(ownerWindow) ?? null)
-		: null;
+	const ownerWindow = entry.ownerWindow;
+	const sharedObserver =
+		sharedLayoutDependencyResizeObservers.get(ownerWindow) ?? null;
 	unobserveSharedResizeTarget(sharedObserver, target, entry, () => {
-		if (ownerWindow) {
-			sharedLayoutDependencyResizeObservers.delete(ownerWindow);
-		}
+		sharedLayoutDependencyResizeObservers.delete(ownerWindow);
 	});
 };
 
@@ -544,6 +529,7 @@ const moveSubscriberToCurrentScroller = (
 	}
 	invalidateScrollGeometry(subscriber.rootEl, "scroller-changed");
 	unregisterSubscriber(subscriber);
+	subscriber.ownerWindow = ownerWindow;
 	const nextEntry = getScrollerViewportEntry(
 		nextScroller,
 		subscriber.rootEl,
@@ -664,9 +650,8 @@ const finishScrollIdle = (entry: ScrollerViewportEntry): void => {
 		return;
 	}
 
-	const ownerWindow = getOptionalOwnerWindow(entry.registryKey);
-	if (ownerWindow && entry.idleTimer !== null) {
-		ownerWindow.clearTimeout(entry.idleTimer);
+	if (entry.idleTimer !== null) {
+		entry.ownerWindow.clearTimeout(entry.idleTimer);
 	}
 	entry.idleTimer = null;
 	entry.pendingScrollTop = null;
@@ -789,6 +774,7 @@ const getScrollerViewportEntry = (
 	const entry: ScrollerViewportEntry = {
 		registryKey: key,
 		scroller,
+		ownerWindow,
 		structureMutationObserver: undefined as unknown as MutationObserver,
 		subscriber: null,
 		hasPendingScrollMeasurement: false,
@@ -838,7 +824,7 @@ const getScrollerViewportEntry = (
 			refreshDependencyObservers(entry);
 		},
 		{
-			getWindow: () => getOptionalOwnerWindow(entry.registryKey),
+			getWindow: () => entry.ownerWindow,
 			counterName:
 				process.env.NODE_ENV !== "production"
 					? "virtualList.scheduler.dependencyRefresh.animationFrame"
@@ -855,7 +841,7 @@ const getScrollerViewportEntry = (
 			getActiveSubscriber(entry)?.scheduleLayoutMeasurement();
 		},
 		{
-			getWindow: () => getOptionalOwnerWindow(entry.registryKey),
+			getWindow: () => entry.ownerWindow,
 			counterName:
 				process.env.NODE_ENV !== "production"
 					? "virtualList.scheduler.observerLayout.animationFrame"
@@ -919,8 +905,7 @@ const unregisterSubscriber = (subscriber: VirtualListViewportSubscriber): void =
 	entry.refreshDependencyObserversTask.cancel();
 	entry.layoutMeasurementTask.cancel();
 	if (entry.idleTimer !== null) {
-		const ownerWindow = getOptionalOwnerWindow(entry.registryKey);
-		ownerWindow?.clearTimeout(entry.idleTimer);
+		entry.ownerWindow.clearTimeout(entry.idleTimer);
 		entry.idleTimer = null;
 	}
 	entry.hasPendingScrollMeasurement = false;
@@ -936,48 +921,87 @@ const unregisterSubscriber = (subscriber: VirtualListViewportSubscriber): void =
 export const observeVirtualListViewport = (
 	options: ObserveVirtualListViewportOptions,
 ): VirtualListViewportObservation => {
-	const ownerWindow = getOptionalOwnerWindow(options.rootEl);
-	if (!ownerWindow) {
-		return Object.assign(() => {}, {
-			publishScrollMeasurementRange: () => {},
-		});
-	}
+	let disposed = false;
+	let currentSubscriber: VirtualListViewportSubscriber | null = null;
+	let publishedRange = options.getScrollMeasurementRange?.() ?? null;
 
-	const scrollContainer = findNearestScrollContainerCached(options.rootEl);
-	const entry = getScrollerViewportEntry(
-		scrollContainer,
-		options.rootEl,
-		ownerWindow,
-	);
-	const subscriber: VirtualListViewportSubscriber = {
-		...options,
-		entry,
-		lastObservedWidth: null,
-		lastObservedHeight: null,
-		isDisposed: false,
-	};
-
-	options.onScrollContainerChange(scrollContainer);
-	registerSubscriber(entry, subscriber);
-	options.runInitialLayoutMeasurement();
-	publishScrollMeasurementRange(entry, options.getScrollMeasurementRange?.() ?? null);
-
-	const stopObserving = (): void => {
-		if (subscriber.isDisposed) {
-			return;
-		}
-
+	const unbindCurrentRealm = (
+		reason: "subscriber-cleanup" | "window-migration",
+	): void => {
+		const subscriber = currentSubscriber;
+		if (!subscriber) return;
+		currentSubscriber = null;
 		subscriber.isDisposed = true;
 		unregisterSubscriber(subscriber);
-		invalidateScrollGeometry(subscriber.rootEl, "subscriber-cleanup");
+		invalidateScrollGeometry(subscriber.rootEl, reason);
 	};
-	stopObserving.publishScrollMeasurementRange = (
-		range: ScrollMeasurementRange | null,
-	): void => {
-		if (subscriber.isDisposed || entry.subscriber !== subscriber) {
+
+	const bindCurrentRealm = (): void => {
+		if (disposed) return;
+		const ownerWindow = getOptionalOwnerWindow(options.rootEl);
+		if (!ownerWindow) {
+			options.onScrollContainerChange(null);
 			return;
 		}
-		publishScrollMeasurementRange(entry, range);
+
+		const scrollContainer = findNearestScrollContainerCached(options.rootEl);
+		const entry = getScrollerViewportEntry(
+			scrollContainer,
+			options.rootEl,
+			ownerWindow,
+		);
+		const subscriber: VirtualListViewportSubscriber = {
+			...options,
+			ownerWindow,
+			entry,
+			lastObservedWidth: null,
+			lastObservedHeight: null,
+			isDisposed: false,
+		};
+		currentSubscriber = subscriber;
+
+		options.onScrollContainerChange(scrollContainer);
+		registerSubscriber(entry, subscriber);
+		options.runInitialLayoutMeasurement();
+		publishScrollMeasurementRange(entry, publishedRange);
+
+		// Popout/window migration can bind while the composed ancestor tree is
+		// still being attached. Only the premature `null` resolution needs a
+		// retry on the next frame; when an element scroller was found, binding
+		// is authoritative and the bind path must stay free of extra layout
+		// reads (see the scroll-path contract in VirtualListDomObserver tests).
+		if (scrollContainer === null) {
+			invalidateScrollGeometry(options.rootEl, "observer-bind");
+			entry.refreshDependencyObserversTask.schedule();
+		}
 	};
-	return stopObserving;
+
+	const unregisterWindowMigration =
+		typeof options.rootEl.onWindowMigrated === "function"
+			? options.rootEl.onWindowMigrated(() => {
+					unbindCurrentRealm("window-migration");
+					bindCurrentRealm();
+				})
+			: null;
+
+	bindCurrentRealm();
+
+	const observation = (() => {
+		if (disposed) return;
+		disposed = true;
+		unregisterWindowMigration?.();
+		unbindCurrentRealm("subscriber-cleanup");
+	}) as VirtualListViewportObservation;
+
+	observation.publishScrollMeasurementRange = (
+		range: ScrollMeasurementRange | null,
+	): void => {
+		publishedRange = range;
+		const subscriber = currentSubscriber;
+		if (!subscriber || subscriber.isDisposed) return;
+		if (subscriber.entry.subscriber !== subscriber) return;
+		publishScrollMeasurementRange(subscriber.entry, range);
+	};
+
+	return observation;
 };

@@ -1,3 +1,9 @@
+import {
+	getOptionalOwnerWindow,
+	isHtmlStyleElementLike,
+	isShadowRootLike,
+} from "./realmSafeDom";
+
 const MATHJAX_SHADOW_STYLE_ATTRIBUTE = "data-ccl-mathjax-shadow-style";
 const DOCUMENT_MATHJAX_STYLE_ID = "MJX-CHTML-styles";
 const SUSPICIOUS_CSS_SHRINK_RATIO = 0.7;
@@ -17,10 +23,6 @@ type MathJaxWithStylesheet = {
 		};
 	};
 };
-
-function isStyleElement(value: unknown): value is HTMLStyleElement {
-	return value instanceof HTMLStyleElement;
-}
 
 function getMathJax(): MathJaxWithStylesheet | undefined {
 	return (globalThis as { MathJax?: MathJaxWithStylesheet }).MathJax;
@@ -53,16 +55,28 @@ function getMathJaxStylesheetText(source: HTMLStyleElement): string {
 	return source.textContent ?? "";
 }
 
-function getMathJaxStylesheetSource(): HTMLStyleElement | null {
-	const documentStylesheet = document.getElementById(DOCUMENT_MATHJAX_STYLE_ID);
-	return isStyleElement(documentStylesheet) ? documentStylesheet : null;
+function getMathJaxStylesheetSource(
+	ownerDocument?: Document | null,
+): HTMLStyleElement | null {
+	const documents: Document[] = [];
+	if (ownerDocument) documents.push(ownerDocument);
+	if (typeof document !== "undefined" && document !== ownerDocument) {
+		documents.push(document);
+	}
+
+	for (const candidateDocument of documents) {
+		const stylesheet = candidateDocument.getElementById(DOCUMENT_MATHJAX_STYLE_ID);
+		if (isHtmlStyleElementLike(stylesheet)) return stylesheet;
+	}
+	return null;
 }
 
 function cloneMathJaxStylesheet(
 	source: HTMLStyleElement,
 	cssText: string,
+	targetDocument: Document,
 ): HTMLStyleElement {
-	const cloned = document.createElement("style");
+	const cloned = targetDocument.createElement("style");
 	cloned.setAttribute(MATHJAX_SHADOW_STYLE_ATTRIBUTE, "1");
 	cloned.textContent = cssText;
 
@@ -127,7 +141,9 @@ function syncMathJaxStylesToShadowRootWithSource(
 	}
 
 	existing?.remove();
-	shadowRoot.prepend(cloneMathJaxStylesheet(source, nextText));
+	shadowRoot.prepend(
+		cloneMathJaxStylesheet(source, nextText, shadowRoot.ownerDocument),
+	);
 	return true;
 }
 
@@ -158,13 +174,10 @@ export function unregisterMathJaxShadowRoot(shadowRoot: ShadowRoot): void {
 function syncRegisteredMathJaxShadowRoots(): boolean {
 	pruneDisconnectedShadowRoots();
 
-	const source = getMathJaxStylesheetSource();
-	if (!source) {
-		return false;
-	}
-
 	let didSync = false;
 	for (const shadowRoot of registeredShadowRoots) {
+		const source = getMathJaxStylesheetSource(shadowRoot.ownerDocument);
+		if (!source) continue;
 		didSync =
 			syncMathJaxStylesToShadowRootWithSource(shadowRoot, source) || didSync;
 	}
@@ -184,8 +197,23 @@ export function queueMathJaxShadowStylesSync(): void {
 			syncRegisteredMathJaxShadowRoots();
 		};
 
-		if (typeof window !== "undefined" && window.requestAnimationFrame) {
-			window.requestAnimationFrame(() => flush());
+		const ownerWindows = new Set<Window>();
+		for (const shadowRoot of registeredShadowRoots) {
+			const ownerWindow = getOptionalOwnerWindow(shadowRoot.host);
+			if (ownerWindow) ownerWindows.add(ownerWindow);
+		}
+		if (ownerWindows.size > 0) {
+			for (const ownerWindow of ownerWindows) {
+				if (typeof ownerWindow.requestAnimationFrame === "function") {
+					ownerWindow.requestAnimationFrame(() => {
+						if (isMathJaxShadowSyncQueued) flush();
+					});
+				} else {
+					ownerWindow.setTimeout(() => {
+						if (isMathJaxShadowSyncQueued) flush();
+					}, 0);
+				}
+			}
 			return;
 		}
 
@@ -233,7 +261,7 @@ export function installMathJaxShadowPatch(): void {
 export function syncMathJaxStylesToShadowRoot(shadowRoot: ShadowRoot): boolean {
 	registerMathJaxShadowRoot(shadowRoot);
 
-	const source = getMathJaxStylesheetSource();
+	const source = getMathJaxStylesheetSource(shadowRoot.ownerDocument);
 	if (!source) {
 		return false;
 	}
@@ -247,7 +275,7 @@ export function syncMathJaxStylesForNode(node: Node | null | undefined): boolean
 	}
 
 	const root = node.getRootNode();
-	if (!(root instanceof ShadowRoot)) {
+	if (!isShadowRootLike(root)) {
 		return false;
 	}
 

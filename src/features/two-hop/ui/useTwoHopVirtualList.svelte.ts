@@ -474,6 +474,7 @@ export function useTwoHopVirtualList(
 		},
 		set rootEl(next: HTMLDivElement | null) {
 			rootEl = next;
+			frameCoordinator.bindOwnerElement?.(next);
 			if (next) publishTwoHopCardCounts(next, rowModel.cardCounts);
 		},
 		get layout() {

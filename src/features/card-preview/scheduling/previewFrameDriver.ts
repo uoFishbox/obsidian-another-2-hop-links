@@ -20,11 +20,16 @@ export interface PreviewFrameSchedule {
 export interface CreatePreviewFrameDriverOptions {
 	readonly coordinator?: VirtualFrameCoordinator;
 	readonly taskKey: string;
+	/** Window used only when no virtual frame coordinator accepts the task. */
+	readonly getWindow?: () => Window | null;
 	readonly onAnimationFrameScheduled?: () => void;
 	readonly onFrame: (timestamp: number) => void;
 }
 
-export function readPreviewSchedulingTime(): number {
+export function readPreviewSchedulingTime(ownerWindow?: Window | null): number {
+	if (typeof ownerWindow?.performance?.now === "function") {
+		return ownerWindow.performance.now();
+	}
 	if (typeof globalThis.performance?.now === "function") {
 		return globalThis.performance.now();
 	}
@@ -40,8 +45,12 @@ export function createPreviewFrameDriver(
 ): PreviewFrameDriver {
 	let frameHandle: number | null = null;
 	let frameHandleKind: "animation-frame" | "timeout" | null = null;
+	let frameHandleWindow: Window | null = null;
 	let scheduledCoordinatorLane: PreviewFrameSchedule["lane"] | null = null;
 	let disposed = false;
+
+	const resolveWindow = (): Window | null =>
+		options.getWindow?.() ?? (typeof window === "undefined" ? null : window);
 
 	function isScheduled(): boolean {
 		return scheduledCoordinatorLane !== null || frameHandle !== null;
@@ -59,7 +68,7 @@ export function createPreviewFrameDriver(
 				options.taskKey,
 				() => {
 					scheduledCoordinatorLane = null;
-					runFrame(readPreviewSchedulingTime());
+					runFrame(readPreviewSchedulingTime(resolveWindow()));
 				},
 			);
 			if (scheduled) {
@@ -68,9 +77,53 @@ export function createPreviewFrameDriver(
 			}
 		}
 
+		const ownerWindow = resolveWindow();
+		if (ownerWindow && typeof ownerWindow.requestAnimationFrame === "function") {
+			options.onAnimationFrameScheduled?.();
+			frameHandleKind = "animation-frame";
+			frameHandleWindow = ownerWindow;
+			frameHandle = ownerWindow.requestAnimationFrame((timestamp) => {
+				frameHandle = null;
+				frameHandleKind = null;
+				frameHandleWindow = null;
+				if (lane === "post-paint") {
+					frameHandleKind = "timeout";
+					frameHandle = ownerWindow.setTimeout(() => {
+						frameHandle = null;
+						frameHandleKind = null;
+						frameHandleWindow = null;
+						runFrame(timestamp);
+					}, 0);
+					return;
+				}
+				runFrame(timestamp);
+			});
+			return;
+		}
+
+		if (ownerWindow && typeof ownerWindow.setTimeout === "function") {
+			frameHandleKind = "timeout";
+			frameHandleWindow = ownerWindow;
+			frameHandle = ownerWindow.setTimeout(() => {
+				frameHandle = null;
+				frameHandleKind = null;
+				frameHandleWindow = null;
+				runFrame(readPreviewSchedulingTime(ownerWindow));
+			}, FALLBACK_FRAME_INTERVAL_MS);
+			return;
+		}
+
+		scheduleFrameOnGlobalThis(lane);
+	}
+
+	function scheduleFrameOnGlobalThis(lane: PreviewFrameSchedule["lane"]): void {
+		// Windowless realms (node tests) resolve no DOM window. Keep the
+		// globalThis fallback so the driver still schedules there instead of
+		// silently dropping the task.
 		if (typeof globalThis.requestAnimationFrame === "function") {
 			options.onAnimationFrameScheduled?.();
 			frameHandleKind = "animation-frame";
+			frameHandleWindow = null;
 			frameHandle = globalThis.requestAnimationFrame((timestamp) => {
 				frameHandle = null;
 				frameHandleKind = null;
@@ -87,7 +140,7 @@ export function createPreviewFrameDriver(
 					return;
 				}
 				runFrame(timestamp);
-			});
+			}) as unknown as number;
 			return;
 		}
 
@@ -96,7 +149,7 @@ export function createPreviewFrameDriver(
 		frameHandle = globalThis.setTimeout(() => {
 			frameHandle = null;
 			frameHandleKind = null;
-			runFrame(readPreviewSchedulingTime());
+			runFrame(readPreviewSchedulingTime(null));
 		}, FALLBACK_FRAME_INTERVAL_MS) as unknown as number;
 	}
 
@@ -104,11 +157,25 @@ export function createPreviewFrameDriver(
 		if (disposed || isScheduled()) return;
 
 		const delayMs = Math.max(0, schedule.delayMs ?? 0);
-		if (delayMs === 0 || typeof globalThis.setTimeout !== "function") {
+		if (delayMs === 0) {
 			scheduleFrame(schedule.lane);
 			return;
 		}
 
+		const ownerWindow = resolveWindow();
+		if (ownerWindow) {
+			frameHandleKind = "timeout";
+			frameHandleWindow = ownerWindow;
+			frameHandle = ownerWindow.setTimeout(() => {
+				frameHandle = null;
+				frameHandleKind = null;
+				frameHandleWindow = null;
+				scheduleFrame(schedule.lane);
+			}, delayMs);
+			return;
+		}
+
+		if (typeof globalThis.setTimeout !== "function") return;
 		frameHandleKind = "timeout";
 		frameHandle = globalThis.setTimeout(() => {
 			frameHandle = null;
@@ -124,16 +191,23 @@ export function createPreviewFrameDriver(
 		}
 		if (frameHandle === null) return;
 
-		if (
-			frameHandleKind === "animation-frame" &&
-			typeof globalThis.cancelAnimationFrame === "function"
-		) {
-			globalThis.cancelAnimationFrame(frameHandle);
+		if (frameHandleKind === "animation-frame") {
+			if (
+				frameHandleWindow &&
+				typeof frameHandleWindow.cancelAnimationFrame === "function"
+			) {
+				frameHandleWindow.cancelAnimationFrame(frameHandle);
+			} else if (typeof globalThis.cancelAnimationFrame === "function") {
+				globalThis.cancelAnimationFrame(frameHandle);
+			}
+		} else if (frameHandleWindow) {
+			frameHandleWindow.clearTimeout(frameHandle);
 		} else if (typeof globalThis.clearTimeout === "function") {
 			globalThis.clearTimeout(frameHandle);
 		}
 		frameHandle = null;
 		frameHandleKind = null;
+		frameHandleWindow = null;
 	}
 
 	function dispose(): void {

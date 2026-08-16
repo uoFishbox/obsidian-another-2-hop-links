@@ -17,6 +17,7 @@ import { DisplayModeController } from "features/display-mode/DisplayModeControll
 import { CanvasDropManager } from "infrastructure/workspace/CanvasDropHandler";
 import { DOMMutationObserver } from "infrastructure/observers/DOMMutationObserver";
 import { ScrollManager } from "infrastructure/workspace/ScrollHistoryState";
+import { resolveWorkspaceWindow } from "infrastructure/workspace/workspaceDocuments";
 import {
 	createEmptyViewController,
 	type EmptyViewController,
@@ -61,6 +62,7 @@ import type { ViewServices } from "ui/shared/views/viewServices";
 import { areTagFeaturesEnabled, type PluginSettings } from "features/settings/model";
 import { getLazyLoadManager } from "infrastructure/observers/IntersectionObserverRegistry";
 import { resolvePreviewActivationsPerSecond } from "appConstants";
+import { setYieldSchedulingWindowResolver } from "core/indexing/timeSlicing";
 
 export interface PluginRuntimeOptions {
 	app: App;
@@ -107,7 +109,12 @@ export interface PluginRuntime {
 
 /** Creates, connects, and owns the services used for one plugin load. */
 export function createPluginRuntime(options: PluginRuntimeOptions): PluginRuntime {
-	const frameScheduler = createFrameScheduler(options.isUnloaded);
+	const resetYieldSchedulingWindowResolver = setYieldSchedulingWindowResolver(() =>
+		resolveWorkspaceWindow(options.app.workspace),
+	);
+	const frameScheduler = createFrameScheduler(options.isUnloaded, () =>
+		resolveWorkspaceWindow(options.app.workspace),
+	);
 	const previewService = createPreviewService({
 		vault: options.app.vault,
 		metadataCache: options.app.metadataCache,
@@ -268,6 +275,7 @@ export function createPluginRuntime(options: PluginRuntimeOptions): PluginRuntim
 	});
 
 	function destroy(): void {
+		resetYieldSchedulingWindowResolver();
 		frameScheduler.destroy();
 		options.destroySettings();
 		unsubscribeIndexDataUpdate();

@@ -21,7 +21,11 @@ import {
 	transitionSessionInteraction,
 } from "./session";
 import { getSessionOpenPopover } from "./state-machine";
-import { createOwnerMouseEvent, isHTMLElementLike } from "ui/shared/dom/realmSafeDom";
+import {
+	createOwnerMouseEvent,
+	getOwnerWindow,
+	isHTMLElementLike,
+} from "ui/shared/dom/realmSafeDom";
 import { enableLogging } from "shared/logging/logger";
 
 export class ShadowHoverControllerImpl implements ShadowHoverController {
@@ -386,7 +390,9 @@ export class ShadowHoverControllerImpl implements ShadowHoverController {
 				toAnchor: { actualEl: anchorEl, proxyEl: proxy },
 				requestSeq,
 			});
-			this.session.handoffTimer = window.setTimeout(() => {
+			const ownerWindow = getOwnerWindow(anchorEl);
+			this.session.handoffTimerWindow = ownerWindow;
+			this.session.handoffTimer = ownerWindow.setTimeout(() => {
 				const handoff = expirePendingPopoverHandoff(this.session, requestSeq);
 				if (!handoff) {
 					return;

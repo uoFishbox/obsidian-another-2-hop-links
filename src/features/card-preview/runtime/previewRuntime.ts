@@ -1,4 +1,5 @@
 import type { App } from "obsidian";
+import { resolveWorkspaceWindow } from "infrastructure/workspace/workspaceDocuments";
 import {
 	createPreviewActivationScheduler,
 	type PreviewBackpressureChangeListener,
@@ -59,8 +60,13 @@ export function createPreviewRuntime(options: PreviewRuntimeOptions): PreviewRun
 			subscribeBackpressure: options.subscribeBackpressure,
 			getActivationsPerSecond: options.getActivationsPerSecond,
 		});
+	// Preview work may target surfaces in popout realms. When a coordinator
+	// cannot accept a task, fall back to the workspace window receiving input
+	// instead of the main Electron window, which may be throttled.
+	const resolveSchedulingWindow = (): Window | null =>
+		resolveWorkspaceWindow(options.app.workspace);
 	const domCommitScheduler: PreviewDomCommitScheduler =
-		createPreviewDomCommitScheduler();
+		createPreviewDomCommitScheduler(resolveSchedulingWindow);
 	const sharedCache = createCardPreviewSharedCache();
 	const surfaces = new Set<VirtualPreviewSurface>();
 	let disposed = false;
@@ -78,6 +84,7 @@ export function createPreviewRuntime(options: PreviewRuntimeOptions): PreviewRun
 		});
 		const surface = createVirtualPreviewSurface({
 			frameCoordinator: surfaceOptions.frameCoordinator,
+			getWindow: resolveSchedulingWindow,
 			activationScheduler,
 			createRenderer: () =>
 				createCardPreviewRenderer({

@@ -59,4 +59,54 @@ describe("observePreviewSurfaceVisibility", () => {
 		expect(listener).toHaveBeenLastCalledWith(true);
 		dispose();
 	});
+	it("rebinds document-owned observers after the surface moves to a popout", () => {
+		Reflect.set(window, "IntersectionObserver", IntersectionObserverMock);
+		const frame = document.createElement("iframe");
+		document.body.append(frame);
+		const foreignDocument = frame.contentDocument;
+		const foreignWindow = frame.contentWindow;
+		expect(foreignDocument).toBeTruthy();
+		expect(foreignWindow).toBeTruthy();
+		if (!foreignDocument || !foreignWindow) return;
+
+		let foreignObserver: IntersectionObserverMock | undefined;
+		class ForeignIntersectionObserver extends IntersectionObserverMock {
+			constructor(callback: IntersectionObserverCallback) {
+				super(callback);
+				foreignObserver = this;
+			}
+		}
+		Reflect.set(foreignWindow, "IntersectionObserver", ForeignIntersectionObserver);
+
+		const mainPane = document.createElement("div");
+		mainPane.className = "workspace-leaf-content";
+		const surface = document.createElement("div");
+		mainPane.append(surface);
+		document.body.append(mainPane);
+		let migrate: ((ownerWindow: Window) => void) | undefined;
+		const unregister = vi.fn();
+		Object.defineProperty(surface, "onWindowMigrated", {
+			configurable: true,
+			value: vi.fn((listener: (ownerWindow: Window) => void) => {
+				migrate = listener;
+				return unregister;
+			}),
+		});
+
+		const dispose = observePreviewSurfaceVisibility(surface, vi.fn());
+		const mainObserver = IntersectionObserverMock.latest;
+		expect(mainObserver?.observe).toHaveBeenCalledWith(mainPane);
+
+		const foreignPane = foreignDocument.createElement("div");
+		foreignPane.className = "workspace-leaf-content";
+		foreignPane.append(surface);
+		foreignDocument.body.append(foreignPane);
+		migrate?.(foreignWindow);
+
+		expect(mainObserver?.disconnect).toHaveBeenCalledOnce();
+		expect(foreignObserver?.observe).toHaveBeenCalledWith(foreignPane);
+		dispose();
+		expect(foreignObserver?.disconnect).toHaveBeenCalledOnce();
+		expect(unregister).toHaveBeenCalledOnce();
+	});
 });

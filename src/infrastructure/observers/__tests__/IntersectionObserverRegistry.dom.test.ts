@@ -203,4 +203,70 @@ describe("IntersectionObserverRegistry", () => {
 		expect(observerRecords[0]?.observe).toHaveBeenCalledWith(mainElement);
 		expect(foreignRecords[0]?.observe).toHaveBeenCalledWith(foreignElement);
 	});
+	it("moves a live registration to the observer owned by the migrated window", () => {
+		const registry = getLazyLoadManager();
+		const frame = document.createElement("iframe");
+		document.body.append(frame);
+		const frameDocument = frame.contentDocument;
+		const frameWindow =
+			frame.contentWindow as WindowWithIntersectionObserver | null;
+		expect(frameDocument).toBeTruthy();
+		expect(frameWindow).toBeTruthy();
+		if (!frameDocument || !frameWindow) return;
+
+		const foreignRecords: MockObserverRecord[] = [];
+		class ForeignIntersectionObserver {
+			root: IntersectionObserver["root"] = null;
+			rootMargin = "";
+			thresholds: ReadonlyArray<number> = [];
+			observe = vi.fn();
+			unobserve = vi.fn();
+			disconnect = vi.fn();
+			takeRecords = () => [];
+			constructor(
+				_callback: IntersectionObserverCallback,
+				options?: IntersectionObserverInit,
+			) {
+				foreignRecords.push({
+					options,
+					observe: this.observe,
+					unobserve: this.unobserve,
+					disconnect: this.disconnect,
+				});
+			}
+		}
+		frameWindow.IntersectionObserver =
+			ForeignIntersectionObserver as unknown as typeof IntersectionObserver;
+
+		const element = document.createElement("div");
+		document.body.append(element);
+		let migrate: ((ownerWindow: Window) => void) | undefined;
+		const unregister = vi.fn();
+		Object.defineProperty(element, "onWindowMigrated", {
+			configurable: true,
+			value: vi.fn((listener: (ownerWindow: Window) => void) => {
+				migrate = listener;
+				return unregister;
+			}),
+		});
+
+		const token = registry.observe(element, vi.fn(), {
+			root: null,
+			rootMargin: "10px",
+			threshold: 0,
+		});
+		expect(observerRecords).toHaveLength(1);
+
+		frameDocument.body.append(element);
+		migrate?.(frameWindow);
+
+		expect(observerRecords[0]?.unobserve).toHaveBeenCalledWith(element);
+		expect(observerRecords[0]?.disconnect).toHaveBeenCalledOnce();
+		expect(foreignRecords).toHaveLength(1);
+		expect(foreignRecords[0]?.observe).toHaveBeenCalledWith(element);
+
+		registry.unobserve(token);
+		expect(foreignRecords[0]?.unobserve).toHaveBeenCalledWith(element);
+		expect(unregister).toHaveBeenCalledOnce();
+	});
 });

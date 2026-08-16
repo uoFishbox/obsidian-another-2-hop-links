@@ -103,6 +103,8 @@ export function createPreviewSlotController(
 	let operation: SlotOperation = { state: "idle" };
 	let content: SlotContent = { state: "empty" };
 	let cleanupHandle: number | undefined;
+	let cleanupWindow: Window | null = null;
+	let cleanupUsesIdleCallback = false;
 	let renderer: CardPreviewRenderer | undefined;
 	let disposed = false;
 	let appliedState = EMPTY_STATE;
@@ -177,8 +179,14 @@ export function createPreviewSlotController(
 
 	function cancelCleanup(): void {
 		if (cleanupHandle === undefined) return;
-		window.cancelIdleCallback(cleanupHandle);
+		if (cleanupUsesIdleCallback && cleanupWindow?.cancelIdleCallback) {
+			cleanupWindow.cancelIdleCallback(cleanupHandle);
+		} else {
+			cleanupWindow?.clearTimeout(cleanupHandle);
+		}
 		cleanupHandle = undefined;
+		cleanupWindow = null;
+		cleanupUsesIdleCallback = false;
 	}
 
 	function cancelOperation(): void {
@@ -214,8 +222,13 @@ export function createPreviewSlotController(
 			content.state === "committed" ? content.renderKey : undefined;
 		if (!expectedHost || !expectedRenderKey) return;
 
-		cleanupHandle = window.requestIdleCallback(() => {
+		const ownerWindow = expectedHost.ownerDocument.defaultView;
+		if (!ownerWindow) return;
+		cleanupWindow = ownerWindow;
+		const runCleanup = () => {
 			cleanupHandle = undefined;
+			cleanupWindow = null;
+			cleanupUsesIdleCallback = false;
 			if (
 				disposed ||
 				activity === "active" ||
@@ -232,7 +245,15 @@ export function createPreviewSlotController(
 			}
 			expectedHost.replaceChildren();
 			publishState();
-		});
+		};
+
+		if (typeof ownerWindow.requestIdleCallback === "function") {
+			cleanupUsesIdleCallback = true;
+			cleanupHandle = ownerWindow.requestIdleCallback(runCleanup);
+		} else {
+			cleanupUsesIdleCallback = false;
+			cleanupHandle = ownerWindow.setTimeout(runCleanup, 0);
+		}
 	}
 
 	function isCurrent(
@@ -410,7 +431,8 @@ export function createPreviewSlotController(
 						)
 					)
 						return;
-					const errorElement = document.createElement("div");
+					const errorElement =
+						expectedHost.ownerDocument.createElement("div");
 					errorElement.className = "error";
 					errorElement.textContent = "Preview not available.";
 					expectedHost.replaceChildren(errorElement);
