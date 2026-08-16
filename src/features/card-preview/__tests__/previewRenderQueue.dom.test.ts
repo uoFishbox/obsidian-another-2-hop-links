@@ -19,22 +19,22 @@ async function loadQueueModule() {
 beforeEach(() => {
 	vi.resetModules();
 	vi.useFakeTimers();
+	vi.stubGlobal(
+		"requestAnimationFrame",
+		vi.fn((callback: FrameRequestCallback) => setTimeout(() => callback(0), 0)),
+	);
+	vi.stubGlobal("cancelAnimationFrame", (handle: number) => clearTimeout(handle));
 });
 
 afterEach(() => {
 	vi.restoreAllMocks();
+	vi.unstubAllGlobals();
 	vi.useRealTimers();
 });
 
 describe("enqueuePreviewRender", () => {
 	test("schedules preview rendering on the next animation frame", async () => {
 		const requestIdleCallback = vi.spyOn(window, "requestIdleCallback");
-		const requestAnimationFrame = vi
-			.spyOn(window, "requestAnimationFrame")
-			.mockImplementation((callback) => {
-				setTimeout(() => callback(0), 0);
-				return 1;
-			});
 		const { enqueuePreviewRender } = await loadQueueModule();
 		const { getCCLDevMeasurementSnapshot } =
 			await import("infrastructure/debug/CCLDevMeasurements");
@@ -44,7 +44,7 @@ describe("enqueuePreviewRender", () => {
 
 		await expect(result).resolves.toBe("rendered");
 		expect(requestIdleCallback).not.toHaveBeenCalled();
-		expect(requestAnimationFrame).toHaveBeenCalledTimes(1);
+		expect(vi.mocked(requestAnimationFrame)).toHaveBeenCalledTimes(1);
 		expect(
 			getCCLDevMeasurementSnapshot().counters[
 				"preview.renderScheduler.animationFrame"
