@@ -225,11 +225,11 @@ export class TagNotesView extends AbstractSvelteListView<TaggedNote> {
 					text: `Loading notes tagged with #${this.tag}.`,
 				}) as HTMLParagraphElement;
 				const loadingEl = infoEl.createDiv({
-					cls: "loading-container",
+					cls: "cosense-card-links__loading-container",
 				});
-				loadingEl.createDiv({ cls: "loading-spinner" });
+				loadingEl.createDiv({ cls: "cosense-card-links__loading-spinner" });
 				loadingEl.createEl("p", {
-					cls: "loading-message",
+					cls: "cosense-card-links__loading-message",
 					text: this.isLoadingNotes
 						? "Waiting for the tag index to finish building."
 						: "Preparing tag notes.",

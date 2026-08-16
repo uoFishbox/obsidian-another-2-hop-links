@@ -93,7 +93,7 @@
 	);
 }
 
-.loading-container {
+.cosense-card-links__loading-container {
 	display: flex;
 	flex-direction: column;
 	align-items: center;
@@ -107,7 +107,7 @@
 	text-align: center;
 }
 
-.loading-spinner {
+.cosense-card-links__loading-spinner {
 	width: 28px;
 	height: 28px;
 	border-radius: 999px;
@@ -117,7 +117,7 @@
 	box-sizing: border-box;
 }
 
-.loading-message {
+.cosense-card-links__loading-message {
 	margin: 0;
 	font-size: 0.85em;
 	color: var(--text-muted);
@@ -380,7 +380,6 @@ span[data-twohop-link-state="special-unresolved"] > .is-unresolved,
 /* .view-contentがrootScroller側へsquashされ、その広いpaint/hit-test stateをスクロールごとにLayerizeすることがボトルネックになる。.view-contentにcompositing boundaryを強制すると更新範囲が局所化され、スクロールパフォーマンスが大幅に改善される。.cm-scroller, .markdown-preview-viewも同様。 */
 .workspace-leaf-content[data-type="cosense-card-links-view"] > .view-content,
 .cm-scroller.ccl-inline-card-host,
-.markdown-preview-view
-{
-    transform: translateZ(0);
+.markdown-preview-view {
+	transform: translateZ(0);
 }

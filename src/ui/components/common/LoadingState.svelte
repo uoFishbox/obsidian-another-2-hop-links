@@ -6,9 +6,14 @@
 	let { message }: Props = $props();
 </script>
 
-<div class="loading-container" role="status" aria-live="polite" aria-busy="true">
-	<div class="loading-spinner"></div>
+<div
+	class="cosense-card-links__loading-container"
+	role="status"
+	aria-live="polite"
+	aria-busy="true"
+>
+	<div class="cosense-card-links__loading-spinner"></div>
 	{#if message}
-		<p class="loading-message">{message}</p>
+		<p class="cosense-card-links__loading-message">{message}</p>
 	{/if}
 </div>
