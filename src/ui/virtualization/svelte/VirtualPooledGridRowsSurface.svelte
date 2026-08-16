@@ -110,7 +110,7 @@
 				})
 			: cell.renderSlotKey;
 
-	const setRowTransform = (element: HTMLElement, top: number) => {
+	const setRowTop = (element: HTMLElement, top: number) => {
 		let committedTop = Number.NaN;
 
 		const update = (nextTop: number): void => {
@@ -118,7 +118,7 @@
 			if (normalizedTop === committedTop) return;
 
 			committedTop = normalizedTop;
-			element.style.transform = `translateY(${normalizedTop}px)`;
+			element.style.top = `${normalizedTop}px`;
 		};
 		update(top);
 		return { update };
@@ -133,7 +133,7 @@
 				class={rowClassName}
 				data-ccl-row-slot={!IS_PROD ? row.slotIndex : undefined}
 				data-ccl-row-index={!IS_PROD ? row.rowIndex : undefined}
-				use:setRowTransform={row.top}
+				use:setRowTop={row.top}
 			>
 				{#each resolveRowCellSlots(row) as cellSlot (cellSlot.renderSlotKey)}
 					{@const currentBinding = cellSlot.binding}

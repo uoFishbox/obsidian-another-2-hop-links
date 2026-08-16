@@ -169,7 +169,7 @@ export const CARD_RENDER_SHADOW_CSS = String.raw`
 	display: block;
 	flex: 0 0 auto;
 	position: relative;
-	z-index: 1;
+	z-index: auto;
 	pointer-events: none;
 }
 
@@ -383,13 +383,14 @@ export const CARD_RENDER_SHADOW_CSS = String.raw`
 .twohop-virtual-row {
 	position: absolute;
 	left: 0;
+	top: 0;
 	width: 100%;
 	display: grid;
 	box-sizing: border-box;
 	height: var(--ccl-box-height);
 	grid-template-columns: repeat(var(--ccl-columns), minmax(0, 1fr));
 	gap: var(--ccl-box-gap);
-	contain: layout;
+	contain: none;
 }
 
 .twohop-virtual-cell {

@@ -49,11 +49,11 @@ describe("VirtualGridLinkList regression", () => {
 			),
 		);
 		expect(rows[0].style.position).toBe("");
-		expect(rows[0].style.top).toBe("");
-		expect(rows[0].style.transform).toBe("translateY(0px)");
+		expect(rows[0].style.transform).toBe("");
+		expect(rows[0].style.top).toBe("0px");
 		expect(rows[1].style.position).toBe("");
-		expect(rows[1].style.top).toBe("");
-		expect(rows[1].style.transform).toBe("translateY(134px)");
+		expect(rows[1].style.transform).toBe("");
+		expect(rows[1].style.top).toBe("134px");
 
 		const cells = Array.from(
 			shadowRoot.querySelectorAll<HTMLElement>(
@@ -113,10 +113,8 @@ describe("VirtualGridLinkList regression", () => {
 		expect(rowSlots).toEqual([...rowSlots].sort((left, right) => left - right));
 		for (const row of rows) {
 			expect(row.style.position).toBe("");
-			expect(row.style.top).toBe("");
-			expect(row.style.transform).toBe(
-				`translateY(${Number(row.dataset.cclRowIndex) * 134}px)`,
-			);
+			expect(row.style.transform).toBe("");
+			expect(row.style.top).toBe(`${Number(row.dataset.cclRowIndex) * 134}px`);
 		}
 		expect(driver.renderedIndexes()).not.toContain(0);
 	});
