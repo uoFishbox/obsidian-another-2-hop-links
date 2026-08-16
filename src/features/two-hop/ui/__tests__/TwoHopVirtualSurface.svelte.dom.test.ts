@@ -160,6 +160,17 @@ function getRows(root: HTMLElement): HTMLElement[] {
 	);
 }
 
+async function waitForStableRowCount(root: HTMLElement): Promise<number> {
+	let previousRowCount = -1;
+	for (let attempt = 0; attempt < 20; attempt += 1) {
+		const rowCount = getRows(root).length;
+		if (rowCount === previousRowCount) return rowCount;
+		previousRowCount = rowCount;
+		await flushFrames();
+	}
+	return previousRowCount;
+}
+
 beforeEach(() => {
 	resetRecords();
 	resetCCLDevMeasurements();
@@ -407,7 +418,7 @@ describe("TwoHopVirtualSurface", () => {
 		});
 	});
 
-	it("counts keyed cell-body replacements across a long scroll", async () => {
+	it("rebinds cell bodies in reused physical slots across a long scroll", async () => {
 		const resolver = createCardModelResolver();
 		const { root, scroller } = await renderSurface({
 			section: createSection(10_000),
@@ -415,7 +426,7 @@ describe("TwoHopVirtualSurface", () => {
 		});
 
 		await vi.waitFor(() => expect(getRows(root).length).toBeGreaterThan(0));
-		resetCCLDevMeasurements();
+		await waitForStableRowCount(root);
 
 		setNumericProperty(scroller, "scrollTop", 20_000);
 		await fireEvent.scroll(scroller);
@@ -425,10 +436,69 @@ describe("TwoHopVirtualSurface", () => {
 			);
 			expect(Math.min(...rowIndexes)).toBeGreaterThan(100);
 		});
+		await waitForStableRowCount(root);
+
+		resetCCLDevMeasurements();
+
+		setNumericProperty(scroller, "scrollTop", 10_000);
+		await fireEvent.scroll(scroller);
+		await vi.waitFor(() => {
+			const rowIndexes = getRows(root).map((row) =>
+				Number(row.dataset.cclRowIndex),
+			);
+			expect(Math.min(...rowIndexes)).toBeGreaterThan(50);
+			expect(Math.max(...rowIndexes)).toBeLessThan(200);
+		});
+		await waitForStableRowCount(root);
 
 		const counters = getCCLDevMeasurementSnapshot().counters;
-		expect(counters["twoHop.cellBody.mount"].count).toBeGreaterThan(0);
-		expect(counters["twoHop.cellBody.unmount"].count).toBeGreaterThan(0);
-		expect(counters["twoHop.cellBody.rebind"].count).toBe(0);
+		expect(counters["twoHop.cellBody.rebind"].count).toBeGreaterThan(0);
+		expect(counters["twoHop.cellBody.mount"].count).toBe(0);
+		expect(counters["twoHop.cellBody.unmount"].count).toBe(0);
+	});
+
+	it("clears the stale card model when a physical slot rebinds to another item", async () => {
+		const resolver = createCardModelResolver();
+		const section = createSection(20);
+		const { root, publishSection } = await renderSurface({
+			section,
+			resolveItemCardModel: resolver,
+		});
+
+		const resolveFirstItemShell = (): Element | null =>
+			getRows(root)[0]
+				?.querySelector('[data-testid="twohop-virtual-item-cell"]')
+				?.querySelector(".cosense-card-links__box") ?? null;
+		await vi.waitFor(() =>
+			expect(resolveFirstItemShell()?.textContent).toContain("item:0"),
+		);
+
+		const replacementItems: TwoHopItemModel[] = Array.from(
+			{ length: 3 },
+			(_, index) => ({
+				item: { type: "newLink" },
+				interactionId: `replaced:${index}`,
+				searchKey: `replaced:${index}`,
+				key: `replaced:${index}`,
+			}),
+		) as TwoHopItemModel[];
+		await publishSection(
+			createTwoHopSectionModel({
+				id: section.id,
+				kind: section.kind,
+				title: section.title,
+				items: [...replacementItems, ...section.items.slice(3)],
+				totalCount: section.totalCount,
+			}),
+		);
+
+		const shellAfterRebind = resolveFirstItemShell();
+		expect(shellAfterRebind?.className).toContain("is-skeleton");
+		expect(shellAfterRebind?.textContent).not.toContain("item:0");
+
+		await vi.waitFor(() =>
+			expect(resolveFirstItemShell()?.textContent).toContain("replaced:0"),
+		);
+		expect(resolveFirstItemShell()?.className).not.toContain("is-skeleton");
 	});
 });

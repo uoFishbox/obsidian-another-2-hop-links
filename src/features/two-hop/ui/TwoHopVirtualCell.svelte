@@ -46,6 +46,7 @@
 		const nextLogicalKey = cell.logicalKey;
 		if (nextLogicalKey !== boundLogicalKey) {
 			boundLogicalKey = nextLogicalKey;
+			cardModel = undefined;
 			recordCCLDevMeasurement("twoHop.cellBody.rebind");
 		}
 

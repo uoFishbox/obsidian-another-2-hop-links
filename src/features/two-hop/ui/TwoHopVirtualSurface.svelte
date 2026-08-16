@@ -1,5 +1,6 @@
 <script lang="ts">
 	import VirtualSurface from "ui/virtualization/components/VirtualSurface.svelte";
+	import { PHYSICAL_SLOT_BODY_LIFECYCLE } from "ui/virtualization/core/bodyLifecycle";
 	import { provideVirtualFrameCoordinator } from "ui/virtualization/svelte/frameCoordinatorContext.svelte";
 	import { provideVirtualPreviewSurface } from "features/card-preview/ui/virtualPreviewSurfaceContext";
 	import TwoHopVirtualCell from "features/two-hop/ui/TwoHopVirtualCell.svelte";
@@ -25,6 +26,7 @@
 	columns={list.layout.columns}
 	gap={list.layout.gap}
 	mountedRows={list.mountedRows}
+	bodyLifecyclePolicy={PHYSICAL_SLOT_BODY_LIFECYCLE}
 	bind:rootEl={list.rootEl}
 	observerRoot={list.observerRoot}
 	resolveNavigationTarget={list.resolveNavigationTarget}
