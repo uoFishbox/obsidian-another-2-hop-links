@@ -1,14 +1,22 @@
 import type { SortOption } from "core/sorting";
 
-export type DisplayMode = "editor-inline" | "sidebar-view" | "hybrid";
+export const LANGUAGES = ["en", "ja"] as const;
+export type Language = (typeof LANGUAGES)[number];
 
-export type TwoHopHeaderSortOrder = "appearance" | "hop2-count-asc";
+export const DISPLAY_MODES = ["editor-inline", "sidebar-view", "hybrid"] as const;
+export type DisplayMode = (typeof DISPLAY_MODES)[number];
 
-export type HighlightOnOpen = "always" | "never";
+export const TWO_HOP_HEADER_SORT_ORDERS = ["appearance", "hop2-count-asc"] as const;
+export type TwoHopHeaderSortOrder = (typeof TWO_HOP_HEADER_SORT_ORDERS)[number];
 
-export type MobileLongPressAction = "preview" | "menu";
+export const HIGHLIGHT_ON_OPEN_ACTIONS = ["always", "never"] as const;
+export type HighlightOnOpen = (typeof HIGHLIGHT_ON_OPEN_ACTIONS)[number];
 
-export type Language = "en" | "ja";
+export const MOBILE_LONG_PRESS_ACTIONS = ["preview", "menu"] as const;
+export type MobileLongPressAction = (typeof MOBILE_LONG_PRESS_ACTIONS)[number];
+
+/** Current persisted settings shape version; bump when keys are renamed or reshaped. */
+export const SETTINGS_SCHEMA_VERSION = 1;
 
 export const DEFAULT_CARD_WIDTH_PX = 140;
 export const DEFAULT_CARD_HEIGHT_PX = 154;
@@ -28,6 +36,8 @@ export const CARD_LAYOUT_SETTING_KEYS = [
 export type CardLayoutSettingKey = (typeof CARD_LAYOUT_SETTING_KEYS)[number];
 
 export interface PluginSettings {
+	/** Always matches SETTINGS_SCHEMA_VERSION after a successful load. */
+	settingsSchemaVersion: number;
 	language: Language;
 	displayMode: DisplayMode;
 	useMergedLinksSection: boolean;

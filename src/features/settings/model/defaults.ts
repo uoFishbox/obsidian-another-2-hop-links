@@ -5,10 +5,12 @@ import {
 	DEFAULT_CARD_MAX_COLUMNS,
 	DEFAULT_CARD_WIDTH_PX,
 	DEFAULT_SECTION_MARGIN_BOTTOM_PX,
+	SETTINGS_SCHEMA_VERSION,
 	type PluginSettings,
 } from "./settings";
 
 export const DEFAULT_SETTINGS: PluginSettings = {
+	settingsSchemaVersion: SETTINGS_SCHEMA_VERSION,
 	language: "en",
 	displayMode: "editor-inline",
 	useMergedLinksSection: false,
@@ -56,3 +58,11 @@ export const DEFAULT_SETTINGS: PluginSettings = {
 	ripgrepExecutablePath: "",
 	maxOutgoingToProcess: 0,
 };
+
+/** Returns a copy whose nested arrays are not shared with the source. */
+export function clonePluginSettings(settings: PluginSettings): PluginSettings {
+	return {
+		...settings,
+		renderCodeBlockTypes: [...settings.renderCodeBlockTypes],
+	};
+}

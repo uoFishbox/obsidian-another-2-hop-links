@@ -64,6 +64,21 @@ describe("SettingsManager", () => {
 		expect(manager.settings).not.toHaveProperty("obsoleteSetting");
 	});
 
+	it("loads without throwing when renderCodeBlockTypes is corrupt", async () => {
+		const plugin = {
+			loadData: vi.fn().mockResolvedValue({
+				renderCodeBlockTypes: 123,
+			}),
+			saveData: vi.fn(),
+		};
+		const manager = new SettingsManager(plugin as never);
+
+		await manager.load();
+
+		expect(manager.settings.renderCodeBlockTypes).toEqual([]);
+		expect(manager.getSnapshot().renderCodeBlockTypes).toEqual([]);
+	});
+
 	it("does not share nested default settings between instances", () => {
 		const firstPlugin = {
 			loadData: vi.fn(),

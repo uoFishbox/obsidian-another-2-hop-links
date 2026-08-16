@@ -1,7 +1,8 @@
 import type { PluginHost } from "types/pluginHost";
 import {
-	CARD_LAYOUT_SETTING_KEYS,
+	clonePluginSettings,
 	DEFAULT_SETTINGS,
+	parsePluginSettings,
 	type PluginSettings,
 } from "features/settings/model";
 
@@ -9,85 +10,6 @@ const SAVE_DEBOUNCE_DELAY_MS = 100;
 
 interface UpdateOptions {
 	immediate?: boolean;
-}
-
-type RawSettings = Record<string, unknown>;
-
-const normalizePositiveIntegerSetting = (value: unknown, fallback: number): number => {
-	if (typeof value !== "number" || !Number.isFinite(value) || value <= 0) {
-		return fallback;
-	}
-
-	return Math.floor(value);
-};
-
-const normalizePositiveNumberSetting = (value: unknown, fallback: number): number => {
-	if (typeof value !== "number" || !Number.isFinite(value) || value <= 0) {
-		return fallback;
-	}
-
-	return value;
-};
-
-const normalizeNonNegativeIntegerSetting = (
-	value: unknown,
-	fallback: number,
-): number => {
-	if (typeof value !== "number" || !Number.isFinite(value) || value < 0) {
-		return fallback;
-	}
-
-	return Math.floor(value);
-};
-
-function mergeSettings(raw: RawSettings): PluginSettings {
-	const settings = createDefaultSettings();
-	for (const key of Object.keys(settings) as Array<keyof PluginSettings>) {
-		if (key in raw) {
-			Object.assign(settings, { [key]: raw[key] });
-		}
-	}
-
-	normalizeCardLayoutSettings(settings);
-
-	settings.previewMaxChars = normalizeNonNegativeIntegerSetting(
-		settings.previewMaxChars,
-		DEFAULT_SETTINGS.previewMaxChars,
-	);
-	settings.previewMaxLines = normalizeNonNegativeIntegerSetting(
-		settings.previewMaxLines,
-		DEFAULT_SETTINGS.previewMaxLines,
-	);
-	settings.previewVisualLineSafetyMargin = normalizeNonNegativeIntegerSetting(
-		settings.previewVisualLineSafetyMargin,
-		DEFAULT_SETTINGS.previewVisualLineSafetyMargin,
-	);
-	settings.previewActivationAheadRows = normalizeNonNegativeIntegerSetting(
-		settings.previewActivationAheadRows,
-		DEFAULT_SETTINGS.previewActivationAheadRows,
-	);
-	settings.previewDomCommitsPerSecond = normalizePositiveIntegerSetting(
-		settings.previewDomCommitsPerSecond,
-		DEFAULT_SETTINGS.previewDomCommitsPerSecond,
-	);
-	return settings as PluginSettings;
-}
-
-function normalizeCardLayoutSettings(settings: PluginSettings): void {
-	for (const key of CARD_LAYOUT_SETTING_KEYS) {
-		if (key === "cardHeightRatio") {
-			settings[key] = normalizePositiveNumberSetting(
-				settings[key],
-				DEFAULT_SETTINGS[key],
-			);
-			continue;
-		}
-
-		settings[key] = normalizePositiveIntegerSetting(
-			settings[key],
-			DEFAULT_SETTINGS[key],
-		);
-	}
 }
 
 export class SettingsManager {
@@ -108,8 +30,7 @@ export class SettingsManager {
 	async load(): Promise<void> {
 		try {
 			const data = await this.plugin.loadData();
-			const raw = (data ?? {}) as RawSettings;
-			this.plugin.settings = mergeSettings(raw);
+			this.plugin.settings = parsePluginSettings(data);
 			this.snapshot = this.createSnapshot();
 		} catch (error) {
 			console.error("設定の読み込みに失敗しました:", error);
@@ -196,13 +117,6 @@ export class SettingsManager {
 			await this.saveImmediate();
 		}
 	}
-}
-
-function clonePluginSettings(settings: PluginSettings): PluginSettings {
-	return {
-		...settings,
-		renderCodeBlockTypes: [...settings.renderCodeBlockTypes],
-	};
 }
 
 function createDefaultSettings(): PluginSettings {
