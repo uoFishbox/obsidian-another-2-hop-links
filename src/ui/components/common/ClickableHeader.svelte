@@ -34,13 +34,16 @@
 	const interactionRegistry = useInteractionRegistry();
 
 	function registerInteractionDescriptor(): (() => void) | undefined {
-		if (!interactionRegistry || !interactionDescriptor) {
+		const descriptor = interactionDescriptor;
+
+		if (!interactionRegistry || !descriptor) {
 			return;
 		}
 
-		interactionRegistry.register(interactionDescriptor);
+		interactionRegistry.register(descriptor);
+		const interactionId = descriptor.interactionId;
 		return () => {
-			interactionRegistry.unregister(interactionDescriptor.interactionId);
+			interactionRegistry.unregister(interactionId);
 		};
 	}
 

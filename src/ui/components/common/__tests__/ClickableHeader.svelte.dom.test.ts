@@ -73,4 +73,29 @@ describe("ClickableHeader", () => {
 
 		expect(registry.resolve(nextDescriptor.interactionId)).toBeUndefined();
 	});
+
+	it("unregisters the previous descriptor without error when the prop transitions to undefined on rebind", async () => {
+		const registry = createInteractionRegistry();
+		const initialDescriptor = createDescriptor("section:gamma");
+
+		const view = render(ClickableHeaderHarness, {
+			props: {
+				registry,
+				interactionId: initialDescriptor.interactionId,
+				descriptor: initialDescriptor,
+			},
+		});
+
+		expect(registry.resolve(initialDescriptor.interactionId)).toStrictEqual(
+			initialDescriptor,
+		);
+
+		await view.rerender({
+			registry,
+			interactionId: "section:gamma-tag",
+			descriptor: undefined,
+		});
+
+		expect(registry.resolve(initialDescriptor.interactionId)).toBeUndefined();
+	});
 });
