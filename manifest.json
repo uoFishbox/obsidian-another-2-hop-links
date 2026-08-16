@@ -1,10 +1,10 @@
 {
 	"author": "uoFishbox",
 	"authorUrl": "https://github.com/uoFishbox/obsidian-cosense-style-card-links",
-	"description": "Render Obsidian links as Cosense-style preview cards with two-hop navigation.",
-	"id": "obsidian-cosense-style-card-links",
+	"description": "Browse Obsidian links as Cosense-style card links with two-hop navigation.",
+	"id": "cosense-style-card-links",
 	"isDesktopOnly": false,
-	"minAppVersion": "0.15.0",
+	"minAppVersion": "1.13.5",
 	"name": "Cosense-style card links",
 	"version": "1.0.2"
 }
