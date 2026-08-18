@@ -49,7 +49,7 @@ export interface CreateVirtualListControllerAdapterOptions<
 	): VirtualListLayoutMeasurementResolution<TContext>;
 	onStableMeasurement?(context: VirtualListStableMeasurementContext): void;
 	onObservedWidthChange?(width: number): void;
-	frameCoordinator?: VirtualFrameCoordinator;
+	frameCoordinator: VirtualFrameCoordinator;
 }
 
 type VirtualMeasurementController = ReturnType<
@@ -362,9 +362,6 @@ export function createVirtualListControllerAdapter<
 		onMeasurement: applyMeasurement,
 		onObservedWidthChange,
 		getScrollMeasurementRange,
-		enableBootstrapMeasurementSuppression: true,
-		enableInitialStabilization: true,
-		primeUnstableScrollStart: true,
 		maxUnstableMeasurementRetries:
 			CARD_VIRTUAL_LIST_MAX_UNSTABLE_MEASUREMENT_RETRIES,
 		frameCoordinator,

@@ -8,7 +8,10 @@ import {
 	getCCLDevMeasurementSnapshot,
 	resetCCLDevMeasurements,
 } from "infrastructure/debug/CCLDevMeasurements";
-import type { VirtualFrameCoordinator } from "ui/virtualization/scheduling/frameCoordinator";
+import {
+	createVirtualFrameCoordinator,
+	type VirtualFrameCoordinator,
+} from "ui/virtualization/scheduling/frameCoordinator";
 
 describe("createVirtualListMeasurementScheduler", () => {
 	beforeEach(() => {
@@ -29,10 +32,12 @@ describe("createVirtualListMeasurementScheduler", () => {
 	it("suppresses scroll measurement while a layout measurement is already pending", async () => {
 		const runLayoutMeasurement = vi.fn();
 		const runScrollMeasurement = vi.fn();
+		const frameCoordinator = createVirtualFrameCoordinator();
 		const scheduler = createVirtualListMeasurementScheduler({
 			runLayoutMeasurement,
 			runScrollMeasurement,
 			maxUnstableMeasurementRetries: 3,
+			frameCoordinator,
 		});
 
 		scheduler.scheduleLayoutMeasurement();
@@ -49,14 +54,17 @@ describe("createVirtualListMeasurementScheduler", () => {
 		expect(runScrollMeasurement).toHaveBeenCalledTimes(1);
 
 		scheduler.cancelAll();
+		frameCoordinator.dispose();
 	});
 
 	it("stops scheduling unstable measurement retries after the retry limit", async () => {
 		const runLayoutMeasurement = vi.fn();
+		const frameCoordinator = createVirtualFrameCoordinator();
 		const scheduler = createVirtualListMeasurementScheduler({
 			runLayoutMeasurement,
 			runScrollMeasurement: vi.fn(),
 			maxUnstableMeasurementRetries: 2,
+			frameCoordinator,
 		});
 
 		scheduler.scheduleUnstableMeasurementRetry();
@@ -76,6 +84,7 @@ describe("createVirtualListMeasurementScheduler", () => {
 		await vi.runAllTimersAsync();
 
 		expect(runLayoutMeasurement).toHaveBeenCalledTimes(3);
+		frameCoordinator.dispose();
 	});
 
 	it("delegates measurement work to the coordinator critical lane", () => {

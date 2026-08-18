@@ -88,7 +88,7 @@ two-hop surface も同じ不変条件に従う。section margin、header、load-
 - `VirtualListSnapshot` およびすべてのビルド結果は、高速な構築のために内部型がミューテーションを許可している場合でも、公開された後は厳密に読み取り専用となる。
 - リコンシリエーション（差分調整）ビルダーは、新しく割り当てられた配列やマップを返す前にミューテーションすることが可能である。ただし、以前に公開されたビルドは **絶対に** ミューテーションしてはならない。
 - `ScrollerViewportEntry` は、単一のactive subscriber、保留中の測定フラグ、依存オブザーバー、およびスクロールフェーズフラグを所有・管理する。
-- スクロールフェーズフラグの状態遷移は、`dom/scrollerViewportScrollPhase.ts` を経由して処理されなければならない。
+- スクロール中の後処理フラグは `dom/virtualListDomObserver.ts` の scroller entry が所有し、scroll start/idle で直接遷移させる。
 - 構造ミューテーションを無視するためのセレクターは `dom/structureMutationObserver.ts` に定義されている。無視されたミューテーションは意図的にレイアウト計算を抑制するため、新しい無視ルールを追加する際は必ず固有のテストを追加すること。
 
 ## 測定チェックリスト（Measurement Checklist）

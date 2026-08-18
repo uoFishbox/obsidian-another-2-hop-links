@@ -83,6 +83,11 @@ const importsSvelteRuntime = (file: SourceFile): boolean =>
 		);
 	});
 
+const definesDomObserverOrScrollContainerCache = (file: SourceFile): boolean =>
+	/(?:\b(?:const|let|var)\s+nearestScrollContainerCache\b|\b(?:export\s+)?function\s+(?:findNearestScrollContainerCached|invalidateNearestScrollContainerCache)\b|\bnew\s+(?:ResizeObserver|MutationObserver)(?:Ctor)?\b)/.test(
+		file.content,
+	);
+
 describe("virtual-list layer boundaries", () => {
 	const productionFiles = readProductionTsFiles(virtualListRoot);
 	const coreFiles = readProductionTsFiles(join(virtualListRoot, "core"));
@@ -147,9 +152,7 @@ describe("virtual-list layer boundaries", () => {
 				productionFiles,
 				(file) =>
 					!file.relativePath.startsWith("dom/") &&
-					/\b(?:ResizeObserver|MutationObserver|findNearestScrollContainerCached|invalidateNearestScrollContainerCache|nearestScrollContainerCache)\b/.test(
-						file.content,
-					),
+					definesDomObserverOrScrollContainerCache(file),
 			),
 		).toEqual([]);
 	});

@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 import { syncMathJaxStylesForNode } from "ui/shared/dom/mathJaxShadowStyles";
-import { installVirtualListShadowSurface } from "ui/virtualization/svelte/VirtualSurfaceRuntime";
 import { ensureCardRenderShadowSurface } from "../cardRenderShadowSurface";
 
 describe("cardRenderShadowSurface", () => {
@@ -75,19 +74,6 @@ describe("cardRenderShadowSurface", () => {
 
 		sourceStyle.remove();
 		host.remove();
-	});
-
-	it("mounts virtual list content directly into the surface element", () => {
-		const host = document.createElement("div");
-		const content = document.createElement("div");
-
-		const handles = installVirtualListShadowSurface(host, content);
-
-		expect(content.parentElement).toBe(handles.surfaceEl);
-		expect(handles.surfaceEl.children).toHaveLength(1);
-		expect(handles.surfaceEl.firstElementChild).toBe(content);
-
-		handles.dispose();
 	});
 
 	it("creates shadow surface elements in the host document realm", () => {

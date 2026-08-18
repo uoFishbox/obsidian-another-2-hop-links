@@ -1,9 +1,47 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
 	createVirtualMeasurementController,
+	type CreateVirtualMeasurementControllerOptions,
 	type VirtualMeasurement,
 } from "../virtualMeasurementController";
+import type { VirtualFrameCoordinator } from "ui/virtualization/scheduling/frameCoordinator";
 import { createVirtualListMeasurementState } from "../virtualListMeasurementState";
+
+const createTestFrameCoordinator = (): VirtualFrameCoordinator => {
+	const handles = new Map<string, number>();
+	const taskKey = (lane: string, key: string): string => `${lane}:${key}`;
+	return {
+		schedule(lane, key, task): boolean {
+			const resolvedKey = taskKey(lane, key);
+			if (handles.has(resolvedKey)) return false;
+			const handle = window.setTimeout(() => {
+				handles.delete(resolvedKey);
+				task();
+			}, 0);
+			handles.set(resolvedKey, handle);
+			return true;
+		},
+		cancel(lane, key): void {
+			const resolvedKey = taskKey(lane, key);
+			const handle = handles.get(resolvedKey);
+			if (handle !== undefined) window.clearTimeout(handle);
+			handles.delete(resolvedKey);
+		},
+		isScheduled: (lane, key) => handles.has(taskKey(lane, key)),
+		dispose(): void {
+			for (const handle of handles.values()) window.clearTimeout(handle);
+			handles.clear();
+		},
+	};
+};
+
+const createController = (
+	options: Omit<CreateVirtualMeasurementControllerOptions, "frameCoordinator">,
+) =>
+	createVirtualMeasurementController({
+		...options,
+		frameCoordinator: createTestFrameCoordinator(),
+	});
 
 const createRoot = (rectOverrides: Partial<DOMRect> = {}): HTMLElement => {
 	const rootEl = document.createElement("div");
@@ -37,7 +75,7 @@ describe("createVirtualMeasurementController", () => {
 		document.body.append(rootEl);
 		const state = createVirtualListMeasurementState();
 		const onMeasurement = vi.fn();
-		const controller = createVirtualMeasurementController({
+		const controller = createController({
 			getRootEl: () => rootEl,
 			measurement: state,
 			onMeasurement,
@@ -77,7 +115,7 @@ describe("createVirtualMeasurementController", () => {
 		state.viewportHeight = 200;
 		state.hasStableScrollMetrics = true;
 		const onMeasurement = vi.fn();
-		const controller = createVirtualMeasurementController({
+		const controller = createController({
 			getRootEl: () => rootEl,
 			measurement: state,
 			onMeasurement,
@@ -116,7 +154,7 @@ describe("createVirtualMeasurementController", () => {
 		state.viewportHeight = 200;
 		state.hasStableScrollMetrics = true;
 		const onMeasurement = vi.fn();
-		const controller = createVirtualMeasurementController({
+		const controller = createController({
 			getRootEl: () => rootEl,
 			measurement: state,
 			onMeasurement,
@@ -155,7 +193,7 @@ describe("createVirtualMeasurementController", () => {
 		state.viewportHeight = 200;
 		state.hasStableScrollMetrics = true;
 		const onMeasurement = vi.fn();
-		const controller = createVirtualMeasurementController({
+		const controller = createController({
 			getRootEl: () => rootEl,
 			measurement: state,
 			onMeasurement,
@@ -188,7 +226,7 @@ describe("createVirtualMeasurementController", () => {
 
 	it("skips measurement when no root is available for layout", () => {
 		const state = createVirtualListMeasurementState();
-		const controller = createVirtualMeasurementController({
+		const controller = createController({
 			getRootEl: () => null,
 			measurement: state,
 			maxUnstableMeasurementRetries: 1,
@@ -205,11 +243,10 @@ describe("createVirtualMeasurementController", () => {
 		document.body.append(rootEl);
 		const state = createVirtualListMeasurementState();
 		const onMeasurement = vi.fn();
-		const controller = createVirtualMeasurementController({
+		const controller = createController({
 			getRootEl: () => rootEl,
 			measurement: state,
 			onMeasurement,
-			enableInitialStabilization: true,
 			initialStabilizationMaxPasses: 1,
 			maxUnstableMeasurementRetries: 1,
 		});
@@ -231,10 +268,9 @@ describe("createVirtualMeasurementController", () => {
 		document.body.append(rootEl);
 		const rectGetter = vi.spyOn(rootEl, "getBoundingClientRect");
 		const state = createVirtualListMeasurementState();
-		const controller = createVirtualMeasurementController({
+		const controller = createController({
 			getRootEl: () => rootEl,
 			measurement: state,
-			primeUnstableScrollStart: true,
 			maxUnstableMeasurementRetries: 1,
 		});
 
@@ -257,7 +293,7 @@ describe("createVirtualMeasurementController", () => {
 		const onMeasurement = vi.fn(
 			(_measurement: VirtualMeasurement) => "stable" as const,
 		);
-		const controller = createVirtualMeasurementController({
+		const controller = createController({
 			getRootEl: () => rootEl,
 			measurement: state,
 			onMeasurement,

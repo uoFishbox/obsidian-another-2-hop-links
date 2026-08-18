@@ -1,9 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { findMountedCellElementByKey } from "../VirtualSurfaceNavigation";
-import {
-	createVirtualCellElementRegistration,
-	findClosestRegisteredVirtualCell,
-} from "../VirtualCellRegistry";
+import { createVirtualGridSurfaceTransaction } from "../VirtualGridSurfaceTransaction";
 
 describe("findMountedCellElementByKey", () => {
 	it("finds mounted cell elements by logical key attributes", () => {
@@ -32,12 +29,18 @@ describe("findMountedCellElementByKey", () => {
 		const cell = document.createElement("div");
 		container.append(cell);
 
-		const registration = createVirtualCellElementRegistration(cell);
-		registration.update("registered-a", 1, 2);
+		const transaction = createVirtualGridSurfaceTransaction();
+		transaction.rebindCell(cell, {
+			nextLogicalKey: "registered-a",
+			rowIndex: 1,
+			columnIndex: 2,
+		});
 
-		expect(findMountedCellElementByKey(container, "registered-a")).toBe(cell);
+		expect(
+			findMountedCellElementByKey(container, "registered-a", transaction),
+		).toBe(cell);
 
-		const closest = findClosestRegisteredVirtualCell(cell);
+		const closest = transaction.findClosestCell(cell);
 		expect(closest?.element).toBe(cell);
 		expect(closest?.metadata).toEqual({
 			logicalKey: "registered-a",
@@ -45,9 +48,11 @@ describe("findMountedCellElementByKey", () => {
 			columnIndex: 2,
 		});
 
-		registration.unregister();
+		transaction.releaseCell(cell);
 
-		expect(findMountedCellElementByKey(container, "registered-a")).toBeNull();
-		expect(findClosestRegisteredVirtualCell(cell)).toBeNull();
+		expect(
+			findMountedCellElementByKey(container, "registered-a", transaction),
+		).toBeNull();
+		expect(transaction.findClosestCell(cell)).toBeNull();
 	});
 });

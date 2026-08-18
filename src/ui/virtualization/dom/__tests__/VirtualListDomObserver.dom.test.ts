@@ -55,13 +55,14 @@ describe("observeVirtualListViewport", () => {
 		});
 
 		const onScrollContainerChange = vi.fn();
+		const scheduleLayoutMeasurement = vi.fn();
 		const runScrollMeasurement = vi.fn();
 		const stopObserving = observeVirtualListViewport({
 			rootEl,
 			onWidthChange: vi.fn(),
 			getCachedViewportHeight: () => 240,
 			onScrollContainerChange,
-			scheduleLayoutMeasurement: vi.fn(),
+			scheduleLayoutMeasurement,
 			scheduleScrollMeasurement,
 			runScrollMeasurement,
 			runInitialLayoutMeasurement: vi.fn(),
@@ -90,6 +91,7 @@ describe("observeVirtualListViewport", () => {
 			await flushFrames();
 
 			expect(onScrollContainerChange).toHaveBeenNthCalledWith(2, scrollContainer);
+			expect(scheduleLayoutMeasurement).toHaveBeenCalledTimes(1);
 
 			scrollContainer.dispatchEvent(new Event("scroll"));
 			await flushFrames();
@@ -481,79 +483,84 @@ describe("observeVirtualListViewport", () => {
 
 		const firstScheduleLayoutMeasurement = vi.fn();
 		const secondScheduleLayoutMeasurement = vi.fn();
-		const firstStopObserving = observeVirtualListViewport({
-			rootEl: firstRootEl,
-			onWidthChange: vi.fn(),
-			onScrollContainerChange: vi.fn(),
-			scheduleLayoutMeasurement: firstScheduleLayoutMeasurement,
-			scheduleScrollMeasurement,
-			runScrollMeasurement: vi.fn(),
-			runInitialLayoutMeasurement: vi.fn(),
-		});
-		const secondStopObserving = observeVirtualListViewport({
-			rootEl: secondRootEl,
-			onWidthChange: vi.fn(),
-			onScrollContainerChange: vi.fn(),
-			scheduleLayoutMeasurement: secondScheduleLayoutMeasurement,
-			scheduleScrollMeasurement,
-			runScrollMeasurement: vi.fn(),
-			runInitialLayoutMeasurement: vi.fn(),
-		});
+		let firstStopObserving: (() => void) | null = null;
+		let secondStopObserving: (() => void) | null = null;
 
-		expect(mutationObserverRecords).toHaveLength(2);
-		const firstStructureObserver = mutationObserverRecords.find((record) =>
-			record.elements.has(firstScroller),
-		);
-		expect(firstStructureObserver).toBeDefined();
-		firstStructureObserver?.callback(
-			[
-				{
-					type: "childList",
-					target: firstRootEl,
-					addedNodes: [firstAddedNode],
-					removedNodes: [],
-				} as unknown as MutationRecord,
-				{
-					type: "childList",
-					target: firstRootEl,
-					addedNodes: [firstAddedNode],
-					removedNodes: [],
-				} as unknown as MutationRecord,
-			],
-			{} as MutationObserver,
-		);
+		try {
+			firstStopObserving = observeVirtualListViewport({
+				rootEl: firstRootEl,
+				onWidthChange: vi.fn(),
+				onScrollContainerChange: vi.fn(),
+				scheduleLayoutMeasurement: firstScheduleLayoutMeasurement,
+				scheduleScrollMeasurement,
+				runScrollMeasurement: vi.fn(),
+				runInitialLayoutMeasurement: vi.fn(),
+			});
+			secondStopObserving = observeVirtualListViewport({
+				rootEl: secondRootEl,
+				onWidthChange: vi.fn(),
+				onScrollContainerChange: vi.fn(),
+				scheduleLayoutMeasurement: secondScheduleLayoutMeasurement,
+				scheduleScrollMeasurement,
+				runScrollMeasurement: vi.fn(),
+				runInitialLayoutMeasurement: vi.fn(),
+			});
 
-		expect(firstScheduleLayoutMeasurement).not.toHaveBeenCalled();
-		expect(secondScheduleLayoutMeasurement).not.toHaveBeenCalled();
+			expect(mutationObserverRecords).toHaveLength(2);
+			const firstStructureObserver = mutationObserverRecords.find((record) =>
+				record.elements.has(firstScroller),
+			);
+			expect(firstStructureObserver).toBeDefined();
+			firstStructureObserver?.callback(
+				[
+					{
+						type: "childList",
+						target: firstRootEl,
+						addedNodes: [firstAddedNode],
+						removedNodes: [],
+					} as unknown as MutationRecord,
+					{
+						type: "childList",
+						target: firstRootEl,
+						addedNodes: [firstAddedNode],
+						removedNodes: [],
+					} as unknown as MutationRecord,
+				],
+				{} as MutationObserver,
+			);
 
-		await vi.runOnlyPendingTimersAsync();
+			expect(firstScheduleLayoutMeasurement).toHaveBeenCalledTimes(1);
+			expect(secondScheduleLayoutMeasurement).not.toHaveBeenCalled();
 
-		expect(firstScheduleLayoutMeasurement).toHaveBeenCalledTimes(1);
-		expect(secondScheduleLayoutMeasurement).not.toHaveBeenCalled();
+			await vi.runOnlyPendingTimersAsync();
 
-		const secondStructureObserver = mutationObserverRecords.find((record) =>
-			record.elements.has(secondScroller),
-		);
-		expect(secondStructureObserver).toBeDefined();
-		secondStructureObserver?.callback(
-			[
-				{
-					type: "childList",
-					target: secondRootEl,
-					addedNodes: [secondAddedNode],
-					removedNodes: [],
-				} as unknown as MutationRecord,
-			],
-			{} as MutationObserver,
-		);
+			expect(firstScheduleLayoutMeasurement).toHaveBeenCalledTimes(1);
+			expect(secondScheduleLayoutMeasurement).not.toHaveBeenCalled();
 
-		await vi.runOnlyPendingTimersAsync();
+			const secondStructureObserver = mutationObserverRecords.find((record) =>
+				record.elements.has(secondScroller),
+			);
+			expect(secondStructureObserver).toBeDefined();
+			secondStructureObserver?.callback(
+				[
+					{
+						type: "childList",
+						target: secondRootEl,
+						addedNodes: [secondAddedNode],
+						removedNodes: [],
+					} as unknown as MutationRecord,
+				],
+				{} as MutationObserver,
+			);
 
-		expect(firstScheduleLayoutMeasurement).toHaveBeenCalledTimes(1);
-		expect(secondScheduleLayoutMeasurement).toHaveBeenCalledTimes(1);
+			await vi.runOnlyPendingTimersAsync();
 
-		firstStopObserving();
-		secondStopObserving();
+			expect(firstScheduleLayoutMeasurement).toHaveBeenCalledTimes(1);
+			expect(secondScheduleLayoutMeasurement).toHaveBeenCalledTimes(1);
+		} finally {
+			firstStopObserving?.();
+			secondStopObserving?.();
+		}
 	});
 
 	it("disconnects shared observers after the last subscriber cleanup", () => {
@@ -619,6 +626,58 @@ describe("observeVirtualListViewport", () => {
 
 		const onScrollContainerChange = vi.fn();
 		const scheduleLayoutMeasurement = vi.fn();
+		let stopObserving: (() => void) | null = null;
+
+		try {
+			stopObserving = observeVirtualListViewport({
+				rootEl,
+				onWidthChange: vi.fn(),
+				onScrollContainerChange,
+				scheduleLayoutMeasurement,
+				scheduleScrollMeasurement,
+				runScrollMeasurement: vi.fn(),
+				runInitialLayoutMeasurement: vi.fn(),
+			});
+
+			secondParent.append(rootEl);
+			mutationObserverRecords[0].callback(
+				[
+					{
+						type: "childList",
+						target: firstParent,
+						addedNodes: [],
+						removedNodes: [rootEl],
+					} as unknown as MutationRecord,
+				],
+				{} as MutationObserver,
+			);
+
+			await vi.runOnlyPendingTimersAsync();
+
+			expect(onScrollContainerChange).toHaveBeenNthCalledWith(1, firstScroller);
+			expect(onScrollContainerChange).toHaveBeenNthCalledWith(2, secondScroller);
+			expect(scheduleLayoutMeasurement).toHaveBeenCalledTimes(1);
+		} finally {
+			stopObserving?.();
+		}
+	});
+
+	it("schedules one measurement when a root resize moves it to a new scroller", () => {
+		const firstScroller = document.createElement("div");
+		const secondScroller = document.createElement("div");
+		const firstParent = document.createElement("div");
+		const secondParent = document.createElement("div");
+		const rootEl = document.createElement("div");
+
+		firstScroller.style.overflow = "auto";
+		secondScroller.style.overflow = "auto";
+		document.body.append(firstScroller, secondScroller);
+		firstScroller.append(firstParent);
+		secondScroller.append(secondParent);
+		firstParent.append(rootEl);
+
+		const onScrollContainerChange = vi.fn();
+		const scheduleLayoutMeasurement = vi.fn();
 		const stopObserving = observeVirtualListViewport({
 			rootEl,
 			onWidthChange: vi.fn(),
@@ -629,26 +688,18 @@ describe("observeVirtualListViewport", () => {
 			runInitialLayoutMeasurement: vi.fn(),
 		});
 
-		secondParent.append(rootEl);
-		mutationObserverRecords[0].callback(
-			[
-				{
-					type: "childList",
-					target: firstParent,
-					addedNodes: [],
-					removedNodes: [rootEl],
-				} as unknown as MutationRecord,
-			],
-			{} as MutationObserver,
-		);
+		try {
+			triggerResize(rootEl, 200, 100);
+			scheduleLayoutMeasurement.mockClear();
 
-		await vi.runOnlyPendingTimersAsync();
+			secondParent.append(rootEl);
+			triggerResize(rootEl, 200, 100);
 
-		expect(onScrollContainerChange).toHaveBeenNthCalledWith(1, firstScroller);
-		expect(onScrollContainerChange).toHaveBeenNthCalledWith(2, secondScroller);
-		expect(scheduleLayoutMeasurement).toHaveBeenCalledTimes(1);
-
-		stopObserving();
+			expect(onScrollContainerChange).toHaveBeenNthCalledWith(2, secondScroller);
+			expect(scheduleLayoutMeasurement).toHaveBeenCalledTimes(1);
+		} finally {
+			stopObserving();
+		}
 	});
 
 	it("treats coverage boundary values as miss (open interval)", async () => {

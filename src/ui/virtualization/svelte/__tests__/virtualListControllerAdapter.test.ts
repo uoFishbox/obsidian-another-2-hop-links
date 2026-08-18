@@ -11,6 +11,14 @@ import type {
 } from "../../dom/virtualMeasurementController";
 import type { RowRange } from "../../rowRange";
 import type { VirtualRanges } from "../../types";
+import type { VirtualFrameCoordinator } from "../../scheduling/frameCoordinator";
+
+const TEST_FRAME_COORDINATOR: VirtualFrameCoordinator = {
+	schedule: vi.fn(() => false),
+	cancel: vi.fn(),
+	isScheduled: vi.fn(() => false),
+	dispose: vi.fn(),
+};
 
 const measurementControllerHarness = vi.hoisted(() => ({
 	options: null as CreateVirtualMeasurementControllerOptions | null,
@@ -140,12 +148,6 @@ const createAdapterHarness = (
 			scrollContainerEl: null,
 			invalidateViewport: vi.fn(),
 			updateFromLiveMetrics: vi.fn(),
-			resolvePhase: () => ({
-				type: "stable",
-				sectionTop: 0,
-				viewportHeight: 100,
-				visibleRangeStable: true,
-			}),
 		},
 		getContext: () => rowModel,
 		hasRenderableContent: () => true,
@@ -157,6 +159,7 @@ const createAdapterHarness = (
 			measurement,
 			isStable: true,
 		}),
+		frameCoordinator: TEST_FRAME_COORDINATOR,
 	});
 
 	return {

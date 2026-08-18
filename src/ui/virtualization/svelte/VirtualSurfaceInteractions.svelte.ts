@@ -10,8 +10,10 @@ import { useAppContext, useLinkContext } from "ui/context/linkContext";
 import type { ResultNavigationDirection } from "features/keyboard-navigation/resultFocus";
 import type { VirtualNavigationTarget } from "../types";
 import type { ProgrammaticScrollSnapshot } from "../dom/flushVirtualScrollMeasurement";
-import { installVirtualListInteractions } from "./VirtualListInteractions.svelte";
 import { createVirtualSurfaceNavigation } from "./VirtualSurfaceNavigation";
+import { ensureCardRenderShadowSurface } from "ui/components/common/cardRenderShadowSurface";
+import { installShadowHoverPopoverBridge } from "features/popover/shadowHoverPopoverBridge";
+import { createVirtualGridSurfaceTransaction } from "./VirtualGridSurfaceTransaction";
 
 export interface VirtualSurfaceInteractionParams {
 	getRootEl(): HTMLDivElement | null;
@@ -77,6 +79,12 @@ export function createVirtualSurfaceInteractions({
 			}
 		: {};
 
+	const surfaceTransaction = createVirtualGridSurfaceTransaction({
+		onLogicalCellWillRebind: () => {
+			delegatedInteractions.resetTransientState();
+		},
+	});
+
 	const flushMountedState = async (): Promise<void> => {
 		await tick();
 	};
@@ -87,20 +95,50 @@ export function createVirtualSurfaceInteractions({
 		getScrollContainerEl: getObserverRoot,
 		getRowHeight,
 		delegatedInteractions,
+		surfaceTransaction,
 		resolveNavigationTarget,
 		flushVirtualScrollMeasurement,
 		flushMountedState,
 	});
 
-	installVirtualListInteractions({
-		getRootEl,
-		getContentEl,
-		getShadowRoot,
-		setShadowRoot,
-		delegatedInteractions,
-		interactionRegistry,
-		linkContext,
-		appContext,
+	$effect(() => {
+		const rootEl = getRootEl();
+		const contentEl = getContentEl();
+		if (!rootEl || !contentEl) {
+			setShadowRoot(null);
+			return;
+		}
+
+		const handles = ensureCardRenderShadowSurface(rootEl);
+		if (contentEl.parentNode !== handles.surfaceEl) {
+			handles.surfaceEl.append(contentEl);
+		}
+		setShadowRoot(handles.shadowRoot);
+
+		return () => {
+			handles.dispose();
+		};
+	});
+
+	$effect(() => {
+		return () => {
+			delegatedInteractions.clearLongPressTimer();
+			interactionRegistry.clear();
+		};
+	});
+
+	$effect(() => {
+		const shadowRoot = getShadowRoot();
+		if (!shadowRoot) {
+			return;
+		}
+
+		return installShadowHoverPopoverBridge({
+			shadowRoot,
+			registry: interactionRegistry,
+			linkContext,
+			appContext,
+		});
 	});
 
 	let syncedInteractionDescriptorScopeId: string | undefined;
@@ -138,6 +176,7 @@ export function createVirtualSurfaceInteractions({
 	return {
 		delegatedInteractions,
 		handleKeyDown,
+		surfaceTransaction,
 		touchEventHandlers,
 	};
 }

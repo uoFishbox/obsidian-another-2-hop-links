@@ -84,12 +84,9 @@ export interface CreateVirtualMeasurementControllerOptions {
 	onScrollContainerChange?: (element: HTMLElement | null) => void;
 	/** Returns the range to push after each applied measurement. */
 	getScrollMeasurementRange?: () => ScrollMeasurementRange | null;
-	enableBootstrapMeasurementSuppression?: boolean;
-	enableInitialStabilization?: boolean;
 	initialStabilizationMaxPasses?: number;
-	primeUnstableScrollStart?: boolean;
 	maxUnstableMeasurementRetries: number;
-	frameCoordinator?: VirtualFrameCoordinator;
+	frameCoordinator: VirtualFrameCoordinator;
 }
 
 const SKIPPED_NO_ROOT: VirtualMeasurementResult = {
@@ -117,10 +114,7 @@ export function createVirtualMeasurementController({
 	onObservedWidthChange,
 	onScrollContainerChange,
 	getScrollMeasurementRange,
-	enableBootstrapMeasurementSuppression = false,
-	enableInitialStabilization = false,
 	initialStabilizationMaxPasses,
-	primeUnstableScrollStart = false,
 	maxUnstableMeasurementRetries,
 	frameCoordinator,
 }: CreateVirtualMeasurementControllerOptions) {
@@ -345,9 +339,8 @@ export function createVirtualMeasurementController({
 		maxPasses: initialStabilizationMaxPasses,
 	});
 
-	const scheduleObservedLayoutMeasurement = enableBootstrapMeasurementSuppression
-		? bootstrapMeasurementSuppression.scheduleObservedLayoutMeasurement
-		: scheduleLayoutMeasurement;
+	const scheduleObservedLayoutMeasurement =
+		bootstrapMeasurementSuppression.scheduleObservedLayoutMeasurement;
 
 	const observeRoot = (
 		rootEl: HTMLElement,
@@ -376,25 +369,18 @@ export function createVirtualMeasurementController({
 			runScrollMeasurement,
 			runInitialLayoutMeasurement: () => {
 				runWithoutTracking(() => {
-					if (enableBootstrapMeasurementSuppression) {
-						bootstrapMeasurementSuppression.suppressForBootstrap();
-					}
+					bootstrapMeasurementSuppression.suppressForBootstrap();
 					runLayoutMeasurement();
-					if (enableInitialStabilization) {
-						initialStabilization.schedule();
-					}
+					initialStabilization.schedule();
 				});
 			},
-			cancelInitialStabilizationMeasurement: enableInitialStabilization
-				? initialStabilization.cancelBecauseScrollStarted
-				: undefined,
-			onScrollStart: primeUnstableScrollStart
-				? () => {
-						if (measurement.hasStableScrollMetrics) return;
-						if (hasPendingLayoutMeasurement()) return;
-						scheduleLayoutMeasurement();
-					}
-				: undefined,
+			cancelInitialStabilizationMeasurement:
+				initialStabilization.cancelBecauseScrollStarted,
+			onScrollStart: () => {
+				if (measurement.hasStableScrollMetrics) return;
+				if (hasPendingLayoutMeasurement()) return;
+				scheduleLayoutMeasurement();
+			},
 		});
 		activeViewportObservation = observation;
 

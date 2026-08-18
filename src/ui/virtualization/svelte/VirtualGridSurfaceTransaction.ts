@@ -1,9 +1,5 @@
 import { dispatchVirtualCellWillRebind } from "ui/interactions/virtualCellRebind";
 import type { ActionReturn } from "svelte/action";
-import {
-	createVirtualCellElementRegistration,
-	type VirtualCellElementRegistration,
-} from "./VirtualCellRegistry";
 
 export interface VirtualGridCellRebindMetadata {
 	previousLogicalKey?: string;
@@ -12,9 +8,22 @@ export interface VirtualGridCellRebindMetadata {
 	columnIndex?: number;
 }
 
+export interface VirtualGridCellMetadata {
+	readonly logicalKey: string;
+	readonly rowIndex?: number;
+	readonly columnIndex?: number;
+}
+
 export interface VirtualGridSurfaceTransaction {
 	rebindCell(element: HTMLElement, rebind: VirtualGridCellRebindMetadata): void;
 	releaseCell(element: HTMLElement): void;
+	findCellElementByKey(
+		container: HTMLElement | null,
+		key: string | null | undefined,
+	): HTMLElement | null;
+	findClosestCell(
+		target: HTMLElement | null,
+	): { element: HTMLElement; metadata: VirtualGridCellMetadata } | null;
 }
 
 export interface VirtualGridSurfaceTransactionOptions {
@@ -29,36 +38,65 @@ export interface VirtualGridCellActionParams extends VirtualGridCellRebindMetada
 	transaction: VirtualGridSurfaceTransaction;
 }
 
-interface CellBinding {
+interface MutableVirtualGridCellMetadata {
 	logicalKey: string;
 	rowIndex?: number;
 	columnIndex?: number;
-	readonly registration: VirtualCellElementRegistration;
 }
 
 /**
- * Owns the imperative state changes required when a physical grid cell is
- * rebound to another logical cell.
+ * Owns physical-to-logical cell bindings and navigation lookups for one
+ * rendered surface. Keeping both indexes here avoids duplicating binding state
+ * in a process-wide registry.
  */
 export function createVirtualGridSurfaceTransaction(
 	options: VirtualGridSurfaceTransactionOptions = {},
 ): VirtualGridSurfaceTransaction {
-	const bindingByElement = new WeakMap<HTMLElement, CellBinding>();
+	const metadataByElement = new WeakMap<
+		HTMLElement,
+		MutableVirtualGridCellMetadata
+	>();
+	const elementsByLogicalKey = new Map<string, Set<HTMLElement>>();
+
+	const removeElementFromLogicalKey = (
+		element: HTMLElement,
+		logicalKey: string,
+	): void => {
+		const elements = elementsByLogicalKey.get(logicalKey);
+		if (!elements) return;
+
+		elements.delete(element);
+		if (elements.size === 0) {
+			elementsByLogicalKey.delete(logicalKey);
+		}
+	};
+
+	const addElementForLogicalKey = (
+		element: HTMLElement,
+		logicalKey: string,
+	): void => {
+		let elements = elementsByLogicalKey.get(logicalKey);
+		if (!elements) {
+			elements = new Set<HTMLElement>();
+			elementsByLogicalKey.set(logicalKey, elements);
+		}
+		elements.add(element);
+	};
 
 	const rebindCell = (
 		element: HTMLElement,
 		rebind: VirtualGridCellRebindMetadata,
 	): void => {
-		const previous = bindingByElement.get(element);
+		const metadata = metadataByElement.get(element);
 		if (
-			previous?.logicalKey === rebind.nextLogicalKey &&
-			previous.rowIndex === rebind.rowIndex &&
-			previous.columnIndex === rebind.columnIndex
+			metadata?.logicalKey === rebind.nextLogicalKey &&
+			metadata.rowIndex === rebind.rowIndex &&
+			metadata.columnIndex === rebind.columnIndex
 		) {
 			return;
 		}
 
-		const previousLogicalKey = previous?.logicalKey ?? rebind.previousLogicalKey;
+		const previousLogicalKey = metadata?.logicalKey ?? rebind.previousLogicalKey;
 		if (
 			previousLogicalKey !== undefined &&
 			previousLogicalKey !== rebind.nextLogicalKey
@@ -70,36 +108,53 @@ export function createVirtualGridSurfaceTransaction(
 			});
 		}
 
-		const registration =
-			previous?.registration ?? createVirtualCellElementRegistration(element);
-		registration.update(rebind.nextLogicalKey, rebind.rowIndex, rebind.columnIndex);
-
-		if (previous) {
-			previous.logicalKey = rebind.nextLogicalKey;
-			previous.rowIndex = rebind.rowIndex;
-			previous.columnIndex = rebind.columnIndex;
+		if (!metadata) {
+			const nextMetadata: MutableVirtualGridCellMetadata = {
+				logicalKey: rebind.nextLogicalKey,
+				rowIndex: rebind.rowIndex,
+				columnIndex: rebind.columnIndex,
+			};
+			metadataByElement.set(element, nextMetadata);
+			addElementForLogicalKey(element, rebind.nextLogicalKey);
 			return;
 		}
 
-		bindingByElement.set(element, {
-			logicalKey: rebind.nextLogicalKey,
-			rowIndex: rebind.rowIndex,
-			columnIndex: rebind.columnIndex,
-			registration,
-		});
+		if (metadata.logicalKey !== rebind.nextLogicalKey) {
+			removeElementFromLogicalKey(element, metadata.logicalKey);
+			addElementForLogicalKey(element, rebind.nextLogicalKey);
+		}
+		metadata.logicalKey = rebind.nextLogicalKey;
+		metadata.rowIndex = rebind.rowIndex;
+		metadata.columnIndex = rebind.columnIndex;
 	};
 
 	const releaseCell = (element: HTMLElement): void => {
-		const binding = bindingByElement.get(element);
-		if (!binding) return;
+		const metadata = metadataByElement.get(element);
+		if (!metadata) return;
 
-		binding.registration.unregister();
-		bindingByElement.delete(element);
+		removeElementFromLogicalKey(element, metadata.logicalKey);
+		metadataByElement.delete(element);
 	};
 
 	return {
 		rebindCell,
 		releaseCell,
+		findCellElementByKey(container, key): HTMLElement | null {
+			if (!container || !key) return null;
+			for (const element of elementsByLogicalKey.get(key) ?? []) {
+				if (container.contains(element)) return element;
+			}
+			return null;
+		},
+		findClosestCell(target) {
+			for (let element = target; element; element = element.parentElement) {
+				const metadata = metadataByElement.get(element);
+				if (metadata) {
+					return { element, metadata };
+				}
+			}
+			return null;
+		},
 	};
 }
 

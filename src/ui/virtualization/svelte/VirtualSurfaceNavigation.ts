@@ -6,25 +6,25 @@ import { waitForNextAnimationFrame } from "ui/shared/scheduling/frame";
 import type { VirtualNavigationTarget } from "../types";
 import { getScrollMetrics } from "../dom/virtualListMeasurementAdapter";
 import { createVirtualListKeyboardHandler } from "./VirtualSurfaceKeyboard";
-import { findNearestScrollContainer } from "../dom/scrollContainer";
-import { invalidateScrollGeometry } from "../dom/virtualListScrollGeometryInvalidation";
-import type { ProgrammaticScrollSnapshot } from "../dom/flushVirtualScrollMeasurement";
 import {
-	findClosestRegisteredVirtualCell,
-	findRegisteredVirtualCellElementByKey,
-} from "./VirtualCellRegistry";
+	findNearestScrollContainer,
+	invalidateNearestScrollContainerCache,
+} from "../dom/scrollContainer";
+import type { ProgrammaticScrollSnapshot } from "../dom/flushVirtualScrollMeasurement";
+import type { VirtualGridSurfaceTransaction } from "./VirtualGridSurfaceTransaction";
 
 const LOGICAL_CELL_SELECTOR = "[data-ccl-logical-key]";
 
 export function findMountedCellElementByKey(
 	container: HTMLElement | null,
 	key: string | null | undefined,
+	surfaceTransaction?: VirtualGridSurfaceTransaction,
 ): HTMLElement | null {
 	if (!container || !key) {
 		return null;
 	}
 
-	const registeredElement = findRegisteredVirtualCellElementByKey(container, key);
+	const registeredElement = surfaceTransaction?.findCellElementByKey(container, key);
 	if (registeredElement) {
 		return registeredElement;
 	}
@@ -93,6 +93,7 @@ export const createVirtualSurfaceNavigation = (options: {
 	getScrollContainerEl: () => HTMLElement | null;
 	getRowHeight: () => number;
 	delegatedInteractions: DelegatedKeyboardInteractions;
+	surfaceTransaction: VirtualGridSurfaceTransaction;
 	flushMountedState: () => Promise<void>;
 	resolveNavigationTarget?: (
 		currentKey: string,
@@ -123,7 +124,11 @@ export const createVirtualSurfaceNavigation = (options: {
 		target: VirtualNavigationTarget,
 	): Promise<boolean> => {
 		const getMountedCellElement = (key: string): HTMLElement | null =>
-			findMountedCellElementByKey(options.getContentEl(), key);
+			findMountedCellElementByKey(
+				options.getContentEl(),
+				key,
+				options.surfaceTransaction,
+			);
 		const mountedCellElement = getMountedCellElement(target.key);
 
 		const rootEl = options.getRootEl();
@@ -140,7 +145,7 @@ export const createVirtualSurfaceNavigation = (options: {
 			targetHeight: options.getRowHeight(),
 		});
 		if (scrollSnapshot.didScroll) {
-			invalidateScrollGeometry(rootEl, "navigation-scroll");
+			invalidateNearestScrollContainerCache(rootEl);
 		}
 		if (!scrollSnapshot.didScroll && focusCellTarget(mountedCellElement)) {
 			return true;
@@ -157,7 +162,8 @@ export const createVirtualSurfaceNavigation = (options: {
 		currentTarget: HTMLElement,
 		direction: ResultNavigationDirection,
 	): Promise<boolean> => {
-		const registeredCell = findClosestRegisteredVirtualCell(currentTarget);
+		const registeredCell =
+			options.surfaceTransaction.findClosestCell(currentTarget);
 		const currentCellElement =
 			registeredCell?.element ??
 			currentTarget.closest<HTMLElement>(LOGICAL_CELL_SELECTOR);

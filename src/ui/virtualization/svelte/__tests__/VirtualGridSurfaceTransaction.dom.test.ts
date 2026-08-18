@@ -1,8 +1,4 @@
 import { describe, expect, it, vi } from "vitest";
-import {
-	findClosestRegisteredVirtualCell,
-	findRegisteredVirtualCellElementByKey,
-} from "../VirtualCellRegistry";
 import { createVirtualGridSurfaceTransaction } from "../VirtualGridSurfaceTransaction";
 
 describe("VirtualGridSurfaceTransaction", () => {
@@ -19,10 +15,7 @@ describe("VirtualGridSurfaceTransaction", () => {
 			) => {
 				calls.push(`will:${previousLogicalKey}->${nextLogicalKey}`);
 				expect(
-					findRegisteredVirtualCellElementByKey(
-						container,
-						previousLogicalKey,
-					),
+					transaction.findCellElementByKey(container, previousLogicalKey),
 				).toBe(element);
 			},
 		});
@@ -40,16 +33,16 @@ describe("VirtualGridSurfaceTransaction", () => {
 		});
 
 		expect(calls).toEqual(["will:A->B"]);
-		expect(findRegisteredVirtualCellElementByKey(container, "A")).toBeNull();
-		expect(findRegisteredVirtualCellElementByKey(container, "B")).toBe(element);
-		expect(findClosestRegisteredVirtualCell(element)?.metadata).toEqual({
+		expect(transaction.findCellElementByKey(container, "A")).toBeNull();
+		expect(transaction.findCellElementByKey(container, "B")).toBe(element);
+		expect(transaction.findClosestCell(element)?.metadata).toEqual({
 			logicalKey: "B",
 			rowIndex: 3,
 			columnIndex: 4,
 		});
 
 		transaction.releaseCell(element);
-		expect(findRegisteredVirtualCellElementByKey(container, "B")).toBeNull();
+		expect(transaction.findCellElementByKey(container, "B")).toBeNull();
 	});
 
 	it("does not announce an unchanged binding", () => {
@@ -68,7 +61,7 @@ describe("VirtualGridSurfaceTransaction", () => {
 		transaction.rebindCell(element, rebind);
 
 		expect(onLogicalCellWillRebind).not.toHaveBeenCalled();
-		expect(findClosestRegisteredVirtualCell(element)?.metadata).toEqual({
+		expect(transaction.findClosestCell(element)?.metadata).toEqual({
 			logicalKey: "A",
 			rowIndex: 1,
 			columnIndex: 2,

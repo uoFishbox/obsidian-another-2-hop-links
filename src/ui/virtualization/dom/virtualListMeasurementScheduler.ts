@@ -1,8 +1,3 @@
-import type { CCLDevMeasurementName } from "infrastructure/debug/CCLDevMeasurements";
-import {
-	createScheduledVirtualListTask,
-	type ScheduledVirtualListTask,
-} from "./virtualListScheduler";
 import {
 	createCoordinatedScheduledTask,
 	type VirtualFrameCoordinator,
@@ -13,7 +8,7 @@ export interface VirtualListMeasurementSchedulerOptions {
 	runScrollMeasurement: () => void;
 	maxUnstableMeasurementRetries: number;
 	getWindow?: () => Window | null;
-	frameCoordinator?: VirtualFrameCoordinator;
+	frameCoordinator: VirtualFrameCoordinator;
 }
 
 export interface VirtualListMeasurementScheduler {
@@ -40,58 +35,39 @@ export const createVirtualListMeasurementScheduler = ({
 }: VirtualListMeasurementSchedulerOptions): VirtualListMeasurementScheduler => {
 	let unstableMeasurementRetryCount = 0;
 	let pendingScrollMeasurementTask: (() => void) | undefined;
-	const createTask = (
-		key: string,
-		task: () => void,
-		counterName?: CCLDevMeasurementName,
-	): ScheduledVirtualListTask =>
-		frameCoordinator
-			? createCoordinatedScheduledTask({
-					coordinator: frameCoordinator,
-					lane: "scroll-critical",
-					key,
-					task,
-				})
-			: createScheduledVirtualListTask(task, { getWindow, counterName });
-	const layoutTask = createTask(
-		"virtual-list:layout-measurement",
-		runLayoutMeasurement,
-		process.env.NODE_ENV !== "production"
-			? "virtualList.scheduler.measurementLayout.animationFrame"
-			: undefined,
-	);
-	// Frame-align scroll measurements so wheel/scroll bursts coalesce before work runs.
-	const scrollTask = createTask(
-		"virtual-list:scroll-measurement",
-		() => {
+	const layoutTask = createCoordinatedScheduledTask({
+		coordinator: frameCoordinator,
+		lane: "scroll-critical",
+		key: "virtual-list:layout-measurement",
+		task: runLayoutMeasurement,
+	});
+	const scrollTask = createCoordinatedScheduledTask({
+		coordinator: frameCoordinator,
+		lane: "scroll-critical",
+		key: "virtual-list:scroll-measurement",
+		task: () => {
 			const task = pendingScrollMeasurementTask ?? runScrollMeasurement;
 			pendingScrollMeasurementTask = undefined;
 			task();
 		},
-		process.env.NODE_ENV !== "production"
-			? "virtualList.scheduler.measurementScroll.animationFrame"
-			: undefined,
-	);
-	const retryTask = createTask(
-		"virtual-list:unstable-measurement",
-		() => {
+	});
+	const retryTask = createCoordinatedScheduledTask({
+		coordinator: frameCoordinator,
+		lane: "scroll-critical",
+		key: "virtual-list:unstable-measurement",
+		task: () => {
 			unstableMeasurementRetryCount += 1;
 			runLayoutMeasurement();
 		},
-		process.env.NODE_ENV !== "production"
-			? "virtualList.scheduler.unstableRetry.animationFrame"
-			: undefined,
-	);
+	});
 
 	return {
 		hasPendingLayoutMeasurement() {
 			return layoutTask.isScheduled() || retryTask.isScheduled();
 		},
 		scheduleLayoutMeasurement() {
-			if (!resolveScheduledTaskWindow(getWindow) || layoutTask.isScheduled()) {
+			if (!resolveScheduledTaskWindow(getWindow) || layoutTask.isScheduled())
 				return;
-			}
-
 			retryTask.cancel();
 			scrollTask.cancel();
 			layoutTask.schedule();
@@ -108,18 +84,16 @@ export const createVirtualListMeasurementScheduler = ({
 			) {
 				return;
 			}
-
 			scrollTask.schedule();
 		},
 		scheduleUnstableMeasurementRetry() {
-			if (!resolveScheduledTaskWindow(getWindow) || retryTask.isScheduled()) {
+			if (
+				!resolveScheduledTaskWindow(getWindow) ||
+				retryTask.isScheduled() ||
+				unstableMeasurementRetryCount >= maxUnstableMeasurementRetries
+			) {
 				return;
 			}
-
-			if (unstableMeasurementRetryCount >= maxUnstableMeasurementRetries) {
-				return;
-			}
-
 			retryTask.schedule();
 		},
 		resetUnstableMeasurementRetry() {

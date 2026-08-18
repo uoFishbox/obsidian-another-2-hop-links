@@ -1,6 +1,6 @@
 <script lang="ts" generics="TMountedCell extends MountedVirtualCell">
 	import VirtualInteractiveSurface from "../svelte/VirtualInteractiveSurface.svelte";
-	import VirtualSurfaceCells from "../svelte/VirtualSurfaceCells.svelte";
+	import VirtualPooledGridRowsSurface from "../svelte/VirtualPooledGridRowsSurface.svelte";
 	import type { VirtualSurfaceProps } from "../svelte/VirtualSurfaceProps";
 	import type { MountedVirtualCell } from "../types";
 	import { KEYED_VIRTUAL_CELL_BODY_LIFECYCLE } from "ui/virtualization/core/bodyLifecycle";
@@ -45,7 +45,7 @@
 	{flushVirtualScrollMeasurement}
 >
 	{#snippet children(surfaceTransaction)}
-		<VirtualSurfaceCells
+		<VirtualPooledGridRowsSurface
 			{contentClassName}
 			{rowClassName}
 			{cellClassName}

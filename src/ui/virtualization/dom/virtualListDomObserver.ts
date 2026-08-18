@@ -1,4 +1,7 @@
-import { findNearestScrollContainerCached } from "./scrollContainer";
+import {
+	findNearestScrollContainerCached,
+	invalidateNearestScrollContainerCache,
+} from "./scrollContainer";
 import {
 	markScrollActivityActive,
 	markScrollActivityIdle,
@@ -24,17 +27,6 @@ import {
 	type VirtualListSharedScrollMetrics,
 } from "./sharedScrollMetrics";
 import { hasRelevantStructureMutation } from "./structureMutationObserver";
-import {
-	INITIAL_SCROLLER_VIEWPORT_SCROLL_PHASE_STATE,
-	markScrollerViewportDependencyRefreshAfterScroll,
-	markScrollerViewportLayoutMeasurementAfterScroll,
-	markScrollerViewportScrollObserved,
-	reduceScrollerViewportPhase,
-	type ScrollerViewportScrollPhaseState,
-	type ScrollPhase,
-	type ScrollPhaseEffect,
-} from "./scrollerViewportScrollPhase";
-import { invalidateScrollGeometry } from "./virtualListScrollGeometryInvalidation";
 import { getOptionalOwnerWindow, isHTMLElementLike } from "ui/shared/dom/realmSafeDom";
 import type { VirtualScrollMeasurementReason } from "./virtualMeasurementController";
 
@@ -123,7 +115,6 @@ interface ScrollerViewportEntry {
 	structureMutationObserver: MutationObserver;
 	subscriber: VirtualListViewportSubscriber | null;
 	hasPendingScrollMeasurement: boolean;
-	hasPendingLayoutMeasurement: boolean;
 	scrollMeasurementReason: VirtualScrollMeasurementReason;
 	structureDependencyTargets: Set<Node>;
 	positionDependencyElements: Set<HTMLElement>;
@@ -133,14 +124,17 @@ interface ScrollerViewportEntry {
 	scrollGeneration: number;
 	scrollCoverageGate: ScrollCoverageGate;
 	scrollTarget: Window | HTMLElement;
-	scrollPhaseState: ScrollerViewportScrollPhaseState;
+	isScrolling: boolean;
+	reconnectStructureObserverAfterScroll: boolean;
+	refreshDependenciesAfterScroll: boolean;
+	measureLayoutAfterScroll: boolean;
+	layoutMeasurementPendingForDependencyRefresh: boolean;
 	structureObserverConnected: boolean;
 	idleTimer: number | null;
 	lastScrollEventAt: number;
 	onNativeScroll: () => void;
 	onScrollIdleTimeout: () => void;
 	unsubscribeWindowResize: (() => void) | null;
-	layoutMeasurementTask: ReturnType<typeof createScheduledVirtualListTask>;
 	refreshDependencyObserversTask: ReturnType<typeof createScheduledVirtualListTask>;
 }
 
@@ -193,11 +187,10 @@ const scheduleLayoutMeasurement = (entry: ScrollerViewportEntry): void => {
 		return;
 	}
 
-	entry.hasPendingLayoutMeasurement = true;
 	if (process.env.NODE_ENV !== "production") {
 		recordCCLDevMeasurement("virtualList.observer.layoutTask.scheduled");
 	}
-	entry.layoutMeasurementTask.schedule();
+	subscriber.scheduleLayoutMeasurement();
 };
 
 const scheduleScrollMeasurement = (
@@ -255,7 +248,7 @@ const notifyScrollStateChange = (entry: ScrollerViewportEntry): void => {
 	getActiveSubscriber(entry)?.onScrollStateChange?.(
 		entry.scrollGeneration,
 		entry.pendingScrollTop !== null,
-		entry.scrollPhaseState.type === "scrolling",
+		entry.isScrolling,
 	);
 };
 
@@ -297,7 +290,7 @@ const readSharedScrollMetrics = (
 			resolveCachedViewportHeight(getActiveSubscriber(entry)) ??
 			out.viewportHeight;
 		out.frameId = ++scrollMeasurementFrameId;
-		out.isScrollActive = entry.scrollPhaseState.type === "scrolling";
+		out.isScrollActive = entry.isScrolling;
 		out.scrollGeneration = entry.scrollGeneration;
 		notifyScrollStateChange(entry);
 		return out;
@@ -309,7 +302,7 @@ const readSharedScrollMetrics = (
 		subscriber,
 		ownerElement: subscriber?.rootEl ?? entry.registryKey,
 		frameId: ++scrollMeasurementFrameId,
-		isScrollActive: entry.scrollPhaseState.type === "scrolling",
+		isScrollActive: entry.isScrolling,
 		scrollGeneration: entry.scrollGeneration,
 	});
 };
@@ -338,10 +331,8 @@ const connectStructureObserver = (entry: ScrollerViewportEntry): void => {
 };
 
 const scheduleLayoutMeasurementWhenIdle = (entry: ScrollerViewportEntry): void => {
-	if (entry.scrollPhaseState.type === "scrolling") {
-		entry.scrollPhaseState = markScrollerViewportLayoutMeasurementAfterScroll(
-			entry.scrollPhaseState,
-		);
+	if (entry.isScrolling) {
+		entry.measureLayoutAfterScroll = true;
 		return;
 	}
 
@@ -514,7 +505,7 @@ const observeDependencyTargets = (entry: ScrollerViewportEntry): void => {
 	if (structureChanged) {
 		disconnectStructureObserver(entry);
 		entry.structureDependencyTargets = nextStructure;
-		if (entry.scrollPhaseState.type !== "scrolling") {
+		if (!entry.isScrolling) {
 			connectStructureObserver(entry);
 		}
 	}
@@ -522,17 +513,17 @@ const observeDependencyTargets = (entry: ScrollerViewportEntry): void => {
 
 const moveSubscriberToCurrentScroller = (
 	subscriber: VirtualListViewportSubscriber,
-): void => {
+): boolean => {
 	const nextScroller = findNearestScrollContainerCached(subscriber.rootEl);
 	if (nextScroller === subscriber.entry.scroller) {
-		return;
+		return false;
 	}
 
 	const ownerWindow = getOptionalOwnerWindow(subscriber.rootEl);
 	if (!ownerWindow) {
-		return;
+		return false;
 	}
-	invalidateScrollGeometry(subscriber.rootEl, "scroller-changed");
+	invalidateNearestScrollContainerCache(subscriber.rootEl);
 	unregisterSubscriber(subscriber);
 	subscriber.ownerWindow = ownerWindow;
 	const nextEntry = getScrollerViewportEntry(
@@ -542,13 +533,19 @@ const moveSubscriberToCurrentScroller = (
 	);
 	registerSubscriber(nextEntry, subscriber);
 	subscriber.onScrollContainerChange(nextScroller);
-	subscriber.scheduleLayoutMeasurement();
+	return true;
 };
 
 const refreshDependencyObservers = (entry: ScrollerViewportEntry): void => {
+	const layoutMeasurementPending = entry.layoutMeasurementPendingForDependencyRefresh;
+	entry.layoutMeasurementPendingForDependencyRefresh = false;
+
 	const subscriber = getActiveSubscriber(entry);
 	if (subscriber) {
-		moveSubscriberToCurrentScroller(subscriber);
+		const moved = moveSubscriberToCurrentScroller(subscriber);
+		if (moved && !layoutMeasurementPending) {
+			scheduleLayoutMeasurement(subscriber.entry);
+		}
 	}
 
 	if (getActiveSubscriber(entry)) {
@@ -564,8 +561,8 @@ const handleRootResizeEntry = (
 		return;
 	}
 
-	invalidateScrollGeometry(subscriber.rootEl, "root-resize");
-	moveSubscriberToCurrentScroller(subscriber);
+	invalidateNearestScrollContainerCache(subscriber.rootEl);
+	const moved = moveSubscriberToCurrentScroller(subscriber);
 	if (subscriber.isDisposed) {
 		return;
 	}
@@ -578,6 +575,9 @@ const handleRootResizeEntry = (
 		subscriber.lastObservedHeight === null ||
 		Math.abs(height - subscriber.lastObservedHeight) >= ROOT_RESIZE_EPSILON_PX;
 	if (!widthChanged && !heightChanged) {
+		if (moved) {
+			subscriber.scheduleLayoutMeasurement();
+		}
 		return;
 	}
 
@@ -591,6 +591,9 @@ const handleRootResizeEntry = (
 
 	if (heightChanged) {
 		if (subscriber.measureOnRootHeightChange === false) {
+			if (moved) {
+				subscriber.scheduleLayoutMeasurement();
+			}
 			return;
 		}
 		subscriber.scheduleLayoutMeasurement();
@@ -598,60 +601,58 @@ const handleRootResizeEntry = (
 	}
 };
 
-const applyScrollPhaseEffect = (
-	entry: ScrollerViewportEntry,
-	effect: ScrollPhaseEffect,
-): void => {
-	switch (effect.type) {
-		case "none":
-			return;
-		case "scroll-start": {
-			markScrollActivityActive(entry.scrollActivitySource);
-			disconnectStructureObserver(entry);
-
-			const subscriber = getActiveSubscriber(entry);
-			subscriber?.cancelInitialStabilizationMeasurement?.();
-			subscriber?.onScrollStart?.();
-			return;
-		}
-		case "scroll-idle":
-			markScrollActivityIdle(entry.scrollActivitySource);
-			if (effect.refreshDependencies) {
-				if (process.env.NODE_ENV !== "production") {
-					recordCCLDevMeasurement(
-						"virtualList.observer.dependencyTask.scheduled",
-					);
-				}
-				entry.refreshDependencyObserversTask.schedule();
-			} else if (effect.reconnectObserver) {
-				// The scroll ended without any observed structure mutation, so
-				// re-arm the existing structure observer targets instead of
-				// paying for a full dependency re-collection on every gesture.
-				connectStructureObserver(entry);
-			}
-			if (effect.measureLayout) {
-				scheduleLayoutMeasurement(entry);
-			}
-			if (effect.measureScroll) {
-				scheduleScrollMeasurement(entry, "scroll-idle");
-			}
-			return;
-		default: {
-			const _exhaustive: never = effect;
-			return _exhaustive;
-		}
+const startScroll = (entry: ScrollerViewportEntry): void => {
+	if (entry.isScrolling) {
+		return;
 	}
+
+	entry.isScrolling = true;
+	entry.reconnectStructureObserverAfterScroll = false;
+	entry.refreshDependenciesAfterScroll = false;
+	entry.measureLayoutAfterScroll = false;
+	markScrollActivityActive(entry.scrollActivitySource);
+	disconnectStructureObserver(entry);
+
+	const subscriber = getActiveSubscriber(entry);
+	subscriber?.cancelInitialStabilizationMeasurement?.();
+	subscriber?.onScrollStart?.();
+	notifyScrollStateChange(entry);
 };
 
-const handleScrollPhase = (entry: ScrollerViewportEntry, phase: ScrollPhase): void => {
-	const transition = reduceScrollerViewportPhase(entry.scrollPhaseState, phase);
-	entry.scrollPhaseState = transition.state;
-	applyScrollPhaseEffect(entry, transition.effect);
+const finishScrollPhase = (entry: ScrollerViewportEntry): void => {
+	if (!entry.isScrolling) {
+		return;
+	}
+
+	const refreshDependencies = entry.refreshDependenciesAfterScroll;
+	const measureLayout = entry.measureLayoutAfterScroll;
+	const reconnectObserver = entry.reconnectStructureObserverAfterScroll;
+	entry.isScrolling = false;
+	entry.reconnectStructureObserverAfterScroll = false;
+	entry.refreshDependenciesAfterScroll = false;
+	entry.measureLayoutAfterScroll = false;
+
+	markScrollActivityIdle(entry.scrollActivitySource);
+	if (refreshDependencies) {
+		if (process.env.NODE_ENV !== "production") {
+			recordCCLDevMeasurement("virtualList.observer.dependencyTask.scheduled");
+		}
+		entry.refreshDependencyObserversTask.schedule();
+	} else if (reconnectObserver) {
+		// The scroll ended without any observed structure mutation, so re-arm
+		// the existing targets instead of re-collecting dependencies.
+		connectStructureObserver(entry);
+	}
+	if (measureLayout) {
+		scheduleLayoutMeasurement(entry);
+	} else {
+		scheduleScrollMeasurement(entry, "scroll-idle");
+	}
 	notifyScrollStateChange(entry);
 };
 
 const finishScrollIdle = (entry: ScrollerViewportEntry): void => {
-	if (entry.scrollPhaseState.type === "idle") {
+	if (!entry.isScrolling) {
 		return;
 	}
 
@@ -660,7 +661,7 @@ const finishScrollIdle = (entry: ScrollerViewportEntry): void => {
 	}
 	entry.idleTimer = null;
 	entry.pendingScrollTop = null;
-	handleScrollPhase(entry, "idle");
+	finishScrollPhase(entry);
 };
 
 // The idle timer is the single source of truth for idle detection. Native
@@ -692,8 +693,8 @@ const handleNativeScroll = (
 	if (process.env.NODE_ENV !== "production") {
 		recordCCLDevMeasurement("virtualList.observer.scrollEvent");
 	}
-	if (entry.scrollPhaseState.type === "idle") {
-		handleScrollPhase(entry, "start");
+	if (!entry.isScrolling) {
+		startScroll(entry);
 	}
 	entry.pendingScrollTop = scrollTop;
 	entry.scrollGeneration += 1;
@@ -704,14 +705,7 @@ const handleNativeScroll = (
 		);
 	}
 
-	if (
-		entry.scrollPhaseState.type === "scrolling" &&
-		!entry.scrollPhaseState.pendingAfterScroll.reconnectObserver
-	) {
-		entry.scrollPhaseState = markScrollerViewportScrollObserved(
-			entry.scrollPhaseState,
-		);
-	}
+	entry.reconnectStructureObserverAfterScroll = true;
 
 	// The pending task consumes the latest pendingScrollTop, so no additional
 	// coverage decision is needed until that task runs.
@@ -753,17 +747,21 @@ const handleStructureMutations = (
 		return;
 	}
 
-	invalidateScrollGeometry(subscriber.rootEl, "structure-mutation");
-	entry.refreshDependencyObserversTask.schedule();
+	invalidateNearestScrollContainerCache(subscriber.rootEl);
+	const shouldScheduleLayoutMeasurement =
+		!entry.layoutMeasurementPendingForDependencyRefresh;
+	entry.layoutMeasurementPendingForDependencyRefresh = true;
 
-	if (entry.scrollPhaseState.type === "scrolling") {
-		entry.scrollPhaseState = markScrollerViewportDependencyRefreshAfterScroll(
-			markScrollerViewportLayoutMeasurementAfterScroll(entry.scrollPhaseState),
-		);
+	if (entry.isScrolling) {
+		entry.refreshDependenciesAfterScroll = true;
+		entry.measureLayoutAfterScroll = true;
 		return;
 	}
 
-	scheduleLayoutMeasurement(entry);
+	entry.refreshDependencyObserversTask.schedule();
+	if (shouldScheduleLayoutMeasurement) {
+		scheduleLayoutMeasurement(entry);
+	}
 };
 
 const getScrollerViewportEntry = (
@@ -783,7 +781,6 @@ const getScrollerViewportEntry = (
 		structureMutationObserver: undefined as unknown as MutationObserver,
 		subscriber: null,
 		hasPendingScrollMeasurement: false,
-		hasPendingLayoutMeasurement: false,
 		scrollMeasurementReason: "scroll-coverage-miss",
 		structureDependencyTargets: new Set<Node>(),
 		positionDependencyElements: new Set<HTMLElement>(),
@@ -803,16 +800,17 @@ const getScrollerViewportEntry = (
 			max: 0,
 		},
 		scrollTarget: scroller ?? ownerWindow,
-		scrollPhaseState: INITIAL_SCROLLER_VIEWPORT_SCROLL_PHASE_STATE,
+		isScrolling: false,
+		reconnectStructureObserverAfterScroll: false,
+		refreshDependenciesAfterScroll: false,
+		measureLayoutAfterScroll: false,
+		layoutMeasurementPendingForDependencyRefresh: false,
 		structureObserverConnected: false,
 		idleTimer: null,
 		lastScrollEventAt: 0,
 		onNativeScroll: undefined as unknown as () => void,
 		onScrollIdleTimeout: undefined as unknown as () => void,
 		unsubscribeWindowResize: null,
-		layoutMeasurementTask: undefined as unknown as ReturnType<
-			typeof createScheduledVirtualListTask
-		>,
 		refreshDependencyObserversTask: undefined as unknown as ReturnType<
 			typeof createScheduledVirtualListTask
 		>,
@@ -833,23 +831,6 @@ const getScrollerViewportEntry = (
 			counterName:
 				process.env.NODE_ENV !== "production"
 					? "virtualList.scheduler.dependencyRefresh.animationFrame"
-					: undefined,
-		},
-	);
-	entry.layoutMeasurementTask = createScheduledVirtualListTask(
-		() => {
-			if (!entry.hasPendingLayoutMeasurement) {
-				return;
-			}
-
-			entry.hasPendingLayoutMeasurement = false;
-			getActiveSubscriber(entry)?.scheduleLayoutMeasurement();
-		},
-		{
-			getWindow: () => entry.ownerWindow,
-			counterName:
-				process.env.NODE_ENV !== "production"
-					? "virtualList.scheduler.observerLayout.animationFrame"
 					: undefined,
 		},
 	);
@@ -879,10 +860,9 @@ const registerSubscriber = (
 		existing.isDisposed = true;
 		entry.scrollCoverageGate.valid = false;
 		entry.hasPendingScrollMeasurement = false;
-		entry.hasPendingLayoutMeasurement = false;
 		entry.pendingScrollTop = null;
 		unobserveRootResizeTarget(existing);
-		invalidateScrollGeometry(existing.rootEl, "subscriber-cleanup");
+		invalidateNearestScrollContainerCache(existing.rootEl);
 	}
 
 	subscriber.entry = entry;
@@ -908,13 +888,11 @@ const unregisterSubscriber = (subscriber: VirtualListViewportSubscriber): void =
 	disconnectStructureObserver(entry);
 	markScrollActivityIdle(entry.scrollActivitySource);
 	entry.refreshDependencyObserversTask.cancel();
-	entry.layoutMeasurementTask.cancel();
 	if (entry.idleTimer !== null) {
 		entry.ownerWindow.clearTimeout(entry.idleTimer);
 		entry.idleTimer = null;
 	}
 	entry.hasPendingScrollMeasurement = false;
-	entry.hasPendingLayoutMeasurement = false;
 	entry.pendingScrollTop = null;
 	entry.scrollCoverageGate.valid = false;
 	entry.scrollTarget.removeEventListener("scroll", entry.onNativeScroll);
@@ -930,15 +908,13 @@ export const observeVirtualListViewport = (
 	let currentSubscriber: VirtualListViewportSubscriber | null = null;
 	let publishedRange = options.getScrollMeasurementRange?.() ?? null;
 
-	const unbindCurrentRealm = (
-		reason: "subscriber-cleanup" | "window-migration",
-	): void => {
+	const unbindCurrentRealm = (): void => {
 		const subscriber = currentSubscriber;
 		if (!subscriber) return;
 		currentSubscriber = null;
 		subscriber.isDisposed = true;
 		unregisterSubscriber(subscriber);
-		invalidateScrollGeometry(subscriber.rootEl, reason);
+		invalidateNearestScrollContainerCache(subscriber.rootEl);
 	};
 
 	const bindCurrentRealm = (): void => {
@@ -976,7 +952,7 @@ export const observeVirtualListViewport = (
 		// is authoritative and the bind path must stay free of extra layout
 		// reads (see the scroll-path contract in VirtualListDomObserver tests).
 		if (scrollContainer === null) {
-			invalidateScrollGeometry(options.rootEl, "observer-bind");
+			invalidateNearestScrollContainerCache(options.rootEl);
 			entry.refreshDependencyObserversTask.schedule();
 		}
 	};
@@ -984,7 +960,7 @@ export const observeVirtualListViewport = (
 	const unregisterWindowMigration =
 		typeof options.rootEl.onWindowMigrated === "function"
 			? options.rootEl.onWindowMigrated(() => {
-					unbindCurrentRealm("window-migration");
+					unbindCurrentRealm();
 					bindCurrentRealm();
 				})
 			: null;
@@ -995,7 +971,7 @@ export const observeVirtualListViewport = (
 		if (disposed) return;
 		disposed = true;
 		unregisterWindowMigration?.();
-		unbindCurrentRealm("subscriber-cleanup");
+		unbindCurrentRealm();
 	}) as VirtualListViewportObservation;
 
 	observation.publishScrollMeasurementRange = (

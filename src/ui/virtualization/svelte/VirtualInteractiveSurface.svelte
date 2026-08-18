@@ -3,7 +3,7 @@
 	import type { MountedVirtualCell } from "../types";
 	import type { VirtualSurfaceCommonProps } from "./VirtualSurfaceProps";
 	import { createVirtualSurfaceInteractions } from "./VirtualSurfaceInteractions.svelte";
-	import { createVirtualGridSurfaceTransaction } from "./VirtualGridSurfaceTransaction";
+	import type { VirtualGridSurfaceTransaction } from "./VirtualGridSurfaceTransaction";
 
 	type Props<TMountedCell extends MountedVirtualCell> = Pick<
 		VirtualSurfaceCommonProps<TMountedCell>,
@@ -18,7 +18,7 @@
 		interactionShadowRoot?: ShadowRoot | null;
 		observerRoot?: HTMLElement | null;
 		rowHeight: number;
-		children?: Snippet<[ReturnType<typeof createVirtualGridSurfaceTransaction>]>;
+		children?: Snippet<[VirtualGridSurfaceTransaction]>;
 	};
 
 	let {
@@ -50,14 +50,12 @@
 		resolveNavigationTarget,
 		flushVirtualScrollMeasurement,
 	});
-	const { delegatedInteractions, handleKeyDown, touchEventHandlers } =
-		surfaceInteractions;
-
-	const surfaceTransaction = createVirtualGridSurfaceTransaction({
-		onLogicalCellWillRebind: () => {
-			delegatedInteractions.resetTransientState();
-		},
-	});
+	const {
+		delegatedInteractions,
+		handleKeyDown,
+		surfaceTransaction,
+		touchEventHandlers,
+	} = surfaceInteractions;
 </script>
 
 <!-- svelte-ignore a11y_no_static_element_interactions a11y_mouse_events_have_key_events -->

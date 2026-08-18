@@ -31,7 +31,6 @@ import { useVirtualList } from "./useVirtualList.svelte";
 import type { VirtualListLogicalCell } from "../logicalCell";
 import type { RenderRevision, RenderRevisionFallbackPolicy } from "../renderRevision";
 import type { VirtualNavigationTarget } from "../types";
-import type { VirtualListItemRenderArgs } from "./renderArgs";
 import { flushVirtualScrollMeasurement as flushCachedVirtualScrollMeasurement } from "../dom/flushVirtualScrollMeasurement";
 import {
 	DEFAULT_FLAT_GRID_LAYOUT,
@@ -52,6 +51,16 @@ import {
 import { useAppContext } from "ui/context/linkContext";
 import type { VirtualFrameCoordinator } from "ui/virtualization/scheduling/frameCoordinator";
 import { DEFAULT_SETTINGS } from "features/settings/model";
+
+/** Props passed to flat virtual list item render snippets. */
+export interface VirtualListItemRenderArgs<T> {
+	item: T;
+	index: number;
+	observerRoot: HTMLElement | null;
+	rowIndex: number;
+	activationCandidateId: string;
+	readonly previewKey: string;
+}
 
 interface FlatVirtualGridApplicationSettings extends CardLayoutSettings {
 	previewActivationAheadRows?: number;
@@ -116,7 +125,7 @@ function isFlatMountedItemCell<T>(
 
 export function useFlatVirtualGridList<T>(
 	props: FlatVirtualGridListProps<T>,
-	frameCoordinator?: VirtualFrameCoordinator,
+	frameCoordinator: VirtualFrameCoordinator,
 ) {
 	let applicationStore = props.applicationStore;
 	if (!applicationStore) {
@@ -353,6 +362,7 @@ export function useFlatVirtualGridList<T>(
 			};
 		},
 		onStableMeasurement: maybeScheduleInfiniteScrollLoad,
+		frameCoordinator,
 	});
 
 	const scheduleLayoutMeasurementForCardLayout = (
@@ -580,7 +590,7 @@ export function useFlatVirtualGridList<T>(
 		},
 		set sectionRootEl(nextRootEl: HTMLDivElement | null) {
 			sectionRootEl = nextRootEl;
-			frameCoordinator?.bindOwnerElement?.(nextRootEl);
+			frameCoordinator.bindOwnerElement?.(nextRootEl);
 		},
 		get contentEl() {
 			return contentEl;
