@@ -23,7 +23,6 @@ export interface ApplyVirtualListMeasurementParams<
 	viewportHeight: number;
 	sectionTop: number;
 	isStableMeasurement: boolean;
-	hasStableVisibleRange: boolean;
 	/** Value-stable ranges; retained by reference and never mutated afterwards. */
 	precomputedRanges?: VirtualRanges;
 	visibilityPolicy: VirtualVisibilityPolicy;
@@ -61,7 +60,6 @@ export interface UseVirtualListOptions<
 	onSnapshotUpdated?(
 		snapshot: VirtualListSnapshot<TCell, TMountedCell, TMountedBuild>,
 	): void;
-	onStableVisibleRange?: () => void;
 }
 
 export function useVirtualList<
@@ -72,6 +70,7 @@ export function useVirtualList<
 >(options: UseVirtualListOptions<TCell, TRowModel, TMountedCell, TMountedBuild>) {
 	let latestSnapshot: VirtualListSnapshot<TCell, TMountedCell, TMountedBuild> | null =
 		null;
+	let hasStableVisibleRange = false;
 	let mountedBuildState = $state.raw<TMountedBuild | null>(null);
 	let totalHeightState = $state<number | null>(null);
 
@@ -123,7 +122,7 @@ export function useVirtualList<
 				viewportHeight: params.viewportHeight,
 				sectionTop: params.sectionTop,
 				isStableMeasurement: params.isStableMeasurement,
-				hasStableVisibleRange: params.hasStableVisibleRange,
+				hasStableVisibleRange,
 				precomputedRanges: params.precomputedRanges,
 				currentMountedRange: previousSnapshot?.ranges.mounted ?? {
 					start: 0,
@@ -161,7 +160,7 @@ export function useVirtualList<
 			};
 		}
 
-		options.onStableVisibleRange?.();
+		hasStableVisibleRange = true;
 		return {
 			kind: "stable",
 			range: nextSnapshot.ranges.mounted,
@@ -204,6 +203,9 @@ export function useVirtualList<
 			void mountedBuildState;
 			void totalHeightState;
 			return latestSnapshot;
+		},
+		hasStableVisibleRange() {
+			return hasStableVisibleRange;
 		},
 		getMountedCells() {
 			return mountedBuildState?.cells ?? [];

@@ -14,8 +14,7 @@ import {
 import type { FlatLinkRowModel } from "../row-models/flatLinkRowModel";
 import { createFlatVirtualGridRuntimeModel } from "../row-models/flatVirtualGridRuntimeModel";
 import { isContentBottomInPreloadRangeFromMetrics } from "../core/preloadRange";
-import type { VirtualListStableMeasurementContext } from "./virtualListController";
-import { createVirtualListMeasurementState } from "../dom/virtualListMeasurementState";
+import type { VirtualListStableMeasurementContext } from "./useVirtualListRuntime.svelte";
 import { createCardVirtualListPolicy } from "../cardVirtualListPolicy";
 import {
 	createResolvedCardLayoutSettingsMemo,
@@ -27,7 +26,7 @@ import {
 	createSectionPaginationState,
 	type SectionPaginationApplicationStore,
 } from "../pagination";
-import { useVirtualList } from "./useVirtualList.svelte";
+import { useVirtualListRuntime } from "./useVirtualListRuntime.svelte";
 import type { VirtualListLogicalCell } from "../logicalCell";
 import type { RenderRevision, RenderRevisionFallbackPolicy } from "../renderRevision";
 import type { VirtualNavigationTarget } from "../types";
@@ -39,7 +38,6 @@ import {
 	type ConfiguredCardLayout,
 	type VirtualGridLayout,
 } from "../dom/flatGridLayoutMeasurement";
-import { createVirtualListController } from "./virtualListController";
 import { DISABLED_PREVIEW_SURFACE } from "features/card-preview/runtime/previewRuntime";
 import type { CardPreviewRequest } from "features/card-preview/core/cardPreviewRequest";
 import type { VirtualPreviewBinding } from "features/card-preview/scheduling/virtualPreviewSurface";
@@ -189,7 +187,6 @@ export function useFlatVirtualGridList<T>(
 	let contentEl = $state<HTMLDivElement | null>(null);
 	let interactionShadowRoot = $state<ShadowRoot | null>(null);
 	let infiniteScrollSentinelEl = $state<HTMLDivElement | null>(null);
-	let measurement = $state(createVirtualListMeasurementState());
 	let loadScheduled = $state(false);
 	let chainedInfiniteScrollLoads = $state(0);
 	let layout = $state.raw(DEFAULT_FLAT_GRID_LAYOUT);
@@ -288,12 +285,18 @@ export function useFlatVirtualGridList<T>(
 		previewSurface.setActiveRange(previewRange.start, previewRange.end, true);
 		interactionController.syncCards(interactionCards);
 	};
-	const virtualList = useVirtualList<
+	const virtualList = useVirtualListRuntime<
 		VirtualListLogicalCell<T>,
 		FlatLinkRowModel<T>,
+		VirtualGridLayout,
 		MountedVirtualGridCell<T>,
 		MountedVirtualGridCellsBuildResult<T>
 	>({
+		getRootEl: () => sectionRootEl,
+		getContext: () => layout,
+		hasRenderableContent: () => itemCount > 0,
+		resolveRowModel: resolveFlatLinkRowModel,
+		resolveVisibilityPolicy,
 		buildMountedCells: ({ rowModel, rowRange, previousBuild, rowSlotAllocator }) =>
 			buildMountedVirtualGridCellsFromRowModel({
 				rowModel,
@@ -302,51 +305,18 @@ export function useFlatVirtualGridList<T>(
 				renderRevisionFallbackPolicy: props.renderRevisionFallbackPolicy,
 				rowSlotAllocator,
 			}),
-		onStableVisibleRange: () => {
-			measurement.hasStableVisibleRange = true;
-		},
 		onSnapshotUpdated: (snapshot) => {
 			syncCardSlots(
 				snapshot.mountedBuild?.rowSlices ?? EMPTY_MOUNTED_ROWS,
 				snapshot.ranges.previewVisible,
 			);
 		},
-	});
-	const contentHeight = $derived(virtualList.getTotalHeight(layout.contentHeight));
-	const mountedCells = $derived<readonly MountedVirtualGridCell<T>[]>(
-		virtualList.getMountedCells(),
-	);
-	const mountedRows = $derived.by<readonly MountedVirtualGridRowSlice<T>[]>(() => {
-		const rowsBySlot = virtualList.getMountedBuild()?.rowsBySlot;
-		return rowsBySlot && rowsBySlot.length > 0 ? rowsBySlot : EMPTY_MOUNTED_ROWS;
-	});
-	const virtualListController = createVirtualListController<
-		FlatLinkRowModel<T>,
-		VirtualGridLayout
-	>({
-		getRootEl: () => sectionRootEl,
-		measurement,
-		getContext: () => layout,
-		hasRenderableContent: () => itemCount > 0,
-		resolveRowModel: resolveFlatLinkRowModel,
-		resolveVisibilityPolicy,
-		applyRangeMeasurement: (nextMeasurement, nextLayout, precomputedRanges) =>
-			virtualList.applyMeasurement({
-				rowModel: resolveFlatLinkRowModel(nextLayout),
-				scrollTop: nextMeasurement.scrollTop,
-				viewportHeight: nextMeasurement.viewportHeight,
-				sectionTop: nextMeasurement.sectionTop,
-				isStableMeasurement: nextMeasurement.isStableMeasurement,
-				hasStableVisibleRange: measurement.hasStableVisibleRange,
-				precomputedRanges,
-				visibilityPolicy: resolveVisibilityPolicy(nextLayout),
-			}),
-		resolveLayoutMeasurement: (nextMeasurement, rootEl) => {
+		resolveLayoutMeasurement: (nextMeasurement, rootEl, runtimeMeasurement) => {
 			const layoutMeasurement = resolveFlatGridLayoutMeasurement({
 				rootEl,
 				rootRect: nextMeasurement.sectionRect,
-				measuredWidth: measurement.measuredWidth,
-				scrollContainerEl: measurement.scrollContainerEl,
+				measuredWidth: runtimeMeasurement.measuredWidth,
+				scrollContainerEl: runtimeMeasurement.scrollContainerEl,
 				configuredLayout: configuredCardLayout,
 				logicalCellCount,
 				hasRenderableItems: itemCount > 0,
@@ -363,11 +333,20 @@ export function useFlatVirtualGridList<T>(
 		onStableMeasurement: maybeScheduleInfiniteScrollLoad,
 		frameCoordinator,
 	});
+	const measurement = virtualList.measurement;
+	const contentHeight = $derived(virtualList.getTotalHeight(layout.contentHeight));
+	const mountedCells = $derived<readonly MountedVirtualGridCell<T>[]>(
+		virtualList.getMountedCells(),
+	);
+	const mountedRows = $derived.by<readonly MountedVirtualGridRowSlice<T>[]>(() => {
+		const rowsBySlot = virtualList.getMountedBuild()?.rowsBySlot;
+		return rowsBySlot && rowsBySlot.length > 0 ? rowsBySlot : EMPTY_MOUNTED_ROWS;
+	});
 
 	const scheduleLayoutMeasurementForCardLayout = (
 		_nextCardLayout: ConfiguredCardLayout | null,
 	): void => {
-		virtualListController.scheduleLayoutMeasurement();
+		virtualList.scheduleLayoutMeasurement();
 	};
 
 	const syncVirtualListForRenderableContent = (
@@ -388,7 +367,7 @@ export function useFlatVirtualGridList<T>(
 			virtualList.recompute({ rowModel: nextRowModel });
 		}
 
-		virtualListController.scheduleLayoutMeasurement();
+		virtualList.scheduleLayoutMeasurement();
 	};
 
 	const observeInfiniteScrollSentinel = (
@@ -418,7 +397,7 @@ export function useFlatVirtualGridList<T>(
 			return;
 		}
 
-		return virtualListController.observeRoot(sectionRootEl, (callback) => {
+		return virtualList.observeRoot(sectionRootEl, (callback) => {
 			untrack(callback);
 		});
 	};
@@ -550,7 +529,7 @@ export function useFlatVirtualGridList<T>(
 			measurement,
 			snapshot,
 			updateFromCachedMeasurement: (metrics) =>
-				virtualListController.updateFromCachedMeasurement(metrics),
+				virtualList.updateFromCachedMeasurement(metrics),
 		});
 	};
 

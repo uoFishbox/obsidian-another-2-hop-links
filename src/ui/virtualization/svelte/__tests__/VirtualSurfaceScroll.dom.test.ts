@@ -1,7 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { scrollElementIntoVirtualViewport } from "../VirtualSurfaceNavigation";
 import { flushVirtualScrollMeasurement } from "../../dom/flushVirtualScrollMeasurement";
-import { createVirtualListMeasurementState } from "../../dom/virtualListMeasurementState";
 
 const setClientHeight = (element: HTMLElement, value: number): void => {
 	Object.defineProperty(element, "clientHeight", {
@@ -99,7 +98,12 @@ describe("VirtualSurfaceScroll", () => {
 				toJSON: () => ({}),
 			} as DOMRect;
 		};
-		const measurement = createVirtualListMeasurementState();
+		const measurement = {
+			sectionTop: 0,
+			viewportHeight: 0,
+			hasStableScrollMetrics: false,
+			scrollContainerEl: null as HTMLElement | null,
+		};
 		const updateFromCachedMeasurement = vi.fn(() => {
 			operations.push("commit-measurement");
 		});

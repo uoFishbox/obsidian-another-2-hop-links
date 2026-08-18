@@ -8,9 +8,11 @@ import {
 	type StableScrollTopBand,
 	type VirtualScrollWindowRangeRowModel,
 } from "../core/scrollWindowMeasurement";
-import type { VirtualVisibilityPolicy } from "../core/virtualListEngine";
-import { createBootstrapMeasurementSuppression } from "../dom/bootstrapMeasurementSuppression";
-import { createInitialVirtualListStabilization } from "../dom/initialVirtualListStabilization";
+import type {
+	MountedVirtualCellsBuild,
+	VirtualListSnapshot,
+	VirtualVisibilityPolicy,
+} from "../core/virtualListEngine";
 import {
 	readVirtualListCachedMeasurementInto,
 	type VirtualListCachedMeasurementInput,
@@ -26,7 +28,6 @@ import type {
 	MeasurementUpdateResult,
 	VirtualListScrollSnapshot,
 } from "../dom/virtualListMeasurementAdapter";
-import type { VirtualListMeasurementStateHandle } from "../dom/virtualListMeasurementState";
 import type {
 	RunVirtualScrollMeasurementOptions,
 	VirtualListStableMeasurementContext,
@@ -38,7 +39,9 @@ import type {
 import type { RowRange } from "../rowRange";
 import type { VirtualFrameCoordinator } from "../scheduling/frameCoordinator";
 import { markVirtualScrollMeasurementRun } from "../scheduling/virtualScrollMeasurementFrame";
-import type { VirtualRanges } from "../types";
+import { createInitialMeasurementLifecycle } from "../dom/initialMeasurementLifecycle";
+import type { MountedVirtualCell, VirtualRanges, VirtualRowModel } from "../types";
+import { useVirtualList, type UseVirtualListOptions } from "./useVirtualList.svelte";
 
 export type {
 	RunVirtualScrollMeasurementOptions,
@@ -53,50 +56,45 @@ export interface VirtualListLayoutMeasurementResolution<TContext> {
 	readonly context: TContext;
 	readonly measurement: VirtualMeasurement;
 	readonly isStable: boolean;
-	readonly precomputeRanges?: boolean;
 }
 
-export interface CreateVirtualListControllerOptions<
-	TRowModel extends VirtualScrollWindowRangeRowModel,
+export interface UseVirtualListRuntimeOptions<
+	TCell,
+	TRowModel extends VirtualRowModel<TCell> & VirtualScrollWindowRangeRowModel,
 	TContext,
+	TMountedCell extends MountedVirtualCell,
+	TMountedBuild extends MountedVirtualCellsBuild<TMountedCell>,
 > {
 	getRootEl(): HTMLElement | null;
-	measurement: VirtualListMeasurementStateHandle;
 	getContext(): TContext;
 	hasRenderableContent(): boolean;
 	resolveRowModel(context: TContext): TRowModel;
 	resolveVisibilityPolicy(context: TContext): VirtualVisibilityPolicy;
-	applyRangeMeasurement(
-		measurement: VirtualMeasurement,
-		context: TContext,
-		precomputedRanges?: VirtualRanges,
-	): MeasurementUpdateResult<RowRange>;
+	buildMountedCells: UseVirtualListOptions<
+		TCell,
+		TRowModel,
+		TMountedCell,
+		TMountedBuild
+	>["buildMountedCells"];
+	onSnapshotUpdated?(
+		snapshot: VirtualListSnapshot<TCell, TMountedCell, TMountedBuild>,
+	): void;
 	resolveLayoutMeasurement(
 		measurement: VirtualMeasurement & { readonly sectionRect: DOMRect },
 		rootEl: HTMLElement,
+		runtimeMeasurement: VirtualListRuntimeMeasurementState,
 	): VirtualListLayoutMeasurementResolution<TContext>;
 	onStableMeasurement?(context: VirtualListStableMeasurementContext): void;
 	onObservedWidthChange?(width: number): void;
 	frameCoordinator: VirtualFrameCoordinator;
 }
 
-export interface VirtualListController {
-	hasPendingLayoutMeasurement(): boolean;
-	observeRoot(
-		rootEl: HTMLElement,
-		runWithoutTracking?: (callback: () => void) => void,
-	): () => void;
-	runLayoutMeasurement(): VirtualMeasurementResult;
-	runScrollMeasurement(
-		sharedScrollMetrics?: VirtualListSharedScrollMetrics,
-		optionsOrReason?:
-			| RunVirtualScrollMeasurementOptions
-			| VirtualScrollMeasurementReason,
-	): VirtualMeasurementResult;
-	scheduleLayoutMeasurement(): void;
-	scheduleScrollMeasurement(task?: () => void): void;
-	resetScrollWindow(): void;
-	updateFromCachedMeasurement(metrics?: VirtualListSharedScrollMetrics): void;
+export interface VirtualListRuntimeMeasurementState {
+	sectionTop: number;
+	viewportHeight: number;
+	hasStableScrollMetrics: boolean;
+	measuredWidth: number | null;
+	scrollContainerEl: HTMLElement | null;
 }
 
 type MutableVirtualMeasurement = {
@@ -128,22 +126,73 @@ const UNSTABLE_MEASUREMENT_TASK_KEY = "virtual-list:unstable-measurement";
  * Owns the viewport measurement transaction from DOM acquisition through
  * scroll-window resolution, engine publication, and observer coverage update.
  */
-export function createVirtualListController<
-	TRowModel extends VirtualScrollWindowRangeRowModel,
+export function useVirtualListRuntime<
+	TCell,
+	TRowModel extends VirtualRowModel<TCell> & VirtualScrollWindowRangeRowModel,
 	TContext,
+	TMountedCell extends MountedVirtualCell,
+	TMountedBuild extends MountedVirtualCellsBuild<TMountedCell>,
 >({
 	getRootEl,
-	measurement,
 	getContext,
 	hasRenderableContent,
 	resolveRowModel,
 	resolveVisibilityPolicy,
-	applyRangeMeasurement,
+	buildMountedCells,
+	onSnapshotUpdated,
 	resolveLayoutMeasurement,
 	onStableMeasurement,
 	onObservedWidthChange,
 	frameCoordinator,
-}: CreateVirtualListControllerOptions<TRowModel, TContext>): VirtualListController {
+}: UseVirtualListRuntimeOptions<
+	TCell,
+	TRowModel,
+	TContext,
+	TMountedCell,
+	TMountedBuild
+>) {
+	const measurement = $state<VirtualListRuntimeMeasurementState>({
+		sectionTop: 0,
+		viewportHeight: 0,
+		hasStableScrollMetrics: false,
+		measuredWidth: null,
+		scrollContainerEl: null,
+	});
+	const invalidateViewportMeasurement = (): void => {
+		measurement.viewportHeight = 0;
+		measurement.hasStableScrollMetrics = false;
+	};
+	const updateLiveMeasurementState = (
+		metrics: { sectionTop: number; viewportHeight: number },
+		isStable: boolean,
+	): void => {
+		measurement.sectionTop = metrics.sectionTop;
+		measurement.viewportHeight = metrics.viewportHeight;
+		measurement.hasStableScrollMetrics = isStable;
+	};
+	const virtualList = useVirtualList<TCell, TRowModel, TMountedCell, TMountedBuild>({
+		buildMountedCells,
+		onSnapshotUpdated,
+	});
+
+	function applyRangeMeasurement(
+		nextMeasurement: VirtualMeasurement,
+		context: TContext,
+		precomputedRanges?: VirtualRanges,
+	): MeasurementUpdateResult<RowRange> {
+		const rowModel = resolveRowModel(context);
+		const result = virtualList.applyMeasurement({
+			rowModel,
+			scrollTop: nextMeasurement.scrollTop,
+			viewportHeight: nextMeasurement.viewportHeight,
+			sectionTop: nextMeasurement.sectionTop,
+			isStableMeasurement: nextMeasurement.isStableMeasurement,
+			precomputedRanges,
+			visibilityPolicy: resolveVisibilityPolicy(context),
+		});
+		return result;
+	}
+
 	const stableMeasurementContext: VirtualListStableMeasurementContext = {
 		scrollTop: 0,
 		viewportHeight: 0,
@@ -301,29 +350,6 @@ export function createVirtualListController<
 		);
 	}
 
-	function primeLastScrollWindow(
-		nextMeasurement: VirtualMeasurement,
-		context: TContext,
-	): void {
-		if (!nextMeasurement.isStableMeasurement) {
-			resetLastScrollWindow();
-			return;
-		}
-
-		const mountedMeasurement = resolveMountedScrollWindowMeasurement(
-			nextMeasurement,
-			context,
-		);
-		const rangedMeasurement = resolveRangedScrollWindowMeasurement(
-			nextMeasurement,
-			context,
-			mountedMeasurement.mounted,
-		);
-		setLastScrollWindow(
-			resolvePublishedCoverageBand(mountedMeasurement, rangedMeasurement),
-		);
-	}
-
 	function applyScrollMeasurement(
 		nextMeasurement: VirtualMeasurement,
 		context: TContext,
@@ -332,23 +358,20 @@ export function createVirtualListController<
 			recordCCLDevMeasurement("virtualScroll.applyScrollMeasurement");
 		}
 
-		let pendingMountedMeasurement: MountedScrollWindowMeasurement | null = null;
-		let pendingRangedMeasurement: RangedScrollWindowMeasurement | null = null;
-		let precomputedRanges: VirtualRanges | undefined;
-
-		if (nextMeasurement.isStableMeasurement && nextMeasurement.isScrollActive) {
-			const mountedMeasurement = resolveMountedScrollWindowMeasurement(
+		let mountedMeasurement: MountedScrollWindowMeasurement | null = null;
+		let rangedMeasurement: RangedScrollWindowMeasurement | null = null;
+		let resolvedRanges: VirtualRanges | undefined;
+		if (nextMeasurement.isStableMeasurement) {
+			mountedMeasurement = resolveMountedScrollWindowMeasurement(
 				nextMeasurement,
 				context,
 			);
-
-			pendingMountedMeasurement = mountedMeasurement;
-			pendingRangedMeasurement = resolveRangedScrollWindowMeasurement(
+			rangedMeasurement = resolveRangedScrollWindowMeasurement(
 				nextMeasurement,
 				context,
 				mountedMeasurement.mounted,
 			);
-			precomputedRanges = pendingRangedMeasurement.ranges;
+			resolvedRanges = rangedMeasurement.ranges;
 		} else {
 			resetLastScrollWindow();
 		}
@@ -357,11 +380,7 @@ export function createVirtualListController<
 			recordCCLDevMeasurement("virtualScroll.rangeMeasurementApplied");
 		}
 
-		const result = applyRangeMeasurement(
-			nextMeasurement,
-			context,
-			precomputedRanges,
-		);
+		const result = applyRangeMeasurement(nextMeasurement, context, resolvedRanges);
 		if (process.env.NODE_ENV !== "production" && result.kind === "stable") {
 			recordCCLDevMeasurement(
 				result.updateKind === "reused"
@@ -371,36 +390,15 @@ export function createVirtualListController<
 		}
 
 		if (result.kind !== "stable") {
-			if (result.kind === "skipped") {
-				resetLastScrollWindow();
-				return "unstable";
-			}
-			setLastScrollWindow(
-				pendingMountedMeasurement && pendingRangedMeasurement
-					? resolvePublishedCoverageBand(
-							pendingMountedMeasurement,
-							pendingRangedMeasurement,
-						)
-					: undefined,
-			);
+			resetLastScrollWindow();
 			return "unstable";
 		}
 
-		if (pendingMountedMeasurement) {
-			setLastScrollWindow(
-				pendingRangedMeasurement
-					? resolvePublishedCoverageBand(
-							pendingMountedMeasurement,
-							pendingRangedMeasurement,
-						)
-					: undefined,
-			);
-		} else {
-			resetLastScrollWindow();
-		}
-		if (!nextMeasurement.isScrollActive) {
-			primeLastScrollWindow(nextMeasurement, context);
-		}
+		setLastScrollWindow(
+			mountedMeasurement && rangedMeasurement
+				? resolvePublishedCoverageBand(mountedMeasurement, rangedMeasurement)
+				: undefined,
+		);
 		notifyStableMeasurement(nextMeasurement);
 		return "stable";
 	}
@@ -417,25 +415,39 @@ export function createVirtualListController<
 		const resolution = resolveLayoutMeasurement(
 			nextMeasurement as VirtualMeasurement & { readonly sectionRect: DOMRect },
 			rootEl,
+			measurement,
 		);
 		const effectiveMeasurement = resolution.measurement;
-		const precomputedRanges = resolution.precomputeRanges
-			? resolveRangedScrollWindowMeasurement(
-					effectiveMeasurement,
-					resolution.context,
-				).ranges
-			: undefined;
+		let mountedMeasurement: MountedScrollWindowMeasurement | null = null;
+		let rangedMeasurement: RangedScrollWindowMeasurement | null = null;
+		let resolvedRanges: VirtualRanges | undefined;
+		if (effectiveMeasurement.isStableMeasurement) {
+			mountedMeasurement = resolveMountedScrollWindowMeasurement(
+				effectiveMeasurement,
+				resolution.context,
+			);
+			rangedMeasurement = resolveRangedScrollWindowMeasurement(
+				effectiveMeasurement,
+				resolution.context,
+				mountedMeasurement.mounted,
+			);
+			resolvedRanges = rangedMeasurement.ranges;
+		}
 		const result = applyRangeMeasurement(
 			{ ...effectiveMeasurement, isScrollActive: false },
 			resolution.context,
-			precomputedRanges,
+			resolvedRanges,
 		);
 		if (result.kind !== "stable" || !resolution.isStable) {
 			resetLastScrollWindow();
 			return "unstable";
 		}
 
-		primeLastScrollWindow(effectiveMeasurement, resolution.context);
+		setLastScrollWindow(
+			mountedMeasurement && rangedMeasurement
+				? resolvePublishedCoverageBand(mountedMeasurement, rangedMeasurement)
+				: undefined,
+		);
 		scheduleScrollMeasurementAfterLayout(effectiveMeasurement);
 		notifyStableMeasurement(effectiveMeasurement);
 		return "stable";
@@ -502,7 +514,7 @@ export function createVirtualListController<
 			hasRenderableContent: hasRenderableContent(),
 		});
 
-		measurement.updateFromLiveMetrics(
+		updateLiveMeasurementState(
 			{
 				sectionTop: liveMeasurement.sectionTop,
 				viewportHeight: liveMeasurement.viewportHeight,
@@ -718,19 +730,15 @@ export function createVirtualListController<
 		scheduleScrollMeasurement();
 	}
 
-	const bootstrapMeasurementSuppression = createBootstrapMeasurementSuppression(
-		scheduleLayoutMeasurement,
-		() => getOptionalOwnerWindow(getRootEl()),
-	);
-	const initialStabilization = createInitialVirtualListStabilization({
+	const initialMeasurementLifecycle = createInitialMeasurementLifecycle({
 		measurement,
+		hasStableVisibleRange: virtualList.hasStableVisibleRange,
 		runLayoutMeasurement,
+		scheduleLayoutMeasurement,
 		getRootEl,
 		getWindow: () => getOptionalOwnerWindow(getRootEl()),
 		frameCoordinator,
 	});
-	const scheduleObservedLayoutMeasurement =
-		bootstrapMeasurementSuppression.scheduleObservedLayoutMeasurement;
 
 	function observeRoot(
 		rootEl: HTMLElement,
@@ -752,20 +760,21 @@ export function createVirtualListController<
 			},
 			onScrollContainerChange: (element) => {
 				measurement.scrollContainerEl = element;
-				measurement.invalidateViewport();
+				invalidateViewportMeasurement();
 			},
-			scheduleLayoutMeasurement: scheduleObservedLayoutMeasurement,
+			scheduleLayoutMeasurement:
+				initialMeasurementLifecycle.scheduleObservedLayoutMeasurement,
 			scheduleScrollMeasurement,
 			runScrollMeasurement,
 			runInitialLayoutMeasurement: () => {
 				runWithoutTracking(() => {
-					bootstrapMeasurementSuppression.suppressForBootstrap();
+					initialMeasurementLifecycle.suppressForBootstrap();
 					runLayoutMeasurement();
-					initialStabilization.schedule();
+					initialMeasurementLifecycle.scheduleStabilization();
 				});
 			},
 			cancelInitialStabilizationMeasurement:
-				initialStabilization.cancelBecauseScrollStarted,
+				initialMeasurementLifecycle.cancelBecauseScrollStarted,
 			onScrollStart: () => {
 				if (measurement.hasStableScrollMetrics) return;
 				if (hasPendingLayoutMeasurement()) return;
@@ -778,14 +787,20 @@ export function createVirtualListController<
 			if (activeViewportObservation === observation) {
 				activeViewportObservation = null;
 			}
-			bootstrapMeasurementSuppression.cancel();
-			initialStabilization.cancel();
+			initialMeasurementLifecycle.cancel();
 			cancelAllScheduledMeasurements();
 			observation();
 		};
 	}
 
 	return {
+		measurement,
+		getSnapshot: virtualList.getSnapshot,
+		getMountedCells: virtualList.getMountedCells,
+		getMountedBuild: virtualList.getMountedBuild,
+		getTotalHeight: virtualList.getTotalHeight,
+		recompute: virtualList.recompute,
+		setEmpty: virtualList.setEmpty,
 		hasPendingLayoutMeasurement,
 		observeRoot,
 		runLayoutMeasurement,
@@ -793,7 +808,7 @@ export function createVirtualListController<
 		scheduleLayoutMeasurement,
 		scheduleScrollMeasurement,
 		resetScrollWindow: resetLastScrollWindow,
-		updateFromCachedMeasurement(metrics): void {
+		updateFromCachedMeasurement(metrics?: VirtualListSharedScrollMetrics): void {
 			runScrollMeasurement(metrics);
 		},
 	};

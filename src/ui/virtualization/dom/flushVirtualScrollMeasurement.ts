@@ -1,4 +1,3 @@
-import type { VirtualListMeasurementState } from "./virtualListMeasurementState";
 import type { VirtualListSharedScrollMetrics } from "./sharedScrollMetrics";
 
 /** Geometry captured before a programmatic virtual-list scroll write. */
@@ -10,8 +9,15 @@ export interface ProgrammaticScrollSnapshot {
 	readonly didScroll: boolean;
 }
 
+interface FlushVirtualScrollMeasurementState {
+	sectionTop: number;
+	viewportHeight: number;
+	hasStableScrollMetrics: boolean;
+	scrollContainerEl: HTMLElement | null;
+}
+
 export interface FlushVirtualScrollMeasurementParams {
-	measurement: VirtualListMeasurementState;
+	measurement: FlushVirtualScrollMeasurementState;
 	snapshot: ProgrammaticScrollSnapshot;
 	updateFromCachedMeasurement: (metrics: VirtualListSharedScrollMetrics) => void;
 }

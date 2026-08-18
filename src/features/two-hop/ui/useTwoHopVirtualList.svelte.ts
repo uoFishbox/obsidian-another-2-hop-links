@@ -35,15 +35,10 @@ import {
 } from "ui/virtualization/svelte/viewPlanLayout";
 import { findNearestScrollContainer } from "ui/virtualization/dom/scrollContainer";
 import { getOptionalOwnerWindow } from "ui/shared/dom/realmSafeDom";
-import { useVirtualList } from "ui/virtualization/svelte/useVirtualList.svelte";
-import { createVirtualListMeasurementState } from "ui/virtualization/dom/virtualListMeasurementState";
-import {
-	createVirtualListController,
-	type VirtualMeasurement,
-} from "ui/virtualization/svelte/virtualListController";
+import { useVirtualListRuntime } from "ui/virtualization/svelte/useVirtualListRuntime.svelte";
+import type { VirtualMeasurement } from "ui/virtualization/svelte/useVirtualListRuntime.svelte";
 import type { VirtualVisibilityPolicy } from "ui/virtualization/core/virtualListEngine";
 import type { RowRange } from "ui/virtualization/rowRange";
-import type { VirtualRanges } from "ui/virtualization/types";
 import { resolveVisibleRange } from "ui/virtualization/virtualRanges";
 import type { ResultNavigationDirection } from "features/keyboard-navigation/resultFocus";
 import type { ProgrammaticScrollSnapshot } from "ui/virtualization/dom/flushVirtualScrollMeasurement";
@@ -98,7 +93,6 @@ export function useTwoHopVirtualList(
 		}),
 	);
 	let rootEl = $state<HTMLDivElement | null>(null);
-	let measurement = $state(createVirtualListMeasurementState());
 	let lastSections = props.sections;
 	let lastCardModelRevision = props.cardModelRevision;
 	let widthWasZero = false;
@@ -138,16 +132,22 @@ export function useTwoHopVirtualList(
 		return cachedVisibilityPolicy;
 	}
 
-	const virtualList = useVirtualList<
+	const virtualList = useVirtualListRuntime<
 		ReturnType<TwoHopRowModel["getRow"]> extends infer TRow
 			? TRow extends { getCell(columnIndex: number): infer TCell }
 				? Exclude<TCell, null>
 				: never
 			: never,
 		TwoHopRowModel,
+		TwoHopRowModel,
 		MountedTwoHopCell,
 		MountedTwoHopBuild
 	>({
+		getRootEl: () => rootEl,
+		getContext: () => rowModel,
+		hasRenderableContent: () => rowModel.rowCount > 0,
+		resolveRowModel: (model) => model,
+		resolveVisibilityPolicy,
 		buildMountedCells: ({
 			rowModel: nextRowModel,
 			rowRange,
@@ -160,11 +160,14 @@ export function useTwoHopVirtualList(
 				previousBuild,
 				rowSlotAllocator,
 			}),
-		onStableVisibleRange: () => {
-			measurement.hasStableVisibleRange = true;
-		},
 		onSnapshotUpdated: () => scheduleRangeEffects(),
+		resolveLayoutMeasurement,
+		onObservedWidthChange: (width) => {
+			if (width <= 0) widthWasZero = true;
+		},
+		frameCoordinator,
 	});
+	const measurement = virtualList.measurement;
 
 	const cardHydrator = createTwoHopCardHydrator({
 		frameCoordinator,
@@ -248,23 +251,6 @@ export function useTwoHopVirtualList(
 			RANGE_EFFECT_TASK_KEY,
 			applyRangeEffects,
 		);
-	}
-
-	function applyVirtualMeasurement(
-		nextMeasurement: VirtualMeasurement,
-		model: TwoHopRowModel,
-		precomputedRanges?: VirtualRanges,
-	) {
-		return virtualList.applyMeasurement({
-			rowModel: model,
-			scrollTop: nextMeasurement.scrollTop,
-			viewportHeight: nextMeasurement.viewportHeight,
-			sectionTop: nextMeasurement.sectionTop,
-			isStableMeasurement: nextMeasurement.isStableMeasurement,
-			hasStableVisibleRange: measurement.hasStableVisibleRange,
-			precomputedRanges,
-			visibilityPolicy: resolveVisibilityPolicy(model),
-		});
 	}
 
 	function captureLayoutAnchor(): LayoutAnchor | null {
@@ -361,27 +347,8 @@ export function useTwoHopVirtualList(
 			context: rowModel,
 			measurement: effectiveMeasurement,
 			isStable: effectiveMeasurement.isStableMeasurement,
-			precomputeRanges: true,
 		};
 	}
-
-	const virtualListController = createVirtualListController<
-		TwoHopRowModel,
-		TwoHopRowModel
-	>({
-		getRootEl: () => rootEl,
-		measurement,
-		getContext: () => rowModel,
-		hasRenderableContent: () => rowModel.rowCount > 0,
-		resolveRowModel: (model) => model,
-		resolveVisibilityPolicy,
-		applyRangeMeasurement: applyVirtualMeasurement,
-		resolveLayoutMeasurement,
-		onObservedWidthChange: (width) => {
-			if (width <= 0) widthWasZero = true;
-		},
-		frameCoordinator,
-	});
 
 	function publishSections(nextSections: readonly TwoHopSectionModel[]): void {
 		const anchor = captureLayoutAnchor();
@@ -397,12 +364,12 @@ export function useTwoHopVirtualList(
 			return;
 		}
 
-		const publication = virtualListController.runScrollMeasurement(undefined, {
+		const publication = virtualList.runScrollMeasurement(undefined, {
 			forcePublish: true,
 			reason: "data-change",
 		});
 		if (publication.kind !== "measured") {
-			virtualListController.scheduleLayoutMeasurement();
+			virtualList.scheduleLayoutMeasurement();
 		}
 	}
 
@@ -415,15 +382,13 @@ export function useTwoHopVirtualList(
 
 	$effect(() => {
 		void configuredLayout;
-		virtualListController.scheduleLayoutMeasurement();
+		virtualList.scheduleLayoutMeasurement();
 	});
 
 	$effect(() => {
 		const element = rootEl;
 		if (!element) return;
-		return virtualListController.observeRoot(element, (callback) =>
-			untrack(callback),
-		);
+		return virtualList.observeRoot(element, (callback) => untrack(callback));
 	});
 
 	$effect(() => {
@@ -450,7 +415,7 @@ export function useTwoHopVirtualList(
 			measurement,
 			snapshot,
 			updateFromCachedMeasurement: (metrics) => {
-				virtualListController.runScrollMeasurement(metrics, {
+				virtualList.runScrollMeasurement(metrics, {
 					forcePublish: true,
 				});
 			},

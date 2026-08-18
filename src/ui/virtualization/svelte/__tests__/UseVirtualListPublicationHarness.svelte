@@ -66,7 +66,6 @@
 			viewportHeight: 100,
 			sectionTop: 0,
 			isStableMeasurement: true,
-			hasStableVisibleRange: true,
 			precomputedRanges: {
 				mounted: { start: 0, end: 3 },
 				previewVisible,

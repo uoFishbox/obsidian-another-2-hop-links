@@ -101,7 +101,6 @@ describe("useVirtualList", () => {
 			viewportHeight: 0,
 			sectionTop: 0,
 			isStableMeasurement: false,
-			hasStableVisibleRange: false,
 			visibilityPolicy: {
 				bootstrapRows: 3,
 				mountedOverscanPx: 220,
@@ -128,7 +127,6 @@ describe("useVirtualList", () => {
 			viewportHeight: 100,
 			sectionTop: 0,
 			isStableMeasurement: true,
-			hasStableVisibleRange: false,
 			visibilityPolicy: {
 				bootstrapRows: 3,
 				mountedOverscanPx: 220,
@@ -163,7 +161,6 @@ describe("useVirtualList", () => {
 			viewportHeight: 100,
 			sectionTop: 0,
 			isStableMeasurement: true,
-			hasStableVisibleRange: false,
 			visibilityPolicy: {
 				bootstrapRows: 3,
 				mountedOverscanPx: 220,
@@ -174,7 +171,6 @@ describe("useVirtualList", () => {
 		const initial = virtualList.getSnapshot();
 		const reusedResult = virtualList.applyMeasurement({
 			...measurement,
-			hasStableVisibleRange: true,
 		});
 
 		expect(initialResult.updateKind).toBe("recomputed");
@@ -198,7 +194,6 @@ describe("useVirtualList", () => {
 			viewportHeight: 100,
 			sectionTop: 0,
 			isStableMeasurement: true,
-			hasStableVisibleRange: false,
 			visibilityPolicy: {
 				bootstrapRows: 3,
 				mountedOverscanPx: 0,
@@ -242,7 +237,6 @@ describe("useVirtualList", () => {
 			viewportHeight: 100,
 			sectionTop: 0,
 			isStableMeasurement: true,
-			hasStableVisibleRange: false,
 			visibilityPolicy: {
 				bootstrapRows: 3,
 				mountedOverscanPx: 0,
@@ -272,7 +266,6 @@ describe("useVirtualList", () => {
 			viewportHeight: 100,
 			sectionTop: 0,
 			isStableMeasurement: true,
-			hasStableVisibleRange: false,
 			visibilityPolicy: {
 				bootstrapRows: 3,
 				mountedOverscanPx: 220,
@@ -283,7 +276,6 @@ describe("useVirtualList", () => {
 		const initial = virtualList.getSnapshot();
 		virtualList.applyMeasurement({
 			...measurement,
-			hasStableVisibleRange: true,
 		});
 
 		expect(virtualList.getSnapshot()?.mountedBuild?.cells).toBe(
@@ -302,7 +294,6 @@ describe("useVirtualList", () => {
 			viewportHeight: 100,
 			sectionTop: 0,
 			isStableMeasurement: true,
-			hasStableVisibleRange: false,
 			visibilityPolicy: {
 				bootstrapRows: 3,
 				mountedOverscanPx: 220,
@@ -315,7 +306,6 @@ describe("useVirtualList", () => {
 			...measurement,
 			scrollTop: 100,
 			isStableMeasurement: false,
-			hasStableVisibleRange: true,
 		});
 
 		expect(result).toEqual({
@@ -340,7 +330,6 @@ describe("useVirtualList", () => {
 			viewportHeight: 100,
 			sectionTop: 0,
 			isStableMeasurement: true,
-			hasStableVisibleRange: false,
 			visibilityPolicy: {
 				bootstrapRows: 3,
 				mountedOverscanPx: 220,
@@ -363,7 +352,6 @@ describe("useVirtualList", () => {
 			viewportHeight: 100,
 			sectionTop: 0,
 			isStableMeasurement: true,
-			hasStableVisibleRange: false,
 			visibilityPolicy: {
 				bootstrapRows: 3,
 				mountedOverscanPx: 220,
@@ -378,7 +366,6 @@ describe("useVirtualList", () => {
 			viewportHeight: 100,
 			sectionTop: 0,
 			isStableMeasurement: true,
-			hasStableVisibleRange: false,
 			visibilityPolicy: {
 				bootstrapRows: 3,
 				mountedOverscanPx: 220,
