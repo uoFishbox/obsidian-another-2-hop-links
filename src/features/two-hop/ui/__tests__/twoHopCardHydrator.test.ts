@@ -63,7 +63,6 @@ function createItem(index: number): TwoHopItemModel {
 	return {
 		item: { type: "newLink" },
 		interactionId: `interaction:${index}`,
-		interactionKey: `interaction:${index}`,
 		searchKey: `item:${index}`,
 		key: `item:${index}`,
 	} as TwoHopItemModel;
@@ -73,7 +72,6 @@ function resolveCardModel(item: TwoHopItemModel): CardRenderModel {
 	const interactionId = item.interactionId ?? item.key;
 	const interactionDescriptor: ItemInteractionDescriptor = {
 		interactionId,
-		interactionKey: item.interactionKey,
 		kind: "item",
 		item: item.item,
 		targetFile: null,
@@ -86,7 +84,6 @@ function resolveCardModel(item: TwoHopItemModel): CardRenderModel {
 		className: null,
 		extension: null,
 		interactionId,
-		interactionKey: item.interactionKey ?? item.key,
 		interactionDescriptor,
 		searchQuery: "",
 		previewRequest: null,

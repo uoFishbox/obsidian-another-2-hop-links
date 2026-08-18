@@ -14,10 +14,6 @@ import {
 } from "features/card-preview/core/previewContent";
 import { readRawContent } from "features/card-preview/core/rawContentReader";
 import {
-	CACHE_KEY_SEPARATOR,
-	getPreviewSettingsSignatures,
-} from "features/card-preview/core/previewRenderKeys";
-import {
 	createAbortError,
 	isAbortError,
 	throwIfAborted,
@@ -81,15 +77,6 @@ function estimatePreviewAnalysisSize(analysis: PreviewContentAnalysis): number {
 			0,
 		)
 	);
-}
-
-function buildSearchContextCacheKey(
-	previewContentIdentityKey: string,
-	normalizedQuery: string,
-	settings: PreviewRenderSettingsInput,
-): string {
-	const { searchSignature } = getPreviewSettingsSignatures(settings);
-	return `${previewContentIdentityKey}${CACHE_KEY_SEPARATOR}${normalizedQuery}${CACHE_KEY_SEPARATOR}${searchSignature}`;
 }
 
 function previewContentHasVisibleQuery(
@@ -198,7 +185,7 @@ async function applySharedSearchContextToTextPreviewForState(
 	state: CardPreviewSharedCacheState,
 	params: {
 		previewContent: string;
-		previewContentIdentityKey: string;
+		cacheKey: string;
 		targetFile: TFile;
 		normalizedQuery: string;
 		searchContext?: PreviewSearchContext | (() => PreviewSearchContext | undefined);
@@ -209,7 +196,7 @@ async function applySharedSearchContextToTextPreviewForState(
 ): Promise<string> {
 	const {
 		previewContent,
-		previewContentIdentityKey,
+		cacheKey,
 		targetFile,
 		normalizedQuery,
 		searchContext,
@@ -217,11 +204,6 @@ async function applySharedSearchContextToTextPreviewForState(
 		vault,
 		signal,
 	} = params;
-	const cacheKey = buildSearchContextCacheKey(
-		previewContentIdentityKey,
-		normalizedQuery,
-		settings,
-	);
 	const cached = state.searchContextPreviewCache.get(cacheKey);
 	if (cached !== undefined) {
 		return cached;

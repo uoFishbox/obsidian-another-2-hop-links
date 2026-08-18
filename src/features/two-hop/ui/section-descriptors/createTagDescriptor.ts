@@ -28,12 +28,10 @@ export function createTagSectionDescriptor(
 	input: TagSectionBuildInput,
 	tokens: TwoHopInteractionTokenAllocator,
 ): TwoHopSectionModel {
-	const headerInteraction = tokens.createHeaderInteractionIdentity(
-		input.rawSectionId,
-	);
+	const headerInteractionId = tokens.createHeaderInteractionToken(input.rawSectionId);
 	const headerProps: ClickableHeaderExtraProps = {
 		className: "cosense-card-links__box--tag",
-		interactionId: headerInteraction.interactionId,
+		interactionId: headerInteractionId,
 		onClick: () => input.onTagClick(input.source.tag),
 	};
 	const rows = materializeItemPrefix(
@@ -52,11 +50,10 @@ export function createTagSectionDescriptor(
 				input.source.tag,
 				index,
 			);
-			const interactionKey = createItemInteractionKey(item, virtualKey);
+			const semanticKey = createItemInteractionKey(item, virtualKey);
 			return {
 				item,
-				interactionId: tokens.createItemInteractionToken(interactionKey),
-				interactionKey,
+				interactionId: tokens.createItemInteractionToken(semanticKey),
 				searchKey: getTagNoteSearchKeyFromBaseKey(input.source.tag, baseKey),
 				key: virtualKey,
 			};

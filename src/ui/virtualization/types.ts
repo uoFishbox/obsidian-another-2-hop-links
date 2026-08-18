@@ -16,12 +16,9 @@ export type Brand<T, TBrand extends string> = T & {
 };
 
 export type LogicalCellKey = Brand<string, "LogicalCellKey">;
-export type RenderSlotKey = Brand<number, "RenderSlotKey">;
 export type SourceKey = Brand<string, "SourceKey">;
 export const logicalCellKey = (value: string): LogicalCellKey =>
 	value as LogicalCellKey;
-
-export const renderSlotKey = (value: number): RenderSlotKey => value as RenderSlotKey;
 
 export const sourceKey = (value: string): SourceKey => value as SourceKey;
 
@@ -103,11 +100,9 @@ export interface VirtualRanges {
 
 export interface MountedVirtualCell {
 	readonly key: LogicalCellKey;
-	readonly renderSlotKey: RenderSlotKey;
 	readonly renderSlotIndex: number;
 	readonly rowIndex: number;
 	readonly columnIndex?: number;
 	readonly cellMetadataKey?: unknown;
 	readonly renderBodyKey?: RenderBodyKey;
-	readonly cellSlotKey?: number;
 }

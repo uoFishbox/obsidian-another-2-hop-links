@@ -24,7 +24,7 @@ Vault全体のベンチマークは、インデックス作成レイヤーやE2E
 - マウントされるDOM要素の数は、全体の `cardCount` ではなく「マウント範囲」によって制限されること。
 - `renderSlotIndex` は、単一のマウント済みスナップショット内で一意であること。
 - 保持された論理セルは、レイアウトとphysical slot poolのepochが再利用可能な場合、そのレンダースロットを維持すること。
-- slot lease (`poolId`、`poolEpoch`、`slotIndex`、`slotGeneration`)、logical key、publication revisionを別々に比較すること。keyまたはpublicationが変わればbindingを再公開する。
+- physical row/cell slot は `slotIndex` / `renderSlotIndex` の数値だけを所有し、logical key と分離する。row が別の physical slot に移動した場合だけ physical binding を更新する。
 - `previewVisible` は、 `mounted` の範囲を超えて拡張されないこと。
 - スクロールの測定値は、スクロールのフラッシュごとに1回だけ読み取られ、activeなsubscriberに渡されること。
 - 構造のミューテーションは、同じスクロールコンテナのactive subscriberだけを更新し、他のスクロールコンテナのsubscriberを測定しないこと。

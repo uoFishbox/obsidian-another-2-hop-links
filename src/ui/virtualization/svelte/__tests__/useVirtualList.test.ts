@@ -230,7 +230,7 @@ describe("useVirtualList", () => {
 
 		const updated = virtualList.getSnapshot();
 		const first = updated?.mountedCells[0];
-		expect(first?.renderSlotKey).toBe(initial?.mountedCells[0]?.renderSlotKey);
+		expect(first?.renderSlotIndex).toBe(initial?.mountedCells[0]?.renderSlotIndex);
 		expect(first?.cell.kind).toBe("item");
 		if (!first || first.cell.kind !== "item") {
 			return;

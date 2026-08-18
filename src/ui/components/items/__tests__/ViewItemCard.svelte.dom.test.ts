@@ -56,7 +56,6 @@ describe("ViewItemCard", () => {
 			className: "compiled-card",
 			extension: "pdf",
 			interactionId: "compiled-id",
-			interactionKey: "compiled-key",
 			interactionDescriptor: null,
 			searchQuery: "compiled",
 			previewRequest: null,

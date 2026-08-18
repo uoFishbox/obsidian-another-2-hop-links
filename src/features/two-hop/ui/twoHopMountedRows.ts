@@ -8,10 +8,8 @@ import type { RenderBodyKey } from "ui/virtualization/renderRevision";
 import type { RowRange } from "ui/virtualization/rowRange";
 import {
 	logicalCellKey,
-	renderSlotKey,
 	type LogicalCellKey,
 	type MountedVirtualCell,
-	type RenderSlotKey,
 } from "ui/virtualization/types";
 import type {
 	TwoHopRowModel,
@@ -24,17 +22,14 @@ import {
 
 export interface MountedTwoHopCell extends MountedVirtualCell {
 	readonly key: LogicalCellKey;
-	readonly renderSlotKey: RenderSlotKey;
 	readonly columnIndex: number;
 	readonly cell: TwoHopVirtualCell;
 	readonly renderBodyKey: RenderBodyKey;
-	readonly cellSlotKey: number;
 }
 
 export interface MountedTwoHopRow {
 	readonly key: number;
 	readonly slotIndex: number;
-	readonly slotKey: number;
 	readonly rowIndex: number;
 	readonly top: number;
 	readonly cells: readonly MountedTwoHopCell[];
@@ -62,7 +57,7 @@ export function buildMountedTwoHopRows(
 	markCCLDevPerformance("ccl:range-build-start");
 	const { rowModel, rowSlotAllocator } = params;
 	const columns = rowModel.layout.columns;
-	const slotPublication = rowSlotAllocator.prepareRange({
+	rowSlotAllocator.prepareRange({
 		start: params.rowRange.start,
 		end: params.rowRange.end,
 		slotTopologyRevision: columns,
@@ -82,8 +77,8 @@ export function buildMountedTwoHopRows(
 	>({
 		rowRange: params.rowRange,
 		columns,
-		slotCapacity: slotPublication.capacity,
-		resolveSlotLease: (rowIndex) => rowSlotAllocator.resolveSlotLease(rowIndex),
+		slotCapacity: rowSlotAllocator.capacity,
+		resolveSlotIndex: (rowIndex) => rowSlotAllocator.resolveSlotIndex(rowIndex),
 		resolvePreviousRow: (rowIndex) => {
 			const previousRow = previousRowSlices?.[rowIndex - previousFirstRowIndex];
 			return previousRow?.rowIndex === rowIndex ? previousRow : undefined;
@@ -108,7 +103,6 @@ export function buildMountedTwoHopRows(
 			return {
 				key: rowIndex,
 				slotIndex,
-				slotKey: slotIndex,
 				rowIndex,
 				top: row.top,
 				cells,
@@ -130,7 +124,7 @@ export function buildMountedTwoHopRows(
 		rowSlices: mountedRows.rowSlices,
 		rowsBySlot: mountedRows.rowsBySlot,
 		nextRenderSlotIndex: mountedRows.nextRenderSlotIndex,
-		poolCapacity: slotPublication.capacity,
+		poolCapacity: rowSlotAllocator.capacity,
 		rowModel,
 	};
 	markCCLDevPerformance("ccl:range-build-end");
@@ -146,11 +140,9 @@ function createMountedCell(
 	return {
 		key: logicalCellKey(cell.logicalKey),
 		renderSlotIndex,
-		renderSlotKey: renderSlotKey(renderSlotIndex),
 		rowIndex: cell.rowIndex,
 		columnIndex: cell.columnIndex,
 		cell,
 		renderBodyKey: cell.logicalKey,
-		cellSlotKey: renderSlotIndex,
 	};
 }

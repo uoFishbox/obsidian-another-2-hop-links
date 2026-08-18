@@ -133,14 +133,14 @@ function buildCells(params: {
 }
 
 function slotsByKey(build: {
-	cells: ReadonlyArray<{ key: string; renderSlotKey: number }>;
+	cells: ReadonlyArray<{ key: string; renderSlotIndex: number }>;
 }): Map<string, number> {
-	return new Map(build.cells.map((cell) => [cell.key, cell.renderSlotKey]));
+	return new Map(build.cells.map((cell) => [cell.key, cell.renderSlotIndex]));
 }
 
 function expectSameSlotsForKeys(
-	previous: { cells: ReadonlyArray<{ key: string; renderSlotKey: number }> },
-	next: { cells: ReadonlyArray<{ key: string; renderSlotKey: number }> },
+	previous: { cells: ReadonlyArray<{ key: string; renderSlotIndex: number }> },
+	next: { cells: ReadonlyArray<{ key: string; renderSlotIndex: number }> },
 	keys: string[],
 ): void {
 	const previousSlots = slotsByKey(previous);
@@ -331,7 +331,7 @@ describe("linkListVirtualLayout", () => {
 
 		expect(build.rowSlices).toHaveLength(2);
 		expect(build.rowSlices.map((row) => row.key)).toEqual([0, 1]);
-		expect(build.rowSlices.map((row) => row.slotKey)).toEqual([0, 1]);
+		expect(build.rowSlices.map((row) => row.slotIndex)).toEqual([0, 1]);
 		expect(build.rowSlices.map((row) => row.top)).toEqual([0, 130]);
 		expect(build.rowSlices.map((row) => row.cells.map((cell) => cell.key))).toEqual(
 			[

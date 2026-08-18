@@ -16,8 +16,7 @@
 		key: number;
 		rowIndex: number;
 		top: number;
-		slotIndex?: number;
-		slotKey?: number;
+		slotIndex: number;
 		cells: TestMountedCell[];
 		cellSlots?: SectionedGridMountedCellSlot<TestMountedCell>[];
 	}

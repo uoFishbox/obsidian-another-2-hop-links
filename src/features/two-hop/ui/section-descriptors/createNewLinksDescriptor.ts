@@ -13,7 +13,7 @@ export interface CreateNewLinksSectionDescriptorParams {
 	readonly items: readonly TwoHopIndexedLink[];
 	readonly itemLimit: number;
 	readonly previousItems: readonly TwoHopItemModel[];
-	readonly createItemInteractionToken: (interactionKey: string) => string;
+	readonly createItemInteractionToken: (semanticKey: string) => string;
 }
 
 /** Builds an immutable new-links publication with allocation-free viewport reads. */
@@ -27,11 +27,10 @@ export function createNewLinksSectionDescriptor(
 		(source, index): TwoHopItemModel => {
 			const item: ViewItem = { type: "newLink", data: source };
 			const virtualKey = newLinksSectionConfig.getKey(source, index);
-			const interactionKey = createItemInteractionKey(item, virtualKey);
+			const semanticKey = createItemInteractionKey(item, virtualKey);
 			return {
 				item,
-				interactionId: params.createItemInteractionToken(interactionKey),
-				interactionKey,
+				interactionId: params.createItemInteractionToken(semanticKey),
 				searchKey: virtualKey,
 				key: virtualKey,
 			};

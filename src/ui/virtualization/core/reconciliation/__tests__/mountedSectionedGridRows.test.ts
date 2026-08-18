@@ -5,23 +5,6 @@ import {
 	type SectionedGridMountedCellSlot,
 	type SectionedGridMountedRow,
 } from "ui/virtualization/core/reconciliation/mountedSectionedGridRows";
-import {
-	rowSlotIndex,
-	type ResidentRowSlotLease,
-	type ResidentSlotPoolId,
-} from "ui/virtualization/core/residentSlotBinding";
-
-const TEST_POOL_ID = Object.freeze({}) as ResidentSlotPoolId;
-
-function createTestLease(slotIndex: number): ResidentRowSlotLease {
-	return {
-		poolId: TEST_POOL_ID,
-		poolEpoch: 0,
-		rowSlotIndex: rowSlotIndex(slotIndex),
-		rowSlotGeneration: 1,
-	};
-}
-
 interface TestCell extends SectionedGridMountedCell {
 	readonly label: string;
 }
@@ -62,7 +45,7 @@ function buildRows(params: {
 		rowRange: { start: 0, end: 1 },
 		columns: 4,
 		slotCapacity: 2,
-		resolveSlotLease: () => createTestLease(params.slotIndex),
+		resolveSlotIndex: () => params.slotIndex,
 		resolvePreviousRow: () => params.previousRow,
 		canReusePreviousRow: () => true,
 		resolveRow: () => ({
@@ -143,8 +126,7 @@ describe("buildMountedSectionedGridRows", () => {
 			rowRange: { start: 0, end: 4 },
 			columns: 1,
 			slotCapacity: 4,
-			resolveSlotLease: (rowIndex) =>
-				createTestLease(slotByRowIndex[rowIndex] ?? 0),
+			resolveSlotIndex: (rowIndex) => slotByRowIndex[rowIndex] ?? 0,
 			resolvePreviousRow: () => undefined,
 			canReusePreviousRow: () => false,
 			resolveRow: (rowIndex) => ({
@@ -171,13 +153,13 @@ describe("buildMountedSectionedGridRows", () => {
 		expect(build.rowsBySlot.map((row) => row.rowIndex)).toEqual([1, 3, 0, 2]);
 	});
 
-	it("throws when a logical row has no resident slot lease", () => {
+	it("throws when a logical row has no resident slot", () => {
 		expect(() =>
 			buildMountedSectionedGridRows<TestCell, TestRow, null>({
 				rowRange: { start: 7, end: 8 },
 				columns: 1,
 				slotCapacity: 1,
-				resolveSlotLease: () => undefined,
+				resolveSlotIndex: () => undefined,
 				resolvePreviousRow: () => undefined,
 				canReusePreviousRow: () => false,
 				resolveRow: () => null,

@@ -12,12 +12,7 @@ import {
 	encodeRenderRevisionToken,
 	resolveItemRenderRevisionToken,
 } from "./renderBodyRevision";
-import {
-	logicalCellKey,
-	renderSlotKey,
-	type LogicalCellKey,
-	type RenderSlotKey,
-} from "../../types";
+import { logicalCellKey, type LogicalCellKey } from "../../types";
 import {
 	assertVirtualListInvariant,
 	shouldAssertVirtualListInvariants,
@@ -26,7 +21,6 @@ import {
 	createResidentRowSlotAllocator,
 	type ResidentRowSlotAllocator,
 } from "ui/virtualization/core/residentSlotAllocator";
-import type { ResidentRowSlotLease } from "ui/virtualization/core/residentSlotBinding";
 import {
 	buildMountedSectionedGridRows,
 	type SectionedGridMountedCellSlot,
@@ -36,8 +30,7 @@ const ROW_SLOT_ALLOCATOR = Symbol("flat-grid-row-slot-allocator");
 
 interface MountedRowSlotAllocation {
 	readonly capacity: number;
-	readonly epoch: number;
-	resolveSlotLease(rowIndex: number): ResidentRowSlotLease | undefined;
+	resolveSlotIndex(rowIndex: number): number | undefined;
 }
 
 export interface MountedVirtualGridCellPosition {
@@ -52,20 +45,17 @@ export interface MountedVirtualGridCellPosition {
 export interface MountedVirtualGridCell<T> {
 	readonly key: LogicalCellKey;
 	readonly renderSlotIndex: number;
-	readonly renderSlotKey: RenderSlotKey;
 	readonly rowIndex: number;
 	readonly columnIndex: number;
 	readonly cell: VirtualListLogicalCell<T>;
 	readonly cellIndex: number;
 	readonly renderBodyKey?: RenderBodyKey;
 	readonly position: MountedVirtualGridCellPosition;
-	readonly cellSlotKey?: number;
 }
 
 export interface MountedVirtualGridRowSlice<T> {
 	readonly key: number;
 	readonly slotIndex: number;
-	readonly slotKey: number;
 	rowIndex: number;
 	top: number;
 	cells: MountedVirtualGridCell<T>[];
@@ -79,7 +69,6 @@ export interface MountedVirtualGridCellsBuildResult<T> {
 	readonly reusableCellsByKey: Map<string, MountedVirtualGridCell<T>>;
 	readonly nextRenderSlotIndex: number;
 	readonly poolCapacity: number;
-	readonly poolEpoch: number;
 	readonly visibleWindow: VisibleCellWindow;
 	readonly cellSourceRevision: unknown;
 	/**
@@ -156,13 +145,11 @@ const createMountedVirtualGridCell = <T>(params: {
 	position: MountedVirtualGridCellPosition;
 	previous?: MountedVirtualGridCell<T>;
 	renderRevisionFallbackPolicy?: RenderRevisionFallbackPolicy;
-	cellSlotKey?: number;
 }): MountedVirtualGridCell<T> => {
 	recordCCLDevMeasurement("virtualGrid.cellShellCreated");
 	return {
 		key: params.key,
 		renderSlotIndex: params.renderSlotIndex,
-		renderSlotKey: renderSlotKey(params.renderSlotIndex),
 		rowIndex: params.rowIndex,
 		columnIndex: params.position.column,
 		cell: params.cell,
@@ -173,7 +160,6 @@ const createMountedVirtualGridCell = <T>(params: {
 			cell: params.cell,
 			fallbackPolicy: params.renderRevisionFallbackPolicy,
 		}),
-		cellSlotKey: params.cellSlotKey,
 	};
 };
 
@@ -236,7 +222,6 @@ function updateMountedVirtualGridCell<T>(
 	height: number,
 	renderSlotIndex: number,
 	renderRevisionFallbackPolicy?: RenderRevisionFallbackPolicy,
-	cellSlotKey?: number,
 ): MountedVirtualGridCell<T> {
 	const renderBodyKey = resolveMountedVirtualGridCellBodyKey({
 		previous,
@@ -279,10 +264,8 @@ function updateMountedVirtualGridCell<T>(
 		rowIndex,
 		columnIndex,
 		renderSlotIndex,
-		renderSlotKey: renderSlotKey(renderSlotIndex),
 		position,
 		renderBodyKey,
-		cellSlotKey,
 	};
 }
 
@@ -460,8 +443,7 @@ function resolveMountedRowSlotAllocation(params: {
 		allocator,
 		allocation: {
 			capacity: allocator.capacity,
-			epoch: allocator.epoch,
-			resolveSlotLease: (rowIndex) => allocator.resolveSlotLease(rowIndex),
+			resolveSlotIndex: (rowIndex) => allocator.resolveSlotIndex(rowIndex),
 		},
 	};
 }
@@ -537,7 +519,7 @@ function buildMountedVirtualGridCellsFromCore<T>(params: {
 		rowRange: visibleRows,
 		columns,
 		slotCapacity: slotAllocation.capacity,
-		resolveSlotLease: (rowIndex) => slotAllocation.resolveSlotLease(rowIndex),
+		resolveSlotIndex: (rowIndex) => slotAllocation.resolveSlotIndex(rowIndex),
 		resolvePreviousRow: (rowIndex) =>
 			hasCompatiblePreviousRowSlots
 				? getPreviousMountedVirtualGridRow(previousBuild, rowIndex)
@@ -569,7 +551,6 @@ function buildMountedVirtualGridCellsFromCore<T>(params: {
 			const cellIndex = rowIndex * columns + columnIndex;
 			const cell = params.resolveCellAtIndex(cellIndex);
 			if (!cell || cellIndex >= visibleWindow.end) return null;
-			const cellSlotKey = renderSlotIndex;
 			const key = logicalCellKey(cell.key);
 			const top = rowIndex * rowStep;
 			const left = columnIndex * colStep;
@@ -608,7 +589,6 @@ function buildMountedVirtualGridCellsFromCore<T>(params: {
 					height,
 					renderSlotIndex,
 					params.renderRevisionFallbackPolicy,
-					cellSlotKey,
 				);
 			}
 			return createMountedVirtualGridCell({
@@ -619,7 +599,6 @@ function buildMountedVirtualGridCellsFromCore<T>(params: {
 				renderSlotIndex,
 				previous,
 				renderRevisionFallbackPolicy: params.renderRevisionFallbackPolicy,
-				cellSlotKey,
 				position: {
 					row: rowIndex,
 					column: columnIndex,
@@ -635,7 +614,6 @@ function buildMountedVirtualGridCellsFromCore<T>(params: {
 			return {
 				key: rowIndex,
 				slotIndex,
-				slotKey: slotIndex,
 				rowIndex,
 				top: row.top,
 				cells,
@@ -655,7 +633,6 @@ function buildMountedVirtualGridCellsFromCore<T>(params: {
 		},
 		nextRenderSlotIndex: mountedRows.nextRenderSlotIndex,
 		poolCapacity: slotAllocation.capacity,
-		poolEpoch: slotAllocation.epoch,
 		visibleWindow,
 		cellSourceRevision: params.cellSourceRevision,
 		bindingTopologyRevision: params.bindingTopologyRevision,

@@ -27,7 +27,6 @@ export interface TwoHopHeaderModel {
 export interface TwoHopItemModel {
 	readonly item: ViewItem;
 	readonly interactionId?: string;
-	readonly interactionKey?: string;
 	readonly searchKey: string;
 	readonly key: string;
 }

@@ -1,9 +1,6 @@
 <script lang="ts">
 	import type { Snippet } from "svelte";
-	import {
-		interactionIdBinding,
-		type SectionHeaderInteractionDescriptor,
-	} from "ui/interactions/interactionTypes";
+	import type { SectionHeaderInteractionDescriptor } from "ui/interactions/interactionTypes";
 	import { useInteractionRegistry } from "ui/interactions/interactionRegistry";
 	import type { CardSectionVariant } from "./cardPresentation";
 
@@ -62,7 +59,6 @@
 	{draggable}
 	data-ccl-interaction-id={interactionId}
 	data-ccl-section-variant={sectionVariant}
-	use:interactionIdBinding={interactionId}
 	onclick={() => onClick?.()}
 	onkeydown={(e) => {
 		if (e.key === "Enter" || e.key === " ") {

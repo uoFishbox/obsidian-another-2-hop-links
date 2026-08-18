@@ -20,7 +20,7 @@ describe("section descriptor prefix materialization", () => {
 			(_, index) => ({ hop1: createLink(`${index}.md`), hop2: [] }),
 		);
 		const createItemInteractionToken = vi.fn(
-			(_interactionKey: string) =>
+			(_semanticKey: string) =>
 				`i${createItemInteractionToken.mock.calls.length}`,
 		);
 
@@ -54,7 +54,7 @@ describe("section descriptor prefix materialization", () => {
 			{ ...createLink("second-missing.md"), isUnresolved: true },
 		];
 		const createItemInteractionToken = vi.fn(
-			(_interactionKey: string) =>
+			(_semanticKey: string) =>
 				`i${createItemInteractionToken.mock.calls.length}`,
 		);
 

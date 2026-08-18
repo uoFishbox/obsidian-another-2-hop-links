@@ -38,7 +38,6 @@ interface PreviewFrame {
 function request(identity: string): CardPreviewRequest {
 	return {
 		renderKey: identity,
-		previewContentKey: `content:${identity}`,
 		previewCacheRevision: "0:0",
 		file: {
 			path: `${identity}.md`,

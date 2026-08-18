@@ -10,7 +10,6 @@ export interface ItemProps {
 	draggable?: boolean;
 	contentPreview?: string;
 	interactionId?: string;
-	interactionKey?: string;
 	previewKey?: string;
 	model?: CardRenderModel;
 }

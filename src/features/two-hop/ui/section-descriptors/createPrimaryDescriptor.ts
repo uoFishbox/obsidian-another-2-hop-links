@@ -40,7 +40,7 @@ export interface CreatePrimarySectionDescriptorParams {
 	readonly input: PrimarySectionBuildInput;
 	readonly itemLimit: number;
 	readonly previousItems: readonly TwoHopItemModel[];
-	readonly createItemInteractionToken: (interactionKey: string) => string;
+	readonly createItemInteractionToken: (semanticKey: string) => string;
 }
 
 /**
@@ -93,7 +93,7 @@ interface CreatePrimaryDescriptorParams<T> {
 	readonly config: SectionConfig<T>;
 	readonly toViewItem: (item: T) => ViewItem;
 	readonly getSearchKey: (item: T) => string;
-	readonly createItemInteractionToken: (interactionKey: string) => string;
+	readonly createItemInteractionToken: (semanticKey: string) => string;
 }
 
 function createPrimaryDescriptor<T>(
@@ -106,11 +106,10 @@ function createPrimaryDescriptor<T>(
 		(source, index): TwoHopItemModel => {
 			const item = params.toViewItem(source);
 			const virtualKey = params.config.getKey(source, index);
-			const interactionKey = createItemInteractionKey(item, virtualKey);
+			const semanticKey = createItemInteractionKey(item, virtualKey);
 			return {
 				item,
-				interactionId: params.createItemInteractionToken(interactionKey),
-				interactionKey,
+				interactionId: params.createItemInteractionToken(semanticKey),
 				searchKey: params.getSearchKey(source),
 				key: virtualKey,
 			};

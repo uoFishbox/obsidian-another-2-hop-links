@@ -27,7 +27,6 @@ export const INTERACTION_SELECTOR = `[${INTERACTION_ID_ATTRIBUTE}]`;
 const CARD_INTERACTION_SELECTOR = `.cosense-card-links__box${INTERACTION_SELECTOR}`;
 const SYNTHETIC_HOVER_EVENT_FLAG = "__cclSyntheticHover";
 const LAST_TOUCH_AT_DATASET_KEY = "cclLastTouchAt";
-const interactionIdsByElement = new WeakMap<Element, string>();
 
 export type InteractionKind = "item" | "sectionHeader";
 
@@ -39,7 +38,6 @@ export type InteractionSettings = Pick<
 
 interface BaseInteractionDescriptor {
 	interactionId: string;
-	interactionKey?: string;
 	kind: InteractionKind;
 	targetFile: TFile | null;
 	hoverPreviewEnabled?: boolean;
@@ -63,30 +61,6 @@ export interface SectionHeaderInteractionDescriptor extends BaseInteractionDescr
 export type InteractionDescriptor =
 	| ItemInteractionDescriptor
 	| SectionHeaderInteractionDescriptor;
-
-function bindInteractionId(element: Element, interactionId: string): void {
-	interactionIdsByElement.set(element, interactionId);
-}
-
-function unbindInteractionId(element: Element): void {
-	interactionIdsByElement.delete(element);
-}
-
-export function interactionIdBinding(
-	element: HTMLElement,
-	interactionId: string,
-): { update: (nextInteractionId: string) => void; destroy: () => void } {
-	bindInteractionId(element, interactionId);
-
-	return {
-		update(nextInteractionId: string): void {
-			bindInteractionId(element, nextInteractionId);
-		},
-		destroy(): void {
-			unbindInteractionId(element);
-		},
-	};
-}
 
 export function createItemInteractionKey(item: ViewItem, virtualKey?: string): string {
 	switch (item.type) {
@@ -113,7 +87,6 @@ export const createItemInteractionId = createItemInteractionKey;
 
 export interface CreateItemInteractionDescriptorOptions {
 	interactionId?: string;
-	interactionKey?: string;
 }
 
 export function createItemInteractionDescriptor(
@@ -126,13 +99,12 @@ export function createItemInteractionDescriptor(
 	const strategy = getItemStrategy(item);
 	if (!strategy) return null;
 
-	const interactionKey = options.interactionKey ?? createItemInteractionKey(item);
+	const interactionId = options.interactionId ?? createItemInteractionKey(item);
 	const targetFile = strategy.getTargetFile(item.data, context);
 	const rawText = strategy.getRawText(item.data);
 
 	return {
-		interactionId: options.interactionId ?? interactionKey,
-		interactionKey,
+		interactionId,
 		kind: "item",
 		item,
 		targetFile,
@@ -244,9 +216,7 @@ export function getInteractionIdFromElement(
 		return null;
 	}
 
-	return (
-		interactionIdsByElement.get(element) ?? element.dataset.cclInteractionId ?? null
-	);
+	return element.dataset.cclInteractionId ?? null;
 }
 
 export function markInteractionLongPressed(element: HTMLElement): void {

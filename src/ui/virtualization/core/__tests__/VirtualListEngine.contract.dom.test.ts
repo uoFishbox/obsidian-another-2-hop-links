@@ -115,10 +115,10 @@ describe("VirtualListEngine contract", () => {
 			scrollTop: 110,
 		}).snapshot;
 
-		expect(initial.mountedCells.map((cell) => cell.renderSlotKey)).toEqual([
+		expect(initial.mountedCells.map((cell) => cell.renderSlotIndex)).toEqual([
 			0, 1, 2,
 		]);
-		expect(shifted.mountedCells.map((cell) => cell.renderSlotKey)).toEqual([
+		expect(shifted.mountedCells.map((cell) => cell.renderSlotIndex)).toEqual([
 			0, 1, 2,
 		]);
 		expect(

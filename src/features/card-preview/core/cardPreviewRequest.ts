@@ -11,7 +11,6 @@ import {
 /** Complete immutable value required to render one card preview. */
 export interface CardPreviewRequest {
 	readonly renderKey: string;
-	readonly previewContentKey: string;
 	readonly previewCacheRevision: string;
 	readonly file: TFile;
 	readonly searchQuery: string;
@@ -46,7 +45,6 @@ export function compileCardPreviewRequest(
 
 	return Object.freeze({
 		renderKey: keys.renderCacheKey,
-		previewContentKey: keys.previewContentIdentityKey,
 		previewCacheRevision,
 		file: params.file,
 		searchQuery: params.searchQuery,

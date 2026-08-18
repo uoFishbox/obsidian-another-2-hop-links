@@ -80,11 +80,10 @@ export function createBranchSectionDescriptor(
 		(source): TwoHopItemModel => {
 			const item: ViewItem = { type: "backlink", data: source };
 			const virtualKey = generateBacklinkKey(source);
-			const interactionKey = createItemInteractionKey(item, virtualKey);
+			const semanticKey = createItemInteractionKey(item, virtualKey);
 			return {
 				item,
-				interactionId: tokens.createItemInteractionToken(interactionKey),
-				interactionKey,
+				interactionId: tokens.createItemInteractionToken(semanticKey),
 				searchKey: createTwohopChildSearchKeyFromBaseKeys(
 					branchBaseKey,
 					virtualKey,
@@ -93,11 +92,9 @@ export function createBranchSectionDescriptor(
 			};
 		},
 	);
-	const headerInteractionIdentity = tokens.createHeaderInteractionIdentity(
-		input.rawSectionId,
-	);
+	const headerInteractionId = tokens.createHeaderInteractionToken(input.rawSectionId);
 	const headerInteractionDescriptor: SectionHeaderInteractionDescriptor = {
-		...headerInteractionIdentity,
+		interactionId: headerInteractionId,
 		kind: "sectionHeader",
 		link: input.branch.hop1,
 		isOutgoingLink: true,

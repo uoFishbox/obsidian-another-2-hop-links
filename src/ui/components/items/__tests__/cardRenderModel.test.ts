@@ -42,7 +42,6 @@ describe("createCardRenderModel", () => {
 			searchScope: "title-only",
 			contentPreview: "matched content",
 			interactionId: "i0",
-			interactionKey: "item:file:report",
 		});
 
 		expect(model).toMatchObject({
@@ -52,7 +51,6 @@ describe("createCardRenderModel", () => {
 			className: null,
 			extension: "pdf",
 			interactionId: "i0",
-			interactionKey: "item:file:report",
 			searchQuery: "needle",
 		});
 		expect(getPreviewRenderVersion).not.toHaveBeenCalled();

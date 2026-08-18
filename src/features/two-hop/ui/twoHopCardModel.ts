@@ -36,6 +36,5 @@ export function buildTwoHopCardModel(
 				: "title-only",
 		contentPreview: matchedItem?.contentPreview,
 		interactionId: row.interactionId,
-		interactionKey: row.interactionKey,
 	});
 }

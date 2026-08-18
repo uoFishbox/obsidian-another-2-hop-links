@@ -6,12 +6,7 @@ import {
 	teardownAnimationFrameMock,
 } from "testing/helpers/DOMObserverMock";
 import VirtualSurfaceRecyclingHarness from "./VirtualSurfaceRecyclingHarness.svelte";
-import {
-	renderSlotKey,
-	type MountedVirtualCell,
-	type LogicalCellKey,
-	type RenderSlotKey,
-} from "../../types";
+import { type MountedVirtualCell, type LogicalCellKey } from "../../types";
 import type { SectionedGridMountedCellSlot } from "../../core/reconciliation/mountedSectionedGridRows";
 
 interface TestMountedCell extends MountedVirtualCell {
@@ -26,8 +21,7 @@ interface TestMountedRow {
 	key: number;
 	rowIndex: number;
 	top: number;
-	slotIndex?: number;
-	slotKey?: number;
+	slotIndex: number;
 	cells: TestMountedCell[];
 	cellSlots?: SectionedGridMountedCellSlot<TestMountedCell>[];
 }
@@ -35,8 +29,7 @@ interface TestMountedRow {
 function createCells(keys: string[], slotOffset: number = 0): TestMountedCell[] {
 	return keys.map((key, index) => ({
 		key: key as LogicalCellKey,
-		renderSlotKey: (slotOffset + index) as RenderSlotKey,
-		renderSlotIndex: index,
+		renderSlotIndex: slotOffset + index,
 		rowIndex: 0,
 		columnIndex: index,
 		top: 0,
@@ -53,15 +46,13 @@ function createRows(
 		rowIndex?: number;
 		top?: number;
 		slotIndex?: number;
-		slotKey?: number;
 	} = {},
 ): TestMountedRow[] {
 	const row = {
 		key: options.key ?? 0,
 		rowIndex: options.rowIndex ?? 0,
 		top: options.top ?? 0,
-		slotIndex: options.slotIndex,
-		slotKey: options.slotKey,
+		slotIndex: options.slotIndex ?? 0,
 		cells,
 	};
 	return [row];
@@ -74,7 +65,6 @@ function createCellSlots(
 		binding,
 		columnIndex,
 		renderSlotIndex: columnIndex,
-		renderSlotKey: renderSlotKey(columnIndex),
 	}));
 }
 
@@ -143,7 +133,6 @@ describe("VirtualSurface grid-row recycling", () => {
 					key: 0,
 					rowIndex: 0,
 					slotIndex: 0,
-					slotKey: 0,
 				}),
 				contentHeight: 100,
 				rowHeight: 50,
@@ -174,7 +163,6 @@ describe("VirtualSurface grid-row recycling", () => {
 				rowIndex: 12,
 				top: 600,
 				slotIndex: 0,
-				slotKey: 0,
 			}),
 			contentHeight: 1000,
 			rowHeight: 50,
@@ -206,7 +194,6 @@ describe("VirtualSurface grid-row recycling", () => {
 					key: 0,
 					rowIndex: 0,
 					slotIndex: 0,
-					slotKey: 0,
 				}),
 				contentHeight: 100,
 				rowHeight: 50,
@@ -231,7 +218,6 @@ describe("VirtualSurface grid-row recycling", () => {
 				rowIndex: 12,
 				top: 600,
 				slotIndex: 0,
-				slotKey: 0,
 			}),
 			contentHeight: 1000,
 			rowHeight: 50,
@@ -264,7 +250,6 @@ describe("VirtualSurface grid-row recycling", () => {
 					rowIndex: 0,
 					top: 0,
 					slotIndex: 0,
-					slotKey: 0,
 					cells: binding ? [binding] : [],
 					cellSlots: createCellSlots([binding]),
 				},
@@ -337,7 +322,6 @@ describe("VirtualSurface grid-row recycling", () => {
 				rowIndex: 0,
 				top: 0,
 				slotIndex: 0,
-				slotKey: 0,
 				cells: binding ? [binding] : [],
 				cellSlots: createCellSlots([binding]),
 			},

@@ -70,19 +70,15 @@ export function buildPreviewRenderKeys(
 	settings: PreviewRenderSettingsInput,
 	previewRenderVersion: string,
 ): {
-	previewContentIdentityKey: string;
 	renderCacheKey: string;
-	normalizedQuery: string;
 } {
 	const { contentSignature, searchSignature } =
 		getPreviewSettingsSignatures(settings);
 	const normalizedQuery = normalizePreviewQuery(query);
 
-	const previewContentIdentityKey = `${file.path}${CACHE_KEY_SEPARATOR}${file.stat.mtime}${CACHE_KEY_SEPARATOR}${previewRenderVersion}${CACHE_KEY_SEPARATOR}${contentSignature}`;
+	const renderKeyPrefix = `${file.path}${CACHE_KEY_SEPARATOR}${file.stat.mtime}${CACHE_KEY_SEPARATOR}${previewRenderVersion}${CACHE_KEY_SEPARATOR}${contentSignature}`;
 
 	return {
-		previewContentIdentityKey,
-		renderCacheKey: `${previewContentIdentityKey}${CACHE_KEY_SEPARATOR}${normalizedQuery}${CACHE_KEY_SEPARATOR}${searchSignature}`,
-		normalizedQuery,
+		renderCacheKey: `${renderKeyPrefix}${CACHE_KEY_SEPARATOR}${normalizedQuery}${CACHE_KEY_SEPARATOR}${searchSignature}`,
 	};
 }

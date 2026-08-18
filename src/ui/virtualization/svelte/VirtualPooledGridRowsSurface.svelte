@@ -5,7 +5,6 @@
 	import { IS_PROD } from "appConstants";
 	import type { Snippet } from "svelte";
 	import type { LogicalCellKey, MountedVirtualCell } from "../types";
-	import { renderSlotKey } from "../types";
 	import type { SectionedGridMountedCellSlot } from "../core/reconciliation/mountedSectionedGridRows";
 	import {
 		KEYED_VIRTUAL_CELL_BODY_LIFECYCLE,
@@ -77,16 +76,12 @@
 		`height:${contentHeight}px; position:relative; --ccl-box-height:${rowHeight}px; --ccl-cell-width:${cellWidth ?? 0}px; --ccl-columns:${Math.max(1, Math.floor(columns))}${gap !== undefined ? `; --ccl-box-gap:${gap}px` : ""}`,
 	);
 
-	const resolveCellSlotKey = (_row: TMountedRow, cell: TMountedCell): number =>
-		cell.cellSlotKey ?? cell.renderSlotIndex;
-
 	const resolveRowCellSlots = (
 		row: TMountedRow,
 	): readonly SectionedGridMountedCellSlot<TMountedCell>[] =>
 		row.cellSlots ??
 		row.cells.map((cell) => ({
 			renderSlotIndex: cell.renderSlotIndex,
-			renderSlotKey: renderSlotKey(cell.renderSlotIndex),
 			columnIndex: cell.columnIndex ?? 0,
 			binding: cell,
 		}));
@@ -108,7 +103,7 @@
 					policy: bodyLifecyclePolicy,
 					resolveDefaultKey: resolveDefaultMountedCellBodyKey,
 				})
-			: cell.renderSlotKey;
+			: cell.renderSlotIndex;
 
 	const setRowTop = (element: HTMLElement, top: number) => {
 		let committedTop = Number.NaN;
@@ -126,7 +121,7 @@
 </script>
 
 <div class={contentClassName} bind:this={contentEl} style={contentStyle}>
-	{#each mountedRows as row (row.slotIndex ?? row.key)}
+	{#each mountedRows as row (row.slotIndex)}
 		{#if !isRowActive || isRowActive(row)}
 			<div
 				{...row.attributes}
@@ -135,7 +130,7 @@
 				data-ccl-row-index={!IS_PROD ? row.rowIndex : undefined}
 				use:setRowTop={row.top}
 			>
-				{#each resolveRowCellSlots(row) as cellSlot (cellSlot.renderSlotKey)}
+				{#each resolveRowCellSlots(row) as cellSlot (cellSlot.renderSlotIndex)}
 					{@const currentBinding = cellSlot.binding}
 					<VirtualGridLogicalCellMount
 						logicalKey={currentBinding
@@ -147,9 +142,7 @@
 						dataTestId={!IS_PROD && currentBinding
 							? getCellDataTestId?.(currentBinding)
 							: undefined}
-						cellSlotKey={currentBinding
-							? resolveCellSlotKey(row, currentBinding)
-							: cellSlot.renderSlotIndex}
+						renderSlotIndex={cellSlot.renderSlotIndex}
 						rowIndex={currentBinding
 							? resolveMountedCellRowIndex(currentBinding)
 							: row.rowIndex}

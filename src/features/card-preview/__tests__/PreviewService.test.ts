@@ -189,7 +189,7 @@ describe("PreviewService.getPreview", () => {
 		await expect(
 			previewSharedCache.applySharedSearchContextToTextPreview({
 				previewContent: "<p>fallback preview</p>",
-				previewContentIdentityKey: "preview-id:shared-raw",
+				cacheKey: "preview-id:shared-raw",
 				targetFile: file,
 				normalizedQuery: "alpha",
 				settings: DEFAULT_SETTINGS,

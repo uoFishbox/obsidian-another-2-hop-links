@@ -100,14 +100,14 @@ describe("cardPreviewSharedCache search context", () => {
 		}));
 	});
 
-	it("reuses shared search context when preview identity key is unchanged", async () => {
+	it("reuses shared search context when render key is unchanged", async () => {
 		const file = createMockTFile("notes/search-content-fingerprint.md");
 		const settings = createSettings();
-		const previewContentIdentityKey = "preview-id:stable";
+		const cacheKey = "preview-id:stable";
 
 		const first = await applySharedSearchContextToTextPreview({
 			previewContent: "<p>alpha first</p>",
-			previewContentIdentityKey,
+			cacheKey,
 			targetFile: file,
 			normalizedQuery: "alpha",
 			settings,
@@ -115,7 +115,7 @@ describe("cardPreviewSharedCache search context", () => {
 		});
 		const second = await applySharedSearchContextToTextPreview({
 			previewContent: "<p>alpha first</p>",
-			previewContentIdentityKey,
+			cacheKey,
 			targetFile: file,
 			normalizedQuery: "alpha",
 			settings,
@@ -128,13 +128,13 @@ describe("cardPreviewSharedCache search context", () => {
 		expect(state.getFileContent).not.toHaveBeenCalled();
 	});
 
-	it("separates shared search context entries by preview identity key", async () => {
+	it("separates shared search context entries by render key", async () => {
 		const file = createMockTFile("notes/search-content-fingerprint.md");
 		const settings = createSettings();
 
 		const first = await applySharedSearchContextToTextPreview({
 			previewContent: "<p>alpha first</p>",
-			previewContentIdentityKey: "preview-id:first",
+			cacheKey: "preview-id:first",
 			targetFile: file,
 			normalizedQuery: "alpha",
 			settings,
@@ -142,7 +142,7 @@ describe("cardPreviewSharedCache search context", () => {
 		});
 		const second = await applySharedSearchContextToTextPreview({
 			previewContent: "<p>alpha second</p>",
-			previewContentIdentityKey: "preview-id:second",
+			cacheKey: "preview-id:second",
 			targetFile: file,
 			normalizedQuery: "alpha",
 			settings,
@@ -188,16 +188,22 @@ describe("cardPreviewSharedCache search context", () => {
 		const secondSettings = createSettings({
 			searchPreviewSeekBufferChars: 30,
 		});
-		const previewContentIdentityKey = buildPreviewRenderKeys(
+		const firstCacheKey = buildPreviewRenderKeys(
 			file,
 			"alpha",
 			firstSettings,
 			"render-v1",
-		).previewContentIdentityKey;
+		).renderCacheKey;
+		const secondCacheKey = buildPreviewRenderKeys(
+			file,
+			"alpha",
+			secondSettings,
+			"render-v1",
+		).renderCacheKey;
 
 		await applySharedSearchContextToTextPreview({
 			previewContent: "<p>fallback preview</p>",
-			previewContentIdentityKey,
+			cacheKey: firstCacheKey,
 			targetFile: file,
 			normalizedQuery: "alpha",
 			settings: firstSettings,
@@ -205,7 +211,7 @@ describe("cardPreviewSharedCache search context", () => {
 		});
 		await applySharedSearchContextToTextPreview({
 			previewContent: "<p>fallback preview</p>",
-			previewContentIdentityKey,
+			cacheKey: secondCacheKey,
 			targetFile: file,
 			normalizedQuery: "alpha",
 			settings: secondSettings,
@@ -213,7 +219,7 @@ describe("cardPreviewSharedCache search context", () => {
 		});
 		await applySharedSearchContextToTextPreview({
 			previewContent: "<p>fallback preview</p>",
-			previewContentIdentityKey,
+			cacheKey: secondCacheKey,
 			targetFile: file,
 			normalizedQuery: "alpha",
 			settings: secondSettings,
@@ -230,7 +236,7 @@ describe("cardPreviewSharedCache search context", () => {
 
 		await applySharedSearchContextToTextPreview({
 			previewContent: "<p>fallback preview</p>",
-			previewContentIdentityKey: "preview-id:with-offset",
+			cacheKey: "preview-id:with-offset",
 			targetFile: file,
 			normalizedQuery: "alpha",
 			searchContext: {
@@ -261,7 +267,7 @@ describe("cardPreviewSharedCache search context", () => {
 
 		await applySharedSearchContextToTextPreview({
 			previewContent: "<p>fallback preview</p>",
-			previewContentIdentityKey: "preview-id:first-large",
+			cacheKey: "preview-id:first-large",
 			targetFile: file,
 			normalizedQuery: "alpha",
 			settings,
@@ -269,7 +275,7 @@ describe("cardPreviewSharedCache search context", () => {
 		});
 		await applySharedSearchContextToTextPreview({
 			previewContent: "<p>fallback preview</p>",
-			previewContentIdentityKey: "preview-id:second-large",
+			cacheKey: "preview-id:second-large",
 			targetFile: file,
 			normalizedQuery: "alpha",
 			settings,
@@ -290,7 +296,7 @@ describe("cardPreviewSharedCache search context", () => {
 
 		const first = applySharedSearchContextToTextPreview({
 			previewContent: "<p>fallback preview</p>",
-			previewContentIdentityKey: "preview-id:abort-shared",
+			cacheKey: "preview-id:abort-shared",
 			targetFile: file,
 			normalizedQuery: "alpha",
 			settings,
@@ -306,7 +312,7 @@ describe("cardPreviewSharedCache search context", () => {
 
 		const second = applySharedSearchContextToTextPreview({
 			previewContent: "<p>fallback preview</p>",
-			previewContentIdentityKey: "preview-id:abort-shared",
+			cacheKey: "preview-id:abort-shared",
 			targetFile: file,
 			normalizedQuery: "alpha",
 			settings,
@@ -334,7 +340,7 @@ describe("cardPreviewSharedCache search context", () => {
 
 		const request = applySharedSearchContextToTextPreview({
 			previewContent: "<p>fallback preview</p>",
-			previewContentIdentityKey: "preview-id:abort-before-snippet",
+			cacheKey: "preview-id:abort-before-snippet",
 			targetFile: file,
 			normalizedQuery: "alpha",
 			settings,
@@ -361,7 +367,7 @@ describe("cardPreviewSharedCache search context", () => {
 
 		const first = applySharedSearchContextToTextPreview({
 			previewContent: "<p>alpha first</p>",
-			previewContentIdentityKey: "preview-id:clear-search-context",
+			cacheKey: "preview-id:clear-search-context",
 			targetFile: file,
 			normalizedQuery: "alpha",
 			settings,
@@ -379,7 +385,7 @@ describe("cardPreviewSharedCache search context", () => {
 
 		const second = await applySharedSearchContextToTextPreview({
 			previewContent: "<p>alpha first</p>",
-			previewContentIdentityKey: "preview-id:clear-search-context",
+			cacheKey: "preview-id:clear-search-context",
 			targetFile: file,
 			normalizedQuery: "alpha",
 			settings,

@@ -2,26 +2,8 @@ import {
 	recordCCLDevMeasurement,
 	recordCCLDevMeasurementCount,
 } from "infrastructure/debug/CCLDevMeasurements";
-import {
-	rowSlotIndex,
-	type ResidentRowSlotLease,
-	type ResidentSlotPoolId,
-} from "./residentSlotBinding";
 
 export type ResidentSlotResetReason = "empty" | "topology";
-
-/**
- * Lightweight ownership publication used to validate mounted-build reuse.
- *
- * Slot assignments stay private to the allocator; consumers resolve only the
- * lease they need instead of allocating a full immutable delta every frame.
- */
-export interface ResidentSlotPoolPublication {
-	readonly poolId: ResidentSlotPoolId;
-	readonly poolEpoch: number;
-	readonly revision: number;
-	readonly capacity: number;
-}
 
 export interface ResidentRowSlotRange {
 	readonly start: number;
@@ -37,21 +19,16 @@ export interface ResidentRowSlotRange {
 
 export interface ResidentRowSlotAllocator {
 	/** Reconciles a bounded physical slot pool with a contiguous integer row range. */
-	prepareRange(params: ResidentRowSlotRange): ResidentSlotPoolPublication;
-	resolveSlotLease(logicalRowIndex: number): ResidentRowSlotLease | undefined;
+	prepareRange(params: ResidentRowSlotRange): void;
+	resolveSlotIndex(logicalRowIndex: number): number | undefined;
 	reset(reason: ResidentSlotResetReason): void;
 	dispose(): void;
 	readonly capacity: number;
-	readonly epoch: number;
-	readonly publication: ResidentSlotPoolPublication;
 }
 
 /** Creates the authoritative free-list slot lifecycle used by resident row windows. */
 export function createResidentRowSlotAllocator(): ResidentRowSlotAllocator {
-	const poolId = Object.freeze({}) as ResidentSlotPoolId;
 	let capacity = 0;
-	let epoch = 0;
-	let revision = 0;
 	let slotTopologyRevision = 0;
 	let hasSlotTopologyRevision = false;
 	let activeStart = 0;
@@ -59,12 +36,9 @@ export function createResidentRowSlotAllocator(): ResidentRowSlotAllocator {
 	let hasActiveRange = false;
 	let disposed = false;
 	const logicalRowToSlot = new Map<number, number>();
-	const slotGenerations: number[] = [];
-	const leasesBySlot: Array<ResidentRowSlotLease | undefined> = [];
 	const freeSlotIndices = new Set<number>();
 	// Reused across range shifts so prepareRange stays allocation-free.
 	const leavingSlotIndicesScratch: number[] = [];
-	let publication = createPublication();
 
 	function assertUsable(): void {
 		if (disposed) {
@@ -81,15 +55,10 @@ export function createResidentRowSlotAllocator(): ResidentRowSlotAllocator {
 		activeEnd = 0;
 		hasActiveRange = false;
 		logicalRowToSlot.clear();
-		slotGenerations.length = 0;
-		leasesBySlot.length = 0;
 		freeSlotIndices.clear();
-		epoch += 1;
-		revision += 1;
-		publication = createPublication();
 	}
 
-	function prepareRange(params: ResidentRowSlotRange): ResidentSlotPoolPublication {
+	function prepareRange(params: ResidentRowSlotRange): void {
 		assertUsable();
 		recordCCLDevMeasurement("virtualGrid.contiguousSlotPool.apply");
 
@@ -103,7 +72,7 @@ export function createResidentRowSlotAllocator(): ResidentRowSlotAllocator {
 			activeEnd === end
 		) {
 			recordCCLDevMeasurement("virtualGrid.residentSlotPool.rangeHit");
-			return publication;
+			return;
 		}
 
 		if (
@@ -139,69 +108,33 @@ export function createResidentRowSlotAllocator(): ResidentRowSlotAllocator {
 			if (previouslyFreeSlotIndex !== undefined) {
 				freeSlotIndices.delete(previouslyFreeSlotIndex);
 			}
-			assignSlot(slotIndex, logicalRowIndex);
+			logicalRowToSlot.set(logicalRowIndex, slotIndex);
 			changedSlotCount += 1;
 		}
 
 		for (let index = leavingOffset; index < leavingSlotIndices.length; index += 1) {
-			const slotIndex = leavingSlotIndices[index]!;
-			invalidateSlot(slotIndex);
-			freeSlotIndices.add(slotIndex);
+			freeSlotIndices.add(leavingSlotIndices[index]!);
 			changedSlotCount += 1;
 		}
 
 		activeStart = start;
 		activeEnd = end;
 		hasActiveRange = true;
-		revision += 1;
-		publication = createPublication();
 		recordCCLDevMeasurementCount(
 			"virtualGrid.residentSlotPool.changedSlots",
 			changedSlotCount,
 		);
-		return publication;
 	}
 
 	function allocateSlot(): number {
 		const slotIndex = capacity;
 		capacity += 1;
-		slotGenerations.push(0);
-		leasesBySlot.push(undefined);
 		return slotIndex;
 	}
 
-	function resolveSlotLease(
-		logicalRowIndex: number,
-	): ResidentRowSlotLease | undefined {
+	function resolveSlotIndex(logicalRowIndex: number): number | undefined {
 		assertUsable();
-		const slotIndex = logicalRowToSlot.get(logicalRowIndex);
-		return slotIndex === undefined ? undefined : leasesBySlot[slotIndex];
-	}
-
-	function assignSlot(slotIndex: number, logicalRowIndex: number): void {
-		const slotGeneration = (slotGenerations[slotIndex] ?? 0) + 1;
-		slotGenerations[slotIndex] = slotGeneration;
-		leasesBySlot[slotIndex] = Object.freeze({
-			poolId,
-			poolEpoch: epoch,
-			rowSlotIndex: rowSlotIndex(slotIndex),
-			rowSlotGeneration: slotGeneration,
-		});
-		logicalRowToSlot.set(logicalRowIndex, slotIndex);
-	}
-
-	function invalidateSlot(slotIndex: number): void {
-		slotGenerations[slotIndex] = (slotGenerations[slotIndex] ?? 0) + 1;
-		leasesBySlot[slotIndex] = undefined;
-	}
-
-	function createPublication(): ResidentSlotPoolPublication {
-		return Object.freeze({
-			poolId,
-			poolEpoch: epoch,
-			revision,
-			capacity,
-		});
+		return logicalRowToSlot.get(logicalRowIndex);
 	}
 
 	function dispose(): void {
@@ -212,17 +145,11 @@ export function createResidentRowSlotAllocator(): ResidentRowSlotAllocator {
 
 	return {
 		prepareRange,
-		resolveSlotLease,
+		resolveSlotIndex,
 		reset,
 		dispose,
 		get capacity() {
 			return capacity;
-		},
-		get epoch() {
-			return epoch;
-		},
-		get publication() {
-			return publication;
 		},
 	};
 }

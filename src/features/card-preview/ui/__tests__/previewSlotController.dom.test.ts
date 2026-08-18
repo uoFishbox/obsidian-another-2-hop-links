@@ -12,7 +12,6 @@ import { describe, expect, it, vi } from "vitest";
 function request(renderKey: string): CardPreviewRequest {
 	return {
 		renderKey,
-		previewContentKey: `content:${renderKey}`,
 		previewCacheRevision: "0:0",
 		file: { path: `${renderKey}.md` } as TFile,
 		searchQuery: "",

@@ -2,7 +2,6 @@
 	import { type TFile } from "obsidian";
 	import Icon from "ui/components/common/Icon.svelte";
 	import { type IconName } from "ui/shared/icons/iconRegistry";
-	import { interactionIdBinding } from "ui/interactions/interactionTypes";
 	import { isAttachment } from "core/rules/fileRules";
 	import { AUDIO_EXTENSIONS, IMAGE_EXTENSIONS } from "../../../appConstants";
 	import { type Snippet } from "svelte";
@@ -88,7 +87,6 @@
 	aria-hidden={interactive ? undefined : "true"}
 	data-ccl-interaction-id={interactive ? interactionId : undefined}
 	draggable={interactive && draggable ? true : undefined}
-	use:interactionIdBinding={interactive ? interactionId : ""}
 >
 	<div class="cosense-card-links__box-title-wrapper">
 		<div

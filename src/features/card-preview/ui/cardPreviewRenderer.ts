@@ -370,7 +370,7 @@ export function createCardPreviewRenderer(
 		const contentForRender =
 			await sharedCache.applySharedSearchContextToTextPreview({
 				previewContent: preview.content,
-				previewContentIdentityKey: request.previewContentKey,
+				cacheKey: request.renderKey,
 				targetFile: request.file,
 				normalizedQuery,
 				searchContext: () => buildPreviewSearchContext(request),

@@ -11,7 +11,6 @@ function createDescriptor(
 	const file = { path, extension: "md" } as TFile;
 	return {
 		interactionId,
-		interactionKey: interactionId,
 		kind: "item",
 		item: { type: "file", data: file } as ViewItem,
 		targetFile: file,

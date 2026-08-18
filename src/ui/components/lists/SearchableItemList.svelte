@@ -387,7 +387,7 @@
 			(matchedItem?.contentMatched ?? true)
 				? "title-and-content"
 				: "title-only";
-		const interactionKey = createItemInteractionKey(item, itemKey);
+		const interactionId = createItemInteractionKey(item, itemKey);
 		const model = createCardRenderModel({
 			item,
 			settings: revision.settings,
@@ -397,8 +397,7 @@
 			searchQuery: revision.searchQuery,
 			searchScope,
 			contentPreview: matchedItem?.contentPreview,
-			interactionId: interactionKey,
-			interactionKey,
+			interactionId,
 		});
 		cardModelCache.set(item, { revision, itemKey, model });
 		return model;

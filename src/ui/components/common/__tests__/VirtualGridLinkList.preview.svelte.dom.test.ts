@@ -54,12 +54,10 @@ function createModel(file: TFile): CardRenderModel {
 		className: null,
 		extension: "md",
 		interactionId: file.path,
-		interactionKey: file.path,
 		interactionDescriptor: null,
 		searchQuery: "",
 		previewRequest: {
 			renderKey: `preview:${file.path}`,
-			previewContentKey: `content:${file.path}`,
 			previewCacheRevision: "0:0",
 			file,
 			searchQuery: "",
@@ -191,7 +189,7 @@ describe("VirtualGridLinkList preview surface", () => {
 			},
 			previewRuntime,
 		} as AppContext;
-		const getItemId = (model: CardRenderModel) => model.interactionKey;
+		const getItemId = (model: CardRenderModel) => model.interactionId;
 		const rendered = render(VirtualGridPreviewHarness, {
 			props: {
 				models,

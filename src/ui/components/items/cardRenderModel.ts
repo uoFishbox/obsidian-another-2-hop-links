@@ -25,7 +25,6 @@ export interface CardShellModel {
 	readonly className: string | null;
 	readonly extension: string | null;
 	readonly interactionId: string;
-	readonly interactionKey: string;
 	readonly searchQuery: string;
 }
 
@@ -54,7 +53,6 @@ export interface CreateCardRenderModelParams {
 	readonly searchScope?: "title-only" | "title-and-content";
 	readonly contentPreview?: string;
 	readonly interactionId?: string;
-	readonly interactionKey?: string;
 }
 
 /** Creates the card shell and memoizes preview/interaction models on first access. */
@@ -74,9 +72,7 @@ export function createCardRenderModel(
 	const searchQuery = params.searchQuery ?? "";
 	const searchScope = params.searchScope ?? "title-and-content";
 	const contentPreview = params.contentPreview;
-	const interactionKey =
-		params.interactionKey ?? createItemInteractionKey(params.item);
-	const interactionId = params.interactionId ?? interactionKey;
+	const interactionId = params.interactionId ?? createItemInteractionKey(params.item);
 	let previewRequest: CardPreviewRequest | null | undefined;
 	let interactionDescriptor: ItemInteractionDescriptor | null | undefined;
 
@@ -103,7 +99,7 @@ export function createCardRenderModel(
 			params.settings,
 			searchQuery,
 			params.context,
-			{ interactionId, interactionKey },
+			{ interactionId },
 		);
 		return interactionDescriptor;
 	}
@@ -119,7 +115,6 @@ export function createCardRenderModel(
 		className,
 		extension: targetFile?.extension ?? null,
 		interactionId,
-		interactionKey,
 		get interactionDescriptor() {
 			return resolveInteractionDescriptor();
 		},

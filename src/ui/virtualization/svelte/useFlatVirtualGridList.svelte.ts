@@ -270,7 +270,7 @@ export function useFlatVirtualGridList<T>(
 				);
 				if (descriptor) {
 					interactionCards.push({
-						slotId: String(mountedCell.renderSlotKey),
+						slotId: String(mountedCell.renderSlotIndex),
 						descriptor,
 					});
 				}

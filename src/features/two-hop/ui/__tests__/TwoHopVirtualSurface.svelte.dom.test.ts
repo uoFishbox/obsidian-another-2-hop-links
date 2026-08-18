@@ -75,7 +75,6 @@ function createCardModelResolver() {
 			className: null,
 			extension: null,
 			interactionId: item.key,
-			interactionKey: item.key,
 			interactionDescriptor: null,
 			searchQuery: "",
 			previewRequest: null,

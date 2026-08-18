@@ -6,8 +6,7 @@ export interface VirtualSurfaceMountedRow<TMountedCell extends MountedVirtualCel
 	key: RowKey;
 	rowIndex: number;
 	top: number;
-	slotIndex?: number;
-	slotKey?: number;
+	slotIndex: number;
 	attributes?: Record<string, string | number | undefined>;
 	cells: readonly TMountedCell[];
 	cellSlots?: readonly SectionedGridMountedCellSlot<TMountedCell>[];

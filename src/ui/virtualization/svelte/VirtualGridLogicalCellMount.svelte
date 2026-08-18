@@ -9,7 +9,7 @@
 		logicalKey?: LogicalCellKey;
 		className?: string;
 		dataTestId?: string;
-		cellSlotKey?: number;
+		renderSlotIndex?: number;
 		rowIndex?: number;
 		columnIndex?: number;
 		ariaHidden?: boolean;
@@ -21,7 +21,7 @@
 		logicalKey,
 		className = "",
 		dataTestId,
-		cellSlotKey,
+		renderSlotIndex,
 		rowIndex,
 		columnIndex,
 		ariaHidden = false,
@@ -45,7 +45,7 @@
 			}}
 	class={className}
 	data-ccl-logical-key={!IS_PROD ? logicalKeyAttribute : undefined}
-	data-ccl-cell-slot={!IS_PROD ? cellSlotKey : undefined}
+	data-ccl-cell-slot={!IS_PROD ? renderSlotIndex : undefined}
 	data-testid={!IS_PROD ? dataTestId : undefined}
 	data-ccl-row-index={!IS_PROD ? rowIndex : undefined}
 	data-ccl-column-index={!IS_PROD ? columnIndex : undefined}

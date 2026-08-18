@@ -1,7 +1,7 @@
 export function expectUniqueRenderSlots(
-	cells: ReadonlyArray<{ renderSlotKey: number }>,
+	cells: ReadonlyArray<{ renderSlotIndex: number }>,
 ): void {
-	const keys = cells.map((c) => c.renderSlotKey);
+	const keys = cells.map((c) => c.renderSlotIndex);
 	expect(new Set(keys).size).toBe(keys.length);
 }
 
