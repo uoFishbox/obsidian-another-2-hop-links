@@ -177,7 +177,7 @@ describe("linkListVirtualLayout", () => {
 		}
 	});
 
-	it("keeps keys, items, positions, and render slots stable when logical cells are rebuilt for the same items", () => {
+	it("keeps keys, items, and render slots stable when logical cells are rebuilt for the same items", () => {
 		const items = createItems(3);
 
 		const initial = buildCells({ items });
@@ -189,9 +189,6 @@ describe("linkListVirtualLayout", () => {
 		expectKeys(rebuilt.cells).toEqual([itemKey(0), itemKey(1), itemKey(2)]);
 		expect(rebuilt.cells.map((cell) => cell.cell)).toEqual(
 			initial.cells.map((cell) => cell.cell),
-		);
-		expect(rebuilt.cells.map((cell) => cell.position)).toEqual(
-			initial.cells.map((cell) => cell.position),
 		);
 		expect(rebuilt.cells[0]).toBe(initial.cells[0]);
 		expect(rebuilt.cells[1]).toBe(initial.cells[1]);
@@ -270,23 +267,11 @@ describe("linkListVirtualLayout", () => {
 		]);
 		expectUniqueRenderSlots(resized.cells);
 
-		expect(resized.cells[0].position).toEqual({
-			row: 0,
-			column: 0,
-			top: 0,
-			left: 0,
-			width: 120,
-			height: 140,
-		});
-
-		expect(resized.cells[3].position).toEqual({
-			row: 1,
-			column: 0,
-			top: 150,
-			left: 0,
-			width: 120,
-			height: 140,
-		});
+		expect(resized.cellWidth).toBe(120);
+		expect(resized.rowHeight).toBe(140);
+		expect(resized.rowSlices.map((row) => row.top)).toEqual([0, 150]);
+		expect(resized.cells[0].columnIndex).toBe(0);
+		expect(resized.cells[3].columnIndex).toBe(0);
 	});
 
 	it("mounts only cells inside the visible row window", () => {
@@ -304,18 +289,9 @@ describe("linkListVirtualLayout", () => {
 		expectKeys(result.cells).toEqual([itemKey(3), itemKey(4), itemKey(5)]);
 
 		expect(result.cells.map((cell) => cell.cellIndex)).toEqual([3, 4, 5]);
-		expect(result.cells[0].position).toMatchObject({
-			row: 1,
-			column: 0,
-			top: 130,
-			left: 0,
-		});
-		expect(result.cells[1].position).toMatchObject({
-			row: 1,
-			column: 1,
-			top: 130,
-			left: 110,
-		});
+		expect(result.cells[0]).toMatchObject({ rowIndex: 1, columnIndex: 0 });
+		expect(result.cells[1]).toMatchObject({ rowIndex: 1, columnIndex: 1 });
+		expect(result.rowSlices[0].top).toBe(130);
 		expectUniqueRenderSlots(result.cells);
 	});
 

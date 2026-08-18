@@ -57,12 +57,6 @@ export interface MountedVirtualCellsBuild<TMountedCell extends MountedVirtualCel
 	nextRenderSlotIndex: number;
 }
 
-export interface VirtualListReconciliationState<
-	TMountedBuild extends MountedVirtualCellsBuild<MountedVirtualCell>,
-> {
-	mountedBuild: TMountedBuild | null;
-}
-
 export interface VirtualListSnapshot<
 	TCell,
 	TMountedCell extends MountedVirtualCell,
@@ -70,7 +64,7 @@ export interface VirtualListSnapshot<
 > {
 	rowModel: VirtualRowModel<TCell>;
 	ranges: VirtualRanges;
-	mountedCells: readonly TMountedCell[];
+	mountedBuild: TMountedBuild | null;
 	totalHeight: number;
 	mode: MaterializedVirtualListMode;
 }
@@ -81,7 +75,6 @@ export interface VirtualListComputation<
 	TMountedBuild extends MountedVirtualCellsBuild<TMountedCell>,
 > {
 	snapshot: VirtualListSnapshot<TCell, TMountedCell, TMountedBuild>;
-	reconciliationState: VirtualListReconciliationState<TMountedBuild>;
 	measurementKind: VirtualListMeasurementKind;
 }
 
@@ -94,7 +87,6 @@ export interface VirtualListInput<
 	measurement: VirtualListMeasurement;
 	visibilityPolicy: VirtualVisibilityPolicy;
 	previous?: VirtualListSnapshot<TCell, TMountedCell, TMountedBuild> | null;
-	previousState?: VirtualListReconciliationState<TMountedBuild> | null;
 	buildMountedCells(params: {
 		rowModel: VirtualRowModel<TCell>;
 		rowRange: RowRange;
@@ -110,7 +102,6 @@ export interface VirtualListRecomputeInput<
 > {
 	rowModel: VirtualRowModel<TCell>;
 	previous: VirtualListSnapshot<TCell, TMountedCell, TMountedBuild>;
-	previousState?: VirtualListReconciliationState<TMountedBuild> | null;
 	buildMountedCells(params: {
 		rowModel: VirtualRowModel<TCell>;
 		rowRange: RowRange;
@@ -150,7 +141,7 @@ const createSnapshot = <
 	return {
 		rowModel: params.rowModel,
 		ranges: params.ranges,
-		mountedCells: params.mountedBuild.cells,
+		mountedBuild: params.mountedBuild,
 		totalHeight: params.totalHeight,
 		mode: params.mode,
 	};
@@ -258,23 +249,15 @@ export const createEmptyVirtualListComputation = <
 	TMountedBuild extends MountedVirtualCellsBuild<TMountedCell>,
 >(params: {
 	rowModel: VirtualRowModel<TCell>;
-	previous:
-		| VirtualListSnapshot<TCell, TMountedCell, TMountedBuild>
-		| null
-		| undefined;
 	mode: Extract<MaterializedVirtualListMode, { kind: "empty" }>;
 }): VirtualListComputation<TCell, TMountedCell, TMountedBuild> => {
-	const mountedCells: readonly TMountedCell[] = [];
 	return {
 		snapshot: {
 			rowModel: params.rowModel,
 			ranges: EMPTY_VIRTUAL_RANGES,
-			mountedCells,
+			mountedBuild: null,
 			totalHeight: params.rowModel.totalHeight,
 			mode: params.mode,
-		},
-		reconciliationState: {
-			mountedBuild: null,
 		},
 		measurementKind: getMeasurementKindForMode(params.mode),
 	};
@@ -308,7 +291,7 @@ const hasSameMountedCellRowModelRevision = <TCell>(
 	return Object.is(previous.revision, next.revision);
 };
 
-export function computeVirtualListSnapshotWithState<
+export function computeVirtualListSnapshot<
 	TCell,
 	TMountedCell extends MountedVirtualCell,
 	TMountedBuild extends MountedVirtualCellsBuild<TMountedCell>,
@@ -330,12 +313,11 @@ export function computeVirtualListSnapshotWithState<
 		precomputedRanges: input.measurement.precomputedRanges,
 	});
 	const previous = input.previous ?? null;
-	const previousMountedBuild = input.previousState?.mountedBuild ?? null;
+	const previousMountedBuild = previous?.mountedBuild ?? null;
 
 	if (rangesResult.mode.kind === "empty") {
 		return createEmptyVirtualListComputation({
 			rowModel: input.rowModel,
-			previous,
 			mode: rangesResult.mode,
 		});
 	}
@@ -352,25 +334,20 @@ export function computeVirtualListSnapshotWithState<
 			});
 			return {
 				snapshot,
-				reconciliationState: input.previousState ?? {
-					mountedBuild: previousMountedBuild,
-				},
 				measurementKind: getMeasurementKindForMode(rangesResult.mode),
 			};
 		}
 
 		if (previous) {
-			const recomputed = recomputeVirtualListSnapshotWithState({
+			const recomputed = recomputeVirtualListSnapshot({
 				rowModel: input.rowModel,
 				previous,
-				previousState: input.previousState,
 				buildMountedCells: input.buildMountedCells,
 			});
 			return {
 				snapshot: cloneSnapshotWithOverrides(recomputed.snapshot, {
 					mode: rangesResult.mode,
 				}),
-				reconciliationState: recomputed.reconciliationState,
 				measurementKind: getMeasurementKindForMode(rangesResult.mode),
 			};
 		}
@@ -379,12 +356,9 @@ export function computeVirtualListSnapshotWithState<
 			snapshot: {
 				rowModel: input.rowModel,
 				ranges: EMPTY_VIRTUAL_RANGES,
-				mountedCells: [],
+				mountedBuild: previousMountedBuild,
 				totalHeight: input.rowModel.totalHeight,
 				mode: rangesResult.mode,
-			},
-			reconciliationState: {
-				mountedBuild: previousMountedBuild,
 			},
 			measurementKind: getMeasurementKindForMode(rangesResult.mode),
 		};
@@ -404,7 +378,7 @@ export function computeVirtualListSnapshotWithState<
 		hasSameMountedCellRowModelRevision(previous.rowModel, input.rowModel) &&
 		!rangeChanged &&
 		previous.totalHeight === input.rowModel.totalHeight &&
-		input.previousState?.mountedBuild
+		previous.mountedBuild
 	) {
 		const snapshot = withFastPathReuseSnapshot(previous, {
 			rowModel: input.rowModel,
@@ -412,7 +386,6 @@ export function computeVirtualListSnapshotWithState<
 		});
 		return {
 			snapshot,
-			reconciliationState: input.previousState,
 			measurementKind: getMeasurementKindForMode(rangesResult.mode),
 		};
 	}
@@ -422,17 +395,16 @@ export function computeVirtualListSnapshotWithState<
 		hasSameMountedCellRowModelRevision(previous.rowModel, input.rowModel) &&
 		!mountedRangeChanged &&
 		previous.totalHeight === input.rowModel.totalHeight &&
-		input.previousState?.mountedBuild
+		previous.mountedBuild
 	) {
 		return {
 			snapshot: createSnapshot({
 				rowModel: input.rowModel,
 				ranges: rangesResult.ranges,
-				mountedBuild: input.previousState.mountedBuild,
+				mountedBuild: previous.mountedBuild,
 				totalHeight: input.rowModel.totalHeight,
 				mode: rangesResult.mode,
 			}),
-			reconciliationState: input.previousState,
 			measurementKind: getMeasurementKindForMode(rangesResult.mode),
 		};
 	}
@@ -452,14 +424,11 @@ export function computeVirtualListSnapshotWithState<
 			totalHeight: input.rowModel.totalHeight,
 			mode: rangesResult.mode,
 		}),
-		reconciliationState: {
-			mountedBuild,
-		},
 		measurementKind: getMeasurementKindForMode(rangesResult.mode),
 	};
 }
 
-export function recomputeVirtualListSnapshotWithState<
+export function recomputeVirtualListSnapshot<
 	TCell,
 	TMountedCell extends MountedVirtualCell,
 	TMountedBuild extends MountedVirtualCellsBuild<TMountedCell>,
@@ -469,12 +438,11 @@ export function recomputeVirtualListSnapshotWithState<
 	if (input.rowModel.rowCount <= 0) {
 		return createEmptyVirtualListComputation({
 			rowModel: input.rowModel,
-			previous: input.previous,
 			mode: { kind: "empty", reason: "no-rows" },
 		});
 	}
 
-	const previousMountedBuild = input.previousState?.mountedBuild ?? null;
+	const previousMountedBuild = input.previous.mountedBuild;
 	const ranges = clampVirtualRanges(input.previous.ranges, input.rowModel.rowCount);
 	if (
 		previousMountedBuild &&
@@ -489,9 +457,6 @@ export function recomputeVirtualListSnapshotWithState<
 				totalHeight: input.rowModel.totalHeight,
 				mode: input.previous.mode,
 			}),
-			reconciliationState: input.previousState ?? {
-				mountedBuild: previousMountedBuild,
-			},
 			measurementKind: getMeasurementKindForMode(input.previous.mode),
 		};
 	}
@@ -510,9 +475,6 @@ export function recomputeVirtualListSnapshotWithState<
 			totalHeight: input.rowModel.totalHeight,
 			mode: input.previous.mode,
 		}),
-		reconciliationState: {
-			mountedBuild,
-		},
 		measurementKind: getMeasurementKindForMode(input.previous.mode),
 	};
 }

@@ -170,10 +170,7 @@ export function useTwoHopVirtualList(
 	});
 
 	function getMountedRows(): readonly MountedTwoHopRow[] {
-		return (
-			virtualList.getReconciliationState().mountedBuild?.rowsBySlot ??
-			EMPTY_MOUNTED_ROWS
-		);
+		return virtualList.getMountedBuild()?.rowsBySlot ?? EMPTY_MOUNTED_ROWS;
 	}
 
 	function publishPreviewBindings(): void {

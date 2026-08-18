@@ -83,9 +83,7 @@ describe("useVirtualList", () => {
 
 		expect(virtualList.getSnapshot()).toBeNull();
 		expect(virtualList.getMountedCells()).toEqual([]);
-		expect(virtualList.getReconciliationState()).toEqual({
-			mountedBuild: null,
-		});
+		expect(virtualList.getMountedBuild()).toBeNull();
 	});
 
 	it("bootstraps mounted rows without publishing preview-visible rows", () => {
@@ -135,10 +133,10 @@ describe("useVirtualList", () => {
 		});
 		expect(snapshot?.ranges.mounted).toEqual({ start: 0, end: 3 });
 		expect(snapshot?.mode.kind).toBe("stable");
-		expect(virtualList.getMountedCells()).toBe(snapshot?.mountedCells);
+		expect(virtualList.getMountedCells()).toBe(snapshot?.mountedBuild?.cells);
 		expect(virtualList.getTotalHeight(123)).toBe(snapshot?.totalHeight);
 		expect(
-			snapshot?.mountedCells.every(
+			snapshot?.mountedBuild?.cells.every(
 				(cell) => !Object.prototype.hasOwnProperty.call(cell, "visibility"),
 			),
 		).toBe(true);
@@ -196,7 +194,9 @@ describe("useVirtualList", () => {
 
 		expect(initialResult.updateKind).toBe("recomputed");
 		expect(reusedResult.updateKind).toBe("reused");
-		expect(virtualList.getSnapshot()?.mountedCells).toBe(initial?.mountedCells);
+		expect(virtualList.getSnapshot()?.mountedBuild?.cells).toBe(
+			initial?.mountedBuild?.cells,
+		);
 		expect(buildMountedCells).toHaveBeenCalledTimes(1);
 	});
 
@@ -229,15 +229,17 @@ describe("useVirtualList", () => {
 		virtualList.recompute({ rowModel: updatedRowModel });
 
 		const updated = virtualList.getSnapshot();
-		const first = updated?.mountedCells[0];
-		expect(first?.renderSlotIndex).toBe(initial?.mountedCells[0]?.renderSlotIndex);
+		const first = updated?.mountedBuild?.cells[0];
+		expect(first?.renderSlotIndex).toBe(
+			initial?.mountedBuild?.cells[0]?.renderSlotIndex,
+		);
 		expect(first?.cell.kind).toBe("item");
 		if (!first || first.cell.kind !== "item") {
 			return;
 		}
 		expect(first.cell.item.label).toBe("Updated 0");
 		expect(first.cell.item).not.toBe(
-			(initial?.mountedCells[0]?.cell as typeof first.cell).item,
+			(initial?.mountedBuild?.cells[0]?.cell as typeof first.cell).item,
 		);
 	});
 
@@ -271,16 +273,8 @@ describe("useVirtualList", () => {
 		virtualList.recompute({ rowModel: updatedRowModel });
 
 		expect(onSnapshotUpdated).toHaveBeenCalledTimes(2);
-		expect(onSnapshotUpdated).toHaveBeenNthCalledWith(
-			1,
-			measured,
-			expect.objectContaining({ mountedBuild: expect.any(Object) }),
-		);
-		expect(onSnapshotUpdated).toHaveBeenNthCalledWith(
-			2,
-			virtualList.getSnapshot(),
-			expect.objectContaining({ mountedBuild: expect.any(Object) }),
-		);
+		expect(onSnapshotUpdated).toHaveBeenNthCalledWith(1, measured);
+		expect(onSnapshotUpdated).toHaveBeenNthCalledWith(2, virtualList.getSnapshot());
 	});
 
 	it("does not notify consumers when measurement reuses cells and snapshot identity is preserved", () => {
@@ -307,65 +301,10 @@ describe("useVirtualList", () => {
 			hasStableVisibleRange: true,
 		});
 
-		expect(virtualList.getSnapshot()?.mountedCells).toBe(initial?.mountedCells);
+		expect(virtualList.getSnapshot()?.mountedBuild?.cells).toBe(
+			initial?.mountedBuild?.cells,
+		);
 		expect(onSnapshotUpdated).toHaveBeenCalledTimes(1);
-	});
-
-	it("publishes mounted builds and preview ranges through independent callbacks", () => {
-		const rowModel = createRowModel(30);
-		const onMountedBuildChanged = vi.fn();
-		const onPreviewRangeChanged = vi.fn();
-		const onModeChanged = vi.fn();
-		const virtualList = useVirtualList<
-			VirtualListLogicalCell<TestItem>,
-			FlatLinkRowModel<TestItem>,
-			MountedVirtualGridCell<TestItem>,
-			MountedVirtualGridCellsBuildResult<TestItem>
-		>({
-			buildMountedCells: buildMountedVirtualGridCellsFromRowModel,
-			onMountedBuildChanged,
-			onPreviewRangeChanged,
-			onModeChanged,
-		});
-		const measurement = {
-			rowModel,
-			scrollTop: 0,
-			viewportHeight: 100,
-			sectionTop: 0,
-			isStableMeasurement: true,
-			hasStableVisibleRange: false,
-			isScrollActive: true,
-			visibilityPolicy: {
-				bootstrapRows: 3,
-				mountedOverscanPx: 500,
-				previewActivationAheadRows: 0,
-			},
-			precomputedRanges: {
-				mounted: { start: 0, end: 7 },
-				previewVisible: { start: 0, end: 1 },
-			},
-		};
-
-		virtualList.applyMeasurement(measurement);
-		const initialBuild = virtualList.getReconciliationState().mountedBuild;
-		onMountedBuildChanged.mockClear();
-		onPreviewRangeChanged.mockClear();
-		onModeChanged.mockClear();
-
-		virtualList.applyMeasurement({
-			...measurement,
-			scrollTop: 100,
-			hasStableVisibleRange: true,
-			precomputedRanges: {
-				mounted: { start: 0, end: 7 },
-				previewVisible: { start: 1, end: 2 },
-			},
-		});
-
-		expect(virtualList.getReconciliationState().mountedBuild).toBe(initialBuild);
-		expect(onMountedBuildChanged).not.toHaveBeenCalled();
-		expect(onPreviewRangeChanged).toHaveBeenCalledTimes(1);
-		expect(onModeChanged).not.toHaveBeenCalled();
 	});
 
 	it("returns skipped and publishes skipped mode when unstable measurement keeps the same content", () => {
@@ -400,7 +339,9 @@ describe("useVirtualList", () => {
 			updateKind: "skipped",
 		});
 		expect(virtualList.getSnapshot()).not.toBe(initial);
-		expect(virtualList.getSnapshot()?.mountedCells).toBe(initial?.mountedCells);
+		expect(virtualList.getSnapshot()?.mountedBuild?.cells).toBe(
+			initial?.mountedBuild?.cells,
+		);
 		expect(virtualList.getSnapshot()?.mode.kind).toBe("skipped");
 		expect(onSnapshotUpdated).toHaveBeenCalledTimes(2);
 	});
@@ -432,8 +373,8 @@ describe("useVirtualList", () => {
 			reason: "no-renderable-content",
 		});
 		expect(virtualList.getMountedCells()).toEqual([]);
-		expect(virtualList.getSnapshot()?.mountedCells).toEqual([]);
-		expect(virtualList.getReconciliationState().mountedBuild).toBeNull();
+		expect(virtualList.getSnapshot()?.mountedBuild).toBeNull();
+		expect(virtualList.getMountedBuild()).toBeNull();
 		expect(onSnapshotUpdated).toHaveBeenCalledTimes(2);
 	});
 

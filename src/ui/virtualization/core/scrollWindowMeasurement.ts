@@ -2,11 +2,27 @@ import type { RowRange } from "../rowRange";
 import type { VirtualRanges } from "../types";
 import type { VirtualVisibilityPolicy } from "./virtualListEngine";
 import { recordCCLDevMeasurement } from "infrastructure/debug/CCLDevMeasurements";
-import type {
-	MountedScrollWindowMeasurement,
-	RangedScrollWindowMeasurement,
-	StableScrollTopBand,
-} from "./scrollWindowGate";
+export type ScrollWindowIdentity = object | string | number | symbol;
+
+export interface StableScrollTopBand {
+	readonly min: number;
+	readonly max: number;
+}
+
+export interface MountedScrollWindowMeasurement {
+	identity: ScrollWindowIdentity;
+	mounted: RowRange;
+	stableMountedScrollTopBand?: StableScrollTopBand;
+	/** Open interval in which resident mounted rows cover the required range. */
+	mountedCoverageScrollTopBand?: StableScrollTopBand;
+}
+
+export interface RangedScrollWindowMeasurement {
+	identity: ScrollWindowIdentity;
+	ranges: VirtualRanges;
+	/** Open interval in which published preview rows cover the strict viewport. */
+	previewCoverageScrollTopBand?: StableScrollTopBand;
+}
 
 type StableScrollTopBandMutable = {
 	-readonly [K in keyof StableScrollTopBand]: StableScrollTopBand[K];

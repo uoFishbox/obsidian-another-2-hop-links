@@ -1,6 +1,9 @@
 import { markVirtualScrollMeasurementRun } from "ui/virtualization/scheduling/virtualScrollMeasurementFrame";
 import { recordCCLDevMeasurement } from "infrastructure/debug/CCLDevMeasurements";
-import type { VirtualListSharedScrollMetrics } from "./virtualListDomObserver";
+import type {
+	ScrollMeasurementRange,
+	VirtualListSharedScrollMetrics,
+} from "./virtualListDomObserver";
 import {
 	observeVirtualListViewport,
 	type VirtualListViewportObservation,
@@ -17,7 +20,6 @@ import { createVirtualListMeasurementScheduler } from "./virtualListMeasurementS
 import type { VirtualListMeasurementStateHandle } from "./virtualListMeasurementState";
 import { getOptionalOwnerWindow } from "ui/shared/dom/realmSafeDom";
 import type { VirtualFrameCoordinator } from "ui/virtualization/scheduling/frameCoordinator";
-import type { ScrollMeasurementRange } from "../core/scrollWindowGate";
 
 export type VirtualMeasurementSource = "layout" | "scroll";
 

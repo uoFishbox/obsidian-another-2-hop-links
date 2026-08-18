@@ -298,9 +298,9 @@ export function useFlatVirtualGridList<T>(
 		onStableVisibleRange: () => {
 			measurement.hasStableVisibleRange = true;
 		},
-		onSnapshotUpdated: (snapshot, reconciliationState) => {
+		onSnapshotUpdated: (snapshot) => {
 			syncCardSlots(
-				reconciliationState.mountedBuild?.rowSlices ?? EMPTY_MOUNTED_ROWS,
+				snapshot.mountedBuild?.rowSlices ?? EMPTY_MOUNTED_ROWS,
 				snapshot.ranges.previewVisible,
 			);
 		},
@@ -310,8 +310,7 @@ export function useFlatVirtualGridList<T>(
 		virtualList.getMountedCells(),
 	);
 	const mountedRows = $derived.by<readonly MountedVirtualGridRowSlice<T>[]>(() => {
-		const rowsBySlot =
-			virtualList.getReconciliationState().mountedBuild?.rowsBySlot;
+		const rowsBySlot = virtualList.getMountedBuild()?.rowsBySlot;
 		return rowsBySlot && rowsBySlot.length > 0 ? rowsBySlot : EMPTY_MOUNTED_ROWS;
 	});
 	const virtualListController = createVirtualListControllerAdapter<
@@ -445,9 +444,7 @@ export function useFlatVirtualGridList<T>(
 		void props.resolveItemInteractionDescriptor;
 		const snapshot = virtualList.getSnapshot();
 		if (!snapshot) return;
-		const rows =
-			virtualList.getReconciliationState().mountedBuild?.rowSlices ??
-			EMPTY_MOUNTED_ROWS;
+		const rows = virtualList.getMountedBuild()?.rowSlices ?? EMPTY_MOUNTED_ROWS;
 		syncCardSlots(rows, snapshot.ranges.previewVisible);
 	});
 
@@ -624,8 +621,7 @@ export function useFlatVirtualGridList<T>(
 			return mountedRows;
 		},
 		get cellBindingTopologyRevision() {
-			return virtualList.getReconciliationState().mountedBuild
-				?.bindingTopologyRevision;
+			return virtualList.getMountedBuild()?.bindingTopologyRevision;
 		},
 		get observerRoot() {
 			return measurement.scrollContainerEl;

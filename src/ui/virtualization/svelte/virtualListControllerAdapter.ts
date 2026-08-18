@@ -1,19 +1,13 @@
 import { CARD_VIRTUAL_LIST_MAX_UNSTABLE_MEASUREMENT_RETRIES } from "../cardVirtualListPolicy";
 import {
 	createVirtualScrollWindowRangeResolver,
-	type VirtualScrollWindowRangeRowModel,
-} from "../core/scrollWindowMeasurement";
-
-import {
-	createMountedScrollWindow,
-	updateMountedScrollWindow,
-	type LastMountedScrollWindow,
 	type MountedScrollWindowMeasurement,
 	type RangedScrollWindowMeasurement,
-	type ScrollMeasurementRange,
 	type StableScrollTopBand,
-} from "../core/scrollWindowGate";
+	type VirtualScrollWindowRangeRowModel,
+} from "../core/scrollWindowMeasurement";
 import type { VirtualVisibilityPolicy } from "../core/virtualListEngine";
+import type { ScrollMeasurementRange } from "../dom/virtualListDomObserver";
 import type { MeasurementUpdateResult } from "../dom/virtualListMeasurementAdapter";
 import type { VirtualListMeasurementStateHandle } from "../dom/virtualListMeasurementState";
 import {
@@ -123,7 +117,8 @@ export function createVirtualListControllerAdapter<
 		resolveVisibilityPolicy,
 		resolveStableMountedScrollTopBand: true,
 	});
-	let lastMountedScrollWindow: LastMountedScrollWindow | null = null;
+	let coverageScrollTopMin = Number.POSITIVE_INFINITY;
+	let coverageScrollTopMax = Number.NEGATIVE_INFINITY;
 	const scrollMeasurementRange: {
 		-readonly [K in keyof ScrollMeasurementRange]: ScrollMeasurementRange[K];
 	} = {
@@ -163,8 +158,13 @@ export function createVirtualListControllerAdapter<
 		);
 	}
 
+	function setLastScrollWindow(coverageBand?: StableScrollTopBand): void {
+		coverageScrollTopMin = coverageBand?.min ?? Number.POSITIVE_INFINITY;
+		coverageScrollTopMax = coverageBand?.max ?? Number.NEGATIVE_INFINITY;
+	}
+
 	function resetLastScrollWindow(): void {
-		lastMountedScrollWindow = null;
+		setLastScrollWindow();
 	}
 
 	function resolvePublishedCoverageBand(
@@ -196,20 +196,12 @@ export function createVirtualListControllerAdapter<
 	}
 
 	function getScrollMeasurementRange(): ScrollMeasurementRange | null {
-		if (
-			!lastMountedScrollWindow ||
-			!(
-				lastMountedScrollWindow.coverageScrollTopMin <
-				lastMountedScrollWindow.coverageScrollTopMax
-			)
-		) {
+		if (!(coverageScrollTopMin < coverageScrollTopMax)) {
 			return null;
 		}
 
-		scrollMeasurementRange.minScrollTopBeforeMeasurement =
-			lastMountedScrollWindow.coverageScrollTopMin;
-		scrollMeasurementRange.maxScrollTopBeforeMeasurement =
-			lastMountedScrollWindow.coverageScrollTopMax;
+		scrollMeasurementRange.minScrollTopBeforeMeasurement = coverageScrollTopMin;
+		scrollMeasurementRange.maxScrollTopBeforeMeasurement = coverageScrollTopMax;
 		return scrollMeasurementRange;
 	}
 
@@ -231,7 +223,7 @@ export function createVirtualListControllerAdapter<
 			context,
 			mountedMeasurement.mounted,
 		);
-		lastMountedScrollWindow = createMountedScrollWindow(
+		setLastScrollWindow(
 			resolvePublishedCoverageBand(mountedMeasurement, rangedMeasurement),
 		);
 	}
@@ -287,22 +279,19 @@ export function createVirtualListControllerAdapter<
 				resetLastScrollWindow();
 				return "unstable";
 			}
-			lastMountedScrollWindow = pendingMountedMeasurement
-				? createMountedScrollWindow(
-						pendingRangedMeasurement
-							? resolvePublishedCoverageBand(
-									pendingMountedMeasurement,
-									pendingRangedMeasurement,
-								)
-							: undefined,
-					)
-				: null;
+			setLastScrollWindow(
+				pendingMountedMeasurement && pendingRangedMeasurement
+					? resolvePublishedCoverageBand(
+							pendingMountedMeasurement,
+							pendingRangedMeasurement,
+						)
+					: undefined,
+			);
 			return "unstable";
 		}
 
 		if (pendingMountedMeasurement) {
-			lastMountedScrollWindow = updateMountedScrollWindow(
-				lastMountedScrollWindow,
+			setLastScrollWindow(
 				pendingRangedMeasurement
 					? resolvePublishedCoverageBand(
 							pendingMountedMeasurement,

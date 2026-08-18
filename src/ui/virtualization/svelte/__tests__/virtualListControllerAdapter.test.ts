@@ -1,9 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { VirtualScrollWindowRangeRowModel } from "../../core/scrollWindowMeasurement";
-import type {
-	ScrollMeasurementRange,
-	StableScrollTopBand,
-} from "../../core/scrollWindowGate";
+import type { StableScrollTopBand } from "../../core/scrollWindowMeasurement";
+import type { ScrollMeasurementRange } from "../../dom/virtualListDomObserver";
 import type { VirtualVisibilityPolicy } from "../../core/virtualListEngine";
 import type { MeasurementUpdateResult } from "../../dom/virtualListMeasurementAdapter";
 import type {

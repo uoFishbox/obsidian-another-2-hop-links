@@ -16,8 +16,7 @@ import {
 	type FlatLinkRowModel,
 } from "../../row-models/flatLinkRowModel";
 import {
-	computeVirtualListSnapshotWithState,
-	type VirtualListReconciliationState,
+	computeVirtualListSnapshot,
 	type VirtualListSnapshot,
 } from "../virtualListEngine";
 
@@ -25,9 +24,6 @@ type TestItem = { id: string };
 type TestSnapshot = VirtualListSnapshot<
 	VirtualListLogicalCell<TestItem>,
 	MountedVirtualGridCell<TestItem>,
-	MountedVirtualGridCellsBuildResult<TestItem>
->;
-type TestReconciliationState = VirtualListReconciliationState<
 	MountedVirtualGridCellsBuildResult<TestItem>
 >;
 
@@ -72,14 +68,13 @@ const createRowModel = (cardCount: number): FlatLinkRowModel<TestItem> => {
 const measureWorkload = (cardCount: number) => {
 	const rowModel = createRowModel(cardCount);
 	let previous: TestSnapshot | null = null;
-	let previousState: TestReconciliationState | null = null;
 	let mountedCellBuilds = 0;
 	let fastPathReuses = 0;
 
 	// Count reconciliation builds separately from snapshot computations. Every
 	// replay computes a snapshot, but no-op replays must take the fast path.
 	const applyMeasurement = (): void => {
-		const result = computeVirtualListSnapshotWithState<
+		const result = computeVirtualListSnapshot<
 			VirtualListLogicalCell<TestItem>,
 			MountedVirtualGridCell<TestItem>,
 			MountedVirtualGridCellsBuildResult<TestItem>
@@ -101,7 +96,6 @@ const measureWorkload = (cardCount: number) => {
 				mountedOverscanPx: MOUNTED_OVERSCAN_PX,
 			},
 			previous,
-			previousState,
 			buildMountedCells: ({
 				rowModel: nextRowModel,
 				rowRange,
@@ -120,7 +114,6 @@ const measureWorkload = (cardCount: number) => {
 			fastPathReuses += 1;
 		}
 		previous = result.snapshot;
-		previousState = result.reconciliationState;
 	};
 
 	// Prime the mounted build once, then replay a sustained no-op workload.
@@ -139,11 +132,11 @@ const measureWorkload = (cardCount: number) => {
 		cardCount,
 		viewportRows: getRangeLength(snapshot.ranges.previewVisible),
 		mountedRows: getRangeLength(snapshot.ranges.mounted),
-		mountedCells: snapshot.mountedCells.length,
+		mountedCells: snapshot.mountedBuild?.cells.length ?? 0,
 		mountedCellBuilds,
 		fastPathReuses,
 		uniqueRenderSlots: new Set(
-			snapshot.mountedCells.map((cell) => cell.renderSlotIndex),
+			snapshot.mountedBuild?.cells.map((cell) => cell.renderSlotIndex) ?? [],
 		).size,
 	};
 };

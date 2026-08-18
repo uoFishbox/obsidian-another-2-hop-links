@@ -13,10 +13,9 @@ import {
 	type MountedVirtualGridCellsBuildResult,
 } from "../reconciliation/linkListVirtualLayout";
 import {
-	computeVirtualListSnapshotWithState,
-	recomputeVirtualListSnapshotWithState,
+	computeVirtualListSnapshot,
+	recomputeVirtualListSnapshot,
 	type VirtualListComputation,
-	type VirtualListReconciliationState,
 	type VirtualListSnapshot,
 } from "../virtualListEngine";
 
@@ -29,16 +28,11 @@ type TestSnapshot = VirtualListSnapshot<
 	MountedVirtualGridCell<TestItem>,
 	MountedVirtualGridCellsBuildResult<TestItem>
 >;
-type TestReconciliationState = VirtualListReconciliationState<
-	MountedVirtualGridCellsBuildResult<TestItem>
->;
 type TestComputation = VirtualListComputation<
 	VirtualListLogicalCell<TestItem>,
 	MountedVirtualGridCell<TestItem>,
 	MountedVirtualGridCellsBuildResult<TestItem>
 >;
-
-const stateBySnapshot = new WeakMap<TestSnapshot, TestReconciliationState>();
 
 const createRowModel = (count: number): FlatLinkRowModel<TestItem> => {
 	const items = Array.from({ length: count }, (_, index) => ({
@@ -72,7 +66,7 @@ const compute = (params: {
 	readonly mountedOverscanPx?: number;
 	readonly buildMountedCells?: typeof buildMountedVirtualGridCellsFromRowModel<TestItem>;
 }): TestComputation => {
-	const result = computeVirtualListSnapshotWithState({
+	const result = computeVirtualListSnapshot({
 		rowModel: params.rowModel,
 		measurement: {
 			scrollTop: params.scrollTop ?? 0,
@@ -91,9 +85,6 @@ const compute = (params: {
 			mountedOverscanPx: params.mountedOverscanPx ?? 0,
 		},
 		previous: params.previous,
-		previousState: params.previous
-			? stateBySnapshot.get(params.previous)
-			: undefined,
 		buildMountedCells: ({ rowModel, rowRange, previousBuild }) =>
 			(params.buildMountedCells ?? buildMountedVirtualGridCellsFromRowModel)({
 				rowModel: rowModel as FlatLinkRowModel<TestItem>,
@@ -101,7 +92,6 @@ const compute = (params: {
 				previousBuild,
 			}),
 	});
-	stateBySnapshot.set(result.snapshot, result.reconciliationState);
 	return result;
 };
 
@@ -115,15 +105,16 @@ describe("VirtualListEngine contract", () => {
 			scrollTop: 110,
 		}).snapshot;
 
-		expect(initial.mountedCells.map((cell) => cell.renderSlotIndex)).toEqual([
-			0, 1, 2,
-		]);
-		expect(shifted.mountedCells.map((cell) => cell.renderSlotIndex)).toEqual([
-			0, 1, 2,
-		]);
+		expect(initial.mountedBuild!.cells.map((cell) => cell.renderSlotIndex)).toEqual(
+			[0, 1, 2],
+		);
+		expect(shifted.mountedBuild!.cells.map((cell) => cell.renderSlotIndex)).toEqual(
+			[0, 1, 2],
+		);
 		expect(
-			new Set(shifted.mountedCells.map((cell) => cell.renderSlotIndex)).size,
-		).toBe(shifted.mountedCells.length);
+			new Set(shifted.mountedBuild!.cells.map((cell) => cell.renderSlotIndex))
+				.size,
+		).toBe(shifted.mountedBuild!.cells.length);
 	});
 
 	it("publishes no visibility metadata or mounted-cell key index", () => {
@@ -134,9 +125,9 @@ describe("VirtualListEngine contract", () => {
 
 		expect(snapshot.ranges.mounted).toEqual({ start: 0, end: 3 });
 		expect("mountedCellsByKey" in snapshot).toBe(false);
-		expect("mountedBuild" in snapshot).toBe(false);
+		expect(snapshot.mountedBuild).not.toBeNull();
 		expect(
-			snapshot.mountedCells.every(
+			snapshot.mountedBuild!.cells.every(
 				(cell) => !Object.prototype.hasOwnProperty.call(cell, "visibility"),
 			),
 		).toBe(true);
@@ -168,9 +159,8 @@ describe("VirtualListEngine contract", () => {
 		expect(buildMountedCells).toHaveBeenCalledTimes(1);
 		expect(nextResult.snapshot).not.toBe(initialResult.snapshot);
 		expect(nextResult.snapshot.ranges.previewVisible).toEqual({ start: 1, end: 2 });
-		expect(nextResult.reconciliationState).toBe(initialResult.reconciliationState);
-		expect(nextResult.snapshot.mountedCells).toBe(
-			initialResult.snapshot.mountedCells,
+		expect(nextResult.snapshot.mountedBuild!.cells).toBe(
+			initialResult.snapshot.mountedBuild!.cells,
 		);
 	});
 
@@ -210,7 +200,7 @@ describe("VirtualListEngine contract", () => {
 		}).snapshot;
 
 		expect(buildMountedCells).toHaveBeenCalledTimes(2);
-		expect(shifted.mountedCells).not.toBe(initial.mountedCells);
+		expect(shifted.mountedBuild!.cells).not.toBe(initial.mountedBuild!.cells);
 	});
 
 	it("recompute reuses mounted cells when mounted dependencies are unchanged", () => {
@@ -220,10 +210,9 @@ describe("VirtualListEngine contract", () => {
 			buildMountedVirtualGridCellsFromRowModel<TestItem>,
 		);
 
-		const recomputed = recomputeVirtualListSnapshotWithState({
+		const recomputed = recomputeVirtualListSnapshot({
 			rowModel,
 			previous: initialResult.snapshot,
-			previousState: initialResult.reconciliationState,
 			buildMountedCells: ({ rowModel: nextRowModel, rowRange, previousBuild }) =>
 				buildMountedCells({
 					rowModel: nextRowModel as FlatLinkRowModel<TestItem>,
@@ -233,20 +222,18 @@ describe("VirtualListEngine contract", () => {
 		});
 
 		expect(buildMountedCells).not.toHaveBeenCalled();
-		expect(recomputed.snapshot.mountedCells).toBe(
-			initialResult.snapshot.mountedCells,
+		expect(recomputed.snapshot.mountedBuild!.cells).toBe(
+			initialResult.snapshot.mountedBuild!.cells,
 		);
-		expect(recomputed.reconciliationState).toBe(initialResult.reconciliationState);
 	});
 
 	it("returns an empty snapshot when the row model has no rows", () => {
 		const result = compute({ rowModel: createRowModel(0) });
 
-		expect(result.snapshot.mountedCells).toEqual([]);
+		expect(result.snapshot.mountedBuild).toBeNull();
 		expect(result.snapshot.ranges).toEqual({
 			mounted: { start: 0, end: 0 },
 			previewVisible: { start: 0, end: 0 },
 		});
-		expect(result.reconciliationState.mountedBuild).toBeNull();
 	});
 });

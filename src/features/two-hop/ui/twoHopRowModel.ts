@@ -1,5 +1,5 @@
 import type { TwoHopSectionModel } from "features/two-hop/ui/twoHopSectionModel";
-import type { StableScrollTopBand } from "ui/virtualization/core/scrollWindowGate";
+import type { StableScrollTopBand } from "ui/virtualization/core/scrollWindowMeasurement";
 import {
 	createVirtualListLayoutRevisionToken,
 	createVirtualListRevision,
