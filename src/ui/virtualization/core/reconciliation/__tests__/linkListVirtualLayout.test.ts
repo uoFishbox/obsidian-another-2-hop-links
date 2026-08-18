@@ -33,7 +33,8 @@ function createItems(count: number): TestItem[] {
 }
 
 function itemKey(index: number): string {
-	return `item-${index}::item:${index}`;
+	const itemId = `item-${index}`;
+	return `flat:9:section-0:item:${itemId.length}:${itemId}`;
 }
 
 function createLogicalCellSource(params: {
@@ -41,7 +42,7 @@ function createLogicalCellSource(params: {
 	items: TestItem[];
 	visibleCount: number;
 	showLoadMore: boolean;
-	getKey: (item: TestItem, index: number) => string;
+	getItemId: (item: TestItem, index: number) => string;
 	sectionId: string;
 	getItemRenderRevision?: (
 		item: TestItem,
@@ -51,7 +52,7 @@ function createLogicalCellSource(params: {
 	return createFlatLogicalCellSource({
 		header: params.header,
 		items: params.items,
-		getKey: params.getKey,
+		getItemId: params.getItemId,
 		getItemRenderRevision: params.getItemRenderRevision,
 		visibleCount: params.visibleCount,
 		showLoadMore: params.showLoadMore,
@@ -100,7 +101,7 @@ function buildCells(params: {
 		items: params.items,
 		visibleCount: params.items.length,
 		showLoadMore: false,
-		getKey: (item) => item.id,
+		getItemId: (item) => item.id,
 		sectionId: "section-0",
 		getItemRenderRevision: params.getItemRenderRevision,
 	});
@@ -185,11 +186,7 @@ describe("linkListVirtualLayout", () => {
 			previousBuild: initial,
 		});
 
-		expectKeys(rebuilt.cells).toEqual([
-			"item-0::item:0",
-			"item-1::item:1",
-			"item-2::item:2",
-		]);
+		expectKeys(rebuilt.cells).toEqual([itemKey(0), itemKey(1), itemKey(2)]);
 		expect(rebuilt.cells.map((cell) => cell.cell)).toEqual(
 			initial.cells.map((cell) => cell.cell),
 		);
@@ -200,11 +197,7 @@ describe("linkListVirtualLayout", () => {
 		expect(rebuilt.cells[1]).toBe(initial.cells[1]);
 		expect(rebuilt.cells[2]).toBe(initial.cells[2]);
 
-		expectSameSlotsForKeys(initial, rebuilt, [
-			"item-0::item:0",
-			"item-1::item:1",
-			"item-2::item:2",
-		]);
+		expectSameSlotsForKeys(initial, rebuilt, [itemKey(0), itemKey(1), itemKey(2)]);
 		expectUniqueRenderSlots(rebuilt.cells);
 	});
 
@@ -221,11 +214,7 @@ describe("linkListVirtualLayout", () => {
 			previousBuild: initial,
 		});
 
-		expectKeys(updated.cells).toEqual([
-			"item-0::item:0",
-			"item-1::item:1",
-			"item-2::item:2",
-		]);
+		expectKeys(updated.cells).toEqual([itemKey(0), itemKey(1), itemKey(2)]);
 
 		const first = updated.cells[0];
 		expect(first.cell.kind).toBe("item");
@@ -238,11 +227,7 @@ describe("linkListVirtualLayout", () => {
 		expect(first.cell.item).not.toBe(initialItems[0]);
 		expect(first.cell.item.label).toBe("Updated 0");
 
-		expectSameSlotsForKeys(initial, updated, [
-			"item-0::item:0",
-			"item-1::item:1",
-			"item-2::item:2",
-		]);
+		expectSameSlotsForKeys(initial, updated, [itemKey(0), itemKey(1), itemKey(2)]);
 		expectUniqueRenderSlots(updated.cells);
 	});
 
@@ -394,7 +379,7 @@ describe("linkListVirtualLayout", () => {
 			items,
 			visibleCount: items.length,
 			showLoadMore: false,
-			getKey: (item) => item.id,
+			getItemId: (item) => item.id,
 			sectionId: "section-0",
 		});
 		const rowModel = createRowModel({
@@ -495,7 +480,7 @@ describe("linkListVirtualLayout", () => {
 				renderRevisionFallbackPolicy: "required",
 			}),
 		).toThrow(
-			'Missing item render revision for sourceKey="item-0" cellKey="item-0::item:0".',
+			`Missing item render revision for sourceKey="item-0" cellKey="${itemKey(0)}".`,
 		);
 	});
 

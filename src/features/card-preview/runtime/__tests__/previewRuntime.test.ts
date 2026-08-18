@@ -14,9 +14,7 @@ vi.mock("features/card-preview/scheduling/virtualPreviewSurface", () => ({
 		state.surfaceOptions.push(options);
 		return {
 			registerHost: () => ({ dispose: () => {} }),
-			beginBindings: () => {},
-			bindSlot: () => {},
-			endBindings: () => {},
+			syncBindings: () => {},
 			setActiveRange: () => {},
 			dispose: () => {},
 		};
@@ -98,8 +96,7 @@ describe("PreviewRuntime", () => {
 		expect(state.surfaceOptions).toHaveLength(0);
 		expect(state.rendererOptions).toHaveLength(0);
 		expect(() => {
-			surface.beginBindings();
-			surface.endBindings();
+			surface.syncBindings([]);
 			surface.setActiveRange(0, 0, false);
 		}).not.toThrow();
 	});

@@ -4,7 +4,6 @@ import { vi } from "vitest";
 export interface TestPreviewBinding {
 	readonly slotId: string;
 	readonly rowIndex: number;
-	readonly ownerKey: string;
 	readonly request: CardPreviewRequest;
 }
 
@@ -22,7 +21,6 @@ export function createPreviewSurfaceProbe(
 ) {
 	const publish = vi.fn<(frame: PreviewFrame) => void>();
 	let bindings = new Map<string, TestPreviewBinding>();
-	let stagedBindings: Map<string, TestPreviewBinding> | undefined;
 	let bindingsChanged = false;
 	let initialized = false;
 	let rangeStart = 0;
@@ -37,16 +35,13 @@ export function createPreviewSurfaceProbe(
 				readonly activeRange: { readonly start: number; readonly end: number };
 				readonly bindings: readonly TestPreviewBinding[];
 			}): void => {
-				surface.beginBindings();
-				for (const binding of frame.bindings) {
-					surface.bindSlot(
-						binding.slotId,
-						binding.rowIndex,
-						binding.ownerKey,
-						binding.request,
-					);
-				}
-				surface.endBindings();
+				surface.syncBindings(
+					frame.bindings.map((binding) => ({
+						key: binding.slotId,
+						rowIndex: binding.rowIndex,
+						request: binding.request,
+					})),
+				);
 				surface.setActiveRange(
 					frame.activeRange.start,
 					frame.activeRange.end,
@@ -54,40 +49,39 @@ export function createPreviewSurfaceProbe(
 				);
 			},
 		),
-		beginBindings: vi.fn(() => {
-			stagedBindings = new Map();
-		}),
-		bindSlot: vi.fn(
+		syncBindings: vi.fn(
 			(
-				slotId: string,
-				rowIndex: number,
-				ownerKey: string,
-				request: CardPreviewRequest,
+				next: readonly {
+					readonly key: string;
+					readonly rowIndex: number;
+					readonly request: CardPreviewRequest;
+				}[],
 			): void => {
-				if (!stagedBindings) return;
-				const previous = bindings.get(slotId);
-				const binding =
-					previous?.rowIndex === rowIndex &&
-					previous.ownerKey === ownerKey &&
-					previous.request.renderKey === request.renderKey
-						? previous
-						: { slotId, rowIndex, ownerKey, request };
-				stagedBindings.set(slotId, binding);
+				const nextBindings = new Map<string, TestPreviewBinding>();
+				for (const binding of next) {
+					const previous = bindings.get(binding.key);
+					const value =
+						previous?.rowIndex === binding.rowIndex &&
+						previous.request.renderKey === binding.request.renderKey
+							? previous
+							: {
+									slotId: binding.key,
+									rowIndex: binding.rowIndex,
+									request: binding.request,
+								};
+					nextBindings.set(binding.key, value);
+				}
+				const sameBindings =
+					nextBindings.size === bindings.size &&
+					[...nextBindings].every(
+						([key, binding]) => bindings.get(key) === binding,
+					);
+				if (!sameBindings) {
+					bindings = nextBindings;
+					bindingsChanged = true;
+				}
 			},
 		),
-		endBindings: vi.fn(() => {
-			if (!stagedBindings) return;
-			const sameBindings =
-				stagedBindings.size === bindings.size &&
-				[...stagedBindings].every(
-					([slotId, binding]) => bindings.get(slotId) === binding,
-				);
-			if (!sameBindings) {
-				bindings = stagedBindings;
-				bindingsChanged = true;
-			}
-			stagedBindings = undefined;
-		}),
 		setActiveRange: vi.fn(
 			(start: number, end: number, nextActive: boolean): void => {
 				const rangeChanged =

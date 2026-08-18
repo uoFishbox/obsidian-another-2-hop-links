@@ -3,23 +3,23 @@ import type { PreviewHostLease } from "features/card-preview/scheduling/virtualP
 import { getVirtualPreviewSurface } from "features/card-preview/ui/virtualPreviewSurfaceContext";
 
 /**
- * Registers the bound element as a preview host on the virtual preview surface.
+ * Registers the bound element as the host for one logical card preview.
  *
- * Avoids a Svelte component boundary for each virtualized preview host. The
- * host element is registered on
- * mount, re-registered only when the slot ID changes, and released on destroy.
+ * The action follows the logical preview key rather than a physical virtual
+ * slot, so a card can move between reused DOM cells without changing preview
+ * identity.
  */
-export function previewHost(node: HTMLElement, slotId: string): ActionReturn<string> {
+export function previewHost(node: HTMLElement, key: string): ActionReturn<string> {
 	const surface = getVirtualPreviewSurface();
-	let currentSlotId = slotId;
-	let lease: PreviewHostLease = surface.registerHost(currentSlotId, node);
+	let currentKey = key;
+	let lease: PreviewHostLease = surface.registerHost(currentKey, node);
 
 	return {
-		update(nextSlotId: string): void {
-			if (nextSlotId === currentSlotId) return;
+		update(nextKey: string): void {
+			if (nextKey === currentKey) return;
 			lease.dispose();
-			currentSlotId = nextSlotId;
-			lease = surface.registerHost(currentSlotId, node);
+			currentKey = nextKey;
+			lease = surface.registerHost(currentKey, node);
 		},
 		destroy(): void {
 			lease.dispose();

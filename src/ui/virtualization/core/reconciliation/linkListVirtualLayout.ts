@@ -82,6 +82,12 @@ export interface MountedVirtualGridCellsBuildResult<T> {
 	readonly poolEpoch: number;
 	readonly visibleWindow: VisibleCellWindow;
 	readonly cellSourceRevision: unknown;
+	/**
+	 * Binding-topology revision captured by the same mounted-build commit as
+	 * `rowsBySlot`. Consumers that key physical cell bodies must use this
+	 * committed value rather than the eagerly derived logical-source revision.
+	 */
+	readonly bindingTopologyRevision: unknown;
 	readonly columns: number;
 	readonly cellWidth: number;
 	readonly rowHeight: number;
@@ -463,6 +469,7 @@ function resolveMountedRowSlotAllocation(params: {
 function buildMountedVirtualGridCellsFromCore<T>(params: {
 	cellCount: number;
 	cellSourceRevision: unknown;
+	bindingTopologyRevision: unknown;
 	resolveCellAtIndex: (index: number) => VirtualListLogicalCell<T> | null;
 	visibleWindow: VisibleCellWindow;
 	columns: number;
@@ -651,6 +658,7 @@ function buildMountedVirtualGridCellsFromCore<T>(params: {
 		poolEpoch: slotAllocation.epoch,
 		visibleWindow,
 		cellSourceRevision: params.cellSourceRevision,
+		bindingTopologyRevision: params.bindingTopologyRevision,
 		columns,
 		cellWidth: params.cellWidth,
 		rowHeight: params.rowHeight,
@@ -678,6 +686,7 @@ export function buildMountedVirtualGridCellsFromRowModel<T>(params: {
 	return buildMountedVirtualGridCellsFromCore({
 		cellCount: rowModel.cellCount,
 		cellSourceRevision: rowModel.cellSource.revision,
+		bindingTopologyRevision: rowModel.cellSource.bindingTopologyRevision,
 		resolveCellAtIndex: (index) => rowModel.resolveCellAtIndex(index),
 		visibleWindow: computeVisibleCellWindow({
 			cellCount: rowModel.cellCount,

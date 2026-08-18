@@ -36,7 +36,6 @@
 		resolveSearchMatchPosition,
 	});
 	const slotId = "card-preview-test-slot";
-	const ownerKey = "card-preview-test-owner";
 	let container = $state<HTMLDivElement | undefined>(undefined);
 	const request = $derived(
 		file
@@ -57,9 +56,9 @@
 	});
 
 	$effect(() => {
-		previewSurface.beginBindings();
-		if (request) previewSurface.bindSlot(slotId, 0, ownerKey, request);
-		previewSurface.endBindings();
+		previewSurface.syncBindings(
+			request ? [{ key: slotId, rowIndex: 0, request }] : [],
+		);
 		previewSurface.setActiveRange(
 			0,
 			active && request ? 1 : 0,

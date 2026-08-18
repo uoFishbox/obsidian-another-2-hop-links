@@ -54,7 +54,7 @@ const createRowModel = (cardCount: number): FlatLinkRowModel<TestItem> => {
 		items,
 		visibleCount: items.length,
 		showLoadMore: false,
-		getKey: (item) => item.id,
+		getItemId: (item) => item.id,
 		sectionId: "virtual-list-engine-perf",
 	});
 	const layout = computeVirtualGridLayout({

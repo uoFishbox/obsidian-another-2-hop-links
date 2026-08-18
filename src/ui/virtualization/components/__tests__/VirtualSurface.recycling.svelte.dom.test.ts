@@ -329,4 +329,48 @@ describe("VirtualSurface grid-row recycling", () => {
 			expect(unmountedKeys).toStrictEqual(["A"]);
 		},
 	);
+
+	it("does not render an empty physical slot while its structural revision changes", async () => {
+		const createRow = (binding: TestMountedCell | null): TestMountedRow[] => [
+			{
+				key: 0,
+				rowIndex: 0,
+				top: 0,
+				slotIndex: 0,
+				slotKey: 0,
+				cells: binding ? [binding] : [],
+				cellSlots: createCellSlots([binding]),
+			},
+		];
+		const mountedKeys: string[] = [];
+		const unmountedKeys: string[] = [];
+		const initialCell = createCells(["A"])[0];
+		const { rerender } = render(VirtualSurfaceRecyclingHarness, {
+			props: {
+				mountedRows: createRow(initialCell),
+				contentHeight: 100,
+				rowHeight: 50,
+				remountCellBodyOnKeyChange: false,
+				physicalSlotRevision: 1,
+				onCellMount: (key: string) => mountedKeys.push(key),
+				onCellUnmount: (key: string) => unmountedKeys.push(key),
+			},
+		});
+		await flushFrames();
+		expect(mountedKeys).toStrictEqual(["A"]);
+
+		await rerender({
+			mountedRows: createRow(null),
+			contentHeight: 100,
+			rowHeight: 50,
+			remountCellBodyOnKeyChange: false,
+			physicalSlotRevision: 2,
+			onCellMount: (key: string) => mountedKeys.push(key),
+			onCellUnmount: (key: string) => unmountedKeys.push(key),
+		});
+		await flushFrames();
+
+		expect(mountedKeys).toStrictEqual(["A"]);
+		expect(unmountedKeys).toStrictEqual(["A"]);
+	});
 });

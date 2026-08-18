@@ -54,12 +54,18 @@ export interface CardPreviewRendererOptions {
 export interface PreviewRenderCallbacks {
 	onCommitted(
 		contentType: PreviewData["type"] | undefined,
-		retention: CardPreviewRetention,
+		attachment: CardPreviewAttachment,
 	): void;
 	onError?(): void;
 }
 
-export type CardPreviewRetention = "resident" | "lifecycle-bound";
+/**
+ * Describes whether committed DOM still depends on renderer-owned resources.
+ * `detachable` DOM owns everything it needs and may move between hosts after
+ * renderer cleanup. `host-bound` DOM must keep renderer resources alive until
+ * that DOM is removed or replaced.
+ */
+export type CardPreviewAttachment = "detachable" | "host-bound";
 
 export type CardPreviewRenderer = (
 	container: HTMLElement,
@@ -202,7 +208,7 @@ export function createCardPreviewRenderer(
 								container.replaceChildren(image);
 							}
 							lastAppliedRenderKey = renderKey;
-							callbacks?.onCommitted?.("image", "resident");
+							callbacks?.onCommitted?.("image", "detachable");
 							return true;
 						},
 					});
@@ -229,7 +235,7 @@ export function createCardPreviewRenderer(
 					tempContainer,
 					shouldSyncMathStyles,
 					previewForRender.type,
-					resolvePreviewRetention(previewForRender),
+					resolvePreviewAttachment(previewForRender),
 				);
 				return didReplace;
 			}
@@ -293,7 +299,7 @@ export function createCardPreviewRenderer(
 							mathContainer,
 							true,
 							previewForRender.type,
-							resolvePreviewRetention(previewForRender),
+							resolvePreviewAttachment(previewForRender),
 						)
 					) {
 						options.onMathRenderingChange?.(false);
@@ -341,7 +347,7 @@ export function createCardPreviewRenderer(
 				if (shouldSyncMathStyles) {
 					syncMathJaxStylesForNode(container);
 				}
-				callbacks?.onCommitted?.("text", "resident");
+				callbacks?.onCommitted?.("text", "detachable");
 				return true;
 			},
 		});
@@ -355,7 +361,7 @@ export function createCardPreviewRenderer(
 		source: HTMLElement,
 		shouldSyncMathStyles: boolean,
 		contentType: PreviewData["type"],
-		retention: CardPreviewRetention,
+		attachment: CardPreviewAttachment,
 	): Promise<boolean> {
 		return enqueueCoordinatedDomCommit({
 			targetKey: domCommitScopeKey,
@@ -366,7 +372,7 @@ export function createCardPreviewRenderer(
 				if (shouldSyncMathStyles) {
 					syncMathJaxStylesForNode(container);
 				}
-				callbacks?.onCommitted?.(contentType, retention);
+				callbacks?.onCommitted?.(contentType, attachment);
 				return true;
 			},
 		});
@@ -432,12 +438,12 @@ export function createCardPreviewRenderer(
 	}
 }
 
-function resolvePreviewRetention(preview: PreviewData): CardPreviewRetention {
-	if (preview.type === "dom") return "lifecycle-bound";
+function resolvePreviewAttachment(preview: PreviewData): CardPreviewAttachment {
+	if (preview.type === "dom") return "host-bound";
 	if (preview.type === "text" && !canDetachRenderedTextPreview(preview.content)) {
-		return "lifecycle-bound";
+		return "host-bound";
 	}
-	return "resident";
+	return "detachable";
 }
 
 function renderDetachedTextPreviewFragment(params: {

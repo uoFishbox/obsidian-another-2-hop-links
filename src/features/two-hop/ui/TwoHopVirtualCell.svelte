@@ -16,7 +16,7 @@
 	interface Props {
 		cell: TwoHopVirtualCell;
 		previewHostEnabled: boolean;
-		previewSlotId: string;
+		previewKey: string;
 		registerCardModelConsumer: (
 			logicalKey: string,
 			consumer: (model: CardShellModel | undefined) => void,
@@ -27,7 +27,7 @@
 	let {
 		cell,
 		previewHostEnabled,
-		previewSlotId,
+		previewKey,
 		registerCardModelConsumer,
 		onLoadMore,
 	}: Props = $props();
@@ -136,7 +136,7 @@
 				<UnresolvedPreviewPlaceholder />
 			{:else if model && !getDebugDisableCardDomPreview() && model.targetFile && previewHostEnabled}
 				<div
-					use:previewHost={previewSlotId}
+					use:previewHost={previewKey}
 					class="cosense-card-links__box-preview"
 				></div>
 			{/if}

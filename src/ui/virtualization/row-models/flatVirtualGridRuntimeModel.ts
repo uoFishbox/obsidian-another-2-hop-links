@@ -7,6 +7,13 @@ import type { RenderRevision } from "../renderRevision";
 import { createFlatLinkRowModel, type FlatLinkRowModel } from "./flatLinkRowModel";
 import { resolveVirtualListKeyRevision } from "./virtualListKeyRevision";
 
+interface FlatListBindingTopologyRevision {
+	readonly data: unknown;
+	readonly key: unknown;
+	readonly hasHeader: boolean;
+	readonly sectionId?: string;
+}
+
 interface FlatListContentRevision {
 	readonly data: unknown;
 	readonly key: unknown;
@@ -24,6 +31,10 @@ type FlatGridLayoutMemoKey = readonly [
 	gap: number,
 	rowCount: number,
 ];
+
+interface FlatListBindingTopologyMemoEntry {
+	readonly revision: FlatListBindingTopologyRevision;
+}
 
 interface LogicalCellSourceMemoEntry<T> {
 	readonly revision: FlatListContentRevision;
@@ -71,6 +82,32 @@ function hasSameFlatListContentRevision(
 	);
 }
 
+function createFlatListBindingTopologyRevision(params: {
+	dataRevision: unknown;
+	keyRevision: unknown;
+	hasHeader: boolean;
+	sectionId?: string;
+}): FlatListBindingTopologyRevision {
+	return {
+		data: params.dataRevision,
+		key: params.keyRevision,
+		hasHeader: params.hasHeader,
+		sectionId: params.sectionId,
+	};
+}
+
+function hasSameFlatListBindingTopologyRevision(
+	current: FlatListBindingTopologyRevision,
+	next: FlatListBindingTopologyRevision,
+): boolean {
+	return (
+		Object.is(current.data, next.data) &&
+		Object.is(current.key, next.key) &&
+		current.hasHeader === next.hasHeader &&
+		current.sectionId === next.sectionId
+	);
+}
+
 function createFlatGridLayoutMemoKey(
 	layout: FlatGridLayoutMetrics,
 ): FlatGridLayoutMemoKey {
@@ -93,18 +130,19 @@ function hasSameFlatGridLayoutMemoKey(
 /**
  * Keeps one logical-source memo and one row-model memo per list instance.
  * Callers mutating an items array in place must change itemsRevision. Callers
- * changing key behavior without replacing getKey must change keyRevision.
+ * changing item-id behavior without replacing getItemId must change itemIdRevision.
  */
 export function createFlatVirtualGridRuntimeModel<T>() {
+	let bindingTopologyMemo: FlatListBindingTopologyMemoEntry | null = null;
 	let logicalCellSourceMemo: LogicalCellSourceMemoEntry<T> | null = null;
 	let rowModelMemo: FlatLinkRowModelMemoEntry<T> | null = null;
 
 	return {
 		resolveLogicalCellSource(params: {
 			items: readonly T[];
-			getKey: (item: T, index: number) => string;
+			getItemId: (item: T, index: number) => string;
 			itemsRevision?: unknown;
-			keyRevision?: unknown;
+			itemIdRevision?: unknown;
 			itemRenderRevisionToken?: RenderRevision;
 			getItemRenderRevision?: (
 				item: T,
@@ -115,13 +153,32 @@ export function createFlatVirtualGridRuntimeModel<T>() {
 			showLoadMore: boolean;
 			sectionId?: string;
 		}): FlatLogicalCellSource<T> {
-			const keyRevision = resolveVirtualListKeyRevision({
-				explicitRevision: params.keyRevision,
-				resolver: params.getKey,
+			const itemIdRevision = resolveVirtualListKeyRevision({
+				explicitRevision: params.itemIdRevision,
+				resolver: params.getItemId,
 			});
+			const dataRevision = params.itemsRevision ?? params.items;
+			const nextBindingTopologyRevision = createFlatListBindingTopologyRevision({
+				dataRevision,
+				keyRevision: itemIdRevision,
+				hasHeader: params.hasHeader,
+				sectionId: params.sectionId,
+			});
+			if (
+				!bindingTopologyMemo ||
+				!hasSameFlatListBindingTopologyRevision(
+					bindingTopologyMemo.revision,
+					nextBindingTopologyRevision,
+				)
+			) {
+				bindingTopologyMemo = {
+					revision: nextBindingTopologyRevision,
+				};
+			}
+			const bindingTopologyRevision = bindingTopologyMemo.revision;
 			const revision = createFlatListContentRevision({
-				dataRevision: params.itemsRevision ?? params.items,
-				keyRevision,
+				dataRevision,
+				keyRevision: itemIdRevision,
 				itemRenderRevision:
 					params.itemRenderRevisionToken ?? params.getItemRenderRevision,
 				visibleCount: params.visibleCount,
@@ -137,12 +194,13 @@ export function createFlatVirtualGridRuntimeModel<T>() {
 			const source = createFlatLogicalCellSource({
 				header: params.hasHeader,
 				items: params.items,
-				getKey: params.getKey,
+				getItemId: params.getItemId,
 				getItemRenderRevision: params.getItemRenderRevision,
 				visibleCount: params.visibleCount,
 				showLoadMore: params.showLoadMore,
 				sectionId: params.sectionId,
 				revision,
+				bindingTopologyRevision,
 			});
 			logicalCellSourceMemo = {
 				revision,

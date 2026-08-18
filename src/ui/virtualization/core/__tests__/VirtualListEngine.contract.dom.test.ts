@@ -49,7 +49,7 @@ const createRowModel = (count: number): FlatLinkRowModel<TestItem> => {
 		items,
 		visibleCount: items.length,
 		showLoadMore: false,
-		getKey: (item) => item.id,
+		getItemId: (item) => item.id,
 		sectionId: "engine-contract",
 	});
 	const layout = computeVirtualGridLayout({

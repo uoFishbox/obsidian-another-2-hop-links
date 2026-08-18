@@ -81,7 +81,7 @@ describe("linkListLayout", () => {
 				items: ["A", "B", "C", "D"],
 				visibleCount: 3,
 				showLoadMore: true,
-				getKey: (item) => item,
+				getItemId: (item) => item,
 				sectionId: "demo",
 			});
 			expect(cells[0]?.kind).toBe("header");
@@ -97,27 +97,27 @@ describe("linkListLayout", () => {
 			}
 		});
 
-		it("capping by visibleCount and deduplication of duplicate keys", () => {
+		it("caps by visibleCount and rejects duplicate item ids", () => {
 			const capped = collectCellsFromSource({
 				header: false,
 				items: ["A", "B", "C"],
 				visibleCount: 2,
 				showLoadMore: false,
-				getKey: (item) => item,
+				getItemId: (item) => item,
 				sectionId: "demo",
 			});
 			expect(capped.filter((c) => c.kind === "item").length).toBe(2);
 
-			const withDups = collectCellsFromSource({
-				header: false,
-				items: ["A", "B", "C"],
-				visibleCount: 3,
-				showLoadMore: false,
-				getKey: () => "dup",
-				sectionId: "demo",
-			});
-			const keys = withDups.map((c) => c.key);
-			expect(new Set(keys).size).toBe(keys.length);
+			expect(() =>
+				collectCellsFromSource({
+					header: false,
+					items: ["A", "B", "C"],
+					visibleCount: 3,
+					showLoadMore: false,
+					getItemId: () => "dup",
+					sectionId: "demo",
+				}),
+			).toThrow(/item id must be unique/);
 		});
 
 		it("keeps source keys separate from mounted item keys", () => {
@@ -126,7 +126,7 @@ describe("linkListLayout", () => {
 				items: ["A"],
 				visibleCount: 1,
 				showLoadMore: false,
-				getKey: () => "source-a",
+				getItemId: () => "source-a",
 				sectionId: "demo",
 			});
 			const item = cells[0];
@@ -136,11 +136,11 @@ describe("linkListLayout", () => {
 				return;
 			}
 			expect(item.sourceKey).toBe("source-a");
-			expect(item.key).toBe("source-a::item:0");
+			expect(item.key).toBe("flat:4:demo:item:8:source-a");
 		});
 
 		it("does not prefix scan when resolving key for far index", () => {
-			const getKey = vi.fn((item: string) => item);
+			const getItemId = vi.fn((item: string) => item);
 			const items = Array.from(
 				{ length: 100_000 },
 				(_, index) => `item-${index}`,
@@ -148,17 +148,17 @@ describe("linkListLayout", () => {
 			const source = createFlatLogicalCellSource({
 				header: false,
 				items,
-				getKey,
+				getItemId,
 				visibleCount: items.length,
 				showLoadMore: false,
 				sectionId: "demo",
 			});
 
 			expect(source.resolveLogicalCellKeyAtItemIndex(90_000)).toBe(
-				"item-90000::item:90000",
+				"flat:4:demo:item:10:item-90000",
 			);
-			expect(getKey).toHaveBeenCalledTimes(1);
-			expect(getKey).toHaveBeenCalledWith("item-90000", 90_000);
+			expect(getItemId).toHaveBeenCalledTimes(1);
+			expect(getItemId).toHaveBeenCalledWith("item-90000", 90_000);
 		});
 
 		it("items only without header/load-more", () => {
@@ -167,7 +167,7 @@ describe("linkListLayout", () => {
 				items: ["A", "B"],
 				visibleCount: 2,
 				showLoadMore: false,
-				getKey: (item) => item,
+				getItemId: (item) => item,
 				sectionId: "demo",
 			});
 			expect(cells.length).toBe(2);
@@ -182,7 +182,7 @@ describe("linkListLayout", () => {
 				items: ["A"],
 				visibleCount: 1,
 				showLoadMore: false,
-				getKey: (item) => item,
+				getItemId: (item) => item,
 				sectionId: "demo",
 			});
 			expect(source.resolveCellAtIndex(-1)).toBeNull();
@@ -193,7 +193,7 @@ describe("linkListLayout", () => {
 				items: ["A", "B", "C"],
 				visibleCount: 2,
 				showLoadMore: true,
-				getKey: (item) => item,
+				getItemId: (item) => item,
 				sectionId: "demo",
 			});
 			expect(outOfBoundsSource.resolveCellAtIndex(4)).toBeNull();

@@ -159,4 +159,41 @@ describe("VirtualGridLinkList body remount policy", () => {
 		expect(updatedItems).toContain(firstSlotProbeId);
 		expect(updatedItems.length).toBeGreaterThan(0);
 	});
+
+	it("remounts a physical-slot body when the item binding topology changes", async () => {
+		const mountedItems: string[] = [];
+		const items = createItems(2);
+		const onItemMount = (id: string) => mountedItems.push(id);
+		const rendered = render(VirtualGridLinkListRenderProbeHarness, {
+			props: {
+				items,
+				initialVisibleCount: 2,
+				remountCellBodyOnKeyChange: false,
+				onItemMount,
+			},
+		});
+
+		await setViewport(rendered.container, { rootHeight: 120, width: 330 });
+		await waitFor(() => {
+			expect(getFirstSlotProbe(rendered.container)?.textContent).toBe("Item 0");
+		});
+		const firstSlotProbeBefore = getFirstSlotProbe(rendered.container);
+		expect(firstSlotProbeBefore).not.toBeNull();
+
+		mountedItems.length = 0;
+		await rendered.rerender({
+			items: [items[1]!],
+			initialVisibleCount: 2,
+			remountCellBodyOnKeyChange: false,
+			onItemMount,
+		});
+		await flushFrames();
+
+		await waitFor(() => {
+			expect(getFirstSlotProbe(rendered.container)?.textContent).toBe("Item 1");
+		});
+		const firstSlotProbeAfter = getFirstSlotProbe(rendered.container);
+		expect(firstSlotProbeAfter).not.toBe(firstSlotProbeBefore);
+		expect(mountedItems).toContain("0-Item 1");
+	});
 });

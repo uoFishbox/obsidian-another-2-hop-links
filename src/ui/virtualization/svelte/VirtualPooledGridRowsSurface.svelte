@@ -159,21 +159,26 @@
 						ariaHidden={currentBinding === null}
 						{surfaceTransaction}
 					>
-						{#if currentBinding}
-							{@const mountedCell = currentBinding}
-							{#if bodyLifecyclePolicy.type === "keyed"}
+						{#if bodyLifecyclePolicy.type === "keyed"}
+							{#if currentBinding}
+								{@const mountedCell = currentBinding}
 								{#key resolveMountedCellBodyKey(mountedCell)}
 									{@render renderCell({
 										mountedCell,
 										observerRoot,
 									})}
 								{/key}
-							{:else}
-								{@render renderCell({
-									mountedCell,
-									observerRoot,
-								})}
 							{/if}
+						{:else}
+							{#key bodyLifecyclePolicy.revision}
+								{#if currentBinding}
+									{@const mountedCell = currentBinding}
+									{@render renderCell({
+										mountedCell,
+										observerRoot,
+									})}
+								{/if}
+							{/key}
 						{/if}
 					</VirtualGridLogicalCellMount>
 				{/each}

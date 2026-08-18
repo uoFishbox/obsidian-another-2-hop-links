@@ -7,7 +7,7 @@ export interface VirtualListItemRenderArgs<T> {
 	observerRoot: HTMLElement | null;
 	rowIndex: number;
 	activationCandidateId: string;
-	readonly previewSlotId: string;
+	readonly previewKey: string;
 }
 
 /**

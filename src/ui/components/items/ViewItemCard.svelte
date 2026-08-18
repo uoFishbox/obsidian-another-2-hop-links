@@ -9,7 +9,7 @@
 	let {
 		settings,
 		draggable = true,
-		previewSlotId = undefined,
+		previewKey = undefined,
 		model = undefined,
 	}: ItemProps = $props();
 	const renderState = $derived(model ?? null);
@@ -19,7 +19,7 @@
 
 		void settings;
 		void draggable;
-		void previewSlotId;
+		void previewKey;
 		void model;
 		void renderState;
 		return markCCLComponentReevaluation("ViewItemCard");
@@ -41,9 +41,9 @@
 		{#snippet children()}
 			{#if !getDebugDisableCardDomPreview() && renderState.item.type === "newLink" && !renderState.targetFile}
 				<UnresolvedPreviewPlaceholder />
-			{:else if !getDebugDisableCardDomPreview() && renderState.targetFile && previewSlotId}
+			{:else if !getDebugDisableCardDomPreview() && renderState.targetFile && previewKey}
 				<div
-					use:previewHost={previewSlotId}
+					use:previewHost={previewKey}
 					class="cosense-card-links__box-preview"
 				></div>
 			{/if}

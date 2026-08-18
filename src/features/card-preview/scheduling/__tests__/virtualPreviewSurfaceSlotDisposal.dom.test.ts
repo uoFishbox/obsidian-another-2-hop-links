@@ -13,9 +13,7 @@ function publishBinding(
 	bound: boolean,
 	range: { start: number; end: number },
 ): void {
-	surface.beginBindings();
-	if (bound) surface.bindSlot("logical-slot", 0, "owner-a", request);
-	surface.endBindings();
+	surface.syncBindings(bound ? [{ key: "logical-slot", rowIndex: 0, request }] : []);
 	surface.setActiveRange(range.start, range.end, true);
 }
 
@@ -26,7 +24,7 @@ function createSurface() {
 	const surface = createVirtualPreviewSurface({
 		activationScheduler,
 		createRenderer: () => renderer,
-		onSlotDisposed: (slotId) => disposedSlotIds.push(slotId),
+		onEntryDisposed: (slotId) => disposedSlotIds.push(slotId),
 	});
 	return {
 		surface,
@@ -64,10 +62,10 @@ describe("VirtualPreviewSurface slot disposal", () => {
 			"logical-slot-2",
 			document.createElement("div"),
 		);
-		harness.surface.beginBindings();
-		harness.surface.bindSlot("logical-slot", 0, "owner-a", request);
-		harness.surface.bindSlot("logical-slot-2", 1, "owner-b", request);
-		harness.surface.endBindings();
+		harness.surface.syncBindings([
+			{ key: "logical-slot", rowIndex: 0, request },
+			{ key: "logical-slot-2", rowIndex: 1, request },
+		]);
 		harness.surface.setActiveRange(0, 2, true);
 		await vi.advanceTimersByTimeAsync(32);
 		firstLease.dispose();
@@ -75,8 +73,7 @@ describe("VirtualPreviewSurface slot disposal", () => {
 
 		expect(harness.disposedSlotIds).toEqual([]);
 
-		harness.surface.beginBindings();
-		harness.surface.endBindings();
+		harness.surface.syncBindings([]);
 		harness.surface.setActiveRange(0, 0, true);
 		await vi.advanceTimersByTimeAsync(32);
 

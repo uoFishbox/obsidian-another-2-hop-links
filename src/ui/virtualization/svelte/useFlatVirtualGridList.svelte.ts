@@ -44,6 +44,7 @@ import { createVirtualListControllerAdapter } from "./virtualListControllerAdapt
 import { createResidentRowSlotAllocator } from "ui/virtualization/core/residentSlotAllocator";
 import { DISABLED_PREVIEW_SURFACE } from "features/card-preview/runtime/previewRuntime";
 import type { CardPreviewRequest } from "features/card-preview/core/cardPreviewRequest";
+import type { VirtualPreviewBinding } from "features/card-preview/scheduling/virtualPreviewSurface";
 import type { ItemInteractionDescriptor } from "ui/interactions/interactionTypes";
 import {
 	createVirtualCardInteractionController,
@@ -64,17 +65,21 @@ interface FlatVirtualGridApplicationStore extends SectionPaginationApplicationSt
 
 export interface FlatVirtualGridListProps<T> {
 	items?: readonly T[];
-	getKey: (item: T, index: number) => string;
+	/**
+	 * Stable unique identity for one logical list item. The value must remain
+	 * unchanged when the item moves to another index.
+	 */
+	getItemId: (item: T, index: number) => string;
 	/**
 	 * Change this token when items are mutated in place. Array replacement is
 	 * detected automatically.
 	 */
 	itemsRevision?: unknown;
 	/**
-	 * Change this token when getKey behavior changes without replacing the
+	 * Change this token when getItemId behavior changes without replacing the
 	 * resolver function.
 	 */
-	keyRevision?: unknown;
+	itemIdRevision?: unknown;
 	itemRenderRevisionToken?: RenderRevision;
 	getItemRenderRevision?: (item: T, index: number) => RenderRevision | undefined;
 	renderRevisionFallbackPolicy?: RenderRevisionFallbackPolicy;
@@ -103,6 +108,12 @@ const EMPTY_MOUNTED_ROWS: readonly MountedVirtualGridRowSlice<never>[] = [];
 type FlatMountedItemCell<T> = MountedVirtualGridCell<T> & {
 	readonly cell: Extract<VirtualListLogicalCell<T>, { kind: "item" }>;
 };
+
+function isFlatMountedItemCell<T>(
+	mountedCell: MountedVirtualGridCell<T> | null | undefined,
+): mountedCell is FlatMountedItemCell<T> {
+	return mountedCell?.cell.kind === "item";
+}
 
 export function useFlatVirtualGridList<T>(
 	props: FlatVirtualGridListProps<T>,
@@ -209,9 +220,9 @@ export function useFlatVirtualGridList<T>(
 	const logicalCellSource = $derived.by(() => {
 		return flatGridModel.resolveLogicalCellSource({
 			items,
-			getKey: props.getKey,
+			getItemId: props.getItemId,
 			itemsRevision: props.itemsRevision,
-			keyRevision: props.keyRevision,
+			itemIdRevision: props.itemIdRevision,
 			itemRenderRevisionToken: props.itemRenderRevisionToken,
 			getItemRenderRevision: props.getItemRenderRevision,
 			visibleCount,
@@ -229,40 +240,43 @@ export function useFlatVirtualGridList<T>(
 			layout: nextLayout,
 		});
 	const rowModel = $derived(resolveFlatLinkRowModel(layout));
+	const resolveMountedItemPreviewKey = (
+		mountedCell: FlatMountedItemCell<T>,
+	): string => String(mountedCell.key);
 	const syncCardSlots = (
 		rows: readonly MountedVirtualGridRowSlice<T>[],
 		previewRange: RowRange,
 	): void => {
+		const previewBindings: VirtualPreviewBinding[] = [];
 		const interactionCards: VirtualCardInteractionBinding[] = [];
-		previewSurface.beginBindings();
-		try {
-			for (const row of rows) {
-				for (const mountedCell of row.cells) {
-					if (mountedCell.cell.kind !== "item") continue;
-					const { item, itemIndex } = mountedCell.cell;
-					const slotId = String(mountedCell.renderSlotKey);
-					const previewRequest = props.resolveItemPreviewRequest?.(
-						item,
-						itemIndex,
-					);
-					if (previewRequest) {
-						previewSurface.bindSlot(
-							slotId,
-							mountedCell.rowIndex,
-							mountedCell.key,
-							previewRequest,
-						);
-					}
-					const descriptor = props.resolveItemInteractionDescriptor?.(
-						item,
-						itemIndex,
-					);
-					if (descriptor) interactionCards.push({ slotId, descriptor });
+		for (const row of rows) {
+			for (const mountedCell of row.cells) {
+				if (!isFlatMountedItemCell(mountedCell)) continue;
+				const { item, itemIndex } = mountedCell.cell;
+				const previewRequest = props.resolveItemPreviewRequest?.(
+					item,
+					itemIndex,
+				);
+				if (previewRequest) {
+					previewBindings.push({
+						key: resolveMountedItemPreviewKey(mountedCell),
+						rowIndex: mountedCell.rowIndex,
+						request: previewRequest,
+					});
+				}
+				const descriptor = props.resolveItemInteractionDescriptor?.(
+					item,
+					itemIndex,
+				);
+				if (descriptor) {
+					interactionCards.push({
+						slotId: String(mountedCell.renderSlotKey),
+						descriptor,
+					});
 				}
 			}
-		} finally {
-			previewSurface.endBindings();
 		}
+		previewSurface.syncBindings(previewBindings);
 		previewSurface.setActiveRange(previewRange.start, previewRange.end, true);
 		interactionController.syncCards(interactionCards);
 	};
@@ -551,17 +565,17 @@ export function useFlatVirtualGridList<T>(
 		null;
 
 	const createItemRenderArgs = (
-		mountedCell: MountedVirtualGridCell<T>,
+		mountedCell: MountedVirtualGridCell<T> | null | undefined,
 		observerRoot: HTMLElement | null,
-	): VirtualListItemRenderArgs<T> => {
-		const itemCell = mountedCell as FlatMountedItemCell<T>;
+	): VirtualListItemRenderArgs<T> | null => {
+		if (!isFlatMountedItemCell(mountedCell)) return null;
 		return {
-			item: itemCell.cell.item,
-			index: itemCell.cell.itemIndex,
+			item: mountedCell.cell.item,
+			index: mountedCell.cell.itemIndex,
 			observerRoot,
-			rowIndex: itemCell.rowIndex,
-			activationCandidateId: itemCell.key,
-			previewSlotId: String(itemCell.renderSlotKey),
+			rowIndex: mountedCell.rowIndex,
+			activationCandidateId: mountedCell.key,
+			previewKey: resolveMountedItemPreviewKey(mountedCell),
 		};
 	};
 
@@ -608,6 +622,10 @@ export function useFlatVirtualGridList<T>(
 		},
 		get mountedRows() {
 			return mountedRows;
+		},
+		get cellBindingTopologyRevision() {
+			return virtualList.getReconciliationState().mountedBuild
+				?.bindingTopologyRevision;
 		},
 		get observerRoot() {
 			return measurement.scrollContainerEl;

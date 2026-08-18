@@ -47,7 +47,7 @@
 			{itemsRevision}
 			{itemRenderRevisionToken}
 			{renderRevisionFallbackPolicy}
-			getKey={(item) => item.id}
+			getItemId={(item) => item.id}
 			getItemRenderRevision={useItemRenderRevision
 				? (item) => item.renderVersion
 				: undefined}

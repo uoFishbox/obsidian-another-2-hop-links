@@ -5,10 +5,7 @@
 		useFlatVirtualGridList,
 		type FlatVirtualGridListProps,
 	} from "ui/virtualization/svelte/useFlatVirtualGridList.svelte";
-	import {
-		KEYED_VIRTUAL_CELL_BODY_LIFECYCLE,
-		PHYSICAL_SLOT_BODY_LIFECYCLE,
-	} from "ui/virtualization/core/bodyLifecycle";
+	import { KEYED_VIRTUAL_CELL_BODY_LIFECYCLE } from "ui/virtualization/core/bodyLifecycle";
 	import { provideVirtualPreviewSurface } from "features/card-preview/ui/virtualPreviewSurfaceContext";
 	import { provideVirtualFrameCoordinator } from "ui/virtualization/svelte/frameCoordinatorContext.svelte";
 
@@ -16,6 +13,14 @@
 	const frameCoordinator = provideVirtualFrameCoordinator();
 	const list = useFlatVirtualGridList(props, frameCoordinator);
 	provideVirtualPreviewSurface(list.previewSurface);
+	const bodyLifecyclePolicy = $derived.by(() =>
+		props.remountCellBodyOnKeyChange === false
+			? ({
+					type: "physical-slot",
+					revision: list.cellBindingTopologyRevision,
+				} as const)
+			: KEYED_VIRTUAL_CELL_BODY_LIFECYCLE,
+	);
 </script>
 
 {#if list.itemCount === 0}
@@ -35,9 +40,7 @@
 		bind:contentEl={list.contentEl}
 		bind:interactionShadowRoot={list.interactionShadowRoot}
 		observerRoot={list.observerRoot}
-		bodyLifecyclePolicy={props.remountCellBodyOnKeyChange === false
-			? PHYSICAL_SLOT_BODY_LIFECYCLE
-			: KEYED_VIRTUAL_CELL_BODY_LIFECYCLE}
+		{bodyLifecyclePolicy}
 		resolveNavigationTarget={list.resolveNavigationTarget}
 		flushVirtualScrollMeasurement={list.flushVirtualScrollMeasurement}
 		interactionDescriptorScopeId="virtual-grid-card-slots"
@@ -52,7 +55,9 @@
 						mountedCell,
 						observerRoot,
 					)}
-					{@render props.item(itemRenderArgs)}
+					{#if itemRenderArgs}
+						{@render props.item(itemRenderArgs)}
+					{/if}
 				{/if}
 			{:else}
 				<VirtualListLoadMoreButton onClick={list.loadNextPage} />

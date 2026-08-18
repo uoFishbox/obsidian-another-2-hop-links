@@ -46,7 +46,7 @@
 		{#if showHeader}
 			<LinkList
 				{items}
-				getKey={(item, index) => `${item}-${index}`}
+				getItemId={(item) => item}
 				{initialVisibleCount}
 				{loadMoreIncrement}
 				{sectionId}
@@ -80,7 +80,7 @@
 		{:else}
 			<LinkList
 				{items}
-				getKey={(item, index) => `${item}-${index}`}
+				getItemId={(item) => item}
 				{initialVisibleCount}
 				{loadMoreIncrement}
 				{sectionId}

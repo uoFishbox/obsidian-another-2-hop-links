@@ -11,6 +11,6 @@ export interface ItemProps {
 	contentPreview?: string;
 	interactionId?: string;
 	interactionKey?: string;
-	previewSlotId?: string;
+	previewKey?: string;
 	model?: CardRenderModel;
 }

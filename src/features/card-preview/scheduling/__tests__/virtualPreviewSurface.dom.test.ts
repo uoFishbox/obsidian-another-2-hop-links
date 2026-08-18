@@ -25,7 +25,6 @@ interface RowPreviewCardBinding {
 	readonly slotId: string;
 	readonly rowIndex: number;
 	readonly request: CardPreviewRequest;
-	readonly ownerKey: string;
 }
 
 interface PreviewFrame {
@@ -58,7 +57,7 @@ function binding(
 	rowIndex: number,
 	identity: string,
 ): RowPreviewCardBinding {
-	return { slotId, rowIndex, request: request(identity), ownerKey: identity };
+	return { slotId, rowIndex, request: request(identity) };
 }
 
 function committedFrame(card: RowPreviewCardBinding): PreviewFrame {
@@ -137,19 +136,13 @@ function createHarness(frameCoordinator?: VirtualFrameCoordinator): {
 	): void => {
 		bindings = new Map(nextBindings);
 		previewWindow = nextWindow;
-		actualSurface.beginBindings();
-		try {
-			for (const card of bindings.values()) {
-				actualSurface.bindSlot(
-					card.slotId,
-					card.rowIndex,
-					card.ownerKey,
-					card.request,
-				);
-			}
-		} finally {
-			actualSurface.endBindings();
-		}
+		actualSurface.syncBindings(
+			[...bindings.values()].map((card) => ({
+				key: card.slotId,
+				rowIndex: card.rowIndex,
+				request: card.request,
+			})),
+		);
 		actualSurface.setActiveRange(
 			nextWindow.previewRange.start,
 			nextWindow.previewRange.end,
@@ -218,13 +211,13 @@ function rebind(surface: Surface, card: RowPreviewCardBinding): void {
 
 function commit(
 	record: RenderRecord,
-	retention: "resident" | "lifecycle-bound" = "resident",
+	attachment: "detachable" | "host-bound" = "detachable",
 ): boolean {
 	if (record.isCancelled()) return false;
 	const content = document.createElement("span");
 	content.textContent = record.identity;
 	record.container.replaceChildren(content);
-	record.callbacks.onCommitted("text", retention);
+	record.callbacks.onCommitted("text", attachment);
 	return true;
 }
 
@@ -298,46 +291,11 @@ describe("VirtualPreviewSurface", () => {
 		surface.dispose();
 	});
 
-	it("uses the current committed frame to reject an old preview owner", async () => {
-		const { surface, renders } = createHarness();
-		const host = document.createElement("div");
-		surface.registerHost("slot-0", host);
-		const firstOwnerKey = "owner-a";
-		const secondOwnerKey = "owner-b";
-		const firstBinding = {
-			...binding("slot-0", 0, "same-cache-identity"),
-			ownerKey: firstOwnerKey,
-		};
-		let current = committedFrame(firstBinding);
-		const source = {
-			get current() {
-				return current;
-			},
-		};
-		surface.acceptCommittedFrame(source);
-		await flushActivation();
-
-		const secondBinding = {
-			...binding("slot-0", 0, "same-cache-identity"),
-			ownerKey: secondOwnerKey,
-		};
-		current = committedFrame(secondBinding);
-		surface.acceptCommittedFrame(source);
-
-		await flushActivation();
-		expect(commit(renders[0])).toBe(false);
-		expect(commit(renders[1])).toBe(true);
-		surface.dispose();
-	});
-
 	it("rejects a committed-frame render after its host lease is remounted", async () => {
 		const { surface, renders } = createHarness();
 		const oldHost = document.createElement("div");
 		const hostLease = surface.registerHost("slot-0", oldHost);
-		const card = {
-			...binding("slot-0", 0, "a"),
-			ownerKey: "a",
-		};
+		const card = binding("slot-0", 0, "a");
 		const current = committedFrame(card);
 		surface.acceptCommittedFrame({ current });
 		await flushActivation();
@@ -354,7 +312,7 @@ describe("VirtualPreviewSurface", () => {
 		surface.dispose();
 	});
 
-	it("invalidates and hides a rebound slot before post-paint cleanup", async () => {
+	it("keeps committed content visible while a changed request is staged", async () => {
 		const { surface, renders } = createHarness();
 		const host = document.createElement("div");
 		surface.registerHost("slot-0", host);
@@ -381,108 +339,14 @@ describe("VirtualPreviewSurface", () => {
 
 		expect(renders[0].cleanup).toHaveBeenCalledOnce();
 		expect(host.textContent).toBe("a");
-		expect(host.classList.contains("is-stale")).toBe(true);
+		expect(host.classList.contains("is-stale")).toBe(false);
 
 		await flushActivation();
 		await flushActivation();
 		expect(renders[0].cleanup).toHaveBeenCalledOnce();
 		expect(renders.at(-1)?.identity).toBe("c");
-		surface.dispose();
-	});
-
-	it("restores an invalidated binding after a staged A to B to A rollback", async () => {
-		const { surface, renders } = createHarness();
-		const host = document.createElement("div");
-		const originalBinding = binding("slot-0", 0, "a");
-		const originalFrame = committedFrame(originalBinding);
-		surface.registerHost("slot-0", host);
-		surface.publish(originalFrame);
-		await flushActivation();
-		expect(renders.map((record) => record.identity)).toEqual(["a"]);
-
-		surface.publish(committedFrame(binding("slot-0", 0, "b")));
-		surface.publish(originalFrame);
-		await flushActivation();
-		await flushActivation();
-		expect(renders.map((record) => record.identity)).toEqual(["a", "a"]);
-		expect(commit(renders[0])).toBe(false);
-		expect(commit(renders[1])).toBe(true);
 		expect(host.textContent).toBe("a");
-		surface.dispose();
-	});
-
-	it("coalesces staged deltas per slot without losing an earlier release", async () => {
-		const { surface, renders } = createHarness();
-		const firstHost = document.createElement("div");
-		const secondHost = document.createElement("div");
-		surface.registerHost("slot-0", firstHost);
-		surface.registerHost("slot-1", secondHost);
-		surface.commitBindingDelta(
-			{
-				enteredSlots: [binding("slot-0", 0, "a"), binding("slot-1", 1, "b")],
-				reboundSlots: [],
-				releasedSlots: [],
-			},
-			{ previewRange: { start: 0, end: 2 }, active: true },
-		);
-		await flushActivation();
-		expect(commit(renders[0])).toBe(true);
-		expect(commit(renders[1])).toBe(true);
-
-		surface.commitBindingDelta(
-			{
-				enteredSlots: [],
-				reboundSlots: [binding("slot-1", 1, "c")],
-				releasedSlots: ["slot-0"],
-			},
-			{ previewRange: { start: 0, end: 2 }, active: true },
-		);
-		surface.commitBindingDelta(
-			{
-				enteredSlots: [],
-				reboundSlots: [binding("slot-1", 1, "d")],
-				releasedSlots: [],
-			},
-			{ previewRange: { start: 0, end: 2 }, active: true },
-		);
-
-		expect(firstHost.textContent).toBe("a");
-		expect(secondHost.textContent).toBe("b");
-		await flushActivation();
-		await flushActivation();
-
-		expect(firstHost.childNodes).toHaveLength(0);
-		expect(renders[1].cleanup).toHaveBeenCalledOnce();
-		expect(renders.map((record) => record.identity)).not.toContain("c");
-		surface.dispose();
-	});
-
-	it("lets a later binding overwrite a staged release of the same slot", async () => {
-		const { surface, renders } = createHarness();
-		const host = document.createElement("div");
-		surface.registerHost("slot-0", host);
-		enter(surface, binding("slot-0", 0, "a"));
-		await flushActivation();
-		expect(commit(renders[0])).toBe(true);
-
-		surface.commitBindingDelta(
-			{ enteredSlots: [], reboundSlots: [], releasedSlots: ["slot-0"] },
-			{ previewRange: { start: 0, end: 1 }, active: true },
-		);
-		surface.commitBindingDelta(
-			{
-				enteredSlots: [binding("slot-0", 0, "b")],
-				reboundSlots: [],
-				releasedSlots: [],
-			},
-			{ previewRange: { start: 0, end: 1 }, active: true },
-		);
-		await flushActivation();
-
-		expect(renders.map((record) => record.identity)).toEqual(["a", "b"]);
-		expect(host.classList.contains("is-stale")).toBe(true);
-		expect(commit(renders[1])).toBe(true);
-		expect(host.textContent).toBe("b");
+		expect(host.dataset.previewState).toBe("refreshing");
 		surface.dispose();
 	});
 
@@ -506,14 +370,10 @@ describe("VirtualPreviewSurface", () => {
 		surface.dispose();
 	});
 
-	it("does not restart rendering for a new request object with the same owner and render key", async () => {
+	it("does not restart rendering for a new request object with the same render key", async () => {
 		const { surface, renders } = createHarness();
 		const host = document.createElement("div");
-		const ownerKey = "stable-owner";
-		const first = {
-			...binding("slot-0", 0, "stable-render"),
-			ownerKey,
-		};
+		const first = binding("slot-0", 0, "stable-render");
 		surface.registerHost("slot-0", host);
 		enter(surface, first);
 		await flushActivation();
@@ -566,28 +426,6 @@ describe("VirtualPreviewSurface", () => {
 		surface.dispose();
 	});
 
-	it("does not schedule a flush for an unchanged binding pass and range", () => {
-		const schedule = vi.fn(() => true);
-		const frameCoordinator: VirtualFrameCoordinator = {
-			schedule,
-			cancel: vi.fn(),
-			isScheduled: vi.fn(() => false),
-			dispose: vi.fn(),
-		};
-		const { surface } = createHarness(frameCoordinator);
-		const card = binding("slot-0", 0, "a");
-		enter(surface, card);
-		schedule.mockClear();
-
-		surface.commitBindingDelta(
-			{ enteredSlots: [], reboundSlots: [], releasedSlots: [] },
-			{ previewRange: { start: 0, end: 1 }, active: true },
-		);
-
-		expect(schedule).not.toHaveBeenCalled();
-		surface.dispose();
-	});
-
 	it("keeps and reuses resident DOM outside the preview range", async () => {
 		const { surface, renders } = createHarness();
 		const host = document.createElement("div");
@@ -612,59 +450,35 @@ describe("VirtualPreviewSurface", () => {
 		surface.dispose();
 	});
 
-	it("does not mutate host attributes when the applied state is unchanged", async () => {
-		const { surface } = createHarness();
-		const host = document.createElement("div");
-		const attributeMutations: MutationRecord[] = [];
-		const observer = new MutationObserver((records) => {
-			attributeMutations.push(...records);
-		});
-		observer.observe(host, { attributes: true });
-		surface.registerHost("slot-0", host);
-		await Promise.resolve();
-		attributeMutations.length = 0;
-
-		surface.syncBindingDelta({
-			enteredSlots: [],
-			reboundSlots: [],
-			releasedSlots: ["slot-0"],
-		});
-		await Promise.resolve();
-
-		expect(attributeMutations).toEqual([]);
-		observer.disconnect();
-		surface.dispose();
-	});
-
-	it("unloads and idle-clears lifecycle-bound DOM on deactivation", async () => {
+	it("unloads and idle-clears host-bound DOM on deactivation", async () => {
 		const { surface, renders } = createHarness();
 		const host = document.createElement("div");
 		surface.registerHost("slot-0", host);
 		enter(surface, binding("slot-0", 0, "a"));
 		await flushActivation();
-		commit(renders[0], "lifecycle-bound");
+		commit(renders[0], "host-bound");
 
 		surface.setPreviewWindow({
 			previewRange: { start: 1, end: 2 },
 			active: true,
 		});
 		await flushActivation();
-		expect(renders[0].cleanup).toHaveBeenCalledOnce();
 		expect(host.dataset.previewState).toBe("dormant");
 
 		await vi.runAllTimersAsync();
+		expect(renders[0].cleanup).toHaveBeenCalledOnce();
 		expect(host.childNodes).toHaveLength(0);
 		expect(host.dataset.hasPreviewContent).toBeUndefined();
 		surface.dispose();
 	});
 
-	it("cancels lifecycle idle cleanup when the slot is reactivated", async () => {
+	it("cancels host-bound idle cleanup when the slot is reactivated", async () => {
 		const { surface, renders } = createHarness();
 		const host = document.createElement("div");
 		surface.registerHost("slot-0", host);
 		enter(surface, binding("slot-0", 0, "a"));
 		await flushActivation();
-		commit(renders[0], "lifecycle-bound");
+		commit(renders[0], "host-bound");
 
 		surface.setPreviewWindow({
 			previewRange: { start: 1, end: 2 },

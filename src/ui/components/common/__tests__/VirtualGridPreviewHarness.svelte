@@ -16,9 +16,16 @@
 		linkContext: LinkContext;
 		appContext: AppContext;
 		applicationStore: ApplicationStore;
+		getItemId?: (model: CardRenderModel, index: number) => string;
 	}
 
-	const { models, linkContext, appContext, applicationStore }: Props = $props();
+	let {
+		models,
+		linkContext,
+		appContext,
+		applicationStore,
+		getItemId = (model) => model.interactionKey,
+	}: Props = $props();
 	setLinkContext(linkContext);
 	setAppContext(appContext);
 	setContext<ApplicationStore>("applicationStore", applicationStore);
@@ -30,19 +37,19 @@
 >
 	<VirtualGridLinkList
 		items={models}
-		getKey={(model) => model.interactionKey}
+		{getItemId}
 		initialVisibleCount={models.length}
 		{applicationStore}
 		resolveItemPreviewRequest={(model) => model.previewRequest}
 		resolveItemInteractionDescriptor={(model) => model.interactionDescriptor}
 		remountCellBodyOnKeyChange={false}
 	>
-		{#snippet item({ item, previewSlotId })}
+		{#snippet item({ item, previewKey })}
 			<ViewItemCard
 				item={item.item}
 				settings={applicationStore.settings}
 				model={item}
-				{previewSlotId}
+				{previewKey}
 			/>
 		{/snippet}
 	</VirtualGridLinkList>

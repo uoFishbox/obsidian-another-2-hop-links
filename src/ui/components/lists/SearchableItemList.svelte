@@ -77,6 +77,17 @@
 	const viewItemSortCache = createViewItemSortCache();
 	const getViewItemKey = (item: ViewItem, index: number): string =>
 		config.getItemKey(item, index);
+	const virtualItemIdByItem = new WeakMap<ViewItem, string>();
+	let nextVirtualItemId = 0;
+	const getVirtualItemId = (item: ViewItem): string => {
+		const existing = virtualItemIdByItem.get(item);
+		if (existing) return existing;
+
+		nextVirtualItemId += 1;
+		const itemId = `view-item-${nextVirtualItemId}`;
+		virtualItemIdByItem.set(item, itemId);
+		return itemId;
+	};
 	const viewItemReconciler = createStableViewItemReconciler<ViewItem>({
 		getKey: getViewItemKey,
 		toViewItem: (item) => item,
@@ -458,7 +469,7 @@
 		<LinkList
 			className="cosense-card-links__section twohop-links-back-links"
 			items={filteredItems}
-			getKey={getViewItemKey}
+			getItemId={getVirtualItemId}
 			sectionId={searchScopedSectionId}
 			{applicationStore}
 			{initialVisibleCount}
@@ -475,7 +486,7 @@
 				observerRoot,
 				rowIndex,
 				activationCandidateId,
-				previewSlotId,
+				previewKey,
 			})}
 				{@const ItemComponent = config.itemComponent}
 				{@const renderedItemKey = config.getItemKey(item, index)}
@@ -486,7 +497,7 @@
 						{item}
 						settings={applicationStore.settings}
 						model={resolveViewItemCardModel(item, index)}
-						{previewSlotId}
+						{previewKey}
 					/>
 				{:else}
 					<ItemComponent

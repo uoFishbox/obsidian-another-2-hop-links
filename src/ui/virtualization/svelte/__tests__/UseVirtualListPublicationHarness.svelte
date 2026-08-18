@@ -22,7 +22,7 @@
 		items,
 		visibleCount: items.length,
 		showLoadMore: false,
-		getKey: (item: TestItem) => item.id,
+		getItemId: (item: TestItem) => item.id,
 		sectionId: "publication-harness",
 	});
 	const layout = computeVirtualGridLayout({

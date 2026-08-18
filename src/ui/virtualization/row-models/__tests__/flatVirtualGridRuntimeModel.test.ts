@@ -17,17 +17,17 @@ describe("flatVirtualGridRuntimeModel", () => {
 	it("reuses the logical cell source while declared content inputs are stable", () => {
 		const runtime = createFlatVirtualGridRuntimeModel<string>();
 		const items = ["a", "b"];
-		const getKey = (item: string) => item;
+		const getItemId = (item: string) => item;
 		const first = runtime.resolveLogicalCellSource({
 			items,
-			getKey,
+			getItemId,
 			visibleCount: 2,
 			hasHeader: false,
 			showLoadMore: false,
 		});
 		const second = runtime.resolveLogicalCellSource({
 			items,
-			getKey,
+			getItemId,
 			visibleCount: 2,
 			hasHeader: false,
 			showLoadMore: false,
@@ -39,30 +39,52 @@ describe("flatVirtualGridRuntimeModel", () => {
 	it("invalidates the logical cell source when the visible shape changes", () => {
 		const runtime = createFlatVirtualGridRuntimeModel<string>();
 		const items = ["a", "b"];
-		const getKey = (item: string) => item;
+		const getItemId = (item: string) => item;
 		const first = runtime.resolveLogicalCellSource({
 			items,
-			getKey,
+			getItemId,
 			visibleCount: 1,
 			hasHeader: false,
 			showLoadMore: true,
 		});
 		const second = runtime.resolveLogicalCellSource({
 			items,
-			getKey,
+			getItemId,
 			visibleCount: 2,
 			hasHeader: false,
 			showLoadMore: false,
 		});
 
 		expect(second).not.toBe(first);
+		expect(second.bindingTopologyRevision).toBe(first.bindingTopologyRevision);
+	});
+
+	it("invalidates the binding topology when the item collection changes", () => {
+		const runtime = createFlatVirtualGridRuntimeModel<string>();
+		const getItemId = (item: string) => item;
+		const first = runtime.resolveLogicalCellSource({
+			items: ["a", "b"],
+			getItemId,
+			visibleCount: 2,
+			hasHeader: false,
+			showLoadMore: false,
+		});
+		const second = runtime.resolveLogicalCellSource({
+			items: ["b"],
+			getItemId,
+			visibleCount: 1,
+			hasHeader: false,
+			showLoadMore: false,
+		});
+
+		expect(second.bindingTopologyRevision).not.toBe(first.bindingTopologyRevision);
 	});
 
 	it("reuses the row model for an equivalent layout key", () => {
 		const runtime = createFlatVirtualGridRuntimeModel<string>();
 		const cellSource = runtime.resolveLogicalCellSource({
 			items: ["a", "b"],
-			getKey: (item) => item,
+			getItemId: (item) => item,
 			visibleCount: 2,
 			hasHeader: false,
 			showLoadMore: false,
@@ -80,7 +102,7 @@ describe("flatVirtualGridRuntimeModel", () => {
 		const runtime = createFlatVirtualGridRuntimeModel<string>();
 		const cellSource = runtime.resolveLogicalCellSource({
 			items: ["a", "b"],
-			getKey: (item) => item,
+			getItemId: (item) => item,
 			visibleCount: 2,
 			hasHeader: false,
 			showLoadMore: false,

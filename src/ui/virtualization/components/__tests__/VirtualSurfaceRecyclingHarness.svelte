@@ -27,6 +27,7 @@
 		contentHeight: number;
 		rowHeight: number;
 		remountCellBodyOnKeyChange?: boolean;
+		physicalSlotRevision?: unknown;
 		interactionId?: string;
 		onCellMount?: (key: string) => void;
 		onCellUpdate?: (key: string) => void;
@@ -38,6 +39,7 @@
 		contentHeight,
 		rowHeight,
 		remountCellBodyOnKeyChange = true,
+		physicalSlotRevision,
 		interactionId,
 		onCellMount,
 		onCellUpdate,
@@ -54,7 +56,9 @@
 	{rowHeight}
 	bodyLifecyclePolicy={remountCellBodyOnKeyChange
 		? KEYED_VIRTUAL_CELL_BODY_LIFECYCLE
-		: PHYSICAL_SLOT_BODY_LIFECYCLE}
+		: physicalSlotRevision === undefined
+			? PHYSICAL_SLOT_BODY_LIFECYCLE
+			: { type: "physical-slot", revision: physicalSlotRevision }}
 	interactionDescriptorScopeId={interactionId ? "recycling-test-items" : undefined}
 >
 	{#snippet renderCell({ mountedCell })}

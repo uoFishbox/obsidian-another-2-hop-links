@@ -36,7 +36,7 @@
 	>
 		<LinkList
 			{items}
-			getKey={(item, index) => `${item}-${index}`}
+			getItemId={(item) => item}
 			{initialVisibleCount}
 			{loadMoreIncrement}
 			{applicationStore}

@@ -32,13 +32,115 @@ describe("PreviewSlotController", () => {
 		const secondLease = controller.attachHost(host);
 
 		firstLease.dispose();
-		controller.bind({ ownerKey: "owner", request: request("current") });
+		controller.bind(request("current"));
 		controller.setActive(true);
 		controller.activate();
 
 		expect(render).toHaveBeenCalledOnce();
 		expect(render.mock.calls[0]?.[0]).toBe(host);
 		secondLease.dispose();
+		controller.dispose();
+	});
+
+	it("releases detachable renderer resources at commit and moves its DOM without rendering again", () => {
+		const callbacks: PreviewRenderCallbacks[] = [];
+		const cleanup = vi.fn();
+		const render = vi.fn<CardPreviewRenderer>((_host, _request, next) => {
+			if (!next) throw new TypeError("Missing callbacks");
+			callbacks.push(next);
+			return cleanup;
+		});
+		const controller = createPreviewSlotController({
+			createRenderer: () => render,
+		});
+		const firstHost = document.createElement("div");
+		const firstLease = controller.attachHost(firstHost);
+		controller.bind(request("stable"));
+		controller.setActive(true);
+		controller.activate();
+
+		const image = document.createElement("img");
+		firstHost.replaceChildren(image);
+		callbacks[0]?.onCommitted("image", "detachable");
+		expect(cleanup).toHaveBeenCalledOnce();
+		expect(render).toHaveBeenCalledOnce();
+
+		firstLease.dispose();
+		expect(firstHost.childNodes).toHaveLength(0);
+
+		const secondHost = document.createElement("div");
+		controller.attachHost(secondHost);
+		expect(secondHost.firstChild).toBe(image);
+		expect(secondHost.dataset.previewState).toBe("committed");
+		expect(controller.needsActivation()).toBe(false);
+
+		controller.activate();
+		expect(render).toHaveBeenCalledOnce();
+		controller.dispose();
+	});
+
+	it("keeps committed DOM visible while a changed render key is refreshing", () => {
+		const callbacks: PreviewRenderCallbacks[] = [];
+		const render = vi.fn<CardPreviewRenderer>((_host, _request, next) => {
+			if (!next) throw new TypeError("Missing callbacks");
+			callbacks.push(next);
+			return vi.fn();
+		});
+		const controller = createPreviewSlotController({
+			createRenderer: () => render,
+		});
+		const host = document.createElement("div");
+		controller.attachHost(host);
+		controller.bind(request("v1"));
+		controller.setActive(true);
+		controller.activate();
+
+		const oldNode = document.createElement("span");
+		oldNode.textContent = "old";
+		host.replaceChildren(oldNode);
+		callbacks[0]?.onCommitted("text", "detachable");
+
+		controller.bind(request("v2"));
+		controller.activate();
+		expect(host.firstChild).toBe(oldNode);
+		expect(host.dataset.previewState).toBe("refreshing");
+		expect(host.classList.contains("is-stale")).toBe(false);
+		controller.dispose();
+	});
+
+	it("keeps host-bound resources until their visible DOM is replaced", () => {
+		const callbacks: PreviewRenderCallbacks[] = [];
+		const cleanups: Array<ReturnType<typeof vi.fn>> = [];
+		const render = vi.fn<CardPreviewRenderer>((_host, _request, next) => {
+			if (!next) throw new TypeError("Missing callbacks");
+			const cleanup = vi.fn();
+			callbacks.push(next);
+			cleanups.push(cleanup);
+			return cleanup;
+		});
+		const controller = createPreviewSlotController({
+			createRenderer: () => render,
+		});
+		const host = document.createElement("div");
+		controller.attachHost(host);
+		controller.bind(request("v1"));
+		controller.setActive(true);
+		controller.activate();
+
+		const oldNode = document.createElement("span");
+		host.replaceChildren(oldNode);
+		callbacks[0]?.onCommitted("dom", "host-bound");
+		expect(cleanups[0]).not.toHaveBeenCalled();
+
+		controller.bind(request("v2"));
+		controller.activate();
+		expect(host.firstChild).toBe(oldNode);
+		expect(cleanups[0]).not.toHaveBeenCalled();
+
+		host.replaceChildren(document.createElement("img"));
+		callbacks[1]?.onCommitted("image", "detachable");
+		expect(cleanups[0]).toHaveBeenCalledOnce();
+		expect(cleanups[1]).toHaveBeenCalledOnce();
 		controller.dispose();
 	});
 
@@ -59,7 +161,7 @@ describe("PreviewSlotController", () => {
 			onStateChange: (state) => states.push(state.phase),
 		});
 		controller.attachHost(document.createElement("div"));
-		controller.bind({ ownerKey: "owner", request: request("retry") });
+		controller.bind(request("retry"));
 		controller.setActive(true);
 
 		controller.activate();
@@ -70,29 +172,6 @@ describe("PreviewSlotController", () => {
 		expect(callbacks).toHaveLength(2);
 		expect(cleanups[0]).toHaveBeenCalledOnce();
 		expect(states.at(-1)).toBe("error");
-		controller.dispose();
-	});
-
-	it("publishes the loading phase exactly once per activation", () => {
-		let callbacks: PreviewRenderCallbacks | undefined;
-		const render: CardPreviewRenderer = (_host, _request, next) => {
-			callbacks = next;
-			return vi.fn();
-		};
-		const onStateChange = vi.fn();
-		const controller = createPreviewSlotController({
-			createRenderer: () => render,
-			onStateChange,
-		});
-		controller.attachHost(document.createElement("div"));
-		controller.bind({ ownerKey: "owner", request: request("dedupe") });
-		controller.setActive(true);
-		controller.activate();
-
-		expect(callbacks).toBeDefined();
-		expect(
-			onStateChange.mock.calls.filter(([state]) => state.phase === "loading"),
-		).toHaveLength(1);
 		controller.dispose();
 	});
 });

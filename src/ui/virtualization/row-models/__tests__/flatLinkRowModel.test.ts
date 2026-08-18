@@ -14,7 +14,7 @@ const createRowModel = (itemCount: number) => {
 		items,
 		visibleCount: items.length,
 		showLoadMore: false,
-		getKey: (item) => item.id,
+		getItemId: (item) => item.id,
 		sectionId: "flat-link-row-model",
 	});
 	const layout = computeVirtualGridLayout({

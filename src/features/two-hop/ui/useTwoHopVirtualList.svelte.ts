@@ -23,6 +23,7 @@ import {
 } from "features/two-hop/ui/twoHopCardHydrator";
 import type { PreviewRuntime } from "features/card-preview/runtime/previewRuntime";
 import { DISABLED_PREVIEW_SURFACE } from "features/card-preview/runtime/previewRuntime";
+import type { VirtualPreviewBinding } from "features/card-preview/scheduling/virtualPreviewSurface";
 import type { VirtualFrameCoordinator } from "ui/virtualization/scheduling/frameCoordinator";
 import { createResolvedCardLayoutSettingsMemo } from "ui/shared/layout/cardLayoutCssVars";
 import { resolveCachedCardGridLayoutBase } from "ui/virtualization/dom/virtualListCardLayout";
@@ -176,11 +177,11 @@ export function useTwoHopVirtualList(
 	}
 
 	function publishPreviewBindings(): void {
-		previewSurface.beginBindings();
 		if (!isPreviewSurfaceActive()) {
-			previewSurface.endBindings();
+			previewSurface.syncBindings([]);
 			return;
 		}
+		const bindings: VirtualPreviewBinding[] = [];
 		for (const row of getMountedRows()) {
 			for (const mountedCell of row.cells) {
 				if (mountedCell.cell.kind !== "item") continue;
@@ -188,15 +189,14 @@ export function useTwoHopVirtualList(
 					mountedCell.cell.logicalKey,
 				)?.previewRequest;
 				if (!request) continue;
-				previewSurface.bindSlot(
-					String(mountedCell.renderSlotKey),
-					mountedCell.rowIndex,
-					mountedCell.cell.logicalKey,
+				bindings.push({
+					key: mountedCell.cell.logicalKey,
+					rowIndex: mountedCell.rowIndex,
 					request,
-				);
+				});
 			}
 		}
-		previewSurface.endBindings();
+		previewSurface.syncBindings(bindings);
 	}
 
 	function collectCardDemand(

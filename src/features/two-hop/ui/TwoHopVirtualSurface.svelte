@@ -40,7 +40,7 @@
 		<TwoHopVirtualCell
 			cell={mountedCell.cell}
 			previewHostEnabled={list.isPreviewHostEnabled(mountedCell.rowIndex)}
-			previewSlotId={String(mountedCell.renderSlotKey)}
+			previewKey={mountedCell.cell.logicalKey}
 			registerCardModelConsumer={list.registerCardModelConsumer}
 			onLoadMore={list.loadMore}
 		/>

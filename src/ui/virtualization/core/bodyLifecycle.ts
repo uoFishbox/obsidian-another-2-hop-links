@@ -1,6 +1,11 @@
 export type VirtualCellBodyLifecyclePolicy<TCell> =
 	| {
 			readonly type: "physical-slot";
+			/**
+			 * Remounts the body when the physical slot itself stays resident but the
+			 * meaning of its binding changes outside normal viewport recycling.
+			 */
+			readonly revision?: unknown;
 	  }
 	| {
 			readonly type: "keyed";
