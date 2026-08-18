@@ -1,25 +1,15 @@
 import type { RowRange } from "ui/virtualization/rowRange";
 
 export interface SectionedGridMountedCell {
-	readonly key: string;
 	readonly columnIndex?: number;
 	readonly renderSlotIndex: number;
-}
-
-/**
- * One stable physical column slot whose logical binding may be empty.
- */
-export interface SectionedGridMountedCellSlot<TCell extends SectionedGridMountedCell> {
-	readonly renderSlotIndex: number;
-	readonly columnIndex: number;
-	readonly binding: TCell | null;
 }
 
 export interface SectionedGridMountedRow<TCell extends SectionedGridMountedCell> {
 	readonly rowIndex: number;
 	readonly slotIndex: number;
-	readonly cells: readonly TCell[];
-	readonly cellSlots: readonly SectionedGridMountedCellSlot<TCell>[];
+	/** Physical column bindings. Empty physical slots are represented by null. */
+	readonly bindings: readonly (TCell | null)[];
 }
 
 export interface ResolvedSectionedGridRow<TRowMetadata> {
@@ -34,10 +24,8 @@ export interface MountedSectionedGridRows<
 	TRow extends SectionedGridMountedRow<TCell>,
 > {
 	readonly cells: TCell[];
-	readonly reusableCellsByKey: Map<string, TCell>;
 	readonly rowSlices: TRow[];
 	readonly rowsBySlot: TRow[];
-	readonly nextRenderSlotIndex: number;
 }
 
 export interface BuildMountedSectionedGridRowsParams<
@@ -64,21 +52,18 @@ export interface BuildMountedSectionedGridRowsParams<
 		readonly columnIndex: number;
 		readonly renderSlotIndex: number;
 		readonly row: ResolvedSectionedGridRow<TRowMetadata>;
-	}): TCell;
+	}): TCell | null;
 	createRow(params: {
 		readonly rowIndex: number;
 		readonly slotIndex: number;
-		readonly cells: TCell[];
-		readonly cellSlots: SectionedGridMountedCellSlot<TCell>[];
+		readonly bindings: (TCell | null)[];
 		readonly row: ResolvedSectionedGridRow<TRowMetadata>;
 	}): TRow;
 }
 
 /**
- * Builds the shared physical row/cell shells for section-aware virtual grids.
- *
- * Logical row and cell resolution stays with the caller. This function owns the
- * physical-slot invariants and the derived row/cell indexes used by renderers.
+ * Builds resident rows while preserving stable physical row/column slots.
+ * Logical resolution stays with the caller; this function owns slot topology.
  */
 export function buildMountedSectionedGridRows<
 	TCell extends SectionedGridMountedCell,
@@ -90,7 +75,6 @@ export function buildMountedSectionedGridRows<
 	const columns = Math.max(1, params.columns);
 	const rowSlices: TRow[] = [];
 	let flattenedCells: TCell[] | undefined;
-	let reusableCellsByKey: Map<string, TCell> | undefined;
 
 	for (
 		let rowIndex = params.rowRange.start;
@@ -101,21 +85,24 @@ export function buildMountedSectionedGridRows<
 		if (slotIndex === undefined) {
 			throw new Error(`No resident slot assigned for row ${rowIndex}.`);
 		}
+
 		const previousRow = params.resolvePreviousRow(rowIndex);
-		const canReusePreviousRow =
-			previousRow !== undefined && params.canReusePreviousRow(previousRow);
-		if (canReusePreviousRow && previousRow.slotIndex === slotIndex) {
+		if (
+			previousRow !== undefined &&
+			previousRow.slotIndex === slotIndex &&
+			params.canReusePreviousRow(previousRow)
+		) {
 			rowSlices.push(previousRow);
 			continue;
 		}
 
 		const row = params.resolveRow(rowIndex);
 		if (!row) continue;
-		const mountedCellSlots =
-			canReusePreviousRow &&
+		const bindings =
+			previousRow !== undefined &&
 			params.rebindCell &&
-			hasMatchingCellSlots(previousRow, columns)
-				? rebindPreviousCellSlots({
+			previousRow.bindings.length === columns
+				? rebindPreviousBindings({
 						previousRow,
 						row,
 						rowIndex,
@@ -124,21 +111,19 @@ export function buildMountedSectionedGridRows<
 						rebindCell: params.rebindCell,
 						resolveCell: params.resolveCell,
 					})
-				: resolveMountedCellSlots({
+				: resolveBindings({
 						row,
 						rowIndex,
 						slotIndex,
 						columns,
 						resolveCell: params.resolveCell,
 					});
-		const rowCells = collectBoundCells(mountedCellSlots);
 
 		rowSlices.push(
 			params.createRow({
 				rowIndex,
 				slotIndex,
-				cells: rowCells,
-				cellSlots: mountedCellSlots,
+				bindings,
 				row,
 			}),
 		);
@@ -151,45 +136,30 @@ export function buildMountedSectionedGridRows<
 		columns,
 	});
 
-	const getCells = (): TCell[] => {
-		if (flattenedCells) return flattenedCells;
-		flattenedCells = [];
-		for (const row of rowSlices) flattenedCells.push(...row.cells);
-		return flattenedCells;
-	};
-	const getReusableCellsByKey = (): Map<string, TCell> => {
-		if (reusableCellsByKey) return reusableCellsByKey;
-		reusableCellsByKey = new Map();
-		for (const cell of getCells()) reusableCellsByKey.set(cell.key, cell);
-		return reusableCellsByKey;
-	};
-
 	return {
 		get cells() {
-			return getCells();
-		},
-		get reusableCellsByKey() {
-			return getReusableCellsByKey();
+			if (flattenedCells) return flattenedCells;
+			flattenedCells = [];
+			for (const row of rowSlices) {
+				for (const binding of row.bindings) {
+					if (binding) flattenedCells.push(binding);
+				}
+			}
+			return flattenedCells;
 		},
 		rowSlices,
 		rowsBySlot,
-		nextRenderSlotIndex: params.slotCapacity * columns,
 	};
 }
 
-/**
- * Orders mounted rows by physical slot without copying and sorting the resident
- * rows on every range shift: slot indices are unique, so each row is written
- * directly at its slot position and the holes are compacted in place.
- */
+/** Orders resident rows by physical slot in O(resident rows) without sorting. */
 function orderRowsBySlotIndex<
 	TCell extends SectionedGridMountedCell,
 	TRow extends SectionedGridMountedRow<TCell>,
 >(rows: readonly TRow[]): TRow[] {
 	const rowsBySlot: (TRow | undefined)[] = [];
-	for (const row of rows) {
-		rowsBySlot[row.slotIndex] = row;
-	}
+	for (const row of rows) rowsBySlot[row.slotIndex] = row;
+
 	let writeIndex = 0;
 	for (let readIndex = 0; readIndex < rowsBySlot.length; readIndex += 1) {
 		const row = rowsBySlot[readIndex];
@@ -209,11 +179,12 @@ function assertMountedSectionedGridRows<
 	readonly slotCapacity: number;
 	readonly columns: number;
 }): void {
-	if (process.env.NODE_ENV === "production") return;
+	if (typeof process !== "undefined" && process.env?.NODE_ENV === "production") {
+		return;
+	}
 
 	const logicalRows = new Set<number>();
 	const rowSlots = new Set<number>();
-	const cellSlots = new Set<number>();
 	for (const row of params.rows) {
 		if (logicalRows.has(row.rowIndex)) {
 			throw new Error(`Duplicate mounted logical row: ${row.rowIndex}.`);
@@ -225,41 +196,36 @@ function assertMountedSectionedGridRows<
 		) {
 			throw new Error(`Invalid or duplicate mounted row slot: ${row.slotIndex}.`);
 		}
+		if (row.bindings.length !== params.columns) {
+			throw new Error(
+				`Mounted row ${row.rowIndex} has ${row.bindings.length} bindings; expected ${params.columns}.`,
+			);
+		}
 		logicalRows.add(row.rowIndex);
 		rowSlots.add(row.slotIndex);
 
-		for (const cellSlot of row.cellSlots) {
-			const expectedSlotIndex =
-				row.slotIndex * params.columns + cellSlot.columnIndex;
-			if (
-				cellSlot.renderSlotIndex !== expectedSlotIndex ||
-				cellSlot.renderSlotIndex < 0 ||
-				cellSlot.renderSlotIndex >= params.slotCapacity * params.columns ||
-				cellSlots.has(cellSlot.renderSlotIndex)
-			) {
+		for (let columnIndex = 0; columnIndex < row.bindings.length; columnIndex += 1) {
+			const binding = row.bindings[columnIndex];
+			if (!binding) continue;
+			const expectedSlotIndex = row.slotIndex * params.columns + columnIndex;
+			if (binding.renderSlotIndex !== expectedSlotIndex) {
 				throw new Error(
-					`Invalid or duplicate mounted cell slot: ${cellSlot.renderSlotIndex}.`,
+					`Mounted cell render slot ${binding.renderSlotIndex} does not match physical slot ${expectedSlotIndex}.`,
 				);
 			}
-			cellSlots.add(cellSlot.renderSlotIndex);
+			if (
+				binding.columnIndex !== undefined &&
+				binding.columnIndex !== columnIndex
+			) {
+				throw new Error(
+					`Mounted cell column ${binding.columnIndex} does not match physical column ${columnIndex}.`,
+				);
+			}
 		}
 	}
 }
 
-function hasMatchingCellSlots<
-	TCell extends SectionedGridMountedCell,
-	TRow extends SectionedGridMountedRow<TCell>,
->(previousRow: TRow, columns: number): boolean {
-	if (previousRow.cellSlots.length !== columns) return false;
-	for (let columnIndex = 0; columnIndex < columns; columnIndex += 1) {
-		if (previousRow.cellSlots[columnIndex]?.columnIndex !== columnIndex) {
-			return false;
-		}
-	}
-	return true;
-}
-
-function rebindPreviousCellSlots<
+function rebindPreviousBindings<
 	TCell extends SectionedGridMountedCell,
 	TRow extends SectionedGridMountedRow<TCell>,
 	TRowMetadata,
@@ -275,52 +241,43 @@ function rebindPreviousCellSlots<
 		readonly columnIndex: number;
 		readonly renderSlotIndex: number;
 		readonly row: ResolvedSectionedGridRow<TRowMetadata>;
-	}): TCell;
+	}): TCell | null;
 	resolveCell(params: {
 		readonly rowIndex: number;
 		readonly columnIndex: number;
 		readonly renderSlotIndex: number;
 		readonly row: ResolvedSectionedGridRow<TRowMetadata>;
 	}): TCell | null;
-}): SectionedGridMountedCellSlot<TCell>[] {
-	const cellSlots: SectionedGridMountedCellSlot<TCell>[] = [];
+}): (TCell | null)[] {
+	const bindings: (TCell | null)[] = [];
 	for (let columnIndex = 0; columnIndex < params.columns; columnIndex += 1) {
 		const renderSlotIndex = params.slotIndex * params.columns + columnIndex;
-		const previousBinding =
-			params.previousRow.cellSlots[columnIndex]?.binding ?? null;
+		const previousBinding = params.previousRow.bindings[columnIndex] ?? null;
 		const isOccupied =
 			columnIndex >= params.row.columnStart && columnIndex < params.row.columnEnd;
-		const binding = !isOccupied
-			? null
-			: previousBinding
-				? params.rebindCell({
-						previous: previousBinding,
-						rowIndex: params.rowIndex,
-						columnIndex,
-						renderSlotIndex,
-						row: params.row,
-					})
-				: params.resolveCell({
-						rowIndex: params.rowIndex,
-						columnIndex,
-						renderSlotIndex,
-						row: params.row,
-					});
-		cellSlots.push(
-			createMountedCellSlot({
-				columnIndex,
-				renderSlotIndex,
-				binding,
-			}),
+		bindings.push(
+			!isOccupied
+				? null
+				: previousBinding
+					? params.rebindCell({
+							previous: previousBinding,
+							rowIndex: params.rowIndex,
+							columnIndex,
+							renderSlotIndex,
+							row: params.row,
+						})
+					: params.resolveCell({
+							rowIndex: params.rowIndex,
+							columnIndex,
+							renderSlotIndex,
+							row: params.row,
+						}),
 		);
 	}
-	return cellSlots;
+	return bindings;
 }
 
-function resolveMountedCellSlots<
-	TCell extends SectionedGridMountedCell,
-	TRowMetadata,
->(params: {
+function resolveBindings<TCell extends SectionedGridMountedCell, TRowMetadata>(params: {
 	readonly row: ResolvedSectionedGridRow<TRowMetadata>;
 	readonly rowIndex: number;
 	readonly slotIndex: number;
@@ -331,11 +288,11 @@ function resolveMountedCellSlots<
 		readonly renderSlotIndex: number;
 		readonly row: ResolvedSectionedGridRow<TRowMetadata>;
 	}): TCell | null;
-}): SectionedGridMountedCellSlot<TCell>[] {
-	const cellSlots: SectionedGridMountedCellSlot<TCell>[] = [];
+}): (TCell | null)[] {
+	const bindings: (TCell | null)[] = [];
 	for (let columnIndex = 0; columnIndex < params.columns; columnIndex += 1) {
 		const renderSlotIndex = params.slotIndex * params.columns + columnIndex;
-		const binding =
+		bindings.push(
 			columnIndex >= params.row.columnStart && columnIndex < params.row.columnEnd
 				? params.resolveCell({
 						rowIndex: params.rowIndex,
@@ -343,36 +300,8 @@ function resolveMountedCellSlots<
 						renderSlotIndex,
 						row: params.row,
 					})
-				: null;
-		cellSlots.push(
-			createMountedCellSlot({
-				columnIndex,
-				renderSlotIndex,
-				binding,
-			}),
+				: null,
 		);
 	}
-	return cellSlots;
-}
-
-function createMountedCellSlot<TCell extends SectionedGridMountedCell>(params: {
-	readonly columnIndex: number;
-	readonly renderSlotIndex: number;
-	readonly binding: TCell | null;
-}): SectionedGridMountedCellSlot<TCell> {
-	return {
-		columnIndex: params.columnIndex,
-		renderSlotIndex: params.renderSlotIndex,
-		binding: params.binding,
-	};
-}
-
-function collectBoundCells<TCell extends SectionedGridMountedCell>(
-	cellSlots: readonly SectionedGridMountedCellSlot<TCell>[],
-): TCell[] {
-	const cells: TCell[] = [];
-	for (const cellSlot of cellSlots) {
-		if (cellSlot.binding) cells.push(cellSlot.binding);
-	}
-	return cells;
+	return bindings;
 }

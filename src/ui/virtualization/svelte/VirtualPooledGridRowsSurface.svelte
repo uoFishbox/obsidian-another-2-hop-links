@@ -5,7 +5,6 @@
 	import { IS_PROD } from "appConstants";
 	import type { Snippet } from "svelte";
 	import type { LogicalCellKey, MountedVirtualCell } from "../types";
-	import type { SectionedGridMountedCellSlot } from "../core/reconciliation/mountedSectionedGridRows";
 	import {
 		KEYED_VIRTUAL_CELL_BODY_LIFECYCLE,
 		resolveVirtualCellBodyKey,
@@ -76,16 +75,6 @@
 		`height:${contentHeight}px; position:relative; --ccl-box-height:${rowHeight}px; --ccl-cell-width:${cellWidth ?? 0}px; --ccl-columns:${Math.max(1, Math.floor(columns))}${gap !== undefined ? `; --ccl-box-gap:${gap}px` : ""}`,
 	);
 
-	const resolveRowCellSlots = (
-		row: TMountedRow,
-	): readonly SectionedGridMountedCellSlot<TMountedCell>[] =>
-		row.cellSlots ??
-		row.cells.map((cell) => ({
-			renderSlotIndex: cell.renderSlotIndex,
-			columnIndex: cell.columnIndex ?? 0,
-			binding: cell,
-		}));
-
 	const resolveMountedCellLogicalKey = (cell: TMountedCell): LogicalCellKey =>
 		cell.key;
 
@@ -130,8 +119,9 @@
 				data-ccl-row-index={!IS_PROD ? row.rowIndex : undefined}
 				use:setRowTop={row.top}
 			>
-				{#each resolveRowCellSlots(row) as cellSlot (cellSlot.renderSlotIndex)}
-					{@const currentBinding = cellSlot.binding}
+				{#each row.bindings as currentBinding, columnIndex (row.slotIndex * row.bindings.length + columnIndex)}
+					{@const renderSlotIndex =
+						row.slotIndex * row.bindings.length + columnIndex}
 					<VirtualGridLogicalCellMount
 						logicalKey={currentBinding
 							? resolveMountedCellLogicalKey(currentBinding)
@@ -142,13 +132,13 @@
 						dataTestId={!IS_PROD && currentBinding
 							? getCellDataTestId?.(currentBinding)
 							: undefined}
-						renderSlotIndex={cellSlot.renderSlotIndex}
+						{renderSlotIndex}
 						rowIndex={currentBinding
 							? resolveMountedCellRowIndex(currentBinding)
 							: row.rowIndex}
 						columnIndex={currentBinding
 							? resolveMountedCellColumnIndex(currentBinding)
-							: cellSlot.columnIndex}
+							: columnIndex}
 						ariaHidden={currentBinding === null}
 						{surfaceTransaction}
 					>

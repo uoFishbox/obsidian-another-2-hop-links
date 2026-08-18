@@ -11,6 +11,7 @@ import {
 	type MountedVirtualGridCell,
 	type MountedVirtualGridCellsBuildResult,
 } from "../../core/reconciliation/linkListVirtualLayout";
+import { createResidentRowSlotAllocator } from "../../core/residentSlotAllocator";
 import { useVirtualList, type UseVirtualListOptions } from "../useVirtualList.svelte";
 
 type TestItem = { id: string; label?: string };
@@ -60,9 +61,11 @@ const createVirtualList = (
 			typeof buildMountedVirtualGridCellsFromRowModel
 		>[0]["rowRange"];
 		previousBuild?: MountedVirtualGridCellsBuildResult<TestItem>;
+		rowSlotAllocator: ReturnType<typeof createResidentRowSlotAllocator>;
 	}) => MountedVirtualGridCellsBuildResult<TestItem> = buildMountedVirtualGridCellsFromRowModel,
-) =>
-	useVirtualList<
+) => {
+	const rowSlotAllocator = createResidentRowSlotAllocator();
+	return useVirtualList<
 		VirtualListLogicalCell<TestItem>,
 		FlatLinkRowModel<TestItem>,
 		MountedVirtualGridCell<TestItem>,
@@ -73,9 +76,11 @@ const createVirtualList = (
 				rowModel,
 				rowRange,
 				previousBuild,
+				rowSlotAllocator,
 			}),
 		onSnapshotUpdated,
 	});
+};
 
 describe("useVirtualList", () => {
 	it("starts uninitialized", () => {

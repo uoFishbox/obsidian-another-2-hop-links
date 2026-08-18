@@ -1,6 +1,5 @@
 import type { RowKey } from "../rowKey";
 import type { MountedVirtualCell } from "../types";
-import type { SectionedGridMountedCellSlot } from "../core/reconciliation/mountedSectionedGridRows";
 
 export interface VirtualSurfaceMountedRow<TMountedCell extends MountedVirtualCell> {
 	key: RowKey;
@@ -8,6 +7,6 @@ export interface VirtualSurfaceMountedRow<TMountedCell extends MountedVirtualCel
 	top: number;
 	slotIndex: number;
 	attributes?: Record<string, string | number | undefined>;
-	cells: readonly TMountedCell[];
-	cellSlots?: readonly SectionedGridMountedCellSlot<TMountedCell>[];
+	/** Stable physical column bindings; null keeps an empty physical slot mounted. */
+	bindings: readonly (TMountedCell | null)[];
 }

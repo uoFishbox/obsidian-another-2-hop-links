@@ -2,21 +2,20 @@ import { describe, expect, it, vi } from "vitest";
 import {
 	buildMountedSectionedGridRows,
 	type SectionedGridMountedCell,
-	type SectionedGridMountedCellSlot,
 	type SectionedGridMountedRow,
 } from "ui/virtualization/core/reconciliation/mountedSectionedGridRows";
+
 interface TestCell extends SectionedGridMountedCell {
 	readonly label: string;
 }
 
-interface TestRow extends SectionedGridMountedRow<TestCell> {
-	readonly cellSlots: readonly SectionedGridMountedCellSlot<TestCell>[];
-}
+type TestRow = SectionedGridMountedRow<TestCell>;
 
 function buildRows(params: {
 	readonly columnEnd: number;
 	readonly slotIndex: number;
 	readonly previousRow?: TestRow;
+	readonly canReusePreviousRow?: boolean;
 	readonly resolveCell?: ReturnType<typeof vi.fn<(columnIndex: number) => TestCell>>;
 	readonly rebindCell?: ReturnType<
 		typeof vi.fn<(previous: TestCell, renderSlotIndex: number) => TestCell>
@@ -26,7 +25,6 @@ function buildRows(params: {
 		params.resolveCell ??
 		vi.fn(
 			(columnIndex: number): TestCell => ({
-				key: `cell:${columnIndex}`,
 				columnIndex,
 				renderSlotIndex: params.slotIndex * 4 + columnIndex,
 				label: `cell:${columnIndex}`,
@@ -47,7 +45,7 @@ function buildRows(params: {
 		slotCapacity: 2,
 		resolveSlotIndex: () => params.slotIndex,
 		resolvePreviousRow: () => params.previousRow,
-		canReusePreviousRow: () => true,
+		canReusePreviousRow: () => params.canReusePreviousRow ?? true,
 		resolveRow: () => ({
 			top: 0,
 			columnStart: 0,
@@ -57,11 +55,10 @@ function buildRows(params: {
 		resolveCell: ({ columnIndex }) => resolveCell(columnIndex),
 		rebindCell: ({ previous, renderSlotIndex }) =>
 			rebindCell(previous, renderSlotIndex),
-		createRow: ({ rowIndex, slotIndex, cells, cellSlots }) => ({
+		createRow: ({ rowIndex, slotIndex, bindings }) => ({
 			rowIndex,
 			slotIndex,
-			cells,
-			cellSlots,
+			bindings,
 		}),
 	});
 
@@ -69,27 +66,35 @@ function buildRows(params: {
 }
 
 describe("buildMountedSectionedGridRows", () => {
-	it("keeps physical slots fixed while logical cells remain compact", () => {
+	it("keeps one binding per physical column while flattening only occupied cells", () => {
 		const { build } = buildRows({ columnEnd: 2, slotIndex: 0 });
 		const row = build.rowSlices[0];
 
-		expect(row?.cellSlots).toHaveLength(4);
-		expect(row?.cells).toHaveLength(2);
-		expect(row?.cellSlots.map((slot) => slot.columnIndex)).toEqual([0, 1, 2, 3]);
-		expect(row?.cellSlots.map((slot) => slot.binding?.key ?? null)).toEqual([
+		expect(row?.bindings).toHaveLength(4);
+		expect(row?.bindings.map((binding) => binding?.label ?? null)).toEqual([
 			"cell:0",
 			"cell:1",
 			null,
 			null,
 		]);
-		expect(build.cells).toEqual(row?.cells);
-		expect(Array.from(build.reusableCellsByKey.keys())).toEqual([
-			"cell:0",
-			"cell:1",
-		]);
+		expect(build.cells).toEqual(row?.bindings.filter(Boolean));
 	});
 
-	it("rebinds occupied slots and resolves only slots transitioning from empty", () => {
+	it("rebinds physical bindings even when the whole logical row cannot be reused", () => {
+		const initial = buildRows({ columnEnd: 2, slotIndex: 0 });
+		const rebuilt = buildRows({
+			columnEnd: 2,
+			slotIndex: 0,
+			previousRow: initial.build.rowSlices[0],
+			canReusePreviousRow: false,
+		});
+
+		expect(rebuilt.build.rowSlices[0]).not.toBe(initial.build.rowSlices[0]);
+		expect(rebuilt.rebindCell).toHaveBeenCalledTimes(2);
+		expect(rebuilt.resolveCell).not.toHaveBeenCalled();
+	});
+
+	it("rebinds occupied bindings and resolves only columns transitioning from empty", () => {
 		const full = buildRows({ columnEnd: 4, slotIndex: 0 });
 		const partial = buildRows({
 			columnEnd: 2,
@@ -105,7 +110,7 @@ describe("buildMountedSectionedGridRows", () => {
 		expect(partial.rebindCell).toHaveBeenCalledTimes(2);
 		expect(partial.resolveCell).not.toHaveBeenCalled();
 		expect(
-			partial.build.rowSlices[0]?.cellSlots.map((slot) => slot.binding !== null),
+			partial.build.rowSlices[0]?.bindings.map((binding) => binding !== null),
 		).toEqual([true, true, false, false]);
 
 		expect(restored.rebindCell).toHaveBeenCalledTimes(2);
@@ -114,9 +119,7 @@ describe("buildMountedSectionedGridRows", () => {
 			restored.resolveCell.mock.calls.map(([columnIndex]) => columnIndex),
 		).toEqual([2, 3]);
 		expect(
-			restored.build.rowSlices[0]?.cellSlots.every(
-				(slot) => slot.binding !== null,
-			),
+			restored.build.rowSlices[0]?.bindings.every((binding) => binding !== null),
 		).toBe(true);
 	});
 
@@ -136,16 +139,14 @@ describe("buildMountedSectionedGridRows", () => {
 				metadata: null,
 			}),
 			resolveCell: ({ columnIndex, renderSlotIndex }) => ({
-				key: `cell:${renderSlotIndex}`,
 				columnIndex,
 				renderSlotIndex,
 				label: `cell:${renderSlotIndex}`,
 			}),
-			createRow: ({ rowIndex, slotIndex, cells, cellSlots }) => ({
+			createRow: ({ rowIndex, slotIndex, bindings }) => ({
 				rowIndex,
 				slotIndex,
-				cells,
-				cellSlots,
+				bindings,
 			}),
 		});
 
@@ -164,11 +165,10 @@ describe("buildMountedSectionedGridRows", () => {
 				canReusePreviousRow: () => false,
 				resolveRow: () => null,
 				resolveCell: () => null,
-				createRow: ({ rowIndex, slotIndex, cells, cellSlots }) => ({
+				createRow: ({ rowIndex, slotIndex, bindings }) => ({
 					rowIndex,
 					slotIndex,
-					cells,
-					cellSlots,
+					bindings,
 				}),
 			}),
 		).toThrowError("No resident slot assigned for row 7.");

@@ -10,6 +10,10 @@ import type {
 } from "../../../renderRevision";
 import { createFlatLinkRowModel } from "../../../row-models/flatLinkRowModel";
 import {
+	createResidentRowSlotAllocator,
+	type ResidentRowSlotAllocator,
+} from "../../residentSlotAllocator";
+import {
 	buildMountedVirtualGridCellsFromRowModel,
 	type MountedVirtualGridCellsBuildResult,
 } from "../linkListVirtualLayout";
@@ -24,6 +28,7 @@ type TestItem = {
 	renderVersion?: RenderRevision;
 };
 type TestBuildResult = MountedVirtualGridCellsBuildResult<TestItem>;
+const rowSlotAllocators = new WeakMap<TestBuildResult, ResidentRowSlotAllocator>();
 
 function createItems(count: number): TestItem[] {
 	return Array.from({ length: count }, (_, index) => ({
@@ -95,6 +100,7 @@ function buildCells(params: {
 		index: number,
 	) => RenderRevision | undefined;
 	renderRevisionFallbackPolicy?: RenderRevisionFallbackPolicy;
+	rowSlotAllocator?: ResidentRowSlotAllocator;
 }): TestBuildResult {
 	const cellSource = createLogicalCellSource({
 		header: false,
@@ -121,7 +127,13 @@ function buildCells(params: {
 		end: cellSource.cellCount,
 	};
 
-	return buildMountedVirtualGridCellsFromRowModel({
+	const rowSlotAllocator =
+		params.rowSlotAllocator ??
+		(params.previousBuild
+			? rowSlotAllocators.get(params.previousBuild)
+			: undefined) ??
+		createResidentRowSlotAllocator();
+	const build = buildMountedVirtualGridCellsFromRowModel({
 		rowModel,
 		rowRange: {
 			start: Math.floor(Math.max(0, visibleWindow.start) / columns),
@@ -129,7 +141,10 @@ function buildCells(params: {
 		},
 		previousBuild: params.previousBuild,
 		renderRevisionFallbackPolicy: params.renderRevisionFallbackPolicy,
+		rowSlotAllocator,
 	});
+	rowSlotAllocators.set(build, rowSlotAllocator);
+	return build;
 }
 
 function slotsByKey(build: {
@@ -309,12 +324,14 @@ describe("linkListVirtualLayout", () => {
 		expect(build.rowSlices.map((row) => row.key)).toEqual([0, 1]);
 		expect(build.rowSlices.map((row) => row.slotIndex)).toEqual([0, 1]);
 		expect(build.rowSlices.map((row) => row.top)).toEqual([0, 130]);
-		expect(build.rowSlices.map((row) => row.cells.map((cell) => cell.key))).toEqual(
-			[
-				[itemKey(0), itemKey(1), itemKey(2)],
-				[itemKey(3), itemKey(4), itemKey(5)],
-			],
-		);
+		expect(
+			build.rowSlices.map((row) =>
+				row.bindings.filter((cell) => cell !== null).map((cell) => cell.key),
+			),
+		).toEqual([
+			[itemKey(0), itemKey(1), itemKey(2)],
+			[itemKey(3), itemKey(4), itemKey(5)],
+		]);
 	});
 
 	it("renders a shifted visible window in visual row order", () => {
@@ -365,20 +382,46 @@ describe("linkListVirtualLayout", () => {
 			rowHeight: 120,
 			gap: 10,
 		});
+		const rowSlotAllocator = createResidentRowSlotAllocator();
 		const initial = buildMountedVirtualGridCellsFromRowModel({
 			rowModel,
 			rowRange: { start: 0, end: 2 },
+			rowSlotAllocator,
 		});
 		const shifted = buildMountedVirtualGridCellsFromRowModel({
 			rowModel,
 			rowRange: { start: 1, end: 3 },
 			previousBuild: initial,
+			rowSlotAllocator,
 		});
 
 		expect(shifted.rowSlices[0]).toBe(initial.rowSlices[1]);
-		expect(shifted.rowSlices[0].cells).toBe(initial.rowSlices[1].cells);
+		expect(shifted.rowSlices[0].bindings).toBe(initial.rowSlices[1].bindings);
 		expect(shifted.rowSlices[1].slotIndex).toBe(0);
 		expect(shifted.rowSlices[1].slotIndex).toBe(initial.rowSlices[0].slotIndex);
+	});
+
+	it("keeps primitive render revisions collision-free in mounted body keys", () => {
+		const revisions: RenderRevision[] = [
+			null,
+			false,
+			true,
+			0,
+			-0,
+			Number.NaN,
+			"null",
+			"0",
+			"n:NaN",
+		];
+		const bodyKeys = revisions.map(
+			(renderVersion) =>
+				buildCells({
+					items: [{ id: "item-0", label: "Item 0", renderVersion }],
+					getItemRenderRevision: (item) => item.renderVersion,
+				}).cells[0].renderBodyKey,
+		);
+
+		expect(new Set(bodyKeys).size).toBe(revisions.length);
 	});
 
 	it("keeps item body keys stable when item render revisions are stable", () => {
@@ -480,6 +523,5 @@ describe("linkListVirtualLayout", () => {
 
 		expect(shrunk.cells).toEqual([]);
 		expect(shrunk.rowSlices).toEqual([]);
-		expect(shrunk.reusableCellsByKey.size).toBe(0);
 	});
 });

@@ -1,8 +1,5 @@
 import type { MountedVirtualCellsBuild } from "ui/virtualization/core/virtualListEngine";
-import {
-	buildMountedSectionedGridRows,
-	type SectionedGridMountedCellSlot,
-} from "ui/virtualization/core/reconciliation/mountedSectionedGridRows";
+import { buildMountedSectionedGridRows } from "ui/virtualization/core/reconciliation/mountedSectionedGridRows";
 import type { ResidentRowSlotAllocator } from "ui/virtualization/core/residentSlotAllocator";
 import type { RenderBodyKey } from "ui/virtualization/renderRevision";
 import type { RowRange } from "ui/virtualization/rowRange";
@@ -32,8 +29,7 @@ export interface MountedTwoHopRow {
 	readonly slotIndex: number;
 	readonly rowIndex: number;
 	readonly top: number;
-	readonly cells: readonly MountedTwoHopCell[];
-	readonly cellSlots: readonly SectionedGridMountedCellSlot<MountedTwoHopCell>[];
+	readonly bindings: readonly (MountedTwoHopCell | null)[];
 }
 
 export interface MountedTwoHopBuild extends MountedVirtualCellsBuild<MountedTwoHopCell> {
@@ -97,16 +93,15 @@ export function buildMountedTwoHopRows(
 		resolveCell: ({ columnIndex, renderSlotIndex, row }) =>
 			createMountedCell(row.metadata.getCell(columnIndex), renderSlotIndex),
 		rebindCell: ({ columnIndex, renderSlotIndex, row }) =>
-			createMountedCell(row.metadata.getCell(columnIndex), renderSlotIndex)!,
-		createRow: ({ rowIndex, slotIndex, cells, cellSlots, row }) => {
+			createMountedCell(row.metadata.getCell(columnIndex), renderSlotIndex),
+		createRow: ({ rowIndex, slotIndex, bindings, row }) => {
 			recordCCLDevMeasurement("virtualGrid.rowShellCreated");
 			return {
 				key: rowIndex,
 				slotIndex,
 				rowIndex,
 				top: row.top,
-				cells,
-				cellSlots,
+				bindings,
 			};
 		},
 	});
@@ -116,14 +111,8 @@ export function buildMountedTwoHopRows(
 		get cells() {
 			return mountedRows.cells;
 		},
-		// Two-hop reuses cells only through whole-row reuse; no consumer reads this
-		// map, so the lazy build below must stay off the scroll hot path.
-		get reusableCellsByKey() {
-			return mountedRows.reusableCellsByKey;
-		},
 		rowSlices: mountedRows.rowSlices,
 		rowsBySlot: mountedRows.rowsBySlot,
-		nextRenderSlotIndex: mountedRows.nextRenderSlotIndex,
 		poolCapacity: rowSlotAllocator.capacity,
 		rowModel,
 	};

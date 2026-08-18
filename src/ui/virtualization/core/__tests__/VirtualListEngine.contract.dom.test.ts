@@ -18,6 +18,10 @@ import {
 	type VirtualListComputation,
 	type VirtualListSnapshot,
 } from "../virtualListEngine";
+import {
+	createResidentRowSlotAllocator,
+	type ResidentRowSlotAllocator,
+} from "../residentSlotAllocator";
 
 interface TestItem {
 	readonly id: string;
@@ -33,6 +37,7 @@ type TestComputation = VirtualListComputation<
 	MountedVirtualGridCell<TestItem>,
 	MountedVirtualGridCellsBuildResult<TestItem>
 >;
+const rowSlotAllocators = new WeakMap<TestSnapshot, ResidentRowSlotAllocator>();
 
 const createRowModel = (count: number): FlatLinkRowModel<TestItem> => {
 	const items = Array.from({ length: count }, (_, index) => ({
@@ -65,7 +70,12 @@ const compute = (params: {
 	readonly scrollTop?: number;
 	readonly mountedOverscanPx?: number;
 	readonly buildMountedCells?: typeof buildMountedVirtualGridCellsFromRowModel<TestItem>;
+	readonly rowSlotAllocator?: ResidentRowSlotAllocator;
 }): TestComputation => {
+	const rowSlotAllocator =
+		params.rowSlotAllocator ??
+		(params.previous ? rowSlotAllocators.get(params.previous) : undefined) ??
+		createResidentRowSlotAllocator();
 	const result = computeVirtualListSnapshot({
 		rowModel: params.rowModel,
 		measurement: {
@@ -90,8 +100,10 @@ const compute = (params: {
 				rowModel: rowModel as FlatLinkRowModel<TestItem>,
 				rowRange,
 				previousBuild,
+				rowSlotAllocator,
 			}),
 	});
+	rowSlotAllocators.set(result.snapshot, rowSlotAllocator);
 	return result;
 };
 
@@ -218,6 +230,7 @@ describe("VirtualListEngine contract", () => {
 					rowModel: nextRowModel as FlatLinkRowModel<TestItem>,
 					rowRange,
 					previousBuild,
+					rowSlotAllocator: createResidentRowSlotAllocator(),
 				}),
 		});
 

@@ -2,7 +2,6 @@
 	import VirtualSurface from "../VirtualSurface.svelte";
 	import VirtualSurfaceRecyclingProbe from "./VirtualSurfaceRecyclingProbe.svelte";
 	import type { MountedVirtualCell } from "../../types";
-	import type { SectionedGridMountedCellSlot } from "ui/virtualization/core/reconciliation/mountedSectionedGridRows";
 	import {
 		KEYED_VIRTUAL_CELL_BODY_LIFECYCLE,
 		PHYSICAL_SLOT_BODY_LIFECYCLE,
@@ -17,8 +16,7 @@
 		rowIndex: number;
 		top: number;
 		slotIndex: number;
-		cells: TestMountedCell[];
-		cellSlots?: SectionedGridMountedCellSlot<TestMountedCell>[];
+		bindings: Array<TestMountedCell | null>;
 	}
 
 	interface Props {

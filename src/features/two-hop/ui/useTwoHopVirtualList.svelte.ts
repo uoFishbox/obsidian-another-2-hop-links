@@ -35,7 +35,6 @@ import {
 } from "ui/virtualization/svelte/viewPlanLayout";
 import { findNearestScrollContainer } from "ui/virtualization/dom/scrollContainer";
 import { getOptionalOwnerWindow } from "ui/shared/dom/realmSafeDom";
-import { createResidentRowSlotAllocator } from "ui/virtualization/core/residentSlotAllocator";
 import { useVirtualList } from "ui/virtualization/svelte/useVirtualList.svelte";
 import { createVirtualListMeasurementState } from "ui/virtualization/dom/virtualListMeasurementState";
 import type { VirtualMeasurement } from "ui/virtualization/dom/virtualMeasurementController";
@@ -102,7 +101,6 @@ export function useTwoHopVirtualList(
 	let widthWasZero = false;
 	let disposed = false;
 
-	const rowSlotAllocator = createResidentRowSlotAllocator();
 	const resolveConfiguredLayout = createResolvedCardLayoutSettingsMemo();
 	const configuredLayout = $derived(
 		resolveConfiguredLayout(applicationStore.settings),
@@ -147,14 +145,18 @@ export function useTwoHopVirtualList(
 		MountedTwoHopCell,
 		MountedTwoHopBuild
 	>({
-		buildMountedCells: ({ rowModel: nextRowModel, rowRange, previousBuild }) =>
+		buildMountedCells: ({
+			rowModel: nextRowModel,
+			rowRange,
+			previousBuild,
+			rowSlotAllocator,
+		}) =>
 			buildMountedTwoHopRows({
 				rowModel: nextRowModel,
 				rowRange,
 				previousBuild,
 				rowSlotAllocator,
 			}),
-		mountedRowsReconciler: rowSlotAllocator,
 		onStableVisibleRange: () => {
 			measurement.hasStableVisibleRange = true;
 		},
@@ -180,7 +182,8 @@ export function useTwoHopVirtualList(
 		}
 		const bindings: VirtualPreviewBinding[] = [];
 		for (const row of getMountedRows()) {
-			for (const mountedCell of row.cells) {
+			for (const mountedCell of row.bindings) {
+				if (!mountedCell) continue;
 				if (mountedCell.cell.kind !== "item") continue;
 				const request = cardHydrator.getModel(
 					mountedCell.cell.logicalKey,
@@ -203,7 +206,8 @@ export function useTwoHopVirtualList(
 		const foreground: TwoHopCardHydrationCell[] = [];
 		const background: TwoHopCardHydrationCell[] = [];
 		for (const row of getMountedRows()) {
-			for (const mountedCell of row.cells) {
+			for (const mountedCell of row.bindings) {
+				if (!mountedCell) continue;
 				if (mountedCell.cell.kind !== "item") continue;
 				if (
 					mountedCell.rowIndex >= foregroundRange.start &&

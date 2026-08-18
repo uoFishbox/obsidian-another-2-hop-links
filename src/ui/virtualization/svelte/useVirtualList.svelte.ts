@@ -9,7 +9,11 @@ import {
 	type VirtualVisibilityPolicy,
 } from "../core/virtualListEngine";
 import type { EmptyReason, VirtualListMode } from "../core/VirtualListMode";
-import type { ResidentSlotResetReason } from "../core/residentSlotAllocator";
+import {
+	createResidentRowSlotAllocator,
+	type ResidentRowSlotAllocator,
+	type ResidentSlotResetReason,
+} from "../core/residentSlotAllocator";
 import type { MountedVirtualCell, VirtualRanges, VirtualRowModel } from "../types";
 
 export interface ApplyVirtualListMeasurementParams<
@@ -62,11 +66,17 @@ export interface UseVirtualListOptions<
 		rowRange: RowRange;
 		ranges: VirtualRanges;
 		previousBuild?: TMountedBuild;
+		/** Shared across builds; reuses physical row slots across range shifts. */
+		rowSlotAllocator: ResidentRowSlotAllocator;
 	}): TMountedBuild;
 	onSnapshotUpdated?(
 		snapshot: VirtualListSnapshot<TCell, TMountedCell, TMountedBuild>,
 	): void;
 	onStableVisibleRange?: () => void;
+	/**
+	 * Overrides the resident row-slot reconciler owned by the list. Defaults
+	 * to the allocator injected into `buildMountedCells`.
+	 */
 	mountedRowsReconciler?: {
 		reset(reason: ResidentSlotResetReason): void;
 		dispose(): void;
@@ -101,6 +111,25 @@ export function useVirtualList<
 	let mountedBuildState = $state.raw<TMountedBuild | null>(null);
 	let totalHeightState = $state<number | null>(null);
 	let modeState = $state.raw<VirtualListMode>({ kind: "uninitialized" });
+
+	// The list owns the resident row-slot allocator: every mounted build must
+	// share it so physical row slots stay reusable across range shifts.
+	const rowSlotAllocator = createResidentRowSlotAllocator();
+	const mountedRowsReconciler = options.mountedRowsReconciler ?? rowSlotAllocator;
+
+	const buildMountedCells = (params: {
+		rowModel: TRowModel;
+		rowRange: RowRange;
+		ranges: VirtualRanges;
+		previousBuild?: TMountedBuild;
+	}): TMountedBuild =>
+		options.buildMountedCells({
+			rowModel: params.rowModel,
+			rowRange: params.rowRange,
+			ranges: params.ranges,
+			previousBuild: params.previousBuild,
+			rowSlotAllocator,
+		});
 
 	const commitComputation = (
 		result: VirtualListComputation<TCell, TMountedCell, TMountedBuild>,
@@ -145,11 +174,11 @@ export function useVirtualList<
 			},
 			visibilityPolicy: params.visibilityPolicy,
 			previous: previousSnapshot,
-			buildMountedCells: options.buildMountedCells,
+			buildMountedCells,
 		});
 		const nextSnapshot = result.snapshot;
 		if (nextSnapshot.mode.kind === "empty" && previousMountedBuild) {
-			options.mountedRowsReconciler?.reset("empty");
+			mountedRowsReconciler.reset("empty");
 		}
 		commitComputation(result);
 
@@ -204,16 +233,16 @@ export function useVirtualList<
 		const result = recomputeVirtualListSnapshot({
 			rowModel: params.rowModel,
 			previous: previousSnapshot,
-			buildMountedCells: options.buildMountedCells,
+			buildMountedCells,
 		});
 		if (result.snapshot.mode.kind === "empty" && previousSnapshot.mountedBuild) {
-			options.mountedRowsReconciler?.reset("empty");
+			mountedRowsReconciler.reset("empty");
 		}
 		commitComputation(result);
 	};
 
 	const setEmpty = (params: { rowModel: TRowModel; reason?: EmptyReason }): void => {
-		options.mountedRowsReconciler?.reset("empty");
+		mountedRowsReconciler.reset("empty");
 		commitComputation(
 			createEmptyVirtualListComputation<TCell, TMountedCell, TMountedBuild>({
 				rowModel: params.rowModel,
@@ -225,7 +254,12 @@ export function useVirtualList<
 		);
 	};
 
-	$effect(() => () => options.mountedRowsReconciler?.dispose());
+	$effect(() => () => {
+		mountedRowsReconciler.dispose();
+		if (mountedRowsReconciler !== rowSlotAllocator) {
+			rowSlotAllocator.dispose();
+		}
+	});
 
 	return {
 		getSnapshot() {

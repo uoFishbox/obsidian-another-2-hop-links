@@ -48,13 +48,7 @@ export interface MountedVirtualCellsBuild<TMountedCell extends MountedVirtualCel
 	 * immutable after returning the build to the engine.
 	 */
 	cells: TMountedCell[];
-	/**
-	 * Builders own this map while constructing the result. Treat it as
-	 * immutable after returning the build to the engine.
-	 */
-	reusableCellsByKey: Map<string, TMountedCell>;
 	mountedCellCount?: number;
-	nextRenderSlotIndex: number;
 }
 
 export interface VirtualListSnapshot<

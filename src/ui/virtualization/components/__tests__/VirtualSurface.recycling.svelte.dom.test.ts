@@ -7,7 +7,6 @@ import {
 } from "testing/helpers/DOMObserverMock";
 import VirtualSurfaceRecyclingHarness from "./VirtualSurfaceRecyclingHarness.svelte";
 import { type MountedVirtualCell, type LogicalCellKey } from "../../types";
-import type { SectionedGridMountedCellSlot } from "../../core/reconciliation/mountedSectionedGridRows";
 
 interface TestMountedCell extends MountedVirtualCell {
 	columnIndex: number;
@@ -22,8 +21,7 @@ interface TestMountedRow {
 	rowIndex: number;
 	top: number;
 	slotIndex: number;
-	cells: TestMountedCell[];
-	cellSlots?: SectionedGridMountedCellSlot<TestMountedCell>[];
+	bindings: Array<TestMountedCell | null>;
 }
 
 function createCells(keys: string[], slotOffset: number = 0): TestMountedCell[] {
@@ -53,19 +51,9 @@ function createRows(
 		rowIndex: options.rowIndex ?? 0,
 		top: options.top ?? 0,
 		slotIndex: options.slotIndex ?? 0,
-		cells,
+		bindings: cells,
 	};
 	return [row];
-}
-
-function createCellSlots(
-	bindings: Array<TestMountedCell | null>,
-): SectionedGridMountedCellSlot<TestMountedCell>[] {
-	return bindings.map((binding, columnIndex) => ({
-		binding,
-		columnIndex,
-		renderSlotIndex: columnIndex,
-	}));
 }
 
 describe("VirtualSurface grid-row recycling", () => {
@@ -250,8 +238,7 @@ describe("VirtualSurface grid-row recycling", () => {
 					rowIndex: 0,
 					top: 0,
 					slotIndex: 0,
-					cells: binding ? [binding] : [],
-					cellSlots: createCellSlots([binding]),
+					bindings: [binding],
 				},
 			];
 			const rerenderProps = (binding: TestMountedCell | null) => ({
@@ -322,8 +309,7 @@ describe("VirtualSurface grid-row recycling", () => {
 				rowIndex: 0,
 				top: 0,
 				slotIndex: 0,
-				cells: binding ? [binding] : [],
-				cellSlots: createCellSlots([binding]),
+				bindings: [binding],
 			},
 		];
 		const mountedKeys: string[] = [];

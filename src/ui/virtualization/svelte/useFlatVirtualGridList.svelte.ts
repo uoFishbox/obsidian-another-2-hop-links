@@ -41,7 +41,6 @@ import {
 	type VirtualGridLayout,
 } from "../dom/flatGridLayoutMeasurement";
 import { createVirtualListControllerAdapter } from "./virtualListControllerAdapter";
-import { createResidentRowSlotAllocator } from "ui/virtualization/core/residentSlotAllocator";
 import { DISABLED_PREVIEW_SURFACE } from "features/card-preview/runtime/previewRuntime";
 import type { CardPreviewRequest } from "features/card-preview/core/cardPreviewRequest";
 import type { VirtualPreviewBinding } from "features/card-preview/scheduling/virtualPreviewSurface";
@@ -151,7 +150,6 @@ export function useFlatVirtualGridList<T>(
 		appContext?.previewRuntime?.createSurface(previewSurfaceOptions) ??
 		DISABLED_PREVIEW_SURFACE;
 	const interactionController = createVirtualCardInteractionController();
-	const rowSlotAllocator = createResidentRowSlotAllocator();
 	let lastResolvedVisibilityPolicyRowHeight: number | undefined;
 	let lastResolvedVisibilityPolicyGap: number | undefined;
 	let lastResolvedVisibilityPolicyAheadRows: number | undefined;
@@ -250,7 +248,8 @@ export function useFlatVirtualGridList<T>(
 		const previewBindings: VirtualPreviewBinding[] = [];
 		const interactionCards: VirtualCardInteractionBinding[] = [];
 		for (const row of rows) {
-			for (const mountedCell of row.cells) {
+			for (const mountedCell of row.bindings) {
+				if (!mountedCell) continue;
 				if (!isFlatMountedItemCell(mountedCell)) continue;
 				const { item, itemIndex } = mountedCell.cell;
 				const previewRequest = props.resolveItemPreviewRequest?.(
@@ -286,7 +285,7 @@ export function useFlatVirtualGridList<T>(
 		MountedVirtualGridCell<T>,
 		MountedVirtualGridCellsBuildResult<T>
 	>({
-		buildMountedCells: ({ rowModel, rowRange, previousBuild }) =>
+		buildMountedCells: ({ rowModel, rowRange, previousBuild, rowSlotAllocator }) =>
 			buildMountedVirtualGridCellsFromRowModel({
 				rowModel,
 				rowRange,
@@ -294,7 +293,6 @@ export function useFlatVirtualGridList<T>(
 				renderRevisionFallbackPolicy: props.renderRevisionFallbackPolicy,
 				rowSlotAllocator,
 			}),
-		mountedRowsReconciler: rowSlotAllocator,
 		onStableVisibleRange: () => {
 			measurement.hasStableVisibleRange = true;
 		},

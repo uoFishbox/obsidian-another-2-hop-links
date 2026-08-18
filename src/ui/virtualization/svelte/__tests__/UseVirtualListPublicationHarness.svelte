@@ -1,8 +1,17 @@
 <script lang="ts">
 	import { computeVirtualGridLayout } from "../../layout/flatGridLayout";
 	import { createFlatLogicalCellSource } from "../../flatLogicalCellSource";
-	import { createFlatLinkRowModel } from "../../row-models/flatLinkRowModel";
-	import { buildMountedVirtualGridCellsFromRowModel } from "../../core/reconciliation/linkListVirtualLayout";
+	import {
+		createFlatLinkRowModel,
+		type FlatLinkRowModel,
+	} from "../../row-models/flatLinkRowModel";
+	import { createResidentRowSlotAllocator } from "../../core/residentSlotAllocator";
+	import {
+		buildMountedVirtualGridCellsFromRowModel,
+		type MountedVirtualGridCell,
+		type MountedVirtualGridCellsBuildResult,
+	} from "../../core/reconciliation/linkListVirtualLayout";
+	import type { VirtualListLogicalCell } from "../../logicalCell";
 	import { useVirtualList } from "../useVirtualList.svelte";
 
 	interface TestItem {
@@ -34,8 +43,20 @@
 		cellCount: cellSource.cellCount,
 	});
 	const rowModel = createFlatLinkRowModel({ cellSource, layout });
-	const virtualList = useVirtualList({
-		buildMountedCells: buildMountedVirtualGridCellsFromRowModel<TestItem>,
+	const rowSlotAllocator = createResidentRowSlotAllocator();
+	const virtualList = useVirtualList<
+		VirtualListLogicalCell<TestItem>,
+		FlatLinkRowModel<TestItem>,
+		MountedVirtualGridCell<TestItem>,
+		MountedVirtualGridCellsBuildResult<TestItem>
+	>({
+		buildMountedCells: ({ rowModel: nextRowModel, rowRange, previousBuild }) =>
+			buildMountedVirtualGridCellsFromRowModel({
+				rowModel: nextRowModel,
+				rowRange,
+				previousBuild,
+				rowSlotAllocator,
+			}),
 	});
 
 	const applyMeasurement = (

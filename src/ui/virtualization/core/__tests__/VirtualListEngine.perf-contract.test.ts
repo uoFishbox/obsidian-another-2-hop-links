@@ -19,6 +19,7 @@ import {
 	computeVirtualListSnapshot,
 	type VirtualListSnapshot,
 } from "../virtualListEngine";
+import { createResidentRowSlotAllocator } from "../residentSlotAllocator";
 
 type TestItem = { id: string };
 type TestSnapshot = VirtualListSnapshot<
@@ -70,6 +71,7 @@ const measureWorkload = (cardCount: number) => {
 	let previous: TestSnapshot | null = null;
 	let mountedCellBuilds = 0;
 	let fastPathReuses = 0;
+	const rowSlotAllocator = createResidentRowSlotAllocator();
 
 	// Count reconciliation builds separately from snapshot computations. Every
 	// replay computes a snapshot, but no-op replays must take the fast path.
@@ -106,6 +108,7 @@ const measureWorkload = (cardCount: number) => {
 					rowModel: nextRowModel as FlatLinkRowModel<TestItem>,
 					rowRange,
 					previousBuild,
+					rowSlotAllocator,
 				});
 			},
 		});
@@ -163,9 +166,11 @@ describe("VirtualListEngine performance contracts", () => {
 	it("resolves only the entering flat-grid row across sustained scrolling", () => {
 		const rowModel = createRowModel(10_000);
 		const resolveCellAtIndex = vi.spyOn(rowModel, "resolveCellAtIndex");
+		const rowSlotAllocator = createResidentRowSlotAllocator();
 		let mounted = buildMountedVirtualGridCellsFromRowModel({
 			rowModel,
 			rowRange: { start: 10, end: 19 },
+			rowSlotAllocator,
 		});
 		const mountedRows = mounted.rowSlices.length;
 		const columns = rowModel.layout.columns;
@@ -179,6 +184,7 @@ describe("VirtualListEngine performance contracts", () => {
 					end: 19 + frame,
 				},
 				previousBuild: mounted,
+				rowSlotAllocator,
 			});
 		}
 
