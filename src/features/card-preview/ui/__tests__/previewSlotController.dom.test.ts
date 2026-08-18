@@ -24,9 +24,7 @@ function request(renderKey: string): CardPreviewRequest {
 describe("PreviewSlotController", () => {
 	it("does not let an old lease detach a newer lease for the same host", () => {
 		const render = vi.fn<CardPreviewRenderer>(() => vi.fn());
-		const controller = createPreviewSlotController({
-			createRenderer: () => render,
-		});
+		const controller = createPreviewSlotController(() => render);
 		const host = document.createElement("div");
 		const firstLease = controller.attachHost(host);
 		const secondLease = controller.attachHost(host);
@@ -50,9 +48,7 @@ describe("PreviewSlotController", () => {
 			callbacks.push(next);
 			return cleanup;
 		});
-		const controller = createPreviewSlotController({
-			createRenderer: () => render,
-		});
+		const controller = createPreviewSlotController(() => render);
 		const firstHost = document.createElement("div");
 		const firstLease = controller.attachHost(firstHost);
 		controller.bind(request("stable"));
@@ -86,9 +82,7 @@ describe("PreviewSlotController", () => {
 			callbacks.push(next);
 			return vi.fn();
 		});
-		const controller = createPreviewSlotController({
-			createRenderer: () => render,
-		});
+		const controller = createPreviewSlotController(() => render);
 		const host = document.createElement("div");
 		controller.attachHost(host);
 		controller.bind(request("v1"));
@@ -118,9 +112,7 @@ describe("PreviewSlotController", () => {
 			cleanups.push(cleanup);
 			return cleanup;
 		});
-		const controller = createPreviewSlotController({
-			createRenderer: () => render,
-		});
+		const controller = createPreviewSlotController(() => render);
 		const host = document.createElement("div");
 		controller.attachHost(host);
 		controller.bind(request("v1"));
@@ -155,23 +147,20 @@ describe("PreviewSlotController", () => {
 			next.onError?.();
 			return cleanup;
 		};
-		const states: string[] = [];
-		const controller = createPreviewSlotController({
-			createRenderer: () => render,
-			onStateChange: (state) => states.push(state.phase),
-		});
-		controller.attachHost(document.createElement("div"));
+		const controller = createPreviewSlotController(() => render);
+		const host = document.createElement("div");
+		controller.attachHost(host);
 		controller.bind(request("retry"));
 		controller.setActive(true);
 
 		controller.activate();
-		expect(states.at(-1)).toBe("error");
+		expect(host.dataset.previewState).toBe("error");
 		expect(controller.needsActivation()).toBe(true);
 
 		controller.activate();
 		expect(callbacks).toHaveLength(2);
 		expect(cleanups[0]).toHaveBeenCalledOnce();
-		expect(states.at(-1)).toBe("error");
+		expect(host.dataset.previewState).toBe("error");
 		controller.dispose();
 	});
 });

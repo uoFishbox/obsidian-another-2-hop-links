@@ -3,16 +3,6 @@ import { createAbortError, isAbortError } from "./previewAbort";
 
 const MAX_CONCURRENT_VISIBLE_PREVIEWS = 1;
 
-export interface PreviewQueueTask {
-	cancelled: boolean;
-	cleanup: () => void;
-	reject: (error: unknown) => void;
-	resolve: (data: PreviewData) => void;
-	run: () => Promise<PreviewData>;
-	signal?: AbortSignal;
-	started: boolean;
-}
-
 export interface PreviewQueueSnapshot {
 	readonly queued: number;
 	readonly active: number;
@@ -20,132 +10,106 @@ export interface PreviewQueueSnapshot {
 
 export type PreviewQueueListener = (snapshot: PreviewQueueSnapshot) => void;
 
-export interface PreviewQueue {
-	enqueue: (task: PreviewQueueTask) => Promise<PreviewData>;
-	getActiveCount: () => number;
-	getOutstandingCount: () => number;
-	getSize: () => number;
-	shutdown: () => void;
-	subscribe: (listener: PreviewQueueListener) => () => void;
+interface QueuedPreviewTask {
+	readonly run: () => Promise<PreviewData>;
+	readonly signal?: AbortSignal;
+	started: boolean;
+	cancelled: boolean;
+	resolve(data: PreviewData): void;
+	reject(error: unknown): void;
+	cleanup(): void;
 }
 
-export function createPreviewQueue(): PreviewQueue {
-	let activeVisiblePreviews = 0;
-	const visibleQueue: PreviewQueueTask[] = [];
+export function createPreviewQueue() {
+	let activeCount = 0;
+	const queue: QueuedPreviewTask[] = [];
 	const listeners = new Set<PreviewQueueListener>();
-	let lastSnapshot: PreviewQueueSnapshot = { queued: 0, active: 0 };
-
-	function getSize(): number {
-		return visibleQueue.length;
-	}
-
-	function getActiveCount(): number {
-		return activeVisiblePreviews;
-	}
-
-	function getOutstandingCount(): number {
-		return visibleQueue.length + activeVisiblePreviews;
-	}
+	let lastQueued = 0;
+	let lastActive = 0;
 
 	function notifyIfChanged(): void {
-		const snapshot: PreviewQueueSnapshot = {
-			queued: visibleQueue.length,
-			active: activeVisiblePreviews,
-		};
-		if (
-			snapshot.queued === lastSnapshot.queued &&
-			snapshot.active === lastSnapshot.active
-		) {
-			return;
-		}
-		lastSnapshot = snapshot;
+		if (queue.length === lastQueued && activeCount === lastActive) return;
+		lastQueued = queue.length;
+		lastActive = activeCount;
+		const snapshot = { queued: lastQueued, active: lastActive };
 		for (const listener of listeners) listener(snapshot);
 	}
 
 	function subscribe(listener: PreviewQueueListener): () => void {
 		listeners.add(listener);
-		listener({ queued: visibleQueue.length, active: activeVisiblePreviews });
+		listener({ queued: queue.length, active: activeCount });
 		return () => listeners.delete(listener);
 	}
 
-	function shutdown(): void {
-		for (const task of visibleQueue) {
-			task.cancelled = true;
-			task.reject(createAbortError());
-		}
-		visibleQueue.length = 0;
-		activeVisiblePreviews = 0;
+	function removeQueuedTask(task: QueuedPreviewTask): void {
+		const index = queue.indexOf(task);
+		if (index < 0) return;
+		queue.splice(index, 1);
 		notifyIfChanged();
 	}
 
-	function enqueue(task: PreviewQueueTask): Promise<PreviewData> {
+	function enqueue(
+		run: () => Promise<PreviewData>,
+		signal?: AbortSignal,
+	): Promise<PreviewData> {
 		return new Promise((resolve, reject) => {
 			let settled = false;
+			const task: QueuedPreviewTask = {
+				run,
+				signal,
+				started: false,
+				cancelled: false,
+				resolve: () => {},
+				reject: () => {},
+				cleanup: () => {},
+			};
 
 			const settle = (handler: () => void): void => {
-				if (settled) {
-					return;
-				}
+				if (settled) return;
 				settled = true;
 				task.cleanup();
 				handler();
 			};
-
-			task.reject = (error) => settle(() => reject(error));
 			task.resolve = (data) => settle(() => resolve(data));
+			task.reject = (error) => settle(() => reject(error));
 
-			const signal = task.signal;
 			if (signal?.aborted) {
 				task.reject(createAbortError());
 				return;
 			}
-
 			if (signal) {
 				const onAbort = () => {
-					if (task.started) {
-						return;
-					}
-
+					if (task.started) return;
 					task.cancelled = true;
 					removeQueuedTask(task);
 					task.reject(createAbortError());
 				};
 				signal.addEventListener("abort", onAbort, { once: true });
-				task.cleanup = () => {
-					signal.removeEventListener("abort", onAbort);
-				};
+				task.cleanup = () => signal.removeEventListener("abort", onAbort);
 			}
 
-			visibleQueue.push(task);
+			queue.push(task);
 			notifyIfChanged();
-			processQueue();
+			drainQueue();
 		});
 	}
 
-	function processQueue(): void {
-		drainQueue();
-	}
-
 	function drainQueue(): void {
-		while (activeVisiblePreviews < MAX_CONCURRENT_VISIBLE_PREVIEWS) {
-			const nextTask = visibleQueue.shift();
-			if (!nextTask) {
-				return;
-			}
+		while (activeCount < MAX_CONCURRENT_VISIBLE_PREVIEWS) {
+			const task = queue.shift();
+			if (!task) return;
 			notifyIfChanged();
-
-			if (nextTask.cancelled || nextTask.signal?.aborted) {
-				nextTask.reject(createAbortError());
+			if (task.cancelled || task.signal?.aborted) {
+				task.reject(createAbortError());
 				continue;
 			}
-
-			startTask(nextTask);
+			startTask(task);
 		}
 	}
 
-	function startTask(task: PreviewQueueTask): void {
+	function startTask(task: QueuedPreviewTask): void {
 		task.started = true;
-		activeVisiblePreviews += 1;
+		activeCount += 1;
 		notifyIfChanged();
 
 		void task
@@ -165,25 +129,27 @@ export function createPreviewQueue(): PreviewQueue {
 				task.reject(error);
 			})
 			.finally(() => {
-				activeVisiblePreviews = Math.max(activeVisiblePreviews - 1, 0);
+				activeCount = Math.max(activeCount - 1, 0);
 				notifyIfChanged();
-				processQueue();
+				drainQueue();
 			});
 	}
 
-	function removeQueuedTask(task: PreviewQueueTask): void {
-		const index = visibleQueue.indexOf(task);
-		if (index >= 0) {
-			visibleQueue.splice(index, 1);
-			notifyIfChanged();
+	function shutdown(): void {
+		for (const task of queue) {
+			task.cancelled = true;
+			task.reject(createAbortError());
 		}
+		queue.length = 0;
+		activeCount = 0;
+		notifyIfChanged();
 	}
 
 	return {
 		enqueue,
-		getActiveCount,
-		getOutstandingCount,
-		getSize,
+		getActiveCount: () => activeCount,
+		getOutstandingCount: () => queue.length + activeCount,
+		getSize: () => queue.length,
 		shutdown,
 		subscribe,
 	};

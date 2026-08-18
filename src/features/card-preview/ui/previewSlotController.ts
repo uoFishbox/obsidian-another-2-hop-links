@@ -2,7 +2,7 @@ import type { PreviewData } from "features/card-preview/public-types";
 import type { CardPreviewRequest } from "features/card-preview/core/cardPreviewRequest";
 import type { CardPreviewAttachment, CardPreviewRenderer } from "./cardPreviewRenderer";
 
-export type PreviewSlotPhase =
+type PreviewSlotPhase =
 	| "empty"
 	| "loading"
 	| "refreshing"
@@ -10,31 +10,20 @@ export type PreviewSlotPhase =
 	| "error"
 	| "dormant";
 
-export interface PreviewSlotState {
+interface PreviewSlotState {
 	readonly phase: PreviewSlotPhase;
 	readonly contentType?: PreviewData["type"];
 	readonly hasContent: boolean;
-	readonly isMathRendering: boolean;
-}
-
-export interface PreviewSlotHostLease {
-	dispose(): void;
 }
 
 export interface PreviewSlotController {
-	attachHost(element: HTMLElement): PreviewSlotHostLease;
+	attachHost(element: HTMLElement): { dispose(): void };
 	bind(request: CardPreviewRequest | null): void;
 	setActive(active: boolean): void;
-	setMathRendering(isRendering: boolean): void;
 	needsActivation(): boolean;
 	activate(): void;
 	clear(): void;
 	dispose(): void;
-}
-
-export interface CreatePreviewSlotControllerOptions {
-	readonly createRenderer: () => CardPreviewRenderer;
-	readonly onStateChange?: (state: PreviewSlotState) => void;
 }
 
 type SlotOperation =
@@ -65,19 +54,17 @@ type SlotContent =
 const EMPTY_STATE: PreviewSlotState = {
 	phase: "empty",
 	hasContent: false,
-	isMathRendering: false,
 };
 
 /** Owns rendering and retained DOM for one logical card preview. */
 export function createPreviewSlotController(
-	options: CreatePreviewSlotControllerOptions,
+	createRenderer: () => CardPreviewRenderer,
 ): PreviewSlotController {
 	let request: CardPreviewRequest | undefined;
 	let revision = 0;
 	let host: HTMLElement | undefined;
 	let hostGeneration = 0;
 	let activity: SlotActivity = "idle";
-	let isMathRendering = false;
 	let operation: SlotOperation = { state: "idle" };
 	let content: SlotContent = { state: "empty" };
 	let detachedContent: DocumentFragment | undefined;
@@ -120,7 +107,6 @@ export function createPreviewSlotController(
 			phase,
 			contentType: committed?.contentType,
 			hasContent,
-			isMathRendering,
 		};
 	}
 
@@ -129,7 +115,6 @@ export function createPreviewSlotController(
 		if (isSamePreviewSlotState(appliedState, next)) return;
 		if (host) applyPreviewSlotHostState(host, appliedState, next);
 		appliedState = next;
-		options.onStateChange?.(next);
 	}
 
 	function cancelCleanup(): void {
@@ -243,12 +228,11 @@ export function createPreviewSlotController(
 		);
 	}
 
-	function attachHost(element: HTMLElement): PreviewSlotHostLease {
+	function attachHost(element: HTMLElement): { dispose(): void } {
 		const leaseGeneration = ++hostGeneration;
 		if (host !== element) {
 			cancelCleanup();
 			advanceRevision();
-			isMathRendering = false;
 			cancelOperation();
 			const previousHost = host;
 			const retained =
@@ -274,7 +258,6 @@ export function createPreviewSlotController(
 				if (host !== element || hostGeneration !== leaseGeneration) return;
 				cancelCleanup();
 				advanceRevision();
-				isMathRendering = false;
 				cancelOperation();
 				const retained = detachDetachableContent(element);
 				if (!retained) clearDom();
@@ -298,7 +281,6 @@ export function createPreviewSlotController(
 		failedRenderKey = undefined;
 		advanceRevision();
 		cancelCleanup();
-		isMathRendering = false;
 		cancelOperation();
 		if (content.state === "error") clearDom();
 		publishState();
@@ -316,18 +298,11 @@ export function createPreviewSlotController(
 		if (content.state !== "committed" || content.attachment !== "detachable") {
 			activity = "dormant";
 			advanceRevision();
-			isMathRendering = false;
 			cancelOperation();
 			scheduleHostBoundCleanup();
 		} else {
 			activity = "idle";
 		}
-		publishState();
-	}
-
-	function setMathRendering(next: boolean): void {
-		if (isMathRendering === next) return;
-		isMathRendering = next;
 		publishState();
 	}
 
@@ -355,7 +330,7 @@ export function createPreviewSlotController(
 
 	function activate(): void {
 		if (!needsActivation() || !request || !host) return;
-		renderer ??= options.createRenderer();
+		renderer ??= createRenderer();
 		cancelCleanup();
 		cancelOperation();
 
@@ -454,7 +429,6 @@ export function createPreviewSlotController(
 	function clear(): void {
 		cancelCleanup();
 		advanceRevision();
-		isMathRendering = false;
 		cancelOperation();
 		request = undefined;
 		failedRenderKey = undefined;
@@ -474,7 +448,6 @@ export function createPreviewSlotController(
 		attachHost,
 		bind,
 		setActive,
-		setMathRendering,
 		needsActivation,
 		activate,
 		clear,
@@ -499,8 +472,7 @@ function isSamePreviewSlotState(
 	return (
 		left.phase === right.phase &&
 		left.contentType === right.contentType &&
-		left.hasContent === right.hasContent &&
-		left.isMathRendering === right.isMathRendering
+		left.hasContent === right.hasContent
 	);
 }
 

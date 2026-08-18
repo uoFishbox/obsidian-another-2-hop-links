@@ -48,7 +48,6 @@ export interface CardPreviewRendererOptions {
 		query: string,
 		file: TFile | null | undefined,
 	) => Pos | undefined;
-	onMathRenderingChange?: (isRendering: boolean) => void;
 }
 
 export interface PreviewRenderCallbacks {
@@ -81,7 +80,6 @@ export function createCardPreviewRenderer(
 ): CardPreviewRenderer {
 	const domCommitScopeKey = `card-preview:${++nextDomCommitScopeId}`;
 	const sharedCache = options.sharedCache;
-	let lastAppliedRenderKey: string | undefined;
 
 	const enqueueCoordinatedDomCommit = async (
 		task: PreviewDomCommitTask,
@@ -164,8 +162,6 @@ export function createCardPreviewRenderer(
 			);
 
 			if (!shouldDelayMathCardRendering) {
-				options.onMathRenderingChange?.(false);
-
 				if (
 					previewForRender.type === "text" &&
 					canDetachRenderedTextPreview(previewForRender.content)
@@ -182,7 +178,6 @@ export function createCardPreviewRenderer(
 					if (isRenderStale(signal)) return false;
 					return commitDetachedTextPreview(
 						container,
-						request,
 						callbacks,
 						signal,
 						renderedFragment,
@@ -203,11 +198,8 @@ export function createCardPreviewRenderer(
 						targetKey: domCommitScopeKey,
 						isStale: () => isRenderStale(signal),
 						commit: () => {
-							if (!shouldSkipDomApply(container, request)) {
-								image.src = imageSrc;
-								container.replaceChildren(image);
-							}
-							lastAppliedRenderKey = renderKey;
+							image.src = imageSrc;
+							container.replaceChildren(image);
 							callbacks?.onCommitted?.("image", "detachable");
 							return true;
 						},
@@ -229,7 +221,6 @@ export function createCardPreviewRenderer(
 
 				const didReplace = await replaceContainerContent(
 					container,
-					request,
 					callbacks,
 					signal,
 					tempContainer,
@@ -240,7 +231,6 @@ export function createCardPreviewRenderer(
 				return didReplace;
 			}
 
-			options.onMathRenderingChange?.(true);
 			await enqueueMathRender(
 				async () => {
 					if (isRenderStale(signal)) return;
@@ -261,19 +251,13 @@ export function createCardPreviewRenderer(
 							});
 
 						if (isRenderStale(signal)) return;
-						const didCommit = await commitDetachedTextPreview(
+						await commitDetachedTextPreview(
 							container,
-							request,
 							callbacks,
 							signal,
 							renderedFragment,
 							shouldSyncMathStyles,
 						);
-						if (!didCommit) {
-							options.onMathRenderingChange?.(false);
-							return;
-						}
-						options.onMathRenderingChange?.(false);
 						return;
 					}
 
@@ -290,20 +274,15 @@ export function createCardPreviewRenderer(
 					);
 
 					if (isRenderStale(signal)) return;
-					if (
-						await replaceContainerContent(
-							container,
-							request,
-							callbacks,
-							signal,
-							mathContainer,
-							true,
-							previewForRender.type,
-							resolvePreviewAttachment(previewForRender),
-						)
-					) {
-						options.onMathRenderingChange?.(false);
-					}
+					await replaceContainerContent(
+						container,
+						callbacks,
+						signal,
+						mathContainer,
+						true,
+						previewForRender.type,
+						resolvePreviewAttachment(previewForRender),
+					);
 				},
 				{
 					key: `${file.path}:${file.stat.mtime}:${searchQuery}`,
@@ -330,7 +309,6 @@ export function createCardPreviewRenderer(
 
 	function commitDetachedTextPreview(
 		container: HTMLElement,
-		request: CardPreviewRequest,
 		callbacks: PreviewRenderCallbacks | undefined,
 		signal: AbortSignal,
 		fragment: DocumentFragment,
@@ -340,10 +318,7 @@ export function createCardPreviewRenderer(
 			targetKey: domCommitScopeKey,
 			isStale: () => isRenderStale(signal),
 			commit: () => {
-				if (!shouldSkipDomApply(container, request)) {
-					container.replaceChildren(fragment);
-				}
-				lastAppliedRenderKey = request.renderKey;
+				container.replaceChildren(fragment);
 				if (shouldSyncMathStyles) {
 					syncMathJaxStylesForNode(container);
 				}
@@ -355,7 +330,6 @@ export function createCardPreviewRenderer(
 
 	function replaceContainerContent(
 		container: HTMLElement,
-		request: CardPreviewRequest,
 		callbacks: PreviewRenderCallbacks | undefined,
 		signal: AbortSignal,
 		source: HTMLElement,
@@ -368,7 +342,6 @@ export function createCardPreviewRenderer(
 			isStale: () => isRenderStale(signal),
 			commit: () => {
 				container.replaceChildren(moveChildrenToFragment(source));
-				lastAppliedRenderKey = request.renderKey;
 				if (shouldSyncMathStyles) {
 					syncMathJaxStylesForNode(container);
 				}
@@ -376,17 +349,6 @@ export function createCardPreviewRenderer(
 				return true;
 			},
 		});
-	}
-
-	function shouldSkipDomApply(
-		container: HTMLElement,
-		request: CardPreviewRequest,
-	): boolean {
-		return (
-			lastAppliedRenderKey === request.renderKey &&
-			!!container.firstChild &&
-			request.previewOverride?.type !== "dom"
-		);
 	}
 
 	function isRenderStale(signal: AbortSignal): boolean {

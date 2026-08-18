@@ -9,11 +9,8 @@ import type { CardPreviewRequest } from "features/card-preview/core/cardPreviewR
 import {
 	createPreviewSlotController,
 	type PreviewSlotController,
-	type PreviewSlotPhase,
 } from "features/card-preview/ui/previewSlotController";
 import type { VirtualFrameCoordinator } from "ui/virtualization/scheduling/frameCoordinator";
-
-export type PreviewHostPhase = PreviewSlotPhase;
 
 export interface PreviewHostLease {
 	dispose(): void;
@@ -105,9 +102,7 @@ export function createVirtualPreviewSurface(
 		if (existing) return existing;
 		const entry: PreviewEntryRuntime = {
 			key,
-			controller: createPreviewSlotController({
-				createRenderer: options.createRenderer,
-			}),
+			controller: createPreviewSlotController(options.createRenderer),
 			dirty: false,
 		};
 		entriesByKey.set(key, entry);

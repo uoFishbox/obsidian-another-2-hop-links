@@ -4,7 +4,7 @@ import type { IPreviewService } from "types/services";
 import type { PluginSettings } from "features/settings/model";
 import type { PreviewData, PreviewRequestOptions } from "../public-types";
 import type { PreviewResolver } from "./previewResolver";
-import type { PreviewQueueListener, PreviewQueueTask } from "./previewQueue";
+import type { PreviewQueueListener } from "./previewQueue";
 import {
 	buildPreviewGenerationKey,
 	createPreviewGenerationCache,
@@ -151,12 +151,8 @@ export class PreviewService {
 		cacheKey: string,
 	): InFlightRequest {
 		const controller = new AbortController();
-		const task: PreviewQueueTask = {
-			cancelled: false,
-			cleanup: () => {},
-			reject: () => {},
-			resolve: () => {},
-			run: async () =>
+		const promise = this.queue.enqueue(
+			() =>
 				this.generatePreview(
 					file,
 					vault,
@@ -166,11 +162,8 @@ export class PreviewService {
 					controller.signal,
 					cacheKey,
 				),
-			signal: controller.signal,
-			started: false,
-		};
-
-		const promise = this.queue.enqueue(task);
+			controller.signal,
+		);
 		const request: InFlightRequest = {
 			cacheKey,
 			callerCount: 0,
