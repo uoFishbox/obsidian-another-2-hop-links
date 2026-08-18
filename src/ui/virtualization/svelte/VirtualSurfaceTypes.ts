@@ -1,5 +1,4 @@
-import type { RowKey } from "../rowKey";
-import type { MountedVirtualCell } from "../types";
+import type { MountedVirtualCell, RowKey } from "../types";
 
 export interface VirtualSurfaceMountedRow<TMountedCell extends MountedVirtualCell> {
 	key: RowKey;

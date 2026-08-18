@@ -1,11 +1,12 @@
+import type { VirtualFrameCoordinator } from "ui/virtualization/scheduling/frameCoordinator";
 import type { VirtualListMeasurementStateHandle } from "./virtualListMeasurementState";
-import { createPostPaintVirtualListTask } from "./virtualListScheduler";
 
 export interface InitialVirtualListStabilizationOptions {
 	measurement: VirtualListMeasurementStateHandle;
 	runLayoutMeasurement: () => void;
 	getRootEl: () => HTMLElement | null;
 	getWindow: () => Window | null;
+	frameCoordinator: VirtualFrameCoordinator;
 	maxPasses?: number;
 }
 
@@ -15,16 +16,20 @@ export interface InitialVirtualListStabilization {
 	cancelBecauseScrollStarted(): void;
 }
 
+const INITIAL_STABILIZATION_TASK_KEY = "virtual-list:initial-stabilization";
+
 export function createInitialVirtualListStabilization({
 	measurement,
 	runLayoutMeasurement,
 	getRootEl,
 	getWindow,
+	frameCoordinator,
 	maxPasses = 2,
 }: InitialVirtualListStabilizationOptions): InitialVirtualListStabilization {
 	let passCount = 0;
 	let completed = false;
 	let cancelledByScroll = false;
+	let remainingFrames = 0;
 
 	const hasStableMeasurement = (): boolean =>
 		measurement.hasStableScrollMetrics && measurement.hasStableVisibleRange;
@@ -53,39 +58,74 @@ export function createInitialVirtualListStabilization({
 		}
 
 		if (passCount < maxPasses) {
-			task.schedule();
+			schedule();
 		}
 	};
 
-	const task = createPostPaintVirtualListTask(run, 2, getWindow);
+	const advanceFrame = (): void => {
+		remainingFrames -= 1;
+		if (remainingFrames > 0) {
+			frameCoordinator.schedule(
+				"animation-frame",
+				INITIAL_STABILIZATION_TASK_KEY,
+				advanceFrame,
+			);
+			return;
+		}
+		run();
+	};
+
+	function schedule(): void {
+		if (
+			completed ||
+			cancelledByScroll ||
+			frameCoordinator.isScheduled(
+				"animation-frame",
+				INITIAL_STABILIZATION_TASK_KEY,
+			)
+		) {
+			return;
+		}
+
+		if (hasStableMeasurement()) {
+			completed = true;
+			return;
+		}
+		const ownerWindow = getWindow();
+		if (!ownerWindow) {
+			return;
+		}
+
+		// Preserve the legacy scheduler: double rAF in browsers, one macrotask
+		// fallback when requestAnimationFrame is unavailable.
+		remainingFrames =
+			typeof ownerWindow.requestAnimationFrame === "function" ? 2 : 1;
+		frameCoordinator.schedule(
+			"animation-frame",
+			INITIAL_STABILIZATION_TASK_KEY,
+			advanceFrame,
+		);
+	}
+
+	function cancel(): void {
+		remainingFrames = 0;
+		frameCoordinator.cancel("animation-frame", INITIAL_STABILIZATION_TASK_KEY);
+	}
 
 	return {
-		schedule() {
-			if (completed || cancelledByScroll || task.isScheduled()) {
-				return;
-			}
-
-			if (hasStableMeasurement()) {
-				completed = true;
-				return;
-			}
-
-			task.schedule();
-		},
-		cancel() {
-			task.cancel();
-		},
+		schedule,
+		cancel,
 		cancelBecauseScrollStarted() {
 			// A stable first pass already warmed the scroll-window gate. Preserve it
 			// instead of turning the scroll-start cancellation into invalidation.
 			if (hasStableMeasurement()) {
 				completed = true;
-				task.cancel();
+				cancel();
 				return;
 			}
 
 			cancelledByScroll = true;
-			task.cancel();
+			cancel();
 		},
 	};
 }

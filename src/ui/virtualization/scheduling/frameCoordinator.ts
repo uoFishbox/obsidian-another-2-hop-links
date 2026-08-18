@@ -4,7 +4,11 @@ import {
 	subscribeScrollActivity,
 } from "ui/virtualization/scheduling/scrollActivity";
 
-export type VirtualFrameLane = "scroll-critical" | "post-paint" | "idle";
+export type VirtualFrameLane =
+	| "animation-frame"
+	| "scroll-critical"
+	| "post-paint"
+	| "idle";
 
 export interface VirtualFrameCoordinator {
 	schedule(lane: VirtualFrameLane, key: string, task: () => void): boolean;
@@ -19,12 +23,6 @@ export interface VirtualFrameCoordinator {
 	dispose(): void;
 }
 
-export interface CoordinatedScheduledTask {
-	schedule(): boolean;
-	cancel(): void;
-	isScheduled(): boolean;
-}
-
 const CRITICAL_BUDGET_MS = 2;
 const POST_PAINT_BUDGET_MS = 2;
 const IDLE_BUDGET_MS = 2;
@@ -37,6 +35,7 @@ export function createVirtualFrameCoordinator(
 	} = {},
 ): VirtualFrameCoordinator {
 	const queues: Record<VirtualFrameLane, Map<string, () => void>> = {
+		"animation-frame": new Map(),
 		"scroll-critical": new Map(),
 		"post-paint": new Map(),
 		idle: new Map(),
@@ -45,6 +44,9 @@ export function createVirtualFrameCoordinator(
 	let boundOwnerElement: HTMLElement | null = null;
 	let unregisterWindowMigration: (() => void) | null = null;
 
+	let animationFrameHandle: number | null = null;
+	let animationFrameHandleWindow: Window | null = null;
+	let animationFrameUsesAnimationFrame = false;
 	let criticalHandle: number | null = null;
 	let criticalHandleWindow: Window | null = null;
 	let criticalUsesAnimationFrame = false;
@@ -98,7 +100,11 @@ export function createVirtualFrameCoordinator(
 			scheduledKeysScratch.length = 0;
 			scheduledTasksScratch.length = 0;
 		}
-		if (process.env.NODE_ENV !== "production" && executed > 0) {
+		if (
+			process.env.NODE_ENV !== "production" &&
+			executed > 0 &&
+			lane !== "animation-frame"
+		) {
 			recordCCLDevMeasurement(
 				lane === "scroll-critical"
 					? "virtualFrame.critical"
@@ -107,6 +113,30 @@ export function createVirtualFrameCoordinator(
 						: "virtualFrame.idle",
 			);
 		}
+	}
+
+	function scheduleAnimationFrameDrain(): void {
+		if (disposed || animationFrameHandle !== null) return;
+		const ownerWindow = resolveWindow();
+		if (!ownerWindow) return;
+		const drain = (): void => {
+			animationFrameHandle = null;
+			animationFrameHandleWindow = null;
+			runLane(
+				"animation-frame",
+				Number.POSITIVE_INFINITY,
+				Number.POSITIVE_INFINITY,
+			);
+			if (queues["animation-frame"].size > 0) scheduleAnimationFrameDrain();
+		};
+		animationFrameHandleWindow = ownerWindow;
+		if (typeof ownerWindow.requestAnimationFrame === "function") {
+			animationFrameUsesAnimationFrame = true;
+			animationFrameHandle = ownerWindow.requestAnimationFrame(drain);
+			return;
+		}
+		animationFrameUsesAnimationFrame = false;
+		animationFrameHandle = ownerWindow.setTimeout(drain, 0);
 	}
 
 	function scheduleCriticalDrain(): void {
@@ -246,6 +276,16 @@ export function createVirtualFrameCoordinator(
 	});
 
 	function cancelAllHandles(): void {
+		if (animationFrameHandle !== null && animationFrameHandleWindow) {
+			if (
+				animationFrameUsesAnimationFrame &&
+				typeof animationFrameHandleWindow.cancelAnimationFrame === "function"
+			) {
+				animationFrameHandleWindow.cancelAnimationFrame(animationFrameHandle);
+			} else {
+				animationFrameHandleWindow.clearTimeout(animationFrameHandle);
+			}
+		}
 		if (criticalHandle !== null && criticalHandleWindow) {
 			if (
 				criticalUsesAnimationFrame &&
@@ -269,6 +309,8 @@ export function createVirtualFrameCoordinator(
 		if (postPaintTaskHandle !== null && postPaintTaskWindow) {
 			postPaintTaskWindow.clearTimeout(postPaintTaskHandle);
 		}
+		animationFrameHandle = null;
+		animationFrameHandleWindow = null;
 		criticalHandle = null;
 		criticalHandleWindow = null;
 		postPaintFrameHandle = null;
@@ -280,6 +322,7 @@ export function createVirtualFrameCoordinator(
 
 	function schedulePendingLanes(): void {
 		if (disposed) return;
+		if (queues["animation-frame"].size > 0) scheduleAnimationFrameDrain();
 		if (queues["scroll-critical"].size > 0) scheduleCriticalDrain();
 		if (queues["post-paint"].size > 0) schedulePostPaintDrain();
 		if (queues.idle.size > 0) scheduleIdleDrain();
@@ -310,7 +353,8 @@ export function createVirtualFrameCoordinator(
 		schedule(lane, key, task): boolean {
 			if (disposed || queues[lane].has(key)) return false;
 			queues[lane].set(key, task);
-			if (lane === "scroll-critical") scheduleCriticalDrain();
+			if (lane === "animation-frame") scheduleAnimationFrameDrain();
+			else if (lane === "scroll-critical") scheduleCriticalDrain();
 			else if (lane === "post-paint") schedulePostPaintDrain();
 			else scheduleIdleDrain();
 			return true;
@@ -330,20 +374,5 @@ export function createVirtualFrameCoordinator(
 			for (const queue of Object.values(queues)) queue.clear();
 			unsubscribeScrollActivity();
 		},
-	};
-}
-
-/** Adapts one coordinator lane/key to the existing scheduled-task contract. */
-export function createCoordinatedScheduledTask(params: {
-	readonly coordinator: VirtualFrameCoordinator;
-	readonly lane: VirtualFrameLane;
-	readonly key: string;
-	readonly task: () => void;
-}): CoordinatedScheduledTask {
-	return {
-		schedule: () =>
-			params.coordinator.schedule(params.lane, params.key, params.task),
-		cancel: () => params.coordinator.cancel(params.lane, params.key),
-		isScheduled: () => params.coordinator.isScheduled(params.lane, params.key),
 	};
 }

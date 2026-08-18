@@ -4,14 +4,16 @@
 >
 	import { IS_PROD } from "appConstants";
 	import type { Snippet } from "svelte";
-	import type { LogicalCellKey, MountedVirtualCell } from "../types";
+	import type { MountedVirtualCell } from "../types";
 	import {
 		KEYED_VIRTUAL_CELL_BODY_LIFECYCLE,
 		resolveVirtualCellBodyKey,
 		type VirtualCellBodyLifecyclePolicy,
 	} from "ui/virtualization/core/bodyLifecycle";
-	import VirtualGridLogicalCellMount from "./VirtualGridLogicalCellMount.svelte";
-	import type { VirtualGridSurfaceTransaction } from "./VirtualGridSurfaceTransaction";
+	import {
+		bindVirtualGridCell,
+		type VirtualGridSurfaceTransaction,
+	} from "./VirtualGridSurfaceTransaction";
 	import type { VirtualSurfaceMountedRow } from "./VirtualSurfaceTypes";
 
 	interface Props<
@@ -75,14 +77,6 @@
 		`height:${contentHeight}px; position:relative; --ccl-box-height:${rowHeight}px; --ccl-cell-width:${cellWidth ?? 0}px; --ccl-columns:${Math.max(1, Math.floor(columns))}${gap !== undefined ? `; --ccl-box-gap:${gap}px` : ""}`,
 	);
 
-	const resolveMountedCellLogicalKey = (cell: TMountedCell): LogicalCellKey =>
-		cell.key;
-
-	const resolveMountedCellRowIndex = (cell: TMountedCell): number => cell.rowIndex;
-
-	const resolveMountedCellColumnIndex = (cell: TMountedCell): number | undefined =>
-		cell.columnIndex;
-
 	const resolveDefaultMountedCellBodyKey = (cell: TMountedCell): unknown =>
 		cell.renderBodyKey ?? cell.cellMetadataKey ?? cell.key;
 	const resolveMountedCellBodyKey = (cell: TMountedCell): unknown =>
@@ -122,25 +116,39 @@
 				{#each row.bindings as currentBinding, columnIndex (row.slotIndex * row.bindings.length + columnIndex)}
 					{@const renderSlotIndex =
 						row.slotIndex * row.bindings.length + columnIndex}
-					<VirtualGridLogicalCellMount
-						logicalKey={currentBinding
-							? resolveMountedCellLogicalKey(currentBinding)
-							: undefined}
-						className={currentBinding
+					{@const logicalKeyAttribute = currentBinding
+						? String(currentBinding.key)
+						: undefined}
+					{@const mountedRowIndex = currentBinding
+						? currentBinding.rowIndex
+						: row.rowIndex}
+					{@const mountedColumnIndex = currentBinding
+						? currentBinding.columnIndex
+						: columnIndex}
+					<div
+						use:bindVirtualGridCell={logicalKeyAttribute === undefined
+							? undefined
+							: {
+									transaction: surfaceTransaction,
+									nextLogicalKey: logicalKeyAttribute,
+									rowIndex: mountedRowIndex,
+									columnIndex: mountedColumnIndex,
+								}}
+						class={currentBinding
 							? resolveCellClassName(currentBinding)
 							: cellClassName}
-						dataTestId={!IS_PROD && currentBinding
+						data-ccl-logical-key={!IS_PROD
+							? logicalKeyAttribute
+							: undefined}
+						data-ccl-cell-slot={!IS_PROD ? renderSlotIndex : undefined}
+						data-testid={!IS_PROD && currentBinding
 							? getCellDataTestId?.(currentBinding)
 							: undefined}
-						{renderSlotIndex}
-						rowIndex={currentBinding
-							? resolveMountedCellRowIndex(currentBinding)
-							: row.rowIndex}
-						columnIndex={currentBinding
-							? resolveMountedCellColumnIndex(currentBinding)
-							: columnIndex}
-						ariaHidden={currentBinding === null}
-						{surfaceTransaction}
+						data-ccl-row-index={!IS_PROD ? mountedRowIndex : undefined}
+						data-ccl-column-index={!IS_PROD
+							? mountedColumnIndex
+							: undefined}
+						aria-hidden={currentBinding === null ? "true" : undefined}
 					>
 						{#if bodyLifecyclePolicy.type === "keyed"}
 							{#if currentBinding}
@@ -163,7 +171,7 @@
 								{/if}
 							{/key}
 						{/if}
-					</VirtualGridLogicalCellMount>
+					</div>
 				{/each}
 			</div>
 		{/if}

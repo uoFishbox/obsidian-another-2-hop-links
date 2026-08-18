@@ -16,7 +16,6 @@ import { readVirtualListLiveMeasurement } from "./virtualListLiveMeasurement";
 import { type VirtualListScrollSnapshot } from "./virtualListMeasurementAdapter";
 import { createBootstrapMeasurementSuppression } from "./bootstrapMeasurementSuppression";
 import { createInitialVirtualListStabilization } from "./initialVirtualListStabilization";
-import { createVirtualListMeasurementScheduler } from "./virtualListMeasurementScheduler";
 import type { VirtualListMeasurementStateHandle } from "./virtualListMeasurementState";
 import { getOptionalOwnerWindow } from "ui/shared/dom/realmSafeDom";
 import type { VirtualFrameCoordinator } from "ui/virtualization/scheduling/frameCoordinator";
@@ -105,6 +104,10 @@ const SKIPPED_UNCHANGED_SCROLL: VirtualMeasurementResult = {
 };
 
 const EMPTY_RUN_SCROLL_MEASUREMENT_OPTIONS: RunVirtualScrollMeasurementOptions = {};
+const MEASUREMENT_LANE = "scroll-critical" as const;
+const LAYOUT_MEASUREMENT_TASK_KEY = "virtual-list:layout-measurement";
+const SCROLL_MEASUREMENT_TASK_KEY = "virtual-list:scroll-measurement";
+const UNSTABLE_MEASUREMENT_TASK_KEY = "virtual-list:unstable-measurement";
 
 export function createVirtualMeasurementController({
 	getRootEl,
@@ -156,6 +159,8 @@ export function createVirtualMeasurementController({
 	let isObservedScrollActive = false;
 	let pendingScrollMeasurementReason: VirtualScrollMeasurementReason | null = null;
 	let activeViewportObservation: VirtualListViewportObservation | null = null;
+	let unstableMeasurementRetryCount = 0;
+	let pendingScrollMeasurementTask: (() => void) | undefined;
 
 	const rememberPublishedScrollMeasurement = (
 		measurement: VirtualMeasurement,
@@ -313,20 +318,90 @@ export function createVirtualMeasurementController({
 		return scrollMeasurementResult;
 	};
 
-	const {
-		cancelAll,
-		hasPendingLayoutMeasurement,
-		resetUnstableMeasurementRetry,
-		scheduleLayoutMeasurement,
-		scheduleScrollMeasurement,
-		scheduleUnstableMeasurementRetry,
-	} = createVirtualListMeasurementScheduler({
-		runLayoutMeasurement,
-		runScrollMeasurement,
-		maxUnstableMeasurementRetries,
-		getWindow: () => getOptionalOwnerWindow(getRootEl()),
-		frameCoordinator,
-	});
+	const hasSchedulingWindow = (): boolean =>
+		getOptionalOwnerWindow(getRootEl()) !== null;
+
+	const hasPendingLayoutMeasurement = (): boolean =>
+		frameCoordinator.isScheduled(MEASUREMENT_LANE, LAYOUT_MEASUREMENT_TASK_KEY) ||
+		frameCoordinator.isScheduled(MEASUREMENT_LANE, UNSTABLE_MEASUREMENT_TASK_KEY);
+
+	function scheduleLayoutMeasurement(): void {
+		if (
+			!hasSchedulingWindow() ||
+			frameCoordinator.isScheduled(MEASUREMENT_LANE, LAYOUT_MEASUREMENT_TASK_KEY)
+		) {
+			return;
+		}
+
+		frameCoordinator.cancel(MEASUREMENT_LANE, UNSTABLE_MEASUREMENT_TASK_KEY);
+		frameCoordinator.cancel(MEASUREMENT_LANE, SCROLL_MEASUREMENT_TASK_KEY);
+		frameCoordinator.schedule(
+			MEASUREMENT_LANE,
+			LAYOUT_MEASUREMENT_TASK_KEY,
+			runLayoutMeasurement,
+		);
+	}
+
+	const runScheduledScrollMeasurement = (): void => {
+		const task = pendingScrollMeasurementTask ?? runScrollMeasurement;
+		pendingScrollMeasurementTask = undefined;
+		task();
+	};
+
+	function scheduleScrollMeasurement(task?: () => void): void {
+		if (task) {
+			pendingScrollMeasurementTask = task;
+		}
+		if (
+			!hasSchedulingWindow() ||
+			hasPendingLayoutMeasurement() ||
+			frameCoordinator.isScheduled(MEASUREMENT_LANE, SCROLL_MEASUREMENT_TASK_KEY)
+		) {
+			return;
+		}
+
+		frameCoordinator.schedule(
+			MEASUREMENT_LANE,
+			SCROLL_MEASUREMENT_TASK_KEY,
+			runScheduledScrollMeasurement,
+		);
+	}
+
+	const runUnstableMeasurementRetry = (): void => {
+		unstableMeasurementRetryCount += 1;
+		runLayoutMeasurement();
+	};
+
+	function scheduleUnstableMeasurementRetry(): void {
+		if (
+			!hasSchedulingWindow() ||
+			frameCoordinator.isScheduled(
+				MEASUREMENT_LANE,
+				UNSTABLE_MEASUREMENT_TASK_KEY,
+			) ||
+			unstableMeasurementRetryCount >= maxUnstableMeasurementRetries
+		) {
+			return;
+		}
+
+		frameCoordinator.schedule(
+			MEASUREMENT_LANE,
+			UNSTABLE_MEASUREMENT_TASK_KEY,
+			runUnstableMeasurementRetry,
+		);
+	}
+
+	function resetUnstableMeasurementRetry(): void {
+		frameCoordinator.cancel(MEASUREMENT_LANE, UNSTABLE_MEASUREMENT_TASK_KEY);
+		unstableMeasurementRetryCount = 0;
+	}
+
+	function cancelAllScheduledMeasurements(): void {
+		frameCoordinator.cancel(MEASUREMENT_LANE, LAYOUT_MEASUREMENT_TASK_KEY);
+		frameCoordinator.cancel(MEASUREMENT_LANE, SCROLL_MEASUREMENT_TASK_KEY);
+		frameCoordinator.cancel(MEASUREMENT_LANE, UNSTABLE_MEASUREMENT_TASK_KEY);
+		pendingScrollMeasurementTask = undefined;
+	}
 	const bootstrapMeasurementSuppression = createBootstrapMeasurementSuppression(
 		scheduleLayoutMeasurement,
 		() => getOptionalOwnerWindow(getRootEl()),
@@ -336,6 +411,7 @@ export function createVirtualMeasurementController({
 		runLayoutMeasurement,
 		getRootEl,
 		getWindow: () => getOptionalOwnerWindow(getRootEl()),
+		frameCoordinator,
 		maxPasses: initialStabilizationMaxPasses,
 	});
 
@@ -348,6 +424,7 @@ export function createVirtualMeasurementController({
 	): (() => void) => {
 		const observation = observeVirtualListViewport({
 			rootEl,
+			frameCoordinator,
 			onWidthChange: (width) => {
 				measurement.measuredWidth = width;
 				onObservedWidthChange?.(width);
@@ -390,7 +467,7 @@ export function createVirtualMeasurementController({
 			}
 			bootstrapMeasurementSuppression.cancel();
 			initialStabilization.cancel();
-			cancelAll();
+			cancelAllScheduledMeasurements();
 			observation();
 		};
 	};

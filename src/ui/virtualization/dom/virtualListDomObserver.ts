@@ -7,7 +7,7 @@ import {
 	markScrollActivityIdle,
 } from "ui/virtualization/scheduling/scrollActivity";
 import { subscribeWindowResize } from "ui/virtualization/scheduling/windowResizeListeners";
-import { createScheduledVirtualListTask } from "./virtualListScheduler";
+import type { VirtualFrameCoordinator } from "ui/virtualization/scheduling/frameCoordinator";
 import {
 	markCCLDevPerformance,
 	recordCCLDevMeasurement,
@@ -40,6 +40,7 @@ export interface ScrollMeasurementRange {
 
 export interface ObserveVirtualListViewportOptions {
 	rootEl: HTMLElement;
+	frameCoordinator: VirtualFrameCoordinator;
 	onWidthChange: (width: number) => void;
 	/** Whether root height-only resize entries should schedule layout work. */
 	measureOnRootHeightChange?: boolean;
@@ -84,6 +85,8 @@ export interface VirtualListViewportObservation {
 
 const ROOT_RESIZE_EPSILON_PX = 0.5;
 const SCROLL_IDLE_MS = 140;
+const DEPENDENCY_REFRESH_LANE = "animation-frame" as const;
+const DEPENDENCY_REFRESH_TASK_KEY = "virtual-list:dependency-refresh";
 
 interface ScrollCoverageGate {
 	valid: boolean;
@@ -135,7 +138,7 @@ interface ScrollerViewportEntry {
 	onNativeScroll: () => void;
 	onScrollIdleTimeout: () => void;
 	unsubscribeWindowResize: (() => void) | null;
-	refreshDependencyObserversTask: ReturnType<typeof createScheduledVirtualListTask>;
+	runDependencyObserverRefresh: () => void;
 }
 
 const scrollerViewportEntries = new WeakMap<HTMLElement, ScrollerViewportEntry>();
@@ -179,6 +182,25 @@ const getActiveSubscriber = (
 	}
 
 	return subscriber;
+};
+
+const scheduleDependencyObserverRefresh = (entry: ScrollerViewportEntry): void => {
+	const subscriber = getActiveSubscriber(entry);
+	if (!subscriber) return;
+	subscriber.frameCoordinator.schedule(
+		DEPENDENCY_REFRESH_LANE,
+		DEPENDENCY_REFRESH_TASK_KEY,
+		entry.runDependencyObserverRefresh,
+	);
+};
+
+const cancelDependencyObserverRefresh = (
+	subscriber: VirtualListViewportSubscriber,
+): void => {
+	subscriber.frameCoordinator.cancel(
+		DEPENDENCY_REFRESH_LANE,
+		DEPENDENCY_REFRESH_TASK_KEY,
+	);
 };
 
 const scheduleLayoutMeasurement = (entry: ScrollerViewportEntry): void => {
@@ -637,7 +659,7 @@ const finishScrollPhase = (entry: ScrollerViewportEntry): void => {
 		if (process.env.NODE_ENV !== "production") {
 			recordCCLDevMeasurement("virtualList.observer.dependencyTask.scheduled");
 		}
-		entry.refreshDependencyObserversTask.schedule();
+		scheduleDependencyObserverRefresh(entry);
 	} else if (reconnectObserver) {
 		// The scroll ended without any observed structure mutation, so re-arm
 		// the existing targets instead of re-collecting dependencies.
@@ -758,7 +780,7 @@ const handleStructureMutations = (
 		return;
 	}
 
-	entry.refreshDependencyObserversTask.schedule();
+	scheduleDependencyObserverRefresh(entry);
 	if (shouldScheduleLayoutMeasurement) {
 		scheduleLayoutMeasurement(entry);
 	}
@@ -811,27 +833,17 @@ const getScrollerViewportEntry = (
 		onNativeScroll: undefined as unknown as () => void,
 		onScrollIdleTimeout: undefined as unknown as () => void,
 		unsubscribeWindowResize: null,
-		refreshDependencyObserversTask: undefined as unknown as ReturnType<
-			typeof createScheduledVirtualListTask
-		>,
+		runDependencyObserverRefresh,
 	};
+
+	function runDependencyObserverRefresh(): void {
+		refreshDependencyObservers(entry);
+	}
 
 	const MutationObserverCtor = getMutationObserverConstructor(ownerWindow);
 	entry.structureMutationObserver = new MutationObserverCtor(
 		(mutations: MutationRecord[]) => {
 			handleStructureMutations(entry, mutations);
-		},
-	);
-	entry.refreshDependencyObserversTask = createScheduledVirtualListTask(
-		() => {
-			refreshDependencyObservers(entry);
-		},
-		{
-			getWindow: () => entry.ownerWindow,
-			counterName:
-				process.env.NODE_ENV !== "production"
-					? "virtualList.scheduler.dependencyRefresh.animationFrame"
-					: undefined,
 		},
 	);
 	entry.onNativeScroll = () => handleNativeScroll(entry, ownerWindow);
@@ -857,6 +869,7 @@ const registerSubscriber = (
 ): void => {
 	const existing = entry.subscriber;
 	if (existing && existing !== subscriber) {
+		cancelDependencyObserverRefresh(existing);
 		existing.isDisposed = true;
 		entry.scrollCoverageGate.valid = false;
 		entry.hasPendingScrollMeasurement = false;
@@ -887,7 +900,7 @@ const unregisterSubscriber = (subscriber: VirtualListViewportSubscriber): void =
 	}
 	disconnectStructureObserver(entry);
 	markScrollActivityIdle(entry.scrollActivitySource);
-	entry.refreshDependencyObserversTask.cancel();
+	cancelDependencyObserverRefresh(subscriber);
 	if (entry.idleTimer !== null) {
 		entry.ownerWindow.clearTimeout(entry.idleTimer);
 		entry.idleTimer = null;
@@ -953,7 +966,7 @@ export const observeVirtualListViewport = (
 		// reads (see the scroll-path contract in VirtualListDomObserver tests).
 		if (scrollContainer === null) {
 			invalidateNearestScrollContainerCache(options.rootEl);
-			entry.refreshDependencyObserversTask.schedule();
+			scheduleDependencyObserverRefresh(entry);
 		}
 	};
 

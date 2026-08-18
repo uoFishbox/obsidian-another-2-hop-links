@@ -30,16 +30,43 @@ function createMockRowModel(
 						cellCount: 1,
 						getCell: () => null,
 					},
-		findVisibleRange: ({ scrollTop, viewportHeight, overscanPx }) => {
+		findVisibleRangeInto(out, { scrollTop, viewportHeight, overscanPx }) {
 			const start = Math.max(0, Math.floor((scrollTop - overscanPx) / rowHeight));
 			const end = Math.min(
 				rowCount,
 				Math.ceil((scrollTop + viewportHeight + overscanPx) / rowHeight),
 			);
-			if (start >= end) {
-				return { start: 0, end: 0 };
-			}
-			return { start, end };
+			out.start = start >= end ? 0 : start;
+			out.end = start >= end ? 0 : end;
+		},
+		findVisibleRangesInto(out, params) {
+			const mountedOverscanPx = Math.max(0, params.mountedOverscanPx);
+			const previewOverscanPx = Math.min(
+				mountedOverscanPx,
+				Math.max(0, params.previewOverscanPx ?? 0),
+			);
+			this.findVisibleRangeInto(out.mounted, {
+				scrollTop: params.scrollTop,
+				viewportHeight: params.viewportHeight,
+				overscanPx: mountedOverscanPx,
+			});
+			this.findVisibleRangeInto(out.previewVisible, {
+				scrollTop: params.scrollTop,
+				viewportHeight: params.viewportHeight,
+				overscanPx: previewOverscanPx,
+			});
+		},
+		findVisibleRangesFromMountedInto(out, params) {
+			out.mounted.start = params.mounted.start;
+			out.mounted.end = params.mounted.end;
+			this.findVisibleRangeInto(out.previewVisible, {
+				scrollTop: params.scrollTop,
+				viewportHeight: params.viewportHeight,
+				overscanPx: Math.min(
+					Math.max(0, params.mountedOverscanPx),
+					Math.max(0, params.previewOverscanPx ?? 0),
+				),
+			});
 		},
 	};
 }
@@ -212,7 +239,7 @@ describe("computeVirtualRanges", () => {
 	it("uses precomputed ranges for stable measurements", () => {
 		const rowModel = {
 			...createMockRowModel(100, 50),
-			findVisibleRange: () => {
+			findVisibleRangesInto: () => {
 				throw new Error("Expected precomputed ranges to be reused.");
 			},
 		};

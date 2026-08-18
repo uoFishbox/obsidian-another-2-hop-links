@@ -42,6 +42,7 @@ import { createVirtualListControllerAdapter } from "ui/virtualization/svelte/vir
 import type { VirtualVisibilityPolicy } from "ui/virtualization/core/virtualListEngine";
 import type { RowRange } from "ui/virtualization/rowRange";
 import type { VirtualRanges } from "ui/virtualization/types";
+import { resolveVisibleRange } from "ui/virtualization/virtualRanges";
 import type { ResultNavigationDirection } from "features/keyboard-navigation/resultFocus";
 import type { ProgrammaticScrollSnapshot } from "ui/virtualization/dom/flushVirtualScrollMeasurement";
 import { flushVirtualScrollMeasurement as flushCachedVirtualScrollMeasurement } from "ui/virtualization/dom/flushVirtualScrollMeasurement";
@@ -270,7 +271,7 @@ export function useTwoHopVirtualList(
 		const ownerWindow = getOptionalOwnerWindow(rootEl);
 		if (!ownerWindow) return null;
 		const scrollTop = scrollRoot?.scrollTop ?? ownerWindow.scrollY;
-		const visible = rowModel.findVisibleRange({
+		const visible = resolveVisibleRange(rowModel, {
 			scrollTop: scrollTop - measurement.sectionTop,
 			viewportHeight: measurement.viewportHeight,
 			overscanPx: 0,

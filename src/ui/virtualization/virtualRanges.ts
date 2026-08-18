@@ -2,7 +2,7 @@ import { EMPTY_ROW_RANGE, isEmptyRange, type RowRange } from "./rowRange";
 import type { VirtualRanges, VirtualRowModel } from "./types";
 
 /**
- * Scroll window used by row models to resolve a single visible row range.
+ * Scroll window used to resolve a single visible row range.
  */
 export interface FindVisibleRangeParams {
 	scrollTop: number;
@@ -20,7 +20,6 @@ export interface ResolveVirtualRangesParams {
 	mountedOverscanPx: number;
 	previewOverscanPx?: number;
 	mounted?: RowRange;
-	reuseMountedReference?: boolean;
 }
 
 /**
@@ -58,16 +57,6 @@ const EMPTY_VIRTUAL_RANGES: VirtualRanges = {
 	previewVisible: EMPTY_ROW_RANGE,
 };
 
-/**
- * Creates mutable range storage for row models that expose allocated range APIs.
- */
-export function createMutableVirtualRanges(): VirtualRanges {
-	return {
-		mounted: { start: 0, end: 0 },
-		previewVisible: { start: 0, end: 0 },
-	};
-}
-
 function copyRowRangeInto(out: RowRange, range: RowRange): void {
 	out.start = range.start;
 	out.end = range.end;
@@ -85,31 +74,25 @@ export function normalizePreviewOverscan(
 }
 
 /**
- * Allocates and resolves a visible range through a row-model-specific writer.
+ * Allocates a single range at the non-hot-path boundary that needs a value result.
  */
 export function resolveVisibleRange(
-	writeVisibleRangeInto: WriteVisibleRangeInto,
+	rowModel: Pick<VirtualRowModel<unknown>, "findVisibleRangeInto">,
 	params: FindVisibleRangeParams,
 ): RowRange {
 	const range = { start: 0, end: 0 };
-	writeVisibleRangeInto(
-		range,
-		params.scrollTop,
-		params.viewportHeight,
-		params.overscanPx,
-	);
+	rowModel.findVisibleRangeInto(range, params);
 	return range;
 }
 
 /**
- * Resolves mounted and preview-visible ranges while preserving the existing
- * reference-reuse behavior of allocation-free row model paths.
+ * Resolves mounted and preview-visible ranges into caller-owned storage.
  */
 export function resolveVirtualRangesInto(
 	out: VirtualRanges,
 	params: ResolveVirtualRangesParams,
 	writeVisibleRangeInto: WriteVisibleRangeInto,
-): VirtualRanges {
+): void {
 	const mountedOverscanPx = Math.max(0, params.mountedOverscanPx);
 	const previewOverscanPx = normalizePreviewOverscan(
 		params.previewOverscanPx,
@@ -122,18 +105,12 @@ export function resolveVirtualRangesInto(
 			params.viewportHeight,
 			mountedOverscanPx,
 		);
-	} else if (params.reuseMountedReference === true) {
-		out.mounted = params.mounted;
 	} else {
 		copyRowRangeInto(out.mounted, params.mounted);
 	}
 	if (previewOverscanPx >= mountedOverscanPx) {
-		if (params.reuseMountedReference === true) {
-			out.previewVisible = out.mounted;
-			return out;
-		}
 		copyRowRangeInto(out.previewVisible, out.mounted);
-		return out;
+		return;
 	}
 	writeVisibleRangeInto(
 		out.previewVisible,
@@ -141,7 +118,6 @@ export function resolveVirtualRangesInto(
 		params.viewportHeight,
 		previewOverscanPx,
 	);
-	return out;
 }
 
 export function computeVirtualRanges<TCell>(params: {
@@ -192,38 +168,18 @@ export function computeVirtualRanges<TCell>(params: {
 	}
 
 	const relativeScrollTop = params.scrollTop - params.sectionTop;
-	const measuredRanges: VirtualRanges = params.precomputedRanges
-		? params.precomputedRanges
-		: (params.rowModel.findVisibleRanges?.({
-				scrollTop: relativeScrollTop,
-				viewportHeight: params.viewportHeight,
-				mountedOverscanPx: params.mountedOverscanPx,
-				previewOverscanPx: params.previewOverscanPx,
-			}) ??
-			(() => {
-				const mountedOverscanPx = Math.max(0, params.mountedOverscanPx);
-				const previewOverscanPx = Math.min(
-					mountedOverscanPx,
-					Math.max(0, params.previewOverscanPx ?? 0),
-				);
-				const previewVisible = params.rowModel.findVisibleRange({
-					scrollTop: relativeScrollTop,
-					viewportHeight: params.viewportHeight,
-					overscanPx: previewOverscanPx,
-				});
-				const mounted =
-					mountedOverscanPx <= 0
-						? previewVisible
-						: params.rowModel.findVisibleRange({
-								scrollTop: relativeScrollTop,
-								viewportHeight: params.viewportHeight,
-								overscanPx: mountedOverscanPx,
-							});
-
-				return {
-					mounted,
-					previewVisible,
-				};
-			})());
+	let measuredRanges = params.precomputedRanges;
+	if (!measuredRanges) {
+		measuredRanges = {
+			mounted: { start: 0, end: 0 },
+			previewVisible: { start: 0, end: 0 },
+		};
+		params.rowModel.findVisibleRangesInto(measuredRanges, {
+			scrollTop: relativeScrollTop,
+			viewportHeight: params.viewportHeight,
+			mountedOverscanPx: params.mountedOverscanPx,
+			previewOverscanPx: params.previewOverscanPx,
+		});
+	}
 	return { kind: "stable", ranges: measuredRanges };
 }

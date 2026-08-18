@@ -10,11 +10,7 @@ import type {
 	VirtualRow,
 	VirtualRowModel,
 } from "ui/virtualization/types";
-import {
-	createMutableVirtualRanges,
-	resolveVirtualRangesInto,
-	resolveVisibleRange,
-} from "ui/virtualization/virtualRanges";
+import { resolveVirtualRangesInto } from "ui/virtualization/virtualRanges";
 
 interface TwoHopCellBase {
 	readonly logicalKey: string;
@@ -49,35 +45,9 @@ type MutableStableScrollTopBand = {
 	-readonly [K in keyof StableScrollTopBand]: StableScrollTopBand[K];
 };
 
-export interface TwoHopRowModel extends Omit<
-	VirtualRowModel<TwoHopVirtualCell>,
-	"getRowCellCount" | "findVisibleRangesFromMounted"
-> {
+export interface TwoHopRowModel extends VirtualRowModel<TwoHopVirtualCell> {
 	readonly cardCounts: TwoHopLogicalCardCounts;
 	readonly layout: TwoHopRowLayoutMetrics;
-	findVisibleRangeInto(
-		out: RowRange,
-		params: { scrollTop: number; viewportHeight: number; overscanPx: number },
-	): void;
-	findVisibleRangesInto(
-		out: VirtualRanges,
-		params: {
-			scrollTop: number;
-			viewportHeight: number;
-			mountedOverscanPx: number;
-			previewOverscanPx?: number;
-		},
-	): void;
-	findVisibleRangesFromMountedInto(
-		out: VirtualRanges,
-		params: {
-			scrollTop: number;
-			viewportHeight: number;
-			mounted: RowRange;
-			mountedOverscanPx: number;
-			previewOverscanPx?: number;
-		},
-	): void;
 	findStableMountedScrollTopBandInto(
 		out: MutableStableScrollTopBand,
 		params: {
@@ -413,9 +383,6 @@ export function createTwoHopRowModel(
 		getRow,
 		getRowTop: resolveRowTop,
 		getRowEnd: (rowIndex) => resolveRowTop(rowIndex) + rowHeight,
-		findVisibleRange(params) {
-			return resolveVisibleRange(writeVisibleRange, params);
-		},
 		findVisibleRangeInto(out, rangeParams) {
 			writeVisibleRange(
 				out,
@@ -423,10 +390,6 @@ export function createTwoHopRowModel(
 				rangeParams.viewportHeight,
 				rangeParams.overscanPx,
 			);
-		},
-		findVisibleRanges(rangeParams) {
-			const ranges = createMutableVirtualRanges();
-			return resolveVirtualRangesInto(ranges, rangeParams, writeVisibleRange);
 		},
 		findVisibleRangesInto(out, rangeParams) {
 			resolveVirtualRangesInto(out, rangeParams, writeVisibleRange);

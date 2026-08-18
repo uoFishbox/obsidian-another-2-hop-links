@@ -40,6 +40,34 @@ describe("createVirtualFrameCoordinator", () => {
 		coordinator.dispose();
 	});
 
+	it("keeps animation-frame work on its own keyed frame", () => {
+		const frames: FrameRequestCallback[] = [];
+		const ownerWindow = {
+			requestAnimationFrame: vi.fn((callback: FrameRequestCallback) => {
+				frames.push(callback);
+				return frames.length;
+			}),
+			cancelAnimationFrame: vi.fn(),
+		} as unknown as Window;
+		const coordinator = createVirtualFrameCoordinator({
+			getWindow: () => ownerWindow,
+		});
+		const frameTask = vi.fn();
+		const criticalTask = vi.fn();
+
+		coordinator.schedule("animation-frame", "dependency-refresh", frameTask);
+		coordinator.schedule("scroll-critical", "measurement", criticalTask);
+		expect(frames).toHaveLength(2);
+
+		frames[0]?.(0);
+		expect(frameTask).toHaveBeenCalledOnce();
+		expect(criticalTask).not.toHaveBeenCalled();
+
+		frames[1]?.(1);
+		expect(criticalTask).toHaveBeenCalledOnce();
+		coordinator.dispose();
+	});
+
 	it("runs at most one post-paint task per drain", async () => {
 		vi.useFakeTimers();
 		const coordinator = createVirtualFrameCoordinator();

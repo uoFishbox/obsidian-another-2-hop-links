@@ -2,6 +2,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { observeVirtualListViewport } from "../virtualListDomObserver";
 import { resetScrollActivityForTests } from "ui/virtualization/scheduling/scrollActivity";
 import {
+	createVirtualFrameCoordinator,
+	type VirtualFrameCoordinator,
+} from "ui/virtualization/scheduling/frameCoordinator";
+import {
 	getCCLDevMeasurementSnapshot,
 	resetCCLDevMeasurements,
 } from "infrastructure/debug/CCLDevMeasurements";
@@ -20,6 +24,14 @@ import {
 	triggerResize,
 } from "testing/helpers/DOMObserverMock";
 
+const observerFrameCoordinators: VirtualFrameCoordinator[] = [];
+
+const createObserverFrameCoordinator = (): VirtualFrameCoordinator => {
+	const coordinator = createVirtualFrameCoordinator();
+	observerFrameCoordinators.push(coordinator);
+	return coordinator;
+};
+
 const scheduleScrollMeasurement = (task?: () => void): void => {
 	if (!task) return;
 	window.requestAnimationFrame(task);
@@ -33,6 +45,9 @@ describe("observeVirtualListViewport", () => {
 	});
 
 	afterEach(() => {
+		for (const coordinator of observerFrameCoordinators.splice(0)) {
+			coordinator.dispose();
+		}
 		document.body.innerHTML = "";
 		resetScrollActivityForTests();
 		vi.useRealTimers();
@@ -58,6 +73,7 @@ describe("observeVirtualListViewport", () => {
 		const scheduleLayoutMeasurement = vi.fn();
 		const runScrollMeasurement = vi.fn();
 		const stopObserving = observeVirtualListViewport({
+			frameCoordinator: createObserverFrameCoordinator(),
 			rootEl,
 			onWidthChange: vi.fn(),
 			getCachedViewportHeight: () => 240,
@@ -127,6 +143,7 @@ describe("observeVirtualListViewport", () => {
 
 		const onWidthChange = vi.fn();
 		const stopObserving = observeVirtualListViewport({
+			frameCoordinator: createObserverFrameCoordinator(),
 			rootEl,
 			onWidthChange,
 			onScrollContainerChange: vi.fn(),
@@ -169,6 +186,7 @@ describe("observeVirtualListViewport", () => {
 		});
 
 		const firstStopObserving = observeVirtualListViewport({
+			frameCoordinator: createObserverFrameCoordinator(),
 			rootEl: firstRootEl,
 			onWidthChange: vi.fn(),
 			onScrollContainerChange: vi.fn(),
@@ -178,6 +196,7 @@ describe("observeVirtualListViewport", () => {
 			runInitialLayoutMeasurement: vi.fn(),
 		});
 		const secondStopObserving = observeVirtualListViewport({
+			frameCoordinator: createObserverFrameCoordinator(),
 			rootEl: secondRootEl,
 			onWidthChange: vi.fn(),
 			onScrollContainerChange: vi.fn(),
@@ -226,6 +245,7 @@ describe("observeVirtualListViewport", () => {
 
 		const scheduleLayoutMeasurement = vi.fn();
 		const stopObserving = observeVirtualListViewport({
+			frameCoordinator: createObserverFrameCoordinator(),
 			rootEl,
 			onWidthChange: vi.fn(),
 			onScrollContainerChange: vi.fn(),
@@ -294,6 +314,7 @@ describe("observeVirtualListViewport", () => {
 		const onScrollContainerChange = vi.fn();
 		const onScrollStateChange = vi.fn();
 		const stopObserving = observeVirtualListViewport({
+			frameCoordinator: createObserverFrameCoordinator(),
 			rootEl,
 			onWidthChange: vi.fn(),
 			getCachedViewportHeight: () => 240,
@@ -370,6 +391,7 @@ describe("observeVirtualListViewport", () => {
 			maxScrollTopBeforeMeasurement: 150,
 		}));
 		const stopObserving = observeVirtualListViewport({
+			frameCoordinator: createObserverFrameCoordinator(),
 			rootEl,
 			onWidthChange: vi.fn(),
 			getCachedViewportHeight: () => 240,
@@ -431,6 +453,7 @@ describe("observeVirtualListViewport", () => {
 
 		const runScrollMeasurement = vi.fn();
 		const stopObserving = observeVirtualListViewport({
+			frameCoordinator: createObserverFrameCoordinator(),
 			rootEl,
 			onWidthChange: vi.fn(),
 			getCachedViewportHeight: () => 240,
@@ -488,6 +511,7 @@ describe("observeVirtualListViewport", () => {
 
 		try {
 			firstStopObserving = observeVirtualListViewport({
+				frameCoordinator: createObserverFrameCoordinator(),
 				rootEl: firstRootEl,
 				onWidthChange: vi.fn(),
 				onScrollContainerChange: vi.fn(),
@@ -497,6 +521,7 @@ describe("observeVirtualListViewport", () => {
 				runInitialLayoutMeasurement: vi.fn(),
 			});
 			secondStopObserving = observeVirtualListViewport({
+				frameCoordinator: createObserverFrameCoordinator(),
 				rootEl: secondRootEl,
 				onWidthChange: vi.fn(),
 				onScrollContainerChange: vi.fn(),
@@ -576,6 +601,7 @@ describe("observeVirtualListViewport", () => {
 		sizer.append(rootEl);
 
 		const stopObserving = observeVirtualListViewport({
+			frameCoordinator: createObserverFrameCoordinator(),
 			rootEl,
 			onWidthChange: vi.fn(),
 			onScrollContainerChange: vi.fn(),
@@ -630,6 +656,7 @@ describe("observeVirtualListViewport", () => {
 
 		try {
 			stopObserving = observeVirtualListViewport({
+				frameCoordinator: createObserverFrameCoordinator(),
 				rootEl,
 				onWidthChange: vi.fn(),
 				onScrollContainerChange,
@@ -679,6 +706,7 @@ describe("observeVirtualListViewport", () => {
 		const onScrollContainerChange = vi.fn();
 		const scheduleLayoutMeasurement = vi.fn();
 		const stopObserving = observeVirtualListViewport({
+			frameCoordinator: createObserverFrameCoordinator(),
 			rootEl,
 			onWidthChange: vi.fn(),
 			onScrollContainerChange,
@@ -724,6 +752,7 @@ describe("observeVirtualListViewport", () => {
 			maxScrollTopBeforeMeasurement: 200,
 		}));
 		const stopObserving = observeVirtualListViewport({
+			frameCoordinator: createObserverFrameCoordinator(),
 			rootEl,
 			onWidthChange: vi.fn(),
 			getCachedViewportHeight: () => 240,
@@ -790,6 +819,7 @@ describe("observeVirtualListViewport", () => {
 			maxScrollTopBeforeMeasurement: 200,
 		}));
 		const stopObserving = observeVirtualListViewport({
+			frameCoordinator: createObserverFrameCoordinator(),
 			rootEl,
 			onWidthChange: vi.fn(),
 			getCachedViewportHeight: () => 240,
@@ -855,6 +885,7 @@ describe("observeVirtualListViewport", () => {
 			maxScrollTopBeforeMeasurement: 200,
 		}));
 		const stopObserving = observeVirtualListViewport({
+			frameCoordinator: createObserverFrameCoordinator(),
 			rootEl,
 			onWidthChange: vi.fn(),
 			getCachedViewportHeight: () => 240,
@@ -914,6 +945,7 @@ describe("observeVirtualListViewport", () => {
 			maxScrollTopBeforeMeasurement: 200,
 		}));
 		const stopObserving = observeVirtualListViewport({
+			frameCoordinator: createObserverFrameCoordinator(),
 			rootEl,
 			onWidthChange: vi.fn(),
 			getCachedViewportHeight: () => 240,
@@ -978,6 +1010,7 @@ describe("observeVirtualListViewport", () => {
 			maxScrollTopBeforeMeasurement: 200,
 		}));
 		const stopObserving = observeVirtualListViewport({
+			frameCoordinator: createObserverFrameCoordinator(),
 			rootEl,
 			onWidthChange: vi.fn(),
 			getCachedViewportHeight: () => 240,
@@ -1044,6 +1077,7 @@ describe("observeVirtualListViewport", () => {
 			maxScrollTopBeforeMeasurement: rangeMax,
 		}));
 		const stopObserving = observeVirtualListViewport({
+			frameCoordinator: createObserverFrameCoordinator(),
 			rootEl,
 			onWidthChange: vi.fn(),
 			getCachedViewportHeight: () => 240,
@@ -1104,6 +1138,7 @@ describe("observeVirtualListViewport", () => {
 			maxScrollTopBeforeMeasurement: 200,
 		}));
 		const stopObserving = observeVirtualListViewport({
+			frameCoordinator: createObserverFrameCoordinator(),
 			rootEl,
 			onWidthChange: vi.fn(),
 			getCachedViewportHeight: () => 240,
@@ -1168,6 +1203,7 @@ describe("observeVirtualListViewport", () => {
 			maxScrollTopBeforeMeasurement: 200,
 		}));
 		const stopObserving = observeVirtualListViewport({
+			frameCoordinator: createObserverFrameCoordinator(),
 			rootEl,
 			onWidthChange: vi.fn(),
 			getCachedViewportHeight: () => 240,
@@ -1220,6 +1256,7 @@ describe("observeVirtualListViewport", () => {
 		const runScrollMeasurement = vi.fn();
 		const getScrollMeasurementRange = vi.fn(() => null);
 		const stopObserving = observeVirtualListViewport({
+			frameCoordinator: createObserverFrameCoordinator(),
 			rootEl,
 			onWidthChange: vi.fn(),
 			getCachedViewportHeight: () => 240,

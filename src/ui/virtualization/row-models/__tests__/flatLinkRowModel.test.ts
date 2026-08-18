@@ -81,27 +81,6 @@ describe("flatLinkRowModel", () => {
 		expect(rangesScratch.previewVisible).toBe(previewScratch);
 	});
 
-	it("reuses the mounted range reference when preview overscan matches mounted overscan", () => {
-		const rowModel = createRowModel(30);
-		const ranges = rowModel.findVisibleRanges({
-			scrollTop: 110,
-			viewportHeight: 100,
-			mountedOverscanPx: 110,
-			previewOverscanPx: 110,
-		});
-		const mounted = { start: 2, end: 5 };
-		const rangesFromMounted = rowModel.findVisibleRangesFromMounted({
-			scrollTop: 110,
-			viewportHeight: 100,
-			mounted,
-			mountedOverscanPx: 110,
-			previewOverscanPx: 110,
-		});
-
-		expect(ranges.previewVisible).toBe(ranges.mounted);
-		expect(rangesFromMounted.previewVisible).toBe(mounted);
-	});
-
 	it("resolves a stable scroll band for the flat mounted range", () => {
 		const rowModel = createRowModel(60);
 		const mounted = { start: 0, end: 0 };
@@ -191,7 +170,11 @@ describe("flatLinkRowModel", () => {
 
 	it("ends preview coverage before the strict viewport can leave preview rows", () => {
 		const rowModel = createRowModel(30);
-		const ranges = rowModel.findVisibleRanges({
+		const ranges = {
+			mounted: { start: 0, end: 0 },
+			previewVisible: { start: 0, end: 0 },
+		};
+		rowModel.findVisibleRangesInto(ranges, {
 			scrollTop: 0,
 			viewportHeight: 100,
 			mountedOverscanPx: 220,

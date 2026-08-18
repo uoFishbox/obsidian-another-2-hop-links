@@ -1,5 +1,5 @@
 import type { RowRange } from "../rowRange";
-import type { VirtualRanges } from "../types";
+import type { VirtualRanges, VirtualRowModel } from "../types";
 import type { VirtualVisibilityPolicy } from "./virtualListEngine";
 import { recordCCLDevMeasurement } from "infrastructure/debug/CCLDevMeasurements";
 export type ScrollWindowIdentity = object | string | number | symbol;
@@ -28,36 +28,14 @@ type StableScrollTopBandMutable = {
 	-readonly [K in keyof StableScrollTopBand]: StableScrollTopBand[K];
 };
 
-export interface VirtualScrollWindowRangeRowModel {
-	readonly rowCount: number;
-	readonly totalHeight: number;
-	findVisibleRangeInto(
-		out: RowRange,
-		params: {
-			scrollTop: number;
-			viewportHeight: number;
-			overscanPx: number;
-		},
-	): void;
-	findVisibleRangesInto(
-		out: VirtualRanges,
-		params: {
-			scrollTop: number;
-			viewportHeight: number;
-			mountedOverscanPx: number;
-			previewOverscanPx?: number;
-		},
-	): void;
-	findVisibleRangesFromMountedInto(
-		out: VirtualRanges,
-		params: {
-			scrollTop: number;
-			viewportHeight: number;
-			mounted: RowRange;
-			mountedOverscanPx: number;
-			previewOverscanPx?: number;
-		},
-	): void;
+export type VirtualScrollWindowRangeRowModel = Pick<
+	VirtualRowModel<unknown>,
+	| "rowCount"
+	| "totalHeight"
+	| "findVisibleRangeInto"
+	| "findVisibleRangesInto"
+	| "findVisibleRangesFromMountedInto"
+> & {
 	findStableMountedScrollTopBandInto?(
 		out: StableScrollTopBandMutable,
 		params: {
@@ -77,7 +55,7 @@ export interface VirtualScrollWindowRangeRowModel {
 			requiredOverscanPx: number;
 		},
 	): void;
-}
+};
 
 export interface CreateVirtualScrollWindowRangeResolverOptions<
 	TRowModel extends VirtualScrollWindowRangeRowModel,

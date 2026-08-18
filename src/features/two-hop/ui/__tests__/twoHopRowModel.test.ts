@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { createTwoHopRowModel } from "features/two-hop/ui/twoHopRowModel";
+import {
+	createTwoHopRowModel,
+	type TwoHopRowModel,
+} from "features/two-hop/ui/twoHopRowModel";
 import {
 	createTwoHopSectionModel,
 	type TwoHopItemModel,
@@ -46,6 +49,15 @@ function createModel(sections: readonly TwoHopSectionModel[]) {
 	});
 }
 
+function resolveVisibleRange(
+	model: TwoHopRowModel,
+	params: { scrollTop: number; viewportHeight: number; overscanPx: number },
+) {
+	const range = { start: 0, end: 0 };
+	model.findVisibleRangeInto(range, params);
+	return range;
+}
+
 describe("TwoHopRowModel", () => {
 	it("uses sections as the sole logical content publication", () => {
 		const sections = [createSection("first", 2)];
@@ -56,7 +68,6 @@ describe("TwoHopRowModel", () => {
 		}
 
 		expect(model.revision.content).toBe(sections);
-		expect(model.revision.pagination).toBe(otherModel.revision.pagination);
 	});
 
 	it("compiles section prefixes including header and load-more cells", () => {
@@ -85,14 +96,14 @@ describe("TwoHopRowModel", () => {
 		]);
 
 		expect(
-			model.findVisibleRange({
+			resolveVisibleRange(model, {
 				scrollTop: 225,
 				viewportHeight: 120,
 				overscanPx: 0,
 			}),
 		).toEqual({ start: 2, end: 3 });
 		expect(
-			model.findVisibleRange({
+			resolveVisibleRange(model, {
 				scrollTop: 100,
 				viewportHeight: 10,
 				overscanPx: 0,
@@ -114,14 +125,14 @@ describe("TwoHopRowModel", () => {
 		});
 
 		expect(
-			model.findVisibleRange({
+			resolveVisibleRange(model, {
 				scrollTop: 100.25,
 				viewportHeight: 10.5,
 				overscanPx: 0,
 			}),
 		).toEqual({ start: 1, end: 1 });
 		expect(
-			model.findVisibleRange({
+			resolveVisibleRange(model, {
 				scrollTop: 100.25,
 				viewportHeight: 10.51,
 				overscanPx: 0,

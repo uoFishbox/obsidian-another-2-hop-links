@@ -1,7 +1,6 @@
 import type { RowRange } from "./rowRange";
 import type { VirtualRowLayoutMetrics } from "./layoutMetrics";
 import type { RenderBodyKey } from "./renderRevision";
-import type { RowKey } from "./rowKey";
 
 export interface RowNumberLookup {
 	readonly length: number;
@@ -17,6 +16,7 @@ export type Brand<T, TBrand extends string> = T & {
 
 export type LogicalCellKey = Brand<string, "LogicalCellKey">;
 export type SourceKey = Brand<string, "SourceKey">;
+export type RowKey = number;
 export const logicalCellKey = (value: string): LogicalCellKey =>
 	value as LogicalCellKey;
 
@@ -49,24 +49,33 @@ export interface VirtualRowModel<TCell> {
 	getRowTop?: (rowIndex: number) => number;
 	getRowEnd?: (rowIndex: number) => number;
 
-	findVisibleRange(params: {
-		scrollTop: number;
-		viewportHeight: number;
-		overscanPx: number;
-	}): RowRange;
-	findVisibleRanges?(params: {
-		scrollTop: number;
-		viewportHeight: number;
-		mountedOverscanPx: number;
-		previewOverscanPx?: number;
-	}): VirtualRanges;
-	findVisibleRangesFromMounted?(params: {
-		scrollTop: number;
-		viewportHeight: number;
-		mounted: RowRange;
-		mountedOverscanPx: number;
-		previewOverscanPx?: number;
-	}): VirtualRanges;
+	findVisibleRangeInto(
+		out: RowRange,
+		params: {
+			scrollTop: number;
+			viewportHeight: number;
+			overscanPx: number;
+		},
+	): void;
+	findVisibleRangesInto(
+		out: VirtualRanges,
+		params: {
+			scrollTop: number;
+			viewportHeight: number;
+			mountedOverscanPx: number;
+			previewOverscanPx?: number;
+		},
+	): void;
+	findVisibleRangesFromMountedInto(
+		out: VirtualRanges,
+		params: {
+			scrollTop: number;
+			viewportHeight: number;
+			mounted: RowRange;
+			mountedOverscanPx: number;
+			previewOverscanPx?: number;
+		},
+	): void;
 
 	resolveNavigationTarget?: (
 		currentKey: string,

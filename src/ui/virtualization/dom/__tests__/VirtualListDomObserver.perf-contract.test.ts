@@ -1,6 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { resetScrollActivityForTests } from "ui/virtualization/scheduling/scrollActivity";
 import {
+	createVirtualFrameCoordinator,
+	type VirtualFrameCoordinator,
+} from "ui/virtualization/scheduling/frameCoordinator";
+import {
 	getCCLDevMeasurementSnapshot,
 	resetCCLDevMeasurements,
 } from "infrastructure/debug/CCLDevMeasurements";
@@ -18,6 +22,14 @@ const SCROLLER_COUNT = 32;
 
 const flushScheduledMeasurements = async (): Promise<void> => {
 	await vi.runOnlyPendingTimersAsync();
+};
+
+const observerFrameCoordinators: VirtualFrameCoordinator[] = [];
+
+const createObserverFrameCoordinator = (): VirtualFrameCoordinator => {
+	const coordinator = createVirtualFrameCoordinator();
+	observerFrameCoordinators.push(coordinator);
+	return coordinator;
 };
 
 const scheduleScrollMeasurement = (task?: () => void): void => {
@@ -49,6 +61,9 @@ describe("VirtualListDomObserver performance contracts", () => {
 		for (const stop of stopObserving.splice(0)) {
 			stop();
 		}
+		for (const coordinator of observerFrameCoordinators.splice(0)) {
+			coordinator.dispose();
+		}
 		document.body.innerHTML = "";
 		resetScrollActivityForTests();
 		vi.useRealTimers();
@@ -76,6 +91,7 @@ describe("VirtualListDomObserver performance contracts", () => {
 		for (const [index, rootEl] of roots.entries()) {
 			stopObserving.push(
 				observeVirtualListViewport({
+					frameCoordinator: createObserverFrameCoordinator(),
 					rootEl,
 					onWidthChange: vi.fn(),
 					onScrollContainerChange: vi.fn(),
@@ -136,6 +152,7 @@ describe("VirtualListDomObserver performance contracts", () => {
 
 		let frame = 0;
 		const observation = observeVirtualListViewport({
+			frameCoordinator: createObserverFrameCoordinator(),
 			rootEl,
 			onWidthChange: vi.fn(),
 			getCachedViewportHeight: () => 240,

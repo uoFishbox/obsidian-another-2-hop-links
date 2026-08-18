@@ -238,6 +238,80 @@ describe("createVirtualMeasurementController", () => {
 		});
 	});
 
+	it("suppresses scroll work while layout measurement is pending", async () => {
+		const rootEl = createRoot();
+		document.body.append(rootEl);
+		const state = createVirtualListMeasurementState();
+		const onMeasurement = vi.fn(
+			(_measurement: VirtualMeasurement) => "stable" as const,
+		);
+		const controller = createController({
+			getRootEl: () => rootEl,
+			measurement: state,
+			onMeasurement,
+			maxUnstableMeasurementRetries: 1,
+		});
+
+		controller.scheduleLayoutMeasurement();
+		controller.scheduleScrollMeasurement();
+		await vi.runAllTimersAsync();
+
+		expect(onMeasurement).toHaveBeenCalledTimes(1);
+		expect(onMeasurement.mock.calls[0]?.[0].source).toBe("layout");
+
+		controller.scheduleScrollMeasurement();
+		await vi.runAllTimersAsync();
+
+		expect(onMeasurement).toHaveBeenCalledTimes(2);
+		expect(onMeasurement.mock.calls[1]?.[0].source).toBe("scroll");
+		rootEl.remove();
+	});
+
+	it("bounds unstable layout retries", async () => {
+		const rootEl = createRoot();
+		document.body.append(rootEl);
+		const state = createVirtualListMeasurementState();
+		const onMeasurement = vi.fn(() => "unstable" as const);
+		const controller = createController({
+			getRootEl: () => rootEl,
+			measurement: state,
+			onMeasurement,
+			maxUnstableMeasurementRetries: 2,
+		});
+
+		controller.runLayoutMeasurement();
+		await vi.runAllTimersAsync();
+
+		// One immediate measurement plus the configured two retries.
+		expect(onMeasurement).toHaveBeenCalledTimes(3);
+		await vi.advanceTimersByTimeAsync(250);
+		expect(onMeasurement).toHaveBeenCalledTimes(3);
+		rootEl.remove();
+	});
+
+	it("retains observer scroll work when layout temporarily supersedes it", async () => {
+		const rootEl = createRoot();
+		document.body.append(rootEl);
+		const state = createVirtualListMeasurementState();
+		const observerTask = vi.fn();
+		const controller = createController({
+			getRootEl: () => rootEl,
+			measurement: state,
+			maxUnstableMeasurementRetries: 1,
+		});
+
+		controller.scheduleScrollMeasurement(observerTask);
+		controller.scheduleLayoutMeasurement();
+		await vi.runAllTimersAsync();
+
+		expect(observerTask).not.toHaveBeenCalled();
+		controller.scheduleScrollMeasurement();
+		await vi.runAllTimersAsync();
+
+		expect(observerTask).toHaveBeenCalledOnce();
+		rootEl.remove();
+	});
+
 	it("can schedule post-paint initial stabilization without range callbacks", async () => {
 		const rootEl = createRoot();
 		document.body.append(rootEl);
