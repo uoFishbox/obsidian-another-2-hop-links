@@ -125,7 +125,7 @@ describe("createResidentRowSlotAllocator", () => {
 			}),
 		).toThrowError(disposedError);
 		expect(() => allocator.resolveSlotIndex(10)).toThrowError(disposedError);
-		expect(() => allocator.reset("empty")).toThrowError(disposedError);
+		expect(() => allocator.reset()).toThrowError(disposedError);
 		expect(() => allocator.dispose()).not.toThrow();
 	});
 });

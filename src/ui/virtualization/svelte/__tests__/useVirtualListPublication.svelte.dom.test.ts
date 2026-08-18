@@ -19,9 +19,5 @@ describe("useVirtualList reactive publication", () => {
 		await fireEvent.click(getByTestId("preview-only"));
 		await tick();
 		expect(onSurfacePublication).toHaveBeenCalledTimes(2);
-
-		await fireEvent.click(getByTestId("mode"));
-		await tick();
-		expect(onSurfacePublication).toHaveBeenCalledTimes(3);
 	});
 });

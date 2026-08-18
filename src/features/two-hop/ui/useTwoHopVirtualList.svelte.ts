@@ -258,7 +258,6 @@ export function useTwoHopVirtualList(
 			viewportHeight: nextMeasurement.viewportHeight,
 			sectionTop: nextMeasurement.sectionTop,
 			isStableMeasurement: nextMeasurement.isStableMeasurement,
-			isScrollActive: nextMeasurement.isScrollActive,
 			hasStableVisibleRange: measurement.hasStableVisibleRange,
 			precomputedRanges,
 			visibilityPolicy: resolveVisibilityPolicy(model),

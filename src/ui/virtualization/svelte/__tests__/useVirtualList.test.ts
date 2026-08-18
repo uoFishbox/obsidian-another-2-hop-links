@@ -95,8 +95,13 @@ describe("useVirtualList", () => {
 		const rowModel = createRowModel(12);
 		const virtualList = createVirtualList();
 
-		const result = virtualList.bootstrap({
+		const result = virtualList.applyMeasurement({
 			rowModel,
+			scrollTop: 0,
+			viewportHeight: 0,
+			sectionTop: 0,
+			isStableMeasurement: false,
+			hasStableVisibleRange: false,
 			visibilityPolicy: {
 				bootstrapRows: 3,
 				mountedOverscanPx: 220,
@@ -137,7 +142,6 @@ describe("useVirtualList", () => {
 			updateKind: "recomputed",
 		});
 		expect(snapshot?.ranges.mounted).toEqual({ start: 0, end: 3 });
-		expect(snapshot?.mode.kind).toBe("stable");
 		expect(virtualList.getMountedCells()).toBe(snapshot?.mountedBuild?.cells);
 		expect(virtualList.getTotalHeight(123)).toBe(snapshot?.totalHeight);
 		expect(
@@ -145,30 +149,6 @@ describe("useVirtualList", () => {
 				(cell) => !Object.prototype.hasOwnProperty.call(cell, "visibility"),
 			),
 		).toBe(true);
-	});
-
-	it("reflects active scrolling in stable mode", () => {
-		const rowModel = createRowModel(12);
-		const virtualList = createVirtualList();
-
-		virtualList.applyMeasurement({
-			rowModel,
-			scrollTop: 0,
-			viewportHeight: 100,
-			sectionTop: 0,
-			isStableMeasurement: true,
-			hasStableVisibleRange: false,
-			isScrollActive: true,
-			visibilityPolicy: {
-				bootstrapRows: 3,
-				mountedOverscanPx: 220,
-			},
-		});
-
-		expect(virtualList.getSnapshot()?.mode).toEqual({
-			kind: "stable",
-			scrolling: true,
-		});
 	});
 
 	it("does not rebuild mounted cells when row model and all ranges are unchanged", () => {
@@ -312,7 +292,7 @@ describe("useVirtualList", () => {
 		expect(onSnapshotUpdated).toHaveBeenCalledTimes(1);
 	});
 
-	it("returns skipped and publishes skipped mode when unstable measurement keeps the same content", () => {
+	it("returns skipped without publishing a diagnostic-only snapshot change", () => {
 		const onSnapshotUpdated = vi.fn();
 		const virtualList = createVirtualList(onSnapshotUpdated);
 		const rowModel = createRowModel(12);
@@ -343,12 +323,11 @@ describe("useVirtualList", () => {
 			reason: "unstable",
 			updateKind: "skipped",
 		});
-		expect(virtualList.getSnapshot()).not.toBe(initial);
+		expect(virtualList.getSnapshot()).toBe(initial);
 		expect(virtualList.getSnapshot()?.mountedBuild?.cells).toBe(
 			initial?.mountedBuild?.cells,
 		);
-		expect(virtualList.getSnapshot()?.mode.kind).toBe("skipped");
-		expect(onSnapshotUpdated).toHaveBeenCalledTimes(2);
+		expect(onSnapshotUpdated).toHaveBeenCalledTimes(1);
 	});
 
 	it("transitions to empty explicitly and clears mounted cells", () => {
@@ -368,15 +347,7 @@ describe("useVirtualList", () => {
 			},
 		});
 
-		virtualList.setEmpty({
-			rowModel,
-			reason: "no-renderable-content",
-		});
-
-		expect(virtualList.getSnapshot()?.mode).toEqual({
-			kind: "empty",
-			reason: "no-renderable-content",
-		});
+		virtualList.setEmpty({ rowModel });
 		expect(virtualList.getMountedCells()).toEqual([]);
 		expect(virtualList.getSnapshot()?.mountedBuild).toBeNull();
 		expect(virtualList.getMountedBuild()).toBeNull();
@@ -414,7 +385,6 @@ describe("useVirtualList", () => {
 			},
 		});
 
-		expect(virtualList.getSnapshot()?.mode.kind).toBe("stable");
 		expect(virtualList.getMountedCells()).not.toBe(initialCells);
 		expect(virtualList.getMountedCells()[0]?.renderSlotIndex).toBe(0);
 	});

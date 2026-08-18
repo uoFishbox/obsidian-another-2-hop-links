@@ -59,10 +59,7 @@
 			}),
 	});
 
-	const applyMeasurement = (
-		previewVisible: { start: number; end: number },
-		isScrollActive: boolean,
-	): void => {
+	const applyMeasurement = (previewVisible: { start: number; end: number }): void => {
 		virtualList.applyMeasurement({
 			rowModel,
 			scrollTop: 0,
@@ -70,7 +67,6 @@
 			sectionTop: 0,
 			isStableMeasurement: true,
 			hasStableVisibleRange: true,
-			isScrollActive,
 			precomputedRanges: {
 				mounted: { start: 0, end: 3 },
 				previewVisible,
@@ -88,18 +84,12 @@
 	});
 </script>
 
-<button
-	data-testid="initial"
-	onclick={() => applyMeasurement({ start: 0, end: 1 }, false)}
->
+<button data-testid="initial" onclick={() => applyMeasurement({ start: 0, end: 1 })}>
 	Initial
 </button>
 <button
 	data-testid="preview-only"
-	onclick={() => applyMeasurement({ start: 1, end: 2 }, false)}
+	onclick={() => applyMeasurement({ start: 1, end: 2 })}
 >
 	Preview only
-</button>
-<button data-testid="mode" onclick={() => applyMeasurement({ start: 2, end: 3 }, true)}>
-	Mode
 </button>

@@ -8,17 +8,8 @@ import {
 	type VirtualListRevision,
 	type VirtualRanges,
 	type VirtualRowModel,
-	type VirtualRowModelRevision,
 } from "../types";
-import {
-	getMeasurementKindForMode,
-	type MaterializedVirtualListMode,
-	type VirtualListMeasurementKind,
-} from "./VirtualListMode";
-import {
-	hasSameVirtualListRevisionDependency,
-	type VirtualListRevisionDependency,
-} from "./virtualListRevision";
+import { hasSameVirtualListRevision } from "./virtualListRevision";
 
 export interface VirtualListMeasurement {
 	scrollTop: number;
@@ -27,7 +18,6 @@ export interface VirtualListMeasurement {
 	isStableMeasurement: boolean;
 	hasStableVisibleRange: boolean;
 	currentMountedRange: RowRange;
-	isScrollActive?: boolean;
 	/**
 	 * Value-stable ranges published by the scroll-window resolver. They are
 	 * retained by reference, so callers must not mutate them after passing
@@ -60,8 +50,9 @@ export interface VirtualListSnapshot<
 	ranges: VirtualRanges;
 	mountedBuild: TMountedBuild | null;
 	totalHeight: number;
-	mode: MaterializedVirtualListMode;
 }
+
+export type VirtualListMeasurementKind = "stable" | "bootstrapped" | "skipped";
 
 export interface VirtualListComputation<
 	TCell,
@@ -109,17 +100,9 @@ const EMPTY_VIRTUAL_RANGES: VirtualRanges = {
 	previewVisible: { start: 0, end: 0 },
 };
 
-/**
- * Mounted-cell reuse deliberately ignores measurement and preview policy.
- * Those inputs may change visible metadata or ranges without changing cell
- * bodies. Add a dependency here only when mounted-cell construction reads it.
- */
-const MOUNTED_CELL_ROW_MODEL_REVISION_DEPENDENCY = {
-	content: true,
-	layout: true,
-	keyResolver: true,
-	pagination: true,
-} as const satisfies VirtualListRevisionDependency;
+const getMeasurementKind = (
+	kind: ComputeVirtualRangesResult["kind"],
+): VirtualListMeasurementKind => (kind === "empty" ? "stable" : kind);
 
 const createSnapshot = <
 	TCell,
@@ -130,14 +113,12 @@ const createSnapshot = <
 	ranges: VirtualRanges;
 	mountedBuild: TMountedBuild;
 	totalHeight: number;
-	mode: MaterializedVirtualListMode;
 }): VirtualListSnapshot<TCell, TMountedCell, TMountedBuild> => {
 	return {
 		rowModel: params.rowModel,
 		ranges: params.ranges,
 		mountedBuild: params.mountedBuild,
 		totalHeight: params.totalHeight,
-		mode: params.mode,
 	};
 };
 
@@ -151,7 +132,6 @@ const cloneSnapshotWithOverrides = <
 		rowModel?: VirtualRowModel<TCell>;
 		ranges?: VirtualRanges;
 		totalHeight?: number;
-		mode?: MaterializedVirtualListMode;
 	},
 ): VirtualListSnapshot<TCell, TMountedCell, TMountedBuild> => ({
 	...snapshot,
@@ -187,53 +167,23 @@ const clampVirtualRanges = (ranges: VirtualRanges, rowCount: number): VirtualRan
 	};
 };
 
-const sameVirtualListMode = (
-	previous: MaterializedVirtualListMode,
-	next: MaterializedVirtualListMode,
-): boolean => {
-	if (previous.kind !== next.kind) {
-		return false;
-	}
-
-	switch (previous.kind) {
-		case "bootstrapped":
-		case "empty":
-		case "skipped":
-			if (next.kind !== previous.kind) {
-				return false;
-			}
-			return previous.reason === next.reason;
-		case "stable":
-			if (next.kind !== "stable") {
-				return false;
-			}
-			return previous.scrolling === next.scrolling;
-	}
-};
-
 const withFastPathReuseSnapshot = <
 	TCell,
 	TMountedCell extends MountedVirtualCell,
 	TMountedBuild extends MountedVirtualCellsBuild<TMountedCell>,
 >(
 	snapshot: VirtualListSnapshot<TCell, TMountedCell, TMountedBuild>,
-	params: {
-		rowModel: VirtualRowModel<TCell>;
-		mode: MaterializedVirtualListMode;
-	},
+	rowModel: VirtualRowModel<TCell>,
 ): VirtualListSnapshot<TCell, TMountedCell, TMountedBuild> => {
-	const rowModelReused = snapshot.rowModel === params.rowModel;
 	if (
-		rowModelReused &&
-		snapshot.totalHeight === params.rowModel.totalHeight &&
-		sameVirtualListMode(snapshot.mode, params.mode)
+		snapshot.rowModel === rowModel &&
+		snapshot.totalHeight === rowModel.totalHeight
 	) {
 		return snapshot;
 	}
 	return cloneSnapshotWithOverrides(snapshot, {
-		rowModel: params.rowModel,
-		totalHeight: params.rowModel.totalHeight,
-		mode: params.mode,
+		rowModel,
+		totalHeight: rowModel.totalHeight,
 	});
 };
 
@@ -243,7 +193,6 @@ export const createEmptyVirtualListComputation = <
 	TMountedBuild extends MountedVirtualCellsBuild<TMountedCell>,
 >(params: {
 	rowModel: VirtualRowModel<TCell>;
-	mode: Extract<MaterializedVirtualListMode, { kind: "empty" }>;
 }): VirtualListComputation<TCell, TMountedCell, TMountedBuild> => {
 	return {
 		snapshot: {
@@ -251,39 +200,15 @@ export const createEmptyVirtualListComputation = <
 			ranges: EMPTY_VIRTUAL_RANGES,
 			mountedBuild: null,
 			totalHeight: params.rowModel.totalHeight,
-			mode: params.mode,
 		},
-		measurementKind: getMeasurementKindForMode(params.mode),
+		measurementKind: "stable",
 	};
 };
-
-const isVirtualListRevision = (
-	revision: VirtualRowModelRevision,
-): revision is VirtualListRevision =>
-	"content" in revision &&
-	"layout" in revision &&
-	"keyResolver" in revision &&
-	"pagination" in revision &&
-	"measurement" in revision &&
-	"previewPolicy" in revision;
 
 const hasSameMountedCellRowModelRevision = <TCell>(
 	previous: VirtualRowModel<TCell>,
 	next: VirtualRowModel<TCell>,
-): boolean => {
-	if (
-		isVirtualListRevision(previous.revision) &&
-		isVirtualListRevision(next.revision)
-	) {
-		return hasSameVirtualListRevisionDependency(
-			previous.revision,
-			next.revision,
-			MOUNTED_CELL_ROW_MODEL_REVISION_DEPENDENCY,
-		);
-	}
-
-	return Object.is(previous.revision, next.revision);
-};
+): boolean => hasSameVirtualListRevision(previous.revision, next.revision);
 
 export function computeVirtualListSnapshot<
 	TCell,
@@ -303,32 +228,24 @@ export function computeVirtualListSnapshot<
 		bootstrapRows: input.visibilityPolicy.bootstrapRows,
 		mountedOverscanPx: input.visibilityPolicy.mountedOverscanPx,
 		previewOverscanPx: input.visibilityPolicy.previewOverscanPx ?? 0,
-		isScrollActive: input.measurement.isScrollActive,
 		precomputedRanges: input.measurement.precomputedRanges,
 	});
 	const previous = input.previous ?? null;
 	const previousMountedBuild = previous?.mountedBuild ?? null;
 
-	if (rangesResult.mode.kind === "empty") {
-		return createEmptyVirtualListComputation({
-			rowModel: input.rowModel,
-			mode: rangesResult.mode,
-		});
+	if (rangesResult.kind === "empty") {
+		return createEmptyVirtualListComputation({ rowModel: input.rowModel });
 	}
 
-	if (rangesResult.mode.kind === "skipped") {
+	if (rangesResult.kind === "skipped") {
 		if (
 			previous &&
 			hasSameMountedCellRowModelRevision(previous.rowModel, input.rowModel) &&
 			previous.totalHeight === input.rowModel.totalHeight
 		) {
-			const snapshot = withFastPathReuseSnapshot(previous, {
-				rowModel: input.rowModel,
-				mode: rangesResult.mode,
-			});
 			return {
-				snapshot,
-				measurementKind: getMeasurementKindForMode(rangesResult.mode),
+				snapshot: withFastPathReuseSnapshot(previous, input.rowModel),
+				measurementKind: "skipped",
 			};
 		}
 
@@ -339,10 +256,8 @@ export function computeVirtualListSnapshot<
 				buildMountedCells: input.buildMountedCells,
 			});
 			return {
-				snapshot: cloneSnapshotWithOverrides(recomputed.snapshot, {
-					mode: rangesResult.mode,
-				}),
-				measurementKind: getMeasurementKindForMode(rangesResult.mode),
+				snapshot: recomputed.snapshot,
+				measurementKind: "skipped",
 			};
 		}
 
@@ -352,14 +267,9 @@ export function computeVirtualListSnapshot<
 				ranges: EMPTY_VIRTUAL_RANGES,
 				mountedBuild: previousMountedBuild,
 				totalHeight: input.rowModel.totalHeight,
-				mode: rangesResult.mode,
 			},
-			measurementKind: getMeasurementKindForMode(rangesResult.mode),
+			measurementKind: "skipped",
 		};
-	}
-
-	if (!("ranges" in rangesResult)) {
-		throw new Error("Virtual ranges are required for measured list modes.");
 	}
 
 	const rangeChanged = didRangesChange(previous?.ranges, rangesResult.ranges);
@@ -374,13 +284,9 @@ export function computeVirtualListSnapshot<
 		previous.totalHeight === input.rowModel.totalHeight &&
 		previous.mountedBuild
 	) {
-		const snapshot = withFastPathReuseSnapshot(previous, {
-			rowModel: input.rowModel,
-			mode: rangesResult.mode,
-		});
 		return {
-			snapshot,
-			measurementKind: getMeasurementKindForMode(rangesResult.mode),
+			snapshot: withFastPathReuseSnapshot(previous, input.rowModel),
+			measurementKind: getMeasurementKind(rangesResult.kind),
 		};
 	}
 
@@ -397,9 +303,8 @@ export function computeVirtualListSnapshot<
 				ranges: rangesResult.ranges,
 				mountedBuild: previous.mountedBuild,
 				totalHeight: input.rowModel.totalHeight,
-				mode: rangesResult.mode,
 			}),
-			measurementKind: getMeasurementKindForMode(rangesResult.mode),
+			measurementKind: getMeasurementKind(rangesResult.kind),
 		};
 	}
 
@@ -416,9 +321,8 @@ export function computeVirtualListSnapshot<
 			ranges: rangesResult.ranges,
 			mountedBuild,
 			totalHeight: input.rowModel.totalHeight,
-			mode: rangesResult.mode,
 		}),
-		measurementKind: getMeasurementKindForMode(rangesResult.mode),
+		measurementKind: getMeasurementKind(rangesResult.kind),
 	};
 }
 
@@ -430,10 +334,7 @@ export function recomputeVirtualListSnapshot<
 	input: VirtualListRecomputeInput<TCell, TMountedCell, TMountedBuild>,
 ): VirtualListComputation<TCell, TMountedCell, TMountedBuild> {
 	if (input.rowModel.rowCount <= 0) {
-		return createEmptyVirtualListComputation({
-			rowModel: input.rowModel,
-			mode: { kind: "empty", reason: "no-rows" },
-		});
+		return createEmptyVirtualListComputation({ rowModel: input.rowModel });
 	}
 
 	const previousMountedBuild = input.previous.mountedBuild;
@@ -449,9 +350,8 @@ export function recomputeVirtualListSnapshot<
 				ranges,
 				mountedBuild: previousMountedBuild,
 				totalHeight: input.rowModel.totalHeight,
-				mode: input.previous.mode,
 			}),
-			measurementKind: getMeasurementKindForMode(input.previous.mode),
+			measurementKind: "stable",
 		};
 	}
 	const mountedBuild = input.buildMountedCells({
@@ -467,8 +367,7 @@ export function recomputeVirtualListSnapshot<
 			ranges,
 			mountedBuild,
 			totalHeight: input.rowModel.totalHeight,
-			mode: input.previous.mode,
 		}),
-		measurementKind: getMeasurementKindForMode(input.previous.mode),
+		measurementKind: "stable",
 	};
 }

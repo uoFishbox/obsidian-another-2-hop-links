@@ -1,14 +1,13 @@
 import { describe, expect, it } from "vitest";
 import { computeVirtualRanges } from "../virtualRanges";
-import type { VirtualRanges, VirtualRowModel, VirtualRowModelRevision } from "../types";
+import type { VirtualRanges, VirtualRowModel } from "../types";
 
 function createMockRowModel(
 	rowCount: number,
 	rowHeight: number,
 ): VirtualRowModel<unknown> {
-	const revision: VirtualRowModelRevision = { kind: "opaque", token: 0 };
 	return {
-		revision,
+		revision: { content: 0, layout: 0 },
 		rowCount,
 		totalHeight: rowCount * rowHeight,
 		layout: {
@@ -57,7 +56,7 @@ function expectComputedRanges(
 }
 
 describe("computeVirtualRanges", () => {
-	it("returns explicit empty mode when there are no rows", () => {
+	it("returns an explicit empty result when there are no rows", () => {
 		const rowModel = createMockRowModel(0, 50);
 		const result = computeVirtualRanges({
 			rowModel,
@@ -72,7 +71,7 @@ describe("computeVirtualRanges", () => {
 		});
 
 		expect(result).toEqual({
-			mode: { kind: "empty", reason: "no-rows" },
+			kind: "empty",
 			ranges: {
 				mounted: { start: 0, end: 0 },
 				previewVisible: { start: 0, end: 0 },
@@ -93,9 +92,7 @@ describe("computeVirtualRanges", () => {
 			bootstrapRows: 5,
 			mountedOverscanPx: 100,
 		});
-		expect(result).toEqual({
-			mode: { kind: "skipped", reason: "unstable-measurement" },
-		});
+		expect(result).toEqual({ kind: "skipped" });
 	});
 
 	it("mounts bootstrap rows without exposing them as preview-visible", () => {
@@ -112,7 +109,7 @@ describe("computeVirtualRanges", () => {
 			mountedOverscanPx: 100,
 		});
 		expect(result).toEqual({
-			mode: { kind: "bootstrapped", reason: "initial" },
+			kind: "bootstrapped",
 			ranges: {
 				mounted: { start: 0, end: 5 },
 				previewVisible: { start: 0, end: 0 },
@@ -135,7 +132,7 @@ describe("computeVirtualRanges", () => {
 		});
 
 		expect(result).toEqual({
-			mode: { kind: "bootstrapped", reason: "invalid-mounted-range" },
+			kind: "bootstrapped",
 			ranges: {
 				mounted: { start: 0, end: 3 },
 				previewVisible: { start: 0, end: 0 },
@@ -157,9 +154,8 @@ describe("computeVirtualRanges", () => {
 			mountedOverscanPx: 100,
 		});
 
-		expect(result.mode.kind).toBe("stable");
-		if (result.mode.kind !== "stable") return;
-		expect(result.mode.scrolling).toBe(false);
+		expect(result.kind).toBe("stable");
+		if (result.kind !== "stable") return;
 		const ranges = expectComputedRanges(result);
 
 		// visible: rows 4..12 (200..600)
@@ -186,7 +182,7 @@ describe("computeVirtualRanges", () => {
 			previewOverscanPx: 50,
 		});
 
-		expect(result.mode.kind).toBe("stable");
+		expect(result.kind).toBe("stable");
 		const ranges = expectComputedRanges(result);
 		expect(ranges.previewVisible).toEqual({ start: 3, end: 13 });
 		expect(ranges.mounted).toEqual({ start: 2, end: 14 });
@@ -207,28 +203,10 @@ describe("computeVirtualRanges", () => {
 			previewOverscanPx: 150,
 		});
 
-		expect(result.mode.kind).toBe("stable");
+		expect(result.kind).toBe("stable");
 		const ranges = expectComputedRanges(result);
 		expect(ranges.previewVisible).toEqual({ start: 3, end: 13 });
 		expect(ranges.mounted).toEqual({ start: 3, end: 13 });
-	});
-
-	it("marks stable mode as scrolling while scroll is active", () => {
-		const rowModel = createMockRowModel(100, 50);
-		const result = computeVirtualRanges({
-			rowModel,
-			scrollTop: 200,
-			viewportHeight: 400,
-			sectionTop: 0,
-			isStableMeasurement: true,
-			hasStableVisibleRange: true,
-			currentMountedRange: { start: 0, end: 10 },
-			bootstrapRows: 5,
-			mountedOverscanPx: 100,
-			isScrollActive: true,
-		});
-
-		expect(result.mode).toEqual({ kind: "stable", scrolling: true });
 	});
 
 	it("uses precomputed ranges for stable measurements", () => {
@@ -255,7 +233,7 @@ describe("computeVirtualRanges", () => {
 			precomputedRanges,
 		});
 
-		expect(result.mode.kind).toBe("stable");
+		expect(result.kind).toBe("stable");
 		const ranges = expectComputedRanges(result);
 		expect(ranges).toEqual(precomputedRanges);
 	});
@@ -296,8 +274,8 @@ describe("computeVirtualRanges", () => {
 			mountedOverscanPx: 1000, // huge overscan
 		});
 
-		expect(result.mode.kind).toBe("stable");
-		if (result.mode.kind !== "stable") return;
+		expect(result.kind).toBe("stable");
+		if (result.kind !== "stable") return;
 		const ranges = expectComputedRanges(result);
 
 		expect(ranges.mounted.start).toBe(0);

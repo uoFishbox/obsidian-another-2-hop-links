@@ -1,9 +1,5 @@
 import type { TwoHopSectionModel } from "features/two-hop/ui/twoHopSectionModel";
 import type { StableScrollTopBand } from "ui/virtualization/core/scrollWindowMeasurement";
-import {
-	createVirtualListLayoutRevisionToken,
-	createVirtualListRevision,
-} from "ui/virtualization/core/virtualListRevision";
 import type { VirtualRowLayoutMetrics } from "ui/virtualization/layoutMetrics";
 import type { RowRange } from "ui/virtualization/rowRange";
 import type { ViewPlanLayoutMetrics } from "ui/virtualization/svelte/viewPlanLayout";
@@ -155,14 +151,6 @@ export function createTwoHopRowModel(
 		rowStride,
 		sectionMarginBottom,
 	};
-	const layoutRevision = createVirtualListLayoutRevisionToken([
-		layout.containerWidth,
-		layout.columns,
-		layout.cellWidth,
-		layout.rowHeight,
-		layout.gap,
-		layout.sectionMarginBottom,
-	]);
 	const cardCounts: TwoHopLogicalCardCounts = Object.freeze({
 		header: sections.length,
 		item: itemCount,
@@ -407,10 +395,17 @@ export function createTwoHopRowModel(
 	};
 
 	const rowModel: TwoHopRowModel = {
-		revision: createVirtualListRevision({
+		revision: {
 			content: sections,
-			layout: layoutRevision,
-		}),
+			layout: Object.freeze([
+				layout.containerWidth,
+				layout.columns,
+				layout.cellWidth,
+				layout.rowHeight,
+				layout.gap,
+				layout.sectionMarginBottom,
+			]),
+		},
 		rowCount,
 		totalHeight,
 		layout,

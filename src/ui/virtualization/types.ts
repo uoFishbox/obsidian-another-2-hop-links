@@ -35,18 +35,10 @@ export interface VirtualRow<TCell> {
 export interface VirtualListRevision {
 	readonly content: unknown;
 	readonly layout: unknown;
-	readonly keyResolver: unknown;
-	readonly pagination: unknown;
-	readonly measurement: unknown;
-	readonly previewPolicy: unknown;
 }
 
-export type VirtualRowModelRevision =
-	| VirtualListRevision
-	| { readonly kind: "opaque"; readonly token: unknown };
-
 export interface VirtualRowModel<TCell> {
-	revision: VirtualRowModelRevision;
+	revision: VirtualListRevision;
 	rowCount: number;
 	readonly rowCellCountByRow?: Uint16Array | RowNumberLookup;
 	totalHeight: number;

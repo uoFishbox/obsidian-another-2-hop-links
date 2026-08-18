@@ -1,5 +1,4 @@
 import { EMPTY_ROW_RANGE, isEmptyRange, type RowRange } from "./rowRange";
-import type { BootstrapReason, EmptyReason, SkipReason } from "./core/VirtualListMode";
 import type { VirtualRanges, VirtualRowModel } from "./types";
 
 /**
@@ -49,21 +48,10 @@ function createBootstrapVirtualRowRange(
 }
 
 export type ComputeVirtualRangesResult =
-	| {
-			mode: { kind: "empty"; reason: EmptyReason };
-			ranges: VirtualRanges;
-	  }
-	| {
-			mode: { kind: "bootstrapped"; reason: BootstrapReason };
-			ranges: VirtualRanges;
-	  }
-	| {
-			mode: { kind: "stable"; scrolling: boolean };
-			ranges: VirtualRanges;
-	  }
-	| {
-			mode: { kind: "skipped"; reason: SkipReason };
-	  };
+	| { kind: "empty"; ranges: VirtualRanges }
+	| { kind: "bootstrapped"; ranges: VirtualRanges }
+	| { kind: "stable"; ranges: VirtualRanges }
+	| { kind: "skipped" };
 
 const EMPTY_VIRTUAL_RANGES: VirtualRanges = {
 	mounted: EMPTY_ROW_RANGE,
@@ -156,25 +144,6 @@ export function resolveVirtualRangesInto(
 	return out;
 }
 
-const resolveBootstrapReason = (params: {
-	hasStableVisibleRange: boolean;
-	currentMountedRange: RowRange;
-	rowCount: number;
-}): BootstrapReason => {
-	if (!params.hasStableVisibleRange) {
-		return "initial";
-	}
-
-	if (
-		params.currentMountedRange.start >= params.rowCount ||
-		params.currentMountedRange.end > params.rowCount
-	) {
-		return "invalid-mounted-range";
-	}
-
-	return "empty-current-range";
-};
-
 export function computeVirtualRanges<TCell>(params: {
 	rowModel: VirtualRowModel<TCell>;
 	scrollTop: number;
@@ -186,7 +155,6 @@ export function computeVirtualRanges<TCell>(params: {
 	bootstrapRows: number;
 	mountedOverscanPx: number;
 	previewOverscanPx?: number;
-	isScrollActive?: boolean;
 	/**
 	 * Value-stable ranges published by the scroll-window resolver. They are
 	 * retained by reference, so callers must not mutate them after passing
@@ -195,10 +163,7 @@ export function computeVirtualRanges<TCell>(params: {
 	precomputedRanges?: VirtualRanges;
 }): ComputeVirtualRangesResult {
 	if (params.rowModel.rowCount <= 0) {
-		return {
-			mode: { kind: "empty", reason: "no-rows" },
-			ranges: EMPTY_VIRTUAL_RANGES,
-		};
+		return { kind: "empty", ranges: EMPTY_VIRTUAL_RANGES };
 	}
 
 	if (!params.isStableMeasurement) {
@@ -210,9 +175,7 @@ export function computeVirtualRanges<TCell>(params: {
 				isEmptyRange(params.currentMountedRange));
 
 		if (!shouldUseBootstrapRange) {
-			return {
-				mode: { kind: "skipped", reason: "unstable-measurement" },
-			};
+			return { kind: "skipped" };
 		}
 
 		const bootstrapRange = createBootstrapVirtualRowRange(
@@ -220,14 +183,7 @@ export function computeVirtualRanges<TCell>(params: {
 			params.bootstrapRows,
 		);
 		return {
-			mode: {
-				kind: "bootstrapped",
-				reason: resolveBootstrapReason({
-					hasStableVisibleRange: params.hasStableVisibleRange,
-					currentMountedRange: params.currentMountedRange,
-					rowCount: params.rowModel.rowCount,
-				}),
-			},
+			kind: "bootstrapped",
 			ranges: {
 				mounted: bootstrapRange,
 				previewVisible: EMPTY_ROW_RANGE,
@@ -269,8 +225,5 @@ export function computeVirtualRanges<TCell>(params: {
 					previewVisible,
 				};
 			})());
-	return {
-		mode: { kind: "stable", scrolling: Boolean(params.isScrollActive) },
-		ranges: measuredRanges,
-	};
+	return { kind: "stable", ranges: measuredRanges };
 }

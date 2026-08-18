@@ -3,8 +3,6 @@ import {
 	recordCCLDevMeasurementCount,
 } from "infrastructure/debug/CCLDevMeasurements";
 
-export type ResidentSlotResetReason = "empty" | "topology";
-
 export interface ResidentRowSlotRange {
 	readonly start: number;
 	readonly end: number;
@@ -21,7 +19,7 @@ export interface ResidentRowSlotAllocator {
 	/** Reconciles a bounded physical slot pool with a contiguous integer row range. */
 	prepareRange(params: ResidentRowSlotRange): void;
 	resolveSlotIndex(logicalRowIndex: number): number | undefined;
-	reset(reason: ResidentSlotResetReason): void;
+	reset(): void;
 	dispose(): void;
 	readonly capacity: number;
 }
@@ -46,7 +44,7 @@ export function createResidentRowSlotAllocator(): ResidentRowSlotAllocator {
 		}
 	}
 
-	function reset(_reason: ResidentSlotResetReason): void {
+	function reset(): void {
 		assertUsable();
 		capacity = 0;
 		slotTopologyRevision = 0;
@@ -79,7 +77,7 @@ export function createResidentRowSlotAllocator(): ResidentRowSlotAllocator {
 			hasSlotTopologyRevision &&
 			!Object.is(slotTopologyRevision, params.slotTopologyRevision)
 		) {
-			reset("topology");
+			reset();
 		}
 		slotTopologyRevision = params.slotTopologyRevision;
 		hasSlotTopologyRevision = true;
@@ -139,7 +137,7 @@ export function createResidentRowSlotAllocator(): ResidentRowSlotAllocator {
 
 	function dispose(): void {
 		if (disposed) return;
-		reset("empty");
+		reset();
 		disposed = true;
 	}
 

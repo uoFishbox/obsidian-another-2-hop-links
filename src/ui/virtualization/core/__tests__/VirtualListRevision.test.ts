@@ -1,110 +1,34 @@
 import { describe, expect, it } from "vitest";
-import {
-	createVirtualListLayoutRevisionToken,
-	createVirtualListRevision,
-	hasSameVirtualListRevisionDependency,
-	sameRevisionToken,
-} from "../virtualListRevision";
+import { hasSameVirtualListRevision } from "../virtualListRevision";
 
 describe("VirtualListRevision", () => {
-	it("compares array revision tokens shallowly with Object.is semantics", () => {
-		const sharedObject = { id: "shared" };
-
-		expect(sameRevisionToken([sharedObject, 1, NaN], [sharedObject, 1, NaN])).toBe(
-			true,
-		);
-		expect(sameRevisionToken([sharedObject, 1], [{ id: "shared" }, 1])).toBe(false);
-	});
-
-	it("creates stable layout tokens from numeric layout dependencies", () => {
-		const current = createVirtualListRevision({
-			layout: createVirtualListLayoutRevisionToken([3, 100, 120, 10]),
-		});
-		const next = createVirtualListRevision({
-			layout: createVirtualListLayoutRevisionToken([3, 100, 120, 10]),
-		});
-
-		expect(
-			hasSameVirtualListRevisionDependency(current, next, {
-				layout: true,
-			}),
-		).toBe(true);
-	});
-
-	it("keeps layout token values distinct without string coercion collisions", () => {
-		const current = createVirtualListRevision({
-			layout: createVirtualListLayoutRevisionToken(["1:2", 3]),
-		});
-		const next = createVirtualListRevision({
-			layout: createVirtualListLayoutRevisionToken([1, "2:3"]),
-		});
-
-		expect(
-			hasSameVirtualListRevisionDependency(current, next, {
-				layout: true,
-			}),
-		).toBe(false);
-	});
-
-	it("compares object layout token values by reference instead of stringifying", () => {
-		const sharedObject = { width: 100 };
-		const current = createVirtualListRevision({
-			layout: createVirtualListLayoutRevisionToken([sharedObject]),
-		});
-		const sameReference = createVirtualListRevision({
-			layout: createVirtualListLayoutRevisionToken([sharedObject]),
-		});
-		const sameShape = createVirtualListRevision({
-			layout: createVirtualListLayoutRevisionToken([{ width: 100 }]),
-		});
-
-		expect(
-			hasSameVirtualListRevisionDependency(current, sameReference, {
-				layout: true,
-			}),
-		).toBe(true);
-		expect(
-			hasSameVirtualListRevisionDependency(current, sameShape, {
-				layout: true,
-			}),
-		).toBe(false);
-	});
-
-	it("compares only the dependencies a cache declares", () => {
+	it("compares content and layout array tokens shallowly with Object.is semantics", () => {
 		const rows = [{ key: 0 }];
-		const layoutA = { columns: 2 };
-		const layoutB = { columns: 3 };
-		const current = createVirtualListRevision({
+		const sharedObject = { width: 100 };
+		const current = {
 			content: rows,
-			layout: layoutA,
-			keyResolver: 1,
-			pagination: "page-1",
-		});
-		const measurementChanged = createVirtualListRevision({
+			layout: [3, 100, NaN, sharedObject],
+		};
+		const same = {
+			content: [...rows],
+			layout: [3, 100, NaN, sharedObject],
+		};
+		const changedLayout = {
 			content: rows,
-			layout: layoutA,
-			keyResolver: 1,
-			pagination: "page-1",
-			measurement: "scroll-1",
-		});
-		const layoutChanged = createVirtualListRevision({
-			content: rows,
-			layout: layoutB,
-			keyResolver: 1,
-			pagination: "page-1",
-		});
+			layout: [4, 100, NaN, sharedObject],
+		};
 
-		expect(
-			hasSameVirtualListRevisionDependency(current, measurementChanged, {
-				content: true,
-				layout: true,
-			}),
-		).toBe(true);
-		expect(
-			hasSameVirtualListRevisionDependency(current, layoutChanged, {
-				content: true,
-				layout: true,
-			}),
-		).toBe(false);
+		expect(hasSameVirtualListRevision(current, same)).toBe(true);
+		expect(hasSameVirtualListRevision(current, changedLayout)).toBe(false);
+	});
+
+	it("keeps revision values distinct without string coercion or object deep comparison", () => {
+		const current = { content: [], layout: ["1:2", 3, { width: 100 }] };
+		const differentValues = {
+			content: [],
+			layout: [1, "2:3", { width: 100 }],
+		};
+
+		expect(hasSameVirtualListRevision(current, differentValues)).toBe(false);
 	});
 });

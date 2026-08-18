@@ -18,10 +18,6 @@ import type {
 	FindVisibleRangeParams,
 	ResolveVirtualRangesParams,
 } from "../virtualRanges";
-import {
-	createVirtualListLayoutRevisionToken,
-	createVirtualListRevision,
-} from "../core/virtualListRevision";
 import { resolveFlatVirtualNavigationTarget } from "../navigation/flatVirtualNavigation";
 
 export interface FlatLinkRowModelInput<T> {
@@ -309,18 +305,16 @@ export function createFlatLinkRowModel<T>(
 			writeInvalidStableScrollTopBand(out);
 		}
 	};
-	const layoutRevision = createVirtualListLayoutRevisionToken([
-		columns,
-		input.layout.cellWidth,
-		input.layout.rowHeight,
-		input.layout.gap,
-	]);
-
 	return {
-		revision: createVirtualListRevision({
+		revision: {
 			content: cellSource.revision,
-			layout: layoutRevision,
-		}),
+			layout: Object.freeze([
+				columns,
+				input.layout.cellWidth,
+				input.layout.rowHeight,
+				input.layout.gap,
+			]),
+		},
 		rowCount,
 		totalHeight,
 		layout: {

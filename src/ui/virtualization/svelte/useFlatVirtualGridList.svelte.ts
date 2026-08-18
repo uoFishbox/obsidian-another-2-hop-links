@@ -337,7 +337,6 @@ export function useFlatVirtualGridList<T>(
 				viewportHeight: nextMeasurement.viewportHeight,
 				sectionTop: nextMeasurement.sectionTop,
 				isStableMeasurement: nextMeasurement.isStableMeasurement,
-				isScrollActive: nextMeasurement.isScrollActive,
 				hasStableVisibleRange: measurement.hasStableVisibleRange,
 				precomputedRanges,
 				visibilityPolicy: resolveVisibilityPolicy(nextLayout),
@@ -376,10 +375,7 @@ export function useFlatVirtualGridList<T>(
 		nextRowModel: FlatLinkRowModel<T>,
 	): void => {
 		if (nextLogicalCellCount === 0) {
-			virtualList.setEmpty({
-				rowModel: nextRowModel,
-				reason: "no-renderable-content",
-			});
+			virtualList.setEmpty({ rowModel: nextRowModel });
 			return;
 		}
 
