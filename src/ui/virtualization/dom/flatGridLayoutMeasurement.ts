@@ -1,5 +1,5 @@
 import { computeVirtualGridLayout } from "../layout/flatGridLayout";
-import { resolveCachedCardGridLayoutBase } from "./virtualListCardLayout";
+import { resolveCardGridLayoutBase } from "./virtualListCardLayout";
 import { resolveVirtualListLayoutStability } from "./virtualListMeasurementStability";
 import { resolveCardLayoutSettings } from "ui/shared/layout/cardLayoutCssVars";
 
@@ -21,7 +21,6 @@ export interface ResolveFlatGridLayoutMeasurementParams {
 	rootEl: HTMLElement;
 	rootRect: DOMRect;
 	measuredWidth: number | null;
-	scrollContainerEl: HTMLElement | null;
 	configuredLayout: ConfiguredCardLayout | null;
 	logicalCellCount: number;
 	hasRenderableItems: boolean;
@@ -50,18 +49,15 @@ export function resolveFlatGridLayoutMeasurement({
 	rootEl,
 	rootRect,
 	measuredWidth,
-	scrollContainerEl,
 	configuredLayout,
 	logicalCellCount,
 	hasRenderableItems,
 }: ResolveFlatGridLayoutMeasurementParams): FlatGridLayoutMeasurement {
-	const layoutBase = resolveCachedCardGridLayoutBase({
+	const layoutBase = resolveCardGridLayoutBase({
 		rootEl,
 		rootRect,
 		measuredWidth,
 		defaults: DEFAULT_FLAT_GRID_CARD_LAYOUT,
-		listKind: "flat",
-		scrollContainerEl,
 		configuredLayout,
 		includeSectionMarginBottom: false,
 	});

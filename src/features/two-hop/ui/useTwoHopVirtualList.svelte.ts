@@ -26,7 +26,7 @@ import { DISABLED_PREVIEW_SURFACE } from "features/card-preview/runtime/previewR
 import type { VirtualPreviewBinding } from "features/card-preview/scheduling/virtualPreviewSurface";
 import type { VirtualFrameCoordinator } from "ui/virtualization/scheduling/frameCoordinator";
 import { createResolvedCardLayoutSettingsMemo } from "ui/shared/layout/cardLayoutCssVars";
-import { resolveCachedCardGridLayoutBase } from "ui/virtualization/dom/virtualListCardLayout";
+import { resolveCardGridLayoutBase } from "ui/virtualization/dom/virtualListCardLayout";
 import {
 	DEFAULT_VIEW_PLAN_CARD_LAYOUT,
 	DEFAULT_VIEW_PLAN_LAYOUT,
@@ -299,13 +299,11 @@ export function useTwoHopVirtualList(
 
 	function resolveMeasuredLayout(rect: DOMRect): ViewPlanLayoutMetrics {
 		if (!rootEl) return layout;
-		const layoutBase = resolveCachedCardGridLayoutBase({
+		const layoutBase = resolveCardGridLayoutBase({
 			rootEl,
 			rootRect: rect,
 			measuredWidth: rect.width > 0 ? rect.width : measurement.measuredWidth,
 			defaults: DEFAULT_VIEW_PLAN_CARD_LAYOUT,
-			listKind: "view-plan",
-			scrollContainerEl: measurement.scrollContainerEl,
 			configuredLayout,
 		});
 		return {

@@ -3,33 +3,6 @@ import {
 	findNearestScrollContainerCached,
 	invalidateNearestScrollContainerCache,
 } from "../scrollContainer";
-import {
-	resolveCachedCardGridLayoutBase,
-	type CachedCardGridLayoutBase,
-} from "../virtualListCardLayout";
-import type { ResolvedCardLayoutSettings } from "ui/shared/layout/cardLayoutCssVars";
-
-const defaults: ResolvedCardLayoutSettings = {
-	cardWidthPx: 160,
-	cardHeightRatio: 0.75,
-	cardHeightPx: 120,
-	cardGapPx: 12,
-	cardMaxColumns: 4,
-	sectionMarginBottomPx: 24,
-};
-
-const makeRect = (width: number): DOMRect =>
-	({
-		x: 0,
-		y: 0,
-		top: 0,
-		left: 0,
-		right: width,
-		bottom: 0,
-		width,
-		height: 0,
-		toJSON: () => ({}),
-	}) as DOMRect;
 
 describe("virtual-list cache performance contracts", () => {
 	afterEach(() => {
@@ -103,60 +76,5 @@ describe("virtual-list cache performance contracts", () => {
 		expect(findNearestScrollContainerCached(root)).toBe(scrollContainer);
 		expect(iframeGetComputedStyle).toHaveBeenCalled();
 		expect(mainGetComputedStyle).not.toHaveBeenCalled();
-	});
-
-	it("reuses one derived grid layout across repeated measurements for one list", () => {
-		const scrollContainer = document.createElement("div");
-		const rootEl = document.createElement("div");
-		scrollContainer.append(rootEl);
-		document.body.append(scrollContainer);
-
-		const layouts = Array.from({ length: 32 }, () =>
-			resolveCachedCardGridLayoutBase({
-				rootEl,
-				rootRect: makeRect(640),
-				measuredWidth: null,
-				defaults,
-				listKind: "flat",
-				scrollContainerEl: scrollContainer,
-				configuredLayout: defaults,
-			}),
-		);
-
-		expect(new Set(layouts).size).toBe(1);
-	});
-
-	it("evicts the oldest derived grid layout after 48 entries", () => {
-		const scrollContainer = document.createElement("div");
-		const rootEl = document.createElement("div");
-		scrollContainer.append(rootEl);
-		document.body.append(scrollContainer);
-		const layouts: CachedCardGridLayoutBase[] = [];
-
-		for (let width = 200; width < 249; width += 1) {
-			layouts.push(
-				resolveCachedCardGridLayoutBase({
-					rootEl,
-					rootRect: makeRect(width),
-					measuredWidth: null,
-					defaults,
-					listKind: "flat",
-					scrollContainerEl: scrollContainer,
-					configuredLayout: defaults,
-				}),
-			);
-		}
-
-		const firstAfterEviction = resolveCachedCardGridLayoutBase({
-			rootEl,
-			rootRect: makeRect(200),
-			measuredWidth: null,
-			defaults,
-			listKind: "flat",
-			scrollContainerEl: scrollContainer,
-			configuredLayout: defaults,
-		});
-
-		expect(firstAfterEviction).not.toBe(layouts[0]);
 	});
 });

@@ -316,7 +316,6 @@ export function useFlatVirtualGridList<T>(
 				rootEl,
 				rootRect: nextMeasurement.sectionRect,
 				measuredWidth: runtimeMeasurement.measuredWidth,
-				scrollContainerEl: runtimeMeasurement.scrollContainerEl,
 				configuredLayout: configuredCardLayout,
 				logicalCellCount,
 				hasRenderableItems: itemCount > 0,

@@ -15,9 +15,7 @@ interface ResolveCardLayoutFromCssVarsOptions {
 	includeSectionMarginBottom?: boolean;
 }
 
-export type CachedCardGridLayoutKind = "flat" | "view-plan";
-
-export interface CachedCardGridLayoutBase {
+export interface CardGridLayoutBase {
 	cardLayout: ResolvedCardLayoutSettings;
 	containerWidth: number;
 	columns: number;
@@ -26,39 +24,23 @@ export interface CachedCardGridLayoutBase {
 	gap: number;
 }
 
-interface CssCardLayoutSnapshot {
-	signature: string;
-	layout: ResolvedCardLayoutSettings;
-}
-
-interface ResolveCachedCardGridLayoutBaseOptions {
+interface ResolveCardGridLayoutBaseOptions {
 	rootEl: HTMLElement;
 	rootRect: DOMRect;
 	measuredWidth: number | null;
 	defaults: ResolvedCardLayoutSettings;
-	listKind: CachedCardGridLayoutKind;
-	scrollContainerEl?: HTMLElement | null;
 	configuredLayout?: ResolvedCardLayoutSettings | null;
 	includeSectionMarginBottom?: boolean;
 }
 
-const sharedCardGridLayoutCache = new WeakMap<
-	HTMLElement,
-	Map<string, CachedCardGridLayoutBase>
->();
-const MAX_SHARED_CARD_GRID_LAYOUT_CACHE_ENTRIES = 48;
-
-const createCssCardLayoutSnapshot = (
+const resolveCardLayoutFromCssVars = (
 	rootEl: HTMLElement,
 	defaults: ResolvedCardLayoutSettings,
 	options?: ResolveCardLayoutFromCssVarsOptions,
-): CssCardLayoutSnapshot => {
+): ResolvedCardLayoutSettings => {
 	const ownerWindow = getOptionalOwnerWindow(rootEl);
 	if (!ownerWindow) {
-		return {
-			signature: "no-window",
-			layout: defaults,
-		};
+		return defaults;
 	}
 
 	const computedStyle = ownerWindow.getComputedStyle(rootEl);
@@ -93,81 +75,28 @@ const createCssCardLayoutSnapshot = (
 		cardMaxColumns: parseCssNumber(cardMaxColumnsCssValue, defaults.cardMaxColumns),
 		sectionMarginBottomPx,
 	};
-	const signature = [
-		cardWidthCssValue,
-		fallbackCardHeightCssValue,
-		cardHeightRatioCssValue,
-		cardGapCssValue,
-		cardMaxColumnsCssValue,
-		sectionMarginBottomCssValue,
-	].join("\u001f");
-	return { signature, layout };
+	return layout;
 };
 
-const createConfiguredCardLayoutSignature = (
-	layout: ResolvedCardLayoutSettings,
-	includeSectionMarginBottom: boolean,
-): string =>
-	[
-		"configured",
-		layout.cardWidthPx,
-		layout.cardHeightRatio,
-		layout.cardGapPx,
-		layout.cardMaxColumns,
-		includeSectionMarginBottom ? layout.sectionMarginBottomPx : "",
-	].join("\u001f");
-
-const resolveSharedLayoutCacheRoot = (
-	rootEl: HTMLElement,
-	scrollContainerEl: HTMLElement | null | undefined,
-): HTMLElement =>
-	scrollContainerEl ??
-	rootEl.closest<HTMLElement>(".cosense-card-links__container") ??
-	rootEl;
-
-export function resolveCachedCardGridLayoutBase({
+export function resolveCardGridLayoutBase({
 	rootEl,
 	rootRect,
 	measuredWidth,
 	defaults,
-	listKind,
-	scrollContainerEl,
 	configuredLayout,
 	includeSectionMarginBottom,
-}: ResolveCachedCardGridLayoutBaseOptions): CachedCardGridLayoutBase {
-	const shouldIncludeSectionMarginBottom = includeSectionMarginBottom !== false;
-	const layoutSnapshot = configuredLayout
-		? {
-				signature: createConfiguredCardLayoutSignature(
-					configuredLayout,
-					shouldIncludeSectionMarginBottom,
-				),
-				layout: configuredLayout,
-			}
-		: createCssCardLayoutSnapshot(rootEl, defaults, {
-				includeSectionMarginBottom,
-			});
-	const cardLayout = layoutSnapshot.layout;
+}: ResolveCardGridLayoutBaseOptions): CardGridLayoutBase {
+	const cardLayout =
+		configuredLayout ??
+		resolveCardLayoutFromCssVars(rootEl, defaults, {
+			includeSectionMarginBottom,
+		});
 	const containerWidth = computeContainerWidth(
 		measuredWidth,
 		rootRect,
 		rootEl,
 		cardLayout.cardWidthPx,
 	);
-	const cacheRoot = resolveSharedLayoutCacheRoot(rootEl, scrollContainerEl);
-	const cacheKey = [listKind, containerWidth, layoutSnapshot.signature].join(
-		"\u001e",
-	);
-	let cacheForRoot = sharedCardGridLayoutCache.get(cacheRoot);
-	if (!cacheForRoot) {
-		cacheForRoot = new Map<string, CachedCardGridLayoutBase>();
-		sharedCardGridLayoutCache.set(cacheRoot, cacheForRoot);
-	}
-	const cached = cacheForRoot.get(cacheKey);
-	if (cached) {
-		return cached;
-	}
-
 	const gap = Math.max(0, cardLayout.cardGapPx);
 	const columns = computeColumnCount({
 		containerWidth,
@@ -183,7 +112,7 @@ export function resolveCachedCardGridLayoutBase({
 		cellWidth,
 		cardLayout.cardHeightRatio,
 	);
-	const nextLayoutBase: CachedCardGridLayoutBase = {
+	return {
 		cardLayout,
 		containerWidth,
 		columns,
@@ -191,17 +120,6 @@ export function resolveCachedCardGridLayoutBase({
 		rowHeight,
 		gap,
 	};
-	if (
-		cacheForRoot.size >= MAX_SHARED_CARD_GRID_LAYOUT_CACHE_ENTRIES &&
-		!cacheForRoot.has(cacheKey)
-	) {
-		const oldestKey = cacheForRoot.keys().next().value;
-		if (oldestKey) {
-			cacheForRoot.delete(oldestKey);
-		}
-	}
-	cacheForRoot.set(cacheKey, nextLayoutBase);
-	return nextLayoutBase;
 }
 
 export function computeContainerWidth(
