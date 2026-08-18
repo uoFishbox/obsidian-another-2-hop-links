@@ -37,8 +37,10 @@ import { findNearestScrollContainer } from "ui/virtualization/dom/scrollContaine
 import { getOptionalOwnerWindow } from "ui/shared/dom/realmSafeDom";
 import { useVirtualList } from "ui/virtualization/svelte/useVirtualList.svelte";
 import { createVirtualListMeasurementState } from "ui/virtualization/dom/virtualListMeasurementState";
-import type { VirtualMeasurement } from "ui/virtualization/dom/virtualMeasurementController";
-import { createVirtualListControllerAdapter } from "ui/virtualization/svelte/virtualListControllerAdapter";
+import {
+	createVirtualListController,
+	type VirtualMeasurement,
+} from "ui/virtualization/svelte/virtualListController";
 import type { VirtualVisibilityPolicy } from "ui/virtualization/core/virtualListEngine";
 import type { RowRange } from "ui/virtualization/rowRange";
 import type { VirtualRanges } from "ui/virtualization/types";
@@ -363,7 +365,7 @@ export function useTwoHopVirtualList(
 		};
 	}
 
-	const virtualListController = createVirtualListControllerAdapter<
+	const virtualListController = createVirtualListController<
 		TwoHopRowModel,
 		TwoHopRowModel
 	>({

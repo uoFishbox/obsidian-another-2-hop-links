@@ -14,7 +14,7 @@ import {
 import type { FlatLinkRowModel } from "../row-models/flatLinkRowModel";
 import { createFlatVirtualGridRuntimeModel } from "../row-models/flatVirtualGridRuntimeModel";
 import { isContentBottomInPreloadRangeFromMetrics } from "../core/preloadRange";
-import type { VirtualListStableMeasurementContext } from "../dom/virtualMeasurementController";
+import type { VirtualListStableMeasurementContext } from "./virtualListController";
 import { createVirtualListMeasurementState } from "../dom/virtualListMeasurementState";
 import { createCardVirtualListPolicy } from "../cardVirtualListPolicy";
 import {
@@ -39,7 +39,7 @@ import {
 	type ConfiguredCardLayout,
 	type VirtualGridLayout,
 } from "../dom/flatGridLayoutMeasurement";
-import { createVirtualListControllerAdapter } from "./virtualListControllerAdapter";
+import { createVirtualListController } from "./virtualListController";
 import { DISABLED_PREVIEW_SURFACE } from "features/card-preview/runtime/previewRuntime";
 import type { CardPreviewRequest } from "features/card-preview/core/cardPreviewRequest";
 import type { VirtualPreviewBinding } from "features/card-preview/scheduling/virtualPreviewSurface";
@@ -320,7 +320,7 @@ export function useFlatVirtualGridList<T>(
 		const rowsBySlot = virtualList.getMountedBuild()?.rowsBySlot;
 		return rowsBySlot && rowsBySlot.length > 0 ? rowsBySlot : EMPTY_MOUNTED_ROWS;
 	});
-	const virtualListController = createVirtualListControllerAdapter<
+	const virtualListController = createVirtualListController<
 		FlatLinkRowModel<T>,
 		VirtualGridLayout
 	>({

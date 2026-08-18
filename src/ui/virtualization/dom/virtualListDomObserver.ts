@@ -28,7 +28,7 @@ import {
 } from "./sharedScrollMetrics";
 import { hasRelevantStructureMutation } from "./structureMutationObserver";
 import { getOptionalOwnerWindow, isHTMLElementLike } from "ui/shared/dom/realmSafeDom";
-import type { VirtualScrollMeasurementReason } from "./virtualMeasurementController";
+import type { VirtualScrollMeasurementReason } from "./virtualMeasurement";
 
 export type { VirtualListSharedScrollMetrics } from "./sharedScrollMetrics";
 
