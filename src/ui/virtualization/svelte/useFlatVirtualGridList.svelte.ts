@@ -28,7 +28,6 @@ import {
 } from "../pagination";
 import { useVirtualListRuntime } from "./useVirtualListRuntime.svelte";
 import type { VirtualListLogicalCell } from "../logicalCell";
-import type { RenderRevision, RenderRevisionFallbackPolicy } from "../renderRevision";
 import type { VirtualNavigationTarget } from "../types";
 import {
 	DEFAULT_FLAT_GRID_LAYOUT,
@@ -85,9 +84,6 @@ export interface FlatVirtualGridListProps<T> {
 	 * resolver function.
 	 */
 	itemIdRevision?: unknown;
-	itemRenderRevisionToken?: RenderRevision;
-	getItemRenderRevision?: (item: T, index: number) => RenderRevision | undefined;
-	renderRevisionFallbackPolicy?: RenderRevisionFallbackPolicy;
 	header?: Snippet;
 	item?: Snippet<[VirtualListItemRenderArgs<T>]>;
 	empty?: Snippet;
@@ -98,7 +94,6 @@ export interface FlatVirtualGridListProps<T> {
 	className?: string;
 	paginationMode?: "button" | "infinite-scroll";
 	infiniteScrollRootMargin?: string;
-	remountCellBodyOnKeyChange?: boolean;
 	/** Resolves immutable preview input for the surface-owned slot controller. */
 	resolveItemPreviewRequest?: (item: T, index: number) => CardPreviewRequest | null;
 	/** Resolves the current item descriptor without card-owned effects. */
@@ -226,8 +221,6 @@ export function useFlatVirtualGridList<T>(
 			getItemId: props.getItemId,
 			itemsRevision: props.itemsRevision,
 			itemIdRevision: props.itemIdRevision,
-			itemRenderRevisionToken: props.itemRenderRevisionToken,
-			getItemRenderRevision: props.getItemRenderRevision,
 			visibleCount,
 			hasHeader: Boolean(props.header),
 			showLoadMore: showLoadMoreButton,
@@ -301,7 +294,6 @@ export function useFlatVirtualGridList<T>(
 				rowModel,
 				rowRange,
 				previousBuild,
-				renderRevisionFallbackPolicy: props.renderRevisionFallbackPolicy,
 				rowSlotAllocator,
 			}),
 		onSnapshotUpdated: (snapshot) => {

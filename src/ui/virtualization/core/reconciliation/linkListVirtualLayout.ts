@@ -2,11 +2,6 @@ import { recordCCLDevMeasurement } from "infrastructure/debug/CCLDevMeasurements
 import type { VirtualListLogicalCell } from "../../logicalCell";
 import { clampRange, type RowRange } from "../../rowRange";
 import type { FlatLinkRowModel } from "../../row-models/flatLinkRowModel";
-import type {
-	RenderBodyKey,
-	RenderRevision,
-	RenderRevisionFallbackPolicy,
-} from "../../renderRevision";
 import { logicalCellKey, type LogicalCellKey } from "../../types";
 import type { ResidentRowSlotAllocator } from "ui/virtualization/core/residentSlotAllocator";
 import {
@@ -21,7 +16,6 @@ export interface MountedVirtualGridCell<T> {
 	readonly columnIndex: number;
 	readonly cell: VirtualListLogicalCell<T>;
 	readonly cellIndex: number;
-	readonly renderBodyKey?: RenderBodyKey;
 }
 
 export type MountedVirtualGridRowSlice<T> = MountedGridRow<MountedVirtualGridCell<T>>;
@@ -44,50 +38,6 @@ export interface MountedVirtualGridCellsBuildResult<T> {
 	readonly gap: number;
 }
 
-const escapeRenderRevisionString = (value: string): string =>
-	value.includes("\\") || value.includes("|")
-		? value.replace(/\\/g, "\\\\").replace(/\|/g, "\\p")
-		: value;
-
-const encodeRenderRevisionToken = (value: RenderRevision): string => {
-	if (value === null) return "null";
-	if (typeof value === "boolean") return `b:${value}`;
-	if (typeof value === "string") return `s:${escapeRenderRevisionString(value)}`;
-	if (Number.isNaN(value)) return "n:NaN";
-	if (Object.is(value, -0)) return "n:-0";
-	return `n:${value}`;
-};
-
-const createMountedVirtualGridCellBodyKey = <T>(
-	cell: VirtualListLogicalCell<T>,
-	fallbackPolicy?: RenderRevisionFallbackPolicy,
-): RenderBodyKey => {
-	switch (cell.kind) {
-		case "header":
-			return `header|${encodeRenderRevisionToken(String(cell.key))}`;
-		case "item": {
-			let revision: RenderRevision = null;
-			if (cell.itemRenderRevision !== undefined) {
-				revision = cell.itemRenderRevision;
-			} else if (fallbackPolicy === "required") {
-				throw new Error(
-					`Missing item render revision for sourceKey=${JSON.stringify(
-						String(cell.sourceKey ?? cell.key),
-					)} cellKey=${JSON.stringify(String(cell.key))}.`,
-				);
-			}
-			return (
-				"item|" +
-				encodeRenderRevisionToken(String(cell.sourceKey ?? cell.key)) +
-				"|" +
-				encodeRenderRevisionToken(revision)
-			);
-		}
-		case "load-more":
-			return `load-more|${encodeRenderRevisionToken(String(cell.key))}`;
-	}
-};
-
 const createMountedVirtualGridCell = <T>(params: {
 	key: LogicalCellKey;
 	cell: VirtualListLogicalCell<T>;
@@ -95,7 +45,6 @@ const createMountedVirtualGridCell = <T>(params: {
 	rowIndex: number;
 	renderSlotIndex: number;
 	columnIndex: number;
-	renderRevisionFallbackPolicy?: RenderRevisionFallbackPolicy;
 }): MountedVirtualGridCell<T> => {
 	recordCCLDevMeasurement("virtualGrid.cellShellCreated");
 	return {
@@ -105,10 +54,6 @@ const createMountedVirtualGridCell = <T>(params: {
 		columnIndex: params.columnIndex,
 		cell: params.cell,
 		cellIndex: params.cellIndex,
-		renderBodyKey: createMountedVirtualGridCellBodyKey(
-			params.cell,
-			params.renderRevisionFallbackPolicy,
-		),
 	};
 };
 
@@ -121,11 +66,7 @@ function isSameLogicalCellForMountedReuse<T>(
 	}
 
 	if (previous.kind === "item" && next.kind === "item") {
-		return (
-			previous.itemIndex === next.itemIndex &&
-			previous.item === next.item &&
-			Object.is(previous.itemRenderRevision, next.itemRenderRevision)
-		);
+		return previous.itemIndex === next.itemIndex && previous.item === next.item;
 	}
 
 	return true;
@@ -158,13 +99,7 @@ function updateMountedVirtualGridCell<T>(
 	rowIndex: number,
 	columnIndex: number,
 	renderSlotIndex: number,
-	renderRevisionFallbackPolicy?: RenderRevisionFallbackPolicy,
 ): MountedVirtualGridCell<T> {
-	const renderBodyKey = createMountedVirtualGridCellBodyKey(
-		cell,
-		renderRevisionFallbackPolicy,
-	);
-
 	recordCCLDevMeasurement("virtualGrid.cellShellRebound");
 	return {
 		...previous,
@@ -174,7 +109,6 @@ function updateMountedVirtualGridCell<T>(
 		rowIndex,
 		columnIndex,
 		renderSlotIndex,
-		renderBodyKey,
 	};
 }
 
@@ -185,7 +119,6 @@ function resolveMountedVirtualGridCell<T>(params: {
 	rowIndex: number;
 	columnIndex: number;
 	renderSlotIndex: number;
-	renderRevisionFallbackPolicy?: RenderRevisionFallbackPolicy;
 }): MountedVirtualGridCell<T> {
 	const cell = params.cell;
 	const cellIndex = params.cellIndex;
@@ -213,7 +146,6 @@ function resolveMountedVirtualGridCell<T>(params: {
 			params.rowIndex,
 			params.columnIndex,
 			params.renderSlotIndex,
-			params.renderRevisionFallbackPolicy,
 		);
 	}
 
@@ -223,7 +155,6 @@ function resolveMountedVirtualGridCell<T>(params: {
 		cellIndex,
 		rowIndex: params.rowIndex,
 		renderSlotIndex: params.renderSlotIndex,
-		renderRevisionFallbackPolicy: params.renderRevisionFallbackPolicy,
 		columnIndex: params.columnIndex,
 	});
 }
@@ -319,7 +250,6 @@ export function buildMountedVirtualGridCellsFromRowModel<T>(params: {
 	rowModel: FlatLinkRowModel<T>;
 	rowRange: RowRange;
 	previousBuild?: MountedVirtualGridCellsBuildResult<T>;
-	renderRevisionFallbackPolicy?: RenderRevisionFallbackPolicy;
 	rowSlotAllocator: ResidentRowSlotAllocator;
 }): MountedVirtualGridCellsBuildResult<T> {
 	const { rowModel } = params;
@@ -373,7 +303,6 @@ export function buildMountedVirtualGridCellsFromRowModel<T>(params: {
 				rowIndex,
 				columnIndex,
 				renderSlotIndex,
-				renderRevisionFallbackPolicy: params.renderRevisionFallbackPolicy,
 			}),
 	});
 

@@ -1,34 +1,23 @@
 <script lang="ts">
 	import LinkList from "../VirtualGridLinkList.svelte";
-	import type {
-		RenderRevision,
-		RenderRevisionFallbackPolicy,
-	} from "ui/virtualization/renderRevision";
 
 	interface HarnessItem {
 		id: string;
 		label: string;
-		renderVersion?: RenderRevision;
 	}
 
 	interface Props {
 		items: HarnessItem[];
 		itemsRevision?: unknown;
-		itemRenderRevisionToken?: RenderRevision;
-		renderRevisionFallbackPolicy?: RenderRevisionFallbackPolicy;
 		initialVisibleCount?: number;
 		loadMoreIncrement?: number;
-		useItemRenderRevision?: boolean;
 	}
 
 	let {
 		items,
 		itemsRevision,
-		itemRenderRevisionToken,
-		renderRevisionFallbackPolicy,
 		initialVisibleCount = items.length,
 		loadMoreIncrement = items.length,
-		useItemRenderRevision = false,
 	}: Props = $props();
 </script>
 
@@ -45,12 +34,7 @@
 		<LinkList
 			{items}
 			{itemsRevision}
-			{itemRenderRevisionToken}
-			{renderRevisionFallbackPolicy}
 			getItemId={(item) => item.id}
-			getItemRenderRevision={useItemRenderRevision
-				? (item) => item.renderVersion
-				: undefined}
 			{initialVisibleCount}
 			{loadMoreIncrement}
 		>

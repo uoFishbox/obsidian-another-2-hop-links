@@ -42,7 +42,6 @@
 		{applicationStore}
 		resolveItemPreviewRequest={(model) => model.previewRequest}
 		resolveItemInteractionDescriptor={(model) => model.interactionDescriptor}
-		remountCellBodyOnKeyChange={false}
 	>
 		{#snippet item({ item, previewKey })}
 			<ViewItemCard

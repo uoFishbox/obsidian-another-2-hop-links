@@ -3,7 +3,6 @@ import {
 	type FlatLogicalCellSource,
 } from "../flatLogicalCellSource";
 import type { FlatGridLayoutMetrics } from "../layoutMetrics";
-import type { RenderRevision } from "../renderRevision";
 import { createFlatLinkRowModel, type FlatLinkRowModel } from "./flatLinkRowModel";
 
 /**
@@ -21,7 +20,6 @@ export function createFlatVirtualGridRuntimeModel<T>() {
 	let logicalCellSource: FlatLogicalCellSource<T> | null = null;
 	let contentDataRevision: unknown;
 	let contentKeyRevision: unknown;
-	let contentItemRenderRevision: unknown;
 	let contentVisibleCount = -1;
 	let contentHasHeader = false;
 	let contentShowLoadMore = false;
@@ -41,11 +39,6 @@ export function createFlatVirtualGridRuntimeModel<T>() {
 			getItemId: (item: T, index: number) => string;
 			itemsRevision?: unknown;
 			itemIdRevision?: unknown;
-			itemRenderRevisionToken?: RenderRevision;
-			getItemRenderRevision?: (
-				item: T,
-				index: number,
-			) => RenderRevision | undefined;
 			visibleCount: number;
 			hasHeader: boolean;
 			showLoadMore: boolean;
@@ -73,13 +66,10 @@ export function createFlatVirtualGridRuntimeModel<T>() {
 				};
 			}
 
-			const itemRenderRevision =
-				params.itemRenderRevisionToken ?? params.getItemRenderRevision;
 			if (
 				logicalCellSource &&
 				Object.is(contentDataRevision, dataRevision) &&
 				Object.is(contentKeyRevision, keyRevision) &&
-				Object.is(contentItemRenderRevision, itemRenderRevision) &&
 				contentVisibleCount === params.visibleCount &&
 				contentHasHeader === params.hasHeader &&
 				contentShowLoadMore === params.showLoadMore &&
@@ -90,7 +80,6 @@ export function createFlatVirtualGridRuntimeModel<T>() {
 
 			contentDataRevision = dataRevision;
 			contentKeyRevision = keyRevision;
-			contentItemRenderRevision = itemRenderRevision;
 			contentVisibleCount = params.visibleCount;
 			contentHasHeader = params.hasHeader;
 			contentShowLoadMore = params.showLoadMore;
@@ -99,14 +88,12 @@ export function createFlatVirtualGridRuntimeModel<T>() {
 				header: params.hasHeader,
 				items: params.items,
 				getItemId: params.getItemId,
-				getItemRenderRevision: params.getItemRenderRevision,
 				visibleCount: params.visibleCount,
 				showLoadMore: params.showLoadMore,
 				sectionId: params.sectionId,
 				revision: {
 					data: dataRevision,
 					key: keyRevision,
-					itemRender: itemRenderRevision,
 					visibleCount: params.visibleCount,
 					hasHeader: params.hasHeader,
 					showLoadMore: params.showLoadMore,

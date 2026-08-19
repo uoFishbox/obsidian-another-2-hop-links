@@ -32,10 +32,6 @@ import {
 	queryAllByTextDeep,
 	type TextMatcher,
 } from "testing/helpers/shadowDomQueries";
-import type {
-	RenderRevision,
-	RenderRevisionFallbackPolicy,
-} from "ui/virtualization/renderRevision";
 
 function queryAllByLabelTextDeep(text: TextMatcher): HTMLElement[] {
 	const seen = new Set<HTMLElement>();
@@ -465,17 +461,13 @@ export function renderVirtualGridList(
 export interface HarnessItem {
 	id: string;
 	label: string;
-	renderVersion?: RenderRevision;
 }
 
 export interface RenderVirtualGridListObjectOptions {
 	items: HarnessItem[];
 	itemsRevision?: unknown;
-	itemRenderRevisionToken?: RenderRevision;
-	renderRevisionFallbackPolicy?: RenderRevisionFallbackPolicy;
 	initialVisibleCount?: number;
 	loadMoreIncrement?: number;
-	useItemRenderRevision?: boolean;
 }
 
 export interface VirtualGridListObjectDriver {
@@ -490,13 +482,7 @@ export interface VirtualGridListObjectDriver {
 		scrollTop?: number;
 	}): Promise<void>;
 
-	rerender(props: {
-		items: HarnessItem[];
-		itemsRevision?: unknown;
-		itemRenderRevisionToken?: RenderRevision;
-		renderRevisionFallbackPolicy?: RenderRevisionFallbackPolicy;
-		useItemRenderRevision?: boolean;
-	}): Promise<void>;
+	rerender(props: { items: HarnessItem[]; itemsRevision?: unknown }): Promise<void>;
 
 	getCellByItemId(id: string): HTMLElement | null;
 	queryByText(text: string): HTMLElement | null;
@@ -508,22 +494,16 @@ export function renderVirtualGridListObject(
 	const {
 		items,
 		itemsRevision,
-		itemRenderRevisionToken,
-		renderRevisionFallbackPolicy,
 		initialVisibleCount = items.length,
 		loadMoreIncrement = items.length,
-		useItemRenderRevision = false,
 	} = options;
 
 	const view = render(LinkListObjectHarness, {
 		props: {
 			items,
 			itemsRevision,
-			itemRenderRevisionToken,
-			renderRevisionFallbackPolicy,
 			initialVisibleCount,
 			loadMoreIncrement,
-			useItemRenderRevision,
 		},
 	});
 
@@ -571,14 +551,8 @@ export function renderVirtualGridListObject(
 			await view.rerender({
 				items: rerenderOptions.items,
 				itemsRevision: rerenderOptions.itemsRevision,
-				itemRenderRevisionToken: rerenderOptions.itemRenderRevisionToken,
-				renderRevisionFallbackPolicy:
-					rerenderOptions.renderRevisionFallbackPolicy ??
-					renderRevisionFallbackPolicy,
 				initialVisibleCount,
 				loadMoreIncrement,
-				useItemRenderRevision:
-					rerenderOptions.useItemRenderRevision ?? useItemRenderRevision,
 			});
 			await flushFrames();
 		},

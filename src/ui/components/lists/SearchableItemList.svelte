@@ -401,18 +401,13 @@
 
 	const resolveItemPreviewRequest = $derived.by(() => {
 		const revision = cardModelRevision;
-		return config.itemComponent === ViewItemCard
-			? (item: ViewItem, index: number) =>
-					resolveViewItemCardModel(item, index, revision).previewRequest
-			: undefined;
+		return (item: ViewItem, index: number) =>
+			resolveViewItemCardModel(item, index, revision).previewRequest;
 	});
 	const resolveItemInteractionDescriptor = $derived.by(() => {
 		const revision = cardModelRevision;
-		return config.itemComponent === ViewItemCard
-			? (item: ViewItem, index: number) =>
-					resolveViewItemCardModel(item, index, revision)
-						.interactionDescriptor
-			: undefined;
+		return (item: ViewItem, index: number) =>
+			resolveViewItemCardModel(item, index, revision).interactionDescriptor;
 	});
 
 	let resultsContainerEl = $state<HTMLDivElement | null>(null);
@@ -472,43 +467,15 @@
 			paginationMode={config.paginationMode ?? "button"}
 			{resolveItemPreviewRequest}
 			{resolveItemInteractionDescriptor}
-			remountCellBodyOnKeyChange={config.itemComponent !== ViewItemCard}
 			header={config.showSectionHeader ? sectionHeader : undefined}
 		>
-			{#snippet item({
-				item,
-				index,
-				observerRoot,
-				rowIndex,
-				activationCandidateId,
-				previewKey,
-			})}
-				{@const ItemComponent = config.itemComponent}
-				{@const renderedItemKey = config.getItemKey(item, index)}
-				{@const matchedItem = matchesByKey?.get(renderedItemKey) ?? null}
-				{#if ItemComponent === ViewItemCard}
-					<ViewItemCard
-						{...config.getItemProps(item)}
-						{item}
-						settings={applicationStore.settings}
-						model={resolveViewItemCardModel(item, index)}
-						{previewKey}
-					/>
-				{:else}
-					<ItemComponent
-						{...config.getItemProps(item)}
-						searchQuery={search.normalized}
-						searchScope={allowContentSearch &&
-						contentSearchEnabled &&
-						(matchedItem?.contentMatched ?? true)
-							? "title-and-content"
-							: "title-only"}
-						contentPreview={matchedItem?.contentPreview}
-						{observerRoot}
-						{rowIndex}
-						{activationCandidateId}
-					/>
-				{/if}
+			{#snippet item({ item, index, previewKey })}
+				<ViewItemCard
+					{item}
+					settings={applicationStore.settings}
+					model={resolveViewItemCardModel(item, index)}
+					{previewKey}
+				/>
 			{/snippet}
 		</LinkList>
 	{:else}

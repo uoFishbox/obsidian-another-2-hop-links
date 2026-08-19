@@ -94,37 +94,7 @@ function getFirstSlotProbe(container: HTMLElement): HTMLElement | null {
 	);
 }
 
-describe("VirtualGridLinkList body remount policy", () => {
-	it("remounts a grid-row body by default when a physical slot receives another logical item", async () => {
-		const mountedItems: string[] = [];
-		const { container } = render(VirtualGridLinkListRenderProbeHarness, {
-			props: {
-				items: createItems(30),
-				initialVisibleCount: 30,
-				onItemMount: (id: string) => mountedItems.push(id),
-			},
-		});
-
-		await setViewport(container, { rootHeight: 120, width: 330 });
-		await waitFor(() => {
-			expect(getFirstSlotProbe(container)?.textContent).toBe("Item 0");
-		});
-
-		mountedItems.length = 0;
-		await scrollGrid(container, {
-			scrollTop: 804,
-			sectionTop: -804,
-		});
-
-		await waitFor(() => {
-			expect(getFirstSlotProbe(container)?.textContent).not.toBe("Item 0");
-		});
-		const firstSlotProbe = getFirstSlotProbe(container);
-		const firstSlotProbeId = `${firstSlotProbe?.dataset.index}-${firstSlotProbe?.textContent}`;
-		expect(mountedItems.length).toBeGreaterThan(0);
-		expect(mountedItems).toContain(firstSlotProbeId);
-	});
-
+describe("VirtualGridLinkList physical-slot body lifecycle", () => {
 	it("can reuse a grid-row body when a physical slot receives another logical item", async () => {
 		const mountedItems: string[] = [];
 		const updatedItems: string[] = [];
@@ -132,7 +102,6 @@ describe("VirtualGridLinkList body remount policy", () => {
 			props: {
 				items: createItems(30),
 				initialVisibleCount: 30,
-				remountCellBodyOnKeyChange: false,
 				onItemMount: (id: string) => mountedItems.push(id),
 				onItemUpdate: (id: string) => updatedItems.push(id),
 			},
@@ -168,7 +137,6 @@ describe("VirtualGridLinkList body remount policy", () => {
 			props: {
 				items,
 				initialVisibleCount: 2,
-				remountCellBodyOnKeyChange: false,
 				onItemMount,
 			},
 		});
@@ -184,7 +152,6 @@ describe("VirtualGridLinkList body remount policy", () => {
 		await rendered.rerender({
 			items: [items[1]!],
 			initialVisibleCount: 2,
-			remountCellBodyOnKeyChange: false,
 			onItemMount,
 		});
 		await flushFrames();

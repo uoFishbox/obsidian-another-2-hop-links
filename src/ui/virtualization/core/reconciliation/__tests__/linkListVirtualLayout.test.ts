@@ -4,10 +4,6 @@ import {
 	type FlatLogicalCellSource,
 } from "../../../flatLogicalCellSource";
 import { computeVirtualGridLayout } from "../../../layout/flatGridLayout";
-import type {
-	RenderRevision,
-	RenderRevisionFallbackPolicy,
-} from "../../../renderRevision";
 import { createFlatLinkRowModel } from "../../../row-models/flatLinkRowModel";
 import {
 	createResidentRowSlotAllocator,
@@ -25,7 +21,6 @@ import {
 type TestItem = {
 	id: string;
 	label: string;
-	renderVersion?: RenderRevision;
 };
 type TestBuildResult = MountedVirtualGridCellsBuildResult<TestItem>;
 const rowSlotAllocators = new WeakMap<TestBuildResult, ResidentRowSlotAllocator>();
@@ -49,16 +44,11 @@ function createLogicalCellSource(params: {
 	showLoadMore: boolean;
 	getItemId: (item: TestItem, index: number) => string;
 	sectionId: string;
-	getItemRenderRevision?: (
-		item: TestItem,
-		index: number,
-	) => RenderRevision | undefined;
 }): FlatLogicalCellSource<TestItem> {
 	return createFlatLogicalCellSource({
 		header: params.header,
 		items: params.items,
 		getItemId: params.getItemId,
-		getItemRenderRevision: params.getItemRenderRevision,
 		visibleCount: params.visibleCount,
 		showLoadMore: params.showLoadMore,
 		sectionId: params.sectionId,
@@ -95,11 +85,6 @@ function buildCells(params: {
 	rowHeight?: number;
 	gap?: number;
 	previousBuild?: TestBuildResult;
-	getItemRenderRevision?: (
-		item: TestItem,
-		index: number,
-	) => RenderRevision | undefined;
-	renderRevisionFallbackPolicy?: RenderRevisionFallbackPolicy;
 	rowSlotAllocator?: ResidentRowSlotAllocator;
 }): TestBuildResult {
 	const cellSource = createLogicalCellSource({
@@ -109,7 +94,6 @@ function buildCells(params: {
 		showLoadMore: false,
 		getItemId: (item) => item.id,
 		sectionId: "section-0",
-		getItemRenderRevision: params.getItemRenderRevision,
 	});
 	const columns = params.columns ?? 3;
 	const cellWidth = params.cellWidth ?? 100;
@@ -140,7 +124,6 @@ function buildCells(params: {
 			end: Math.ceil(Math.max(0, visibleWindow.end) / columns),
 		},
 		previousBuild: params.previousBuild,
-		renderRevisionFallbackPolicy: params.renderRevisionFallbackPolicy,
 		rowSlotAllocator,
 	});
 	rowSlotAllocators.set(build, rowSlotAllocator);
@@ -399,108 +382,6 @@ describe("linkListVirtualLayout", () => {
 		expect(shifted.rowSlices[0].bindings).toBe(initial.rowSlices[1].bindings);
 		expect(shifted.rowSlices[1].slotIndex).toBe(0);
 		expect(shifted.rowSlices[1].slotIndex).toBe(initial.rowSlices[0].slotIndex);
-	});
-
-	it("keeps primitive render revisions collision-free in mounted body keys", () => {
-		const revisions: RenderRevision[] = [
-			null,
-			false,
-			true,
-			0,
-			-0,
-			Number.NaN,
-			"null",
-			"0",
-			"n:NaN",
-		];
-		const bodyKeys = revisions.map(
-			(renderVersion) =>
-				buildCells({
-					items: [{ id: "item-0", label: "Item 0", renderVersion }],
-					getItemRenderRevision: (item) => item.renderVersion,
-				}).cells[0].renderBodyKey,
-		);
-
-		expect(new Set(bodyKeys).size).toBe(revisions.length);
-	});
-
-	it("keeps item body keys stable when item render revisions are stable", () => {
-		const initialItems: TestItem[] = [
-			{
-				id: "item-0",
-				label: "Initial",
-				renderVersion: "body-1",
-			},
-		];
-		const updatedItems: TestItem[] = [
-			{
-				id: "item-0",
-				label: "Updated",
-				renderVersion: "body-1",
-			},
-		];
-
-		const initial = buildCells({
-			items: initialItems,
-			getItemRenderRevision: (item) => item.renderVersion,
-		});
-		const updated = buildCells({
-			items: updatedItems,
-			previousBuild: initial,
-			getItemRenderRevision: (item) => item.renderVersion,
-		});
-
-		expect(updated.cells[0].renderBodyKey).toBe(initial.cells[0].renderBodyKey);
-		expect(updated.cells[0].cell).not.toBe(initial.cells[0].cell);
-	});
-
-	it("changes item body keys when item render revisions change", () => {
-		const initialItems: TestItem[] = [
-			{ id: "item-0", label: "Initial", renderVersion: 1 },
-		];
-		const updatedItems: TestItem[] = [
-			{ id: "item-0", label: "Updated", renderVersion: 2 },
-		];
-
-		const initial = buildCells({
-			items: initialItems,
-			getItemRenderRevision: (item) => item.renderVersion,
-		});
-		const updated = buildCells({
-			items: updatedItems,
-			previousBuild: initial,
-			getItemRenderRevision: (item) => item.renderVersion,
-		});
-
-		expect(updated.cells[0].renderBodyKey).not.toBe(initial.cells[0].renderBodyKey);
-	});
-
-	it("keeps item body keys stable with source-key-only fallback", () => {
-		const initialItems: TestItem[] = [{ id: "item-0", label: "Initial" }];
-		const updatedItems: TestItem[] = [{ id: "item-0", label: "Updated" }];
-
-		const initial = buildCells({
-			items: initialItems,
-			renderRevisionFallbackPolicy: "source-key-only",
-		});
-		const updated = buildCells({
-			items: updatedItems,
-			previousBuild: initial,
-			renderRevisionFallbackPolicy: "source-key-only",
-		});
-
-		expect(updated.cells[0].renderBodyKey).toBe(initial.cells[0].renderBodyKey);
-	});
-
-	it("throws for missing item render revisions when fallback policy is required", () => {
-		expect(() =>
-			buildCells({
-				items: [{ id: "item-0", label: "Initial" }],
-				renderRevisionFallbackPolicy: "required",
-			}),
-		).toThrow(
-			`Missing item render revision for sourceKey="item-0" cellKey="${itemKey(0)}".`,
-		);
 	});
 
 	it("clamps a stale visible window when the logical cell count shrinks", () => {

@@ -4,13 +4,17 @@ import { TFile } from "obsidian";
 import { createMockTFile } from "testing/__mocks__/testHelpers";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import SearchableItemList from "../SearchableItemList.svelte";
-import SearchableItemListItemStub from "./SearchableItemListItemStub.svelte";
 import type { ViewItem } from "application/presenters";
 import type { ListConfig } from "../types";
 import type { LinkContext } from "ui/context/linkContext";
 import type { ApplicationStore } from "ui/stores/ApplicationStore.svelte";
 import type { ISortService } from "core/sorting";
 import { filterSearchWorkerDatasetWithMatchDetails } from "features/search/searchWorkerFilter";
+
+vi.mock("ui/components/items/ViewItemCard.svelte", async () => {
+	const component = await import("./SearchableItemListItemStub.svelte");
+	return { default: component.default };
+});
 
 vi.mock("features/search/searchWorkerClient", async () => {
 	const { filterSearchWorkerDatasetWithMatchDetails } =
@@ -140,10 +144,6 @@ function createLinkContext(sourceFile: TFile): LinkContext {
 function createConfig(): ListConfig<ViewItem> {
 	return {
 		title: "Searchable",
-		itemComponent: SearchableItemListItemStub,
-		getItemProps: (item) => ({
-			label: item.type === "taggedNote" ? item.data.file.basename : "unknown",
-		}),
 		getItemKey: (item: ViewItem) => {
 			switch (item.type) {
 				case "taggedNote":

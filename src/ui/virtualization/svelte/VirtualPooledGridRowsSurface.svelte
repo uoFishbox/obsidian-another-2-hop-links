@@ -6,11 +6,6 @@
 	import type { Snippet } from "svelte";
 	import type { MountedVirtualCell } from "../types";
 	import {
-		KEYED_VIRTUAL_CELL_BODY_LIFECYCLE,
-		resolveVirtualCellBodyKey,
-		type VirtualCellBodyLifecyclePolicy,
-	} from "ui/virtualization/core/bodyLifecycle";
-	import {
 		bindVirtualGridCell,
 		type VirtualGridSurfaceTransaction,
 	} from "./VirtualGridSurfaceTransaction";
@@ -33,7 +28,7 @@
 		observerRoot?: HTMLElement | null;
 		getCellClassName?: (cell: TMountedCell) => string | undefined;
 		getCellDataTestId?: (cell: TMountedCell) => string | undefined;
-		bodyLifecyclePolicy?: VirtualCellBodyLifecyclePolicy<TMountedCell>;
+		bodyRevision?: unknown;
 		isRowActive?: (row: TMountedRow) => boolean;
 		surfaceTransaction: VirtualGridSurfaceTransaction;
 		renderCell: Snippet<
@@ -60,7 +55,7 @@
 		observerRoot = null,
 		getCellClassName,
 		getCellDataTestId,
-		bodyLifecyclePolicy = KEYED_VIRTUAL_CELL_BODY_LIFECYCLE,
+		bodyRevision = undefined,
 		isRowActive,
 		surfaceTransaction,
 		renderCell,
@@ -76,17 +71,6 @@
 	const contentStyle = $derived(
 		`height:${contentHeight}px; position:relative; --ccl-box-height:${rowHeight}px; --ccl-cell-width:${cellWidth ?? 0}px; --ccl-columns:${Math.max(1, Math.floor(columns))}${gap !== undefined ? `; --ccl-box-gap:${gap}px` : ""}`,
 	);
-
-	const resolveDefaultMountedCellBodyKey = (cell: TMountedCell): unknown =>
-		cell.renderBodyKey ?? cell.cellMetadataKey ?? cell.key;
-	const resolveMountedCellBodyKey = (cell: TMountedCell): unknown =>
-		bodyLifecyclePolicy.type === "keyed"
-			? resolveVirtualCellBodyKey({
-					cell,
-					policy: bodyLifecyclePolicy,
-					resolveDefaultKey: resolveDefaultMountedCellBodyKey,
-				})
-			: cell.renderSlotIndex;
 
 	const setRowTop = (element: HTMLElement, top: number) => {
 		let committedTop = Number.NaN;
@@ -150,27 +134,15 @@
 							: undefined}
 						aria-hidden={currentBinding === null ? "true" : undefined}
 					>
-						{#if bodyLifecyclePolicy.type === "keyed"}
+						{#key bodyRevision}
 							{#if currentBinding}
 								{@const mountedCell = currentBinding}
-								{#key resolveMountedCellBodyKey(mountedCell)}
-									{@render renderCell({
-										mountedCell,
-										observerRoot,
-									})}
-								{/key}
+								{@render renderCell({
+									mountedCell,
+									observerRoot,
+								})}
 							{/if}
-						{:else}
-							{#key bodyLifecyclePolicy.revision}
-								{#if currentBinding}
-									{@const mountedCell = currentBinding}
-									{@render renderCell({
-										mountedCell,
-										observerRoot,
-									})}
-								{/if}
-							{/key}
-						{/if}
+						{/key}
 					</div>
 				{/each}
 			</div>

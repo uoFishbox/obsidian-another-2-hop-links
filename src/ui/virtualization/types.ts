@@ -1,6 +1,5 @@
 import type { RowRange } from "./rowRange";
 import type { VirtualRowLayoutMetrics } from "./layoutMetrics";
-import type { RenderBodyKey } from "./renderRevision";
 
 export interface RowNumberLookup {
 	readonly length: number;
@@ -95,6 +94,4 @@ export interface MountedVirtualCell {
 	readonly renderSlotIndex: number;
 	readonly rowIndex: number;
 	readonly columnIndex?: number;
-	readonly cellMetadataKey?: unknown;
-	readonly renderBodyKey?: RenderBodyKey;
 }

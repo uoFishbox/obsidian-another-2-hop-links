@@ -16,7 +16,6 @@ import {
 } from "core/indexing/link-resolution/linkResolution";
 import { dedupeBySourceFile } from "core/indexing/backlink-builder/backlinkIndexer";
 import TagNotesListHost from "ui/components/lists/TagNotesListHost.svelte";
-import ViewItemCard from "ui/components/items/ViewItemCard.svelte";
 import type { ListConfig } from "ui/components/lists/types";
 import type { PluginHost } from "types/pluginHost";
 import type { ViewServices } from "ui/shared/views/viewServices";
@@ -497,11 +496,6 @@ export class PreCreationView extends AbstractSvelteListView<TwoHopIndexedLink> {
 				: "Backlinks",
 			paginationMode: "infinite-scroll",
 			preserveResultsHeightOnSearch: false,
-			itemComponent: ViewItemCard,
-			getItemProps: (item: ViewItem) => ({
-				item,
-				settings: this.plugin.settings,
-			}),
 			getItemKey: getViewItemKey,
 			sectionId: "pre-create-backlinks",
 			emptyMessage: "他のノートからの未解決バックリンクは見つかりませんでした。",

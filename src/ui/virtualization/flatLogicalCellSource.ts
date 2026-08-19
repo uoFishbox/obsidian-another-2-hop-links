@@ -5,7 +5,6 @@ import {
 	type SourceKey,
 } from "./types";
 import type { VirtualListLogicalCell } from "./logicalCell";
-import type { RenderRevision } from "./renderRevision";
 
 export interface FlatLogicalCellSource<T> {
 	readonly revision: unknown;
@@ -44,7 +43,6 @@ export function createFlatLogicalCellSource<T>(params: {
 	visibleCount: number;
 	showLoadMore: boolean;
 	getItemId: (item: T, index: number) => string;
-	getItemRenderRevision?: (item: T, index: number) => RenderRevision | undefined;
 	sectionId?: string;
 	revision?: unknown;
 	bindingTopologyRevision?: unknown;
@@ -74,7 +72,6 @@ export function createFlatLogicalCellSource<T>(params: {
 	const revision = params.revision ?? {
 		data: params.items,
 		itemId: params.getItemId,
-		itemRenderRevisionResolver: params.getItemRenderRevision,
 		visibleCount,
 		hasHeader,
 		showLoadMore: params.showLoadMore,
@@ -146,7 +143,6 @@ export function createFlatLogicalCellSource<T>(params: {
 				sourceKey: identity.sourceKey,
 				item,
 				itemIndex,
-				itemRenderRevision: params.getItemRenderRevision?.(item, itemIndex),
 			};
 		},
 	};

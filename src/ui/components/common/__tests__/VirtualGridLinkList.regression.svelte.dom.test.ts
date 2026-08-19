@@ -239,18 +239,16 @@ describe("VirtualGridLinkList regression", () => {
 		expect(driver.queryByText("Initial 1")).toBeNull();
 	});
 
-	it("updates rendered content when the same item object reports a new item render revision", async () => {
+	it("updates rendered content when the same item object changes with itemsRevision", async () => {
 		const items = Array.from({ length: 2 }, (_, index) => ({
 			id: `item-${index}`,
 			label: `Initial ${index}`,
-			renderVersion: 0,
 		}));
 
 		const driver = renderVirtualGridListObject({
 			items,
 			itemsRevision: 0,
 			initialVisibleCount: 2,
-			useItemRenderRevision: true,
 		});
 
 		await driver.setViewport({
@@ -263,12 +261,10 @@ describe("VirtualGridLinkList regression", () => {
 		});
 
 		items[0].label = "Updated 0";
-		items[0].renderVersion += 1;
 
 		await driver.rerender({
 			items,
 			itemsRevision: 1,
-			useItemRenderRevision: true,
 		});
 
 		await waitFor(() => {

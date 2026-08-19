@@ -1,5 +1,4 @@
 import type { LogicalCellKey, SourceKey } from "./types";
-import type { RenderRevision } from "./renderRevision";
 
 export type VirtualListLogicalCell<T> =
 	| VirtualHeaderCell
@@ -17,7 +16,6 @@ export interface VirtualItemCell<T> {
 	sourceKey: SourceKey;
 	item: T;
 	itemIndex: number;
-	itemRenderRevision?: RenderRevision;
 }
 
 export interface VirtualLoadMoreCell {

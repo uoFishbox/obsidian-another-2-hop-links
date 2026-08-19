@@ -4,7 +4,6 @@ import {
 	type MountedGridRow,
 } from "ui/virtualization/core/reconciliation/mountedGridRows";
 import type { ResidentRowSlotAllocator } from "ui/virtualization/core/residentSlotAllocator";
-import type { RenderBodyKey } from "ui/virtualization/renderRevision";
 import type { RowRange } from "ui/virtualization/rowRange";
 import {
 	logicalCellKey,
@@ -24,7 +23,6 @@ export interface MountedTwoHopCell extends MountedVirtualCell {
 	readonly key: LogicalCellKey;
 	readonly columnIndex: number;
 	readonly cell: TwoHopVirtualCell;
-	readonly renderBodyKey: RenderBodyKey;
 }
 
 export type MountedTwoHopRow = MountedGridRow<MountedTwoHopCell>;
@@ -84,6 +82,5 @@ function createMountedCell(
 		rowIndex: cell.rowIndex,
 		columnIndex: cell.columnIndex,
 		cell,
-		renderBodyKey: cell.logicalKey,
 	};
 }

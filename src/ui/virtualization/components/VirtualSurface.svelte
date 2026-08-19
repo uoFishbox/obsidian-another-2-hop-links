@@ -3,7 +3,6 @@
 	import type { VirtualSurfaceProps } from "../svelte/VirtualSurfaceProps";
 	import { createVirtualSurfaceInteractions } from "../svelte/VirtualSurfaceInteractions.svelte";
 	import type { MountedVirtualCell } from "../types";
-	import { KEYED_VIRTUAL_CELL_BODY_LIFECYCLE } from "ui/virtualization/core/bodyLifecycle";
 
 	let {
 		className = "",
@@ -26,7 +25,7 @@
 		observerRoot = null,
 		getCellClassName,
 		getCellDataTestId,
-		bodyLifecyclePolicy = KEYED_VIRTUAL_CELL_BODY_LIFECYCLE,
+		bodyRevision = undefined,
 		resolveNavigationTarget,
 		flushVirtualScrollMeasurement,
 	}: VirtualSurfaceProps<TMountedCell> = $props();
@@ -79,7 +78,7 @@
 		{observerRoot}
 		{getCellClassName}
 		{getCellDataTestId}
-		{bodyLifecyclePolicy}
+		{bodyRevision}
 		{surfaceTransaction}
 		{renderCell}
 	/>

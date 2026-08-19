@@ -6,7 +6,6 @@ import type { ListConfig } from "../types";
 import type { LinkContext } from "ui/context/linkContext";
 import type { ApplicationStore } from "ui/stores/ApplicationStore.svelte";
 import type { ISortService } from "core/sorting";
-import SearchableItemListItemStub from "./SearchableItemListItemStub.svelte";
 
 export function createSearchableListStore(
 	overrides: Partial<ApplicationStore> = {},
@@ -95,15 +94,6 @@ export function createLinkContext(
 export function createConfig(): ListConfig<ViewItem> {
 	return {
 		title: "Searchable",
-		itemComponent: SearchableItemListItemStub,
-		getItemProps: (item) => ({
-			label:
-				item.type === "taggedNote"
-					? item.data.file.basename
-					: item.type === "file"
-						? item.data.basename
-						: "unknown",
-		}),
 		getItemKey: (item: ViewItem) => {
 			switch (item.type) {
 				case "backlink":

@@ -1,4 +1,3 @@
-import type { Component } from "svelte";
 import type { LinkContext } from "ui/context/linkContext";
 import type { ApplicationStore } from "ui/stores/ApplicationStore.svelte";
 import type { ISortService } from "core/sorting";
@@ -24,15 +23,8 @@ export interface ListConfig<T = ViewItem> {
 	searchPlaceholder?: string;
 	getSearchText?: (item: T, linkContext: LinkContext) => string;
 	onSearchSubmit?: (value: string) => void | Promise<void>;
-	itemComponent: Component<any>;
-	getItemProps: (item: T) => Record<string, unknown>;
 	getItemKey: (item: T, index?: number) => string;
 	sectionId: string;
-	headerAction?: {
-		label: string;
-		onClick: () => void;
-	};
 	pinBookmarkedToTop?: boolean;
 	emptyMessage: string;
-	onKeyPress?: Record<string, () => void>;
 }

@@ -10,7 +10,6 @@ import {
 import { normalizeTag } from "core/indexing/tag-index/tagIndexer";
 import { resolveFileByPath } from "shared/obsidian/resolveFileByPath";
 import TagNotesListHost from "ui/components/lists/TagNotesListHost.svelte";
-import ViewItemCard from "ui/components/items/ViewItemCard.svelte";
 import type { ListConfig } from "ui/components/lists/types";
 import type { PluginHost } from "types/pluginHost";
 import type { ViewServices } from "ui/shared/views/viewServices";
@@ -331,11 +330,6 @@ export class TagNotesView extends AbstractSvelteListView<TaggedNote> {
 			title: `Notes with #${this.tag}`,
 			paginationMode: "infinite-scroll",
 			preserveResultsHeightOnSearch: false,
-			itemComponent: ViewItemCard,
-			getItemProps: (item: ViewItem) => ({
-				item,
-				settings: this.plugin.settings,
-			}),
 			getItemKey: getViewItemKey,
 			sectionId: `tag-view-${this.tag}`,
 			emptyMessage: "No notes found with this tag.",

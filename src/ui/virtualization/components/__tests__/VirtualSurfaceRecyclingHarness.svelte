@@ -2,10 +2,6 @@
 	import VirtualSurface from "../VirtualSurface.svelte";
 	import VirtualSurfaceRecyclingProbe from "./VirtualSurfaceRecyclingProbe.svelte";
 	import type { MountedVirtualCell } from "../../types";
-	import {
-		KEYED_VIRTUAL_CELL_BODY_LIFECYCLE,
-		PHYSICAL_SLOT_BODY_LIFECYCLE,
-	} from "ui/virtualization/core/bodyLifecycle";
 
 	interface TestMountedCell extends MountedVirtualCell {
 		columnIndex: number;
@@ -23,8 +19,7 @@
 		mountedRows: TestMountedRow[];
 		contentHeight: number;
 		rowHeight: number;
-		remountCellBodyOnKeyChange?: boolean;
-		physicalSlotRevision?: unknown;
+		bodyRevision?: unknown;
 		interactionId?: string;
 		onCellMount?: (key: string) => void;
 		onCellUpdate?: (key: string) => void;
@@ -35,8 +30,7 @@
 		mountedRows,
 		contentHeight,
 		rowHeight,
-		remountCellBodyOnKeyChange = true,
-		physicalSlotRevision,
+		bodyRevision,
 		interactionId,
 		onCellMount,
 		onCellUpdate,
@@ -51,11 +45,7 @@
 	{mountedRows}
 	{contentHeight}
 	{rowHeight}
-	bodyLifecyclePolicy={remountCellBodyOnKeyChange
-		? KEYED_VIRTUAL_CELL_BODY_LIFECYCLE
-		: physicalSlotRevision === undefined
-			? PHYSICAL_SLOT_BODY_LIFECYCLE
-			: { type: "physical-slot", revision: physicalSlotRevision }}
+	{bodyRevision}
 	interactionDescriptorScopeId={interactionId ? "recycling-test-items" : undefined}
 >
 	{#snippet renderCell({ mountedCell })}

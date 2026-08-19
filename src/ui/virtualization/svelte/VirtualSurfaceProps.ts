@@ -3,7 +3,6 @@ import type { ResultNavigationDirection } from "features/keyboard-navigation/res
 import type { InteractionDescriptorResolverProvider } from "ui/interactions/interactionRegistry";
 import type { MountedVirtualCell, VirtualNavigationTarget } from "../types";
 import type { ProgrammaticScrollSnapshot } from "../dom/virtualListMeasurementAdapter";
-import type { VirtualCellBodyLifecyclePolicy } from "ui/virtualization/core/bodyLifecycle";
 import type { VirtualSurfaceMountedRow } from "./VirtualSurfaceTypes";
 
 export interface VirtualSurfaceCommonProps<TMountedCell extends MountedVirtualCell> {
@@ -33,7 +32,7 @@ export interface VirtualSurfaceCommonProps<TMountedCell extends MountedVirtualCe
 	observerRoot?: HTMLElement | null;
 	getCellClassName?: (cell: TMountedCell) => string | undefined;
 	getCellDataTestId?: (cell: TMountedCell) => string | undefined;
-	bodyLifecyclePolicy?: VirtualCellBodyLifecyclePolicy<TMountedCell>;
+	bodyRevision?: unknown;
 	resolveNavigationTarget?: (
 		currentKey: string,
 		direction: ResultNavigationDirection,

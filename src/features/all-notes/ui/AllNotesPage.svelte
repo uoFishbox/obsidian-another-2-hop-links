@@ -2,7 +2,6 @@
 	import { Component, Notice, TFile, TFolder, type App } from "obsidian";
 	import { toViewItems, type ViewItem } from "application/presenters";
 	import { resolveExpectedPath } from "shared/obsidian/resolveExpectedPath";
-	import ViewItemCard from "ui/components/items/ViewItemCard.svelte";
 	import SearchableItemList from "ui/components/lists/SearchableItemList.svelte";
 	import type { ListConfig } from "ui/components/lists/types";
 	import type { LinkContext } from "ui/context/linkContext";
@@ -95,7 +94,6 @@
 		searchEnabled: true,
 		allowContentSearch: true,
 		searchPlaceholder: "Search note titles...",
-		itemComponent: ViewItemCard,
 		getSearchText: (item: ViewItem, ctx) => {
 			if (item.type !== "file") return "";
 			return getFileCardTitleSearchText(
@@ -106,10 +104,6 @@
 				settings.priorityFrontmatterKeyForTitle,
 			);
 		},
-		getItemProps: (item: ViewItem) => ({
-			item,
-			settings,
-		}),
 		getItemKey: (item: ViewItem, index = 0) => {
 			switch (item.type) {
 				case "file":

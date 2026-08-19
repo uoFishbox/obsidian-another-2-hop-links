@@ -2,12 +2,24 @@
 	import type { ViewItem } from "application/presenters";
 
 	interface Props {
-		label: string;
-		searchQuery?: string;
-		item?: ViewItem;
+		item: ViewItem;
 	}
 
-	let { label, searchQuery = "", item }: Props = $props();
+	let { item }: Props = $props();
+	const label = $derived.by(() => {
+		switch (item.type) {
+			case "taggedNote":
+				return item.data.file.basename;
+			case "file":
+				return item.data.basename;
+			case "backlink":
+				return item.data.sourceFile.basename;
+			case "branch":
+				return item.data.hop1.path ?? item.data.hop1.rawText;
+			case "newLink":
+				return item.data.path ?? item.data.rawText;
+		}
+	});
 </script>
 
 <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
@@ -15,7 +27,6 @@
 	class="cosense-card-links__box"
 	data-testid="searchable-item"
 	data-label={label}
-	data-search-query={searchQuery}
 	data-ccl-interaction-id={label}
 	tabindex="0"
 >
