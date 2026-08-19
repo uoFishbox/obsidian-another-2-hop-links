@@ -1,20 +1,53 @@
 import { enableLogging, logger } from "shared/logging/logger";
+import { isElementLike, isNodeLike } from "ui/shared/dom/realmSafeDom";
 import type {
 	DebugLogEntry,
 	HoverPopoverLike,
 	ShadowHoverSession,
 } from "./internal-types";
-import { getSessionAnchor, getSessionPopover } from "./state-machine";
 
 const MAX_DEBUG_LOGS = 200;
+
+export function rectToObject(rect: DOMRect): Record<string, number> {
+	return {
+		x: rect.x,
+		y: rect.y,
+		width: rect.width,
+		height: rect.height,
+		top: rect.top,
+		right: rect.right,
+		bottom: rect.bottom,
+		left: rect.left,
+	};
+}
+
+export function summarizeNode(node: unknown): Record<string, unknown> | null {
+	if (!isNodeLike(node)) {
+		return node == null ? null : { type: typeof node, value: String(node) };
+	}
+
+	const root = typeof node.getRootNode === "function" ? node.getRootNode() : null;
+	if (isElementLike(node)) {
+		return {
+			nodeType: node.nodeType,
+			tag: node.tagName,
+			className: node.className,
+			id: node.id || null,
+			rootType: root?.constructor?.name ?? null,
+		};
+	}
+
+	return {
+		nodeType: node.nodeType,
+		nodeName: node.nodeName,
+		rootType: root?.constructor?.name ?? null,
+	};
+}
 
 export function summarizePopover(
 	popover: HoverPopoverLike | null | undefined,
 ): Record<string, unknown> | null {
-	if (!popover) {
-		return null;
-	}
-
+	if (!popover) return null;
 	return {
 		state: popover.state ?? null,
 		onTarget: popover.onTarget ?? null,
@@ -31,27 +64,34 @@ export function summarizePopover(
 }
 
 export function summarizeSession(session: ShadowHoverSession): Record<string, unknown> {
-	const activeAnchor = getSessionAnchor(session.state);
-	const popover = getSessionPopover(session.state);
-	const handoff = session.state.type === "handoff" ? session.state : null;
+	const handoff = session.pendingHandoff;
+	const lifecycle = session.destroyed
+		? "destroyed"
+		: handoff
+			? "handoff"
+			: session.activePopover
+				? "open"
+				: session.activeAnchor
+					? "hovering-anchor"
+					: "idle";
 	return {
-		lifecycle: session.state.type,
-		overAnchor: session.interaction.overAnchor,
-		overPopover: session.interaction.overPopover,
-		destroyed: session.state.type === "destroyed",
-		activeAnchorTag: activeAnchor?.proxyEl.tagName ?? null,
-		activeAnchorClass: activeAnchor?.proxyEl.className ?? null,
-		activeActualTag: activeAnchor?.actualEl.tagName ?? null,
-		activeActualClass: activeAnchor?.actualEl.className ?? null,
-		popover: summarizePopover(popover),
+		lifecycle,
+		overAnchor: session.overAnchor,
+		overPopover: session.overPopover,
+		destroyed: session.destroyed,
+		activeAnchorTag: session.activeAnchor?.proxyEl.tagName ?? null,
+		activeAnchorClass: session.activeAnchor?.proxyEl.className ?? null,
+		activeActualTag: session.activeAnchor?.actualEl.tagName ?? null,
+		activeActualClass: session.activeAnchor?.actualEl.className ?? null,
+		popover: summarizePopover(session.activePopover),
 		lastHoverPath: session.lastHoverPath,
-		hoverRequestSeq: session.state.requestSeq,
+		hoverRequestSeq: session.requestSeq,
 		pendingHandoff: handoff
 			? {
 					requestSeq: handoff.requestSeq,
-					fromPopover: summarizePopover(handoff.from.popover),
-					fromActualClass: handoff.from.anchor.actualEl.className,
-					toActualClass: handoff.to.actualEl.className,
+					fromPopover: summarizePopover(handoff.fromPopover),
+					fromActualClass: handoff.fromAnchor.actualEl.className,
+					toActualClass: handoff.toAnchor.actualEl.className,
 					timerActive: session.handoffTimer != null,
 				}
 			: null,
@@ -64,15 +104,7 @@ export function debugLog(
 	message: string,
 	detail?: unknown | (() => unknown),
 ): void {
-	if (!enableLogging) {
-		return;
-	}
-	if (!session || typeof session !== "object") {
-		return;
-	}
-	if (typeof session.logSeq !== "number" || !Array.isArray(session.logs)) {
-		return;
-	}
+	if (!enableLogging) return;
 	const resolvedDetail = typeof detail === "function" ? detail() : detail;
 	const entry: DebugLogEntry = {
 		index: session.logSeq++,
@@ -85,5 +117,5 @@ export function debugLog(
 	if (session.logs.length > MAX_DEBUG_LOGS) {
 		session.logs.splice(0, session.logs.length - MAX_DEBUG_LOGS);
 	}
-	if (enableLogging) logger(`[ShadowHover][${type}] ${message}`, resolvedDetail);
+	logger(`[ShadowHover][${type}] ${message}`, resolvedDetail);
 }

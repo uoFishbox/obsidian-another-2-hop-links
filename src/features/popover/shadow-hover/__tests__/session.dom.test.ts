@@ -1,17 +1,20 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { ShadowAnchorRegistry } from "../registry";
 import {
+	beginSessionHandoff,
+	beginSessionRequest,
 	createRequestHoverParent,
 	createShadowHoverSession,
+	getActiveSessionHoverParent,
 	getActiveSessionPopover,
 	getBoundPopoverActualAnchor,
 	getBoundPopoverAnchor,
 	getPendingPopoverHandoff,
-	syncSessionAnchor,
+	isActualHovered,
+	relayHoverToProxy,
+	setAnchorHovered,
 	syncPopoverTargetAndTransition,
-	transitionSession,
+	syncProxyRectForActual,
 } from "../session";
-import { getSessionOpenPopover } from "../state-machine";
 import type { HoverPopoverLike, ShadowHoverSession } from "../internal-types";
 
 describe("createRequestHoverParent", () => {
@@ -24,7 +27,7 @@ describe("createRequestHoverParent", () => {
 	});
 
 	it("defers stale popover cleanup so hover-editor can finish registering listeners", async () => {
-		const session = createShadowHoverSession(new ShadowAnchorRegistry());
+		const session = createShadowHoverSession();
 		const requestAnchorEl = document.createElement("button");
 		const activeAnchorEl = document.createElement("button");
 		beginRequest(session, activeAnchorEl, activeAnchorEl, 2);
@@ -48,7 +51,7 @@ describe("createRequestHoverParent", () => {
 	});
 
 	it("clears the session popover when the assigned popover is removed", () => {
-		const session = createShadowHoverSession(new ShadowAnchorRegistry());
+		const session = createShadowHoverSession();
 		const requestAnchorEl = document.createElement("button");
 		beginRequest(session, requestAnchorEl, requestAnchorEl, 1);
 
@@ -61,11 +64,11 @@ describe("createRequestHoverParent", () => {
 		hoverParent.hoverPopover = null;
 
 		expect(getActiveSessionPopover(session)).toBeNull();
-		expect(getSessionOpenPopover(session.state)).toBeNull();
+		expect(getActiveSessionHoverParent(session)).toBeNull();
 	});
 
 	it("does not clear another hoverParent's popover when this one is removed", () => {
-		const session = createShadowHoverSession(new ShadowAnchorRegistry());
+		const session = createShadowHoverSession();
 		const requestAnchorElA = document.createElement("button");
 		const requestAnchorElB = document.createElement("button");
 		beginRequest(session, requestAnchorElB, requestAnchorElB, 2);
@@ -76,21 +79,20 @@ describe("createRequestHoverParent", () => {
 
 		hoverParentB.hoverPopover = popoverB;
 		expect(getActiveSessionPopover(session)).toBe(popoverB);
-		expect(getSessionOpenPopover(session.state)?.hoverParent).toBe(hoverParentB);
+		expect(getActiveSessionHoverParent(session)).toBe(hoverParentB);
 
 		hoverParentA.hoverPopover = null;
 
 		expect(getActiveSessionPopover(session)).toBe(popoverB);
-		expect(getSessionOpenPopover(session.state)?.hoverParent).toBe(hoverParentB);
+		expect(getActiveSessionHoverParent(session)).toBe(hoverParentB);
 	});
 
 	it("relays proxy enter after accepted assignment listeners can finish registering", async () => {
-		const registry = new ShadowAnchorRegistry();
-		const session = createShadowHoverSession(registry);
+		const session = createShadowHoverSession();
 		const actualAnchor = createMeasuredButton(10);
-		const proxyAnchor = registry.syncProxyRectForActual(actualAnchor);
+		const proxyAnchor = syncProxyRectForActual(session, actualAnchor);
 		beginRequest(session, actualAnchor, proxyAnchor, 1);
-		registry.setHovered(actualAnchor, true);
+		setAnchorHovered(session, actualAnchor, true);
 		const popover = { transition: vi.fn() };
 		const hoverParent = createRequestHoverParent(
 			session,
@@ -110,12 +112,11 @@ describe("createRequestHoverParent", () => {
 	});
 
 	it("skips deferred proxy enter after the actual anchor has been left", async () => {
-		const registry = new ShadowAnchorRegistry();
-		const session = createShadowHoverSession(registry);
+		const session = createShadowHoverSession();
 		const actualAnchor = createMeasuredButton(10);
-		const proxyAnchor = registry.syncProxyRectForActual(actualAnchor);
+		const proxyAnchor = syncProxyRectForActual(session, actualAnchor);
 		beginRequest(session, actualAnchor, proxyAnchor, 1);
-		registry.setHovered(actualAnchor, true);
+		setAnchorHovered(session, actualAnchor, true);
 		const hoverParent = createRequestHoverParent(
 			session,
 			1,
@@ -126,20 +127,19 @@ describe("createRequestHoverParent", () => {
 		hoverParent.hoverPopover = { transition: vi.fn() };
 		const onProxyEnter = vi.fn();
 		proxyAnchor.addEventListener("mouseover", onProxyEnter);
-		registry.setHovered(actualAnchor, false);
+		setAnchorHovered(session, actualAnchor, false);
 		await Promise.resolve();
 
 		expect(onProxyEnter).not.toHaveBeenCalled();
 	});
 
 	it("keeps popover ownership bound to the original actual anchor when another proxy is synced", () => {
-		const registry = new ShadowAnchorRegistry();
-		const session = createShadowHoverSession(registry);
+		const session = createShadowHoverSession();
 		const actualAnchorA = createMeasuredButton(10);
 		const actualAnchorB = createMeasuredButton(80);
-		const proxyAnchorA = registry.syncProxyRectForActual(actualAnchorA);
+		const proxyAnchorA = syncProxyRectForActual(session, actualAnchorA);
 		beginRequest(session, actualAnchorA, proxyAnchorA, 1);
-		registry.setHovered(actualAnchorA, true);
+		setAnchorHovered(session, actualAnchorA, true);
 
 		const originalHide = vi.fn();
 		const popover = {
@@ -161,9 +161,9 @@ describe("createRequestHoverParent", () => {
 		expect(getBoundPopoverAnchor(popover)).toBe(proxyAnchorA);
 		expect(getBoundPopoverActualAnchor(popover)).toBe(actualAnchorA);
 
-		registry.setHovered(actualAnchorA, false);
-		registry.setHovered(actualAnchorB, true);
-		const proxyAnchorB = registry.syncProxyRectForActual(actualAnchorB);
+		setAnchorHovered(session, actualAnchorA, false);
+		setAnchorHovered(session, actualAnchorB, true);
+		const proxyAnchorB = syncProxyRectForActual(session, actualAnchorB);
 		syncPopoverTargetAndTransition(session, "test-anchor-rebind");
 
 		popover.hide();
@@ -171,16 +171,15 @@ describe("createRequestHoverParent", () => {
 		expect(proxyAnchorB).not.toBe(proxyAnchorA);
 		expect(getBoundPopoverAnchor(popover)).toBe(proxyAnchorA);
 		expect(originalHide).toHaveBeenCalledTimes(1);
-		expect(session.interaction.overAnchor).toBe(false);
+		expect(session.overAnchor).toBe(false);
 	});
 
 	it("releases a pending handoff popover to native lifecycle after replacement", () => {
-		const registry = new ShadowAnchorRegistry();
-		const session = createShadowHoverSession(registry);
+		const session = createShadowHoverSession();
 		const actualAnchorA = createMeasuredButton(10);
 		const actualAnchorB = createMeasuredButton(80);
-		const proxyAnchorA = registry.syncProxyRectForActual(actualAnchorA);
-		const proxyAnchorB = registry.syncProxyRectForActual(actualAnchorB);
+		const proxyAnchorA = syncProxyRectForActual(session, actualAnchorA);
+		const proxyAnchorB = syncProxyRectForActual(session, actualAnchorB);
 		const hideA = vi.fn();
 		const hideB = vi.fn();
 		const transitionA = vi.fn(function (this: HoverPopoverLike) {
@@ -203,16 +202,14 @@ describe("createRequestHoverParent", () => {
 		document.body.append(popoverA.hoverEl!, popoverB.hoverEl);
 
 		beginRequest(session, actualAnchorA, proxyAnchorA, 1);
-		registry.setHovered(actualAnchorA, true);
+		setAnchorHovered(session, actualAnchorA, true);
 		createRequestHoverParent(session, 1, proxyAnchorA, actualAnchorA).hoverPopover =
 			popoverA;
 
-		syncSessionAnchor(session, actualAnchorB, proxyAnchorB);
-		registry.setHovered(actualAnchorB, true);
-		transitionSession(session, {
-			type: "handoff-start",
+		setAnchorHovered(session, actualAnchorB, true);
+		beginSessionHandoff(session, {
 			fromPopover: popoverA,
-			fromHoverParent: getSessionOpenPopover(session.state)?.hoverParent ?? null,
+			fromHoverParent: getActiveSessionHoverParent(session),
 			fromAnchor: { actualEl: actualAnchorA, proxyEl: proxyAnchorA },
 			toAnchor: { actualEl: actualAnchorB, proxyEl: proxyAnchorB },
 			requestSeq: 2,
@@ -233,19 +230,19 @@ describe("createRequestHoverParent", () => {
 		expect(proxyAnchorA.isConnected).toBe(false);
 		expect(getActiveSessionPopover(session)).toBe(popoverB);
 		expect(getPendingPopoverHandoff(session)).toBeNull();
-		expect(registry.isActualHovered(actualAnchorA)).toBe(false);
-		expect(registry.isActualHovered(actualAnchorB)).toBe(true);
+		expect(isActualHovered(session, actualAnchorA)).toBe(false);
+		expect(isActualHovered(session, actualAnchorB)).toBe(true);
 	});
 
 	it("clears hover state when syncing a detached actual anchor", () => {
-		const registry = new ShadowAnchorRegistry();
+		const session = createShadowHoverSession();
 		const actualAnchor = createMeasuredButton(10);
-		registry.setHovered(actualAnchor, true);
+		setAnchorHovered(session, actualAnchor, true);
 
 		actualAnchor.remove();
-		const proxyAnchor = registry.syncProxyRectForActual(actualAnchor);
+		const proxyAnchor = syncProxyRectForActual(session, actualAnchor);
 
-		expect(registry.isActualHovered(actualAnchor)).toBe(false);
+		expect(isActualHovered(session, actualAnchor)).toBe(false);
 		expect(proxyAnchor.style.left).toBe("0px");
 		expect(proxyAnchor.style.top).toBe("0px");
 		expect(proxyAnchor.style.width).toBe("0px");
@@ -253,12 +250,11 @@ describe("createRequestHoverParent", () => {
 	});
 
 	it("does not keep a popover alive for a detached hovered actual anchor", () => {
-		const registry = new ShadowAnchorRegistry();
-		const session = createShadowHoverSession(registry);
+		const session = createShadowHoverSession();
 		const actualAnchor = createMeasuredButton(10);
-		const proxyAnchor = registry.syncProxyRectForActual(actualAnchor);
+		const proxyAnchor = syncProxyRectForActual(session, actualAnchor);
 		beginRequest(session, actualAnchor, proxyAnchor, 1);
-		registry.setHovered(actualAnchor, true);
+		setAnchorHovered(session, actualAnchor, true);
 
 		const originalHide = vi.fn();
 		const popover = {
@@ -277,17 +273,16 @@ describe("createRequestHoverParent", () => {
 		popover.hide();
 
 		expect(originalHide).toHaveBeenCalledTimes(1);
-		expect(session.interaction.overAnchor).toBe(false);
-		expect(registry.isActualHovered(actualAnchor)).toBe(false);
+		expect(session.overAnchor).toBe(false);
+		expect(isActualHovered(session, actualAnchor)).toBe(false);
 	});
 
 	it("patches only position while preserving native lifecycle methods and state", () => {
-		const registry = new ShadowAnchorRegistry();
-		const session = createShadowHoverSession(registry);
+		const session = createShadowHoverSession();
 		const actualAnchor = createMeasuredButton(10);
-		const proxyAnchor = registry.syncProxyRectForActual(actualAnchor);
+		const proxyAnchor = syncProxyRectForActual(session, actualAnchor);
 		beginRequest(session, actualAnchor, proxyAnchor, 1);
-		registry.setHovered(actualAnchor, true);
+		setAnchorHovered(session, actualAnchor, true);
 
 		const hide = vi.fn();
 		const close = vi.fn();
@@ -338,12 +333,11 @@ describe("createRequestHoverParent", () => {
 	});
 
 	it("synchronizes onTarget at explicit bridge boundaries without wrapping transition", () => {
-		const registry = new ShadowAnchorRegistry();
-		const session = createShadowHoverSession(registry);
+		const session = createShadowHoverSession();
 		const actualAnchor = createMeasuredButton(10);
-		const proxyAnchor = registry.syncProxyRectForActual(actualAnchor);
+		const proxyAnchor = syncProxyRectForActual(session, actualAnchor);
 		beginRequest(session, actualAnchor, proxyAnchor, 1);
-		registry.setHovered(actualAnchor, true);
+		setAnchorHovered(session, actualAnchor, true);
 
 		const onTargetValues: Array<boolean | undefined> = [];
 		const transition = function (this: HoverPopoverLike) {
@@ -359,7 +353,7 @@ describe("createRequestHoverParent", () => {
 		createRequestHoverParent(session, 1, proxyAnchor, actualAnchor).hoverPopover =
 			popover;
 		expect(popover.transition).toBe(transition);
-		registry.setHovered(actualAnchor, false);
+		setAnchorHovered(session, actualAnchor, false);
 		popover.transition();
 		syncPopoverTargetAndTransition(session, "test-anchor-leave");
 
@@ -367,12 +361,11 @@ describe("createRequestHoverParent", () => {
 	});
 
 	it("lets proxy listeners drive the unwrapped native transition", () => {
-		const registry = new ShadowAnchorRegistry();
-		const session = createShadowHoverSession(registry);
+		const session = createShadowHoverSession();
 		const actualAnchor = createMeasuredButton(10);
-		const proxyAnchor = registry.syncProxyRectForActual(actualAnchor);
+		const proxyAnchor = syncProxyRectForActual(session, actualAnchor);
 		beginRequest(session, actualAnchor, proxyAnchor, 1);
-		registry.setHovered(actualAnchor, true);
+		setAnchorHovered(session, actualAnchor, true);
 		const onTargetValues: Array<boolean | undefined> = [];
 		const transition = function (this: HoverPopoverLike) {
 			onTargetValues.push(this.onTarget);
@@ -390,8 +383,8 @@ describe("createRequestHoverParent", () => {
 			popover.onTarget = false;
 			popover.transition?.();
 		});
-		registry.setHovered(actualAnchor, false);
-		registry.relayHoverToProxy(actualAnchor, false);
+		setAnchorHovered(session, actualAnchor, false);
+		relayHoverToProxy(session, actualAnchor, false);
 
 		expect(popover.transition).toBe(transition);
 		expect(onTargetValues).toEqual([true, false]);
@@ -429,10 +422,5 @@ function beginRequest(
 	proxyEl: HTMLElement,
 	requestSeq: number,
 ): void {
-	syncSessionAnchor(session, actualEl, proxyEl);
-	transitionSession(session, {
-		type: "request-open",
-		anchor: { actualEl, proxyEl },
-		requestSeq,
-	});
+	beginSessionRequest(session, { actualEl, proxyEl }, requestSeq);
 }

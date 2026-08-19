@@ -1,4 +1,4 @@
-import { PROXY_CLASS_NAME } from "./internal-constants";
+const PROXY_CLASS_NAME = "ccl-shadow-hover-proxy-anchor";
 
 const PROXY_ATTRIBUTE_NAME = "data-ccl-shadow-hover-proxy";
 

@@ -1,8 +1,10 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { ShadowHoverControllerImpl } from "../controller";
+import {
+	ShadowHoverControllerImpl,
+	type ShadowPopoverLaunchRequest,
+} from "../controller";
 import type { HoverPopoverLike } from "../internal-types";
-import type { ShadowPopoverLaunchRequest } from "../launcher";
-import { createRequestHoverParent } from "../session";
+import { createRequestHoverParent, syncProxyRectForActual } from "../session";
 
 describe("ShadowHoverControllerImpl", () => {
 	afterEach(() => {
@@ -15,7 +17,7 @@ describe("ShadowHoverControllerImpl", () => {
 			linktext: "note",
 			sourcePath: "note.md",
 		}));
-		const controller = new ShadowHoverControllerImpl({ launch }, resolveLink);
+		const controller = new ShadowHoverControllerImpl(launch, resolveLink);
 		const anchorEl = createAnchor();
 
 		controller.handleDelegatedEnter(
@@ -34,14 +36,13 @@ describe("ShadowHoverControllerImpl", () => {
 	});
 
 	it("relays delegated anchor enter and leave to the geometry proxy", () => {
-		const controller = new ShadowHoverControllerImpl({ launch: vi.fn() }, () => ({
+		const controller = new ShadowHoverControllerImpl(vi.fn(), () => ({
 			linktext: "note",
 			sourcePath: "note.md",
 		}));
 		const anchorEl = createAnchor();
-		const proxy = controller
-			.getDebugSession()
-			.anchorRegistry.syncProxyRectForActual(anchorEl);
+		const session = controller.getDebugSession();
+		const proxy = syncProxyRectForActual(session, anchorEl);
 		const onEnter = vi.fn();
 		const onLeave = vi.fn();
 		proxy.addEventListener("mouseover", onEnter);
@@ -81,7 +82,7 @@ describe("ShadowHoverControllerImpl", () => {
 				request.actualAnchorEl,
 			).hoverPopover = popover;
 		});
-		const controller = new ShadowHoverControllerImpl({ launch }, () => ({
+		const controller = new ShadowHoverControllerImpl(launch, () => ({
 			linktext: "note",
 			sourcePath: "note.md",
 		}));
@@ -102,27 +103,19 @@ describe("ShadowHoverControllerImpl", () => {
 		expect(controller.getDebugPopover()).toBeNull();
 	});
 
-	it("relaunches on modifier-key pointermove transitions through delegated handlers", () => {
+	it("relaunches when the bridge forwards an armed modifier pointermove", () => {
 		const launch = vi.fn();
 		const resolveLink = vi.fn(() => ({
 			linktext: "note",
 			sourcePath: "note.md",
 		}));
-		const controller = new ShadowHoverControllerImpl({ launch }, resolveLink);
+		const controller = new ShadowHoverControllerImpl(launch, resolveLink);
 		const anchorEl = createAnchor();
 
 		controller.handleDelegatedEnter(
 			anchorEl,
 			"item:first",
 			new MouseEvent("mouseover", { bubbles: true }),
-		);
-		controller.handleDelegatedPointerMove(
-			anchorEl,
-			"item:first",
-			new PointerEvent("pointermove", {
-				bubbles: true,
-				ctrlKey: false,
-			}),
 		);
 		controller.handleDelegatedPointerMove(
 			anchorEl,
@@ -143,7 +136,7 @@ describe("ShadowHoverControllerImpl", () => {
 			linktext: "note",
 			sourcePath: "note.md",
 		}));
-		const controller = new ShadowHoverControllerImpl({ launch }, resolveLink);
+		const controller = new ShadowHoverControllerImpl(launch, resolveLink);
 		const anchorEl = createAnchor();
 
 		controller.handleDelegatedEnter(
@@ -172,7 +165,7 @@ describe("ShadowHoverControllerImpl", () => {
 			linktext: "note",
 			sourcePath: "note.md",
 		}));
-		const controller = new ShadowHoverControllerImpl({ launch }, resolveLink);
+		const controller = new ShadowHoverControllerImpl(launch, resolveLink);
 		const firstAnchorEl = createAnchor();
 		const secondAnchorEl = createAnchor();
 
@@ -191,15 +184,15 @@ describe("ShadowHoverControllerImpl", () => {
 	});
 
 	it("relays leave and enter when the active anchor node is replaced", () => {
-		const controller = new ShadowHoverControllerImpl({ launch: vi.fn() }, () => ({
+		const controller = new ShadowHoverControllerImpl(vi.fn(), () => ({
 			linktext: "note",
 			sourcePath: "note.md",
 		}));
 		const firstAnchorEl = createAnchor(10);
 		const secondAnchorEl = createAnchor(80);
-		const registry = controller.getDebugSession().anchorRegistry;
-		const firstProxy = registry.syncProxyRectForActual(firstAnchorEl);
-		const secondProxy = registry.syncProxyRectForActual(secondAnchorEl);
+		const session = controller.getDebugSession();
+		const firstProxy = syncProxyRectForActual(session, firstAnchorEl);
+		const secondProxy = syncProxyRectForActual(session, secondAnchorEl);
 		const onFirstLeave = vi.fn();
 		const onSecondEnter = vi.fn();
 		firstProxy.addEventListener("mouseout", onFirstLeave);
@@ -249,7 +242,7 @@ describe("ShadowHoverControllerImpl", () => {
 			linktext: "note",
 			sourcePath: "note.md",
 		}));
-		const controller = new ShadowHoverControllerImpl({ launch }, resolveLink);
+		const controller = new ShadowHoverControllerImpl(launch, resolveLink);
 		const firstAnchorEl = createAnchor(10);
 		const replacementAnchorEl = createAnchor(80);
 
@@ -277,7 +270,7 @@ describe("ShadowHoverControllerImpl", () => {
 				linktext: "note",
 				sourcePath: "note.md",
 			}));
-			const controller = new ShadowHoverControllerImpl({ launch }, resolveLink);
+			const controller = new ShadowHoverControllerImpl(launch, resolveLink);
 			const anchorEl = createAnchor();
 
 			controller.handleDelegatedEnter(
@@ -317,7 +310,7 @@ describe("ShadowHoverControllerImpl", () => {
 			linktext: "note",
 			sourcePath: "note.md",
 		}));
-		const controller = new ShadowHoverControllerImpl({ launch }, resolveLink);
+		const controller = new ShadowHoverControllerImpl(launch, resolveLink);
 		const anchorEl = createAnchor();
 
 		controller.handleDelegatedEnter(
@@ -354,7 +347,7 @@ describe("ShadowHoverControllerImpl", () => {
 				request.actualAnchorEl,
 			).hoverPopover = popover;
 		});
-		const controller = new ShadowHoverControllerImpl({ launch }, () => ({
+		const controller = new ShadowHoverControllerImpl(launch, () => ({
 			linktext: "note",
 			sourcePath: "note.md",
 		}));
@@ -393,7 +386,7 @@ describe("ShadowHoverControllerImpl", () => {
 				request.actualAnchorEl,
 			).hoverPopover = popover;
 		});
-		const controller = new ShadowHoverControllerImpl({ launch }, () => ({
+		const controller = new ShadowHoverControllerImpl(launch, () => ({
 			linktext: "note",
 			sourcePath: "note.md",
 		}));
@@ -408,36 +401,6 @@ describe("ShadowHoverControllerImpl", () => {
 
 		expect(originalHide).toHaveBeenCalledTimes(1);
 		controller.destroy();
-	});
-
-	it("does not relaunch on steady-state pointermove", () => {
-		const launch = vi.fn();
-		const resolveLink = vi.fn(() => ({
-			linktext: "note",
-			sourcePath: "note.md",
-		}));
-		const controller = new ShadowHoverControllerImpl({ launch }, resolveLink);
-		const anchorEl = createAnchor();
-
-		controller.handleDelegatedEnter(
-			anchorEl,
-			"item:first",
-			new MouseEvent("mouseover", { bubbles: true }),
-		);
-		launch.mockClear();
-		resolveLink.mockClear();
-
-		controller.handleDelegatedPointerMove(
-			anchorEl,
-			"item:first",
-			new PointerEvent("pointermove", {
-				bubbles: true,
-				ctrlKey: false,
-			}),
-		);
-
-		expect(launch).not.toHaveBeenCalled();
-		expect(resolveLink).not.toHaveBeenCalled();
 	});
 
 	it("releases a focused handoff popover on timeout without forcing close", () => {
@@ -473,7 +436,7 @@ describe("ShadowHoverControllerImpl", () => {
 				linktext: "note",
 				sourcePath: "note.md",
 			}));
-			const controller = new ShadowHoverControllerImpl({ launch }, resolveLink);
+			const controller = new ShadowHoverControllerImpl(launch, resolveLink);
 			const firstAnchorEl = createAnchor(10);
 			const secondAnchorEl = createAnchor(80);
 

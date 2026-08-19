@@ -1,4 +1,4 @@
-import type { ShadowAnchorRegistry } from "./registry";
+import type { ShadowGeometryProxyStore } from "./geometry-proxy";
 
 export type HoverPopoverLike = {
 	hoverEl?: HTMLElement;
@@ -44,22 +44,18 @@ export type DebugLogEntry = {
 	detail?: unknown;
 };
 
-export type PendingPopoverHandoff = {
-	fromPopover: HoverPopoverLike;
-	fromActualAnchor: HTMLElement;
-	toActualAnchor: HTMLElement;
-	requestSeq: number;
-};
-
 export interface HoverAnchorTarget {
 	actualEl: HTMLElement;
 	proxyEl: HTMLElement;
 }
 
-export interface HoverSessionOpenPopover {
-	popover: HoverPopoverLike;
-	hoverParent: HoverParentLike | null;
-}
+export type PendingPopoverHandoff = {
+	fromPopover: HoverPopoverLike;
+	fromHoverParent: HoverParentLike | null;
+	fromAnchor: HoverAnchorTarget;
+	toAnchor: HoverAnchorTarget;
+	requestSeq: number;
+};
 
 export type PopoverReleaseReason =
 	| "anchor-rebind"
@@ -68,89 +64,22 @@ export type PopoverReleaseReason =
 	| "handoff-complete"
 	| "handoff-timeout";
 
-export type HoverSessionState =
-	| { type: "idle"; requestSeq: number }
-	| {
-			type: "hovering-anchor";
-			anchor: HoverAnchorTarget;
-			requestSeq: number;
-	  }
-	| {
-			type: "opening";
-			anchor: HoverAnchorTarget;
-			requestSeq: number;
-			previous: HoverSessionOpenPopover | null;
-	  }
-	| {
-			type: "open";
-			anchor: HoverAnchorTarget;
-			requestSeq: number;
-			assigned: HoverSessionOpenPopover;
-	  }
-	| {
-			type: "handoff";
-			from: HoverSessionOpenPopover & { anchor: HoverAnchorTarget };
-			to: HoverAnchorTarget;
-			requestSeq: number;
-	  }
-	| { type: "destroyed"; requestSeq: number };
-
-export type HoverSessionEvent =
-	| { type: "anchor-sync"; anchor: HoverAnchorTarget }
-	| {
-			type: "request-open";
-			anchor: HoverAnchorTarget;
-			requestSeq: number;
-	  }
-	| { type: "request-cancel"; requestSeq: number }
-	| {
-			type: "handoff-start";
-			fromPopover: HoverPopoverLike;
-			fromHoverParent: HoverParentLike | null;
-			fromAnchor: HoverAnchorTarget;
-			toAnchor: HoverAnchorTarget;
-			requestSeq: number;
-	  }
-	| {
-			type: "popover-assigned";
-			popover: HoverPopoverLike;
-			hoverParent: HoverParentLike;
-			anchor: HoverAnchorTarget;
-			requestSeq: number;
-	  }
-	| {
-			type: "popover-cleared";
-			popover: HoverPopoverLike;
-			hoverParent: HoverParentLike;
-	  }
-	| { type: "popover-released"; popover: HoverPopoverLike }
-	| { type: "handoff-timeout"; requestSeq: number }
-	| { type: "destroy" };
-
-export interface HoverSessionInteractionState {
+export type ShadowHoverSession = {
+	proxyStore: ShadowGeometryProxyStore;
+	hoveredActuals: Set<HTMLElement>;
+	activeAnchor: HoverAnchorTarget | null;
+	activePopover: HoverPopoverLike | null;
+	activeHoverParent: HoverParentLike | null;
+	pendingHandoff: PendingPopoverHandoff | null;
+	requestSeq: number;
+	destroyed: boolean;
 	overAnchor: boolean;
 	overPopover: boolean;
-}
-
-export type HoverSessionInteractionEvent =
-	| {
-			type: "interaction-sync";
-			overAnchor: boolean;
-			overPopover: boolean;
-	  }
-	| { type: "anchor-hover-sync"; overAnchor: boolean }
-	| { type: "popover-hover-sync"; overPopover: boolean }
-	| { type: "interaction-reset" };
-
-export type ShadowHoverSession = {
-	anchorRegistry: ShadowAnchorRegistry;
-	state: HoverSessionState;
-	interaction: HoverSessionInteractionState;
 	attachedPopoverEl: HTMLElement | null;
 	teardownPopoverListeners: (() => void) | null;
 	lastHoverPath: string | null;
 	handoffTimer: number | null;
-	handoffTimerWindow?: Window | null;
+	handoffTimerWindow: Window | null;
 	logs: DebugLogEntry[];
 	logSeq: number;
 };

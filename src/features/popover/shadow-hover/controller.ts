@@ -1,45 +1,63 @@
-import { debugLog, summarizeSession } from "./debug";
-import { rectToObject } from "./dom-utils";
-import type { HoverPopoverLike, ShadowHoverSession } from "./internal-types";
-import type { ShadowPopoverLauncher } from "./launcher";
-import type { ShadowHoverController, ShadowHoverLinkResolver } from "./public-types";
-import { ShadowAnchorRegistry } from "./registry";
-import {
-	clearPendingHandoffTimer,
-	createShadowHoverSession,
-	expirePendingPopoverHandoff,
-	getActiveSessionAnchor,
-	getActiveSessionPopover,
-	getBoundPopoverActualAnchor,
-	getBoundPopoverAnchor,
-	isSessionDestroyed,
-	nextSessionRequestSeq,
-	releasePopoverToNativeLifecycle,
-	syncSessionAnchor,
-	syncPopoverTargetAndTransition,
-	transitionSession,
-	transitionSessionInteraction,
-} from "./session";
-import { getSessionOpenPopover } from "./state-machine";
+import { enableLogging } from "shared/logging/logger";
 import {
 	createOwnerMouseEvent,
 	getOwnerWindow,
 	isHTMLElementLike,
 } from "ui/shared/dom/realmSafeDom";
-import { enableLogging } from "shared/logging/logger";
+import { debugLog, rectToObject, summarizeSession } from "./debug";
+import type { HoverPopoverLike, ShadowHoverSession } from "./internal-types";
+import {
+	beginSessionHandoff,
+	beginSessionRequest,
+	clearPendingHandoffTimer,
+	createShadowHoverSession,
+	destroySessionState,
+	expirePendingPopoverHandoff,
+	getActiveSessionAnchor,
+	getActiveSessionHoverParent,
+	getActiveSessionPopover,
+	getActualForProxy,
+	getBoundPopoverActualAnchor,
+	getBoundPopoverAnchor,
+	isActualHovered,
+	nextSessionRequestSeq,
+	relayHoverToProxy,
+	releasePopoverToNativeLifecycle,
+	setAnchorHovered,
+	syncPopoverTargetAndTransition,
+	syncProxyRectForActual,
+	syncSessionAnchor,
+} from "./session";
 
-export class ShadowHoverControllerImpl implements ShadowHoverController {
+export type ShadowPopoverLaunchRequest = {
+	session: ShadowHoverSession;
+	actualAnchorEl: HTMLElement;
+	proxyAnchorEl: HTMLElement;
+	event: MouseEvent;
+	link: ShadowHoverLinkSpec;
+	requestSeq: number;
+};
+
+type ShadowHoverLinkSpec = {
+	linktext: string;
+	sourcePath: string;
+	state?: unknown;
+};
+
+type LaunchShadowPopover = (request: ShadowPopoverLaunchRequest) => void;
+type ResolveShadowHoverLink = (interactionId: string) => ShadowHoverLinkSpec | null;
+
+export class ShadowHoverControllerImpl {
 	private static readonly RECOVERY_RELAUNCH_DELAY_MS = 650;
 
-	private readonly session = createShadowHoverSession(new ShadowAnchorRegistry());
-	private lastPointerModState: boolean | null = null;
+	private readonly session = createShadowHoverSession();
 	private lastLaunchActualEl: HTMLElement | null = null;
 	private lastLaunchInteractionId: string | null = null;
 	private lastLaunchAt = 0;
 
 	constructor(
-		private readonly launcher: ShadowPopoverLauncher,
-		private readonly resolveLink: ShadowHoverLinkResolver,
+		private readonly launchPopover: LaunchShadowPopover,
+		private readonly resolveLink: ResolveShadowHoverLink,
 	) {}
 
 	handleDelegatedEnter(
@@ -47,13 +65,9 @@ export class ShadowHoverControllerImpl implements ShadowHoverController {
 		interactionId: string,
 		event: MouseEvent,
 	): void {
-		if (isSessionDestroyed(this.session)) {
-			return;
-		}
-
-		this.session.anchorRegistry.setHovered(anchorEl, true);
-		this.lastPointerModState = this.getPointerModState(event);
-		void this.handleAnchorEnter(anchorEl, interactionId, event);
+		if (this.session.destroyed) return;
+		setAnchorHovered(this.session, anchorEl, true);
+		this.handleAnchorEnter(anchorEl, interactionId, event);
 	}
 
 	handleDelegatedAnchorSync(
@@ -61,32 +75,28 @@ export class ShadowHoverControllerImpl implements ShadowHoverController {
 		interactionId?: string,
 		event?: MouseEvent,
 	): void {
-		if (isSessionDestroyed(this.session)) {
-			return;
-		}
+		if (this.session.destroyed) return;
 
-		const previousAnchorEl = getActiveSessionAnchor(this.session)?.actualEl;
-		const wasHovered = this.session.anchorRegistry.isActualHovered(anchorEl);
+		const previousAnchorEl = this.session.activeAnchor?.actualEl;
+		const wasHovered = isActualHovered(this.session, anchorEl);
 		if (previousAnchorEl && previousAnchorEl !== anchorEl) {
-			const wasPreviousHovered =
-				this.session.anchorRegistry.isActualHovered(previousAnchorEl);
-			this.session.anchorRegistry.setHovered(previousAnchorEl, false);
-			if (wasPreviousHovered) {
-				this.session.anchorRegistry.relayHoverToProxy(previousAnchorEl, false);
-			}
-			const previousPopover = getActiveSessionPopover(this.session);
-			if (previousPopover) {
+			const wasPreviousHovered = isActualHovered(this.session, previousAnchorEl);
+			setAnchorHovered(this.session, previousAnchorEl, false);
+			if (wasPreviousHovered)
+				relayHoverToProxy(this.session, previousAnchorEl, false);
+			if (this.session.activePopover) {
 				releasePopoverToNativeLifecycle(
-					previousPopover,
+					this.session.activePopover,
 					this.session,
 					"anchor-rebind",
 				);
 			}
 		}
-		this.session.anchorRegistry.setHovered(anchorEl, true);
+
+		setAnchorHovered(this.session, anchorEl, true);
 		this.syncActiveAnchor(anchorEl);
 		if (!wasHovered || previousAnchorEl !== anchorEl) {
-			this.session.anchorRegistry.relayHoverToProxy(anchorEl, true);
+			relayHoverToProxy(this.session, anchorEl, true);
 		}
 		syncPopoverTargetAndTransition(this.session, "anchor-sync");
 		if (
@@ -108,21 +118,14 @@ export class ShadowHoverControllerImpl implements ShadowHoverController {
 		interactionId: string,
 		event: KeyboardEvent,
 	): void {
-		if (isSessionDestroyed(this.session)) {
-			return;
-		}
-
-		this.session.anchorRegistry.setHovered(anchorEl, true);
-		this.lastPointerModState = this.getPointerModState(event);
+		if (this.session.destroyed) return;
+		setAnchorHovered(this.session, anchorEl, true);
 		this.relaunchAnchor(
 			anchorEl,
 			interactionId,
 			"anchor-modifier-key",
 			enableLogging
-				? {
-						key: event.key,
-						modState: this.lastPointerModState,
-					}
+				? { key: event.key, modState: Boolean(event.ctrlKey || event.metaKey) }
 				: undefined,
 		);
 	}
@@ -132,56 +135,51 @@ export class ShadowHoverControllerImpl implements ShadowHoverController {
 		interactionId: string,
 		event: PointerEvent,
 	): void {
-		if (isSessionDestroyed(this.session)) {
+		if (this.session.destroyed) return;
+		setAnchorHovered(this.session, anchorEl, true);
+
+		if (this.session.activeAnchor?.actualEl !== anchorEl) {
+			this.handleAnchorEnter(anchorEl, interactionId, event);
 			return;
 		}
-
-		this.session.anchorRegistry.setHovered(anchorEl, true);
-		this.handleAnchorPointerMove(anchorEl, interactionId, event);
+		this.relaunchAnchor(
+			anchorEl,
+			interactionId,
+			"anchor-pointermove",
+			enableLogging
+				? { modState: Boolean(event.ctrlKey || event.metaKey) }
+				: undefined,
+			event,
+		);
 	}
 
 	handleDelegatedLeave(anchorEl: HTMLElement): void {
-		if (isSessionDestroyed(this.session)) {
-			return;
-		}
+		if (this.session.destroyed) return;
+		const wasHovered = isActualHovered(this.session, anchorEl);
+		setAnchorHovered(this.session, anchorEl, false);
+		if (this.session.activeAnchor?.actualEl !== anchorEl) return;
 
-		const wasHovered = this.session.anchorRegistry.isActualHovered(anchorEl);
-		this.session.anchorRegistry.setHovered(anchorEl, false);
-		if (getActiveSessionAnchor(this.session)?.actualEl === anchorEl) {
-			if (wasHovered) {
-				this.session.anchorRegistry.relayHoverToProxy(anchorEl, false);
-			}
-			transitionSessionInteraction(this.session, {
-				type: "anchor-hover-sync",
-				overAnchor: false,
-			});
-			this.lastPointerModState = null;
-			if (enableLogging) {
-				debugLog(this.session, "anchor-leave", "Anchor left", () =>
-					this.describeAnchor(anchorEl),
-				);
-			}
-			syncPopoverTargetAndTransition(this.session, "anchor-leave");
+		if (wasHovered) relayHoverToProxy(this.session, anchorEl, false);
+		this.session.overAnchor = false;
+		if (enableLogging) {
+			debugLog(this.session, "anchor-leave", "Anchor left", () =>
+				this.describeAnchor(anchorEl),
+			);
 		}
+		syncPopoverTargetAndTransition(this.session, "anchor-leave");
 	}
 
 	releaseActivePopover(): void {
-		if (isSessionDestroyed(this.session)) {
-			return;
-		}
-
-		const popover = getActiveSessionPopover(this.session);
-		if (!popover) {
-			return;
-		}
-		releasePopoverToNativeLifecycle(popover, this.session, "bridge-release");
+		if (this.session.destroyed || !this.session.activePopover) return;
+		releasePopoverToNativeLifecycle(
+			this.session.activePopover,
+			this.session,
+			"bridge-release",
+		);
 	}
 
 	syncActivePopover(): void {
-		if (isSessionDestroyed(this.session)) {
-			return;
-		}
-
+		if (this.session.destroyed) return;
 		if (enableLogging) {
 			debugLog(this.session, "debug-sync", "Manual sync requested", () =>
 				summarizeSession(this.session),
@@ -191,11 +189,23 @@ export class ShadowHoverControllerImpl implements ShadowHoverController {
 	}
 
 	destroy(): void {
-		if (isSessionDestroyed(this.session)) {
-			return;
+		if (this.session.destroyed) return;
+		if (enableLogging) {
+			debugLog(this.session, "session-teardown", "Tearing down session", () =>
+				summarizeSession(this.session),
+			);
 		}
-
-		this.teardownSession();
+		clearPendingHandoffTimer(this.session);
+		if (this.session.activePopover) {
+			releasePopoverToNativeLifecycle(
+				this.session.activePopover,
+				this.session,
+				"destroy",
+			);
+		}
+		this.session.teardownPopoverListeners?.();
+		this.session.teardownPopoverListeners = null;
+		destroySessionState(this.session);
 	}
 
 	getDebugSession(): ShadowHoverSession {
@@ -203,20 +213,14 @@ export class ShadowHoverControllerImpl implements ShadowHoverController {
 	}
 
 	getDebugPopover(): HoverPopoverLike | null {
-		return getActiveSessionPopover(this.session);
-	}
-
-	private hasLivePopover(): boolean {
-		return Boolean(getActiveSessionPopover(this.session));
+		return this.session.activePopover;
 	}
 
 	private shouldRecoverMissingPopover(
 		anchorEl: HTMLElement,
 		interactionId: string,
 	): boolean {
-		if (this.hasLivePopover()) {
-			return false;
-		}
+		if (this.session.activePopover) return false;
 		if (
 			this.lastLaunchActualEl !== anchorEl ||
 			this.lastLaunchInteractionId !== interactionId
@@ -236,48 +240,10 @@ export class ShadowHoverControllerImpl implements ShadowHoverController {
 	}
 
 	private syncActiveAnchor(anchorEl: HTMLElement): HTMLElement {
-		const proxy = this.session.anchorRegistry.syncProxyRectForActual(anchorEl);
+		const proxy = syncProxyRectForActual(this.session, anchorEl);
 		syncSessionAnchor(this.session, anchorEl, proxy);
-		transitionSessionInteraction(this.session, {
-			type: "anchor-hover-sync",
-			overAnchor: this.session.anchorRegistry.isHovered(proxy),
-		});
+		this.session.overAnchor = isActualHovered(this.session, anchorEl);
 		return proxy;
-	}
-
-	private getPointerModState(
-		evt: MouseEvent | PointerEvent | KeyboardEvent,
-	): boolean {
-		return Boolean(evt.ctrlKey || evt.metaKey);
-	}
-
-	private handleAnchorPointerMove(
-		anchorEl: HTMLElement,
-		interactionId: string,
-		evt: PointerEvent,
-	): void {
-		const previouslyActiveActual = getActiveSessionAnchor(this.session)?.actualEl;
-		if (previouslyActiveActual !== anchorEl) {
-			this.lastPointerModState = this.getPointerModState(evt);
-			void this.handleAnchorEnter(anchorEl, interactionId, evt);
-			return;
-		}
-
-		const previousModState = this.lastPointerModState;
-		const modState = this.getPointerModState(evt);
-		this.lastPointerModState = modState;
-		const shouldRetrigger = modState && !previousModState;
-		if (!shouldRetrigger) {
-			return;
-		}
-
-		this.relaunchAnchor(
-			anchorEl,
-			interactionId,
-			"anchor-pointermove",
-			enableLogging ? { modState, previousModState } : undefined,
-			evt,
-		);
 	}
 
 	private relaunchAnchor(
@@ -310,13 +276,13 @@ export class ShadowHoverControllerImpl implements ShadowHoverController {
 		}
 		syncPopoverTargetAndTransition(this.session, `${reason}-retrigger`);
 		const requestSeq = nextSessionRequestSeq(this.session);
-		transitionSession(this.session, {
-			type: "request-open",
-			anchor: { actualEl: anchorEl, proxyEl: proxy },
+		beginSessionRequest(
+			this.session,
+			{ actualEl: anchorEl, proxyEl: proxy },
 			requestSeq,
-		});
+		);
 		this.markLaunch(anchorEl, interactionId);
-		this.launcher.launch({
+		this.launchPopover({
 			session: this.session,
 			actualAnchorEl: anchorEl,
 			proxyAnchorEl: proxy,
@@ -326,25 +292,22 @@ export class ShadowHoverControllerImpl implements ShadowHoverController {
 		});
 	}
 
-	private async handleAnchorEnter(
+	private handleAnchorEnter(
 		anchorEl: HTMLElement,
 		interactionId: string,
 		mouseEvent?: MouseEvent,
-	): Promise<void> {
-		if (isSessionDestroyed(this.session)) {
-			return;
-		}
+	): void {
+		if (this.session.destroyed) return;
 
 		const requestSeq = nextSessionRequestSeq(this.session);
 		const currentPopover = getActiveSessionPopover(this.session);
-		const currentOpenPopover = getSessionOpenPopover(this.session.state);
 		const previousSessionAnchor = getActiveSessionAnchor(this.session);
 		const currentAnchor = currentPopover
 			? (getBoundPopoverActualAnchor(currentPopover) ??
 				getBoundPopoverAnchor(currentPopover))
 			: null;
 		const previousActualAnchor = isHTMLElementLike(currentAnchor)
-			? (this.session.anchorRegistry.getActual(currentAnchor) ?? currentAnchor)
+			? (getActualForProxy(this.session, currentAnchor) ?? currentAnchor)
 			: previousSessionAnchor?.actualEl;
 		const previousProxyAnchor = currentPopover
 			? getBoundPopoverAnchor(currentPopover)
@@ -353,9 +316,12 @@ export class ShadowHoverControllerImpl implements ShadowHoverController {
 			enableLogging && previousActualAnchor
 				? rectToObject(previousActualAnchor.getBoundingClientRect())
 				: null;
-		const wantsPreview = mouseEvent ? this.getPointerModState(mouseEvent) : true;
+		const wantsPreview = mouseEvent
+			? Boolean(mouseEvent.ctrlKey || mouseEvent.metaKey)
+			: true;
 		const proxy = this.syncActiveAnchor(anchorEl);
-		this.session.anchorRegistry.relayHoverToProxy(anchorEl, true);
+		relayHoverToProxy(this.session, anchorEl, true);
+
 		if (
 			currentPopover &&
 			previousActualAnchor &&
@@ -375,17 +341,14 @@ export class ShadowHoverControllerImpl implements ShadowHoverController {
 				);
 			}
 			clearPendingHandoffTimer(this.session);
-			transitionSession(this.session, {
-				type: "handoff-start",
+			beginSessionHandoff(this.session, {
 				fromPopover: currentPopover,
-				fromHoverParent: currentOpenPopover?.hoverParent ?? null,
+				fromHoverParent: getActiveSessionHoverParent(this.session),
 				fromAnchor: {
 					actualEl: previousActualAnchor,
 					proxyEl:
 						previousProxyAnchor ??
-						this.session.anchorRegistry.syncProxyRectForActual(
-							previousActualAnchor,
-						),
+						syncProxyRectForActual(this.session, previousActualAnchor),
 				},
 				toAnchor: { actualEl: anchorEl, proxyEl: proxy },
 				requestSeq,
@@ -394,29 +357,24 @@ export class ShadowHoverControllerImpl implements ShadowHoverController {
 			this.session.handoffTimerWindow = ownerWindow;
 			this.session.handoffTimer = ownerWindow.setTimeout(() => {
 				const handoff = expirePendingPopoverHandoff(this.session, requestSeq);
-				if (!handoff) {
-					return;
+				if (handoff) {
+					releasePopoverToNativeLifecycle(
+						handoff.fromPopover,
+						this.session,
+						"handoff-timeout",
+					);
 				}
-				releasePopoverToNativeLifecycle(
-					handoff.fromPopover,
-					this.session,
-					"handoff-timeout",
-				);
 			}, 600);
 		} else {
-			transitionSession(this.session, {
-				type: "request-open",
-				anchor: { actualEl: anchorEl, proxyEl: proxy },
+			beginSessionRequest(
+				this.session,
+				{ actualEl: anchorEl, proxyEl: proxy },
 				requestSeq,
-			});
+			);
 		}
 
 		const link = this.resolveLink(interactionId);
 		if (!link) {
-			transitionSession(this.session, {
-				type: "request-cancel",
-				requestSeq,
-			});
 			this.session.lastHoverPath = "link-resolver-null";
 			if (enableLogging) {
 				debugLog(
@@ -446,7 +404,7 @@ export class ShadowHoverControllerImpl implements ShadowHoverController {
 		}
 		syncPopoverTargetAndTransition(this.session, "anchor-enter");
 		this.markLaunch(anchorEl, interactionId);
-		this.launcher.launch({
+		this.launchPopover({
 			session: this.session,
 			actualAnchorEl: anchorEl,
 			proxyAnchorEl: proxy,
@@ -473,37 +431,4 @@ export class ShadowHoverControllerImpl implements ShadowHoverController {
 			rect: rectToObject(anchorEl.getBoundingClientRect()),
 		};
 	}
-
-	private teardownSession(): void {
-		if (enableLogging) {
-			debugLog(this.session, "session-teardown", "Tearing down session", () =>
-				summarizeSession(this.session),
-			);
-		}
-		clearPendingHandoffTimer(this.session);
-		const popover = getActiveSessionPopover(this.session);
-		if (popover) {
-			releasePopoverToNativeLifecycle(popover, this.session, "destroy");
-		}
-		transitionSession(this.session, { type: "destroy" });
-		this.session.teardownPopoverListeners?.();
-		this.session.teardownPopoverListeners = null;
-		this.session.anchorRegistry.destroy();
-	}
-}
-
-function getShadowHoverControllerDebugState(
-	controller: ShadowHoverController,
-): ShadowHoverSession | null {
-	return controller instanceof ShadowHoverControllerImpl
-		? controller.getDebugSession()
-		: null;
-}
-
-export function getShadowHoverControllerDebugPopover(
-	controller: ShadowHoverController,
-): HoverPopoverLike | null {
-	return controller instanceof ShadowHoverControllerImpl
-		? controller.getDebugPopover()
-		: null;
 }

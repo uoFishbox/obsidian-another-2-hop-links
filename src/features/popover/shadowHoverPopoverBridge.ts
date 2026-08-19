@@ -1,4 +1,4 @@
-import type { AppContext, LinkContext } from "ui/context/linkContext";
+import type { AppContext } from "ui/context/linkContext";
 import type { InteractionRegistry } from "ui/interactions/interactionRegistry";
 import {
 	INTERACTION_SELECTOR,
@@ -10,8 +10,13 @@ import {
 	findMatchingElementInComposedPath,
 } from "ui/shared/dom/shadowDom";
 import { enableLogging, logger } from "shared/logging/logger";
-import { ShadowHoverControllerImpl } from "features/popover/shadow-hover/controller";
-import { WorkspaceTriggerPopoverLauncher } from "features/popover/shadow-hover/launcher";
+import {
+	ShadowHoverControllerImpl,
+	type ShadowPopoverLaunchRequest,
+} from "features/popover/shadow-hover/controller";
+import { createRequestHoverParent } from "features/popover/shadow-hover/session";
+import { debugLog, summarizeNode } from "features/popover/shadow-hover/debug";
+import type { HoverLinkPayloadLike } from "features/popover/shadow-hover/internal-types";
 import { COSENSE_CARD_LINKS_HOVER_SOURCE_ID } from "features/popover/hoverPopoverLinkSpec";
 import { isHTMLElementLike, isNodeLike } from "ui/shared/dom/realmSafeDom";
 import { VIRTUAL_CELL_WILL_REBIND_EVENT } from "ui/interactions/virtualCellRebind";
@@ -23,14 +28,12 @@ import {
 interface ShadowHoverPopoverBridgeOptions {
 	shadowRoot: ShadowRoot;
 	registry: InteractionRegistry;
-	linkContext?: LinkContext;
 	appContext?: AppContext;
 }
 
 interface SharedShadowHoverBridgeHandle {
 	shadowRoot: ShadowRoot;
 	registry: InteractionRegistry;
-	linkContext?: LinkContext;
 	appContext?: AppContext;
 	refCount: number;
 	controller: ShadowHoverControllerImpl;
@@ -380,7 +383,6 @@ function disposeHandle(handle: SharedShadowHoverBridgeHandle): void {
 function createHandle({
 	shadowRoot,
 	registry,
-	linkContext,
 	appContext,
 }: ShadowHoverPopoverBridgeOptions): SharedShadowHoverBridgeHandle | null {
 	const app = appContext?.app;
@@ -398,14 +400,47 @@ function createHandle({
 			handle.registry.resolve(interactionId),
 			handle.appContext,
 		);
-	const controller = new ShadowHoverControllerImpl(
-		new WorkspaceTriggerPopoverLauncher(app, COSENSE_CARD_LINKS_HOVER_SOURCE_ID),
-		resolveLink,
-	);
+	const launchPopover = (request: ShadowPopoverLaunchRequest): void => {
+		const hoverParent = createRequestHoverParent(
+			request.session,
+			request.requestSeq,
+			request.proxyAnchorEl,
+			request.actualAnchorEl,
+		);
+		const payload: HoverLinkPayloadLike = {
+			event: request.event,
+			source: COSENSE_CARD_LINKS_HOVER_SOURCE_ID,
+			hoverParent,
+			targetEl: request.proxyAnchorEl,
+			linktext: request.link.linktext,
+			sourcePath: request.link.sourcePath,
+			state: {
+				...(request.link.state as Record<string, unknown> | undefined),
+				__cclShadowHoverRequestSeq: request.requestSeq,
+			},
+		};
+		request.session.lastHoverPath = "workspace-trigger";
+		if (enableLogging) {
+			debugLog(
+				request.session,
+				"workspace-hover-trigger",
+				"Triggering workspace hover-link from shadow target via proxy",
+				() => ({
+					source: payload.source,
+					linktext: payload.linktext,
+					sourcePath: payload.sourcePath,
+					actualTarget: summarizeNode(request.actualAnchorEl),
+					proxyTarget: summarizeNode(payload.targetEl),
+					requestSeq: request.requestSeq,
+				}),
+			);
+		}
+		app.workspace.trigger("hover-link", payload);
+	};
+	const controller = new ShadowHoverControllerImpl(launchPopover, resolveLink);
 	handle = {
 		shadowRoot,
 		registry,
-		linkContext,
 		appContext,
 		refCount: 1,
 		controller,
@@ -508,14 +543,12 @@ function createHandle({
 export function installShadowHoverPopoverBridge({
 	shadowRoot,
 	registry,
-	linkContext,
 	appContext,
 }: ShadowHoverPopoverBridgeOptions): () => void {
 	const existingHandle = sharedShadowHoverBridgeHandles.get(shadowRoot);
 	if (existingHandle) {
 		existingHandle.refCount += 1;
 		existingHandle.registry = registry;
-		existingHandle.linkContext = linkContext;
 		existingHandle.appContext = appContext;
 		return () => {
 			existingHandle.refCount = Math.max(0, existingHandle.refCount - 1);
@@ -529,7 +562,6 @@ export function installShadowHoverPopoverBridge({
 	const handle = createHandle({
 		shadowRoot,
 		registry,
-		linkContext,
 		appContext,
 	});
 	if (!handle) {
