@@ -13,9 +13,9 @@ describe("LinkItem", () => {
 	it("renders title as plain text when search query is empty", () => {
 		const { container } = render(LinkItem, {
 			props: {
-				title: "Alpha <Beta>",
-				ariaLabel: "alpha",
-				interactionId: "item:file:notes/alpha.md",
+				title: "Target Note <Beta>",
+				ariaLabel: "target-note-card",
+				interactionId: "token-plain-card",
 				searchQuery: "",
 			},
 		});
@@ -23,7 +23,7 @@ describe("LinkItem", () => {
 		const title = container.querySelector(".cosense-card-links__box-title");
 		expect(title).not.toBeNull();
 		expect(title?.querySelector(".ccl-search-highlight")).toBeNull();
-		expect(title).toHaveTextContent("Alpha <Beta>");
+		expect(title).toHaveTextContent("Target Note <Beta>");
 		expect(title?.innerHTML).not.toContain("ccl-search-highlight");
 	});
 
@@ -68,9 +68,9 @@ describe("LinkItem", () => {
 	it("makes card body draggable", () => {
 		const { container } = render(LinkItem, {
 			props: {
-				title: "Alpha",
-				ariaLabel: "alpha",
-				interactionId: "item:file:notes/alpha.md",
+				title: "Draggable Target",
+				ariaLabel: "draggable-target-card",
+				interactionId: "token-draggable-card",
 			},
 		});
 
@@ -82,9 +82,9 @@ describe("LinkItem", () => {
 	it("does not make card body draggable when draggable is disabled", () => {
 		const { container } = render(LinkItem, {
 			props: {
-				title: "Alpha",
-				ariaLabel: "alpha",
-				interactionId: "item:file:notes/alpha.md",
+				title: "Disabled Target",
+				ariaLabel: "disabled-target-card",
+				interactionId: "token-disabled-card",
 				draggable: false,
 			},
 		});
@@ -98,7 +98,7 @@ describe("LinkItem", () => {
 		const baseProps = {
 			title: "",
 			ariaLabel: "",
-			interactionId: "item:file:notes/alpha.md",
+			interactionId: "token-reusable-card",
 			className: "twohop-card-shell is-skeleton",
 		};
 		const { container, rerender } = render(LinkItem, {
@@ -117,8 +117,8 @@ describe("LinkItem", () => {
 
 		await rerender({
 			...baseProps,
-			title: "Alpha",
-			ariaLabel: "alpha",
+			title: "Visible Target Note",
+			ariaLabel: "visible-target-card",
 			className: "",
 			interactive: true,
 		});
@@ -127,10 +127,7 @@ describe("LinkItem", () => {
 		expect(card).not.toHaveAttribute("aria-hidden");
 		expect(card).toHaveAttribute("role", "button");
 		expect(card).toHaveAttribute("tabindex", "0");
-		expect(card).toHaveAttribute(
-			"data-ccl-interaction-id",
-			"item:file:notes/alpha.md",
-		);
+		expect(card).toHaveAttribute("data-ccl-interaction-id", "token-reusable-card");
 		expect(card).toHaveAttribute("draggable", "true");
 	});
 

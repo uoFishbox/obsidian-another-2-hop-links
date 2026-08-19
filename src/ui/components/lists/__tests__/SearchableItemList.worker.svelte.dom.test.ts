@@ -298,6 +298,38 @@ function createTaggedNoteItem(file: TFile): ViewItem {
 	};
 }
 
+/**
+ * A comfortably large input. Large enough that the filter loop is guaranteed
+ * to hit several yield checkpoints before finishing, for any reasonable
+ * chunking policy.
+ */
+const LARGE_INPUT_ITEM_COUNT = 1000;
+
+function createManyTaggedNoteItems(basenamePrefix: string, count: number): ViewItem[] {
+	return Array.from({ length: count }, (_unused, index) =>
+		createTaggedNoteItem(
+			createMockTFile(
+				`notes/${basenamePrefix}-${String(index).padStart(3, "0")}.md`,
+			),
+		),
+	);
+}
+
+/**
+ * Mocks `performance.now` to always report freshly elapsed time so the filter
+ * loop's time-budget gate opens on every checkpoint. The step is deliberately
+ * generous so the test does not depend on the exact budget in milliseconds.
+ * Returns a function that restores the original implementation.
+ */
+function mockElapsedPerformanceNow(): () => void {
+	let now = 0;
+	const spy = vi.spyOn(performance, "now").mockImplementation(() => {
+		now += 1000;
+		return now;
+	});
+	return () => spy.mockRestore();
+}
+
 function createLinkContext(sourceFile: TFile): LinkContext {
 	return {
 		resolveFile: vi.fn(() => null),
@@ -512,20 +544,12 @@ describe("SearchableItemList worker integration", () => {
 		);
 	});
 
-	it("publishes large filtered results in chunks", async () => {
+	it("yields before completing a large filtered search, publishing partial results", async () => {
 		vi.useRealTimers();
 		const yieldGate = createDeferred<void>();
 		yieldHarness.setNextYield(() => yieldGate.promise);
-		let now = 0;
-		const performanceSpy = vi.spyOn(performance, "now").mockImplementation(() => {
-			now += 17;
-			return now;
-		});
-		const items = Array.from({ length: 260 }, (_unused, index) =>
-			createTaggedNoteItem(
-				createMockTFile(`notes/target-${String(index).padStart(3, "0")}.md`),
-			),
-		);
+		const restorePerformanceNow = mockElapsedPerformanceNow();
+		const items = createManyTaggedNoteItems("target", LARGE_INPUT_ITEM_COUNT);
 
 		try {
 			render(SearchableItemList, { props: createTestProps({ items }) });
@@ -535,18 +559,22 @@ describe("SearchableItemList worker integration", () => {
 			await fireEvent.input(input, { target: { value: "target" } });
 			await flushAsyncUi();
 
-			await waitFor(() =>
-				expect(screen.getByTestId("filtered-count")).toHaveTextContent("128"),
+			await waitFor(() => expect(yieldHarness.calls).toHaveLength(1));
+			const partialCount = Number(
+				screen.getByTestId("filtered-count").textContent,
 			);
-			expect(yieldHarness.calls).toEqual([{ maxDelayMs: 16 }]);
+			expect(partialCount).toBeGreaterThan(0);
+			expect(partialCount).toBeLessThan(items.length);
 
 			yieldGate.resolve();
 
 			await waitFor(() =>
-				expect(screen.getByTestId("filtered-count")).toHaveTextContent("260"),
+				expect(screen.getByTestId("filtered-count")).toHaveTextContent(
+					String(items.length),
+				),
 			);
 		} finally {
-			performanceSpy.mockRestore();
+			restorePerformanceNow();
 		}
 	}, 10000);
 
@@ -554,16 +582,8 @@ describe("SearchableItemList worker integration", () => {
 		vi.useRealTimers();
 		const yieldGate = createDeferred<void>();
 		yieldHarness.setNextYield(() => yieldGate.promise);
-		let now = 0;
-		const performanceSpy = vi.spyOn(performance, "now").mockImplementation(() => {
-			now += 17;
-			return now;
-		});
-		const alphaItems = Array.from({ length: 260 }, (_unused, index) =>
-			createTaggedNoteItem(
-				createMockTFile(`notes/alpha-${String(index).padStart(3, "0")}.md`),
-			),
-		);
+		const restorePerformanceNow = mockElapsedPerformanceNow();
+		const alphaItems = createManyTaggedNoteItems("alpha", LARGE_INPUT_ITEM_COUNT);
 		const betaItem = createTaggedNoteItem(createMockTFile("notes/beta.md"));
 
 		try {
@@ -582,9 +602,12 @@ describe("SearchableItemList worker integration", () => {
 			await fireEvent.input(input, { target: { value: "alpha" } });
 			await flushAsyncUi();
 
-			await waitFor(() =>
-				expect(screen.getByTestId("filtered-count")).toHaveTextContent("128"),
+			await waitFor(() => expect(yieldHarness.calls).toHaveLength(1));
+			const partialAlphaCount = Number(
+				screen.getByTestId("filtered-count").textContent,
 			);
+			expect(partialAlphaCount).toBeGreaterThan(0);
+			expect(partialAlphaCount).toBeLessThan(alphaItems.length);
 
 			await fireEvent.input(input, { target: { value: "beta" } });
 			await flushAsyncUi();
@@ -600,7 +623,7 @@ describe("SearchableItemList worker integration", () => {
 			expect(screen.getByTestId("filtered-count")).toHaveTextContent(/^1$/);
 			expect(getAllSearchableItems()[0]).toHaveTextContent("beta");
 		} finally {
-			performanceSpy.mockRestore();
+			restorePerformanceNow();
 		}
 	}, 10000);
 

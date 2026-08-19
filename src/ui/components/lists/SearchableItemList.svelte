@@ -41,6 +41,10 @@
 	} from "ui/components/items/cardRenderModel";
 	import { createItemInteractionKey } from "ui/interactions/interactionTypes";
 	import type { PreviewRuntime } from "features/card-preview/runtime/previewRuntime";
+	import {
+		SEARCH_FILTER_YIELD_CHECK_INTERVAL,
+		SEARCH_FILTER_YIELD_MAX_DELAY_MS,
+	} from "./searchFilterTimeSlicing";
 
 	interface Props {
 		items: ViewItem[];
@@ -318,17 +322,19 @@
 					nextItems.push(item);
 				}
 
-				if ((index + 1) % 128 !== 0) {
+				if ((index + 1) % SEARCH_FILTER_YIELD_CHECK_INTERVAL !== 0) {
 					continue;
 				}
 
 				const now = performance.now();
-				if (now - lastPublish <= 16) {
+				if (now - lastPublish <= SEARCH_FILTER_YIELD_MAX_DELAY_MS) {
 					continue;
 				}
 
 				filteredItems = nextItems.slice();
-				await yieldToMainThreadIdleAware({ maxDelayMs: 16 });
+				await yieldToMainThreadIdleAware({
+					maxDelayMs: SEARCH_FILTER_YIELD_MAX_DELAY_MS,
+				});
 				lastPublish = performance.now();
 			}
 

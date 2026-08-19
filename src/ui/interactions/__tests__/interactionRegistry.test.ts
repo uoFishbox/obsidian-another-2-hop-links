@@ -7,8 +7,9 @@ import type { ItemInteractionDescriptor } from "../interactionTypes";
 function createDescriptor(
 	interactionId: string,
 	dragRawText: string,
+	filePath: string,
 ): ItemInteractionDescriptor {
-	const file = { path: `${interactionId}.md` } as TFile;
+	const file = { path: filePath } as TFile;
 	return {
 		interactionId,
 		kind: "item",
@@ -30,7 +31,11 @@ describe("interactionRegistry", () => {
 
 	it("registers and unregisters direct descriptors", () => {
 		const registry = createInteractionRegistry();
-		const descriptor = createDescriptor("item:first", "[[first]]");
+		const descriptor = createDescriptor(
+			"token-registry-direct",
+			"[[drag-alias]]",
+			"notes/registry-target.md",
+		);
 
 		registry.register(descriptor);
 		expect(registry.resolve(descriptor.interactionId)).toBe(descriptor);
@@ -41,8 +46,16 @@ describe("interactionRegistry", () => {
 
 	it("prefers direct descriptors over provider descriptors", () => {
 		const registry = createInteractionRegistry();
-		const provided = createDescriptor("item:first", "[[provided]]");
-		const direct = createDescriptor("item:first", "[[direct]]");
+		const provided = createDescriptor(
+			"token-provider-item",
+			"[[provided-alias]]",
+			"notes/provider-target.md",
+		);
+		const direct = createDescriptor(
+			"token-provider-item",
+			"[[direct-alias]]",
+			"notes/direct-target.md",
+		);
 		registry.syncInteractionDescriptorResolverProvider("mounted-items", {
 			resolveInteractionDescriptor: () => provided,
 		});
@@ -56,8 +69,16 @@ describe("interactionRegistry", () => {
 
 	it("resolves provider descriptors lazily without caching them", () => {
 		const registry = createInteractionRegistry();
-		const stale = createDescriptor("item:first", "[[stale]]");
-		const fresh = createDescriptor("item:first", "[[fresh]]");
+		const stale = createDescriptor(
+			"token-lazy-item",
+			"[[stale-alias]]",
+			"notes/stale-target.md",
+		);
+		const fresh = createDescriptor(
+			"token-lazy-item",
+			"[[fresh-alias]]",
+			"notes/fresh-target.md",
+		);
 		let descriptor = stale;
 		const resolveInteractionDescriptor = vi.fn(() => descriptor);
 
@@ -74,7 +95,11 @@ describe("interactionRegistry", () => {
 
 	it("removes a provider when its scope is cleared", () => {
 		const registry = createInteractionRegistry();
-		const descriptor = createDescriptor("item:first", "[[first]]");
+		const descriptor = createDescriptor(
+			"token-cleared-item",
+			"[[cleared-alias]]",
+			"notes/cleared-target.md",
+		);
 		registry.syncInteractionDescriptorResolverProvider("mounted-items", {
 			resolveInteractionDescriptor: () => descriptor,
 		});

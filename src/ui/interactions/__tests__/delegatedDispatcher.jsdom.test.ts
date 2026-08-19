@@ -23,6 +23,15 @@ vi.mock("obsidian", async () => {
 	};
 });
 
+const SOURCE_FILE_PATH = "notes/source-note.md";
+const TARGET_FILE_PATH = "notes/target-note.md";
+const FOREIGN_TARGET_FILE_PATH = "notes/foreign-target.md";
+const INTERACTION_ID = "token-37";
+const SECTION_INTERACTION_ID = "section-token-19";
+const LINK_RAW_TEXT = "target-reference";
+const DRAG_RAW_TEXT = "visible-alias";
+const SEARCH_QUERY = "needle-query";
+
 function createLinkContext() {
 	return {
 		onOpenFile: vi.fn(),
@@ -32,9 +41,12 @@ function createLinkContext() {
 		onLinkHover: vi.fn(),
 		onShowFileMenu: vi.fn(),
 		resolveFile: vi.fn(),
-		buildWikiLink: vi.fn(() => "[[alpha]]"),
+		buildWikiLink: vi.fn(
+			(targetFile: TFile | null, rawText: string) =>
+				`[[${targetFile?.path ?? "unresolved"}|${rawText}]]`,
+		),
 		fileToLinktext: vi.fn(),
-		sourceFile: createMockTFile("notes/source.md"),
+		sourceFile: createMockTFile(SOURCE_FILE_PATH),
 		getMetadata: vi.fn(() => null),
 		getPreview: vi.fn(async () => ({ type: "empty", content: "" }) as const),
 	} satisfies LinkContext;
@@ -92,33 +104,35 @@ function createTouchEvent(
 
 function createItemDescriptor(item: ViewItem, file: TFile): ItemInteractionDescriptor {
 	return {
-		interactionId: "item:file:notes/alpha.md",
+		interactionId: INTERACTION_ID,
 		kind: "item",
 		item,
 		targetFile: file,
-		dragRawText: "alpha",
+		dragRawText: DRAG_RAW_TEXT,
 		filePathForDrag: file.path,
 		settings: {
 			mobileLongPressAction: "preview",
 		} as any,
-		searchQuery: "alpha",
+		searchQuery: SEARCH_QUERY,
 	};
 }
 
-function createSectionDescriptor(file: TFile): SectionHeaderInteractionDescriptor {
+function createSectionDescriptor(
+	targetFile: TFile,
+): SectionHeaderInteractionDescriptor {
 	return {
-		interactionId: "section:twohop-alpha",
+		interactionId: SECTION_INTERACTION_ID,
 		kind: "sectionHeader",
 		link: {
-			rawText: "alpha",
-			path: file.path,
+			rawText: LINK_RAW_TEXT,
+			path: targetFile.path,
 			isUnresolved: false,
-			sourceFile: file,
+			sourceFile: createMockTFile(SOURCE_FILE_PATH),
 		},
 		isOutgoingLink: true,
-		targetFile: file,
-		dragRawText: "alpha",
-		filePathForDrag: file.path,
+		targetFile,
+		dragRawText: DRAG_RAW_TEXT,
+		filePathForDrag: targetFile.path,
 		settings: {
 			mobileLongPressAction: "preview",
 		} as any,
@@ -140,7 +154,7 @@ describe("delegated interaction dispatcher", () => {
 		const linkContext = createLinkContext();
 		const appContext = createAppContext(linkContext);
 		const registry = createInteractionRegistry();
-		const file = createMockTFile("notes/alpha.md");
+		const file = createMockTFile(TARGET_FILE_PATH);
 		const item = { type: "file", data: file } as ViewItem;
 		const descriptor = createItemDescriptor(item, file);
 		registry.register(descriptor);
@@ -158,6 +172,10 @@ describe("delegated interaction dispatcher", () => {
 
 		element.dispatchEvent(new MouseEvent("click", { bubbles: true }));
 
+		expect(appContext.resolveSearchMatchPosition).toHaveBeenCalledWith(
+			SEARCH_QUERY,
+			file,
+		);
 		expect(linkContext.onOpenFile).toHaveBeenCalledWith(
 			expect.any(MouseEvent),
 			file,
@@ -177,7 +195,7 @@ describe("delegated interaction dispatcher", () => {
 		const linkContext = createLinkContext();
 		const appContext = createAppContext(linkContext);
 		const registry = createInteractionRegistry();
-		const file = createMockTFile("notes/alpha.md");
+		const file = createMockTFile(TARGET_FILE_PATH);
 		const descriptor = createItemDescriptor(
 			{ type: "file", data: file } as ViewItem,
 			file,
@@ -208,7 +226,7 @@ describe("delegated interaction dispatcher", () => {
 		const linkContext = createLinkContext();
 		const appContext = createAppContext(linkContext);
 		const registry = createInteractionRegistry();
-		const file = createMockTFile("notes/alpha.md");
+		const file = createMockTFile(TARGET_FILE_PATH);
 		const descriptor = createItemDescriptor(
 			{ type: "file", data: file } as ViewItem,
 			file,
@@ -240,7 +258,7 @@ describe("delegated interaction dispatcher", () => {
 		const linkContext = createLinkContext();
 		const appContext = createAppContext(linkContext);
 		const registry = createInteractionRegistry();
-		const file = createMockTFile("notes/alpha.md");
+		const file = createMockTFile(TARGET_FILE_PATH);
 		const descriptor = createItemDescriptor(
 			{ type: "file", data: file } as ViewItem,
 			file,
@@ -276,7 +294,7 @@ describe("delegated interaction dispatcher", () => {
 		const linkContext = createLinkContext();
 		const appContext = createAppContext(linkContext);
 		const registry = createInteractionRegistry();
-		const file = createMockTFile("notes/alpha.md");
+		const file = createMockTFile(TARGET_FILE_PATH);
 		const descriptor = {
 			...createItemDescriptor({ type: "file", data: file } as ViewItem, file),
 			hoverPreviewEnabled: false,
@@ -305,7 +323,7 @@ describe("delegated interaction dispatcher", () => {
 		const linkContext = createLinkContext();
 		const appContext = createAppContext(linkContext);
 		const registry = createInteractionRegistry();
-		const file = createMockTFile("notes/alpha.md");
+		const file = createMockTFile(TARGET_FILE_PATH);
 		const descriptor = createItemDescriptor(
 			{ type: "file", data: file } as ViewItem,
 			file,
@@ -365,7 +383,7 @@ describe("delegated interaction dispatcher", () => {
 		const linkContext = createLinkContext();
 		const appContext = createAppContext(linkContext);
 		const registry = createInteractionRegistry();
-		const file = createMockTFile("notes/alpha.md");
+		const file = createMockTFile(TARGET_FILE_PATH);
 		const descriptor = createItemDescriptor(
 			{ type: "file", data: file } as ViewItem,
 			file,
@@ -396,7 +414,7 @@ describe("delegated interaction dispatcher", () => {
 		const linkContext = createLinkContext();
 		const appContext = createAppContext(linkContext);
 		const registry = createInteractionRegistry();
-		const file = createMockTFile("notes/alpha.md");
+		const file = createMockTFile(TARGET_FILE_PATH);
 		const descriptor = createItemDescriptor(
 			{ type: "file", data: file } as ViewItem,
 			file,
@@ -437,7 +455,7 @@ describe("delegated interaction dispatcher", () => {
 		const linkContext = createLinkContext();
 		const appContext = createAppContext(linkContext);
 		const registry = createInteractionRegistry();
-		const file = createMockTFile("notes/alpha.md");
+		const file = createMockTFile(TARGET_FILE_PATH);
 		const descriptor = createSectionDescriptor(file);
 		registry.register(descriptor);
 		const dispatcher = createDelegatedInteractionDispatcher({
@@ -475,7 +493,10 @@ describe("delegated interaction dispatcher", () => {
 			expect.any(MouseEvent),
 			file,
 		);
-		expect(dataTransfer.setData).toHaveBeenCalledWith("text/plain", "[[alpha]]");
+		expect(dataTransfer.setData).toHaveBeenCalledWith(
+			"text/plain",
+			`[[${file.path}|${DRAG_RAW_TEXT}]]`,
+		);
 		expect(dataTransfer.setData).toHaveBeenCalledWith(
 			CANVAS_NOTE_DRAG_FORMAT,
 			file.path,
@@ -486,7 +507,7 @@ describe("delegated interaction dispatcher", () => {
 		const linkContext = createLinkContext();
 		const appContext = createAppContext(linkContext);
 		const registry = createInteractionRegistry();
-		const file = createMockTFile("notes/alpha.md");
+		const file = createMockTFile(TARGET_FILE_PATH);
 		const descriptor = createSectionDescriptor(file);
 		registry.register(descriptor);
 		const dispatcher = createDelegatedInteractionDispatcher({
@@ -515,15 +536,18 @@ describe("delegated interaction dispatcher", () => {
 		element.dispatchEvent(dragStartEvent);
 
 		expect(linkContext.buildWikiLink).toHaveBeenCalledTimes(1);
-		expect(linkContext.buildWikiLink).toHaveBeenCalledWith(file, "alpha");
-		expect(dataTransfer.setData).toHaveBeenCalledWith("text/plain", "[[alpha]]");
+		expect(linkContext.buildWikiLink).toHaveBeenCalledWith(file, DRAG_RAW_TEXT);
+		expect(dataTransfer.setData).toHaveBeenCalledWith(
+			"text/plain",
+			`[[${file.path}|${DRAG_RAW_TEXT}]]`,
+		);
 	});
 
 	it("resolves interaction targets from composed paths inside a shadow root", () => {
 		const linkContext = createLinkContext();
 		const appContext = createAppContext(linkContext);
 		const registry = createInteractionRegistry();
-		const file = createMockTFile("notes/alpha.md");
+		const file = createMockTFile(TARGET_FILE_PATH);
 		const descriptor = createItemDescriptor(
 			{ type: "file", data: file } as ViewItem,
 			file,
@@ -563,7 +587,7 @@ describe("delegated interaction dispatcher", () => {
 		const linkContext = createLinkContext();
 		const appContext = createAppContext(linkContext);
 		const registry = createInteractionRegistry();
-		const file = createMockTFile("notes/alpha.md");
+		const file = createMockTFile(TARGET_FILE_PATH);
 		const descriptor = createItemDescriptor(
 			{ type: "file", data: file } as ViewItem,
 			file,
@@ -614,7 +638,7 @@ describe("delegated interaction dispatcher", () => {
 		const linkContext = createLinkContext();
 		const appContext = createAppContext(linkContext);
 		const registry = createInteractionRegistry();
-		const file = createMockTFile("notes/alpha_cards.md");
+		const file = createMockTFile(FOREIGN_TARGET_FILE_PATH);
 		const descriptor = createItemDescriptor(
 			{ type: "file", data: file } as ViewItem,
 			file,
@@ -656,7 +680,7 @@ describe("delegated interaction dispatcher", () => {
 	});
 
 	it("creates a lightweight title-only drag image", () => {
-		const file = createMockTFile("notes/alpha.md");
+		const file = createMockTFile(TARGET_FILE_PATH);
 		const descriptor = createItemDescriptor(
 			{ type: "file", data: file } as ViewItem,
 			file,

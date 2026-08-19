@@ -220,7 +220,9 @@ describe("SearchableItemList", () => {
 		} as unknown as ApplicationStore;
 
 		const sortService: ISortService = {
-			sort: vi.fn((nextItems) => nextItems),
+			sort(nextItems) {
+				return [nextItems[2]!, nextItems[3]!, nextItems[0]!, nextItems[1]!];
+			},
 		};
 
 		const linkContext = createLinkContext(
@@ -250,9 +252,9 @@ describe("SearchableItemList", () => {
 
 		const renderedItems = screen.getAllByTestId("searchable-item");
 		expect(renderedItems).toHaveLength(4);
-		expect(renderedItems[0]).toHaveAttribute("data-label", "beta");
-		expect(renderedItems[1]).toHaveAttribute("data-label", "gamma");
-		expect(renderedItems[2]).toHaveAttribute("data-label", "delta");
-		expect(renderedItems[3]).toHaveAttribute("data-label", "alpha");
+		expect(renderedItems[0]).toHaveAttribute("data-label", "delta");
+		expect(renderedItems[1]).toHaveAttribute("data-label", "alpha");
+		expect(renderedItems[2]).toHaveAttribute("data-label", "beta");
+		expect(renderedItems[3]).toHaveAttribute("data-label", "gamma");
 	});
 });

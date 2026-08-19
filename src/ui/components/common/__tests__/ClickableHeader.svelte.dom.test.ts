@@ -14,12 +14,15 @@ vi.mock("obsidian", async () => {
 	};
 });
 
-function createDescriptor(interactionId: string): SectionHeaderInteractionDescriptor {
+function createDescriptor(
+	interactionId: string,
+	rawText: string,
+): SectionHeaderInteractionDescriptor {
 	return {
 		interactionId,
 		kind: "sectionHeader",
 		link: {
-			rawText: interactionId,
+			rawText,
 			path: undefined,
 			isUnresolved: true,
 			sourceFile: null,
@@ -36,8 +39,14 @@ describe("ClickableHeader", () => {
 
 	it("registers and unregisters its interaction descriptor through the registry context", async () => {
 		const registry = createInteractionRegistry();
-		const initialDescriptor = createDescriptor("section:alpha");
-		const nextDescriptor = createDescriptor("section:beta");
+		const initialDescriptor = createDescriptor(
+			"section:header-initial",
+			"header-target-initial",
+		);
+		const nextDescriptor = createDescriptor(
+			"section:header-next",
+			"header-target-next",
+		);
 
 		const view = render(ClickableHeaderHarness, {
 			props: {
@@ -76,7 +85,10 @@ describe("ClickableHeader", () => {
 
 	it("unregisters the previous descriptor without error when the prop transitions to undefined on rebind", async () => {
 		const registry = createInteractionRegistry();
-		const initialDescriptor = createDescriptor("section:gamma");
+		const initialDescriptor = createDescriptor(
+			"section:header-rebind",
+			"rebind-target",
+		);
 
 		const view = render(ClickableHeaderHarness, {
 			props: {
@@ -92,7 +104,7 @@ describe("ClickableHeader", () => {
 
 		await view.rerender({
 			registry,
-			interactionId: "section:gamma-tag",
+			interactionId: "section:header-rebound-placeholder",
 			descriptor: undefined,
 		});
 

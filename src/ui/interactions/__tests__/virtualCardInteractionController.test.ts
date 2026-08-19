@@ -20,47 +20,67 @@ function createDescriptor(
 describe("virtualCardInteractionController", () => {
 	it("updates the descriptor stored by a physical slot on rebind", () => {
 		const controller = createVirtualCardInteractionController();
-		const first = createDescriptor("item-a", "notes/a.md");
-		const second = createDescriptor("item-b", "notes/b.md");
+		const first = createDescriptor("token-card-first", "notes/first-card.md");
+		const second = createDescriptor("token-card-second", "notes/second-card.md");
 
 		controller.syncCards([{ slotId: "slot-0", descriptor: first }]);
-		expect(controller.provider.resolveInteractionDescriptor("item-a")).toBe(first);
+		expect(
+			controller.provider.resolveInteractionDescriptor(first.interactionId),
+		).toBe(first);
 
 		controller.syncCards([{ slotId: "slot-0", descriptor: second }]);
-		expect(controller.provider.resolveInteractionDescriptor("item-a")).toBeNull();
-		expect(controller.provider.resolveInteractionDescriptor("item-b")).toBe(second);
+		expect(
+			controller.provider.resolveInteractionDescriptor(first.interactionId),
+		).toBeNull();
+		expect(
+			controller.provider.resolveInteractionDescriptor(second.interactionId),
+		).toBe(second);
 	});
 
 	it("drops entries for slots that leave the mounted window", () => {
 		const controller = createVirtualCardInteractionController();
-		const descriptor = createDescriptor("item-a", "notes/a.md");
+		const descriptor = createDescriptor(
+			"token-card-mounted",
+			"notes/mounted-card.md",
+		);
 
 		controller.syncCards([{ slotId: "slot-0", descriptor }]);
 		controller.syncCards([]);
 
-		expect(controller.provider.resolveInteractionDescriptor("item-a")).toBeNull();
+		expect(
+			controller.provider.resolveInteractionDescriptor(descriptor.interactionId),
+		).toBeNull();
 	});
 
 	it("updates and releases cards through direct slot operations", () => {
 		const controller = createVirtualCardInteractionController();
-		const first = createDescriptor("item-a", "notes/a.md");
-		const second = createDescriptor("item-b", "notes/b.md");
-		const retained = createDescriptor("item-c", "notes/c.md");
+		const first = createDescriptor("token-card-first", "notes/first-card.md");
+		const second = createDescriptor("token-card-second", "notes/second-card.md");
+		const retained = createDescriptor(
+			"token-card-retained",
+			"notes/retained-card.md",
+		);
 
 		controller.setCard("slot-0", first);
 		controller.setCard("slot-1", retained);
 		controller.setCard("slot-0", second);
 
-		expect(controller.provider.resolveInteractionDescriptor("item-a")).toBeNull();
-		expect(controller.provider.resolveInteractionDescriptor("item-b")).toBe(second);
-		expect(controller.provider.resolveInteractionDescriptor("item-c")).toBe(
-			retained,
-		);
+		expect(
+			controller.provider.resolveInteractionDescriptor(first.interactionId),
+		).toBeNull();
+		expect(
+			controller.provider.resolveInteractionDescriptor(second.interactionId),
+		).toBe(second);
+		expect(
+			controller.provider.resolveInteractionDescriptor(retained.interactionId),
+		).toBe(retained);
 
 		controller.setCard("slot-0", null);
-		expect(controller.provider.resolveInteractionDescriptor("item-b")).toBeNull();
-		expect(controller.provider.resolveInteractionDescriptor("item-c")).toBe(
-			retained,
-		);
+		expect(
+			controller.provider.resolveInteractionDescriptor(second.interactionId),
+		).toBeNull();
+		expect(
+			controller.provider.resolveInteractionDescriptor(retained.interactionId),
+		).toBe(retained);
 	});
 });

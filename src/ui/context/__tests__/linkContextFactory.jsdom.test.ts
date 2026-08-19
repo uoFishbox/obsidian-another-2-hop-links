@@ -98,6 +98,32 @@ describe("createLinkContextFactory", () => {
 		);
 	});
 
+	it("onHop1Click: opens unresolved links with their raw text and source path", () => {
+		const sourceFile = createMockTFile("notes/origin-note.md");
+		const workspace = { openLinkText: vi.fn() };
+		const factory = createFactory(
+			{
+				fileToLinktext: vi.fn((f: TFile) => f.basename),
+			},
+			workspace,
+		);
+		const context = factory(sourceFile, { highlightOnOpen: "always" } as any);
+		const link: TwoHopIndexedLink = {
+			rawText: "missing-destination",
+			path: undefined,
+			isUnresolved: true,
+			sourceFile: createMockTFile("notes/link-origin.md"),
+		};
+
+		context.onHop1Click(new MouseEvent("click"), link);
+
+		expect(workspace.openLinkText).toHaveBeenCalledWith(
+			"missing-destination",
+			"notes/origin-note.md",
+			false,
+		);
+	});
+
 	it("onHop1Click: does not pass property key when search hit position is prioritized", () => {
 		const originFile = createMockTFile("notes/origin.md");
 		const targetFile = createMockTFile("notes/target.md");
@@ -178,43 +204,51 @@ describe("createLinkContextFactory", () => {
 	});
 
 	it("onHop2Click: focuses the first target property and prefers it over body links", () => {
-		const sourceFile = createMockTFile("notes/source.md");
-		const targetFile = createMockTFile("notes/target.md");
-		const otherFile = createMockTFile("notes/other.md");
+		const sourceFile = createMockTFile("notes/backlink-origin.md");
+		const targetFile = createMockTFile("notes/destination-note.md");
+		const otherFile = createMockTFile("notes/unrelated-note.md");
 		const workspace = {};
 		const metadataCache = {
 			fileToLinktext: vi.fn((f: TFile) => f.basename),
 			getFileCache: vi.fn(() => ({
 				links: [
 					{
-						link: "target",
-						original: "[[target]]",
+						link: "destination-link",
+						original: "[[destination-link]]",
 						position: createPosition(4),
 					},
 				],
 				embeds: [],
 				frontmatterLinks: [
-					{ key: "other", link: "other", original: "[[other]]" },
 					{
-						key: "first",
-						link: "alias-to-target",
-						original: "[[alias-to-target]]",
+						key: "unrelated-property",
+						link: "unrelated-link",
+						original: "[[unrelated-link]]",
 					},
-					{ key: "second", link: "target", original: "[[target]]" },
+					{
+						key: "display-alias-property",
+						link: "display-alias",
+						original: "[[display-alias]]",
+					},
+					{
+						key: "second-destination-property",
+						link: "destination-link",
+						original: "[[destination-link]]",
+					},
 				],
 			})),
 			getFirstLinkpathDest: vi.fn((linkpath: string) => {
-				if (linkpath === "target" || linkpath === "alias-to-target") {
+				if (linkpath === "destination-link" || linkpath === "display-alias") {
 					return targetFile;
 				}
-				if (linkpath === "other") return otherFile;
+				if (linkpath === "unrelated-link") return otherFile;
 				return null;
 			}),
 		} as any;
 		const factory = createFactory(metadataCache, workspace);
 		const context = factory(sourceFile, { highlightOnOpen: "always" } as any);
 		const link: TwoHopIndexedLink = {
-			rawText: "target",
+			rawText: "destination-link",
 			path: targetFile.path,
 			lookupPath: targetFile.path,
 			isUnresolved: false,
@@ -228,7 +262,7 @@ describe("createLinkContextFactory", () => {
 			sourceFile,
 			undefined,
 			false,
-			"first",
+			"display-alias-property",
 		);
 	});
 
