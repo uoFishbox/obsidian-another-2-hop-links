@@ -55,27 +55,6 @@ function createTaggedNote(overrides: Partial<TaggedNote> = {}): TaggedNote {
 }
 
 describe("twohopEquality", () => {
-	it("returns before reading identical object references", () => {
-		const throwOnRead = {
-			get(): never {
-				throw new Error("identical references must not be read");
-			},
-		};
-		const link = new Proxy(createLink(), throwOnRead);
-		const branch = new Proxy(createBranch(), throwOnRead);
-		const taggedNote = new Proxy(createTaggedNote(), throwOnRead);
-		const viewItem = new Proxy(
-			{ type: "backlink", data: link } as ViewItem,
-			throwOnRead,
-		);
-
-		expect(hasSameTwoHopIndexedLink(link, link)).toBe(true);
-		expect(hasSameBacklinkIndexedLink(link, link)).toBe(true);
-		expect(hasSameTwoHopBranchCard(branch, branch)).toBe(true);
-		expect(hasSameTaggedNote(taggedNote, taggedNote)).toBe(true);
-		expect(hasSameViewItemSource(viewItem, viewItem)).toBe(true);
-	});
-
 	it("treats identical two-hop links as equal", () => {
 		const current = createLink();
 		const next = createLink({

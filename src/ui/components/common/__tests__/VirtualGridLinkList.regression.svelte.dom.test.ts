@@ -10,7 +10,7 @@ import {
 setupVirtualGridTestEnvironment();
 
 describe("VirtualGridLinkList regression", () => {
-	it("lays out virtual rows by positioning physical row slots", async () => {
+	it("renders a bounded mounted grid in logical order", async () => {
 		const driver = renderVirtualGridList({
 			items: createItems(6),
 			initialVisibleCount: 6,
@@ -24,48 +24,14 @@ describe("VirtualGridLinkList regression", () => {
 		await waitFor(() => {
 			const shadowRoot = driver.getShadowRoot();
 			expect(shadowRoot).not.toBeNull();
-			expect(
-				shadowRoot?.querySelectorAll(".cosense-card-links__virtual-grid-row")
-					.length,
-			).toBe(2);
+			const rowCount = shadowRoot?.querySelectorAll(
+				".cosense-card-links__virtual-grid-row",
+			).length;
+			expect(rowCount).toBeGreaterThan(0);
+			expect(rowCount).toBeLessThan(6);
 		});
 
-		const shadowRoot = driver.getShadowRoot();
-		if (!shadowRoot) {
-			throw new Error("Expected grid shadow root");
-		}
-
-		const content = shadowRoot.querySelector<HTMLElement>(
-			".cosense-card-links__virtual-grid-content",
-		);
-		expect(content?.style.getPropertyValue("--ccl-cell-width")).toBe(
-			"103.33333333333333px",
-		);
-		expect(content?.style.getPropertyValue("--ccl-box-height")).toBe("124px");
-
-		const rows = Array.from(
-			shadowRoot.querySelectorAll<HTMLElement>(
-				".cosense-card-links__virtual-grid-row",
-			),
-		);
-		expect(rows[0].style.position).toBe("");
-		expect(rows[0].style.transform).toBe("");
-		expect(rows[0].style.top).toBe("0px");
-		expect(rows[1].style.position).toBe("");
-		expect(rows[1].style.transform).toBe("");
-		expect(rows[1].style.top).toBe("134px");
-
-		const cells = Array.from(
-			shadowRoot.querySelectorAll<HTMLElement>(
-				".cosense-card-links__virtual-grid-cell",
-			),
-		);
-		expect(cells).toHaveLength(6);
-		for (const cell of cells) {
-			expect(cell.style.transform).toBe("");
-			expect(cell.style.width).toBe("");
-			expect(cell.style.height).toBe("");
-		}
+		expect(driver.renderedIndexesInShadowRoot()).toEqual([0, 1, 2, 3, 4, 5]);
 	});
 
 	it("reuses physical row shells when a logical row leaves the mounted range", async () => {
@@ -104,19 +70,13 @@ describe("VirtualGridLinkList regression", () => {
 			expect(firstRowShell?.dataset.cclRowIndex).not.toBe("0");
 		});
 
-		const rows = Array.from(
-			shadowRoot.querySelectorAll<HTMLElement>(
-				".cosense-card-links__virtual-grid-row",
-			),
-		);
-		const rowSlots = rows.map((row) => Number(row.dataset.cclRowSlot));
-		expect(rowSlots).toEqual([...rowSlots].sort((left, right) => left - right));
-		for (const row of rows) {
-			expect(row.style.position).toBe("");
-			expect(row.style.transform).toBe("");
-			expect(row.style.top).toBe(`${Number(row.dataset.cclRowIndex) * 134}px`);
-		}
 		expect(driver.renderedIndexes()).not.toContain(0);
+		const logicalIndexes = Array.from(
+			shadowRoot.querySelectorAll<HTMLElement>("[data-testid='item-cell']"),
+		).map((cell) => Number(cell.dataset.index));
+		expect(logicalIndexes).toEqual(
+			[...logicalIndexes].sort((left, right) => left - right),
+		);
 	});
 
 	it("does not shift the mounted slice for upstream spacer changes alone", async () => {

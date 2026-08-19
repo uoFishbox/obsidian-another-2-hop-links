@@ -96,14 +96,11 @@ type ItemSortCache = Map<
 	WeakMap<readonly SortableItem[], readonly SortableItem[]>
 >;
 
-export type Hop2SortCache = ItemSortCache;
+type Hop2SortCache = ItemSortCache;
 
-export type TagItemSortCache = ItemSortCache;
+type TagItemSortCache = ItemSortCache;
 
-export type DisplayAssemblyCache = WeakMap<
-	PreprocessedDisplayData,
-	Map<string, DisplayData>
->;
+type DisplayAssemblyCache = WeakMap<PreprocessedDisplayData, Map<string, DisplayData>>;
 
 function createEmptyLinkPreprocessedDisplayData(): LinkPreprocessedDisplayData {
 	return {
@@ -121,7 +118,7 @@ function createEmptyTagPreprocessedDisplayData(): TagPreprocessedDisplayData {
 	};
 }
 
-export function createHop2SortCache(): Hop2SortCache {
+function createHop2SortCache(): Hop2SortCache {
 	return new Map();
 }
 
@@ -129,7 +126,7 @@ function createTagItemSortCache(): TagItemSortCache {
 	return new Map();
 }
 
-export function createDisplayAssemblyCache(): DisplayAssemblyCache {
+function createDisplayAssemblyCache(): DisplayAssemblyCache {
 	return new WeakMap();
 }
 
@@ -482,7 +479,7 @@ function createSortCacheKey(
 	return `${sortContextVersion}\u0000${sortOption}`;
 }
 
-export function getSortedItemsWithCache<T extends SortableItem>(
+function getSortedItemsWithCache<T extends SortableItem>(
 	items: readonly T[],
 	sortService: ISortService,
 	sortOption: SortOption,
@@ -509,7 +506,7 @@ export function getSortedItemsWithCache<T extends SortableItem>(
 	return sortedItems;
 }
 
-export function sortAndAssembleDisplayData(
+function sortAndAssembleDisplayData(
 	preprocessed: PreprocessedDisplayData,
 	settings: PluginSettings,
 	sortOption: SortOption,

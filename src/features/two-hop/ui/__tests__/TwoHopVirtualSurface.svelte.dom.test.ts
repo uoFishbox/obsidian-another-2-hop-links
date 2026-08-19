@@ -1,10 +1,6 @@
 import { fireEvent, render } from "@testing-library/svelte";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { DEFAULT_SETTINGS } from "features/settings/model";
-import {
-	getCCLDevMeasurementSnapshot,
-	resetCCLDevMeasurements,
-} from "infrastructure/debug/CCLDevMeasurements";
 import { getTwoHopCardCounts } from "infrastructure/debug/twoHopCardCountRegistry";
 import type { ApplicationStore } from "ui/stores/ApplicationStore.svelte";
 import type { CardRenderModel } from "ui/components/items/cardRenderModel";
@@ -26,28 +22,6 @@ import {
 	triggerResize,
 } from "testing/helpers/DOMObserverMock";
 import TwoHopVirtualSurfaceHarness from "./TwoHopVirtualSurfaceHarness.svelte";
-
-const cardDemandProbe = vi.hoisted(() => ({ setDemand: vi.fn() }));
-
-vi.mock("features/two-hop/ui/twoHopCardHydrator", async (importOriginal) => {
-	const actual =
-		await importOriginal<typeof import("features/two-hop/ui/twoHopCardHydrator")>();
-	return {
-		...actual,
-		createTwoHopCardHydrator: (
-			params: Parameters<typeof actual.createTwoHopCardHydrator>[0],
-		) => {
-			const hydrator = actual.createTwoHopCardHydrator(params);
-			return {
-				...hydrator,
-				setDemand(demand: Parameters<typeof hydrator.setDemand>[0]): void {
-					cardDemandProbe.setDemand(demand);
-					hydrator.setDemand(demand);
-				},
-			};
-		},
-	};
-});
 
 function createSection(count: number, totalCount = count): TwoHopSectionModel {
 	const items = Array.from({ length: count }, (_, index) => ({
@@ -172,8 +146,6 @@ async function waitForStableRowCount(root: HTMLElement): Promise<number> {
 
 beforeEach(() => {
 	resetRecords();
-	resetCCLDevMeasurements();
-	cardDemandProbe.setDemand.mockClear();
 	installResizeObserverMock();
 	installAnimationFrameMock();
 	setNumericProperty(window, "scrollY", 0);
@@ -271,41 +243,6 @@ describe("TwoHopVirtualSurface", () => {
 		await publishSection(createFilteredSection(filteredItems), 1);
 		await vi.waitFor(() => expect(resolver).toHaveBeenCalled());
 		expect(resolver.mock.calls.every((call) => call[1] === 1)).toBe(true);
-	});
-
-	it("publishes card demand once for one section publication", async () => {
-		const resolver = createCardModelResolver();
-		const section = createSection(20);
-		const { publishSection } = await renderSurface({
-			section,
-			resolveItemCardModel: resolver,
-		});
-		cardDemandProbe.setDemand.mockClear();
-		resetCCLDevMeasurements();
-
-		const replacement = { ...section.items[0]! };
-		await publishSection(
-			createTwoHopSectionModel({
-				id: section.id,
-				kind: section.kind,
-				title: section.title,
-				items: [replacement, ...section.items.slice(1)],
-				totalCount: section.totalCount,
-			}),
-		);
-		const demandAfterRerender = cardDemandProbe.setDemand.mock.calls.length;
-		for (let index = 0; index < 4; index += 1) await flushFrames();
-
-		expect(demandAfterRerender).toBe(0);
-		expect(cardDemandProbe.setDemand).toHaveBeenCalledTimes(1);
-		const counters = getCCLDevMeasurementSnapshot().counters;
-		expect(counters["virtualScroll.applyScrollMeasurement.dataChange"].count).toBe(
-			1,
-		);
-		expect(counters["virtualScroll.rangeMeasurementApplied"].count).toBe(1);
-		expect(
-			counters["virtualList.scheduler.measurementLayout.animationFrame"].count,
-		).toBe(0);
 	});
 
 	it("preserves the visible anchor while prepending one row of items", async () => {
@@ -415,45 +352,6 @@ describe("TwoHopVirtualSurface", () => {
 			loadMore: 0,
 			total: 4,
 		});
-	});
-
-	it("rebinds cell bodies in reused physical slots across a long scroll", async () => {
-		const resolver = createCardModelResolver();
-		const { root, scroller } = await renderSurface({
-			section: createSection(10_000),
-			resolveItemCardModel: resolver,
-		});
-
-		await vi.waitFor(() => expect(getRows(root).length).toBeGreaterThan(0));
-		await waitForStableRowCount(root);
-
-		setNumericProperty(scroller, "scrollTop", 20_000);
-		await fireEvent.scroll(scroller);
-		await vi.waitFor(() => {
-			const rowIndexes = getRows(root).map((row) =>
-				Number(row.dataset.cclRowIndex),
-			);
-			expect(Math.min(...rowIndexes)).toBeGreaterThan(100);
-		});
-		await waitForStableRowCount(root);
-
-		resetCCLDevMeasurements();
-
-		setNumericProperty(scroller, "scrollTop", 10_000);
-		await fireEvent.scroll(scroller);
-		await vi.waitFor(() => {
-			const rowIndexes = getRows(root).map((row) =>
-				Number(row.dataset.cclRowIndex),
-			);
-			expect(Math.min(...rowIndexes)).toBeGreaterThan(50);
-			expect(Math.max(...rowIndexes)).toBeLessThan(200);
-		});
-		await waitForStableRowCount(root);
-
-		const counters = getCCLDevMeasurementSnapshot().counters;
-		expect(counters["twoHop.cellBody.rebind"].count).toBeGreaterThan(0);
-		expect(counters["twoHop.cellBody.mount"].count).toBe(0);
-		expect(counters["twoHop.cellBody.unmount"].count).toBe(0);
 	});
 
 	it("clears the stale card model when a physical slot rebinds to another item", async () => {

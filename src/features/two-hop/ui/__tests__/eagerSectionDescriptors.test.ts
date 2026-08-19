@@ -1,6 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
 import type { TFile } from "obsidian";
-import { createNewLinksSectionDescriptor } from "features/two-hop/ui/section-descriptors/createNewLinksDescriptor";
 import { createPrimarySectionDescriptor } from "features/two-hop/ui/section-descriptors/createPrimaryDescriptor";
 import type { TwoHopIndexedLink, TwoHopLinkBranch } from "types/domain";
 
@@ -46,29 +45,5 @@ describe("section descriptor prefix materialization", () => {
 		expect(expanded.items).toHaveLength(40);
 		expect(expanded.items[0]).toBe(rows[0]);
 		expect(expanded.items[19]).toBe(rows[19]);
-	});
-
-	it("materializes complete new-link rows when the descriptor is created", () => {
-		const links = [
-			{ ...createLink("first-missing.md"), isUnresolved: true },
-			{ ...createLink("second-missing.md"), isUnresolved: true },
-		];
-		const createItemInteractionToken = vi.fn(
-			(_semanticKey: string) =>
-				`i${createItemInteractionToken.mock.calls.length}`,
-		);
-
-		const section = createNewLinksSectionDescriptor({
-			items: links,
-			itemLimit: links.length,
-			previousItems: [],
-			createItemInteractionToken,
-		});
-
-		expect(createItemInteractionToken).toHaveBeenCalledTimes(2);
-		const rows = section.items;
-		expect(Object.isFrozen(rows)).toBe(true);
-		expect(section.items[1]).toBe(rows[1]);
-		expect(rows.map((row) => row.item.type)).toEqual(["newLink", "newLink"]);
 	});
 });

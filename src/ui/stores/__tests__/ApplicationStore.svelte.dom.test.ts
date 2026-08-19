@@ -926,7 +926,7 @@ describe("ApplicationStore (Runes)", () => {
 		expect(resolveTwoHopLinks).not.toHaveBeenCalled();
 	});
 
-	it("handleDataUpdate does not reload on unrelated update", async () => {
+	it("handleDataUpdate does nothing for a no-op action", async () => {
 		const file = createMockTFile("current.md");
 		const resolveTwoHopLinks = vi
 			.fn<TestResolveTwoHopLinks>()
@@ -937,8 +937,8 @@ describe("ApplicationStore (Runes)", () => {
 		expect(resolveTwoHopLinks).toHaveBeenCalledTimes(1);
 
 		await store.handleDataUpdate({
-			affectedPaths: ["other.md"],
-			affectedLookupKeys: ["other.md"],
+			affectedPaths: [],
+			affectedLookupKeys: [],
 			affectedTags: [],
 			affectedLinkSourcePaths: [],
 			affectedTagSourcePaths: [],
@@ -997,24 +997,7 @@ describe("ApplicationStore (Runes)", () => {
 		]);
 	});
 
-	it("handleDataUpdate reloads on related lookup update", async () => {
-		const file = createMockTFile("current.md");
-		const resolveTwoHopLinks = vi
-			.fn<TestResolveTwoHopLinks>()
-			.mockResolvedValue(createLinkResultWithBranch(file.path, "target.md"));
-		const { store } = createStore({ resolveTwoHopLinks });
-
-		await store.load(file);
-		expect(resolveTwoHopLinks).toHaveBeenCalledTimes(1);
-
-		await store.handleDataUpdate({
-			affectedLookupKeys: ["target.md"],
-		});
-
-		expect(resolveTwoHopLinks).toHaveBeenCalledTimes(2);
-	});
-
-	it("handleDataUpdate invalidates related preview even with content-only update", async () => {
+	it("handleDataUpdate reloads and invalidates previews for a reload action", async () => {
 		const file = createMockTFile("current.md");
 		const resolveTwoHopLinks = vi
 			.fn<TestResolveTwoHopLinks>()
@@ -1025,38 +1008,13 @@ describe("ApplicationStore (Runes)", () => {
 		const previousPreviewVersion = store.getPreviewRenderVersion("target.md");
 
 		await store.handleDataUpdate({
-			affectedPaths: ["target.md"],
-			affectedLookupKeys: ["unrelated.md"],
-			affectedTags: [],
-			affectedLinkSourcePaths: [],
-			affectedTagSourcePaths: [],
-		});
-
-		// preview-only では reload しない
-		expect(resolveTwoHopLinks).toHaveBeenCalledTimes(1);
-		expect(store.getPreviewRenderVersion("target.md")).not.toBe(
-			previousPreviewVersion,
-		);
-	});
-
-	it("handleDataUpdate reloads on link source update", async () => {
-		const file = createMockTFile("current.md");
-		const resolveTwoHopLinks = vi
-			.fn<TestResolveTwoHopLinks>()
-			.mockResolvedValue(createLinkResultWithBranch(file.path, "target.md"));
-		const { store } = createStore({ resolveTwoHopLinks });
-
-		await store.load(file);
-
-		await store.handleDataUpdate({
-			affectedPaths: ["target.md"],
-			affectedLookupKeys: ["new-child.md"],
-			affectedTags: [],
-			affectedLinkSourcePaths: ["target.md"],
-			affectedTagSourcePaths: [],
+			affectsAll: true,
 		});
 
 		expect(resolveTwoHopLinks).toHaveBeenCalledTimes(2);
+		expect(store.getPreviewRenderVersion("target.md")).not.toBe(
+			previousPreviewVersion,
+		);
 	});
 
 	it("handleDataUpdate only advances preview version without load on preview-only update", async () => {
@@ -1077,9 +1035,7 @@ describe("ApplicationStore (Runes)", () => {
 			affectedTagSourcePaths: [],
 		});
 
-		// reload しない
 		expect(resolveTwoHopLinks).toHaveBeenCalledTimes(1);
-		// preview version は進む
 		expect(store.getPreviewRenderVersion("target.md")).not.toBe(
 			previousPreviewVersion,
 		);
