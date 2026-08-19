@@ -166,7 +166,7 @@ describe("VirtualListEngine performance contracts", () => {
 
 	it("resolves only the entering flat-grid row across sustained scrolling", () => {
 		const rowModel = createRowModel(10_000);
-		const resolveCellAtIndex = vi.spyOn(rowModel, "resolveCellAtIndex");
+		const getRow = vi.spyOn(rowModel, "getRow");
 		const rowSlotAllocator = createResidentRowSlotAllocator();
 		let mounted = buildMountedVirtualGridCellsFromRowModel({
 			rowModel,
@@ -190,9 +190,7 @@ describe("VirtualListEngine performance contracts", () => {
 		}
 
 		expect(mounted.rowSlices).toHaveLength(mountedRows);
-		expect(resolveCellAtIndex).toHaveBeenCalledTimes(
-			mountedRows * columns + NO_OP_MEASUREMENTS * columns,
-		);
+		expect(getRow).toHaveBeenCalledTimes(mountedRows + NO_OP_MEASUREMENTS);
 		const counters = getCCLDevMeasurementSnapshot().counters;
 		expect(counters["virtualGrid.buildMountedRows"].count).toBe(NO_OP_MEASUREMENTS);
 		expect(counters["virtualGrid.contiguousSlotPool.apply"].count).toBe(

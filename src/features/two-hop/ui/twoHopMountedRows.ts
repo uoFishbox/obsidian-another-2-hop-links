@@ -1,5 +1,8 @@
 import type { MountedVirtualCellsBuild } from "ui/virtualization/core/virtualListEngine";
-import { buildMountedSectionedGridRows } from "ui/virtualization/core/reconciliation/mountedSectionedGridRows";
+import {
+	buildMountedGridRows,
+	type MountedGridRow,
+} from "ui/virtualization/core/reconciliation/mountedGridRows";
 import type { ResidentRowSlotAllocator } from "ui/virtualization/core/residentSlotAllocator";
 import type { RenderBodyKey } from "ui/virtualization/renderRevision";
 import type { RowRange } from "ui/virtualization/rowRange";
@@ -24,13 +27,7 @@ export interface MountedTwoHopCell extends MountedVirtualCell {
 	readonly renderBodyKey: RenderBodyKey;
 }
 
-export interface MountedTwoHopRow {
-	readonly key: number;
-	readonly slotIndex: number;
-	readonly rowIndex: number;
-	readonly top: number;
-	readonly bindings: readonly (MountedTwoHopCell | null)[];
-}
+export type MountedTwoHopRow = MountedGridRow<MountedTwoHopCell>;
 
 export interface MountedTwoHopBuild extends MountedVirtualCellsBuild<MountedTwoHopCell> {
 	readonly rowSlices: readonly MountedTwoHopRow[];
@@ -52,58 +49,14 @@ export function buildMountedTwoHopRows(
 ): MountedTwoHopBuild {
 	markCCLDevPerformance("ccl:range-build-start");
 	const { rowModel, rowSlotAllocator } = params;
-	const columns = rowModel.layout.columns;
-	rowSlotAllocator.prepareRange({
-		start: params.rowRange.start,
-		end: params.rowRange.end,
-		slotTopologyRevision: columns,
-	});
-	// rowSlices stay in ascending contiguous rowIndex order, so an overlapping
-	// previous row resolves with one direct lookup instead of a resident-wide Map.
-	const previousRowSlices = params.previousBuild?.rowSlices;
-	const previousFirstRowIndex = previousRowSlices?.[0]?.rowIndex ?? 0;
-	const canReuseRows = params.previousBuild?.rowModel === rowModel;
-
-	const mountedRows = buildMountedSectionedGridRows<
-		MountedTwoHopCell,
-		MountedTwoHopRow,
-		ReturnType<TwoHopRowModel["getRow"]> extends infer TRow
-			? Exclude<TRow, null>
-			: never
-	>({
+	const mountedRows = buildMountedGridRows<TwoHopVirtualCell, MountedTwoHopCell>({
+		rowModel,
 		rowRange: params.rowRange,
-		columns,
-		slotCapacity: rowSlotAllocator.capacity,
-		resolveSlotIndex: (rowIndex) => rowSlotAllocator.resolveSlotIndex(rowIndex),
-		resolvePreviousRow: (rowIndex) => {
-			const previousRow = previousRowSlices?.[rowIndex - previousFirstRowIndex];
-			return previousRow?.rowIndex === rowIndex ? previousRow : undefined;
-		},
-		canReusePreviousRow: () => canReuseRows,
-		resolveRow: (rowIndex) => {
-			const row = rowModel.getRow(rowIndex);
-			if (!row) return null;
-			return {
-				top: row.top,
-				columnStart: 0,
-				columnEnd: row.cellCount,
-				metadata: row,
-			};
-		},
-		resolveCell: ({ columnIndex, renderSlotIndex, row }) =>
-			createMountedCell(row.metadata.getCell(columnIndex), renderSlotIndex),
-		rebindCell: ({ columnIndex, renderSlotIndex, row }) =>
-			createMountedCell(row.metadata.getCell(columnIndex), renderSlotIndex),
-		createRow: ({ rowIndex, slotIndex, bindings, row }) => {
-			recordCCLDevMeasurement("virtualGrid.rowShellCreated");
-			return {
-				key: rowIndex,
-				slotIndex,
-				rowIndex,
-				top: row.top,
-				bindings,
-			};
-		},
+		rowSlotAllocator,
+		previousRows: params.previousBuild?.rowSlices,
+		canReusePreviousRows: params.previousBuild?.rowModel === rowModel,
+		bindCell: ({ cell, renderSlotIndex }) =>
+			createMountedCell(cell, renderSlotIndex),
 	});
 
 	recordCCLDevMeasurement("virtualGrid.buildMountedRows");
@@ -121,10 +74,9 @@ export function buildMountedTwoHopRows(
 }
 
 function createMountedCell(
-	cell: TwoHopVirtualCell | null,
+	cell: TwoHopVirtualCell,
 	renderSlotIndex: number,
-): MountedTwoHopCell | null {
-	if (!cell) return null;
+): MountedTwoHopCell {
 	recordCCLDevMeasurement("virtualGrid.cellShellCreated");
 	return {
 		key: logicalCellKey(cell.logicalKey),

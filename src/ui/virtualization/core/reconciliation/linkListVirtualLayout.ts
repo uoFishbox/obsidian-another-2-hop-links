@@ -1,12 +1,6 @@
 import { recordCCLDevMeasurement } from "infrastructure/debug/CCLDevMeasurements";
 import type { VirtualListLogicalCell } from "../../logicalCell";
-import {
-	clampRange,
-	EMPTY_ROW_RANGE,
-	isEmptyRange,
-	sameRange,
-	type RowRange,
-} from "../../rowRange";
+import { clampRange, type RowRange } from "../../rowRange";
 import type { FlatLinkRowModel } from "../../row-models/flatLinkRowModel";
 import type {
 	RenderBodyKey,
@@ -15,22 +9,10 @@ import type {
 } from "../../renderRevision";
 import { logicalCellKey, type LogicalCellKey } from "../../types";
 import type { ResidentRowSlotAllocator } from "ui/virtualization/core/residentSlotAllocator";
-import { buildMountedSectionedGridRows } from "ui/virtualization/core/reconciliation/mountedSectionedGridRows";
-
-const computeVisibleCellWindow = (params: {
-	cellCount: number;
-	columns: number;
-	rowRange: RowRange;
-}): RowRange => {
-	if (params.cellCount <= 0 || params.columns <= 0 || isEmptyRange(params.rowRange)) {
-		return EMPTY_ROW_RANGE;
-	}
-
-	return {
-		start: params.rowRange.start * params.columns,
-		end: Math.min(params.cellCount, params.rowRange.end * params.columns),
-	};
-};
+import {
+	buildMountedGridRows,
+	type MountedGridRow,
+} from "ui/virtualization/core/reconciliation/mountedGridRows";
 
 export interface MountedVirtualGridCell<T> {
 	readonly key: LogicalCellKey;
@@ -42,23 +24,13 @@ export interface MountedVirtualGridCell<T> {
 	readonly renderBodyKey?: RenderBodyKey;
 }
 
-export interface MountedVirtualGridRowSlice<T> {
-	readonly key: number;
-	readonly slotIndex: number;
-	rowIndex: number;
-	top: number;
-	bindings: Array<MountedVirtualGridCell<T> | null>;
-}
+export type MountedVirtualGridRowSlice<T> = MountedGridRow<MountedVirtualGridCell<T>>;
 
 export interface MountedVirtualGridCellsBuildResult<T> {
 	readonly cells: MountedVirtualGridCell<T>[];
 	readonly rowSlices: MountedVirtualGridRowSlice<T>[];
 	readonly rowsBySlot: MountedVirtualGridRowSlice<T>[];
 	readonly poolCapacity: number;
-	readonly visibleWindow: {
-		readonly start: number;
-		readonly end: number;
-	};
 	readonly cellSourceRevision: unknown;
 	/**
 	 * Binding-topology revision captured by the same mounted-build commit as
@@ -208,20 +180,15 @@ function updateMountedVirtualGridCell<T>(
 
 function resolveMountedVirtualGridCell<T>(params: {
 	previous?: MountedVirtualGridCell<T>;
-	resolveCellAtIndex: (index: number) => VirtualListLogicalCell<T> | null;
-	visibleWindowEnd: number;
-	columns: number;
+	cell: VirtualListLogicalCell<T>;
+	cellIndex: number;
 	rowIndex: number;
 	columnIndex: number;
 	renderSlotIndex: number;
 	renderRevisionFallbackPolicy?: RenderRevisionFallbackPolicy;
-}): MountedVirtualGridCell<T> | null {
-	const cellIndex = params.rowIndex * params.columns + params.columnIndex;
-	if (cellIndex >= params.visibleWindowEnd) return null;
-
-	const cell = params.resolveCellAtIndex(cellIndex);
-	if (!cell) return null;
-
+}): MountedVirtualGridCell<T> {
+	const cell = params.cell;
+	const cellIndex = params.cellIndex;
 	const key = logicalCellKey(cell.key);
 	if (params.previous) {
 		if (
@@ -293,18 +260,17 @@ const hasCompatibleMountedVirtualGridRowSlots = <T>(
 	previousBuild.rowHeight === params.rowHeight &&
 	previousBuild.gap === params.gap;
 
-const getPreviousMountedVirtualGridRow = <T>(
-	previousBuild: MountedVirtualGridCellsBuildResult<T> | undefined,
-	rowIndex: number,
-): MountedVirtualGridRowSlice<T> | undefined => {
-	const previousRows = previousBuild?.rowSlices;
-	if (!previousRows || previousRows.length === 0) {
-		return undefined;
-	}
-
-	const firstRowIndex = previousRows[0].rowIndex;
-	const previousRow = previousRows[rowIndex - firstRowIndex];
-	return previousRow?.rowIndex === rowIndex ? previousRow : undefined;
+const hasSameMountedVirtualGridRowRange = <T>(
+	build: MountedVirtualGridCellsBuildResult<T>,
+	rowRange: RowRange,
+): boolean => {
+	const rows = build.rowSlices;
+	if (rowRange.start >= rowRange.end) return rows.length === 0;
+	return (
+		rows.length === rowRange.end - rowRange.start &&
+		rows[0]?.rowIndex === rowRange.start &&
+		rows[rows.length - 1]?.rowIndex === rowRange.end - 1
+	);
 };
 
 const assertMountedVirtualGridBuildInvariants = <T>(
@@ -358,13 +324,7 @@ export function buildMountedVirtualGridCellsFromRowModel<T>(params: {
 }): MountedVirtualGridCellsBuildResult<T> {
 	const { rowModel } = params;
 	const columns = Math.max(1, rowModel.layout.columns);
-	const cellCount = rowModel.cellCount;
 	const visibleRows = clampRange(params.rowRange, rowModel.rowCount);
-	const visibleWindow = computeVisibleCellWindow({
-		cellCount,
-		columns,
-		rowRange: visibleRows,
-	});
 	const previousBuild = params.previousBuild;
 	const cellSourceRevision = rowModel.cellSource.revision;
 	const hasCompatiblePreviousBuild = hasCompatibleMountedVirtualGridCellsBuild(
@@ -379,7 +339,7 @@ export function buildMountedVirtualGridCellsFromRowModel<T>(params: {
 	);
 	if (
 		hasCompatiblePreviousBuild &&
-		sameRange(previousBuild.visibleWindow, visibleWindow)
+		hasSameMountedVirtualGridRowRange(previousBuild, visibleRows)
 	) {
 		return previousBuild;
 	}
@@ -394,67 +354,27 @@ export function buildMountedVirtualGridCellsFromRowModel<T>(params: {
 		},
 	);
 	const { rowSlotAllocator } = params;
-	rowSlotAllocator.prepareRange({
-		start: visibleRows.start,
-		end: visibleRows.end,
-		slotTopologyRevision: columns,
-	});
-
-	const rowStep = rowModel.layout.rowHeight + rowModel.layout.gap;
-	const mountedRows = buildMountedSectionedGridRows<
-		MountedVirtualGridCell<T>,
-		MountedVirtualGridRowSlice<T>,
-		null
+	const mountedRows = buildMountedGridRows<
+		VirtualListLogicalCell<T>,
+		MountedVirtualGridCell<T>
 	>({
+		rowModel,
 		rowRange: visibleRows,
-		columns,
-		slotCapacity: rowSlotAllocator.capacity,
-		resolveSlotIndex: rowSlotAllocator.resolveSlotIndex,
-		resolvePreviousRow: (rowIndex) =>
-			hasCompatiblePreviousRowSlots
-				? getPreviousMountedVirtualGridRow(previousBuild, rowIndex)
-				: undefined,
-		canReusePreviousRow: () => hasCompatiblePreviousBuild,
-		resolveRow: (rowIndex) => ({
-			top: rowIndex * rowStep,
-			columnStart:
-				Math.max(visibleWindow.start, rowIndex * columns) - rowIndex * columns,
-			columnEnd:
-				Math.min(visibleWindow.end, cellCount, (rowIndex + 1) * columns) -
-				rowIndex * columns,
-			metadata: null,
-		}),
-		resolveCell: ({ rowIndex, columnIndex, renderSlotIndex }) =>
+		rowSlotAllocator,
+		previousRows: hasCompatiblePreviousRowSlots
+			? previousBuild?.rowSlices
+			: undefined,
+		canReusePreviousRows: hasCompatiblePreviousBuild,
+		bindCell: ({ cell, previous, rowIndex, columnIndex, renderSlotIndex }) =>
 			resolveMountedVirtualGridCell({
-				resolveCellAtIndex: rowModel.resolveCellAtIndex,
-				visibleWindowEnd: visibleWindow.end,
-				columns,
-				rowIndex,
-				columnIndex,
-				renderSlotIndex,
-				renderRevisionFallbackPolicy: params.renderRevisionFallbackPolicy,
-			}),
-		rebindCell: ({ previous, rowIndex, columnIndex, renderSlotIndex }) =>
-			resolveMountedVirtualGridCell({
+				cell,
+				cellIndex: rowModel.getCellIndex(rowIndex, columnIndex),
 				previous,
-				resolveCellAtIndex: rowModel.resolveCellAtIndex,
-				visibleWindowEnd: visibleWindow.end,
-				columns,
 				rowIndex,
 				columnIndex,
 				renderSlotIndex,
 				renderRevisionFallbackPolicy: params.renderRevisionFallbackPolicy,
 			}),
-		createRow: ({ rowIndex, slotIndex, bindings, row }) => {
-			recordCCLDevMeasurement("virtualGrid.rowShellCreated");
-			return {
-				key: rowIndex,
-				slotIndex,
-				rowIndex,
-				top: row.top,
-				bindings,
-			};
-		},
 	});
 
 	const buildState: MountedVirtualGridCellsBuildResult<T> = {
@@ -464,7 +384,6 @@ export function buildMountedVirtualGridCellsFromRowModel<T>(params: {
 		rowSlices: mountedRows.rowSlices,
 		rowsBySlot: mountedRows.rowsBySlot,
 		poolCapacity: rowSlotAllocator.capacity,
-		visibleWindow,
 		cellSourceRevision,
 		bindingTopologyRevision: rowModel.cellSource.bindingTopologyRevision,
 		columns,
