@@ -22,6 +22,12 @@ export interface ResolveVirtualRangesParams {
 	mounted?: RowRange;
 }
 
+export interface VirtualVisibilityPolicy {
+	bootstrapRows: number;
+	mountedOverscanPx: number;
+	previewOverscanPx?: number;
+}
+
 /**
  * Writes the rows intersecting a scroll window into caller-owned storage.
  */

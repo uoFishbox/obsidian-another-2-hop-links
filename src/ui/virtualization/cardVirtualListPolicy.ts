@@ -1,4 +1,4 @@
-import type { VirtualVisibilityPolicy } from "./core/virtualListEngine";
+import type { VirtualVisibilityPolicy } from "./virtualRanges";
 
 export const CARD_VIRTUAL_LIST_BOOTSTRAP_VISIBLE_ROWS = 3;
 export const CARD_VIRTUAL_LIST_MAX_UNSTABLE_MEASUREMENT_RETRIES = 6;

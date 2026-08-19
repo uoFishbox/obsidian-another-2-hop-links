@@ -6,6 +6,7 @@ import {
 import { createFlatLogicalCellSource } from "../../flatLogicalCellSource";
 import { computeVirtualGridLayout } from "../../layout/flatGridLayout";
 import type { VirtualListLogicalCell } from "../../logicalCell";
+import { computeVirtualRanges } from "../../virtualRanges";
 import {
 	buildMountedVirtualGridCellsFromRowModel,
 	type MountedVirtualGridCell,
@@ -76,27 +77,27 @@ const measureWorkload = (cardCount: number) => {
 	// Count reconciliation builds separately from snapshot computations. Every
 	// replay computes a snapshot, but no-op replays must take the fast path.
 	const applyMeasurement = (): void => {
+		const rangesResult = computeVirtualRanges({
+			rowModel,
+			scrollTop: SCROLL_TOP,
+			viewportHeight: VIEWPORT_HEIGHT,
+			sectionTop: 0,
+			isStableMeasurement: true,
+			hasStableVisibleRange: previous !== null,
+			currentMountedRange: previous?.ranges.mounted ?? {
+				start: 0,
+				end: 0,
+			},
+			bootstrapRows: 3,
+			mountedOverscanPx: MOUNTED_OVERSCAN_PX,
+		});
 		const result = computeVirtualListSnapshot<
 			VirtualListLogicalCell<TestItem>,
 			MountedVirtualGridCell<TestItem>,
 			MountedVirtualGridCellsBuildResult<TestItem>
 		>({
 			rowModel,
-			measurement: {
-				scrollTop: SCROLL_TOP,
-				viewportHeight: VIEWPORT_HEIGHT,
-				sectionTop: 0,
-				isStableMeasurement: true,
-				hasStableVisibleRange: previous !== null,
-				currentMountedRange: previous?.ranges.mounted ?? {
-					start: 0,
-					end: 0,
-				},
-			},
-			visibilityPolicy: {
-				bootstrapRows: 3,
-				mountedOverscanPx: MOUNTED_OVERSCAN_PX,
-			},
+			rangesResult,
 			previous,
 			buildMountedCells: ({
 				rowModel: nextRowModel,

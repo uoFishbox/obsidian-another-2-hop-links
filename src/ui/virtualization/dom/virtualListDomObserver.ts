@@ -30,8 +30,6 @@ import { hasRelevantStructureMutation } from "./structureMutationObserver";
 import { getOptionalOwnerWindow, isHTMLElementLike } from "ui/shared/dom/realmSafeDom";
 import type { VirtualScrollMeasurementReason } from "./virtualMeasurement";
 
-export type { VirtualListSharedScrollMetrics } from "./sharedScrollMetrics";
-
 /** Open scrollTop interval in which another scroll measurement is unnecessary. */
 export interface ScrollMeasurementRange {
 	readonly minScrollTopBeforeMeasurement: number;

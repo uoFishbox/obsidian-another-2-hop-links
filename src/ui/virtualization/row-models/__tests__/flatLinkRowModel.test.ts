@@ -65,7 +65,7 @@ describe("flatLinkRowModel", () => {
 		expect(rangesScratch.mounted).toBe(mountedScratch);
 		expect(rangesScratch.previewVisible).toBe(previewScratch);
 
-		rowModel.findVisibleRangesFromMountedInto(rangesScratch, {
+		rowModel.findVisibleRangesInto(rangesScratch, {
 			scrollTop: 110,
 			viewportHeight: 100,
 			mounted: { start: 2, end: 5 },

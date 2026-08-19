@@ -37,12 +37,11 @@ import { findNearestScrollContainer } from "ui/virtualization/dom/scrollContaine
 import { getOptionalOwnerWindow } from "ui/shared/dom/realmSafeDom";
 import { useVirtualListRuntime } from "ui/virtualization/svelte/useVirtualListRuntime.svelte";
 import type { VirtualMeasurement } from "ui/virtualization/svelte/useVirtualListRuntime.svelte";
-import type { VirtualVisibilityPolicy } from "ui/virtualization/core/virtualListEngine";
+import type { VirtualVisibilityPolicy } from "ui/virtualization/virtualRanges";
 import type { RowRange } from "ui/virtualization/rowRange";
 import { resolveVisibleRange } from "ui/virtualization/virtualRanges";
 import type { ResultNavigationDirection } from "features/keyboard-navigation/resultFocus";
-import type { ProgrammaticScrollSnapshot } from "ui/virtualization/dom/flushVirtualScrollMeasurement";
-import { flushVirtualScrollMeasurement as flushCachedVirtualScrollMeasurement } from "ui/virtualization/dom/flushVirtualScrollMeasurement";
+import type { ProgrammaticScrollSnapshot } from "ui/virtualization/dom/virtualListMeasurementAdapter";
 import { publishTwoHopCardCounts } from "infrastructure/debug/twoHopCardCountRegistry";
 
 /** Dependencies required to enable previews on the two-hop virtual surface. */
@@ -409,14 +408,8 @@ export function useTwoHopVirtualList(
 	});
 
 	function flushVirtualScrollMeasurement(snapshot: ProgrammaticScrollSnapshot): void {
-		flushCachedVirtualScrollMeasurement({
-			measurement,
-			snapshot,
-			updateFromCachedMeasurement: (metrics) => {
-				virtualList.runScrollMeasurement(metrics, {
-					forcePublish: true,
-				});
-			},
+		virtualList.flushProgrammaticScrollMeasurement(snapshot, {
+			forcePublish: true,
 		});
 	}
 

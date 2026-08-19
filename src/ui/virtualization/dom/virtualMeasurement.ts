@@ -1,4 +1,4 @@
-import type { VirtualListSharedScrollMetrics } from "./virtualListDomObserver";
+import type { VirtualListSharedScrollMetrics } from "./sharedScrollMetrics";
 
 export type VirtualMeasurementSource = "layout" | "scroll";
 

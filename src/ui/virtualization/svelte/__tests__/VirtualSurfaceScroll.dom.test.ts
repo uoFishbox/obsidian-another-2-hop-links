@@ -1,6 +1,5 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import { scrollElementIntoVirtualViewport } from "../VirtualSurfaceNavigation";
-import { flushVirtualScrollMeasurement } from "../../dom/flushVirtualScrollMeasurement";
 
 const setClientHeight = (element: HTMLElement, value: number): void => {
 	Object.defineProperty(element, "clientHeight", {
@@ -98,26 +97,11 @@ describe("VirtualSurfaceScroll", () => {
 				toJSON: () => ({}),
 			} as DOMRect;
 		};
-		const measurement = {
-			sectionTop: 0,
-			viewportHeight: 0,
-			hasStableScrollMetrics: false,
-			scrollContainerEl: null as HTMLElement | null,
-		};
-		const updateFromCachedMeasurement = vi.fn(() => {
-			operations.push("commit-measurement");
-		});
-
 		const snapshot = scrollElementIntoVirtualViewport({
 			rootEl: root,
 			scrollContainerEl: container,
 			targetTop: 180,
 			targetHeight: 20,
-		});
-		flushVirtualScrollMeasurement({
-			measurement,
-			snapshot,
-			updateFromCachedMeasurement,
 		});
 
 		expect(operations).toEqual([
@@ -126,15 +110,15 @@ describe("VirtualSurfaceScroll", () => {
 			"read-client-height",
 			"read-scroller-rect",
 			"write-scroll-top",
-			"commit-measurement",
 		]);
-		expect(updateFromCachedMeasurement).toHaveBeenCalledWith(
+		expect(snapshot).toEqual(
 			expect.objectContaining({
+				scrollContainerEl: container,
 				scrollTop: 100,
 				viewportHeight: 100,
+				sectionTop: 0,
+				didScroll: true,
 			}),
 		);
-		expect(measurement.sectionTop).toBe(0);
-		expect(measurement.viewportHeight).toBe(100);
 	});
 });

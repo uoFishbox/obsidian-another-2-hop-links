@@ -45,27 +45,20 @@ function createMockRowModel(
 				mountedOverscanPx,
 				Math.max(0, params.previewOverscanPx ?? 0),
 			);
-			this.findVisibleRangeInto(out.mounted, {
-				scrollTop: params.scrollTop,
-				viewportHeight: params.viewportHeight,
-				overscanPx: mountedOverscanPx,
-			});
+			if (params.mounted) {
+				out.mounted.start = params.mounted.start;
+				out.mounted.end = params.mounted.end;
+			} else {
+				this.findVisibleRangeInto(out.mounted, {
+					scrollTop: params.scrollTop,
+					viewportHeight: params.viewportHeight,
+					overscanPx: mountedOverscanPx,
+				});
+			}
 			this.findVisibleRangeInto(out.previewVisible, {
 				scrollTop: params.scrollTop,
 				viewportHeight: params.viewportHeight,
 				overscanPx: previewOverscanPx,
-			});
-		},
-		findVisibleRangesFromMountedInto(out, params) {
-			out.mounted.start = params.mounted.start;
-			out.mounted.end = params.mounted.end;
-			this.findVisibleRangeInto(out.previewVisible, {
-				scrollTop: params.scrollTop,
-				viewportHeight: params.viewportHeight,
-				overscanPx: Math.min(
-					Math.max(0, params.mountedOverscanPx),
-					Math.max(0, params.previewOverscanPx ?? 0),
-				),
 			});
 		},
 	};

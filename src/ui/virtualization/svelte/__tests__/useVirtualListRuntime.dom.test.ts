@@ -1,7 +1,7 @@
 import { cleanup, render } from "@testing-library/svelte";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { StableScrollTopBand } from "../../core/scrollWindowMeasurement";
-import type { VirtualVisibilityPolicy } from "../../core/virtualListEngine";
+import type { VirtualVisibilityPolicy } from "../../virtualRanges";
 import type {
 	ObserveVirtualListViewportOptions,
 	ScrollMeasurementRange,
@@ -100,12 +100,8 @@ const createTestRowModel = (state: TestRowModelState): TestRowModel => {
 		findVisibleRangeInto(out) {
 			copyRange(out, state.mounted);
 		},
-		findVisibleRangesInto(out) {
-			copyRange(out.mounted, state.mounted);
-			copyRange(out.previewVisible, state.previewVisible);
-		},
-		findVisibleRangesFromMountedInto(out, { mounted }) {
-			copyRange(out.mounted, mounted);
+		findVisibleRangesInto(out, { mounted }) {
+			copyRange(out.mounted, mounted ?? state.mounted);
 			copyRange(out.previewVisible, state.previewVisible);
 		},
 		findMountedCoverageScrollTopBandInto(out, { mounted }) {
@@ -200,10 +196,6 @@ const createRuntimeHarness = (
 	const onSnapshotUpdated = vi.fn();
 	const findVisibleRangeInto = vi.spyOn(rowModel, "findVisibleRangeInto");
 	const findVisibleRangesInto = vi.spyOn(rowModel, "findVisibleRangesInto");
-	const findVisibleRangesFromMountedInto = vi.spyOn(
-		rowModel,
-		"findVisibleRangesFromMountedInto",
-	);
 	const options: UseVirtualListRuntimeOptions<
 		TestCell,
 		TestRowModel,
@@ -256,7 +248,6 @@ const createRuntimeHarness = (
 		onSnapshotUpdated,
 		findVisibleRangeInto,
 		findVisibleRangesInto,
-		findVisibleRangesFromMountedInto,
 	};
 };
 
@@ -298,14 +289,34 @@ describe("useVirtualListRuntime", () => {
 		expect(onSnapshotUpdated).toHaveBeenCalledOnce();
 	});
 
+	it("owns programmatic scroll measurement state and publication", () => {
+		const { runtime } = createRuntimeHarness();
+
+		const result = runtime.flushProgrammaticScrollMeasurement({
+			scrollContainerEl: null,
+			scrollTop: 80,
+			viewportHeight: 120,
+			sectionTop: 20,
+			didScroll: true,
+		});
+
+		expect(result.kind).toBe("measured");
+		expect(runtime.measurement.viewportHeight).toBe(120);
+		expect(runtime.measurement.sectionTop).toBe(20);
+		expect(runtime.measurement.hasStableScrollMetrics).toBe(true);
+		expect(runtime.getSnapshot()?.ranges).toEqual({
+			mounted: { start: 0, end: 10 },
+			previewVisible: { start: 2, end: 8 },
+		});
+	});
+
 	it("skips unchanged stable cached scroll geometry", () => {
-		const { runtime, findVisibleRangesFromMountedInto } = createRuntimeHarness();
+		const { runtime, findVisibleRangesInto } = createRuntimeHarness();
 
 		expect(runtime.runScrollMeasurement(ACTIVE_SCROLL_METRICS).kind).toBe(
 			"measured",
 		);
-		const callCountAfterFirstMeasurement =
-			findVisibleRangesFromMountedInto.mock.calls.length;
+		const callCountAfterFirstMeasurement = findVisibleRangesInto.mock.calls.length;
 		const skipped = runtime.runScrollMeasurement({
 			...ACTIVE_SCROLL_METRICS,
 			frameId: 2,
@@ -315,41 +326,35 @@ describe("useVirtualListRuntime", () => {
 			kind: "skipped",
 			reason: "unchanged-scroll",
 		});
-		expect(findVisibleRangesFromMountedInto).toHaveBeenCalledTimes(
+		expect(findVisibleRangesInto).toHaveBeenCalledTimes(
 			callCountAfterFirstMeasurement,
 		);
 	});
 
 	it("re-runs range resolution when publication is forced", () => {
-		const { runtime, findVisibleRangesFromMountedInto } = createRuntimeHarness();
+		const { runtime, findVisibleRangesInto } = createRuntimeHarness();
 
 		runtime.runScrollMeasurement(ACTIVE_SCROLL_METRICS);
-		const callCountAfterFirstMeasurement =
-			findVisibleRangesFromMountedInto.mock.calls.length;
+		const callCountAfterFirstMeasurement = findVisibleRangesInto.mock.calls.length;
 		const result = runtime.runScrollMeasurement(
 			{ ...ACTIVE_SCROLL_METRICS, frameId: 2 },
 			{ forcePublish: true, reason: "data-change" },
 		);
 
 		expect(result.kind).toBe("measured");
-		expect(findVisibleRangesFromMountedInto.mock.calls.length).toBeGreaterThan(
+		expect(findVisibleRangesInto.mock.calls.length).toBeGreaterThan(
 			callCountAfterFirstMeasurement,
 		);
 	});
 
 	it("resolves stable ranges once and reuses them for engine publication and coverage", () => {
-		const {
-			runtime,
-			findVisibleRangeInto,
-			findVisibleRangesInto,
-			findVisibleRangesFromMountedInto,
-		} = createRuntimeHarness();
+		const { runtime, findVisibleRangeInto, findVisibleRangesInto } =
+			createRuntimeHarness();
 
 		runtime.runScrollMeasurement(ACTIVE_SCROLL_METRICS);
 
 		expect(findVisibleRangeInto).toHaveBeenCalledTimes(1);
-		expect(findVisibleRangesFromMountedInto).toHaveBeenCalledTimes(1);
-		expect(findVisibleRangesInto).not.toHaveBeenCalled();
+		expect(findVisibleRangesInto).toHaveBeenCalledTimes(1);
 	});
 
 	it("uses one runtime-owned range result on the active-scroll hot path", () => {
@@ -398,7 +403,7 @@ describe("useVirtualListRuntime", () => {
 	});
 
 	it("suppresses scroll work while layout measurement is pending", async () => {
-		const { runtime, onSnapshotUpdated, findVisibleRangesFromMountedInto } =
+		const { runtime, onSnapshotUpdated, findVisibleRangesInto } =
 			createRuntimeHarness();
 
 		runtime.scheduleLayoutMeasurement();
@@ -406,12 +411,11 @@ describe("useVirtualListRuntime", () => {
 		await vi.runAllTimersAsync();
 
 		expect(onSnapshotUpdated).toHaveBeenCalledTimes(1);
-		const rangeCallsAfterLayout =
-			findVisibleRangesFromMountedInto.mock.calls.length;
+		const rangeCallsAfterLayout = findVisibleRangesInto.mock.calls.length;
 
 		runtime.scheduleScrollMeasurement();
 		await vi.runAllTimersAsync();
-		expect(findVisibleRangesFromMountedInto.mock.calls.length).toBeGreaterThan(
+		expect(findVisibleRangesInto.mock.calls.length).toBeGreaterThan(
 			rangeCallsAfterLayout,
 		);
 	});

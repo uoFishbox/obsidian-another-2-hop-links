@@ -7,6 +7,7 @@ import {
 	type FlatLinkRowModel,
 } from "../../row-models/flatLinkRowModel";
 import type { VirtualRanges } from "../../types";
+import { computeVirtualRanges } from "../../virtualRanges";
 import {
 	buildMountedVirtualGridCellsFromRowModel,
 	type MountedVirtualGridCell,
@@ -76,24 +77,24 @@ const compute = (params: {
 		params.rowSlotAllocator ??
 		(params.previous ? rowSlotAllocators.get(params.previous) : undefined) ??
 		createResidentRowSlotAllocator();
+	const rangesResult = computeVirtualRanges({
+		rowModel: params.rowModel,
+		scrollTop: params.scrollTop ?? 0,
+		viewportHeight: 100,
+		sectionTop: 0,
+		isStableMeasurement: true,
+		hasStableVisibleRange: params.previous !== undefined,
+		currentMountedRange: params.previous?.ranges.mounted ?? {
+			start: 0,
+			end: 0,
+		},
+		bootstrapRows: 3,
+		mountedOverscanPx: params.mountedOverscanPx ?? 0,
+		precomputedRanges: params.ranges,
+	});
 	const result = computeVirtualListSnapshot({
 		rowModel: params.rowModel,
-		measurement: {
-			scrollTop: params.scrollTop ?? 0,
-			viewportHeight: 100,
-			sectionTop: 0,
-			isStableMeasurement: true,
-			hasStableVisibleRange: params.previous !== undefined,
-			currentMountedRange: params.previous?.ranges.mounted ?? {
-				start: 0,
-				end: 0,
-			},
-			precomputedRanges: params.ranges,
-		},
-		visibilityPolicy: {
-			bootstrapRows: 3,
-			mountedOverscanPx: params.mountedOverscanPx ?? 0,
-		},
+		rangesResult,
 		previous: params.previous,
 		buildMountedCells: ({ rowModel, rowRange, previousBuild }) =>
 			(params.buildMountedCells ?? buildMountedVirtualGridCellsFromRowModel)({

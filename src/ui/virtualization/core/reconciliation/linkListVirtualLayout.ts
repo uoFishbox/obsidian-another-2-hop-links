@@ -1,10 +1,12 @@
-import {
-	computeVisibleCellWindow,
-	type VisibleCellWindow,
-} from "../../layout/flatGridLayout";
 import { recordCCLDevMeasurement } from "infrastructure/debug/CCLDevMeasurements";
 import type { VirtualListLogicalCell } from "../../logicalCell";
-import { clampRange, sameRange, type RowRange } from "../../rowRange";
+import {
+	clampRange,
+	EMPTY_ROW_RANGE,
+	isEmptyRange,
+	sameRange,
+	type RowRange,
+} from "../../rowRange";
 import type { FlatLinkRowModel } from "../../row-models/flatLinkRowModel";
 import type {
 	RenderBodyKey,
@@ -14,6 +16,21 @@ import type {
 import { logicalCellKey, type LogicalCellKey } from "../../types";
 import type { ResidentRowSlotAllocator } from "ui/virtualization/core/residentSlotAllocator";
 import { buildMountedSectionedGridRows } from "ui/virtualization/core/reconciliation/mountedSectionedGridRows";
+
+const computeVisibleCellWindow = (params: {
+	cellCount: number;
+	columns: number;
+	rowRange: RowRange;
+}): RowRange => {
+	if (params.cellCount <= 0 || params.columns <= 0 || isEmptyRange(params.rowRange)) {
+		return EMPTY_ROW_RANGE;
+	}
+
+	return {
+		start: params.rowRange.start * params.columns,
+		end: Math.min(params.cellCount, params.rowRange.end * params.columns),
+	};
+};
 
 export interface MountedVirtualGridCell<T> {
 	readonly key: LogicalCellKey;
@@ -38,7 +55,10 @@ export interface MountedVirtualGridCellsBuildResult<T> {
 	readonly rowSlices: MountedVirtualGridRowSlice<T>[];
 	readonly rowsBySlot: MountedVirtualGridRowSlice<T>[];
 	readonly poolCapacity: number;
-	readonly visibleWindow: VisibleCellWindow;
+	readonly visibleWindow: {
+		readonly start: number;
+		readonly end: number;
+	};
 	readonly cellSourceRevision: unknown;
 	/**
 	 * Binding-topology revision captured by the same mounted-build commit as

@@ -12,6 +12,15 @@ export interface VirtualListScrollSnapshot {
 	viewportHeight: number;
 }
 
+/** Geometry captured before a programmatic virtual-list scroll write. */
+export interface ProgrammaticScrollSnapshot {
+	readonly scrollContainerEl: HTMLElement | null;
+	readonly scrollTop: number;
+	readonly viewportHeight: number;
+	readonly sectionTop: number;
+	readonly didScroll: boolean;
+}
+
 export type MeasurementUpdateResult<TRange> =
 	| { kind: "stable"; range: TRange; updateKind?: "reused" | "recomputed" }
 	| { kind: "bootstrapped"; range: TRange; updateKind?: "reused" | "recomputed" }

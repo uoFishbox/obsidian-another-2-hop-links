@@ -2,7 +2,6 @@ import { describe, expect, it, vi } from "vitest";
 import {
 	computeColumnCount,
 	computeVirtualGridLayout,
-	computeVisibleRowRange,
 } from "ui/virtualization/layout/flatGridLayout";
 import { createFlatLogicalCellSource } from "ui/virtualization/flatLogicalCellSource";
 
@@ -197,59 +196,6 @@ describe("linkListLayout", () => {
 				sectionId: "demo",
 			});
 			expect(outOfBoundsSource.resolveCellAtIndex(4)).toBeNull();
-		});
-	});
-
-	describe("computeVisibleRowRange", () => {
-		it("start <= end, within bounds, overscan reflected", () => {
-			const noOverscan = computeVisibleRowRange({
-				scrollTop: 350,
-				viewportHeight: 220,
-				sectionTop: 300,
-				rowHeight: 100,
-				gap: 10,
-				rowCount: 10,
-				overscanRows: 0,
-			});
-			expect(noOverscan.start).toBeLessThanOrEqual(noOverscan.end);
-			expect(noOverscan.start).toBeGreaterThanOrEqual(0);
-			expect(noOverscan.end).toBeLessThanOrEqual(10);
-
-			const withOverscan = computeVisibleRowRange({
-				scrollTop: 350,
-				viewportHeight: 220,
-				sectionTop: 300,
-				rowHeight: 100,
-				gap: 10,
-				rowCount: 10,
-				overscanRows: 3,
-			});
-			expect(withOverscan.start).toBeLessThanOrEqual(noOverscan.start);
-			expect(withOverscan.end).toBeGreaterThanOrEqual(noOverscan.end);
-		});
-
-		it("empty range when rowCount=0 or outside viewport", () => {
-			const empty = computeVisibleRowRange({
-				scrollTop: 0,
-				viewportHeight: 200,
-				sectionTop: 0,
-				rowHeight: 100,
-				gap: 10,
-				rowCount: 0,
-				overscanRows: 2,
-			});
-			expect(empty.start).toBe(empty.end);
-
-			const outside = computeVisibleRowRange({
-				scrollTop: 0,
-				viewportHeight: 200,
-				sectionTop: 400,
-				rowHeight: 100,
-				gap: 10,
-				rowCount: 10,
-				overscanRows: 2,
-			});
-			expect(outside.start).toBe(outside.end);
 		});
 	});
 });

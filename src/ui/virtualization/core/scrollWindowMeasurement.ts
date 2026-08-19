@@ -1,6 +1,6 @@
 import type { RowRange } from "../rowRange";
 import type { VirtualRanges, VirtualRowModel } from "../types";
-import type { VirtualVisibilityPolicy } from "./virtualListEngine";
+import type { VirtualVisibilityPolicy } from "../virtualRanges";
 import { recordCCLDevMeasurement } from "infrastructure/debug/CCLDevMeasurements";
 export type ScrollWindowIdentity = object | string | number | symbol;
 
@@ -30,11 +30,7 @@ type StableScrollTopBandMutable = {
 
 export type VirtualScrollWindowRangeRowModel = Pick<
 	VirtualRowModel<unknown>,
-	| "rowCount"
-	| "totalHeight"
-	| "findVisibleRangeInto"
-	| "findVisibleRangesInto"
-	| "findVisibleRangesFromMountedInto"
+	"rowCount" | "totalHeight" | "findVisibleRangeInto" | "findVisibleRangesInto"
 > & {
 	findStableMountedScrollTopBandInto?(
 		out: StableScrollTopBandMutable,
@@ -79,16 +75,15 @@ export function createVirtualScrollWindowRangeResolver<
 		viewportHeight: 0,
 		overscanPx: 0,
 	};
-	const rangeParams = {
+	const rangeParams: {
+		scrollTop: number;
+		viewportHeight: number;
+		mountedOverscanPx: number;
+		previewOverscanPx: number;
+		mounted?: RowRange;
+	} = {
 		scrollTop: 0,
 		viewportHeight: 0,
-		mountedOverscanPx: 0,
-		previewOverscanPx: 0,
-	};
-	const rangesFromMountedParams = {
-		scrollTop: 0,
-		viewportHeight: 0,
-		mounted: { start: 0, end: 0 },
 		mountedOverscanPx: 0,
 		previewOverscanPx: 0,
 	};
@@ -324,6 +319,7 @@ export function createVirtualScrollWindowRangeResolver<
 		rangeParams.viewportHeight = viewportHeight;
 		rangeParams.mountedOverscanPx = visibilityPolicy.mountedOverscanPx;
 		rangeParams.previewOverscanPx = visibilityPolicy.previewOverscanPx ?? 0;
+		rangeParams.mounted = precomputedMountedRange;
 		if (!precomputedMountedRange) {
 			committedScrollWindowMeasurement.identity = measurementRowModel;
 			measurementRowModel.findVisibleRangesInto(
@@ -348,15 +344,7 @@ export function createVirtualScrollWindowRangeResolver<
 		}
 
 		scrollWindowMeasurement.identity = measurementRowModel;
-		rangesFromMountedParams.scrollTop = rangeParams.scrollTop;
-		rangesFromMountedParams.viewportHeight = rangeParams.viewportHeight;
-		rangesFromMountedParams.mounted = precomputedMountedRange;
-		rangesFromMountedParams.mountedOverscanPx = rangeParams.mountedOverscanPx;
-		rangesFromMountedParams.previewOverscanPx = rangeParams.previewOverscanPx;
-		measurementRowModel.findVisibleRangesFromMountedInto(
-			scrollRangesScratch,
-			rangesFromMountedParams,
-		);
+		measurementRowModel.findVisibleRangesInto(scrollRangesScratch, rangeParams);
 		lastPublishedScrollRanges = publishStableRanges(
 			scrollRangesScratch,
 			lastPublishedScrollRanges,

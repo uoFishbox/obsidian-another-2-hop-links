@@ -1,8 +1,5 @@
 import { clampRange, sameRange, type RowRange } from "../rowRange";
-import {
-	computeVirtualRanges,
-	type ComputeVirtualRangesResult,
-} from "../virtualRanges";
+import type { ComputeVirtualRangesResult } from "../virtualRanges";
 import {
 	type MountedVirtualCell,
 	type VirtualListRevision,
@@ -10,27 +7,6 @@ import {
 	type VirtualRowModel,
 } from "../types";
 import { hasSameVirtualListRevision } from "./virtualListRevision";
-
-export interface VirtualListMeasurement {
-	scrollTop: number;
-	viewportHeight: number;
-	sectionTop: number;
-	isStableMeasurement: boolean;
-	hasStableVisibleRange: boolean;
-	currentMountedRange: RowRange;
-	/**
-	 * Value-stable ranges published by the scroll-window resolver. They are
-	 * retained by reference, so callers must not mutate them after passing
-	 * them here.
-	 */
-	precomputedRanges?: VirtualRanges;
-}
-
-export interface VirtualVisibilityPolicy {
-	bootstrapRows: number;
-	mountedOverscanPx: number;
-	previewOverscanPx?: number;
-}
 
 export interface MountedVirtualCellsBuild<TMountedCell extends MountedVirtualCell> {
 	/**
@@ -69,8 +45,7 @@ export interface VirtualListInput<
 	TMountedBuild extends MountedVirtualCellsBuild<TMountedCell>,
 > {
 	rowModel: VirtualRowModel<TCell>;
-	measurement: VirtualListMeasurement;
-	visibilityPolicy: VirtualVisibilityPolicy;
+	rangesResult: ComputeVirtualRangesResult;
 	previous?: VirtualListSnapshot<TCell, TMountedCell, TMountedBuild> | null;
 	buildMountedCells(params: {
 		rowModel: VirtualRowModel<TCell>;
@@ -217,19 +192,7 @@ export function computeVirtualListSnapshot<
 >(
 	input: VirtualListInput<TCell, TMountedCell, TMountedBuild>,
 ): VirtualListComputation<TCell, TMountedCell, TMountedBuild> {
-	const rangesResult: ComputeVirtualRangesResult = computeVirtualRanges({
-		rowModel: input.rowModel,
-		scrollTop: input.measurement.scrollTop,
-		viewportHeight: input.measurement.viewportHeight,
-		sectionTop: input.measurement.sectionTop,
-		isStableMeasurement: input.measurement.isStableMeasurement,
-		hasStableVisibleRange: input.measurement.hasStableVisibleRange,
-		currentMountedRange: input.measurement.currentMountedRange,
-		bootstrapRows: input.visibilityPolicy.bootstrapRows,
-		mountedOverscanPx: input.visibilityPolicy.mountedOverscanPx,
-		previewOverscanPx: input.visibilityPolicy.previewOverscanPx ?? 0,
-		precomputedRanges: input.measurement.precomputedRanges,
-	});
+	const rangesResult = input.rangesResult;
 	const previous = input.previous ?? null;
 	const previousMountedBuild = previous?.mountedBuild ?? null;
 

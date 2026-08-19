@@ -3,7 +3,7 @@ import {
 	createVirtualScrollWindowRangeResolver,
 	type VirtualScrollWindowRangeRowModel,
 } from "../scrollWindowMeasurement";
-import type { VirtualVisibilityPolicy } from "../virtualListEngine";
+import type { VirtualVisibilityPolicy } from "../../virtualRanges";
 import {
 	getCCLDevMeasurementSnapshot,
 	resetCCLDevMeasurements,
@@ -21,7 +21,6 @@ function createRowModel(
 			out.end = 20;
 		},
 		findVisibleRangesInto() {},
-		findVisibleRangesFromMountedInto() {},
 		findStableMountedScrollTopBandInto(out) {
 			out.min = -1_000;
 			out.max = 1_000;
@@ -55,7 +54,6 @@ function createEmptyRangeRowModel(
 			out.end = 1;
 		},
 		findVisibleRangesInto() {},
-		findVisibleRangesFromMountedInto() {},
 	};
 }
 
@@ -105,8 +103,8 @@ describe("createVirtualScrollWindowRangeResolver", () => {
 				out.start = 0;
 				out.end = 10;
 			},
-			findVisibleRangesInto() {},
-			findVisibleRangesFromMountedInto(out, params) {
+			findVisibleRangesInto(out, params) {
+				if (!params.mounted) throw new Error("Expected mounted range.");
 				out.mounted.start = params.mounted.start;
 				out.mounted.end = params.mounted.end;
 				out.previewVisible.start = 2;
@@ -268,16 +266,17 @@ describe("createVirtualScrollWindowRangeResolver", () => {
 			totalHeight: 10_000,
 			findVisibleRangeInto() {},
 			findVisibleRangesInto(out, params) {
+				if (params.mounted) {
+					out.mounted.start = params.mounted.start;
+					out.mounted.end = params.mounted.end;
+					out.previewVisible.start = params.mounted.start + 1;
+					out.previewVisible.end = params.mounted.end - 1;
+					return;
+				}
 				out.mounted.start = params.scrollTop;
 				out.mounted.end = params.scrollTop + 10;
 				out.previewVisible.start = params.scrollTop + 1;
 				out.previewVisible.end = params.scrollTop + 5;
-			},
-			findVisibleRangesFromMountedInto(out, params) {
-				out.mounted.start = params.mounted.start;
-				out.mounted.end = params.mounted.end;
-				out.previewVisible.start = params.mounted.start + 1;
-				out.previewVisible.end = params.mounted.end - 1;
 			},
 		};
 		const resolver = createVirtualScrollWindowRangeResolver({
@@ -315,8 +314,8 @@ describe("createVirtualScrollWindowRangeResolver", () => {
 			rowCount: 100,
 			totalHeight: 10_000,
 			findVisibleRangeInto() {},
-			findVisibleRangesInto() {},
-			findVisibleRangesFromMountedInto(out, params) {
+			findVisibleRangesInto(out, params) {
+				if (!params.mounted) return;
 				out.mounted.start = params.mounted.start;
 				out.mounted.end = params.mounted.end;
 				out.previewVisible.start = params.mounted.start + 1;

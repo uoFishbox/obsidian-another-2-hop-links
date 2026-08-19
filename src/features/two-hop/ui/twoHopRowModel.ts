@@ -394,9 +394,6 @@ export function createTwoHopRowModel(
 		findVisibleRangesInto(out, rangeParams) {
 			resolveVirtualRangesInto(out, rangeParams, writeVisibleRange);
 		},
-		findVisibleRangesFromMountedInto(out, rangeParams) {
-			resolveVirtualRangesInto(out, rangeParams, writeVisibleRange);
-		},
 		findStableMountedScrollTopBandInto(out, bandParams) {
 			writeStableBand(
 				out,

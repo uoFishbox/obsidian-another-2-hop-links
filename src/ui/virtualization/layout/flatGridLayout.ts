@@ -2,8 +2,6 @@ import type { FlatGridLayoutMetrics } from "../layoutMetrics";
 import { computeColumnCount } from "../core/gridLayout";
 
 export { computeColumnCount } from "../core/gridLayout";
-export { computeVisibleCellWindow, computeVisibleRowRange } from "./flatGridRanges";
-export type { VisibleCellWindow } from "./flatGridRanges";
 
 export interface VirtualGridLayoutInput {
 	containerWidth: number;

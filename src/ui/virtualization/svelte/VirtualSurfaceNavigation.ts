@@ -4,40 +4,27 @@ import {
 } from "features/keyboard-navigation/resultFocus";
 import { waitForNextAnimationFrame } from "ui/shared/scheduling/frame";
 import type { VirtualNavigationTarget } from "../types";
-import { getScrollMetrics } from "../dom/virtualListMeasurementAdapter";
+import {
+	getScrollMetrics,
+	type ProgrammaticScrollSnapshot,
+} from "../dom/virtualListMeasurementAdapter";
 import { createVirtualListKeyboardHandler } from "./VirtualSurfaceKeyboard";
 import {
 	findNearestScrollContainer,
 	invalidateNearestScrollContainerCache,
 } from "../dom/scrollContainer";
-import type { ProgrammaticScrollSnapshot } from "../dom/flushVirtualScrollMeasurement";
 import type { VirtualGridSurfaceTransaction } from "./VirtualGridSurfaceTransaction";
-
-const LOGICAL_CELL_SELECTOR = "[data-ccl-logical-key]";
 
 export function findMountedCellElementByKey(
 	container: HTMLElement | null,
 	key: string | null | undefined,
-	surfaceTransaction?: VirtualGridSurfaceTransaction,
+	surfaceTransaction: VirtualGridSurfaceTransaction,
 ): HTMLElement | null {
 	if (!container || !key) {
 		return null;
 	}
 
-	const registeredElement = surfaceTransaction?.findCellElementByKey(container, key);
-	if (registeredElement) {
-		return registeredElement;
-	}
-
-	for (const element of container.querySelectorAll<HTMLElement>(
-		LOGICAL_CELL_SELECTOR,
-	)) {
-		if (element.dataset.cclLogicalKey === key) {
-			return element;
-		}
-	}
-
-	return null;
+	return surfaceTransaction.findCellElementByKey(container, key);
 }
 
 const scrollElementIntoVirtualViewport = (params: {
@@ -164,30 +151,23 @@ export const createVirtualSurfaceNavigation = (options: {
 	): Promise<boolean> => {
 		const registeredCell =
 			options.surfaceTransaction.findClosestCell(currentTarget);
-		const currentCellElement =
-			registeredCell?.element ??
-			currentTarget.closest<HTMLElement>(LOGICAL_CELL_SELECTOR);
-		const currentKey =
-			registeredCell?.metadata.logicalKey ??
-			currentCellElement?.dataset.cclLogicalKey;
-		const rowIndex =
-			registeredCell?.metadata.rowIndex ??
-			Number(currentCellElement?.dataset.cclRowIndex);
-		const columnIndex =
-			registeredCell?.metadata.columnIndex ??
-			Number(currentCellElement?.dataset.cclColumnIndex);
-		if (
-			!currentKey ||
-			!Number.isInteger(rowIndex) ||
-			!Number.isInteger(columnIndex)
-		) {
+		if (!registeredCell) {
 			return false;
 		}
 
-		const target = options.resolveNavigationTarget?.(currentKey, direction, {
-			rowIndex,
-			columnIndex,
-		});
+		const { rowIndex, columnIndex } = registeredCell.metadata;
+		if (rowIndex === undefined || columnIndex === undefined) {
+			return false;
+		}
+
+		const target = options.resolveNavigationTarget?.(
+			registeredCell.metadata.logicalKey,
+			direction,
+			{
+				rowIndex,
+				columnIndex,
+			},
+		);
 		if (!target) {
 			return false;
 		}

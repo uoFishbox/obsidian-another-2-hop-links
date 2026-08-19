@@ -64,16 +64,7 @@ export interface VirtualRowModel<TCell> {
 			viewportHeight: number;
 			mountedOverscanPx: number;
 			previewOverscanPx?: number;
-		},
-	): void;
-	findVisibleRangesFromMountedInto(
-		out: VirtualRanges,
-		params: {
-			scrollTop: number;
-			viewportHeight: number;
-			mounted: RowRange;
-			mountedOverscanPx: number;
-			previewOverscanPx?: number;
+			mounted?: RowRange;
 		},
 	): void;
 

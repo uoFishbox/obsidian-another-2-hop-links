@@ -5,137 +5,35 @@ import {
 import type { FlatGridLayoutMetrics } from "../layoutMetrics";
 import type { RenderRevision } from "../renderRevision";
 import { createFlatLinkRowModel, type FlatLinkRowModel } from "./flatLinkRowModel";
-import { resolveVirtualListKeyRevision } from "./virtualListKeyRevision";
-
-interface FlatListBindingTopologyRevision {
-	readonly data: unknown;
-	readonly key: unknown;
-	readonly hasHeader: boolean;
-	readonly sectionId?: string;
-}
-
-interface FlatListContentRevision {
-	readonly data: unknown;
-	readonly key: unknown;
-	readonly itemRender: unknown;
-	readonly visibleCount: number;
-	readonly hasHeader: boolean;
-	readonly showLoadMore: boolean;
-	readonly sectionId?: string;
-}
-
-type FlatGridLayoutMemoKey = readonly [
-	columns: number,
-	cellWidth: number,
-	rowHeight: number,
-	gap: number,
-	rowCount: number,
-];
-
-interface FlatListBindingTopologyMemoEntry {
-	readonly revision: FlatListBindingTopologyRevision;
-}
-
-interface LogicalCellSourceMemoEntry<T> {
-	readonly revision: FlatListContentRevision;
-	readonly source: FlatLogicalCellSource<T>;
-}
-
-interface FlatLinkRowModelMemoEntry<T> {
-	readonly cellSourceRevision: unknown;
-	readonly layoutMemoKey: FlatGridLayoutMemoKey;
-	readonly rowModel: FlatLinkRowModel<T>;
-}
-
-function createFlatListContentRevision(params: {
-	dataRevision: unknown;
-	keyRevision: unknown;
-	itemRenderRevision: unknown;
-	visibleCount: number;
-	hasHeader: boolean;
-	showLoadMore: boolean;
-	sectionId?: string;
-}): FlatListContentRevision {
-	return {
-		data: params.dataRevision,
-		key: params.keyRevision,
-		itemRender: params.itemRenderRevision,
-		visibleCount: params.visibleCount,
-		hasHeader: params.hasHeader,
-		showLoadMore: params.showLoadMore,
-		sectionId: params.sectionId,
-	};
-}
-
-function hasSameFlatListContentRevision(
-	current: FlatListContentRevision,
-	next: FlatListContentRevision,
-): boolean {
-	return (
-		Object.is(current.data, next.data) &&
-		Object.is(current.key, next.key) &&
-		Object.is(current.itemRender, next.itemRender) &&
-		current.visibleCount === next.visibleCount &&
-		current.hasHeader === next.hasHeader &&
-		current.showLoadMore === next.showLoadMore &&
-		current.sectionId === next.sectionId
-	);
-}
-
-function createFlatListBindingTopologyRevision(params: {
-	dataRevision: unknown;
-	keyRevision: unknown;
-	hasHeader: boolean;
-	sectionId?: string;
-}): FlatListBindingTopologyRevision {
-	return {
-		data: params.dataRevision,
-		key: params.keyRevision,
-		hasHeader: params.hasHeader,
-		sectionId: params.sectionId,
-	};
-}
-
-function hasSameFlatListBindingTopologyRevision(
-	current: FlatListBindingTopologyRevision,
-	next: FlatListBindingTopologyRevision,
-): boolean {
-	return (
-		Object.is(current.data, next.data) &&
-		Object.is(current.key, next.key) &&
-		current.hasHeader === next.hasHeader &&
-		current.sectionId === next.sectionId
-	);
-}
-
-function createFlatGridLayoutMemoKey(
-	layout: FlatGridLayoutMetrics,
-): FlatGridLayoutMemoKey {
-	return [
-		layout.columns,
-		layout.cellWidth,
-		layout.rowHeight,
-		layout.gap,
-		layout.rowCount,
-	];
-}
-
-function hasSameFlatGridLayoutMemoKey(
-	current: FlatGridLayoutMemoKey,
-	next: FlatGridLayoutMemoKey,
-): boolean {
-	return current.every((value, index) => Object.is(value, next[index]));
-}
 
 /**
- * Keeps one logical-source memo and one row-model memo per list instance.
- * Callers mutating an items array in place must change itemsRevision. Callers
- * changing item-id behavior without replacing getItemId must change itemIdRevision.
+ * Keeps one logical source and row model per list instance while their actual
+ * inputs stay unchanged. In-place item mutations still require itemsRevision.
  */
 export function createFlatVirtualGridRuntimeModel<T>() {
-	let bindingTopologyMemo: FlatListBindingTopologyMemoEntry | null = null;
-	let logicalCellSourceMemo: LogicalCellSourceMemoEntry<T> | null = null;
-	let rowModelMemo: FlatLinkRowModelMemoEntry<T> | null = null;
+	let hasBindingTopology = false;
+	let bindingDataRevision: unknown;
+	let bindingKeyRevision: unknown;
+	let bindingHasHeader = false;
+	let bindingSectionId: string | undefined;
+	let bindingTopologyRevision: unknown;
+
+	let logicalCellSource: FlatLogicalCellSource<T> | null = null;
+	let contentDataRevision: unknown;
+	let contentKeyRevision: unknown;
+	let contentItemRenderRevision: unknown;
+	let contentVisibleCount = -1;
+	let contentHasHeader = false;
+	let contentShowLoadMore = false;
+	let contentSectionId: string | undefined;
+
+	let rowModel: FlatLinkRowModel<T> | null = null;
+	let rowModelCellSourceRevision: unknown;
+	let rowModelColumns = -1;
+	let rowModelCellWidth = -1;
+	let rowModelRowHeight = -1;
+	let rowModelGap = -1;
+	let rowModelRowCount = -1;
 
 	return {
 		resolveLogicalCellSource(params: {
@@ -153,45 +51,51 @@ export function createFlatVirtualGridRuntimeModel<T>() {
 			showLoadMore: boolean;
 			sectionId?: string;
 		}): FlatLogicalCellSource<T> {
-			const itemIdRevision = resolveVirtualListKeyRevision({
-				explicitRevision: params.itemIdRevision,
-				resolver: params.getItemId,
-			});
 			const dataRevision = params.itemsRevision ?? params.items;
-			const nextBindingTopologyRevision = createFlatListBindingTopologyRevision({
-				dataRevision,
-				keyRevision: itemIdRevision,
-				hasHeader: params.hasHeader,
-				sectionId: params.sectionId,
-			});
+			const keyRevision = params.itemIdRevision ?? params.getItemId;
 			if (
-				!bindingTopologyMemo ||
-				!hasSameFlatListBindingTopologyRevision(
-					bindingTopologyMemo.revision,
-					nextBindingTopologyRevision,
-				)
+				!hasBindingTopology ||
+				!Object.is(bindingDataRevision, dataRevision) ||
+				!Object.is(bindingKeyRevision, keyRevision) ||
+				bindingHasHeader !== params.hasHeader ||
+				bindingSectionId !== params.sectionId
 			) {
-				bindingTopologyMemo = {
-					revision: nextBindingTopologyRevision,
+				hasBindingTopology = true;
+				bindingDataRevision = dataRevision;
+				bindingKeyRevision = keyRevision;
+				bindingHasHeader = params.hasHeader;
+				bindingSectionId = params.sectionId;
+				bindingTopologyRevision = {
+					data: dataRevision,
+					key: keyRevision,
+					hasHeader: params.hasHeader,
+					sectionId: params.sectionId,
 				};
 			}
-			const bindingTopologyRevision = bindingTopologyMemo.revision;
-			const revision = createFlatListContentRevision({
-				dataRevision,
-				keyRevision: itemIdRevision,
-				itemRenderRevision:
-					params.itemRenderRevisionToken ?? params.getItemRenderRevision,
-				visibleCount: params.visibleCount,
-				hasHeader: params.hasHeader,
-				showLoadMore: params.showLoadMore,
-				sectionId: params.sectionId,
-			});
-			const memo = logicalCellSourceMemo;
-			if (memo && hasSameFlatListContentRevision(memo.revision, revision)) {
-				return memo.source;
+
+			const itemRenderRevision =
+				params.itemRenderRevisionToken ?? params.getItemRenderRevision;
+			if (
+				logicalCellSource &&
+				Object.is(contentDataRevision, dataRevision) &&
+				Object.is(contentKeyRevision, keyRevision) &&
+				Object.is(contentItemRenderRevision, itemRenderRevision) &&
+				contentVisibleCount === params.visibleCount &&
+				contentHasHeader === params.hasHeader &&
+				contentShowLoadMore === params.showLoadMore &&
+				contentSectionId === params.sectionId
+			) {
+				return logicalCellSource;
 			}
 
-			const source = createFlatLogicalCellSource({
+			contentDataRevision = dataRevision;
+			contentKeyRevision = keyRevision;
+			contentItemRenderRevision = itemRenderRevision;
+			contentVisibleCount = params.visibleCount;
+			contentHasHeader = params.hasHeader;
+			contentShowLoadMore = params.showLoadMore;
+			contentSectionId = params.sectionId;
+			logicalCellSource = createFlatLogicalCellSource({
 				header: params.hasHeader,
 				items: params.items,
 				getItemId: params.getItemId,
@@ -199,39 +103,47 @@ export function createFlatVirtualGridRuntimeModel<T>() {
 				visibleCount: params.visibleCount,
 				showLoadMore: params.showLoadMore,
 				sectionId: params.sectionId,
-				revision,
+				revision: {
+					data: dataRevision,
+					key: keyRevision,
+					itemRender: itemRenderRevision,
+					visibleCount: params.visibleCount,
+					hasHeader: params.hasHeader,
+					showLoadMore: params.showLoadMore,
+					sectionId: params.sectionId,
+				},
 				bindingTopologyRevision,
 			});
-			logicalCellSourceMemo = {
-				revision,
-				source,
-			};
-			return source;
+			return logicalCellSource;
 		},
 
 		resolveRowModel(params: {
 			cellSource: FlatLogicalCellSource<T>;
 			layout: FlatGridLayoutMetrics;
 		}): FlatLinkRowModel<T> {
-			const layoutMemoKey = createFlatGridLayoutMemoKey(params.layout);
-			const memo = rowModelMemo;
+			const { layout } = params;
 			if (
-				memo &&
-				Object.is(memo.cellSourceRevision, params.cellSource.revision) &&
-				hasSameFlatGridLayoutMemoKey(memo.layoutMemoKey, layoutMemoKey)
+				rowModel &&
+				Object.is(rowModelCellSourceRevision, params.cellSource.revision) &&
+				rowModelColumns === layout.columns &&
+				rowModelCellWidth === layout.cellWidth &&
+				rowModelRowHeight === layout.rowHeight &&
+				rowModelGap === layout.gap &&
+				rowModelRowCount === layout.rowCount
 			) {
-				return memo.rowModel;
+				return rowModel;
 			}
 
-			const rowModel = createFlatLinkRowModel({
+			rowModelCellSourceRevision = params.cellSource.revision;
+			rowModelColumns = layout.columns;
+			rowModelCellWidth = layout.cellWidth;
+			rowModelRowHeight = layout.rowHeight;
+			rowModelGap = layout.gap;
+			rowModelRowCount = layout.rowCount;
+			rowModel = createFlatLinkRowModel({
 				cellSource: params.cellSource,
-				layout: params.layout,
+				layout,
 			});
-			rowModelMemo = {
-				cellSourceRevision: params.cellSource.revision,
-				layoutMemoKey,
-				rowModel,
-			};
 			return rowModel;
 		},
 	};

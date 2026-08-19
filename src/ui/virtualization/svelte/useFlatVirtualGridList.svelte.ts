@@ -30,7 +30,6 @@ import { useVirtualListRuntime } from "./useVirtualListRuntime.svelte";
 import type { VirtualListLogicalCell } from "../logicalCell";
 import type { RenderRevision, RenderRevisionFallbackPolicy } from "../renderRevision";
 import type { VirtualNavigationTarget } from "../types";
-import { flushVirtualScrollMeasurement as flushCachedVirtualScrollMeasurement } from "../dom/flushVirtualScrollMeasurement";
 import {
 	DEFAULT_FLAT_GRID_LAYOUT,
 	isSameFlatGridLayout,
@@ -521,17 +520,6 @@ export function useFlatVirtualGridList<T>(
 		return observeInfiniteScrollWhenReady();
 	});
 
-	const flushVirtualScrollMeasurement = (
-		snapshot: Parameters<typeof flushCachedVirtualScrollMeasurement>[0]["snapshot"],
-	): void => {
-		flushCachedVirtualScrollMeasurement({
-			measurement,
-			snapshot,
-			updateFromCachedMeasurement: (metrics) =>
-				virtualList.updateFromCachedMeasurement(metrics),
-		});
-	};
-
 	const resolveNavigationTarget = (
 		currentKey: string,
 		direction: ResultNavigationDirection,
@@ -621,7 +609,7 @@ export function useFlatVirtualGridList<T>(
 			return canLoadMore;
 		},
 		resolveNavigationTarget,
-		flushVirtualScrollMeasurement,
+		flushVirtualScrollMeasurement: virtualList.flushProgrammaticScrollMeasurement,
 		createItemRenderArgs,
 		loadNextPage,
 	};

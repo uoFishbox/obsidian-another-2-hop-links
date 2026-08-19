@@ -121,18 +121,7 @@ export function createFlatLinkRowModel<T>(
 			viewportHeight: number;
 			mountedOverscanPx: number;
 			previewOverscanPx?: number;
-		},
-	): void => {
-		resolveVirtualRangesInto(out, params, writeVisibleRange);
-	};
-	const findVisibleRangesFromMountedInto = (
-		out: VirtualRanges,
-		params: {
-			scrollTop: number;
-			viewportHeight: number;
-			mounted: RowRange;
-			mountedOverscanPx: number;
-			previewOverscanPx?: number;
+			mounted?: RowRange;
 		},
 	): void => {
 		resolveVirtualRangesInto(out, params, writeVisibleRange);
@@ -286,7 +275,6 @@ export function createFlatLinkRowModel<T>(
 			);
 		},
 		findVisibleRangesInto,
-		findVisibleRangesFromMountedInto,
 		findStableMountedScrollTopBandInto,
 		findMountedCoverageScrollTopBandInto,
 		resolveNavigationTarget(

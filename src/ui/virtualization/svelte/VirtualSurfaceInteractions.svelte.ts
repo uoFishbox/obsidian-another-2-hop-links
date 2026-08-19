@@ -9,7 +9,7 @@ import {
 import { useAppContext, useLinkContext } from "ui/context/linkContext";
 import type { ResultNavigationDirection } from "features/keyboard-navigation/resultFocus";
 import type { VirtualNavigationTarget } from "../types";
-import type { ProgrammaticScrollSnapshot } from "../dom/flushVirtualScrollMeasurement";
+import type { ProgrammaticScrollSnapshot } from "../dom/virtualListMeasurementAdapter";
 import { createVirtualSurfaceNavigation } from "./VirtualSurfaceNavigation";
 import { ensureCardRenderShadowSurface } from "ui/components/common/cardRenderShadowSurface";
 import { installShadowHoverPopoverBridge } from "features/popover/shadowHoverPopoverBridge";
