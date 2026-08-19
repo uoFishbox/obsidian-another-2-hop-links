@@ -1,8 +1,8 @@
-import { App, TFile, FileView } from "obsidian";
+import { App, FileView } from "obsidian";
 import { resolveFileByPath } from "shared/obsidian/resolveFileByPath";
 import { CANVAS_NOTE_DRAG_FORMAT } from "../../appConstants";
 import type { CanvasView, CanvasViewCanvas } from "obsidian-typings";
-import { ObsidianInternalFacade } from "infrastructure/capabilities/ObsidianInternalFacade";
+import { getCanvasCreateFileNode } from "infrastructure/capabilities/obsidianInternals";
 
 export class CanvasDropManager {
 	private registeredListeners = new Map<HTMLElement, () => void>();
@@ -117,14 +117,12 @@ export class CanvasDropManager {
 
 		const pos = canvas.posFromEvt(event);
 
-		const capability = new ObsidianInternalFacade(this.app).getCanvasCreateFileNode(
-			canvas,
-		);
-		if (!capability.ok) {
+		const canvasWithFileNodeCreation = getCanvasCreateFileNode(canvas);
+		if (!canvasWithFileNodeCreation) {
 			return;
 		}
 
-		capability.value.createFileNode({
+		canvasWithFileNodeCreation.createFileNode({
 			pos: pos,
 			file: file,
 			position: "center",

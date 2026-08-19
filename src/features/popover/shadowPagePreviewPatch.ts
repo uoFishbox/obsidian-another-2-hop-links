@@ -1,6 +1,6 @@
 import type { App } from "obsidian";
 import { getAttachedInteractionHoverTarget } from "ui/interactions/interactionTypes";
-import { ObsidianInternalFacade } from "infrastructure/capabilities/ObsidianInternalFacade";
+import { getPagePreviewOnLinkHover } from "infrastructure/capabilities/obsidianInternals";
 import {
 	isEventLike,
 	isHTMLElementLike,
@@ -66,16 +66,16 @@ function normalizeShadowPopoverTarget(
 }
 
 export function ensurePagePreviewShadowPatch(app: App): void {
-	const capability = new ObsidianInternalFacade(app).getPagePreviewOnLinkHover();
-	if (!capability.ok) {
+	const capability = getPagePreviewOnLinkHover(app);
+	if (!capability) {
 		return;
 	}
-	const instance = capability.value.instance as PatchedPagePreviewInstance;
+	const instance = capability.instance as PatchedPagePreviewInstance;
 	if (isPagePreviewPatched(instance)) {
 		return;
 	}
 
-	const originalOnLinkHover = capability.value.onLinkHover;
+	const originalOnLinkHover = capability.instance.onLinkHover;
 	instance.onLinkHover = function patchedOnLinkHover(
 		this: unknown,
 		parent: unknown,

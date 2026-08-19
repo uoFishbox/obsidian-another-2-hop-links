@@ -1,52 +1,17 @@
-import type { TFile, MarkdownView, Pos, CachedMetadata } from "obsidian";
-import type {
-	BacklinksMap,
-	IndexedLinkQueryResult,
-	TaggedNote,
-	TwoHopIndexedLink,
-} from "./domain";
+import type { TFile, MarkdownView } from "obsidian";
+import type { BacklinksMap, IndexedLinkQueryResult, TaggedNote } from "./domain";
 import type {
 	PreviewData,
 	PreviewRequestOptions,
 } from "features/card-preview/public-types";
 import type { DataUpdateContext } from "core/indexing/index-service/IndexEvents";
 
-/**
- * ILinkStatusService
- *
- * リンク状態の判定を行うサービスのインターフェース。
- * 未解決リンク判定、シングルバックリンク判定、装飾可否判定を提供する。
- */
 export interface ILinkStatusService {
-	/**
-	 * リンクテキストからlookupPath（正規化されたパス）を生成
-	 */
 	generateLookupPath(linkText: string, sourceFile?: TFile): string;
-
-	/**
-	 * href属性からパス部分を抽出（#以降のアンカー部分を除去）
-	 */
 	normalizeHref(href: string): string;
-
-	/**
-	 * DOM要素からhref情報を抽出
-	 */
 	extractHref(linkEl: HTMLElement): string | undefined;
-
-	/**
-	 * 指定されたlookupPathが装飾対象かどうかを判定（設定考慮済み）
-	 */
 	shouldDecorateLink(lookupPath: string): boolean;
-
-	/**
-	 * 複数のlookupPathをバッチで判定
-	 */
 	shouldDecorateLinkBatch(lookupPaths: Iterable<string>): Map<string, boolean>;
-
-	/**
-	 * 指定されたlookupPathが未解決リンクかつシングルバックリンクかを判定
-	 * （設定を考慮しない低レベルAPI）
-	 */
 	isUnresolvedWithSingleBacklink(lookupPath: string): boolean;
 }
 
@@ -108,22 +73,4 @@ export interface IComponentManager {
 	): void;
 	unmountViewComponents(view: MarkdownView): void;
 	destroy(): void;
-}
-
-export interface EventHandlers {
-	handleOpenLinkDestination: (
-		link: TwoHopIndexedLink,
-		sourceFile: TFile,
-		newLeaf?: boolean | "tab" | "split" | "window",
-	) => void;
-	handleOpenFile: (
-		file: TFile,
-		position?: Pos,
-		newLeaf?: boolean | "tab" | "split" | "window",
-		key?: string,
-	) => void;
-	handleGetFileContent: (file: TFile) => Promise<string>;
-	handleResolveFile: (path: string) => TFile | null;
-	handleGetMetadata: (file: TFile) => CachedMetadata | null;
-	handleShowFileMenu: (event: MouseEvent, file: TFile) => void;
 }

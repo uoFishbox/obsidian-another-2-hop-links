@@ -4,8 +4,8 @@ import {
 	normalizeHoverPopoverTargetEl,
 } from "features/popover/hoverPopoverTarget";
 import { enableLogging, logger } from "shared/logging/logger";
-import { ObsidianInternalFacade } from "infrastructure/capabilities/ObsidianInternalFacade";
-import type { PatchRegistry } from "infrastructure/capabilities/PatchRegistry";
+import { getPagePreviewOnLinkHover } from "infrastructure/capabilities/obsidianInternals";
+import { applyPatch } from "infrastructure/capabilities/applyPatch";
 import {
 	isEventLike,
 	isHTMLElementLike,
@@ -24,12 +24,7 @@ interface PagePreviewLike {
 	) => unknown;
 }
 
-interface WorkspaceLike {
-	trigger: (name: string, ...args: unknown[]) => unknown;
-}
-
 let hoverCallSequence = 0;
-let hoverTriggerSequence = 0;
 
 function describeTargetEl(
 	targetEl: HTMLElement | ShadowRoot | null | undefined,
@@ -83,72 +78,30 @@ function describeShortStack(limit = 6): string[] {
 		.filter((entry) => entry.length > 0);
 }
 
-function describeHoverLinkPayload(payload: unknown): Record<string, unknown> {
-	const hoverPayload = payload as {
-		event?: Event;
-		targetEl?: HTMLElement | ShadowRoot | null;
-		source?: string;
-		linktext?: string;
-		sourcePath?: string;
-		state?: unknown;
-		hoverParent?: unknown;
-	};
-	const event = isEventLike(hoverPayload?.event) ? hoverPayload.event : undefined;
-	return {
-		source: hoverPayload?.source ?? null,
-		linktext: hoverPayload?.linktext ?? null,
-		sourcePath: hoverPayload?.sourcePath ?? null,
-		targetEl: describeTargetEl(hoverPayload?.targetEl ?? null),
-		hoverParentType:
-			hoverPayload?.hoverParent &&
-			typeof hoverPayload.hoverParent === "object" &&
-			"constructor" in hoverPayload.hoverParent
-				? ((
-						hoverPayload.hoverParent as {
-							constructor?: { name?: string };
-						}
-					).constructor?.name ?? null)
-				: typeof hoverPayload?.hoverParent,
-		state: hoverPayload?.state ?? null,
-		...describeHoverEvent(event),
-	};
-}
-
-export function initPagePreviewShadowDomPatcher(
-	plugin: PluginHost,
-	patchRegistry: PatchRegistry,
-): void {
+export function initPagePreviewShadowDomPatcher(plugin: PluginHost): void {
 	plugin.register(() => {
 		disposeShadowHoverPopoverProxies();
 	});
 
 	plugin.app.workspace.onLayoutReady(() => {
-		patchPagePreviewInstance(plugin, patchRegistry);
-		patchWorkspaceHoverLinkTrigger(plugin, patchRegistry);
+		patchPagePreviewInstance(plugin);
 	});
 }
 
-function patchPagePreviewInstance(
-	plugin: PluginHost,
-	patchRegistry: PatchRegistry,
-): void {
-	const capability = new ObsidianInternalFacade(
-		plugin.app,
-	).getPagePreviewOnLinkHover();
-	if (!capability.ok) {
+function patchPagePreviewInstance(plugin: PluginHost): void {
+	const capability = getPagePreviewOnLinkHover(plugin.app);
+	if (!capability) {
 		if (enableLogging)
 			logger(
-				`[PagePreviewShadowDomPatcher] Skipped page-preview patch: ${capability.reason}.`,
+				"[PagePreviewShadowDomPatcher] Skipped page-preview patch: onLinkHover unavailable.",
 			);
 		return;
 	}
 
-	const applied = patchRegistry.apply(plugin, {
+	const applied = applyPatch(plugin, {
 		id: "page-preview:onLinkHover",
-		target: capability.value.instance,
+		target: capability.instance,
 		method: "onLinkHover",
-		risk: capability.risk,
-		enabled: true,
 		wrap: (next) =>
 			function (
 				this: PagePreviewLike,
@@ -201,54 +154,9 @@ function patchPagePreviewInstance(
 			},
 	});
 
-	if (applied) {
-		if (enableLogging)
-			logger(
-				"[PagePreviewShadowDomPatcher] Patched page-preview onLinkHover for Shadow DOM anchors.",
-			);
-	}
-}
-
-function patchWorkspaceHoverLinkTrigger(
-	plugin: PluginHost,
-	patchRegistry: PatchRegistry,
-): void {
-	const workspace = plugin.app.workspace as WorkspaceLike;
-	if (typeof workspace.trigger !== "function") {
-		if (enableLogging)
-			logger(
-				"[PagePreviewShadowDomPatcher] Skipped workspace hover-link patch: workspace.trigger unavailable.",
-			);
-		return;
-	}
-	const applied = patchRegistry.apply(plugin, {
-		id: "workspace:hover-link-diagnostics",
-		target: workspace,
-		method: "trigger",
-		risk: "low",
-		enabled: true,
-		wrap: (next) =>
-			function (this: WorkspaceLike, name: string, ...args: unknown[]) {
-				if (name === "hover-link") {
-					const triggerId = ++hoverTriggerSequence;
-					if (enableLogging)
-						logger(
-							"[PagePreviewShadowDomPatcher] workspace.trigger('hover-link')",
-							{
-								triggerId,
-								stack: describeShortStack(),
-								...describeHoverLinkPayload(args[0]),
-							},
-						);
-				}
-				return next.call(this, name, ...args);
-			},
-	});
-
-	if (applied) {
-		if (enableLogging)
-			logger(
-				"[PagePreviewShadowDomPatcher] Patched workspace.trigger for hover-link diagnostics.",
-			);
+	if (applied && enableLogging) {
+		logger(
+			"[PagePreviewShadowDomPatcher] Patched page-preview onLinkHover for Shadow DOM anchors.",
+		);
 	}
 }

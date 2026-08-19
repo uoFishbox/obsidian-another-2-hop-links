@@ -1,7 +1,5 @@
 import type { App, TFile } from "obsidian";
 import type { StateEffectType } from "@codemirror/state";
-import { createEventHandlers } from "infrastructure/workspace/eventHandlers";
-import { createWorkspaceViewQueries } from "infrastructure/workspace/workspaceViewQueries";
 import { IndexUpdateQueue } from "infrastructure/lifecycle/IndexUpdateQueue";
 import { ComponentController } from "infrastructure/lifecycle/ComponentController";
 import {
@@ -166,11 +164,6 @@ export function createPluginRuntime(options: PluginRuntimeOptions): PluginRuntim
 		},
 	);
 	const sortService = new SortService(metricProvider);
-	const eventHandlers = createEventHandlers(
-		options.app.metadataCache,
-		options.app.vault,
-		options.app.workspace,
-	);
 	const linkStatusService = createLinkStatusService(
 		indexingService,
 		options.getSettings,
@@ -178,10 +171,8 @@ export function createPluginRuntime(options: PluginRuntimeOptions): PluginRuntim
 	const stylingService = createStylingService(linkStatusService);
 	const propertyWidgetStyler = createPropertyWidgetStyler(stylingService);
 	const renderedMdElementsRegistry = new RenderedMdElementsRegistry(stylingService);
-	const workspaceViewQueries = createWorkspaceViewQueries(options.app.workspace);
 	const linkContextFactory = createLinkContextFactory(
 		options.app.metadataCache,
-		eventHandlers,
 		indexingService,
 		options.app.vault,
 		options.app.workspace,
@@ -230,7 +221,6 @@ export function createPluginRuntime(options: PluginRuntimeOptions): PluginRuntim
 	const displayModeController = new DisplayModeController(
 		options.app,
 		options.settingsManager,
-		workspaceViewQueries,
 		componentController,
 		options.plugin,
 		options.updateSidebarView,

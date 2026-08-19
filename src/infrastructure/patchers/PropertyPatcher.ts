@@ -1,39 +1,28 @@
 import type { PluginHost } from "types/pluginHost";
-import type { StylingService } from "features/link-decoration/stylingService";
 import type { PropertyWidgetStyler } from "features/link-decoration/propertyWidgetStyler";
 import { resolveFileByPath } from "shared/obsidian/resolveFileByPath";
 import { enableLogging, logger } from "shared/logging/logger";
 import {
-	ObsidianInternalFacade,
+	getPropertyWidgetRenderSave,
 	type PropertyWidgetComponentLike,
-	type PropertyWidgetLike,
-} from "infrastructure/capabilities/ObsidianInternalFacade";
-import type { PatchRegistry } from "infrastructure/capabilities/PatchRegistry";
+} from "infrastructure/capabilities/obsidianInternals";
+import { applyPatch } from "infrastructure/capabilities/applyPatch";
 import { getOwnerWindow, isHTMLElementLike } from "ui/shared/dom/realmSafeDom";
 const widgetPatchIds = new WeakMap<object, string>();
 let nextWidgetPatchId = 1;
 
 export function initPropertyPatcher(
 	plugin: PluginHost,
-	patchRegistry: PatchRegistry,
-	stylingService: StylingService,
 	propertyStyleManager: PropertyWidgetStyler,
 ): void {
 	// ObsidianのUIの準備が整ってからパッチを適用する
 	plugin.app.workspace.onLayoutReady(() => {
-		patchPropertyWidgets(
-			plugin,
-			patchRegistry,
-			stylingService,
-			propertyStyleManager,
-		);
+		patchPropertyWidgets(plugin, propertyStyleManager);
 	});
 }
 
 function patchPropertyWidgets(
 	plugin: PluginHost,
-	patchRegistry: PatchRegistry,
-	stylingService: StylingService,
 	propertyStyleManager: PropertyWidgetStyler,
 ): void {
 	const widgets = plugin.app.metadataTypeManager.registeredTypeWidgets;
@@ -46,28 +35,21 @@ function patchPropertyWidgets(
 	const scheduledElements = new WeakSet<Element>();
 
 	for (const widget of Object.values(widgets)) {
-		const capability = new ObsidianInternalFacade(
-			plugin.app,
-		).getPropertyWidgetRenderSave(widget);
-		if (!capability.ok) {
-			if (enableLogging)
-				logger(`[PropertyPatcher] Skipped widget: ${capability.reason}.`);
+		const widgetObject = getPropertyWidgetRenderSave(widget);
+		if (!widgetObject) {
+			if (enableLogging) logger("[PropertyPatcher] Skipped unsupported widget.");
 			continue;
 		}
-
-		const widgetObject = capability.value;
 		let patchId = widgetPatchIds.get(widgetObject);
 		if (!patchId) {
 			patchId = `property-widget:${nextWidgetPatchId++}`;
 			widgetPatchIds.set(widgetObject, patchId);
 		}
 
-		patchRegistry.apply(plugin, {
+		applyPatch(plugin, {
 			id: `${patchId}:render`,
 			target: widgetObject,
 			method: "render",
-			risk: capability.risk,
-			enabled: true,
 			wrap: (oldRender) => {
 				return function (
 					this: unknown,
@@ -115,12 +97,10 @@ function patchPropertyWidgets(
 			continue;
 		}
 
-		patchRegistry.apply(plugin, {
+		applyPatch(plugin, {
 			id: `${patchId}:save`,
 			target: widgetObject,
 			method: "save",
-			risk: capability.risk,
-			enabled: true,
 			wrap: (oldSave) => {
 				return function (this: unknown, ...args: unknown[]) {
 					const result = oldSave.call(this, ...args);

@@ -26,8 +26,8 @@ import {
 	type LeafHistoryInternal,
 	type LeafWithInternalHistory,
 	type NativeHistoryEntry,
-} from "infrastructure/capabilities/ObsidianInternalFacade";
-import type { PatchRegistry } from "infrastructure/capabilities/PatchRegistry";
+} from "infrastructure/capabilities/obsidianInternals";
+import { applyPatch } from "infrastructure/capabilities/applyPatch";
 
 type MaterializedTrigger = "file-open" | "vault-create";
 
@@ -37,26 +37,18 @@ type CleanupPhase =
 	| "vault-create-immediate"
 	| "vault-create-deferred-50ms";
 
-export function initWorkspacePatcher(
-	plugin: PluginHost,
-	patchRegistry: PatchRegistry,
-): void {
+export function initWorkspacePatcher(plugin: PluginHost): void {
 	plugin.app.workspace.onLayoutReady(() => {
-		patchWorkspaceOpenLinkText(plugin, patchRegistry);
+		patchWorkspaceOpenLinkText(plugin);
 		registerPreCreationHistoryCleanup(plugin);
 	});
 }
 
-function patchWorkspaceOpenLinkText(
-	plugin: PluginHost,
-	patchRegistry: PatchRegistry,
-): void {
-	const applied = patchRegistry.apply(plugin, {
+function patchWorkspaceOpenLinkText(plugin: PluginHost): void {
+	const applied = applyPatch(plugin, {
 		id: "workspace:openLinkText",
 		target: plugin.app.workspace,
 		method: "openLinkText",
-		risk: "low",
-		enabled: true,
 		wrap: (next) =>
 			async function (
 				this: unknown,

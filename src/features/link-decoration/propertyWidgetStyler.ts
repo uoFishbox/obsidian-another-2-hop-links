@@ -5,7 +5,7 @@ import { enableLogging, logger } from "shared/logging/logger";
 import {
 	getMetadataEditorContentEl,
 	getViewFile,
-} from "infrastructure/capabilities/ObsidianInternalFacade";
+} from "infrastructure/capabilities/obsidianInternals";
 
 type RegisteredWidgetRecord = {
 	sourceFile: TFile;

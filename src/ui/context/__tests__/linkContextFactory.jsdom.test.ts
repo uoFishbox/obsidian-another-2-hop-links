@@ -1,9 +1,11 @@
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { TFile } from "obsidian";
 import { createMockTFile } from "testing/__mocks__/testHelpers";
 import { createLinkContextFactory } from "ui/context/linkContextFactory";
 import type { TwoHopIndexedLink } from "types";
 import { triggerHoverPopover } from "features/popover/mobilePopover";
+import { openFile, openLinkDestination } from "infrastructure/workspace/fileOpener";
+import { resolveFileByPath } from "shared/obsidian/resolveFileByPath";
 
 vi.mock("ui/handlers/viewHandlers", () => ({
 	handleTagClick: vi.fn(),
@@ -12,6 +14,19 @@ vi.mock("ui/handlers/viewHandlers", () => ({
 vi.mock("features/popover/mobilePopover", () => ({
 	triggerHoverPopover: vi.fn(),
 }));
+
+vi.mock("infrastructure/workspace/fileOpener", () => ({
+	openFile: vi.fn(),
+	openLinkDestination: vi.fn(),
+}));
+
+vi.mock("shared/obsidian/resolveFileByPath", () => ({
+	resolveFileByPath: vi.fn(),
+}));
+
+const openFileMock = vi.mocked(openFile);
+const openLinkDestinationMock = vi.mocked(openLinkDestination);
+const resolveFileByPathMock = vi.mocked(resolveFileByPath);
 
 function createPosition(line: number) {
 	return {
@@ -36,29 +51,31 @@ function createPreviewServiceMock() {
 	return {};
 }
 
+function createFactory(metadataCache: object, workspace: object = {}) {
+	return createLinkContextFactory(
+		metadataCache as any,
+		{} as any,
+		{} as any,
+		workspace as any,
+		{} as any,
+		{ workspace } as any,
+		createPreviewServiceMock() as any,
+	);
+}
+
 describe("createLinkContextFactory", () => {
+	beforeEach(() => {
+		vi.clearAllMocks();
+	});
+
 	it("onHop2Click: does not pass property key when search hit position is prioritized", () => {
 		const sourceFile = createMockTFile("notes/source.md");
-		const handleOpenFile = vi.fn();
-		const eventHandlers = {
-			handleResolveFile: vi.fn(),
-			handleOpenFile,
-			handleOpenLinkDestination: vi.fn(),
-			handleGetMetadata: vi.fn(),
-			handleShowFileMenu: vi.fn(),
-		} as any;
-
-		const factory = createLinkContextFactory(
+		const workspace = {};
+		const factory = createFactory(
 			{
 				fileToLinktext: vi.fn((f: TFile) => f.basename),
-			} as any,
-			eventHandlers,
-			{} as any,
-			{} as any,
-			{} as any,
-			{} as any,
-			{} as any,
-			createPreviewServiceMock() as any,
+			},
+			workspace,
 		);
 		const context = factory(sourceFile, {
 			highlightOnOpen: "always",
@@ -70,7 +87,8 @@ describe("createLinkContextFactory", () => {
 			preferredPosition: createPosition(9),
 		});
 
-		expect(handleOpenFile).toHaveBeenCalledWith(
+		expect(openFileMock).toHaveBeenCalledWith(
+			workspace,
 			sourceFile,
 			expect.objectContaining({
 				start: expect.objectContaining({ line: 9 }),
@@ -83,33 +101,14 @@ describe("createLinkContextFactory", () => {
 	it("onHop1Click: does not pass property key when search hit position is prioritized", () => {
 		const originFile = createMockTFile("notes/origin.md");
 		const targetFile = createMockTFile("notes/target.md");
-		const handleOpenFile = vi.fn();
-		const handleOpenLinkDestination = vi.fn();
-		const eventHandlers = {
-			handleResolveFile: vi.fn(() => targetFile),
-			handleOpenFile,
-			handleOpenLinkDestination,
-			handleGetMetadata: vi.fn(),
-			handleShowFileMenu: vi.fn(),
-		} as any;
+		const workspace = { openLinkText: vi.fn() };
+		resolveFileByPathMock.mockReturnValue(targetFile);
 
-		const factory = createLinkContextFactory(
+		const factory = createFactory(
 			{
 				fileToLinktext: vi.fn((f: TFile) => f.basename),
-			} as any,
-			eventHandlers,
-			{} as any,
-			{} as any,
-			{} as any,
-			{
-				app: {
-					workspace: {
-						openLinkText: vi.fn(),
-					},
-				},
-			} as any,
-			{} as any,
-			createPreviewServiceMock() as any,
+			},
+			workspace,
 		);
 		const context = factory(originFile, {
 			highlightOnOpen: "always",
@@ -124,7 +123,8 @@ describe("createLinkContextFactory", () => {
 			preferredPosition: createPosition(6),
 		});
 
-		expect(handleOpenFile).toHaveBeenCalledWith(
+		expect(openFileMock).toHaveBeenCalledWith(
+			workspace,
 			targetFile,
 			expect.objectContaining({
 				start: expect.objectContaining({ line: 6 }),
@@ -132,21 +132,13 @@ describe("createLinkContextFactory", () => {
 			false,
 			undefined,
 		);
-		expect(handleOpenLinkDestination).not.toHaveBeenCalled();
+		expect(openLinkDestinationMock).not.toHaveBeenCalled();
 	});
 
 	it("onHop2Click: runtime-hydrates backlink position and opens", () => {
 		const sourceFile = createMockTFile("notes/source.md");
-		const handleOpenFile = vi.fn();
-		const eventHandlers = {
-			handleResolveFile: vi.fn(),
-			handleOpenFile,
-			handleOpenLinkDestination: vi.fn(),
-			handleGetMetadata: vi.fn(),
-			handleShowFileMenu: vi.fn(),
-		} as any;
-
-		const factory = createLinkContextFactory(
+		const workspace = {};
+		const factory = createFactory(
 			{
 				fileToLinktext: vi.fn((f: TFile) => f.basename),
 				getFileCache: vi.fn(() => ({
@@ -161,14 +153,8 @@ describe("createLinkContextFactory", () => {
 					embeds: [],
 					frontmatterLinks: undefined,
 				})),
-			} as any,
-			eventHandlers,
-			{} as any,
-			{} as any,
-			{} as any,
-			{} as any,
-			{} as any,
-			createPreviewServiceMock() as any,
+			},
+			workspace,
 		);
 		const context = factory(sourceFile, {
 			highlightOnOpen: "always",
@@ -180,7 +166,8 @@ describe("createLinkContextFactory", () => {
 		};
 		context.onHop2Click(new MouseEvent("click"), link);
 
-		expect(handleOpenFile).toHaveBeenCalledWith(
+		expect(openFileMock).toHaveBeenCalledWith(
+			workspace,
 			sourceFile,
 			expect.objectContaining({
 				start: expect.objectContaining({ line: 4 }),
@@ -194,7 +181,7 @@ describe("createLinkContextFactory", () => {
 		const sourceFile = createMockTFile("notes/source.md");
 		const targetFile = createMockTFile("notes/target.md");
 		const otherFile = createMockTFile("notes/other.md");
-		const handleOpenFile = vi.fn();
+		const workspace = {};
 		const metadataCache = {
 			fileToLinktext: vi.fn((f: TFile) => f.basename),
 			getFileCache: vi.fn(() => ({
@@ -224,22 +211,7 @@ describe("createLinkContextFactory", () => {
 				return null;
 			}),
 		} as any;
-		const factory = createLinkContextFactory(
-			metadataCache,
-			{
-				handleResolveFile: vi.fn(),
-				handleOpenFile,
-				handleOpenLinkDestination: vi.fn(),
-				handleGetMetadata: vi.fn(),
-				handleShowFileMenu: vi.fn(),
-			} as any,
-			{} as any,
-			{} as any,
-			{} as any,
-			{} as any,
-			{} as any,
-			createPreviewServiceMock() as any,
-		);
+		const factory = createFactory(metadataCache, workspace);
 		const context = factory(sourceFile, { highlightOnOpen: "always" } as any);
 		const link: TwoHopIndexedLink = {
 			rawText: "target",
@@ -251,7 +223,8 @@ describe("createLinkContextFactory", () => {
 
 		context.onHop2Click(new MouseEvent("click"), link);
 
-		expect(handleOpenFile).toHaveBeenCalledWith(
+		expect(openFileMock).toHaveBeenCalledWith(
+			workspace,
 			sourceFile,
 			undefined,
 			false,
@@ -269,25 +242,13 @@ describe("createLinkContextFactory", () => {
 		}
 
 		const sourceFile = createMockTFile("notes/source.md");
-		const handleOpenFile = vi.fn();
-		const factory = createLinkContextFactory(
+		const workspace = {};
+		const factory = createFactory(
 			{
 				fileToLinktext: vi.fn((f: TFile) => f.basename),
 				getFileCache: vi.fn(() => null),
-			} as any,
-			{
-				handleResolveFile: vi.fn(),
-				handleOpenFile,
-				handleOpenLinkDestination: vi.fn(),
-				handleGetMetadata: vi.fn(),
-				handleShowFileMenu: vi.fn(),
-			} as any,
-			{} as any,
-			{} as any,
-			{} as any,
-			{} as any,
-			{} as any,
-			createPreviewServiceMock() as any,
+			},
+			workspace,
 		);
 		const context = factory(sourceFile, {
 			highlightOnOpen: "always",
@@ -299,7 +260,8 @@ describe("createLinkContextFactory", () => {
 
 		context.onHop2Click(event, createBaseLink(sourceFile));
 
-		expect(handleOpenFile).toHaveBeenCalledWith(
+		expect(openFileMock).toHaveBeenCalledWith(
+			workspace,
 			sourceFile,
 			expect.objectContaining({
 				start: expect.objectContaining({ line: 1 }),
@@ -311,6 +273,7 @@ describe("createLinkContextFactory", () => {
 
 	it("onLinkHover: runtime-hydrates backlink position and passes to hover", () => {
 		const sourceFile = createMockTFile("notes/source.md");
+		const workspace = {};
 		const metadataCache = {
 			fileToLinktext: vi.fn((f: TFile) => f.basename),
 			getFileCache: vi.fn(() => ({
@@ -327,22 +290,7 @@ describe("createLinkContextFactory", () => {
 			})),
 		} as any;
 
-		const factory = createLinkContextFactory(
-			metadataCache,
-			{
-				handleResolveFile: vi.fn(),
-				handleOpenFile: vi.fn(),
-				handleOpenLinkDestination: vi.fn(),
-				handleGetMetadata: vi.fn(),
-				handleShowFileMenu: vi.fn(),
-			} as any,
-			{} as any,
-			{} as any,
-			{} as any,
-			{} as any,
-			{} as any,
-			createPreviewServiceMock() as any,
-		);
+		const factory = createFactory(metadataCache, workspace);
 		const context = factory(sourceFile, {} as any);
 
 		context.onLinkHover?.(
@@ -356,7 +304,7 @@ describe("createLinkContextFactory", () => {
 		);
 
 		expect(triggerHoverPopover).toHaveBeenCalledWith(
-			expect.anything(),
+			workspace,
 			expect.anything(),
 			expect.any(MouseEvent),
 			expect.objectContaining({

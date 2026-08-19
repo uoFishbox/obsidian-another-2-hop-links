@@ -47,7 +47,6 @@ vi.mock("obsidian", () => {
 });
 
 import { MarkdownView, TFile } from "obsidian";
-import { PatchRegistry } from "infrastructure/capabilities/PatchRegistry";
 import { initFilePatcher } from "../MarkdownViewPatcher";
 
 function createPlugin(displayMode: "editor-inline" | "hybrid" | "sidebar") {
@@ -87,7 +86,7 @@ describe("MarkdownViewPatcher", () => {
 
 	it("prepares inline containers on file load without mounting components", async () => {
 		const { plugin, cleanup } = createPlugin("editor-inline");
-		initFilePatcher(plugin as any, new PatchRegistry());
+		initFilePatcher(plugin as any);
 
 		try {
 			const view = new (MarkdownView as any)();
@@ -108,7 +107,7 @@ describe("MarkdownViewPatcher", () => {
 
 	it("skips container preparation outside inline modes and still unmounts on unload", async () => {
 		const { plugin, cleanup } = createPlugin("sidebar");
-		initFilePatcher(plugin as any, new PatchRegistry());
+		initFilePatcher(plugin as any);
 
 		try {
 			const view = new (MarkdownView as any)();

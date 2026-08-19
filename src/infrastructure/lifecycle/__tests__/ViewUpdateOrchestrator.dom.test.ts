@@ -255,6 +255,7 @@ describe("ViewUpdateOrchestrator", () => {
 			affectedLookupKeys: [],
 		});
 
+		expect(mocks.app.workspace.iterateAllLeaves).toHaveBeenCalledTimes(1);
 		expect(mocks.markdownRenderManager.reprocessDecorations).toHaveBeenCalledTimes(
 			1,
 		);
@@ -284,6 +285,9 @@ describe("ViewUpdateOrchestrator", () => {
 		const preview = createMarkdownLeaf("notes/preview.md", "preview");
 		const leaves = [source.leaf, preview.leaf];
 		const mocks = createMocks();
+		mocks.markdownRenderManager.getTrackedSourcePaths.mockReturnValue(
+			new Set(["notes/source.md", "notes/preview.md"]),
+		);
 		mocks.app.workspace.iterateAllLeaves.mockImplementation(
 			(callback: (leaf: { view: unknown }) => void) => leaves.forEach(callback),
 		);
@@ -292,6 +296,7 @@ describe("ViewUpdateOrchestrator", () => {
 
 		orchestrator.updateForContext({});
 
+		expect(mocks.app.workspace.iterateAllLeaves).toHaveBeenCalledTimes(2);
 		expect(mocks.markdownRenderManager.reprocessDecorations).toHaveBeenCalledWith(
 			"notes/source.md",
 		);

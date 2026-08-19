@@ -1,34 +1,27 @@
 import type { PluginHost } from "types/pluginHost";
 import { waitForViewRequest } from "./patcherUtils";
 import type { CanvasView, CanvasViewCanvas } from "obsidian-typings";
-import { ObsidianInternalFacade } from "infrastructure/capabilities/ObsidianInternalFacade";
-import type { PatchRegistry } from "infrastructure/capabilities/PatchRegistry";
+import { getCanvasSelectionData } from "infrastructure/capabilities/obsidianInternals";
+import { applyPatch } from "infrastructure/capabilities/applyPatch";
 const canvasPatchIds = new WeakMap<CanvasViewCanvas, string>();
 let nextCanvasPatchId = 1;
 
-export function initCanvasPatcher(
-	plugin: PluginHost,
-	patchRegistry: PatchRegistry,
-): void {
-	waitForViewRequest<CanvasView>(plugin, patchRegistry, "canvas", (view) =>
-		patchCanvasView(plugin, patchRegistry, view),
+export function initCanvasPatcher(plugin: PluginHost): void {
+	waitForViewRequest<CanvasView>(plugin, "canvas", (view) =>
+		patchCanvasView(plugin, view),
 	);
 	setTimeout(() => {
 		const leaves = plugin.app.workspace.getLeavesOfType("canvas");
 		for (const leaf of leaves) {
 			const view = leaf.view as CanvasView;
 			if (view && view.canvas) {
-				patchCanvasView(plugin, patchRegistry, view);
+				patchCanvasView(plugin, view);
 			}
 		}
 	}, 100);
 }
 
-function patchCanvasView(
-	plugin: PluginHost,
-	patchRegistry: PatchRegistry,
-	view: CanvasView,
-): void {
+function patchCanvasView(plugin: PluginHost, view: CanvasView): void {
 	const canvas = view.canvas;
 
 	if (!canvas) return;
@@ -38,12 +31,10 @@ function patchCanvasView(
 		canvasPatchIds.set(canvas, patchId);
 	}
 
-	const applied = patchRegistry.apply(plugin, {
+	const applied = applyPatch(plugin, {
 		id: patchId,
 		target: canvas,
 		method: "updateSelection",
-		risk: "medium",
-		enabled: true,
 		wrap: (next) =>
 			function (this: CanvasViewCanvas, update: () => void) {
 				const result = next.call(this, update);
@@ -58,15 +49,13 @@ function patchCanvasView(
 					return result;
 				}
 
-				const capability = new ObsidianInternalFacade(
-					plugin.app,
-				).getCanvasSelectionData(this);
-				if (!capability.ok) {
+				const canvasWithSelectionData = getCanvasSelectionData(this);
+				if (!canvasWithSelectionData) {
 					return result;
 				}
 
 				const selectedNodes =
-					capability.value.getSelectionData?.()?.nodes ?? [];
+					canvasWithSelectionData.getSelectionData?.()?.nodes ?? [];
 				plugin.app.workspace.trigger(
 					"cosense-card-links:canvas-selection-changed" as any,
 					this,

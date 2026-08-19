@@ -1,6 +1,5 @@
-import { TFile, type MetadataCache, type Vault, type Workspace } from "obsidian";
+import { Menu, TFile, type MetadataCache, type Vault, type Workspace } from "obsidian";
 import type { App } from "obsidian";
-import type { EventHandlers } from "types/services";
 import type { IPreviewService } from "types/services";
 import type {
 	CachedMetadataWithLinkReferences,
@@ -19,10 +18,12 @@ import {
 	hydrateRuntimeBacklinkLink,
 } from "./runtimeBacklinkPositionResolver";
 import { isMouseEventLike } from "ui/shared/dom/realmSafeDom";
+import { openFile, openLinkDestination } from "infrastructure/workspace/fileOpener";
+import { resolveFileByPath } from "shared/obsidian/resolveFileByPath";
+import * as ErrorHandler from "shared/errors/errorHandler";
 
 export function createLinkContextFactory(
 	metadataCache: MetadataCache,
-	eventHandlers: EventHandlers,
 	indexingService: IIndexingService,
 	vault: Vault,
 	workspace: Workspace,
@@ -31,6 +32,31 @@ export function createLinkContextFactory(
 	previewService: IPreviewService,
 ) {
 	const fileToLinktext = metadataCache.fileToLinktext.bind(metadataCache);
+	const resolveFile = (path: string): TFile | null => {
+		try {
+			return resolveFileByPath(vault, path);
+		} catch (error) {
+			ErrorHandler.handleLinkResolutionError(error, path);
+			return null;
+		}
+	};
+	const showFileMenu = (event: MouseEvent, file: TFile): void => {
+		try {
+			const menu = new Menu();
+			menu.addItem((item) => {
+				item.setTitle("Open in new tab")
+					.setIcon("file-plus")
+					.setSection("open")
+					.onClick(() => {
+						void openFile(workspace, file, undefined, "tab");
+					});
+			});
+			workspace.trigger("file-menu", menu, file);
+			menu.showAtMouseEvent(event);
+		} catch (error) {
+			ErrorHandler.handleFileOperationError(error, "showFileMenu", file.path);
+		}
+	};
 	return (file: TFile, settings: PluginSettings): LinkContext => {
 		const dragLinkFormat = buildDragLinkFormat(file, fileToLinktext, app);
 		const resolveHighlightEnabled = (
@@ -59,7 +85,6 @@ export function createLinkContextFactory(
 			const shift = event.shiftKey;
 			const middleClick = event.button === 1;
 
-			// Shift+Alt+Ctrl で新しいウィンドウで開く
 			if (shift && alt && ctrl) {
 				return "window";
 			}
@@ -77,16 +102,18 @@ export function createLinkContextFactory(
 		const linkContext: Partial<LinkContext> = {
 			getPreview: (fileToLoad, signal, options) =>
 				previewService.getPreview(fileToLoad, signal, options),
-			resolveFile: eventHandlers.handleResolveFile,
+			resolveFile,
 			buildWikiLink: (targetFile: TFile | null, fallback: string) =>
 				targetFile ? dragLinkFormat(targetFile) : `[[${fallback}]]`,
-			getMetadata: eventHandlers.handleGetMetadata,
-			onOpenFile: (event, f, pos, options) =>
-				eventHandlers.handleOpenFile(
+			getMetadata: (targetFile) => metadataCache.getFileCache(targetFile),
+			onOpenFile: (event, f, pos, options) => {
+				void openFile(
+					workspace,
 					f,
 					resolveHighlightEnabled(event, options) ? pos : undefined,
 					getNewLeafOption(event),
-				),
+				);
+			},
 			onHop2Click: (event, link, options) => {
 				const highlight = resolveHighlightEnabled(event, options);
 				const hydratedLink = options?.preferredPosition
@@ -101,7 +128,8 @@ export function createLinkContextFactory(
 							link,
 							metadataCache,
 						);
-				eventHandlers.handleOpenFile(
+				void openFile(
+					workspace,
 					link.sourceFile,
 					highlight ? hydratedLink.position : undefined,
 					getNewLeafOption(event),
@@ -131,7 +159,7 @@ export function createLinkContextFactory(
 			},
 			sourceFile: file,
 			fileToLinktext: fileToLinktext,
-			onShowFileMenu: eventHandlers.handleShowFileMenu,
+			onShowFileMenu: showFileMenu,
 		};
 		linkContext.onHop1Click = (event, link, options) => {
 			if (link.isUnresolved) {
@@ -144,9 +172,10 @@ export function createLinkContextFactory(
 
 			const highlight = resolveHighlightEnabled(event, options);
 			if (options?.preferredPosition && link.path) {
-				const targetFile = eventHandlers.handleResolveFile(link.path);
+				const targetFile = resolveFile(link.path);
 				if (targetFile) {
-					eventHandlers.handleOpenFile(
+					void openFile(
+						workspace,
 						targetFile,
 						highlight ? options.preferredPosition : undefined,
 						newLeafOption,
@@ -173,7 +202,7 @@ export function createLinkContextFactory(
 				}
 			}
 
-			eventHandlers.handleOpenLinkDestination(linkToOpen, file, newLeafOption);
+			void openLinkDestination(workspace, linkToOpen, file, newLeafOption);
 		};
 
 		linkContext.onTagClick = (tag: string) =>

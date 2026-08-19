@@ -46,10 +46,10 @@ export function createViewUpdateOrchestrator(
 	} = deps;
 
 	function updateAllViews(): void {
-		reprocessTrackedMarkdownDecorations(collectTrackedMarkdownSourcePaths());
-		updateMarkdownSourceViews();
-		updateMarkdownReadingViews();
-		updateCanvasViews();
+		reprocessTrackedMarkdownDecorations(
+			markdownRenderManager.getTrackedSourcePaths(),
+		);
+		updateWorkspaceViews();
 		updateBasesPanes();
 		propertyStyleManager.updateAll();
 	}
@@ -89,9 +89,7 @@ export function createViewUpdateOrchestrator(
 			markdownRenderManager.reprocessDecorations(sourcePath);
 		}
 
-		updateMarkdownSourceViews(refreshSourcePathSet);
-		updateMarkdownReadingViews(refreshSourcePathSet);
-		updateCanvasViews(refreshSourcePathSet, affectedLookupKeySet);
+		updateWorkspaceViews(refreshSourcePathSet, affectedLookupKeySet);
 		updateBasesPanes(affectedLookupKeySet);
 		if (refreshSourcePathSet.size > 0) {
 			propertyStyleManager.updateForPaths(refreshSourcePathSet);
@@ -131,30 +129,58 @@ export function createViewUpdateOrchestrator(
 		}
 	}
 
-	function updateMarkdownSourceViews(affectedPaths?: Set<string>): void {
+	function updateWorkspaceViews(
+		affectedPaths?: Set<string>,
+		affectedLookupKeys?: Set<string>,
+	): void {
 		app.workspace.iterateAllLeaves((leaf) => {
-			if (!(leaf.view instanceof MarkdownView)) {
+			const view = leaf.view;
+			if (view instanceof MarkdownView) {
+				updateMarkdownView(view, affectedPaths);
 				return;
 			}
 
-			if (leaf.view.getMode() !== "source" || !leaf.view.file) {
-				return;
+			if (view.getViewType() === "canvas") {
+				updateCanvasView(view as CanvasView, affectedPaths, affectedLookupKeys);
 			}
+		});
+	}
 
-			const sourcePath = leaf.view.file.path;
-			if (affectedPaths && !affectedPaths.has(sourcePath)) {
-				return;
-			}
+	function updateMarkdownView(view: MarkdownView, affectedPaths?: Set<string>): void {
+		if (!view.file) {
+			return;
+		}
 
-			const cm = leaf.view.editor?.cm;
+		const sourcePath = view.file.path;
+		if (affectedPaths && !affectedPaths.has(sourcePath)) {
+			return;
+		}
+
+		if (view.getMode() === "source") {
+			const cm = view.editor?.cm;
 			if (cm) {
 				cm.dispatch({
 					effects: forceRedrawEffect.of(undefined),
 				});
 			}
 
-			decorateLivePreviewPostProcessorContainers(leaf.view, sourcePath);
-		});
+			decorateLivePreviewPostProcessorContainers(view, sourcePath);
+			return;
+		}
+
+		if (view.getMode() !== "preview") {
+			return;
+		}
+
+		// 起動直後などで postProcessor 登録対象外だった既存プレビュー要素にも適用する
+		const previewContainer = getPreviewContainerForReadingView(view);
+		if (
+			previewContainer &&
+			previewContainer.isConnected &&
+			!markdownRenderManager.isTrackedElement(sourcePath, previewContainer)
+		) {
+			stylingService.decorateLinksInContainer(previewContainer, sourcePath);
+		}
 	}
 
 	function decorateLivePreviewPostProcessorContainers(
@@ -177,37 +203,6 @@ export function createViewUpdateOrchestrator(
 				return;
 			}
 			stylingService.decorateLinksInContainer(container, sourcePath);
-		});
-	}
-
-	function updateMarkdownReadingViews(affectedPaths?: Set<string>): void {
-		app.workspace.iterateAllLeaves((leaf) => {
-			if (
-				leaf.view instanceof MarkdownView &&
-				leaf.view.getMode() === "preview" &&
-				leaf.view.file
-			) {
-				const sourcePath = leaf.view.file.path;
-				if (affectedPaths && !affectedPaths.has(sourcePath)) {
-					return;
-				}
-
-				// 起動直後などで postProcessor 登録対象外だった既存プレビュー要素にも適用する
-				const previewContainer = getPreviewContainerForReadingView(leaf.view);
-				if (
-					previewContainer &&
-					previewContainer.isConnected &&
-					!markdownRenderManager.isTrackedElement(
-						sourcePath,
-						previewContainer,
-					)
-				) {
-					stylingService.decorateLinksInContainer(
-						previewContainer,
-						sourcePath,
-					);
-				}
-			}
 		});
 	}
 
@@ -236,60 +231,54 @@ export function createViewUpdateOrchestrator(
 		return result;
 	}
 
-	function updateCanvasViews(
+	function updateCanvasView(
+		canvasView: CanvasView,
 		affectedPaths?: Set<string>,
 		affectedLookupKeys?: Set<string>,
 	): void {
-		app.workspace.iterateAllLeaves((leaf) => {
-			if (leaf.view.getViewType() !== "canvas") {
-				return;
+		const canvasFile = canvasView.file;
+		if (!canvasFile || !canvasView.canvas?.nodes) {
+			return;
+		}
+
+		for (const node of canvasView.canvas.nodes.values()) {
+			const anyNode = node as any;
+			const sourcePath = anyNode.file?.path ?? canvasFile.path;
+			const previewEl = anyNode.child?.previewMode?.containerEl;
+			const targetEl = previewEl || anyNode.contentEl;
+
+			const matchesPath = !affectedPaths || affectedPaths.has(sourcePath);
+			const matchesLookupKey =
+				!matchesPath &&
+				!!affectedLookupKeys &&
+				affectedLookupKeys.size > 0 &&
+				!!targetEl &&
+				containerHasAffectedLookupKey(targetEl, affectedLookupKeys);
+
+			if (!matchesPath && !matchesLookupKey) {
+				continue;
 			}
 
-			const canvasView = leaf.view as CanvasView;
-			const canvasFile = canvasView.file;
-			if (!canvasFile || !canvasView.canvas?.nodes) {
-				return;
+			const cm = anyNode.child?.editMode?.cm;
+			if (cm) {
+				cm.dispatch({
+					effects: forceRedrawEffect.of(undefined),
+				});
+				continue;
 			}
 
-			for (const node of canvasView.canvas.nodes.values()) {
-				const anyNode = node as any;
-				const sourcePath = anyNode.file?.path ?? canvasFile.path;
-				const previewEl = anyNode.child?.previewMode?.containerEl;
-				const targetEl = previewEl || anyNode.contentEl;
-
-				const matchesPath = !affectedPaths || affectedPaths.has(sourcePath);
-				const matchesLookupKey =
-					!matchesPath &&
-					!!affectedLookupKeys &&
-					affectedLookupKeys.size > 0 &&
-					!!targetEl &&
-					containerHasAffectedLookupKey(targetEl, affectedLookupKeys);
-
-				if (!matchesPath && !matchesLookupKey) {
-					continue;
-				}
-
-				const cm = anyNode.child?.editMode?.cm;
-				if (cm) {
-					cm.dispatch({
-						effects: forceRedrawEffect.of(undefined),
-					});
-					continue;
-				}
-
-				if (anyNode.file && anyNode.contentEl) {
-					plugin.processUnresolvedLinksInElement(
-						anyNode.contentEl,
-						anyNode.file.path,
-					);
-					continue;
-				}
-
-				if (targetEl) {
-					plugin.processUnresolvedLinksInElement(targetEl, canvasFile.path);
-				}
+			if (anyNode.file && anyNode.contentEl) {
+				plugin.processUnresolvedLinksInElement(
+					anyNode.contentEl,
+					anyNode.file.path,
+				);
+				continue;
 			}
-		});
+
+			if (targetEl) {
+				plugin.processUnresolvedLinksInElement(targetEl, canvasFile.path);
+			}
+		}
 	}
 
 	function containerHasAffectedLookupKey(
@@ -306,21 +295,6 @@ export function createViewUpdateOrchestrator(
 		}
 
 		return false;
-	}
-
-	function collectTrackedMarkdownSourcePaths(): Set<string> {
-		const sourcePaths = new Set<string>();
-		app.workspace.iterateAllLeaves((leaf) => {
-			if (leaf.view instanceof MarkdownView && leaf.view.file) {
-				sourcePaths.add(leaf.view.file.path);
-			}
-		});
-
-		for (const sourcePath of markdownRenderManager.getTrackedSourcePaths()) {
-			sourcePaths.add(sourcePath);
-		}
-
-		return sourcePaths;
 	}
 
 	function reprocessTrackedMarkdownDecorations(sourcePaths: Iterable<string>): void {

@@ -4,7 +4,6 @@ import type { CanvasViewCanvas } from "obsidian-typings";
 import type { CanvasNodeData } from "types/obsidian";
 import type { SettingsManager } from "features/settings/persistence/SettingsManager";
 import type { IComponentManager } from "types/services";
-import type { WorkspaceViewQueries } from "infrastructure/workspace/workspaceViewQueries";
 import { resolveWorkspaceWindow } from "infrastructure/workspace/workspaceDocuments";
 import type { DisplayModeStrategy } from "features/display-mode/createDisplayModeStrategy";
 import type { DisplayModeStrategyContext } from "features/display-mode/DisplayModeStrategyContext";
@@ -15,9 +14,9 @@ import {
 } from "features/two-hop/ui/TwoHopLinksView";
 import {
 	getCanvasFile,
+	getCanvasSelectionData,
 	getFileNodePath,
-	ObsidianInternalFacade,
-} from "infrastructure/capabilities/ObsidianInternalFacade";
+} from "infrastructure/capabilities/obsidianInternals";
 
 export class DisplayModeController {
 	private readonly VIEW_TYPES = {
@@ -38,7 +37,6 @@ export class DisplayModeController {
 	constructor(
 		private app: App,
 		private settingsManager: SettingsManager,
-		private viewManager: WorkspaceViewQueries,
 		private componentManager: IComponentManager,
 		private plugin: Plugin,
 		private updateSidebarView?: (file: TFile) => void,
@@ -165,10 +163,10 @@ export class DisplayModeController {
 	private forEachMarkdownView(
 		callback: (view: MarkdownView, file: TFile) => void,
 	): void {
-		for (const view of this.viewManager.getOpenMarkdownViews()) {
-			const file = this.viewManager.getFileFromView(view);
-			if (file && view instanceof MarkdownView) {
-				callback(view, file);
+		for (const leaf of this.app.workspace.getLeavesOfType("markdown")) {
+			const view = leaf.view;
+			if (view instanceof MarkdownView && view.file) {
+				callback(view, view.file);
 			}
 		}
 	}
@@ -178,19 +176,15 @@ export class DisplayModeController {
 		if (!canvas) return;
 
 		if (this.shouldFollowSelectedCanvasFileNode()) {
-			const capability = new ObsidianInternalFacade(
-				this.app,
-			).getCanvasSelectionData(canvas);
-			const nodes: CanvasNodeData[] = capability.ok
-				? (capability.value.getSelectionData?.()?.nodes ?? [])
-				: [];
+			const canvasWithSelectionData = getCanvasSelectionData(canvas);
+			const nodes: CanvasNodeData[] =
+				canvasWithSelectionData?.getSelectionData?.()?.nodes ?? [];
 
 			if (nodes.length === 1 && nodes[0].type === this.NODE_TYPES.FILE) {
 				const node = nodes[0];
 				const filePath = getFileNodePath(node);
 
 				if (filePath && this.updateSidebarView) {
-					// ファイルパスからTFileを取得して表示更新
 					const file = resolveFileByPath(this.app.vault, filePath);
 					if (file) {
 						this.updateSidebarView(file);
@@ -244,7 +238,6 @@ export class DisplayModeController {
 			const capturedPath = activeFile.path;
 			const ownerWindow = resolveWorkspaceWindow(this.app.workspace);
 			const update = () => {
-				// rAF待機中にアクティブファイルが変わった場合は旧ファイル描画を抑止
 				const latestActiveFile = this.getActiveFile?.();
 				if (!latestActiveFile || latestActiveFile.path !== capturedPath) {
 					return;
@@ -278,12 +271,9 @@ export class DisplayModeController {
 		const canvas = (view as { canvas?: CanvasViewCanvas }).canvas;
 		if (!canvas) return false;
 
-		const capability = new ObsidianInternalFacade(this.app).getCanvasSelectionData(
-			canvas,
-		);
-		const nodes: CanvasNodeData[] = capability.ok
-			? (capability.value.getSelectionData?.()?.nodes ?? [])
-			: [];
+		const canvasWithSelectionData = getCanvasSelectionData(canvas);
+		const nodes: CanvasNodeData[] =
+			canvasWithSelectionData?.getSelectionData?.()?.nodes ?? [];
 
 		return nodes.length === 1 && nodes[0].type === this.NODE_TYPES.FILE;
 	}

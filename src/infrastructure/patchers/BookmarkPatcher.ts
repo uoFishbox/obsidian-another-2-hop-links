@@ -1,7 +1,7 @@
 import type { PluginHost } from "types/pluginHost";
 import { normalizePath } from "obsidian";
 import { enableLogging, logger } from "shared/logging/logger";
-import type { PatchRegistry } from "infrastructure/capabilities/PatchRegistry";
+import { applyPatch } from "infrastructure/capabilities/applyPatch";
 
 type VaultAdapterWithWrite = {
 	write: (
@@ -11,18 +11,13 @@ type VaultAdapterWithWrite = {
 	) => Promise<unknown>;
 };
 
-export function initBookmarkPatcher(
-	plugin: PluginHost,
-	patchRegistry: PatchRegistry,
-): void {
+export function initBookmarkPatcher(plugin: PluginHost): void {
 	const bookmarksPath = normalizePath(`${plugin.app.vault.configDir}/bookmarks.json`);
 
-	const applied = patchRegistry.apply(plugin, {
+	const applied = applyPatch(plugin, {
 		id: "vault-adapter:write-bookmarks",
 		target: plugin.app.vault.adapter as VaultAdapterWithWrite,
 		method: "write",
-		risk: "low",
-		enabled: true,
 		wrap: (next) =>
 			async function (
 				this: unknown,
@@ -32,7 +27,6 @@ export function initBookmarkPatcher(
 			) {
 				const result = await next.call(this, normalizedPath, data, options);
 
-				// ブックマークファイルが更新された場合、カスタムイベントを発火
 				if (normalizedPath === bookmarksPath) {
 					if (enableLogging)
 						logger(

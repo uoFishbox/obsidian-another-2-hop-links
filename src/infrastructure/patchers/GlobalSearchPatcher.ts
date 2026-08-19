@@ -2,35 +2,28 @@ import type { PluginHost } from "types/pluginHost";
 import { enableLogging, logger } from "shared/logging/logger";
 import { openTagNotesView } from "features/tag-notes/ui/TagNotesView";
 import { areTagFeaturesEnabled } from "features/settings/model";
-import { ObsidianInternalFacade } from "infrastructure/capabilities/ObsidianInternalFacade";
-import type { PatchRegistry } from "infrastructure/capabilities/PatchRegistry";
+import { getGlobalSearchOpenGlobalSearch } from "infrastructure/capabilities/obsidianInternals";
+import { applyPatch } from "infrastructure/capabilities/applyPatch";
 import type { TaggedNote } from "types/domain";
 
-export function initGlobalSearchPatcher(
-	plugin: PluginHost,
-	patchRegistry: PatchRegistry,
-): void {
+export function initGlobalSearchPatcher(plugin: PluginHost): void {
 	plugin.app.workspace.onLayoutReady(() => {
-		patchGlobalSearch(plugin, patchRegistry);
+		patchGlobalSearch(plugin);
 	});
 }
 
-function patchGlobalSearch(plugin: PluginHost, patchRegistry: PatchRegistry): void {
-	const capability = new ObsidianInternalFacade(
-		plugin.app,
-	).getGlobalSearchOpenGlobalSearch();
-	if (!capability.ok) {
+function patchGlobalSearch(plugin: PluginHost): void {
+	const capability = getGlobalSearchOpenGlobalSearch(plugin.app);
+	if (!capability) {
 		if (enableLogging)
-			logger(`[GlobalSearchPatcher] Skipped patch: ${capability.reason}.`);
+			logger("[GlobalSearchPatcher] Skipped patch: global-search unavailable.");
 		return;
 	}
 
-	const applied = patchRegistry.apply(plugin, {
+	const applied = applyPatch(plugin, {
 		id: "global-search:openGlobalSearch",
-		target: capability.value.instance,
+		target: capability.instance,
 		method: "openGlobalSearch",
-		risk: capability.risk,
-		enabled: true,
 		wrap: (next) => {
 			let searchGeneration = 0;
 			return function (this: unknown, query: string) {

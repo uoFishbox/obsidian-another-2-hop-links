@@ -10,7 +10,6 @@ vi.mock("features/tag-notes/ui/TagNotesView", () => ({
 }));
 
 import { initGlobalSearchPatcher } from "../GlobalSearchPatcher";
-import { PatchRegistry } from "infrastructure/capabilities/PatchRegistry";
 
 function createPlugin(getNotesWithTag: (tag: string) => Promise<TaggedNote[]>) {
 	const originalOpenGlobalSearch = vi.fn();
@@ -37,7 +36,7 @@ function createPlugin(getNotesWithTag: (tag: string) => Promise<TaggedNote[]>) {
 		register: vi.fn(),
 	};
 
-	initGlobalSearchPatcher(plugin as any, new PatchRegistry());
+	initGlobalSearchPatcher(plugin as any);
 
 	return {
 		instance,
@@ -138,10 +137,7 @@ describe("GlobalSearchPatcher", () => {
 	});
 
 	test("ignores an older tag lookup that completes after a newer search", async () => {
-		const resolvers = new Map<
-			string,
-			(notes: TaggedNote[]) => void
-		>();
+		const resolvers = new Map<string, (notes: TaggedNote[]) => void>();
 		const { instance, originalOpenGlobalSearch } = createPlugin(
 			(tag) =>
 				new Promise<TaggedNote[]>((resolve) => {

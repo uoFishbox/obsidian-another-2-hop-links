@@ -104,31 +104,10 @@ export class DOMMutationObserver {
 		}
 	}
 
-	private collectBasesViewContainers(root: HTMLElement): HTMLElement[] {
-		if (root.matches(".bases-view")) {
-			return [root];
-		}
-
-		return Array.from(root.querySelectorAll<HTMLElement>(".bases-view"));
-	}
-
 	private initBasesObservers(): void {
 		const containersToWatch = new Set<HTMLElement>();
 
-		this.plugin.app.workspace.getLeavesOfType("bases").forEach((leaf) => {
-			for (const el of this.collectBasesViewContainers(leaf.view.containerEl)) {
-				containersToWatch.add(el);
-			}
-		});
-
-		this.plugin.app.workspace.getLeavesOfType("markdown").forEach((leaf) => {
-			for (const el of this.collectBasesViewContainers(leaf.view.containerEl)) {
-				containersToWatch.add(el);
-			}
-		});
-
-		// Bases can also be embedded or internally re-mounted without a workspace
-		// leaf transition. Query every workspace Document, including popouts.
+		// Workspace Documents cover regular leaves, embedded Bases, and popouts.
 		for (const ownerDocument of collectWorkspaceDocuments(
 			this.plugin.app.workspace,
 		)) {

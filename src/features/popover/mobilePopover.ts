@@ -15,9 +15,9 @@ import {
 } from "./hoverPopoverLinkSpec";
 import { enableLogging, logger } from "shared/logging/logger";
 import {
-	ObsidianInternalFacade,
+	getPagePreviewOnLinkHover,
 	type PagePreviewOnLinkHoverCapability,
-} from "infrastructure/capabilities/ObsidianInternalFacade";
+} from "infrastructure/capabilities/obsidianInternals";
 import { isHTMLElementLike, isShadowRootLike } from "ui/shared/dom/realmSafeDom";
 
 function describeTargetEl(
@@ -176,11 +176,11 @@ const mobileHoverParent: { hoverPopover: HoverPopover | undefined } = {
 
 function getPagePreviewInstance(app: App): typeof pagePreviewInstance {
 	if (!checkedPagePreview) {
-		const capability = new ObsidianInternalFacade(app).getPagePreviewOnLinkHover();
-		if (capability.ok) {
-			pagePreviewInstance = capability.value.instance;
+		const capability = getPagePreviewOnLinkHover(app);
+		if (capability) {
+			pagePreviewInstance = capability.instance;
 		} else {
-			console.warn(`Could not get page-preview instance: ${capability.reason}`);
+			console.warn("Could not get page-preview instance");
 			pagePreviewInstance = undefined;
 		}
 		checkedPagePreview = true;

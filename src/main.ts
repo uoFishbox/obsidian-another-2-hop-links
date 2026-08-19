@@ -25,7 +25,6 @@ import { registerMarkdownProcessors } from "infrastructure/registration/register
 import { registerFileMenu } from "infrastructure/registration/registerFileMenu";
 import { installAllPatchers } from "infrastructure/patchers/installAllPatchers";
 import { setupWorkspaceEventHandlers } from "infrastructure/workspace/workspaceEventBootstrap";
-import { PatchRegistry } from "infrastructure/capabilities/PatchRegistry";
 import {
 	createPluginRuntime,
 	type PluginRuntime,
@@ -35,7 +34,6 @@ import type { PluginHost } from "types/pluginHost";
 export default class CosenseCardLinksPlugin extends Plugin implements PluginHost {
 	public settings: PluginSettings = { ...DEFAULT_SETTINGS };
 	public settingsManager!: SettingsManager;
-	private readonly patchRegistry = new PatchRegistry();
 	private runtime!: PluginRuntime;
 
 	private readonly forceRedrawEffect = forceRedrawEffect;
@@ -145,8 +143,7 @@ export default class CosenseCardLinksPlugin extends Plugin implements PluginHost
 		this.app.workspace.onLayoutReady(async () => {
 			if (this.isUnloaded) return;
 
-			installAllPatchers(this, this.patchRegistry, {
-				stylingService: runtime.stylingService,
+			installAllPatchers(this, {
 				propertyWidgetStyler: runtime.propertyWidgetStyler,
 			});
 

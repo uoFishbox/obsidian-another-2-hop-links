@@ -20,7 +20,7 @@ import {
 	unfreezePopoverForDebug,
 	setCCLDebugAutoFreeze,
 } from "./CCLDebugRuntime";
-import { ObsidianInternalFacade } from "infrastructure/capabilities/ObsidianInternalFacade";
+import { getPagePreviewOnLinkHover } from "infrastructure/capabilities/obsidianInternals";
 import {
 	getCCLDevMeasurementSnapshot,
 	resetCCLDevMeasurements,
@@ -80,17 +80,12 @@ declare global {
 }
 
 function getPagePreviewPlugin(plugin: PluginHost): unknown {
-	const capability = new ObsidianInternalFacade(
-		plugin.app,
-	).getPagePreviewOnLinkHover();
-	return capability.ok ? { instance: capability.value.instance } : undefined;
+	const capability = getPagePreviewOnLinkHover(plugin.app);
+	return capability ? { instance: capability.instance } : undefined;
 }
 
 function getPagePreviewInstance(plugin: PluginHost): unknown {
-	const capability = new ObsidianInternalFacade(
-		plugin.app,
-	).getPagePreviewOnLinkHover();
-	return capability.ok ? capability.value.instance : undefined;
+	return getPagePreviewOnLinkHover(plugin.app)?.instance;
 }
 
 function dumpProtoChain(obj: unknown): Array<{
