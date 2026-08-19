@@ -136,7 +136,6 @@ export function createVirtualSurfaceInteractions({
 		return installShadowHoverPopoverBridge({
 			shadowRoot,
 			registry: interactionRegistry,
-			linkContext,
 			appContext,
 		});
 	});
