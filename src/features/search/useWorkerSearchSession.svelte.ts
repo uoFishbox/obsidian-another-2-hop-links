@@ -5,24 +5,103 @@ import {
 	useFileContentIndex,
 	type FileContentIndexResult,
 } from "./useFileContentIndex.svelte";
-import type { SearchContentIndexEntry } from "./fileContentSearchIndex";
+import type { SearchContentIndexEntry } from "./useFileContentIndex.svelte";
 import type {
 	SearchWorkerMatchScope,
 	SearchWorkerItemSnapshot,
 	SearchWorkerMatchedItem,
+	SearchWorkerFileContentSnapshot,
 } from "./searchWorkerTypes";
-import {
-	shouldSyncWorkerFileContents,
-	diffSearchWorkerFileContentsFromVisitor,
-} from "./searchWorkerContentSync";
 import {
 	searchRipgrepContentByTerm,
 	filterSearchDatasetWithRipgrepMatches,
 	collectUniqueTargetFilePaths,
 } from "./ripgrepContentSearch";
+import { filterSearchWorkerDatasetWithMatchDetailsTimeSliced } from "./searchWorkerFilter";
 
 const EMPTY_SEARCH_WORKER_ITEMS: readonly SearchWorkerItemSnapshot[] = [];
 const EMPTY_RIPGREP_POSITION_BY_PATH = new Map<string, Pos>();
+
+interface WorkerFileContentSyncState {
+	sessionEnabled: boolean;
+	matchScope: SearchWorkerMatchScope;
+	query: string;
+	partialSyncEnabled: boolean;
+	contentIndexIsLoading: boolean;
+}
+
+function shouldSyncWorkerFileContents(state: WorkerFileContentSyncState): boolean {
+	if (
+		!state.sessionEnabled ||
+		state.matchScope !== "title-and-content" ||
+		!state.query
+	) {
+		return false;
+	}
+
+	return !state.contentIndexIsLoading || state.partialSyncEnabled;
+}
+
+interface SearchWorkerFileContentDiff {
+	changed: boolean;
+	upserts: SearchWorkerFileContentSnapshot[];
+	removals: string[];
+	nextEntriesByPath: Map<string, Readonly<SearchContentIndexEntry>> | null;
+}
+
+type FileContentEntryVisitor = (
+	visitor: (path: string, entry: Readonly<SearchContentIndexEntry>) => void,
+) => void;
+
+function diffSearchWorkerFileContentsFromVisitor(
+	visitCurrentEntries: FileContentEntryVisitor,
+	previousEntriesByPath: ReadonlyMap<string, Readonly<SearchContentIndexEntry>>,
+	includeContents: boolean,
+): SearchWorkerFileContentDiff {
+	const seenPaths = new Set<string>();
+	const upserts: SearchWorkerFileContentSnapshot[] = [];
+	const removals: string[] = [];
+	let nextEntriesByPath: Map<string, Readonly<SearchContentIndexEntry>> | null = null;
+	const ensureNextEntriesByPath = (): Map<
+		string,
+		Readonly<SearchContentIndexEntry>
+	> => {
+		nextEntriesByPath ??= new Map(previousEntriesByPath);
+		return nextEntriesByPath;
+	};
+
+	visitCurrentEntries((path, entry) => {
+		seenPaths.add(path);
+		const previousEntry = previousEntriesByPath.get(path);
+		if (
+			!includeContents ||
+			(previousEntry?.mtime === entry.mtime &&
+				previousEntry?.content === entry.content)
+		) {
+			return;
+		}
+
+		upserts.push({ path, content: entry.content });
+		ensureNextEntriesByPath().set(path, entry);
+	});
+
+	for (const path of previousEntriesByPath.keys()) {
+		if (seenPaths.has(path)) continue;
+		removals.push(path);
+		ensureNextEntriesByPath().delete(path);
+	}
+
+	if (upserts.length === 0 && removals.length === 0) {
+		return { changed: false, upserts, removals, nextEntriesByPath: null };
+	}
+
+	return {
+		changed: true,
+		upserts,
+		removals,
+		nextEntriesByPath: nextEntriesByPath ?? new Map(),
+	};
+}
 
 export type ContentSearchBackend = "worker" | "ripgrep";
 
@@ -34,15 +113,12 @@ export interface UseWorkerSearchSessionOptions {
 	matchScope?: SearchWorkerMatchScope | (() => SearchWorkerMatchScope);
 	getSearchableFiles: () => readonly TFile[];
 	buildDataset: () => readonly SearchWorkerItemSnapshot[];
-	contentSyncMode?: "eager" | "when-idle" | "progressive";
-	progressiveSyncIntervalMs?: number;
 	contentSearchBackend?: ContentSearchBackend | (() => ContentSearchBackend);
 	ripgrepExecutablePath?: string | (() => string | undefined);
 }
 
 export interface WorkerSearchSessionResult {
-	readonly matchedKeySet: Set<string> | null;
-	readonly matchedItemByKey: Map<string, SearchWorkerMatchedItem> | null;
+	readonly matchesByKey: Map<string, SearchWorkerMatchedItem> | null;
 	readonly matchedQuery: string;
 	readonly matchedScope: SearchWorkerMatchScope;
 	readonly isFiltering: boolean;
@@ -65,8 +141,6 @@ export function useWorkerSearchSession(
 		matchScope = "title-and-content",
 		getSearchableFiles,
 		buildDataset,
-		contentSyncMode = "eager",
-		progressiveSyncIntervalMs = 400,
 		contentSearchBackend = "worker",
 		ripgrepExecutablePath,
 	} = options;
@@ -88,10 +162,9 @@ export function useWorkerSearchSession(
 			: ripgrepExecutablePath;
 	let sessionEnabled = $derived(isEnabled());
 	let currentMatchScope = $derived(getMatchScope());
-	let progressiveTick = $state(0);
+	let partialSyncEnabled = $state(false);
 	let ripgrepBackendUnavailable = $state(false);
 	let lastRipgrepConfigSignature = "";
-	let lastProgressiveQuerySignature = "";
 	const getEffectiveContentSearchBackend = (): ContentSearchBackend =>
 		getContentSearchBackend() === "ripgrep" && !ripgrepBackendUnavailable
 			? "ripgrep"
@@ -111,8 +184,7 @@ export function useWorkerSearchSession(
 	};
 
 	let workerDataset = $derived.by(buildWorkerDataset);
-	let matchedKeySet = $state<Set<string> | null>(null);
-	let matchedItemByKey = $state<Map<string, SearchWorkerMatchedItem> | null>(null);
+	let matchesByKey = $state<Map<string, SearchWorkerMatchedItem> | null>(null);
 	let matchedQuery = $state("");
 	let matchedScope = $state<SearchWorkerMatchScope>("title-only");
 	let ripgrepPositionByPath = $state<Map<string, Pos>>(
@@ -125,6 +197,8 @@ export function useWorkerSearchSession(
 	let activeRequestScope: SearchWorkerMatchScope = "title-only";
 	let ripgrepRequestSerial = 0;
 	let ripgrepAbortController: AbortController | null = null;
+	let fallbackFilterSerial = 0;
+	let workerUnavailable = $state(false);
 	let lastIssuedSearchSignature = "";
 	let lastSyncedWorkerDataset: readonly SearchWorkerItemSnapshot[] | null = null;
 	let lastSyncedFileContentsByPath = new Map<
@@ -134,6 +208,7 @@ export function useWorkerSearchSession(
 
 	const searchWorkerClient = createSearchWorkerClient((message) => {
 		if (message.type === "error") {
+			workerUnavailable = true;
 			lastIssuedSearchSignature = "";
 			isWorkerFiltering = false;
 			const normalizedQuery = query();
@@ -151,26 +226,11 @@ export function useWorkerSearchSession(
 			return;
 		}
 
-		let matchedItems = message.matchedItems;
-		if (!matchedItems) {
-			const matchedKeys = message.matchedKeys ?? [];
-			matchedItems = new Array<SearchWorkerMatchedItem>(matchedKeys.length);
-			for (let index = 0; index < matchedKeys.length; index += 1) {
-				matchedItems[index] = {
-					key: matchedKeys[index],
-					titleMatched: true,
-					contentMatched: false,
-				};
-			}
+		const nextMatchesByKey = new Map<string, SearchWorkerMatchedItem>();
+		for (const item of message.matchedItems) {
+			nextMatchesByKey.set(item.key, item);
 		}
-		const nextMatchedKeySet = new Set<string>();
-		const nextMatchedItemByKey = new Map<string, SearchWorkerMatchedItem>();
-		for (const item of matchedItems) {
-			nextMatchedKeySet.add(item.key);
-			nextMatchedItemByKey.set(item.key, item);
-		}
-		matchedKeySet = nextMatchedKeySet;
-		matchedItemByKey = nextMatchedItemByKey;
+		matchesByKey = nextMatchesByKey;
 		matchedQuery = activeRequestQuery;
 		matchedScope = activeRequestScope;
 		ripgrepPositionByPath = EMPTY_RIPGREP_POSITION_BY_PATH;
@@ -187,8 +247,66 @@ export function useWorkerSearchSession(
 		ripgrepRequestSerial += 1;
 	};
 
+	const cancelFallbackSearch = (): void => {
+		fallbackFilterSerial += 1;
+	};
+
+	const buildFallbackContentByPath = (): Map<string, string> => {
+		const contentByPath = new Map<string, string>();
+		contentIndex.forEachEntry((path, entry) => {
+			contentByPath.set(path, entry.content);
+		});
+		return contentByPath;
+	};
+
+	const issueFallbackSearch = (
+		normalizedQuery: string,
+		requestId: number,
+		requestScope: SearchWorkerMatchScope,
+	): void => {
+		const fallbackSerial = ++fallbackFilterSerial;
+		const datasetVersion = syncedDatasetVersion;
+		const matchedItems: SearchWorkerMatchedItem[] = [];
+		isWorkerFiltering = true;
+
+		void filterSearchWorkerDatasetWithMatchDetailsTimeSliced({
+			dataset: {
+				datasetVersion,
+				items: workerDataset,
+				fileContents: [],
+			},
+			query: normalizedQuery,
+			matchScope: requestScope,
+			cachedContentByPath: buildFallbackContentByPath(),
+			onMatch: (item) => matchedItems.push(item),
+			isCancelled: () =>
+				fallbackSerial !== fallbackFilterSerial ||
+				requestId !== requestSerial ||
+				datasetVersion !== syncedDatasetVersion,
+		}).then(() => {
+			if (
+				fallbackSerial !== fallbackFilterSerial ||
+				requestId !== requestSerial ||
+				datasetVersion !== syncedDatasetVersion
+			) {
+				return;
+			}
+
+			const nextMatchesByKey = new Map<string, SearchWorkerMatchedItem>();
+			for (const item of matchedItems) {
+				nextMatchesByKey.set(item.key, item);
+			}
+			matchesByKey = nextMatchesByKey;
+			matchedQuery = normalizedQuery;
+			matchedScope = requestScope;
+			ripgrepPositionByPath = EMPTY_RIPGREP_POSITION_BY_PATH;
+			isWorkerFiltering = false;
+		});
+	};
+
 	onDestroy(() => {
 		cancelRipgrepSearch();
+		cancelFallbackSearch();
 		searchWorkerClient.terminate();
 	});
 
@@ -221,43 +339,25 @@ export function useWorkerSearchSession(
 	});
 
 	$effect(() => {
-		if (contentSyncMode !== "progressive") {
-			progressiveTick = 0;
-			lastProgressiveQuerySignature = "";
+		const shouldWaitForPartialSync =
+			sessionEnabled &&
+			isContentIndexEnabled() &&
+			currentMatchScope === "title-and-content" &&
+			getEffectiveContentSearchBackend() === "worker" &&
+			!!query() &&
+			contentIndex.isLoading();
+
+		partialSyncEnabled = false;
+		if (!shouldWaitForPartialSync) {
 			return;
 		}
 
-		const normalizedQuery =
-			sessionEnabled && currentMatchScope === "title-and-content" ? query() : "";
-		if (normalizedQuery === lastProgressiveQuerySignature) {
-			return;
-		}
-
-		lastProgressiveQuerySignature = normalizedQuery;
-		progressiveTick = 0;
-	});
-
-	$effect(() => {
-		if (contentSyncMode !== "progressive") {
-			return;
-		}
-
-		if (
-			!sessionEnabled ||
-			currentMatchScope !== "title-and-content" ||
-			getEffectiveContentSearchBackend() === "ripgrep" ||
-			!query() ||
-			!contentIndex.isLoading()
-		) {
-			return;
-		}
-
-		const timer = window.setInterval(() => {
-			progressiveTick += 1;
-		}, progressiveSyncIntervalMs);
+		const timer = window.setTimeout(() => {
+			partialSyncEnabled = true;
+		}, 400);
 
 		return () => {
-			window.clearInterval(timer);
+			window.clearTimeout(timer);
 		};
 	});
 
@@ -268,8 +368,7 @@ export function useWorkerSearchSession(
 			getEffectiveContentSearchBackend() !== "ripgrep";
 
 		if (!sessionEnabled && !contentSyncCanTrackPaths) {
-			matchedKeySet = null;
-			matchedItemByKey = null;
+			matchesByKey = null;
 			matchedQuery = "";
 			ripgrepPositionByPath = EMPTY_RIPGREP_POSITION_BY_PATH;
 			isWorkerFiltering = false;
@@ -278,8 +377,7 @@ export function useWorkerSearchSession(
 		}
 
 		if (!sessionEnabled) {
-			matchedKeySet = null;
-			matchedItemByKey = null;
+			matchesByKey = null;
 			matchedQuery = "";
 			ripgrepPositionByPath = EMPTY_RIPGREP_POSITION_BY_PATH;
 			isWorkerFiltering = false;
@@ -295,8 +393,7 @@ export function useWorkerSearchSession(
 				sessionEnabled,
 				matchScope: currentMatchScope,
 				query: query(),
-				contentSyncMode,
-				progressiveTick,
+				partialSyncEnabled,
 				contentIndexIsLoading: contentIndex.isLoading(),
 			});
 		const contentDiff = contentSyncCanTrackPaths
@@ -350,9 +447,9 @@ export function useWorkerSearchSession(
 
 		if (!sessionEnabled) {
 			cancelRipgrepSearch();
+			cancelFallbackSearch();
 			requestSerial += 1;
-			matchedKeySet = null;
-			matchedItemByKey = null;
+			matchesByKey = null;
 			matchedQuery = "";
 			ripgrepPositionByPath = EMPTY_RIPGREP_POSITION_BY_PATH;
 			isWorkerFiltering = false;
@@ -364,9 +461,9 @@ export function useWorkerSearchSession(
 		const normalizedQuery = query();
 		if (!normalizedQuery) {
 			cancelRipgrepSearch();
+			cancelFallbackSearch();
 			requestSerial += 1;
-			matchedKeySet = null;
-			matchedItemByKey = null;
+			matchesByKey = null;
 			matchedQuery = "";
 			ripgrepPositionByPath = EMPTY_RIPGREP_POSITION_BY_PATH;
 			isWorkerFiltering = false;
@@ -386,11 +483,10 @@ export function useWorkerSearchSession(
 		}
 
 		if (
-			matchedKeySet !== null &&
+			matchesByKey !== null &&
 			(matchedQuery !== normalizedQuery || matchedScope !== requestScope)
 		) {
-			matchedKeySet = null;
-			matchedItemByKey = null;
+			matchesByKey = null;
 			matchedQuery = "";
 			ripgrepPositionByPath = EMPTY_RIPGREP_POSITION_BY_PATH;
 		}
@@ -428,19 +524,12 @@ export function useWorkerSearchSession(
 						normalizedQuery,
 						ripgrepResult.matchesByTerm,
 						ripgrepResult.previewByPath,
-						ripgrepResult.positionByPath,
 					);
-					const nextMatchedKeySet = new Set<string>();
-					const nextMatchedItemByKey = new Map<
-						string,
-						SearchWorkerMatchedItem
-					>();
+					const nextMatchesByKey = new Map<string, SearchWorkerMatchedItem>();
 					for (const item of matchedItems) {
-						nextMatchedKeySet.add(item.key);
-						nextMatchedItemByKey.set(item.key, item);
+						nextMatchesByKey.set(item.key, item);
 					}
-					matchedKeySet = nextMatchedKeySet;
-					matchedItemByKey = nextMatchedItemByKey;
+					matchesByKey = nextMatchesByKey;
 					matchedQuery = normalizedQuery;
 					matchedScope = requestScope;
 					ripgrepPositionByPath = ripgrepResult.positionByPath;
@@ -468,6 +557,12 @@ export function useWorkerSearchSession(
 		}
 
 		cancelRipgrepSearch();
+		cancelFallbackSearch();
+		if (workerUnavailable) {
+			issueFallbackSearch(normalizedQuery, requestId, requestScope);
+			return;
+		}
+
 		isWorkerFiltering = true;
 		searchWorkerClient.filter({
 			requestId,
@@ -478,11 +573,8 @@ export function useWorkerSearchSession(
 	};
 
 	return {
-		get matchedKeySet() {
-			return matchedKeySet;
-		},
-		get matchedItemByKey() {
-			return matchedItemByKey;
+		get matchesByKey() {
+			return matchesByKey;
 		},
 		get matchedQuery() {
 			return matchedQuery;

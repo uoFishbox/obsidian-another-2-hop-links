@@ -26,17 +26,12 @@ export function filterSearchWorkerDataset(
 	matchScope: SearchWorkerMatchScope = "title-and-content",
 	cachedContentByPath?: ReadonlyMap<string, string>,
 ): string[] {
-	const matchedItems = filterSearchWorkerDatasetWithMatchDetails(
+	return filterSearchWorkerDatasetWithMatchDetails(
 		dataset,
 		query,
 		matchScope,
 		cachedContentByPath,
-	);
-	const matchedKeys = new Array<string>(matchedItems.length);
-	for (let index = 0; index < matchedItems.length; index += 1) {
-		matchedKeys[index] = matchedItems[index].key;
-	}
-	return matchedKeys;
+	).map((item) => item.key);
 }
 
 export function filterSearchWorkerDatasetWithMatchDetails(
@@ -135,7 +130,6 @@ function createEmptyQueryMatch(
 ): SearchWorkerMatchedItem {
 	return {
 		key: item.key,
-		titleMatched: true,
 		contentMatched: false,
 	};
 }
@@ -149,7 +143,6 @@ function getSearchWorkerItemMatch(
 	const fileContent = item.targetFilePath
 		? contentByPath?.get(item.targetFilePath)
 		: undefined;
-	let titleMatched = true;
 	let contentMatched = false;
 
 	for (const term of queryTerms) {
@@ -162,13 +155,11 @@ function getSearchWorkerItemMatch(
 			return null;
 		}
 
-		titleMatched = titleMatched && termTitleMatched;
 		contentMatched = contentMatched || (!termTitleMatched && termContentMatched);
 	}
 
 	return {
 		key: item.key,
-		titleMatched,
 		contentMatched,
 	};
 }
@@ -178,7 +169,7 @@ export function buildSearchWorkerContentMap(
 ): Map<string, string> {
 	const contentByPath = new Map<string, string>();
 	for (const entry of fileContents) {
-		contentByPath.set(entry.path, entry.content.toLowerCase());
+		contentByPath.set(entry.path, entry.content);
 	}
 	return contentByPath;
 }

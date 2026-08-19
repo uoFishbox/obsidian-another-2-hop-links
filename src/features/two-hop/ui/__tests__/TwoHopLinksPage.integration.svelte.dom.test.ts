@@ -30,7 +30,7 @@ import {
 const previewRuntimes = new Set<PreviewRuntime>();
 
 vi.mock("features/search/searchWorkerClient", async () => {
-	const { filterSearchWorkerDataset } =
+	const { filterSearchWorkerDatasetWithMatchDetails } =
 		await import("features/search/searchWorkerFilter");
 
 	return {
@@ -59,7 +59,7 @@ vi.mock("features/search/searchWorkerClient", async () => {
 						datasetVersion: update.datasetVersion,
 					};
 					for (const entry of update.entries) {
-						contentByPath.set(entry.path, entry.content.toLowerCase());
+						contentByPath.set(entry.path, entry.content);
 					}
 				},
 				removeFileContents: (update: {
@@ -84,7 +84,7 @@ vi.mock("features/search/searchWorkerClient", async () => {
 						type: "filter-result",
 						requestId: request.requestId,
 						datasetVersion: request.datasetVersion,
-						matchedKeys: filterSearchWorkerDataset(
+						matchedItems: filterSearchWorkerDatasetWithMatchDetails(
 							snapshot,
 							request.query,
 							request.matchScope,
@@ -126,7 +126,6 @@ vi.mock("features/search/useFileContentIndex.svelte", () => ({
 		isLoading: () => false,
 		getFirstMatchPosition: () => undefined,
 		forEachEntry: () => {},
-		getSerializableEntries: () => [],
 	}),
 }));
 

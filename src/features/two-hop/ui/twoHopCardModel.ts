@@ -11,7 +11,7 @@ export interface TwoHopCardModelRevision {
 	readonly settings: PluginSettings;
 	readonly searchQuery: string;
 	readonly searchScope: "title-only" | "title-and-content";
-	readonly matchedItemByKey: Map<string, SearchWorkerMatchedItem> | null;
+	readonly matchesByKey: Map<string, SearchWorkerMatchedItem> | null;
 	readonly linkContext: LinkUtilitiesContext;
 	readonly getPreviewRenderVersion: (path: string) => string;
 	readonly applicationUpdateVersion: number;
@@ -22,7 +22,7 @@ export function buildTwoHopCardModel(
 	row: TwoHopItemModel,
 	revision: TwoHopCardModelRevision,
 ): CardRenderModel {
-	const matchedItem = revision.matchedItemByKey?.get(row.searchKey);
+	const matchedItem = revision.matchesByKey?.get(row.searchKey);
 	return createCardRenderModel({
 		item: row.item,
 		settings: revision.settings,

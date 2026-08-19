@@ -7,12 +7,11 @@ import {
 } from "../searchWorkerFilter";
 
 describe("filterSearchWorkerDataset", () => {
-	it("normalizes file content to lower-case in the shared content map", () => {
+	it("uses normalized file content from the index without changing it", () => {
 		const contentByPath = buildSearchWorkerContentMap([
 			{
 				path: "notes/alpha.md",
-				content: "MiXeD Case Content",
-				mtime: 1,
+				content: "mixed case content",
 			},
 		]);
 
@@ -39,7 +38,6 @@ describe("filterSearchWorkerDataset", () => {
 					{
 						path: "notes/beta.md",
 						content: "this body contains the target token",
-						mtime: 1,
 					},
 				],
 			},
@@ -64,7 +62,6 @@ describe("filterSearchWorkerDataset", () => {
 					{
 						path: "notes/beta.md",
 						content: "this body contains the target token",
-						mtime: 1,
 					},
 				],
 			},
@@ -124,17 +121,14 @@ describe("filterSearchWorkerDataset", () => {
 					{
 						path: "notes/title-and-body.md",
 						content: "body includes beta",
-						mtime: 1,
 					},
 					{
 						path: "notes/title-only.md",
 						content: "body has something else",
-						mtime: 1,
 					},
 					{
 						path: "notes/body-only.md",
 						content: "alpha and beta are both here",
-						mtime: 1,
 					},
 				],
 			},
@@ -163,7 +157,6 @@ describe("filterSearchWorkerDataset", () => {
 				{
 					path: "notes/alpha.md",
 					content: "cached body token",
-					mtime: 1,
 				},
 			]),
 		);
@@ -191,12 +184,10 @@ describe("filterSearchWorkerDataset", () => {
 					{
 						path: "notes/title-only.md",
 						content: "body has no query",
-						mtime: 1,
 					},
 					{
 						path: "notes/content-only.md",
 						content: "body includes beta",
-						mtime: 1,
 					},
 				],
 			},
@@ -206,12 +197,10 @@ describe("filterSearchWorkerDataset", () => {
 		expect(result).toEqual([
 			{
 				key: "title-only",
-				titleMatched: true,
 				contentMatched: false,
 			},
 			{
 				key: "content-only",
-				titleMatched: false,
 				contentMatched: true,
 			},
 		]);
@@ -271,8 +260,6 @@ describe("filterSearchWorkerDataset", () => {
 			isCancelled: () => cancelled,
 		});
 
-		expect(matchedItems).toEqual([
-			{ key: "item-0", titleMatched: true, contentMatched: false },
-		]);
+		expect(matchedItems).toEqual([{ key: "item-0", contentMatched: false }]);
 	});
 });

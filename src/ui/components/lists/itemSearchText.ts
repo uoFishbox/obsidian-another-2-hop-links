@@ -3,7 +3,6 @@ import type { PluginSettings } from "features/settings/model";
 import { getFileCardTitleSearchText } from "core/frontmatterCardTitle";
 import type { ViewItem } from "application/presenters";
 import type { LinkContext } from "ui/context/linkContext";
-import { getBranchSearchText } from "features/search/searchSnapshotBuilders";
 
 export function createItemSearchTextCache() {
 	const cache = new Map<string, string>();
@@ -50,16 +49,16 @@ export const getItemSearchText = (
 		case "file":
 			return getFileText(item.data).toLowerCase();
 		case "branch": {
+			const branchText = item.data.hop1.rawText ?? item.data.hop1.path ?? "";
 			const targetFile = item.data.hop1.path
 				? linkContext.resolveFile(item.data.hop1.path)
 				: null;
 
 			if (!targetFile) {
-				return getBranchSearchText(item.data.hop1).toLowerCase();
+				return branchText.toLowerCase();
 			}
 
 			const titleText = getFileText(targetFile);
-			const branchText = getBranchSearchText(item.data.hop1);
 			return (
 				titleText && branchText
 					? `${titleText} ${branchText}`

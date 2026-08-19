@@ -7,6 +7,7 @@ import type {
 	TwoHopIndexedLink,
 	TwoHopLinkBranch,
 } from "types/domain";
+import type { SearchWorkerMatchedItem } from "features/search/searchWorkerTypes";
 import type { DisplayData } from "features/two-hop/application/displayDataBuilder";
 import {
 	createTwohopSearchAdapter,
@@ -90,6 +91,19 @@ const DEFAULT_RENDER_MODE: TwohopSearchRenderMode = {
 	useMergedLinks: false,
 	showTags: true,
 };
+
+function createMatchesByKey(
+	keys: Iterable<string>,
+): Map<string, SearchWorkerMatchedItem> {
+	const matchesByKey = new Map<string, SearchWorkerMatchedItem>();
+	for (const key of keys) {
+		matchesByKey.set(key, {
+			key,
+			contentMatched: false,
+		});
+	}
+	return matchesByKey;
+}
 
 function createAdapterOptions(
 	displayData: DisplayData,
@@ -318,14 +332,14 @@ describe("TwohopSearchAdapter.filterDisplayData", () => {
 		const result = searchAdapter.filterDisplayData(
 			displayData,
 			"",
-			new Set(),
+			createMatchesByKey([]),
 			DEFAULT_RENDER_MODE,
 		);
 
 		expect(result).toBe(displayData);
 	});
 
-	it("returns empty sections when matchedKeySet is null", () => {
+	it("returns empty sections when matchesByKey is null", () => {
 		const sourceFile = createMockTFile("notes/source.md");
 		const targetFile = createMockTFile("notes/target.md");
 		const displayData = createDisplayData({
@@ -366,7 +380,7 @@ describe("TwohopSearchAdapter.filterDisplayData", () => {
 		const result = searchAdapter.filterDisplayData(
 			displayData,
 			"query",
-			new Set([parentKey ?? ""]),
+			createMatchesByKey([parentKey ?? ""]),
 			DEFAULT_RENDER_MODE,
 		);
 
@@ -393,7 +407,7 @@ describe("TwohopSearchAdapter.filterDisplayData", () => {
 		const result = searchAdapter.filterDisplayData(
 			displayData,
 			"query",
-			new Set([betaChildKey ?? ""]),
+			createMatchesByKey([betaChildKey ?? ""]),
 			DEFAULT_RENDER_MODE,
 		);
 
@@ -419,7 +433,7 @@ describe("TwohopSearchAdapter.filterDisplayData", () => {
 		const result = searchAdapter.filterDisplayData(
 			displayData,
 			"query",
-			new Set([tagGroupKey ?? ""]),
+			createMatchesByKey([tagGroupKey ?? ""]),
 			DEFAULT_RENDER_MODE,
 		);
 
@@ -449,7 +463,7 @@ describe("TwohopSearchAdapter.filterDisplayData", () => {
 		const result = searchAdapter.filterDisplayData(
 			displayData,
 			"query",
-			new Set([betaNoteKey ?? ""]),
+			createMatchesByKey([betaNoteKey ?? ""]),
 			DEFAULT_RENDER_MODE,
 		);
 
@@ -474,7 +488,7 @@ describe("TwohopSearchAdapter.filterDisplayData", () => {
 		const result = searchAdapter.filterDisplayData(
 			displayData,
 			"query",
-			new Set(),
+			createMatchesByKey([]),
 			DEFAULT_RENDER_MODE,
 		);
 
@@ -498,7 +512,7 @@ describe("TwohopSearchAdapter.filterDisplayData", () => {
 		const result = adapter.filterDisplayData(
 			displayData,
 			"query",
-			new Set([key]),
+			createMatchesByKey([key]),
 			DEFAULT_RENDER_MODE,
 		);
 
@@ -550,7 +564,7 @@ describe("TwohopSearchAdapter.filterDisplayData", () => {
 		const result = searchAdapter.filterDisplayData(
 			displayData,
 			"query",
-			new Set([mergedKey ?? ""]),
+			createMatchesByKey([mergedKey ?? ""]),
 			{
 				useMergedLinks: true,
 				showTags: true,
@@ -581,7 +595,7 @@ describe("TwohopSearchAdapter.filterDisplayData", () => {
 		const result = searchAdapter.filterDisplayData(
 			displayData,
 			"query",
-			new Set([tagGroupKey ?? ""]),
+			createMatchesByKey([tagGroupKey ?? ""]),
 			{
 				useMergedLinks: false,
 				showTags: false,

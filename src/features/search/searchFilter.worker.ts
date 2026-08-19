@@ -29,7 +29,7 @@ self.onmessage = (event: MessageEvent<MainToSearchWorkerMessage>): void => {
 	if (message.type === "upsert-file-contents") {
 		currentDataset.datasetVersion = message.datasetVersion;
 		for (const entry of message.entries) {
-			currentContentByPath.set(entry.path, entry.content.toLowerCase());
+			currentContentByPath.set(entry.path, entry.content);
 		}
 		return;
 	}

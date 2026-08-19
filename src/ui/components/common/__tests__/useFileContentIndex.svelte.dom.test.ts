@@ -3,7 +3,6 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { tick } from "svelte";
 import { TFile, type App } from "obsidian";
 import { createMockTFile } from "testing/__mocks__/testHelpers";
-import { BoundedQueryCache } from "features/search/useFileContentIndex.svelte";
 import UseFileContentIndexHarness from "./UseFileContentIndexHarness.svelte";
 
 const yieldHarness = vi.hoisted(() => {
@@ -176,7 +175,7 @@ describe("useFileContentIndex", () => {
 		});
 	});
 
-	it("retains body snapshot as raw", async () => {
+	it("stores a normalized body snapshot for case-insensitive search", async () => {
 		const file = createMockTFile("notes/raw-content.md");
 		const rawContent = "MiXeD Case Token";
 		const { app } = createMockApp({
@@ -195,7 +194,7 @@ describe("useFileContentIndex", () => {
 
 		await waitFor(() => {
 			expect(screen.getByTestId("serialized-content").textContent).toBe(
-				rawContent,
+				rawContent.toLowerCase(),
 			);
 		});
 	});
@@ -416,36 +415,5 @@ describe("useFileContentIndex", () => {
 		await waitFor(() => {
 			expect(screen.getByTestId("first-match-line").textContent).toBe("1");
 		});
-	});
-
-	it("BoundedQueryCache retains only recently used queries", () => {
-		const cache = new BoundedQueryCache<number | undefined>(4);
-
-		cache.set("a", 1);
-		cache.set("b", 2);
-		cache.set("c", 3);
-		cache.set("d", undefined);
-
-		expect(cache.size()).toBe(4);
-		expect(cache.has("d")).toBe(true);
-		expect(cache.get("d")).toBeUndefined();
-		expect(cache.has("d")).toBe(true);
-		expect(cache.keys()).toEqual(["a", "b", "c", "d"]);
-
-		cache.get("b");
-		expect(cache.keys()).toEqual(["a", "c", "d", "b"]);
-
-		cache.set("e", 5);
-		expect(cache.size()).toBe(4);
-		expect(cache.keys()).toEqual(["c", "d", "b", "e"]);
-
-		cache.set("f", 6);
-		expect(cache.keys()).toEqual(["d", "b", "e", "f"]);
-
-		cache.set("g", 7);
-		expect(cache.keys()).toEqual(["b", "e", "f", "g"]);
-		expect(cache.has("a")).toBe(false);
-		expect(cache.has("c")).toBe(false);
-		expect(cache.has("d")).toBe(false);
 	});
 });

@@ -13,8 +13,9 @@
 		getSearchableFiles?: () => TFile[];
 		dataset: SearchWorkerItemSnapshot[];
 		buildDataset?: () => SearchWorkerItemSnapshot[];
-		contentSyncMode?: "eager" | "when-idle" | "progressive";
-		progressiveSyncIntervalMs?: number;
+		matchScope?: "title-only" | "title-and-content";
+		contentSearchBackend?: "worker" | "ripgrep";
+		ripgrepExecutablePath?: string;
 	}
 
 	let {
@@ -27,8 +28,9 @@
 		getSearchableFiles,
 		dataset,
 		buildDataset,
-		contentSyncMode,
-		progressiveSyncIntervalMs,
+		matchScope = "title-and-content",
+		contentSearchBackend = "worker",
+		ripgrepExecutablePath,
 	}: Props = $props();
 
 	const session = useWorkerSearchSession({
@@ -38,19 +40,23 @@
 		contentIndexEnabled,
 		getSearchableFiles: () => getSearchableFiles?.() ?? files,
 		buildDataset: () => buildDataset?.() ?? dataset,
-		contentSyncMode,
-		progressiveSyncIntervalMs,
+		matchScope,
+		contentSearchBackend,
+		ripgrepExecutablePath,
 	});
 
 	const matchedState = $derived(
-		session.matchedKeySet
-			? Array.from(session.matchedKeySet).sort().join(",")
+		session.matchesByKey
+			? Array.from(session.matchesByKey.keys()).sort().join(",")
 			: "null",
 	);
 	const isFiltering = $derived(session.isFiltering);
 	const isLoading = $derived(session.isLoading);
 	const matchedQuery = $derived(session.matchedQuery);
 	const matchedScope = $derived(session.matchedScope);
+	const alphaMatch = $derived(session.matchesByKey?.get("alpha"));
+	const betaMatch = $derived(session.matchesByKey?.get("beta"));
+	const firstMatchPosition = $derived(session.getFirstMatchPosition(query, files[0]));
 	let noise = $state(0);
 </script>
 
@@ -59,6 +65,14 @@
 <div data-testid="is-loading">{isLoading ? "true" : "false"}</div>
 <div data-testid="matched-query">{matchedQuery}</div>
 <div data-testid="matched-scope">{matchedScope}</div>
+<div data-testid="matched-content">{alphaMatch?.contentMatched ? "true" : "false"}</div>
+<div data-testid="matched-preview">{alphaMatch?.contentPreview ?? ""}</div>
+<div data-testid="beta-matched-content">
+	{betaMatch?.contentMatched ? "true" : "false"}
+</div>
+<div data-testid="first-match-position">
+	{JSON.stringify(firstMatchPosition ?? null)}
+</div>
 <button type="button" data-testid="rerender-noise" onclick={() => (noise += 1)}>
 	{noise}
 </button>

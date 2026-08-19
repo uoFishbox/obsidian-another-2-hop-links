@@ -120,8 +120,6 @@
 		query: () => search.normalized,
 		enabled: () => !!search.normalized,
 		matchScope: () => (contentSearchEnabled ? "title-and-content" : "title-only"),
-		contentSyncMode: "progressive",
-		progressiveSyncIntervalMs: 400,
 		getSearchableFiles: () => searchSnapshot.searchableFiles,
 		buildDataset: () => searchSnapshot.workerItems,
 		contentSearchBackend: () =>
@@ -129,13 +127,12 @@
 		ripgrepExecutablePath: () => currentSettings.ripgrepExecutablePath || undefined,
 	});
 	let isSearchLoading = $derived(workerSearchSession.isLoading);
-	let matchedKeySet = $derived(workerSearchSession.matchedKeySet);
-	let matchedItemByKey = $derived(workerSearchSession.matchedItemByKey);
+	let matchesByKey = $derived(workerSearchSession.matchesByKey);
 	let appliedSearchQuery = $derived(
-		matchedKeySet === null ? search.normalized : workerSearchSession.matchedQuery,
+		matchesByKey === null ? search.normalized : workerSearchSession.matchedQuery,
 	);
 	let appliedSearchScope = $derived(
-		matchedKeySet === null ? searchScope : workerSearchSession.matchedScope,
+		matchesByKey === null ? searchScope : workerSearchSession.matchedScope,
 	);
 	let paginationScope = $derived(
 		JSON.stringify([file.path, appliedSearchQuery, appliedSearchScope]),
@@ -145,7 +142,7 @@
 		return searchAdapter.filterDisplayData(
 			displayData,
 			appliedSearchQuery,
-			matchedKeySet,
+			matchesByKey,
 			getSearchRenderMode(),
 		);
 	});
@@ -257,7 +254,7 @@
 			settings: currentSettings,
 			searchQuery: appliedSearchQuery,
 			searchScope: appliedSearchScope,
-			matchedItemByKey,
+			matchesByKey,
 			linkContext,
 			getPreviewRenderVersion,
 			applicationUpdateVersion: applicationStore.updateVersion,

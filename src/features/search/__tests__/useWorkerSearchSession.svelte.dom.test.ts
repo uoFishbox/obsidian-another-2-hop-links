@@ -1,9 +1,11 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/svelte";
+import { tick } from "svelte";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import UseWorkerSearchSessionHarness from "./UseWorkerSearchSessionHarness.svelte";
 import type {
 	SearchWorkerFileContentSnapshot,
 	SearchWorkerItemSnapshot,
+	SearchWorkerMatchedItem,
 } from "../searchWorkerTypes";
 
 type WorkerMessage =
@@ -11,7 +13,7 @@ type WorkerMessage =
 			type: "filter-result";
 			requestId: number;
 			datasetVersion: number;
-			matchedKeys: string[];
+			matchedItems: SearchWorkerMatchedItem[];
 	  }
 	| {
 			type: "error";
@@ -62,24 +64,28 @@ const workerHarness = vi.hoisted(() => {
 		emit(message: WorkerMessage) {
 			handler?.(message);
 		},
-		resolveFirstPendingSearch(matchedKeys: string[]) {
+		resolveFirstPendingSearch(keys: string[]) {
 			const request = pendingSearches.shift();
 			if (!request) throw new Error("No pending search");
 			handler?.({
 				type: "filter-result",
 				requestId: request.requestId,
 				datasetVersion: request.datasetVersion,
-				matchedKeys,
+				matchedItems: keys.map((key) => ({ key, contentMatched: false })),
 			});
 		},
-		resolveLatestPendingSearch(matchedKeys: string[]) {
+		resolveLatestPendingSearch(
+			keys: string[],
+			matchedItems?: SearchWorkerMatchedItem[],
+		) {
 			const request = pendingSearches.pop();
 			if (!request) throw new Error("No pending search");
 			handler?.({
 				type: "filter-result",
 				requestId: request.requestId,
 				datasetVersion: request.datasetVersion,
-				matchedKeys,
+				matchedItems:
+					matchedItems ?? keys.map((key) => ({ key, contentMatched: false })),
 			});
 		},
 		rejectLatestPendingSearch(message = "failed") {
@@ -100,9 +106,14 @@ const workerHarness = vi.hoisted(() => {
 			client.removeFileContents.mockReset();
 			client.filter.mockReset();
 			client.terminate.mockReset();
+			ripgrepHarness.search.mockReset();
 		},
 	};
 });
+
+const ripgrepHarness = vi.hoisted(() => ({
+	search: vi.fn(),
+}));
 
 const fileContentIndexHarness = vi.hoisted(() => {
 	const state = {
@@ -132,6 +143,17 @@ vi.mock("../searchWorkerClient.js", () => ({
 	}),
 }));
 
+vi.mock("../ripgrepContentSearch.js", async () => {
+	const actual = await vi.importActual<typeof import("../ripgrepContentSearch")>(
+		"../ripgrepContentSearch",
+	);
+
+	return {
+		...actual,
+		searchRipgrepContentByTerm: ripgrepHarness.search,
+	};
+});
+
 vi.mock("../useFileContentIndex.svelte.js", () => ({
 	useFileContentIndex: () => ({
 		hasMatch: vi.fn(() => false),
@@ -139,13 +161,9 @@ vi.mock("../useFileContentIndex.svelte.js", () => ({
 		getFirstMatchPosition: vi.fn(() => undefined),
 		forEachEntry: vi.fn((visitor) => {
 			for (const entry of fileContentIndexHarness.state.entries) {
-				visitor(entry.path, {
-					content: entry.content,
-					mtime: entry.mtime,
-				});
+				visitor(entry.path, entry);
 			}
 		}),
-		getSerializableEntries: vi.fn(() => fileContentIndexHarness.state.entries),
 	}),
 }));
 
@@ -160,6 +178,11 @@ function createDataset(keys: string[]): SearchWorkerItemSnapshot[] {
 async function flushAsyncUi(): Promise<void> {
 	await Promise.resolve();
 	await vi.runOnlyPendingTimersAsync();
+	await Promise.resolve();
+}
+
+async function flushReactiveUi(): Promise<void> {
+	await tick();
 	await Promise.resolve();
 }
 
@@ -195,7 +218,7 @@ describe("useWorkerSearchSession", () => {
 		expect(screen.getByTestId("is-filtering")).toHaveTextContent("false");
 	});
 
-	it("clears matchedKeySet and filtering state when query is emptied", async () => {
+	it("clears matchesByKey and filtering state when query is emptied", async () => {
 		const view = render(UseWorkerSearchSessionHarness, {
 			props: {
 				app: {} as never,
@@ -226,6 +249,62 @@ describe("useWorkerSearchSession", () => {
 
 		expect(screen.getByTestId("matched-state")).toHaveTextContent("null");
 		expect(screen.getByTestId("is-filtering")).toHaveTextContent("false");
+	});
+
+	it("represents a completed search with no matches as an empty result", async () => {
+		render(UseWorkerSearchSessionHarness, {
+			props: {
+				app: {} as never,
+				query: "missing",
+				enabled: true,
+				files: [],
+				dataset: createDataset(["alpha"]),
+			},
+		});
+
+		await flushAsyncUi();
+		workerHarness.resolveLatestPendingSearch([]);
+
+		await waitFor(() => {
+			expect(screen.getByTestId("matched-state")).toHaveTextContent(/^$/);
+			expect(screen.getByTestId("is-filtering")).toHaveTextContent("false");
+		});
+	});
+
+	it("uses the last match detail for duplicate keys", async () => {
+		render(UseWorkerSearchSessionHarness, {
+			props: {
+				app: {} as never,
+				query: "alpha",
+				enabled: true,
+				files: [],
+				dataset: createDataset(["alpha"]),
+			},
+		});
+
+		await flushAsyncUi();
+		workerHarness.resolveLatestPendingSearch(
+			["alpha"],
+			[
+				{
+					key: "alpha",
+					contentMatched: false,
+				},
+				{
+					key: "alpha",
+					contentMatched: true,
+					contentPreview: "latest preview",
+				},
+			],
+		);
+
+		await waitFor(() => {
+			expect(screen.getByTestId("matched-state")).toHaveTextContent("alpha");
+		});
+		expect(screen.getByTestId("matched-content")).toHaveTextContent("true");
+		expect(screen.getByTestId("matched-preview")).toHaveTextContent(
+			"latest preview",
+		);
 	});
 
 	it("preserves search results and does not revert to filtering on unrelated rerenders", async () => {
@@ -418,25 +497,17 @@ describe("useWorkerSearchSession", () => {
 		workerHarness.rejectLatestPendingSearch("failed");
 
 		await waitFor(() => {
-			expect(workerHarness.client.filter).toHaveBeenCalledTimes(2);
-		});
-		expect(workerHarness.getPendingSearchQueries()).toEqual(["alpha"]);
-		expect(screen.getByTestId("is-filtering")).toHaveTextContent("true");
-
-		workerHarness.resolveLatestPendingSearch(["alpha"]);
-
-		await waitFor(() => {
+			expect(workerHarness.client.filter).toHaveBeenCalledTimes(1);
 			expect(screen.getByTestId("matched-state")).toHaveTextContent("alpha");
 			expect(screen.getByTestId("is-filtering")).toHaveTextContent("false");
 		});
 	});
 
-	it("reflects body index matches in search results in eager mode", async () => {
+	it("reflects body index matches when loading has completed", async () => {
 		fileContentIndexHarness.setEntries([
 			{
 				path: "notes/beta.md",
 				content: "body contains target token",
-				mtime: 1,
 			},
 		]);
 
@@ -453,7 +524,6 @@ describe("useWorkerSearchSession", () => {
 						targetFilePath: "notes/beta.md",
 					},
 				],
-				contentSyncMode: "eager",
 			},
 		});
 
@@ -466,13 +536,12 @@ describe("useWorkerSearchSession", () => {
 		});
 	});
 
-	it("can adopt search result updates after tick in progressive mode", async () => {
+	it("syncs loading content once after a 400ms one-shot delay", async () => {
 		fileContentIndexHarness.setLoading(true);
 		fileContentIndexHarness.setEntries([
 			{
 				path: "notes/alpha.md",
 				content: "alpha body content",
-				mtime: 1,
 			},
 		]);
 
@@ -483,28 +552,74 @@ describe("useWorkerSearchSession", () => {
 				enabled: true,
 				files: [],
 				dataset: createDataset(["alpha"]),
-				contentSyncMode: "progressive",
-				progressiveSyncIntervalMs: 400,
 			},
 		});
 
+		await flushReactiveUi();
+		workerHarness.resolveLatestPendingSearch(["alpha"]);
+		await flushReactiveUi();
+
+		expect(workerHarness.client.upsertFileContents).not.toHaveBeenCalled();
+		await vi.advanceTimersByTimeAsync(399);
+		expect(workerHarness.client.upsertFileContents).not.toHaveBeenCalled();
+
+		await vi.advanceTimersByTimeAsync(1);
 		await flushAsyncUi();
+		expect(workerHarness.client.upsertFileContents).toHaveBeenCalledTimes(1);
 
 		workerHarness.resolveLatestPendingSearch(["alpha"]);
-
 		await waitFor(() => {
-			expect(screen.getByTestId("matched-state")).toHaveTextContent("alpha");
+			expect(screen.getByTestId("is-filtering")).toHaveTextContent("false");
 		});
 
 		await vi.advanceTimersByTimeAsync(400);
 		await flushAsyncUi();
+		expect(workerHarness.client.upsertFileContents).toHaveBeenCalledTimes(1);
 
-		workerHarness.resolveLatestPendingSearch(["alpha"]);
+		await vi.advanceTimersByTimeAsync(400);
+		await flushAsyncUi();
+		expect(workerHarness.client.upsertFileContents).toHaveBeenCalledTimes(1);
+	});
 
-		await waitFor(() => {
-			expect(screen.getByTestId("matched-state")).toHaveTextContent("alpha");
-			expect(screen.getByTestId("is-filtering")).toHaveTextContent("false");
+	it("invalidates the previous partial sync timer when the query changes", async () => {
+		fileContentIndexHarness.setLoading(true);
+		fileContentIndexHarness.setEntries([
+			{
+				path: "notes/alpha.md",
+				content: "alpha body content",
+			},
+		]);
+
+		const view = render(UseWorkerSearchSessionHarness, {
+			props: {
+				app: {} as never,
+				query: "alpha body",
+				enabled: true,
+				files: [],
+				dataset: createDataset(["alpha"]),
+			},
 		});
+
+		await flushReactiveUi();
+		await vi.advanceTimersByTimeAsync(399);
+
+		await view.rerender({
+			app: {} as never,
+			query: "beta body",
+			enabled: true,
+			files: [],
+			dataset: createDataset(["alpha"]),
+		});
+		await flushReactiveUi();
+
+		await vi.advanceTimersByTimeAsync(1);
+		await flushReactiveUi();
+		expect(workerHarness.client.upsertFileContents).not.toHaveBeenCalled();
+
+		await vi.advanceTimersByTimeAsync(399);
+		await vi.advanceTimersByTimeAsync(1);
+		await flushReactiveUi();
+		expect(workerHarness.client.upsertFileContents).toHaveBeenCalledTimes(1);
 	});
 
 	it("does not remove synced worker contents when the query is emptied", async () => {
@@ -512,7 +627,6 @@ describe("useWorkerSearchSession", () => {
 			{
 				path: "notes/alpha.md",
 				content: "alpha body content",
-				mtime: 1,
 			},
 		]);
 
@@ -531,7 +645,6 @@ describe("useWorkerSearchSession", () => {
 						targetFilePath: "notes/alpha.md",
 					},
 				],
-				contentSyncMode: "progressive",
 			},
 		});
 
@@ -543,7 +656,6 @@ describe("useWorkerSearchSession", () => {
 				{
 					path: "notes/alpha.md",
 					content: "alpha body content",
-					mtime: 1,
 				},
 			],
 		});
@@ -562,12 +674,129 @@ describe("useWorkerSearchSession", () => {
 					targetFilePath: "notes/alpha.md",
 				},
 			],
-			contentSyncMode: "progressive",
 		});
 
 		await flushAsyncUi();
 
 		expect(workerHarness.client.removeFileContents).not.toHaveBeenCalled();
+	});
+
+	it("removes stale worker content paths before the next filter", async () => {
+		fileContentIndexHarness.setEntries([
+			{
+				path: "notes/alpha.md",
+				content: "alpha body content",
+			},
+		]);
+
+		const view = render(UseWorkerSearchSessionHarness, {
+			props: {
+				app: {} as never,
+				query: "alpha body",
+				enabled: true,
+				contentIndexEnabled: true,
+				files: [],
+				dataset: [
+					{
+						key: "alpha",
+						searchText: "alpha title",
+						targetFilePath: "notes/alpha.md",
+					},
+				],
+			},
+		});
+
+		await flushAsyncUi();
+		expect(workerHarness.client.upsertFileContents).toHaveBeenCalled();
+
+		fileContentIndexHarness.setEntries([]);
+		await view.rerender({
+			app: {} as never,
+			query: "alpha body",
+			enabled: true,
+			contentIndexEnabled: true,
+			files: [],
+			dataset: [
+				{
+					key: "alpha",
+					searchText: "alpha title",
+					targetFilePath: "notes/alpha.md",
+				},
+			],
+		});
+		await flushAsyncUi();
+
+		expect(workerHarness.client.removeFileContents).toHaveBeenCalledWith({
+			datasetVersion: expect.any(Number),
+			paths: ["notes/alpha.md"],
+		});
+		view.unmount();
+	});
+
+	it("gets ripgrep match positions through the session API", async () => {
+		const targetFile = { path: "notes/target.md" } as never;
+		ripgrepHarness.search.mockResolvedValue({
+			matchesByTerm: new Map([["needle", new Set(["notes/target.md"])]]),
+			previewByPath: new Map(),
+			positionByPath: new Map([
+				[
+					"notes/target.md",
+					{
+						start: { line: 2, col: 4, offset: -1 },
+						end: { line: 2, col: 10, offset: -1 },
+					},
+				],
+			]),
+		});
+
+		render(UseWorkerSearchSessionHarness, {
+			props: {
+				app: {} as never,
+				query: "needle",
+				enabled: true,
+				matchScope: "title-and-content",
+				contentSearchBackend: "ripgrep",
+				files: [targetFile],
+				dataset: [
+					{
+						key: "target",
+						searchText: "plain title",
+						targetFilePath: "notes/target.md",
+					},
+				],
+			},
+		});
+
+		await waitFor(() => {
+			expect(screen.getByTestId("matched-state")).toHaveTextContent("target");
+		});
+		expect(screen.getByTestId("first-match-position")).toHaveTextContent(
+			JSON.stringify({
+				start: { line: 2, col: 4, offset: -1 },
+				end: { line: 2, col: 10, offset: -1 },
+			}),
+		);
+	});
+
+	it("cleans up the partial sync timer on destroy", async () => {
+		fileContentIndexHarness.setLoading(true);
+		const clearTimeoutSpy = vi.spyOn(window, "clearTimeout");
+		const view = render(UseWorkerSearchSessionHarness, {
+			props: {
+				app: {} as never,
+				query: "alpha",
+				enabled: true,
+				matchScope: "title-and-content",
+				files: [],
+				dataset: createDataset(["alpha"]),
+			},
+		});
+
+		await flushReactiveUi();
+		view.unmount();
+
+		expect(clearTimeoutSpy).toHaveBeenCalled();
+		clearTimeoutSpy.mockRestore();
 	});
 
 	it("terminates the worker client on destroy", async () => {

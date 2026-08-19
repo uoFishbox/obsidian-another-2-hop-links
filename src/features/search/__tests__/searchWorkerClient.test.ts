@@ -57,19 +57,11 @@ describe("createSearchWorkerClient", () => {
 		expect(workerHarness.factory).toHaveBeenCalledOnce();
 	});
 
-	it("can terminate safely before initialization", () => {
+	it("posts sync messages before the corresponding filter message", () => {
 		const client = createSearchWorkerClient(vi.fn());
 
-		expect(() => client.terminate()).not.toThrow();
-		expect(workerHarness.factory).not.toHaveBeenCalled();
-		expect(workerHarness.terminate).not.toHaveBeenCalled();
-	});
-
-	it("terminates a failed worker and filters from the retained snapshot", async () => {
-		const messages: SearchWorkerToMainMessage[] = [];
-		const client = createSearchWorkerClient((message) => messages.push(message));
 		client.syncItems({
-			datasetVersion: 2,
+			datasetVersion: 1,
 			items: [
 				{
 					key: "beta",
@@ -83,17 +75,45 @@ describe("createSearchWorkerClient", () => {
 			entries: [
 				{
 					path: "notes/beta.md",
-					content: "Body contains the recovery token",
-					mtime: 1,
+					content: "body contains beta",
 				},
 			],
 		});
 		client.filter({
 			requestId: 1,
 			datasetVersion: 2,
-			query: "recovery token",
+			query: "beta",
 			matchScope: "title-and-content",
 		});
+
+		expect(
+			workerHarness.postMessage.mock.calls.map(([message]) => message.type),
+		).toEqual(["sync-items", "upsert-file-contents", "filter"]);
+	});
+
+	it("forwards worker messages without retaining search state", () => {
+		const messages: SearchWorkerToMainMessage[] = [];
+		const client = createSearchWorkerClient((message) => messages.push(message));
+		client.syncItems({ datasetVersion: 1, items: [] });
+
+		const worker = workerHarness.factory.mock.results[0].value as WorkerDouble;
+		const response: SearchWorkerToMainMessage = {
+			type: "filter-result",
+			requestId: 3,
+			datasetVersion: 1,
+			matchedItems: [{ key: "alpha", contentMatched: false }],
+		};
+		worker.onmessage?.({
+			data: response,
+		} as MessageEvent<SearchWorkerToMainMessage>);
+
+		expect(messages).toEqual([response]);
+	});
+
+	it("reports worker errors and does not run fallback filtering", () => {
+		const messages: SearchWorkerToMainMessage[] = [];
+		const client = createSearchWorkerClient((message) => messages.push(message));
+		client.syncItems({ datasetVersion: 1, items: [] });
 
 		const failedWorker = workerHarness.factory.mock.results[0]
 			.value as WorkerDouble;
@@ -104,26 +124,22 @@ describe("createSearchWorkerClient", () => {
 
 		client.filter({
 			requestId: 2,
-			datasetVersion: 2,
-			query: "recovery token",
-			matchScope: "title-and-content",
+			datasetVersion: 1,
+			query: "alpha",
+			matchScope: "title-only",
 		});
 
-		await vi.waitFor(() => {
-			expect(messages).toHaveLength(2);
-		});
-		expect(messages[1]).toEqual({
-			type: "filter-result",
-			requestId: 2,
-			datasetVersion: 2,
-			matchedItems: [
-				{
-					key: "beta",
-					titleMatched: false,
-					contentMatched: true,
-				},
-			],
-		});
-		expect(workerHarness.postMessage).toHaveBeenCalledTimes(3);
+		expect(messages).toEqual([
+			{ type: "error", message: "worker crashed" },
+			{ type: "error", message: "Search worker is unavailable." },
+		]);
+	});
+
+	it("can terminate safely before initialization", () => {
+		const client = createSearchWorkerClient(vi.fn());
+
+		expect(() => client.terminate()).not.toThrow();
+		expect(workerHarness.factory).not.toHaveBeenCalled();
+		expect(workerHarness.terminate).not.toHaveBeenCalled();
 	});
 });

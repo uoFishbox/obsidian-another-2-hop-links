@@ -1,11 +1,9 @@
 import type { CachedMetadata, TFile } from "obsidian";
-import type { SearchWorkerItemSnapshot } from "features/search/searchWorkerTypes";
-import {
-	buildSearchWorkerItemSnapshot,
-	getBranchSearchText,
-	getTagGroupSearchText,
-	type FileToLinktext,
-} from "features/search/searchSnapshotBuilders";
+import type {
+	SearchWorkerItemSnapshot,
+	SearchWorkerMatchedItem,
+} from "features/search/searchWorkerTypes";
+import type { FileToLinktext } from "types/obsidian";
 import {
 	createBacklinkIdentitySignature,
 	createBranchIdentitySignature,
@@ -43,7 +41,7 @@ export interface TwohopSearchAdapter {
 	filterDisplayData(
 		displayData: DisplayData,
 		query: string,
-		matchedKeySet: Set<string> | null,
+		matchesByKey: Map<string, SearchWorkerMatchedItem> | null,
 		renderMode: TwohopSearchRenderMode,
 	): DisplayData;
 }
@@ -114,11 +112,11 @@ export function createTwohopSearchAdapter(): TwohopSearchAdapter {
 				getSearchKeyCache(options.displayData),
 			);
 		},
-		filterDisplayData(displayData, query, matchedKeySet, renderMode) {
+		filterDisplayData(displayData, query, matchesByKey, renderMode) {
 			return filterTwohopDisplayDataWithCache(
 				displayData,
 				query,
-				matchedKeySet,
+				matchesByKey,
 				renderMode,
 				getSearchKeyCache(displayData),
 			);
@@ -158,9 +156,11 @@ function buildTwoHopSearchSnapshotWithCache(
 		targetFile: TFile | null,
 	): void => {
 		addFile(targetFile);
-		snapshots.push(
-			buildSearchWorkerItemSnapshot(key, searchText, targetFile?.path ?? null),
-		);
+		snapshots.push({
+			key,
+			searchText: searchText.toLowerCase(),
+			targetFilePath: targetFile?.path ?? null,
+		});
 	};
 
 	const getBranchTitleSearchText = (
@@ -168,11 +168,11 @@ function buildTwoHopSearchSnapshotWithCache(
 		targetFile: TFile | null,
 	): string => {
 		if (!targetFile) {
-			return getBranchSearchText(branch.hop1);
+			return branch.hop1.rawText ?? branch.hop1.path ?? "";
 		}
 
 		const titleText = getFileTitleSearchText(targetFile);
-		const branchText = getBranchSearchText(branch.hop1);
+		const branchText = branch.hop1.rawText ?? branch.hop1.path ?? "";
 		return titleText && branchText
 			? `${titleText} ${branchText}`
 			: titleText || branchText;
@@ -234,11 +234,7 @@ function buildTwoHopSearchSnapshotWithCache(
 
 	if (options.renderMode.showTags) {
 		for (const section of displayData.tagGroups) {
-			appendSnapshot(
-				getTagGroupSearchKey(section),
-				getTagGroupSearchText(section.tag),
-				null,
-			);
+			appendSnapshot(getTagGroupSearchKey(section), `#${section.tag}`, null);
 
 			for (const note of section.notes) {
 				appendSnapshot(
@@ -259,7 +255,7 @@ function buildTwoHopSearchSnapshotWithCache(
 function filterTwohopDisplayDataWithCache(
 	displayData: DisplayData,
 	query: string,
-	matchedKeySet: Set<string> | null,
+	matchesByKey: Map<string, SearchWorkerMatchedItem> | null,
 	renderMode: TwohopSearchRenderMode,
 	searchKeyCache?: SearchKeyCache,
 ): DisplayData {
@@ -267,7 +263,7 @@ function filterTwohopDisplayDataWithCache(
 		return displayData;
 	}
 
-	if (!matchedKeySet) {
+	if (!matchesByKey) {
 		return {
 			...displayData,
 			outgoing: [],
@@ -282,26 +278,22 @@ function filterTwohopDisplayDataWithCache(
 	const outgoing = renderMode.useMergedLinks
 		? []
 		: filterWithReferenceReuse(displayData.outgoing, (branch) =>
-				matchedKeySet.has(createOutgoingSearchKey(branch, searchKeyCache)),
+				matchesByKey.has(createOutgoingSearchKey(branch, searchKeyCache)),
 			);
 	const backlinks = renderMode.useMergedLinks
 		? []
 		: filterWithReferenceReuse(displayData.backlinks, (link) =>
-				matchedKeySet.has(createBacklinkSearchKey(link, searchKeyCache)),
+				matchesByKey.has(createBacklinkSearchKey(link, searchKeyCache)),
 			);
 	const mergedItems = renderMode.useMergedLinks
 		? filterWithReferenceReuse(displayData.mergedItems, (item) =>
-				matchedKeySet.has(createMergedSearchKey(item, searchKeyCache)),
+				matchesByKey.has(createMergedSearchKey(item, searchKeyCache)),
 			)
 		: [];
 
 	const twoHopBranches: TwoHopLinkBranch[] = [];
 	for (const branch of displayData.twoHopBranches) {
-		const filteredBranch = filterTwohopBranch(
-			branch,
-			matchedKeySet,
-			searchKeyCache,
-		);
+		const filteredBranch = filterTwohopBranch(branch, matchesByKey, searchKeyCache);
 		if (filteredBranch) {
 			twoHopBranches.push(filteredBranch);
 		}
@@ -311,7 +303,7 @@ function filterTwohopDisplayDataWithCache(
 		for (const section of displayData.tagGroups) {
 			const filteredSection = filterTagGroup(
 				section,
-				matchedKeySet,
+				matchesByKey,
 				searchKeyCache,
 			);
 			if (filteredSection) {
@@ -333,12 +325,12 @@ function filterTwohopDisplayDataWithCache(
 
 function filterTwohopBranch(
 	branch: TwoHopLinkBranch,
-	matchedKeySet: Set<string>,
+	matchesByKey: Map<string, SearchWorkerMatchedItem>,
 	searchKeyCache?: SearchKeyCache,
 ): TwoHopLinkBranch | null {
 	const branchBaseKey = getBranchBaseKey(branch, searchKeyCache);
 	const matchedHop2 = branch.hop2.filter((link) =>
-		matchedKeySet.has(
+		matchesByKey.has(
 			createTwohopChildSearchKeyFromBranchBaseKey(
 				branchBaseKey,
 				link,
@@ -358,15 +350,15 @@ function filterTwohopBranch(
 
 function filterTagGroup(
 	section: TagGroup,
-	matchedKeySet: Set<string>,
+	matchesByKey: Map<string, SearchWorkerMatchedItem>,
 	searchKeyCache?: SearchKeyCache,
 ): TagGroup | null {
-	if (matchedKeySet.has(getTagGroupSearchKey(section))) {
+	if (matchesByKey.has(getTagGroupSearchKey(section))) {
 		return section;
 	}
 
 	const matchedNotes = section.notes.filter((note) =>
-		matchedKeySet.has(createTagNoteSearchKey(section, note, searchKeyCache)),
+		matchesByKey.has(createTagNoteSearchKey(section, note, searchKeyCache)),
 	);
 	if (matchedNotes.length === 0) {
 		return null;

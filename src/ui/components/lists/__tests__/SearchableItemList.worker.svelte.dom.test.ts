@@ -10,13 +10,15 @@ import type { ListConfig } from "../types";
 import type { LinkContext } from "ui/context/linkContext";
 import type { ApplicationStore } from "ui/stores/ApplicationStore.svelte";
 import type { ISortService } from "core/sorting";
+import type { SearchWorkerMatchedItem } from "features/search/searchWorkerTypes";
+import { filterSearchWorkerDatasetWithMatchDetails } from "features/search/searchWorkerFilter";
 
 type WorkerMessage =
 	| {
 			type: "filter-result";
 			requestId: number;
 			datasetVersion: number;
-			matchedKeys: string[];
+			matchedItems: SearchWorkerMatchedItem[];
 	  }
 	| {
 			type: "error";
@@ -194,7 +196,7 @@ vi.mock("features/search/searchWorkerClient", async () => {
 						datasetVersion: update.datasetVersion,
 					};
 					for (const entry of update.entries) {
-						contentByPath.set(entry.path, entry.content.toLowerCase());
+						contentByPath.set(entry.path, entry.content);
 					}
 				},
 				removeFileContents: (update: {
@@ -217,7 +219,7 @@ vi.mock("features/search/searchWorkerClient", async () => {
 					matchScope?: "title-only" | "title-and-content";
 				}) => {
 					workerHarness.getCalls().filter.push(request);
-					const matchedKeys = filterSearchWorkerDataset(
+					const matchedItems = filterSearchWorkerDatasetWithMatchDetails(
 						snapshot,
 						request.query,
 						request.matchScope,
@@ -227,7 +229,7 @@ vi.mock("features/search/searchWorkerClient", async () => {
 						type: "filter-result",
 						requestId: request.requestId,
 						datasetVersion: request.datasetVersion,
-						matchedKeys,
+						matchedItems,
 					};
 					if (workerHarness.shouldAutoReleaseFilters()) {
 						workerHarness.emit(response);
@@ -260,7 +262,6 @@ vi.mock("features/search/useFileContentIndex.svelte", () => ({
 				});
 			}
 		}),
-		getSerializableEntries: vi.fn(() => fileContentIndexHarness.state.entries),
 	}),
 }));
 
@@ -612,7 +613,7 @@ describe("SearchableItemList worker integration", () => {
 		const input = screen.getByRole("searchbox");
 		expect(getAllSearchableItems()).toHaveLength(2);
 
-		// First search: the worker response is held back, so matchedKeySet
+		// First search: the worker response is held back, so matchesByKey
 		// stays null and the unfiltered list must remain visible instead of
 		// unmounting LinkList.
 		await fireEvent.input(input, { target: { value: "alpha" } });
@@ -625,7 +626,7 @@ describe("SearchableItemList worker integration", () => {
 		await waitFor(() => expect(getAllSearchableItems()).toHaveLength(1));
 		expect(getAllSearchableItems()[0]).toHaveTextContent("alpha");
 
-		// Query change: matchedKeySet is reset to null until the new result
+		// Query change: matchesByKey is reset to null until the new result
 		// arrives, so the previous result set must stay mounted.
 		await fireEvent.input(input, { target: { value: "beta" } });
 		await vi.advanceTimersByTimeAsync(150);

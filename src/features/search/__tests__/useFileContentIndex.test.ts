@@ -4,7 +4,7 @@ import {
 	applyLoadedFileContentEntry,
 	reconcileFileContentIndex,
 	type SearchContentIndexEntry,
-} from "features/search/fileContentSearchIndex";
+} from "features/search/useFileContentIndex.svelte";
 
 const createMockFile = (path: string, mtime: number): TFile =>
 	({
@@ -28,8 +28,8 @@ describe("reconcileFileContentIndex", () => {
 
 		const result = reconcileFileContentIndex([file], currentIndex);
 
-		expect(result.nextIndex.get(file.path)).toBe(cachedEntry);
-		expect(result.nextIndex.has("notes/inactive.md")).toBe(false);
+		expect(currentIndex.get(file.path)).toBe(cachedEntry);
+		expect(currentIndex.has("notes/inactive.md")).toBe(false);
 		expect(result.filesToLoad).toEqual([]);
 		expect(Array.from(result.activePaths)).toEqual([file.path]);
 	});
@@ -42,17 +42,18 @@ describe("reconcileFileContentIndex", () => {
 
 		const result = reconcileFileContentIndex([file], currentIndex);
 
-		expect(result.nextIndex.has(file.path)).toBe(false);
+		expect(currentIndex.has(file.path)).toBe(false);
 		expect(result.filesToLoad).toEqual([file]);
 	});
 
 	test("queues files for reload when no cached entry exists", () => {
 		const file = createMockFile("notes/new.md", 100);
+		const currentIndex = new Map<string, SearchContentIndexEntry>();
 
-		const result = reconcileFileContentIndex([file], new Map());
+		const result = reconcileFileContentIndex([file], currentIndex);
 
 		expect(result.filesToLoad).toEqual([file]);
-		expect(result.nextIndex.size).toBe(0);
+		expect(currentIndex.size).toBe(0);
 	});
 
 	test("iterates searchableFiles directly, last duplicate wins for filesToLoad", () => {

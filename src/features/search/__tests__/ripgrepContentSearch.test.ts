@@ -40,7 +40,6 @@ describe("filterSearchDatasetWithRipgrepMatches", () => {
 		expect(matchedItems).toEqual([
 			{
 				key: "title-and-content",
-				titleMatched: false,
 				contentMatched: true,
 			},
 		]);
@@ -55,7 +54,6 @@ describe("filterSearchDatasetWithRipgrepMatches", () => {
 
 		expect(matchedItems).toContainEqual({
 			key: "title-only",
-			titleMatched: true,
 			contentMatched: false,
 		});
 	});
@@ -72,27 +70,13 @@ describe("filterSearchDatasetWithRipgrepMatches", () => {
 			"needle",
 			new Map([["needle", new Set(["files/reference.txt"])]]),
 			new Map([["files/reference.txt", "line with needle"]]),
-			new Map([
-				[
-					"files/reference.txt",
-					{
-						start: { line: 3, col: 10, offset: -1 },
-						end: { line: 3, col: 16, offset: -1 },
-					},
-				],
-			]),
 		);
 
 		expect(matchedItems).toEqual([
 			{
 				key: "pdf",
-				titleMatched: false,
 				contentMatched: true,
 				contentPreview: "line with needle",
-				contentPosition: {
-					start: { line: 3, col: 10, offset: -1 },
-					end: { line: 3, col: 16, offset: -1 },
-				},
 			},
 		]);
 	});

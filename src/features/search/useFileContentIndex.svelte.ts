@@ -1,36 +1,65 @@
-/**
- * ファイル内容検索インデックスを管理するカスタムフック
- *
- * 非同期でファイルをバッチ読み込みし、Vault の変更イベントを監視します。
- * インデックスの追跡・更新と、ファイル変更の自動リフレッシュを処理します。
- *
- * 使用例:
- * ```svelte
- * const contentIndex = useFileContentIndex(app, () => {
- *   return sortedItems.map(item => getTargetFile(item)).filter(Boolean);
- * });
- *
- * const hasMatch = (query: string, file: TFile) =>
- *   contentIndex.hasMatch(query, file);
- * ```
- */
-
 import { TFile, type App, type Pos, type Vault } from "obsidian";
 import { untrack } from "svelte";
 import { SvelteMap, SvelteSet } from "svelte/reactivity";
 import { getFileContent } from "features/card-preview/core/previewContent";
-import {
-	applyLoadedFileContentEntry,
-	reconcileFileContentIndex,
-	type SearchContentIndexEntry,
-} from "features/search/fileContentSearchIndex";
 import { yieldToMainThreadIdleAware } from "core/indexing/timeSlicing";
-import type { SearchWorkerFileContentSnapshot } from "./searchWorkerTypes";
 import { getFileContentVaultEventHub } from "./fileContentVaultEventHub";
 import { getSearchQueryTerms } from "./searchQueryTerms";
 
+export interface SearchContentIndexEntry {
+	/** Lowercase content used directly for case-insensitive search. */
+	content: string;
+	mtime: number;
+}
+
+export interface ReconciledFileContentIndex {
+	filesToLoad: TFile[];
+	activePaths: Set<string>;
+}
+
+export function reconcileFileContentIndex(
+	searchableFiles: readonly TFile[],
+	currentIndex: Map<string, SearchContentIndexEntry>,
+): ReconciledFileContentIndex {
+	const filesToLoad: TFile[] = [];
+	const activePaths = new Set<string>();
+
+	for (const file of searchableFiles) {
+		activePaths.add(file.path);
+	}
+
+	for (const path of currentIndex.keys()) {
+		if (!activePaths.has(path)) {
+			currentIndex.delete(path);
+		}
+	}
+
+	for (const file of searchableFiles) {
+		const currentEntry = currentIndex.get(file.path);
+		if (currentEntry && currentEntry.mtime === file.stat.mtime) {
+			continue;
+		}
+
+		// Do not expose content from an older mtime while the replacement loads.
+		currentIndex.delete(file.path);
+		filesToLoad.push(file);
+	}
+
+	return { filesToLoad, activePaths };
+}
+
+export function applyLoadedFileContentEntry(
+	index: Map<string, SearchContentIndexEntry>,
+	path: string,
+	entry: SearchContentIndexEntry,
+): void {
+	const existing = index.get(path);
+	if (!existing || existing.mtime <= entry.mtime) {
+		index.set(path, entry);
+	}
+}
+
 export interface FileContentIndexResult {
-	hasMatch(query: string, targetFile: TFile | null | undefined): boolean;
 	isLoading(): boolean;
 	getFirstMatchPosition(
 		query: string,
@@ -39,66 +68,16 @@ export interface FileContentIndexResult {
 	forEachEntry(
 		visitor: (path: string, entry: Readonly<SearchContentIndexEntry>) => void,
 	): void;
-	getSerializableEntries(): SearchWorkerFileContentSnapshot[];
 }
 
 export interface UseFileContentIndexOptions {
 	enabled?: boolean | (() => boolean);
 }
 
-const FIRST_MATCH_POSITION_CACHE_LIMIT = 8;
-
-export class BoundedQueryCache<T> {
-	private readonly entries = new Map<string, T>();
-
-	constructor(private readonly limit: number) {
-		if (!Number.isFinite(limit) || limit < 1) {
-			throw new Error("limit must be a positive finite number");
-		}
-	}
-
-	get(key: string): T | undefined {
-		if (!this.entries.has(key)) {
-			return undefined;
-		}
-
-		const value = this.entries.get(key);
-		this.entries.delete(key);
-		this.entries.set(key, value as T);
-		return value;
-	}
-
-	has(key: string): boolean {
-		return this.entries.has(key);
-	}
-
-	set(key: string, value: T): void {
-		if (this.entries.has(key)) {
-			this.entries.delete(key);
-		}
-
-		this.entries.set(key, value);
-		this.evictIfNeeded();
-	}
-
-	size(): number {
-		return this.entries.size;
-	}
-
-	keys(): string[] {
-		return Array.from(this.entries.keys());
-	}
-
-	private evictIfNeeded(): void {
-		while (this.entries.size > this.limit) {
-			const oldestKey = this.entries.keys().next().value as string | undefined;
-			if (oldestKey === undefined) {
-				break;
-			}
-			this.entries.delete(oldestKey);
-		}
-	}
-}
+type PositionCache = {
+	queryKey: string;
+	position: Pos | undefined;
+};
 
 async function loadFileContentEntry(
 	targetFile: TFile,
@@ -107,7 +86,10 @@ async function loadFileContentEntry(
 	const mtime = targetFile.stat.mtime;
 	try {
 		const content = await getFileContent(targetFile, vault);
-		return { path: targetFile.path, entry: { content, mtime } };
+		return {
+			path: targetFile.path,
+			entry: { content: content.toLowerCase(), mtime },
+		};
 	} catch {
 		return { path: targetFile.path, entry: { content: "", mtime } };
 	}
@@ -125,19 +107,8 @@ export function useFileContentIndex(
 	const indexedContentActivePaths = new SvelteSet<string>();
 	const firstMatchPositionCacheByEntry = new WeakMap<
 		SearchContentIndexEntry,
-		BoundedQueryCache<Pos | undefined>
+		PositionCache
 	>();
-	const normalizedContentByEntry = new WeakMap<SearchContentIndexEntry, string>();
-	const getNormalizedContent = (entry: SearchContentIndexEntry): string => {
-		const cachedContent = normalizedContentByEntry.get(entry);
-		if (cachedContent !== undefined) {
-			return cachedContent;
-		}
-
-		const normalizedContent = entry.content.toLowerCase();
-		normalizedContentByEntry.set(entry, normalizedContent);
-		return normalizedContent;
-	};
 	let contentIndexRefreshNonce = $state(0);
 	let isLoading = $state(false);
 
@@ -157,11 +128,10 @@ export function useFileContentIndex(
 		void contentIndexRefreshNonce; // 依存関係に登録
 
 		const searchableFiles = getSearchableFiles();
-		const { nextIndex, filesToLoad, activePaths } = untrack(() =>
+		const { filesToLoad, activePaths } = untrack(() =>
 			reconcileFileContentIndex(searchableFiles, fileContentIndex),
 		);
 
-		replaceFileContentIndex(fileContentIndex, nextIndex);
 		replaceActivePaths(indexedContentActivePaths, activePaths);
 
 		isLoading = filesToLoad.length > 0;
@@ -169,9 +139,6 @@ export function useFileContentIndex(
 		if (filesToLoad.length === 0) {
 			return;
 		}
-
-		// staging に積みつつ、各バッチ完了ごとに reactive なインデックスへ反映する
-		const stagedIndex = new Map(nextIndex);
 
 		void (async () => {
 			for (
@@ -193,8 +160,7 @@ export function useFileContentIndex(
 				if (canceled) break;
 
 				for (const { path, entry } of batchResults) {
-					applyLoadedFileContentEntry(stagedIndex, path, entry);
-					fileContentIndex.set(path, entry);
+					applyLoadedFileContentEntry(fileContentIndex, path, entry);
 				}
 
 				if (canceled || end >= filesToLoad.length) {
@@ -246,21 +212,6 @@ export function useFileContentIndex(
 	});
 
 	return {
-		hasMatch(query: string, targetFile: TFile | null | undefined): boolean {
-			if (!query || !targetFile) return false;
-			const queryTerms = getSearchQueryTerms(query);
-			if (queryTerms.length === 0) return false;
-			const entry = fileContentIndex.get(targetFile.path);
-			if (!entry?.content) return false;
-
-			const normalizedContent = getNormalizedContent(entry);
-			for (const term of queryTerms) {
-				if (!normalizedContent.includes(term)) {
-					return false;
-				}
-			}
-			return true;
-		},
 		isLoading(): boolean {
 			return isLoading;
 		},
@@ -283,16 +234,12 @@ export function useFileContentIndex(
 			}
 
 			const cacheKey = queryTerms.join("\u0000");
-			let cachedPositions = firstMatchPositionCacheByEntry.get(entry);
-			if (cachedPositions?.has(cacheKey)) {
-				return cachedPositions.get(cacheKey);
+			const cachedPosition = firstMatchPositionCacheByEntry.get(entry);
+			if (cachedPosition && cachedPosition.queryKey === cacheKey) {
+				return cachedPosition.position;
 			}
-			cachedPositions ??= new BoundedQueryCache<Pos | undefined>(
-				FIRST_MATCH_POSITION_CACHE_LIMIT,
-			);
-			firstMatchPositionCacheByEntry.set(entry, cachedPositions);
 
-			const normalizedContent = getNormalizedContent(entry);
+			const normalizedContent = entry.content;
 			let matchStart = -1;
 			let matchTerm = "";
 			for (const term of queryTerms) {
@@ -307,7 +254,10 @@ export function useFileContentIndex(
 			}
 
 			if (matchStart === -1) {
-				cachedPositions.set(cacheKey, undefined);
+				firstMatchPositionCacheByEntry.set(entry, {
+					queryKey: cacheKey,
+					position: undefined,
+				});
 				return undefined;
 			}
 
@@ -316,7 +266,10 @@ export function useFileContentIndex(
 				matchStart,
 				matchTerm.length,
 			);
-			cachedPositions.set(cacheKey, position);
+			firstMatchPositionCacheByEntry.set(entry, {
+				queryKey: cacheKey,
+				position,
+			});
 			return position;
 		},
 		forEachEntry(
@@ -326,24 +279,7 @@ export function useFileContentIndex(
 				visitor(path, entry);
 			}
 		},
-		getSerializableEntries(): SearchWorkerFileContentSnapshot[] {
-			return Array.from(fileContentIndex, ([path, entry]) => ({
-				path,
-				content: entry.content,
-				mtime: entry.mtime,
-			}));
-		},
 	};
-}
-
-function replaceFileContentIndex(
-	target: SvelteMap<string, SearchContentIndexEntry>,
-	next: Map<string, SearchContentIndexEntry>,
-): void {
-	target.clear();
-	for (const [path, entry] of next) {
-		target.set(path, entry);
-	}
 }
 
 function replaceActivePaths(target: SvelteSet<string>, next: Set<string>): void {

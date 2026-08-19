@@ -28,7 +28,6 @@
 		toViewItem,
 	} from "application/presenters";
 	import { createItemSearchTextCache, getItemSearchText } from "./itemSearchText";
-	import { buildSearchWorkerItemSnapshot } from "features/search/searchSnapshotBuilders";
 	import type { SearchWorkerItemSnapshot } from "features/search/searchWorkerTypes";
 	import {
 		createViewItemSortCache,
@@ -198,11 +197,11 @@
 				continue;
 			}
 
-			const snapshot = buildSearchWorkerItemSnapshot(
+			const snapshot: SearchWorkerItemSnapshot = {
 				key,
 				searchText,
 				targetFilePath,
-			);
+			};
 			workerSnapshotByKey.set(key, snapshot);
 			nextDataset[index] = snapshot;
 		}
@@ -243,8 +242,6 @@
 			allowContentSearch && contentSearchEnabled
 				? "title-and-content"
 				: "title-only",
-		contentSyncMode: "progressive",
-		progressiveSyncIntervalMs: 400,
 		getSearchableFiles,
 		buildDataset: buildWorkerDataset,
 		contentSearchBackend: () =>
@@ -266,8 +263,7 @@
 	});
 	const lazyLoaderCache = new Set<string>();
 	setLazyLoaderCache(lazyLoaderCache);
-	let matchedKeySet = $derived(workerSearchSession.matchedKeySet);
-	let matchedItemByKey = $derived(workerSearchSession.matchedItemByKey);
+	let matchesByKey = $derived(workerSearchSession.matchesByKey);
 	let isSearchLoading = $derived(workerSearchSession.isLoading);
 
 	let sortedItems = $derived(
@@ -288,7 +284,7 @@
 		const serial = ++filterRunSerial;
 		const sourceItems = sortedItems;
 		const query = search.normalized;
-		const keySet = matchedKeySet;
+		const matches = matchesByKey;
 		const shouldPin = config.pinBookmarkedToTop;
 		void bookmarks.filePaths.size;
 		void bookmarks.orderedFilePaths;
@@ -301,7 +297,7 @@
 				return;
 			}
 
-			if (!keySet) {
+			if (!matches) {
 				// Stale-while-search: keep the previous results while the
 				// search worker has not produced a result for the current
 				// query yet. Clearing `filteredItems` here would unmount
@@ -318,7 +314,7 @@
 				}
 
 				const item = sourceItems[index];
-				if (keySet.has(config.getItemKey(item))) {
+				if (matches.has(config.getItemKey(item))) {
 					nextItems.push(item);
 				}
 
@@ -363,7 +359,7 @@
 		searchQuery: search.normalized,
 		contentSearchEnabled,
 		allowContentSearch,
-		matchedItemByKey,
+		matchesByKey,
 		applicationUpdateVersion: applicationStore.updateVersion,
 		previewGlobalVersion: applicationStore.previewGlobalVersion,
 		previewPathVersions: applicationStore.previewPathVersions,
@@ -380,7 +376,7 @@
 			return cached.model;
 		}
 
-		const matchedItem = revision.matchedItemByKey?.get(itemKey) ?? null;
+		const matchedItem = revision.matchesByKey?.get(itemKey) ?? null;
 		const searchScope =
 			revision.allowContentSearch &&
 			revision.contentSearchEnabled &&
@@ -489,7 +485,7 @@
 			})}
 				{@const ItemComponent = config.itemComponent}
 				{@const renderedItemKey = config.getItemKey(item, index)}
-				{@const matchedItem = matchedItemByKey?.get(renderedItemKey) ?? null}
+				{@const matchedItem = matchesByKey?.get(renderedItemKey) ?? null}
 				{#if ItemComponent === ViewItemCard}
 					<ViewItemCard
 						{...config.getItemProps(item)}

@@ -1,5 +1,3 @@
-import type { Pos } from "obsidian";
-
 export interface SearchWorkerItemSnapshot {
 	key: string;
 	searchText: string;
@@ -10,8 +8,8 @@ export type SearchWorkerMatchScope = "title-only" | "title-and-content";
 
 export interface SearchWorkerFileContentSnapshot {
 	path: string;
+	/** Content normalized to lower case by the main-thread index. */
 	content: string;
-	mtime: number;
 }
 
 export interface SearchWorkerDatasetSnapshot {
@@ -44,18 +42,15 @@ export interface SearchWorkerFilterRequest {
 
 export interface SearchWorkerMatchedItem {
 	key: string;
-	titleMatched: boolean;
 	contentMatched: boolean;
 	contentPreview?: string;
-	contentPosition?: Pos;
 }
 
 export interface SearchWorkerFilterResult {
 	type: "filter-result";
 	requestId: number;
 	datasetVersion: number;
-	matchedKeys?: string[];
-	matchedItems?: SearchWorkerMatchedItem[];
+	matchedItems: SearchWorkerMatchedItem[];
 }
 
 export interface SearchWorkerErrorMessage {

@@ -11,7 +11,6 @@ type ExecFile = typeof import("child_process").execFile;
 const RIPGREP_COMMAND_LINE_BUDGET_CHARS = 24_000;
 const RIPGREP_SEARCH_CONCURRENCY = 3;
 const EMPTY_CONTENT_PREVIEW_BY_PATH: ReadonlyMap<string, string> = new Map();
-const EMPTY_CONTENT_POSITION_BY_PATH: ReadonlyMap<string, Pos> = new Map();
 const RIPGREP_FIXED_ARGS = [
 	"--json",
 	"--line-number",
@@ -487,7 +486,6 @@ export function filterSearchDatasetWithRipgrepMatches(
 	query: string,
 	contentMatchesByTerm: ReadonlyMap<string, ReadonlySet<string>>,
 	contentPreviewByPath: ReadonlyMap<string, string> = EMPTY_CONTENT_PREVIEW_BY_PATH,
-	contentPositionByPath: ReadonlyMap<string, Pos> = EMPTY_CONTENT_POSITION_BY_PATH,
 ): SearchWorkerMatchedItem[] {
 	const queryTerms = getSearchQueryTerms(query);
 	if (queryTerms.length === 0) {
@@ -495,7 +493,6 @@ export function filterSearchDatasetWithRipgrepMatches(
 		for (let index = 0; index < items.length; index += 1) {
 			matchedItems[index] = {
 				key: items[index].key,
-				titleMatched: true,
 				contentMatched: false,
 			};
 		}
@@ -505,7 +502,6 @@ export function filterSearchDatasetWithRipgrepMatches(
 	const matchedItems: SearchWorkerMatchedItem[] = [];
 
 	for (const item of items) {
-		let titleMatched = true;
 		let contentMatched = false;
 		let matched = true;
 
@@ -520,7 +516,6 @@ export function filterSearchDatasetWithRipgrepMatches(
 				break;
 			}
 
-			titleMatched = titleMatched && termTitleMatched;
 			contentMatched =
 				contentMatched || (!termTitleMatched && termContentMatched);
 		}
@@ -530,20 +525,12 @@ export function filterSearchDatasetWithRipgrepMatches(
 				contentMatched && item.targetFilePath
 					? contentPreviewByPath.get(item.targetFilePath)
 					: undefined;
-			const contentPosition =
-				contentMatched && item.targetFilePath
-					? contentPositionByPath.get(item.targetFilePath)
-					: undefined;
 			const matchedItem: SearchWorkerMatchedItem = {
 				key: item.key,
-				titleMatched,
 				contentMatched,
 			};
 			if (contentPreview) {
 				matchedItem.contentPreview = contentPreview;
-			}
-			if (contentPosition) {
-				matchedItem.contentPosition = contentPosition;
 			}
 			matchedItems.push(matchedItem);
 		}
