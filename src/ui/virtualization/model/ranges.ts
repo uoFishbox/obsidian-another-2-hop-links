@@ -1,5 +1,10 @@
-import { EMPTY_ROW_RANGE, isEmptyRange, type RowRange } from "./rowRange";
-import type { VirtualRanges, VirtualRowModel } from "./types";
+import {
+	EMPTY_ROW_RANGE,
+	isEmptyRange,
+	type MutableRowRange,
+	type RowRange,
+} from "./rowRange";
+import type { MutableVirtualRanges, VirtualRanges, VirtualRowModel } from "./types";
 
 /**
  * Scroll window used to resolve a single visible row range.
@@ -32,7 +37,7 @@ export interface VirtualVisibilityPolicy {
  * Writes the rows intersecting a scroll window into caller-owned storage.
  */
 export type WriteVisibleRangeInto = (
-	out: RowRange,
+	out: MutableRowRange,
 	scrollTop: number,
 	viewportHeight: number,
 	overscanPx: number,
@@ -58,12 +63,18 @@ export type ComputeVirtualRangesResult =
 	| { kind: "stable"; ranges: VirtualRanges }
 	| { kind: "skipped" };
 
-const EMPTY_VIRTUAL_RANGES: VirtualRanges = {
+const EMPTY_VIRTUAL_RANGES: VirtualRanges = Object.freeze({
 	mounted: EMPTY_ROW_RANGE,
 	previewVisible: EMPTY_ROW_RANGE,
-};
+});
 
-function copyRowRangeInto(out: RowRange, range: RowRange): void {
+function freezeVirtualRanges<T extends VirtualRanges>(ranges: T): T {
+	Object.freeze(ranges.mounted);
+	Object.freeze(ranges.previewVisible);
+	return Object.freeze(ranges);
+}
+
+function copyRowRangeInto(out: MutableRowRange, range: RowRange): void {
 	out.start = range.start;
 	out.end = range.end;
 }
@@ -95,7 +106,7 @@ export function resolveVisibleRange(
  * Resolves mounted and preview-visible ranges into caller-owned storage.
  */
 export function resolveVirtualRangesInto(
-	out: VirtualRanges,
+	out: MutableVirtualRanges,
 	params: ResolveVirtualRangesParams,
 	writeVisibleRangeInto: WriteVisibleRangeInto,
 ): void {
@@ -166,15 +177,16 @@ export function computeVirtualRanges<TCell>(params: {
 		);
 		return {
 			kind: "bootstrapped",
-			ranges: {
-				mounted: bootstrapRange,
+			ranges: freezeVirtualRanges({
+				mounted: Object.freeze(bootstrapRange),
 				previewVisible: EMPTY_ROW_RANGE,
-			},
+			}),
 		};
 	}
 
 	const relativeScrollTop = params.scrollTop - params.sectionTop;
-	let measuredRanges = params.precomputedRanges;
+	let measuredRanges: VirtualRanges | MutableVirtualRanges | undefined =
+		params.precomputedRanges;
 	if (!measuredRanges) {
 		measuredRanges = {
 			mounted: { start: 0, end: 0 },
@@ -187,5 +199,5 @@ export function computeVirtualRanges<TCell>(params: {
 			previewOverscanPx: params.previewOverscanPx,
 		});
 	}
-	return { kind: "stable", ranges: measuredRanges };
+	return { kind: "stable", ranges: freezeVirtualRanges(measuredRanges) };
 }

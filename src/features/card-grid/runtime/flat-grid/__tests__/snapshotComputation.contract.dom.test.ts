@@ -143,6 +143,15 @@ describe("VirtualListEngine contract", () => {
 		).toBe(true);
 	});
 
+	it("publishes frozen snapshot and range objects", () => {
+		const snapshot = compute({ rowModel: createRowModel(12) }).snapshot;
+
+		expect(Object.isFrozen(snapshot)).toBe(true);
+		expect(Object.isFrozen(snapshot.ranges)).toBe(true);
+		expect(Object.isFrozen(snapshot.ranges.mounted)).toBe(true);
+		expect(Object.isFrozen(snapshot.ranges.previewVisible)).toBe(true);
+	});
+
 	it("reuses the mounted build and cells when only previewVisible changes", () => {
 		const rowModel = createRowModel(30);
 		const buildMountedCells = vi.fn(buildMountedFlatGridCells<TestItem>);

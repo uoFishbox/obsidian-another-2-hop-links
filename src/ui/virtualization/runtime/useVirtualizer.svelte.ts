@@ -668,6 +668,10 @@ export function useVirtualizer<
 			},
 			cancelInitialStabilizationMeasurement:
 				initialMeasurementLifecycle.cancelBecauseScrollStarted,
+			resetMeasurementForObservation: () => {
+				initialMeasurementLifecycle.resetForObservation();
+				measurementScheduler.resetForObservation();
+			},
 			onScrollStart: () => {
 				if (measurement.hasStableScrollMetrics) return;
 				if (hasPendingLayoutMeasurement()) return;

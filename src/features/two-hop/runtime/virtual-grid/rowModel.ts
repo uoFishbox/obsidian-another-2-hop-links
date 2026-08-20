@@ -1,12 +1,11 @@
 import type { TwoHopSectionModel } from "features/two-hop/ui/twoHopSectionModel";
 import type { StableScrollTopBand } from "ui/virtualization/public";
 import type { VirtualRowLayoutMetrics } from "ui/virtualization/public";
-import type { RowRange } from "ui/virtualization/public";
+import type { MutableRowRange, RowRange } from "ui/virtualization/public";
 import type { ViewPlanLayoutMetrics } from "./layout";
 import type {
 	VirtualNavigationDirection,
 	VirtualNavigationTarget,
-	VirtualRanges,
 	VirtualRow,
 	VirtualRowModel,
 } from "ui/virtualization/public";
@@ -201,7 +200,7 @@ export function createTwoHopRowModel(
 	};
 
 	const writeVisibleRange = (
-		out: RowRange,
+		out: MutableRowRange,
 		scrollTop: number,
 		viewportHeight: number,
 		overscanPx: number,
@@ -215,7 +214,7 @@ export function createTwoHopRowModel(
 	};
 
 	const writeVisibleRangeWithoutOverscan = (
-		out: RowRange,
+		out: MutableRowRange,
 		scrollTop: number,
 		viewportHeight: number,
 	): void => {

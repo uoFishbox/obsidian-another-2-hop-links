@@ -15,7 +15,6 @@ export interface VirtualScrollSessionState {
 	scrollTarget: Window | HTMLElement;
 	scrollActivitySource: object;
 	isScrolling: boolean;
-	reconnectStructureObserverAfterScroll: boolean;
 	refreshDependenciesAfterScroll: boolean;
 	measureLayoutAfterScroll: boolean;
 	idleTimer: number | null;
@@ -27,8 +26,6 @@ export interface VirtualScrollSessionState {
 }
 
 export interface VirtualScrollSessionActions {
-	disconnectStructureObserver(): void;
-	connectStructureObserver(): void;
 	cancelInitialStabilizationMeasurement(): void;
 	onScrollStart(): void;
 	notifyScrollStateChange(): void;
@@ -53,11 +50,9 @@ const startScrollSession = (
 	}
 
 	state.isScrolling = true;
-	state.reconnectStructureObserverAfterScroll = false;
 	state.refreshDependenciesAfterScroll = false;
 	state.measureLayoutAfterScroll = false;
 	markScrollActivityActive(state.scrollActivitySource);
-	actions.disconnectStructureObserver();
 	actions.cancelInitialStabilizationMeasurement();
 	actions.onScrollStart();
 	actions.notifyScrollStateChange();
@@ -73,9 +68,7 @@ const finishScrollPhase = (
 
 	const refreshDependencies = state.refreshDependenciesAfterScroll;
 	const measureLayout = state.measureLayoutAfterScroll;
-	const reconnectObserver = state.reconnectStructureObserverAfterScroll;
 	state.isScrolling = false;
-	state.reconnectStructureObserverAfterScroll = false;
 	state.refreshDependenciesAfterScroll = false;
 	state.measureLayoutAfterScroll = false;
 
@@ -85,8 +78,6 @@ const finishScrollPhase = (
 			recordCCLDevMeasurement("virtualList.observer.dependencyTask.scheduled");
 		}
 		actions.scheduleDependencyObserverRefresh();
-	} else if (reconnectObserver) {
-		actions.connectStructureObserver();
 	}
 	if (measureLayout) {
 		actions.scheduleLayoutMeasurement();
@@ -157,7 +148,6 @@ export function handleVirtualScrollEvent(
 		);
 	}
 
-	state.reconnectStructureObserverAfterScroll = true;
 	if (state.hasPendingScrollMeasurement) {
 		return;
 	}

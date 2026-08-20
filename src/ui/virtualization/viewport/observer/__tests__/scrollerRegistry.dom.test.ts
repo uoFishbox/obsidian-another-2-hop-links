@@ -268,6 +268,135 @@ describe("observeVirtualListViewport", () => {
 		stopObserving();
 	});
 
+	it("retains structure mutations during scroll and measures layout once at idle", async () => {
+		vi.useFakeTimers();
+
+		const scrollContainer = document.createElement("div");
+		const content = document.createElement("div");
+		const rootEl = document.createElement("div");
+		scrollContainer.style.overflow = "auto";
+		document.body.append(scrollContainer);
+		scrollContainer.append(content);
+		content.append(rootEl);
+
+		const scheduleLayoutMeasurement = vi.fn();
+		const stopObserving = observeVirtualListViewport({
+			frameCoordinator: createObserverFrameCoordinator(),
+			rootEl,
+			onWidthChange: vi.fn(),
+			onScrollContainerChange: vi.fn(),
+			scheduleLayoutMeasurement,
+			scheduleScrollMeasurement,
+			runScrollMeasurement: vi.fn(),
+			runInitialLayoutMeasurement: vi.fn(),
+		});
+		const structureObserver = mutationObserverRecords[0];
+		expect(structureObserver).toBeDefined();
+
+		try {
+			scrollContainer.dispatchEvent(new Event("scroll"));
+			expect(structureObserver?.elements.has(content)).toBe(true);
+
+			const sibling = document.createElement("div");
+			content.insertBefore(sibling, rootEl);
+			structureObserver?.callback(
+				[
+					{
+						type: "childList",
+						target: content,
+						addedNodes: [sibling],
+						removedNodes: [],
+					} as unknown as MutationRecord,
+				],
+				{} as MutationObserver,
+			);
+
+			expect(scheduleLayoutMeasurement).not.toHaveBeenCalled();
+			await vi.advanceTimersByTimeAsync(140);
+			await vi.runAllTimersAsync();
+
+			expect(scheduleLayoutMeasurement).toHaveBeenCalledTimes(1);
+		} finally {
+			stopObserving();
+		}
+	});
+
+	it("shares one registry entry for window scrolling", () => {
+		const firstRootEl = document.createElement("div");
+		const secondRootEl = document.createElement("div");
+		document.body.append(firstRootEl, secondRootEl);
+
+		const firstStopObserving = observeVirtualListViewport({
+			frameCoordinator: createObserverFrameCoordinator(),
+			rootEl: firstRootEl,
+			onWidthChange: vi.fn(),
+			onScrollContainerChange: vi.fn(),
+			scheduleLayoutMeasurement: vi.fn(),
+			scheduleScrollMeasurement,
+			runScrollMeasurement: vi.fn(),
+			runInitialLayoutMeasurement: vi.fn(),
+		});
+		const secondStopObserving = observeVirtualListViewport({
+			frameCoordinator: createObserverFrameCoordinator(),
+			rootEl: secondRootEl,
+			onWidthChange: vi.fn(),
+			onScrollContainerChange: vi.fn(),
+			scheduleLayoutMeasurement: vi.fn(),
+			scheduleScrollMeasurement,
+			runScrollMeasurement: vi.fn(),
+			runInitialLayoutMeasurement: vi.fn(),
+		});
+
+		expect(mutationObserverRecords).toHaveLength(1);
+		const rootResizeRecord = resizeObserverRecords.find((record) =>
+			record.elements.has(secondRootEl),
+		);
+		expect(rootResizeRecord?.elements.has(firstRootEl)).toBe(false);
+
+		firstStopObserving();
+		expect(mutationObserverRecords[0]?.elements.size).toBeGreaterThan(0);
+		secondStopObserving();
+		expect(mutationObserverRecords[0]?.elements.size).toBe(0);
+	});
+
+	it("resets observation-scoped measurement state on every window bind", () => {
+		const rootEl = document.createElement("div");
+		document.body.append(rootEl);
+		let migrate: ((ownerWindow: Window) => void) | undefined;
+		Object.defineProperty(rootEl, "onWindowMigrated", {
+			configurable: true,
+			value: (listener: (ownerWindow: Window) => void) => {
+				migrate = listener;
+				return vi.fn();
+			},
+		});
+		const resetMeasurementForObservation = vi.fn();
+		const runInitialLayoutMeasurement = vi.fn();
+		const stopObserving = observeVirtualListViewport({
+			frameCoordinator: createObserverFrameCoordinator(),
+			rootEl,
+			onWidthChange: vi.fn(),
+			onScrollContainerChange: vi.fn(),
+			scheduleLayoutMeasurement: vi.fn(),
+			scheduleScrollMeasurement,
+			runScrollMeasurement: vi.fn(),
+			runInitialLayoutMeasurement,
+			resetMeasurementForObservation,
+		});
+
+		try {
+			expect(resetMeasurementForObservation).toHaveBeenCalledOnce();
+			expect(runInitialLayoutMeasurement).toHaveBeenCalledOnce();
+
+			migrate?.(window);
+
+			expect(resetMeasurementForObservation).toHaveBeenCalledTimes(2);
+			expect(runInitialLayoutMeasurement).toHaveBeenCalledTimes(2);
+		} finally {
+			stopObserving();
+		}
+	});
+
 	it("reads scrollTop in the native event and runs measurement in the next frame", async () => {
 		installAnimationFrameMock();
 		const requestAnimationFrame = vi.spyOn(window, "requestAnimationFrame");

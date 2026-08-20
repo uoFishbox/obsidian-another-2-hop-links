@@ -22,10 +22,10 @@ export interface VirtualListSnapshot<
 	TMountedCell extends MountedVirtualCell,
 	TMountedBuild extends MountedVirtualCellsBuild<TMountedCell>,
 > {
-	rowModel: VirtualRowModel<TCell>;
-	ranges: VirtualRanges;
-	mountedBuild: TMountedBuild | null;
-	totalHeight: number;
+	readonly rowModel: VirtualRowModel<TCell>;
+	readonly ranges: VirtualRanges;
+	readonly mountedBuild: TMountedBuild | null;
+	readonly totalHeight: number;
 }
 
 export type VirtualListMeasurementKind = "stable" | "bootstrapped" | "skipped";
@@ -35,8 +35,8 @@ export interface VirtualListComputation<
 	TMountedCell extends MountedVirtualCell,
 	TMountedBuild extends MountedVirtualCellsBuild<TMountedCell>,
 > {
-	snapshot: VirtualListSnapshot<TCell, TMountedCell, TMountedBuild>;
-	measurementKind: VirtualListMeasurementKind;
+	readonly snapshot: VirtualListSnapshot<TCell, TMountedCell, TMountedBuild>;
+	readonly measurementKind: VirtualListMeasurementKind;
 }
 
 export interface VirtualListInput<
@@ -70,9 +70,16 @@ export interface VirtualListRecomputeInput<
 	}): TMountedBuild;
 }
 
-const EMPTY_VIRTUAL_RANGES: VirtualRanges = {
-	mounted: { start: 0, end: 0 },
-	previewVisible: { start: 0, end: 0 },
+const EMPTY_RANGE: RowRange = Object.freeze({ start: 0, end: 0 });
+const EMPTY_VIRTUAL_RANGES: VirtualRanges = Object.freeze({
+	mounted: EMPTY_RANGE,
+	previewVisible: EMPTY_RANGE,
+});
+
+const freezeVirtualRanges = (ranges: VirtualRanges): VirtualRanges => {
+	Object.freeze(ranges.mounted);
+	Object.freeze(ranges.previewVisible);
+	return Object.freeze(ranges);
 };
 
 const getMeasurementKind = (
@@ -89,12 +96,12 @@ const createSnapshot = <
 	mountedBuild: TMountedBuild;
 	totalHeight: number;
 }): VirtualListSnapshot<TCell, TMountedCell, TMountedBuild> => {
-	return {
+	return Object.freeze({
 		rowModel: params.rowModel,
-		ranges: params.ranges,
+		ranges: freezeVirtualRanges(params.ranges),
 		mountedBuild: params.mountedBuild,
 		totalHeight: params.totalHeight,
-	};
+	});
 };
 
 const cloneSnapshotWithOverrides = <
@@ -108,10 +115,11 @@ const cloneSnapshotWithOverrides = <
 		ranges?: VirtualRanges;
 		totalHeight?: number;
 	},
-): VirtualListSnapshot<TCell, TMountedCell, TMountedBuild> => ({
-	...snapshot,
-	...overrides,
-});
+): VirtualListSnapshot<TCell, TMountedCell, TMountedBuild> =>
+	Object.freeze({
+		...snapshot,
+		...overrides,
+	});
 
 const didRangesChange = (
 	previous: VirtualRanges | undefined,
@@ -170,12 +178,12 @@ export const createEmptyVirtualListComputation = <
 	rowModel: VirtualRowModel<TCell>;
 }): VirtualListComputation<TCell, TMountedCell, TMountedBuild> => {
 	return {
-		snapshot: {
+		snapshot: Object.freeze({
 			rowModel: params.rowModel,
 			ranges: EMPTY_VIRTUAL_RANGES,
 			mountedBuild: null,
 			totalHeight: params.rowModel.totalHeight,
-		},
+		}),
 		measurementKind: "stable",
 	};
 };
@@ -225,12 +233,12 @@ export function computeVirtualListSnapshot<
 		}
 
 		return {
-			snapshot: {
+			snapshot: Object.freeze({
 				rowModel: input.rowModel,
 				ranges: EMPTY_VIRTUAL_RANGES,
 				mountedBuild: previousMountedBuild,
 				totalHeight: input.rowModel.totalHeight,
-			},
+			}),
 			measurementKind: "skipped",
 		};
 	}

@@ -6,7 +6,7 @@ import type {
 	ObserveVirtualViewportOptions,
 	ScrollMeasurementRange,
 } from "ui/virtualization/viewport/observer/observeVirtualViewport";
-import type { RowRange } from "ui/virtualization/model/rowRange";
+import type { MutableRowRange, RowRange } from "ui/virtualization/model/rowRange";
 import type { VirtualFrameCoordinator } from "ui/shared/scheduling/frameCoordinator";
 import {
 	logicalCellKey,
@@ -78,7 +78,7 @@ type TestRowModel = VirtualRowModel<TestCell> & {
 	): void;
 };
 
-const copyRange = (out: RowRange, range: RowRange): void => {
+const copyRange = (out: MutableRowRange, range: RowRange): void => {
 	out.start = range.start;
 	out.end = range.end;
 };

@@ -1,5 +1,9 @@
 import type { RowRange } from "../model/rowRange";
-import type { VirtualRanges, VirtualRowModel } from "../model/types";
+import type {
+	MutableVirtualRanges,
+	VirtualRanges,
+	VirtualRowModel,
+} from "../model/types";
 import type { VirtualVisibilityPolicy } from "../model/ranges";
 import { recordCCLDevMeasurement } from "infrastructure/debug/CCLDevMeasurements";
 export type ScrollWindowIdentity = object | string | number | symbol;
@@ -110,11 +114,11 @@ export function createVirtualScrollWindowRangeResolver<
 	let mountedStableBandOverscanPx: number | undefined;
 	// Row models write ranges in place, so the writable scratch stays private and
 	// only value-stable published snapshots are exposed on the measurements.
-	const scrollRangesScratch: VirtualRanges = {
+	const scrollRangesScratch: MutableVirtualRanges = {
 		mounted: { start: 0, end: 0 },
 		previewVisible: { start: 0, end: 0 },
 	};
-	const committedRangesScratch: VirtualRanges = {
+	const committedRangesScratch: MutableVirtualRanges = {
 		mounted: { start: 0, end: 0 },
 		previewVisible: { start: 0, end: 0 },
 	};
@@ -132,7 +136,7 @@ export function createVirtualScrollWindowRangeResolver<
 	let lastPublishedCommittedRanges: VirtualRanges | undefined;
 
 	const publishStableRanges = (
-		scratch: VirtualRanges,
+		scratch: MutableVirtualRanges,
 		previous: VirtualRanges | undefined,
 	): VirtualRanges => {
 		if (
@@ -144,13 +148,16 @@ export function createVirtualScrollWindowRangeResolver<
 		) {
 			return previous;
 		}
-		return {
-			mounted: { start: scratch.mounted.start, end: scratch.mounted.end },
-			previewVisible: {
+		return Object.freeze({
+			mounted: Object.freeze({
+				start: scratch.mounted.start,
+				end: scratch.mounted.end,
+			}),
+			previewVisible: Object.freeze({
 				start: scratch.previewVisible.start,
 				end: scratch.previewVisible.end,
-			},
-		};
+			}),
+		});
 	};
 
 	const resolveMeasurementRowModel = (

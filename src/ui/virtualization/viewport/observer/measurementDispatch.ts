@@ -96,7 +96,7 @@ export function readSharedScrollMetrics(
 	return readVirtualListSharedScrollMetricsInto(entry.sharedScrollMetricsScratch, {
 		scroller: entry.scroller,
 		subscriber,
-		ownerElement: subscriber?.rootEl ?? entry.registryKey,
+		ownerElement: subscriber?.rootEl ?? null,
 		frameId: ++scrollMeasurementFrameId,
 		isScrollActive: entry.isScrolling,
 		scrollGeneration: entry.scrollGeneration,

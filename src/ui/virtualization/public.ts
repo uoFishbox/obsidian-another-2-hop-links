@@ -23,7 +23,12 @@ export type {
 	StableScrollTopBand,
 	VirtualScrollWindowRangeRowModel,
 } from "./engine/scrollWindowResolver";
-export { clampRange, EMPTY_ROW_RANGE, type RowRange } from "./model/rowRange";
+export {
+	clampRange,
+	EMPTY_ROW_RANGE,
+	type MutableRowRange,
+	type RowRange,
+} from "./model/rowRange";
 export {
 	computeVirtualRanges,
 	resolveVirtualRangesInto,
@@ -33,6 +38,7 @@ export {
 export type {
 	LogicalCellKey,
 	MountedVirtualCell,
+	MutableVirtualRanges,
 	RowKey,
 	SourceKey,
 	VirtualNavigationDirection,

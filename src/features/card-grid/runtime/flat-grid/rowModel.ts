@@ -3,10 +3,11 @@ import type { FlatGridLogicalCell } from "./logicalCell";
 import {
 	resolveVirtualRangesInto,
 	type FlatGridLayoutMetrics,
+	type MutableRowRange,
+	type MutableVirtualRanges,
 	type RowRange,
 	type StableScrollTopBand,
 	type VirtualNavigationTarget,
-	type VirtualRanges,
 	type VirtualRow,
 	type VirtualRowModel,
 } from "ui/virtualization/public";
@@ -80,7 +81,7 @@ export function createFlatGridRowModel<T>(
 	const resolveOverscanRows = (overscanPx: number): number =>
 		rowStride > 0 ? Math.ceil(Math.max(0, overscanPx) / rowStride) : 0;
 	const writeVisibleRange = (
-		out: RowRange,
+		out: MutableRowRange,
 		scrollTop: number,
 		viewportHeight: number,
 		overscanPx: number,
@@ -113,7 +114,7 @@ export function createFlatGridRowModel<T>(
 		out.end = Math.min(rowCount, lastVisibleRow + overscanRows + 1);
 	};
 	const findVisibleRangesInto = (
-		out: VirtualRanges,
+		out: MutableVirtualRanges,
 		params: {
 			scrollTop: number;
 			viewportHeight: number;
@@ -258,7 +259,7 @@ export function createFlatGridRowModel<T>(
 			};
 		},
 		findVisibleRangeInto(
-			out: RowRange,
+			out: MutableRowRange,
 			params: {
 				scrollTop: number;
 				viewportHeight: number;

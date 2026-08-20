@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createVirtualFrameCoordinator } from "ui/shared/scheduling/frameCoordinator";
+import type { VirtualFrameCoordinator } from "ui/shared/scheduling/frameCoordinator";
 import { createInitialMeasurementLifecycle } from "../initialMeasurement";
 
 describe("createInitialMeasurementLifecycle", () => {
@@ -111,5 +112,48 @@ describe("createInitialMeasurementLifecycle", () => {
 		frames[1]?.(1);
 		expect(runLayoutMeasurement).toHaveBeenCalledOnce();
 		frameCoordinator.dispose();
+	});
+
+	it("starts stabilization again after a scroll-cancelled observation is reset", () => {
+		let scheduledTask: (() => void) | null = null;
+		const frameCoordinator: VirtualFrameCoordinator = {
+			schedule(_lane, _key, task): boolean {
+				if (scheduledTask) return false;
+				scheduledTask = task;
+				return true;
+			},
+			cancel(): void {
+				scheduledTask = null;
+			},
+			isScheduled: () => scheduledTask !== null,
+			dispose(): void {
+				scheduledTask = null;
+			},
+		};
+		const runScheduledFrame = (): void => {
+			const task = scheduledTask as (() => void) | null;
+			scheduledTask = null;
+			task?.();
+		};
+		const runLayoutMeasurement = vi.fn();
+		const lifecycle = createInitialMeasurementLifecycle({
+			measurement: { hasStableScrollMetrics: false },
+			hasStableVisibleRange: () => false,
+			runLayoutMeasurement,
+			scheduleLayoutMeasurement: vi.fn(),
+			getRootEl: () => ({}) as HTMLElement,
+			getWindow: () => ({ requestAnimationFrame: vi.fn() }) as unknown as Window,
+			frameCoordinator,
+			maxPasses: 1,
+		});
+
+		lifecycle.scheduleStabilization();
+		lifecycle.cancelBecauseScrollStarted();
+		lifecycle.resetForObservation();
+		lifecycle.scheduleStabilization();
+		runScheduledFrame();
+		runScheduledFrame();
+
+		expect(runLayoutMeasurement).toHaveBeenCalledOnce();
 	});
 });

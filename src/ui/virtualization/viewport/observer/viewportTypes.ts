@@ -19,6 +19,8 @@ export interface ObserveVirtualViewportOptions {
 		reason?: VirtualScrollMeasurementReason,
 	) => void;
 	runInitialLayoutMeasurement: () => void;
+	/** Resets observation-scoped measurement state before each realm bind. */
+	resetMeasurementForObservation?: () => void;
 	cancelInitialStabilizationMeasurement?: () => void;
 	onScrollStateChange?: (
 		generation: number,
@@ -47,7 +49,7 @@ export interface VirtualViewportSubscriber extends Omit<
 
 /** Mutable state owned by one scroll container and its active subscriber. */
 export interface ScrollerViewportEntry {
-	registryKey: HTMLElement;
+	registryKey: Window | HTMLElement;
 	scroller: HTMLElement | null;
 	ownerWindow: Window;
 	structureMutationObserver: MutationObserver;
@@ -63,7 +65,6 @@ export interface ScrollerViewportEntry {
 	scrollCoverageGate: ScrollCoverageGate;
 	scrollTarget: Window | HTMLElement;
 	isScrolling: boolean;
-	reconnectStructureObserverAfterScroll: boolean;
 	refreshDependenciesAfterScroll: boolean;
 	measureLayoutAfterScroll: boolean;
 	layoutMeasurementPendingForDependencyRefresh: boolean;

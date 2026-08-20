@@ -39,7 +39,7 @@ two-hop surface も同じ不変条件に従う。section margin、header、load-
 
 ### 直近のスクロールコンテナ（Nearest Scroll Container）
 
-場所: `dom/scrollContainer.ts`
+場所: `src/ui/shared/scroll/scrollContainer.ts`
 
 - **目的:** 繰り返しのDOMツリー走査や `getComputedStyle()` の呼び出しを防ぐ。
 - **スコープ:** virtual listのルート要素ごとに1つの `WeakMap` エントリ。
@@ -48,15 +48,15 @@ two-hop surface も同じ不変条件に従う。section margin、header、load-
 
 ### Shared Frame Scroll Metrics
 
-場所: `dom/virtualListDomObserver.ts`
+場所: `src/ui/virtualization/viewport/observer/scrollerRegistry.ts`, `src/ui/virtualization/viewport/sharedScrollMetrics.ts`
 
 - **目的:** フレームごとにスクロールメトリクスを1回読み取り、スケジュールされたその測定中にactive subscriberへ渡す。
-- **スコープ:** `ScrollerViewportEntry` 1つにつき1件。
+- **スコープ:** element scroller または `Window` をキーにした `ScrollerViewportEntry` 1つにつき1件。同じ scroller の active subscriber は最大1件。
 - **無効化:** スクロールのフラッシュごとに新しく読み取られ、最終的なクリーンアップ時に保留状態がクリアされる。
 
 ### Flat Grid Runtime Memo
 
-場所: `row-models/flatVirtualGridRuntimeModel.ts`
+場所: `src/features/card-grid/runtime/flat-grid/modelMemo.ts`
 
 - **目的:** 依存関係に変更がない限り、再評価をまたいでも論理セルのソースと行モデルの同一性を安定して維持する。
 - **スコープ:** フックインスタンスごとに1つの論理ソースエントリと1つの行モデルエントリ。
@@ -66,7 +66,7 @@ two-hop surface も同じ不変条件に従う。section margin、header、load-
 
 ### Engine Snapshot Fast Paths
 
-場所: `core/virtualListEngine.ts`
+場所: `src/ui/virtualization/engine/snapshotComputation.ts`, `src/ui/virtualization/engine/virtualizer.ts`
 
 - **目的:** 行モデルのリビジョン、マウント範囲、全体の高さが再利用を許容する場合、マウントされたセルの再構築をスキップする。
 - **スコープ:** 次のエンジン計算に渡される以前のスナップショット。
@@ -78,8 +78,8 @@ two-hop surface も同じ不変条件に従う。section margin、header、load-
 - `VirtualListSnapshot` およびすべてのビルド結果は、高速な構築のために内部型がミューテーションを許可している場合でも、公開された後は厳密に読み取り専用となる。
 - リコンシリエーション（差分調整）ビルダーは、新しく割り当てられた配列やマップを返す前にミューテーションすることが可能である。ただし、以前に公開されたビルドは **絶対に** ミューテーションしてはならない。
 - `ScrollerViewportEntry` は、単一のactive subscriber、保留中の測定フラグ、依存オブザーバー、およびスクロールフェーズフラグを所有・管理する。
-- スクロール中の後処理フラグは `dom/virtualListDomObserver.ts` の scroller entry が所有し、scroll start/idle で直接遷移させる。
-- 構造ミューテーションを無視するためのセレクターは `dom/structureMutationObserver.ts` に定義されている。無視されたミューテーションは意図的にレイアウト計算を抑制するため、新しい無視ルールを追加する際は必ず固有のテストを追加すること。
+- スクロール中の後処理フラグは `src/ui/virtualization/viewport/observer/scrollerRegistry.ts` の scroller entry が所有し、`src/ui/virtualization/viewport/observer/scrollSession.ts` の scroll start/idle で遷移させる。structure observer は購読中接続したままにし、scroll 中は dependency refresh と layout measurement の dirty flag だけを立てる。
+- 構造ミューテーションを無視するためのセレクターは `src/ui/virtualization/viewport/observer/structureMutation.ts` に定義されている。無視されたミューテーションは意図的にレイアウト計算を抑制するため、新しい無視ルールを追加する際は必ず固有のテストを追加すること。
 
 ## 測定チェックリスト（Measurement Checklist）
 

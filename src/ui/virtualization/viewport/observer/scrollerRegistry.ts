@@ -48,7 +48,7 @@ export type {
 
 const ROOT_RESIZE_EPSILON_PX = 0.5;
 
-const scrollerViewportEntries = new WeakMap<HTMLElement, ScrollerViewportEntry>();
+const scrollerViewportEntries = new WeakMap<object, ScrollerViewportEntry>();
 
 type SharedRootResizeObserver =
 	SharedResizeObserverRegistry<VirtualListViewportSubscriber>;
@@ -271,9 +271,7 @@ const observeDependencyTargets = (entry: ScrollerViewportEntry): void => {
 	if (structureChanged) {
 		disconnectStructureObserver(entry);
 		entry.structureDependencyTargets = nextStructure;
-		if (!entry.isScrolling) {
-			connectStructureObserver(entry);
-		}
+		connectStructureObserver(entry);
 	}
 };
 
@@ -292,11 +290,7 @@ const moveSubscriberToCurrentScroller = (
 	invalidateNearestScrollContainerCache(subscriber.rootEl);
 	unregisterSubscriber(subscriber);
 	subscriber.ownerWindow = ownerWindow;
-	const nextEntry = getScrollerViewportEntry(
-		nextScroller,
-		subscriber.rootEl,
-		ownerWindow,
-	);
+	const nextEntry = getScrollerViewportEntry(nextScroller, ownerWindow);
 	registerSubscriber(nextEntry, subscriber);
 	subscriber.onScrollContainerChange(nextScroller);
 	return true;
@@ -370,8 +364,6 @@ const handleRootResizeEntry = (
 const createScrollSessionActions = (
 	entry: ScrollerViewportEntry,
 ): VirtualScrollSessionActions => ({
-	disconnectStructureObserver: () => disconnectStructureObserver(entry),
-	connectStructureObserver: () => connectStructureObserver(entry),
 	cancelInitialStabilizationMeasurement: () => {
 		getActiveSubscriber(entry)?.cancelInitialStabilizationMeasurement?.();
 	},
@@ -425,10 +417,9 @@ const handleStructureMutations = (
 
 const getScrollerViewportEntry = (
 	scroller: HTMLElement | null,
-	fallbackKey: HTMLElement,
 	ownerWindow: Window,
 ): ScrollerViewportEntry => {
-	const key = scroller ?? fallbackKey;
+	const key = scroller ?? ownerWindow;
 	const existingEntry = scrollerViewportEntries.get(key);
 	if (existingEntry) {
 		return existingEntry;
@@ -460,7 +451,6 @@ const getScrollerViewportEntry = (
 		},
 		scrollTarget: scroller ?? ownerWindow,
 		isScrolling: false,
-		reconnectStructureObserverAfterScroll: false,
 		refreshDependenciesAfterScroll: false,
 		measureLayoutAfterScroll: false,
 		layoutMeasurementPendingForDependencyRefresh: false,
@@ -578,11 +568,7 @@ export const registerVirtualViewport = (
 		}
 
 		const scrollContainer = findNearestScrollContainerCached(options.rootEl);
-		const entry = getScrollerViewportEntry(
-			scrollContainer,
-			options.rootEl,
-			ownerWindow,
-		);
+		const entry = getScrollerViewportEntry(scrollContainer, ownerWindow);
 		const subscriber: VirtualListViewportSubscriber = {
 			...options,
 			ownerWindow,
@@ -595,6 +581,7 @@ export const registerVirtualViewport = (
 
 		options.onScrollContainerChange(scrollContainer);
 		registerSubscriber(entry, subscriber);
+		options.resetMeasurementForObservation?.();
 		options.runInitialLayoutMeasurement();
 		publishScrollMeasurementRange(entry, publishedRange);
 

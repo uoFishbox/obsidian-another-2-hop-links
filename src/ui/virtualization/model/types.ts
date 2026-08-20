@@ -1,4 +1,4 @@
-import type { RowRange } from "./rowRange";
+import type { MutableRowRange, RowRange } from "./rowRange";
 import type { VirtualRowLayoutMetrics } from "./layoutMetrics";
 
 export interface RowNumberLookup {
@@ -49,7 +49,7 @@ export interface VirtualRowModel<TCell> {
 	getRowEnd?: (rowIndex: number) => number;
 
 	findVisibleRangeInto(
-		out: RowRange,
+		out: MutableRowRange,
 		params: {
 			scrollTop: number;
 			viewportHeight: number;
@@ -57,7 +57,7 @@ export interface VirtualRowModel<TCell> {
 		},
 	): void;
 	findVisibleRangesInto(
-		out: VirtualRanges,
+		out: MutableVirtualRanges,
 		params: {
 			scrollTop: number;
 			viewportHeight: number;
@@ -85,8 +85,14 @@ export interface VirtualNavigationTarget {
 }
 
 export interface VirtualRanges {
-	mounted: RowRange;
-	previewVisible: RowRange;
+	readonly mounted: RowRange;
+	readonly previewVisible: RowRange;
+}
+
+/** Caller-owned scratch ranges used by row-model writers. */
+export interface MutableVirtualRanges {
+	mounted: MutableRowRange;
+	previewVisible: MutableRowRange;
 }
 
 export interface MountedVirtualCell {

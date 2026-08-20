@@ -1,9 +1,15 @@
 export interface RowRange {
+	readonly start: number;
+	readonly end: number;
+}
+
+/** Caller-owned scratch range used by row-model writers. */
+export interface MutableRowRange {
 	start: number;
 	end: number;
 }
 
-export const EMPTY_ROW_RANGE: RowRange = { start: 0, end: 0 };
+export const EMPTY_ROW_RANGE: RowRange = Object.freeze({ start: 0, end: 0 });
 
 export function isEmptyRange(range: RowRange): boolean {
 	return range.end <= range.start;

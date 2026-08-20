@@ -13,6 +13,17 @@ export interface InitialMeasurementLifecycleOptions {
 	maxPasses?: number;
 }
 
+export interface InitialMeasurementLifecycle {
+	suppressForBootstrap(): void;
+	scheduleObservedLayoutMeasurement(): void;
+	scheduleStabilization(): void;
+	cancelBecauseScrollStarted(): void;
+	/** Starts a fresh lifecycle for a newly bound observation. */
+	resetForObservation(): void;
+	/** Stops pending work without changing the completed/cancelled state. */
+	cancel(): void;
+}
+
 export function createInitialMeasurementLifecycle({
 	measurement,
 	hasStableVisibleRange,
@@ -22,7 +33,7 @@ export function createInitialMeasurementLifecycle({
 	getWindow,
 	frameCoordinator,
 	maxPasses = 2,
-}: InitialMeasurementLifecycleOptions) {
+}: InitialMeasurementLifecycleOptions): InitialMeasurementLifecycle {
 	let suppressObservedLayoutMeasurement = false;
 	let observedLayoutSuppressionHandle: number | null = null;
 	let passCount = 0;
@@ -142,6 +153,14 @@ export function createInitialMeasurementLifecycle({
 			}
 			cancelledByScroll = true;
 			cancelStabilization();
+		},
+		resetForObservation(): void {
+			cancelObservedLayoutSuppression();
+			cancelStabilization();
+			passCount = 0;
+			completed = false;
+			cancelledByScroll = false;
+			remainingFrames = 0;
 		},
 		cancel(): void {
 			cancelObservedLayoutSuppression();

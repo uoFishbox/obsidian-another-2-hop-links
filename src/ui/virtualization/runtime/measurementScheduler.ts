@@ -11,6 +11,8 @@ export interface VirtualMeasurementScheduler {
 	scheduleScrollMeasurement(task?: () => void): void;
 	scheduleUnstableMeasurementRetry(): void;
 	resetUnstableMeasurementRetry(): void;
+	/** Cancels old work and restores retry capacity for a new observation. */
+	resetForObservation(): void;
 	cancelAll(): void;
 }
 
@@ -118,12 +120,18 @@ export function createVirtualMeasurementScheduler({
 		pendingScrollMeasurementTask = undefined;
 	};
 
+	const resetForObservation = (): void => {
+		cancelAll();
+		unstableMeasurementRetryCount = 0;
+	};
+
 	return {
 		hasPendingLayoutMeasurement,
 		scheduleLayoutMeasurement,
 		scheduleScrollMeasurement,
 		scheduleUnstableMeasurementRetry,
 		resetUnstableMeasurementRetry,
+		resetForObservation,
 		cancelAll,
 	};
 }
