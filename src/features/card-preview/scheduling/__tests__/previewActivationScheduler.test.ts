@@ -293,6 +293,60 @@ describe("preview activation scheduler", () => {
 		expect(activated).toBeLessThanOrEqual(161);
 	});
 
+	it("preserves a very low configured activation rate", async () => {
+		const activated = await countScrollingActivations({
+			intervalMs: 1000 / 60,
+			durationMs: 5_000,
+			activationsPerSecond: 1,
+		});
+
+		expect(activated).toBeGreaterThanOrEqual(5);
+		expect(activated).toBeLessThanOrEqual(6);
+	});
+
+	it("waits in the owner realm until a scrolling token can be available", async () => {
+		markScrollActivityActive(scrollSource);
+		let postPaintTask: (() => void) | undefined;
+		const frameCoordinator: VirtualFrameCoordinator = {
+			schedule: vi.fn((_lane, _key, task) => {
+				postPaintTask = task;
+				return true;
+			}),
+			cancel: vi.fn(),
+			isScheduled: vi.fn(() => false),
+			dispose: vi.fn(),
+		};
+		const scheduleDelay = vi.fn((callback: () => void, delay?: number) =>
+			globalThis.setTimeout(callback, delay),
+		);
+		const schedulingWindow = {
+			performance: globalThis.performance,
+			setTimeout: scheduleDelay,
+			clearTimeout: globalThis.clearTimeout.bind(globalThis),
+		} as unknown as Window;
+		resetPreviewActivationSchedulerForTests({
+			getActivationsPerSecond: () => 1,
+			getWindow: () => schedulingWindow,
+		});
+		const scope = createPreviewActivationScope({ frameCoordinator });
+		const first = requestActivation("preview-sparse-first", scope);
+		requestActivation("preview-sparse-second", scope);
+
+		expect(frameCoordinator.schedule).toHaveBeenCalledOnce();
+		postPaintTask?.();
+		await Promise.resolve();
+
+		expect(first.onActivated).toHaveBeenCalledOnce();
+		expect(scheduleDelay).toHaveBeenCalledOnce();
+		expect(scheduleDelay.mock.calls[0]?.[1]).toBe(250);
+		expect(frameCoordinator.schedule).toHaveBeenCalledOnce();
+
+		await vi.advanceTimersByTimeAsync(249);
+		expect(frameCoordinator.schedule).toHaveBeenCalledOnce();
+		await vi.advanceTimersByTimeAsync(2);
+		expect(frameCoordinator.schedule).toHaveBeenCalledTimes(2);
+	});
+
 	it("switches delayed scrolling work back to the idle burst policy", async () => {
 		frameIntervalMs = 1000 / 120;
 		markScrollActivityActive(scrollSource);
@@ -399,6 +453,7 @@ describe("preview activation scheduler", () => {
 		for (let index = 0; index < 100; index += 1) {
 			requestActivation("same-key", scope);
 		}
+		expect(requestAnimationFrame).toHaveBeenCalledOnce();
 
 		await flushAnimationFrame();
 
@@ -599,6 +654,11 @@ describe("preview activation scheduler", () => {
 
 		await vi.advanceTimersByTimeAsync(1_000);
 		expect(requestAnimationFrame).toHaveBeenCalledTimes(1);
+		const stillBlocked = requestActivation("preview-still-blocked", scope);
+		expect(requestAnimationFrame).toHaveBeenCalledTimes(1);
+		notifyPressureChanged?.();
+		expect(requestAnimationFrame).toHaveBeenCalledTimes(1);
+		stillBlocked.handle.cancel();
 
 		outstandingPreviewJobCount = 2;
 		notifyPressureChanged?.();

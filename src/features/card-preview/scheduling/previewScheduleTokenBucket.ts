@@ -71,6 +71,20 @@ export function canConsumePreviewScheduleToken(
 	return state.availableCredits + TOKEN_CREDIT_EPSILON >= 1;
 }
 
+/** Returns the delay until one token can be consumed at the supplied rate. */
+export function readPreviewScheduleTokenDelayMs(
+	state: PreviewScheduleTokenState,
+	ratePerSecond: number,
+): number {
+	if (canConsumePreviewScheduleToken(state)) return 0;
+	if (!Number.isFinite(ratePerSecond) || ratePerSecond <= 0) {
+		return Number.POSITIVE_INFINITY;
+	}
+
+	const missingCredits = Math.max(0, 1 - state.availableCredits);
+	return (missingCredits * 1000) / ratePerSecond;
+}
+
 export function consumePreviewScheduleToken(
 	state: PreviewScheduleTokenState,
 ): PreviewScheduleTokenState {

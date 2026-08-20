@@ -54,17 +54,18 @@ export interface PreviewRuntime {
 
 /** Creates the preview runtime for one plugin load. */
 export function createPreviewRuntime(options: PreviewRuntimeOptions): PreviewRuntime {
-	const activationScheduler: PreviewActivationScheduler =
-		createPreviewActivationScheduler({
-			getOutstandingPreviewJobCount: options.getOutstandingPreviewJobCount,
-			subscribeBackpressure: options.subscribeBackpressure,
-			getActivationsPerSecond: options.getActivationsPerSecond,
-		});
 	// Preview work may target surfaces in popout realms. When a coordinator
 	// cannot accept a task, fall back to the workspace window receiving input
 	// instead of the main Electron window, which may be throttled.
 	const resolveSchedulingWindow = (): Window | null =>
 		resolveWorkspaceWindow(options.app.workspace);
+	const activationScheduler: PreviewActivationScheduler =
+		createPreviewActivationScheduler({
+			getOutstandingPreviewJobCount: options.getOutstandingPreviewJobCount,
+			subscribeBackpressure: options.subscribeBackpressure,
+			getActivationsPerSecond: options.getActivationsPerSecond,
+			getWindow: resolveSchedulingWindow,
+		});
 	const domCommitScheduler: PreviewDomCommitScheduler =
 		createPreviewDomCommitScheduler(resolveSchedulingWindow);
 	const sharedCache = createCardPreviewSharedCache();

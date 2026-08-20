@@ -14,6 +14,8 @@ import {
 	canConsumePreviewScheduleToken,
 	consumePreviewScheduleToken,
 	createEmptyPreviewScheduleTokenState,
+	MAX_TOKEN_REFILL_ELAPSED_MS,
+	readPreviewScheduleTokenDelayMs,
 	refillPreviewScheduleTokens,
 	type PreviewScheduleTokenState,
 } from "./previewScheduleTokenBucket";
@@ -245,12 +247,15 @@ function readTokenAvailabilityDelayMs(
 	tokenState: PreviewScheduleTokenState,
 	ratePerSecond: number,
 ): number {
-	if (canConsumePreviewScheduleToken(tokenState)) return 0;
-
-	const missingCredits = Math.max(0, 1 - tokenState.availableCredits);
-	const availabilityDelayMs = (missingCredits * 1000) / ratePerSecond;
+	const availabilityDelayMs = readPreviewScheduleTokenDelayMs(
+		tokenState,
+		ratePerSecond,
+	);
 	// The driver observes and refills tokens on the scheduled frame itself.
-	return Math.max(0, availabilityDelayMs - EXPECTED_FRAME_INTERVAL_MS);
+	return Math.min(
+		MAX_TOKEN_REFILL_ELAPSED_MS,
+		Math.max(0, availabilityDelayMs - EXPECTED_FRAME_INTERVAL_MS),
+	);
 }
 
 function schedulePendingPartition(
@@ -260,10 +265,14 @@ function schedulePendingPartition(
 ): void {
 	if (partition.queue.size === 0) return;
 
+	const tokenAvailabilityDelayMs = readTokenAvailabilityDelayMs(
+		partition.tokenState,
+		policy.ratePerSecond,
+	);
 	const delayMs =
 		policy.mode === "scrolling"
-			? SCROLLING_REEVALUATION_DELAY_MS
-			: readTokenAvailabilityDelayMs(partition.tokenState, policy.ratePerSecond);
+			? Math.max(SCROLLING_REEVALUATION_DELAY_MS, tokenAvailabilityDelayMs)
+			: tokenAvailabilityDelayMs;
 	schedulePartition(state, partition, delayMs, policy.mode === "scrolling");
 }
 
@@ -357,15 +366,6 @@ function enqueuePreviewDomCommitForState(
 		return Promise.resolve({ type: "skipped", reason: "disposed" });
 	}
 	return new Promise<PreviewDomCommitResult>((resolve, reject) => {
-		const existingTask = state.pendingByTargetKey.get(task.targetKey);
-		if (existingTask) {
-			settleTask(state, existingTask, {
-				type: "skipped",
-				reason: "replaced",
-			});
-			compactQueue(existingTask.scopeState.partition);
-		}
-
 		const partition = scopeState.partition;
 		const queuedTask: QueuedPreviewDomCommitTask = {
 			...task,
@@ -374,8 +374,16 @@ function enqueuePreviewDomCommitForState(
 			reject,
 			settled: false,
 		};
+		const existingTask = state.pendingByTargetKey.get(task.targetKey);
 		state.pendingByTargetKey.set(task.targetKey, queuedTask);
 		partition.queue.enqueue(task.targetKey, queuedTask);
+		if (existingTask) {
+			settleTask(state, existingTask, {
+				type: "skipped",
+				reason: "replaced",
+			});
+			compactQueue(existingTask.scopeState.partition);
+		}
 		ensureScrollActivitySubscription(state);
 		schedulePartition(state, partition);
 	});

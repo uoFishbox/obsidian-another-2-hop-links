@@ -21,6 +21,8 @@ import {
 	canConsumePreviewScheduleToken,
 	consumePreviewScheduleToken,
 	createEmptyPreviewScheduleTokenState,
+	MAX_TOKEN_REFILL_ELAPSED_MS,
+	readPreviewScheduleTokenDelayMs,
 	refillPreviewScheduleTokens,
 	type PreviewScheduleTokenState,
 } from "./previewScheduleTokenBucket";
@@ -28,6 +30,7 @@ import { createPreviewKeyedQueue, type PreviewKeyedQueue } from "./previewKeyedQ
 
 const MAX_QUEUE_ENTRIES_PER_DRAIN = 256;
 const MAX_OUTSTANDING_PREVIEW_JOBS = 3;
+const EXPECTED_FRAME_INTERVAL_MS = 1000 / 60;
 
 interface PreviewActivationPolicy {
 	readonly mode: "idle" | "backpressured" | "scrolling";
@@ -104,6 +107,8 @@ export interface CreatePreviewActivationSchedulerOptions {
 	) => () => void;
 	/** Maximum preview activations admitted per second while scrolling. */
 	readonly getActivationsPerSecond?: () => number;
+	/** Realm used when a delayed frame cannot be scheduled directly by a coordinator. */
+	readonly getWindow?: () => Window | null;
 }
 
 export interface CreatePreviewActivationScopeOptions {
@@ -156,6 +161,7 @@ interface PreviewActivationSchedulerState {
 		| ((listener: PreviewBackpressureChangeListener) => () => void)
 		| undefined;
 	readonly getActivationsPerSecond: () => number;
+	readonly getWindow: (() => Window | null) | undefined;
 	readonly roundRobinCursorByPartition: Map<PreviewActivationPartition, number>;
 	readonly scrollingPolicy: PreviewActivationPolicy;
 	tokenState: PreviewScheduleTokenState;
@@ -179,6 +185,7 @@ function createSchedulerState(
 		subscribeBackpressure: options.subscribeBackpressure,
 		getActivationsPerSecond:
 			options.getActivationsPerSecond ?? getDefaultActivationsPerSecond,
+		getWindow: options.getWindow,
 		roundRobinCursorByPartition: new Map(),
 		scrollingPolicy: { ...SCROLLING_POLICY },
 		tokenState: createEmptyPreviewScheduleTokenState(),
@@ -242,6 +249,7 @@ function getOrCreatePartition(
 	const driver = createPreviewFrameDriver({
 		coordinator,
 		taskKey,
+		getWindow: state.getWindow,
 		onAnimationFrameScheduled: () => {
 			if (process.env.NODE_ENV !== "production") {
 				recordCCLDevMeasurement("preview.activationScheduler.animationFrame");
@@ -368,11 +376,16 @@ function ensureBackpressureSubscription(
 
 	schedulerState.unsubscribeBackpressure = schedulerState.subscribeBackpressure(
 		() => {
+			const outstandingPreviewJobCount =
+				schedulerState.getOutstandingPreviewJobCount();
+			if (!hasPreviewAdmissionCapacity(outstandingPreviewJobCount)) {
+				schedulerState.blockedForBackpressure = true;
+				return;
+			}
+
 			schedulerState.blockedForBackpressure = false;
-			for (const scopeState of schedulerState.scopes) {
-				if (hasPendingScope(scopeState)) {
-					schedulePartition(schedulerState, scopeState.partition);
-				}
+			for (const partition of schedulerState.partitionsByIdentity.values()) {
+				schedulePartition(schedulerState, partition);
 			}
 		},
 	);
@@ -427,6 +440,21 @@ function resolveActivationPolicy(
 
 function hasPreviewAdmissionCapacity(outstandingPreviewJobCount: number): boolean {
 	return outstandingPreviewJobCount < MAX_OUTSTANDING_PREVIEW_JOBS;
+}
+
+function readTokenAvailabilityDelayMs(
+	tokenState: PreviewScheduleTokenState,
+	ratePerSecond: number,
+): number {
+	const availabilityDelayMs = readPreviewScheduleTokenDelayMs(
+		tokenState,
+		ratePerSecond,
+	);
+	// The driver refills tokens on the scheduled frame, so account for that frame.
+	return Math.min(
+		MAX_TOKEN_REFILL_ELAPSED_MS,
+		Math.max(0, availabilityDelayMs - EXPECTED_FRAME_INTERVAL_MS),
+	);
 }
 
 function compactScopeQueue(scopeState: PreviewActivationScopeState): void {
@@ -556,7 +584,10 @@ function drainPartitionScopes(
 	if (schedulerState.blockedForBackpressure || !hasPendingPartition(partition)) {
 		return null;
 	}
-	return 0;
+	return readTokenAvailabilityDelayMs(
+		schedulerState.tokenState,
+		policy.ratePerSecond,
+	);
 }
 
 function drainPartition(
@@ -599,9 +630,6 @@ function enqueuePreviewActivationRequest(
 	const scopeState = readScopeState(schedulerState, scope);
 	if (scopeState.disposed) return createActivationHandle(key, undefined);
 
-	const existing = scopeState.queue.get(key);
-	if (existing) settleRequest(schedulerState, existing, false);
-
 	const request: PreviewActivationRequest = {
 		schedulerState,
 		key,
@@ -610,8 +638,11 @@ function enqueuePreviewActivationRequest(
 		hasDeferredForVirtualScrollMeasurement: false,
 		settled: false,
 	};
-	scopeState.queue.enqueue(key, request);
-	schedulerState.blockedForBackpressure = false;
+	const existing = scopeState.queue.enqueue(key, request);
+	if (existing) {
+		settleRequest(schedulerState, existing, false);
+		compactScopeQueue(scopeState);
+	}
 	ensureScrollActivitySubscription(schedulerState);
 	ensureBackpressureSubscription(schedulerState);
 	schedulePartition(schedulerState, scopeState.partition);

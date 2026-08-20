@@ -371,6 +371,38 @@ describe("preview DOM commit scheduler", () => {
 		expect(frameCoordinator.schedule).toHaveBeenCalledTimes(2);
 	});
 
+	it("waits until a low-rate scrolling token can be available", async () => {
+		markScrollActivityActive(scrollSource);
+		const scheduledTask: { current: (() => void) | undefined } = {
+			current: undefined,
+		};
+		const frameCoordinator = createTestFrameCoordinator(scheduledTask);
+		const scope = defaultTestScheduler.createScope({
+			frameCoordinator,
+			getCommitsPerSecond: () => 1,
+		});
+		const first = scope.schedule({
+			targetKey: "preview-low-rate-first",
+			isStale: () => false,
+			commit: () => true,
+		});
+		void scope.schedule({
+			targetKey: "preview-low-rate-second",
+			isStale: () => false,
+			commit: () => true,
+		});
+
+		expect(frameCoordinator.schedule).toHaveBeenCalledOnce();
+		scheduledTask.current?.();
+		await expect(first).resolves.toEqual({ type: "committed" });
+		expect(frameCoordinator.schedule).toHaveBeenCalledOnce();
+
+		await vi.advanceTimersByTimeAsync(249);
+		expect(frameCoordinator.schedule).toHaveBeenCalledOnce();
+		await vi.advanceTimersByTimeAsync(2);
+		expect(frameCoordinator.schedule).toHaveBeenCalledTimes(2);
+	});
+
 	it("commits during scrolling even when browser input is pending", async () => {
 		markScrollActivityActive(scrollSource);
 		const isInputPending = vi.fn(() => true);
@@ -474,6 +506,18 @@ describe("preview DOM commit scheduler", () => {
 
 		expect(committed).toBeGreaterThanOrEqual(192);
 		expect(committed).toBeLessThanOrEqual(196);
+	});
+
+	it("preserves a very low configured commit rate", async () => {
+		const committed = await countCommits({
+			intervalMs: 1000 / 60,
+			durationMs: 5_000,
+			scrolling: true,
+			commitsPerSecond: 1,
+		});
+
+		expect(committed).toBeGreaterThanOrEqual(5);
+		expect(committed).toBeLessThanOrEqual(6);
 	});
 
 	it("rate-limits idle commits independently of refresh rate", async () => {

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
 	consumePreviewScheduleToken,
 	createEmptyPreviewScheduleTokenState,
+	readPreviewScheduleTokenDelayMs,
 	refillPreviewScheduleTokens,
 	type PreviewScheduleTokenPolicy,
 } from "../previewScheduleTokenBucket";
@@ -53,5 +54,31 @@ describe("preview schedule token bucket", () => {
 			lastRefillTimestamp: 2_000,
 			policyMode: "scrolling",
 		});
+	});
+
+	it("reports when the next token can be consumed", () => {
+		expect(
+			readPreviewScheduleTokenDelayMs(
+				{
+					availableCredits: 0.25,
+					lastRefillTimestamp: 1_000,
+					policyMode: "scrolling",
+				},
+				4,
+			),
+		).toBeCloseTo(187.5);
+	});
+
+	it("reports no delay when a token is already available", () => {
+		expect(
+			readPreviewScheduleTokenDelayMs(
+				{
+					availableCredits: 1,
+					lastRefillTimestamp: 1_000,
+					policyMode: "idle",
+				},
+				1,
+			),
+		).toBe(0);
 	});
 });
