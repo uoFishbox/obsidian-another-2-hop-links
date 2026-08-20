@@ -1,5 +1,5 @@
 <script lang="ts">
-	import ViewItemCard from "ui/components/items/ViewItemCard.svelte";
+	import ViewItemCard from "features/list-view/ui/ViewItemCard.svelte";
 	import type { TwoHopLinkBranch } from "types/domain";
 	import { DEFAULT_SETTINGS } from "features/settings/model";
 

@@ -1,4 +1,12 @@
 import type { SortOption } from "core/sorting";
+export {
+	DEFAULT_CARD_GAP_PX,
+	DEFAULT_CARD_HEIGHT_PX,
+	DEFAULT_CARD_HEIGHT_RATIO,
+	DEFAULT_CARD_MAX_COLUMNS,
+	DEFAULT_CARD_WIDTH_PX,
+	DEFAULT_SECTION_MARGIN_BOTTOM_PX,
+} from "ui/layout/cardLayoutCssVars";
 
 export const LANGUAGES = ["en", "ja"] as const;
 export type Language = (typeof LANGUAGES)[number];
@@ -17,13 +25,6 @@ export type MobileLongPressAction = (typeof MOBILE_LONG_PRESS_ACTIONS)[number];
 
 /** Current persisted settings shape version; bump when keys are renamed or reshaped. */
 export const SETTINGS_SCHEMA_VERSION = 1;
-
-export const DEFAULT_CARD_WIDTH_PX = 140;
-export const DEFAULT_CARD_HEIGHT_PX = 154;
-export const DEFAULT_CARD_HEIGHT_RATIO = DEFAULT_CARD_HEIGHT_PX / DEFAULT_CARD_WIDTH_PX;
-export const DEFAULT_CARD_GAP_PX = 12;
-export const DEFAULT_CARD_MAX_COLUMNS = 6;
-export const DEFAULT_SECTION_MARGIN_BOTTOM_PX = 45;
 
 export const CARD_LAYOUT_SETTING_KEYS = [
 	"cardWidthPx",

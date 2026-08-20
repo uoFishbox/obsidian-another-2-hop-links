@@ -120,10 +120,30 @@ vi.mock("ui/context/linkContext", () => ({
 	setLazyLoaderCache: vi.fn(),
 }));
 
+function createApplicationUiState() {
+	return {
+		initialVisibleCount: DEFAULT_SETTINGS.defaultVisibleLinkCount,
+		loadMoreIncrement: DEFAULT_SETTINGS.loadMoreLinkIncrement,
+		settings: DEFAULT_SETTINGS,
+		sortOption: DEFAULT_SETTINGS.lastUsedSortOption,
+		sectionExpandedLimits: {},
+		updateVersion: 0,
+		previewGlobalVersion: 0,
+		previewPathVersions: {},
+		setSortOption: vi.fn(),
+		setContentSearchEnabled: vi.fn(),
+		setSettings: vi.fn(),
+		setSectionExpandedLimit: vi.fn(),
+		getSectionExpandedLimit: vi.fn(() => undefined),
+		getPreviewRenderVersion: vi.fn(() => "0:0"),
+	};
+}
+
 describe("TwoHopLinksPage", () => {
 	it("adds a keyboard navigation surface marker to the root element", async () => {
 		const file = createMockTFile("target.md");
 		const applicationStore = {
+			uiState: createApplicationUiState(),
 			loading: false,
 			loadingPhase: "initial",
 			data: undefined,
@@ -192,6 +212,7 @@ describe("TwoHopLinksPage", () => {
 	it("displays LoadingState in card area while loading", () => {
 		const file = createMockTFile("target.md");
 		const applicationStore = {
+			uiState: createApplicationUiState(),
 			loading: true,
 			loadingPhase: "initial",
 			data: undefined,
@@ -270,6 +291,7 @@ describe("TwoHopLinksPage", () => {
 			taggedNotes: [],
 		};
 		const applicationStore = {
+			uiState: createApplicationUiState(),
 			loading: false,
 			loadingPhase: "base-ready",
 			data: linkResult,

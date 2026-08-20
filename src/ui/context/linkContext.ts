@@ -1,7 +1,6 @@
 import type { TFile, Pos, CachedMetadata, App } from "obsidian";
 import type { TwoHopIndexedLink } from "types/domain";
 import { createContext } from "svelte";
-import type { ApplicationStore } from "ui/stores/ApplicationStore.svelte";
 import type { PluginSettings } from "features/settings/model";
 import type {
 	PreviewData,
@@ -58,9 +57,16 @@ export interface LinkInteractionContext {
 
 export type LinkContext = LinkUtilitiesContext & LinkInteractionContext;
 
+/** Store capabilities consumed by UI context users. */
+export interface AppContextApplicationStore {
+	readonly settings: PluginSettings;
+	getPreviewRenderVersion?(path: string): string;
+	setSettings(settings: PluginSettings): void;
+}
+
 export interface AppContext {
 	linkContext: LinkContext;
-	applicationStore: ApplicationStore;
+	applicationStore: AppContextApplicationStore;
 	app: App;
 	bookmarks: BookmarksState;
 	/** Runtime-owned preview factory; optional for isolated Svelte consumers. */

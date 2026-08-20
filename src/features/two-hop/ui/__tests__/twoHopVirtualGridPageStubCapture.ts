@@ -1,9 +1,9 @@
 import type { TwoHopPreviewDependencies } from "features/two-hop/runtime/virtual-grid/useTwoHopVirtualGrid.svelte";
-import type { ApplicationStore } from "ui/stores/ApplicationStore.svelte";
+import type { ApplicationUiState } from "application/stores/ApplicationUiState.svelte";
 
 /** Last props received by the mocked TwoHopVirtualGrid component. */
 interface TwoHopVirtualGridPageStubProps {
-	readonly applicationStore: ApplicationStore;
+	readonly applicationStore: ApplicationUiState;
 	readonly loadMoreSection: ((sectionId: string) => void) | undefined;
 	readonly previewDependencies: TwoHopPreviewDependencies | undefined;
 	readonly previewActive: boolean;

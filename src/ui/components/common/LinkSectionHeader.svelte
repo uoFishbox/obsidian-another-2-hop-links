@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { Menu } from "obsidian";
-	import Icon from "ui/components/common/Icon.svelte";
+	import Icon from "ui/primitives/Icon.svelte";
 	import type { Snippet } from "svelte";
 	import { useAppContext } from "ui/context/linkContext";
 	import type { CardSectionVariant } from "./cardPresentation";

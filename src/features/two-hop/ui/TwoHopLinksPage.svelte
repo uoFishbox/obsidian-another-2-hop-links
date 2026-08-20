@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { MarkdownView, TFile, type App } from "obsidian";
 	import { setContext } from "svelte";
-	import LoadingState from "ui/components/common/LoadingState.svelte";
+	import LoadingState from "ui/primitives/LoadingState.svelte";
 	import ListControls from "ui/components/common/ListControls.svelte";
 	import TwoHopVirtualGrid from "features/two-hop/ui/TwoHopVirtualGrid.svelte";
 	import { useSearchQuery } from "ui/hooks/useSearchQuery.svelte";
@@ -15,9 +15,10 @@
 		setAppContext,
 		setLazyLoaderCache,
 	} from "ui/context/linkContext";
-	import type { ApplicationStore } from "ui/stores/ApplicationStore.svelte";
+	import type { ApplicationUiState } from "application/stores/ApplicationUiState.svelte";
+	import type { TwoHopApplicationStore } from "features/two-hop/application/TwoHopApplicationStore.svelte";
 	import type { PluginSettings } from "features/settings/model";
-	import { getCardLayoutCssText } from "ui/shared/layout/cardLayoutCssVars";
+	import { getCardLayoutCssText } from "ui/layout/cardLayoutCssVars";
 	import { createTwohopSearchAdapter } from "features/two-hop/ui/twoHopSearchAdapter";
 	import { tick } from "svelte";
 	import { createTwoHopSectionPublicationMemo } from "features/two-hop/ui/section-descriptors/cache";
@@ -38,7 +39,7 @@
 	interface Props {
 		file: TFile;
 		linkContext: LinkContext;
-		applicationStore: ApplicationStore;
+		applicationStore: TwoHopApplicationStore;
 		app: App;
 		previewRuntime?: PreviewRuntime;
 		lazyLoaderCache: Set<string>;
@@ -61,6 +62,7 @@
 		updateSetting,
 		uiState,
 	}: Props = $props();
+	const applicationUiState = applicationStore.uiState;
 
 	let loading = $derived(applicationStore.loading);
 	let loadingPhase = $derived(applicationStore.loadingPhase);
@@ -73,10 +75,10 @@
 	let showTwoHopPlaceholder = $derived(
 		loadingPhase === "base-ready" && (linkResult?.branches.length ?? 0) > 0,
 	);
-	let currentSettings = $derived(applicationStore.settings);
+	let currentSettings = $derived(applicationUiState.settings);
 	let useMergedLinks = $derived(currentSettings.useMergedLinksSection);
 	let showTags = $derived(currentSettings.showTagsSection);
-	let currentSort = $derived(applicationStore.sortOption);
+	let currentSort = $derived(applicationUiState.sortOption);
 	let cardLayoutCssText = $derived(getCardLayoutCssText(currentSettings));
 	let contentSearchEnabled = $state(false);
 
@@ -153,16 +155,17 @@
 	const sectionPublicationMemo = createTwoHopSectionPublicationMemo();
 	let getSortedTwoHopItems = $derived.by(() => {
 		const store = applicationStore;
-		return (items: Parameters<ApplicationStore["getSortedTwoHopItems"]>[0]) =>
+		return (items: Parameters<TwoHopApplicationStore["getSortedTwoHopItems"]>[0]) =>
 			store.getSortedTwoHopItems(items);
 	});
 	let getSortedTagGroupItems = $derived.by(() => {
 		const store = applicationStore;
-		return (items: Parameters<ApplicationStore["getSortedTagGroupItems"]>[0]) =>
-			store.getSortedTagGroupItems(items);
+		return (
+			items: Parameters<TwoHopApplicationStore["getSortedTagGroupItems"]>[0],
+		) => store.getSortedTagGroupItems(items);
 	});
 	let getSectionVisibleCount = $derived.by(() => {
-		const expandedLimits = applicationStore.sectionExpandedLimits ?? {};
+		const expandedLimits = applicationUiState.sectionExpandedLimits ?? {};
 		const requestedDefaultLimit = Math.floor(
 			currentSettings.defaultVisibleLinkCount,
 		);
@@ -207,16 +210,16 @@
 		const visibleCount = getSectionVisibleCount(sectionId, section.totalCount);
 		if (visibleCount >= section.totalCount) return;
 
-		const increment = normalizeIncrement(applicationStore.loadMoreIncrement);
+		const increment = normalizeIncrement(applicationUiState.loadMoreIncrement);
 		const nextCount =
 			increment === Number.POSITIVE_INFINITY
 				? section.totalCount
 				: Math.min(section.totalCount, visibleCount + increment);
 		const paginationId = buildScopedSectionId(sectionId, paginationScope);
-		applicationStore.setSectionExpandedLimit(
+		applicationUiState.setSectionExpandedLimit(
 			paginationId,
 			Math.max(
-				applicationStore.getSectionExpandedLimit(paginationId) ?? 0,
+				applicationUiState.getSectionExpandedLimit(paginationId) ?? 0,
 				nextCount,
 			),
 		);
@@ -224,7 +227,7 @@
 
 	setAppContext({
 		linkContext,
-		applicationStore,
+		applicationStore: applicationUiState,
 		app,
 		previewRuntime,
 		bookmarks,
@@ -234,7 +237,7 @@
 	});
 
 	setLinkContext(linkContext);
-	setContext<ApplicationStore>("applicationStore", applicationStore);
+	setContext<ApplicationUiState>("applicationStore", applicationUiState);
 	setLazyLoaderCache(lazyLoaderCache);
 
 	const previewDependencies: TwoHopPreviewDependencies | undefined = previewRuntime
@@ -246,7 +249,7 @@
 		: undefined;
 
 	function getPreviewRenderVersion(path: string): string {
-		return applicationStore.getPreviewRenderVersion(path);
+		return applicationUiState.getPreviewRenderVersion(path);
 	}
 
 	const cardModelRevision = $derived.by(
@@ -257,7 +260,7 @@
 			matchesByKey,
 			linkContext,
 			getPreviewRenderVersion,
-			applicationUpdateVersion: applicationStore.updateVersion,
+			applicationUpdateVersion: applicationUiState.updateVersion,
 		}),
 	);
 	const resolveItemCardModel = (
@@ -368,11 +371,11 @@
 			onToggleContentSearch={() => {
 				const newValue = !contentSearchEnabled;
 				contentSearchEnabled = newValue;
-				applicationStore.setContentSearchEnabled(newValue);
+				applicationUiState.setContentSearchEnabled(newValue);
 			}}
 			{contentSearchEnabled}
 			sortOption={currentSort}
-			onSortChange={(opt) => applicationStore.setSortOption(opt)}
+			onSortChange={(opt) => applicationUiState.setSortOption(opt)}
 			onMoveFocusToResults={moveFocusToResults}
 		/>
 	{/if}
@@ -387,7 +390,7 @@
 		{:else if linkResult}
 			<TwoHopVirtualGrid
 				sections={twoHopVirtualListSections}
-				{applicationStore}
+				applicationStore={applicationUiState}
 				{loadMoreSection}
 				{cardModelRevision}
 				{resolveItemCardModel}

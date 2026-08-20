@@ -9,8 +9,8 @@ import {
 } from "obsidian";
 import { normalizeTag } from "core/indexing/tag-index/tagIndexer";
 import { resolveFileByPath } from "shared/obsidian/resolveFileByPath";
-import TagNotesListHost from "ui/components/lists/TagNotesListHost.svelte";
-import type { ListConfig } from "ui/components/lists/types";
+import TagNotesListHost from "features/list-view/ui/TagNotesListHost.svelte";
+import type { ListConfig } from "features/list-view/ui/types";
 import type { PluginHost } from "types/pluginHost";
 import type { ViewServices } from "ui/shared/views/viewServices";
 import type { TaggedNote } from "types/domain";

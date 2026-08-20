@@ -1,8 +1,8 @@
 import type { IIndexingService } from "types/services";
 import type { PluginSettings } from "features/settings/model";
 import type { SortOption } from "core/sorting";
-import type { DisplayDataBuilder } from "ui/stores/ApplicationStore.svelte";
-import { ApplicationStore } from "ui/stores/ApplicationStore.svelte";
+import type { DisplayDataBuilder } from "features/two-hop/application/displayDataBuilder";
+import { TwoHopApplicationStore } from "features/two-hop/application/TwoHopApplicationStore.svelte";
 import type { ResolveTwoHopLinks } from "features/two-hop/application/TwoHopLinksLoader";
 
 export const RECENT_APPLICATION_STORE_LIMIT = 6;
@@ -16,7 +16,7 @@ export interface ApplicationStorePoolOptions {
 
 /** Manages ApplicationStore ownership, reference counts, and idle LRU reuse. */
 export class ApplicationStorePool {
-	private readonly stores = new Map<string, ApplicationStore>();
+	private readonly stores = new Map<string, TwoHopApplicationStore>();
 	private readonly refCounts = new Map<string, number>();
 	private readonly lastAccess = new Map<string, number>();
 	private readonly displayDataBuilders = new Map<string, DisplayDataBuilder>();
@@ -28,8 +28,8 @@ export class ApplicationStorePool {
 		settings: PluginSettings,
 		buildDisplayData: DisplayDataBuilder,
 		resolveTwoHopLinks: ResolveTwoHopLinks,
-	): ApplicationStore {
-		const store = new ApplicationStore(
+	): TwoHopApplicationStore {
+		const store = new TwoHopApplicationStore(
 			settings,
 			buildDisplayData,
 			resolveTwoHopLinks,
@@ -58,7 +58,7 @@ export class ApplicationStorePool {
 		settings: PluginSettings,
 		buildDisplayData: DisplayDataBuilder,
 		resolveTwoHopLinks: ResolveTwoHopLinks,
-	): ApplicationStore {
+	): TwoHopApplicationStore {
 		const key = buildStoreKey(leafId, filePath);
 		let store = this.stores.get(key);
 		if (!store) {
@@ -121,7 +121,7 @@ export class ApplicationStorePool {
 	trimIdleStores(): void {
 		const idleEntries: Array<{
 			key: string;
-			store: ApplicationStore;
+			store: TwoHopApplicationStore;
 			lastAccess: number;
 		}> = [];
 		for (const [key, store] of this.stores) {

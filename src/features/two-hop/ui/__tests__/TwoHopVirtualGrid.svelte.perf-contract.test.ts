@@ -6,7 +6,7 @@ import {
 	resetCCLDevMeasurements,
 } from "infrastructure/debug/CCLDevMeasurements";
 import { getTwoHopCardCounts } from "infrastructure/debug/twoHopCardCountRegistry";
-import type { ApplicationStore } from "ui/stores/ApplicationStore.svelte";
+import type { ApplicationUiState } from "application/stores/ApplicationUiState.svelte";
 import type { CardRenderModel } from "ui/components/items/cardRenderModel";
 import type { LinkContext } from "ui/context/linkContext";
 import type {
@@ -111,7 +111,7 @@ async function renderSurface(params: {
 			cardHeightRatio: 1,
 			cardMaxColumns: 3,
 		},
-	} as unknown as ApplicationStore;
+	} as unknown as ApplicationUiState;
 	const scroller = document.createElement("div");
 	scroller.style.overflow = "auto";
 	setNumericProperty(scroller, "clientWidth", 320);

@@ -23,3 +23,14 @@ export {
 	type StableViewItemReconciler,
 	type StableViewItemReconcilerOptions,
 } from "./stableViewItemReconciler";
+
+export {
+	hasSameBacklinkIndexedLink,
+	hasSameBacklinkIndexedLinks,
+	hasSameTaggedNote,
+	hasSameTaggedNotes,
+	hasSameTwoHopBranchCard,
+	hasSameTwoHopIndexedLink,
+	hasSameTwoHopIndexedLinks,
+	hasSameViewItemSource,
+} from "./viewItemEquality";

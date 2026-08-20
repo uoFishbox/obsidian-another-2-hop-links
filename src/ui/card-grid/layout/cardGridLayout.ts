@@ -2,7 +2,7 @@ import {
 	computeCardHeightPxFromWidth,
 	normalizeCardHeightRatio,
 	type ResolvedCardLayoutSettings,
-} from "ui/shared/layout/cardLayoutCssVars";
+} from "ui/layout/cardLayoutCssVars";
 import { getOptionalOwnerWindow } from "ui/shared/dom/realmSafeDom";
 import { computeColumnCount } from "ui/virtualization/public";
 

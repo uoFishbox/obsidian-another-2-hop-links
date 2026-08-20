@@ -1,7 +1,7 @@
 import { computeFlatGridLayout } from "ui/virtualization/public";
 import { resolveVirtualListLayoutStability } from "ui/virtualization/public";
 import { resolveCardGridLayoutBase } from "./cardGridLayout";
-import { resolveCardLayoutSettings } from "ui/shared/layout/cardLayoutCssVars";
+import { resolveCardLayoutSettings } from "ui/layout/cardLayoutCssVars";
 
 export const DEFAULT_FLAT_GRID_CARD_LAYOUT = resolveCardLayoutSettings();
 

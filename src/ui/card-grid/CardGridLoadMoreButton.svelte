@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { ARIA_LABELS } from "appConstants";
-	import Icon from "ui/components/common/Icon.svelte";
+	import Icon from "ui/primitives/Icon.svelte";
 
 	interface CardGridLoadMoreButtonProps {
 		onClick: () => void;

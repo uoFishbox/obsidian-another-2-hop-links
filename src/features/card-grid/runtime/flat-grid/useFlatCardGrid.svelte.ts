@@ -19,7 +19,7 @@ import { createCardGridVisibilityPolicy } from "features/card-grid/model/cardGri
 import {
 	createResolvedCardLayoutSettingsMemo,
 	type CardLayoutSettings,
-} from "ui/shared/layout/cardLayoutCssVars";
+} from "ui/layout/cardLayoutCssVars";
 import { getOptionalOwnerWindow } from "ui/shared/dom/realmSafeDom";
 import { scheduleAnimationFrame } from "ui/shared/scheduling/frame";
 import {

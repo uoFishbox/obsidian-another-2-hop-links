@@ -161,7 +161,9 @@ vi.mock("ui/shared/views/viewFactories", () => {
 	return {
 		createDefaultApplicationStore: vi.fn(() => ({
 			destroy: vi.fn(),
-			triggerUpdate: triggerUpdateMock,
+			uiState: {
+				triggerUpdate: triggerUpdateMock,
+			},
 		})),
 		createLinkContextForView: vi.fn(() => ({
 			resolveFile: vi.fn(() => null),
@@ -170,12 +172,12 @@ vi.mock("ui/shared/views/viewFactories", () => {
 	};
 });
 
-vi.mock("ui/components/lists/TagNotesListHost.svelte", async () => {
+vi.mock("features/list-view/ui/TagNotesListHost.svelte", async () => {
 	const component = await import("./TagNotesListHostAutofocusProbe.svelte");
 	return { default: component.default };
 });
 
-vi.mock("ui/components/items/ViewItemCard.svelte", () => ({
+vi.mock("features/list-view/ui/ViewItemCard.svelte", () => ({
 	default: {},
 }));
 

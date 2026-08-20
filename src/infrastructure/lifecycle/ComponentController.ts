@@ -12,10 +12,8 @@ import type { SortOption } from "core/sorting";
 import { areTagFeaturesEnabled } from "features/settings/model";
 import type { IComponentManager } from "types/services";
 import type { TwoHopLinkResult } from "types/domain";
-import type {
-	ApplicationStore,
-	DisplayDataBuilder,
-} from "ui/stores/ApplicationStore.svelte";
+import type { TwoHopApplicationStore } from "features/two-hop/application/TwoHopApplicationStore.svelte";
+import type { DisplayDataBuilder } from "features/two-hop/application/displayDataBuilder";
 import type { IIndexingService } from "types/services";
 import type { PluginHost } from "types/pluginHost";
 import type { ResolveTwoHopLinks } from "features/two-hop/application/TwoHopLinksLoader";
@@ -183,7 +181,7 @@ export class ComponentController implements IComponentManager {
 		settings: PluginSettings,
 		buildDisplayData: DisplayDataBuilder,
 		resolveTwoHopLinks: ResolveTwoHopLinks,
-	): ApplicationStore {
+	): TwoHopApplicationStore {
 		return this.applicationStorePool.create(
 			settings,
 			buildDisplayData,
@@ -197,7 +195,7 @@ export class ComponentController implements IComponentManager {
 		settings: PluginSettings,
 		buildDisplayData: DisplayDataBuilder,
 		resolveTwoHopLinks: ResolveTwoHopLinks,
-	): ApplicationStore {
+	): TwoHopApplicationStore {
 		return this.applicationStorePool.acquire(
 			leafId,
 			filePath,
@@ -261,7 +259,7 @@ export class ComponentController implements IComponentManager {
 		leafId: string,
 		view: MarkdownView,
 	): MountedComponent {
-		let applicationStore: ApplicationStore | undefined;
+		let applicationStore: TwoHopApplicationStore | undefined;
 		let shouldReleaseStoreOnError = false;
 		const layoutController = createInlineSurfaceLayoutController({
 			container,

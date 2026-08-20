@@ -1,6 +1,6 @@
 <script lang="ts">
 	import FlatCardGrid from "../FlatCardGrid.svelte";
-	import type { ApplicationStore } from "ui/stores/ApplicationStore.svelte";
+	import type { ApplicationUiState } from "application/stores/ApplicationUiState.svelte";
 
 	interface Props {
 		items: string[];
@@ -8,7 +8,7 @@
 		initialVisibleCount?: number;
 		loadMoreIncrement?: number;
 		sectionId?: string;
-		applicationStore?: ApplicationStore;
+		applicationStore?: ApplicationUiState;
 		paginationMode?: "button" | "infinite-scroll";
 		infiniteScrollRootMargin?: string;
 		topSpacerHeight?: number;

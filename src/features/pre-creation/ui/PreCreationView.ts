@@ -15,8 +15,8 @@ import {
 	toCaseInsensitiveLookupKey,
 } from "core/indexing/link-resolution/linkResolution";
 import { dedupeBySourceFile } from "core/indexing/backlink-builder/backlinkIndexer";
-import TagNotesListHost from "ui/components/lists/TagNotesListHost.svelte";
-import type { ListConfig } from "ui/components/lists/types";
+import TagNotesListHost from "features/list-view/ui/TagNotesListHost.svelte";
+import type { ListConfig } from "features/list-view/ui/types";
 import type { PluginHost } from "types/pluginHost";
 import type { ViewServices } from "ui/shared/views/viewServices";
 import type { TwoHopIndexedLink } from "types/domain";

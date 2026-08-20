@@ -3,7 +3,7 @@ import type { App, TFile } from "obsidian";
 import { tick } from "svelte";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { DEFAULT_SETTINGS, type PluginSettings } from "features/settings/model";
-import { ApplicationStore } from "ui/stores/ApplicationStore.svelte";
+import { ApplicationUiState } from "application/stores/ApplicationUiState.svelte";
 import CardPreview from "./CardPreviewHarness.svelte";
 import { createMockTFile } from "testing/__mocks__/testHelpers";
 import { createPreviewRuntime } from "features/card-preview/runtime/previewRuntime";
@@ -15,7 +15,7 @@ const state = vi.hoisted(() => ({
 			settings: {} as PluginSettings,
 			updateVersion: 0,
 			getPreviewRenderVersion: vi.fn(() => "0:0"),
-		} as unknown as ApplicationStore,
+		} as unknown as ApplicationUiState,
 	},
 	processPreviewContent: vi.fn(),
 	enqueueMathRender: vi.fn(),
@@ -102,8 +102,10 @@ function createSettings(overrides: Partial<PluginSettings> = {}): PluginSettings
 	};
 }
 
-function createReactiveApplicationStore(settings = createSettings()): ApplicationStore {
-	return new ApplicationStore(settings, {} as never, vi.fn() as never, vi.fn());
+function createReactiveApplicationStore(
+	settings = createSettings(),
+): ApplicationUiState {
+	return new ApplicationUiState(settings, vi.fn());
 }
 
 describe("virtual card preview rendering", () => {
@@ -135,7 +137,7 @@ describe("virtual card preview rendering", () => {
 			settings: createSettings(),
 			updateVersion: 0,
 			getPreviewRenderVersion: vi.fn(() => "0:0"),
-		} as unknown as ApplicationStore;
+		} as unknown as ApplicationUiState;
 		state.disableCardDomPreview = false;
 
 		state.processPreviewContent.mockReset();
@@ -638,7 +640,7 @@ describe("virtual card preview rendering", () => {
 			settings: createSettings(),
 			updateVersion: 0,
 			getPreviewRenderVersion,
-		} as unknown as ApplicationStore;
+		} as unknown as ApplicationUiState;
 
 		const firstRender = render(CardPreview, {
 			props: { file, getPreview, searchQuery: "" },

@@ -1,6 +1,6 @@
 import { onDestroy, untrack } from "svelte";
 import type { Pos, TFile } from "obsidian";
-import type { ApplicationStore } from "ui/stores/ApplicationStore.svelte";
+import type { ApplicationUiState } from "application/stores/ApplicationUiState.svelte";
 import type { CardRenderModel } from "ui/components/items/cardRenderModel";
 import type {
 	TwoHopItemModel,
@@ -22,7 +22,7 @@ import type { PreviewRuntime } from "features/card-preview/runtime/previewRuntim
 import { DISABLED_PREVIEW_SURFACE } from "features/card-preview/runtime/previewRuntime";
 import type { VirtualPreviewBinding } from "features/card-preview/scheduling/virtualPreviewSurface";
 import type { VirtualFrameCoordinator } from "ui/shared/scheduling/frameCoordinator";
-import { createResolvedCardLayoutSettingsMemo } from "ui/shared/layout/cardLayoutCssVars";
+import { createResolvedCardLayoutSettingsMemo } from "ui/layout/cardLayoutCssVars";
 import { resolveCardGridLayoutBase } from "ui/card-grid/layout/cardGridLayout";
 import {
 	DEFAULT_VIEW_PLAN_CARD_LAYOUT,
@@ -52,7 +52,7 @@ export interface TwoHopPreviewDependencies {
 
 export interface TwoHopVirtualGridProps {
 	readonly sections: readonly TwoHopSectionModel[];
-	readonly applicationStore: ApplicationStore;
+	readonly applicationStore: ApplicationUiState;
 	/** Fixed for the lifetime of the virtual surface. */
 	readonly previewDependencies?: TwoHopPreviewDependencies;
 	readonly loadMoreSection?: (sectionId: string) => void;

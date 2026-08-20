@@ -1,6 +1,6 @@
 import { ItemView, WorkspaceLeaf, TFile, type IconName } from "obsidian";
 import type { PluginHost } from "types/pluginHost";
-import type { ApplicationStore } from "ui/stores/ApplicationStore.svelte";
+import type { TwoHopApplicationStore } from "features/two-hop/application/TwoHopApplicationStore.svelte";
 import type { ViewServices } from "ui/shared/views/viewServices";
 import {
 	createDefaultApplicationStore,
@@ -16,7 +16,7 @@ export const TWO_HOP_LINKS_VIEW_TYPE = "cosense-card-links-view";
 
 export class TwoHopLinksView extends ItemView {
 	private component: SvelteComponentInstance | undefined = undefined;
-	private applicationStore: ApplicationStore | undefined = undefined;
+	private applicationStore: TwoHopApplicationStore | undefined = undefined;
 	private currentFile: TFile | undefined = undefined;
 	private lazyLoaderCache: Set<string> = new Set();
 

@@ -2,13 +2,13 @@
 	import { Component, Notice, TFile, TFolder, type App } from "obsidian";
 	import { toViewItems, type ViewItem } from "application/presenters";
 	import { resolveExpectedPath } from "shared/obsidian/resolveExpectedPath";
-	import SearchableItemList from "ui/components/lists/SearchableItemList.svelte";
-	import type { ListConfig } from "ui/components/lists/types";
+	import SearchableItemList from "features/list-view/ui/SearchableItemList.svelte";
+	import type { ListConfig } from "features/list-view/ui/types";
 	import type { LinkContext } from "ui/context/linkContext";
 	import type { PluginSettings } from "features/settings/model";
 	import type { ISortService } from "core/sorting";
-	import type { ApplicationStore } from "ui/stores/ApplicationStore.svelte";
-	import { getCardLayoutCssText } from "ui/shared/layout/cardLayoutCssVars";
+	import type { ApplicationUiState } from "application/stores/ApplicationUiState.svelte";
+	import { getCardLayoutCssText } from "ui/layout/cardLayoutCssVars";
 	import { getFileCardTitleSearchText } from "core/frontmatterCardTitle";
 	import type { PreviewRuntime } from "features/card-preview/runtime/previewRuntime";
 
@@ -17,7 +17,7 @@
 		settings: PluginSettings;
 		sortService: ISortService;
 		linkContext: LinkContext;
-		applicationStore: ApplicationStore;
+		applicationStore: ApplicationUiState;
 		previewRuntime?: PreviewRuntime;
 	}
 

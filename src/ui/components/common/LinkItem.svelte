@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { type TFile } from "obsidian";
-	import Icon from "ui/components/common/Icon.svelte";
+	import Icon from "ui/primitives/Icon.svelte";
 	import { type IconName } from "ui/shared/icons/iconRegistry";
 	import { isAttachment } from "core/rules/fileRules";
 	import { AUDIO_EXTENSIONS, IMAGE_EXTENSIONS } from "../../../appConstants";

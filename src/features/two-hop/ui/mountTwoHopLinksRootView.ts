@@ -1,7 +1,7 @@
 import type { App, TFile } from "obsidian";
 import { mount } from "svelte";
 import type { PluginSettings } from "features/settings/model";
-import type { ApplicationStore } from "ui/stores/ApplicationStore.svelte";
+import type { TwoHopApplicationStore } from "features/two-hop/application/TwoHopApplicationStore.svelte";
 import type { LinkContext } from "ui/context/linkContext";
 import type { PreviewRuntime } from "features/card-preview/runtime/previewRuntime";
 import type { SvelteComponentInstance } from "ui/shared/views/svelteLifecycle";
@@ -13,7 +13,7 @@ export interface MountTwoHopLinksRootViewOptions {
 	app: App;
 	file: TFile;
 	settings: PluginSettings;
-	applicationStore: ApplicationStore;
+	applicationStore: TwoHopApplicationStore;
 	linkContext: LinkContext;
 	previewRuntime: PreviewRuntime;
 	lazyLoaderCache: Set<string>;
@@ -27,7 +27,7 @@ export interface MountTwoHopLinksRootViewOptions {
 
 export interface MountedTwoHopLinksRootView {
 	component: SvelteComponentInstance;
-	applicationStore: ApplicationStore;
+	applicationStore: TwoHopApplicationStore;
 }
 
 /** Mounts the Two Hop page and starts loading its source file. */
@@ -47,7 +47,7 @@ export function mountTwoHopLinksRootView(
 		updateSetting,
 		uiState,
 	} = options;
-	applicationStore.setSettings(settings);
+	applicationStore.uiState.setSettings(settings);
 
 	const component = mount(TwoHopLinksPage, {
 		target,

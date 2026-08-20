@@ -1,7 +1,7 @@
 <script lang="ts">
 	import TwoHopVirtualGrid from "../TwoHopVirtualGrid.svelte";
 	import { setLinkContext, type LinkContext } from "ui/context/linkContext";
-	import type { ApplicationStore } from "ui/stores/ApplicationStore.svelte";
+	import type { ApplicationUiState } from "application/stores/ApplicationUiState.svelte";
 	import type { CardRenderModel } from "ui/components/items/cardRenderModel";
 	import type { TwoHopPreviewDependencies } from "features/two-hop/runtime/virtual-grid/useTwoHopVirtualGrid.svelte";
 	import type {
@@ -11,7 +11,7 @@
 
 	interface Props {
 		sections: readonly TwoHopSectionModel[];
-		applicationStore: ApplicationStore;
+		applicationStore: ApplicationUiState;
 		linkContext: LinkContext;
 		previewDependencies?: TwoHopPreviewDependencies;
 		previewActive?: boolean;

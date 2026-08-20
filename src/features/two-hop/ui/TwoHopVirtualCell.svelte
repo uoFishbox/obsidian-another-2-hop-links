@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { onDestroy, onMount } from "svelte";
-	import ClickableHeader from "ui/components/common/ClickableHeader.svelte";
-	import Icon from "ui/components/common/Icon.svelte";
+	import InteractiveSectionHeader from "presentation/obsidian/interactions/InteractiveSectionHeader.svelte";
+	import Icon from "ui/primitives/Icon.svelte";
 	import LinkItem from "ui/components/common/LinkItem.svelte";
 	import CardGridLoadMoreButton from "ui/card-grid/CardGridLoadMoreButton.svelte";
 	import UnresolvedPreviewPlaceholder from "features/card-preview/ui/UnresolvedPreviewPlaceholder.svelte";
@@ -77,7 +77,7 @@
 	{@const headerProps = section.header.props}
 	{@const sectionVariant = resolveTwoHopSectionVariant(section)}
 	{#if headerProps.interactionId}
-		<ClickableHeader
+		<InteractiveSectionHeader
 			title={section.title}
 			count={section.totalCount}
 			className={headerProps.className}
@@ -95,7 +95,7 @@
 					class="twohop-links-icon"
 				/>
 			{/snippet}
-		</ClickableHeader>
+		</InteractiveSectionHeader>
 	{:else}
 		<div
 			class="cosense-card-links__box cosense-card-links__connected-links-header {headerProps.className ??

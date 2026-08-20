@@ -98,7 +98,7 @@ vi.mock("features/search/searchWorkerClient", async () => {
 	};
 });
 
-vi.mock("ui/components/items/ViewItemCard.svelte", async () => {
+vi.mock("features/list-view/ui/ViewItemCard.svelte", async () => {
 	const component = await import("./TwoHopLinksPageItemStub.svelte");
 	return { default: component.default };
 });
@@ -203,6 +203,27 @@ function createApplicationStore(
 		backlinks: displayData.backlinks,
 		taggedNotes: displayData.tagGroups.flatMap((section) => section.notes),
 	};
+	const uiState = {
+		initialVisibleCount: 10,
+		loadMoreIncrement: 10,
+		settings,
+		sortOption: settings.lastUsedSortOption,
+		sectionExpandedLimits: {},
+		setSortOption: vi.fn(),
+		setContentSearchEnabled: vi.fn(),
+		setSettings: vi.fn(),
+		getPreviewRenderVersion: vi.fn(() => "0:0"),
+		getDefaultSectionVisibleLimit: vi.fn(() => 10),
+		getSectionExpandedLimit: vi.fn((sectionId: string) =>
+			expandedLimits.get(sectionId),
+		),
+		setSectionExpandedLimit: vi.fn((sectionId: string, limit: number) => {
+			expandedLimits.set(sectionId, limit);
+		}),
+		updateVersion: 0,
+		previewGlobalVersion: 0,
+		previewPathVersions: {},
+	};
 
 	return {
 		loading: false,
@@ -212,22 +233,9 @@ function createApplicationStore(
 			displayData,
 			hasDisplayableItems: true,
 		},
-		initialVisibleCount: 10,
-		loadMoreIncrement: 10,
-		settings,
-		sortOption: settings.lastUsedSortOption,
-		setSortOption: vi.fn(),
-		getDefaultSectionVisibleLimit: vi.fn(() => 10),
-		getSectionExpandedLimit: vi.fn((sectionId: string) =>
-			expandedLimits.get(sectionId),
-		),
-		setSectionExpandedLimit: vi.fn((sectionId: string, limit: number) => {
-			expandedLimits.set(sectionId, limit);
-		}),
+		uiState,
 		getSortedTwoHopItems: vi.fn((items: TwoHopIndexedLink[]) => items),
 		getSortedTagGroupItems: vi.fn((items: TaggedNote[]) => items),
-		triggerUpdate: vi.fn(),
-		updateVersion: 0,
 	};
 }
 
@@ -406,7 +414,9 @@ describe("TwoHopLinksPage descriptor plumbing", () => {
 		await flushAsyncUi();
 		expect(surface.dataset.previewActive).toBe("true");
 
-		expect(capturedProps?.applicationStore).toBe(rootProps.applicationStore);
+		expect(capturedProps?.applicationStore).toBe(
+			rootProps.applicationStore.uiState,
+		);
 		expect(capturedProps?.loadMoreSection).toEqual(expect.any(Function));
 		expect(capturedProps?.previewDependencies?.previewRuntime).toBe(
 			rootProps.previewRuntime,
@@ -434,10 +444,9 @@ describe("TwoHopLinksPage descriptor plumbing", () => {
 		await flushAsyncUi();
 		getTwoHopVirtualGridPageStubProps()?.loadMoreSection?.("tags-alpha");
 
-		expect(rootProps.applicationStore.setSectionExpandedLimit).toHaveBeenCalledWith(
-			expect.stringMatching(/^s:/),
-			11,
-		);
+		expect(
+			rootProps.applicationStore.uiState.setSectionExpandedLimit,
+		).toHaveBeenCalledWith(expect.stringMatching(/^s:/), 11);
 	});
 
 	it("propagates item count changes for the same sectionId (memo regression)", async () => {

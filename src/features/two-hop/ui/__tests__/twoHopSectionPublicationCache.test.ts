@@ -1,7 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import type { TFile } from "obsidian";
 import type { DisplayData } from "features/two-hop/application/displayDataBuilder";
-import type { ApplicationStore } from "ui/stores/ApplicationStore.svelte";
 import { DEFAULT_SETTINGS } from "features/settings/model";
 import type { TaggedNote, TwoHopIndexedLink, TwoHopLinkBranch } from "types/domain";
 import { createTwoHopSectionPublicationMemo } from "features/two-hop/ui/section-descriptors/cache";
@@ -9,6 +8,19 @@ import { createTwoHopInteractionTokenAllocator } from "features/two-hop/ui/secti
 import { buildScopedSectionId } from "ui/components/common/listPagination";
 
 const sourceFile = { path: "source.md" } as TFile;
+
+interface SectionPublicationHarnessStore {
+	readonly sectionExpandedLimits: Record<string, number>;
+	readonly loadMoreIncrement: number;
+	getSortContextVersion(): number;
+	getSortedTagGroupItems(items: readonly TaggedNote[]): readonly TaggedNote[];
+	getSortedTwoHopItems(
+		items: readonly TwoHopIndexedLink[],
+	): readonly TwoHopIndexedLink[];
+	getDefaultSectionVisibleLimit(): number;
+	getSectionExpandedLimit(sectionId: string): number | undefined;
+	setSectionExpandedLimit(sectionId: string, limit: number): void;
+}
 
 function createLink(path: string): TwoHopIndexedLink {
 	return { rawText: path, path, isUnresolved: false, sourceFile };
@@ -61,7 +73,7 @@ function createHarness(defaultVisibleLimit = 20, loadMoreIncrement = 20) {
 				[sectionId]: limit,
 			};
 		}),
-	} as unknown as ApplicationStore;
+	} satisfies SectionPublicationHarnessStore;
 	const createVisibleCountResolver =
 		(scope = "") =>
 		(sectionId: string, totalCount: number): number => {

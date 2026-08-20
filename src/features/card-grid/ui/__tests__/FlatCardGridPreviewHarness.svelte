@@ -1,21 +1,21 @@
 <script lang="ts">
 	import { setContext } from "svelte";
 	import FlatCardGrid from "../FlatCardGrid.svelte";
-	import ViewItemCard from "ui/components/items/ViewItemCard.svelte";
+	import ViewItemCard from "features/list-view/ui/ViewItemCard.svelte";
 	import {
 		setAppContext,
 		setLinkContext,
 		type AppContext,
 		type LinkContext,
 	} from "ui/context/linkContext";
-	import type { ApplicationStore } from "ui/stores/ApplicationStore.svelte";
+	import type { ApplicationUiState } from "application/stores/ApplicationUiState.svelte";
 	import type { CardRenderModel } from "ui/components/items/cardRenderModel";
 
 	interface Props {
 		models: readonly CardRenderModel[];
 		linkContext: LinkContext;
 		appContext: AppContext;
-		applicationStore: ApplicationStore;
+		applicationStore: ApplicationUiState;
 		getItemId?: (model: CardRenderModel, index: number) => string;
 	}
 
@@ -28,7 +28,7 @@
 	}: Props = $props();
 	setLinkContext(linkContext);
 	setAppContext(appContext);
-	setContext<ApplicationStore>("applicationStore", applicationStore);
+	setContext<ApplicationUiState>("applicationStore", applicationStore);
 </script>
 
 <div

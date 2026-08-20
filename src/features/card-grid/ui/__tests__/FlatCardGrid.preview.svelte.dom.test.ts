@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { App, TFile } from "obsidian";
 import { DEFAULT_SETTINGS } from "features/settings/model";
 import { createPreviewRenderSettings } from "features/card-preview/core/previewRenderSettings";
-import type { ApplicationStore } from "ui/stores/ApplicationStore.svelte";
+import type { ApplicationUiState } from "application/stores/ApplicationUiState.svelte";
 import type { AppContext, LinkContext } from "ui/context/linkContext";
 import type { ViewItem } from "application/presenters";
 import type { CardRenderModel } from "ui/components/items/cardRenderModel";
@@ -89,7 +89,7 @@ describe("FlatCardGrid preview surface", () => {
 		const applicationStore = {
 			settings: DEFAULT_SETTINGS,
 			getPreviewRenderVersion: () => "0:0",
-		} as unknown as ApplicationStore;
+		} as unknown as ApplicationUiState;
 		const app = { vault: {} } as App;
 		const previewRuntime = createPreviewRuntime({ app, getPreview });
 		previewRuntimes.add(previewRuntime);
@@ -174,7 +174,7 @@ describe("FlatCardGrid preview surface", () => {
 		const applicationStore = {
 			settings: DEFAULT_SETTINGS,
 			getPreviewRenderVersion: () => "0:0",
-		} as unknown as ApplicationStore;
+		} as unknown as ApplicationUiState;
 		const app = { vault: {} } as App;
 		const previewRuntime = createPreviewRuntime({ app, getPreview });
 		previewRuntimes.add(previewRuntime);

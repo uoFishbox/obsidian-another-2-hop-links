@@ -1,11 +1,11 @@
 <script lang="ts">
 	import FlatCardGrid from "../FlatCardGrid.svelte";
 	import FlatCardGridItemRenderProbe from "./FlatCardGridItemRenderProbe.svelte";
-	import type { ApplicationStore } from "ui/stores/ApplicationStore.svelte";
+	import type { ApplicationUiState } from "application/stores/ApplicationUiState.svelte";
 
 	interface Props {
 		items: string[];
-		applicationStore?: ApplicationStore;
+		applicationStore?: ApplicationUiState;
 		initialVisibleCount?: number;
 		loadMoreIncrement?: number;
 		onItemMount?: (id: string) => void;

@@ -1,13 +1,13 @@
 <script lang="ts">
-	import ViewItemCard from "ui/components/items/ViewItemCard.svelte";
+	import ViewItemCard from "features/list-view/ui/ViewItemCard.svelte";
 	import type { TwoHopSectionModel } from "features/two-hop/ui/twoHopSectionModel";
-	import type { ApplicationStore } from "ui/stores/ApplicationStore.svelte";
+	import type { ApplicationUiState } from "application/stores/ApplicationUiState.svelte";
 	import type { TwoHopPreviewDependencies } from "features/two-hop/runtime/virtual-grid/useTwoHopVirtualGrid.svelte";
 	import { captureTwoHopVirtualGridPageStubProps } from "./twoHopVirtualGridPageStubCapture";
 
 	interface TwoHopVirtualGridPageStubProps {
 		sections: readonly TwoHopSectionModel[];
-		applicationStore: ApplicationStore;
+		applicationStore: ApplicationUiState;
 		loadMoreSection?: (sectionId: string) => void;
 		previewDependencies?: TwoHopPreviewDependencies;
 		previewActive?: boolean;

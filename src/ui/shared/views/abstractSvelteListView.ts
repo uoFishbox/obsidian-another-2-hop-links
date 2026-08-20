@@ -6,8 +6,8 @@ import { toViewItems, type ViewItem } from "application/presenters";
 import type { ComponentInstance } from "infrastructure/lifecycle/ComponentController";
 import type { PluginHost } from "types/pluginHost";
 import type { ViewServices } from "ui/shared/views/viewServices";
-import type { ListConfig } from "ui/components/lists/types";
-import type { ApplicationStore } from "ui/stores/ApplicationStore.svelte";
+import type { ListConfig } from "features/list-view/ui/types";
+import type { TwoHopApplicationStore } from "features/two-hop/application/TwoHopApplicationStore.svelte";
 import { createGuardedIndexUpdateHandler } from "ui/shared/views/indexUpdateLifecycle";
 import { mergeItemsPreservingUnchanged } from "ui/shared/views/itemDiff";
 import { cleanupSvelteAndStore } from "ui/shared/views/svelteLifecycle";
@@ -15,7 +15,7 @@ import {
 	createDefaultApplicationStore,
 	createLinkContextForView,
 } from "ui/shared/views/viewFactories";
-import { applyCardLayoutCssVars } from "ui/shared/layout/cardLayoutCssVars";
+import { applyCardLayoutCssVars } from "ui/layout/cardLayoutCssVars";
 
 interface ListHostComponent extends ComponentInstance {
 	updateItems?: (nextItems: ViewItem[]) => void;
@@ -52,7 +52,7 @@ export abstract class AbstractSvelteListView<
 	protected scrollerEl: HTMLElement | undefined = undefined;
 
 	private listHostComponent: ListHostComponent | undefined = undefined;
-	private applicationStore: ApplicationStore | undefined = undefined;
+	private applicationStore: TwoHopApplicationStore | undefined = undefined;
 	private currentItems: TItem[] = [];
 	private currentItemKeySet = new Set<string>();
 	private unsubscribeFromIndex: (() => void) | undefined = undefined;
@@ -176,7 +176,7 @@ export abstract class AbstractSvelteListView<
 				items: toViewItems(this.currentItems),
 				config: options.config,
 				linkContext,
-				applicationStore,
+				applicationStore: applicationStore.uiState,
 				sortService: this.plugin.sortService,
 				app: this.app,
 				previewRuntime: this.viewServices.previewRuntime,
@@ -207,7 +207,7 @@ export abstract class AbstractSvelteListView<
 
 		this.setCurrentItems(mergedItems);
 		this.listHostComponent?.updateItems?.(toViewItems(mergedItems));
-		this.applicationStore?.triggerUpdate?.();
+		this.applicationStore?.uiState.triggerUpdate();
 	}
 
 	private destroyListHost(): void {

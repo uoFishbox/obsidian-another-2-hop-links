@@ -1,7 +1,7 @@
 import { TFile, type App, type WorkspaceLeaf } from "obsidian";
 import { mount, unmount } from "svelte";
 import type { PluginHost } from "types/pluginHost";
-import type { ApplicationStore } from "ui/stores/ApplicationStore.svelte";
+import type { TwoHopApplicationStore } from "features/two-hop/application/TwoHopApplicationStore.svelte";
 import type { ViewServices } from "ui/shared/views/viewServices";
 import {
 	createDefaultApplicationStore,
@@ -16,7 +16,7 @@ interface MountedEmptyView {
 	component: ComponentInstance | undefined;
 	hostEl: HTMLElement;
 	rootEl: HTMLElement;
-	applicationStore: ApplicationStore;
+	applicationStore: TwoHopApplicationStore;
 }
 
 export interface EmptyViewController {
@@ -114,7 +114,7 @@ export function createEmptyViewController(
 				settings: plugin.settings,
 				sortService: plugin.sortService,
 				linkContext,
-				applicationStore,
+				applicationStore: applicationStore.uiState,
 				previewRuntime: viewServices.previewRuntime,
 			},
 		}) as ComponentInstance;

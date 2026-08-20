@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { computeContainerWidth, resolveCardGridLayoutBase } from "../cardGridLayout";
-import type { ResolvedCardLayoutSettings } from "ui/shared/layout/cardLayoutCssVars";
+import type { ResolvedCardLayoutSettings } from "ui/layout/cardLayoutCssVars";
 
 const defaults: ResolvedCardLayoutSettings = {
 	cardWidthPx: 160,

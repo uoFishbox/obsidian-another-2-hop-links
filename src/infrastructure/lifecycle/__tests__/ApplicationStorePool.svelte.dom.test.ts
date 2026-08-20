@@ -15,8 +15,8 @@ const { createdStores, MockApplicationStore } = vi.hoisted(() => {
 	return { createdStores: created, MockApplicationStore: Store };
 });
 
-vi.mock("ui/stores/ApplicationStore.svelte", () => ({
-	ApplicationStore: MockApplicationStore,
+vi.mock("features/two-hop/application/TwoHopApplicationStore.svelte", () => ({
+	TwoHopApplicationStore: MockApplicationStore,
 }));
 
 import {
