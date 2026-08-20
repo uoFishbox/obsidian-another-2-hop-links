@@ -1,9 +1,5 @@
 import { canvasToSearchText } from "./canvasText";
-import {
-	findFirstAllowedFencedCodeBlock,
-	type CooperativeScanOptions,
-	type FencedCodeBlockRange,
-} from "./fencedCodeBlocks";
+import type { CooperativeScanOptions } from "./fencedCodeBlocks";
 import { extractFirstEmbeddedMedia, type ParsedEmbed } from "./mediaExtractor";
 import {
 	getContentSnippet,
@@ -14,15 +10,12 @@ import {
 	type PreviewSnippetSettings,
 } from "./snippetExtractor";
 import { highlightSearchMatchesInHtml } from "./searchHighlighter";
-import { transformContentForPreview } from "./textTransformUtils";
 import { findCaseInsensitiveIndex } from "./searchUtils";
-import type { TransformContentForPreviewOptions } from "./types";
 import {
 	PREVIEW_TEXT_WORKER_MIN_CONTENT_LENGTH,
 	type PreviewTextWorkerResult,
 } from "./previewTextWorkerTypes";
 import { runPreviewTextWorker } from "./previewTextWorkerClient";
-import type { PluginSettings } from "features/settings/model";
 
 function shouldUsePreviewTextWorker(content: string): boolean {
 	return content.length > PREVIEW_TEXT_WORKER_MIN_CONTENT_LENGTH;
@@ -43,7 +36,6 @@ function selectPreviewSnippetSettings(
 		previewVisualLineSafetyMargin: settings.previewVisualLineSafetyMargin,
 		searchPreviewSeekThresholdChars: settings.searchPreviewSeekThresholdChars,
 		searchPreviewSeekBufferChars: settings.searchPreviewSeekBufferChars,
-		renderCodeBlockTypes: settings.renderCodeBlockTypes,
 	};
 }
 
@@ -159,30 +151,6 @@ export async function getContentSnippetAsync(
 	);
 }
 
-export async function transformContentForPreviewAsync(
-	content: string,
-	settings?: PluginSettings,
-	options?: TransformContentForPreviewOptions,
-	signal?: AbortSignal,
-): Promise<string> {
-	if (!shouldUsePreviewTextWorker(content)) {
-		return transformContentForPreview(content, settings, options);
-	}
-
-	return await runWithFallback<string>(
-		runPreviewTextWorker(
-			{
-				type: "transform-content",
-				content,
-				settings,
-				options,
-			},
-			signal,
-		),
-		() => transformContentForPreview(content, settings, options),
-	);
-}
-
 export async function highlightSearchMatchesInHtmlAsync(
 	content: string,
 	searchQuery?: string,
@@ -244,29 +212,5 @@ export async function canvasToSearchTextAsync(
 			signal,
 		),
 		() => canvasToSearchText(input),
-	);
-}
-
-export async function findFirstAllowedFencedCodeBlockAsync(
-	content: string,
-	allowedTypes: ReadonlySet<string>,
-	options: CooperativeScanOptions = {},
-	allowedTypesArray: readonly string[],
-): Promise<FencedCodeBlockRange | undefined> {
-	if (!shouldUsePreviewTextWorker(content)) {
-		return await findFirstAllowedFencedCodeBlock(content, allowedTypes, options);
-	}
-
-	return await runWithFallback<FencedCodeBlockRange | undefined>(
-		runPreviewTextWorker(
-			{
-				type: "find-first-allowed-fenced-code-block",
-				content,
-				allowedTypes: allowedTypesArray,
-				maxScanChars: options.maxScanChars,
-			},
-			options.signal,
-		),
-		() => findFirstAllowedFencedCodeBlock(content, allowedTypes, options),
 	);
 }

@@ -1,9 +1,7 @@
 import { canvasToSearchText } from "./canvasText";
-import { findFirstAllowedFencedCodeBlock } from "./fencedCodeBlocks";
 import { extractFirstEmbeddedMedia } from "./mediaExtractor";
 import { getContentSnippet, renderPreparedContentSnippet } from "./snippetExtractor";
 import { highlightSearchMatchesInHtml } from "./searchHighlighter";
-import { transformContentForPreview } from "./textTransformUtils";
 import type {
 	PreviewTextWorkerRequest,
 	PreviewTextWorkerResponse,
@@ -47,12 +45,6 @@ function executeRequest(
 			);
 		case "render-prepared-content-snippet":
 			return renderPreparedContentSnippet(message.prepared, message.settings);
-		case "transform-content":
-			return transformContentForPreview(
-				message.content,
-				message.settings,
-				message.options,
-			);
 		case "highlight-html":
 			return highlightSearchMatchesInHtml(message.content, message.searchQuery);
 		case "extract-first-embedded-media":
@@ -61,12 +53,6 @@ function executeRequest(
 			});
 		case "canvas-to-search-text":
 			return canvasToSearchText(message.input);
-		case "find-first-allowed-fenced-code-block":
-			return findFirstAllowedFencedCodeBlock(
-				message.content,
-				new Set(message.allowedTypes),
-				{ maxScanChars: message.maxScanChars },
-			);
 		default: {
 			const _exhaustive: never = message;
 			return _exhaustive;

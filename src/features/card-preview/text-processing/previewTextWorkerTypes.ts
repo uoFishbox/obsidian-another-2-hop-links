@@ -1,12 +1,10 @@
-import type { FencedCodeBlockRange } from "./fencedCodeBlocks";
 import type {
 	GetContentSnippetOptions,
 	PreparedContentSnippet,
 	PreviewSnippetSettings,
 } from "./snippetExtractor";
-import type { TextTransformContext, TransformContentForPreviewOptions } from "./types";
+import type { TextTransformContext } from "./types";
 import type { ParsedEmbed } from "./mediaExtractor";
-import type { PluginSettings } from "features/settings/model";
 
 export const PREVIEW_TEXT_WORKER_MIN_CONTENT_LENGTH = 40000;
 
@@ -26,13 +24,6 @@ export type PreviewTextWorkerRequest =
 			settings?: PreviewSnippetSettings;
 	  }
 	| {
-			type: "transform-content";
-			requestId: number;
-			content: string;
-			settings?: PluginSettings;
-			options?: TransformContentForPreviewOptions;
-	  }
-	| {
 			type: "highlight-html";
 			requestId: number;
 			content: string;
@@ -50,13 +41,6 @@ export type PreviewTextWorkerRequest =
 			input: string | unknown;
 	  }
 	| {
-			type: "find-first-allowed-fenced-code-block";
-			requestId: number;
-			content: string;
-			allowedTypes: readonly string[];
-			maxScanChars?: number;
-	  }
-	| {
 			type: "cancel";
 			requestId: number;
 	  };
@@ -64,7 +48,6 @@ export type PreviewTextWorkerRequest =
 export type PreviewTextWorkerResult =
 	| string
 	| ParsedEmbed
-	| FencedCodeBlockRange
 	| {
 			entries: {
 				id?: string;
@@ -96,10 +79,6 @@ export interface PreviewTextWorkerRunRequestMap {
 		PreviewTextWorkerRequest,
 		{ type: "render-prepared-content-snippet" }
 	>;
-	"transform-content": Extract<
-		PreviewTextWorkerRequest,
-		{ type: "transform-content" }
-	>;
 	"highlight-html": Extract<PreviewTextWorkerRequest, { type: "highlight-html" }>;
 	"extract-first-embedded-media": Extract<
 		PreviewTextWorkerRequest,
@@ -108,9 +87,5 @@ export interface PreviewTextWorkerRunRequestMap {
 	"canvas-to-search-text": Extract<
 		PreviewTextWorkerRequest,
 		{ type: "canvas-to-search-text" }
-	>;
-	"find-first-allowed-fenced-code-block": Extract<
-		PreviewTextWorkerRequest,
-		{ type: "find-first-allowed-fenced-code-block" }
 	>;
 }

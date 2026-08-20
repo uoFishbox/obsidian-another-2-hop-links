@@ -114,13 +114,3 @@ export const parseCommaSeparatedList = (value: string): string[] =>
 		.split(",")
 		.map((entry) => entry.trim())
 		.filter(Boolean);
-
-export const parseCommaOrLineSeparatedList = (value: string): string[] =>
-	value
-		.split(/[,\n]+/)
-		.map((entry) => entry.trim())
-		.filter(Boolean);
-
-export const formatStringArray = (
-	value: PluginSettings[keyof PluginSettings],
-): string => (Array.isArray(value) ? value.join(", ") : "");

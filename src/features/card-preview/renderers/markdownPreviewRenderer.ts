@@ -1,6 +1,4 @@
-import type { TFile, App } from "obsidian";
-import { renderMath, finishRenderMath, Component, MarkdownRenderer } from "obsidian";
-import { transformContentForPreview } from "../text-processing/textTransformUtils";
+import { renderMath, finishRenderMath } from "obsidian";
 import { createProtectedSegmentRestorer } from "../text-processing/protectedHtml";
 import {
 	analyzePreviewContent,
@@ -27,9 +25,6 @@ interface ProcessPreviewContentOptions {
 export async function processPreviewContent(
 	containerEl: HTMLElement,
 	content: string,
-	app: App,
-	sourcePath: string,
-	component: Component,
 	options?: ProcessPreviewContentOptions,
 ) {
 	const signal = options?.signal;
@@ -80,7 +75,6 @@ export async function processPreviewContent(
 						lastIndex,
 						match.index,
 					);
-					// ここではinnerHTMLを使うため、HTMLタグ（twohop-render-blockなど）も維持される
 					const span = containerEl.createSpan();
 					span.innerHTML = restoreProtectedSegments(textPart);
 				}
@@ -125,57 +119,6 @@ export async function processPreviewContent(
 			if (signal?.aborted) {
 				return;
 			}
-		}
-	}
-
-	if (signal?.aborted) {
-		return;
-	}
-
-	const hasRenderBlocks = content.includes("twohop-render-block");
-	if (hasRenderBlocks) {
-		const renderBlocks = containerEl.querySelectorAll(".twohop-render-block");
-		if (renderBlocks.length > 0) {
-			await Promise.allSettled(
-				Array.from(renderBlocks, async (renderBlock) => {
-					if (signal?.aborted) {
-						return;
-					}
-
-					const block = renderBlock as HTMLElement;
-					const lang = block.getAttribute("data-lang") || "";
-					const encodedCode = block.getAttribute("data-code") || "";
-
-					if (!lang || !encodedCode) {
-						return;
-					}
-
-					try {
-						const code = decodeURIComponent(encodedCode);
-						// ブロックの中身をクリア
-						block.innerHTML = "";
-						// MarkdownRendererを使用してレンダリング
-						// ブロック形式 (```lang ... ```) として渡す
-						const markdown = "```" + lang + "\n" + code + "\n```";
-						if (signal?.aborted) {
-							return;
-						}
-						await MarkdownRenderer.render(
-							app,
-							markdown,
-							block,
-							sourcePath,
-							component,
-						);
-					} catch (e) {
-						if (signal?.aborted) {
-							return;
-						}
-						console.error("Failed to render code block in preview:", e);
-						block.textContent = "Render Error";
-					}
-				}),
-			);
 		}
 	}
 

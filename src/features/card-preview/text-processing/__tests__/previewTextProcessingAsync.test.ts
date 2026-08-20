@@ -1,6 +1,5 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
 import {
-	findFirstAllowedFencedCodeBlockAsync,
 	getContentSnippetAsync,
 	highlightSearchMatchesInHtmlAsync,
 } from "../previewTextProcessingAsync";
@@ -156,27 +155,6 @@ describe("preview text processing async wrappers", () => {
 
 		await expect(highlightSearchMatchesInHtmlAsync(content, "x")).rejects.toBe(
 			error,
-		);
-	});
-
-	test("reuses normalized allowed block type arrays for worker requests", async () => {
-		state.runPreviewTextWorker.mockResolvedValue(undefined);
-		const content = "x".repeat(PREVIEW_TEXT_WORKER_MIN_CONTENT_LENGTH + 1);
-		const allowedTypesArray = ["dataview"] as const;
-
-		await findFirstAllowedFencedCodeBlockAsync(
-			content,
-			new Set(allowedTypesArray),
-			{},
-			allowedTypesArray,
-		);
-
-		expect(state.runPreviewTextWorker).toHaveBeenCalledWith(
-			expect.objectContaining({
-				type: "find-first-allowed-fenced-code-block",
-				allowedTypes: allowedTypesArray,
-			}),
-			undefined,
 		);
 	});
 });

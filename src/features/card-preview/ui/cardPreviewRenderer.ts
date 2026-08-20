@@ -29,10 +29,6 @@ function moveChildrenToFragment(source: HTMLElement): DocumentFragment {
 	return fragment;
 }
 
-function canDetachRenderedTextPreview(content: string): boolean {
-	return !content.includes("twohop-render-block");
-}
-
 export type CardPreviewLoader = (
 	file: TFile,
 	signal?: AbortSignal,
@@ -162,15 +158,10 @@ export function createCardPreviewRenderer(
 			);
 
 			if (!shouldDelayMathCardRendering) {
-				if (
-					previewForRender.type === "text" &&
-					canDetachRenderedTextPreview(previewForRender.content)
-				) {
+				if (previewForRender.type === "text") {
 					const renderedFragment = await renderDetachedTextPreviewFragment({
 						document: container.ownerDocument,
 						content: previewForRender.content,
-						app: options.app,
-						sourcePath: file.path,
 						enableMathRendering,
 						analysis: previewAnalysis,
 						signal,
@@ -211,7 +202,6 @@ export function createCardPreviewRenderer(
 					tempContainer,
 					previewForRender,
 					file,
-					options.app,
 					getOrCreateComponent,
 					enableMathRendering,
 					previewAnalysis,
@@ -235,16 +225,11 @@ export function createCardPreviewRenderer(
 				async () => {
 					if (isRenderStale(signal)) return;
 
-					if (
-						previewForRender.type === "text" &&
-						canDetachRenderedTextPreview(previewForRender.content)
-					) {
+					if (previewForRender.type === "text") {
 						const renderedFragment =
 							await renderDetachedTextPreviewFragment({
 								document: container.ownerDocument,
 								content: previewForRender.content,
-								app: options.app,
-								sourcePath: file.path,
 								enableMathRendering: true,
 								analysis: previewAnalysis,
 								signal,
@@ -260,29 +245,6 @@ export function createCardPreviewRenderer(
 						);
 						return;
 					}
-
-					const mathContainer = container.ownerDocument.createElement("div");
-					await renderPreviewContent(
-						mathContainer,
-						previewForRender,
-						file,
-						options.app,
-						getOrCreateComponent,
-						true,
-						previewAnalysis,
-						signal,
-					);
-
-					if (isRenderStale(signal)) return;
-					await replaceContainerContent(
-						container,
-						callbacks,
-						signal,
-						mathContainer,
-						true,
-						previewForRender.type,
-						resolvePreviewAttachment(previewForRender),
-					);
 				},
 				{
 					key: `${file.path}:${file.stat.mtime}:${searchQuery}`,
@@ -402,17 +364,12 @@ export function createCardPreviewRenderer(
 
 function resolvePreviewAttachment(preview: PreviewData): CardPreviewAttachment {
 	if (preview.type === "dom") return "host-bound";
-	if (preview.type === "text" && !canDetachRenderedTextPreview(preview.content)) {
-		return "host-bound";
-	}
 	return "detachable";
 }
 
 function renderDetachedTextPreviewFragment(params: {
 	document: Document;
 	content: string;
-	app: App;
-	sourcePath: string;
 	enableMathRendering: boolean;
 	analysis?: PreviewContentAnalysis;
 	signal?: AbortSignal;
@@ -420,8 +377,6 @@ function renderDetachedTextPreviewFragment(params: {
 	const {
 		document: ownerDocument,
 		content,
-		app,
-		sourcePath,
 		enableMathRendering,
 		analysis,
 		signal,
@@ -430,29 +385,15 @@ function renderDetachedTextPreviewFragment(params: {
 	return enqueuePreviewRender(
 		async () => {
 			const tempContainer = ownerDocument.createElement("div");
-			const renderComponent = new Component();
-			renderComponent.load();
-
-			try {
-				throwIfAborted(signal, "Preview render aborted");
-				await processPreviewContent(
-					tempContainer,
-					content,
-					app,
-					sourcePath,
-					renderComponent,
-					{
-						enableMathRendering,
-						analysis,
-						syncShadowRootMathStyles: false,
-						signal,
-					},
-				);
-				throwIfAborted(signal, "Preview render aborted");
-				return moveChildrenToFragment(tempContainer);
-			} finally {
-				renderComponent.unload();
-			}
+			throwIfAborted(signal, "Preview render aborted");
+			await processPreviewContent(tempContainer, content, {
+				enableMathRendering,
+				analysis,
+				syncShadowRootMathStyles: false,
+				signal,
+			});
+			throwIfAborted(signal, "Preview render aborted");
+			return moveChildrenToFragment(tempContainer);
 		},
 		signal,
 		ownerDocument.defaultView,
@@ -463,7 +404,6 @@ async function renderPreviewContent(
 	element: HTMLElement,
 	preview: PreviewData,
 	file: TFile,
-	app: App,
 	getOrCreateComponent: () => Component,
 	enableMathRendering: boolean,
 	analysis?: PreviewContentAnalysis,
@@ -492,19 +432,12 @@ async function renderPreviewContent(
 	}
 
 	if (preview.type === "text") {
-		await processPreviewContent(
-			element,
-			preview.content,
-			app,
-			file.path,
-			getOrCreateComponent(),
-			{
-				enableMathRendering,
-				analysis,
-				syncShadowRootMathStyles: false,
-				signal,
-			},
-		);
+		await processPreviewContent(element, preview.content, {
+			enableMathRendering,
+			analysis,
+			syncShadowRootMathStyles: false,
+			signal,
+		});
 	}
 }
 

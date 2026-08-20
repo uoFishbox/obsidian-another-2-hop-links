@@ -1,21 +1,7 @@
-import {
-	formatStringArray,
-	parseCommaOrLineSeparatedList,
-	parseTrimmedString,
-} from "./settingDefinition";
+import { parseTrimmedString } from "./settingDefinition";
 import type { SettingDefinition } from "./settingDefinition";
 
 export const ADVANCED_SETTING_DEFINITIONS: ReadonlyArray<SettingDefinition> = [
-	{
-		section: "experimental",
-		settingKey: "renderCodeBlockTypes",
-		controlType: "textarea",
-		translationKey: "codeBlocksToRender",
-		descriptionKey: "codeBlocksToRenderDesc",
-		placeholder: "dataview, mermaid",
-		parse: (value) => parseCommaOrLineSeparatedList(value),
-		format: formatStringArray,
-	},
 	{
 		section: "integrationAdvancedSettings",
 		settingKey: "enableLogging",

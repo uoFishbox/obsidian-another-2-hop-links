@@ -273,54 +273,6 @@ export function findEnclosingFencedCodeBlockRange(
 	return null;
 }
 
-export function findFirstAllowedFencedCodeBlock(
-	content: string,
-	allowedTypes: ReadonlySet<string>,
-	options: CooperativeScanOptions = {},
-): Promise<FencedCodeBlockRange | undefined> {
-	let lineStart = 0;
-	const scanEnd = Math.min(content.length, options.maxScanChars ?? content.length);
-	const yieldEveryChars = options.yieldEveryChars ?? DEFAULT_YIELD_EVERY_CHARS;
-	let lastYieldIndex = 0;
-
-	return (async () => {
-		while (lineStart < scanEnd) {
-			if (options.signal?.aborted) {
-				return undefined;
-			}
-			if (
-				options.yieldToMainThread &&
-				lineStart - lastYieldIndex >= yieldEveryChars
-			) {
-				await options.yieldToMainThread();
-				lastYieldIndex = lineStart;
-				if (options.signal?.aborted) {
-					return undefined;
-				}
-			}
-
-			const block = await findFencedCodeBlockAtLineStartAsync(
-				content,
-				lineStart,
-				options,
-			);
-			if (block) {
-				const lang = block.infoString.trim().toLowerCase();
-				if (allowedTypes.has(lang)) {
-					return block;
-				}
-				lineStart = block.blockEnd;
-				continue;
-			}
-
-			const lineEnd = getLineEnd(content, lineStart);
-			lineStart = getNextLineStart(content, lineEnd);
-		}
-
-		return undefined;
-	})();
-}
-
 export function replaceFencedCodeBlocks(
 	content: string,
 	replacement: (block: FencedCodeBlockRange) => string,

@@ -37,6 +37,7 @@ export type AssertSortOptionsExhaustive =
 const OBSOLETE_SETTING_KEYS = [
 	"twoHopListMode",
 	"enableTwoRowMountedOverscan",
+	"renderCodeBlockTypes",
 ] as const;
 
 const positiveInteger = (fallback: number) =>
@@ -113,9 +114,6 @@ export const PluginSettingsSchema = z.object({
 	showTwoHopForSelectedCanvasFileNode: booleanSetting(
 		DEFAULT_SETTINGS.showTwoHopForSelectedCanvasFileNode,
 	),
-	renderCodeBlockTypes: z
-		.array(z.string())
-		.catch(DEFAULT_SETTINGS.renderCodeBlockTypes),
 	mobileLongPressAction: z
 		.enum(MOBILE_LONG_PRESS_ACTIONS)
 		.catch(DEFAULT_SETTINGS.mobileLongPressAction),

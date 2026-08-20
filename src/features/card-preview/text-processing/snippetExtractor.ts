@@ -15,7 +15,6 @@ export interface PreviewSnippetSettings {
 	readonly previewVisualLineSafetyMargin: number;
 	readonly searchPreviewSeekThresholdChars?: number;
 	readonly searchPreviewSeekBufferChars?: number;
-	readonly renderCodeBlockTypes: readonly string[];
 }
 
 export interface GetContentSnippetOptions {
@@ -466,7 +465,7 @@ function buildFallbackSnippetFromRawContent(
 		};
 	}
 
-	const transformedFallback = transformContentForPreview(rawResult, settings, {
+	const transformedFallback = transformContentForPreview(rawResult, {
 		context,
 		skipFrontmatterRemoval: true,
 	})
@@ -771,14 +770,10 @@ export function renderPreparedContentSnippet(
 	prepared: PreparedContentSnippet,
 	settings?: PreviewSnippetSettings,
 ): string {
-	let processedContent = transformContentForPreview(
-		prepared.contentToProcess,
-		settings,
-		{
-			context: prepared.context,
-			skipFrontmatterRemoval: true,
-		},
-	);
+	let processedContent = transformContentForPreview(prepared.contentToProcess, {
+		context: prepared.context,
+		skipFrontmatterRemoval: true,
+	});
 	processedContent = processedContent.replace(/^[\r\n]+/, "");
 
 	if (!settings || (settings.previewMaxLines <= 0 && settings.previewMaxChars <= 0)) {

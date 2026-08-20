@@ -9,7 +9,6 @@ import {
 import { generateVideoPreview } from "../renderers/videoPreviewRenderer";
 import { getContentSnippetAsync } from "../text-processing/previewTextProcessingAsync";
 import { resolveEmbeddedMediaPreview } from "../strategies/EmbeddedMediaStrategy";
-import { resolvePriorityBlockPreview } from "../strategies/PriorityBlockStrategy";
 import { createAbortError, isAbortError } from "./previewAbort";
 import {
 	isCanvas,
@@ -34,7 +33,6 @@ export async function resolvePreview(
 ): Promise<PreviewData> {
 	return (
 		(await tryResolve(resolveFrontmatterPropertyPreview, file, context, signal)) ??
-		(await tryResolve(resolvePriorityBlockPreview, file, context, signal)) ??
 		(await tryResolve(resolveImagePreview, file, context, signal)) ??
 		(await tryResolve(resolveVideoPreview, file, context, signal)) ??
 		(await tryResolve(resolveCanvasPreview, file, context, signal)) ??

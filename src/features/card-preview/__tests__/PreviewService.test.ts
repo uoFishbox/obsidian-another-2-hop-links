@@ -165,7 +165,7 @@ describe("PreviewService.getPreview", () => {
 			vault,
 			metadataCache,
 			undefined,
-			{ renderCodeBlockTypes: ["javascript"] } as any,
+			DEFAULT_SETTINGS,
 		);
 		expect(vault.cachedRead).toHaveBeenCalledTimes(1);
 		expect(result.type).toBe("text");

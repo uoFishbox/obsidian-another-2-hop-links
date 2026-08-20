@@ -20,7 +20,6 @@ function compile(
 function createSettings(overrides: Partial<PluginSettings> = {}): PluginSettings {
 	return {
 		...DEFAULT_SETTINGS,
-		renderCodeBlockTypes: [...DEFAULT_SETTINGS.renderCodeBlockTypes],
 		...overrides,
 	};
 }
@@ -40,17 +39,14 @@ describe("compileCardPreviewRequest", () => {
 
 	it("invalidates the projection after an in-place relevant setting update", () => {
 		const file = createMockTFile("notes/updated-preview-settings.md");
-		const settings = createSettings({ renderCodeBlockTypes: ["dataview"] });
+		const settings = createSettings();
 
 		const first = compile(file, settings, "first");
 		settings.previewMaxChars += 1;
-		settings.renderCodeBlockTypes.push("query");
 		const second = compile(file, settings, "second");
 
 		expect(second?.settings).not.toBe(first?.settings);
 		expect(second?.settings.previewMaxChars).toBe(settings.previewMaxChars);
-		expect(second?.settings.renderCodeBlockTypes).toEqual(["dataview", "query"]);
-		expect(first?.settings.renderCodeBlockTypes).toEqual(["dataview"]);
 	});
 
 	it("keeps the projection after an unrelated in-place setting update", () => {

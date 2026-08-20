@@ -65,7 +65,6 @@ export interface PluginSettings {
 	searchPreviewSeekThresholdChars?: number;
 	searchPreviewSeekBufferChars?: number;
 	showTwoHopForSelectedCanvasFileNode: boolean;
-	renderCodeBlockTypes: string[];
 	mobileLongPressAction: MobileLongPressAction;
 	excludeAttachments: boolean;
 	frontmatterKeyCreatedDate: string;

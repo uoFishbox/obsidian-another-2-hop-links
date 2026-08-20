@@ -49,8 +49,6 @@ export type TranslationKey =
 	| "searchPreviewSeekThresholdDesc"
 	| "searchPreviewLeadingBuffer"
 	| "searchPreviewLeadingBufferDesc"
-	| "codeBlocksToRender"
-	| "codeBlocksToRenderDesc"
 	| "priorityFrontmatterKeyForPreview"
 	| "priorityFrontmatterKeyForPreviewDesc"
 	| "priorityFrontmatterKeyForTitle"
@@ -172,9 +170,6 @@ const translations: Record<Language, Record<TranslationKey, string>> = {
 		searchPreviewLeadingBuffer: "Search preview leading buffer (chars)",
 		searchPreviewLeadingBufferDesc:
 			"The number of characters to keep before the first search hit when seeking.",
-		codeBlocksToRender: "Code blocks to render in preview",
-		codeBlocksToRenderDesc:
-			"Specify the languages of code blocks to render in the preview card, separated by commas (e.g., dataview, mermaid). Heavy processing may impact performance.",
 		priorityFrontmatterKeyForPreview: "Priority frontmatter key for preview",
 		priorityFrontmatterKeyForPreviewDesc:
 			"If specified, the value of this property will be displayed as plain text in the preview instead of the file content.",
@@ -309,9 +304,6 @@ const translations: Record<Language, Record<TranslationKey, string>> = {
 		searchPreviewLeadingBuffer: "検索プレビュー先行バッファ（文字数）",
 		searchPreviewLeadingBufferDesc:
 			"シーク時に最初の検索ヒットの前に保持する文字数を設定します。",
-		codeBlocksToRender: "プレビューでレンダリングするコードブロック",
-		codeBlocksToRenderDesc:
-			"プレビューカードでレンダリングするコードブロックの言語をカンマ区切りで指定します（例: dataview, mermaid）。重い処理はパフォーマンスに影響する可能性があります。",
 		priorityFrontmatterKeyForPreview: "プレビュー優先フロントマターキー",
 		priorityFrontmatterKeyForPreviewDesc:
 			"指定した場合、このプロパティの値がファイルコンテンツの代わりにプレビューにプレーンテキストとして表示されます。",

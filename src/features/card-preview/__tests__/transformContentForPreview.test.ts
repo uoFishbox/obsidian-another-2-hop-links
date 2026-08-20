@@ -26,7 +26,7 @@ Some content here.`;
 		const content = `# Heading
 
 Body`;
-		const result = transformContentForPreview(content, undefined, {
+		const result = transformContentForPreview(content, {
 			preserveHeadings: true,
 		});
 		expect(result).toContain("# Heading");
@@ -37,7 +37,7 @@ Body`;
 		const content = `# Heading
 
 Body`;
-		const result = transformContentForPreview(content, undefined, {
+		const result = transformContentForPreview(content, {
 			context: "searchSnippet",
 		});
 		expect(result).toContain("# Heading");
@@ -48,7 +48,7 @@ Body`;
 		const content = `# Heading
 
 Body`;
-		const result = transformContentForPreview(content, undefined, {
+		const result = transformContentForPreview(content, {
 			context: "searchSnippet",
 			preserveHeadings: false,
 		});
@@ -83,13 +83,11 @@ Body`;
 		expect(result).toContain("[[note]]");
 	});
 
-	test("converts permitted code blocks to render blocks", () => {
+	test("converts fenced code blocks to styled text", () => {
 		const content = "```javascript\nconsole.log(1);\n```";
-		const settings = { renderCodeBlockTypes: ["javascript"] } as any;
-		const result = transformContentForPreview(content, settings);
-		expect(result).toContain('class="twohop-render-block"');
-		expect(result).toContain('data-lang="javascript"');
-		expect(result).not.toContain('class="cosense-card-links__code-block"');
+		const result = transformContentForPreview(content);
+		expect(result).toContain('class="cosense-card-links__code-block"');
+		expect(result).toContain("console.log(1);");
 	});
 
 	test("code protection takes priority over subsequent rules", () => {

@@ -98,7 +98,6 @@ export class SettingsManager {
 
 	private replaceSettings(settings: PluginSettings): void {
 		const nextSettings = clonePluginSettings(settings);
-		Object.freeze(nextSettings.renderCodeBlockTypes);
 		this.plugin.settings = Object.freeze(nextSettings);
 	}
 

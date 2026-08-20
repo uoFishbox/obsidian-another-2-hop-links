@@ -36,7 +36,6 @@ export const DEFAULT_SETTINGS: PluginSettings = {
 	searchPreviewSeekThresholdChars: 0,
 	searchPreviewSeekBufferChars: 15,
 	showTwoHopForSelectedCanvasFileNode: true,
-	renderCodeBlockTypes: [],
 	mobileLongPressAction: "preview",
 	excludeAttachments: false,
 	frontmatterKeyCreatedDate: "",
@@ -59,10 +58,7 @@ export const DEFAULT_SETTINGS: PluginSettings = {
 	maxOutgoingToProcess: 0,
 };
 
-/** Returns a copy whose nested arrays are not shared with the source. */
+/** Returns an independent settings object. */
 export function clonePluginSettings(settings: PluginSettings): PluginSettings {
-	return {
-		...settings,
-		renderCodeBlockTypes: [...settings.renderCodeBlockTypes],
-	};
+	return { ...settings };
 }

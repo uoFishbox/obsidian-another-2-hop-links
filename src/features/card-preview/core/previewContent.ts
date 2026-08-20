@@ -72,7 +72,7 @@ export function resolveFile(path: string, metadataCache: IMetadataCache): TFile 
 }
 
 const PROTECTED_HTML_CLASS_PATTERN =
-	"cosense-card-links__code-block|cosense-card-links__inline-code|twohop-render-block";
+	"cosense-card-links__code-block|cosense-card-links__inline-code";
 
 const MATH_EXPRESSION_PATTERN = /(^|[^\\])\$\$[\s\S]+?\$\$|(^|[^\\])\$[^$\n]+?\$/;
 

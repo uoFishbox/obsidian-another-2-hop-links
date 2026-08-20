@@ -5,16 +5,10 @@ type ProcessPreviewContent =
 	(typeof import("../renderers/markdownPreviewRenderer"))["processPreviewContent"];
 
 let finishRenderMath: ObsidianModule["finishRenderMath"];
-let MarkdownRenderer: ObsidianModule["MarkdownRenderer"];
 let renderMath: ObsidianModule["renderMath"];
 let processPreviewContent: ProcessPreviewContent;
 
 function createObsidianMock() {
-	class MockComponent {
-		load() {}
-		unload() {}
-	}
-
 	return {
 		renderMath: vi.fn((content: string, displayMode: boolean) => {
 			const span = document.createElement("span");
@@ -23,10 +17,6 @@ function createObsidianMock() {
 			return span;
 		}),
 		finishRenderMath: vi.fn(),
-		Component: MockComponent,
-		MarkdownRenderer: {
-			render: vi.fn().mockResolvedValue(undefined),
-		},
 	};
 }
 
@@ -36,34 +26,18 @@ HTMLElement.prototype.createSpan = function (this: HTMLElement) {
 	return span;
 } as typeof HTMLElement.prototype.createSpan;
 
-function createDeferred<T>() {
-	let resolve!: (value: T) => void;
-	let reject!: (reason?: unknown) => void;
-	const promise = new Promise<T>((res, rej) => {
-		resolve = res;
-		reject = rej;
-	});
-
-	return { promise, resolve, reject };
-}
-
 describe("processPreviewContent DOM rendering", () => {
 	let containerEl: HTMLElement;
-	let mockApp: never;
-	let mockComponent: never;
 
 	beforeEach(async () => {
 		vi.resetModules();
 		vi.doMock("obsidian", createObsidianMock);
 		const obsidian = await import("obsidian");
 		finishRenderMath = obsidian.finishRenderMath;
-		MarkdownRenderer = obsidian.MarkdownRenderer;
 		renderMath = obsidian.renderMath;
 		({ processPreviewContent } =
 			await import("../renderers/markdownPreviewRenderer"));
 		containerEl = document.createElement("div");
-		mockApp = {} as never;
-		mockComponent = { load: vi.fn(), unload: vi.fn() } as never;
 	});
 
 	afterEach(() => {
@@ -74,7 +48,7 @@ describe("processPreviewContent DOM rendering", () => {
 
 	test("renders math through Obsidian math APIs", async () => {
 		const content = "Inline $x^2$ and block $$y^2$$";
-		await processPreviewContent(containerEl, content, mockApp, "", mockComponent);
+		await processPreviewContent(containerEl, content);
 
 		expect(renderMath).toHaveBeenCalledWith("x^2", false);
 		expect(renderMath).toHaveBeenCalledWith("y^2", true);
@@ -88,67 +62,11 @@ describe("processPreviewContent DOM rendering", () => {
 	test("renders preview content without math APIs when math rendering is disabled", async () => {
 		const content = "Text before $$\\frac{1}{2} + target$$ text after";
 
-		await processPreviewContent(containerEl, content, mockApp, "", mockComponent, {
+		await processPreviewContent(containerEl, content, {
 			enableMathRendering: false,
 		});
 
 		expect(renderMath).not.toHaveBeenCalled();
 		expect(containerEl.textContent).toContain("$$\\frac{1}{2} + target$$");
-	});
-
-	test("twohop-render-block starts rendering in parallel", async () => {
-		const content = [
-			'<div class="twohop-render-block" data-lang="js" data-code="console.log(1);"></div>',
-			'<div class="twohop-render-block" data-lang="ts" data-code="console.log(2);"></div>',
-		].join(" ");
-		const renderMock = vi.mocked(MarkdownRenderer.render);
-		const deferreds: ReturnType<typeof createDeferred<void>>[] = [];
-
-		renderMock.mockImplementation(() => {
-			const deferred = createDeferred<void>();
-			deferreds.push(deferred);
-			return deferred.promise;
-		});
-
-		const promise = processPreviewContent(
-			containerEl,
-			content,
-			mockApp,
-			"note.md",
-			mockComponent,
-			{ enableMathRendering: false },
-		);
-
-		await Promise.resolve();
-
-		expect(renderMock).toHaveBeenCalledTimes(2);
-		expect(deferreds).toHaveLength(2);
-
-		deferreds[0].resolve();
-		deferreds[1].resolve();
-		await promise;
-	});
-
-	test("does not start subsequent render block processing after abort", async () => {
-		const abortController = new AbortController();
-		const content = [
-			"$x$",
-			'<div class="twohop-render-block" data-lang="js" data-code="console.log(1);"></div>',
-		].join(" ");
-
-		vi.mocked(finishRenderMath).mockImplementationOnce(async () => {
-			abortController.abort();
-		});
-
-		await processPreviewContent(
-			containerEl,
-			content,
-			mockApp,
-			"note.md",
-			mockComponent,
-			{ signal: abortController.signal },
-		);
-
-		expect(MarkdownRenderer.render).not.toHaveBeenCalled();
 	});
 });

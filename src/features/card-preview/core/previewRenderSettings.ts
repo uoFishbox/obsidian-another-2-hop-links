@@ -9,7 +9,6 @@ export interface PreviewRenderSettings {
 	readonly previewMaxLines: number;
 	readonly previewVisualLineSafetyMargin: number;
 	readonly priorityFrontmatterKeyForPreview: string;
-	readonly renderCodeBlockTypes: readonly string[];
 	readonly searchPreviewSeekThresholdChars: number;
 	readonly searchPreviewSeekBufferChars: number;
 }
@@ -34,7 +33,6 @@ export function createPreviewRenderSettings(
 		previewVisualLineSafetyMargin: settings.previewVisualLineSafetyMargin,
 		priorityFrontmatterKeyForPreview:
 			settings.priorityFrontmatterKeyForPreview ?? "",
-		renderCodeBlockTypes: Object.freeze([...settings.renderCodeBlockTypes]),
 		searchPreviewSeekThresholdChars:
 			settings.searchPreviewSeekThresholdChars ??
 			DEFAULT_SETTINGS.searchPreviewSeekThresholdChars ??
@@ -62,17 +60,6 @@ function hasSamePreviewRenderSettings(
 			next.priorityFrontmatterKeyForPreview &&
 		previous.searchPreviewSeekThresholdChars ===
 			next.searchPreviewSeekThresholdChars &&
-		previous.searchPreviewSeekBufferChars === next.searchPreviewSeekBufferChars &&
-		hasSameStringArray(previous.renderCodeBlockTypes, next.renderCodeBlockTypes)
-	);
-}
-
-function hasSameStringArray(
-	previous: readonly string[],
-	next: readonly string[],
-): boolean {
-	return (
-		previous.length === next.length &&
-		previous.every((value, index) => value === next[index])
+		previous.searchPreviewSeekBufferChars === next.searchPreviewSeekBufferChars
 	);
 }

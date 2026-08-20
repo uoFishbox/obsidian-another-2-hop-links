@@ -51,14 +51,6 @@ describe("PluginSettingsSchema", () => {
 		);
 	});
 
-	it("falls back to an empty array when renderCodeBlockTypes is not an array", () => {
-		const settings = parsePluginSettings({
-			renderCodeBlockTypes: 123,
-		});
-
-		expect(settings.renderCodeBlockTypes).toEqual([]);
-	});
-
 	it("floors positive fractional numbers instead of discarding them", () => {
 		const settings = parsePluginSettings({
 			previewActivationAheadRows: 2.8,
@@ -94,11 +86,13 @@ describe("PluginSettingsSchema", () => {
 			obsoleteSetting: { retained: false },
 			twoHopListMode: "precise-virtual",
 			enableTwoRowMountedOverscan: true,
+			renderCodeBlockTypes: ["mermaid"],
 		});
 
 		expect(settings).not.toHaveProperty("obsoleteSetting");
 		expect(settings).not.toHaveProperty("twoHopListMode");
 		expect(settings).not.toHaveProperty("enableTwoRowMountedOverscan");
+		expect(settings).not.toHaveProperty("renderCodeBlockTypes");
 	});
 
 	it("always reports the current schema version", () => {
@@ -113,15 +107,5 @@ describe("PluginSettingsSchema", () => {
 		expect(parsePluginSettings(null)).toEqual(DEFAULT_SETTINGS);
 		expect(parsePluginSettings("corrupted")).toEqual(DEFAULT_SETTINGS);
 		expect(parsePluginSettings([1, 2])).toEqual(DEFAULT_SETTINGS);
-	});
-
-	it("does not share nested arrays between parsed results and defaults", () => {
-		const first = parsePluginSettings({ renderCodeBlockTypes: ["mermaid"] });
-		const second = parsePluginSettings({});
-
-		first.renderCodeBlockTypes.push("obsidian");
-
-		expect(second.renderCodeBlockTypes).toEqual([]);
-		expect(DEFAULT_SETTINGS.renderCodeBlockTypes).toEqual([]);
 	});
 });

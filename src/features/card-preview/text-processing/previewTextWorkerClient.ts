@@ -41,14 +41,6 @@ function buildWorkerRequest(
 				prepared: request.prepared,
 				settings: request.settings,
 			};
-		case "transform-content":
-			return {
-				type: "transform-content",
-				requestId,
-				content: request.content,
-				settings: request.settings,
-				options: request.options,
-			};
 		case "highlight-html":
 			return {
 				type: "highlight-html",
@@ -68,14 +60,6 @@ function buildWorkerRequest(
 				type: "canvas-to-search-text",
 				requestId,
 				input: request.input,
-			};
-		case "find-first-allowed-fenced-code-block":
-			return {
-				type: "find-first-allowed-fenced-code-block",
-				requestId,
-				content: request.content,
-				allowedTypes: request.allowedTypes,
-				maxScanChars: request.maxScanChars,
 			};
 	}
 }

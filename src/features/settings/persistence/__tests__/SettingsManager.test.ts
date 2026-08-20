@@ -64,39 +64,6 @@ describe("SettingsManager", () => {
 		expect(manager.settings).not.toHaveProperty("obsoleteSetting");
 	});
 
-	it("loads without throwing when renderCodeBlockTypes is corrupt", async () => {
-		const plugin = {
-			loadData: vi.fn().mockResolvedValue({
-				renderCodeBlockTypes: 123,
-			}),
-			saveData: vi.fn(),
-		};
-		const manager = new SettingsManager(plugin as never);
-
-		await manager.load();
-
-		expect(manager.settings.renderCodeBlockTypes).toEqual([]);
-		expect(Object.isFrozen(manager.settings)).toBe(true);
-	});
-
-	it("does not share nested default settings between instances", () => {
-		const firstPlugin = {
-			loadData: vi.fn(),
-			saveData: vi.fn(),
-		};
-		const secondPlugin = {
-			loadData: vi.fn(),
-			saveData: vi.fn(),
-		};
-		const firstManager = new SettingsManager(firstPlugin as never);
-		const secondManager = new SettingsManager(secondPlugin as never);
-
-		expect(() =>
-			firstManager.settings.renderCodeBlockTypes.push("mermaid"),
-		).toThrow();
-		expect(secondManager.settings.renderCodeBlockTypes).toEqual([]);
-	});
-
 	it("replaces the authoritative settings object on update", async () => {
 		const plugin = {
 			loadData: vi.fn(),
