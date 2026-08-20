@@ -13,14 +13,10 @@ interface UpdateOptions {
 }
 
 export class SettingsManager {
-	private snapshot: PluginSettings;
 	private saveDebounceTimer: number | undefined = undefined;
 
 	constructor(private plugin: PluginHost) {
-		if (!this.plugin.settings) {
-			this.plugin.settings = createDefaultSettings();
-		}
-		this.snapshot = this.createSnapshot();
+		this.replaceSettings(this.plugin.settings ?? DEFAULT_SETTINGS);
 	}
 
 	public get settings(): PluginSettings {
@@ -30,12 +26,10 @@ export class SettingsManager {
 	async load(): Promise<void> {
 		try {
 			const data = await this.plugin.loadData();
-			this.plugin.settings = parsePluginSettings(data);
-			this.snapshot = this.createSnapshot();
+			this.replaceSettings(parsePluginSettings(data));
 		} catch (error) {
 			console.error("設定の読み込みに失敗しました:", error);
-			this.plugin.settings = createDefaultSettings();
-			this.snapshot = this.createSnapshot();
+			this.replaceSettings(DEFAULT_SETTINGS);
 			throw error;
 		}
 	}
@@ -90,8 +84,7 @@ export class SettingsManager {
 		value: PluginSettings[K],
 		options: UpdateOptions = {},
 	): Promise<void> {
-		this.settings[key] = value;
-		this.snapshot = this.createSnapshot();
+		this.replaceSettings({ ...this.settings, [key]: value });
 		await this.save(options);
 	}
 
@@ -99,17 +92,14 @@ export class SettingsManager {
 		updates: Partial<PluginSettings>,
 		options: UpdateOptions = {},
 	): Promise<void> {
-		Object.assign(this.settings, updates);
-		this.snapshot = this.createSnapshot();
+		this.replaceSettings({ ...this.settings, ...updates });
 		await this.save(options);
 	}
 
-	getSnapshot(): PluginSettings {
-		return this.snapshot;
-	}
-
-	private createSnapshot(): PluginSettings {
-		return deepFreeze(clonePluginSettings(this.settings));
+	private replaceSettings(settings: PluginSettings): void {
+		const nextSettings = clonePluginSettings(settings);
+		Object.freeze(nextSettings.renderCodeBlockTypes);
+		this.plugin.settings = Object.freeze(nextSettings);
 	}
 
 	async destroy(): Promise<void> {
@@ -117,28 +107,4 @@ export class SettingsManager {
 			await this.saveImmediate();
 		}
 	}
-}
-
-function createDefaultSettings(): PluginSettings {
-	return clonePluginSettings(DEFAULT_SETTINGS);
-}
-
-function deepFreeze<T>(value: T): T {
-	if (typeof value !== "object" || value === null) {
-		return value;
-	}
-
-	Object.freeze(value);
-
-	for (const nestedValue of Object.values(value)) {
-		if (
-			typeof nestedValue === "object" &&
-			nestedValue !== null &&
-			!Object.isFrozen(nestedValue)
-		) {
-			deepFreeze(nestedValue);
-		}
-	}
-
-	return value;
 }

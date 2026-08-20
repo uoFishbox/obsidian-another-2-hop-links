@@ -2,7 +2,6 @@ import type { MarkdownView, Plugin, TFile } from "obsidian";
 import type { PluginSettings } from "features/settings/model";
 import type { ResolveProgress, TwoHopLinkResult } from "types/domain";
 import type { ResolveOptions } from "features/two-hop/domain/TwoHopLinkResolver";
-import type { TwoHopResolveSnapshot } from "features/two-hop/domain/ResolverDependencies";
 import type { IIndexingService } from "types/services";
 import type { ISortService } from "core/sorting";
 
@@ -17,7 +16,6 @@ export interface PluginSettingsManager {
 		updates: Partial<PluginSettings>,
 		options?: { immediate?: boolean },
 	): Promise<void>;
-	getSnapshot(): PluginSettings;
 }
 
 /**
@@ -68,12 +66,6 @@ export interface PluginHost extends Plugin {
 		onProgress?: (progress: ResolveProgress) => void,
 		options?: ResolveOptions,
 	): Promise<TwoHopLinkResult>;
-	getTwoHopResolveSnapshot(
-		file: TFile,
-		onProgress?: (progress: ResolveProgress) => void,
-		options?: ResolveOptions,
-	): Promise<TwoHopResolveSnapshot>;
-	processUnresolvedLinksInElement(el: HTMLElement, sourcePath: string): void;
 	updateSetting<K extends keyof PluginSettings>(
 		key: K,
 		value: PluginSettings[K],

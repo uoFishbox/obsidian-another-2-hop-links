@@ -76,7 +76,7 @@ describe("SettingsManager", () => {
 		await manager.load();
 
 		expect(manager.settings.renderCodeBlockTypes).toEqual([]);
-		expect(manager.getSnapshot().renderCodeBlockTypes).toEqual([]);
+		expect(Object.isFrozen(manager.settings)).toBe(true);
 	});
 
 	it("does not share nested default settings between instances", () => {
@@ -91,8 +91,24 @@ describe("SettingsManager", () => {
 		const firstManager = new SettingsManager(firstPlugin as never);
 		const secondManager = new SettingsManager(secondPlugin as never);
 
-		firstManager.settings.renderCodeBlockTypes.push("mermaid");
-
+		expect(() =>
+			firstManager.settings.renderCodeBlockTypes.push("mermaid"),
+		).toThrow();
 		expect(secondManager.settings.renderCodeBlockTypes).toEqual([]);
+	});
+
+	it("replaces the authoritative settings object on update", async () => {
+		const plugin = {
+			loadData: vi.fn(),
+			saveData: vi.fn(),
+		};
+		const manager = new SettingsManager(plugin as never);
+		const previous = manager.settings;
+
+		await manager.update("language", "ja", { immediate: true });
+
+		expect(manager.settings).not.toBe(previous);
+		expect(manager.settings.language).toBe("ja");
+		expect(plugin.saveData).toHaveBeenCalledWith(manager.settings);
 	});
 });

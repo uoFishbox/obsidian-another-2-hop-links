@@ -203,7 +203,7 @@ function createMocks(overrides?: { indexingService?: Record<string, unknown> }) 
 function createOrchestrator(mockDeps: ReturnType<typeof createMocks>) {
 	return createViewUpdateOrchestrator({
 		app: mockDeps.app as never,
-		plugin: mockDeps.plugin as never,
+		indexingService: mockDeps.plugin.indexingService as never,
 		forceRedrawEffect: mockDeps.plugin.forceRedrawEffect as never,
 		stylingService: mockDeps.stylingService as never,
 		markdownRenderManager: mockDeps.markdownRenderManager as never,
@@ -331,15 +331,15 @@ describe("ViewUpdateOrchestrator", () => {
 
 		expect(canvasLeaf.matchedEditDispatch).toHaveBeenCalledTimes(1);
 		expect(canvasLeaf.otherEditDispatch).not.toHaveBeenCalled();
-		expect(mocks.plugin.processUnresolvedLinksInElement).toHaveBeenCalledWith(
+		expect(mocks.stylingService.decorateLinksInContainer).toHaveBeenCalledWith(
 			canvasLeaf.matchedPreviewEl,
 			"notes/match.md",
 		);
-		expect(mocks.plugin.processUnresolvedLinksInElement).toHaveBeenCalledWith(
+		expect(mocks.stylingService.decorateLinksInContainer).toHaveBeenCalledWith(
 			canvasLeaf.textPreviewEl,
 			"boards/board.canvas",
 		);
-		expect(mocks.plugin.processUnresolvedLinksInElement).toHaveBeenCalledTimes(2);
+		expect(mocks.stylingService.decorateLinksInContainer).toHaveBeenCalledTimes(2);
 	});
 
 	it("updates markdown views and property widgets for lookup-key-only changes", () => {
@@ -408,8 +408,8 @@ describe("ViewUpdateOrchestrator", () => {
 			affectedLookupKeys: ["match.md"],
 		});
 
-		expect(mocks.plugin.processUnresolvedLinksInElement).toHaveBeenCalledTimes(1);
-		expect(mocks.plugin.processUnresolvedLinksInElement).toHaveBeenCalledWith(
+		expect(mocks.stylingService.decorateLinksInContainer).toHaveBeenCalledTimes(1);
+		expect(mocks.stylingService.decorateLinksInContainer).toHaveBeenCalledWith(
 			canvasLeaf.textPreviewEl,
 			"boards/board.canvas",
 		);

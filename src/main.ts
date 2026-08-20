@@ -79,7 +79,6 @@ export default class CosenseCardLinksPlugin extends Plugin implements PluginHost
 			forceRedrawEffect: this.forceRedrawEffect,
 			settingsManager: this.settingsManager,
 			getSettings: () => this.settings,
-			getSettingsSnapshot: () => this.settingsManager.getSnapshot(),
 			isUnloaded: () => this.isUnloaded,
 			bumpSortContextVersion: () => this.bumpSortContextVersion(),
 			getSortContextVersion: () => this.getSortContextVersion(),
@@ -200,10 +199,7 @@ export default class CosenseCardLinksPlugin extends Plugin implements PluginHost
 		options: { immediate?: boolean } = {},
 	): Promise<void> {
 		const updatePromise = this.settingsManager.update(key, value, options);
-		this.runtime.sideEffectController.apply(
-			[key],
-			this.settingsManager.getSnapshot(),
-		);
+		this.runtime.sideEffectController.apply([key], this.settings);
 		await updatePromise;
 	}
 
@@ -214,7 +210,7 @@ export default class CosenseCardLinksPlugin extends Plugin implements PluginHost
 		const updatePromise = this.settingsManager.updateBatch(updates, options);
 		this.runtime.sideEffectController.apply(
 			Object.keys(updates) as Array<keyof PluginSettings>,
-			this.settingsManager.getSnapshot(),
+			this.settings,
 		);
 		await updatePromise;
 	}

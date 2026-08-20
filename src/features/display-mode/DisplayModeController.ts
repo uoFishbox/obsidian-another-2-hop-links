@@ -3,11 +3,9 @@ import { resolveFileByPath } from "shared/obsidian/resolveFileByPath";
 import type { CanvasViewCanvas } from "obsidian-typings";
 import type { CanvasNodeData } from "types/obsidian";
 import type { SettingsManager } from "features/settings/persistence/SettingsManager";
+import type { DisplayMode } from "features/settings/model";
 import type { IComponentManager } from "types/services";
 import { resolveWorkspaceWindow } from "infrastructure/workspace/workspaceDocuments";
-import type { DisplayModeStrategy } from "features/display-mode/createDisplayModeStrategy";
-import type { DisplayModeStrategyContext } from "features/display-mode/DisplayModeStrategyContext";
-import { createDisplayModeStrategy } from "features/display-mode/createDisplayModeStrategy";
 import {
 	TwoHopLinksView,
 	TWO_HOP_LINKS_VIEW_TYPE,
@@ -31,8 +29,7 @@ export class DisplayModeController {
 		FILE: "file",
 	} as const;
 
-	private currentStrategy: DisplayModeStrategy;
-	private readonly strategyContext: DisplayModeStrategyContext;
+	private activeMode: DisplayMode;
 
 	constructor(
 		private app: App,
@@ -42,30 +39,7 @@ export class DisplayModeController {
 		private updateSidebarView?: (file: TFile) => void,
 		private getActiveFile?: () => TFile | null,
 	) {
-		this.strategyContext = {
-			ensureSidebarView: () => this.activateSidebarView(),
-			detachSidebarView: () => this.deactivateSidebarView(),
-			clearSidebarViewContent: () => this.clearSidebarViewContent(),
-			mountInlineComponents: (forceRemount) =>
-				this.mountInlineComponents({ forceRemount }),
-			unmountInlineComponents: () => this.deactivateInlineMode(),
-			updateSidebarForActiveFile: () => this.updateSidebarForActiveFile(),
-			updateSidebarForCanvasSelectionView: (view) =>
-				this.updateSidebarForCanvasSelectionView(view),
-			updateSidebarForCanvasSelectionEvent: (canvas, selectedNodes) =>
-				this.updateSidebarForCanvasSelectionEvent(canvas, selectedNodes),
-			isCanvasSingleFileSelected: (view) => this.isCanvasSingleFileSelected(view),
-			isMarkdownView: (view) => this.isMarkdownView(view),
-			isCanvasView: (view) => this.isCanvasView(view),
-			isBaseView: (view) => this.isBaseView(view),
-			isMediaOrPdfView: (view) => this.isMediaOrPdfView(view),
-		};
-
-		this.currentStrategy = createDisplayModeStrategy(
-			this.settingsManager.settings.displayMode,
-			this.strategyContext,
-			() => this.app.workspace.activeLeaf?.view,
-		);
+		this.activeMode = this.settingsManager.settings.displayMode;
 
 		this.plugin.registerEvent(
 			this.app.workspace.on(
@@ -76,7 +50,7 @@ export class DisplayModeController {
 	}
 
 	public destroy(): void {
-		this.currentStrategy.deactivate();
+		this.deactivateMode(this.activeMode);
 		this.deactivateInlineMode();
 		this.deactivateSidebarView();
 	}
@@ -85,7 +59,11 @@ export class DisplayModeController {
 		canvas: CanvasViewCanvas,
 		selectedNodes: CanvasNodeData[],
 	): void {
-		this.currentStrategy.handleCanvasSelectionChange(canvas, selectedNodes);
+		if (this.activeMode === "editor-inline") {
+			return;
+		}
+
+		this.updateSidebarForCanvasSelectionEvent(canvas, selectedNodes);
 	}
 
 	public mountInlineComponents(options: { forceRemount?: boolean } = {}): void {
@@ -110,15 +88,12 @@ export class DisplayModeController {
 	}
 
 	public handleSettingsChange(): void {
-		this.currentStrategy.deactivate();
-		this.currentStrategy = createDisplayModeStrategy(
-			this.settingsManager.settings.displayMode,
-			this.strategyContext,
-			() => this.app.workspace.activeLeaf?.view,
-		);
-		this.currentStrategy.activate();
+		this.deactivateMode(this.activeMode);
+		this.activeMode = this.settingsManager.settings.displayMode;
+		this.activateMode(this.activeMode);
 		// 設定変更直後にも現在のアクティブビューに対する表示対象を再評価する
-		this.currentStrategy.handleActiveLeafChange(
+		this.handleActiveLeafChangeByMode(
+			this.activeMode,
 			this.app.workspace.activeLeaf?.view,
 		);
 	}
@@ -129,9 +104,77 @@ export class DisplayModeController {
 			return;
 		}
 
-		this.currentStrategy.handleActiveLeafChange(
+		this.handleActiveLeafChangeByMode(
+			this.activeMode,
 			this.app.workspace.activeLeaf?.view,
 		);
+	}
+
+	private activateMode(mode: DisplayMode): void {
+		switch (mode) {
+			case "editor-inline":
+				this.deactivateSidebarView();
+				this.mountInlineComponents({ forceRemount: true });
+				return;
+			case "sidebar-view":
+				this.deactivateInlineMode();
+				void this.activateSidebarView().then(() => {
+					this.updateSidebarForActiveFile();
+				});
+				return;
+			case "hybrid":
+				void this.activateSidebarView().then(() => {
+					this.applyHybridLayout(this.app.workspace.activeLeaf?.view, true);
+				});
+		}
+	}
+
+	private deactivateMode(mode: DisplayMode): void {
+		if (mode === "editor-inline") {
+			this.deactivateInlineMode();
+		}
+	}
+
+	private handleActiveLeafChangeByMode(mode: DisplayMode, view: unknown): void {
+		switch (mode) {
+			case "editor-inline":
+				this.mountInlineComponents({ forceRemount: false });
+				return;
+			case "sidebar-view":
+				if (this.isCanvasSingleFileSelected(view)) {
+					this.updateSidebarForCanvasSelectionView(view);
+					return;
+				}
+				this.updateSidebarForActiveFile();
+				return;
+			case "hybrid":
+				this.applyHybridLayout(view, false);
+		}
+	}
+
+	private applyHybridLayout(view: unknown, forceInlineRemount: boolean): void {
+		if (!view) {
+			return;
+		}
+
+		if (this.isMarkdownView(view)) {
+			this.clearSidebarViewContent();
+			this.mountInlineComponents({ forceRemount: forceInlineRemount });
+			return;
+		}
+
+		if (this.isCanvasSingleFileSelected(view)) {
+			this.updateSidebarForCanvasSelectionView(view);
+			return;
+		}
+
+		if (
+			this.isCanvasView(view) ||
+			this.isBaseView(view) ||
+			this.isMediaOrPdfView(view)
+		) {
+			this.updateSidebarForActiveFile();
+		}
 	}
 
 	private async activateSidebarView(): Promise<void> {

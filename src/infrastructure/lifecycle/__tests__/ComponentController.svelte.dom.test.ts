@@ -144,6 +144,7 @@ function createController() {
 		app,
 		plugin as any,
 		() => DEFAULT_SETTINGS,
+		resolveTwoHopLinks,
 		indexingService as any,
 		vi.fn(),
 		{

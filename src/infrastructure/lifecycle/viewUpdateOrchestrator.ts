@@ -6,7 +6,7 @@ import type { DataUpdateContext } from "core/indexing/index-service/IndexEvents"
 import type { StylingService } from "features/link-decoration/stylingService";
 import type { RenderedMdElementsRegistry } from "../markdown/RenderedMdElementsRegistry";
 import type { PropertyWidgetStyler } from "../../features/link-decoration/propertyWidgetStyler";
-import type { PluginHost } from "types/pluginHost";
+import type { IIndexingService } from "types/services";
 import {
 	getBasesLinkLookupKey,
 	processBasesPane,
@@ -26,7 +26,7 @@ export interface ViewUpdateOrchestrator {
 
 export interface ViewUpdateOrchestratorDeps {
 	app: App;
-	plugin: PluginHost;
+	indexingService: IIndexingService;
 	forceRedrawEffect: StateEffectType<undefined>;
 	stylingService: StylingService;
 	markdownRenderManager: RenderedMdElementsRegistry;
@@ -38,7 +38,7 @@ export function createViewUpdateOrchestrator(
 ): ViewUpdateOrchestrator {
 	const {
 		app,
-		plugin,
+		indexingService,
 		forceRedrawEffect,
 		stylingService,
 		markdownRenderManager,
@@ -216,11 +216,6 @@ export function createViewUpdateOrchestrator(
 			return result;
 		}
 
-		const indexingService = plugin.indexingService;
-		if (!indexingService) {
-			return result;
-		}
-
 		const sourcePaths =
 			indexingService.getSourcePathsForLookupKeys(affectedLookupKeys);
 
@@ -268,7 +263,7 @@ export function createViewUpdateOrchestrator(
 			}
 
 			if (anyNode.file && anyNode.contentEl) {
-				plugin.processUnresolvedLinksInElement(
+				stylingService.decorateLinksInContainer(
 					anyNode.contentEl,
 					anyNode.file.path,
 				);
@@ -276,7 +271,7 @@ export function createViewUpdateOrchestrator(
 			}
 
 			if (targetEl) {
-				plugin.processUnresolvedLinksInElement(targetEl, canvasFile.path);
+				stylingService.decorateLinksInContainer(targetEl, canvasFile.path);
 			}
 		}
 	}

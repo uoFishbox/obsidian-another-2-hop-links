@@ -1,27 +1,24 @@
 import type { Workspace } from "obsidian";
-import {
-	applySettingsSideEffects,
-	type SettingsSideEffectHandlers,
-} from "./settingsSideEffects";
-import type { PluginSettings } from "features/settings/model";
+import { CARD_LAYOUT_SETTING_KEYS, type PluginSettings } from "features/settings/model";
 import type { IndexingService } from "core/indexing/index-service/IndexingService";
 import type { SortService } from "core/sorting/SortService";
 import type { DisplayModeController } from "features/display-mode/DisplayModeController";
 import type { EmptyViewController } from "infrastructure/lifecycle/emptyViewController";
 import type { ViewUpdateOrchestrator } from "infrastructure/lifecycle/viewUpdateOrchestrator";
-import { TWO_HOP_LINKS_VIEW_TYPE } from "features/two-hop/ui/TwoHopLinksView";
-import { VIEW_TYPE_TAG_NOTES } from "features/tag-notes/ui/TagNotesView";
-import { VIEW_TYPE_PRE_CREATE } from "features/pre-creation/ui/PreCreationView";
-
 /**
  * View types whose layouts are affected by LAYOUT_AFFECTING_SETTINGS.
  * Each view exposes `refreshFromSettings()` to re-render with new settings.
  */
 const LAYOUT_REFRESHABLE_VIEW_TYPES: ReadonlyArray<string> = [
-	TWO_HOP_LINKS_VIEW_TYPE,
-	VIEW_TYPE_TAG_NOTES,
-	VIEW_TYPE_PRE_CREATE,
+	"cosense-card-links-view",
+	"cosense-card-links-tag-notes-view",
+	"cosense-card-links-pre-create-view",
 ];
+
+const LAYOUT_AFFECTING_SETTINGS = new Set<keyof PluginSettings>([
+	...CARD_LAYOUT_SETTING_KEYS,
+	"enableTagFeatures",
+]);
 
 interface RefreshableFromSettings {
 	refreshFromSettings(): void;
@@ -70,46 +67,61 @@ export function createSettingsSideEffectController(
 		deps.emptyViewController.refresh();
 	}
 
-	function buildHandlers(): SettingsSideEffectHandlers {
-		return {
-			setLoggingEnabled: (enabled) => {
-				deps.setLoggingEnabled(enabled);
-			},
-			updateDecoratedViews: () => {
-				deps.viewUpdateOrchestrator.updateAllViews();
-			},
-			syncEmptyView: () => {
-				deps.emptyViewController.sync();
-			},
-			syncTagFeatureSettings: () => {
-				deps.indexingService.invalidateAll();
-				void deps.indexingService
-					.enqueueRebuild("settings-change")
-					.catch((error) => {
-						console.error(
-							"[Cosense card links] Failed to rebuild indexes after tag feature change:",
-							error,
-						);
-					});
-			},
-			invalidateSortCache: () => {
-				deps.sortService.invalidateCache();
-				deps.bumpSortContextVersion();
-			},
-			handleDisplayModeSettingsChange: () => {
-				deps.displayModeManager.handleSettingsChange();
-			},
-			refreshLayoutAffectedViews: () => {
-				refreshLayoutAffectedViews();
-			},
-		};
-	}
-
 	function apply(
 		changedKeys: Iterable<keyof PluginSettings>,
 		settings: PluginSettings,
 	): void {
-		applySettingsSideEffects(changedKeys, settings, buildHandlers());
+		const changedKeySet = new Set(changedKeys);
+		if (changedKeySet.size === 0) {
+			return;
+		}
+
+		if (changedKeySet.has("enableLogging")) {
+			deps.setLoggingEnabled(settings.enableLogging);
+		}
+		if (changedKeySet.has("enableUnresolvedLinkDecoration")) {
+			deps.viewUpdateOrchestrator.updateAllViews();
+		}
+		if (changedKeySet.has("enableEmptyViewAllNotesInNewTab")) {
+			deps.emptyViewController.sync();
+		}
+		if (changedKeySet.has("enableTagFeatures")) {
+			deps.indexingService.invalidateAll();
+			void deps.indexingService
+				.enqueueRebuild("settings-change")
+				.catch((error) => {
+					console.error(
+						"[Cosense card links] Failed to rebuild indexes after tag feature change:",
+						error,
+					);
+				});
+		}
+
+		let invalidatesSort = false;
+		let reactivatesDisplayMode = false;
+		let refreshesLayout = false;
+		for (const key of changedKeySet) {
+			if (key !== "lastUsedSortOption") {
+				invalidatesSort = true;
+				if (key !== "enableContentSearch") {
+					reactivatesDisplayMode = true;
+				}
+			}
+			if (LAYOUT_AFFECTING_SETTINGS.has(key)) {
+				refreshesLayout = true;
+			}
+		}
+
+		if (invalidatesSort) {
+			deps.sortService.invalidateCache();
+			deps.bumpSortContextVersion();
+		}
+		if (reactivatesDisplayMode) {
+			deps.displayModeManager.handleSettingsChange();
+		}
+		if (refreshesLayout) {
+			refreshLayoutAffectedViews();
+		}
 	}
 
 	return {

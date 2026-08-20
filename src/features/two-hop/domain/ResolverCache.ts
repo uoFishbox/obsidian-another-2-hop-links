@@ -1,10 +1,5 @@
 import type { DataUpdateContext } from "core/indexing/index-service/IndexEvents";
-import type { TwoHopLinkResult } from "types/domain";
-import type {
-	TwoHopResolveSnapshot,
-	TwoHopResolverDependencies,
-} from "./ResolverDependencies";
-import { freezeTwoHopLinkResult } from "./immutableTwoHopLinkResult";
+import type { TwoHopResolveSnapshot } from "./ResolverDependencies";
 import type { ResolverPerformanceSettings } from "./ResolverTypes";
 
 const MAX_RESOLVE_CACHE_SIZE = 64;
@@ -60,25 +55,14 @@ export class ResolverCache {
 		filePath: string,
 		performanceSettings: ResolverPerformanceSettings,
 		resolveSettings: ResolverResolveSettings,
-		dependencies: TwoHopResolverDependencies,
-		result: TwoHopLinkResult,
+		snapshot: TwoHopResolveSnapshot,
 	): void {
-		const cachedDependencies: TwoHopResolverDependencies = Object.freeze({
-			originPath: dependencies.originPath,
-			relevantPaths: new Set(dependencies.relevantPaths),
-			relevantLookupKeys: new Set(dependencies.relevantLookupKeys),
-			relevantTags: new Set(dependencies.relevantTags),
-			structuralSourcePaths: new Set(dependencies.structuralSourcePaths),
-		});
 		this.cache.set(filePath, {
 			enableProgressiveTwoHopBuild:
 				performanceSettings.enableProgressiveTwoHopBuild,
 			maxOutgoingToProcess: performanceSettings.maxOutgoingToProcess,
 			includeTaggedNotes: resolveSettings.includeTaggedNotes,
-			snapshot: Object.freeze({
-				result: freezeTwoHopLinkResult(result),
-				dependencies: cachedDependencies,
-			}),
+			snapshot,
 		});
 
 		// キャッシュサイズ制限を超えた場合、最も古いエントリを削除

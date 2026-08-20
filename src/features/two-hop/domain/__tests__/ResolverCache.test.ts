@@ -3,6 +3,8 @@ import { ResolverCache } from "../ResolverCache";
 import type { DataUpdateContext } from "core/indexing/index-service/IndexEvents";
 import type { TwoHopLinkResult } from "types/domain";
 import { TFile } from "obsidian";
+import { createTwoHopResolveSnapshot } from "../ResolverDependencies";
+import { freezeTwoHopLinkResult } from "../immutableTwoHopLinkResult";
 
 function createMockTFile(path: string): TFile {
 	return { path, extension: "md" } as TFile;
@@ -40,6 +42,22 @@ function defaultDependencies() {
 	};
 }
 
+function setCachedResult(
+	cache: ResolverCache,
+	filePath: string,
+	performanceSettings: ReturnType<typeof defaultPerformanceSettings>,
+	resolveSettings: ReturnType<typeof defaultResolveSettings>,
+	dependencies: ReturnType<typeof defaultDependencies>,
+	result: TwoHopLinkResult,
+): void {
+	cache.set(
+		filePath,
+		performanceSettings,
+		resolveSettings,
+		createTwoHopResolveSnapshot(freezeTwoHopLinkResult(result), dependencies),
+	);
+}
+
 function getCachedResult(
 	cache: ResolverCache,
 	filePath: string,
@@ -54,7 +72,8 @@ describe("ResolverCache", () => {
 		const cache = new ResolverCache();
 		const result = createMockResult();
 
-		cache.set(
+		setCachedResult(
+			cache,
 			"origin.md",
 			defaultPerformanceSettings(),
 			defaultResolveSettings(),
@@ -85,7 +104,8 @@ describe("ResolverCache", () => {
 		const cache = new ResolverCache();
 		const result = createMockResult();
 
-		cache.set(
+		setCachedResult(
+			cache,
 			"origin.md",
 			defaultPerformanceSettings(),
 			defaultResolveSettings(),
@@ -107,7 +127,8 @@ describe("ResolverCache", () => {
 		const cache = new ResolverCache();
 		const result = createMockResult();
 
-		cache.set(
+		setCachedResult(
+			cache,
 			"origin.md",
 			defaultPerformanceSettings(),
 			defaultResolveSettings(),
@@ -130,7 +151,8 @@ describe("ResolverCache", () => {
 		const resultA = createMockResult();
 		const resultB = createMockResult();
 
-		cache.set(
+		setCachedResult(
+			cache,
 			"a.md",
 			defaultPerformanceSettings(),
 			defaultResolveSettings(),
@@ -140,7 +162,8 @@ describe("ResolverCache", () => {
 			},
 			resultA,
 		);
-		cache.set(
+		setCachedResult(
+			cache,
 			"b.md",
 			defaultPerformanceSettings(),
 			defaultResolveSettings(),
@@ -178,7 +201,8 @@ describe("ResolverCache", () => {
 		const resultA = createMockResult();
 		const resultB = createMockResult();
 
-		cache.set(
+		setCachedResult(
+			cache,
 			"a.md",
 			defaultPerformanceSettings(),
 			defaultResolveSettings(),
@@ -188,7 +212,8 @@ describe("ResolverCache", () => {
 			},
 			resultA,
 		);
-		cache.set(
+		setCachedResult(
+			cache,
 			"b.md",
 			defaultPerformanceSettings(),
 			defaultResolveSettings(),
@@ -226,7 +251,8 @@ describe("ResolverCache", () => {
 		const resultA = createMockResult();
 		const resultB = createMockResult();
 
-		cache.set(
+		setCachedResult(
+			cache,
 			"a.md",
 			defaultPerformanceSettings(),
 			defaultResolveSettings(),
@@ -236,7 +262,8 @@ describe("ResolverCache", () => {
 			},
 			resultA,
 		);
-		cache.set(
+		setCachedResult(
+			cache,
 			"b.md",
 			defaultPerformanceSettings(),
 			defaultResolveSettings(),
@@ -273,7 +300,8 @@ describe("ResolverCache", () => {
 		const cache = new ResolverCache();
 		const result = createMockResult();
 
-		cache.set(
+		setCachedResult(
+			cache,
 			"origin.md",
 			defaultPerformanceSettings(),
 			defaultResolveSettings(),
@@ -306,7 +334,8 @@ describe("ResolverCache", () => {
 		const cache = new ResolverCache();
 		const result = createMockResult();
 
-		cache.set(
+		setCachedResult(
+			cache,
 			"origin.md",
 			defaultPerformanceSettings(),
 			defaultResolveSettings(),
@@ -332,7 +361,8 @@ describe("ResolverCache", () => {
 		const cache = new ResolverCache();
 		const result = createMockResult();
 
-		cache.set(
+		setCachedResult(
+			cache,
 			"origin.md",
 			defaultPerformanceSettings(),
 			defaultResolveSettings(),
@@ -356,7 +386,8 @@ describe("ResolverCache", () => {
 		const cache = new ResolverCache();
 		const result = createMockResult();
 
-		cache.set(
+		setCachedResult(
+			cache,
 			"origin.md",
 			defaultPerformanceSettings(),
 			defaultResolveSettings(),
@@ -380,48 +411,34 @@ describe("ResolverCache", () => {
 		).toBeUndefined();
 	});
 
-	test("freezes the cached snapshot and isolates copied dependencies", () => {
+	test("stores the completed immutable snapshot without copying it", () => {
 		const cache = new ResolverCache();
 		const result = createMockResult();
 		const dependencies = {
 			...defaultDependencies(),
 			relevantPaths: new Set(["note1.md"]),
 		};
+		const snapshot = createTwoHopResolveSnapshot(
+			freezeTwoHopLinkResult(result),
+			dependencies,
+		);
 
 		cache.set(
 			"origin.md",
 			defaultPerformanceSettings(),
 			defaultResolveSettings(),
-			dependencies,
-			result,
+			snapshot,
 		);
 
-		const externalLink = {
-			rawText: "mutated",
-			path: "mutated.md",
-			isUnresolved: false,
-			sourceFile: createMockTFile("mutated.md"),
-		};
-		expect(Reflect.set(result.backlinks, 0, externalLink)).toBe(false);
-		dependencies.relevantPaths.clear();
-
-		const first = getCachedResult(
-			cache,
-			"origin.md",
-			defaultPerformanceSettings(),
-			defaultResolveSettings(),
-		)!;
-		expect(Object.isFrozen(first)).toBe(true);
-		expect(Object.isFrozen(first.backlinks)).toBe(true);
-
-		const second = getCachedResult(
-			cache,
+		const cachedSnapshot = cache.getSnapshot(
 			"origin.md",
 			defaultPerformanceSettings(),
 			defaultResolveSettings(),
 		);
-		expect(second).toBe(first);
-		expect(second?.backlinks).toEqual([]);
+		expect(cachedSnapshot).toBe(snapshot);
+		expect(cachedSnapshot?.result).toBe(result);
+		expect(Object.isFrozen(cachedSnapshot?.result)).toBe(true);
+		expect(Object.isFrozen(cachedSnapshot?.result.backlinks)).toBe(true);
 
 		cache.invalidate({
 			affectedPaths: ["note1.md"],
@@ -473,7 +490,8 @@ describe("ResolverCache", () => {
 			],
 		};
 
-		cache.set(
+		setCachedResult(
+			cache,
 			"origin.md",
 			defaultPerformanceSettings(),
 			defaultResolveSettings(),

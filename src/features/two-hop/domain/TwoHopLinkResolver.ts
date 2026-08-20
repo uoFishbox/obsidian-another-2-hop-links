@@ -337,8 +337,7 @@ export class TwoHopLinkResolver {
 				targetFile.path,
 				performanceSettings,
 				resolveSettings,
-				dependencies,
-				result,
+				snapshot,
 			);
 			onProgress?.({
 				phase: "complete",

@@ -68,7 +68,6 @@ export interface PluginRuntimeOptions {
 	forceRedrawEffect: StateEffectType<undefined>;
 	settingsManager: SettingsManager;
 	getSettings: () => PluginSettings;
-	getSettingsSnapshot: () => PluginSettings;
 	isUnloaded: () => boolean;
 	bumpSortContextVersion: () => void;
 	getSortContextVersion: () => number;
@@ -187,7 +186,7 @@ export function createPluginRuntime(options: PluginRuntimeOptions): PluginRuntim
 		});
 	const resolveTwoHopLinks: ResolveTwoHopLinks = (file, onProgress, signal) => {
 		const settings = options.getSettings();
-		return options.plugin.getTwoHopResolveSnapshot(file, onProgress, {
+		return twoHopLinkResolver.resolveSnapshot(file, onProgress, {
 			includeTaggedNotes:
 				areTagFeaturesEnabled(settings) && settings.showTagsSection,
 			signal,
@@ -196,7 +195,8 @@ export function createPluginRuntime(options: PluginRuntimeOptions): PluginRuntim
 	const componentController = new ComponentController(
 		options.app,
 		options.plugin,
-		options.getSettingsSnapshot,
+		options.getSettings,
+		resolveTwoHopLinks,
 		indexingService,
 		options.updateSortOption,
 		{
@@ -232,7 +232,7 @@ export function createPluginRuntime(options: PluginRuntimeOptions): PluginRuntim
 	);
 	const viewUpdateOrchestrator = createViewUpdateOrchestrator({
 		app: options.app,
-		plugin: options.plugin,
+		indexingService,
 		forceRedrawEffect: options.forceRedrawEffect,
 		stylingService,
 		markdownRenderManager: renderedMdElementsRegistry,

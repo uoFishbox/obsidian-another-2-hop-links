@@ -9,7 +9,6 @@ import { getLeafId } from "infrastructure/workspace/workspaceLeafIdentity";
 import * as ErrorHandler from "shared/errors/errorHandler";
 import type { PluginSettings } from "features/settings/model";
 import type { SortOption } from "core/sorting";
-import { areTagFeaturesEnabled } from "features/settings/model";
 import type { IComponentManager } from "types/services";
 import type { TwoHopLinkResult } from "types/domain";
 import type { TwoHopApplicationStore } from "features/two-hop/application/TwoHopApplicationStore.svelte";
@@ -65,6 +64,7 @@ export class ComponentController implements IComponentManager {
 		private readonly app: App,
 		private readonly plugin: PluginHost,
 		private readonly getSettings: () => PluginSettings,
+		private readonly resolveTwoHopLinks: ResolveTwoHopLinks,
 		indexingService: IIndexingService,
 		updateSortOption: (option: SortOption) => void,
 		private readonly viewDeps: ComponentControllerViewDeps,
@@ -277,19 +277,7 @@ export class ComponentController implements IComponentManager {
 				file.path,
 				settings,
 				this.applicationStorePool.getOrCreateDisplayDataBuilder(leafId),
-				(targetFile: TFile, onProgress, signal) => {
-					const currentSettings = this.getSettings();
-					return this.plugin.getTwoHopResolveSnapshot(
-						targetFile,
-						onProgress,
-						{
-							includeTaggedNotes:
-								areTagFeaturesEnabled(currentSettings) &&
-								currentSettings.showTagsSection,
-							signal,
-						},
-					);
-				},
+				this.resolveTwoHopLinks,
 			);
 			shouldReleaseStoreOnError = true;
 
