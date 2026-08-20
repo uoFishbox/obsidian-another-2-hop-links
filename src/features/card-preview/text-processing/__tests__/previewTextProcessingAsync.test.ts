@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
 import {
+	extractFirstEmbeddedMediaAsync,
 	getContentSnippetAsync,
 	highlightSearchMatchesInHtmlAsync,
 } from "../previewTextProcessingAsync";
@@ -146,6 +147,41 @@ describe("preview text processing async wrappers", () => {
 		await expect(
 			getContentSnippetAsync(content, settings, "target"),
 		).resolves.toContain('<span class="cosense-card-links__wikilink">');
+	});
+
+	test("skips the worker when the embed scan range has no syntax candidate", async () => {
+		const content = "Important! " + "x".repeat(200_000);
+
+		await expect(
+			extractFirstEmbeddedMediaAsync(content, { maxScanChars: 100_000 }),
+		).resolves.toBeUndefined();
+		expect(state.runPreviewTextWorker).not.toHaveBeenCalled();
+	});
+
+	test("sends only the bounded embed scan range to the worker", async () => {
+		state.runPreviewTextWorker.mockResolvedValue({
+			syntax: "wiki",
+			original: "![[cover.png]]",
+			target: "cover.png",
+		});
+		const maxScanChars = PREVIEW_TEXT_WORKER_MIN_CONTENT_LENGTH + 100;
+		const content = "![[cover.png]]" + "x".repeat(maxScanChars * 4);
+
+		await expect(
+			extractFirstEmbeddedMediaAsync(content, { maxScanChars }),
+		).resolves.toEqual({
+			syntax: "wiki",
+			original: "![[cover.png]]",
+			target: "cover.png",
+		});
+		expect(state.runPreviewTextWorker).toHaveBeenCalledWith(
+			{
+				type: "extract-first-embedded-media",
+				content: content.substring(0, maxScanChars),
+				maxScanChars,
+			},
+			undefined,
+		);
 	});
 
 	test("propagates abort errors instead of falling back", async () => {

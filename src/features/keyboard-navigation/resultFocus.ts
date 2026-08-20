@@ -37,6 +37,13 @@ interface NavigationTarget {
 	navigationRoot: HTMLElement | null;
 }
 
+interface NavigationScore {
+	axisPriority: number;
+	primaryDistance: number;
+	secondaryDistance: number;
+	fallbackDistance: number;
+}
+
 const NAVIGATION_ROOT_SELECTOR = ".cosense-card-links__virtual-grid";
 
 type WindowWithEventConstructor = Window & {
@@ -203,12 +210,7 @@ function scoreNavigationCandidate(
 	current: NavigationTarget,
 	candidate: NavigationTarget,
 	direction: ResultNavigationDirection,
-): {
-	axisPriority: number;
-	primaryDistance: number;
-	secondaryDistance: number;
-	fallbackDistance: number;
-} | null {
+): NavigationScore | null {
 	const horizontalOverlap =
 		Math.min(current.rect.right, candidate.rect.right) -
 		Math.max(current.rect.left, candidate.rect.left);
@@ -270,6 +272,23 @@ function scoreNavigationCandidate(
 	}
 }
 
+function isBetterNavigationScore(
+	score: NavigationScore,
+	bestScore: NavigationScore | null,
+): boolean {
+	if (!bestScore) return true;
+	if (score.axisPriority !== bestScore.axisPriority) {
+		return score.axisPriority < bestScore.axisPriority;
+	}
+	if (score.primaryDistance !== bestScore.primaryDistance) {
+		return score.primaryDistance < bestScore.primaryDistance;
+	}
+	if (score.secondaryDistance !== bestScore.secondaryDistance) {
+		return score.secondaryDistance < bestScore.secondaryDistance;
+	}
+	return score.fallbackDistance < bestScore.fallbackDistance;
+}
+
 function resolveNavigationTarget(
 	targets: readonly NavigationTarget[],
 	currentTarget: HTMLElement | null,
@@ -289,12 +308,7 @@ function resolveNavigationTarget(
 	}
 
 	let bestCandidate: NavigationTarget | null = null;
-	let bestScore: {
-		axisPriority: number;
-		primaryDistance: number;
-		secondaryDistance: number;
-		fallbackDistance: number;
-	} | null = null;
+	let bestScore: NavigationScore | null = null;
 
 	for (const candidate of targets) {
 		if (candidate.element === current.element) {
@@ -306,19 +320,7 @@ function resolveNavigationTarget(
 			continue;
 		}
 
-		if (
-			!bestScore ||
-			score.axisPriority < bestScore.axisPriority ||
-			(score.axisPriority === bestScore.axisPriority &&
-				score.primaryDistance < bestScore.primaryDistance) ||
-			(score.axisPriority === bestScore.axisPriority &&
-				score.primaryDistance === bestScore.primaryDistance &&
-				score.secondaryDistance < bestScore.secondaryDistance) ||
-			(score.axisPriority === bestScore.axisPriority &&
-				score.primaryDistance === bestScore.primaryDistance &&
-				score.secondaryDistance === bestScore.secondaryDistance &&
-				score.fallbackDistance < bestScore.fallbackDistance)
-		) {
+		if (isBetterNavigationScore(score, bestScore)) {
 			bestCandidate = candidate;
 			bestScore = score;
 		}

@@ -1,6 +1,10 @@
 import { canvasToSearchText } from "./canvasText";
 import type { CooperativeScanOptions } from "./fencedCodeBlocks";
-import { extractFirstEmbeddedMedia, type ParsedEmbed } from "./mediaExtractor";
+import {
+	extractFirstEmbeddedMedia,
+	selectEmbeddedMediaScanContent,
+	type ParsedEmbed,
+} from "./mediaExtractor";
 import {
 	getContentSnippet,
 	normalizeSearchQuery,
@@ -10,7 +14,6 @@ import {
 	type PreviewSnippetSettings,
 } from "./snippetExtractor";
 import { highlightSearchMatchesInHtml } from "./searchHighlighter";
-import { findCaseInsensitiveIndex } from "./searchUtils";
 import {
 	PREVIEW_TEXT_WORKER_MIN_CONTENT_LENGTH,
 	type PreviewTextWorkerResult,
@@ -64,35 +67,11 @@ async function runWithFallback<T>(
 	}
 }
 
-function resolveContentSnippetFirstMatchIndex(
-	content: string,
-	normalizedSearchQuery: string,
-	searchOptions?: GetContentSnippetOptions,
-): number {
-	if (typeof searchOptions?.firstMatchIndex === "number") {
-		return searchOptions.firstMatchIndex;
-	}
-
-	if (!normalizedSearchQuery) {
-		return -1;
-	}
-
-	return findCaseInsensitiveIndex(content, normalizedSearchQuery);
-}
-
 function shouldRunContentSnippetWorker(
 	content: string,
 	normalizedSearchQuery: string,
-	firstMatchIndex: number,
 ): boolean {
-	if (!normalizedSearchQuery) {
-		return false;
-	}
-
-	return (
-		content.length > PREVIEW_TEXT_WORKER_MIN_CONTENT_LENGTH ||
-		firstMatchIndex > PREVIEW_TEXT_WORKER_MIN_CONTENT_LENGTH
-	);
+	return normalizedSearchQuery !== "" && shouldUsePreviewTextWorker(content);
 }
 
 export async function getContentSnippetAsync(
@@ -103,15 +82,8 @@ export async function getContentSnippetAsync(
 	signal?: AbortSignal,
 ): Promise<string> {
 	const normalizedSearchQuery = normalizeSearchQuery(searchQuery);
-	const firstMatchIndex = resolveContentSnippetFirstMatchIndex(
-		content,
-		normalizedSearchQuery,
-		searchOptions,
-	);
 
-	if (
-		shouldRunContentSnippetWorker(content, normalizedSearchQuery, firstMatchIndex)
-	) {
+	if (shouldRunContentSnippetWorker(content, normalizedSearchQuery)) {
 		return await runWithFallback<string>(
 			runPreviewTextWorker(
 				{
@@ -177,20 +149,25 @@ export async function extractFirstEmbeddedMediaAsync(
 	content: string,
 	options: CooperativeScanOptions = {},
 ): Promise<ParsedEmbed | undefined> {
-	if (!shouldUsePreviewTextWorker(content)) {
-		return await extractFirstEmbeddedMedia(content, options);
+	const scanContent = selectEmbeddedMediaScanContent(content, options.maxScanChars);
+	if (!scanContent) {
+		return undefined;
+	}
+
+	if (!shouldUsePreviewTextWorker(scanContent)) {
+		return await extractFirstEmbeddedMedia(scanContent, options);
 	}
 
 	return await runWithFallback<ParsedEmbed | undefined>(
 		runPreviewTextWorker(
 			{
 				type: "extract-first-embedded-media",
-				content,
-				maxScanChars: options.maxScanChars,
+				content: scanContent,
+				maxScanChars: scanContent.length,
 			},
 			options.signal,
 		),
-		() => extractFirstEmbeddedMedia(content, options),
+		() => extractFirstEmbeddedMedia(scanContent, options),
 	);
 }
 

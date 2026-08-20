@@ -324,6 +324,46 @@ Plain text`;
 			expect(result).toContain("Text");
 		});
 
+		test("rewinds a closed wiki link when the limit is reached inside it", () => {
+			const result = getContentSnippet(
+				"Before [[Destination|" + "x".repeat(100) + "]] After",
+				{
+					...defaultSettings,
+					previewMaxChars: 8,
+					previewMaxLines: 0,
+				},
+			);
+
+			expect(result).toContain("Before");
+			expect(result).not.toContain("Destination");
+			expect(result).not.toContain("After");
+		});
+
+		test("continues to the safe inline-code end after reaching the limit", () => {
+			const result = getContentSnippet("`abcdefgh` After", {
+				...defaultSettings,
+				previewMaxChars: 2,
+				previewMaxLines: 0,
+			});
+
+			expect(result).toContain("abcdefgh");
+			expect(result).not.toContain("After");
+			expect(result.match(/<span/g)).toHaveLength(
+				result.match(/<\/span>/g)?.length ?? 0,
+			);
+		});
+
+		test("keeps an escaped character together at the truncation boundary", () => {
+			const result = getContentSnippet("123456789\\*After", {
+				...defaultSettings,
+				previewMaxChars: 5,
+				previewMaxLines: 0,
+			});
+
+			expect(result).toContain("*");
+			expect(result).not.toContain("After");
+		});
+
 		test("rewinds past unclosed code fence when truncated", () => {
 			const result = getContentSnippet("Text\n```\n" + "code\n".repeat(100), {
 				...defaultSettings,
@@ -475,6 +515,33 @@ describe("getContentSnippet with search query", () => {
 		const matchIndex = snippet.toLowerCase().indexOf("target");
 		expect(matchIndex).toBeGreaterThanOrEqual(0);
 		expect(matchIndex).toBeLessThanOrEqual(8);
+	});
+
+	test("keeps a match at the content start with a line limit", () => {
+		const result = getContentSnippet(
+			"target\ntrailing line",
+			{
+				...defaultSettings,
+				previewMaxChars: 0,
+				previewMaxLines: 1,
+			},
+			"target",
+			{ firstMatchIndex: 0 },
+		);
+
+		expect(result).toContain("target");
+		expect(result.startsWith("...")).toBe(false);
+	});
+
+	test("seeks a precomputed late match in a long single line", () => {
+		const firstMatchIndex = 100_000;
+		const content = "a".repeat(firstMatchIndex) + "target suffix";
+		const result = getContentSnippet(content, defaultSettings, "target", {
+			firstMatchIndex,
+		});
+
+		expect(result).toContain("target suffix");
+		expect(result.startsWith("...")).toBe(true);
 	});
 
 	test("preserves fenced code block when search hits inside it", () => {

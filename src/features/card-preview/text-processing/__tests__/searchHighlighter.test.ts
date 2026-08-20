@@ -27,6 +27,12 @@ describe("highlightTextForSearch", () => {
 		expect(highlightTextForSearch("plain text")).toBe("plain text");
 	});
 
+	test("escapes HTML when no query is provided", () => {
+		expect(highlightTextForSearch("<b>unsafe</b>")).toBe(
+			"&lt;b&gt;unsafe&lt;/b&gt;",
+		);
+	});
+
 	test("returns unchanged text when no match", () => {
 		const result = highlightTextForSearch("hello world", "xyz");
 		expect(result).toBe("hello world");
@@ -69,8 +75,35 @@ describe("highlightSearchMatchesInHtml", () => {
 		expect(highlightSearchMatchesInHtml(html, "search")).toBe(html);
 	});
 
+	test("does not highlight a match split by an HTML tag", () => {
+		const html = "hel<strong>lo</strong> hello";
+		expect(highlightSearchMatchesInHtml(html, "hello")).toBe(
+			'hel<strong>lo</strong> <span class="ccl-search-highlight">hello</span>',
+		);
+	});
+
+	test("highlights multiple visible matches without changing tag attributes", () => {
+		const html = '<span data-label="search">search</span> search search';
+		const result = highlightSearchMatchesInHtml(html, "search");
+
+		expect(result.match(/class="ccl-search-highlight"/g)).toHaveLength(3);
+		expect(result).toContain('data-label="search"');
+	});
+
 	test("does not match a literal less-than query across an HTML boundary", () => {
 		const html = "visible<span>text</span>";
 		expect(highlightSearchMatchesInHtml(html, "visible<")).toBe(html);
+	});
+
+	test("does not match a literal greater-than query across an HTML boundary", () => {
+		const html = "<span>visible</span>";
+		expect(highlightSearchMatchesInHtml(html, ">visible")).toBe(html);
+	});
+
+	test("treats a less-than character without a closing tag as visible text", () => {
+		const html = "visible<search";
+		expect(highlightSearchMatchesInHtml(html, "<search")).toBe(
+			'visible<span class="ccl-search-highlight"><search</span>',
+		);
 	});
 });

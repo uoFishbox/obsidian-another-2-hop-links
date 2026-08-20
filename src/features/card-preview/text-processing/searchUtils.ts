@@ -90,9 +90,32 @@ export function findCaseInsensitiveIndex(
 	return match?.index ?? -1;
 }
 
+function collectVisibleHtmlText(html: string): string {
+	let tagStart = html.indexOf("<");
+	if (tagStart === -1) return html;
+
+	const parts: string[] = [];
+	let cursor = 0;
+
+	while (tagStart !== -1) {
+		const tagEnd = html.indexOf(">", tagStart + 1);
+		if (tagEnd === -1) break;
+
+		if (tagStart > cursor) {
+			parts.push(html.substring(cursor, tagStart));
+		}
+		cursor = tagEnd + 1;
+		tagStart = html.indexOf("<", cursor);
+	}
+
+	if (cursor === 0) return html;
+	if (cursor < html.length) parts.push(html.substring(cursor));
+	return parts.join("");
+}
+
 /**
- * rendered HTML の visible text 内に needle が含まれるかを中間文字列なしで判定する。
- * `<...>` タグを skip しながら streaming に大文字小文字不一致検索を行う。
+ * rendered HTML の visible text 内に needle が含まれるかを判定する。
+ * タグを除いた短い preview 文字列へ変換し、ネイティブ文字列検索を使う。
  *
  * **注意**: rendered HTML 専用。raw markdown には使わないこと。
  * raw markdown の backtick 内 `<tag>` は visible text だが、
@@ -106,46 +129,5 @@ export function htmlVisibleTextContainsCaseInsensitive(
 		return false;
 	}
 
-	const needle = normalizedQuery;
-	const needleLen = needle.length;
-	const len = html.length;
-	let i = 0;
-
-	while (i < len) {
-		// Skip HTML tags
-		if (html[i] === "<") {
-			const closeIndex = html.indexOf(">", i + 1);
-			if (closeIndex !== -1) {
-				i = closeIndex + 1;
-				continue;
-			}
-			// 閉じ `>` がなければタグではなく visible text の `<`
-		}
-
-		// Try matching needle starting at position i
-		let j = 0;
-		let k = i;
-		while (j < needleLen && k < len) {
-			if (html[k] === "<") {
-				const closeIndex = html.indexOf(">", k + 1);
-				if (closeIndex !== -1) {
-					k = closeIndex + 1;
-					continue;
-				}
-			}
-			if (html[k].toLowerCase() !== needle[j]) {
-				break;
-			}
-			j++;
-			k++;
-		}
-
-		if (j === needleLen) {
-			return true;
-		}
-
-		i++;
-	}
-
-	return false;
+	return collectVisibleHtmlText(html).toLowerCase().includes(normalizedQuery);
 }

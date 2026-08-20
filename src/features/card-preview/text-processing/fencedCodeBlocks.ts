@@ -244,10 +244,18 @@ export async function skipFencedCodeBlockAsync(
 		: lineStartIndex;
 }
 
-export function findEnclosingFencedCodeBlockRange(
+/** Finds the closed fenced code block whose body contains the given offset. */
+export function findFencedCodeBlockContainingOffset(
 	content: string,
 	matchIndex: number,
 ): FencedCodeBlockRange | null {
+	if (
+		content.lastIndexOf("```", matchIndex) === -1 &&
+		content.lastIndexOf("~~~", matchIndex) === -1
+	) {
+		return null;
+	}
+
 	let lineStart = 0;
 
 	while (lineStart < content.length) {

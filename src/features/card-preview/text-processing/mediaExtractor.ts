@@ -17,6 +17,22 @@ const EMBED_REGEX = /!\[\[([^\]]+)\]\]|!\[[^\]]*\]\(([^)]+)\)/;
 const INLINE_CODE_REGEX = /`[^`\n]*`/g;
 const NEWLINE_CHAR_CODE = 10;
 
+/** Returns the bounded content that can contain a supported embed syntax. */
+export function selectEmbeddedMediaScanContent(
+	content: string,
+	maxScanChars?: number,
+): string | null {
+	const scanEnd = Math.min(
+		content.length,
+		Math.max(maxScanChars ?? content.length, 0),
+	);
+	if (scanEnd === 0) return null;
+
+	const scanContent =
+		scanEnd === content.length ? content : content.substring(0, scanEnd);
+	return scanContent.includes("![") ? scanContent : null;
+}
+
 export function stripCodeSegmentsForEmbedDetection(content: string): string {
 	return replaceFencedCodeBlocks(content, () => "").replace(INLINE_CODE_REGEX, "");
 }
@@ -158,13 +174,14 @@ export function extractFirstEmbeddedMedia(
 	content: string,
 	options: CooperativeScanOptions = {},
 ): Promise<ParsedEmbed | undefined> {
-	if (!content || !content.includes("!")) {
+	const scanContent = selectEmbeddedMediaScanContent(content, options.maxScanChars);
+	if (!scanContent) {
 		return Promise.resolve(undefined);
 	}
 
 	let i = 0;
 	let atLineStart = true;
-	const scanEnd = Math.min(content.length, options.maxScanChars ?? content.length);
+	const scanEnd = scanContent.length;
 	const yieldEveryChars = options.yieldEveryChars ?? 20_000;
 	let lastYieldIndex = 0;
 
@@ -181,13 +198,13 @@ export function extractFirstEmbeddedMedia(
 				}
 			}
 
-			if (atLineStart && detectFenceStart(content, i)) {
-				i = await skipFencedCodeBlockAsync(content, i, options);
+			if (atLineStart && detectFenceStart(scanContent, i)) {
+				i = await skipFencedCodeBlockAsync(scanContent, i, options);
 				atLineStart = true;
 				continue;
 			}
 
-			const charCode = content.charCodeAt(i);
+			const charCode = scanContent.charCodeAt(i);
 			if (charCode === NEWLINE_CHAR_CODE) {
 				i++;
 				atLineStart = true;
@@ -196,18 +213,18 @@ export function extractFirstEmbeddedMedia(
 
 			atLineStart = false;
 
-			if (content[i] === "`") {
-				i = skipInlineCode(content, i);
+			if (scanContent[i] === "`") {
+				i = skipInlineCode(scanContent, i);
 				continue;
 			}
 
-			if (content[i] === "!") {
-				const wikiEmbed = parseWikiEmbedAt(content, i);
+			if (scanContent[i] === "!") {
+				const wikiEmbed = parseWikiEmbedAt(scanContent, i);
 				if (wikiEmbed) {
 					return wikiEmbed;
 				}
 
-				const markdownEmbed = parseMarkdownEmbedAt(content, i);
+				const markdownEmbed = parseMarkdownEmbedAt(scanContent, i);
 				if (markdownEmbed) {
 					return markdownEmbed;
 				}

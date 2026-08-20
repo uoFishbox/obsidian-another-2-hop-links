@@ -31,10 +31,26 @@ describe("htmlVisibleTextContainsCaseInsensitive", () => {
 		expect(htmlVisibleTextContainsCaseInsensitive(html, "hello world")).toBe(true);
 	});
 
+	it("matches visible text across multiple adjacent HTML tags", () => {
+		const html = "<span>he</span><i></i><strong>llo</strong> world";
+		expect(htmlVisibleTextContainsCaseInsensitive(html, "hello world")).toBe(true);
+	});
+
 	it("does not match text that only appears inside tags", () => {
 		const html = '<div class="hello">visible</div>';
 		expect(htmlVisibleTextContainsCaseInsensitive(html, "hello")).toBe(false);
 		expect(htmlVisibleTextContainsCaseInsensitive(html, "visible")).toBe(true);
+	});
+
+	it("does not start a match in tag names or attributes", () => {
+		const html =
+			'<search-target data-query="hidden needle">visible</search-target>';
+		expect(htmlVisibleTextContainsCaseInsensitive(html, "search-target")).toBe(
+			false,
+		);
+		expect(htmlVisibleTextContainsCaseInsensitive(html, "hidden needle")).toBe(
+			false,
+		);
 	});
 
 	it("keeps inline-code html-like text visible for query detection", () => {
@@ -51,6 +67,19 @@ describe("htmlVisibleTextContainsCaseInsensitive", () => {
 		expect(htmlVisibleTextContainsCaseInsensitive("<p>hello</p>", "world")).toBe(
 			false,
 		);
+	});
+
+	it("treats an unclosed angle bracket as visible text", () => {
+		expect(
+			htmlVisibleTextContainsCaseInsensitive("before <unfinished", "<unfinished"),
+		).toBe(true);
+	});
+
+	it("handles repeated query prefixes without changing the result", () => {
+		const html = `<span>${"a".repeat(2_500)}</span>`;
+		const query = `${"a".repeat(80)}b`;
+
+		expect(htmlVisibleTextContainsCaseInsensitive(html, query)).toBe(false);
 	});
 
 	it("does not decode HTML entities (consistent with stripHtmlTags)", () => {

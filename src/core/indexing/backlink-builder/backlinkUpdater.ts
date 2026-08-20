@@ -22,6 +22,7 @@ import {
 	type ResolvedLinkMemo,
 } from "./backlinkReferenceSequence";
 import {
+	drainYieldSteps,
 	HEAVY_YIELD_CHECK_INTERVAL,
 	maybeYield,
 	type YieldScheduler,
@@ -358,16 +359,9 @@ export function createBacklinkUpdater(
 			HEAVY_YIELD_CHECK_INTERVAL,
 		);
 
-		const chunked = createSourceSummaryFromAggregationChunked(
-			localScratch,
-			yieldScheduler,
+		return drainYieldSteps(
+			createSourceSummaryFromAggregationChunked(localScratch, yieldScheduler),
 		);
-		let step = chunked.next();
-		while (!step.done) {
-			await step.value;
-			step = chunked.next();
-		}
-		return step.value;
 	}
 
 	async function reconcileBacklinksBySourceAsync(

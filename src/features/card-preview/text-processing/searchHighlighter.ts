@@ -1,20 +1,21 @@
 import { escapeHtml } from "./protectedHtml";
 import { createCaseInsensitiveRegExp } from "./searchUtils";
 
-function wrapMatchesWithHighlight(
-	text: string,
-	searchPattern: RegExp | null,
-	escapeSegments: boolean,
-): string {
+const HIGHLIGHT_OPEN_TAG = '<span class="ccl-search-highlight">';
+const HIGHLIGHT_CLOSE_TAG = "</span>";
+const EXISTING_HIGHLIGHT_PATTERN =
+	/<span\s+class="ccl-search-highlight">([\s\S]*?)<\/span>/gi;
+
+function highlightEscapedText(text: string, searchPattern: RegExp | null): string {
 	if (!searchPattern) {
-		return escapeSegments ? escapeHtml(text) : text;
+		return escapeHtml(text);
 	}
 
 	searchPattern.lastIndex = 0;
 	let cursor = 0;
 	let match = searchPattern.exec(text);
 	if (!match) {
-		return escapeSegments ? escapeHtml(text) : text;
+		return escapeHtml(text);
 	}
 
 	const parts: string[] = [];
@@ -24,11 +25,9 @@ function wrapMatchesWithHighlight(
 
 		const prefix = text.substring(cursor, matchIndex);
 
-		parts.push(escapeSegments ? escapeHtml(prefix) : prefix);
+		parts.push(escapeHtml(prefix));
 		parts.push(
-			`<span class="ccl-search-highlight">${
-				escapeSegments ? escapeHtml(matchText) : matchText
-			}</span>`,
+			`${HIGHLIGHT_OPEN_TAG}${escapeHtml(matchText)}${HIGHLIGHT_CLOSE_TAG}`,
 		);
 
 		cursor = matchIndex + matchText.length;
@@ -36,76 +35,29 @@ function wrapMatchesWithHighlight(
 	} while (match);
 
 	const suffix = text.substring(cursor);
-	parts.push(escapeSegments ? escapeHtml(suffix) : suffix);
+	parts.push(escapeHtml(suffix));
 
 	return parts.join("");
 }
 
 function stripCmHighlightSpans(content: string): string {
-	return content.replace(
-		/<span\s+class="ccl-search-highlight">([\s\S]*?)<\/span>/gi,
-		"$1",
-	);
+	return content.replace(EXISTING_HIGHLIGHT_PATTERN, "$1");
 }
 
-function highlightTextSegmentsInHtmlByVisibleRange(
+function findHtmlTagEndExclusive(content: string, tagStart: number): number {
+	if (tagStart === -1) {
+		return -1;
+	}
+
+	const tagEnd = content.indexOf(">", tagStart + 1);
+	return tagEnd === -1 ? -1 : tagEnd + 1;
+}
+
+function highlightMatchesOutsideHtmlTags(
 	content: string,
 	searchPattern: RegExp,
 ): string {
-	const parts: string[] = [];
-	let cursor = 0;
-
-	while (cursor < content.length) {
-		const tagStart = content.indexOf("<", cursor);
-		if (tagStart === -1) {
-			parts.push(
-				wrapMatchesWithHighlight(
-					content.substring(cursor),
-					searchPattern,
-					false,
-				),
-			);
-			break;
-		}
-
-		const tagEnd = content.indexOf(">", tagStart + 1);
-		if (tagEnd === -1) {
-			parts.push(
-				wrapMatchesWithHighlight(
-					content.substring(cursor),
-					searchPattern,
-					false,
-				),
-			);
-			break;
-		}
-
-		if (tagStart > cursor) {
-			parts.push(
-				wrapMatchesWithHighlight(
-					content.substring(cursor, tagStart),
-					searchPattern,
-					false,
-				),
-			);
-		}
-
-		parts.push(content.substring(tagStart, tagEnd + 1));
-		cursor = tagEnd + 1;
-	}
-
-	return parts.join("");
-}
-
-function highlightTextSegmentsInHtml(content: string, searchPattern: RegExp): string {
-	// A literal "<" can cross an HTML boundary when matching against the
-	// original string. Keep that rare case scoped to each visible range.
-	if (searchPattern.source.includes("<")) {
-		return highlightTextSegmentsInHtmlByVisibleRange(content, searchPattern);
-	}
-
 	let parts: string[] | undefined;
-	let cursor = 0;
 	let copiedUntil = 0;
 	searchPattern.lastIndex = 0;
 	let match = searchPattern.exec(content);
@@ -114,48 +66,35 @@ function highlightTextSegmentsInHtml(content: string, searchPattern: RegExp): st
 		return content;
 	}
 
-	const appendHighlightedRange = (start: number, end: number): void => {
-		while (match && match.index < start) {
-			match = searchPattern.exec(content);
+	let tagStart = content.indexOf("<");
+	let tagEndExclusive = findHtmlTagEndExclusive(content, tagStart);
+
+	do {
+		const matchStart = match.index;
+		const matchText = match[0];
+		const matchEnd = matchStart + matchText.length;
+
+		while (tagEndExclusive !== -1 && tagEndExclusive <= matchStart) {
+			tagStart = content.indexOf("<", tagEndExclusive);
+			tagEndExclusive = findHtmlTagEndExclusive(content, tagStart);
 		}
 
-		while (match && match.index < end) {
-			const matchIndex = match.index;
-			const matchText = match[0];
-			const matchEnd = matchIndex + matchText.length;
+		const overlapsHtmlTag =
+			tagEndExclusive !== -1 &&
+			matchStart < tagEndExclusive &&
+			tagStart < matchEnd;
 
-			if (matchEnd <= end) {
-				parts ??= [];
-				parts.push(
-					content.substring(copiedUntil, matchIndex),
-					`<span class="ccl-search-highlight">${matchText}</span>`,
-				);
-				copiedUntil = matchEnd;
-			}
-
-			match = searchPattern.exec(content);
-		}
-	};
-
-	while (cursor < content.length) {
-		const tagStart = content.indexOf("<", cursor);
-		if (tagStart === -1) {
-			appendHighlightedRange(cursor, content.length);
-			break;
+		if (!overlapsHtmlTag) {
+			parts ??= [];
+			parts.push(
+				content.substring(copiedUntil, matchStart),
+				`${HIGHLIGHT_OPEN_TAG}${matchText}${HIGHLIGHT_CLOSE_TAG}`,
+			);
+			copiedUntil = matchEnd;
 		}
 
-		const tagEnd = content.indexOf(">", tagStart + 1);
-		if (tagEnd === -1) {
-			appendHighlightedRange(cursor, content.length);
-			break;
-		}
-
-		if (tagStart > cursor) {
-			appendHighlightedRange(cursor, tagStart);
-		}
-
-		cursor = tagEnd + 1;
-	}
+		match = searchPattern.exec(content);
+	} while (match);
 
 	if (!parts) {
 		return content;
@@ -167,7 +106,7 @@ function highlightTextSegmentsInHtml(content: string, searchPattern: RegExp): st
 
 export function highlightTextForSearch(text: string, searchQuery?: string): string {
 	const searchPattern = createCaseInsensitiveRegExp(searchQuery, true);
-	return wrapMatchesWithHighlight(text, searchPattern, true);
+	return highlightEscapedText(text, searchPattern);
 }
 
 export function highlightSearchMatchesInHtml(
@@ -182,5 +121,5 @@ export function highlightSearchMatchesInHtml(
 		return cleanedContent;
 	}
 
-	return highlightTextSegmentsInHtml(cleanedContent, searchPattern);
+	return highlightMatchesOutsideHtmlTags(cleanedContent, searchPattern);
 }

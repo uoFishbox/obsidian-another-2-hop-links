@@ -1,6 +1,7 @@
 import { describe, expect, test } from "vitest";
 import {
 	extractFirstEmbeddedMedia,
+	selectEmbeddedMediaScanContent,
 	stripCodeSegmentsForEmbedDetection,
 } from "../mediaExtractor";
 
@@ -64,6 +65,28 @@ describe("extractFirstEmbeddedMedia", () => {
 		);
 
 		expect(embed).toBeUndefined();
+	});
+
+	test("treats the scan budget as a strict embed boundary", async () => {
+		const content = "prefix ![[outside-budget.png]]";
+		const embed = await extractFirstEmbeddedMedia(content, {
+			maxScanChars: "prefix ![[out".length,
+		});
+
+		expect(embed).toBeUndefined();
+	});
+
+	test("rejects ordinary punctuation before starting the scanner", () => {
+		const content = "Important! " + "x".repeat(100_000);
+
+		expect(selectEmbeddedMediaScanContent(content, content.length)).toBeNull();
+	});
+
+	test("returns only the configured scan range", () => {
+		const prefix = "![[cover.png]]" + "x".repeat(100);
+		const content = prefix + "y".repeat(100);
+
+		expect(selectEmbeddedMediaScanContent(content, prefix.length)).toBe(prefix);
 	});
 
 	test("yields during long scans and observes abort", async () => {

@@ -61,12 +61,16 @@ function createVirtualResult({
 	id,
 	left,
 	top,
+	width,
+	height,
 }: {
 	id: string;
 	left: number;
 	top: number;
+	width?: number;
+	height?: number;
 }): HTMLElement {
-	const cell = createVirtualCell({ left, top });
+	const cell = createVirtualCell({ left, top, width, height });
 	const card = document.createElement("div");
 	card.className = "cosense-card-links__box";
 	card.dataset.cclInteractionId = id;
@@ -125,6 +129,51 @@ describe("moveFocusBetweenResults", () => {
 			inline: "nearest",
 		});
 	});
+
+	it.each([
+		{
+			name: "axis priority",
+			first: { left: 140, top: 100 },
+			second: { left: 300, top: 0 },
+			expected: "second",
+		},
+		{
+			name: "primary distance",
+			first: { left: 300, top: 0 },
+			second: { left: 140, top: 0 },
+			expected: "second",
+		},
+		{
+			name: "secondary distance",
+			first: { left: 160, top: 20 },
+			second: { left: 160, top: 0 },
+			expected: "second",
+		},
+		{
+			name: "fallback distance",
+			first: { left: 160, top: 48 },
+			second: { left: 160, top: -48 },
+			expected: "second",
+		},
+	])(
+		"uses $name as the next navigation score tie-break",
+		({ first, second, expected }) => {
+			const root = document.createElement("div");
+			root.className = "cosense-card-links__virtual-grid";
+			const currentCell = createVirtualResult({ id: "current", left: 0, top: 0 });
+			const firstCell = createVirtualResult({ id: "first", ...first });
+			const secondCell = createVirtualResult({ id: "second", ...second });
+			root.append(currentCell, firstCell, secondCell);
+			document.body.append(root);
+			const current = currentCell.querySelector<HTMLElement>(
+				'[data-ccl-interaction-id="current"]',
+			);
+
+			const result = moveFocusBetweenResults(root, current, "right");
+
+			expect(result?.dataset.cclInteractionId).toBe(expected);
+		},
+	);
 
 	it("resolves a focus target from a foreign-window keyboard event", () => {
 		const frame = document.createElement("iframe");

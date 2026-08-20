@@ -12,7 +12,7 @@ export interface YieldScheduler {
 	checkpoint(iteration: number, cadence: number): Promise<void> | undefined;
 }
 
-export type YieldStepGenerator = Generator<Promise<void>, void, void>;
+export type YieldStepGenerator<T = void> = Generator<Promise<void>, T, void>;
 
 export interface YieldToMainThreadOptions {
 	maxDelayMs?: number;
@@ -175,8 +175,12 @@ export function maybeYield(
 	return yieldScheduler.checkpoint(iteration, cadence);
 }
 
-export async function drainYieldSteps(steps: YieldStepGenerator): Promise<void> {
-	for (const pendingYield of steps) {
-		await pendingYield;
+/** Awaits every cooperative yield and returns the generator's final value. */
+export async function drainYieldSteps<T>(steps: YieldStepGenerator<T>): Promise<T> {
+	let step = steps.next();
+	while (!step.done) {
+		await step.value;
+		step = steps.next();
 	}
+	return step.value;
 }

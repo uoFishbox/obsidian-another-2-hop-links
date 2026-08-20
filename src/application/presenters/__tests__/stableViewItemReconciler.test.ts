@@ -160,4 +160,25 @@ describe("createStableViewItemReconciler", () => {
 		expect(second[1]).toBe(first[0]);
 		expect(second[2]).toBe(first[1]);
 	});
+
+	it("preserves duplicate bucket order after removing head, middle, and tail entries", () => {
+		const reconciler = createStableViewItemReconciler<RawItem>({
+			getKey: (item) => item.key,
+			toViewItem: (item) =>
+				({
+					type: "newLink",
+					data: { rawText: item.label, path: item.key },
+				}) as ViewItem,
+			canReuseSource: (previous, next) => previous.id === next.id,
+		});
+		const alpha = { id: "a", key: "duplicate", label: "Alpha" };
+		const beta = { id: "b", key: "duplicate", label: "Beta" };
+		const gamma = { id: "c", key: "duplicate", label: "Gamma" };
+		const delta = { id: "d", key: "duplicate", label: "Delta" };
+
+		const first = reconciler.reconcile([alpha, beta, gamma, delta]);
+		const second = reconciler.reconcile([beta, delta, alpha, gamma]);
+
+		expect(second).toEqual([first[1], first[3], first[0], first[2]]);
+	});
 });

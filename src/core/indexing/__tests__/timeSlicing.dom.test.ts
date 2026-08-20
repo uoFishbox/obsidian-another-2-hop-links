@@ -2,10 +2,38 @@ import { describe, expect, test, vi } from "vitest";
 import {
 	createYieldScheduler,
 	defaultYieldToMainThread,
+	drainYieldSteps,
 	maybeYield,
 	setYieldSchedulingWindowResolver,
 	yieldToMainThreadIdleAware,
 } from "../timeSlicing";
+
+describe("drainYieldSteps", () => {
+	test("returns a generator's final value when there are no yields", async () => {
+		function* steps(): Generator<Promise<void>, string, void> {
+			return "summary";
+		}
+
+		await expect(drainYieldSteps(steps())).resolves.toBe("summary");
+	});
+
+	test("awaits multiple yields in order and preserves the final value", async () => {
+		const events: string[] = [];
+		function* steps(): Generator<Promise<void>, number, void> {
+			yield Promise.resolve().then(() => {
+				events.push("first");
+			});
+			events.push("after-first");
+			yield Promise.resolve().then(() => {
+				events.push("second");
+			});
+			return 2;
+		}
+
+		await expect(drainYieldSteps(steps())).resolves.toBe(2);
+		expect(events).toEqual(["first", "after-first", "second"]);
+	});
+});
 
 describe("createYieldScheduler", () => {
 	test("requests yield only at cadence boundaries", async () => {

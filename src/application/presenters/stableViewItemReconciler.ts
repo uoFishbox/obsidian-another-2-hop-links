@@ -42,6 +42,13 @@ function canReuseEntrySource<T>(
 		: previousSource === nextSource;
 }
 
+function removeAtPreservingOrder<T>(items: T[], index: number): void {
+	for (let shiftIndex = index + 1; shiftIndex < items.length; shiftIndex += 1) {
+		items[shiftIndex - 1] = items[shiftIndex];
+	}
+	items.pop();
+}
+
 function takeReusableEntry<T>(
 	bucket: EntryBucket<T> | undefined,
 	item: T,
@@ -62,14 +69,7 @@ function takeReusableEntry<T>(
 				continue;
 			}
 
-			for (
-				let shiftIndex = index + 1;
-				shiftIndex < bucket.length;
-				shiftIndex += 1
-			) {
-				bucket[shiftIndex - 1] = bucket[shiftIndex];
-			}
-			bucket.pop();
+			removeAtPreservingOrder(bucket, index);
 			return { entry: candidate, consumed: bucket.length === 0 };
 		}
 
