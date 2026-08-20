@@ -104,7 +104,7 @@ vi.mock("ui/components/common/ListControls.svelte", async () => {
 	return { default: component.default };
 });
 
-vi.mock("ui/components/common/VirtualGridLinkList.svelte", async () => {
+vi.mock("features/card-grid/ui/FlatCardGrid.svelte", async () => {
 	const component = await import("./SearchableItemListLinkListStub.svelte");
 	return { default: component.default };
 });

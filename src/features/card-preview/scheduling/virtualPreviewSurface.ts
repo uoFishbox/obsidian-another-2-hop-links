@@ -10,7 +10,7 @@ import {
 	createPreviewSlotController,
 	type PreviewSlotController,
 } from "features/card-preview/ui/previewSlotController";
-import type { VirtualFrameCoordinator } from "ui/virtualization/scheduling/frameCoordinator";
+import type { VirtualFrameCoordinator } from "ui/shared/scheduling/frameCoordinator";
 
 export interface PreviewHostLease {
 	dispose(): void;

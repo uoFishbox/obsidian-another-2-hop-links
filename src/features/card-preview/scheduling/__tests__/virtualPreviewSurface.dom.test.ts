@@ -6,7 +6,7 @@ import type {
 } from "features/card-preview/ui/cardPreviewRenderer";
 import type { CardPreviewRequest } from "features/card-preview/core/cardPreviewRequest";
 import { createPreviewRenderSettings } from "features/card-preview/core/previewRenderSettings";
-import type { VirtualFrameCoordinator } from "ui/virtualization/scheduling/frameCoordinator";
+import type { VirtualFrameCoordinator } from "ui/shared/scheduling/frameCoordinator";
 import { createVirtualPreviewSurface } from "../virtualPreviewSurface";
 import { createPreviewActivationScheduler } from "../previewActivationScheduler";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";

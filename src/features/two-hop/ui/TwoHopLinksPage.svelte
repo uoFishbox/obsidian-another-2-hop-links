@@ -3,7 +3,7 @@
 	import { setContext } from "svelte";
 	import LoadingState from "ui/components/common/LoadingState.svelte";
 	import ListControls from "ui/components/common/ListControls.svelte";
-	import TwoHopVirtualSurface from "features/two-hop/ui/TwoHopVirtualSurface.svelte";
+	import TwoHopVirtualGrid from "features/two-hop/ui/TwoHopVirtualGrid.svelte";
 	import { useSearchQuery } from "ui/hooks/useSearchQuery.svelte";
 	import { useBookmarks } from "ui/hooks/useBookmarks.svelte";
 	import { useWorkerSearchSession } from "features/search/useWorkerSearchSession.svelte";
@@ -28,7 +28,7 @@
 	} from "ui/components/common/listPagination";
 	import type { TwoHopLinksRootUiState } from "features/two-hop/ui/twoHopLinksRootUiState";
 	import { observePreviewSurfaceVisibility } from "features/card-preview/scheduling/previewSurfaceVisibility";
-	import type { TwoHopPreviewDependencies } from "features/two-hop/ui/useTwoHopVirtualList.svelte";
+	import type { TwoHopPreviewDependencies } from "features/two-hop/runtime/virtual-grid/useTwoHopVirtualGrid.svelte";
 	import type { PreviewRuntime } from "features/card-preview/runtime/previewRuntime";
 	import {
 		buildTwoHopCardModel,
@@ -385,7 +385,7 @@
 		{#if loading}
 			<LoadingState message="Waiting for the initial index to finish building." />
 		{:else if linkResult}
-			<TwoHopVirtualSurface
+			<TwoHopVirtualGrid
 				sections={twoHopVirtualListSections}
 				{applicationStore}
 				{loadMoreSection}

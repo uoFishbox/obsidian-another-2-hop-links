@@ -1,5 +1,5 @@
 import { MarkdownView, Notice, type WorkspaceLeaf } from "obsidian";
-import { findNearestScrollContainer } from "ui/virtualization/dom/scrollContainer";
+import { findNearestScrollContainer } from "ui/shared/scroll/scrollContainer";
 import { TWO_HOP_LINKS_VIEW_TYPE } from "features/two-hop/ui/TwoHopLinksView";
 import { VIEW_TYPE_PRE_CREATE } from "features/pre-creation/ui/PreCreationView";
 import { VIEW_TYPE_TAG_NOTES } from "features/tag-notes/ui/TagNotesView";

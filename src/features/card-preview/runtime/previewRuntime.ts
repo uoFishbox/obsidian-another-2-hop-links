@@ -13,7 +13,7 @@ import {
 	createVirtualPreviewSurface,
 	type VirtualPreviewSurface,
 } from "features/card-preview/scheduling/virtualPreviewSurface";
-import type { VirtualFrameCoordinator } from "ui/virtualization/scheduling/frameCoordinator";
+import type { VirtualFrameCoordinator } from "ui/shared/scheduling/frameCoordinator";
 import {
 	createCardPreviewRenderer,
 	type CardPreviewLoader,

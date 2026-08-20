@@ -2,7 +2,7 @@
 	import { setContext } from "svelte";
 	import ViewItemCard from "ui/components/items/ViewItemCard.svelte";
 	import ListControls from "ui/components/common/ListControls.svelte";
-	import LinkList from "ui/components/common/VirtualGridLinkList.svelte";
+	import LinkList from "features/card-grid/ui/FlatCardGrid.svelte";
 	import LinkSectionHeader from "ui/components/common/LinkSectionHeader.svelte";
 	import { buildScopedSectionId } from "ui/components/common/listPagination";
 	import { useSearchQuery } from "ui/hooks/useSearchQuery.svelte";

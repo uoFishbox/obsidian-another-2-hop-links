@@ -1,6 +1,6 @@
 import { Notice } from "obsidian";
 import type { PluginHost } from "types/pluginHost";
-import { findNearestScrollContainerCached } from "ui/virtualization/dom/scrollContainer";
+import { findNearestScrollContainerCached } from "ui/shared/scroll/scrollContainer";
 import {
 	getCCLDevMeasurementSnapshot,
 	resetCCLDevMeasurements,

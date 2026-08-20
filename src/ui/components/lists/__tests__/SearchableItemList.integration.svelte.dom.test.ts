@@ -10,6 +10,7 @@ import type { LinkContext } from "ui/context/linkContext";
 import type { ApplicationStore } from "ui/stores/ApplicationStore.svelte";
 import type { ISortService } from "core/sorting";
 import { filterSearchWorkerDatasetWithMatchDetails } from "features/search/searchWorkerFilter";
+import { DEFAULT_SETTINGS } from "features/settings/model";
 
 vi.mock("ui/components/items/ViewItemCard.svelte", async () => {
 	const component = await import("./SearchableItemListItemStub.svelte");
@@ -264,7 +265,7 @@ describe("SearchableItemList integration", () => {
 			sortOption: "alphabetical",
 			initialVisibleCount: 10,
 			loadMoreIncrement: 10,
-			settings: {},
+			settings: DEFAULT_SETTINGS,
 			setSortOption: vi.fn(),
 			getDefaultSectionVisibleLimit: vi.fn(() => 10),
 			getSectionExpandedLimit: vi.fn((sectionId: string) =>
@@ -315,7 +316,7 @@ describe("SearchableItemList integration", () => {
 			sortOption: "alphabetical",
 			initialVisibleCount: 10,
 			loadMoreIncrement: 10,
-			settings: {},
+			settings: DEFAULT_SETTINGS,
 			setSortOption: vi.fn(),
 			getDefaultSectionVisibleLimit: vi.fn(() => 10),
 			getSectionExpandedLimit: vi.fn((sectionId: string) =>

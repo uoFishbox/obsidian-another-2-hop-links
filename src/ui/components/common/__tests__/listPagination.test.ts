@@ -5,7 +5,7 @@ import {
 	createCompactSectionId,
 	normalizeIncrement,
 } from "ui/components/common/listPagination";
-import { createSectionPaginationState } from "ui/virtualization/pagination";
+import { createSectionPaginationState } from "features/card-grid/pagination/sectionPagination";
 
 describe("listPagination", () => {
 	it("clamps the initial visible count to the available items", () => {

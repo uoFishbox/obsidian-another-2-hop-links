@@ -282,7 +282,7 @@ vi.mock("ui/context/linkContext", async () => {
 	};
 });
 
-vi.mock("ui/components/common/VirtualGridLinkList.svelte", async () => {
+vi.mock("features/card-grid/ui/FlatCardGrid.svelte", async () => {
 	const component = await import("./SearchableItemListLinkListStub.svelte");
 	return { default: component.default };
 });

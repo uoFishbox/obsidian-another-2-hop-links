@@ -3,12 +3,12 @@
 	import ClickableHeader from "ui/components/common/ClickableHeader.svelte";
 	import Icon from "ui/components/common/Icon.svelte";
 	import LinkItem from "ui/components/common/LinkItem.svelte";
-	import VirtualListLoadMoreButton from "ui/virtualization/components/VirtualListLoadMoreButton.svelte";
+	import CardGridLoadMoreButton from "ui/card-grid/CardGridLoadMoreButton.svelte";
 	import UnresolvedPreviewPlaceholder from "features/card-preview/ui/UnresolvedPreviewPlaceholder.svelte";
 	import { previewHost } from "features/card-preview/ui/previewHostAction";
 	import type { CardShellModel } from "ui/components/items/cardRenderModel";
 	import type { IconName } from "ui/shared/icons/iconRegistry";
-	import type { TwoHopVirtualCell } from "features/two-hop/ui/twoHopRowModel";
+	import type { TwoHopVirtualCell } from "features/two-hop/runtime/virtual-grid/rowModel";
 	import { resolveTwoHopSectionVariant } from "features/two-hop/ui/twoHopCellStaticState";
 	import { recordCCLDevMeasurement } from "infrastructure/debug/CCLDevMeasurements";
 	import { getDebugDisableCardDomPreview } from "../../../appConstants";
@@ -115,7 +115,7 @@
 		</div>
 	{/if}
 {:else if cell.kind === "load-more"}
-	<VirtualListLoadMoreButton onClick={() => onLoadMore(cell.section.id)} />
+	<CardGridLoadMoreButton onClick={() => onLoadMore(cell.section.id)} />
 {:else}
 	{@const model = cardModel}
 	<LinkItem

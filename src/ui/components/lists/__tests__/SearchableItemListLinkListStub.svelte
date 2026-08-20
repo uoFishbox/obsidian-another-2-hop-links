@@ -8,7 +8,7 @@
 				{
 					item: T;
 					index: number;
-					observerRoot: HTMLElement | null;
+					scrollContainerEl: HTMLElement | null;
 				},
 			]
 		>;
@@ -23,6 +23,6 @@
 	{@render item?.({
 		item: entry,
 		index,
-		observerRoot: null,
+		scrollContainerEl: null,
 	})}
 {/each}

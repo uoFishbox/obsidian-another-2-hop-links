@@ -14,9 +14,9 @@ import type {
 import type { DisplayData } from "features/two-hop/application/displayDataBuilder";
 import TwoHopLinksPage from "../TwoHopLinksPage.svelte";
 import {
-	getTwoHopVirtualSurfacePageStubProps,
-	resetTwoHopVirtualSurfacePageStubProps,
-} from "./twoHopVirtualSurfacePageStubCapture";
+	getTwoHopVirtualGridPageStubProps,
+	resetTwoHopVirtualGridPageStubProps,
+} from "./twoHopVirtualGridPageStubCapture";
 import {
 	installIntersectionObserverMock,
 	teardownIntersectionObserverMock,
@@ -103,8 +103,8 @@ vi.mock("ui/components/items/ViewItemCard.svelte", async () => {
 	return { default: component.default };
 });
 
-vi.mock("features/two-hop/ui/TwoHopVirtualSurface.svelte", async () => {
-	const component = await import("./TwoHopVirtualSurfacePageStub.svelte");
+vi.mock("features/two-hop/ui/TwoHopVirtualGrid.svelte", async () => {
+	const component = await import("./TwoHopVirtualGridPageStub.svelte");
 	return { default: component.default };
 });
 
@@ -331,7 +331,7 @@ async function flushAsyncUi(): Promise<void> {
 describe("TwoHopLinksPage descriptor plumbing", () => {
 	beforeEach(() => {
 		vi.useFakeTimers();
-		resetTwoHopVirtualSurfacePageStubProps();
+		resetTwoHopVirtualGridPageStubProps();
 		installIntersectionObserverMock();
 	});
 
@@ -394,7 +394,7 @@ describe("TwoHopLinksPage descriptor plumbing", () => {
 		await flushAsyncUi();
 
 		const surface = screen.getByTestId("two-hop-virtual-surface-stub");
-		const capturedProps = getTwoHopVirtualSurfacePageStubProps();
+		const capturedProps = getTwoHopVirtualGridPageStubProps();
 		expect(surface.dataset.hasPreviewDependencies).toBe("true");
 		expect(surface.dataset.hasPreviewRuntime).toBe("true");
 		expect(surface.dataset.hasSearchPositionResolver).toBe("true");
@@ -432,7 +432,7 @@ describe("TwoHopLinksPage descriptor plumbing", () => {
 
 		render(TwoHopLinksPage, { props: rootProps });
 		await flushAsyncUi();
-		getTwoHopVirtualSurfacePageStubProps()?.loadMoreSection?.("tags-alpha");
+		getTwoHopVirtualGridPageStubProps()?.loadMoreSection?.("tags-alpha");
 
 		expect(rootProps.applicationStore.setSectionExpandedLimit).toHaveBeenCalledWith(
 			expect.stringMatching(/^s:/),

@@ -3,8 +3,8 @@ import { DEFAULT_PREVIEW_DOM_COMMITS_PER_SECOND } from "appConstants";
 import {
 	isScrollActivityActive,
 	subscribeScrollActivity,
-} from "ui/virtualization/scheduling/scrollActivity";
-import type { VirtualFrameCoordinator } from "ui/virtualization/scheduling/frameCoordinator";
+} from "ui/shared/scroll/scrollActivity";
+import type { VirtualFrameCoordinator } from "ui/shared/scheduling/frameCoordinator";
 import {
 	createPreviewFrameDriver,
 	readPreviewSchedulingTime,

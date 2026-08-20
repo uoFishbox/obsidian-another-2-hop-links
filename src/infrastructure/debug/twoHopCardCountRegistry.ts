@@ -1,4 +1,4 @@
-import type { TwoHopLogicalCardCounts } from "features/two-hop/ui/twoHopRowModel";
+import type { TwoHopLogicalCardCounts } from "features/two-hop/runtime/virtual-grid/rowModel";
 
 const cardCountsByRoot = new WeakMap<HTMLElement, TwoHopLogicalCardCounts>();
 

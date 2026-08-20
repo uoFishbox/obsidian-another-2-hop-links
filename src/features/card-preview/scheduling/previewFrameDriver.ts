@@ -1,7 +1,7 @@
 import type {
 	VirtualFrameCoordinator,
 	VirtualFrameLane,
-} from "ui/virtualization/scheduling/frameCoordinator";
+} from "ui/shared/scheduling/frameCoordinator";
 
 const FALLBACK_FRAME_INTERVAL_MS = 1000 / 60;
 

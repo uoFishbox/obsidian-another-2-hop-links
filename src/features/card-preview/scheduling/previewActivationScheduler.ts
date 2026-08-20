@@ -6,12 +6,12 @@ import { recordCCLDevMeasurement } from "infrastructure/debug/CCLDevMeasurements
 import {
 	isScrollActivityActive,
 	subscribeScrollActivity,
-} from "ui/virtualization/scheduling/scrollActivity";
+} from "ui/shared/scroll/scrollActivity";
 import {
 	readVirtualScrollMeasurementEpoch,
 	shouldDeferPreviewActivationForVirtualScrollMeasurement,
-} from "ui/virtualization/scheduling/virtualScrollMeasurementFrame";
-import type { VirtualFrameCoordinator } from "ui/virtualization/scheduling/frameCoordinator";
+} from "ui/virtualization/public";
+import type { VirtualFrameCoordinator } from "ui/shared/scheduling/frameCoordinator";
 import {
 	createPreviewFrameDriver,
 	readPreviewSchedulingTime,
