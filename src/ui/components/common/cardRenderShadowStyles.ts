@@ -222,6 +222,21 @@ export const CARD_RENDER_SHADOW_CSS = String.raw`
 	background-color: var(--ccl-bg-box) !important;
 }
 
+.cosense-card-links__code-block,
+.cosense-card-links__inline-code {
+	font-family: var(--font-monospace);
+	color: var(--ccl-box-text-content);
+	text-align: left;
+	font-size: var(--code-size);
+	word-spacing: normal;
+	word-wrap: break-word;
+	padding: 2px;
+	background-color: var(--code-background);
+	white-space: var(--code-white-space);
+	border: var(--code-border-width) solid var(--code-border-color);
+	border-radius: 3px;
+}
+
 .cosense-card-links__connected-links-header[data-ccl-section-variant="new-links"] {
 	background-color: var(--ccl-single-backlink-unresolved) !important;
 }
