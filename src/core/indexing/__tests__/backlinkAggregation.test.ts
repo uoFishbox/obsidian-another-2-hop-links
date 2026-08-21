@@ -3,10 +3,13 @@ import {
 	createFileLocalAggregation,
 	createSourceSummaryFromAggregation,
 	createSourceSummaryFromAggregationChunked,
+	recordFileLocalReference,
 	type FileLocalAggregation,
 } from "../backlink-builder/backlinkAggregation";
 import type { SourceSummary } from "../types/IndexTypes";
 import type { YieldScheduler } from "../timeSlicing";
+import type { LinkCache } from "obsidian";
+import type { ResolvedLinkInfo } from "../link-resolution/linkResolution";
 
 const NO_YIELD_SCHEDULER: YieldScheduler = {
 	checkpoint: () => undefined,
@@ -35,45 +38,55 @@ describe("backlinkAggregation", () => {
 		);
 	});
 
-	test("copies non-empty unresolved lookup keys", () => {
-		const aggregation = createAggregationWithResolvedLookupKey("target.md");
-		aggregation.unresolvedLookupKeys.add("missing.md");
+	test("snapshots non-empty unresolved lookup keys into the summary", () => {
+		const aggregation = createFileLocalAggregation();
+		recordFileLocalReference(
+			aggregation,
+			createLinkCache("missing", 0),
+			createUnresolvedResolvedInfo("missing.md"),
+			0,
+			"missing",
+		);
 
 		const summary = createChunkedSummary(aggregation);
-		aggregation.unresolvedLookupKeys.add("later.md");
+		recordFileLocalReference(
+			aggregation,
+			createLinkCache("later", 1),
+			createUnresolvedResolvedInfo("later.md"),
+			1,
+			"later",
+		);
 
 		expect(summary?.unresolvedLookupKeys).toEqual(new Set(["missing.md"]));
-		expect(summary?.unresolvedLookupKeys).not.toBe(
-			aggregation.unresolvedLookupKeys,
-		);
 	});
 
-	test("transfers scratch map ownership into the source summary", () => {
+	test("splits fused lookup-key states into persistent summary maps", () => {
 		const aggregation = createAggregationWithResolvedLookupKey("target.md");
-		const representative = aggregation.firstRefByLookupKey.get("target.md")!;
+		const representative =
+			aggregation.lookupKeyStates.get("target.md")!.representative;
 		aggregation.destinationBuckets.set("target.md", {
 			count: 2,
 			hasResolved: true,
 			firstRef: representative,
 		});
-		aggregation.lookupKeyToRawLinkPaths.set("target.md", "target.md");
 
 		const destinationBuckets = aggregation.destinationBuckets;
-		const firstRefByLookupKey = aggregation.firstRefByLookupKey;
-		const lookupKeyToRawLinkPaths = aggregation.lookupKeyToRawLinkPaths;
 
 		const summary = createChunkedSummary(aggregation);
 
 		expect(summary).toBeDefined();
-		// The scratch maps themselves become the persistent summary maps.
+		// The destination scratch map itself becomes the persistent summary map.
 		expect(summary?.destinations).toBe(destinationBuckets);
-		expect(summary?.firstRefIndexByLookupKey).toBe(firstRefByLookupKey);
-		expect(summary?.lookupKeyToRawLinkPaths).toBe(lookupKeyToRawLinkPaths);
-		// The scratch slots are replaced with empty maps for the next file.
+		// Fused per-lookup-key records are split into fresh maps in one pass.
+		expect(summary?.firstRefIndexByLookupKey).toEqual(new Map([["target.md", 0]]));
+		expect(summary?.lookupKeyToRawLinkPaths).toEqual(
+			new Map([["target.md", "target.md"]]),
+		);
+		// The scratch slots are emptied for the next file.
 		expect(aggregation.destinationBuckets.size).toBe(0);
-		expect(aggregation.firstRefByLookupKey.size).toBe(0);
-		expect(aggregation.lookupKeyToRawLinkPaths.size).toBe(0);
+		expect(aggregation.lookupKeyStates.size).toBe(0);
 
+		// The shared representative is deduplicated into one ordered entry.
 		expect(summary?.destinations.get("target.md")).toEqual({
 			count: 2,
 			hasResolved: true,
@@ -81,6 +94,7 @@ describe("backlinkAggregation", () => {
 		});
 		expect(summary?.firstRefIndexByLookupKey.get("target.md")).toBe(0);
 		expect(summary?.lookupKeyToRawLinkPaths.get("target.md")).toBe("target.md");
+		expect(summary?.orderedReferences).toHaveLength(1);
 	});
 });
 
@@ -88,16 +102,42 @@ function createAggregationWithResolvedLookupKey(
 	lookupKey: string,
 ): FileLocalAggregation {
 	const aggregation = createFileLocalAggregation();
-	aggregation.firstRefByLookupKey.set(lookupKey, {
-		ref: {
-			destinationPath: lookupKey,
-			rawLookupKey: lookupKey,
-			isUnresolved: false,
-			rawText: `[[${lookupKey}]]`,
+	aggregation.lookupKeyStates.set(lookupKey, {
+		representative: {
+			ref: {
+				destinationPath: lookupKey,
+				rawLookupKey: lookupKey,
+				isUnresolved: false,
+				rawText: `[[${lookupKey}]]`,
+			},
+			offset: 0,
 		},
-		offset: 0,
+		rawLinkPaths: lookupKey,
+		isUnresolved: false,
 	});
 	return aggregation;
+}
+
+function createLinkCache(linkText: string, offset: number): LinkCache {
+	return {
+		link: linkText,
+		original: `[[${linkText}]]`,
+		displayText: linkText,
+		position: {
+			start: { line: 0, col: 0, offset },
+			end: { line: 0, col: 0, offset },
+		},
+	};
+}
+
+function createUnresolvedResolvedInfo(lookupKey: string): ResolvedLinkInfo {
+	return {
+		destinationPath: lookupKey,
+		rawLookupKey: lookupKey,
+		isUnresolved: true,
+		isAmbiguous: false,
+		isSourceDependent: false,
+	};
 }
 
 function createChunkedSummary(

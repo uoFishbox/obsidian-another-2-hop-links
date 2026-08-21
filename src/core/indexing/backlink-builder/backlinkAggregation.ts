@@ -23,11 +23,15 @@ export interface RepresentativeRef {
 
 export type RawLinkPathAccumulator = string | Set<string>;
 
+export interface FileLocalLookupKeyState {
+	representative: RepresentativeRef;
+	rawLinkPaths: RawLinkPathAccumulator;
+	isUnresolved: boolean;
+}
+
 export interface FileLocalAggregation {
 	destinationBuckets: Map<string, FileLocalDestinationAggregate>;
-	firstRefByLookupKey: Map<string, RepresentativeRef>;
-	lookupKeyToRawLinkPaths: Map<string, RawLinkPathAccumulator>;
-	unresolvedLookupKeys: Set<string>;
+	lookupKeyStates: Map<string, FileLocalLookupKeyState>;
 	hasSourceDependentLinks: boolean;
 }
 
@@ -41,39 +45,29 @@ const EMPTY_UNRESOLVED_LOOKUP_KEYS: ReadonlySet<string> = new Set<string>();
 export function createFileLocalAggregation(): FileLocalAggregation {
 	return {
 		destinationBuckets: new Map(),
-		firstRefByLookupKey: new Map(),
-		lookupKeyToRawLinkPaths: new Map(),
-		unresolvedLookupKeys: new Set(),
+		lookupKeyStates: new Map(),
 		hasSourceDependentLinks: false,
 	};
 }
 
 export function resetFileLocalAggregation(scratch: FileLocalAggregation): void {
 	scratch.destinationBuckets.clear();
-	scratch.firstRefByLookupKey.clear();
-	scratch.lookupKeyToRawLinkPaths.clear();
-	scratch.unresolvedLookupKeys.clear();
+	scratch.lookupKeyStates.clear();
 	scratch.hasSourceDependentLinks = false;
 }
 
-function recordLookupKeyRawLinkPath(
-	lookupKeyToRawLinkPaths: Map<string, RawLinkPathAccumulator>,
-	lookupKey: string,
+function accumulateRawLinkPath(
+	lookupState: FileLocalLookupKeyState,
 	rawLinkPath: string,
 ): void {
-	const existing = lookupKeyToRawLinkPaths.get(lookupKey);
-	if (existing === undefined) {
-		lookupKeyToRawLinkPaths.set(lookupKey, rawLinkPath);
-		return;
-	}
-
+	const existing = lookupState.rawLinkPaths;
 	if (typeof existing === "string") {
 		if (existing === rawLinkPath) return;
 
 		const paths = new Set<string>();
 		paths.add(existing);
 		paths.add(rawLinkPath);
-		lookupKeyToRawLinkPaths.set(lookupKey, paths);
+		lookupState.rawLinkPaths = paths;
 		return;
 	}
 
@@ -90,26 +84,28 @@ export function recordFileLocalReference(
 	let representativeRef: OrderedBacklinkRef | undefined;
 	let sharedRep: RepresentativeRef | undefined;
 
-	const existing = state.firstRefByLookupKey.get(resolved.rawLookupKey);
-	if (!existing || offset < existing.offset) {
+	const rawLookupKey = resolved.rawLookupKey;
+	const lookupState = state.lookupKeyStates.get(rawLookupKey);
+	if (!lookupState) {
 		representativeRef = createOrderedBacklinkRef(linkReference, resolved);
-		if (existing) {
-			existing.ref = representativeRef;
-			existing.offset = offset;
-		} else {
-			sharedRep = { ref: representativeRef, offset };
-			state.firstRefByLookupKey.set(resolved.rawLookupKey, sharedRep);
+		sharedRep = { ref: representativeRef, offset };
+		state.lookupKeyStates.set(rawLookupKey, {
+			representative: sharedRep,
+			rawLinkPaths: rawLinkPath,
+			isUnresolved: resolved.isUnresolved,
+		});
+	} else {
+		if (offset < lookupState.representative.offset) {
+			representativeRef = createOrderedBacklinkRef(linkReference, resolved);
+			lookupState.representative.ref = representativeRef;
+			lookupState.representative.offset = offset;
+		}
+		accumulateRawLinkPath(lookupState, rawLinkPath);
+		if (resolved.isUnresolved) {
+			lookupState.isUnresolved = true;
 		}
 	}
-	recordLookupKeyRawLinkPath(
-		state.lookupKeyToRawLinkPaths,
-		resolved.rawLookupKey,
-		rawLinkPath,
-	);
 	state.hasSourceDependentLinks ||= resolved.isSourceDependent;
-	if (resolved.isUnresolved) {
-		state.unresolvedLookupKeys.add(resolved.rawLookupKey);
-	}
 
 	const destination = state.destinationBuckets.get(resolved.destinationPath);
 	if (!destination) {
@@ -163,8 +159,7 @@ export function createSourceSummaryFromAggregation(
 ): SourceSummary | undefined {
 	if (
 		localAggregation.destinationBuckets.size === 0 &&
-		localAggregation.firstRefByLookupKey.size === 0 &&
-		localAggregation.unresolvedLookupKeys.size === 0
+		localAggregation.lookupKeyStates.size === 0
 	) {
 		return undefined;
 	}
@@ -187,34 +182,52 @@ export function createSourceSummaryFromAggregation(
 			firstRefIndex: addRepresentativeRef(orderedReferences, aggregate.firstRef),
 		});
 	}
-	const representatives = localAggregation.firstRefByLookupKey;
-	localAggregation.firstRefByLookupKey = new Map();
-	const firstRefIndexByLookupKey = representatives as unknown as Map<string, number>;
-	for (const [lookupKey, representative] of representatives) {
-		firstRefIndexByLookupKey.set(
-			lookupKey,
-			addRepresentativeRef(orderedReferences, representative),
-		);
-	}
-	const rawLinkPathAccumulators = localAggregation.lookupKeyToRawLinkPaths;
-	localAggregation.lookupKeyToRawLinkPaths = new Map();
-	const lookupKeyToRawLinkPaths = rawLinkPathAccumulators as unknown as Map<
-		string,
-		string | string[]
-	>;
-	for (const [lookupKey, rawLinkPaths] of rawLinkPathAccumulators) {
-		if (typeof rawLinkPaths !== "string") {
-			lookupKeyToRawLinkPaths.set(lookupKey, Array.from(rawLinkPaths));
-		}
-	}
+
+	const lookupKeyStates = localAggregation.lookupKeyStates;
+	localAggregation.lookupKeyStates = new Map();
+	const split = splitLookupKeyStates(lookupKeyStates, orderedReferences);
 
 	return {
 		destinations,
 		orderedReferences,
+		firstRefIndexByLookupKey: split.firstRefIndexByLookupKey,
+		lookupKeyToRawLinkPaths: split.lookupKeyToRawLinkPaths,
+		unresolvedLookupKeys: split.unresolvedLookupKeys,
+		hasSourceDependentLinks: localAggregation.hasSourceDependentLinks,
+	};
+}
+
+function splitLookupKeyStates(
+	lookupKeyStates: Map<string, FileLocalLookupKeyState>,
+	orderedReferences: OrderedBacklinkRef[],
+): {
+	firstRefIndexByLookupKey: Map<string, number>;
+	lookupKeyToRawLinkPaths: Map<string, string | string[]>;
+	unresolvedLookupKeys: ReadonlySet<string>;
+} {
+	const firstRefIndexByLookupKey = new Map<string, number>();
+	const lookupKeyToRawLinkPaths = new Map<string, string | string[]>();
+	let unresolvedLookupKeys: Set<string> | undefined;
+
+	for (const [lookupKey, lookupState] of lookupKeyStates) {
+		firstRefIndexByLookupKey.set(
+			lookupKey,
+			addRepresentativeRef(orderedReferences, lookupState.representative),
+		);
+		const rawLinkPaths = lookupState.rawLinkPaths;
+		lookupKeyToRawLinkPaths.set(
+			lookupKey,
+			typeof rawLinkPaths === "string" ? rawLinkPaths : Array.from(rawLinkPaths),
+		);
+		if (lookupState.isUnresolved) {
+			(unresolvedLookupKeys ??= new Set<string>()).add(lookupKey);
+		}
+	}
+
+	return {
 		firstRefIndexByLookupKey,
 		lookupKeyToRawLinkPaths,
-		unresolvedLookupKeys: takeUnresolvedLookupKeys(localAggregation),
-		hasSourceDependentLinks: localAggregation.hasSourceDependentLinks,
+		unresolvedLookupKeys: unresolvedLookupKeys ?? EMPTY_UNRESOLVED_LOOKUP_KEYS,
 	};
 }
 
@@ -225,8 +238,7 @@ export function* createSourceSummaryFromAggregationChunked(
 ): Generator<Promise<void>, SourceSummary | undefined, void> {
 	if (
 		localAggregation.destinationBuckets.size === 0 &&
-		localAggregation.firstRefByLookupKey.size === 0 &&
-		localAggregation.unresolvedLookupKeys.size === 0
+		localAggregation.lookupKeyStates.size === 0
 	) {
 		return undefined;
 	}
@@ -261,34 +273,26 @@ export function* createSourceSummaryFromAggregationChunked(
 		}
 	}
 
-	const representatives = localAggregation.firstRefByLookupKey;
-	localAggregation.firstRefByLookupKey = new Map();
-	const firstRefIndexByLookupKey = representatives as unknown as Map<string, number>;
-	for (const [lookupKey, representative] of representatives) {
+	// The fused per-lookup-key records cannot be handed to two output maps,
+	// so split them into fresh maps in a single yielding pass.
+	const lookupKeyStates = localAggregation.lookupKeyStates;
+	localAggregation.lookupKeyStates = new Map();
+	const firstRefIndexByLookupKey = new Map<string, number>();
+	const lookupKeyToRawLinkPaths = new Map<string, string | string[]>();
+	let unresolvedLookupKeys: Set<string> | undefined;
+
+	for (const [lookupKey, lookupState] of lookupKeyStates) {
 		firstRefIndexByLookupKey.set(
 			lookupKey,
-			addRepresentativeRef(orderedReferences, representative),
+			addRepresentativeRef(orderedReferences, lookupState.representative),
 		);
-
-		operationCount++;
-		const pendingYield = yieldScheduler.checkpoint(
-			operationCount,
-			HEAVY_YIELD_CHECK_INTERVAL,
+		const rawLinkPaths = lookupState.rawLinkPaths;
+		lookupKeyToRawLinkPaths.set(
+			lookupKey,
+			typeof rawLinkPaths === "string" ? rawLinkPaths : Array.from(rawLinkPaths),
 		);
-		if (pendingYield) {
-			yield pendingYield;
-		}
-	}
-
-	const rawLinkPathAccumulators = localAggregation.lookupKeyToRawLinkPaths;
-	localAggregation.lookupKeyToRawLinkPaths = new Map();
-	const lookupKeyToRawLinkPaths = rawLinkPathAccumulators as unknown as Map<
-		string,
-		string | string[]
-	>;
-	for (const [lookupKey, rawLinkPaths] of rawLinkPathAccumulators) {
-		if (typeof rawLinkPaths !== "string") {
-			lookupKeyToRawLinkPaths.set(lookupKey, Array.from(rawLinkPaths));
+		if (lookupState.isUnresolved) {
+			(unresolvedLookupKeys ??= new Set<string>()).add(lookupKey);
 		}
 
 		operationCount++;
@@ -306,19 +310,7 @@ export function* createSourceSummaryFromAggregationChunked(
 		orderedReferences,
 		firstRefIndexByLookupKey,
 		lookupKeyToRawLinkPaths,
-		unresolvedLookupKeys: takeUnresolvedLookupKeys(localAggregation),
+		unresolvedLookupKeys: unresolvedLookupKeys ?? EMPTY_UNRESOLVED_LOOKUP_KEYS,
 		hasSourceDependentLinks: localAggregation.hasSourceDependentLinks,
 	};
-}
-
-function takeUnresolvedLookupKeys(
-	localAggregation: FileLocalAggregation,
-): ReadonlySet<string> {
-	if (localAggregation.unresolvedLookupKeys.size === 0) {
-		return EMPTY_UNRESOLVED_LOOKUP_KEYS;
-	}
-
-	const snapshot = localAggregation.unresolvedLookupKeys;
-	localAggregation.unresolvedLookupKeys = new Set<string>();
-	return snapshot;
 }
