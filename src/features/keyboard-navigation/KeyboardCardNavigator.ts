@@ -3,6 +3,7 @@ import { findNearestScrollContainer } from "ui/shared/scroll/scrollContainer";
 import { TWO_HOP_LINKS_VIEW_TYPE } from "features/two-hop/ui/TwoHopLinksView";
 import { VIEW_TYPE_PRE_CREATE } from "features/pre-creation/ui/PreCreationView";
 import { VIEW_TYPE_TAG_NOTES } from "features/tag-notes/ui/TagNotesView";
+import { VIEW_TYPE_ALL_NOTES } from "features/all-notes/ui/AllNotesView";
 import { CARD_SELECTOR, LOAD_MORE_SELECTOR } from "./resultFocus";
 import { querySelectorAllIncludingShadow } from "ui/shared/dom/shadowDom";
 import { isElementVisible } from "ui/shared/dom/domUtils";
@@ -225,6 +226,7 @@ export class KeyboardCardNavigator {
 			const viewType = view?.getViewType?.();
 			if (
 				viewType !== "empty" &&
+				viewType !== VIEW_TYPE_ALL_NOTES &&
 				viewType !== VIEW_TYPE_PRE_CREATE &&
 				viewType !== VIEW_TYPE_TAG_NOTES
 			) {
@@ -238,7 +240,10 @@ export class KeyboardCardNavigator {
 				return;
 			}
 
-			const host: CardSurfaceHost = viewType === "empty" ? "empty" : "inline";
+			const host: CardSurfaceHost =
+				viewType === "empty" || viewType === VIEW_TYPE_ALL_NOTES
+					? "empty"
+					: "inline";
 			const emptySurface = this.findVisibleSurfaceRoot(container, host);
 			if (emptySurface) {
 				candidates.push({

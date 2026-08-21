@@ -88,13 +88,17 @@ export function setupWorkspaceEventHandlers(
 
 	plugin.registerEvent(
 		deps.workspace.on("layout-change", () => {
-			deps.emptyViewController.sync();
 			deps.propertyWidgetStyler.pruneDisconnected();
 			schedulePostPaintViewWork();
 		}),
 	);
 
-	plugin.registerEvent(deps.workspace.on("active-leaf-change", scheduleLayoutChange));
+	plugin.registerEvent(
+		deps.workspace.on("active-leaf-change", () => {
+			deps.emptyViewController.sync();
+			scheduleLayoutChange();
+		}),
+	);
 
 	plugin.registerEvent(deps.workspace.on("file-open", scheduleLayoutChange));
 

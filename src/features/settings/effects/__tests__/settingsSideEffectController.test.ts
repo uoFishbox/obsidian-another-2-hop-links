@@ -73,7 +73,7 @@ describe("SettingsSideEffectController", () => {
 
 		apply("cardWidthPx");
 
-		expect(mocks.getLeavesOfType).toHaveBeenCalledTimes(3);
+		expect(mocks.getLeavesOfType).toHaveBeenCalledTimes(4);
 		expect(mocks.refreshEmptyView).toHaveBeenCalledOnce();
 	});
 

@@ -10,6 +10,7 @@ import type { ViewUpdateOrchestrator } from "infrastructure/lifecycle/viewUpdate
  * Each view exposes `refreshFromSettings()` to re-render with new settings.
  */
 const LAYOUT_REFRESHABLE_VIEW_TYPES: ReadonlyArray<string> = [
+	"cosense-card-links-all-notes-view",
 	"cosense-card-links-view",
 	"cosense-card-links-tag-notes-view",
 	"cosense-card-links-pre-create-view",

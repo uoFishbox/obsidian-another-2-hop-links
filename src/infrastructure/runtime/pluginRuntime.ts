@@ -239,11 +239,7 @@ export function createPluginRuntime(options: PluginRuntimeOptions): PluginRuntim
 		propertyStyleManager: propertyWidgetStyler,
 	});
 	const scrollManager = new ScrollManager();
-	const emptyViewController = createEmptyViewController(
-		options.app,
-		options.plugin,
-		viewServices,
-	);
+	const emptyViewController = createEmptyViewController(options.app, options.plugin);
 	const keyboardCardNavigator = new KeyboardCardNavigator(options.app);
 
 	const unsubscribeIndexDataUpdate = indexingService.onDataUpdate((context) => {
