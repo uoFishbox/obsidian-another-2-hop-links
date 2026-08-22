@@ -3,6 +3,14 @@ export const HEAVY_YIELD_CHECK_INTERVAL = 128;
 const DEFAULT_MAX_YIELD_DELAY_MS = 16;
 const RESPONSIVE_YIELD_INTERVAL_MS = 8;
 const RESPONSIVE_MODE_DURATION_MS = 500;
+const INPUT_PENDING_OPTIONS: Readonly<{
+	includeContinuous: boolean;
+}> = {
+	includeContinuous: true,
+};
+const DEFAULT_IDLE_REQUEST_OPTIONS: IdleRequestOptions = {
+	timeout: DEFAULT_MAX_YIELD_DELAY_MS,
+};
 
 interface BrowserScheduling {
 	isInputPending?: (options?: { includeContinuous?: boolean }) => boolean;
@@ -58,10 +66,16 @@ export function hasPendingBrowserInput(): boolean {
 			scheduling?: BrowserScheduling;
 		}
 	).scheduling;
-	return scheduling?.isInputPending?.({ includeContinuous: true }) ?? false;
+	return scheduling?.isInputPending?.(INPUT_PENDING_OPTIONS) ?? false;
 }
 
-const idleRequestOptions: IdleRequestOptions = { timeout: 0 };
+function getIdleRequestOptions(maxDelayMs: number): IdleRequestOptions {
+	if (maxDelayMs === DEFAULT_MAX_YIELD_DELAY_MS) {
+		return DEFAULT_IDLE_REQUEST_OPTIONS;
+	}
+
+	return { timeout: maxDelayMs };
+}
 
 function schedulePause(resolve: () => void, maxDelayMs: number): void {
 	const ownerWindow = resolveSchedulingWindow();
@@ -83,7 +97,6 @@ function schedulePause(resolve: () => void, maxDelayMs: number): void {
 			resolve();
 		}, maxDelayMs);
 
-		idleRequestOptions.timeout = maxDelayMs;
 		idleId = ownerWindow.requestIdleCallback(() => {
 			if (finished) {
 				return;
@@ -91,7 +104,7 @@ function schedulePause(resolve: () => void, maxDelayMs: number): void {
 			finished = true;
 			ownerWindow.clearTimeout(timeoutId);
 			resolve();
-		}, idleRequestOptions);
+		}, getIdleRequestOptions(maxDelayMs));
 		return;
 	}
 
@@ -139,6 +152,9 @@ export function createYieldScheduler(
 ): YieldScheduler {
 	let lastYieldTime = performance.now();
 	let responsiveUntil = 0;
+	const handleYieldComplete = (): void => {
+		lastYieldTime = performance.now();
+	};
 
 	return {
 		checkpoint(iteration: number, cadence: number) {
@@ -160,9 +176,7 @@ export function createYieldScheduler(
 				return undefined;
 			}
 
-			return yieldFn().then(() => {
-				lastYieldTime = performance.now();
-			});
+			return yieldFn().then(handleYieldComplete);
 		},
 	};
 }
