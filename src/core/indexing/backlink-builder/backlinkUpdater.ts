@@ -89,11 +89,11 @@ function getRepresentativeRefByLookupKey(
 	summary: SourceSummary,
 	lookupKey: string,
 ): OrderedBacklinkRef | undefined {
-	const firstRefIndex = summary.firstRefIndexByLookupKey.get(lookupKey);
-	if (firstRefIndex === undefined) {
+	const lookupEntry = summary.lookupEntries.get(lookupKey);
+	if (!lookupEntry) {
 		return undefined;
 	}
-	return summary.orderedReferences[firstRefIndex];
+	return summary.orderedReferences[lookupEntry.firstRefIndex];
 }
 
 function areOrderedBacklinkRefsEqual(
@@ -146,8 +146,8 @@ async function visitRepresentativeChangedLookupKeysAsync(
 
 	let changed = false;
 	let lookupKeyCount = 0;
-	for (const lookupKey of previousSummary.firstRefIndexByLookupKey.keys()) {
-		if (!nextSummary.firstRefIndexByLookupKey.has(lookupKey)) {
+	for (const lookupKey of previousSummary.lookupEntries.keys()) {
+		if (!nextSummary.lookupEntries.has(lookupKey)) {
 			continue;
 		}
 
@@ -265,18 +265,13 @@ export function createBacklinkUpdater(
 		}
 		const before = sourceMap.get(sourcePath);
 		const hadResolved = before ? hasResolvedBacklink(before) : false;
-		let after: BacklinkBucket;
-		if (before) {
-			before.count += destinationSummary.count;
-			before.hasResolved ||= destinationSummary.hasResolved;
-			after = before;
-		} else {
-			after = {
-				count: destinationSummary.count,
-				hasResolved: destinationSummary.hasResolved,
-			};
-			sourceMap.set(sourcePath, after);
-		}
+		const after: BacklinkBucket = before
+			? {
+					count: before.count + destinationSummary.count,
+					hasResolved: before.hasResolved || destinationSummary.hasResolved,
+				}
+			: destinationSummary;
+		sourceMap.set(sourcePath, after);
 		onMutation?.(
 			destinationPath,
 			toCaseInsensitiveLookupKey(destinationPath),

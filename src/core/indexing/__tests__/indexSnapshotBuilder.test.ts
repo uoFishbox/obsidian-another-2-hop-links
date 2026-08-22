@@ -50,11 +50,7 @@ describe("index snapshot builders", () => {
 			"target.md",
 		]);
 		expect(
-			new Set(
-				snapshot.sourceSummaries
-					.get("origin.md")
-					?.firstRefIndexByLookupKey.keys(),
-			),
+			new Set(snapshot.sourceSummaries.get("origin.md")?.lookupEntries.keys()),
 		).toEqual(new Set(["target.md"]));
 	});
 
@@ -76,11 +72,14 @@ describe("index snapshot builders", () => {
 		);
 
 		expect(
-			syncSnapshot.sourceSummaries.get("origin.md")?.unresolvedLookupKeys,
-		).toEqual(new Set(["missing.md"]));
+			syncSnapshot.sourceSummaries
+				.get("origin.md")
+				?.lookupEntries.get("missing.md")?.isUnresolved,
+		).toBe(true);
 		expect(
-			syncSnapshot.sourceSummaries.get("peer.md")?.unresolvedLookupKeys,
-		).toEqual(new Set(["missing.md"]));
+			syncSnapshot.sourceSummaries.get("peer.md")?.lookupEntries.get("missing.md")
+				?.isUnresolved,
+		).toBe(true);
 		expect(syncSnapshot.linkLookupToSources.get("missing.md")).toEqual(
 			new Set(["origin.md", "peer.md"]),
 		);

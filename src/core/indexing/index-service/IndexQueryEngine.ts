@@ -7,6 +7,11 @@ import type {
 	IndexedLinkQueryResult,
 	TwoHopIndexedLink,
 } from "types/domain";
+import {
+	compactStringSetFirst,
+	compactStringSetSize,
+	compactStringSetValues,
+} from "shared/collections/compactStringSet";
 import type { IVault } from "types/obsidian";
 import { enableLogging, logger } from "shared/logging/logger";
 import type { IndexSnapshot } from "../types/IndexTypes";
@@ -359,12 +364,12 @@ export class IndexQueryEngine {
 			return undefined;
 		}
 
-		const firstRefIndex = summary.firstRefIndexByLookupKey.get(lookupKey);
-		if (firstRefIndex === undefined) {
+		const lookupEntry = summary.lookupEntries.get(lookupKey);
+		if (!lookupEntry) {
 			return undefined;
 		}
 
-		const ref = summary.orderedReferences[firstRefIndex];
+		const ref = summary.orderedReferences[lookupEntry.firstRefIndex];
 		if (!ref) {
 			return undefined;
 		}
@@ -430,14 +435,14 @@ export class IndexQueryEngine {
 		}
 
 		const lookupPaths = snapshot.lookupKeyToLookupPaths.get(lookupKey);
-		if (!lookupPaths || lookupPaths.size === 0) {
+		if (!lookupPaths) {
 			return undefined;
 		}
 		// Single lookup path: no merge needed — share the existing sourceMap
 		// directly. Callers only read buckets (count, hasResolved) and never
 		// mutate them, so sharing the snapshot reference is safe.
-		if (lookupPaths.size === 1) {
-			const lookupPath = lookupPaths.values().next().value!;
+		if (compactStringSetSize(lookupPaths) === 1) {
+			const lookupPath = compactStringSetFirst(lookupPaths)!;
 			const sourceMap = snapshot.backlinksMap.get(lookupPath);
 			if (!sourceMap || sourceMap.size === 0) {
 				return undefined;
@@ -448,7 +453,7 @@ export class IndexQueryEngine {
 
 		const mergedSourceMap: BacklinkSourceMap = new Map();
 		const sharedKeys = new Set<string>();
-		for (const lookupPath of lookupPaths) {
+		for (const lookupPath of compactStringSetValues(lookupPaths)) {
 			const sourceMap = snapshot.backlinksMap.get(lookupPath);
 			if (!sourceMap || sourceMap.size === 0) {
 				continue;

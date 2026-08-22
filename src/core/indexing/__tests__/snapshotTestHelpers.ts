@@ -17,7 +17,7 @@ export function serializeSnapshot(snapshot: IndexSnapshot) {
 		backlinksMap: serializeNestedBacklinkMap(snapshot.backlinksMap),
 		sourceSummaries: serializeSourceSummaryMap(snapshot.sourceSummaries),
 		linkLookupToSources: serializeSetMap(snapshot.linkLookupToSources),
-		lookupKeyToLookupPaths: serializeSetMap(snapshot.lookupKeyToLookupPaths),
+		lookupKeyToLookupPaths: serializeCompactSetMap(snapshot.lookupKeyToLookupPaths),
 		lookupPathResolvedSourceCount: serializeNumberMap(
 			snapshot.lookupPathResolvedSourceCount,
 		),
@@ -51,28 +51,31 @@ function serializeSourceSummaryMap(map: IndexSnapshot["sourceSummaries"]) {
 							rawText: ref.rawText,
 						})),
 						firstRefIndexByLookupKey: Array.from(
-							summary.firstRefIndexByLookupKey.entries(),
+							summary.lookupEntries.entries(),
+							([lookupKey, entry]) =>
+								[lookupKey, entry.firstRefIndex] as const,
 						).sort(([left], [right]) => left.localeCompare(right)),
-						lookupKeys: Array.from(
-							summary.firstRefIndexByLookupKey.keys(),
-						).sort(),
+						lookupKeys: Array.from(summary.lookupEntries.keys()).sort(),
 						lookupKeyToRawLinkPaths: Array.from(
-							summary.lookupKeyToRawLinkPaths.entries(),
+							summary.lookupEntries.entries(),
 						)
 							.map(
-								([lookupKey, rawLinkPaths]) =>
+								([lookupKey, entry]) =>
 									[
 										lookupKey,
-										(typeof rawLinkPaths === "string"
-											? [rawLinkPaths]
-											: rawLinkPaths.slice()
+										(typeof entry.rawLinkPaths === "string"
+											? [entry.rawLinkPaths]
+											: entry.rawLinkPaths.slice()
 										).sort(),
 									] as const,
 							)
 							.sort(([left], [right]) => left.localeCompare(right)),
 						unresolvedLookupKeys: Array.from(
-							summary.unresolvedLookupKeys,
-						).sort(),
+							summary.lookupEntries.entries(),
+						)
+							.filter(([, entry]) => entry.isUnresolved)
+							.map(([lookupKey]) => lookupKey)
+							.sort(),
 						hasSourceDependentLinks: summary.hasSourceDependentLinks,
 					},
 				] as const,
@@ -83,6 +86,18 @@ function serializeSourceSummaryMap(map: IndexSnapshot["sourceSummaries"]) {
 function serializeSetMap(map: Map<string, Iterable<string>>) {
 	return Array.from(map.entries())
 		.map(([key, values]) => [key, Array.from(values).sort()] as const)
+		.sort(([left], [right]) => left.localeCompare(right));
+}
+
+function serializeCompactSetMap(map: IndexSnapshot["lookupKeyToLookupPaths"]) {
+	return Array.from(map.entries())
+		.map(
+			([key, values]) =>
+				[
+					key,
+					(typeof values === "string" ? [values] : Array.from(values)).sort(),
+				] as const,
+		)
 		.sort(([left], [right]) => left.localeCompare(right));
 }
 

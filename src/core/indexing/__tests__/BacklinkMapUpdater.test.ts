@@ -424,6 +424,48 @@ describe("BacklinkMapUpdater", () => {
 		expect(removals).toEqual([]);
 		expect(additions).toEqual([]);
 	});
+
+	test("copies an existing backlink bucket before merging a summary", async () => {
+		const destinationSummary = {
+			count: 2,
+			hasResolved: true,
+			firstRefIndex: 0,
+		};
+		const nextSummary = {
+			destinations: new Map([["target.md", destinationSummary]]),
+			orderedReferences: [
+				{
+					destinationPath: "target.md",
+					rawLookupKey: "target.md",
+					isUnresolved: false,
+					rawText: "[[target]]",
+				},
+			],
+			lookupEntries: new Map(),
+			hasSourceDependentLinks: false,
+		};
+		const existingBucket = { count: 1, hasResolved: false };
+		const backlinksMap = new Map([
+			["target.md", new Map([["source1.md", existingBucket]])],
+		]);
+
+		await updater.reconcileBacklinksBySourceAsync(
+			backlinksMap,
+			"source1.md",
+			undefined,
+			nextSummary,
+			createImmediateYieldScheduler(),
+		);
+
+		const mergedBucket = backlinksMap.get("target.md")?.get("source1.md");
+		expect(mergedBucket).toEqual({ count: 3, hasResolved: true });
+		expect(mergedBucket).not.toBe(existingBucket);
+		expect(destinationSummary).toEqual({
+			count: 2,
+			hasResolved: true,
+			firstRefIndex: 0,
+		});
+	});
 });
 
 function createImmediateYieldScheduler() {
@@ -466,12 +508,16 @@ function createSourceSummaryWithLookupKeys(
 			firstRefIndexByLookupKey.set(key, 0);
 		}
 	}
+	const lookupEntries = new Map(
+		Array.from(firstRefIndexByLookupKey, ([lookupKey, firstRefIndex]) => [
+			lookupKey,
+			{ firstRefIndex, rawLinkPaths: lookupKey, isUnresolved: false },
+		]),
+	);
 	return {
 		destinations,
 		orderedReferences,
-		firstRefIndexByLookupKey,
-		lookupKeyToRawLinkPaths: new Map(),
-		unresolvedLookupKeys: new Set<string>(),
+		lookupEntries,
 		hasSourceDependentLinks: false,
 	};
 }

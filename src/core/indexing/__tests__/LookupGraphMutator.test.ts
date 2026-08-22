@@ -55,13 +55,21 @@ describe("LookupGraphMutator", () => {
 			firstRefIndexByLookupKey.set(key, i);
 			snapshot.linkLookupToSources.set(key, new Set([sourcePath]));
 		}
+		const lookupEntries = new Map(
+			Array.from(
+				firstRefIndexByLookupKey,
+				([lookupKey, firstRefIndex]) =>
+					[
+						lookupKey,
+						{ firstRefIndex, rawLinkPaths: lookupKey, isUnresolved: false },
+					] as const,
+			),
+		);
 
 		const previousSummary: SourceSummary = {
 			destinations: new Map(),
 			orderedReferences: [],
-			firstRefIndexByLookupKey,
-			lookupKeyToRawLinkPaths: new Map(),
-			unresolvedLookupKeys: new Set(),
+			lookupEntries,
 			hasSourceDependentLinks: false,
 		};
 		snapshot.sourceSummaries.set(sourcePath, previousSummary);
@@ -89,13 +97,21 @@ describe("LookupGraphMutator", () => {
 		for (let i = 0; i < lookupKeyCount; i++) {
 			firstRefIndexByLookupKey.set(`next-lookup-${i}.md`, i);
 		}
+		const lookupEntries = new Map(
+			Array.from(
+				firstRefIndexByLookupKey,
+				([lookupKey, firstRefIndex]) =>
+					[
+						lookupKey,
+						{ firstRefIndex, rawLinkPaths: lookupKey, isUnresolved: false },
+					] as const,
+			),
+		);
 
 		const nextSummary: SourceSummary = {
 			destinations: new Map(),
 			orderedReferences: [],
-			firstRefIndexByLookupKey,
-			lookupKeyToRawLinkPaths: new Map(),
-			unresolvedLookupKeys: new Set(),
+			lookupEntries,
 			hasSourceDependentLinks: false,
 		};
 

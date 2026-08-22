@@ -1,4 +1,5 @@
 import type { BacklinksMap, TagReference } from "types/domain";
+import type { CompactStringSet } from "shared/collections/compactStringSet";
 
 export type IncrementalFileChangeType = "create" | "modify" | "delete" | "rename";
 
@@ -51,26 +52,30 @@ export interface OrderedBacklinkRef {
 }
 
 export interface SourceDestinationSummary {
-	count: number;
-	hasResolved: boolean;
-	firstRefIndex: number;
+	readonly count: number;
+	readonly hasResolved: boolean;
+	readonly firstRefIndex: number;
+}
+
+export interface SourceLookupSummary {
+	readonly firstRefIndex: number;
+	readonly rawLinkPaths: string | readonly string[];
+	readonly isUnresolved: boolean;
 }
 
 export interface SourceSummary {
 	readonly destinations: ReadonlyMap<string, Readonly<SourceDestinationSummary>>;
 	/**
 	 * Compact representative refs indexed by destinations.firstRefIndex and
-	 * firstRefIndexByLookupKey. This is not a full ordered occurrence list.
+	 * lookupEntries.firstRefIndex. This is not a full ordered occurrence list.
 	 */
 	readonly orderedReferences: readonly Readonly<OrderedBacklinkRef>[];
 	/**
 	 * The canonical source of lookup keys for this source.
 	 * All lookup key enumeration, existence checks, and size queries
-	 * must go through this map. There is no separate lookupKeys set.
+	 * must go through this map.
 	 */
-	readonly firstRefIndexByLookupKey: ReadonlyMap<string, number>;
-	readonly lookupKeyToRawLinkPaths: ReadonlyMap<string, string | readonly string[]>;
-	readonly unresolvedLookupKeys: ReadonlySet<string>;
+	readonly lookupEntries: ReadonlyMap<string, Readonly<SourceLookupSummary>>;
 	readonly hasSourceDependentLinks: boolean;
 }
 
@@ -78,7 +83,7 @@ export interface IndexSnapshot {
 	backlinksMap: BacklinksMap;
 	sourceSummaries: Map<string, SourceSummary>;
 	linkLookupToSources: Map<string, Set<string>>;
-	lookupKeyToLookupPaths: Map<string, Set<string>>;
+	lookupKeyToLookupPaths: Map<string, CompactStringSet>;
 	lookupPathResolvedSourceCount: Map<string, number>;
 }
 

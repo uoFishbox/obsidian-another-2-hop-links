@@ -7,29 +7,32 @@ import {
 } from "../link-resolution/linkResolution";
 import type { CachedMetadataWithLinkReferences } from "types/domain";
 import type { IMetadataCache, IVault } from "types/obsidian";
-import type { IndexSnapshot } from "../types/IndexTypes";
+import type { IndexSnapshot, SourceLookupSummary } from "../types/IndexTypes";
 import {
 	HEAVY_YIELD_CHECK_INTERVAL,
 	maybeYield,
 	type YieldScheduler,
 } from "../timeSlicing";
 
-const EMPTY_SOURCE_LOOKUP_KEY_TO_RAW_LINK_PATHS: ReadonlyMap<
+type SourceRawLinkEntries = ReadonlyMap<
 	string,
-	string | readonly string[]
-> = new Map();
+	Readonly<Pick<SourceLookupSummary, "rawLinkPaths">>
+>;
+
+interface MutableSourceRawLinkEntry {
+	rawLinkPaths: string | string[];
+}
+
+const EMPTY_SOURCE_RAW_LINK_ENTRIES: SourceRawLinkEntries = new Map();
 
 export interface CreateEventEvaluationCache {
-	sourceLookupKeyToRawLinkPaths: Map<
-		string,
-		ReadonlyMap<string, string | readonly string[]>
-	>;
+	sourceRawLinkEntries: Map<string, SourceRawLinkEntries>;
 	resolvedDestinations: Map<string, Map<string, string | null>>;
 }
 
 export function createCreateEventEvaluationCache(): CreateEventEvaluationCache {
 	return {
-		sourceLookupKeyToRawLinkPaths: new Map(),
+		sourceRawLinkEntries: new Map(),
 		resolvedDestinations: new Map(),
 	};
 }
@@ -81,7 +84,10 @@ export function createCreateChangePlanner(
 			for (const sourcePath of sources) {
 				if (!pathsToUpdate.has(sourcePath)) {
 					const sourceSummary = snapshot.sourceSummaries.get(sourcePath);
-					if (sourceSummary?.unresolvedLookupKeys.has(candidate)) {
+					if (
+						sourceSummary?.lookupEntries.get(candidate)?.isUnresolved ===
+						true
+					) {
 						pathsToUpdate.add(sourcePath);
 					} else if (!evaluatedSources?.has(sourcePath)) {
 						(evaluatedSources ??= new Set<string>()).add(sourcePath);
@@ -123,22 +129,23 @@ export function createCreateChangePlanner(
 		yieldScheduler: YieldScheduler,
 	): Promise<boolean> {
 		const normalizedNewFilePathKey = toCaseInsensitiveLookupKey(newFilePath);
-		const lookupKeyToRawLinkPaths = getSourceLookupKeyToRawLinkPathsForCreateEvent(
+		const lookupEntries = getSourceRawLinkEntriesForCreateEvent(
 			snapshot,
 			sourcePath,
 			createEventEvaluationCache,
 		);
-		if (lookupKeyToRawLinkPaths.size === 0) {
+		if (lookupEntries.size === 0) {
 			return false;
 		}
 
 		let rawLinkPathCount = 0;
 		let found = false;
 		for (const lookupKey of candidateLookupKeys) {
-			const rawLinkPaths = lookupKeyToRawLinkPaths.get(lookupKey);
-			if (!rawLinkPaths) {
+			const lookupEntry = lookupEntries.get(lookupKey);
+			if (!lookupEntry) {
 				continue;
 			}
+			const rawLinkPaths = lookupEntry.rawLinkPaths;
 
 			if (typeof rawLinkPaths === "string") {
 				found = rawLinkPathResolvesToCreatedFile(
@@ -192,65 +199,64 @@ export function createCreateChangePlanner(
 		);
 	}
 
-	function getSourceLookupKeyToRawLinkPathsForCreateEvent(
+	function getSourceRawLinkEntriesForCreateEvent(
 		snapshot: IndexSnapshot,
 		sourcePath: string,
 		createEventEvaluationCache: CreateEventEvaluationCache,
-	): ReadonlyMap<string, string | readonly string[]> {
-		const cached =
-			createEventEvaluationCache.sourceLookupKeyToRawLinkPaths.get(sourcePath);
+	): SourceRawLinkEntries {
+		const cached = createEventEvaluationCache.sourceRawLinkEntries.get(sourcePath);
 		if (cached) {
 			return cached;
 		}
 
 		const summary = snapshot.sourceSummaries.get(sourcePath);
 		if (summary) {
-			createEventEvaluationCache.sourceLookupKeyToRawLinkPaths.set(
+			createEventEvaluationCache.sourceRawLinkEntries.set(
 				sourcePath,
-				summary.lookupKeyToRawLinkPaths,
+				summary.lookupEntries,
 			);
-			return summary.lookupKeyToRawLinkPaths;
+			return summary.lookupEntries;
 		}
 
 		const sourceFile = resolveFileByPath(vault, sourcePath);
 		if (!sourceFile) {
-			createEventEvaluationCache.sourceLookupKeyToRawLinkPaths.set(
+			createEventEvaluationCache.sourceRawLinkEntries.set(
 				sourcePath,
-				EMPTY_SOURCE_LOOKUP_KEY_TO_RAW_LINK_PATHS,
+				EMPTY_SOURCE_RAW_LINK_ENTRIES,
 			);
-			return EMPTY_SOURCE_LOOKUP_KEY_TO_RAW_LINK_PATHS;
+			return EMPTY_SOURCE_RAW_LINK_ENTRIES;
 		}
 
 		const cache = metadataCache.getFileCache(
 			sourceFile,
 		) as CachedMetadataWithLinkReferences | null;
-		const lookupKeyToRawLinkPaths = new Map<string, string | string[]>();
+		const lookupEntries = new Map<string, MutableSourceRawLinkEntry>();
 		forEachLinkReferenceUnordered(cache, (linkReference) => {
 			const lookupKey = toCaseInsensitiveLookupKey(
 				normalizeLinkToMarkdownPath(linkReference.link),
 			);
 			const rawLinkPath = getLinkpath(linkReference.link);
-			const existing = lookupKeyToRawLinkPaths.get(lookupKey);
+			const existing = lookupEntries.get(lookupKey);
 			if (existing === undefined) {
-				lookupKeyToRawLinkPaths.set(lookupKey, rawLinkPath);
+				lookupEntries.set(lookupKey, {
+					rawLinkPaths: rawLinkPath,
+				});
 				return;
 			}
 
-			if (typeof existing === "string") {
-				if (existing === rawLinkPath) return;
-				lookupKeyToRawLinkPaths.set(lookupKey, [existing, rawLinkPath]);
+			const existingPaths = existing.rawLinkPaths;
+			if (typeof existingPaths === "string") {
+				if (existingPaths === rawLinkPath) return;
+				existing.rawLinkPaths = [existingPaths, rawLinkPath];
 				return;
 			}
 
-			if (!existing.includes(rawLinkPath)) {
-				existing.push(rawLinkPath);
+			if (!existingPaths.includes(rawLinkPath)) {
+				existingPaths.push(rawLinkPath);
 			}
 		});
-		createEventEvaluationCache.sourceLookupKeyToRawLinkPaths.set(
-			sourcePath,
-			lookupKeyToRawLinkPaths,
-		);
-		return lookupKeyToRawLinkPaths;
+		createEventEvaluationCache.sourceRawLinkEntries.set(sourcePath, lookupEntries);
+		return lookupEntries;
 	}
 
 	function getResolvedDestinationPathForCreateEvent(

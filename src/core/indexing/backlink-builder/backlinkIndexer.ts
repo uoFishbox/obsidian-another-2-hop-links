@@ -18,7 +18,12 @@ import {
 	INDEXING_YIELD_INTERVAL_MS,
 	INDEX_LINK_CAPABLE_EXTENSIONS,
 } from "../../../appConstants";
-import type { RebuildOptions, SourceSummary } from "../types/IndexTypes";
+import type {
+	RebuildOptions,
+	SourceDestinationSummary,
+	SourceSummary,
+} from "../types/IndexTypes";
+import { addCompactStringSetValue } from "shared/collections/compactStringSet";
 import {
 	addFileTagsToTagIndex,
 	createEmptyTagIndex,
@@ -42,13 +47,11 @@ import {
 	type ResolvedLinkMemo,
 } from "./backlinkReferenceSequence";
 import {
-	createBacklinkBucketForSource,
 	createFileLocalAggregation,
 	createSourceSummaryFromAggregationChunked,
 	recordFileLocalReference,
 	resetFileLocalAggregation,
 	type FileLocalAggregation,
-	type FileLocalDestinationAggregate,
 } from "./backlinkAggregation";
 import type { BacklinksBuildArtifacts } from "./backlinkBuildArtifacts";
 
@@ -92,7 +95,7 @@ function addSourceLookupIndexes(
 	sourcePath: string,
 	sourceSummary: SourceSummary,
 ): void {
-	for (const lookupKey of sourceSummary.firstRefIndexByLookupKey.keys()) {
+	for (const lookupKey of sourceSummary.lookupEntries.keys()) {
 		let sources = artifacts.linkLookupToSources.get(lookupKey);
 		if (!sources) {
 			sources = new Set<string>();
@@ -113,7 +116,7 @@ function getOrCreateDestinationBuildState(
 	}
 
 	const lookupKey = toCaseInsensitiveLookupKey(lookupPath);
-	addLookupKeyPath(artifacts.lookupKeyToLookupPaths, lookupKey, lookupPath);
+	addCompactStringSetValue(artifacts.lookupKeyToLookupPaths, lookupKey, lookupPath);
 
 	const state: DestinationBuildState = {
 		sourceMap: new Map(),
@@ -122,19 +125,6 @@ function getOrCreateDestinationBuildState(
 	destinationBuildStates.set(lookupPath, state);
 	artifacts.detailedMap.set(lookupPath, state.sourceMap);
 	return state;
-}
-
-function addLookupKeyPath(
-	lookupKeyToLookupPaths: Map<string, Set<string>>,
-	lookupKey: string,
-	lookupPath: string,
-): void {
-	let lookupPaths = lookupKeyToLookupPaths.get(lookupKey);
-	if (!lookupPaths) {
-		lookupPaths = new Set<string>();
-		lookupKeyToLookupPaths.set(lookupKey, lookupPaths);
-	}
-	lookupPaths.add(lookupPath);
 }
 
 function* indexFileIntoArtifactsPhaseOne(
@@ -156,7 +146,7 @@ function* indexFileIntoArtifactsPhaseOne(
 	) => void,
 	visitDestination: (
 		destinationPath: string,
-		aggregate: FileLocalDestinationAggregate,
+		summary: SourceDestinationSummary,
 	) => void,
 ): YieldStepGenerator {
 	const sourcePath = sourceFile.path;
@@ -265,18 +255,15 @@ function* createBacklinksBuildSteps(
 
 	function visitDestinationForCurrentSource(
 		destinationPath: string,
-		aggregate: FileLocalDestinationAggregate,
+		summary: SourceDestinationSummary,
 	): void {
 		const destinationState = getOrCreateDestinationBuildState(
 			artifacts,
 			destinationBuildStates,
 			destinationPath,
 		);
-		destinationState.sourceMap.set(
-			currentSourcePath,
-			createBacklinkBucketForSource(aggregate),
-		);
-		if (aggregate.hasResolved) {
+		destinationState.sourceMap.set(currentSourcePath, summary);
+		if (summary.hasResolved) {
 			destinationState.resolvedSourceCount++;
 		}
 	}

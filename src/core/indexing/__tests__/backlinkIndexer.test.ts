@@ -249,11 +249,7 @@ describe("buildDetailedBacklinksArtifactsChunked", () => {
 			artifacts.detailedMap.get("target-frontmatter.md")?.has("source.md"),
 		).toBe(true);
 		expect(
-			new Set(
-				artifacts.sourceSummaries
-					.get("source.md")
-					?.firstRefIndexByLookupKey.keys(),
-			),
+			new Set(artifacts.sourceSummaries.get("source.md")?.lookupEntries.keys()),
 		).toEqual(
 			new Set(["target-link.md", "target-embed.md", "target-frontmatter.md"]),
 		);
@@ -293,9 +289,7 @@ describe("buildDetailedBacklinksArtifactsChunked", () => {
 		expect(artifacts.linkLookupToSources.get("note.md")).toEqual(
 			new Set(["source.md"]),
 		);
-		expect(artifacts.lookupKeyToLookupPaths.get("note.md")).toEqual(
-			new Set(["Note.md"]),
-		);
+		expect(artifacts.lookupKeyToLookupPaths.get("note.md")).toBe("Note.md");
 	});
 
 	test("deduplicates duplicate raw lookup keys within the same source", async () => {
@@ -315,9 +309,7 @@ describe("buildDetailedBacklinksArtifactsChunked", () => {
 				artifacts.sourceSummaries.get("source.md")?.destinations.keys() ?? [],
 			),
 		).toEqual(["target.md"]);
-		expect(artifacts.lookupKeyToLookupPaths.get("target.md")).toEqual(
-			new Set(["target.md"]),
-		);
+		expect(artifacts.lookupKeyToLookupPaths.get("target.md")).toBe("target.md");
 		expect(artifacts.detailedMap.get("target.md")?.has("source.md")).toBe(true);
 	});
 
@@ -336,7 +328,10 @@ describe("buildDetailedBacklinksArtifactsChunked", () => {
 
 		expect(summary.orderedReferences).toHaveLength(1);
 		expect(summary.destinations.get("target.md")?.firstRefIndex).toBe(0);
-		expect(summary.firstRefIndexByLookupKey.get("target.md")).toBe(0);
+		expect(summary.lookupEntries.get("target.md")?.firstRefIndex).toBe(0);
+		expect(artifacts.detailedMap.get("target.md")?.get("source.md")).toBe(
+			summary.destinations.get("target.md"),
+		);
 	});
 
 	test("does not index unresolved entries when the same lookup key is resolved", async () => {

@@ -7,7 +7,15 @@ import {
 import { VaultEnvironmentBuilder } from "testing/helpers/VaultEnvironmentBuilder";
 import { buildIndexSnapshotAsync, serializeSnapshot } from "./snapshotTestHelpers";
 import type { CachedMetadata, TFile } from "obsidian";
-import type { IndexSnapshot } from "../types/IndexTypes";
+import type { IndexSnapshot, SourceSummary } from "../types/IndexTypes";
+
+function getUnresolvedLookupKeys(summary: SourceSummary | undefined): Set<string> {
+	return new Set(
+		Array.from(summary?.lookupEntries.entries() ?? [])
+			.filter(([, entry]) => entry.isUnresolved)
+			.map(([lookupKey]) => lookupKey),
+	);
+}
 
 function createPosition(offset: number) {
 	return {
@@ -351,7 +359,7 @@ describe("IncrementalIndexUpdater", () => {
 		).toBe(true);
 		expect(snapshot.backlinksMap.get("archive/new-name.md")).toBeUndefined();
 		expect(
-			snapshot.sourceSummaries.get("old-source.md")?.unresolvedLookupKeys,
+			getUnresolvedLookupKeys(snapshot.sourceSummaries.get("old-source.md")),
 		).toEqual(new Set(["old-name.md"]));
 		expect(serializeSnapshot(snapshot)).toEqual(
 			serializeSnapshot(await final.snapshotBuilder.buildAsync()),
@@ -390,7 +398,7 @@ describe("IncrementalIndexUpdater", () => {
 		);
 		expect(snapshot.backlinksMap.get("src/note.md")).toBeUndefined();
 		expect(
-			snapshot.sourceSummaries.get("src/note.md")?.unresolvedLookupKeys,
+			getUnresolvedLookupKeys(snapshot.sourceSummaries.get("src/note.md")),
 		).toEqual(new Set(["foldera/note.md"]));
 
 		expect(serializeSnapshot(snapshot)).toEqual(
@@ -429,7 +437,7 @@ describe("IncrementalIndexUpdater", () => {
 		expect(
 			snapshot.sourceSummaries
 				.get("src/note.md")
-				?.unresolvedLookupKeys.has("src/note.md"),
+				?.lookupEntries.get("src/note.md")?.isUnresolved === true,
 		).toBe(false);
 
 		expect(serializeSnapshot(snapshot)).toEqual(
@@ -544,14 +552,14 @@ describe("IncrementalIndexUpdater", () => {
 		]);
 		const snapshot = await env.snapshotBuilder.buildAsync();
 
-		expect(snapshot.sourceSummaries.get("origin.md")?.unresolvedLookupKeys).toEqual(
-			new Set(["missing.md"]),
-		);
+		expect(
+			getUnresolvedLookupKeys(snapshot.sourceSummaries.get("origin.md")),
+		).toEqual(new Set(["missing.md"]));
 		env.builder.addFile({ path: "origin.md", links: ["target"] });
 		await env.updater.applyAsync(snapshot, [{ type: "modify", path: "origin.md" }]);
 
 		expect(
-			snapshot.sourceSummaries.get("origin.md")?.unresolvedLookupKeys.size ?? 0,
+			getUnresolvedLookupKeys(snapshot.sourceSummaries.get("origin.md")).size,
 		).toBe(0);
 	});
 
@@ -561,9 +569,9 @@ describe("IncrementalIndexUpdater", () => {
 		]);
 		const snapshot = await env.snapshotBuilder.buildAsync();
 
-		expect(snapshot.sourceSummaries.get("origin.md")?.unresolvedLookupKeys).toEqual(
-			new Set(["missing.md"]),
-		);
+		expect(
+			getUnresolvedLookupKeys(snapshot.sourceSummaries.get("origin.md")),
+		).toEqual(new Set(["missing.md"]));
 
 		const result = await env.updater.applyAsync(snapshot, [
 			{ type: "delete", path: "origin.md" },

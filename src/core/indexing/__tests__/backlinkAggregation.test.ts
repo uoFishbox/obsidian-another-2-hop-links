@@ -16,7 +16,7 @@ const NO_YIELD_SCHEDULER: YieldScheduler = {
 };
 
 describe("backlinkAggregation", () => {
-	test("shares empty unresolved lookup keys across source summaries", () => {
+	test("stores resolved state in fused lookup entries", () => {
 		const syncSummary = createSourceSummaryFromAggregation(
 			createAggregationWithResolvedLookupKey("sync.md"),
 		);
@@ -30,11 +30,12 @@ describe("backlinkAggregation", () => {
 		expect(syncSummary).toBeDefined();
 		expect(firstChunkedSummary).toBeDefined();
 		expect(secondChunkedSummary).toBeDefined();
-		expect(syncSummary?.unresolvedLookupKeys).toBe(
-			firstChunkedSummary?.unresolvedLookupKeys,
+		expect(syncSummary?.lookupEntries.get("sync.md")?.isUnresolved).toBe(false);
+		expect(firstChunkedSummary?.lookupEntries.get("first.md")?.isUnresolved).toBe(
+			false,
 		);
-		expect(firstChunkedSummary?.unresolvedLookupKeys).toBe(
-			secondChunkedSummary?.unresolvedLookupKeys,
+		expect(secondChunkedSummary?.lookupEntries.get("second.md")?.isUnresolved).toBe(
+			false,
 		);
 	});
 
@@ -57,10 +58,10 @@ describe("backlinkAggregation", () => {
 			"later",
 		);
 
-		expect(summary?.unresolvedLookupKeys).toEqual(new Set(["missing.md"]));
+		expect(summary?.lookupEntries.get("missing.md")?.isUnresolved).toBe(true);
 	});
 
-	test("splits fused lookup-key states into persistent summary maps", () => {
+	test("keeps fused lookup-key states in one persistent summary map", () => {
 		const aggregation = createAggregationWithResolvedLookupKey("target.md");
 		const representative =
 			aggregation.lookupKeyStates.get("target.md")!.representative;
@@ -71,17 +72,15 @@ describe("backlinkAggregation", () => {
 		});
 
 		const destinationBuckets = aggregation.destinationBuckets;
+		const lookupKeyStates = aggregation.lookupKeyStates;
 
 		const summary = createChunkedSummary(aggregation);
 
 		expect(summary).toBeDefined();
 		// The destination scratch map itself becomes the persistent summary map.
 		expect(summary?.destinations).toBe(destinationBuckets);
-		// Fused per-lookup-key records are split into fresh maps in one pass.
-		expect(summary?.firstRefIndexByLookupKey).toEqual(new Map([["target.md", 0]]));
-		expect(summary?.lookupKeyToRawLinkPaths).toEqual(
-			new Map([["target.md", "target.md"]]),
-		);
+		// The fused lookup scratch map itself becomes the persistent summary map.
+		expect(summary?.lookupEntries).toBe(lookupKeyStates);
 		// The scratch slots are emptied for the next file.
 		expect(aggregation.destinationBuckets.size).toBe(0);
 		expect(aggregation.lookupKeyStates.size).toBe(0);
@@ -92,8 +91,11 @@ describe("backlinkAggregation", () => {
 			hasResolved: true,
 			firstRefIndex: 0,
 		});
-		expect(summary?.firstRefIndexByLookupKey.get("target.md")).toBe(0);
-		expect(summary?.lookupKeyToRawLinkPaths.get("target.md")).toBe("target.md");
+		expect(summary?.lookupEntries.get("target.md")).toEqual({
+			firstRefIndex: 0,
+			rawLinkPaths: "target.md",
+			isUnresolved: false,
+		});
 		expect(summary?.orderedReferences).toHaveLength(1);
 	});
 });

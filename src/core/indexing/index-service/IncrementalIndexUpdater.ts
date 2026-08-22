@@ -232,11 +232,7 @@ export class IncrementalIndexUpdater {
 						await pendingYield;
 					}
 				}
-				removeLookupPath(
-					run.snapshot,
-					path,
-					run.affectedLookupKeys,
-				);
+				removeLookupPath(run.snapshot, path, run.affectedLookupKeys);
 			}
 
 			await this.backlinkUpdater.removeBacklinksBySourceAsync(
@@ -424,10 +420,8 @@ export class IncrementalIndexUpdater {
 		const newLookupKey = toCaseInsensitiveLookupKey(newPath);
 
 		return (
-			summary.firstRefIndexByLookupKey.has(oldLookupKey) ||
-			summary.firstRefIndexByLookupKey.has(newLookupKey) ||
-			summary.unresolvedLookupKeys.has(oldLookupKey) ||
-			summary.unresolvedLookupKeys.has(newLookupKey)
+			summary.lookupEntries.has(oldLookupKey) ||
+			summary.lookupEntries.has(newLookupKey)
 		);
 	}
 
@@ -499,9 +493,7 @@ export class IncrementalIndexUpdater {
 		return {
 			destinations: nextDestinations,
 			orderedReferences: nextOrderedReferences,
-			firstRefIndexByLookupKey: summary.firstRefIndexByLookupKey,
-			lookupKeyToRawLinkPaths: summary.lookupKeyToRawLinkPaths,
-			unresolvedLookupKeys: summary.unresolvedLookupKeys,
+			lookupEntries: summary.lookupEntries,
 			hasSourceDependentLinks: summary.hasSourceDependentLinks,
 		};
 	}

@@ -1,4 +1,5 @@
 import type { IndexSnapshot } from "../types/IndexTypes";
+import { compactStringSetValues } from "shared/collections/compactStringSet";
 
 export function hasDirectResolvedLookupKey(
 	snapshot: IndexSnapshot,
@@ -9,7 +10,7 @@ export function hasDirectResolvedLookupKey(
 		return false;
 	}
 
-	for (const lookupPath of lookupPaths) {
+	for (const lookupPath of compactStringSetValues(lookupPaths)) {
 		if (snapshot.lookupPathResolvedSourceCount.has(lookupPath)) {
 			return true;
 		}
@@ -29,7 +30,7 @@ export function collectSourcePathsForLookupKeys(
 			continue;
 		}
 
-		for (const lookupPath of lookupPaths) {
+		for (const lookupPath of compactStringSetValues(lookupPaths)) {
 			const sourceMap = snapshot.backlinksMap.get(lookupPath);
 			if (!sourceMap) {
 				continue;

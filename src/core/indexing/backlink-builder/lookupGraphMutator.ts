@@ -1,6 +1,11 @@
 import { toCaseInsensitiveLookupKey } from "../link-resolution/linkResolution";
 import type { IndexSnapshot, SourceSummary } from "../types/IndexTypes";
 import {
+	addCompactStringSetValue,
+	compactStringSetValues,
+	removeCompactStringSetValue,
+} from "shared/collections/compactStringSet";
+import {
 	HEAVY_YIELD_CHECK_INTERVAL,
 	maybeYield,
 	type YieldScheduler,
@@ -30,7 +35,7 @@ export async function collectCacheInvalidationPathsAsync(
 		if (!siblingLookupPaths) {
 			continue;
 		}
-		for (const lookupPath of siblingLookupPaths) {
+		for (const lookupPath of compactStringSetValues(siblingLookupPaths)) {
 			pathsToInvalidate.add(lookupPath);
 
 			pathCount++;
@@ -58,16 +63,14 @@ export async function replaceSourceSummaryAsync(
 	await syncLookupIndexForSourceAsync(
 		snapshot.linkLookupToSources,
 		sourcePath,
-		previousSummary?.firstRefIndexByLookupKey,
-		nextSummary?.firstRefIndexByLookupKey,
+		previousSummary?.lookupEntries,
+		nextSummary?.lookupEntries,
 		yieldScheduler,
 	);
 
 	if (
 		nextSummary &&
-		(nextSummary.destinations.size > 0 ||
-			nextSummary.firstRefIndexByLookupKey.size > 0 ||
-			nextSummary.unresolvedLookupKeys.size > 0)
+		(nextSummary.destinations.size > 0 || nextSummary.lookupEntries.size > 0)
 	) {
 		snapshot.sourceSummaries.set(sourcePath, nextSummary);
 		return;
@@ -139,12 +142,7 @@ function ensureLookupPathRegistered(
 	lookupPath: string,
 	lookupKey: string,
 ): void {
-	let lookupPaths = snapshot.lookupKeyToLookupPaths.get(lookupKey);
-	if (!lookupPaths) {
-		lookupPaths = new Set<string>();
-		snapshot.lookupKeyToLookupPaths.set(lookupKey, lookupPaths);
-	}
-	lookupPaths.add(lookupPath);
+	addCompactStringSetValue(snapshot.lookupKeyToLookupPaths, lookupKey, lookupPath);
 }
 
 function removeLookupPathRegistration(
@@ -152,14 +150,7 @@ function removeLookupPathRegistration(
 	lookupPath: string,
 	lookupKey: string,
 ): void {
-	const lookupPaths = snapshot.lookupKeyToLookupPaths.get(lookupKey);
-	if (!lookupPaths) {
-		return;
-	}
-	lookupPaths.delete(lookupPath);
-	if (lookupPaths.size === 0) {
-		snapshot.lookupKeyToLookupPaths.delete(lookupKey);
-	}
+	removeCompactStringSetValue(snapshot.lookupKeyToLookupPaths, lookupKey, lookupPath);
 }
 
 async function syncLookupIndexForSourceAsync(

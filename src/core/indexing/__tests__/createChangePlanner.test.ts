@@ -48,9 +48,7 @@ describe("CreateChangePlanner", () => {
 		const planner = createCreateChangePlanner(env.mockVault, env.mockMetadataCache);
 		const sourceSummary = snapshot.sourceSummaries.get("src/origin.md");
 
-		expect(sourceSummary?.lookupKeyToRawLinkPaths).toEqual(
-			new Map([["note.md", "note"]]),
-		);
+		expect(sourceSummary?.lookupEntries.get("note.md")?.rawLinkPaths).toBe("note");
 		if (sourceSummary) {
 			(sourceSummary as unknown as { orderedReferences: [] }).orderedReferences =
 				[];
