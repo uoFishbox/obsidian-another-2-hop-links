@@ -1,150 +1,297 @@
 import { recordCCLDevMeasurement } from "infrastructure/debug/CCLDevMeasurements";
 
+const MAX_TASKS_PER_DRAIN = 4;
+const MAX_DRAIN_CPU_MS = 2;
+const ANIMATION_FRAME_WATCHDOG_MS = 100;
+
+type RenderTaskState = "pending" | "running" | "settled";
+
 type RenderTask<T> = {
-	cancelled: boolean;
 	cleanup: () => void;
+	partition: RenderQueuePartition;
 	reject: (error: unknown) => void;
 	resolve: (value: T) => void;
 	run: () => Promise<T>;
 	signal?: AbortSignal;
-	ownerWindow?: Window | null;
+	state: RenderTaskState;
 };
 
-const MAX_CONCURRENT_PREVIEW_RENDERS = 1;
-let activePreviewRenders = 0;
-const pendingTasks: RenderTask<unknown>[] = [];
-const scheduledTasks = new Set<RenderTask<unknown>>();
+interface RenderQueuePartition {
+	readonly key: object;
+	readonly ownerWindow: Window | null;
+	readonly pendingTasks: RenderTask<unknown>[];
+	cancelScheduledDrain: (() => void) | null;
+	draining: boolean;
+	runningTask: RenderTask<unknown> | null;
+}
+
+export type EnqueuePreviewRender = <T>(
+	run: () => Promise<T>,
+	signal?: AbortSignal,
+	ownerWindow?: Window | null,
+) => Promise<T>;
+
+export interface PreviewRenderQueue {
+	/** Enqueues detached preview DOM work in its owner window partition. */
+	enqueue: EnqueuePreviewRender;
+	/** Rejects queued work and prevents the queue from accepting new tasks. */
+	dispose(): void;
+}
+
+export interface CreatePreviewRenderQueueOptions {
+	/** Resolves the visible realm used to schedule partition drains. */
+	getSchedulingWindow?: () => Window | null;
+}
 
 function createAbortError(): DOMException {
 	return new DOMException("Preview render aborted", "AbortError");
 }
 
-function scheduleTask(task: () => void, ownerWindow?: Window | null): void {
-	const targetWindow = ownerWindow ?? (typeof window === "undefined" ? null : window);
-	if (targetWindow) {
-		if (process.env.NODE_ENV !== "production") {
-			recordCCLDevMeasurement("preview.renderScheduler.animationFrame");
-		}
-		if (typeof targetWindow.requestAnimationFrame === "function") {
-			targetWindow.requestAnimationFrame(() => task());
-		} else {
-			targetWindow.setTimeout(task, 0);
-		}
-		return;
+function readSchedulingTime(): number {
+	if (typeof globalThis.performance?.now === "function") {
+		return globalThis.performance.now();
 	}
-
-	globalThis.setTimeout(task, 0);
+	return Date.now();
 }
 
-function removePendingTask(task: RenderTask<unknown>): boolean {
-	const index = pendingTasks.indexOf(task);
-	if (index < 0) {
-		return false;
-	}
-	pendingTasks.splice(index, 1);
-	return true;
-}
+/**
+ * Creates a render queue owned by one preview runtime.
+ *
+ * Work is partitioned by DOM owner window so a stalled popout cannot hold the
+ * render capacity of another realm. A drain starts at most four serialized
+ * tasks per frame, avoiding the former one-preview-per-frame throughput cap.
+ */
+export function createPreviewRenderQueue(
+	options: CreatePreviewRenderQueueOptions = {},
+): PreviewRenderQueue {
+	const fallbackPartitionKey = {};
+	const partitions = new Map<object, RenderQueuePartition>();
+	let disposed = false;
 
-function drainPreviewRenderQueue(): void {
-	if (activePreviewRenders >= MAX_CONCURRENT_PREVIEW_RENDERS) {
-		return;
-	}
-
-	const nextTask = pendingTasks.shift();
-	if (!nextTask) {
-		return;
-	}
-
-	if (nextTask.cancelled || nextTask.signal?.aborted) {
-		nextTask.reject(createAbortError());
-		drainPreviewRenderQueue();
-		return;
+	function resolveOwnerWindow(ownerWindow?: Window | null): Window | null {
+		return ownerWindow ?? (typeof window === "undefined" ? null : window);
 	}
 
-	activePreviewRenders++;
-	scheduledTasks.add(nextTask);
+	function getOrCreatePartition(ownerWindow: Window | null): RenderQueuePartition {
+		const key = ownerWindow ?? fallbackPartitionKey;
+		const existing = partitions.get(key);
+		if (existing) return existing;
 
-	scheduleTask(() => {
-		scheduledTasks.delete(nextTask);
-
-		if (nextTask.cancelled || nextTask.signal?.aborted) {
-			activePreviewRenders = Math.max(activePreviewRenders - 1, 0);
-			nextTask.reject(createAbortError());
-			drainPreviewRenderQueue();
-			return;
-		}
-
-		void nextTask
-			.run()
-			.then(nextTask.resolve)
-			.catch(nextTask.reject)
-			.finally(() => {
-				activePreviewRenders = Math.max(activePreviewRenders - 1, 0);
-				drainPreviewRenderQueue();
-			});
-	}, nextTask.ownerWindow);
-}
-
-export function enqueuePreviewRender<T>(
-	run: () => Promise<T>,
-	signal?: AbortSignal,
-	ownerWindow?: Window | null,
-): Promise<T> {
-	return new Promise<T>((resolve, reject) => {
-		let settled = false;
-
-		const settle = (handler: () => void): void => {
-			if (settled) {
-				return;
-			}
-			settled = true;
-			task.cleanup();
-			handler();
-		};
-
-		const task: RenderTask<T> = {
-			cancelled: false,
-			cleanup: () => {},
-			reject: (error) => settle(() => reject(error)),
-			resolve: (value) => settle(() => resolve(value)),
-			run,
-			signal,
+		const partition: RenderQueuePartition = {
+			key,
 			ownerWindow,
+			pendingTasks: [],
+			cancelScheduledDrain: null,
+			draining: false,
+			runningTask: null,
+		};
+		partitions.set(key, partition);
+		return partition;
+	}
+
+	function removePartitionIfIdle(partition: RenderQueuePartition): void {
+		if (partition.pendingTasks.length > 0) return;
+		if (partition.cancelScheduledDrain || partition.draining) return;
+		if (partitions.get(partition.key) === partition) {
+			partitions.delete(partition.key);
+		}
+	}
+
+	function removePendingTask(task: RenderTask<unknown>): boolean {
+		const index = task.partition.pendingTasks.indexOf(task);
+		if (index < 0) return false;
+		task.partition.pendingTasks.splice(index, 1);
+		return true;
+	}
+
+	function cancelIdlePartitionSchedule(partition: RenderQueuePartition): void {
+		if (partition.pendingTasks.length > 0 || partition.draining) return;
+		partition.cancelScheduledDrain?.();
+		partition.cancelScheduledDrain = null;
+		removePartitionIfIdle(partition);
+	}
+
+	function scheduleOnAnimationFrame(
+		partition: RenderQueuePartition,
+		callback: () => void,
+	): () => void {
+		let schedulingWindow = partition.ownerWindow;
+		try {
+			schedulingWindow = options.getSchedulingWindow?.() ?? partition.ownerWindow;
+		} catch {
+			// Workspace teardown can invalidate realm lookup. The owner realm and
+			// global watchdog remain valid fallbacks for settling queued work.
+		}
+		let completed = false;
+		const cancellations: Array<() => void> = [];
+
+		const cancel = (): void => {
+			if (completed) return;
+			completed = true;
+			for (const cancelScheduledWork of cancellations) {
+				cancelScheduledWork();
+			}
+		};
+		const runOnce = (): void => {
+			if (completed) return;
+			completed = true;
+			for (const cancelScheduledWork of cancellations) {
+				cancelScheduledWork();
+			}
+			callback();
 		};
 
-		if (signal?.aborted) {
-			task.reject(createAbortError());
+		if (
+			schedulingWindow &&
+			typeof schedulingWindow.requestAnimationFrame === "function"
+		) {
+			if (process.env.NODE_ENV !== "production") {
+				recordCCLDevMeasurement("preview.renderScheduler.animationFrame");
+			}
+			try {
+				const frameHandle = schedulingWindow.requestAnimationFrame(runOnce);
+				const cancelFrame = (): void => {
+					if (typeof schedulingWindow.cancelAnimationFrame === "function") {
+						schedulingWindow.cancelAnimationFrame(frameHandle);
+					}
+				};
+				if (completed) {
+					cancelFrame();
+					return cancel;
+				}
+				cancellations.push(cancelFrame);
+
+				// Keep the watchdog outside the target window. A closed or throttled
+				// popout must not retain the queue merely because its rAF never fires.
+				const watchdogHandle = globalThis.setTimeout(
+					runOnce,
+					ANIMATION_FRAME_WATCHDOG_MS,
+				);
+				cancellations.push(() => globalThis.clearTimeout(watchdogHandle));
+				return cancel;
+			} catch {
+				// A closing popout may reject new callbacks. Fall through to the
+				// realm-independent timeout path instead of rejecting the render.
+			}
+		}
+
+		const timeoutHandle = globalThis.setTimeout(runOnce, 0);
+		cancellations.push(() => globalThis.clearTimeout(timeoutHandle));
+		return cancel;
+	}
+
+	function schedulePartitionDrain(partition: RenderQueuePartition): void {
+		if (disposed || partition.draining || partition.cancelScheduledDrain) return;
+		if (partition.pendingTasks.length === 0) {
+			removePartitionIfIdle(partition);
 			return;
 		}
 
-		if (signal) {
-			const onAbort = () => {
-				task.cancelled = true;
-				if (removePendingTask(task as RenderTask<unknown>)) {
+		let ranSynchronously = false;
+		const cancelScheduledDrain = scheduleOnAnimationFrame(partition, () => {
+			ranSynchronously = true;
+			partition.cancelScheduledDrain = null;
+			void drainPartition(partition);
+		});
+		partition.cancelScheduledDrain = ranSynchronously ? null : cancelScheduledDrain;
+	}
+
+	async function drainPartition(partition: RenderQueuePartition): Promise<void> {
+		if (disposed || partition.draining) return;
+		partition.draining = true;
+		const startedAt = readSchedulingTime();
+		let startedTaskCount = 0;
+
+		try {
+			while (!disposed && startedTaskCount < MAX_TASKS_PER_DRAIN) {
+				const task = partition.pendingTasks.shift();
+				if (!task) break;
+
+				if (task.state !== "pending" || task.signal?.aborted) {
 					task.reject(createAbortError());
-					drainPreviewRenderQueue();
+					continue;
 				}
-			};
-			signal.addEventListener("abort", onAbort, { once: true });
-			task.cleanup = () => {
-				signal.removeEventListener("abort", onAbort);
-			};
+
+				task.state = "running";
+				partition.runningTask = task;
+				startedTaskCount++;
+				try {
+					const value = await task.run();
+					task.resolve(value);
+				} catch (error) {
+					task.reject(error);
+				} finally {
+					partition.runningTask = null;
+				}
+
+				if (readSchedulingTime() - startedAt >= MAX_DRAIN_CPU_MS) break;
+			}
+		} finally {
+			partition.draining = false;
+			if (!disposed && partition.pendingTasks.length > 0) {
+				schedulePartitionDrain(partition);
+			} else {
+				removePartitionIfIdle(partition);
+			}
+		}
+	}
+
+	function enqueue<T>(
+		run: () => Promise<T>,
+		signal?: AbortSignal,
+		ownerWindow?: Window | null,
+	): Promise<T> {
+		if (disposed || signal?.aborted) {
+			return Promise.reject(createAbortError());
 		}
 
-		pendingTasks.push(task as RenderTask<unknown>);
-		drainPreviewRenderQueue();
-	});
-}
+		return new Promise<T>((resolve, reject) => {
+			const partition = getOrCreatePartition(resolveOwnerWindow(ownerWindow));
+			const settle = (handler: () => void): void => {
+				if (task.state === "settled") return;
+				task.state = "settled";
+				task.cleanup();
+				handler();
+			};
+			const task: RenderTask<T> = {
+				cleanup: () => {},
+				partition,
+				reject: (error) => settle(() => reject(error)),
+				resolve: (value) => settle(() => resolve(value)),
+				run,
+				signal,
+				state: "pending",
+			};
 
-export function clearPreviewRenderQueue(): void {
-	for (const task of pendingTasks.splice(0)) {
-		task.cancelled = true;
-		task.reject(createAbortError());
+			if (signal) {
+				const onAbort = (): void => {
+					const wasPending = removePendingTask(task as RenderTask<unknown>);
+					task.reject(createAbortError());
+					if (wasPending) cancelIdlePartitionSchedule(partition);
+				};
+				signal.addEventListener("abort", onAbort, { once: true });
+				task.cleanup = () => signal.removeEventListener("abort", onAbort);
+			}
+
+			partition.pendingTasks.push(task as RenderTask<unknown>);
+			schedulePartitionDrain(partition);
+		});
 	}
-	for (const task of scheduledTasks) {
-		task.cancelled = true;
-		task.reject(createAbortError());
+
+	function dispose(): void {
+		if (disposed) return;
+		disposed = true;
+
+		for (const partition of partitions.values()) {
+			partition.cancelScheduledDrain?.();
+			partition.cancelScheduledDrain = null;
+			for (const task of partition.pendingTasks.splice(0)) {
+				task.reject(createAbortError());
+			}
+			partition.runningTask?.reject(createAbortError());
+		}
+		partitions.clear();
 	}
-	scheduledTasks.clear();
-	activePreviewRenders = 0;
+
+	return { enqueue, dispose };
 }

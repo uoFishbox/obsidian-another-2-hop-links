@@ -3,6 +3,7 @@ import type { App } from "obsidian";
 import { DEFAULT_SETTINGS } from "features/settings/model";
 import type { CardPreviewLoader } from "features/card-preview/ui/cardPreviewRenderer";
 import type { CardPreviewSharedCache } from "features/card-preview/ui/cardPreviewSharedCache";
+import type { EnqueuePreviewRender } from "features/card-preview/renderers/previewRenderQueue";
 
 const state = vi.hoisted(() => ({
 	surfaceOptions: [] as Array<Record<string, unknown>>,
@@ -82,6 +83,38 @@ describe("PreviewRuntime", () => {
 		expect(secondClear).not.toHaveBeenCalled();
 		second.dispose();
 		expect(secondClear).toHaveBeenCalledOnce();
+	});
+
+	it("owns a render queue which is not disposed by another runtime", async () => {
+		const createRuntime = () =>
+			createPreviewRuntime({
+				app: {} as App,
+				getPreview: vi.fn() as unknown as CardPreviewLoader,
+			});
+		const first = createRuntime();
+		const second = createRuntime();
+
+		first.createSurface({});
+		const firstCreateRenderer = state.surfaceOptions.at(-1)
+			?.createRenderer as () => unknown;
+		firstCreateRenderer();
+		const firstEnqueue = state.rendererOptions.at(-1)
+			?.enqueuePreviewRender as EnqueuePreviewRender;
+
+		second.createSurface({});
+		const secondCreateRenderer = state.surfaceOptions.at(-1)
+			?.createRenderer as () => unknown;
+		secondCreateRenderer();
+		const secondEnqueue = state.rendererOptions.at(-1)
+			?.enqueuePreviewRender as EnqueuePreviewRender;
+
+		expect(firstEnqueue).not.toBe(secondEnqueue);
+		first.dispose();
+		await expect(firstEnqueue(async () => "disposed")).rejects.toMatchObject({
+			name: "AbortError",
+		});
+		await expect(secondEnqueue(async () => "active")).resolves.toBe("active");
+		second.dispose();
 	});
 
 	it("returns disabled surfaces after disposal", () => {

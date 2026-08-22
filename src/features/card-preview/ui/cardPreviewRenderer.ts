@@ -1,6 +1,6 @@
 import { Component, type App, type Pos, type TFile } from "obsidian";
 import { enqueueMathRender } from "features/card-preview/renderers/mathRenderQueue";
-import { enqueuePreviewRender } from "features/card-preview/renderers/previewRenderQueue";
+import type { EnqueuePreviewRender } from "features/card-preview/renderers/previewRenderQueue";
 import { processPreviewContent } from "features/card-preview/renderers/markdownPreviewRenderer";
 import {
 	type PreviewDomCommitScope,
@@ -39,6 +39,7 @@ export interface CardPreviewRendererOptions {
 	app: App;
 	getPreview: CardPreviewLoader;
 	domCommitScope: PreviewDomCommitScope;
+	enqueuePreviewRender: EnqueuePreviewRender;
 	sharedCache: CardPreviewSharedCache;
 	resolveSearchMatchPosition?: (
 		query: string,
@@ -164,6 +165,7 @@ export function createCardPreviewRenderer(
 						content: previewForRender.content,
 						enableMathRendering,
 						analysis: previewAnalysis,
+						enqueuePreviewRender: options.enqueuePreviewRender,
 						signal,
 					});
 					if (isRenderStale(signal)) return false;
@@ -232,6 +234,7 @@ export function createCardPreviewRenderer(
 								content: previewForRender.content,
 								enableMathRendering: true,
 								analysis: previewAnalysis,
+								enqueuePreviewRender: options.enqueuePreviewRender,
 								signal,
 							});
 
@@ -371,6 +374,7 @@ function renderDetachedTextPreviewFragment(params: {
 	document: Document;
 	content: string;
 	enableMathRendering: boolean;
+	enqueuePreviewRender: EnqueuePreviewRender;
 	analysis?: PreviewContentAnalysis;
 	signal?: AbortSignal;
 }): Promise<DocumentFragment> {
@@ -378,6 +382,7 @@ function renderDetachedTextPreviewFragment(params: {
 		document: ownerDocument,
 		content,
 		enableMathRendering,
+		enqueuePreviewRender,
 		analysis,
 		signal,
 	} = params;

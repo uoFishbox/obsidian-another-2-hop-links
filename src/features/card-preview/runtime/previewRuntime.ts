@@ -20,6 +20,7 @@ import {
 	type CardPreviewRendererOptions,
 } from "features/card-preview/ui/cardPreviewRenderer";
 import { createCardPreviewSharedCache } from "features/card-preview/ui/cardPreviewSharedCache";
+import { createPreviewRenderQueue } from "features/card-preview/renderers/previewRenderQueue";
 
 /** Configuration shared by every preview surface owned by one plugin load. */
 export interface PreviewRuntimeOptions {
@@ -68,6 +69,9 @@ export function createPreviewRuntime(options: PreviewRuntimeOptions): PreviewRun
 		});
 	const domCommitScheduler: PreviewDomCommitScheduler =
 		createPreviewDomCommitScheduler(resolveSchedulingWindow);
+	const previewRenderQueue = createPreviewRenderQueue({
+		getSchedulingWindow: resolveSchedulingWindow,
+	});
 	const sharedCache = createCardPreviewSharedCache();
 	const surfaces = new Set<VirtualPreviewSurface>();
 	let disposed = false;
@@ -91,6 +95,7 @@ export function createPreviewRuntime(options: PreviewRuntimeOptions): PreviewRun
 				createCardPreviewRenderer({
 					app: options.app,
 					getPreview: options.getPreview,
+					enqueuePreviewRender: previewRenderQueue.enqueue,
 					sharedCache,
 					resolveSearchMatchPosition:
 						surfaceOptions.resolveSearchMatchPosition,
@@ -115,6 +120,7 @@ export function createPreviewRuntime(options: PreviewRuntimeOptions): PreviewRun
 		disposed = true;
 		for (const surface of surfaces) surface.dispose();
 		surfaces.clear();
+		previewRenderQueue.dispose();
 		sharedCache.clear();
 		// These schedulers are shared by renderers created by this runtime. Their
 		// lifetime must end with the plugin, not with an individual idle queue.
