@@ -4,19 +4,29 @@
 
 	interface Props {
 		app: App;
-		path: string;
+		paths: string[];
 	}
 
-	let { app, path }: Props = $props();
+	let { app, paths }: Props = $props();
 
-	const bookmarks = useBookmarks(app);
-	const isBookmarked = $derived(bookmarks.isBookmarked(path));
-	const bookmarkCount = $derived(bookmarks.filePaths.size);
+	const bookmarkStates = paths.map(() => useBookmarks(app));
+	const bookmarkStatuses = $derived(
+		paths.map((path, index) => bookmarkStates[index]?.isBookmarked(path) ?? false),
+	);
+	const primaryBookmarks = bookmarkStates[0];
+	const bookmarkCount = $derived(primaryBookmarks?.filePaths.size ?? 0);
 	const orderedPaths = $derived(
-		(bookmarks.filePaths.size, bookmarks.orderedFilePaths.join(",")),
+		primaryBookmarks
+			? (primaryBookmarks.filePaths.size,
+				primaryBookmarks.orderedFilePaths.join(","))
+			: "",
 	);
 </script>
 
-<div data-testid="is-bookmarked">{isBookmarked ? "true" : "false"}</div>
+{#each bookmarkStatuses as isBookmarked, index}
+	<div data-testid={`bookmark-status-${index}`}>
+		{isBookmarked ? "true" : "false"}
+	</div>
+{/each}
 <div data-testid="bookmark-count">{bookmarkCount}</div>
 <div data-testid="ordered-file-paths">{orderedPaths}</div>

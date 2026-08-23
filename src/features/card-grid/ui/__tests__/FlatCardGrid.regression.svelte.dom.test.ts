@@ -1,17 +1,19 @@
 import { waitFor } from "@testing-library/svelte";
 import { describe, expect, it } from "vitest";
 import {
+	renderFlatCardGridContract,
+	renderFlatCardGridObjectContract,
+} from "./flatCardGridContractFixture";
+import {
 	createItems,
-	renderFlatCardGrid,
-	renderFlatCardGridObject,
 	setupFlatCardGridTestEnvironment,
-} from "./flatCardGridTestDriver";
+} from "./flatCardGridTestEnvironment";
 
 setupFlatCardGridTestEnvironment();
 
 describe("FlatCardGrid regression", () => {
 	it("renders a bounded mounted grid in logical order", async () => {
-		const driver = renderFlatCardGrid({
+		const driver = renderFlatCardGridContract({
 			items: createItems(6),
 			initialVisibleCount: 6,
 		});
@@ -31,11 +33,11 @@ describe("FlatCardGrid regression", () => {
 			expect(rowCount).toBeLessThan(6);
 		});
 
-		expect(driver.renderedIndexesInShadowRoot()).toEqual([0, 1, 2, 3, 4, 5]);
+		expect(driver.mountedLogicalIndexesInShadowRoot()).toEqual([0, 1, 2, 3, 4, 5]);
 	});
 
 	it("reuses physical row shells when a logical row leaves the mounted range", async () => {
-		const driver = renderFlatCardGrid({
+		const driver = renderFlatCardGridContract({
 			items: createItems(30),
 			initialVisibleCount: 30,
 		});
@@ -46,7 +48,7 @@ describe("FlatCardGrid regression", () => {
 		});
 
 		await waitFor(() => {
-			expect(driver.renderedIndexes()).toContain(0);
+			expect(driver.mountedLogicalIndexes()).toContain(0);
 		});
 
 		const shadowRoot = driver.getShadowRoot();
@@ -70,7 +72,7 @@ describe("FlatCardGrid regression", () => {
 			expect(firstRowShell?.dataset.cclRowIndex).not.toBe("0");
 		});
 
-		expect(driver.renderedIndexes()).not.toContain(0);
+		expect(driver.mountedLogicalIndexes()).not.toContain(0);
 		const logicalIndexes = Array.from(
 			shadowRoot.querySelectorAll<HTMLElement>("[data-testid='item-cell']"),
 		).map((cell) => Number(cell.dataset.index));
@@ -80,7 +82,7 @@ describe("FlatCardGrid regression", () => {
 	});
 
 	it("does not shift the mounted slice for upstream spacer changes alone", async () => {
-		const driver = renderFlatCardGrid({
+		const driver = renderFlatCardGridContract({
 			items: createItems(20),
 			initialVisibleCount: 20,
 			topSpacerHeight: 390,
@@ -98,7 +100,7 @@ describe("FlatCardGrid regression", () => {
 			sectionTop: -804,
 		});
 
-		driver.expectRenderedIndexes({
+		driver.expectMountedLogicalIndexes({
 			include: [15],
 			exclude: [0],
 			maxCount: 12,
@@ -115,7 +117,7 @@ describe("FlatCardGrid regression", () => {
 		await Promise.resolve();
 		await Promise.resolve();
 
-		driver.expectRenderedIndexes({
+		driver.expectMountedLogicalIndexes({
 			include: [15],
 			exclude: [0],
 			maxCount: 12,
@@ -124,7 +126,7 @@ describe("FlatCardGrid regression", () => {
 		await driver.resizeGrid({ width: 330, height: 2001 });
 
 		await waitFor(() => {
-			expect(driver.renderedIndexes()).toEqual([]);
+			expect(driver.mountedLogicalIndexes()).toEqual([]);
 		});
 	});
 
@@ -134,7 +136,7 @@ describe("FlatCardGrid regression", () => {
 			label: `Initial ${index}`,
 		}));
 
-		const driver = renderFlatCardGridObject({
+		const driver = renderFlatCardGridObjectContract({
 			items: initialItems,
 			initialVisibleCount: 2,
 			loadMoreIncrement: 2,
@@ -168,7 +170,7 @@ describe("FlatCardGrid regression", () => {
 			label: `Initial ${index}`,
 		}));
 
-		const driver = renderFlatCardGridObject({
+		const driver = renderFlatCardGridObjectContract({
 			items,
 			itemsRevision: 0,
 			initialVisibleCount: 3,
@@ -205,7 +207,7 @@ describe("FlatCardGrid regression", () => {
 			label: `Initial ${index}`,
 		}));
 
-		const driver = renderFlatCardGridObject({
+		const driver = renderFlatCardGridObjectContract({
 			items,
 			itemsRevision: 0,
 			initialVisibleCount: 2,

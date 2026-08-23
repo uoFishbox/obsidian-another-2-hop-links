@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/svelte";
+import { fireEvent, render, screen, waitFor } from "@testing-library/svelte";
 import { tick } from "svelte";
 import { TFile } from "obsidian";
 import { createMockTFile } from "testing/__mocks__/testHelpers";
@@ -11,11 +11,15 @@ import type { ListViewState } from "features/list-view/model/ListViewState";
 import type { ISortService } from "core/sorting";
 import { filterSearchWorkerDatasetWithMatchDetails } from "features/search/searchWorkerFilter";
 import { DEFAULT_SETTINGS } from "features/settings/model";
-
-vi.mock("../ViewItemCard.svelte", async () => {
-	const component = await import("./SearchableItemListItemStub.svelte");
-	return { default: component.default };
-});
+import { ARIA_LABELS } from "appConstants";
+import { queryAllByRoleDeep } from "testing/helpers/shadowDomQueries";
+import {
+	installResizeObserverMock,
+	resetRecords,
+	setElementRect,
+	teardownResizeObserverMock,
+	triggerResize,
+} from "testing/helpers/DOMObserverMock";
 
 vi.mock("features/search/searchWorkerClient", async () => {
 	const { filterSearchWorkerDatasetWithMatchDetails } =
@@ -180,62 +184,34 @@ async function flushAsyncUi(): Promise<void> {
 	await tick();
 }
 
-function collectOpenShadowRoots(root: ParentNode = document): ShadowRoot[] {
-	const shadowRoots: ShadowRoot[] = [];
-	for (const element of Array.from(root.querySelectorAll("*"))) {
-		if (!(element instanceof HTMLElement) || !element.shadowRoot) {
-			continue;
-		}
-
-		shadowRoots.push(element.shadowRoot);
-		shadowRoots.push(...collectOpenShadowRoots(element.shadowRoot));
-	}
-	return shadowRoots;
-}
-
-function queryAllByTestIdIncludingShadow(testId: string): HTMLElement[] {
-	const elements = screen.queryAllByTestId(testId) as HTMLElement[];
-	for (const shadowRoot of collectOpenShadowRoots()) {
-		elements.push(
-			...(within(shadowRoot as unknown as HTMLElement).queryAllByTestId(
-				testId,
-			) as HTMLElement[]),
-		);
-	}
-	return elements;
-}
-
 function getAllSearchableItems(): HTMLElement[] {
-	const items = queryAllByTestIdIncludingShadow("searchable-item");
+	const items = queryAllByRoleDeep("button", { name: / を開く$/ });
 	if (items.length === 0) {
 		throw new Error("Unable to find searchable items");
 	}
 	return items;
 }
 
-function queryByTextIncludingShadow(text: string): HTMLElement | null {
-	const element = screen.queryByText(text) as HTMLElement | null;
-	if (element) {
-		return element;
-	}
-
-	for (const shadowRoot of collectOpenShadowRoots()) {
-		const shadowElement = within(shadowRoot as unknown as HTMLElement).queryByText(
-			text,
-		) as HTMLElement | null;
-		if (shadowElement) {
-			return shadowElement;
-		}
-	}
-	return null;
+function querySearchableItem(label: string): HTMLElement | null {
+	return (
+		queryAllByRoleDeep("button", {
+			name: ARIA_LABELS.OPEN_LINK(label),
+		})[0] ?? null
+	);
 }
 
-function getByTextIncludingShadow(text: string): HTMLElement {
-	const element = queryByTextIncludingShadow(text);
-	if (!element) {
-		throw new Error(`Unable to find text: ${text}`);
+async function setGridViewportWidth(width: number): Promise<void> {
+	await tick();
+	const gridRoot = document.querySelector<HTMLElement>(
+		".cosense-card-links__virtual-grid",
+	);
+	if (!gridRoot) {
+		throw new Error("Unable to find searchable item grid");
 	}
-	return element;
+
+	setElementRect(gridRoot, { top: 0, width, height: 1000 });
+	triggerResize(gridRoot, width, 1000);
+	await flushAsyncUi();
 }
 
 function expectComposedFocus(element: HTMLElement): void {
@@ -248,9 +224,12 @@ function expectComposedFocus(element: HTMLElement): void {
 describe("SearchableItemList integration", () => {
 	beforeEach(() => {
 		vi.useFakeTimers();
+		resetRecords();
+		installResizeObserverMock();
 	});
 
 	afterEach(() => {
+		teardownResizeObserverMock();
 		vi.useRealTimers();
 	});
 
@@ -301,8 +280,62 @@ describe("SearchableItemList integration", () => {
 		await flushAsyncUi();
 
 		await waitFor(() => expect(getAllSearchableItems()).toHaveLength(1));
-		expect(getByTextIncludingShadow("alpha-note")).toBeInTheDocument();
-		expect(queryByTextIncludingShadow("beta-note")).not.toBeInTheDocument();
+		expect(querySearchableItem("alpha-note")).toBeInTheDocument();
+		expect(querySearchableItem("beta-note")).not.toBeInTheDocument();
+	});
+
+	it("renders cards in the order returned by the sort service", async () => {
+		const sourceFile = createMockTFile("notes/source.md");
+		const items = ["beta", "gamma", "delta", "alpha"].map((name) =>
+			createTaggedNoteItem(createMockTFile(`notes/${name}.md`)),
+		);
+		const expandedLimits = new Map<string, number>();
+		const applicationStore = {
+			sortOption: "alphabetical",
+			initialVisibleCount: 10,
+			loadMoreIncrement: 10,
+			settings: DEFAULT_SETTINGS,
+			setSortOption: vi.fn(),
+			getDefaultSectionVisibleLimit: vi.fn(() => 10),
+			getSectionExpandedLimit: vi.fn((sectionId: string) =>
+				expandedLimits.get(sectionId),
+			),
+			setSectionExpandedLimit: vi.fn((sectionId: string, limit: number) => {
+				expandedLimits.set(sectionId, limit);
+			}),
+			updateVersion: 0,
+		} as unknown as ListViewState;
+		const sortService: ISortService = {
+			sort: vi.fn((nextItems) => [
+				nextItems[2]!,
+				nextItems[3]!,
+				nextItems[0]!,
+				nextItems[1]!,
+			]),
+		};
+
+		render(SearchableItemList, {
+			props: {
+				items,
+				config: { ...createConfig(), searchEnabled: false },
+				linkContext: createLinkContext(sourceFile),
+				applicationStore,
+				sortService,
+				app: {} as never,
+				autofocus: false,
+			},
+		});
+
+		await setGridViewportWidth(1600);
+
+		expect(
+			getAllSearchableItems().map((item) => item.getAttribute("aria-label")),
+		).toEqual([
+			ARIA_LABELS.OPEN_LINK("delta"),
+			ARIA_LABELS.OPEN_LINK("alpha"),
+			ARIA_LABELS.OPEN_LINK("beta"),
+			ARIA_LABELS.OPEN_LINK("gamma"),
+		]);
 	});
 
 	it("moves focus between the search input and visible result cards", async () => {

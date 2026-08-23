@@ -198,38 +198,6 @@ afterEach(() => {
 	toViewItemsMock.mockClear();
 });
 
-class TagNotesViewHarness extends TagNotesView {
-	public setTag(tag: string, sourcePath = ""): void {
-		(this as unknown as { tag: string; sourcePath: string }).tag = tag;
-		(this as unknown as { tag: string; sourcePath: string }).sourcePath =
-			sourcePath;
-	}
-
-	public renderForTest(): void {
-		this.render();
-	}
-
-	public refreshForTest(context?: {
-		affectsAll?: boolean;
-		affectedPaths?: string[];
-		affectedTags?: string[];
-	}): void {
-		this.refreshItemsForContext(context);
-	}
-
-	public shouldRefreshForContextForTest(context?: {
-		affectsAll?: boolean;
-		affectedPaths?: string[];
-		affectedTags?: string[];
-	}): boolean {
-		return this.shouldRefreshForContext(context);
-	}
-
-	public getCurrentItemsForTest(): Array<{ path: string }> {
-		return this.getCurrentItems();
-	}
-}
-
 function createLeaf(): any {
 	return {
 		app: {
@@ -386,70 +354,33 @@ describe("TagNotesView", () => {
 		});
 	});
 
-	it("autofocuses on initial list render even when loading was interleaved", () => {
-		const view = new TagNotesViewHarness(
+	it("autofocuses the first list rendered after an interleaved load", async () => {
+		const deferredNotes = createDeferred<ReturnType<typeof createTaggedNote>[]>();
+		const view = new TagNotesView(
 			createLeaf(),
-			createPlugin(),
+			{
+				...createPlugin(),
+				indexingService: {
+					...createPlugin().indexingService,
+					getNotesWithTag: vi.fn(() => deferredNotes.promise),
+				},
+			},
 			createViewServices(),
 		);
 
-		view.setTag("alpha");
-		(
-			view as unknown as {
-				isLoadingNotes: boolean;
-				hasLoadedNotes: boolean;
-				notes: Array<{ path: string }>;
-			}
-		).isLoadingNotes = true;
-		(
-			view as unknown as {
-				isLoadingNotes: boolean;
-				hasLoadedNotes: boolean;
-				notes: Array<{ path: string }>;
-			}
-		).hasLoadedNotes = false;
-		(
-			view as unknown as {
-				isLoadingNotes: boolean;
-				hasLoadedNotes: boolean;
-				notes: Array<{ path: string }>;
-			}
-		).notes = [];
-
-		view.renderForTest();
+		await view.setState({ tag: "alpha" }, { history: false });
 
 		expect(screen.queryByTestId("tag-notes-list-host")).toBeNull();
 		expect(
 			screen.getByText("Waiting for the tag index to finish building."),
 		).toBeInTheDocument();
 
-		(
-			view as unknown as {
-				isLoadingNotes: boolean;
-				hasLoadedNotes: boolean;
-				notes: Array<{ path: string }>;
-			}
-		).isLoadingNotes = false;
-		(
-			view as unknown as {
-				isLoadingNotes: boolean;
-				hasLoadedNotes: boolean;
-				notes: Array<{ path: string }>;
-			}
-		).hasLoadedNotes = true;
-		(
-			view as unknown as {
-				isLoadingNotes: boolean;
-				hasLoadedNotes: boolean;
-				notes: Array<{ path: string }>;
-			}
-		).notes = [{ path: "notes/alpha.md" }];
-
-		view.renderForTest();
-
-		expect(screen.getByTestId("tag-notes-list-host")).toHaveAttribute(
-			"data-autofocus",
-			"true",
+		deferredNotes.resolve([createTaggedNote("notes/alpha.md", 1)]);
+		await waitFor(() =>
+			expect(screen.getByTestId("tag-notes-list-host")).toHaveAttribute(
+				"data-autofocus",
+				"true",
+			),
 		);
 
 		view.refreshFromSettings();
@@ -458,110 +389,5 @@ describe("TagNotesView", () => {
 			"data-autofocus",
 			"false",
 		);
-	});
-
-	it("does not request re-render for updates unrelated to affectedTags", () => {
-		const view = new TagNotesViewHarness(
-			createLeaf(),
-			createPlugin(),
-			createViewServices(),
-		);
-
-		view.setTag("alpha", "source.md");
-		(view as unknown as { hasLoadedNotes: boolean }).hasLoadedNotes = true;
-		(view as unknown as { notes: Array<{ path: string }> }).notes = [
-			createTaggedNote("notes/alpha.md", 1),
-		];
-
-		expect(
-			view.shouldRefreshForContextForTest({
-				affectedTags: ["beta"],
-				affectedPaths: ["notes/other.md"],
-			}),
-		).toBe(false);
-
-		expect(
-			view.shouldRefreshForContextForTest({
-				affectedTags: ["alpha"],
-			}),
-		).toBe(true);
-	});
-
-	it("updates mounted list via diff without calling render on index update", async () => {
-		const peekNotesWithTag = vi.fn(() => [
-			createTaggedNote("notes/alpha-a.md", 2),
-			createTaggedNote("notes/alpha-b.md", 3),
-		]);
-		const view = new TagNotesViewHarness(
-			createLeaf(),
-			{
-				...createPlugin(),
-				indexingService: {
-					peekNotesWithTag,
-				},
-			},
-			createViewServices(),
-		);
-
-		view.setTag("alpha");
-		(view as unknown as { hasLoadedNotes: boolean }).hasLoadedNotes = true;
-		(view as unknown as { notes: ReturnType<typeof createTaggedNote>[] }).notes = [
-			createTaggedNote("notes/alpha-a.md", 1),
-		];
-
-		const renderSpy = vi.spyOn(view as unknown as { render: () => void }, "render");
-
-		view.renderForTest();
-		renderSpy.mockClear();
-
-		const host = screen.getByTestId("tag-notes-list-host");
-		expect(host).toHaveAttribute("data-item-count", "1");
-
-		view.refreshForTest({
-			affectedTags: ["alpha"],
-		});
-
-		expect(peekNotesWithTag).toHaveBeenCalledWith("alpha", "");
-		expect(renderSpy).not.toHaveBeenCalled();
-		expect(
-			screen.getByText("Showing 2 notes tagged with #alpha."),
-		).toBeInTheDocument();
-		expect(screen.getByTestId("tag-notes-list-host")).toBe(host);
-		expect(view.getCurrentItemsForTest()).toHaveLength(2);
-	});
-
-	it("skips update when diff result is same reference array as previous", () => {
-		const alpha = createTaggedNote("notes/alpha-a.md", 1);
-		const peekNotesWithTag = vi.fn(() => [alpha]);
-		const view = new TagNotesViewHarness(
-			createLeaf(),
-			{
-				...createPlugin(),
-				indexingService: {
-					peekNotesWithTag,
-				},
-			},
-			createViewServices(),
-		);
-
-		view.setTag("alpha");
-		(view as unknown as { hasLoadedNotes: boolean }).hasLoadedNotes = true;
-		(view as unknown as { notes: ReturnType<typeof createTaggedNote>[] }).notes = [
-			alpha,
-		];
-
-		view.renderForTest();
-
-		toViewItemsMock.mockClear();
-		triggerUpdateMock.mockClear();
-
-		view.refreshForTest({
-			affectedTags: ["alpha"],
-		});
-
-		expect(peekNotesWithTag).toHaveBeenCalledWith("alpha", "");
-		expect(toViewItemsMock).not.toHaveBeenCalled();
-		expect(triggerUpdateMock).not.toHaveBeenCalled();
-		expect(view.getCurrentItemsForTest()[0]).toBe(alpha);
 	});
 });

@@ -1,23 +1,41 @@
 import { describe, expect, it } from "vitest";
 import { waitFor } from "@testing-library/svelte";
+import { renderFlatCardGridContract } from "./flatCardGridContractFixture";
 import {
 	createItems,
-	renderFlatCardGrid,
 	setupFlatCardGridTestEnvironment,
-} from "./flatCardGridTestDriver";
+} from "./flatCardGridTestEnvironment";
 
 setupFlatCardGridTestEnvironment();
 
-describe("FlatCardGrid viewport", () => {
+describe("FlatCardGrid virtualization contract", () => {
+	it("keeps the infinite-scroll sentinel outside the shadow root", async () => {
+		const fixture = renderFlatCardGridContract({
+			items: createItems(20),
+			initialVisibleCount: 5,
+			loadMoreIncrement: 5,
+			paginationMode: "infinite-scroll",
+		});
+
+		await fixture.setViewport({ rootHeight: 120, width: 330 });
+
+		expect(fixture.getInfiniteScrollSentinel()).not.toBeNull();
+		expect(
+			fixture
+				.getShadowRoot()
+				?.querySelector(".cosense-card-links__infinite-scroll-sentinel"),
+		).toBeNull();
+	});
+
 	it("mounts only a bounded slice around the initial viewport", async () => {
-		const driver = renderFlatCardGrid({
+		const driver = renderFlatCardGridContract({
 			items: createItems(20),
 			initialVisibleCount: 20,
 		});
 
 		await driver.setViewport({ rootHeight: 120, width: 330 });
 
-		driver.expectRenderedIndexes({
+		driver.expectMountedLogicalIndexes({
 			include: [0],
 			exclude: [15],
 			minCount: 1,
@@ -26,7 +44,7 @@ describe("FlatCardGrid viewport", () => {
 	});
 
 	it("updates the mounted slice after scrolling while keeping mount count bounded", async () => {
-		const driver = renderFlatCardGrid({
+		const driver = renderFlatCardGridContract({
 			items: createItems(20),
 			initialVisibleCount: 20,
 		});
@@ -37,7 +55,7 @@ describe("FlatCardGrid viewport", () => {
 			scrollTop: 0,
 		});
 
-		driver.expectRenderedIndexes({
+		driver.expectMountedLogicalIndexes({
 			include: [0],
 			exclude: [15],
 			maxCount: 12,
@@ -48,7 +66,7 @@ describe("FlatCardGrid viewport", () => {
 			sectionTop: -402,
 		});
 
-		driver.expectRenderedIndexes({
+		driver.expectMountedLogicalIndexes({
 			include: [6],
 			exclude: [19],
 			maxCount: 12,
@@ -59,7 +77,7 @@ describe("FlatCardGrid viewport", () => {
 			sectionTop: 0,
 		});
 
-		driver.expectRenderedIndexes({
+		driver.expectMountedLogicalIndexes({
 			include: [0],
 			exclude: [15],
 			maxCount: 12,
@@ -67,7 +85,7 @@ describe("FlatCardGrid viewport", () => {
 	});
 
 	it("uses fallback rows during unstable measurement and recomputes when height stabilizes", async () => {
-		const driver = renderFlatCardGrid({
+		const driver = renderFlatCardGridContract({
 			items: createItems(20),
 			initialVisibleCount: 20,
 		});
@@ -78,7 +96,7 @@ describe("FlatCardGrid viewport", () => {
 			scrollTop: 402,
 		});
 
-		driver.expectRenderedIndexes({
+		driver.expectMountedLogicalIndexes({
 			include: [0],
 			exclude: [15],
 			maxCount: 12,
@@ -96,7 +114,7 @@ describe("FlatCardGrid viewport", () => {
 		});
 
 		await waitFor(() => {
-			driver.expectRenderedIndexes({
+			driver.expectMountedLogicalIndexes({
 				include: [6],
 				exclude: [19],
 				maxCount: 12,
@@ -105,7 +123,7 @@ describe("FlatCardGrid viewport", () => {
 	});
 
 	it("renders small datasets with a header during unstable initial measurements", async () => {
-		const driver = renderFlatCardGrid({
+		const driver = renderFlatCardGridContract({
 			items: createItems(2),
 			showHeader: true,
 			initialVisibleCount: 2,
@@ -117,11 +135,11 @@ describe("FlatCardGrid viewport", () => {
 		});
 
 		expect(driver.getHeader()).not.toBeNull();
-		expect(driver.renderedIndexes()).toEqual([0, 1]);
+		expect(driver.mountedLogicalIndexes()).toEqual([0, 1]);
 	});
 
 	it("recomputes the mounted slice when the grid width changes", async () => {
-		const driver = renderFlatCardGrid({
+		const driver = renderFlatCardGridContract({
 			items: createItems(20),
 			initialVisibleCount: 20,
 		});
@@ -131,14 +149,14 @@ describe("FlatCardGrid viewport", () => {
 			width: 330,
 		});
 
-		const before = driver.renderedIndexes();
+		const before = driver.mountedLogicalIndexes();
 
 		await driver.resizeTo({
 			rootHeight: 120,
 			width: 210,
 		});
 
-		const after = driver.renderedIndexes();
+		const after = driver.mountedLogicalIndexes();
 
 		expect(after).toContain(0);
 		expect(after).not.toContain(10);

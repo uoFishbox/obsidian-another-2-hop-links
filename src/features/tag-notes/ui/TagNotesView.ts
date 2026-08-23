@@ -19,6 +19,7 @@ import type { DataUpdateContext } from "core/indexing/index-service/IndexEvents"
 import { AbstractSvelteListView } from "ui/shared/views/abstractSvelteListView";
 import { buildEditorLikeFrame } from "ui/shared/views/editorLikeFrame";
 import { getViewItemKey, type ViewItem } from "application/presenters";
+import { shouldRefreshTagNotesForContext } from "features/tag-notes/ui/tagNotesRefreshDecision";
 
 export const VIEW_TYPE_TAG_NOTES = "cosense-card-links-tag-notes-view";
 
@@ -248,39 +249,13 @@ export class TagNotesView extends AbstractSvelteListView<TaggedNote> {
 	}
 
 	protected shouldRefreshForContext(context?: DataUpdateContext): boolean {
-		if (!this.isTagFeatureEnabled()) {
-			return false;
-		}
-
-		if (!this.tag) {
-			return false;
-		}
-
-		if (!context || context.affectsAll) {
-			return true;
-		}
-
-		const affectedTags = context.affectedTags;
-		if (affectedTags?.includes(this.tag)) {
-			return true;
-		}
-
-		const affectedPaths = context.affectedPaths;
-		if (!affectedPaths || affectedPaths.length === 0) {
-			return false;
-		}
-
-		if (this.sourcePath && affectedPaths.includes(this.sourcePath)) {
-			return true;
-		}
-
-		for (const path of affectedPaths) {
-			if (this.hasCurrentItemKey(path)) {
-				return true;
-			}
-		}
-
-		return false;
+		return shouldRefreshTagNotesForContext({
+			tagFeaturesEnabled: this.isTagFeatureEnabled(),
+			tag: this.tag,
+			sourcePath: this.sourcePath,
+			context,
+			hasCurrentItemPath: (path) => this.hasCurrentItemKey(path),
+		});
 	}
 
 	protected refreshItemsForContext(_context?: DataUpdateContext): void {

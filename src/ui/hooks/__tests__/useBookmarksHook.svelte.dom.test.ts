@@ -2,7 +2,6 @@ import { cleanup, render, screen, waitFor } from "@testing-library/svelte";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { App } from "obsidian";
 import UseBookmarksHarness from "./UseBookmarksHarness.svelte";
-import UseBookmarksPairHarness from "./UseBookmarksPairHarness.svelte";
 
 vi.mock("obsidian", () => {
 	class MockComponent {
@@ -85,12 +84,12 @@ describe("useBookmarks", () => {
 		render(UseBookmarksHarness, {
 			props: {
 				app,
-				path: "notes/alpha.md",
+				paths: ["notes/alpha.md"],
 			},
 		});
 
 		await waitFor(() => {
-			expect(screen.getByTestId("is-bookmarked").textContent).toBe("true");
+			expect(screen.getByTestId("bookmark-status-0").textContent).toBe("true");
 		});
 		expect(screen.getByTestId("bookmark-count").textContent).toBe("1");
 	});
@@ -109,7 +108,7 @@ describe("useBookmarks", () => {
 		render(UseBookmarksHarness, {
 			props: {
 				app,
-				path: "notes/alpha.md",
+				paths: ["notes/alpha.md"],
 			},
 		});
 
@@ -132,12 +131,12 @@ describe("useBookmarks", () => {
 		render(UseBookmarksHarness, {
 			props: {
 				app: mockApp.app,
-				path: "notes/alpha.md",
+				paths: ["notes/alpha.md"],
 			},
 		});
 
 		await waitFor(() => {
-			expect(screen.getByTestId("is-bookmarked").textContent).toBe("true");
+			expect(screen.getByTestId("bookmark-status-0").textContent).toBe("true");
 		});
 
 		mockApp.setContent(
@@ -149,7 +148,7 @@ describe("useBookmarks", () => {
 		await vi.advanceTimersByTimeAsync(120);
 
 		await waitFor(() => {
-			expect(screen.getByTestId("is-bookmarked").textContent).toBe("false");
+			expect(screen.getByTestId("bookmark-status-0").textContent).toBe("false");
 		});
 		expect(screen.getByTestId("bookmark-count").textContent).toBe("1");
 	});
@@ -165,16 +164,15 @@ describe("useBookmarks", () => {
 			}),
 		});
 
-		render(UseBookmarksPairHarness, {
+		render(UseBookmarksHarness, {
 			props: {
 				app: mockApp.app,
-				firstPath: "notes/alpha.md",
-				secondPath: "notes/beta.md",
+				paths: ["notes/alpha.md", "notes/beta.md"],
 			},
 		});
 		await waitFor(() => {
-			expect(screen.getByTestId("first-is-bookmarked").textContent).toBe("true");
-			expect(screen.getByTestId("second-is-bookmarked").textContent).toBe("true");
+			expect(screen.getByTestId("bookmark-status-0").textContent).toBe("true");
+			expect(screen.getByTestId("bookmark-status-1").textContent).toBe("true");
 		});
 
 		const readMock = mockApp.app.vault.adapter.read as unknown as {
@@ -197,8 +195,8 @@ describe("useBookmarks", () => {
 		await vi.advanceTimersByTimeAsync(120);
 
 		await waitFor(() => {
-			expect(screen.getByTestId("first-is-bookmarked").textContent).toBe("false");
-			expect(screen.getByTestId("second-is-bookmarked").textContent).toBe("true");
+			expect(screen.getByTestId("bookmark-status-0").textContent).toBe("false");
+			expect(screen.getByTestId("bookmark-status-1").textContent).toBe("true");
 		});
 		expect(readMock.mock.calls.length).toBe(initialReadCount + 1);
 		expect(workspaceOnMock.mock.calls.length).toBe(initialWorkspaceOnCount);
@@ -215,7 +213,7 @@ describe("useBookmarks", () => {
 		render(UseBookmarksHarness, {
 			props: {
 				app: mockApp.app,
-				path: "notes/alpha.md",
+				paths: ["notes/alpha.md"],
 			},
 		});
 
@@ -230,7 +228,7 @@ describe("useBookmarks", () => {
 		await waitFor(() => {
 			expect(screen.getByTestId("bookmark-count").textContent).toBe("0");
 		});
-		expect(screen.getByTestId("is-bookmarked").textContent).toBe("false");
+		expect(screen.getByTestId("bookmark-status-0").textContent).toBe("false");
 	});
 
 	it("falls back to empty set on read error", async () => {
@@ -244,7 +242,7 @@ describe("useBookmarks", () => {
 		render(UseBookmarksHarness, {
 			props: {
 				app: mockApp.app,
-				path: "notes/alpha.md",
+				paths: ["notes/alpha.md"],
 			},
 		});
 
@@ -259,6 +257,6 @@ describe("useBookmarks", () => {
 		await waitFor(() => {
 			expect(screen.getByTestId("bookmark-count").textContent).toBe("0");
 		});
-		expect(screen.getByTestId("is-bookmarked").textContent).toBe("false");
+		expect(screen.getByTestId("bookmark-status-0").textContent).toBe("false");
 	});
 });

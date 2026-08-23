@@ -1,16 +1,16 @@
-import { fireEvent, waitFor } from "@testing-library/svelte";
+import { waitFor } from "@testing-library/svelte";
 import { describe, expect, it } from "vitest";
+import { renderFlatCardGridBehavior } from "./flatCardGridBehaviorDriver";
 import {
 	createItems,
-	renderFlatCardGrid,
 	setupFlatCardGridTestEnvironment,
-} from "./flatCardGridTestDriver";
+} from "./flatCardGridTestEnvironment";
 
 setupFlatCardGridTestEnvironment();
 
 describe("FlatCardGrid pagination", () => {
 	it("loads the next page when the load more button is clicked", async () => {
-		const driver = renderFlatCardGrid({
+		const driver = renderFlatCardGridBehavior({
 			items: createItems(20),
 			showHeader: true,
 			initialVisibleCount: 5,
@@ -22,19 +22,19 @@ describe("FlatCardGrid pagination", () => {
 			width: 330,
 		});
 
-		await fireEvent.click(driver.getLoadMoreButton());
+		await driver.clickLoadMore();
 
 		await waitFor(() => {
-			expect(driver.renderedIndexes()).toEqual(
-				expect.arrayContaining([0, 1, 2, 3, 4, 5, 6, 7, 8, 9]),
+			expect(driver.visibleItems()).toEqual(
+				expect.arrayContaining(createItems(10)),
 			);
 		});
 
-		expect(driver.getLoadMoreButton()).not.toBeNull();
+		expect(driver.hasLoadMoreButton()).toBe(true);
 	});
 
 	it("loads one additional page when the infinite-scroll sentinel intersects", async () => {
-		const driver = renderFlatCardGrid({
+		const driver = renderFlatCardGridBehavior({
 			items: createItems(20),
 			initialVisibleCount: 5,
 			loadMoreIncrement: 5,
@@ -47,41 +47,18 @@ describe("FlatCardGrid pagination", () => {
 			width: 330,
 		});
 
-		expect(driver.renderedIndexes()).toEqual([0, 1, 2, 3, 4]);
+		expect(driver.visibleItems()).toEqual(createItems(5));
+		expect(driver.hasInfiniteScrollTrigger()).toBe(true);
 
-		const sentinel = driver.getSentinel();
-		expect(sentinel).not.toBeNull();
-
-		driver.intersectSentinel();
+		driver.triggerInfiniteScroll();
 
 		await waitFor(() => {
-			expect(driver.renderedIndexes()).toEqual([0, 1, 2, 3, 4, 5, 6, 7, 8, 9]);
+			expect(driver.visibleItems()).toEqual(createItems(10));
 		});
-	});
-
-	it("keeps the infinite-scroll sentinel outside the shadow root", async () => {
-		const driver = renderFlatCardGrid({
-			items: createItems(20),
-			initialVisibleCount: 5,
-			loadMoreIncrement: 5,
-			paginationMode: "infinite-scroll",
-		});
-
-		await driver.setViewport({
-			rootHeight: 120,
-			width: 330,
-		});
-
-		expect(driver.getSentinel()).not.toBeNull();
-		expect(
-			driver
-				.getShadowRoot()
-				?.querySelector(".cosense-card-links__infinite-scroll-sentinel"),
-		).toBeNull();
 	});
 
 	it("does not chain sentinel intersections through all remaining pages", async () => {
-		const driver = renderFlatCardGrid({
+		const driver = renderFlatCardGridBehavior({
 			items: createItems(20),
 			initialVisibleCount: 5,
 			loadMoreIncrement: 5,
@@ -94,13 +71,13 @@ describe("FlatCardGrid pagination", () => {
 			width: 330,
 		});
 
-		driver.intersectSentinel();
+		driver.triggerInfiniteScroll();
 
 		await waitFor(() => {
-			expect(driver.renderedIndexes()).toHaveLength(10);
+			expect(driver.visibleItems()).toHaveLength(10);
 		});
 
-		expect(driver.renderedIndexes()).not.toContain(10);
-		expect(driver.renderedIndexes()).not.toContain(15);
+		expect(driver.visibleItems()).not.toContain("Item 10");
+		expect(driver.visibleItems()).not.toContain("Item 15");
 	});
 });

@@ -1,87 +1,16 @@
-import { fireEvent, render, waitFor } from "@testing-library/svelte";
+import { render, waitFor } from "@testing-library/svelte";
 import { describe, expect, it } from "vitest";
 import {
 	createItems,
+	getFlatCardGridElements,
+	scrollFlatCardGrid,
+	setFlatCardGridViewport,
 	setupFlatCardGridTestEnvironment,
-} from "./flatCardGridTestDriver";
-import {
-	flushFrames,
-	setElementRect,
-	setNumericProperty,
-	triggerResize,
-} from "testing/helpers/DOMObserverMock";
+} from "./flatCardGridTestEnvironment";
+import { flushFrames } from "testing/helpers/DOMObserverMock";
 import FlatCardGridRenderProbeHarness from "./FlatCardGridRenderProbeHarness.svelte";
 
 setupFlatCardGridTestEnvironment();
-
-function getRequiredElement<T extends HTMLElement>(
-	container: HTMLElement,
-	selector: string,
-): T {
-	const element = container.querySelector<T>(selector);
-	if (!element) {
-		throw new Error(`Missing test element: ${selector}`);
-	}
-	return element;
-}
-
-async function setViewport(
-	container: HTMLElement,
-	options: { rootHeight: number; width: number; scrollTop?: number },
-): Promise<void> {
-	const scrollRoot = getRequiredElement<HTMLElement>(
-		container,
-		"[data-testid='scroll-root']",
-	);
-	const gridRoot = getRequiredElement<HTMLElement>(
-		container,
-		".cosense-card-links__virtual-grid",
-	);
-
-	setNumericProperty(scrollRoot, "clientHeight", options.rootHeight);
-	setNumericProperty(scrollRoot, "scrollTop", options.scrollTop ?? 0);
-	scrollRoot.style.overflow = "auto";
-	setElementRect(scrollRoot, {
-		top: 0,
-		width: options.width,
-		height: options.rootHeight,
-	});
-	gridRoot.style.setProperty("--ccl-box-size", "100px");
-	gridRoot.style.setProperty("--ccl-box-height", "120px");
-	gridRoot.style.setProperty("--ccl-box-gap", "10px");
-	gridRoot.style.setProperty("--ccl-box-cols-max", "4");
-	setElementRect(gridRoot, {
-		top: 0,
-		width: options.width,
-		height: 2000,
-	});
-	triggerResize(gridRoot, options.width, 2000);
-	triggerResize(scrollRoot, options.width, options.rootHeight);
-	await flushFrames();
-}
-
-async function scrollGrid(
-	container: HTMLElement,
-	options: { scrollTop: number; sectionTop: number },
-): Promise<void> {
-	const scrollRoot = getRequiredElement<HTMLElement>(
-		container,
-		"[data-testid='scroll-root']",
-	);
-	const gridRoot = getRequiredElement<HTMLElement>(
-		container,
-		".cosense-card-links__virtual-grid",
-	);
-
-	setNumericProperty(scrollRoot, "scrollTop", options.scrollTop);
-	setElementRect(gridRoot, {
-		top: options.sectionTop,
-		width: gridRoot.getBoundingClientRect().width,
-		height: 2000,
-	});
-	await fireEvent.scroll(scrollRoot);
-	await flushFrames();
-}
 
 function getFirstSlotProbe(container: HTMLElement): HTMLElement | null {
 	const gridRoot = container.querySelector<HTMLElement>(
@@ -107,14 +36,15 @@ describe("FlatCardGrid physical-slot body lifecycle", () => {
 			},
 		});
 
-		await setViewport(container, { rootHeight: 120, width: 330 });
+		const elements = getFlatCardGridElements(container);
+		await setFlatCardGridViewport(elements, { rootHeight: 120, width: 330 });
 		await waitFor(() => {
 			expect(getFirstSlotProbe(container)?.textContent).toBe("Item 0");
 		});
 
 		mountedItems.length = 0;
 		updatedItems.length = 0;
-		await scrollGrid(container, {
+		await scrollFlatCardGrid(elements, {
 			scrollTop: 804,
 			sectionTop: -804,
 		});
@@ -141,7 +71,10 @@ describe("FlatCardGrid physical-slot body lifecycle", () => {
 			},
 		});
 
-		await setViewport(rendered.container, { rootHeight: 120, width: 330 });
+		await setFlatCardGridViewport(getFlatCardGridElements(rendered.container), {
+			rootHeight: 120,
+			width: 330,
+		});
 		await waitFor(() => {
 			expect(getFirstSlotProbe(rendered.container)?.textContent).toBe("Item 0");
 		});

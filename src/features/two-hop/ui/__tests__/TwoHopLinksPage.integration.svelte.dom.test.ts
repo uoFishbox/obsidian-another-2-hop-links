@@ -1,7 +1,7 @@
-import { render, screen } from "@testing-library/svelte";
+import { fireEvent, render } from "@testing-library/svelte";
 import { TFile } from "obsidian";
 import { createMockTFile } from "testing/__mocks__/testHelpers";
-import type { ComponentProps } from "svelte";
+import { tick, type ComponentProps } from "svelte";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { DEFAULT_SETTINGS } from "features/settings/model";
 import type {
@@ -14,18 +14,25 @@ import type {
 import type { DisplayData } from "features/two-hop/application/displayDataBuilder";
 import TwoHopLinksPage from "../TwoHopLinksPage.svelte";
 import {
-	getTwoHopVirtualGridPageStubProps,
-	resetTwoHopVirtualGridPageStubProps,
-} from "./twoHopVirtualGridPageStubCapture";
-import {
+	installAnimationFrameMock,
 	installIntersectionObserverMock,
+	installResizeObserverMock,
+	resetRecords,
+	setElementRect,
+	setNumericProperty,
+	teardownAnimationFrameMock,
 	teardownIntersectionObserverMock,
+	teardownResizeObserverMock,
 	triggerIntersection,
+	triggerResize,
 } from "testing/helpers/DOMObserverMock";
 import {
 	createPreviewRuntime,
 	type PreviewRuntime,
 } from "features/card-preview/runtime/previewRuntime";
+import { ApplicationUiState } from "application/stores/ApplicationUiState.svelte";
+import { ARIA_LABELS } from "appConstants";
+import { queryAllByRoleDeep } from "testing/helpers/shadowDomQueries";
 
 const previewRuntimes = new Set<PreviewRuntime>();
 
@@ -97,20 +104,6 @@ vi.mock("features/search/searchWorkerClient", async () => {
 		},
 	};
 });
-
-vi.mock("features/list-view/ui/ViewItemCard.svelte", async () => {
-	const component = await import("./TwoHopLinksPageItemStub.svelte");
-	return { default: component.default };
-});
-
-vi.mock("features/two-hop/ui/TwoHopVirtualGrid.svelte", async () => {
-	const component = await import("./TwoHopVirtualGridPageStub.svelte");
-	return { default: component.default };
-});
-
-vi.mock("ui/components/common/LinkSectionHeader.svelte", () => ({
-	default: () => null,
-}));
 
 vi.mock("ui/hooks/useBookmarks.svelte", () => ({
 	useBookmarks: () => ({
@@ -196,34 +189,13 @@ function createApplicationStore(
 	settings: typeof DEFAULT_SETTINGS,
 	originFile: TFile,
 ) {
-	const expandedLimits = new Map<string, number>();
 	const linkResult: TwoHopLinkResult = {
 		originFile,
 		branches: [...displayData.outgoing, ...displayData.twoHopBranches],
 		backlinks: displayData.backlinks,
 		taggedNotes: displayData.tagGroups.flatMap((section) => section.notes),
 	};
-	const uiState = {
-		initialVisibleCount: 10,
-		loadMoreIncrement: 10,
-		settings,
-		sortOption: settings.lastUsedSortOption,
-		sectionExpandedLimits: {},
-		setSortOption: vi.fn(),
-		setContentSearchEnabled: vi.fn(),
-		setSettings: vi.fn(),
-		getPreviewRenderVersion: vi.fn(() => "0:0"),
-		getDefaultSectionVisibleLimit: vi.fn(() => 10),
-		getSectionExpandedLimit: vi.fn((sectionId: string) =>
-			expandedLimits.get(sectionId),
-		),
-		setSectionExpandedLimit: vi.fn((sectionId: string, limit: number) => {
-			expandedLimits.set(sectionId, limit);
-		}),
-		updateVersion: 0,
-		previewGlobalVersion: 0,
-		previewPathVersions: {},
-	};
+	const uiState = new ApplicationUiState(settings, vi.fn(), vi.fn());
 
 	return {
 		loading: false,
@@ -331,22 +303,59 @@ function renderRoot(
 }
 
 async function flushAsyncUi(): Promise<void> {
-	await Promise.resolve();
-	await vi.runOnlyPendingTimersAsync();
-	await Promise.resolve();
+	for (let pass = 0; pass < 6; pass += 1) {
+		await Promise.resolve();
+		await tick();
+		await vi.runOnlyPendingTimersAsync();
+	}
 }
 
-describe("TwoHopLinksPage descriptor plumbing", () => {
+function getVirtualSurface(): HTMLElement {
+	const surface = document.querySelector<HTMLElement>(".twohop-virtual-surface");
+	if (!surface) {
+		throw new Error("Two-hop virtual surface was not rendered");
+	}
+	return surface;
+}
+
+async function showEntireVirtualSurface(width = 1600): Promise<HTMLElement> {
+	await tick();
+	const surface = getVirtualSurface();
+	setElementRect(surface, { top: 0, width, height: 2000 });
+	triggerResize(surface, width, 2000);
+	await flushAsyncUi();
+	return surface;
+}
+
+function queryCardButtons(): HTMLElement[] {
+	return queryAllByRoleDeep("button", { name: / を開く$/ });
+}
+
+function queryCard(label: string): HTMLElement | null {
+	return (
+		queryAllByRoleDeep("button", {
+			name: ARIA_LABELS.OPEN_LINK(label),
+		})[0] ?? null
+	);
+}
+
+describe("TwoHopLinksPage behavior", () => {
 	beforeEach(() => {
 		vi.useFakeTimers();
-		resetTwoHopVirtualGridPageStubProps();
+		resetRecords();
+		installResizeObserverMock();
 		installIntersectionObserverMock();
+		installAnimationFrameMock();
+		setNumericProperty(window, "innerHeight", 900);
+		setNumericProperty(window, "scrollY", 0);
 	});
 
 	afterEach(() => {
 		for (const runtime of previewRuntimes) runtime.dispose();
 		previewRuntimes.clear();
+		teardownAnimationFrameMock();
 		teardownIntersectionObserverMock();
+		teardownResizeObserverMock();
 		vi.useRealTimers();
 	});
 
@@ -372,17 +381,16 @@ describe("TwoHopLinksPage descriptor plumbing", () => {
 			showTagsSection: true,
 		};
 
-		const { container } = renderRoot(displayData, settings, file);
+		renderRoot(displayData, settings, file);
 
-		await flushAsyncUi();
+		await showEntireVirtualSurface();
 
-		expect(container.querySelectorAll(".twohop-page-virtual-list")).toHaveLength(1);
-		expect(screen.getByText("outgoing-parent")).toBeInTheDocument();
-		expect(screen.getByText("backlink-note")).toBeInTheDocument();
-		expect(screen.getByText("tagged-note")).toBeInTheDocument();
+		expect(queryCard("outgoing-parent")).toBeInTheDocument();
+		expect(queryCard("backlink-note")).toBeInTheDocument();
+		expect(queryCard("tagged-note")).toBeInTheDocument();
 	});
 
-	it("passes one explicit preview dependency set to the virtual surface", async () => {
+	it("shows a card preview after the surface becomes visible", async () => {
 		const file = createMockTFile("notes/target.md");
 		const parentFile = createMockTFile("notes/outgoing-parent.md");
 		const displayData = {
@@ -396,34 +404,27 @@ describe("TwoHopLinksPage descriptor plumbing", () => {
 		};
 
 		const rootProps = createRootProps(displayData, settings, file);
+		vi.mocked(rootProps.linkContext.getPreview).mockResolvedValue({
+			type: "image",
+			content: "https://example.com/outgoing-parent.png",
+		});
 		const { container } = render(TwoHopLinksPage, {
 			props: rootProps,
 		});
-		await flushAsyncUi();
-
-		const surface = screen.getByTestId("two-hop-virtual-surface-stub");
-		const capturedProps = getTwoHopVirtualGridPageStubProps();
-		expect(surface.dataset.hasPreviewDependencies).toBe("true");
-		expect(surface.dataset.hasPreviewRuntime).toBe("true");
-		expect(surface.dataset.hasSearchPositionResolver).toBe("true");
-		expect(surface.dataset.previewActive).toBe("false");
+		const surface = await showEntireVirtualSurface();
+		expect(rootProps.linkContext.getPreview).not.toHaveBeenCalled();
+		expect(surface.shadowRoot?.querySelector("img")).toBeNull();
 
 		const root = container.querySelector<HTMLElement>(".cosense-card-links__root");
 		expect(root).not.toBeNull();
 		triggerIntersection(root!);
 		await flushAsyncUi();
-		expect(surface.dataset.previewActive).toBe("true");
 
-		expect(capturedProps?.applicationStore).toBe(
-			rootProps.applicationStore.uiState,
-		);
-		expect(capturedProps?.loadMoreSection).toEqual(expect.any(Function));
-		expect(capturedProps?.previewDependencies?.previewRuntime).toBe(
-			rootProps.previewRuntime,
-		);
+		expect(rootProps.linkContext.getPreview).toHaveBeenCalled();
+		expect(surface.shadowRoot?.querySelector("img")).not.toBeNull();
 	});
 
-	it("owns the scoped load-more action outside the publication memo", async () => {
+	it("shows the next page of cards when load more is clicked", async () => {
 		const file = createMockTFile("notes/target.md");
 		const notes = Array.from({ length: 20 }, (_, index) =>
 			createTaggedNote(createMockTFile(`notes/tagged-${index}.md`), "alpha"),
@@ -435,18 +436,27 @@ describe("TwoHopLinksPage descriptor plumbing", () => {
 		const settings = {
 			...DEFAULT_SETTINGS,
 			defaultVisibleLinkCount: 1,
+			loadMoreLinkIncrement: 10,
 			useMergedLinksSection: false,
 			showTagsSection: true,
 		};
-		const rootProps = createRootProps(displayData, settings, file);
 
-		render(TwoHopLinksPage, { props: rootProps });
+		render(TwoHopLinksPage, {
+			props: createRootProps(displayData, settings, file),
+		});
+		await showEntireVirtualSurface();
+		expect(queryCardButtons()).toHaveLength(1);
+		expect(queryCard("tagged-0")).toBeInTheDocument();
+
+		const loadMoreButton = queryAllByRoleDeep("button", {
+			name: ARIA_LABELS.LOAD_MORE,
+		})[0];
+		expect(loadMoreButton).toBeTruthy();
+		await fireEvent.click(loadMoreButton!);
 		await flushAsyncUi();
-		getTwoHopVirtualGridPageStubProps()?.loadMoreSection?.("tags-alpha");
 
-		expect(
-			rootProps.applicationStore.uiState.setSectionExpandedLimit,
-		).toHaveBeenCalledWith(expect.stringMatching(/^s:/), 11);
+		expect(queryCardButtons()).toHaveLength(11);
+		expect(queryCard("tagged-10")).toBeInTheDocument();
 	});
 
 	it("propagates item count changes for the same sectionId (memo regression)", async () => {
@@ -463,13 +473,11 @@ describe("TwoHopLinksPage descriptor plumbing", () => {
 			...createDisplayData(),
 			outgoing: [createBranch(file, parentFile, [], "outgoing-parent")],
 		};
-		const { container, rerender } = renderRoot(displayDataV1, settings, file);
-		await flushAsyncUi();
+		const { rerender } = renderRoot(displayDataV1, settings, file);
+		await showEntireVirtualSurface();
 
-		const items = () =>
-			container.querySelectorAll('[data-testid="root-link-item"]');
-		expect(items()).toHaveLength(1);
-		expect(screen.getByText("outgoing-parent")).toBeInTheDocument();
+		expect(queryCardButtons()).toHaveLength(1);
+		expect(queryCard("outgoing-parent")).toBeInTheDocument();
 
 		const displayDataV2 = {
 			...createDisplayData(),
@@ -481,8 +489,8 @@ describe("TwoHopLinksPage descriptor plumbing", () => {
 		await rerender(createRootProps(displayDataV2, settings, file));
 		await flushAsyncUi();
 
-		expect(items()).toHaveLength(2);
-		expect(screen.getByText("outgoing-extra")).toBeInTheDocument();
+		expect(queryCardButtons()).toHaveLength(2);
+		expect(queryCard("outgoing-extra")).toBeInTheDocument();
 	});
 
 	it("keeps the virtual surface mounted while sections transition through empty", async () => {
@@ -504,9 +512,8 @@ describe("TwoHopLinksPage descriptor plumbing", () => {
 		);
 		await flushAsyncUi();
 
-		const initialSurface = container.querySelector(".twohop-page-virtual-list");
-		expect(initialSurface).not.toBeNull();
-		expect(screen.getByText("outgoing-parent")).toBeInTheDocument();
+		const initialSurface = await showEntireVirtualSurface();
+		expect(queryCard("outgoing-parent")).toBeInTheDocument();
 
 		await rerender(createRootProps(createDisplayData(), settings, file));
 		await flushAsyncUi();
@@ -514,7 +521,7 @@ describe("TwoHopLinksPage descriptor plumbing", () => {
 		expect(container.querySelector(".twohop-page-virtual-list")).toBe(
 			initialSurface,
 		);
-		expect(screen.queryByText("outgoing-parent")).not.toBeInTheDocument();
+		expect(queryCard("outgoing-parent")).not.toBeInTheDocument();
 
 		await rerender(createRootProps(populatedDisplayData, settings, file));
 		await flushAsyncUi();
@@ -522,6 +529,6 @@ describe("TwoHopLinksPage descriptor plumbing", () => {
 		expect(container.querySelector(".twohop-page-virtual-list")).toBe(
 			initialSurface,
 		);
-		expect(screen.getByText("outgoing-parent")).toBeInTheDocument();
+		expect(queryCard("outgoing-parent")).toBeInTheDocument();
 	});
 });

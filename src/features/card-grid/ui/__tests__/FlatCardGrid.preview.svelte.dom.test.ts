@@ -259,4 +259,101 @@ describe("FlatCardGrid preview surface", () => {
 			getPreview.mock.calls.filter(([file]) => file.path === "duplicate-b.md"),
 		).toHaveLength(loadsBefore);
 	});
+
+	it("replaces a rebound card preview without showing stale content", async () => {
+		const files = ["preview-a.md", "preview-b.md"].map(
+			(path, index) =>
+				({
+					path,
+					basename: path.replace(/\.md$/, ""),
+					extension: "md",
+					parent: { path: "" },
+					stat: { mtime: index + 1 },
+				}) as TFile,
+		);
+		const models = files.map(createModel);
+		const getPreview = vi.fn(async (file: TFile) => ({
+			type: "image" as const,
+			content: `https://example.com/${file.basename}.png`,
+		}));
+		const linkContext = {
+			getPreview,
+			sourceFile: files[0],
+			fileToLinktext: () => "card",
+			getMetadata: () => null,
+		} as unknown as LinkContext;
+		const applicationStore = {
+			settings: DEFAULT_SETTINGS,
+			getPreviewRenderVersion: () => "0:0",
+		} as unknown as ApplicationUiState;
+		const app = { vault: {} } as App;
+		const previewRuntime = createPreviewRuntime({ app, getPreview });
+		previewRuntimes.add(previewRuntime);
+		const appContext = {
+			app,
+			applicationStore,
+			linkContext,
+			bookmarks: {
+				filePaths: new Set(),
+				orderedFilePaths: [],
+				isBookmarked: () => false,
+			},
+			previewRuntime,
+		} as AppContext;
+		const rendered = render(FlatCardGridPreviewHarness, {
+			props: {
+				models: [models[0]!],
+				linkContext,
+				appContext,
+				applicationStore,
+			},
+		});
+		const scrollRoot = rendered.container.querySelector<HTMLElement>(
+			'[data-testid="scroll-root"]',
+		);
+		const gridRoot = rendered.container.querySelector<HTMLElement>(
+			".cosense-card-links__virtual-grid",
+		);
+		if (!scrollRoot || !gridRoot) {
+			throw new TypeError("Virtual grid test surface was not rendered");
+		}
+		setNumericProperty(scrollRoot, "clientHeight", 240);
+		setNumericProperty(scrollRoot, "scrollTop", 0);
+		setElementRect(scrollRoot, { top: 0, width: 330, height: 240 });
+		gridRoot.style.setProperty("--ccl-box-size", "100px");
+		gridRoot.style.setProperty("--ccl-box-height", "120px");
+		gridRoot.style.setProperty("--ccl-box-gap", "10px");
+		gridRoot.style.setProperty("--ccl-box-cols-max", "3");
+		setElementRect(gridRoot, { top: 0, width: 330, height: 500 });
+		triggerResize(gridRoot, 330, 500);
+		triggerResize(scrollRoot, 330, 240);
+		for (let index = 0; index < 8; index += 1) {
+			await flushFrames();
+			await Promise.resolve();
+		}
+		const shadowRoot = gridRoot.shadowRoot;
+		if (!shadowRoot) throw new TypeError("Missing virtual grid shadow root");
+		await waitFor(() => {
+			const image = shadowRoot.querySelector<HTMLImageElement>("img");
+			expect(image?.src).toContain("preview-a.png");
+		});
+
+		await rendered.rerender({
+			models: [models[1]!],
+			linkContext,
+			appContext,
+			applicationStore,
+		});
+		for (let index = 0; index < 8; index += 1) {
+			await flushFrames();
+			await Promise.resolve();
+		}
+
+		await waitFor(() => {
+			const images = shadowRoot.querySelectorAll<HTMLImageElement>("img");
+			expect(images).toHaveLength(1);
+			expect(images[0]?.src).toContain("preview-b.png");
+			expect(images[0]?.src).not.toContain("preview-a.png");
+		});
+	});
 });
