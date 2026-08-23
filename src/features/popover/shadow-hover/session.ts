@@ -1,11 +1,6 @@
 import { enableLogging } from "shared/logging/logger";
-import {
-	createOwnerMouseEvent,
-	getOptionalOwnerWindow,
-	isElementLike,
-	isHTMLElementLike,
-} from "ui/shared/dom/realmSafeDom";
-import { debugLog, rectToObject, summarizePopover, summarizeSession } from "./debug";
+import { createOwnerMouseEvent } from "ui/shared/dom/realmSafeDom";
+import { debugLog, summarizePopover, summarizeSession } from "./debug";
 import { createShadowGeometryProxyStore } from "./geometry-proxy";
 import type {
 	HoverAnchorTarget,
@@ -15,21 +10,23 @@ import type {
 	PopoverReleaseReason,
 	ShadowHoverSession,
 } from "./internal-types";
+import {
+	bindAndPatchPopoverPosition,
+	bindPopoverAnchor,
+	disposePopoverPositionPatch,
+	getBoundPopoverActualAnchor,
+	getBoundPopoverProxyAnchor,
+	isActiveElementWithinPopover,
+	POPOVER_ACTUAL_ANCHOR_KEY,
+	POPOVER_ANCHOR_KEY,
+	scheduleAttachPopoverHoverListeners,
+} from "./popoverBinding";
 
-const LISTENER_ATTACH_MARKER = "__cclShadowHoverListenersAttached";
-const POPOVER_ANCHOR_KEY = "__cclShadowHoverAnchorEl";
-const POPOVER_ACTUAL_ANCHOR_KEY = "__cclShadowHoverActualAnchorEl";
-
-type PopoverPositionPatchState = {
-	ownerSession: ShadowHoverSession;
-	originalPosition: HoverPopoverLike["position"];
-	dispose(): void;
-};
-
-const patchedPopoverPositions = new WeakMap<
-	HoverPopoverLike,
-	PopoverPositionPatchState
->();
+export {
+	getBoundPopoverActualAnchor,
+	getBoundPopoverAnchor,
+	getBoundPopoverProxyAnchor,
+} from "./popoverBinding";
 
 export function createShadowHoverSession(): ShadowHoverSession {
 	const session: ShadowHoverSession = {
@@ -235,13 +232,6 @@ function scheduleProxyEnterRelay(
 	});
 }
 
-function isActiveElementWithinPopover(popover: HoverPopoverLike): boolean {
-	const hoverEl = popover.hoverEl;
-	if (!isHTMLElementLike(hoverEl)) return false;
-	const activeElement = hoverEl.ownerDocument?.activeElement;
-	return isElementLike(activeElement) ? hoverEl.contains(activeElement) : false;
-}
-
 function syncShadowTargetState(
 	popover: HoverPopoverLike,
 	session: ShadowHoverSession,
@@ -364,10 +354,17 @@ export function createRequestHoverParent(
 			bindAndPatchPopoverPosition(
 				nextPopover,
 				session,
+				{
+					syncProxyRectForActual,
+					syncPopoverTargetAndTransition,
+				},
 				requestAnchorEl,
 				requestActualAnchorEl,
 			);
-			scheduleAttachPopoverHoverListeners(nextPopover, session);
+			scheduleAttachPopoverHoverListeners(nextPopover, session, {
+				syncProxyRectForActual,
+				syncPopoverTargetAndTransition,
+			});
 			scheduleProxyEnterRelay(
 				nextPopover,
 				session,
@@ -404,204 +401,6 @@ export function createRequestHoverParent(
 		},
 	});
 	return hoverParent;
-}
-
-function bindPopoverAnchor(
-	popover: HoverPopoverLike,
-	proxyAnchorEl: HTMLElement,
-	actualAnchorEl = proxyAnchorEl,
-): void {
-	popover[POPOVER_ANCHOR_KEY] = proxyAnchorEl;
-	popover[POPOVER_ACTUAL_ANCHOR_KEY] = actualAnchorEl;
-	popover.targetEl = proxyAnchorEl;
-}
-
-export function getBoundPopoverProxyAnchor(
-	popover: HoverPopoverLike | null | undefined,
-): HTMLElement | null {
-	if (!popover) return null;
-	const anchor = popover[POPOVER_ANCHOR_KEY];
-	return isHTMLElementLike(anchor)
-		? anchor
-		: isHTMLElementLike(popover.targetEl)
-			? popover.targetEl
-			: null;
-}
-
-export function getBoundPopoverActualAnchor(
-	popover: HoverPopoverLike | null | undefined,
-): HTMLElement | null {
-	if (!popover) return null;
-	const anchor = popover[POPOVER_ACTUAL_ANCHOR_KEY];
-	return isHTMLElementLike(anchor) ? anchor : null;
-}
-
-export function getBoundPopoverAnchor(
-	popover: HoverPopoverLike | null | undefined,
-): HTMLElement | null {
-	return getBoundPopoverProxyAnchor(popover);
-}
-
-function bindAndPatchPopoverPosition(
-	popover: HoverPopoverLike,
-	session: ShadowHoverSession,
-	proxyAnchorEl?: HTMLElement,
-	actualAnchorEl?: HTMLElement,
-): void {
-	if (enableLogging) {
-		debugLog(session, "popover-patch", "Patching popover position", () =>
-			summarizePopover(popover),
-		);
-	}
-	const boundActualAnchor = isHTMLElementLike(actualAnchorEl)
-		? actualAnchorEl
-		: getBoundPopoverActualAnchor(popover);
-	const syncedProxyAnchor = boundActualAnchor
-		? syncProxyRectForActual(session, boundActualAnchor)
-		: isHTMLElementLike(proxyAnchorEl)
-			? proxyAnchorEl
-			: getBoundPopoverProxyAnchor(popover);
-	if (syncedProxyAnchor) {
-		bindPopoverAnchor(
-			popover,
-			syncedProxyAnchor,
-			boundActualAnchor ?? syncedProxyAnchor,
-		);
-	}
-	if (typeof popover.position !== "function") return;
-	patchPosition(popover, ensurePopoverPositionPatchState(popover, session));
-}
-
-function ensurePopoverPositionPatchState(
-	popover: HoverPopoverLike,
-	session: ShadowHoverSession,
-): PopoverPositionPatchState {
-	const existing = patchedPopoverPositions.get(popover);
-	if (existing) {
-		if (existing.ownerSession === session) return existing;
-		if (enableLogging) {
-			debugLog(
-				session,
-				"popover-patch-owner-change",
-				"Reassigning popover patch owner",
-				() => ({
-					popover: summarizePopover(popover),
-					previousOwner: summarizeSession(existing.ownerSession),
-					nextOwner: summarizeSession(session),
-				}),
-			);
-		}
-		existing.dispose();
-	}
-
-	const state: PopoverPositionPatchState = {
-		ownerSession: session,
-		originalPosition: popover.position,
-		dispose() {
-			if (patchedPopoverPositions.get(popover) === state)
-				patchedPopoverPositions.delete(popover);
-		},
-	};
-	patchedPopoverPositions.set(popover, state);
-	return state;
-}
-
-function patchPosition(
-	popover: HoverPopoverLike,
-	state: PopoverPositionPatchState,
-): void {
-	const originalPosition = state.originalPosition;
-	if (typeof originalPosition !== "function") return;
-	const session = state.ownerSession;
-	const patchedPosition = function (this: HoverPopoverLike, ...args: unknown[]) {
-		const actualAnchorEl = getBoundPopoverActualAnchor(this);
-		const proxyAnchorEl = actualAnchorEl
-			? syncProxyRectForActual(session, actualAnchorEl)
-			: getBoundPopoverProxyAnchor(this);
-		if (proxyAnchorEl) this.targetEl = proxyAnchorEl;
-		if (enableLogging) {
-			debugLog(session, "popover-position", "Popover position() invoked", () => ({
-				argsCount: args.length,
-				anchorRect: proxyAnchorEl
-					? rectToObject(proxyAnchorEl.getBoundingClientRect())
-					: null,
-			}));
-		}
-		return originalPosition.apply(this, args);
-	};
-	popover.position = patchedPosition;
-	const disposeBase = state.dispose;
-	state.dispose = () => {
-		if (popover.position === patchedPosition) popover.position = originalPosition;
-		disposeBase();
-	};
-}
-
-function disposePopoverPositionPatch(
-	popover: HoverPopoverLike,
-	session: ShadowHoverSession,
-): void {
-	const state = patchedPopoverPositions.get(popover);
-	if (state?.ownerSession === session) state.dispose();
-}
-
-export function scheduleAttachPopoverHoverListeners(
-	popover: HoverPopoverLike,
-	session: ShadowHoverSession,
-	retries = 8,
-): void {
-	if (session.destroyed) return;
-	const hoverEl = popover.hoverEl;
-	if (!isHTMLElementLike(hoverEl)) {
-		if (retries <= 0) {
-			if (enableLogging) {
-				debugLog(
-					session,
-					"popover-listeners-giveup",
-					"Popover hoverEl never appeared",
-					() => summarizePopover(popover),
-				);
-			}
-			return;
-		}
-		const ownerWindow = getOptionalOwnerWindow(session.activeAnchor?.actualEl);
-		ownerWindow?.requestAnimationFrame(() =>
-			scheduleAttachPopoverHoverListeners(popover, session, retries - 1),
-		);
-		return;
-	}
-
-	const hoverElWithMarker = hoverEl as HTMLElement & Record<string, unknown>;
-	if (hoverElWithMarker[LISTENER_ATTACH_MARKER]) return;
-	hoverElWithMarker[LISTENER_ATTACH_MARKER] = true;
-	session.attachedPopoverEl = hoverEl;
-	session.teardownPopoverListeners?.();
-	const onSync = (type: string) => {
-		session.overPopover =
-			Boolean(popover.onHover) || isActiveElementWithinPopover(popover);
-		if (enableLogging) {
-			debugLog(session, "popover-sync", `Popover sync from ${type}`, () =>
-				summarizeSession(session),
-			);
-		}
-		syncPopoverTargetAndTransition(session, type);
-	};
-	const onEnter = () => onSync("mouseenter");
-	const onLeave = () => onSync("mouseleave");
-	const onFocusIn = () => onSync("focusin");
-	const onFocusOut = () => onSync("focusout");
-	hoverEl.addEventListener("mouseenter", onEnter, true);
-	hoverEl.addEventListener("mouseleave", onLeave, true);
-	hoverEl.addEventListener("focusin", onFocusIn, true);
-	hoverEl.addEventListener("focusout", onFocusOut, true);
-	session.teardownPopoverListeners = () => {
-		hoverEl.removeEventListener("mouseenter", onEnter, true);
-		hoverEl.removeEventListener("mouseleave", onLeave, true);
-		hoverEl.removeEventListener("focusin", onFocusIn, true);
-		hoverEl.removeEventListener("focusout", onFocusOut, true);
-		hoverElWithMarker[LISTENER_ATTACH_MARKER] = false;
-		if (session.attachedPopoverEl === hoverEl) session.attachedPopoverEl = null;
-	};
 }
 
 export function syncPopoverTargetAndTransition(

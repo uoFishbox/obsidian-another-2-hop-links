@@ -3,34 +3,34 @@ import {
 	DEFAULT_PREVIEW_ACTIVATIONS_PER_SECOND,
 } from "../../../appConstants";
 import { recordCCLDevMeasurement } from "infrastructure/debug/CCLDevMeasurements";
-import {
-	isScrollActivityActive,
-	subscribeScrollActivity,
-} from "ui/shared/scroll/scrollActivity";
+import { isScrollActivityActive } from "ui/shared/scroll/scrollActivity";
 import {
 	readVirtualScrollMeasurementEpoch,
 	shouldDeferPreviewActivationForVirtualScrollMeasurement,
 } from "ui/virtualization/public";
 import type { VirtualFrameCoordinator } from "ui/shared/scheduling/frameCoordinator";
 import {
-	createPreviewFrameDriver,
-	readPreviewSchedulingTime,
-	type PreviewFrameDriver,
-} from "./previewFrameDriver";
-import {
 	canConsumePreviewScheduleToken,
 	consumePreviewScheduleToken,
 	createEmptyPreviewScheduleTokenState,
-	MAX_TOKEN_REFILL_ELAPSED_MS,
-	readPreviewScheduleTokenDelayMs,
 	refillPreviewScheduleTokens,
 	type PreviewScheduleTokenState,
 } from "./previewScheduleTokenBucket";
 import { createPreviewKeyedQueue, type PreviewKeyedQueue } from "./previewKeyedQueue";
+import {
+	ensurePreviewScrollActivitySubscription,
+	createPreviewSchedulerPartitionRegistry,
+	getOrCreatePreviewSchedulerPartition,
+	readPreviewSchedulingTime,
+	readPreviewTokenAvailabilityDelayMs,
+	releasePreviewScrollActivitySubscriptionIfIdle,
+	resolvePositivePreviewRate,
+	type PreviewSchedulerPartitionBase,
+	type PreviewSchedulerPartitionRegistry,
+} from "./previewSchedulerCore";
 
 const MAX_QUEUE_ENTRIES_PER_DRAIN = 256;
 const MAX_OUTSTANDING_PREVIEW_JOBS = 3;
-const EXPECTED_FRAME_INTERVAL_MS = 1000 / 60;
 
 interface PreviewActivationPolicy {
 	readonly mode: "idle" | "backpressured" | "scrolling";
@@ -86,9 +86,7 @@ interface PreviewActivationRequest {
 	settled: boolean;
 }
 
-interface PreviewActivationPartition {
-	readonly coordinator: VirtualFrameCoordinator | undefined;
-	readonly driver: PreviewFrameDriver;
+interface PreviewActivationPartition extends PreviewSchedulerPartitionBase {
 	readonly scopes: Set<PreviewActivationScopeState>;
 	readonly pendingScopesScratch: PreviewActivationScopeState[];
 	lastObservedMeasurementEpoch: number;
@@ -153,7 +151,7 @@ interface PreviewActivationHandleInternal extends PreviewActivationHandle {
 	[ACTIVATION_REQUEST]: PreviewActivationRequest | undefined;
 }
 
-interface PreviewActivationSchedulerState {
+interface PreviewActivationSchedulerState extends PreviewSchedulerPartitionRegistry<PreviewActivationPartition> {
 	/** Every scope of this scheduler. */
 	readonly scopes: Set<PreviewActivationScopeState>;
 	readonly getOutstandingPreviewJobCount: () => number;
@@ -167,10 +165,7 @@ interface PreviewActivationSchedulerState {
 	tokenState: PreviewScheduleTokenState;
 	blockedForBackpressure: boolean;
 	unsubscribeBackpressure: (() => void) | undefined;
-	readonly fallbackPartitionIdentity: object;
 	readonly scopeStates: WeakMap<PreviewActivationScope, PreviewActivationScopeState>;
-	readonly partitionsByIdentity: Map<object, PreviewActivationPartition>;
-	nextPartitionId: number;
 	unsubscribeScrollActivity?: () => void;
 	disposed: boolean;
 }
@@ -191,10 +186,8 @@ function createSchedulerState(
 		tokenState: createEmptyPreviewScheduleTokenState(),
 		blockedForBackpressure: false,
 		unsubscribeBackpressure: undefined,
-		fallbackPartitionIdentity: {},
+		...createPreviewSchedulerPartitionRegistry<PreviewActivationPartition>(),
 		scopeStates: new WeakMap(),
-		partitionsByIdentity: new Map(),
-		nextPartitionId: 0,
 		disposed: false,
 	};
 }
@@ -232,40 +225,28 @@ function getDefaultActivationsPerSecond(): number {
 	return DEFAULT_PREVIEW_ACTIVATIONS_PER_SECOND;
 }
 
-function resolvePositiveRate(value: number, fallback: number): number {
-	return Number.isFinite(value) && value > 0 ? value : fallback;
-}
-
 function getOrCreatePartition(
 	state: PreviewActivationSchedulerState,
 	coordinator: VirtualFrameCoordinator | undefined,
 ): PreviewActivationPartition {
-	const identity = coordinator ?? state.fallbackPartitionIdentity;
-	const existing = state.partitionsByIdentity.get(identity);
-	if (existing) return existing;
-
-	let partition: PreviewActivationPartition;
-	const taskKey = `preview:activation-drain:${++state.nextPartitionId}`;
-	const driver = createPreviewFrameDriver({
+	return getOrCreatePreviewSchedulerPartition(state, {
 		coordinator,
-		taskKey,
+		taskKeyPrefix: "preview:activation-drain",
 		getWindow: state.getWindow,
 		onAnimationFrameScheduled: () => {
 			if (process.env.NODE_ENV !== "production") {
 				recordCCLDevMeasurement("preview.activationScheduler.animationFrame");
 			}
 		},
-		onFrame: (timestamp) => drainPartition(state, partition, timestamp),
+		createPartition: (driver, partitionCoordinator) => ({
+			coordinator: partitionCoordinator,
+			driver,
+			scopes: new Set(),
+			pendingScopesScratch: [],
+			lastObservedMeasurementEpoch: readVirtualScrollMeasurementEpoch(),
+		}),
+		onFrame: (partition, timestamp) => drainPartition(state, partition, timestamp),
 	});
-	partition = {
-		coordinator,
-		driver,
-		scopes: new Set(),
-		pendingScopesScratch: [],
-		lastObservedMeasurementEpoch: readVirtualScrollMeasurementEpoch(),
-	};
-	state.partitionsByIdentity.set(identity, partition);
-	return partition;
 }
 
 function createPreviewActivationScopeForState(
@@ -341,9 +322,7 @@ function settleRequest(
 function ensureScrollActivitySubscription(
 	schedulerState: PreviewActivationSchedulerState,
 ): void {
-	if (schedulerState.unsubscribeScrollActivity) return;
-
-	schedulerState.unsubscribeScrollActivity = subscribeScrollActivity((isActive) => {
+	ensurePreviewScrollActivitySubscription(schedulerState, (isActive) => {
 		for (const partition of schedulerState.partitionsByIdentity.values()) {
 			partition.driver.cancel();
 			schedulePartition(schedulerState, partition, 0, isActive);
@@ -354,9 +333,10 @@ function ensureScrollActivitySubscription(
 function releaseScrollActivitySubscriptionIfIdle(
 	schedulerState: PreviewActivationSchedulerState,
 ): void {
-	if (hasAnyPendingScope(schedulerState)) return;
-	schedulerState.unsubscribeScrollActivity?.();
-	schedulerState.unsubscribeScrollActivity = undefined;
+	releasePreviewScrollActivitySubscriptionIfIdle(
+		schedulerState,
+		hasAnyPendingScope(schedulerState),
+	);
 }
 
 function blockForBackpressure(schedulerState: PreviewActivationSchedulerState): void {
@@ -442,21 +422,6 @@ function hasPreviewAdmissionCapacity(outstandingPreviewJobCount: number): boolea
 	return outstandingPreviewJobCount < MAX_OUTSTANDING_PREVIEW_JOBS;
 }
 
-function readTokenAvailabilityDelayMs(
-	tokenState: PreviewScheduleTokenState,
-	ratePerSecond: number,
-): number {
-	const availabilityDelayMs = readPreviewScheduleTokenDelayMs(
-		tokenState,
-		ratePerSecond,
-	);
-	// The driver refills tokens on the scheduled frame, so account for that frame.
-	return Math.min(
-		MAX_TOKEN_REFILL_ELAPSED_MS,
-		Math.max(0, availabilityDelayMs - EXPECTED_FRAME_INTERVAL_MS),
-	);
-}
-
 function compactScopeQueue(scopeState: PreviewActivationScopeState): void {
 	scopeState.queue.compact();
 }
@@ -505,7 +470,7 @@ function drainPartitionScopes(
 	let outstandingPreviewJobCount = schedulerState.getOutstandingPreviewJobCount();
 	let policy = resolveActivationPolicy(outstandingPreviewJobCount, scrolling);
 	if (scrolling) {
-		schedulerState.scrollingPolicy.ratePerSecond = resolvePositiveRate(
+		schedulerState.scrollingPolicy.ratePerSecond = resolvePositivePreviewRate(
 			schedulerState.getActivationsPerSecond(),
 			DEFAULT_PREVIEW_ACTIVATIONS_PER_SECOND,
 		);
@@ -584,7 +549,7 @@ function drainPartitionScopes(
 	if (schedulerState.blockedForBackpressure || !hasPendingPartition(partition)) {
 		return null;
 	}
-	return readTokenAvailabilityDelayMs(
+	return readPreviewTokenAvailabilityDelayMs(
 		schedulerState.tokenState,
 		policy.ratePerSecond,
 	);

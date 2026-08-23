@@ -149,7 +149,28 @@ The goal is to maintain code that can be safely edited by humans, the TypeScript
 
 ## File Structure
 
-As a rule, assign a single primary responsibility to each file.
+As a rule, assign a cohesive unit of change to each file. A file may contain
+the types, constants, helpers, and implementation that normally change
+together; splitting every concept into its own file is not a goal.
+
+Create a new file only when at least one of the following is true:
+
+- It owns behavior that is independently changed or tested.
+- It is consumed by multiple production modules.
+- It forms a clear public API, external boundary, or framework-context identity.
+- It separates IO from pure logic or otherwise gives dependencies a useful direction.
+- It isolates a meaningful change axis from the original file.
+
+Co-locate types with the implementation that owns them. Do not mechanically
+create `types.ts`, `*Types.ts`, `*Context.ts`, or one-function wrappers. A
+barrel is a public façade only when its consumer fan-out makes that boundary
+intentional; otherwise import the concrete module directly.
+
+Use file size as a review signal, not a hard formatter rule: files over 450
+lines require a change-axis review, files over 600 lines are refactor
+candidates with an explicit rationale, and files under 50 lines with one
+production consumer are co-location candidates unless they form an explicit
+boundary.
 
 ```txt
 src/
@@ -220,9 +241,7 @@ export interface BuildResult {
 	warnings: string[];
 }
 
-export async function buildProject(
-	options: BuildOptions,
-): Promise<BuildResult> {
+export async function buildProject(options: BuildOptions): Promise<BuildResult> {
 	// ...
 }
 ```
@@ -385,9 +404,7 @@ Local mutation for the sake of readability and performance is acceptable. Avoid 
 Push IO to the boundaries. Separate pure transformation logic from side effects.
 
 ```ts
-export async function loadConfig(
-	path: string,
-): Promise<Result<Config, ConfigError>> {
+export async function loadConfig(path: string): Promise<Result<Config, ConfigError>> {
 	const content = await readFile(path, "utf-8");
 	return parseConfig(content);
 }
@@ -538,10 +555,7 @@ export function createRunner(options: RunnerOptions = {}): Runner {
 	return { run };
 }
 
-function resolveInput(
-	root: string,
-	input: string,
-): Result<string, RunnerError> {
+function resolveInput(root: string, input: string): Result<string, RunnerError> {
 	if (!input) {
 		return { ok: false, error: { type: "missing-input" } };
 	}

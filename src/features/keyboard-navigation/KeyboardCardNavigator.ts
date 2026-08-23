@@ -1,10 +1,5 @@
-import { MarkdownView, Notice, type WorkspaceLeaf } from "obsidian";
-import { findNearestScrollContainer } from "ui/shared/scroll/scrollContainer";
-import { TWO_HOP_LINKS_VIEW_TYPE } from "features/two-hop/ui/TwoHopLinksView";
-import { VIEW_TYPE_PRE_CREATE } from "features/pre-creation/ui/PreCreationView";
-import { VIEW_TYPE_TAG_NOTES } from "features/tag-notes/ui/TagNotesView";
-import { VIEW_TYPE_ALL_NOTES } from "features/all-notes/ui/AllNotesView";
-import { CARD_SELECTOR, LOAD_MORE_SELECTOR } from "./resultFocus";
+import { Notice } from "obsidian";
+import { LOAD_MORE_SELECTOR } from "./resultFocus";
 import { querySelectorAllIncludingShadow } from "ui/shared/dom/shadowDom";
 import { isElementVisible } from "ui/shared/dom/domUtils";
 import {
@@ -12,15 +7,30 @@ import {
 	getOptionalOwnerWindow,
 	isHTMLElementLike,
 } from "ui/shared/dom/realmSafeDom";
+import {
+	collectVisibleKeyboardNavigationRows,
+	KEYBOARD_ROW_TOP_TOLERANCE_PX,
+	resolveKeyboardNavigationTargetSurface,
+	type CardSurfaceHost,
+	type KeyboardNavigationApp,
+	type KeyboardNavigationRow,
+	type KeyboardNavigationTargetSurface,
+} from "./keyboardNavigationSurface";
+import {
+	centerKeyboardNavigationRow,
+	estimateKeyboardNavigationScrollStep,
+	findLastKeyboardNavigationRowIndex,
+	resolveKeyboardNavigationScrollTarget,
+	scrollKeyboardNavigationContainerBy,
+} from "./keyboardNavigationScroll";
 
-const INLINE_SURFACE_SELECTOR =
-	'.cosense-card-links__root[data-ccl-card-surface="inline"]';
-const SIDEBAR_SURFACE_SELECTOR =
-	'.cosense-card-links__root[data-ccl-card-surface="sidebar"]';
-const EMPTY_SURFACE_SELECTOR = '[data-ccl-card-surface="empty"]';
-const ROW_ELEMENT_SELECTOR = `${CARD_SELECTOR}, ${LOAD_MORE_SELECTOR}`;
-const ROW_TOP_TOLERANCE_PX = 8;
-const MIN_SCROLL_STEP_PX = 24;
+export type {
+	CardSurfaceHost,
+	KeyboardNavigationApp,
+	KeyboardNavigationRow,
+	KeyboardNavigationTargetSurface,
+} from "./keyboardNavigationSurface";
+
 const SHORT_HINT_KEYS = ["d", "f", "j", "k"] as const;
 const LONG_HINT_KEYS = ["a", "s", "d", "f", "j", "k", "l", ";"] as const;
 const HANDLED_HINT_KEYS = new Set<string>(LONG_HINT_KEYS);
@@ -28,46 +38,6 @@ const HANDLED_HINT_KEYS = new Set<string>(LONG_HINT_KEYS);
 type WindowWithEventConstructor = Window & {
 	Event: typeof Event;
 };
-
-type CardSurfaceHost = "inline" | "sidebar" | "empty";
-
-interface WorkspaceLike {
-	activeLeaf?: {
-		view?: unknown;
-	} | null;
-	getActiveViewOfType(type: new (...args: any[]) => unknown): unknown | null;
-	getLeavesOfType(type: string): Array<{
-		view?: {
-			contentEl?: HTMLElement;
-			containerEl?: HTMLElement;
-		};
-	}>;
-	iterateAllLeaves(callback: (leaf: WorkspaceLeaf) => void): void;
-}
-
-interface AppLike {
-	workspace: WorkspaceLike;
-}
-
-export interface KeyboardNavigationTargetSurface {
-	rootEl: HTMLElement;
-	host: CardSurfaceHost;
-}
-
-export interface KeyboardNavigationRow {
-	top: number;
-	bottom: number;
-	elements: HTMLElement[];
-	cards: HTMLElement[];
-}
-
-interface VisibleRowEntry {
-	element: HTMLElement;
-	top: number;
-	left: number;
-	bottom: number;
-	isHintTarget: boolean;
-}
 
 export class KeyboardCardNavigator {
 	private rootEl: HTMLElement | null = null;
@@ -82,7 +52,7 @@ export class KeyboardCardNavigator {
 	private readonly handleDocumentKeydownBound = this.handleDocumentKeydown.bind(this);
 
 	constructor(
-		private readonly app: AppLike,
+		private readonly app: KeyboardNavigationApp,
 		private readonly notify: (message: string) => void = (message) =>
 			new Notice(message),
 	) {}
@@ -179,136 +149,11 @@ export class KeyboardCardNavigator {
 	}
 
 	public resolveTargetSurface(): KeyboardNavigationTargetSurface | null {
-		const candidates: KeyboardNavigationTargetSurface[] = [];
-
-		const activeMarkdownView = this.app.workspace.getActiveViewOfType(
-			MarkdownView,
-		) as MarkdownView | null;
-
-		if (isHTMLElementLike(activeMarkdownView?.containerEl)) {
-			const inlineSurface = this.findVisibleSurfaceRoot(
-				activeMarkdownView.containerEl,
-				"inline",
-			);
-			if (inlineSurface) {
-				candidates.push({
-					rootEl: inlineSurface,
-					host: "inline",
-				});
-			}
-		}
-
-		for (const leaf of this.app.workspace.getLeavesOfType(
-			TWO_HOP_LINKS_VIEW_TYPE,
-		)) {
-			const container = isHTMLElementLike(leaf.view?.contentEl)
-				? leaf.view.contentEl
-				: leaf.view?.containerEl;
-			if (!isHTMLElementLike(container)) {
-				continue;
-			}
-
-			const sidebarSurface = this.findVisibleSurfaceRoot(container, "sidebar");
-			if (sidebarSurface) {
-				candidates.push({
-					rootEl: sidebarSurface,
-					host: "sidebar",
-				});
-			}
-		}
-
-		this.app.workspace.iterateAllLeaves((leaf) => {
-			const view = leaf.view as {
-				getViewType?: () => string;
-				contentEl?: HTMLElement;
-				containerEl?: HTMLElement;
-			} | null;
-			const viewType = view?.getViewType?.();
-			if (
-				viewType !== "empty" &&
-				viewType !== VIEW_TYPE_ALL_NOTES &&
-				viewType !== VIEW_TYPE_PRE_CREATE &&
-				viewType !== VIEW_TYPE_TAG_NOTES
-			) {
-				return;
-			}
-
-			const container = isHTMLElementLike(view?.contentEl)
-				? view.contentEl
-				: view?.containerEl;
-			if (!isHTMLElementLike(container)) {
-				return;
-			}
-
-			const host: CardSurfaceHost =
-				viewType === "empty" || viewType === VIEW_TYPE_ALL_NOTES
-					? "empty"
-					: "inline";
-			const emptySurface = this.findVisibleSurfaceRoot(container, host);
-			if (emptySurface) {
-				candidates.push({
-					rootEl: emptySurface,
-					host,
-				});
-			}
-		});
-
-		return (
-			candidates.find(
-				(candidate) => this.collectVisibleRows(candidate.rootEl).length > 0,
-			) ?? null
-		);
+		return resolveKeyboardNavigationTargetSurface(this.app);
 	}
 
 	public collectVisibleRows(rootEl: HTMLElement): KeyboardNavigationRow[] {
-		const elements = querySelectorAllIncludingShadow<HTMLElement>(
-			rootEl,
-			ROW_ELEMENT_SELECTOR,
-		);
-		const rowElements: VisibleRowEntry[] = [];
-		for (const element of elements) {
-			const rect = element.getBoundingClientRect();
-			if (!isElementVisible(element) || rect.width <= 0 || rect.height <= 0) {
-				continue;
-			}
-
-			rowElements.push({
-				element,
-				top: rect.top,
-				left: rect.left,
-				bottom: rect.bottom,
-				isHintTarget: this.isHintTarget(element),
-			});
-		}
-		rowElements.sort((left, right) => {
-			if (Math.abs(left.top - right.top) > ROW_TOP_TOLERANCE_PX) {
-				return left.top - right.top;
-			}
-			return left.left - right.left;
-		});
-
-		const rows: KeyboardNavigationRow[] = [];
-		for (const entry of rowElements) {
-			const lastRow = rows.at(-1);
-			if (lastRow && Math.abs(lastRow.top - entry.top) <= ROW_TOP_TOLERANCE_PX) {
-				lastRow.elements.push(entry.element);
-				if (entry.isHintTarget) {
-					lastRow.cards.push(entry.element);
-				}
-				lastRow.top = Math.min(lastRow.top, entry.top);
-				lastRow.bottom = Math.max(lastRow.bottom, entry.bottom);
-				continue;
-			}
-
-			rows.push({
-				top: entry.top,
-				bottom: entry.bottom,
-				elements: [entry.element],
-				cards: entry.isHintTarget ? [entry.element] : [],
-			});
-		}
-
-		return rows.sort((left, right) => left.top - right.top);
+		return collectVisibleKeyboardNavigationRows(rootEl);
 	}
 
 	public moveRow(delta: -1 | 1): void {
@@ -521,7 +366,11 @@ export class KeyboardCardNavigator {
 
 		const scrollStep = this.estimateScrollStep(delta);
 		const anchorTop = currentRow.top;
-		this.scrollBy(scrollContainer, delta * scrollStep);
+		scrollKeyboardNavigationContainerBy(
+			scrollContainer,
+			delta * scrollStep,
+			this.createOwnerEvent.bind(this),
+		);
 
 		const ownerWindow = getOptionalOwnerWindow(this.rootEl);
 		if (!ownerWindow) {
@@ -547,11 +396,15 @@ export class KeyboardCardNavigator {
 				const nextIndex =
 					delta > 0
 						? this.rows.findIndex(
-								(row) => row.top > anchorTop + ROW_TOP_TOLERANCE_PX / 2,
+								(row) =>
+									row.top >
+									anchorTop + KEYBOARD_ROW_TOP_TOLERANCE_PX / 2,
 							)
 						: this.findLastIndex(
 								this.rows,
-								(row) => row.top < anchorTop - ROW_TOP_TOLERANCE_PX / 2,
+								(row) =>
+									row.top <
+									anchorTop - KEYBOARD_ROW_TOP_TOLERANCE_PX / 2,
 							);
 
 				if (nextIndex >= 0) {
@@ -566,70 +419,16 @@ export class KeyboardCardNavigator {
 
 	private centerRow(row: KeyboardNavigationRow): void {
 		const target = this.resolveScrollTarget();
-		if (!target) {
-			return;
-		}
-
-		const rowCenter = (row.top + row.bottom) / 2;
-
-		if (isHTMLElementLike(target)) {
-			const rect = target.getBoundingClientRect();
-			const viewportCenter = rect.top + target.clientHeight / 2;
-			const delta = rowCenter - viewportCenter;
-
-			if (Math.abs(delta) >= 1) {
-				this.scrollBy(target, delta);
-			}
-			return;
-		}
-
-		const viewportCenter = target.innerHeight / 2;
-		const delta = rowCenter - viewportCenter;
-
-		if (Math.abs(delta) >= 1) {
-			target.scrollTo({
-				top: Math.max(0, target.scrollY + delta),
-			});
-			target.dispatchEvent(this.createOwnerEvent(target, "scroll"));
-		}
+		centerKeyboardNavigationRow(row, target, this.createOwnerEvent.bind(this));
 	}
 
 	private resolveScrollTarget(): HTMLElement | Window | null {
-		const rootEl = this.rootEl;
-		if (!rootEl) {
-			this.cachedScrollContainer = null;
-			return null;
-		}
-
-		if (
-			this.cachedScrollContainer?.isConnected &&
-			this.cachedScrollContainer.contains(rootEl)
-		) {
-			return this.cachedScrollContainer;
-		}
-
-		this.cachedScrollContainer = findNearestScrollContainer(rootEl);
-		return this.cachedScrollContainer ?? getOptionalOwnerWindow(rootEl);
-	}
-
-	private setScrollTop(scrollContainer: HTMLElement, nextScrollTop: number): boolean {
-		const clamped = Math.max(0, nextScrollTop);
-		const previous = scrollContainer.scrollTop;
-
-		scrollContainer.scrollTop = clamped;
-
-		if (scrollContainer.scrollTop !== previous) {
-			scrollContainer.dispatchEvent(
-				this.createOwnerEvent(scrollContainer, "scroll"),
-			);
-			return true;
-		}
-
-		return false;
-	}
-
-	private scrollBy(scrollContainer: HTMLElement, delta: number): boolean {
-		return this.setScrollTop(scrollContainer, scrollContainer.scrollTop + delta);
+		const resolved = resolveKeyboardNavigationScrollTarget(
+			this.rootEl,
+			this.cachedScrollContainer,
+		);
+		this.cachedScrollContainer = resolved.cachedContainer;
+		return resolved.target;
 	}
 
 	private activateLoadMoreByHint(
@@ -669,62 +468,17 @@ export class KeyboardCardNavigator {
 	}
 
 	private estimateScrollStep(delta: -1 | 1): number {
-		const currentRow = this.rows[this.selectedRowIndex];
-		const adjacentRow = this.rows[this.selectedRowIndex + delta];
-		if (currentRow && adjacentRow) {
-			return Math.max(
-				MIN_SCROLL_STEP_PX,
-				Math.abs(adjacentRow.top - currentRow.top),
-			);
-		}
-
-		if (currentRow) {
-			return Math.max(
-				MIN_SCROLL_STEP_PX,
-				currentRow.bottom - currentRow.top + ROW_TOP_TOLERANCE_PX,
-			);
-		}
-
-		return MIN_SCROLL_STEP_PX;
+		return estimateKeyboardNavigationScrollStep(
+			this.rows,
+			this.selectedRowIndex,
+			delta,
+		);
 	}
 
 	private getHintKeysForRow(cardCount: number): string[] {
 		const keys =
 			cardCount <= SHORT_HINT_KEYS.length ? SHORT_HINT_KEYS : LONG_HINT_KEYS;
 		return keys.slice(0, cardCount);
-	}
-
-	private findVisibleSurfaceRoot(
-		containerEl: HTMLElement,
-		host: CardSurfaceHost,
-	): HTMLElement | null {
-		const selectors =
-			host === "inline"
-				? [
-						INLINE_SURFACE_SELECTOR,
-						'.cosense-card-links__temp-view[data-ccl-card-surface="inline"]',
-					]
-				: host === "sidebar"
-					? [SIDEBAR_SURFACE_SELECTOR]
-					: [EMPTY_SURFACE_SELECTOR];
-
-		for (const selector of selectors) {
-			const surfaces = Array.from(
-				containerEl.querySelectorAll<HTMLElement>(selector),
-			);
-
-			for (const surface of surfaces) {
-				if (isElementVisible(surface)) {
-					return surface;
-				}
-			}
-		}
-
-		return null;
-	}
-
-	private isHintTarget(element: HTMLElement): boolean {
-		return element.matches(CARD_SELECTOR);
 	}
 
 	private isLoadMoreButton(element: HTMLElement): element is HTMLButtonElement {
@@ -753,12 +507,6 @@ export class KeyboardCardNavigator {
 	}
 
 	private findLastIndex<T>(items: T[], predicate: (value: T) => boolean): number {
-		for (let index = items.length - 1; index >= 0; index -= 1) {
-			if (predicate(items[index])) {
-				return index;
-			}
-		}
-
-		return -1;
+		return findLastKeyboardNavigationRowIndex(items, predicate);
 	}
 }
