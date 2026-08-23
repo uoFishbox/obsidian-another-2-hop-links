@@ -55,7 +55,14 @@
 }
 
 .cm-scroller.ccl-inline-card-host > .cm-sizer {
-	min-height: 0%;
+	min-height: 0;
+}
+
+.cosense-card-links-pre-create
+	> .cm-editor
+	> .cm-scroller
+	> .cm-sizer {
+	min-height: 0;
 }
 
 .cm-scroller.ccl-inline-card-host .cm-content {
