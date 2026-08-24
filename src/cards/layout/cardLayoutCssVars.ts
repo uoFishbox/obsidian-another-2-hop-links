@@ -34,6 +34,17 @@ const normalizePositiveInteger = (
 	return normalized;
 };
 
+const normalizeNonNegativeInteger = (
+	value: number | undefined,
+	fallback: number,
+): number => {
+	const normalized = Math.floor(value ?? fallback);
+	if (!Number.isFinite(normalized) || normalized < 0) {
+		return fallback;
+	}
+	return normalized;
+};
+
 const normalizePositiveNumber = (
 	value: number | undefined,
 	fallback: number,
@@ -74,7 +85,10 @@ export function resolveCardLayoutSettings(
 		cardWidthPx,
 		cardHeightRatio,
 		cardHeightPx: computeCardHeightPxFromWidth(cardWidthPx, cardHeightRatio),
-		cardGapPx: normalizePositiveInteger(settings?.cardGapPx, DEFAULT_CARD_GAP_PX),
+		cardGapPx: normalizeNonNegativeInteger(
+			settings?.cardGapPx,
+			DEFAULT_CARD_GAP_PX,
+		),
 		cardMaxColumns: normalizePositiveInteger(
 			settings?.cardMaxColumns,
 			DEFAULT_CARD_MAX_COLUMNS,
@@ -104,7 +118,7 @@ export function createResolvedCardLayoutSettingsMemo(): (
 		const cardWidthPx = normalizeCardWidthPx(settings.cardWidthPx);
 		const cardHeightRatio = normalizeCardHeightRatio(settings.cardHeightRatio);
 		const cardHeightPx = computeCardHeightPxFromWidth(cardWidthPx, cardHeightRatio);
-		const cardGapPx = normalizePositiveInteger(
+		const cardGapPx = normalizeNonNegativeInteger(
 			settings.cardGapPx,
 			DEFAULT_CARD_GAP_PX,
 		);

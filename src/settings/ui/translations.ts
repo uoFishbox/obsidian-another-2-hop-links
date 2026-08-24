@@ -105,7 +105,8 @@ const translations: Record<Language, Record<TranslationKey, string>> = {
 		cardHeightRatioDesc:
 			"Set card height as a ratio of the actual rendered card width. Example: 1.1 means height = width x 1.1.",
 		cardGap: "Card gap (px)",
-		cardGapDesc: "Set the spacing between cards in the responsive grid layout.",
+		cardGapDesc:
+			"Set the spacing between cards in the responsive grid layout. Set to 0 for no gap.",
 		cardMaxColumns: "Maximum card columns",
 		cardMaxColumnsDesc:
 			"Set the upper limit for the number of columns in the responsive grid layout.",
@@ -220,7 +221,8 @@ const translations: Record<Language, Record<TranslationKey, string>> = {
 		cardHeightRatioDesc:
 			"実際に描画されるカード幅に対する高さの比率を設定します。例: 1.1 は 高さ = 幅 x 1.1 です。",
 		cardGap: "カード間隔（px）",
-		cardGapDesc: "レスポンシブグリッドでカード間の間隔を設定します。",
+		cardGapDesc:
+			"レスポンシブグリッドでカード間の間隔を設定します。0にすると間隔をなくします。",
 		cardMaxColumns: "カードの最大列数",
 		cardMaxColumnsDesc: "レスポンシブグリッドで使用する列数の上限を設定します。",
 		sectionMarginBottom: "セクション下余白（px）",

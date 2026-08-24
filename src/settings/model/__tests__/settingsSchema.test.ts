@@ -50,6 +50,14 @@ describe("PluginSettingsSchema", () => {
 		expect(settings.cardWidthPx).toBe(140);
 	});
 
+	it("accepts zero card gap", () => {
+		const settings = parsePluginSettings({
+			cardGapPx: 0,
+		});
+
+		expect(settings.cardGapPx).toBe(0);
+	});
+
 	it("falls back to defaults for out-of-range or non-numeric numbers", () => {
 		const settings = parsePluginSettings({
 			cardHeightRatio: 0,

@@ -85,7 +85,7 @@ export const PluginSettingsSchema = z.object({
 	loadMoreLinkIncrement: positiveInteger(DEFAULT_SETTINGS.loadMoreLinkIncrement),
 	cardWidthPx: positiveInteger(DEFAULT_SETTINGS.cardWidthPx),
 	cardHeightRatio: positiveNumber(DEFAULT_SETTINGS.cardHeightRatio),
-	cardGapPx: positiveInteger(DEFAULT_SETTINGS.cardGapPx),
+	cardGapPx: nonNegativeInteger(DEFAULT_SETTINGS.cardGapPx),
 	cardMaxColumns: positiveInteger(DEFAULT_SETTINGS.cardMaxColumns),
 	sectionMarginBottomPx: positiveInteger(DEFAULT_SETTINGS.sectionMarginBottomPx),
 	highlightOnOpen: z

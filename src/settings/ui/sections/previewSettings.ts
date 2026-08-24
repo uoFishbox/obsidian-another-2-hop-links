@@ -64,7 +64,7 @@ export const PREVIEW_SETTING_DEFINITIONS: ReadonlyArray<SettingDefinition> = [
 		translationKey: "cardGap",
 		descriptionKey: "cardGapDesc",
 		placeholder: "12",
-		parse: (value) => parsePositiveInteger(value),
+		parse: (value) => parseNonNegativeInteger(value),
 		format: (value) => String(value ?? ""),
 	},
 	{

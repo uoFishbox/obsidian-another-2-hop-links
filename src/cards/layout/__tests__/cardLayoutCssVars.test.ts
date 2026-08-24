@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { createResolvedCardLayoutSettingsMemo } from "../cardLayoutCssVars";
+import {
+	createResolvedCardLayoutSettingsMemo,
+	getCardLayoutCssText,
+	resolveCardLayoutSettings,
+} from "../cardLayoutCssVars";
 
 describe("createResolvedCardLayoutSettingsMemo", () => {
 	it("reuses the resolved layout when non-layout settings change", () => {
@@ -41,5 +45,10 @@ describe("createResolvedCardLayoutSettingsMemo", () => {
 
 		expect(second).not.toBe(first);
 		expect(second?.cardWidthPx).toBe(160);
+	});
+
+	it("preserves a zero card gap in resolved settings and CSS", () => {
+		expect(resolveCardLayoutSettings({ cardGapPx: 0 }).cardGapPx).toBe(0);
+		expect(getCardLayoutCssText({ cardGapPx: 0 })).toContain("--ccl-box-gap: 0px;");
 	});
 });
