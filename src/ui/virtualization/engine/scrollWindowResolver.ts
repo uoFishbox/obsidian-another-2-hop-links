@@ -1,4 +1,4 @@
-import type { RowRange } from "../model/rowRange";
+import type { RowRange } from "../model/ranges";
 import type {
 	MutableVirtualRanges,
 	VirtualRanges,

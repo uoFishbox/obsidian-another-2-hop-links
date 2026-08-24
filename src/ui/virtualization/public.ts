@@ -9,7 +9,7 @@ export {
 export {
 	createResidentRowSlotAllocator,
 	type ResidentRowSlotAllocator,
-} from "./engine/residentRowPool";
+} from "./engine/mountedGridRows";
 export {
 	buildMountedGridRows,
 	type MountedGridRow,
@@ -28,7 +28,7 @@ export {
 	EMPTY_ROW_RANGE,
 	type MutableRowRange,
 	type RowRange,
-} from "./model/rowRange";
+} from "./model/ranges";
 export {
 	computeVirtualRanges,
 	resolveVirtualRangesInto,
@@ -47,15 +47,12 @@ export type {
 	VirtualRowModel,
 } from "./model/types";
 export { logicalCellKey, sourceKey } from "./model/types";
-export type {
-	FlatGridLayoutMetrics,
-	VirtualRowLayoutMetrics,
-} from "./model/layoutMetrics";
+export type { FlatGridLayoutMetrics, VirtualRowLayoutMetrics } from "./model/types";
 export {
 	getScrollMetrics,
 	type ProgrammaticScrollSnapshot,
-} from "./viewport/measurementAdapter";
-export { resolveVirtualListLayoutStability } from "./viewport/measurementStability";
+} from "./viewport/measurement";
+export { resolveVirtualListLayoutStability } from "./viewport/measurement";
 export {
 	computeColumnCount,
 	computeFlatGridLayout,
@@ -67,10 +64,10 @@ export {
 	type SectionedGridGeometry,
 	type SectionedGridGeometryInput,
 	type SectionedGridRowPosition,
-} from "./grid/sectionedGridGeometry";
+} from "./grid/layout";
 export {
 	markVirtualScrollMeasurementRun,
 	readVirtualScrollMeasurementEpoch,
 	resetVirtualScrollMeasurementFrameForTests,
 	shouldDeferPreviewActivationForVirtualScrollMeasurement,
-} from "./runtime/virtualScrollMeasurementEpoch";
+} from "./runtime/measurementLifecycle";

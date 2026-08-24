@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
-import { createResidentRowSlotAllocator } from "ui/virtualization/engine/residentRowPool";
+import { createResidentRowSlotAllocator } from "ui/virtualization/engine/mountedGridRows";
 import { buildMountedGridRows, type MountedGridRow } from "../mountedGridRows";
-import type { RowRange } from "ui/virtualization/model/rowRange";
+import type { RowRange } from "ui/virtualization/model/ranges";
 import {
 	logicalCellKey,
 	type MountedVirtualCell,

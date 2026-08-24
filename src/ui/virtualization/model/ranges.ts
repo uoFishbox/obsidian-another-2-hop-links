@@ -1,10 +1,30 @@
-import {
-	EMPTY_ROW_RANGE,
-	isEmptyRange,
-	type MutableRowRange,
-	type RowRange,
-} from "./rowRange";
-import type { MutableVirtualRanges, VirtualRanges, VirtualRowModel } from "./types";
+import type {
+	MutableRowRange,
+	MutableVirtualRanges,
+	RowRange,
+	VirtualRanges,
+	VirtualRowModel,
+} from "./types";
+
+export type { MutableRowRange, RowRange } from "./types";
+
+export const EMPTY_ROW_RANGE: RowRange = Object.freeze({ start: 0, end: 0 });
+
+export function isEmptyRange(range: RowRange): boolean {
+	return range.end <= range.start;
+}
+
+export function sameRange(a: RowRange, b: RowRange): boolean {
+	return a.start === b.start && a.end === b.end;
+}
+
+export function clampRange(range: RowRange, itemCount: number): RowRange {
+	const count = Math.max(0, itemCount);
+	const start = Math.min(count, Math.max(0, range.start));
+	const end = Math.min(count, Math.max(start, range.end));
+
+	return { start, end };
+}
 
 /**
  * Scroll window used to resolve a single visible row range.

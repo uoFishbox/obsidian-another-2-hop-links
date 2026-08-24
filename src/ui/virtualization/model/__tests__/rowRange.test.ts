@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { clampRange, EMPTY_ROW_RANGE, type MutableRowRange } from "../rowRange";
+import { clampRange, EMPTY_ROW_RANGE, type MutableRowRange } from "../ranges";
 
 describe("clampRange", () => {
 	it("protects the shared empty range from mutation", () => {

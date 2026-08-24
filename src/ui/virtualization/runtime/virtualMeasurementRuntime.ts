@@ -7,19 +7,19 @@ import {
 } from "../engine/scrollWindowResolver";
 import type { MountedVirtualCellsBuild } from "../engine/snapshotComputation";
 import type { VirtualizerEngine } from "../engine/virtualizer";
-import { observeVirtualViewport } from "../viewport/observer/observeVirtualViewport";
+import { observeVirtualViewport } from "../viewport/observer/scrollerRegistry";
 import {
 	getScrollMetrics,
 	readScrollSnapshot,
 	type ProgrammaticScrollSnapshot,
 	type VirtualListScrollSnapshot,
-} from "../viewport/measurementAdapter";
+} from "../viewport/measurement";
 import {
 	isStableCachedVirtualListMeasurementFromMetrics,
 	isStableVirtualListMeasurement,
-} from "../viewport/measurementStability";
-import type { VirtualListSharedScrollMetrics } from "../viewport/sharedScrollMetrics";
-import type { RowRange } from "../model/rowRange";
+} from "../viewport/measurement";
+import type { VirtualListSharedScrollMetrics } from "../viewport/measurement";
+import type { RowRange } from "../model/ranges";
 import type {
 	MountedVirtualCell,
 	VirtualRanges,
@@ -27,10 +27,12 @@ import type {
 } from "../model/types";
 import type { VirtualVisibilityPolicy } from "../model/ranges";
 import type { VirtualFrameCoordinator } from "ui/shared/scheduling/frameCoordinator";
-import { markVirtualScrollMeasurementRun } from "./virtualScrollMeasurementEpoch";
-import { createInitialMeasurementLifecycle } from "./initialMeasurement";
-import { createVirtualMeasurementScheduler } from "./measurementScheduler";
-import { createVirtualScrollCoverageController } from "./scrollCoverageController";
+import {
+	createInitialMeasurementLifecycle,
+	createVirtualMeasurementScheduler,
+	createVirtualScrollCoverageController,
+	markVirtualScrollMeasurementRun,
+} from "./measurementLifecycle";
 import type {
 	RunVirtualScrollMeasurementOptions,
 	VirtualListStableMeasurementContext,
@@ -38,7 +40,7 @@ import type {
 	VirtualMeasurementApplicationResult,
 	VirtualMeasurementResult,
 	VirtualScrollMeasurementReason,
-} from "./measurementTypes";
+} from "./measurementLifecycle";
 
 export interface VirtualizerMeasurementState {
 	sectionTop: number;

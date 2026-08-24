@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createSectionedGridGeometry } from "../sectionedGridGeometry";
+import { createSectionedGridGeometry } from "../layout";
 
 describe("sectionedGridGeometry", () => {
 	it("represents a flat grid as one section without trailing spacing", () => {

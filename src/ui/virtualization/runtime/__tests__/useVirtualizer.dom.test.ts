@@ -5,8 +5,8 @@ import type { VirtualVisibilityPolicy } from "ui/virtualization/model/ranges";
 import type {
 	ObserveVirtualViewportOptions,
 	ScrollMeasurementRange,
-} from "ui/virtualization/viewport/observer/observeVirtualViewport";
-import type { MutableRowRange, RowRange } from "ui/virtualization/model/rowRange";
+} from "ui/virtualization/viewport/observer/scrollerRegistry";
+import type { MutableRowRange, RowRange } from "ui/virtualization/model/ranges";
 import type { VirtualFrameCoordinator } from "ui/shared/scheduling/frameCoordinator";
 import {
 	logicalCellKey,
@@ -27,11 +27,11 @@ const viewportObservationHarness = vi.hoisted(() => ({
 }));
 
 vi.mock(
-	"ui/virtualization/viewport/observer/observeVirtualViewport",
+	"ui/virtualization/viewport/observer/scrollerRegistry",
 	async (importOriginal) => {
 		const actual =
 			await importOriginal<
-				typeof import("ui/virtualization/viewport/observer/observeVirtualViewport")
+				typeof import("ui/virtualization/viewport/observer/scrollerRegistry")
 			>();
 		return {
 			...actual,

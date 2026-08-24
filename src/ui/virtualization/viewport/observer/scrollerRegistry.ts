@@ -7,23 +7,17 @@ import { subscribeWindowResize } from "ui/shared/scroll/windowResize";
 import {
 	collectPositionDependencyElements,
 	collectStructureDependencyTargets,
-} from "ui/virtualization/viewport/observer/layoutDependencies";
-import {
+	hasRelevantStructureMutation,
 	observeSharedResizeTarget,
 	unobserveSharedResizeTarget,
 	type SharedResizeObserverRegistry,
-} from "./sharedResizeRegistry";
-import { hasRelevantStructureMutation } from "./structureMutation";
+} from "./observerDependencies";
 import { getOptionalOwnerWindow, isHTMLElementLike } from "ui/shared/dom/realmSafeDom";
 import {
-	checkVirtualScrollIdle,
-	handleVirtualScrollEvent,
-	type VirtualScrollSessionActions,
-} from "./scrollSession";
-import type { ScrollMeasurementRange } from "./scrollCoverageGate";
-import {
 	cancelDependencyObserverRefresh,
+	checkVirtualScrollIdle,
 	getActiveSubscriber,
+	handleVirtualScrollEvent,
 	isWithinScrollMeasurementRange,
 	notifyScrollStateChange,
 	publishScrollMeasurementRange,
@@ -31,19 +25,19 @@ import {
 	scheduleDependencyObserverRefresh,
 	scheduleLayoutMeasurement,
 	scheduleScrollMeasurement,
-} from "./measurementDispatch";
-import type {
-	ObserveVirtualViewportOptions,
-	ScrollerViewportEntry,
-	VirtualViewportObservation,
-	VirtualViewportSubscriber as VirtualListViewportSubscriber,
-} from "./viewportTypes";
+	type ObserveVirtualViewportOptions,
+	type ScrollMeasurementRange,
+	type ScrollerViewportEntry,
+	type VirtualScrollSessionActions,
+	type VirtualViewportObservation,
+	type VirtualViewportSubscriber as VirtualListViewportSubscriber,
+} from "./scrollMeasurement";
 
-export type { ScrollMeasurementRange } from "./scrollCoverageGate";
 export type {
 	ObserveVirtualViewportOptions,
+	ScrollMeasurementRange,
 	VirtualViewportObservation,
-} from "./viewportTypes";
+} from "./scrollMeasurement";
 
 const ROOT_RESIZE_EPSILON_PX = 0.5;
 
@@ -542,7 +536,7 @@ const unregisterSubscriber = (subscriber: VirtualListViewportSubscriber): void =
 	scrollerViewportEntries.delete(entry.registryKey);
 };
 
-export const registerVirtualViewport = (
+export const observeVirtualViewport = (
 	options: ObserveVirtualViewportOptions,
 ): VirtualViewportObservation => {
 	let disposed = false;

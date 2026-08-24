@@ -9,10 +9,10 @@ import {
 import {
 	createResidentRowSlotAllocator,
 	type ResidentRowSlotAllocator,
-} from "./residentRowPool";
-import type { MeasurementUpdateResult } from "../viewport/measurementAdapter";
-import type { VirtualMeasurement } from "../runtime/measurementTypes";
-import type { RowRange } from "../model/rowRange";
+} from "./mountedGridRows";
+import type { MeasurementUpdateResult } from "../viewport/measurement";
+import type { VirtualMeasurement } from "../runtime/measurementLifecycle";
+import type { RowRange } from "../model/ranges";
 import type {
 	MountedVirtualCell,
 	VirtualRanges,

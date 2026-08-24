@@ -1,4 +1,4 @@
-import { clampRange, sameRange, type RowRange } from "../model/rowRange";
+import { clampRange, sameRange, type RowRange } from "../model/ranges";
 import type { ComputeVirtualRangesResult } from "../model/ranges";
 import {
 	type MountedVirtualCell,

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { observeVirtualViewport as observeVirtualListViewport } from "../observeVirtualViewport";
+import { observeVirtualViewport as observeVirtualListViewport } from "../scrollerRegistry";
 import { resetScrollActivityForTests } from "ui/shared/scroll/scrollActivity";
 import {
 	createVirtualFrameCoordinator,

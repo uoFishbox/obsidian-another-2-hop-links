@@ -3,8 +3,8 @@ import type {
 	VirtualListSnapshot,
 } from "../engine/snapshotComputation";
 import type { VirtualScrollWindowRangeRowModel } from "../engine/scrollWindowResolver";
-import type { ResidentRowSlotAllocator } from "../engine/residentRowPool";
-import type { RowRange } from "../model/rowRange";
+import type { ResidentRowSlotAllocator } from "../engine/mountedGridRows";
+import type { RowRange } from "../model/ranges";
 import type {
 	MountedVirtualCell,
 	VirtualRanges,
@@ -18,7 +18,7 @@ import type {
 	VirtualMeasurementApplicationResult,
 	VirtualMeasurementResult,
 	VirtualScrollMeasurementReason,
-} from "./measurementTypes";
+} from "./measurementLifecycle";
 import type { VirtualFrameCoordinator } from "ui/shared/scheduling/frameCoordinator";
 import { createVirtualizerEngine } from "../engine/virtualizer";
 import {
@@ -34,7 +34,7 @@ export type {
 	VirtualMeasurementApplicationResult,
 	VirtualMeasurementResult,
 	VirtualScrollMeasurementReason,
-} from "./measurementTypes";
+} from "./measurementLifecycle";
 export type {
 	VirtualListLayoutMeasurementResolution,
 	VirtualizerMeasurementState,

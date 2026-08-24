@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { getScrollMetrics, readScrollSnapshot } from "../measurementAdapter";
+import { getScrollMetrics, readScrollSnapshot } from "../measurement";
 import { setElementRect, setNumericProperty } from "testing/helpers/DOMObserverMock";
 
 afterEach(() => {

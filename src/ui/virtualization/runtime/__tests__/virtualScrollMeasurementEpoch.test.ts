@@ -4,7 +4,7 @@ import {
 	readVirtualScrollMeasurementEpoch,
 	resetVirtualScrollMeasurementFrameForTests,
 	shouldDeferPreviewActivationForVirtualScrollMeasurement,
-} from "../virtualScrollMeasurementEpoch";
+} from "../measurementLifecycle";
 
 describe("virtual scroll measurement frame", () => {
 	beforeEach(() => {

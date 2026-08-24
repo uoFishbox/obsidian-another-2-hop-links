@@ -3,7 +3,7 @@ import {
 	observeSharedResizeTarget,
 	unobserveSharedResizeTarget,
 	type SharedResizeObserverRegistry,
-} from "../sharedResizeRegistry";
+} from "../observerDependencies";
 
 describe("sharedResizeObservers", () => {
 	const createRegistry = <T>(): SharedResizeObserverRegistry<T> => ({

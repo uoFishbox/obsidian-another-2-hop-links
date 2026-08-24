@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
 	readVirtualListSharedScrollMetricsInto,
 	resolveCachedViewportHeight,
-} from "../sharedScrollMetrics";
+} from "../measurement";
 
 describe("sharedScrollMetrics", () => {
 	it("uses the cached viewport height from the active subscriber", () => {

@@ -1,5 +1,27 @@
-import type { MutableRowRange, RowRange } from "./rowRange";
-import type { VirtualRowLayoutMetrics } from "./layoutMetrics";
+export interface RowRange {
+	readonly start: number;
+	readonly end: number;
+}
+
+/** Caller-owned scratch range used by row-model writers. */
+export interface MutableRowRange {
+	start: number;
+	end: number;
+}
+
+export interface VirtualRowLayoutMetrics {
+	containerWidth: number;
+	columns: number;
+	cellWidth: number;
+	gap: number;
+	rowHeight: number;
+	contentHeight: number;
+}
+
+export interface FlatGridLayoutMetrics extends VirtualRowLayoutMetrics {
+	rowCount: number;
+	rowStride: number;
+}
 
 declare const brand: unique symbol;
 

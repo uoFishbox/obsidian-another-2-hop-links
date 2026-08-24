@@ -12,7 +12,7 @@ import {
 	teardownMutationObserverMock,
 	teardownResizeObserverMock,
 } from "testing/helpers/DOMObserverMock";
-import { observeVirtualViewport as observeVirtualListViewport } from "../observeVirtualViewport";
+import { observeVirtualViewport as observeVirtualListViewport } from "../scrollerRegistry";
 
 const SCROLLER_COUNT = 32;
 

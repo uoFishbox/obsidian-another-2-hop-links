@@ -3,7 +3,7 @@ import {
 	isStableCachedVirtualListMeasurementFromMetrics,
 	isStableVirtualListMeasurement,
 	resolveVirtualListLayoutStability,
-} from "../measurementStability";
+} from "../measurement";
 import { createDomRect, setNumericProperty } from "testing/helpers/DOMObserverMock";
 
 describe("virtual list measurement stability", () => {

@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
 	hasRelevantStructureMutation,
 	shouldIgnoreStructureMutationNode,
-} from "../structureMutation";
+} from "../observerDependencies";
 
 const createMutationRecord = (params: {
 	target: Node;

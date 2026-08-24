@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import type { VirtualFrameCoordinator } from "ui/shared/scheduling/frameCoordinator";
-import { createVirtualMeasurementScheduler } from "../measurementScheduler";
+import { createVirtualMeasurementScheduler } from "../measurementLifecycle";
 
 describe("createVirtualMeasurementScheduler", () => {
 	it("restores unstable retry capacity for each observation", () => {

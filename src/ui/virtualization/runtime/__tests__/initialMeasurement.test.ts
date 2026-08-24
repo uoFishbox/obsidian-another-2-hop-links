@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createVirtualFrameCoordinator } from "ui/shared/scheduling/frameCoordinator";
 import type { VirtualFrameCoordinator } from "ui/shared/scheduling/frameCoordinator";
-import { createInitialMeasurementLifecycle } from "../initialMeasurement";
+import { createInitialMeasurementLifecycle } from "../measurementLifecycle";
 
 describe("createInitialMeasurementLifecycle", () => {
 	afterEach(() => {

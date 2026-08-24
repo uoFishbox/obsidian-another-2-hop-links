@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createResidentRowSlotAllocator } from "../residentRowPool";
+import { createResidentRowSlotAllocator } from "../mountedGridRows";
 
 describe("createResidentRowSlotAllocator", () => {
 	it("uses exactly the mounted row count and reuses the leaving slot", () => {

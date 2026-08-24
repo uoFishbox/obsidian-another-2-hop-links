@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
 	collectPositionDependencyElements,
 	collectStructureDependencyTargets,
-} from "../layoutDependencies";
+} from "../observerDependencies";
 
 describe("scrollContainerDependencies", () => {
 	it("collects inline host sizer as a position dependency", () => {
