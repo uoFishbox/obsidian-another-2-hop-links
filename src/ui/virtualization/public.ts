@@ -62,6 +62,13 @@ export {
 	type FlatGridLayoutInput,
 } from "./grid/layout";
 export {
+	createSectionedGridGeometry,
+	type SectionedGridCellPosition,
+	type SectionedGridGeometry,
+	type SectionedGridGeometryInput,
+	type SectionedGridRowPosition,
+} from "./grid/sectionedGridGeometry";
+export {
 	markVirtualScrollMeasurementRun,
 	readVirtualScrollMeasurementEpoch,
 	resetVirtualScrollMeasurementFrameForTests,

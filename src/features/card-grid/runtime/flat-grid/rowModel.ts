@@ -1,6 +1,7 @@
 import type { FlatGridCellSource } from "./cellSource";
 import type { FlatGridLogicalCell } from "./logicalCell";
 import {
+	createSectionedGridGeometry,
 	resolveVirtualRangesInto,
 	type FlatGridLayoutMetrics,
 	type MutableRowRange,
@@ -51,23 +52,19 @@ export interface FlatGridRowModel<T> extends VirtualRowModel<FlatGridLogicalCell
 export function createFlatGridRowModel<T>(
 	input: FlatGridRowModelInput<T>,
 ): FlatGridRowModel<T> {
-	const columns = Math.max(1, input.layout.columns);
 	const cellSource = input.cellSource;
 	const cellCount = cellSource.cellCount;
-	const rowCount = cellCount > 0 ? Math.ceil(cellCount / columns) : 0;
-	const rowStride = input.layout.rowHeight + input.layout.gap;
-	const totalHeight =
-		rowCount > 0
-			? rowCount * input.layout.rowHeight + (rowCount - 1) * input.layout.gap
-			: 0;
-
-	const getRowCellCount = (rowIndex: number): number => {
-		if (rowIndex < 0 || rowIndex >= rowCount) {
-			return 0;
-		}
-		const startCellIndex = rowIndex * columns;
-		return Math.min(columns, Math.max(0, cellCount - startCellIndex));
-	};
+	const geometry = createSectionedGridGeometry({
+		sectionCellCounts: cellCount > 0 ? [cellCount] : [],
+		columns: input.layout.columns,
+		rowHeight: input.layout.rowHeight,
+		gap: input.layout.gap,
+		sectionMarginBottom: 0,
+	});
+	const columns = geometry.columns;
+	const rowCount = geometry.rowCount;
+	const rowStride = geometry.rowStride;
+	const totalHeight = geometry.totalHeight;
 
 	const getCellIndex = (rowIndex: number, columnIndex: number): number =>
 		rowIndex * columns + columnIndex;
@@ -227,17 +224,14 @@ export function createFlatGridRowModel<T>(
 		getCellIndex,
 		resolveCellAtIndex,
 		getRow(rowIndex): VirtualRow<FlatGridLogicalCell<T>> | null {
-			if (rowIndex < 0 || rowIndex >= rowCount) {
-				return null;
-			}
-
+			const rowPosition = geometry.resolveRow(rowIndex);
+			if (!rowPosition) return null;
 			const startCellIndex = rowIndex * columns;
-			const rowCellCount = getRowCellCount(rowIndex);
 			return {
-				top: rowIndex * rowStride,
-				cellCount: rowCellCount,
+				top: rowPosition.top,
+				cellCount: rowPosition.cellCount,
 				getCell(columnIndex) {
-					if (columnIndex < 0 || columnIndex >= rowCellCount) {
+					if (columnIndex < 0 || columnIndex >= rowPosition.cellCount) {
 						return null;
 					}
 

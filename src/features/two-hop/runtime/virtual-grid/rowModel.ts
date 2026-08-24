@@ -9,7 +9,10 @@ import type {
 	VirtualRow,
 	VirtualRowModel,
 } from "ui/virtualization/public";
-import { resolveVirtualRangesInto } from "ui/virtualization/public";
+import {
+	createSectionedGridGeometry,
+	resolveVirtualRangesInto,
+} from "ui/virtualization/public";
 
 interface TwoHopCellBase {
 	readonly logicalKey: string;
@@ -70,25 +73,22 @@ export function createTwoHopRowModel(
 	params: CreateTwoHopRowModelParams,
 ): TwoHopRowModel {
 	const { sections } = params;
-	const columns = Math.max(1, Math.floor(params.layout.columns));
-	const rowHeight = Math.max(1, params.layout.rowHeight);
-	const gap = Math.max(0, params.layout.gap);
-	const rowStride = rowHeight + gap;
-	const sectionMarginBottom = Math.max(0, params.layout.sectionMarginBottom);
-	const firstRowBySection = new Uint32Array(sections.length);
-	const sectionSpacingAdjustment = sectionMarginBottom - gap;
-	let rowCount = 0;
-
-	for (let sectionIndex = 0; sectionIndex < sections.length; sectionIndex += 1) {
-		const section = sections[sectionIndex]!;
-		const cellCount = resolveSectionCellCount(section);
-		const sectionRowCount = Math.ceil(cellCount / columns);
-
-		firstRowBySection[sectionIndex] = rowCount;
-		rowCount += sectionRowCount;
-	}
-	const totalHeight =
-		rowCount * rowStride + sections.length * sectionSpacingAdjustment;
+	const geometry = createSectionedGridGeometry({
+		sectionCellCounts: sections.map(resolveSectionCellCount),
+		columns: params.layout.columns,
+		rowHeight: Math.max(1, params.layout.rowHeight),
+		gap: params.layout.gap,
+		sectionMarginBottom: params.layout.sectionMarginBottom,
+	});
+	const {
+		columns,
+		rowHeight,
+		gap,
+		rowStride,
+		sectionMarginBottom,
+		rowCount,
+		totalHeight,
+	} = geometry;
 
 	const layout: TwoHopRowLayoutMetrics = {
 		containerWidth: params.layout.containerWidth,
@@ -101,81 +101,38 @@ export function createTwoHopRowModel(
 		sectionMarginBottom,
 	};
 
-	const resolveSectionRowCount = (sectionIndex: number): number => {
-		const firstRow = firstRowBySection[sectionIndex]!;
-		const nextFirstRow =
-			sectionIndex + 1 < firstRowBySection.length
-				? firstRowBySection[sectionIndex + 1]!
-				: rowCount;
-		return nextFirstRow - firstRow;
-	};
-
-	const resolveSectionTop = (sectionIndex: number): number =>
-		firstRowBySection[sectionIndex]! * rowStride +
-		sectionIndex * sectionSpacingAdjustment;
-
-	const resolveSectionLastRowTop = (sectionIndex: number): number =>
-		resolveSectionTop(sectionIndex) +
-		(resolveSectionRowCount(sectionIndex) - 1) * rowStride;
-
-	const resolveSectionIndexForRow = (rowIndex: number): number => {
-		if (rowIndex < 0 || rowIndex >= rowCount) return -1;
-		let low = 0;
-		let high = firstRowBySection.length;
-		while (low < high) {
-			const middle = (low + high) >>> 1;
-			if (firstRowBySection[middle]! <= rowIndex) low = middle + 1;
-			else high = middle;
-		}
-		return low - 1;
-	};
-
-	const resolveRowTop = (rowIndex: number): number => {
-		const sectionIndex = resolveSectionIndexForRow(rowIndex);
-		if (sectionIndex < 0) return 0;
-		return (
-			resolveSectionTop(sectionIndex) +
-			(rowIndex - firstRowBySection[sectionIndex]!) * rowStride
-		);
-	};
+	const resolveRowTop = (rowIndex: number): number =>
+		geometry.resolveRowTop(rowIndex) ?? 0;
 
 	const getCell = (
 		rowIndex: number,
 		columnIndex: number,
 	): TwoHopVirtualCell | null => {
-		const sectionIndex = resolveSectionIndexForRow(rowIndex);
-		if (sectionIndex < 0 || columnIndex < 0 || columnIndex >= columns) return null;
-		const section = sections[sectionIndex]!;
-		const rowInSection = rowIndex - firstRowBySection[sectionIndex]!;
+		const row = geometry.resolveRow(rowIndex);
+		if (!row || columnIndex < 0 || columnIndex >= row.cellCount) return null;
+		const section = sections[row.sectionIndex]!;
 		return resolveTwoHopCell(
 			section,
 			rowIndex,
 			columnIndex,
-			rowInSection * columns + columnIndex,
+			row.firstCellIndexInSection + columnIndex,
 		);
 	};
 
 	const getRow = (rowIndex: number): VirtualRow<TwoHopVirtualCell> | null => {
-		if (rowIndex < 0 || rowIndex >= rowCount) return null;
-		const sectionIndex = resolveSectionIndexForRow(rowIndex);
-		if (sectionIndex < 0) return null;
-		const section = sections[sectionIndex]!;
-		const rowInSection = rowIndex - firstRowBySection[sectionIndex]!;
-		const cellCount = Math.min(
-			columns,
-			Math.max(0, resolveSectionCellCount(section) - rowInSection * columns),
-		);
-		const top = resolveSectionTop(sectionIndex) + rowInSection * rowStride;
+		const row = geometry.resolveRow(rowIndex);
+		if (!row) return null;
+		const section = sections[row.sectionIndex]!;
 		return {
-			top,
-			cellCount,
+			top: row.top,
+			cellCount: row.cellCount,
 			getCell(columnIndex) {
-				if (columnIndex < 0 || columnIndex >= cellCount) return null;
+				if (columnIndex < 0 || columnIndex >= row.cellCount) return null;
 				return resolveTwoHopCell(
 					section,
 					rowIndex,
 					columnIndex,
-					rowInSection * columns + columnIndex,
+					row.firstCellIndexInSection + columnIndex,
 				);
 			},
 		};
@@ -207,47 +164,8 @@ export function createTwoHopRowModel(
 			out.end = 0;
 			return;
 		}
-		out.start = resolveFirstRowEndingAfter(scrollTop);
-		out.end = resolveFirstRowStartingAtOrAfter(viewportBottom);
-	};
-
-	const resolveFirstRowEndingAfter = (offset: number): number => {
-		const pixelTarget = offset - rowHeight;
-		let low = 0;
-		let high = firstRowBySection.length;
-		while (low < high) {
-			const middle = (low + high) >>> 1;
-			const lastRowTop = resolveSectionLastRowTop(middle);
-			if (lastRowTop <= pixelTarget) low = middle + 1;
-			else high = middle;
-		}
-		if (low >= firstRowBySection.length) return rowCount;
-		const sectionTop = resolveSectionTop(low);
-		const rowsInSection = resolveSectionRowCount(low);
-		const rowInSection = Math.min(
-			rowsInSection - 1,
-			Math.max(0, Math.floor((pixelTarget - sectionTop) / rowStride) + 1),
-		);
-		return firstRowBySection[low]! + rowInSection;
-	};
-
-	const resolveFirstRowStartingAtOrAfter = (offset: number): number => {
-		let low = 0;
-		let high = firstRowBySection.length;
-		while (low < high) {
-			const middle = (low + high) >>> 1;
-			const lastRowTop = resolveSectionLastRowTop(middle);
-			if (lastRowTop < offset) low = middle + 1;
-			else high = middle;
-		}
-		if (low >= firstRowBySection.length) return rowCount;
-		const sectionTop = resolveSectionTop(low);
-		const rowsInSection = resolveSectionRowCount(low);
-		const rowInSection = Math.min(
-			rowsInSection - 1,
-			Math.max(0, Math.ceil((offset - sectionTop) / rowStride)),
-		);
-		return firstRowBySection[low]! + rowInSection;
+		out.start = geometry.resolveFirstRowEndingAfter(scrollTop);
+		out.end = geometry.resolveFirstRowStartingAtOrAfter(viewportBottom);
 	};
 
 	const writeStableBand = (
@@ -302,13 +220,8 @@ export function createTwoHopRowModel(
 				);
 				if (itemIndex >= 0) cellIndex = itemIndex + 1;
 			}
-			if (cellIndex < 0 || cellIndex >= resolveSectionCellCount(section))
-				continue;
-			return {
-				rowIndex:
-					firstRowBySection[sectionIndex]! + Math.floor(cellIndex / columns),
-				columnIndex: cellIndex % columns,
-			};
+			const position = geometry.resolveCellPosition(sectionIndex, cellIndex);
+			if (position) return position;
 		}
 		return null;
 	};
