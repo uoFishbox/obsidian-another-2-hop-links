@@ -209,8 +209,6 @@ function buildTwoHopSearchSnapshotWithCache(
 	}
 
 	for (const branch of displayData.twoHopBranches) {
-		const targetFile = getBranchTargetFile(branch, resolveFile);
-		addFile(targetFile);
 		const branchBaseKey = getBranchBaseKey(branch, searchKeyCache);
 		for (const link of branch.hop2) {
 			appendSnapshot(

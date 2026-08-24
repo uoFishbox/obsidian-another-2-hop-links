@@ -361,25 +361,32 @@ describe("TwohopSearchAdapter.filterDisplayData", () => {
 	it("hides twohop branch when only parent matches", () => {
 		const sourceFile = createMockTFile("notes/source.md");
 		const targetFile = createMockTFile("notes/parent.md");
-		const childFile = createMockTFile("notes/child.md");
+		const alphaChild = createMockTFile("notes/alpha-child.md");
+		const betaChild = createMockTFile("notes/beta-child.md");
+		const branch = createBranch(sourceFile, targetFile.path, "needle-parent", [
+			createBacklink(alphaChild, "alpha-child"),
+			createBacklink(betaChild, "beta-child"),
+		]);
 		const displayData = createDisplayData({
-			twoHopBranches: [
-				createBranch(sourceFile, targetFile.path, "parent", [
-					createBacklink(childFile, "child"),
-				]),
-			],
+			outgoing: [branch],
+			twoHopBranches: [branch],
 		});
 		const options = createAdapterOptions(displayData, sourceFile);
 		const snapshots = searchAdapter.buildDataset(options);
-		const parentKey = snapshots.find((s) => !s.key.startsWith("h"))?.key;
+		const parentSnapshot = snapshots.find((snapshot) =>
+			snapshot.key.startsWith("o"),
+		);
+		expect(parentSnapshot).toBeDefined();
+		if (!parentSnapshot) return;
 
 		const result = searchAdapter.filterDisplayData(
 			displayData,
-			"query",
-			createMatchesByKey([parentKey ?? ""]),
+			"needle-parent",
+			createMatchesByKey([parentSnapshot.key]),
 			DEFAULT_RENDER_MODE,
 		);
 
+		expect(result.outgoing).toEqual([branch]);
 		expect(result.twoHopBranches).toHaveLength(0);
 	});
 
@@ -583,7 +590,7 @@ describe("TwohopSearchAdapter.buildSnapshot", () => {
 });
 
 describe("TwohopSearchAdapter searchable files", () => {
-	it("collects files from visible sections", () => {
+	it("collects files represented by worker items in active sections", () => {
 		const sourceFile = createMockTFile("notes/source.md");
 		const outgoingTarget = createMockTFile("notes/outgoing-target.md");
 		const backlinkSource = createMockTFile("notes/backlink-source.md");
@@ -623,11 +630,11 @@ describe("TwohopSearchAdapter searchable files", () => {
 			expect.arrayContaining([
 				outgoingTarget.path,
 				backlinkSource.path,
-				twoHopParentTarget.path,
 				childSource.path,
 				taggedFile.path,
 			]),
 		);
+		expect(filePaths).not.toContain(twoHopParentTarget.path);
 		expect(filePaths).not.toContain(mergedTarget.path);
 		expect(filePaths).not.toContain(mergedBacklinkSource.path);
 	});

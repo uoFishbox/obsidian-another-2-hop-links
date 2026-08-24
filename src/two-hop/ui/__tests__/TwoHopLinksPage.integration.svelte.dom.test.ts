@@ -27,7 +27,10 @@ import {
 } from "preview/runtime/previewRuntime";
 import { CardCollectionState } from "cards/CardCollectionState.svelte";
 import { ARIA_LABELS } from "cards/ariaLabels";
-import { queryAllByRoleDeep } from "testing/helpers/shadowDomQueries";
+import {
+	queryAllByRoleDeep,
+	queryAllByTextDeep,
+} from "testing/helpers/shadowDomQueries";
 
 const previewRuntimes = new Set<PreviewRuntime>();
 
@@ -334,6 +337,14 @@ function queryCard(label: string): HTMLElement | null {
 	);
 }
 
+function querySectionHeader(label: string): HTMLElement | null {
+	return (
+		queryAllByTextDeep(label).find((element) =>
+			element.matches(".cosense-card-links__header-title"),
+		) ?? null
+	);
+}
+
 describe("TwoHopLinksPage behavior", () => {
 	beforeEach(() => {
 		vi.useFakeTimers();
@@ -383,6 +394,46 @@ describe("TwoHopLinksPage behavior", () => {
 		expect(queryCard("outgoing-parent")).toBeInTheDocument();
 		expect(queryCard("backlink-note")).toBeInTheDocument();
 		expect(queryCard("tagged-note")).toBeInTheDocument();
+	});
+
+	it("hides the two-hop section when only its parent matches the search", async () => {
+		const file = createMockTFile("notes/target.md");
+		const parentFile = createMockTFile("notes/needle-parent.md");
+		const alphaChild = createMockTFile("notes/alpha-child.md");
+		const betaChild = createMockTFile("notes/beta-child.md");
+		const branch = createBranch(
+			file,
+			parentFile,
+			[alphaChild, betaChild],
+			"needle-parent",
+		);
+		const displayData = {
+			...createDisplayData(),
+			outgoing: [branch],
+			twoHopBranches: [branch],
+		};
+		const settings = {
+			...DEFAULT_SETTINGS,
+			useMergedLinksSection: false,
+			showTagsSection: false,
+		};
+
+		const { getByRole } = renderRoot(displayData, settings, file);
+		await showEntireVirtualSurface();
+		expect(queryCard("needle-parent")).toBeInTheDocument();
+		expect(querySectionHeader("needle-parent")).toBeInTheDocument();
+		expect(queryCard("alpha-child")).toBeInTheDocument();
+		expect(queryCard("beta-child")).toBeInTheDocument();
+
+		await fireEvent.input(getByRole("searchbox", { name: "Find cards" }), {
+			target: { value: "needle-parent" },
+		});
+		await flushAsyncUi();
+
+		expect(queryCard("needle-parent")).toBeInTheDocument();
+		expect(querySectionHeader("needle-parent")).not.toBeInTheDocument();
+		expect(queryCard("alpha-child")).not.toBeInTheDocument();
+		expect(queryCard("beta-child")).not.toBeInTheDocument();
 	});
 
 	it("shows a card preview after the surface becomes visible", async () => {
