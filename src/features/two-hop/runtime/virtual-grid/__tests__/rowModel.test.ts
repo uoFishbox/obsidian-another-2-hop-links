@@ -78,12 +78,24 @@ describe("TwoHopRowModel", () => {
 		expect(model.getRow(0)?.cellCount).toBe(2);
 		expect(model.getRow(3)?.top).toBe(330);
 		expect(model.getRow(2)?.getCell(0)?.kind).toBe("load-more");
-		expect(model.cardCounts).toEqual({
-			header: 2,
-			item: 4,
-			loadMore: 1,
-			total: 7,
+	});
+
+	it("reuses the resolved section while materializing a row", () => {
+		const source = [createSection("first", 4)];
+		let sectionReads = 0;
+		const sections = new Proxy(source, {
+			get(target, property, receiver) {
+				if (property === "0") sectionReads += 1;
+				return Reflect.get(target, property, receiver);
+			},
 		});
+		const model = createModel(sections);
+		sectionReads = 0;
+
+		const row = model.getRow(1);
+		expect(row?.getCell(0)?.kind).toBe("item");
+		expect(row?.getCell(1)?.kind).toBe("item");
+		expect(sectionReads).toBe(1);
 	});
 
 	it("resolves half-open visible ranges across section margins", () => {
@@ -106,6 +118,16 @@ describe("TwoHopRowModel", () => {
 				overscanPx: 0,
 			}),
 		).toEqual({ start: 1, end: 1 });
+	});
+
+	it("derives section tops when the section margin differs from the row gap", () => {
+		const model = createTwoHopRowModel({
+			sections: [createSection("first", 2), createSection("second", 1)],
+			layout: { ...layout, sectionMarginBottom: 30 },
+		});
+
+		expect(model.getRow(2)?.top).toBe(240);
+		expect(model.totalHeight).toBe(370);
 	});
 
 	it("preserves half-open visibility with fractional row metrics", () => {

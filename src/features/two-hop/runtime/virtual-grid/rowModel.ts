@@ -27,14 +27,6 @@ export type TwoHopVirtualCell =
 	  })
 	| (TwoHopCellBase & { readonly kind: "load-more" });
 
-/** Logical card counts represented by a complete two-hop row model. */
-export interface TwoHopLogicalCardCounts {
-	readonly header: number;
-	readonly item: number;
-	readonly loadMore: number;
-	readonly total: number;
-}
-
 export interface TwoHopRowLayoutMetrics extends VirtualRowLayoutMetrics {
 	readonly rowStride: number;
 	readonly sectionMarginBottom: number;
@@ -45,7 +37,6 @@ type MutableStableScrollTopBand = {
 };
 
 export interface TwoHopRowModel extends VirtualRowModel<TwoHopVirtualCell> {
-	readonly cardCounts: TwoHopLogicalCardCounts;
 	readonly layout: TwoHopRowLayoutMetrics;
 	findStableMountedScrollTopBandInto(
 		out: MutableStableScrollTopBand,
@@ -85,30 +76,19 @@ export function createTwoHopRowModel(
 	const rowStride = rowHeight + gap;
 	const sectionMarginBottom = Math.max(0, params.layout.sectionMarginBottom);
 	const firstRowBySection = new Uint32Array(sections.length);
-	const rowCountBySection = new Uint32Array(sections.length);
-	const topBySection = new Float64Array(sections.length);
+	const sectionSpacingAdjustment = sectionMarginBottom - gap;
 	let rowCount = 0;
-	let totalHeight = 0;
-	let itemCount = 0;
-	let loadMoreCount = 0;
 
 	for (let sectionIndex = 0; sectionIndex < sections.length; sectionIndex += 1) {
 		const section = sections[sectionIndex]!;
-		itemCount += section.items.length;
-		if (section.items.length < section.totalCount) loadMoreCount += 1;
 		const cellCount = resolveSectionCellCount(section);
 		const sectionRowCount = Math.ceil(cellCount / columns);
-		const contentHeight =
-			sectionRowCount > 0
-				? sectionRowCount * rowHeight + (sectionRowCount - 1) * gap
-				: 0;
 
 		firstRowBySection[sectionIndex] = rowCount;
-		rowCountBySection[sectionIndex] = sectionRowCount;
-		topBySection[sectionIndex] = totalHeight;
 		rowCount += sectionRowCount;
-		totalHeight += contentHeight + sectionMarginBottom;
 	}
+	const totalHeight =
+		rowCount * rowStride + sections.length * sectionSpacingAdjustment;
 
 	const layout: TwoHopRowLayoutMetrics = {
 		containerWidth: params.layout.containerWidth,
@@ -120,44 +100,42 @@ export function createTwoHopRowModel(
 		rowStride,
 		sectionMarginBottom,
 	};
-	const cardCounts: TwoHopLogicalCardCounts = Object.freeze({
-		header: sections.length,
-		item: itemCount,
-		loadMore: loadMoreCount,
-		total: sections.length + itemCount + loadMoreCount,
-	});
+
+	const resolveSectionRowCount = (sectionIndex: number): number => {
+		const firstRow = firstRowBySection[sectionIndex]!;
+		const nextFirstRow =
+			sectionIndex + 1 < firstRowBySection.length
+				? firstRowBySection[sectionIndex + 1]!
+				: rowCount;
+		return nextFirstRow - firstRow;
+	};
+
+	const resolveSectionTop = (sectionIndex: number): number =>
+		firstRowBySection[sectionIndex]! * rowStride +
+		sectionIndex * sectionSpacingAdjustment;
+
+	const resolveSectionLastRowTop = (sectionIndex: number): number =>
+		resolveSectionTop(sectionIndex) +
+		(resolveSectionRowCount(sectionIndex) - 1) * rowStride;
 
 	const resolveSectionIndexForRow = (rowIndex: number): number => {
+		if (rowIndex < 0 || rowIndex >= rowCount) return -1;
 		let low = 0;
-		let high = firstRowBySection.length - 1;
-		while (low <= high) {
+		let high = firstRowBySection.length;
+		while (low < high) {
 			const middle = (low + high) >>> 1;
-			const firstRow = firstRowBySection[middle]!;
-			const endRow = firstRow + rowCountBySection[middle]!;
-			if (rowIndex < firstRow) high = middle - 1;
-			else if (rowIndex >= endRow) low = middle + 1;
-			else return middle;
+			if (firstRowBySection[middle]! <= rowIndex) low = middle + 1;
+			else high = middle;
 		}
-		return -1;
+		return low - 1;
 	};
 
 	const resolveRowTop = (rowIndex: number): number => {
 		const sectionIndex = resolveSectionIndexForRow(rowIndex);
 		if (sectionIndex < 0) return 0;
 		return (
-			topBySection[sectionIndex]! +
+			resolveSectionTop(sectionIndex) +
 			(rowIndex - firstRowBySection[sectionIndex]!) * rowStride
-		);
-	};
-
-	const getRowCellCount = (rowIndex: number): number => {
-		const sectionIndex = resolveSectionIndexForRow(rowIndex);
-		if (sectionIndex < 0) return 0;
-		const section = sections[sectionIndex]!;
-		const rowInSection = rowIndex - firstRowBySection[sectionIndex]!;
-		return Math.min(
-			columns,
-			Math.max(0, resolveSectionCellCount(section) - rowInSection * columns),
 		);
 	};
 
@@ -181,20 +159,24 @@ export function createTwoHopRowModel(
 		if (rowIndex < 0 || rowIndex >= rowCount) return null;
 		const sectionIndex = resolveSectionIndexForRow(rowIndex);
 		if (sectionIndex < 0) return null;
+		const section = sections[sectionIndex]!;
 		const rowInSection = rowIndex - firstRowBySection[sectionIndex]!;
-		const sectionRowCount = rowCountBySection[sectionIndex]!;
-		const isLastSectionRow = rowInSection === sectionRowCount - 1;
-		const cellCount = getRowCellCount(rowIndex);
+		const cellCount = Math.min(
+			columns,
+			Math.max(0, resolveSectionCellCount(section) - rowInSection * columns),
+		);
+		const top = resolveSectionTop(sectionIndex) + rowInSection * rowStride;
 		return {
-			key: rowIndex,
-			index: rowIndex,
-			top: resolveRowTop(rowIndex),
-			height: rowHeight,
-			bottomSpacing: isLastSectionRow ? sectionMarginBottom : gap,
+			top,
 			cellCount,
 			getCell(columnIndex) {
 				if (columnIndex < 0 || columnIndex >= cellCount) return null;
-				return getCell(rowIndex, columnIndex);
+				return resolveTwoHopCell(
+					section,
+					rowIndex,
+					columnIndex,
+					rowInSection * columns + columnIndex,
+				);
 			},
 		};
 	};
@@ -232,17 +214,16 @@ export function createTwoHopRowModel(
 	const resolveFirstRowEndingAfter = (offset: number): number => {
 		const pixelTarget = offset - rowHeight;
 		let low = 0;
-		let high = topBySection.length;
+		let high = firstRowBySection.length;
 		while (low < high) {
 			const middle = (low + high) >>> 1;
-			const lastRowTop =
-				topBySection[middle]! + (rowCountBySection[middle]! - 1) * rowStride;
+			const lastRowTop = resolveSectionLastRowTop(middle);
 			if (lastRowTop <= pixelTarget) low = middle + 1;
 			else high = middle;
 		}
-		if (low >= topBySection.length) return rowCount;
-		const sectionTop = topBySection[low]!;
-		const rowsInSection = rowCountBySection[low]!;
+		if (low >= firstRowBySection.length) return rowCount;
+		const sectionTop = resolveSectionTop(low);
+		const rowsInSection = resolveSectionRowCount(low);
 		const rowInSection = Math.min(
 			rowsInSection - 1,
 			Math.max(0, Math.floor((pixelTarget - sectionTop) / rowStride) + 1),
@@ -252,17 +233,16 @@ export function createTwoHopRowModel(
 
 	const resolveFirstRowStartingAtOrAfter = (offset: number): number => {
 		let low = 0;
-		let high = topBySection.length;
+		let high = firstRowBySection.length;
 		while (low < high) {
 			const middle = (low + high) >>> 1;
-			const lastRowTop =
-				topBySection[middle]! + (rowCountBySection[middle]! - 1) * rowStride;
+			const lastRowTop = resolveSectionLastRowTop(middle);
 			if (lastRowTop < offset) low = middle + 1;
 			else high = middle;
 		}
-		if (low >= topBySection.length) return rowCount;
-		const sectionTop = topBySection[low]!;
-		const rowsInSection = rowCountBySection[low]!;
+		if (low >= firstRowBySection.length) return rowCount;
+		const sectionTop = resolveSectionTop(low);
+		const rowsInSection = resolveSectionRowCount(low);
 		const rowInSection = Math.min(
 			rowsInSection - 1,
 			Math.max(0, Math.ceil((offset - sectionTop) / rowStride)),
@@ -378,10 +358,7 @@ export function createTwoHopRowModel(
 		rowCount,
 		totalHeight,
 		layout,
-		cardCounts,
 		getRow,
-		getRowTop: resolveRowTop,
-		getRowEnd: (rowIndex) => resolveRowTop(rowIndex) + rowHeight,
 		findVisibleRangeInto(out, rangeParams) {
 			writeVisibleRange(
 				out,

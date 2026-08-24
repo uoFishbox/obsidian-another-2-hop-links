@@ -18,10 +18,6 @@ export interface FlatGridRowModelInput<T> {
 	layout: FlatGridLayoutMetrics;
 }
 
-export interface FlatGridRow<T> extends VirtualRow<FlatGridLogicalCell<T>> {
-	startCellIndex: number;
-}
-
 type StableScrollTopBandMutable = {
 	-readonly [K in keyof StableScrollTopBand]: StableScrollTopBand[K];
 };
@@ -30,7 +26,6 @@ export interface FlatGridRowModel<T> extends VirtualRowModel<FlatGridLogicalCell
 	cellSource: FlatGridCellSource<T>;
 	cellCount: number;
 	getCellIndex(rowIndex: number, columnIndex: number): number;
-	getRowCellCount(rowIndex: number): number;
 	resolveCellAtIndex(index: number): FlatGridLogicalCell<T> | null;
 	findStableMountedScrollTopBandInto(
 		out: StableScrollTopBandMutable,
@@ -230,25 +225,17 @@ export function createFlatGridRowModel<T>(
 		cellSource,
 		cellCount,
 		getCellIndex,
-		getRowCellCount,
 		resolveCellAtIndex,
-		getRow(rowIndex): FlatGridRow<T> | null {
+		getRow(rowIndex): VirtualRow<FlatGridLogicalCell<T>> | null {
 			if (rowIndex < 0 || rowIndex >= rowCount) {
 				return null;
 			}
 
 			const startCellIndex = rowIndex * columns;
 			const rowCellCount = getRowCellCount(rowIndex);
-			const isLastRow = rowIndex === rowCount - 1;
-
 			return {
-				key: rowIndex,
-				index: rowIndex,
 				top: rowIndex * rowStride,
-				height: input.layout.rowHeight,
-				bottomSpacing: isLastRow ? 0 : input.layout.gap,
 				cellCount: rowCellCount,
-				startCellIndex,
 				getCell(columnIndex) {
 					if (columnIndex < 0 || columnIndex >= rowCellCount) {
 						return null;

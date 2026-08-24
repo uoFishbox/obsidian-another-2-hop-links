@@ -297,7 +297,7 @@ describe("linkListVirtualLayout", () => {
 		});
 
 		expect(build.rowsInMountedRange).toHaveLength(2);
-		expect(build.rowsInMountedRange.map((row) => row.key)).toEqual([0, 1]);
+		expect(build.rowsInMountedRange.map((row) => row.rowIndex)).toEqual([0, 1]);
 		expect(build.rowsInMountedRange.map((row) => row.physicalRowSlot)).toEqual([
 			0, 1,
 		]);

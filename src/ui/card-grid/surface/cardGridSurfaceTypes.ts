@@ -1,8 +1,7 @@
-import type { MountedVirtualCell, RowKey } from "ui/virtualization/public";
+import type { MountedVirtualCell } from "ui/virtualization/public";
 
 /** Physical row rendered by the reusable card-grid surface. */
 export interface CardGridMountedRow<TMountedCell extends MountedVirtualCell> {
-	key: RowKey;
 	rowIndex: number;
 	top: number;
 	physicalRowSlot: number;

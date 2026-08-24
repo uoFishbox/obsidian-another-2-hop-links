@@ -6,7 +6,6 @@ import type {
 } from "ui/virtualization/model/types";
 
 export interface MountedGridRow<TCell extends MountedVirtualCell> {
-	readonly key: number;
 	readonly physicalRowSlot: number;
 	readonly rowIndex: number;
 	readonly top: number;
@@ -104,7 +103,6 @@ export function buildMountedGridRows<TLogicalCell, TCell extends MountedVirtualC
 		}
 
 		rowsInMountedRange.push({
-			key: rowIndex,
 			physicalRowSlot,
 			rowIndex,
 			top: row.top,

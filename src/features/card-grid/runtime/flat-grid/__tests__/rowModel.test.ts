@@ -33,13 +33,11 @@ describe("flatLinkRowModel", () => {
 	it("resolves row cell counts arithmetically without a per-row lookup table", () => {
 		const rowModel = createRowModel(8);
 
-		expect(rowModel.rowCellCountByRow).toBeUndefined();
-		expect(rowModel.getRowCellCount(0)).toBe(3);
-		expect(rowModel.getRowCellCount(1)).toBe(3);
-		expect(rowModel.getRowCellCount(2)).toBe(2);
-		expect(rowModel.getRowCellCount(-1)).toBe(0);
-		expect(rowModel.getRowCellCount(3)).toBe(0);
+		expect(rowModel.getRow(0)?.cellCount).toBe(3);
+		expect(rowModel.getRow(1)?.cellCount).toBe(3);
 		expect(rowModel.getRow(2)?.cellCount).toBe(2);
+		expect(rowModel.getRow(-1)).toBeNull();
+		expect(rowModel.getRow(3)).toBeNull();
 	});
 
 	it("writes visible ranges into caller-owned scratch objects", () => {

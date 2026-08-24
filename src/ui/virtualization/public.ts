@@ -39,7 +39,6 @@ export type {
 	LogicalCellKey,
 	MountedVirtualCell,
 	MutableVirtualRanges,
-	RowKey,
 	SourceKey,
 	VirtualNavigationDirection,
 	VirtualNavigationTarget,

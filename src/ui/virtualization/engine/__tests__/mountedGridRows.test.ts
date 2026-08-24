@@ -40,11 +40,7 @@ function createRowModel(rowCellCounts: readonly number[], columns = 4) {
 			if (rowIndex < 0 || rowIndex >= rowCount) return null;
 			const cellCount = Math.min(columns, rowCellCounts[rowIndex] ?? 0);
 			return {
-				key: rowIndex,
-				index: rowIndex,
 				top: rowIndex * rowStride,
-				height: rowHeight,
-				bottomSpacing: rowIndex === rowCount - 1 ? 0 : gap,
 				cellCount,
 				getCell(columnIndex) {
 					return columnIndex >= 0 && columnIndex < cellCount

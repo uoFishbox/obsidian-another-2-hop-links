@@ -14,7 +14,6 @@ export interface MountedVirtualCellsBuild<TMountedCell extends MountedVirtualCel
 	 * immutable after returning the build to the engine.
 	 */
 	cells: TMountedCell[];
-	mountedCellCount?: number;
 }
 
 export interface VirtualListSnapshot<

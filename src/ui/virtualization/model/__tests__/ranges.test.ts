@@ -22,11 +22,7 @@ function createMockRowModel(
 			index < 0 || index >= rowCount
 				? null
 				: {
-						key: index,
-						index,
 						top: index * rowHeight,
-						height: rowHeight,
-						bottomSpacing: 0,
 						cellCount: 1,
 						getCell: () => null,
 					},
