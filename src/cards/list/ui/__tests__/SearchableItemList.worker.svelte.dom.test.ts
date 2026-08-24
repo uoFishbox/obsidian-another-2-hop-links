@@ -579,7 +579,7 @@ describe("SearchableItemList worker integration", () => {
 		);
 	});
 
-	it("yields before completing a large filtered search, publishing partial results", async () => {
+	it("yields before completing a large filtered search without publishing partial results", async () => {
 		vi.useRealTimers();
 		const yieldGate = createDeferred<void>();
 		yieldHarness.setNextYield(() => yieldGate.promise);
@@ -595,11 +595,10 @@ describe("SearchableItemList worker integration", () => {
 			await flushAsyncUi();
 
 			await waitFor(() => expect(yieldHarness.calls).toHaveLength(1));
-			const partialCount = Number(
+			const visibleCountWhileFiltering = Number(
 				screen.getByTestId("filtered-count").textContent,
 			);
-			expect(partialCount).toBeGreaterThan(0);
-			expect(partialCount).toBeLessThan(items.length);
+			expect(visibleCountWhileFiltering).toBe(items.length);
 
 			yieldGate.resolve();
 
@@ -638,11 +637,10 @@ describe("SearchableItemList worker integration", () => {
 			await flushAsyncUi();
 
 			await waitFor(() => expect(yieldHarness.calls).toHaveLength(1));
-			const partialAlphaCount = Number(
+			const visibleCountWhileFiltering = Number(
 				screen.getByTestId("filtered-count").textContent,
 			);
-			expect(partialAlphaCount).toBeGreaterThan(0);
-			expect(partialAlphaCount).toBeLessThan(alphaItems.length);
+			expect(visibleCountWhileFiltering).toBe(alphaItems.length + 1);
 
 			await fireEvent.input(input, { target: { value: "beta" } });
 			await flushAsyncUi();
@@ -684,8 +682,8 @@ describe("SearchableItemList worker integration", () => {
 		await waitFor(() => expect(getAllSearchableItems()).toHaveLength(1));
 		expect(getAllSearchableItems()[0]).toHaveTextContent("alpha");
 
-		// Query change: matchesByKey is reset to null until the new result
-		// arrives, so the previous result set must stay mounted.
+		// Query change: the committed result remains visible until the new
+		// worker result arrives, so the previous result set stays mounted.
 		await fireEvent.input(input, { target: { value: "beta" } });
 		await vi.advanceTimersByTimeAsync(150);
 		await flushAsyncUi();

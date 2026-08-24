@@ -166,6 +166,9 @@
 	const lazyLoaderCache = new Set<string>();
 	setLazyLoaderCache(lazyLoaderCache);
 	let matchesByKey = $derived(workerSearchSession.matchesByKey);
+	let appliedSearchQuery = $derived(workerSearchSession.matchedQuery);
+	let appliedSearchScope = $derived(workerSearchSession.matchedScope);
+	let isWorkerFiltering = $derived(workerSearchSession.isFiltering);
 	let isSearchLoading = $derived(workerSearchSession.isLoading);
 
 	let sortedItems = $derived.by(() => {
@@ -182,7 +185,14 @@
 		const serial = ++filterRunSerial;
 		const sourceItems = sortedItems;
 		const query = search.normalized;
+		const currentSearchScope =
+			allowContentSearch && contentSearchEnabled
+				? "title-and-content"
+				: "title-only";
 		const matches = matchesByKey;
+		const committedQuery = appliedSearchQuery;
+		const committedScope = appliedSearchScope;
+		const filtering = isWorkerFiltering;
 		const shouldPin = config.pinBookmarkedToTop;
 		void bookmarks.filePaths.size;
 		void bookmarks.orderedFilePaths;
@@ -195,10 +205,15 @@
 				return;
 			}
 
-			if (!matches) {
+			if (
+				!matches ||
+				filtering ||
+				committedQuery !== query ||
+				committedScope !== currentSearchScope
+			) {
 				// Stale-while-search: keep the previous results while the
-				// search worker has not produced a result for the current
-				// query yet. Clearing `filteredItems` here would unmount
+				// search worker has not committed a result for the current
+				// query and scope yet. Clearing `filteredItems` here would unmount
 				// LinkList and destroy the preview host with it.
 				return;
 			}
@@ -225,7 +240,6 @@
 					continue;
 				}
 
-				filteredItems = nextItems.slice();
 				await yieldToMainThreadIdleAware({
 					maxDelayMs: SEARCH_FILTER_YIELD_MAX_DELAY_MS,
 				});
@@ -244,7 +258,7 @@
 
 	let initialVisibleCount = $derived(applicationStore.initialVisibleCount);
 	let searchScopedSectionId = $derived(
-		buildScopedSectionId(config.sectionId, search.normalized),
+		buildScopedSectionId(config.sectionId, appliedSearchQuery),
 	);
 	let loadMoreIncrement = $derived(applicationStore.loadMoreIncrement);
 	let preserveResultsHeightOnSearch = $derived(
@@ -254,9 +268,8 @@
 		items,
 		getItemKey,
 		settings: applicationStore.settings,
-		searchQuery: search.normalized,
-		contentSearchEnabled,
-		allowContentSearch,
+		searchQuery: appliedSearchQuery,
+		searchScope: appliedSearchScope,
 		matchesByKey,
 		applicationUpdateVersion: applicationStore.updateVersion,
 		previewGlobalVersion: applicationStore.previewState.globalVersion,
@@ -276,8 +289,7 @@
 
 		const matchedItem = revision.matchesByKey?.get(itemKey) ?? null;
 		const searchScope =
-			revision.allowContentSearch &&
-			revision.contentSearchEnabled &&
+			revision.searchScope === "title-and-content" &&
 			(matchedItem?.contentMatched ?? true)
 				? "title-and-content"
 				: "title-only";
@@ -342,7 +354,7 @@
 
 <div
 	class="cosense-card-links__view-results cosense-card-links__search-result-container"
-	class:is-loading={isSearchLoading}
+	class:ccl-search-pending={isSearchLoading}
 	bind:this={resultsContainerEl}
 	style:min-height={resultsMinHeight}
 >

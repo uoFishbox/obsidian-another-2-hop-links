@@ -404,14 +404,6 @@ export function useWorkerSearchSession(
 			return;
 		}
 
-		if (
-			matchesByKey !== null &&
-			(matchedQuery !== normalizedQuery || matchedScope !== requestScope)
-		) {
-			matchesByKey = null;
-			matchedQuery = "";
-		}
-
 		lastIssuedSearchSignature = signature;
 		const requestId = ++requestSerial;
 		activeRequestQuery = normalizedQuery;

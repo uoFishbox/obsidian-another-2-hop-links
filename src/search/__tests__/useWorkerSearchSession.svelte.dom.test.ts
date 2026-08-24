@@ -318,7 +318,7 @@ describe("useWorkerSearchSession", () => {
 		expect(screen.getByTestId("is-filtering")).toHaveTextContent("false");
 	});
 
-	it("clears previous results while a different query is filtering", async () => {
+	it("keeps previous results while a different query is filtering", async () => {
 		const dataset = createDataset(["alpha", "beta"]);
 		const view = render(UseWorkerSearchSessionHarness, {
 			props: {
@@ -346,8 +346,8 @@ describe("useWorkerSearchSession", () => {
 		});
 		await flushAsyncUi();
 
-		expect(screen.getByTestId("matched-state")).toHaveTextContent("null");
-		expect(screen.getByTestId("matched-query")).toHaveTextContent(/^$/);
+		expect(screen.getByTestId("matched-state")).toHaveTextContent("alpha");
+		expect(screen.getByTestId("matched-query")).toHaveTextContent("alpha");
 		expect(screen.getByTestId("is-filtering")).toHaveTextContent("true");
 
 		workerHarness.resolveLatestPendingSearch(["beta"]);

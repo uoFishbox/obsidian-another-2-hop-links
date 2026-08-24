@@ -7,10 +7,7 @@
 	import { useSearchQuery } from "cards/hooks/useSearchQuery.svelte";
 	import { useBookmarks } from "cards/hooks/useBookmarks.svelte";
 	import { useWorkerSearchSession } from "search/useWorkerSearchSession.svelte";
-	import type {
-		SearchWorkerMatchedItem,
-		SearchWorkerMatchScope,
-	} from "search/searchWorkerTypes";
+	import type { SearchWorkerMatchedItem } from "search/searchWorkerTypes";
 	import { focusResultEdge } from "cards/navigation/resultFocus";
 	import {
 		setLinkContext,
@@ -122,10 +119,6 @@
 		contentSearchEnabled = currentSettings.enableContentSearch ?? false;
 	});
 
-	let searchScope: SearchWorkerMatchScope = $derived(
-		contentSearchEnabled ? "title-and-content" : "title-only",
-	);
-
 	// フックを利用
 	const search = useSearchQuery({
 		initialValue: uiState?.searchInputValue,
@@ -163,12 +156,8 @@
 	});
 	let isSearchLoading = $derived(workerSearchSession.isLoading);
 	let matchesByKey = $derived(workerSearchSession.matchesByKey);
-	let appliedSearchQuery = $derived(
-		matchesByKey === null ? search.normalized : workerSearchSession.matchedQuery,
-	);
-	let appliedSearchScope = $derived(
-		matchesByKey === null ? searchScope : workerSearchSession.matchedScope,
-	);
+	let appliedSearchQuery = $derived(workerSearchSession.matchedQuery);
+	let appliedSearchScope = $derived(workerSearchSession.matchedScope);
 	let paginationScope = $derived(
 		JSON.stringify([file.path, appliedSearchQuery, appliedSearchScope]),
 	);
@@ -413,7 +402,7 @@
 	{/if}
 	<div
 		class="cosense-card-links__results cosense-card-links__search-result-container"
-		class:is-loading={isSearchLoading}
+		class:ccl-search-pending={isSearchLoading}
 		bind:this={resultsContainerEl}
 		style:min-height={resultsMinHeight}
 	>
