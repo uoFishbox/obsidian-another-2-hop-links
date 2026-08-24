@@ -7,7 +7,10 @@
 	import { useSearchQuery } from "ui/hooks/useSearchQuery.svelte";
 	import { useBookmarks } from "ui/hooks/useBookmarks.svelte";
 	import { useWorkerSearchSession } from "features/search/useWorkerSearchSession.svelte";
-	import type { SearchWorkerMatchScope } from "features/search/searchWorkerTypes";
+	import type {
+		SearchWorkerMatchedItem,
+		SearchWorkerMatchScope,
+	} from "features/search/searchWorkerTypes";
 	import { focusResultEdge } from "features/keyboard-navigation/resultFocus";
 	import {
 		setLinkContext,
@@ -31,10 +34,43 @@
 	import { observePreviewSurfaceVisibility } from "features/card-preview/scheduling/previewSurfaceVisibility";
 	import type { TwoHopPreviewDependencies } from "features/two-hop/runtime/virtual-grid/useTwoHopVirtualGrid.svelte";
 	import type { PreviewRuntime } from "features/card-preview/runtime/previewRuntime";
+	import type { LinkUtilitiesContext } from "types/linkContext";
 	import {
-		buildTwoHopCardModel,
-		type TwoHopCardModelRevision,
-	} from "features/two-hop/ui/twoHopCardModel";
+		createCardRenderModel,
+		type CardRenderModel,
+	} from "ui/components/items/cardRenderModel";
+	import type { TwoHopItemModel } from "features/two-hop/ui/twoHopSectionModel";
+
+	interface TwoHopCardModelRevision {
+		readonly settings: PluginSettings;
+		readonly searchQuery: string;
+		readonly searchScope: "title-only" | "title-and-content";
+		readonly matchesByKey: Map<string, SearchWorkerMatchedItem> | null;
+		readonly linkContext: LinkUtilitiesContext;
+		readonly getPreviewRenderVersion: (path: string) => string;
+		readonly applicationUpdateVersion: number;
+	}
+
+	function buildTwoHopCardModel(
+		row: TwoHopItemModel,
+		revision: TwoHopCardModelRevision,
+	): CardRenderModel {
+		const matchedItem = revision.matchesByKey?.get(row.searchKey);
+		return createCardRenderModel({
+			item: row.item,
+			settings: revision.settings,
+			context: revision.linkContext,
+			getPreviewRenderVersion: revision.getPreviewRenderVersion,
+			searchQuery: revision.searchQuery,
+			searchScope:
+				revision.searchScope === "title-and-content" &&
+				(matchedItem?.contentMatched ?? true)
+					? "title-and-content"
+					: "title-only",
+			contentPreview: matchedItem?.contentPreview,
+			interactionId: row.interactionId,
+		});
+	}
 
 	interface Props {
 		file: TFile;

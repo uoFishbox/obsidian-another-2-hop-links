@@ -30,14 +30,22 @@ export function buildPreviewContentSettingsSignature(
 function buildSearchContextSettingsSignature(
 	settings: PreviewRenderSettingsInput,
 ): string {
+	const seekThreshold =
+		"searchPreviewSeekThresholdChars" in settings
+			? settings.searchPreviewSeekThresholdChars
+			: 0;
+	const seekBuffer =
+		"searchPreviewSeekBufferChars" in settings
+			? settings.searchPreviewSeekBufferChars
+			: 15;
 	return [
 		settings.cardWidthPx,
 		settings.cardHeightRatio,
 		settings.previewMaxChars,
 		settings.previewMaxLines,
 		settings.previewVisualLineSafetyMargin,
-		settings.searchPreviewSeekThresholdChars,
-		settings.searchPreviewSeekBufferChars,
+		seekThreshold,
+		seekBuffer,
 	].join(SIGNATURE_SEP);
 }
 

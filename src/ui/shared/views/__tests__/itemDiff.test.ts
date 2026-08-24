@@ -1,5 +1,10 @@
-import { describe, expect, it } from "vitest";
-import { mergeItemsPreservingUnchanged } from "ui/shared/views/itemDiff";
+import { describe, expect, it, vi } from "vitest";
+
+vi.mock("obsidian", () => ({
+	ItemView: class {},
+}));
+
+import { mergeItemsPreservingUnchanged } from "ui/shared/views/abstractSvelteListView";
 
 type Item = {
 	key: string;

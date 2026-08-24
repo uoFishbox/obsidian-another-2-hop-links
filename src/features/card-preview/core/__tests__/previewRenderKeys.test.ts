@@ -2,7 +2,7 @@ import type { TFile } from "obsidian";
 import { describe, expect, test } from "vitest";
 import { DEFAULT_SETTINGS } from "features/settings/model";
 import { compileCardPreviewRequest } from "../cardPreviewRequest";
-import { createPreviewOverrideIdentity } from "../previewRenderIdentity";
+import { createPreviewOverrideIdentity } from "../cardPreviewRequest";
 import { buildPreviewRenderKey, normalizePreviewQuery } from "../previewRenderKeys";
 
 function createFile(path: string, extension = "md"): TFile {

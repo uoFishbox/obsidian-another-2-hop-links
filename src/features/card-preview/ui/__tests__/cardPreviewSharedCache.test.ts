@@ -180,56 +180,6 @@ describe("cardPreviewSharedCache search context", () => {
 		expect(second).toBe(third);
 	});
 
-	it("separates search context cache keys by query settings", async () => {
-		const file = createMockTFile("notes/search-settings.md");
-		const firstSettings = createSettings({
-			searchPreviewSeekBufferChars: 15,
-		});
-		const secondSettings = createSettings({
-			searchPreviewSeekBufferChars: 30,
-		});
-		const firstCacheKey = buildPreviewRenderKey(
-			file,
-			"alpha",
-			firstSettings,
-			"render-v1",
-		);
-		const secondCacheKey = buildPreviewRenderKey(
-			file,
-			"alpha",
-			secondSettings,
-			"render-v1",
-		);
-
-		await applySharedSearchContextToTextPreview({
-			previewContent: "<p>fallback preview</p>",
-			cacheKey: firstCacheKey,
-			targetFile: file,
-			normalizedQuery: "alpha",
-			settings: firstSettings,
-			vault: {} as never,
-		});
-		await applySharedSearchContextToTextPreview({
-			previewContent: "<p>fallback preview</p>",
-			cacheKey: secondCacheKey,
-			targetFile: file,
-			normalizedQuery: "alpha",
-			settings: secondSettings,
-			vault: {} as never,
-		});
-		await applySharedSearchContextToTextPreview({
-			previewContent: "<p>fallback preview</p>",
-			cacheKey: secondCacheKey,
-			targetFile: file,
-			normalizedQuery: "alpha",
-			settings: secondSettings,
-			vault: {} as never,
-		});
-
-		expect(state.getContentSnippet).toHaveBeenCalledTimes(2);
-		expect(state.highlightSearchMatchesInHtml).toHaveBeenCalledTimes(2);
-	});
-
 	it("uses provided first match offset instead of searching raw content", async () => {
 		const file = createMockTFile("notes/search-offset.md");
 		const settings = createSettings();

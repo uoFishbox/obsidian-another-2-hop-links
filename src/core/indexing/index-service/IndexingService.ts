@@ -24,9 +24,8 @@ import {
 	type TimeSlicingOptions,
 } from "../types/IndexTypes";
 import { createEmptyTagIndex } from "../tag-index/tagIndexMutations";
-import type { DataUpdateListener } from "./IndexEvents";
+import type { DataUpdateContext, DataUpdateListener } from "./IndexEvents";
 import { IndexWriteCoordinator, type RebuildReason } from "./IndexWriteCoordinator";
-import { IndexUpdateEmitter } from "./IndexUpdateEmitter";
 import { defaultYieldToMainThread } from "../timeSlicing";
 import {
 	createLinkResolutionAmbiguityDetector,
@@ -50,7 +49,8 @@ export class IndexingService implements IIndexingService {
 	private readonly tagIndexStore: TagIndexStore;
 	private readonly writeCoordinator: IndexWriteCoordinator;
 	private readonly externalIdleWaiters = new Set<() => Promise<void>>();
-	private readonly updateEmitter = new IndexUpdateEmitter();
+	private readonly dataUpdateListeners = new Set<DataUpdateListener>();
+	private indexVersion = 0;
 	private commonTagsCache:
 		| {
 				path: string;
@@ -86,11 +86,14 @@ export class IndexingService implements IIndexingService {
 	}
 
 	public onDataUpdate(listener: DataUpdateListener): () => void {
-		return this.updateEmitter.onDataUpdate(listener);
+		this.dataUpdateListeners.add(listener);
+		return () => {
+			this.dataUpdateListeners.delete(listener);
+		};
 	}
 
 	public getIndexVersion(): number {
-		return this.updateEmitter.getIndexVersion();
+		return this.indexVersion;
 	}
 
 	public async awaitIdle(): Promise<void> {
@@ -351,7 +354,7 @@ export class IndexingService implements IIndexingService {
 	}
 
 	private bumpIndexVersion(): void {
-		this.updateEmitter.bumpIndexVersion();
+		this.indexVersion++;
 	}
 
 	private notifyDataUpdate(
@@ -364,7 +367,34 @@ export class IndexingService implements IIndexingService {
 			affectedTagSourcePaths?: Iterable<string>;
 		} = {},
 	): void {
-		this.updateEmitter.notifyDataUpdate(context);
+		if (this.dataUpdateListeners.size === 0) return;
+
+		const payload: DataUpdateContext = {
+			affectsAll: context.affectsAll,
+			affectedPaths: context.affectedPaths
+				? Array.from(context.affectedPaths)
+				: undefined,
+			affectedLookupKeys: context.affectedLookupKeys
+				? Array.from(context.affectedLookupKeys)
+				: undefined,
+			affectedTags: context.affectedTags
+				? Array.from(context.affectedTags)
+				: undefined,
+			affectedLinkSourcePaths: context.affectedLinkSourcePaths
+				? Array.from(context.affectedLinkSourcePaths)
+				: undefined,
+			affectedTagSourcePaths: context.affectedTagSourcePaths
+				? Array.from(context.affectedTagSourcePaths)
+				: undefined,
+		};
+
+		for (const listener of this.dataUpdateListeners) {
+			try {
+				listener(payload);
+			} catch (error) {
+				console.error("Error in data update listener:", error);
+			}
+		}
 	}
 }
 

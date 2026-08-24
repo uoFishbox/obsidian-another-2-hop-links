@@ -1,6 +1,6 @@
 import { tick, untrack, getContext, onDestroy, type Snippet } from "svelte";
 import type { ResultNavigationDirection } from "features/keyboard-navigation/resultFocus";
-import type { RowRange } from "ui/virtualization/public";
+import type { RowRange, VirtualVisibilityPolicy } from "ui/virtualization/public";
 import {
 	getLazyLoadManager,
 	type RegistrationToken,
@@ -13,9 +13,7 @@ import {
 } from "./mountedCells";
 import type { FlatGridRowModel } from "./rowModel";
 import { createFlatGridModelMemo } from "./modelMemo";
-import { isContentBottomInPreloadRangeFromMetrics } from "../../model/contentPreloadRange";
 import type { VirtualListStableMeasurementContext } from "ui/virtualization/public";
-import { createCardGridVisibilityPolicy } from "features/card-grid/model/cardGridVisibilityPolicy";
 import {
 	createResolvedCardLayoutSettingsMemo,
 	type CardLayoutSettings,
@@ -58,10 +56,7 @@ export interface FlatCardGridItemRenderArgs<T> {
 	readonly previewKey: string;
 }
 
-interface FlatCardGridApplicationSettings extends CardLayoutSettings {
-	previewActivationAheadRows?: number;
-	previewDomCommitsPerSecond?: number;
-}
+type FlatCardGridApplicationSettings = CardLayoutSettings;
 
 interface FlatCardGridApplicationStore extends SectionPaginationApplicationStore {
 	settings?: FlatCardGridApplicationSettings;
@@ -104,7 +99,49 @@ export interface FlatCardGridProps<T> {
 }
 
 const MAX_CHAINED_INFINITE_SCROLL_LOADS = 2;
+export const CARD_GRID_BOOTSTRAP_VISIBLE_ROWS = 3;
+const CARD_GRID_PREVIEW_ACTIVATION_AHEAD_ROWS = 1;
 const EMPTY_MOUNTED_ROWS: readonly MountedFlatGridRow<never>[] = [];
+
+export function createCardGridVisibilityPolicy(
+	layout: Pick<FlatGridLayout, "rowHeight" | "gap">,
+): VirtualVisibilityPolicy {
+	const rowOverscanPx = Math.max(0, layout.rowHeight + layout.gap);
+	const previewOverscanPx = rowOverscanPx * CARD_GRID_PREVIEW_ACTIVATION_AHEAD_ROWS;
+	return {
+		bootstrapRows: CARD_GRID_BOOTSTRAP_VISIBLE_ROWS,
+		mountedOverscanPx: Math.max(rowOverscanPx, previewOverscanPx),
+		previewOverscanPx,
+	};
+}
+
+interface ContentBottomPreloadMetrics {
+	contentHeight: number;
+	rootMargin: string;
+	scrollTop: number;
+	viewportHeight: number;
+	sectionTop: number;
+}
+
+function parseBottomRootMarginPx(rootMargin: string): number {
+	const tokens = rootMargin.trim().split(/\s+/).filter(Boolean);
+	if (tokens.length === 0) return 0;
+	const parsed = Number.parseFloat(tokens[tokens.length <= 2 ? 0 : 2] ?? "0");
+	return Number.isFinite(parsed) ? parsed : 0;
+}
+
+export function isContentBottomInPreloadRangeFromMetrics({
+	contentHeight,
+	rootMargin,
+	scrollTop,
+	viewportHeight,
+	sectionTop,
+}: ContentBottomPreloadMetrics): boolean {
+	const preloadBottom =
+		scrollTop + viewportHeight + parseBottomRootMarginPx(rootMargin);
+	return sectionTop + contentHeight <= preloadBottom;
+}
+
 export function useFlatCardGrid<T>(
 	props: FlatCardGridProps<T>,
 	frameCoordinator: VirtualFrameCoordinator,
@@ -143,7 +180,6 @@ export function useFlatCardGrid<T>(
 	const interactionController = createVirtualCardInteractionController();
 	let lastResolvedVisibilityPolicyRowHeight: number | undefined;
 	let lastResolvedVisibilityPolicyGap: number | undefined;
-	let lastResolvedVisibilityPolicyAheadRows: number | undefined;
 	let lastResolvedVisibilityPolicy:
 		| ReturnType<typeof createCardGridVisibilityPolicy>
 		| undefined;
@@ -153,16 +189,11 @@ export function useFlatCardGrid<T>(
 		if (
 			!lastResolvedVisibilityPolicy ||
 			lastResolvedVisibilityPolicyRowHeight !== nextLayout.rowHeight ||
-			lastResolvedVisibilityPolicyGap !== nextLayout.gap ||
-			lastResolvedVisibilityPolicyAheadRows !== previewActivationAheadRows
+			lastResolvedVisibilityPolicyGap !== nextLayout.gap
 		) {
 			lastResolvedVisibilityPolicyRowHeight = nextLayout.rowHeight;
 			lastResolvedVisibilityPolicyGap = nextLayout.gap;
-			lastResolvedVisibilityPolicyAheadRows = previewActivationAheadRows;
-			lastResolvedVisibilityPolicy = createCardGridVisibilityPolicy({
-				layout: nextLayout,
-				previewActivationAheadRows,
-			});
+			lastResolvedVisibilityPolicy = createCardGridVisibilityPolicy(nextLayout);
 		}
 		return lastResolvedVisibilityPolicy!;
 	};
@@ -178,10 +209,6 @@ export function useFlatCardGrid<T>(
 	const configuredCardLayout = $derived.by(() =>
 		resolveConfiguredCardLayout(applicationStore?.settings),
 	);
-	const previewActivationAheadRows = $derived(
-		applicationStore?.settings?.previewActivationAheadRows ?? 1,
-	);
-
 	const flatPaginationSectionId = $derived(sectionId ?? "link-list");
 	const itemCount = $derived.by(() => {
 		void props.itemsRevision;

@@ -59,16 +59,6 @@ export const PREVIEW_SETTING_DEFINITIONS: ReadonlyArray<SettingDefinition> = [
 	},
 	{
 		section: "preview",
-		settingKey: "previewDomCommitsPerSecond",
-		controlType: "text",
-		translationKey: "previewDomCommitsPerSecond",
-		descriptionKey: "previewDomCommitsPerSecondDesc",
-		placeholder: "80",
-		parse: (value) => parsePositiveInteger(value),
-		format: (value) => String(value ?? ""),
-	},
-	{
-		section: "preview",
 		settingKey: "cardGapPx",
 		controlType: "text",
 		translationKey: "cardGap",

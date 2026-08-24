@@ -1,6 +1,5 @@
 import { MarkdownView, type Pos, type TFile, type Workspace } from "obsidian";
 import type { TwoHopIndexedLink } from "types";
-import { buildFileNavigationState } from "./fileNavigationStrategies";
 import { isAdvancedCanvasPosition } from "core/rules/fileRules";
 
 type MetadataEditorLike = {
@@ -13,6 +12,19 @@ type MarkdownViewWithMetadataEditor = MarkdownView & {
 
 const PROPERTY_FOCUS_MAX_ATTEMPTS = 12;
 const PROPERTY_FOCUS_RETRY_MS = 80;
+
+type FileNavigationState = Record<string, unknown>;
+
+export function buildFileNavigationState(
+	file: TFile,
+	position?: Pos,
+): FileNavigationState | undefined {
+	if (!position) return undefined;
+	if (file.extension === "canvas" && isAdvancedCanvasPosition(position)) {
+		return { match: { matches: [[0, position.end.offset]] } };
+	}
+	return { line: position.start.line, scroll: position.start.line };
+}
 
 function getPropertyFocusCandidates(rawKey: string): string[] {
 	const candidates: string[] = [];

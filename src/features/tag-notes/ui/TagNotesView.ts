@@ -19,9 +19,33 @@ import type { DataUpdateContext } from "core/indexing/index-service/IndexEvents"
 import { AbstractSvelteListView } from "ui/shared/views/abstractSvelteListView";
 import { buildEditorLikeFrame } from "ui/shared/views/editorLikeFrame";
 import { getViewItemKey, type ViewItem } from "application/presenters/ViewItem";
-import { shouldRefreshTagNotesForContext } from "features/tag-notes/ui/tagNotesRefreshDecision";
 
 export const VIEW_TYPE_TAG_NOTES = "cosense-card-links-tag-notes-view";
+
+export interface TagNotesRefreshDecisionInput {
+	readonly tagFeaturesEnabled: boolean;
+	readonly tag: string;
+	readonly sourcePath: string;
+	readonly context?: DataUpdateContext;
+	readonly hasCurrentItemPath: (path: string) => boolean;
+}
+
+export function shouldRefreshTagNotesForContext({
+	tagFeaturesEnabled,
+	tag,
+	sourcePath,
+	context,
+	hasCurrentItemPath,
+}: TagNotesRefreshDecisionInput): boolean {
+	if (!tagFeaturesEnabled || !tag) return false;
+	if (!context || context.affectsAll) return true;
+	if (context.affectedTags?.includes(tag)) return true;
+
+	const affectedPaths = context.affectedPaths;
+	if (!affectedPaths || affectedPaths.length === 0) return false;
+	if (sourcePath && affectedPaths.includes(sourcePath)) return true;
+	return affectedPaths.some(hasCurrentItemPath);
+}
 
 interface TagNotesViewState {
 	tag?: unknown;

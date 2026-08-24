@@ -1,15 +1,29 @@
 import type { PluginHost } from "types/pluginHost";
-import { waitForViewRequest } from "./patcherUtils";
 import type { CanvasView, CanvasViewCanvas } from "obsidian-typings";
 import { getCanvasSelectionData } from "infrastructure/capabilities/obsidianInternals";
 import { applyPatch } from "infrastructure/capabilities/applyPatch";
 const canvasPatchIds = new WeakMap<CanvasViewCanvas, string>();
 let nextCanvasPatchId = 1;
 
+function waitForCanvasViewRequest(
+	plugin: PluginHost,
+	patchCallback: (view: CanvasView) => void,
+): void {
+	applyPatch(plugin, {
+		id: "view-registry:canvas",
+		target: plugin.app.viewRegistry.viewByType,
+		method: "canvas",
+		wrap: (next) =>
+			function (this: unknown, leaf: unknown) {
+				const view = next.call(this, leaf as Parameters<typeof next>[0]);
+				patchCallback(view as CanvasView);
+				return view;
+			},
+	});
+}
+
 export function initCanvasPatcher(plugin: PluginHost): void {
-	waitForViewRequest<CanvasView>(plugin, "canvas", (view) =>
-		patchCanvasView(plugin, view),
-	);
+	waitForCanvasViewRequest(plugin, (view) => patchCanvasView(plugin, view));
 	setTimeout(() => {
 		const leaves = plugin.app.workspace.getLeavesOfType("canvas");
 		for (const leaf of leaves) {

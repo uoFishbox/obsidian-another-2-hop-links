@@ -7,8 +7,8 @@ import { triggerHoverPopover } from "features/popover/mobilePopover";
 import { openFile, openLinkDestination } from "infrastructure/workspace/fileOpener";
 import { resolveFileByPath } from "shared/obsidian/resolveFileByPath";
 
-vi.mock("features/tag-notes/ui/handleTagClick", () => ({
-	handleTagClick: vi.fn(),
+vi.mock("features/tag-notes/ui/TagNotesView", () => ({
+	openTagNotesView: vi.fn(),
 }));
 
 vi.mock("features/popover/mobilePopover", () => ({

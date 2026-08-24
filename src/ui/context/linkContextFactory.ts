@@ -7,10 +7,10 @@ import type {
 	TwoHopIndexedLink,
 } from "types";
 import type { HighlightMode, LinkContext, LinkInteractionOptions } from "./linkContext";
-import type { PluginSettings } from "features/settings/model";
+import { areTagFeaturesEnabled, type PluginSettings } from "features/settings/model";
 import { triggerHoverPopover } from "features/popover/mobilePopover";
 import type { PluginHost } from "types/pluginHost";
-import { handleTagClick } from "features/tag-notes/ui/handleTagClick";
+import { openTagNotesView } from "features/tag-notes/ui/TagNotesView";
 import {
 	hydrateRuntimeBacklinkHoverLink,
 	hydrateRuntimeBacklinkLink,
@@ -19,6 +19,21 @@ import { isMouseEventLike } from "ui/shared/dom/realmSafeDom";
 import { openFile, openLinkDestination } from "infrastructure/workspace/fileOpener";
 import { resolveFileByPath } from "shared/obsidian/resolveFileByPath";
 import * as ErrorHandler from "shared/errors/errorHandler";
+
+export async function handleTagClick(
+	tag: string,
+	linkContext: LinkContext,
+	indexingService: IIndexingService,
+	plugin: PluginHost,
+): Promise<void> {
+	if (!areTagFeaturesEnabled(plugin.settings)) return;
+	const notes = await indexingService.getNotesWithTag(
+		tag,
+		linkContext.sourceFile.path,
+	);
+	if (notes.length === 0) return;
+	void openTagNotesView(plugin, tag, linkContext.sourceFile.path, false);
+}
 
 export function createLinkContextFactory(
 	metadataCache: MetadataCache,

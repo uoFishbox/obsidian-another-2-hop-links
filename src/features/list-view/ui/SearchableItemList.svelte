@@ -41,10 +41,9 @@
 	} from "ui/components/items/cardRenderModel";
 	import { createItemInteractionKey } from "ui/interactions/interactionTypes";
 	import type { PreviewRuntime } from "features/card-preview/runtime/previewRuntime";
-	import {
-		SEARCH_FILTER_YIELD_CHECK_INTERVAL,
-		SEARCH_FILTER_YIELD_MAX_DELAY_MS,
-	} from "features/list-view/runtime/searchFilterTimeSlicing";
+
+	const SEARCH_FILTER_YIELD_CHECK_INTERVAL = 128;
+	const SEARCH_FILTER_YIELD_MAX_DELAY_MS = 16;
 
 	interface Props {
 		items: ViewItem[];

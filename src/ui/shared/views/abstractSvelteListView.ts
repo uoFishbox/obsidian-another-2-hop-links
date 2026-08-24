@@ -8,7 +8,6 @@ import type { PluginHost } from "types/pluginHost";
 import type { ViewServices } from "ui/shared/views/viewServices";
 import type { ListConfig } from "features/list-view/ui/types";
 import type { TwoHopApplicationStore } from "features/two-hop/application/TwoHopApplicationStore.svelte";
-import { mergeItemsPreservingUnchanged } from "ui/shared/views/itemDiff";
 import { cleanupSvelteAndStore } from "ui/shared/views/svelteLifecycle";
 import {
 	createDefaultApplicationStore,
@@ -18,6 +17,31 @@ import { applyCardLayoutCssVars } from "ui/layout/cardLayoutCssVars";
 
 interface ListHostComponent extends ComponentInstance {
 	updateItems?: (nextItems: ViewItem[]) => void;
+}
+
+interface MergePreservingUnchangedOptions<T> {
+	getKey: (item: T) => string;
+	getVersion: (item: T) => number | string;
+	changedKeys?: Set<string>;
+}
+
+export function mergeItemsPreservingUnchanged<T>(
+	previousItems: T[],
+	nextItems: T[],
+	options: MergePreservingUnchangedOptions<T>,
+): T[] {
+	const previousByKey = new Map<string, T>();
+	for (const item of previousItems) previousByKey.set(options.getKey(item), item);
+
+	return nextItems.map((item) => {
+		const key = options.getKey(item);
+		const previous = previousByKey.get(key);
+		if (!previous) return item;
+		return options.changedKeys?.has(key) ||
+			options.getVersion(previous) !== options.getVersion(item)
+			? item
+			: previous;
+	});
 }
 
 type MountListSectionOptions = {

@@ -8,9 +8,29 @@ import {
 	createBoundedGenerationalCache,
 	type BoundedGenerationalCache,
 } from "shared/cache/boundedGenerationalCache";
-import { hasSourceDependentRawLinkPath } from "./sourceDependentLinks";
 
 const HAS_EXTENSION_RE = /\.[a-z0-9]+$/i;
+
+export function hasSourceDependentRawLinkPath(rawLinkPath: string): boolean {
+	let segmentStart = 0;
+	for (let index = 0; index <= rawLinkPath.length; index++) {
+		const ch = index < rawLinkPath.length ? rawLinkPath.charCodeAt(index) : -1;
+		if (ch !== 0x2f && ch !== 0x5c && ch !== -1) continue;
+
+		const segmentLength = index - segmentStart;
+		if (
+			(segmentLength === 1 && rawLinkPath.charCodeAt(segmentStart) === 0x2e) ||
+			(segmentLength === 2 &&
+				rawLinkPath.charCodeAt(segmentStart) === 0x2e &&
+				rawLinkPath.charCodeAt(segmentStart + 1) === 0x2e)
+		) {
+			return true;
+		}
+
+		segmentStart = index + 1;
+	}
+	return false;
+}
 // 高頻度で同じリンク文字列・パスが渡るため、正規化結果を使い回す。
 // 無制限 Map だと削除済みファイルや過去のリンク文字列が old generation に
 // 残留し major GC / retained heap に悪影響が出るため、上限付き2世代キャッシュ

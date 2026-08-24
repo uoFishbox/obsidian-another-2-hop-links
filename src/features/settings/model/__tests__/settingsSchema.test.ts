@@ -45,34 +45,24 @@ describe("PluginSettingsSchema", () => {
 		);
 	});
 
-	it("floors positive fractional numbers instead of discarding them", () => {
+	it("floors positive fractional user settings instead of discarding them", () => {
 		const settings = parsePluginSettings({
-			previewActivationAheadRows: 2.8,
-			previewDomCommitsPerSecond: 40.8,
 			cardWidthPx: 140.9,
 		});
 
-		expect(settings.previewActivationAheadRows).toBe(2);
-		expect(settings.previewDomCommitsPerSecond).toBe(40);
 		expect(settings.cardWidthPx).toBe(140);
 	});
 
 	it("falls back to defaults for out-of-range or non-numeric numbers", () => {
 		const settings = parsePluginSettings({
-			previewActivationAheadRows: -1,
 			cardHeightRatio: 0,
 			cardGapPx: Number.NaN,
 			previewMaxChars: "500",
-			maxOutgoingToProcess: -3,
 		});
 
-		expect(settings.previewActivationAheadRows).toBe(1);
 		expect(settings.cardHeightRatio).toBe(DEFAULT_SETTINGS.cardHeightRatio);
 		expect(settings.cardGapPx).toBe(DEFAULT_SETTINGS.cardGapPx);
 		expect(settings.previewMaxChars).toBe(DEFAULT_SETTINGS.previewMaxChars);
-		expect(settings.maxOutgoingToProcess).toBe(
-			DEFAULT_SETTINGS.maxOutgoingToProcess,
-		);
 	});
 
 	it("strips unknown and obsolete keys", () => {
@@ -81,12 +71,24 @@ describe("PluginSettingsSchema", () => {
 			twoHopListMode: "precise-virtual",
 			enableTwoRowMountedOverscan: true,
 			renderCodeBlockTypes: ["mermaid"],
+			previewActivationAheadRows: 2,
+			previewDomCommitsPerSecond: 40,
+			searchPreviewSeekThresholdChars: 20,
+			searchPreviewSeekBufferChars: 8,
+			enableProgressiveTwoHopBuild: false,
+			maxOutgoingToProcess: 10,
 		});
 
 		expect(settings).not.toHaveProperty("obsoleteSetting");
 		expect(settings).not.toHaveProperty("twoHopListMode");
 		expect(settings).not.toHaveProperty("enableTwoRowMountedOverscan");
 		expect(settings).not.toHaveProperty("renderCodeBlockTypes");
+		expect(settings).not.toHaveProperty("previewActivationAheadRows");
+		expect(settings).not.toHaveProperty("previewDomCommitsPerSecond");
+		expect(settings).not.toHaveProperty("searchPreviewSeekThresholdChars");
+		expect(settings).not.toHaveProperty("searchPreviewSeekBufferChars");
+		expect(settings).not.toHaveProperty("enableProgressiveTwoHopBuild");
+		expect(settings).not.toHaveProperty("maxOutgoingToProcess");
 	});
 
 	it("always reports the current schema version", () => {

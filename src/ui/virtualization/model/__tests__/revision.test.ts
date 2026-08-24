@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { hasSameVirtualListRevision } from "../revision";
+import { hasSameVirtualListRevision } from "../../engine/snapshotComputation";
 
 describe("VirtualListRevision", () => {
 	it("compares content and layout array tokens shallowly with Object.is semantics", () => {

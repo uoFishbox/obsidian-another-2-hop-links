@@ -38,6 +38,12 @@ const OBSOLETE_SETTING_KEYS = [
 	"twoHopListMode",
 	"enableTwoRowMountedOverscan",
 	"renderCodeBlockTypes",
+	"previewActivationAheadRows",
+	"previewDomCommitsPerSecond",
+	"searchPreviewSeekThresholdChars",
+	"searchPreviewSeekBufferChars",
+	"enableProgressiveTwoHopBuild",
+	"maxOutgoingToProcess",
 ] as const;
 
 const positiveInteger = (fallback: number) =>
@@ -99,18 +105,6 @@ export const PluginSettingsSchema = z.object({
 	previewVisualLineSafetyMargin: nonNegativeInteger(
 		DEFAULT_SETTINGS.previewVisualLineSafetyMargin,
 	),
-	previewActivationAheadRows: nonNegativeInteger(
-		DEFAULT_SETTINGS.previewActivationAheadRows,
-	),
-	previewDomCommitsPerSecond: positiveInteger(
-		DEFAULT_SETTINGS.previewDomCommitsPerSecond,
-	),
-	searchPreviewSeekThresholdChars: nonNegativeInteger(
-		DEFAULT_SETTINGS.searchPreviewSeekThresholdChars ?? 0,
-	),
-	searchPreviewSeekBufferChars: nonNegativeInteger(
-		DEFAULT_SETTINGS.searchPreviewSeekBufferChars ?? 15,
-	),
 	showTwoHopForSelectedCanvasFileNode: booleanSetting(
 		DEFAULT_SETTINGS.showTwoHopForSelectedCanvasFileNode,
 	),
@@ -145,18 +139,12 @@ export const PluginSettingsSchema = z.object({
 	enableEditorArrowDownToSearchInput: booleanSetting(
 		DEFAULT_SETTINGS.enableEditorArrowDownToSearchInput,
 	),
-	enableProgressiveTwoHopBuild: booleanSetting(
-		DEFAULT_SETTINGS.enableProgressiveTwoHopBuild ?? true,
-	),
 	enableContentSearch: booleanSetting(DEFAULT_SETTINGS.enableContentSearch ?? false),
 	priorityFrontmatterKeyForPreview: stringSetting(
 		DEFAULT_SETTINGS.priorityFrontmatterKeyForPreview ?? "",
 	),
 	priorityFrontmatterKeyForTitle: stringSetting(
 		DEFAULT_SETTINGS.priorityFrontmatterKeyForTitle ?? "",
-	),
-	maxOutgoingToProcess: nonNegativeInteger(
-		DEFAULT_SETTINGS.maxOutgoingToProcess ?? 0,
 	),
 });
 

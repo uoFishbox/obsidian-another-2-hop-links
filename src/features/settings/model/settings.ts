@@ -59,11 +59,6 @@ export interface PluginSettings {
 	previewMaxLines: number;
 	previewMaxChars: number;
 	previewVisualLineSafetyMargin: number;
-	previewActivationAheadRows: number;
-	/** Maximum preview DOM updates committed per second while scrolling. */
-	previewDomCommitsPerSecond: number;
-	searchPreviewSeekThresholdChars?: number;
-	searchPreviewSeekBufferChars?: number;
 	showTwoHopForSelectedCanvasFileNode: boolean;
 	mobileLongPressAction: MobileLongPressAction;
 	excludeAttachments: boolean;
@@ -76,11 +71,9 @@ export interface PluginSettings {
 	enableUnresolvedLinkDecoration: boolean;
 	enableSearchArrowUpToEditorBottom: boolean;
 	enableEditorArrowDownToSearchInput: boolean;
-	enableProgressiveTwoHopBuild?: boolean;
 	enableContentSearch?: boolean;
 	priorityFrontmatterKeyForPreview?: string;
 	priorityFrontmatterKeyForTitle?: string;
-	maxOutgoingToProcess?: number;
 }
 
 export function areTagFeaturesEnabled(

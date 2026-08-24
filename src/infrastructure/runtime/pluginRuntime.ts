@@ -59,7 +59,10 @@ import type { PluginHost } from "types/pluginHost";
 import type { ViewServices } from "ui/shared/views/viewServices";
 import { areTagFeaturesEnabled, type PluginSettings } from "features/settings/model";
 import { getLazyLoadManager } from "infrastructure/observers/IntersectionObserverRegistry";
-import { resolvePreviewActivationsPerSecond } from "appConstants";
+import {
+	DEFAULT_PREVIEW_ACTIVATIONS_PER_SECOND,
+	DEFAULT_PREVIEW_DOM_COMMITS_PER_SECOND,
+} from "appConstants";
 import { setYieldSchedulingWindowResolver } from "core/indexing/timeSlicing";
 
 export interface PluginRuntimeOptions {
@@ -126,11 +129,8 @@ export function createPluginRuntime(options: PluginRuntimeOptions): PluginRuntim
 			previewService.subscribeVisiblePreviewQueue(() => {
 				listener();
 			}),
-		getActivationsPerSecond: () =>
-			resolvePreviewActivationsPerSecond(
-				options.getSettings().previewDomCommitsPerSecond,
-			),
-		getDomCommitsPerSecond: () => options.getSettings().previewDomCommitsPerSecond,
+		getActivationsPerSecond: () => DEFAULT_PREVIEW_ACTIVATIONS_PER_SECOND,
+		getDomCommitsPerSecond: () => DEFAULT_PREVIEW_DOM_COMMITS_PER_SECOND,
 	});
 	options.plugin.register(() => previewService.dispose());
 
@@ -142,11 +142,6 @@ export function createPluginRuntime(options: PluginRuntimeOptions): PluginRuntim
 	const twoHopLinkResolver = new TwoHopLinkResolver(
 		options.app.metadataCache,
 		indexingService,
-		() => ({
-			enableProgressiveTwoHopBuild:
-				options.getSettings().enableProgressiveTwoHopBuild,
-			maxOutgoingToProcess: options.getSettings().maxOutgoingToProcess,
-		}),
 	);
 	const metricProvider = new MetricProvider(
 		options.app.metadataCache,

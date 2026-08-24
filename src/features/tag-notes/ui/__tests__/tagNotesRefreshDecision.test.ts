@@ -1,5 +1,13 @@
 import { describe, expect, it, vi } from "vitest";
-import { shouldRefreshTagNotesForContext } from "features/tag-notes/ui/tagNotesRefreshDecision";
+
+vi.mock("features/list-view/ui/TagNotesListHost.svelte", () => ({
+	default: {},
+}));
+vi.mock("ui/shared/views/abstractSvelteListView", () => ({
+	AbstractSvelteListView: class {},
+}));
+
+import { shouldRefreshTagNotesForContext } from "features/tag-notes/ui/TagNotesView";
 
 describe("shouldRefreshTagNotesForContext", () => {
 	it("refreshes only when an index update can affect the current tag result", () => {

@@ -2,7 +2,6 @@ import { Platform } from "obsidian";
 import { CANVAS_NOTE_DRAG_FORMAT } from "../../appConstants";
 import { dispatchItemClick, dispatchItemHover } from "ui/handlers/linkItemHandlers";
 import type { AppContext, LinkContext } from "ui/context/linkContext";
-import { handleKeyboardActivation } from "ui/shared/input/keyboard";
 import { createHoverPreviewMouseEvent } from "features/popover/hoverPopoverTarget";
 import type { InteractionRegistry } from "./interactionRegistry";
 import {
@@ -31,6 +30,15 @@ const MOBILE_TOUCH_MOUSEOVER_SUPPRESSION_MS = 900;
 const LONG_PRESS_DURATION = 500;
 const TOUCH_SLOP = 10;
 const VIBRATION_DURATION = 50;
+
+function handleKeyboardActivation(
+	event: KeyboardEvent,
+	callback: (event: KeyboardEvent) => void,
+): void {
+	if (event.key !== "Enter" && event.key !== " ") return;
+	event.preventDefault();
+	callback(event);
+}
 
 function resolveDragData(
 	descriptor: InteractionDescriptor,

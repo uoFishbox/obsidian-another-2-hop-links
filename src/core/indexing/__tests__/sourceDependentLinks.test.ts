@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { hasSourceDependentRawLinkPath } from "../link-resolution/sourceDependentLinks";
+import { hasSourceDependentRawLinkPath } from "../link-resolution/linkResolution";
 
 describe("hasSourceDependentRawLinkPath", () => {
 	test.each([

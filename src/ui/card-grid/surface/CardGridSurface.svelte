@@ -1,8 +1,47 @@
 <script lang="ts" generics="TMountedCell extends MountedVirtualCell">
 	import PooledCardGridRows from "./PooledCardGridRows.svelte";
-	import type { CardGridSurfaceProps } from "./cardGridSurfaceProps";
+	import type { Snippet } from "svelte";
+	import type { ResultNavigationDirection } from "features/keyboard-navigation/resultFocus";
+	import type { InteractionDescriptorResolverProvider } from "ui/interactions/interactionRegistry";
+	import type {
+		ProgrammaticScrollSnapshot,
+		VirtualNavigationTarget,
+	} from "ui/virtualization/public";
+	import type { CardGridMountedRow } from "./cardGridSurfaceTypes";
 	import { createCardSurfaceInteractions } from "../interaction/useCardGridInteractions.svelte";
 	import type { MountedVirtualCell } from "ui/virtualization/public";
+
+	interface CardGridSurfaceProps<TCell extends MountedVirtualCell> {
+		className?: string;
+		contentClassName?: string;
+		rowClassName?: string;
+		cellClassName?: string;
+		contentHeight: number;
+		cellWidth?: number;
+		rowHeight: number;
+		columns?: number;
+		gap?: number;
+		mountedRows: readonly CardGridMountedRow<TCell>[];
+		interactionDescriptorScopeId?: string;
+		interactionDescriptorResolverProvider?: InteractionDescriptorResolverProvider;
+		renderCell: Snippet<
+			[{ mountedCell: TCell; scrollContainerEl: HTMLElement | null }]
+		>;
+		afterContent?: Snippet;
+		rootEl?: HTMLDivElement | null;
+		contentEl?: HTMLDivElement | null;
+		interactionShadowRoot?: ShadowRoot | null;
+		scrollContainerEl?: HTMLElement | null;
+		getCellClassName?: (cell: TCell) => string | undefined;
+		getCellDataTestId?: (cell: TCell) => string | undefined;
+		slotBodyRevision?: unknown;
+		resolveNavigationTarget?: (
+			currentKey: string,
+			direction: ResultNavigationDirection,
+			currentPosition: { rowIndex: number; columnIndex: number },
+		) => VirtualNavigationTarget | null;
+		flushVirtualScrollMeasurement?: (snapshot: ProgrammaticScrollSnapshot) => void;
+	}
 
 	let {
 		className = "",

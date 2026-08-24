@@ -1,5 +1,7 @@
 import type { PluginSettings } from "features/settings/model";
-import { DEFAULT_SETTINGS } from "features/settings/model";
+
+const SEARCH_PREVIEW_SEEK_THRESHOLD_CHARS = 0;
+const SEARCH_PREVIEW_SEEK_BUFFER_CHARS = 15;
 
 /** Settings which can change generated or rendered card preview content. */
 export interface PreviewRenderSettings {
@@ -33,14 +35,8 @@ export function createPreviewRenderSettings(
 		previewVisualLineSafetyMargin: settings.previewVisualLineSafetyMargin,
 		priorityFrontmatterKeyForPreview:
 			settings.priorityFrontmatterKeyForPreview ?? "",
-		searchPreviewSeekThresholdChars:
-			settings.searchPreviewSeekThresholdChars ??
-			DEFAULT_SETTINGS.searchPreviewSeekThresholdChars ??
-			0,
-		searchPreviewSeekBufferChars:
-			settings.searchPreviewSeekBufferChars ??
-			DEFAULT_SETTINGS.searchPreviewSeekBufferChars ??
-			0,
+		searchPreviewSeekThresholdChars: SEARCH_PREVIEW_SEEK_THRESHOLD_CHARS,
+		searchPreviewSeekBufferChars: SEARCH_PREVIEW_SEEK_BUFFER_CHARS,
 	});
 	settingsSnapshots.set(settings, snapshot);
 	return snapshot;
@@ -57,9 +53,6 @@ function hasSamePreviewRenderSettings(
 		previous.previewMaxLines === next.previewMaxLines &&
 		previous.previewVisualLineSafetyMargin === next.previewVisualLineSafetyMargin &&
 		previous.priorityFrontmatterKeyForPreview ===
-			next.priorityFrontmatterKeyForPreview &&
-		previous.searchPreviewSeekThresholdChars ===
-			next.searchPreviewSeekThresholdChars &&
-		previous.searchPreviewSeekBufferChars === next.searchPreviewSeekBufferChars
+			next.priorityFrontmatterKeyForPreview
 	);
 }

@@ -504,7 +504,7 @@ describe("getContentSnippet with search query", () => {
 	});
 
 	test("seeks within threshold using buffer", () => {
-		const settings: PluginSettings = {
+		const settings = {
 			...defaultSettings,
 			searchPreviewSeekThresholdChars: 20,
 			searchPreviewSeekBufferChars: 8,
