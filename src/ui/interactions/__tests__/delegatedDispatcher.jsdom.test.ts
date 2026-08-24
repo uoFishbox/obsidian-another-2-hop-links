@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { Platform, TFile } from "obsidian";
 import { createMockTFile } from "testing/__mocks__/testHelpers";
 import { CANVAS_NOTE_DRAG_FORMAT } from "../../../appConstants";
-import type { ViewItem } from "application/presenters";
+import type { ViewItem } from "application/presenters/ViewItem";
 import { createDelegatedInteractionDispatcher } from "../delegatedDispatcher";
 import { createInteractionRegistry } from "../interactionRegistry";
 import type { AppContext, LinkContext } from "ui/context/linkContext";

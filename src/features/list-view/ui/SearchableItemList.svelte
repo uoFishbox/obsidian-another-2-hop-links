@@ -11,7 +11,7 @@
 	import { focusResultEdge } from "features/keyboard-navigation/resultFocus";
 	import { yieldToMainThreadIdleAware } from "core/indexing/timeSlicing";
 	import type { ListConfig } from "./types";
-	import { hasSameViewItemSource } from "application/presenters";
+	import { hasSameViewItemSource } from "application/presenters/viewItemEquality";
 	import { sameArrayBy } from "shared/collections/arrayEquality";
 	import {
 		setLinkContext,
@@ -22,11 +22,8 @@
 	import type { ISortService, SortOption } from "core/sorting";
 	import type { ListViewState } from "features/list-view/model/ListViewState";
 	import type { App, TFile } from "obsidian";
-	import {
-		createStableViewItemReconciler,
-		type ViewItem,
-		toViewItem,
-	} from "application/presenters";
+	import { createStableViewItemReconciler } from "application/presenters/stableViewItemReconciler";
+	import { toViewItem, type ViewItem } from "application/presenters/ViewItem";
 	import {
 		createItemSearchTextCache,
 		getItemSearchText,

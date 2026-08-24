@@ -2,7 +2,7 @@ import { ItemView, type TFile, type WorkspaceLeaf } from "obsidian";
 import { mount, type Component } from "svelte";
 import type { DataUpdateContext } from "core/indexing/index-service/IndexEvents";
 import type { SortableItem } from "core/sorting";
-import { toViewItems, type ViewItem } from "application/presenters";
+import { toViewItems, type ViewItem } from "application/presenters/ViewItem";
 import type { ComponentInstance } from "infrastructure/lifecycle/ComponentController";
 import type { PluginHost } from "types/pluginHost";
 import type { ViewServices } from "ui/shared/views/viewServices";

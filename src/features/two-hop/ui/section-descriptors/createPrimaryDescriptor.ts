@@ -2,7 +2,7 @@ import type {
 	DisplayData,
 	MergedLinkItem,
 } from "features/two-hop/application/displayDataBuilder";
-import type { ViewItem } from "application/presenters";
+import type { ViewItem } from "application/presenters/ViewItem";
 import type { SectionConfig } from "ui/components/sections/types";
 import {
 	backlinksSectionConfig,

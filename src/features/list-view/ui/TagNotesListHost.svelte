@@ -5,7 +5,7 @@
 	import type { LinkContext } from "ui/context/linkContext";
 	import type { ListViewState } from "features/list-view/model/ListViewState";
 	import type { ISortService } from "core/sorting";
-	import type { ViewItem } from "application/presenters";
+	import type { ViewItem } from "application/presenters/ViewItem";
 	import type { PreviewRuntime } from "features/card-preview/runtime/previewRuntime";
 
 	interface Props {

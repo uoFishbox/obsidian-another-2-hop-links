@@ -2,7 +2,7 @@ import { cleanup, render, screen } from "@testing-library/svelte";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { TFile } from "obsidian";
 import { createMockTFile } from "testing/__mocks__/testHelpers";
-import type { ViewItem } from "application/presenters";
+import type { ViewItem } from "application/presenters/ViewItem";
 import { DEFAULT_SETTINGS } from "features/settings/model";
 import ViewItemCardHarness from "./ViewItemCardHarness.svelte";
 import { getLazyLoadManager } from "infrastructure/observers/IntersectionObserverRegistry";

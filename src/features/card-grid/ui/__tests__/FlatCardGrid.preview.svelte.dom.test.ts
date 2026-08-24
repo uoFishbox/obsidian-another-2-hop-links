@@ -5,7 +5,7 @@ import { DEFAULT_SETTINGS } from "features/settings/model";
 import { createPreviewRenderSettings } from "features/card-preview/core/previewRenderSettings";
 import type { ApplicationUiState } from "application/stores/ApplicationUiState.svelte";
 import type { AppContext, LinkContext } from "ui/context/linkContext";
-import type { ViewItem } from "application/presenters";
+import type { ViewItem } from "application/presenters/ViewItem";
 import type { CardRenderModel } from "ui/components/items/cardRenderModel";
 import {
 	flushFrames,

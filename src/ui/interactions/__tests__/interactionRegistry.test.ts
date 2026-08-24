@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import type { TFile } from "obsidian";
-import type { ViewItem } from "application/presenters";
+import type { ViewItem } from "application/presenters/ViewItem";
 import { createInteractionRegistry } from "../interactionRegistry";
 import type { ItemInteractionDescriptor } from "../interactionTypes";
 

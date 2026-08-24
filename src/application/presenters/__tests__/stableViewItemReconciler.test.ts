@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
-import { createStableViewItemReconciler, type ViewItem } from "application/presenters";
+import { createStableViewItemReconciler } from "application/presenters/stableViewItemReconciler";
+import type { ViewItem } from "application/presenters/ViewItem";
 
 interface RawItem {
 	id?: string;

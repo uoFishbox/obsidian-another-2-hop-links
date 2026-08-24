@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { createMockTFile } from "testing/__mocks__/testHelpers";
 import type { TFile } from "obsidian";
 import type { LinkContext } from "ui/context/linkContext";
-import type { ViewItem } from "application/presenters";
+import type { ViewItem } from "application/presenters/ViewItem";
 import {
 	createItemSearchTextCache,
 	getItemSearchText,

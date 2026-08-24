@@ -6,7 +6,7 @@
 	import type { ApplicationUiState } from "application/stores/ApplicationUiState.svelte";
 	import type { BookmarksState, LinkContext } from "ui/context/linkContext";
 	import type { App, TFile } from "obsidian";
-	import type { ViewItem } from "application/presenters";
+	import type { ViewItem } from "application/presenters/ViewItem";
 	import type { CardRenderModel } from "ui/components/items/cardRenderModel";
 	import { createCardRenderModel } from "ui/components/items/cardRenderModel";
 

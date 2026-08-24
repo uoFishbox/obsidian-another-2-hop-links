@@ -1,7 +1,7 @@
 import type { TFile } from "obsidian";
 import type { PluginSettings } from "features/settings/model";
 import { getFileCardTitleSearchText } from "core/frontmatterCardTitle";
-import type { ViewItem } from "application/presenters";
+import type { ViewItem } from "application/presenters/ViewItem";
 import type { LinkContext } from "ui/context/linkContext";
 
 export function createItemSearchTextCache() {

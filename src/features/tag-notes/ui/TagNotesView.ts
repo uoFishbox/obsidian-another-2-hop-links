@@ -18,7 +18,7 @@ import { areTagFeaturesEnabled } from "features/settings/model";
 import type { DataUpdateContext } from "core/indexing/index-service/IndexEvents";
 import { AbstractSvelteListView } from "ui/shared/views/abstractSvelteListView";
 import { buildEditorLikeFrame } from "ui/shared/views/editorLikeFrame";
-import { getViewItemKey, type ViewItem } from "application/presenters";
+import { getViewItemKey, type ViewItem } from "application/presenters/ViewItem";
 import { shouldRefreshTagNotesForContext } from "features/tag-notes/ui/tagNotesRefreshDecision";
 
 export const VIEW_TYPE_TAG_NOTES = "cosense-card-links-tag-notes-view";

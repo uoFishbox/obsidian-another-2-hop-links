@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { Component, Notice, TFile, TFolder, type App } from "obsidian";
-	import { toViewItems, type ViewItem } from "application/presenters";
+	import { toViewItems, type ViewItem } from "application/presenters/ViewItem";
 	import { resolveExpectedPath } from "shared/obsidian/resolveExpectedPath";
 	import SearchableItemList from "features/list-view/ui/SearchableItemList.svelte";
 	import type { ListConfig } from "features/list-view/ui/types";

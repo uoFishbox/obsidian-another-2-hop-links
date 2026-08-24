@@ -10,7 +10,7 @@ import {
 	hasSameTwoHopIndexedLinks,
 	hasSameViewItemSource,
 } from "application/presenters/viewItemEquality";
-import type { ViewItem } from "application/presenters";
+import type { ViewItem } from "application/presenters/ViewItem";
 import type { TaggedNote, TwoHopIndexedLink, TwoHopLinkBranch } from "types/domain";
 
 function createLink(overrides: Partial<TwoHopIndexedLink> = {}): TwoHopIndexedLink {

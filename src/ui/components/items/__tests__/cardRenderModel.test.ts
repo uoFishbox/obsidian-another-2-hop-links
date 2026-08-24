@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import type { ViewItem } from "application/presenters";
+import type { ViewItem } from "application/presenters/ViewItem";
 import { createMockTFile } from "testing/__mocks__/testHelpers";
 import type { LinkUtilitiesContext } from "types/linkContext";
 import { DEFAULT_SETTINGS } from "features/settings/model";

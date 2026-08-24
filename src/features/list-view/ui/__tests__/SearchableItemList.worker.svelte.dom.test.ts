@@ -4,7 +4,7 @@ import { TFile } from "obsidian";
 import { createMockTFile } from "testing/__mocks__/testHelpers";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import SearchableItemList from "../SearchableItemList.svelte";
-import type { ViewItem } from "application/presenters";
+import type { ViewItem } from "application/presenters/ViewItem";
 import type { ListConfig } from "../types";
 import type { LinkContext } from "ui/context/linkContext";
 import type { ListViewState } from "features/list-view/model/ListViewState";

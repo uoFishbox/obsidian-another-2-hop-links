@@ -1,5 +1,9 @@
 import type { TFile } from "obsidian";
-import type { ViewItem } from "application/presenters";
+import {
+	getItemRawText,
+	getItemTargetFile,
+	type ViewItem,
+} from "application/presenters/ViewItem";
 import {
 	generateBacklinkKey,
 	generateBranchKey,
@@ -12,7 +16,6 @@ import type {
 } from "ui/context/linkContext";
 import type { TwoHopIndexedLink } from "types";
 import type { PluginSettings } from "features/settings/model";
-import { getItemStrategy } from "application/presenters";
 import { findClosestComposed } from "ui/shared/dom/shadowDom";
 import {
 	createOwnerMouseEvent,
@@ -96,12 +99,9 @@ export function createItemInteractionDescriptor(
 	context: LinkUtilitiesContext,
 	options: CreateItemInteractionDescriptorOptions = {},
 ): ItemInteractionDescriptor | null {
-	const strategy = getItemStrategy(item);
-	if (!strategy) return null;
-
 	const interactionId = options.interactionId ?? createItemInteractionKey(item);
-	const targetFile = strategy.getTargetFile(item.data, context);
-	const rawText = strategy.getRawText(item.data);
+	const targetFile = getItemTargetFile(item, context);
+	const rawText = getItemRawText(item);
 
 	return {
 		interactionId,

@@ -1,4 +1,4 @@
-import type { ViewItem } from "application/presenters";
+import type { ViewItem } from "application/presenters/ViewItem";
 import { createItemInteractionKey } from "ui/interactions/interactionTypes";
 import type { ClickableHeaderExtraProps } from "ui/components/sections/types";
 import { generateLinkKey } from "features/card-preview/text-processing/textUtils";

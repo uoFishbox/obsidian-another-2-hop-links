@@ -1,4 +1,4 @@
-import type { ViewItem } from "application/presenters";
+import type { ViewItem } from "application/presenters/ViewItem";
 import { createItemInteractionKey } from "ui/interactions/interactionTypes";
 import { newLinksSectionConfig } from "ui/components/sections/sectionConfigs";
 import type { TwoHopIndexedLink } from "types/domain";

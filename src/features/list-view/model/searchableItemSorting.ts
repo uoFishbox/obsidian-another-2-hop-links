@@ -1,5 +1,8 @@
-import type { ViewItem } from "application/presenters";
-import { fromViewItem, getViewItemPath } from "application/presenters";
+import {
+	fromViewItem,
+	getViewItemPath,
+	type ViewItem,
+} from "application/presenters/ViewItem";
 import type { ISortService, SortableItem, SortOption } from "core/sorting";
 
 export type ViewItemSortCache = Map<string, WeakMap<ViewItem[], ViewItem[]>>;

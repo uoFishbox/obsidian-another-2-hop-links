@@ -23,7 +23,7 @@ import type { TwoHopIndexedLink } from "types/domain";
 import type { DataUpdateContext } from "core/indexing/index-service/IndexEvents";
 import { AbstractSvelteListView } from "ui/shared/views/abstractSvelteListView";
 import { buildEditorLikeFrame } from "ui/shared/views/editorLikeFrame";
-import { getViewItemKey, type ViewItem } from "application/presenters";
+import { getViewItemKey, type ViewItem } from "application/presenters/ViewItem";
 
 export const VIEW_TYPE_PRE_CREATE = "cosense-card-links-pre-create-view";
 export const PRE_CREATION_EPHEMERAL_STATE_KEY = "cosense-card-links-pre-create";

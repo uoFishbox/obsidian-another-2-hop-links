@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { TFile } from "obsidian";
-import type { ViewItem } from "application/presenters";
+import type { ViewItem } from "application/presenters/ViewItem";
 import { createVirtualCardInteractionController } from "../virtualCardInteractionController";
 import type { ItemInteractionDescriptor } from "../interactionTypes";
 

@@ -1,6 +1,7 @@
 import { TFile } from "obsidian";
 import type { SortableItem } from "core/sorting";
 import type { TwoHopIndexedLink, TwoHopLinkBranch, TaggedNote } from "types/domain";
+import type { LinkUtilitiesContext } from "types/linkContext";
 
 export type ViewItem =
 	| {
@@ -103,6 +104,58 @@ export function getViewItemPath(item: ViewItem): string | null {
 		case "branch":
 			return item.data.hop1.path ?? null;
 		default:
+			return null;
+	}
+}
+
+/** Resolves the vault file opened or previewed by a view item. */
+export function getItemTargetFile(
+	item: ViewItem,
+	context: LinkUtilitiesContext,
+): TFile | null {
+	switch (item.type) {
+		case "branch":
+			return item.data.hop1.path
+				? context.resolveFile(item.data.hop1.path)
+				: null;
+		case "newLink":
+			return null;
+		case "backlink":
+			return item.data.sourceFile;
+		case "taggedNote":
+			return item.data.file;
+		case "file":
+			return item.data;
+	}
+}
+
+/** Returns the source text used when dragging a view item. */
+export function getItemRawText(item: ViewItem): string {
+	switch (item.type) {
+		case "branch":
+			return item.data.hop1.rawText;
+		case "newLink":
+		case "backlink":
+			return item.data.rawText;
+		case "taggedNote":
+			return item.data.file.basename;
+		case "file":
+			return item.data.basename;
+	}
+}
+
+/** Returns the state class applied to a view-item card. */
+export function getItemClassName(item: ViewItem): string | null {
+	switch (item.type) {
+		case "newLink":
+			return "cosense-card-links__box--missing";
+		case "branch":
+			return item.data.hop1.isUnresolved
+				? "cosense-card-links__box--missing"
+				: "cosense-card-links__box--existing";
+		case "backlink":
+		case "taggedNote":
+		case "file":
 			return null;
 	}
 }

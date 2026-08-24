@@ -181,7 +181,7 @@ vi.mock("features/list-view/ui/ViewItemCard.svelte", () => ({
 	default: {},
 }));
 
-vi.mock("application/presenters", () => ({
+vi.mock("application/presenters/ViewItem", () => ({
 	getViewItemKey: vi.fn(() => "view-item-key"),
 	toViewItems: toViewItemsMock,
 	fromViewItem: vi.fn((item: unknown) => item),

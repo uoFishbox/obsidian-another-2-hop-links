@@ -1,6 +1,9 @@
 import type { TFile } from "obsidian";
-import type { ViewItem } from "application/presenters";
-import { getItemStrategy } from "application/presenters";
+import {
+	getItemClassName,
+	getItemTargetFile,
+	type ViewItem,
+} from "application/presenters/ViewItem";
 import { ARIA_LABELS } from "../../../appConstants";
 import { resolveFileCardTitle } from "core/frontmatterCardTitle";
 import {
@@ -59,10 +62,8 @@ export interface CreateCardRenderModelParams {
 export function createCardRenderModel(
 	params: CreateCardRenderModelParams,
 ): CardRenderModel {
-	const strategy = getItemStrategy(params.item);
-	const targetFile =
-		strategy?.getTargetFile(params.item.data, params.context) ?? null;
-	const className = strategy?.getClassName(params.item.data) ?? null;
+	const targetFile = getItemTargetFile(params.item, params.context);
+	const className = getItemClassName(params.item);
 	const title = resolveCardTitle(
 		params.item,
 		targetFile,
@@ -131,8 +132,7 @@ export function resolveCardTitleSnapshot(
 	settings: Pick<PluginSettings, "priorityFrontmatterKeyForTitle">,
 	context: LinkUtilitiesContext,
 ): CardTitleSnapshot {
-	const strategy = getItemStrategy(item);
-	const targetFile = strategy?.getTargetFile(item.data, context) ?? null;
+	const targetFile = getItemTargetFile(item, context);
 
 	return {
 		targetFile,

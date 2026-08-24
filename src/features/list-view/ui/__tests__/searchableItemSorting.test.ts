@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { createMockTFile } from "testing/__mocks__/testHelpers";
-import type { ViewItem } from "application/presenters";
+import type { ViewItem } from "application/presenters/ViewItem";
 import type { ISortService } from "core/sorting";
 import {
 	createViewItemSortCache,

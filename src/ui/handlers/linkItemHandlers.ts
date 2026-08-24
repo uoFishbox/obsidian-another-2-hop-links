@@ -1,5 +1,5 @@
 import type { TFile } from "obsidian";
-import type { ViewItem } from "application/presenters";
+import type { ViewItem } from "application/presenters/ViewItem";
 import type { LinkContext, LinkInteractionOptions } from "ui/context/linkContext";
 
 export function dispatchItemClick(
