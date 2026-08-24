@@ -6,10 +6,11 @@
 	import CardGridLoadMoreButton from "ui/card-grid/CardGridLoadMoreButton.svelte";
 	import UnresolvedPreviewPlaceholder from "features/card-preview/ui/UnresolvedPreviewPlaceholder.svelte";
 	import { previewHost } from "features/card-preview/ui/previewHostAction";
+	import type { CardSectionVariant } from "ui/components/common/cardPresentation";
 	import type { CardShellModel } from "ui/components/items/cardRenderModel";
 	import type { IconName } from "ui/shared/icons/iconRegistry";
 	import type { TwoHopVirtualCell } from "features/two-hop/runtime/virtual-grid/rowModel";
-	import { resolveTwoHopSectionVariant } from "features/two-hop/ui/twoHopCellStaticState";
+	import type { TwoHopSectionModel } from "features/two-hop/ui/twoHopSectionModel";
 	import { recordCCLDevMeasurement } from "infrastructure/debug/CCLDevMeasurements";
 	import { getDebugDisableCardDomPreview } from "../../../appConstants";
 
@@ -68,6 +69,28 @@
 			case "primary-section":
 			case "two-hop-branch":
 				return "Link";
+		}
+	}
+
+	function resolveTwoHopSectionVariant(
+		section: TwoHopSectionModel,
+	): CardSectionVariant {
+		switch (section.kind) {
+			case "new-links-section":
+				return "new-links";
+			case "tag-section":
+				return "tag";
+			case "two-hop-branch":
+				return "two-hop";
+			case "primary-section":
+				switch (section.id) {
+					case "outgoing":
+						return "outgoing";
+					case "merged":
+						return "merged";
+					default:
+						return "backlinks";
+				}
 		}
 	}
 </script>

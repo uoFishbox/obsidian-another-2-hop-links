@@ -8,7 +8,6 @@ import type { PluginHost } from "types/pluginHost";
 import type { ViewServices } from "ui/shared/views/viewServices";
 import type { ListConfig } from "features/list-view/ui/types";
 import type { TwoHopApplicationStore } from "features/two-hop/application/TwoHopApplicationStore.svelte";
-import { createGuardedIndexUpdateHandler } from "ui/shared/views/indexUpdateLifecycle";
 import { mergeItemsPreservingUnchanged } from "ui/shared/views/itemDiff";
 import { cleanupSvelteAndStore } from "ui/shared/views/svelteLifecycle";
 import {
@@ -28,6 +27,22 @@ type MountListSectionOptions = {
 	autofocus?: boolean;
 	wrapForView?: boolean;
 };
+
+function createGuardedIndexUpdateHandler(options: {
+	isReady: () => boolean;
+	shouldRefresh: (context?: DataUpdateContext) => boolean;
+	refresh: (context?: DataUpdateContext) => void;
+}): (context?: DataUpdateContext) => void {
+	return (context?: DataUpdateContext) => {
+		if (!options.isReady()) {
+			return;
+		}
+		if (!options.shouldRefresh(context)) {
+			return;
+		}
+		options.refresh(context);
+	};
+}
 
 function hasSameItemReferences<T>(
 	currentItems: readonly T[],

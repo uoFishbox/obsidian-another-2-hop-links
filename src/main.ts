@@ -1,7 +1,6 @@
 import { Plugin, TFile, loadMathJax } from "obsidian";
 import { installMathJaxShadowPatch } from "ui/shared/dom/mathJaxShadowStyles";
 import { SettingsManager } from "features/settings/persistence/SettingsManager";
-import { CosenseCardLinksSettingTab } from "features/settings/ui/SettingTab";
 import { DEFAULT_SETTINGS } from "features/settings/model";
 import type { PluginSettings } from "features/settings/model";
 import type { SortOption } from "core/sorting";
@@ -14,15 +13,7 @@ import type { ResolveOptions } from "features/two-hop/domain/TwoHopLinkResolver"
 import type { TwoHopResolveSnapshot } from "features/two-hop/domain/ResolverDependencies";
 import { forceRedrawEffect } from "infrastructure/markdown/livePreview";
 import { setEnableLogging } from "shared/logging/logger";
-import { installCCLDebugExposure } from "infrastructure/debug/CCLDebugExposure";
-import { registerBenchmarkCommand } from "infrastructure/debug/benchmarkCommandController";
-import { registerScrollBenchmarkCommand } from "infrastructure/debug/scrollBenchmarkCommandController";
-import { registerCardDragStateCleanup } from "ui/interactions/cardDragState";
-import { registerViews } from "infrastructure/registration/registerViews";
-import { registerCommands } from "infrastructure/registration/registerCommands";
-import { registerEditorExtensions } from "infrastructure/registration/registerEditorExtensions";
-import { registerMarkdownProcessors } from "infrastructure/registration/registerMarkdownProcessors";
-import { registerFileMenu } from "infrastructure/registration/registerFileMenu";
+import { registerPluginSurfaces } from "infrastructure/registration/registerPluginSurfaces";
 import { installAllPatchers } from "infrastructure/patchers/installAllPatchers";
 import { setupWorkspaceEventHandlers } from "infrastructure/workspace/workspaceEventBootstrap";
 import {
@@ -68,7 +59,7 @@ export default class CosenseCardLinksPlugin extends Plugin implements PluginHost
 
 		setEnableLogging(this.settings.enableLogging);
 		this.runtime = this.createRuntime();
-		this.registerPluginSurfaces();
+		registerPluginSurfaces(this, this.runtime);
 		this.startWorkspaceRuntime();
 	}
 
@@ -101,39 +92,6 @@ export default class CosenseCardLinksPlugin extends Plugin implements PluginHost
 					console.error("設定の保存に失敗しました:", error);
 				});
 			},
-		});
-	}
-
-	private registerPluginSurfaces(): void {
-		const runtime = this.runtime;
-		registerCardDragStateCleanup(this);
-		if (process.env.NODE_ENV !== "production") {
-			installCCLDebugExposure(this);
-		}
-
-		this.addSettingTab(new CosenseCardLinksSettingTab(this.app, this));
-		registerViews(this, runtime.viewServices);
-		registerCommands(this, {
-			scrollManager: runtime.scrollManager,
-			keyboardCardNavigator: runtime.keyboardCardNavigator,
-		});
-		if (process.env.NODE_ENV !== "production") {
-			registerBenchmarkCommand(this, runtime.indexingService);
-			registerScrollBenchmarkCommand(this);
-		}
-		registerEditorExtensions(this, {
-			linkStatusService: runtime.linkStatusService,
-		});
-		registerMarkdownProcessors(this, {
-			app: this.app,
-			indexingService: runtime.indexingService,
-			stylingService: runtime.stylingService,
-			renderedMdElementsRegistry: runtime.renderedMdElementsRegistry,
-		});
-		registerFileMenu(this, {
-			app: this.app,
-			getTwoHopLinkResult: (file, onProgress, options) =>
-				this.getTwoHopLinkResult(file, onProgress, options),
 		});
 	}
 

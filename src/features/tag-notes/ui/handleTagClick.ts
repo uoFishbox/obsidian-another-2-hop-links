@@ -1,8 +1,8 @@
 import type { IIndexingService } from "types";
-import type { LinkContext } from "../context/linkContext";
-import { openTagNotesView } from "features/tag-notes/ui/TagNotesView";
+import type { LinkContext } from "ui/context/linkContext";
 import type { PluginHost } from "types/pluginHost";
 import { areTagFeaturesEnabled } from "features/settings/model";
+import { openTagNotesView } from "./TagNotesView";
 
 export async function handleTagClick(
 	tag: string,
@@ -18,7 +18,6 @@ export async function handleTagClick(
 		tag,
 		linkContext.sourceFile.path,
 	);
-
 	if (notes.length === 0) {
 		return;
 	}

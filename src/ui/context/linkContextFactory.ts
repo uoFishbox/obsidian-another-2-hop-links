@@ -10,9 +10,7 @@ import type { HighlightMode, LinkContext, LinkInteractionOptions } from "./linkC
 import type { PluginSettings } from "features/settings/model";
 import { triggerHoverPopover } from "features/popover/mobilePopover";
 import type { PluginHost } from "types/pluginHost";
-import { shouldHighlight } from "ui/interactions/highlightUtils";
-import { buildDragLinkFormat } from "application/presenters/linkHelper";
-import { handleTagClick } from "ui/handlers/viewHandlers";
+import { handleTagClick } from "features/tag-notes/ui/handleTagClick";
 import {
 	hydrateRuntimeBacklinkHoverLink,
 	hydrateRuntimeBacklinkLink,
@@ -70,7 +68,7 @@ export function createLinkContextFactory(
 			if (mode === "suppress") {
 				return false;
 			}
-			return shouldHighlight(event, settings);
+			return shouldHighlight(settings);
 		};
 
 		const getNewLeafOption = (
@@ -214,5 +212,24 @@ export function createLinkContextFactory(
 			);
 
 		return linkContext as LinkContext;
+	};
+}
+
+function shouldHighlight(settings: PluginSettings): boolean {
+	return settings.highlightOnOpen === "always";
+}
+
+function buildDragLinkFormat(
+	sourceFile: TFile,
+	fileToLinktext: (file: TFile, sourcePath: string) => string,
+	app: App,
+): (targetFile: TFile) => string {
+	return (targetFile: TFile) => {
+		const linkText = fileToLinktext(targetFile, sourceFile.path);
+		const useMarkdownLinks = app.vault.getConfig("useMarkdownLinks") as boolean;
+		if (useMarkdownLinks) {
+			return `[${targetFile.basename}](${linkText})`;
+		}
+		return `[[${linkText}]]`;
 	};
 }

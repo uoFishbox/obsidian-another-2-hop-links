@@ -15,7 +15,6 @@ import { countLinkReferences } from "core/indexing/metadata/metadataExtractor";
 import { resolveFileByPath } from "shared/obsidian/resolveFileByPath";
 import type { IIndexingService } from "types/services";
 import type { IMetadataCache, IVault } from "types/obsidian";
-import { resolveFrontmatterDate } from "./frontmatterDate";
 import {
 	getPriorityFrontmatterCardTitle,
 	resolveFileCardTitle,
@@ -31,6 +30,34 @@ export function isBacklink(item: SortableItem): item is TwoHopIndexedLink {
 
 export function isTaggedNote(item: SortableItem): item is TaggedNote {
 	return "file" in item && "commonTags" in item;
+}
+
+function resolveFrontmatterDate(
+	metadataCache: IMetadataCache,
+	file: TFile,
+	key: string,
+): number | null {
+	const cache = metadataCache.getFileCache(file);
+	const frontmatter = cache?.frontmatter;
+
+	if (!frontmatter || !(key in frontmatter)) {
+		return null;
+	}
+
+	const value = frontmatter[key];
+	if (value instanceof Date) {
+		return value.getTime();
+	}
+	if (typeof value === "string") {
+		const timestamp = Date.parse(value);
+		if (!isNaN(timestamp)) {
+			return timestamp;
+		}
+	}
+	if (typeof value === "number") {
+		return value;
+	}
+	return null;
 }
 
 export class MetricProvider implements IMetricProvider {

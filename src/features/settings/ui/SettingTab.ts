@@ -6,8 +6,18 @@ import {
 	type SelectOption,
 	type SettingDefinition,
 } from "./sections/settingDefinition";
-import { SETTING_DEFINITIONS } from "./sections";
+import { ADVANCED_SETTING_DEFINITIONS } from "./sections/advancedSettings";
+import { DISPLAY_SETTING_DEFINITIONS } from "./sections/displaySettings";
+import { INTERACTION_SETTING_DEFINITIONS } from "./sections/interactionSettings";
+import { PREVIEW_SETTING_DEFINITIONS } from "./sections/previewSettings";
 import { t } from "./translations";
+
+const SETTING_DEFINITIONS: ReadonlyArray<SettingDefinition> = [
+	...DISPLAY_SETTING_DEFINITIONS,
+	...PREVIEW_SETTING_DEFINITIONS,
+	...INTERACTION_SETTING_DEFINITIONS,
+	...ADVANCED_SETTING_DEFINITIONS,
+];
 
 function getOptionLabel(option: SelectOption, lang: Language): string {
 	if (option.isTranslationKey) {

@@ -3,7 +3,6 @@ import {
 	buildDetailedBacklinksArtifactsChunked,
 	dedupeBySourceFile,
 } from "../backlink-builder/backlinkIndexer";
-import { hasResolvedBacklink } from "../backlink-builder/backlinkBuckets";
 import { VaultEnvironmentBuilder } from "testing/helpers/VaultEnvironmentBuilder";
 import type { TwoHopIndexedLink } from "types/domain";
 import { type CachedMetadata, type TFile } from "obsidian";
@@ -154,7 +153,7 @@ describe("buildDetailedBacklinksArtifactsChunked", () => {
 
 		expect(collection).toBeDefined();
 		expect(collection?.count).toBe(2);
-		expect(hasResolvedBacklink(collection!)).toBe(true);
+		expect(collection?.hasResolved).toBe(true);
 		const representative =
 			artifacts.sourceSummaries.get("source.md")?.orderedReferences[0];
 		expect(representative).toMatchObject({ rawText: "target" });

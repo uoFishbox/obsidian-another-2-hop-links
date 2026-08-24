@@ -9,7 +9,7 @@ vi.mock("features/tag-notes/ui/TagNotesView", () => ({
 	openTagNotesView,
 }));
 
-import { handleTagClick } from "../viewHandlers";
+import { handleTagClick } from "../handleTagClick";
 
 describe("handleTagClick", () => {
 	beforeEach(() => {

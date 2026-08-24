@@ -1,10 +1,24 @@
 <script lang="ts">
-	import type { ItemProps } from "ui/components/items/types";
+	import type { ViewItem } from "application/presenters";
+	import type { PluginSettings } from "features/settings/model";
 	import LinkItem from "ui/components/common/LinkItem.svelte";
+	import type { CardRenderModel } from "ui/components/items/cardRenderModel";
 	import { previewHost } from "features/card-preview/ui/previewHostAction";
 	import UnresolvedPreviewPlaceholder from "features/card-preview/ui/UnresolvedPreviewPlaceholder.svelte";
 	import { getDebugDisableCardDomPreview } from "../../../appConstants";
 	import { markCCLComponentReevaluation } from "infrastructure/debug/CCLDevMeasurements";
+
+	interface ItemProps {
+		item: ViewItem | undefined;
+		settings: PluginSettings;
+		searchQuery?: string;
+		searchScope?: "title-only" | "title-and-content";
+		draggable?: boolean;
+		contentPreview?: string;
+		interactionId?: string;
+		previewKey?: string;
+		model?: CardRenderModel;
+	}
 
 	let {
 		settings,

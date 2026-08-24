@@ -1,6 +1,5 @@
 import type { IVault, IMetadataCache } from "types/obsidian";
 import { TFile } from "obsidian";
-import { hasResolvedBacklink } from "./backlinkBuckets";
 import type {
 	BacklinkBucket,
 	BacklinksMap,
@@ -240,7 +239,7 @@ export function createBacklinkUpdater(
 			destinationPath,
 			toCaseInsensitiveLookupKey(destinationPath),
 			sourcePath,
-			hasResolvedBacklink(removed),
+			removed.hasResolved,
 			sourceMap.size === 0,
 		);
 
@@ -264,7 +263,7 @@ export function createBacklinkUpdater(
 			backlinksMap.set(destinationPath, sourceMap);
 		}
 		const before = sourceMap.get(sourcePath);
-		const hadResolved = before ? hasResolvedBacklink(before) : false;
+		const hadResolved = before?.hasResolved ?? false;
 		const after: BacklinkBucket = before
 			? {
 					count: before.count + destinationSummary.count,
@@ -278,7 +277,7 @@ export function createBacklinkUpdater(
 			sourcePath,
 			!before,
 			hadResolved,
-			hasResolvedBacklink(after),
+			after.hasResolved,
 		);
 		return true;
 	}

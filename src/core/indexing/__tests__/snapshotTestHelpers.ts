@@ -1,4 +1,3 @@
-import { hasResolvedBacklink } from "../backlink-builder/backlinkBuckets";
 import { buildIndexesAsync } from "../index-service/indexSnapshotBuilder";
 import type { BacklinkSourceMap } from "types/domain";
 import type { IMetadataCache, IVault } from "types/obsidian";
@@ -131,7 +130,7 @@ function serializeNestedBacklinkMap(map: Map<string, BacklinkSourceMap>) {
 								sourcePath,
 								{
 									count: bucket.count,
-									hasResolved: hasResolvedBacklink(bucket),
+									hasResolved: bucket.hasResolved,
 								},
 							] as const;
 						})
