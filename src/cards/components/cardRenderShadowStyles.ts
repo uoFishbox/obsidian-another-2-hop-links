@@ -156,6 +156,7 @@ export const CARD_RENDER_SHADOW_CSS = String.raw`
 	font-size: 0.95em;
 	line-height: 1.1;
 	word-break: break-word;
+	overflow: clip;
 }
 
 .cosense-card-links__header-title {
