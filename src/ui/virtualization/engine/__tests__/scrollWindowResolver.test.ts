@@ -4,10 +4,6 @@ import {
 	type VirtualScrollWindowRangeRowModel,
 } from "../scrollWindowResolver";
 import type { VirtualVisibilityPolicy } from "ui/virtualization/model/ranges";
-import {
-	getCCLDevMeasurementSnapshot,
-	resetCCLDevMeasurements,
-} from "infrastructure/debug/CCLDevMeasurements";
 
 function createRowModel(
 	findVisibleRangeInto: () => void,
@@ -143,7 +139,6 @@ describe("createVirtualScrollWindowRangeResolver", () => {
 	});
 
 	it("publishes absolute coverage bands for empty mounted ranges", () => {
-		resetCCLDevMeasurements();
 		const rowModel = createEmptyRangeRowModel(10, 1_000);
 		const resolver = createVirtualScrollWindowRangeResolver({
 			resolveRowModel: () => rowModel,
@@ -172,10 +167,6 @@ describe("createVirtualScrollWindowRangeResolver", () => {
 			min: 1_500,
 			max: Number.POSITIVE_INFINITY,
 		});
-
-		const counters = getCCLDevMeasurementSnapshot().counters;
-		expect(counters["virtualScroll.coverageBand.emptyAbove"].count).toBe(1);
-		expect(counters["virtualScroll.coverageBand.emptyBelow"].count).toBe(1);
 	});
 
 	it("matches the empty-range boundaries used by mounted range resolution", () => {
@@ -231,7 +222,6 @@ describe("createVirtualScrollWindowRangeResolver", () => {
 	});
 
 	it("covers every finite scroll position when the row model is empty", () => {
-		resetCCLDevMeasurements();
 		const rowModel = createEmptyRangeRowModel(0, 0);
 		const resolver = createVirtualScrollWindowRangeResolver({
 			resolveRowModel: () => rowModel,
@@ -253,11 +243,6 @@ describe("createVirtualScrollWindowRangeResolver", () => {
 			min: Number.NEGATIVE_INFINITY,
 			max: Number.POSITIVE_INFINITY,
 		});
-		expect(
-			getCCLDevMeasurementSnapshot().counters[
-				"virtualScroll.coverageBand.emptyData"
-			].count,
-		).toBe(1);
 	});
 
 	it("publishes value-stable ranges without reallocating unchanged snapshots", () => {

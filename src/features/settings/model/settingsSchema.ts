@@ -136,7 +136,6 @@ export const PluginSettingsSchema = z.object({
 	pinBookmarkedToTopInAllNotes: booleanSetting(
 		DEFAULT_SETTINGS.pinBookmarkedToTopInAllNotes,
 	),
-	enableLogging: booleanSetting(DEFAULT_SETTINGS.enableLogging),
 	enableUnresolvedLinkDecoration: booleanSetting(
 		DEFAULT_SETTINGS.enableUnresolvedLinkDecoration,
 	),
@@ -149,14 +148,7 @@ export const PluginSettingsSchema = z.object({
 	enableProgressiveTwoHopBuild: booleanSetting(
 		DEFAULT_SETTINGS.enableProgressiveTwoHopBuild ?? true,
 	),
-	enableAdvancedCanvasIntegration: booleanSetting(
-		DEFAULT_SETTINGS.enableAdvancedCanvasIntegration ?? false,
-	),
-	enableRipgrepContentSearch: booleanSetting(
-		DEFAULT_SETTINGS.enableRipgrepContentSearch ?? false,
-	),
 	enableContentSearch: booleanSetting(DEFAULT_SETTINGS.enableContentSearch ?? false),
-	ripgrepExecutablePath: stringSetting(DEFAULT_SETTINGS.ripgrepExecutablePath ?? ""),
 	priorityFrontmatterKeyForPreview: stringSetting(
 		DEFAULT_SETTINGS.priorityFrontmatterKeyForPreview ?? "",
 	),

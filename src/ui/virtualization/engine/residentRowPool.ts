@@ -1,8 +1,3 @@
-import {
-	recordCCLDevMeasurement,
-	recordCCLDevMeasurementCount,
-} from "infrastructure/debug/CCLDevMeasurements";
-
 export interface ResidentRowSlotRange {
 	readonly start: number;
 	readonly end: number;
@@ -58,8 +53,6 @@ export function createResidentRowSlotAllocator(): ResidentRowSlotAllocator {
 
 	function prepareRange(params: ResidentRowSlotRange): void {
 		assertUsable();
-		recordCCLDevMeasurement("virtualGrid.contiguousSlotPool.apply");
-
 		const start = Math.max(0, Math.floor(params.start));
 		const end = Math.max(start, Math.floor(params.end));
 		if (
@@ -69,7 +62,6 @@ export function createResidentRowSlotAllocator(): ResidentRowSlotAllocator {
 			activeStart === start &&
 			activeEnd === end
 		) {
-			recordCCLDevMeasurement("virtualGrid.residentSlotPool.rangeHit");
 			return;
 		}
 
@@ -90,7 +82,6 @@ export function createResidentRowSlotAllocator(): ResidentRowSlotAllocator {
 			leavingSlotIndices.push(physicalRowSlot);
 		}
 
-		let changedSlotCount = 0;
 		let leavingOffset = 0;
 		for (let logicalRowIndex = start; logicalRowIndex < end; logicalRowIndex += 1) {
 			if (logicalRowToSlot.has(logicalRowIndex)) continue;
@@ -107,21 +98,15 @@ export function createResidentRowSlotAllocator(): ResidentRowSlotAllocator {
 				freeSlotIndices.delete(previouslyFreeSlotIndex);
 			}
 			logicalRowToSlot.set(logicalRowIndex, physicalRowSlot);
-			changedSlotCount += 1;
 		}
 
 		for (let index = leavingOffset; index < leavingSlotIndices.length; index += 1) {
 			freeSlotIndices.add(leavingSlotIndices[index]!);
-			changedSlotCount += 1;
 		}
 
 		activeStart = start;
 		activeEnd = end;
 		hasActiveRange = true;
-		recordCCLDevMeasurementCount(
-			"virtualGrid.residentSlotPool.changedSlots",
-			changedSlotCount,
-		);
 	}
 
 	function allocateSlot(): number {

@@ -2,7 +2,6 @@ import { Component, normalizePath, type App } from "obsidian";
 import { SvelteSet } from "svelte/reactivity";
 import type { BookmarksState } from "ui/context/linkContext";
 import { parseBookmarkedFilePaths } from "./bookmarksUtils";
-import { enableLogging, logger } from "shared/logging/logger";
 
 const BOOKMARKS_RELOAD_DEBOUNCE_MS = 120;
 
@@ -68,12 +67,11 @@ class BookmarksStore {
 		}
 
 		const component = new Component();
-		if (enableLogging) logger(`[Bookmarks] watcher initialized`);
 		void this.loadBookmarks();
 
 		component.registerEvent(
 			this.app.workspace.on("cosense-card-links:bookmarks-updated" as any, () => {
-				this.scheduleReload("workspace-event");
+				this.scheduleReload();
 			}),
 		);
 
@@ -96,9 +94,8 @@ class BookmarksStore {
 		this.reloadTimer = null;
 	}
 
-	private scheduleReload(trigger: string): void {
+	private scheduleReload(): void {
 		this.clearReloadTimer();
-		if (enableLogging) logger(`[Bookmarks] schedule reload (trigger=${trigger})`);
 		this.reloadTimer = setTimeout(() => {
 			this.reloadTimer = null;
 			void this.loadBookmarks();
@@ -118,8 +115,6 @@ class BookmarksStore {
 			if (!exists) {
 				this.filePaths.clear();
 				this.orderedFilePaths = [];
-				if (enableLogging)
-					logger(`[Bookmarks] file not found. Cleared bookmark state.`);
 				return;
 			}
 
@@ -134,16 +129,13 @@ class BookmarksStore {
 				this.filePaths.add(path);
 			}
 			this.orderedFilePaths = parsed.orderedFilePaths;
-			if (enableLogging)
-				logger(`[Bookmarks] reloaded ${this.filePaths.size} bookmarks.`);
-		} catch (error) {
+		} catch {
 			if (loadRequestId !== this.loadRequestId) {
 				return;
 			}
 
 			this.filePaths.clear();
 			this.orderedFilePaths = [];
-			if (enableLogging) logger(`[Bookmarks] failed to reload bookmarks`, error);
 		}
 	}
 }

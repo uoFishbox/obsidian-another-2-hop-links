@@ -14,8 +14,6 @@
 		dataset: SearchWorkerItemSnapshot[];
 		buildDataset?: () => SearchWorkerItemSnapshot[];
 		matchScope?: "title-only" | "title-and-content";
-		contentSearchBackend?: "worker" | "ripgrep";
-		ripgrepExecutablePath?: string;
 	}
 
 	let {
@@ -29,8 +27,6 @@
 		dataset,
 		buildDataset,
 		matchScope = "title-and-content",
-		contentSearchBackend = "worker",
-		ripgrepExecutablePath,
 	}: Props = $props();
 
 	const session = useWorkerSearchSession({
@@ -41,8 +37,6 @@
 		getSearchableFiles: () => getSearchableFiles?.() ?? files,
 		buildDataset: () => buildDataset?.() ?? dataset,
 		matchScope,
-		contentSearchBackend,
-		ripgrepExecutablePath,
 	});
 
 	const matchedState = $derived(

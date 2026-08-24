@@ -39,7 +39,6 @@ import type { RowRange } from "ui/virtualization/public";
 import { resolveVisibleRange } from "ui/virtualization/public";
 import type { ResultNavigationDirection } from "features/keyboard-navigation/resultFocus";
 import type { ProgrammaticScrollSnapshot } from "ui/virtualization/public";
-import { publishTwoHopCardCounts } from "infrastructure/debug/twoHopCardCountRegistry";
 
 /** Dependencies required to enable previews on the two-hop virtual surface. */
 export interface TwoHopPreviewDependencies {
@@ -351,7 +350,6 @@ export function useTwoHopVirtualGrid(
 			layout,
 		});
 		rowModel = nextRowModel;
-		if (rootEl) publishTwoHopCardCounts(rootEl, nextRowModel.cardCounts);
 		restoreLayoutAnchor(anchor, nextRowModel);
 		if (nextRowModel.rowCount === 0) {
 			virtualList.setEmpty({ rowModel: nextRowModel });
@@ -431,7 +429,6 @@ export function useTwoHopVirtualGrid(
 		set rootEl(next: HTMLDivElement | null) {
 			rootEl = next;
 			frameCoordinator.bindOwnerElement?.(next);
-			if (next) publishTwoHopCardCounts(next, rowModel.cardCounts);
 		},
 		get layout() {
 			return layout;

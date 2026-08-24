@@ -124,9 +124,6 @@
 		matchScope: () => (contentSearchEnabled ? "title-and-content" : "title-only"),
 		getSearchableFiles: () => searchSnapshot.searchableFiles,
 		buildDataset: () => searchSnapshot.workerItems,
-		contentSearchBackend: () =>
-			currentSettings.enableRipgrepContentSearch ? "ripgrep" : "worker",
-		ripgrepExecutablePath: () => currentSettings.ripgrepExecutablePath || undefined,
 	});
 	let isSearchLoading = $derived(workerSearchSession.isLoading);
 	let matchesByKey = $derived(workerSearchSession.matchesByKey);

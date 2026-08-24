@@ -36,14 +36,6 @@ export type HoverLinkPayloadLike = {
 	[key: string]: unknown;
 };
 
-export type DebugLogEntry = {
-	index: number;
-	at: number;
-	type: string;
-	message: string;
-	detail?: unknown;
-};
-
 export interface HoverAnchorTarget {
 	actualEl: HTMLElement;
 	proxyEl: HTMLElement;
@@ -56,13 +48,6 @@ export type PendingPopoverHandoff = {
 	toAnchor: HoverAnchorTarget;
 	requestSeq: number;
 };
-
-export type PopoverReleaseReason =
-	| "anchor-rebind"
-	| "bridge-release"
-	| "destroy"
-	| "handoff-complete"
-	| "handoff-timeout";
 
 export type ShadowHoverSession = {
 	proxyStore: ShadowGeometryProxyStore;
@@ -77,9 +62,6 @@ export type ShadowHoverSession = {
 	overPopover: boolean;
 	attachedPopoverEl: HTMLElement | null;
 	teardownPopoverListeners: (() => void) | null;
-	lastHoverPath: string | null;
 	handoffTimer: number | null;
 	handoffTimerWindow: Window | null;
-	logs: DebugLogEntry[];
-	logSeq: number;
 };

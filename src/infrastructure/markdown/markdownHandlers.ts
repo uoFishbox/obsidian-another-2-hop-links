@@ -7,7 +7,6 @@ import {
 	toCaseInsensitiveLookupKey,
 } from "core/indexing/link-resolution/linkResolution";
 import { UNRESOLVED_LINK_ATTRIBUTE } from "../../appConstants";
-import { enableLogging, logger } from "shared/logging/logger";
 
 export async function markdownPostProcessor(
 	el: HTMLElement,
@@ -19,12 +18,6 @@ export async function markdownPostProcessor(
 ): Promise<void> {
 	markdownRenderManager.registerElement(ctx.sourcePath, el, ctx);
 
-	if (enableLogging) {
-		const renderedText = el.innerText;
-		logger(`[Cosense card links] Post-processing markdown for: ${ctx.sourcePath}`, {
-			text: renderedText,
-		});
-	}
 	await indexingService.awaitIdle();
 
 	stylingService.decorateLinksInContainer(el, ctx.sourcePath);

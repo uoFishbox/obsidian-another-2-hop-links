@@ -11,23 +11,16 @@ import {
 } from "./decorationTargetCollector";
 import type { LinkStatusService } from "./linkStatusService";
 import { UNRESOLVED_LINK_ATTRIBUTE } from "../../appConstants";
-import { enableLogging, logger } from "shared/logging/logger";
 
 export type LinkHrefExtractor = (el: HTMLElement) => string | undefined;
 
-type LinkElementCollection = Iterable<HTMLElement> & {
-	readonly length: number;
-};
-
 export interface LinkDecorationRequest {
 	containerEl: HTMLElement;
-	linkElements: LinkElementCollection;
+	linkElements: Iterable<HTMLElement>;
 	sourceFile?: TFile;
-	sourcePath?: string;
 	targetSelectors?: string[];
 	hrefExtractor?: LinkHrefExtractor;
 	mode?: DecorationTargetMode;
-	shouldLogCanvas?: boolean;
 }
 
 const EMPTY_TARGET_SELECTORS: string[] = [];
@@ -56,16 +49,6 @@ export function createLinkDecorationReconciler(
 	function reconcile(request: LinkDecorationRequest): void {
 		const mode = request.mode ?? "rendered";
 		const targetSelectors = request.targetSelectors ?? EMPTY_TARGET_SELECTORS;
-		const shouldLogCanvas = request.shouldLogCanvas ?? false;
-
-		if (shouldLogCanvas && enableLogging) {
-			logger(
-				`[DEBUG_CANVAS] decorateLinksInContainer called for: ${request.sourcePath ?? "unknown"}`,
-			);
-			logger(
-				`[DEBUG_CANVAS] Found ${request.linkElements.length} internal links in container.`,
-			);
-		}
 		const targetCollectionOptions = {
 			mode,
 			targetSelectors,
@@ -76,18 +59,8 @@ export function createLinkDecorationReconciler(
 			targetCollectionOptions,
 		);
 
-		logCanvasLookupPaths(shouldLogCanvas, lookupPaths);
 		const resolutionResults = resolveLookupPaths(linkStatusService, lookupPaths);
-		logCanvasResolutionResults(shouldLogCanvas, resolutionResults);
-
-		const appliedCount = applyDecorationRecords(
-			decorationRecords,
-			resolutionResults,
-			shouldLogCanvas,
-		);
-		if (shouldLogCanvas && enableLogging) {
-			logger(`[DEBUG_CANVAS] Total attributes applied: ${appliedCount}`);
-		}
+		applyDecorationRecords(decorationRecords, resolutionResults);
 	}
 
 	function clearContainerAttribute(container: HTMLElement, attrName: string): void {
@@ -151,58 +124,14 @@ function resolveLookupPaths(
 function applyDecorationRecords(
 	decorationRecords: DecorationRecord[],
 	resolutionResults: ReadonlyMap<string, boolean>,
-	shouldLogCanvas: boolean,
-): number {
-	let appliedCount = 0;
-
+): void {
 	for (const record of decorationRecords) {
 		const shouldDecorate = record.lookupPath
 			? (resolutionResults.get(record.lookupPath) ?? false)
 			: false;
 
 		applyUnresolvedLinkAttribute(record.linkEl, record.targets, shouldDecorate);
-
-		if (!shouldDecorate) {
-			continue;
-		}
-
-		appliedCount++;
-		if (shouldLogCanvas && enableLogging) {
-			logger(
-				`[DEBUG_CANVAS] Applied attribute to ${record.targets ? record.targets.length : 1} elements: (path: ${record.lookupPath})`,
-			);
-		}
 	}
-
-	return appliedCount;
-}
-
-function logCanvasLookupPaths(
-	shouldLogCanvas: boolean,
-	lookupPaths: Set<string>,
-): void {
-	if (!shouldLogCanvas) {
-		return;
-	}
-
-	if (enableLogging)
-		logger(
-			`[DEBUG_CANVAS] Unique lookup paths to check: ${[...lookupPaths].join(", ")}`,
-		);
-}
-
-function logCanvasResolutionResults(
-	shouldLogCanvas: boolean,
-	resolutionResults: ReadonlyMap<string, boolean>,
-): void {
-	if (!shouldLogCanvas) {
-		return;
-	}
-
-	if (enableLogging)
-		logger(
-			`[DEBUG_CANVAS] Batch resolution results: ${JSON.stringify(Object.fromEntries(resolutionResults))}`,
-		);
 }
 
 function applyUnresolvedLinkAttribute(

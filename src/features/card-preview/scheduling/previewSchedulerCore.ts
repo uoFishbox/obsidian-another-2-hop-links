@@ -93,7 +93,6 @@ export interface CreatePreviewSchedulerPartitionOptions<
 	readonly coordinator: VirtualFrameCoordinator | undefined;
 	readonly taskKeyPrefix: string;
 	readonly getWindow?: () => Window | null;
-	readonly onAnimationFrameScheduled?: () => void;
 	readonly createPartition: (
 		driver: PreviewFrameDriver,
 		coordinator: VirtualFrameCoordinator | undefined,
@@ -121,7 +120,6 @@ export function getOrCreatePreviewSchedulerPartition<
 		coordinator: options.coordinator,
 		taskKey,
 		getWindow: options.getWindow,
-		onAnimationFrameScheduled: options.onAnimationFrameScheduled,
 		onFrame: (timestamp) => {
 			if (partition) options.onFrame(partition, timestamp);
 		},

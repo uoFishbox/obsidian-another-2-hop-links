@@ -4,7 +4,6 @@ import {
 } from "ui/shared/scroll/scrollContainer";
 import { markScrollActivityIdle } from "ui/shared/scroll/scrollActivity";
 import { subscribeWindowResize } from "ui/shared/scroll/windowResize";
-import { recordCCLDevMeasurement } from "infrastructure/debug/CCLDevMeasurements";
 import {
 	collectPositionDependencyElements,
 	collectStructureDependencyTargets,

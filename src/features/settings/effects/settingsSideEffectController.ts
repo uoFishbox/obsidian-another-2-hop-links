@@ -41,7 +41,6 @@ export interface SettingsSideEffectControllerDeps {
 	readonly indexingService: IndexingService;
 	readonly workspace: Workspace;
 	readonly bumpSortContextVersion: () => void;
-	readonly setLoggingEnabled: (enabled: boolean) => void;
 }
 
 export interface SettingsSideEffectController {
@@ -77,9 +76,6 @@ export function createSettingsSideEffectController(
 			return;
 		}
 
-		if (changedKeySet.has("enableLogging")) {
-			deps.setLoggingEnabled(settings.enableLogging);
-		}
 		if (changedKeySet.has("enableUnresolvedLinkDecoration")) {
 			deps.viewUpdateOrchestrator.updateAllViews();
 		}

@@ -17,64 +17,11 @@ const HAS_EXTENSION_RE = /\.[a-z0-9]+$/i;
 // で保持量を制限する。正規化は安価なので LRU の per-call delete/set ではなく
 // 世代到達時の一括切り替えで追い出す。
 const CASE_INSENSITIVE_LOOKUP_KEY_CACHE: BoundedGenerationalCache<string, string> =
-	createBoundedGenerationalCache(
-		"caseInsensitiveLookupKey",
-		LINK_NORMALIZATION_CACHE_MAX_ENTRIES,
-	);
+	createBoundedGenerationalCache(LINK_NORMALIZATION_CACHE_MAX_ENTRIES);
 const RAW_LINKPATH_TO_MARKDOWN_PATH_CACHE: BoundedGenerationalCache<string, string> =
-	createBoundedGenerationalCache(
-		"rawLinkpathToMarkdownPath",
-		LINK_NORMALIZATION_CACHE_MAX_ENTRIES,
-	);
+	createBoundedGenerationalCache(LINK_NORMALIZATION_CACHE_MAX_ENTRIES);
 const LINK_TEXT_TO_MARKDOWN_PATH_CACHE: BoundedGenerationalCache<string, string> =
-	createBoundedGenerationalCache(
-		"linkTextToMarkdownPath",
-		LINK_NORMALIZATION_CACHE_MAX_ENTRIES,
-	);
-
-/** Names of the bounded normalization caches, for stats grouping. */
-export type LinkNormalizationCacheName =
-	| "caseInsensitiveLookupKey"
-	| "rawLinkpathToMarkdownPath"
-	| "linkTextToMarkdownPath";
-
-export interface LinkNormalizationCacheStats {
-	name: LinkNormalizationCacheName;
-	maxEntries: number;
-	currentSize: number;
-	previousSize: number;
-	hits: number;
-	misses: number;
-	promotions: number;
-	generations: number;
-	clears: number;
-}
-
-const NORMALIZATION_CACHES = [
-	CASE_INSENSITIVE_LOOKUP_KEY_CACHE,
-	RAW_LINKPATH_TO_MARKDOWN_PATH_CACHE,
-	LINK_TEXT_TO_MARKDOWN_PATH_CACHE,
-] as const;
-
-/**
- * Returns current stats for every normalization cache, for debug measurement.
- */
-export function getLinkNormalizationCacheStats(): LinkNormalizationCacheStats[] {
-	return NORMALIZATION_CACHES.map(
-		(cache) => cache.getStats() as LinkNormalizationCacheStats,
-	);
-}
-
-/**
- * Clears all link normalization caches. Intended for benchmarks to separate
- * cold-cache from warm-cache runs; not needed during normal operation because
- * the bounded generational caches self-trim.
- */
-export function clearLinkNormalizationCaches(): void {
-	for (const cache of NORMALIZATION_CACHES) {
-		cache.clear();
-	}
-}
+	createBoundedGenerationalCache(LINK_NORMALIZATION_CACHE_MAX_ENTRIES);
 
 export interface ResolvedLinkInfo {
 	destinationPath: string;

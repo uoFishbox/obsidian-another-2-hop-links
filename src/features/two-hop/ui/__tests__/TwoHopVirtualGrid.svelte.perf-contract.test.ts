@@ -1,11 +1,6 @@
 import { cleanup, fireEvent, render } from "@testing-library/svelte";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { DEFAULT_SETTINGS } from "features/settings/model";
-import {
-	getCCLDevMeasurementSnapshot,
-	resetCCLDevMeasurements,
-} from "infrastructure/debug/CCLDevMeasurements";
-import { getTwoHopCardCounts } from "infrastructure/debug/twoHopCardCountRegistry";
 import type { ApplicationUiState } from "application/stores/ApplicationUiState.svelte";
 import type { CardRenderModel } from "ui/components/items/cardRenderModel";
 import type { LinkContext } from "ui/context/linkContext";
@@ -177,7 +172,6 @@ async function waitForStableRowCount(root: HTMLElement): Promise<number> {
 
 beforeEach(() => {
 	resetRecords();
-	resetCCLDevMeasurements();
 	cardDemandProbe.setDemand.mockClear();
 	installResizeObserverMock();
 	installAnimationFrameMock();
@@ -199,7 +193,6 @@ describe("TwoHopVirtualGrid performance contract", () => {
 			resolveItemCardModel: resolver,
 		});
 		cardDemandProbe.setDemand.mockClear();
-		resetCCLDevMeasurements();
 
 		const replacement = { ...section.items[0]! };
 		await publishSection(
@@ -216,52 +209,5 @@ describe("TwoHopVirtualGrid performance contract", () => {
 
 		expect(demandAfterRerender).toBe(0);
 		expect(cardDemandProbe.setDemand).toHaveBeenCalledTimes(1);
-		const counters = getCCLDevMeasurementSnapshot().counters;
-		expect(counters["virtualScroll.applyScrollMeasurement.dataChange"].count).toBe(
-			1,
-		);
-		expect(counters["virtualScroll.rangeMeasurementApplied"].count).toBe(1);
-		expect(
-			counters["virtualList.scheduler.measurementLayout.animationFrame"].count,
-		).toBe(0);
-	});
-
-	it("rebinds cell bodies in reused physical slots across a long scroll", async () => {
-		const resolver = createCardModelResolver();
-		const { root, scroller } = await renderSurface({
-			section: createSection(10_000),
-			resolveItemCardModel: resolver,
-		});
-
-		await vi.waitFor(() => expect(getRows(root).length).toBeGreaterThan(0));
-		await waitForStableRowCount(root);
-
-		setNumericProperty(scroller, "scrollTop", 20_000);
-		await fireEvent.scroll(scroller);
-		await vi.waitFor(() => {
-			const rowIndexes = getRows(root).map((row) =>
-				Number(row.dataset.cclRowIndex),
-			);
-			expect(Math.min(...rowIndexes)).toBeGreaterThan(100);
-		});
-		await waitForStableRowCount(root);
-
-		resetCCLDevMeasurements();
-
-		setNumericProperty(scroller, "scrollTop", 10_000);
-		await fireEvent.scroll(scroller);
-		await vi.waitFor(() => {
-			const rowIndexes = getRows(root).map((row) =>
-				Number(row.dataset.cclRowIndex),
-			);
-			expect(Math.min(...rowIndexes)).toBeGreaterThan(50);
-			expect(Math.max(...rowIndexes)).toBeLessThan(200);
-		});
-		await waitForStableRowCount(root);
-
-		const counters = getCCLDevMeasurementSnapshot().counters;
-		expect(counters["twoHop.cellBody.rebind"].count).toBeGreaterThan(0);
-		expect(counters["twoHop.cellBody.mount"].count).toBe(0);
-		expect(counters["twoHop.cellBody.unmount"].count).toBe(0);
 	});
 });

@@ -9,13 +9,11 @@ import {
 	findClosestComposed,
 	findMatchingElementInComposedPath,
 } from "ui/shared/dom/shadowDom";
-import { enableLogging, logger } from "shared/logging/logger";
 import {
 	ShadowHoverControllerImpl,
 	type ShadowPopoverLaunchRequest,
 } from "features/popover/shadow-hover/controller";
 import { createRequestHoverParent } from "features/popover/shadow-hover/session";
-import { debugLog, summarizeNode } from "features/popover/shadow-hover/debug";
 import type { HoverLinkPayloadLike } from "features/popover/shadow-hover/internal-types";
 import { COSENSE_CARD_LINKS_HOVER_SOURCE_ID } from "features/popover/hoverPopoverLinkSpec";
 import { isHTMLElementLike, isNodeLike } from "ui/shared/dom/realmSafeDom";
@@ -387,10 +385,6 @@ function createHandle({
 }: ShadowHoverPopoverBridgeOptions): SharedShadowHoverBridgeHandle | null {
 	const app = appContext?.app;
 	if (!app) {
-		if (enableLogging)
-			logger("[ShadowHoverBridge] Bridge install skipped: app context missing.", {
-				host: shadowRoot.host.tagName,
-			});
 		return null;
 	}
 
@@ -419,22 +413,6 @@ function createHandle({
 				__cclShadowHoverRequestSeq: request.requestSeq,
 			},
 		};
-		request.session.lastHoverPath = "workspace-trigger";
-		if (enableLogging) {
-			debugLog(
-				request.session,
-				"workspace-hover-trigger",
-				"Triggering workspace hover-link from shadow target via proxy",
-				() => ({
-					source: payload.source,
-					linktext: payload.linktext,
-					sourcePath: payload.sourcePath,
-					actualTarget: summarizeNode(request.actualAnchorEl),
-					proxyTarget: summarizeNode(payload.targetEl),
-					requestSeq: request.requestSeq,
-				}),
-			);
-		}
 		app.workspace.trigger("hover-link", payload);
 	};
 	const controller = new ShadowHoverControllerImpl(launchPopover, resolveLink);

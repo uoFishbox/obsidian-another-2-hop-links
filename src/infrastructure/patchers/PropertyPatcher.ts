@@ -1,7 +1,6 @@
 import type { PluginHost } from "types/pluginHost";
 import type { PropertyWidgetStyler } from "features/link-decoration/propertyWidgetStyler";
 import { resolveFileByPath } from "shared/obsidian/resolveFileByPath";
-import { enableLogging, logger } from "shared/logging/logger";
 import {
 	getPropertyWidgetRenderSave,
 	type PropertyWidgetComponentLike,
@@ -27,9 +26,6 @@ function patchPropertyWidgets(
 ): void {
 	const widgets = plugin.app.metadataTypeManager.registeredTypeWidgets;
 
-	if (enableLogging)
-		logger("[PropertyPatcher] Patching built-in property widgets for styling...");
-
 	// 再描画フレームでの再スタイリングが重複しないように、
 	// 要素単位でスケジュールを管理するWeakSetを関数スコープに配置
 	const scheduledElements = new WeakSet<Element>();
@@ -37,7 +33,6 @@ function patchPropertyWidgets(
 	for (const widget of Object.values(widgets)) {
 		const widgetObject = getPropertyWidgetRenderSave(widget);
 		if (!widgetObject) {
-			if (enableLogging) logger("[PropertyPatcher] Skipped unsupported widget.");
 			continue;
 		}
 		let patchId = widgetPatchIds.get(widgetObject);
@@ -137,9 +132,6 @@ function patchPropertyWidgets(
 			},
 		});
 	}
-
-	if (enableLogging)
-		logger("[PropertyPatcher] Finished patching property widgets for styling.");
 }
 
 function isPropertyContext(value: unknown): value is { sourcePath: string } {

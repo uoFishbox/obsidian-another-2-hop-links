@@ -1,6 +1,5 @@
 import type { PluginHost } from "types/pluginHost";
 import { MarkdownView, TFile } from "obsidian";
-import { enableLogging, logger } from "shared/logging/logger";
 import { getActiveInlineContainer } from "ui/shared/dom/domUtils";
 import { applyPatch } from "infrastructure/capabilities/applyPatch";
 
@@ -20,7 +19,7 @@ function patchViewLifecycle(plugin: PluginHost) {
 		getActiveInlineContainer(view);
 	};
 
-	const applied = applyPatch(plugin, {
+	applyPatch(plugin, {
 		id: "markdown-view:lifecycle",
 		target: MarkdownView.prototype,
 		method: "onload",
@@ -64,8 +63,4 @@ function patchViewLifecycle(plugin: PluginHost) {
 				return await next.call(this, file);
 			},
 	});
-
-	if (applied) {
-		if (enableLogging) logger("[FilePatcher] MarkdownView lifecycle patched.");
-	}
 }

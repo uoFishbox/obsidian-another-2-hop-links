@@ -1,4 +1,3 @@
-import { recordCCLDevMeasurement } from "infrastructure/debug/CCLDevMeasurements";
 import {
 	isScrollActivityActive,
 	subscribeScrollActivity,
@@ -99,19 +98,6 @@ export function createVirtualFrameCoordinator(
 		} finally {
 			scheduledKeysScratch.length = 0;
 			scheduledTasksScratch.length = 0;
-		}
-		if (
-			process.env.NODE_ENV !== "production" &&
-			executed > 0 &&
-			lane !== "animation-frame"
-		) {
-			recordCCLDevMeasurement(
-				lane === "scroll-critical"
-					? "virtualFrame.critical"
-					: lane === "post-paint"
-						? "virtualFrame.postPaint"
-						: "virtualFrame.idle",
-			);
 		}
 	}
 

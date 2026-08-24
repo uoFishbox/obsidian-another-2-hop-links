@@ -106,14 +106,9 @@ const workerHarness = vi.hoisted(() => {
 			client.removeFileContents.mockReset();
 			client.filter.mockReset();
 			client.terminate.mockReset();
-			ripgrepHarness.search.mockReset();
 		},
 	};
 });
-
-const ripgrepHarness = vi.hoisted(() => ({
-	search: vi.fn(),
-}));
 
 const fileContentIndexHarness = vi.hoisted(() => {
 	const state = {
@@ -142,17 +137,6 @@ vi.mock("../searchWorkerClient.js", () => ({
 		return workerHarness.client;
 	}),
 }));
-
-vi.mock("../ripgrepContentSearch.js", async () => {
-	const actual = await vi.importActual<typeof import("../ripgrepContentSearch")>(
-		"../ripgrepContentSearch",
-	);
-
-	return {
-		...actual,
-		searchRipgrepContentByTerm: ripgrepHarness.search,
-	};
-});
 
 vi.mock("../useFileContentIndex.svelte.js", () => ({
 	useFileContentIndex: () => ({
@@ -731,51 +715,6 @@ describe("useWorkerSearchSession", () => {
 			paths: ["notes/alpha.md"],
 		});
 		view.unmount();
-	});
-
-	it("gets ripgrep match positions through the session API", async () => {
-		const targetFile = { path: "notes/target.md" } as never;
-		ripgrepHarness.search.mockResolvedValue({
-			matchesByTerm: new Map([["needle", new Set(["notes/target.md"])]]),
-			previewByPath: new Map(),
-			positionByPath: new Map([
-				[
-					"notes/target.md",
-					{
-						start: { line: 2, col: 4, offset: -1 },
-						end: { line: 2, col: 10, offset: -1 },
-					},
-				],
-			]),
-		});
-
-		render(UseWorkerSearchSessionHarness, {
-			props: {
-				app: {} as never,
-				query: "needle",
-				enabled: true,
-				matchScope: "title-and-content",
-				contentSearchBackend: "ripgrep",
-				files: [targetFile],
-				dataset: [
-					{
-						key: "target",
-						searchText: "plain title",
-						targetFilePath: "notes/target.md",
-					},
-				],
-			},
-		});
-
-		await waitFor(() => {
-			expect(screen.getByTestId("matched-state")).toHaveTextContent("target");
-		});
-		expect(screen.getByTestId("first-match-position")).toHaveTextContent(
-			JSON.stringify({
-				start: { line: 2, col: 4, offset: -1 },
-				end: { line: 2, col: 10, offset: -1 },
-			}),
-		);
 	});
 
 	it("cleans up the partial sync timer on destroy", async () => {

@@ -1,7 +1,6 @@
 import { fireEvent, render } from "@testing-library/svelte";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { DEFAULT_SETTINGS } from "features/settings/model";
-import { getTwoHopCardCounts } from "infrastructure/debug/twoHopCardCountRegistry";
 import type { ApplicationUiState } from "application/stores/ApplicationUiState.svelte";
 import type { CardRenderModel } from "ui/components/items/cardRenderModel";
 import type { LinkContext } from "ui/context/linkContext";
@@ -328,12 +327,6 @@ describe("TwoHopVirtualGrid component", () => {
 			expect(candidate).not.toBeNull();
 			return candidate!;
 		});
-		expect(getTwoHopCardCounts(root)).toEqual({
-			header: 1,
-			item: 2,
-			loadMore: 1,
-			total: 4,
-		});
 		await fireEvent.click(button);
 		expect(loadMoreSection).toHaveBeenCalledWith("section");
 
@@ -346,12 +339,6 @@ describe("TwoHopVirtualGrid component", () => {
 				root.shadowRoot?.querySelector(".cosense-card-links__load-more-button"),
 			).toBeNull(),
 		);
-		expect(getTwoHopCardCounts(root)).toEqual({
-			header: 1,
-			item: 3,
-			loadMore: 0,
-			total: 4,
-		});
 	});
 
 	it("clears the stale card model when a physical slot rebinds to another item", async () => {

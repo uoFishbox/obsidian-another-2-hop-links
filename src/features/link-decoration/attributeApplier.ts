@@ -1,8 +1,4 @@
-export interface AttributeApplierOptions {
-	enableDebugLog?: boolean;
-}
-
-export interface AttributeOperationOptions extends AttributeApplierOptions {
+export interface AttributeOperationOptions {
 	attrName: string;
 	attrValue: string;
 	shouldApply: boolean;
@@ -35,13 +31,9 @@ export function applyAttributeToElements(
 export function clearAttributeFromContainer(
 	container: HTMLElement,
 	attrName: string,
-	options: AttributeApplierOptions = {},
 ): void {
 	const elements = container.querySelectorAll<HTMLElement>(`[${attrName}]`);
-	removeAttributeFromElements(elements, {
-		attrName,
-		enableDebugLog: options.enableDebugLog,
-	});
+	removeAttributeFromElements(elements, { attrName });
 }
 
 function addAttributeToElement(
@@ -57,7 +49,7 @@ function addAttributeToElement(
 
 function removeAttributeFromElement(
 	element: HTMLElement,
-	options: Pick<AttributeOperationOptions, "attrName" | "enableDebugLog">,
+	options: Pick<AttributeOperationOptions, "attrName">,
 ): void {
 	if (!element.hasAttribute(options.attrName)) {
 		return;
@@ -77,7 +69,7 @@ function addAttributeToElements(
 
 function removeAttributeFromElements(
 	elements: Iterable<HTMLElement>,
-	options: Pick<AttributeOperationOptions, "attrName" | "enableDebugLog">,
+	options: Pick<AttributeOperationOptions, "attrName">,
 ): void {
 	for (const el of elements) {
 		removeAttributeFromElement(el, options);

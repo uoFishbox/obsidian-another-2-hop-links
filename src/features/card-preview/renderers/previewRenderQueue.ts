@@ -1,5 +1,3 @@
-import { recordCCLDevMeasurement } from "infrastructure/debug/CCLDevMeasurements";
-
 const MAX_TASKS_PER_DRAIN = 4;
 const MAX_DRAIN_CPU_MS = 2;
 const ANIMATION_FRAME_WATCHDOG_MS = 100;
@@ -145,9 +143,6 @@ export function createPreviewRenderQueue(
 			schedulingWindow &&
 			typeof schedulingWindow.requestAnimationFrame === "function"
 		) {
-			if (process.env.NODE_ENV !== "production") {
-				recordCCLDevMeasurement("preview.renderScheduler.animationFrame");
-			}
 			try {
 				const frameHandle = schedulingWindow.requestAnimationFrame(runOnce);
 				const cancelFrame = (): void => {

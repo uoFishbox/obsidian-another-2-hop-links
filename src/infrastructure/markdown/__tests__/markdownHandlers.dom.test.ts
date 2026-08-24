@@ -1,5 +1,4 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
-import { setEnableLogging } from "shared/logging/logger";
+import { describe, expect, it, vi } from "vitest";
 import { markdownPostProcessor } from "../markdownHandlers";
 
 function createMockElement(innerTextValue: string) {
@@ -60,47 +59,13 @@ function assertCoreEffects(
 }
 
 describe("markdownPostProcessor", () => {
-	afterEach(() => {
-		setEnableLogging(false);
-		vi.restoreAllMocks();
-	});
-
-	it("does not read rendered markdown text when logging is disabled", async () => {
-		setEnableLogging(false);
+	it("registers, waits for indexing, and decorates without reading text", async () => {
 		const { el, innerText } = createMockElement("private note body");
 		const deps = createPostProcessorDependencies();
 
 		await runPostProcessor(el, deps);
 
 		expect(innerText).not.toHaveBeenCalled();
-		assertCoreEffects(el, deps);
-	});
-
-	it("reads rendered markdown text when logging is enabled", async () => {
-		setEnableLogging(true);
-		vi.spyOn(console, "log").mockImplementation(() => {});
-		const { el, innerText } = createMockElement("private note body");
-		const deps = createPostProcessorDependencies();
-
-		await runPostProcessor(el, deps);
-
-		expect(innerText).toHaveBeenCalledTimes(1);
-		expect(console.log).toHaveBeenCalled();
-		const calls = (console.log as any).mock.calls as unknown[][];
-		const allArgs = calls.flat();
-		expect(
-			allArgs.some(
-				(arg) => typeof arg === "string" && arg.includes("notes/private.md"),
-			),
-		).toBe(true);
-		expect(
-			allArgs.some(
-				(arg) =>
-					typeof arg === "object" &&
-					arg !== null &&
-					(arg as any).text === "private note body",
-			),
-		).toBe(true);
 		assertCoreEffects(el, deps);
 	});
 });

@@ -1,17 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const { getActiveInlineContainerSpy, loggerSpy } = vi.hoisted(() => ({
+const { getActiveInlineContainerSpy } = vi.hoisted(() => ({
 	getActiveInlineContainerSpy: vi.fn(),
-	loggerSpy: vi.fn(),
 }));
 
 vi.mock("ui/shared/dom/domUtils", () => ({
 	getActiveInlineContainer: getActiveInlineContainerSpy,
-}));
-
-vi.mock("shared/logging/logger", () => ({
-	enableLogging: false,
-	logger: loggerSpy,
 }));
 
 vi.mock("obsidian", () => {
@@ -77,7 +71,6 @@ function createPlugin(displayMode: "editor-inline" | "hybrid" | "sidebar") {
 describe("MarkdownViewPatcher", () => {
 	beforeEach(() => {
 		getActiveInlineContainerSpy.mockReset();
-		loggerSpy.mockReset();
 	});
 
 	afterEach(() => {

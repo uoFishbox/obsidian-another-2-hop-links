@@ -1,6 +1,5 @@
 import { TFile, TFolder, debounce, normalizePath } from "obsidian";
 import {
-	PLUGIN_NAME,
 	INDEXING_DEBOUNCE_DELAY,
 	INDEX_LINK_CAPABLE_EXTENSIONS,
 } from "../../appConstants";
@@ -8,7 +7,6 @@ import type { IncrementalFileChange } from "core/indexing/types/IndexTypes";
 import { FileChangeQueue } from "core/indexing/index-service/FileChangeQueue";
 import type { IndexingService } from "core/indexing/index-service/IndexingService";
 import type { PluginHost } from "types/pluginHost";
-import { enableLogging, logger } from "shared/logging/logger";
 import { InitialScanChangeRecorder } from "./InitialScanChangeRecorder";
 
 type InitialFullScanState = "pending" | "running" | "failed" | "completed";
@@ -89,7 +87,6 @@ export class IndexUpdateQueue {
 		if (this.destroyed) {
 			return;
 		}
-		if (enableLogging) logger(`[EventManager] Index update requested for: ${path}`);
 		this.recordObservedChange({ type: "modify", path });
 	}
 
@@ -131,10 +128,6 @@ export class IndexUpdateQueue {
 				if (!INDEX_LINK_CAPABLE_EXTENSIONS.has(file.extension.toLowerCase())) {
 					return;
 				}
-				if (enableLogging)
-					logger(
-						`[EventManager] ${file.path}: Metadata changed, queueing index update`,
-					);
 				this.recordObservedChange({
 					type: "modify",
 					path: file.path,
@@ -147,9 +140,6 @@ export class IndexUpdateQueue {
 		if (this.destroyed) {
 			return;
 		}
-		if (enableLogging)
-			logger("[EventManager] Registering vault file system listeners");
-
 		this.plugin.registerEvent(
 			this.plugin.app.vault.on("rename", (file, oldPath) => {
 				if (this.destroyed) {
@@ -162,18 +152,10 @@ export class IndexUpdateQueue {
 					return;
 				}
 				if (file instanceof TFolder) {
-					if (enableLogging)
-						logger(
-							`[EventManager] Folder renamed: ${oldPath} -> ${file.path}, queueing descendant rename events`,
-						);
 					this.queueFolderRename(file, oldPath);
 					return;
 				}
 
-				if (enableLogging)
-					logger(
-						`[EventManager] File renamed: ${oldPath} -> ${file.path}, queueing rename event`,
-					);
 				this.recordObservedChange({
 					type: "rename",
 					oldPath,
@@ -190,10 +172,6 @@ export class IndexUpdateQueue {
 				if (!(file instanceof TFile)) {
 					return;
 				}
-				if (enableLogging)
-					logger(
-						`[EventManager] File created: ${file.path}, queueing create event`,
-					);
 				this.recordObservedChange({
 					type: "create",
 					path: file.path,
@@ -344,8 +322,6 @@ export class IndexUpdateQueue {
 			if (this.destroyed) {
 				return;
 			}
-			if (enableLogging)
-				logger(`${PLUGIN_NAME}: Detailed backlinks map built (Initial)`);
 			this.initialFullScanState = "completed";
 			this.resolveInitialFullScanReady?.();
 			this.resolveInitialFullScanReady = undefined;
@@ -390,21 +366,9 @@ export class IndexUpdateQueue {
 					(path) => this.fileExists(path),
 					(path) => this.shouldIndexPath(path),
 				);
-
-				if (enableLogging) {
-					logger(
-						`[IndexUpdateQueue] Initial catch-up: applying ${changes.length} changes after full scan`,
-					);
-				}
-
 				if (changes.length > 0) {
 					await this.indexingService.applyFileChangesTimeSliced(changes);
 				}
-			}
-			if (enableLogging) {
-				logger(
-					"[IndexUpdateQueue] Initial catch-up: all observed changes applied",
-				);
 			}
 		} finally {
 			this.isProcessingPendingChanges = false;

@@ -1,8 +1,4 @@
 import { describe, expect, it, vi } from "vitest";
-import {
-	getCCLDevMeasurementSnapshot,
-	resetCCLDevMeasurements,
-} from "infrastructure/debug/CCLDevMeasurements";
 import { createFlatGridCellSource } from "../cellSource";
 import { computeFlatGridLayout } from "ui/virtualization/public";
 import type { FlatGridLogicalCell } from "../logicalCell";
@@ -171,9 +167,6 @@ describe("VirtualListEngine performance contracts", () => {
 			rowSlotAllocator,
 		});
 		const mountedRows = mounted.rowsInMountedRange.length;
-		const columns = rowModel.layout.columns;
-
-		resetCCLDevMeasurements();
 		for (let frame = 1; frame <= NO_OP_MEASUREMENTS; frame += 1) {
 			mounted = buildMountedFlatGridCells({
 				rowModel,
@@ -188,17 +181,5 @@ describe("VirtualListEngine performance contracts", () => {
 
 		expect(mounted.rowsInMountedRange).toHaveLength(mountedRows);
 		expect(getRow).toHaveBeenCalledTimes(mountedRows + NO_OP_MEASUREMENTS);
-		const counters = getCCLDevMeasurementSnapshot().counters;
-		expect(counters["virtualGrid.buildMountedRows"].count).toBe(NO_OP_MEASUREMENTS);
-		expect(counters["virtualGrid.contiguousSlotPool.apply"].count).toBe(
-			NO_OP_MEASUREMENTS,
-		);
-		expect(counters["virtualGrid.residentSlotPool.changedSlots"].count).toBe(
-			NO_OP_MEASUREMENTS,
-		);
-		expect(counters["virtualGrid.rowShellCreated"].count).toBe(NO_OP_MEASUREMENTS);
-		expect(counters["virtualGrid.cellShellCreated"].count).toBe(
-			NO_OP_MEASUREMENTS * columns,
-		);
 	});
 });

@@ -74,19 +74,10 @@ export type TranslationKey =
 	| "frontmatterKeyCreationDateDesc"
 	| "frontmatterKeyModificationDate"
 	| "frontmatterKeyModificationDateDesc"
-	| "integrationAdvancedSettings"
-	| "enableLogging"
-	| "enableLoggingDesc"
 	| "enableSearchArrowUpToEditorBottom"
 	| "enableSearchArrowUpToEditorBottomDesc"
 	| "enableEditorArrowDownToSearchInput"
 	| "enableEditorArrowDownToSearchInputDesc"
-	| "enableAdvancedCanvasIntegration"
-	| "enableAdvancedCanvasIntegrationDesc"
-	| "enableRipgrepContentSearch"
-	| "enableRipgrepContentSearchDesc"
-	| "ripgrepExecutablePath"
-	| "ripgrepExecutablePathDesc"
 	| "belowEditor"
 	| "sidebar"
 	| "hybrid"
@@ -98,7 +89,6 @@ export type TranslationKey =
 	| "showMenu"
 	| "tags"
 	| "canvas"
-	| "experimentalFeatures"
 	| "card";
 
 const translations: Record<Language, Record<TranslationKey, string>> = {
@@ -205,9 +195,6 @@ const translations: Record<Language, Record<TranslationKey, string>> = {
 		frontmatterKeyModificationDate: "Frontmatter key to use for modification date",
 		frontmatterKeyModificationDateDesc:
 			"If specified, use the value of this key instead of the file's modification date (e.g., updated). If empty, use the file's modification date.",
-		integrationAdvancedSettings: "Integration and Advanced Settings",
-		enableLogging: "Enable logging",
-		enableLoggingDesc: "Output debug logs to the console. May affect performance.",
 		enableSearchArrowUpToEditorBottom: "ArrowUp from search moves to editor bottom",
 		enableSearchArrowUpToEditorBottomDesc:
 			"When enabled, pressing ArrowUp in the search bar focuses the bottom of the inline editor. If that is not available, nothing happens.",
@@ -215,14 +202,6 @@ const translations: Record<Language, Record<TranslationKey, string>> = {
 			"ArrowDown from editor bottom moves to search",
 		enableEditorArrowDownToSearchInputDesc:
 			"When enabled, pressing ArrowDown at the bottom of the inline editor focuses the search bar instead of moving the cursor down.",
-		enableAdvancedCanvasIntegration: "Advanced Canvas integration",
-		enableAdvancedCanvasIntegrationDesc:
-			"Opt in to the experimental Advanced Canvas internal-link integration. If unavailable, Obsidian behavior is left unchanged.",
-		enableRipgrepContentSearch: "Use ripgrep for full-text search",
-		enableRipgrepContentSearchDesc:
-			"Use ripgrep for content search on the desktop app. Falls back to the built-in search when unavailable.",
-		ripgrepExecutablePath: "ripgrep executable path",
-		ripgrepExecutablePathDesc: "Optional. Leave empty to use rg from PATH.",
 		belowEditor: "Below editor",
 		sidebar: "Sidebar",
 		hybrid: "Hybrid",
@@ -236,7 +215,6 @@ const translations: Record<Language, Record<TranslationKey, string>> = {
 		tags: "Tags",
 		canvas: "Canvas",
 		card: "Card",
-		experimentalFeatures: "Experimental Features",
 	},
 	ja: {
 		language: "言語",
@@ -340,24 +318,12 @@ const translations: Record<Language, Record<TranslationKey, string>> = {
 		frontmatterKeyModificationDate: "更新日に使用するフロントマターキー",
 		frontmatterKeyModificationDateDesc:
 			"指定した場合、ファイルの更新日の代わりにこのキーの値を使用します（例: updated）。空の場合、ファイルの更新日を使用します。",
-		integrationAdvancedSettings: "統合と詳細設定",
-		enableLogging: "ログを有効化",
-		enableLoggingDesc:
-			"デバッグログをコンソールに出力します。パフォーマンスに影響する可能性があります。",
 		enableSearchArrowUpToEditorBottom: "検索欄のArrowUpでエディタ最下行へ移動",
 		enableSearchArrowUpToEditorBottomDesc:
 			"有効にすると、検索欄でArrowUpを押したときにインラインエディタの最下行へフォーカスします。利用可能なエディタがない場合は何もしません。",
 		enableEditorArrowDownToSearchInput: "エディタ最下行のArrowDownで検索欄へ移動",
 		enableEditorArrowDownToSearchInputDesc:
 			"有効にすると、インラインエディタの最下行でArrowDownを押したときにカーソルを下げる代わりに検索欄へフォーカスします。",
-		enableAdvancedCanvasIntegration: "Advanced Canvas 連携",
-		enableAdvancedCanvasIntegrationDesc:
-			"実験的な Advanced Canvas 内部リンク連携を有効化します。利用できない場合は Obsidian 標準挙動のままです。",
-		enableRipgrepContentSearch: "全文検索に ripgrep を使用",
-		enableRipgrepContentSearchDesc:
-			"デスクトップ版で content 検索に ripgrep を使用します。利用できない場合は内蔵検索にフォールバックします。",
-		ripgrepExecutablePath: "ripgrep 実行ファイルのパス",
-		ripgrepExecutablePathDesc: "任意です。空の場合は PATH 上の rg を使用します。",
 		belowEditor: "エディタの下",
 		sidebar: "サイドバー",
 		hybrid: "ハイブリッド",
@@ -371,7 +337,6 @@ const translations: Record<Language, Record<TranslationKey, string>> = {
 		tags: "タグ",
 		canvas: "Canvas",
 		card: "カード",
-		experimentalFeatures: "実験的機能",
 	},
 };
 

@@ -8,10 +8,6 @@ import {
 	type MountedVirtualCell,
 } from "ui/virtualization/public";
 import type { TwoHopRowModel, TwoHopVirtualCell } from "./rowModel";
-import {
-	markCCLDevPerformance,
-	recordCCLDevMeasurement,
-} from "infrastructure/debug/CCLDevMeasurements";
 
 export interface MountedTwoHopCell extends MountedVirtualCell {
 	readonly key: LogicalCellKey;
@@ -39,7 +35,6 @@ export interface BuildMountedTwoHopRowsParams {
 export function buildMountedTwoHopRows(
 	params: BuildMountedTwoHopRowsParams,
 ): MountedTwoHopBuild {
-	markCCLDevPerformance("ccl:range-build-start");
 	const { rowModel, rowSlotAllocator } = params;
 	const mountedRows = buildMountedGridRows<TwoHopVirtualCell, MountedTwoHopCell>({
 		rowModel,
@@ -51,7 +46,6 @@ export function buildMountedTwoHopRows(
 			createMountedCell(cell, physicalCellSlot),
 	});
 
-	recordCCLDevMeasurement("virtualGrid.buildMountedRows");
 	const build: MountedTwoHopBuild = {
 		get cells() {
 			return mountedRows.cells;
@@ -61,7 +55,6 @@ export function buildMountedTwoHopRows(
 		poolCapacity: rowSlotAllocator.capacity,
 		rowModel,
 	};
-	markCCLDevPerformance("ccl:range-build-end");
 	return build;
 }
 
@@ -69,7 +62,6 @@ function createMountedCell(
 	cell: TwoHopVirtualCell,
 	physicalCellSlot: number,
 ): MountedTwoHopCell {
-	recordCCLDevMeasurement("virtualGrid.cellShellCreated");
 	return {
 		key: logicalCellKey(cell.logicalKey),
 		physicalCellSlot,

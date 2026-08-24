@@ -1,5 +1,4 @@
 <script lang="ts">
-	import { onDestroy, onMount } from "svelte";
 	import InteractiveSectionHeader from "presentation/obsidian/interactions/InteractiveSectionHeader.svelte";
 	import Icon from "ui/primitives/Icon.svelte";
 	import LinkItem from "ui/components/common/LinkItem.svelte";
@@ -11,8 +10,6 @@
 	import type { IconName } from "ui/shared/icons/iconRegistry";
 	import type { TwoHopVirtualCell } from "features/two-hop/runtime/virtual-grid/rowModel";
 	import type { TwoHopSectionModel } from "features/two-hop/ui/twoHopSectionModel";
-	import { recordCCLDevMeasurement } from "infrastructure/debug/CCLDevMeasurements";
-	import { getDebugDisableCardDomPreview } from "../../../appConstants";
 
 	interface Props {
 		cell: TwoHopVirtualCell;
@@ -35,20 +32,11 @@
 	let cardModel = $state.raw<CardShellModel | undefined>(undefined);
 	let boundLogicalKey = cell.logicalKey;
 
-	onMount(() => {
-		recordCCLDevMeasurement("twoHop.cellBody.mount");
-	});
-
-	onDestroy(() => {
-		recordCCLDevMeasurement("twoHop.cellBody.unmount");
-	});
-
 	$effect(() => {
 		const nextLogicalKey = cell.logicalKey;
 		if (nextLogicalKey !== boundLogicalKey) {
 			boundLogicalKey = nextLogicalKey;
 			cardModel = undefined;
-			recordCCLDevMeasurement("twoHop.cellBody.rebind");
 		}
 
 		if (cell.kind !== "item") {
@@ -155,9 +143,9 @@
 		searchQuery={model?.searchQuery ?? ""}
 	>
 		{#snippet children()}
-			{#if model && !getDebugDisableCardDomPreview() && model.item.type === "newLink" && !model.targetFile}
+			{#if model && model.item.type === "newLink" && !model.targetFile}
 				<UnresolvedPreviewPlaceholder />
-			{:else if model && !getDebugDisableCardDomPreview() && model.targetFile && previewHostEnabled}
+			{:else if model && model.targetFile && previewHostEnabled}
 				<div
 					use:previewHost={previewKey}
 					class="cosense-card-links__box-preview"

@@ -5,7 +5,6 @@ import type {
 	VirtualRowModel,
 } from "../model/types";
 import type { VirtualVisibilityPolicy } from "../model/ranges";
-import { recordCCLDevMeasurement } from "infrastructure/debug/CCLDevMeasurements";
 export type ScrollWindowIdentity = object | string | number | symbol;
 
 export interface StableScrollTopBand {
@@ -207,36 +206,21 @@ export function createVirtualScrollWindowRangeResolver<
 			if (measurementRowModel.rowCount === 0) {
 				out.min = Number.NEGATIVE_INFINITY;
 				out.max = Number.POSITIVE_INFINITY;
-				if (process.env.NODE_ENV !== "production") {
-					recordCCLDevMeasurement("virtualScroll.coverageBand.emptyData");
-				}
 			} else if (viewportHeight > 0 && localScrollTop + viewportHeight <= 0) {
 				out.min = Number.NEGATIVE_INFINITY;
 				out.max = -viewportHeight;
-				if (process.env.NODE_ENV !== "production") {
-					recordCCLDevMeasurement("virtualScroll.coverageBand.emptyAbove");
-				}
 			} else if (
 				viewportHeight > 0 &&
 				localScrollTop >= measurementRowModel.totalHeight
 			) {
 				out.min = measurementRowModel.totalHeight;
 				out.max = Number.POSITIVE_INFINITY;
-				if (process.env.NODE_ENV !== "production") {
-					recordCCLDevMeasurement("virtualScroll.coverageBand.emptyBelow");
-				}
 			} else {
 				out.min = Number.POSITIVE_INFINITY;
 				out.max = Number.NEGATIVE_INFINITY;
-				if (process.env.NODE_ENV !== "production") {
-					recordCCLDevMeasurement("virtualScroll.coverageBand.invalid");
-				}
 			}
 		} else {
 			if (!measurementRowModel.findMountedCoverageScrollTopBandInto) {
-				if (process.env.NODE_ENV !== "production") {
-					recordCCLDevMeasurement("virtualScroll.coverageBand.invalid");
-				}
 				return undefined;
 			}
 			measurementRowModel.findMountedCoverageScrollTopBandInto(out, {
@@ -244,9 +228,6 @@ export function createVirtualScrollWindowRangeResolver<
 				mounted,
 				requiredOverscanPx: 0,
 			});
-			if (process.env.NODE_ENV !== "production" && !(out.min < out.max)) {
-				recordCCLDevMeasurement("virtualScroll.coverageBand.invalid");
-			}
 		}
 		out.min += sectionTop;
 		out.max += sectionTop;

@@ -1,4 +1,3 @@
-import { recordCCLDevMeasurement } from "infrastructure/debug/CCLDevMeasurements";
 import { getOptionalOwnerWindow } from "ui/shared/dom/realmSafeDom";
 import {
 	createVirtualScrollWindowRangeResolver,
@@ -190,7 +189,6 @@ export function createVirtualMeasurementRuntime<
 	let observedScrollGeneration = 0;
 	let hasPendingObservedScrollTop = false;
 	let isObservedScrollActive = false;
-	let pendingScrollMeasurementReason: VirtualScrollMeasurementReason | null = null;
 
 	function invalidateViewportMeasurement(): void {
 		measurement.viewportHeight = 0;
@@ -247,10 +245,6 @@ export function createVirtualMeasurementRuntime<
 		nextMeasurement: VirtualMeasurement,
 		context: TContext,
 	): VirtualMeasurementApplicationResult {
-		if (process.env.NODE_ENV !== "production") {
-			recordCCLDevMeasurement("virtualScroll.applyScrollMeasurement");
-		}
-
 		let mountedMeasurement: MountedScrollWindowMeasurement | null = null;
 		let rangedMeasurement: RangedScrollWindowMeasurement | null = null;
 		let resolvedRanges: VirtualRanges | undefined;
@@ -269,22 +263,11 @@ export function createVirtualMeasurementRuntime<
 			scrollCoverage.reset();
 		}
 
-		if (process.env.NODE_ENV !== "production") {
-			recordCCLDevMeasurement("virtualScroll.rangeMeasurementApplied");
-		}
 		const result = engine.applyRangeMeasurement(
 			nextMeasurement,
 			context,
 			resolvedRanges,
 		);
-		if (process.env.NODE_ENV !== "production" && result.kind === "stable") {
-			recordCCLDevMeasurement(
-				result.updateKind === "reused"
-					? "virtualScroll.rangeMeasurementReused"
-					: "virtualScroll.rangeMeasurementChanged",
-			);
-		}
-
 		if (result.kind !== "stable") {
 			scrollCoverage.reset();
 			return "unstable";
@@ -452,11 +435,6 @@ export function createVirtualMeasurementRuntime<
 	): VirtualMeasurementResult {
 		const isReasonOnly = typeof optionsOrReason === "string";
 		const forcePublish = isReasonOnly ? false : optionsOrReason.forcePublish;
-		const resolvedReason =
-			(isReasonOnly ? optionsOrReason : optionsOrReason.reason) ??
-			pendingScrollMeasurementReason ??
-			undefined;
-		pendingScrollMeasurementReason = null;
 		const rootEl = getRootEl();
 		if (!getOptionalOwnerWindow(rootEl ?? measurement.scrollContainerEl)) {
 			return SKIPPED_NO_WINDOW;
@@ -496,24 +474,7 @@ export function createVirtualMeasurementRuntime<
 				scrollMeasurement.isScrollActive,
 			)
 		) {
-			if (process.env.NODE_ENV !== "production") {
-				recordCCLDevMeasurement(
-					"virtualScroll.applyScrollMeasurement.skippedUnchanged",
-				);
-			}
 			return SKIPPED_UNCHANGED_SCROLL;
-		}
-
-		if (process.env.NODE_ENV !== "production" && resolvedReason) {
-			recordCCLDevMeasurement(
-				resolvedReason === "scroll-coverage-miss"
-					? "virtualScroll.applyScrollMeasurement.scrollCoverageMiss"
-					: resolvedReason === "scroll-idle"
-						? "virtualScroll.applyScrollMeasurement.scrollIdle"
-						: resolvedReason === "data-change"
-							? "virtualScroll.applyScrollMeasurement.dataChange"
-							: "virtualScroll.applyScrollMeasurement.postLayout",
-			);
 		}
 
 		markVirtualScrollMeasurementRun();
@@ -585,7 +546,6 @@ export function createVirtualMeasurementRuntime<
 			return;
 		}
 
-		pendingScrollMeasurementReason = "post-layout";
 		scheduleScrollMeasurement();
 	}
 

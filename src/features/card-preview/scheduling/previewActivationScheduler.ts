@@ -1,8 +1,4 @@
-import {
-	getDebugDisableCardDomPreview,
-	DEFAULT_PREVIEW_ACTIVATIONS_PER_SECOND,
-} from "../../../appConstants";
-import { recordCCLDevMeasurement } from "infrastructure/debug/CCLDevMeasurements";
+import { DEFAULT_PREVIEW_ACTIVATIONS_PER_SECOND } from "../../../appConstants";
 import { isScrollActivityActive } from "ui/shared/scroll/scrollActivity";
 import {
 	readVirtualScrollMeasurementEpoch,
@@ -233,11 +229,6 @@ function getOrCreatePartition(
 		coordinator,
 		taskKeyPrefix: "preview:activation-drain",
 		getWindow: state.getWindow,
-		onAnimationFrameScheduled: () => {
-			if (process.env.NODE_ENV !== "production") {
-				recordCCLDevMeasurement("preview.activationScheduler.animationFrame");
-			}
-		},
 		createPartition: (driver, partitionCoordinator) => ({
 			coordinator: partitionCoordinator,
 			driver,
@@ -533,10 +524,6 @@ function drainPartitionScopes(
 			continue;
 		}
 
-		if (scrolling && process.env.NODE_ENV !== "production") {
-			recordCCLDevMeasurement("preview.activationDuringScroll");
-		}
-
 		settleRequest(schedulerState, request, true);
 		schedulerState.tokenState = consumePreviewScheduleToken(
 			schedulerState.tokenState,
@@ -623,7 +610,7 @@ function requestQueuedPreviewActivationForState(
 	scope: PreviewActivationScope,
 	onActivated?: () => void,
 ): PreviewActivationHandle {
-	if (schedulerState.disposed || getDebugDisableCardDomPreview()) {
+	if (schedulerState.disposed) {
 		return createActivationHandle(key, undefined);
 	}
 	return enqueuePreviewActivationRequest(schedulerState, key, scope, onActivated);

@@ -44,12 +44,7 @@
 		resolveItemInteractionDescriptor={(model) => model.interactionDescriptor}
 	>
 		{#snippet item({ item, previewKey })}
-			<ViewItemCard
-				item={item.item}
-				settings={applicationStore.settings}
-				model={item}
-				{previewKey}
-			/>
+			<ViewItemCard model={item} {previewKey} />
 		{/snippet}
 	</FlatCardGrid>
 </div>

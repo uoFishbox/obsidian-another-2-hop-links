@@ -66,4 +66,4 @@
 	);
 </script>
 
-<ViewItemCard {item} {settings} {searchQuery} model={effectiveModel} />
+<ViewItemCard model={effectiveModel} />

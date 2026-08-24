@@ -9,9 +9,7 @@ export type SectionId =
 	| "canvas"
 	| "interaction"
 	| "emptyViewAllNotes"
-	| "dateSortingSettings"
-	| "integrationAdvancedSettings"
-	| "experimental";
+	| "dateSortingSettings";
 
 type SettingOption = {
 	value: string;
@@ -76,11 +74,6 @@ export const SECTION_ORDER: ReadonlyArray<{
 	{ id: "interaction", titleKey: "interaction" },
 	{ id: "emptyViewAllNotes", titleKey: "emptyViewAllNotesSection" },
 	{ id: "dateSortingSettings", titleKey: "dateSortingSettings" },
-	{
-		id: "integrationAdvancedSettings",
-		titleKey: "integrationAdvancedSettings",
-	},
-	{ id: "experimental", titleKey: "experimentalFeatures" },
 ];
 
 export const parsePositiveInteger = (value: string): number | undefined => {

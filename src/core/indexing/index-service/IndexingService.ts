@@ -15,9 +15,7 @@ import type { IIndexingService } from "types/services";
 import {
 	INDEXING_REBUILD_YIELD_INTERVAL_MS,
 	INDEXING_YIELD_INTERVAL_MS,
-	PLUGIN_NAME,
 } from "../../../appConstants";
-import { enableLogging, logger } from "shared/logging/logger";
 import {
 	createEmptyIndexSnapshot,
 	type IncrementalFileChange,
@@ -274,16 +272,8 @@ export class IndexingService implements IIndexingService {
 		options: RebuildOptions,
 		isCurrent: () => boolean,
 	): Promise<void> {
-		if (enableLogging) {
-			logger(
-				"[IndexingService.rebuildBacklinksMapChunked] Starting backlinks map rebuild",
-			);
-		}
 		this.queryEngine.invalidate();
 		this.commonTagsCache = undefined;
-		const shouldLogRebuildTiming =
-			process.env.NODE_ENV !== "production" || enableLogging;
-		const startTime = shouldLogRebuildTiming ? performance.now() : undefined;
 		const includeTagIndex = this.isTagFeatureEnabled();
 		const result = await buildIndexesAsync(
 			this.vault,
@@ -301,10 +291,6 @@ export class IndexingService implements IIndexingService {
 		this.tagIndexStore.replace(
 			includeTagIndex ? result.tagIndex : createEmptyTagIndex(),
 		);
-		this.logRebuildComplete(
-			"[IndexingService.rebuildBacklinksMapChunked] Rebuilt backlinks map with",
-			startTime,
-		);
 		await this.finishFullRebuildTimeSliced(
 			options.yieldFn ?? defaultYieldToMainThread,
 		);
@@ -321,11 +307,6 @@ export class IndexingService implements IIndexingService {
 		changes: IncrementalFileChange[],
 		options: TimeSlicingOptions,
 	): Promise<void> {
-		if (enableLogging) {
-			logger(
-				`[IndexingService.applyFileChangesTimeSliced] Applying ${changes.length} file changes`,
-			);
-		}
 		const timeSlicingOptions = {
 			yieldFn: options.yieldFn ?? defaultYieldToMainThread,
 			yieldIntervalMs: options.yieldIntervalMs ?? INDEXING_YIELD_INTERVAL_MS,
@@ -351,12 +332,6 @@ export class IndexingService implements IIndexingService {
 			this.queryEngine.invalidate(result.cacheInvalidationPaths);
 		}
 
-		if (enableLogging) {
-			logger(
-				"[IndexingService.applyFileChangesTimeSliced] Applied changes complete",
-			);
-		}
-
 		this.bumpIndexVersion();
 		this.notifyDataUpdate({
 			affectedPaths,
@@ -373,17 +348,6 @@ export class IndexingService implements IIndexingService {
 		await yieldToMainThread();
 		this.bumpIndexVersion();
 		this.notifyDataUpdate({ affectsAll: true });
-	}
-
-	private logRebuildComplete(message: string, startTime: number | undefined): void {
-		if (startTime !== undefined) {
-			const duration = performance.now() - startTime;
-			console.log(
-				`[${PLUGIN_NAME}] Backlinks map built: ${this.snapshot.backlinksMap.size} entries in ${duration.toFixed(2)}ms`,
-			);
-		}
-		if (enableLogging)
-			logger(`${message} ${this.snapshot.backlinksMap.size} entries`);
 	}
 
 	private bumpIndexVersion(): void {

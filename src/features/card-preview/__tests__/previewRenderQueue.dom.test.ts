@@ -45,8 +45,6 @@ describe("createPreviewRenderQueue", () => {
 	test("schedules preview rendering on the next animation frame", async () => {
 		const requestIdleCallback = vi.spyOn(window, "requestIdleCallback");
 		const { createPreviewRenderQueue } = await loadQueueModule();
-		const { getCCLDevMeasurementSnapshot } =
-			await import("infrastructure/debug/CCLDevMeasurements");
 		const queue = createPreviewRenderQueue();
 
 		const result = queue.enqueue(async () => "rendered");
@@ -55,11 +53,6 @@ describe("createPreviewRenderQueue", () => {
 		await expect(result).resolves.toBe("rendered");
 		expect(requestIdleCallback).not.toHaveBeenCalled();
 		expect(vi.mocked(requestAnimationFrame)).toHaveBeenCalledTimes(1);
-		expect(
-			getCCLDevMeasurementSnapshot().counters[
-				"preview.renderScheduler.animationFrame"
-			].count,
-		).toBe(1);
 		queue.dispose();
 	});
 

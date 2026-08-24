@@ -40,7 +40,6 @@ export function createStylingService(
 		containerEl: HTMLElement,
 		sourcePath: string,
 	): void {
-		const isCanvas = sourcePath.endsWith(".canvas");
 		const linkNodes =
 			containerEl.querySelectorAll<HTMLAnchorElement>("a.internal-link");
 
@@ -48,8 +47,6 @@ export function createStylingService(
 			containerEl,
 			linkElements: linkNodes,
 			mode: "rendered",
-			shouldLogCanvas: isCanvas,
-			sourcePath,
 		});
 	}
 

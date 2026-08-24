@@ -20,7 +20,6 @@ import {
 	VIEW_TYPE_PRE_CREATE,
 } from "features/pre-creation/ui/PreCreationView";
 import { resolveExpectedPath } from "shared/obsidian/resolveExpectedPath";
-import { enableLogging, logger } from "shared/logging/logger";
 import {
 	isLeafHistoryInternal,
 	type LeafHistoryInternal,
@@ -31,12 +30,6 @@ import { applyPatch } from "infrastructure/capabilities/applyPatch";
 
 type MaterializedTrigger = "file-open" | "vault-create";
 
-type CleanupPhase =
-	| "file-open-immediate"
-	| "file-open-deferred-50ms"
-	| "vault-create-immediate"
-	| "vault-create-deferred-50ms";
-
 export function initWorkspacePatcher(plugin: PluginHost): void {
 	plugin.app.workspace.onLayoutReady(() => {
 		patchWorkspaceOpenLinkText(plugin);
@@ -45,7 +38,7 @@ export function initWorkspacePatcher(plugin: PluginHost): void {
 }
 
 function patchWorkspaceOpenLinkText(plugin: PluginHost): void {
-	const applied = applyPatch(plugin, {
+	applyPatch(plugin, {
 		id: "workspace:openLinkText",
 		target: plugin.app.workspace,
 		method: "openLinkText",
@@ -141,23 +134,6 @@ function patchWorkspaceOpenLinkText(plugin: PluginHost): void {
 									sourcePath,
 									expectedPath: normalizedExpectedPath,
 								});
-								if (enableLogging)
-									logger(
-										`[WorkspacePatcher] Prepared pre-creation state for leaf "${
-											(
-												leaf as WorkspaceLeaf & {
-													id?: string;
-												}
-											).id ?? "<unknown>"
-										}".`,
-										{
-											linktext,
-											sourcePath,
-											expectedPath: normalizedExpectedPath,
-											hasIncomingEState: !!openViewState?.eState,
-										},
-									);
-
 								const viewState: ViewState = {
 									type: VIEW_TYPE_PRE_CREATE,
 									state: {
@@ -180,16 +156,6 @@ function patchWorkspaceOpenLinkText(plugin: PluginHost): void {
 									viewState,
 									preCreationEphemeralState,
 								);
-								if (enableLogging)
-									logger(
-										`[WorkspacePatcher] setViewState completed for pre-creation leaf "${
-											(
-												leaf as WorkspaceLeaf & {
-													id?: string;
-												}
-											).id ?? "<unknown>"
-										}".`,
-									);
 								if (openViewState?.active !== false) {
 									plugin.app.workspace.revealLeaf(leaf);
 								}
@@ -211,10 +177,6 @@ function patchWorkspaceOpenLinkText(plugin: PluginHost): void {
 				return next.call(this, linktext, sourcePath, newLeaf, openViewState);
 			},
 	});
-
-	if (applied) {
-		if (enableLogging) logger("[WorkspacePatcher] Workspace.openLinkText patched.");
-	}
 }
 
 function registerPreCreationHistoryCleanup(plugin: PluginHost): void {
@@ -245,29 +207,13 @@ async function handleMaterializedFile(
 	try {
 		const createdPath = normalizePath(file.path);
 		if (!hasAnyPreCreationBootstrapState()) {
-			if (enableLogging)
-				logger(
-					`[WorkspacePatcher] No pre-creation bootstrap state present. Skipped materialized-file cleanup for "${createdPath}" (${trigger}).`,
-				);
 			return;
 		}
-		if (enableLogging)
-			logger(
-				`[WorkspacePatcher] ${trigger} captured for path: "${createdPath}". Running replacement + history cleanup passes.`,
-			);
 		await replaceMatchingPreCreationLeaves(plugin, file, createdPath, trigger);
 
-		cleanupPreCreationHistoryForPath(
-			plugin,
-			createdPath,
-			getImmediateCleanupPhase(trigger),
-		);
+		cleanupPreCreationHistoryForPath(plugin, createdPath);
 		setTimeout(() => {
-			cleanupPreCreationHistoryForPath(
-				plugin,
-				createdPath,
-				getDeferredCleanupPhase(trigger),
-			);
+			cleanupPreCreationHistoryForPath(plugin, createdPath);
 		}, 50);
 	} catch (error) {
 		console.error(
@@ -275,16 +221,6 @@ async function handleMaterializedFile(
 			error,
 		);
 	}
-}
-
-function getImmediateCleanupPhase(trigger: MaterializedTrigger): CleanupPhase {
-	return trigger === "file-open" ? "file-open-immediate" : "vault-create-immediate";
-}
-
-function getDeferredCleanupPhase(trigger: MaterializedTrigger): CleanupPhase {
-	return trigger === "file-open"
-		? "file-open-deferred-50ms"
-		: "vault-create-deferred-50ms";
 }
 
 async function replaceMatchingPreCreationLeaves(
@@ -315,18 +251,10 @@ async function replaceMatchingPreCreationLeaves(
 	});
 
 	if (replacementTasks.length === 0) {
-		if (enableLogging)
-			logger(
-				`[WorkspacePatcher] No open pre-creation leaves matched "${createdPath}" (${trigger}).`,
-			);
 		return;
 	}
 
 	await Promise.all(replacementTasks);
-	if (enableLogging)
-		logger(
-			`[WorkspacePatcher] Replaced ${replacementTasks.length} pre-creation leaves for "${createdPath}" (${trigger}).`,
-		);
 }
 
 function safeReadLeafViewState(
@@ -358,49 +286,21 @@ function isMatchingPreCreationViewState(
 function cleanupPreCreationHistoryForPath(
 	plugin: PluginHost,
 	createdPath: string,
-	phase: CleanupPhase,
 ): void {
-	let removedCount = 0;
-	let hasInternalHistory = false;
-	if (enableLogging)
-		logger(
-			`[WorkspacePatcher] History cleanup (${phase}) started for "${createdPath}".`,
-		);
-
 	plugin.app.workspace.iterateAllLeaves((leaf) => {
 		const internalHistory = getInternalHistory(leaf);
 		if (!internalHistory) {
 			return;
 		}
 
-		hasInternalHistory = true;
-
 		const filteredBackHistory = internalHistory.backHistory.filter((entry) => {
 			const shouldRemove = isMatchingPreCreationEntry(entry, createdPath);
-			if (shouldRemove) {
-				removedCount++;
-				if (enableLogging)
-					logger(
-						`[WorkspacePatcher] Removing matched pre-creation history entry (${phase}): ${summarizeHistoryEntry(
-							entry,
-						)}`,
-					);
-			}
 			return !shouldRemove;
 		});
 
 		const filteredForwardHistory = internalHistory.forwardHistory.filter(
 			(entry) => {
 				const shouldRemove = isMatchingPreCreationEntry(entry, createdPath);
-				if (shouldRemove) {
-					removedCount++;
-					if (enableLogging)
-						logger(
-							`[WorkspacePatcher] Removing matched pre-creation history entry (${phase}): ${summarizeHistoryEntry(
-								entry,
-							)}`,
-						);
-				}
 				return !shouldRemove;
 			},
 		);
@@ -422,16 +322,6 @@ function cleanupPreCreationHistoryForPath(
 			leafWithInternalHistory.trigger("history-change");
 		}
 	});
-
-	if (!hasInternalHistory) {
-		return;
-	}
-
-	if (removedCount > 0) {
-		return;
-	}
-
-	logHistoryDebugSample(plugin, createdPath, phase);
 }
 
 function getInternalHistory(leaf: WorkspaceLeaf): LeafHistoryInternal | null {
@@ -519,74 +409,4 @@ function asRecord(value: unknown): Record<string, unknown> | null {
 		return null;
 	}
 	return value as Record<string, unknown>;
-}
-
-function summarizeHistoryEntry(entry: NativeHistoryEntry): string {
-	const viewState = extractViewStateFromHistoryEntry(entry);
-	if (!viewState) {
-		return "<unreadable-entry>";
-	}
-
-	const type = typeof viewState.type === "string" ? viewState.type : "<unknown-type>";
-	const stateObj = asRecord(viewState.state);
-	const virtualPath =
-		typeof stateObj?.virtualPath === "string"
-			? normalizePath(stateObj.virtualPath)
-			: "";
-	const expectedPath =
-		typeof stateObj?.expectedPath === "string"
-			? normalizePath(stateObj.expectedPath)
-			: "";
-	const filePath =
-		typeof stateObj?.file === "string" ? normalizePath(stateObj.file) : "";
-
-	if (virtualPath) {
-		return `${type}(virtualPath=${virtualPath})`;
-	}
-	if (expectedPath) {
-		return `${type}(expectedPath=${expectedPath})`;
-	}
-	if (filePath) {
-		return `${type}(file=${filePath})`;
-	}
-	return type;
-}
-
-function logHistoryDebugSample(
-	plugin: PluginHost,
-	createdPath: string,
-	phase: CleanupPhase,
-): void {
-	let sampledLeafCount = 0;
-
-	plugin.app.workspace.iterateAllLeaves((leaf) => {
-		if (sampledLeafCount >= 3) {
-			return;
-		}
-
-		const internalHistory = getInternalHistory(leaf);
-		if (!internalHistory) {
-			return;
-		}
-
-		const backSamples = internalHistory.backHistory
-			.slice(0, 3)
-			.map((entry) => `back:${summarizeHistoryEntry(entry)}`);
-		const forwardSamples = internalHistory.forwardHistory
-			.slice(0, 3)
-			.map((entry) => `forward:${summarizeHistoryEntry(entry)}`);
-		const summary = [...backSamples, ...forwardSamples];
-
-		if (summary.length === 0) {
-			return;
-		}
-
-		sampledLeafCount += 1;
-		if (enableLogging)
-			logger(
-				`[WorkspacePatcher] History sample (${phase}) for "${createdPath}" leaf#${sampledLeafCount}: ${summary.join(
-					" | ",
-				)}`,
-			);
-	});
 }

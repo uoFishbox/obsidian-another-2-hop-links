@@ -1,4 +1,3 @@
-import { recordCCLDevMeasurement } from "infrastructure/debug/CCLDevMeasurements";
 import { DEFAULT_PREVIEW_DOM_COMMITS_PER_SECOND } from "appConstants";
 import { isScrollActivityActive } from "ui/shared/scroll/scrollActivity";
 import type { VirtualFrameCoordinator } from "ui/shared/scheduling/frameCoordinator";
@@ -132,11 +131,6 @@ function getOrCreatePartition(
 		coordinator,
 		taskKeyPrefix: "preview:dom-commit-drain",
 		getWindow: state.getWindow,
-		onAnimationFrameScheduled: () => {
-			if (process.env.NODE_ENV !== "production") {
-				recordCCLDevMeasurement("preview.domCommitScheduler.animationFrame");
-			}
-		},
 		createPartition: (driver, partitionCoordinator) => ({
 			coordinator: partitionCoordinator,
 			driver,
@@ -290,10 +284,6 @@ function drainPartition(
 		if (task.isStale()) {
 			settleTask(state, task, { type: "skipped", reason: "stale" });
 			continue;
-		}
-
-		if (scrolling && process.env.NODE_ENV !== "production") {
-			recordCCLDevMeasurement("preview.domCommitDuringScroll");
 		}
 
 		drainedTasks += 1;

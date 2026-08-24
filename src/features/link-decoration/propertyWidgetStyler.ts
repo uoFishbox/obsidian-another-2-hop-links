@@ -1,7 +1,6 @@
 import type { App, TFile } from "obsidian";
 import type { StylingService } from "features/link-decoration/stylingService";
 import type { CanvasView } from "obsidian-typings";
-import { enableLogging, logger } from "shared/logging/logger";
 import {
 	getMetadataEditorContentEl,
 	getViewFile,
@@ -150,20 +149,14 @@ export function createPropertyWidgetStyler(
 	 * ロード時、Patcherがフックする前にレンダリングされた要素を捕捉する
 	 */
 	function scanAndRegisterAll(app: App): void {
-		if (enableLogging)
-			logger(
-				"[PropertyWidgetStyler] Scanning for existing property widgets across all views...",
-			);
-		let count = 0;
-
 		app.workspace.iterateAllLeaves((leaf) => {
 			const view = leaf.view;
 			if (!view) return;
 
 			const propertiesEl = getMetadataEditorContentEl(view);
 			const file = getViewFile(view);
-			if (propertiesEl && file && registerAndStyleNewWidget(propertiesEl, file)) {
-				count++;
+			if (propertiesEl && file) {
+				registerAndStyleNewWidget(propertiesEl, file);
 			}
 
 			if (view.getViewType() === "canvas") {
@@ -187,18 +180,12 @@ export function createPropertyWidgetStyler(
 					const propertiesEl =
 						nodeEl.querySelector<HTMLElement>(".metadata-container");
 
-					if (propertiesEl && registerAndStyleNewWidget(propertiesEl, file)) {
-						count++;
+					if (propertiesEl) {
+						registerAndStyleNewWidget(propertiesEl, file);
 					}
 				}
 			}
 		});
-
-		if (count > 0 && enableLogging) {
-			logger(
-				`[PropertyWidgetStyler] Registered and styled ${count} existing property widgets.`,
-			);
-		}
 	}
 
 	return {

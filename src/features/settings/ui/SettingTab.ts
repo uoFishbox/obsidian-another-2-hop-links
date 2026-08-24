@@ -6,7 +6,6 @@ import {
 	type SelectOption,
 	type SettingDefinition,
 } from "./sections/settingDefinition";
-import { ADVANCED_SETTING_DEFINITIONS } from "./sections/advancedSettings";
 import { DISPLAY_SETTING_DEFINITIONS } from "./sections/displaySettings";
 import { INTERACTION_SETTING_DEFINITIONS } from "./sections/interactionSettings";
 import { PREVIEW_SETTING_DEFINITIONS } from "./sections/previewSettings";
@@ -16,7 +15,6 @@ const SETTING_DEFINITIONS: ReadonlyArray<SettingDefinition> = [
 	...DISPLAY_SETTING_DEFINITIONS,
 	...PREVIEW_SETTING_DEFINITIONS,
 	...INTERACTION_SETTING_DEFINITIONS,
-	...ADVANCED_SETTING_DEFINITIONS,
 ];
 
 function getOptionLabel(option: SelectOption, lang: Language): string {

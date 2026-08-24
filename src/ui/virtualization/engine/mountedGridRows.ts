@@ -1,4 +1,3 @@
-import { recordCCLDevMeasurement } from "infrastructure/debug/CCLDevMeasurements";
 import type { ResidentRowSlotAllocator } from "ui/virtualization/engine/residentRowPool";
 import { clampRange, type RowRange } from "ui/virtualization/model/rowRange";
 import type {
@@ -104,7 +103,6 @@ export function buildMountedGridRows<TLogicalCell, TCell extends MountedVirtualC
 			);
 		}
 
-		recordCCLDevMeasurement("virtualGrid.rowShellCreated");
 		rowsInMountedRange.push({
 			key: rowIndex,
 			physicalRowSlot,

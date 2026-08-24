@@ -2,10 +2,6 @@ import {
 	markScrollActivityActive,
 	markScrollActivityIdle,
 } from "ui/shared/scroll/scrollActivity";
-import {
-	markCCLDevPerformance,
-	recordCCLDevMeasurement,
-} from "infrastructure/debug/CCLDevMeasurements";
 import type { VirtualScrollMeasurementReason } from "../../runtime/measurementTypes";
 
 const SCROLL_IDLE_MS = 140;
@@ -74,9 +70,6 @@ const finishScrollPhase = (
 
 	markScrollActivityIdle(state.scrollActivitySource);
 	if (refreshDependencies) {
-		if (process.env.NODE_ENV !== "production") {
-			recordCCLDevMeasurement("virtualList.observer.dependencyTask.scheduled");
-		}
 		actions.scheduleDependencyObserverRefresh();
 	}
 	if (measureLayout) {
@@ -133,9 +126,6 @@ export function handleVirtualScrollEvent(
 	state.lastScrollEventAt = readMonotonicTime(state.ownerWindow);
 	const scrollTop = readScrollTop(state.scrollTarget);
 
-	if (process.env.NODE_ENV !== "production") {
-		recordCCLDevMeasurement("virtualList.observer.scrollEvent");
-	}
 	if (!state.isScrolling) {
 		startScrollSession(state, actions);
 	}
@@ -153,15 +143,7 @@ export function handleVirtualScrollEvent(
 	}
 
 	if (actions.isWithinScrollMeasurementRange(scrollTop)) {
-		if (process.env.NODE_ENV !== "production") {
-			recordCCLDevMeasurement("virtualList.observer.coverageHit");
-		}
 		return;
-	}
-
-	if (process.env.NODE_ENV !== "production") {
-		recordCCLDevMeasurement("virtualList.observer.coverageMiss");
-		markCCLDevPerformance("ccl:coverage-miss");
 	}
 	actions.scheduleScrollMeasurement();
 }

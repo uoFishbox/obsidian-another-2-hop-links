@@ -251,12 +251,6 @@
 				: "title-only",
 		getSearchableFiles,
 		buildDataset: buildWorkerDataset,
-		contentSearchBackend: () =>
-			applicationStore.settings?.enableRipgrepContentSearch
-				? "ripgrep"
-				: "worker",
-		ripgrepExecutablePath: () =>
-			applicationStore.settings?.ripgrepExecutablePath || undefined,
 	});
 
 	setAppContext({
@@ -480,8 +474,6 @@
 		>
 			{#snippet item({ item, index, previewKey })}
 				<ViewItemCard
-					{item}
-					settings={applicationStore.settings}
 					model={resolveViewItemCardModel(item, index)}
 					{previewKey}
 				/>

@@ -6,7 +6,6 @@ import type { TwoHopItemModel } from "features/two-hop/ui/twoHopSectionModel";
 import type { TwoHopVirtualCell } from "./rowModel";
 import type { VirtualFrameCoordinator } from "ui/shared/scheduling/frameCoordinator";
 import { createVirtualCardInteractionController } from "ui/interactions/virtualCardInteractionController";
-import { recordCCLDevMeasurement } from "infrastructure/debug/CCLDevMeasurements";
 
 type CardModelConsumer = (model: CardShellModel | undefined) => void;
 type HydrationPriority = "foreground" | "background";
@@ -276,9 +275,6 @@ export function createTwoHopCardHydrator(
 			if (!hydration) break;
 			processed += 1;
 			const current = entries.get(hydration.logicalKey);
-			if (process.env.NODE_ENV !== "production") {
-				recordCCLDevMeasurement("twoHop.resolveItemCardModel.call");
-			}
 			const model = params.resolveCardModel(hydration.item, revision);
 			const previewRenderKeyChanged =
 				previewActive &&

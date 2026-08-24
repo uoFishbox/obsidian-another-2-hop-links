@@ -73,15 +73,11 @@ export interface PluginSettings {
 	enableUnresolvedLinkModal: boolean;
 	enableEmptyViewAllNotesInNewTab: boolean;
 	pinBookmarkedToTopInAllNotes: boolean;
-	enableLogging: boolean;
 	enableUnresolvedLinkDecoration: boolean;
 	enableSearchArrowUpToEditorBottom: boolean;
 	enableEditorArrowDownToSearchInput: boolean;
 	enableProgressiveTwoHopBuild?: boolean;
-	enableAdvancedCanvasIntegration?: boolean;
-	enableRipgrepContentSearch?: boolean;
 	enableContentSearch?: boolean;
-	ripgrepExecutablePath?: string;
 	priorityFrontmatterKeyForPreview?: string;
 	priorityFrontmatterKeyForTitle?: string;
 	maxOutgoingToProcess?: number;

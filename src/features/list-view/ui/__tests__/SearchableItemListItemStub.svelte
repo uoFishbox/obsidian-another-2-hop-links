@@ -1,11 +1,12 @@
 <script lang="ts">
-	import type { ViewItem } from "application/presenters";
+	import type { CardRenderModel } from "ui/components/items/cardRenderModel";
 
 	interface Props {
-		item: ViewItem;
+		model: CardRenderModel;
 	}
 
-	let { item }: Props = $props();
+	let { model }: Props = $props();
+	let item = $derived(model.item);
 	const label = $derived.by(() => {
 		switch (item.type) {
 			case "taggedNote":

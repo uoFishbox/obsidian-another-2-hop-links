@@ -44,17 +44,13 @@ export const DEFAULT_SETTINGS: PluginSettings = {
 	enableUnresolvedLinkModal: true,
 	enableEmptyViewAllNotesInNewTab: true,
 	pinBookmarkedToTopInAllNotes: true,
-	enableLogging: false,
 	enableUnresolvedLinkDecoration: true,
 	enableSearchArrowUpToEditorBottom: true,
 	enableEditorArrowDownToSearchInput: true,
 	priorityFrontmatterKeyForPreview: "",
 	priorityFrontmatterKeyForTitle: "",
 	enableProgressiveTwoHopBuild: true,
-	enableAdvancedCanvasIntegration: false,
-	enableRipgrepContentSearch: false,
 	enableContentSearch: false,
-	ripgrepExecutablePath: "",
 	maxOutgoingToProcess: 0,
 };
 

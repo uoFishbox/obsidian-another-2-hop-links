@@ -12,7 +12,7 @@ if you want to view the source, please visit the github repository of this plugi
 `;
 
 const mode = process.argv[2] ?? "development";
-const prod = mode === "production" || mode === "profile";
+const prod = mode === "production";
 
 const context = await esbuild.context({
 	banner: {
@@ -49,12 +49,10 @@ const context = await esbuild.context({
 	format: "cjs",
 	target: "es2018",
 	define: {
-		"process.env.NODE_ENV": JSON.stringify(
-			prod ? "production" : "development",
-		),
+		"process.env.NODE_ENV": JSON.stringify(prod ? "production" : "development"),
 	},
 	logLevel: "info",
-	sourcemap: mode === "profile" ? "external" : mode === "development" ? "inline" : false,
+	sourcemap: mode === "development" ? "inline" : false,
 	treeShaking: true,
 	outfile: "main.js",
 	minify: mode === "production",

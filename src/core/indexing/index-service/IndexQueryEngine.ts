@@ -13,7 +13,6 @@ import {
 	compactStringSetValues,
 } from "shared/collections/compactStringSet";
 import type { IVault } from "types/obsidian";
-import { enableLogging, logger } from "shared/logging/logger";
 import type { IndexSnapshot } from "../types/IndexTypes";
 
 interface LookupSourceView {
@@ -178,11 +177,6 @@ export class IndexQueryEngine {
 		lookupPaths: string[],
 	): Map<string, boolean> {
 		this.ensureSnapshotCacheScope(snapshot);
-		if (enableLogging)
-			logger(
-				`[IndexingService.isUnresolvedWithSingleBacklinkBatch] Batch checking ${lookupPaths.length} paths`,
-			);
-
 		const results = new Map<string, boolean>();
 		let resolvedCount = 0;
 		for (const path of lookupPaths) {
@@ -193,10 +187,6 @@ export class IndexQueryEngine {
 			}
 		}
 
-		if (enableLogging)
-			logger(
-				`[IndexingService.isUnresolvedWithSingleBacklinkBatch] Found ${resolvedCount}/${lookupPaths.length} unresolved links with single backlink`,
-			);
 		return results;
 	}
 

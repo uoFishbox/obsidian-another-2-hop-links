@@ -36,18 +36,12 @@ describe("PluginSettingsSchema", () => {
 	it("falls back to defaults for invalid boolean and string values", () => {
 		const settings = parsePluginSettings({
 			dedupeCards: "yes",
-			enableLogging: 1,
 			frontmatterKeyCreatedDate: 123,
-			ripgrepExecutablePath: null,
 		});
 
 		expect(settings.dedupeCards).toBe(DEFAULT_SETTINGS.dedupeCards);
-		expect(settings.enableLogging).toBe(DEFAULT_SETTINGS.enableLogging);
 		expect(settings.frontmatterKeyCreatedDate).toBe(
 			DEFAULT_SETTINGS.frontmatterKeyCreatedDate,
-		);
-		expect(settings.ripgrepExecutablePath).toBe(
-			DEFAULT_SETTINGS.ripgrepExecutablePath,
 		);
 	});
 

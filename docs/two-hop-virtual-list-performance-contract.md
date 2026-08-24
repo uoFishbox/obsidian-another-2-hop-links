@@ -1,8 +1,7 @@
 # Two-hop virtual-list performance contract
 
 This document is the structural performance baseline for the retained two-hop
-virtual list. Refactors must preserve these counters and identity guarantees;
-elapsed time is recorded only as a local comparison and is not a CI gate.
+virtual list. Refactors must preserve these identity and workload guarantees.
 
 ## Pipeline
 
@@ -49,30 +48,6 @@ change.
   changes may reconstruct the keyed surface.
 - Interaction descriptors are created on first interaction, then cache hits
   reuse the descriptor while the mounted item and revision remain compatible.
-
-## Diagnostic counters
-
-The relevant development counters are:
-
-- `twoHop.plan.compile`
-- `twoHop.physicalPool.resize`
-- `twoHop.binding.commit`
-- `twoHop.itemBody.mount`
-- `twoHop.interactionDescriptorCache.hit`
-- `twoHop.interactionDescriptorCache.miss`
-- `twoHop.scalarKernel.rowShellCreated`
-- `twoHop.scalarKernel.cellShellCreated`
-- `twoHop.reboundRowSlot`
-- `twoHop.reboundCellSlot`
-
-## Performance recording range
-
-The development command `Benchmark two-hop virtual list scroll (600 frames
-down/up)` emits `twohop-start` and `twohop-end` marks. It also emits a
-`twohop-benchmark` measure spanning only the down/up scroll loops. In the
-Performance panel, select this custom timing range when collecting figures so
-that pre-benchmark settling, post-benchmark settling, console work, and unrelated
-DevTools activity are excluded.
 
 The checked-in baseline is the contract encoded by the tests rather than a
 machine-specific duration. Before the staged refactor, `bun run check`, the 65

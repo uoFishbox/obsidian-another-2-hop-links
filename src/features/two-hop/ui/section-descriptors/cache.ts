@@ -24,7 +24,6 @@ import {
 } from "./createPrimaryDescriptor";
 import { createTagSectionDescriptor } from "./createTagDescriptor";
 import { createNewLinksSectionDescriptor } from "./createNewLinksDescriptor";
-import { recordCCLDevMeasurement } from "infrastructure/debug/CCLDevMeasurements";
 
 export interface ResolveTwoHopSectionsParams {
 	readonly displayData: DisplayData;
@@ -137,7 +136,6 @@ export function createTwoHopSectionPublicationMemo(): TwoHopSectionPublicationMe
 				previousSnapshot &&
 				hasSameResolveSnapshot(previousSnapshot, snapshot)
 			) {
-				recordCacheMeasurement("exactHit");
 				return previousSections;
 			}
 
@@ -175,7 +173,6 @@ export function createTwoHopSectionPublicationMemo(): TwoHopSectionPublicationMe
 			const changed = !hasSameSectionRefs(previousSections, nextSections);
 			previousSnapshot = snapshot;
 			previousSections = changed ? nextSections : previousSections;
-			recordCacheMeasurement(changed ? "miss" : "hit");
 			return previousSections;
 		},
 	};
@@ -396,9 +393,4 @@ function hasSameSectionRefs(
 		current.length === next.length &&
 		current.every((section, index) => section === next[index])
 	);
-}
-
-function recordCacheMeasurement(result: "exactHit" | "hit" | "miss"): void {
-	if (process.env.NODE_ENV === "production") return;
-	recordCCLDevMeasurement(`twoHop.sectionDescriptorIdentityCache.${result}`);
 }

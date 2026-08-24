@@ -5,10 +5,6 @@ import {
 	resetScrollActivityForTests,
 } from "ui/shared/scroll/scrollActivity";
 import {
-	getCCLDevMeasurementSnapshot,
-	resetCCLDevMeasurements,
-} from "infrastructure/debug/CCLDevMeasurements";
-import {
 	createPreviewDomCommitScheduler,
 	type PreviewDomCommitScope,
 	type PreviewDomCommitTask,
@@ -113,7 +109,6 @@ async function countCommits(params: {
 beforeEach(() => {
 	frameIntervalMs = DEFAULT_FRAME_INTERVAL_MS;
 	frameTimestamp = 0;
-	resetCCLDevMeasurements();
 	vi.useFakeTimers();
 	frameTimeOrigin = Date.now();
 	vi.stubGlobal(
@@ -136,7 +131,6 @@ beforeEach(() => {
 afterEach(() => {
 	resetPreviewDomCommitSchedulerForTests();
 	resetScrollActivityForTests();
-	resetCCLDevMeasurements();
 	vi.restoreAllMocks();
 	vi.unstubAllGlobals();
 	vi.useRealTimers();
@@ -251,11 +245,6 @@ describe("preview DOM commit scheduler", () => {
 		await vi.advanceTimersByTimeAsync(1_000);
 		expect(committed.length).toBeGreaterThanOrEqual(76);
 		expect(committed.length).toBeLessThanOrEqual(79);
-		let counters = getCCLDevMeasurementSnapshot().counters;
-		expect(counters["preview.domCommitScheduler.animationFrame"].count).toBe(
-			vi.mocked(requestAnimationFrame).mock.calls.length,
-		);
-		expect(counters["preview.domCommitDuringScroll"].count).toBe(committed.length);
 		const scrollingCommitCount = committed.length;
 		const scrollingFrameCount = vi.mocked(requestAnimationFrame).mock.calls.length;
 

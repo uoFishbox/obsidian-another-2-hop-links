@@ -4,7 +4,7 @@ import {
 	type ShadowPopoverLaunchRequest,
 } from "../controller";
 import type { HoverPopoverLike } from "../internal-types";
-import { createRequestHoverParent, syncProxyRectForActual } from "../session";
+import { createRequestHoverParent } from "../session";
 
 describe("ShadowHoverControllerImpl", () => {
 	afterEach(() => {
@@ -33,31 +33,6 @@ describe("ShadowHoverControllerImpl", () => {
 
 		expect(launch).toHaveBeenCalledTimes(1);
 		expect(resolveLink).toHaveBeenCalledTimes(1);
-	});
-
-	it("relays delegated anchor enter and leave to the geometry proxy", () => {
-		const controller = new ShadowHoverControllerImpl(vi.fn(), () => ({
-			linktext: "note",
-			sourcePath: "note.md",
-		}));
-		const anchorEl = createAnchor();
-		const session = controller.getDebugSession();
-		const proxy = syncProxyRectForActual(session, anchorEl);
-		const onEnter = vi.fn();
-		const onLeave = vi.fn();
-		proxy.addEventListener("mouseover", onEnter);
-		proxy.addEventListener("mouseout", onLeave);
-
-		controller.handleDelegatedEnter(
-			anchorEl,
-			"item:first",
-			new MouseEvent("mouseover", { bubbles: true }),
-		);
-		controller.handleDelegatedLeave(anchorEl);
-
-		expect(onEnter).toHaveBeenCalledTimes(1);
-		expect(onLeave).toHaveBeenCalledTimes(1);
-		controller.destroy();
 	});
 
 	it("releases an accepted focused popover on destroy without forcing close", () => {
@@ -100,7 +75,6 @@ describe("ShadowHoverControllerImpl", () => {
 		expect(popover.onTarget).toBe(false);
 		expect(popover.isFocused).toBe(true);
 		expect(popover.transition).toBe(nativeTransition);
-		expect(controller.getDebugPopover()).toBeNull();
 	});
 
 	it("relaunches when the bridge forwards an armed modifier pointermove", () => {
@@ -183,33 +157,6 @@ describe("ShadowHoverControllerImpl", () => {
 		expect(resolveLink).not.toHaveBeenCalled();
 	});
 
-	it("relays leave and enter when the active anchor node is replaced", () => {
-		const controller = new ShadowHoverControllerImpl(vi.fn(), () => ({
-			linktext: "note",
-			sourcePath: "note.md",
-		}));
-		const firstAnchorEl = createAnchor(10);
-		const secondAnchorEl = createAnchor(80);
-		const session = controller.getDebugSession();
-		const firstProxy = syncProxyRectForActual(session, firstAnchorEl);
-		const secondProxy = syncProxyRectForActual(session, secondAnchorEl);
-		const onFirstLeave = vi.fn();
-		const onSecondEnter = vi.fn();
-		firstProxy.addEventListener("mouseout", onFirstLeave);
-		secondProxy.addEventListener("mouseover", onSecondEnter);
-
-		controller.handleDelegatedEnter(
-			firstAnchorEl,
-			"item:first",
-			new MouseEvent("mouseover", { bubbles: true }),
-		);
-		controller.handleDelegatedAnchorSync(secondAnchorEl);
-
-		expect(onFirstLeave).toHaveBeenCalledTimes(1);
-		expect(onSecondEnter).toHaveBeenCalledTimes(1);
-		controller.destroy();
-	});
-
 	it("releases the old accepted popover before relaunching a replaced anchor", () => {
 		const hideA = vi.fn();
 		const onTargetValuesA: Array<boolean | undefined> = [];
@@ -257,7 +204,6 @@ describe("ShadowHoverControllerImpl", () => {
 		expect(hideA).not.toHaveBeenCalled();
 		expect(onTargetValuesA.at(-1)).toBe(false);
 		expect(popoverA.isFocused).toBe(true);
-		expect(controller.getDebugPopover()).toBe(popoverB);
 		controller.destroy();
 	});
 
@@ -460,7 +406,6 @@ describe("ShadowHoverControllerImpl", () => {
 			expect(onTargetValues.at(-1)).toBe(false);
 			expect(popover.onTarget).toBe(false);
 			expect(popover.isFocused).toBe(true);
-			expect(controller.getDebugPopover()).toBeNull();
 			controller.destroy();
 		} finally {
 			vi.useRealTimers();

@@ -26,9 +26,6 @@ import {
 	COSENSE_CARD_LINKS_HOVER_SOURCE_ID,
 } from "features/popover/hoverPopoverLinkSpec";
 import { CosenseCardLinksSettingTab } from "features/settings/ui/SettingTab";
-import { installCCLDebugExposure } from "infrastructure/debug/CCLDebugExposure";
-import { registerBenchmarkCommand } from "infrastructure/debug/benchmarkCommandController";
-import { registerScrollBenchmarkCommand } from "infrastructure/debug/scrollBenchmarkCommandController";
 import { registerCardDragStateCleanup } from "ui/interactions/cardDragState";
 
 /** Collaborators required while registering plugin-owned Obsidian surfaces. */
@@ -48,17 +45,9 @@ export function registerPluginSurfaces(
 	deps: RegisterPluginSurfacesDeps,
 ): void {
 	registerCardDragStateCleanup(plugin);
-	if (process.env.NODE_ENV !== "production") {
-		installCCLDebugExposure(plugin);
-	}
-
 	plugin.addSettingTab(new CosenseCardLinksSettingTab(plugin.app, plugin));
 	registerViews(plugin, deps.viewServices);
 	registerCommands(plugin, deps);
-	if (process.env.NODE_ENV !== "production") {
-		registerBenchmarkCommand(plugin, deps.indexingService);
-		registerScrollBenchmarkCommand(plugin);
-	}
 	registerEditorExtensions(plugin, deps.linkStatusService);
 	registerMarkdownProcessors(plugin, deps);
 	registerFileMenu(plugin);

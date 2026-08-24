@@ -1,6 +1,4 @@
-import { enableLogging } from "shared/logging/logger";
 import { getOptionalOwnerWindow, isHTMLElementLike } from "ui/shared/dom/realmSafeDom";
-import { debugLog, rectToObject, summarizePopover, summarizeSession } from "./debug";
 import type { HoverPopoverLike, ShadowHoverSession } from "./internal-types";
 
 export const LISTENER_ATTACH_MARKER = "__cclShadowHoverListenersAttached";
@@ -12,7 +10,7 @@ export interface PopoverBindingCallbacks {
 		session: ShadowHoverSession,
 		actual: HTMLElement,
 	): HTMLElement;
-	syncPopoverTargetAndTransition(session: ShadowHoverSession, reason: string): void;
+	syncPopoverTargetAndTransition(session: ShadowHoverSession): void;
 }
 
 type PopoverPositionPatchState = {
@@ -70,11 +68,6 @@ export function bindAndPatchPopoverPosition(
 	proxyAnchorEl?: HTMLElement,
 	actualAnchorEl?: HTMLElement,
 ): void {
-	if (enableLogging) {
-		debugLog(session, "popover-patch", "Patching popover position", () =>
-			summarizePopover(popover),
-		);
-	}
 	const boundActualAnchor = isHTMLElementLike(actualAnchorEl)
 		? actualAnchorEl
 		: getBoundPopoverActualAnchor(popover);
@@ -105,18 +98,6 @@ function ensurePopoverPositionPatchState(
 	const existing = patchedPopoverPositions.get(popover);
 	if (existing) {
 		if (existing.ownerSession === session) return existing;
-		if (enableLogging) {
-			debugLog(
-				session,
-				"popover-patch-owner-change",
-				"Reassigning popover patch owner",
-				() => ({
-					popover: summarizePopover(popover),
-					previousOwner: summarizeSession(existing.ownerSession),
-					nextOwner: summarizeSession(session),
-				}),
-			);
-		}
 		existing.dispose();
 	}
 
@@ -147,14 +128,6 @@ function patchPosition(
 			? state.syncProxyRectForActual(session, actualAnchorEl)
 			: getBoundPopoverProxyAnchor(this);
 		if (proxyAnchorEl) this.targetEl = proxyAnchorEl;
-		if (enableLogging) {
-			debugLog(session, "popover-position", "Popover position() invoked", () => ({
-				argsCount: args.length,
-				anchorRect: proxyAnchorEl
-					? rectToObject(proxyAnchorEl.getBoundingClientRect())
-					: null,
-			}));
-		}
 		return originalPosition.apply(this, args);
 	};
 	popover.position = patchedPosition;
@@ -183,14 +156,6 @@ export function scheduleAttachPopoverHoverListeners(
 	const hoverEl = popover.hoverEl;
 	if (!isHTMLElementLike(hoverEl)) {
 		if (retries <= 0) {
-			if (enableLogging) {
-				debugLog(
-					session,
-					"popover-listeners-giveup",
-					"Popover hoverEl never appeared",
-					() => summarizePopover(popover),
-				);
-			}
 			return;
 		}
 		const ownerWindow = getOptionalOwnerWindow(session.activeAnchor?.actualEl);
@@ -210,20 +175,15 @@ export function scheduleAttachPopoverHoverListeners(
 	hoverElWithMarker[LISTENER_ATTACH_MARKER] = true;
 	session.attachedPopoverEl = hoverEl;
 	session.teardownPopoverListeners?.();
-	const onSync = (type: string) => {
+	const onSync = () => {
 		session.overPopover =
 			Boolean(popover.onHover) || isActiveElementWithinPopover(popover);
-		if (enableLogging) {
-			debugLog(session, "popover-sync", `Popover sync from ${type}`, () =>
-				summarizeSession(session),
-			);
-		}
-		callbacks.syncPopoverTargetAndTransition(session, type);
+		callbacks.syncPopoverTargetAndTransition(session);
 	};
-	const onEnter = () => onSync("mouseenter");
-	const onLeave = () => onSync("mouseleave");
-	const onFocusIn = () => onSync("focusin");
-	const onFocusOut = () => onSync("focusout");
+	const onEnter = () => onSync();
+	const onLeave = () => onSync();
+	const onFocusIn = () => onSync();
+	const onFocusOut = () => onSync();
 	hoverEl.addEventListener("mouseenter", onEnter, true);
 	hoverEl.addEventListener("mouseleave", onLeave, true);
 	hoverEl.addEventListener("focusin", onFocusIn, true);

@@ -22,7 +22,6 @@ export interface CreatePreviewFrameDriverOptions {
 	readonly taskKey: string;
 	/** Window used only when no virtual frame coordinator accepts the task. */
 	readonly getWindow?: () => Window | null;
-	readonly onAnimationFrameScheduled?: () => void;
 	readonly onFrame: (timestamp: number) => void;
 }
 
@@ -79,7 +78,6 @@ export function createPreviewFrameDriver(
 
 		const ownerWindow = resolveWindow();
 		if (ownerWindow && typeof ownerWindow.requestAnimationFrame === "function") {
-			options.onAnimationFrameScheduled?.();
 			frameHandleKind = "animation-frame";
 			frameHandleWindow = ownerWindow;
 			frameHandle = ownerWindow.requestAnimationFrame((timestamp) => {
@@ -121,7 +119,6 @@ export function createPreviewFrameDriver(
 		// globalThis fallback so the driver still schedules there instead of
 		// silently dropping the task.
 		if (typeof globalThis.requestAnimationFrame === "function") {
-			options.onAnimationFrameScheduled?.();
 			frameHandleKind = "animation-frame";
 			frameHandleWindow = null;
 			frameHandle = globalThis.requestAnimationFrame((timestamp) => {

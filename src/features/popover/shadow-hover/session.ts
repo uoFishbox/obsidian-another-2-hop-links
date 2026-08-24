@@ -1,13 +1,10 @@
-import { enableLogging } from "shared/logging/logger";
 import { createOwnerMouseEvent } from "ui/shared/dom/realmSafeDom";
-import { debugLog, summarizePopover, summarizeSession } from "./debug";
 import { createShadowGeometryProxyStore } from "./geometry-proxy";
 import type {
 	HoverAnchorTarget,
 	HoverParentLike,
 	HoverPopoverLike,
 	PendingPopoverHandoff,
-	PopoverReleaseReason,
 	ShadowHoverSession,
 } from "./internal-types";
 import {
@@ -42,17 +39,9 @@ export function createShadowHoverSession(): ShadowHoverSession {
 		overPopover: false,
 		attachedPopoverEl: null,
 		teardownPopoverListeners: null,
-		lastHoverPath: null,
 		handoffTimer: null,
 		handoffTimerWindow: null,
-		logs: [],
-		logSeq: 0,
 	};
-	if (enableLogging) {
-		debugLog(session, "session-create", "Created shadow hover session", () =>
-			summarizeSession(session),
-		);
-	}
 	return session;
 }
 
@@ -235,7 +224,6 @@ function scheduleProxyEnterRelay(
 function syncShadowTargetState(
 	popover: HoverPopoverLike,
 	session: ShadowHoverSession,
-	reason: string,
 ): void {
 	const actualAnchorEl =
 		getBoundPopoverActualAnchor(popover) ?? session.activeAnchor?.actualEl;
@@ -249,24 +237,10 @@ function syncShadowTargetState(
 		bindPopoverAnchor(popover, proxyAnchorEl, actualAnchorEl ?? proxyAnchorEl);
 	}
 
-	const changed =
-		popover.onTarget !== overAnchor || session.overAnchor !== overAnchor;
 	popover.onTarget = overAnchor;
 	session.overAnchor = overAnchor;
 	session.overPopover =
 		Boolean(popover.onHover) || isActiveElementWithinPopover(popover);
-	if (changed && enableLogging) {
-		debugLog(
-			session,
-			"shadow-target-sync",
-			`Shadow target sync (${reason})`,
-			() => ({
-				overAnchor,
-				overPopover: session.overPopover,
-				popover: summarizePopover(popover),
-			}),
-		);
-	}
 }
 
 export function createRequestHoverParent(
@@ -284,19 +258,6 @@ export function createRequestHoverParent(
 		set(value: HoverPopoverLike | null | undefined) {
 			const previousPopover = assignedPopover;
 			const nextPopover = value ?? null;
-			if (enableLogging) {
-				debugLog(
-					session,
-					"hoverParent-set",
-					"Request hoverParent.hoverPopover assigned",
-					() => ({
-						requestSeq,
-						requestAnchor: requestAnchorEl.className,
-						previous: summarizePopover(previousPopover),
-						next: summarizePopover(nextPopover),
-					}),
-				);
-			}
 			assignedPopover = nextPopover;
 
 			if (!nextPopover) {
@@ -324,20 +285,6 @@ export function createRequestHoverParent(
 				session.requestSeq !== requestSeq ||
 				session.activeAnchor?.proxyEl !== requestAnchorEl
 			) {
-				if (enableLogging) {
-					debugLog(
-						session,
-						"hoverParent-stale",
-						"Discarding stale popover assignment",
-						() => ({
-							requestSeq,
-							latestRequestSeq: session.requestSeq,
-							matchesActiveAnchor:
-								session.activeAnchor?.proxyEl === requestAnchorEl,
-							popover: summarizePopover(nextPopover),
-						}),
-					);
-				}
 				assignedPopover = null;
 				scheduleUnacceptedPopoverClose(nextPopover);
 				return;
@@ -372,30 +319,14 @@ export function createRequestHoverParent(
 				requestAnchorEl,
 				requestActualAnchorEl,
 			);
-			syncPopoverTargetAndTransition(session, "hoverParent-set");
+			syncPopoverTargetAndTransition(session);
 
 			if (
 				handoff?.requestSeq === requestSeq &&
 				handoff.fromPopover !== nextPopover
 			) {
-				if (enableLogging) {
-					debugLog(
-						session,
-						"handoff-complete",
-						"Releasing replaced popover after new assignment",
-						() => ({
-							requestSeq,
-							from: summarizePopover(handoff.fromPopover),
-							to: summarizePopover(nextPopover),
-						}),
-					);
-				}
 				session.pendingHandoff = null;
-				releasePopoverToNativeLifecycle(
-					handoff.fromPopover,
-					session,
-					"handoff-complete",
-				);
+				releasePopoverToNativeLifecycle(handoff.fromPopover, session);
 				clearPendingHandoffTimer(session);
 			}
 		},
@@ -403,36 +334,18 @@ export function createRequestHoverParent(
 	return hoverParent;
 }
 
-export function syncPopoverTargetAndTransition(
-	session: ShadowHoverSession,
-	reason = "manual-sync",
-): void {
+export function syncPopoverTargetAndTransition(session: ShadowHoverSession): void {
 	const popover = session.activePopover;
 	if (!popover) return;
-	syncShadowTargetState(popover, session, reason);
+	syncShadowTargetState(popover, session);
 	if (typeof popover.transition !== "function") return;
-	if (enableLogging) {
-		debugLog(
-			session,
-			"native-transition",
-			`Re-evaluating popover transition (${reason})`,
-			() => summarizeSession(session),
-		);
-	}
 	popover.transition();
 }
 
 export function releasePopoverToNativeLifecycle(
 	popover: HoverPopoverLike,
 	session: ShadowHoverSession,
-	reason: PopoverReleaseReason,
 ): void {
-	if (enableLogging) {
-		debugLog(session, "popover-release", `Releasing popover (${reason})`, () => ({
-			popover: summarizePopover(popover),
-			session: summarizeSession(session),
-		}));
-	}
 	if (session.pendingHandoff?.fromPopover === popover) {
 		session.pendingHandoff = null;
 		clearPendingHandoffTimer(session);
@@ -456,18 +369,7 @@ export function releasePopoverToNativeLifecycle(
 	}
 	try {
 		popover.transition?.();
-	} catch (error) {
-		if (enableLogging) {
-			debugLog(
-				session,
-				"popover-release-transition-error",
-				`Native transition failed during release (${reason})`,
-				() => ({
-					error: String(error),
-					popover: summarizePopover(popover),
-				}),
-			);
-		}
+	} catch {
 	} finally {
 		disposePopoverPositionPatch(popover, session);
 		if (actualAnchor) releaseActualAnchor(session, actualAnchor);

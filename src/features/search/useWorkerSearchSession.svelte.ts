@@ -12,15 +12,9 @@ import type {
 	SearchWorkerMatchedItem,
 	SearchWorkerFileContentSnapshot,
 } from "./searchWorkerTypes";
-import {
-	searchRipgrepContentByTerm,
-	filterSearchDatasetWithRipgrepMatches,
-	collectUniqueTargetFilePaths,
-} from "./ripgrepContentSearch";
 import { filterSearchWorkerDatasetWithMatchDetailsTimeSliced } from "./searchWorkerFilter";
 
 const EMPTY_SEARCH_WORKER_ITEMS: readonly SearchWorkerItemSnapshot[] = [];
-const EMPTY_RIPGREP_POSITION_BY_PATH = new Map<string, Pos>();
 
 interface WorkerFileContentSyncState {
 	sessionEnabled: boolean;
@@ -103,8 +97,6 @@ function diffSearchWorkerFileContentsFromVisitor(
 	};
 }
 
-export type ContentSearchBackend = "worker" | "ripgrep";
-
 export interface UseWorkerSearchSessionOptions {
 	app: App;
 	query: () => string;
@@ -113,8 +105,6 @@ export interface UseWorkerSearchSessionOptions {
 	matchScope?: SearchWorkerMatchScope | (() => SearchWorkerMatchScope);
 	getSearchableFiles: () => readonly TFile[];
 	buildDataset: () => readonly SearchWorkerItemSnapshot[];
-	contentSearchBackend?: ContentSearchBackend | (() => ContentSearchBackend);
-	ripgrepExecutablePath?: string | (() => string | undefined);
 }
 
 export interface WorkerSearchSessionResult {
@@ -141,8 +131,6 @@ export function useWorkerSearchSession(
 		matchScope = "title-and-content",
 		getSearchableFiles,
 		buildDataset,
-		contentSearchBackend = "worker",
-		ripgrepExecutablePath,
 	} = options;
 	const isEnabled = (): boolean =>
 		typeof enabled === "function" ? enabled() : enabled;
@@ -152,28 +140,12 @@ export function useWorkerSearchSession(
 			: contentIndexEnabled;
 	const getMatchScope = (): SearchWorkerMatchScope =>
 		typeof matchScope === "function" ? matchScope() : matchScope;
-	const getContentSearchBackend = (): ContentSearchBackend =>
-		typeof contentSearchBackend === "function"
-			? contentSearchBackend()
-			: contentSearchBackend;
-	const getRipgrepExecutablePath = (): string | undefined =>
-		typeof ripgrepExecutablePath === "function"
-			? ripgrepExecutablePath()
-			: ripgrepExecutablePath;
 	let sessionEnabled = $derived(isEnabled());
 	let currentMatchScope = $derived(getMatchScope());
 	let partialSyncEnabled = $state(false);
-	let ripgrepBackendUnavailable = $state(false);
-	let lastRipgrepConfigSignature = "";
-	const getEffectiveContentSearchBackend = (): ContentSearchBackend =>
-		getContentSearchBackend() === "ripgrep" && !ripgrepBackendUnavailable
-			? "ripgrep"
-			: "worker";
 	const contentIndex = useFileContentIndex(app, getSearchableFiles, {
 		enabled: () =>
-			isContentIndexEnabled() &&
-			currentMatchScope === "title-and-content" &&
-			getEffectiveContentSearchBackend() !== "ripgrep",
+			isContentIndexEnabled() && currentMatchScope === "title-and-content",
 	});
 	const buildWorkerDataset = (): readonly SearchWorkerItemSnapshot[] => {
 		if (!sessionEnabled) {
@@ -187,16 +159,11 @@ export function useWorkerSearchSession(
 	let matchesByKey = $state<Map<string, SearchWorkerMatchedItem> | null>(null);
 	let matchedQuery = $state("");
 	let matchedScope = $state<SearchWorkerMatchScope>("title-only");
-	let ripgrepPositionByPath = $state<Map<string, Pos>>(
-		EMPTY_RIPGREP_POSITION_BY_PATH,
-	);
 	let isWorkerFiltering = $state(false);
 	let syncedDatasetVersion = $state(0);
 	let requestSerial = 0;
 	let activeRequestQuery = "";
 	let activeRequestScope: SearchWorkerMatchScope = "title-only";
-	let ripgrepRequestSerial = 0;
-	let ripgrepAbortController: AbortController | null = null;
 	let fallbackFilterSerial = 0;
 	let workerUnavailable = $state(false);
 	let lastIssuedSearchSignature = "";
@@ -233,19 +200,8 @@ export function useWorkerSearchSession(
 		matchesByKey = nextMatchesByKey;
 		matchedQuery = activeRequestQuery;
 		matchedScope = activeRequestScope;
-		ripgrepPositionByPath = EMPTY_RIPGREP_POSITION_BY_PATH;
 		isWorkerFiltering = false;
 	});
-
-	const cancelRipgrepSearch = (): void => {
-		if (!ripgrepAbortController) {
-			return;
-		}
-
-		ripgrepAbortController.abort();
-		ripgrepAbortController = null;
-		ripgrepRequestSerial += 1;
-	};
 
 	const cancelFallbackSearch = (): void => {
 		fallbackFilterSerial += 1;
@@ -299,13 +255,11 @@ export function useWorkerSearchSession(
 			matchesByKey = nextMatchesByKey;
 			matchedQuery = normalizedQuery;
 			matchedScope = requestScope;
-			ripgrepPositionByPath = EMPTY_RIPGREP_POSITION_BY_PATH;
 			isWorkerFiltering = false;
 		});
 	};
 
 	onDestroy(() => {
-		cancelRipgrepSearch();
 		cancelFallbackSearch();
 		searchWorkerClient.terminate();
 	});
@@ -313,37 +267,15 @@ export function useWorkerSearchSession(
 	let isSearchLoading = $derived(
 		sessionEnabled &&
 			!!query() &&
-			((currentMatchScope === "title-and-content" &&
-				getEffectiveContentSearchBackend() !== "ripgrep" &&
-				contentIndex.isLoading()) ||
+			((currentMatchScope === "title-and-content" && contentIndex.isLoading()) ||
 				isWorkerFiltering),
 	);
-
-	$effect(() => {
-		const configuredBackend = getContentSearchBackend();
-		const ripgrepConfigSignature = [
-			configuredBackend,
-			getRipgrepExecutablePath() ?? "",
-		].join("|");
-
-		if (configuredBackend !== "ripgrep") {
-			ripgrepBackendUnavailable = false;
-			lastRipgrepConfigSignature = ripgrepConfigSignature;
-			return;
-		}
-
-		if (ripgrepConfigSignature !== lastRipgrepConfigSignature) {
-			ripgrepBackendUnavailable = false;
-			lastRipgrepConfigSignature = ripgrepConfigSignature;
-		}
-	});
 
 	$effect(() => {
 		const shouldWaitForPartialSync =
 			sessionEnabled &&
 			isContentIndexEnabled() &&
 			currentMatchScope === "title-and-content" &&
-			getEffectiveContentSearchBackend() === "worker" &&
 			!!query() &&
 			contentIndex.isLoading();
 
@@ -363,14 +295,11 @@ export function useWorkerSearchSession(
 
 	$effect(() => {
 		const contentSyncCanTrackPaths =
-			isContentIndexEnabled() &&
-			currentMatchScope === "title-and-content" &&
-			getEffectiveContentSearchBackend() !== "ripgrep";
+			isContentIndexEnabled() && currentMatchScope === "title-and-content";
 
 		if (!sessionEnabled && !contentSyncCanTrackPaths) {
 			matchesByKey = null;
 			matchedQuery = "";
-			ripgrepPositionByPath = EMPTY_RIPGREP_POSITION_BY_PATH;
 			isWorkerFiltering = false;
 			lastIssuedSearchSignature = "";
 			return;
@@ -379,7 +308,6 @@ export function useWorkerSearchSession(
 		if (!sessionEnabled) {
 			matchesByKey = null;
 			matchedQuery = "";
-			ripgrepPositionByPath = EMPTY_RIPGREP_POSITION_BY_PATH;
 			isWorkerFiltering = false;
 			lastIssuedSearchSignature = "";
 		}
@@ -446,26 +374,21 @@ export function useWorkerSearchSession(
 		void syncedDatasetVersion;
 
 		if (!sessionEnabled) {
-			cancelRipgrepSearch();
 			cancelFallbackSearch();
 			requestSerial += 1;
 			matchesByKey = null;
 			matchedQuery = "";
-			ripgrepPositionByPath = EMPTY_RIPGREP_POSITION_BY_PATH;
 			isWorkerFiltering = false;
 			lastIssuedSearchSignature = "";
 			return;
 		}
 
-		void getEffectiveContentSearchBackend();
 		const normalizedQuery = query();
 		if (!normalizedQuery) {
-			cancelRipgrepSearch();
 			cancelFallbackSearch();
 			requestSerial += 1;
 			matchesByKey = null;
 			matchedQuery = "";
-			ripgrepPositionByPath = EMPTY_RIPGREP_POSITION_BY_PATH;
 			isWorkerFiltering = false;
 			lastIssuedSearchSignature = "";
 			return;
@@ -475,9 +398,8 @@ export function useWorkerSearchSession(
 	});
 
 	const issueSearchFilter = (normalizedQuery: string): void => {
-		const backend = getEffectiveContentSearchBackend();
 		const requestScope = currentMatchScope;
-		const signature = `${syncedDatasetVersion}:${requestScope}:${backend}:${normalizedQuery}`;
+		const signature = `${syncedDatasetVersion}:${requestScope}:${normalizedQuery}`;
 		if (signature === lastIssuedSearchSignature) {
 			return;
 		}
@@ -488,75 +410,12 @@ export function useWorkerSearchSession(
 		) {
 			matchesByKey = null;
 			matchedQuery = "";
-			ripgrepPositionByPath = EMPTY_RIPGREP_POSITION_BY_PATH;
 		}
 
 		lastIssuedSearchSignature = signature;
 		const requestId = ++requestSerial;
 		activeRequestQuery = normalizedQuery;
 		activeRequestScope = requestScope;
-		if (backend === "ripgrep" && requestScope === "title-and-content") {
-			cancelRipgrepSearch();
-			const abortController = new AbortController();
-			ripgrepAbortController = abortController;
-			const ripgrepRequestId = ++ripgrepRequestSerial;
-			isWorkerFiltering = true;
-
-			void (async () => {
-				try {
-					const nextWorkerDataset = workerDataset;
-					const targetFilePaths =
-						collectUniqueTargetFilePaths(nextWorkerDataset);
-					const ripgrepResult = await searchRipgrepContentByTerm(
-						app,
-						normalizedQuery,
-						getRipgrepExecutablePath(),
-						targetFilePaths,
-						{ signal: abortController.signal },
-					);
-
-					if (ripgrepRequestId !== ripgrepRequestSerial) {
-						return;
-					}
-
-					const matchedItems = filterSearchDatasetWithRipgrepMatches(
-						nextWorkerDataset,
-						normalizedQuery,
-						ripgrepResult.matchesByTerm,
-						ripgrepResult.previewByPath,
-					);
-					const nextMatchesByKey = new Map<string, SearchWorkerMatchedItem>();
-					for (const item of matchedItems) {
-						nextMatchesByKey.set(item.key, item);
-					}
-					matchesByKey = nextMatchesByKey;
-					matchedQuery = normalizedQuery;
-					matchedScope = requestScope;
-					ripgrepPositionByPath = ripgrepResult.positionByPath;
-					isWorkerFiltering = false;
-				} catch {
-					if (abortController.signal.aborted) {
-						return;
-					}
-
-					if (ripgrepRequestId !== ripgrepRequestSerial) {
-						return;
-					}
-
-					ripgrepBackendUnavailable = true;
-					lastIssuedSearchSignature = "";
-					isWorkerFiltering = false;
-				} finally {
-					if (ripgrepAbortController === abortController) {
-						ripgrepAbortController = null;
-					}
-				}
-			})();
-
-			return;
-		}
-
-		cancelRipgrepSearch();
 		cancelFallbackSearch();
 		if (workerUnavailable) {
 			issueFallbackSearch(normalizedQuery, requestId, requestScope);
@@ -597,10 +456,7 @@ export function useWorkerSearchSession(
 				return undefined;
 			}
 
-			return (
-				ripgrepPositionByPath.get(targetFile.path) ??
-				contentIndex.getFirstMatchPosition(query, targetFile)
-			);
+			return contentIndex.getFirstMatchPosition(query, targetFile);
 		},
 	};
 }

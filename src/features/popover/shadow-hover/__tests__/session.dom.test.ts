@@ -164,7 +164,7 @@ describe("createRequestHoverParent", () => {
 		setAnchorHovered(session, actualAnchorA, false);
 		setAnchorHovered(session, actualAnchorB, true);
 		const proxyAnchorB = syncProxyRectForActual(session, actualAnchorB);
-		syncPopoverTargetAndTransition(session, "test-anchor-rebind");
+		syncPopoverTargetAndTransition(session);
 
 		popover.hide();
 
@@ -269,7 +269,7 @@ describe("createRequestHoverParent", () => {
 			popover;
 
 		actualAnchor.remove();
-		syncPopoverTargetAndTransition(session, "test-anchor-detached");
+		syncPopoverTargetAndTransition(session);
 		popover.hide();
 
 		expect(originalHide).toHaveBeenCalledTimes(1);
@@ -355,7 +355,7 @@ describe("createRequestHoverParent", () => {
 		expect(popover.transition).toBe(transition);
 		setAnchorHovered(session, actualAnchor, false);
 		popover.transition();
-		syncPopoverTargetAndTransition(session, "test-anchor-leave");
+		syncPopoverTargetAndTransition(session);
 
 		expect(onTargetValues).toEqual([true, true, false]);
 	});

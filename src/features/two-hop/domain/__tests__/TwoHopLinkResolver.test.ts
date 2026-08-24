@@ -7,10 +7,7 @@ import type {
 	TwoHopIndexedLink,
 } from "types/domain";
 import type { IIndexingService } from "types/services";
-import type {
-	ResolverDebugPolicy,
-	ResolverPerformanceSettings,
-} from "../ResolverTypes";
+import type { ResolverPerformanceSettings } from "../ResolverTypes";
 
 type ResolverEnvironment = ReturnType<VaultEnvironmentBuilder["build"]>;
 
@@ -29,14 +26,12 @@ function createResolver(
 	indexingService: IIndexingService = env.service,
 	options?: {
 		performance?: () => Partial<ResolverPerformanceSettings>;
-		debug?: () => ResolverDebugPolicy;
 	},
 ): TwoHopLinkResolver {
 	return new TwoHopLinkResolver(
 		env.mockMetadataCache,
 		indexingService,
 		options?.performance,
-		options?.debug,
 	);
 }
 

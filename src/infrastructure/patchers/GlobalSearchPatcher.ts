@@ -1,5 +1,4 @@
 import type { PluginHost } from "types/pluginHost";
-import { enableLogging, logger } from "shared/logging/logger";
 import { openTagNotesView } from "features/tag-notes/ui/TagNotesView";
 import { areTagFeaturesEnabled } from "features/settings/model";
 import { getGlobalSearchOpenGlobalSearch } from "infrastructure/capabilities/obsidianInternals";
@@ -15,12 +14,10 @@ export function initGlobalSearchPatcher(plugin: PluginHost): void {
 function patchGlobalSearch(plugin: PluginHost): void {
 	const capability = getGlobalSearchOpenGlobalSearch(plugin.app);
 	if (!capability) {
-		if (enableLogging)
-			logger("[GlobalSearchPatcher] Skipped patch: global-search unavailable.");
 		return;
 	}
 
-	const applied = applyPatch(plugin, {
+	applyPatch(plugin, {
 		id: "global-search:openGlobalSearch",
 		target: capability.instance,
 		method: "openGlobalSearch",
@@ -68,10 +65,6 @@ function patchGlobalSearch(plugin: PluginHost): void {
 								return;
 							}
 
-							if (enableLogging)
-								logger(
-									`[GlobalSearchPatcher] Intercepting tag search: "${tag}". Found ${notes.length} notes.`,
-								);
 							const sourcePath =
 								plugin.app.workspace.getActiveFile()?.path ?? "";
 							try {
@@ -96,9 +89,4 @@ function patchGlobalSearch(plugin: PluginHost): void {
 			};
 		},
 	});
-
-	if (applied) {
-		if (enableLogging)
-			logger("[GlobalSearchPatcher] Successfully patched openGlobalSearch.");
-	}
 }

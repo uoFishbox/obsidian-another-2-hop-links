@@ -10,7 +10,6 @@ import type {
 	TwoHopLinkResult,
 } from "types/domain";
 import type { IMetadataCache } from "types/obsidian";
-import { enableLogging, logger } from "shared/logging/logger";
 import { ResolverCache } from "./ResolverCache";
 import {
 	collectResolverDependencies,
@@ -18,7 +17,7 @@ import {
 	type TwoHopResolveSnapshot,
 } from "./ResolverDependencies";
 import { TwoHopBranchBuilder } from "./TwoHopBranchBuilder";
-import type { ResolverDebugPolicy, ResolverPerformanceSettings } from "./ResolverTypes";
+import type { ResolverPerformanceSettings } from "./ResolverTypes";
 import {
 	createImmutableTaggedNotes,
 	freezeTwoHopLinkResult,
@@ -61,7 +60,6 @@ export class TwoHopLinkResolver {
 		private readonly metadataCache: IMetadataCache,
 		private readonly indexingService: IIndexingService,
 		private readonly getPerformanceSettingsOverride?: () => Partial<ResolverPerformanceSettings>,
-		private readonly getDebugPolicy?: () => ResolverDebugPolicy,
 	) {
 		this.cache = new ResolverCache();
 		this.branchBuilder = new TwoHopBranchBuilder(metadataCache, indexingService);
@@ -252,16 +250,11 @@ export class TwoHopLinkResolver {
 			) as CachedMetadataWithLinkReferences | null;
 			const outgoingLinks = collectLinkReferences(cache);
 
-			const enableCanvasBacklinkDebug =
-				this.getDebugPolicy?.().enableCanvasBacklinkDebug ?? false;
-			this.logCanvasDebugHeader(targetFile, enableCanvasBacklinkDebug);
-
 			const indexedBacklinks =
 				this.indexingService.getUniqueBacklinkSourcesForLink(
 					targetFile.path,
 					targetFile.path,
 				);
-			this.logCanvasBacklinks(indexedBacklinks, enableCanvasBacklinkDebug);
 			const uniqueBacklinks = this.addBacklinkCounts(indexedBacklinks);
 			const baseBranches = await this.branchBuilder.buildHop1OnlyBranches(
 				targetFile,
@@ -396,51 +389,5 @@ export class TwoHopLinkResolver {
 		}\u0000${performanceSettings.maxOutgoingToProcess}\u0000${
 			resolveSettings.includeTaggedNotes ? "1" : "0"
 		}`;
-	}
-
-	private logCanvasDebugHeader(
-		targetFile: TFile,
-		enableCanvasBacklinkDebug: boolean,
-	): void {
-		if (!enableCanvasBacklinkDebug) {
-			return;
-		}
-		if (enableLogging)
-			logger(
-				`[DEBUG_CANVAS] TwoHopLinkResolver.resolve called for: ${targetFile.path}`,
-			);
-		if (enableLogging)
-			logger(
-				`[DEBUG_CANVAS]   Target is canvas: ${targetFile.extension === "canvas"}`,
-			);
-	}
-
-	private logCanvasBacklinks(
-		uniqueBacklinks: readonly Readonly<TwoHopIndexedLink>[],
-		enableCanvasBacklinkDebug: boolean,
-	): void {
-		if (!enableCanvasBacklinkDebug) {
-			return;
-		}
-		if (enableLogging)
-			logger(
-				`[DEBUG_CANVAS]   Unique backlinks after dedupe: ${uniqueBacklinks.length}`,
-			);
-		const canvasBacklinks = uniqueBacklinks.filter(
-			(link) => link.sourceFile.extension === "canvas",
-		);
-		if (enableLogging)
-			logger(
-				`[DEBUG_CANVAS]   Backlinks from canvas files: ${canvasBacklinks.length}`,
-			);
-		if (canvasBacklinks.length === 0) {
-			return;
-		}
-		canvasBacklinks.forEach((link, index) => {
-			if (enableLogging)
-				logger(
-					`[DEBUG_CANVAS]     Canvas backlink ${index + 1}: ${link.sourceFile.path} -> ${link.rawText}`,
-				);
-		});
 	}
 }

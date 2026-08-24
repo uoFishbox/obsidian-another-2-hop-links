@@ -1,4 +1,3 @@
-import { enableLogging, logger } from "shared/logging/logger";
 import type { DataUpdateContext, DataUpdateListener } from "./IndexEvents";
 
 export class IndexUpdateEmitter {
@@ -53,10 +52,6 @@ export class IndexUpdateEmitter {
 				: undefined,
 		};
 
-		if (enableLogging)
-			logger(
-				`[IndexingService] Notifying ${this.dataUpdateListeners.size} data update listeners`,
-			);
 		this.dataUpdateListeners.forEach((listener) => {
 			try {
 				listener(payload);

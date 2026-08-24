@@ -5,10 +5,6 @@ import {
 	type VirtualFrameCoordinator,
 } from "ui/shared/scheduling/frameCoordinator";
 import {
-	getCCLDevMeasurementSnapshot,
-	resetCCLDevMeasurements,
-} from "infrastructure/debug/CCLDevMeasurements";
-import {
 	installMutationObserverMock,
 	installResizeObserverMock,
 	mutationObserverRecords,
@@ -151,6 +147,7 @@ describe("VirtualListDomObserver performance contracts", () => {
 		});
 
 		let frame = 0;
+		const runScrollMeasurement = vi.fn();
 		const observation = observeVirtualListViewport({
 			frameCoordinator: createObserverFrameCoordinator(),
 			rootEl,
@@ -159,11 +156,10 @@ describe("VirtualListDomObserver performance contracts", () => {
 			onScrollContainerChange: vi.fn(),
 			scheduleLayoutMeasurement: vi.fn(),
 			scheduleScrollMeasurement,
-			runScrollMeasurement: vi.fn(),
+			runScrollMeasurement,
 			runInitialLayoutMeasurement: vi.fn(),
 		});
 		stopObserving.push(observation);
-		resetCCLDevMeasurements();
 
 		// rAF-driven programmatic scroll stream, one scroll event per frame
 		for (frame = 0; frame < SCROLL_FRAMES; frame += 1) {
@@ -186,20 +182,12 @@ describe("VirtualListDomObserver performance contracts", () => {
 		await vi.advanceTimersByTimeAsync(140);
 		await vi.runAllTimersAsync();
 
-		const counters = getCCLDevMeasurementSnapshot().counters;
-		const scrollEvents = counters["virtualList.observer.scrollEvent"].count;
-		const coverageHits = counters["virtualList.observer.coverageHit"].count;
-		const coverageMisses = counters["virtualList.observer.coverageMiss"].count;
-		const scrollTasksExecuted =
-			counters["virtualList.observer.scrollTask.executed"].count;
+		const coverageMisses = SCROLL_FRAMES / MISS_EVERY_N_FRAMES;
 		const scrollGestureCount = 1;
 
-		expect(scrollEvents).toBe(SCROLL_FRAMES);
-		expect(coverageHits + coverageMisses).toBe(SCROLL_FRAMES);
-		expect(coverageMisses).toBe(SCROLL_FRAMES / MISS_EVERY_N_FRAMES);
 		// Contract: coverage hits never turn into scroll tasks; only misses
 		// and the per-gesture idle normalization may execute measurements.
-		expect(scrollTasksExecuted).toBeLessThanOrEqual(
+		expect(runScrollMeasurement).toHaveBeenCalledTimes(
 			coverageMisses + scrollGestureCount,
 		);
 	});

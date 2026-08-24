@@ -1,12 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const state = vi.hoisted(() => ({
-	disableCardDomPreview: false,
-}));
-
 vi.mock("../../../../appConstants", () => ({
 	DEFAULT_PREVIEW_ACTIVATIONS_PER_SECOND: 64,
-	getDebugDisableCardDomPreview: () => state.disableCardDomPreview,
 }));
 
 import {
@@ -18,10 +13,6 @@ import {
 	markVirtualScrollMeasurementRun,
 	resetVirtualScrollMeasurementFrameForTests,
 } from "ui/virtualization/public";
-import {
-	getCCLDevMeasurementSnapshot,
-	resetCCLDevMeasurements,
-} from "infrastructure/debug/CCLDevMeasurements";
 import {
 	createPreviewActivationScheduler,
 	type CreatePreviewActivationSchedulerOptions,
@@ -111,12 +102,10 @@ async function countScrollingActivations(params: {
 }
 
 beforeEach(() => {
-	state.disableCardDomPreview = false;
 	frameIntervalMs = DEFAULT_FRAME_INTERVAL_MS;
 	frameTimestamp = 0;
 	outstandingPreviewJobCount = 0;
 	results = [];
-	resetCCLDevMeasurements();
 	defaultTestScheduler = createPreviewActivationScheduler({
 		getOutstandingPreviewJobCount: () => outstandingPreviewJobCount,
 	});
@@ -144,7 +133,6 @@ afterEach(() => {
 	resetPreviewActivationSchedulerForTests();
 	resetScrollActivityForTests();
 	resetVirtualScrollMeasurementFrameForTests();
-	resetCCLDevMeasurements();
 	vi.restoreAllMocks();
 	vi.unstubAllGlobals();
 	vi.useRealTimers();
@@ -196,11 +184,6 @@ describe("preview activation scheduler", () => {
 		await vi.advanceTimersByTimeAsync(1_000);
 		expect(results.length).toBeGreaterThanOrEqual(62);
 		expect(results.length).toBeLessThanOrEqual(65);
-		let counters = getCCLDevMeasurementSnapshot().counters;
-		expect(counters["preview.activationScheduler.animationFrame"].count).toBe(
-			vi.mocked(requestAnimationFrame).mock.calls.length,
-		);
-		expect(counters["preview.activationDuringScroll"].count).toBe(results.length);
 		const scrollingActivationCount = results.length;
 		const scrollingFrameCount = vi.mocked(requestAnimationFrame).mock.calls.length;
 
@@ -566,17 +549,6 @@ describe("preview activation scheduler", () => {
 		await flushAnimationFrame();
 		expect(normal.onActivated).toHaveBeenCalledOnce();
 		expect(consoleError).toHaveBeenCalledOnce();
-	});
-
-	it("skips activation entirely while card DOM previews are disabled", async () => {
-		state.disableCardDomPreview = true;
-		const activation = requestActivation("preview-disabled");
-
-		expect(activation.onActivated).not.toHaveBeenCalled();
-		expect(requestAnimationFrame).not.toHaveBeenCalled();
-
-		await flushAnimationFrame();
-		expect(activation.onActivated).not.toHaveBeenCalled();
 	});
 
 	it("keeps coordinator drains isolated to their own surface", async () => {

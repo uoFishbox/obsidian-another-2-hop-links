@@ -13,7 +13,6 @@ function createHarness() {
 		enqueueRebuild: vi.fn(() => Promise.resolve()),
 		getLeavesOfType: vi.fn(() => []),
 		bumpSortContextVersion: vi.fn(),
-		setLoggingEnabled: vi.fn(),
 	};
 	const controller = createSettingsSideEffectController({
 		viewUpdateOrchestrator: {
@@ -37,7 +36,6 @@ function createHarness() {
 			getLeavesOfType: mocks.getLeavesOfType,
 		} as never,
 		bumpSortContextVersion: mocks.bumpSortContextVersion,
-		setLoggingEnabled: mocks.setLoggingEnabled,
 	});
 
 	return {
@@ -106,17 +104,5 @@ describe("SettingsSideEffectController", () => {
 		expect(mocks.enqueueRebuild).toHaveBeenCalledWith("settings-change");
 		expect(mocks.invalidateSortCache).toHaveBeenCalledOnce();
 		expect(mocks.refreshEmptyView).toHaveBeenCalledOnce();
-	});
-
-	it("uses the final settings once for a batch", () => {
-		const { apply, mocks } = createHarness();
-
-		apply("enableLogging", "enableUnresolvedLinkDecoration");
-
-		expect(mocks.setLoggingEnabled).toHaveBeenCalledWith(
-			DEFAULT_SETTINGS.enableLogging,
-		);
-		expect(mocks.invalidateSortCache).toHaveBeenCalledOnce();
-		expect(mocks.handleSettingsChange).toHaveBeenCalledOnce();
 	});
 });

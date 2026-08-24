@@ -10,7 +10,7 @@ Shadow DOM anchors cannot be passed directly to Obsidian's light-DOM hover popov
 
 `session.ts` is the single owner of runtime hover state: active anchor, accepted popover, request sequence, pending handoff, anchor-hover membership, proxy store, listener teardown state, timers, and position-patch ownership. `popoverBinding.ts` is the Obsidian adapter that binds anchors, wraps `popover.position`, and attaches native hover listeners; it receives session synchronization callbacks instead of owning parallel state. State is updated directly; there is no parallel lifecycle reducer or registry layer.
 
-`geometry-proxy.ts` only maps Shadow DOM elements to non-interactive light-DOM geometry targets. `debug.ts` contains optional diagnostics. `internal-types.ts` contains the duck-typed Obsidian/session shapes shared by those modules.
+`geometry-proxy.ts` only maps Shadow DOM elements to non-interactive light-DOM geometry targets. `internal-types.ts` contains the duck-typed Obsidian/session shapes shared by those modules.
 
 ## Invariants
 

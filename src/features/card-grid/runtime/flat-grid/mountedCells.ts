@@ -1,4 +1,3 @@
-import { recordCCLDevMeasurement } from "infrastructure/debug/CCLDevMeasurements";
 import type { FlatGridLogicalCell } from "./logicalCell";
 import {
 	buildMountedGridRows,
@@ -48,7 +47,6 @@ const createMountedFlatGridCell = <T>(params: {
 	physicalCellSlot: number;
 	columnIndex: number;
 }): MountedFlatGridCell<T> => {
-	recordCCLDevMeasurement("virtualGrid.cellShellCreated");
 	return {
 		key: params.key,
 		physicalCellSlot: params.physicalCellSlot,
@@ -102,7 +100,6 @@ function updateMountedFlatGridCell<T>(
 	columnIndex: number,
 	physicalCellSlot: number,
 ): MountedFlatGridCell<T> {
-	recordCCLDevMeasurement("virtualGrid.cellShellRebound");
 	return {
 		...previous,
 		key: logicalKey,
@@ -323,7 +320,6 @@ export function buildMountedFlatGridCells<T>(params: {
 		rowHeight: rowModel.layout.rowHeight,
 		gap: rowModel.layout.gap,
 	};
-	recordCCLDevMeasurement("virtualGrid.buildMountedRows");
 	assertMountedVirtualGridBuildInvariants(buildState);
 	return buildState;
 }

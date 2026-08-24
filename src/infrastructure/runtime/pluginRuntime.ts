@@ -74,7 +74,6 @@ export interface PluginRuntimeOptions {
 	updateSortOption: (option: SortOption) => void;
 	updateContentSearch: (enabled: boolean) => void;
 	updateSidebarView: (file: TFile) => void;
-	setLoggingEnabled: (enabled: boolean) => void;
 	destroySettings: () => void;
 }
 
@@ -257,7 +256,6 @@ export function createPluginRuntime(options: PluginRuntimeOptions): PluginRuntim
 		indexingService,
 		workspace: options.app.workspace,
 		bumpSortContextVersion: options.bumpSortContextVersion,
-		setLoggingEnabled: options.setLoggingEnabled,
 	});
 
 	function destroy(): void {

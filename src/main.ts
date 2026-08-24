@@ -12,7 +12,6 @@ import type { ResolveProgress, TwoHopLinkResult } from "types/domain";
 import type { ResolveOptions } from "features/two-hop/domain/TwoHopLinkResolver";
 import type { TwoHopResolveSnapshot } from "features/two-hop/domain/ResolverDependencies";
 import { forceRedrawEffect } from "infrastructure/markdown/livePreview";
-import { setEnableLogging } from "shared/logging/logger";
 import { registerPluginSurfaces } from "infrastructure/registration/registerPluginSurfaces";
 import { installAllPatchers } from "infrastructure/patchers/installAllPatchers";
 import { setupWorkspaceEventHandlers } from "infrastructure/workspace/workspaceEventBootstrap";
@@ -57,7 +56,6 @@ export default class CosenseCardLinksPlugin extends Plugin implements PluginHost
 			console.error("設定の初期化に失敗しました。デフォルト設定を使用します。");
 		}
 
-		setEnableLogging(this.settings.enableLogging);
 		this.runtime = this.createRuntime();
 		registerPluginSurfaces(this, this.runtime);
 		this.startWorkspaceRuntime();
@@ -86,7 +84,6 @@ export default class CosenseCardLinksPlugin extends Plugin implements PluginHost
 				);
 			},
 			updateSidebarView: (file) => this.updateSidebarView(file),
-			setLoggingEnabled: setEnableLogging,
 			destroySettings: () => {
 				void this.settingsManager.destroy().catch((error) => {
 					console.error("設定の保存に失敗しました:", error);

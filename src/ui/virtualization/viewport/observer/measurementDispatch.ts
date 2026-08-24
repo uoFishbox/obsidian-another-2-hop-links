@@ -1,4 +1,3 @@
-import { recordCCLDevMeasurement } from "infrastructure/debug/CCLDevMeasurements";
 import {
 	readVirtualListSharedScrollMetricsInto,
 	resolveCachedViewportHeight,
@@ -46,9 +45,6 @@ export function scheduleLayoutMeasurement(entry: ScrollerViewportEntry): void {
 	const subscriber = getActiveSubscriber(entry);
 	if (!subscriber) return;
 
-	if (process.env.NODE_ENV !== "production") {
-		recordCCLDevMeasurement("virtualList.observer.layoutTask.scheduled");
-	}
 	subscriber.scheduleLayoutMeasurement();
 }
 
@@ -112,28 +108,17 @@ export function scheduleScrollMeasurement(
 
 	entry.hasPendingScrollMeasurement = true;
 	entry.scrollMeasurementReason = reason;
-	if (process.env.NODE_ENV !== "production") {
-		recordCCLDevMeasurement("virtualList.observer.scrollTask.scheduled");
-	}
 	subscriber.scheduleScrollMeasurement(() => {
 		if (!entry.hasPendingScrollMeasurement) return;
 
 		entry.hasPendingScrollMeasurement = false;
 		const activeSubscriber = getActiveSubscriber(entry);
 		if (!activeSubscriber) return;
-		if (process.env.NODE_ENV !== "production") {
-			recordCCLDevMeasurement("virtualList.observer.scrollTask.executed");
-		}
 		if (
 			entry.scrollMeasurementReason === "scroll-coverage-miss" &&
 			entry.pendingScrollTop !== null &&
 			isWithinScrollMeasurementRange(entry, entry.pendingScrollTop)
 		) {
-			if (process.env.NODE_ENV !== "production") {
-				recordCCLDevMeasurement(
-					"virtualList.observer.scrollTask.skippedRecoveredCoverage",
-				);
-			}
 			notifyScrollStateChange(entry);
 			return;
 		}

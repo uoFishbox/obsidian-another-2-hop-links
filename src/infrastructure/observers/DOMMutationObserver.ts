@@ -4,7 +4,6 @@ import { processBasesPane } from "infrastructure/markdown/markdownHandlers";
 import { scheduleAnimationFrame } from "ui/shared/scheduling/frame";
 import { isHTMLElementLike } from "ui/shared/dom/realmSafeDom";
 import { collectWorkspaceDocuments } from "infrastructure/workspace/workspaceDocuments";
-import { enableLogging, logger } from "shared/logging/logger";
 
 const BASES_DISCOVERY_IGNORE_SELECTOR = [
 	".cosense-card-links__root",
@@ -42,14 +41,11 @@ export class DOMMutationObserver {
 	) {}
 
 	public initialize(): void {
-		if (enableLogging) logger("[ObserverManager] Initializing all observers");
 		this.destroyed = false;
 		this.initObservers();
-		if (enableLogging) logger("[ObserverManager] All observers initialized");
 	}
 
 	public destroy(): void {
-		if (enableLogging) logger("[ObserverManager] Destroying all observers");
 		this.destroyed = true;
 		this.basesObservers.forEach((observer) => observer.disconnect());
 		this.basesObservers.clear();
@@ -61,8 +57,6 @@ export class DOMMutationObserver {
 			cancel();
 		});
 		this.basesPaneRefreshTimers.clear();
-
-		if (enableLogging) logger("[ObserverManager] All observers destroyed");
 	}
 
 	public initObservers(): void {
@@ -77,13 +71,9 @@ export class DOMMutationObserver {
 		watchFunction: (container: T) => void,
 	): void {
 		const currentContainers = new Set(observers.keys());
-		let added = 0;
-		let removed = 0;
-
 		for (const container of newContainers) {
 			if (!currentContainers.has(container)) {
 				watchFunction(container);
-				added++;
 			}
 		}
 
@@ -92,15 +82,7 @@ export class DOMMutationObserver {
 				const observer = observers.get(container);
 				observer?.disconnect();
 				observers.delete(container);
-				removed++;
 			}
-		}
-
-		if (added > 0 || removed > 0) {
-			if (enableLogging)
-				logger(
-					`[ObserverManager.updateObservers] Added: ${added}, Removed: ${removed}`,
-				);
 		}
 	}
 
@@ -238,11 +220,6 @@ export class DOMMutationObserver {
 	}
 
 	private watchBasesContainer(container: HTMLElement): void {
-		if (enableLogging)
-			logger(
-				"[ObserverManager.watchBasesContainer] Starting watch for Bases container",
-			);
-
 		let observer: MutationObserver | null = null;
 		let unregisterWindowMigration: (() => void) | null = null;
 		let disconnected = false;
@@ -257,18 +234,7 @@ export class DOMMutationObserver {
 			const ownerWindow = container.ownerDocument.defaultView;
 			const MutationObserverConstructor =
 				ownerWindow?.MutationObserver ?? MutationObserver;
-			observer = new MutationObserverConstructor((mutations) => {
-				if (enableLogging) {
-					const addedCount = mutations.reduce(
-						(sum, m) => sum + m.addedNodes.length,
-						0,
-					);
-					if (addedCount > 0) {
-						logger(
-							`[ObserverManager.watchBasesContainer] Detected ${addedCount} added nodes`,
-						);
-					}
-				}
+			observer = new MutationObserverConstructor(() => {
 				this.scheduleBasesPaneRefresh(container);
 			});
 
@@ -333,12 +299,6 @@ export class DOMMutationObserver {
 	}
 
 	private processExistingLinksInBases(container: HTMLElement): void {
-		if (enableLogging) {
-			const existingCount = container.querySelectorAll(".internal-link").length;
-			logger(
-				`[ObserverManager.processExistingLinksInBases] Processing ${existingCount} existing links`,
-			);
-		}
 		processBasesPane(container, this.stylingService);
 	}
 }
