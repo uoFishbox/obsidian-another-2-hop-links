@@ -4,7 +4,7 @@ import type { DisplayData } from "features/two-hop/application/displayDataBuilde
 import { DEFAULT_SETTINGS } from "features/settings/model";
 import type { TaggedNote, TwoHopIndexedLink, TwoHopLinkBranch } from "types/domain";
 import { createTwoHopSectionPublicationMemo } from "features/two-hop/ui/section-descriptors/cache";
-import { createTwoHopInteractionTokenAllocator } from "features/two-hop/ui/section-descriptors/interactionTokenAllocator";
+import { createTwoHopInteractionTokenAllocator } from "features/two-hop/ui/section-descriptors/descriptors";
 import { buildScopedSectionId } from "ui/components/common/listPagination";
 
 const sourceFile = { path: "source.md" } as TFile;

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { createResidentRowSlotAllocator } from "ui/virtualization/public";
-import { buildMountedTwoHopRows } from "../mountedRows";
+import { buildMountedTwoHopRows } from "../rowModel";
 import { createTwoHopRowModel } from "../rowModel";
 import {
 	createTwoHopSectionModel,

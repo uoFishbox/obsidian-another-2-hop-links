@@ -7,7 +7,7 @@ import type {
 	TwoHopIndexedLink,
 } from "types/domain";
 import type { IIndexingService } from "types/services";
-import type { ResolverPerformanceSettings } from "../ResolverTypes";
+import type { ResolverPerformanceSettings } from "../ResolverDependencies";
 
 type ResolverEnvironment = ReturnType<VaultEnvironmentBuilder["build"]>;
 

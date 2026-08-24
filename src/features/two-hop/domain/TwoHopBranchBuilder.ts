@@ -5,8 +5,10 @@ import type { LinkReference, TwoHopIndexedLink, TwoHopLinkBranch } from "types/d
 import { defaultYieldToMainThread } from "core/indexing/timeSlicing";
 import { getLookupPathForLink } from "core/indexing/link-resolution/linkResolution";
 import { resolveLinkDestination } from "core/indexing/link-resolution/linkResolution";
-import type { ResolverPerformanceSettings } from "./ResolverTypes";
-import { throwIfResolveAborted } from "./resolveCancellation";
+import {
+	throwIfResolveAborted,
+	type ResolverPerformanceSettings,
+} from "./ResolverDependencies";
 
 const BUILD_YIELD_INTERVAL_MS = 8;
 const BUILD_YIELD_CHECK_CADENCE = 32;

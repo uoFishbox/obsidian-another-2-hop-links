@@ -25,7 +25,7 @@
 	import { createTwohopSearchAdapter } from "features/two-hop/ui/twoHopSearchAdapter";
 	import { tick } from "svelte";
 	import { createTwoHopSectionPublicationMemo } from "features/two-hop/ui/section-descriptors/cache";
-	import { createTwoHopInteractionTokenAllocator } from "features/two-hop/ui/section-descriptors/interactionTokenAllocator";
+	import { createTwoHopInteractionTokenAllocator } from "features/two-hop/ui/section-descriptors/descriptors";
 	import {
 		buildScopedSectionId,
 		normalizeIncrement,

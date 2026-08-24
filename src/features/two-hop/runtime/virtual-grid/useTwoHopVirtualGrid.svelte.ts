@@ -12,7 +12,7 @@ import {
 	type MountedTwoHopBuild,
 	type MountedTwoHopCell,
 	type MountedTwoHopRow,
-} from "./mountedRows";
+} from "./rowModel";
 import {
 	createTwoHopCardHydrator,
 	type TwoHopCardDemand,
@@ -29,7 +29,7 @@ import {
 	DEFAULT_VIEW_PLAN_LAYOUT,
 	isSameViewPlanLayout,
 	type ViewPlanLayoutMetrics,
-} from "./layout";
+} from "./rowModel";
 import { findNearestScrollContainer } from "ui/shared/scroll/scrollContainer";
 import { getOptionalOwnerWindow } from "ui/shared/dom/realmSafeDom";
 import { useVirtualizer } from "ui/virtualization/public";

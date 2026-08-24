@@ -13,17 +13,15 @@ import type {
 	TwoHopItemModel,
 	TwoHopSectionModel,
 } from "features/two-hop/ui/twoHopSectionModel";
-import type { TwoHopInteractionTokenAllocator } from "./interactionTokenAllocator";
 import {
 	createBranchSectionDescriptor,
+	createNewLinksSectionDescriptor,
 	resolveBranchHeader,
-} from "./createBranchDescriptor";
-import {
 	createPrimarySectionDescriptor,
+	createTagSectionDescriptor,
 	type PrimarySectionBuildInput,
-} from "./createPrimaryDescriptor";
-import { createTagSectionDescriptor } from "./createTagDescriptor";
-import { createNewLinksSectionDescriptor } from "./createNewLinksDescriptor";
+	type TwoHopInteractionTokenAllocator,
+} from "./descriptors";
 
 export interface ResolveTwoHopSectionsParams {
 	readonly displayData: DisplayData;

@@ -6,6 +6,7 @@ import type { IIndexingService } from "types/services";
 import type {
 	CachedMetadataWithLinkReferences,
 	ResolveProgress,
+	TaggedNote,
 	TwoHopIndexedLink,
 	TwoHopLinkResult,
 } from "types/domain";
@@ -13,16 +14,13 @@ import type { IMetadataCache } from "types/obsidian";
 import { ResolverCache } from "./ResolverCache";
 import {
 	collectResolverDependencies,
+	createResolveAbortError,
 	createTwoHopResolveSnapshot,
+	throwIfResolveAborted,
+	type ResolverPerformanceSettings,
 	type TwoHopResolveSnapshot,
 } from "./ResolverDependencies";
 import { TwoHopBranchBuilder } from "./TwoHopBranchBuilder";
-import type { ResolverPerformanceSettings } from "./ResolverTypes";
-import {
-	createImmutableTaggedNotes,
-	freezeTwoHopLinkResult,
-} from "./immutableTwoHopLinkResult";
-import { createResolveAbortError, throwIfResolveAborted } from "./resolveCancellation";
 
 /**
  * Maximum number of times `resolveInternal` retries when the index version
@@ -390,4 +388,56 @@ export class TwoHopLinkResolver {
 			resolveSettings.includeTaggedNotes ? "1" : "0"
 		}`;
 	}
+}
+
+/**
+ * Freezes a resolver-owned result graph and returns it as one immutable snapshot.
+ *
+ * Obsidian values referenced by the graph (`TFile` and `Pos`) remain shared because
+ * they are owned outside the resolver.
+ */
+export function freezeTwoHopLinkResult(result: TwoHopLinkResult): TwoHopLinkResult {
+	for (const branch of result.branches) {
+		freezeIndexedLink(branch.hop1);
+		freezeIndexedLinks(branch.hop2);
+		Object.freeze(branch);
+	}
+	Object.freeze(result.branches);
+	freezeIndexedLinks(result.backlinks);
+
+	for (const note of result.taggedNotes) {
+		Object.freeze(note.commonTags);
+		Object.freeze(note);
+	}
+	Object.freeze(result.taggedNotes);
+
+	return Object.freeze(result);
+}
+
+/**
+ * Copies tag-index values at the resolver boundary before they are frozen.
+ */
+export function createImmutableTaggedNotes(
+	taggedNotes: readonly TaggedNote[],
+): readonly Readonly<TaggedNote>[] {
+	const snapshot = new Array<TaggedNote>(taggedNotes.length);
+	for (let index = 0; index < taggedNotes.length; index += 1) {
+		const note = taggedNotes[index];
+		snapshot[index] = {
+			...note,
+			commonTags: note.commonTags.slice(),
+		};
+	}
+	return snapshot;
+}
+
+function freezeIndexedLinks(links: readonly Readonly<TwoHopIndexedLink>[]): void {
+	for (const link of links) {
+		freezeIndexedLink(link);
+	}
+	Object.freeze(links);
+}
+
+function freezeIndexedLink(link: Readonly<TwoHopIndexedLink>): void {
+	Object.freeze(link);
 }

@@ -4,7 +4,7 @@ import type { DataUpdateContext } from "core/indexing/index-service/IndexEvents"
 import type { TwoHopLinkResult } from "types/domain";
 import { TFile } from "obsidian";
 import { createTwoHopResolveSnapshot } from "../ResolverDependencies";
-import { freezeTwoHopLinkResult } from "../immutableTwoHopLinkResult";
+import { freezeTwoHopLinkResult } from "../TwoHopLinkResolver";
 
 function createMockTFile(path: string): TFile {
 	return { path, extension: "md" } as TFile;

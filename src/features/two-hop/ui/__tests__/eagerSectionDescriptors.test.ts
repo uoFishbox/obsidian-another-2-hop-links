@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import type { TFile } from "obsidian";
-import { createPrimarySectionDescriptor } from "features/two-hop/ui/section-descriptors/createPrimaryDescriptor";
+import { createPrimarySectionDescriptor } from "features/two-hop/ui/section-descriptors/descriptors";
 import type { TwoHopIndexedLink, TwoHopLinkBranch } from "types/domain";
 
 const sourceFile = { path: "source.md" } as TFile;

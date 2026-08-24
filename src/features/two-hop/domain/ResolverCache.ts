@@ -1,6 +1,6 @@
 import type { DataUpdateContext } from "core/indexing/index-service/IndexEvents";
 import type { TwoHopResolveSnapshot } from "./ResolverDependencies";
-import type { ResolverPerformanceSettings } from "./ResolverTypes";
+import type { ResolverPerformanceSettings } from "./ResolverDependencies";
 
 const MAX_RESOLVE_CACHE_SIZE = 64;
 

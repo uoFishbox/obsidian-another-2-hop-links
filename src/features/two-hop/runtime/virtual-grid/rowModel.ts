@@ -1,8 +1,17 @@
 import type { TwoHopSectionModel } from "features/two-hop/ui/twoHopSectionModel";
+import { resolveCardLayoutSettings } from "ui/layout/cardLayoutCssVars";
+import {
+	buildMountedGridRows,
+	logicalCellKey,
+	type LogicalCellKey,
+	type MountedGridRow,
+	type MountedVirtualCell,
+	type MountedVirtualCellsBuild,
+	type ResidentRowSlotAllocator,
+} from "ui/virtualization/public";
 import type { StableScrollTopBand } from "ui/virtualization/public";
 import type { VirtualRowLayoutMetrics } from "ui/virtualization/public";
 import type { MutableRowRange, RowRange } from "ui/virtualization/public";
-import type { ViewPlanLayoutMetrics } from "./layout";
 import type {
 	VirtualNavigationDirection,
 	VirtualNavigationTarget,
@@ -414,4 +423,97 @@ function resolveVerticalNavigationTarget(
 function writeInvalidBand(out: MutableStableScrollTopBand): void {
 	out.min = Number.POSITIVE_INFINITY;
 	out.max = Number.NEGATIVE_INFINITY;
+}
+
+export interface ViewPlanLayoutMetrics {
+	containerWidth: number;
+	columns: number;
+	cellWidth: number;
+	rowHeight: number;
+	gap: number;
+	sectionMarginBottom: number;
+}
+
+export const DEFAULT_VIEW_PLAN_CARD_LAYOUT = resolveCardLayoutSettings();
+
+export const DEFAULT_VIEW_PLAN_LAYOUT: ViewPlanLayoutMetrics = {
+	containerWidth: DEFAULT_VIEW_PLAN_CARD_LAYOUT.cardWidthPx,
+	columns: 1,
+	cellWidth: DEFAULT_VIEW_PLAN_CARD_LAYOUT.cardWidthPx,
+	rowHeight: DEFAULT_VIEW_PLAN_CARD_LAYOUT.cardHeightPx,
+	gap: DEFAULT_VIEW_PLAN_CARD_LAYOUT.cardGapPx,
+	sectionMarginBottom: DEFAULT_VIEW_PLAN_CARD_LAYOUT.sectionMarginBottomPx,
+};
+
+export const isSameViewPlanLayout = (
+	current: ViewPlanLayoutMetrics,
+	next: ViewPlanLayoutMetrics,
+): boolean =>
+	current.containerWidth === next.containerWidth &&
+	current.columns === next.columns &&
+	current.cellWidth === next.cellWidth &&
+	current.rowHeight === next.rowHeight &&
+	current.gap === next.gap &&
+	current.sectionMarginBottom === next.sectionMarginBottom;
+
+export interface MountedTwoHopCell extends MountedVirtualCell {
+	readonly key: LogicalCellKey;
+	readonly columnIndex: number;
+	readonly cell: TwoHopVirtualCell;
+}
+
+export type MountedTwoHopRow = MountedGridRow<MountedTwoHopCell>;
+
+export interface MountedTwoHopBuild extends MountedVirtualCellsBuild<MountedTwoHopCell> {
+	readonly rowsInMountedRange: readonly MountedTwoHopRow[];
+	readonly rowsByPhysicalSlot: readonly MountedTwoHopRow[];
+	readonly poolCapacity: number;
+	readonly rowModel: TwoHopRowModel;
+}
+
+export interface BuildMountedTwoHopRowsParams {
+	readonly rowModel: TwoHopRowModel;
+	readonly rowRange: RowRange;
+	readonly rowSlotAllocator: ResidentRowSlotAllocator;
+	readonly previousBuild?: MountedTwoHopBuild;
+}
+
+/** Builds resident two-hop rows while reusing shared physical slots. */
+export function buildMountedTwoHopRows(
+	params: BuildMountedTwoHopRowsParams,
+): MountedTwoHopBuild {
+	const { rowModel, rowSlotAllocator } = params;
+	const mountedRows = buildMountedGridRows<TwoHopVirtualCell, MountedTwoHopCell>({
+		rowModel,
+		rowRange: params.rowRange,
+		rowSlotAllocator,
+		previousRows: params.previousBuild?.rowsInMountedRange,
+		canReusePreviousRows: params.previousBuild?.rowModel === rowModel,
+		bindCell: ({ cell, physicalCellSlot }) =>
+			createMountedCell(cell, physicalCellSlot),
+	});
+
+	const build: MountedTwoHopBuild = {
+		get cells() {
+			return mountedRows.cells;
+		},
+		rowsInMountedRange: mountedRows.rowsInMountedRange,
+		rowsByPhysicalSlot: mountedRows.rowsByPhysicalSlot,
+		poolCapacity: rowSlotAllocator.capacity,
+		rowModel,
+	};
+	return build;
+}
+
+function createMountedCell(
+	cell: TwoHopVirtualCell,
+	physicalCellSlot: number,
+): MountedTwoHopCell {
+	return {
+		key: logicalCellKey(cell.logicalKey),
+		physicalCellSlot,
+		rowIndex: cell.rowIndex,
+		columnIndex: cell.columnIndex,
+		cell,
+	};
 }

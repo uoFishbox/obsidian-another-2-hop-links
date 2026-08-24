@@ -5,7 +5,7 @@ import type {
 	VirtualFrameCoordinator,
 	VirtualFrameLane,
 } from "ui/shared/scheduling/frameCoordinator";
-import { DEFAULT_VIEW_PLAN_LAYOUT } from "../layout";
+import { DEFAULT_VIEW_PLAN_LAYOUT } from "../rowModel";
 import {
 	createTwoHopCardHydrator,
 	type TwoHopCardHydrationCell,
