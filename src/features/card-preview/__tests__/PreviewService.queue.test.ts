@@ -1,12 +1,16 @@
 import { describe, test, expect, vi, beforeEach } from "vitest";
-import { PreviewService as PreviewServiceClass } from "../core/createPreviewService";
+import {
+	createPreviewService,
+	type DisposablePreviewService,
+	type PreviewResolver,
+} from "../core/createPreviewService";
 import type { IVault, IMetadataCache } from "types/obsidian";
 import {
 	createMockTFileAsPlainObject,
 	createMockVault,
 } from "testing/__mocks__/testHelpers";
-import type { PreviewResolver } from "../core/previewResolver";
 import type { PreviewData } from "../public-types";
+import { DEFAULT_SETTINGS } from "features/settings/model";
 
 function createDeferred<T>() {
 	let resolve!: (value: T) => void;
@@ -27,6 +31,32 @@ describe("PreviewService queue behavior", () => {
 	let vault: IVault;
 	let metadataCache: IMetadataCache;
 
+	function createService(resolvePreview?: PreviewResolver): DisposablePreviewService {
+		return createPreviewService(
+			{
+				vault,
+				metadataCache,
+				app: { workspace: {} } as any,
+				getSettings: () => DEFAULT_SETTINGS,
+			},
+			resolvePreview,
+		);
+	}
+
+	function expectQueue(
+		service: DisposablePreviewService,
+		queued: number,
+		active: number,
+	): void {
+		let current = { queued: -1, active: -1 };
+		const unsubscribe = service.subscribeVisiblePreviewQueue((snapshot) => {
+			current = snapshot;
+		});
+		unsubscribe();
+		expect(current).toEqual({ queued, active });
+		expect(service.getOutstandingVisiblePreviewCount()).toBe(queued + active);
+	}
+
 	beforeEach(() => {
 		vault = createMockVault();
 		metadataCache = createMockMetadataCache();
@@ -34,11 +64,9 @@ describe("PreviewService queue behavior", () => {
 	});
 
 	test("queue metrics start at zero", () => {
-		const service = new PreviewServiceClass();
+		const service = createService();
 
-		expect(service.getVisibleQueueSize()).toBe(0);
-		expect(service.getActiveVisiblePreviewCount()).toBe(0);
-		expect(service.getOutstandingVisiblePreviewCount()).toBe(0);
+		expectQueue(service, 0, 0);
 	});
 
 	test("queue metrics report active and queued visible previews", async () => {
@@ -51,16 +79,14 @@ describe("PreviewService queue behavior", () => {
 			deferredByPath.set(file.path, deferred);
 			return deferred.promise;
 		});
-		const service = new PreviewServiceClass(resolvePreview);
+		const service = createService(resolvePreview);
 		const firstFile = createMockTFileAsPlainObject("first.md");
 		const secondFile = createMockTFileAsPlainObject("second.md");
 
-		const firstPromise = service.getPreview(firstFile, vault, metadataCache);
-		const secondPromise = service.getPreview(secondFile, vault, metadataCache);
+		const firstPromise = service.getPreview(firstFile);
+		const secondPromise = service.getPreview(secondFile);
 
-		expect(service.getActiveVisiblePreviewCount()).toBe(1);
-		expect(service.getVisibleQueueSize()).toBe(1);
-		expect(service.getOutstandingVisiblePreviewCount()).toBe(2);
+		expectQueue(service, 1, 1);
 
 		deferredByPath.get(firstFile.path)?.resolve({
 			type: "text",
@@ -72,9 +98,7 @@ describe("PreviewService queue behavior", () => {
 		});
 		await Promise.resolve();
 
-		expect(service.getActiveVisiblePreviewCount()).toBe(1);
-		expect(service.getVisibleQueueSize()).toBe(0);
-		expect(service.getOutstandingVisiblePreviewCount()).toBe(1);
+		expectQueue(service, 0, 1);
 
 		deferredByPath.get(secondFile.path)?.resolve({
 			type: "text",
@@ -86,39 +110,26 @@ describe("PreviewService queue behavior", () => {
 		});
 		await Promise.resolve();
 
-		expect(service.getActiveVisiblePreviewCount()).toBe(0);
-		expect(service.getVisibleQueueSize()).toBe(0);
-		expect(service.getOutstandingVisiblePreviewCount()).toBe(0);
+		expectQueue(service, 0, 0);
 	});
 
 	test("queue metrics update when a queued visible preview is aborted", async () => {
 		const firstDeferred = createDeferred<PreviewData>();
 		const resolvePreview = vi.fn<PreviewResolver>(() => firstDeferred.promise);
-		const service = new PreviewServiceClass(resolvePreview);
+		const service = createService(resolvePreview);
 		const firstFile = createMockTFileAsPlainObject("first.md");
 		const secondFile = createMockTFileAsPlainObject("second.md");
 		const secondController = new AbortController();
 
-		const firstPromise = service.getPreview(firstFile, vault, metadataCache);
-		const secondPromise = service.getPreview(
-			secondFile,
-			vault,
-			metadataCache,
-			undefined,
-			undefined,
-			secondController.signal,
-		);
+		const firstPromise = service.getPreview(firstFile);
+		const secondPromise = service.getPreview(secondFile, secondController.signal);
 
-		expect(service.getActiveVisiblePreviewCount()).toBe(1);
-		expect(service.getVisibleQueueSize()).toBe(1);
-		expect(service.getOutstandingVisiblePreviewCount()).toBe(2);
+		expectQueue(service, 1, 1);
 
 		secondController.abort();
 		await expect(secondPromise).rejects.toMatchObject({ name: "AbortError" });
 
-		expect(service.getActiveVisiblePreviewCount()).toBe(1);
-		expect(service.getVisibleQueueSize()).toBe(0);
-		expect(service.getOutstandingVisiblePreviewCount()).toBe(1);
+		expectQueue(service, 0, 1);
 
 		firstDeferred.resolve({ type: "text", content: "first" });
 		await expect(firstPromise).resolves.toEqual({
@@ -127,31 +138,25 @@ describe("PreviewService queue behavior", () => {
 		});
 		await Promise.resolve();
 
-		expect(service.getActiveVisiblePreviewCount()).toBe(0);
-		expect(service.getVisibleQueueSize()).toBe(0);
-		expect(service.getOutstandingVisiblePreviewCount()).toBe(0);
+		expectQueue(service, 0, 0);
 	});
 
-	test("shutdown resets queue metrics", () => {
+	test("dispose resets queue metrics", () => {
 		const resolvePreview = vi.fn<PreviewResolver>(
 			() => new Promise<PreviewData>(() => {}),
 		);
-		const service = new PreviewServiceClass(resolvePreview);
+		const service = createService(resolvePreview);
 		const firstFile = createMockTFileAsPlainObject("first.md");
 		const secondFile = createMockTFileAsPlainObject("second.md");
 
-		void service.getPreview(firstFile, vault, metadataCache).catch(() => {});
-		void service.getPreview(secondFile, vault, metadataCache).catch(() => {});
+		void service.getPreview(firstFile).catch(() => {});
+		void service.getPreview(secondFile).catch(() => {});
 
-		expect(service.getActiveVisiblePreviewCount()).toBe(1);
-		expect(service.getVisibleQueueSize()).toBe(1);
-		expect(service.getOutstandingVisiblePreviewCount()).toBe(2);
+		expectQueue(service, 1, 1);
 
-		service.shutdown();
+		service.dispose();
 
-		expect(service.getActiveVisiblePreviewCount()).toBe(0);
-		expect(service.getVisibleQueueSize()).toBe(0);
-		expect(service.getOutstandingVisiblePreviewCount()).toBe(0);
+		expectQueue(service, 0, 0);
 	});
 
 	test("already aborted preview is not executed", async () => {
@@ -159,19 +164,12 @@ describe("PreviewService queue behavior", () => {
 			type: "empty" as const,
 			content: "generated",
 		}));
-		const service = new PreviewServiceClass(resolvePreview);
+		const service = createService(resolvePreview);
 		const file = createMockTFileAsPlainObject("first.md");
 		const controller = new AbortController();
 		controller.abort();
 
-		const promise = service.getPreview(
-			file,
-			vault,
-			metadataCache,
-			undefined,
-			undefined,
-			controller.signal,
-		);
+		const promise = service.getPreview(file, controller.signal);
 
 		await expect(promise).rejects.toMatchObject({ name: "AbortError" });
 		expect(resolvePreview).not.toHaveBeenCalled();
@@ -180,28 +178,14 @@ describe("PreviewService queue behavior", () => {
 	test("in-flight preview for the same file is shared", async () => {
 		const deferred = createDeferred<PreviewData>();
 		const resolvePreview = vi.fn<PreviewResolver>(() => deferred.promise);
-		const service = new PreviewServiceClass(resolvePreview);
+		const service = createService(resolvePreview);
 		const file = createMockTFileAsPlainObject("shared.md");
 		const firstController = new AbortController();
 		const secondController = new AbortController();
 
-		const firstPromise = service.getPreview(
-			file,
-			vault,
-			metadataCache,
-			undefined,
-			undefined,
-			firstController.signal,
-		);
+		const firstPromise = service.getPreview(file, firstController.signal);
 
-		const secondPromise = service.getPreview(
-			file,
-			vault,
-			metadataCache,
-			undefined,
-			undefined,
-			secondController.signal,
-		);
+		const secondPromise = service.getPreview(file, secondController.signal);
 
 		expect(resolvePreview).toHaveBeenCalledTimes(1);
 
@@ -215,7 +199,7 @@ describe("PreviewService queue behavior", () => {
 		await expect(secondPromise).rejects.toMatchObject({ name: "AbortError" });
 	});
 
-	test("shutdown aborts in-flight requests", async () => {
+	test("dispose aborts in-flight requests", async () => {
 		const resolvePreview = vi.fn<PreviewResolver>(
 			(_file, _context, signal): Promise<PreviewData> => {
 				return new Promise<PreviewData>((_, reject) => {
@@ -232,15 +216,15 @@ describe("PreviewService queue behavior", () => {
 				});
 			},
 		);
-		const service = new PreviewServiceClass(resolvePreview);
+		const service = createService(resolvePreview);
 		const file = createMockTFileAsPlainObject("visible.md");
 
-		const request = service.getPreview(file, vault, metadataCache);
+		const request = service.getPreview(file);
 
 		await Promise.resolve();
 		expect(resolvePreview).toHaveBeenCalledTimes(1);
 
-		service.shutdown();
+		service.dispose();
 
 		await expect(request).rejects.toMatchObject({ name: "AbortError" });
 	});
@@ -255,7 +239,7 @@ describe("PreviewService queue behavior", () => {
 			deferredByPath.set(file.path, deferred);
 			return deferred.promise;
 		});
-		const service = new PreviewServiceClass(resolvePreview);
+		const service = createService(resolvePreview);
 		const snapshots: Array<{ queued: number; active: number }> = [];
 		const unsubscribe = service.subscribeVisiblePreviewQueue((snapshot) => {
 			snapshots.push(snapshot);
@@ -263,8 +247,8 @@ describe("PreviewService queue behavior", () => {
 		const firstFile = createMockTFileAsPlainObject("first.md");
 		const secondFile = createMockTFileAsPlainObject("second.md");
 
-		const firstPromise = service.getPreview(firstFile, vault, metadataCache);
-		const secondPromise = service.getPreview(secondFile, vault, metadataCache);
+		const firstPromise = service.getPreview(firstFile);
+		const secondPromise = service.getPreview(secondFile);
 		expect(snapshots).toContainEqual({ queued: 1, active: 1 });
 
 		deferredByPath.get(firstFile.path)?.resolve({

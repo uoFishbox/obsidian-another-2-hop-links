@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createCardPreviewSharedCache } from "../cardPreviewSharedCache";
-import { buildPreviewRenderKeys } from "features/card-preview/core/previewRenderKeys";
+import { buildPreviewRenderKey } from "features/card-preview/core/previewRenderKeys";
 import { DEFAULT_SETTINGS, type PluginSettings } from "features/settings/model";
 import { createMockTFile } from "testing/__mocks__/testHelpers";
 
@@ -157,24 +157,24 @@ describe("cardPreviewSharedCache search context", () => {
 
 	it("separates render cache keys by preview content settings", () => {
 		const file = createMockTFile("notes/render-settings.md");
-		const first = buildPreviewRenderKeys(
+		const first = buildPreviewRenderKey(
 			file,
 			"alpha",
 			createSettings({ previewMaxChars: 100 }),
 			"render-v1",
-		).renderCacheKey;
-		const second = buildPreviewRenderKeys(
+		);
+		const second = buildPreviewRenderKey(
 			file,
 			"alpha",
 			createSettings({ previewMaxChars: 200 }),
 			"render-v1",
-		).renderCacheKey;
-		const third = buildPreviewRenderKeys(
+		);
+		const third = buildPreviewRenderKey(
 			file,
 			"alpha",
 			createSettings({ previewMaxChars: 200 }),
 			"render-v1",
-		).renderCacheKey;
+		);
 
 		expect(first).not.toBe(second);
 		expect(second).toBe(third);
@@ -188,18 +188,18 @@ describe("cardPreviewSharedCache search context", () => {
 		const secondSettings = createSettings({
 			searchPreviewSeekBufferChars: 30,
 		});
-		const firstCacheKey = buildPreviewRenderKeys(
+		const firstCacheKey = buildPreviewRenderKey(
 			file,
 			"alpha",
 			firstSettings,
 			"render-v1",
-		).renderCacheKey;
-		const secondCacheKey = buildPreviewRenderKeys(
+		);
+		const secondCacheKey = buildPreviewRenderKey(
 			file,
 			"alpha",
 			secondSettings,
 			"render-v1",
-		).renderCacheKey;
+		);
 
 		await applySharedSearchContextToTextPreview({
 			previewContent: "<p>fallback preview</p>",
@@ -239,10 +239,7 @@ describe("cardPreviewSharedCache search context", () => {
 			cacheKey: "preview-id:with-offset",
 			targetFile: file,
 			normalizedQuery: "alpha",
-			searchContext: {
-				query: "alpha",
-				firstMatchOffset: 7,
-			},
+			firstMatchOffset: 7,
 			settings,
 			vault: {} as never,
 		});

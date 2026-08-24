@@ -15,10 +15,7 @@ import type {
 import { syncMathJaxStylesForNode } from "ui/shared/dom/mathJaxShadowStyles";
 import { isAbortError, throwIfAborted } from "features/card-preview/core/previewAbort";
 import { normalizePreviewQuery } from "features/card-preview/core/previewRenderKeys";
-import {
-	type CardPreviewSharedCache,
-	type PreviewSearchContext,
-} from "./cardPreviewSharedCache";
+import type { CardPreviewSharedCache } from "./cardPreviewSharedCache";
 import type { CardPreviewRequest } from "features/card-preview/core/cardPreviewRequest";
 
 function moveChildrenToFragment(source: HTMLElement): DocumentFragment {
@@ -338,7 +335,11 @@ export function createCardPreviewRenderer(
 				cacheKey: request.renderKey,
 				targetFile: request.file,
 				normalizedQuery,
-				searchContext: () => buildPreviewSearchContext(request),
+				firstMatchOffset: () =>
+					options.resolveSearchMatchPosition?.(
+						request.searchQuery,
+						request.file,
+					)?.start.offset,
 				settings: request.settings,
 				vault: options.app.vault,
 				signal,
@@ -346,22 +347,6 @@ export function createCardPreviewRenderer(
 		if (signal.aborted) return preview;
 
 		return { ...preview, content: contentForRender };
-	}
-
-	function buildPreviewSearchContext(
-		request: CardPreviewRequest,
-	): PreviewSearchContext {
-		const firstMatchOffset = options.resolveSearchMatchPosition?.(
-			request.searchQuery,
-			request.file,
-		)?.start.offset;
-
-		return {
-			query: request.searchQuery,
-			...(typeof firstMatchOffset === "number" && firstMatchOffset >= 0
-				? { firstMatchOffset }
-				: {}),
-		};
 	}
 }
 

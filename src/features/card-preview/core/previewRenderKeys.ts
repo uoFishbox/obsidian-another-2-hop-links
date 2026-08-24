@@ -61,21 +61,15 @@ export function normalizePreviewQuery(query: string): string {
 	return query.trim().toLowerCase();
 }
 
-export function buildPreviewRenderKeys(
+export function buildPreviewRenderKey(
 	file: TFile,
 	query: string,
 	settings: PreviewRenderSettingsInput,
 	previewRenderVersion: string,
-): {
-	renderCacheKey: string;
-} {
+): string {
 	const { contentSignature, searchSignature } =
 		getPreviewSettingsSignatures(settings);
 	const normalizedQuery = normalizePreviewQuery(query);
 
-	const renderKeyPrefix = `${file.path}${CACHE_KEY_SEPARATOR}${file.stat.mtime}${CACHE_KEY_SEPARATOR}${previewRenderVersion}${CACHE_KEY_SEPARATOR}${contentSignature}`;
-
-	return {
-		renderCacheKey: `${renderKeyPrefix}${CACHE_KEY_SEPARATOR}${normalizedQuery}${CACHE_KEY_SEPARATOR}${searchSignature}`,
-	};
+	return `${file.path}${CACHE_KEY_SEPARATOR}${file.stat.mtime}${CACHE_KEY_SEPARATOR}${previewRenderVersion}${CACHE_KEY_SEPARATOR}${contentSignature}${CACHE_KEY_SEPARATOR}${normalizedQuery}${CACHE_KEY_SEPARATOR}${searchSignature}`;
 }

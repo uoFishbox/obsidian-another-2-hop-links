@@ -1,6 +1,5 @@
 import type { TFile } from "obsidian";
 import type { IMetadataCache, IVault } from "types/obsidian";
-import type { PreviewContext } from "./previewResolver";
 import type { ProtectedSegment } from "../text-processing/protectedHtml";
 import { buildProtectedSegmentToken } from "../text-processing/protectedHtml";
 
@@ -45,26 +44,6 @@ export async function getFileContent(file: TFile, vault: IVault): Promise<string
 		return await vault.cachedRead(file);
 	}
 	return "";
-}
-
-export async function readPreviewContent(
-	file: TFile,
-	context: Pick<PreviewContext, "vault" | "getContent">,
-	signal?: AbortSignal,
-): Promise<string | undefined> {
-	if (signal?.aborted) {
-		return undefined;
-	}
-
-	const content = context.getContent
-		? await context.getContent(signal)
-		: await getFileContent(file, context.vault);
-
-	if (signal?.aborted || !content) {
-		return undefined;
-	}
-
-	return content;
 }
 
 export function resolveFile(path: string, metadataCache: IMetadataCache): TFile | null {

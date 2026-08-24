@@ -3,7 +3,7 @@ import { describe, expect, test } from "vitest";
 import { DEFAULT_SETTINGS } from "features/settings/model";
 import { compileCardPreviewRequest } from "../cardPreviewRequest";
 import { createPreviewOverrideIdentity } from "../previewRenderIdentity";
-import { buildPreviewRenderKeys, normalizePreviewQuery } from "../previewRenderKeys";
+import { buildPreviewRenderKey, normalizePreviewQuery } from "../previewRenderKeys";
 
 function createFile(path: string, extension = "md"): TFile {
 	const name = path.slice(path.lastIndexOf("/") + 1);
@@ -36,12 +36,12 @@ describe("preview render keys", () => {
 				previewOverride: override,
 			}).renderKey,
 		).toBe(
-			buildPreviewRenderKeys(
+			buildPreviewRenderKey(
 				file,
 				normalizedQuery,
 				DEFAULT_SETTINGS,
 				renderVersionIdentity,
-			).renderCacheKey,
+			),
 		);
 	});
 });

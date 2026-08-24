@@ -10,14 +10,8 @@ import { generateVideoPreview } from "../renderers/videoPreviewRenderer";
 import { getContentSnippetAsync } from "../text-processing/previewTextProcessingAsync";
 import { resolveEmbeddedMediaPreview } from "../strategies/EmbeddedMediaStrategy";
 import { createAbortError, isAbortError } from "./previewAbort";
-import {
-	isCanvas,
-	isImage,
-	isSource,
-	isVideo,
-	readPreviewContent,
-} from "./previewContent";
-import type { PreviewContext } from "./previewResolver";
+import { isCanvas, isImage, isSource, isVideo } from "./previewContent";
+import type { PreviewContext } from "./previewContext";
 
 type OptionalPreviewResolver = (
 	file: TFile,
@@ -69,7 +63,7 @@ async function resolveFrontmatterPropertyPreview(
 	signal?: AbortSignal,
 ): Promise<PreviewData | undefined> {
 	if (file.extension !== "md" || signal?.aborted) return undefined;
-	const key = context.settings?.priorityFrontmatterKeyForPreview?.trim();
+	const key = context.settings.priorityFrontmatterKeyForPreview?.trim();
 	if (!key) return undefined;
 
 	const value = context.metadataCache.getFileCache(file)?.frontmatter?.[key];
@@ -103,7 +97,7 @@ async function resolveVideoPreview(
 	return await generateVideoPreview(
 		file,
 		signal,
-		context.app ? resolveWorkspaceDocument(context.app.workspace) : undefined,
+		resolveWorkspaceDocument(context.app.workspace),
 	);
 }
 
@@ -112,7 +106,7 @@ async function resolveCanvasPreview(
 	context: PreviewContext,
 	signal?: AbortSignal,
 ): Promise<PreviewData | undefined> {
-	if (!isCanvas(file) || signal?.aborted || !context.app) return undefined;
+	if (!isCanvas(file) || signal?.aborted) return undefined;
 	return await generateCanvasPreview(file, context.app, signal);
 }
 
@@ -133,8 +127,9 @@ async function resolveTextSnippetPreview(
 	signal?: AbortSignal,
 ): Promise<PreviewData | undefined> {
 	if (file.extension !== "md" && !isSource(file)) return undefined;
-	const content = await readPreviewContent(file, context, signal);
-	if (!content) return undefined;
+	if (signal?.aborted) return undefined;
+	const content = await context.getContent(signal);
+	if (signal?.aborted || !content) return undefined;
 	const snippet = await getContentSnippetAsync(
 		content,
 		context.settings,

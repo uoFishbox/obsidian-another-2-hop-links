@@ -1,7 +1,6 @@
 import type { App, TFile } from "obsidian";
 import type { IMetadataCache, IVault } from "types/obsidian";
 import type { PluginSettings } from "features/settings/model";
-import type { PreviewContext } from "./previewResolver";
 import type { ParsedEmbed } from "../text-processing/mediaExtractor";
 import { defaultYieldToMainThread } from "core/indexing/timeSlicing";
 import { extractFirstEmbeddedMediaAsync } from "../text-processing/previewTextProcessingAsync";
@@ -9,12 +8,22 @@ import { readRawContent } from "./rawContentReader";
 
 const VISIBLE_PREVIEW_SCAN_BUDGET_CHARS = 200_000;
 
+/** Concrete dependencies and lazy content reads for one preview generation. */
+export interface PreviewContext {
+	readonly vault: IVault;
+	readonly metadataCache: IMetadataCache;
+	readonly app: App;
+	readonly settings: PluginSettings;
+	readonly getContent: (signal?: AbortSignal) => Promise<string>;
+	readonly getFirstEmbeddedMedia: () => Promise<ParsedEmbed | undefined>;
+}
+
 export function createPreviewContext(
 	file: TFile,
 	vault: IVault,
 	metadataCache: IMetadataCache,
-	app: App | undefined,
-	settings: PluginSettings | undefined,
+	app: App,
+	settings: PluginSettings,
 	signal?: AbortSignal,
 ): PreviewContext {
 	let contentPromise: Promise<string> | undefined;
@@ -47,9 +56,7 @@ export function createPreviewContext(
 		metadataCache,
 		app,
 		settings,
-		scanBudgetChars: VISIBLE_PREVIEW_SCAN_BUDGET_CHARS,
 		getContent,
 		getFirstEmbeddedMedia,
-		yieldToMainThread: defaultYieldToMainThread,
 	};
 }

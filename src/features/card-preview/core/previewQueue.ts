@@ -147,9 +147,9 @@ export function createPreviewQueue() {
 
 	return {
 		enqueue,
+		getQueuedCount: () => queue.length,
 		getActiveCount: () => activeCount,
 		getOutstandingCount: () => queue.length + activeCount,
-		getSize: () => queue.length,
 		shutdown,
 		subscribe,
 	};

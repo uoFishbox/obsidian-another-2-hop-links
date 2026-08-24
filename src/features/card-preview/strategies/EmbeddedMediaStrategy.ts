@@ -1,12 +1,11 @@
 import type { TFile } from "obsidian";
 import type { PreviewData } from "../public-types";
-import type { PreviewContext } from "../core/previewResolver";
+import type { PreviewContext } from "../core/previewContext";
 import {
 	parseEmbeddedMedia,
 	type ParsedEmbed,
 } from "../text-processing/mediaExtractor";
-import { extractFirstEmbeddedMediaAsync } from "../text-processing/previewTextProcessingAsync";
-import { isImage, isVideo, readPreviewContent } from "../core/previewContent";
+import { isImage, isVideo } from "../core/previewContent";
 import {
 	isFileUrlImage,
 	toObsidianResourceUrl,
@@ -38,7 +37,7 @@ export async function resolveEmbeddedMediaPreview(
 	signal?: AbortSignal,
 ): Promise<PreviewData | undefined> {
 	if (file.extension !== "md" || signal?.aborted) return undefined;
-	const embedded = await resolveFirstEmbed(file, context, signal);
+	const embedded = await resolveFirstEmbed(file, context);
 	if (signal?.aborted || !embedded) return undefined;
 	return resolveEmbeddedMedia(file.path, embedded, context, signal);
 }
@@ -46,7 +45,6 @@ export async function resolveEmbeddedMediaPreview(
 async function resolveFirstEmbed(
 	file: TFile,
 	context: PreviewContext,
-	signal?: AbortSignal,
 ): Promise<ParsedEmbed | undefined> {
 	if (file.extension === "md") {
 		const cache = context.metadataCache.getFileCache(file);
@@ -56,20 +54,7 @@ async function resolveFirstEmbed(
 		}
 	}
 
-	if (context.getFirstEmbeddedMedia) {
-		return await context.getFirstEmbeddedMedia();
-	}
-
-	const content = await readPreviewContent(file, context, signal);
-	if (!content) {
-		return undefined;
-	}
-
-	return await extractFirstEmbeddedMediaAsync(content, {
-		maxScanChars: context.scanBudgetChars,
-		signal,
-		yieldToMainThread: context.yieldToMainThread,
-	});
+	return await context.getFirstEmbeddedMedia();
 }
 
 async function resolveEmbeddedMedia(
@@ -94,7 +79,7 @@ async function resolveEmbeddedMedia(
 		return await generateVideoPreview(
 			resolved,
 			signal,
-			context.app ? resolveWorkspaceDocument(context.app.workspace) : undefined,
+			resolveWorkspaceDocument(context.app.workspace),
 		);
 	}
 

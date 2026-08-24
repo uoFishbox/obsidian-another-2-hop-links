@@ -21,13 +21,6 @@ import {
 import type { PreviewRenderSettingsInput } from "features/card-preview/core/previewRenderSettings";
 import { createSizedLRUCache, stringBytes } from "shared/cache/sizedLRUCache";
 
-export type PreviewSearchContext = {
-	query: string;
-	firstMatchOffset?: number;
-	matchedLine?: string;
-	surroundingText?: string;
-};
-
 const SEARCH_CONTEXT_CACHE_MAX_BYTES = 4 * 1024 * 1024;
 const PREVIEW_ANALYSIS_CACHE_MAX_BYTES = 2 * 1024 * 1024;
 
@@ -166,9 +159,12 @@ function abortSharedRequests<T>(requests: Map<string, SharedInFlightRequest<T>>)
 function resolveFirstMatchIndex(
 	rawContent: string,
 	normalizedQuery: string,
-	searchContext: PreviewSearchContext | undefined,
+	firstMatchOffsetInput: number | (() => number | undefined) | undefined,
 ): number {
-	const firstMatchOffset = searchContext?.firstMatchOffset;
+	const firstMatchOffset =
+		typeof firstMatchOffsetInput === "function"
+			? firstMatchOffsetInput()
+			: firstMatchOffsetInput;
 	if (
 		typeof firstMatchOffset === "number" &&
 		Number.isFinite(firstMatchOffset) &&
@@ -188,7 +184,7 @@ async function applySharedSearchContextToTextPreviewForState(
 		cacheKey: string;
 		targetFile: TFile;
 		normalizedQuery: string;
-		searchContext?: PreviewSearchContext | (() => PreviewSearchContext | undefined);
+		firstMatchOffset?: number | (() => number | undefined);
 		settings: PreviewRenderSettingsInput;
 		vault: Vault;
 		signal?: AbortSignal;
@@ -199,7 +195,7 @@ async function applySharedSearchContextToTextPreviewForState(
 		cacheKey,
 		targetFile,
 		normalizedQuery,
-		searchContext,
+		firstMatchOffset,
 		settings,
 		vault,
 		signal,
@@ -235,12 +231,10 @@ async function applySharedSearchContextToTextPreviewForState(
 			const rawContent = await readRawContent(targetFile, vault, sharedSignal);
 			throwIfAborted(sharedSignal, "Preview request aborted");
 
-			const resolvedSearchContext =
-				typeof searchContext === "function" ? searchContext() : searchContext;
 			const firstMatchIndex = resolveFirstMatchIndex(
 				rawContent,
 				normalizedQuery,
-				resolvedSearchContext,
+				firstMatchOffset,
 			);
 			throwIfAborted(sharedSignal, "Preview request aborted");
 

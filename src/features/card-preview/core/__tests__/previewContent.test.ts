@@ -1,7 +1,7 @@
-import { describe, expect, test, vi, type Mock } from "vitest";
+import { describe, expect, test, vi } from "vitest";
 import { resolveEmbeddedMediaPreview } from "../../strategies/EmbeddedMediaStrategy";
 import { canvasToSearchText } from "../../text-processing/canvasText";
-import { analyzePreviewContent, readPreviewContent } from "../previewContent";
+import { analyzePreviewContent } from "../previewContent";
 import {
 	createMockTFileAsPlainObject,
 	createMockVault,
@@ -33,46 +33,6 @@ describe("canvasToSearchText", () => {
 		expect(result.searchableText).toBe(
 			"first\nline\nNote.md#Heading\nhttps://example.com\nGroup",
 		);
-	});
-});
-
-describe("readPreviewContent", () => {
-	test("prioritizes using context.getContent", async () => {
-		const file = createMockTFileAsPlainObject("note.md");
-		const vault = createMockVault();
-		const getContent = vi.fn().mockResolvedValue("context-content");
-		const context = { vault, getContent } as any;
-
-		await expect(readPreviewContent(file, context)).resolves.toBe(
-			"context-content",
-		);
-		expect(getContent).toHaveBeenCalledTimes(1);
-		expect(vault.cachedRead).not.toHaveBeenCalled();
-	});
-
-	test("falls back to vault.cachedRead when getContent is unavailable", async () => {
-		const file = createMockTFileAsPlainObject("note.md");
-		const vault = createMockVault();
-		(vault.cachedRead as Mock).mockResolvedValue("vault-content");
-		const context = { vault } as any;
-
-		await expect(readPreviewContent(file, context)).resolves.toBe("vault-content");
-		expect(vault.cachedRead).toHaveBeenCalledTimes(1);
-	});
-
-	test("does not start reading when already aborted", async () => {
-		const file = createMockTFileAsPlainObject("note.md");
-		const vault = createMockVault();
-		const getContent = vi.fn().mockResolvedValue("context-content");
-		const controller = new AbortController();
-		controller.abort();
-		const context = { vault, getContent } as any;
-
-		await expect(
-			readPreviewContent(file, context, controller.signal),
-		).resolves.toBeUndefined();
-		expect(getContent).not.toHaveBeenCalled();
-		expect(vault.cachedRead).not.toHaveBeenCalled();
 	});
 });
 

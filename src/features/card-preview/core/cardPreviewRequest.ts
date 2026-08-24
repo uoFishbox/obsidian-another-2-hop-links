@@ -2,7 +2,7 @@ import type { TFile } from "obsidian";
 import type { PluginSettings } from "features/settings/model";
 import type { PreviewData } from "features/card-preview/public-types";
 import { createPreviewOverrideIdentity } from "./previewRenderIdentity";
-import { buildPreviewRenderKeys } from "./previewRenderKeys";
+import { buildPreviewRenderKey } from "./previewRenderKeys";
 import {
 	createPreviewRenderSettings,
 	type PreviewRenderSettings,
@@ -36,7 +36,7 @@ export function compileCardPreviewRequest(
 	);
 	const previewCacheRevision = params.previewRenderVersion;
 	const renderRevision = `${previewCacheRevision}:${previewOverrideIdentity}`;
-	const keys = buildPreviewRenderKeys(
+	const renderKey = buildPreviewRenderKey(
 		params.file,
 		params.searchQuery,
 		settings,
@@ -44,7 +44,7 @@ export function compileCardPreviewRequest(
 	);
 
 	return Object.freeze({
-		renderKey: keys.renderCacheKey,
+		renderKey,
 		previewCacheRevision,
 		file: params.file,
 		searchQuery: params.searchQuery,
