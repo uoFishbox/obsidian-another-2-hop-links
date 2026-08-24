@@ -3,6 +3,7 @@ import { describe, expect, test } from "vitest";
 import { DEFAULT_SETTINGS } from "features/settings/model";
 import { compileCardPreviewRequest } from "../cardPreviewRequest";
 import { createPreviewOverrideIdentity } from "../cardPreviewRequest";
+import { createPreviewRenderSettings } from "../previewRenderSettings";
 import { buildPreviewRenderKey, normalizePreviewQuery } from "../previewRenderKeys";
 
 function createFile(path: string, extension = "md"): TFile {
@@ -26,6 +27,7 @@ describe("preview render keys", () => {
 		const normalizedQuery = normalizePreviewQuery(" Alpha ");
 		const overrideIdentity = createPreviewOverrideIdentity(override);
 		const renderVersionIdentity = `${renderVersion}:${overrideIdentity}`;
+		const renderSettings = createPreviewRenderSettings(DEFAULT_SETTINGS);
 
 		expect(
 			compileCardPreviewRequest({
@@ -39,7 +41,7 @@ describe("preview render keys", () => {
 			buildPreviewRenderKey(
 				file,
 				normalizedQuery,
-				DEFAULT_SETTINGS,
+				renderSettings,
 				renderVersionIdentity,
 			),
 		);

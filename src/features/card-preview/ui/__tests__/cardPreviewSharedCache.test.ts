@@ -1,6 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createCardPreviewSharedCache } from "../cardPreviewSharedCache";
 import { buildPreviewRenderKey } from "features/card-preview/core/previewRenderKeys";
+import {
+	createPreviewRenderSettings,
+	type PreviewRenderSettings,
+} from "features/card-preview/core/previewRenderSettings";
 import { DEFAULT_SETTINGS, type PluginSettings } from "features/settings/model";
 import { createMockTFile } from "testing/__mocks__/testHelpers";
 
@@ -40,11 +44,13 @@ vi.mock("features/card-preview/core/previewContent", () => ({
 	analyzePreviewContent: state.analyzePreviewContent,
 }));
 
-function createSettings(overrides: Partial<PluginSettings> = {}): PluginSettings {
-	return {
+function createSettings(
+	overrides: Partial<PluginSettings> = {},
+): PreviewRenderSettings {
+	return createPreviewRenderSettings({
 		...DEFAULT_SETTINGS,
 		...overrides,
-	};
+	});
 }
 
 function createDeferred<T>() {

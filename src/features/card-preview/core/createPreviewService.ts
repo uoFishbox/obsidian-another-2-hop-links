@@ -15,6 +15,7 @@ import { createAbortError, isAbortError } from "./previewAbort";
 import { createPreviewContext } from "./previewContext";
 import { createPreviewQueue } from "./previewQueue";
 import { resolvePreview as resolveDefaultPreview } from "./previewPipeline";
+import { createPreviewRenderSettings } from "./previewRenderSettings";
 import type { PluginSettings } from "features/settings/model";
 import type { App } from "obsidian";
 import type { IMetadataCache, IVault } from "types/obsidian";
@@ -63,7 +64,7 @@ export function createPreviewService(
 		const settings = options.getSettings();
 		const cacheKey = buildPreviewGenerationKey(
 			file,
-			settings,
+			createPreviewRenderSettings(settings),
 			requestOptions.cacheRevision,
 		);
 		const cached = cache.get(cacheKey);

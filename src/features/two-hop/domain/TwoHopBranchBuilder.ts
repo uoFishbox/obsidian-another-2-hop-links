@@ -5,10 +5,7 @@ import type { LinkReference, TwoHopIndexedLink, TwoHopLinkBranch } from "types/d
 import { defaultYieldToMainThread } from "core/indexing/timeSlicing";
 import { getLookupPathForLink } from "core/indexing/link-resolution/linkResolution";
 import { resolveLinkDestination } from "core/indexing/link-resolution/linkResolution";
-import {
-	throwIfResolveAborted,
-	type ResolverPerformanceSettings,
-} from "./ResolverDependencies";
+import { throwIfResolveAborted } from "./ResolverDependencies";
 
 const BUILD_YIELD_INTERVAL_MS = 8;
 const BUILD_YIELD_CHECK_CADENCE = 32;
@@ -22,7 +19,6 @@ export class TwoHopBranchBuilder {
 	public async buildHop1OnlyBranches(
 		targetFile: TFile,
 		outgoingLinks: readonly LinkReference[],
-		performanceSettings: ResolverPerformanceSettings,
 		signal?: AbortSignal,
 	): Promise<TwoHopLinkBranch[]> {
 		let lastYieldAt = this.getNowMs();
@@ -33,12 +29,7 @@ export class TwoHopBranchBuilder {
 			string,
 			ReturnType<typeof resolveLinkDestination>
 		>();
-		const effectiveCount = this.getEffectiveOutgoingCount(
-			outgoingLinks,
-			performanceSettings.maxOutgoingToProcess,
-		);
-
-		for (let i = 0; i < effectiveCount; i += 1) {
+		for (let i = 0; i < outgoingLinks.length; i += 1) {
 			throwIfResolveAborted(signal);
 			const linkReference = outgoingLinks[i];
 			const resolution = this.getResolvedOutgoingLink(
@@ -58,13 +49,7 @@ export class TwoHopBranchBuilder {
 					linkReference,
 				);
 				processedCount += 1;
-				if (
-					this.shouldYieldToMainThread(
-						processedCount,
-						lastYieldAt,
-						performanceSettings.enableProgressiveTwoHopBuild,
-					)
-				) {
+				if (this.shouldYieldToMainThread(processedCount, lastYieldAt)) {
 					await this.yieldToMainThread();
 					throwIfResolveAborted(signal);
 					lastYieldAt = this.getNowMs();
@@ -83,13 +68,7 @@ export class TwoHopBranchBuilder {
 			branches.push({ hop1, hop2: [] });
 
 			processedCount += 1;
-			if (
-				this.shouldYieldToMainThread(
-					processedCount,
-					lastYieldAt,
-					performanceSettings.enableProgressiveTwoHopBuild,
-				)
-			) {
+			if (this.shouldYieldToMainThread(processedCount, lastYieldAt)) {
 				await this.yieldToMainThread();
 				throwIfResolveAborted(signal);
 				lastYieldAt = this.getNowMs();
@@ -102,7 +81,6 @@ export class TwoHopBranchBuilder {
 	public async populateHop2(
 		targetFile: TFile,
 		branches: readonly TwoHopLinkBranch[],
-		performanceSettings: ResolverPerformanceSettings,
 		signal?: AbortSignal,
 	): Promise<TwoHopLinkBranch[]> {
 		let lastYieldAt = this.getNowMs();
@@ -120,13 +98,7 @@ export class TwoHopBranchBuilder {
 				),
 			};
 
-			if (
-				this.shouldYieldToMainThread(
-					index + 1,
-					lastYieldAt,
-					performanceSettings.enableProgressiveTwoHopBuild,
-				)
-			) {
+			if (this.shouldYieldToMainThread(index + 1, lastYieldAt)) {
 				await this.yieldToMainThread();
 				throwIfResolveAborted(signal);
 				lastYieldAt = this.getNowMs();
@@ -163,16 +135,6 @@ export class TwoHopBranchBuilder {
 			existingHop1,
 			"position" in linkReference ? linkReference.position : undefined,
 		);
-	}
-
-	private getEffectiveOutgoingCount(
-		outgoingLinks: readonly LinkReference[],
-		maxOutgoingToProcess: number,
-	): number {
-		if (maxOutgoingToProcess <= 0) {
-			return outgoingLinks.length;
-		}
-		return Math.min(outgoingLinks.length, maxOutgoingToProcess);
 	}
 
 	private getResolvedOutgoingLink(
@@ -244,14 +206,7 @@ export class TwoHopBranchBuilder {
 		);
 	}
 
-	private shouldYieldToMainThread(
-		iteration: number,
-		lastYieldAt: number,
-		enableProgressiveTwoHopBuild: boolean,
-	): boolean {
-		if (!enableProgressiveTwoHopBuild) {
-			return false;
-		}
+	private shouldYieldToMainThread(iteration: number, lastYieldAt: number): boolean {
 		if ((iteration & (BUILD_YIELD_CHECK_CADENCE - 1)) !== 0) {
 			return false;
 		}

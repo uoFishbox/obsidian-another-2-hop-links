@@ -2,6 +2,10 @@ import {
 	findFencedCodeBlockContainingOffset,
 	type FencedCodeBlockRange,
 } from "./fencedCodeBlocks";
+import {
+	SEARCH_PREVIEW_SEEK_BUFFER_CHARS,
+	SEARCH_PREVIEW_SEEK_THRESHOLD_CHARS,
+} from "../core/previewRenderSettings";
 import { stripLeadingFrontmatter } from "./frontmatterUtils";
 import { findCaseInsensitiveIndex } from "./searchUtils";
 import type { GetContentSnippetOptions, PreviewSnippetSettings } from "./types";
@@ -13,31 +17,26 @@ export interface ContentSnippetWindow {
 	readonly hasTrailingOmission: boolean;
 }
 
+const DEFAULT_PREVIEW_MAX_CHARS = 300;
 const DEFAULT_SEARCH_PREVIEW_SEEK_THRESHOLD_CHARS = 300;
 const DEFAULT_SEARCH_PREVIEW_SEEK_BUFFER_CHARS = 30;
-const DEFAULT_PREVIEW_MAX_CHARS = 300;
 const RAW_WINDOW_SIZE_MULTIPLIER = 4;
 const MIN_RAW_WINDOW_SIZE = 2500;
 
 function resolveSearchPreviewSeekThresholdChars(
 	settings: PreviewSnippetSettings | undefined,
 ): number {
-	const fallbackThreshold =
-		settings?.previewMaxChars && settings.previewMaxChars > 0
-			? settings.previewMaxChars
-			: DEFAULT_SEARCH_PREVIEW_SEEK_THRESHOLD_CHARS;
-	const configuredThreshold =
-		settings?.searchPreviewSeekThresholdChars ?? fallbackThreshold;
-	return Math.max(configuredThreshold, 0);
+	return settings
+		? SEARCH_PREVIEW_SEEK_THRESHOLD_CHARS
+		: DEFAULT_SEARCH_PREVIEW_SEEK_THRESHOLD_CHARS;
 }
 
 function resolveSearchPreviewSeekBufferChars(
 	settings: PreviewSnippetSettings | undefined,
 ): number {
-	const configuredBuffer =
-		settings?.searchPreviewSeekBufferChars ??
-		DEFAULT_SEARCH_PREVIEW_SEEK_BUFFER_CHARS;
-	return Math.max(configuredBuffer, 0);
+	return settings
+		? SEARCH_PREVIEW_SEEK_BUFFER_CHARS
+		: DEFAULT_SEARCH_PREVIEW_SEEK_BUFFER_CHARS;
 }
 
 function resolveFirstMatchIndexAfterFrontmatter(

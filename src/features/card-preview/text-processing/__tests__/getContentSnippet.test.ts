@@ -2,6 +2,7 @@ import { describe, test, expect } from "vitest";
 import { getContentSnippet } from "../snippetExtractor";
 import type { PluginSettings } from "features/settings/model";
 import { DEFAULT_SETTINGS } from "features/settings/model";
+import { SEARCH_PREVIEW_SEEK_BUFFER_CHARS } from "features/card-preview/core/previewRenderSettings";
 
 const defaultSettings: PluginSettings = DEFAULT_SETTINGS;
 
@@ -503,18 +504,13 @@ describe("getContentSnippet with search query", () => {
 		expect(result).toContain("C++");
 	});
 
-	test("seeks within threshold using buffer", () => {
-		const settings = {
-			...defaultSettings,
-			searchPreviewSeekThresholdChars: 20,
-			searchPreviewSeekBufferChars: 8,
-		};
+	test("seeks using the fixed search buffer", () => {
 		const content = "prefix-prefix-prefix-target-suffix";
-		const result = getContentSnippet(content, settings, "target");
+		const result = getContentSnippet(content, defaultSettings, "target");
 		const snippet = result.startsWith("...") ? result.slice(3) : result;
 		const matchIndex = snippet.toLowerCase().indexOf("target");
 		expect(matchIndex).toBeGreaterThanOrEqual(0);
-		expect(matchIndex).toBeLessThanOrEqual(8);
+		expect(matchIndex).toBeLessThanOrEqual(SEARCH_PREVIEW_SEEK_BUFFER_CHARS);
 	});
 
 	test("keeps a match at the content start with a line limit", () => {

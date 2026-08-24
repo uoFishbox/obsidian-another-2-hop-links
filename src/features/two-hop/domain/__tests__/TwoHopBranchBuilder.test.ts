@@ -31,10 +31,6 @@ describe("TwoHopBranchBuilder", () => {
 			collectLinkReferences(
 				service["metadataCache"].getFileCache(files["origin.md"]),
 			),
-			{
-				enableProgressiveTwoHopBuild: true,
-				maxOutgoingToProcess: 0,
-			},
 		);
 
 		expect(branches).toHaveLength(128);
@@ -60,10 +56,6 @@ describe("TwoHopBranchBuilder", () => {
 				collectLinkReferences(
 					service["metadataCache"].getFileCache(files["origin.md"]),
 				),
-				{
-					enableProgressiveTwoHopBuild: true,
-					maxOutgoingToProcess: 0,
-				},
 				signal,
 			),
 		).rejects.toMatchObject({ name: "AbortError" });

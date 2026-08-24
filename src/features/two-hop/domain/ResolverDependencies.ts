@@ -79,11 +79,6 @@ export function createTwoHopResolveSnapshot(
 	return Object.freeze({ result, dependencies });
 }
 
-export interface ResolverPerformanceSettings {
-	enableProgressiveTwoHopBuild: boolean;
-	maxOutgoingToProcess: number;
-}
-
 export function createResolveAbortError(): DOMException | Error {
 	if (typeof DOMException !== "undefined") {
 		return new DOMException("Two-hop resolve aborted", "AbortError");

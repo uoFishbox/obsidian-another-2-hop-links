@@ -7,8 +7,6 @@ export interface PreviewSnippetSettings {
 	readonly previewMaxLines: number;
 	readonly previewMaxChars: number;
 	readonly previewVisualLineSafetyMargin: number;
-	readonly searchPreviewSeekThresholdChars?: number;
-	readonly searchPreviewSeekBufferChars?: number;
 }
 
 /** Optional search metadata supplied by callers that already located a match. */

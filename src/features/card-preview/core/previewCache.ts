@@ -1,6 +1,6 @@
 import type { TFile } from "obsidian";
 import type { PreviewData } from "../public-types";
-import type { PreviewRenderSettingsInput } from "./previewRenderSettings";
+import type { PreviewRenderSettings } from "./previewRenderSettings";
 import { buildPreviewContentSettingsSignature } from "./previewRenderKeys";
 import { createSizedLRUCache, stringBytes } from "shared/cache/sizedLRUCache";
 import type { SizedLRUCache } from "shared/cache/sizedLRUCache";
@@ -23,7 +23,7 @@ export function createPreviewGenerationCache(): PreviewGenerationCache {
 
 export function buildPreviewGenerationKey(
 	file: TFile,
-	settings?: PreviewRenderSettingsInput,
+	settings?: PreviewRenderSettings,
 	cacheRevision: number | string = "",
 ): string {
 	const settingsSignature = settings

@@ -1,7 +1,8 @@
 import type { PluginSettings } from "features/settings/model";
 
-const SEARCH_PREVIEW_SEEK_THRESHOLD_CHARS = 0;
-const SEARCH_PREVIEW_SEEK_BUFFER_CHARS = 15;
+/** Fixed search-snippet seek policy after the corresponding settings were removed. */
+export const SEARCH_PREVIEW_SEEK_THRESHOLD_CHARS = 0;
+export const SEARCH_PREVIEW_SEEK_BUFFER_CHARS = 15;
 
 /** Settings which can change generated or rendered card preview content. */
 export interface PreviewRenderSettings {
@@ -11,12 +12,7 @@ export interface PreviewRenderSettings {
 	readonly previewMaxLines: number;
 	readonly previewVisualLineSafetyMargin: number;
 	readonly priorityFrontmatterKeyForPreview: string;
-	readonly searchPreviewSeekThresholdChars: number;
-	readonly searchPreviewSeekBufferChars: number;
 }
-
-/** Accepted only at compilation/cache compatibility boundaries. */
-export type PreviewRenderSettingsInput = PreviewRenderSettings | PluginSettings;
 
 const settingsSnapshots = new WeakMap<PluginSettings, PreviewRenderSettings>();
 
@@ -35,8 +31,6 @@ export function createPreviewRenderSettings(
 		previewVisualLineSafetyMargin: settings.previewVisualLineSafetyMargin,
 		priorityFrontmatterKeyForPreview:
 			settings.priorityFrontmatterKeyForPreview ?? "",
-		searchPreviewSeekThresholdChars: SEARCH_PREVIEW_SEEK_THRESHOLD_CHARS,
-		searchPreviewSeekBufferChars: SEARCH_PREVIEW_SEEK_BUFFER_CHARS,
 	});
 	settingsSnapshots.set(settings, snapshot);
 	return snapshot;

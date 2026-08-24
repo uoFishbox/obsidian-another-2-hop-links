@@ -1,8 +1,5 @@
 import type { TFile } from "obsidian";
-import type {
-	PreviewRenderSettings,
-	PreviewRenderSettingsInput,
-} from "./previewRenderSettings";
+import type { PreviewRenderSettings } from "./previewRenderSettings";
 
 export const CACHE_KEY_SEPARATOR = "\0";
 const SIGNATURE_SEP = "\u001f";
@@ -15,7 +12,7 @@ export interface PreviewSettingsSignatures {
 const settingsSignatureCache = new WeakMap<object, PreviewSettingsSignatures>();
 
 export function buildPreviewContentSettingsSignature(
-	settings: PreviewRenderSettingsInput,
+	settings: PreviewRenderSettings,
 ): string {
 	return [
 		settings.cardWidthPx,
@@ -27,30 +24,18 @@ export function buildPreviewContentSettingsSignature(
 	].join(SIGNATURE_SEP);
 }
 
-function buildSearchContextSettingsSignature(
-	settings: PreviewRenderSettingsInput,
-): string {
-	const seekThreshold =
-		"searchPreviewSeekThresholdChars" in settings
-			? settings.searchPreviewSeekThresholdChars
-			: 0;
-	const seekBuffer =
-		"searchPreviewSeekBufferChars" in settings
-			? settings.searchPreviewSeekBufferChars
-			: 15;
+function buildSearchContextSettingsSignature(settings: PreviewRenderSettings): string {
 	return [
 		settings.cardWidthPx,
 		settings.cardHeightRatio,
 		settings.previewMaxChars,
 		settings.previewMaxLines,
 		settings.previewVisualLineSafetyMargin,
-		seekThreshold,
-		seekBuffer,
 	].join(SIGNATURE_SEP);
 }
 
 export function getPreviewSettingsSignatures(
-	settings: PreviewRenderSettingsInput,
+	settings: PreviewRenderSettings,
 ): PreviewSettingsSignatures {
 	const cached = settingsSignatureCache.get(settings);
 	if (cached) {
@@ -72,7 +57,7 @@ export function normalizePreviewQuery(query: string): string {
 export function buildPreviewRenderKey(
 	file: TFile,
 	query: string,
-	settings: PreviewRenderSettingsInput,
+	settings: PreviewRenderSettings,
 	previewRenderVersion: string,
 ): string {
 	const { contentSignature, searchSignature } =

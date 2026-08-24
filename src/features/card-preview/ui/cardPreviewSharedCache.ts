@@ -18,7 +18,7 @@ import {
 	isAbortError,
 	throwIfAborted,
 } from "features/card-preview/core/previewAbort";
-import type { PreviewRenderSettingsInput } from "features/card-preview/core/previewRenderSettings";
+import type { PreviewRenderSettings } from "features/card-preview/core/previewRenderSettings";
 import { createSizedLRUCache, stringBytes } from "shared/cache/sizedLRUCache";
 
 const SEARCH_CONTEXT_CACHE_MAX_BYTES = 4 * 1024 * 1024;
@@ -185,7 +185,7 @@ async function applySharedSearchContextToTextPreviewForState(
 		targetFile: TFile;
 		normalizedQuery: string;
 		firstMatchOffset?: number | (() => number | undefined);
-		settings: PreviewRenderSettingsInput;
+		settings: PreviewRenderSettings;
 		vault: Vault;
 		signal?: AbortSignal;
 	},

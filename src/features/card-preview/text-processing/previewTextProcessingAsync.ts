@@ -37,8 +37,6 @@ function selectPreviewSnippetSettings(
 		previewMaxLines: settings.previewMaxLines,
 		previewMaxChars: settings.previewMaxChars,
 		previewVisualLineSafetyMargin: settings.previewVisualLineSafetyMargin,
-		searchPreviewSeekThresholdChars: settings.searchPreviewSeekThresholdChars,
-		searchPreviewSeekBufferChars: settings.searchPreviewSeekBufferChars,
 	};
 }
 

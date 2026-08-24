@@ -7,7 +7,6 @@ import type {
 	TwoHopIndexedLink,
 } from "types/domain";
 import type { IIndexingService } from "types/services";
-import type { ResolverPerformanceSettings } from "../ResolverDependencies";
 
 type ResolverEnvironment = ReturnType<VaultEnvironmentBuilder["build"]>;
 
@@ -24,15 +23,8 @@ function createDeferred<T>() {
 function createResolver(
 	env: ResolverEnvironment,
 	indexingService: IIndexingService = env.service,
-	options?: {
-		performance?: () => Partial<ResolverPerformanceSettings>;
-	},
 ): TwoHopLinkResolver {
-	return new TwoHopLinkResolver(
-		env.mockMetadataCache,
-		indexingService,
-		options?.performance,
-	);
+	return new TwoHopLinkResolver(env.mockMetadataCache, indexingService);
 }
 
 async function buildResolvedEnvironment(
@@ -249,33 +241,6 @@ describe("TwoHopLinkResolver", () => {
 	});
 
 	describe("cache and updates", () => {
-		test("rebuilds when the outgoing branch limit changes at the same index version", async () => {
-			const env = await buildResolvedEnvironment([
-				{ path: "origin.md", links: ["note1", "note2"] },
-				{ path: "note1.md" },
-				{ path: "note2.md" },
-				{ path: "backlink1.md", links: ["note1"] },
-				{ path: "backlink2.md", links: ["note1"] },
-			]);
-			const performanceSettings: ResolverPerformanceSettings = {
-				enableProgressiveTwoHopBuild: true,
-				maxOutgoingToProcess: 1,
-			};
-			const resolver = createResolver(env, env.service, {
-				performance: () => performanceSettings,
-			});
-			const indexVersion = env.service.getIndexVersion();
-
-			const outgoingLimited = await resolver.resolve(env.files["origin.md"]);
-			expect(outgoingLimited.branches).toHaveLength(1);
-			expect(outgoingLimited.branches[0].hop2).toHaveLength(2);
-
-			performanceSettings.maxOutgoingToProcess = 2;
-			const outgoingExpanded = await resolver.resolve(env.files["origin.md"]);
-			expect(env.service.getIndexVersion()).toBe(indexVersion);
-			expect(outgoingExpanded.branches).toHaveLength(2);
-		});
-
 		test("concurrent same-file resolve shares the same in-flight result", async () => {
 			const env = await buildResolvedEnvironment([
 				{ path: "origin.md", links: ["note1"] },

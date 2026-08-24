@@ -1,6 +1,5 @@
 import type { DataUpdateContext } from "core/indexing/index-service/IndexEvents";
 import type { TwoHopResolveSnapshot } from "./ResolverDependencies";
-import type { ResolverPerformanceSettings } from "./ResolverDependencies";
 
 const MAX_RESOLVE_CACHE_SIZE = 64;
 
@@ -9,8 +8,6 @@ interface ResolverResolveSettings {
 }
 
 interface CachedResolveResult {
-	enableProgressiveTwoHopBuild: boolean;
-	maxOutgoingToProcess: number;
 	includeTaggedNotes: boolean;
 	snapshot: TwoHopResolveSnapshot;
 }
@@ -27,7 +24,6 @@ export class ResolverCache {
 
 	getSnapshot(
 		filePath: string,
-		performanceSettings: ResolverPerformanceSettings,
 		resolveSettings: ResolverResolveSettings,
 	): TwoHopResolveSnapshot | undefined {
 		const cached = this.cache.get(filePath);
@@ -35,13 +31,7 @@ export class ResolverCache {
 			return undefined;
 		}
 
-		// パフォーマンス設定が変更されている場合はキャッシュ無効
-		if (
-			cached.enableProgressiveTwoHopBuild !==
-				performanceSettings.enableProgressiveTwoHopBuild ||
-			cached.maxOutgoingToProcess !== performanceSettings.maxOutgoingToProcess ||
-			cached.includeTaggedNotes !== resolveSettings.includeTaggedNotes
-		) {
+		if (cached.includeTaggedNotes !== resolveSettings.includeTaggedNotes) {
 			return undefined;
 		}
 
@@ -53,14 +43,10 @@ export class ResolverCache {
 	 */
 	set(
 		filePath: string,
-		performanceSettings: ResolverPerformanceSettings,
 		resolveSettings: ResolverResolveSettings,
 		snapshot: TwoHopResolveSnapshot,
 	): void {
 		this.cache.set(filePath, {
-			enableProgressiveTwoHopBuild:
-				performanceSettings.enableProgressiveTwoHopBuild,
-			maxOutgoingToProcess: performanceSettings.maxOutgoingToProcess,
 			includeTaggedNotes: resolveSettings.includeTaggedNotes,
 			snapshot,
 		});

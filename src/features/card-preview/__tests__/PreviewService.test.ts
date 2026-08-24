@@ -8,6 +8,7 @@ import {
 import { generateVideoPreview } from "../renderers/videoPreviewRenderer";
 import { generateCanvasPreview } from "../renderers/canvasPreviewRenderer";
 import { createCardPreviewSharedCache } from "features/card-preview/ui/cardPreviewSharedCache";
+import { createPreviewRenderSettings } from "features/card-preview/core/previewRenderSettings";
 import { DEFAULT_SETTINGS, type PluginSettings } from "features/settings/model";
 import type { IVault, IMetadataCache } from "types/obsidian";
 import {
@@ -181,7 +182,7 @@ describe("PreviewService.getPreview", () => {
 				cacheKey: "preview-id:shared-raw",
 				targetFile: file,
 				normalizedQuery: "alpha",
-				settings: DEFAULT_SETTINGS,
+				settings: createPreviewRenderSettings(DEFAULT_SETTINGS),
 				vault: vault as any,
 			}),
 		).resolves.toContain("alpha");

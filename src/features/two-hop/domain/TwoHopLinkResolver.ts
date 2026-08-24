@@ -17,7 +17,6 @@ import {
 	createResolveAbortError,
 	createTwoHopResolveSnapshot,
 	throwIfResolveAborted,
-	type ResolverPerformanceSettings,
 	type TwoHopResolveSnapshot,
 } from "./ResolverDependencies";
 import { TwoHopBranchBuilder } from "./TwoHopBranchBuilder";
@@ -57,7 +56,6 @@ export class TwoHopLinkResolver {
 	constructor(
 		private readonly metadataCache: IMetadataCache,
 		private readonly indexingService: IIndexingService,
-		private readonly getPerformanceSettingsOverride?: () => Partial<ResolverPerformanceSettings>,
 	) {
 		this.cache = new ResolverCache();
 		this.branchBuilder = new TwoHopBranchBuilder(metadataCache, indexingService);
@@ -93,11 +91,9 @@ export class TwoHopLinkResolver {
 		options?: ResolveOptions,
 	): Promise<TwoHopResolveSnapshot> {
 		throwIfResolveAborted(options?.signal);
-		const performanceSettings = this.getPerformanceSettings();
 		const resolveSettings = this.getResolveSettings(options);
 		const requestKey = this.createResolveRequestKey(
 			targetFile.path,
-			performanceSettings,
 			resolveSettings,
 		);
 		const inFlight = this.inFlightResolves.get(requestKey);
@@ -109,7 +105,6 @@ export class TwoHopLinkResolver {
 		let progressBeforeRegistration: ResolveProgress | undefined;
 		const resolvePromise = this.resolveInternal(
 			targetFile,
-			performanceSettings,
 			resolveSettings,
 			(progress) => {
 				const current = this.inFlightResolves.get(requestKey);
@@ -206,7 +201,6 @@ export class TwoHopLinkResolver {
 
 	private async resolveInternal(
 		targetFile: TFile,
-		performanceSettings: ResolverPerformanceSettings,
 		resolveSettings: ResolveSettings,
 		onProgress?: (progress: ResolveProgress) => void,
 		signal?: AbortSignal,
@@ -215,7 +209,6 @@ export class TwoHopLinkResolver {
 			throwIfResolveAborted(signal);
 			const warmSnapshot = this.cache.getSnapshot(
 				targetFile.path,
-				performanceSettings,
 				resolveSettings,
 			);
 			if (warmSnapshot) {
@@ -232,7 +225,6 @@ export class TwoHopLinkResolver {
 
 			const cachedSnapshot = this.cache.getSnapshot(
 				targetFile.path,
-				performanceSettings,
 				resolveSettings,
 			);
 			if (cachedSnapshot) {
@@ -257,7 +249,6 @@ export class TwoHopLinkResolver {
 			const baseBranches = await this.branchBuilder.buildHop1OnlyBranches(
 				targetFile,
 				outgoingLinks,
-				performanceSettings,
 				signal,
 			);
 			const baseResult = freezeTwoHopLinkResult({
@@ -277,7 +268,6 @@ export class TwoHopLinkResolver {
 			const twoHopBranches = await this.branchBuilder.populateHop2(
 				targetFile,
 				baseBranches,
-				performanceSettings,
 				signal,
 			);
 			const twoHopResult = freezeTwoHopLinkResult({
@@ -324,12 +314,7 @@ export class TwoHopLinkResolver {
 
 			const dependencies = collectResolverDependencies(cache, result);
 			const snapshot = createTwoHopResolveSnapshot(result, dependencies);
-			this.cache.set(
-				targetFile.path,
-				performanceSettings,
-				resolveSettings,
-				snapshot,
-			);
+			this.cache.set(targetFile.path, resolveSettings, snapshot);
 			onProgress?.({
 				phase: "complete",
 				data: result,
@@ -359,18 +344,6 @@ export class TwoHopLinkResolver {
 		return linksWithBacklinkCounts;
 	}
 
-	private getPerformanceSettings(): ResolverPerformanceSettings {
-		const override = this.getPerformanceSettingsOverride?.();
-		return {
-			enableProgressiveTwoHopBuild:
-				override?.enableProgressiveTwoHopBuild ?? true,
-			maxOutgoingToProcess: Math.max(
-				0,
-				Math.floor(override?.maxOutgoingToProcess ?? 0),
-			),
-		};
-	}
-
 	private getResolveSettings(options?: ResolveOptions): ResolveSettings {
 		return {
 			includeTaggedNotes: options?.includeTaggedNotes ?? true,
@@ -379,14 +352,9 @@ export class TwoHopLinkResolver {
 
 	private createResolveRequestKey(
 		filePath: string,
-		performanceSettings: ResolverPerformanceSettings,
 		resolveSettings: ResolveSettings,
 	): string {
-		return `${filePath}\u0000${
-			performanceSettings.enableProgressiveTwoHopBuild ? "1" : "0"
-		}\u0000${performanceSettings.maxOutgoingToProcess}\u0000${
-			resolveSettings.includeTaggedNotes ? "1" : "0"
-		}`;
+		return `${filePath}\u0000${resolveSettings.includeTaggedNotes ? "1" : "0"}`;
 	}
 }
 
