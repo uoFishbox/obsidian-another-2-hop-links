@@ -1,0 +1,409 @@
+import { describe, expect, it } from "vitest";
+import { createFlatGridCellSource, type FlatGridCellSource } from "../cellSource";
+import { computeFlatGridLayout } from "cards/virtualization/public";
+import { createFlatGridRowModel } from "../rowModel";
+import {
+	createResidentRowSlotAllocator,
+	type ResidentRowSlotAllocator,
+} from "cards/virtualization/public";
+import { buildMountedFlatGridCells, type MountedFlatGridBuild } from "../mountedCells";
+import { expectKeys, expectUniquePhysicalCellSlots } from "./mountedCellsTestHelpers";
+
+type TestItem = {
+	id: string;
+	label: string;
+};
+type TestBuildResult = MountedFlatGridBuild<TestItem>;
+const rowSlotAllocators = new WeakMap<TestBuildResult, ResidentRowSlotAllocator>();
+
+function createItems(count: number): TestItem[] {
+	return Array.from({ length: count }, (_, index) => ({
+		id: `item-${index}`,
+		label: `Item ${index}`,
+	}));
+}
+
+function itemKey(index: number): string {
+	const itemId = `item-${index}`;
+	return `flat:9:section-0:item:${itemId.length}:${itemId}`;
+}
+
+function createLogicalCellSource(params: {
+	header: boolean;
+	items: TestItem[];
+	visibleCount: number;
+	showLoadMore: boolean;
+	getItemId: (item: TestItem, index: number) => string;
+	sectionId: string;
+}): FlatGridCellSource<TestItem> {
+	return createFlatGridCellSource({
+		header: params.header,
+		items: params.items,
+		getItemId: params.getItemId,
+		visibleCount: params.visibleCount,
+		showLoadMore: params.showLoadMore,
+		sectionId: params.sectionId,
+	});
+}
+
+function createRowModel(params: {
+	cellSource: FlatGridCellSource<TestItem>;
+	columns: number;
+	cellWidth: number;
+	rowHeight: number;
+	gap: number;
+}) {
+	const layout = computeFlatGridLayout({
+		containerWidth:
+			params.columns * params.cellWidth + params.gap * (params.columns - 1),
+		minCellWidth: params.cellWidth,
+		gap: params.gap,
+		maxColumns: params.columns,
+		rowHeight: params.rowHeight,
+		cellCount: params.cellSource.cellCount,
+	});
+	return createFlatGridRowModel({
+		cellSource: params.cellSource,
+		layout,
+	});
+}
+
+function buildCells(params: {
+	items: TestItem[];
+	visibleWindow?: { start: number; end: number };
+	columns?: number;
+	cellWidth?: number;
+	rowHeight?: number;
+	gap?: number;
+	previousBuild?: TestBuildResult;
+	rowSlotAllocator?: ResidentRowSlotAllocator;
+}): TestBuildResult {
+	const cellSource = createLogicalCellSource({
+		header: false,
+		items: params.items,
+		visibleCount: params.items.length,
+		showLoadMore: false,
+		getItemId: (item) => item.id,
+		sectionId: "section-0",
+	});
+	const columns = params.columns ?? 3;
+	const cellWidth = params.cellWidth ?? 100;
+	const rowHeight = params.rowHeight ?? 120;
+	const gap = params.gap ?? 10;
+	const rowModel = createRowModel({
+		cellSource,
+		columns,
+		cellWidth,
+		rowHeight,
+		gap,
+	});
+	const visibleWindow = params.visibleWindow ?? {
+		start: 0,
+		end: cellSource.cellCount,
+	};
+
+	const rowSlotAllocator =
+		params.rowSlotAllocator ??
+		(params.previousBuild
+			? rowSlotAllocators.get(params.previousBuild)
+			: undefined) ??
+		createResidentRowSlotAllocator();
+	const build = buildMountedFlatGridCells({
+		rowModel,
+		rowRange: {
+			start: Math.floor(Math.max(0, visibleWindow.start) / columns),
+			end: Math.ceil(Math.max(0, visibleWindow.end) / columns),
+		},
+		previousBuild: params.previousBuild,
+		rowSlotAllocator,
+	});
+	rowSlotAllocators.set(build, rowSlotAllocator);
+	return build;
+}
+
+function slotsByKey(build: {
+	cells: ReadonlyArray<{ key: string; physicalCellSlot: number }>;
+}): Map<string, number> {
+	return new Map(build.cells.map((cell) => [cell.key, cell.physicalCellSlot]));
+}
+
+function expectSameSlotsForKeys(
+	previous: { cells: ReadonlyArray<{ key: string; physicalCellSlot: number }> },
+	next: { cells: ReadonlyArray<{ key: string; physicalCellSlot: number }> },
+	keys: string[],
+): void {
+	const previousSlots = slotsByKey(previous);
+	const nextSlots = slotsByKey(next);
+
+	for (const key of keys) {
+		expect(nextSlots.get(key)).toBe(previousSlots.get(key));
+	}
+}
+
+describe("linkListVirtualLayout", () => {
+	it("keeps the peak row-slot capacity when the mounted window repeatedly shrinks", () => {
+		const items = createItems(90);
+		let build = buildCells({
+			items,
+			visibleWindow: { start: 0, end: 30 },
+		});
+		expect(build.poolCapacity).toBe(10);
+
+		for (const visibleWindow of [
+			{ start: 27, end: 30 },
+			{ start: 27, end: 57 },
+			{ start: 54, end: 57 },
+			{ start: 54, end: 84 },
+		]) {
+			build = buildCells({ items, visibleWindow, previousBuild: build });
+			expect(build.poolCapacity).toBe(10);
+			expect(
+				Math.max(...build.rowsInMountedRange.map((row) => row.physicalRowSlot)),
+			).toBeLessThan(build.poolCapacity);
+			expect(build.rowsByPhysicalSlot.map((row) => row.physicalRowSlot)).toEqual(
+				build.rowsByPhysicalSlot
+					.map((row) => row.physicalRowSlot)
+					.sort((a, b) => a - b),
+			);
+		}
+	});
+
+	it("keeps keys, items, and render slots stable when logical cells are rebuilt for the same items", () => {
+		const items = createItems(3);
+
+		const initial = buildCells({ items });
+		const rebuilt = buildCells({
+			items: [...items],
+			previousBuild: initial,
+		});
+
+		expectKeys(rebuilt.cells).toEqual([itemKey(0), itemKey(1), itemKey(2)]);
+		expect(rebuilt.cells.map((cell) => cell.cell)).toEqual(
+			initial.cells.map((cell) => cell.cell),
+		);
+		expect(rebuilt.cells[0]).toBe(initial.cells[0]);
+		expect(rebuilt.cells[1]).toBe(initial.cells[1]);
+		expect(rebuilt.cells[2]).toBe(initial.cells[2]);
+
+		expectSameSlotsForKeys(initial, rebuilt, [itemKey(0), itemKey(1), itemKey(2)]);
+		expectUniquePhysicalCellSlots(rebuilt.cells);
+	});
+
+	it("updates the mounted item payload when an item changes under the same key", () => {
+		const initialItems = createItems(3);
+		const updatedItems = initialItems.map((item, index) => ({
+			id: item.id,
+			label: `Updated ${index}`,
+		}));
+
+		const initial = buildCells({ items: initialItems });
+		const updated = buildCells({
+			items: updatedItems,
+			previousBuild: initial,
+		});
+
+		expectKeys(updated.cells).toEqual([itemKey(0), itemKey(1), itemKey(2)]);
+
+		const first = updated.cells[0];
+		expect(first.cell.kind).toBe("item");
+
+		if (first.cell.kind !== "item") {
+			throw new Error("Expected first cell to be an item cell");
+		}
+
+		expect(first.cell.item).toBe(updatedItems[0]);
+		expect(first.cell.item).not.toBe(initialItems[0]);
+		expect(first.cell.item.label).toBe("Updated 0");
+
+		expectSameSlotsForKeys(initial, updated, [itemKey(0), itemKey(1), itemKey(2)]);
+		expectUniquePhysicalCellSlots(updated.cells);
+	});
+
+	it("recomputes positions while preserving key-to-slot mapping when layout metrics change", () => {
+		const items = createItems(6);
+
+		const initial = buildCells({
+			items,
+			columns: 3,
+			cellWidth: 100,
+			rowHeight: 120,
+			gap: 10,
+		});
+
+		const resized = buildCells({
+			items,
+			columns: 3,
+			cellWidth: 120,
+			rowHeight: 140,
+			gap: 10,
+			previousBuild: initial,
+		});
+
+		expectKeys(resized.cells).toEqual([
+			itemKey(0),
+			itemKey(1),
+			itemKey(2),
+			itemKey(3),
+			itemKey(4),
+			itemKey(5),
+		]);
+
+		expectSameSlotsForKeys(initial, resized, [
+			itemKey(0),
+			itemKey(1),
+			itemKey(2),
+			itemKey(3),
+			itemKey(4),
+			itemKey(5),
+		]);
+		expectUniquePhysicalCellSlots(resized.cells);
+
+		expect(resized.cellWidth).toBe(120);
+		expect(resized.rowHeight).toBe(140);
+		expect(resized.rowsInMountedRange.map((row) => row.top)).toEqual([0, 150]);
+		expect(resized.cells[0].columnIndex).toBe(0);
+		expect(resized.cells[3].columnIndex).toBe(0);
+	});
+
+	it("mounts only cells inside the visible row window", () => {
+		const items = createItems(8);
+
+		const result = buildCells({
+			items,
+			visibleWindow: { start: 3, end: 6 },
+			columns: 3,
+			cellWidth: 100,
+			rowHeight: 120,
+			gap: 10,
+		});
+
+		expectKeys(result.cells).toEqual([itemKey(3), itemKey(4), itemKey(5)]);
+
+		expect(result.cells.map((cell) => cell.cellIndex)).toEqual([3, 4, 5]);
+		expect(result.cells[0]).toMatchObject({ rowIndex: 1, columnIndex: 0 });
+		expect(result.cells[1]).toMatchObject({ rowIndex: 1, columnIndex: 1 });
+		expect(result.rowsInMountedRange[0].top).toBe(130);
+		expectUniquePhysicalCellSlots(result.cells);
+	});
+
+	it("builds row slices from mounted cells", () => {
+		const items = createItems(6);
+		const build = buildCells({
+			items,
+			columns: 3,
+			cellWidth: 100,
+			rowHeight: 120,
+			gap: 10,
+		});
+
+		expect(build.rowsInMountedRange).toHaveLength(2);
+		expect(build.rowsInMountedRange.map((row) => row.rowIndex)).toEqual([0, 1]);
+		expect(build.rowsInMountedRange.map((row) => row.physicalRowSlot)).toEqual([
+			0, 1,
+		]);
+		expect(build.rowsInMountedRange.map((row) => row.top)).toEqual([0, 130]);
+		expect(
+			build.rowsInMountedRange.map((row) =>
+				row.bindings.filter((cell) => cell !== null).map((cell) => cell.key),
+			),
+		).toEqual([
+			[itemKey(0), itemKey(1), itemKey(2)],
+			[itemKey(3), itemKey(4), itemKey(5)],
+		]);
+	});
+
+	it("renders a shifted visible window in visual row order", () => {
+		const items = createItems(9);
+
+		const initial = buildCells({
+			items,
+			visibleWindow: { start: 0, end: 6 },
+			columns: 3,
+		});
+
+		const shifted = buildCells({
+			items,
+			visibleWindow: { start: 3, end: 9 },
+			columns: 3,
+			previousBuild: initial,
+		});
+
+		expectKeys(shifted.cells).toEqual([
+			itemKey(3),
+			itemKey(4),
+			itemKey(5),
+			itemKey(6),
+			itemKey(7),
+			itemKey(8),
+		]);
+
+		expectSameSlotsForKeys(initial, shifted, [itemKey(3), itemKey(4), itemKey(5)]);
+		expect(shifted.rowsInMountedRange.map((row) => row.rowIndex)).toEqual([1, 2]);
+		expect(shifted.rowsInMountedRange.map((row) => row.physicalRowSlot)).toEqual([
+			1, 0,
+		]);
+		expectUniquePhysicalCellSlots(shifted.cells);
+	});
+
+	it("reuses retained row slices when scrolling with the same cell source", () => {
+		const items = createItems(9);
+		const cellSource = createLogicalCellSource({
+			header: false,
+			items,
+			visibleCount: items.length,
+			showLoadMore: false,
+			getItemId: (item) => item.id,
+			sectionId: "section-0",
+		});
+		const rowModel = createRowModel({
+			cellSource,
+			columns: 3,
+			cellWidth: 100,
+			rowHeight: 120,
+			gap: 10,
+		});
+		const rowSlotAllocator = createResidentRowSlotAllocator();
+		const initial = buildMountedFlatGridCells({
+			rowModel,
+			rowRange: { start: 0, end: 2 },
+			rowSlotAllocator,
+		});
+		const shifted = buildMountedFlatGridCells({
+			rowModel,
+			rowRange: { start: 1, end: 3 },
+			previousBuild: initial,
+			rowSlotAllocator,
+		});
+
+		expect(shifted.rowsInMountedRange[0]).toBe(initial.rowsInMountedRange[1]);
+		expect(shifted.rowsInMountedRange[0].bindings).toBe(
+			initial.rowsInMountedRange[1].bindings,
+		);
+		expect(shifted.rowsInMountedRange[1].physicalRowSlot).toBe(0);
+		expect(shifted.rowsInMountedRange[1].physicalRowSlot).toBe(
+			initial.rowsInMountedRange[0].physicalRowSlot,
+		);
+	});
+
+	it("clamps a stale visible window when the logical cell count shrinks", () => {
+		const initialItems = createItems(8);
+
+		const initial = buildCells({
+			items: initialItems,
+			visibleWindow: { start: 3, end: 8 },
+			columns: 3,
+		});
+
+		const smallerItems = createItems(2);
+
+		const shrunk = buildCells({
+			items: smallerItems,
+			visibleWindow: { start: 3, end: 8 },
+			columns: 3,
+			previousBuild: initial,
+		});
+
+		expect(shrunk.cells).toEqual([]);
+		expect(shrunk.rowsInMountedRange).toEqual([]);
+	});
+});

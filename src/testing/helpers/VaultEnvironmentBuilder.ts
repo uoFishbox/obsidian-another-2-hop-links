@@ -1,12 +1,15 @@
 import { vi, type MockedObject } from "vitest";
-import { IndexingService } from "../../core/indexing/index-service/IndexingService";
-import type { CachedMetadata, ObsidianLinkMap } from "../../types/obsidian";
+import { IndexingService } from "../../indexing/index-service/IndexingService";
+import type {
+	CachedMetadata,
+	ObsidianLinkMap,
+} from "../../obsidian-integration/hostContracts";
 import { TFile, type LinkCache } from "obsidian";
-import type { IVault, IMetadataCache } from "../../types/obsidian";
+import type { IVault, IMetadataCache } from "../../obsidian-integration/hostContracts";
 import type { Pos } from "obsidian";
-import { buildDetailedBacklinksArtifactsChunked } from "../../core/indexing/backlink-builder/backlinkIndexer";
-import { normalizeLinkToMarkdownPath } from "../../core/indexing/link-resolution/linkResolution";
-import type { BacklinksMap } from "../../types/domain";
+import { buildDetailedBacklinksArtifactsChunked } from "../../indexing/backlink-builder/backlinkIndexer";
+import { normalizeLinkToMarkdownPath } from "../../indexing/link-resolution/linkResolution";
+import type { BacklinksMap } from "indexing/model";
 import { createMockTFile } from "../__mocks__/testHelpers";
 
 function createLinkCache(linkText: string): LinkCache {

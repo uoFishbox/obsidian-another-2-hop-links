@@ -1,5 +1,5 @@
 import { TFile } from "obsidian";
-import type { IVault } from "../../types/obsidian";
+import type { IVault } from "../../obsidian-integration/hostContracts";
 import { vi } from "vitest";
 
 let __mockFileCounter = 0;

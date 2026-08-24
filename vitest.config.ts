@@ -27,16 +27,7 @@ export default defineConfig({
 					name: "node",
 					globals: true,
 					environment: "node",
-					include: [
-						"src/application/**/__tests__/**/*.test.ts",
-						"src/core/**/__tests__/**/*.test.ts",
-						"src/features/**/__tests__/**/*.test.ts",
-						"src/infrastructure/**/__tests__/**/*.test.ts",
-						"src/presentation/**/__tests__/**/*.test.ts",
-						"src/settings/**/__tests__/**/*.test.ts",
-						"src/ui/**/__tests__/**/*.test.ts",
-						"src/utils/**/__tests__/**/*.test.ts",
-					],
+					include: ["src/**/__tests__/**/*.test.ts"],
 					exclude: [
 						"**/*.dom.test.ts",
 						"**/*.jsdom.test.ts",
@@ -54,14 +45,7 @@ export default defineConfig({
 					globals: true,
 					environment: "jsdom",
 					isolate: false,
-					include: [
-						"src/application/**/__tests__/**/*.dom.test.ts",
-						"src/core/**/__tests__/**/*.dom.test.ts",
-						"src/features/**/__tests__/**/*.dom.test.ts",
-						"src/infrastructure/**/__tests__/**/*.dom.test.ts",
-						"src/presentation/**/__tests__/**/*.dom.test.ts",
-						"src/ui/**/__tests__/**/*.dom.test.ts",
-					],
+					include: ["src/**/__tests__/**/*.dom.test.ts"],
 					exclude: [
 						"**/*.svelte.dom.test.ts",
 						"**/*.jsdom.test.ts",
@@ -78,14 +62,7 @@ export default defineConfig({
 					name: "dom-svelte",
 					globals: true,
 					environment: "jsdom",
-					include: [
-						"src/application/**/__tests__/**/*.svelte.dom.test.ts",
-						"src/core/**/__tests__/**/*.svelte.dom.test.ts",
-						"src/features/**/__tests__/**/*.svelte.dom.test.ts",
-						"src/infrastructure/**/__tests__/**/*.svelte.dom.test.ts",
-						"src/presentation/**/__tests__/**/*.svelte.dom.test.ts",
-						"src/ui/**/__tests__/**/*.svelte.dom.test.ts",
-					],
+					include: ["src/**/__tests__/**/*.svelte.dom.test.ts"],
 					exclude: ["**/*.perf.test.ts", "**/*.perf-contract.test.ts"],
 					setupFiles: ["src/testing/setupSvelteDomTests.ts"],
 					pool: "threads",
@@ -97,14 +74,7 @@ export default defineConfig({
 					name: "jsdom",
 					globals: true,
 					environment: "jsdom",
-					include: [
-						"src/application/**/__tests__/**/*.jsdom.test.ts",
-						"src/core/**/__tests__/**/*.jsdom.test.ts",
-						"src/features/**/__tests__/**/*.jsdom.test.ts",
-						"src/infrastructure/**/__tests__/**/*.jsdom.test.ts",
-						"src/presentation/**/__tests__/**/*.jsdom.test.ts",
-						"src/ui/**/__tests__/**/*.jsdom.test.ts",
-					],
+					include: ["src/**/__tests__/**/*.jsdom.test.ts"],
 					exclude: ["**/*.perf.test.ts", "**/*.perf-contract.test.ts"],
 					setupFiles: ["src/testing/setupBrowserDomTests.ts"],
 					pool: "threads",
@@ -125,9 +95,18 @@ export default defineConfig({
 	},
 	resolve: {
 		conditions: ["browser"],
-		alias: {
-			obsidian: path.resolve(__dirname, "src/testing/__mocks__/obsidianMocks.ts"),
-			"@/": new URL("./src/", import.meta.url).pathname,
-		},
+		alias: [
+			{
+				find: /^obsidian$/,
+				replacement: path.resolve(
+					__dirname,
+					"src/testing/__mocks__/obsidianMocks.ts",
+				),
+			},
+			{
+				find: "@/",
+				replacement: new URL("./src/", import.meta.url).pathname,
+			},
+		],
 	},
 });

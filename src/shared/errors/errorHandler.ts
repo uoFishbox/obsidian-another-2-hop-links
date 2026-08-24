@@ -1,4 +1,4 @@
-import { PLUGIN_NAME } from "../../appConstants";
+const PLUGIN_NAME = "Cosense card links";
 
 function logError(message: string, error: unknown, context?: string): void {
 	const contextStr = context ? ` [${context}]` : "";

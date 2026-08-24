@@ -19,7 +19,7 @@ Compact guide for agents working in this repo.
 | Test (coverage)      | `bun run test:coverage`                                                                                                           |
 | Type/Svelte check    | `bun run check`                                                                                                                   |
 | Check circular deps  | `bun run check:circular`                                                                                                          |
-| Run single test file | `bun run test -- src/core/sorting/__tests__/sortService.test.ts`                                                                  |
+| Run single test file | `bun run test -- src/cards/sorting/__tests__/sortService.test.ts`                                                                 |
 | Version bump         | `npm version patch` (or `minor` / `major`) — updates `manifest.json`, `package.json`, `versions.json`, and git-adds the first two |
 
 - Package scripts use `bun`, but CI (`release.yml`) uses `npm install` + `npm run build`.
@@ -61,20 +61,21 @@ Compact guide for agents working in this repo.
 ```
 src/
   main.ts                    # Plugin entry (Obsidian Plugin class)
-  appConstants.ts               # Shared constants
-  application/               # Presentation layer: presenters
-  core/                      # Domain logic: indexing, sorting, deduplication, grouping, rules, signatures
-  features/                  # Feature modules: display-mode, export, keyboard-navigation, preview, search
-  infrastructure/            # Obsidian integration: patchers, lifecycle, markdown, observers, workspace
-  ui/                        # Svelte views, components, stores, context, actions, hooks
-  settings/                  # Settings manager, side-effects, setting tab
-  types/                     # Domain and settings type definitions
-  utils/                     # Shared utilities
-  testing/                   # Test setup + mocks
+  appConstants.ts           # Shared constants
+  cards/                    # Card models, lists, grids, interactions, and virtualization
+  indexing/                 # Vault indexing and query state
+  two-hop/                  # Two-hop resolution, display state, and UI
+  preview/                  # Card preview pipeline, rendering, scheduling, and popovers
+  search/                   # Search filtering and worker boundary
+  settings/                 # Settings model, persistence, effects, and UI
+  obsidian/                 # Obsidian integration, lifecycle, workspace, and custom-view hosts
+  shared/                   # Feature-independent utilities and UI foundations
+  types/                    # Cross-feature host and domain contracts
+  testing/                  # Test setup, mocks, and architecture checks
 ```
 
 - Custom views: `TwoHopLinksPage`, `PreCreationView`, `TagNotesView`.
-- Search worker: `src/features/search/searchFilter.worker.ts` (inlined at build time).
+- Search worker: `src/search/searchFilter.worker.ts` (inlined at build time).
 
 ## Code style
 
@@ -83,8 +84,8 @@ src/
 ## Shadow DOM styles
 
 - Styles inside Shadow DOM are **not** defined in `styles.css`.
-- Shadow DOM card render styles are defined in `src/ui/components/common/cardRenderShadowStyles.ts` (exported as `CARD_RENDER_SHADOW_CSS`).
-- The Shadow DOM surface is created by `ensureCardRenderShadowSurface()` in `src/ui/components/common/cardRenderShadowSurface.ts`, which:
+- Shadow DOM card render styles are defined in `src/cards/components/cardRenderShadowStyles.ts` (exported as `CARD_RENDER_SHADOW_CSS`).
+- The Shadow DOM surface is created by `ensureCardRenderShadowSurface()` in `src/cards/components/cardRenderShadowSurface.ts`, which:
     - Calls `host.attachShadow({ mode: "open" })`
     - Injects `CARD_RENDER_SHADOW_CSS` into a `<style>` element inside the shadow root
     - Registers the shadow root for MathJax style syncing
@@ -92,7 +93,7 @@ src/
 
 ## Shadow DOM hover popovers
 
-- Implementation lives in `src/features/popover/shadow-hover/`. See that directory's `README.md` for architecture, mechanisms, and invariants.
+- Implementation lives in `src/preview/popover/shadow-hover/`. See that directory's `README.md` for architecture, mechanisms, and invariants.
 
 ## Release workflow
 
@@ -110,7 +111,7 @@ src/
 - **Store caching**: `ComponentController` maintains an LRU of `ApplicationStore` instances keyed by `leafId:filePath`. Any change to store lifetime or keying must respect ref-counting and trimming logic.
 - **Worker**: Search filter runs in an inlined worker. If you add imports inside `searchFilter.worker.ts`, ensure esbuild inlines them correctly.
 - **Styles**: `styles.css` is shipped with the plugin; it uses CSS custom properties prefixed with `--ccl-`.
-- **Shadow hover state**: See `src/features/popover/shadow-hover/README.md` for the invariants (pure reducers, no parallel lifecycle/interaction fields).
+- **Shadow hover state**: See `src/preview/popover/shadow-hover/README.md` for the invariants (pure reducers, no parallel lifecycle/interaction fields).
 
 ## Command Output
 

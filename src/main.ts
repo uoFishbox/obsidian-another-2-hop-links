@@ -1,25 +1,22 @@
 import { Plugin, TFile, loadMathJax } from "obsidian";
-import { installMathJaxShadowPatch } from "ui/shared/dom/mathJaxShadowStyles";
-import { SettingsManager } from "features/settings/persistence/SettingsManager";
-import { DEFAULT_SETTINGS } from "features/settings/model";
-import type { PluginSettings } from "features/settings/model";
-import type { SortOption } from "core/sorting";
-import {
-	TwoHopLinksView,
-	TWO_HOP_LINKS_VIEW_TYPE,
-} from "features/two-hop/ui/TwoHopLinksView";
-import type { ResolveProgress, TwoHopLinkResult } from "types/domain";
-import type { ResolveOptions } from "features/two-hop/domain/TwoHopLinkResolver";
-import type { TwoHopResolveSnapshot } from "features/two-hop/domain/ResolverDependencies";
-import { forceRedrawEffect } from "infrastructure/markdown/livePreview";
-import { registerPluginSurfaces } from "infrastructure/registration/registerPluginSurfaces";
-import { installAllPatchers } from "infrastructure/patchers/installAllPatchers";
-import { setupWorkspaceEventHandlers } from "infrastructure/workspace/workspaceEventBootstrap";
+import { installMathJaxShadowPatch } from "shared/ui/dom/mathJaxShadowStyles";
+import { SettingsManager } from "settings/persistence/SettingsManager";
+import { DEFAULT_SETTINGS } from "settings/model";
+import type { PluginSettings } from "settings/model";
+import type { SortOption } from "cards/sorting";
+import { TwoHopLinksView, TWO_HOP_LINKS_VIEW_TYPE } from "two-hop/ui/TwoHopLinksView";
+import type { ResolveProgress, TwoHopLinkResult } from "two-hop/model";
+import type { ResolveOptions } from "two-hop/resolution/TwoHopLinkResolver";
+import type { TwoHopResolveSnapshot } from "two-hop/resolution/ResolverDependencies";
+import { forceRedrawEffect } from "obsidian-integration/markdown/livePreview";
+import { registerPluginSurfaces } from "obsidian-integration/registration/registerPluginSurfaces";
+import { installAllPatchers } from "obsidian-integration/patchers/installAllPatchers";
+import { setupWorkspaceEventHandlers } from "obsidian-integration/workspace/workspaceEventBootstrap";
 import {
 	createPluginRuntime,
 	type PluginRuntime,
-} from "infrastructure/runtime/pluginRuntime";
-import type { PluginHost } from "types/pluginHost";
+} from "obsidian-integration/runtime/pluginRuntime";
+import type { PluginHost } from "obsidian-integration/pluginHost";
 
 export default class CosenseCardLinksPlugin extends Plugin implements PluginHost {
 	public settings: PluginSettings = { ...DEFAULT_SETTINGS };
