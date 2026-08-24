@@ -11,27 +11,27 @@
 	import { focusResultEdge } from "features/keyboard-navigation/resultFocus";
 	import { yieldToMainThreadIdleAware } from "core/indexing/timeSlicing";
 	import type { ListConfig } from "./types";
-	import { hasSameViewItemSource } from "application/presenters/viewItemEquality";
-	import { sameArrayBy } from "shared/collections/arrayEquality";
 	import {
 		setLinkContext,
 		type LinkContext,
 		setAppContext,
 		setLazyLoaderCache,
 	} from "ui/context/linkContext";
-	import type { ISortService, SortOption } from "core/sorting";
+	import type { ISortService } from "core/sorting";
 	import type { ListViewState } from "features/list-view/model/ListViewState";
 	import type { App, TFile } from "obsidian";
-	import { createStableViewItemReconciler } from "application/presenters/stableViewItemReconciler";
-	import { toViewItem, type ViewItem } from "application/presenters/ViewItem";
+	import {
+		getItemTargetFile,
+		toViewItem,
+		type ViewItem,
+	} from "application/presenters/ViewItem";
 	import {
 		createItemSearchTextCache,
 		getItemSearchText,
 	} from "features/list-view/model/itemSearchText";
 	import type { SearchWorkerItemSnapshot } from "features/search/searchWorkerTypes";
 	import {
-		createViewItemSortCache,
-		getSortedViewItemsWithCache,
+		getSortedViewItems,
 		pinBookmarkedViewItems,
 	} from "features/list-view/model/searchableItemSorting";
 	import { tick } from "svelte";
@@ -77,33 +77,10 @@
 			applicationStore.updateVersion,
 		].join("\u001f"),
 	);
-	const viewItemSortCache = createViewItemSortCache();
-	const getViewItemKey = (item: ViewItem, index: number): string =>
-		config.getItemKey(item, index);
-	const virtualItemIdByItem = new WeakMap<ViewItem, string>();
-	let nextVirtualItemId = 0;
-	const getVirtualItemId = (item: ViewItem): string => {
-		const existing = virtualItemIdByItem.get(item);
-		if (existing) return existing;
-
-		nextVirtualItemId += 1;
-		const itemId = `view-item-${nextVirtualItemId}`;
-		virtualItemIdByItem.set(item, itemId);
-		return itemId;
-	};
-	const viewItemReconciler = createStableViewItemReconciler<ViewItem>({
-		getKey: getViewItemKey,
-		toViewItem: (item) => item,
-		canReuseSource: hasSameViewItemSource,
-	});
+	let getItemKey = $derived(config.getItemKey);
 
 	let searchEnabled = $derived(config.searchEnabled ?? true);
 	let allowContentSearch = $derived(config.allowContentSearch ?? true);
-	let reconcileResetVersion = $state(0);
-	let reconciledItems = $derived.by(() => {
-		void reconcileResetVersion;
-		return viewItemReconciler.reconcile(items);
-	});
 
 	const search = useSearchQuery();
 	let contentSearchEnabled = $state(false);
@@ -116,11 +93,9 @@
 	}
 
 	const searchTextCache = createItemSearchTextCache();
-	let previousWorkerDataset: SearchWorkerItemSnapshot[] = [];
-	const workerSnapshotByKey = new Map<string, SearchWorkerItemSnapshot>();
 
 	function clearSearchTextCacheForInputChange(): void {
-		void reconciledItems;
+		void items;
 		void linkContext.sourceFile.path;
 		void config.getItemKey;
 		void config.getSearchText;
@@ -137,25 +112,8 @@
 		clearSearchTextCacheForInputChange();
 	});
 
-	const getItemTargetFile = (item: ViewItem): TFile | null => {
-		switch (item.type) {
-			case "backlink":
-				return item.data.sourceFile;
-			case "taggedNote":
-				return item.data.file;
-			case "file":
-				return item.data;
-			case "branch":
-				return item.data.hop1.path
-					? linkContext.resolveFile(item.data.hop1.path)
-					: null;
-			default:
-				return null;
-		}
-	};
-
 	const getCachedItemSearchText = (item: ViewItem): string => {
-		const key = config.getItemKey(item);
+		const key = getItemKey(item);
 		return searchTextCache.get(key, () =>
 			(config.getSearchText
 				? config.getSearchText(item, linkContext)
@@ -167,66 +125,17 @@
 			).toLowerCase(),
 		);
 	};
-	const hasSameWorkerDataset = (
-		nextDataset: readonly SearchWorkerItemSnapshot[],
-		previousDataset: readonly SearchWorkerItemSnapshot[],
-	): boolean =>
-		sameArrayBy(
-			nextDataset,
-			previousDataset,
-			(nextItem, previousItem) =>
-				nextItem.key === previousItem.key &&
-				nextItem.searchText === previousItem.searchText &&
-				nextItem.targetFilePath === previousItem.targetFilePath,
-		);
-
 	const buildWorkerDataset = (): SearchWorkerItemSnapshot[] => {
-		const nextDataset = new Array<SearchWorkerItemSnapshot>(reconciledItems.length);
-		const nextKeys = new Set<string>();
-		for (let index = 0; index < reconciledItems.length; index += 1) {
-			const item = reconciledItems[index];
-			const key = config.getItemKey(item);
-			const targetFile = getItemTargetFile(item);
-			const targetFilePath = targetFile?.path ?? null;
-			const searchText = getCachedItemSearchText(item);
-			const previous = workerSnapshotByKey.get(key);
-			nextKeys.add(key);
-
-			if (
-				previous &&
-				previous.searchText === searchText &&
-				previous.targetFilePath === targetFilePath
-			) {
-				nextDataset[index] = previous;
-				continue;
-			}
-
-			const snapshot: SearchWorkerItemSnapshot = {
-				key,
-				searchText,
-				targetFilePath,
-			};
-			workerSnapshotByKey.set(key, snapshot);
-			nextDataset[index] = snapshot;
-		}
-
-		for (const key of workerSnapshotByKey.keys()) {
-			if (!nextKeys.has(key)) {
-				workerSnapshotByKey.delete(key);
-			}
-		}
-
-		if (hasSameWorkerDataset(nextDataset, previousWorkerDataset)) {
-			return previousWorkerDataset;
-		}
-
-		previousWorkerDataset = nextDataset;
-		return nextDataset;
+		return items.map((item) => ({
+			key: getItemKey(item),
+			searchText: getCachedItemSearchText(item),
+			targetFilePath: getItemTargetFile(item, linkContext)?.path ?? null,
+		}));
 	};
 	const getSearchableFiles = (): TFile[] => {
 		const filesByPath = new Map<string, TFile>();
-		for (const item of reconciledItems) {
-			const targetFile = getItemTargetFile(item);
+		for (const item of items) {
+			const targetFile = getItemTargetFile(item, linkContext);
 			if (targetFile) {
 				filesByPath.set(targetFile.path, targetFile);
 			}
@@ -264,16 +173,12 @@
 	let matchesByKey = $derived(workerSearchSession.matchesByKey);
 	let isSearchLoading = $derived(workerSearchSession.isLoading);
 
-	let sortedItems = $derived(
-		getSortedViewItemsWithCache(
-			reconciledItems,
-			sortOption,
-			sortSettingsSignature,
-			sortService,
-			viewItemSortCache,
-			(raw) => toViewItem(raw),
-		),
-	);
+	let sortedItems = $derived.by(() => {
+		void sortSettingsSignature;
+		return getSortedViewItems(items, sortOption, sortService, (raw) =>
+			toViewItem(raw),
+		);
+	});
 
 	let filteredItems = $state.raw<ViewItem[]>([]);
 	let filterRunSerial = 0;
@@ -312,7 +217,7 @@
 				}
 
 				const item = sourceItems[index];
-				if (matches.has(config.getItemKey(item))) {
+				if (matches.has(getItemKey(item))) {
 					nextItems.push(item);
 				}
 
@@ -350,11 +255,9 @@
 	let preserveResultsHeightOnSearch = $derived(
 		config.preserveResultsHeightOnSearch ?? true,
 	);
-	const cardModelCache = new WeakMap<
-		ViewItem,
-		{ revision: object; itemKey: string; model: CardRenderModel }
-	>();
 	const cardModelRevision = $derived.by(() => ({
+		items,
+		getItemKey,
 		settings: applicationStore.settings,
 		searchQuery: search.normalized,
 		contentSearchEnabled,
@@ -363,16 +266,16 @@
 		applicationUpdateVersion: applicationStore.updateVersion,
 		previewGlobalVersion: applicationStore.previewGlobalVersion,
 		previewPathVersions: applicationStore.previewPathVersions,
+		modelsByKey: new Map<string, { item: ViewItem; model: CardRenderModel }>(),
 	}));
 
 	function resolveViewItemCardModel(
 		item: ViewItem,
-		index: number,
 		revision = cardModelRevision,
 	): CardRenderModel {
-		const itemKey = config.getItemKey(item, index);
-		const cached = cardModelCache.get(item);
-		if (cached?.revision === revision && cached.itemKey === itemKey) {
+		const itemKey = getItemKey(item);
+		const cached = revision.modelsByKey.get(itemKey);
+		if (cached?.item === item) {
 			return cached.model;
 		}
 
@@ -395,19 +298,19 @@
 			contentPreview: matchedItem?.contentPreview,
 			interactionId,
 		});
-		cardModelCache.set(item, { revision, itemKey, model });
+		revision.modelsByKey.set(itemKey, { item, model });
 		return model;
 	}
 
 	const resolveItemPreviewRequest = $derived.by(() => {
 		const revision = cardModelRevision;
-		return (item: ViewItem, index: number) =>
-			resolveViewItemCardModel(item, index, revision).previewRequest;
+		return (item: ViewItem) =>
+			resolveViewItemCardModel(item, revision).previewRequest;
 	});
 	const resolveItemInteractionDescriptor = $derived.by(() => {
 		const revision = cardModelRevision;
-		return (item: ViewItem, index: number) =>
-			resolveViewItemCardModel(item, index, revision).interactionDescriptor;
+		return (item: ViewItem) =>
+			resolveViewItemCardModel(item, revision).interactionDescriptor;
 	});
 
 	let resultsContainerEl = $state<HTMLDivElement | null>(null);
@@ -459,7 +362,7 @@
 		<LinkList
 			className="cosense-card-links__section twohop-links-back-links"
 			items={filteredItems}
-			getItemId={getVirtualItemId}
+			getItemId={getItemKey}
 			sectionId={searchScopedSectionId}
 			{applicationStore}
 			{initialVisibleCount}
@@ -469,11 +372,8 @@
 			{resolveItemInteractionDescriptor}
 			header={config.showSectionHeader ? sectionHeader : undefined}
 		>
-			{#snippet item({ item, index, previewKey })}
-				<ViewItemCard
-					model={resolveViewItemCardModel(item, index)}
-					{previewKey}
-				/>
+			{#snippet item({ item, previewKey })}
+				<ViewItemCard model={resolveViewItemCardModel(item)} {previewKey} />
 			{/snippet}
 		</LinkList>
 	{:else}

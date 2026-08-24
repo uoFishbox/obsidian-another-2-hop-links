@@ -23,7 +23,8 @@ export interface ListConfig<T = ViewItem> {
 	searchPlaceholder?: string;
 	getSearchText?: (item: T, linkContext: LinkContext) => string;
 	onSearchSubmit?: (value: string) => void | Promise<void>;
-	getItemKey: (item: T, index?: number) => string;
+	/** Unique semantic identity that remains stable across filtering and sorting. */
+	getItemKey: (item: T) => string;
 	sectionId: string;
 	pinBookmarkedToTop?: boolean;
 	emptyMessage: string;

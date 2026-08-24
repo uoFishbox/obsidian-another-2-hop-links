@@ -5,8 +5,6 @@ import {
 } from "application/presenters/ViewItem";
 import type { ISortService, SortableItem, SortOption } from "core/sorting";
 
-export type ViewItemSortCache = Map<string, WeakMap<ViewItem[], ViewItem[]>>;
-
 interface DuplicateViewItemBucket {
 	readonly items: ViewItem[];
 	nextIndex: number;
@@ -37,18 +35,7 @@ function hasSameRawItemOrder(
 	return true;
 }
 
-function createSortCacheKey(
-	sortOption: SortOption,
-	sortSettingsSignature: string,
-): string {
-	return `${sortSettingsSignature}|${sortOption}`;
-}
-
-export function createViewItemSortCache(): ViewItemSortCache {
-	return new Map();
-}
-
-function sortViewItems(
+export function getSortedViewItems(
 	viewItems: ViewItem[],
 	option: SortOption,
 	sortService: ISortService,
@@ -102,34 +89,6 @@ function sortViewItems(
 			itemMap.delete(raw);
 		}
 	}
-	return sortedItems;
-}
-
-export function getSortedViewItemsWithCache(
-	viewItems: ViewItem[],
-	option: SortOption,
-	sortSettingsSignature: string,
-	sortService: ISortService,
-	cache: ViewItemSortCache,
-	fallbackFactory?: (raw: SortableItem) => ViewItem,
-): ViewItem[] {
-	if (viewItems.length <= 1) {
-		return viewItems;
-	}
-
-	const cacheKey = createSortCacheKey(option, sortSettingsSignature);
-	const cachedSortedItemsByKey = cache.get(cacheKey) ?? new WeakMap();
-	if (!cache.has(cacheKey)) {
-		cache.set(cacheKey, cachedSortedItemsByKey);
-	}
-
-	const cached = cachedSortedItemsByKey.get(viewItems);
-	if (cached) {
-		return cached;
-	}
-
-	const sortedItems = sortViewItems(viewItems, option, sortService, fallbackFactory);
-	cachedSortedItemsByKey.set(viewItems, sortedItems);
 	return sortedItems;
 }
 

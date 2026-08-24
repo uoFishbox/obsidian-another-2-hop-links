@@ -3,8 +3,7 @@ import { createMockTFile } from "testing/__mocks__/testHelpers";
 import type { ViewItem } from "application/presenters/ViewItem";
 import type { ISortService } from "core/sorting";
 import {
-	createViewItemSortCache,
-	getSortedViewItemsWithCache,
+	getSortedViewItems,
 	pinBookmarkedViewItems,
 } from "features/list-view/model/searchableItemSorting";
 
@@ -21,7 +20,7 @@ function createTaggedNoteItem(path: string): ViewItem {
 }
 
 describe("searchableItemSorting", () => {
-	it("memoizes sorted view items for the same array, sort option, and settings signature", () => {
+	it("returns items in the order produced by the sort service", () => {
 		const viewItems = [
 			createTaggedNoteItem("notes/a.md"),
 			createTaggedNoteItem("notes/b.md"),
@@ -29,54 +28,10 @@ describe("searchableItemSorting", () => {
 		const sortService: ISortService = {
 			sort: vi.fn((items) => [...items].reverse()),
 		};
-		const cache = createViewItemSortCache();
-
-		const first = getSortedViewItemsWithCache(
-			viewItems,
-			"alphabetical",
-			"created|modified",
-			sortService,
-			cache,
-		);
-		const second = getSortedViewItemsWithCache(
-			viewItems,
-			"alphabetical",
-			"created|modified",
-			sortService,
-			cache,
-		);
+		const sorted = getSortedViewItems(viewItems, "alphabetical", sortService);
 
 		expect(sortService.sort).toHaveBeenCalledTimes(1);
-		expect(second).toBe(first);
-	});
-
-	it("invalidates the cache when the sort settings signature changes", () => {
-		const viewItems = [
-			createTaggedNoteItem("notes/a.md"),
-			createTaggedNoteItem("notes/b.md"),
-		];
-		const sortService: ISortService = {
-			sort: vi.fn((items) => [...items].reverse()),
-		};
-		const cache = createViewItemSortCache();
-
-		const first = getSortedViewItemsWithCache(
-			viewItems,
-			"alphabetical",
-			"created-a|modified",
-			sortService,
-			cache,
-		);
-		const second = getSortedViewItemsWithCache(
-			viewItems,
-			"alphabetical",
-			"created-b|modified",
-			sortService,
-			cache,
-		);
-
-		expect(sortService.sort).toHaveBeenCalledTimes(2);
-		expect(second).not.toBe(first);
+		expect(sorted).toEqual([viewItems[1], viewItems[0]]);
 	});
 
 	it("returns the original array when the sort service preserves order", () => {
@@ -87,15 +42,7 @@ describe("searchableItemSorting", () => {
 		const sortService: ISortService = {
 			sort: vi.fn((items) => [...items]),
 		};
-		const cache = createViewItemSortCache();
-
-		const sorted = getSortedViewItemsWithCache(
-			viewItems,
-			"alphabetical",
-			"created|modified",
-			sortService,
-			cache,
-		);
+		const sorted = getSortedViewItems(viewItems, "alphabetical", sortService);
 
 		expect(sortService.sort).toHaveBeenCalledTimes(1);
 		expect(sorted).toBe(viewItems);

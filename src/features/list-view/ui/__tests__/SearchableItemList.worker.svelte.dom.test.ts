@@ -502,6 +502,37 @@ describe("SearchableItemList worker integration", () => {
 		vi.useRealTimers();
 	});
 
+	it("uses the semantic key while refreshing replaced item content", async () => {
+		vi.useRealTimers();
+		const initialFile = createMockTFile("notes/stable.md");
+		const initialItem = createTaggedNoteItem(initialFile);
+		const props = createTestProps({ items: [initialItem] });
+		const view = render(SearchableItemList, { props });
+
+		await flushAsyncUi();
+		expect(getAllSearchableItems()[0]).toHaveTextContent("stable");
+		expect(screen.getByTestId("searchable-item-slot")).toHaveAttribute(
+			"data-item-key",
+			"notes/stable.md",
+		);
+
+		const replacementFile = createMockTFile("notes/stable.md");
+		replacementFile.basename = "updated";
+		await view.rerender({
+			...props,
+			items: [createTaggedNoteItem(replacementFile)],
+		});
+		await flushAsyncUi();
+
+		await waitFor(() =>
+			expect(getAllSearchableItems()[0]).toHaveTextContent("updated"),
+		);
+		expect(screen.getByTestId("searchable-item-slot")).toHaveAttribute(
+			"data-item-key",
+			"notes/stable.md",
+		);
+	});
+
 	it("toggles full-text search on and off, changing visible results", async () => {
 		fileContentIndexHarness.setEntries([
 			{

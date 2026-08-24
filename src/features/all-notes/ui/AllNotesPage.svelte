@@ -1,6 +1,10 @@
 <script lang="ts">
 	import { Component, Notice, TFile, TFolder, type App } from "obsidian";
-	import { toViewItems, type ViewItem } from "application/presenters/ViewItem";
+	import {
+		getViewItemKey,
+		toViewItems,
+		type ViewItem,
+	} from "application/presenters/ViewItem";
 	import { resolveExpectedPath } from "shared/obsidian/resolveExpectedPath";
 	import SearchableItemList from "features/list-view/ui/SearchableItemList.svelte";
 	import type { ListConfig } from "features/list-view/ui/types";
@@ -104,21 +108,7 @@
 				settings.priorityFrontmatterKeyForTitle,
 			);
 		},
-		getItemKey: (item: ViewItem, index = 0) => {
-			switch (item.type) {
-				case "file":
-					return item.data.path;
-				case "taggedNote":
-					return item.data.path;
-				case "backlink":
-					return item.data.sourceFile.path;
-				case "branch":
-					return item.data.hop1.path ?? item.data.hop1.rawText;
-				default:
-					// フォールバックとしてindexを使うのはデータがない場合のみ
-					return `${index}`;
-			}
-		},
+		getItemKey: getViewItemKey,
 		sectionId: "empty-view-all-notes",
 		pinBookmarkedToTop: settings.pinBookmarkedToTopInAllNotes,
 		emptyMessage: "No notes found.",

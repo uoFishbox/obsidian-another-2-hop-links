@@ -3,6 +3,7 @@
 
 	interface Props<T> {
 		items?: readonly T[];
+		getItemId?: (item: T, index: number) => string;
 		item?: Snippet<
 			[
 				{
@@ -14,15 +15,17 @@
 		>;
 	}
 
-	let { items = [], item }: Props<T> = $props();
+	let { items = [], getItemId, item }: Props<T> = $props();
 </script>
 
 <div data-testid="filtered-count">{items.length}</div>
 
 {#each items as entry, index}
-	{@render item?.({
-		item: entry,
-		index,
-		scrollContainerEl: null,
-	})}
+	<div data-testid="searchable-item-slot" data-item-key={getItemId?.(entry, index)}>
+		{@render item?.({
+			item: entry,
+			index,
+			scrollContainerEl: null,
+		})}
+	</div>
 {/each}
