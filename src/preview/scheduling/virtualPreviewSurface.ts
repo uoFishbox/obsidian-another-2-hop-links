@@ -63,10 +63,18 @@ interface PreviewHostRegistration {
 interface PreviewEntryRuntime {
 	readonly key: string;
 	readonly controller: PreviewSlotController;
+	lastSeenSnapshotGeneration: number;
 }
 
 const PREVIEW_SURFACE_FLUSH_KEY = "virtual-preview-surface:flush";
 const DISABLED_PREVIEW_HOST_LEASE: PreviewHostLease = { dispose: () => {} };
+
+function compareBindingsByDescendingRow(
+	left: VirtualPreviewBinding,
+	right: VirtualPreviewBinding,
+): number {
+	return right.rowIndex - left.rowIndex;
+}
 
 /**
  * Reconciles logical card previews with virtualized hosts.
@@ -81,11 +89,15 @@ export function createVirtualPreviewSurface(
 	const entriesByKey = new Map<string, PreviewEntryRuntime>();
 	const hostsByKey = new Map<string, Set<PreviewHostRegistration>>();
 	const pendingByKey = new Map<string, PreviewActivationHandle>();
+	const backwardActivationOrderScratch: VirtualPreviewBinding[] = [];
 	const activationScheduler = options.activationScheduler;
 	const scope: PreviewActivationScope = activationScheduler.createScope({
 		frameCoordinator: options.frameCoordinator,
 	});
 	let latestSnapshot: VirtualPreviewSurfaceSnapshot | undefined;
+	let lastAppliedActiveStart: number | undefined;
+	let appliedSnapshotGeneration = 0;
+	let lastAppliedActive = false;
 	let disposed = false;
 	const frameFlushDriver = createPreviewFrameDriver({
 		coordinator: options.frameCoordinator,
@@ -100,6 +112,7 @@ export function createVirtualPreviewSurface(
 		const entry: PreviewEntryRuntime = {
 			key,
 			controller: createPreviewSlotController(options.createRenderer),
+			lastSeenSnapshotGeneration: 0,
 		};
 		entriesByKey.set(key, entry);
 		for (const registration of hostsByKey.get(key) ?? []) {
@@ -135,6 +148,11 @@ export function createVirtualPreviewSurface(
 		pendingByKey.delete(key);
 	}
 
+	function cancelAllPendingActivations(): void {
+		for (const handle of pendingByKey.values()) handle.cancel();
+		pendingByKey.clear();
+	}
+
 	function reconcileActivation(entry: PreviewEntryRuntime): void {
 		if (entry.controller.needsActivation()) {
 			enqueueActivation(entry.key);
@@ -157,11 +175,31 @@ export function createVirtualPreviewSurface(
 	function applyLatestSnapshot(): void {
 		if (disposed || !latestSnapshot) return;
 		const snapshot = latestSnapshot;
-		const seenKeys = new Set<string>();
+		appliedSnapshotGeneration += 1;
+		const snapshotGeneration = appliedSnapshotGeneration;
+		const movedBackward =
+			snapshot.active &&
+			lastAppliedActive &&
+			lastAppliedActiveStart !== undefined &&
+			snapshot.activeRange.start < lastAppliedActiveStart;
 
-		for (const binding of snapshot.bindings) {
-			seenKeys.add(binding.key);
+		// The activation scheduler is FIFO. When the preview window moves backward,
+		// cancel the old queue and rebuild it from the bottom row toward the top so
+		// previews fill in the same direction as the reverse scroll. Keep the original
+		// order within a row so columns do not flip left-to-right.
+		if (movedBackward) cancelAllPendingActivations();
+		let bindingsInActivationOrder = snapshot.bindings;
+		if (movedBackward) {
+			for (const binding of snapshot.bindings) {
+				backwardActivationOrderScratch.push(binding);
+			}
+			backwardActivationOrderScratch.sort(compareBindingsByDescendingRow);
+			bindingsInActivationOrder = backwardActivationOrderScratch;
+		}
+
+		for (const binding of bindingsInActivationOrder) {
 			const entry = getOrCreateEntry(binding.key);
+			entry.lastSeenSnapshotGeneration = snapshotGeneration;
 			entry.controller.bind(binding.request);
 			entry.controller.setActive(
 				snapshot.active &&
@@ -170,10 +208,16 @@ export function createVirtualPreviewSurface(
 			);
 			reconcileActivation(entry);
 		}
+		backwardActivationOrderScratch.length = 0;
 
 		for (const entry of entriesByKey.values()) {
-			if (!seenKeys.has(entry.key)) disposeEntry(entry);
+			if (entry.lastSeenSnapshotGeneration !== snapshotGeneration) {
+				disposeEntry(entry);
+			}
 		}
+
+		lastAppliedActiveStart = snapshot.activeRange.start;
+		lastAppliedActive = snapshot.active;
 	}
 
 	function registerHost(key: string, element: HTMLElement): PreviewHostLease {
@@ -218,6 +262,7 @@ export function createVirtualPreviewSurface(
 		frameFlushDriver.dispose();
 		for (const handle of pendingByKey.values()) handle.cancel();
 		pendingByKey.clear();
+		backwardActivationOrderScratch.length = 0;
 		for (const registrations of hostsByKey.values()) {
 			for (const registration of registrations) {
 				registration.controllerLease?.dispose();

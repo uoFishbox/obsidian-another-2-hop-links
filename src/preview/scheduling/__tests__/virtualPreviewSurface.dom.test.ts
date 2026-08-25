@@ -8,7 +8,10 @@ import type { CardPreviewRequest } from "preview/pipeline/cardPreviewRequest";
 import { createPreviewRenderSettings } from "preview/pipeline/previewRenderSettings";
 import type { VirtualFrameCoordinator } from "shared/ui/scheduling/frameCoordinator";
 import { createVirtualPreviewSurface } from "../virtualPreviewSurface";
-import { createPreviewActivationScheduler } from "../previewActivationScheduler";
+import {
+	createPreviewActivationScheduler,
+	type PreviewActivationScheduler,
+} from "../previewActivationScheduler";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const FRAME_INTERVAL_MS = 1000 / 60;
@@ -97,12 +100,61 @@ type Surface = ReturnType<typeof createVirtualPreviewSurface> & {
 	acceptCommittedFrame(source: { readonly current: PreviewFrame }): void;
 };
 
-function createHarness(frameCoordinator?: VirtualFrameCoordinator): {
+function createManualActivationQueue(): {
+	readonly scheduler: PreviewActivationScheduler;
+	pendingKeys(): string[];
+	activateNext(): string | undefined;
+} {
+	interface ManualRequest {
+		readonly key: string;
+		readonly onActivated: (() => void) | undefined;
+		settled: boolean;
+	}
+
+	const requests: ManualRequest[] = [];
+	const settleAll = (): void => {
+		for (const request of requests) request.settled = true;
+	};
+	const scheduler: PreviewActivationScheduler = {
+		createScope: () => ({ kind: "preview-activation-scope" }),
+		request: (key, _scope, onActivated) => {
+			const request: ManualRequest = { key, onActivated, settled: false };
+			requests.push(request);
+			return {
+				key,
+				cancel(): void {
+					request.settled = true;
+				},
+			};
+		},
+		disposeScope: settleAll,
+		dispose: settleAll,
+	};
+
+	return {
+		scheduler,
+		pendingKeys: () =>
+			requests
+				.filter((request) => !request.settled)
+				.map((request) => request.key),
+		activateNext(): string | undefined {
+			const request = requests.find((candidate) => !candidate.settled);
+			if (!request) return undefined;
+			request.settled = true;
+			request.onActivated?.();
+			return request.key;
+		},
+	};
+}
+
+function createHarness(
+	frameCoordinator?: VirtualFrameCoordinator,
+	activationScheduler = createPreviewActivationScheduler(),
+): {
 	surface: Surface;
 	renders: RenderRecord[];
 } {
 	const renders: RenderRecord[] = [];
-	const activationScheduler = createPreviewActivationScheduler();
 	const actualSurface = createVirtualPreviewSurface({
 		frameCoordinator,
 		activationScheduler,
@@ -417,6 +469,81 @@ describe("VirtualPreviewSurface", () => {
 		expect(commit(renders[0])).toBe(false);
 		expect(commit(renders[1])).toBe(true);
 		expect(newHost.textContent).toBe("a");
+		surface.dispose();
+	});
+
+	it("activates queued previews bottom-to-top when the preview range moves backward", async () => {
+		const activationQueue = createManualActivationQueue();
+		const { surface, renders } = createHarness(
+			undefined,
+			activationQueue.scheduler,
+		);
+		const initialCards = [
+			binding("slot-10", 10, "row-10"),
+			binding("slot-11", 11, "row-11"),
+			binding("slot-12-left", 12, "row-12-left"),
+			binding("slot-12-right", 12, "row-12-right"),
+			binding("slot-13", 13, "row-13"),
+		];
+		for (const card of initialCards) {
+			surface.registerHost(card.slotId, document.createElement("div"));
+		}
+
+		surface.publish({
+			previewBindingsBySlot: new Map(
+				initialCards.map((card) => [card.slotId, card]),
+			),
+			previewWindow: {
+				previewRange: { start: 10, end: 14 },
+				active: true,
+			},
+		});
+		await flushActivation();
+		expect(activationQueue.pendingKeys()).toEqual([
+			"slot-10",
+			"slot-11",
+			"slot-12-left",
+			"slot-12-right",
+			"slot-13",
+		]);
+
+		expect(activationQueue.activateNext()).toBe("slot-10");
+		expect(renders.map((render) => render.identity)).toEqual(["row-10"]);
+
+		const newlyEntered = binding("slot-9", 9, "row-9");
+		surface.registerHost(newlyEntered.slotId, document.createElement("div"));
+		const backwardCards = [newlyEntered, ...initialCards];
+		surface.publish({
+			previewBindingsBySlot: new Map(
+				backwardCards.map((card) => [card.slotId, card]),
+			),
+			previewWindow: {
+				previewRange: { start: 9, end: 14 },
+				active: true,
+			},
+		});
+		await flushActivation();
+
+		expect(activationQueue.pendingKeys()).toEqual([
+			"slot-13",
+			"slot-12-left",
+			"slot-12-right",
+			"slot-11",
+			"slot-9",
+		]);
+		expect(activationQueue.activateNext()).toBe("slot-13");
+		expect(activationQueue.activateNext()).toBe("slot-12-left");
+		expect(activationQueue.activateNext()).toBe("slot-12-right");
+		expect(activationQueue.activateNext()).toBe("slot-11");
+		expect(activationQueue.activateNext()).toBe("slot-9");
+		expect(renders.map((render) => render.identity)).toEqual([
+			"row-10",
+			"row-13",
+			"row-12-left",
+			"row-12-right",
+			"row-11",
+			"row-9",
+		]);
 		surface.dispose();
 	});
 
