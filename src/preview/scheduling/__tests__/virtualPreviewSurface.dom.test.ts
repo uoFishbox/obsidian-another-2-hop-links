@@ -35,6 +35,7 @@ interface PreviewFrame {
 	readonly previewBindingsBySlot: ReadonlyMap<string, RowPreviewCardBinding>;
 	readonly previewWindow: {
 		readonly previewRange: { readonly start: number; readonly end: number };
+		readonly priorityRange?: { readonly start: number; readonly end: number };
 		readonly active: boolean;
 	};
 }
@@ -180,7 +181,7 @@ function createHarness(
 		},
 	});
 	let bindings = new Map<string, RowPreviewCardBinding>();
-	let previewWindow = {
+	let previewWindow: PreviewFrame["previewWindow"] = {
 		previewRange: { start: 0, end: 0 },
 		active: false,
 	};
@@ -197,6 +198,7 @@ function createHarness(
 				request: card.request,
 			})),
 			activeRange: nextWindow.previewRange,
+			priorityRange: nextWindow.priorityRange,
 			active: nextWindow.active,
 		});
 	};
@@ -472,6 +474,42 @@ describe("VirtualPreviewSurface", () => {
 		expect(commit(renders[0])).toBe(false);
 		expect(commit(renders[1])).toBe(true);
 		expect(newHost.textContent).toBe("a");
+		surface.dispose();
+	});
+
+	it("activates strict viewport previews before overscan previews", async () => {
+		const activationQueue = createManualActivationQueue();
+		const { surface } = createHarness(undefined, activationQueue.scheduler);
+		const cards = [
+			binding("slot-8", 8, "row-8"),
+			binding("slot-9", 9, "row-9"),
+			binding("slot-10", 10, "row-10"),
+			binding("slot-11", 11, "row-11"),
+			binding("slot-12", 12, "row-12"),
+			binding("slot-13", 13, "row-13"),
+		];
+		for (const card of cards) {
+			surface.registerHost(card.slotId, document.createElement("div"));
+		}
+
+		surface.publish({
+			previewBindingsBySlot: new Map(cards.map((card) => [card.slotId, card])),
+			previewWindow: {
+				previewRange: { start: 8, end: 14 },
+				priorityRange: { start: 10, end: 12 },
+				active: true,
+			},
+		});
+		await flushActivation();
+
+		expect(activationQueue.pendingKeys()).toEqual([
+			"slot-10",
+			"slot-11",
+			"slot-8",
+			"slot-9",
+			"slot-12",
+			"slot-13",
+		]);
 		surface.dispose();
 	});
 

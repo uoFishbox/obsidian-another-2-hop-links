@@ -450,6 +450,7 @@ const getScrollerViewportEntry = (
 		structureObserverConnected: false,
 		idleTimer: null,
 		lastScrollEventAt: 0,
+		suppressedNativeScrollTop: null,
 		onNativeScroll: undefined as unknown as () => void,
 		onScrollIdleTimeout: undefined as unknown as () => void,
 		unsubscribeWindowResize: null,
@@ -496,6 +497,7 @@ const registerSubscriber = (
 		entry.scrollCoverageGate.valid = false;
 		entry.hasPendingScrollMeasurement = false;
 		entry.pendingScrollTop = null;
+		entry.suppressedNativeScrollTop = null;
 		unobserveRootResizeTarget(existing);
 		invalidateNearestScrollContainerCache(existing.rootEl);
 	}
@@ -529,6 +531,7 @@ const unregisterSubscriber = (subscriber: VirtualListViewportSubscriber): void =
 	}
 	entry.hasPendingScrollMeasurement = false;
 	entry.pendingScrollTop = null;
+	entry.suppressedNativeScrollTop = null;
 	entry.scrollCoverageGate.valid = false;
 	entry.scrollTarget.removeEventListener("scroll", entry.onNativeScroll);
 	entry.unsubscribeWindowResize?.();
@@ -614,6 +617,13 @@ export const observeVirtualViewport = (
 		if (!subscriber || subscriber.isDisposed) return;
 		if (subscriber.entry.subscriber !== subscriber) return;
 		publishScrollMeasurementRange(subscriber.entry, range);
+	};
+
+	observation.suppressNextNativeScroll = (scrollTop: number): void => {
+		const subscriber = currentSubscriber;
+		if (!subscriber || subscriber.isDisposed) return;
+		if (subscriber.entry.subscriber !== subscriber) return;
+		subscriber.entry.suppressedNativeScrollTop = scrollTop;
 	};
 
 	return observation;

@@ -24,6 +24,7 @@ const viewportObservationHarness = vi.hoisted(() => ({
 	options: undefined as unknown,
 	publishScrollMeasurementRange:
 		vi.fn<(range: ScrollMeasurementRange | null) => void>(),
+	suppressNextNativeScroll: vi.fn<(scrollTop: number) => void>(),
 }));
 
 vi.mock(
@@ -42,6 +43,8 @@ vi.mock(
 					{
 						publishScrollMeasurementRange:
 							viewportObservationHarness.publishScrollMeasurementRange,
+						suppressNextNativeScroll:
+							viewportObservationHarness.suppressNextNativeScroll,
 					},
 				) as ReturnType<typeof actual.observeVirtualViewport>;
 			},
@@ -269,6 +272,7 @@ describe("useVirtualizer", () => {
 		vi.useFakeTimers();
 		viewportObservationHarness.options = undefined;
 		viewportObservationHarness.publishScrollMeasurementRange.mockReset();
+		viewportObservationHarness.suppressNextNativeScroll.mockReset();
 	});
 
 	afterEach(() => {

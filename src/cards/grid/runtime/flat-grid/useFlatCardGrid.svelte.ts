@@ -222,6 +222,8 @@ export function useFlatCardGrid<T>(
 	let loadScheduled = $state(false);
 	let chainedInfiniteScrollLoads = $state(0);
 	let layout = $state.raw(DEFAULT_FLAT_GRID_LAYOUT);
+	let previewPriorityRange: RowRange | undefined;
+	const previewPriorityRangeScratch = { start: 0, end: 0 };
 	const resolveConfiguredCardLayout = createResolvedCardLayoutSettingsMemo();
 	const configuredCardLayout = $derived.by(() =>
 		resolveConfiguredCardLayout(applicationStore?.settings),
@@ -271,19 +273,47 @@ export function useFlatCardGrid<T>(
 	const syncCardSlots = (
 		rows: readonly MountedFlatGridRow<T>[],
 		previewRange: RowRange,
+		includeInteractions = true,
 	): void => {
 		const bindings = buildCardGridBindings({
 			rows,
 			previewRange,
 			resolvePreviewRequest: props.resolveItemPreviewRequest,
-			resolveInteractionDescriptor: props.resolveItemInteractionDescriptor,
+			resolveInteractionDescriptor: includeInteractions
+				? props.resolveItemInteractionDescriptor
+				: undefined,
 		});
 		previewSurface.publish({
 			bindings: bindings.previewBindings,
 			activeRange: bindings.previewRange,
+			priorityRange: previewPriorityRange,
 			active: true,
 		});
-		interactionController.syncCards(bindings.interactionBindings);
+		if (includeInteractions) {
+			interactionController.syncCards(bindings.interactionBindings);
+		}
+	};
+
+	const updatePreviewPriorityRange = (
+		context: VirtualListStableMeasurementContext,
+	): boolean => {
+		rowModel.findVisibleRangeInto(previewPriorityRangeScratch, {
+			scrollTop: context.scrollTop - context.sectionTop,
+			viewportHeight: context.viewportHeight,
+			overscanPx: 0,
+		});
+		if (
+			previewPriorityRange?.start === previewPriorityRangeScratch.start &&
+			previewPriorityRange.end === previewPriorityRangeScratch.end
+		) {
+			return false;
+		}
+
+		previewPriorityRange = {
+			start: previewPriorityRangeScratch.start,
+			end: previewPriorityRangeScratch.end,
+		};
+		return true;
 	};
 	const virtualList = useVirtualizer<
 		FlatGridLogicalCell<T>,
@@ -523,6 +553,17 @@ export function useFlatCardGrid<T>(
 	function handleStableMeasurement(
 		context: VirtualListStableMeasurementContext,
 	): void {
+		if (updatePreviewPriorityRange(context)) {
+			const snapshot = virtualList.getSnapshot();
+			if (snapshot) {
+				syncCardSlots(
+					snapshot.mountedBuild?.rowsInMountedRange ?? EMPTY_MOUNTED_ROWS,
+					snapshot.ranges.previewVisible,
+					false,
+				);
+			}
+		}
+
 		if (restorePendingScrollPosition(context)) {
 			return;
 		}
@@ -555,6 +596,9 @@ export function useFlatCardGrid<T>(
 		const restoredScrollTop = scrollContainerEl
 			? scrollContainerEl.scrollTop
 			: ownerWindow.scrollY || ownerWindow.pageYOffset || 0;
+		if (restoredScrollTop !== context.scrollTop) {
+			virtualList.suppressNextNativeScroll(restoredScrollTop);
+		}
 		virtualList.flushProgrammaticScrollMeasurement(
 			{
 				scrollContainerEl,

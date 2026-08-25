@@ -1,6 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { observeVirtualViewport as observeVirtualListViewport } from "../scrollerRegistry";
-import { resetScrollActivityForTests } from "shared/ui/scroll/scrollActivity";
+import {
+	isScrollActivityActive,
+	resetScrollActivityForTests,
+} from "shared/ui/scroll/scrollActivity";
 import {
 	createVirtualFrameCoordinator,
 	type VirtualFrameCoordinator,
@@ -914,6 +917,61 @@ describe("observeVirtualListViewport", () => {
 			stopObserving();
 			requestAnimationFrame.mockRestore();
 			teardownAnimationFrameMock();
+		}
+	});
+
+	it("suppresses one matching native scroll event already handled programmatically", async () => {
+		vi.useFakeTimers();
+
+		const scrollContainer = document.createElement("div");
+		const rootEl = document.createElement("div");
+		scrollContainer.style.overflow = "auto";
+		document.body.append(scrollContainer);
+		scrollContainer.append(rootEl);
+
+		let scrollTop = 120;
+		Object.defineProperty(scrollContainer, "scrollTop", {
+			get: () => scrollTop,
+			configurable: true,
+		});
+
+		const scheduleScrollMeasurementSpy = vi.fn();
+		const onScrollStateChange = vi.fn();
+		const stopObserving = observeVirtualListViewport({
+			frameCoordinator: createObserverFrameCoordinator(),
+			rootEl,
+			onWidthChange: vi.fn(),
+			getCachedViewportHeight: () => 240,
+			onScrollContainerChange: vi.fn(),
+			scheduleLayoutMeasurement: vi.fn(),
+			scheduleScrollMeasurement: scheduleScrollMeasurementSpy,
+			runScrollMeasurement: vi.fn(),
+			runInitialLayoutMeasurement: vi.fn(),
+			onScrollStateChange,
+		});
+		onScrollStateChange.mockClear();
+
+		try {
+			scrollTop = 640;
+			stopObserving.suppressNextNativeScroll(scrollTop);
+			scrollContainer.dispatchEvent(new Event("scroll"));
+
+			expect(isScrollActivityActive()).toBe(false);
+			expect(scheduleScrollMeasurementSpy).not.toHaveBeenCalled();
+			expect(onScrollStateChange).not.toHaveBeenCalled();
+
+			// The suppression is one-shot. A later user scroll must behave normally.
+			scrollTop = 660;
+			scrollContainer.dispatchEvent(new Event("scroll"));
+
+			expect(isScrollActivityActive()).toBe(true);
+			expect(scheduleScrollMeasurementSpy).toHaveBeenCalledTimes(1);
+			expect(onScrollStateChange).toHaveBeenCalledWith(0, false, true);
+
+			await vi.advanceTimersByTimeAsync(100);
+			expect(isScrollActivityActive()).toBe(false);
+		} finally {
+			stopObserving();
 		}
 	});
 

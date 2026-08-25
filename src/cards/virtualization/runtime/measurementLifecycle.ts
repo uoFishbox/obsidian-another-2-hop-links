@@ -371,6 +371,7 @@ export interface VirtualScrollCoverageController {
 	): StableScrollTopBand | undefined;
 	getMeasurementRange(): ScrollMeasurementRange | null;
 	publish(): void;
+	suppressNextNativeScroll(scrollTop: number): void;
 }
 
 /** Owns the open scroll interval already covered by the published snapshot. */
@@ -448,6 +449,10 @@ export function createVirtualScrollCoverageController(): VirtualScrollCoverageCo
 		observation?.publishScrollMeasurementRange(getMeasurementRange());
 	}
 
+	function suppressNextNativeScroll(scrollTop: number): void {
+		observation?.suppressNextNativeScroll(scrollTop);
+	}
+
 	return {
 		setObservation,
 		clearObservation,
@@ -456,6 +461,7 @@ export function createVirtualScrollCoverageController(): VirtualScrollCoverageCo
 		resolvePublishedCoverageBand,
 		getMeasurementRange,
 		publish,
+		suppressNextNativeScroll,
 	};
 }
 

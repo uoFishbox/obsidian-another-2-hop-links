@@ -99,6 +99,7 @@ export interface VirtualMeasurementRuntime {
 		snapshot: ProgrammaticScrollSnapshot,
 		options?: RunVirtualScrollMeasurementOptions,
 	): VirtualMeasurementResult;
+	suppressNextNativeScroll(scrollTop: number): void;
 	observeRoot(
 		rootEl: HTMLElement,
 		runWithoutTracking?: (callback: () => void) => void,
@@ -623,6 +624,7 @@ export function createVirtualMeasurementRuntime<
 		runLayoutMeasurement,
 		runScrollMeasurement,
 		flushProgrammaticScrollMeasurement,
+		suppressNextNativeScroll: scrollCoverage.suppressNextNativeScroll,
 		observeRoot,
 		resetScrollWindow: scrollCoverage.reset,
 	};

@@ -78,6 +78,8 @@ export interface ObserveVirtualViewportOptions {
 export interface VirtualViewportObservation {
 	(): void;
 	publishScrollMeasurementRange(range: ScrollMeasurementRange | null): void;
+	/** Suppresses one matching native scroll event already handled programmatically. */
+	suppressNextNativeScroll(scrollTop: number): void;
 }
 
 export interface VirtualViewportSubscriber extends Omit<
@@ -240,7 +242,8 @@ export function scheduleScrollMeasurement(
 	});
 }
 
-const SCROLL_IDLE_MS = 140;
+const SCROLL_IDLE_MS = 80;
+const SUPPRESSED_NATIVE_SCROLL_EPSILON_PX = 0.5;
 
 export interface VirtualScrollSessionState {
 	ownerWindow: Window;
@@ -251,6 +254,7 @@ export interface VirtualScrollSessionState {
 	measureLayoutAfterScroll: boolean;
 	idleTimer: number | null;
 	lastScrollEventAt: number;
+	suppressedNativeScrollTop: number | null;
 	onScrollIdleTimeout: () => void;
 	pendingScrollTop: number | null;
 	scrollGeneration: number;
@@ -359,8 +363,20 @@ export function handleVirtualScrollEvent(
 	state: VirtualScrollSessionState,
 	actions: VirtualScrollSessionActions,
 ): void {
-	state.lastScrollEventAt = readMonotonicTime(state.ownerWindow);
 	const scrollTop = readScrollTop(state.scrollTarget);
+	const suppressedScrollTop = state.suppressedNativeScrollTop;
+	if (suppressedScrollTop !== null) {
+		state.suppressedNativeScrollTop = null;
+		if (
+			!state.isScrolling &&
+			Math.abs(scrollTop - suppressedScrollTop) <=
+				SUPPRESSED_NATIVE_SCROLL_EPSILON_PX
+		) {
+			return;
+		}
+	}
+
+	state.lastScrollEventAt = readMonotonicTime(state.ownerWindow);
 
 	if (!state.isScrolling) {
 		startScrollSession(state, actions);

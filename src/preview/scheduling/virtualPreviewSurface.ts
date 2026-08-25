@@ -31,6 +31,8 @@ export interface VirtualPreviewRange {
 export interface VirtualPreviewSurfaceSnapshot {
 	readonly bindings: readonly VirtualPreviewBinding[];
 	readonly activeRange: VirtualPreviewRange;
+	/** Strict viewport rows that should activate before overscan rows. */
+	readonly priorityRange?: VirtualPreviewRange;
 	readonly active: boolean;
 }
 
@@ -66,11 +68,11 @@ interface PreviewEntryRuntime {
 const PREVIEW_SURFACE_FLUSH_KEY = "virtual-preview-surface:flush";
 const DISABLED_PREVIEW_HOST_LEASE: PreviewHostLease = { dispose: () => {} };
 
-function compareBindingsByDescendingRow(
-	left: VirtualPreviewBinding,
-	right: VirtualPreviewBinding,
-): number {
-	return right.rowIndex - left.rowIndex;
+function isBindingInRange(
+	binding: VirtualPreviewBinding,
+	range: VirtualPreviewRange,
+): boolean {
+	return binding.rowIndex >= range.start && binding.rowIndex < range.end;
 }
 
 /**
@@ -86,7 +88,7 @@ export function createVirtualPreviewSurface(
 	const entriesByKey = new Map<string, PreviewEntryRuntime>();
 	const hostsByKey = new Map<string, Set<PreviewHostRegistration>>();
 	const pendingByKey = new Map<string, PreviewActivationHandle>();
-	const backwardActivationOrderScratch: VirtualPreviewBinding[] = [];
+	const activationOrderScratch: VirtualPreviewBinding[] = [];
 	const activationScheduler = options.activationScheduler;
 	const scope: PreviewActivationScope = activationScheduler.createScope({
 		frameCoordinator: options.frameCoordinator,
@@ -178,18 +180,30 @@ export function createVirtualPreviewSurface(
 			lastAppliedActiveStart !== undefined &&
 			snapshot.activeRange.start < lastAppliedActiveStart;
 
-		// The activation scheduler is FIFO. When the preview window moves backward,
-		// cancel the old queue and rebuild it from the bottom row toward the top so
-		// previews fill in the same direction as the reverse scroll. Keep the original
-		// order within a row so columns do not flip left-to-right.
+		// The activation scheduler is FIFO. Strictly visible rows must enter that
+		// queue before overscan rows; otherwise a restored deep scroll position can
+		// spend several serial preview renders on cards above the viewport. When the
+		// preview window moves backward, keep the existing bottom-to-top direction.
 		if (movedBackward) cancelAllPendingActivations();
 		let bindingsInActivationOrder = snapshot.bindings;
-		if (movedBackward) {
+		const priorityRange = snapshot.priorityRange;
+		const hasPriorityRange =
+			priorityRange !== undefined && priorityRange.start < priorityRange.end;
+		if (movedBackward || hasPriorityRange) {
 			for (const binding of snapshot.bindings) {
-				backwardActivationOrderScratch.push(binding);
+				activationOrderScratch.push(binding);
 			}
-			backwardActivationOrderScratch.sort(compareBindingsByDescendingRow);
-			bindingsInActivationOrder = backwardActivationOrderScratch;
+			activationOrderScratch.sort((left, right) => {
+				if (hasPriorityRange && priorityRange) {
+					const leftPriority = isBindingInRange(left, priorityRange);
+					const rightPriority = isBindingInRange(right, priorityRange);
+					if (leftPriority !== rightPriority) return leftPriority ? -1 : 1;
+				}
+				return movedBackward
+					? right.rowIndex - left.rowIndex
+					: left.rowIndex - right.rowIndex;
+			});
+			bindingsInActivationOrder = activationOrderScratch;
 		}
 
 		for (const binding of bindingsInActivationOrder) {
@@ -203,7 +217,7 @@ export function createVirtualPreviewSurface(
 			);
 			reconcileActivation(entry);
 		}
-		backwardActivationOrderScratch.length = 0;
+		activationOrderScratch.length = 0;
 
 		for (const entry of entriesByKey.values()) {
 			if (entry.lastSeenSnapshotGeneration !== snapshotGeneration) {
@@ -257,7 +271,7 @@ export function createVirtualPreviewSurface(
 		options.frameCoordinator.cancel("post-paint", PREVIEW_SURFACE_FLUSH_KEY);
 		for (const handle of pendingByKey.values()) handle.cancel();
 		pendingByKey.clear();
-		backwardActivationOrderScratch.length = 0;
+		activationOrderScratch.length = 0;
 		for (const registrations of hostsByKey.values()) {
 			for (const registration of registrations) {
 				registration.controllerLease?.dispose();

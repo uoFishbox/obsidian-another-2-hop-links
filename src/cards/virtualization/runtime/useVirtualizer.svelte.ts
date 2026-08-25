@@ -170,6 +170,7 @@ export function useVirtualizer<
 		runLayoutMeasurement: runtime.runLayoutMeasurement,
 		runScrollMeasurement: runtime.runScrollMeasurement,
 		flushProgrammaticScrollMeasurement: runtime.flushProgrammaticScrollMeasurement,
+		suppressNextNativeScroll: runtime.suppressNextNativeScroll,
 		scheduleLayoutMeasurement: runtime.scheduleLayoutMeasurement,
 		scheduleScrollMeasurement: runtime.scheduleScrollMeasurement,
 		resetScrollWindow: runtime.resetScrollWindow,
