@@ -271,7 +271,7 @@ describe("ShadowHoverControllerImpl", () => {
 		controller.destroy();
 	});
 
-	it("keeps a hovered popover alive when the delegated anchor is released", () => {
+	it("lets native transition keep a hovered popover after anchor release", () => {
 		const originalHide = vi.fn();
 		const popover: HoverPopoverLike = {
 			hoverEl: document.createElement("div"),
@@ -279,9 +279,7 @@ describe("ShadowHoverControllerImpl", () => {
 			hide: originalHide,
 			state: 1,
 			transition() {
-				if (!popover.onTarget && !popover.onHover && !popover.isFocused) {
-					popover.hide?.();
-				}
+				if (!this.onTarget && !this.onHover) this.hide?.();
 			},
 		};
 		document.body.append(popover.hoverEl!);
@@ -318,9 +316,7 @@ describe("ShadowHoverControllerImpl", () => {
 			hide: originalHide,
 			state: 1,
 			transition() {
-				if (!popover.onTarget && !popover.onHover && !popover.isFocused) {
-					popover.hide?.();
-				}
+				if (!this.onTarget && !this.onHover) this.hide?.();
 			},
 		};
 		document.body.append(popover.hoverEl!);

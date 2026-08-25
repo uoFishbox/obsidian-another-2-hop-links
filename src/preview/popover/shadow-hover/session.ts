@@ -8,12 +8,13 @@ import type {
 	ShadowHoverSession,
 } from "./internal-types";
 import {
-	bindAndPatchPopoverPosition,
+	bindAndPatchPopover,
 	bindPopoverAnchor,
+	disposePopoverCloseGuard,
+	disposePopoverPinPatch,
 	disposePopoverPositionPatch,
 	getBoundPopoverActualAnchor,
 	getBoundPopoverProxyAnchor,
-	isActiveElementWithinPopover,
 	POPOVER_ACTUAL_ANCHOR_KEY,
 	POPOVER_ANCHOR_KEY,
 	scheduleAttachPopoverHoverListeners,
@@ -239,8 +240,16 @@ function syncShadowTargetState(
 
 	popover.onTarget = overAnchor;
 	session.overAnchor = overAnchor;
-	session.overPopover =
-		Boolean(popover.onHover) || isActiveElementWithinPopover(popover);
+	session.overPopover = Boolean(popover.onHover);
+}
+
+function shouldKeepPopoverAlive(
+	popover: HoverPopoverLike,
+	session: ShadowHoverSession,
+): boolean {
+	if (session.destroyed || session.activePopover !== popover) return false;
+	syncShadowTargetState(popover, session);
+	return session.overAnchor;
 }
 
 export function createRequestHoverParent(
@@ -298,12 +307,14 @@ export function createRequestHoverParent(
 				proxyEl: requestAnchorEl,
 			};
 			bindPopoverAnchor(nextPopover, requestAnchorEl, requestActualAnchorEl);
-			bindAndPatchPopoverPosition(
+			bindAndPatchPopover(
 				nextPopover,
 				session,
 				{
 					syncProxyRectForActual,
 					syncPopoverTargetAndTransition,
+					shouldKeepPopoverAlive,
+					releaseToNativeLifecycle: releasePopoverToNativeLifecycle,
 				},
 				requestAnchorEl,
 				requestActualAnchorEl,
@@ -367,6 +378,8 @@ export function releasePopoverToNativeLifecycle(
 		session.teardownPopoverListeners?.();
 		session.teardownPopoverListeners = null;
 	}
+	disposePopoverCloseGuard(popover, session);
+	disposePopoverPinPatch(popover, session);
 	try {
 		popover.transition?.();
 	} catch {

@@ -11,6 +11,7 @@ import {
 	getPendingPopoverHandoff,
 	isActualHovered,
 	relayHoverToProxy,
+	releasePopoverToNativeLifecycle,
 	setAnchorHovered,
 	syncPopoverTargetAndTransition,
 	syncProxyRectForActual,
@@ -277,7 +278,7 @@ describe("createRequestHoverParent", () => {
 		expect(isActualHovered(session, actualAnchor)).toBe(false);
 	});
 
-	it("patches only position while preserving native lifecycle methods and state", () => {
+	it("guards close methods while preserving native transition and detect", () => {
 		const session = createShadowHoverSession();
 		const actualAnchor = createMeasuredButton(10);
 		const proxyAnchor = syncProxyRectForActual(session, actualAnchor);
@@ -291,6 +292,7 @@ describe("createRequestHoverParent", () => {
 		const position = vi.fn();
 		const transition = vi.fn();
 		const nativeState = { type: "plugin-owned" };
+		const clearTimeoutSpy = vi.spyOn(window, "clearTimeout");
 		const popover = {
 			hoverEl: document.createElement("div"),
 			hide,
@@ -307,9 +309,9 @@ describe("createRequestHoverParent", () => {
 		createRequestHoverParent(session, 1, proxyAnchor, actualAnchor).hoverPopover =
 			popover;
 
-		expect(popover.hide).toBe(hide);
-		expect(popover.close).toBe(close);
-		expect(popover.unload).toBe(unload);
+		expect(popover.hide).not.toBe(hide);
+		expect(popover.close).not.toBe(close);
+		expect(popover.unload).not.toBe(unload);
 		expect(popover.detect).toBe(detect);
 		expect(popover.position).not.toBe(position);
 		expect(popover.transition).toBe(transition);
@@ -319,17 +321,276 @@ describe("createRequestHoverParent", () => {
 		setMeasuredButtonRect(actualAnchor, 80);
 		popover.position();
 
+		const closingState = { type: "closing" };
+		popover.state = closingState;
+		popover.timer = 123;
 		popover.hide();
 		popover.close();
 		popover.unload();
 
-		expect(hide).toHaveBeenCalledTimes(1);
-		expect(close).toHaveBeenCalledTimes(1);
-		expect(unload).toHaveBeenCalledTimes(1);
+		expect(hide).not.toHaveBeenCalled();
+		expect(close).not.toHaveBeenCalled();
+		expect(unload).not.toHaveBeenCalled();
 		expect(position).toHaveBeenCalledTimes(1);
 		expect(proxyAnchor.style.left).toBe("80px");
 		expect(popover.state).toBe(nativeState);
-		expect(popover.timer).toBe(123);
+		expect(popover.timer).toBe(0);
+		expect(clearTimeoutSpy).toHaveBeenCalledWith(123);
+
+		releasePopoverToNativeLifecycle(popover, session);
+
+		expect(popover.hide).toBe(hide);
+		expect(popover.close).toBe(close);
+		expect(popover.unload).toBe(unload);
+		expect(popover.detect).toBe(detect);
+		expect(popover.transition).toBe(transition);
+	});
+
+	it("allows an active unpinned Hover Editor popover to close after pointer leave", () => {
+		const session = createShadowHoverSession();
+		const actualAnchor = createMeasuredButton(10);
+		const proxyAnchor = syncProxyRectForActual(session, actualAnchor);
+		beginRequest(session, actualAnchor, proxyAnchor, 1);
+		setAnchorHovered(session, actualAnchor, true);
+
+		const hoverEl = document.createElement("div");
+		hoverEl.className = "popover hover-popover hover-editor is-active";
+		const editor = document.createElement("textarea");
+		hoverEl.append(editor);
+		document.body.append(hoverEl);
+		const hide = vi.fn();
+		const popover: HoverPopoverLike = {
+			hoverEl,
+			hide,
+			isPinned: false,
+			onHover: false,
+			shouldShowSelf() {
+				return Boolean(this.onTarget || this.onHover || this.isPinned);
+			},
+			state: 1,
+			transition: vi.fn(),
+		};
+		createRequestHoverParent(session, 1, proxyAnchor, actualAnchor).hoverPopover =
+			popover;
+		editor.focus();
+		setAnchorHovered(session, actualAnchor, false);
+
+		popover.hide?.();
+
+		expect(document.activeElement).toBe(editor);
+		expect(session.overAnchor).toBe(false);
+		expect(session.overPopover).toBe(false);
+		expect(hide).toHaveBeenCalledTimes(1);
+		expect(popover.hide).toBe(hide);
+	});
+
+	it("lets a standard popover's native transition retain focused content", () => {
+		const session = createShadowHoverSession();
+		const actualAnchor = createMeasuredButton(10);
+		const proxyAnchor = syncProxyRectForActual(session, actualAnchor);
+		beginRequest(session, actualAnchor, proxyAnchor, 1);
+		setAnchorHovered(session, actualAnchor, true);
+
+		const hoverEl = document.createElement("div");
+		const focusTarget = document.createElement("button");
+		hoverEl.append(focusTarget);
+		document.body.append(hoverEl);
+		const hide = vi.fn();
+		const shouldShowSelf = vi.fn(() => hoverEl.contains(document.activeElement));
+		const popover: HoverPopoverLike = {
+			hoverEl,
+			hide,
+			onHover: false,
+			shouldShowSelf,
+			state: 1,
+			transition() {
+				if (!this.shouldShowSelf?.()) this.hide?.();
+			},
+		};
+		createRequestHoverParent(session, 1, proxyAnchor, actualAnchor).hoverPopover =
+			popover;
+		focusTarget.focus();
+		setAnchorHovered(session, actualAnchor, false);
+
+		syncPopoverTargetAndTransition(session);
+
+		expect(session.overAnchor).toBe(false);
+		expect(session.overPopover).toBe(false);
+		expect(shouldShowSelf).toHaveBeenCalled();
+		expect(hide).not.toHaveBeenCalled();
+		expect(popover.hide).not.toBe(hide);
+	});
+
+	it("allows Hover Editor to hide an empty window while its pointer remains active", () => {
+		const session = createShadowHoverSession();
+		const actualAnchor = createMeasuredButton(10);
+		const proxyAnchor = syncProxyRectForActual(session, actualAnchor);
+		beginRequest(session, actualAnchor, proxyAnchor, 1);
+		setAnchorHovered(session, actualAnchor, true);
+
+		const hoverEl = document.createElement("div");
+		hoverEl.className = "popover hover-popover hover-editor is-active";
+		document.body.append(hoverEl);
+		const hide = vi.fn();
+		const shouldShowSelf = vi.fn(() => true);
+		const popover: HoverPopoverLike = {
+			hoverEl,
+			hide,
+			isPinned: false,
+			onHover: true,
+			shouldShowSelf,
+			state: 1,
+			transition: vi.fn(),
+		};
+		createRequestHoverParent(session, 1, proxyAnchor, actualAnchor).hoverPopover =
+			popover;
+		setAnchorHovered(session, actualAnchor, false);
+
+		const leaves: unknown[] = [];
+		if (leaves.length === 0) popover.hide?.();
+
+		expect(session.overAnchor).toBe(false);
+		expect(session.overPopover).toBe(true);
+		expect(shouldShowSelf).not.toHaveBeenCalled();
+		expect(hide).toHaveBeenCalledTimes(1);
+		expect(popover.hide).toBe(hide);
+	});
+
+	it("releases a Hover Editor popover to native lifecycle when it becomes pinned", () => {
+		const session = createShadowHoverSession();
+		const actualAnchor = createMeasuredButton(10);
+		const proxyAnchor = syncProxyRectForActual(session, actualAnchor);
+		beginRequest(session, actualAnchor, proxyAnchor, 1);
+		setAnchorHovered(session, actualAnchor, true);
+
+		const hide = vi.fn();
+		const position = vi.fn();
+		const transition = vi.fn();
+		const togglePin = vi.fn(function (this: HoverPopoverLike, pinned?: boolean) {
+			this.isPinned = pinned ?? !this.isPinned;
+		});
+		const popover: HoverPopoverLike = {
+			hoverEl: document.createElement("div"),
+			hide,
+			isPinned: false,
+			position,
+			state: 1,
+			togglePin,
+			transition,
+		};
+		document.body.append(popover.hoverEl!);
+		createRequestHoverParent(session, 1, proxyAnchor, actualAnchor).hoverPopover =
+			popover;
+
+		expect(popover.togglePin).not.toBe(togglePin);
+		expect(popover.hide).not.toBe(hide);
+		expect(popover.position).not.toBe(position);
+
+		popover.togglePin?.(true);
+
+		expect(togglePin).toHaveBeenCalledWith(true);
+		expect(popover.isPinned).toBe(true);
+		expect(popover.togglePin).toBe(togglePin);
+		expect(popover.hide).toBe(hide);
+		expect(popover.position).toBe(position);
+		expect(getActiveSessionPopover(session)).toBeNull();
+		expect(getActiveSessionHoverParent(session)).toBeNull();
+		expect(getBoundPopoverActualAnchor(popover)).toBeNull();
+		expect(proxyAnchor.isConnected).toBe(false);
+		expect(hide).not.toHaveBeenCalled();
+		expect(transition).toHaveBeenCalledTimes(2);
+	});
+
+	it("keeps bridge ownership when Hover Editor remains unpinned", () => {
+		const session = createShadowHoverSession();
+		const actualAnchor = createMeasuredButton(10);
+		const proxyAnchor = syncProxyRectForActual(session, actualAnchor);
+		beginRequest(session, actualAnchor, proxyAnchor, 1);
+		setAnchorHovered(session, actualAnchor, true);
+
+		const togglePin = vi.fn(function (this: HoverPopoverLike, pinned?: boolean) {
+			this.isPinned = pinned ?? !this.isPinned;
+		});
+		const popover: HoverPopoverLike = {
+			hoverEl: document.createElement("div"),
+			isPinned: false,
+			state: 1,
+			togglePin,
+			transition: vi.fn(),
+		};
+		document.body.append(popover.hoverEl!);
+		createRequestHoverParent(session, 1, proxyAnchor, actualAnchor).hoverPopover =
+			popover;
+
+		popover.togglePin?.(false);
+
+		expect(popover.isPinned).toBe(false);
+		expect(popover.togglePin).not.toBe(togglePin);
+		expect(getActiveSessionPopover(session)).toBe(popover);
+		expect(getBoundPopoverActualAnchor(popover)).toBe(actualAnchor);
+		expect(proxyAnchor.isConnected).toBe(true);
+	});
+
+	it("waits for Hover Editor to confirm an auto-pinned popover via togglePin", () => {
+		const session = createShadowHoverSession();
+		const actualAnchor = createMeasuredButton(10);
+		const proxyAnchor = syncProxyRectForActual(session, actualAnchor);
+		beginRequest(session, actualAnchor, proxyAnchor, 1);
+		setAnchorHovered(session, actualAnchor, true);
+
+		const togglePin = vi.fn();
+		const popover: HoverPopoverLike = {
+			hoverEl: document.createElement("div"),
+			isPinned: true,
+			state: 1,
+			togglePin,
+			transition: vi.fn(),
+		};
+		document.body.append(popover.hoverEl!);
+
+		createRequestHoverParent(session, 1, proxyAnchor, actualAnchor).hoverPopover =
+			popover;
+
+		expect(popover.togglePin).not.toBe(togglePin);
+		expect(getActiveSessionPopover(session)).toBe(popover);
+		expect(getBoundPopoverActualAnchor(popover)).toBe(actualAnchor);
+		expect(proxyAnchor.isConnected).toBe(true);
+
+		popover.togglePin?.(true);
+
+		expect(popover.togglePin).toBe(togglePin);
+		expect(getActiveSessionPopover(session)).toBeNull();
+		expect(getBoundPopoverActualAnchor(popover)).toBeNull();
+		expect(proxyAnchor.isConnected).toBe(false);
+	});
+
+	it("allows an explicit popover close button to bypass the keep-alive guard", () => {
+		const session = createShadowHoverSession();
+		const actualAnchor = createMeasuredButton(10);
+		const proxyAnchor = syncProxyRectForActual(session, actualAnchor);
+		beginRequest(session, actualAnchor, proxyAnchor, 1);
+		setAnchorHovered(session, actualAnchor, true);
+
+		const close = vi.fn();
+		const hoverEl = document.createElement("div");
+		const closeButton = document.createElement("button");
+		closeButton.classList.add("mod-close");
+		hoverEl.append(closeButton);
+		const popover: HoverPopoverLike = {
+			hoverEl,
+			onHover: true,
+			close,
+			state: 1,
+		};
+		document.body.append(hoverEl);
+		createRequestHoverParent(session, 1, proxyAnchor, actualAnchor).hoverPopover =
+			popover;
+		closeButton.addEventListener("click", () => popover.close?.());
+
+		closeButton.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+
+		expect(close).toHaveBeenCalledTimes(1);
+		expect(popover.close).toBe(close);
 	});
 
 	it("synchronizes onTarget at explicit bridge boundaries without wrapping transition", () => {

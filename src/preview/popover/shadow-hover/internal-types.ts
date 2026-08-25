@@ -7,6 +7,8 @@ export type HoverPopoverLike = {
 	onHover?: boolean;
 	isFocused?: boolean;
 	setIsFocused?: (focused: boolean) => void;
+	isPinned?: boolean;
+	togglePin?: (pinned?: boolean) => unknown;
 	timer?: number | null;
 	state?: unknown;
 	position?: (...args: unknown[]) => unknown;
