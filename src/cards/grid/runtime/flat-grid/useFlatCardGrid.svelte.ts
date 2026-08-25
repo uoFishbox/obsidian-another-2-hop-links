@@ -105,7 +105,7 @@ export interface FlatCardGridProps<T> {
 
 const MAX_CHAINED_INFINITE_SCROLL_LOADS = 2;
 export const CARD_GRID_BOOTSTRAP_VISIBLE_ROWS = 3;
-const CARD_GRID_PREVIEW_ACTIVATION_AHEAD_ROWS = 1;
+const CARD_GRID_PREVIEW_ACTIVATION_AHEAD_ROWS = 2;
 const EMPTY_MOUNTED_ROWS: readonly MountedFlatGridRow<never>[] = [];
 
 export function createCardGridVisibilityPolicy(
