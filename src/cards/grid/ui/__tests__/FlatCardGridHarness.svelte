@@ -1,6 +1,7 @@
 <script lang="ts">
 	import FlatCardGrid from "../FlatCardGrid.svelte";
 	import type { CardCollectionState } from "cards/CardCollectionState.svelte";
+	import type { FlatListScrollState } from "cards/list/model/listViewUiState";
 
 	interface Props {
 		items: string[];
@@ -12,6 +13,8 @@
 		paginationMode?: "button" | "infinite-scroll";
 		infiniteScrollRootMargin?: string;
 		topSpacerHeight?: number;
+		initialScrollState?: FlatListScrollState;
+		onScrollStateChange?: (state: FlatListScrollState) => void;
 	}
 
 	let {
@@ -24,6 +27,8 @@
 		paginationMode = "button",
 		infiniteScrollRootMargin = "0px 0px 900px 0px",
 		topSpacerHeight = 0,
+		initialScrollState = undefined,
+		onScrollStateChange = undefined,
 	}: Props = $props();
 </script>
 
@@ -53,6 +58,8 @@
 				{applicationStore}
 				{paginationMode}
 				{infiniteScrollRootMargin}
+				{initialScrollState}
+				{onScrollStateChange}
 			>
 				{#snippet header()}
 					<div class="test-cell" data-testid="header-cell">Header</div>
@@ -87,6 +94,8 @@
 				{applicationStore}
 				{paginationMode}
 				{infiniteScrollRootMargin}
+				{initialScrollState}
+				{onScrollStateChange}
 			>
 				{#snippet item({ item, index })}
 					<!-- svelte-ignore a11y_no_noninteractive_tabindex -->

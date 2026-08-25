@@ -9,6 +9,7 @@ import type { ListConfig } from "../types";
 import type { LinkContext } from "cards/context/linkContext";
 import type { ListViewState } from "cards/list/model/ListViewState";
 import type { ISortService } from "cards/sorting";
+import type { ListViewUiState } from "cards/list/model/listViewUiState";
 import { filterSearchWorkerDatasetWithMatchDetails } from "search/searchWorkerFilter";
 import { DEFAULT_SETTINGS } from "settings/model";
 import { ARIA_LABELS } from "cards/ariaLabels";
@@ -287,6 +288,56 @@ describe("SearchableItemList integration", () => {
 		await waitFor(() => expect(getAllSearchableItems()).toHaveLength(1));
 		expect(querySearchableItem("alpha-note")).toBeInTheDocument();
 		expect(querySearchableItem("beta-note")).not.toBeInTheDocument();
+	});
+
+	it("restores and persists the search input through list UI state", async () => {
+		const sourceFile = createMockTFile("notes/source.md");
+		const items = [
+			createTaggedNoteItem(createMockTFile("notes/alpha-note.md")),
+			createTaggedNoteItem(createMockTFile("notes/beta-note.md")),
+		] as CardItem[];
+		const uiState: ListViewUiState = { searchInputValue: "alpha" };
+		const applicationStore = {
+			sortOption: "alphabetical",
+			initialVisibleCount: 10,
+			loadMoreIncrement: 10,
+			settings: DEFAULT_SETTINGS,
+			setSortOption: vi.fn(),
+			setContentSearchEnabled: vi.fn(),
+			previewState: {
+				globalVersion: 0,
+				pathVersions: {},
+				getRenderVersion: () => "0:0",
+			},
+			updateVersion: 0,
+		} as unknown as ListViewState;
+		const sortService: ISortService = {
+			sort: vi.fn((nextItems) => nextItems),
+		};
+
+		render(SearchableItemList, {
+			props: {
+				items,
+				config: createConfig(),
+				linkContext: createLinkContext(sourceFile),
+				applicationStore,
+				sortService,
+				app: {} as never,
+				autofocus: false,
+				uiState,
+			},
+		});
+
+		await flushAsyncUi();
+		expect(screen.getByRole("searchbox")).toHaveValue("alpha");
+		await waitFor(() => expect(getAllSearchableItems()).toHaveLength(1));
+
+		uiState.scrollState = { localScrollTop: 200, visibleCount: 20 };
+		await fireEvent.input(screen.getByRole("searchbox"), {
+			target: { value: "beta" },
+		});
+		expect(uiState.searchInputValue).toBe("beta");
+		expect(uiState.scrollState).toBeUndefined();
 	});
 
 	it("renders cards in the order returned by the sort service", async () => {

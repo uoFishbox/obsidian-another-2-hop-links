@@ -11,6 +11,7 @@
 	import { getCardLayoutCssText } from "cards/layout/cardLayoutCssVars";
 	import { getFileCardTitleSearchText } from "cards/title/cardTitle";
 	import type { PreviewRuntime } from "preview/runtime/previewRuntime";
+	import type { ListViewUiState } from "cards/list/model/listViewUiState";
 
 	interface Props {
 		app: App;
@@ -19,6 +20,7 @@
 		linkContext: LinkContext;
 		applicationStore: CardCollectionState;
 		previewRuntime?: PreviewRuntime;
+		uiState?: ListViewUiState;
 	}
 
 	let {
@@ -28,6 +30,7 @@
 		linkContext,
 		applicationStore,
 		previewRuntime = undefined,
+		uiState = undefined,
 	}: Props = $props();
 
 	let notesVersion = $state(0);
@@ -172,6 +175,7 @@
 		{app}
 		{previewRuntime}
 		autofocus={false}
+		{uiState}
 	/>
 </div>
 

@@ -45,6 +45,7 @@ import {
 	buildCardGridBindings,
 	isCardGridMountedItemCell,
 } from "./mountedCardBindings";
+import type { FlatListScrollState } from "cards/list/model/listViewUiState";
 
 /** Props passed to flat virtual list item render snippets. */
 export interface FlatCardGridItemRenderArgs<T> {
@@ -89,6 +90,10 @@ export interface FlatCardGridProps<T> {
 	className?: string;
 	paginationMode?: "button" | "infinite-scroll";
 	infiniteScrollRootMargin?: string;
+	/** Scroll position restored once after the first stable layout measurement. */
+	initialScrollState?: FlatListScrollState;
+	/** Persists stable scroll and pagination measurements outside the grid. */
+	onScrollStateChange?: (state: FlatListScrollState) => void;
 	/** Resolves immutable preview input for the surface-owned slot controller. */
 	resolveItemPreviewRequest?: (item: T, index: number) => CardPreviewRequest | null;
 	/** Resolves the current item descriptor without card-owned effects. */
@@ -197,7 +202,19 @@ export function useFlatCardGrid<T>(
 		}
 		return lastResolvedVisibilityPolicy!;
 	};
-	let sectionExpandedLimits = $state.raw<Record<string, number>>({});
+	const initialScrollState = props.initialScrollState
+		? {
+				localScrollTop: props.initialScrollState.localScrollTop,
+				visibleCount: props.initialScrollState.visibleCount,
+			}
+		: undefined;
+	const initialPaginationSectionId = props.sectionId ?? "link-list";
+	let pendingScrollRestore = initialScrollState;
+	let sectionExpandedLimits = $state.raw<Record<string, number>>(
+		initialScrollState
+			? { [initialPaginationSectionId]: initialScrollState.visibleCount }
+			: {},
+	);
 	let sectionRootEl = $state<HTMLDivElement | null>(null);
 	let contentEl = $state<HTMLDivElement | null>(null);
 	let interactionShadowRoot = $state<ShadowRoot | null>(null);
@@ -312,7 +329,7 @@ export function useFlatCardGrid<T>(
 				isStable: layoutMeasurement.hasStableLayout,
 			};
 		},
-		onStableMeasurement: maybeScheduleInfiniteScrollLoad,
+		onStableMeasurement: handleStableMeasurement,
 		frameCoordinator,
 	});
 	const measurement = virtualList.measurement;
@@ -417,6 +434,7 @@ export function useFlatCardGrid<T>(
 	});
 
 	onDestroy(() => {
+		persistCurrentScrollState();
 		previewSurface.dispose();
 		interactionController.clear();
 	});
@@ -501,6 +519,69 @@ export function useFlatCardGrid<T>(
 
 		chainedInfiniteScrollLoads = 0;
 		scheduleLoadNextPage();
+	}
+
+	function handleStableMeasurement(
+		context: VirtualListStableMeasurementContext,
+	): void {
+		if (restorePendingScrollPosition(context)) {
+			return;
+		}
+
+		publishScrollState(context);
+		maybeScheduleInfiniteScrollLoad(context);
+	}
+
+	function restorePendingScrollPosition(
+		context: VirtualListStableMeasurementContext,
+	): boolean {
+		const restoreState = pendingScrollRestore;
+		if (!restoreState) return false;
+
+		const scrollContainerEl = measurement.scrollContainerEl;
+		const ownerWindow = getOptionalOwnerWindow(scrollContainerEl ?? sectionRootEl);
+		if (!ownerWindow) return false;
+
+		pendingScrollRestore = undefined;
+		const targetScrollTop = Math.max(
+			0,
+			context.sectionTop + restoreState.localScrollTop,
+		);
+		if (scrollContainerEl) {
+			scrollContainerEl.scrollTop = targetScrollTop;
+		} else {
+			ownerWindow.scrollTo({ top: targetScrollTop });
+		}
+
+		const restoredScrollTop = scrollContainerEl
+			? scrollContainerEl.scrollTop
+			: ownerWindow.scrollY || ownerWindow.pageYOffset || 0;
+		virtualList.flushProgrammaticScrollMeasurement(
+			{
+				scrollContainerEl,
+				scrollTop: restoredScrollTop,
+				viewportHeight: scrollContainerEl
+					? scrollContainerEl.clientHeight
+					: ownerWindow.innerHeight,
+				sectionTop: context.sectionTop,
+				didScroll: restoredScrollTop !== context.scrollTop,
+			},
+			{ forcePublish: true },
+		);
+		return true;
+	}
+
+	function publishScrollState(context: VirtualListStableMeasurementContext): void {
+		props.onScrollStateChange?.({
+			localScrollTop: Math.max(0, context.scrollTop - context.sectionTop),
+			visibleCount,
+		});
+	}
+
+	function persistCurrentScrollState(): void {
+		if (pendingScrollRestore || !measurement.hasStableScrollMetrics) return;
+		const context = getCurrentPreloadMetrics();
+		if (context) publishScrollState(context);
 	}
 
 	$effect(() => {

@@ -1,4 +1,10 @@
-import { ItemView, TFile, type IconName, type WorkspaceLeaf } from "obsidian";
+import {
+	ItemView,
+	TFile,
+	type IconName,
+	type ViewStateResult,
+	type WorkspaceLeaf,
+} from "obsidian";
 import { mount } from "svelte";
 import type { CardCollectionState } from "cards/CardCollectionState.svelte";
 import type { PluginHost } from "obsidian-integration/pluginHost";
@@ -12,12 +18,17 @@ import {
 	type SvelteComponentInstance,
 } from "obsidian-integration/views/svelteLifecycle";
 import AllNotesPage from "./AllNotesPage.svelte";
+import {
+	createListViewUiState,
+	type ListViewUiState,
+} from "cards/list/model/listViewUiState";
 
 export const VIEW_TYPE_ALL_NOTES = "cosense-card-links-all-notes-view";
 
 export class AllNotesView extends ItemView {
 	private component: SvelteComponentInstance | undefined = undefined;
 	private cardCollectionState: CardCollectionState | undefined = undefined;
+	private listUiState: ListViewUiState = createListViewUiState();
 
 	constructor(
 		leaf: WorkspaceLeaf,
@@ -38,6 +49,23 @@ export class AllNotesView extends ItemView {
 
 	getIcon(): IconName {
 		return "files";
+	}
+
+	getState(): Record<string, unknown> {
+		return {
+			...super.getState(),
+			listUiState: createListViewUiState(this.listUiState),
+		};
+	}
+
+	async setState(state: unknown, result: ViewStateResult): Promise<void> {
+		await super.setState(state, result);
+		const candidate =
+			typeof state === "object" && state !== null
+				? (state as { listUiState?: unknown })
+				: undefined;
+		this.listUiState = createListViewUiState(candidate?.listUiState);
+		this.render();
 	}
 
 	async onOpen(): Promise<void> {
@@ -90,6 +118,7 @@ export class AllNotesView extends ItemView {
 				linkContext,
 				applicationStore: cardCollectionState,
 				previewRuntime: this.viewServices.previewRuntime,
+				uiState: this.listUiState,
 			},
 		}) as SvelteComponentInstance;
 	}

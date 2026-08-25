@@ -14,6 +14,7 @@ import {
 	createLinkContextForView,
 } from "obsidian-integration/views/viewFactories";
 import { applyCardLayoutCssVars } from "cards/layout/cardLayoutCssVars";
+import type { ListViewUiState } from "cards/list/model/listViewUiState";
 
 interface ListHostComponent extends ComponentInstance {
 	updateItems?: (nextItems: CardItem[]) => void;
@@ -50,6 +51,7 @@ type MountListSectionOptions = {
 	config: ListConfig<CardItem>;
 	autofocus?: boolean;
 	wrapForView?: boolean;
+	uiState?: ListViewUiState;
 };
 
 function createGuardedIndexUpdateHandler(options: {
@@ -220,6 +222,7 @@ export abstract class AbstractSvelteListView<
 				app: this.app,
 				previewRuntime: this.viewServices.previewRuntime,
 				autofocus: options.autofocus,
+				uiState: options.uiState,
 			},
 		}) as ListHostComponent;
 	}

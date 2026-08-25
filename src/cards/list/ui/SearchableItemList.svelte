@@ -37,6 +37,7 @@
 	} from "cards/rendering/cardRenderModel";
 	import { createItemInteractionKey } from "cards/interactions/interactionTypes";
 	import type { PreviewRuntime } from "preview/runtime/previewRuntime";
+	import type { ListViewUiState } from "cards/list/model/listViewUiState";
 
 	const SEARCH_FILTER_YIELD_CHECK_INTERVAL = 128;
 	const SEARCH_FILTER_YIELD_MAX_DELAY_MS = 16;
@@ -50,6 +51,7 @@
 		app: App;
 		previewRuntime?: PreviewRuntime;
 		autofocus?: boolean;
+		uiState?: ListViewUiState;
 	}
 
 	let {
@@ -61,6 +63,7 @@
 		app,
 		previewRuntime = undefined,
 		autofocus = true,
+		uiState = undefined,
 	}: Props = $props();
 
 	let sortOption = $derived(applicationStore.sortOption);
@@ -77,7 +80,16 @@
 	let searchEnabled = $derived(config.searchEnabled ?? true);
 	let allowContentSearch = $derived(config.allowContentSearch ?? true);
 
-	const search = useSearchQuery();
+	const search = useSearchQuery({
+		initialValue: uiState?.searchInputValue,
+		onInputChange: (value) => {
+			if (!uiState) return;
+			if (value !== uiState.searchInputValue) {
+				uiState.scrollState = undefined;
+			}
+			uiState.searchInputValue = value;
+		},
+	});
 	let contentSearchEnabled = $state(false);
 	const contentSearchEnabledSetting = $derived(
 		applicationStore.settings?.enableContentSearch ?? false,
@@ -375,6 +387,13 @@
 			{initialVisibleCount}
 			{loadMoreIncrement}
 			paginationMode={config.paginationMode ?? "button"}
+			initialScrollState={uiState?.scrollState}
+			onScrollStateChange={(scrollState) => {
+				if (!uiState || isWorkerFiltering) return;
+				const currentInputQuery = uiState.searchInputValue.trim().toLowerCase();
+				if (currentInputQuery !== appliedSearchQuery) return;
+				uiState.scrollState = scrollState;
+			}}
 			{resolveItemPreviewRequest}
 			{resolveItemInteractionDescriptor}
 			header={config.showSectionHeader ? sectionHeader : undefined}

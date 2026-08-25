@@ -7,6 +7,7 @@
 	import type { ISortService } from "cards/sorting";
 	import type { CardItem } from "cards/CardItem";
 	import type { PreviewRuntime } from "preview/runtime/previewRuntime";
+	import type { ListViewUiState } from "cards/list/model/listViewUiState";
 
 	interface Props {
 		items: CardItem[];
@@ -17,6 +18,7 @@
 		app: App;
 		autofocus?: boolean;
 		previewRuntime?: PreviewRuntime;
+		uiState?: ListViewUiState;
 	}
 
 	let {
@@ -28,6 +30,7 @@
 		app,
 		autofocus = true,
 		previewRuntime = undefined,
+		uiState = undefined,
 	}: Props = $props();
 
 	let currentItems = $state.raw<CardItem[]>(items);
@@ -54,4 +57,5 @@
 	{app}
 	{previewRuntime}
 	{autofocus}
+	{uiState}
 />

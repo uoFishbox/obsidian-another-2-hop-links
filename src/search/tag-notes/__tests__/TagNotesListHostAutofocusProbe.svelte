@@ -6,9 +6,16 @@
 	interface Props {
 		items?: CardItem[];
 		autofocus?: boolean;
+		uiState?: {
+			searchInputValue: string;
+			scrollState?: {
+				localScrollTop: number;
+				visibleCount: number;
+			};
+		};
 	}
 
-	let { items = [], autofocus }: Props = $props();
+	let { items = [], autofocus, uiState }: Props = $props();
 
 	let currentItems = $state<CardItem[]>(items);
 
@@ -25,4 +32,7 @@
 	data-testid="tag-notes-list-host"
 	data-autofocus={String(autofocus)}
 	data-item-count={String(currentItems.length)}
+	data-search-input={uiState?.searchInputValue ?? ""}
+	data-local-scroll-top={String(uiState?.scrollState?.localScrollTop ?? "")}
+	data-visible-count={String(uiState?.scrollState?.visibleCount ?? "")}
 ></div>

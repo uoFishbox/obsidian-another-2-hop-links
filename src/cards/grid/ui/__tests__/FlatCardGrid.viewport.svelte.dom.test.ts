@@ -1,14 +1,79 @@
-import { describe, expect, it } from "vitest";
-import { waitFor } from "@testing-library/svelte";
+import { describe, expect, it, vi } from "vitest";
+import { render, waitFor } from "@testing-library/svelte";
 import { renderFlatCardGridContract } from "./flatCardGridContractFixture";
 import {
 	createItems,
+	getFlatCardGridElements,
+	setFlatCardGridViewport,
 	setupFlatCardGridTestEnvironment,
 } from "./flatCardGridTestEnvironment";
+import FlatCardGridHarness from "./FlatCardGridHarness.svelte";
+import { setNumericProperty } from "testing/helpers/DOMObserverMock";
 
 setupFlatCardGridTestEnvironment();
 
 describe("FlatCardGrid virtualization contract", () => {
+	it("restores local scroll position after rebuilding the saved visible range", async () => {
+		const onScrollStateChange = vi.fn();
+		const { container } = render(FlatCardGridHarness, {
+			props: {
+				items: createItems(100),
+				initialVisibleCount: 10,
+				initialScrollState: {
+					localScrollTop: 780,
+					visibleCount: 50,
+				},
+				onScrollStateChange,
+			},
+		});
+		const elements = getFlatCardGridElements(container);
+
+		await setFlatCardGridViewport(elements, {
+			rootHeight: 120,
+			width: 330,
+			sectionTop: 200,
+		});
+
+		await waitFor(() => expect(elements.scrollRoot.scrollTop).toBe(980));
+		await waitFor(() => {
+			expect(onScrollStateChange).toHaveBeenLastCalledWith({
+				localScrollTop: 780,
+				visibleCount: 50,
+			});
+		});
+		expect(
+			Array.from(
+				elements.gridRoot.shadowRoot?.querySelectorAll<HTMLElement>(
+					"[data-testid='item-cell']",
+				) ?? [],
+			).map((element) => Number(element.dataset.index)),
+		).toContain(18);
+	});
+
+	it("persists the latest scroll position when the grid is unmounted", async () => {
+		const onScrollStateChange = vi.fn();
+		const rendered = render(FlatCardGridHarness, {
+			props: {
+				items: createItems(30),
+				initialVisibleCount: 30,
+				onScrollStateChange,
+			},
+		});
+		const elements = getFlatCardGridElements(rendered.container);
+		await setFlatCardGridViewport(elements, {
+			rootHeight: 120,
+			width: 330,
+		});
+
+		setNumericProperty(elements.scrollRoot, "scrollTop", 520);
+		rendered.unmount();
+
+		expect(onScrollStateChange).toHaveBeenLastCalledWith({
+			localScrollTop: 520,
+			visibleCount: 30,
+		});
+	});
+
 	it("keeps the infinite-scroll sentinel outside the shadow root", async () => {
 		const fixture = renderFlatCardGridContract({
 			items: createItems(20),

@@ -302,6 +302,66 @@ describe("TagNotesView", () => {
 		});
 	});
 
+	it("round-trips list UI navigation state without retaining payload references", async () => {
+		const listUiState = {
+			searchInputValue: "project",
+			scrollState: {
+				localScrollTop: 640,
+				visibleCount: 90,
+			},
+		};
+		const view = new TagNotesView(
+			createLeaf(),
+			{
+				...createPlugin(),
+				indexingService: {
+					...createPlugin().indexingService,
+					getNotesWithTag: vi.fn(async () => [
+						createTaggedNote("notes/alpha.md", 1),
+					]),
+				},
+			},
+			createViewServices(),
+		);
+
+		await view.setState(
+			{ tag: "alpha", sourcePath: "source.md", listUiState },
+			{ history: false },
+		);
+		await waitFor(() => {
+			expect(screen.getByTestId("tag-notes-list-host")).toHaveAttribute(
+				"data-search-input",
+				"project",
+			);
+		});
+		expect(screen.getByTestId("tag-notes-list-host")).toHaveAttribute(
+			"data-local-scroll-top",
+			"640",
+		);
+		expect(screen.getByTestId("tag-notes-list-host")).toHaveAttribute(
+			"data-visible-count",
+			"90",
+		);
+
+		listUiState.searchInputValue = "mutated input";
+		listUiState.scrollState.localScrollTop = 1;
+		const firstSnapshot = view.getState() as {
+			listUiState: typeof listUiState;
+		};
+		expect(firstSnapshot.listUiState).toEqual({
+			searchInputValue: "project",
+			scrollState: { localScrollTop: 640, visibleCount: 90 },
+		});
+
+		firstSnapshot.listUiState.scrollState.localScrollTop = 2;
+		expect(view.getState()).toMatchObject({
+			listUiState: {
+				searchInputValue: "project",
+				scrollState: { localScrollTop: 640, visibleCount: 90 },
+			},
+		});
+	});
+
 	it("refreshes loaded notes from an index update after onOpen", async () => {
 		let onDataUpdate: ((context: { affectedTags?: string[] }) => void) | undefined;
 		const initialNote = createTaggedNote("notes/alpha-a.md", 1);

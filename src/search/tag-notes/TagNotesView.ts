@@ -19,6 +19,10 @@ import type { DataUpdateContext } from "indexing/index-service/IndexEvents";
 import { AbstractSvelteListView } from "obsidian-integration/views/abstractSvelteListView";
 import { buildEditorLikeFrame } from "obsidian-integration/views/editorLikeFrame";
 import { getCardItemKey, type CardItem } from "cards/CardItem";
+import {
+	createListViewUiState,
+	type ListViewUiState,
+} from "cards/list/model/listViewUiState";
 
 export const VIEW_TYPE_TAG_NOTES = "cosense-card-links-tag-notes-view";
 
@@ -50,6 +54,7 @@ export function shouldRefreshTagNotesForContext({
 interface TagNotesViewState {
 	tag?: unknown;
 	sourcePath?: unknown;
+	listUiState?: unknown;
 }
 
 export async function openTagNotesView(
@@ -90,6 +95,7 @@ export class TagNotesView extends AbstractSvelteListView<TaggedNote> {
 	private loadRequestId = 0;
 	private autofocusNextRender = true;
 	private infoTextEl: HTMLParagraphElement | undefined = undefined;
+	private listUiState: ListViewUiState = createListViewUiState();
 
 	constructor(leaf: WorkspaceLeaf, plugin: PluginHost, viewServices: ViewServices) {
 		super(leaf, plugin, viewServices);
@@ -119,13 +125,14 @@ export class TagNotesView extends AbstractSvelteListView<TaggedNote> {
 			...super.getState(),
 			tag: this.tag,
 			sourcePath: this.sourcePath,
+			listUiState: createListViewUiState(this.listUiState),
 		};
 	}
 
 	async setState(state: unknown, result: ViewStateResult): Promise<void> {
 		await super.setState(state, result);
 
-		const { tag, sourcePath } = this.extractState(state);
+		const { tag, sourcePath, listUiState } = this.extractState(state);
 		if (tag !== this.tag || sourcePath !== this.sourcePath) {
 			result.history = true;
 		}
@@ -133,6 +140,7 @@ export class TagNotesView extends AbstractSvelteListView<TaggedNote> {
 		const stateChanged = tag !== this.tag || sourcePath !== this.sourcePath;
 		this.tag = tag;
 		this.sourcePath = sourcePath;
+		this.listUiState = listUiState;
 		if (stateChanged) {
 			this.autofocusNextRender = true;
 			this.resetLoadedNotes();
@@ -147,13 +155,18 @@ export class TagNotesView extends AbstractSvelteListView<TaggedNote> {
 	private extractState(state: unknown): {
 		tag: string;
 		sourcePath: string;
+		listUiState: ListViewUiState;
 	} {
 		const candidate = state as TagNotesViewState | null;
 		const tag =
 			typeof candidate?.tag === "string" ? normalizeTag(candidate.tag) : "";
 		const sourcePath =
 			typeof candidate?.sourcePath === "string" ? candidate.sourcePath : "";
-		return { tag, sourcePath };
+		return {
+			tag,
+			sourcePath,
+			listUiState: createListViewUiState(candidate?.listUiState),
+		};
 	}
 
 	private refreshLeafHeader(): void {
@@ -339,6 +352,7 @@ export class TagNotesView extends AbstractSvelteListView<TaggedNote> {
 			sourceFile,
 			config,
 			autofocus,
+			uiState: this.listUiState,
 		});
 	}
 
