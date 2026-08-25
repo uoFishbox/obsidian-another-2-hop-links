@@ -13,22 +13,20 @@ import {
 	type PreviewContentAnalysis,
 } from "preview/pipeline/previewContent";
 import { readRawContent } from "preview/pipeline/rawContentReader";
-import {
-	createAbortError,
-	isAbortError,
-	throwIfAborted,
-} from "preview/pipeline/previewAbort";
+import { throwIfAborted } from "preview/pipeline/previewAbort";
 import type { PreviewRenderSettings } from "preview/pipeline/previewRenderSettings";
+import {
+	attachSharedCaller,
+	createSharedAbortableRequest,
+	type SharedAbortableRequest,
+} from "preview/pipeline/sharedAbortableRequest";
 import { createSizedLRUCache, stringBytes } from "shared/cache/sizedLRUCache";
 
 const SEARCH_CONTEXT_CACHE_MAX_BYTES = 4 * 1024 * 1024;
 const PREVIEW_ANALYSIS_CACHE_MAX_BYTES = 2 * 1024 * 1024;
 
-type SharedInFlightRequest<T> = {
-	cacheKey: string;
-	callerCount: number;
-	controller: AbortController;
-	promise: Promise<T>;
+type SharedInFlightRequest<T> = SharedAbortableRequest<T> & {
+	readonly cacheKey: string;
 };
 
 interface CardPreviewSharedCacheState {
@@ -81,72 +79,6 @@ function previewContentHasVisibleQuery(
 	}
 
 	return htmlVisibleTextContainsCaseInsensitive(previewContent, normalizedQuery);
-}
-
-function attachCallerToSharedRequest<T>(
-	request: SharedInFlightRequest<T>,
-	signal: AbortSignal | undefined,
-	message: string,
-): Promise<T> {
-	if (signal?.aborted || request.controller.signal.aborted) {
-		return Promise.reject(createAbortError(message));
-	}
-
-	request.callerCount += 1;
-
-	return new Promise<T>((resolve, reject) => {
-		let settled = false;
-		let onAbort = () => {};
-
-		const cleanup = (): void => {
-			if (signal) {
-				signal.removeEventListener("abort", onAbort);
-			}
-		};
-
-		const settle = (handler: () => void): void => {
-			if (settled) {
-				return;
-			}
-
-			settled = true;
-			cleanup();
-			releaseSharedRequestCaller(request);
-			handler();
-		};
-
-		onAbort = () => {
-			settle(() => reject(createAbortError(message)));
-		};
-
-		if (signal) {
-			signal.addEventListener("abort", onAbort, { once: true });
-		}
-
-		request.promise.then(
-			(value) => {
-				if (signal?.aborted) {
-					settle(() => reject(createAbortError(message)));
-				} else {
-					settle(() => resolve(value));
-				}
-			},
-			(error) => {
-				if (signal?.aborted && !isAbortError(error)) {
-					settle(() => reject(createAbortError(message)));
-					return;
-				}
-				settle(() => reject(error));
-			},
-		);
-	});
-}
-
-function releaseSharedRequestCaller<T>(request: SharedInFlightRequest<T>): void {
-	request.callerCount = Math.max(request.callerCount - 1, 0);
-	if (request.callerCount === 0) {
-		request.controller.abort();
-	}
 }
 
 function abortSharedRequests<T>(requests: Map<string, SharedInFlightRequest<T>>): void {
@@ -207,11 +139,7 @@ async function applySharedSearchContextToTextPreviewForState(
 
 	const existingRequest = state.searchContextPreviewInFlight.get(cacheKey);
 	if (existingRequest && !existingRequest.controller.signal.aborted) {
-		return attachCallerToSharedRequest(
-			existingRequest,
-			signal,
-			"Preview request aborted",
-		);
+		return attachSharedCaller(existingRequest, signal, "Preview request aborted");
 	}
 	if (existingRequest) {
 		state.searchContextPreviewInFlight.delete(cacheKey);
@@ -219,63 +147,61 @@ async function applySharedSearchContextToTextPreviewForState(
 
 	const request: SharedInFlightRequest<string> = {
 		cacheKey,
-		callerCount: 0,
-		controller: new AbortController(),
-		promise: Promise.resolve(""),
-	};
-	const sharedSignal = request.controller.signal;
-	const buildPromise = (async () => {
-		throwIfAborted(sharedSignal, "Preview request aborted");
-		let contentForRender = previewContent;
-		if (!previewContentHasVisibleQuery(previewContent, normalizedQuery)) {
-			const rawContent = await readRawContent(targetFile, vault, sharedSignal);
+		...createSharedAbortableRequest(async (sharedSignal) => {
 			throwIfAborted(sharedSignal, "Preview request aborted");
-
-			const firstMatchIndex = resolveFirstMatchIndex(
-				rawContent,
-				normalizedQuery,
-				firstMatchOffset,
-			);
-			throwIfAborted(sharedSignal, "Preview request aborted");
-
-			if (firstMatchIndex !== -1) {
-				const snippetOptions: GetContentSnippetOptions = {
-					firstMatchIndex,
-				};
-				throwIfAborted(sharedSignal, "Preview request aborted");
-				contentForRender = await getContentSnippetAsync(
-					rawContent,
-					settings,
-					normalizedQuery,
-					snippetOptions,
+			let contentForRender = previewContent;
+			if (!previewContentHasVisibleQuery(previewContent, normalizedQuery)) {
+				const rawContent = await readRawContent(
+					targetFile,
+					vault,
 					sharedSignal,
 				);
+				throwIfAborted(sharedSignal, "Preview request aborted");
+
+				const firstMatchIndex = resolveFirstMatchIndex(
+					rawContent,
+					normalizedQuery,
+					firstMatchOffset,
+				);
+				throwIfAborted(sharedSignal, "Preview request aborted");
+
+				if (firstMatchIndex !== -1) {
+					const snippetOptions: GetContentSnippetOptions = {
+						firstMatchIndex,
+					};
+					throwIfAborted(sharedSignal, "Preview request aborted");
+					contentForRender = await getContentSnippetAsync(
+						rawContent,
+						settings,
+						normalizedQuery,
+						snippetOptions,
+						sharedSignal,
+					);
+				}
 			}
-		}
 
-		throwIfAborted(sharedSignal, "Preview request aborted");
-		const highlightedContent = await highlightSearchMatchesInHtmlAsync(
-			contentForRender,
-			normalizedQuery,
-			sharedSignal,
-		);
-		throwIfAborted(sharedSignal, "Preview request aborted");
-		state.searchContextPreviewCache.set(
-			cacheKey,
-			highlightedContent,
-			stringBytes(highlightedContent),
-		);
-		return highlightedContent;
-	})();
-
-	request.promise = buildPromise;
+			throwIfAborted(sharedSignal, "Preview request aborted");
+			const highlightedContent = await highlightSearchMatchesInHtmlAsync(
+				contentForRender,
+				normalizedQuery,
+				sharedSignal,
+			);
+			throwIfAborted(sharedSignal, "Preview request aborted");
+			state.searchContextPreviewCache.set(
+				cacheKey,
+				highlightedContent,
+				stringBytes(highlightedContent),
+			);
+			return highlightedContent;
+		}),
+	};
 	state.searchContextPreviewInFlight.set(cacheKey, request);
-	void buildPromise.then(
+	void request.promise.then(
 		() => finalizeSharedRequest(state.searchContextPreviewInFlight, request),
 		() => finalizeSharedRequest(state.searchContextPreviewInFlight, request),
 	);
 
-	return attachCallerToSharedRequest(request, signal, "Preview request aborted");
+	return attachSharedCaller(request, signal, "Preview request aborted");
 }
 
 function finalizeSharedRequest<T>(

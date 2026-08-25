@@ -135,18 +135,15 @@ function createHarness(frameCoordinator?: VirtualFrameCoordinator): {
 	): void => {
 		bindings = new Map(nextBindings);
 		previewWindow = nextWindow;
-		actualSurface.syncBindings(
-			[...bindings.values()].map((card) => ({
+		actualSurface.publish({
+			bindings: [...bindings.values()].map((card) => ({
 				key: card.slotId,
 				rowIndex: card.rowIndex,
 				request: card.request,
 			})),
-		);
-		actualSurface.setActiveRange(
-			nextWindow.previewRange.start,
-			nextWindow.previewRange.end,
-			nextWindow.active,
-		);
+			activeRange: nextWindow.previewRange,
+			active: nextWindow.active,
+		});
 	};
 	const applyDelta = (
 		delta: {
@@ -273,6 +270,19 @@ describe("VirtualPreviewSurface", () => {
 		surface.dispose();
 	});
 
+	it("applies only the latest snapshot published before the post-paint flush", async () => {
+		const { surface, renders } = createHarness();
+		const host = document.createElement("div");
+		surface.registerHost("slot-0", host);
+
+		enter(surface, binding("slot-0", 0, "superseded"));
+		rebind(surface, binding("slot-0", 0, "latest"));
+		await flushActivation();
+
+		expect(renders.map((render) => render.identity)).toEqual(["latest"]);
+		surface.dispose();
+	});
+
 	it("rejects an old render after the physical slot is rebound", async () => {
 		const { surface, renders } = createHarness();
 		const host = document.createElement("div");
@@ -345,7 +355,7 @@ describe("VirtualPreviewSurface", () => {
 		expect(renders[0].cleanup).toHaveBeenCalledOnce();
 		expect(renders.at(-1)?.identity).toBe("c");
 		expect(host.textContent).toBe("a");
-		expect(host.dataset.previewState).toBe("refreshing");
+		expect(host.classList.contains("is-stale")).toBe(false);
 		surface.dispose();
 	});
 
@@ -438,7 +448,7 @@ describe("VirtualPreviewSurface", () => {
 			active: true,
 		});
 		expect(host.textContent).toBe("a");
-		expect(host.dataset.previewState).toBe("committed");
+		expect(host.classList.contains("is-stale")).toBe(false);
 
 		surface.setPreviewWindow({
 			previewRange: { start: 0, end: 1 },
@@ -462,12 +472,14 @@ describe("VirtualPreviewSurface", () => {
 			active: true,
 		});
 		await flushActivation();
-		expect(host.dataset.previewState).toBe("dormant");
+		expect(host.classList.contains("is-stale")).toBe(true);
 
 		await vi.runAllTimersAsync();
 		expect(renders[0].cleanup).toHaveBeenCalledOnce();
 		expect(host.childNodes).toHaveLength(0);
-		expect(host.dataset.hasPreviewContent).toBeUndefined();
+		expect(host.classList.contains("cosense-card-links__box-preview--dom")).toBe(
+			false,
+		);
 		surface.dispose();
 	});
 

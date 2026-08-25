@@ -66,7 +66,9 @@ describe("PreviewSlotController", () => {
 		const secondHost = document.createElement("div");
 		controller.attachHost(secondHost);
 		expect(secondHost.firstChild).toBe(image);
-		expect(secondHost.dataset.previewState).toBe("committed");
+		expect(
+			secondHost.classList.contains("cosense-card-links__box-preview--image"),
+		).toBe(true);
 		expect(controller.needsActivation()).toBe(false);
 
 		controller.activate();
@@ -96,7 +98,6 @@ describe("PreviewSlotController", () => {
 		controller.bind(request("v2"));
 		controller.activate();
 		expect(host.firstChild).toBe(oldNode);
-		expect(host.dataset.previewState).toBe("refreshing");
 		expect(host.classList.contains("is-stale")).toBe(false);
 		controller.dispose();
 	});
@@ -153,13 +154,17 @@ describe("PreviewSlotController", () => {
 		controller.setActive(true);
 
 		controller.activate();
-		expect(host.dataset.previewState).toBe("error");
+		expect(host.querySelector(".error")?.textContent).toBe(
+			"Preview not available.",
+		);
 		expect(controller.needsActivation()).toBe(true);
 
 		controller.activate();
 		expect(callbacks).toHaveLength(2);
 		expect(cleanups[0]).toHaveBeenCalledOnce();
-		expect(host.dataset.previewState).toBe("error");
+		expect(host.querySelector(".error")?.textContent).toBe(
+			"Preview not available.",
+		);
 		controller.dispose();
 	});
 });

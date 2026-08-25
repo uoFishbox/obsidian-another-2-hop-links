@@ -176,11 +176,8 @@ export function useTwoHopVirtualGrid(
 		return virtualList.getMountedBuild()?.rowsByPhysicalSlot ?? EMPTY_MOUNTED_ROWS;
 	}
 
-	function publishPreviewBindings(): void {
-		if (!isPreviewSurfaceActive()) {
-			previewSurface.syncBindings([]);
-			return;
-		}
+	function buildPreviewBindings(): VirtualPreviewBinding[] {
+		if (!isPreviewSurfaceActive()) return [];
 		const bindings: VirtualPreviewBinding[] = [];
 		for (const row of getMountedRows()) {
 			for (const mountedCell of row.bindings) {
@@ -197,7 +194,7 @@ export function useTwoHopVirtualGrid(
 				});
 			}
 		}
-		previewSurface.syncBindings(bindings);
+		return bindings;
 	}
 
 	function collectCardDemand(
@@ -228,8 +225,11 @@ export function useTwoHopVirtualGrid(
 		const snapshot = virtualList.getSnapshot();
 		const active = isPreviewSurfaceActive();
 		const range = snapshot?.ranges.previewVisible ?? EMPTY_RANGE;
-		publishPreviewBindings();
-		previewSurface.setActiveRange(range.start, range.end, active);
+		previewSurface.publish({
+			bindings: buildPreviewBindings(),
+			activeRange: range,
+			active,
+		});
 	}
 
 	function applyRangeEffects(): void {

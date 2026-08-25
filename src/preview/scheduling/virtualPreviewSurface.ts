@@ -23,16 +23,25 @@ export interface VirtualPreviewBinding {
 	readonly request: CardPreviewRequest;
 }
 
+export interface VirtualPreviewRange {
+	readonly start: number;
+	readonly end: number;
+}
+
+/** Complete preview state for the currently mounted/overscan virtual window. */
+export interface VirtualPreviewSurfaceSnapshot {
+	readonly bindings: readonly VirtualPreviewBinding[];
+	readonly activeRange: VirtualPreviewRange;
+	readonly active: boolean;
+}
+
 export interface VirtualPreviewSurface {
 	registerHost(key: string, element: HTMLElement): PreviewHostLease;
 	/**
-	 * Publishes the complete logical-card binding set for the currently managed
-	 * virtual window. Callers should pass mounted/overscan cards, not the full
-	 * result set.
+	 * Publishes the complete preview state for the currently managed virtual
+	 * window. Callers should pass mounted/overscan cards, not the full result set.
 	 */
-	syncBindings(bindings: readonly VirtualPreviewBinding[]): void;
-	/** Updates the active preview row range without rebuilding bindings. */
-	setActiveRange(start: number, end: number, active: boolean): void;
+	publish(snapshot: VirtualPreviewSurfaceSnapshot): void;
 	dispose(): void;
 }
 
@@ -54,11 +63,6 @@ interface PreviewHostRegistration {
 interface PreviewEntryRuntime {
 	readonly key: string;
 	readonly controller: PreviewSlotController;
-	request?: CardPreviewRequest;
-	rowIndex?: number;
-	desiredRequest?: CardPreviewRequest;
-	desiredRowIndex?: number;
-	dirty: boolean;
 }
 
 const PREVIEW_SURFACE_FLUSH_KEY = "virtual-preview-surface:flush";
@@ -75,26 +79,19 @@ export function createVirtualPreviewSurface(
 	options: CreateVirtualPreviewSurfaceOptions,
 ): VirtualPreviewSurface {
 	const entriesByKey = new Map<string, PreviewEntryRuntime>();
-	const keysByRow = new Map<number, Set<string>>();
 	const hostsByKey = new Map<string, Set<PreviewHostRegistration>>();
-	const dirtyEntries = new Set<PreviewEntryRuntime>();
 	const pendingByKey = new Map<string, PreviewActivationHandle>();
 	const activationScheduler = options.activationScheduler;
 	const scope: PreviewActivationScope = activationScheduler.createScope({
 		frameCoordinator: options.frameCoordinator,
 	});
-	let desiredRangeStart = 0;
-	let desiredRangeEnd = 0;
-	let desiredRangeActive = false;
-	let appliedRangeStart = 0;
-	let appliedRangeEnd = 0;
-	let appliedRangeActive = false;
+	let latestSnapshot: VirtualPreviewSurfaceSnapshot | undefined;
 	let disposed = false;
 	const frameFlushDriver = createPreviewFrameDriver({
 		coordinator: options.frameCoordinator,
 		taskKey: PREVIEW_SURFACE_FLUSH_KEY,
 		getWindow: options.getWindow,
-		onFrame: applyDesiredState,
+		onFrame: applyLatestSnapshot,
 	});
 
 	function getOrCreateEntry(key: string): PreviewEntryRuntime {
@@ -103,7 +100,6 @@ export function createVirtualPreviewSurface(
 		const entry: PreviewEntryRuntime = {
 			key,
 			controller: createPreviewSlotController(options.createRenderer),
-			dirty: false,
 		};
 		entriesByKey.set(key, entry);
 		for (const registration of hostsByKey.get(key) ?? []) {
@@ -114,37 +110,8 @@ export function createVirtualPreviewSurface(
 		return entry;
 	}
 
-	function markDirty(entry: PreviewEntryRuntime): void {
-		if (entry.dirty) return;
-		entry.dirty = true;
-		dirtyEntries.add(entry);
-	}
-
 	function scheduleFlush(): void {
 		frameFlushDriver.schedule({ lane: "post-paint" });
-	}
-
-	function maybeDisposeEntry(entry: PreviewEntryRuntime): void {
-		if (entry.request || entry.desiredRequest) return;
-		if (entry.dirty) return;
-		if (pendingByKey.has(entry.key)) return;
-		removeKeyFromRow(entry.key, entry.rowIndex);
-		for (const registration of hostsByKey.get(entry.key) ?? []) {
-			registration.controllerLease?.dispose();
-			registration.controllerLease = undefined;
-		}
-		entry.controller.dispose();
-		entriesByKey.delete(entry.key);
-		options.onEntryDisposed?.(entry.key);
-	}
-
-	function isInAppliedRange(entry: PreviewEntryRuntime): boolean {
-		return (
-			appliedRangeActive &&
-			entry.rowIndex !== undefined &&
-			entry.rowIndex >= appliedRangeStart &&
-			entry.rowIndex < appliedRangeEnd
-		);
 	}
 
 	function activateQueuedEntry(key: string): void {
@@ -168,99 +135,45 @@ export function createVirtualPreviewSurface(
 		pendingByKey.delete(key);
 	}
 
-	function reconcileEntry(entry: PreviewEntryRuntime): void {
-		const isActive = Boolean(entry.request && isInAppliedRange(entry));
-		entry.controller.setActive(isActive);
-		if (isActive && entry.controller.needsActivation()) {
+	function reconcileActivation(entry: PreviewEntryRuntime): void {
+		if (entry.controller.needsActivation()) {
 			enqueueActivation(entry.key);
 			return;
 		}
 		cancelPendingActivation(entry.key);
 	}
 
-	function addKeyToRow(key: string, rowIndex: number | undefined): void {
-		if (rowIndex === undefined) return;
-		let keys = keysByRow.get(rowIndex);
-		if (!keys) {
-			keys = new Set();
-			keysByRow.set(rowIndex, keys);
+	function disposeEntry(entry: PreviewEntryRuntime): void {
+		cancelPendingActivation(entry.key);
+		for (const registration of hostsByKey.get(entry.key) ?? []) {
+			registration.controllerLease?.dispose();
+			registration.controllerLease = undefined;
 		}
-		keys.add(key);
+		entry.controller.dispose();
+		entriesByKey.delete(entry.key);
+		options.onEntryDisposed?.(entry.key);
 	}
 
-	function removeKeyFromRow(key: string, rowIndex: number | undefined): void {
-		if (rowIndex === undefined) return;
-		const keys = keysByRow.get(rowIndex);
-		if (!keys) return;
-		keys.delete(key);
-		if (keys.size === 0) keysByRow.delete(rowIndex);
-	}
+	function applyLatestSnapshot(): void {
+		if (disposed || !latestSnapshot) return;
+		const snapshot = latestSnapshot;
+		const seenKeys = new Set<string>();
 
-	function applyDirtyBinding(entry: PreviewEntryRuntime): void {
-		const previousRowIndex = entry.rowIndex;
-		if (entry.desiredRequest) {
-			entry.controller.bind(entry.desiredRequest);
-			entry.request = entry.desiredRequest;
-			entry.rowIndex = entry.desiredRowIndex;
-		} else {
-			entry.controller.clear();
-			entry.request = undefined;
-			entry.rowIndex = undefined;
+		for (const binding of snapshot.bindings) {
+			seenKeys.add(binding.key);
+			const entry = getOrCreateEntry(binding.key);
+			entry.controller.bind(binding.request);
+			entry.controller.setActive(
+				snapshot.active &&
+					binding.rowIndex >= snapshot.activeRange.start &&
+					binding.rowIndex < snapshot.activeRange.end,
+			);
+			reconcileActivation(entry);
 		}
-		if (previousRowIndex !== entry.rowIndex) {
-			removeKeyFromRow(entry.key, previousRowIndex);
-			addKeyToRow(entry.key, entry.rowIndex);
+
+		for (const entry of entriesByKey.values()) {
+			if (!seenKeys.has(entry.key)) disposeEntry(entry);
 		}
-		entry.dirty = false;
-	}
-
-	function reconcileRow(rowIndex: number): void {
-		for (const key of keysByRow.get(rowIndex) ?? []) {
-			const entry = entriesByKey.get(key);
-			if (entry) reconcileEntry(entry);
-		}
-	}
-
-	function reconcileRangeDifference(
-		leftStart: number,
-		leftEnd: number,
-		rightStart: number,
-		rightEnd: number,
-	): void {
-		for (let rowIndex = leftStart; rowIndex < leftEnd; rowIndex += 1) {
-			if (rowIndex >= rightStart && rowIndex < rightEnd) continue;
-			reconcileRow(rowIndex);
-		}
-	}
-
-	function applyDesiredState(): void {
-		if (disposed) return;
-		const previousRangeActive = appliedRangeActive;
-		const previousRangeStart = appliedRangeStart;
-		const previousRangeEnd = appliedRangeEnd;
-		const rangeChanged =
-			desiredRangeActive !== previousRangeActive ||
-			desiredRangeStart !== previousRangeStart ||
-			desiredRangeEnd !== previousRangeEnd;
-		const dirtySnapshot = [...dirtyEntries];
-
-		appliedRangeActive = desiredRangeActive;
-		appliedRangeStart = desiredRangeStart;
-		appliedRangeEnd = desiredRangeEnd;
-
-		for (const entry of dirtySnapshot) applyDirtyBinding(entry);
-
-		if (rangeChanged) {
-			const oldStart = previousRangeActive ? previousRangeStart : 0;
-			const oldEnd = previousRangeActive ? previousRangeEnd : 0;
-			const nextStart = desiredRangeActive ? desiredRangeStart : 0;
-			const nextEnd = desiredRangeActive ? desiredRangeEnd : 0;
-			reconcileRangeDifference(oldStart, oldEnd, nextStart, nextEnd);
-			reconcileRangeDifference(nextStart, nextEnd, oldStart, oldEnd);
-		}
-		for (const entry of dirtySnapshot) reconcileEntry(entry);
-		for (const entry of dirtySnapshot) maybeDisposeEntry(entry);
-		dirtyEntries.clear();
 	}
 
 	function registerHost(key: string, element: HTMLElement): PreviewHostLease {
@@ -275,7 +188,7 @@ export function createVirtualPreviewSurface(
 		const entry = entriesByKey.get(key);
 		if (entry) {
 			registration.controllerLease = entry.controller.attachHost(element);
-			reconcileEntry(entry);
+			reconcileActivation(entry);
 		}
 		let disposedLease = false;
 		return {
@@ -287,60 +200,24 @@ export function createVirtualPreviewSurface(
 				registrations?.delete(registration);
 				if (registrations?.size === 0) hostsByKey.delete(key);
 				const activeEntry = entriesByKey.get(key);
-				if (!activeEntry) return;
-				reconcileEntry(activeEntry);
-				maybeDisposeEntry(activeEntry);
+				if (activeEntry) reconcileActivation(activeEntry);
 			},
 		};
 	}
 
-	function syncBindings(bindings: readonly VirtualPreviewBinding[]): void {
+	function publish(snapshot: VirtualPreviewSurfaceSnapshot): void {
 		if (disposed) return;
-		const seenKeys = new Set<string>();
-		for (const binding of bindings) {
-			seenKeys.add(binding.key);
-			const entry = getOrCreateEntry(binding.key);
-			const renderChanged =
-				entry.desiredRequest?.renderKey !== binding.request.renderKey;
-			const rowChanged = entry.desiredRowIndex !== binding.rowIndex;
-			entry.desiredRequest = binding.request;
-			entry.desiredRowIndex = binding.rowIndex;
-			if (renderChanged || rowChanged) markDirty(entry);
-		}
-
-		for (const entry of entriesByKey.values()) {
-			if (seenKeys.has(entry.key) || !entry.desiredRequest) continue;
-			entry.desiredRequest = undefined;
-			entry.desiredRowIndex = undefined;
-			markDirty(entry);
-		}
-		if (dirtyEntries.size > 0) scheduleFlush();
-	}
-
-	function setActiveRange(start: number, end: number, active: boolean): void {
-		if (disposed) return;
-		const nextStart = active ? start : 0;
-		const nextEnd = active ? end : 0;
-		if (
-			desiredRangeActive === active &&
-			desiredRangeStart === nextStart &&
-			desiredRangeEnd === nextEnd
-		) {
-			return;
-		}
-		desiredRangeActive = active;
-		desiredRangeStart = nextStart;
-		desiredRangeEnd = nextEnd;
+		latestSnapshot = snapshot;
 		scheduleFlush();
 	}
 
 	function dispose(): void {
 		if (disposed) return;
 		disposed = true;
+		latestSnapshot = undefined;
 		frameFlushDriver.dispose();
 		for (const handle of pendingByKey.values()) handle.cancel();
 		pendingByKey.clear();
-		dirtyEntries.clear();
 		for (const registrations of hostsByKey.values()) {
 			for (const registration of registrations) {
 				registration.controllerLease?.dispose();
@@ -349,14 +226,8 @@ export function createVirtualPreviewSurface(
 		hostsByKey.clear();
 		for (const entry of entriesByKey.values()) entry.controller.dispose();
 		entriesByKey.clear();
-		keysByRow.clear();
 		activationScheduler.disposeScope(scope);
 	}
 
-	return {
-		registerHost,
-		syncBindings,
-		setActiveRange,
-		dispose,
-	};
+	return { registerHost, publish, dispose };
 }

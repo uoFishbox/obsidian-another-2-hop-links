@@ -145,7 +145,9 @@ describe("FlatCardGrid preview surface", () => {
 			await Promise.resolve();
 		}
 
-		expect(host?.dataset.previewState).toBe("committed");
+		expect(host?.classList.contains("cosense-card-links__box-preview--image")).toBe(
+			true,
+		);
 		expect(host?.querySelector("img")).not.toBeNull();
 	});
 

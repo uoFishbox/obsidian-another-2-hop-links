@@ -13,8 +13,11 @@ function publishBinding(
 	bound: boolean,
 	range: { start: number; end: number },
 ): void {
-	surface.syncBindings(bound ? [{ key: "logical-slot", rowIndex: 0, request }] : []);
-	surface.setActiveRange(range.start, range.end, true);
+	surface.publish({
+		bindings: bound ? [{ key: "logical-slot", rowIndex: 0, request }] : [],
+		activeRange: range,
+		active: true,
+	});
 }
 
 function createSurface() {
@@ -62,19 +65,25 @@ describe("VirtualPreviewSurface slot disposal", () => {
 			"logical-slot-2",
 			document.createElement("div"),
 		);
-		harness.surface.syncBindings([
-			{ key: "logical-slot", rowIndex: 0, request },
-			{ key: "logical-slot-2", rowIndex: 1, request },
-		]);
-		harness.surface.setActiveRange(0, 2, true);
+		harness.surface.publish({
+			bindings: [
+				{ key: "logical-slot", rowIndex: 0, request },
+				{ key: "logical-slot-2", rowIndex: 1, request },
+			],
+			activeRange: { start: 0, end: 2 },
+			active: true,
+		});
 		await vi.advanceTimersByTimeAsync(32);
 		firstLease.dispose();
 		secondLease.dispose();
 
 		expect(harness.disposedSlotIds).toEqual([]);
 
-		harness.surface.syncBindings([]);
-		harness.surface.setActiveRange(0, 0, true);
+		harness.surface.publish({
+			bindings: [],
+			activeRange: { start: 0, end: 0 },
+			active: true,
+		});
 		await vi.advanceTimersByTimeAsync(32);
 
 		expect(harness.disposedSlotIds).toEqual(["logical-slot", "logical-slot-2"]);

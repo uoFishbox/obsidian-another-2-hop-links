@@ -278,12 +278,11 @@ export function useFlatCardGrid<T>(
 			resolvePreviewRequest: props.resolveItemPreviewRequest,
 			resolveInteractionDescriptor: props.resolveItemInteractionDescriptor,
 		});
-		previewSurface.syncBindings(bindings.previewBindings);
-		previewSurface.setActiveRange(
-			bindings.previewRange.start,
-			bindings.previewRange.end,
-			true,
-		);
+		previewSurface.publish({
+			bindings: bindings.previewBindings,
+			activeRange: bindings.previewRange,
+			active: true,
+		});
 		interactionController.syncCards(bindings.interactionBindings);
 	};
 	const virtualList = useVirtualizer<
