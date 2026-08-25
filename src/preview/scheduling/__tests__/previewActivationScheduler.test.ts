@@ -21,6 +21,7 @@ import {
 	type PreviewActivationScope,
 } from "../previewActivationScheduler";
 import type { VirtualFrameCoordinator } from "shared/ui/scheduling/frameCoordinator";
+import { createTestVirtualFrameCoordinator } from "testing/testVirtualFrameCoordinator";
 
 const scrollSource = {};
 const DEFAULT_FRAME_INTERVAL_MS = 1000 / 60;
@@ -30,19 +31,22 @@ let frameTimeOrigin = 0;
 let outstandingPreviewJobCount = 0;
 let activationScope: PreviewActivationScope;
 let results: string[];
+let defaultFrameCoordinator = createTestVirtualFrameCoordinator();
 let defaultTestScheduler = createPreviewActivationScheduler();
 
 function createPreviewActivationScope(
-	options: CreatePreviewActivationScopeOptions = {},
+	options: Partial<CreatePreviewActivationScopeOptions> = {},
 ): PreviewActivationScope {
-	return defaultTestScheduler.createScope(options);
+	return defaultTestScheduler.createScope({
+		frameCoordinator: options.frameCoordinator ?? defaultFrameCoordinator,
+	});
 }
 function requestQueuedPreviewActivation(
 	key: string,
 	scope: PreviewActivationScope,
 	onActivated?: () => void,
 ): PreviewActivationHandle {
-	return defaultTestScheduler.request(key, scope, onActivated);
+	return scope.request(key, onActivated);
 }
 
 function disposePreviewActivationScheduler(): void {
@@ -106,10 +110,11 @@ beforeEach(() => {
 	frameTimestamp = 0;
 	outstandingPreviewJobCount = 0;
 	results = [];
+	defaultFrameCoordinator = createTestVirtualFrameCoordinator();
 	defaultTestScheduler = createPreviewActivationScheduler({
 		getOutstandingPreviewJobCount: () => outstandingPreviewJobCount,
 	});
-	activationScope = defaultTestScheduler.createScope();
+	activationScope = createPreviewActivationScope();
 	vi.useFakeTimers();
 	frameTimeOrigin = Date.now();
 	vi.stubGlobal(
@@ -127,6 +132,7 @@ beforeEach(() => {
 	vi.stubGlobal("cancelAnimationFrame", (handle: number) => {
 		clearTimeout(handle);
 	});
+	vi.spyOn(globalThis.performance, "now").mockImplementation(() => frameTimestamp);
 });
 
 afterEach(() => {
@@ -142,12 +148,16 @@ describe("preview activation scheduler", () => {
 	it("disposes only scopes owned by one scheduler instance", async () => {
 		const first = createPreviewActivationScheduler();
 		const second = createPreviewActivationScheduler();
-		const firstScope = first.createScope();
-		const secondScope = second.createScope();
+		const firstScope = first.createScope({
+			frameCoordinator: createTestVirtualFrameCoordinator(),
+		});
+		const secondScope = second.createScope({
+			frameCoordinator: createTestVirtualFrameCoordinator(),
+		});
 		const firstActivated = vi.fn();
 		const secondActivated = vi.fn();
-		first.request("same-key", firstScope, firstActivated);
-		second.request("same-key", secondScope, secondActivated);
+		firstScope.request("same-key", firstActivated);
+		secondScope.request("same-key", secondActivated);
 
 		first.dispose();
 		await flushAnimationFrame();
@@ -444,14 +454,6 @@ describe("preview activation scheduler", () => {
 		expect(getOutstandingPreviewJobCount).toHaveBeenCalledTimes(2);
 	});
 
-	it("uses a timeout fallback when requestAnimationFrame is unavailable", async () => {
-		vi.stubGlobal("requestAnimationFrame", undefined);
-		const activation = requestActivation("preview-fallback");
-
-		await vi.advanceTimersByTimeAsync(frameIntervalMs);
-		expect(activation.onActivated).toHaveBeenCalledOnce();
-	});
-
 	it("settles pending activations without invoking the callback when disposed", async () => {
 		markScrollActivityActive(scrollSource);
 		const activation = requestActivation("preview-disposed");
@@ -464,48 +466,25 @@ describe("preview activation scheduler", () => {
 
 	it("does not recreate scopes or queue work after disposal", async () => {
 		const scheduler = createPreviewActivationScheduler();
-		const existingScope = scheduler.createScope();
+		const existingScope = scheduler.createScope({
+			frameCoordinator: createTestVirtualFrameCoordinator(),
+		});
 		const existingScopeCallback = vi.fn();
 		scheduler.dispose();
 
 		expect(() =>
-			scheduler.request("existing", existingScope, existingScopeCallback),
+			existingScope.request("existing", existingScopeCallback),
 		).not.toThrow();
-		const disposedScope = scheduler.createScope();
+		const disposedScope = scheduler.createScope({
+			frameCoordinator: createTestVirtualFrameCoordinator(),
+		});
 		const disposedScopeCallback = vi.fn();
-		const handle = scheduler.request(
-			"disposed",
-			disposedScope,
-			disposedScopeCallback,
-		);
+		const handle = disposedScope.request("disposed", disposedScopeCallback);
 		handle.cancel();
 		await flushAnimationFrame();
 
 		expect(existingScopeCallback).not.toHaveBeenCalled();
 		expect(disposedScopeCallback).not.toHaveBeenCalled();
-	});
-
-	it("uses one global animation-frame callback for multiple scopes", () => {
-		const firstScope = createPreviewActivationScope();
-		const secondScope = createPreviewActivationScope();
-
-		requestQueuedPreviewActivation("preview-a", firstScope);
-		requestQueuedPreviewActivation("preview-b", secondScope);
-
-		expect(requestAnimationFrame).toHaveBeenCalledTimes(1);
-	});
-
-	it("drains multiple scopes in round-robin order", async () => {
-		const firstScope = createPreviewActivationScope();
-		const secondScope = createPreviewActivationScope();
-
-		requestActivation("a-1", firstScope);
-		requestActivation("a-2", firstScope);
-		requestActivation("b-1", secondScope);
-		requestActivation("b-2", secondScope);
-
-		await flushAnimationFrame();
-		expect(results).toEqual(["a-1", "b-1"]);
 	});
 
 	it("coalesces requests sharing the same key", async () => {

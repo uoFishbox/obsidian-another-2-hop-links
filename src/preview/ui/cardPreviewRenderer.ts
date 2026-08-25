@@ -69,7 +69,7 @@ let nextDomCommitScopeId = 0;
 export function createCardPreviewRenderer(
 	options: CardPreviewRendererOptions,
 ): CardPreviewRenderer {
-	const domCommitScopeKey = `card-preview:${++nextDomCommitScopeId}`;
+	const domCommitTargetKey = `card-preview:${++nextDomCommitScopeId}`;
 	const sharedCache = options.sharedCache;
 
 	const enqueueCoordinatedDomCommit = async (
@@ -182,7 +182,7 @@ export function createCardPreviewRenderer(
 					image.fetchPriority = "low";
 
 					return enqueueCoordinatedDomCommit({
-						targetKey: domCommitScopeKey,
+						targetKey: domCommitTargetKey,
 						isStale: () => isRenderStale(signal),
 						commit: () => {
 							image.src = imageSrc;
@@ -255,7 +255,7 @@ export function createCardPreviewRenderer(
 		} catch (error) {
 			if (signal.aborted || isAbortError(error)) return false;
 			await enqueueCoordinatedDomCommit({
-				targetKey: domCommitScopeKey,
+				targetKey: domCommitTargetKey,
 				isStale: () => isRenderStale(signal),
 				commit: () => {
 					callbacks?.onError?.();
@@ -274,7 +274,7 @@ export function createCardPreviewRenderer(
 		shouldSyncMathStyles: boolean,
 	): Promise<boolean> {
 		return enqueueCoordinatedDomCommit({
-			targetKey: domCommitScopeKey,
+			targetKey: domCommitTargetKey,
 			isStale: () => isRenderStale(signal),
 			commit: () => {
 				container.replaceChildren(fragment);
@@ -297,7 +297,7 @@ export function createCardPreviewRenderer(
 		attachment: CardPreviewAttachment,
 	): Promise<boolean> {
 		return enqueueCoordinatedDomCommit({
-			targetKey: domCommitScopeKey,
+			targetKey: domCommitTargetKey,
 			isStale: () => isRenderStale(signal),
 			commit: () => {
 				container.replaceChildren(moveChildrenToFragment(source));

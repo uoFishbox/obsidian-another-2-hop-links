@@ -13,6 +13,7 @@ import {
 	type PreviewActivationScheduler,
 } from "../previewActivationScheduler";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { createTestVirtualFrameCoordinator } from "testing/testVirtualFrameCoordinator";
 
 const FRAME_INTERVAL_MS = 1000 / 60;
 
@@ -115,9 +116,8 @@ function createManualActivationQueue(): {
 	const settleAll = (): void => {
 		for (const request of requests) request.settled = true;
 	};
-	const scheduler: PreviewActivationScheduler = {
-		createScope: () => ({ kind: "preview-activation-scope" }),
-		request: (key, _scope, onActivated) => {
+	const scope = {
+		request: (key: string, onActivated?: () => void) => {
 			const request: ManualRequest = { key, onActivated, settled: false };
 			requests.push(request);
 			return {
@@ -127,7 +127,10 @@ function createManualActivationQueue(): {
 				},
 			};
 		},
-		disposeScope: settleAll,
+		dispose: settleAll,
+	};
+	const scheduler: PreviewActivationScheduler = {
+		createScope: () => scope,
 		dispose: settleAll,
 	};
 
@@ -148,7 +151,7 @@ function createManualActivationQueue(): {
 }
 
 function createHarness(
-	frameCoordinator?: VirtualFrameCoordinator,
+	frameCoordinator: VirtualFrameCoordinator = createTestVirtualFrameCoordinator(),
 	activationScheduler = createPreviewActivationScheduler(),
 ): {
 	surface: Surface;
@@ -313,7 +316,7 @@ describe("VirtualPreviewSurface", () => {
 			{ previewRange: { start: 0, end: 1 }, active: true },
 		);
 
-		expect(schedule).toHaveBeenCalledOnce();
+		expect(schedule).toHaveBeenCalledTimes(2);
 		expect(schedule).toHaveBeenCalledWith(
 			"post-paint",
 			"virtual-preview-surface:flush",

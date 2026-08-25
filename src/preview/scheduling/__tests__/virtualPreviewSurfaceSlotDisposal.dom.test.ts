@@ -3,6 +3,7 @@ import { createPreviewActivationScheduler } from "preview/scheduling/previewActi
 import { createVirtualPreviewSurface } from "preview/scheduling/virtualPreviewSurface";
 import type { CardPreviewRenderer } from "preview/ui/cardPreviewRenderer";
 import type { CardPreviewRequest } from "preview/pipeline/cardPreviewRequest";
+import { createTestVirtualFrameCoordinator } from "testing/testVirtualFrameCoordinator";
 
 const request = {
 	renderKey: "preview-key",
@@ -25,6 +26,7 @@ function createSurface() {
 	const renderer: CardPreviewRenderer = () => () => {};
 	const disposedSlotIds: string[] = [];
 	const surface = createVirtualPreviewSurface({
+		frameCoordinator: createTestVirtualFrameCoordinator(),
 		activationScheduler,
 		createRenderer: () => renderer,
 		onEntryDisposed: (slotId) => disposedSlotIds.push(slotId),

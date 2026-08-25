@@ -36,7 +36,7 @@ export interface PreviewRuntimeOptions {
 
 /** Per-surface values which are expected to vary with the current view. */
 export interface PreviewRuntimeSurfaceOptions {
-	readonly frameCoordinator?: VirtualFrameCoordinator;
+	readonly frameCoordinator: VirtualFrameCoordinator;
 	readonly resolveSearchMatchPosition?: CardPreviewRendererOptions["resolveSearchMatchPosition"];
 }
 
@@ -55,9 +55,8 @@ export interface PreviewRuntime {
 
 /** Creates the preview runtime for one plugin load. */
 export function createPreviewRuntime(options: PreviewRuntimeOptions): PreviewRuntime {
-	// Preview work may target surfaces in popout realms. When a coordinator
-	// cannot accept a task, fall back to the workspace window receiving input
-	// instead of the main Electron window, which may be throttled.
+	// Token-delay timers and non-surface render work follow the workspace window
+	// receiving input so popout work does not fall back to a throttled main realm.
 	const resolveSchedulingWindow = (): Window | null =>
 		resolveWorkspaceWindow(options.app.workspace);
 	const activationScheduler: PreviewActivationScheduler =
@@ -89,7 +88,6 @@ export function createPreviewRuntime(options: PreviewRuntimeOptions): PreviewRun
 		});
 		const surface = createVirtualPreviewSurface({
 			frameCoordinator: surfaceOptions.frameCoordinator,
-			getWindow: resolveSchedulingWindow,
 			activationScheduler,
 			createRenderer: () =>
 				createCardPreviewRenderer({

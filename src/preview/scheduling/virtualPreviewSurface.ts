@@ -3,7 +3,6 @@ import {
 	type PreviewActivationScheduler,
 	type PreviewActivationScope,
 } from "./previewActivationScheduler";
-import { createPreviewFrameDriver } from "./previewFrameDriver";
 import type { CardPreviewRenderer } from "preview/ui/cardPreviewRenderer";
 import type { CardPreviewRequest } from "preview/pipeline/cardPreviewRequest";
 import {
@@ -46,9 +45,7 @@ export interface VirtualPreviewSurface {
 }
 
 export interface CreateVirtualPreviewSurfaceOptions {
-	readonly frameCoordinator?: VirtualFrameCoordinator;
-	/** Realm used by the flush driver when no coordinator accepts the task. */
-	readonly getWindow?: () => Window | null;
+	readonly frameCoordinator: VirtualFrameCoordinator;
 	readonly activationScheduler: PreviewActivationScheduler;
 	readonly createRenderer: () => CardPreviewRenderer;
 	/** Optional lifecycle probe invoked after an unbound preview entry is released. */
@@ -99,12 +96,6 @@ export function createVirtualPreviewSurface(
 	let appliedSnapshotGeneration = 0;
 	let lastAppliedActive = false;
 	let disposed = false;
-	const frameFlushDriver = createPreviewFrameDriver({
-		coordinator: options.frameCoordinator,
-		taskKey: PREVIEW_SURFACE_FLUSH_KEY,
-		getWindow: options.getWindow,
-		onFrame: applyLatestSnapshot,
-	});
 
 	function getOrCreateEntry(key: string): PreviewEntryRuntime {
 		const existing = entriesByKey.get(key);
@@ -124,7 +115,11 @@ export function createVirtualPreviewSurface(
 	}
 
 	function scheduleFlush(): void {
-		frameFlushDriver.schedule({ lane: "post-paint" });
+		options.frameCoordinator.schedule(
+			"post-paint",
+			PREVIEW_SURFACE_FLUSH_KEY,
+			applyLatestSnapshot,
+		);
 	}
 
 	function activateQueuedEntry(key: string): void {
@@ -135,7 +130,7 @@ export function createVirtualPreviewSurface(
 
 	function enqueueActivation(key: string): void {
 		if (pendingByKey.has(key)) return;
-		const handle = activationScheduler.request(key, scope, () => {
+		const handle = scope.request(key, () => {
 			activateQueuedEntry(key);
 		});
 		pendingByKey.set(key, handle);
@@ -259,7 +254,7 @@ export function createVirtualPreviewSurface(
 		if (disposed) return;
 		disposed = true;
 		latestSnapshot = undefined;
-		frameFlushDriver.dispose();
+		options.frameCoordinator.cancel("post-paint", PREVIEW_SURFACE_FLUSH_KEY);
 		for (const handle of pendingByKey.values()) handle.cancel();
 		pendingByKey.clear();
 		backwardActivationOrderScratch.length = 0;
@@ -271,7 +266,7 @@ export function createVirtualPreviewSurface(
 		hostsByKey.clear();
 		for (const entry of entriesByKey.values()) entry.controller.dispose();
 		entriesByKey.clear();
-		activationScheduler.disposeScope(scope);
+		scope.dispose();
 	}
 
 	return { registerHost, publish, dispose };

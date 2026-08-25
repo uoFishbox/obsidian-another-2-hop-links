@@ -4,6 +4,7 @@ import { DEFAULT_SETTINGS } from "settings/model";
 import type { CardPreviewLoader } from "preview/ui/cardPreviewRenderer";
 import type { CardPreviewSharedCache } from "preview/ui/cardPreviewSharedCache";
 import type { EnqueuePreviewRender } from "preview/renderers/previewRenderQueue";
+import { createTestVirtualFrameCoordinator } from "testing/testVirtualFrameCoordinator";
 
 const state = vi.hoisted(() => ({
 	surfaceOptions: [] as Array<Record<string, unknown>>,
@@ -43,7 +44,9 @@ describe("PreviewRuntime", () => {
 			getPreview: runtimeLoader,
 		});
 
-		runtime.createSurface({});
+		runtime.createSurface({
+			frameCoordinator: createTestVirtualFrameCoordinator(),
+		});
 		const surfaceOptions = state.surfaceOptions.at(-1);
 		const createRenderer = surfaceOptions?.createRenderer as () => unknown;
 		createRenderer();
@@ -59,14 +62,18 @@ describe("PreviewRuntime", () => {
 			});
 		const first = createRuntime();
 		const second = createRuntime();
-		const firstSurfaceOptions = first.createSurface({});
+		const firstSurfaceOptions = first.createSurface({
+			frameCoordinator: createTestVirtualFrameCoordinator(),
+		});
 		void firstSurfaceOptions;
 		const firstCreateRenderer = state.surfaceOptions.at(-1)
 			?.createRenderer as () => unknown;
 		firstCreateRenderer();
 		const firstCache = state.rendererOptions.at(-1)
 			?.sharedCache as CardPreviewSharedCache;
-		const secondSurfaceOptions = second.createSurface({});
+		const secondSurfaceOptions = second.createSurface({
+			frameCoordinator: createTestVirtualFrameCoordinator(),
+		});
 		void secondSurfaceOptions;
 		const secondCreateRenderer = state.surfaceOptions.at(-1)
 			?.createRenderer as () => unknown;
@@ -93,14 +100,18 @@ describe("PreviewRuntime", () => {
 		const first = createRuntime();
 		const second = createRuntime();
 
-		first.createSurface({});
+		first.createSurface({
+			frameCoordinator: createTestVirtualFrameCoordinator(),
+		});
 		const firstCreateRenderer = state.surfaceOptions.at(-1)
 			?.createRenderer as () => unknown;
 		firstCreateRenderer();
 		const firstEnqueue = state.rendererOptions.at(-1)
 			?.enqueuePreviewRender as EnqueuePreviewRender;
 
-		second.createSurface({});
+		second.createSurface({
+			frameCoordinator: createTestVirtualFrameCoordinator(),
+		});
 		const secondCreateRenderer = state.surfaceOptions.at(-1)
 			?.createRenderer as () => unknown;
 		secondCreateRenderer();
@@ -123,7 +134,9 @@ describe("PreviewRuntime", () => {
 		});
 		runtime.dispose();
 
-		const surface = runtime.createSurface({});
+		const surface = runtime.createSurface({
+			frameCoordinator: createTestVirtualFrameCoordinator(),
+		});
 
 		expect(state.surfaceOptions).toHaveLength(0);
 		expect(state.rendererOptions).toHaveLength(0);
