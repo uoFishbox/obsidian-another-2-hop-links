@@ -129,7 +129,7 @@ export function useTwoHopVirtualGrid(
 			cachedVisibilityPolicyRowStride = rowStride;
 			cachedVisibilityPolicy = {
 				bootstrapRows: 3,
-				mountedOverscanPx: rowStride * 3,
+				mountedOverscanPx: rowStride * 2,
 				previewOverscanPx: 0,
 			};
 		}
