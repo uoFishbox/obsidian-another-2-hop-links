@@ -7,12 +7,14 @@ describe("setupWorkspaceEventHandlers", () => {
 		const postPaintCallbacks: Array<() => void> = [];
 		const idleCallbacks: Array<() => void> = [];
 		const reconcileInlineComponents = vi.fn();
+		const rootSplit = {};
 		const workspace = {
+			rootSplit,
 			on: vi.fn((event: string, handler: () => void) => {
 				handlers.set(event, handler);
 				return { event };
 			}),
-			getLeaf: vi.fn(() => null),
+			getMostRecentLeaf: vi.fn(() => null),
 		};
 		const plugin = {
 			registerEvent: vi.fn(),
@@ -56,5 +58,10 @@ describe("setupWorkspaceEventHandlers", () => {
 		expect(reconcileInlineComponents).toHaveBeenCalledTimes(1);
 		expect(deps.domMutationObserver.initObservers).toHaveBeenCalledTimes(1);
 		expect(idleCallbacks).toHaveLength(1);
+
+		const fileOpen = handlers.get("file-open");
+		expect(fileOpen).toBeDefined();
+		fileOpen?.();
+		expect(workspace.getMostRecentLeaf).toHaveBeenCalledWith(rootSplit);
 	});
 });

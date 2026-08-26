@@ -104,9 +104,11 @@ export function setupWorkspaceEventHandlers(
 
 	plugin.registerEvent(
 		deps.workspace.on("file-open", () => {
-			const activeLeaf = deps.workspace.getLeaf(false);
-			if (activeLeaf) {
-				deps.scrollManager.clearHistory(activeLeaf.id);
+			const currentMainLeaf = deps.workspace.getMostRecentLeaf(
+				deps.workspace.rootSplit,
+			);
+			if (currentMainLeaf) {
+				deps.scrollManager.clearHistory(currentMainLeaf.id);
 			}
 		}),
 	);

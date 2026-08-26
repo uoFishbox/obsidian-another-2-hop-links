@@ -43,8 +43,12 @@ export function createEmptyViewController(
 		}
 	}
 
-	function isActiveLeaf(leaf: WorkspaceLeaf): boolean {
-		return app.workspace.getLeaf(false) === leaf;
+	function getCurrentMainLeaf(): WorkspaceLeaf | null {
+		return app.workspace.getMostRecentLeaf(app.workspace.rootSplit);
+	}
+
+	function isCurrentMainLeaf(leaf: WorkspaceLeaf): boolean {
+		return getCurrentMainLeaf() === leaf;
 	}
 
 	function openAllNotesView(leaf: WorkspaceLeaf): void {
@@ -70,7 +74,7 @@ export function createEmptyViewController(
 		if (!plugin.settings.enableEmptyViewAllNotesInNewTab) {
 			return;
 		}
-		if (!isActiveLeaf(pending.leaf)) {
+		if (!isCurrentMainLeaf(pending.leaf)) {
 			return;
 		}
 		if (getViewType(pending.leaf) !== EMPTY_VIEW_TYPE) {
@@ -110,27 +114,27 @@ export function createEmptyViewController(
 			return;
 		}
 
-		const activeLeaf = app.workspace.getLeaf(false);
-		if (!activeLeaf) {
+		const currentMainLeaf = getCurrentMainLeaf();
+		if (!currentMainLeaf) {
 			cancelAllPending();
 			return;
 		}
 
-		const activeLeafId = getLeafId(activeLeaf);
+		const currentMainLeafId = getLeafId(currentMainLeaf);
 		for (const leafId of pendingByLeafId.keys()) {
-			if (leafId !== activeLeafId) {
+			if (leafId !== currentMainLeafId) {
 				cancelPendingLeaf(leafId);
 			}
 		}
 
-		if (getViewType(activeLeaf) !== EMPTY_VIEW_TYPE) {
-			if (activeLeafId) {
-				cancelPendingLeaf(activeLeafId);
+		if (getViewType(currentMainLeaf) !== EMPTY_VIEW_TYPE) {
+			if (currentMainLeafId) {
+				cancelPendingLeaf(currentMainLeafId);
 			}
 			return;
 		}
 
-		scheduleEmptyLeaf(activeLeaf);
+		scheduleEmptyLeaf(currentMainLeaf);
 	}
 
 	function destroy(): void {
