@@ -9,6 +9,7 @@ function createHarness() {
 		refreshEmptyView: vi.fn(),
 		handleSettingsChange: vi.fn(),
 		invalidateSortCache: vi.fn(),
+		invalidateAllNotesSorting: vi.fn(),
 		invalidateAll: vi.fn(),
 		enqueueRebuild: vi.fn(() => Promise.resolve()),
 		getLeavesOfType: vi.fn(() => []),
@@ -28,6 +29,7 @@ function createHarness() {
 		sortService: {
 			invalidateCache: mocks.invalidateSortCache,
 		} as never,
+		invalidateAllNotesSorting: mocks.invalidateAllNotesSorting,
 		indexingService: {
 			invalidateAll: mocks.invalidateAll,
 			enqueueRebuild: mocks.enqueueRebuild,
@@ -53,6 +55,7 @@ describe("SettingsSideEffectController", () => {
 
 		expect(mocks.updateAllViews).toHaveBeenCalledOnce();
 		expect(mocks.invalidateSortCache).toHaveBeenCalledOnce();
+		expect(mocks.invalidateAllNotesSorting).toHaveBeenCalledOnce();
 		expect(mocks.bumpSortContextVersion).toHaveBeenCalledOnce();
 		expect(mocks.handleSettingsChange).toHaveBeenCalledOnce();
 	});
@@ -81,6 +84,7 @@ describe("SettingsSideEffectController", () => {
 		apply("lastUsedSortOption");
 
 		expect(mocks.invalidateSortCache).not.toHaveBeenCalled();
+		expect(mocks.invalidateAllNotesSorting).not.toHaveBeenCalled();
 		expect(mocks.handleSettingsChange).not.toHaveBeenCalled();
 		expect(mocks.refreshEmptyView).not.toHaveBeenCalled();
 	});

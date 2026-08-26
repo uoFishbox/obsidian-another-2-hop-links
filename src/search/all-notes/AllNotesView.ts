@@ -118,6 +118,7 @@ export class AllNotesView extends ItemView {
 				linkContext,
 				applicationStore: cardCollectionState,
 				previewRuntime: this.viewServices.previewRuntime,
+				allNotesCatalog: this.viewServices.allNotesCatalog,
 				uiState: this.listUiState,
 			},
 		}) as SvelteComponentInstance;

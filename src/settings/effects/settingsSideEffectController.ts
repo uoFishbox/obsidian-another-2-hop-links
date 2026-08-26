@@ -38,6 +38,7 @@ export interface SettingsSideEffectControllerDeps {
 	readonly emptyViewController: EmptyViewController;
 	readonly displayModeManager: DisplayModeController;
 	readonly sortService: SortService;
+	readonly invalidateAllNotesSorting: () => void;
 	readonly indexingService: IndexingService;
 	readonly workspace: Workspace;
 	readonly bumpSortContextVersion: () => void;
@@ -112,6 +113,7 @@ export function createSettingsSideEffectController(
 		if (invalidatesSort) {
 			deps.sortService.invalidateCache();
 			deps.bumpSortContextVersion();
+			deps.invalidateAllNotesSorting();
 		}
 		if (reactivatesDisplayMode) {
 			deps.displayModeManager.handleSettingsChange();

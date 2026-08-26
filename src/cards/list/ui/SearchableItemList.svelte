@@ -30,7 +30,7 @@
 		getSortedViewItems,
 		pinBookmarkedViewItems,
 	} from "cards/list/model/searchableItemSorting";
-	import { tick } from "svelte";
+	import { tick, untrack } from "svelte";
 	import {
 		createCardRenderModel,
 		type CardRenderModel,
@@ -52,6 +52,7 @@
 		previewRuntime?: PreviewRuntime;
 		autofocus?: boolean;
 		uiState?: ListViewUiState;
+		itemsRevision?: number;
 	}
 
 	let {
@@ -64,6 +65,7 @@
 		previewRuntime = undefined,
 		autofocus = true,
 		uiState = undefined,
+		itemsRevision = 0,
 	}: Props = $props();
 
 	let sortOption = $derived(applicationStore.sortOption);
@@ -73,6 +75,7 @@
 			applicationStore.settings?.frontmatterKeyModifiedDate ?? "",
 			applicationStore.settings?.priorityFrontmatterKeyForTitle ?? "",
 			applicationStore.updateVersion,
+			itemsRevision,
 		].join("\u001f"),
 	);
 	let getItemKey = $derived(config.getItemKey);
@@ -103,6 +106,7 @@
 
 	function clearSearchTextCacheForInputChange(): void {
 		void items;
+		void itemsRevision;
 		void linkContext.sourceFile.path;
 		void config.getItemKey;
 		void config.getSearchText;
@@ -133,6 +137,7 @@
 		);
 	};
 	const buildWorkerDataset = (): SearchWorkerItemSnapshot[] => {
+		void itemsRevision;
 		return items.map((item) => ({
 			key: getItemKey(item),
 			searchText: getCachedItemSearchText(item),
@@ -140,6 +145,7 @@
 		}));
 	};
 	const getSearchableFiles = (): TFile[] => {
+		void itemsRevision;
 		const filesByPath = new Map<string, TFile>();
 		for (const item of items) {
 			const targetFile = getItemTargetFile(item, linkContext);
@@ -185,6 +191,9 @@
 
 	let sortedItems = $derived.by(() => {
 		void sortSettingsSignature;
+		if (config.getSortedItems) {
+			return config.getSortedItems(sortOption);
+		}
 		return getSortedViewItems(items, sortOption, sortService, (raw) =>
 			toCardItem(raw),
 		);
@@ -195,6 +204,7 @@
 
 	$effect(() => {
 		const serial = ++filterRunSerial;
+		void itemsRevision;
 		const sourceItems = sortedItems;
 		const query = search.normalized;
 		const currentSearchScope =
@@ -211,9 +221,11 @@
 
 		void (async () => {
 			if (!searchEnabled || !query) {
-				filteredItems = shouldPin
+				const nextItems = shouldPin
 					? pinBookmarkedViewItems(sourceItems, bookmarks)
 					: sourceItems;
+				const currentItems = untrack(() => filteredItems);
+				filteredItems = nextItems === currentItems ? [...nextItems] : nextItems;
 				return;
 			}
 
@@ -278,6 +290,7 @@
 	);
 	const cardModelRevision = $derived.by(() => ({
 		items,
+		itemsRevision,
 		getItemKey,
 		settings: applicationStore.settings,
 		searchQuery: appliedSearchQuery,

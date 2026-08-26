@@ -4,6 +4,7 @@ import type { PreviewRuntime } from "preview/runtime/previewRuntime";
 import type { LinkContext } from "cards/context/linkContext";
 import type { CardCollectionState } from "cards/CardCollectionState.svelte";
 import type { TwoHopState } from "two-hop/state/TwoHopState.svelte";
+import type { AllNotesCatalog } from "search/all-notes/allNotesCatalog";
 
 /** UI views に対して composition root が提供する生成・共有 capability。 */
 export interface ViewServices {
@@ -15,4 +16,6 @@ export interface ViewServices {
 	createLinkContext(sourceFile: TFile, settings: PluginSettings): LinkContext;
 	/** plugin load 単位で共有される preview runtime。 */
 	readonly previewRuntime: PreviewRuntime;
+	/** plugin load 単位で共有される All Notes のsource・sort cache。 */
+	readonly allNotesCatalog: AllNotesCatalog;
 }

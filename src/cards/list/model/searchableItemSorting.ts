@@ -92,6 +92,10 @@ export function pinBookmarkedViewItems(
 	viewItems: CardItem[],
 	bookmarks: BookmarkedViewItemOrder,
 ): CardItem[] {
+	if (bookmarks.filePaths.size === 0) {
+		return viewItems;
+	}
+
 	const bookmarked = new Map<string, CardItem>();
 	const others: CardItem[] = [];
 
@@ -108,8 +112,6 @@ export function pinBookmarkedViewItems(
 		return viewItems;
 	}
 
-	// SvelteSet の変更を検知して再評価されるように size にアクセス
-	void bookmarks.filePaths.size;
 	const orderedBookmarked: CardItem[] = [];
 	for (const path of bookmarks.orderedFilePaths) {
 		const item = bookmarked.get(path);

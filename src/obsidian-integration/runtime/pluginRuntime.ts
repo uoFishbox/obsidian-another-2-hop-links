@@ -62,6 +62,7 @@ import { areTagFeaturesEnabled, type PluginSettings } from "settings/model";
 import { getLazyLoadManager } from "obsidian-integration/observers/IntersectionObserverRegistry";
 import { DEFAULT_PREVIEW_DOM_COMMITS_PER_SECOND } from "preview/scheduling/previewSchedulingConfig";
 import { setYieldSchedulingWindowResolver } from "indexing/timeSlicing";
+import { createAllNotesCatalog } from "search/all-notes/allNotesCatalog";
 
 export interface PluginRuntimeOptions {
 	app: App;
@@ -148,6 +149,11 @@ export function createPluginRuntime(options: PluginRuntimeOptions): PluginRuntim
 		},
 	);
 	const sortService = new SortService(metricProvider);
+	const allNotesCatalog = createAllNotesCatalog({
+		app: options.app,
+		sortService,
+		getSortContextVersion: options.getSortContextVersion,
+	});
 	const linkStatusService = createLinkStatusService(
 		indexingService,
 		options.getSettings,
@@ -206,6 +212,7 @@ export function createPluginRuntime(options: PluginRuntimeOptions): PluginRuntim
 			),
 		createLinkContext: linkContextFactory,
 		previewRuntime,
+		allNotesCatalog,
 	};
 	const domMutationObserver = new DOMMutationObserver(options.plugin, stylingService);
 	const indexUpdateQueue = new IndexUpdateQueue(options.plugin, indexingService);
@@ -236,6 +243,7 @@ export function createPluginRuntime(options: PluginRuntimeOptions): PluginRuntim
 	const unsubscribeIndexDataUpdate = indexingService.onDataUpdate((context) => {
 		sortService.invalidateCache();
 		options.bumpSortContextVersion();
+		allNotesCatalog.invalidateSorting();
 		viewUpdateOrchestrator.updateForContext(context);
 	});
 	indexUpdateQueue.setupEventListeners();
@@ -245,6 +253,7 @@ export function createPluginRuntime(options: PluginRuntimeOptions): PluginRuntim
 		emptyViewController,
 		displayModeManager: displayModeController,
 		sortService,
+		invalidateAllNotesSorting: () => allNotesCatalog.invalidateSorting(),
 		indexingService,
 		workspace: options.app.workspace,
 		bumpSortContextVersion: options.bumpSortContextVersion,
@@ -257,6 +266,7 @@ export function createPluginRuntime(options: PluginRuntimeOptions): PluginRuntim
 		unsubscribeIndexDataUpdate();
 		indexUpdateQueue.destroy();
 		previewRuntime.dispose();
+		allNotesCatalog.destroy();
 		componentController.destroy();
 		twoHopLinkResolver.destroy();
 		displayModeController.destroy();

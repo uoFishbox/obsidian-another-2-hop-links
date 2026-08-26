@@ -1,6 +1,6 @@
 <script lang="ts">
-	import { Component, Notice, TFile, TFolder, type App } from "obsidian";
-	import { getCardItemKey, toCardItems, type CardItem } from "cards/CardItem";
+	import { Notice, TFile, TFolder, type App } from "obsidian";
+	import { getCardItemKey, type CardItem } from "cards/CardItem";
 	import { resolveExpectedPath } from "obsidian-integration/files/resolveExpectedPath";
 	import SearchableItemList from "cards/list/ui/SearchableItemList.svelte";
 	import type { ListConfig } from "cards/list/ui/types";
@@ -12,6 +12,7 @@
 	import { getFileCardTitleSearchText } from "cards/title/cardTitle";
 	import type { PreviewRuntime } from "preview/runtime/previewRuntime";
 	import type { ListViewUiState } from "cards/list/model/listViewUiState";
+	import type { AllNotesCatalog } from "./allNotesCatalog";
 
 	interface Props {
 		app: App;
@@ -21,6 +22,7 @@
 		applicationStore: CardCollectionState;
 		previewRuntime?: PreviewRuntime;
 		uiState?: ListViewUiState;
+		allNotesCatalog: AllNotesCatalog;
 	}
 
 	let {
@@ -31,20 +33,17 @@
 		applicationStore,
 		previewRuntime = undefined,
 		uiState = undefined,
+		allNotesCatalog,
 	}: Props = $props();
 
-	let notesVersion = $state(0);
+	let catalogRevision = $state(allNotesCatalog.getRevision());
 	let cardLayoutCssText = $derived(getCardLayoutCssText(settings));
 	let isCreatingSearchNote = $state(false);
 
-	let notes = $derived.by(() => {
-		void notesVersion;
-		return app.vault
-			.getFiles()
-			.filter((f) => f.extension === "md" || f.extension === "canvas");
+	let noteViewItems = $derived.by(() => {
+		void catalogRevision;
+		return allNotesCatalog.getItems();
 	});
-
-	let noteViewItems = $derived(toCardItems(notes));
 
 	async function createNoteFromSearchTitle(title: string): Promise<void> {
 		const trimmedTitle = title.trim();
@@ -108,6 +107,7 @@
 			);
 		},
 		getItemKey: getCardItemKey,
+		getSortedItems: (sortOption) => allNotesCatalog.getSortedItems(sortOption),
 		sectionId: "empty-view-all-notes",
 		pinBookmarkedToTop: settings.pinBookmarkedToTopInAllNotes,
 		emptyMessage: "No notes found.",
@@ -115,48 +115,9 @@
 	};
 
 	$effect(() => {
-		const component = new Component();
-
-		component.registerEvent(
-			app.vault.on("create", (file) => {
-				if (
-					file instanceof TFile &&
-					(file.extension === "md" || file.extension === "canvas")
-				) {
-					notesVersion += 1;
-				}
-			}),
-		);
-
-		component.registerEvent(
-			app.vault.on("delete", (file) => {
-				if (
-					file instanceof TFile &&
-					(file.extension === "md" || file.extension === "canvas")
-				) {
-					notesVersion += 1;
-				}
-			}),
-		);
-
-		component.registerEvent(
-			app.vault.on("rename", (file, oldPath) => {
-				if (!(file instanceof TFile)) {
-					return;
-				}
-
-				const wasNote =
-					oldPath.toLowerCase().endsWith(".md") ||
-					oldPath.toLowerCase().endsWith(".canvas");
-				if (file.extension === "md" || file.extension === "canvas" || wasNote) {
-					notesVersion += 1;
-				}
-			}),
-		);
-
-		return () => {
-			component.unload();
-		};
+		return allNotesCatalog.subscribe((revision) => {
+			catalogRevision = revision;
+		});
 	});
 </script>
 
@@ -176,6 +137,7 @@
 		{previewRuntime}
 		autofocus={false}
 		{uiState}
+		itemsRevision={catalogRevision}
 	/>
 </div>
 

@@ -70,12 +70,14 @@ describe("searchableItemSorting", () => {
 			createTaggedNoteItem("notes/b.md"),
 		];
 
+		const isBookmarked = vi.fn(() => false);
 		const sorted = pinBookmarkedViewItems(viewItems, {
 			filePaths: new Set(),
 			orderedFilePaths: [],
-			isBookmarked: () => false,
+			isBookmarked,
 		});
 
 		expect(sorted).toBe(viewItems);
+		expect(isBookmarked).not.toHaveBeenCalled();
 	});
 });
