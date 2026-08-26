@@ -58,10 +58,14 @@
 	min-height: 0;
 }
 
-.cosense-card-links-pre-create
-	> .cm-editor
-	> .cm-scroller
-	> .cm-sizer {
+.workspace-leaf-content[data-type="cosense-card-links-all-notes-view"] > .view-content,
+.workspace-leaf-content[data-type="cosense-card-links-view"] > .view-content,
+.workspace-leaf-content[data-type="cosense-card-links-pre-create-view"] > .view-content,
+.workspace-leaf-content[data-type="cosense-card-links-tag-notes-view"] > .view-content {
+	scrollbar-gutter: stable;
+}
+
+.cosense-card-links-pre-create > .cm-editor > .cm-scroller > .cm-sizer {
 	min-height: 0;
 }
 
