@@ -39,6 +39,11 @@ import type { RowRange } from "cards/virtualization/public";
 import { resolveVisibleRange } from "cards/virtualization/public";
 import type { ResultNavigationDirection } from "cards/navigation/resultFocus";
 import type { ProgrammaticScrollSnapshot } from "cards/virtualization/public";
+import {
+	resolvePreviewPrefetchRange,
+	resolvePreviewScrollDirection,
+	type PreviewScrollDirection,
+} from "preview/prefetch/previewPrefetchRange";
 
 /** Dependencies required to enable previews on the two-hop virtual surface. */
 export interface TwoHopPreviewDependencies {
@@ -92,6 +97,10 @@ export function useTwoHopVirtualGrid(
 	let lastCardModelRevision = props.cardModelRevision;
 	let widthWasZero = false;
 	let disposed = false;
+	let previousPreviewVisibleRange: RowRange | undefined;
+	let previewScrollDirection: PreviewScrollDirection = "stationary";
+	let previewVisibleRange: Readonly<RowRange> = EMPTY_RANGE;
+	let previewPrefetchRange: Readonly<RowRange> = EMPTY_RANGE;
 
 	const resolveConfiguredLayout = createResolvedCardLayoutSettingsMemo();
 	const configuredLayout = $derived(
@@ -121,7 +130,7 @@ export function useTwoHopVirtualGrid(
 			cachedVisibilityPolicy = {
 				bootstrapRows: 3,
 				mountedOverscanPx: rowStride * 3,
-				previewOverscanPx: rowStride,
+				previewOverscanPx: 0,
 			};
 		}
 		return cachedVisibilityPolicy;
@@ -198,36 +207,43 @@ export function useTwoHopVirtualGrid(
 	}
 
 	function collectCardDemand(
-		foregroundRange: Readonly<RowRange>,
+		visibleRange: Readonly<RowRange>,
+		prefetchRange: Readonly<RowRange>,
 		includeBackground: boolean,
 	): TwoHopCardDemand {
 		const foreground: TwoHopCardHydrationCell[] = [];
+		const prefetch: TwoHopCardHydrationCell[] = [];
 		const background: TwoHopCardHydrationCell[] = [];
 		for (const row of getMountedRows()) {
 			for (const mountedCell of row.bindings) {
 				if (!mountedCell) continue;
 				if (mountedCell.cell.kind !== "item") continue;
 				if (
-					mountedCell.rowIndex >= foregroundRange.start &&
-					mountedCell.rowIndex < foregroundRange.end
+					mountedCell.rowIndex >= visibleRange.start &&
+					mountedCell.rowIndex < visibleRange.end
 				) {
 					foreground.push(mountedCell.cell);
+				} else if (
+					mountedCell.rowIndex >= prefetchRange.start &&
+					mountedCell.rowIndex < prefetchRange.end
+				) {
+					prefetch.push(mountedCell.cell);
 				} else if (includeBackground) {
 					background.push(mountedCell.cell);
 				}
 			}
 		}
+		foreground.push(...prefetch);
 		return { foreground, background };
 	}
 
 	function publishPreviewSnapshot(): void {
 		if (disposed) return;
-		const snapshot = virtualList.getSnapshot();
 		const active = isPreviewSurfaceActive();
-		const range = snapshot?.ranges.previewVisible ?? EMPTY_RANGE;
 		previewSurface.publish({
 			bindings: buildPreviewBindings(),
-			activeRange: range,
+			visibleRange: previewVisibleRange,
+			prefetchRange: previewPrefetchRange,
 			active,
 		});
 	}
@@ -235,8 +251,24 @@ export function useTwoHopVirtualGrid(
 	function applyRangeEffects(): void {
 		if (disposed) return;
 		const snapshot = virtualList.getSnapshot();
-		const foreground = snapshot?.ranges.previewVisible ?? EMPTY_RANGE;
-		cardHydrator.setDemand(collectCardDemand(foreground, isPreviewSurfaceActive()));
+		previewVisibleRange = snapshot?.ranges.previewVisible ?? EMPTY_RANGE;
+		previewScrollDirection = resolvePreviewScrollDirection(
+			previousPreviewVisibleRange,
+			previewVisibleRange,
+			previewScrollDirection,
+		);
+		previousPreviewVisibleRange = previewVisibleRange;
+		const active = isPreviewSurfaceActive();
+		previewPrefetchRange = active
+			? resolvePreviewPrefetchRange(
+					previewVisibleRange,
+					rowModel.rowCount,
+					previewScrollDirection,
+				)
+			: previewVisibleRange;
+		cardHydrator.setDemand(
+			collectCardDemand(previewVisibleRange, previewPrefetchRange, active),
+		);
 		publishPreviewSnapshot();
 	}
 

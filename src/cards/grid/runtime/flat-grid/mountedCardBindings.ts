@@ -2,7 +2,6 @@ import type { CardPreviewRequest } from "preview/pipeline/cardPreviewRequest";
 import type { VirtualPreviewBinding } from "preview/scheduling/virtualPreviewSurface";
 import type { MountedFlatGridCell, MountedFlatGridRow } from "./mountedCells";
 import type { FlatGridLogicalCell } from "./logicalCell";
-import type { RowRange } from "cards/virtualization/public";
 import type { ItemInteractionDescriptor } from "cards/interactions/interactionTypes";
 import type { VirtualCardInteractionBinding } from "cards/interactions/virtualCardInteractionController";
 
@@ -14,12 +13,10 @@ export type CardGridMountedItemCell<T> = MountedFlatGridCell<T> & {
 export interface CardGridBindings {
 	readonly previewBindings: VirtualPreviewBinding[];
 	readonly interactionBindings: VirtualCardInteractionBinding[];
-	readonly previewRange: RowRange;
 }
 
 export interface BuildCardGridBindingsParams<T> {
 	rows: readonly MountedFlatGridRow<T>[];
-	previewRange: RowRange;
 	resolvePreviewRequest?(item: T, index: number): CardPreviewRequest | null;
 	resolveInteractionDescriptor?(
 		item: T,
@@ -36,7 +33,6 @@ export function isCardGridMountedItemCell<T>(
 /** Resolves immutable preview and interaction bindings from mounted card rows. */
 export function buildCardGridBindings<T>({
 	rows,
-	previewRange,
 	resolvePreviewRequest,
 	resolveInteractionDescriptor,
 }: BuildCardGridBindingsParams<T>): CardGridBindings {
@@ -69,6 +65,5 @@ export function buildCardGridBindings<T>({
 	return {
 		previewBindings,
 		interactionBindings,
-		previewRange,
 	};
 }

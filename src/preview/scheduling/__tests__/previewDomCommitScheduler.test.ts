@@ -263,7 +263,7 @@ describe("preview DOM commit scheduler", () => {
 
 		markScrollActivityIdle(scrollSource);
 		await flushAnimationFrame();
-		expect(committed.length).toBe(scrollingCommitCount + 4);
+		expect(committed.length).toBe(scrollingCommitCount + 8);
 		expect(vi.mocked(requestAnimationFrame).mock.calls.length).toBeGreaterThan(
 			scrollingFrameCount,
 		);
@@ -430,10 +430,10 @@ describe("preview DOM commit scheduler", () => {
 		expect(isInputPending).not.toHaveBeenCalled();
 	});
 
-	it("allows an idle burst of four commits", async () => {
+	it("allows an idle burst of eight commits", async () => {
 		const committed: string[] = [];
 
-		const commits = ["a", "b", "c", "d", "e"].map((key) =>
+		const commits = ["a", "b", "c", "d", "e", "f", "g", "h", "i"].map((key) =>
 			enqueueTestCommit({
 				targetKey: key,
 				onCommit: () => committed.push(key),
@@ -441,11 +441,15 @@ describe("preview DOM commit scheduler", () => {
 		);
 
 		await flushAnimationFrame();
-		expect(committed).toEqual(["a", "b", "c", "d"]);
+		expect(committed).toEqual(["a", "b", "c", "d", "e", "f", "g", "h"]);
 
 		await flushAnimationFrame();
-		expect(committed).toEqual(["a", "b", "c", "d", "e"]);
+		expect(committed).toEqual(["a", "b", "c", "d", "e", "f", "g", "h", "i"]);
 		await expect(Promise.all(commits)).resolves.toEqual([
+			true,
+			true,
+			true,
+			true,
 			true,
 			true,
 			true,
@@ -534,11 +538,11 @@ describe("preview DOM commit scheduler", () => {
 			scrolling: false,
 		});
 
-		expect(Math.abs(commitsAt60Hz - commitsAt120Hz)).toBeLessThanOrEqual(4);
-		expect(commitsAt60Hz).toBeGreaterThanOrEqual(236);
-		expect(commitsAt60Hz).toBeLessThanOrEqual(252);
-		expect(commitsAt120Hz).toBeGreaterThanOrEqual(236);
-		expect(commitsAt120Hz).toBeLessThanOrEqual(252);
+		expect(Math.abs(commitsAt60Hz - commitsAt120Hz)).toBeLessThanOrEqual(8);
+		expect(commitsAt60Hz).toBeGreaterThanOrEqual(476);
+		expect(commitsAt60Hz).toBeLessThanOrEqual(508);
+		expect(commitsAt120Hz).toBeGreaterThanOrEqual(476);
+		expect(commitsAt120Hz).toBeLessThanOrEqual(508);
 	});
 
 	it("does not burst after a long scrolling frame gap", async () => {

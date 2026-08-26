@@ -43,33 +43,13 @@ describe("PreviewService queue behavior", () => {
 		);
 	}
 
-	function expectQueue(
-		service: DisposablePreviewService,
-		queued: number,
-		active: number,
-	): void {
-		let current = { queued: -1, active: -1 };
-		const unsubscribe = service.subscribeVisiblePreviewQueue((snapshot) => {
-			current = snapshot;
-		});
-		unsubscribe();
-		expect(current).toEqual({ queued, active });
-		expect(service.getOutstandingVisiblePreviewCount()).toBe(queued + active);
-	}
-
 	beforeEach(() => {
 		vault = createMockVault();
 		metadataCache = createMockMetadataCache();
 		vi.clearAllMocks();
 	});
 
-	test("queue metrics start at zero", () => {
-		const service = createService();
-
-		expectQueue(service, 0, 0);
-	});
-
-	test("queue metrics report active and queued visible previews", async () => {
+	test("runs preview generation serially", async () => {
 		const deferredByPath = new Map<
 			string,
 			ReturnType<typeof createDeferred<PreviewData>>
@@ -86,7 +66,7 @@ describe("PreviewService queue behavior", () => {
 		const firstPromise = service.getPreview(firstFile);
 		const secondPromise = service.getPreview(secondFile);
 
-		expectQueue(service, 1, 1);
+		expect(resolvePreview).toHaveBeenCalledTimes(1);
 
 		deferredByPath.get(firstFile.path)?.resolve({
 			type: "text",
@@ -98,7 +78,7 @@ describe("PreviewService queue behavior", () => {
 		});
 		await Promise.resolve();
 
-		expectQueue(service, 0, 1);
+		expect(resolvePreview).toHaveBeenCalledTimes(2);
 
 		deferredByPath.get(secondFile.path)?.resolve({
 			type: "text",
@@ -109,11 +89,9 @@ describe("PreviewService queue behavior", () => {
 			content: "second",
 		});
 		await Promise.resolve();
-
-		expectQueue(service, 0, 0);
 	});
 
-	test("queue metrics update when a queued visible preview is aborted", async () => {
+	test("removes an aborted preview before it starts", async () => {
 		const firstDeferred = createDeferred<PreviewData>();
 		const resolvePreview = vi.fn<PreviewResolver>(() => firstDeferred.promise);
 		const service = createService(resolvePreview);
@@ -124,12 +102,9 @@ describe("PreviewService queue behavior", () => {
 		const firstPromise = service.getPreview(firstFile);
 		const secondPromise = service.getPreview(secondFile, secondController.signal);
 
-		expectQueue(service, 1, 1);
-
 		secondController.abort();
 		await expect(secondPromise).rejects.toMatchObject({ name: "AbortError" });
-
-		expectQueue(service, 0, 1);
+		expect(resolvePreview).toHaveBeenCalledTimes(1);
 
 		firstDeferred.resolve({ type: "text", content: "first" });
 		await expect(firstPromise).resolves.toEqual({
@@ -137,26 +112,30 @@ describe("PreviewService queue behavior", () => {
 			content: "first",
 		});
 		await Promise.resolve();
-
-		expectQueue(service, 0, 0);
 	});
 
-	test("dispose resets queue metrics", () => {
+	test("dispose aborts active and queued generation", async () => {
 		const resolvePreview = vi.fn<PreviewResolver>(
-			() => new Promise<PreviewData>(() => {}),
+			(_file, _context, signal) =>
+				new Promise<PreviewData>((_resolve, reject) => {
+					signal?.addEventListener(
+						"abort",
+						() => reject(new DOMException("Aborted", "AbortError")),
+						{ once: true },
+					);
+				}),
 		);
 		const service = createService(resolvePreview);
 		const firstFile = createMockTFileAsPlainObject("first.md");
 		const secondFile = createMockTFileAsPlainObject("second.md");
 
-		void service.getPreview(firstFile).catch(() => {});
-		void service.getPreview(secondFile).catch(() => {});
-
-		expectQueue(service, 1, 1);
+		const first = service.getPreview(firstFile);
+		const second = service.getPreview(secondFile);
 
 		service.dispose();
 
-		expectQueue(service, 0, 0);
+		await expect(first).rejects.toMatchObject({ name: "AbortError" });
+		await expect(second).rejects.toMatchObject({ name: "AbortError" });
 	});
 
 	test("already aborted preview is not executed", async () => {
@@ -227,46 +206,5 @@ describe("PreviewService queue behavior", () => {
 		service.dispose();
 
 		await expect(request).rejects.toMatchObject({ name: "AbortError" });
-	});
-
-	test("queue subscribers receive capacity changes", async () => {
-		const deferredByPath = new Map<
-			string,
-			ReturnType<typeof createDeferred<PreviewData>>
-		>();
-		const resolvePreview = vi.fn<PreviewResolver>((file) => {
-			const deferred = createDeferred<PreviewData>();
-			deferredByPath.set(file.path, deferred);
-			return deferred.promise;
-		});
-		const service = createService(resolvePreview);
-		const snapshots: Array<{ queued: number; active: number }> = [];
-		const unsubscribe = service.subscribeVisiblePreviewQueue((snapshot) => {
-			snapshots.push(snapshot);
-		});
-		const firstFile = createMockTFileAsPlainObject("first.md");
-		const secondFile = createMockTFileAsPlainObject("second.md");
-
-		const firstPromise = service.getPreview(firstFile);
-		const secondPromise = service.getPreview(secondFile);
-		expect(snapshots).toContainEqual({ queued: 1, active: 1 });
-
-		deferredByPath.get(firstFile.path)?.resolve({
-			type: "text",
-			content: "first",
-		});
-		await firstPromise;
-		await Promise.resolve();
-		expect(snapshots).toContainEqual({ queued: 0, active: 1 });
-
-		deferredByPath.get(secondFile.path)?.resolve({
-			type: "text",
-			content: "second",
-		});
-		await secondPromise;
-		await Promise.resolve();
-		expect(snapshots.at(-1)).toEqual({ queued: 0, active: 0 });
-
-		unsubscribe();
 	});
 });

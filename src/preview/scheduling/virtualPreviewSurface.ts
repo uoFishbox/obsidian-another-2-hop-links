@@ -1,14 +1,9 @@
-import {
-	type PreviewActivationHandle,
-	type PreviewActivationScheduler,
-	type PreviewActivationScope,
-} from "./previewActivationScheduler";
-import type { CardPreviewRenderer } from "preview/ui/cardPreviewRenderer";
 import type { CardPreviewRequest } from "preview/pipeline/cardPreviewRequest";
 import {
 	createPreviewSlotController,
 	type PreviewSlotController,
 } from "preview/ui/previewSlotController";
+import type { CardPreviewRenderer } from "preview/ui/cardPreviewRenderer";
 import type { VirtualFrameCoordinator } from "shared/ui/scheduling/frameCoordinator";
 
 export interface PreviewHostLease {
@@ -27,29 +22,27 @@ export interface VirtualPreviewRange {
 	readonly end: number;
 }
 
-/** Complete preview state for the currently mounted/overscan virtual window. */
+/** Complete preview state for the currently mounted virtual window. */
 export interface VirtualPreviewSurfaceSnapshot {
 	readonly bindings: readonly VirtualPreviewBinding[];
-	readonly activeRange: VirtualPreviewRange;
-	/** Strict viewport rows that should activate before overscan rows. */
-	readonly priorityRange?: VirtualPreviewRange;
+	readonly visibleRange: VirtualPreviewRange;
+	readonly prefetchRange: VirtualPreviewRange;
 	readonly active: boolean;
 }
 
 export interface VirtualPreviewSurface {
 	registerHost(key: string, element: HTMLElement): PreviewHostLease;
-	/**
-	 * Publishes the complete preview state for the currently managed virtual
-	 * window. Callers should pass mounted/overscan cards, not the full result set.
-	 */
 	publish(snapshot: VirtualPreviewSurfaceSnapshot): void;
 	dispose(): void;
 }
 
 export interface CreateVirtualPreviewSurfaceOptions {
 	readonly frameCoordinator: VirtualFrameCoordinator;
-	readonly activationScheduler: PreviewActivationScheduler;
 	readonly createRenderer: () => CardPreviewRenderer;
+	readonly prefetchPreview: (
+		request: CardPreviewRequest,
+		signal: AbortSignal,
+	) => Promise<void>;
 	/** Optional lifecycle probe invoked after an unbound preview entry is released. */
 	readonly onEntryDisposed?: (key: string) => void;
 }
@@ -65,6 +58,12 @@ interface PreviewEntryRuntime {
 	lastSeenSnapshotGeneration: number;
 }
 
+interface PreviewPrefetchRuntime {
+	readonly renderKey: string;
+	readonly controller: AbortController;
+	lastSeenSnapshotGeneration: number;
+}
+
 const PREVIEW_SURFACE_FLUSH_KEY = "virtual-preview-surface:flush";
 const DISABLED_PREVIEW_HOST_LEASE: PreviewHostLease = { dispose: () => {} };
 
@@ -75,28 +74,17 @@ function isBindingInRange(
 	return binding.rowIndex >= range.start && binding.rowIndex < range.end;
 }
 
-/**
- * Reconciles logical card previews with virtualized hosts.
- *
- * Preview identity is the logical card key, not a physical render slot. Moving a
- * card because another row/cell disappeared therefore updates only its host and
- * row position; an unchanged renderKey never restarts rendering.
- */
+/** Reconciles visible render lifecycles separately from cancellable data prefetch. */
 export function createVirtualPreviewSurface(
 	options: CreateVirtualPreviewSurfaceOptions,
 ): VirtualPreviewSurface {
 	const entriesByKey = new Map<string, PreviewEntryRuntime>();
 	const hostsByKey = new Map<string, Set<PreviewHostRegistration>>();
-	const pendingByKey = new Map<string, PreviewActivationHandle>();
-	const activationOrderScratch: VirtualPreviewBinding[] = [];
-	const activationScheduler = options.activationScheduler;
-	const scope: PreviewActivationScope = activationScheduler.createScope({
-		frameCoordinator: options.frameCoordinator,
-	});
+	const prefetchesByKey = new Map<string, PreviewPrefetchRuntime>();
+	const visibleBindingsScratch: VirtualPreviewBinding[] = [];
+	const prefetchBindingsScratch: VirtualPreviewBinding[] = [];
 	let latestSnapshot: VirtualPreviewSurfaceSnapshot | undefined;
-	let lastAppliedActiveStart: number | undefined;
 	let appliedSnapshotGeneration = 0;
-	let lastAppliedActive = false;
 	let disposed = false;
 
 	function getOrCreateEntry(key: string): PreviewEntryRuntime {
@@ -116,50 +104,7 @@ export function createVirtualPreviewSurface(
 		return entry;
 	}
 
-	function scheduleFlush(): void {
-		options.frameCoordinator.schedule(
-			"post-paint",
-			PREVIEW_SURFACE_FLUSH_KEY,
-			applyLatestSnapshot,
-		);
-	}
-
-	function activateQueuedEntry(key: string): void {
-		if (disposed) return;
-		pendingByKey.delete(key);
-		entriesByKey.get(key)?.controller.activate();
-	}
-
-	function enqueueActivation(key: string): void {
-		if (pendingByKey.has(key)) return;
-		const handle = scope.request(key, () => {
-			activateQueuedEntry(key);
-		});
-		pendingByKey.set(key, handle);
-	}
-
-	function cancelPendingActivation(key: string): void {
-		const handle = pendingByKey.get(key);
-		if (!handle) return;
-		handle.cancel();
-		pendingByKey.delete(key);
-	}
-
-	function cancelAllPendingActivations(): void {
-		for (const handle of pendingByKey.values()) handle.cancel();
-		pendingByKey.clear();
-	}
-
-	function reconcileActivation(entry: PreviewEntryRuntime): void {
-		if (entry.controller.needsActivation()) {
-			enqueueActivation(entry.key);
-			return;
-		}
-		cancelPendingActivation(entry.key);
-	}
-
 	function disposeEntry(entry: PreviewEntryRuntime): void {
-		cancelPendingActivation(entry.key);
 		for (const registration of hostsByKey.get(entry.key) ?? []) {
 			registration.controllerLease?.dispose();
 			registration.controllerLease = undefined;
@@ -169,64 +114,86 @@ export function createVirtualPreviewSurface(
 		options.onEntryDisposed?.(entry.key);
 	}
 
+	function cancelPrefetch(key: string): void {
+		const prefetch = prefetchesByKey.get(key);
+		if (!prefetch) return;
+		prefetchesByKey.delete(key);
+		prefetch.controller.abort();
+	}
+
+	function startPrefetch(binding: VirtualPreviewBinding): void {
+		if (binding.request.previewOverride) return;
+		const existing = prefetchesByKey.get(binding.key);
+		if (existing?.renderKey === binding.request.renderKey) return;
+		if (existing) cancelPrefetch(binding.key);
+
+		const controller = new AbortController();
+		prefetchesByKey.set(binding.key, {
+			renderKey: binding.request.renderKey,
+			controller,
+			lastSeenSnapshotGeneration: appliedSnapshotGeneration,
+		});
+		void options
+			.prefetchPreview(binding.request, controller.signal)
+			.catch(() => {});
+	}
+
 	function applyLatestSnapshot(): void {
 		if (disposed || !latestSnapshot) return;
 		const snapshot = latestSnapshot;
-		appliedSnapshotGeneration += 1;
-		const snapshotGeneration = appliedSnapshotGeneration;
-		const movedBackward =
-			snapshot.active &&
-			lastAppliedActive &&
-			lastAppliedActiveStart !== undefined &&
-			snapshot.activeRange.start < lastAppliedActiveStart;
+		const snapshotGeneration = ++appliedSnapshotGeneration;
 
-		// The activation scheduler is FIFO. Strictly visible rows must enter that
-		// queue before overscan rows; otherwise a restored deep scroll position can
-		// spend several serial preview renders on cards above the viewport. When the
-		// preview window moves backward, keep the existing bottom-to-top direction.
-		if (movedBackward) cancelAllPendingActivations();
-		let bindingsInActivationOrder = snapshot.bindings;
-		const priorityRange = snapshot.priorityRange;
-		const hasPriorityRange =
-			priorityRange !== undefined && priorityRange.start < priorityRange.end;
-		if (movedBackward || hasPriorityRange) {
-			for (const binding of snapshot.bindings) {
-				activationOrderScratch.push(binding);
+		for (const binding of snapshot.bindings) {
+			const visible =
+				snapshot.active && isBindingInRange(binding, snapshot.visibleRange);
+			const shouldPrefetch =
+				snapshot.active &&
+				!visible &&
+				isBindingInRange(binding, snapshot.prefetchRange);
+			if (visible) visibleBindingsScratch.push(binding);
+			if (shouldPrefetch) prefetchBindingsScratch.push(binding);
+
+			const existingPrefetch = prefetchesByKey.get(binding.key);
+			if (!existingPrefetch) continue;
+			if (existingPrefetch.renderKey !== binding.request.renderKey) {
+				cancelPrefetch(binding.key);
+				continue;
 			}
-			activationOrderScratch.sort((left, right) => {
-				if (hasPriorityRange && priorityRange) {
-					const leftPriority = isBindingInRange(left, priorityRange);
-					const rightPriority = isBindingInRange(right, priorityRange);
-					if (leftPriority !== rightPriority) return leftPriority ? -1 : 1;
-				}
-				return movedBackward
-					? right.rowIndex - left.rowIndex
-					: left.rowIndex - right.rowIndex;
-			});
-			bindingsInActivationOrder = activationOrderScratch;
+			if (visible || shouldPrefetch) {
+				existingPrefetch.lastSeenSnapshotGeneration = snapshotGeneration;
+			}
 		}
 
-		for (const binding of bindingsInActivationOrder) {
-			const entry = getOrCreateEntry(binding.key);
+		for (const [key, prefetch] of prefetchesByKey) {
+			if (prefetch.lastSeenSnapshotGeneration !== snapshotGeneration) {
+				cancelPrefetch(key);
+			}
+		}
+
+		for (const binding of snapshot.bindings) {
+			const visible =
+				snapshot.active && isBindingInRange(binding, snapshot.visibleRange);
+			let entry = entriesByKey.get(binding.key);
+			if (visible) entry ??= getOrCreateEntry(binding.key);
+			if (!entry) continue;
 			entry.lastSeenSnapshotGeneration = snapshotGeneration;
 			entry.controller.bind(binding.request);
-			entry.controller.setActive(
-				snapshot.active &&
-					binding.rowIndex >= snapshot.activeRange.start &&
-					binding.rowIndex < snapshot.activeRange.end,
-			);
-			reconcileActivation(entry);
+			entry.controller.setActive(visible);
+			if (visible) entry.controller.activate();
 		}
-		activationOrderScratch.length = 0;
+
+		// Visible renderers synchronously join matching shared requests before the
+		// prefetch caller is detached, so promotion never aborts useful work.
+		for (const binding of visibleBindingsScratch) cancelPrefetch(binding.key);
+		for (const binding of prefetchBindingsScratch) startPrefetch(binding);
+		visibleBindingsScratch.length = 0;
+		prefetchBindingsScratch.length = 0;
 
 		for (const entry of entriesByKey.values()) {
 			if (entry.lastSeenSnapshotGeneration !== snapshotGeneration) {
 				disposeEntry(entry);
 			}
 		}
-
-		lastAppliedActiveStart = snapshot.activeRange.start;
-		lastAppliedActive = snapshot.active;
 	}
 
 	function registerHost(key: string, element: HTMLElement): PreviewHostLease {
@@ -241,7 +208,7 @@ export function createVirtualPreviewSurface(
 		const entry = entriesByKey.get(key);
 		if (entry) {
 			registration.controllerLease = entry.controller.attachHost(element);
-			reconcileActivation(entry);
+			entry.controller.activate();
 		}
 		let disposedLease = false;
 		return {
@@ -252,8 +219,6 @@ export function createVirtualPreviewSurface(
 				registration.controllerLease = undefined;
 				registrations?.delete(registration);
 				if (registrations?.size === 0) hostsByKey.delete(key);
-				const activeEntry = entriesByKey.get(key);
-				if (activeEntry) reconcileActivation(activeEntry);
 			},
 		};
 	}
@@ -261,7 +226,11 @@ export function createVirtualPreviewSurface(
 	function publish(snapshot: VirtualPreviewSurfaceSnapshot): void {
 		if (disposed) return;
 		latestSnapshot = snapshot;
-		scheduleFlush();
+		options.frameCoordinator.schedule(
+			"post-paint",
+			PREVIEW_SURFACE_FLUSH_KEY,
+			applyLatestSnapshot,
+		);
 	}
 
 	function dispose(): void {
@@ -269,9 +238,9 @@ export function createVirtualPreviewSurface(
 		disposed = true;
 		latestSnapshot = undefined;
 		options.frameCoordinator.cancel("post-paint", PREVIEW_SURFACE_FLUSH_KEY);
-		for (const handle of pendingByKey.values()) handle.cancel();
-		pendingByKey.clear();
-		activationOrderScratch.length = 0;
+		for (const key of prefetchesByKey.keys()) cancelPrefetch(key);
+		visibleBindingsScratch.length = 0;
+		prefetchBindingsScratch.length = 0;
 		for (const registrations of hostsByKey.values()) {
 			for (const registration of registrations) {
 				registration.controllerLease?.dispose();
@@ -280,7 +249,6 @@ export function createVirtualPreviewSurface(
 		hostsByKey.clear();
 		for (const entry of entriesByKey.values()) entry.controller.dispose();
 		entriesByKey.clear();
-		scope.dispose();
 	}
 
 	return { registerHost, publish, dispose };

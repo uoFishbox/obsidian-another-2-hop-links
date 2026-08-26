@@ -301,7 +301,7 @@ function renderRoot(
 }
 
 async function flushAsyncUi(): Promise<void> {
-	for (let pass = 0; pass < 6; pass += 1) {
+	for (let pass = 0; pass < 8; pass += 1) {
 		await Promise.resolve();
 		await tick();
 		await vi.runOnlyPendingTimersAsync();

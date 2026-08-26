@@ -46,6 +46,11 @@ import {
 	isCardGridMountedItemCell,
 } from "./mountedCardBindings";
 import type { FlatListScrollState } from "cards/list/model/listViewUiState";
+import {
+	resolvePreviewPrefetchRange,
+	resolvePreviewScrollDirection,
+	type PreviewScrollDirection,
+} from "preview/prefetch/previewPrefetchRange";
 
 /** Props passed to flat virtual list item render snippets. */
 export interface FlatCardGridItemRenderArgs<T> {
@@ -112,11 +117,11 @@ export function createCardGridVisibilityPolicy(
 	layout: Pick<FlatGridLayout, "rowHeight" | "gap">,
 ): VirtualVisibilityPolicy {
 	const rowOverscanPx = Math.max(0, layout.rowHeight + layout.gap);
-	const previewOverscanPx = rowOverscanPx * CARD_GRID_PREVIEW_ACTIVATION_AHEAD_ROWS;
+	const mountedOverscanPx = rowOverscanPx * CARD_GRID_PREVIEW_ACTIVATION_AHEAD_ROWS;
 	return {
 		bootstrapRows: CARD_GRID_BOOTSTRAP_VISIBLE_ROWS,
-		mountedOverscanPx: Math.max(rowOverscanPx, previewOverscanPx),
-		previewOverscanPx,
+		mountedOverscanPx,
+		previewOverscanPx: 0,
 	};
 }
 
@@ -222,8 +227,8 @@ export function useFlatCardGrid<T>(
 	let loadScheduled = $state(false);
 	let chainedInfiniteScrollLoads = $state(0);
 	let layout = $state.raw(DEFAULT_FLAT_GRID_LAYOUT);
-	let previewPriorityRange: RowRange | undefined;
-	const previewPriorityRangeScratch = { start: 0, end: 0 };
+	let previousPreviewVisibleRange: RowRange | undefined;
+	let previewScrollDirection: PreviewScrollDirection = "stationary";
 	const resolveConfiguredCardLayout = createResolvedCardLayoutSettingsMemo();
 	const configuredCardLayout = $derived.by(() =>
 		resolveConfiguredCardLayout(applicationStore?.settings),
@@ -272,48 +277,31 @@ export function useFlatCardGrid<T>(
 	const rowModel = $derived(resolveFlatGridRowModel(layout));
 	const syncCardSlots = (
 		rows: readonly MountedFlatGridRow<T>[],
-		previewRange: RowRange,
-		includeInteractions = true,
+		visibleRange: RowRange,
 	): void => {
+		previewScrollDirection = resolvePreviewScrollDirection(
+			previousPreviewVisibleRange,
+			visibleRange,
+			previewScrollDirection,
+		);
+		previousPreviewVisibleRange = visibleRange;
+		const prefetchRange = resolvePreviewPrefetchRange(
+			visibleRange,
+			rowModel.rowCount,
+			previewScrollDirection,
+		);
 		const bindings = buildCardGridBindings({
 			rows,
-			previewRange,
 			resolvePreviewRequest: props.resolveItemPreviewRequest,
-			resolveInteractionDescriptor: includeInteractions
-				? props.resolveItemInteractionDescriptor
-				: undefined,
+			resolveInteractionDescriptor: props.resolveItemInteractionDescriptor,
 		});
 		previewSurface.publish({
 			bindings: bindings.previewBindings,
-			activeRange: bindings.previewRange,
-			priorityRange: previewPriorityRange,
+			visibleRange,
+			prefetchRange,
 			active: true,
 		});
-		if (includeInteractions) {
-			interactionController.syncCards(bindings.interactionBindings);
-		}
-	};
-
-	const updatePreviewPriorityRange = (
-		context: VirtualListStableMeasurementContext,
-	): boolean => {
-		rowModel.findVisibleRangeInto(previewPriorityRangeScratch, {
-			scrollTop: context.scrollTop - context.sectionTop,
-			viewportHeight: context.viewportHeight,
-			overscanPx: 0,
-		});
-		if (
-			previewPriorityRange?.start === previewPriorityRangeScratch.start &&
-			previewPriorityRange.end === previewPriorityRangeScratch.end
-		) {
-			return false;
-		}
-
-		previewPriorityRange = {
-			start: previewPriorityRangeScratch.start,
-			end: previewPriorityRangeScratch.end,
-		};
-		return true;
+		interactionController.syncCards(bindings.interactionBindings);
 	};
 	const virtualList = useVirtualizer<
 		FlatGridLogicalCell<T>,
@@ -553,17 +541,6 @@ export function useFlatCardGrid<T>(
 	function handleStableMeasurement(
 		context: VirtualListStableMeasurementContext,
 	): void {
-		if (updatePreviewPriorityRange(context)) {
-			const snapshot = virtualList.getSnapshot();
-			if (snapshot) {
-				syncCardSlots(
-					snapshot.mountedBuild?.rowsInMountedRange ?? EMPTY_MOUNTED_ROWS,
-					snapshot.ranges.previewVisible,
-					false,
-				);
-			}
-		}
-
 		if (restorePendingScrollPosition(context)) {
 			return;
 		}

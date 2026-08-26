@@ -5,11 +5,11 @@ import {
 } from "../../runtime/flat-grid/useFlatCardGrid.svelte";
 
 describe("card virtual list policy", () => {
-	it("uses one preview and mounted overscan row by default", () => {
+	it("mounts two prefetch rows while keeping render overscan at zero", () => {
 		expect(createCardGridVisibilityPolicy({ rowHeight: 120, gap: 12 })).toEqual({
 			bootstrapRows: 3,
-			mountedOverscanPx: 132,
-			previewOverscanPx: 132,
+			mountedOverscanPx: 264,
+			previewOverscanPx: 0,
 		});
 	});
 

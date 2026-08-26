@@ -1,7 +1,6 @@
 import type { TFile } from "obsidian";
 import type { PreviewData, PreviewRequestOptions } from "../types";
 import type { PreviewContext } from "./previewContext";
-import type { PreviewQueueListener } from "./previewQueue";
 import {
 	buildPreviewGenerationKey,
 	createPreviewGenerationCache,
@@ -30,23 +29,12 @@ export type PreviewResolver = (
 	signal?: AbortSignal,
 ) => Promise<PreviewData>;
 
-export interface PreviewQueueMetrics {
-	readonly queued: number;
-	readonly active: number;
-}
-
 export interface IPreviewService {
 	getPreview(
 		file: TFile,
 		signal?: AbortSignal,
 		options?: PreviewRequestOptions,
 	): Promise<PreviewData>;
-	getVisibleQueueSize(): number;
-	getActiveVisiblePreviewCount(): number;
-	getOutstandingVisiblePreviewCount(): number;
-	subscribeVisiblePreviewQueue(
-		listener: (metrics: PreviewQueueMetrics) => void,
-	): () => void;
 }
 
 type InFlightRequest = SharedAbortableRequest<PreviewData> & {
@@ -161,11 +149,6 @@ export function createPreviewService(
 
 	return {
 		getPreview,
-		getVisibleQueueSize: () => queue.getQueuedCount(),
-		getActiveVisiblePreviewCount: () => queue.getActiveCount(),
-		getOutstandingVisiblePreviewCount: () => queue.getOutstandingCount(),
-		subscribeVisiblePreviewQueue: (listener: PreviewQueueListener) =>
-			queue.subscribe(listener),
 		clearCache: () => cache.clear(),
 		dispose,
 	};

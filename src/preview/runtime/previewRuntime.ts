@@ -1,11 +1,6 @@
 import type { App } from "obsidian";
 import { resolveWorkspaceWindow } from "obsidian-integration/workspace/workspaceDocuments";
 import {
-	createPreviewActivationScheduler,
-	type PreviewBackpressureChangeListener,
-	type PreviewActivationScheduler,
-} from "preview/scheduling/previewActivationScheduler";
-import {
 	createPreviewDomCommitScheduler,
 	type PreviewDomCommitScheduler,
 } from "preview/scheduling/previewDomCommitScheduler";
@@ -26,11 +21,6 @@ import { createPreviewRenderQueue } from "preview/renderers/previewRenderQueue";
 export interface PreviewRuntimeOptions {
 	readonly app: App;
 	readonly getPreview: CardPreviewLoader;
-	readonly getOutstandingPreviewJobCount?: () => number;
-	readonly subscribeBackpressure?: (
-		listener: PreviewBackpressureChangeListener,
-	) => () => void;
-	readonly getActivationsPerSecond?: () => number;
 	readonly getDomCommitsPerSecond?: () => number;
 }
 
@@ -59,13 +49,6 @@ export function createPreviewRuntime(options: PreviewRuntimeOptions): PreviewRun
 	// receiving input so popout work does not fall back to a throttled main realm.
 	const resolveSchedulingWindow = (): Window | null =>
 		resolveWorkspaceWindow(options.app.workspace);
-	const activationScheduler: PreviewActivationScheduler =
-		createPreviewActivationScheduler({
-			getOutstandingPreviewJobCount: options.getOutstandingPreviewJobCount,
-			subscribeBackpressure: options.subscribeBackpressure,
-			getActivationsPerSecond: options.getActivationsPerSecond,
-			getWindow: resolveSchedulingWindow,
-		});
 	const domCommitScheduler: PreviewDomCommitScheduler =
 		createPreviewDomCommitScheduler(resolveSchedulingWindow);
 	const previewRenderQueue = createPreviewRenderQueue({
@@ -88,7 +71,12 @@ export function createPreviewRuntime(options: PreviewRuntimeOptions): PreviewRun
 		});
 		const surface = createVirtualPreviewSurface({
 			frameCoordinator: surfaceOptions.frameCoordinator,
-			activationScheduler,
+			prefetchPreview: async (request, signal) => {
+				if (request.previewOverride) return;
+				await options.getPreview(request.file, signal, {
+					cacheRevision: request.previewCacheRevision,
+				});
+			},
 			createRenderer: () =>
 				createCardPreviewRenderer({
 					app: options.app,
@@ -122,7 +110,6 @@ export function createPreviewRuntime(options: PreviewRuntimeOptions): PreviewRun
 		sharedCache.clear();
 		// These schedulers are shared by renderers created by this runtime. Their
 		// lifetime must end with the plugin, not with an individual idle queue.
-		activationScheduler.dispose();
 		domCommitScheduler.dispose();
 	}
 

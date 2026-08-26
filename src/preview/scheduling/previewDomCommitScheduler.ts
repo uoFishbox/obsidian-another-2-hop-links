@@ -35,10 +35,10 @@ interface PreviewDomCommitPolicy {
 
 const IDLE_POLICY: PreviewDomCommitPolicy = {
 	mode: "idle",
-	ratePerSecond: 240,
-	creditCapacity: 4,
-	maxTasksPerDrain: 4,
-	maxDrainCpuMs: 2,
+	ratePerSecond: 480,
+	creditCapacity: 8,
+	maxTasksPerDrain: 8,
+	maxDrainCpuMs: 3,
 };
 const SCROLLING_POLICY: PreviewDomCommitPolicy = {
 	mode: "scrolling",

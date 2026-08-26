@@ -60,10 +60,7 @@ import type { PluginHost } from "obsidian-integration/pluginHost";
 import type { ViewServices } from "obsidian-integration/views/viewServices";
 import { areTagFeaturesEnabled, type PluginSettings } from "settings/model";
 import { getLazyLoadManager } from "obsidian-integration/observers/IntersectionObserverRegistry";
-import {
-	DEFAULT_PREVIEW_ACTIVATIONS_PER_SECOND,
-	DEFAULT_PREVIEW_DOM_COMMITS_PER_SECOND,
-} from "preview/scheduling/previewSchedulingConfig";
+import { DEFAULT_PREVIEW_DOM_COMMITS_PER_SECOND } from "preview/scheduling/previewSchedulingConfig";
 import { setYieldSchedulingWindowResolver } from "indexing/timeSlicing";
 
 export interface PluginRuntimeOptions {
@@ -124,13 +121,6 @@ export function createPluginRuntime(options: PluginRuntimeOptions): PluginRuntim
 	const previewRuntime = createPreviewRuntime({
 		app: options.app,
 		getPreview: previewService.getPreview,
-		getOutstandingPreviewJobCount: () =>
-			previewService.getOutstandingVisiblePreviewCount(),
-		subscribeBackpressure: (listener) =>
-			previewService.subscribeVisiblePreviewQueue(() => {
-				listener();
-			}),
-		getActivationsPerSecond: () => DEFAULT_PREVIEW_ACTIVATIONS_PER_SECOND,
 		getDomCommitsPerSecond: () => DEFAULT_PREVIEW_DOM_COMMITS_PER_SECOND,
 	});
 	options.plugin.register(() => previewService.dispose());

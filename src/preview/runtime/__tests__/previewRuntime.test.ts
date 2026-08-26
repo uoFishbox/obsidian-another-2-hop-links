@@ -51,6 +51,23 @@ describe("PreviewRuntime", () => {
 		const createRenderer = surfaceOptions?.createRenderer as () => unknown;
 		createRenderer();
 		expect(state.rendererOptions.at(-1)?.getPreview).toBe(runtimeLoader);
+		const prefetchPreview = surfaceOptions?.prefetchPreview as (
+			request: {
+				file: unknown;
+				previewCacheRevision: string;
+				previewOverride: null;
+			},
+			signal: AbortSignal,
+		) => Promise<void>;
+		const signal = new AbortController().signal;
+		const file = {};
+		void prefetchPreview(
+			{ file, previewCacheRevision: "revision", previewOverride: null },
+			signal,
+		);
+		expect(runtimeLoader).toHaveBeenCalledWith(file, signal, {
+			cacheRevision: "revision",
+		});
 		runtime.dispose();
 	});
 
@@ -143,7 +160,8 @@ describe("PreviewRuntime", () => {
 		expect(() => {
 			surface.publish({
 				bindings: [],
-				activeRange: { start: 0, end: 0 },
+				visibleRange: { start: 0, end: 0 },
+				prefetchRange: { start: 0, end: 0 },
 				active: false,
 			});
 		}).not.toThrow();

@@ -31,7 +31,6 @@ import {
 	createInitialMeasurementLifecycle,
 	createVirtualMeasurementScheduler,
 	createVirtualScrollCoverageController,
-	markVirtualScrollMeasurementRun,
 } from "./measurementLifecycle";
 import type {
 	RunVirtualScrollMeasurementOptions,
@@ -480,7 +479,6 @@ export function createVirtualMeasurementRuntime<
 			return SKIPPED_UNCHANGED_SCROLL;
 		}
 
-		markVirtualScrollMeasurementRun();
 		const applicationResult = publishMeasurement(scrollMeasurement);
 		rememberPublishedScrollMeasurement(scrollMeasurement);
 

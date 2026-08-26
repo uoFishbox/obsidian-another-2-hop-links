@@ -118,6 +118,7 @@ export interface ScrollerViewportEntry {
 	structureObserverConnected: boolean;
 	idleTimer: number | null;
 	lastScrollEventAt: number;
+	suppressedNativeScrollTop: number | null;
 	onNativeScroll: () => void;
 	onScrollIdleTimeout: () => void;
 	unsubscribeWindowResize: (() => void) | null;

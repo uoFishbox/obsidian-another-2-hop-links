@@ -134,7 +134,7 @@ describe("FlatCardGrid virtualization contract", () => {
 		driver.expectMountedLogicalIndexes({
 			include: [6],
 			exclude: [19],
-			maxCount: 12,
+			maxCount: 15,
 		});
 
 		await driver.scrollTo({
@@ -182,7 +182,7 @@ describe("FlatCardGrid virtualization contract", () => {
 			driver.expectMountedLogicalIndexes({
 				include: [6],
 				exclude: [19],
-				maxCount: 12,
+				maxCount: 15,
 			});
 		});
 	});

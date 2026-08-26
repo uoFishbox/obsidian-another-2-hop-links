@@ -65,9 +65,3 @@ export {
 	type SectionedGridGeometryInput,
 	type SectionedGridRowPosition,
 } from "./grid/layout";
-export {
-	markVirtualScrollMeasurementRun,
-	readVirtualScrollMeasurementEpoch,
-	resetVirtualScrollMeasurementFrameForTests,
-	shouldDeferPreviewActivationForVirtualScrollMeasurement,
-} from "./runtime/measurementLifecycle";

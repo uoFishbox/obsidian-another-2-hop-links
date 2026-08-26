@@ -1142,7 +1142,7 @@ describe("observeVirtualListViewport", () => {
 			scrollContainer.dispatchEvent(new Event("scroll"));
 
 			// One tick before the idle threshold: still active, no measurement
-			await vi.advanceTimersByTimeAsync(139);
+			await vi.advanceTimersByTimeAsync(79);
 			expect(runScrollMeasurement).not.toHaveBeenCalled();
 
 			await vi.advanceTimersByTimeAsync(1);

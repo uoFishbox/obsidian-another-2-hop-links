@@ -1,14 +1,7 @@
 import type { PreviewData } from "../types";
 import { createAbortError, isAbortError } from "./previewAbort";
 
-const MAX_CONCURRENT_VISIBLE_PREVIEWS = 1;
-
-export interface PreviewQueueSnapshot {
-	readonly queued: number;
-	readonly active: number;
-}
-
-export type PreviewQueueListener = (snapshot: PreviewQueueSnapshot) => void;
+const MAX_CONCURRENT_PREVIEWS = 1;
 
 interface QueuedPreviewTask {
 	readonly run: () => Promise<PreviewData>;
@@ -23,29 +16,11 @@ interface QueuedPreviewTask {
 export function createPreviewQueue() {
 	let activeCount = 0;
 	const queue: QueuedPreviewTask[] = [];
-	const listeners = new Set<PreviewQueueListener>();
-	let lastQueued = 0;
-	let lastActive = 0;
-
-	function notifyIfChanged(): void {
-		if (queue.length === lastQueued && activeCount === lastActive) return;
-		lastQueued = queue.length;
-		lastActive = activeCount;
-		const snapshot = { queued: lastQueued, active: lastActive };
-		for (const listener of listeners) listener(snapshot);
-	}
-
-	function subscribe(listener: PreviewQueueListener): () => void {
-		listeners.add(listener);
-		listener({ queued: queue.length, active: activeCount });
-		return () => listeners.delete(listener);
-	}
 
 	function removeQueuedTask(task: QueuedPreviewTask): void {
 		const index = queue.indexOf(task);
 		if (index < 0) return;
 		queue.splice(index, 1);
-		notifyIfChanged();
 	}
 
 	function enqueue(
@@ -89,16 +64,14 @@ export function createPreviewQueue() {
 			}
 
 			queue.push(task);
-			notifyIfChanged();
 			drainQueue();
 		});
 	}
 
 	function drainQueue(): void {
-		while (activeCount < MAX_CONCURRENT_VISIBLE_PREVIEWS) {
+		while (activeCount < MAX_CONCURRENT_PREVIEWS) {
 			const task = queue.shift();
 			if (!task) return;
-			notifyIfChanged();
 			if (task.cancelled || task.signal?.aborted) {
 				task.reject(createAbortError());
 				continue;
@@ -110,7 +83,6 @@ export function createPreviewQueue() {
 	function startTask(task: QueuedPreviewTask): void {
 		task.started = true;
 		activeCount += 1;
-		notifyIfChanged();
 
 		void task
 			.run()
@@ -130,7 +102,6 @@ export function createPreviewQueue() {
 			})
 			.finally(() => {
 				activeCount = Math.max(activeCount - 1, 0);
-				notifyIfChanged();
 				drainQueue();
 			});
 	}
@@ -142,15 +113,10 @@ export function createPreviewQueue() {
 		}
 		queue.length = 0;
 		activeCount = 0;
-		notifyIfChanged();
 	}
 
 	return {
 		enqueue,
-		getQueuedCount: () => queue.length,
-		getActiveCount: () => activeCount,
-		getOutstandingCount: () => queue.length + activeCount,
 		shutdown,
-		subscribe,
 	};
 }
