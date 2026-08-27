@@ -21,75 +21,6 @@ vi.mock("obsidian", () => {
 	};
 });
 
-vi.mock("search/searchWorkerClient", async () => {
-	const { filterSearchWorkerDatasetWithMatchDetails } =
-		await import("search/searchWorkerFilter");
-
-	return {
-		createSearchWorkerClient: (onMessage: (message: unknown) => void) => {
-			let snapshot = {
-				datasetVersion: 0,
-				items: [],
-				fileContents: [],
-			};
-			let contentByPath = new Map<string, string>();
-
-			return {
-				syncItems: (nextSnapshot: typeof snapshot) => {
-					snapshot = {
-						...snapshot,
-						datasetVersion: nextSnapshot.datasetVersion,
-						items: nextSnapshot.items,
-					};
-				},
-				upsertFileContents: (update: {
-					datasetVersion: number;
-					entries: Array<{ path: string; content: string }>;
-				}) => {
-					snapshot = {
-						...snapshot,
-						datasetVersion: update.datasetVersion,
-					};
-					for (const entry of update.entries) {
-						contentByPath.set(entry.path, entry.content);
-					}
-				},
-				removeFileContents: (update: {
-					datasetVersion: number;
-					paths: string[];
-				}) => {
-					snapshot = {
-						...snapshot,
-						datasetVersion: update.datasetVersion,
-					};
-					for (const path of update.paths) {
-						contentByPath.delete(path);
-					}
-				},
-				filter: (request: {
-					requestId: number;
-					datasetVersion: number;
-					query: string;
-					matchScope?: "title-only" | "title-and-content";
-				}) => {
-					onMessage({
-						type: "filter-result",
-						requestId: request.requestId,
-						datasetVersion: request.datasetVersion,
-						matchedItems: filterSearchWorkerDatasetWithMatchDetails(
-							snapshot,
-							request.query,
-							request.matchScope,
-							contentByPath,
-						),
-					});
-				},
-				terminate: vi.fn(),
-			};
-		},
-	};
-});
-
 vi.mock("cards/hooks/useSearchQuery.svelte", () => ({
 	useSearchQuery: () => ({
 		value: "",
@@ -102,15 +33,6 @@ vi.mock("cards/hooks/useBookmarks.svelte", () => ({
 		filePaths: new Set<string>(),
 		orderedFilePaths: [],
 		isBookmarked: () => false,
-	}),
-}));
-
-vi.mock("search/useFileContentIndex.svelte", () => ({
-	useFileContentIndex: () => ({
-		hasMatch: () => false,
-		isLoading: () => false,
-		getFirstMatchPosition: () => undefined,
-		forEachEntry: () => {},
 	}),
 }));
 

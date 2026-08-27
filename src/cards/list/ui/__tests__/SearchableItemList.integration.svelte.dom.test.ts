@@ -10,7 +10,6 @@ import type { LinkContext } from "cards/context/linkContext";
 import type { ListViewState } from "cards/list/model/ListViewState";
 import type { ISortService } from "cards/sorting";
 import type { ListViewUiState } from "cards/list/model/listViewUiState";
-import { filterSearchWorkerDatasetWithMatchDetails } from "search/searchWorkerFilter";
 import { DEFAULT_SETTINGS } from "settings/model";
 import { ARIA_LABELS } from "cards/ariaLabels";
 import { queryAllByRoleDeep } from "testing/helpers/shadowDomQueries";
@@ -22,89 +21,11 @@ import {
 	triggerResize,
 } from "testing/helpers/DOMObserverMock";
 
-vi.mock("search/searchWorkerClient", async () => {
-	const { filterSearchWorkerDatasetWithMatchDetails } =
-		await import("search/searchWorkerFilter");
-
-	return {
-		createSearchWorkerClient: (onMessage: (message: unknown) => void) => {
-			let snapshot = {
-				datasetVersion: 0,
-				items: [],
-				fileContents: [],
-			};
-			let contentByPath = new Map<string, string>();
-
-			return {
-				syncItems: (nextSnapshot: typeof snapshot) => {
-					snapshot = {
-						...snapshot,
-						datasetVersion: nextSnapshot.datasetVersion,
-						items: nextSnapshot.items,
-					};
-				},
-				upsertFileContents: (update: {
-					datasetVersion: number;
-					entries: Array<{ path: string; content: string }>;
-				}) => {
-					snapshot = {
-						...snapshot,
-						datasetVersion: update.datasetVersion,
-					};
-					for (const entry of update.entries) {
-						contentByPath.set(entry.path, entry.content);
-					}
-				},
-				removeFileContents: (update: {
-					datasetVersion: number;
-					paths: string[];
-				}) => {
-					snapshot = {
-						...snapshot,
-						datasetVersion: update.datasetVersion,
-					};
-					for (const path of update.paths) {
-						contentByPath.delete(path);
-					}
-				},
-				filter: (request: {
-					requestId: number;
-					datasetVersion: number;
-					query: string;
-					matchScope?: "title-only" | "title-and-content";
-				}) => {
-					onMessage({
-						type: "filter-result",
-						requestId: request.requestId,
-						datasetVersion: request.datasetVersion,
-						matchedItems: filterSearchWorkerDatasetWithMatchDetails(
-							snapshot,
-							request.query,
-							request.matchScope,
-							contentByPath,
-						),
-					});
-				},
-				terminate: vi.fn(),
-			};
-		},
-	};
-});
-
 vi.mock("cards/hooks/useBookmarks.svelte", () => ({
 	useBookmarks: () => ({
 		filePaths: new Set<string>(),
 		orderedFilePaths: [],
 		isBookmarked: () => false,
-	}),
-}));
-
-vi.mock("search/useFileContentIndex.svelte", () => ({
-	useFileContentIndex: () => ({
-		hasMatch: vi.fn(() => false),
-		isLoading: vi.fn(() => false),
-		getFirstMatchPosition: vi.fn(() => undefined),
-		forEachEntry: vi.fn(() => {}),
 	}),
 }));
 

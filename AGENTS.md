@@ -32,7 +32,7 @@ Compact guide for agents working in this repo.
 - Entry: `src/main.ts` → `main.js` (CJS, es2018 target, minified in production).
 - Bundler: `esbuild` via `esbuild.config.mjs`:
     - `esbuild-svelte` (css: `'injected'`, preprocess: `sveltePreprocess()`)
-    - `esbuild-plugin-inline-worker` (inlines `searchFilter.worker.ts`)
+    - `esbuild-plugin-inline-worker` (inlines preview text processing workers)
 - `obsidian`, `electron`, all `@codemirror/*`, `@lezer/*`, and Node builtins are **external** — never bundle them.
 - Dev mode emits inline sourcemaps; production does not.
 - `process.env.NODE_ENV` is injected as `"development"` or `"production"`.
@@ -75,7 +75,7 @@ src/
 ```
 
 - Custom views: `TwoHopLinksPage`, `PreCreationView`, `TagNotesView`.
-- Search worker: `src/search/searchFilter.worker.ts` (inlined at build time).
+- Full-text search runs on demand on the main thread with cooperative time slicing.
 
 ## Code style
 
@@ -109,7 +109,7 @@ src/
 - **Lifecycle**: The plugin mounts Svelte components into MarkdownViews via `MarkdownRenderChild`. Cleanup happens through `onunload()` of those children, not just Svelte `unmount`. Check `ComponentController.ts` before changing mount/unmount logic.
 - **Patching**: The plugin monkey-patches Obsidian internals (Canvas, MarkdownView, Property, Workspace, GlobalSearch, Bookmark, PagePreview). Changes to patchers can have broad side effects.
 - **Store caching**: `ComponentController` maintains an LRU of `ApplicationStore` instances keyed by `leafId:filePath`. Any change to store lifetime or keying must respect ref-counting and trimming logic.
-- **Worker**: Search filter runs in an inlined worker. If you add imports inside `searchFilter.worker.ts`, ensure esbuild inlines them correctly.
+- **Search**: Full-text matching must remain unique-file based, cancellable, and cooperatively time-sliced. Do not reintroduce a resident full-content index without profiling evidence.
 - **Styles**: `styles.css` is shipped with the plugin; it uses CSS custom properties prefixed with `--ccl-`.
 - **Shadow hover state**: See `src/preview/popover/shadow-hover/README.md` for the invariants (pure reducers, no parallel lifecycle/interaction fields).
 

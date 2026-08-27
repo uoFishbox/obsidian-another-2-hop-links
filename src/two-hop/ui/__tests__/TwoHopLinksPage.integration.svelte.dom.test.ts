@@ -34,71 +34,46 @@ import {
 
 const previewRuntimes = new Set<PreviewRuntime>();
 
-vi.mock("search/searchWorkerClient", async () => {
-	const { filterSearchWorkerDatasetWithMatchDetails } =
-		await import("search/searchWorkerFilter");
-
+const searchResponseHarness = vi.hoisted(() => {
+	let held = false;
+	let pendingResponse: (() => void) | null = null;
 	return {
-		createSearchWorkerClient: (onMessage: (message: unknown) => void) => {
-			let snapshot = {
-				datasetVersion: 0,
-				items: [],
-				fileContents: [],
-			};
-			let contentByPath = new Map<string, string>();
+		get held() {
+			return held;
+		},
+		hold() {
+			held = true;
+		},
+		queue(response: () => void) {
+			pendingResponse = response;
+		},
+		release() {
+			held = false;
+			pendingResponse?.();
+			pendingResponse = null;
+		},
+		reset() {
+			held = false;
+			pendingResponse = null;
+		},
+	};
+});
 
-			return {
-				syncItems: (nextSnapshot: typeof snapshot) => {
-					snapshot = {
-						...snapshot,
-						datasetVersion: nextSnapshot.datasetVersion,
-						items: nextSnapshot.items,
-					};
-				},
-				upsertFileContents: (update: {
-					datasetVersion: number;
-					entries: Array<{ path: string; content: string }>;
-				}) => {
-					snapshot = {
-						...snapshot,
-						datasetVersion: update.datasetVersion,
-					};
-					for (const entry of update.entries) {
-						contentByPath.set(entry.path, entry.content);
-					}
-				},
-				removeFileContents: (update: {
-					datasetVersion: number;
-					paths: string[];
-				}) => {
-					snapshot = {
-						...snapshot,
-						datasetVersion: update.datasetVersion,
-					};
-					for (const path of update.paths) {
-						contentByPath.delete(path);
-					}
-				},
-				filter: (request: {
-					requestId: number;
-					datasetVersion: number;
-					query: string;
-					matchScope?: "title-only" | "title-and-content";
-				}) => {
-					onMessage({
-						type: "filter-result",
-						requestId: request.requestId,
-						datasetVersion: request.datasetVersion,
-						matchedItems: filterSearchWorkerDatasetWithMatchDetails(
-							snapshot,
-							request.query,
-							request.matchScope,
-							contentByPath,
-						),
-					});
-				},
-				terminate: vi.fn(),
-			};
+vi.mock("search/streamingSearch", async () => {
+	const actual = await vi.importActual<typeof import("search/streamingSearch")>(
+		"search/streamingSearch",
+	);
+	return {
+		...actual,
+		runStreamingSearch: async (
+			options: Parameters<typeof actual.runStreamingSearch>[0],
+		) => {
+			if (searchResponseHarness.held) {
+				await new Promise<void>((resolve) =>
+					searchResponseHarness.queue(resolve),
+				);
+			}
+			return actual.runStreamingSearch(options);
 		},
 	};
 });
@@ -108,15 +83,6 @@ vi.mock("cards/hooks/useBookmarks.svelte", () => ({
 		filePaths: new Set<string>(),
 		orderedFilePaths: [],
 		isBookmarked: () => false,
-	}),
-}));
-
-vi.mock("search/useFileContentIndex.svelte", () => ({
-	useFileContentIndex: () => ({
-		hasMatch: () => false,
-		isLoading: () => false,
-		getFirstMatchPosition: () => undefined,
-		forEachEntry: () => {},
 	}),
 }));
 
@@ -347,6 +313,7 @@ function querySectionHeader(label: string): HTMLElement | null {
 
 describe("TwoHopLinksPage behavior", () => {
 	beforeEach(() => {
+		searchResponseHarness.reset();
 		vi.useFakeTimers();
 		resetRecords();
 		installResizeObserverMock();
@@ -357,6 +324,7 @@ describe("TwoHopLinksPage behavior", () => {
 	});
 
 	afterEach(() => {
+		searchResponseHarness.release();
 		for (const runtime of previewRuntimes) runtime.dispose();
 		previewRuntimes.clear();
 		teardownAnimationFrameMock();
@@ -434,6 +402,43 @@ describe("TwoHopLinksPage behavior", () => {
 		expect(querySectionHeader("needle-parent")).not.toBeInTheDocument();
 		expect(queryCard("alpha-child")).not.toBeInTheDocument();
 		expect(queryCard("beta-child")).not.toBeInTheDocument();
+	});
+
+	it("keeps the old searched presentation while refreshed data is filtering", async () => {
+		const file = createMockTFile("notes/target.md");
+		const alphaFile = createMockTFile("notes/alpha.md");
+		const betaFile = createMockTFile("notes/beta.md");
+		const settings = {
+			...DEFAULT_SETTINGS,
+			useMergedLinksSection: false,
+			showTagsSection: false,
+		};
+		const displayDataV1 = {
+			...createDisplayData(),
+			backlinks: [createBacklink(alphaFile, "alpha")],
+		};
+		const view = renderRoot(displayDataV1, settings, file);
+		await showEntireVirtualSurface();
+		await fireEvent.input(view.getByRole("searchbox", { name: "Find cards" }), {
+			target: { value: "alpha" },
+		});
+		await flushAsyncUi();
+		expect(queryCard("alpha")).toBeInTheDocument();
+
+		searchResponseHarness.hold();
+		const displayDataV2 = {
+			...createDisplayData(),
+			backlinks: [createBacklink(betaFile, "beta")],
+		};
+		await view.rerender(createRootProps(displayDataV2, settings, file));
+		await flushAsyncUi();
+
+		expect(queryCard("alpha")).toBeInTheDocument();
+		expect(queryCard("beta")).not.toBeInTheDocument();
+
+		searchResponseHarness.release();
+		await flushAsyncUi();
+		expect(queryCard("alpha")).not.toBeInTheDocument();
 	});
 
 	it("shows a card preview after the surface becomes visible", async () => {

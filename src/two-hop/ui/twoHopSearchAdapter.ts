@@ -1,8 +1,6 @@
 import type { CachedMetadata, TFile } from "obsidian";
-import type {
-	SearchWorkerItemSnapshot,
-	SearchWorkerMatchedItem,
-} from "search/searchWorkerTypes";
+import type { SearchItemSnapshot, SearchMatchedItem } from "search/searchTypes";
+import type { SearchMatchSnapshot } from "search/useStreamingSearchSession.svelte";
 import type { FileToLinktext } from "obsidian-integration/hostContracts";
 import {
 	createBacklinkIdentitySignature,
@@ -33,16 +31,15 @@ export interface TwohopSearchAdapter {
 	buildSnapshot(options: TwohopSearchAdapterOptions): TwoHopSearchSnapshot;
 	filterDisplayData(
 		displayData: DisplayData,
-		query: string,
-		matchesByKey: Map<string, SearchWorkerMatchedItem> | null,
+		result: SearchMatchSnapshot,
 		renderMode: TwohopSearchRenderMode,
 	): DisplayData;
 }
 
 /** Immutable inputs derived together for one Two-hop search session. */
 export interface TwoHopSearchSnapshot {
-	/** Lower-cased title snapshots sent to the search Worker. */
-	readonly workerItems: readonly SearchWorkerItemSnapshot[];
+	/** Lower-cased title snapshots consumed by one search run. */
+	readonly items: readonly SearchItemSnapshot[];
 	/** Unique target files eligible for content search. */
 	readonly searchableFiles: readonly TFile[];
 }
@@ -105,11 +102,11 @@ export function createTwohopSearchAdapter(): TwohopSearchAdapter {
 				getSearchKeyCache(options.displayData),
 			);
 		},
-		filterDisplayData(displayData, query, matchesByKey, renderMode) {
+		filterDisplayData(displayData, result, renderMode) {
 			return filterTwohopDisplayDataWithCache(
 				displayData,
-				query,
-				matchesByKey,
+				result.query,
+				result.matchesByKey,
 				renderMode,
 				getSearchKeyCache(displayData),
 			);
@@ -121,7 +118,7 @@ function buildTwoHopSearchSnapshotWithCache(
 	options: TwohopSearchAdapterOptions,
 	searchKeyCache?: SearchKeyCache,
 ): TwoHopSearchSnapshot {
-	const snapshots: SearchWorkerItemSnapshot[] = [];
+	const snapshots: SearchItemSnapshot[] = [];
 	const filesByPath = new Map<string, TFile>();
 	const titleTextByFile = new Map<TFile, string>();
 	const { displayData, resolveFile } = options;
@@ -238,7 +235,7 @@ function buildTwoHopSearchSnapshotWithCache(
 	}
 
 	return {
-		workerItems: snapshots,
+		items: snapshots,
 		searchableFiles: Array.from(filesByPath.values()),
 	};
 }
@@ -246,24 +243,12 @@ function buildTwoHopSearchSnapshotWithCache(
 function filterTwohopDisplayDataWithCache(
 	displayData: DisplayData,
 	query: string,
-	matchesByKey: Map<string, SearchWorkerMatchedItem> | null,
+	matchesByKey: ReadonlyMap<string, SearchMatchedItem>,
 	renderMode: TwohopSearchRenderMode,
 	searchKeyCache?: SearchKeyCache,
 ): DisplayData {
 	if (!query) {
 		return displayData;
-	}
-
-	if (!matchesByKey) {
-		return {
-			...displayData,
-			outgoing: [],
-			backlinks: [],
-			mergedItems: [],
-			twoHopBranches: [],
-			tagGroups: [],
-			newLinks: [],
-		};
 	}
 
 	const outgoing = renderMode.useMergedLinks
@@ -316,7 +301,7 @@ function filterTwohopDisplayDataWithCache(
 
 function filterTwohopBranch(
 	branch: TwoHopLinkBranch,
-	matchesByKey: Map<string, SearchWorkerMatchedItem>,
+	matchesByKey: ReadonlyMap<string, SearchMatchedItem>,
 	searchKeyCache?: SearchKeyCache,
 ): TwoHopLinkBranch | null {
 	const branchBaseKey = getBranchBaseKey(branch, searchKeyCache);
@@ -341,7 +326,7 @@ function filterTwohopBranch(
 
 function filterTagGroup(
 	section: TagGroup,
-	matchesByKey: Map<string, SearchWorkerMatchedItem>,
+	matchesByKey: ReadonlyMap<string, SearchMatchedItem>,
 	searchKeyCache?: SearchKeyCache,
 ): TagGroup | null {
 	if (matchesByKey.has(getTagGroupSearchKey(section))) {

@@ -7,7 +7,10 @@
 	import { buildScopedSectionId } from "cards/components/listPagination";
 	import { useSearchQuery } from "cards/hooks/useSearchQuery.svelte";
 	import { useBookmarks } from "cards/hooks/useBookmarks.svelte";
-	import { useWorkerSearchSession } from "search/useWorkerSearchSession.svelte";
+	import {
+		useStreamingSearchSession,
+		type SearchMatchSnapshot,
+	} from "search/useStreamingSearchSession.svelte";
 	import { focusResultEdge } from "cards/navigation/resultFocus";
 	import { yieldToMainThreadIdleAware } from "indexing/timeSlicing";
 	import type { ListConfig } from "./types";
@@ -25,7 +28,7 @@
 		createItemSearchTextCache,
 		getItemSearchText,
 	} from "cards/list/model/itemSearchText";
-	import type { SearchWorkerItemSnapshot } from "search/searchWorkerTypes";
+	import type { SearchItemSnapshot } from "search/searchTypes";
 	import {
 		getSortedViewItems,
 		pinBookmarkedViewItems,
@@ -41,6 +44,11 @@
 
 	const SEARCH_FILTER_YIELD_CHECK_INTERVAL = 128;
 	const SEARCH_FILTER_YIELD_MAX_DELAY_MS = 16;
+
+	interface SearchablePresentation {
+		readonly result: SearchMatchSnapshot | null;
+		readonly items: readonly CardItem[];
+	}
 
 	interface Props {
 		items: CardItem[];
@@ -136,7 +144,7 @@
 			).toLowerCase(),
 		);
 	};
-	const buildWorkerDataset = (): SearchWorkerItemSnapshot[] => {
+	const buildSearchDataset = (): SearchItemSnapshot[] => {
 		void itemsRevision;
 		return items.map((item) => ({
 			key: getItemKey(item),
@@ -159,17 +167,16 @@
 	setLinkContext(linkContext);
 	setContext<ListViewState>("applicationStore", applicationStore);
 	const bookmarks = useBookmarks(app);
-	const workerSearchSession = useWorkerSearchSession({
+	const searchSession = useStreamingSearchSession({
 		app,
 		query: () => search.normalized,
 		enabled: () => searchEnabled && !!search.normalized,
-		contentIndexEnabled: () => searchEnabled,
 		matchScope: () =>
 			allowContentSearch && contentSearchEnabled
 				? "title-and-content"
 				: "title-only",
 		getSearchableFiles,
-		buildDataset: buildWorkerDataset,
+		buildDataset: buildSearchDataset,
 	});
 
 	setAppContext({
@@ -179,15 +186,11 @@
 		bookmarks,
 		previewRuntime,
 		resolveSearchMatchPosition: (query, file) =>
-			workerSearchSession.getFirstMatchPosition(query, file),
+			searchSession.getFirstMatchPosition(query, file),
 	});
 	const lazyLoaderCache = new Set<string>();
 	setLazyLoaderCache(lazyLoaderCache);
-	let matchesByKey = $derived(workerSearchSession.matchesByKey);
-	let appliedSearchQuery = $derived(workerSearchSession.matchedQuery);
-	let appliedSearchScope = $derived(workerSearchSession.matchedScope);
-	let isWorkerFiltering = $derived(workerSearchSession.isFiltering);
-	let isSearchLoading = $derived(workerSearchSession.isLoading);
+	let isSearchLoading = $derived(searchSession.isPending);
 
 	let sortedItems = $derived.by(() => {
 		void sortSettingsSignature;
@@ -199,7 +202,13 @@
 		);
 	});
 
-	let filteredItems = $state.raw<CardItem[]>([]);
+	let presentation = $state.raw<SearchablePresentation>({
+		result: null,
+		items: [],
+	});
+	let filteredItems = $derived(presentation.items);
+	let appliedSearchQuery = $derived(presentation.result?.query ?? "");
+	let appliedSearchScope = $derived(presentation.result?.scope ?? "title-only");
 	let filterRunSerial = 0;
 
 	$effect(() => {
@@ -207,14 +216,11 @@
 		void itemsRevision;
 		const sourceItems = sortedItems;
 		const query = search.normalized;
-		const currentSearchScope =
-			allowContentSearch && contentSearchEnabled
-				? "title-and-content"
-				: "title-only";
-		const matches = matchesByKey;
-		const committedQuery = appliedSearchQuery;
-		const committedScope = appliedSearchScope;
-		const filtering = isWorkerFiltering;
+		const committedResult = searchSession.committedResult;
+		const progressiveResult = searchSession.progressiveResult;
+		const result =
+			searchSession.currentResult ??
+			(progressiveResult?.query === query ? progressiveResult : null);
 		const shouldPin = config.pinBookmarkedToTop;
 		void bookmarks.filePaths.size;
 		void bookmarks.orderedFilePaths;
@@ -224,21 +230,21 @@
 				const nextItems = shouldPin
 					? pinBookmarkedViewItems(sourceItems, bookmarks)
 					: sourceItems;
-				const currentItems = untrack(() => filteredItems);
-				filteredItems = nextItems === currentItems ? [...nextItems] : nextItems;
+				const currentItems = untrack(() => presentation.items);
+				presentation = {
+					result: null,
+					items: nextItems === currentItems ? [...nextItems] : nextItems,
+				};
 				return;
 			}
 
-			if (
-				!matches ||
-				filtering ||
-				committedQuery !== query ||
-				committedScope !== currentSearchScope
-			) {
-				// Stale-while-search: keep the previous results while the
-				// search worker has not committed a result for the current
-				// query and scope yet. Clearing `filteredItems` here would unmount
-				// LinkList and destroy the preview host with it.
+			if (!result) {
+				const visibleResult = untrack(() => presentation.result);
+				if (committedResult === null && visibleResult !== null) {
+					// A provisional result belongs only to its exact query. Keeping it
+					// here would leave prefix-query cards/highlights visible after input.
+					presentation = { result: null, items: [] };
+				}
 				return;
 			}
 
@@ -251,7 +257,7 @@
 				}
 
 				const item = sourceItems[index];
-				if (matches.has(getItemKey(item))) {
+				if (result.matchesByKey.has(getItemKey(item))) {
 					nextItems.push(item);
 				}
 
@@ -270,32 +276,44 @@
 				lastPublish = performance.now();
 			}
 
-			if (serial !== filterRunSerial) {
+			const resultIsStillCurrent =
+				searchSession.currentResult === result ||
+				searchSession.progressiveResult === result;
+			if (serial !== filterRunSerial || !resultIsStillCurrent) {
 				return;
 			}
 
-			filteredItems = shouldPin
-				? pinBookmarkedViewItems(nextItems, bookmarks)
-				: nextItems;
+			presentation = {
+				result,
+				items: shouldPin
+					? pinBookmarkedViewItems(nextItems, bookmarks)
+					: nextItems,
+			};
 		})();
 	});
 
 	let initialVisibleCount = $derived(applicationStore.initialVisibleCount);
 	let searchScopedSectionId = $derived(
-		buildScopedSectionId(config.sectionId, appliedSearchQuery),
+		buildScopedSectionId(
+			config.sectionId,
+			JSON.stringify([
+				presentation.result?.query ?? "",
+				presentation.result?.scope ?? "none",
+			]),
+		),
 	);
 	let loadMoreIncrement = $derived(applicationStore.loadMoreIncrement);
 	let preserveResultsHeightOnSearch = $derived(
 		config.preserveResultsHeightOnSearch ?? true,
 	);
 	const cardModelRevision = $derived.by(() => ({
-		items,
+		items: presentation.items,
 		itemsRevision,
 		getItemKey,
 		settings: applicationStore.settings,
-		searchQuery: appliedSearchQuery,
-		searchScope: appliedSearchScope,
-		matchesByKey,
+		searchQuery: presentation.result?.query ?? "",
+		searchScope: presentation.result?.scope ?? "title-only",
+		matchesByKey: presentation.result?.matchesByKey ?? null,
 		applicationUpdateVersion: applicationStore.updateVersion,
 		previewGlobalVersion: applicationStore.previewState.globalVersion,
 		previewPathVersions: applicationStore.previewState.pathVersions,
@@ -380,6 +398,7 @@
 <div
 	class="cosense-card-links__view-results cosense-card-links__search-result-container"
 	class:ccl-search-pending={isSearchLoading}
+	aria-busy={isSearchLoading}
 	bind:this={resultsContainerEl}
 	style:min-height={resultsMinHeight}
 >
@@ -402,9 +421,15 @@
 			paginationMode={config.paginationMode ?? "button"}
 			initialScrollState={uiState?.scrollState}
 			onScrollStateChange={(scrollState) => {
-				if (!uiState || isWorkerFiltering) return;
+				if (!uiState) return;
 				const currentInputQuery = uiState.searchInputValue.trim().toLowerCase();
-				if (currentInputQuery !== appliedSearchQuery) return;
+				if (
+					currentInputQuery &&
+					(searchSession.phase !== "ready" ||
+						presentation.result !== searchSession.currentResult)
+				) {
+					return;
+				}
 				uiState.scrollState = scrollState;
 			}}
 			{resolveItemPreviewRequest}
@@ -415,9 +440,16 @@
 				<ViewItemCard model={resolveViewItemCardModel(item)} {previewKey} />
 			{/snippet}
 		</LinkList>
+		{#if isSearchLoading}
+			<div class="cosense-card-links__search-status" aria-live="polite">
+				Searching…
+			</div>
+		{/if}
 	{:else}
 		<div class="modal-empty">
-			{#if searchEnabled && search.normalized}
+			{#if isSearchLoading}
+				Searching…
+			{:else if searchEnabled && search.normalized && searchSession.phase === "ready"}
 				No matches found.
 			{:else}
 				{config.emptyMessage}
@@ -434,6 +466,12 @@
 	.modal-empty {
 		padding: 40px 20px;
 		text-align: center;
+		color: var(--text-muted);
+	}
+
+	.cosense-card-links__search-status {
+		padding: 6px 12px;
+		font-size: var(--font-ui-smaller);
 		color: var(--text-muted);
 	}
 </style>

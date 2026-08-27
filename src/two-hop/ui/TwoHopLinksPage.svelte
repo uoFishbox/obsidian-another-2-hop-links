@@ -6,8 +6,11 @@
 	import TwoHopVirtualGrid from "two-hop/ui/TwoHopVirtualGrid.svelte";
 	import { useSearchQuery } from "cards/hooks/useSearchQuery.svelte";
 	import { useBookmarks } from "cards/hooks/useBookmarks.svelte";
-	import { useWorkerSearchSession } from "search/useWorkerSearchSession.svelte";
-	import type { SearchWorkerMatchedItem } from "search/searchWorkerTypes";
+	import {
+		useStreamingSearchSession,
+		type SearchMatchSnapshot,
+	} from "search/useStreamingSearchSession.svelte";
+	import type { SearchMatchedItem } from "search/searchTypes";
 	import { focusResultEdge } from "cards/navigation/resultFocus";
 	import {
 		setLinkContext,
@@ -19,8 +22,12 @@
 	import type { TwoHopState } from "two-hop/state/TwoHopState.svelte";
 	import type { PluginSettings } from "settings/model";
 	import { getCardLayoutCssText } from "cards/layout/cardLayoutCssVars";
-	import { createTwohopSearchAdapter } from "two-hop/ui/twoHopSearchAdapter";
-	import { tick } from "svelte";
+	import {
+		createTwohopSearchAdapter,
+		type TwohopSearchRenderMode,
+	} from "two-hop/ui/twoHopSearchAdapter";
+	import type { DisplayData } from "two-hop/display/displayDataBuilder";
+	import { tick, untrack } from "svelte";
 	import { createTwoHopSectionPublicationMemo } from "two-hop/ui/section-descriptors/cache";
 	import { createTwoHopInteractionTokenAllocator } from "two-hop/ui/section-descriptors/descriptors";
 	import {
@@ -42,7 +49,7 @@
 		readonly settings: PluginSettings;
 		readonly searchQuery: string;
 		readonly searchScope: "title-only" | "title-and-content";
-		readonly matchesByKey: Map<string, SearchWorkerMatchedItem> | null;
+		readonly matchesByKey: ReadonlyMap<string, SearchMatchedItem> | null;
 		readonly linkContext: LinkUtilitiesContext;
 		readonly getPreviewRenderVersion: (path: string) => string;
 		readonly applicationUpdateVersion: number;
@@ -82,6 +89,23 @@
 			value: PluginSettings[K],
 		) => Promise<void>;
 		uiState?: TwoHopLinksRootUiState;
+	}
+
+	interface TwoHopSearchPresentation {
+		readonly result: SearchMatchSnapshot | null;
+		readonly displayData: DisplayData;
+		readonly renderMode: TwohopSearchRenderMode;
+	}
+
+	function clearDisplayData(): DisplayData {
+		return {
+			outgoing: [],
+			backlinks: [],
+			mergedItems: [],
+			twoHopBranches: [],
+			tagGroups: [],
+			newLinks: [],
+		};
 	}
 
 	let {
@@ -146,30 +170,73 @@
 	let searchSnapshot = $derived.by(() =>
 		searchAdapter.buildSnapshot(getSearchAdapterOptions()),
 	);
-	const workerSearchSession = useWorkerSearchSession({
+	const searchSession = useStreamingSearchSession({
 		app,
 		query: () => search.normalized,
 		enabled: () => !!search.normalized,
 		matchScope: () => (contentSearchEnabled ? "title-and-content" : "title-only"),
 		getSearchableFiles: () => searchSnapshot.searchableFiles,
-		buildDataset: () => searchSnapshot.workerItems,
+		buildDataset: () => searchSnapshot.items,
 	});
-	let isSearchLoading = $derived(workerSearchSession.isLoading);
-	let matchesByKey = $derived(workerSearchSession.matchesByKey);
-	let appliedSearchQuery = $derived(workerSearchSession.matchedQuery);
-	let appliedSearchScope = $derived(workerSearchSession.matchedScope);
+	let isSearchLoading = $derived(searchSession.isPending);
+	let searchPresentation = $state.raw<TwoHopSearchPresentation>({
+		result: null,
+		displayData: untrack(() => displayData),
+		renderMode: untrack(getSearchRenderMode),
+	});
+
+	$effect(() => {
+		const currentDisplayData = displayData;
+		const renderMode = getSearchRenderMode();
+		if (!search.normalized) {
+			searchPresentation = {
+				result: null,
+				displayData: currentDisplayData,
+				renderMode,
+			};
+			return;
+		}
+
+		const committedResult = searchSession.committedResult;
+		const progressiveResult = searchSession.progressiveResult;
+		const result =
+			searchSession.currentResult ??
+			(progressiveResult?.query === search.normalized ? progressiveResult : null);
+		if (!result) {
+			if (committedResult === null && searchPresentation.result !== null) {
+				searchPresentation = {
+					result: null,
+					displayData: clearDisplayData(),
+					renderMode,
+				};
+			}
+			return;
+		}
+		const filtered = searchAdapter.filterDisplayData(
+			currentDisplayData,
+			result,
+			renderMode,
+		);
+		if (
+			searchSession.currentResult !== result &&
+			searchSession.progressiveResult !== result
+		) {
+			return;
+		}
+		searchPresentation = { result, displayData: filtered, renderMode };
+	});
+
+	let appliedSearchQuery = $derived(searchPresentation.result?.query ?? "");
+	let appliedSearchScope = $derived(searchPresentation.result?.scope ?? "title-only");
 	let paginationScope = $derived(
-		JSON.stringify([file.path, appliedSearchQuery, appliedSearchScope]),
+		JSON.stringify([
+			file.path,
+			searchPresentation.result?.query ?? "",
+			searchPresentation.result?.scope ?? "none",
+		]),
 	);
 
-	let filteredDisplayData = $derived.by(() => {
-		return searchAdapter.filterDisplayData(
-			displayData,
-			appliedSearchQuery,
-			matchesByKey,
-			getSearchRenderMode(),
-		);
-	});
+	let filteredDisplayData = $derived(searchPresentation.displayData);
 	const sourceFile = linkContext.sourceFile;
 	const fileToLinktext = linkContext.fileToLinktext;
 	const onTagClick = linkContext.onTagClick;
@@ -207,8 +274,8 @@
 	const twoHopVirtualListSections = $derived.by(() =>
 		sectionPublicationMemo.resolve({
 			displayData: filteredDisplayData,
-			useMergedLinks,
-			showTags,
+			useMergedLinks: searchPresentation.renderMode.useMergedLinks,
+			showTags: searchPresentation.renderMode.showTags,
 			sourceFile,
 			resolveFile: linkContext.resolveFile,
 			fileToLinktext,
@@ -253,7 +320,7 @@
 		previewRuntime,
 		bookmarks,
 		resolveSearchMatchPosition: (query, targetFile) =>
-			workerSearchSession.getFirstMatchPosition(query, targetFile),
+			searchSession.getFirstMatchPosition(query, targetFile),
 		updateSetting,
 	});
 
@@ -265,7 +332,7 @@
 		? {
 				previewRuntime,
 				resolveSearchMatchPosition: (query, targetFile) =>
-					workerSearchSession.getFirstMatchPosition(query, targetFile),
+					searchSession.getFirstMatchPosition(query, targetFile),
 			}
 		: undefined;
 
@@ -278,7 +345,7 @@
 			settings: currentSettings,
 			searchQuery: appliedSearchQuery,
 			searchScope: appliedSearchScope,
-			matchesByKey,
+			matchesByKey: searchPresentation.result?.matchesByKey ?? null,
 			linkContext,
 			getPreviewRenderVersion,
 			applicationUpdateVersion: applicationUiState.updateVersion,
@@ -403,6 +470,7 @@
 	<div
 		class="cosense-card-links__results cosense-card-links__search-result-container"
 		class:ccl-search-pending={isSearchLoading}
+		aria-busy={isSearchLoading}
 		bind:this={resultsContainerEl}
 		style:min-height={resultsMinHeight}
 	>
@@ -418,6 +486,13 @@
 				{previewDependencies}
 				previewActive={previewSurfaceActive}
 			/>
+			{#if isSearchLoading}
+				<div class="cosense-card-links__search-status" aria-live="polite">
+					Searching…
+				</div>
+			{:else if search.normalized && searchSession.phase === "ready" && twoHopVirtualListSections.length === 0}
+				<div class="modal-empty">No matches found.</div>
+			{/if}
 			{#if !filteredDisplayData.twoHopBranches.length && showTwoHopPlaceholder}
 				<div class="cosense-card-links__phase-placeholder">
 					<LoadingState message="Loading two-hop links..." />
@@ -444,5 +519,17 @@
 
 	.cosense-card-links__search-result-container {
 		overflow-anchor: none;
+	}
+
+	.cosense-card-links__search-status {
+		padding: 6px 12px;
+		font-size: var(--font-ui-smaller);
+		color: var(--text-muted);
+	}
+
+	.modal-empty {
+		padding: 40px 20px;
+		text-align: center;
+		color: var(--text-muted);
 	}
 </style>

@@ -3,7 +3,8 @@ import { createMockTFile } from "testing/__mocks__/testHelpers";
 import type { TFile } from "obsidian";
 import type { TagGroup, TwoHopLinkBranch } from "two-hop/model";
 import type { TaggedNote, IndexedLink } from "indexing/model";
-import type { SearchWorkerMatchedItem } from "search/searchWorkerTypes";
+import type { SearchMatchedItem } from "search/searchTypes";
+import type { SearchResultSnapshot } from "search/useStreamingSearchSession.svelte";
 import type { DisplayData } from "two-hop/display/displayDataBuilder";
 import {
 	createTwohopSearchAdapter,
@@ -32,7 +33,7 @@ function createSearchAdapterHarness() {
 	return {
 		...adapter,
 		buildDataset: (options: TwohopSearchAdapterOptions) =>
-			adapter.buildSnapshot(options).workerItems,
+			adapter.buildSnapshot(options).items,
 	};
 }
 
@@ -88,10 +89,8 @@ const DEFAULT_RENDER_MODE: TwohopSearchRenderMode = {
 	showTags: true,
 };
 
-function createMatchesByKey(
-	keys: Iterable<string>,
-): Map<string, SearchWorkerMatchedItem> {
-	const matchesByKey = new Map<string, SearchWorkerMatchedItem>();
+function createMatchesByKey(keys: Iterable<string>): Map<string, SearchMatchedItem> {
+	const matchesByKey = new Map<string, SearchMatchedItem>();
 	for (const key of keys) {
 		matchesByKey.set(key, {
 			key,
@@ -99,6 +98,21 @@ function createMatchesByKey(
 		});
 	}
 	return matchesByKey;
+}
+
+function createSearchResult(
+	query: string,
+	matchesByKey: ReadonlyMap<string, SearchMatchedItem>,
+): SearchResultSnapshot {
+	return {
+		requestId: 1,
+		query,
+		scope: "title-only",
+		datasetRevision: 1,
+		contentRevision: 0,
+		matchesByKey,
+		firstContentMatchPositionByPath: new Map(),
+	};
 }
 
 function createAdapterOptions(
@@ -327,15 +341,14 @@ describe("TwohopSearchAdapter.filterDisplayData", () => {
 
 		const result = searchAdapter.filterDisplayData(
 			displayData,
-			"",
-			createMatchesByKey([]),
+			createSearchResult("", createMatchesByKey([])),
 			DEFAULT_RENDER_MODE,
 		);
 
 		expect(result).toBe(displayData);
 	});
 
-	it("returns empty sections when matchesByKey is null", () => {
+	it("returns empty sections when the committed result has no matches", () => {
 		const sourceFile = createMockTFile("notes/source.md");
 		const targetFile = createMockTFile("notes/target.md");
 		const displayData = createDisplayData({
@@ -345,8 +358,7 @@ describe("TwohopSearchAdapter.filterDisplayData", () => {
 
 		const result = searchAdapter.filterDisplayData(
 			displayData,
-			"query",
-			null,
+			createSearchResult("query", createMatchesByKey([])),
 			DEFAULT_RENDER_MODE,
 		);
 
@@ -381,8 +393,10 @@ describe("TwohopSearchAdapter.filterDisplayData", () => {
 
 		const result = searchAdapter.filterDisplayData(
 			displayData,
-			"needle-parent",
-			createMatchesByKey([parentSnapshot.key]),
+			createSearchResult(
+				"needle-parent",
+				createMatchesByKey([parentSnapshot.key]),
+			),
 			DEFAULT_RENDER_MODE,
 		);
 
@@ -409,8 +423,7 @@ describe("TwohopSearchAdapter.filterDisplayData", () => {
 
 		const result = searchAdapter.filterDisplayData(
 			displayData,
-			"query",
-			createMatchesByKey([betaChildKey ?? ""]),
+			createSearchResult("query", createMatchesByKey([betaChildKey ?? ""])),
 			DEFAULT_RENDER_MODE,
 		);
 
@@ -435,8 +448,7 @@ describe("TwohopSearchAdapter.filterDisplayData", () => {
 
 		const result = searchAdapter.filterDisplayData(
 			displayData,
-			"query",
-			createMatchesByKey([tagGroupKey ?? ""]),
+			createSearchResult("query", createMatchesByKey([tagGroupKey ?? ""])),
 			DEFAULT_RENDER_MODE,
 		);
 
@@ -465,8 +477,7 @@ describe("TwohopSearchAdapter.filterDisplayData", () => {
 
 		const result = searchAdapter.filterDisplayData(
 			displayData,
-			"query",
-			createMatchesByKey([betaNoteKey ?? ""]),
+			createSearchResult("query", createMatchesByKey([betaNoteKey ?? ""])),
 			DEFAULT_RENDER_MODE,
 		);
 
@@ -490,8 +501,7 @@ describe("TwohopSearchAdapter.filterDisplayData", () => {
 
 		const result = searchAdapter.filterDisplayData(
 			displayData,
-			"query",
-			createMatchesByKey([]),
+			createSearchResult("query", createMatchesByKey([])),
 			DEFAULT_RENDER_MODE,
 		);
 
@@ -519,8 +529,7 @@ describe("TwohopSearchAdapter.filterDisplayData", () => {
 
 		const result = searchAdapter.filterDisplayData(
 			displayData,
-			"query",
-			createMatchesByKey([mergedKey ?? ""]),
+			createSearchResult("query", createMatchesByKey([mergedKey ?? ""])),
 			{
 				useMergedLinks: true,
 				showTags: true,
@@ -550,8 +559,7 @@ describe("TwohopSearchAdapter.filterDisplayData", () => {
 
 		const result = searchAdapter.filterDisplayData(
 			displayData,
-			"query",
-			createMatchesByKey([tagGroupKey ?? ""]),
+			createSearchResult("query", createMatchesByKey([tagGroupKey ?? ""])),
 			{
 				useMergedLinks: false,
 				showTags: false,
@@ -583,7 +591,7 @@ describe("TwohopSearchAdapter.buildSnapshot", () => {
 
 		const snapshot = adapter.buildSnapshot(options);
 		expect(snapshot.searchableFiles).toEqual([repeatedFile]);
-		expect(snapshot.workerItems).toHaveLength(4);
+		expect(snapshot.items).toHaveLength(4);
 		expect(options.fileToLinktext).toHaveBeenCalledTimes(1);
 		expect(options.getMetadata).toHaveBeenCalledTimes(1);
 	});
