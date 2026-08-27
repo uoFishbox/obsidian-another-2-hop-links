@@ -3,7 +3,7 @@ import type { TaggedNote, TagReference } from "indexing/model";
 import { resolveFileByPath } from "obsidian-integration/files/resolveFileByPath";
 import type { TagIndex } from "../indexState";
 import type { IVault } from "obsidian-integration/hostContracts";
-import { createFileUsageKey } from "shared/identity/fileIdentity";
+import { createFileUsageKeyFromNormalizedPath } from "shared/identity/fileIdentity";
 
 export function normalizeTag(tag: string): string {
 	const trimmed = tag.trim();
@@ -121,7 +121,7 @@ export function getNotesWithCommonTagsFromTagRefs(
 			file,
 			commonTags: commonTagInfo.commonTags,
 			path,
-			usageKey: createFileUsageKey(path),
+			usageKey: createFileUsageKeyFromNormalizedPath(path),
 			position: commonTagInfo.position,
 		});
 	}
@@ -193,7 +193,7 @@ export function getNotesWithTag(
 			file,
 			path,
 			commonTags: [normalizedTargetTag],
-			usageKey: createFileUsageKey(path),
+			usageKey: createFileUsageKeyFromNormalizedPath(path),
 			position: position,
 		});
 	}
