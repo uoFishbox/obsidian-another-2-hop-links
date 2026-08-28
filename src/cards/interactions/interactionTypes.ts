@@ -4,7 +4,7 @@ import {
 	generateBacklinkKey,
 	generateBranchKey,
 	generateIndexedLinkKey,
-} from "preview/text/textUtils";
+} from "card-preview/text/textUtils";
 import type {
 	AppContext,
 	LinkInteractionOptions,

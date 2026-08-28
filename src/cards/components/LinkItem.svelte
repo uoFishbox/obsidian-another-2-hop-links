@@ -3,10 +3,10 @@
 	import Icon from "shared/ui/primitives/Icon.svelte";
 	import { type IconName } from "shared/ui/icons/iconRegistry";
 	import { isAttachment } from "obsidian-integration/files/fileRules";
-	import { isImageExtension } from "preview/fileTypes";
+	import { isImageExtension } from "card-preview/fileTypes";
 	import { type Snippet } from "svelte";
 	import { useAppContext } from "cards/context/linkContext";
-	import { highlightTextForSearch } from "preview/text/searchHighlighter";
+	import { highlightTextForSearch } from "card-preview/text/searchHighlighter";
 
 	const AUDIO_EXTENSIONS = new Set([
 		"mp3",

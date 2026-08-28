@@ -3,8 +3,8 @@
 	import Icon from "shared/ui/primitives/Icon.svelte";
 	import LinkItem from "cards/components/LinkItem.svelte";
 	import CardGridLoadMoreButton from "cards/grid/ui/CardGridLoadMoreButton.svelte";
-	import UnresolvedPreviewPlaceholder from "preview/ui/UnresolvedPreviewPlaceholder.svelte";
-	import { previewHost } from "preview/ui/previewHostAction";
+	import UnresolvedPreviewPlaceholder from "card-preview/ui/UnresolvedPreviewPlaceholder.svelte";
+	import { previewHost } from "card-preview/ui/previewHostAction";
 	import type { CardSectionVariant } from "cards/components/cardPresentation";
 	import type { CardShellModel } from "cards/rendering/cardRenderModel";
 	import type { IconName } from "shared/ui/icons/iconRegistry";

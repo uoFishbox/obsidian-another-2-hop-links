@@ -4,7 +4,7 @@ import {
 	createCompactSectionId,
 	SHOULD_VALIDATE_SECTION_IDS,
 } from "cards/components/listPagination";
-import { generateBranchKey } from "preview/text/textUtils";
+import { generateBranchKey } from "card-preview/text/textUtils";
 import type { PluginSettings } from "settings/model";
 import type { SortOption } from "cards/sorting";
 import type { InteractionSettings } from "cards/interactions/interactionTypes";

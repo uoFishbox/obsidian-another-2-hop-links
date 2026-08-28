@@ -5,7 +5,7 @@ import {
 	dispatchItemHover,
 } from "cards/interactions/linkItemHandlers";
 import type { AppContext, LinkContext } from "cards/context/linkContext";
-import { createHoverPreviewMouseEvent } from "preview/popover/hoverPopoverTarget";
+import { createHoverPreviewMouseEvent } from "hover-popover/hoverPopoverTarget";
 import type { InteractionRegistry } from "./interactionRegistry";
 import {
 	clearInteractionLongPressed,

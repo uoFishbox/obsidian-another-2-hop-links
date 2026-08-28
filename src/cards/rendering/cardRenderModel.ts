@@ -5,9 +5,9 @@ import { resolveFileCardTitle } from "cards/title/cardTitle";
 import {
 	compileCardPreviewRequest,
 	type CardPreviewRequest,
-} from "preview/pipeline/cardPreviewRequest";
-import type { PreviewData } from "preview/types";
-import { formatLinkText } from "preview/text/textUtils";
+} from "card-preview/pipeline/cardPreviewRequest";
+import type { PreviewData } from "card-preview/types";
+import { formatLinkText } from "card-preview/text/textUtils";
 import type { LinkUtilitiesContext } from "cards/context/linkUtilities";
 import type { PluginSettings } from "settings/model";
 import {

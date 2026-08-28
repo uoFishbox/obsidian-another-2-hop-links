@@ -2,7 +2,7 @@ import type { PluginHost } from "obsidian-integration/pluginHost";
 import {
 	disposeShadowHoverPopoverProxies,
 	normalizeHoverPopoverTargetEl,
-} from "preview/popover/hoverPopoverTarget";
+} from "hover-popover/hoverPopoverTarget";
 import { getPagePreviewOnLinkHover } from "obsidian-integration/capabilities/obsidianInternals";
 import { applyPatch } from "obsidian-integration/capabilities/applyPatch";
 import { isEventLike } from "shared/ui/dom/realmSafeDom";

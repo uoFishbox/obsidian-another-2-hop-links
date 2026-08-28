@@ -1,6 +1,6 @@
 import type { TFile, Vault } from "obsidian";
 import { yieldToMainThreadIdleAware } from "indexing/timeSlicing";
-import { getFileContent } from "preview/pipeline/previewContent";
+import { getFileContent } from "card-preview/pipeline/previewContent";
 import { getSearchQueryTerms } from "./searchQueryTerms";
 import type {
 	SearchItemSnapshot,

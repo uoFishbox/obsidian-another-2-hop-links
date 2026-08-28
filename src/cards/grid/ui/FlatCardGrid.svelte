@@ -5,7 +5,7 @@
 		useFlatCardGrid,
 		type FlatCardGridProps,
 	} from "cards/grid/runtime/flat-grid/useFlatCardGrid.svelte";
-	import { provideVirtualPreviewSurface } from "preview/ui/virtualPreviewSurfaceContext";
+	import { provideVirtualPreviewSurface } from "card-preview/ui/virtualPreviewSurfaceContext";
 	import { provideVirtualFrameCoordinator } from "shared/ui/scheduling/frameCoordinatorContext.svelte";
 
 	const props: FlatCardGridProps<T> = $props();

@@ -1,5 +1,5 @@
 import type { CardItem } from "cards/CardItem";
-import { generateLinkKey } from "preview/text/textUtils";
+import { generateLinkKey } from "card-preview/text/textUtils";
 import type { ClickableHeaderExtraProps } from "two-hop/ui/section-descriptors/types";
 
 /** Immutable section data consumed by two-hop layout and rendering. */

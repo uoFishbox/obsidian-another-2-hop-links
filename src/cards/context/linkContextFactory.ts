@@ -1,11 +1,11 @@
 import { Menu, TFile, type MetadataCache, type Vault, type Workspace } from "obsidian";
 import type { App } from "obsidian";
-import type { IPreviewService } from "preview/pipeline/createPreviewService";
+import type { IPreviewService } from "card-preview/pipeline/createPreviewService";
 import type { CachedMetadataWithLinkReferences, IndexedLink } from "indexing/model";
 import type { IIndexingService } from "indexing/index-service/IndexingService";
 import type { HighlightMode, LinkContext, LinkInteractionOptions } from "./linkContext";
 import { areTagFeaturesEnabled, type PluginSettings } from "settings/model";
-import { triggerHoverPopover } from "preview/popover/mobilePopover";
+import { triggerHoverPopover } from "hover-popover/mobilePopover";
 import type { PluginHost } from "obsidian-integration/pluginHost";
 import { openTagNotesView } from "search/tag-notes/TagNotesView";
 import {

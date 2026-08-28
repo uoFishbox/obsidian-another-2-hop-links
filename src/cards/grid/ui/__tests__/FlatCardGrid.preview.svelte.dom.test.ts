@@ -2,7 +2,7 @@ import { cleanup, render, waitFor } from "@testing-library/svelte";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { App, TFile } from "obsidian";
 import { DEFAULT_SETTINGS } from "settings/model";
-import { createPreviewRenderSettings } from "preview/pipeline/previewRenderSettings";
+import { createPreviewRenderSettings } from "card-preview/pipeline/previewRenderSettings";
 import type { CardCollectionState } from "cards/CardCollectionState.svelte";
 import type { AppContext, LinkContext } from "cards/context/linkContext";
 import type { CardItem } from "cards/CardItem";
@@ -24,7 +24,7 @@ import FlatCardGridPreviewHarness from "./FlatCardGridPreviewHarness.svelte";
 import {
 	createPreviewRuntime,
 	type PreviewRuntime,
-} from "preview/runtime/previewRuntime";
+} from "card-preview/runtime/previewRuntime";
 
 const previewRuntimes = new Set<PreviewRuntime>();
 

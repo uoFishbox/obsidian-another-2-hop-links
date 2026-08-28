@@ -1,6 +1,6 @@
 import type { TFile } from "obsidian";
 import type { PluginSettings } from "settings/model";
-import type { PreviewRuntime } from "preview/runtime/previewRuntime";
+import type { PreviewRuntime } from "card-preview/runtime/previewRuntime";
 import type { LinkContext } from "cards/context/linkContext";
 import type { CardCollectionState } from "cards/CardCollectionState.svelte";
 import type { TwoHopState } from "two-hop/state/TwoHopState.svelte";

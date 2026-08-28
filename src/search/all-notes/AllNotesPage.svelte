@@ -10,7 +10,7 @@
 	import type { CardCollectionState } from "cards/CardCollectionState.svelte";
 	import { getCardLayoutCssText } from "cards/layout/cardLayoutCssVars";
 	import { getFileCardTitleSearchText } from "cards/title/cardTitle";
-	import type { PreviewRuntime } from "preview/runtime/previewRuntime";
+	import type { PreviewRuntime } from "card-preview/runtime/previewRuntime";
 	import type { ListViewUiState } from "cards/list/model/listViewUiState";
 	import type { AllNotesCatalog } from "./allNotesCatalog";
 

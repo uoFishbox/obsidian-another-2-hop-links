@@ -1,8 +1,8 @@
 <script lang="ts">
 	import LinkItem from "cards/components/LinkItem.svelte";
 	import type { CardRenderModel } from "cards/rendering/cardRenderModel";
-	import { previewHost } from "preview/ui/previewHostAction";
-	import UnresolvedPreviewPlaceholder from "preview/ui/UnresolvedPreviewPlaceholder.svelte";
+	import { previewHost } from "card-preview/ui/previewHostAction";
+	import UnresolvedPreviewPlaceholder from "card-preview/ui/UnresolvedPreviewPlaceholder.svelte";
 
 	interface ItemProps {
 		draggable?: boolean;

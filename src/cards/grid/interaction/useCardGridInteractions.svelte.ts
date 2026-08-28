@@ -12,7 +12,7 @@ import type { VirtualNavigationTarget } from "cards/virtualization/public";
 import type { ProgrammaticScrollSnapshot } from "cards/virtualization/public";
 import { createCardSurfaceNavigation } from "./surfaceNavigation";
 import { ensureCardRenderShadowSurface } from "cards/components/cardRenderShadowSurface";
-import { installShadowHoverPopoverBridge } from "preview/popover/shadowHoverPopoverBridge";
+import { installShadowHoverPopoverBridge } from "hover-popover/shadowHoverPopoverBridge";
 import { createVirtualCellBindingRegistry } from "./cellBindingRegistry";
 
 export interface CardSurfaceInteractionParams {

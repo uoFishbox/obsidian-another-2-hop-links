@@ -19,9 +19,9 @@ import {
 	type TwoHopCardDemand,
 	type TwoHopCardHydrationCell,
 } from "./cardHydrator";
-import type { PreviewRuntime } from "preview/runtime/previewRuntime";
-import { DISABLED_PREVIEW_SURFACE } from "preview/runtime/previewRuntime";
-import type { VirtualPreviewBinding } from "preview/scheduling/virtualPreviewSurface";
+import type { PreviewRuntime } from "card-preview/runtime/previewRuntime";
+import { DISABLED_PREVIEW_SURFACE } from "card-preview/runtime/previewRuntime";
+import type { VirtualPreviewBinding } from "card-preview/scheduling/virtualPreviewSurface";
 import type { VirtualFrameCoordinator } from "shared/ui/scheduling/frameCoordinator";
 import { createResolvedCardLayoutSettingsMemo } from "cards/layout/cardLayoutCssVars";
 import { resolveCardGridLayoutBase } from "cards/grid/layout/cardGridLayout";
@@ -44,7 +44,7 @@ import {
 	resolvePreviewPrefetchRange,
 	resolvePreviewScrollDirection,
 	type PreviewScrollDirection,
-} from "preview/prefetch/previewPrefetchRange";
+} from "card-preview/prefetch/previewPrefetchRange";
 
 /** Dependencies required to enable previews on the two-hop virtual surface. */
 export interface TwoHopPreviewDependencies {

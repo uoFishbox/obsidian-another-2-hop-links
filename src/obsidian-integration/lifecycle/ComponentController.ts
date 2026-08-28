@@ -17,7 +17,7 @@ import type { PluginHost } from "obsidian-integration/pluginHost";
 import type { ResolveTwoHopLinks } from "two-hop/state/TwoHopLinksLoader";
 import { mountTwoHopLinksRootView } from "two-hop/ui/mountTwoHopLinksRootView";
 import type { LinkContext } from "cards/context/linkContext";
-import type { PreviewRuntime } from "preview/runtime/previewRuntime";
+import type { PreviewRuntime } from "card-preview/runtime/previewRuntime";
 import { createViewLinkContext } from "obsidian-integration/views/createViewLinkContext";
 import type { TwoHopLinksRootUiState } from "two-hop/ui/twoHopLinksRootUiState";
 import type { SvelteComponentInstance } from "obsidian-integration/views/svelteLifecycle";

@@ -46,11 +46,11 @@ import { KeyboardCardNavigator } from "obsidian-integration/navigation/KeyboardC
 import {
 	createPreviewService,
 	type DisposablePreviewService,
-} from "preview/pipeline/createPreviewService";
+} from "card-preview/pipeline/createPreviewService";
 import {
 	createPreviewRuntime,
 	type PreviewRuntime,
-} from "preview/runtime/previewRuntime";
+} from "card-preview/runtime/previewRuntime";
 import {
 	createSettingsSideEffectController,
 	type SettingsSideEffectController,
@@ -60,7 +60,7 @@ import type { PluginHost } from "obsidian-integration/pluginHost";
 import type { ViewServices } from "obsidian-integration/views/viewServices";
 import { areTagFeaturesEnabled, type PluginSettings } from "settings/model";
 import { getLazyLoadManager } from "obsidian-integration/observers/IntersectionObserverRegistry";
-import { DEFAULT_PREVIEW_DOM_COMMITS_PER_SECOND } from "preview/scheduling/previewSchedulingConfig";
+import { DEFAULT_PREVIEW_DOM_COMMITS_PER_SECOND } from "card-preview/scheduling/previewSchedulingConfig";
 import { setYieldSchedulingWindowResolver } from "indexing/timeSlicing";
 import { createAllNotesCatalog } from "search/all-notes/allNotesCatalog";
 

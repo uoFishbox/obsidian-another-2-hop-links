@@ -1,7 +1,7 @@
 <script lang="ts">
 	import CardGridSurface from "cards/grid/surface/CardGridSurface.svelte";
 	import { provideVirtualFrameCoordinator } from "shared/ui/scheduling/frameCoordinatorContext.svelte";
-	import { provideVirtualPreviewSurface } from "preview/ui/virtualPreviewSurfaceContext";
+	import { provideVirtualPreviewSurface } from "card-preview/ui/virtualPreviewSurfaceContext";
 	import TwoHopVirtualCell from "two-hop/ui/TwoHopVirtualCell.svelte";
 	import {
 		useTwoHopVirtualGrid,

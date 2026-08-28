@@ -36,9 +36,9 @@
 		normalizeIncrement,
 	} from "cards/components/listPagination";
 	import type { TwoHopLinksRootUiState } from "two-hop/ui/twoHopLinksRootUiState";
-	import { observePreviewSurfaceVisibility } from "preview/scheduling/previewSurfaceVisibility";
+	import { observePreviewSurfaceVisibility } from "card-preview/scheduling/previewSurfaceVisibility";
 	import type { TwoHopPreviewDependencies } from "two-hop/ui/virtual-grid/useTwoHopVirtualGrid.svelte";
-	import type { PreviewRuntime } from "preview/runtime/previewRuntime";
+	import type { PreviewRuntime } from "card-preview/runtime/previewRuntime";
 	import type { LinkUtilitiesContext } from "cards/context/linkUtilities";
 	import {
 		createCardRenderModel,

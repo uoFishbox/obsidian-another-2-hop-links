@@ -83,7 +83,11 @@ describe("feature ownership", () => {
 			forbids: (specifier) => specifier.startsWith("two-hop/"),
 		},
 		{
-			directory: "preview",
+			directory: "card-preview",
+			forbids: (specifier) => specifier.startsWith("two-hop/"),
+		},
+		{
+			directory: "hover-popover",
 			forbids: (specifier) => specifier.startsWith("two-hop/"),
 		},
 		{
@@ -94,12 +98,13 @@ describe("feature ownership", () => {
 			directory: "shared",
 			forbids: (specifier) =>
 				specifier.startsWith("cards/") ||
+				specifier.startsWith("card-preview/") ||
 				specifier.startsWith("core/") ||
 				specifier.startsWith("features/") ||
+				specifier.startsWith("hover-popover/") ||
 				specifier.startsWith("indexing/") ||
 				specifier.startsWith("obsidian-integration/") ||
 				specifier.startsWith("obsidian/") ||
-				specifier.startsWith("preview/") ||
 				specifier.startsWith("search/") ||
 				specifier.startsWith("settings/") ||
 				specifier.startsWith("two-hop/") ||
@@ -110,8 +115,9 @@ describe("feature ownership", () => {
 			directory: "indexing",
 			forbids: (specifier) =>
 				specifier.startsWith("cards/") ||
+				specifier.startsWith("card-preview/") ||
 				specifier.startsWith("features/") ||
-				specifier.startsWith("preview/") ||
+				specifier.startsWith("hover-popover/") ||
 				specifier.startsWith("two-hop/") ||
 				specifier.startsWith("ui/"),
 		},

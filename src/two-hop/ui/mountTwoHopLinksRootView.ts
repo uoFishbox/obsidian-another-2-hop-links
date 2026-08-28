@@ -3,7 +3,7 @@ import { mount } from "svelte";
 import type { PluginSettings } from "settings/model";
 import type { TwoHopState } from "two-hop/state/TwoHopState.svelte";
 import type { LinkContext } from "cards/context/linkContext";
-import type { PreviewRuntime } from "preview/runtime/previewRuntime";
+import type { PreviewRuntime } from "card-preview/runtime/previewRuntime";
 import type { SvelteComponentInstance } from "obsidian-integration/views/svelteLifecycle";
 import TwoHopLinksPage from "./TwoHopLinksPage.svelte";
 import type { TwoHopLinksRootUiState } from "./twoHopLinksRootUiState";

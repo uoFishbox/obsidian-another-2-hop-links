@@ -2,14 +2,14 @@ import type { TFile, Pos, CachedMetadata, App } from "obsidian";
 import type { IndexedLink } from "indexing/model";
 import { createContext } from "svelte";
 import type { PluginSettings } from "settings/model";
-import type { PreviewData, PreviewRequestOptions } from "preview/types";
-import type { PreviewRuntime } from "preview/runtime/previewRuntime";
-import type { PreviewRevisionReader } from "preview/PreviewRevisionState.svelte";
+import type { PreviewData, PreviewRequestOptions } from "card-preview/types";
+import type { PreviewRuntime } from "card-preview/runtime/previewRuntime";
+import type { PreviewRevisionReader } from "card-preview/PreviewRevisionState.svelte";
 export type {
 	PreviewData,
 	PreviewDomRenderer,
 	PreviewRequestOptions,
-} from "preview/types";
+} from "card-preview/types";
 export type { LinkUtilitiesContext } from "cards/context/linkUtilities";
 import type { LinkUtilitiesContext } from "cards/context/linkUtilities";
 import type { SearchContentMatch } from "search/searchTypes";

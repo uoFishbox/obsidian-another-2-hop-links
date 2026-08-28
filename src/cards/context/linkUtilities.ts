@@ -1,5 +1,5 @@
 import type { TFile, CachedMetadata } from "obsidian";
-import type { PreviewData, PreviewRequestOptions } from "preview/types";
+import type { PreviewData, PreviewRequestOptions } from "card-preview/types";
 
 export interface LinkUtilitiesContext {
 	getPreview: (

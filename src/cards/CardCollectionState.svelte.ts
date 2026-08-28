@@ -8,7 +8,7 @@ import {
 	setSectionExpandedLimit,
 	type SectionExpansionLimits,
 } from "cards/sectionExpansion";
-import { PreviewRevisionState } from "preview/PreviewRevisionState.svelte";
+import { PreviewRevisionState } from "card-preview/PreviewRevisionState.svelte";
 
 const DISPLAY_REFRESH_EXCLUDED_SETTINGS = new Set<keyof PluginSettings>([
 	"lastUsedSortOption",

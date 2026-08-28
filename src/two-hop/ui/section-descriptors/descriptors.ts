@@ -5,7 +5,7 @@ import {
 	formatLinkText,
 	generateBacklinkKey,
 	generateLinkKey,
-} from "preview/text/textUtils";
+} from "card-preview/text/textUtils";
 import {
 	getBacklinkSearchKey,
 	getMergedSearchKey,

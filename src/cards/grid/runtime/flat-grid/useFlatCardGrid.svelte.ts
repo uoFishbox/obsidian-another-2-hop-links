@@ -34,8 +34,8 @@ import {
 	type ConfiguredCardLayout,
 	type FlatGridLayout,
 } from "cards/grid/layout/flatGridMeasurement";
-import { DISABLED_PREVIEW_SURFACE } from "preview/runtime/previewRuntime";
-import type { CardPreviewRequest } from "preview/pipeline/cardPreviewRequest";
+import { DISABLED_PREVIEW_SURFACE } from "card-preview/runtime/previewRuntime";
+import type { CardPreviewRequest } from "card-preview/pipeline/cardPreviewRequest";
 import type { ItemInteractionDescriptor } from "cards/interactions/interactionTypes";
 import { createVirtualCardInteractionController } from "cards/interactions/virtualCardInteractionController";
 import { useAppContext } from "cards/context/linkContext";
@@ -50,7 +50,7 @@ import {
 	resolvePreviewPrefetchRange,
 	resolvePreviewScrollDirection,
 	type PreviewScrollDirection,
-} from "preview/prefetch/previewPrefetchRange";
+} from "card-preview/prefetch/previewPrefetchRange";
 
 /** Props passed to flat virtual list item render snippets. */
 export interface FlatCardGridItemRenderArgs<T> {

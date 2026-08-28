@@ -3,7 +3,7 @@ import { TFile } from "obsidian";
 import { createMockTFile } from "testing/__mocks__/testHelpers";
 import { createLinkContextFactory } from "cards/context/linkContextFactory";
 import type { IndexedLink } from "indexing/model";
-import { triggerHoverPopover } from "preview/popover/mobilePopover";
+import { triggerHoverPopover } from "hover-popover/mobilePopover";
 import {
 	openFile,
 	openLinkDestination,
@@ -14,7 +14,7 @@ vi.mock("search/tag-notes/TagNotesView", () => ({
 	openTagNotesView: vi.fn(),
 }));
 
-vi.mock("preview/popover/mobilePopover", () => ({
+vi.mock("hover-preview/mobilePopover", () => ({
 	triggerHoverPopover: vi.fn(),
 }));
 

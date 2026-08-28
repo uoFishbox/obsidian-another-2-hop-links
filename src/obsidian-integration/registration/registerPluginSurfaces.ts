@@ -21,7 +21,7 @@ import { AllNotesView, VIEW_TYPE_ALL_NOTES } from "search/all-notes/AllNotesView
 import {
 	COSENSE_CARD_LINKS_HOVER_SOURCE_DISPLAY,
 	COSENSE_CARD_LINKS_HOVER_SOURCE_ID,
-} from "preview/popover/hoverPopoverLinkSpec";
+} from "hover-popover/hoverPopoverLinkSpec";
 import { CosenseCardLinksSettingTab } from "settings/ui/SettingTab";
 import { registerCardDragStateCleanup } from "cards/interactions/cardDragState";
 

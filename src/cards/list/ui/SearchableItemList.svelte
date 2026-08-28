@@ -39,7 +39,7 @@
 		type CardRenderModel,
 	} from "cards/rendering/cardRenderModel";
 	import { createItemInteractionKey } from "cards/interactions/interactionTypes";
-	import type { PreviewRuntime } from "preview/runtime/previewRuntime";
+	import type { PreviewRuntime } from "card-preview/runtime/previewRuntime";
 	import type { ListViewUiState } from "cards/list/model/listViewUiState";
 
 	interface SearchablePresentation {

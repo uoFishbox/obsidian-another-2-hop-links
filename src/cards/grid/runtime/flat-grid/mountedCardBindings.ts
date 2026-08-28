@@ -1,5 +1,5 @@
-import type { CardPreviewRequest } from "preview/pipeline/cardPreviewRequest";
-import type { VirtualPreviewBinding } from "preview/scheduling/virtualPreviewSurface";
+import type { CardPreviewRequest } from "card-preview/pipeline/cardPreviewRequest";
+import type { VirtualPreviewBinding } from "card-preview/scheduling/virtualPreviewSurface";
 import type {
 	MountedFlatGridBuild,
 	MountedFlatGridCell,

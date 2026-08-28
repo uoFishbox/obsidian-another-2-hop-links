@@ -24,7 +24,7 @@ import {
 import {
 	createPreviewRuntime,
 	type PreviewRuntime,
-} from "preview/runtime/previewRuntime";
+} from "card-preview/runtime/previewRuntime";
 import { CardCollectionState } from "cards/CardCollectionState.svelte";
 import { ARIA_LABELS } from "cards/ariaLabels";
 import {

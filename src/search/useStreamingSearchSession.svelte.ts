@@ -8,7 +8,7 @@ import type {
 	SearchMatchedItem,
 	SearchMatchScope,
 } from "./searchTypes";
-import { getFileContent } from "preview/pipeline/previewContent";
+import { getFileContent } from "card-preview/pipeline/previewContent";
 
 const EMPTY_SEARCH_SNAPSHOT: SearchDatasetSnapshot = {
 	items: [],

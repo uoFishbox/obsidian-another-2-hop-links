@@ -1,7 +1,7 @@
 import type { SortOption } from "cards/sorting";
 import type { PluginSettings } from "settings/model";
 import type { AppContextApplicationStore } from "cards/context/linkContext";
-import type { PreviewRevisionReader } from "preview/PreviewRevisionState.svelte";
+import type { PreviewRevisionReader } from "card-preview/PreviewRevisionState.svelte";
 
 /** State capabilities required by the searchable list-view feature. */
 export interface ListViewState extends AppContextApplicationStore {

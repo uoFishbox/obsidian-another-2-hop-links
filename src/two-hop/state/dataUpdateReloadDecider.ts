@@ -1,7 +1,7 @@
 import type { TFile } from "obsidian";
 import type { DataUpdateContext } from "indexing/index-service/IndexEvents";
 import type { TwoHopResolverDependencies } from "two-hop/resolution/ResolverDependencies";
-import type { PreviewInvalidation } from "preview/PreviewRevisionState.svelte";
+import type { PreviewInvalidation } from "card-preview/PreviewRevisionState.svelte";
 
 export interface ReloadDecisionInput {
 	currentFile: TFile | undefined;

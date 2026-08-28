@@ -65,7 +65,8 @@ src/
   cards/                    # Card models, lists, grids, interactions, and virtualization
   indexing/                 # Vault indexing and query state
   two-hop/                  # Two-hop resolution, display state, and UI
-  preview/                  # Card preview pipeline, rendering, scheduling, and popovers
+  card-preview/             # Card preview pipeline, rendering, and scheduling
+  hover-preview/            # Obsidian hover-preview integration and Shadow DOM bridging
   search/                   # Search filtering and worker boundary
   settings/                 # Settings model, persistence, effects, and UI
   obsidian/                 # Obsidian integration, lifecycle, workspace, and custom-view hosts
@@ -93,7 +94,7 @@ src/
 
 ## Shadow DOM hover popovers
 
-- Implementation lives in `src/preview/popover/shadow-hover/`. See that directory's `README.md` for architecture, mechanisms, and invariants.
+- Implementation lives in `src/hover-popover/shadow-hover/`. See that directory's `README.md` for architecture, mechanisms, and invariants.
 
 ## Release workflow
 
@@ -111,7 +112,7 @@ src/
 - **Store caching**: `ComponentController` maintains an LRU of `ApplicationStore` instances keyed by `leafId:filePath`. Any change to store lifetime or keying must respect ref-counting and trimming logic.
 - **Search**: Full-text matching must remain unique-file based, cancellable, and cooperatively time-sliced. Do not reintroduce a resident full-content index without profiling evidence.
 - **Styles**: `styles.css` is shipped with the plugin; it uses CSS custom properties prefixed with `--ccl-`.
-- **Shadow hover state**: See `src/preview/popover/shadow-hover/README.md` for the invariants (pure reducers, no parallel lifecycle/interaction fields).
+- **Shadow hover state**: See `src/hover-popover/shadow-hover/README.md` for the invariants (pure reducers, no parallel lifecycle/interaction fields).
 
 ## Command Output
 
