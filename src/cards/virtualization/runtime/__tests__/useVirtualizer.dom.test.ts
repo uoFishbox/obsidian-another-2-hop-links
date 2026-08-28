@@ -411,6 +411,116 @@ describe("useVirtualizer", () => {
 		cleanup();
 	});
 
+	it("notifies stable scroll idle inside coverage without resolving or publishing ranges", () => {
+		const onStableMeasurement = vi.fn();
+		const {
+			runtime,
+			findVisibleRangeInto,
+			findVisibleRangesInto,
+			onSnapshotUpdated,
+		} = createRuntimeHarness(
+			{
+				mounted: { start: 0, end: 10 },
+				previewVisible: { start: 2, end: 8 },
+				mountedCoverageBand: { min: 20, max: 80 },
+				previewCoverageBand: { min: 30, max: 70 },
+			},
+			{ onStableMeasurement },
+		);
+		runtime.runScrollMeasurement(ACTIVE_SCROLL_METRICS);
+		const mountedResolutionCount = findVisibleRangeInto.mock.calls.length;
+		const rangedResolutionCount = findVisibleRangesInto.mock.calls.length;
+		const snapshotPublicationCount = onSnapshotUpdated.mock.calls.length;
+		onStableMeasurement.mockClear();
+
+		const result = runtime.runScrollMeasurement(
+			{
+				...ACTIVE_SCROLL_METRICS,
+				scrollTop: 60,
+				frameId: 2,
+				isScrollActive: false,
+			},
+			"scroll-idle",
+		);
+
+		expect(result.kind).toBe("measured");
+		expect(findVisibleRangeInto).toHaveBeenCalledTimes(mountedResolutionCount);
+		expect(findVisibleRangesInto).toHaveBeenCalledTimes(rangedResolutionCount);
+		expect(onSnapshotUpdated).toHaveBeenCalledTimes(snapshotPublicationCount);
+		expect(onStableMeasurement).toHaveBeenCalledOnce();
+		expect(onStableMeasurement).toHaveBeenCalledWith(
+			expect.objectContaining({
+				scrollTop: 60,
+				viewportHeight: 100,
+				sectionTop: 0,
+				isScrollActive: false,
+			}),
+		);
+	});
+
+	it.each([29, 30, 70, 71])(
+		"fully measures scroll idle outside or at coverage boundary %s",
+		(scrollTop) => {
+			const { runtime, findVisibleRangeInto, findVisibleRangesInto } =
+				createRuntimeHarness({
+					mounted: { start: 0, end: 10 },
+					previewVisible: { start: 2, end: 8 },
+					mountedCoverageBand: { min: 20, max: 80 },
+					previewCoverageBand: { min: 30, max: 70 },
+				});
+			runtime.runScrollMeasurement(ACTIVE_SCROLL_METRICS);
+			const mountedResolutionCount = findVisibleRangeInto.mock.calls.length;
+			const rangedResolutionCount = findVisibleRangesInto.mock.calls.length;
+
+			runtime.runScrollMeasurement(
+				{
+					...ACTIVE_SCROLL_METRICS,
+					scrollTop,
+					frameId: 2,
+					isScrollActive: false,
+				},
+				"scroll-idle",
+			);
+
+			expect(findVisibleRangeInto.mock.calls.length).toBeGreaterThan(
+				mountedResolutionCount,
+			);
+			expect(findVisibleRangesInto.mock.calls.length).toBeGreaterThan(
+				rangedResolutionCount,
+			);
+		},
+	);
+
+	it("fully measures covered scroll idle when publication is forced", () => {
+		const { runtime, findVisibleRangeInto, findVisibleRangesInto } =
+			createRuntimeHarness({
+				mounted: { start: 0, end: 10 },
+				previewVisible: { start: 2, end: 8 },
+				mountedCoverageBand: { min: 20, max: 80 },
+				previewCoverageBand: { min: 30, max: 70 },
+			});
+		runtime.runScrollMeasurement(ACTIVE_SCROLL_METRICS);
+		const mountedResolutionCount = findVisibleRangeInto.mock.calls.length;
+		const rangedResolutionCount = findVisibleRangesInto.mock.calls.length;
+
+		runtime.runScrollMeasurement(
+			{
+				...ACTIVE_SCROLL_METRICS,
+				scrollTop: 60,
+				frameId: 2,
+				isScrollActive: false,
+			},
+			{ forcePublish: true, reason: "scroll-idle" },
+		);
+
+		expect(findVisibleRangeInto.mock.calls.length).toBeGreaterThan(
+			mountedResolutionCount,
+		);
+		expect(findVisibleRangesInto.mock.calls.length).toBeGreaterThan(
+			rangedResolutionCount,
+		);
+	});
+
 	it("suppresses scroll work while layout measurement is pending", async () => {
 		const { runtime, onSnapshotUpdated, findVisibleRangesInto } =
 			createRuntimeHarness();

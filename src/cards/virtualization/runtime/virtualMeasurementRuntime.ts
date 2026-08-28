@@ -437,6 +437,7 @@ export function createVirtualMeasurementRuntime<
 	): VirtualMeasurementResult {
 		const isReasonOnly = typeof optionsOrReason === "string";
 		const forcePublish = isReasonOnly ? false : optionsOrReason.forcePublish;
+		const reason = isReasonOnly ? optionsOrReason : optionsOrReason.reason;
 		const rootEl = getRootEl();
 		if (!getOptionalOwnerWindow(rootEl ?? measurement.scrollContainerEl)) {
 			return SKIPPED_NO_WINDOW;
@@ -465,6 +466,17 @@ export function createVirtualMeasurementRuntime<
 		scrollMeasurement.sharedScrollMetrics = sharedScrollMetrics;
 		scrollMeasurement.scrollGeneration =
 			sharedScrollMetrics?.scrollGeneration ?? observedScrollGeneration;
+
+		if (
+			!forcePublish &&
+			reason === "scroll-idle" &&
+			scrollMeasurement.isStableMeasurement &&
+			scrollCoverage.isWithinCoverage(scrollMeasurement.scrollTop)
+		) {
+			notifyStableMeasurement(scrollMeasurement);
+			resetUnstableMeasurementRetry();
+			return scrollMeasurementResult;
+		}
 
 		if (
 			!forcePublish &&

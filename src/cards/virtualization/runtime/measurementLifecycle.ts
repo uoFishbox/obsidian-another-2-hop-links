@@ -365,6 +365,7 @@ export interface VirtualScrollCoverageController {
 	clearObservation(observation: VirtualViewportObservation): void;
 	setCoverageBand(coverageBand?: StableScrollTopBand): void;
 	reset(): void;
+	isWithinCoverage(scrollTop: number): boolean;
 	resolvePublishedCoverageBand(
 		mountedMeasurement: MountedScrollWindowMeasurement,
 		rangedMeasurement: RangedScrollWindowMeasurement,
@@ -407,6 +408,10 @@ export function createVirtualScrollCoverageController(): VirtualScrollCoverageCo
 
 	function reset(): void {
 		setCoverageBand();
+	}
+
+	function isWithinCoverage(scrollTop: number): boolean {
+		return scrollTop > coverageScrollTopMin && scrollTop < coverageScrollTopMax;
 	}
 
 	function resolvePublishedCoverageBand(
@@ -458,6 +463,7 @@ export function createVirtualScrollCoverageController(): VirtualScrollCoverageCo
 		clearObservation,
 		setCoverageBand,
 		reset,
+		isWithinCoverage,
 		resolvePublishedCoverageBand,
 		getMeasurementRange,
 		publish,
