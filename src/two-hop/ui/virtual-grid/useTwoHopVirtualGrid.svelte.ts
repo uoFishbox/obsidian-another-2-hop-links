@@ -78,6 +78,7 @@ interface LayoutAnchor {
 
 const EMPTY_RANGE: Readonly<RowRange> = Object.freeze({ start: 0, end: 0 });
 const EMPTY_MOUNTED_ROWS: readonly MountedTwoHopRow[] = [];
+const EMPTY_MOUNTED_CELLS: readonly MountedTwoHopCell[] = [];
 const RANGE_EFFECT_TASK_KEY = "two-hop-virtual-range-effects";
 
 /** Connects two-hop geometry and hydration to the shared bounded virtual-list runtime. */
@@ -185,6 +186,10 @@ export function useTwoHopVirtualGrid(
 		return virtualList.getMountedBuild()?.rowsByPhysicalSlot ?? EMPTY_MOUNTED_ROWS;
 	}
 
+	function getMountedCells(): readonly MountedTwoHopCell[] {
+		return virtualList.getMountedBuild()?.cells ?? EMPTY_MOUNTED_CELLS;
+	}
+
 	function buildPreviewBindings(): VirtualPreviewBinding[] {
 		if (!isPreviewSurfaceActive()) return [];
 		const bindings: VirtualPreviewBinding[] = [];
@@ -214,23 +219,20 @@ export function useTwoHopVirtualGrid(
 		const foreground: TwoHopCardHydrationCell[] = [];
 		const prefetch: TwoHopCardHydrationCell[] = [];
 		const background: TwoHopCardHydrationCell[] = [];
-		for (const row of getMountedRows()) {
-			for (const mountedCell of row.bindings) {
-				if (!mountedCell) continue;
-				if (mountedCell.cell.kind !== "item") continue;
-				if (
-					mountedCell.rowIndex >= visibleRange.start &&
-					mountedCell.rowIndex < visibleRange.end
-				) {
-					foreground.push(mountedCell.cell);
-				} else if (
-					mountedCell.rowIndex >= prefetchRange.start &&
-					mountedCell.rowIndex < prefetchRange.end
-				) {
-					prefetch.push(mountedCell.cell);
-				} else if (includeBackground) {
-					background.push(mountedCell.cell);
-				}
+		for (const mountedCell of getMountedCells()) {
+			if (mountedCell.cell.kind !== "item") continue;
+			if (
+				mountedCell.rowIndex >= visibleRange.start &&
+				mountedCell.rowIndex < visibleRange.end
+			) {
+				foreground.push(mountedCell.cell);
+			} else if (
+				mountedCell.rowIndex >= prefetchRange.start &&
+				mountedCell.rowIndex < prefetchRange.end
+			) {
+				prefetch.push(mountedCell.cell);
+			} else if (includeBackground) {
+				background.push(mountedCell.cell);
 			}
 		}
 		foreground.push(...prefetch);

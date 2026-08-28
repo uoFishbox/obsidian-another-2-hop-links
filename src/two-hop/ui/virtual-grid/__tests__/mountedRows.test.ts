@@ -44,13 +44,13 @@ describe("buildMountedTwoHopRows", () => {
 				rowRange: { start: 10, end: 19 },
 				rowSlotAllocator: allocator,
 			});
+			const cells = build.cells;
 
 			expect(build.rowsInMountedRange).toHaveLength(9);
-			expect(build.cells).toHaveLength(27);
+			expect(cells).toHaveLength(27);
+			expect(build.cells).toBe(cells);
 			expect(build.poolCapacity).toBe(9);
-			expect(new Set(build.cells.map((cell) => cell.physicalCellSlot)).size).toBe(
-				27,
-			);
+			expect(new Set(cells.map((cell) => cell.physicalCellSlot)).size).toBe(27);
 			allocator.dispose();
 		}
 	});
