@@ -4,11 +4,12 @@ import { renderFlatCardGridContract } from "./flatCardGridContractFixture";
 import {
 	createItems,
 	getFlatCardGridElements,
+	scrollFlatCardGrid,
 	setFlatCardGridViewport,
 	setupFlatCardGridTestEnvironment,
 } from "./flatCardGridTestEnvironment";
 import FlatCardGridHarness from "./FlatCardGridHarness.svelte";
-import { setNumericProperty } from "testing/helpers/DOMObserverMock";
+import { flushFrames, setNumericProperty } from "testing/helpers/DOMObserverMock";
 
 setupFlatCardGridTestEnvironment();
 
@@ -71,6 +72,38 @@ describe("FlatCardGrid virtualization contract", () => {
 		expect(onScrollStateChange).toHaveBeenLastCalledWith({
 			localScrollTop: 520,
 			visibleCount: 30,
+		});
+	});
+
+	it("publishes the latest scroll state after active scrolling becomes idle", async () => {
+		const onScrollStateChange = vi.fn();
+		const { container } = render(FlatCardGridHarness, {
+			props: {
+				items: createItems(100),
+				initialVisibleCount: 100,
+				onScrollStateChange,
+			},
+		});
+		const elements = getFlatCardGridElements(container);
+		await setFlatCardGridViewport(elements, {
+			rootHeight: 120,
+			width: 330,
+		});
+		onScrollStateChange.mockClear();
+
+		await scrollFlatCardGrid(elements, {
+			scrollTop: 1500,
+			sectionTop: -1500,
+		});
+
+		expect(onScrollStateChange).not.toHaveBeenCalled();
+
+		await new Promise<void>((resolve) => window.setTimeout(resolve, 100));
+		await flushFrames();
+
+		expect(onScrollStateChange).toHaveBeenLastCalledWith({
+			localScrollTop: 1500,
+			visibleCount: 100,
 		});
 	});
 

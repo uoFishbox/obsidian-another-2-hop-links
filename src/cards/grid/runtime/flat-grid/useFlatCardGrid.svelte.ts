@@ -545,7 +545,9 @@ export function useFlatCardGrid<T>(
 			return;
 		}
 
-		publishScrollState(context);
+		if (!context.isScrollActive) {
+			publishScrollState(context);
+		}
 		maybeScheduleInfiniteScrollLoad(context);
 	}
 
