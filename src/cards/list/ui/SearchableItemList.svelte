@@ -9,10 +9,10 @@
 	import { useBookmarks } from "cards/hooks/useBookmarks.svelte";
 	import {
 		useStreamingSearchSession,
+		type SearchDatasetSnapshot,
 		type SearchMatchSnapshot,
 	} from "search/useStreamingSearchSession.svelte";
 	import { focusResultEdge } from "cards/navigation/resultFocus";
-	import { yieldToMainThreadIdleAware } from "indexing/timeSlicing";
 	import type { ListConfig } from "./types";
 	import {
 		setLinkContext,
@@ -28,7 +28,7 @@
 		createItemSearchTextCache,
 		getItemSearchText,
 	} from "cards/list/model/itemSearchText";
-	import type { SearchItemSnapshot } from "search/searchTypes";
+	import type { SearchItemSnapshot, SearchMatchScope } from "search/searchTypes";
 	import {
 		getSortedViewItems,
 		pinBookmarkedViewItems,
@@ -42,12 +42,11 @@
 	import type { PreviewRuntime } from "preview/runtime/previewRuntime";
 	import type { ListViewUiState } from "cards/list/model/listViewUiState";
 
-	const SEARCH_FILTER_YIELD_CHECK_INTERVAL = 128;
-	const SEARCH_FILTER_YIELD_MAX_DELAY_MS = 16;
-
 	interface SearchablePresentation {
 		readonly result: SearchMatchSnapshot | null;
 		readonly items: readonly CardItem[];
+		readonly consumedMatchCount: number;
+		readonly sourceItems: readonly CardItem[] | null;
 	}
 
 	interface Props {
@@ -105,6 +104,12 @@
 	const contentSearchEnabledSetting = $derived(
 		applicationStore.settings?.enableContentSearch ?? false,
 	);
+	let searchMatchScope = $derived.by(
+		(): SearchMatchScope =>
+			allowContentSearch && contentSearchEnabled
+				? "title-and-content"
+				: "title-only",
+	);
 
 	function syncContentSearchToggleFromSettings(): void {
 		contentSearchEnabled = contentSearchEnabledSetting;
@@ -144,54 +149,7 @@
 			).toLowerCase(),
 		);
 	};
-	const buildSearchDataset = (): SearchItemSnapshot[] => {
-		void itemsRevision;
-		return items.map((item) => ({
-			key: getItemKey(item),
-			searchText: getCachedItemSearchText(item),
-			targetFilePath: getItemTargetFile(item, linkContext)?.path ?? null,
-		}));
-	};
-	const getSearchableFiles = (): TFile[] => {
-		void itemsRevision;
-		const filesByPath = new Map<string, TFile>();
-		for (const item of items) {
-			const targetFile = getItemTargetFile(item, linkContext);
-			if (targetFile) {
-				filesByPath.set(targetFile.path, targetFile);
-			}
-		}
-		return Array.from(filesByPath.values());
-	};
-
-	setLinkContext(linkContext);
-	setContext<ListViewState>("applicationStore", applicationStore);
 	const bookmarks = useBookmarks(app);
-	const searchSession = useStreamingSearchSession({
-		app,
-		query: () => search.normalized,
-		enabled: () => searchEnabled && !!search.normalized,
-		matchScope: () =>
-			allowContentSearch && contentSearchEnabled
-				? "title-and-content"
-				: "title-only",
-		getSearchableFiles,
-		buildDataset: buildSearchDataset,
-	});
-
-	setAppContext({
-		linkContext,
-		applicationStore,
-		app,
-		bookmarks,
-		previewRuntime,
-		resolveSearchMatchPosition: (query, file) =>
-			searchSession.getFirstMatchPosition(query, file),
-	});
-	const lazyLoaderCache = new Set<string>();
-	setLazyLoaderCache(lazyLoaderCache);
-	let isSearchLoading = $derived(searchSession.isPending);
-
 	let sortedItems = $derived.by(() => {
 		void sortSettingsSignature;
 		if (config.getSortedItems) {
@@ -201,95 +159,129 @@
 			toCardItem(raw),
 		);
 	});
+	let orderedItems = $derived.by(() => {
+		const sourceItems = sortedItems;
+		const shouldPin = config.pinBookmarkedToTop;
+		void bookmarks.filePaths.size;
+		void bookmarks.orderedFilePaths;
+		return shouldPin ? pinBookmarkedViewItems(sourceItems, bookmarks) : sourceItems;
+	});
+	let orderedItemByKey = $derived.by(() => {
+		const byKey = new Map<string, CardItem>();
+		for (const item of orderedItems) byKey.set(getItemKey(item), item);
+		return byKey;
+	});
+	const buildSearchSnapshot = (): SearchDatasetSnapshot => {
+		void itemsRevision;
+		const searchItems: SearchItemSnapshot[] = [];
+		const filesByPath = new Map<string, TFile>();
+		for (const item of orderedItems) {
+			const targetFile = getItemTargetFile(item, linkContext);
+			if (targetFile) filesByPath.set(targetFile.path, targetFile);
+			searchItems.push({
+				key: getItemKey(item),
+				searchText: getCachedItemSearchText(item),
+				targetFilePath: targetFile?.path ?? null,
+			});
+		}
+		return {
+			items: searchItems,
+			searchableFiles: Array.from(filesByPath.values()),
+		};
+	};
+
+	setLinkContext(linkContext);
+	setContext<ListViewState>("applicationStore", applicationStore);
+	const searchSession = useStreamingSearchSession({
+		app,
+		query: () => search.normalized,
+		enabled: () => searchEnabled && !!search.normalized,
+		matchScope: () => searchMatchScope,
+		buildSnapshot: buildSearchSnapshot,
+	});
+
+	setAppContext({
+		linkContext,
+		applicationStore,
+		app,
+		bookmarks,
+		previewRuntime,
+		resolveSearchMatchPosition: (query, file) =>
+			searchSession.resolveFirstMatchPosition(query, file),
+		resolveSearchMatchOffset: (query, file) =>
+			searchSession.getFirstMatchOffset(query, file),
+	});
+	const lazyLoaderCache = new Set<string>();
+	setLazyLoaderCache(lazyLoaderCache);
+	let isSearchLoading = $derived(searchSession.isPending);
 
 	let presentation = $state.raw<SearchablePresentation>({
 		result: null,
 		items: [],
+		consumedMatchCount: 0,
+		sourceItems: null,
 	});
 	let filteredItems = $derived(presentation.items);
 	let appliedSearchQuery = $derived(presentation.result?.query ?? "");
 	let appliedSearchScope = $derived(presentation.result?.scope ?? "title-only");
-	let filterRunSerial = 0;
-
 	$effect(() => {
-		const serial = ++filterRunSerial;
 		void itemsRevision;
-		const sourceItems = sortedItems;
+		const sourceItems = orderedItems;
+		const itemByKey = orderedItemByKey;
 		const query = search.normalized;
-		const committedResult = searchSession.committedResult;
-		const progressiveResult = searchSession.progressiveResult;
-		const result =
-			searchSession.currentResult ??
-			(progressiveResult?.query === query ? progressiveResult : null);
-		const shouldPin = config.pinBookmarkedToTop;
-		void bookmarks.filePaths.size;
-		void bookmarks.orderedFilePaths;
+		const visibleResult = searchSession.visibleResult;
+		const currentPresentation = untrack(() => presentation);
+		if (!searchEnabled || !query) {
+			presentation = {
+				result: null,
+				items: sourceItems,
+				consumedMatchCount: 0,
+				sourceItems,
+			};
+			return;
+		}
+		if (visibleResult?.type === "stale") return;
+		const result = visibleResult?.result ?? null;
 
-		void (async () => {
-			if (!searchEnabled || !query) {
-				const nextItems = shouldPin
-					? pinBookmarkedViewItems(sourceItems, bookmarks)
-					: sourceItems;
-				const currentItems = untrack(() => presentation.items);
+		if (!result) {
+			if (
+				currentPresentation.result !== null ||
+				currentPresentation.items.length > 0
+			) {
 				presentation = {
 					result: null,
-					items: nextItems === currentItems ? [...nextItems] : nextItems,
+					items: [],
+					consumedMatchCount: 0,
+					sourceItems,
 				};
-				return;
 			}
+			return;
+		}
 
-			if (!result) {
-				const visibleResult = untrack(() => presentation.result);
-				if (committedResult === null && visibleResult !== null) {
-					// A provisional result belongs only to its exact query. Keeping it
-					// here would leave prefix-query cards/highlights visible after input.
-					presentation = { result: null, items: [] };
-				}
-				return;
-			}
+		const continuesCurrentRun =
+			currentPresentation.result?.requestId === result.requestId &&
+			currentPresentation.sourceItems === sourceItems;
+		const consumedMatchCount = continuesCurrentRun
+			? currentPresentation.consumedMatchCount
+			: 0;
+		const addedItems: CardItem[] = [];
+		for (
+			let index = consumedMatchCount;
+			index < result.orderedMatches.length;
+			index += 1
+		) {
+			const item = itemByKey.get(result.orderedMatches[index].key);
+			if (item) addedItems.push(item);
+		}
 
-			const nextItems: CardItem[] = [];
-			let lastPublish = performance.now();
-
-			for (let index = 0; index < sourceItems.length; index += 1) {
-				if (serial !== filterRunSerial) {
-					return;
-				}
-
-				const item = sourceItems[index];
-				if (result.matchesByKey.has(getItemKey(item))) {
-					nextItems.push(item);
-				}
-
-				if ((index + 1) % SEARCH_FILTER_YIELD_CHECK_INTERVAL !== 0) {
-					continue;
-				}
-
-				const now = performance.now();
-				if (now - lastPublish <= SEARCH_FILTER_YIELD_MAX_DELAY_MS) {
-					continue;
-				}
-
-				await yieldToMainThreadIdleAware({
-					maxDelayMs: SEARCH_FILTER_YIELD_MAX_DELAY_MS,
-				});
-				lastPublish = performance.now();
-			}
-
-			const resultIsStillCurrent =
-				searchSession.currentResult === result ||
-				searchSession.progressiveResult === result;
-			if (serial !== filterRunSerial || !resultIsStillCurrent) {
-				return;
-			}
-
-			presentation = {
-				result,
-				items: shouldPin
-					? pinBookmarkedViewItems(nextItems, bookmarks)
-					: nextItems,
-			};
-		})();
+		presentation = {
+			result,
+			items: continuesCurrentRun
+				? [...currentPresentation.items, ...addedItems]
+				: addedItems,
+			consumedMatchCount: result.orderedMatches.length,
+			sourceItems,
+		};
 	});
 
 	let initialVisibleCount = $derived(applicationStore.initialVisibleCount);
@@ -345,7 +337,6 @@
 				applicationStore.previewState.getRenderVersion(path),
 			searchQuery: revision.searchQuery,
 			searchScope,
-			contentPreview: matchedItem?.contentPreview,
 			interactionId,
 		});
 		revision.modelsByKey.set(itemKey, { item, model });
@@ -426,7 +417,7 @@
 				if (
 					currentInputQuery &&
 					(searchSession.phase !== "ready" ||
-						presentation.result !== searchSession.currentResult)
+						presentation.result !== searchSession.visibleResult?.result)
 				) {
 					return;
 				}

@@ -1,5 +1,6 @@
 import { onDestroy, untrack } from "svelte";
-import type { Pos, TFile } from "obsidian";
+import type { TFile } from "obsidian";
+import type { SearchContentMatch } from "search/searchTypes";
 import type { CardCollectionState } from "cards/CardCollectionState.svelte";
 import type { CardRenderModel } from "cards/rendering/cardRenderModel";
 import type {
@@ -48,10 +49,10 @@ import {
 /** Dependencies required to enable previews on the two-hop virtual surface. */
 export interface TwoHopPreviewDependencies {
 	readonly previewRuntime: PreviewRuntime;
-	readonly resolveSearchMatchPosition: (
+	readonly resolveSearchMatchOffset: (
 		query: string,
 		file: TFile | null | undefined,
-	) => Pos | undefined;
+	) => SearchContentMatch | undefined;
 }
 
 export interface TwoHopVirtualGridProps {
@@ -110,8 +111,7 @@ export function useTwoHopVirtualGrid(
 	const previewSurface = previewDependencies
 		? previewDependencies.previewRuntime.createSurface({
 				frameCoordinator,
-				resolveSearchMatchPosition:
-					previewDependencies.resolveSearchMatchPosition,
+				resolveSearchMatchOffset: previewDependencies.resolveSearchMatchOffset,
 			})
 		: DISABLED_PREVIEW_SURFACE;
 

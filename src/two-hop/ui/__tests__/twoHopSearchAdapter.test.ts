@@ -4,10 +4,9 @@ import type { TFile } from "obsidian";
 import type { TagGroup, TwoHopLinkBranch } from "two-hop/model";
 import type { TaggedNote, IndexedLink } from "indexing/model";
 import type { SearchMatchedItem } from "search/searchTypes";
-import type { SearchResultSnapshot } from "search/useStreamingSearchSession.svelte";
 import type { DisplayData } from "two-hop/display/displayDataBuilder";
 import {
-	createTwohopSearchAdapter,
+	buildTwoHopSearchSnapshot,
 	type TwohopSearchAdapterOptions,
 	type TwohopSearchRenderMode,
 } from "two-hop/ui/twoHopSearchAdapter";
@@ -29,11 +28,10 @@ vi.mock("obsidian", () => {
 });
 
 function createSearchAdapterHarness() {
-	const adapter = createTwohopSearchAdapter();
 	return {
-		...adapter,
+		buildSnapshot: buildTwoHopSearchSnapshot,
 		buildDataset: (options: TwohopSearchAdapterOptions) =>
-			adapter.buildSnapshot(options).items,
+			buildTwoHopSearchSnapshot(options).items,
 	};
 }
 
@@ -89,30 +87,20 @@ const DEFAULT_RENDER_MODE: TwohopSearchRenderMode = {
 	showTags: true,
 };
 
-function createMatchesByKey(keys: Iterable<string>): Map<string, SearchMatchedItem> {
-	const matchesByKey = new Map<string, SearchMatchedItem>();
-	for (const key of keys) {
-		matchesByKey.set(key, {
-			key,
-			contentMatched: false,
-		});
-	}
-	return matchesByKey;
-}
-
-function createSearchResult(
-	query: string,
-	matchesByKey: ReadonlyMap<string, SearchMatchedItem>,
-): SearchResultSnapshot {
-	return {
-		requestId: 1,
-		query,
-		scope: "title-only",
-		datasetRevision: 1,
-		contentRevision: 0,
-		matchesByKey,
-		firstContentMatchPositionByPath: new Map(),
-	};
+function applyIncrementalMatches(
+	options: TwohopSearchAdapterOptions,
+	keys: readonly string[],
+): DisplayData {
+	return buildTwoHopSearchSnapshot(options)
+		.createIncrementalFilter()
+		.append(
+			keys.map(
+				(key): SearchMatchedItem => ({
+					key,
+					contentMatched: false,
+				}),
+			),
+		);
 }
 
 function createAdapterOptions(
@@ -168,6 +156,8 @@ function createAdapterOptions(
 		getMetadata: vi.fn(
 			(file: TFile) => (metadataByPath.get(file.path) ?? null) as never,
 		),
+		getSortedTwoHopItems: vi.fn((items: readonly IndexedLink[]) => items),
+		getSortedTagGroupItems: vi.fn((items: readonly TaggedNote[]) => items),
 		priorityFrontmatterKeyForTitle: "title",
 	};
 }
@@ -261,6 +251,54 @@ describe("TwohopSearchAdapter.buildDataset", () => {
 		expect(tagGroupSnapshot?.targetFilePath).toBeNull();
 	});
 
+	it("builds nested snapshots in the same sorted order as their sections", () => {
+		const sourceFile = createMockTFile("notes/source.md");
+		const parentFile = createMockTFile("notes/parent.md");
+		const firstChild = createBacklink(
+			createMockTFile("notes/first-child.md"),
+			"First Child",
+		);
+		const secondChild = createBacklink(
+			createMockTFile("notes/second-child.md"),
+			"Second Child",
+		);
+		const firstNote = createTaggedNote(createMockTFile("notes/first-note.md"));
+		const secondNote = createTaggedNote(createMockTFile("notes/second-note.md"));
+		const displayData = createDisplayData({
+			twoHopBranches: [
+				createBranch(sourceFile, parentFile.path, "Parent", [
+					firstChild,
+					secondChild,
+				]),
+			],
+			tagGroups: [
+				{
+					tag: "alpha",
+					notes: [firstNote, secondNote],
+				},
+			],
+		});
+		const options = createAdapterOptions(displayData, sourceFile);
+		options.getSortedTwoHopItems.mockImplementation((items) =>
+			[...items].reverse(),
+		);
+		options.getSortedTagGroupItems.mockImplementation((items) =>
+			[...items].reverse(),
+		);
+
+		const snapshots = searchAdapter.buildDataset(options);
+
+		expect(
+			snapshots.map((snapshot) => snapshot.targetFilePath ?? snapshot.searchText),
+		).toEqual([
+			secondChild.sourceFile.path,
+			firstChild.sourceFile.path,
+			"#alpha",
+			secondNote.file.path,
+			firstNote.file.path,
+		]);
+	});
+
 	it("uses only the active primary link mode for snapshots", () => {
 		const sourceFile = createMockTFile("notes/source.md");
 		const outgoingTarget = createMockTFile("notes/outgoing-target.md");
@@ -329,24 +367,8 @@ describe("TwohopSearchAdapter.buildDataset", () => {
 	});
 });
 
-describe("TwohopSearchAdapter.filterDisplayData", () => {
+describe("TwohopSearchAdapter incremental filtering", () => {
 	const searchAdapter = createSearchAdapterHarness();
-
-	it("returns original displayData when query is empty", () => {
-		const sourceFile = createMockTFile("notes/source.md");
-		const targetFile = createMockTFile("notes/target.md");
-		const displayData = createDisplayData({
-			outgoing: [createBranch(sourceFile, targetFile.path, "target")],
-		});
-
-		const result = searchAdapter.filterDisplayData(
-			displayData,
-			createSearchResult("", createMatchesByKey([])),
-			DEFAULT_RENDER_MODE,
-		);
-
-		expect(result).toBe(displayData);
-	});
 
 	it("returns empty sections when the committed result has no matches", () => {
 		const sourceFile = createMockTFile("notes/source.md");
@@ -356,10 +378,9 @@ describe("TwohopSearchAdapter.filterDisplayData", () => {
 			backlinks: [createBacklink(targetFile, "backlink")],
 		});
 
-		const result = searchAdapter.filterDisplayData(
-			displayData,
-			createSearchResult("query", createMatchesByKey([])),
-			DEFAULT_RENDER_MODE,
+		const result = applyIncrementalMatches(
+			createAdapterOptions(displayData, sourceFile),
+			[],
 		);
 
 		expect(result.outgoing).toEqual([]);
@@ -391,14 +412,7 @@ describe("TwohopSearchAdapter.filterDisplayData", () => {
 		expect(parentSnapshot).toBeDefined();
 		if (!parentSnapshot) return;
 
-		const result = searchAdapter.filterDisplayData(
-			displayData,
-			createSearchResult(
-				"needle-parent",
-				createMatchesByKey([parentSnapshot.key]),
-			),
-			DEFAULT_RENDER_MODE,
-		);
+		const result = applyIncrementalMatches(options, [parentSnapshot.key]);
 
 		expect(result.outgoing).toEqual([branch]);
 		expect(result.twoHopBranches).toHaveLength(0);
@@ -421,11 +435,7 @@ describe("TwohopSearchAdapter.filterDisplayData", () => {
 		const snapshots = searchAdapter.buildDataset(options);
 		const betaChildKey = snapshots.find((s) => s.key.includes("beta-child"))?.key;
 
-		const result = searchAdapter.filterDisplayData(
-			displayData,
-			createSearchResult("query", createMatchesByKey([betaChildKey ?? ""])),
-			DEFAULT_RENDER_MODE,
-		);
+		const result = applyIncrementalMatches(options, [betaChildKey ?? ""]);
 
 		expect(result.twoHopBranches).toHaveLength(1);
 		expect(result.twoHopBranches[0].hop2).toHaveLength(1);
@@ -446,11 +456,7 @@ describe("TwohopSearchAdapter.filterDisplayData", () => {
 		const snapshots = searchAdapter.buildDataset(options);
 		const tagGroupKey = snapshots.find((s) => s.key.startsWith("g"))?.key;
 
-		const result = searchAdapter.filterDisplayData(
-			displayData,
-			createSearchResult("query", createMatchesByKey([tagGroupKey ?? ""])),
-			DEFAULT_RENDER_MODE,
-		);
+		const result = applyIncrementalMatches(options, [tagGroupKey ?? ""]);
 
 		expect(result.tagGroups).toHaveLength(1);
 		expect(result.tagGroups[0].notes).toHaveLength(1);
@@ -475,11 +481,7 @@ describe("TwohopSearchAdapter.filterDisplayData", () => {
 		const snapshots = searchAdapter.buildDataset(options);
 		const betaNoteKey = snapshots.find((s) => s.key.includes("beta-note"))?.key;
 
-		const result = searchAdapter.filterDisplayData(
-			displayData,
-			createSearchResult("query", createMatchesByKey([betaNoteKey ?? ""])),
-			DEFAULT_RENDER_MODE,
-		);
+		const result = applyIncrementalMatches(options, [betaNoteKey ?? ""]);
 
 		expect(result.tagGroups).toHaveLength(1);
 		expect(result.tagGroups[0].notes).toHaveLength(1);
@@ -499,10 +501,9 @@ describe("TwohopSearchAdapter.filterDisplayData", () => {
 			],
 		});
 
-		const result = searchAdapter.filterDisplayData(
-			displayData,
-			createSearchResult("query", createMatchesByKey([])),
-			DEFAULT_RENDER_MODE,
+		const result = applyIncrementalMatches(
+			createAdapterOptions(displayData, sourceFile),
+			[],
 		);
 
 		expect(result.newLinks).toEqual([]);
@@ -527,14 +528,7 @@ describe("TwohopSearchAdapter.filterDisplayData", () => {
 			.buildDataset(options)
 			.find((snapshot) => snapshot.key.startsWith("m"))?.key;
 
-		const result = searchAdapter.filterDisplayData(
-			displayData,
-			createSearchResult("query", createMatchesByKey([mergedKey ?? ""])),
-			{
-				useMergedLinks: true,
-				showTags: true,
-			},
-		);
+		const result = applyIncrementalMatches(options, [mergedKey ?? ""]);
 
 		expect(result.outgoing).toEqual([]);
 		expect(result.backlinks).toEqual([]);
@@ -552,26 +546,22 @@ describe("TwohopSearchAdapter.filterDisplayData", () => {
 				} satisfies TagGroup,
 			],
 		});
-		const options = createAdapterOptions(displayData, sourceFile);
+		const options = createAdapterOptions(displayData, sourceFile, {
+			useMergedLinks: false,
+			showTags: false,
+		});
 		const tagGroupKey = searchAdapter
 			.buildDataset(options)
 			.find((snapshot) => snapshot.key.startsWith("g"))?.key;
 
-		const result = searchAdapter.filterDisplayData(
-			displayData,
-			createSearchResult("query", createMatchesByKey([tagGroupKey ?? ""])),
-			{
-				useMergedLinks: false,
-				showTags: false,
-			},
-		);
+		const result = applyIncrementalMatches(options, [tagGroupKey ?? ""]);
 
 		expect(result.tagGroups).toEqual([]);
 	});
 });
 
 describe("TwohopSearchAdapter.buildSnapshot", () => {
-	it("builds worker items and unique files in one snapshot", () => {
+	it("builds search items and unique files in one snapshot", () => {
 		const sourceFile = createMockTFile("notes/source.md");
 		const repeatedFile = createMockTFile("notes/repeated.md");
 		const displayData = createDisplayData({
@@ -598,7 +588,7 @@ describe("TwohopSearchAdapter.buildSnapshot", () => {
 });
 
 describe("TwohopSearchAdapter searchable files", () => {
-	it("collects files represented by worker items in active sections", () => {
+	it("collects files represented by search items in active sections", () => {
 		const sourceFile = createMockTFile("notes/source.md");
 		const outgoingTarget = createMockTFile("notes/outgoing-target.md");
 		const backlinkSource = createMockTFile("notes/backlink-source.md");
@@ -630,8 +620,7 @@ describe("TwohopSearchAdapter searchable files", () => {
 		};
 		const options = createAdapterOptions(displayData, sourceFile);
 
-		const files =
-			createTwohopSearchAdapter().buildSnapshot(options).searchableFiles;
+		const files = buildTwoHopSearchSnapshot(options).searchableFiles;
 		const filePaths = files.map((f) => f.path);
 
 		expect(filePaths).toEqual(
@@ -675,8 +664,7 @@ describe("TwohopSearchAdapter searchable files", () => {
 			showTags: false,
 		});
 
-		const files =
-			createTwohopSearchAdapter().buildSnapshot(options).searchableFiles;
+		const files = buildTwoHopSearchSnapshot(options).searchableFiles;
 		const filePaths = files.map((f) => f.path);
 
 		expect(filePaths).toEqual(
@@ -685,5 +673,47 @@ describe("TwohopSearchAdapter searchable files", () => {
 		expect(filePaths).not.toContain(outgoingTarget.path);
 		expect(filePaths).not.toContain(backlinkSource.path);
 		expect(filePaths).not.toContain(taggedFile.path);
+	});
+});
+
+describe("TwohopSearchAdapter incremental publication", () => {
+	it("appends nested matches in search order without mutating earlier snapshots", () => {
+		const sourceFile = createMockTFile("notes/source.md");
+		const parentFile = createMockTFile("notes/parent.md");
+		const firstChild = createBacklink(
+			createMockTFile("notes/first-child.md"),
+			"First Child",
+		);
+		const secondChild = createBacklink(
+			createMockTFile("notes/second-child.md"),
+			"Second Child",
+		);
+		const branch = createBranch(sourceFile, parentFile.path, "Parent", [
+			firstChild,
+			secondChild,
+		]);
+		const displayData = createDisplayData({ twoHopBranches: [branch] });
+		const options = createAdapterOptions(displayData, sourceFile);
+		options.getSortedTwoHopItems.mockImplementation((items) =>
+			[...items].reverse(),
+		);
+		const searchSnapshot = buildTwoHopSearchSnapshot(options);
+		const childMatches = searchSnapshot.items.map(
+			(item): SearchMatchedItem => ({
+				key: item.key,
+				contentMatched: false,
+			}),
+		);
+		const filter = searchSnapshot.createIncrementalFilter();
+
+		const firstSnapshot = filter.append([childMatches[0]]);
+		const secondSnapshot = filter.append([childMatches[1]]);
+
+		expect(
+			firstSnapshot.twoHopBranches[0].hop2.map((link) => link.sourceFile.path),
+		).toEqual([secondChild.sourceFile.path]);
+		expect(
+			secondSnapshot.twoHopBranches[0].hop2.map((link) => link.sourceFile.path),
+		).toEqual([secondChild.sourceFile.path, firstChild.sourceFile.path]);
 	});
 });

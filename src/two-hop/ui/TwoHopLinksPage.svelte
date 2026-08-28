@@ -10,7 +10,7 @@
 		useStreamingSearchSession,
 		type SearchMatchSnapshot,
 	} from "search/useStreamingSearchSession.svelte";
-	import type { SearchMatchedItem } from "search/searchTypes";
+	import type { SearchMatchedItem, SearchMatchScope } from "search/searchTypes";
 	import { focusResultEdge } from "cards/navigation/resultFocus";
 	import {
 		setLinkContext,
@@ -23,7 +23,8 @@
 	import type { PluginSettings } from "settings/model";
 	import { getCardLayoutCssText } from "cards/layout/cardLayoutCssVars";
 	import {
-		createTwohopSearchAdapter,
+		buildTwoHopSearchSnapshot,
+		type TwohopIncrementalSearchFilter,
 		type TwohopSearchRenderMode,
 	} from "two-hop/ui/twoHopSearchAdapter";
 	import type { DisplayData } from "two-hop/display/displayDataBuilder";
@@ -71,7 +72,6 @@
 				(matchedItem?.contentMatched ?? true)
 					? "title-and-content"
 					: "title-only",
-			contentPreview: matchedItem?.contentPreview,
 			interactionId: row.interactionId,
 		});
 	}
@@ -108,6 +108,17 @@
 		};
 	}
 
+	function hasDisplayDataItems(data: DisplayData): boolean {
+		return (
+			data.outgoing.length > 0 ||
+			data.backlinks.length > 0 ||
+			data.mergedItems.length > 0 ||
+			data.twoHopBranches.length > 0 ||
+			data.tagGroups.length > 0 ||
+			data.newLinks.length > 0
+		);
+	}
+
 	let {
 		file,
 		linkContext,
@@ -138,6 +149,10 @@
 	let currentSort = $derived(applicationUiState.sortOption);
 	let cardLayoutCssText = $derived(getCardLayoutCssText(currentSettings));
 	let contentSearchEnabled = $state(false);
+	let searchMatchScope = $derived.by(
+		(): SearchMatchScope =>
+			contentSearchEnabled ? "title-and-content" : "title-only",
+	);
 
 	$effect(() => {
 		contentSearchEnabled = currentSettings.enableContentSearch ?? false;
@@ -153,7 +168,16 @@
 		},
 	});
 	const bookmarks = useBookmarks(app);
-	const searchAdapter = createTwohopSearchAdapter();
+	let getSortedTwoHopItems = $derived.by(() => {
+		const store = applicationStore;
+		return (items: Parameters<TwoHopState["getSortedTwoHopItems"]>[0]) =>
+			store.getSortedTwoHopItems(items);
+	});
+	let getSortedTagGroupItems = $derived.by(() => {
+		const store = applicationStore;
+		return (items: Parameters<TwoHopState["getSortedTagGroupItems"]>[0]) =>
+			store.getSortedTagGroupItems(items);
+	});
 	const getSearchRenderMode = () => ({
 		useMergedLinks,
 		showTags,
@@ -165,18 +189,19 @@
 		fileToLinktext: linkContext.fileToLinktext,
 		sourcePath: file.path,
 		getMetadata: linkContext.getMetadata,
+		getSortedTwoHopItems,
+		getSortedTagGroupItems,
 		priorityFrontmatterKeyForTitle: currentSettings.priorityFrontmatterKeyForTitle,
 	});
 	let searchSnapshot = $derived.by(() =>
-		searchAdapter.buildSnapshot(getSearchAdapterOptions()),
+		buildTwoHopSearchSnapshot(getSearchAdapterOptions()),
 	);
 	const searchSession = useStreamingSearchSession({
 		app,
 		query: () => search.normalized,
 		enabled: () => !!search.normalized,
-		matchScope: () => (contentSearchEnabled ? "title-and-content" : "title-only"),
-		getSearchableFiles: () => searchSnapshot.searchableFiles,
-		buildDataset: () => searchSnapshot.items,
+		matchScope: () => searchMatchScope,
+		buildSnapshot: () => searchSnapshot,
 	});
 	let isSearchLoading = $derived(searchSession.isPending);
 	let searchPresentation = $state.raw<TwoHopSearchPresentation>({
@@ -184,11 +209,19 @@
 		displayData: untrack(() => displayData),
 		renderMode: untrack(getSearchRenderMode),
 	});
+	let incrementalSearchRun: {
+		readonly requestId: number;
+		readonly displayData: DisplayData;
+		readonly renderMode: TwohopSearchRenderMode;
+		readonly filter: TwohopIncrementalSearchFilter;
+		consumedMatchCount: number;
+	} | null = null;
 
 	$effect(() => {
 		const currentDisplayData = displayData;
 		const renderMode = getSearchRenderMode();
 		if (!search.normalized) {
+			incrementalSearchRun = null;
 			searchPresentation = {
 				result: null,
 				displayData: currentDisplayData,
@@ -197,13 +230,14 @@
 			return;
 		}
 
-		const committedResult = searchSession.committedResult;
-		const progressiveResult = searchSession.progressiveResult;
-		const result =
-			searchSession.currentResult ??
-			(progressiveResult?.query === search.normalized ? progressiveResult : null);
+		const visibleResult = searchSession.visibleResult;
+		if (visibleResult?.type === "stale") return;
+		const result = visibleResult?.result ?? null;
 		if (!result) {
-			if (committedResult === null && searchPresentation.result !== null) {
+			if (
+				searchPresentation.result !== null ||
+				hasDisplayDataItems(searchPresentation.displayData)
+			) {
 				searchPresentation = {
 					result: null,
 					displayData: clearDisplayData(),
@@ -212,17 +246,26 @@
 			}
 			return;
 		}
-		const filtered = searchAdapter.filterDisplayData(
-			currentDisplayData,
-			result,
-			renderMode,
-		);
-		if (
-			searchSession.currentResult !== result &&
-			searchSession.progressiveResult !== result
-		) {
-			return;
+		const continuesCurrentRun =
+			incrementalSearchRun?.requestId === result.requestId &&
+			incrementalSearchRun.displayData === currentDisplayData &&
+			incrementalSearchRun.renderMode.useMergedLinks ===
+				renderMode.useMergedLinks &&
+			incrementalSearchRun.renderMode.showTags === renderMode.showTags;
+		if (!continuesCurrentRun) {
+			incrementalSearchRun = {
+				requestId: result.requestId,
+				displayData: currentDisplayData,
+				renderMode,
+				filter: searchSnapshot.createIncrementalFilter(),
+				consumedMatchCount: 0,
+			};
 		}
+		const run = incrementalSearchRun;
+		if (!run) return;
+		const addedMatches = result.orderedMatches.slice(run.consumedMatchCount);
+		run.consumedMatchCount = result.orderedMatches.length;
+		const filtered = run.filter.append(addedMatches);
 		searchPresentation = { result, displayData: filtered, renderMode };
 	});
 
@@ -242,16 +285,6 @@
 	const onTagClick = linkContext.onTagClick;
 	const interactionTokens = createTwoHopInteractionTokenAllocator();
 	const sectionPublicationMemo = createTwoHopSectionPublicationMemo();
-	let getSortedTwoHopItems = $derived.by(() => {
-		const store = applicationStore;
-		return (items: Parameters<TwoHopState["getSortedTwoHopItems"]>[0]) =>
-			store.getSortedTwoHopItems(items);
-	});
-	let getSortedTagGroupItems = $derived.by(() => {
-		const store = applicationStore;
-		return (items: Parameters<TwoHopState["getSortedTagGroupItems"]>[0]) =>
-			store.getSortedTagGroupItems(items);
-	});
 	let getSectionVisibleCount = $derived.by(() => {
 		const expandedLimits = applicationUiState.sectionExpandedLimits ?? {};
 		const requestedDefaultLimit = Math.floor(
@@ -320,7 +353,9 @@
 		previewRuntime,
 		bookmarks,
 		resolveSearchMatchPosition: (query, targetFile) =>
-			searchSession.getFirstMatchPosition(query, targetFile),
+			searchSession.resolveFirstMatchPosition(query, targetFile),
+		resolveSearchMatchOffset: (query, targetFile) =>
+			searchSession.getFirstMatchOffset(query, targetFile),
 		updateSetting,
 	});
 
@@ -331,8 +366,8 @@
 	const previewDependencies: TwoHopPreviewDependencies | undefined = previewRuntime
 		? {
 				previewRuntime,
-				resolveSearchMatchPosition: (query, targetFile) =>
-					searchSession.getFirstMatchPosition(query, targetFile),
+				resolveSearchMatchOffset: (query, targetFile) =>
+					searchSession.getFirstMatchOffset(query, targetFile),
 			}
 		: undefined;
 

@@ -1,4 +1,4 @@
-import { Component, type App, type Pos, type TFile } from "obsidian";
+import { Component, type App, type TFile } from "obsidian";
 import { enqueueMathRender } from "preview/renderers/mathRenderQueue";
 import type { EnqueuePreviewRender } from "preview/renderers/previewRenderQueue";
 import { processPreviewContent } from "preview/renderers/markdownPreviewRenderer";
@@ -35,10 +35,10 @@ export interface CardPreviewRendererOptions {
 	domCommitScope: PreviewDomCommitScope;
 	enqueuePreviewRender: EnqueuePreviewRender;
 	sharedCache: CardPreviewSharedCache;
-	resolveSearchMatchPosition?: (
+	resolveSearchMatchOffset?: (
 		query: string,
 		file: TFile | null | undefined,
-	) => Pos | undefined;
+	) => { readonly offset: number } | undefined;
 }
 
 export interface PreviewRenderCallbacks {
@@ -333,10 +333,10 @@ export function createCardPreviewRenderer(
 				targetFile: request.file,
 				normalizedQuery,
 				firstMatchOffset: () =>
-					options.resolveSearchMatchPosition?.(
+					options.resolveSearchMatchOffset?.(
 						request.searchQuery,
 						request.file,
-					)?.start.offset,
+					)?.offset,
 				settings: request.settings,
 				vault: options.app.vault,
 				signal,

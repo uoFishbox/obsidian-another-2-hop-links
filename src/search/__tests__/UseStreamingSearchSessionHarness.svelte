@@ -1,5 +1,5 @@
 <script lang="ts">
-	import type { App, TFile } from "obsidian";
+	import type { App, Pos, TFile } from "obsidian";
 	import type { SearchItemSnapshot, SearchMatchScope } from "../searchTypes";
 	import { useStreamingSearchSession } from "../useStreamingSearchSession.svelte";
 
@@ -25,27 +25,32 @@
 		app,
 		query: () => query,
 		enabled: () => enabled,
-		getSearchableFiles: () => files,
-		buildDataset: () => dataset,
+		buildSnapshot: () => ({ items: dataset, searchableFiles: files }),
 		matchScope: () => matchScope,
 	});
 
-	const committedKeys = $derived(
-		session.committedResult
-			? Array.from(session.committedResult.matchesByKey.keys()).sort().join(",")
+	const visibleKeys = $derived(
+		session.visibleResult
+			? Array.from(session.visibleResult.result.matchesByKey.keys())
+					.sort()
+					.join(",")
 			: "null",
 	);
-	const progressiveKeys = $derived(
-		session.progressiveResult
-			? Array.from(session.progressiveResult.matchesByKey.keys()).sort().join(",")
-			: "null",
-	);
-	const firstPosition = $derived(session.getFirstMatchPosition(query, files[0]));
+	let firstPosition = $state.raw<Pos | null>(null);
+	let positionSerial = 0;
+	$effect(() => {
+		const serial = ++positionSerial;
+		const currentQuery = query;
+		const currentFile = files[0];
+		void session
+			.resolveFirstMatchPosition(currentQuery, currentFile)
+			.then((position) => {
+				if (serial === positionSerial) firstPosition = position ?? null;
+			});
+	});
 </script>
 
-<div data-testid="committed-keys">{committedKeys}</div>
-<div data-testid="progressive-keys">{progressiveKeys}</div>
-<div data-testid="committed-query">{session.committedResult?.query ?? ""}</div>
+<div data-testid="visible-keys">{visibleKeys}</div>
+<div data-testid="visible-query">{session.visibleResult?.result.query ?? ""}</div>
 <div data-testid="phase">{session.phase}</div>
-<div data-testid="current">{session.currentResult ? "true" : "false"}</div>
 <div data-testid="first-position">{JSON.stringify(firstPosition ?? null)}</div>

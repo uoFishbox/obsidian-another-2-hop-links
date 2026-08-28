@@ -36,7 +36,7 @@ vi.mock("cards/context/linkContext", async () => {
 
 	return {
 		...actual,
-		setAppContext: vi.fn(),
+		setAppContext: actual.setAppContext,
 		setLinkContext: vi.fn(),
 		setLazyLoaderCache: vi.fn(),
 	};
@@ -209,6 +209,114 @@ describe("SearchableItemList integration", () => {
 		await waitFor(() => expect(getAllSearchableItems()).toHaveLength(1));
 		expect(querySearchableItem("alpha-note")).toBeInTheDocument();
 		expect(querySearchableItem("beta-note")).not.toBeInTheDocument();
+	});
+
+	it("appends progressive matches without moving cards already shown", async () => {
+		const sourceFile = createMockTFile("notes/source.md");
+		const items = Array.from({ length: 11 }, (_unused, index) =>
+			createTaggedNoteItem(
+				createMockTFile(`notes/alpha-${String(index).padStart(2, "0")}.md`),
+			),
+		);
+		const expandedLimits = new Map<string, number>();
+		const applicationStore = {
+			sortOption: "alphabetical",
+			initialVisibleCount: 20,
+			loadMoreIncrement: 20,
+			settings: { ...DEFAULT_SETTINGS, enableContentSearch: false },
+			setSortOption: vi.fn(),
+			setContentSearchEnabled: vi.fn(),
+			getDefaultSectionVisibleLimit: vi.fn(() => 20),
+			getSectionExpandedLimit: vi.fn((sectionId: string) =>
+				expandedLimits.get(sectionId),
+			),
+			setSectionExpandedLimit: vi.fn((sectionId: string, limit: number) => {
+				expandedLimits.set(sectionId, limit);
+			}),
+			previewState: {
+				globalVersion: 0,
+				pathVersions: {},
+				getRenderVersion: () => "0:0",
+			},
+			updateVersion: 0,
+		} as unknown as ListViewState;
+		const sortService: ISortService = {
+			sort: vi.fn((sortableItems) => sortableItems),
+		};
+		const app = {
+			vault: { cachedRead: vi.fn(async () => "") },
+		} as never;
+		let idleCallback: IdleRequestCallback | undefined;
+		const requestIdle = vi
+			.spyOn(window, "requestIdleCallback")
+			.mockImplementation((callback) => {
+				idleCallback = callback;
+				return 77;
+			});
+		const cancelIdle = vi
+			.spyOn(window, "cancelIdleCallback")
+			.mockImplementation(() => {});
+		let clock = 0;
+		const performanceNow = vi
+			.spyOn(performance, "now")
+			.mockImplementation(() => (clock += 6));
+
+		render(SearchableItemList, {
+			props: {
+				items,
+				config: { ...createConfig(), showSectionHeader: true },
+				linkContext: createLinkContext(sourceFile),
+				applicationStore,
+				sortService,
+				app,
+				autofocus: false,
+				uiState: {
+					searchInputValue: "alpha",
+				} as ListViewUiState,
+			},
+		});
+		for (let index = 0; index < 5; index += 1) {
+			await Promise.resolve();
+			await tick();
+			await vi.advanceTimersByTimeAsync(0);
+		}
+		expect(idleCallback).toBeDefined();
+		const gridRoot = document.querySelector<HTMLElement>(
+			".cosense-card-links__virtual-grid",
+		);
+		if (!gridRoot) throw new Error("Unable to find progressive result grid");
+		setElementRect(gridRoot, { top: 0, width: 1600, height: 1000 });
+		triggerResize(gridRoot, 1600, 1000);
+		await vi.advanceTimersByTimeAsync(16);
+		await tick();
+
+		const firstPublication = getAllSearchableItems().map((item) =>
+			item.getAttribute("aria-label"),
+		);
+		expect(firstPublication.length).toBeGreaterThan(0);
+		expect(firstPublication).not.toContain(ARIA_LABELS.OPEN_LINK("alpha-10"));
+		expect(queryAllByRoleDeep("button", { name: "10 notes" })).toHaveLength(1);
+
+		idleCallback?.({
+			didTimeout: false,
+			timeRemaining: () => 10,
+		} as IdleDeadline);
+		await Promise.resolve();
+		await tick();
+		await vi.advanceTimersByTimeAsync(16);
+		await tick();
+
+		const finalPublication = getAllSearchableItems().map((item) =>
+			item.getAttribute("aria-label"),
+		);
+		expect(finalPublication.slice(0, firstPublication.length)).toEqual(
+			firstPublication,
+		);
+		expect(queryAllByRoleDeep("button", { name: "11 notes" })).toHaveLength(1);
+
+		performanceNow.mockRestore();
+		requestIdle.mockRestore();
+		cancelIdle.mockRestore();
 	});
 
 	it("restores and persists the search input through list UI state", async () => {

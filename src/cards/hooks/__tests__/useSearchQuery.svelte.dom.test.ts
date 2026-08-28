@@ -8,13 +8,12 @@ describe("useSearchQuery", () => {
 		vi.useRealTimers();
 	});
 
-	it("uses the initial value for both immediate and debounced search", () => {
+	it("uses the initial value for immediate and normalized search", () => {
 		const view = render(UseSearchQueryHarness, {
 			initialValue: " Restored Query ",
 		});
 
 		expect(view.getByLabelText("search")).toHaveValue(" Restored Query ");
-		expect(view.getByTestId("debounced").textContent).toBe(" Restored Query ");
 		expect(view.getByTestId("normalized").textContent).toBe("restored query");
 	});
 
@@ -30,10 +29,10 @@ describe("useSearchQuery", () => {
 			target: { value: "Next Query" },
 		});
 		expect(onInputChange).toHaveBeenCalledWith("Next Query");
-		expect(view.getByTestId("debounced").textContent).toBe("");
+		expect(view.getByTestId("normalized").textContent).toBe("");
 
 		vi.advanceTimersByTime(50);
 		await tick();
-		expect(view.getByTestId("debounced").textContent).toBe("Next Query");
+		expect(view.getByTestId("normalized").textContent).toBe("next query");
 	});
 });

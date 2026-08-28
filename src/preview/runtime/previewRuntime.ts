@@ -27,7 +27,7 @@ export interface PreviewRuntimeOptions {
 /** Per-surface values which are expected to vary with the current view. */
 export interface PreviewRuntimeSurfaceOptions {
 	readonly frameCoordinator: VirtualFrameCoordinator;
-	readonly resolveSearchMatchPosition?: CardPreviewRendererOptions["resolveSearchMatchPosition"];
+	readonly resolveSearchMatchOffset?: CardPreviewRendererOptions["resolveSearchMatchOffset"];
 }
 
 /**
@@ -83,8 +83,7 @@ export function createPreviewRuntime(options: PreviewRuntimeOptions): PreviewRun
 					getPreview: options.getPreview,
 					enqueuePreviewRender: previewRenderQueue.enqueue,
 					sharedCache,
-					resolveSearchMatchPosition:
-						surfaceOptions.resolveSearchMatchPosition,
+					resolveSearchMatchOffset: surfaceOptions.resolveSearchMatchOffset,
 					domCommitScope,
 				}),
 		});

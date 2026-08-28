@@ -43,8 +43,7 @@ describe("useStreamingSearchSession", () => {
 		await waitFor(() =>
 			expect(screen.getByTestId("phase")).toHaveTextContent("ready"),
 		);
-		expect(screen.getByTestId("committed-keys")).toHaveTextContent("alpha");
-		expect(screen.getByTestId("current")).toHaveTextContent("true");
+		expect(screen.getByTestId("visible-keys")).toHaveTextContent("alpha");
 		expect(cachedRead).not.toHaveBeenCalled();
 	});
 
@@ -67,7 +66,7 @@ describe("useStreamingSearchSession", () => {
 		await waitFor(() =>
 			expect(screen.getByTestId("phase")).toHaveTextContent("ready"),
 		);
-		expect(screen.getByTestId("committed-keys")).toHaveTextContent("beta");
+		expect(screen.getByTestId("visible-keys")).toHaveTextContent("beta");
 		expect(screen.getByTestId("first-position").textContent).toContain(
 			'"start":{"line":1,"col":9,"offset":18}',
 		);
@@ -106,11 +105,11 @@ describe("useStreamingSearchSession", () => {
 			dataset,
 		});
 		await waitFor(() =>
-			expect(screen.getByTestId("committed-query")).toHaveTextContent("beta"),
+			expect(screen.getByTestId("visible-query")).toHaveTextContent("beta"),
 		);
 
 		resolveAlpha("alpha body");
 		await Promise.resolve();
-		expect(screen.getByTestId("committed-query")).toHaveTextContent("beta");
+		expect(screen.getByTestId("visible-query")).toHaveTextContent("beta");
 	});
 });

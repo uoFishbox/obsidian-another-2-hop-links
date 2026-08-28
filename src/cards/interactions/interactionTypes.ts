@@ -122,30 +122,85 @@ export function resolveDescriptorInteractionOptions(
 	descriptor: InteractionDescriptor,
 	appContext: AppContext | undefined,
 ): LinkInteractionOptions {
-	const normalizedSearchQuery = descriptor.searchQuery?.trim().toLowerCase() ?? "";
-
-	if (!normalizedSearchQuery) {
-		return { highlightMode: "auto" };
-	}
-
-	if (!descriptor.targetFile) {
-		return { highlightMode: "suppress" };
-	}
-
-	const preferredPosition =
-		appContext?.resolveSearchMatchPosition?.(
-			normalizedSearchQuery,
-			descriptor.targetFile,
-		) ?? undefined;
-
-	if (!preferredPosition) {
-		return { highlightMode: "suppress" };
+	const resolution = resolveSearchPositionRequest(descriptor, appContext);
+	if (resolution.type !== "resolved") {
+		return { highlightMode: resolution.type === "none" ? "auto" : "suppress" };
 	}
 
 	return {
 		highlightMode: "force",
-		preferredPosition,
+		preferredPosition: resolution.position,
 	};
+}
+
+/** Resolves an offset-backed search position only when an interaction needs it. */
+export function resolveDescriptorInteractionOptionsAsync(
+	descriptor: InteractionDescriptor,
+	appContext: AppContext | undefined,
+): LinkInteractionOptions | Promise<LinkInteractionOptions> {
+	const resolution = resolveSearchPositionRequest(descriptor, appContext);
+	if (resolution.type === "none") return { highlightMode: "auto" };
+	if (resolution.type === "missing") return { highlightMode: "suppress" };
+	if (resolution.type === "resolved") {
+		return { highlightMode: "force", preferredPosition: resolution.position };
+	}
+
+	return resolution.position.then((position) =>
+		position
+			? { highlightMode: "force", preferredPosition: position }
+			: { highlightMode: "suppress" },
+	);
+}
+
+type SearchPositionResolution =
+	| { readonly type: "none" }
+	| { readonly type: "missing" }
+	| {
+			readonly type: "resolved";
+			readonly position: NonNullable<LinkInteractionOptions["preferredPosition"]>;
+	  }
+	| {
+			readonly type: "pending";
+			readonly position: Promise<
+				NonNullable<LinkInteractionOptions["preferredPosition"]> | undefined
+			>;
+	  };
+
+function resolveSearchPositionRequest(
+	descriptor: InteractionDescriptor,
+	appContext: AppContext | undefined,
+): SearchPositionResolution {
+	const normalizedSearchQuery = descriptor.searchQuery?.trim().toLowerCase() ?? "";
+
+	if (!normalizedSearchQuery) {
+		return { type: "none" };
+	}
+
+	if (!descriptor.targetFile) {
+		return { type: "missing" };
+	}
+
+	const preferredPosition = appContext?.resolveSearchMatchPosition?.(
+		normalizedSearchQuery,
+		descriptor.targetFile,
+	);
+
+	if (!preferredPosition) {
+		return { type: "missing" };
+	}
+	if (isPromiseLike(preferredPosition)) {
+		return { type: "pending", position: preferredPosition };
+	}
+	return { type: "resolved", position: preferredPosition };
+}
+
+export function isPromiseLike<T>(value: T | Promise<T>): value is Promise<T> {
+	return (
+		typeof value === "object" &&
+		value !== null &&
+		"then" in value &&
+		typeof value.then === "function"
+	);
 }
 
 export function getInteractionElement(

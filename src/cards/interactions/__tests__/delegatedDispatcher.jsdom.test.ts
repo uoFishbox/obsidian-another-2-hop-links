@@ -191,6 +191,56 @@ describe("delegated interaction dispatcher", () => {
 		);
 	});
 
+	it("resolves an offset-backed position only after activation", async () => {
+		const linkContext = createLinkContext();
+		const appContext = createAppContext(linkContext);
+		let resolvePosition!: (position: {
+			start: { line: number; col: number; offset: number };
+			end: { line: number; col: number; offset: number };
+		}) => void;
+		const positionPromise = new Promise<{
+			start: { line: number; col: number; offset: number };
+			end: { line: number; col: number; offset: number };
+		}>((resolve) => {
+			resolvePosition = resolve;
+		});
+		appContext.resolveSearchMatchPosition = vi.fn(() => positionPromise);
+		const registry = createInteractionRegistry();
+		const file = createMockTFile(TARGET_FILE_PATH);
+		const descriptor = createItemDescriptor(
+			{ type: "file", data: file } as CardItem,
+			file,
+		);
+		registry.register(descriptor);
+		const dispatcher = createDelegatedInteractionDispatcher({
+			registry,
+			linkContext,
+			appContext,
+		});
+		attachDispatcher(root, dispatcher);
+		const element = document.createElement("div");
+		element.dataset.cclInteractionId = descriptor.interactionId;
+		root.append(element);
+
+		element.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+		expect(linkContext.onOpenFile).not.toHaveBeenCalled();
+
+		resolvePosition({
+			start: { line: 42, col: 3, offset: 500 },
+			end: { line: 42, col: 9, offset: 506 },
+		});
+		await positionPromise;
+		await Promise.resolve();
+		expect(linkContext.onOpenFile).toHaveBeenCalledWith(
+			expect.any(MouseEvent),
+			file,
+			expect.objectContaining({
+				start: expect.objectContaining({ line: 42, offset: 500 }),
+			}),
+			expect.objectContaining({ highlightMode: "force" }),
+		);
+	});
+
 	it("resolves delegated events from descendants through the card box", () => {
 		const linkContext = createLinkContext();
 		const appContext = createAppContext(linkContext);

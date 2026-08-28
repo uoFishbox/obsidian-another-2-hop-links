@@ -181,7 +181,7 @@ export function useFlatCardGrid<T>(
 		appContext = undefined;
 	}
 	const previewSurfaceOptions = {
-		resolveSearchMatchPosition: appContext?.resolveSearchMatchPosition,
+		resolveSearchMatchOffset: appContext?.resolveSearchMatchOffset,
 		frameCoordinator,
 	};
 	const previewSurface =

@@ -1,36 +1,32 @@
-import type { Pos, TFile, Vault } from "obsidian";
+import type { TFile, Vault } from "obsidian";
 import { yieldToMainThreadIdleAware } from "indexing/timeSlicing";
 import { getFileContent } from "preview/pipeline/previewContent";
 import { getSearchQueryTerms } from "./searchQueryTerms";
 import type {
 	SearchItemSnapshot,
+	SearchContentMatch,
 	SearchMatchedItem,
-	SearchMatchesSnapshot,
 	SearchMatchScope,
 } from "./searchTypes";
 
 const YIELD_CHECK_INTERVAL = 10;
 const YIELD_BUDGET_MS = 5;
 const YIELD_MAX_DELAY_MS = 100;
-const PROGRESS_INTERVAL_MS = 16;
-
-interface PendingContentItem {
-	readonly item: SearchItemSnapshot;
-	readonly titleMatches: readonly boolean[];
-}
-
-interface FirstTermMatch {
-	readonly offset: number;
-	readonly length: number;
-}
-
 interface ContentTermMatches {
 	readonly matches: readonly boolean[];
-	readonly firstMatch: FirstTermMatch | null;
+	readonly firstMatch: SearchContentMatch | null;
 }
 
-export interface StreamingSearchUpdate extends SearchMatchesSnapshot {
+export interface StreamingSearchContentMatchUpdate {
+	readonly path: string;
+	readonly match: SearchContentMatch;
+}
+
+/** Append-only delta published at a cooperative yield boundary or completion. */
+export interface StreamingSearchUpdate {
 	readonly complete: boolean;
+	readonly addedMatches: readonly SearchMatchedItem[];
+	readonly addedContentMatches: readonly StreamingSearchContentMatchUpdate[];
 }
 
 export interface RunStreamingSearchOptions {
@@ -54,37 +50,34 @@ export async function runStreamingSearch(
 ): Promise<void> {
 	const terms = getSearchQueryTerms(options.query);
 	const contentMatchers = terms.map(createCaseInsensitiveLiteralMatcher);
-	const matchesByKey = new Map<string, SearchMatchedItem>();
-	const firstContentMatchPositionByPath = new Map<string, Pos>();
-	const pendingItemsByPath = new Map<string, PendingContentItem[]>();
+	const contentMatchesByPath = new Map<string, ContentTermMatches>();
+	const fileByPath = new Map(options.files.map((file) => [file.path, file]));
 	const now = options.now ?? (() => performance.now());
 	const yieldToMainThread =
 		options.yieldToMainThread ??
 		(() => yieldToMainThreadIdleAware({ maxDelayMs: YIELD_MAX_DELAY_MS }));
 	let lastYieldTime = now();
-	let lastPublishTime = lastYieldTime;
-	let publishedMatchCount = 0;
 	let processedCount = 0;
+	let pendingMatches: SearchMatchedItem[] = [];
+	let pendingContentMatches: StreamingSearchContentMatchUpdate[] = [];
 
 	const publish = (complete: boolean): void => {
 		if (options.isCancelled()) return;
-		if (!complete && matchesByKey.size === publishedMatchCount) return;
-
-		const currentTime = now();
 		if (
 			!complete &&
-			publishedMatchCount > 0 &&
-			currentTime - lastPublishTime < PROGRESS_INTERVAL_MS
-		) {
+			pendingMatches.length === 0 &&
+			pendingContentMatches.length === 0
+		)
 			return;
-		}
 
-		publishedMatchCount = matchesByKey.size;
-		lastPublishTime = currentTime;
+		const addedMatches = pendingMatches;
+		const addedContentMatches = pendingContentMatches;
+		pendingMatches = [];
+		pendingContentMatches = [];
 		options.onUpdate({
 			complete,
-			matchesByKey: new Map(matchesByKey),
-			firstContentMatchPositionByPath: new Map(firstContentMatchPositionByPath),
+			addedMatches,
+			addedContentMatches,
 		});
 	};
 
@@ -107,59 +100,44 @@ export async function runStreamingSearch(
 
 		const titleMatches = terms.map((term) => item.searchText.includes(term));
 		if (titleMatches.every(Boolean)) {
-			matchesByKey.set(item.key, {
+			pendingMatches.push({
 				key: item.key,
 				contentMatched: false,
 			});
-			publish(false);
 		} else if (options.scope === "title-and-content" && item.targetFilePath) {
-			const pendingItems = pendingItemsByPath.get(item.targetFilePath);
-			const pendingItem = { item, titleMatches };
-			if (pendingItems) pendingItems.push(pendingItem);
-			else pendingItemsByPath.set(item.targetFilePath, [pendingItem]);
-		}
-
-		if (!(await checkpoint())) return;
-	}
-
-	if (options.scope === "title-and-content" && pendingItemsByPath.size > 0) {
-		const fileByPath = new Map<string, TFile>();
-		for (const file of options.files) {
-			if (pendingItemsByPath.has(file.path)) fileByPath.set(file.path, file);
-		}
-
-		for (const [path, pendingItems] of pendingItemsByPath) {
-			if (options.isCancelled()) return;
-			const file = fileByPath.get(path);
-			if (!file) continue;
-
-			const content = await readContent(file, options.vault);
-			if (options.isCancelled()) return;
-			const { matches: contentMatches, firstMatch } = matchContentTerms(
-				content,
-				contentMatchers,
-			);
-			if (firstMatch) {
-				firstContentMatchPositionByPath.set(
-					path,
-					buildPosFromOffset(content, firstMatch.offset, firstMatch.length),
-				);
+			const path = item.targetFilePath;
+			let contentTermMatches = contentMatchesByPath.get(path);
+			if (!contentTermMatches) {
+				const file = fileByPath.get(path);
+				if (file) {
+					const content = await readContent(file, options.vault);
+					if (options.isCancelled()) return;
+					contentTermMatches = matchContentTerms(content, contentMatchers);
+					contentMatchesByPath.set(path, contentTermMatches);
+					if (contentTermMatches.firstMatch) {
+						pendingContentMatches.push({
+							path,
+							match: contentTermMatches.firstMatch,
+						});
+					}
+				}
 			}
 
-			for (const pending of pendingItems) {
-				if (!matchesAllTerms(pending.titleMatches, contentMatches)) continue;
-				matchesByKey.set(pending.item.key, {
-					key: pending.item.key,
+			if (
+				contentTermMatches &&
+				matchesAllTerms(titleMatches, contentTermMatches.matches)
+			) {
+				pendingMatches.push({
+					key: item.key,
 					contentMatched: hasRequiredContentMatch(
-						pending.titleMatches,
-						contentMatches,
+						titleMatches,
+						contentTermMatches.matches,
 					),
 				});
 			}
-
-			publish(false);
-			if (!(await checkpoint())) return;
 		}
+
+		if (!(await checkpoint())) return;
 	}
 
 	if (!options.isCancelled()) publish(true);
@@ -182,7 +160,7 @@ function matchContentTerms(
 	matchers: readonly RegExp[],
 ): ContentTermMatches {
 	const matches: boolean[] = [];
-	let firstMatch: FirstTermMatch | null = null;
+	let firstMatch: SearchContentMatch | null = null;
 
 	for (const matcher of matchers) {
 		const match = matcher.exec(content);
@@ -215,33 +193,4 @@ function hasRequiredContentMatch(
 		if (!titleMatches[index] && contentMatches[index]) return true;
 	}
 	return false;
-}
-
-function countNewlinesUntil(content: string, endOffset: number): number {
-	let lines = 0;
-	for (let index = 0; index < endOffset; index += 1) {
-		if (content.charCodeAt(index) === 10) lines += 1;
-	}
-	return lines;
-}
-
-function getLineStartOffset(content: string, offset: number): number {
-	const newlineIndex = content.lastIndexOf("\n", Math.max(0, offset - 1));
-	return newlineIndex === -1 ? 0 : newlineIndex + 1;
-}
-
-function buildPosFromOffset(content: string, startOffset: number, length: number): Pos {
-	const endOffset = startOffset + Math.max(1, length);
-	return {
-		start: {
-			line: countNewlinesUntil(content, startOffset),
-			col: startOffset - getLineStartOffset(content, startOffset),
-			offset: startOffset,
-		},
-		end: {
-			line: countNewlinesUntil(content, endOffset),
-			col: endOffset - getLineStartOffset(content, endOffset),
-			offset: endOffset,
-		},
-	};
 }

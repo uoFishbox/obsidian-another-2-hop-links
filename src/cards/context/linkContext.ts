@@ -12,6 +12,7 @@ export type {
 } from "preview/types";
 export type { LinkUtilitiesContext } from "cards/context/linkUtilities";
 import type { LinkUtilitiesContext } from "cards/context/linkUtilities";
+import type { SearchContentMatch } from "search/searchTypes";
 
 export interface BookmarksState {
 	filePaths: Set<string>;
@@ -72,7 +73,11 @@ export interface AppContext {
 	resolveSearchMatchPosition?: (
 		query: string,
 		file: TFile | null | undefined,
-	) => Pos | undefined;
+	) => Pos | undefined | Promise<Pos | undefined>;
+	resolveSearchMatchOffset?: (
+		query: string,
+		file: TFile | null | undefined,
+	) => SearchContentMatch | undefined;
 	updateSetting?: <K extends keyof PluginSettings>(
 		key: K,
 		value: PluginSettings[K],

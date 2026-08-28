@@ -3,20 +3,29 @@ import { onDestroy, untrack } from "svelte";
 import { getFileContentVaultEventHub } from "./fileContentVaultEventHub";
 import { runStreamingSearch, type StreamingSearchUpdate } from "./streamingSearch";
 import type {
+	SearchContentMatch,
 	SearchItemSnapshot,
 	SearchMatchedItem,
 	SearchMatchScope,
 } from "./searchTypes";
+import { getFileContent } from "preview/pipeline/previewContent";
 
-const EMPTY_SEARCH_ITEMS: readonly SearchItemSnapshot[] = [];
+const EMPTY_SEARCH_SNAPSHOT: SearchDatasetSnapshot = {
+	items: [],
+	searchableFiles: [],
+};
+
+export interface SearchDatasetSnapshot {
+	readonly items: readonly SearchItemSnapshot[];
+	readonly searchableFiles: readonly TFile[];
+}
 
 export interface UseStreamingSearchSessionOptions {
 	app: App;
 	query: () => string;
 	enabled?: boolean | (() => boolean);
 	matchScope?: SearchMatchScope | (() => SearchMatchScope);
-	getSearchableFiles: () => readonly TFile[];
-	buildDataset: () => readonly SearchItemSnapshot[];
+	buildSnapshot: () => SearchDatasetSnapshot;
 }
 
 interface SearchRequestIdentity {
@@ -29,23 +38,28 @@ interface SearchRequestIdentity {
 export interface SearchResultSnapshot extends SearchRequestIdentity {
 	readonly requestId: number;
 	readonly matchesByKey: ReadonlyMap<string, SearchMatchedItem>;
-	readonly firstContentMatchPositionByPath: ReadonlyMap<string, Pos>;
+	readonly orderedMatches: readonly SearchMatchedItem[];
+	readonly firstContentMatchByPath: ReadonlyMap<string, SearchContentMatch>;
 }
 
 export type SearchMatchSnapshot = SearchResultSnapshot;
 export type SearchPhase = "idle" | "filtering" | "ready" | "failed";
+export type VisibleSearchResult =
+	| { readonly type: "current"; readonly result: SearchResultSnapshot }
+	| { readonly type: "stale"; readonly result: SearchResultSnapshot };
 
 export interface StreamingSearchSessionResult {
-	readonly committedResult: SearchResultSnapshot | null;
-	readonly currentResult: SearchResultSnapshot | null;
-	readonly progressiveResult: SearchResultSnapshot | null;
+	readonly visibleResult: VisibleSearchResult | null;
 	readonly phase: SearchPhase;
 	readonly isPending: boolean;
-	readonly isShowingStaleResult: boolean;
-	getFirstMatchPosition(
+	getFirstMatchOffset(
 		query: string,
 		targetFile: TFile | null | undefined,
-	): Pos | undefined;
+	): SearchContentMatch | undefined;
+	resolveFirstMatchPosition(
+		query: string,
+		targetFile: TFile | null | undefined,
+	): Promise<Pos | undefined>;
 }
 
 function isSameRequest(
@@ -72,23 +86,24 @@ export function useStreamingSearchSession(
 		typeof matchScope === "function" ? matchScope() : matchScope;
 	let sessionEnabled = $derived(isEnabled());
 	let currentMatchScope = $derived(getMatchScope());
-	let dataset = $derived.by(() =>
-		sessionEnabled ? options.buildDataset() : EMPTY_SEARCH_ITEMS,
+	let searchSnapshot = $derived.by(() =>
+		sessionEnabled ? options.buildSnapshot() : EMPTY_SEARCH_SNAPSHOT,
 	);
 	let datasetRevision = $state(0);
 	let contentRevision = $state(0);
-	let lastDataset: readonly SearchItemSnapshot[] | null = null;
+	let lastSearchSnapshot: SearchDatasetSnapshot | null = null;
 	let nextRequestId = 0;
 	let activeSerial = 0;
 	let activeRequest: SearchRequestIdentity | null = null;
 	let failedRequest = $state.raw<SearchRequestIdentity | null>(null);
 	let committedResult = $state.raw<SearchResultSnapshot | null>(null);
 	let progressiveResult = $state.raw<SearchResultSnapshot | null>(null);
+	const positionPromises = new Map<string, Promise<Pos | undefined>>();
 
 	$effect(() => {
-		const nextDataset = dataset;
-		if (nextDataset === lastDataset) return;
-		lastDataset = nextDataset;
+		const nextSnapshot = searchSnapshot;
+		if (nextSnapshot === lastSearchSnapshot) return;
+		lastSearchSnapshot = nextSnapshot;
 		datasetRevision += 1;
 	});
 
@@ -98,7 +113,7 @@ export function useStreamingSearchSession(
 		}
 
 		const activePaths = new Set(
-			options.getSearchableFiles().map((file) => file.path),
+			searchSnapshot.searchableFiles.map((file) => file.path),
 		);
 		return getFileContentVaultEventHub(app).subscribe((file, oldPath) => {
 			if (activePaths.has(file.path) || (oldPath && activePaths.has(oldPath))) {
@@ -128,6 +143,17 @@ export function useStreamingSearchSession(
 			? progressiveResult
 			: null,
 	);
+	let visibleResult = $derived.by(() => {
+		if (!desiredRequest) return null;
+		if (currentResult) return { type: "current" as const, result: currentResult };
+		if (currentProgressiveResult) {
+			return { type: "current" as const, result: currentProgressiveResult };
+		}
+		return committedResult?.query === desiredRequest.query &&
+			committedResult.scope === desiredRequest.scope
+			? { type: "stale" as const, result: committedResult }
+			: null;
+	});
 	let phase = $derived.by((): SearchPhase => {
 		if (!desiredRequest) return "idle";
 		if (failedRequest && isSameRequest(failedRequest, desiredRequest)) {
@@ -145,25 +171,31 @@ export function useStreamingSearchSession(
 	function toSnapshot(
 		request: SearchRequestIdentity,
 		requestId: number,
-		update: StreamingSearchUpdate,
+		matchesByKey: ReadonlyMap<string, SearchMatchedItem>,
+		orderedMatches: readonly SearchMatchedItem[],
+		firstContentMatchByPath: ReadonlyMap<string, SearchContentMatch>,
 	): SearchResultSnapshot {
 		return {
 			...request,
 			requestId,
-			matchesByKey: update.matchesByKey,
-			firstContentMatchPositionByPath: update.firstContentMatchPositionByPath,
+			matchesByKey,
+			orderedMatches,
+			firstContentMatchByPath,
 		};
 	}
 
 	function issueSearch(request: SearchRequestIdentity): void {
 		cancelActiveSearch();
+		positionPromises.clear();
 		const serial = activeSerial;
 		const requestId = ++nextRequestId;
 		activeRequest = request;
 		failedRequest = null;
 		progressiveResult = null;
-		const itemsSnapshot = dataset;
-		const filesSnapshot = options.getSearchableFiles();
+		const { items: itemsSnapshot, searchableFiles: filesSnapshot } = searchSnapshot;
+		const matchesByKey = new Map<string, SearchMatchedItem>();
+		const orderedMatches: SearchMatchedItem[] = [];
+		const firstContentMatchByPath = new Map<string, SearchContentMatch>();
 
 		void runStreamingSearch({
 			vault: app.vault,
@@ -178,7 +210,7 @@ export function useStreamingSearchSession(
 					request,
 					untrack(() => desiredRequest),
 				),
-			onUpdate: (update) => {
+			onUpdate: (update: StreamingSearchUpdate) => {
 				if (
 					serial !== activeSerial ||
 					activeRequest !== request ||
@@ -189,7 +221,23 @@ export function useStreamingSearchSession(
 				) {
 					return;
 				}
-				const snapshot = toSnapshot(request, requestId, update);
+				for (const match of update.addedMatches) {
+					if (matchesByKey.has(match.key)) continue;
+					matchesByKey.set(match.key, match);
+					orderedMatches.push(match);
+				}
+				for (const entry of update.addedContentMatches) {
+					if (!firstContentMatchByPath.has(entry.path)) {
+						firstContentMatchByPath.set(entry.path, entry.match);
+					}
+				}
+				const snapshot = toSnapshot(
+					request,
+					requestId,
+					matchesByKey,
+					orderedMatches,
+					firstContentMatchByPath,
+				);
 				if (update.complete) {
 					committedResult = snapshot;
 					progressiveResult = null;
@@ -221,14 +269,8 @@ export function useStreamingSearchSession(
 	onDestroy(cancelActiveSearch);
 
 	return {
-		get committedResult() {
-			return committedResult;
-		},
-		get currentResult() {
-			return currentResult;
-		},
-		get progressiveResult() {
-			return currentProgressiveResult;
+		get visibleResult() {
+			return visibleResult;
 		},
 		get phase() {
 			return phase;
@@ -236,22 +278,73 @@ export function useStreamingSearchSession(
 		get isPending() {
 			return phase === "filtering";
 		},
-		get isShowingStaleResult() {
-			return (
-				committedResult !== null && currentResult === null && phase !== "idle"
-			);
-		},
-		getFirstMatchPosition(searchQuery, targetFile) {
+		getFirstMatchOffset(searchQuery, targetFile) {
 			if (!targetFile) return undefined;
-			const normalizedQuery = searchQuery.trim().toLowerCase();
-			const result =
-				currentResult ??
-				(currentProgressiveResult?.query === normalizedQuery
-					? currentProgressiveResult
-					: committedResult?.query === normalizedQuery
-						? committedResult
-						: null);
-			return result?.firstContentMatchPositionByPath.get(targetFile.path);
+			const result = getResultForQuery(searchQuery);
+			return result?.firstContentMatchByPath.get(targetFile.path);
+		},
+		resolveFirstMatchPosition(searchQuery, targetFile) {
+			if (!targetFile) return Promise.resolve(undefined);
+			const result = getResultForQuery(searchQuery);
+			const match = result?.firstContentMatchByPath.get(targetFile.path);
+			if (!match) return Promise.resolve(undefined);
+			const cacheKey = `${result?.requestId ?? 0}\u001f${targetFile.path}`;
+			const cached = positionPromises.get(cacheKey);
+			if (cached) return cached;
+
+			const promise = getFileContent(targetFile, app.vault)
+				.then((content) => buildPosFromOffset(content, match))
+				.catch(() => undefined);
+			positionPromises.set(cacheKey, promise);
+			return promise;
+		},
+	};
+
+	function getResultForQuery(searchQuery: string): SearchResultSnapshot | null {
+		const normalizedQuery = searchQuery.trim().toLowerCase();
+		return (
+			currentResult ??
+			(currentProgressiveResult?.query === normalizedQuery
+				? currentProgressiveResult
+				: committedResult?.query === normalizedQuery
+					? committedResult
+					: null)
+		);
+	}
+}
+
+function buildPosFromOffset(content: string, match: SearchContentMatch): Pos {
+	const startOffset = Math.min(Math.max(0, match.offset), content.length);
+	const endOffset = Math.min(content.length, startOffset + Math.max(1, match.length));
+	let line = 0;
+	let lineStartOffset = 0;
+	let startLine = 0;
+	let startLineOffset = 0;
+
+	for (let index = 0; index < endOffset; index += 1) {
+		if (index === startOffset) {
+			startLine = line;
+			startLineOffset = lineStartOffset;
+		}
+		if (content.charCodeAt(index) !== 10) continue;
+		line += 1;
+		lineStartOffset = index + 1;
+	}
+	if (startOffset === endOffset) {
+		startLine = line;
+		startLineOffset = lineStartOffset;
+	}
+
+	return {
+		start: {
+			line: startLine,
+			col: startOffset - startLineOffset,
+			offset: startOffset,
+		},
+		end: {
+			line,
+			col: endOffset - lineStartOffset,
+			offset: endOffset,
 		},
 	};
 }

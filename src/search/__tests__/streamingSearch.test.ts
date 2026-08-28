@@ -2,7 +2,11 @@ import type { TFile, Vault } from "obsidian";
 import { describe, expect, it, vi } from "vitest";
 import { createMockTFile } from "testing/__mocks__/testHelpers";
 import { runStreamingSearch, type StreamingSearchUpdate } from "../streamingSearch";
-import type { SearchItemSnapshot } from "../searchTypes";
+import type {
+	SearchContentMatch,
+	SearchItemSnapshot,
+	SearchMatchedItem,
+} from "../searchTypes";
 
 function createVault(contentsByPath: ReadonlyMap<string, string>): {
 	readonly vault: Vault;
@@ -22,12 +26,23 @@ function createItem(
 	return { key, searchText, targetFilePath };
 }
 
-function getFinalUpdate(
-	updates: readonly StreamingSearchUpdate[],
-): StreamingSearchUpdate {
+function getFinalUpdate(updates: readonly StreamingSearchUpdate[]): {
+	readonly matchesByKey: ReadonlyMap<string, SearchMatchedItem>;
+	readonly firstContentMatchByPath: ReadonlyMap<string, SearchContentMatch>;
+} {
 	const update = updates.at(-1);
 	if (!update?.complete) throw new Error("Search did not publish a final update.");
-	return update;
+	const matchesByKey = new Map<string, SearchMatchedItem>();
+	const firstContentMatchByPath = new Map<string, SearchContentMatch>();
+	for (const current of updates) {
+		for (const match of current.addedMatches) matchesByKey.set(match.key, match);
+		for (const entry of current.addedContentMatches) {
+			if (!firstContentMatchByPath.has(entry.path)) {
+				firstContentMatchByPath.set(entry.path, entry.match);
+			}
+		}
+	}
+	return { matchesByKey, firstContentMatchByPath };
 }
 
 describe("runStreamingSearch", () => {
@@ -80,10 +95,14 @@ describe("runStreamingSearch", () => {
 		expect(cachedRead).not.toHaveBeenCalled();
 	});
 
-	it("publishes the first content match position without retaining content", async () => {
+	it("publishes the first content match offset without scanning for line numbers", async () => {
 		const file = createMockTFile("notes/alpha.md");
+		const plainContent = `${"line\n".repeat(1_000_000)}find alpha here`;
+		const wrappedContent = new String(plainContent);
+		const charCodeAt = vi.fn(String.prototype.charCodeAt.bind(wrappedContent));
+		Object.defineProperty(wrappedContent, "charCodeAt", { value: charCodeAt });
 		const { vault } = createVault(
-			new Map([[file.path, "first line\nfind alpha here"]]),
+			new Map([[file.path, wrappedContent as unknown as string]]),
 		);
 		const updates: StreamingSearchUpdate[] = [];
 
@@ -97,11 +116,12 @@ describe("runStreamingSearch", () => {
 			onUpdate: (update) => updates.push(update),
 		});
 
-		const position = getFinalUpdate(updates).firstContentMatchPositionByPath.get(
-			file.path,
-		);
-		expect(position?.start).toEqual({ line: 1, col: 5, offset: 16 });
-		expect(position?.end).toEqual({ line: 1, col: 10, offset: 21 });
+		const position = getFinalUpdate(updates).firstContentMatchByPath.get(file.path);
+		expect(position).toEqual({
+			offset: plainContent.length - "alpha here".length,
+			length: 5,
+		});
+		expect(charCodeAt).not.toHaveBeenCalled();
 	});
 
 	it("treats regular expression metacharacters as case-insensitive literal text", async () => {
@@ -130,16 +150,41 @@ describe("runStreamingSearch", () => {
 
 		const result = getFinalUpdate(updates);
 		expect(Array.from(result.matchesByKey.keys())).toEqual(["exact"]);
-		expect(
-			result.firstContentMatchPositionByPath.get(exactFile.path)?.start,
-		).toEqual({
-			line: 0,
-			col: 8,
+		expect(result.firstContentMatchByPath.get(exactFile.path)).toEqual({
 			offset: 8,
+			length: 3,
 		});
-		expect(result.firstContentMatchPositionByPath.has(falsePositiveFile.path)).toBe(
-			false,
+		expect(result.firstContentMatchByPath.has(falsePositiveFile.path)).toBe(false);
+	});
+
+	it("publishes matches only by appending in dataset order", async () => {
+		const firstFile = createMockTFile("notes/content-first.md");
+		const { vault } = createVault(new Map([[firstFile.path, "alpha in body"]]));
+		const updates: StreamingSearchUpdate[] = [];
+		let clock = 0;
+
+		await runStreamingSearch({
+			vault,
+			files: [firstFile],
+			items: [
+				createItem("content-first", "unrelated", firstFile.path),
+				...Array.from({ length: 9 }, (_unused, index) =>
+					createItem(`missing-${index}`, "unrelated", null),
+				),
+				createItem("title-second", "alpha title", null),
+			],
+			query: "alpha",
+			scope: "title-and-content",
+			isCancelled: () => false,
+			onUpdate: (update) => updates.push(update),
+			yieldToMainThread: async () => {},
+			now: () => (clock += 20),
+		});
+
+		const publishedKeys = updates.map((update) =>
+			update.addedMatches.map((match) => match.key),
 		);
+		expect(publishedKeys).toEqual([["content-first"], ["title-second"]]);
 	});
 
 	it("yields after the time budget and stops before publishing stale work", async () => {

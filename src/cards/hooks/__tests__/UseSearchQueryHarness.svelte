@@ -12,5 +12,4 @@
 </script>
 
 <input aria-label="search" bind:value={search.value} />
-<span data-testid="debounced">{search.debounced}</span>
 <span data-testid="normalized">{search.normalized}</span>

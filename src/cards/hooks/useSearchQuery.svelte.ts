@@ -42,9 +42,6 @@ export function useSearchQuery(options: SearchQueryOptions = {}) {
 			inputValue = value;
 			options.onInputChange?.(value);
 		},
-		get debounced() {
-			return debouncedQuery;
-		},
 		get normalized() {
 			return normalizedQuery;
 		},

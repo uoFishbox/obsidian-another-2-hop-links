@@ -14,10 +14,12 @@ import {
 	getInteractionElement,
 	getInteractionIdFromElement,
 	getInteractionLastTouchAt,
+	isPromiseLike,
 	isSyntheticInteractionHoverEvent,
 	markInteractionLongPressed,
 	markInteractionTouched,
 	resolveDescriptorInteractionOptions,
+	resolveDescriptorInteractionOptionsAsync,
 	type InteractionDescriptor,
 } from "./interactionTypes";
 import { installNativeDragSelectionShim } from "./cardDragState";
@@ -87,7 +89,22 @@ function dispatchActivation(
 		return;
 	}
 
-	const options = resolveDescriptorInteractionOptions(descriptor, appContext);
+	const options = resolveDescriptorInteractionOptionsAsync(descriptor, appContext);
+	if (isPromiseLike(options)) {
+		void options.then((resolved) =>
+			dispatchActivationWithOptions(event, descriptor, linkContext, resolved),
+		);
+		return;
+	}
+	dispatchActivationWithOptions(event, descriptor, linkContext, options);
+}
+
+function dispatchActivationWithOptions(
+	event: MouseEvent | KeyboardEvent,
+	descriptor: InteractionDescriptor,
+	linkContext: LinkContext,
+	options: ReturnType<typeof resolveDescriptorInteractionOptions>,
+): void {
 	if (descriptor.kind === "item") {
 		dispatchItemClick(descriptor.item, linkContext, event, options);
 		return;

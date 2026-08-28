@@ -1,5 +1,3 @@
-import type { Pos } from "obsidian";
-
 /** Immutable text and target identity used by one search run. */
 export interface SearchItemSnapshot {
 	key: string;
@@ -12,10 +10,10 @@ export type SearchMatchScope = "title-only" | "title-and-content";
 export interface SearchMatchedItem {
 	key: string;
 	contentMatched: boolean;
-	contentPreview?: string;
 }
 
-export interface SearchMatchesSnapshot {
-	readonly matchesByKey: ReadonlyMap<string, SearchMatchedItem>;
-	readonly firstContentMatchPositionByPath: ReadonlyMap<string, Pos>;
+/** Offset-only match retained by search without scanning content for line numbers. */
+export interface SearchContentMatch {
+	readonly offset: number;
+	readonly length: number;
 }
