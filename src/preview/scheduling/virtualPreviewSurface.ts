@@ -154,25 +154,14 @@ export function createVirtualPreviewSurface(
 			if (shouldPrefetch) prefetchBindingsScratch.push(binding);
 
 			const existingPrefetch = prefetchesByKey.get(binding.key);
-			if (!existingPrefetch) continue;
-			if (existingPrefetch.renderKey !== binding.request.renderKey) {
-				cancelPrefetch(binding.key);
-				continue;
+			if (existingPrefetch) {
+				if (existingPrefetch.renderKey !== binding.request.renderKey) {
+					cancelPrefetch(binding.key);
+				} else if (visible || shouldPrefetch) {
+					existingPrefetch.lastSeenSnapshotGeneration = snapshotGeneration;
+				}
 			}
-			if (visible || shouldPrefetch) {
-				existingPrefetch.lastSeenSnapshotGeneration = snapshotGeneration;
-			}
-		}
 
-		for (const [key, prefetch] of prefetchesByKey) {
-			if (prefetch.lastSeenSnapshotGeneration !== snapshotGeneration) {
-				cancelPrefetch(key);
-			}
-		}
-
-		for (const binding of snapshot.bindings) {
-			const visible =
-				snapshot.active && isBindingInRange(binding, snapshot.visibleRange);
 			let entry = entriesByKey.get(binding.key);
 			if (visible) entry ??= getOrCreateEntry(binding.key);
 			if (!entry) continue;
@@ -180,6 +169,12 @@ export function createVirtualPreviewSurface(
 			entry.controller.bind(binding.request);
 			entry.controller.setActive(visible);
 			if (visible) entry.controller.activate();
+		}
+
+		for (const [key, prefetch] of prefetchesByKey) {
+			if (prefetch.lastSeenSnapshotGeneration !== snapshotGeneration) {
+				cancelPrefetch(key);
+			}
 		}
 
 		// Visible renderers synchronously join matching shared requests before the
