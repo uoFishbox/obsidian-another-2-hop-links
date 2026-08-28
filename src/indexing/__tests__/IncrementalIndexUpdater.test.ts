@@ -162,6 +162,31 @@ describe("IncrementalIndexUpdater", () => {
 		);
 	});
 
+	test("create materializes an unresolved markdown file name containing a dot", async () => {
+		const initial = createUpdaterEnvironment([
+			{ path: "origin.md", links: ["release.v1"] },
+		]);
+		const final = createUpdaterEnvironment([
+			{ path: "origin.md", links: ["release.v1"] },
+			{ path: "release.v1.md" },
+		]);
+
+		const snapshot = await initial.snapshotBuilder.buildAsync();
+		initial.builder.addFile({ path: "release.v1.md" });
+		installDottedMarkdownResolver(initial.mockVault, initial.mockMetadataCache);
+		installDottedMarkdownResolver(final.mockVault, final.mockMetadataCache);
+
+		const result = await initial.updater.applyAsync(snapshot, [
+			{ type: "create", path: "release.v1.md" },
+		]);
+
+		expect(result.affectedPaths).toContain("origin.md");
+		expect(snapshot.backlinksMap.get("release.v1.md")?.has("origin.md")).toBe(true);
+		expect(serializeSnapshot(snapshot)).toEqual(
+			serializeSnapshot(await final.snapshotBuilder.buildAsync()),
+		);
+	});
+
 	test("create reflects both unresolved fast path and shadowing fallback without duplicates", async () => {
 		const initial = createUpdaterEnvironment([
 			{ path: "src/origin.md", links: ["note"] },
@@ -592,6 +617,19 @@ function installShadowingResolver(mockVault: any, mockMetadataCache: any): void 
 					mockVault.getAbstractFileByPath("src/note.md") ??
 					mockVault.getAbstractFileByPath("archive/note.md")
 				);
+			}
+
+			const normalized = linkText.endsWith(".md") ? linkText : `${linkText}.md`;
+			return mockVault.getAbstractFileByPath(normalized);
+		},
+	);
+}
+
+function installDottedMarkdownResolver(mockVault: any, mockMetadataCache: any): void {
+	(mockMetadataCache.getFirstLinkpathDest as any).mockImplementation(
+		(linkText: string) => {
+			if (linkText === "release.v1") {
+				return mockVault.getAbstractFileByPath("release.v1.md");
 			}
 
 			const normalized = linkText.endsWith(".md") ? linkText : `${linkText}.md`;

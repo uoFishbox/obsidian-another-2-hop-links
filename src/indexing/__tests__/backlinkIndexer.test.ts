@@ -291,6 +291,57 @@ describe("buildDetailedBacklinksArtifactsChunked", () => {
 		expect(artifacts.lookupKeyToLookupPaths.get("note.md")).toBe("Note.md");
 	});
 
+	test("uses the resolved markdown path when the file name contains a dot", async () => {
+		const { mockVault, mockMetadataCache, files } = new VaultEnvironmentBuilder([
+			{ path: "source.md", links: ["release.v1"] },
+			{ path: "release.v1.md" },
+		]).build();
+		(mockMetadataCache.getFirstLinkpathDest as any).mockReturnValue(
+			files["release.v1.md"],
+		);
+
+		const artifacts = await buildDetailedBacklinksArtifactsChunked(
+			mockVault,
+			mockMetadataCache,
+			{},
+		);
+
+		expect(artifacts.linkLookupToSources.get("release.v1.md")).toEqual(
+			new Set(["source.md"]),
+		);
+		expect(artifacts.lookupKeyToLookupPaths.get("release.v1.md")).toBe(
+			"release.v1.md",
+		);
+	});
+
+	test("resolves duplicate dotted markdown file names per source path", async () => {
+		const { mockVault, mockMetadataCache, files } = new VaultEnvironmentBuilder([
+			{ path: "team-a/source.md", links: ["release.v1"] },
+			{ path: "team-b/source.md", links: ["release.v1"] },
+			{ path: "team-a/release.v1.md" },
+			{ path: "team-b/release.v1.md" },
+		]).build();
+		(mockMetadataCache.getFirstLinkpathDest as any).mockImplementation(
+			(_linkText: string, sourcePath: string) =>
+				sourcePath.startsWith("team-a/")
+					? files["team-a/release.v1.md"]
+					: files["team-b/release.v1.md"],
+		);
+
+		const artifacts = await buildDetailedBacklinksArtifactsChunked(
+			mockVault,
+			mockMetadataCache,
+			{},
+		);
+
+		expect(
+			artifacts.detailedMap.get("team-a/release.v1.md")?.has("team-a/source.md"),
+		).toBe(true);
+		expect(
+			artifacts.detailedMap.get("team-b/release.v1.md")?.has("team-b/source.md"),
+		).toBe(true);
+	});
+
 	test("deduplicates duplicate raw lookup keys within the same source", async () => {
 		const { mockVault, mockMetadataCache, files } = new VaultEnvironmentBuilder([
 			{ path: "source.md", links: ["target", "target", "target"] },

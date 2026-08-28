@@ -163,7 +163,9 @@ function computeIsAmbiguousRawLinkPath(
 
 	const lookupKey = toCaseInsensitiveLookupKey(normalizedFileName);
 	if (HAS_EXTENSION_RE.test(normalizedFileName)) {
-		return (index.fileNameCounts.get(lookupKey) ?? 0) > 1;
+		const exactFileNameCount = index.fileNameCounts.get(lookupKey) ?? 0;
+		const markdownBaseNameCount = index.baseNameCounts.get(lookupKey) ?? 0;
+		return exactFileNameCount + markdownBaseNameCount > 1;
 	}
 
 	return (index.baseNameCounts.get(lookupKey) ?? 0) > 1;
@@ -227,6 +229,20 @@ export function normalizeRawLinkpathToMarkdownPath(rawPath: string): string {
 	return markdownPath;
 }
 
+function normalizeResolvedRawLinkpathToLookupPath(
+	rawPath: string,
+	destinationPath: string,
+): string {
+	const normalizedLookupPath = normalizeRawLinkpathToMarkdownPath(rawPath);
+	if (!destinationPath.toLowerCase().endsWith(".md")) {
+		return normalizedLookupPath;
+	}
+	if (normalizedLookupPath.toLowerCase().endsWith(".md")) {
+		return normalizedLookupPath;
+	}
+	return `${normalizedLookupPath}.md`;
+}
+
 export function getLookupPathForLink(link: IndexedLink): string {
 	if (link.lookupPath) {
 		return link.lookupPath;
@@ -284,7 +300,9 @@ export function resolveLinkFromRawLinkPath(
 	// Run-scoped reuse belongs to backlinkReferenceSequence. Keeping this
 	// function stateless avoids retaining link history across index updates.
 	const dest = metadataCache.getFirstLinkpathDest(rawLinkPath, sourcePath);
-	const rawLookupPath = normalizeRawLinkpathToMarkdownPath(rawLinkPath);
+	const rawLookupPath = dest
+		? normalizeResolvedRawLinkpathToLookupPath(rawLinkPath, dest.path)
+		: normalizeRawLinkpathToMarkdownPath(rawLinkPath);
 	const rawLookupKey = toCaseInsensitiveLookupKey(rawLookupPath);
 	const isAmbiguous = ambiguityDetector.isAmbiguous(rawLinkPath);
 

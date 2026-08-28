@@ -293,17 +293,26 @@ export function createCreateChangePlanner(
 function generateCandidateLookupPaths(filePath: string): string[] {
 	const normalized = toCaseInsensitiveLookupKey(filePath);
 	const candidates: string[] = [];
+	const seen = new Set<string>();
+	const lookupPaths = normalized.endsWith(".md")
+		? [normalized, normalized.slice(0, -3)]
+		: [normalized];
 
-	let searchFrom = 0;
-	while (true) {
-		const suffix = normalized.slice(searchFrom);
-		candidates.push(suffix);
+	for (const lookupPath of lookupPaths) {
+		let searchFrom = 0;
+		while (true) {
+			const suffix = lookupPath.slice(searchFrom);
+			if (!seen.has(suffix)) {
+				seen.add(suffix);
+				candidates.push(suffix);
+			}
 
-		const nextSlash = normalized.indexOf("/", searchFrom);
-		if (nextSlash === -1) {
-			break;
+			const nextSlash = lookupPath.indexOf("/", searchFrom);
+			if (nextSlash === -1) {
+				break;
+			}
+			searchFrom = nextSlash + 1;
 		}
-		searchFrom = nextSlash + 1;
 	}
 
 	return candidates;
