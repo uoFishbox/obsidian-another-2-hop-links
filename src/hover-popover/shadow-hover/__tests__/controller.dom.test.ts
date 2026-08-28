@@ -35,6 +35,104 @@ describe("ShadowHoverControllerImpl", () => {
 		expect(resolveLink).toHaveBeenCalledTimes(1);
 	});
 
+	it("launches after an asynchronous link resolution", async () => {
+		let resolvePendingLink: (link: {
+			linktext: string;
+			sourcePath: string;
+		}) => void = () => {};
+		const pendingLink = new Promise<{
+			linktext: string;
+			sourcePath: string;
+		}>((resolve) => {
+			resolvePendingLink = resolve;
+		});
+		const launch = vi.fn();
+		const controller = new ShadowHoverControllerImpl(launch, () => pendingLink);
+		const anchorEl = createAnchor();
+
+		controller.handleDelegatedEnter(
+			anchorEl,
+			"item:first",
+			new MouseEvent("mouseover", { bubbles: true }),
+		);
+		expect(launch).not.toHaveBeenCalled();
+
+		resolvePendingLink({ linktext: "note", sourcePath: "note.md" });
+		await pendingLink;
+		await Promise.resolve();
+
+		expect(launch).toHaveBeenCalledTimes(1);
+		controller.destroy();
+	});
+
+	it("discards an asynchronous link resolved after another anchor is entered", async () => {
+		let resolveFirstLink: (link: {
+			linktext: string;
+			sourcePath: string;
+		}) => void = () => {};
+		const firstLink = new Promise<{
+			linktext: string;
+			sourcePath: string;
+		}>((resolve) => {
+			resolveFirstLink = resolve;
+		});
+		const launch = vi.fn();
+		const controller = new ShadowHoverControllerImpl(launch, (interactionId) =>
+			interactionId === "item:first"
+				? firstLink
+				: { linktext: "second", sourcePath: "second.md" },
+		);
+		const firstAnchorEl = createAnchor(10);
+		const secondAnchorEl = createAnchor(80);
+
+		controller.handleDelegatedEnter(
+			firstAnchorEl,
+			"item:first",
+			new MouseEvent("mouseover", { bubbles: true }),
+		);
+		controller.handleDelegatedEnter(
+			secondAnchorEl,
+			"item:second",
+			new MouseEvent("mouseover", { bubbles: true }),
+		);
+		resolveFirstLink({ linktext: "first", sourcePath: "first.md" });
+		await firstLink;
+		await Promise.resolve();
+
+		expect(launch).toHaveBeenCalledTimes(1);
+		expect(launch.mock.calls[0]?.[0]?.link.linktext).toBe("second");
+		controller.destroy();
+	});
+
+	it("discards an asynchronous link resolved after the anchor is released", async () => {
+		let resolvePendingLink: (link: {
+			linktext: string;
+			sourcePath: string;
+		}) => void = () => {};
+		const pendingLink = new Promise<{
+			linktext: string;
+			sourcePath: string;
+		}>((resolve) => {
+			resolvePendingLink = resolve;
+		});
+		const launch = vi.fn();
+		const controller = new ShadowHoverControllerImpl(launch, () => pendingLink);
+		const anchorEl = createAnchor();
+
+		controller.handleDelegatedEnter(
+			anchorEl,
+			"item:first",
+			new MouseEvent("mouseover", { bubbles: true }),
+		);
+		controller.releaseActivePopover();
+		resolvePendingLink({ linktext: "note", sourcePath: "note.md" });
+		await pendingLink;
+		await Promise.resolve();
+
+		expect(launch).not.toHaveBeenCalled();
+		controller.destroy();
+	});
+
 	it("releases an accepted focused popover on destroy without forcing close", () => {
 		const hide = vi.fn();
 		const nativeTransition = vi.fn(function (this: HoverPopoverLike) {

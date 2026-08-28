@@ -72,7 +72,8 @@ describe("buildShadowHoverLinkSpec", () => {
 			targetFile,
 			settings: {
 				highlightInPreviewOnHover: false,
-			} as any,
+				mobileLongPressAction: "preview",
+			},
 			searchQuery: "target",
 		};
 		const appContext = {
@@ -87,6 +88,49 @@ describe("buildShadowHoverLinkSpec", () => {
 			state: {
 				line: 12,
 				scroll: 12,
+			},
+		});
+	});
+
+	it("awaits an asynchronous search-match position for branch items", async () => {
+		const sourceFile = createMockTFile("source.md");
+		const targetFile = createMockTFile("target.md");
+		const preferredPosition = createPosition(18);
+		const descriptor: ItemInteractionDescriptor = {
+			interactionId: "item:branch:async-target",
+			kind: "item",
+			item: {
+				type: "branch",
+				data: {
+					hop1: {
+						rawText: "target#Heading",
+						path: targetFile.path,
+						sourceFile,
+						isUnresolved: false,
+						position: createPosition(3),
+					},
+					hop2: [],
+				},
+			},
+			targetFile,
+			settings: {
+				highlightInPreviewOnHover: false,
+				mobileLongPressAction: "preview",
+			},
+			searchQuery: "target",
+		};
+		const appContext = {
+			resolveSearchMatchPosition: () => Promise.resolve(preferredPosition),
+		} as unknown as AppContext;
+
+		const spec = await buildShadowHoverLinkSpec(descriptor, appContext);
+
+		expect(spec).toEqual({
+			linktext: targetFile.path,
+			sourcePath: sourceFile.path,
+			state: {
+				line: 18,
+				scroll: 18,
 			},
 		});
 	});

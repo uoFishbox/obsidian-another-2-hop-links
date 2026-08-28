@@ -3,6 +3,7 @@ import {
 	getOwnerWindow,
 	isHTMLElementLike,
 } from "shared/ui/dom/realmSafeDom";
+import { isPromiseLike } from "cards/interactions/interactionTypes";
 import type { ShadowHoverSession } from "./internal-types";
 import {
 	beginSessionHandoff,
@@ -43,7 +44,9 @@ type ShadowHoverLinkSpec = {
 };
 
 type LaunchShadowPopover = (request: ShadowPopoverLaunchRequest) => void;
-type ResolveShadowHoverLink = (interactionId: string) => ShadowHoverLinkSpec | null;
+type ResolveShadowHoverLink = (
+	interactionId: string,
+) => ShadowHoverLinkSpec | null | Promise<ShadowHoverLinkSpec | null>;
 
 export class ShadowHoverControllerImpl {
 	private static readonly RECOVERY_RELAUNCH_DELAY_MS = 650;
@@ -141,8 +144,15 @@ export class ShadowHoverControllerImpl {
 	}
 
 	releaseActivePopover(): void {
-		if (this.session.destroyed || !this.session.activePopover) return;
-		releasePopoverToNativeLifecycle(this.session.activePopover, this.session);
+		if (this.session.destroyed) return;
+		this.session.requestSeq = nextSessionRequestSeq(this.session);
+		const activeActualEl = this.session.activeAnchor?.actualEl;
+		if (activeActualEl) {
+			setAnchorHovered(this.session, activeActualEl, false);
+		}
+		if (this.session.activePopover) {
+			releasePopoverToNativeLifecycle(this.session.activePopover, this.session);
+		}
 	}
 
 	destroy(): void {
@@ -192,10 +202,6 @@ export class ShadowHoverControllerImpl {
 		event?: MouseEvent,
 	): void {
 		const proxy = this.syncActiveAnchor(anchorEl);
-		const link = this.resolveLink(interactionId);
-		if (!link) {
-			return;
-		}
 		syncPopoverTargetAndTransition(this.session);
 		const requestSeq = nextSessionRequestSeq(this.session);
 		beginSessionRequest(
@@ -203,15 +209,13 @@ export class ShadowHoverControllerImpl {
 			{ actualEl: anchorEl, proxyEl: proxy },
 			requestSeq,
 		);
-		this.markLaunch(anchorEl, interactionId);
-		this.launchPopover({
-			session: this.session,
-			actualAnchorEl: anchorEl,
-			proxyAnchorEl: proxy,
-			event: event ?? this.createSyntheticHoverEvent(anchorEl),
-			link,
+		this.resolveAndLaunch(
+			anchorEl,
+			proxy,
+			interactionId,
+			event ?? this.createSyntheticHoverEvent(anchorEl),
 			requestSeq,
-		});
+		);
 	}
 
 	private handleAnchorEnter(
@@ -275,18 +279,83 @@ export class ShadowHoverControllerImpl {
 			);
 		}
 
-		const link = this.resolveLink(interactionId);
-		if (!link) {
-			syncPopoverTargetAndTransition(this.session);
+		syncPopoverTargetAndTransition(this.session);
+		this.resolveAndLaunch(
+			anchorEl,
+			proxy,
+			interactionId,
+			mouseEvent ?? this.createSyntheticHoverEvent(anchorEl),
+			requestSeq,
+		);
+	}
+
+	private resolveAndLaunch(
+		actualAnchorEl: HTMLElement,
+		proxyAnchorEl: HTMLElement,
+		interactionId: string,
+		event: MouseEvent,
+		requestSeq: number,
+	): void {
+		const resolution = this.resolveLink(interactionId);
+		if (!isPromiseLike(resolution)) {
+			if (!resolution) return;
+			this.markLaunch(actualAnchorEl, interactionId);
+			this.launchResolvedLink(
+				actualAnchorEl,
+				proxyAnchorEl,
+				event,
+				requestSeq,
+				resolution,
+			);
 			return;
 		}
-		syncPopoverTargetAndTransition(this.session);
-		this.markLaunch(anchorEl, interactionId);
+
+		this.markLaunch(actualAnchorEl, interactionId);
+		void resolution.then(
+			(link) => {
+				if (!link) return;
+				if (!this.isCurrentRequest(actualAnchorEl, proxyAnchorEl, requestSeq)) {
+					return;
+				}
+				this.launchResolvedLink(
+					actualAnchorEl,
+					proxyAnchorEl,
+					event,
+					requestSeq,
+					link,
+				);
+			},
+			() => undefined,
+		);
+	}
+
+	private isCurrentRequest(
+		actualAnchorEl: HTMLElement,
+		proxyAnchorEl: HTMLElement,
+		requestSeq: number,
+	): boolean {
+		return (
+			!this.session.destroyed &&
+			this.session.requestSeq === requestSeq &&
+			this.session.activeAnchor?.actualEl === actualAnchorEl &&
+			this.session.activeAnchor.proxyEl === proxyAnchorEl &&
+			actualAnchorEl.isConnected &&
+			isActualHovered(this.session, actualAnchorEl)
+		);
+	}
+
+	private launchResolvedLink(
+		actualAnchorEl: HTMLElement,
+		proxyAnchorEl: HTMLElement,
+		event: MouseEvent,
+		requestSeq: number,
+		link: ShadowHoverLinkSpec,
+	): void {
 		this.launchPopover({
 			session: this.session,
-			actualAnchorEl: anchorEl,
-			proxyAnchorEl: proxy,
-			event: mouseEvent ?? this.createSyntheticHoverEvent(anchorEl),
+			actualAnchorEl,
+			proxyAnchorEl,
+			event,
 			link,
 			requestSeq,
 		});

@@ -18,6 +18,7 @@ Shadow DOM anchors cannot be passed directly to Obsidian's light-DOM hover popov
 - `popover.position` is wrapped for geometry updates. Accepted Shadow popovers guard `hide`, `close`, and `unload` only while the real Shadow anchor remains hovered; popover hover, focus, and structural close semantics remain native-owned. Explicit close interactions and bridge release restore the native methods before closing. `transition` and `detect` remain unwrapped.
 - Hover Editor popovers are released to their native lifecycle as soon as `togglePin()` confirms them as pinned.
 - Accepted popovers are matched by monotonically increasing request sequence plus active proxy identity; stale assignments are closed asynchronously.
+- Asynchronous link-spec results launch only while their request sequence, active proxy, connected actual anchor, and hover ownership are still current.
 - Handoff keeps the previous popover until replacement or timeout, then releases it to native lifecycle without forcing close.
 - Hover/pointermove state mutation is allocation-free after event resolution: modifier-edge state lives in the bridge and session booleans/sets are updated in place.
 - Independent proxy stores remain isolated so one owner cannot release another owner's geometry target.

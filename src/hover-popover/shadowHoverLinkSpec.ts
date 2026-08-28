@@ -1,7 +1,11 @@
 import type { CachedMetadataWithLinkReferences } from "indexing/model";
-import type { AppContext } from "cards/context/linkContext";
+import type { TFile } from "obsidian";
+import type { AppContext, LinkInteractionOptions } from "cards/context/linkContext";
 import type { InteractionDescriptor } from "cards/interactions/interactionTypes";
-import { resolveDescriptorInteractionOptions } from "cards/interactions/interactionTypes";
+import {
+	isPromiseLike,
+	resolveDescriptorInteractionOptionsAsync,
+} from "cards/interactions/interactionTypes";
 import {
 	buildHoverPopoverLinkSpec,
 	type HoverPopoverLinkSpec,
@@ -11,19 +15,45 @@ import { hydrateRuntimeBacklinkHoverLink } from "cards/context/runtimeBacklinkPo
 export function buildShadowHoverLinkSpec(
 	descriptor: InteractionDescriptor | undefined,
 	appContext: AppContext | undefined,
-): HoverPopoverLinkSpec | null {
+): HoverPopoverLinkSpec | null | Promise<HoverPopoverLinkSpec | null> {
 	if (!descriptor?.targetFile || descriptor.hoverPreviewEnabled === false) {
 		return null;
 	}
+	const targetFile = descriptor.targetFile;
 
-	const options = resolveDescriptorInteractionOptions(descriptor, appContext);
+	const options = resolveDescriptorInteractionOptionsAsync(descriptor, appContext);
+	if (isPromiseLike(options)) {
+		return options.then((resolvedOptions) =>
+			buildResolvedShadowHoverLinkSpec(
+				descriptor,
+				targetFile,
+				appContext,
+				resolvedOptions,
+			),
+		);
+	}
+
+	return buildResolvedShadowHoverLinkSpec(
+		descriptor,
+		targetFile,
+		appContext,
+		options,
+	);
+}
+
+function buildResolvedShadowHoverLinkSpec(
+	descriptor: InteractionDescriptor,
+	targetFile: TFile,
+	appContext: AppContext | undefined,
+	options: LinkInteractionOptions,
+): HoverPopoverLinkSpec | null {
 	const highlightMode = options.highlightMode ?? "auto";
 	const preferredPosition = options.preferredPosition;
 
 	if (descriptor.kind === "sectionHeader") {
 		return buildHoverPopoverLinkSpec(
 			descriptor.link,
-			descriptor.targetFile,
+			targetFile,
 			descriptor.settings,
 			descriptor.isOutgoingLink,
 			highlightMode,
@@ -40,7 +70,7 @@ export function buildShadowHoverLinkSpec(
 					isUnresolved: false,
 					position: preferredPosition ?? descriptor.item.data.position,
 				},
-				descriptor.targetFile,
+				targetFile,
 				descriptor.settings,
 				false,
 				highlightMode,
@@ -54,7 +84,7 @@ export function buildShadowHoverLinkSpec(
 							position: preferredPosition,
 						}
 					: descriptor.item.data.hop1,
-				descriptor.targetFile,
+				targetFile,
 				descriptor.settings,
 				!preferSearchMatch,
 				highlightMode,
@@ -74,7 +104,7 @@ export function buildShadowHoverLinkSpec(
 							descriptor.item.data,
 							appContext?.app?.metadataCache,
 						),
-				descriptor.targetFile,
+				targetFile,
 				descriptor.settings,
 				false,
 				highlightMode,
@@ -88,7 +118,7 @@ export function buildShadowHoverLinkSpec(
 					isUnresolved: false,
 					position: preferredPosition,
 				},
-				descriptor.targetFile,
+				targetFile,
 				descriptor.settings,
 				false,
 				highlightMode,
