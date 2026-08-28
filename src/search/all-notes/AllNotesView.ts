@@ -1,5 +1,6 @@
 import {
 	ItemView,
+	Scope,
 	TFile,
 	type IconName,
 	type ViewStateResult,
@@ -22,6 +23,7 @@ import {
 	createListViewUiState,
 	type ListViewUiState,
 } from "cards/list/model/listViewUiState";
+import { registerSearchFocusShortcut } from "obsidian-integration/views/searchFocusShortcut";
 
 export const VIEW_TYPE_ALL_NOTES = "cosense-card-links-all-notes-view";
 
@@ -29,6 +31,8 @@ export class AllNotesView extends ItemView {
 	private component: SvelteComponentInstance | undefined = undefined;
 	private cardCollectionState: CardCollectionState | undefined = undefined;
 	private listUiState: ListViewUiState = createListViewUiState();
+	private readonly searchFocusScope: Scope;
+	private unregisterSearchFocusShortcut: (() => void) | undefined = undefined;
 
 	constructor(
 		leaf: WorkspaceLeaf,
@@ -37,6 +41,8 @@ export class AllNotesView extends ItemView {
 	) {
 		super(leaf);
 		this.navigation = true;
+		this.searchFocusScope = new Scope(this.app.scope);
+		this.scope = this.searchFocusScope;
 	}
 
 	getViewType(): string {
@@ -70,6 +76,11 @@ export class AllNotesView extends ItemView {
 
 	async onOpen(): Promise<void> {
 		this.render();
+		this.unregisterSearchFocusShortcut?.();
+		this.unregisterSearchFocusShortcut = registerSearchFocusShortcut(
+			this.contentEl,
+			this.searchFocusScope,
+		);
 	}
 
 	public refreshFromSettings(): void {
@@ -125,6 +136,8 @@ export class AllNotesView extends ItemView {
 	}
 
 	async onClose(): Promise<void> {
+		this.unregisterSearchFocusShortcut?.();
+		this.unregisterSearchFocusShortcut = undefined;
 		[this.component, this.cardCollectionState] = cleanupSvelteAndStore(
 			this.component,
 			this.cardCollectionState,

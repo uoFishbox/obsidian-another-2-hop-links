@@ -1,4 +1,4 @@
-import { ItemView, type TFile, type WorkspaceLeaf } from "obsidian";
+import { ItemView, Scope, type TFile, type WorkspaceLeaf } from "obsidian";
 import { mount, type Component } from "svelte";
 import type { DataUpdateContext } from "indexing/index-service/IndexEvents";
 import type { SortableItem } from "cards/sorting";
@@ -15,6 +15,7 @@ import {
 } from "obsidian-integration/views/viewFactories";
 import { applyCardLayoutCssVars } from "cards/layout/cardLayoutCssVars";
 import type { ListViewUiState } from "cards/list/model/listViewUiState";
+import { registerSearchFocusShortcut } from "obsidian-integration/views/searchFocusShortcut";
 
 interface ListHostComponent extends ComponentInstance {
 	updateItems?: (nextItems: CardItem[]) => void;
@@ -97,6 +98,8 @@ export abstract class AbstractSvelteListView<
 	private currentItems: TItem[] = [];
 	private currentItemKeySet = new Set<string>();
 	private unsubscribeFromIndex: (() => void) | undefined = undefined;
+	private readonly searchFocusScope: Scope;
+	private unregisterSearchFocusShortcut: (() => void) | undefined = undefined;
 
 	private readonly guardedIndexUpdateHandler = createGuardedIndexUpdateHandler({
 		isReady: () => this.isViewReady(),
@@ -111,10 +114,17 @@ export abstract class AbstractSvelteListView<
 	) {
 		super(leaf);
 		this.navigation = true;
+		this.searchFocusScope = new Scope(this.app.scope);
+		this.scope = this.searchFocusScope;
 	}
 
 	async onOpen(): Promise<void> {
 		this.render();
+		this.unregisterSearchFocusShortcut?.();
+		this.unregisterSearchFocusShortcut = registerSearchFocusShortcut(
+			this.contentEl,
+			this.searchFocusScope,
+		);
 		this.unsubscribeFromIndex = this.plugin.indexingService.onDataUpdate(
 			(context) => {
 				this.guardedIndexUpdateHandler(context);
@@ -123,6 +133,8 @@ export abstract class AbstractSvelteListView<
 	}
 
 	async onClose(): Promise<void> {
+		this.unregisterSearchFocusShortcut?.();
+		this.unregisterSearchFocusShortcut = undefined;
 		this.unsubscribeFromIndex?.();
 		this.unsubscribeFromIndex = undefined;
 		this.scrollerEl = undefined;
