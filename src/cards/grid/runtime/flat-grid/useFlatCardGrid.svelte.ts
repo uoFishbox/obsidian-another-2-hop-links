@@ -42,7 +42,7 @@ import { useAppContext } from "cards/context/linkContext";
 import type { VirtualFrameCoordinator } from "shared/ui/scheduling/frameCoordinator";
 import { DEFAULT_SETTINGS } from "settings/model";
 import {
-	buildCardGridBindings,
+	createCardGridBindingsMemo,
 	isCardGridMountedItemCell,
 } from "./mountedCardBindings";
 import type { FlatListScrollState } from "cards/list/model/listViewUiState";
@@ -229,6 +229,7 @@ export function useFlatCardGrid<T>(
 	let layout = $state.raw(DEFAULT_FLAT_GRID_LAYOUT);
 	let previousPreviewVisibleRange: RowRange | undefined;
 	let previewScrollDirection: PreviewScrollDirection = "stationary";
+	const resolveCardGridBindings = createCardGridBindingsMemo<T>();
 	const resolveConfiguredCardLayout = createResolvedCardLayoutSettingsMemo();
 	const configuredCardLayout = $derived.by(() =>
 		resolveConfiguredCardLayout(applicationStore?.settings),
@@ -276,7 +277,7 @@ export function useFlatCardGrid<T>(
 		});
 	const rowModel = $derived(resolveFlatGridRowModel(layout));
 	const syncCardSlots = (
-		rows: readonly MountedFlatGridRow<T>[],
+		mountedBuild: MountedFlatGridBuild<T> | null,
 		visibleRange: RowRange,
 	): void => {
 		previewScrollDirection = resolvePreviewScrollDirection(
@@ -290,18 +291,22 @@ export function useFlatCardGrid<T>(
 			rowModel.rowCount,
 			previewScrollDirection,
 		);
-		const bindings = buildCardGridBindings({
-			rows,
+		const bindingsResult = resolveCardGridBindings({
+			mountedBuild,
 			resolvePreviewRequest: props.resolveItemPreviewRequest,
 			resolveInteractionDescriptor: props.resolveItemInteractionDescriptor,
 		});
 		previewSurface.publish({
-			bindings: bindings.previewBindings,
+			bindings: bindingsResult.bindings.previewBindings,
 			visibleRange,
 			prefetchRange,
 			active: true,
 		});
-		interactionController.syncCards(bindings.interactionBindings);
+		if (bindingsResult.changed) {
+			interactionController.syncCards(
+				bindingsResult.bindings.interactionBindings,
+			);
+		}
 	};
 	const virtualList = useVirtualizer<
 		FlatGridLogicalCell<T>,
@@ -323,10 +328,7 @@ export function useFlatCardGrid<T>(
 				rowSlotAllocator,
 			}),
 		onSnapshotUpdated: (snapshot) => {
-			syncCardSlots(
-				snapshot.mountedBuild?.rowsInMountedRange ?? EMPTY_MOUNTED_ROWS,
-				snapshot.ranges.previewVisible,
-			);
+			syncCardSlots(snapshot.mountedBuild, snapshot.ranges.previewVisible);
 		},
 		resolveLayoutMeasurement: (nextMeasurement, rootEl, runtimeMeasurement) => {
 			const layoutMeasurement = resolveFlatGridLayoutMeasurement({
@@ -445,9 +447,7 @@ export function useFlatCardGrid<T>(
 		void props.resolveItemInteractionDescriptor;
 		const snapshot = virtualList.getSnapshot();
 		if (!snapshot) return;
-		const rows =
-			virtualList.getMountedBuild()?.rowsInMountedRange ?? EMPTY_MOUNTED_ROWS;
-		syncCardSlots(rows, snapshot.ranges.previewVisible);
+		syncCardSlots(virtualList.getMountedBuild(), snapshot.ranges.previewVisible);
 	});
 
 	onDestroy(() => {
