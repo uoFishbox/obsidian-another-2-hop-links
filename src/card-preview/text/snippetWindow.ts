@@ -73,9 +73,12 @@ function buildFencedBlockSliceAroundMatch(
 	);
 	const header = `${block.fence}${block.infoString}\n`;
 	const footer = `\n${block.fence}`;
+	const visibleInfoString =
+		firstMatchIndex < block.contentStart ? block.infoString.trim() : "";
+	const visibleInfoPrefix = visibleInfoString ? `${visibleInfoString}\n` : "";
 	const codeWindowSize = Math.max(
 		searchQueryLength,
-		windowSize - header.length - footer.length,
+		windowSize - header.length - footer.length - visibleInfoPrefix.length,
 	);
 	const centeredPadding = Math.max(
 		0,
@@ -104,11 +107,28 @@ function buildFencedBlockSliceAroundMatch(
 			slicedCodeBody +
 			(trailingOmission ? "..." : "");
 	}
+	slicedCodeBody = visibleInfoPrefix + slicedCodeBody;
+
+	const fencedCodeSlice = `${header}${slicedCodeBody}${footer}`;
+	const hasFollowingContent = block.blockEnd < content.length;
+	const trailingSeparator = hasFollowingContent ? "\n" : "";
+	const trailingWindowSize = Math.max(
+		0,
+		windowSize - fencedCodeSlice.length - trailingSeparator.length,
+	);
+	const trailingSliceEnd = Math.min(
+		content.length,
+		block.blockEnd + trailingWindowSize,
+	);
+	const trailingContent =
+		trailingSliceEnd > block.blockEnd
+			? trailingSeparator + content.substring(block.blockEnd, trailingSliceEnd)
+			: "";
 
 	return {
-		contentToProcess: `${header}${slicedCodeBody}${footer}`,
+		contentToProcess: fencedCodeSlice + trailingContent,
 		hasLeadingOmission: block.blockStart > 0 || leadingOmission,
-		hasTrailingOmission: block.blockEnd < content.length || trailingOmission,
+		hasTrailingOmission: trailingOmission || trailingSliceEnd < content.length,
 	};
 }
 
@@ -221,10 +241,12 @@ function selectContentSlice(
 		firstMatchIndex,
 	);
 	if (enclosingFencedBlock) {
+		const matchIsInOpeningFence =
+			firstMatchIndex < enclosingFencedBlock.contentStart;
 		const cutsFenceBoundary =
 			sliceStart > enclosingFencedBlock.blockStart ||
 			sliceEnd < enclosingFencedBlock.blockEnd;
-		if (cutsFenceBoundary) {
+		if (matchIsInOpeningFence || cutsFenceBoundary) {
 			return buildFencedBlockSliceAroundMatch(
 				content,
 				enclosingFencedBlock,

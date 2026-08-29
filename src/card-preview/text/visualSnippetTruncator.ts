@@ -23,9 +23,16 @@ interface OpenCodeBlock {
 	readonly multiline: boolean;
 }
 
+interface OpenCodeBlockSpan {
+	readonly tagStart: number;
+	readonly contentStart: number;
+	readonly stackDepth: number;
+}
+
 const INLINE_CODE_BLOCK: OpenCodeBlock = { end: "`", multiline: false };
 const FENCED_CODE_BLOCK: OpenCodeBlock = { end: "```", multiline: true };
 const VOID_ELEMENTS = new Set(["br", "hr", "img", "input", "meta", "link"]);
+const CODE_BLOCK_OPEN_TAG = '<span class="cosense-card-links__code-block">';
 
 const DEFAULT_CARD_WIDTH_PX = 140;
 const DEFAULT_CARD_HEIGHT_RATIO = 1.1;
@@ -192,6 +199,18 @@ function resolveSafeTruncationEnd(
 	);
 }
 
+function avoidSplittingHtmlEntity(
+	text: string,
+	index: number,
+	contentStart: number,
+): number {
+	const entityStart = text.lastIndexOf("&", index - 1);
+	if (entityStart < contentStart) return index;
+
+	const entityEnd = text.lastIndexOf(";", index - 1);
+	return entityStart > entityEnd ? entityStart : index;
+}
+
 function scanAndTruncate(
 	text: string,
 	metrics: VisualTruncateMetrics,
@@ -203,10 +222,27 @@ function scanAndTruncate(
 	let wikiLinkStart = -1;
 	const tagStackNames: string[] = [];
 	let firstUnclosedTagStart = -1;
+	let openCodeBlockSpan: OpenCodeBlockSpan | undefined;
 	const length = text.length;
 
 	while (index < length) {
 		if (weight >= metrics.maxWeight || state.visualLines > metrics.maxVisualLines) {
+			if (
+				openCodeBlockSpan &&
+				firstUnclosedTagStart === openCodeBlockSpan.tagStart &&
+				index > openCodeBlockSpan.contentStart
+			) {
+				const safeIndex = avoidSplittingHtmlEntity(
+					text,
+					index,
+					openCodeBlockSpan.contentStart,
+				);
+				return {
+					content: text.substring(0, safeIndex) + "</span>",
+					truncated: true,
+				};
+			}
+
 			const safeEnd = resolveSafeTruncationEnd(
 				text,
 				index,
@@ -347,7 +383,14 @@ function scanAndTruncate(
 								lastIndex >= 0 &&
 								tagStackNames[lastIndex] === tagName
 							) {
+								const closingDepth = tagStackNames.length;
 								tagStackNames.pop();
+								if (
+									openCodeBlockSpan?.stackDepth === closingDepth &&
+									tagName === "span"
+								) {
+									openCodeBlockSpan = undefined;
+								}
 								if (tagStackNames.length === 0)
 									firstUnclosedTagStart = -1;
 							}
@@ -355,6 +398,13 @@ function scanAndTruncate(
 							if (tagStackNames.length === 0)
 								firstUnclosedTagStart = index;
 							tagStackNames.push(tagName);
+							if (text.startsWith(CODE_BLOCK_OPEN_TAG, index)) {
+								openCodeBlockSpan = {
+									tagStart: index,
+									contentStart: closeIndex + 1,
+									stackDepth: tagStackNames.length,
+								};
+							}
 						}
 
 						index = closeIndex + 1;

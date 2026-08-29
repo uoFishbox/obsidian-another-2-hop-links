@@ -1,5 +1,6 @@
 import { describe, test, expect } from "vitest";
 import { getContentSnippet } from "../snippetExtractor";
+import { highlightSearchMatchesInHtml } from "../searchHighlighter";
 import type { PluginSettings } from "settings/model";
 import { DEFAULT_SETTINGS } from "settings/model";
 import { SEARCH_PREVIEW_SEEK_BUFFER_CHARS } from "card-preview/pipeline/previewRenderSettings";
@@ -551,6 +552,47 @@ describe("getContentSnippet with search query", () => {
 		expect(result).toContain('class="cosense-card-links__code-block"');
 		expect(result).toContain("# target_hit");
 		expect(result).not.toContain("\n```");
+	});
+
+	test("fills a short fenced-code search slice with following content", () => {
+		const prelude = Array.from({ length: 40 }, (_, i) => `line_${i}`).join("\n");
+		const content =
+			"prefix\n".repeat(80) +
+			"```python\n" +
+			prelude +
+			"\n# target_hit\nprint(1)\n```\n" +
+			"TAIL context after the code block.\n".repeat(100);
+		const result = getContentSnippet(content, defaultSettings, "target_hit");
+
+		expect(result).toContain('class="cosense-card-links__code-block"');
+		expect(result).toContain("# target_hit");
+		expect(result).toContain("TAIL");
+		expect(result).not.toContain("\n```");
+	});
+
+	test("shows and highlights a fenced-code language match", () => {
+		const codeLines = Array.from(
+			{ length: 30 },
+			(_, i) => `line_${i} = "instance value"`,
+		).join("\n");
+		const content =
+			"An instance variable is created when a class is instantiated and exists independently for each instance.\n" +
+			"```python\n" +
+			"class MyClass:\n" +
+			codeLines +
+			"\n```\n\nBody text after the code block.";
+		const result = getContentSnippet(content, defaultSettings, "python");
+		const highlighted = highlightSearchMatchesInHtml(result, "python");
+
+		expect(result).toContain('class="cosense-card-links__code-block"');
+		expect(result).toContain("class MyClass:");
+		expect(result).not.toContain("line_29");
+		expect(highlighted).toContain(
+			'<span class="ccl-search-highlight">python</span>',
+		);
+		expect(result.match(/<span/g)).toHaveLength(
+			result.match(/<\/span>/g)?.length ?? 0,
+		);
 	});
 
 	test("keeps headings when searching (searchSnippet context)", () => {

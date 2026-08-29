@@ -244,7 +244,7 @@ export async function skipFencedCodeBlockAsync(
 		: lineStartIndex;
 }
 
-/** Finds the closed fenced code block whose body contains the given offset. */
+/** Finds the closed fenced code block whose opening line or body contains the offset. */
 export function findFencedCodeBlockContainingOffset(
 	content: string,
 	matchIndex: number,
@@ -261,7 +261,7 @@ export function findFencedCodeBlockContainingOffset(
 	while (lineStart < content.length) {
 		const block = findFencedCodeBlockAtLineStart(content, lineStart);
 		if (block) {
-			if (matchIndex >= block.contentStart && matchIndex <= block.contentEnd) {
+			if (matchIndex >= block.blockStart && matchIndex <= block.contentEnd) {
 				return block;
 			}
 			if (block.blockStart > matchIndex) {
