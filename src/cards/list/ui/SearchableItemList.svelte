@@ -222,6 +222,9 @@
 		sourceItems: null,
 	});
 	let filteredItems = $derived(presentation.items);
+	let gridItemsRevision = $derived(
+		searchEnabled && search.normalized ? presentation.result?.requestId : undefined,
+	);
 	let appliedSearchQuery = $derived(presentation.result?.query ?? "");
 	let appliedSearchScope = $derived(presentation.result?.scope ?? "title-only");
 	$effect(() => {
@@ -404,6 +407,7 @@
 		<LinkList
 			className="cosense-card-links__section twohop-links-back-links"
 			items={filteredItems}
+			itemsRevision={gridItemsRevision}
 			getItemId={getItemKey}
 			sectionId={searchScopedSectionId}
 			{applicationStore}

@@ -211,7 +211,7 @@ describe("SearchableItemList integration", () => {
 		expect(querySearchableItem("beta-note")).not.toBeInTheDocument();
 	});
 
-	it("appends progressive matches without moving cards already shown", async () => {
+	it("appends progressive matches without remounting cards already shown", async () => {
 		const sourceFile = createMockTFile("notes/source.md");
 		const items = Array.from({ length: 11 }, (_unused, index) =>
 			createTaggedNoteItem(
@@ -287,10 +287,16 @@ describe("SearchableItemList integration", () => {
 		if (!gridRoot) throw new Error("Unable to find progressive result grid");
 		setElementRect(gridRoot, { top: 0, width: 1600, height: 1000 });
 		triggerResize(gridRoot, 1600, 1000);
-		await vi.advanceTimersByTimeAsync(16);
-		await tick();
+		for (let frame = 0; frame < 3; frame += 1) {
+			await vi.advanceTimersByTimeAsync(16);
+			await tick();
+		}
 
-		const firstPublication = getAllSearchableItems().map((item) =>
+		const firstPublicationElements = getAllSearchableItems();
+		const firstPublicationCells = firstPublicationElements.map((item) =>
+			item.closest<HTMLElement>("[data-ccl-cell-slot]"),
+		);
+		const firstPublication = firstPublicationElements.map((item) =>
 			item.getAttribute("aria-label"),
 		);
 		expect(firstPublication.length).toBeGreaterThan(0);
@@ -306,12 +312,21 @@ describe("SearchableItemList integration", () => {
 		await vi.advanceTimersByTimeAsync(16);
 		await tick();
 
-		const finalPublication = getAllSearchableItems().map((item) =>
+		const finalPublicationElements = getAllSearchableItems();
+		const finalPublication = finalPublicationElements.map((item) =>
 			item.getAttribute("aria-label"),
 		);
 		expect(finalPublication.slice(0, firstPublication.length)).toEqual(
 			firstPublication,
 		);
+		for (let index = 0; index < firstPublicationElements.length; index += 1) {
+			expect(
+				finalPublicationElements[index]?.closest("[data-ccl-cell-slot]"),
+			).toBe(firstPublicationCells[index]);
+			expect(finalPublicationElements[index]).toBe(
+				firstPublicationElements[index],
+			);
+		}
 		expect(queryAllByRoleDeep("button", { name: "11 notes" })).toHaveLength(1);
 
 		performanceNow.mockRestore();
