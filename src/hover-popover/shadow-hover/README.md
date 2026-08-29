@@ -14,7 +14,7 @@ Shadow DOM anchors cannot be passed directly to Obsidian's light-DOM hover popov
 
 ## Invariants
 
-- Proxy elements are geometry-only (`pointer-events: none`) and are never activation relays.
+- Proxy elements are geometry-only (`pointer-events: none`) and are never activation relays. They normally live under `document.body`, but when the Shadow DOM anchor is inside a `.hover-popover`, the proxy is reparented into that popover so Hover Editor can recognize nested popovers through `targetEl` containment.
 - `popover.position` is wrapped for geometry updates. Accepted Shadow popovers guard `hide`, `close`, and `unload` only while the real Shadow anchor remains hovered; popover hover, focus, and structural close semantics remain native-owned. Explicit close interactions and bridge release restore the native methods before closing. `transition` and `detect` remain unwrapped.
 - Hover Editor popovers are released to their native lifecycle as soon as `togglePin()` confirms them as pinned.
 - Accepted popovers are matched by monotonically increasing request sequence plus active proxy identity; stale assignments are closed asynchronously.

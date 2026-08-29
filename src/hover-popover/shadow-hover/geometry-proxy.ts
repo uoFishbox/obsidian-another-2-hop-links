@@ -1,3 +1,5 @@
+import { isHTMLElementLike, isShadowRootLike } from "shared/ui/dom/realmSafeDom";
+
 const PROXY_CLASS_NAME = "ccl-shadow-hover-proxy-anchor";
 
 const PROXY_ATTRIBUTE_NAME = "data-ccl-shadow-hover-proxy";
@@ -14,6 +16,32 @@ type ProxyEntry = {
 	actual: HTMLElement;
 	lastRect: ProxyRect | null;
 };
+
+function getDefaultProxyContainer(documentRef: Document): HTMLElement {
+	return documentRef.body ?? documentRef.documentElement;
+}
+
+function resolveHoverPopoverContainer(actual: HTMLElement): HTMLElement | null {
+	let root: Node = actual.getRootNode();
+
+	while (isShadowRootLike(root) && isHTMLElementLike(root.host)) {
+		const host = root.host;
+		const hoverPopover = host.closest(".hover-popover");
+		if (isHTMLElementLike(hoverPopover)) {
+			return hoverPopover;
+		}
+		root = host.getRootNode();
+	}
+
+	return null;
+}
+
+function resolveProxyContainer(actual: HTMLElement): HTMLElement {
+	return (
+		resolveHoverPopoverContainer(actual) ??
+		getDefaultProxyContainer(actual.ownerDocument)
+	);
+}
 
 /**
  * Owns non-interactive light-DOM geometry proxies for Shadow DOM elements.
@@ -53,7 +81,7 @@ export function createShadowGeometryProxyStore(): ShadowGeometryProxyStore {
 		proxy.style.padding = "0";
 		proxy.style.border = "0";
 		proxy.style.zIndex = "-1";
-		(documentRef.body ?? documentRef.documentElement).appendChild(proxy);
+		resolveProxyContainer(actual).appendChild(proxy);
 		return proxy;
 	}
 
@@ -127,6 +155,11 @@ export function createShadowGeometryProxyStore(): ShadowGeometryProxyStore {
 			return proxy;
 		}
 
+		const proxyContainer = resolveProxyContainer(actual);
+		if (entry.proxy.parentElement !== proxyContainer) {
+			proxyContainer.appendChild(entry.proxy);
+		}
+
 		const rect = actual.getBoundingClientRect();
 		if (rect.width <= 0 || rect.height <= 0) {
 			resetProxyRect(entry);
@@ -153,7 +186,10 @@ export function createShadowGeometryProxyStore(): ShadowGeometryProxyStore {
 			release(actual);
 			return null;
 		}
-		if (entry.proxy.ownerDocument !== actual.ownerDocument) {
+		if (
+			entry.proxy.ownerDocument !== actual.ownerDocument ||
+			entry.proxy.parentElement !== resolveProxyContainer(actual)
+		) {
 			return sync(actual);
 		}
 		return entry.proxy;
