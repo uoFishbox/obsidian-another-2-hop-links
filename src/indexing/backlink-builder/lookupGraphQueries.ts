@@ -1,8 +1,8 @@
-import type { IndexSnapshot } from "../indexState";
+import type { ReadonlyIndexState } from "../indexState";
 import { compactStringSetValues } from "shared/collections/compactStringSet";
 
 export function hasDirectResolvedLookupKey(
-	snapshot: IndexSnapshot,
+	snapshot: ReadonlyIndexState,
 	lookupKey: string,
 ): boolean {
 	const lookupPaths = snapshot.lookupKeyToLookupPaths.get(lookupKey);
@@ -19,7 +19,7 @@ export function hasDirectResolvedLookupKey(
 }
 
 export function collectSourcePathsForLookupKeys(
-	snapshot: IndexSnapshot,
+	snapshot: ReadonlyIndexState,
 	lookupKeys: Iterable<string>,
 ): Set<string> {
 	const result = new Set<string>();

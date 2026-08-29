@@ -13,7 +13,7 @@ import {
 	compactStringSetValues,
 } from "shared/collections/compactStringSet";
 import type { IVault } from "obsidian-integration/hostContracts";
-import type { IndexSnapshot } from "../indexState";
+import type { ReadonlyIndexState } from "../indexState";
 
 interface LookupSourceView {
 	sourceMap: BacklinkSourceMap;
@@ -27,12 +27,12 @@ export class IndexQueryEngine {
 		Map<string, IndexedLinkQueryResult>
 	>();
 	private readonly unresolvedMergedCache = new Map<string, BacklinkSourceMap>();
-	private lastSnapshotReference: IndexSnapshot | undefined;
+	private lastSnapshotReference: ReadonlyIndexState | undefined;
 
 	constructor(private readonly vault: IVault) {}
 
 	public getBacklinksForLink(
-		snapshot: IndexSnapshot,
+		snapshot: ReadonlyIndexState,
 		linkPath: string,
 	): IndexedLinkQueryResult {
 		this.ensureSnapshotCacheScope(snapshot);
@@ -56,7 +56,7 @@ export class IndexQueryEngine {
 	}
 
 	public getUniqueBacklinkSourcesForLink(
-		snapshot: IndexSnapshot,
+		snapshot: ReadonlyIndexState,
 		linkPath: string,
 		excludePath?: string,
 		limit?: number,
@@ -100,7 +100,10 @@ export class IndexQueryEngine {
 		return Object.freeze(links);
 	}
 
-	public getBacklinkCountForLink(snapshot: IndexSnapshot, linkPath: string): number {
+	public getBacklinkCountForLink(
+		snapshot: ReadonlyIndexState,
+		linkPath: string,
+	): number {
 		this.ensureSnapshotCacheScope(snapshot);
 		const directSourceMap = snapshot.backlinksMap.get(linkPath);
 		if (directSourceMap && this.hasDirectResolvedEntries(snapshot, linkPath)) {
@@ -115,7 +118,7 @@ export class IndexQueryEngine {
 	}
 
 	public hasAtLeastUniqueBacklinkSources(
-		snapshot: IndexSnapshot,
+		snapshot: ReadonlyIndexState,
 		linkPath: string,
 		minCount: number,
 		options?: {
@@ -164,7 +167,7 @@ export class IndexQueryEngine {
 	}
 
 	public isUnresolvedWithSingleBacklink(
-		snapshot: IndexSnapshot,
+		snapshot: ReadonlyIndexState,
 		lookupPath: string,
 	): boolean {
 		this.ensureSnapshotCacheScope(snapshot);
@@ -173,7 +176,7 @@ export class IndexQueryEngine {
 	}
 
 	public isUnresolvedWithSingleBacklinkBatch(
-		snapshot: IndexSnapshot,
+		snapshot: ReadonlyIndexState,
 		lookupPaths: string[],
 	): Map<string, boolean> {
 		this.ensureSnapshotCacheScope(snapshot);
@@ -257,7 +260,7 @@ export class IndexQueryEngine {
 	}
 
 	private collectIncomingIndexedLinks(
-		snapshot: IndexSnapshot,
+		snapshot: ReadonlyIndexState,
 		lookupView: LookupSourceView,
 		targetPath: string,
 		options?: {
@@ -301,7 +304,7 @@ export class IndexQueryEngine {
 	}
 
 	private buildBacklinkFromSourceSummary(
-		snapshot: IndexSnapshot,
+		snapshot: ReadonlyIndexState,
 		sourcePath: string,
 		targetPath: string,
 		bucket: BacklinkBucket,
@@ -338,7 +341,7 @@ export class IndexQueryEngine {
 	}
 
 	private buildBacklinkFromSourceSummaryByLookupKey(
-		snapshot: IndexSnapshot,
+		snapshot: ReadonlyIndexState,
 		sourcePath: string,
 		lookupKey: string,
 		displayPath: string,
@@ -376,7 +379,7 @@ export class IndexQueryEngine {
 	}
 
 	private getSourceMapForLookup(
-		snapshot: IndexSnapshot,
+		snapshot: ReadonlyIndexState,
 		linkPath: string,
 	): LookupSourceView | undefined {
 		const directSourceMap = snapshot.backlinksMap.get(linkPath);
@@ -405,14 +408,14 @@ export class IndexQueryEngine {
 	}
 
 	private hasDirectResolvedEntries(
-		snapshot: IndexSnapshot,
+		snapshot: ReadonlyIndexState,
 		lookupPath: string,
 	): boolean {
 		return (snapshot.lookupPathResolvedSourceCount.get(lookupPath) ?? 0) > 0;
 	}
 
 	private getOrBuildUnresolvedMergedSourceMap(
-		snapshot: IndexSnapshot,
+		snapshot: ReadonlyIndexState,
 		lookupKey: string,
 	): BacklinkSourceMap | undefined {
 		const cached = this.unresolvedMergedCache.get(lookupKey);
@@ -497,7 +500,7 @@ export class IndexQueryEngine {
 		}
 	}
 
-	private ensureSnapshotCacheScope(snapshot: IndexSnapshot): void {
+	private ensureSnapshotCacheScope(snapshot: ReadonlyIndexState): void {
 		if (this.lastSnapshotReference === snapshot) {
 			return;
 		}

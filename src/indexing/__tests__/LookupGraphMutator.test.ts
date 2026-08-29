@@ -4,13 +4,13 @@ import {
 	collectSourcePathsForLookupKeys,
 	hasDirectResolvedLookupKey,
 } from "../backlink-builder/lookupGraphQueries";
-import { createEmptyIndexSnapshot } from "../indexState";
+import { createEmptyMutableIndexState } from "../indexState";
 import type { BacklinkBucket } from "indexing/model";
 import type { SourceSummary } from "../indexState";
 
 describe("LookupGraphMutator", () => {
 	test("collectSourcePathsForLookupKeys aggregates sources of sibling lookupPaths", () => {
-		const snapshot = createEmptyIndexSnapshot();
+		const snapshot = createEmptyMutableIndexState();
 
 		snapshot.lookupKeyToLookupPaths.set("foo.md", new Set(["Foo.md", "foo.md"]));
 		snapshot.backlinksMap.set("Foo.md", new Map([["source-a.md", bucket()]]));
@@ -22,7 +22,7 @@ describe("LookupGraphMutator", () => {
 	});
 
 	test("collectSourcePathsForLookupKeys deduplicates sources across sibling lookupPaths", () => {
-		const snapshot = createEmptyIndexSnapshot();
+		const snapshot = createEmptyMutableIndexState();
 
 		snapshot.lookupKeyToLookupPaths.set("foo.md", new Set(["Foo.md", "foo.md"]));
 		snapshot.backlinksMap.set("Foo.md", new Map([["source-a.md", bucket()]]));
@@ -34,7 +34,7 @@ describe("LookupGraphMutator", () => {
 	});
 
 	test("hasDirectResolvedLookupKey derives direct resolution from sibling paths", () => {
-		const snapshot = createEmptyIndexSnapshot();
+		const snapshot = createEmptyMutableIndexState();
 
 		snapshot.lookupKeyToLookupPaths.set("foo.md", new Set(["Foo.md", "foo.md"]));
 		snapshot.lookupPathResolvedSourceCount.set("Foo.md", 1);
@@ -45,7 +45,7 @@ describe("LookupGraphMutator", () => {
 	});
 
 	test("replaceSourceSummaryAsync yields during previous key removal", async () => {
-		const snapshot = createEmptyIndexSnapshot();
+		const snapshot = createEmptyMutableIndexState();
 		const sourcePath = "source.md";
 
 		const lookupKeyCount = 256;
@@ -89,7 +89,7 @@ describe("LookupGraphMutator", () => {
 	});
 
 	test("replaceSourceSummaryAsync yields during next key addition", async () => {
-		const snapshot = createEmptyIndexSnapshot();
+		const snapshot = createEmptyMutableIndexState();
 		const sourcePath = "source.md";
 
 		const lookupKeyCount = 256;

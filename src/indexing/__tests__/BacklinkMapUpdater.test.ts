@@ -130,7 +130,7 @@ describe("BacklinkMapUpdater", () => {
 		const removals: string[] = [];
 		const additions: string[] = [];
 
-		const result = await updater.reconcileBacklinksBySourceAsync(
+		const result = await updater.reconcileBacklinksBySourceCollectingAsync(
 			backlinksMap,
 			"source1.md",
 			previousSummary,
@@ -140,10 +140,10 @@ describe("BacklinkMapUpdater", () => {
 			(lookupPath) => additions.push(lookupPath),
 		);
 
-		expect(result.affectedDestinations).toEqual(
+		expect(result.changedDestinationPaths).toEqual(
 			new Set(["target2.md", "target3.md"]),
 		);
-		expect(result.representativeChangedLookupKeys).toEqual(new Set());
+		expect(result.changedRepresentativeLookupKeys).toEqual(new Set());
 		expect(removals).toEqual(["target2.md"]);
 		expect(additions).toEqual(["target3.md"]);
 		expect(backlinksMap.get("target1.md")?.has("source1.md")).toBe(true);
@@ -172,15 +172,15 @@ describe("BacklinkMapUpdater", () => {
 		const affectedDestinations = new Set<string>();
 		const representativeChangedLookupKeys = new Set<string>();
 
-		const changed = await updater.reconcileBacklinksBySourceAsync(
+		const changed = await updater.reconcileBacklinksBySourceIntoAsync(
 			backlinksMap,
 			"source1.md",
 			previousSummary,
 			nextSummary,
 			createImmediateYieldScheduler(),
-			undefined,
-			undefined,
 			{
+				onBacklinkRemoved() {},
+				onBacklinkAdded() {},
 				markAffectedDestination(destinationPath) {
 					affectedDestinations.add(destinationPath);
 				},
@@ -255,7 +255,7 @@ describe("BacklinkMapUpdater", () => {
 		const removals: string[] = [];
 		const additions: string[] = [];
 
-		const result = await localUpdater.reconcileBacklinksBySourceAsync(
+		const result = await localUpdater.reconcileBacklinksBySourceCollectingAsync(
 			backlinksMap,
 			"source.md",
 			previousSummary,
@@ -265,8 +265,8 @@ describe("BacklinkMapUpdater", () => {
 			(lookupPath) => additions.push(lookupPath),
 		);
 
-		expect(result.affectedDestinations).toEqual(new Set());
-		expect(result.representativeChangedLookupKeys).toEqual(new Set());
+		expect(result.changedDestinationPaths).toEqual(new Set());
+		expect(result.changedRepresentativeLookupKeys).toEqual(new Set());
 		expect(removals).toEqual([]);
 		expect(additions).toEqual([]);
 		expect(backlinksMap.get("target.md")?.get("source.md")?.count).toBe(1);
@@ -334,7 +334,7 @@ describe("BacklinkMapUpdater", () => {
 		const removals: string[] = [];
 		const additions: string[] = [];
 
-		const result = await localUpdater.reconcileBacklinksBySourceAsync(
+		const result = await localUpdater.reconcileBacklinksBySourceCollectingAsync(
 			backlinksMap,
 			"source.md",
 			previousSummary,
@@ -344,8 +344,8 @@ describe("BacklinkMapUpdater", () => {
 			(lookupPath) => additions.push(lookupPath),
 		);
 
-		expect(result.affectedDestinations).toEqual(new Set());
-		expect(result.representativeChangedLookupKeys).toEqual(new Set());
+		expect(result.changedDestinationPaths).toEqual(new Set());
+		expect(result.changedRepresentativeLookupKeys).toEqual(new Set());
 		expect(result.sourceSummaryChanged).toBe(false);
 		expect(removals).toEqual([]);
 		expect(additions).toEqual([]);
@@ -409,7 +409,7 @@ describe("BacklinkMapUpdater", () => {
 			undefined,
 			createImmediateYieldScheduler(),
 		);
-		const result = await localUpdater.reconcileBacklinksBySourceAsync(
+		const result = await localUpdater.reconcileBacklinksBySourceCollectingAsync(
 			backlinksMap,
 			"source.md",
 			previousSummary,
@@ -419,8 +419,8 @@ describe("BacklinkMapUpdater", () => {
 			(lookupPath) => additions.push(lookupPath),
 		);
 
-		expect(result.affectedDestinations).toEqual(new Set());
-		expect(result.representativeChangedLookupKeys).toEqual(new Set(["foo.md"]));
+		expect(result.changedDestinationPaths).toEqual(new Set());
+		expect(result.changedRepresentativeLookupKeys).toEqual(new Set(["foo.md"]));
 		expect(removals).toEqual([]);
 		expect(additions).toEqual([]);
 	});
@@ -449,7 +449,7 @@ describe("BacklinkMapUpdater", () => {
 			["target.md", new Map([["source1.md", existingBucket]])],
 		]);
 
-		await updater.reconcileBacklinksBySourceAsync(
+		await updater.reconcileBacklinksBySourceCollectingAsync(
 			backlinksMap,
 			"source1.md",
 			undefined,
@@ -523,7 +523,7 @@ function createSourceSummaryWithLookupKeys(
 }
 
 describe("BacklinkMapUpdater yield behavior", () => {
-	test("reconcileBacklinksBySourceAsync yields during representative lookup key comparison", async () => {
+	test("reconcileBacklinksBySourceCollectingAsync yields during representative lookup key comparison", async () => {
 		const customBuilder = new VaultEnvironmentBuilder([
 			{ path: "source.md" },
 			{ path: "target.md" },
@@ -592,7 +592,7 @@ describe("BacklinkMapUpdater yield behavior", () => {
 		const backlinksMap = await customBuilder.buildBacklinksMapAsync();
 		const countingScheduler = createCountingYieldScheduler();
 
-		const result = await localUpdater.reconcileBacklinksBySourceAsync(
+		const result = await localUpdater.reconcileBacklinksBySourceCollectingAsync(
 			backlinksMap,
 			"source.md",
 			previousSummary,
@@ -603,6 +603,6 @@ describe("BacklinkMapUpdater yield behavior", () => {
 		);
 
 		expect(countingScheduler.yieldCalls).toBeGreaterThan(0);
-		expect(result.representativeChangedLookupKeys.has("lookup-0.md")).toBe(true);
+		expect(result.changedRepresentativeLookupKeys.has("lookup-0.md")).toBe(true);
 	});
 });

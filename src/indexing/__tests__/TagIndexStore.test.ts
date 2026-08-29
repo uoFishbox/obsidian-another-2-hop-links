@@ -82,7 +82,7 @@ describe("TagIndexStore", () => {
 		expect(store.getSnapshot().tagToFilePaths.get("tag1/sub")).toBe(
 			"notes/new-name.md",
 		);
-		// tag set が同じ rename では metadata 呼び出しは不要
+		// A rename with the same tag set does not need a metadata lookup.
 		expect(env.mockMetadataCache.getFileCache).not.toHaveBeenCalled();
 	});
 
@@ -124,14 +124,14 @@ describe("TagIndexStore", () => {
 
 		store.replace(artifacts.tagIndex);
 
-		// 本文だけを変更（タグは同じ）
+		// Change only the body (the tags remain the same).
 		const result = await store.applyFileChangesAsync([
 			{ type: "modify", path: "note.md" },
 		]);
 
 		expect(result.affectedTags.size).toBe(0);
 		expect(result.affectedTagSourcePaths.size).toBe(0);
-		// tag index 自体は正しく維持される
+		// The tag index itself remains intact.
 		expect(store.getSnapshot().tagToFilePaths.get("project")).toBe("note.md");
 	});
 
@@ -149,7 +149,7 @@ describe("TagIndexStore", () => {
 
 		store.replace(artifacts.tagIndex);
 
-		// タグを追加
+		// Add a tag.
 		env.builder.addFile({ path: "note.md", tags: ["#project"] });
 		const result = await store.applyFileChangesAsync([
 			{ type: "modify", path: "note.md" },
@@ -173,7 +173,7 @@ describe("TagIndexStore", () => {
 
 		store.replace(artifacts.tagIndex);
 
-		// タグを削除
+		// Remove a tag.
 		env.builder.addFile({ path: "note.md", tags: [] });
 		const result = await store.applyFileChangesAsync([
 			{ type: "modify", path: "note.md" },
@@ -197,7 +197,7 @@ describe("TagIndexStore", () => {
 
 		store.replace(artifacts.tagIndex);
 
-		// タグを変更
+		// Change the tag.
 		env.builder.addFile({ path: "note.md", tags: ["#new"] });
 		const result = await store.applyFileChangesAsync([
 			{ type: "modify", path: "note.md" },
@@ -228,7 +228,7 @@ describe("TagIndexStore", () => {
 			{ type: "rename", oldPath: "old.md", newPath: "new.md" },
 		]);
 
-		// tag set は同じだが path membership が変わるため affected
+		// The tag set is unchanged, but the path membership is affected.
 		expect(result.affectedTags.has("project")).toBe(true);
 		expect(result.affectedTagSourcePaths.has("old.md")).toBe(true);
 		expect(result.affectedTagSourcePaths.has("new.md")).toBe(true);
@@ -254,12 +254,13 @@ describe("TagIndexStore", () => {
 			{ type: "rename", oldPath: "old.md", newPath: "new.md" },
 		]);
 
-		// rename では moved tags のみを収集（実際のファイル内容との差分は modify イベントで補正）
+		// A rename collects only moved tags; a subsequent modify event corrects differences
+		// from the actual file contents.
 		expect(result.affectedTags.has("old")).toBe(true);
 		expect(result.affectedTags.has("new")).toBe(false);
 		expect(result.affectedTagSourcePaths.has("old.md")).toBe(true);
 		expect(result.affectedTagSourcePaths.has("new.md")).toBe(true);
-		// tag index は旧 path のタグが新 path に移動される
+		// The tag index moves the old path's tags to the new path.
 		expect(store.getSnapshot().tagToFilePaths.get("old")).toBe("new.md");
 	});
 

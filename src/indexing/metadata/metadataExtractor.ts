@@ -38,7 +38,7 @@ export function extractTags(cache: CachedMetadata | null): readonly TagReference
 
 	const tagsMap = new Map<string, TagReference>();
 
-	// 1. フロントマターのタグを処理 (位置情報なし)
+	// 1. Process frontmatter tags (without position information).
 	if (frontmatterTags) {
 		if (Array.isArray(frontmatterTags)) {
 			for (const tag of frontmatterTags) {
@@ -54,12 +54,12 @@ export function extractTags(cache: CachedMetadata | null): readonly TagReference
 		}
 	}
 
-	// 2. 本文中のタグを処理 (位置情報あり)
+	// 2. Process inline tags (with position information).
 	if (cache.tags) {
-		// cache.tags は TagCache[] 型
+		// cache.tags has type TagCache[].
 		for (const tagCache of cache.tags) {
 			const normalized = normalizeTag(tagCache.tag);
-			// 既に同じタグが登録されていても、位置情報を持つこちらを優先する
+			// Prefer this entry with position information even if the same tag is already registered.
 			if (normalized) {
 				tagsMap.set(normalized, {
 					tag: normalized,
@@ -111,7 +111,7 @@ export function collectLinkReferences(
 	}
 
 	return allRefs.sort((a, b) => {
-		// positionプロパティがない場合（Frontmatterなど）は先頭(-1)とみなす
+		// Treat a missing position property (for example, frontmatter entries) as the beginning (-1).
 		const offsetA = "position" in a ? (a.position?.start.offset ?? -1) : -1;
 		const offsetB = "position" in b ? (b.position?.start.offset ?? -1) : -1;
 
@@ -120,8 +120,8 @@ export function collectLinkReferences(
 }
 
 /**
- * リンク参照をソートせずに走査する。
- * 順序が不要な用途（集計・インデックス更新）向け。
+ * Iterates over link references without sorting them.
+ * Intended for use cases where order is not required, such as aggregation and index updates.
  */
 export function forEachLinkReferenceUnordered(
 	cache: CachedMetadataWithLinkReferences | null,

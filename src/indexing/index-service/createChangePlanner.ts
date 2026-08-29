@@ -7,7 +7,7 @@ import {
 } from "../link-resolution/linkResolution";
 import type { CachedMetadataWithLinkReferences } from "indexing/model";
 import type { IMetadataCache, IVault } from "obsidian-integration/hostContracts";
-import type { IndexSnapshot, SourceLookupSummary } from "../indexState";
+import type { ReadonlyIndexState, SourceLookupSummary } from "../indexState";
 import { compactStringSetValues } from "shared/collections/compactStringSet";
 import {
 	HEAVY_YIELD_CHECK_INTERVAL,
@@ -40,15 +40,15 @@ export function createCreateEventEvaluationCache(): CreateEventEvaluationCache {
 
 export interface CreateChangePlanner {
 	collectPathsForCreateEventAsync(
-		snapshot: IndexSnapshot,
+		snapshot: ReadonlyIndexState,
 		newFilePath: string,
-		pathsToUpdate: Set<string>,
+		sourcePathsToReindex: Set<string>,
 		createEventEvaluationCache: CreateEventEvaluationCache,
 		yieldScheduler: YieldScheduler,
 		options?: { includeCreatedPath?: boolean },
 	): Promise<void>;
 	sourceHasLinkResolvingToCreatedFileAsync(
-		snapshot: IndexSnapshot,
+		snapshot: ReadonlyIndexState,
 		sourcePath: string,
 		newFilePath: string,
 		candidateLookupKeys: Iterable<string>,
@@ -62,15 +62,15 @@ export function createCreateChangePlanner(
 	metadataCache: IMetadataCache,
 ): CreateChangePlanner {
 	async function collectPathsForCreateEventAsync(
-		snapshot: IndexSnapshot,
+		snapshot: ReadonlyIndexState,
 		newFilePath: string,
-		pathsToUpdate: Set<string>,
+		sourcePathsToReindex: Set<string>,
 		createEventEvaluationCache: CreateEventEvaluationCache,
 		yieldScheduler: YieldScheduler,
 		options: { includeCreatedPath?: boolean } = {},
 	): Promise<void> {
 		if (options.includeCreatedPath ?? true) {
-			pathsToUpdate.add(newFilePath);
+			sourcePathsToReindex.add(newFilePath);
 		}
 
 		const candidates = generateCandidateLookupPaths(newFilePath);
@@ -83,13 +83,13 @@ export function createCreateChangePlanner(
 				continue;
 			}
 			for (const sourcePath of compactStringSetValues(sources)) {
-				if (!pathsToUpdate.has(sourcePath)) {
+				if (!sourcePathsToReindex.has(sourcePath)) {
 					const sourceSummary = snapshot.sourceSummaries.get(sourcePath);
 					if (
 						sourceSummary?.lookupEntries.get(candidate)?.isUnresolved ===
 						true
 					) {
-						pathsToUpdate.add(sourcePath);
+						sourcePathsToReindex.add(sourcePath);
 					} else if (!evaluatedSources?.has(sourcePath)) {
 						(evaluatedSources ??= new Set<string>()).add(sourcePath);
 
@@ -103,7 +103,7 @@ export function createCreateChangePlanner(
 								yieldScheduler,
 							)
 						) {
-							pathsToUpdate.add(sourcePath);
+							sourcePathsToReindex.add(sourcePath);
 						}
 					}
 				}
@@ -122,7 +122,7 @@ export function createCreateChangePlanner(
 	}
 
 	async function sourceHasLinkResolvingToCreatedFileAsync(
-		snapshot: IndexSnapshot,
+		snapshot: ReadonlyIndexState,
 		sourcePath: string,
 		newFilePath: string,
 		candidateLookupKeys: Iterable<string>,
@@ -201,7 +201,7 @@ export function createCreateChangePlanner(
 	}
 
 	function getSourceRawLinkEntriesForCreateEvent(
-		snapshot: IndexSnapshot,
+		snapshot: ReadonlyIndexState,
 		sourcePath: string,
 		createEventEvaluationCache: CreateEventEvaluationCache,
 	): SourceRawLinkEntries {

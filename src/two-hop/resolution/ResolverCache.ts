@@ -1,4 +1,8 @@
-import type { DataUpdateContext } from "indexing/index-service/IndexEvents";
+import {
+	dataUpdateCollectionSize,
+	toDataUpdateSet,
+	type DataUpdateContext,
+} from "indexing/index-service/IndexEvents";
 import type { TwoHopResolveSnapshot } from "./ResolverDependencies";
 
 const MAX_RESOLVE_CACHE_SIZE = 64;
@@ -70,16 +74,16 @@ export class ResolverCache {
 		}
 
 		const affectedPathSet =
-			context.affectedPaths && context.affectedPaths.length > 0
-				? new Set(context.affectedPaths)
+			dataUpdateCollectionSize(context.affectedPaths) > 0
+				? toDataUpdateSet(context.affectedPaths)
 				: undefined;
 		const affectedLookupKeySet =
-			context.affectedLookupKeys && context.affectedLookupKeys.length > 0
-				? new Set(context.affectedLookupKeys)
+			dataUpdateCollectionSize(context.affectedLookupKeys) > 0
+				? toDataUpdateSet(context.affectedLookupKeys)
 				: undefined;
 		const affectedTagSet =
-			context.affectedTags && context.affectedTags.length > 0
-				? new Set(context.affectedTags)
+			dataUpdateCollectionSize(context.affectedTags) > 0
+				? toDataUpdateSet(context.affectedTags)
 				: undefined;
 
 		if (!affectedPathSet && !affectedLookupKeySet && !affectedTagSet) {

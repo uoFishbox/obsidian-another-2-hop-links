@@ -155,14 +155,10 @@ export function createSourceSummaryFromAggregation(
 
 	const orderedReferences: OrderedBacklinkRef[] = [];
 
-	// Take ownership of the scratch maps and rewrite values in place instead
-	// of copying every entry into new persistent maps. The scratch slots are
-	// replaced with empty maps for the next file.
-	const destinationAggregates = localAggregation.destinationBuckets;
-	localAggregation.destinationBuckets = new Map();
-	const destinations = destinationAggregates as unknown as Map<
+	const destinations = takeDestinationBucketsAsSummaryMap(localAggregation);
+	const destinationAggregates = destinations as unknown as Map<
 		string,
-		SourceDestinationSummary
+		FileLocalDestinationAggregate
 	>;
 	for (const [destinationPath, aggregate] of destinationAggregates) {
 		const summary: SourceDestinationSummary = {
@@ -173,9 +169,11 @@ export function createSourceSummaryFromAggregation(
 		destinations.set(destinationPath, summary);
 	}
 
-	const lookupKeyStates = localAggregation.lookupKeyStates;
-	localAggregation.lookupKeyStates = new Map();
-	const lookupEntries = fuseLookupKeyStates(lookupKeyStates, orderedReferences);
+	const lookupKeyStates = takeLookupKeyStatesAsSummaryMap(localAggregation);
+	const lookupEntries = fuseLookupKeyStates(
+		lookupKeyStates as unknown as Map<string, FileLocalLookupKeyState>,
+		orderedReferences,
+	);
 
 	return {
 		destinations,
@@ -183,6 +181,29 @@ export function createSourceSummaryFromAggregation(
 		lookupEntries,
 		hasSourceDependentLinks: localAggregation.hasSourceDependentLinks,
 	};
+}
+
+/**
+ * Transfers the scratch map into the persistent summary without copying its
+ * entries. A fresh empty map is installed before the caller starts rewriting
+ * the transferred values, so the scratch owner never observes the summary map
+ * again.
+ */
+function takeDestinationBucketsAsSummaryMap(
+	localAggregation: FileLocalAggregation,
+): Map<string, SourceDestinationSummary> {
+	const destinationBuckets = localAggregation.destinationBuckets;
+	localAggregation.destinationBuckets = new Map();
+	return destinationBuckets as unknown as Map<string, SourceDestinationSummary>;
+}
+
+/** Transfers lookup-key scratch slots into the persistent summary map. */
+function takeLookupKeyStatesAsSummaryMap(
+	localAggregation: FileLocalAggregation,
+): Map<string, SourceLookupSummary> {
+	const lookupKeyStates = localAggregation.lookupKeyStates;
+	localAggregation.lookupKeyStates = new Map();
+	return lookupKeyStates as unknown as Map<string, SourceLookupSummary>;
 }
 
 function fuseLookupKeyStates(
@@ -227,14 +248,10 @@ export function* createSourceSummaryFromAggregationChunked(
 	const orderedReferences: OrderedBacklinkRef[] = [];
 	let operationCount = 0;
 
-	// Take ownership of the scratch maps and rewrite values in place instead
-	// of copying every entry into new persistent maps. The scratch slots are
-	// replaced with empty maps for the next file.
-	const destinationAggregates = localAggregation.destinationBuckets;
-	localAggregation.destinationBuckets = new Map();
-	const destinations = destinationAggregates as unknown as Map<
+	const destinations = takeDestinationBucketsAsSummaryMap(localAggregation);
+	const destinationAggregates = destinations as unknown as Map<
 		string,
-		SourceDestinationSummary
+		FileLocalDestinationAggregate
 	>;
 	for (const [destinationPath, aggregate] of destinationAggregates) {
 		const summary: SourceDestinationSummary = {
@@ -256,11 +273,10 @@ export function* createSourceSummaryFromAggregationChunked(
 	}
 
 	// Keep the fused per-lookup-key records in the persistent summary map.
-	const lookupKeyStates = localAggregation.lookupKeyStates;
-	localAggregation.lookupKeyStates = new Map();
-	const lookupEntries = lookupKeyStates as unknown as Map<
+	const lookupEntries = takeLookupKeyStatesAsSummaryMap(localAggregation);
+	const lookupKeyStates = lookupEntries as unknown as Map<
 		string,
-		SourceLookupSummary
+		FileLocalLookupKeyState
 	>;
 
 	for (const [lookupKey, lookupState] of lookupKeyStates) {

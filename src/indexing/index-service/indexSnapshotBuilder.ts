@@ -5,10 +5,10 @@ import {
 	type MutableLinkResolutionAmbiguityDetector,
 } from "../link-resolution/linkResolution";
 import type { IMetadataCache, IVault } from "obsidian-integration/hostContracts";
-import type { IndexSnapshot, RebuildOptions, TagIndex } from "../indexState";
+import type { MutableIndexState, RebuildOptions, TagIndex } from "../indexState";
 
 export interface BuiltIndexesResult {
-	snapshot: IndexSnapshot;
+	snapshot: MutableIndexState;
 	tagIndex: TagIndex;
 }
 
@@ -41,7 +41,7 @@ function createBuiltIndexesResult(
 	};
 }
 
-function createSnapshot(artifacts: BacklinksBuildArtifacts): IndexSnapshot {
+function createSnapshot(artifacts: BacklinksBuildArtifacts): MutableIndexState {
 	return {
 		backlinksMap: artifacts.detailedMap,
 		sourceSummaries: artifacts.sourceSummaries,

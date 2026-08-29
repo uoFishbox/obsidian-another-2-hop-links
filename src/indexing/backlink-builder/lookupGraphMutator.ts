@@ -1,5 +1,9 @@
 import { toCaseInsensitiveLookupKey } from "../link-resolution/linkResolution";
-import type { IndexSnapshot, SourceSummary } from "../indexState";
+import type {
+	MutableIndexState,
+	ReadonlyIndexState,
+	SourceSummary,
+} from "../indexState";
 import {
 	addCompactStringSetValue,
 	compactStringSetValues,
@@ -19,19 +23,19 @@ export interface LookupKeyCollection {
 }
 
 export async function collectCacheInvalidationPathsAsync(
-	snapshot: IndexSnapshot,
-	affectedLookupPaths: Set<string>,
-	affectedLookupKeys: Set<string>,
+	snapshot: ReadonlyIndexState,
+	changedDestinationPaths: ReadonlySet<string>,
+	changedLookupKeys: ReadonlySet<string>,
 	yieldScheduler: YieldScheduler,
 ): Promise<Iterable<string>> {
-	if (affectedLookupKeys.size === 0) {
-		return affectedLookupPaths;
+	if (changedLookupKeys.size === 0) {
+		return changedDestinationPaths;
 	}
 
-	const pathsToInvalidate = new Set<string>(affectedLookupPaths);
+	const pathsToInvalidate = new Set<string>(changedDestinationPaths);
 	let pathCount = 0;
 
-	for (const lookupKey of affectedLookupKeys) {
+	for (const lookupKey of changedLookupKeys) {
 		const siblingLookupPaths = snapshot.lookupKeyToLookupPaths.get(lookupKey);
 		if (!siblingLookupPaths) {
 			continue;
@@ -54,7 +58,7 @@ export async function collectCacheInvalidationPathsAsync(
 }
 
 export async function replaceSourceSummaryAsync(
-	snapshot: IndexSnapshot,
+	snapshot: MutableIndexState,
 	sourcePath: string,
 	nextSummary: SourceSummary | undefined,
 	yieldScheduler: YieldScheduler,
@@ -81,14 +85,14 @@ export async function replaceSourceSummaryAsync(
 }
 
 export function onAddEdge(
-	snapshot: IndexSnapshot,
+	snapshot: MutableIndexState,
 	lookupPath: string,
 	lookupKey: string,
 	hadResolved: boolean,
 	hasResolved: boolean,
-	affectedLookupKeys: Set<string>,
+	changedLookupKeys: Set<string>,
 ): void {
-	affectedLookupKeys.add(lookupKey);
+	changedLookupKeys.add(lookupKey);
 	ensureLookupPathRegistered(snapshot, lookupPath, lookupKey);
 
 	if (!hadResolved && hasResolved) {
@@ -99,14 +103,14 @@ export function onAddEdge(
 }
 
 export function onRemoveSourceFromLookupPath(
-	snapshot: IndexSnapshot,
+	snapshot: MutableIndexState,
 	lookupPath: string,
 	lookupKey: string,
 	hadResolved: boolean,
 	isLookupPathEmptyAfter: boolean,
-	affectedLookupKeys: Set<string>,
+	changedLookupKeys: Set<string>,
 ): void {
-	affectedLookupKeys.add(lookupKey);
+	changedLookupKeys.add(lookupKey);
 
 	if (hadResolved) {
 		const nextResolvedSourceCount =
@@ -128,18 +132,18 @@ export function onRemoveSourceFromLookupPath(
 }
 
 export function removeLookupPath(
-	snapshot: IndexSnapshot,
+	snapshot: MutableIndexState,
 	lookupPath: string,
-	affectedLookupKeys: Set<string>,
+	changedLookupKeys: Set<string>,
 ): void {
 	const lookupKey = toCaseInsensitiveLookupKey(lookupPath);
-	affectedLookupKeys.add(lookupKey);
+	changedLookupKeys.add(lookupKey);
 	snapshot.lookupPathResolvedSourceCount.delete(lookupPath);
 	removeLookupPathRegistration(snapshot, lookupPath, lookupKey);
 }
 
 function ensureLookupPathRegistered(
-	snapshot: IndexSnapshot,
+	snapshot: MutableIndexState,
 	lookupPath: string,
 	lookupKey: string,
 ): void {
@@ -147,7 +151,7 @@ function ensureLookupPathRegistered(
 }
 
 function removeLookupPathRegistration(
-	snapshot: IndexSnapshot,
+	snapshot: MutableIndexState,
 	lookupPath: string,
 	lookupKey: string,
 ): void {

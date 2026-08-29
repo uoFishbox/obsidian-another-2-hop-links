@@ -8,7 +8,6 @@ import {
 	type LinkResolutionAmbiguityDetector,
 	type ResolvedLinkInfo,
 } from "../link-resolution/linkResolution";
-import { forEachLinkReferenceUnordered } from "../metadata/metadataExtractor";
 import type { YieldScheduler, YieldStepGenerator } from "../timeSlicing";
 
 export interface ResolvedLinkMemo {
@@ -77,39 +76,6 @@ function resolveLinkReferenceForSourceRaw(
 	}
 
 	return resolved;
-}
-
-function createResolvedBacklinkRef(
-	link: LinkReference,
-	rawLinkPath: string,
-	resolved: ResolvedLinkInfo,
-): ResolvedBacklinkRef {
-	return {
-		linkReference: link,
-		resolved,
-		offset: getLinkReferenceOffset(link),
-		rawLinkPath,
-	};
-}
-
-function resolveBacklinkRefForSource(
-	metadataCache: IMetadataCache,
-	sourcePath: string,
-	link: LinkReference,
-	resolvedMemo: ResolvedLinkMemo,
-	ambiguityDetector: LinkResolutionAmbiguityDetector,
-): ResolvedBacklinkRef {
-	const rawLinkPath = getLinkpath(link.link);
-	const resolved = resolveLinkReferenceForSourceRaw(
-		metadataCache,
-		sourcePath,
-		link,
-		rawLinkPath,
-		resolvedMemo,
-		ambiguityDetector,
-	);
-
-	return createResolvedBacklinkRef(link, rawLinkPath, resolved);
 }
 
 export function createOrderedBacklinkRef(

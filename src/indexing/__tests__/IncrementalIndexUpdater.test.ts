@@ -7,7 +7,7 @@ import {
 import { VaultEnvironmentBuilder } from "testing/helpers/VaultEnvironmentBuilder";
 import { buildIndexSnapshotAsync, serializeSnapshot } from "./snapshotTestHelpers";
 import type { CachedMetadata, TFile } from "obsidian";
-import type { IndexSnapshot, SourceSummary } from "../indexState";
+import type { MutableIndexState, SourceSummary } from "../indexState";
 
 function getUnresolvedLookupKeys(summary: SourceSummary | undefined): Set<string> {
 	return new Set(
@@ -107,7 +107,7 @@ describe("IncrementalIndexUpdater", () => {
 
 		expect(snapshot.backlinksMap.get("first.md")).toBeUndefined();
 		expect(snapshot.backlinksMap.get("second.md")).toBeUndefined();
-		expect(result.affectedLookupPaths).toEqual(
+		expect(result.changedDestinationPaths).toEqual(
 			new Set(["origin.md", "first.md", "second.md"]),
 		);
 	});
@@ -180,7 +180,7 @@ describe("IncrementalIndexUpdater", () => {
 			{ type: "create", path: "release.v1.md" },
 		]);
 
-		expect(result.affectedPaths).toContain("origin.md");
+		expect(result.changedFilePaths).toContain("origin.md");
 		expect(snapshot.backlinksMap.get("release.v1.md")?.has("origin.md")).toBe(true);
 		expect(serializeSnapshot(snapshot)).toEqual(
 			serializeSnapshot(await final.snapshotBuilder.buildAsync()),
@@ -210,7 +210,7 @@ describe("IncrementalIndexUpdater", () => {
 			{ type: "create", path: "src/note.md" },
 		]);
 
-		expect(result.affectedPaths).toEqual(
+		expect(result.changedFilePaths).toEqual(
 			new Set(["src/note.md", "src/origin.md", "other/unresolved-source.md"]),
 		);
 		expect(snapshot.backlinksMap.get("src/note.md")?.has("src/origin.md")).toBe(
@@ -250,7 +250,7 @@ describe("IncrementalIndexUpdater", () => {
 			},
 		]);
 
-		expect(result.affectedPaths).toEqual(
+		expect(result.changedFilePaths).toEqual(
 			new Set(["folderA/note.md", "src/note.md", "src/origin.md"]),
 		);
 		expect(snapshot.backlinksMap.get("src/note.md")?.has("src/origin.md")).toBe(
@@ -290,7 +290,7 @@ describe("IncrementalIndexUpdater", () => {
 			},
 		]);
 
-		expect(result.affectedPaths).toEqual(
+		expect(result.changedFilePaths).toEqual(
 			new Set(["folderA/note.md", "src/note.md"]),
 		);
 		expect(snapshot.backlinksMap.get("folderA/peer.md")).toBeUndefined();
@@ -367,7 +367,7 @@ describe("IncrementalIndexUpdater", () => {
 			},
 		]);
 
-		expect(result.affectedPaths).toEqual(
+		expect(result.changedFilePaths).toEqual(
 			new Set([
 				"old-name.md",
 				"src/new-name.md",
@@ -418,7 +418,7 @@ describe("IncrementalIndexUpdater", () => {
 			},
 		]);
 
-		expect(result.affectedPaths).toEqual(
+		expect(result.changedFilePaths).toEqual(
 			new Set(["folderA/note.md", "src/note.md"]),
 		);
 		expect(snapshot.backlinksMap.get("src/note.md")).toBeUndefined();
@@ -455,7 +455,7 @@ describe("IncrementalIndexUpdater", () => {
 			},
 		]);
 
-		expect(result.affectedPaths).toEqual(
+		expect(result.changedFilePaths).toEqual(
 			new Set(["folderA/note.md", "src/note.md"]),
 		);
 		expect(snapshot.backlinksMap.get("src/note.md")?.has("src/note.md")).toBe(true);
@@ -525,10 +525,10 @@ describe("IncrementalIndexUpdater", () => {
 			{ type: "modify", path: "source.md" },
 		]);
 
-		expect(result.affectedPaths).toEqual(new Set(["source.md"]));
-		expect(result.affectedLookupPaths).toEqual(new Set());
-		expect(result.affectedLookupKeys).toEqual(new Set());
-		expect(result.affectedLinkSourcePaths).toEqual(new Set());
+		expect(result.changedFilePaths).toEqual(new Set(["source.md"]));
+		expect(result.changedDestinationPaths).toEqual(new Set());
+		expect(result.changedLookupKeys).toEqual(new Set());
+		expect(result.changedLinkSourcePaths).toEqual(new Set());
 		expect(result.linkIndexChanged).toBe(false);
 		expect([...result.cacheInvalidationPaths]).toEqual([]);
 	});
@@ -566,7 +566,7 @@ describe("IncrementalIndexUpdater", () => {
 			{ type: "modify", path: "source.md" },
 		]);
 
-		expect(result.affectedLookupKeys).toEqual(new Set(["foo.md"]));
+		expect(result.changedLookupKeys).toEqual(new Set(["foo.md"]));
 		expect([...result.cacheInvalidationPaths].sort()).toEqual(["Foo.md", "foo.md"]);
 	});
 
@@ -602,7 +602,7 @@ describe("IncrementalIndexUpdater", () => {
 			{ type: "delete", path: "origin.md" },
 		]);
 
-		expect(result.affectedLookupPaths).toEqual(
+		expect(result.changedDestinationPaths).toEqual(
 			new Set(["origin.md", "missing.md"]),
 		);
 		expect(snapshot.sourceSummaries.has("origin.md")).toBe(false);
@@ -806,7 +806,10 @@ describe("IncrementalIndexUpdater - unresolved link correctness", () => {
 	});
 });
 
-function checkUnresolvedSingle(snapshot: IndexSnapshot, lookupPath: string): boolean {
+function checkUnresolvedSingle(
+	snapshot: MutableIndexState,
+	lookupPath: string,
+): boolean {
 	const key = lookupPath.toLowerCase().replace(/\\/g, "/");
 	if (hasDirectResolvedLookupKey(snapshot, key)) {
 		return false;

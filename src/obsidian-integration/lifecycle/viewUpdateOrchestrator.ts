@@ -2,7 +2,11 @@ import { MarkdownView } from "obsidian";
 import type { App } from "obsidian";
 import type { StateEffectType } from "@codemirror/state";
 import type { CanvasView } from "obsidian-typings";
-import type { DataUpdateContext } from "indexing/index-service/IndexEvents";
+import {
+	dataUpdateCollectionSize,
+	toDataUpdateSet,
+	type DataUpdateContext,
+} from "indexing/index-service/IndexEvents";
 import type { StylingService } from "obsidian-integration/link-decoration/stylingService";
 import type { RenderedMdElementsRegistry } from "../markdown/RenderedMdElementsRegistry";
 import type { PropertyWidgetStyler } from "../../obsidian-integration/link-decoration/propertyWidgetStyler";
@@ -17,6 +21,8 @@ import {
 } from "indexing/link-resolution/linkResolution";
 import { isHTMLElementLike } from "shared/ui/dom/realmSafeDom";
 import { collectWorkspaceDocuments } from "obsidian-integration/workspace/workspaceDocuments";
+
+const EMPTY_STRING_SET: ReadonlySet<string> = new Set();
 
 export interface ViewUpdateOrchestrator {
 	updateAllViews(): void;
@@ -60,26 +66,31 @@ export function createViewUpdateOrchestrator(
 			return;
 		}
 
-		const affectedPaths = context.affectedPaths ?? [];
-		const affectedLookupKeys = context.affectedLookupKeys ?? [];
-		const affectedTags = context.affectedTags ?? [];
+		const affectedPaths = toDataUpdateSet(context.affectedPaths);
+		const affectedLookupKeys = toDataUpdateSet(context.affectedLookupKeys);
+		const affectedTags = context.affectedTags;
+		const affectedPathCount = dataUpdateCollectionSize(context.affectedPaths);
+		const affectedLookupKeyCount = dataUpdateCollectionSize(
+			context.affectedLookupKeys,
+		);
 
 		const hasPathOrLookupImpact =
-			affectedPaths.length > 0 || affectedLookupKeys.length > 0;
+			affectedPathCount > 0 || affectedLookupKeyCount > 0;
 
-		const hasOnlyTagImpact = !hasPathOrLookupImpact && affectedTags.length > 0;
+		const hasOnlyTagImpact =
+			!hasPathOrLookupImpact && dataUpdateCollectionSize(affectedTags) > 0;
 
 		if (hasOnlyTagImpact) {
 			return;
 		}
 
-		if (affectedPaths.length === 0 && affectedLookupKeys.length === 0) {
+		if (affectedPathCount === 0 && affectedLookupKeyCount === 0) {
 			updateAllViews();
 			return;
 		}
 
-		const affectedPathSet = new Set(affectedPaths);
-		const affectedLookupKeySet = new Set(affectedLookupKeys);
+		const affectedPathSet = affectedPaths ?? EMPTY_STRING_SET;
+		const affectedLookupKeySet = affectedLookupKeys ?? EMPTY_STRING_SET;
 		const refreshSourcePathSet = collectRefreshSourcePaths(
 			affectedPathSet,
 			affectedLookupKeySet,
@@ -130,8 +141,8 @@ export function createViewUpdateOrchestrator(
 	}
 
 	function updateWorkspaceViews(
-		affectedPaths?: Set<string>,
-		affectedLookupKeys?: Set<string>,
+		affectedPaths?: ReadonlySet<string>,
+		affectedLookupKeys?: ReadonlySet<string>,
 	): void {
 		app.workspace.iterateAllLeaves((leaf) => {
 			const view = leaf.view;
@@ -146,7 +157,10 @@ export function createViewUpdateOrchestrator(
 		});
 	}
 
-	function updateMarkdownView(view: MarkdownView, affectedPaths?: Set<string>): void {
+	function updateMarkdownView(
+		view: MarkdownView,
+		affectedPaths?: ReadonlySet<string>,
+	): void {
 		if (!view.file) {
 			return;
 		}
@@ -207,8 +221,8 @@ export function createViewUpdateOrchestrator(
 	}
 
 	function collectRefreshSourcePaths(
-		affectedPaths: Set<string>,
-		affectedLookupKeys: Set<string>,
+		affectedPaths: ReadonlySet<string>,
+		affectedLookupKeys: ReadonlySet<string>,
 	): Set<string> {
 		const result = new Set<string>(affectedPaths);
 
@@ -228,8 +242,8 @@ export function createViewUpdateOrchestrator(
 
 	function updateCanvasView(
 		canvasView: CanvasView,
-		affectedPaths?: Set<string>,
-		affectedLookupKeys?: Set<string>,
+		affectedPaths?: ReadonlySet<string>,
+		affectedLookupKeys?: ReadonlySet<string>,
 	): void {
 		const canvasFile = canvasView.file;
 		if (!canvasFile || !canvasView.canvas?.nodes) {
@@ -278,7 +292,7 @@ export function createViewUpdateOrchestrator(
 
 	function containerHasAffectedLookupKey(
 		container: HTMLElement,
-		affectedLookupKeys: Set<string>,
+		affectedLookupKeys: ReadonlySet<string>,
 	): boolean {
 		const links = container.querySelectorAll<HTMLElement>(".internal-link");
 
@@ -298,7 +312,7 @@ export function createViewUpdateOrchestrator(
 		}
 	}
 
-	function updateBasesPanes(affectedLookupKeys?: Set<string>): void {
+	function updateBasesPanes(affectedLookupKeys?: ReadonlySet<string>): void {
 		if (affectedLookupKeys && affectedLookupKeys.size === 0) {
 			return;
 		}
@@ -358,7 +372,7 @@ function getPreviewContainerForReadingView(view: MarkdownView): HTMLElement | nu
 
 function collectBasesLinksIfAffected(
 	pane: HTMLElement,
-	affectedLookupKeys: Set<string>,
+	affectedLookupKeys: ReadonlySet<string>,
 ): HTMLElement[] | null {
 	const links = pane.querySelectorAll<HTMLElement>(".internal-link");
 

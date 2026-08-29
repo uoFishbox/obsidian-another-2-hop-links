@@ -21,9 +21,9 @@ import {
 	INDEXING_YIELD_INTERVAL_MS,
 } from "indexing/config";
 import {
-	createEmptyIndexSnapshot,
+	createEmptyMutableIndexState,
 	type IncrementalFileChange,
-	type IndexSnapshot,
+	type MutableIndexState,
 	type RebuildOptions,
 	type TimeSlicingOptions,
 } from "../indexState";
@@ -74,7 +74,7 @@ export interface IIndexingService {
 }
 
 export class IndexingService implements IIndexingService {
-	private snapshot: IndexSnapshot = createEmptyIndexSnapshot();
+	private snapshot: MutableIndexState = createEmptyMutableIndexState();
 	private readonly incrementalUpdater: IncrementalIndexUpdater;
 	private readonly ambiguityDetector: MutableLinkResolutionAmbiguityDetector;
 	private readonly queryEngine: IndexQueryEngine;
@@ -356,10 +356,10 @@ export class IndexingService implements IIndexingService {
 			changes,
 			timeSlicingOptions,
 		);
-		const affectedPaths = result.affectedPaths;
-		const affectedLookupKeys = result.affectedLookupKeys;
+		const changedFilePaths = result.changedFilePaths;
+		const changedLookupKeys = result.changedLookupKeys;
 		const affectedTags = tagResult.affectedTags;
-		const affectedLinkSourcePaths = result.affectedLinkSourcePaths;
+		const changedLinkSourcePaths = result.changedLinkSourcePaths;
 		const affectedTagSourcePaths = tagResult.affectedTagSourcePaths;
 		const linkIndexChanged = result.linkIndexChanged;
 
@@ -369,10 +369,10 @@ export class IndexingService implements IIndexingService {
 
 		this.bumpIndexVersion();
 		this.notifyDataUpdate({
-			affectedPaths,
-			affectedLookupKeys,
+			affectedPaths: changedFilePaths,
+			affectedLookupKeys: changedLookupKeys,
 			affectedTags,
-			affectedLinkSourcePaths,
+			affectedLinkSourcePaths: changedLinkSourcePaths,
 			affectedTagSourcePaths,
 		});
 	}
@@ -403,6 +403,8 @@ export class IndexingService implements IIndexingService {
 
 		const payload: DataUpdateContext = {
 			affectsAll: context.affectsAll,
+			// DataUpdateContext is consumed by external view listeners. Keep its
+			// array payload stable; internal consumers accept Set input as well.
 			affectedPaths: context.affectedPaths
 				? Array.from(context.affectedPaths)
 				: undefined,
@@ -431,8 +433,8 @@ export class IndexingService implements IIndexingService {
 }
 
 /**
- * TagReference[] のキャッシュキーを生成する。
- * 各 ref.tag を NUL 文字で結合し、空の場合は空文字列を返す。
+ * Creates a cache key for a TagReference[] value.
+ * Joins each ref.tag with a NUL character and returns an empty string when no tags exist.
  */
 function createTagRefsCacheKey(tags: readonly TagReference[]): string {
 	if (tags.length === 0) {

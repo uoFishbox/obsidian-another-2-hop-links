@@ -20,7 +20,10 @@ import type { ListConfig } from "cards/list/ui/types";
 import type { PluginHost } from "obsidian-integration/pluginHost";
 import type { ViewServices } from "obsidian-integration/views/viewServices";
 import type { IndexedLink } from "indexing/model";
-import type { DataUpdateContext } from "indexing/index-service/IndexEvents";
+import {
+	dataUpdateCollectionSize,
+	type DataUpdateContext,
+} from "indexing/index-service/IndexEvents";
 import { AbstractSvelteListView } from "obsidian-integration/views/abstractSvelteListView";
 import { buildEditorLikeFrame } from "obsidian-integration/views/editorLikeFrame";
 import { getCardItemKey, type CardItem } from "cards/CardItem";
@@ -346,7 +349,7 @@ export class PreCreationView extends AbstractSvelteListView<IndexedLink> {
 		}
 
 		const affectedPaths = context.affectedPaths;
-		if (affectedPaths && affectedPaths.length > 0) {
+		if (affectedPaths && dataUpdateCollectionSize(affectedPaths) > 0) {
 			for (const path of affectedPaths) {
 				if (this.hasCurrentItemKey(path)) {
 					return true;
@@ -355,7 +358,7 @@ export class PreCreationView extends AbstractSvelteListView<IndexedLink> {
 		}
 
 		const affectedLookupKeys = context.affectedLookupKeys;
-		if (!affectedLookupKeys || affectedLookupKeys.length === 0) {
+		if (dataUpdateCollectionSize(affectedLookupKeys) === 0) {
 			return true;
 		}
 
@@ -363,7 +366,12 @@ export class PreCreationView extends AbstractSvelteListView<IndexedLink> {
 		if (!currentLookupKey) {
 			return false;
 		}
-		return affectedLookupKeys.some((lookupKey) => lookupKey === currentLookupKey);
+		for (const lookupKey of affectedLookupKeys ?? []) {
+			if (lookupKey === currentLookupKey) {
+				return true;
+			}
+		}
+		return false;
 	}
 
 	/** ソースファイルを解決する（LinkContext 用）。見つからない場合は null */

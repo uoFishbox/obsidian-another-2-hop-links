@@ -172,9 +172,9 @@ function collectExpandedTagNames(
 }
 
 /**
- * タグセットが変化したかどうかを判定する。
- * 本文のみの変更では false を返す。
- * undefined と空配列は等価として扱う。
+ * Determines whether a tag set changed.
+ * Returns false for body-only changes.
+ * Treats undefined and an empty array as equivalent.
  */
 function hasTagSetChanged(
 	previous: readonly TagReference[] | undefined,

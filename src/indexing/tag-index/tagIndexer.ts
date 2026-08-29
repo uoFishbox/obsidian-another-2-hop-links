@@ -199,6 +199,7 @@ export function getNotesWithTag(
 		});
 	}
 
-	// パス順などでソートしておくと安定するが、呼び出し元のソートサービスに任せるためここではそのまま
+	// Sorting by path (or another stable order) would make results deterministic, but leave
+	// ordering to the caller's sorting service, so preserve the current order here.
 	return notes;
 }

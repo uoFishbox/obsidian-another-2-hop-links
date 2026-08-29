@@ -1,4 +1,4 @@
-import type { BacklinksMap, TagReference } from "indexing/model";
+import type { BacklinkSourceMap, BacklinksMap, TagReference } from "indexing/model";
 import type { CompactStringSet } from "shared/collections/compactStringSet";
 
 export type IncrementalFileChangeType = "create" | "modify" | "delete" | "rename";
@@ -75,7 +75,23 @@ export interface SourceSummary {
 	readonly hasSourceDependentLinks: boolean;
 }
 
-export interface IndexSnapshot {
+/**
+ * Read-only view of the indexes used by query and planning code.
+ *
+ * The maps are mutated by the incremental writer, so this type is deliberately
+ * separate from {@link MutableIndexState}.  Keeping the distinction in the
+ * type system makes ownership explicit without changing the runtime shape.
+ */
+export interface ReadonlyIndexState {
+	readonly backlinksMap: ReadonlyMap<string, BacklinkSourceMap>;
+	readonly sourceSummaries: ReadonlyMap<string, SourceSummary>;
+	readonly linkLookupToSources: ReadonlyMap<string, CompactStringSet>;
+	readonly lookupKeyToLookupPaths: ReadonlyMap<string, CompactStringSet>;
+	readonly lookupPathResolvedSourceCount: ReadonlyMap<string, number>;
+}
+
+/** Mutable index state owned by the indexing writer. */
+export interface MutableIndexState {
 	backlinksMap: BacklinksMap;
 	sourceSummaries: Map<string, SourceSummary>;
 	linkLookupToSources: Map<string, CompactStringSet>;
@@ -84,15 +100,15 @@ export interface IndexSnapshot {
 }
 
 export interface IndexMutationResult {
-	snapshot: IndexSnapshot;
-	affectedPaths: Set<string>;
-	affectedLookupPaths: Set<string>;
-	affectedLookupKeys: Set<string>;
-	affectedLinkSourcePaths: Set<string>;
+	snapshot: MutableIndexState;
+	changedFilePaths: Set<string>;
+	changedDestinationPaths: Set<string>;
+	changedLookupKeys: Set<string>;
+	changedLinkSourcePaths: Set<string>;
 	cacheInvalidationPaths: Iterable<string>;
 	/**
-	 * Link index (backlink / unresolved / lookup graph) に意味的差分があったか.
-	 * 本文のみの変更では false になる.
+	 * Whether the link index (backlinks, unresolved links, or lookup graph) changed semantically.
+	 * False for body-only changes.
 	 */
 	linkIndexChanged: boolean;
 }
@@ -106,7 +122,7 @@ export interface RebuildOptions extends TimeSlicingOptions {
 	signal?: AbortSignal;
 }
 
-export function createEmptyIndexSnapshot(): IndexSnapshot {
+export function createEmptyMutableIndexState(): MutableIndexState {
 	return {
 		backlinksMap: new Map(),
 		sourceSummaries: new Map(),

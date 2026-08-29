@@ -1,5 +1,8 @@
 import type { TFile } from "obsidian";
-import type { DataUpdateContext } from "indexing/index-service/IndexEvents";
+import {
+	dataUpdateCollectionSize,
+	type DataUpdateContext,
+} from "indexing/index-service/IndexEvents";
 import type { TwoHopResolverDependencies } from "two-hop/resolution/ResolverDependencies";
 import type { PreviewInvalidation } from "card-preview/PreviewRevisionState.svelte";
 
@@ -101,7 +104,7 @@ function getPreviewInvalidationForPaths(
 	relevantPaths: ReadonlySet<string>,
 ): PreviewInvalidation {
 	const affectedPaths = context.affectedPaths ?? [];
-	if (affectedPaths.length === 0) {
+	if (dataUpdateCollectionSize(affectedPaths) === 0) {
 		return undefined;
 	}
 
@@ -116,9 +119,12 @@ function getPreviewInvalidationForPaths(
 }
 
 function hasIntersection(
-	affectedValues: readonly string[],
+	affectedValues: DataUpdateContext["affectedPaths"],
 	relevantValues: ReadonlySet<string>,
 ): boolean {
+	if (!affectedValues || dataUpdateCollectionSize(affectedValues) === 0) {
+		return false;
+	}
 	for (const value of affectedValues) {
 		if (relevantValues.has(value)) {
 			return true;

@@ -1,6 +1,10 @@
 import { ItemView, Scope, type TFile, type WorkspaceLeaf } from "obsidian";
 import { mount, type Component } from "svelte";
-import type { DataUpdateContext } from "indexing/index-service/IndexEvents";
+import {
+	dataUpdateCollectionSize,
+	toDataUpdateSet,
+	type DataUpdateContext,
+} from "indexing/index-service/IndexEvents";
 import type { SortableItem } from "cards/sorting";
 import { toCardItems, type CardItem } from "cards/CardItem";
 import type { ComponentInstance } from "obsidian-integration/lifecycle/ComponentController";
@@ -24,7 +28,7 @@ interface ListHostComponent extends ComponentInstance {
 interface MergePreservingUnchangedOptions<T> {
 	getKey: (item: T) => string;
 	getVersion: (item: T) => number | string;
-	changedKeys?: Set<string>;
+	changedKeys?: ReadonlySet<string>;
 }
 
 export function mergeItemsPreservingUnchanged<T>(
@@ -190,12 +194,14 @@ export abstract class AbstractSvelteListView<
 		this.applyItemsDiff(this.getItems(), context);
 	}
 
-	protected getChangedKeys(context?: DataUpdateContext): Set<string> | undefined {
+	protected getChangedKeys(
+		context?: DataUpdateContext,
+	): ReadonlySet<string> | undefined {
 		const affectedPaths = context?.affectedPaths;
-		if (!affectedPaths || affectedPaths.length === 0) {
+		if (dataUpdateCollectionSize(affectedPaths) === 0) {
 			return undefined;
 		}
-		return new Set(affectedPaths);
+		return toDataUpdateSet(affectedPaths);
 	}
 
 	protected mountListSection(options: MountListSectionOptions): void {

@@ -1,17 +1,17 @@
 import { buildIndexesAsync } from "../index-service/indexSnapshotBuilder";
 import type { BacklinkSourceMap } from "indexing/model";
 import type { IMetadataCache, IVault } from "obsidian-integration/hostContracts";
-import type { IndexSnapshot, RebuildOptions, TagIndex } from "../indexState";
+import type { MutableIndexState, RebuildOptions, TagIndex } from "../indexState";
 
 export async function buildIndexSnapshotAsync(
 	vault: IVault,
 	metadataCache: IMetadataCache,
 	options: RebuildOptions = {},
-): Promise<IndexSnapshot> {
+): Promise<MutableIndexState> {
 	return (await buildIndexesAsync(vault, metadataCache, options)).snapshot;
 }
 
-export function serializeSnapshot(snapshot: IndexSnapshot) {
+export function serializeSnapshot(snapshot: MutableIndexState) {
 	return {
 		backlinksMap: serializeNestedBacklinkMap(snapshot.backlinksMap),
 		sourceSummaries: serializeSourceSummaryMap(snapshot.sourceSummaries),
@@ -23,7 +23,7 @@ export function serializeSnapshot(snapshot: IndexSnapshot) {
 	};
 }
 
-function serializeSourceSummaryMap(map: IndexSnapshot["sourceSummaries"]) {
+function serializeSourceSummaryMap(map: MutableIndexState["sourceSummaries"]) {
 	return Array.from(map.entries())
 		.map(
 			([sourcePath, summary]) =>
@@ -82,7 +82,7 @@ function serializeSourceSummaryMap(map: IndexSnapshot["sourceSummaries"]) {
 		.sort(([left], [right]) => left.localeCompare(right));
 }
 
-function serializeCompactSetMap(map: IndexSnapshot["lookupKeyToLookupPaths"]) {
+function serializeCompactSetMap(map: MutableIndexState["lookupKeyToLookupPaths"]) {
 	return Array.from(map.entries())
 		.map(
 			([key, values]) =>

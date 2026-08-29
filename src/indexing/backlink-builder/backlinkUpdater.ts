@@ -28,7 +28,6 @@ import {
 } from "../timeSlicing";
 import {
 	createFileLocalAggregation,
-	createSourceSummaryFromAggregation,
 	createSourceSummaryFromAggregationChunked,
 	recordFileLocalReference,
 	resetFileLocalAggregation,
@@ -52,19 +51,42 @@ export type BacklinkAdditionMutationCallback = (
 	hasResolved: boolean,
 ) => void;
 
+/** Receives changes to the lookup graph while a source is reconciled. */
+export interface BacklinkMutationSink {
+	onBacklinkRemoved(
+		lookupPath: string,
+		lookupKey: string,
+		sourcePath: string,
+		hadResolved: boolean,
+		isLookupPathEmptyAfter: boolean,
+	): void;
+	onBacklinkAdded(
+		lookupPath: string,
+		lookupKey: string,
+		sourcePath: string,
+		isNewSource: boolean,
+		hadResolved: boolean,
+		hasResolved: boolean,
+	): void;
+}
+
 export interface BacklinkReconcileResult {
-	affectedDestinations: Set<string>;
-	representativeChangedLookupKeys: Set<string>;
+	changedDestinationPaths: Set<string>;
+	changedRepresentativeLookupKeys: Set<string>;
 	sourceSummaryChanged: boolean;
 }
 
 /**
  * Receives reconcile effects without allocating per-source result Sets.
  */
-export interface BacklinkReconcileSink {
+export interface BacklinkReconcileEffectsSink {
 	markAffectedDestination(destinationPath: string): void;
 	markRepresentativeChangedLookupKey(lookupKey: string): void;
 }
+
+/** Receives both graph mutations and summary-level reconcile effects. */
+export interface BacklinkReconcileSink
+	extends BacklinkMutationSink, BacklinkReconcileEffectsSink {}
 
 function areSourceDestinationsEqual(
 	left: SourceDestinationSummary,
@@ -137,7 +159,7 @@ async function visitRepresentativeChangedLookupKeysAsync(
 	previousSummary: SourceSummary | undefined,
 	nextSummary: SourceSummary | undefined,
 	yieldScheduler: YieldScheduler,
-	sink: BacklinkReconcileSink,
+	sink: BacklinkReconcileEffectsSink,
 ): Promise<boolean> {
 	if (!previousSummary || !nextSummary) {
 		return false;
@@ -176,6 +198,15 @@ async function visitRepresentativeChangedLookupKeysAsync(
 }
 
 export interface BacklinkUpdater {
+	/** Removes a source while streaming graph effects into the run sink. */
+	removeBacklinksBySourceIntoAsync(
+		backlinksMap: BacklinksMap,
+		sourcePath: string,
+		sourceSummary: SourceSummary | undefined,
+		yieldScheduler: YieldScheduler,
+		sink: BacklinkReconcileSink,
+	): Promise<void>;
+
 	removeBacklinksBySourceAsync(
 		backlinksMap: BacklinksMap,
 		sourcePath: string,
@@ -193,7 +224,8 @@ export interface BacklinkUpdater {
 		localScratch?: FileLocalAggregation,
 	): Promise<SourceSummary | undefined>;
 
-	reconcileBacklinksBySourceAsync(
+	/** Collects reconcile effects into two result Sets. */
+	reconcileBacklinksBySourceCollectingAsync(
 		backlinksMap: BacklinksMap,
 		sourcePath: string,
 		previousSummary: SourceSummary | undefined,
@@ -202,14 +234,14 @@ export interface BacklinkUpdater {
 		onRemoval?: BacklinkRemovalMutationCallback,
 		onAddition?: BacklinkAdditionMutationCallback,
 	): Promise<BacklinkReconcileResult>;
-	reconcileBacklinksBySourceAsync(
+
+	/** Streams effects into a sink without allocating result Sets. */
+	reconcileBacklinksBySourceIntoAsync(
 		backlinksMap: BacklinksMap,
 		sourcePath: string,
 		previousSummary: SourceSummary | undefined,
 		nextSummary: SourceSummary | undefined,
 		yieldScheduler: YieldScheduler,
-		onRemoval: BacklinkRemovalMutationCallback | undefined,
-		onAddition: BacklinkAdditionMutationCallback | undefined,
 		sink: BacklinkReconcileSink,
 	): Promise<boolean>;
 }
@@ -223,6 +255,7 @@ export function createBacklinkUpdater(
 		sourcePath: string,
 		destinationPath: string,
 		onMutation?: BacklinkRemovalMutationCallback,
+		mutationSink?: BacklinkMutationSink,
 	): boolean {
 		const sourceMap = backlinksMap.get(destinationPath);
 		if (!sourceMap) {
@@ -235,9 +268,17 @@ export function createBacklinkUpdater(
 		}
 
 		sourceMap.delete(sourcePath);
+		const lookupKey = toCaseInsensitiveLookupKey(destinationPath);
 		onMutation?.(
 			destinationPath,
-			toCaseInsensitiveLookupKey(destinationPath),
+			lookupKey,
+			sourcePath,
+			removed.hasResolved,
+			sourceMap.size === 0,
+		);
+		mutationSink?.onBacklinkRemoved(
+			destinationPath,
+			lookupKey,
 			sourcePath,
 			removed.hasResolved,
 			sourceMap.size === 0,
@@ -256,6 +297,7 @@ export function createBacklinkUpdater(
 		destinationPath: string,
 		destinationSummary: SourceDestinationSummary,
 		onMutation?: BacklinkAdditionMutationCallback,
+		mutationSink?: BacklinkMutationSink,
 	): boolean {
 		let sourceMap = backlinksMap.get(destinationPath);
 		if (!sourceMap) {
@@ -271,9 +313,18 @@ export function createBacklinkUpdater(
 				}
 			: destinationSummary;
 		sourceMap.set(sourcePath, after);
+		const lookupKey = toCaseInsensitiveLookupKey(destinationPath);
 		onMutation?.(
 			destinationPath,
-			toCaseInsensitiveLookupKey(destinationPath),
+			lookupKey,
+			sourcePath,
+			!before,
+			hadResolved,
+			after.hasResolved,
+		);
+		mutationSink?.onBacklinkAdded(
+			destinationPath,
+			lookupKey,
 			sourcePath,
 			!before,
 			hadResolved,
@@ -306,6 +357,43 @@ export function createBacklinkUpdater(
 				)
 			) {
 				affectedDestinations.add(destinationPath);
+			}
+
+			destinationCount++;
+			const pendingYield = maybeYield(
+				yieldScheduler,
+				destinationCount,
+				HEAVY_YIELD_CHECK_INTERVAL,
+			);
+			if (pendingYield) {
+				await pendingYield;
+			}
+		}
+	}
+
+	async function removeBacklinksBySourceIntoAsync(
+		backlinksMap: BacklinksMap,
+		sourcePath: string,
+		sourceSummary: SourceSummary | undefined,
+		yieldScheduler: YieldScheduler,
+		sink: BacklinkReconcileSink,
+	): Promise<void> {
+		if (!sourceSummary) {
+			return;
+		}
+
+		let destinationCount = 0;
+		for (const destinationPath of sourceSummary.destinations.keys()) {
+			if (
+				removeDestinationForSource(
+					backlinksMap,
+					sourcePath,
+					destinationPath,
+					undefined,
+					sink,
+				)
+			) {
+				sink.markAffectedDestination(destinationPath);
 			}
 
 			destinationCount++;
@@ -358,45 +446,14 @@ export function createBacklinkUpdater(
 		);
 	}
 
-	async function reconcileBacklinksBySourceAsync(
+	async function reconcileBacklinksBySourceIntoAsync(
 		backlinksMap: BacklinksMap,
 		sourcePath: string,
 		previousSummary: SourceSummary | undefined,
 		nextSummary: SourceSummary | undefined,
 		yieldScheduler: YieldScheduler,
-		onRemoval?: BacklinkRemovalMutationCallback,
-		onAddition?: BacklinkAdditionMutationCallback,
-	): Promise<BacklinkReconcileResult>;
-	async function reconcileBacklinksBySourceAsync(
-		backlinksMap: BacklinksMap,
-		sourcePath: string,
-		previousSummary: SourceSummary | undefined,
-		nextSummary: SourceSummary | undefined,
-		yieldScheduler: YieldScheduler,
-		onRemoval: BacklinkRemovalMutationCallback | undefined,
-		onAddition: BacklinkAdditionMutationCallback | undefined,
 		sink: BacklinkReconcileSink,
-	): Promise<boolean>;
-	async function reconcileBacklinksBySourceAsync(
-		backlinksMap: BacklinksMap,
-		sourcePath: string,
-		previousSummary: SourceSummary | undefined,
-		nextSummary: SourceSummary | undefined,
-		yieldScheduler: YieldScheduler,
-		onRemoval?: BacklinkRemovalMutationCallback,
-		onAddition?: BacklinkAdditionMutationCallback,
-		externalSink?: BacklinkReconcileSink,
-	): Promise<BacklinkReconcileResult | boolean> {
-		const affectedDestinations = externalSink ? undefined : new Set<string>();
-		const representativeChangedLookupKeys = externalSink
-			? undefined
-			: new Set<string>();
-		const sink =
-			externalSink ??
-			createBacklinkReconcileResultSink(
-				affectedDestinations!,
-				representativeChangedLookupKeys!,
-			);
+	): Promise<boolean> {
 		const representativeChanged = await visitRepresentativeChangedLookupKeysAsync(
 			previousSummary,
 			nextSummary,
@@ -432,7 +489,8 @@ export function createBacklinkUpdater(
 						backlinksMap,
 						sourcePath,
 						destinationPath,
-						onRemoval,
+						undefined,
+						sink,
 					)
 				) {
 					sink.markAffectedDestination(destinationPath);
@@ -465,7 +523,8 @@ export function createBacklinkUpdater(
 							sourcePath,
 							destinationPath,
 							nextDestination,
-							onAddition,
+							undefined,
+							sink,
 						)
 					) {
 						sink.markAffectedDestination(destinationPath);
@@ -486,30 +545,90 @@ export function createBacklinkUpdater(
 		}
 
 		const sourceSummaryChanged = destinationChanged || representativeChanged;
+		return sourceSummaryChanged;
+	}
 
-		if (externalSink) {
-			return sourceSummaryChanged;
-		}
+	async function reconcileBacklinksBySourceCollectingAsync(
+		backlinksMap: BacklinksMap,
+		sourcePath: string,
+		previousSummary: SourceSummary | undefined,
+		nextSummary: SourceSummary | undefined,
+		yieldScheduler: YieldScheduler,
+		onRemoval?: BacklinkRemovalMutationCallback,
+		onAddition?: BacklinkAdditionMutationCallback,
+	): Promise<BacklinkReconcileResult> {
+		const affectedDestinations = new Set<string>();
+		const representativeChangedLookupKeys = new Set<string>();
+		const sink = createBacklinkReconcileResultSink(
+			affectedDestinations,
+			representativeChangedLookupKeys,
+			onRemoval,
+			onAddition,
+		);
+		const sourceSummaryChanged = await reconcileBacklinksBySourceIntoAsync(
+			backlinksMap,
+			sourcePath,
+			previousSummary,
+			nextSummary,
+			yieldScheduler,
+			sink,
+		);
 
 		return {
-			affectedDestinations: affectedDestinations!,
-			representativeChangedLookupKeys: representativeChangedLookupKeys!,
+			changedDestinationPaths: affectedDestinations,
+			changedRepresentativeLookupKeys: representativeChangedLookupKeys,
 			sourceSummaryChanged,
 		};
 	}
 
 	return {
+		removeBacklinksBySourceIntoAsync,
 		removeBacklinksBySourceAsync,
 		buildSourceSummaryForFileAsync,
-		reconcileBacklinksBySourceAsync,
+		reconcileBacklinksBySourceCollectingAsync,
+		reconcileBacklinksBySourceIntoAsync,
 	};
 }
 
 function createBacklinkReconcileResultSink(
 	affectedDestinations: Set<string>,
 	representativeChangedLookupKeys: Set<string>,
+	onRemoval?: BacklinkRemovalMutationCallback,
+	onAddition?: BacklinkAdditionMutationCallback,
 ): BacklinkReconcileSink {
 	return {
+		onBacklinkRemoved(
+			lookupPath,
+			lookupKey,
+			sourcePath,
+			hadResolved,
+			isLookupPathEmptyAfter,
+		) {
+			onRemoval?.(
+				lookupPath,
+				lookupKey,
+				sourcePath,
+				hadResolved,
+				isLookupPathEmptyAfter,
+			);
+		},
+		onBacklinkAdded(
+			lookupPath,
+			lookupKey,
+			sourcePath,
+			isNewSource,
+			hadResolved,
+			hasResolved,
+		) {
+			onAddition?.(
+				lookupPath,
+				lookupKey,
+				sourcePath,
+				isNewSource,
+				hadResolved,
+				hasResolved,
+			);
+		},
 		markAffectedDestination(destinationPath) {
 			affectedDestinations.add(destinationPath);
 		},

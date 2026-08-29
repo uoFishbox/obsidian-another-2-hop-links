@@ -15,7 +15,11 @@ import type { PluginHost } from "obsidian-integration/pluginHost";
 import type { ViewServices } from "obsidian-integration/views/viewServices";
 import type { TaggedNote } from "indexing/model";
 import { areTagFeaturesEnabled } from "settings/model";
-import type { DataUpdateContext } from "indexing/index-service/IndexEvents";
+import {
+	dataUpdateCollectionHas,
+	dataUpdateCollectionSize,
+	type DataUpdateContext,
+} from "indexing/index-service/IndexEvents";
 import { AbstractSvelteListView } from "obsidian-integration/views/abstractSvelteListView";
 import { buildEditorLikeFrame } from "obsidian-integration/views/editorLikeFrame";
 import { getCardItemKey, type CardItem } from "cards/CardItem";
@@ -43,12 +47,17 @@ export function shouldRefreshTagNotesForContext({
 }: TagNotesRefreshDecisionInput): boolean {
 	if (!tagFeaturesEnabled || !tag) return false;
 	if (!context || context.affectsAll) return true;
-	if (context.affectedTags?.includes(tag)) return true;
+	if (dataUpdateCollectionHas(context.affectedTags, tag)) return true;
 
 	const affectedPaths = context.affectedPaths;
-	if (!affectedPaths || affectedPaths.length === 0) return false;
-	if (sourcePath && affectedPaths.includes(sourcePath)) return true;
-	return affectedPaths.some(hasCurrentItemPath);
+	if (dataUpdateCollectionSize(affectedPaths) === 0) return false;
+	if (sourcePath && dataUpdateCollectionHas(affectedPaths, sourcePath)) {
+		return true;
+	}
+	for (const path of affectedPaths ?? []) {
+		if (hasCurrentItemPath(path)) return true;
+	}
+	return false;
 }
 
 interface TagNotesViewState {

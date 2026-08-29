@@ -31,11 +31,11 @@ export function hasSourceDependentRawLinkPath(rawLinkPath: string): boolean {
 	}
 	return false;
 }
-// 高頻度で同じリンク文字列・パスが渡るため、正規化結果を使い回す。
-// 無制限 Map だと削除済みファイルや過去のリンク文字列が old generation に
-// 残留し major GC / retained heap に悪影響が出るため、上限付き2世代キャッシュ
-// で保持量を制限する。正規化は安価なので LRU の per-call delete/set ではなく
-// 世代到達時の一括切り替えで追い出す。
+// The same link strings and paths are passed frequently, so reuse normalized results.
+// An unbounded Map would retain deleted files and historical link strings in the old
+// generation, increasing major GC pressure and retained heap usage. Limit retention
+// with a two-generation bounded cache. Normalization is cheap, so evict entries by
+// switching generations in bulk instead of performing per-call LRU delete/set operations.
 const CASE_INSENSITIVE_LOOKUP_KEY_CACHE: BoundedGenerationalCache<string, string> =
 	createBoundedGenerationalCache(LINK_NORMALIZATION_CACHE_MAX_ENTRIES);
 const RAW_LINKPATH_TO_MARKDOWN_PATH_CACHE: BoundedGenerationalCache<string, string> =
