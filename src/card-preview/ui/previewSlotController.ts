@@ -3,7 +3,6 @@ import type { CardPreviewRequest } from "card-preview/pipeline/cardPreviewReques
 import type { CardPreviewAttachment, CardPreviewRenderer } from "./cardPreviewRenderer";
 
 interface PreviewHostAppearance {
-	readonly stale: boolean;
 	readonly contentType?: PreviewData["type"];
 }
 
@@ -24,7 +23,7 @@ type SlotOperation =
 			readonly cancel: () => void;
 	  };
 
-type SlotActivity = "idle" | "active" | "dormant";
+type SlotActivity = "idle" | "active";
 
 type SlotContent =
 	| { readonly state: "empty" }
@@ -42,9 +41,7 @@ type SlotContent =
 			readonly host: HTMLElement;
 	  };
 
-const EMPTY_APPEARANCE: PreviewHostAppearance = {
-	stale: false,
-};
+const EMPTY_APPEARANCE: PreviewHostAppearance = {};
 
 /** Owns rendering and retained DOM for one logical card preview. */
 export function createPreviewSlotController(
@@ -59,9 +56,6 @@ export function createPreviewSlotController(
 	let content: SlotContent = { state: "empty" };
 	let detachedContent: DocumentFragment | undefined;
 	let failedRenderKey: string | undefined;
-	let cleanupHandle: number | undefined;
-	let cleanupWindow: Window | null = null;
-	let cleanupUsesIdleCallback = false;
 	let renderer: CardPreviewRenderer | undefined;
 	let disposed = false;
 	let appliedAppearance = EMPTY_APPEARANCE;
@@ -74,7 +68,6 @@ export function createPreviewSlotController(
 	function deriveAppearance(): PreviewHostAppearance {
 		const committed = content.state === "committed" ? content : undefined;
 		return {
-			stale: activity === "dormant",
 			contentType: committed?.contentType,
 		};
 	}
@@ -84,18 +77,6 @@ export function createPreviewSlotController(
 		if (isSamePreviewHostAppearance(appliedAppearance, next)) return;
 		if (host) applyPreviewHostAppearance(host, appliedAppearance, next);
 		appliedAppearance = next;
-	}
-
-	function cancelCleanup(): void {
-		if (cleanupHandle === undefined) return;
-		if (cleanupUsesIdleCallback && cleanupWindow?.cancelIdleCallback) {
-			cleanupWindow.cancelIdleCallback(cleanupHandle);
-		} else {
-			cleanupWindow?.clearTimeout(cleanupHandle);
-		}
-		cleanupHandle = undefined;
-		cleanupWindow = null;
-		cleanupUsesIdleCallback = false;
 	}
 
 	function cancelOperation(): void {
@@ -147,42 +128,6 @@ export function createPreviewSlotController(
 		return true;
 	}
 
-	function scheduleHostBoundCleanup(): void {
-		cancelCleanup();
-		const expectedHost = host;
-		const expectedRevision = revision;
-		const expectedRenderKey =
-			content.state === "committed" ? content.renderKey : undefined;
-		if (!expectedHost || !expectedRenderKey) return;
-		const ownerWindow = expectedHost.ownerDocument.defaultView;
-		if (!ownerWindow) return;
-		cleanupWindow = ownerWindow;
-		const runCleanup = () => {
-			cleanupHandle = undefined;
-			cleanupWindow = null;
-			cleanupUsesIdleCallback = false;
-			if (disposed || activity === "active" || revision !== expectedRevision) {
-				return;
-			}
-			if (
-				host !== expectedHost ||
-				content.state !== "committed" ||
-				content.renderKey !== expectedRenderKey
-			) {
-				return;
-			}
-			clearDom();
-			syncHostAppearance();
-		};
-		if (typeof ownerWindow.requestIdleCallback === "function") {
-			cleanupUsesIdleCallback = true;
-			cleanupHandle = ownerWindow.requestIdleCallback(runCleanup);
-		} else {
-			cleanupUsesIdleCallback = false;
-			cleanupHandle = ownerWindow.setTimeout(runCleanup, 0);
-		}
-	}
-
 	function isCurrent(
 		expectedRevision: number,
 		expectedHost: HTMLElement,
@@ -200,7 +145,6 @@ export function createPreviewSlotController(
 	function attachHost(element: HTMLElement): { dispose(): void } {
 		const leaseGeneration = ++hostGeneration;
 		if (host !== element) {
-			cancelCleanup();
 			advanceRevision();
 			cancelOperation();
 			const previousHost = host;
@@ -215,8 +159,6 @@ export function createPreviewSlotController(
 				clearDom();
 			}
 			syncHostAppearance();
-		} else {
-			cancelCleanup();
 		}
 		let leaseDisposed = false;
 		return {
@@ -224,7 +166,6 @@ export function createPreviewSlotController(
 				if (leaseDisposed) return;
 				leaseDisposed = true;
 				if (host !== element || hostGeneration !== leaseGeneration) return;
-				cancelCleanup();
 				advanceRevision();
 				cancelOperation();
 				const retained = detachDetachableContent(element);
@@ -248,7 +189,6 @@ export function createPreviewSlotController(
 		request = next;
 		failedRenderKey = undefined;
 		advanceRevision();
-		cancelCleanup();
 		cancelOperation();
 		if (content.state === "error") clearDom();
 	}
@@ -258,17 +198,13 @@ export function createPreviewSlotController(
 		if (nextActive) {
 			activity = "active";
 			failedRenderKey = undefined;
-			cancelCleanup();
 			syncHostAppearance();
 			return;
 		}
+		activity = "idle";
 		if (content.state !== "committed" || content.attachment !== "detachable") {
-			activity = "dormant";
 			advanceRevision();
 			cancelOperation();
-			scheduleHostBoundCleanup();
-		} else {
-			activity = "idle";
 		}
 		syncHostAppearance();
 	}
@@ -298,7 +234,6 @@ export function createPreviewSlotController(
 	function activate(): void {
 		if (!needsActivation() || !request || !host) return;
 		renderer ??= createRenderer();
-		cancelCleanup();
 		cancelOperation();
 
 		const expectedRequest = request;
@@ -389,7 +324,6 @@ export function createPreviewSlotController(
 	}
 
 	function clear(): void {
-		cancelCleanup();
 		advanceRevision();
 		cancelOperation();
 		request = undefined;
@@ -418,7 +352,6 @@ export function createPreviewSlotController(
 }
 
 function resetPreviewHostAppearance(element: HTMLElement): void {
-	element.classList.remove("is-stale");
 	for (const type of ["text", "image", "empty", "dom"] as const) {
 		element.classList.remove(`cosense-card-links__box-preview--${type}`);
 	}
@@ -428,7 +361,7 @@ function isSamePreviewHostAppearance(
 	left: PreviewHostAppearance,
 	right: PreviewHostAppearance,
 ): boolean {
-	return left.stale === right.stale && left.contentType === right.contentType;
+	return left.contentType === right.contentType;
 }
 
 function applyPreviewHostAppearance(
@@ -436,9 +369,6 @@ function applyPreviewHostAppearance(
 	previous: PreviewHostAppearance,
 	next: PreviewHostAppearance,
 ): void {
-	if (previous.stale !== next.stale) {
-		element.classList.toggle("is-stale", next.stale);
-	}
 	if (previous.contentType !== next.contentType) {
 		for (const type of ["text", "image", "empty", "dom"] as const) {
 			element.classList.toggle(
