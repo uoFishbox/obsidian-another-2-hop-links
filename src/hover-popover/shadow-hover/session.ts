@@ -94,9 +94,9 @@ export function relayHoverToProxy(
 	const rect = actual.getBoundingClientRect();
 	proxy.dispatchEvent(
 		createOwnerMouseEvent(proxy, hovered ? "mouseover" : "mouseout", {
-			bubbles: true,
+			bubbles: false,
 			cancelable: true,
-			composed: true,
+			composed: false,
 			clientX: rect.left + rect.width / 2,
 			clientY: rect.top + rect.height / 2,
 			relatedTarget: null,
