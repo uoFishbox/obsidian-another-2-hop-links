@@ -1,4 +1,8 @@
-import type { CardPreviewRequest } from "card-preview/pipeline/cardPreviewRequest";
+import {
+	applyCardPreviewDimensions,
+	type CardPreviewRequest,
+} from "card-preview/pipeline/cardPreviewRequest";
+import type { PreviewCardDimensions } from "card-preview/pipeline/previewRenderSettings";
 import type { VirtualPreviewBinding } from "card-preview/scheduling/virtualPreviewSurface";
 import type {
 	MountedFlatGridBuild,
@@ -21,6 +25,7 @@ export interface CardGridBindings {
 
 export interface BuildCardGridBindingsParams<T> {
 	rows: readonly MountedFlatGridRow<T>[];
+	previewCardDimensions: PreviewCardDimensions;
 	resolvePreviewRequest?(item: T, index: number): CardPreviewRequest | null;
 	resolveInteractionDescriptor?(
 		item: T,
@@ -30,6 +35,7 @@ export interface BuildCardGridBindingsParams<T> {
 
 export interface ResolveCardGridBindingsParams<T> {
 	mountedBuild: MountedFlatGridBuild<T> | null;
+	previewCardDimensions: PreviewCardDimensions;
 	resolvePreviewRequest?(item: T, index: number): CardPreviewRequest | null;
 	resolveInteractionDescriptor?(
 		item: T,
@@ -62,6 +68,7 @@ export function isCardGridMountedItemCell<T>(
 /** Resolves immutable preview and interaction bindings from mounted card rows. */
 export function buildCardGridBindings<T>({
 	rows,
+	previewCardDimensions,
 	resolvePreviewRequest,
 	resolveInteractionDescriptor,
 }: BuildCardGridBindingsParams<T>): CardGridBindings {
@@ -72,12 +79,15 @@ export function buildCardGridBindings<T>({
 		for (const mountedCell of row.bindings) {
 			if (!isCardGridMountedItemCell(mountedCell)) continue;
 			const { item, itemIndex } = mountedCell.cell;
-			const previewRequest = resolvePreviewRequest?.(item, itemIndex);
-			if (previewRequest) {
+			const basePreviewRequest = resolvePreviewRequest?.(item, itemIndex);
+			if (basePreviewRequest) {
 				previewBindings.push({
 					key: String(mountedCell.key),
 					rowIndex: mountedCell.rowIndex,
-					request: previewRequest,
+					request: applyCardPreviewDimensions(
+						basePreviewRequest,
+						previewCardDimensions,
+					),
 				});
 			}
 
@@ -104,29 +114,37 @@ export function createCardGridBindingsMemo<T>(): CardGridBindingsMemo<T> {
 	let lastMountedBuild: MountedFlatGridBuild<T> | null | undefined;
 	let lastPreviewResolver: ResolveCardGridBindingsParams<T>["resolvePreviewRequest"];
 	let lastInteractionResolver: ResolveCardGridBindingsParams<T>["resolveInteractionDescriptor"];
+	let lastPreviewWidthPx: number | undefined;
+	let lastPreviewHeightPx: number | undefined;
 	let bindings = EMPTY_CARD_GRID_BINDINGS;
 
 	return ({
 		mountedBuild,
+		previewCardDimensions,
 		resolvePreviewRequest,
 		resolveInteractionDescriptor,
 	}): CardGridBindingsMemoResult => {
 		if (
 			mountedBuild === lastMountedBuild &&
 			resolvePreviewRequest === lastPreviewResolver &&
-			resolveInteractionDescriptor === lastInteractionResolver
+			resolveInteractionDescriptor === lastInteractionResolver &&
+			previewCardDimensions.widthPx === lastPreviewWidthPx &&
+			previewCardDimensions.heightPx === lastPreviewHeightPx
 		) {
 			return { bindings, changed: false };
 		}
 
 		bindings = buildCardGridBindings({
 			rows: mountedBuild?.rowsInMountedRange ?? [],
+			previewCardDimensions,
 			resolvePreviewRequest,
 			resolveInteractionDescriptor,
 		});
 		lastMountedBuild = mountedBuild;
 		lastPreviewResolver = resolvePreviewRequest;
 		lastInteractionResolver = resolveInteractionDescriptor;
+		lastPreviewWidthPx = previewCardDimensions.widthPx;
+		lastPreviewHeightPx = previewCardDimensions.heightPx;
 
 		return { bindings, changed: true };
 	};

@@ -14,7 +14,23 @@ export interface PreviewRenderSettings {
 	readonly priorityFrontmatterKeyForPreview: string;
 }
 
+/** Actual card dimensions already resolved by a card-grid layout. */
+export interface PreviewCardDimensions {
+	readonly widthPx: number;
+	readonly heightPx: number;
+}
+
+interface DimensionedSettingsCacheEntry {
+	readonly widthPx: number;
+	readonly heightPx: number;
+	readonly settings: PreviewRenderSettings;
+}
+
 const settingsSnapshots = new WeakMap<PluginSettings, PreviewRenderSettings>();
+const dimensionedSettingsSnapshots = new WeakMap<
+	PreviewRenderSettings,
+	DimensionedSettingsCacheEntry
+>();
 
 /** Creates an immutable, narrowly-scoped snapshot for one preview request. */
 export function createPreviewRenderSettings(
@@ -34,6 +50,44 @@ export function createPreviewRenderSettings(
 	});
 	settingsSnapshots.set(settings, snapshot);
 	return snapshot;
+}
+
+/** Replaces configured card geometry with one grid's resolved cell geometry. */
+export function applyPreviewCardDimensions(
+	settings: PreviewRenderSettings,
+	dimensions: PreviewCardDimensions,
+): PreviewRenderSettings {
+	const widthPx = normalizeDimension(dimensions.widthPx, settings.cardWidthPx);
+	const fallbackHeightPx = settings.cardWidthPx * settings.cardHeightRatio;
+	const heightPx = normalizeDimension(dimensions.heightPx, fallbackHeightPx);
+	const cardHeightRatio = heightPx / widthPx;
+	if (
+		settings.cardWidthPx === widthPx &&
+		settings.cardHeightRatio === cardHeightRatio
+	) {
+		return settings;
+	}
+
+	const cached = dimensionedSettingsSnapshots.get(settings);
+	if (cached?.widthPx === widthPx && cached.heightPx === heightPx) {
+		return cached.settings;
+	}
+
+	const dimensionedSettings: PreviewRenderSettings = Object.freeze({
+		...settings,
+		cardWidthPx: widthPx,
+		cardHeightRatio,
+	});
+	dimensionedSettingsSnapshots.set(settings, {
+		widthPx,
+		heightPx,
+		settings: dimensionedSettings,
+	});
+	return dimensionedSettings;
+}
+
+function normalizeDimension(value: number, fallback: number): number {
+	return Number.isFinite(value) && value > 0 ? value : Math.max(1, fallback);
 }
 
 function hasSamePreviewRenderSettings(

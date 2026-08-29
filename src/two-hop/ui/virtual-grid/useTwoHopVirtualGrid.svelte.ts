@@ -22,6 +22,7 @@ import {
 import type { PreviewRuntime } from "card-preview/runtime/previewRuntime";
 import { DISABLED_PREVIEW_SURFACE } from "card-preview/runtime/previewRuntime";
 import type { VirtualPreviewBinding } from "card-preview/scheduling/virtualPreviewSurface";
+import { applyCardPreviewDimensions } from "card-preview/pipeline/cardPreviewRequest";
 import type { VirtualFrameCoordinator } from "shared/ui/scheduling/frameCoordinator";
 import { createResolvedCardLayoutSettingsMemo } from "cards/layout/cardLayoutCssVars";
 import { resolveCardGridLayoutBase } from "cards/grid/layout/cardGridLayout";
@@ -204,7 +205,10 @@ export function useTwoHopVirtualGrid(
 				bindings.push({
 					key: mountedCell.cell.logicalKey,
 					rowIndex: mountedCell.rowIndex,
-					request,
+					request: applyCardPreviewDimensions(request, {
+						widthPx: layout.cellWidth,
+						heightPx: layout.rowHeight,
+					}),
 				});
 			}
 		}

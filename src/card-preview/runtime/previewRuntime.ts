@@ -75,6 +75,7 @@ export function createPreviewRuntime(options: PreviewRuntimeOptions): PreviewRun
 				if (request.previewOverride) return;
 				await options.getPreview(request.file, signal, {
 					cacheRevision: request.previewCacheRevision,
+					renderSettings: request.settings,
 				});
 			},
 			createRenderer: () =>

@@ -56,17 +56,25 @@ describe("PreviewRuntime", () => {
 				file: unknown;
 				previewCacheRevision: string;
 				previewOverride: null;
+				settings: unknown;
 			},
 			signal: AbortSignal,
 		) => Promise<void>;
 		const signal = new AbortController().signal;
 		const file = {};
+		const settings = { cardWidthPx: 170 };
 		void prefetchPreview(
-			{ file, previewCacheRevision: "revision", previewOverride: null },
+			{
+				file,
+				previewCacheRevision: "revision",
+				previewOverride: null,
+				settings,
+			},
 			signal,
 		);
 		expect(runtimeLoader).toHaveBeenCalledWith(file, signal, {
 			cacheRevision: "revision",
+			renderSettings: settings,
 		});
 		runtime.dispose();
 	});

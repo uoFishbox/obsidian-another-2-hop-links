@@ -1,6 +1,7 @@
 import { cleanup, render, waitFor } from "@testing-library/svelte";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { App, TFile } from "obsidian";
+import type { PreviewRequestOptions } from "card-preview/types";
 import { DEFAULT_SETTINGS } from "settings/model";
 import { createPreviewRenderSettings } from "card-preview/pipeline/previewRenderSettings";
 import type { CardCollectionState } from "cards/CardCollectionState.svelte";
@@ -76,10 +77,16 @@ describe("FlatCardGrid preview surface", () => {
 			parent: { path: "notes" },
 			stat: { mtime: 1 },
 		} as TFile;
-		const getPreview = vi.fn(async () => ({
-			type: "image" as const,
-			content: "https://example.com/flat.png",
-		}));
+		const getPreview = vi.fn(
+			async (
+				_file: TFile,
+				_signal?: AbortSignal,
+				_options?: PreviewRequestOptions,
+			) => ({
+				type: "image" as const,
+				content: "https://example.com/flat.png",
+			}),
+		);
 		const linkContext = {
 			getPreview,
 			sourceFile: file,
@@ -140,6 +147,13 @@ describe("FlatCardGrid preview surface", () => {
 		);
 		expect(host).not.toBeNull();
 		await waitFor(() => expect(getPreview).toHaveBeenCalled());
+		expect(getPreview).toHaveBeenCalledWith(file, expect.anything(), {
+			cacheRevision: "0:0",
+			renderSettings: expect.objectContaining({
+				cardWidthPx: 159,
+				cardHeightRatio: 175 / 159,
+			}),
+		});
 		for (let index = 0; index < 4; index += 1) {
 			await flushFrames();
 			await Promise.resolve();

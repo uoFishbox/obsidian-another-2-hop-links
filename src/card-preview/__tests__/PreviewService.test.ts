@@ -232,6 +232,40 @@ describe("PreviewService.getPreview", () => {
 		expect(resolvePreview).toHaveBeenCalledTimes(2);
 	});
 
+	test("uses requested card dimensions for generation and cache identity", async () => {
+		const resolvePreview = vi.fn<PreviewResolver>(async (_file, context) => ({
+			type: "text" as const,
+			content: `${context.settings.cardWidthPx}:${context.settings.cardHeightRatio}`,
+		}));
+		const service = createService(resolvePreview);
+		const file = createMockTFileAsPlainObject("dimensioned-note.md");
+		const firstSettings = createPreviewRenderSettings({
+			...DEFAULT_SETTINGS,
+			cardWidthPx: 170,
+			cardHeightRatio: 1.2,
+		});
+		const secondSettings = createPreviewRenderSettings({
+			...DEFAULT_SETTINGS,
+			cardWidthPx: 200,
+			cardHeightRatio: 1.2,
+		});
+
+		const first = await service.getPreview(file, undefined, {
+			renderSettings: firstSettings,
+		});
+		const firstCached = await service.getPreview(file, undefined, {
+			renderSettings: firstSettings,
+		});
+		const second = await service.getPreview(file, undefined, {
+			renderSettings: secondSettings,
+		});
+
+		expect(first).toEqual({ type: "text", content: "170:1.2" });
+		expect(firstCached).toBe(first);
+		expect(second).toEqual({ type: "text", content: "200:1.2" });
+		expect(resolvePreview).toHaveBeenCalledTimes(2);
+	});
+
 	test("Blob URL image previews are evicted from cache by byteSize and count-limit-equivalent size", async () => {
 		const revokeObjectURL = vi.fn();
 		const originalRevokeObjectURL = URL.revokeObjectURL;

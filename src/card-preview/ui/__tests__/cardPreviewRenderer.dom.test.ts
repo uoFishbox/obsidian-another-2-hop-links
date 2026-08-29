@@ -169,12 +169,9 @@ describe("card preview renderer contract", () => {
 			content: "detached content",
 		}));
 		const renderCallbacks = callbacks();
+		const request = createRequest(file, { previewRenderVersion: "3:1" });
 
-		createRenderer(getPreview)(
-			host,
-			createRequest(file, { previewRenderVersion: "3:1" }),
-			renderCallbacks,
-		);
+		createRenderer(getPreview)(host, request, renderCallbacks);
 
 		await waitFor(() =>
 			expect(host.textContent).toContain("rendered:detached content"),
@@ -182,6 +179,7 @@ describe("card preview renderer contract", () => {
 		expect(host.isConnected).toBe(false);
 		expect(getPreview).toHaveBeenCalledWith(file, expect.any(AbortSignal), {
 			cacheRevision: "3:1",
+			renderSettings: request.settings,
 		});
 		expect(renderCallbacks.onCommitted).toHaveBeenCalledWith("text", "detachable");
 	});

@@ -12,6 +12,8 @@ interface TestItem {
 	readonly id: string;
 }
 
+const PREVIEW_CARD_DIMENSIONS = { widthPx: 100, heightPx: 120 } as const;
+
 function createMountedBuild(items: readonly TestItem[]) {
 	const cellSource = createFlatGridCellSource({
 		header: false,
@@ -51,11 +53,13 @@ describe("createCardGridBindingsMemo", () => {
 
 		const first = resolveBindings({
 			mountedBuild,
+			previewCardDimensions: PREVIEW_CARD_DIMENSIONS,
 			resolvePreviewRequest,
 			resolveInteractionDescriptor,
 		});
 		const previewOnlyUpdate = resolveBindings({
 			mountedBuild,
+			previewCardDimensions: PREVIEW_CARD_DIMENSIONS,
 			resolvePreviewRequest,
 			resolveInteractionDescriptor,
 		});
@@ -79,16 +83,19 @@ describe("createCardGridBindingsMemo", () => {
 
 		resolveBindings({
 			mountedBuild,
+			previewCardDimensions: PREVIEW_CARD_DIMENSIONS,
 			resolvePreviewRequest: firstPreviewResolver,
 			resolveInteractionDescriptor,
 		});
 		const resolverUpdate = resolveBindings({
 			mountedBuild,
+			previewCardDimensions: PREVIEW_CARD_DIMENSIONS,
 			resolvePreviewRequest: nextPreviewResolver,
 			resolveInteractionDescriptor,
 		});
 		const buildUpdate = resolveBindings({
 			mountedBuild: nextMountedBuild,
+			previewCardDimensions: PREVIEW_CARD_DIMENSIONS,
 			resolvePreviewRequest: nextPreviewResolver,
 			resolveInteractionDescriptor,
 		});
@@ -98,5 +105,28 @@ describe("createCardGridBindingsMemo", () => {
 		expect(firstPreviewResolver).toHaveBeenCalledTimes(1);
 		expect(nextPreviewResolver).toHaveBeenCalledTimes(2);
 		expect(resolveInteractionDescriptor).toHaveBeenCalledTimes(3);
+	});
+
+	it("rebuilds bindings when resolved card dimensions change", () => {
+		const mountedBuild = createMountedBuild([{ id: "item-0" }]);
+		const resolvePreviewRequest = vi.fn(() => null);
+		const resolveInteractionDescriptor = vi.fn(() => null);
+		const resolveBindings = createCardGridBindingsMemo<TestItem>();
+
+		resolveBindings({
+			mountedBuild,
+			previewCardDimensions: PREVIEW_CARD_DIMENSIONS,
+			resolvePreviewRequest,
+			resolveInteractionDescriptor,
+		});
+		const resized = resolveBindings({
+			mountedBuild,
+			previewCardDimensions: { widthPx: 150, heightPx: 180 },
+			resolvePreviewRequest,
+			resolveInteractionDescriptor,
+		});
+
+		expect(resized.changed).toBe(true);
+		expect(resolvePreviewRequest).toHaveBeenCalledTimes(2);
 	});
 });

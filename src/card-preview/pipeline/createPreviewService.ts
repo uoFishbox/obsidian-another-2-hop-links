@@ -13,7 +13,10 @@ import { createAbortError } from "./previewAbort";
 import { createPreviewContext } from "./previewContext";
 import { createPreviewQueue } from "./previewQueue";
 import { resolvePreview as resolveDefaultPreview } from "./previewPipeline";
-import { createPreviewRenderSettings } from "./previewRenderSettings";
+import {
+	createPreviewRenderSettings,
+	type PreviewRenderSettings,
+} from "./previewRenderSettings";
 import {
 	attachSharedCaller,
 	createSharedAbortableRequest,
@@ -70,9 +73,11 @@ export function createPreviewService(
 		if (signal?.aborted) throw createAbortError();
 
 		const settings = options.getSettings();
+		const renderSettings =
+			requestOptions.renderSettings ?? createPreviewRenderSettings(settings);
 		const cacheKey = buildPreviewGenerationKey(
 			file,
-			createPreviewRenderSettings(settings),
+			renderSettings,
 			requestOptions.cacheRevision,
 		);
 		const cached = cache.get(cacheKey);
@@ -83,7 +88,11 @@ export function createPreviewService(
 			return attachSharedCaller(existingRequest, signal);
 		}
 
-		const request = createInFlightRequest(file, settings, cacheKey);
+		const request = createInFlightRequest(
+			file,
+			applyRequestedRenderSettings(settings, renderSettings),
+			cacheKey,
+		);
 		inFlightRequests.set(cacheKey, request);
 		return attachSharedCaller(request, signal);
 	}
@@ -151,5 +160,15 @@ export function createPreviewService(
 		getPreview,
 		clearCache: () => cache.clear(),
 		dispose,
+	};
+}
+
+function applyRequestedRenderSettings(
+	settings: PluginSettings,
+	renderSettings: PreviewRenderSettings,
+): PluginSettings {
+	return {
+		...settings,
+		...renderSettings,
 	};
 }

@@ -123,6 +123,7 @@ export function createCardPreviewRenderer(
 				: normalizePreviewData(
 						await options.getPreview(file, signal, {
 							cacheRevision: request.previewCacheRevision,
+							renderSettings: request.settings,
 						}),
 					);
 			const previewForRender = await applySearchContextToPreview(

@@ -293,6 +293,10 @@ export function useFlatCardGrid<T>(
 		);
 		const bindingsResult = resolveCardGridBindings({
 			mountedBuild,
+			previewCardDimensions: {
+				widthPx: layout.cellWidth,
+				heightPx: layout.rowHeight,
+			},
 			resolvePreviewRequest: props.resolveItemPreviewRequest,
 			resolveInteractionDescriptor: props.resolveItemInteractionDescriptor,
 		});

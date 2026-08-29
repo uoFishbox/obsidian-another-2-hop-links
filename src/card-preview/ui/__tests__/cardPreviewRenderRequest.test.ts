@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { DEFAULT_SETTINGS, type PluginSettings } from "settings/model";
 import { createMockTFile } from "testing/__mocks__/testHelpers";
-import { compileCardPreviewRequest } from "card-preview/pipeline/cardPreviewRequest";
+import {
+	applyCardPreviewDimensions,
+	compileCardPreviewRequest,
+} from "card-preview/pipeline/cardPreviewRequest";
 
 function compile(
 	file: ReturnType<typeof createMockTFile>,
@@ -58,5 +61,19 @@ describe("compileCardPreviewRequest", () => {
 		const second = compile(file, settings, "second");
 
 		expect(second?.settings).toBe(first?.settings);
+	});
+
+	it("uses resolved grid dimensions and reuses the dimensioned request", () => {
+		const file = createMockTFile("notes/resolved-card-dimensions.md");
+		const request = compile(file, createSettings({ cardWidthPx: 140 }), "");
+		const dimensions = { widthPx: 170, heightPx: 204 };
+
+		const first = applyCardPreviewDimensions(request, dimensions);
+		const second = applyCardPreviewDimensions(request, dimensions);
+
+		expect(first.settings.cardWidthPx).toBe(170);
+		expect(first.settings.cardHeightRatio).toBe(1.2);
+		expect(first.renderKey).not.toBe(request.renderKey);
+		expect(second).toBe(first);
 	});
 });

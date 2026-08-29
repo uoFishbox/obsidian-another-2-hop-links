@@ -3,7 +3,9 @@ import type { PluginSettings } from "settings/model";
 import type { PreviewData } from "card-preview/types";
 import { buildPreviewRenderKey } from "./previewRenderKeys";
 import {
+	applyPreviewCardDimensions,
 	createPreviewRenderSettings,
+	type PreviewCardDimensions,
 	type PreviewRenderSettings,
 } from "./previewRenderSettings";
 
@@ -13,6 +15,13 @@ const FNV1A32_OFFSET = 0x811c9dc5;
 const FNV1A32_PRIME = 0x01000193;
 const domPreviewOverrideIds = new WeakMap<DomPreviewOverride, number>();
 let nextDomPreviewOverrideId = 1;
+const dimensionedRequestSnapshots = new WeakMap<
+	CardPreviewRequest,
+	{
+		readonly settings: PreviewRenderSettings;
+		readonly request: CardPreviewRequest;
+	}
+>();
 
 function hashPreviewContent(content: string): string {
 	let hash = FNV1A32_OFFSET;
@@ -82,4 +91,36 @@ export function compileCardPreviewRequest(
 		previewOverride: params.previewOverride,
 		settings,
 	});
+}
+
+/** Applies resolved grid geometry without reading layout from each card DOM node. */
+export function applyCardPreviewDimensions(
+	request: CardPreviewRequest,
+	dimensions: PreviewCardDimensions,
+): CardPreviewRequest {
+	const settings = applyPreviewCardDimensions(request.settings, dimensions);
+	if (settings === request.settings) return request;
+
+	const cached = dimensionedRequestSnapshots.get(request);
+	if (cached?.settings === settings) return cached.request;
+
+	const previewOverrideIdentity = createPreviewOverrideIdentity(
+		request.previewOverride,
+	);
+	const renderRevision = `${request.previewCacheRevision}:${previewOverrideIdentity}`;
+	const dimensionedRequest: CardPreviewRequest = Object.freeze({
+		...request,
+		renderKey: buildPreviewRenderKey(
+			request.file,
+			request.searchQuery,
+			settings,
+			renderRevision,
+		),
+		settings,
+	});
+	dimensionedRequestSnapshots.set(request, {
+		settings,
+		request: dimensionedRequest,
+	});
+	return dimensionedRequest;
 }
