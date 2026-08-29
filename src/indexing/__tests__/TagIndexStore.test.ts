@@ -30,20 +30,14 @@ describe("TagIndexStore", () => {
 		);
 
 		store.replace(artifacts.tagIndex);
-		expect(store.getSnapshot().tagToFilePaths.get("tag1")).toEqual(
-			new Set(["file1.md"]),
-		);
+		expect(store.getSnapshot().tagToFilePaths.get("tag1")).toBe("file1.md");
 
 		env.builder.addFile({ path: "file1.md", tags: ["#tag2/sub"] });
 		await store.applyFileChangesAsync([{ type: "modify", path: "file1.md" }]);
 
 		expect(store.getSnapshot().tagToFilePaths.has("tag1")).toBe(false);
-		expect(store.getSnapshot().tagToFilePaths.get("tag2")).toEqual(
-			new Set(["file1.md"]),
-		);
-		expect(store.getSnapshot().tagToFilePaths.get("tag2/sub")).toEqual(
-			new Set(["file1.md"]),
-		);
+		expect(store.getSnapshot().tagToFilePaths.get("tag2")).toBe("file1.md");
+		expect(store.getSnapshot().tagToFilePaths.get("tag2/sub")).toBe("file1.md");
 
 		await store.applyFileChangesAsync([{ type: "delete", path: "file1.md" }]);
 		expect(store.getSnapshot().fileEntries.has("file1.md")).toBe(false);
@@ -80,13 +74,13 @@ describe("TagIndexStore", () => {
 			store
 				.getSnapshot()
 				.fileEntries.get("notes/new-name.md")
-				?.tags.map((tag) => tag.tag),
+				?.map((tag) => tag.tag),
 		).toEqual(["tag1/sub"]);
-		expect(store.getSnapshot().tagToFilePaths.get("tag1")).toEqual(
-			new Set(["notes/new-name.md"]),
+		expect(store.getSnapshot().tagToFilePaths.get("tag1")).toBe(
+			"notes/new-name.md",
 		);
-		expect(store.getSnapshot().tagToFilePaths.get("tag1/sub")).toEqual(
-			new Set(["notes/new-name.md"]),
+		expect(store.getSnapshot().tagToFilePaths.get("tag1/sub")).toBe(
+			"notes/new-name.md",
 		);
 		// tag set が同じ rename では metadata 呼び出しは不要
 		expect(env.mockMetadataCache.getFileCache).not.toHaveBeenCalled();
@@ -111,7 +105,7 @@ describe("TagIndexStore", () => {
 			store
 				.getSnapshot()
 				.fileEntries.get("notes/new-name.md")
-				?.tags.map((tag) => tag.tag),
+				?.map((tag) => tag.tag),
 		).toEqual(["fallback"]);
 		expect(env.mockMetadataCache.getFileCache).toHaveBeenCalledTimes(1);
 	});
@@ -138,9 +132,7 @@ describe("TagIndexStore", () => {
 		expect(result.affectedTags.size).toBe(0);
 		expect(result.affectedTagSourcePaths.size).toBe(0);
 		// tag index 自体は正しく維持される
-		expect(store.getSnapshot().tagToFilePaths.get("project")).toEqual(
-			new Set(["note.md"]),
-		);
+		expect(store.getSnapshot().tagToFilePaths.get("project")).toBe("note.md");
 	});
 
 	// --- C. tag membership add/remove ---
@@ -165,9 +157,7 @@ describe("TagIndexStore", () => {
 
 		expect(result.affectedTags.has("project")).toBe(true);
 		expect(result.affectedTagSourcePaths.has("note.md")).toBe(true);
-		expect(store.getSnapshot().tagToFilePaths.get("project")).toEqual(
-			new Set(["note.md"]),
-		);
+		expect(store.getSnapshot().tagToFilePaths.get("project")).toBe("note.md");
 	});
 
 	test("tag removal is included in affectedTags and affectedTagSourcePaths", async () => {
@@ -242,9 +232,7 @@ describe("TagIndexStore", () => {
 		expect(result.affectedTags.has("project")).toBe(true);
 		expect(result.affectedTagSourcePaths.has("old.md")).toBe(true);
 		expect(result.affectedTagSourcePaths.has("new.md")).toBe(true);
-		expect(store.getSnapshot().tagToFilePaths.get("project")).toEqual(
-			new Set(["new.md"]),
-		);
+		expect(store.getSnapshot().tagToFilePaths.get("project")).toBe("new.md");
 	});
 
 	test("only moved tags are included in affectedTags when tag set also changes in rename", async () => {
@@ -272,9 +260,7 @@ describe("TagIndexStore", () => {
 		expect(result.affectedTagSourcePaths.has("old.md")).toBe(true);
 		expect(result.affectedTagSourcePaths.has("new.md")).toBe(true);
 		// tag index は旧 path のタグが新 path に移動される
-		expect(store.getSnapshot().tagToFilePaths.get("old")).toEqual(
-			new Set(["new.md"]),
-		);
+		expect(store.getSnapshot().tagToFilePaths.get("old")).toBe("new.md");
 	});
 
 	test("previous tags are included in affectedTags on delete", async () => {

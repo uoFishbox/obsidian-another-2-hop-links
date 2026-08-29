@@ -21,7 +21,10 @@ export function addCompactStringSetValue(
 
 	if (typeof existing === "string") {
 		if (existing === value) return;
-		index.set(key, new Set([existing, value]));
+		const values = new Set<string>();
+		values.add(existing);
+		values.add(value);
+		index.set(key, values);
 		return;
 	}
 

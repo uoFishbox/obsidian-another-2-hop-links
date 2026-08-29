@@ -1,4 +1,9 @@
 import type { TagReference } from "indexing/model";
+import {
+	addCompactStringSetValue,
+	removeCompactStringSetValue,
+	type CompactStringSet,
+} from "shared/collections/compactStringSet";
 import type { TagIndex } from "../indexState";
 
 export function createEmptyTagIndex(): TagIndex {
@@ -17,7 +22,7 @@ export function addFileTagsToTagIndex(
 		return;
 	}
 
-	tagIndex.fileEntries.set(path, { tags });
+	tagIndex.fileEntries.set(path, tags);
 	for (const tagRef of tags) {
 		forEachParentTag(tagRef.tag, tagIndex.tagToFilePaths, path, addPathToTagIndex);
 	}
@@ -29,7 +34,7 @@ export function removeFileTagsFromTagIndex(tagIndex: TagIndex, path: string): vo
 		return;
 	}
 
-	for (const tagRef of existing.tags) {
+	for (const tagRef of existing) {
 		forEachParentTag(
 			tagRef.tag,
 			tagIndex.tagToFilePaths,
@@ -52,12 +57,12 @@ export function moveFileTagsInTagIndex(
 	}
 
 	if (oldPath === newPath) {
-		return existing.tags;
+		return existing;
 	}
 
 	removeFileTagsFromTagIndex(tagIndex, newPath);
 
-	for (const tagRef of existing.tags) {
+	for (const tagRef of existing) {
 		forEachParentTag(
 			tagRef.tag,
 			tagIndex.tagToFilePaths,
@@ -75,7 +80,7 @@ export function moveFileTagsInTagIndex(
 	tagIndex.fileEntries.delete(oldPath);
 	tagIndex.fileEntries.set(newPath, existing);
 
-	return existing.tags;
+	return existing;
 }
 
 export function replaceFileTagsInTagIndex(
@@ -87,40 +92,20 @@ export function replaceFileTagsInTagIndex(
 	addFileTagsToTagIndex(tagIndex, path, tags);
 }
 
-function getOrCreateTagPathSet(
-	tagToFilePaths: Map<string, Set<string>>,
-	tag: string,
-): Set<string> {
-	let paths = tagToFilePaths.get(tag);
-	if (!paths) {
-		paths = new Set<string>();
-		tagToFilePaths.set(tag, paths);
-	}
-	return paths;
-}
-
 function addPathToTagIndex(
-	tagToFilePaths: Map<string, Set<string>>,
+	tagToFilePaths: Map<string, CompactStringSet>,
 	path: string,
 	parentTag: string,
 ): void {
-	getOrCreateTagPathSet(tagToFilePaths, parentTag).add(path);
+	addCompactStringSetValue(tagToFilePaths, parentTag, path);
 }
 
 function removePathFromTagIndex(
-	tagToFilePaths: Map<string, Set<string>>,
+	tagToFilePaths: Map<string, CompactStringSet>,
 	path: string,
 	parentTag: string,
 ): void {
-	const paths = tagToFilePaths.get(parentTag);
-	if (!paths) {
-		return;
-	}
-
-	paths.delete(path);
-	if (paths.size === 0) {
-		tagToFilePaths.delete(parentTag);
-	}
+	removeCompactStringSetValue(tagToFilePaths, parentTag, path);
 }
 
 function forEachParentTag<T1, T2>(

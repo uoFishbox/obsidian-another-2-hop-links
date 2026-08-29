@@ -285,9 +285,7 @@ describe("buildDetailedBacklinksArtifactsChunked", () => {
 			{},
 		);
 
-		expect(artifacts.linkLookupToSources.get("note.md")).toEqual(
-			new Set(["source.md"]),
-		);
+		expect(artifacts.linkLookupToSources.get("note.md")).toBe("source.md");
 		expect(artifacts.lookupKeyToLookupPaths.get("note.md")).toBe("Note.md");
 	});
 
@@ -306,9 +304,7 @@ describe("buildDetailedBacklinksArtifactsChunked", () => {
 			{},
 		);
 
-		expect(artifacts.linkLookupToSources.get("release.v1.md")).toEqual(
-			new Set(["source.md"]),
-		);
+		expect(artifacts.linkLookupToSources.get("release.v1.md")).toBe("source.md");
 		expect(artifacts.lookupKeyToLookupPaths.get("release.v1.md")).toBe(
 			"release.v1.md",
 		);
@@ -411,6 +407,23 @@ describe("buildDetailedBacklinksArtifactsChunked", () => {
 		expect(artifacts.lookupPathResolvedSourceCount.get("Note.md")).toBe(1);
 	});
 
+	test("counts each resolved source once per destination", async () => {
+		const { mockVault, mockMetadataCache } = new VaultEnvironmentBuilder([
+			{ path: "source-a.md", links: ["target", "target"] },
+			{ path: "source-b.md", links: ["target"] },
+			{ path: "target.md" },
+		]).build();
+
+		const artifacts = await buildDetailedBacklinksArtifactsChunked(
+			mockVault,
+			mockMetadataCache,
+			{},
+		);
+
+		expect(artifacts.detailedMap.get("target.md")?.size).toBe(2);
+		expect(artifacts.lookupPathResolvedSourceCount.get("target.md")).toBe(2);
+	});
+
 	test("keeps source-dependent ambiguous links resolved per source path", async () => {
 		const { mockVault, mockMetadataCache, files } = new VaultEnvironmentBuilder([
 			{ path: "team-a/index.md", links: ["Dashboard"] },
@@ -457,15 +470,9 @@ describe("buildDetailedBacklinksArtifactsChunked", () => {
 			{},
 		);
 
-		expect(artifacts.tagIndex.tagToFilePaths.get("tag")).toEqual(
-			new Set(["source.md"]),
-		);
-		expect(artifacts.tagIndex.tagToFilePaths.get("tag/root")).toEqual(
-			new Set(["source.md"]),
-		);
-		expect(artifacts.tagIndex.tagToFilePaths.get("tag/leaf")).toEqual(
-			new Set(["source.md"]),
-		);
+		expect(artifacts.tagIndex.tagToFilePaths.get("tag")).toBe("source.md");
+		expect(artifacts.tagIndex.tagToFilePaths.get("tag/root")).toBe("source.md");
+		expect(artifacts.tagIndex.tagToFilePaths.get("tag/leaf")).toBe("source.md");
 		expect(artifacts.sourceSummaries.has("source.md")).toBe(false);
 		expect(artifacts.detailedMap.has("source.md")).toBe(false);
 	});
@@ -492,9 +499,7 @@ describe("buildDetailedBacklinksArtifactsChunked", () => {
 		expect(artifacts.detailedMap.get("target.md")?.has("board.canvas")).toBe(true);
 		expect(artifacts.detailedMap.get("target.md")?.has("asset.png")).toBe(false);
 		expect(artifacts.tagIndex.fileEntries.has("asset.png")).toBe(false);
-		expect(artifacts.tagIndex.tagToFilePaths.get("tag/root")).toEqual(
-			new Set(["source.md"]),
-		);
+		expect(artifacts.tagIndex.tagToFilePaths.get("tag/root")).toBe("source.md");
 	});
 
 	test("can yield during large builds without changing artifacts", async () => {

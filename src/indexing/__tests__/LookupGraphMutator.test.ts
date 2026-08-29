@@ -53,7 +53,7 @@ describe("LookupGraphMutator", () => {
 		for (let i = 0; i < lookupKeyCount; i++) {
 			const key = `prev-lookup-${i}.md`;
 			firstRefIndexByLookupKey.set(key, i);
-			snapshot.linkLookupToSources.set(key, new Set([sourcePath]));
+			snapshot.linkLookupToSources.set(key, sourcePath);
 		}
 		const lookupEntries = new Map(
 			Array.from(
@@ -125,12 +125,8 @@ describe("LookupGraphMutator", () => {
 
 		expect(countingScheduler.yieldCalls).toBeGreaterThan(0);
 		expect(snapshot.sourceSummaries.get(sourcePath)).toBe(nextSummary);
-		expect(
-			snapshot.linkLookupToSources.get("next-lookup-0.md")?.has(sourcePath),
-		).toBe(true);
-		expect(
-			snapshot.linkLookupToSources.get("next-lookup-255.md")?.has(sourcePath),
-		).toBe(true);
+		expect(snapshot.linkLookupToSources.get("next-lookup-0.md")).toBe(sourcePath);
+		expect(snapshot.linkLookupToSources.get("next-lookup-255.md")).toBe(sourcePath);
 	});
 });
 

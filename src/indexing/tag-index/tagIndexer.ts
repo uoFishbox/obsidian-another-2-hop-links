@@ -4,6 +4,7 @@ import { resolveFileByPath } from "obsidian-integration/files/resolveFileByPath"
 import type { TagIndex } from "../indexState";
 import type { IVault } from "obsidian-integration/hostContracts";
 import { createFileUsageKeyFromNormalizedPath } from "shared/identity/fileIdentity";
+import { compactStringSetValues } from "shared/collections/compactStringSet";
 
 export function normalizeTag(tag: string): string {
 	const trimmed = tag.trim();
@@ -81,7 +82,7 @@ export function getNotesWithCommonTagsFromTagRefs(
 		if (!paths) {
 			continue;
 		}
-		for (const path of paths) {
+		for (const path of compactStringSetValues(paths)) {
 			candidatePaths.add(path);
 		}
 	}
@@ -107,7 +108,7 @@ export function getNotesWithCommonTagsFromTagRefs(
 			continue;
 		}
 
-		const commonTagInfo = collectCommonTagInfo(targetSet, entry.tags);
+		const commonTagInfo = collectCommonTagInfo(targetSet, entry);
 		if (!commonTagInfo) {
 			continue;
 		}
@@ -158,23 +159,23 @@ export function getNotesWithTag(
 	}
 
 	const paths = tagIndex.tagToFilePaths.get(normalizedTargetTag);
-	if (!paths || paths.size === 0) {
+	if (!paths) {
 		return [];
 	}
 
 	const notes: TaggedNote[] = [];
 	const descendantPrefix = `${normalizedTargetTag}/`;
 
-	for (const path of paths) {
+	for (const path of compactStringSetValues(paths)) {
 		const file = resolveFileByPath(vault, path);
 		if (!file) {
 			continue;
 		}
 
-		const fileEntry = tagIndex.fileEntries.get(path);
+		const fileTags = tagIndex.fileEntries.get(path);
 		let tagRef: TagReference | undefined;
-		if (fileEntry) {
-			for (const candidate of fileEntry.tags) {
+		if (fileTags) {
+			for (const candidate of fileTags) {
 				if (
 					candidate.tag === normalizedTargetTag ||
 					candidate.tag.startsWith(descendantPrefix)

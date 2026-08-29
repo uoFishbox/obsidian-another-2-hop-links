@@ -4,6 +4,7 @@ import {
 	addCompactStringSetValue,
 	compactStringSetValues,
 	removeCompactStringSetValue,
+	type CompactStringSet,
 } from "shared/collections/compactStringSet";
 import {
 	HEAVY_YIELD_CHECK_INTERVAL,
@@ -154,7 +155,7 @@ function removeLookupPathRegistration(
 }
 
 async function syncLookupIndexForSourceAsync(
-	index: Map<string, Set<string>>,
+	index: Map<string, CompactStringSet>,
 	sourcePath: string,
 	previousKeys: LookupKeyCollection | undefined,
 	nextKeys: LookupKeyCollection | undefined,
@@ -166,14 +167,7 @@ async function syncLookupIndexForSourceAsync(
 			if (nextKeys?.has(lookupKey)) {
 				continue;
 			}
-			const sources = index.get(lookupKey);
-			if (!sources) {
-				continue;
-			}
-			sources.delete(sourcePath);
-			if (sources.size === 0) {
-				index.delete(lookupKey);
-			}
+			removeCompactStringSetValue(index, lookupKey, sourcePath);
 
 			previousKeyCount++;
 			const pendingYield = maybeYield(
@@ -196,12 +190,7 @@ async function syncLookupIndexForSourceAsync(
 		if (previousKeys?.has(lookupKey)) {
 			continue;
 		}
-		let sources = index.get(lookupKey);
-		if (!sources) {
-			sources = new Set<string>();
-			index.set(lookupKey, sources);
-		}
-		sources.add(sourcePath);
+		addCompactStringSetValue(index, lookupKey, sourcePath);
 
 		nextKeyCount++;
 		const pendingYield = maybeYield(

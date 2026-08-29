@@ -35,13 +35,9 @@ export type IncrementalFileChange =
  * - should not live here
  */
 
-export interface TagIndexEntry {
-	tags: readonly TagReference[];
-}
-
 export interface TagIndex {
-	tagToFilePaths: Map<string, Set<string>>;
-	fileEntries: Map<string, TagIndexEntry>;
+	tagToFilePaths: Map<string, CompactStringSet>;
+	fileEntries: Map<string, readonly TagReference[]>;
 }
 
 export interface OrderedBacklinkRef {
@@ -82,7 +78,7 @@ export interface SourceSummary {
 export interface IndexSnapshot {
 	backlinksMap: BacklinksMap;
 	sourceSummaries: Map<string, SourceSummary>;
-	linkLookupToSources: Map<string, Set<string>>;
+	linkLookupToSources: Map<string, CompactStringSet>;
 	lookupKeyToLookupPaths: Map<string, CompactStringSet>;
 	lookupPathResolvedSourceCount: Map<string, number>;
 }

@@ -311,6 +311,10 @@ export class IndexUpdateQueue {
 		}
 
 		this.initialFullScanState = "running";
+		let startedAt = 0;
+		if (process.env.NODE_ENV === "development") {
+			startedAt = performance.now();
+		}
 		try {
 			await this.indexingService.rebuildIndexesTimeSliced();
 			if (this.destroyed) {
@@ -321,6 +325,12 @@ export class IndexUpdateQueue {
 				return;
 			}
 			this.initialFullScanState = "completed";
+			if (process.env.NODE_ENV === "development") {
+				const durationMs = performance.now() - startedAt;
+				console.info(
+					`[IndexUpdateQueue] Initial backlink map built in ${durationMs.toFixed(1)} ms.`,
+				);
+			}
 			this.resolveInitialFullScanReady?.();
 			this.resolveInitialFullScanReady = undefined;
 		} catch (error) {

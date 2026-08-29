@@ -15,7 +15,7 @@ export function serializeSnapshot(snapshot: IndexSnapshot) {
 	return {
 		backlinksMap: serializeNestedBacklinkMap(snapshot.backlinksMap),
 		sourceSummaries: serializeSourceSummaryMap(snapshot.sourceSummaries),
-		linkLookupToSources: serializeSetMap(snapshot.linkLookupToSources),
+		linkLookupToSources: serializeCompactSetMap(snapshot.linkLookupToSources),
 		lookupKeyToLookupPaths: serializeCompactSetMap(snapshot.lookupKeyToLookupPaths),
 		lookupPathResolvedSourceCount: serializeNumberMap(
 			snapshot.lookupPathResolvedSourceCount,
@@ -82,12 +82,6 @@ function serializeSourceSummaryMap(map: IndexSnapshot["sourceSummaries"]) {
 		.sort(([left], [right]) => left.localeCompare(right));
 }
 
-function serializeSetMap(map: Map<string, Iterable<string>>) {
-	return Array.from(map.entries())
-		.map(([key, values]) => [key, Array.from(values).sort()] as const)
-		.sort(([left], [right]) => left.localeCompare(right));
-}
-
 function serializeCompactSetMap(map: IndexSnapshot["lookupKeyToLookupPaths"]) {
 	return Array.from(map.entries())
 		.map(
@@ -108,12 +102,9 @@ function serializeNumberMap(map: Map<string, number>) {
 
 export function serializeTagIndex(tagIndex: TagIndex) {
 	return {
-		tagToFilePaths: serializeSetMap(tagIndex.tagToFilePaths),
+		tagToFilePaths: serializeCompactSetMap(tagIndex.tagToFilePaths),
 		fileEntries: Array.from(tagIndex.fileEntries.entries())
-			.map(
-				([path, entry]) =>
-					[path, entry.tags.map((tag) => tag.tag).sort()] as const,
-			)
+			.map(([path, tags]) => [path, tags.map((tag) => tag.tag).sort()] as const)
 			.sort(([left], [right]) => left.localeCompare(right)),
 	};
 }

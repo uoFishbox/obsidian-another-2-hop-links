@@ -8,6 +8,7 @@ import {
 import type { CachedMetadataWithLinkReferences } from "indexing/model";
 import type { IMetadataCache, IVault } from "obsidian-integration/hostContracts";
 import type { IndexSnapshot, SourceLookupSummary } from "../indexState";
+import { compactStringSetValues } from "shared/collections/compactStringSet";
 import {
 	HEAVY_YIELD_CHECK_INTERVAL,
 	maybeYield,
@@ -81,7 +82,7 @@ export function createCreateChangePlanner(
 			if (!sources) {
 				continue;
 			}
-			for (const sourcePath of sources) {
+			for (const sourcePath of compactStringSetValues(sources)) {
 				if (!pathsToUpdate.has(sourcePath)) {
 					const sourceSummary = snapshot.sourceSummaries.get(sourcePath);
 					if (

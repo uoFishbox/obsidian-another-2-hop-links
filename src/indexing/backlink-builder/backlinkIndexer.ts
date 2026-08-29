@@ -7,6 +7,7 @@ import {
 	type ResolvedLinkInfo,
 } from "../link-resolution/linkResolution";
 import type {
+	BacklinkSourceMap,
 	CachedMetadataWithLinkReferences,
 	LinkReference,
 	IndexedLink,
@@ -37,10 +38,6 @@ import {
 	type YieldScheduler,
 	type YieldStepGenerator,
 } from "../timeSlicing";
-import {
-	finalizePhaseTwoArtifactsChunked,
-	type DestinationBuildState,
-} from "./backlinkBuildPhaseTwo";
 import {
 	createResolvedLinkMemo,
 	visitResolvedBacklinkRefsUnorderedChunked,
@@ -96,21 +93,15 @@ function addSourceLookupIndexes(
 	sourceSummary: SourceSummary,
 ): void {
 	for (const lookupKey of sourceSummary.lookupEntries.keys()) {
-		let sources = artifacts.linkLookupToSources.get(lookupKey);
-		if (!sources) {
-			sources = new Set<string>();
-			artifacts.linkLookupToSources.set(lookupKey, sources);
-		}
-		sources.add(sourcePath);
+		addCompactStringSetValue(artifacts.linkLookupToSources, lookupKey, sourcePath);
 	}
 }
 
-function getOrCreateDestinationBuildState(
+function getOrCreateDestinationSourceMap(
 	artifacts: MutableBacklinksBuildArtifacts,
-	destinationBuildStates: Map<string, DestinationBuildState>,
 	lookupPath: string,
-): DestinationBuildState {
-	const existing = destinationBuildStates.get(lookupPath);
+): BacklinkSourceMap {
+	const existing = artifacts.detailedMap.get(lookupPath);
 	if (existing) {
 		return existing;
 	}
@@ -118,18 +109,13 @@ function getOrCreateDestinationBuildState(
 	const lookupKey = toCaseInsensitiveLookupKey(lookupPath);
 	addCompactStringSetValue(artifacts.lookupKeyToLookupPaths, lookupKey, lookupPath);
 
-	const state: DestinationBuildState = {
-		sourceMap: new Map(),
-		resolvedSourceCount: 0,
-	};
-	destinationBuildStates.set(lookupPath, state);
-	artifacts.detailedMap.set(lookupPath, state.sourceMap);
-	return state;
+	const sourceMap: BacklinkSourceMap = new Map();
+	artifacts.detailedMap.set(lookupPath, sourceMap);
+	return sourceMap;
 }
 
-function* indexFileIntoArtifactsPhaseOne(
+function* indexFileIntoArtifacts(
 	artifacts: MutableBacklinksBuildArtifacts,
-	destinationBuildStates: Map<string, DestinationBuildState>,
 	metadataCache: IMetadataCache,
 	sourceFile: TFile,
 	normalizedExtension: string,
@@ -193,7 +179,6 @@ function* indexFileIntoArtifactsPhaseOne(
 
 interface BacklinksBuildExecution {
 	artifacts: MutableBacklinksBuildArtifacts;
-	destinationBuildStates: Map<string, DestinationBuildState>;
 	steps: YieldStepGenerator;
 }
 
@@ -206,13 +191,10 @@ function createBacklinksBuildExecution(
 	yieldScheduler: YieldScheduler,
 ): BacklinksBuildExecution {
 	const artifacts = createArtifactsAccumulator();
-	const destinationBuildStates = new Map<string, DestinationBuildState>();
 	return {
 		artifacts,
-		destinationBuildStates,
 		steps: createBacklinksBuildSteps(
 			artifacts,
-			destinationBuildStates,
 			vault,
 			metadataCache,
 			allFiles,
@@ -225,7 +207,6 @@ function createBacklinksBuildExecution(
 
 function* createBacklinksBuildSteps(
 	artifacts: MutableBacklinksBuildArtifacts,
-	destinationBuildStates: Map<string, DestinationBuildState>,
 	vault: IVault,
 	metadataCache: IMetadataCache,
 	allFiles: TFile[],
@@ -257,14 +238,13 @@ function* createBacklinksBuildSteps(
 		destinationPath: string,
 		summary: SourceDestinationSummary,
 	): void {
-		const destinationState = getOrCreateDestinationBuildState(
-			artifacts,
-			destinationBuildStates,
-			destinationPath,
-		);
-		destinationState.sourceMap.set(currentSourcePath, summary);
+		const sourceMap = getOrCreateDestinationSourceMap(artifacts, destinationPath);
+		sourceMap.set(currentSourcePath, summary);
 		if (summary.hasResolved) {
-			destinationState.resolvedSourceCount++;
+			artifacts.lookupPathResolvedSourceCount.set(
+				destinationPath,
+				(artifacts.lookupPathResolvedSourceCount.get(destinationPath) ?? 0) + 1,
+			);
 		}
 	}
 
@@ -273,9 +253,8 @@ function* createBacklinksBuildSteps(
 		currentSourcePath = sourceFile.path;
 		const normalizedExtension = sourceFile.extension.toLowerCase();
 		if (isIndexLinkCapableExtension(normalizedExtension)) {
-			yield* indexFileIntoArtifactsPhaseOne(
+			yield* indexFileIntoArtifacts(
 				artifacts,
-				destinationBuildStates,
 				metadataCache,
 				sourceFile,
 				normalizedExtension,
@@ -321,11 +300,6 @@ export async function buildDetailedBacklinksArtifactsChunked(
 		yieldScheduler,
 	);
 	await drainYieldSteps(execution.steps);
-	await finalizePhaseTwoArtifactsChunked(
-		execution.artifacts,
-		execution.destinationBuildStates,
-		yieldScheduler,
-	);
 	throwIfRebuildAborted(options.signal);
 	return execution.artifacts;
 }

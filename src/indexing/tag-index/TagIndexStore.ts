@@ -65,9 +65,7 @@ export class TagIndexStore {
 		for (const change of changes) {
 			if (change.type === "rename") {
 				const newPathIsMd = change.newPath.toLowerCase().endsWith(".md");
-				const previousTags = this.tagIndex.fileEntries.get(
-					change.oldPath,
-				)?.tags;
+				const previousTags = this.tagIndex.fileEntries.get(change.oldPath);
 				const movedTags = moveFileTagsInTagIndex(
 					this.tagIndex,
 					change.oldPath,
@@ -106,7 +104,7 @@ export class TagIndexStore {
 					}
 				}
 			} else {
-				const previousTags = this.tagIndex.fileEntries.get(change.path)?.tags;
+				const previousTags = this.tagIndex.fileEntries.get(change.path);
 
 				if (change.type === "delete") {
 					removeFileTagsFromTagIndex(this.tagIndex, change.path);

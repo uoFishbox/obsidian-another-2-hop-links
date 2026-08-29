@@ -5,6 +5,10 @@ import type { TagReference, TaggedNote } from "indexing/model";
 import type { IVault } from "obsidian-integration/hostContracts";
 import { TFile } from "obsidian";
 import { createMockTFile } from "testing/__mocks__/testHelpers";
+import {
+	addFileTagsToTagIndex,
+	createEmptyTagIndex,
+} from "../tag-index/tagIndexMutations";
 
 function createPosition(offset: number) {
 	return {
@@ -13,38 +17,14 @@ function createPosition(offset: number) {
 	};
 }
 
-function forEachParentTag(tag: string, visitor: (parentTag: string) => void): void {
-	let slash = tag.indexOf("/");
-	while (slash !== -1) {
-		visitor(tag.slice(0, slash));
-		slash = tag.indexOf("/", slash + 1);
-	}
-
-	visitor(tag);
-}
-
 function buildTagIndex(fileTags: Map<string, TagReference[]>): TagIndex {
-	const tagToFilePaths = new Map<string, Set<string>>();
-	const fileEntries = new Map<string, { tags: TagReference[] }>();
+	const tagIndex = createEmptyTagIndex();
 
 	for (const [path, tags] of fileTags) {
-		fileEntries.set(path, { tags });
-		for (const tagRef of tags) {
-			forEachParentTag(tagRef.tag, (parentTag) => {
-				let paths = tagToFilePaths.get(parentTag);
-				if (!paths) {
-					paths = new Set<string>();
-					tagToFilePaths.set(parentTag, paths);
-				}
-				paths.add(path);
-			});
-		}
+		addFileTagsToTagIndex(tagIndex, path, tags);
 	}
 
-	return {
-		tagToFilePaths,
-		fileEntries,
-	};
+	return tagIndex;
 }
 
 function buildVault(files: Map<string, TFile>): IVault {

@@ -41,7 +41,6 @@ export type {
 	IncrementalFileChangeType,
 	RebuildOptions,
 	TagIndex,
-	TagIndexEntry,
 } from "../indexState";
 export type { DataUpdateContext, DataUpdateListener } from "./IndexEvents";
 
@@ -230,9 +229,9 @@ export class IndexingService implements IIndexingService {
 		}
 
 		const tagIndex = this.tagIndexStore.getSnapshot();
-		const indexedEntry = tagIndex.fileEntries.get(file.path);
 		const tagRefs: readonly TagReference[] =
-			indexedEntry?.tags ?? extractTags(this.metadataCache.getFileCache(file));
+			tagIndex.fileEntries.get(file.path) ??
+			extractTags(this.metadataCache.getFileCache(file));
 
 		const targetTagsKey = createTagRefsCacheKey(tagRefs);
 		const indexVersion = this.getIndexVersion();
