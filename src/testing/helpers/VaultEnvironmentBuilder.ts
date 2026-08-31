@@ -7,9 +7,9 @@ import type {
 import { TFile, type LinkCache } from "obsidian";
 import type { IVault, IMetadataCache } from "../../obsidian-integration/hostContracts";
 import type { Pos } from "obsidian";
-import { buildDetailedBacklinksArtifactsChunked } from "../../indexing/backlink-builder/backlinkIndexer";
+import { buildLinkIndexArtifactsChunked } from "../../indexing/backlink-builder/backlinkIndexer";
 import { normalizeLinkToMarkdownPath } from "../../indexing/link-resolution/linkResolution";
-import type { BacklinksMap } from "indexing/model";
+import type { LinkIndex } from "indexing/link-index/linkIndex";
 import { createMockTFile } from "../__mocks__/testHelpers";
 
 function createLinkCache(linkText: string): LinkCache {
@@ -214,17 +214,17 @@ export class VaultEnvironmentBuilder {
 		return this.files.get(targetPath) || null;
 	}
 
-	public async buildBacklinksMapAsync(): Promise<BacklinksMap> {
+	public async buildLinkIndexAsync(): Promise<LinkIndex> {
 		if (!this.mockVault || !this.mockMetadataCache) {
 			this.build();
 		}
 		return (
-			await buildDetailedBacklinksArtifactsChunked(
+			await buildLinkIndexArtifactsChunked(
 				this.mockVault!,
 				this.mockMetadataCache!,
 				{},
 			)
-		).detailedMap;
+		).linkIndex;
 	}
 }
 

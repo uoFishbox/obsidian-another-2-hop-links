@@ -1,9 +1,5 @@
 import { type BacklinksBuildArtifacts } from "indexing/backlink-builder/backlinkBuildArtifacts";
-import { buildDetailedBacklinksArtifactsChunked } from "indexing/backlink-builder/backlinkIndexer";
-import {
-	createLinkResolutionAmbiguityDetector,
-	type MutableLinkResolutionAmbiguityDetector,
-} from "../link-resolution/linkResolution";
+import { buildLinkIndexArtifactsChunked } from "indexing/backlink-builder/backlinkIndexer";
 import type { IMetadataCache, IVault } from "obsidian-integration/hostContracts";
 import type { MutableIndexState, RebuildOptions, TagIndex } from "../indexState";
 
@@ -17,17 +13,13 @@ export async function buildIndexesAsync(
 	metadataCache: IMetadataCache,
 	options: RebuildOptions = {},
 	includeTagIndex = true,
-	ambiguityDetector: MutableLinkResolutionAmbiguityDetector = createLinkResolutionAmbiguityDetector(
-		vault,
-	),
 ): Promise<BuiltIndexesResult> {
 	return createBuiltIndexesResult(
-		await buildDetailedBacklinksArtifactsChunked(
+		await buildLinkIndexArtifactsChunked(
 			vault,
 			metadataCache,
 			options,
 			includeTagIndex,
-			ambiguityDetector,
 		),
 	);
 }
@@ -42,11 +34,5 @@ function createBuiltIndexesResult(
 }
 
 function createSnapshot(artifacts: BacklinksBuildArtifacts): MutableIndexState {
-	return {
-		backlinksMap: artifacts.detailedMap,
-		sourceSummaries: artifacts.sourceSummaries,
-		linkLookupToSources: artifacts.linkLookupToSources,
-		lookupKeyToLookupPaths: artifacts.lookupKeyToLookupPaths,
-		lookupPathResolvedSourceCount: artifacts.lookupPathResolvedSourceCount,
-	};
+	return artifacts.linkIndex;
 }

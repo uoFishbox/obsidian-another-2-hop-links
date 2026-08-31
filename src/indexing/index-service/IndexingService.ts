@@ -9,17 +9,9 @@ import { IncrementalIndexUpdater } from "indexing/index-service/IncrementalIndex
 import { collectSourcePathsForLookupKeys } from "indexing/backlink-builder/lookupGraphQueries";
 import { IndexQueryEngine } from "indexing/index-service/IndexQueryEngine";
 import { TagIndexStore } from "indexing/tag-index/TagIndexStore";
-import type {
-	BacklinksMap,
-	IndexedLinkQueryResult,
-	TaggedNote,
-	TagReference,
-} from "indexing/model";
+import type { IndexedLinkQueryResult, TaggedNote, TagReference } from "indexing/model";
 import type { IVault, IMetadataCache } from "obsidian-integration/hostContracts";
-import {
-	INDEXING_REBUILD_YIELD_INTERVAL_MS,
-	INDEXING_YIELD_INTERVAL_MS,
-} from "indexing/config";
+import { INDEXING_YIELD_INTERVAL_MS } from "indexing/config";
 import {
 	createEmptyMutableIndexState,
 	type IncrementalFileChange,
@@ -31,10 +23,6 @@ import { createEmptyTagIndex } from "../tag-index/tagIndexMutations";
 import type { DataUpdateContext, DataUpdateListener } from "./IndexEvents";
 import { IndexWriteCoordinator, type RebuildReason } from "./IndexWriteCoordinator";
 import { defaultYieldToMainThread } from "../timeSlicing";
-import {
-	createLinkResolutionAmbiguityDetector,
-	type MutableLinkResolutionAmbiguityDetector,
-} from "../link-resolution/linkResolution";
 
 export type {
 	IncrementalFileChange,
@@ -45,7 +33,6 @@ export type {
 export type { DataUpdateContext, DataUpdateListener } from "./IndexEvents";
 
 export interface IIndexingService {
-	getBacklinksMap(): BacklinksMap;
 	invalidateAll(): void;
 	getSourcePathsForLookupKeys(lookupKeys: Iterable<string>): Set<string>;
 	getBacklinksForLink(linkPath: string): IndexedLinkQueryResult;
@@ -63,6 +50,7 @@ export interface IIndexingService {
 			requireExistingSourceFile?: boolean;
 		},
 	): boolean;
+	isReady(): boolean;
 	getIndexVersion(): number;
 	peekNotesWithCommonTags(file: TFile): TaggedNote[];
 	getNotesWithTag(tag: string, sourcePath?: string): Promise<TaggedNote[]>;
@@ -73,16 +61,33 @@ export interface IIndexingService {
 	onDataUpdate(listener: (context: DataUpdateContext) => void): () => void;
 }
 
+/** Controls one staged full rebuild whose state remains private until commit. */
+export interface StagedIndexRebuild {
+	/** Atomically replaces the live indexes and publishes one full update. */
+	commit(): void;
+
+	/** Drops the staged indexes without changing or notifying live readers. */
+	discard(): void;
+}
+
+interface StagedIndexRebuildState {
+	generation: number;
+	snapshot: MutableIndexState;
+	tagIndexStore: TagIndexStore;
+}
+
 export class IndexingService implements IIndexingService {
 	private snapshot: MutableIndexState = createEmptyMutableIndexState();
 	private readonly incrementalUpdater: IncrementalIndexUpdater;
-	private readonly ambiguityDetector: MutableLinkResolutionAmbiguityDetector;
 	private readonly queryEngine: IndexQueryEngine;
 	private readonly tagIndexStore: TagIndexStore;
 	private readonly writeCoordinator: IndexWriteCoordinator;
 	private readonly externalIdleWaiters = new Set<() => Promise<void>>();
 	private readonly dataUpdateListeners = new Set<DataUpdateListener>();
+	private stagedRebuild: StagedIndexRebuildState | undefined;
+	private stagedRebuildGeneration = 0;
 	private indexVersion = 0;
+	private ready = false;
 	private commonTagsCache:
 		| {
 				path: string;
@@ -97,13 +102,8 @@ export class IndexingService implements IIndexingService {
 		private readonly metadataCache: IMetadataCache,
 		private readonly isTagFeatureEnabled: () => boolean = () => true,
 	) {
-		this.ambiguityDetector = createLinkResolutionAmbiguityDetector(vault);
-		this.incrementalUpdater = new IncrementalIndexUpdater(
-			vault,
-			metadataCache,
-			this.ambiguityDetector,
-		);
-		this.queryEngine = new IndexQueryEngine(vault);
+		this.incrementalUpdater = new IncrementalIndexUpdater(metadataCache);
+		this.queryEngine = new IndexQueryEngine(vault, metadataCache);
 		this.tagIndexStore = new TagIndexStore(
 			vault,
 			metadataCache,
@@ -126,6 +126,10 @@ export class IndexingService implements IIndexingService {
 
 	public getIndexVersion(): number {
 		return this.indexVersion;
+	}
+
+	public isReady(): boolean {
+		return this.ready;
 	}
 
 	public async awaitIdle(): Promise<void> {
@@ -155,19 +159,8 @@ export class IndexingService implements IIndexingService {
 		};
 	}
 
-	public getBacklinksMap(): BacklinksMap {
-		return this.snapshot.backlinksMap;
-	}
-
 	public getSourcePathsForLookupKeys(lookupKeys: Iterable<string>): Set<string> {
 		return collectSourcePathsForLookupKeys(this.snapshot, lookupKeys);
-	}
-
-	public getTagIndexFileCount(): number {
-		if (!this.isTagFeatureEnabled()) {
-			return 0;
-		}
-		return this.tagIndexStore.getSnapshot().fileEntries.size;
 	}
 
 	public getBacklinksForLink(linkPath: string) {
@@ -286,10 +279,36 @@ export class IndexingService implements IIndexingService {
 		this.commonTagsCache = undefined;
 	}
 
-	public async rebuildBacklinksMapChunked(
-		yieldIntervalMs = INDEXING_REBUILD_YIELD_INTERVAL_MS,
-	): Promise<void> {
-		await this.rebuildIndexesTimeSliced({ yieldIntervalMs });
+	/**
+	 * Starts a full rebuild transaction for startup indexing.
+	 * Rebuild and incremental writes target private state until the returned
+	 * transaction is committed.
+	 */
+	public beginStagedRebuild(): StagedIndexRebuild {
+		const generation = ++this.stagedRebuildGeneration;
+		this.stagedRebuild = {
+			generation,
+			snapshot: createEmptyMutableIndexState(),
+			tagIndexStore: new TagIndexStore(
+				this.vault,
+				this.metadataCache,
+				this.isTagFeatureEnabled,
+			),
+		};
+		let settled = false;
+
+		return {
+			commit: () => {
+				if (settled) return;
+				settled = true;
+				this.commitStagedRebuild(generation);
+			},
+			discard: () => {
+				if (settled) return;
+				settled = true;
+				this.discardStagedRebuild(generation);
+			},
+		};
 	}
 
 	public async rebuildIndexesTimeSliced(options: RebuildOptions = {}): Promise<void> {
@@ -307,18 +326,29 @@ export class IndexingService implements IIndexingService {
 		options: RebuildOptions,
 		isCurrent: () => boolean,
 	): Promise<void> {
-		this.queryEngine.invalidate();
-		this.commonTagsCache = undefined;
+		if (!this.stagedRebuild) {
+			this.queryEngine.invalidate();
+			this.commonTagsCache = undefined;
+		}
 		const includeTagIndex = this.isTagFeatureEnabled();
 		const result = await buildIndexesAsync(
 			this.vault,
 			this.metadataCache,
 			options,
 			includeTagIndex,
-			this.ambiguityDetector,
 		);
 
 		if (!isCurrent()) {
+			return;
+		}
+
+		const stagedRebuild = this.stagedRebuild;
+		if (stagedRebuild) {
+			stagedRebuild.snapshot = result.snapshot;
+			stagedRebuild.tagIndexStore.replace(
+				includeTagIndex ? result.tagIndex : createEmptyTagIndex(),
+			);
+			await (options.yieldFn ?? defaultYieldToMainThread)();
 			return;
 		}
 
@@ -342,17 +372,34 @@ export class IndexingService implements IIndexingService {
 		changes: IncrementalFileChange[],
 		options: TimeSlicingOptions,
 	): Promise<void> {
+		// esbuild replaces process.env.NODE_ENV at build time, so this branch is
+		// dead-code eliminated in production builds.
+		const shouldLog = process.env.NODE_ENV === "development";
+		const startedAt = shouldLog ? performance.now() : 0;
+		if (shouldLog) {
+			console.info(
+				"[IndexingService] Incremental index update start:",
+				countChangesByType(changes),
+			);
+		}
+		const stagedRebuild = this.stagedRebuild;
+		const targetSnapshot = stagedRebuild?.snapshot ?? this.snapshot;
+		const targetTagIndexStore = stagedRebuild?.tagIndexStore ?? this.tagIndexStore;
 		const timeSlicingOptions = {
 			yieldFn: options.yieldFn ?? defaultYieldToMainThread,
 			yieldIntervalMs: options.yieldIntervalMs ?? INDEXING_YIELD_INTERVAL_MS,
 		};
 		const result = await this.incrementalUpdater.applyAsync(
-			this.snapshot,
+			targetSnapshot,
 			changes,
 			timeSlicingOptions,
 		);
-		this.snapshot = result.snapshot;
-		const tagResult = await this.tagIndexStore.applyFileChangesAsync(
+		if (stagedRebuild) {
+			stagedRebuild.snapshot = result.snapshot;
+		} else {
+			this.snapshot = result.snapshot;
+		}
+		const tagResult = await targetTagIndexStore.applyFileChangesAsync(
 			changes,
 			timeSlicingOptions,
 		);
@@ -363,8 +410,23 @@ export class IndexingService implements IIndexingService {
 		const affectedTagSourcePaths = tagResult.affectedTagSourcePaths;
 		const linkIndexChanged = result.linkIndexChanged;
 
-		if (linkIndexChanged) {
-			this.queryEngine.invalidate(result.cacheInvalidationPaths);
+		if (shouldLog) {
+			console.info("[IndexingService] Incremental index update end (ms):", {
+				durationMs: roundTimingMs(performance.now() - startedAt),
+				changeCount: changes.length,
+				changedFilePaths: changedFilePaths.size,
+				changedLookupKeys: changedLookupKeys.size,
+				changedLinkSourcePaths: changedLinkSourcePaths.size,
+				affectedTags: affectedTags.size,
+				linkIndexChanged,
+			});
+		}
+
+		if (linkIndexChanged && !stagedRebuild) {
+			this.queryEngine.invalidate(result.cacheInvalidationKeys);
+		}
+		if (stagedRebuild) {
+			return;
 		}
 
 		this.bumpIndexVersion();
@@ -381,12 +443,36 @@ export class IndexingService implements IIndexingService {
 		yieldToMainThread: () => Promise<void>,
 	): Promise<void> {
 		await yieldToMainThread();
+		this.ready = true;
 		this.bumpIndexVersion();
 		this.notifyDataUpdate({ affectsAll: true });
 	}
 
 	private bumpIndexVersion(): void {
 		this.indexVersion++;
+	}
+
+	private commitStagedRebuild(generation: number): void {
+		const stagedRebuild = this.stagedRebuild;
+		if (!stagedRebuild || stagedRebuild.generation !== generation) {
+			return;
+		}
+
+		this.stagedRebuild = undefined;
+		this.snapshot = stagedRebuild.snapshot;
+		this.tagIndexStore.replace(stagedRebuild.tagIndexStore.getSnapshot());
+		this.queryEngine.invalidate();
+		this.commonTagsCache = undefined;
+		this.ready = true;
+		this.bumpIndexVersion();
+		this.notifyDataUpdate({ affectsAll: true });
+	}
+
+	private discardStagedRebuild(generation: number): void {
+		if (this.stagedRebuild?.generation !== generation) {
+			return;
+		}
+		this.stagedRebuild = undefined;
 	}
 
 	private notifyDataUpdate(
@@ -447,4 +533,18 @@ function createTagRefsCacheKey(tags: readonly TagReference[]): string {
 	}
 
 	return key;
+}
+
+function countChangesByType(
+	changes: readonly IncrementalFileChange[],
+): Record<string, number> {
+	const counts: Record<string, number> = {};
+	for (const change of changes) {
+		counts[change.type] = (counts[change.type] ?? 0) + 1;
+	}
+	return counts;
+}
+
+function roundTimingMs(durationMs: number): number {
+	return Math.round(durationMs * 10) / 10;
 }

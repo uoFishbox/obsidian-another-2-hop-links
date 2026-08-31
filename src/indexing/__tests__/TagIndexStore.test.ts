@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { buildDetailedBacklinksArtifactsChunked } from "../backlink-builder/backlinkIndexer";
+import { buildLinkIndexArtifactsChunked } from "../backlink-builder/backlinkIndexer";
 import { TagIndexStore } from "../tag-index/TagIndexStore";
 import { VaultEnvironmentBuilder } from "testing/helpers/VaultEnvironmentBuilder";
 
@@ -23,7 +23,7 @@ describe("TagIndexStore", () => {
 			{ path: "file1.md", tags: ["#tag1"] },
 		]).build();
 		const store = new TagIndexStore(env.mockVault, env.mockMetadataCache);
-		const artifacts = await buildDetailedBacklinksArtifactsChunked(
+		const artifacts = await buildLinkIndexArtifactsChunked(
 			env.mockVault,
 			env.mockMetadataCache,
 			{},
@@ -49,7 +49,7 @@ describe("TagIndexStore", () => {
 			{ path: "notes/old-name.md", tags: ["#tag1/sub"] },
 		]).build();
 		const store = new TagIndexStore(env.mockVault, env.mockMetadataCache);
-		const artifacts = await buildDetailedBacklinksArtifactsChunked(
+		const artifacts = await buildLinkIndexArtifactsChunked(
 			env.mockVault,
 			env.mockMetadataCache,
 			{},
@@ -116,7 +116,7 @@ describe("TagIndexStore", () => {
 			{ path: "note.md", tags: ["#project"] },
 		]).build();
 		const store = new TagIndexStore(env.mockVault, env.mockMetadataCache);
-		const artifacts = await buildDetailedBacklinksArtifactsChunked(
+		const artifacts = await buildLinkIndexArtifactsChunked(
 			env.mockVault,
 			env.mockMetadataCache,
 			{},
@@ -141,7 +141,7 @@ describe("TagIndexStore", () => {
 			{ path: "note.md", tags: [] },
 		]).build();
 		const store = new TagIndexStore(env.mockVault, env.mockMetadataCache);
-		const artifacts = await buildDetailedBacklinksArtifactsChunked(
+		const artifacts = await buildLinkIndexArtifactsChunked(
 			env.mockVault,
 			env.mockMetadataCache,
 			{},
@@ -165,7 +165,7 @@ describe("TagIndexStore", () => {
 			{ path: "note.md", tags: ["#project"] },
 		]).build();
 		const store = new TagIndexStore(env.mockVault, env.mockMetadataCache);
-		const artifacts = await buildDetailedBacklinksArtifactsChunked(
+		const artifacts = await buildLinkIndexArtifactsChunked(
 			env.mockVault,
 			env.mockMetadataCache,
 			{},
@@ -189,7 +189,7 @@ describe("TagIndexStore", () => {
 			{ path: "note.md", tags: ["#old"] },
 		]).build();
 		const store = new TagIndexStore(env.mockVault, env.mockMetadataCache);
-		const artifacts = await buildDetailedBacklinksArtifactsChunked(
+		const artifacts = await buildLinkIndexArtifactsChunked(
 			env.mockVault,
 			env.mockMetadataCache,
 			{},
@@ -214,7 +214,7 @@ describe("TagIndexStore", () => {
 			{ path: "old.md", tags: ["#project"] },
 		]).build();
 		const store = new TagIndexStore(env.mockVault, env.mockMetadataCache);
-		const artifacts = await buildDetailedBacklinksArtifactsChunked(
+		const artifacts = await buildLinkIndexArtifactsChunked(
 			env.mockVault,
 			env.mockMetadataCache,
 			{},
@@ -240,7 +240,7 @@ describe("TagIndexStore", () => {
 			{ path: "old.md", tags: ["#old"] },
 		]).build();
 		const store = new TagIndexStore(env.mockVault, env.mockMetadataCache);
-		const artifacts = await buildDetailedBacklinksArtifactsChunked(
+		const artifacts = await buildLinkIndexArtifactsChunked(
 			env.mockVault,
 			env.mockMetadataCache,
 			{},
@@ -269,7 +269,7 @@ describe("TagIndexStore", () => {
 			{ path: "note.md", tags: ["#project", "#alpha"] },
 		]).build();
 		const store = new TagIndexStore(env.mockVault, env.mockMetadataCache);
-		const artifacts = await buildDetailedBacklinksArtifactsChunked(
+		const artifacts = await buildLinkIndexArtifactsChunked(
 			env.mockVault,
 			env.mockMetadataCache,
 			{},
@@ -292,7 +292,7 @@ describe("TagIndexStore", () => {
 			{ path: "note.md", tags: [] },
 		]).build();
 		const store = new TagIndexStore(env.mockVault, env.mockMetadataCache);
-		const artifacts = await buildDetailedBacklinksArtifactsChunked(
+		const artifacts = await buildLinkIndexArtifactsChunked(
 			env.mockVault,
 			env.mockMetadataCache,
 			{},

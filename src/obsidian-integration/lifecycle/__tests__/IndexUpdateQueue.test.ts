@@ -48,13 +48,19 @@ import { VaultEnvironmentBuilder } from "testing/helpers/VaultEnvironmentBuilder
 import { IndexUpdateQueue } from "../IndexUpdateQueue";
 
 type EventCallback = (...args: unknown[]) => void;
+const INITIAL_FULL_SCAN_DELAY_MS = 100;
 
 interface Harness {
 	queue: IndexUpdateQueue;
 	indexingService: {
+		beginStagedRebuild: ReturnType<typeof vi.fn>;
 		rebuildIndexesTimeSliced: ReturnType<typeof vi.fn>;
 		applyFileChangesTimeSliced: ReturnType<typeof vi.fn>;
 	};
+	stagedRebuilds: Array<{
+		commit: ReturnType<typeof vi.fn>;
+		discard: ReturnType<typeof vi.fn>;
+	}>;
 	setVaultFile: (file: TFile) => void;
 	removeVaultFile: (path: string) => void;
 	triggerLayoutReady: () => void;
@@ -63,26 +69,39 @@ interface Harness {
 	emitMetadataEvent: (event: string, ...args: unknown[]) => void;
 }
 
-function createHarness(): Harness {
+interface HarnessOptions {
+	readonly layoutAlreadyReady?: boolean;
+}
+
+function createHarness(options: HarnessOptions = {}): Harness {
 	const vaultHandlers = new Map<string, EventCallback[]>();
 	const metadataHandlers = new Map<string, EventCallback[]>();
 	const layoutReadyCallbacks: Array<() => void> = [];
 	const vaultFiles = new Map<string, TFile>();
+	let layoutReady = options.layoutAlreadyReady ?? false;
+	const metadataCache = {
+		on: vi.fn((event: string, callback: EventCallback) => {
+			const handlers = metadataHandlers.get(event) ?? [];
+			handlers.push(callback);
+			metadataHandlers.set(event, handlers);
+		}),
+	};
 
 	const plugin = {
 		app: {
 			workspace: {
+				get layoutReady(): boolean {
+					return layoutReady;
+				},
 				onLayoutReady: vi.fn((callback: () => void) => {
+					if (layoutReady) {
+						callback();
+						return;
+					}
 					layoutReadyCallbacks.push(callback);
 				}),
 			},
-			metadataCache: {
-				on: vi.fn((event: string, callback: EventCallback) => {
-					const handlers = metadataHandlers.get(event) ?? [];
-					handlers.push(callback);
-					metadataHandlers.set(event, handlers);
-				}),
-			},
+			metadataCache,
 			vault: {
 				on: vi.fn((event: string, callback: EventCallback) => {
 					const handlers = vaultHandlers.get(event) ?? [];
@@ -99,8 +118,17 @@ function createHarness(): Harness {
 	};
 
 	let indexIdleWaiter: (() => Promise<void>) | undefined;
+	const stagedRebuilds: Harness["stagedRebuilds"] = [];
 
 	const indexingService = {
+		beginStagedRebuild: vi.fn(() => {
+			const stagedRebuild = {
+				commit: vi.fn(),
+				discard: vi.fn(),
+			};
+			stagedRebuilds.push(stagedRebuild);
+			return stagedRebuild;
+		}),
 		rebuildIndexesTimeSliced: vi.fn(async () => undefined),
 		applyFileChangesTimeSliced: vi.fn(async () => undefined),
 		registerIdleWaiter: vi.fn((waiter: () => Promise<void>) => {
@@ -114,6 +142,7 @@ function createHarness(): Harness {
 	return {
 		queue,
 		indexingService,
+		stagedRebuilds,
 		setVaultFile: (file: TFile) => {
 			vaultFiles.set(file.path, file);
 		},
@@ -121,6 +150,7 @@ function createHarness(): Harness {
 			vaultFiles.delete(path);
 		},
 		triggerLayoutReady: () => {
+			layoutReady = true;
 			for (const callback of layoutReadyCallbacks) {
 				callback();
 			}
@@ -151,16 +181,18 @@ async function flushAsyncTasks(): Promise<void> {
 async function initializeQueue(harness: Harness): Promise<void> {
 	harness.queue.setupEventListeners();
 	harness.triggerLayoutReady();
-	vi.advanceTimersByTime(100);
+	await vi.advanceTimersByTimeAsync(INITIAL_FULL_SCAN_DELAY_MS);
 	await flushAsyncTasks();
+	await harness.waitForIndexIdle();
 	harness.indexingService.rebuildIndexesTimeSliced.mockClear();
 	harness.indexingService.applyFileChangesTimeSliced.mockClear();
 }
 
-function startInitialScan(harness: Harness): void {
+async function startInitialScan(harness: Harness): Promise<void> {
 	harness.queue.setupEventListeners();
 	harness.triggerLayoutReady();
-	vi.advanceTimersByTime(100);
+	await vi.advanceTimersByTimeAsync(INITIAL_FULL_SCAN_DELAY_MS);
+	await flushAsyncTasks();
 }
 
 describe("IndexUpdateQueue", () => {
@@ -176,6 +208,66 @@ describe("IndexUpdateQueue", () => {
 		vi.unstubAllGlobals();
 		vi.useRealTimers();
 		vi.clearAllMocks();
+	});
+
+	test("initial scan starts 100 ms after layout ready without waiting for cache clean", async () => {
+		const harness = createHarness();
+
+		harness.queue.setupEventListeners();
+		harness.triggerLayoutReady();
+		await flushAsyncTasks();
+		let becameIdle = false;
+		const idlePromise = harness.waitForIndexIdle().then(() => {
+			becameIdle = true;
+		});
+		await flushAsyncTasks();
+
+		expect(harness.indexingService.rebuildIndexesTimeSliced).not.toHaveBeenCalled();
+		expect(becameIdle).toBe(false);
+
+		harness.emitMetadataEvent("resolved");
+		await vi.advanceTimersByTimeAsync(INITIAL_FULL_SCAN_DELAY_MS - 1);
+		expect(harness.indexingService.rebuildIndexesTimeSliced).not.toHaveBeenCalled();
+		expect(becameIdle).toBe(false);
+
+		await vi.advanceTimersByTimeAsync(1);
+		await flushAsyncTasks();
+		expect(harness.indexingService.rebuildIndexesTimeSliced).toHaveBeenCalledTimes(
+			1,
+		);
+		await idlePromise;
+
+		expect(becameIdle).toBe(true);
+	});
+
+	test("metadata activity before the scheduled scan does not postpone it", async () => {
+		const harness = createHarness();
+
+		harness.queue.setupEventListeners();
+		harness.triggerLayoutReady();
+		await vi.advanceTimersByTimeAsync(INITIAL_FULL_SCAN_DELAY_MS - 1);
+
+		harness.emitMetadataEvent("resolved");
+		await vi.advanceTimersByTimeAsync(1);
+		await flushAsyncTasks();
+
+		expect(harness.indexingService.rebuildIndexesTimeSliced).toHaveBeenCalledTimes(
+			1,
+		);
+	});
+
+	test("initial scan keeps the 100 ms delay when layout is already ready", async () => {
+		const harness = createHarness({ layoutAlreadyReady: true });
+
+		harness.queue.setupEventListeners();
+		await vi.advanceTimersByTimeAsync(INITIAL_FULL_SCAN_DELAY_MS - 1);
+		expect(harness.indexingService.rebuildIndexesTimeSliced).not.toHaveBeenCalled();
+		await vi.advanceTimersByTimeAsync(1);
+		await flushAsyncTasks();
+
+		expect(harness.indexingService.rebuildIndexesTimeSliced).toHaveBeenCalledTimes(
+			1,
+		);
 	});
 
 	test("create waits for metadata resolved before processing", async () => {
@@ -271,6 +363,56 @@ describe("IndexUpdateQueue", () => {
 		expect(
 			harness.indexingService.applyFileChangesTimeSliced,
 		).not.toHaveBeenCalled();
+	});
+
+	test("per-file resolution does not schedule an index update", async () => {
+		const harness = createHarness();
+		await initializeQueue(harness);
+
+		harness.emitMetadataEvent(
+			"resolve",
+			createMockTFile("notes/resolved-source.md"),
+		);
+		await flushAsyncTasks();
+
+		expect(
+			harness.indexingService.applyFileChangesTimeSliced,
+		).not.toHaveBeenCalled();
+	});
+
+	test("initial scan includes parsed metadata added before its scheduled start", async () => {
+		const environment = new VaultEnvironmentBuilder([
+			{ path: "first-source.md", links: ["missing"] },
+			{ path: "second-source.md", links: [] },
+		]).build();
+		const harness = createHarness();
+		harness.indexingService.rebuildIndexesTimeSliced.mockImplementation(() =>
+			environment.service.rebuildIndexesTimeSliced(),
+		);
+		harness.indexingService.applyFileChangesTimeSliced.mockImplementation(
+			(changes) => environment.service.applyFileChangesTimeSliced(changes),
+		);
+		harness.queue.setupEventListeners();
+		harness.triggerLayoutReady();
+		harness.emitMetadataEvent("resolved");
+		await flushAsyncTasks();
+		expect(harness.indexingService.rebuildIndexesTimeSliced).not.toHaveBeenCalled();
+
+		environment.builder.addFile({
+			path: "second-source.md",
+			links: ["missing"],
+		});
+		await vi.advanceTimersByTimeAsync(INITIAL_FULL_SCAN_DELAY_MS);
+		await flushAsyncTasks();
+		await harness.waitForIndexIdle();
+
+		expect(harness.indexingService.rebuildIndexesTimeSliced).toHaveBeenCalledTimes(
+			1,
+		);
+		expect(
+			harness.indexingService.applyFileChangesTimeSliced,
+		).not.toHaveBeenCalled();
+		expect(environment.service.getBacklinkCountForLink("missing.md")).toBe(2);
 	});
 
 	test("folder rename batches descendant changes behind one metadata gate", async () => {
@@ -381,12 +523,21 @@ describe("IndexUpdateQueue", () => {
 	test("initial catch-up applies delete for a file created and deleted during initial scan", async () => {
 		const harness = createHarness();
 		const temp = createMockTFile("notes/temp.md");
+		let finishInitialScan: (() => void) | undefined;
+		harness.indexingService.rebuildIndexesTimeSliced.mockImplementationOnce(
+			() =>
+				new Promise<void>((resolve) => {
+					finishInitialScan = resolve;
+				}),
+		);
 
-		startInitialScan(harness);
+		await startInitialScan(harness);
 		harness.emitVaultEvent("create", temp);
 		harness.emitVaultEvent("delete", temp);
 		harness.removeVaultFile(temp.path);
+		finishInitialScan?.();
 		await flushAsyncTasks();
+		await harness.waitForIndexIdle();
 
 		expect(
 			harness.indexingService.applyFileChangesTimeSliced,
@@ -403,7 +554,6 @@ describe("IndexUpdateQueue", () => {
 		harness.queue.setupEventListeners();
 		harness.emitVaultEvent("modify", preScanFile);
 		harness.triggerLayoutReady();
-		vi.advanceTimersByTime(100);
 		await flushAsyncTasks();
 
 		expect(
@@ -414,10 +564,18 @@ describe("IndexUpdateQueue", () => {
 	test("initial catch-up waits for metadata resolved when created file still exists", async () => {
 		const harness = createHarness();
 		const created = createMockTFile("notes/new-note.md");
+		let finishInitialScan: (() => void) | undefined;
+		harness.indexingService.rebuildIndexesTimeSliced.mockImplementationOnce(
+			() =>
+				new Promise<void>((resolve) => {
+					finishInitialScan = resolve;
+				}),
+		);
 
-		startInitialScan(harness);
+		await startInitialScan(harness);
 		harness.setVaultFile(created);
 		harness.emitVaultEvent("create", created);
+		finishInitialScan?.();
 		await flushAsyncTasks();
 
 		expect(
@@ -426,6 +584,7 @@ describe("IndexUpdateQueue", () => {
 
 		harness.emitMetadataEvent("resolved");
 		await flushAsyncTasks();
+		await harness.waitForIndexIdle();
 
 		expect(
 			harness.indexingService.applyFileChangesTimeSliced,
@@ -447,7 +606,7 @@ describe("IndexUpdateQueue", () => {
 				}),
 		);
 
-		startInitialScan(harness);
+		await startInitialScan(harness);
 		const changedDuringFailure = createMockTFile("notes/during-failure.md");
 		harness.setVaultFile(changedDuringFailure);
 		harness.emitVaultEvent("modify", changedDuringFailure);
@@ -481,5 +640,8 @@ describe("IndexUpdateQueue", () => {
 			"[IndexUpdateQueue] Initial full scan failed:",
 			error,
 		);
+		expect(harness.stagedRebuilds[0]?.commit).not.toHaveBeenCalled();
+		expect(harness.stagedRebuilds[0]?.discard).toHaveBeenCalledTimes(1);
+		expect(harness.stagedRebuilds[1]?.commit).toHaveBeenCalledTimes(1);
 	});
 });

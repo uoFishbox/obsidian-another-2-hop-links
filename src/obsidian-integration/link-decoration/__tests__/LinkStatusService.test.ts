@@ -5,13 +5,17 @@ import { DEFAULT_SETTINGS, type PluginSettings } from "settings/model";
 
 type IndexingServiceLike = Pick<
 	IndexingService,
-	"isUnresolvedWithSingleBacklink" | "isUnresolvedWithSingleBacklinkBatch"
+	"isReady" | "isUnresolvedWithSingleBacklink" | "isUnresolvedWithSingleBacklinkBatch"
 >;
 
-function createIndexingService(batchResults: Map<string, boolean> = new Map()): {
+function createIndexingService(
+	batchResults: Map<string, boolean> = new Map(),
+	ready = true,
+): {
 	service: IndexingServiceLike;
 } {
 	const service: IndexingServiceLike = {
+		isReady: vi.fn(() => ready),
 		isUnresolvedWithSingleBacklink: vi.fn((path: string) => {
 			return batchResults.get(path) ?? false;
 		}),
@@ -33,6 +37,29 @@ function createSettings(enableUnresolvedLinkDecoration: boolean): PluginSettings
 }
 
 describe("LinkStatusService", () => {
+	it("returns neutral results without querying the index before it is ready", () => {
+		const { service: indexingService } = createIndexingService(
+			new Map([["missing.md", true]]),
+			false,
+		);
+		const linkStatusService = createLinkStatusService(
+			indexingService as IndexingService,
+			() => createSettings(true),
+		);
+
+		expect(linkStatusService.shouldDecorateLink("missing.md")).toBe(false);
+		expect(linkStatusService.shouldDecorateLinkBatch(["missing.md"])).toEqual(
+			new Map(),
+		);
+		expect(linkStatusService.isUnresolvedWithSingleBacklink("missing.md")).toBe(
+			false,
+		);
+		expect(indexingService.isUnresolvedWithSingleBacklink).not.toHaveBeenCalled();
+		expect(
+			indexingService.isUnresolvedWithSingleBacklinkBatch,
+		).not.toHaveBeenCalled();
+	});
+
 	it("returns an empty batch result without querying the index when decoration is disabled", () => {
 		const { service: indexingService } = createIndexingService(
 			new Map([["missing.md", true]]),

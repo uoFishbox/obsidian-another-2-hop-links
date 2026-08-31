@@ -1,57 +1,49 @@
-import { toCaseInsensitiveLookupKey } from "indexing/link-resolution/linkResolution";
-import { hasDirectResolvedLookupKey } from "indexing/backlink-builder/lookupGraphQueries";
-import { resolveFileByPath } from "obsidian-integration/files/resolveFileByPath";
+import { getLinkpath, type TFile } from "obsidian";
 import type {
-	BacklinkBucket,
-	BacklinkSourceMap,
-	IndexedLinkQueryResult,
 	IndexedLink,
+	IndexedLinkQueryResult,
+	LinkReference,
 } from "indexing/model";
-import {
-	compactStringSetFirst,
-	compactStringSetSize,
-	compactStringSetValues,
-} from "shared/collections/compactStringSet";
-import type { IVault } from "obsidian-integration/hostContracts";
+import { collectLinkReferences } from "indexing/metadata/metadataExtractor";
+import { resolveFileByPath } from "obsidian-integration/files/resolveFileByPath";
+import type { IMetadataCache, IVault } from "obsidian-integration/hostContracts";
 import type { ReadonlyIndexState } from "../indexState";
+import {
+	decodeEdgeKey,
+	resolvedEdgeKey,
+	unresolvedEdgeKey,
+	type EdgeKey,
+} from "../link-index/linkIndex";
 
-interface LookupSourceView {
-	sourceMap: BacklinkSourceMap;
-	lookupKey?: string;
+interface IncomingView {
+	readonly key: EdgeKey;
+	readonly sources: ReadonlyMap<string, number>;
 }
 
+/** Materializes presentation data lazily from the canonical two-map index. */
 export class IndexQueryEngine {
-	private readonly cachedIndexedLinks = new Map<string, IndexedLinkQueryResult>();
+	private readonly cachedIndexedLinks = new Map<EdgeKey, IndexedLinkQueryResult>();
 	private readonly cachedUniqueIndexedLinks = new Map<
-		string,
+		EdgeKey,
 		Map<string, IndexedLinkQueryResult>
 	>();
-	private readonly unresolvedMergedCache = new Map<string, BacklinkSourceMap>();
-	private lastSnapshotReference: ReadonlyIndexState | undefined;
 
-	constructor(private readonly vault: IVault) {}
+	public constructor(
+		private readonly vault: IVault,
+		private readonly metadataCache: IMetadataCache,
+	) {}
 
 	public getBacklinksForLink(
 		snapshot: ReadonlyIndexState,
 		linkPath: string,
 	): IndexedLinkQueryResult {
-		this.ensureSnapshotCacheScope(snapshot);
-		const cached = this.cachedIndexedLinks.get(linkPath);
-		if (cached) {
-			return cached;
-		}
+		const incoming = this.getIncomingView(snapshot, linkPath);
+		if (!incoming) return EMPTY_INDEXED_LINKS;
+		const cached = this.cachedIndexedLinks.get(incoming.key);
+		if (cached) return cached;
 
-		const lookupView = this.getSourceMapForLookup(snapshot, linkPath);
-		if (!lookupView || lookupView.sourceMap.size === 0) {
-			const links = this.freezeIndexedLinks([]);
-			this.cachedIndexedLinks.set(linkPath, links);
-			return links;
-		}
-
-		const links = this.freezeIndexedLinks(
-			this.collectIncomingIndexedLinks(snapshot, lookupView, linkPath),
-		);
-		this.cachedIndexedLinks.set(linkPath, links);
+		const links = freezeIndexedLinks(this.collectIncomingIndexedLinks(incoming));
+		this.cachedIndexedLinks.set(incoming.key, links);
 		return links;
 	}
 
@@ -61,60 +53,31 @@ export class IndexQueryEngine {
 		excludePath?: string,
 		limit?: number,
 	): IndexedLinkQueryResult {
-		this.ensureSnapshotCacheScope(snapshot);
+		const incoming = this.getIncomingView(snapshot, linkPath);
+		if (!incoming) return EMPTY_INDEXED_LINKS;
 		const excludeKey = excludePath ?? "";
 		const limitKey = typeof limit === "number" && limit > 0 ? String(limit) : "all";
 		const cacheKey = `${excludeKey}\u0000${limitKey}`;
-		let cacheByExclude = this.cachedUniqueIndexedLinks.get(linkPath);
-		if (!cacheByExclude) {
-			cacheByExclude = new Map<string, IndexedLinkQueryResult>();
-			this.cachedUniqueIndexedLinks.set(linkPath, cacheByExclude);
+		let cacheForEdge = this.cachedUniqueIndexedLinks.get(incoming.key);
+		if (!cacheForEdge) {
+			cacheForEdge = new Map();
+			this.cachedUniqueIndexedLinks.set(incoming.key, cacheForEdge);
 		}
+		const cached = cacheForEdge.get(cacheKey);
+		if (cached) return cached;
 
-		const cached = cacheByExclude.get(cacheKey);
-		if (cached) {
-			return cached;
-		}
-
-		const lookupView = this.getSourceMapForLookup(snapshot, linkPath);
-		if (!lookupView || lookupView.sourceMap.size === 0) {
-			const links = this.freezeIndexedLinks([]);
-			cacheByExclude.set(cacheKey, links);
-			return links;
-		}
-
-		const links = this.freezeIndexedLinks(
-			this.collectIncomingIndexedLinks(snapshot, lookupView, linkPath, {
-				excludePath,
-				limit,
-			}),
+		const links = freezeIndexedLinks(
+			this.collectIncomingIndexedLinks(incoming, { excludePath, limit }),
 		);
-		cacheByExclude.set(cacheKey, links);
+		cacheForEdge.set(cacheKey, links);
 		return links;
-	}
-
-	private freezeIndexedLinks(links: IndexedLink[]): IndexedLinkQueryResult {
-		for (const link of links) {
-			Object.freeze(link);
-		}
-		return Object.freeze(links);
 	}
 
 	public getBacklinkCountForLink(
 		snapshot: ReadonlyIndexState,
 		linkPath: string,
 	): number {
-		this.ensureSnapshotCacheScope(snapshot);
-		const directSourceMap = snapshot.backlinksMap.get(linkPath);
-		if (directSourceMap && this.hasDirectResolvedEntries(snapshot, linkPath)) {
-			return directSourceMap.size;
-		}
-
-		const unresolvedSourceMap = this.getOrBuildUnresolvedMergedSourceMap(
-			snapshot,
-			toCaseInsensitiveLookupKey(linkPath),
-		);
-		return unresolvedSourceMap?.size ?? directSourceMap?.size ?? 0;
+		return this.getIncomingView(snapshot, linkPath)?.sources.size ?? 0;
 	}
 
 	public hasAtLeastUniqueBacklinkSources(
@@ -126,388 +89,144 @@ export class IndexQueryEngine {
 			requireExistingSourceFile?: boolean;
 		},
 	): boolean {
-		this.ensureSnapshotCacheScope(snapshot);
-		if (minCount <= 0) {
-			return true;
+		if (minCount <= 0) return true;
+		const incoming = this.getIncomingView(snapshot, linkPath);
+		if (!incoming) return false;
+
+		let count = 0;
+		for (const sourcePath of incoming.sources.keys()) {
+			if (options?.excludePath === sourcePath) continue;
+			if (
+				options?.requireExistingSourceFile &&
+				!resolveFileByPath(this.vault, sourcePath)
+			) {
+				continue;
+			}
+			count++;
+			if (count >= minCount) return true;
 		}
-
-		const directSourceMap = snapshot.backlinksMap.get(linkPath);
-
-		// Prefer direct resolved entries when available — no Set allocation needed.
-		if (directSourceMap && this.hasDirectResolvedEntries(snapshot, linkPath)) {
-			return this.hasAtLeastFromSourcePaths(
-				directSourceMap.keys(),
-				minCount,
-				options,
-			);
-		}
-
-		const lookupKey = toCaseInsensitiveLookupKey(linkPath);
-		const unresolvedSourceMap = this.getOrBuildUnresolvedMergedSourceMap(
-			snapshot,
-			lookupKey,
-		);
-		if (unresolvedSourceMap && unresolvedSourceMap.size > 0) {
-			return this.hasAtLeastFromSourcePaths(
-				unresolvedSourceMap.keys(),
-				minCount,
-				options,
-			);
-		}
-
-		if (!directSourceMap || directSourceMap.size === 0) {
-			return false;
-		}
-
-		return this.hasAtLeastFromSourcePaths(
-			directSourceMap.keys(),
-			minCount,
-			options,
-		);
+		return false;
 	}
 
 	public isUnresolvedWithSingleBacklink(
 		snapshot: ReadonlyIndexState,
 		lookupPath: string,
 	): boolean {
-		this.ensureSnapshotCacheScope(snapshot);
-		const key = toCaseInsensitiveLookupKey(lookupPath);
-		return this.getOrBuildUnresolvedMergedSourceMap(snapshot, key)?.size === 1;
+		if ((snapshot.incoming.get(resolvedEdgeKey(lookupPath))?.size ?? 0) > 0) {
+			return false;
+		}
+		return snapshot.incoming.get(unresolvedEdgeKey(lookupPath))?.size === 1;
 	}
 
 	public isUnresolvedWithSingleBacklinkBatch(
 		snapshot: ReadonlyIndexState,
 		lookupPaths: string[],
 	): Map<string, boolean> {
-		this.ensureSnapshotCacheScope(snapshot);
-		const results = new Map<string, boolean>();
-		let resolvedCount = 0;
+		const result = new Map<string, boolean>();
 		for (const path of lookupPaths) {
-			const has = this.isUnresolvedWithSingleBacklink(snapshot, path);
-			results.set(path, has);
-			if (has) {
-				resolvedCount++;
-			}
+			result.set(path, this.isUnresolvedWithSingleBacklink(snapshot, path));
 		}
-
-		return results;
+		return result;
 	}
 
-	public invalidate(paths?: Iterable<string>): void {
-		if (!paths) {
+	public invalidate(keys?: Iterable<EdgeKey>): void {
+		if (!keys) {
 			this.cachedIndexedLinks.clear();
 			this.cachedUniqueIndexedLinks.clear();
-			this.unresolvedMergedCache.clear();
 			return;
 		}
-
-		for (const path of paths) {
-			this.deleteQueryCacheEntriesForPath(path);
+		for (const key of keys) {
+			this.cachedIndexedLinks.delete(key);
+			this.cachedUniqueIndexedLinks.delete(key);
 		}
 	}
 
-	private deleteQueryCacheEntriesForPath(path: string): void {
-		const lookupKey = toCaseInsensitiveLookupKey(path);
-		this.deleteCaseInsensitiveKey(this.cachedIndexedLinks, path, lookupKey);
-		this.deleteCaseInsensitiveKey(this.cachedUniqueIndexedLinks, path, lookupKey);
-		this.unresolvedMergedCache.delete(lookupKey);
-	}
-
-	private deleteCaseInsensitiveKey<T>(
-		cache: Map<string, T>,
-		path: string,
-		lookupKey: string,
-	): void {
-		cache.delete(path);
-		cache.delete(lookupKey);
-
-		for (const key of cache.keys()) {
-			if (toCaseInsensitiveLookupKey(key) === lookupKey) {
-				cache.delete(key);
-			}
-		}
-	}
-
-	private hasAtLeastFromSourcePaths(
-		sourcePaths: Iterable<string>,
-		minCount: number,
-		options?: {
-			excludePath?: string;
-			requireExistingSourceFile?: boolean;
-		},
-	): boolean {
-		let count = 0;
-
-		for (const sourcePath of sourcePaths) {
-			if (options?.excludePath && sourcePath === options.excludePath) {
-				continue;
-			}
-
-			if (options?.requireExistingSourceFile) {
-				const sourceFile = resolveFileByPath(this.vault, sourcePath);
-				if (!sourceFile) {
-					continue;
-				}
-			}
-
-			count++;
-			if (count >= minCount) {
-				return true;
-			}
+	private getIncomingView(
+		snapshot: ReadonlyIndexState,
+		linkPath: string,
+	): IncomingView | undefined {
+		const resolvedKey = resolvedEdgeKey(linkPath);
+		const resolvedSources = snapshot.incoming.get(resolvedKey);
+		if (resolvedSources?.size) {
+			return { key: resolvedKey, sources: resolvedSources };
 		}
 
-		return false;
+		const unresolvedKey = unresolvedEdgeKey(linkPath);
+		const unresolvedSources = snapshot.incoming.get(unresolvedKey);
+		return unresolvedSources?.size
+			? { key: unresolvedKey, sources: unresolvedSources }
+			: undefined;
 	}
 
 	private collectIncomingIndexedLinks(
-		snapshot: ReadonlyIndexState,
-		lookupView: LookupSourceView,
-		targetPath: string,
-		options?: {
-			excludePath?: string;
-			limit?: number;
-		},
+		incoming: IncomingView,
+		options?: { readonly excludePath?: string; readonly limit?: number },
 	): IndexedLink[] {
 		const links: IndexedLink[] = [];
-		const hasLimit = typeof options?.limit === "number" && options.limit > 0;
+		const limit =
+			typeof options?.limit === "number" && options.limit > 0
+				? options.limit
+				: undefined;
 
-		for (const [sourcePath, bucket] of lookupView.sourceMap.entries()) {
-			if (options?.excludePath && sourcePath === options.excludePath) {
-				continue;
-			}
-
-			const link = lookupView.lookupKey
-				? this.buildBacklinkFromSourceSummaryByLookupKey(
-						snapshot,
-						sourcePath,
-						lookupView.lookupKey,
-						targetPath,
-						bucket,
-					)
-				: this.buildBacklinkFromSourceSummary(
-						snapshot,
-						sourcePath,
-						targetPath,
-						bucket,
-					);
-			if (!link) {
-				continue;
-			}
-
-			links.push(link);
-			if (hasLimit && links.length >= (options?.limit ?? 0)) {
-				break;
-			}
+		for (const [sourcePath, count] of incoming.sources) {
+			if (sourcePath === options?.excludePath) continue;
+			const sourceFile = resolveFileByPath(this.vault, sourcePath);
+			if (!sourceFile) continue;
+			links.push(this.materializeIndexedLink(incoming.key, sourceFile, count));
+			if (limit !== undefined && links.length >= limit) break;
 		}
-
 		return links;
 	}
 
-	private buildBacklinkFromSourceSummary(
-		snapshot: ReadonlyIndexState,
-		sourcePath: string,
-		targetPath: string,
-		bucket: BacklinkBucket,
-	): IndexedLink | undefined {
-		const sourceFile = resolveFileByPath(this.vault, sourcePath);
-		if (!sourceFile) {
-			return undefined;
-		}
-
-		const summary = snapshot.sourceSummaries.get(sourcePath);
-		if (!summary) {
-			return undefined;
-		}
-
-		const destination = summary.destinations.get(targetPath);
-		if (!destination) {
-			return undefined;
-		}
-
-		const ref = summary.orderedReferences[destination.firstRefIndex];
-		if (!ref) {
-			return undefined;
-		}
-
+	private materializeIndexedLink(
+		key: EdgeKey,
+		sourceFile: TFile,
+		count: number,
+	): IndexedLink {
+		const edge = decodeEdgeKey(key)!;
+		const reference = this.findRepresentativeReference(key, sourceFile);
 		return {
-			rawText: ref.rawText,
-			path: targetPath,
-			lookupPath: targetPath,
-			isUnresolved: ref.isUnresolved,
+			rawText: reference?.link ?? edge.path,
+			path: edge.path,
+			lookupPath: edge.path,
+			isUnresolved: edge.type === "unresolved",
 			sourceFile,
-			position: undefined,
-			backlinkCount: bucket.count,
+			position:
+				reference && "position" in reference ? reference.position : undefined,
+			backlinkCount: count,
+			key: reference && "key" in reference ? reference.key : undefined,
 		};
 	}
 
-	private buildBacklinkFromSourceSummaryByLookupKey(
-		snapshot: ReadonlyIndexState,
-		sourcePath: string,
-		lookupKey: string,
-		displayPath: string,
-		bucket: BacklinkBucket,
-	): IndexedLink | undefined {
-		const sourceFile = resolveFileByPath(this.vault, sourcePath);
-		if (!sourceFile) {
-			return undefined;
-		}
-
-		const summary = snapshot.sourceSummaries.get(sourcePath);
-		if (!summary) {
-			return undefined;
-		}
-
-		const lookupEntry = summary.lookupEntries.get(lookupKey);
-		if (!lookupEntry) {
-			return undefined;
-		}
-
-		const ref = summary.orderedReferences[lookupEntry.firstRefIndex];
-		if (!ref) {
-			return undefined;
-		}
-
-		return {
-			rawText: ref.rawText,
-			path: displayPath,
-			lookupPath: displayPath,
-			isUnresolved: ref.isUnresolved,
-			sourceFile,
-			position: undefined,
-			backlinkCount: bucket.count,
-		};
-	}
-
-	private getSourceMapForLookup(
-		snapshot: ReadonlyIndexState,
-		linkPath: string,
-	): LookupSourceView | undefined {
-		const directSourceMap = snapshot.backlinksMap.get(linkPath);
-		if (directSourceMap && this.hasDirectResolvedEntries(snapshot, linkPath)) {
-			return {
-				sourceMap: directSourceMap,
-			};
-		}
-
-		const unresolvedKey = toCaseInsensitiveLookupKey(linkPath);
-		const unresolvedMergedMap = this.getOrBuildUnresolvedMergedSourceMap(
-			snapshot,
-			unresolvedKey,
+	private findRepresentativeReference(
+		key: EdgeKey,
+		sourceFile: TFile,
+	): LinkReference | undefined {
+		const references = collectLinkReferences(
+			this.metadataCache.getFileCache(sourceFile),
 		);
-		if (!unresolvedMergedMap || unresolvedMergedMap.size === 0) {
-			return directSourceMap
-				? {
-						sourceMap: directSourceMap,
-					}
-				: undefined;
-		}
-		return {
-			sourceMap: unresolvedMergedMap,
-			lookupKey: unresolvedKey,
-		};
-	}
+		const edge = decodeEdgeKey(key);
+		if (!edge) return undefined;
 
-	private hasDirectResolvedEntries(
-		snapshot: ReadonlyIndexState,
-		lookupPath: string,
-	): boolean {
-		return (snapshot.lookupPathResolvedSourceCount.get(lookupPath) ?? 0) > 0;
-	}
-
-	private getOrBuildUnresolvedMergedSourceMap(
-		snapshot: ReadonlyIndexState,
-		lookupKey: string,
-	): BacklinkSourceMap | undefined {
-		const cached = this.unresolvedMergedCache.get(lookupKey);
-		if (cached) {
-			return cached;
-		}
-
-		if (hasDirectResolvedLookupKey(snapshot, lookupKey)) {
-			return undefined;
-		}
-
-		const lookupPaths = snapshot.lookupKeyToLookupPaths.get(lookupKey);
-		if (!lookupPaths) {
-			return undefined;
-		}
-		// Single lookup path: no merge needed — share the existing sourceMap
-		// directly. Callers only read buckets (count, hasResolved) and never
-		// mutate them, so sharing the snapshot reference is safe.
-		if (compactStringSetSize(lookupPaths) === 1) {
-			const lookupPath = compactStringSetFirst(lookupPaths)!;
-			const sourceMap = snapshot.backlinksMap.get(lookupPath);
-			if (!sourceMap || sourceMap.size === 0) {
-				return undefined;
-			}
-			this.unresolvedMergedCache.set(lookupKey, sourceMap);
-			return sourceMap;
-		}
-
-		const mergedSourceMap: BacklinkSourceMap = new Map();
-		const sharedKeys = new Set<string>();
-		for (const lookupPath of compactStringSetValues(lookupPaths)) {
-			const sourceMap = snapshot.backlinksMap.get(lookupPath);
-			if (!sourceMap || sourceMap.size === 0) {
+		for (const reference of references) {
+			const rawPath = getLinkpath(reference.link);
+			const destination = this.metadataCache.getFirstLinkpathDest(
+				rawPath,
+				sourceFile.path,
+			);
+			if (edge.type === "resolved") {
+				if (destination?.path === edge.path) return reference;
 				continue;
 			}
-			this.mergeSourceMapEntries(mergedSourceMap, sourceMap, sharedKeys);
+			if (!destination && unresolvedEdgeKey(rawPath) === key) return reference;
 		}
-		if (mergedSourceMap.size === 0) {
-			return undefined;
-		}
-
-		this.unresolvedMergedCache.set(lookupKey, mergedSourceMap);
-		return mergedSourceMap;
+		return undefined;
 	}
+}
 
-	/**
-	 * Merge entries from `source` into `target`.
-	 *
-	 * Bucket references that have not yet collided are shared directly from
-	 * the source map to avoid unnecessary clones.  When a sourcePath collides
-	 * with an entry that is still a shared reference (tracked via
-	 * `sharedKeys`), a new owned bucket is created so the original snapshot
-	 * bucket is never mutated.
-	 */
-	private mergeSourceMapEntries(
-		target: BacklinkSourceMap,
-		source: BacklinkSourceMap,
-		sharedKeys: Set<string>,
-	): void {
-		for (const [sourcePath, infoCollection] of source) {
-			const existing = target.get(sourcePath);
-			if (existing) {
-				if (sharedKeys.has(sourcePath)) {
-					// existing is a shared reference to a snapshot bucket —
-					// create a new owned bucket to avoid mutating the snapshot.
-					const count = existing.count + infoCollection.count;
-					target.set(sourcePath, {
-						count,
-						hasResolved: existing.hasResolved || infoCollection.hasResolved,
-					});
-					sharedKeys.delete(sourcePath);
-				} else {
-					// existing is already an owned bucket — safe to mutate
-					existing.count += infoCollection.count;
-					existing.hasResolved ||= infoCollection.hasResolved;
-				}
-			} else {
-				// First encounter — share reference (no clone needed)
-				target.set(sourcePath, infoCollection);
-				sharedKeys.add(sourcePath);
-			}
-		}
-	}
+const EMPTY_INDEXED_LINKS: IndexedLinkQueryResult = Object.freeze([]);
 
-	private ensureSnapshotCacheScope(snapshot: ReadonlyIndexState): void {
-		if (this.lastSnapshotReference === snapshot) {
-			return;
-		}
-
-		this.cachedIndexedLinks.clear();
-		this.cachedUniqueIndexedLinks.clear();
-		this.unresolvedMergedCache.clear();
-		this.lastSnapshotReference = snapshot;
-	}
+function freezeIndexedLinks(links: IndexedLink[]): IndexedLinkQueryResult {
+	for (const link of links) Object.freeze(link);
+	return Object.freeze(links);
 }

@@ -35,15 +35,6 @@ export interface IndexedLink {
 
 export type IndexedLinkQueryResult = readonly Readonly<IndexedLink>[];
 
-export interface BacklinkBucket {
-	count: number;
-	hasResolved: boolean;
-}
-
-export type BacklinkSourceMap = Map<string, BacklinkBucket>;
-
-export type BacklinksMap = Map<string, BacklinkSourceMap>;
-
 export interface IndexedFile {
 	file: TFile;
 	path: string;

@@ -37,7 +37,7 @@ function createCachedMetadata(
 }
 
 describe("IndexingService", () => {
-	describe("rebuildBacklinksMap", () => {
+	describe("rebuildLinkIndex", () => {
 		test("can build backlinks map in initial state", async () => {
 			const { service } = new VaultEnvironmentBuilder([
 				{ path: "note1.md", links: ["note2", "note3"] },
@@ -47,11 +47,16 @@ describe("IndexingService", () => {
 
 			await service.rebuildIndexesTimeSliced();
 
-			const backlinksMap = service.getBacklinksMap();
-			expect(backlinksMap.get("note2.md")?.has("note1.md")).toBe(true);
-			expect(backlinksMap.get("note3.md")?.has("note1.md")).toBe(true);
-			expect(backlinksMap.get("note3.md")?.has("note2.md")).toBe(true);
-			expect(backlinksMap.get("note3.md")?.size).toBe(2);
+			expect(
+				service
+					.getBacklinksForLink("note2.md")
+					.map((link) => link.sourceFile.path),
+			).toEqual(["note1.md"]);
+			expect(
+				service
+					.getBacklinksForLink("note3.md")
+					.map((link) => link.sourceFile.path),
+			).toEqual(["note1.md", "note2.md"]);
 		});
 
 		test("can retrieve source paths for a lookupKey", async () => {
@@ -90,9 +95,9 @@ describe("IndexingService", () => {
 			expect(listener).toHaveBeenCalledTimes(1);
 		});
 
-		test("alias-only modify preserves backlink query cache and emits no structural link source", async () => {
+		test("alias-only modify invalidates lazy presentation without changing structure", async () => {
 			const env = new VaultEnvironmentBuilder([
-				{ path: "source.md" },
+				{ path: "source.md", links: ["target"] },
 				{ path: "target.md" },
 			]).build();
 			const sourceFile = env.mockVault.getAbstractFileByPath(
@@ -128,11 +133,11 @@ describe("IndexingService", () => {
 			expect(listener).toHaveBeenCalledWith(
 				expect.objectContaining({
 					affectedPaths: ["source.md"],
-					affectedLookupKeys: [],
-					affectedLinkSourcePaths: [],
+					affectedLookupKeys: ["target.md"],
+					affectedLinkSourcePaths: ["source.md"],
 				}),
 			);
-			expect(env.service.getBacklinksForLink("target.md")).toBe(cachedBefore);
+			expect(env.service.getBacklinksForLink("target.md")).not.toBe(cachedBefore);
 		});
 
 		test("onDataUpdate is called only once even with multiple change events", async () => {
@@ -174,8 +179,8 @@ describe("IndexingService", () => {
 		});
 	});
 
-	describe("rebuildBacklinksMap and onDataUpdate", () => {
-		test("onDataUpdate listener is called after rebuildBacklinksMap executes", async () => {
+	describe("rebuildLinkIndex and onDataUpdate", () => {
+		test("onDataUpdate listener is called after rebuildLinkIndex executes", async () => {
 			const { service } = new VaultEnvironmentBuilder([
 				{ path: "file1.md", links: ["file2"] },
 				{ path: "file2.md" },
@@ -184,12 +189,14 @@ describe("IndexingService", () => {
 			const listener = vi.fn();
 			service.onDataUpdate(listener);
 
+			expect(service.isReady()).toBe(false);
 			await service.rebuildIndexesTimeSliced();
 
+			expect(service.isReady()).toBe(true);
 			expect(listener).toHaveBeenCalledTimes(1);
 		});
 
-		test("multiple rebuildBacklinksMap calls trigger multiple notifications", async () => {
+		test("multiple rebuildLinkIndex calls trigger multiple notifications", async () => {
 			const { service } = new VaultEnvironmentBuilder([
 				{ path: "file1.md" },
 			]).build();
@@ -201,6 +208,77 @@ describe("IndexingService", () => {
 			await service.rebuildIndexesTimeSliced();
 
 			expect(listener).toHaveBeenCalledTimes(2);
+		});
+
+		test("staged rebuild publishes full scan and catch-up as one atomic update", async () => {
+			const builder = new VaultEnvironmentBuilder([
+				{ path: "first-source.md", links: ["missing"], tags: ["#cold"] },
+				{ path: "second-source.md", links: [] },
+			]);
+			const { service } = builder.build();
+			const listener = vi.fn();
+			service.onDataUpdate(listener);
+			const stagedRebuild = service.beginStagedRebuild();
+			expect(service.isReady()).toBe(false);
+
+			await service.rebuildIndexesTimeSliced({
+				yieldFn: async () => undefined,
+			});
+			builder.addFile({
+				path: "second-source.md",
+				links: ["missing"],
+				tags: ["#cold"],
+			});
+			await service.applyFileChangesTimeSliced(
+				[{ type: "modify", path: "second-source.md" }],
+				{ yieldFn: async () => undefined },
+			);
+
+			expect(service.getBacklinkCountForLink("missing.md")).toBe(0);
+			expect(service.peekNotesWithTag("cold")).toEqual([]);
+			expect(service.getIndexVersion()).toBe(0);
+			expect(listener).not.toHaveBeenCalled();
+
+			stagedRebuild.commit();
+
+			expect(service.isReady()).toBe(true);
+			expect(service.getBacklinkCountForLink("missing.md")).toBe(2);
+			expect(
+				service
+					.peekNotesWithTag("cold")
+					.map((note) => note.path)
+					.sort(),
+			).toEqual(["first-source.md", "second-source.md"]);
+			expect(service.getIndexVersion()).toBe(1);
+			expect(listener).toHaveBeenCalledTimes(1);
+			expect(listener).toHaveBeenCalledWith(
+				expect.objectContaining({ affectsAll: true }),
+			);
+		});
+
+		test("discarding a staged rebuild preserves the live index", async () => {
+			const builder = new VaultEnvironmentBuilder([
+				{ path: "source.md", links: ["first-target"] },
+			]);
+			const { service } = builder.build();
+			await service.rebuildIndexesTimeSliced({
+				yieldFn: async () => undefined,
+			});
+			const listener = vi.fn();
+			service.onDataUpdate(listener);
+			const versionBeforeStaging = service.getIndexVersion();
+			const stagedRebuild = service.beginStagedRebuild();
+			builder.addFile({ path: "source.md", links: ["second-target"] });
+
+			await service.rebuildIndexesTimeSliced({
+				yieldFn: async () => undefined,
+			});
+			stagedRebuild.discard();
+
+			expect(service.getBacklinkCountForLink("first-target.md")).toBe(1);
+			expect(service.getBacklinkCountForLink("second-target.md")).toBe(0);
+			expect(service.getIndexVersion()).toBe(versionBeforeStaging);
+			expect(listener).not.toHaveBeenCalled();
 		});
 	});
 
@@ -383,25 +461,18 @@ describe("IndexingService", () => {
 	});
 
 	describe("Integration with applyFileChanges", () => {
-		test("modify: adding a link should update backlinksMap", async () => {
+		test("modify: adding a link updates incoming edges", async () => {
 			const builder = new VaultEnvironmentBuilder([
 				{ path: "file1.md", links: [] },
 				{ path: "file2.md" },
 			]);
-			const { service, mockMetadataCache } = builder.build();
+			const { service } = builder.build();
 			await service.rebuildIndexesTimeSliced();
 
 			let backlinks = service.getBacklinksForLink("file2.md");
 			expect(backlinks.some((b) => b.sourceFile.path === "file1.md")).toBe(false);
 
-			(mockMetadataCache.getFileCache as any).mockImplementation(
-				(file: TFile) => {
-					if (file.path === "file1.md") {
-						return createCachedMetadata([createLinkCache("file2")]);
-					}
-					return null;
-				},
-			);
+			builder.addFile({ path: "file1.md", links: ["file2"] });
 
 			const changes: IncrementalFileChange[] = [
 				{ type: "modify", path: "file1.md" },
@@ -448,7 +519,7 @@ describe("IndexingService", () => {
 				{ path: "file2.md" },
 				{ path: "file3.md" },
 			]);
-			const { service, mockMetadataCache } = builder.build();
+			const { service } = builder.build();
 			await service.rebuildIndexesTimeSliced();
 
 			expect(
@@ -457,14 +528,7 @@ describe("IndexingService", () => {
 					.some((b) => b.sourceFile.path === "file1.md"),
 			).toBe(true);
 
-			(mockMetadataCache.getFileCache as any).mockImplementation(
-				(file: TFile) => {
-					if (file.path === "file1.md") {
-						return createCachedMetadata([createLinkCache("file3")]);
-					}
-					return null;
-				},
-			);
+			builder.addFile({ path: "file1.md", links: ["file3"] });
 
 			const changes: IncrementalFileChange[] = [
 				{ type: "modify", path: "file1.md" },
@@ -484,13 +548,13 @@ describe("IndexingService", () => {
 			).toBe(true);
 		});
 
-		test("modify multiple files: backlinksMap should reflect all changes", async () => {
+		test("modify multiple files updates all incoming edges", async () => {
 			const builder = new VaultEnvironmentBuilder([
 				{ path: "file1.md", links: ["target"] },
 				{ path: "file2.md", links: [] },
 				{ path: "target.md" },
 			]);
-			const { service, mockMetadataCache } = builder.build();
+			const { service } = builder.build();
 			await service.rebuildIndexesTimeSliced();
 
 			expect(
@@ -500,17 +564,7 @@ describe("IndexingService", () => {
 				service.getBacklinksForLink("target.md").map((b) => b.sourceFile.path),
 			).not.toContain("file2.md");
 
-			(mockMetadataCache.getFileCache as any).mockImplementation(
-				(file: TFile) => {
-					if (file.path === "file2.md") {
-						return createCachedMetadata([createLinkCache("target")]);
-					}
-					if (file.path === "file1.md") {
-						return createCachedMetadata([createLinkCache("target")]);
-					}
-					return null;
-				},
-			);
+			builder.addFile({ path: "file2.md", links: ["target"] });
 
 			const changes: IncrementalFileChange[] = [
 				{ type: "modify", path: "file2.md" },
@@ -524,12 +578,12 @@ describe("IndexingService", () => {
 			expect(backlinkPaths).toContain("file2.md");
 		});
 
-		test("remove a link: modifying file to remove link should update backlinksMap", async () => {
+		test("remove a link updates incoming edges", async () => {
 			const builder = new VaultEnvironmentBuilder([
 				{ path: "file1.md", links: ["file2"] },
 				{ path: "file2.md" },
 			]);
-			const { service, mockMetadataCache } = builder.build();
+			const { service } = builder.build();
 			await service.rebuildIndexesTimeSliced();
 
 			expect(
@@ -538,14 +592,7 @@ describe("IndexingService", () => {
 					.some((b) => b.sourceFile.path === "file1.md"),
 			).toBe(true);
 
-			(mockMetadataCache.getFileCache as any).mockImplementation(
-				(file: TFile) => {
-					if (file.path === "file1.md") {
-						return createCachedMetadata([]);
-					}
-					return null;
-				},
-			);
+			builder.addFile({ path: "file1.md", links: [] });
 
 			const changes: IncrementalFileChange[] = [
 				{ type: "modify", path: "file1.md" },
@@ -591,6 +638,9 @@ describe("IndexingService", () => {
 			};
 
 			applyShadowingResolver();
+			mockMetadataCache.resolvedLinks["src/source.md"] = {
+				"folderA/note.md": 1,
+			};
 			await service.rebuildIndexesTimeSliced();
 
 			expect(
@@ -601,6 +651,7 @@ describe("IndexingService", () => {
 
 			builder.addFile({ path: "src/note.md" });
 			applyShadowingResolver();
+			mockMetadataCache.resolvedLinks["src/source.md"] = { "src/note.md": 1 };
 
 			await service.applyFileChangesTimeSliced([
 				{ type: "create", path: "src/note.md" },
@@ -649,6 +700,9 @@ describe("IndexingService", () => {
 			};
 
 			applyShadowingResolver();
+			mockMetadataCache.resolvedLinks["src/source.md"] = {
+				"folderA/note.md": 1,
+			};
 			await service.rebuildIndexesTimeSliced();
 
 			await service.applyFileChangesTimeSliced([
@@ -657,6 +711,7 @@ describe("IndexingService", () => {
 
 			builder.addFile({ path: "src/note.md" });
 			applyShadowingResolver();
+			mockMetadataCache.resolvedLinks["src/source.md"] = { "src/note.md": 1 };
 
 			await service.applyFileChangesTimeSliced([
 				{ type: "create", path: "src/note.md" },

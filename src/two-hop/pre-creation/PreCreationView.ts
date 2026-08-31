@@ -14,7 +14,6 @@ import {
 	normalizeLinkToMarkdownPath,
 	toCaseInsensitiveLookupKey,
 } from "indexing/link-resolution/linkResolution";
-import { dedupeBySourceFile } from "indexing/backlink-builder/backlinkIndexer";
 import TagNotesListHost from "cards/list/ui/TagNotesListHost.svelte";
 import type { ListConfig } from "cards/list/ui/types";
 import type { PluginHost } from "obsidian-integration/pluginHost";
@@ -43,6 +42,21 @@ const persistedBootstrapStateByLeafId = new Map<string, PreCreationBootstrapStat
 function getPathBasename(path: string): string {
 	const slash = path.lastIndexOf("/");
 	return slash === -1 ? path : path.slice(slash + 1);
+}
+
+function dedupeBySourceFile(
+	links: readonly Readonly<IndexedLink>[],
+	excludePath?: string,
+): IndexedLink[] {
+	const seen = new Set<string>();
+	const result: IndexedLink[] = [];
+	for (const link of links) {
+		const sourcePath = link.sourceFile.path;
+		if (sourcePath === excludePath || seen.has(sourcePath)) continue;
+		seen.add(sourcePath);
+		result.push(link);
+	}
+	return result;
 }
 
 export function hasAnyPreCreationBootstrapState(): boolean {

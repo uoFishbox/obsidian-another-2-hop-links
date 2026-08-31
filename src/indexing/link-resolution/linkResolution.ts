@@ -1,8 +1,6 @@
 import { getLinkpath, normalizePath } from "obsidian";
-import type { TFile } from "obsidian";
-import type { LinkReference, LinkResolution } from "indexing/model";
-import type { IndexedLink } from "indexing/model";
-import type { IMetadataCache, IVault } from "obsidian-integration/hostContracts";
+import type { IndexedLink, LinkReference, LinkResolution } from "indexing/model";
+import type { IMetadataCache } from "obsidian-integration/hostContracts";
 import {
 	createBoundedGenerationalCache,
 	type BoundedGenerationalCache,
@@ -10,32 +8,6 @@ import {
 
 const HAS_EXTENSION_RE = /\.[a-z0-9]+$/i;
 const LINK_NORMALIZATION_CACHE_MAX_ENTRIES = 8192;
-
-export function hasSourceDependentRawLinkPath(rawLinkPath: string): boolean {
-	let segmentStart = 0;
-	for (let index = 0; index <= rawLinkPath.length; index++) {
-		const ch = index < rawLinkPath.length ? rawLinkPath.charCodeAt(index) : -1;
-		if (ch !== 0x2f && ch !== 0x5c && ch !== -1) continue;
-
-		const segmentLength = index - segmentStart;
-		if (
-			(segmentLength === 1 && rawLinkPath.charCodeAt(segmentStart) === 0x2e) ||
-			(segmentLength === 2 &&
-				rawLinkPath.charCodeAt(segmentStart) === 0x2e &&
-				rawLinkPath.charCodeAt(segmentStart + 1) === 0x2e)
-		) {
-			return true;
-		}
-
-		segmentStart = index + 1;
-	}
-	return false;
-}
-// The same link strings and paths are passed frequently, so reuse normalized results.
-// An unbounded Map would retain deleted files and historical link strings in the old
-// generation, increasing major GC pressure and retained heap usage. Limit retention
-// with a two-generation bounded cache. Normalization is cheap, so evict entries by
-// switching generations in bulk instead of performing per-call LRU delete/set operations.
 const CASE_INSENSITIVE_LOOKUP_KEY_CACHE: BoundedGenerationalCache<string, string> =
 	createBoundedGenerationalCache(LINK_NORMALIZATION_CACHE_MAX_ENTRIES);
 const RAW_LINKPATH_TO_MARKDOWN_PATH_CACHE: BoundedGenerationalCache<string, string> =
@@ -43,152 +15,9 @@ const RAW_LINKPATH_TO_MARKDOWN_PATH_CACHE: BoundedGenerationalCache<string, stri
 const LINK_TEXT_TO_MARKDOWN_PATH_CACHE: BoundedGenerationalCache<string, string> =
 	createBoundedGenerationalCache(LINK_NORMALIZATION_CACHE_MAX_ENTRIES);
 
-export interface ResolvedLinkInfo {
-	destinationPath: string;
-	rawLookupKey: string;
-	isUnresolved: boolean;
-	isAmbiguous: boolean;
-	isSourceDependent: boolean;
-}
-
-export interface LinkResolutionAmbiguityDetector {
-	isAmbiguous(rawLinkPath: string): boolean;
-}
-
-export interface MutableLinkResolutionAmbiguityDetector extends LinkResolutionAmbiguityDetector {
-	addPath(path: string): void;
-	removePath(path: string): void;
-	renamePath(oldPath: string, newPath: string): void;
-}
-
-interface LinkResolutionAmbiguityIndex {
-	fileNameCounts: Map<string, number>;
-	baseNameCounts: Map<string, number>;
-}
-
-function incrementCachedCount(cache: Map<string, number>, key: string): void {
-	cache.set(key, (cache.get(key) ?? 0) + 1);
-}
-
-function decrementCachedCount(cache: Map<string, number>, key: string): void {
-	const current = cache.get(key);
-	if (current === undefined) {
-		return;
-	}
-
-	if (current <= 1) {
-		cache.delete(key);
-		return;
-	}
-
-	cache.set(key, current - 1);
-}
-
-function getPathBasename(path: string): string {
-	const slash = path.lastIndexOf("/");
-	return slash === -1 ? path : path.slice(slash + 1);
-}
-
-function getFileNameFromPath(path: string): string {
-	const normalizedPath = normalizePath(path);
-	return getPathBasename(normalizedPath);
-}
-
-function getBaseNameFromFileName(fileName: string): string {
-	const dotIndex = fileName.lastIndexOf(".");
-	if (dotIndex <= 0 || dotIndex === fileName.length - 1) {
-		return fileName;
-	}
-
-	return fileName.slice(0, dotIndex);
-}
-
-function isExplicitVaultPath(rawLinkPath: string): boolean {
-	return rawLinkPath.includes("/") || rawLinkPath.includes("\\");
-}
-
-class MutableLinkResolutionAmbiguityDetectorImpl implements MutableLinkResolutionAmbiguityDetector {
-	private readonly fileNameCounts = new Map<string, number>();
-	private readonly baseNameCounts = new Map<string, number>();
-
-	constructor(paths: Iterable<string>) {
-		for (const path of paths) {
-			this.addPath(path);
-		}
-	}
-
-	public isAmbiguous(rawLinkPath: string): boolean {
-		return computeIsAmbiguousRawLinkPath(rawLinkPath, {
-			fileNameCounts: this.fileNameCounts,
-			baseNameCounts: this.baseNameCounts,
-		});
-	}
-
-	public addPath(path: string): void {
-		const fileName = getFileNameFromPath(path);
-		const baseName = getBaseNameFromFileName(fileName);
-		incrementCachedCount(this.fileNameCounts, toCaseInsensitiveLookupKey(fileName));
-		incrementCachedCount(this.baseNameCounts, toCaseInsensitiveLookupKey(baseName));
-	}
-
-	public removePath(path: string): void {
-		const fileName = getFileNameFromPath(path);
-		const baseName = getBaseNameFromFileName(fileName);
-		decrementCachedCount(this.fileNameCounts, toCaseInsensitiveLookupKey(fileName));
-		decrementCachedCount(this.baseNameCounts, toCaseInsensitiveLookupKey(baseName));
-	}
-
-	public renamePath(oldPath: string, newPath: string): void {
-		this.removePath(oldPath);
-		this.addPath(newPath);
-	}
-}
-
-function computeIsAmbiguousRawLinkPath(
-	rawLinkPath: string,
-	index: LinkResolutionAmbiguityIndex,
-): boolean {
-	if (hasSourceDependentRawLinkPath(rawLinkPath)) {
-		return true;
-	}
-
-	if (isExplicitVaultPath(rawLinkPath)) {
-		return false;
-	}
-
-	const normalizedFileName = getPathBasename(normalizePath(rawLinkPath));
-	if (normalizedFileName.length === 0) {
-		return true;
-	}
-
-	const lookupKey = toCaseInsensitiveLookupKey(normalizedFileName);
-	if (HAS_EXTENSION_RE.test(normalizedFileName)) {
-		const exactFileNameCount = index.fileNameCounts.get(lookupKey) ?? 0;
-		const markdownBaseNameCount = index.baseNameCounts.get(lookupKey) ?? 0;
-		return exactFileNameCount + markdownBaseNameCount > 1;
-	}
-
-	return (index.baseNameCounts.get(lookupKey) ?? 0) > 1;
-}
-
-function* filePaths(files: readonly TFile[]): Iterable<string> {
-	for (const file of files) {
-		yield file.path;
-	}
-}
-
-export function createLinkResolutionAmbiguityDetector(
-	vault: IVault,
-): MutableLinkResolutionAmbiguityDetector {
-	return new MutableLinkResolutionAmbiguityDetectorImpl(filePaths(vault.getFiles()));
-}
-
 export function toCaseInsensitiveLookupKey(path: string): string {
 	const cached = CASE_INSENSITIVE_LOOKUP_KEY_CACHE.get(path);
-	if (cached !== undefined) {
-		return cached;
-	}
-
+	if (cached !== undefined) return cached;
 	const normalized = path.indexOf("\\") === -1 ? path : normalizePath(path);
 	const lookupKey = normalized.toLowerCase();
 	CASE_INSENSITIVE_LOOKUP_KEY_CACHE.set(path, lookupKey);
@@ -197,12 +26,8 @@ export function toCaseInsensitiveLookupKey(path: string): string {
 
 export function normalizeLinkToMarkdownPath(linkText: string): string {
 	const cached = LINK_TEXT_TO_MARKDOWN_PATH_CACHE.get(linkText);
-	if (cached !== undefined) {
-		return cached;
-	}
-
-	const rawPath = getLinkpath(linkText);
-	const markdownPath = normalizeRawLinkpathToMarkdownPath(rawPath);
+	if (cached !== undefined) return cached;
+	const markdownPath = normalizeRawLinkpathToMarkdownPath(getLinkpath(linkText));
 	LINK_TEXT_TO_MARKDOWN_PATH_CACHE.set(linkText, markdownPath);
 	return markdownPath;
 }
@@ -218,55 +43,19 @@ export function normalizeHrefToLookupPath(href: string): string {
 
 export function normalizeRawLinkpathToMarkdownPath(rawPath: string): string {
 	const cached = RAW_LINKPATH_TO_MARKDOWN_PATH_CACHE.get(rawPath);
-	if (cached !== undefined) {
-		return cached;
-	}
-
+	if (cached !== undefined) return cached;
 	const normalized = normalizePath(rawPath);
-	const hasExtension = HAS_EXTENSION_RE.test(normalized);
-	const markdownPath = hasExtension ? normalized : `${normalized}.md`;
+	const markdownPath = HAS_EXTENSION_RE.test(normalized)
+		? normalized
+		: `${normalized}.md`;
 	RAW_LINKPATH_TO_MARKDOWN_PATH_CACHE.set(rawPath, markdownPath);
 	return markdownPath;
 }
 
-function normalizeResolvedRawLinkpathToLookupPath(
-	rawPath: string,
-	destinationPath: string,
-): string {
-	const normalizedLookupPath = normalizeRawLinkpathToMarkdownPath(rawPath);
-	if (!destinationPath.toLowerCase().endsWith(".md")) {
-		return normalizedLookupPath;
-	}
-	if (normalizedLookupPath.toLowerCase().endsWith(".md")) {
-		return normalizedLookupPath;
-	}
-	return `${normalizedLookupPath}.md`;
-}
-
 export function getLookupPathForLink(link: IndexedLink): string {
-	if (link.lookupPath) {
-		return link.lookupPath;
-	}
-	if (link.path) {
-		return link.path;
-	}
+	if (link.lookupPath) return link.lookupPath;
+	if (link.path) return link.path;
 	return normalizeLinkToMarkdownPath(link.rawText);
-}
-
-function createResolvedLinkInfo(
-	rawLinkPath: string,
-	destinationPath: string,
-	rawLookupKey: string,
-	isUnresolved: boolean,
-	isAmbiguous: boolean,
-): ResolvedLinkInfo {
-	return {
-		destinationPath,
-		rawLookupKey,
-		isUnresolved,
-		isAmbiguous,
-		isSourceDependent: hasSourceDependentRawLinkPath(rawLinkPath),
-	};
 }
 
 export function resolveLinkDestination(
@@ -275,53 +64,17 @@ export function resolveLinkDestination(
 	sourcePath: string,
 ): LinkResolution {
 	const rawLinkPath = getLinkpath(link.link);
-	const dest = metadataCache.getFirstLinkpathDest(rawLinkPath, sourcePath);
-	if (dest) {
+	const destination = metadataCache.getFirstLinkpathDest(rawLinkPath, sourcePath);
+	if (destination) {
 		return {
-			file: dest,
-			lookupPath: dest.path,
+			file: destination,
+			lookupPath: destination.path,
 			isUnresolved: false,
 		};
 	}
-
 	return {
 		file: null,
 		lookupPath: normalizeRawLinkpathToMarkdownPath(rawLinkPath),
 		isUnresolved: true,
 	};
-}
-
-export function resolveLinkFromRawLinkPath(
-	metadataCache: IMetadataCache,
-	rawLinkPath: string,
-	sourcePath: string,
-	ambiguityDetector: LinkResolutionAmbiguityDetector,
-): ResolvedLinkInfo {
-	// Run-scoped reuse belongs to backlinkReferenceSequence. Keeping this
-	// function stateless avoids retaining link history across index updates.
-	const dest = metadataCache.getFirstLinkpathDest(rawLinkPath, sourcePath);
-	const rawLookupPath = dest
-		? normalizeResolvedRawLinkpathToLookupPath(rawLinkPath, dest.path)
-		: normalizeRawLinkpathToMarkdownPath(rawLinkPath);
-	const rawLookupKey = toCaseInsensitiveLookupKey(rawLookupPath);
-	const isAmbiguous = ambiguityDetector.isAmbiguous(rawLinkPath);
-
-	if (dest) {
-		const destinationPath = dest.path;
-		return createResolvedLinkInfo(
-			rawLinkPath,
-			destinationPath,
-			rawLookupKey,
-			false,
-			isAmbiguous,
-		);
-	}
-
-	return createResolvedLinkInfo(
-		rawLinkPath,
-		rawLookupPath,
-		rawLookupKey,
-		true,
-		isAmbiguous,
-	);
 }

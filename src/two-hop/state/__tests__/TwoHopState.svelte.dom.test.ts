@@ -19,7 +19,7 @@ import type {
 import type { IndexedLink } from "indexing/model";
 import { DEFAULT_SETTINGS, type PluginSettings } from "settings/model";
 import type { SortOption } from "cards/sorting";
-import { buildDetailedBacklinksArtifactsChunked } from "indexing/backlink-builder/backlinkIndexer";
+import { buildLinkIndexArtifactsChunked } from "indexing/backlink-builder/backlinkIndexer";
 import { TagIndexStore } from "indexing/tag-index/TagIndexStore";
 import { createDedupState } from "two-hop/display/deduplication/usageTracker";
 import { VaultEnvironmentBuilder } from "testing/helpers/VaultEnvironmentBuilder";
@@ -953,7 +953,7 @@ describe("TwoHopState (Runes)", () => {
 			environment.mockVault,
 			environment.mockMetadataCache,
 		);
-		const initialArtifacts = await buildDetailedBacklinksArtifactsChunked(
+		const initialArtifacts = await buildLinkIndexArtifactsChunked(
 			environment.mockVault,
 			environment.mockMetadataCache,
 			{},

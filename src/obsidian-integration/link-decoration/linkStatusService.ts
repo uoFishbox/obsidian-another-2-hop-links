@@ -41,7 +41,7 @@ export function createLinkStatusService(
 	}
 
 	function shouldDecorateLink(lookupPath: string): boolean {
-		if (!isDecorationEnabled()) {
+		if (!isDecorationEnabled() || !indexingService.isReady()) {
 			return false;
 		}
 		return indexingService.isUnresolvedWithSingleBacklink(lookupPath);
@@ -50,7 +50,7 @@ export function createLinkStatusService(
 	function shouldDecorateLinkBatch(
 		lookupPaths: Iterable<string>,
 	): Map<string, boolean> {
-		if (!isDecorationEnabled()) {
+		if (!isDecorationEnabled() || !indexingService.isReady()) {
 			return new Map();
 		}
 		return indexingService.isUnresolvedWithSingleBacklinkBatch(
@@ -59,6 +59,9 @@ export function createLinkStatusService(
 	}
 
 	function isUnresolvedWithSingleBacklink(lookupPath: string): boolean {
+		if (!indexingService.isReady()) {
+			return false;
+		}
 		return indexingService.isUnresolvedWithSingleBacklink(lookupPath);
 	}
 

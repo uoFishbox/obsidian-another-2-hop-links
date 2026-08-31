@@ -1,311 +1,284 @@
-import { TFile } from "obsidian";
-
-import {
-	createLinkResolutionAmbiguityDetector,
-	toCaseInsensitiveLookupKey,
-	type LinkResolutionAmbiguityDetector,
-	type ResolvedLinkInfo,
-} from "../link-resolution/linkResolution";
-import type {
-	BacklinkSourceMap,
-	CachedMetadataWithLinkReferences,
-	LinkReference,
-	IndexedLink,
-} from "indexing/model";
-import type { IVault, IMetadataCache } from "obsidian-integration/hostContracts";
-
-import { extractTags, countLinkReferences } from "../metadata/metadataExtractor";
+import { getLinkpath, normalizePath, type TFile } from "obsidian";
 import {
 	INDEXING_YIELD_INTERVAL_MS,
 	isIndexLinkCapableExtension,
 } from "indexing/config";
-import type {
-	RebuildOptions,
-	SourceDestinationSummary,
-	SourceSummary,
-} from "../indexState";
-import { addCompactStringSetValue } from "shared/collections/compactStringSet";
+import type { CachedMetadataWithLinkReferences, LinkReference } from "indexing/model";
+import { extractTags } from "../metadata/metadataExtractor";
+import { toCaseInsensitiveLookupKey } from "../link-resolution/linkResolution";
+import type { RebuildOptions } from "../indexState";
+import {
+	createEmptyLinkIndex,
+	reconcileSourceRow,
+	resolvedEdgeKey,
+	type SourceEdge,
+	unresolvedEdgeKey,
+} from "../link-index/linkIndex";
+import type { IMetadataCache, IVault } from "obsidian-integration/hostContracts";
 import {
 	addFileTagsToTagIndex,
 	createEmptyTagIndex,
 } from "../tag-index/tagIndexMutations";
 import {
 	createYieldScheduler,
-	drainYieldSteps,
 	defaultYieldToMainThread,
 	HEAVY_YIELD_CHECK_INTERVAL,
+	maybeYield,
 	YIELD_CHECK_INTERVAL,
 	type YieldScheduler,
 	type YieldStepGenerator,
 } from "../timeSlicing";
-import {
-	createResolvedLinkMemo,
-	visitResolvedBacklinkRefsUnorderedChunked,
-	type ResolvedLinkMemo,
-} from "./backlinkReferenceSequence";
-import {
-	createFileLocalAggregation,
-	createSourceSummaryFromAggregationChunked,
-	recordFileLocalReference,
-	resetFileLocalAggregation,
-	type FileLocalAggregation,
-} from "./backlinkAggregation";
 import type { BacklinksBuildArtifacts } from "./backlinkBuildArtifacts";
-
-type MutableBacklinksBuildArtifacts = BacklinksBuildArtifacts;
 
 export type ChunkedBacklinksBuildOptions = RebuildOptions;
 
-export function dedupeBySourceFile(
-	links: readonly Readonly<IndexedLink>[],
-	excludePath?: string,
-): IndexedLink[] {
-	const sourcePathsSeen = new Set<string>();
-	const uniqueLinks: IndexedLink[] = [];
+const HAS_EXTENSION_RE = /\.[a-z0-9]+$/i;
 
-	for (const link of links) {
-		if (
-			(!excludePath || link.sourceFile.path !== excludePath) &&
-			!sourcePathsSeen.has(link.sourceFile.path)
-		) {
-			uniqueLinks.push(link);
-			sourcePathsSeen.add(link.sourceFile.path);
-		}
-	}
-
-	return uniqueLinks;
+interface ResolvedEdgeMemo {
+	readonly global: Map<string, string>;
+	readonly local: Map<string, string>;
 }
 
-function createArtifactsAccumulator(): MutableBacklinksBuildArtifacts {
-	return {
-		detailedMap: new Map(),
-		sourceSummaries: new Map(),
-		linkLookupToSources: new Map(),
-		lookupKeyToLookupPaths: new Map(),
-		lookupPathResolvedSourceCount: new Map(),
-		tagIndex: createEmptyTagIndex(),
-	};
+interface LinkResolutionAmbiguityIndex {
+	readonly fileNameCounts: Map<string, number>;
+	readonly baseNameCounts: Map<string, number>;
 }
 
-function addSourceLookupIndexes(
-	artifacts: MutableBacklinksBuildArtifacts,
-	sourcePath: string,
-	sourceSummary: SourceSummary,
-): void {
-	for (const lookupKey of sourceSummary.lookupEntries.keys()) {
-		addCompactStringSetValue(artifacts.linkLookupToSources, lookupKey, sourcePath);
-	}
-}
-
-function getOrCreateDestinationSourceMap(
-	artifacts: MutableBacklinksBuildArtifacts,
-	lookupPath: string,
-): BacklinkSourceMap {
-	const existing = artifacts.detailedMap.get(lookupPath);
-	if (existing) {
-		return existing;
-	}
-
-	const lookupKey = toCaseInsensitiveLookupKey(lookupPath);
-	addCompactStringSetValue(artifacts.lookupKeyToLookupPaths, lookupKey, lookupPath);
-
-	const sourceMap: BacklinkSourceMap = new Map();
-	artifacts.detailedMap.set(lookupPath, sourceMap);
-	return sourceMap;
-}
-
-function* indexFileIntoArtifacts(
-	artifacts: MutableBacklinksBuildArtifacts,
-	metadataCache: IMetadataCache,
-	sourceFile: TFile,
-	normalizedExtension: string,
-	includeTagIndex: boolean,
-	resolvedMemo: ResolvedLinkMemo,
-	localScratch: FileLocalAggregation,
-	ambiguityDetector: LinkResolutionAmbiguityDetector,
-	yieldScheduler: YieldScheduler,
-	recordReference: (
-		linkReference: LinkReference,
-		resolved: ResolvedLinkInfo,
-		offset: number,
-		rawLinkPath: string,
-	) => void,
-	visitDestination: (
-		destinationPath: string,
-		summary: SourceDestinationSummary,
-	) => void,
-): YieldStepGenerator {
-	const sourcePath = sourceFile.path;
-	const cache = metadataCache.getFileCache(
-		sourceFile,
-	) as CachedMetadataWithLinkReferences | null;
-	const referenceCount = countLinkReferences(cache);
-	if (referenceCount === 0) {
-		if (includeTagIndex && normalizedExtension === "md") {
-			const tags = extractTags(cache);
-			addFileTagsToTagIndex(artifacts.tagIndex, sourcePath, tags);
-		}
-		return;
-	}
-
-	resetFileLocalAggregation(localScratch);
-
-	yield* visitResolvedBacklinkRefsUnorderedChunked(
-		metadataCache,
-		sourceFile,
-		cache,
-		ambiguityDetector,
-		resolvedMemo,
-		yieldScheduler,
-		recordReference,
-		HEAVY_YIELD_CHECK_INTERVAL,
-	);
-
-	if (includeTagIndex && normalizedExtension === "md") {
-		const tags = extractTags(cache);
-		addFileTagsToTagIndex(artifacts.tagIndex, sourcePath, tags);
-	}
-
-	const sourceSummary = yield* createSourceSummaryFromAggregationChunked(
-		localScratch,
-		yieldScheduler,
-		visitDestination,
-	);
-	if (sourceSummary) {
-		artifacts.sourceSummaries.set(sourcePath, sourceSummary);
-		addSourceLookupIndexes(artifacts, sourcePath, sourceSummary);
-	}
-}
-
-interface BacklinksBuildExecution {
-	artifacts: MutableBacklinksBuildArtifacts;
-	steps: YieldStepGenerator;
-}
-
-function createBacklinksBuildExecution(
-	vault: IVault,
-	metadataCache: IMetadataCache,
-	allFiles: TFile[],
-	includeTagIndex: boolean,
-	ambiguityDetector: LinkResolutionAmbiguityDetector | undefined,
-	yieldScheduler: YieldScheduler,
-): BacklinksBuildExecution {
-	const artifacts = createArtifactsAccumulator();
-	return {
-		artifacts,
-		steps: createBacklinksBuildSteps(
-			artifacts,
-			vault,
-			metadataCache,
-			allFiles,
-			includeTagIndex,
-			ambiguityDetector,
-			yieldScheduler,
-		),
-	};
-}
-
-function* createBacklinksBuildSteps(
-	artifacts: MutableBacklinksBuildArtifacts,
-	vault: IVault,
-	metadataCache: IMetadataCache,
-	allFiles: TFile[],
-	includeTagIndex: boolean,
-	ambiguityDetector: LinkResolutionAmbiguityDetector | undefined,
-	yieldScheduler: YieldScheduler,
-): YieldStepGenerator {
-	const resolvedMemo = createResolvedLinkMemo();
-	const localScratch = createFileLocalAggregation();
-	const detector = ambiguityDetector ?? createLinkResolutionAmbiguityDetector(vault);
-	let currentSourcePath = "";
-
-	function recordIntoScratch(
-		linkReference: LinkReference,
-		resolved: ResolvedLinkInfo,
-		offset: number,
-		rawLinkPath: string,
-	): void {
-		recordFileLocalReference(
-			localScratch,
-			linkReference,
-			resolved,
-			offset,
-			rawLinkPath,
-		);
-	}
-
-	function visitDestinationForCurrentSource(
-		destinationPath: string,
-		summary: SourceDestinationSummary,
-	): void {
-		const sourceMap = getOrCreateDestinationSourceMap(artifacts, destinationPath);
-		sourceMap.set(currentSourcePath, summary);
-		if (summary.hasResolved) {
-			artifacts.lookupPathResolvedSourceCount.set(
-				destinationPath,
-				(artifacts.lookupPathResolvedSourceCount.get(destinationPath) ?? 0) + 1,
-			);
-		}
-	}
-
-	for (let i = 0; i < allFiles.length; i++) {
-		const sourceFile = allFiles[i];
-		currentSourcePath = sourceFile.path;
-		const normalizedExtension = sourceFile.extension.toLowerCase();
-		if (isIndexLinkCapableExtension(normalizedExtension)) {
-			yield* indexFileIntoArtifacts(
-				artifacts,
-				metadataCache,
-				sourceFile,
-				normalizedExtension,
-				includeTagIndex,
-				resolvedMemo,
-				localScratch,
-				detector,
-				yieldScheduler,
-				recordIntoScratch,
-				visitDestinationForCurrentSource,
-			);
-		}
-		const pendingYield = yieldScheduler.checkpoint(i + 1, YIELD_CHECK_INTERVAL);
-		if (pendingYield) {
-			yield pendingYield;
-		}
-	}
-}
-
-export async function buildDetailedBacklinksArtifactsChunked(
+/** Builds the canonical index directly from every file's parsed metadata. */
+export async function buildLinkIndexArtifactsChunked(
 	vault: IVault,
 	metadataCache: IMetadataCache,
 	options: ChunkedBacklinksBuildOptions,
 	includeTagIndex = true,
-	ambiguityDetector?: LinkResolutionAmbiguityDetector,
 ): Promise<BacklinksBuildArtifacts> {
 	throwIfRebuildAborted(options.signal);
-	const allFiles = vault.getFiles();
 	const configuredYieldFn = options.yieldFn ?? defaultYieldToMainThread;
-	const yieldFn = async (): Promise<void> => {
+	const yieldScheduler = createYieldScheduler(async () => {
 		throwIfRebuildAborted(options.signal);
 		await configuredYieldFn();
 		throwIfRebuildAborted(options.signal);
+	}, options.yieldIntervalMs ?? INDEXING_YIELD_INTERVAL_MS);
+	const linkIndex = createEmptyLinkIndex();
+	const noOpSink = { markChangedEdge: (_key: string): void => {} };
+	const tagIndex = createEmptyTagIndex();
+	const allFiles = vault.getFiles();
+	const ambiguityIndex = createLinkResolutionAmbiguityIndex(allFiles);
+	const resolvedEdgeMemo: ResolvedEdgeMemo = {
+		global: new Map(),
+		local: new Map(),
 	};
-	const yieldIntervalMs = options.yieldIntervalMs ?? INDEXING_YIELD_INTERVAL_MS;
-	const yieldScheduler = createYieldScheduler(yieldFn, yieldIntervalMs);
-	const execution = createBacklinksBuildExecution(
-		vault,
-		metadataCache,
-		allFiles,
-		includeTagIndex,
-		ambiguityDetector,
-		yieldScheduler,
-	);
-	await drainYieldSteps(execution.steps);
+	let linkCapableFileCount = 0;
+	let indexedSourceCount = 0;
+
+	// esbuild replaces process.env.NODE_ENV at build time, so this branch is
+	// dead-code eliminated in production builds.
+	const shouldLog = process.env.NODE_ENV === "development";
+	const buildStartedAt = shouldLog ? performance.now() : 0;
+	if (shouldLog) {
+		console.info("[BacklinkIndexer] Backlink map build start");
+	}
+	for (let index = 0; index < allFiles.length; index++) {
+		const file = allFiles[index];
+		const normalizedExtension = file.extension.toLowerCase();
+		const cache = metadataCache.getFileCache(
+			file,
+		) as CachedMetadataWithLinkReferences | null;
+
+		if (isIndexLinkCapableExtension(normalizedExtension)) {
+			resolvedEdgeMemo.local.clear();
+			const sourceRowSteps = readSourceRowFromMetadataChunked(
+				metadataCache,
+				file,
+				cache,
+				resolvedEdgeMemo,
+				ambiguityIndex,
+				yieldScheduler,
+			);
+			let sourceRowStep = sourceRowSteps.next();
+			while (!sourceRowStep.done) {
+				await sourceRowStep.value;
+				sourceRowStep = sourceRowSteps.next();
+			}
+			const sourceRow = sourceRowStep.value;
+			reconcileSourceRow(linkIndex, file.path, sourceRow, noOpSink);
+			linkCapableFileCount++;
+			if (sourceRow.length > 0) {
+				indexedSourceCount++;
+			}
+		}
+
+		if (includeTagIndex && normalizedExtension === "md") {
+			addFileTagsToTagIndex(tagIndex, file.path, extractTags(cache));
+		}
+
+		const pendingYield = maybeYield(
+			yieldScheduler,
+			index + 1,
+			YIELD_CHECK_INTERVAL,
+		);
+		if (pendingYield) await pendingYield;
+	}
+	if (shouldLog) {
+		console.info("[BacklinkIndexer] Backlink map build end (ms):", {
+			durationMs: roundTimingMs(performance.now() - buildStartedAt),
+			vaultFileCount: allFiles.length,
+			linkCapableFileCount,
+			indexedSourceCount,
+		});
+	}
+
 	throwIfRebuildAborted(options.signal);
-	return execution.artifacts;
+	return { linkIndex, tagIndex };
+}
+
+function* readSourceRowFromMetadataChunked(
+	metadataCache: IMetadataCache,
+	sourceFile: TFile,
+	cache: CachedMetadataWithLinkReferences | null,
+	resolvedEdgeMemo: ResolvedEdgeMemo,
+	ambiguityIndex: LinkResolutionAmbiguityIndex,
+	yieldScheduler: YieldScheduler,
+): YieldStepGenerator<readonly SourceEdge[]> {
+	const countsByKey = new Map<string, number>();
+	let referenceCount = 0;
+
+	function* visitReferences(
+		references: readonly LinkReference[] | undefined,
+	): YieldStepGenerator {
+		if (!references) return;
+
+		for (const reference of references) {
+			const rawLinkPath = getLinkpath(reference.link);
+			let key =
+				resolvedEdgeMemo.local.get(rawLinkPath) ??
+				resolvedEdgeMemo.global.get(rawLinkPath);
+			if (key === undefined) {
+				const destination = metadataCache.getFirstLinkpathDest(
+					rawLinkPath,
+					sourceFile.path,
+				);
+				key = destination
+					? resolvedEdgeKey(destination.path)
+					: unresolvedEdgeKey(rawLinkPath);
+				const memo = isAmbiguousRawLinkPath(rawLinkPath, ambiguityIndex)
+					? resolvedEdgeMemo.local
+					: resolvedEdgeMemo.global;
+				memo.set(rawLinkPath, key);
+			}
+			countsByKey.set(key, (countsByKey.get(key) ?? 0) + 1);
+
+			referenceCount++;
+			const pendingYield = maybeYield(
+				yieldScheduler,
+				referenceCount,
+				HEAVY_YIELD_CHECK_INTERVAL,
+			);
+			if (pendingYield) yield pendingYield;
+		}
+	}
+
+	yield* visitReferences(cache?.links);
+	yield* visitReferences(cache?.embeds);
+	yield* visitReferences(cache?.frontmatterLinks);
+
+	return Array.from(countsByKey, ([key, count]) => ({ key, count })).sort(
+		compareSourceEdges,
+	);
+}
+
+function createLinkResolutionAmbiguityIndex(
+	files: readonly TFile[],
+): LinkResolutionAmbiguityIndex {
+	const fileNameCounts = new Map<string, number>();
+	const baseNameCounts = new Map<string, number>();
+
+	for (const file of files) {
+		const fileName = getPathBasename(normalizePath(file.path));
+		const baseName = getBaseNameFromFileName(fileName);
+		incrementCount(fileNameCounts, toCaseInsensitiveLookupKey(fileName));
+		incrementCount(baseNameCounts, toCaseInsensitiveLookupKey(baseName));
+	}
+
+	return { fileNameCounts, baseNameCounts };
+}
+
+function isAmbiguousRawLinkPath(
+	rawLinkPath: string,
+	index: LinkResolutionAmbiguityIndex,
+): boolean {
+	if (hasSourceDependentRawLinkPath(rawLinkPath)) {
+		return true;
+	}
+	if (rawLinkPath.includes("/") || rawLinkPath.includes("\\")) {
+		return false;
+	}
+
+	const fileName = getPathBasename(normalizePath(rawLinkPath));
+	if (fileName.length === 0) {
+		return true;
+	}
+
+	const lookupKey = toCaseInsensitiveLookupKey(fileName);
+	if (HAS_EXTENSION_RE.test(fileName)) {
+		const exactFileNameCount = index.fileNameCounts.get(lookupKey) ?? 0;
+		const markdownBaseNameCount = index.baseNameCounts.get(lookupKey) ?? 0;
+		return exactFileNameCount + markdownBaseNameCount > 1;
+	}
+
+	return (index.baseNameCounts.get(lookupKey) ?? 0) > 1;
+}
+
+function hasSourceDependentRawLinkPath(rawLinkPath: string): boolean {
+	let segmentStart = 0;
+	for (let index = 0; index <= rawLinkPath.length; index++) {
+		const character =
+			index < rawLinkPath.length ? rawLinkPath.charCodeAt(index) : -1;
+		if (character !== 0x2f && character !== 0x5c && character !== -1) {
+			continue;
+		}
+
+		const segmentLength = index - segmentStart;
+		if (
+			(segmentLength === 1 && rawLinkPath.charCodeAt(segmentStart) === 0x2e) ||
+			(segmentLength === 2 &&
+				rawLinkPath.charCodeAt(segmentStart) === 0x2e &&
+				rawLinkPath.charCodeAt(segmentStart + 1) === 0x2e)
+		) {
+			return true;
+		}
+
+		segmentStart = index + 1;
+	}
+	return false;
+}
+
+function getPathBasename(path: string): string {
+	const slashIndex = path.lastIndexOf("/");
+	return slashIndex === -1 ? path : path.slice(slashIndex + 1);
+}
+
+function getBaseNameFromFileName(fileName: string): string {
+	const dotIndex = fileName.lastIndexOf(".");
+	if (dotIndex <= 0 || dotIndex === fileName.length - 1) {
+		return fileName;
+	}
+	return fileName.slice(0, dotIndex);
+}
+
+function incrementCount(counts: Map<string, number>, key: string): void {
+	counts.set(key, (counts.get(key) ?? 0) + 1);
+}
+
+function compareSourceEdges(left: SourceEdge, right: SourceEdge): number {
+	return left.key < right.key ? -1 : left.key > right.key ? 1 : 0;
 }
 
 function throwIfRebuildAborted(signal: AbortSignal | undefined): void {
 	if (signal?.aborted) {
 		throw new DOMException("Index rebuild was superseded", "AbortError");
 	}
+}
+
+function roundTimingMs(durationMs: number): number {
+	return Math.round(durationMs * 10) / 10;
 }

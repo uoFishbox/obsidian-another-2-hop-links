@@ -10,6 +10,7 @@ import type { PluginHost } from "obsidian-integration/pluginHost";
 import { InitialScanChangeRecorder } from "./InitialScanChangeRecorder";
 
 type InitialFullScanState = "pending" | "running" | "failed" | "completed";
+const INITIAL_FULL_SCAN_DELAY_MS = 100;
 
 export class IndexUpdateQueue {
 	private debouncedProcessPending: () => void;
@@ -24,8 +25,10 @@ export class IndexUpdateQueue {
 	private isProcessingPendingChanges = false;
 	private hasAttemptedAutomaticRecovery = false;
 	private initialFullScanState: InitialFullScanState = "pending";
+	private isLayoutReady = false;
 	private waitsForMetadataResolve = false;
 	private metadataResolveGeneration = 0;
+	private initialLayoutReadyAt: number | undefined;
 	private destroyed = false;
 
 	constructor(
@@ -92,33 +95,38 @@ export class IndexUpdateQueue {
 
 	setupEventListeners(): void {
 		this.registerVaultListeners();
-
-		this.plugin.app.workspace.onLayoutReady(() => {
-			if (this.destroyed) {
-				return;
-			}
-			this.initialFullScanTimer = window.setTimeout(() => {
-				this.initialFullScanTimer = undefined;
-				if (this.destroyed) {
-					return;
-				}
-				void this.runInitialFullScan().catch((error) => {
-					console.error(
-						"[IndexUpdateQueue] Initial full scan failed:",
-						error,
-					);
-				});
-			}, 100);
-		});
+		const metadataCache = this.plugin.app.metadataCache;
+		const workspace = this.plugin.app.workspace;
+		this.isLayoutReady = workspace.layoutReady;
+		if (
+			process.env.NODE_ENV === "development" &&
+			this.isLayoutReady &&
+			this.initialLayoutReadyAt === undefined
+		) {
+			this.initialLayoutReadyAt = performance.now();
+		}
 
 		this.plugin.registerEvent(
-			this.plugin.app.metadataCache.on("resolved", () => {
+			metadataCache.on("resolved", () => {
 				this.handleMetadataResolved();
 			}),
 		);
+		workspace.onLayoutReady(() => {
+			if (this.destroyed) {
+				return;
+			}
+			if (
+				process.env.NODE_ENV === "development" &&
+				this.initialLayoutReadyAt === undefined
+			) {
+				this.initialLayoutReadyAt = performance.now();
+			}
+			this.isLayoutReady = true;
+			this.scheduleInitialFullScan();
+		});
 
 		this.plugin.registerEvent(
-			this.plugin.app.metadataCache.on("changed", (file: TFile) => {
+			metadataCache.on("changed", (file: TFile) => {
 				if (this.destroyed) {
 					return;
 				}
@@ -134,6 +142,7 @@ export class IndexUpdateQueue {
 				});
 			}),
 		);
+		this.scheduleInitialFullScan();
 	}
 
 	private registerVaultListeners(): void {
@@ -311,25 +320,43 @@ export class IndexUpdateQueue {
 		}
 
 		this.initialFullScanState = "running";
-		let startedAt = 0;
+		const stagedRebuild = this.indexingService.beginStagedRebuild();
+		let buildStartedAt = 0;
+		let buildFinishedAt = 0;
+		let catchUpFinishedAt = 0;
 		if (process.env.NODE_ENV === "development") {
-			startedAt = performance.now();
+			buildStartedAt = performance.now();
 		}
 		try {
 			await this.indexingService.rebuildIndexesTimeSliced();
 			if (this.destroyed) {
 				return;
 			}
+			if (process.env.NODE_ENV === "development") {
+				buildFinishedAt = performance.now();
+			}
 			await this.applyInitialCatchUpChanges();
 			if (this.destroyed) {
 				return;
 			}
-			this.initialFullScanState = "completed";
 			if (process.env.NODE_ENV === "development") {
-				const durationMs = performance.now() - startedAt;
-				console.info(
-					`[IndexUpdateQueue] Initial backlink map built in ${durationMs.toFixed(1)} ms.`,
-				);
+				catchUpFinishedAt = performance.now();
+			}
+			this.initialFullScanState = "completed";
+			stagedRebuild.commit();
+			if (process.env.NODE_ENV === "development") {
+				const readyAt = performance.now();
+				const layoutReadyAt = this.initialLayoutReadyAt ?? buildStartedAt;
+				console.info("[IndexUpdateQueue] Initial index timing (ms):", {
+					layoutReadyToBuildStartMs: roundTimingMs(
+						buildStartedAt - layoutReadyAt,
+					),
+					buildMs: roundTimingMs(buildFinishedAt - buildStartedAt),
+					catchUpMs: roundTimingMs(catchUpFinishedAt - buildFinishedAt),
+					commitMs: roundTimingMs(readyAt - catchUpFinishedAt),
+					totalFromBuildStartMs: roundTimingMs(readyAt - buildStartedAt),
+					totalFromLayoutReadyMs: roundTimingMs(readyAt - layoutReadyAt),
+				});
 			}
 			this.resolveInitialFullScanReady?.();
 			this.resolveInitialFullScanReady = undefined;
@@ -339,8 +366,30 @@ export class IndexUpdateQueue {
 			}
 			throw error;
 		} finally {
+			stagedRebuild.discard();
 			this.notifyQueueIdleWaitersIfIdle();
 		}
+	}
+
+	private scheduleInitialFullScan(): void {
+		if (
+			this.destroyed ||
+			!this.isLayoutReady ||
+			this.initialFullScanState !== "pending" ||
+			this.initialFullScanTimer !== undefined
+		) {
+			return;
+		}
+
+		this.initialFullScanTimer = window.setTimeout(() => {
+			this.initialFullScanTimer = undefined;
+			if (this.destroyed) {
+				return;
+			}
+			void this.runInitialFullScan().catch((error) => {
+				console.error("[IndexUpdateQueue] Initial full scan failed:", error);
+			});
+		}, INITIAL_FULL_SCAN_DELAY_MS);
 	}
 
 	private retryInitialFullScan(): void {
@@ -517,4 +566,8 @@ export class IndexUpdateQueue {
 		const file = this.plugin.app.vault.getAbstractFileByPath(path);
 		return file instanceof TFile && isIndexLinkCapableExtension(file.extension);
 	}
+}
+
+function roundTimingMs(durationMs: number): number {
+	return Math.round(durationMs * 10) / 10;
 }
