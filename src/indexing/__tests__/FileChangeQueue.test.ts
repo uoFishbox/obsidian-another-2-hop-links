@@ -20,6 +20,11 @@ const normalizationCases: NormalizationCase[] = [
 		expected: [{ type: "modify", path: "notes/existing.md" }],
 	},
 	{
+		name: "single resolve",
+		changes: [{ type: "resolve", path: "notes/source.md" }],
+		expected: [{ type: "resolve", path: "notes/source.md" }],
+	},
+	{
 		name: "single delete",
 		changes: [{ type: "delete", path: "notes/old.md" }],
 		expected: [{ type: "delete", path: "notes/old.md" }],
@@ -46,6 +51,22 @@ const normalizationCases: NormalizationCase[] = [
 			{ type: "modify", path: "notes/new.md" },
 		],
 		expected: [{ type: "create", path: "notes/new.md" }],
+	},
+	{
+		name: "create -> resolve merges to create",
+		changes: [
+			{ type: "create", path: "notes/new.md" },
+			{ type: "resolve", path: "notes/new.md" },
+		],
+		expected: [{ type: "create", path: "notes/new.md" }],
+	},
+	{
+		name: "resolve -> modify merges to modify",
+		changes: [
+			{ type: "resolve", path: "notes/source.md" },
+			{ type: "modify", path: "notes/source.md" },
+		],
+		expected: [{ type: "modify", path: "notes/source.md" }],
 	},
 	{
 		name: "create -> rename becomes create at newPath",
@@ -136,6 +157,14 @@ const normalizationCases: NormalizationCase[] = [
 			{ type: "modify", path: "notes/existing.md" },
 		],
 		expected: [{ type: "modify", path: "notes/existing.md" }],
+	},
+	{
+		name: "duplicate resolve is ignored",
+		changes: [
+			{ type: "resolve", path: "notes/source.md" },
+			{ type: "resolve", path: "notes/source.md" },
+		],
+		expected: [{ type: "resolve", path: "notes/source.md" }],
 	},
 	{
 		name: "rename same path is ignored",

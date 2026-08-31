@@ -135,6 +135,31 @@ describe("TagIndexStore", () => {
 		expect(store.getSnapshot().tagToFilePaths.get("project")).toBe("note.md");
 	});
 
+	test("link resolution does not read or mutate tag metadata", async () => {
+		const env = new VaultEnvironmentBuilder([
+			{ path: "note.md", tags: ["#project"] },
+		]).build();
+		const store = new TagIndexStore(env.mockVault, env.mockMetadataCache);
+		const artifacts = await buildLinkIndexArtifactsChunked(
+			env.mockVault,
+			env.mockMetadataCache,
+			{},
+		);
+		store.replace(artifacts.tagIndex);
+		env.mockVault.getAbstractFileByPath.mockClear();
+		env.mockMetadataCache.getFileCache.mockClear();
+
+		const result = await store.applyFileChangesAsync([
+			{ type: "resolve", path: "note.md" },
+		]);
+
+		expect(result.affectedTags.size).toBe(0);
+		expect(result.affectedTagSourcePaths.size).toBe(0);
+		expect(env.mockVault.getAbstractFileByPath).not.toHaveBeenCalled();
+		expect(env.mockMetadataCache.getFileCache).not.toHaveBeenCalled();
+		expect(store.getSnapshot().tagToFilePaths.get("project")).toBe("note.md");
+	});
+
 	// --- C. tag membership add/remove ---
 	test("tag addition is included in affectedTags and affectedTagSourcePaths", async () => {
 		const env = new VaultEnvironmentBuilder([

@@ -274,12 +274,20 @@ describe("IndexUpdateQueue", () => {
 		const harness = createHarness();
 		await initializeQueue(harness);
 		const created = createMockTFile("notes/new-note.md");
+		const resolvedSource = createMockTFile("notes/existing-source.md");
 
 		harness.emitVaultEvent("create", created);
 		expect(
 			harness.indexingService.applyFileChangesTimeSliced,
 		).not.toHaveBeenCalled();
 
+		harness.emitMetadataEvent("resolve", resolvedSource);
+		harness.emitMetadataEvent("resolve", resolvedSource);
+		harness.emitMetadataEvent("resolve", created);
+		harness.emitMetadataEvent(
+			"resolve",
+			createMockTFile("attachments/image.png", "png"),
+		);
 		harness.emitMetadataEvent("resolved");
 		await flushAsyncTasks();
 
@@ -287,7 +295,10 @@ describe("IndexUpdateQueue", () => {
 			harness.indexingService.applyFileChangesTimeSliced,
 		).toHaveBeenCalledTimes(1);
 		expect(harness.indexingService.applyFileChangesTimeSliced).toHaveBeenCalledWith(
-			[{ type: "create", path: "notes/new-note.md" }],
+			[
+				{ type: "create", path: "notes/new-note.md" },
+				{ type: "resolve", path: "notes/existing-source.md" },
+			],
 		);
 	});
 
@@ -430,6 +441,10 @@ describe("IndexUpdateQueue", () => {
 			harness.indexingService.applyFileChangesTimeSliced,
 		).not.toHaveBeenCalled();
 
+		harness.emitMetadataEvent(
+			"resolve",
+			createMockTFile("notes/linking-source.md"),
+		);
 		harness.emitMetadataEvent("resolved");
 		await flushAsyncTasks();
 
@@ -448,6 +463,7 @@ describe("IndexUpdateQueue", () => {
 					oldPath: "old-folder/second.md",
 					newPath: "new-folder/second.md",
 				},
+				{ type: "resolve", path: "notes/linking-source.md" },
 			],
 		);
 	});
@@ -564,6 +580,7 @@ describe("IndexUpdateQueue", () => {
 	test("initial catch-up waits for metadata resolved when created file still exists", async () => {
 		const harness = createHarness();
 		const created = createMockTFile("notes/new-note.md");
+		const linkingSource = createMockTFile("notes/linking-source.md");
 		let finishInitialScan: (() => void) | undefined;
 		harness.indexingService.rebuildIndexesTimeSliced.mockImplementationOnce(
 			() =>
@@ -574,7 +591,84 @@ describe("IndexUpdateQueue", () => {
 
 		await startInitialScan(harness);
 		harness.setVaultFile(created);
+		harness.setVaultFile(linkingSource);
 		harness.emitVaultEvent("create", created);
+		finishInitialScan?.();
+		await flushAsyncTasks();
+
+		expect(
+			harness.indexingService.applyFileChangesTimeSliced,
+		).not.toHaveBeenCalled();
+
+		harness.emitMetadataEvent("resolve", linkingSource);
+		harness.emitMetadataEvent("resolved");
+		await flushAsyncTasks();
+		await harness.waitForIndexIdle();
+
+		expect(
+			harness.indexingService.applyFileChangesTimeSliced,
+		).toHaveBeenCalledTimes(1);
+		expect(harness.indexingService.applyFileChangesTimeSliced).toHaveBeenCalledWith(
+			[
+				{ type: "create", path: "notes/new-note.md" },
+				{ type: "resolve", path: "notes/linking-source.md" },
+			],
+		);
+	});
+
+	test("initial scan ignores startup resolves without a create or rename", async () => {
+		const harness = createHarness();
+		const firstSource = createMockTFile("notes/first-source.md");
+		const secondSource = createMockTFile("notes/second-source.md");
+		let finishInitialScan: (() => void) | undefined;
+		harness.indexingService.rebuildIndexesTimeSliced.mockImplementationOnce(
+			() =>
+				new Promise<void>((resolve) => {
+					finishInitialScan = resolve;
+				}),
+		);
+
+		await startInitialScan(harness);
+		harness.setVaultFile(firstSource);
+		harness.setVaultFile(secondSource);
+		harness.emitMetadataEvent("resolve", firstSource);
+		harness.emitMetadataEvent("resolve", secondSource);
+		harness.emitMetadataEvent("resolve", firstSource);
+		finishInitialScan?.();
+		await flushAsyncTasks();
+		await harness.waitForIndexIdle();
+
+		expect(
+			harness.indexingService.applyFileChangesTimeSliced,
+		).not.toHaveBeenCalled();
+		expect(harness.stagedRebuilds[0]?.commit).toHaveBeenCalledTimes(1);
+
+		harness.emitMetadataEvent("resolved");
+		await flushAsyncTasks();
+
+		expect(
+			harness.indexingService.applyFileChangesTimeSliced,
+		).not.toHaveBeenCalled();
+		expect(harness.stagedRebuilds[0]?.commit).toHaveBeenCalledTimes(1);
+	});
+
+	test("initial catch-up normalizes modify and rename after the scan", async () => {
+		const harness = createHarness();
+		const modified = createMockTFile("notes/modified.md");
+		const renamed = createMockTFile("notes/new-name.md");
+		let finishInitialScan: (() => void) | undefined;
+		harness.indexingService.rebuildIndexesTimeSliced.mockImplementationOnce(
+			() =>
+				new Promise<void>((resolve) => {
+					finishInitialScan = resolve;
+				}),
+		);
+
+		await startInitialScan(harness);
+		harness.setVaultFile(modified);
+		harness.setVaultFile(renamed);
+		harness.emitVaultEvent("modify", modified);
+		harness.emitVaultEvent("rename", renamed, "notes/old-name.md");
 		finishInitialScan?.();
 		await flushAsyncTasks();
 
@@ -586,12 +680,14 @@ describe("IndexUpdateQueue", () => {
 		await flushAsyncTasks();
 		await harness.waitForIndexIdle();
 
-		expect(
-			harness.indexingService.applyFileChangesTimeSliced,
-		).toHaveBeenCalledTimes(1);
 		expect(harness.indexingService.applyFileChangesTimeSliced).toHaveBeenCalledWith(
-			[{ type: "create", path: "notes/new-note.md" }],
+			[
+				{ type: "modify", path: "notes/modified.md" },
+				{ type: "delete", path: "notes/old-name.md" },
+				{ type: "create", path: "notes/new-name.md" },
+			],
 		);
+		expect(harness.stagedRebuilds[0]?.commit).toHaveBeenCalledTimes(1);
 	});
 
 	test("initial scan failure retries on the next change and keeps readiness pending", async () => {

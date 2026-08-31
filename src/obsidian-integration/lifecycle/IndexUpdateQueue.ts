@@ -27,6 +27,10 @@ export class IndexUpdateQueue {
 	private initialFullScanState: InitialFullScanState = "pending";
 	private isLayoutReady = false;
 	private waitsForMetadataResolve = false;
+	// The public API has no "already resolved" state. Wait only after a
+	// per-file event proves a batch is open, so enabling the plugin after
+	// Obsidian's startup barrier cannot leave the initial scan waiting forever.
+	private hasOpenMetadataResolveBatch = false;
 	private metadataResolveGeneration = 0;
 	private initialLayoutReadyAt: number | undefined;
 	private destroyed = false;
@@ -40,12 +44,7 @@ export class IndexUpdateQueue {
 		});
 		this.debouncedProcessPending = debounce(
 			() => {
-				void this.processPendingChanges().catch((error) => {
-					console.error(
-						"[IndexUpdateQueue] Failed to process pending changes:",
-						error,
-					);
-				});
+				this.processPendingChangesSafely();
 			},
 			INDEXING_DEBOUNCE_DELAY_MS,
 			true,
@@ -106,6 +105,11 @@ export class IndexUpdateQueue {
 			this.initialLayoutReadyAt = performance.now();
 		}
 
+		this.plugin.registerEvent(
+			metadataCache.on("resolve", (file: TFile) => {
+				this.handleMetadataResolve(file);
+			}),
+		);
 		this.plugin.registerEvent(
 			metadataCache.on("resolved", () => {
 				this.handleMetadataResolved();
@@ -231,6 +235,17 @@ export class IndexUpdateQueue {
 			return;
 		}
 
+		if (this.initialFullScanState === "pending") {
+			return;
+		}
+
+		const hasMetadataDependentChange = changes.some(
+			(change) => change.type === "create" || change.type === "rename",
+		);
+		if (hasMetadataDependentChange) {
+			this.waitsForMetadataResolve = true;
+		}
+
 		if (this.initialFullScanState === "running") {
 			for (const change of changes) {
 				this.initialChangeRecorder.record(
@@ -252,19 +267,8 @@ export class IndexUpdateQueue {
 			return;
 		}
 
-		if (this.initialFullScanState === "pending") {
-			return;
-		}
-
 		this.hasAttemptedAutomaticRecovery = false;
 		this.changeQueue.recordChanges(changes);
-
-		const hasMetadataDependentChange = changes.some(
-			(change) => change.type === "create" || change.type === "rename",
-		);
-		if (hasMetadataDependentChange) {
-			this.waitsForMetadataResolve = true;
-		}
 
 		this.syncMetadataResolveGate();
 
@@ -406,6 +410,14 @@ export class IndexUpdateQueue {
 		this.isProcessingPendingChanges = true;
 		try {
 			while (this.initialChangeRecorder.hasPending()) {
+				while (this.hasOpenMetadataResolveBatch) {
+					await this.waitForNextMetadataResolve();
+
+					if (this.destroyed) {
+						return;
+					}
+				}
+
 				while (
 					this.initialChangeRecorder.needsMetadataResolve(
 						this.metadataResolveGeneration,
@@ -536,8 +548,18 @@ export class IndexUpdateQueue {
 		this.queueIdleWaiters.clear();
 	}
 
+	private processPendingChangesSafely(): void {
+		void this.processPendingChanges().catch((error) => {
+			console.error(
+				"[IndexUpdateQueue] Failed to process pending changes:",
+				error,
+			);
+		});
+	}
+
 	private handleMetadataResolved(): void {
 		this.metadataResolveGeneration++;
+		this.hasOpenMetadataResolveBatch = false;
 
 		for (const resolve of this.metadataResolveWaiters) {
 			resolve();
@@ -549,7 +571,23 @@ export class IndexUpdateQueue {
 		}
 
 		this.waitsForMetadataResolve = false;
-		this.debouncedProcessPending();
+		this.processPendingChangesSafely();
+	}
+
+	private handleMetadataResolve(file: TFile): void {
+		if (this.destroyed || !(file instanceof TFile)) {
+			return;
+		}
+		if (!isIndexLinkCapableExtension(file.extension)) {
+			return;
+		}
+
+		if (!this.waitsForMetadataResolve) {
+			return;
+		}
+
+		this.hasOpenMetadataResolveBatch = true;
+		this.recordObservedChange({ type: "resolve", path: file.path });
 	}
 
 	private waitForNextMetadataResolve(): Promise<void> {

@@ -5,6 +5,7 @@ interface QueuedFileTrack {
 	initialPath?: string;
 	currentPath?: string;
 	modified: boolean;
+	resolved: boolean;
 	createSemantics: boolean;
 }
 
@@ -35,6 +36,9 @@ export class FileChangeQueue {
 				return;
 			case "rename":
 				this.recordRename(change.oldPath, change.newPath);
+				return;
+			case "resolve":
+				this.recordResolve(change.path);
 				return;
 		}
 	}
@@ -98,6 +102,7 @@ export class FileChangeQueue {
 			initialPath: undefined,
 			currentPath: path,
 			modified: false,
+			resolved: false,
 			createSemantics: true,
 		});
 	}
@@ -125,6 +130,36 @@ export class FileChangeQueue {
 			initialPath: path,
 			currentPath: path,
 			modified: true,
+			resolved: false,
+			createSemantics: false,
+		});
+	}
+
+	private recordResolve(path: string): void {
+		const track = this.trackByCurrentPath.get(path);
+		if (track) {
+			if (
+				track.initialPath !== undefined &&
+				track.initialPath === track.currentPath &&
+				!track.createSemantics &&
+				!track.modified
+			) {
+				this.updateTrack(track, () => {
+					track.resolved = true;
+				});
+			}
+			return;
+		}
+
+		if (this.findDeletedTrackByInitialPath(path)) {
+			return;
+		}
+
+		this.addTrack({
+			initialPath: path,
+			currentPath: path,
+			modified: false,
+			resolved: true,
 			createSemantics: false,
 		});
 	}
@@ -153,6 +188,7 @@ export class FileChangeQueue {
 			initialPath: path,
 			currentPath: undefined,
 			modified: false,
+			resolved: false,
 			createSemantics: false,
 		});
 	}
@@ -168,6 +204,7 @@ export class FileChangeQueue {
 				initialPath: oldPath,
 				currentPath: oldPath,
 				modified: false,
+				resolved: false,
 				createSemantics: false,
 			});
 
@@ -287,7 +324,8 @@ export class FileChangeQueue {
 		return (
 			track.initialPath !== track.currentPath ||
 			track.createSemantics ||
-			track.modified
+			track.modified ||
+			track.resolved
 		);
 	}
 
@@ -342,6 +380,10 @@ export class FileChangeQueue {
 
 		if (track.modified) {
 			return { type: "modify", path: track.currentPath };
+		}
+
+		if (track.resolved) {
+			return { type: "resolve", path: track.currentPath };
 		}
 
 		return null;

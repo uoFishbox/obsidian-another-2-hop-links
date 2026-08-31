@@ -7,7 +7,6 @@ import type {
 	TimeSlicingOptions,
 } from "../indexState";
 import {
-	collectHostSourcePaths,
 	getLookupKeyForEdge,
 	readCurrentSourceRow,
 	reconcileSourceRow,
@@ -68,6 +67,9 @@ export class IncrementalIndexUpdater {
 			),
 		);
 		for (const change of changes) {
+			if (change.type === "resolve") {
+				continue;
+			}
 			if (change.type === "rename") {
 				run.changedFilePaths.add(change.oldPath);
 				run.changedFilePaths.add(change.newPath);
@@ -76,14 +78,7 @@ export class IncrementalIndexUpdater {
 			run.changedFilePaths.add(change.path);
 		}
 
-		const requiresHostGraphReconcile = changes.some(
-			(change) => change.type === "create" || change.type === "rename",
-		);
-		if (requiresHostGraphReconcile) {
-			await this.reconcileEntireHostGraph(run, changes);
-		} else {
-			await this.applyLocalChanges(run, changes);
-		}
+		await this.applyLocalChanges(run, changes);
 
 		return {
 			snapshot: run.state,
@@ -95,29 +90,6 @@ export class IncrementalIndexUpdater {
 		};
 	}
 
-	private async reconcileEntireHostGraph(
-		run: IncrementalUpdateRun,
-		changes: readonly IncrementalFileChange[],
-	): Promise<void> {
-		const sourcePaths = collectHostSourcePaths(this.metadataCache);
-		for (const sourcePath of run.state.outgoing.keys()) {
-			sourcePaths.add(sourcePath);
-		}
-		const presentationChangedSources = collectPresentationChangedSources(changes);
-		let sourceCount = 0;
-
-		for (const sourcePath of sourcePaths) {
-			this.reconcileHostSource(
-				run,
-				sourcePath,
-				presentationChangedSources.has(sourcePath),
-			);
-			sourceCount++;
-			const pendingYield = maybeYield(run.yieldScheduler, sourceCount, 16);
-			if (pendingYield) await pendingYield;
-		}
-	}
-
 	private async applyLocalChanges(
 		run: IncrementalUpdateRun,
 		changes: readonly IncrementalFileChange[],
@@ -127,6 +99,18 @@ export class IncrementalIndexUpdater {
 		const presentationChangedSources = collectPresentationChangedSources(changes);
 
 		for (const change of changes) {
+			if (change.type === "rename") {
+				const incoming = run.state.incoming.get(
+					resolvedEdgeKey(change.oldPath),
+				);
+				if (incoming) {
+					for (const sourcePath of incoming.keys())
+						dirtySources.add(sourcePath);
+				}
+				this.removeSource(run, change.oldPath);
+				dirtySources.add(change.newPath);
+				continue;
+			}
 			if (change.type === "delete") {
 				deletedPaths.add(change.path);
 				const incoming = run.state.incoming.get(resolvedEdgeKey(change.path));
@@ -139,7 +123,7 @@ export class IncrementalIndexUpdater {
 				run.markChangedEdge(unresolvedEdgeKey(change.path));
 				continue;
 			}
-			if (change.type === "modify") dirtySources.add(change.path);
+			dirtySources.add(change.path);
 		}
 
 		let sourceCount = 0;

@@ -2,6 +2,7 @@ import type { IncrementalFileChange } from "indexing/indexState";
 
 interface InitialTouchedPath {
 	structural: boolean;
+	modified: boolean;
 	metadataSensitiveGeneration?: number;
 }
 
@@ -11,17 +12,20 @@ export class InitialScanChangeRecorder {
 	record(change: IncrementalFileChange, metadataGeneration: number): void {
 		switch (change.type) {
 			case "modify":
-				this.touch(change.path, false, undefined);
+				this.touch(change.path, false, true, undefined);
+				return;
+			case "resolve":
+				this.touch(change.path, false, false, undefined);
 				return;
 			case "create":
-				this.touch(change.path, true, metadataGeneration);
+				this.touch(change.path, true, false, metadataGeneration);
 				return;
 			case "delete":
-				this.touch(change.path, true, undefined);
+				this.touch(change.path, true, false, undefined);
 				return;
 			case "rename":
-				this.touch(change.oldPath, true, undefined);
-				this.touch(change.newPath, true, metadataGeneration);
+				this.touch(change.oldPath, true, false, undefined);
+				this.touch(change.newPath, true, false, metadataGeneration);
 				return;
 		}
 	}
@@ -67,7 +71,11 @@ export class InitialScanChangeRecorder {
 			}
 
 			changes.push({
-				type: entry.structural ? "create" : "modify",
+				type: entry.structural
+					? "create"
+					: entry.modified
+						? "modify"
+						: "resolve",
 				path,
 			});
 		}
@@ -78,11 +86,13 @@ export class InitialScanChangeRecorder {
 	private touch(
 		path: string,
 		structural: boolean,
+		modified: boolean,
 		metadataSensitiveGeneration: number | undefined,
 	): void {
 		const existing = this.touched.get(path);
 		if (existing) {
 			existing.structural ||= structural;
+			existing.modified ||= modified;
 			if (metadataSensitiveGeneration !== undefined) {
 				existing.metadataSensitiveGeneration = metadataSensitiveGeneration;
 			}
@@ -91,6 +101,7 @@ export class InitialScanChangeRecorder {
 
 		this.touched.set(path, {
 			structural,
+			modified,
 			metadataSensitiveGeneration,
 		});
 	}

@@ -28,7 +28,7 @@ describe("IncrementalIndexUpdater", () => {
 		expect(result.changedLinkSourcePaths).toEqual(new Set(["source.md"]));
 	});
 
-	test("create reconciles the host graph once and materializes old unresolved sources", async () => {
+	test("create plus resolved source materializes an old unresolved link", async () => {
 		const env = new VaultEnvironmentBuilder([
 			{ path: "source.md", links: ["missing"] },
 		]).build();
@@ -40,6 +40,7 @@ describe("IncrementalIndexUpdater", () => {
 
 		await new IncrementalIndexUpdater(env.mockMetadataCache).applyAsync(snapshot, [
 			{ type: "create", path: "missing.md" },
+			{ type: "resolve", path: "source.md" },
 		]);
 
 		expect(snapshot.incoming.has(unresolvedEdgeKey("missing"))).toBe(false);
@@ -48,7 +49,61 @@ describe("IncrementalIndexUpdater", () => {
 		).toBe(true);
 	});
 
-	test("rename global reconciliation matches a fresh host-graph build", async () => {
+	test("create reconciles only the created file and host-resolved sources", async () => {
+		const env = new VaultEnvironmentBuilder([
+			{ path: "affected.md", links: ["first-missing"] },
+			{ path: "unrelated.md", links: ["second-missing"] },
+		]).build();
+		const snapshot = await buildIndexSnapshotAsync(
+			env.mockVault,
+			env.mockMetadataCache,
+		);
+		env.builder.addFile({ path: "first-missing.md" });
+		env.builder.addFile({ path: "second-missing.md" });
+
+		await new IncrementalIndexUpdater(env.mockMetadataCache).applyAsync(snapshot, [
+			{ type: "create", path: "first-missing.md" },
+			{ type: "resolve", path: "affected.md" },
+		]);
+
+		expect(
+			snapshot.incoming
+				.get(resolvedEdgeKey("first-missing.md"))
+				?.has("affected.md"),
+		).toBe(true);
+		expect(
+			snapshot.incoming
+				.get(unresolvedEdgeKey("second-missing"))
+				?.has("unrelated.md"),
+		).toBe(true);
+		expect(snapshot.incoming.has(resolvedEdgeKey("second-missing.md"))).toBe(false);
+	});
+
+	test("rename plus resolved sources matches a fresh host-graph build", async () => {
+		const env = new VaultEnvironmentBuilder([
+			{ path: "source.md", links: ["target"] },
+			{ path: "target.md" },
+		]).build();
+		const snapshot = await buildIndexSnapshotAsync(
+			env.mockVault,
+			env.mockMetadataCache,
+		);
+		env.builder.removeFile("target.md");
+		env.builder.addFile({ path: "archive/target.md" });
+
+		await new IncrementalIndexUpdater(env.mockMetadataCache).applyAsync(snapshot, [
+			{ type: "rename", oldPath: "target.md", newPath: "archive/target.md" },
+			{ type: "resolve", path: "source.md" },
+		]);
+		const rebuilt = await buildIndexSnapshotAsync(
+			env.mockVault,
+			env.mockMetadataCache,
+		);
+
+		expect(serializeSnapshot(snapshot)).toEqual(serializeSnapshot(rebuilt));
+	});
+
+	test("rename re-evaluates prior incoming sources without resolve events", async () => {
 		const env = new VaultEnvironmentBuilder([
 			{ path: "source.md", links: ["target"] },
 			{ path: "target.md" },

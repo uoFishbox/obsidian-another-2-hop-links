@@ -7,7 +7,12 @@ import {
 } from "./link-index/linkIndex";
 import type { CompactStringSet } from "shared/collections/compactStringSet";
 
-export type IncrementalFileChangeType = "create" | "modify" | "delete" | "rename";
+export type IncrementalFileChangeType =
+	| "create"
+	| "modify"
+	| "delete"
+	| "rename"
+	| "resolve";
 
 export type IncrementalFileChange =
 	| {
@@ -26,6 +31,10 @@ export type IncrementalFileChange =
 			type: "rename";
 			oldPath: string;
 			newPath: string;
+	  }
+	| {
+			type: "resolve";
+			path: string;
 	  };
 
 export interface TagIndex {

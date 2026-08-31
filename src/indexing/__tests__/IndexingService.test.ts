@@ -655,6 +655,7 @@ describe("IndexingService", () => {
 
 			await service.applyFileChangesTimeSliced([
 				{ type: "create", path: "src/note.md" },
+				{ type: "resolve", path: "src/source.md" },
 			]);
 
 			expect(
@@ -715,6 +716,7 @@ describe("IndexingService", () => {
 
 			await service.applyFileChangesTimeSliced([
 				{ type: "create", path: "src/note.md" },
+				{ type: "resolve", path: "src/source.md" },
 			]);
 
 			expect(

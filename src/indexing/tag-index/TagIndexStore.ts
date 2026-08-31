@@ -63,6 +63,9 @@ export class TagIndexStore {
 		let changeCount = 0;
 
 		for (const change of changes) {
+			if (change.type === "resolve") {
+				continue;
+			}
 			if (change.type === "rename") {
 				const newPathIsMd = change.newPath.toLowerCase().endsWith(".md");
 				const previousTags = this.tagIndex.fileEntries.get(change.oldPath);
