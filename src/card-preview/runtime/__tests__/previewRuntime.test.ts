@@ -50,9 +50,11 @@ describe("PreviewRuntime", () => {
 
 	it("uses the runtime preview loader for surfaces", () => {
 		const runtimeLoader = vi.fn() as unknown as CardPreviewLoader;
+		const rawContentLoader = vi.fn();
 		const runtime = createPreviewRuntime({
 			app: {} as App,
 			getPreview: runtimeLoader,
+			getRawContent: rawContentLoader,
 		});
 
 		runtime.createSurface({
@@ -62,6 +64,7 @@ describe("PreviewRuntime", () => {
 		const createRenderer = surfaceOptions?.createRenderer as () => unknown;
 		createRenderer();
 		expect(state.rendererOptions.at(-1)?.getPreview).toBe(runtimeLoader);
+		expect(state.rendererOptions.at(-1)?.getRawContent).toBe(rawContentLoader);
 		const prefetchPreview = surfaceOptions?.prefetchPreview as (
 			request: {
 				file: unknown;

@@ -25,18 +25,55 @@ export async function resolvePreview(
 	context: PreviewContext,
 	signal?: AbortSignal,
 ): Promise<PreviewData> {
+	if (signal?.aborted) throw createAbortError();
+
+	if (isImage(file)) {
+		return (
+			(await tryResolve(resolveImagePreview, file, context, signal)) ??
+			emptyPreview()
+		);
+	}
+	if (isVideo(file)) {
+		return (
+			(await tryResolve(resolveVideoPreview, file, context, signal)) ??
+			emptyPreview()
+		);
+	}
+	if (isCanvas(file)) {
+		return (
+			(await tryResolve(resolveCanvasPreview, file, context, signal)) ??
+			emptyPreview()
+		);
+	}
+	if (file.extension === "md") {
+		return resolveMarkdownPreview(file, context, signal);
+	}
+	if (isSource(file)) {
+		return (
+			(await tryResolve(resolveTextSnippetPreview, file, context, signal)) ??
+			emptyPreview()
+		);
+	}
+
+	return emptyPreview();
+}
+
+async function resolveMarkdownPreview(
+	file: TFile,
+	context: PreviewContext,
+	signal?: AbortSignal,
+): Promise<PreviewData> {
 	return (
 		(await tryResolve(resolveFrontmatterPropertyPreview, file, context, signal)) ??
-		(await tryResolve(resolveImagePreview, file, context, signal)) ??
-		(await tryResolve(resolveVideoPreview, file, context, signal)) ??
-		(await tryResolve(resolveCanvasPreview, file, context, signal)) ??
 		(await tryResolve(resolveFrontmatterImagePreview, file, context, signal)) ??
 		(await tryResolve(resolveEmbeddedMediaPreview, file, context, signal)) ??
-		(await tryResolve(resolveTextSnippetPreview, file, context, signal)) ?? {
-			type: "empty",
-			content: "",
-		}
+		(await tryResolve(resolveTextSnippetPreview, file, context, signal)) ??
+		emptyPreview()
 	);
+}
+
+function emptyPreview(): PreviewData {
+	return { type: "empty", content: "" };
 }
 
 async function tryResolve(
@@ -62,7 +99,7 @@ async function resolveFrontmatterPropertyPreview(
 	context: PreviewContext,
 	signal?: AbortSignal,
 ): Promise<PreviewData | undefined> {
-	if (file.extension !== "md" || signal?.aborted) return undefined;
+	if (signal?.aborted) return undefined;
 	const key = context.settings.priorityFrontmatterKeyForPreview?.trim();
 	if (!key) return undefined;
 
@@ -84,7 +121,7 @@ async function resolveImagePreview(
 	context: PreviewContext,
 	signal?: AbortSignal,
 ): Promise<PreviewData | undefined> {
-	if (!isImage(file) || signal?.aborted) return undefined;
+	if (signal?.aborted) return undefined;
 	return generateImagePreview(file, context.vault);
 }
 
@@ -93,7 +130,7 @@ async function resolveVideoPreview(
 	context: PreviewContext,
 	signal?: AbortSignal,
 ): Promise<PreviewData | undefined> {
-	if (!isVideo(file) || signal?.aborted) return undefined;
+	if (signal?.aborted) return undefined;
 	return await generateVideoPreview(
 		file,
 		signal,
@@ -106,7 +143,7 @@ async function resolveCanvasPreview(
 	context: PreviewContext,
 	signal?: AbortSignal,
 ): Promise<PreviewData | undefined> {
-	if (!isCanvas(file) || signal?.aborted) return undefined;
+	if (signal?.aborted) return undefined;
 	return await generateCanvasPreview(file, context.app, signal);
 }
 
@@ -115,7 +152,7 @@ async function resolveFrontmatterImagePreview(
 	context: PreviewContext,
 	signal?: AbortSignal,
 ): Promise<PreviewData | undefined> {
-	if (file.extension !== "md" || signal?.aborted) return undefined;
+	if (signal?.aborted) return undefined;
 	const image = context.metadataCache.getFileCache(file)?.frontmatter?.image;
 	if (typeof image !== "string" || image.trim().length === 0) return undefined;
 	return await getFrontmatterImage(file, context.metadataCache, context.vault);
@@ -126,7 +163,6 @@ async function resolveTextSnippetPreview(
 	context: PreviewContext,
 	signal?: AbortSignal,
 ): Promise<PreviewData | undefined> {
-	if (file.extension !== "md" && !isSource(file)) return undefined;
 	if (signal?.aborted) return undefined;
 	const content = await context.getContent(signal);
 	if (signal?.aborted || !content) return undefined;

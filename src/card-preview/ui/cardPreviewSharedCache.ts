@@ -12,7 +12,10 @@ import {
 	analyzePreviewContent,
 	type PreviewContentAnalysis,
 } from "card-preview/pipeline/previewContent";
-import { readRawContent } from "card-preview/pipeline/rawContentReader";
+import {
+	readRawContent,
+	type RawContentLoader,
+} from "card-preview/pipeline/rawContentReader";
 import { throwIfAborted } from "card-preview/pipeline/previewAbort";
 import type { PreviewRenderSettings } from "card-preview/pipeline/previewRenderSettings";
 import {
@@ -119,6 +122,7 @@ async function applySharedSearchContextToTextPreviewForState(
 		firstMatchOffset?: number | (() => number | undefined);
 		settings: PreviewRenderSettings;
 		vault: Vault;
+		getRawContent?: RawContentLoader;
 		signal?: AbortSignal;
 	},
 ): Promise<string> {
@@ -130,6 +134,7 @@ async function applySharedSearchContextToTextPreviewForState(
 		firstMatchOffset,
 		settings,
 		vault,
+		getRawContent,
 		signal,
 	} = params;
 	const cached = state.searchContextPreviewCache.get(cacheKey);
@@ -151,11 +156,9 @@ async function applySharedSearchContextToTextPreviewForState(
 			throwIfAborted(sharedSignal, "Preview request aborted");
 			let contentForRender = previewContent;
 			if (!previewContentHasVisibleQuery(previewContent, normalizedQuery)) {
-				const rawContent = await readRawContent(
-					targetFile,
-					vault,
-					sharedSignal,
-				);
+				const rawContent = getRawContent
+					? await getRawContent(targetFile, sharedSignal)
+					: await readRawContent(targetFile, vault, sharedSignal);
 				throwIfAborted(sharedSignal, "Preview request aborted");
 
 				const firstMatchIndex = resolveFirstMatchIndex(

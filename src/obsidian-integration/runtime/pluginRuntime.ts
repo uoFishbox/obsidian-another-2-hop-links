@@ -125,6 +125,7 @@ export function createPluginRuntime(options: PluginRuntimeOptions): PluginRuntim
 	const previewRuntime = createPreviewRuntime({
 		app: options.app,
 		getPreview: previewService.getPreview,
+		getRawContent: previewService.getRawContent,
 		getDomCommitsPerSecond: () => DEFAULT_PREVIEW_DOM_COMMITS_PER_SECOND,
 		getImageDomCommitsPerSecond: () => DEFAULT_PREVIEW_IMAGE_DOM_COMMITS_PER_SECOND,
 	});

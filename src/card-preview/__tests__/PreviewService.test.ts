@@ -169,7 +169,7 @@ describe("PreviewService.getPreview", () => {
 		expect(result.type).toBe("text");
 	});
 
-	test("reads raw content separately for preview generation and search context", async () => {
+	test("shares raw content between preview generation and search context", async () => {
 		const file = createMockTFileAsPlainObject("note.md");
 		(vault.cachedRead as Mock).mockResolvedValue("before alpha after");
 		(metadataCache.getFileCache as Mock).mockReturnValue({});
@@ -186,9 +186,37 @@ describe("PreviewService.getPreview", () => {
 				normalizedQuery: "alpha",
 				settings: createPreviewRenderSettings(DEFAULT_SETTINGS),
 				vault: vault as any,
+				getRawContent: previewService.getRawContent,
 			}),
 		).resolves.toContain("alpha");
 
+		expect(vault.cachedRead).toHaveBeenCalledTimes(1);
+	});
+
+	test("shares in-flight raw content reads and invalidates them by mtime", async () => {
+		const file = createMockTFileAsPlainObject("shared-note.md");
+		let resolveContent!: (content: string) => void;
+		(vault.cachedRead as Mock).mockReturnValueOnce(
+			new Promise<string>((resolve) => {
+				resolveContent = resolve;
+			}),
+		);
+
+		const first = previewService.getRawContent(file);
+		const second = previewService.getRawContent(file);
+		resolveContent("first revision");
+
+		await expect(Promise.all([first, second])).resolves.toEqual([
+			"first revision",
+			"first revision",
+		]);
+		expect(vault.cachedRead).toHaveBeenCalledTimes(1);
+
+		file.stat.mtime += 1;
+		(vault.cachedRead as Mock).mockResolvedValueOnce("second revision");
+		await expect(previewService.getRawContent(file)).resolves.toBe(
+			"second revision",
+		);
 		expect(vault.cachedRead).toHaveBeenCalledTimes(2);
 	});
 

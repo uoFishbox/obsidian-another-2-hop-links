@@ -1,7 +1,7 @@
 import type { App, TFile } from "obsidian";
 import type { IMetadataCache, IVault } from "obsidian-integration/hostContracts";
 import type { PluginSettings } from "settings/model";
-import { readRawContent } from "./rawContentReader";
+import { readRawContent, type RawContentLoader } from "./rawContentReader";
 
 /** Concrete dependencies and lazy content reads for one preview generation. */
 export interface PreviewContext {
@@ -18,6 +18,8 @@ export function createPreviewContext(
 	metadataCache: IMetadataCache,
 	app: App,
 	settings: PluginSettings,
+	loadRawContent: RawContentLoader = (targetFile, contentSignal) =>
+		readRawContent(targetFile, vault, contentSignal),
 	signal?: AbortSignal,
 ): PreviewContext {
 	let contentPromise: Promise<string> | undefined;
@@ -26,7 +28,7 @@ export function createPreviewContext(
 		contentSignal: AbortSignal | undefined = signal,
 	): Promise<string> => {
 		if (!contentPromise) {
-			contentPromise = readRawContent(file, vault, contentSignal);
+			contentPromise = loadRawContent(file, contentSignal);
 		}
 		return contentPromise;
 	};

@@ -2,6 +2,9 @@ import type { TFile } from "obsidian";
 import type { IVault } from "obsidian-integration/hostContracts";
 import { getFileContent } from "./previewContent";
 
+/** Loads raw preview content for one file with caller-scoped cancellation. */
+export type RawContentLoader = (file: TFile, signal?: AbortSignal) => Promise<string>;
+
 function createAbortError(): DOMException {
 	return new DOMException("Raw content read aborted", "AbortError");
 }

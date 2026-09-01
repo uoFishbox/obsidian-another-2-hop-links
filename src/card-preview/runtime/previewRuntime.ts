@@ -16,11 +16,13 @@ import {
 } from "card-preview/ui/cardPreviewRenderer";
 import { createCardPreviewSharedCache } from "card-preview/ui/cardPreviewSharedCache";
 import { createPreviewRenderQueue } from "card-preview/renderers/previewRenderQueue";
+import type { RawContentLoader } from "card-preview/pipeline/rawContentReader";
 
 /** Configuration shared by every preview surface owned by one plugin load. */
 export interface PreviewRuntimeOptions {
 	readonly app: App;
 	readonly getPreview: CardPreviewLoader;
+	readonly getRawContent?: RawContentLoader;
 	readonly getDomCommitsPerSecond?: () => number;
 	readonly getImageDomCommitsPerSecond?: () => number;
 }
@@ -87,6 +89,7 @@ export function createPreviewRuntime(options: PreviewRuntimeOptions): PreviewRun
 				createCardPreviewRenderer({
 					app: options.app,
 					getPreview: options.getPreview,
+					getRawContent: options.getRawContent,
 					enqueuePreviewRender: previewRenderQueue.enqueue,
 					sharedCache,
 					resolveSearchMatchOffset: surfaceOptions.resolveSearchMatchOffset,

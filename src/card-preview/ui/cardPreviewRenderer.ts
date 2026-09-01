@@ -14,6 +14,7 @@ import { isAbortError, throwIfAborted } from "card-preview/pipeline/previewAbort
 import { normalizePreviewQuery } from "card-preview/pipeline/previewRenderKeys";
 import type { CardPreviewSharedCache } from "./cardPreviewSharedCache";
 import type { CardPreviewRequest } from "card-preview/pipeline/cardPreviewRequest";
+import type { RawContentLoader } from "card-preview/pipeline/rawContentReader";
 
 function moveChildrenToFragment(source: HTMLElement): DocumentFragment {
 	const fragment = source.ownerDocument.createDocumentFragment();
@@ -32,6 +33,7 @@ export type CardPreviewLoader = (
 export interface CardPreviewRendererOptions {
 	app: App;
 	getPreview: CardPreviewLoader;
+	getRawContent?: RawContentLoader;
 	domCommitScope: PreviewDomCommitScope;
 	imageDomCommitScope: PreviewDomCommitScope;
 	enqueuePreviewRender: EnqueuePreviewRender;
@@ -347,6 +349,7 @@ export function createCardPreviewRenderer(
 					)?.offset,
 				settings: request.settings,
 				vault: options.app.vault,
+				getRawContent: options.getRawContent,
 				signal,
 			});
 		if (signal.aborted) return preview;

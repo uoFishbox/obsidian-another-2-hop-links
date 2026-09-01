@@ -25,6 +25,11 @@ import {
 import type { PluginSettings } from "settings/model";
 import type { App } from "obsidian";
 import type { IMetadataCache, IVault } from "obsidian-integration/hostContracts";
+import { readRawContent, type RawContentLoader } from "./rawContentReader";
+import { createSizedLRUCache, stringBytes } from "shared/cache/sizedLRUCache";
+
+const RAW_CONTENT_CACHE_MAX_BYTES = 4 * 1024 * 1024;
+const RAW_CONTENT_CACHE_KEY_SEPARATOR = "\0";
 
 export type PreviewResolver = (
 	file: TFile,
@@ -38,9 +43,14 @@ export interface IPreviewService {
 		signal?: AbortSignal,
 		options?: PreviewRequestOptions,
 	): Promise<PreviewData>;
+	readonly getRawContent: RawContentLoader;
 }
 
 type InFlightRequest = SharedAbortableRequest<PreviewData> & {
+	readonly cacheKey: string;
+};
+
+type InFlightRawContentRequest = SharedAbortableRequest<string> & {
 	readonly cacheKey: string;
 };
 
@@ -63,7 +73,42 @@ export function createPreviewService(
 ): DisposablePreviewService {
 	const cache = createPreviewGenerationCache();
 	const inFlightRequests = new Map<string, InFlightRequest>();
+	const rawContentCache = createSizedLRUCache<string, string>(
+		RAW_CONTENT_CACHE_MAX_BYTES,
+	);
+	const rawContentInFlight = new Map<string, InFlightRawContentRequest>();
 	const queue = createPreviewQueue();
+
+	const getRawContent: RawContentLoader = async (file, signal) => {
+		if (signal?.aborted) throw createAbortError();
+		const cacheKey = buildRawContentCacheKey(file);
+		const cached = rawContentCache.get(cacheKey);
+		if (cached !== undefined) return cached;
+
+		const existingRequest = rawContentInFlight.get(cacheKey);
+		if (existingRequest && !existingRequest.controller.signal.aborted) {
+			return attachSharedCaller(existingRequest, signal);
+		}
+		if (existingRequest) rawContentInFlight.delete(cacheKey);
+
+		const request: InFlightRawContentRequest = {
+			cacheKey,
+			...createSharedAbortableRequest((sharedSignal) =>
+				readRawContent(file, options.vault, sharedSignal),
+			),
+		};
+		rawContentInFlight.set(cacheKey, request);
+		void request.promise.then(
+			(content) => {
+				if (!request.controller.signal.aborted) {
+					rawContentCache.set(cacheKey, content, stringBytes(content));
+				}
+				finalizeRawContentRequest(request);
+			},
+			() => finalizeRawContentRequest(request),
+		);
+		return attachSharedCaller(request, signal);
+	};
 
 	async function getPreview(
 		file: TFile,
@@ -131,6 +176,7 @@ export function createPreviewService(
 			options.metadataCache,
 			options.app,
 			settings,
+			getRawContent,
 			signal,
 		);
 		const result = await resolvePreview(file, context, signal);
@@ -147,20 +193,39 @@ export function createPreviewService(
 		}
 	}
 
+	function finalizeRawContentRequest(request: InFlightRawContentRequest): void {
+		if (rawContentInFlight.get(request.cacheKey) === request) {
+			rawContentInFlight.delete(request.cacheKey);
+		}
+	}
+
+	function clearCache(): void {
+		cache.clear();
+		rawContentCache.clear();
+	}
+
 	function dispose(): void {
 		for (const request of inFlightRequests.values()) request.controller.abort();
 		inFlightRequests.clear();
+		for (const request of rawContentInFlight.values()) request.controller.abort();
+		rawContentInFlight.clear();
 		queue.shutdown();
 		cache.clear();
+		rawContentCache.clear();
 		clearMathRenderQueue();
 		clearVideoPreviewQueue();
 	}
 
 	return {
 		getPreview,
-		clearCache: () => cache.clear(),
+		getRawContent,
+		clearCache,
 		dispose,
 	};
+}
+
+function buildRawContentCacheKey(file: TFile): string {
+	return `${file.path}${RAW_CONTENT_CACHE_KEY_SEPARATOR}${file.stat.mtime}`;
 }
 
 function applyRequestedRenderSettings(
