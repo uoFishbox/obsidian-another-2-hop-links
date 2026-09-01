@@ -106,10 +106,23 @@ function createRequest(
 }
 
 function createRenderer(getPreview: CardPreviewLoader) {
+	return createRendererWithCommitScopes(
+		getPreview,
+		immediateDomCommitScope,
+		immediateDomCommitScope,
+	);
+}
+
+function createRendererWithCommitScopes(
+	getPreview: CardPreviewLoader,
+	domCommitScope: PreviewDomCommitScope,
+	imageDomCommitScope: PreviewDomCommitScope,
+) {
 	return createCardPreviewRenderer({
 		app: { vault: {} } as App,
 		getPreview,
-		domCommitScope: immediateDomCommitScope,
+		domCommitScope,
+		imageDomCommitScope,
 		enqueuePreviewRender: immediatePreviewRender,
 		sharedCache: createCardPreviewSharedCache(),
 	});
@@ -279,6 +292,56 @@ describe("card preview renderer contract", () => {
 		await waitFor(() => expect(host.textContent).toContain("before alpha after"));
 		expect(state.getFileContent).not.toHaveBeenCalled();
 		expect(state.highlightSearchMatchesInHtml).toHaveBeenCalledOnce();
+	});
+
+	it("routes image and non-image commits through separate budget scopes", async () => {
+		const domCommitScope = {
+			...immediateDomCommitScope,
+			schedule: vi.fn(immediateDomCommitScope.schedule),
+		};
+		const imageDomCommitScope = {
+			...immediateDomCommitScope,
+			schedule: vi.fn(immediateDomCommitScope.schedule),
+		};
+		const getPreview = vi.fn<CardPreviewLoader>();
+		const renderer = createRendererWithCommitScopes(
+			getPreview,
+			domCommitScope,
+			imageDomCommitScope,
+		);
+		const imageCallbacks = callbacks();
+		const textCallbacks = callbacks();
+
+		renderer(
+			document.createElement("div"),
+			createRequest(createMockTFile("images/cover.png"), {
+				previewOverride: {
+					type: "image",
+					content: "app://local/images/cover.png",
+				},
+			}),
+			imageCallbacks,
+		);
+		renderer(
+			document.createElement("div"),
+			createRequest(createMockTFile("notes/text.md"), {
+				previewOverride: { type: "text", content: "text preview" },
+			}),
+			textCallbacks,
+		);
+
+		await waitFor(() => {
+			expect(imageCallbacks.onCommitted).toHaveBeenCalledWith(
+				"image",
+				"detachable",
+			);
+			expect(textCallbacks.onCommitted).toHaveBeenCalledWith(
+				"text",
+				"detachable",
+			);
+		});
+		expect(imageDomCommitScope.schedule).toHaveBeenCalledOnce();
+		expect(domCommitScope.schedule).toHaveBeenCalledOnce();
 	});
 
 	it.each([

@@ -22,6 +22,7 @@ export interface PreviewRuntimeOptions {
 	readonly app: App;
 	readonly getPreview: CardPreviewLoader;
 	readonly getDomCommitsPerSecond?: () => number;
+	readonly getImageDomCommitsPerSecond?: () => number;
 }
 
 /** Per-surface values which are expected to vary with the current view. */
@@ -69,6 +70,10 @@ export function createPreviewRuntime(options: PreviewRuntimeOptions): PreviewRun
 			frameCoordinator: surfaceOptions.frameCoordinator,
 			getCommitsPerSecond: options.getDomCommitsPerSecond,
 		});
+		const imageDomCommitScope = domCommitScheduler.createScope({
+			frameCoordinator: surfaceOptions.frameCoordinator,
+			getCommitsPerSecond: options.getImageDomCommitsPerSecond,
+		});
 		const surface = createVirtualPreviewSurface({
 			frameCoordinator: surfaceOptions.frameCoordinator,
 			prefetchPreview: async (request, signal) => {
@@ -86,6 +91,7 @@ export function createPreviewRuntime(options: PreviewRuntimeOptions): PreviewRun
 					sharedCache,
 					resolveSearchMatchOffset: surfaceOptions.resolveSearchMatchOffset,
 					domCommitScope,
+					imageDomCommitScope,
 				}),
 		});
 		let managedSurface!: VirtualPreviewSurface;
@@ -95,6 +101,7 @@ export function createPreviewRuntime(options: PreviewRuntimeOptions): PreviewRun
 				if (!surfaces.delete(managedSurface)) return;
 				surface.dispose();
 				domCommitScope.dispose();
+				imageDomCommitScope.dispose();
 			},
 		};
 		surfaces.add(managedSurface);

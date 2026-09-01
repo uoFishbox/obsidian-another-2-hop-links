@@ -1,10 +1,16 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { App } from "obsidian";
 import { DEFAULT_SETTINGS } from "settings/model";
 import type { CardPreviewLoader } from "card-preview/ui/cardPreviewRenderer";
 import type { CardPreviewSharedCache } from "card-preview/ui/cardPreviewSharedCache";
 import type { EnqueuePreviewRender } from "card-preview/renderers/previewRenderQueue";
+import type { PreviewDomCommitScope } from "card-preview/scheduling/previewDomCommitScheduler";
 import { createTestVirtualFrameCoordinator } from "testing/testVirtualFrameCoordinator";
+import type { VirtualFrameCoordinator } from "shared/ui/scheduling/frameCoordinator";
+import {
+	markScrollActivityActive,
+	resetScrollActivityForTests,
+} from "shared/ui/scroll/scrollActivity";
 
 const state = vi.hoisted(() => ({
 	surfaceOptions: [] as Array<Record<string, unknown>>,
@@ -35,6 +41,11 @@ describe("PreviewRuntime", () => {
 	beforeEach(() => {
 		state.surfaceOptions.length = 0;
 		state.rendererOptions.length = 0;
+		resetScrollActivityForTests();
+	});
+
+	afterEach(() => {
+		resetScrollActivityForTests();
 	});
 
 	it("uses the runtime preview loader for surfaces", () => {
@@ -150,6 +161,64 @@ describe("PreviewRuntime", () => {
 		});
 		await expect(secondEnqueue(async () => "active")).resolves.toBe("active");
 		second.dispose();
+	});
+
+	it("owns separate DOM commit budget scopes for images and other previews", async () => {
+		const getDomCommitsPerSecond = vi.fn(() => 40);
+		const getImageDomCommitsPerSecond = vi.fn(() => 12);
+		const scheduledTasks: Array<() => void> = [];
+		const frameCoordinator: VirtualFrameCoordinator = {
+			schedule: vi.fn((_lane, _key, task) => {
+				scheduledTasks.push(task);
+				return true;
+			}),
+			cancel: vi.fn(),
+			isScheduled: vi.fn(() => false),
+			dispose: vi.fn(),
+		};
+		markScrollActivityActive({});
+		const runtime = createPreviewRuntime({
+			app: {} as App,
+			getPreview: vi.fn() as unknown as CardPreviewLoader,
+			getDomCommitsPerSecond,
+			getImageDomCommitsPerSecond,
+		});
+		const surface = runtime.createSurface({
+			frameCoordinator,
+		});
+		const createRenderer = state.surfaceOptions.at(-1)
+			?.createRenderer as () => unknown;
+		createRenderer();
+		const rendererOptions = state.rendererOptions.at(-1);
+		const domCommitScope = rendererOptions?.domCommitScope as PreviewDomCommitScope;
+		const imageDomCommitScope =
+			rendererOptions?.imageDomCommitScope as PreviewDomCommitScope;
+		const disposeDomCommits = vi.spyOn(domCommitScope, "dispose");
+		const disposeImageCommits = vi.spyOn(imageDomCommitScope, "dispose");
+
+		expect(imageDomCommitScope).not.toBe(domCommitScope);
+		const domCommit = domCommitScope.schedule({
+			targetKey: "text-preview",
+			isStale: () => false,
+			commit: () => true,
+		});
+		const imageCommit = imageDomCommitScope.schedule({
+			targetKey: "image-preview",
+			isStale: () => false,
+			commit: () => true,
+		});
+		expect(scheduledTasks).toHaveLength(2);
+		for (const task of scheduledTasks) task();
+		await expect(Promise.all([domCommit, imageCommit])).resolves.toEqual([
+			{ type: "committed" },
+			{ type: "committed" },
+		]);
+		expect(getDomCommitsPerSecond).toHaveBeenCalledOnce();
+		expect(getImageDomCommitsPerSecond).toHaveBeenCalledOnce();
+		surface.dispose();
+		expect(disposeDomCommits).toHaveBeenCalledOnce();
+		expect(disposeImageCommits).toHaveBeenCalledOnce();
+		runtime.dispose();
 	});
 
 	it("returns disabled surfaces after disposal", () => {

@@ -33,6 +33,7 @@ export interface CardPreviewRendererOptions {
 	app: App;
 	getPreview: CardPreviewLoader;
 	domCommitScope: PreviewDomCommitScope;
+	imageDomCommitScope: PreviewDomCommitScope;
 	enqueuePreviewRender: EnqueuePreviewRender;
 	sharedCache: CardPreviewSharedCache;
 	resolveSearchMatchOffset?: (
@@ -76,6 +77,12 @@ export function createCardPreviewRenderer(
 		task: PreviewDomCommitTask,
 	): Promise<boolean> => {
 		const result = await options.domCommitScope.schedule(task);
+		return result.type === "committed";
+	};
+	const enqueueImageDomCommit = async (
+		task: PreviewDomCommitTask,
+	): Promise<boolean> => {
+		const result = await options.imageDomCommitScope.schedule(task);
 		return result.type === "committed";
 	};
 
@@ -182,7 +189,7 @@ export function createCardPreviewRenderer(
 					image.decoding = "async";
 					image.fetchPriority = "low";
 
-					return enqueueCoordinatedDomCommit({
+					return enqueueImageDomCommit({
 						targetKey: domCommitTargetKey,
 						isStale: () => isRenderStale(signal),
 						commit: () => {
