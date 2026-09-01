@@ -95,6 +95,50 @@ describe("runStreamingSearch", () => {
 		expect(cachedRead).not.toHaveBeenCalled();
 	});
 
+	it("ignores WikiLink delimiters when matching title text", async () => {
+		const { vault } = createVault(new Map());
+		const updates: StreamingSearchUpdate[] = [];
+
+		await runStreamingSearch({
+			vault,
+			files: [],
+			items: [createItem("wikilink-title", "text[[TEXT]]", null)],
+			query: "textTEXT",
+			scope: "title-only",
+			isCancelled: () => false,
+			onUpdate: (update) => updates.push(update),
+		});
+
+		expect(Array.from(getFinalUpdate(updates).matchesByKey.keys())).toEqual([
+			"wikilink-title",
+		]);
+	});
+
+	it("ignores WikiLink delimiters while preserving raw content offsets", async () => {
+		const file = createMockTFile("notes/wikilink.md");
+		const { vault } = createVault(
+			new Map([[file.path, "prefix text[[TEXT]] and [[tail]]END"]]),
+		);
+		const updates: StreamingSearchUpdate[] = [];
+
+		await runStreamingSearch({
+			vault,
+			files: [file],
+			items: [createItem("wikilink-content", "unrelated", file.path)],
+			query: "textTEXT tailEND",
+			scope: "title-and-content",
+			isCancelled: () => false,
+			onUpdate: (update) => updates.push(update),
+		});
+
+		const result = getFinalUpdate(updates);
+		expect(Array.from(result.matchesByKey.keys())).toEqual(["wikilink-content"]);
+		expect(result.firstContentMatchByPath.get(file.path)).toEqual({
+			offset: 7,
+			length: 10,
+		});
+	});
+
 	it("publishes the first content match offset without scanning for line numbers", async () => {
 		const file = createMockTFile("notes/alpha.md");
 		const plainContent = `${"line\n".repeat(1_000_000)}find alpha here`;

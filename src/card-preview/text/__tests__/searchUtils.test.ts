@@ -23,6 +23,15 @@ describe("searchUtils", () => {
 			7,
 		);
 	});
+
+	it("finds adjacent text across WikiLink delimiters", () => {
+		expect(findCaseInsensitiveIndex("before text[[TEXT]] after", "textTEXT")).toBe(
+			7,
+		);
+		expect(findCaseInsensitiveIndex("before [[text]]TEXT after", "textTEXT")).toBe(
+			9,
+		);
+	});
 });
 
 describe("htmlVisibleTextContainsCaseInsensitive", () => {

@@ -1,14 +1,12 @@
-import { getSearchQueryTerms } from "search/searchQueryTerms";
+import {
+	buildWikiLinkInsensitiveLiteralSource,
+	getSearchQueryTerms,
+} from "search/searchQueryTerms";
 
-const REGEXP_ESCAPE_PATTERN = /[.*+?^${}()|[\]\\]/g;
 const REGEXP_SOURCE_CACHE_MAX_SIZE = 64;
 const REGEXP_OBJECT_CACHE_MAX_SIZE = 64;
 const regexpSourceCache = new Map<string, string | null>();
 const regexpObjectCache = new Map<string, RegExp>();
-
-function escapeRegExp(value: string): string {
-	return value.replace(REGEXP_ESCAPE_PATTERN, "\\$&");
-}
 
 function getCachedRegExpObject(source: string): RegExp {
 	const cached = regexpObjectCache.get(source);
@@ -61,7 +59,7 @@ function getCachedRegExpSource(query: string | undefined): string | null {
 	if (terms.length > 0) {
 		terms.sort((a, b) => b.length - a.length);
 		for (let index = 0; index < terms.length; index += 1) {
-			terms[index] = escapeRegExp(terms[index]);
+			terms[index] = buildWikiLinkInsensitiveLiteralSource(terms[index]);
 		}
 		source = terms.join("|");
 	}

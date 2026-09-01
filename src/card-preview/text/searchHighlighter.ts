@@ -44,63 +44,105 @@ function stripCmHighlightSpans(content: string): string {
 	return content.replace(EXISTING_HIGHLIGHT_PATTERN, "$1");
 }
 
-function findHtmlTagEndExclusive(content: string, tagStart: number): number {
-	if (tagStart === -1) {
-		return -1;
-	}
-
-	const tagEnd = content.indexOf(">", tagStart + 1);
-	return tagEnd === -1 ? -1 : tagEnd + 1;
+interface VisibleTextSegment {
+	readonly sourceStart: number;
+	readonly sourceEnd: number;
+	readonly textStart: number;
+	readonly textEnd: number;
 }
 
-function highlightMatchesOutsideHtmlTags(
-	content: string,
-	searchPattern: RegExp,
-): string {
-	let parts: string[] | undefined;
-	let copiedUntil = 0;
-	searchPattern.lastIndex = 0;
-	let match = searchPattern.exec(content);
-
-	if (!match) {
-		return content;
-	}
-
+function collectVisibleTextSegments(content: string): {
+	readonly text: string;
+	readonly segments: readonly VisibleTextSegment[];
+} {
+	const textParts: string[] = [];
+	const segments: VisibleTextSegment[] = [];
+	let textLength = 0;
+	let cursor = 0;
 	let tagStart = content.indexOf("<");
-	let tagEndExclusive = findHtmlTagEndExclusive(content, tagStart);
 
-	do {
-		const matchStart = match.index;
-		const matchText = match[0];
-		const matchEnd = matchStart + matchText.length;
-
-		while (tagEndExclusive !== -1 && tagEndExclusive <= matchStart) {
-			tagStart = content.indexOf("<", tagEndExclusive);
-			tagEndExclusive = findHtmlTagEndExclusive(content, tagStart);
+	while (tagStart !== -1) {
+		const tagEnd = content.indexOf(">", tagStart + 1);
+		if (tagEnd === -1) break;
+		if (tagStart > cursor) {
+			const text = content.substring(cursor, tagStart);
+			textParts.push(text);
+			segments.push({
+				sourceStart: cursor,
+				sourceEnd: tagStart,
+				textStart: textLength,
+				textEnd: textLength + text.length,
+			});
+			textLength += text.length;
 		}
-
-		const overlapsHtmlTag =
-			tagEndExclusive !== -1 &&
-			matchStart < tagEndExclusive &&
-			tagStart < matchEnd;
-
-		if (!overlapsHtmlTag) {
-			parts ??= [];
-			parts.push(
-				content.substring(copiedUntil, matchStart),
-				`${HIGHLIGHT_OPEN_TAG}${matchText}${HIGHLIGHT_CLOSE_TAG}`,
-			);
-			copiedUntil = matchEnd;
-		}
-
-		match = searchPattern.exec(content);
-	} while (match);
-
-	if (!parts) {
-		return content;
+		cursor = tagEnd + 1;
+		tagStart = content.indexOf("<", cursor);
 	}
 
-	parts.push(content.substring(copiedUntil));
+	if (cursor < content.length) {
+		const text = content.substring(cursor);
+		textParts.push(text);
+		segments.push({
+			sourceStart: cursor,
+			sourceEnd: content.length,
+			textStart: textLength,
+			textEnd: textLength + text.length,
+		});
+	}
+
+	return { text: textParts.join(""), segments };
+}
+
+function highlightVisibleTextMatches(content: string, searchPattern: RegExp): string {
+	const visible = collectVisibleTextSegments(content);
+	const sourceRanges: Array<{ readonly start: number; readonly end: number }> = [];
+	let segmentIndex = 0;
+	searchPattern.lastIndex = 0;
+	let match = searchPattern.exec(visible.text);
+
+	while (match) {
+		const matchStart = match.index;
+		const matchEnd = matchStart + match[0].length;
+		while (
+			segmentIndex < visible.segments.length &&
+			visible.segments[segmentIndex].textEnd <= matchStart
+		) {
+			segmentIndex += 1;
+		}
+
+		for (
+			let index = segmentIndex;
+			index < visible.segments.length &&
+			visible.segments[index].textStart < matchEnd;
+			index += 1
+		) {
+			const segment = visible.segments[index];
+			const textStart = Math.max(matchStart, segment.textStart);
+			const textEnd = Math.min(matchEnd, segment.textEnd);
+			if (textStart >= textEnd) continue;
+			sourceRanges.push({
+				start: segment.sourceStart + textStart - segment.textStart,
+				end: segment.sourceStart + textEnd - segment.textStart,
+			});
+		}
+
+		match = searchPattern.exec(visible.text);
+	}
+
+	if (sourceRanges.length === 0) return content;
+
+	const parts: string[] = [];
+	let cursor = 0;
+	for (const range of sourceRanges) {
+		parts.push(
+			content.substring(cursor, range.start),
+			HIGHLIGHT_OPEN_TAG,
+			content.substring(range.start, range.end),
+			HIGHLIGHT_CLOSE_TAG,
+		);
+		cursor = range.end;
+	}
+	parts.push(content.substring(cursor));
 	return parts.join("");
 }
 
@@ -121,5 +163,5 @@ export function highlightSearchMatchesInHtml(
 		return cleanedContent;
 	}
 
-	return highlightMatchesOutsideHtmlTags(cleanedContent, searchPattern);
+	return highlightVisibleTextMatches(cleanedContent, searchPattern);
 }

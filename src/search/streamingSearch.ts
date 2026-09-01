@@ -1,7 +1,10 @@
 import type { TFile, Vault } from "obsidian";
 import { yieldToMainThreadIdleAware } from "indexing/timeSlicing";
 import { getFileContent } from "card-preview/pipeline/previewContent";
-import { getSearchQueryTerms } from "./searchQueryTerms";
+import {
+	buildWikiLinkInsensitiveLiteralSource,
+	getSearchQueryTerms,
+} from "./searchQueryTerms";
 import type {
 	SearchItemSnapshot,
 	SearchContentMatch,
@@ -49,7 +52,7 @@ export async function runStreamingSearch(
 	options: RunStreamingSearchOptions,
 ): Promise<void> {
 	const terms = getSearchQueryTerms(options.query);
-	const contentMatchers = terms.map(createCaseInsensitiveLiteralMatcher);
+	const termMatchers = terms.map(createCaseInsensitiveWikiLinkMatcher);
 	const contentMatchesByPath = new Map<string, ContentTermMatches>();
 	const fileByPath = new Map(options.files.map((file) => [file.path, file]));
 	const now = options.now ?? (() => performance.now());
@@ -98,7 +101,9 @@ export async function runStreamingSearch(
 	for (const item of options.items) {
 		if (options.isCancelled()) return;
 
-		const titleMatches = terms.map((term) => item.searchText.includes(term));
+		const titleMatches = termMatchers.map((matcher) =>
+			matcher.test(item.searchText),
+		);
 		if (titleMatches.every(Boolean)) {
 			pendingMatches.push({
 				key: item.key,
@@ -112,7 +117,7 @@ export async function runStreamingSearch(
 				if (file) {
 					const content = await readContent(file, options.vault);
 					if (options.isCancelled()) return;
-					contentTermMatches = matchContentTerms(content, contentMatchers);
+					contentTermMatches = matchContentTerms(content, termMatchers);
 					contentMatchesByPath.set(path, contentTermMatches);
 					if (contentTermMatches.firstMatch) {
 						pendingContentMatches.push({
@@ -151,8 +156,8 @@ async function readContent(file: TFile, vault: Vault): Promise<string> {
 	}
 }
 
-function createCaseInsensitiveLiteralMatcher(term: string): RegExp {
-	return new RegExp(term.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i");
+function createCaseInsensitiveWikiLinkMatcher(term: string): RegExp {
+	return new RegExp(buildWikiLinkInsensitiveLiteralSource(term), "i");
 }
 
 function matchContentTerms(

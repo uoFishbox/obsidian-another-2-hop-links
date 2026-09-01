@@ -1,3 +1,6 @@
+const REGEXP_ESCAPE_PATTERN = /[.*+?^${}()|[\]\\]/g;
+const WIKILINK_DELIMITER_PATTERN = "(?:\\[\\[|\\]\\])*";
+
 export function getSearchQueryTerms(query: string | undefined): string[] {
 	const normalizedQuery = query?.trim().toLowerCase() ?? "";
 	if (!normalizedQuery) {
@@ -13,4 +16,11 @@ export function getSearchQueryTerms(query: string | undefined): string[] {
 		}
 	}
 	return uniqueTerms;
+}
+
+/** Builds a literal RegExp source that treats WikiLink delimiters as invisible. */
+export function buildWikiLinkInsensitiveLiteralSource(term: string): string {
+	return Array.from(term, (character) =>
+		character.replace(REGEXP_ESCAPE_PATTERN, "\\$&"),
+	).join(WIKILINK_DELIMITER_PATTERN);
 }

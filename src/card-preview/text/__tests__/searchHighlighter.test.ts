@@ -75,10 +75,17 @@ describe("highlightSearchMatchesInHtml", () => {
 		expect(highlightSearchMatchesInHtml(html, "search")).toBe(html);
 	});
 
-	test("does not highlight a match split by an HTML tag", () => {
+	test("splits a visible match around HTML tags without changing the structure", () => {
 		const html = "hel<strong>lo</strong> hello";
 		expect(highlightSearchMatchesInHtml(html, "hello")).toBe(
-			'hel<strong>lo</strong> <span class="ccl-search-highlight">hello</span>',
+			'<span class="ccl-search-highlight">hel</span><strong><span class="ccl-search-highlight">lo</span></strong> <span class="ccl-search-highlight">hello</span>',
+		);
+	});
+
+	test("highlights adjacent text across a rendered WikiLink", () => {
+		const html = 'text<span class="cosense-card-links__wikilink">TEXT</span> after';
+		expect(highlightSearchMatchesInHtml(html, "textTEXT")).toBe(
+			'<span class="ccl-search-highlight">text</span><span class="cosense-card-links__wikilink"><span class="ccl-search-highlight">TEXT</span></span> after',
 		);
 	});
 
