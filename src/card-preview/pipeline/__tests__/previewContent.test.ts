@@ -87,18 +87,20 @@ describe("EmbeddedMediaStrategy", () => {
 		const file = createMockTFileAsPlainObject("note.md");
 		const imageFile = createMockTFileAsPlainObject("images/cover.png", "png");
 		const metadataCache = {
-			getFileCache: vi.fn().mockReturnValue({}),
+			getFileCache: vi.fn().mockReturnValue({
+				embeds: [
+					{
+						original: "![](images/cover.png)",
+						link: "images/cover.png",
+					},
+				],
+			}),
 			getFirstLinkpathDest: vi.fn().mockReturnValue(imageFile),
 		} as unknown as IMetadataCache;
 
 		const result = await strategy.generate(file, {
 			vault: createMockVault(),
 			metadataCache,
-			getFirstEmbeddedMedia: vi.fn().mockResolvedValue({
-				syntax: "markdown",
-				original: `![](images/cover.png)`,
-				target: "images/cover.png",
-			}),
 		} as any);
 
 		expect(result).toEqual({
@@ -112,18 +114,20 @@ describe("EmbeddedMediaStrategy", () => {
 		const file = createMockTFileAsPlainObject("note.md");
 		const linkedNote = createMockTFileAsPlainObject("linked-note.md");
 		const metadataCache = {
-			getFileCache: vi.fn().mockReturnValue({}),
+			getFileCache: vi.fn().mockReturnValue({
+				embeds: [
+					{
+						original: "![](linked-note.md)",
+						link: "linked-note.md",
+					},
+				],
+			}),
 			getFirstLinkpathDest: vi.fn().mockReturnValue(linkedNote),
 		} as unknown as IMetadataCache;
 
 		const result = await strategy.generate(file, {
 			vault: createMockVault(),
 			metadataCache,
-			getFirstEmbeddedMedia: vi.fn().mockResolvedValue({
-				syntax: "markdown",
-				original: `![](linked-note.md)`,
-				target: "linked-note.md",
-			}),
 		} as any);
 
 		expect(result).toBeUndefined();
@@ -134,18 +138,15 @@ describe("EmbeddedMediaStrategy", () => {
 		const file = createMockTFileAsPlainObject("note.md");
 		const imageUrl = "https://example.com/api/image?id=123";
 		const metadataCache = {
-			getFileCache: vi.fn().mockReturnValue({}),
+			getFileCache: vi.fn().mockReturnValue({
+				embeds: [{ original: `![](${imageUrl})`, link: imageUrl }],
+			}),
 			getFirstLinkpathDest: vi.fn().mockReturnValue(undefined),
 		} as unknown as IMetadataCache;
 
 		const result = await strategy.generate(file, {
 			vault: createMockVault(),
 			metadataCache,
-			getFirstEmbeddedMedia: vi.fn().mockResolvedValue({
-				syntax: "markdown",
-				original: `![](${imageUrl})`,
-				target: imageUrl,
-			}),
 		} as any);
 
 		expect(result).toEqual({ type: "image", content: imageUrl });
@@ -161,18 +162,15 @@ describe("EmbeddedMediaStrategy", () => {
 		const strategy = createEmbeddedMediaStrategy();
 		const file = createMockTFileAsPlainObject("note.md");
 		const metadataCache = {
-			getFileCache: vi.fn().mockReturnValue({}),
+			getFileCache: vi.fn().mockReturnValue({
+				embeds: [{ original: `![](${embedUrl})`, link: embedUrl }],
+			}),
 			getFirstLinkpathDest: vi.fn().mockReturnValue(undefined),
 		} as unknown as IMetadataCache;
 
 		const result = await strategy.generate(file, {
 			vault: createMockVault(),
 			metadataCache,
-			getFirstEmbeddedMedia: vi.fn().mockResolvedValue({
-				syntax: "markdown",
-				original: `![](${embedUrl})`,
-				target: embedUrl,
-			}),
 		} as any);
 
 		expect(result).toBeUndefined();
@@ -183,18 +181,15 @@ describe("EmbeddedMediaStrategy", () => {
 		const file = createMockTFileAsPlainObject("note.md");
 		const imageUrl = "https://example.com/api/image?id=123";
 		const metadataCache = {
-			getFileCache: vi.fn().mockReturnValue({}),
+			getFileCache: vi.fn().mockReturnValue({
+				embeds: [{ original: `![[${imageUrl}]]`, link: imageUrl }],
+			}),
 			getFirstLinkpathDest: vi.fn().mockReturnValue(undefined),
 		} as unknown as IMetadataCache;
 
 		const result = await strategy.generate(file, {
 			vault: createMockVault(),
 			metadataCache,
-			getFirstEmbeddedMedia: vi.fn().mockResolvedValue({
-				syntax: "wiki",
-				original: `![[${imageUrl}]]`,
-				target: imageUrl,
-			}),
 		} as any);
 
 		expect(result).toBeUndefined();
@@ -238,7 +233,7 @@ describe("EmbeddedMediaStrategy", () => {
 		expect(result).toBeUndefined();
 	});
 
-	test("uses metadata cache embeds without calling body extraction", async () => {
+	test("uses the first metadata cache embed", async () => {
 		const strategy = createEmbeddedMediaStrategy();
 		const file = createMockTFileAsPlainObject("note.md");
 		const imageFile = createMockTFileAsPlainObject("cached.png", "png");
@@ -248,22 +243,34 @@ describe("EmbeddedMediaStrategy", () => {
 			}),
 			getFirstLinkpathDest: vi.fn().mockReturnValue(imageFile),
 		} as unknown as IMetadataCache;
-		const getFirstEmbeddedMedia = vi.fn().mockResolvedValue({
-			syntax: "wiki",
-			original: "![[body.png]]",
-			target: "body.png",
-		});
-
 		const result = await strategy.generate(file, {
 			vault: createMockVault(),
 			metadataCache,
-			getFirstEmbeddedMedia,
 		} as any);
 
 		expect(result).toEqual({
 			type: "image",
 			content: `app://local/${imageFile.path}`,
 		});
-		expect(getFirstEmbeddedMedia).not.toHaveBeenCalled();
+	});
+
+	test("stops without reading body content when metadata cache has no embeds", async () => {
+		const strategy = createEmbeddedMediaStrategy();
+		const file = createMockTFileAsPlainObject("note.md");
+		const metadataCache = {
+			getFileCache: vi.fn().mockReturnValue({}),
+			getFirstLinkpathDest: vi.fn(),
+		} as unknown as IMetadataCache;
+		const getContent = vi.fn();
+
+		const result = await strategy.generate(file, {
+			vault: createMockVault(),
+			metadataCache,
+			getContent,
+		} as any);
+
+		expect(result).toBeUndefined();
+		expect(getContent).not.toHaveBeenCalled();
+		expect(metadataCache.getFirstLinkpathDest).not.toHaveBeenCalled();
 	});
 });
