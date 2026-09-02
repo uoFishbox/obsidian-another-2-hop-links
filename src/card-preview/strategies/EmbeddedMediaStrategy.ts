@@ -34,18 +34,24 @@ export async function resolveEmbeddedMediaPreview(
 	signal?: AbortSignal,
 ): Promise<PreviewData | undefined> {
 	if (file.extension !== "md" || signal?.aborted) return undefined;
-	const embedded = resolveFirstEmbed(file, context);
+	const embedded = await resolveFirstEmbed(file, context);
 	if (signal?.aborted || !embedded) return undefined;
 	return resolveEmbeddedMedia(file.path, embedded, context, signal);
 }
 
-function resolveFirstEmbed(
+async function resolveFirstEmbed(
 	file: TFile,
 	context: PreviewContext,
-): ParsedEmbed | undefined {
-	const firstEmbed = context.metadataCache.getFileCache(file)?.embeds?.[0];
-	if (!firstEmbed) return undefined;
-	return parseEmbeddedMedia(firstEmbed.original, firstEmbed.link ?? "");
+): Promise<ParsedEmbed | undefined> {
+	if (file.extension === "md") {
+		const cache = context.metadataCache.getFileCache(file);
+		const firstEmbed = cache?.embeds?.[0];
+		if (firstEmbed) {
+			return parseEmbeddedMedia(firstEmbed.original, firstEmbed.link ?? "");
+		}
+	}
+
+	return await context.getFirstEmbeddedMedia();
 }
 
 async function resolveEmbeddedMedia(

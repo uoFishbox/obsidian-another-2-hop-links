@@ -144,17 +144,15 @@ describe("PreviewService.getPreview", () => {
 	});
 
 	describe("image retrieval from Markdown embeds", () => {
-		test("returns image preview from metadata cache without MarkdownRenderer", async () => {
+		test("returns image preview without MarkdownRenderer for extensionless http(s) Markdown image URLs", async () => {
 			const file = createMockTFileAsPlainObject("note.md");
 			const imageUrl = "https://example.com/api/image?id=123";
-			(metadataCache.getFileCache as Mock).mockReturnValue({
-				embeds: [{ original: `![](${imageUrl})`, link: imageUrl }],
-			});
+			(metadataCache.getFileCache as Mock).mockReturnValue({});
 			(metadataCache.getFirstLinkpathDest as Mock).mockReturnValue(undefined);
+			(vault.cachedRead as Mock).mockResolvedValue(`![](${imageUrl})`);
 
 			const result = await previewService.getPreview(file);
 			expect(result).toEqual({ type: "image", content: imageUrl });
-			expect(vault.cachedRead).not.toHaveBeenCalled();
 			expect(MarkdownRenderer.render).not.toHaveBeenCalled();
 		});
 	});
@@ -218,6 +216,28 @@ describe("PreviewService.getPreview", () => {
 			"second revision",
 		);
 		expect(vault.cachedRead).toHaveBeenCalledTimes(2);
+	});
+
+	test("first embed extraction is memoized within one generation", async () => {
+		const file = createMockTFileAsPlainObject("note.md");
+		(vault.cachedRead as Mock).mockResolvedValue(
+			"```md\n![[ignored.png]]\n```\n![[shared.png]]",
+		);
+		(metadataCache.getFileCache as Mock).mockReturnValue({});
+
+		const observedTargets: Array<string | undefined> = [];
+		const resolvePreview: PreviewResolver = async (_file, context) => {
+			const first = await context.getFirstEmbeddedMedia();
+			const second = await context.getFirstEmbeddedMedia();
+			observedTargets.push(first?.target, second?.target);
+			return { type: "text", content: second?.target ?? "" };
+		};
+		const service = createService(resolvePreview);
+
+		const result = await service.getPreview(file);
+		expect(vault.cachedRead).toHaveBeenCalledTimes(1);
+		expect(observedTargets).toEqual(["shared.png", "shared.png"]);
+		expect(result).toEqual({ type: "text", content: "shared.png" });
 	});
 
 	test("preview generation cache is separated by settings affecting generation", async () => {
