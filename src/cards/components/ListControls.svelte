@@ -3,18 +3,17 @@
 	import type { ResultFocusDirection } from "cards/navigation/resultFocus";
 	import type { SortOption } from "cards/sorting";
 
-	const SORT_OPTIONS: Record<SortOption, string> = {
-		alphabetical: "タイトル (A-Z)",
-		"alphabetical-reverse": "タイトル (Z-A)",
-		"backlink-count-reverse": "被リンク数 (多い順)",
-		"backlink-count": "被リンク数 (少ない順)",
-		"created-date-reverse": "作成日時 (新しい順)",
-		"created-date": "作成日時 (古い順)",
-		"modified-date-reverse": "更新日時 (新しい順)",
-		"modified-date": "更新日時 (古い順)",
-		"file-size-reverse": "ファイルサイズ (大きい順)",
-		"file-size": "ファイルサイズ (小さい順)",
-	};
+	const SORT_FIELDS = [
+		{ label: "タイトル", asc: "alphabetical", desc: "alphabetical-reverse" },
+		{ label: "被リンク数", asc: "backlink-count", desc: "backlink-count-reverse" },
+		{ label: "作成日時", asc: "created-date", desc: "created-date-reverse" },
+		{ label: "更新日時", asc: "modified-date", desc: "modified-date-reverse" },
+		{ label: "ファイルサイズ", asc: "file-size", desc: "file-size-reverse" },
+	] as const satisfies readonly {
+		label: string;
+		asc: SortOption;
+		desc: SortOption;
+	}[];
 
 	interface Props {
 		searchInputValue?: string;
@@ -48,9 +47,31 @@
 		searchPlaceholder = "Search...",
 	}: Props = $props();
 
-	function handleSortChange(e: Event) {
+	const sortField = $derived(
+		SORT_FIELDS.find(
+			(field) => field.asc === sortOption || field.desc === sortOption,
+		) ?? SORT_FIELDS[0],
+	);
+	const isDescending = $derived(sortOption === sortField.desc);
+	const sortDirectionLabel = $derived(
+		isDescending
+			? "降順（クリックで昇順に切り替え）"
+			: "昇順（クリックで降順に切り替え）",
+	);
+
+	function handleSortChange(e: Event): void {
 		const target = e.target as HTMLSelectElement;
-		onSortChange(target.value as SortOption);
+		const field = SORT_FIELDS.find((field) => field.asc === target.value);
+		if (!field) return;
+		onSortChange(isDescending ? field.desc : field.asc);
+	}
+
+	function toggleSortDirection(): void {
+		onSortChange(isDescending ? sortField.asc : sortField.desc);
+	}
+
+	function selectModifiedDate(): void {
+		onSortChange(isDescending ? "modified-date-reverse" : "modified-date");
 	}
 
 	function handleSearchInput(e: Event) {
@@ -176,14 +197,48 @@
 		</div>
 	{/if}
 	<div class="twohop-header-controls">
+		<button
+			type="button"
+			class="clickable-icon"
+			aria-label={sortDirectionLabel}
+			title={sortDirectionLabel}
+			onclick={toggleSortDirection}
+		>
+			<svg
+				xmlns="http://www.w3.org/2000/svg"
+				width="18"
+				height="18"
+				viewBox="0 0 24 24"
+				fill="none"
+				stroke="currentColor"
+				stroke-width="2"
+				stroke-linecap="round"
+				stroke-linejoin="round"
+				class="svg-icon"
+				aria-hidden="true"
+				focusable="false"
+			>
+				<path d="M12 5h9M12 12h6M12 19h3M5 5v14" />
+				<path d={isDescending ? "m2 16 3 3 3-3" : "m2 8 3-3 3 3"} />
+			</svg>
+		</button>
+		<button
+			type="button"
+			class:mod-cta={sortField.asc === "modified-date"}
+			aria-pressed={sortField.asc === "modified-date"}
+			title="更新日時で並べ替え"
+			onclick={selectModifiedDate}
+		>
+			更新日時
+		</button>
 		<select
 			class="dropdown"
-			value={sortOption}
+			value={sortField.asc}
 			onchange={handleSortChange}
 			aria-label={ARIA_LABELS.SORT_SELECT}
 		>
-			{#each Object.entries(SORT_OPTIONS) as [value, label]}
-				<option {value}>{label}</option>
+			{#each SORT_FIELDS as field}
+				<option value={field.asc}>{field.label}</option>
 			{/each}
 		</select>
 	</div>
