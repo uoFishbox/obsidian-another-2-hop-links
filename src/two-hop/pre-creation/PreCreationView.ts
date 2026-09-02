@@ -26,6 +26,7 @@ import {
 import { AbstractSvelteListView } from "obsidian-integration/views/abstractSvelteListView";
 import { buildEditorLikeFrame } from "obsidian-integration/views/editorLikeFrame";
 import { getCardItemKey, type CardItem } from "cards/CardItem";
+import { materializePreCreationFile } from "./preCreationFileWorkflow";
 
 export const VIEW_TYPE_PRE_CREATE = "cosense-card-links-pre-create-view";
 export const PRE_CREATION_EPHEMERAL_STATE_KEY = "cosense-card-links-pre-create";
@@ -34,6 +35,7 @@ type PreCreationBootstrapState = {
 	linktext: string;
 	sourcePath: string;
 	expectedPath: string;
+	creationPath: string;
 };
 
 const pendingBootstrapStateByLeafId = new Map<string, PreCreationBootstrapState>();
@@ -92,12 +94,14 @@ type PreCreationState = {
 	linktext?: unknown;
 	sourcePath?: unknown;
 	expectedPath?: unknown;
+	creationPath?: unknown;
 };
 
 export class PreCreationView extends AbstractSvelteListView<IndexedLink> {
 	private linktext = "";
 	private sourcePath = "";
 	private expectedPath = "";
+	private creationPath = "";
 	private inlineTitleEl: HTMLDivElement | undefined = undefined;
 	private createButtonEl: HTMLButtonElement | undefined = undefined;
 	private isCreating = false;
@@ -137,13 +141,15 @@ export class PreCreationView extends AbstractSvelteListView<IndexedLink> {
 			linktext: this.linktext,
 			sourcePath: this.sourcePath,
 			expectedPath: this.expectedPath,
+			creationPath: this.creationPath,
 		};
 	}
 
 	async setState(state: unknown, result: ViewStateResult): Promise<void> {
 		await super.setState(state, result);
 
-		const { linktext, sourcePath, expectedPath } = this.extractState(state);
+		const { linktext, sourcePath, expectedPath, creationPath } =
+			this.extractState(state);
 		if (linktext !== this.linktext || sourcePath !== this.sourcePath) {
 			result.history = true;
 		}
@@ -151,6 +157,7 @@ export class PreCreationView extends AbstractSvelteListView<IndexedLink> {
 		this.linktext = linktext;
 		this.sourcePath = sourcePath;
 		this.expectedPath = expectedPath || this.computeExpectedPath();
+		this.creationPath = creationPath || this.creationPath || this.expectedPath;
 		this.persistCurrentBootstrapState();
 		this.syncToEphemeralState();
 		this.render();
@@ -166,6 +173,7 @@ export class PreCreationView extends AbstractSvelteListView<IndexedLink> {
 		linktext: string;
 		sourcePath: string;
 		expectedPath: string;
+		creationPath: string;
 	} {
 		const candidate = state as PreCreationState | null;
 		const linktext =
@@ -174,7 +182,9 @@ export class PreCreationView extends AbstractSvelteListView<IndexedLink> {
 			typeof candidate?.sourcePath === "string" ? candidate.sourcePath : "";
 		const expectedPath =
 			typeof candidate?.expectedPath === "string" ? candidate.expectedPath : "";
-		return { linktext, sourcePath, expectedPath };
+		const creationPath =
+			typeof candidate?.creationPath === "string" ? candidate.creationPath : "";
+		return { linktext, sourcePath, expectedPath, creationPath };
 	}
 
 	private computeExpectedPath(): string {
@@ -249,6 +259,9 @@ export class PreCreationView extends AbstractSvelteListView<IndexedLink> {
 		if (!this.expectedPath && ephemeral.expectedPath) {
 			this.expectedPath = ephemeral.expectedPath;
 		}
+		if (!this.creationPath && ephemeral.creationPath) {
+			this.creationPath = ephemeral.creationPath;
+		}
 	}
 
 	private hydrateFromPersistedBootstrapState(): void {
@@ -269,6 +282,9 @@ export class PreCreationView extends AbstractSvelteListView<IndexedLink> {
 		if (!this.expectedPath && persisted.expectedPath) {
 			this.expectedPath = persisted.expectedPath;
 		}
+		if (!this.creationPath && persisted.creationPath) {
+			this.creationPath = persisted.creationPath;
+		}
 	}
 
 	private hydrateFromPendingBootstrapState(): void {
@@ -283,6 +299,7 @@ export class PreCreationView extends AbstractSvelteListView<IndexedLink> {
 		this.linktext = pending.linktext;
 		this.sourcePath = pending.sourcePath;
 		this.expectedPath = pending.expectedPath;
+		this.creationPath = pending.creationPath;
 		persistedBootstrapStateByLeafId.set(leafId, pending);
 		pendingBootstrapStateByLeafId.delete(leafId);
 	}
@@ -291,16 +308,17 @@ export class PreCreationView extends AbstractSvelteListView<IndexedLink> {
 		linktext: string;
 		sourcePath: string;
 		expectedPath: string;
+		creationPath: string;
 	} {
 		const eState = this.leaf.getEphemeralState();
 		if (!eState || typeof eState !== "object") {
-			return { linktext: "", sourcePath: "", expectedPath: "" };
+			return { linktext: "", sourcePath: "", expectedPath: "", creationPath: "" };
 		}
 		const raw = (eState as Record<string, unknown>)[
 			PRE_CREATION_EPHEMERAL_STATE_KEY
 		];
 		if (!raw || typeof raw !== "object") {
-			return { linktext: "", sourcePath: "", expectedPath: "" };
+			return { linktext: "", sourcePath: "", expectedPath: "", creationPath: "" };
 		}
 		const candidate = raw as Record<string, unknown>;
 		const linktext =
@@ -309,7 +327,9 @@ export class PreCreationView extends AbstractSvelteListView<IndexedLink> {
 			typeof candidate.sourcePath === "string" ? candidate.sourcePath : "";
 		const expectedPath =
 			typeof candidate.expectedPath === "string" ? candidate.expectedPath : "";
-		return { linktext, sourcePath, expectedPath };
+		const creationPath =
+			typeof candidate.creationPath === "string" ? candidate.creationPath : "";
+		return { linktext, sourcePath, expectedPath, creationPath };
 	}
 
 	private syncToEphemeralState(): void {
@@ -322,6 +342,7 @@ export class PreCreationView extends AbstractSvelteListView<IndexedLink> {
 			linktext: this.linktext,
 			sourcePath: this.sourcePath,
 			expectedPath: this.expectedPath,
+			creationPath: this.creationPath,
 		};
 		this.leaf.setEphemeralState(next);
 	}
@@ -335,6 +356,7 @@ export class PreCreationView extends AbstractSvelteListView<IndexedLink> {
 			linktext: this.linktext,
 			sourcePath: this.sourcePath,
 			expectedPath: this.expectedPath,
+			creationPath: this.creationPath,
 		});
 	}
 
@@ -554,18 +576,20 @@ export class PreCreationView extends AbstractSvelteListView<IndexedLink> {
 		}
 
 		try {
-			// 親ディレクトリが存在しない場合は作成する
-			const lastSlashIndex = this.expectedPath.lastIndexOf("/");
-			if (lastSlashIndex !== -1) {
-				const dirPath = this.expectedPath.slice(0, lastSlashIndex);
-				const folder = this.app.vault.getAbstractFileByPath(dirPath);
-				if (!(folder instanceof TFolder)) {
-					await this.app.vault.createFolder(dirPath);
-				}
+			const creationPath = this.creationPath || this.expectedPath;
+			await this.ensureParentFolder(creationPath);
+			if (creationPath !== this.expectedPath) {
+				await this.ensureParentFolder(this.expectedPath);
 			}
 
-			// vault.createを使用してファイルを作成
-			const file = await this.app.vault.create(this.expectedPath, "");
+			const file = await materializePreCreationFile({
+				creationPath,
+				finalPath: this.expectedPath,
+				createFile: (path) => this.app.vault.create(path, ""),
+				renameFile: (createdFile, newPath) =>
+					this.app.fileManager.renameFile(createdFile, newPath),
+				waitForIndexIdle: () => this.plugin.indexingService.awaitIdle(),
+			});
 			// 現在のleafでファイルを開く
 			await this.leaf.openFile(file, { active: true });
 		} catch (error) {
@@ -579,6 +603,19 @@ export class PreCreationView extends AbstractSvelteListView<IndexedLink> {
 			if (this.leaf.view === this) {
 				this.render();
 			}
+		}
+	}
+
+	private async ensureParentFolder(path: string): Promise<void> {
+		const lastSlashIndex = path.lastIndexOf("/");
+		if (lastSlashIndex === -1) {
+			return;
+		}
+
+		const dirPath = path.slice(0, lastSlashIndex);
+		const folder = this.app.vault.getAbstractFileByPath(dirPath);
+		if (!(folder instanceof TFolder)) {
+			await this.app.vault.createFolder(dirPath);
 		}
 	}
 }

@@ -122,17 +122,20 @@ function patchWorkspaceOpenLinkText(plugin: PluginHost): void {
 										linktext: linktext,
 										sourcePath: sourcePath,
 										expectedPath: normalizedExpectedPath,
+										creationPath: normalizedExpectedPath,
 									},
 								};
 								setPendingPreCreationBootstrapState(leaf, {
 									linktext,
 									sourcePath,
 									expectedPath: normalizedExpectedPath,
+									creationPath: normalizedExpectedPath,
 								});
 								setPersistedPreCreationBootstrapState(leaf, {
 									linktext,
 									sourcePath,
 									expectedPath: normalizedExpectedPath,
+									creationPath: normalizedExpectedPath,
 								});
 								const viewState: ViewState = {
 									type: VIEW_TYPE_PRE_CREATE,
@@ -141,6 +144,7 @@ function patchWorkspaceOpenLinkText(plugin: PluginHost): void {
 										linktext: linktext,
 										sourcePath: sourcePath,
 										expectedPath: normalizedExpectedPath,
+										creationPath: normalizedExpectedPath,
 									},
 								};
 
