@@ -8,7 +8,11 @@ import {
 } from "cards/interactions/interactionRegistry";
 import { useAppContext, useLinkContext } from "cards/context/linkContext";
 import type { ResultNavigationDirection } from "cards/navigation/resultFocus";
-import type { VirtualNavigationTarget } from "cards/virtualization/public";
+import type {
+	VirtualNavigationTarget,
+	VirtualSequentialNavigationDirection,
+	VirtualSequentialNavigationTarget,
+} from "cards/virtualization/public";
 import type { ProgrammaticScrollSnapshot } from "cards/virtualization/public";
 import { createCardSurfaceNavigation } from "./surfaceNavigation";
 import { ensureCardRenderShadowSurface } from "cards/components/cardRenderShadowSurface";
@@ -34,6 +38,14 @@ export interface CardSurfaceInteractionParams {
 			columnIndex: number;
 		},
 	) => VirtualNavigationTarget | null;
+	resolveSequentialNavigationTarget?: (
+		currentKey: string,
+		direction: VirtualSequentialNavigationDirection,
+		currentPosition: {
+			rowIndex: number;
+			columnIndex: number;
+		},
+	) => VirtualSequentialNavigationTarget | null;
 	flushVirtualScrollMeasurement?: (snapshot: ProgrammaticScrollSnapshot) => void;
 }
 
@@ -47,6 +59,7 @@ export function createCardSurfaceInteractions({
 	getInteractionDescriptorScopeId,
 	getInteractionDescriptorResolverProvider,
 	resolveNavigationTarget,
+	resolveSequentialNavigationTarget,
 	flushVirtualScrollMeasurement,
 }: CardSurfaceInteractionParams) {
 	const interactionRegistry = createInteractionRegistry();
@@ -89,7 +102,7 @@ export function createCardSurfaceInteractions({
 		await tick();
 	};
 
-	const handleKeyDown = createCardSurfaceNavigation({
+	const { handleKeyDown, handleFocusIn } = createCardSurfaceNavigation({
 		getRootEl,
 		getContentEl,
 		getScrollContainerEl: getObserverRoot,
@@ -97,6 +110,7 @@ export function createCardSurfaceInteractions({
 		delegatedInteractions,
 		cellBindingRegistry,
 		resolveNavigationTarget,
+		resolveSequentialNavigationTarget,
 		flushVirtualScrollMeasurement,
 		flushMountedState,
 	});
@@ -175,6 +189,7 @@ export function createCardSurfaceInteractions({
 	return {
 		delegatedInteractions,
 		handleKeyDown,
+		handleFocusIn,
 		cellBindingRegistry,
 		touchEventHandlers,
 	};

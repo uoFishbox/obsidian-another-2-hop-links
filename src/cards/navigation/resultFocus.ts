@@ -180,6 +180,36 @@ function getNavigationRect(element: HTMLElement): {
 	};
 }
 
+function collectResultTargetsInLogicalOrder(
+	container: HTMLElement | null,
+): HTMLElement[] {
+	const targets = collectResultTargets(container).map((element, index) => ({
+		element,
+		index,
+		section: findClosestComposed(element, ".cosense-card-links__section"),
+		rect: getNavigationRect(element)?.rect ?? null,
+	}));
+
+	targets.sort((a, b) => {
+		if (a.section && b.section && a.section !== b.section) {
+			const relation = a.section.compareDocumentPosition(b.section);
+			if (relation & Node.DOCUMENT_POSITION_FOLLOWING) return -1;
+			if (relation & Node.DOCUMENT_POSITION_PRECEDING) return 1;
+		}
+
+		if (a.rect && b.rect) {
+			const deltaY = a.rect.top - b.rect.top;
+			if (Math.abs(deltaY) > NAVIGATION_EPSILON_PX) return deltaY;
+			const deltaX = a.rect.left - b.rect.left;
+			if (Math.abs(deltaX) > NAVIGATION_EPSILON_PX) return deltaX;
+		}
+
+		return a.index - b.index;
+	});
+
+	return targets.map((target) => target.element);
+}
+
 function buildNavigationTargets(container: HTMLElement | null): NavigationTarget[] {
 	const targets: NavigationTarget[] = [];
 	for (const element of collectResultTargets(container)) {
@@ -418,7 +448,7 @@ export function focusResultEdge(
 	container: HTMLElement | null,
 	direction: ResultFocusDirection,
 ): HTMLElement | null {
-	const targets = collectResultTargets(container);
+	const targets = collectResultTargetsInLogicalOrder(container);
 
 	if (targets.length === 0) {
 		return null;
@@ -514,7 +544,7 @@ export function moveFocusBetweenResults(
 	direction: ResultNavigationDirection,
 	searchInputContainer: HTMLElement | null = container,
 ): HTMLElement | HTMLInputElement | null {
-	const targets = collectResultTargets(container);
+	const targets = collectResultTargetsInLogicalOrder(container);
 	if (targets.length === 0) {
 		return null;
 	}

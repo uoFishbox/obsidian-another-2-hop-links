@@ -28,6 +28,7 @@
 	bind:rootEl={list.rootEl}
 	scrollContainerEl={list.scrollContainerEl}
 	resolveNavigationTarget={list.resolveNavigationTarget}
+	resolveSequentialNavigationTarget={list.resolveSequentialNavigationTarget}
 	flushVirtualScrollMeasurement={list.flushVirtualScrollMeasurement}
 	interactionDescriptorScopeId="two-hop-virtual-card-slots"
 	interactionDescriptorResolverProvider={list.interactionDescriptorResolverProvider}

@@ -6,6 +6,7 @@ import {
 	scrollSectionIntoViewForFocus,
 	type ResultNavigationDirection,
 } from "cards/navigation/resultFocus";
+import type { VirtualSequentialNavigationDirection } from "cards/virtualization/public";
 import { waitForNextAnimationFrame } from "shared/ui/scheduling/frame";
 import { isHTMLElementLike } from "shared/ui/dom/realmSafeDom";
 
@@ -75,12 +76,32 @@ export const createCardGridKeyboardHandler = (options: {
 		currentTarget: HTMLElement,
 		direction: ResultNavigationDirection,
 	) => Promise<boolean>;
+	prepareSequentialFocusMove: (
+		currentTarget: HTMLElement,
+		direction: VirtualSequentialNavigationDirection,
+	) => (() => Promise<boolean>) | null;
 	flushMountedState: () => Promise<void>;
 }): ((event: KeyboardEvent) => Promise<void>) => {
 	return async (event: KeyboardEvent): Promise<void> => {
 		if (event.ctrlKey || event.metaKey || event.altKey) {
 			options.delegatedInteractions.handleKeyDown(event);
 			return;
+		}
+
+		if (event.key === "Tab") {
+			const origin = event.composedPath()[0];
+			if (isHTMLElementLike(origin)) {
+				const runSequentialMove = options.prepareSequentialFocusMove(
+					origin,
+					event.shiftKey ? "backward" : "forward",
+				);
+				if (runSequentialMove) {
+					event.preventDefault();
+					event.stopPropagation();
+					await runSequentialMove();
+					return;
+				}
+			}
 		}
 
 		const direction = getArrowNavigationDirection(event.key);

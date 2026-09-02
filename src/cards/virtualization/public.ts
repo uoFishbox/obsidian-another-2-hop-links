@@ -42,6 +42,8 @@ export type {
 	SourceKey,
 	VirtualNavigationDirection,
 	VirtualNavigationTarget,
+	VirtualSequentialNavigationDirection,
+	VirtualSequentialNavigationTarget,
 	VirtualRanges,
 	VirtualRow,
 	VirtualRowModel,

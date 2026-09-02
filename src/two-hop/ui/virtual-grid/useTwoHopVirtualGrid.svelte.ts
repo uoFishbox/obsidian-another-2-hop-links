@@ -40,6 +40,7 @@ import type { VirtualVisibilityPolicy } from "cards/virtualization/public";
 import type { RowRange } from "cards/virtualization/public";
 import { resolveVisibleRange } from "cards/virtualization/public";
 import type { ResultNavigationDirection } from "cards/navigation/resultFocus";
+import type { VirtualSequentialNavigationDirection } from "cards/virtualization/public";
 import type { ProgrammaticScrollSnapshot } from "cards/virtualization/public";
 import {
 	resolvePreviewPrefetchRange,
@@ -460,6 +461,20 @@ export function useTwoHopVirtualGrid(
 		);
 	}
 
+	function resolveSequentialNavigationTarget(
+		currentKey: string,
+		direction: VirtualSequentialNavigationDirection,
+		currentPosition: { rowIndex: number; columnIndex: number },
+	) {
+		return (
+			rowModel.resolveSequentialNavigationTarget?.(
+				currentKey,
+				direction,
+				currentPosition,
+			) ?? null
+		);
+	}
+
 	return {
 		get rootEl() {
 			return rootEl;
@@ -497,6 +512,7 @@ export function useTwoHopVirtualGrid(
 		},
 		registerCardModelConsumer: cardHydrator.registerConsumer,
 		resolveNavigationTarget,
+		resolveSequentialNavigationTarget,
 		flushVirtualScrollMeasurement,
 		loadMore(sectionId: string): void {
 			props.loadMoreSection?.(sectionId);

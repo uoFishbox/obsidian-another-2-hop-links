@@ -82,13 +82,27 @@ export interface VirtualRowModel<TCell> {
 			columnIndex: number;
 		},
 	) => VirtualNavigationTarget | null;
+	resolveSequentialNavigationTarget?: (
+		currentKey: string,
+		direction: VirtualSequentialNavigationDirection,
+		currentPosition: {
+			rowIndex: number;
+			columnIndex: number;
+		},
+	) => VirtualSequentialNavigationTarget | null;
 }
 
 export type VirtualNavigationDirection = "up" | "down" | "left" | "right";
+export type VirtualSequentialNavigationDirection = "forward" | "backward";
 
 export interface VirtualNavigationTarget {
 	key: string;
 	rowTop: number;
+}
+
+export interface VirtualSequentialNavigationTarget extends VirtualNavigationTarget {
+	rowIndex: number;
+	columnIndex: number;
 }
 
 export interface VirtualRanges {

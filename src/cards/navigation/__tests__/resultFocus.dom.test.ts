@@ -1,5 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { getFocusableResultTarget, moveFocusBetweenResults } from "../resultFocus";
+import {
+	focusResultEdge,
+	getFocusableResultTarget,
+	moveFocusBetweenResults,
+} from "../resultFocus";
 
 type WindowWithKeyboardEventConstructor = Window & {
 	KeyboardEvent: typeof KeyboardEvent;
@@ -208,5 +212,22 @@ describe("moveFocusBetweenResults", () => {
 		});
 
 		expect(getFocusableResultTarget(event)).toBe(card);
+	});
+	it("focuses the visual/logical edge after physical row slots rotate", () => {
+		const root = document.createElement("div");
+		root.className = "cosense-card-links__virtual-grid";
+		const later = createVirtualResult({ id: "later", left: 0, top: 200 });
+		const first = createVirtualResult({ id: "first", left: 0, top: 100 });
+		root.append(later, first);
+		document.body.append(root);
+		const firstCard = first.querySelector<HTMLElement>(
+			'[data-ccl-interaction-id="first"]',
+		)!;
+		const focusSpy = vi.spyOn(firstCard, "focus");
+
+		const result = focusResultEdge(root, "down");
+
+		expect(result).toBe(firstCard);
+		expect(focusSpy).toHaveBeenCalledWith({ preventScroll: true });
 	});
 });

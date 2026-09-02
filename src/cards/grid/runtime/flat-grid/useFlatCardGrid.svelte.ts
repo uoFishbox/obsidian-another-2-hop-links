@@ -1,5 +1,6 @@
 import { tick, untrack, getContext, onDestroy, type Snippet } from "svelte";
 import type { ResultNavigationDirection } from "cards/navigation/resultFocus";
+import type { VirtualSequentialNavigationDirection } from "cards/virtualization/public";
 import type { RowRange, VirtualVisibilityPolicy } from "cards/virtualization/public";
 import {
 	getLazyLoadManager,
@@ -625,6 +626,17 @@ export function useFlatCardGrid<T>(
 		rowModel.resolveNavigationTarget?.(currentKey, direction, currentPosition) ??
 		null;
 
+	const resolveSequentialNavigationTarget = (
+		currentKey: string,
+		direction: VirtualSequentialNavigationDirection,
+		currentPosition: { rowIndex: number; columnIndex: number },
+	) =>
+		rowModel.resolveSequentialNavigationTarget?.(
+			currentKey,
+			direction,
+			currentPosition,
+		) ?? null;
+
 	const createItemRenderArgs = (
 		mountedCell: MountedFlatGridCell<T> | null | undefined,
 		scrollContainerEl: HTMLElement | null,
@@ -703,6 +715,7 @@ export function useFlatCardGrid<T>(
 			return canLoadMore;
 		},
 		resolveNavigationTarget,
+		resolveSequentialNavigationTarget,
 		flushVirtualScrollMeasurement: virtualList.flushProgrammaticScrollMeasurement,
 		createItemRenderArgs,
 		loadNextPage,

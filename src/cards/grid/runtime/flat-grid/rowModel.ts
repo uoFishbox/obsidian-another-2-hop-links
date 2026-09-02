@@ -9,6 +9,8 @@ import {
 	type RowRange,
 	type StableScrollTopBand,
 	type VirtualNavigationTarget,
+	type VirtualSequentialNavigationDirection,
+	type VirtualSequentialNavigationTarget,
 	type VirtualRow,
 	type VirtualRowModel,
 } from "cards/virtualization/public";
@@ -270,6 +272,36 @@ export function createFlatGridRowModel<T>(
 				direction,
 				currentPosition,
 			});
+		},
+		resolveSequentialNavigationTarget(
+			currentKey: string,
+			direction: VirtualSequentialNavigationDirection,
+			currentPosition: { rowIndex: number; columnIndex: number },
+		): VirtualSequentialNavigationTarget | null {
+			const currentIndex = getCellIndex(
+				currentPosition.rowIndex,
+				currentPosition.columnIndex,
+			);
+			const currentCell = resolveCellAtIndex(currentIndex);
+			if (!currentCell || currentCell.key !== currentKey) return null;
+
+			const targetIndex =
+				direction === "forward" ? currentIndex + 1 : currentIndex - 1;
+			if (targetIndex < 0 || targetIndex >= cellCount) return null;
+
+			const targetCell = resolveCellAtIndex(targetIndex);
+			if (!targetCell) return null;
+			const rowIndex = Math.floor(targetIndex / columns);
+			const columnIndex = targetIndex % columns;
+			const targetRow = this.getRow(rowIndex);
+			if (!targetRow) return null;
+
+			return {
+				key: targetCell.key,
+				rowTop: targetRow.top,
+				rowIndex,
+				columnIndex,
+			};
 		},
 	};
 }

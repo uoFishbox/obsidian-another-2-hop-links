@@ -216,4 +216,37 @@ describe("TwoHopRowModel", () => {
 			columnIndex: 0,
 		});
 	});
+	it("skips non-focusable section headers during sequential focus navigation", () => {
+		const first = createSection("first", 1);
+		const second = createSection("second", 1);
+		const model = createModel([first, second]);
+		const firstItemPosition = model.resolveCellPosition("item:first:first-0");
+		const secondItemPosition = model.resolveCellPosition("item:second:second-0");
+		expect(firstItemPosition).toBeTruthy();
+		expect(secondItemPosition).toBeTruthy();
+		if (!firstItemPosition || !secondItemPosition) return;
+
+		expect(
+			model.resolveSequentialNavigationTarget?.(
+				"item:first:first-0",
+				"forward",
+				firstItemPosition,
+			),
+		).toEqual({
+			key: "item:second:second-0",
+			rowTop: model.getRow(secondItemPosition.rowIndex)?.top,
+			...secondItemPosition,
+		});
+		expect(
+			model.resolveSequentialNavigationTarget?.(
+				"item:second:second-0",
+				"backward",
+				secondItemPosition,
+			),
+		).toEqual({
+			key: "item:first:first-0",
+			rowTop: model.getRow(firstItemPosition.rowIndex)?.top,
+			...firstItemPosition,
+		});
+	});
 });

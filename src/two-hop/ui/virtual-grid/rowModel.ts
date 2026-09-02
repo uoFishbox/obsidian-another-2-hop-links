@@ -15,6 +15,8 @@ import type { MutableRowRange, RowRange } from "cards/virtualization/public";
 import type {
 	VirtualNavigationDirection,
 	VirtualNavigationTarget,
+	VirtualSequentialNavigationDirection,
+	VirtualSequentialNavigationTarget,
 	VirtualRow,
 	VirtualRowModel,
 } from "cards/virtualization/public";
@@ -127,6 +129,9 @@ export function createTwoHopRowModel(
 			row.firstCellIndexInSection + columnIndex,
 		);
 	};
+
+	const isSequentiallyFocusableCell = (cell: TwoHopVirtualCell): boolean =>
+		cell.kind !== "header" || Boolean(cell.section.header.props.interactionId);
 
 	const getRow = (rowIndex: number): VirtualRow<TwoHopVirtualCell> | null => {
 		const row = geometry.resolveRow(rowIndex);
@@ -265,6 +270,60 @@ export function createTwoHopRowModel(
 			: null;
 	};
 
+	const resolveSequentialNavigationTarget = (
+		currentKey: string,
+		direction: VirtualSequentialNavigationDirection,
+		currentPosition: { rowIndex: number; columnIndex: number },
+	): VirtualSequentialNavigationTarget | null => {
+		const currentCell = getCell(
+			currentPosition.rowIndex,
+			currentPosition.columnIndex,
+		);
+		if (!currentCell || currentCell.logicalKey !== currentKey) return null;
+
+		const step = direction === "forward" ? 1 : -1;
+		let rowIndex = currentPosition.rowIndex;
+		let columnIndex = currentPosition.columnIndex + step;
+
+		while (rowIndex >= 0 && rowIndex < rowCount) {
+			const row = getRow(rowIndex);
+			if (!row) return null;
+
+			if (direction === "forward") {
+				for (; columnIndex < row.cellCount; columnIndex += 1) {
+					const targetCell = row.getCell(columnIndex);
+					if (!targetCell || !isSequentiallyFocusableCell(targetCell))
+						continue;
+					return {
+						key: targetCell.logicalKey,
+						rowTop: row.top,
+						rowIndex,
+						columnIndex,
+					};
+				}
+				rowIndex += 1;
+				columnIndex = 0;
+				continue;
+			}
+
+			for (; columnIndex >= 0; columnIndex -= 1) {
+				const targetCell = row.getCell(columnIndex);
+				if (!targetCell || !isSequentiallyFocusableCell(targetCell)) continue;
+				return {
+					key: targetCell.logicalKey,
+					rowTop: row.top,
+					rowIndex,
+					columnIndex,
+				};
+			}
+			rowIndex -= 1;
+			const previousRow = getRow(rowIndex);
+			columnIndex = previousRow ? previousRow.cellCount - 1 : -1;
+		}
+
+		return null;
+	};
+
 	const rowModel: TwoHopRowModel = {
 		revision: {
 			content: sections,
@@ -318,6 +377,7 @@ export function createTwoHopRowModel(
 			if (out.min >= out.max) writeInvalidBand(out);
 		},
 		resolveNavigationTarget,
+		resolveSequentialNavigationTarget,
 		resolveCellPosition,
 	};
 	return rowModel;

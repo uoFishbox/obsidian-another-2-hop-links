@@ -201,4 +201,37 @@ describe("flatLinkRowModel", () => {
 		expect(strictAtBoundary).toEqual({ start: 1, end: 3 });
 		expect(strictAtBoundary.end).toBeGreaterThan(ranges.previewVisible.end);
 	});
+	it("resolves sequential focus across physical row boundaries by logical index", () => {
+		const rowModel = createRowModel(8);
+		const current = rowModel.resolveCellAtIndex(2);
+		const next = rowModel.resolveCellAtIndex(3);
+		const previous = rowModel.resolveCellAtIndex(1);
+		expect(current).toBeTruthy();
+		expect(next).toBeTruthy();
+		expect(previous).toBeTruthy();
+		if (!current || !next || !previous) return;
+
+		expect(
+			rowModel.resolveSequentialNavigationTarget?.(current.key, "forward", {
+				rowIndex: 0,
+				columnIndex: 2,
+			}),
+		).toEqual({
+			key: next.key,
+			rowTop: 110,
+			rowIndex: 1,
+			columnIndex: 0,
+		});
+		expect(
+			rowModel.resolveSequentialNavigationTarget?.(current.key, "backward", {
+				rowIndex: 0,
+				columnIndex: 2,
+			}),
+		).toEqual({
+			key: previous.key,
+			rowTop: 0,
+			rowIndex: 0,
+			columnIndex: 1,
+		});
+	});
 });

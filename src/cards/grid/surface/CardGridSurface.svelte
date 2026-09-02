@@ -6,6 +6,8 @@
 	import type {
 		ProgrammaticScrollSnapshot,
 		VirtualNavigationTarget,
+		VirtualSequentialNavigationDirection,
+		VirtualSequentialNavigationTarget,
 	} from "cards/virtualization/public";
 	import type { CardGridMountedRow } from "./cardGridSurfaceTypes";
 	import { createCardSurfaceInteractions } from "../interaction/useCardGridInteractions.svelte";
@@ -40,6 +42,11 @@
 			direction: ResultNavigationDirection,
 			currentPosition: { rowIndex: number; columnIndex: number },
 		) => VirtualNavigationTarget | null;
+		resolveSequentialNavigationTarget?: (
+			currentKey: string,
+			direction: VirtualSequentialNavigationDirection,
+			currentPosition: { rowIndex: number; columnIndex: number },
+		) => VirtualSequentialNavigationTarget | null;
 		flushVirtualScrollMeasurement?: (snapshot: ProgrammaticScrollSnapshot) => void;
 	}
 
@@ -66,6 +73,7 @@
 		getCellDataTestId,
 		slotBodyRevision = undefined,
 		resolveNavigationTarget,
+		resolveSequentialNavigationTarget,
 		flushVirtualScrollMeasurement,
 	}: CardGridSurfaceProps<TMountedCell> = $props();
 
@@ -82,11 +90,13 @@
 		getInteractionDescriptorResolverProvider: () =>
 			interactionDescriptorResolverProvider,
 		resolveNavigationTarget,
+		resolveSequentialNavigationTarget,
 		flushVirtualScrollMeasurement,
 	});
 	const {
 		delegatedInteractions,
 		handleKeyDown,
+		handleFocusIn,
 		cellBindingRegistry,
 		touchEventHandlers,
 	} = surfaceInteractions;
@@ -100,6 +110,7 @@
 	onmousedown={delegatedInteractions.handleMouseDown}
 	oncontextmenu={delegatedInteractions.handleContextMenu}
 	onkeydown={handleKeyDown}
+	onfocusin={handleFocusIn}
 	ondragstart={delegatedInteractions.handleDragStart}
 	{...touchEventHandlers}
 >
