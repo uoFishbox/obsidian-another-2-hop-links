@@ -42,6 +42,7 @@ export const DEFAULT_SETTINGS: PluginSettings = {
 	enableUnresolvedLinkDecoration: true,
 	enableSearchArrowUpToEditorBottom: true,
 	enableEditorArrowDownToSearchInput: true,
+	experimentalCosenseTitleEditing: false,
 	priorityFrontmatterKeyForPreview: "",
 	priorityFrontmatterKeyForTitle: "",
 	enableContentSearch: false,

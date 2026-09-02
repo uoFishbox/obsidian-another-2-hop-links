@@ -7,6 +7,23 @@ import { DEFAULT_SETTINGS } from "settings/model/defaults";
 import { SETTINGS_SCHEMA_VERSION, type PluginSettings } from "settings/model/settings";
 
 describe("PluginSettingsSchema", () => {
+	it.each([undefined, null, "true", 1, false])(
+		"keeps experimental title editing disabled for %s",
+		(value) => {
+			expect(
+				parsePluginSettings({ experimentalCosenseTitleEditing: value })
+					.experimentalCosenseTitleEditing,
+			).toBe(false);
+		},
+	);
+
+	it("preserves an explicit opt-in to experimental title editing", () => {
+		expect(
+			parsePluginSettings({ experimentalCosenseTitleEditing: true })
+				.experimentalCosenseTitleEditing,
+		).toBe(true);
+	});
+
 	it("accepts a fully valid settings object unchanged", () => {
 		const raw: PluginSettings = { ...DEFAULT_SETTINGS, language: "ja" };
 

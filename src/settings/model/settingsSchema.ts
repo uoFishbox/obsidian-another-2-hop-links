@@ -140,6 +140,9 @@ export const PluginSettingsSchema = z.object({
 		DEFAULT_SETTINGS.enableEditorArrowDownToSearchInput,
 	),
 	enableContentSearch: booleanSetting(DEFAULT_SETTINGS.enableContentSearch ?? false),
+	experimentalCosenseTitleEditing: booleanSetting(
+		DEFAULT_SETTINGS.experimentalCosenseTitleEditing,
+	),
 	priorityFrontmatterKeyForPreview: stringSetting(
 		DEFAULT_SETTINGS.priorityFrontmatterKeyForPreview ?? "",
 	),

@@ -3,6 +3,13 @@ import type { SettingDefinition } from "./settingDefinition";
 export const INTERACTION_SETTING_DEFINITIONS: ReadonlyArray<SettingDefinition> = [
 	{
 		section: "interaction",
+		settingKey: "experimentalCosenseTitleEditing",
+		controlType: "toggle",
+		translationKey: "experimentalCosenseTitleEditing",
+		descriptionKey: "experimentalCosenseTitleEditingDesc",
+	},
+	{
+		section: "interaction",
 		settingKey: "highlightOnOpen",
 		controlType: "dropdown",
 		translationKey: "highlightOnOpen",

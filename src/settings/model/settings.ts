@@ -71,6 +71,8 @@ export interface PluginSettings {
 	enableUnresolvedLinkDecoration: boolean;
 	enableSearchArrowUpToEditorBottom: boolean;
 	enableEditorArrowDownToSearchInput: boolean;
+	/** Enables experimental Cosense-style title/body editing and note creation. */
+	experimentalCosenseTitleEditing: boolean;
 	enableContentSearch?: boolean;
 	priorityFrontmatterKeyForPreview?: string;
 	priorityFrontmatterKeyForTitle?: string;

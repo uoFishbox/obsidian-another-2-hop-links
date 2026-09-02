@@ -27,6 +27,7 @@ import { AbstractSvelteListView } from "obsidian-integration/views/abstractSvelt
 import { buildEditorLikeFrame } from "obsidian-integration/views/editorLikeFrame";
 import { getCardItemKey, type CardItem } from "cards/CardItem";
 import { materializePreCreationFile } from "./preCreationFileWorkflow";
+import { isPlainEnterAtContentEnd } from "shared/ui/dom/contentEditableCaret";
 
 export const VIEW_TYPE_PRE_CREATE = "cosense-card-links-pre-create-view";
 export const PRE_CREATION_EPHEMERAL_STATE_KEY = "cosense-card-links-pre-create";
@@ -464,7 +465,16 @@ export class PreCreationView extends AbstractSvelteListView<IndexedLink> {
 		this.inlineTitleEl.addEventListener("keydown", (e: KeyboardEvent) => {
 			if (e.key === "Enter") {
 				e.preventDefault();
-				this.inlineTitleEl?.blur();
+				if (!this.plugin.settings.experimentalCosenseTitleEditing) {
+					this.inlineTitleEl?.blur();
+					return;
+				}
+				if (
+					this.inlineTitleEl &&
+					isPlainEnterAtContentEnd(e, this.inlineTitleEl)
+				) {
+					void this.handleCreateAndOpen();
+				}
 			} else if (e.key === "Escape") {
 				this.titleCancelled = true;
 				if (this.inlineTitleEl) {

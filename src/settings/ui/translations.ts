@@ -48,6 +48,8 @@ export type TranslationKey =
 	| "priorityFrontmatterKeyForTitle"
 	| "priorityFrontmatterKeyForTitleDesc"
 	| "interaction"
+	| "experimentalCosenseTitleEditing"
+	| "experimentalCosenseTitleEditingDesc"
 	| "highlightOnOpen"
 	| "highlightOnOpenDesc"
 	| "highlightInPopoverOnHover"
@@ -87,6 +89,9 @@ export type TranslationKey =
 
 const translations: Record<Language, Record<TranslationKey, string>> = {
 	en: {
+		experimentalCosenseTitleEditing: "Experimental: Cosense-style title editing",
+		experimentalCosenseTitleEditingDesc:
+			"In edit mode, seamlessly move the caret and edit text between the title and body.",
 		language: "Language",
 		languageDesc: "Select the display language for settings.",
 		display: "Display",
@@ -203,6 +208,9 @@ const translations: Record<Language, Record<TranslationKey, string>> = {
 		card: "Card",
 	},
 	ja: {
+		experimentalCosenseTitleEditing: "Experimental: Cosenseスタイルのタイトル編集",
+		experimentalCosenseTitleEditingDesc:
+			"編集モードで、タイトルと本文の間のキャレット移動・テキスト編集をシームレスにします。",
 		language: "言語",
 		languageDesc: "設定画面の表示言語を選択します。",
 		display: "表示",
