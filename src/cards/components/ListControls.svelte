@@ -1,16 +1,44 @@
 <script lang="ts">
+	import { Menu, setIcon, type IconName } from "obsidian";
+	import { onDestroy } from "svelte";
 	import { ARIA_LABELS } from "cards/ariaLabels";
 	import type { ResultFocusDirection } from "cards/navigation/resultFocus";
 	import type { SortOption } from "cards/sorting";
 
 	const SORT_FIELDS = [
-		{ label: "タイトル", asc: "alphabetical", desc: "alphabetical-reverse" },
-		{ label: "被リンク数", asc: "backlink-count", desc: "backlink-count-reverse" },
-		{ label: "作成日時", asc: "created-date", desc: "created-date-reverse" },
-		{ label: "更新日時", asc: "modified-date", desc: "modified-date-reverse" },
-		{ label: "ファイルサイズ", asc: "file-size", desc: "file-size-reverse" },
+		{
+			label: "タイトル",
+			icon: "type",
+			asc: "alphabetical",
+			desc: "alphabetical-reverse",
+		},
+		{
+			label: "被リンク数",
+			icon: "links-coming-in",
+			asc: "backlink-count",
+			desc: "backlink-count-reverse",
+		},
+		{
+			label: "作成日時",
+			icon: "calendar-plus",
+			asc: "created-date",
+			desc: "created-date-reverse",
+		},
+		{
+			label: "更新日時",
+			icon: "clock",
+			asc: "modified-date",
+			desc: "modified-date-reverse",
+		},
+		{
+			label: "ファイルサイズ",
+			icon: "hard-drive",
+			asc: "file-size",
+			desc: "file-size-reverse",
+		},
 	] as const satisfies readonly {
 		label: string;
+		icon: IconName;
 		asc: SortOption;
 		desc: SortOption;
 	}[];
@@ -59,11 +87,51 @@
 			: "昇順（クリックで降順に切り替え）",
 	);
 
-	function handleSortChange(e: Event): void {
-		const target = e.target as HTMLSelectElement;
-		const field = SORT_FIELDS.find((field) => field.asc === target.value);
-		if (!field) return;
-		onSortChange(isDescending ? field.desc : field.asc);
+	let sortMenu = $state<Menu | null>(null);
+
+	function renderSortFieldIcon(
+		element: HTMLElement,
+		icon: IconName,
+	): { update: (nextIcon: IconName) => void } {
+		setIcon(element, icon);
+
+		return {
+			update(nextIcon): void {
+				setIcon(element, nextIcon);
+			},
+		};
+	}
+
+	onDestroy(() => sortMenu?.hide());
+
+	function openSortMenu(event: MouseEvent | KeyboardEvent): void {
+		const trigger = event.currentTarget as HTMLDivElement;
+		const { left, bottom } = trigger.getBoundingClientRect();
+		sortMenu?.hide();
+
+		const menu = new Menu();
+		for (const field of SORT_FIELDS) {
+			menu.addItem((item) => {
+				item.setTitle(field.label)
+					.setIcon(field.icon)
+					.setChecked(field.asc === sortField.asc)
+					.onClick(() => {
+						onSortChange(isDescending ? field.desc : field.asc);
+					});
+			});
+		}
+		menu.onHide(() => {
+			if (sortMenu === menu) sortMenu = null;
+		});
+		sortMenu = menu;
+		menu.showAtPosition({ x: left, y: bottom }, trigger.ownerDocument);
+	}
+
+	function handleSortMenuKeydown(event: KeyboardEvent): void {
+		if (event.isComposing || (event.key !== "Enter" && event.key !== " ")) return;
+		event.preventDefault();
+		if (event.repeat) return;
+		openSortMenu(event);
 	}
 
 	function toggleSortDirection(): void {
@@ -231,16 +299,28 @@
 		>
 			更新日時
 		</button>
-		<select
-			class="dropdown"
-			value={sortField.asc}
-			onchange={handleSortChange}
+		<div
+			class="twohop-sort-menu-trigger text-icon-button"
+			role="button"
+			tabindex="0"
+			onclick={openSortMenu}
+			onkeydown={handleSortMenuKeydown}
 			aria-label={ARIA_LABELS.SORT_SELECT}
+			aria-haspopup="menu"
+			aria-expanded={sortMenu !== null}
 		>
-			{#each SORT_FIELDS as field}
-				<option value={field.asc}>{field.label}</option>
-			{/each}
-		</select>
+			<span
+				class="twohop-sort-field-icon text-button-icon"
+				aria-hidden="true"
+				use:renderSortFieldIcon={sortField.icon}
+			></span>
+			<span class="text-button-label">{sortField.label}</span>
+			<span
+				class="text-button-icon mod-aux"
+				aria-hidden="true"
+				use:renderSortFieldIcon={"chevrons-up-down"}
+			></span>
+		</div>
 	</div>
 </div>
 
@@ -275,6 +355,42 @@
 		gap: 8px;
 		flex: 0 0 auto;
 		order: 2;
+	}
+
+	.twohop-header-controls .text-icon-button {
+		--icon-color-hover: var(--text-normal);
+    	color: var(--text-normal);
+	}
+
+	/* .twohop-sort-menu-trigger {
+		color: var(--text-muted);
+		font-size: var(--font-smaller);
+		display: flex;
+		align-items: center;
+		gap: var(--size-4-2);
+		padding: var(--size-2-3) var(--size-4-2) var(--size-2-3) var(--size-4-1);
+		background: none;
+		cursor: var(--cursor);
+		overflow: hidden;
+		flex-grow: 1;
+		corner-shape: var(--corner-shape);
+		white-space: nowrap;
+		height: var(--input-height)
+	}
+
+	.twohop-sort-menu-trigger:hover {
+		color: var(--vault-profile-color-hover);
+		background-color: var(--background-modifier-hover);
+		border-radius: var(--vault-profile-radius);
+		height: var(--input-height);
+	} */
+	.twohop-sort-menu-trigger.text-icon-button {
+		margin: 2px;
+	}
+
+	.twohop-sort-menu-trigger:focus-visible {
+		outline: 2px solid var(--interactive-accent);
+		outline-offset: 2px;
 	}
 
 	@container (max-width: 500px) {

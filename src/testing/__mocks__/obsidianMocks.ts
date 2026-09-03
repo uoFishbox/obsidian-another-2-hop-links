@@ -1,3 +1,12 @@
+import type { IconName, MenuPositionDef } from "obsidian";
+
+export function setIcon(parent: HTMLElement, icon: IconName): void {
+	parent.dataset.icon = icon;
+	parent.replaceChildren(
+		parent.ownerDocument.createElementNS("http://www.w3.org/2000/svg", "svg"),
+	);
+}
+
 export class TFile {
 	path: string;
 	name: string;
@@ -45,12 +54,18 @@ type MenuItemCallback = (item: MenuItem) => void;
 
 export class MenuItem {
 	title = "";
+	checked: boolean | null = null;
 	icon = "";
 	section = "";
 	clickHandler: (() => void) | null = null;
 
 	setTitle(title: string): this {
 		this.title = title;
+		return this;
+	}
+
+	setChecked(checked: boolean | null): this {
+		this.checked = checked;
 		return this;
 	}
 
@@ -74,6 +89,7 @@ export class Menu {
 	items: MenuItem[] = [];
 	separatorCount = 0;
 	shownAt: MouseEvent | null = null;
+	private hideCallback: (() => void) | null = null;
 
 	addItem(callback: MenuItemCallback): this {
 		const item = new MenuItem();
@@ -89,6 +105,19 @@ export class Menu {
 
 	showAtMouseEvent(event: MouseEvent): this {
 		this.shownAt = event;
+		return this;
+	}
+
+	showAtPosition(this: Menu, _position: MenuPositionDef, _doc?: Document): Menu {
+		return this;
+	}
+
+	onHide(callback: () => void): void {
+		this.hideCallback = callback;
+	}
+
+	hide(): this {
+		this.hideCallback?.();
 		return this;
 	}
 }
