@@ -498,6 +498,7 @@
 			}}
 			{contentSearchEnabled}
 			sortOption={currentSort}
+			allowRelevanceSort={true}
 			onSortChange={(opt) => applicationUiState.setSortOption(opt)}
 			onMoveFocusToResults={moveFocusToResults}
 		/>

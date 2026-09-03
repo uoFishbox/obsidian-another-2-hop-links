@@ -8,6 +8,33 @@ import ListControls from "../ListControls.svelte";
 describe("ListControls", () => {
 	afterEach(() => vi.restoreAllMocks());
 
+	it("offers relevance only when an origin is available and fixes its direction", async () => {
+		const showAtPosition = vi.spyOn(Menu.prototype, "showAtPosition");
+		const onSortChange = vi.fn();
+		const view = render(ListControls, {
+			props: { sortOption: "alphabetical", onSortChange },
+		});
+		const trigger = screen.getByRole("button", { name: ARIA_LABELS.SORT_SELECT });
+		await fireEvent.click(trigger);
+		expect(
+			showAtPosition.mock.contexts[0].items.some(
+				(item) => item.title === "関連度",
+			),
+		).toBe(false);
+
+		await view.rerender({ allowRelevanceSort: true });
+		await fireEvent.click(trigger);
+		showAtPosition.mock.contexts[1].items
+			.find((item) => item.title === "関連度")
+			?.clickHandler?.();
+		expect(onSortChange).toHaveBeenLastCalledWith("relevance");
+		await view.rerender({ sortOption: "relevance" });
+		expect(trigger).toHaveTextContent("関連度");
+		expect(screen.getByRole("button", { name: "関連度の高い順" })).toBeDisabled();
+		await fireEvent.click(screen.getByRole("button", { name: "更新日時" }));
+		expect(onSortChange).toHaveBeenLastCalledWith("modified-date-reverse");
+	});
+
 	it("opens an Obsidian menu below the div trigger and marks the current sort field", async () => {
 		const showAtPosition = vi.spyOn(Menu.prototype, "showAtPosition");
 		const onSortChange = vi.fn();
@@ -43,7 +70,7 @@ describe("ListControls", () => {
 			menu.items.map(({ title, icon, checked }) => ({ title, icon, checked })),
 		).toEqual([
 			{ title: "タイトル", icon: "type", checked: false },
-			{ title: "被リンク数", icon: "link", checked: false },
+			{ title: "被リンク数", icon: "links-coming-in", checked: false },
 			{ title: "作成日時", icon: "calendar-plus", checked: true },
 			{ title: "更新日時", icon: "clock", checked: false },
 			{ title: "ファイルサイズ", icon: "hard-drive", checked: false },
@@ -91,7 +118,7 @@ describe("ListControls", () => {
 
 	it.each([
 		["タイトル", "type", "alphabetical", "alphabetical-reverse"],
-		["被リンク数", "link", "backlink-count", "backlink-count-reverse"],
+		["被リンク数", "links-coming-in", "backlink-count", "backlink-count-reverse"],
 		["作成日時", "calendar-plus", "created-date", "created-date-reverse"],
 		["更新日時", "clock", "modified-date", "modified-date-reverse"],
 		["ファイルサイズ", "hard-drive", "file-size", "file-size-reverse"],

@@ -5,6 +5,19 @@
 	import type { ResultFocusDirection } from "cards/navigation/resultFocus";
 	import type { SortOption } from "cards/sorting";
 
+	interface SortField {
+		label: string;
+		icon: IconName;
+		asc: SortOption;
+		desc: SortOption;
+	}
+	const RELEVANCE_FIELD: SortField = {
+		label: "関連度",
+		icon: "network",
+		asc: "relevance",
+		desc: "relevance",
+	};
+
 	const SORT_FIELDS = [
 		{
 			label: "タイトル",
@@ -46,6 +59,7 @@
 	interface Props {
 		searchInputValue?: string;
 		sortOption: SortOption;
+		allowRelevanceSort?: boolean;
 		onSortChange: (option: SortOption) => void;
 		onSearchInput?: (value: string) => void;
 		onSearchSubmit?: (value: string) => void | Promise<void>;
@@ -63,6 +77,7 @@
 	let {
 		searchInputValue = "",
 		sortOption,
+		allowRelevanceSort = false,
 		onSortChange,
 		onSearchInput = () => {},
 		onSearchSubmit = () => {},
@@ -75,16 +90,21 @@
 		searchPlaceholder = "Search...",
 	}: Props = $props();
 
+	const sortFields: readonly SortField[] = $derived(
+		allowRelevanceSort ? [RELEVANCE_FIELD, ...SORT_FIELDS] : SORT_FIELDS,
+	);
 	const sortField = $derived(
-		SORT_FIELDS.find(
+		sortFields.find(
 			(field) => field.asc === sortOption || field.desc === sortOption,
 		) ?? SORT_FIELDS[0],
 	);
 	const isDescending = $derived(sortOption === sortField.desc);
 	const sortDirectionLabel = $derived(
-		isDescending
-			? "降順（クリックで昇順に切り替え）"
-			: "昇順（クリックで降順に切り替え）",
+		sortOption === "relevance"
+			? "関連度の高い順"
+			: isDescending
+				? "降順（クリックで昇順に切り替え）"
+				: "昇順（クリックで降順に切り替え）",
 	);
 
 	let sortMenu = $state<Menu | null>(null);
@@ -110,7 +130,7 @@
 		sortMenu?.hide();
 
 		const menu = new Menu();
-		for (const field of SORT_FIELDS) {
+		for (const field of sortFields) {
 			menu.addItem((item) => {
 				item.setTitle(field.label)
 					.setIcon(field.icon)
@@ -135,6 +155,7 @@
 	}
 
 	function toggleSortDirection(): void {
+		if (sortOption === "relevance") return;
 		onSortChange(isDescending ? sortField.asc : sortField.desc);
 	}
 
@@ -269,6 +290,7 @@
 			type="button"
 			class="clickable-icon"
 			aria-label={sortDirectionLabel}
+			disabled={sortOption === "relevance"}
 			title={sortDirectionLabel}
 			onclick={toggleSortDirection}
 		>
@@ -359,7 +381,7 @@
 
 	.twohop-header-controls .text-icon-button {
 		--icon-color-hover: var(--text-normal);
-    	color: var(--text-normal);
+		color: var(--text-normal);
 	}
 
 	/* .twohop-sort-menu-trigger {

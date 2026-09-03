@@ -3,6 +3,7 @@ import type { CardLinkBranch } from "cards/model";
 import type { IndexedLink, TaggedNote } from "indexing/model";
 
 export type SortOption =
+	| "relevance"
 	| "alphabetical"
 	| "alphabetical-reverse"
 	| "created-date"

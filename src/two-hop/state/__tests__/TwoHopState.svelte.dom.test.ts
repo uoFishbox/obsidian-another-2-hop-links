@@ -23,6 +23,10 @@ import { buildLinkIndexArtifactsChunked } from "indexing/backlink-builder/backli
 import { TagIndexStore } from "indexing/tag-index/TagIndexStore";
 import { createDedupState } from "two-hop/display/deduplication/usageTracker";
 import { VaultEnvironmentBuilder } from "testing/helpers/VaultEnvironmentBuilder";
+import { createDisplayDataBuilder } from "two-hop/display/displayDataBuilder";
+import { getRelevanceLinkTargets } from "two-hop/display/relevanceSort";
+import { MetricProvider } from "cards/sorting/MetricProvider";
+import { SortService } from "cards/sorting/SortService";
 
 function createEmptyDisplayData(): DisplayData {
 	return {
@@ -118,6 +122,7 @@ function createStagedBuildDisplayDataMock() {
 			const resolvedBranches = linkResult?.branches ?? [];
 			const resolvedBacklinks = linkResult?.backlinks ?? [];
 			return {
+				originPath: linkResult?.originFile.path,
 				resolvedBranches,
 				resolvedBacklinks,
 				mergedBaseItems: [...resolvedBranches, ...resolvedBacklinks],
@@ -146,6 +151,7 @@ function createStagedBuildDisplayDataMock() {
 			return {
 				state: createDedupState(),
 				data: {
+					originPath: preprocessed.originPath,
 					resolvedBranches: preprocessed.resolvedBranches,
 					resolvedBacklinks: preprocessed.resolvedBacklinks,
 					mergedBaseItems: preprocessed.mergedBaseItems,
@@ -178,6 +184,7 @@ function createSplitStagedBuildDisplayDataMock() {
 			return {
 				state: createDedupState(),
 				data: {
+					originPath: linkResult?.originFile.path,
 					resolvedBranches,
 					resolvedBacklinks,
 					mergedBaseItems: [...resolvedBranches, ...resolvedBacklinks],
@@ -1038,5 +1045,78 @@ describe("TwoHopState (Runes)", () => {
 		expect(store.uiState.previewState.getRenderVersion("target.md")).not.toBe(
 			previousPreviewVersion,
 		);
+	});
+
+	it("refreshes relevance ordering after a text-only edit without reloading the graph", async () => {
+		const environment = new VaultEnvironmentBuilder([
+			{ path: "origin.md", links: ["a", "b"] },
+			{ path: "a.md", links: ["origin"] },
+			{ path: "b.md", links: ["origin"] },
+		]).build();
+		const settings = {
+			...DEFAULT_SETTINGS,
+			lastUsedSortOption: "relevance" as const,
+			useMergedLinksSection: false,
+		};
+		const a = environment.files["a.md"];
+		const b = environment.files["b.md"];
+		a.stat.mtime = 1;
+		b.stat.mtime = 2;
+		const result = {
+			...createLinkResultWithBranch("origin.md", "a.md"),
+			branches: [
+				...createLinkResultWithBranch("origin.md", "a.md").branches,
+				...createLinkResultWithBranch("origin.md", "b.md").branches,
+			],
+		};
+		const resolveTwoHopLinks = vi
+			.fn<ResolveTwoHopLinks>()
+			.mockResolvedValue(
+				createTwoHopResolveSnapshot(
+					result,
+					collectResolverDependencies(null, result),
+				),
+			);
+		let sortVersion = 0;
+		const sortService = new SortService(
+			new MetricProvider(
+				environment.mockMetadataCache,
+				environment.mockVault,
+				environment.service,
+				() => settings,
+			),
+		);
+		const builder = createDisplayDataBuilder({
+			sortService,
+			getLinkTargets: (path) =>
+				getRelevanceLinkTargets(
+					path,
+					environment.mockMetadataCache,
+					environment.mockVault,
+				),
+			getSortContextVersion: () => sortVersion,
+		});
+		const store = new TwoHopState(settings, builder, resolveTwoHopLinks, vi.fn());
+		await store.load(environment.files["origin.md"]);
+		expect(store.displayData.outgoing.map((branch) => branch.hop1.path)).toEqual([
+			"b.md",
+			"a.md",
+		]);
+		a.stat.mtime = 3;
+		sortService.invalidateCache();
+		sortVersion += 1;
+		await store.handleDataUpdate({
+			affectedPaths: ["a.md"],
+			affectedLookupKeys: [],
+			affectedTags: [],
+			affectedLinkSourcePaths: [],
+			affectedTagSourcePaths: [],
+		});
+		expect(resolveTwoHopLinks).toHaveBeenCalledTimes(1);
+		expect(store.displayData.outgoing.map((branch) => branch.hop1.path)).toEqual([
+			"a.md",
+			"b.md",
+		]);
+		store.destroy();
 	});
 });

@@ -106,6 +106,9 @@ vi.mock("obsidian", () => {
 	return {
 		ItemView,
 		TFile,
+		Scope: vi.fn(function () {
+			return { register: vi.fn(), unregister: vi.fn() };
+		}),
 		setIcon: vi.fn(),
 	};
 });

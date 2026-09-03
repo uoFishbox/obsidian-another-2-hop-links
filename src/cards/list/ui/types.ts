@@ -27,6 +27,7 @@ export interface ListConfig<T = CardItem> {
 	getItemKey: (item: T) => string;
 	/** Optional owner-level sorted-result cache for stable item collections. */
 	getSortedItems?: (option: SortOption) => T[];
+	allowRelevanceSort?: boolean;
 	sectionId: string;
 	pinBookmarkedToTop?: boolean;
 	emptyMessage: string;

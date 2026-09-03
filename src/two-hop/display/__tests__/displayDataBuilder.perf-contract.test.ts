@@ -57,6 +57,7 @@ function preprocessDisplayData(
 	settings: PluginSettings,
 ): PreprocessedDisplayData {
 	const builder = createDisplayDataBuilder({
+		getLinkTargets: () => new Set(),
 		sortService: createReorderingSortService().service,
 	});
 	const linkResultData = builder.preprocessLinkDisplayData(linkResult, settings);
@@ -140,7 +141,10 @@ beforeEach(() => {
 describe("DisplayDataBuilder performance contracts", () => {
 	it("does not sort single-element display arrays", () => {
 		const sortService = createIdentitySortService();
-		const builder = createDisplayDataBuilder({ sortService: sortService.service });
+		const builder = createDisplayDataBuilder({
+			getLinkTargets: () => new Set(),
+			sortService: sortService.service,
+		});
 		const linkResult = createLinkResult([createBranch("outgoing", "outgoing.md")]);
 
 		createDisplayData(builder, linkResult, defaultSettings);
@@ -150,7 +154,10 @@ describe("DisplayDataBuilder performance contracts", () => {
 
 	it("reuses the assembled display for the same preprocessed snapshot", () => {
 		const sortService = createReorderingSortService();
-		const builder = createDisplayDataBuilder({ sortService: sortService.service });
+		const builder = createDisplayDataBuilder({
+			getLinkTargets: () => new Set(),
+			sortService: sortService.service,
+		});
 		const preprocessed = preprocessDisplayData(undefined, defaultSettings);
 
 		const first = builder.sortAndAssembleDisplayData(
@@ -181,6 +188,7 @@ describe("DisplayDataBuilder performance contracts", () => {
 			};
 			const sortService = createReorderingSortService();
 			const builder = createDisplayDataBuilder({
+				getLinkTargets: () => new Set(),
 				sortService: sortService.service,
 			});
 			const preprocessed = preprocessDisplayData(
@@ -225,6 +233,7 @@ describe("DisplayDataBuilder performance contracts", () => {
 		let sortContextVersion = 1;
 		const sortService = createReorderingSortService();
 		const builder = createDisplayDataBuilder({
+			getLinkTargets: () => new Set(),
 			sortService: sortService.service,
 			getSortContextVersion: () => sortContextVersion,
 		});
@@ -263,6 +272,7 @@ describe("DisplayDataBuilder performance contracts", () => {
 		let sortContextVersion = 1;
 		const sortService = createReorderingSortService();
 		const builder = createDisplayDataBuilder({
+			getLinkTargets: () => new Set(),
 			sortService: sortService.service,
 			getSortContextVersion: () => sortContextVersion,
 		});
@@ -288,11 +298,19 @@ describe("DisplayDataBuilder performance contracts", () => {
 
 		expect(third).not.toBe(first);
 		expect(sortService.sort.mock.calls.length).toBe(2);
+		sortContextVersion = 1;
+		expect(builder.getSortedTagGroupItems(taggedNotes, "alphabetical")).not.toBe(
+			first,
+		);
+		expect(sortService.sort).toHaveBeenCalledTimes(3);
 	});
 
 	it("reuses a sorted two-hop array by reference", () => {
 		const sortService = createReorderingSortService();
-		const builder = createDisplayDataBuilder({ sortService: sortService.service });
+		const builder = createDisplayDataBuilder({
+			getLinkTargets: () => new Set(),
+			sortService: sortService.service,
+		});
 		const items: IndexedLink[] = [
 			{
 				rawText: "hop2-b",
@@ -319,6 +337,7 @@ describe("DisplayDataBuilder performance contracts", () => {
 		let sortContextVersion = 1;
 		const sortService = createReorderingSortService();
 		const builder = createDisplayDataBuilder({
+			getLinkTargets: () => new Set(),
 			sortService: sortService.service,
 			getSortContextVersion: () => sortContextVersion,
 		});
@@ -343,6 +362,9 @@ describe("DisplayDataBuilder performance contracts", () => {
 
 		expect(second).not.toBe(first);
 		expect(sortService.sort).toHaveBeenCalledTimes(2);
+		sortContextVersion = 1;
+		expect(builder.getSortedTwoHopItems(items, "alphabetical")).not.toBe(first);
+		expect(sortService.sort).toHaveBeenCalledTimes(3);
 	});
 
 	it("reuses the original two-hop branch when its order is unchanged", () => {
@@ -369,6 +391,7 @@ describe("DisplayDataBuilder performance contracts", () => {
 			],
 		};
 		const builder = createDisplayDataBuilder({
+			getLinkTargets: () => new Set(),
 			sortService: createIdentitySortService().service,
 		});
 
@@ -397,6 +420,7 @@ describe("DisplayDataBuilder performance contracts", () => {
 			},
 		];
 		const builder = createDisplayDataBuilder({
+			getLinkTargets: () => new Set(),
 			sortService: createReorderingSortService().service,
 		});
 
@@ -411,6 +435,7 @@ describe("DisplayDataBuilder performance contracts", () => {
 		["showTagsSection", { showTagsSection: false }],
 	] as const)("invalidates the %s assembly dependency", (_key, override) => {
 		const builder = createDisplayDataBuilder({
+			getLinkTargets: () => new Set(),
 			sortService: createIdentitySortService().service,
 		});
 		const preprocessed = preprocessDisplayData(undefined, defaultSettings);
@@ -437,6 +462,7 @@ describe("DisplayDataBuilder performance contracts", () => {
 	it("does not reuse assembled data after the sort context changes", () => {
 		let sortContextVersion = 1;
 		const builder = createDisplayDataBuilder({
+			getLinkTargets: () => new Set(),
 			sortService: createIdentitySortService().service,
 			getSortContextVersion: () => sortContextVersion,
 		});
@@ -460,6 +486,7 @@ describe("DisplayDataBuilder performance contracts", () => {
 	it("groups tags once across an A -> B -> A display revisit", () => {
 		const groupNotesByTagSpy = vi.spyOn(grouping, "groupNotesByTag");
 		const builder = createDisplayDataBuilder({
+			getLinkTargets: () => new Set(),
 			sortService: createReorderingSortService().service,
 		});
 		const preprocessed = preprocessDisplayData(

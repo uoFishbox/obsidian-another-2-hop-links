@@ -20,6 +20,7 @@ import {
 export type MergedLinkItem = TwoHopLinkBranch | IndexedLink;
 
 export interface PreprocessedDisplayData {
+	readonly originPath: string | undefined;
 	readonly resolvedBranches: readonly TwoHopLinkBranch[];
 	readonly resolvedBacklinks: readonly IndexedLink[];
 	readonly mergedBaseItems: readonly MergedLinkItem[];
@@ -29,6 +30,7 @@ export interface PreprocessedDisplayData {
 }
 
 export interface LinkPreprocessedDisplayData {
+	readonly originPath: string | undefined;
 	readonly resolvedBranches: readonly TwoHopLinkBranch[];
 	readonly resolvedBacklinks: readonly IndexedLink[];
 	readonly mergedBaseItems: readonly MergedLinkItem[];
@@ -48,6 +50,7 @@ export interface LinkPreprocessingResult {
 
 function createEmptyLinkPreprocessedDisplayData(): LinkPreprocessedDisplayData {
 	return {
+		originPath: undefined,
 		resolvedBranches: [],
 		resolvedBacklinks: [],
 		mergedBaseItems: [],
@@ -323,6 +326,7 @@ export function preprocessLinkDisplayData(
 
 	return {
 		data: {
+			originPath: linkResult.originFile.path,
 			resolvedBranches,
 			resolvedBacklinks,
 			mergedBaseItems,

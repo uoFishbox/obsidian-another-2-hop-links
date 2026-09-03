@@ -17,6 +17,7 @@ vi.mock("obsidian", () => {
 
 	return {
 		TFile,
+		requireApiVersion: vi.fn(() => false),
 		Platform: { isMobile: false },
 	};
 });

@@ -144,15 +144,16 @@ export class TwoHopState {
 		);
 
 		// ソート段のみを sortOption 依存で再計算する
-		this.computedDisplayData = $derived.by(
-			(): ComputedDisplayData =>
-				computeSortedDisplayDataState(
-					this.displayDataBuilder,
-					this.preprocessedDisplayData,
-					this.uiState.settings,
-					this.uiState.sortOption,
-				),
-		);
+		this.computedDisplayData = $derived.by((): ComputedDisplayData => {
+			if (this.uiState.sortOption === "relevance")
+				void this.uiState.updateVersion;
+			return computeSortedDisplayDataState(
+				this.displayDataBuilder,
+				this.preprocessedDisplayData,
+				this.uiState.settings,
+				this.uiState.sortOption,
+			);
+		});
 		this.displayState = $derived(this.computedDisplayData);
 		this.displayData = $derived(this.displayState.displayData);
 		this.hasDisplayableItems = $derived(this.displayState.hasDisplayableItems);
@@ -196,6 +197,8 @@ export class TwoHopState {
 
 		if (action.kind === "preview-only") {
 			this.uiState.previewState.invalidate(action.previewInvalidation);
+			// Text-only edits change the modified-time tie breaker without changing links.
+			if (this.uiState.sortOption === "relevance") this.uiState.triggerUpdate();
 			return;
 		}
 

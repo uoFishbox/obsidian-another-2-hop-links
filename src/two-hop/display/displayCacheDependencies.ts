@@ -68,12 +68,10 @@ export function createTagPreprocessCacheKey(settings: PluginSettings): string {
 export function createDisplayAssemblyCacheKey(
 	settings: PluginSettings,
 	sortOption: SortOption,
-	sortContextVersion: number,
 ): string {
 	return JSON.stringify([
 		settings.useMergedLinksSection,
 		settings.showTagsSection,
 		sortOption,
-		sortContextVersion,
 	]);
 }

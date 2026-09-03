@@ -4,6 +4,7 @@ import type { TaggedNote } from "indexing/model";
 import type { TagGroup } from "two-hop/model";
 import type { PluginSettings } from "settings/model";
 import type { ISortService, SortableItem, SortOption } from "cards/sorting";
+import { sortOneHopByRelevance, type GetRelevanceLinkTargets } from "./relevanceSort";
 import {
 	createDisplayAssemblyCacheKey,
 	selectDisplayAssemblySettings,
@@ -11,7 +12,6 @@ import {
 import {
 	preprocessLinkDisplayData,
 	preprocessTagDisplayData,
-	type LinkPreprocessedDisplayData,
 	type LinkPreprocessingResult,
 	type MergedLinkItem,
 	type PreprocessedDisplayData,
@@ -63,252 +63,130 @@ export interface DisplayDataBuilder {
 
 export interface DisplayDataBuilderDependencies {
 	sortService: ISortService;
+	getLinkTargets: GetRelevanceLinkTargets;
 	getSortContextVersion?: () => number;
 }
 
 type ItemSortCache = Map<
-	string,
+	SortOption,
 	WeakMap<readonly SortableItem[], readonly SortableItem[]>
 >;
 
-type Hop2SortCache = ItemSortCache;
-type TagItemSortCache = ItemSortCache;
 type DisplayAssemblyCache = WeakMap<PreprocessedDisplayData, Map<string, DisplayData>>;
 
-function createHop2SortCache(): Hop2SortCache {
-	return new Map();
-}
-
-function createTagItemSortCache(): TagItemSortCache {
-	return new Map();
-}
-
-function createDisplayAssemblyCache(): DisplayAssemblyCache {
-	return new WeakMap();
-}
-
-function sortIfNeeded<T extends SortableItem>(
-	items: readonly T[],
-	sortService: ISortService,
-	sortOption: SortOption,
-): readonly T[] {
-	if (items.length <= 1) {
-		return items;
-	}
-	return sortService.sort(items, sortOption);
-}
-
-function sortWithOriginalOrderReuse<T extends SortableItem>(
-	items: readonly T[],
-	sortService: ISortService,
-	sortOption: SortOption,
-): readonly T[] {
-	if (items.length <= 1) {
-		return items;
-	}
-
-	const sortedResult = sortIfNeeded(items, sortService, sortOption);
-	return sortedResult === items || hasSameItemOrder(items, sortedResult)
-		? items
-		: sortedResult;
-}
-
-function hasSameItemOrder<T>(original: readonly T[], sorted: readonly T[]): boolean {
-	if (original.length !== sorted.length) {
-		return false;
-	}
-
-	for (let i = 0; i < original.length; i += 1) {
-		if (original[i] !== sorted[i]) {
-			return false;
-		}
-	}
-
-	return true;
-}
-
-function createSortCacheKey(
-	sortOption: SortOption,
-	sortContextVersion: number,
-): string {
-	return `${sortContextVersion}\u0000${sortOption}`;
-}
-
-function getSortedItemsWithCache<T extends SortableItem>(
-	items: readonly T[],
-	sortService: ISortService,
-	sortOption: SortOption,
-	itemSortCache: ItemSortCache,
-	sortContextVersion = 0,
-): readonly T[] {
-	if (items.length <= 1) {
-		return items;
-	}
-
-	const sortCacheKey = createSortCacheKey(sortOption, sortContextVersion);
-	let cachedSortedItemsByOption = itemSortCache.get(sortCacheKey);
-	if (!cachedSortedItemsByOption) {
-		cachedSortedItemsByOption = new WeakMap();
-		itemSortCache.set(sortCacheKey, cachedSortedItemsByOption);
-	}
-
-	let sortedItems = cachedSortedItemsByOption.get(items) as readonly T[] | undefined;
-	if (!sortedItems) {
-		sortedItems = sortWithOriginalOrderReuse(items, sortService, sortOption);
-		cachedSortedItemsByOption.set(items, sortedItems);
-	}
-
-	return sortedItems;
-}
-
-function sortAndAssembleDisplayData(
-	preprocessed: PreprocessedDisplayData,
-	settings: PluginSettings,
-	sortOption: SortOption,
-	sortService: ISortService,
-	hop2SortCache: Hop2SortCache = createHop2SortCache(),
-	displayAssemblyCache: DisplayAssemblyCache = createDisplayAssemblyCache(),
-	sortContextVersion = 0,
-): DisplayData {
-	const assemblySettings = selectDisplayAssemblySettings(settings);
-	const assemblyKey = createDisplayAssemblyCacheKey(
-		settings,
-		sortOption,
-		sortContextVersion,
-	);
-	const cachedDisplayData = displayAssemblyCache.get(preprocessed)?.get(assemblyKey);
-	if (cachedDisplayData) {
-		return cachedDisplayData;
-	}
-
-	const sortedNewLinks = getSortedItemsWithCache(
-		preprocessed.newLinks,
-		sortService,
-		sortOption,
-		hop2SortCache,
-		sortContextVersion,
-	);
-
-	let sortedOutgoing: readonly TwoHopLinkBranch[] = [];
-	let sortedBacklinks: readonly IndexedLink[] = [];
-	let sortedMergedItems: readonly MergedLinkItem[] = [];
-
-	if (assemblySettings.useMergedLinksSection) {
-		sortedMergedItems = getSortedItemsWithCache(
-			preprocessed.mergedBaseItems,
-			sortService,
-			sortOption,
-			hop2SortCache,
-			sortContextVersion,
-		);
-	} else {
-		sortedOutgoing = getSortedItemsWithCache(
-			preprocessed.resolvedBranches,
-			sortService,
-			sortOption,
-			hop2SortCache,
-			sortContextVersion,
-		);
-		sortedBacklinks = getSortedItemsWithCache(
-			preprocessed.resolvedBacklinks,
-			sortService,
-			sortOption,
-			hop2SortCache,
-			sortContextVersion,
-		);
-	}
-
-	let tagGroups: readonly TagGroup[] = [];
-	if (assemblySettings.showTagsSection) {
-		tagGroups = preprocessed.rawTagGroups;
-	}
-
-	const displayData: DisplayData = {
-		outgoing: sortedOutgoing,
-		backlinks: sortedBacklinks,
-		mergedItems: sortedMergedItems,
-		twoHopBranches: preprocessed.nonEmptyTwoHopBranches,
-		tagGroups,
-		newLinks: sortedNewLinks,
-	};
-
-	const cachedDisplayDataByKey = displayAssemblyCache.get(preprocessed) ?? new Map();
-	if (!displayAssemblyCache.has(preprocessed)) {
-		displayAssemblyCache.set(preprocessed, cachedDisplayDataByKey);
-	}
-	cachedDisplayDataByKey.set(assemblyKey, displayData);
-
-	return displayData;
-}
-
+/** Owns display assembly and lazy item sorting for the current sort context. */
 export function createDisplayDataBuilder(
 	dependencies: DisplayDataBuilderDependencies,
 ): DisplayDataBuilder {
-	const { sortService, getSortContextVersion } = dependencies;
-	let displayAssemblyCache = createDisplayAssemblyCache();
-	let hop2SortCache = createHop2SortCache();
-	let tagItemSortCache = createTagItemSortCache();
+	const { sortService, getLinkTargets, getSortContextVersion } = dependencies;
+	let displayAssemblyCache: DisplayAssemblyCache = new WeakMap();
+	const itemSortCache: ItemSortCache = new Map();
 	const resolveSortContextVersion = (): number => getSortContextVersion?.() ?? 0;
 	let lastSortContextVersion = resolveSortContextVersion();
-	const syncSortContextCaches = (): number => {
+
+	function syncSortContextCaches(): void {
 		const currentSortContextVersion = resolveSortContextVersion();
 		if (currentSortContextVersion === lastSortContextVersion) {
-			return currentSortContextVersion;
+			return;
 		}
 
 		lastSortContextVersion = currentSortContextVersion;
-		displayAssemblyCache = createDisplayAssemblyCache();
-		hop2SortCache = createHop2SortCache();
-		tagItemSortCache = createTagItemSortCache();
-		return currentSortContextVersion;
-	};
-	const sortAndAssembleStage = (
+		displayAssemblyCache = new WeakMap();
+		itemSortCache.clear();
+	}
+
+	function getSortedItems<T extends SortableItem>(
+		items: readonly T[],
+		sortOption: SortOption,
+	): readonly T[] {
+		if (items.length <= 1) return items;
+		const option =
+			sortOption === "relevance" ? "modified-date-reverse" : sortOption;
+		let cache = itemSortCache.get(option);
+		if (!cache) {
+			cache = new WeakMap();
+			itemSortCache.set(option, cache);
+		}
+		const cached = cache.get(items) as readonly T[] | undefined;
+		if (cached) return cached;
+
+		const sorted = sortService.sort(items, option);
+		const result =
+			sorted === items ||
+			(sorted.length === items.length &&
+				sorted.every((item, index) => item === items[index]))
+				? items
+				: sorted;
+		cache.set(items, result);
+		return result;
+	}
+
+	function getSortedGroupItems<T extends IndexedLink | TaggedNote>(
+		items: readonly T[],
+		sortOption: SortOption,
+	): readonly T[] {
+		syncSortContextCaches();
+		return getSortedItems(items, sortOption);
+	}
+
+	function sortAndAssembleDisplayData(
 		preprocessed: PreprocessedDisplayData,
 		settings: PluginSettings,
 		sortOption: SortOption,
-	): DisplayData => {
-		const sortContextVersion = syncSortContextCaches();
-		return sortAndAssembleDisplayData(
-			preprocessed,
-			settings,
-			sortOption,
-			sortService,
-			hop2SortCache,
-			displayAssemblyCache,
-			sortContextVersion,
-		);
-	};
+	): DisplayData {
+		syncSortContextCaches();
+		const assemblyKey = createDisplayAssemblyCacheKey(settings, sortOption);
+		let cache = displayAssemblyCache.get(preprocessed);
+		const cached = cache?.get(assemblyKey);
+		if (cached) return cached;
+
+		const assemblySettings = selectDisplayAssemblySettings(settings);
+		const sortedNewLinks = getSortedItems(preprocessed.newLinks, sortOption);
+		const sortOneHopItems = <T extends MergedLinkItem>(
+			items: readonly T[],
+		): readonly T[] =>
+			sortOption === "relevance"
+				? sortOneHopByRelevance(
+						items,
+						preprocessed.originPath,
+						getLinkTargets,
+						sortService,
+					)
+				: getSortedItems(items, sortOption);
+
+		let outgoing: readonly TwoHopLinkBranch[] = [];
+		let backlinks: readonly IndexedLink[] = [];
+		let mergedItems: readonly MergedLinkItem[] = [];
+		if (assemblySettings.useMergedLinksSection) {
+			mergedItems = sortOneHopItems(preprocessed.mergedBaseItems);
+		} else {
+			outgoing = sortOneHopItems(preprocessed.resolvedBranches);
+			backlinks = sortOneHopItems(preprocessed.resolvedBacklinks);
+		}
+		const displayData: DisplayData = {
+			outgoing,
+			backlinks,
+			mergedItems,
+			twoHopBranches: preprocessed.nonEmptyTwoHopBranches,
+			tagGroups: assemblySettings.showTagsSection
+				? preprocessed.rawTagGroups
+				: [],
+			newLinks: sortedNewLinks,
+		};
+		if (!cache) {
+			cache = new Map();
+			displayAssemblyCache.set(preprocessed, cache);
+		}
+		cache.set(assemblyKey, displayData);
+		return displayData;
+	}
 
 	return {
 		preprocessLinkDisplayData,
 		preprocessTagDisplayData,
-		sortAndAssembleDisplayData: sortAndAssembleStage,
-		getSortedTwoHopItems: (
-			items: readonly IndexedLink[],
-			sortOption: SortOption,
-		): readonly IndexedLink[] => {
-			const sortContextVersion = syncSortContextCaches();
-			return getSortedItemsWithCache(
-				items,
-				sortService,
-				sortOption,
-				hop2SortCache,
-				sortContextVersion,
-			);
-		},
-		getSortedTagGroupItems: (
-			items: readonly TaggedNote[],
-			sortOption: SortOption,
-		): readonly TaggedNote[] => {
-			const sortContextVersion = syncSortContextCaches();
-			return getSortedItemsWithCache(
-				items,
-				sortService,
-				sortOption,
-				tagItemSortCache,
-				sortContextVersion,
-			);
-		},
+		sortAndAssembleDisplayData,
+		getSortedTwoHopItems: getSortedGroupItems,
+		getSortedTagGroupItems: getSortedGroupItems,
 		getSortContextVersion: resolveSortContextVersion,
 	};
 }

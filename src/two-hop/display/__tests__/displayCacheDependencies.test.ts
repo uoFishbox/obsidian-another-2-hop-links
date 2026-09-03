@@ -14,16 +14,11 @@ describe("display cache keys", () => {
 		});
 	});
 
-	it("keys assembly settings, sort option, and sort context", () => {
-		const first = createDisplayAssemblyCacheKey(
-			DEFAULT_SETTINGS,
-			"alphabetical",
-			1,
-		);
+	it("keys assembly settings and sort option within one sort context", () => {
+		const first = createDisplayAssemblyCacheKey(DEFAULT_SETTINGS, "alphabetical");
 		const changed = createDisplayAssemblyCacheKey(
 			{ ...DEFAULT_SETTINGS, showTagsSection: false },
 			"alphabetical",
-			1,
 		);
 		expect(changed).not.toBe(first);
 	});

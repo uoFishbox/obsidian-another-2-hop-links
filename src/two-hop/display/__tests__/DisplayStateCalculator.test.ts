@@ -58,6 +58,7 @@ function createFullDedupeBuilder() {
 					),
 				},
 				data: {
+					originPath: linkResult?.originFile.path,
 					resolvedBranches: [],
 					resolvedBacklinks,
 					mergedBaseItems: [...resolvedBacklinks],
@@ -133,6 +134,7 @@ function createCacheProbeBuilder() {
 		(_linkResult: TwoHopLinkResult | undefined, _settings: PluginSettings) => ({
 			state: createDedupState(),
 			data: {
+				originPath: _linkResult?.originFile.path,
 				resolvedBranches: [],
 				resolvedBacklinks: [],
 				mergedBaseItems: [],
@@ -221,6 +223,29 @@ describe("DisplayStateCalculator", () => {
 			expect(preprocessTagDisplayData).toHaveBeenCalledTimes(1);
 		},
 	);
+
+	it("changes the relevance origin even when link arrays are shared", () => {
+		const { builder } = createFullDedupeBuilder();
+		const cache = createPreprocessedDisplayDataCache();
+		const result = createLinkResult([], []);
+		const first = computePreprocessedDisplayDataState(
+			builder,
+			result,
+			DEFAULT_SETTINGS,
+			cache,
+		);
+		const second = computePreprocessedDisplayDataState(
+			builder,
+			{
+				...result,
+				originFile: createMockTFile("other.md"),
+			},
+			DEFAULT_SETTINGS,
+			cache,
+		);
+		expect(first.originPath).toBe("origin.md");
+		expect(second.originPath).toBe("other.md");
+	});
 
 	it("reuses link preprocessing for a tag-only update with dedupe enabled", () => {
 		const { builder, preprocessLinkDisplayData, preprocessTagDisplayData } =

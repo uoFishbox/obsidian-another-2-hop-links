@@ -20,7 +20,10 @@ function preprocessDisplayData(
 	linkResult: TwoHopLinkResult | undefined,
 	settings: PluginSettings,
 ): PreprocessedDisplayData {
-	const builder = createDisplayDataBuilder({ sortService: mockSortService });
+	const builder = createDisplayDataBuilder({
+		getLinkTargets: () => new Set(),
+		sortService: mockSortService,
+	});
 	const linkResultData = builder.preprocessLinkDisplayData(linkResult, settings);
 	const tagPreprocessed = builder.preprocessTagDisplayData(
 		linkResult,
@@ -36,7 +39,10 @@ function buildDisplayData(
 	sortOption: SortOption,
 	sortService: ISortService,
 ): DisplayData {
-	const builder = createDisplayDataBuilder({ sortService });
+	const builder = createDisplayDataBuilder({
+		getLinkTargets: () => new Set(),
+		sortService,
+	});
 	const linkResultData = builder.preprocessLinkDisplayData(linkResult, settings);
 	const tagPreprocessed = builder.preprocessTagDisplayData(
 		linkResult,

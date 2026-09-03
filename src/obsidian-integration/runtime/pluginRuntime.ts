@@ -24,6 +24,7 @@ import { IndexingService } from "indexing/index-service/IndexingService";
 import { TwoHopLinkResolver } from "two-hop/resolution/TwoHopLinkResolver";
 import type { ResolveTwoHopLinks } from "two-hop/state/TwoHopLinksLoader";
 import { createDisplayDataBuilder } from "two-hop/display/displayDataBuilder";
+import { getRelevanceLinkTargets } from "two-hop/display/relevanceSort";
 import { createLinkContextFactory } from "cards/context/linkContextFactory";
 import type { LinkContext } from "cards/context/linkContext";
 import { CardCollectionState } from "cards/CardCollectionState.svelte";
@@ -178,6 +179,12 @@ export function createPluginRuntime(options: PluginRuntimeOptions): PluginRuntim
 	const createPluginDisplayDataBuilder = () =>
 		createDisplayDataBuilder({
 			sortService,
+			getLinkTargets: (path) =>
+				getRelevanceLinkTargets(
+					path,
+					options.app.metadataCache,
+					options.app.vault,
+				),
 			getSortContextVersion: options.getSortContextVersion,
 		});
 	const resolveTwoHopLinks: ResolveTwoHopLinks = (file, onProgress, signal) => {

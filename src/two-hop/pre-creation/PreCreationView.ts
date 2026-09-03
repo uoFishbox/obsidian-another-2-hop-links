@@ -551,6 +551,8 @@ export class PreCreationView extends AbstractSvelteListView<IndexedLink> {
 			paginationMode: "infinite-scroll",
 			preserveResultsHeightOnSearch: false,
 			getItemKey: getCardItemKey,
+			// The unresolved origin has no outgoing links: every backlink scores 1.
+			allowRelevanceSort: true,
 			sectionId: "pre-create-backlinks",
 			emptyMessage: "他のノートからの未解決バックリンクは見つかりませんでした。",
 		};

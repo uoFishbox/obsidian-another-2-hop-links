@@ -75,7 +75,11 @@
 		itemsRevision = 0,
 	}: Props = $props();
 
-	let sortOption = $derived(applicationStore.sortOption);
+	let sortOption = $derived(
+		applicationStore.sortOption === "relevance" && !config.allowRelevanceSort
+			? "modified-date-reverse"
+			: applicationStore.sortOption,
+	);
 	let sortSettingsSignature = $derived(
 		[
 			applicationStore.settings?.frontmatterKeyCreatedDate ?? "",
@@ -152,12 +156,12 @@
 	const bookmarks = useBookmarks(app);
 	let sortedItems = $derived.by(() => {
 		void sortSettingsSignature;
+		const option =
+			sortOption === "relevance" ? "modified-date-reverse" : sortOption;
 		if (config.getSortedItems) {
-			return config.getSortedItems(sortOption);
+			return config.getSortedItems(option);
 		}
-		return getSortedViewItems(items, sortOption, sortService, (raw) =>
-			toCardItem(raw),
-		);
+		return getSortedViewItems(items, option, sortService, (raw) => toCardItem(raw));
 	});
 	let orderedItems = $derived.by(() => {
 		const sourceItems = sortedItems;
@@ -381,6 +385,7 @@
 	}}
 	{contentSearchEnabled}
 	{sortOption}
+	allowRelevanceSort={config.allowRelevanceSort}
 	onSortChange={(opt) => applicationStore.setSortOption(opt)}
 	onMoveFocusToResults={moveFocusToResults}
 	showSearchInput={searchEnabled}

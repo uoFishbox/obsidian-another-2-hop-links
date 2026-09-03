@@ -1,6 +1,8 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/svelte";
 import { tick } from "svelte";
 import { TFile } from "obsidian";
+import { Menu } from "testing/__mocks__/obsidianMocks";
+import { CardCollectionState } from "cards/CardCollectionState.svelte";
 import { createMockTFile } from "testing/__mocks__/testHelpers";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import SearchableItemList from "../SearchableItemList.svelte";
@@ -153,6 +155,63 @@ describe("SearchableItemList integration", () => {
 	afterEach(() => {
 		teardownResizeObserverMock();
 		vi.useRealTimers();
+	});
+
+	it("restores relevance only for origin collections and uses modified order in other views", async () => {
+		const sourceFile = createMockTFile("source.md");
+		const items = [
+			createTaggedNoteItem(createMockTFile("a.md")),
+			createTaggedNoteItem(createMockTFile("b.md")),
+		];
+		const applicationStore = new CardCollectionState(
+			{ ...DEFAULT_SETTINGS, lastUsedSortOption: "relevance" },
+			vi.fn(),
+		);
+		const sortService: ISortService = {
+			sort: vi.fn((nextItems) => [...nextItems].reverse()),
+		};
+		const showAtPosition = vi.spyOn(Menu.prototype, "showAtPosition");
+		const config = createConfig();
+		const view = render(SearchableItemList, {
+			props: {
+				items,
+				config,
+				linkContext: createLinkContext(sourceFile),
+				applicationStore,
+				sortService,
+				app: {} as never,
+				autofocus: false,
+			},
+		});
+		await flushAsyncUi();
+		expect(sortService.sort).toHaveBeenLastCalledWith(
+			expect.any(Array),
+			"modified-date-reverse",
+		);
+		const trigger = screen.getByRole("button", { name: ARIA_LABELS.SORT_SELECT });
+		expect(trigger).toHaveTextContent("更新日時");
+		await fireEvent.click(trigger);
+		expect(
+			showAtPosition.mock.contexts[0].items.some(
+				(item) => item.title === "関連度",
+			),
+		).toBe(false);
+
+		await view.rerender({ config: { ...config, allowRelevanceSort: true } });
+		await flushAsyncUi();
+		expect(trigger).toHaveTextContent("関連度");
+		expect(sortService.sort).toHaveBeenLastCalledWith(
+			expect.any(Array),
+			"modified-date-reverse",
+		);
+		expect(applicationStore.sortOption).toBe("relevance");
+		expect(screen.getByRole("button", { name: "関連度の高い順" })).toBeDisabled();
+		expect(
+			getAllSearchableItems().map((item) => item.getAttribute("aria-label")),
+		).toEqual([ARIA_LABELS.OPEN_LINK("b"), ARIA_LABELS.OPEN_LINK("a")]);
+		view.unmount();
+		applicationStore.destroy();
+		showAtPosition.mockRestore();
 	});
 
 	it("filters via the real search input flow without relying on mocked bindings", async () => {

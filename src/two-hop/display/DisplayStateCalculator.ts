@@ -28,6 +28,7 @@ export interface PreprocessedDisplayDataCache {
 }
 
 interface LinkPreprocessedDisplayDataCacheEntry {
+	originPath: string | undefined;
 	branchesRef: TwoHopLinkResult["branches"] | undefined;
 	backlinksRef: TwoHopLinkResult["backlinks"] | undefined;
 	preprocessSettingsKey: string;
@@ -74,11 +75,13 @@ function getLinkPreprocessedDisplayData(
 ): LinkPreprocessingResult {
 	const preprocessSettingsKey = createLinkPreprocessCacheKey(settings);
 	const branchesRef = linkResult?.branches;
+	const originPath = linkResult?.originFile.path;
 	const backlinksRef = linkResult?.backlinks;
 	const cached = cache.linkEntry;
 
 	if (
 		cached &&
+		cached.originPath === originPath &&
 		cached.branchesRef === branchesRef &&
 		cached.backlinksRef === backlinksRef &&
 		cached.preprocessSettingsKey === preprocessSettingsKey
@@ -89,6 +92,7 @@ function getLinkPreprocessedDisplayData(
 	const result = displayDataBuilder.preprocessLinkDisplayData(linkResult, settings);
 
 	cache.linkEntry = {
+		originPath,
 		branchesRef,
 		backlinksRef,
 		preprocessSettingsKey,
