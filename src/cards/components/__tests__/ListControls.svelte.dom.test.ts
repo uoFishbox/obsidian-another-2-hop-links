@@ -8,7 +8,7 @@ import ListControls from "../ListControls.svelte";
 describe("ListControls", () => {
 	afterEach(() => vi.restoreAllMocks());
 
-	it("offers relevance only when an origin is available and fixes its direction", async () => {
+	it("offers relevance only when an origin is available and toggles its direction", async () => {
 		const showAtPosition = vi.spyOn(Menu.prototype, "showAtPosition");
 		const onSortChange = vi.fn();
 		const view = render(ListControls, {
@@ -27,12 +27,23 @@ describe("ListControls", () => {
 		showAtPosition.mock.contexts[1].items
 			.find((item) => item.title === "関連度")
 			?.clickHandler?.();
-		expect(onSortChange).toHaveBeenLastCalledWith("relevance");
+		expect(onSortChange).toHaveBeenLastCalledWith("relevance-reverse");
 		await view.rerender({ sortOption: "relevance" });
 		expect(trigger).toHaveTextContent("関連度");
-		expect(screen.getByRole("button", { name: "関連度の高い順" })).toBeDisabled();
+		const directionButton = screen.getByRole("button", {
+			name: "関連度の高い順（クリックで低い順に切り替え）",
+		});
+		expect(directionButton).toBeEnabled();
+		await fireEvent.click(directionButton);
+		expect(onSortChange).toHaveBeenLastCalledWith("relevance-reverse");
+		await view.rerender({ sortOption: "relevance-reverse" });
+		expect(
+			screen.getByRole("button", {
+				name: "関連度の低い順（クリックで高い順に切り替え）",
+			}),
+		).toBeEnabled();
 		await fireEvent.click(screen.getByRole("button", { name: "更新日時" }));
-		expect(onSortChange).toHaveBeenLastCalledWith("modified-date-reverse");
+		expect(onSortChange).toHaveBeenLastCalledWith("modified-date");
 	});
 
 	it("opens an Obsidian menu below the div trigger and marks the current sort field", async () => {

@@ -205,10 +205,20 @@ describe("SearchableItemList integration", () => {
 			"modified-date-reverse",
 		);
 		expect(applicationStore.sortOption).toBe("relevance");
-		expect(screen.getByRole("button", { name: "関連度の高い順" })).toBeDisabled();
+		const relevanceDirection = screen.getByRole("button", {
+			name: "関連度の高い順（クリックで低い順に切り替え）",
+		});
+		expect(relevanceDirection).toBeEnabled();
 		expect(
 			getAllSearchableItems().map((item) => item.getAttribute("aria-label")),
 		).toEqual([ARIA_LABELS.OPEN_LINK("b"), ARIA_LABELS.OPEN_LINK("a")]);
+		await fireEvent.click(relevanceDirection);
+		await flushAsyncUi();
+		expect(applicationStore.sortOption).toBe("relevance-reverse");
+		expect(sortService.sort).toHaveBeenLastCalledWith(
+			expect.any(Array),
+			"modified-date",
+		);
 		view.unmount();
 		applicationStore.destroy();
 		showAtPosition.mockRestore();

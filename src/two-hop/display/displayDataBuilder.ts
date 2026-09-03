@@ -101,7 +101,11 @@ export function createDisplayDataBuilder(
 	): readonly T[] {
 		if (items.length <= 1) return items;
 		const option =
-			sortOption === "relevance" ? "modified-date-reverse" : sortOption;
+			sortOption === "relevance"
+				? "modified-date-reverse"
+				: sortOption === "relevance-reverse"
+					? "modified-date"
+					: sortOption;
 		let cache = itemSortCache.get(option);
 		if (!cache) {
 			cache = new WeakMap();
@@ -145,12 +149,13 @@ export function createDisplayDataBuilder(
 		const sortOneHopItems = <T extends MergedLinkItem>(
 			items: readonly T[],
 		): readonly T[] =>
-			sortOption === "relevance"
+			sortOption === "relevance" || sortOption === "relevance-reverse"
 				? sortOneHopByRelevance(
 						items,
 						preprocessed.originPath,
 						getLinkTargets,
 						sortService,
+						sortOption === "relevance" ? "desc" : "asc",
 					)
 				: getSortedItems(items, sortOption);
 

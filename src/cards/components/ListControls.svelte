@@ -14,7 +14,7 @@
 	const RELEVANCE_FIELD: SortField = {
 		label: "関連度",
 		icon: "network",
-		asc: "relevance",
+		asc: "relevance-reverse",
 		desc: "relevance",
 	};
 
@@ -100,8 +100,10 @@
 	);
 	const isDescending = $derived(sortOption === sortField.desc);
 	const sortDirectionLabel = $derived(
-		sortOption === "relevance"
-			? "関連度の高い順"
+		sortField === RELEVANCE_FIELD
+			? isDescending
+				? "関連度の高い順（クリックで低い順に切り替え）"
+				: "関連度の低い順（クリックで高い順に切り替え）"
 			: isDescending
 				? "降順（クリックで昇順に切り替え）"
 				: "昇順（クリックで降順に切り替え）",
@@ -155,7 +157,6 @@
 	}
 
 	function toggleSortDirection(): void {
-		if (sortOption === "relevance") return;
 		onSortChange(isDescending ? sortField.asc : sortField.desc);
 	}
 
@@ -290,7 +291,6 @@
 			type="button"
 			class="clickable-icon"
 			aria-label={sortDirectionLabel}
-			disabled={sortOption === "relevance"}
 			title={sortDirectionLabel}
 			onclick={toggleSortDirection}
 		>

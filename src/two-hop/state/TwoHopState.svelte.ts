@@ -145,7 +145,10 @@ export class TwoHopState {
 
 		// ソート段のみを sortOption 依存で再計算する
 		this.computedDisplayData = $derived.by((): ComputedDisplayData => {
-			if (this.uiState.sortOption === "relevance")
+			if (
+				this.uiState.sortOption === "relevance" ||
+				this.uiState.sortOption === "relevance-reverse"
+			)
 				void this.uiState.updateVersion;
 			return computeSortedDisplayDataState(
 				this.displayDataBuilder,
@@ -198,7 +201,12 @@ export class TwoHopState {
 		if (action.kind === "preview-only") {
 			this.uiState.previewState.invalidate(action.previewInvalidation);
 			// Text-only edits change the modified-time tie breaker without changing links.
-			if (this.uiState.sortOption === "relevance") this.uiState.triggerUpdate();
+			if (
+				this.uiState.sortOption === "relevance" ||
+				this.uiState.sortOption === "relevance-reverse"
+			) {
+				this.uiState.triggerUpdate();
+			}
 			return;
 		}
 

@@ -13,6 +13,7 @@ import {
 
 const SORT_OPTION_VALUES = [
 	"relevance",
+	"relevance-reverse",
 	"alphabetical",
 	"alphabetical-reverse",
 	"created-date",

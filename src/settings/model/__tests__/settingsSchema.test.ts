@@ -7,11 +7,15 @@ import { DEFAULT_SETTINGS } from "settings/model/defaults";
 import { SETTINGS_SCHEMA_VERSION, type PluginSettings } from "settings/model/settings";
 
 describe("PluginSettingsSchema", () => {
-	it("restores the relevance sort selection", () => {
-		expect(
-			parsePluginSettings({ lastUsedSortOption: "relevance" }).lastUsedSortOption,
-		).toBe("relevance");
-	});
+	it.each(["relevance", "relevance-reverse"] as const)(
+		"restores the %s sort selection",
+		(sortOption) => {
+			expect(
+				parsePluginSettings({ lastUsedSortOption: sortOption })
+					.lastUsedSortOption,
+			).toBe(sortOption);
+		},
+	);
 	it.each([undefined, null, "true", 1, false])(
 		"keeps experimental title editing disabled for %s",
 		(value) => {

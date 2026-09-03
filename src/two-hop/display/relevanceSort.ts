@@ -29,7 +29,7 @@ export function getRelevanceLinkTargets(
 export type GetRelevanceLinkTargets = (path: string) => ReadonlySet<string>;
 
 /**
- * Orders one-hop cards by (forward, unique shared destinations, modified time) DESC.
+ * Orders one-hop cards by (forward, unique shared destinations, modified time).
  * Uses the complete origin link set, independently of display filtering/deduplication.
  */
 export function sortOneHopByRelevance<T extends MergedLinkItem>(
@@ -37,9 +37,13 @@ export function sortOneHopByRelevance<T extends MergedLinkItem>(
 	originPath: string | undefined,
 	getLinkTargets: GetRelevanceLinkTargets,
 	sortService: ISortService,
+	direction: "asc" | "desc" = "desc",
 ): readonly T[] {
 	if (items.length <= 1) return items;
-	const byModifiedDate = sortService.sort(items, "modified-date-reverse");
+	const byModifiedDate = sortService.sort(
+		items,
+		direction === "desc" ? "modified-date-reverse" : "modified-date",
+	);
 	if (!originPath) return byModifiedDate;
 
 	const forwardTargets = getLinkTargets(originPath);
@@ -64,7 +68,10 @@ export function sortOneHopByRelevance<T extends MergedLinkItem>(
 	});
 
 	// Stable sorting retains modified-date order when both relevance keys tie.
-	scored.sort((a, b) => b.forward - a.forward || b.point - a.point);
+	const directionMultiplier = direction === "desc" ? -1 : 1;
+	scored.sort(
+		(a, b) => directionMultiplier * (a.forward - b.forward || a.point - b.point),
+	);
 	return scored.every(({ item }, index) => item === items[index])
 		? items
 		: scored.map(({ item }) => item);

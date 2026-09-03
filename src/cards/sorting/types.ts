@@ -4,6 +4,7 @@ import type { IndexedLink, TaggedNote } from "indexing/model";
 
 export type SortOption =
 	| "relevance"
+	| "relevance-reverse"
 	| "alphabetical"
 	| "alphabetical-reverse"
 	| "created-date"

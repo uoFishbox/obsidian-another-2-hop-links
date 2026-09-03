@@ -101,6 +101,17 @@ describe("one-hop relevance", () => {
 			scenario.sortService,
 		);
 		expect(paths(sorted)).toEqual(["b.md", "a.md", "c.md"]);
+		expect(
+			paths(
+				sortOneHopByRelevance(
+					items,
+					"origin.md",
+					scenario.getLinkTargets,
+					scenario.sortService,
+					"asc",
+				),
+			),
+		).toEqual(["c.md", "a.md", "b.md"]);
 		expect(paths(items)).toEqual(["c.md", "a.md", "b.md"]);
 		expect(
 			sortOneHopByRelevance(
@@ -228,10 +239,29 @@ describe("one-hop relevance", () => {
 						: [...displayed.outgoing, ...displayed.backlinks],
 				),
 			).toEqual(["a.md", "b.md", "old.md", "new.md"]);
+			const ascending = builder.sortAndAssembleDisplayData(
+				preprocessed,
+				settings,
+				"relevance-reverse",
+			);
+			expect(
+				paths(
+					merged
+						? ascending.mergedItems
+						: [...ascending.outgoing, ...ascending.backlinks],
+				),
+			).toEqual(
+				merged
+					? ["new.md", "old.md", "b.md", "a.md"]
+					: ["b.md", "a.md", "new.md", "old.md"],
+			);
 			expect(paths(builder.getSortedTwoHopItems(hop2, "relevance"))).toEqual([
 				"new.md",
 				"old.md",
 			]);
+			expect(
+				paths(builder.getSortedTwoHopItems(hop2, "relevance-reverse")),
+			).toEqual(["old.md", "new.md"]);
 			const tagItems = hop2.map((item) => ({
 				file: item.sourceFile,
 				path: item.sourceFile.path,

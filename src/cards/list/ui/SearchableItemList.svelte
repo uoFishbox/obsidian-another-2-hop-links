@@ -20,7 +20,7 @@
 		setAppContext,
 		setLazyLoaderCache,
 	} from "cards/context/linkContext";
-	import type { ISortService } from "cards/sorting";
+	import type { ISortService, SortOption } from "cards/sorting";
 	import type { ListViewState } from "cards/list/model/ListViewState";
 	import type { App, TFile } from "obsidian";
 	import { getItemTargetFile, toCardItem, type CardItem } from "cards/CardItem";
@@ -75,11 +75,20 @@
 		itemsRevision = 0,
 	}: Props = $props();
 
-	let sortOption = $derived(
-		applicationStore.sortOption === "relevance" && !config.allowRelevanceSort
-			? "modified-date-reverse"
-			: applicationStore.sortOption,
-	);
+	function resolveAvailableSortOption(option: SortOption): SortOption {
+		if (config.allowRelevanceSort) return option;
+		if (option === "relevance") return "modified-date-reverse";
+		if (option === "relevance-reverse") return "modified-date";
+		return option;
+	}
+
+	function resolveStandardSortOption(option: SortOption): SortOption {
+		if (option === "relevance") return "modified-date-reverse";
+		if (option === "relevance-reverse") return "modified-date";
+		return option;
+	}
+
+	let sortOption = $derived(resolveAvailableSortOption(applicationStore.sortOption));
 	let sortSettingsSignature = $derived(
 		[
 			applicationStore.settings?.frontmatterKeyCreatedDate ?? "",
@@ -156,8 +165,7 @@
 	const bookmarks = useBookmarks(app);
 	let sortedItems = $derived.by(() => {
 		void sortSettingsSignature;
-		const option =
-			sortOption === "relevance" ? "modified-date-reverse" : sortOption;
+		const option = resolveStandardSortOption(sortOption);
 		if (config.getSortedItems) {
 			return config.getSortedItems(option);
 		}
