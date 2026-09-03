@@ -17,6 +17,7 @@ function createObsidianMock() {
 			return span;
 		}),
 		finishRenderMath: vi.fn(),
+		requireApiVersion: vi.fn(() => false),
 	};
 }
 

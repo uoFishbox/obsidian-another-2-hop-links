@@ -5,12 +5,12 @@ import {
 	type PreviewContentAnalysis,
 } from "../pipeline/previewContent";
 import {
-	queueMathJaxShadowStylesSync,
-	syncMathJaxStylesForNode,
-} from "shared/ui/dom/mathJaxShadowStyles";
+	queueMathShadowStylesSync,
+	syncMathStylesForNode,
+} from "shared/ui/dom/mathShadowStyles";
 
 // Hot-path optimization: avoid re-allocating this RegExp object on every
-// preview render in the MathJax split loop. Module-level `g` flag regexes are
+// preview render in the math split loop. Module-level `g` flag regexes are
 // reused across calls by resetting `lastIndex` before each scan, mirroring the
 // pattern already used in `searchHighlighter.ts`.
 const MATH_SPLIT_REGEX = /(\$\$[\s\S]*?\$\$|\$[^$\n]+?\$|\\\$)/g;
@@ -41,7 +41,6 @@ export async function processPreviewContent(
 		return;
 	}
 
-	// MathJaxの処理 (既存ロジック)
 	if (!enableMathRendering || !hasDollar) {
 		containerEl.innerHTML = content;
 	} else {
@@ -51,8 +50,6 @@ export async function processPreviewContent(
 		);
 
 		if (!analysis.hasMathExpression) {
-			// 数式が無く、保護済みセグメント内の `$` だけが残っている場合は
-			// MathJax のパースを回さず、そのまま復元する。
 			containerEl.innerHTML = restoreProtectedSegments(
 				analysis.contentForMathParsing.replace(/\\\$/g, "$"),
 			);
@@ -127,7 +124,7 @@ export async function processPreviewContent(
 	}
 
 	if (analysis?.hasMathExpression && syncShadowRootMathStyles) {
-		syncMathJaxStylesForNode(containerEl);
-		queueMathJaxShadowStylesSync();
+		syncMathStylesForNode(containerEl);
+		queueMathShadowStylesSync();
 	}
 }

@@ -1,3 +1,5 @@
+import { requireApiVersion } from "obsidian";
+import { TEMML_SHADOW_CSS } from "./temmlShadowCss";
 import {
 	getOptionalOwnerWindow,
 	isHtmlStyleElementLike,
@@ -9,6 +11,8 @@ const DOCUMENT_MATHJAX_STYLE_ID = "MJX-CHTML-styles";
 const SUSPICIOUS_CSS_SHRINK_RATIO = 0.7;
 
 const registeredShadowRoots = new Set<ShadowRoot>();
+let registeredTemmlShadowRoots = new WeakSet<ShadowRoot>();
+let temmlSheetsByDocument = new WeakMap<Document, CSSStyleSheet>();
 let lastGoodMathJaxCssText = "";
 let isMathJaxShadowSyncQueued = false;
 let hasInstalledMathJaxShadowPatch = false;
@@ -155,20 +159,60 @@ function pruneDisconnectedShadowRoots(): void {
 	}
 }
 
-export function resetMathJaxShadowStylesStateForTests(): void {
+function syncTemmlStylesToShadowRoot(shadowRoot: ShadowRoot): boolean {
+	const ownerDocument = shadowRoot.ownerDocument;
+	let stylesheet = temmlSheetsByDocument.get(ownerDocument);
+	if (!stylesheet) {
+		// Constructed sheets can only be adopted in their originating Document.
+		const Sheet = ownerDocument.defaultView?.CSSStyleSheet;
+		if (
+			typeof Sheet?.prototype.replaceSync !== "function" ||
+			!("adoptedStyleSheets" in shadowRoot)
+		) {
+			return false;
+		}
+		stylesheet = new Sheet();
+		stylesheet.replaceSync(TEMML_SHADOW_CSS);
+		temmlSheetsByDocument.set(ownerDocument, stylesheet);
+	}
+
+	if (!shadowRoot.adoptedStyleSheets.includes(stylesheet)) {
+		shadowRoot.adoptedStyleSheets = [...shadowRoot.adoptedStyleSheets, stylesheet];
+	}
+	return true;
+}
+
+/** Clears bridge state between tests. */
+export function resetMathShadowStylesStateForTests(): void {
 	registeredShadowRoots.clear();
+	registeredTemmlShadowRoots = new WeakSet();
+	temmlSheetsByDocument = new WeakMap();
 	lastGoodMathJaxCssText = "";
 	isMathJaxShadowSyncQueued = false;
 	hasInstalledMathJaxShadowPatch = false;
 }
 
-export function registerMathJaxShadowRoot(shadowRoot: ShadowRoot): void {
+/** Registers a plugin surface and installs the styles for its math renderer. */
+export function registerMathShadowRoot(shadowRoot: ShadowRoot): void {
+	if (requireApiVersion("1.14.0")) {
+		registeredTemmlShadowRoots.add(shadowRoot);
+		syncTemmlStylesToShadowRoot(shadowRoot);
+		return;
+	}
 	registeredShadowRoots.add(shadowRoot);
-	queueMathJaxShadowStylesSync();
+	queueMathShadowStylesSync();
 }
 
-export function unregisterMathJaxShadowRoot(shadowRoot: ShadowRoot): void {
+/** Releases a surface without removing other adopted stylesheets. */
+export function unregisterMathShadowRoot(shadowRoot: ShadowRoot): void {
 	registeredShadowRoots.delete(shadowRoot);
+	if (!registeredTemmlShadowRoots.delete(shadowRoot)) return;
+	const stylesheet = temmlSheetsByDocument.get(shadowRoot.ownerDocument);
+	if (stylesheet) {
+		shadowRoot.adoptedStyleSheets = shadowRoot.adoptedStyleSheets.filter(
+			(candidate) => candidate !== stylesheet,
+		);
+	}
 }
 
 function syncRegisteredMathJaxShadowRoots(): boolean {
@@ -185,7 +229,10 @@ function syncRegisteredMathJaxShadowRoots(): boolean {
 	return didSync;
 }
 
-export function queueMathJaxShadowStylesSync(): void {
+/** Batches updates of the dynamically generated MathJax CSS on older hosts. */
+export function queueMathShadowStylesSync(): void {
+	// Temml CSS is static and installed at registration, without a global scan.
+	if (requireApiVersion("1.14.0")) return;
 	if (isMathJaxShadowSyncQueued) {
 		return;
 	}
@@ -221,7 +268,9 @@ export function queueMathJaxShadowStylesSync(): void {
 	});
 }
 
-export function installMathJaxShadowPatch(): void {
+/** Hooks MathJax updates only on hosts that still use MathJax. */
+export function installMathShadowPatch(): void {
+	if (requireApiVersion("1.14.0")) return;
 	if (hasInstalledMathJaxShadowPatch) {
 		return;
 	}
@@ -245,21 +294,26 @@ export function installMathJaxShadowPatch(): void {
 			typeof (result as PromiseLike<unknown>).then === "function"
 		) {
 			void Promise.resolve(result).finally(() => {
-				queueMathJaxShadowStylesSync();
+				queueMathShadowStylesSync();
 			});
 		} else {
-			queueMathJaxShadowStylesSync();
+			queueMathShadowStylesSync();
 		}
 
 		return result;
 	};
 
 	hasInstalledMathJaxShadowPatch = true;
-	queueMathJaxShadowStylesSync();
+	queueMathShadowStylesSync();
 }
 
-export function syncMathJaxStylesToShadowRoot(shadowRoot: ShadowRoot): boolean {
-	registerMathJaxShadowRoot(shadowRoot);
+/** Registers and synchronizes math CSS, returning whether styles are ready. */
+export function syncMathStylesToShadowRoot(shadowRoot: ShadowRoot): boolean {
+	if (requireApiVersion("1.14.0")) {
+		registeredTemmlShadowRoots.add(shadowRoot);
+		return syncTemmlStylesToShadowRoot(shadowRoot);
+	}
+	registerMathShadowRoot(shadowRoot);
 
 	const source = getMathJaxStylesheetSource(shadowRoot.ownerDocument);
 	if (!source) {
@@ -269,7 +323,8 @@ export function syncMathJaxStylesToShadowRoot(shadowRoot: ShadowRoot): boolean {
 	return syncMathJaxStylesToShadowRootWithSource(shadowRoot, source);
 }
 
-export function syncMathJaxStylesForNode(node: Node | null | undefined): boolean {
+/** Synchronizes math CSS only when the node belongs to a registered surface. */
+export function syncMathStylesForNode(node: Node | null | undefined): boolean {
 	if (!node) {
 		return false;
 	}
@@ -279,9 +334,9 @@ export function syncMathJaxStylesForNode(node: Node | null | undefined): boolean
 		return false;
 	}
 
-	if (!registeredShadowRoots.has(root)) {
+	if (!registeredShadowRoots.has(root) && !registeredTemmlShadowRoots.has(root)) {
 		return false;
 	}
 
-	return syncMathJaxStylesToShadowRoot(root);
+	return syncMathStylesToShadowRoot(root);
 }

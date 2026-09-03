@@ -39,6 +39,11 @@ export const Platform = {
 	isDesktopApp: true,
 };
 
+/** Tests default to the pre-Temml host unless they select the newer API. */
+export function requireApiVersion(_version: string): boolean {
+	return false;
+}
+
 export class Component {
 	load(): void {}
 	unload(): void {}

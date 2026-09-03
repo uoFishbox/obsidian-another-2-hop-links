@@ -23,7 +23,7 @@ const state = vi.hoisted(() => ({
 	htmlVisibleTextContainsCaseInsensitive: vi.fn(),
 	getFileContent: vi.fn(),
 	analyzePreviewContent: vi.fn(),
-	syncMathJaxStylesForNode: vi.fn(),
+	syncMathStylesForNode: vi.fn(),
 	componentUnload: vi.fn(),
 }));
 
@@ -72,8 +72,8 @@ vi.mock("card-preview/pipeline/previewContent", () => ({
 	analyzePreviewContent: state.analyzePreviewContent,
 }));
 
-vi.mock("shared/ui/dom/mathJaxShadowStyles", () => ({
-	syncMathJaxStylesForNode: state.syncMathJaxStylesForNode,
+vi.mock("shared/ui/dom/mathShadowStyles", () => ({
+	syncMathStylesForNode: state.syncMathStylesForNode,
 }));
 
 const immediateDomCommitScope: PreviewDomCommitScope = {
@@ -169,8 +169,8 @@ describe("card preview renderer contract", () => {
 			contentForMathParsing: content,
 			protectedSegments: [],
 		}));
-		state.syncMathJaxStylesForNode.mockReset();
-		state.syncMathJaxStylesForNode.mockReturnValue(true);
+		state.syncMathStylesForNode.mockReset();
+		state.syncMathStylesForNode.mockReturnValue(true);
 		state.componentUnload.mockReset();
 	});
 
@@ -247,7 +247,7 @@ describe("card preview renderer contract", () => {
 		expect(state.componentUnload).toHaveBeenCalledOnce();
 	});
 
-	it("cancels queued MathJax work on cleanup", async () => {
+	it("cancels queued math rendering on cleanup", async () => {
 		const host = document.createElement("div");
 		const file = createMockTFile("notes/math-pending.md");
 		let releaseMathQueue: (() => void) | undefined;

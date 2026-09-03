@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { syncMathJaxStylesForNode } from "shared/ui/dom/mathJaxShadowStyles";
+import { syncMathStylesForNode } from "shared/ui/dom/mathShadowStyles";
 import { ensureCardRenderShadowSurface } from "../cardRenderShadowSurface";
 
 describe("cardRenderShadowSurface", () => {
@@ -69,7 +69,7 @@ describe("cardRenderShadowSurface", () => {
 
 		handles?.dispose();
 
-		expect(syncMathJaxStylesForNode(mathEl)).toBe(false);
+		expect(syncMathStylesForNode(mathEl)).toBe(false);
 		expect(chtmlStylesheet).not.toHaveBeenCalled();
 
 		sourceStyle.remove();

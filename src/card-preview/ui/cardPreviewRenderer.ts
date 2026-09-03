@@ -9,7 +9,7 @@ import {
 import { toPreviewImageSrc } from "card-preview/renderers/externalImageSource";
 import type { PreviewContentAnalysis } from "card-preview/pipeline/previewContent";
 import type { PreviewData, PreviewRequestOptions } from "card-preview/types";
-import { syncMathJaxStylesForNode } from "shared/ui/dom/mathJaxShadowStyles";
+import { syncMathStylesForNode } from "shared/ui/dom/mathShadowStyles";
 import { isAbortError, throwIfAborted } from "card-preview/pipeline/previewAbort";
 import { normalizePreviewQuery } from "card-preview/pipeline/previewRenderKeys";
 import type { CardPreviewSharedCache } from "./cardPreviewSharedCache";
@@ -157,7 +157,7 @@ export function createCardPreviewRenderer(
 				previewForRender.type === "text" &&
 				enableMathRendering &&
 				previewAnalysis?.hasMathExpression === true;
-			const shouldSyncMathStyles = shouldSyncMathJaxStyles(
+			const shouldSyncMathStyles = needsMathStyleSync(
 				enableMathRendering,
 				previewAnalysis,
 			);
@@ -289,7 +289,7 @@ export function createCardPreviewRenderer(
 			commit: () => {
 				container.replaceChildren(fragment);
 				if (shouldSyncMathStyles) {
-					syncMathJaxStylesForNode(container);
+					syncMathStylesForNode(container);
 				}
 				callbacks?.onCommitted?.("text", "detachable");
 				return true;
@@ -312,7 +312,7 @@ export function createCardPreviewRenderer(
 			commit: () => {
 				container.replaceChildren(moveChildrenToFragment(source));
 				if (shouldSyncMathStyles) {
-					syncMathJaxStylesForNode(container);
+					syncMathStylesForNode(container);
 				}
 				callbacks?.onCommitted?.(contentType, attachment);
 				return true;
@@ -463,7 +463,7 @@ function isPreviewData(preview: unknown): preview is PreviewData {
 	return candidate.type === "dom" && typeof candidate.render === "function";
 }
 
-function shouldSyncMathJaxStyles(
+function needsMathStyleSync(
 	enableMathRendering: boolean,
 	analysis?: PreviewContentAnalysis,
 ): boolean {

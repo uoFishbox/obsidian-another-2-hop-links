@@ -316,7 +316,8 @@ export const CARD_RENDER_SHADOW_CSS = String.raw`
 	margin: 0;
 }
 
-.cosense-card-links__box-preview mjx-math[display="true"] {
+.cosense-card-links__box-preview mjx-math[display="true"],
+.cosense-card-links__box-preview math[display="block"] {
 	font-size: 85%;
 }
 

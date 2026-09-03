@@ -89,7 +89,7 @@ src/
 - The Shadow DOM surface is created by `ensureCardRenderShadowSurface()` in `src/cards/components/cardRenderShadowSurface.ts`, which:
     - Calls `host.attachShadow({ mode: "open" })`
     - Injects `CARD_RENDER_SHADOW_CSS` into a `<style>` element inside the shadow root
-    - Registers the shadow root for MathJax style syncing
+    - Registers the shadow root with `mathShadowStyles.ts`: MathJax CSS syncing before Obsidian 1.14.0, shared Temml `adoptedStyleSheets` from 1.14.0 onward (one sheet per Document)
 - Shadow DOM is used for rendering card link surfaces (virtual lists, virtual grids, view-plan flow lists) to isolate styles from the host document.
 
 ## Shadow DOM hover popovers

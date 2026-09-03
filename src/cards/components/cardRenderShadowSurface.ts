@@ -1,7 +1,7 @@
 import {
-	registerMathJaxShadowRoot,
-	unregisterMathJaxShadowRoot,
-} from "shared/ui/dom/mathJaxShadowStyles";
+	registerMathShadowRoot,
+	unregisterMathShadowRoot,
+} from "shared/ui/dom/mathShadowStyles";
 import { CARD_RENDER_SHADOW_CSS } from "./cardRenderShadowStyles";
 
 const SHADOW_BASE_STYLE_ATTRIBUTE = "data-ccl-card-render-shadow-base-style";
@@ -45,7 +45,7 @@ export function ensureCardRenderShadowSurface(
 	}
 
 	const shadowRoot = host.shadowRoot ?? host.attachShadow({ mode: "open" });
-	registerMathJaxShadowRoot(shadowRoot);
+	registerMathShadowRoot(shadowRoot);
 	const ownerDocument = host.ownerDocument;
 
 	let baseStyleEl = shadowRoot.querySelector<HTMLStyleElement>(
@@ -81,7 +81,7 @@ export function ensureCardRenderShadowSurface(
 				return;
 			}
 			disposed = true;
-			unregisterMathJaxShadowRoot(shadowRoot);
+			unregisterMathShadowRoot(shadowRoot);
 		},
 	};
 }
