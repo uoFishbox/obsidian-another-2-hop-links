@@ -15,6 +15,7 @@ Render Obsidian links as Cosense-style preview cards and explore your vault thro
 - **Unresolved note creation** — Create missing notes directly from unresolved links.
 - **Canvas integration** — Follow selected canvas nodes and drop cards onto the canvas.
 - **Customizable appearance** — Adjust card size, gaps, columns, preview length, and more in settings.
+- **Obsidian CLI integration** — Inspect pages with one/two-hop context, search neighborhoods, open related cards, and replace link targets with a dry run option. Standard file and search operations use Obsidian's built-in CLI.
 
 ## Usage
 
@@ -22,6 +23,8 @@ Render Obsidian links as Cosense-style preview cards and explore your vault thro
 - Use the plugin settings to choose your preferred display mode and card style.
 - Click a card to open the note, or hover for a quick preview.
 - Use the search box and keyboard shortcuts to navigate large collections.
+
+The [Cosense-style Card Links agent skill](skills/cosense-style-card-links/SKILL.md) teaches agents how to use the seven extension commands. Copy `skills/cosense-style-card-links/` into your agent's skills directory to install it.
 
 ## Development
 

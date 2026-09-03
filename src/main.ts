@@ -17,6 +17,7 @@ import {
 	type PluginRuntime,
 } from "obsidian-integration/runtime/pluginRuntime";
 import type { PluginHost } from "obsidian-integration/pluginHost";
+import { registerCliHandlers } from "obsidian-integration/cli/registerCliHandlers";
 
 export default class CosenseCardLinksPlugin extends Plugin implements PluginHost {
 	public settings: PluginSettings = { ...DEFAULT_SETTINGS };
@@ -55,6 +56,7 @@ export default class CosenseCardLinksPlugin extends Plugin implements PluginHost
 
 		this.runtime = this.createRuntime();
 		registerPluginSurfaces(this, this.runtime);
+		registerCliHandlers(this);
 		this.startWorkspaceRuntime();
 	}
 

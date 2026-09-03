@@ -38,6 +38,7 @@ export interface RunStreamingSearchOptions {
 	readonly files: readonly TFile[];
 	readonly query: string;
 	readonly scope: SearchMatchScope;
+	readonly operator?: "and" | "or";
 	readonly isCancelled: () => boolean;
 	readonly onUpdate: (update: StreamingSearchUpdate) => void;
 	readonly yieldToMainThread?: () => Promise<void>;
@@ -52,6 +53,10 @@ export async function runStreamingSearch(
 	options: RunStreamingSearchOptions,
 ): Promise<void> {
 	const terms = getSearchQueryTerms(options.query);
+	const matchesTerms = (matches: readonly boolean[]): boolean =>
+		options.operator === "or"
+			? matches.length === 0 || matches.some(Boolean)
+			: matches.every(Boolean);
 	const termMatchers = terms.map(createCaseInsensitiveWikiLinkMatcher);
 	const contentMatchesByPath = new Map<string, ContentTermMatches>();
 	const fileByPath = new Map(options.files.map((file) => [file.path, file]));
@@ -104,7 +109,7 @@ export async function runStreamingSearch(
 		const titleMatches = termMatchers.map((matcher) =>
 			matcher.test(item.searchText),
 		);
-		if (titleMatches.every(Boolean)) {
+		if (matchesTerms(titleMatches)) {
 			pendingMatches.push({
 				key: item.key,
 				contentMatched: false,
@@ -130,7 +135,12 @@ export async function runStreamingSearch(
 
 			if (
 				contentTermMatches &&
-				matchesAllTerms(titleMatches, contentTermMatches.matches)
+				matchesTerms(
+					titleMatches.map(
+						(matched, index) =>
+							matched || contentTermMatches.matches[index],
+					),
+				)
 			) {
 				pendingMatches.push({
 					key: item.key,
@@ -178,16 +188,6 @@ function matchContentTerms(
 	}
 
 	return { matches, firstMatch };
-}
-
-function matchesAllTerms(
-	titleMatches: readonly boolean[],
-	contentMatches: readonly boolean[],
-): boolean {
-	for (let index = 0; index < titleMatches.length; index += 1) {
-		if (!titleMatches[index] && !contentMatches[index]) return false;
-	}
-	return true;
 }
 
 function hasRequiredContentMatch(
