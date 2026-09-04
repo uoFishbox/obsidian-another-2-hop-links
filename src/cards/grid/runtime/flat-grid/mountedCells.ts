@@ -22,7 +22,7 @@ export type MountedFlatGridRow<T> = MountedGridRow<MountedFlatGridCell<T>>;
 
 export interface MountedFlatGridBuild<T> {
 	readonly rowsInMountedRange: MountedFlatGridRow<T>[];
-	readonly cellSourceRevision: unknown;
+	readonly rowModel: FlatGridRowModel<T>;
 	/**
 	 * Binding-topology revision captured by the same mounted-build commit as
 	 * `rowsInMountedRange`. Consumers that key physical cell bodies must use this
@@ -30,13 +30,9 @@ export interface MountedFlatGridBuild<T> {
 	 */
 	readonly slotBindingRevision: unknown;
 	readonly columns: number;
-	readonly cellWidth: number;
-	readonly rowHeight: number;
-	readonly gap: number;
 }
 
 const createMountedFlatGridCell = <T>(params: {
-	key: LogicalCellKey;
 	cell: FlatGridLogicalCell<T>;
 	cellIndex: number;
 	rowIndex: number;
@@ -44,7 +40,7 @@ const createMountedFlatGridCell = <T>(params: {
 	columnIndex: number;
 }): MountedFlatGridCell<T> => {
 	return {
-		key: params.key,
+		key: logicalCellKey(params.cell.key),
 		physicalCellSlot: params.physicalCellSlot,
 		rowIndex: params.rowIndex,
 		columnIndex: params.columnIndex,
@@ -52,124 +48,6 @@ const createMountedFlatGridCell = <T>(params: {
 		cellIndex: params.cellIndex,
 	};
 };
-
-function isSameLogicalCellForMountedReuse<T>(
-	previous: FlatGridLogicalCell<T>,
-	next: FlatGridLogicalCell<T>,
-): boolean {
-	if (previous.kind !== next.kind || previous.key !== next.key) {
-		return false;
-	}
-
-	if (previous.kind === "item" && next.kind === "item") {
-		return previous.itemIndex === next.itemIndex && previous.item === next.item;
-	}
-
-	return true;
-}
-
-function canReuseMountedFlatGridCellView<T>(
-	previous: MountedFlatGridCell<T>,
-	logicalKey: LogicalCellKey,
-	cell: FlatGridLogicalCell<T>,
-	cellIndex: number,
-	rowIndex: number,
-	columnIndex: number,
-	physicalCellSlot: number,
-): boolean {
-	return (
-		previous.key === logicalKey &&
-		isSameLogicalCellForMountedReuse(previous.cell, cell) &&
-		previous.cellIndex === cellIndex &&
-		previous.rowIndex === rowIndex &&
-		previous.columnIndex === columnIndex &&
-		previous.physicalCellSlot === physicalCellSlot
-	);
-}
-
-function updateMountedFlatGridCell<T>(
-	previous: MountedFlatGridCell<T>,
-	logicalKey: LogicalCellKey,
-	cell: FlatGridLogicalCell<T>,
-	cellIndex: number,
-	rowIndex: number,
-	columnIndex: number,
-	physicalCellSlot: number,
-): MountedFlatGridCell<T> {
-	return {
-		...previous,
-		key: logicalKey,
-		cell,
-		cellIndex,
-		rowIndex,
-		columnIndex,
-		physicalCellSlot,
-	};
-}
-
-function resolveMountedFlatGridCell<T>(params: {
-	previous?: MountedFlatGridCell<T>;
-	cell: FlatGridLogicalCell<T>;
-	cellIndex: number;
-	rowIndex: number;
-	columnIndex: number;
-	physicalCellSlot: number;
-}): MountedFlatGridCell<T> {
-	const cell = params.cell;
-	const cellIndex = params.cellIndex;
-	const key = logicalCellKey(cell.key);
-	if (params.previous) {
-		if (
-			canReuseMountedFlatGridCellView(
-				params.previous,
-				key,
-				cell,
-				cellIndex,
-				params.rowIndex,
-				params.columnIndex,
-				params.physicalCellSlot,
-			)
-		) {
-			return params.previous;
-		}
-
-		return updateMountedFlatGridCell(
-			params.previous,
-			key,
-			cell,
-			cellIndex,
-			params.rowIndex,
-			params.columnIndex,
-			params.physicalCellSlot,
-		);
-	}
-
-	return createMountedFlatGridCell({
-		key,
-		cell,
-		cellIndex,
-		rowIndex: params.rowIndex,
-		physicalCellSlot: params.physicalCellSlot,
-		columnIndex: params.columnIndex,
-	});
-}
-
-const hasCompatibleMountedFlatGridCellsBuild = <T>(
-	previousBuild: MountedFlatGridBuild<T> | undefined,
-	params: {
-		cellSourceRevision: unknown;
-		columns: number;
-		cellWidth: number;
-		rowHeight: number;
-		gap: number;
-	},
-): previousBuild is MountedFlatGridBuild<T> =>
-	previousBuild !== undefined &&
-	Object.is(previousBuild.cellSourceRevision, params.cellSourceRevision) &&
-	previousBuild.columns === params.columns &&
-	previousBuild.cellWidth === params.cellWidth &&
-	previousBuild.rowHeight === params.rowHeight &&
-	previousBuild.gap === params.gap;
 
 const hasCompatibleMountedVirtualGridRowSlots = <T>(
 	previousBuild: MountedFlatGridBuild<T> | undefined,
@@ -229,17 +107,7 @@ export function buildMountedFlatGridCells<T>(params: {
 	const { rowModel } = params;
 	const columns = Math.max(1, rowModel.layout.columns);
 	const previousBuild = params.previousBuild;
-	const cellSourceRevision = rowModel.cellSource.revision;
-	const hasCompatiblePreviousBuild = hasCompatibleMountedFlatGridCellsBuild(
-		previousBuild,
-		{
-			cellSourceRevision,
-			columns,
-			cellWidth: rowModel.layout.cellWidth,
-			rowHeight: rowModel.layout.rowHeight,
-			gap: rowModel.layout.gap,
-		},
-	);
+	const canReusePreviousRows = previousBuild?.rowModel === rowModel;
 	const hasCompatiblePreviousRowSlots = hasCompatibleMountedVirtualGridRowSlots(
 		previousBuild,
 		columns,
@@ -255,12 +123,11 @@ export function buildMountedFlatGridCells<T>(params: {
 		previousRows: hasCompatiblePreviousRowSlots
 			? previousBuild?.rowsInMountedRange
 			: undefined,
-		canReusePreviousRows: hasCompatiblePreviousBuild,
-		bindCell: ({ cell, previous, rowIndex, columnIndex, physicalCellSlot }) =>
-			resolveMountedFlatGridCell({
+		canReusePreviousRows,
+		bindCell: ({ cell, rowIndex, columnIndex, physicalCellSlot }) =>
+			createMountedFlatGridCell({
 				cell,
 				cellIndex: rowModel.getCellIndex(rowIndex, columnIndex),
-				previous,
 				rowIndex,
 				columnIndex,
 				physicalCellSlot,
@@ -269,12 +136,9 @@ export function buildMountedFlatGridCells<T>(params: {
 
 	const buildState: MountedFlatGridBuild<T> = {
 		rowsInMountedRange: mountedRows.rowsInMountedRange,
-		cellSourceRevision,
+		rowModel,
 		slotBindingRevision: rowModel.cellSource.slotBindingRevision,
 		columns,
-		cellWidth: rowModel.layout.cellWidth,
-		rowHeight: rowModel.layout.rowHeight,
-		gap: rowModel.layout.gap,
 	};
 	assertMountedVirtualGridBuildInvariants(buildState);
 	return buildState;
