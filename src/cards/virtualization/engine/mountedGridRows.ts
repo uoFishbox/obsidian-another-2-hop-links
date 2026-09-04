@@ -12,9 +12,7 @@ export interface MountedGridRow<TCell extends MountedVirtualCell> {
 }
 
 export interface MountedGridRows<TCell extends MountedVirtualCell> {
-	readonly cells: TCell[];
 	readonly rowsInMountedRange: MountedGridRow<TCell>[];
-	readonly rowsByPhysicalSlot: MountedGridRow<TCell>[];
 }
 
 export interface BuildMountedGridRowsParams<
@@ -53,7 +51,6 @@ export function buildMountedGridRows<TLogicalCell, TCell extends MountedVirtualC
 	const previousRows = params.previousRows;
 	const previousFirstRowIndex = previousRows?.[0]?.rowIndex ?? 0;
 	const rowsInMountedRange: MountedGridRow<TCell>[] = [];
-	let flattenedCells: TCell[] | undefined;
 
 	for (let rowIndex = rowRange.start; rowIndex < rowRange.end; rowIndex += 1) {
 		const physicalRowSlot = rowSlotAllocator.resolveSlotIndex(rowIndex);
@@ -109,45 +106,13 @@ export function buildMountedGridRows<TLogicalCell, TCell extends MountedVirtualC
 		});
 	}
 
-	const rowsByPhysicalSlot = orderRowsBySlotIndex(rowsInMountedRange);
 	assertMountedGridRows({
-		rows: rowsByPhysicalSlot,
+		rows: rowsInMountedRange,
 		slotCapacity: rowSlotAllocator.capacity,
 		columns,
 	});
 
-	return {
-		get cells() {
-			if (flattenedCells) return flattenedCells;
-			flattenedCells = [];
-			for (const row of rowsInMountedRange) {
-				for (const binding of row.bindings) {
-					if (binding) flattenedCells.push(binding);
-				}
-			}
-			return flattenedCells;
-		},
-		rowsInMountedRange,
-		rowsByPhysicalSlot,
-	};
-}
-
-/** Orders resident rows by physical slot in O(resident rows) without sorting. */
-function orderRowsBySlotIndex<TCell extends MountedVirtualCell>(
-	rows: readonly MountedGridRow<TCell>[],
-): MountedGridRow<TCell>[] {
-	const rowsByPhysicalSlot: (MountedGridRow<TCell> | undefined)[] = [];
-	for (const row of rows) rowsByPhysicalSlot[row.physicalRowSlot] = row;
-
-	let writeIndex = 0;
-	for (let readIndex = 0; readIndex < rowsByPhysicalSlot.length; readIndex += 1) {
-		const row = rowsByPhysicalSlot[readIndex];
-		if (row === undefined) continue;
-		rowsByPhysicalSlot[writeIndex] = row;
-		writeIndex += 1;
-	}
-	rowsByPhysicalSlot.length = writeIndex;
-	return rowsByPhysicalSlot as MountedGridRow<TCell>[];
+	return { rowsInMountedRange };
 }
 
 export interface ResidentRowSlotRange {

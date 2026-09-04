@@ -1,3 +1,15 @@
+export function flattenMountedRowBindings<T>(
+	rows: ReadonlyArray<{ readonly bindings: readonly (T | null)[] }>,
+): T[] {
+	const cells: T[] = [];
+	for (const row of rows) {
+		for (const binding of row.bindings) {
+			if (binding) cells.push(binding);
+		}
+	}
+	return cells;
+}
+
 /** Asserts that one mounted snapshot never assigns a physical cell twice. */
 export function expectUniquePhysicalCellSlots(
 	cells: ReadonlyArray<{ physicalCellSlot: number }>,

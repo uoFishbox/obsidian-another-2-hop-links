@@ -59,6 +59,29 @@ function createRows(
 	return [row];
 }
 
+function createGridRow(
+	keys: string[],
+	rowIndex: number,
+	physicalRowSlot: number,
+): TestMountedRow {
+	return {
+		key: rowIndex,
+		rowIndex,
+		top: rowIndex * 50,
+		physicalRowSlot,
+		bindings: keys.map((key, columnIndex) => ({
+			key: key as LogicalCellKey,
+			physicalCellSlot: physicalRowSlot * keys.length + columnIndex,
+			rowIndex,
+			columnIndex,
+			top: rowIndex * 50,
+			left: columnIndex * 100,
+			width: 100,
+			height: 50,
+		})),
+	};
+}
+
 describe("VirtualSurface grid-row recycling", () => {
 	beforeEach(() => {
 		installAnimationFrameMock();
@@ -178,6 +201,89 @@ describe("VirtualSurface grid-row recycling", () => {
 		expect(probe?.getAttribute("data-key")).toBe("B");
 		expect(mountedKeys).toStrictEqual(["A"]);
 		expect(updatedKeys).toStrictEqual(["B"]);
+	});
+
+	it("updates only cells in the rebound physical row slot", async () => {
+		const updatedKeys: string[] = [];
+		const onCellUpdate = (key: string): void => {
+			updatedKeys.push(key);
+		};
+		const firstRow = createGridRow(["A0", "A1"], 0, 0);
+		const secondRow = createGridRow(["B0", "B1"], 1, 1);
+		const thirdRow = createGridRow(["C0", "C1"], 2, 2);
+		const { container, rerender } = render(VirtualSurfaceRecyclingHarness, {
+			props: {
+				mountedRows: [firstRow, secondRow, thirdRow],
+				contentHeight: 300,
+				rowHeight: 50,
+				columns: 2,
+				onCellUpdate,
+			},
+		});
+		await flushFrames();
+
+		const shadowRoot = container.querySelector(".recycling-test-root")?.shadowRoot;
+		expect(shadowRoot).toBeTruthy();
+		if (!shadowRoot) return;
+		const rowShells = Array.from(
+			shadowRoot.querySelectorAll("[data-ccl-row-slot]"),
+		);
+		expect(rowShells).toHaveLength(3);
+		updatedKeys.length = 0;
+
+		const reboundSecondRow = createGridRow(["D0", "D1"], 12, 1);
+		await rerender({
+			mountedRows: [firstRow, reboundSecondRow, thirdRow],
+			contentHeight: 1000,
+			rowHeight: 50,
+			columns: 2,
+			onCellUpdate,
+		});
+		await flushFrames();
+
+		expect(updatedKeys).toStrictEqual(["D0", "D1"]);
+		for (let slotIndex = 0; slotIndex < rowShells.length; slotIndex += 1) {
+			expect(shadowRoot.querySelector(`[data-ccl-row-slot='${slotIndex}']`)).toBe(
+				rowShells[slotIndex],
+			);
+		}
+	});
+
+	it("keeps inactive physical row and cell shells mounted", async () => {
+		const firstRow = createGridRow(["A"], 0, 0);
+		const secondRow = createGridRow(["B"], 1, 1);
+		const { container, rerender } = render(VirtualSurfaceRecyclingHarness, {
+			props: {
+				mountedRows: [firstRow, secondRow],
+				contentHeight: 100,
+				rowHeight: 50,
+			},
+		});
+		await flushFrames();
+
+		const shadowRoot = container.querySelector(".recycling-test-root")?.shadowRoot;
+		expect(shadowRoot).toBeTruthy();
+		if (!shadowRoot) return;
+		const firstRowShell = shadowRoot.querySelector(
+			"[data-ccl-row-slot='0']",
+		) as HTMLElement | null;
+		const firstCellShell = firstRowShell?.querySelector("[data-ccl-cell-slot='0']");
+		expect(firstRowShell).toBeTruthy();
+		expect(firstCellShell).toBeTruthy();
+
+		await rerender({
+			mountedRows: [secondRow],
+			contentHeight: 100,
+			rowHeight: 50,
+		});
+		await flushFrames();
+
+		expect(shadowRoot.querySelector("[data-ccl-row-slot='0']")).toBe(firstRowShell);
+		expect(firstRowShell?.hidden).toBe(true);
+		expect(firstRowShell?.querySelector("[data-ccl-cell-slot='0']")).toBe(
+			firstCellShell,
+		);
+		expect(firstCellShell?.querySelector('[data-testid="probe-cell"]')).toBeNull();
 	});
 
 	it("keeps the occupied → empty → occupied transition on one physical slot safe", async () => {

@@ -1,21 +1,17 @@
-<script
-	lang="ts"
-	generics="TMountedCell extends MountedVirtualCell, TMountedRow extends CardGridMountedRow<TMountedCell>"
->
+<script lang="ts" generics="TMountedCell extends MountedVirtualCell">
 	import type { Snippet } from "svelte";
+	import { untrack } from "svelte";
 	import type { MountedVirtualCell } from "cards/virtualization/public";
 	import {
 		bindVirtualCell,
 		type VirtualCellBindingRegistry,
 	} from "../interaction/cellBindingRegistry";
 	import type { CardGridMountedRow } from "./cardGridSurfaceTypes";
+	import { createPhysicalGridSlotPool } from "./physicalGridSlotPool.svelte";
 
 	const IS_PROD = process.env.NODE_ENV === "production";
 
-	interface Props<
-		TMountedCell extends MountedVirtualCell,
-		TMountedRow extends CardGridMountedRow<TMountedCell>,
-	> {
+	interface Props<TMountedCell extends MountedVirtualCell> {
 		contentClassName?: string;
 		rowClassName?: string;
 		cellClassName?: string;
@@ -24,13 +20,11 @@
 		rowHeight: number;
 		columns?: number;
 		gap?: number;
-		mountedRows: readonly TMountedRow[];
+		mountedRows: readonly CardGridMountedRow<TMountedCell>[];
 		contentEl?: HTMLDivElement | null;
 		scrollContainerEl?: HTMLElement | null;
-		getCellClassName?: (cell: TMountedCell) => string | undefined;
 		getCellDataTestId?: (cell: TMountedCell) => string | undefined;
 		slotBodyRevision?: unknown;
-		isRowActive?: (row: TMountedRow) => boolean;
 		cellBindingRegistry: VirtualCellBindingRegistry;
 		renderCell: Snippet<
 			[
@@ -54,101 +48,79 @@
 		mountedRows,
 		contentEl = $bindable<HTMLDivElement | null>(null),
 		scrollContainerEl = null,
-		getCellClassName,
 		getCellDataTestId,
 		slotBodyRevision = undefined,
-		isRowActive,
 		cellBindingRegistry,
 		renderCell,
-	}: Props<TMountedCell, TMountedRow> = $props();
+	}: Props<TMountedCell> = $props();
 
-	const resolveCellClassName = (mountedCell: TMountedCell): string => {
-		const extraClassName = getCellClassName?.(mountedCell);
-		if (!extraClassName) return cellClassName;
-		if (!cellClassName) return extraClassName;
-		return `${cellClassName} ${extraClassName}`;
-	};
+	const physicalSlotPool = createPhysicalGridSlotPool<TMountedCell>();
+
+	$effect.pre(() => {
+		const nextMountedRows = mountedRows;
+		const nextColumns = columns;
+		untrack(() => physicalSlotPool.sync(nextMountedRows, nextColumns));
+	});
 
 	const contentStyle = $derived(
 		`height:${contentHeight}px; position:relative; --ccl-box-height:${rowHeight}px; --ccl-cell-width:${cellWidth ?? 0}px; --ccl-columns:${Math.max(1, Math.floor(columns))}${gap !== undefined ? `; --ccl-box-gap:${gap}px` : ""}`,
 	);
-
-	const setRowTop = (element: HTMLElement, top: number) => {
-		let committedTop = Number.NaN;
-
-		const update = (nextTop: number): void => {
-			const normalizedTop = Math.max(0, nextTop);
-			if (normalizedTop === committedTop) return;
-
-			committedTop = normalizedTop;
-			element.style.top = `${normalizedTop}px`;
-		};
-		update(top);
-		return { update };
-	};
 </script>
 
 <div class={contentClassName} bind:this={contentEl} style={contentStyle}>
-	{#each mountedRows as row (row.physicalRowSlot)}
-		{#if !isRowActive || isRowActive(row)}
-			<div
-				{...row.attributes}
-				class={rowClassName}
-				data-ccl-row-slot={!IS_PROD ? row.physicalRowSlot : undefined}
-				data-ccl-row-index={!IS_PROD ? row.rowIndex : undefined}
-				use:setRowTop={row.top}
-			>
-				{#each row.bindings as currentBinding, columnIndex (row.physicalRowSlot * row.bindings.length + columnIndex)}
-					{@const physicalCellSlotIndex =
-						row.physicalRowSlot * row.bindings.length + columnIndex}
-					{@const logicalKeyAttribute = currentBinding
-						? String(currentBinding.key)
+	{#each physicalSlotPool.rows as row (row.physicalRowSlot)}
+		<div
+			class={rowClassName}
+			hidden={!row.active}
+			aria-hidden={!row.active ? "true" : undefined}
+			data-ccl-row-slot={!IS_PROD ? row.physicalRowSlot : undefined}
+			data-ccl-row-index={!IS_PROD && row.active ? row.rowIndex : undefined}
+			style:top={`${Math.max(0, row.top)}px`}
+		>
+			{#each row.cells as cell (cell.physicalCellSlot)}
+				{@const currentBinding = cell.binding}
+				{@const columnIndex =
+					cell.physicalCellSlot - row.physicalRowSlot * row.cells.length}
+				{@const physicalCellSlotIndex = cell.physicalCellSlot}
+				{@const logicalKeyAttribute = currentBinding
+					? String(currentBinding.key)
+					: undefined}
+				{@const mountedRowIndex = currentBinding
+					? currentBinding.rowIndex
+					: row.rowIndex}
+				{@const mountedColumnIndex = currentBinding
+					? currentBinding.columnIndex
+					: columnIndex}
+				<div
+					use:bindVirtualCell={logicalKeyAttribute === undefined
+						? undefined
+						: {
+								registry: cellBindingRegistry,
+								nextLogicalKey: logicalKeyAttribute,
+								rowIndex: mountedRowIndex,
+								columnIndex: mountedColumnIndex,
+							}}
+					class={cellClassName}
+					data-ccl-logical-key={!IS_PROD ? logicalKeyAttribute : undefined}
+					data-ccl-cell-slot={!IS_PROD ? physicalCellSlotIndex : undefined}
+					data-testid={!IS_PROD && currentBinding
+						? getCellDataTestId?.(currentBinding)
 						: undefined}
-					{@const mountedRowIndex = currentBinding
-						? currentBinding.rowIndex
-						: row.rowIndex}
-					{@const mountedColumnIndex = currentBinding
-						? currentBinding.columnIndex
-						: columnIndex}
-					<div
-						use:bindVirtualCell={logicalKeyAttribute === undefined
-							? undefined
-							: {
-									registry: cellBindingRegistry,
-									nextLogicalKey: logicalKeyAttribute,
-									rowIndex: mountedRowIndex,
-									columnIndex: mountedColumnIndex,
-								}}
-						class={currentBinding
-							? resolveCellClassName(currentBinding)
-							: cellClassName}
-						data-ccl-logical-key={!IS_PROD
-							? logicalKeyAttribute
-							: undefined}
-						data-ccl-cell-slot={!IS_PROD
-							? physicalCellSlotIndex
-							: undefined}
-						data-testid={!IS_PROD && currentBinding
-							? getCellDataTestId?.(currentBinding)
-							: undefined}
-						data-ccl-row-index={!IS_PROD ? mountedRowIndex : undefined}
-						data-ccl-column-index={!IS_PROD
-							? mountedColumnIndex
-							: undefined}
-						aria-hidden={currentBinding === null ? "true" : undefined}
-					>
-						{#key slotBodyRevision}
-							{#if currentBinding}
-								{@const mountedCell = currentBinding}
-								{@render renderCell({
-									mountedCell,
-									scrollContainerEl,
-								})}
-							{/if}
-						{/key}
-					</div>
-				{/each}
-			</div>
-		{/if}
+					data-ccl-row-index={!IS_PROD ? mountedRowIndex : undefined}
+					data-ccl-column-index={!IS_PROD ? mountedColumnIndex : undefined}
+					aria-hidden={currentBinding === null ? "true" : undefined}
+				>
+					{#key slotBodyRevision}
+						{#if currentBinding}
+							{@const mountedCell = currentBinding}
+							{@render renderCell({
+								mountedCell,
+								scrollContainerEl,
+							})}
+						{/if}
+					{/key}
+				</div>
+			{/each}
+		</div>
 	{/each}
 </div>

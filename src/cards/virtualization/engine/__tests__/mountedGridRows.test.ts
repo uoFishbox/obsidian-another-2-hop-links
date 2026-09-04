@@ -25,7 +25,6 @@ function createRowModel(rowCellCounts: readonly number[], columns = 4) {
 	const rowStride = rowHeight + gap;
 	const rowCount = rowCellCounts.length;
 	const model: VirtualRowModel<TestLogicalCell> = {
-		revision: { content: rowCellCounts, layout: columns },
 		rowCount,
 		totalHeight: rowCount > 0 ? rowCount * rowStride - gap : 0,
 		layout: {
@@ -101,7 +100,7 @@ function buildRows(params: {
 }
 
 describe("buildMountedGridRows", () => {
-	it("keeps one binding per physical column while flattening only occupied cells", () => {
+	it("keeps one binding per physical column", () => {
 		const { build } = buildRows({ rowModel: createRowModel([2]) });
 		const row = build.rowsInMountedRange[0];
 
@@ -112,7 +111,6 @@ describe("buildMountedGridRows", () => {
 			null,
 			null,
 		]);
-		expect(build.cells).toEqual(row?.bindings.filter(Boolean));
 	});
 
 	it("rebinds physical bindings when the logical row shell cannot be reused", () => {
@@ -172,7 +170,7 @@ describe("buildMountedGridRows", () => {
 		).toBe(true);
 	});
 
-	it("orders rowsByPhysicalSlot by physical slot independently of logical row order", () => {
+	it("keeps mounted rows in logical order while physical slots rotate", () => {
 		const allocator = createResidentRowSlotAllocator();
 		const model = createRowModel([1, 1, 1, 1, 1, 1], 1);
 		const initial = buildRows({
@@ -191,11 +189,8 @@ describe("buildMountedGridRows", () => {
 		expect(
 			shifted.build.rowsInMountedRange.map((row) => row.physicalRowSlot),
 		).toEqual([2, 3, 0, 1]);
-		expect(
-			shifted.build.rowsByPhysicalSlot.map((row) => row.physicalRowSlot),
-		).toEqual([0, 1, 2, 3]);
-		expect(shifted.build.rowsByPhysicalSlot.map((row) => row.rowIndex)).toEqual([
-			4, 5, 2, 3,
+		expect(shifted.build.rowsInMountedRange.map((row) => row.rowIndex)).toEqual([
+			2, 3, 4, 5,
 		]);
 	});
 

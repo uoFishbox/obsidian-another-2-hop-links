@@ -7,7 +7,6 @@ function createMockRowModel(
 	rowHeight: number,
 ): VirtualRowModel<unknown> {
 	return {
-		revision: { content: 0, layout: 0 },
 		rowCount,
 		totalHeight: rowCount * rowHeight,
 		layout: {
@@ -41,16 +40,11 @@ function createMockRowModel(
 				mountedOverscanPx,
 				Math.max(0, params.previewOverscanPx ?? 0),
 			);
-			if (params.mounted) {
-				out.mounted.start = params.mounted.start;
-				out.mounted.end = params.mounted.end;
-			} else {
-				this.findVisibleRangeInto(out.mounted, {
-					scrollTop: params.scrollTop,
-					viewportHeight: params.viewportHeight,
-					overscanPx: mountedOverscanPx,
-				});
-			}
+			this.findVisibleRangeInto(out.mounted, {
+				scrollTop: params.scrollTop,
+				viewportHeight: params.viewportHeight,
+				overscanPx: mountedOverscanPx,
+			});
 			this.findVisibleRangeInto(out.previewVisible, {
 				scrollTop: params.scrollTop,
 				viewportHeight: params.viewportHeight,

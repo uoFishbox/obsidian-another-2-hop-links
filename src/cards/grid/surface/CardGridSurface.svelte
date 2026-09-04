@@ -34,7 +34,6 @@
 		contentEl?: HTMLDivElement | null;
 		interactionShadowRoot?: ShadowRoot | null;
 		scrollContainerEl?: HTMLElement | null;
-		getCellClassName?: (cell: TCell) => string | undefined;
 		getCellDataTestId?: (cell: TCell) => string | undefined;
 		slotBodyRevision?: unknown;
 		resolveNavigationTarget?: (
@@ -69,7 +68,6 @@
 		contentEl = $bindable<HTMLDivElement | null>(null),
 		interactionShadowRoot = $bindable<ShadowRoot | null>(null),
 		scrollContainerEl = null,
-		getCellClassName,
 		getCellDataTestId,
 		slotBodyRevision = undefined,
 		resolveNavigationTarget,
@@ -126,7 +124,6 @@
 		{mountedRows}
 		bind:contentEl
 		{scrollContainerEl}
-		{getCellClassName}
 		{getCellDataTestId}
 		{slotBodyRevision}
 		{cellBindingRegistry}

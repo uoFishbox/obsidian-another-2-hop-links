@@ -87,9 +87,7 @@ const copyRange = (out: MutableRowRange, range: RowRange): void => {
 };
 
 const createTestRowModel = (state: TestRowModelState): TestRowModel => {
-	const revision = { content: state, layout: state };
 	return {
-		revision,
 		get rowCount() {
 			return state.rowCount ?? 100;
 		},
@@ -108,8 +106,8 @@ const createTestRowModel = (state: TestRowModelState): TestRowModel => {
 		findVisibleRangeInto(out) {
 			copyRange(out, state.mounted);
 		},
-		findVisibleRangesInto(out, { mounted }) {
-			copyRange(out.mounted, mounted ?? state.mounted);
+		findVisibleRangesInto(out) {
+			copyRange(out.mounted, state.mounted);
 			copyRange(out.previewVisible, state.previewVisible);
 		},
 		findMountedCoverageScrollTopBandInto(out, { mounted }) {
@@ -172,13 +170,7 @@ const createRoot = (rectOverrides: Partial<DOMRect> = {}): HTMLElement => {
 };
 
 type TestRuntime = ReturnType<
-	typeof useVirtualizer<
-		TestCell,
-		TestRowModel,
-		TestRowModel,
-		TestMountedCell,
-		TestMountedBuild
-	>
+	typeof useVirtualizer<TestCell, TestRowModel, TestRowModel, TestMountedBuild>
 >;
 
 const activeFrameCoordinators = new Set<VirtualFrameCoordinator>();
@@ -189,13 +181,7 @@ const createRuntimeHarness = (
 		previewVisible: { start: 2, end: 8 },
 	},
 	overrides: Partial<
-		UseVirtualizerOptions<
-			TestCell,
-			TestRowModel,
-			TestRowModel,
-			TestMountedCell,
-			TestMountedBuild
-		>
+		UseVirtualizerOptions<TestCell, TestRowModel, TestRowModel, TestMountedBuild>
 	> = {},
 ) => {
 	const rootEl = createRoot();
@@ -208,7 +194,6 @@ const createRuntimeHarness = (
 		TestCell,
 		TestRowModel,
 		TestRowModel,
-		TestMountedCell,
 		TestMountedBuild
 	> = {
 		getRootEl: () => rootEl,
@@ -319,36 +304,15 @@ describe("useVirtualizer", () => {
 		});
 	});
 
-	it("skips unchanged stable cached scroll geometry", () => {
-		const { runtime, findVisibleRangesInto } = createRuntimeHarness();
-
-		expect(runtime.runScrollMeasurement(ACTIVE_SCROLL_METRICS).kind).toBe(
-			"measured",
-		);
-		const callCountAfterFirstMeasurement = findVisibleRangesInto.mock.calls.length;
-		const skipped = runtime.runScrollMeasurement({
-			...ACTIVE_SCROLL_METRICS,
-			frameId: 2,
-		});
-
-		expect(skipped).toEqual({
-			kind: "skipped",
-			reason: "unchanged-scroll",
-		});
-		expect(findVisibleRangesInto).toHaveBeenCalledTimes(
-			callCountAfterFirstMeasurement,
-		);
-	});
-
-	it("re-runs range resolution when publication is forced", () => {
+	it("re-runs range resolution for repeated direct measurements", () => {
 		const { runtime, findVisibleRangesInto } = createRuntimeHarness();
 
 		runtime.runScrollMeasurement(ACTIVE_SCROLL_METRICS);
 		const callCountAfterFirstMeasurement = findVisibleRangesInto.mock.calls.length;
-		const result = runtime.runScrollMeasurement(
-			{ ...ACTIVE_SCROLL_METRICS, frameId: 2 },
-			{ forcePublish: true, reason: "data-change" },
-		);
+		const result = runtime.runScrollMeasurement({
+			...ACTIVE_SCROLL_METRICS,
+			frameId: 2,
+		});
 
 		expect(result.kind).toBe("measured");
 		expect(findVisibleRangesInto.mock.calls.length).toBeGreaterThan(
@@ -356,13 +320,13 @@ describe("useVirtualizer", () => {
 		);
 	});
 
-	it("resolves stable ranges once and reuses them for engine publication and coverage", () => {
+	it("resolves mounted and preview ranges in one row-model call", () => {
 		const { runtime, findVisibleRangeInto, findVisibleRangesInto } =
 			createRuntimeHarness();
 
 		runtime.runScrollMeasurement(ACTIVE_SCROLL_METRICS);
 
-		expect(findVisibleRangeInto).toHaveBeenCalledTimes(1);
+		expect(findVisibleRangeInto).not.toHaveBeenCalled();
 		expect(findVisibleRangesInto).toHaveBeenCalledTimes(1);
 	});
 
@@ -482,7 +446,7 @@ describe("useVirtualizer", () => {
 				"scroll-idle",
 			);
 
-			expect(findVisibleRangeInto.mock.calls.length).toBeGreaterThan(
+			expect(findVisibleRangeInto).toHaveBeenCalledTimes(
 				mountedResolutionCount,
 			);
 			expect(findVisibleRangesInto.mock.calls.length).toBeGreaterThan(
@@ -490,36 +454,6 @@ describe("useVirtualizer", () => {
 			);
 		},
 	);
-
-	it("fully measures covered scroll idle when publication is forced", () => {
-		const { runtime, findVisibleRangeInto, findVisibleRangesInto } =
-			createRuntimeHarness({
-				mounted: { start: 0, end: 10 },
-				previewVisible: { start: 2, end: 8 },
-				mountedCoverageBand: { min: 20, max: 80 },
-				previewCoverageBand: { min: 30, max: 70 },
-			});
-		runtime.runScrollMeasurement(ACTIVE_SCROLL_METRICS);
-		const mountedResolutionCount = findVisibleRangeInto.mock.calls.length;
-		const rangedResolutionCount = findVisibleRangesInto.mock.calls.length;
-
-		runtime.runScrollMeasurement(
-			{
-				...ACTIVE_SCROLL_METRICS,
-				scrollTop: 60,
-				frameId: 2,
-				isScrollActive: false,
-			},
-			{ forcePublish: true, reason: "scroll-idle" },
-		);
-
-		expect(findVisibleRangeInto.mock.calls.length).toBeGreaterThan(
-			mountedResolutionCount,
-		);
-		expect(findVisibleRangesInto.mock.calls.length).toBeGreaterThan(
-			rangedResolutionCount,
-		);
-	});
 
 	it("suppresses scroll work while layout measurement is pending", async () => {
 		const { runtime, onSnapshotUpdated, findVisibleRangesInto } =

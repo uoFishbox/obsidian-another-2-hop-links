@@ -317,7 +317,6 @@ export function useFlatCardGrid<T>(
 		FlatGridLogicalCell<T>,
 		FlatGridRowModel<T>,
 		FlatGridLayout,
-		MountedFlatGridCell<T>,
 		MountedFlatGridBuild<T>
 	>({
 		getRootEl: () => sectionRootEl,
@@ -358,13 +357,10 @@ export function useFlatCardGrid<T>(
 	});
 	const measurement = virtualList.measurement;
 	const contentHeight = $derived(virtualList.getTotalHeight(layout.contentHeight));
-	const mountedCells = $derived<readonly MountedFlatGridCell<T>[]>(
-		virtualList.getMountedCells(),
-	);
 	const mountedRows = $derived.by<readonly MountedFlatGridRow<T>[]>(() => {
-		const rowsByPhysicalSlot = virtualList.getMountedBuild()?.rowsByPhysicalSlot;
-		return rowsByPhysicalSlot && rowsByPhysicalSlot.length > 0
-			? rowsByPhysicalSlot
+		const rowsInMountedRange = virtualList.getMountedBuild()?.rowsInMountedRange;
+		return rowsInMountedRange && rowsInMountedRange.length > 0
+			? rowsInMountedRange
 			: EMPTY_MOUNTED_ROWS;
 	});
 
@@ -583,18 +579,15 @@ export function useFlatCardGrid<T>(
 		if (restoredScrollTop !== context.scrollTop) {
 			virtualList.suppressNextNativeScroll(restoredScrollTop);
 		}
-		virtualList.flushProgrammaticScrollMeasurement(
-			{
-				scrollContainerEl,
-				scrollTop: restoredScrollTop,
-				viewportHeight: scrollContainerEl
-					? scrollContainerEl.clientHeight
-					: ownerWindow.innerHeight,
-				sectionTop: context.sectionTop,
-				didScroll: restoredScrollTop !== context.scrollTop,
-			},
-			{ forcePublish: true },
-		);
+		virtualList.flushProgrammaticScrollMeasurement({
+			scrollContainerEl,
+			scrollTop: restoredScrollTop,
+			viewportHeight: scrollContainerEl
+				? scrollContainerEl.clientHeight
+				: ownerWindow.innerHeight,
+			sectionTop: context.sectionTop,
+			didScroll: restoredScrollTop !== context.scrollTop,
+		});
 		return true;
 	}
 
@@ -689,9 +682,6 @@ export function useFlatCardGrid<T>(
 		},
 		get layout() {
 			return layout;
-		},
-		get mountedCells() {
-			return mountedCells;
 		},
 		get mountedRows() {
 			return mountedRows;

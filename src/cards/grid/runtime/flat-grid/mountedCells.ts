@@ -1,7 +1,6 @@
 import type { FlatGridLogicalCell } from "./logicalCell";
 import {
 	buildMountedGridRows,
-	clampRange,
 	logicalCellKey,
 	type LogicalCellKey,
 	type MountedGridRow,
@@ -22,14 +21,11 @@ export interface MountedFlatGridCell<T> {
 export type MountedFlatGridRow<T> = MountedGridRow<MountedFlatGridCell<T>>;
 
 export interface MountedFlatGridBuild<T> {
-	readonly cells: MountedFlatGridCell<T>[];
 	readonly rowsInMountedRange: MountedFlatGridRow<T>[];
-	readonly rowsByPhysicalSlot: MountedFlatGridRow<T>[];
-	readonly poolCapacity: number;
 	readonly cellSourceRevision: unknown;
 	/**
 	 * Binding-topology revision captured by the same mounted-build commit as
-	 * `rowsByPhysicalSlot`. Consumers that key physical cell bodies must use this
+	 * `rowsInMountedRange`. Consumers that key physical cell bodies must use this
 	 * committed value rather than the eagerly derived logical-source revision.
 	 */
 	readonly slotBindingRevision: unknown;
@@ -177,31 +173,9 @@ const hasCompatibleMountedFlatGridCellsBuild = <T>(
 
 const hasCompatibleMountedVirtualGridRowSlots = <T>(
 	previousBuild: MountedFlatGridBuild<T> | undefined,
-	params: {
-		columns: number;
-		cellWidth: number;
-		rowHeight: number;
-		gap: number;
-	},
+	columns: number,
 ): previousBuild is MountedFlatGridBuild<T> =>
-	previousBuild !== undefined &&
-	previousBuild.columns === params.columns &&
-	previousBuild.cellWidth === params.cellWidth &&
-	previousBuild.rowHeight === params.rowHeight &&
-	previousBuild.gap === params.gap;
-
-const hasSameMountedVirtualGridRowRange = <T>(
-	build: MountedFlatGridBuild<T>,
-	rowRange: RowRange,
-): boolean => {
-	const rows = build.rowsInMountedRange;
-	if (rowRange.start >= rowRange.end) return rows.length === 0;
-	return (
-		rows.length === rowRange.end - rowRange.start &&
-		rows[0]?.rowIndex === rowRange.start &&
-		rows[rows.length - 1]?.rowIndex === rowRange.end - 1
-	);
-};
+	previousBuild !== undefined && previousBuild.columns === columns;
 
 const assertMountedVirtualGridBuildInvariants = <T>(
 	build: MountedFlatGridBuild<T>,
@@ -254,7 +228,6 @@ export function buildMountedFlatGridCells<T>(params: {
 }): MountedFlatGridBuild<T> {
 	const { rowModel } = params;
 	const columns = Math.max(1, rowModel.layout.columns);
-	const visibleRows = clampRange(params.rowRange, rowModel.rowCount);
 	const previousBuild = params.previousBuild;
 	const cellSourceRevision = rowModel.cellSource.revision;
 	const hasCompatiblePreviousBuild = hasCompatibleMountedFlatGridCellsBuild(
@@ -267,21 +240,9 @@ export function buildMountedFlatGridCells<T>(params: {
 			gap: rowModel.layout.gap,
 		},
 	);
-	if (
-		hasCompatiblePreviousBuild &&
-		hasSameMountedVirtualGridRowRange(previousBuild, visibleRows)
-	) {
-		return previousBuild;
-	}
-
 	const hasCompatiblePreviousRowSlots = hasCompatibleMountedVirtualGridRowSlots(
 		previousBuild,
-		{
-			columns,
-			cellWidth: rowModel.layout.cellWidth,
-			rowHeight: rowModel.layout.rowHeight,
-			gap: rowModel.layout.gap,
-		},
+		columns,
 	);
 	const { rowSlotAllocator } = params;
 	const mountedRows = buildMountedGridRows<
@@ -289,7 +250,7 @@ export function buildMountedFlatGridCells<T>(params: {
 		MountedFlatGridCell<T>
 	>({
 		rowModel,
-		rowRange: visibleRows,
+		rowRange: params.rowRange,
 		rowSlotAllocator,
 		previousRows: hasCompatiblePreviousRowSlots
 			? previousBuild?.rowsInMountedRange
@@ -307,12 +268,7 @@ export function buildMountedFlatGridCells<T>(params: {
 	});
 
 	const buildState: MountedFlatGridBuild<T> = {
-		get cells() {
-			return mountedRows.cells;
-		},
 		rowsInMountedRange: mountedRows.rowsInMountedRange,
-		rowsByPhysicalSlot: mountedRows.rowsByPhysicalSlot,
-		poolCapacity: rowSlotAllocator.capacity,
 		cellSourceRevision,
 		slotBindingRevision: rowModel.cellSource.slotBindingRevision,
 		columns,

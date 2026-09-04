@@ -7,7 +7,11 @@ import {
 	type ResidentRowSlotAllocator,
 } from "cards/virtualization/public";
 import { buildMountedFlatGridCells, type MountedFlatGridBuild } from "../mountedCells";
-import { expectKeys, expectUniquePhysicalCellSlots } from "./mountedCellsTestHelpers";
+import {
+	expectKeys,
+	expectUniquePhysicalCellSlots,
+	flattenMountedRowBindings,
+} from "./mountedCellsTestHelpers";
 
 type TestItem = {
 	id: string;
@@ -121,15 +125,19 @@ function buildCells(params: {
 	return build;
 }
 
-function slotsByKey(build: {
-	cells: ReadonlyArray<{ key: string; physicalCellSlot: number }>;
-}): Map<string, number> {
-	return new Map(build.cells.map((cell) => [cell.key, cell.physicalCellSlot]));
+function getMountedCells(build: TestBuildResult) {
+	return flattenMountedRowBindings(build.rowsInMountedRange);
+}
+
+function slotsByKey(build: TestBuildResult): Map<string, number> {
+	return new Map(
+		getMountedCells(build).map((cell) => [cell.key, cell.physicalCellSlot]),
+	);
 }
 
 function expectSameSlotsForKeys(
-	previous: { cells: ReadonlyArray<{ key: string; physicalCellSlot: number }> },
-	next: { cells: ReadonlyArray<{ key: string; physicalCellSlot: number }> },
+	previous: TestBuildResult,
+	next: TestBuildResult,
 	keys: string[],
 ): void {
 	const previousSlots = slotsByKey(previous);
@@ -147,7 +155,10 @@ describe("linkListVirtualLayout", () => {
 			items,
 			visibleWindow: { start: 0, end: 30 },
 		});
-		expect(build.poolCapacity).toBe(10);
+		const initialSlots = new Set(
+			build.rowsInMountedRange.map((row) => row.physicalRowSlot),
+		);
+		expect(initialSlots.size).toBe(10);
 
 		for (const visibleWindow of [
 			{ start: 27, end: 30 },
@@ -156,15 +167,11 @@ describe("linkListVirtualLayout", () => {
 			{ start: 54, end: 84 },
 		]) {
 			build = buildCells({ items, visibleWindow, previousBuild: build });
-			expect(build.poolCapacity).toBe(10);
 			expect(
-				Math.max(...build.rowsInMountedRange.map((row) => row.physicalRowSlot)),
-			).toBeLessThan(build.poolCapacity);
-			expect(build.rowsByPhysicalSlot.map((row) => row.physicalRowSlot)).toEqual(
-				build.rowsByPhysicalSlot
-					.map((row) => row.physicalRowSlot)
-					.sort((a, b) => a - b),
-			);
+				build.rowsInMountedRange.every((row) =>
+					initialSlots.has(row.physicalRowSlot),
+				),
+			).toBe(true);
 		}
 	});
 
@@ -176,17 +183,19 @@ describe("linkListVirtualLayout", () => {
 			items: [...items],
 			previousBuild: initial,
 		});
+		const initialCells = getMountedCells(initial);
+		const rebuiltCells = getMountedCells(rebuilt);
 
-		expectKeys(rebuilt.cells).toEqual([itemKey(0), itemKey(1), itemKey(2)]);
-		expect(rebuilt.cells.map((cell) => cell.cell)).toEqual(
-			initial.cells.map((cell) => cell.cell),
+		expectKeys(rebuiltCells).toEqual([itemKey(0), itemKey(1), itemKey(2)]);
+		expect(rebuiltCells.map((cell) => cell.cell)).toEqual(
+			initialCells.map((cell) => cell.cell),
 		);
-		expect(rebuilt.cells[0]).toBe(initial.cells[0]);
-		expect(rebuilt.cells[1]).toBe(initial.cells[1]);
-		expect(rebuilt.cells[2]).toBe(initial.cells[2]);
+		expect(rebuiltCells[0]).toBe(initialCells[0]);
+		expect(rebuiltCells[1]).toBe(initialCells[1]);
+		expect(rebuiltCells[2]).toBe(initialCells[2]);
 
 		expectSameSlotsForKeys(initial, rebuilt, [itemKey(0), itemKey(1), itemKey(2)]);
-		expectUniquePhysicalCellSlots(rebuilt.cells);
+		expectUniquePhysicalCellSlots(rebuiltCells);
 	});
 
 	it("updates the mounted item payload when an item changes under the same key", () => {
@@ -201,10 +210,11 @@ describe("linkListVirtualLayout", () => {
 			items: updatedItems,
 			previousBuild: initial,
 		});
+		const updatedCells = getMountedCells(updated);
 
-		expectKeys(updated.cells).toEqual([itemKey(0), itemKey(1), itemKey(2)]);
+		expectKeys(updatedCells).toEqual([itemKey(0), itemKey(1), itemKey(2)]);
 
-		const first = updated.cells[0];
+		const first = updatedCells[0]!;
 		expect(first.cell.kind).toBe("item");
 
 		if (first.cell.kind !== "item") {
@@ -216,7 +226,7 @@ describe("linkListVirtualLayout", () => {
 		expect(first.cell.item.label).toBe("Updated 0");
 
 		expectSameSlotsForKeys(initial, updated, [itemKey(0), itemKey(1), itemKey(2)]);
-		expectUniquePhysicalCellSlots(updated.cells);
+		expectUniquePhysicalCellSlots(updatedCells);
 	});
 
 	it("recomputes positions while preserving key-to-slot mapping when layout metrics change", () => {
@@ -238,8 +248,10 @@ describe("linkListVirtualLayout", () => {
 			gap: 10,
 			previousBuild: initial,
 		});
+		const initialCells = getMountedCells(initial);
+		const resizedCells = getMountedCells(resized);
 
-		expectKeys(resized.cells).toEqual([
+		expectKeys(resizedCells).toEqual([
 			itemKey(0),
 			itemKey(1),
 			itemKey(2),
@@ -256,13 +268,20 @@ describe("linkListVirtualLayout", () => {
 			itemKey(4),
 			itemKey(5),
 		]);
-		expectUniquePhysicalCellSlots(resized.cells);
+		expectUniquePhysicalCellSlots(resizedCells);
 
 		expect(resized.cellWidth).toBe(120);
 		expect(resized.rowHeight).toBe(140);
 		expect(resized.rowsInMountedRange.map((row) => row.top)).toEqual([0, 150]);
-		expect(resized.cells[0].columnIndex).toBe(0);
-		expect(resized.cells[3].columnIndex).toBe(0);
+		expect(resized.rowsInMountedRange[0]).not.toBe(initial.rowsInMountedRange[0]);
+		expect(resizedCells[0]).toBe(initialCells[0]);
+		expect(resizedCells[1]).toBe(initialCells[1]);
+		expect(resizedCells[2]).toBe(initialCells[2]);
+		expect(resizedCells[3]).toBe(initialCells[3]);
+		expect(resizedCells[4]).toBe(initialCells[4]);
+		expect(resizedCells[5]).toBe(initialCells[5]);
+		expect(resizedCells[0]?.columnIndex).toBe(0);
+		expect(resizedCells[3]?.columnIndex).toBe(0);
 	});
 
 	it("mounts only cells inside the visible row window", () => {
@@ -276,17 +295,18 @@ describe("linkListVirtualLayout", () => {
 			rowHeight: 120,
 			gap: 10,
 		});
+		const cells = getMountedCells(result);
 
-		expectKeys(result.cells).toEqual([itemKey(3), itemKey(4), itemKey(5)]);
+		expectKeys(cells).toEqual([itemKey(3), itemKey(4), itemKey(5)]);
 
-		expect(result.cells.map((cell) => cell.cellIndex)).toEqual([3, 4, 5]);
-		expect(result.cells[0]).toMatchObject({ rowIndex: 1, columnIndex: 0 });
-		expect(result.cells[1]).toMatchObject({ rowIndex: 1, columnIndex: 1 });
+		expect(cells.map((cell) => cell.cellIndex)).toEqual([3, 4, 5]);
+		expect(cells[0]).toMatchObject({ rowIndex: 1, columnIndex: 0 });
+		expect(cells[1]).toMatchObject({ rowIndex: 1, columnIndex: 1 });
 		expect(result.rowsInMountedRange[0].top).toBe(130);
-		expectUniquePhysicalCellSlots(result.cells);
+		expectUniquePhysicalCellSlots(cells);
 	});
 
-	it("builds row slices from mounted cells", () => {
+	it("builds mounted cells inside logical row slices", () => {
 		const items = createItems(6);
 		const build = buildCells({
 			items,
@@ -327,8 +347,9 @@ describe("linkListVirtualLayout", () => {
 			columns: 3,
 			previousBuild: initial,
 		});
+		const shiftedCells = getMountedCells(shifted);
 
-		expectKeys(shifted.cells).toEqual([
+		expectKeys(shiftedCells).toEqual([
 			itemKey(3),
 			itemKey(4),
 			itemKey(5),
@@ -342,7 +363,7 @@ describe("linkListVirtualLayout", () => {
 		expect(shifted.rowsInMountedRange.map((row) => row.physicalRowSlot)).toEqual([
 			1, 0,
 		]);
-		expectUniquePhysicalCellSlots(shifted.cells);
+		expectUniquePhysicalCellSlots(shiftedCells);
 	});
 
 	it("reuses retained row slices when scrolling with the same cell source", () => {
@@ -403,7 +424,7 @@ describe("linkListVirtualLayout", () => {
 			previousBuild: initial,
 		});
 
-		expect(shrunk.cells).toEqual([]);
+		expect(getMountedCells(shrunk)).toEqual([]);
 		expect(shrunk.rowsInMountedRange).toEqual([]);
 	});
 });

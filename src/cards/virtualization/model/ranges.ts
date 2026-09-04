@@ -44,7 +44,6 @@ export interface ResolveVirtualRangesParams {
 	viewportHeight: number;
 	mountedOverscanPx: number;
 	previewOverscanPx?: number;
-	mounted?: RowRange;
 }
 
 export interface VirtualVisibilityPolicy {
@@ -135,16 +134,12 @@ export function resolveVirtualRangesInto(
 		params.previewOverscanPx,
 		mountedOverscanPx,
 	);
-	if (params.mounted === undefined) {
-		writeVisibleRangeInto(
-			out.mounted,
-			params.scrollTop,
-			params.viewportHeight,
-			mountedOverscanPx,
-		);
-	} else {
-		copyRowRangeInto(out.mounted, params.mounted);
-	}
+	writeVisibleRangeInto(
+		out.mounted,
+		params.scrollTop,
+		params.viewportHeight,
+		mountedOverscanPx,
+	);
 	if (previewOverscanPx >= mountedOverscanPx) {
 		copyRowRangeInto(out.previewVisible, out.mounted);
 		return;

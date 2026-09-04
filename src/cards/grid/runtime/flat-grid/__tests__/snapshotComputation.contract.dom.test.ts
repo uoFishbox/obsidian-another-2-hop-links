@@ -5,11 +5,8 @@ import type { FlatGridLogicalCell } from "../logicalCell";
 import { createFlatGridRowModel, type FlatGridRowModel } from "../rowModel";
 import type { VirtualRanges } from "cards/virtualization/public";
 import { computeVirtualRanges } from "cards/virtualization/public";
-import {
-	buildMountedFlatGridCells,
-	type MountedFlatGridCell,
-	type MountedFlatGridBuild,
-} from "../mountedCells";
+import { buildMountedFlatGridCells, type MountedFlatGridBuild } from "../mountedCells";
+import { flattenMountedRowBindings } from "./mountedCellsTestHelpers";
 import {
 	computeVirtualListSnapshot,
 	recomputeVirtualListSnapshot,
@@ -27,15 +24,16 @@ interface TestItem {
 
 type TestSnapshot = VirtualListSnapshot<
 	FlatGridLogicalCell<TestItem>,
-	MountedFlatGridCell<TestItem>,
 	MountedFlatGridBuild<TestItem>
 >;
 type TestComputation = VirtualListComputation<
 	FlatGridLogicalCell<TestItem>,
-	MountedFlatGridCell<TestItem>,
 	MountedFlatGridBuild<TestItem>
 >;
 const rowSlotAllocators = new WeakMap<TestSnapshot, ResidentRowSlotAllocator>();
+
+const getMountedCells = (build: MountedFlatGridBuild<TestItem>) =>
+	flattenMountedRowBindings(build.rowsInMountedRange);
 
 const createRowModel = (count: number): FlatGridRowModel<TestItem> => {
 	const items = Array.from({ length: count }, (_, index) => ({
@@ -114,17 +112,14 @@ describe("VirtualListEngine contract", () => {
 			previous: initial,
 			scrollTop: 110,
 		}).snapshot;
+		const initialCells = getMountedCells(initial.mountedBuild!);
+		const shiftedCells = getMountedCells(shifted.mountedBuild!);
 
-		expect(
-			initial.mountedBuild!.cells.map((cell) => cell.physicalCellSlot),
-		).toEqual([0, 1, 2]);
-		expect(
-			shifted.mountedBuild!.cells.map((cell) => cell.physicalCellSlot),
-		).toEqual([0, 1, 2]);
-		expect(
-			new Set(shifted.mountedBuild!.cells.map((cell) => cell.physicalCellSlot))
-				.size,
-		).toBe(shifted.mountedBuild!.cells.length);
+		expect(initialCells.map((cell) => cell.physicalCellSlot)).toEqual([0, 1, 2]);
+		expect(shiftedCells.map((cell) => cell.physicalCellSlot)).toEqual([0, 1, 2]);
+		expect(new Set(shiftedCells.map((cell) => cell.physicalCellSlot)).size).toBe(
+			shiftedCells.length,
+		);
 	});
 
 	it("publishes no visibility metadata or mounted-cell key index", () => {
@@ -137,7 +132,7 @@ describe("VirtualListEngine contract", () => {
 		expect("mountedCellsByKey" in snapshot).toBe(false);
 		expect(snapshot.mountedBuild).not.toBeNull();
 		expect(
-			snapshot.mountedBuild!.cells.every(
+			getMountedCells(snapshot.mountedBuild!).every(
 				(cell) => !Object.prototype.hasOwnProperty.call(cell, "visibility"),
 			),
 		).toBe(true);
@@ -152,7 +147,7 @@ describe("VirtualListEngine contract", () => {
 		expect(Object.isFrozen(snapshot.ranges.previewVisible)).toBe(true);
 	});
 
-	it("reuses the mounted build and cells when only previewVisible changes", () => {
+	it("reuses the mounted build when only previewVisible changes", () => {
 		const rowModel = createRowModel(30);
 		const buildMountedCells = vi.fn(buildMountedFlatGridCells<TestItem>);
 		const initialResult = compute({
@@ -176,8 +171,8 @@ describe("VirtualListEngine contract", () => {
 		expect(buildMountedCells).toHaveBeenCalledTimes(1);
 		expect(nextResult.snapshot).not.toBe(initialResult.snapshot);
 		expect(nextResult.snapshot.ranges.previewVisible).toEqual({ start: 1, end: 2 });
-		expect(nextResult.snapshot.mountedBuild!.cells).toBe(
-			initialResult.snapshot.mountedBuild!.cells,
+		expect(nextResult.snapshot.mountedBuild).toBe(
+			initialResult.snapshot.mountedBuild,
 		);
 	});
 
@@ -191,6 +186,36 @@ describe("VirtualListEngine contract", () => {
 		const repeated = compute({ rowModel, previous: initial, ranges }).snapshot;
 
 		expect(repeated).toBe(initial);
+	});
+
+	it("rebuilds when a new row model instance is published", () => {
+		const rowModel = createRowModel(30);
+		const replacementRowModel = createFlatGridRowModel({
+			cellSource: rowModel.cellSource,
+			layout: computeFlatGridLayout({
+				containerWidth: 320,
+				minCellWidth: 100,
+				gap: 10,
+				maxColumns: 3,
+				rowHeight: 100,
+				cellCount: rowModel.cellSource.cellCount,
+			}),
+		});
+		const ranges = {
+			mounted: { start: 0, end: 4 },
+			previewVisible: { start: 0, end: 1 },
+		};
+		const buildMountedCells = vi.fn(buildMountedFlatGridCells<TestItem>);
+		const initial = compute({ rowModel, ranges, buildMountedCells }).snapshot;
+		const replaced = compute({
+			rowModel: replacementRowModel,
+			previous: initial,
+			ranges,
+			buildMountedCells,
+		}).snapshot;
+
+		expect(buildMountedCells).toHaveBeenCalledTimes(2);
+		expect(replaced.rowModel).toBe(replacementRowModel);
 	});
 
 	it("rebuilds when the mounted range changes", () => {
@@ -215,10 +240,10 @@ describe("VirtualListEngine contract", () => {
 		}).snapshot;
 
 		expect(buildMountedCells).toHaveBeenCalledTimes(2);
-		expect(shifted.mountedBuild!.cells).not.toBe(initial.mountedBuild!.cells);
+		expect(shifted.mountedBuild).not.toBe(initial.mountedBuild);
 	});
 
-	it("recompute reuses mounted cells when mounted dependencies are unchanged", () => {
+	it("recompute reuses the mounted build when dependencies are unchanged", () => {
 		const rowModel = createRowModel(12);
 		const initialResult = compute({ rowModel });
 		const buildMountedCells = vi.fn(buildMountedFlatGridCells<TestItem>);
@@ -236,8 +261,8 @@ describe("VirtualListEngine contract", () => {
 		});
 
 		expect(buildMountedCells).not.toHaveBeenCalled();
-		expect(recomputed.snapshot.mountedBuild!.cells).toBe(
-			initialResult.snapshot.mountedBuild!.cells,
+		expect(recomputed.snapshot.mountedBuild).toBe(
+			initialResult.snapshot.mountedBuild,
 		);
 	});
 

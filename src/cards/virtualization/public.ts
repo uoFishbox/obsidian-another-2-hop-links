@@ -15,10 +15,7 @@ export {
 	type MountedGridRow,
 	type MountedGridRows,
 } from "./engine/mountedGridRows";
-export type {
-	MountedVirtualCellsBuild,
-	VirtualListSnapshot,
-} from "./engine/snapshotComputation";
+export type { VirtualListSnapshot } from "./engine/snapshotComputation";
 export type {
 	StableScrollTopBand,
 	VirtualScrollWindowRangeRowModel,

@@ -5,7 +5,6 @@ export interface CardGridMountedRow<TMountedCell extends MountedVirtualCell> {
 	rowIndex: number;
 	top: number;
 	physicalRowSlot: number;
-	attributes?: Record<string, string | number | undefined>;
 	/** Stable physical column bindings; null keeps an empty physical slot mounted. */
 	bindings: readonly (TMountedCell | null)[];
 }

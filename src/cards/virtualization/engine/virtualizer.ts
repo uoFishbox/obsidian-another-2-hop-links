@@ -2,7 +2,6 @@ import {
 	computeVirtualListSnapshot,
 	createEmptyVirtualListComputation,
 	recomputeVirtualListSnapshot,
-	type MountedVirtualCellsBuild,
 	type VirtualListComputation,
 	type VirtualListSnapshot,
 } from "./snapshotComputation";
@@ -13,19 +12,14 @@ import {
 import type { MeasurementUpdateResult } from "../viewport/measurement";
 import type { VirtualMeasurement } from "../runtime/measurementLifecycle";
 import type { RowRange } from "../model/ranges";
-import type {
-	MountedVirtualCell,
-	VirtualRanges,
-	VirtualRowModel,
-} from "../model/types";
+import type { VirtualRanges, VirtualRowModel } from "../model/types";
 import { computeVirtualRanges, type VirtualVisibilityPolicy } from "../model/ranges";
 
 export interface VirtualizerEngine<
 	TCell,
 	TRowModel extends VirtualRowModel<TCell>,
 	TContext,
-	TMountedCell extends MountedVirtualCell,
-	TMountedBuild extends MountedVirtualCellsBuild<TMountedCell>,
+	TMountedBuild,
 > {
 	applyRangeMeasurement(
 		measurement: VirtualMeasurement,
@@ -34,7 +28,7 @@ export interface VirtualizerEngine<
 	): MeasurementUpdateResult<RowRange>;
 	recompute(params: { rowModel: TRowModel }): void;
 	setEmpty(params: { rowModel: TRowModel }): void;
-	getSnapshot(): VirtualListSnapshot<TCell, TMountedCell, TMountedBuild> | null;
+	getSnapshot(): VirtualListSnapshot<TCell, TMountedBuild> | null;
 	hasStableVisibleRange(): boolean;
 	dispose(): void;
 }
@@ -43,8 +37,7 @@ export interface CreateVirtualizerEngineOptions<
 	TCell,
 	TRowModel extends VirtualRowModel<TCell>,
 	TContext,
-	TMountedCell extends MountedVirtualCell,
-	TMountedBuild extends MountedVirtualCellsBuild<TMountedCell>,
+	TMountedBuild,
 > {
 	resolveRowModel(context: TContext): TRowModel;
 	resolveVisibilityPolicy(context: TContext): VirtualVisibilityPolicy;
@@ -55,9 +48,7 @@ export interface CreateVirtualizerEngineOptions<
 		previousBuild?: TMountedBuild;
 		rowSlotAllocator: ResidentRowSlotAllocator;
 	}): TMountedBuild;
-	onSnapshotUpdated?(
-		snapshot: VirtualListSnapshot<TCell, TMountedCell, TMountedBuild>,
-	): void;
+	onSnapshotUpdated?(snapshot: VirtualListSnapshot<TCell, TMountedBuild>): void;
 }
 
 /**
@@ -68,8 +59,7 @@ export function createVirtualizerEngine<
 	TCell,
 	TRowModel extends VirtualRowModel<TCell>,
 	TContext,
-	TMountedCell extends MountedVirtualCell,
-	TMountedBuild extends MountedVirtualCellsBuild<TMountedCell>,
+	TMountedBuild,
 >({
 	resolveRowModel,
 	resolveVisibilityPolicy,
@@ -79,11 +69,9 @@ export function createVirtualizerEngine<
 	TCell,
 	TRowModel,
 	TContext,
-	TMountedCell,
 	TMountedBuild
->): VirtualizerEngine<TCell, TRowModel, TContext, TMountedCell, TMountedBuild> {
-	let latestSnapshot: VirtualListSnapshot<TCell, TMountedCell, TMountedBuild> | null =
-		null;
+>): VirtualizerEngine<TCell, TRowModel, TContext, TMountedBuild> {
+	let latestSnapshot: VirtualListSnapshot<TCell, TMountedBuild> | null = null;
 	let stableVisibleRange = false;
 	const rowSlotAllocator = createResidentRowSlotAllocator();
 
@@ -102,7 +90,7 @@ export function createVirtualizerEngine<
 		});
 
 	const commitComputation = (
-		result: VirtualListComputation<TCell, TMountedCell, TMountedBuild>,
+		result: VirtualListComputation<TCell, TMountedBuild>,
 	): void => {
 		const nextSnapshot = result.snapshot;
 		if (latestSnapshot === nextSnapshot) {
@@ -198,7 +186,7 @@ export function createVirtualizerEngine<
 	const setEmpty = (params: { rowModel: TRowModel }): void => {
 		rowSlotAllocator.reset();
 		commitComputation(
-			createEmptyVirtualListComputation<TCell, TMountedCell, TMountedBuild>({
+			createEmptyVirtualListComputation<TCell, TMountedBuild>({
 				rowModel: params.rowModel,
 			}),
 		);

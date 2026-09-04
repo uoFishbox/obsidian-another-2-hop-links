@@ -1,7 +1,4 @@
-import {
-	findNearestScrollContainerCached,
-	invalidateNearestScrollContainerCache,
-} from "shared/ui/scroll/scrollContainer";
+import { findNearestScrollContainer } from "shared/ui/scroll/scrollContainer";
 import { markScrollActivityIdle } from "shared/ui/scroll/scrollActivity";
 import { subscribeWindowResize } from "shared/ui/scroll/windowResize";
 import {
@@ -271,7 +268,7 @@ const observeDependencyTargets = (entry: ScrollerViewportEntry): void => {
 const moveSubscriberToCurrentScroller = (
 	subscriber: VirtualListViewportSubscriber,
 ): boolean => {
-	const nextScroller = findNearestScrollContainerCached(subscriber.rootEl);
+	const nextScroller = findNearestScrollContainer(subscriber.rootEl);
 	if (nextScroller === subscriber.entry.scroller) {
 		return false;
 	}
@@ -280,7 +277,6 @@ const moveSubscriberToCurrentScroller = (
 	if (!ownerWindow) {
 		return false;
 	}
-	invalidateNearestScrollContainerCache(subscriber.rootEl);
 	unregisterSubscriber(subscriber);
 	subscriber.ownerWindow = ownerWindow;
 	const nextEntry = getScrollerViewportEntry(nextScroller, ownerWindow);
@@ -314,7 +310,6 @@ const handleRootResizeEntry = (
 		return;
 	}
 
-	invalidateNearestScrollContainerCache(subscriber.rootEl);
 	const moved = moveSubscriberToCurrentScroller(subscriber);
 	if (subscriber.isDisposed) {
 		return;
@@ -391,7 +386,6 @@ const handleStructureMutations = (
 		return;
 	}
 
-	invalidateNearestScrollContainerCache(subscriber.rootEl);
 	const shouldScheduleLayoutMeasurement =
 		!entry.layoutMeasurementPendingForDependencyRefresh;
 	entry.layoutMeasurementPendingForDependencyRefresh = true;
@@ -499,7 +493,6 @@ const registerSubscriber = (
 		entry.pendingScrollTop = null;
 		entry.suppressedNativeScrollTop = null;
 		unobserveRootResizeTarget(existing);
-		invalidateNearestScrollContainerCache(existing.rootEl);
 	}
 
 	subscriber.entry = entry;
@@ -552,7 +545,6 @@ export const observeVirtualViewport = (
 		currentSubscriber = null;
 		subscriber.isDisposed = true;
 		unregisterSubscriber(subscriber);
-		invalidateNearestScrollContainerCache(subscriber.rootEl);
 	};
 
 	const bindCurrentRealm = (): void => {
@@ -563,7 +555,7 @@ export const observeVirtualViewport = (
 			return;
 		}
 
-		const scrollContainer = findNearestScrollContainerCached(options.rootEl);
+		const scrollContainer = findNearestScrollContainer(options.rootEl);
 		const entry = getScrollerViewportEntry(scrollContainer, ownerWindow);
 		const subscriber: VirtualListViewportSubscriber = {
 			...options,
@@ -587,7 +579,6 @@ export const observeVirtualViewport = (
 		// is authoritative and the bind path must stay free of extra layout
 		// reads (see the scroll-path contract in VirtualListDomObserver tests).
 		if (scrollContainer === null) {
-			invalidateNearestScrollContainerCache(options.rootEl);
 			scheduleDependencyObserverRefresh(entry);
 		}
 	};

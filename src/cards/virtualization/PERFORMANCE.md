@@ -25,6 +25,7 @@ Vault全体のベンチマークは、インデックス作成レイヤーやE2E
 - `physicalCellSlot` は、単一のマウント済みスナップショット内で一意であること。
 - 保持された論理セルは、レイアウトとphysical slot poolのepochが再利用可能な場合、そのレンダースロットを維持すること。
 - physical row/cell slot は `physicalRowSlot` / `physicalCellSlot` の数値だけを所有し、logical key と分離する。row が別の physical slot に移動した場合だけ physical binding を更新する。
+- mounted build の正規表現は `rowsInMountedRange` とし、同じbindingを平坦化した配列は保持しない。平坦な走査が必要なconsumerはrowの `bindings` をその場で走査する。
 - `previewVisible` は、 `mounted` の範囲を超えて拡張されないこと。
 - スクロールの測定値は、スクロールのフラッシュごとに1回だけ読み取られ、activeなsubscriberに渡されること。
 - 構造のミューテーションは、同じスクロールコンテナのactive subscriberだけを更新し、他のスクロールコンテナのsubscriberを測定しないこと。
@@ -36,15 +37,6 @@ two-hop surface も同じ不変条件に従う。section margin、header、load-
 振る舞いのテストは、実装と同じ場所に配置されている。パフォーマンステストでは実行時間のしきい値ではなく、関数呼び出し回数やスパイカウンターを使用すること。
 
 ## キャッシュ一覧（Cache Inventory）
-
-### 直近のスクロールコンテナ（Nearest Scroll Container）
-
-場所: `src/shared/ui/scroll/scrollContainer.ts`
-
-- **目的:** 繰り返しのDOMツリー走査や `getComputedStyle()` の呼び出しを防ぐ。
-- **スコープ:** virtual listのルート要素ごとに1つの `WeakMap` エントリ。
-- **依存関係:** ルートの親、ルートノード、およびキャッシュされたスクロールの祖先。
-- **無効化:** ルート要素のリサイズ、グローバルな構造ミューテーション、ナビゲーションスクロール、サブスクライバーのクリーンアップ、およびスクロールコンテナの階層を変更するその他の操作。
 
 ### Shared Frame Scroll Metrics
 
@@ -68,10 +60,22 @@ two-hop surface も同じ不変条件に従う。section margin、header、load-
 
 場所: `src/cards/virtualization/engine/snapshotComputation.ts`, `src/cards/virtualization/engine/virtualizer.ts`
 
-- **目的:** 行モデルのリビジョン、マウント範囲、全体の高さが再利用を許容する場合、マウントされたセルの再構築をスキップする。
+- **目的:** 行モデルの同一性、マウント範囲、全体の高さが再利用を許容する場合、マウントされたセルの再構築をスキップする。
 - **スコープ:** 次のエンジン計算に渡される以前のスナップショット。
 - **無効化:** 選択されたファストパスによって宣言された依存関係のいずれかの変更。
 - **制限事項:** 可視性メタデータを管理する呼び出し元は、新しい `previewVisible` 範囲を出力しながら、マウントされたセルを再利用する可能性がある。呼び出し元は自身の可視性状態を更新する責任がある。
+- **所有権:** no-op時のsnapshot/build再利用判定はengineだけが所有する。下位のmounted-row builderは同じ範囲判定を重複させず、範囲のclampはshared row builderに委譲する。
+
+### Physical Grid Slot Signals
+
+場所: `src/cards/grid/surface/physicalGridSlotPool.svelte.ts`
+
+- **目的:** immutableなmounted buildを、physical row/cellごとの独立したSvelte signalへ反映し、通常スクロール時にresident row全体の`{#each}` reconciliationを発生させない。
+- **スコープ:** `PooledCardGridRows`インスタンスごとに1つ。row/cell shellはphysical slot capacityのhigh-water markまで保持する。
+- **更新:** 同じmounted rowオブジェクトを保持するslotにはsignalを書き込まない。reboundしたrowだけがrow metadataと各column bindingを更新する。
+- **入力順:** mounted buildは論理行順の`rowsInMountedRange`を直接渡す。poolが`physicalRowSlot`で宛先を解決するため、physical slot順への並べ替え配列は作らない。
+- **構造変更:** capacity増加時だけrow配列を拡張し、columns変更時だけrow/cell topologyを再構築する。range縮小で非activeになったslotはshellを保持し、bindingだけを解除する。
+- **所有権:** virtualizerのsnapshot/buildはimmutableのまま維持し、局所的なミューテーションはsurface-owned slot signalだけが所有する。
 
 ## Mutation Ownership
 

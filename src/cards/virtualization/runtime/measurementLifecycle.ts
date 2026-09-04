@@ -1,7 +1,6 @@
 import type { VirtualFrameCoordinator } from "shared/ui/scheduling/frameCoordinator";
 import type {
-	MountedScrollWindowMeasurement,
-	RangedScrollWindowMeasurement,
+	ScrollWindowMeasurement,
 	StableScrollTopBand,
 } from "../engine/scrollWindowResolver";
 import type {
@@ -32,7 +31,7 @@ export type VirtualMeasurementResult =
 	| { readonly kind: "measured"; readonly measurement: VirtualMeasurement }
 	| {
 			readonly kind: "skipped";
-			readonly reason: "no-root" | "no-window" | "unchanged-scroll";
+			readonly reason: "no-root" | "no-window";
 	  };
 
 export type VirtualMeasurementApplicationResult = "stable" | "unstable" | "skipped";
@@ -43,16 +42,6 @@ export interface VirtualListStableMeasurementContext {
 	sectionTop: number;
 	isScrollActive: boolean;
 	sharedScrollMetrics?: VirtualListSharedScrollMetrics;
-}
-
-export interface RunVirtualScrollMeasurementOptions {
-	/**
-	 * Publish even when the cached scroll geometry matches the last stable
-	 * measurement. Use this when non-scroll inputs, such as row data, changed.
-	 */
-	forcePublish?: boolean;
-	/** Dev-only reason for measurement classification. */
-	reason?: VirtualScrollMeasurementReason;
 }
 
 const INITIAL_STABILIZATION_TASK_KEY = "virtual-list:initial-stabilization";
@@ -367,8 +356,7 @@ export interface VirtualScrollCoverageController {
 	reset(): void;
 	isWithinCoverage(scrollTop: number): boolean;
 	resolvePublishedCoverageBand(
-		mountedMeasurement: MountedScrollWindowMeasurement,
-		rangedMeasurement: RangedScrollWindowMeasurement,
+		measurement: ScrollWindowMeasurement,
 	): StableScrollTopBand | undefined;
 	getMeasurementRange(): ScrollMeasurementRange | null;
 	publish(): void;
@@ -415,22 +403,16 @@ export function createVirtualScrollCoverageController(): VirtualScrollCoverageCo
 	}
 
 	function resolvePublishedCoverageBand(
-		mountedMeasurement: MountedScrollWindowMeasurement,
-		rangedMeasurement: RangedScrollWindowMeasurement,
+		measurement: ScrollWindowMeasurement,
 	): StableScrollTopBand | undefined {
-		const mountedBand = mountedMeasurement.mountedCoverageScrollTopBand;
-		const previewBand = rangedMeasurement.previewCoverageScrollTopBand;
+		const mountedBand = measurement.mountedCoverageScrollTopBand;
+		const previewBand = measurement.previewCoverageScrollTopBand;
 		if (
 			!mountedBand ||
 			!previewBand ||
-			mountedMeasurement.identity !== rangedMeasurement.identity ||
-			mountedMeasurement.mounted.start !==
-				rangedMeasurement.ranges.mounted.start ||
-			mountedMeasurement.mounted.end !== rangedMeasurement.ranges.mounted.end ||
-			rangedMeasurement.ranges.previewVisible.start <
-				rangedMeasurement.ranges.mounted.start ||
-			rangedMeasurement.ranges.previewVisible.end >
-				rangedMeasurement.ranges.mounted.end
+			measurement.ranges.previewVisible.start <
+				measurement.ranges.mounted.start ||
+			measurement.ranges.previewVisible.end > measurement.ranges.mounted.end
 		) {
 			return undefined;
 		}

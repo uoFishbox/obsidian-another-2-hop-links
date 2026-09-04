@@ -6,7 +6,6 @@ import {
 	type LogicalCellKey,
 	type MountedGridRow,
 	type MountedVirtualCell,
-	type MountedVirtualCellsBuild,
 	type ResidentRowSlotAllocator,
 } from "cards/virtualization/public";
 import type { StableScrollTopBand } from "cards/virtualization/public";
@@ -52,14 +51,6 @@ type MutableStableScrollTopBand = {
 
 export interface TwoHopRowModel extends VirtualRowModel<TwoHopVirtualCell> {
 	readonly layout: TwoHopRowLayoutMetrics;
-	findStableMountedScrollTopBandInto(
-		out: MutableStableScrollTopBand,
-		params: {
-			mountedOverscanPx: number;
-			viewportHeight: number;
-			mounted: RowRange;
-		},
-	): void;
 	findMountedCoverageScrollTopBandInto(
 		out: MutableStableScrollTopBand,
 		params: {
@@ -182,39 +173,6 @@ export function createTwoHopRowModel(
 		out.end = geometry.resolveFirstRowStartingAtOrAfter(viewportBottom);
 	};
 
-	const writeStableBand = (
-		out: MutableStableScrollTopBand,
-		range: RowRange,
-		viewportHeight: number,
-		overscanPx: number,
-	): void => {
-		if (range.start >= range.end || viewportHeight <= 0) {
-			writeInvalidBand(out);
-			return;
-		}
-		const overscan = Math.max(0, overscanPx);
-		const expandedViewportHeight = viewportHeight + overscan * 2;
-		const startMin =
-			range.start === 0
-				? Number.NEGATIVE_INFINITY
-				: resolveRowTop(range.start - 1) + rowHeight;
-		const startMax =
-			range.start >= rowCount
-				? Number.POSITIVE_INFINITY
-				: resolveRowTop(range.start) + rowHeight;
-		const endMin =
-			range.end === 0
-				? Number.NEGATIVE_INFINITY
-				: resolveRowTop(range.end - 1) - expandedViewportHeight;
-		const endMax =
-			range.end >= rowCount
-				? Number.POSITIVE_INFINITY
-				: resolveRowTop(range.end) - expandedViewportHeight;
-		out.min = Math.max(startMin, endMin, -expandedViewportHeight) + overscan;
-		out.max = Math.min(startMax, endMax, totalHeight) + overscan;
-		if (out.min >= out.max) writeInvalidBand(out);
-	};
-
 	const resolveCellPosition = (
 		logicalKey: string,
 	): { readonly rowIndex: number; readonly columnIndex: number } | null => {
@@ -325,17 +283,6 @@ export function createTwoHopRowModel(
 	};
 
 	const rowModel: TwoHopRowModel = {
-		revision: {
-			content: sections,
-			layout: Object.freeze([
-				layout.containerWidth,
-				layout.columns,
-				layout.cellWidth,
-				layout.rowHeight,
-				layout.gap,
-				layout.sectionMarginBottom,
-			]),
-		},
 		rowCount,
 		totalHeight,
 		layout,
@@ -350,14 +297,6 @@ export function createTwoHopRowModel(
 		},
 		findVisibleRangesInto(out, rangeParams) {
 			resolveVirtualRangesInto(out, rangeParams, writeVisibleRange);
-		},
-		findStableMountedScrollTopBandInto(out, bandParams) {
-			writeStableBand(
-				out,
-				bandParams.mounted,
-				bandParams.viewportHeight,
-				bandParams.mountedOverscanPx,
-			);
 		},
 		findMountedCoverageScrollTopBandInto(out, bandParams) {
 			const { mounted, viewportHeight } = bandParams;
@@ -524,10 +463,8 @@ export interface MountedTwoHopCell extends MountedVirtualCell {
 
 export type MountedTwoHopRow = MountedGridRow<MountedTwoHopCell>;
 
-export interface MountedTwoHopBuild extends MountedVirtualCellsBuild<MountedTwoHopCell> {
+export interface MountedTwoHopBuild {
 	readonly rowsInMountedRange: readonly MountedTwoHopRow[];
-	readonly rowsByPhysicalSlot: readonly MountedTwoHopRow[];
-	readonly poolCapacity: number;
 	readonly rowModel: TwoHopRowModel;
 }
 
@@ -554,12 +491,7 @@ export function buildMountedTwoHopRows(
 	});
 
 	const build: MountedTwoHopBuild = {
-		get cells() {
-			return mountedRows.cells;
-		},
 		rowsInMountedRange: mountedRows.rowsInMountedRange,
-		rowsByPhysicalSlot: mountedRows.rowsByPhysicalSlot,
-		poolCapacity: rowSlotAllocator.capacity,
 		rowModel,
 	};
 	return build;

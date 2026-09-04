@@ -1,18 +1,10 @@
-import type {
-	MountedVirtualCellsBuild,
-	VirtualListSnapshot,
-} from "../engine/snapshotComputation";
+import type { VirtualListSnapshot } from "../engine/snapshotComputation";
 import type { VirtualScrollWindowRangeRowModel } from "../engine/scrollWindowResolver";
 import type { ResidentRowSlotAllocator } from "../engine/mountedGridRows";
 import type { RowRange } from "../model/ranges";
-import type {
-	MountedVirtualCell,
-	VirtualRanges,
-	VirtualRowModel,
-} from "../model/types";
+import type { VirtualRanges, VirtualRowModel } from "../model/types";
 import type { VirtualVisibilityPolicy } from "../model/ranges";
 import type {
-	RunVirtualScrollMeasurementOptions,
 	VirtualListStableMeasurementContext,
 	VirtualMeasurement,
 	VirtualMeasurementApplicationResult,
@@ -28,7 +20,6 @@ import {
 } from "./virtualMeasurementRuntime";
 
 export type {
-	RunVirtualScrollMeasurementOptions,
 	VirtualListStableMeasurementContext,
 	VirtualMeasurement,
 	VirtualMeasurementApplicationResult,
@@ -44,8 +35,7 @@ export interface UseVirtualizerOptions<
 	TCell,
 	TRowModel extends VirtualRowModel<TCell> & VirtualScrollWindowRangeRowModel,
 	TContext,
-	TMountedCell extends MountedVirtualCell,
-	TMountedBuild extends MountedVirtualCellsBuild<TMountedCell>,
+	TMountedBuild,
 > {
 	getRootEl(): HTMLElement | null;
 	getContext(): TContext;
@@ -59,9 +49,7 @@ export interface UseVirtualizerOptions<
 		previousBuild?: TMountedBuild;
 		rowSlotAllocator: ResidentRowSlotAllocator;
 	}): TMountedBuild;
-	onSnapshotUpdated?(
-		snapshot: VirtualListSnapshot<TCell, TMountedCell, TMountedBuild>,
-	): void;
+	onSnapshotUpdated?(snapshot: VirtualListSnapshot<TCell, TMountedBuild>): void;
 	resolveLayoutMeasurement(
 		measurement: VirtualMeasurement & { readonly sectionRect: DOMRect },
 		rootEl: HTMLElement,
@@ -81,8 +69,7 @@ export function useVirtualizer<
 	TCell,
 	TRowModel extends VirtualRowModel<TCell> & VirtualScrollWindowRangeRowModel,
 	TContext,
-	TMountedCell extends MountedVirtualCell,
-	TMountedBuild extends MountedVirtualCellsBuild<TMountedCell>,
+	TMountedBuild,
 >({
 	getRootEl,
 	getContext,
@@ -96,7 +83,7 @@ export function useVirtualizer<
 	onObservedWidthChange,
 	unstableMeasurementRetryLimit = DEFAULT_UNSTABLE_MEASUREMENT_RETRY_LIMIT,
 	frameCoordinator,
-}: UseVirtualizerOptions<TCell, TRowModel, TContext, TMountedCell, TMountedBuild>) {
+}: UseVirtualizerOptions<TCell, TRowModel, TContext, TMountedBuild>) {
 	const measurement = $state<VirtualizerMeasurementState>({
 		sectionTop: 0,
 		viewportHeight: 0,
@@ -106,13 +93,7 @@ export function useVirtualizer<
 	});
 	let mountedBuildState = $state.raw<TMountedBuild | null>(null);
 	let totalHeightState = $state<number | null>(null);
-	const engine = createVirtualizerEngine<
-		TCell,
-		TRowModel,
-		TContext,
-		TMountedCell,
-		TMountedBuild
-	>({
+	const engine = createVirtualizerEngine<TCell, TRowModel, TContext, TMountedBuild>({
 		resolveRowModel,
 		resolveVisibilityPolicy,
 		buildMountedCells,
@@ -153,9 +134,6 @@ export function useVirtualizer<
 			void mountedBuildState;
 			void totalHeightState;
 			return engine.getSnapshot();
-		},
-		getMountedCells() {
-			return mountedBuildState?.cells ?? [];
 		},
 		getMountedBuild() {
 			return mountedBuildState;

@@ -30,14 +30,6 @@ export interface FlatGridRowModel<T> extends VirtualRowModel<FlatGridLogicalCell
 	cellCount: number;
 	getCellIndex(rowIndex: number, columnIndex: number): number;
 	resolveCellAtIndex(index: number): FlatGridLogicalCell<T> | null;
-	findStableMountedScrollTopBandInto(
-		out: StableScrollTopBandMutable,
-		params: {
-			mountedOverscanPx: number;
-			viewportHeight: number;
-			mounted: RowRange;
-		},
-	): void;
 	/**
 	 * Writes the open scrollTop interval covered by the supplied resident rows.
 	 */
@@ -114,64 +106,13 @@ export function createFlatGridRowModel<T>(
 			viewportHeight: number;
 			mountedOverscanPx: number;
 			previewOverscanPx?: number;
-			mounted?: RowRange;
 		},
 	): void => {
 		resolveVirtualRangesInto(out, params, writeVisibleRange);
 	};
-	const writeInvalidStableScrollTopBand = (out: StableScrollTopBandMutable): void => {
+	const writeInvalidCoverageBand = (out: StableScrollTopBandMutable): void => {
 		out.min = Number.POSITIVE_INFINITY;
 		out.max = Number.NEGATIVE_INFINITY;
-	};
-	const writeStableScrollTopBand = (
-		out: StableScrollTopBandMutable,
-		range: RowRange,
-		viewportHeight: number,
-		overscanPx: number,
-	): void => {
-		if (range.start >= range.end || viewportHeight <= 0) {
-			writeInvalidStableScrollTopBand(out);
-			return;
-		}
-		if (rowStride <= 0) {
-			out.min = Number.NEGATIVE_INFINITY;
-			out.max = Number.POSITIVE_INFINITY;
-			return;
-		}
-
-		const overscanRows = resolveOverscanRows(overscanPx);
-		const minForStart =
-			range.start === 0
-				? Number.NEGATIVE_INFINITY
-				: (range.start + overscanRows) * rowStride;
-		const maxForStart = (range.start + overscanRows + 1) * rowStride;
-		const endBoundaryRow = range.end - overscanRows - 1;
-		const minForEnd = endBoundaryRow * rowStride - viewportHeight + 1;
-		const maxForEnd =
-			range.end >= rowCount
-				? Number.POSITIVE_INFINITY
-				: (endBoundaryRow + 1) * rowStride - viewportHeight + 1;
-
-		out.min = Math.max(minForStart, minForEnd, -viewportHeight);
-		out.max = Math.min(maxForStart, maxForEnd, totalHeight);
-		if (out.min >= out.max) {
-			writeInvalidStableScrollTopBand(out);
-		}
-	};
-	const findStableMountedScrollTopBandInto = (
-		out: StableScrollTopBandMutable,
-		params: {
-			mountedOverscanPx: number;
-			viewportHeight: number;
-			mounted: RowRange;
-		},
-	): void => {
-		writeStableScrollTopBand(
-			out,
-			params.mounted,
-			params.viewportHeight,
-			Math.max(0, params.mountedOverscanPx),
-		);
 	};
 	const findMountedCoverageScrollTopBandInto = (
 		out: StableScrollTopBandMutable,
@@ -183,7 +124,7 @@ export function createFlatGridRowModel<T>(
 	): void => {
 		const { mounted, viewportHeight } = params;
 		if (mounted.start >= mounted.end || viewportHeight <= 0) {
-			writeInvalidStableScrollTopBand(out);
+			writeInvalidCoverageBand(out);
 			return;
 		}
 		if (rowStride <= 0) {
@@ -202,19 +143,10 @@ export function createFlatGridRowModel<T>(
 				? totalHeight
 				: (mounted.end - requiredOverscanRows) * rowStride - viewportHeight + 1;
 		if (out.min >= out.max) {
-			writeInvalidStableScrollTopBand(out);
+			writeInvalidCoverageBand(out);
 		}
 	};
 	return {
-		revision: {
-			content: cellSource.revision,
-			layout: Object.freeze([
-				columns,
-				input.layout.cellWidth,
-				input.layout.rowHeight,
-				input.layout.gap,
-			]),
-		},
 		rowCount,
 		totalHeight,
 		layout: {
@@ -257,7 +189,6 @@ export function createFlatGridRowModel<T>(
 			);
 		},
 		findVisibleRangesInto,
-		findStableMountedScrollTopBandInto,
 		findMountedCoverageScrollTopBandInto,
 		resolveNavigationTarget(
 			currentKey,

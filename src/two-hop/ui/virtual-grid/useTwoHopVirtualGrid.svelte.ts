@@ -11,7 +11,6 @@ import { createTwoHopRowModel, type TwoHopRowModel } from "./rowModel";
 import {
 	buildMountedTwoHopRows,
 	type MountedTwoHopBuild,
-	type MountedTwoHopCell,
 	type MountedTwoHopRow,
 } from "./rowModel";
 import {
@@ -80,7 +79,6 @@ interface LayoutAnchor {
 
 const EMPTY_RANGE: Readonly<RowRange> = Object.freeze({ start: 0, end: 0 });
 const EMPTY_MOUNTED_ROWS: readonly MountedTwoHopRow[] = [];
-const EMPTY_MOUNTED_CELLS: readonly MountedTwoHopCell[] = [];
 const RANGE_EFFECT_TASK_KEY = "two-hop-virtual-range-effects";
 
 /** Connects two-hop geometry and hydration to the shared bounded virtual-list runtime. */
@@ -147,7 +145,6 @@ export function useTwoHopVirtualGrid(
 			: never,
 		TwoHopRowModel,
 		TwoHopRowModel,
-		MountedTwoHopCell,
 		MountedTwoHopBuild
 	>({
 		getRootEl: () => rootEl,
@@ -185,11 +182,7 @@ export function useTwoHopVirtualGrid(
 	});
 
 	function getMountedRows(): readonly MountedTwoHopRow[] {
-		return virtualList.getMountedBuild()?.rowsByPhysicalSlot ?? EMPTY_MOUNTED_ROWS;
-	}
-
-	function getMountedCells(): readonly MountedTwoHopCell[] {
-		return virtualList.getMountedBuild()?.cells ?? EMPTY_MOUNTED_CELLS;
+		return virtualList.getMountedBuild()?.rowsInMountedRange ?? EMPTY_MOUNTED_ROWS;
 	}
 
 	function buildPreviewBindings(): VirtualPreviewBinding[] {
@@ -224,20 +217,22 @@ export function useTwoHopVirtualGrid(
 		const foreground: TwoHopCardHydrationCell[] = [];
 		const prefetch: TwoHopCardHydrationCell[] = [];
 		const background: TwoHopCardHydrationCell[] = [];
-		for (const mountedCell of getMountedCells()) {
-			if (mountedCell.cell.kind !== "item") continue;
-			if (
-				mountedCell.rowIndex >= visibleRange.start &&
-				mountedCell.rowIndex < visibleRange.end
-			) {
-				foreground.push(mountedCell.cell);
-			} else if (
-				mountedCell.rowIndex >= prefetchRange.start &&
-				mountedCell.rowIndex < prefetchRange.end
-			) {
-				prefetch.push(mountedCell.cell);
-			} else if (includeBackground) {
-				background.push(mountedCell.cell);
+		for (const row of getMountedRows()) {
+			for (const mountedCell of row.bindings) {
+				if (!mountedCell || mountedCell.cell.kind !== "item") continue;
+				if (
+					mountedCell.rowIndex >= visibleRange.start &&
+					mountedCell.rowIndex < visibleRange.end
+				) {
+					foreground.push(mountedCell.cell);
+				} else if (
+					mountedCell.rowIndex >= prefetchRange.start &&
+					mountedCell.rowIndex < prefetchRange.end
+				) {
+					prefetch.push(mountedCell.cell);
+				} else if (includeBackground) {
+					background.push(mountedCell.cell);
+				}
 			}
 		}
 		foreground.push(...prefetch);
@@ -395,10 +390,7 @@ export function useTwoHopVirtualGrid(
 			return;
 		}
 
-		const publication = virtualList.runScrollMeasurement(undefined, {
-			forcePublish: true,
-			reason: "data-change",
-		});
+		const publication = virtualList.runScrollMeasurement(undefined, "data-change");
 		if (publication.kind !== "measured") {
 			virtualList.scheduleLayoutMeasurement();
 		}
@@ -442,9 +434,7 @@ export function useTwoHopVirtualGrid(
 	});
 
 	function flushVirtualScrollMeasurement(snapshot: ProgrammaticScrollSnapshot): void {
-		virtualList.flushProgrammaticScrollMeasurement(snapshot, {
-			forcePublish: true,
-		});
+		virtualList.flushProgrammaticScrollMeasurement(snapshot);
 	}
 
 	function resolveNavigationTarget(

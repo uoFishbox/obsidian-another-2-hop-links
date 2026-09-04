@@ -42,16 +42,14 @@ export interface VirtualRow<TCell> {
 	getCell(columnIndex: number): TCell | null;
 }
 
-export interface VirtualListRevision {
-	readonly content: unknown;
-	readonly layout: unknown;
-}
-
+/**
+ * Immutable compiled row model. Reuse the same instance while content and
+ * layout are unchanged; publish a new instance when either changes.
+ */
 export interface VirtualRowModel<TCell> {
-	revision: VirtualListRevision;
-	rowCount: number;
-	totalHeight: number;
-	layout: VirtualRowLayoutMetrics;
+	readonly rowCount: number;
+	readonly totalHeight: number;
+	readonly layout: VirtualRowLayoutMetrics;
 
 	getRow(rowIndex: number): VirtualRow<TCell> | null;
 
@@ -70,7 +68,6 @@ export interface VirtualRowModel<TCell> {
 			viewportHeight: number;
 			mountedOverscanPx: number;
 			previewOverscanPx?: number;
-			mounted?: RowRange;
 		},
 	): void;
 

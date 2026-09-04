@@ -3,11 +3,8 @@ import { createFlatGridCellSource } from "../cellSource";
 import { computeFlatGridLayout } from "cards/virtualization/public";
 import type { FlatGridLogicalCell } from "../logicalCell";
 import { computeVirtualRanges } from "cards/virtualization/public";
-import {
-	buildMountedFlatGridCells,
-	type MountedFlatGridCell,
-	type MountedFlatGridBuild,
-} from "../mountedCells";
+import { buildMountedFlatGridCells, type MountedFlatGridBuild } from "../mountedCells";
+import { flattenMountedRowBindings } from "./mountedCellsTestHelpers";
 import { createFlatGridRowModel, type FlatGridRowModel } from "../rowModel";
 import {
 	computeVirtualListSnapshot,
@@ -18,7 +15,6 @@ import { createResidentRowSlotAllocator } from "cards/virtualization/public";
 type TestItem = { id: string };
 type TestSnapshot = VirtualListSnapshot<
 	FlatGridLogicalCell<TestItem>,
-	MountedFlatGridCell<TestItem>,
 	MountedFlatGridBuild<TestItem>
 >;
 
@@ -86,7 +82,6 @@ const measureWorkload = (cardCount: number) => {
 		});
 		const result = computeVirtualListSnapshot<
 			FlatGridLogicalCell<TestItem>,
-			MountedFlatGridCell<TestItem>,
 			MountedFlatGridBuild<TestItem>
 		>({
 			rowModel,
@@ -124,17 +119,19 @@ const measureWorkload = (cardCount: number) => {
 	if (!snapshot) {
 		throw new Error("Expected a virtual-list snapshot.");
 	}
+	const mountedCells = snapshot.mountedBuild
+		? flattenMountedRowBindings(snapshot.mountedBuild.rowsInMountedRange)
+		: [];
 
 	return {
 		cardCount,
 		viewportRows: getRangeLength(snapshot.ranges.previewVisible),
 		mountedRows: getRangeLength(snapshot.ranges.mounted),
-		mountedCells: snapshot.mountedBuild?.cells.length ?? 0,
+		mountedCells: mountedCells.length,
 		mountedCellBuilds,
 		fastPathReuses,
-		uniqueRenderSlots: new Set(
-			snapshot.mountedBuild?.cells.map((cell) => cell.physicalCellSlot) ?? [],
-		).size,
+		uniqueRenderSlots: new Set(mountedCells.map((cell) => cell.physicalCellSlot))
+			.size,
 	};
 };
 

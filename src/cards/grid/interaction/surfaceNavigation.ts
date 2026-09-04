@@ -13,10 +13,7 @@ import {
 	type ProgrammaticScrollSnapshot,
 } from "cards/virtualization/public";
 import { createCardGridKeyboardHandler } from "./keyboardNavigation";
-import {
-	findNearestScrollContainer,
-	invalidateNearestScrollContainerCache,
-} from "shared/ui/scroll/scrollContainer";
+import { findNearestScrollContainer } from "shared/ui/scroll/scrollContainer";
 import type { VirtualCellBindingRegistry } from "./cellBindingRegistry";
 import { isHTMLElementLike } from "shared/ui/dom/realmSafeDom";
 
@@ -173,9 +170,6 @@ export const createCardSurfaceNavigation = (
 			targetTop: target.rowTop,
 			targetHeight: options.getRowHeight(),
 		});
-		if (scrollSnapshot.didScroll) {
-			invalidateNearestScrollContainerCache(rootEl);
-		}
 		if (
 			!scrollSnapshot.didScroll &&
 			focusCellTarget(mountedCellElement, resolveTarget)

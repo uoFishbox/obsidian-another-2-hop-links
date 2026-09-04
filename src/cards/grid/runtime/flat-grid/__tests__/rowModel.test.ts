@@ -66,20 +66,19 @@ describe("flatLinkRowModel", () => {
 		rowModel.findVisibleRangesInto(rangesScratch, {
 			scrollTop: 110,
 			viewportHeight: 100,
-			mounted: { start: 2, end: 5 },
 			mountedOverscanPx: 110,
 			previewOverscanPx: 110,
 		});
 
 		expect(rangesScratch).toEqual({
-			mounted: { start: 2, end: 5 },
-			previewVisible: { start: 2, end: 5 },
+			mounted: { start: 0, end: 3 },
+			previewVisible: { start: 0, end: 3 },
 		});
 		expect(rangesScratch.mounted).toBe(mountedScratch);
 		expect(rangesScratch.previewVisible).toBe(previewScratch);
 	});
 
-	it("resolves a stable scroll band for the flat mounted range", () => {
+	it("resolves the scroll band covered by the resident mounted range", () => {
 		const rowModel = createRowModel(60);
 		const mounted = { start: 0, end: 0 };
 		rowModel.findVisibleRangeInto(mounted, {
@@ -87,59 +86,13 @@ describe("flatLinkRowModel", () => {
 			viewportHeight: 100,
 			overscanPx: 110,
 		});
-		const mountedBand = { min: Number.NaN, max: Number.NaN };
-
-		rowModel.findStableMountedScrollTopBandInto(mountedBand, {
-			mountedOverscanPx: 110,
-			viewportHeight: 100,
-			mounted,
-		});
-
-		expect(Number.isFinite(mountedBand.min)).toBe(true);
-		expect(Number.isFinite(mountedBand.max)).toBe(true);
-		expect(mountedBand.min).toBeLessThan(mountedBand.max);
-
-		const insideMounted = { start: 0, end: 0 };
-		rowModel.findVisibleRangeInto(insideMounted, {
-			scrollTop: (mountedBand.min + mountedBand.max) / 2,
-			viewportHeight: 100,
-			overscanPx: 110,
-		});
-		expect(insideMounted).toEqual(mounted);
-
-		const beyondMounted = { start: 0, end: 0 };
-		rowModel.findVisibleRangeInto(beyondMounted, {
-			scrollTop: mountedBand.max + 110,
-			viewportHeight: 100,
-			overscanPx: 110,
-		});
-		expect(beyondMounted).not.toEqual(mounted);
-	});
-
-	it("resolves the wider scroll band covered by the resident mounted range", () => {
-		const rowModel = createRowModel(60);
-		const mounted = { start: 0, end: 0 };
-		rowModel.findVisibleRangeInto(mounted, {
-			scrollTop: 220,
-			viewportHeight: 100,
-			overscanPx: 110,
-		});
-		const stableBand = { min: Number.NaN, max: Number.NaN };
 		const coverageBand = { min: Number.NaN, max: Number.NaN };
 
-		rowModel.findStableMountedScrollTopBandInto(stableBand, {
-			mountedOverscanPx: 110,
-			viewportHeight: 100,
-			mounted,
-		});
 		rowModel.findMountedCoverageScrollTopBandInto(coverageBand, {
 			viewportHeight: 100,
 			mounted,
 			requiredOverscanPx: 0,
 		});
-
-		expect(coverageBand.min).toBeLessThan(stableBand.min);
-		expect(coverageBand.max).toBeGreaterThan(stableBand.max);
 
 		const requiredAtLowerEdge = { start: 0, end: 0 };
 		rowModel.findVisibleRangeInto(requiredAtLowerEdge, {

@@ -56,17 +56,6 @@ function resolveVisibleRange(
 }
 
 describe("TwoHopRowModel", () => {
-	it("uses sections as the sole logical content publication", () => {
-		const sections = [createSection("first", 2)];
-		const model = createModel(sections);
-		const otherModel = createModel([createSection("second", 1)]);
-		if ("kind" in model.revision || "kind" in otherModel.revision) {
-			throw new Error("Expected structured virtual-list revisions");
-		}
-
-		expect(model.revision.content).toBe(sections);
-	});
-
 	it("compiles section prefixes including header and load-more cells", () => {
 		const model = createModel([
 			createSection("first", 4, 3),
@@ -159,19 +148,11 @@ describe("TwoHopRowModel", () => {
 		).toEqual({ start: 1, end: 2 });
 	});
 
-	it("writes exact stable and coverage bands", () => {
+	it("writes the exact mounted coverage band", () => {
 		const model = createModel([
 			createSection("first", 2),
 			createSection("second", 1),
 		]);
-		const stable = { min: 0, max: 0 };
-		model.findStableMountedScrollTopBandInto(stable, {
-			mounted: { start: 2, end: 3 },
-			mountedOverscanPx: 0,
-			viewportHeight: 120,
-		});
-		expect(stable).toEqual({ min: 210, max: 320 });
-
 		const coverage = { min: 0, max: 0 };
 		model.findMountedCoverageScrollTopBandInto(coverage, {
 			mounted: { start: 2, end: 3 },

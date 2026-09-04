@@ -19,6 +19,7 @@
 		mountedRows: TestMountedRow[];
 		contentHeight: number;
 		rowHeight: number;
+		columns?: number;
 		slotBodyRevision?: unknown;
 		interactionId?: string;
 		onCellMount?: (key: string) => void;
@@ -30,6 +31,7 @@
 		mountedRows,
 		contentHeight,
 		rowHeight,
+		columns = 1,
 		slotBodyRevision,
 		interactionId,
 		onCellMount,
@@ -45,6 +47,7 @@
 	{mountedRows}
 	{contentHeight}
 	{rowHeight}
+	{columns}
 	{slotBodyRevision}
 	interactionDescriptorScopeId={interactionId ? "recycling-test-items" : undefined}
 >

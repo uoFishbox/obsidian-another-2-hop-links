@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { onMount } from "svelte";
+	import { onMount, untrack } from "svelte";
 
 	interface CardGridSurfaceRecyclingProbeProps {
 		key: string;
@@ -26,14 +26,13 @@
 	});
 
 	$effect(() => {
-		key;
-		onCellUpdate;
+		const nextKey = key;
 		if (!mounted) return;
 		if (!initialEffectDone) {
 			initialEffectDone = true;
 			return;
 		}
-		onCellUpdate?.(key);
+		untrack(() => onCellUpdate?.(nextKey));
 	});
 
 	$effect(() => {

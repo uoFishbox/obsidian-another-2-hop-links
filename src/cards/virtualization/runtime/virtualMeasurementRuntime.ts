@@ -1,11 +1,9 @@
 import { getOptionalOwnerWindow } from "shared/ui/dom/realmSafeDom";
 import {
 	createVirtualScrollWindowRangeResolver,
-	type MountedScrollWindowMeasurement,
-	type RangedScrollWindowMeasurement,
+	type ScrollWindowMeasurement,
 	type VirtualScrollWindowRangeRowModel,
 } from "../engine/scrollWindowResolver";
-import type { MountedVirtualCellsBuild } from "../engine/snapshotComputation";
 import type { VirtualizerEngine } from "../engine/virtualizer";
 import { observeVirtualViewport } from "../viewport/observer/scrollerRegistry";
 import {
@@ -19,12 +17,7 @@ import {
 	isStableVirtualListMeasurement,
 } from "../viewport/measurement";
 import type { VirtualListSharedScrollMetrics } from "../viewport/measurement";
-import type { RowRange } from "../model/ranges";
-import type {
-	MountedVirtualCell,
-	VirtualRanges,
-	VirtualRowModel,
-} from "../model/types";
+import type { VirtualRanges, VirtualRowModel } from "../model/types";
 import type { VirtualVisibilityPolicy } from "../model/ranges";
 import type { VirtualFrameCoordinator } from "shared/ui/scheduling/frameCoordinator";
 import {
@@ -33,7 +26,6 @@ import {
 	createVirtualScrollCoverageController,
 } from "./measurementLifecycle";
 import type {
-	RunVirtualScrollMeasurementOptions,
 	VirtualListStableMeasurementContext,
 	VirtualMeasurement,
 	VirtualMeasurementApplicationResult,
@@ -59,8 +51,7 @@ export interface CreateVirtualMeasurementRuntimeOptions<
 	TCell,
 	TRowModel extends VirtualRowModel<TCell> & VirtualScrollWindowRangeRowModel,
 	TContext,
-	TMountedCell extends MountedVirtualCell,
-	TMountedBuild extends MountedVirtualCellsBuild<TMountedCell>,
+	TMountedBuild,
 > {
 	measurement: VirtualizerMeasurementState;
 	getRootEl(): HTMLElement | null;
@@ -78,7 +69,7 @@ export interface CreateVirtualMeasurementRuntimeOptions<
 	unstableMeasurementRetryLimit: number;
 	frameCoordinator: VirtualFrameCoordinator;
 	engine: Pick<
-		VirtualizerEngine<TCell, TRowModel, TContext, TMountedCell, TMountedBuild>,
+		VirtualizerEngine<TCell, TRowModel, TContext, TMountedBuild>,
 		"applyRangeMeasurement" | "hasStableVisibleRange"
 	>;
 }
@@ -90,13 +81,10 @@ export interface VirtualMeasurementRuntime {
 	runLayoutMeasurement(): VirtualMeasurementResult;
 	runScrollMeasurement(
 		sharedScrollMetrics?: VirtualListSharedScrollMetrics,
-		optionsOrReason?:
-			| RunVirtualScrollMeasurementOptions
-			| VirtualScrollMeasurementReason,
+		reason?: VirtualScrollMeasurementReason,
 	): VirtualMeasurementResult;
 	flushProgrammaticScrollMeasurement(
 		snapshot: ProgrammaticScrollSnapshot,
-		options?: RunVirtualScrollMeasurementOptions,
 	): VirtualMeasurementResult;
 	suppressNextNativeScroll(scrollTop: number): void;
 	observeRoot(
@@ -114,12 +102,6 @@ const SKIPPED_NO_WINDOW: VirtualMeasurementResult = {
 	kind: "skipped",
 	reason: "no-window",
 };
-const SKIPPED_UNCHANGED_SCROLL: VirtualMeasurementResult = {
-	kind: "skipped",
-	reason: "unchanged-scroll",
-};
-const EMPTY_RUN_SCROLL_MEASUREMENT_OPTIONS: RunVirtualScrollMeasurementOptions = {};
-
 type MutableVirtualMeasurement = {
 	-readonly [K in keyof VirtualMeasurement]: VirtualMeasurement[K];
 };
@@ -129,8 +111,7 @@ export function createVirtualMeasurementRuntime<
 	TCell,
 	TRowModel extends VirtualRowModel<TCell> & VirtualScrollWindowRangeRowModel,
 	TContext,
-	TMountedCell extends MountedVirtualCell,
-	TMountedBuild extends MountedVirtualCellsBuild<TMountedCell>,
+	TMountedBuild,
 >({
 	measurement,
 	getRootEl,
@@ -148,7 +129,6 @@ export function createVirtualMeasurementRuntime<
 	TCell,
 	TRowModel,
 	TContext,
-	TMountedCell,
 	TMountedBuild
 >): VirtualMeasurementRuntime {
 	const stableMeasurementContext: VirtualListStableMeasurementContext = {
@@ -161,7 +141,6 @@ export function createVirtualMeasurementRuntime<
 	const rangeResolver = createVirtualScrollWindowRangeResolver<TRowModel, TContext>({
 		resolveRowModel,
 		resolveVisibilityPolicy,
-		resolveStableMountedScrollTopBand: true,
 	});
 	const scrollCoverage = createVirtualScrollCoverageController();
 	const cachedScrollSnapshot: VirtualListScrollSnapshot = {
@@ -182,12 +161,6 @@ export function createVirtualMeasurementRuntime<
 		kind: "measured",
 		measurement: scrollMeasurement,
 	};
-	let hasLastPublishedScrollMeasurement = false;
-	let lastPublishedScrollTop = 0;
-	let lastPublishedViewportHeight = 0;
-	let lastPublishedSectionTop = 0;
-	let lastPublishedIsStableMeasurement = false;
-	let lastPublishedIsScrollActive = false;
 	let observedScrollGeneration = 0;
 	let hasPendingObservedScrollTop = false;
 	let isObservedScrollActive = false;
@@ -217,29 +190,15 @@ export function createVirtualMeasurementRuntime<
 		onStableMeasurement(stableMeasurementContext);
 	}
 
-	function resolveMountedScrollWindowMeasurement(
+	function resolveScrollWindowMeasurement(
 		nextMeasurement: VirtualMeasurement,
 		context: TContext,
-	): MountedScrollWindowMeasurement {
-		return rangeResolver.resolveMountedScrollWindowMeasurement(
-			nextMeasurement.scrollTop,
-			nextMeasurement.viewportHeight,
-			nextMeasurement.sectionTop,
-			context,
-		);
-	}
-
-	function resolveRangedScrollWindowMeasurement(
-		nextMeasurement: VirtualMeasurement,
-		context: TContext,
-		precomputedMountedRange?: RowRange,
-	): RangedScrollWindowMeasurement {
+	): ScrollWindowMeasurement {
 		return rangeResolver.resolveScrollWindowMeasurement(
 			nextMeasurement.scrollTop,
 			nextMeasurement.viewportHeight,
 			nextMeasurement.sectionTop,
 			context,
-			precomputedMountedRange,
 		);
 	}
 
@@ -247,20 +206,11 @@ export function createVirtualMeasurementRuntime<
 		nextMeasurement: VirtualMeasurement,
 		context: TContext,
 	): VirtualMeasurementApplicationResult {
-		let mountedMeasurement: MountedScrollWindowMeasurement | null = null;
-		let rangedMeasurement: RangedScrollWindowMeasurement | null = null;
+		let rangeMeasurement: ScrollWindowMeasurement | null = null;
 		let resolvedRanges: VirtualRanges | undefined;
 		if (nextMeasurement.isStableMeasurement) {
-			mountedMeasurement = resolveMountedScrollWindowMeasurement(
-				nextMeasurement,
-				context,
-			);
-			rangedMeasurement = resolveRangedScrollWindowMeasurement(
-				nextMeasurement,
-				context,
-				mountedMeasurement.mounted,
-			);
-			resolvedRanges = rangedMeasurement.ranges;
+			rangeMeasurement = resolveScrollWindowMeasurement(nextMeasurement, context);
+			resolvedRanges = rangeMeasurement.ranges;
 		} else {
 			scrollCoverage.reset();
 		}
@@ -276,11 +226,8 @@ export function createVirtualMeasurementRuntime<
 		}
 
 		scrollCoverage.setCoverageBand(
-			mountedMeasurement && rangedMeasurement
-				? scrollCoverage.resolvePublishedCoverageBand(
-						mountedMeasurement,
-						rangedMeasurement,
-					)
+			rangeMeasurement
+				? scrollCoverage.resolvePublishedCoverageBand(rangeMeasurement)
 				: undefined,
 		);
 		notifyStableMeasurement(nextMeasurement);
@@ -302,20 +249,14 @@ export function createVirtualMeasurementRuntime<
 			measurement,
 		);
 		const effectiveMeasurement = resolution.measurement;
-		let mountedMeasurement: MountedScrollWindowMeasurement | null = null;
-		let rangedMeasurement: RangedScrollWindowMeasurement | null = null;
+		let rangeMeasurement: ScrollWindowMeasurement | null = null;
 		let resolvedRanges: VirtualRanges | undefined;
 		if (effectiveMeasurement.isStableMeasurement) {
-			mountedMeasurement = resolveMountedScrollWindowMeasurement(
+			rangeMeasurement = resolveScrollWindowMeasurement(
 				effectiveMeasurement,
 				resolution.context,
 			);
-			rangedMeasurement = resolveRangedScrollWindowMeasurement(
-				effectiveMeasurement,
-				resolution.context,
-				mountedMeasurement.mounted,
-			);
-			resolvedRanges = rangedMeasurement.ranges;
+			resolvedRanges = rangeMeasurement.ranges;
 		}
 		const result = engine.applyRangeMeasurement(
 			{ ...effectiveMeasurement, isScrollActive: false },
@@ -328,11 +269,8 @@ export function createVirtualMeasurementRuntime<
 		}
 
 		scrollCoverage.setCoverageBand(
-			mountedMeasurement && rangedMeasurement
-				? scrollCoverage.resolvePublishedCoverageBand(
-						mountedMeasurement,
-						rangedMeasurement,
-					)
+			rangeMeasurement
+				? scrollCoverage.resolvePublishedCoverageBand(rangeMeasurement)
 				: undefined,
 		);
 		scheduleScrollMeasurementAfterLayout(effectiveMeasurement);
@@ -346,36 +284,6 @@ export function createVirtualMeasurementRuntime<
 		return nextMeasurement.source === "layout"
 			? applyLayoutMeasurement(nextMeasurement)
 			: applyScrollMeasurement(nextMeasurement, getContext());
-	}
-
-	function rememberPublishedScrollMeasurement(
-		nextMeasurement: VirtualMeasurement,
-	): void {
-		hasLastPublishedScrollMeasurement = true;
-		lastPublishedScrollTop = nextMeasurement.scrollTop;
-		lastPublishedViewportHeight = nextMeasurement.viewportHeight;
-		lastPublishedSectionTop = nextMeasurement.sectionTop;
-		lastPublishedIsStableMeasurement = nextMeasurement.isStableMeasurement;
-		lastPublishedIsScrollActive = nextMeasurement.isScrollActive;
-	}
-
-	function isUnchangedPublishedScrollMeasurement(
-		scrollTop: number,
-		viewportHeight: number,
-		sectionTop: number,
-		isStableMeasurement: boolean,
-		isScrollActive: boolean,
-	): boolean {
-		return (
-			hasLastPublishedScrollMeasurement &&
-			isStableMeasurement &&
-			lastPublishedIsStableMeasurement &&
-			lastPublishedScrollTop === scrollTop &&
-			lastPublishedViewportHeight === viewportHeight &&
-			lastPublishedSectionTop === sectionTop &&
-			lastPublishedIsStableMeasurement === isStableMeasurement &&
-			lastPublishedIsScrollActive === isScrollActive
-		);
 	}
 
 	function publishMeasurement(
@@ -406,8 +314,6 @@ export function createVirtualMeasurementRuntime<
 		});
 
 		updateLiveMeasurementState(scrollMetrics, isStableMeasurement);
-		hasLastPublishedScrollMeasurement = false;
-
 		const nextMeasurement: VirtualMeasurement = {
 			scrollTop: scrollMetrics.scrollTop,
 			viewportHeight: scrollMetrics.viewportHeight,
@@ -431,13 +337,8 @@ export function createVirtualMeasurementRuntime<
 
 	function runScrollMeasurement(
 		sharedScrollMetrics?: VirtualListSharedScrollMetrics,
-		optionsOrReason:
-			| RunVirtualScrollMeasurementOptions
-			| VirtualScrollMeasurementReason = EMPTY_RUN_SCROLL_MEASUREMENT_OPTIONS,
+		reason?: VirtualScrollMeasurementReason,
 	): VirtualMeasurementResult {
-		const isReasonOnly = typeof optionsOrReason === "string";
-		const forcePublish = isReasonOnly ? false : optionsOrReason.forcePublish;
-		const reason = isReasonOnly ? optionsOrReason : optionsOrReason.reason;
 		const rootEl = getRootEl();
 		if (!getOptionalOwnerWindow(rootEl ?? measurement.scrollContainerEl)) {
 			return SKIPPED_NO_WINDOW;
@@ -468,7 +369,6 @@ export function createVirtualMeasurementRuntime<
 			sharedScrollMetrics?.scrollGeneration ?? observedScrollGeneration;
 
 		if (
-			!forcePublish &&
 			reason === "scroll-idle" &&
 			scrollMeasurement.isStableMeasurement &&
 			scrollCoverage.isWithinCoverage(scrollMeasurement.scrollTop)
@@ -478,21 +378,7 @@ export function createVirtualMeasurementRuntime<
 			return scrollMeasurementResult;
 		}
 
-		if (
-			!forcePublish &&
-			isUnchangedPublishedScrollMeasurement(
-				scrollMeasurement.scrollTop,
-				scrollMeasurement.viewportHeight,
-				scrollMeasurement.sectionTop,
-				scrollMeasurement.isStableMeasurement,
-				scrollMeasurement.isScrollActive,
-			)
-		) {
-			return SKIPPED_UNCHANGED_SCROLL;
-		}
-
 		const applicationResult = publishMeasurement(scrollMeasurement);
-		rememberPublishedScrollMeasurement(scrollMeasurement);
 
 		if (scrollMeasurement.isStableMeasurement && applicationResult === "stable") {
 			resetUnstableMeasurementRetry();
@@ -505,7 +391,6 @@ export function createVirtualMeasurementRuntime<
 
 	function flushProgrammaticScrollMeasurement(
 		snapshot: ProgrammaticScrollSnapshot,
-		options: RunVirtualScrollMeasurementOptions = EMPTY_RUN_SCROLL_MEASUREMENT_OPTIONS,
 	): VirtualMeasurementResult {
 		if (measurement.scrollContainerEl !== snapshot.scrollContainerEl) {
 			measurement.scrollContainerEl = snapshot.scrollContainerEl;
@@ -515,16 +400,13 @@ export function createVirtualMeasurementRuntime<
 			measurement.sectionTop = snapshot.sectionTop;
 			measurement.hasStableScrollMetrics = true;
 		}
-		return runScrollMeasurement(
-			{
-				scrollTop: snapshot.scrollTop,
-				viewportHeight: snapshot.viewportHeight,
-				frameId: 0,
-				isScrollActive: false,
-				scrollGeneration: 0,
-			},
-			options,
-		);
+		return runScrollMeasurement({
+			scrollTop: snapshot.scrollTop,
+			viewportHeight: snapshot.viewportHeight,
+			frameId: 0,
+			isScrollActive: false,
+			scrollGeneration: 0,
+		});
 	}
 
 	function hasSchedulingWindow(): boolean {
