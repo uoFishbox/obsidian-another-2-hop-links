@@ -10,7 +10,13 @@ export const CARD_RENDER_SHADOW_CSS = String.raw`
 
 .ccl-search-highlight {
     color: var(--text-normal);
-    background-color: var(--text-highlight-bg)
+	/* for obsidian 1.13.8 and earlier */
+    background-color: var(--text-highlight-bg);
+}
+
+/* for obsidian 1.14.0 and later */
+.ccl-search-highlight {
+    background-color: var(--highlight-background);
 }
 
 .cosense-card-links__virtual-grid-content {
