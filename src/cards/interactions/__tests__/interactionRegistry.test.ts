@@ -29,7 +29,7 @@ describe("interactionRegistry", () => {
 		expect(registry.createInteractionToken("section:first", "h")).toBe("h0");
 	});
 
-	it("registers and unregisters direct descriptors", () => {
+	it("releases a direct descriptor through its registration lease", () => {
 		const registry = createInteractionRegistry();
 		const descriptor = createDescriptor(
 			"token-registry-direct",
@@ -37,11 +37,61 @@ describe("interactionRegistry", () => {
 			"notes/registry-target.md",
 		);
 
-		registry.register(descriptor);
+		const release = registry.register(descriptor);
 		expect(registry.resolve(descriptor.interactionId)).toBe(descriptor);
 
-		registry.unregister(descriptor.interactionId);
+		release();
 		expect(registry.resolve(descriptor.interactionId)).toBeUndefined();
+	});
+
+	it("keeps a newer owner when an earlier registration is released", () => {
+		const registry = createInteractionRegistry();
+		const first = createDescriptor("shared-token", "[[first]]", "notes/first.md");
+		const second = createDescriptor(
+			"shared-token",
+			"[[second]]",
+			"notes/second.md",
+		);
+		const releaseFirst = registry.register(first);
+		const releaseSecond = registry.register(second);
+
+		releaseFirst();
+
+		expect(registry.resolve("shared-token")).toBe(second);
+		releaseSecond();
+		expect(registry.resolve("shared-token")).toBeUndefined();
+	});
+
+	it("restores the previous owner when the latest registration is released", () => {
+		const registry = createInteractionRegistry();
+		const first = createDescriptor("shared-token", "[[first]]", "notes/first.md");
+		const second = createDescriptor(
+			"shared-token",
+			"[[second]]",
+			"notes/second.md",
+		);
+		const releaseFirst = registry.register(first);
+		const releaseSecond = registry.register(second);
+
+		releaseSecond();
+
+		expect(registry.resolve("shared-token")).toBe(first);
+		releaseFirst();
+	});
+
+	it("makes registration leases idempotent across registry clears", () => {
+		const registry = createInteractionRegistry();
+		const stale = createDescriptor("shared-token", "[[stale]]", "notes/stale.md");
+		const fresh = createDescriptor("shared-token", "[[fresh]]", "notes/fresh.md");
+		const releaseStale = registry.register(stale);
+
+		registry.clear();
+		const releaseFresh = registry.register(fresh);
+		releaseStale();
+		releaseStale();
+
+		expect(registry.resolve("shared-token")).toBe(fresh);
+		releaseFresh();
 	});
 
 	it("prefers direct descriptors over provider descriptors", () => {
@@ -60,10 +110,10 @@ describe("interactionRegistry", () => {
 			resolveInteractionDescriptor: () => provided,
 		});
 
-		registry.register(direct);
+		const release = registry.register(direct);
 		expect(registry.resolve(direct.interactionId)).toBe(direct);
 
-		registry.unregister(direct.interactionId);
+		release();
 		expect(registry.resolve(provided.interactionId)).toBe(provided);
 	});
 

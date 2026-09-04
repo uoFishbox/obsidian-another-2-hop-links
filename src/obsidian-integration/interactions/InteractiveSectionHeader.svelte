@@ -39,8 +39,7 @@
 		const descriptor = interactionDescriptor;
 		if (!interactionRegistry || !descriptor) return;
 
-		interactionRegistry.register(descriptor);
-		return () => interactionRegistry.unregister(descriptor.interactionId);
+		return interactionRegistry.register(descriptor);
 	}
 
 	$effect(() => registerInteractionDescriptor());

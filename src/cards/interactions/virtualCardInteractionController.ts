@@ -17,7 +17,6 @@ export interface VirtualCardInteractionController {
 export function createVirtualCardInteractionController(): VirtualCardInteractionController {
 	const interactionIdBySlot = new Map<string, string>();
 	const descriptorByInteractionId = new Map<string, ItemInteractionDescriptor>();
-	const retainedSlots = new Set<string>();
 
 	function removeSlot(slotId: string) {
 		const prevId = interactionIdBySlot.get(slotId);
@@ -45,15 +44,15 @@ export function createVirtualCardInteractionController(): VirtualCardInteraction
 	return {
 		provider,
 		syncCards(cards) {
-			retainedSlots.clear();
+			interactionIdBySlot.clear();
+			descriptorByInteractionId.clear();
 			for (const card of cards) {
-				retainedSlots.add(card.slotId);
-				bindCard(card.slotId, card.descriptor);
+				interactionIdBySlot.set(card.slotId, card.descriptor.interactionId);
+				descriptorByInteractionId.set(
+					card.descriptor.interactionId,
+					card.descriptor,
+				);
 			}
-			for (const slotId of interactionIdBySlot.keys()) {
-				if (!retainedSlots.has(slotId)) removeSlot(slotId);
-			}
-			retainedSlots.clear();
 		},
 		setCard(slotId, descriptor) {
 			if (descriptor) {
@@ -65,7 +64,6 @@ export function createVirtualCardInteractionController(): VirtualCardInteraction
 		clear() {
 			interactionIdBySlot.clear();
 			descriptorByInteractionId.clear();
-			retainedSlots.clear();
 		},
 	};
 }

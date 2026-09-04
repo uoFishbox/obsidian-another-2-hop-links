@@ -4,6 +4,7 @@ import { DEFAULT_SETTINGS } from "settings/model";
 import type { CardCollectionState } from "cards/CardCollectionState.svelte";
 import type { CardRenderModel } from "cards/rendering/cardRenderModel";
 import type { LinkContext } from "cards/context/linkContext";
+import type { SectionHeaderInteractionDescriptor } from "cards/interactions/interactionTypes";
 import type {
 	TwoHopItemModel,
 	TwoHopSectionModel,
@@ -35,6 +36,35 @@ function createSection(count: number, totalCount = count): TwoHopSectionModel {
 		title: "Section",
 		items,
 		totalCount,
+	});
+}
+
+function createInteractiveBranchSection(
+	sectionId: string,
+	interactionId: string,
+): TwoHopSectionModel {
+	const descriptor: SectionHeaderInteractionDescriptor = {
+		interactionId,
+		kind: "sectionHeader",
+		link: {
+			rawText: sectionId,
+			path: undefined,
+			isUnresolved: true,
+			sourceFile: null,
+		} as never,
+		isOutgoingLink: true,
+		targetFile: null,
+	};
+	return createTwoHopSectionModel({
+		id: sectionId,
+		kind: "two-hop-branch",
+		title: sectionId,
+		headerProps: {
+			interactionId,
+			interactionDescriptor: descriptor,
+		},
+		items: [],
+		totalCount: 0,
 	});
 }
 
@@ -156,6 +186,73 @@ afterEach(() => {
 });
 
 describe("TwoHopVirtualGrid component", () => {
+	it("keeps branch-header clicks working when resident slots exchange sections", async () => {
+		const firstSection = createInteractiveBranchSection("first", "h0");
+		const secondSection = createInteractiveBranchSection("second", "h1");
+		const onHop1Click = vi.fn();
+		const applicationStore = {
+			settings: {
+				...DEFAULT_SETTINGS,
+				cardWidthPx: 100,
+				cardHeightRatio: 1,
+				cardMaxColumns: 1,
+			},
+		} as unknown as CardCollectionState;
+		const linkContext = {
+			getPreview: vi.fn(),
+			onHop1Click,
+		} as unknown as LinkContext;
+		const scroller = document.createElement("div");
+		scroller.style.overflow = "auto";
+		setNumericProperty(scroller, "clientWidth", 320);
+		setNumericProperty(scroller, "clientHeight", 300);
+		setNumericProperty(scroller, "scrollHeight", 2_000);
+		setNumericProperty(scroller, "scrollTop", 0);
+		setElementRect(scroller, { top: 0, width: 320, height: 300 });
+		document.body.append(scroller);
+		const baseProps = {
+			sections: [firstSection, secondSection],
+			applicationStore,
+			linkContext,
+			resolveItemCardModel: createCardModelResolver(),
+			cardModelRevision: 0,
+		};
+		const rendered = render(TwoHopVirtualGridHarness, {
+			target: scroller,
+			props: baseProps,
+		});
+		const root = rendered.container.querySelector<HTMLElement>(
+			".twohop-virtual-surface",
+		);
+		if (!root) throw new Error("Two-hop virtual surface was not rendered");
+		setElementRect(root, { top: 0, width: 320, height: 2_000 });
+		triggerResize(root, 320, 2_000);
+		for (let index = 0; index < 4; index += 1) await flushFrames();
+
+		await rendered.rerender({
+			...baseProps,
+			sections: [secondSection, firstSection],
+		});
+		for (let index = 0; index < 4; index += 1) await flushFrames();
+
+		const firstHeader = root.shadowRoot?.querySelector<HTMLElement>(
+			"[data-ccl-interaction-id='h0']",
+		);
+		const secondHeader = root.shadowRoot?.querySelector<HTMLElement>(
+			"[data-ccl-interaction-id='h1']",
+		);
+		expect(firstHeader).not.toBeNull();
+		expect(secondHeader).not.toBeNull();
+		await fireEvent.click(firstHeader!);
+		await fireEvent.click(secondHeader!);
+
+		expect(onHop1Click).toHaveBeenCalledTimes(2);
+		expect(onHop1Click.mock.calls.map((call) => call[1].rawText)).toEqual([
+			"first",
+			"second",
+		]);
+	});
+
 	it("keeps resident DOM bounded and reuses physical row slots across a long scroll", async () => {
 		const resolver = createCardModelResolver();
 		const { root, scroller } = await renderSurface({

@@ -14,14 +14,18 @@ export interface InteractionRegistry {
 		semanticKey: string,
 		prefix?: InteractionTokenPrefix,
 	) => string;
-	register: (descriptor: InteractionDescriptor) => void;
-	unregister: (interactionId: string) => void;
+	/** Registers one owner and returns an idempotent disposer for that registration. */
+	register: (descriptor: InteractionDescriptor) => () => void;
 	syncInteractionDescriptorResolverProvider: (
 		scopeId: string,
 		provider: InteractionDescriptorResolverProvider | undefined,
 	) => void;
 	resolve: (interactionId: string) => InteractionDescriptor | undefined;
 	clear: () => void;
+}
+
+interface DirectDescriptorRegistration {
+	readonly descriptor: InteractionDescriptor;
 }
 
 export function createInteractionTokenAllocator(
@@ -45,7 +49,10 @@ export function createInteractionTokenAllocator(
 
 export function createInteractionRegistry(): InteractionRegistry {
 	const createInteractionToken = createInteractionTokenAllocator();
-	const directDescriptors = new Map<string, InteractionDescriptor>();
+	const directRegistrationsByInteractionId = new Map<
+		string,
+		DirectDescriptorRegistration[]
+	>();
 	const scopedResolverProviders = new Map<
 		string,
 		InteractionDescriptorResolverProvider
@@ -64,10 +71,26 @@ export function createInteractionRegistry(): InteractionRegistry {
 	return {
 		createInteractionToken,
 		register: (descriptor) => {
-			directDescriptors.set(descriptor.interactionId, descriptor);
-		},
-		unregister: (interactionId) => {
-			directDescriptors.delete(interactionId);
+			const interactionId = descriptor.interactionId;
+			const registration: DirectDescriptorRegistration = { descriptor };
+			const registrations = directRegistrationsByInteractionId.get(interactionId);
+			if (registrations) registrations.push(registration);
+			else directRegistrationsByInteractionId.set(interactionId, [registration]);
+
+			let disposed = false;
+			return () => {
+				if (disposed) return;
+				disposed = true;
+				const currentRegistrations =
+					directRegistrationsByInteractionId.get(interactionId);
+				if (!currentRegistrations) return;
+				const registrationIndex = currentRegistrations.indexOf(registration);
+				if (registrationIndex < 0) return;
+				currentRegistrations.splice(registrationIndex, 1);
+				if (currentRegistrations.length === 0) {
+					directRegistrationsByInteractionId.delete(interactionId);
+				}
+			};
 		},
 		syncInteractionDescriptorResolverProvider: (scopeId, provider) => {
 			if (provider) {
@@ -77,12 +100,13 @@ export function createInteractionRegistry(): InteractionRegistry {
 			}
 		},
 		resolve: (interactionId) => {
-			const descriptor = directDescriptors.get(interactionId);
-			if (descriptor) return descriptor;
+			const registrations = directRegistrationsByInteractionId.get(interactionId);
+			const latestRegistration = registrations?.[registrations.length - 1];
+			if (latestRegistration) return latestRegistration.descriptor;
 			return resolveScopedProviderDescriptor(interactionId);
 		},
 		clear: () => {
-			directDescriptors.clear();
+			directRegistrationsByInteractionId.clear();
 			scopedResolverProviders.clear();
 		},
 	};

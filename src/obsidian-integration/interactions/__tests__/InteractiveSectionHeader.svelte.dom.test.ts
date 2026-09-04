@@ -1,6 +1,7 @@
 import { cleanup, render } from "@testing-library/svelte";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import InteractiveSectionHeaderHarness from "./InteractiveSectionHeaderHarness.svelte";
+import InteractiveSectionHeaderSwapHarness from "./InteractiveSectionHeaderSwapHarness.svelte";
 import { createInteractionRegistry } from "cards/interactions/interactionRegistry";
 import type { SectionHeaderInteractionDescriptor } from "cards/interactions/interactionTypes";
 
@@ -83,7 +84,7 @@ describe("InteractiveSectionHeader", () => {
 		expect(registry.resolve(nextDescriptor.interactionId)).toBeUndefined();
 	});
 
-	it("unregisters the previous descriptor without error when the prop transitions to undefined on rebind", async () => {
+	it("releases the previous descriptor when the prop transitions to undefined on rebind", async () => {
 		const registry = createInteractionRegistry();
 		const initialDescriptor = createDescriptor(
 			"section:header-rebind",
@@ -110,4 +111,42 @@ describe("InteractiveSectionHeader", () => {
 
 		expect(registry.resolve(initialDescriptor.interactionId)).toBeUndefined();
 	});
+
+	it.each([
+		{
+			name: "two resident slots swap headers",
+			initialIds: ["h0", "h1"],
+			reorderedIds: ["h1", "h0"],
+		},
+		{
+			name: "three resident slots rotate headers",
+			initialIds: ["h0", "h1", "h2"],
+			reorderedIds: ["h1", "h2", "h0"],
+		},
+	])(
+		"preserves every descriptor when $name",
+		async ({ initialIds, reorderedIds }) => {
+			const registry = createInteractionRegistry();
+			const descriptors = new Map(
+				initialIds.map((interactionId) => [
+					interactionId,
+					createDescriptor(interactionId, `target-${interactionId}`),
+				]),
+			);
+			const resolveDescriptors = (ids: readonly string[]) =>
+				ids.map((interactionId) => descriptors.get(interactionId)!);
+			const view = render(InteractiveSectionHeaderSwapHarness, {
+				props: { registry, descriptors: resolveDescriptors(initialIds) },
+			});
+
+			await view.rerender({
+				registry,
+				descriptors: resolveDescriptors(reorderedIds),
+			});
+
+			for (const descriptor of descriptors.values()) {
+				expect(registry.resolve(descriptor.interactionId)).toBe(descriptor);
+			}
+		},
+	);
 });

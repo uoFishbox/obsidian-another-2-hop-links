@@ -450,8 +450,7 @@ function createRegistryStub(
 ): InteractionRegistry {
 	return {
 		createInteractionToken: vi.fn((semanticKey: string) => semanticKey),
-		register: vi.fn(),
-		unregister: vi.fn(),
+		register: vi.fn(() => () => {}),
 		syncInteractionDescriptorResolverProvider: vi.fn(),
 		resolve: vi.fn(
 			(interactionId: string) =>
