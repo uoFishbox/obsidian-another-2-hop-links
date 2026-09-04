@@ -39,7 +39,7 @@
 		},
 		{
 			label: "更新日時",
-			icon: "clock",
+			icon: "calendar-clock",
 			asc: "modified-date",
 			desc: "modified-date-reverse",
 		},
