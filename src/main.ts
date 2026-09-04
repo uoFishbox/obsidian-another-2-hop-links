@@ -100,9 +100,10 @@ export default class CosenseCardLinksPlugin extends Plugin implements PluginHost
 				propertyWidgetStyler: runtime.propertyWidgetStyler,
 			});
 
+			await loadMathJax();
+			if (this.isUnloaded) return;
+
 			if (!requireApiVersion("1.14.0")) {
-				await loadMathJax();
-				if (this.isUnloaded) return;
 				installMathShadowPatch();
 			}
 
