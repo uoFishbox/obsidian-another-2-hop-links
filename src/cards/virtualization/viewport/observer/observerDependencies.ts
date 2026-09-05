@@ -103,7 +103,6 @@ export const STRUCTURE_MUTATION_IGNORE_SELECTOR = [
 	".cosense-card-links__box-preview",
 	".cosense-card-links__box-title-wrapper",
 	".cosense-card-links__box-bookmark-bg",
-	".ccl-native-drag-selection-shim",
 	".ccl-shadow-hover-proxy-anchor",
 	".skeleton-loader",
 	".popover",

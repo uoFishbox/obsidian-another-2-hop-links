@@ -22,7 +22,6 @@ import {
 	resolveDescriptorInteractionOptionsAsync,
 	type InteractionDescriptor,
 } from "./interactionTypes";
-import { installNativeDragSelectionShim } from "./cardDragState";
 import { getOwnerWindow, isNodeLike } from "shared/ui/dom/realmSafeDom";
 
 interface DelegatedDispatcherDeps {
@@ -158,73 +157,6 @@ function dispatchHover(
 		options,
 	);
 	return true;
-}
-
-export function setLightweightCardDragImage(
-	event: DragEvent,
-	sourceEl: HTMLElement,
-	descriptor: InteractionDescriptor,
-): void {
-	const dataTransfer = event.dataTransfer;
-	if (!dataTransfer?.setDragImage) {
-		return;
-	}
-
-	const title =
-		sourceEl
-			.querySelector<HTMLElement>(
-				".cosense-card-links__box-title, .cosense-card-links__header-title",
-			)
-			?.textContent?.trim() ||
-		descriptor.targetFile?.basename ||
-		sourceEl.getAttribute("aria-label") ||
-		"Card";
-	const rect = sourceEl.getBoundingClientRect();
-	const width = Math.max(180, Math.min(rect.width || 260, 320));
-	const rawOffsetX = event.clientX - rect.left;
-	const rawOffsetY = event.clientY - rect.top;
-	const pointerOffsetX = Number.isFinite(rawOffsetX) ? rawOffsetX : 16;
-	const pointerOffsetY = Number.isFinite(rawOffsetY) ? rawOffsetY : 16;
-	const offsetX = Math.min(Math.max(pointerOffsetX, 16), width - 8);
-	const offsetY = Math.min(Math.max(pointerOffsetY, 16), 40);
-	const doc = sourceEl.ownerDocument;
-	const ghost = doc.createElement("div");
-
-	ghost.textContent = title;
-	Object.assign(ghost.style, {
-		position: "fixed",
-		left: "-10000px",
-		top: "-10000px",
-		width: `${width}px`,
-		boxSizing: "border-box",
-		padding: "10px 12px",
-		borderRadius: "8px",
-		border: "1px solid var(--background-modifier-border)",
-		background: "var(--background-primary)",
-		color: "var(--text-normal)",
-		fontSize: "13px",
-		fontWeight: "600",
-		lineHeight: "1.3",
-		whiteSpace: "nowrap",
-		overflow: "hidden",
-		textOverflow: "ellipsis",
-		pointerEvents: "none",
-		zIndex: "2147483647",
-		contain: "layout paint style",
-		boxShadow: "var(--shadow-s)",
-	});
-
-	(doc.body ?? doc.documentElement).appendChild(ghost);
-	dataTransfer.setDragImage(ghost, offsetX, offsetY);
-
-	const cleanup = () => ghost.remove();
-	const win = getOwnerWindow(sourceEl);
-	if (typeof win.requestAnimationFrame === "function") {
-		win.requestAnimationFrame(() => win.requestAnimationFrame(cleanup));
-		return;
-	}
-
-	win.setTimeout(cleanup, 0);
 }
 
 export function createDelegatedInteractionDispatcher({
@@ -532,9 +464,6 @@ export function createDelegatedInteractionDispatcher({
 			}
 
 			const dragData = resolveDragData(descriptor, resolvedLinkContext);
-			installNativeDragSelectionShim(element.ownerDocument);
-
-			setLightweightCardDragImage(event, element, descriptor);
 
 			if (dragData) {
 				event.dataTransfer.setData("text/plain", dragData);

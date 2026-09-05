@@ -183,4 +183,45 @@ describe("sequential virtual focus", () => {
 
 		expect(focusSpy).toHaveBeenCalledWith({ preventScroll: true });
 	});
+
+	it("preserves the pointer-selected card when focus enters from outside", () => {
+		vi.useFakeTimers();
+		const before = document.createElement("button");
+		document.body.prepend(before);
+		const { root, content, registry, cards } = createSequentialSurface([
+			2, 3, 0, 1,
+		]);
+		const logicalFirst = cards.get(0)!;
+		const pointerTarget = cards.get(2)!;
+		const focusSpy = vi.spyOn(logicalFirst, "focus");
+		const handlers = createCardSurfaceNavigation({
+			getRootEl: () => root,
+			getContentEl: () => content,
+			getScrollContainerEl: () => null,
+			getRowHeight: () => 10,
+			delegatedInteractions: { handleKeyDown: vi.fn() },
+			cellBindingRegistry: registry,
+			flushMountedState: async () => {},
+			resolveSequentialNavigationTarget: () => null,
+		});
+		const event = new FocusEvent("focusin", {
+			bubbles: true,
+			composed: true,
+			relatedTarget: before,
+		});
+		Object.defineProperty(event, "composedPath", {
+			configurable: true,
+			value: () => [pointerTarget, pointerTarget.parentElement],
+		});
+
+		handlers.handlePointerDown();
+		handlers.handleFocusIn(event);
+
+		expect(focusSpy).not.toHaveBeenCalled();
+
+		vi.runAllTimers();
+		handlers.handleFocusIn(event);
+
+		expect(focusSpy).toHaveBeenCalledWith({ preventScroll: true });
+	});
 });

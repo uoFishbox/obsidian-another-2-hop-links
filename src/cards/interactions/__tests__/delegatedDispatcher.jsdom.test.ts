@@ -11,7 +11,6 @@ import type {
 	SectionHeaderInteractionDescriptor,
 	ItemInteractionDescriptor,
 } from "../interactionTypes";
-import { setLightweightCardDragImage } from "../delegatedDispatcher";
 
 vi.mock("obsidian", async () => {
 	const actual = await vi.importActual<typeof import("obsidian")>("obsidian");
@@ -561,7 +560,7 @@ describe("delegated interaction dispatcher", () => {
 		Platform.isMobile = false;
 	});
 
-	it("dispatches context menu and drag data from the registered descriptor", () => {
+	it("dispatches context menu and drag data without drag-only DOM", () => {
 		const linkContext = createLinkContext();
 		const appContext = createAppContext(linkContext);
 		const registry = createInteractionRegistry();
@@ -590,6 +589,7 @@ describe("delegated interaction dispatcher", () => {
 
 		const dataTransfer = {
 			setData: vi.fn(),
+			setDragImage: vi.fn(),
 		};
 		const dragStartEvent = new Event("dragstart", {
 			bubbles: true,
@@ -598,6 +598,7 @@ describe("delegated interaction dispatcher", () => {
 		Object.defineProperty(dragStartEvent, "dataTransfer", {
 			value: dataTransfer,
 		});
+		const bodyChildCountBeforeDrag = document.body.childElementCount;
 		element.dispatchEvent(dragStartEvent);
 
 		expect(linkContext.onShowFileMenu).toHaveBeenCalledWith(
@@ -612,6 +613,8 @@ describe("delegated interaction dispatcher", () => {
 			CANVAS_NOTE_DRAG_FORMAT,
 			file.path,
 		);
+		expect(dataTransfer.setDragImage).not.toHaveBeenCalled();
+		expect(document.body.childElementCount).toBe(bodyChildCountBeforeDrag);
 	});
 
 	it("evaluates drag data lazily on dragstart", () => {
@@ -736,7 +739,7 @@ describe("delegated interaction dispatcher", () => {
 		);
 	});
 
-	it("creates dataTransfer from foreign window for drag", async () => {
+	it("handles drag data in a foreign window", async () => {
 		document.body.innerHTML = "";
 		const frame = document.createElement("iframe");
 		document.body.append(frame);
@@ -774,7 +777,6 @@ describe("delegated interaction dispatcher", () => {
 
 		const dataTransfer = {
 			setData: vi.fn(),
-			setDragImage: vi.fn(),
 		};
 		const event = new (foreignWindow as any).MouseEvent("dragstart", {
 			bubbles: true,
@@ -785,64 +787,13 @@ describe("delegated interaction dispatcher", () => {
 		Object.defineProperty(event, "dataTransfer", {
 			value: dataTransfer,
 		});
+		const bodyChildCountBeforeDrag = foreignDocument.body.childElementCount;
 		element.dispatchEvent(event);
 
-		const [dragImage] = dataTransfer.setDragImage.mock.calls[0];
-		expect((dragImage as HTMLElement).ownerDocument).toBe(foreignDocument);
-		expect(
-			foreignDocument.body.querySelector(".ccl-native-drag-selection-shim"),
-		).toBeTruthy();
-	});
-
-	it("creates a lightweight title-only drag image", () => {
-		const file = createMockTFile(TARGET_FILE_PATH);
-		const descriptor = createItemDescriptor(
-			{ type: "file", data: file } as CardItem,
-			file,
+		expect(dataTransfer.setData).toHaveBeenCalledWith(
+			CANVAS_NOTE_DRAG_FORMAT,
+			file.path,
 		);
-		const element = document.createElement("div");
-		vi.spyOn(element, "getBoundingClientRect").mockReturnValue({
-			x: 10,
-			y: 20,
-			left: 10,
-			top: 20,
-			right: 290,
-			bottom: 220,
-			width: 280,
-			height: 200,
-			toJSON: () => ({}),
-		} as DOMRect);
-
-		const title = document.createElement("div");
-		title.className = "cosense-card-links__box-title";
-		title.textContent = "Visible title";
-		const preview = document.createElement("div");
-		preview.className = "cosense-card-links__box-preview";
-		preview.textContent = "Preview markdown image canvas MathJax";
-		element.append(title, preview);
-		document.body.append(element);
-
-		const dataTransfer = {
-			setDragImage: vi.fn(),
-		};
-		const event = new MouseEvent("dragstart", {
-			bubbles: true,
-			cancelable: true,
-			clientX: 48,
-			clientY: 62,
-		}) as DragEvent;
-		Object.defineProperty(event, "dataTransfer", {
-			value: dataTransfer,
-		});
-
-		setLightweightCardDragImage(event, element, descriptor);
-
-		expect(dataTransfer.setDragImage).toHaveBeenCalledTimes(1);
-		const [dragImage, offsetX, offsetY] = dataTransfer.setDragImage.mock.calls[0];
-		expect(dragImage).toBeInstanceOf(HTMLElement);
-		expect((dragImage as HTMLElement).textContent).toBe("Visible title");
-		expect((dragImage as HTMLElement).textContent).not.toContain("Preview");
-		expect(offsetX).toBe(38);
-		expect(offsetY).toBe(40);
+		expect(foreignDocument.body.childElementCount).toBe(bodyChildCountBeforeDrag);
 	});
 });

@@ -91,6 +91,7 @@
 	const {
 		delegatedInteractions,
 		handleKeyDown,
+		handlePointerDown,
 		handleFocusIn,
 		cellBindingRegistry,
 		touchEventHandlers,
@@ -105,6 +106,7 @@
 	onmousedown={delegatedInteractions.handleMouseDown}
 	oncontextmenu={delegatedInteractions.handleContextMenu}
 	onkeydown={handleKeyDown}
+	onpointerdown={handlePointerDown}
 	onfocusin={handleFocusIn}
 	ondragstart={delegatedInteractions.handleDragStart}
 	{...touchEventHandlers}

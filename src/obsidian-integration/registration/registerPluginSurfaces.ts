@@ -23,7 +23,6 @@ import {
 	COSENSE_CARD_LINKS_HOVER_SOURCE_ID,
 } from "hover-popover/hoverPopoverLinkSpec";
 import { CosenseCardLinksSettingTab } from "settings/ui/SettingTab";
-import { registerCardDragStateCleanup } from "cards/interactions/cardDragState";
 
 /** Collaborators required while registering plugin-owned Obsidian surfaces. */
 export interface RegisterPluginSurfacesDeps {
@@ -41,7 +40,6 @@ export function registerPluginSurfaces(
 	plugin: PluginHost,
 	deps: RegisterPluginSurfacesDeps,
 ): void {
-	registerCardDragStateCleanup(plugin);
 	plugin.addSettingTab(new CosenseCardLinksSettingTab(plugin.app, plugin));
 	registerViews(plugin, deps.viewServices);
 	registerCommands(plugin, deps);

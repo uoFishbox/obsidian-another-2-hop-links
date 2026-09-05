@@ -107,12 +107,15 @@ interface CardSurfaceNavigationOptions {
 
 export interface CardSurfaceNavigationHandlers {
 	handleKeyDown(event: KeyboardEvent): Promise<void>;
+	handlePointerDown(): void;
 	handleFocusIn(event: FocusEvent): void;
 }
 
 export const createCardSurfaceNavigation = (
 	options: CardSurfaceNavigationOptions,
 ): CardSurfaceNavigationHandlers => {
+	let isPointerFocusEntry = false;
+
 	const getFocusableCellTarget = (
 		cellElement: HTMLElement | null,
 	): HTMLElement | null =>
@@ -343,7 +346,16 @@ export const createCardSurfaceNavigation = (
 		flushMountedState: options.flushMountedState,
 	});
 
+	const handlePointerDown = (): void => {
+		isPointerFocusEntry = true;
+		const ownerWindow = options.getRootEl()?.ownerDocument.defaultView;
+		(ownerWindow ?? globalThis).setTimeout(() => {
+			isPointerFocusEntry = false;
+		}, 0);
+	};
+
 	const handleFocusIn = (event: FocusEvent): void => {
+		if (isPointerFocusEntry) return;
 		if (!options.resolveSequentialNavigationTarget) return;
 		const origin = event.composedPath()[0];
 		if (!isHTMLElementLike(origin)) return;
@@ -380,5 +392,5 @@ export const createCardSurfaceNavigation = (
 		edge.element.focus({ preventScroll: true });
 	};
 
-	return { handleKeyDown, handleFocusIn };
+	return { handleKeyDown, handlePointerDown, handleFocusIn };
 };
