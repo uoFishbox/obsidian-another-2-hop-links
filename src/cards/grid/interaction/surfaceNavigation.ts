@@ -55,7 +55,7 @@ const scrollElementIntoVirtualViewport = (params: {
 		scrollContainerEl: params.scrollContainerEl,
 		scrollTop: resolvedScrollTop,
 		viewportHeight: scrollMetrics.viewportHeight,
-		sectionTop: Math.max(0, resolvedScrollTop - params.targetTop),
+		sectionTop: scrollMetrics.sectionTop,
 		didScroll: resolvedScrollTop !== viewportTop,
 	};
 	if (resolvedScrollTop === viewportTop) {

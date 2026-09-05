@@ -45,6 +45,33 @@ describe("VirtualSurfaceScroll", () => {
 		expect(container.scrollTop).toBe(100);
 	});
 
+	it("preserves sectionTop when scrolling down to reveal a virtual target", () => {
+		const container = document.createElement("div");
+		const root = document.createElement("div");
+		container.append(root);
+		container.scrollTop = 40;
+		setClientHeight(container, 100);
+		setRect(container, { top: 100, width: 300, height: 100 });
+		setRect(root, { top: 250, width: 300, height: 1000 });
+
+		const snapshot = scrollElementIntoVirtualViewport({
+			rootEl: root,
+			scrollContainerEl: container,
+			targetTop: 180,
+			targetHeight: 20,
+		});
+
+		expect(container.scrollTop).toBe(290);
+		expect(snapshot).toEqual(
+			expect.objectContaining({
+				scrollTop: 290,
+				viewportHeight: 100,
+				sectionTop: 190,
+				didScroll: true,
+			}),
+		);
+	});
+
 	it("does not read layout after writing scrollTop", () => {
 		const operations: string[] = [];
 		const container = document.createElement("div");
