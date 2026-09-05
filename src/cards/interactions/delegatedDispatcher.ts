@@ -10,7 +10,6 @@ import type { InteractionRegistry } from "./interactionRegistry";
 import {
 	clearInteractionLongPressed,
 	consumeInteractionLongPressed,
-	dispatchSyntheticMouseOver,
 	getInteractionElement,
 	getInteractionHandleFromElement,
 	getInteractionLastTouchAt,
@@ -22,7 +21,11 @@ import {
 	resolveDescriptorInteractionOptionsAsync,
 	type InteractionDescriptor,
 } from "./interactionTypes";
-import { getOwnerWindow, isNodeLike } from "shared/ui/dom/realmSafeDom";
+import {
+	createOwnerMouseEvent,
+	getOwnerWindow,
+	isNodeLike,
+} from "shared/ui/dom/realmSafeDom";
 
 interface DelegatedDispatcherDeps {
 	registry: InteractionRegistry;
@@ -407,13 +410,35 @@ export function createDelegatedInteractionDispatcher({
 					return;
 				}
 
+				const currentDescriptor = resolveInteractionDescriptor(
+					registry,
+					targetElement,
+				);
+				if (!currentDescriptor) {
+					return;
+				}
+
 				markInteractionLongPressed(targetElement);
-				dispatchSyntheticMouseOver(targetElement, {
+				const hoverEvent = createOwnerMouseEvent(targetElement, "mouseover", {
+					bubbles: true,
+					cancelable: true,
+					composed: true,
 					clientX: touch.clientX,
 					clientY: touch.clientY,
 					screenX: touch.screenX,
 					screenY: touch.screenY,
 				});
+				if (
+					dispatchHover(
+						targetElement,
+						currentDescriptor,
+						resolvedLinkContext,
+						appContext,
+						hoverEvent,
+					)
+				) {
+					activeHoverInteractionId = currentDescriptor.interactionId;
+				}
 
 				if (ownerWindow.navigator.vibrate) {
 					ownerWindow.navigator.vibrate(VIBRATION_DURATION);

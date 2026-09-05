@@ -69,6 +69,16 @@ function createAppContext(linkContext: LinkContext): AppContext {
 	};
 }
 
+function attachProductionMobileTouchDispatcher(
+	root: HTMLElement,
+	dispatcher: ReturnType<typeof createDelegatedInteractionDispatcher>,
+) {
+	root.addEventListener("touchstart", dispatcher.handleTouchStart as EventListener);
+	root.addEventListener("touchmove", dispatcher.handleTouchMove as EventListener);
+	root.addEventListener("touchend", dispatcher.handleTouchEnd as EventListener);
+	root.addEventListener("touchcancel", dispatcher.handleTouchEnd as EventListener);
+}
+
 function attachDispatcher(
 	root: HTMLElement,
 	dispatcher: ReturnType<typeof createDelegatedInteractionDispatcher>,
@@ -81,10 +91,7 @@ function attachDispatcher(
 	root.addEventListener("mouseleave", dispatcher.handleMouseLeave as EventListener);
 	root.addEventListener("keydown", dispatcher.handleKeyDown as EventListener);
 	root.addEventListener("dragstart", dispatcher.handleDragStart as EventListener);
-	root.addEventListener("touchstart", dispatcher.handleTouchStart as EventListener);
-	root.addEventListener("touchmove", dispatcher.handleTouchMove as EventListener);
-	root.addEventListener("touchend", dispatcher.handleTouchEnd as EventListener);
-	root.addEventListener("touchcancel", dispatcher.handleTouchEnd as EventListener);
+	attachProductionMobileTouchDispatcher(root, dispatcher);
 }
 
 function createTouchEvent(
@@ -516,7 +523,7 @@ describe("delegated interaction dispatcher", () => {
 		expect(element.dataset.cclLongPressed).toBeUndefined();
 	});
 
-	it("delegates mobile touch long-press preview from the root", () => {
+	it("delegates mobile touch long-press preview without a mouseover listener", () => {
 		vi.useFakeTimers();
 		Platform.isMobile = true;
 		const linkContext = createLinkContext();
@@ -535,11 +542,14 @@ describe("delegated interaction dispatcher", () => {
 			linkContext,
 			appContext,
 		});
-		attachDispatcher(root, dispatcher);
+		attachProductionMobileTouchDispatcher(root, dispatcher);
 
+		const host = document.createElement("div");
+		const shadowRoot = host.attachShadow({ mode: "open" });
 		const element = document.createElement("div");
 		element.dataset.cclInteractionHandle = interactionHandle;
-		root.append(element);
+		shadowRoot.append(element);
+		root.append(host);
 
 		element.dispatchEvent(
 			createTouchEvent("touchstart", [
@@ -553,7 +563,10 @@ describe("delegated interaction dispatcher", () => {
 		expect(linkContext.onOpenFile).toHaveBeenCalledTimes(0);
 
 		element.dispatchEvent(createTouchEvent("touchend", []));
-		element.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+		root.addEventListener("click", dispatcher.handleClick as EventListener);
+		element.dispatchEvent(
+			new MouseEvent("click", { bubbles: true, composed: true }),
+		);
 
 		expect(linkContext.onOpenFile).not.toHaveBeenCalled();
 		expect(element.dataset.cclLongPressed).toBeUndefined();
