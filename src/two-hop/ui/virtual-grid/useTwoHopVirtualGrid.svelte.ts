@@ -1,4 +1,4 @@
-import { onDestroy, untrack } from "svelte";
+import { onDestroy, tick, untrack } from "svelte";
 import type { TFile } from "obsidian";
 import type { SearchContentMatch } from "search/searchTypes";
 import type { CardCollectionState } from "cards/CardCollectionState.svelte";
@@ -7,45 +7,45 @@ import type {
 	TwoHopItemModel,
 	TwoHopSectionModel,
 } from "two-hop/ui/twoHopSectionModel";
-import { createTwoHopRowModel, type TwoHopRowModel } from "./rowModel";
+import {
+	createTwoHopRowModel,
+	type TwoHopRowModel,
+	type TwoHopVirtualCell,
+} from "./rowModel";
 import {
 	buildMountedTwoHopRows,
 	type MountedTwoHopBuild,
 	type MountedTwoHopRow,
-} from "./rowModel";
-import {
-	createTwoHopCardHydrator,
-	type TwoHopCardDemand,
-	type TwoHopCardHydrationCell,
-} from "./cardHydrator";
+} from "./mountedRows";
+import { createTwoHopCardHydrator } from "./cardHydrator";
 import type { PreviewRuntime } from "card-preview/runtime/previewRuntime";
 import { DISABLED_PREVIEW_SURFACE } from "card-preview/runtime/previewRuntime";
-import type { VirtualPreviewBinding } from "card-preview/scheduling/virtualPreviewSurface";
-import { applyCardPreviewDimensions } from "card-preview/pipeline/cardPreviewRequest";
 import type { VirtualFrameCoordinator } from "shared/ui/scheduling/frameCoordinator";
 import { createResolvedCardLayoutSettingsMemo } from "cards/layout/cardLayoutCssVars";
 import { resolveCardGridLayoutBase } from "cards/grid/layout/cardGridLayout";
 import {
-	DEFAULT_VIEW_PLAN_CARD_LAYOUT,
-	DEFAULT_VIEW_PLAN_LAYOUT,
-	isSameViewPlanLayout,
-	type ViewPlanLayoutMetrics,
+	DEFAULT_TWO_HOP_GRID_CARD_LAYOUT,
+	DEFAULT_TWO_HOP_GRID_LAYOUT,
+	isSameTwoHopGridLayout,
+	type TwoHopGridLayout,
 } from "./rowModel";
-import { findNearestScrollContainer } from "shared/ui/scroll/scrollContainer";
-import { getOptionalOwnerWindow } from "shared/ui/dom/realmSafeDom";
 import { useVirtualizer } from "cards/virtualization/public";
 import type { VirtualMeasurement } from "cards/virtualization/public";
-import type { VirtualVisibilityPolicy } from "cards/virtualization/public";
 import type { RowRange } from "cards/virtualization/public";
-import { resolveVisibleRange } from "cards/virtualization/public";
 import type { ResultNavigationDirection } from "cards/navigation/resultFocus";
 import type { VirtualSequentialNavigationDirection } from "cards/virtualization/public";
 import type { ProgrammaticScrollSnapshot } from "cards/virtualization/public";
 import {
-	resolvePreviewPrefetchRange,
-	resolvePreviewScrollDirection,
-	type PreviewScrollDirection,
-} from "card-preview/prefetch/previewPrefetchRange";
+	buildTwoHopPreviewBindings,
+	collectTwoHopCardDemand,
+} from "./mountedCardBindings";
+import {
+	captureTwoHopLayoutAnchor,
+	restoreTwoHopLayoutAnchor,
+	type TwoHopLayoutAnchor,
+} from "./layoutAnchor";
+import { createPreviewPrefetchRangeTracker } from "card-preview/prefetch/previewPrefetchRange";
+import { createCardGridVisibilityPolicyResolver } from "cards/grid/model/cardGridVisibilityPolicy";
 
 /** Dependencies required to enable previews on the two-hop virtual surface. */
 export interface TwoHopPreviewDependencies {
@@ -70,13 +70,6 @@ export interface TwoHopVirtualGridProps {
 	) => CardRenderModel;
 }
 
-interface LayoutAnchor {
-	readonly logicalKey: string;
-	readonly rowTop: number;
-	readonly scrollTop: number;
-	readonly scrollRoot: HTMLElement | null;
-}
-
 const EMPTY_RANGE: Readonly<RowRange> = Object.freeze({ start: 0, end: 0 });
 const EMPTY_MOUNTED_ROWS: readonly MountedTwoHopRow[] = [];
 const RANGE_EFFECT_TASK_KEY = "two-hop-virtual-range-effects";
@@ -87,11 +80,11 @@ export function useTwoHopVirtualGrid(
 	frameCoordinator: VirtualFrameCoordinator,
 ) {
 	const applicationStore = props.applicationStore;
-	let layout = $state.raw<ViewPlanLayoutMetrics>(DEFAULT_VIEW_PLAN_LAYOUT);
+	let layout = $state.raw<TwoHopGridLayout>(DEFAULT_TWO_HOP_GRID_LAYOUT);
 	let rowModel = $state.raw<TwoHopRowModel>(
 		createTwoHopRowModel({
 			sections: props.sections,
-			layout: DEFAULT_VIEW_PLAN_LAYOUT,
+			layout: DEFAULT_TWO_HOP_GRID_LAYOUT,
 		}),
 	);
 	let rootEl = $state<HTMLDivElement | null>(null);
@@ -99,10 +92,11 @@ export function useTwoHopVirtualGrid(
 	let lastCardModelRevision = props.cardModelRevision;
 	let widthWasZero = false;
 	let disposed = false;
-	let previousPreviewVisibleRange: RowRange | undefined;
-	let previewScrollDirection: PreviewScrollDirection = "stationary";
+	let pendingLayoutAnchor: TwoHopLayoutAnchor | null = null;
+	let anchorRestoreScheduled = false;
 	let previewVisibleRange: Readonly<RowRange> = EMPTY_RANGE;
 	let previewPrefetchRange: Readonly<RowRange> = EMPTY_RANGE;
+	const previewPrefetchRangeTracker = createPreviewPrefetchRangeTracker();
 
 	const resolveConfiguredLayout = createResolvedCardLayoutSettingsMemo();
 	const configuredLayout = $derived(
@@ -120,29 +114,12 @@ export function useTwoHopVirtualGrid(
 		return previewDependencies !== undefined && props.previewActive !== false;
 	}
 
-	// The policy derives only from rowStride, so the same object is reused
-	// across scroll measurements instead of allocating one per measurement.
-	let cachedVisibilityPolicyRowStride: number | undefined;
-	let cachedVisibilityPolicy: VirtualVisibilityPolicy | undefined;
-	function resolveVisibilityPolicy(model: TwoHopRowModel): VirtualVisibilityPolicy {
-		const rowStride = model.layout.rowStride;
-		if (rowStride !== cachedVisibilityPolicyRowStride || !cachedVisibilityPolicy) {
-			cachedVisibilityPolicyRowStride = rowStride;
-			cachedVisibilityPolicy = {
-				bootstrapRows: 3,
-				mountedOverscanPx: rowStride * 2,
-				previewOverscanPx: 0,
-			};
-		}
-		return cachedVisibilityPolicy;
-	}
+	const resolveCardGridVisibilityPolicy = createCardGridVisibilityPolicyResolver();
+	const resolveVisibilityPolicy = (model: TwoHopRowModel) =>
+		resolveCardGridVisibilityPolicy(model.layout.rowStride);
 
 	const virtualList = useVirtualizer<
-		ReturnType<TwoHopRowModel["getRow"]> extends infer TRow
-			? TRow extends { getCell(columnIndex: number): infer TCell }
-				? Exclude<TCell, null>
-				: never
-			: never,
+		TwoHopVirtualCell,
 		TwoHopRowModel,
 		TwoHopRowModel,
 		MountedTwoHopBuild
@@ -152,7 +129,7 @@ export function useTwoHopVirtualGrid(
 		hasRenderableContent: () => rowModel.rowCount > 0,
 		resolveRowModel: (model) => model,
 		resolveVisibilityPolicy,
-		buildMountedCells: ({
+		buildMountedRows: ({
 			rowModel: nextRowModel,
 			rowRange,
 			previousBuild,
@@ -164,10 +141,16 @@ export function useTwoHopVirtualGrid(
 				previousBuild,
 				rowSlotAllocator,
 			}),
-		onSnapshotUpdated: () => scheduleRangeEffects(),
+		onSnapshotUpdated: () => {
+			scheduleAnchorRestoration();
+			scheduleRangeEffects();
+		},
 		resolveLayoutMeasurement,
 		onObservedWidthChange: (width) => {
-			if (width <= 0) widthWasZero = true;
+			if (width <= 0) {
+				widthWasZero = true;
+				pendingLayoutAnchor = null;
+			}
 		},
 		frameCoordinator,
 	});
@@ -185,65 +168,17 @@ export function useTwoHopVirtualGrid(
 		return virtualList.getMountedBuild()?.rowsInMountedRange ?? EMPTY_MOUNTED_ROWS;
 	}
 
-	function buildPreviewBindings(): VirtualPreviewBinding[] {
-		if (!isPreviewSurfaceActive()) return [];
-		const bindings: VirtualPreviewBinding[] = [];
-		for (const row of getMountedRows()) {
-			for (const mountedCell of row.bindings) {
-				if (!mountedCell) continue;
-				if (mountedCell.cell.kind !== "item") continue;
-				const request = cardHydrator.getModel(
-					mountedCell.cell.logicalKey,
-				)?.previewRequest;
-				if (!request) continue;
-				bindings.push({
-					key: mountedCell.cell.logicalKey,
-					rowIndex: mountedCell.rowIndex,
-					request: applyCardPreviewDimensions(request, {
-						widthPx: layout.cellWidth,
-						heightPx: layout.rowHeight,
-					}),
-				});
-			}
-		}
-		return bindings;
-	}
-
-	function collectCardDemand(
-		visibleRange: Readonly<RowRange>,
-		prefetchRange: Readonly<RowRange>,
-		includeBackground: boolean,
-	): TwoHopCardDemand {
-		const foreground: TwoHopCardHydrationCell[] = [];
-		const prefetch: TwoHopCardHydrationCell[] = [];
-		const background: TwoHopCardHydrationCell[] = [];
-		for (const row of getMountedRows()) {
-			for (const mountedCell of row.bindings) {
-				if (!mountedCell || mountedCell.cell.kind !== "item") continue;
-				if (
-					mountedCell.rowIndex >= visibleRange.start &&
-					mountedCell.rowIndex < visibleRange.end
-				) {
-					foreground.push(mountedCell.cell);
-				} else if (
-					mountedCell.rowIndex >= prefetchRange.start &&
-					mountedCell.rowIndex < prefetchRange.end
-				) {
-					prefetch.push(mountedCell.cell);
-				} else if (includeBackground) {
-					background.push(mountedCell.cell);
-				}
-			}
-		}
-		foreground.push(...prefetch);
-		return { foreground, background };
-	}
-
 	function publishPreviewSnapshot(): void {
 		if (disposed) return;
 		const active = isPreviewSurfaceActive();
 		previewSurface.publish({
-			bindings: buildPreviewBindings(),
+			bindings: buildTwoHopPreviewBindings(
+				getMountedRows(),
+				cardHydrator.getModel,
+				layout.cellWidth,
+				layout.rowHeight,
+				active,
+			),
 			visibleRange: previewVisibleRange,
 			prefetchRange: previewPrefetchRange,
 			active,
@@ -254,22 +189,19 @@ export function useTwoHopVirtualGrid(
 		if (disposed) return;
 		const snapshot = virtualList.getSnapshot();
 		previewVisibleRange = snapshot?.ranges.previewVisible ?? EMPTY_RANGE;
-		previewScrollDirection = resolvePreviewScrollDirection(
-			previousPreviewVisibleRange,
-			previewVisibleRange,
-			previewScrollDirection,
-		);
-		previousPreviewVisibleRange = previewVisibleRange;
 		const active = isPreviewSurfaceActive();
-		previewPrefetchRange = active
-			? resolvePreviewPrefetchRange(
-					previewVisibleRange,
-					rowModel.rowCount,
-					previewScrollDirection,
-				)
-			: previewVisibleRange;
+		const nextPreviewPrefetchRange = previewPrefetchRangeTracker.resolve(
+			previewVisibleRange,
+			rowModel.rowCount,
+		);
+		previewPrefetchRange = active ? nextPreviewPrefetchRange : previewVisibleRange;
 		cardHydrator.setDemand(
-			collectCardDemand(previewVisibleRange, previewPrefetchRange, active),
+			collectTwoHopCardDemand(
+				getMountedRows(),
+				previewVisibleRange,
+				previewPrefetchRange,
+				active,
+			),
 		);
 		publishPreviewSnapshot();
 	}
@@ -282,57 +214,13 @@ export function useTwoHopVirtualGrid(
 		);
 	}
 
-	function captureLayoutAnchor(): LayoutAnchor | null {
-		if (!rootEl || measurement.viewportHeight <= 0) return null;
-		const scrollRoot = measurement.scrollContainerEl;
-		const ownerWindow = getOptionalOwnerWindow(rootEl);
-		if (!ownerWindow) return null;
-		const scrollTop = scrollRoot?.scrollTop ?? ownerWindow.scrollY;
-		const visible = resolveVisibleRange(rowModel, {
-			scrollTop: scrollTop - measurement.sectionTop,
-			viewportHeight: measurement.viewportHeight,
-			overscanPx: 0,
-		});
-		if (visible.start >= visible.end) return null;
-		const row = rowModel.getRow(visible.start);
-		const cell = row?.getCell(0);
-		if (!row || !cell) return null;
-		return {
-			logicalKey: cell.logicalKey,
-			rowTop: row.top,
-			scrollTop,
-			scrollRoot,
-		};
-	}
-
-	function restoreLayoutAnchor(
-		anchor: LayoutAnchor | null,
-		nextRowModel: TwoHopRowModel,
-	): number {
-		if (!anchor || !rootEl) return 0;
-		const ownerWindow = getOptionalOwnerWindow(rootEl);
-		if (!ownerWindow) return 0;
-		const currentScrollRoot = findNearestScrollContainer(rootEl);
-		if (currentScrollRoot !== anchor.scrollRoot) return 0;
-		const currentScrollTop = currentScrollRoot?.scrollTop ?? ownerWindow.scrollY;
-		if (Math.abs(currentScrollTop - anchor.scrollTop) >= 0.5) return 0;
-		const position = nextRowModel.resolveCellPosition(anchor.logicalKey);
-		const nextRow = position ? nextRowModel.getRow(position.rowIndex) : null;
-		if (!nextRow) return 0;
-		const delta = nextRow.top - anchor.rowTop;
-		if (Math.abs(delta) < 0.5) return 0;
-		if (currentScrollRoot) currentScrollRoot.scrollTop += delta;
-		else ownerWindow.scrollBy({ top: delta });
-		return delta;
-	}
-
-	function resolveMeasuredLayout(rect: DOMRect): ViewPlanLayoutMetrics {
+	function resolveTwoHopGridLayout(rect: DOMRect): TwoHopGridLayout {
 		if (!rootEl) return layout;
 		const layoutBase = resolveCardGridLayoutBase({
 			rootEl,
 			rootRect: rect,
 			measuredWidth: rect.width > 0 ? rect.width : measurement.measuredWidth,
-			defaults: DEFAULT_VIEW_PLAN_CARD_LAYOUT,
+			defaults: DEFAULT_TWO_HOP_GRID_CARD_LAYOUT,
 			configuredLayout,
 		});
 		return {
@@ -351,40 +239,62 @@ export function useTwoHopVirtualGrid(
 	function resolveLayoutMeasurement(
 		nextMeasurement: VirtualMeasurement & { readonly sectionRect: DOMRect },
 	) {
-		const nextLayout = resolveMeasuredLayout(nextMeasurement.sectionRect);
-		let effectiveMeasurement = nextMeasurement;
-		if (!isSameViewPlanLayout(layout, nextLayout)) {
-			const anchor = widthWasZero ? null : captureLayoutAnchor();
+		const nextLayout = resolveTwoHopGridLayout(nextMeasurement.sectionRect);
+		if (!isSameTwoHopGridLayout(layout, nextLayout)) {
+			if (!widthWasZero) capturePendingLayoutAnchor();
 			layout = nextLayout;
 			const nextRowModel = createTwoHopRowModel({
 				sections: props.sections,
 				layout: nextLayout,
 			});
 			rowModel = nextRowModel;
-			const scrollDelta = restoreLayoutAnchor(anchor, nextRowModel);
-			if (scrollDelta !== 0) {
-				effectiveMeasurement = {
-					...nextMeasurement,
-					scrollTop: nextMeasurement.scrollTop + scrollDelta,
-				};
-			}
 		}
 		widthWasZero = false;
 		return {
 			context: rowModel,
-			measurement: effectiveMeasurement,
-			isStable: effectiveMeasurement.isStableMeasurement,
+			measurement: nextMeasurement,
+			isStable: nextMeasurement.isStableMeasurement,
 		};
 	}
 
+	function capturePendingLayoutAnchor(): void {
+		pendingLayoutAnchor ??= captureTwoHopLayoutAnchor(
+			rootEl,
+			rowModel,
+			measurement,
+		);
+	}
+
+	function scheduleAnchorRestoration(): void {
+		if (!pendingLayoutAnchor || anchorRestoreScheduled) return;
+		anchorRestoreScheduled = true;
+		// The committed content height must reach the DOM before scrollTop can
+		// move beyond the previous height's limit. Coalesce intervening updates.
+		void tick().then(restorePendingLayoutAnchor);
+	}
+
+	function restorePendingLayoutAnchor(): void {
+		anchorRestoreScheduled = false;
+		if (disposed) return;
+		if (virtualList.getSnapshot()?.rowModel !== rowModel) return;
+		const anchor = pendingLayoutAnchor;
+		pendingLayoutAnchor = null;
+		if (!anchor) return;
+		const delta = restoreTwoHopLayoutAnchor(anchor, rootEl, rowModel);
+		if (delta !== 0) {
+			virtualList.suppressNextNativeScroll(anchor.scrollTop + delta);
+		}
+		// A shorter DOM can clamp scrolling even when the anchor cannot be restored.
+		virtualList.runScrollMeasurement(undefined, "data-change");
+	}
+
 	function publishSections(nextSections: readonly TwoHopSectionModel[]): void {
-		const anchor = captureLayoutAnchor();
+		capturePendingLayoutAnchor();
 		const nextRowModel = createTwoHopRowModel({
 			sections: nextSections,
 			layout,
 		});
 		rowModel = nextRowModel;
-		restoreLayoutAnchor(anchor, nextRowModel);
 		if (nextRowModel.rowCount === 0) {
 			virtualList.setEmpty({ rowModel: nextRowModel });
 			return;
@@ -428,6 +338,7 @@ export function useTwoHopVirtualGrid(
 
 	onDestroy(() => {
 		disposed = true;
+		pendingLayoutAnchor = null;
 		frameCoordinator.cancel("post-paint", RANGE_EFFECT_TASK_KEY);
 		cardHydrator.dispose();
 		previewSurface.dispose();

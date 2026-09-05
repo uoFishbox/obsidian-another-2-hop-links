@@ -49,66 +49,27 @@ const createMountedFlatGridCell = <T>(params: {
 	};
 };
 
-const hasCompatibleMountedVirtualGridRowSlots = <T>(
+const hasCompatibleFlatGridRowSlots = <T>(
 	previousBuild: MountedFlatGridBuild<T> | undefined,
 	columns: number,
 ): previousBuild is MountedFlatGridBuild<T> =>
 	previousBuild !== undefined && previousBuild.columns === columns;
 
-const assertMountedVirtualGridBuildInvariants = <T>(
-	build: MountedFlatGridBuild<T>,
-): void => {
-	if (typeof process !== "undefined" && process.env?.NODE_ENV === "production") {
-		return;
-	}
+export interface BuildMountedFlatGridRowsParams<T> {
+	readonly rowModel: FlatGridRowModel<T>;
+	readonly rowRange: RowRange;
+	readonly previousBuild?: MountedFlatGridBuild<T>;
+	readonly rowSlotAllocator: ResidentRowSlotAllocator;
+}
 
-	const physicalCellSlots = new Set<number>();
-	const logicalKeys = new Set<string>();
-	for (const row of build.rowsInMountedRange) {
-		for (let columnIndex = 0; columnIndex < row.bindings.length; columnIndex += 1) {
-			const cell = row.bindings[columnIndex];
-			if (!cell) continue;
-			if (physicalCellSlots.has(cell.physicalCellSlot)) {
-				throw new Error(
-					`Duplicate virtual-grid render slot index: ${cell.physicalCellSlot}.`,
-				);
-			}
-			if (logicalKeys.has(cell.key)) {
-				throw new Error(
-					`Duplicate virtual-grid logical cell key: ${cell.key}.`,
-				);
-			}
-			if (cell.rowIndex !== row.rowIndex) {
-				throw new Error(
-					`Virtual-grid row contains a cell from another row: ${cell.key}.`,
-				);
-			}
-			if (
-				cell.columnIndex !== columnIndex ||
-				cell.physicalCellSlot !==
-					row.physicalRowSlot * build.columns + columnIndex
-			) {
-				throw new Error(
-					`Virtual-grid cell render slot does not match its row slot: ${cell.key}.`,
-				);
-			}
-			physicalCellSlots.add(cell.physicalCellSlot);
-			logicalKeys.add(cell.key);
-		}
-	}
-};
-
-export function buildMountedFlatGridCells<T>(params: {
-	rowModel: FlatGridRowModel<T>;
-	rowRange: RowRange;
-	previousBuild?: MountedFlatGridBuild<T>;
-	rowSlotAllocator: ResidentRowSlotAllocator;
-}): MountedFlatGridBuild<T> {
+export function buildMountedFlatGridRows<T>(
+	params: BuildMountedFlatGridRowsParams<T>,
+): MountedFlatGridBuild<T> {
 	const { rowModel } = params;
 	const columns = Math.max(1, rowModel.layout.columns);
 	const previousBuild = params.previousBuild;
 	const canReusePreviousRows = previousBuild?.rowModel === rowModel;
-	const hasCompatiblePreviousRowSlots = hasCompatibleMountedVirtualGridRowSlots(
+	const hasCompatiblePreviousRowSlots = hasCompatibleFlatGridRowSlots(
 		previousBuild,
 		columns,
 	);
@@ -140,6 +101,5 @@ export function buildMountedFlatGridCells<T>(params: {
 		slotBindingRevision: rowModel.cellSource.slotBindingRevision,
 		columns,
 	};
-	assertMountedVirtualGridBuildInvariants(buildState);
 	return buildState;
 }

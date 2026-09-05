@@ -55,6 +55,7 @@ two-hop surface も同じ不変条件に従う。section margin、header、load-
 - **無効化:** コンテンツリビジョン、item ID リビジョン、表示可能なページネーション形状、またはグリッドレイアウトキーの変更。
 - **item ID 契約:** `getItemId` は同一ソース内で一意かつ、並べ替え・filter・index 移動を跨いで安定していなければならない。index は identity に含めない。
 - **呼び出し元の責任:** items配列がインプレース（破壊的）で変更された場合、呼び出し元は `itemsRevision` を更新しなければならない。リゾルバ関数の同一性を変えずに item ID の解決動作が変わる場合、呼び出し元は `itemIdRevision` を更新しなければならない。
+- **参照とrevision:** 論理ソースは配列参照・リゾルバ参照と各revisionを独立に比較する。明示的なrevisionが同じでも参照の差し替えは検知する。slot bodyのrevisionは別に管理し、段階的な検索結果の配列追加では同じ明示的revisionを使って既存カード本体を保持できる。
 
 ### Engine Snapshot Fast Paths
 

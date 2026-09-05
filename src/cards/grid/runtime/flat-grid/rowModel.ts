@@ -7,7 +7,7 @@ import {
 	type MutableRowRange,
 	type MutableVirtualRanges,
 	type RowRange,
-	type StableScrollTopBand,
+	type MutableStableScrollTopBand,
 	type VirtualNavigationTarget,
 	type VirtualSequentialNavigationDirection,
 	type VirtualSequentialNavigationTarget,
@@ -16,14 +16,10 @@ import {
 } from "cards/virtualization/public";
 import { resolveFlatVirtualNavigationTarget } from "./navigation";
 
-export interface FlatGridRowModelInput<T> {
+export interface CreateFlatGridRowModelParams<T> {
 	cellSource: FlatGridCellSource<T>;
 	layout: FlatGridLayoutMetrics;
 }
-
-type StableScrollTopBandMutable = {
-	-readonly [K in keyof StableScrollTopBand]: StableScrollTopBand[K];
-};
 
 export interface FlatGridRowModel<T> extends VirtualRowModel<FlatGridLogicalCell<T>> {
 	cellSource: FlatGridCellSource<T>;
@@ -34,7 +30,7 @@ export interface FlatGridRowModel<T> extends VirtualRowModel<FlatGridLogicalCell
 	 * Writes the open scrollTop interval covered by the supplied resident rows.
 	 */
 	findMountedCoverageScrollTopBandInto(
-		out: StableScrollTopBandMutable,
+		out: MutableStableScrollTopBand,
 		params: {
 			viewportHeight: number;
 			mounted: RowRange;
@@ -44,15 +40,15 @@ export interface FlatGridRowModel<T> extends VirtualRowModel<FlatGridLogicalCell
 }
 
 export function createFlatGridRowModel<T>(
-	input: FlatGridRowModelInput<T>,
+	params: CreateFlatGridRowModelParams<T>,
 ): FlatGridRowModel<T> {
-	const cellSource = input.cellSource;
+	const cellSource = params.cellSource;
 	const cellCount = cellSource.cellCount;
 	const geometry = createSectionedGridGeometry({
 		sectionCellCounts: cellCount > 0 ? [cellCount] : [],
-		columns: input.layout.columns,
-		rowHeight: input.layout.rowHeight,
-		gap: input.layout.gap,
+		columns: params.layout.columns,
+		rowHeight: params.layout.rowHeight,
+		gap: params.layout.gap,
 		sectionMarginBottom: 0,
 	});
 	const columns = geometry.columns;
@@ -110,12 +106,12 @@ export function createFlatGridRowModel<T>(
 	): void => {
 		resolveVirtualRangesInto(out, params, writeVisibleRange);
 	};
-	const writeInvalidCoverageBand = (out: StableScrollTopBandMutable): void => {
+	const writeInvalidCoverageBand = (out: MutableStableScrollTopBand): void => {
 		out.min = Number.POSITIVE_INFINITY;
 		out.max = Number.NEGATIVE_INFINITY;
 	};
 	const findMountedCoverageScrollTopBandInto = (
-		out: StableScrollTopBandMutable,
+		out: MutableStableScrollTopBand,
 		params: {
 			viewportHeight: number;
 			mounted: RowRange;
@@ -150,7 +146,7 @@ export function createFlatGridRowModel<T>(
 		rowCount,
 		totalHeight,
 		layout: {
-			...input.layout,
+			...params.layout,
 			contentHeight: totalHeight,
 		},
 		cellSource,

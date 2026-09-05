@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+	createPreviewPrefetchRangeTracker,
 	resolvePreviewPrefetchRange,
 	resolvePreviewScrollDirection,
 } from "../previewPrefetchRange";
@@ -48,5 +49,22 @@ describe("preview prefetch range", () => {
 				"stationary",
 			),
 		).toBe("stationary");
+	});
+
+	it("tracks direction across successive visible ranges", () => {
+		const tracker = createPreviewPrefetchRangeTracker();
+
+		expect(tracker.resolve({ start: 4, end: 7 }, 20)).toEqual({
+			start: 3,
+			end: 8,
+		});
+		expect(tracker.resolve({ start: 5, end: 8 }, 20)).toEqual({
+			start: 5,
+			end: 10,
+		});
+		expect(tracker.resolve({ start: 4, end: 7 }, 20)).toEqual({
+			start: 2,
+			end: 7,
+		});
 	});
 });

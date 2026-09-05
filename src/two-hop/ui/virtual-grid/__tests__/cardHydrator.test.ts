@@ -5,7 +5,7 @@ import type {
 	VirtualFrameCoordinator,
 	VirtualFrameLane,
 } from "shared/ui/scheduling/frameCoordinator";
-import { DEFAULT_VIEW_PLAN_LAYOUT } from "../rowModel";
+import { DEFAULT_TWO_HOP_GRID_LAYOUT } from "../rowModel";
 import {
 	createTwoHopCardHydrator,
 	type TwoHopCardHydrationCell,
@@ -105,6 +105,59 @@ function collectItemCells(
 }
 
 describe("createTwoHopCardHydrator", () => {
+	it("does not scan cancelled scroll history when delayed idle work resumes", () => {
+		const section = createTwoHopSectionModel({
+			id: "section",
+			kind: "new-links-section",
+			title: "Section",
+			items: [createItem(0)],
+			totalCount: 1,
+		});
+		const frames = createTestFrameCoordinator();
+		const resolver = vi.fn(resolveCardModel);
+		const hydrator = createTwoHopCardHydrator({
+			frameCoordinator: frames.coordinator,
+			getRevision: () => 0,
+			resolveCardModel: resolver,
+			isPreviewActive: () => false,
+			onPreviewModelsChanged: vi.fn(),
+		});
+		let expiredKeyReads = 0;
+		for (let index = 0; index < 300; index += 1) {
+			const cell: TwoHopCardHydrationCell = {
+				kind: "item",
+				section,
+				rowIndex: index,
+				columnIndex: 0,
+				itemIndex: index,
+				item: createItem(index),
+				get logicalKey() {
+					expiredKeyReads += 1;
+					return `expired:${index}`;
+				},
+			};
+			hydrator.setDemand({ foreground: [], background: [cell] });
+		}
+		hydrator.setDemand({ foreground: [], background: [] });
+		expect(frames.isScheduled("idle")).toBe(false);
+		const current: TwoHopCardHydrationCell = {
+			kind: "item",
+			section,
+			rowIndex: 0,
+			columnIndex: 0,
+			itemIndex: 0,
+			item: createItem(301),
+			logicalKey: "current",
+		};
+		hydrator.setDemand({ foreground: [], background: [current] });
+		expiredKeyReads = 0;
+		frames.drain();
+		expect(expiredKeyReads).toBe(0);
+		expect(resolver).toHaveBeenCalledTimes(1);
+		expect(resolver).toHaveBeenCalledWith(current.item, 0);
+		hydrator.dispose();
+	});
+
 	it("bounds retained models and keeps interactions only for foreground cards", () => {
 		const items = Array.from({ length: 70 }, (_, index) => createItem(index));
 		const section = createTwoHopSectionModel({
@@ -114,7 +167,7 @@ describe("createTwoHopCardHydrator", () => {
 			items,
 			totalCount: items.length,
 		});
-		const layout = { ...DEFAULT_VIEW_PLAN_LAYOUT, columns: 1 };
+		const layout = { ...DEFAULT_TWO_HOP_GRID_LAYOUT, columns: 1 };
 		const rowModel = createTwoHopRowModel({
 			sections: [section],
 			layout,
@@ -208,7 +261,7 @@ describe("createTwoHopCardHydrator", () => {
 						totalCount: 1,
 					}),
 				],
-				layout: { ...DEFAULT_VIEW_PLAN_LAYOUT, columns: 1 },
+				layout: { ...DEFAULT_TWO_HOP_GRID_LAYOUT, columns: 1 },
 			});
 		const firstCell = collectItemCells(createModel(firstItem), 1, 2)[0]!;
 		const replacementCell = collectItemCells(
@@ -254,7 +307,7 @@ describe("createTwoHopCardHydrator", () => {
 					totalCount: 1,
 				}),
 			],
-			layout: { ...DEFAULT_VIEW_PLAN_LAYOUT, columns: 1 },
+			layout: { ...DEFAULT_TWO_HOP_GRID_LAYOUT, columns: 1 },
 		});
 		const cell = collectItemCells(rowModel, 1, 2)[0]!;
 		const frames = createTestFrameCoordinator();

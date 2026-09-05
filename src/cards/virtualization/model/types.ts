@@ -114,6 +114,7 @@ export interface MutableVirtualRanges {
 }
 
 export interface MountedVirtualCell {
+	/** Logical identity, unique within one mounted snapshot. */
 	readonly key: LogicalCellKey;
 	readonly physicalCellSlot: number;
 	readonly rowIndex: number;

@@ -1,16 +1,16 @@
 import type { LogicalCellKey, SourceKey } from "cards/virtualization/public";
 
 export type FlatGridLogicalCell<T> =
-	| VirtualHeaderCell
-	| VirtualItemCell<T>
-	| VirtualLoadMoreCell;
+	| FlatGridHeaderCell
+	| FlatGridItemCell<T>
+	| FlatGridLoadMoreCell;
 
-export interface VirtualHeaderCell {
+export interface FlatGridHeaderCell {
 	kind: "header";
 	key: LogicalCellKey;
 }
 
-export interface VirtualItemCell<T> {
+export interface FlatGridItemCell<T> {
 	kind: "item";
 	key: LogicalCellKey;
 	sourceKey: SourceKey;
@@ -18,7 +18,7 @@ export interface VirtualItemCell<T> {
 	itemIndex: number;
 }
 
-export interface VirtualLoadMoreCell {
+export interface FlatGridLoadMoreCell {
 	kind: "load-more";
 	key: LogicalCellKey;
 }

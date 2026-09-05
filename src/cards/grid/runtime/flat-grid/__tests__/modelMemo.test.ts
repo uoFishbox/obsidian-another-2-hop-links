@@ -14,6 +14,56 @@ const layout: FlatGridLayoutMetrics = {
 };
 
 describe("flat-grid model memo", () => {
+	it("detects array and resolver replacements even with unchanged revision tokens", () => {
+		const runtime = createFlatGridModelMemo<string>();
+		const params = {
+			items: ["old"],
+			getItemId: (item: string) => item,
+			itemsRevision: 0,
+			itemIdRevision: 0,
+			visibleCount: 1,
+			hasHeader: false,
+			showLoadMore: false,
+		};
+		const first = runtime.resolveLogicalCellSource(params);
+		const replaced = { ...params, items: ["new"] };
+		const second = runtime.resolveLogicalCellSource(replaced);
+		expect(second.resolveCellAtIndex(0)).toMatchObject({ item: "new" });
+		expect(second).not.toBe(first);
+		expect(second.slotBindingRevision).toBe(first.slotBindingRevision);
+		expect(runtime.resolveLogicalCellSource(replaced)).toBe(second);
+		const third = runtime.resolveLogicalCellSource({
+			...replaced,
+			getItemId: (item: string) => `changed:${item}`,
+		});
+		expect(third.resolveSourceKeyAtItemIndex(0)).toBe("changed:new");
+		expect(third).not.toBe(second);
+	});
+
+	it("detects in-place mutations through independent revision tokens", () => {
+		const runtime = createFlatGridModelMemo<string>();
+		let prefix = "first:";
+		const params = {
+			items: ["old"],
+			getItemId: (item: string) => prefix + item,
+			itemsRevision: 0,
+			itemIdRevision: 0,
+			visibleCount: 1,
+			hasHeader: false,
+			showLoadMore: false,
+		};
+		const first = runtime.resolveLogicalCellSource(params);
+		expect(first.resolveSourceKeyAtItemIndex(0)).toBe("first:old");
+		params.items[0] = "new";
+		params.itemsRevision += 1;
+		const second = runtime.resolveLogicalCellSource(params);
+		expect(second.resolveCellAtIndex(0)).toMatchObject({ item: "new" });
+		prefix = "second:";
+		params.itemIdRevision += 1;
+		const third = runtime.resolveLogicalCellSource(params);
+		expect(third.resolveSourceKeyAtItemIndex(0)).toBe("second:new");
+	});
+
 	it("reuses the logical cell source while declared content inputs are stable", () => {
 		const runtime = createFlatGridModelMemo<string>();
 		const items = ["a", "b"];

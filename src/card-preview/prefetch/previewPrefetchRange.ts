@@ -2,6 +2,10 @@ import type { RowRange } from "cards/virtualization/public";
 
 export type PreviewScrollDirection = "stationary" | "forward" | "backward";
 
+export interface PreviewPrefetchRangeTracker {
+	resolve(visible: RowRange, rowCount: number): RowRange;
+}
+
 /** Resolves the last meaningful row movement without velocity prediction. */
 export function resolvePreviewScrollDirection(
 	previous: RowRange | undefined,
@@ -34,4 +38,22 @@ export function resolvePreviewPrefetchRange(
 		start: Math.max(0, visible.start - before),
 		end: Math.min(Math.max(0, rowCount), visible.end + after),
 	};
+}
+
+/** Tracks scroll direction and resolves the next directional prefetch range. */
+export function createPreviewPrefetchRangeTracker(): PreviewPrefetchRangeTracker {
+	let previousVisibleRange: RowRange | undefined;
+	let direction: PreviewScrollDirection = "stationary";
+
+	function resolve(visible: RowRange, rowCount: number): RowRange {
+		direction = resolvePreviewScrollDirection(
+			previousVisibleRange,
+			visible,
+			direction,
+		);
+		previousVisibleRange = visible;
+		return resolvePreviewPrefetchRange(visible, rowCount, direction);
+	}
+
+	return { resolve };
 }

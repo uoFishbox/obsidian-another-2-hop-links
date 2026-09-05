@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { createResidentRowSlotAllocator } from "cards/virtualization/public";
-import { buildMountedTwoHopRows } from "../rowModel";
+import { buildMountedTwoHopRows } from "../mountedRows";
 import { createTwoHopRowModel } from "../rowModel";
 import {
 	createTwoHopSectionModel,

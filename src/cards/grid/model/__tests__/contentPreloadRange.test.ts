@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isContentBottomInPreloadRangeFromMetrics } from "../../runtime/flat-grid/useFlatCardGrid.svelte";
+import { isContentBottomInPreloadRangeFromMetrics } from "../../runtime/flat-grid/infiniteScroll";
 
 describe("isContentBottomInPreloadRangeFromMetrics", () => {
 	it("uses shared scroll metrics without requiring DOM reads", () => {

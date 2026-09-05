@@ -22,7 +22,7 @@ type MutableScrollWindowMeasurement = {
 	-readonly [K in keyof ScrollWindowMeasurement]: ScrollWindowMeasurement[K];
 };
 
-type StableScrollTopBandMutable = {
+export type MutableStableScrollTopBand = {
 	-readonly [K in keyof StableScrollTopBand]: StableScrollTopBand[K];
 };
 
@@ -32,7 +32,7 @@ export type VirtualScrollWindowRangeRowModel = Pick<
 > & {
 	/** Writes the open scrollTop interval covered by the supplied resident rows. */
 	findMountedCoverageScrollTopBandInto?(
-		out: StableScrollTopBandMutable,
+		out: MutableStableScrollTopBand,
 		params: {
 			viewportHeight: number;
 			mounted: RowRange;
@@ -63,11 +63,11 @@ export function createVirtualScrollWindowRangeResolver<
 		mountedOverscanPx: 0,
 		previewOverscanPx: 0,
 	};
-	const mountedCoverageBandScratch: StableScrollTopBandMutable = {
+	const mountedCoverageBandScratch: MutableStableScrollTopBand = {
 		min: 0,
 		max: 0,
 	};
-	const previewCoverageBandScratch: StableScrollTopBandMutable = {
+	const previewCoverageBandScratch: MutableStableScrollTopBand = {
 		min: 0,
 		max: 0,
 	};
@@ -110,7 +110,7 @@ export function createVirtualScrollWindowRangeResolver<
 	};
 
 	const updateCoverageScrollTopBand = (
-		out: StableScrollTopBandMutable,
+		out: MutableStableScrollTopBand,
 		rowModel: TRowModel,
 		sectionTop: number,
 		localScrollTop: number,

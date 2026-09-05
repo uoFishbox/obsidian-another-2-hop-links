@@ -68,6 +68,7 @@ function buildRows(params: {
 	readonly previousRows?: readonly TestRow[];
 	readonly canReusePreviousRows?: boolean;
 	readonly allocator?: ReturnType<typeof createResidentRowSlotAllocator>;
+	readonly transformBinding?: (binding: TestMountedCell) => TestMountedCell;
 }) {
 	const allocator = params.allocator ?? createResidentRowSlotAllocator();
 	const bindCell = vi.fn(
@@ -91,10 +92,13 @@ function buildRows(params: {
 		rowSlotAllocator: allocator,
 		previousRows: params.previousRows,
 		canReusePreviousRows: params.canReusePreviousRows,
-		bindCell: ({ cell, previous, rowIndex, columnIndex, physicalCellSlot }) => ({
-			...bindCell(cell, previous, columnIndex, physicalCellSlot),
-			rowIndex,
-		}),
+		bindCell: ({ cell, previous, rowIndex, columnIndex, physicalCellSlot }) => {
+			const binding = {
+				...bindCell(cell, previous, columnIndex, physicalCellSlot),
+				rowIndex,
+			};
+			return params.transformBinding?.(binding) ?? binding;
+		},
 	});
 	return { build, allocator, bindCell };
 }
@@ -218,5 +222,39 @@ describe("buildMountedGridRows", () => {
 			initial.build.rowsInMountedRange[1],
 		);
 		expect(getRow).not.toHaveBeenCalled();
+	});
+
+	it("rejects a binding assigned to another logical row", () => {
+		expect(() =>
+			buildRows({
+				rowModel: createRowModel([1]),
+				transformBinding: (binding) => ({ ...binding, rowIndex: 1 }),
+			}),
+		).toThrow("belongs to row 1; expected 0");
+	});
+
+	it("rejects duplicate logical cell keys across mounted rows", () => {
+		expect(() =>
+			buildRows({
+				rowModel: createRowModel([1, 1], 1),
+				rowRange: { start: 0, end: 2 },
+				transformBinding: (binding) => ({
+					...binding,
+					key: logicalCellKey("duplicate"),
+				}),
+			}),
+		).toThrow("Duplicate mounted logical cell key: duplicate");
+	});
+
+	it("rejects duplicate physical cell slots", () => {
+		expect(() =>
+			buildRows({
+				rowModel: createRowModel([2]),
+				transformBinding: (binding) => ({
+					...binding,
+					physicalCellSlot: 0,
+				}),
+			}),
+		).toThrow("Duplicate mounted physical cell slot: 0");
 	});
 });

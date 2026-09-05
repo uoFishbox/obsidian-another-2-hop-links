@@ -201,7 +201,7 @@ const createRuntimeHarness = (
 		hasRenderableContent: () => true,
 		resolveRowModel: (model) => model,
 		resolveVisibilityPolicy: () => VISIBILITY_POLICY,
-		buildMountedCells: ({ rowRange }) => ({
+		buildMountedRows: ({ rowRange }) => ({
 			cells:
 				rowRange.start < rowRange.end
 					? [
@@ -446,9 +446,7 @@ describe("useVirtualizer", () => {
 				"scroll-idle",
 			);
 
-			expect(findVisibleRangeInto).toHaveBeenCalledTimes(
-				mountedResolutionCount,
-			);
+			expect(findVisibleRangeInto).toHaveBeenCalledTimes(mountedResolutionCount);
 			expect(findVisibleRangesInto.mock.calls.length).toBeGreaterThan(
 				rangedResolutionCount,
 			);

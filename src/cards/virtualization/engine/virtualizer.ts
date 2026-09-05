@@ -41,7 +41,7 @@ export interface CreateVirtualizerEngineOptions<
 > {
 	resolveRowModel(context: TContext): TRowModel;
 	resolveVisibilityPolicy(context: TContext): VirtualVisibilityPolicy;
-	buildMountedCells(params: {
+	buildMountedRows(params: {
 		rowModel: TRowModel;
 		rowRange: RowRange;
 		ranges: VirtualRanges;
@@ -63,7 +63,7 @@ export function createVirtualizerEngine<
 >({
 	resolveRowModel,
 	resolveVisibilityPolicy,
-	buildMountedCells,
+	buildMountedRows,
 	onSnapshotUpdated,
 }: CreateVirtualizerEngineOptions<
 	TCell,
@@ -75,13 +75,13 @@ export function createVirtualizerEngine<
 	let stableVisibleRange = false;
 	const rowSlotAllocator = createResidentRowSlotAllocator();
 
-	const buildMountedCellsForEngine = (params: {
+	const buildMountedRowsForEngine = (params: {
 		rowModel: VirtualRowModel<TCell>;
 		rowRange: RowRange;
 		ranges: VirtualRanges;
 		previousBuild?: TMountedBuild;
 	}): TMountedBuild =>
-		buildMountedCells({
+		buildMountedRows({
 			rowModel: params.rowModel as TRowModel,
 			rowRange: params.rowRange,
 			ranges: params.ranges,
@@ -130,7 +130,7 @@ export function createVirtualizerEngine<
 			rowModel,
 			rangesResult,
 			previous: previousSnapshot,
-			buildMountedCells: buildMountedCellsForEngine,
+			buildMountedRows: buildMountedRowsForEngine,
 		});
 		const nextSnapshot = result.snapshot;
 		if (nextSnapshot.mountedBuild === null && previousMountedBuild) {
@@ -175,7 +175,7 @@ export function createVirtualizerEngine<
 		const result = recomputeVirtualListSnapshot({
 			rowModel: params.rowModel,
 			previous: previousSnapshot,
-			buildMountedCells: buildMountedCellsForEngine,
+			buildMountedRows: buildMountedRowsForEngine,
 		});
 		if (result.snapshot.mountedBuild === null && previousSnapshot.mountedBuild) {
 			rowSlotAllocator.reset();

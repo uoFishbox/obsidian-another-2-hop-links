@@ -3,8 +3,8 @@ import { createFlatGridCellSource } from "../cellSource";
 import { computeFlatGridLayout } from "cards/virtualization/public";
 import type { FlatGridLogicalCell } from "../logicalCell";
 import { computeVirtualRanges } from "cards/virtualization/public";
-import { buildMountedFlatGridCells, type MountedFlatGridBuild } from "../mountedCells";
-import { flattenMountedRowBindings } from "./mountedCellsTestHelpers";
+import { buildMountedFlatGridRows, type MountedFlatGridBuild } from "../mountedRows";
+import { flattenMountedRowBindings } from "./mountedRowsTestHelpers";
 import { createFlatGridRowModel, type FlatGridRowModel } from "../rowModel";
 import {
 	computeVirtualListSnapshot,
@@ -87,13 +87,9 @@ const measureWorkload = (cardCount: number) => {
 			rowModel,
 			rangesResult,
 			previous,
-			buildMountedCells: ({
-				rowModel: nextRowModel,
-				rowRange,
-				previousBuild,
-			}) => {
+			buildMountedRows: ({ rowModel: nextRowModel, rowRange, previousBuild }) => {
 				mountedCellBuilds += 1;
-				return buildMountedFlatGridCells({
+				return buildMountedFlatGridRows({
 					rowModel: nextRowModel as FlatGridRowModel<TestItem>,
 					rowRange,
 					previousBuild,
@@ -158,14 +154,14 @@ describe("VirtualListEngine performance contracts", () => {
 		const rowModel = createRowModel(10_000);
 		const getRow = vi.spyOn(rowModel, "getRow");
 		const rowSlotAllocator = createResidentRowSlotAllocator();
-		let mounted = buildMountedFlatGridCells({
+		let mounted = buildMountedFlatGridRows({
 			rowModel,
 			rowRange: { start: 10, end: 19 },
 			rowSlotAllocator,
 		});
 		const mountedRows = mounted.rowsInMountedRange.length;
 		for (let frame = 1; frame <= NO_OP_MEASUREMENTS; frame += 1) {
-			mounted = buildMountedFlatGridCells({
+			mounted = buildMountedFlatGridRows({
 				rowModel,
 				rowRange: {
 					start: 10 + frame,

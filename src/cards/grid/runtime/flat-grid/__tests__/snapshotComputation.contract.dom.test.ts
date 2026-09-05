@@ -5,8 +5,8 @@ import type { FlatGridLogicalCell } from "../logicalCell";
 import { createFlatGridRowModel, type FlatGridRowModel } from "../rowModel";
 import type { VirtualRanges } from "cards/virtualization/public";
 import { computeVirtualRanges } from "cards/virtualization/public";
-import { buildMountedFlatGridCells, type MountedFlatGridBuild } from "../mountedCells";
-import { flattenMountedRowBindings } from "./mountedCellsTestHelpers";
+import { buildMountedFlatGridRows, type MountedFlatGridBuild } from "../mountedRows";
+import { flattenMountedRowBindings } from "./mountedRowsTestHelpers";
 import {
 	computeVirtualListSnapshot,
 	recomputeVirtualListSnapshot,
@@ -65,7 +65,7 @@ const compute = (params: {
 	readonly ranges?: VirtualRanges;
 	readonly scrollTop?: number;
 	readonly mountedOverscanPx?: number;
-	readonly buildMountedCells?: typeof buildMountedFlatGridCells<TestItem>;
+	readonly buildMountedRows?: typeof buildMountedFlatGridRows<TestItem>;
 	readonly rowSlotAllocator?: ResidentRowSlotAllocator;
 }): TestComputation => {
 	const rowSlotAllocator =
@@ -91,8 +91,8 @@ const compute = (params: {
 		rowModel: params.rowModel,
 		rangesResult,
 		previous: params.previous,
-		buildMountedCells: ({ rowModel, rowRange, previousBuild }) =>
-			(params.buildMountedCells ?? buildMountedFlatGridCells)({
+		buildMountedRows: ({ rowModel, rowRange, previousBuild }) =>
+			(params.buildMountedRows ?? buildMountedFlatGridRows)({
 				rowModel: rowModel as FlatGridRowModel<TestItem>,
 				rowRange,
 				previousBuild,
@@ -149,14 +149,14 @@ describe("VirtualListEngine contract", () => {
 
 	it("reuses the mounted build when only previewVisible changes", () => {
 		const rowModel = createRowModel(30);
-		const buildMountedCells = vi.fn(buildMountedFlatGridCells<TestItem>);
+		const buildMountedRows = vi.fn(buildMountedFlatGridRows<TestItem>);
 		const initialResult = compute({
 			rowModel,
 			ranges: {
 				mounted: { start: 0, end: 7 },
 				previewVisible: { start: 0, end: 1 },
 			},
-			buildMountedCells,
+			buildMountedRows,
 		});
 		const nextResult = compute({
 			rowModel,
@@ -165,10 +165,10 @@ describe("VirtualListEngine contract", () => {
 				mounted: { start: 0, end: 7 },
 				previewVisible: { start: 1, end: 2 },
 			},
-			buildMountedCells,
+			buildMountedRows,
 		});
 
-		expect(buildMountedCells).toHaveBeenCalledTimes(1);
+		expect(buildMountedRows).toHaveBeenCalledTimes(1);
 		expect(nextResult.snapshot).not.toBe(initialResult.snapshot);
 		expect(nextResult.snapshot.ranges.previewVisible).toEqual({ start: 1, end: 2 });
 		expect(nextResult.snapshot.mountedBuild).toBe(
@@ -205,29 +205,29 @@ describe("VirtualListEngine contract", () => {
 			mounted: { start: 0, end: 4 },
 			previewVisible: { start: 0, end: 1 },
 		};
-		const buildMountedCells = vi.fn(buildMountedFlatGridCells<TestItem>);
-		const initial = compute({ rowModel, ranges, buildMountedCells }).snapshot;
+		const buildMountedRows = vi.fn(buildMountedFlatGridRows<TestItem>);
+		const initial = compute({ rowModel, ranges, buildMountedRows }).snapshot;
 		const replaced = compute({
 			rowModel: replacementRowModel,
 			previous: initial,
 			ranges,
-			buildMountedCells,
+			buildMountedRows,
 		}).snapshot;
 
-		expect(buildMountedCells).toHaveBeenCalledTimes(2);
+		expect(buildMountedRows).toHaveBeenCalledTimes(2);
 		expect(replaced.rowModel).toBe(replacementRowModel);
 	});
 
 	it("rebuilds when the mounted range changes", () => {
 		const rowModel = createRowModel(30);
-		const buildMountedCells = vi.fn(buildMountedFlatGridCells<TestItem>);
+		const buildMountedRows = vi.fn(buildMountedFlatGridRows<TestItem>);
 		const initial = compute({
 			rowModel,
 			ranges: {
 				mounted: { start: 0, end: 3 },
 				previewVisible: { start: 0, end: 1 },
 			},
-			buildMountedCells,
+			buildMountedRows,
 		}).snapshot;
 		const shifted = compute({
 			rowModel,
@@ -236,23 +236,23 @@ describe("VirtualListEngine contract", () => {
 				mounted: { start: 1, end: 4 },
 				previewVisible: { start: 1, end: 2 },
 			},
-			buildMountedCells,
+			buildMountedRows,
 		}).snapshot;
 
-		expect(buildMountedCells).toHaveBeenCalledTimes(2);
+		expect(buildMountedRows).toHaveBeenCalledTimes(2);
 		expect(shifted.mountedBuild).not.toBe(initial.mountedBuild);
 	});
 
 	it("recompute reuses the mounted build when dependencies are unchanged", () => {
 		const rowModel = createRowModel(12);
 		const initialResult = compute({ rowModel });
-		const buildMountedCells = vi.fn(buildMountedFlatGridCells<TestItem>);
+		const buildMountedRows = vi.fn(buildMountedFlatGridRows<TestItem>);
 
 		const recomputed = recomputeVirtualListSnapshot({
 			rowModel,
 			previous: initialResult.snapshot,
-			buildMountedCells: ({ rowModel: nextRowModel, rowRange, previousBuild }) =>
-				buildMountedCells({
+			buildMountedRows: ({ rowModel: nextRowModel, rowRange, previousBuild }) =>
+				buildMountedRows({
 					rowModel: nextRowModel as FlatGridRowModel<TestItem>,
 					rowRange,
 					previousBuild,
@@ -260,7 +260,7 @@ describe("VirtualListEngine contract", () => {
 				}),
 		});
 
-		expect(buildMountedCells).not.toHaveBeenCalled();
+		expect(buildMountedRows).not.toHaveBeenCalled();
 		expect(recomputed.snapshot.mountedBuild).toBe(
 			initialResult.snapshot.mountedBuild,
 		);

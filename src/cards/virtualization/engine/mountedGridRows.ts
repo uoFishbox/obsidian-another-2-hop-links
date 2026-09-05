@@ -265,6 +265,8 @@ function assertMountedGridRows<TCell extends MountedVirtualCell>(params: {
 
 	const logicalRows = new Set<number>();
 	const rowSlots = new Set<number>();
+	const logicalCellKeys = new Set<string>();
+	const physicalCellSlots = new Set<number>();
 	for (const row of params.rows) {
 		if (logicalRows.has(row.rowIndex)) {
 			throw new Error(`Duplicate mounted logical row: ${row.rowIndex}.`);
@@ -289,6 +291,19 @@ function assertMountedGridRows<TCell extends MountedVirtualCell>(params: {
 		for (let columnIndex = 0; columnIndex < row.bindings.length; columnIndex += 1) {
 			const binding = row.bindings[columnIndex];
 			if (!binding) continue;
+			if (binding.rowIndex !== row.rowIndex) {
+				throw new Error(
+					`Mounted cell ${binding.key} belongs to row ${binding.rowIndex}; expected ${row.rowIndex}.`,
+				);
+			}
+			if (logicalCellKeys.has(binding.key)) {
+				throw new Error(`Duplicate mounted logical cell key: ${binding.key}.`);
+			}
+			if (physicalCellSlots.has(binding.physicalCellSlot)) {
+				throw new Error(
+					`Duplicate mounted physical cell slot: ${binding.physicalCellSlot}.`,
+				);
+			}
 			const expectedSlotIndex =
 				row.physicalRowSlot * params.columns + columnIndex;
 			if (binding.physicalCellSlot !== expectedSlotIndex) {
@@ -304,6 +319,8 @@ function assertMountedGridRows<TCell extends MountedVirtualCell>(params: {
 					`Mounted cell column ${binding.columnIndex} does not match physical column ${columnIndex}.`,
 				);
 			}
+			logicalCellKeys.add(binding.key);
+			physicalCellSlots.add(binding.physicalCellSlot);
 		}
 	}
 }

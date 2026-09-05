@@ -1,17 +1,14 @@
-import { tick, untrack, getContext, onDestroy, type Snippet } from "svelte";
+import { untrack, getContext, onDestroy, type Snippet } from "svelte";
 import type { ResultNavigationDirection } from "cards/navigation/resultFocus";
 import type { VirtualSequentialNavigationDirection } from "cards/virtualization/public";
-import type { RowRange, VirtualVisibilityPolicy } from "cards/virtualization/public";
+import type { RowRange } from "cards/virtualization/public";
+import { getLazyLoadManager } from "obsidian-integration/observers/IntersectionObserverRegistry";
 import {
-	getLazyLoadManager,
-	type RegistrationToken,
-} from "obsidian-integration/observers/IntersectionObserverRegistry";
-import {
-	buildMountedFlatGridCells,
+	buildMountedFlatGridRows,
 	type MountedFlatGridCell,
 	type MountedFlatGridBuild,
 	type MountedFlatGridRow,
-} from "./mountedCells";
+} from "./mountedRows";
 import type { FlatGridRowModel } from "./rowModel";
 import { createFlatGridModelMemo } from "./modelMemo";
 import type { VirtualListStableMeasurementContext } from "cards/virtualization/public";
@@ -19,8 +16,6 @@ import {
 	createResolvedCardLayoutSettingsMemo,
 	type CardLayoutSettings,
 } from "cards/layout/cardLayoutCssVars";
-import { getOptionalOwnerWindow } from "shared/ui/dom/realmSafeDom";
-import { scheduleAnimationFrame } from "shared/ui/scheduling/frame";
 import {
 	createSectionPaginationState,
 	type SectionPaginationApplicationStore,
@@ -43,15 +38,14 @@ import { useAppContext } from "cards/context/linkContext";
 import type { VirtualFrameCoordinator } from "shared/ui/scheduling/frameCoordinator";
 import { DEFAULT_SETTINGS } from "settings/model";
 import {
-	createCardGridBindingsMemo,
-	isCardGridMountedItemCell,
+	createFlatGridCardBindingsMemo,
+	isMountedFlatGridItemCell,
 } from "./mountedCardBindings";
 import type { FlatListScrollState } from "cards/list/model/listViewUiState";
-import {
-	resolvePreviewPrefetchRange,
-	resolvePreviewScrollDirection,
-	type PreviewScrollDirection,
-} from "card-preview/prefetch/previewPrefetchRange";
+import { createPreviewPrefetchRangeTracker } from "card-preview/prefetch/previewPrefetchRange";
+import { createFlatGridInfiniteScrollController } from "./infiniteScroll";
+import { createFlatGridScrollStateController } from "./scrollState";
+import { createCardGridVisibilityPolicyResolver } from "cards/grid/model/cardGridVisibilityPolicy";
 
 /** Props passed to flat virtual list item render snippets. */
 export interface FlatCardGridItemRenderArgs<T> {
@@ -109,49 +103,7 @@ export interface FlatCardGridProps<T> {
 	) => ItemInteractionDescriptor | null;
 }
 
-const MAX_CHAINED_INFINITE_SCROLL_LOADS = 2;
-export const CARD_GRID_BOOTSTRAP_VISIBLE_ROWS = 3;
-const CARD_GRID_PREVIEW_ACTIVATION_AHEAD_ROWS = 2;
 const EMPTY_MOUNTED_ROWS: readonly MountedFlatGridRow<never>[] = [];
-
-export function createCardGridVisibilityPolicy(
-	layout: Pick<FlatGridLayout, "rowHeight" | "gap">,
-): VirtualVisibilityPolicy {
-	const rowOverscanPx = Math.max(0, layout.rowHeight + layout.gap);
-	const mountedOverscanPx = rowOverscanPx * CARD_GRID_PREVIEW_ACTIVATION_AHEAD_ROWS;
-	return {
-		bootstrapRows: CARD_GRID_BOOTSTRAP_VISIBLE_ROWS,
-		mountedOverscanPx,
-		previewOverscanPx: 0,
-	};
-}
-
-interface ContentBottomPreloadMetrics {
-	contentHeight: number;
-	rootMargin: string;
-	scrollTop: number;
-	viewportHeight: number;
-	sectionTop: number;
-}
-
-function parseBottomRootMarginPx(rootMargin: string): number {
-	const tokens = rootMargin.trim().split(/\s+/).filter(Boolean);
-	if (tokens.length === 0) return 0;
-	const parsed = Number.parseFloat(tokens[tokens.length <= 2 ? 0 : 2] ?? "0");
-	return Number.isFinite(parsed) ? parsed : 0;
-}
-
-export function isContentBottomInPreloadRangeFromMetrics({
-	contentHeight,
-	rootMargin,
-	scrollTop,
-	viewportHeight,
-	sectionTop,
-}: ContentBottomPreloadMetrics): boolean {
-	const preloadBottom =
-		scrollTop + viewportHeight + parseBottomRootMarginPx(rootMargin);
-	return sectionTop + contentHeight <= preloadBottom;
-}
 
 export function useFlatCardGrid<T>(
 	props: FlatCardGridProps<T>,
@@ -189,25 +141,9 @@ export function useFlatCardGrid<T>(
 		appContext?.previewRuntime?.createSurface(previewSurfaceOptions) ??
 		DISABLED_PREVIEW_SURFACE;
 	const interactionController = createVirtualCardInteractionController();
-	let lastResolvedVisibilityPolicyRowHeight: number | undefined;
-	let lastResolvedVisibilityPolicyGap: number | undefined;
-	let lastResolvedVisibilityPolicy:
-		| ReturnType<typeof createCardGridVisibilityPolicy>
-		| undefined;
-	const resolveVisibilityPolicy = (
-		nextLayout: FlatGridLayout,
-	): ReturnType<typeof createCardGridVisibilityPolicy> => {
-		if (
-			!lastResolvedVisibilityPolicy ||
-			lastResolvedVisibilityPolicyRowHeight !== nextLayout.rowHeight ||
-			lastResolvedVisibilityPolicyGap !== nextLayout.gap
-		) {
-			lastResolvedVisibilityPolicyRowHeight = nextLayout.rowHeight;
-			lastResolvedVisibilityPolicyGap = nextLayout.gap;
-			lastResolvedVisibilityPolicy = createCardGridVisibilityPolicy(nextLayout);
-		}
-		return lastResolvedVisibilityPolicy!;
-	};
+	const resolveCardGridVisibilityPolicy = createCardGridVisibilityPolicyResolver();
+	const resolveVisibilityPolicy = (nextLayout: FlatGridLayout) =>
+		resolveCardGridVisibilityPolicy(nextLayout.rowStride);
 	const initialScrollState = props.initialScrollState
 		? {
 				localScrollTop: props.initialScrollState.localScrollTop,
@@ -215,7 +151,6 @@ export function useFlatCardGrid<T>(
 			}
 		: undefined;
 	const initialPaginationSectionId = props.sectionId ?? "link-list";
-	let pendingScrollRestore = initialScrollState;
 	let sectionExpandedLimits = $state.raw<Record<string, number>>(
 		initialScrollState
 			? { [initialPaginationSectionId]: initialScrollState.visibleCount }
@@ -225,12 +160,9 @@ export function useFlatCardGrid<T>(
 	let contentEl = $state<HTMLDivElement | null>(null);
 	let interactionShadowRoot = $state<ShadowRoot | null>(null);
 	let infiniteScrollSentinelEl = $state<HTMLDivElement | null>(null);
-	let loadScheduled = $state(false);
-	let chainedInfiniteScrollLoads = $state(0);
 	let layout = $state.raw(DEFAULT_FLAT_GRID_LAYOUT);
-	let previousPreviewVisibleRange: RowRange | undefined;
-	let previewScrollDirection: PreviewScrollDirection = "stationary";
-	const resolveCardGridBindings = createCardGridBindingsMemo<T>();
+	const previewPrefetchRangeTracker = createPreviewPrefetchRangeTracker();
+	const resolveFlatGridCardBindings = createFlatGridCardBindingsMemo<T>();
 	const resolveConfiguredCardLayout = createResolvedCardLayoutSettingsMemo();
 	const configuredCardLayout = $derived.by(() =>
 		resolveConfiguredCardLayout(applicationStore?.settings),
@@ -277,22 +209,15 @@ export function useFlatCardGrid<T>(
 			layout: nextLayout,
 		});
 	const rowModel = $derived(resolveFlatGridRowModel(layout));
-	const syncCardSlots = (
+	const publishMountedCardBindings = (
 		mountedBuild: MountedFlatGridBuild<T> | null,
 		visibleRange: RowRange,
 	): void => {
-		previewScrollDirection = resolvePreviewScrollDirection(
-			previousPreviewVisibleRange,
-			visibleRange,
-			previewScrollDirection,
-		);
-		previousPreviewVisibleRange = visibleRange;
-		const prefetchRange = resolvePreviewPrefetchRange(
+		const prefetchRange = previewPrefetchRangeTracker.resolve(
 			visibleRange,
 			rowModel.rowCount,
-			previewScrollDirection,
 		);
-		const bindingsResult = resolveCardGridBindings({
+		const bindingsResult = resolveFlatGridCardBindings({
 			mountedBuild,
 			previewCardDimensions: {
 				widthPx: layout.cellWidth,
@@ -324,15 +249,18 @@ export function useFlatCardGrid<T>(
 		hasRenderableContent: () => itemCount > 0,
 		resolveRowModel: resolveFlatGridRowModel,
 		resolveVisibilityPolicy,
-		buildMountedCells: ({ rowModel, rowRange, previousBuild, rowSlotAllocator }) =>
-			buildMountedFlatGridCells({
+		buildMountedRows: ({ rowModel, rowRange, previousBuild, rowSlotAllocator }) =>
+			buildMountedFlatGridRows({
 				rowModel,
 				rowRange,
 				previousBuild,
 				rowSlotAllocator,
 			}),
 		onSnapshotUpdated: (snapshot) => {
-			syncCardSlots(snapshot.mountedBuild, snapshot.ranges.previewVisible);
+			publishMountedCardBindings(
+				snapshot.mountedBuild,
+				snapshot.ranges.previewVisible,
+			);
 		},
 		resolveLayoutMeasurement: (nextMeasurement, rootEl, runtimeMeasurement) => {
 			const layoutMeasurement = resolveFlatGridLayoutMeasurement({
@@ -363,6 +291,28 @@ export function useFlatCardGrid<T>(
 			? rowsInMountedRange
 			: EMPTY_MOUNTED_ROWS;
 	});
+	const scrollStateController = createFlatGridScrollStateController({
+		initialState: initialScrollState,
+		getRootEl: () => sectionRootEl,
+		getScrollContainerEl: () => measurement.scrollContainerEl,
+		getSectionTop: () => measurement.sectionTop,
+		hasStableScrollMetrics: () => measurement.hasStableScrollMetrics,
+		getVisibleCount: () => visibleCount,
+		publish: (state) => props.onScrollStateChange?.(state),
+		suppressNextNativeScroll: virtualList.suppressNextNativeScroll,
+		flushProgrammaticScrollMeasurement:
+			virtualList.flushProgrammaticScrollMeasurement,
+	});
+	const infiniteScrollController = createFlatGridInfiniteScrollController({
+		observer: lazyLoadManager,
+		getRootEl: () => sectionRootEl,
+		getScrollContainerEl: () => measurement.scrollContainerEl,
+		getRootMargin: () => infiniteScrollRootMargin,
+		getContentHeight: () => layout.contentHeight,
+		getPreloadMetrics: scrollStateController.getCurrentMetrics,
+		shouldLoad: () => shouldUseInfiniteScroll && canLoadMore,
+		loadNextPage: () => loadNextPage(),
+	});
 
 	const scheduleLayoutMeasurementForCardLayout = (
 		_nextCardLayout: ConfiguredCardLayout | null,
@@ -391,28 +341,6 @@ export function useFlatCardGrid<T>(
 		virtualList.scheduleLayoutMeasurement();
 	};
 
-	const observeInfiniteScrollSentinel = (
-		sentinelEl: HTMLDivElement,
-	): (() => void) => {
-		const token: RegistrationToken = lazyLoadManager.observe(
-			sentinelEl,
-			() => {
-				chainedInfiniteScrollLoads = 0;
-				scheduleLoadNextPage();
-			},
-			{
-				rootMargin: infiniteScrollRootMargin,
-				threshold: 0,
-				root: measurement.scrollContainerEl,
-			},
-			false,
-		);
-
-		return () => {
-			lazyLoadManager.unobserve(token);
-		};
-	};
-
 	const observeRootElement = (): (() => void) | undefined => {
 		if (!sectionRootEl || typeof window === "undefined") {
 			return;
@@ -428,7 +356,7 @@ export function useFlatCardGrid<T>(
 			return;
 		}
 
-		return observeInfiniteScrollSentinel(infiniteScrollSentinelEl);
+		return infiniteScrollController.observe(infiniteScrollSentinelEl);
 	};
 
 	$effect(() => {
@@ -448,11 +376,14 @@ export function useFlatCardGrid<T>(
 		void props.resolveItemInteractionDescriptor;
 		const snapshot = virtualList.getSnapshot();
 		if (!snapshot) return;
-		syncCardSlots(virtualList.getMountedBuild(), snapshot.ranges.previewVisible);
+		publishMountedCardBindings(
+			virtualList.getMountedBuild(),
+			snapshot.ranges.previewVisible,
+		);
 	});
 
 	onDestroy(() => {
-		persistCurrentScrollState();
+		scrollStateController.persist();
 		previewSurface.dispose();
 		interactionController.clear();
 	});
@@ -465,143 +396,15 @@ export function useFlatCardGrid<T>(
 		paginationState.loadMore(flatPaginationSectionId, itemCount);
 	};
 
-	const scheduleLoadNextPage = () => {
-		if (loadScheduled) {
-			return;
-		}
-
-		loadScheduled = true;
-		scheduleAnimationFrame(async () => {
-			loadScheduled = false;
-			loadNextPage();
-
-			await tick();
-
-			if (!sectionRootEl || !shouldUseInfiniteScroll || !canLoadMore) {
-				return;
-			}
-
-			const preloadMetrics = getCurrentPreloadMetrics();
-			if (
-				chainedInfiniteScrollLoads < MAX_CHAINED_INFINITE_SCROLL_LOADS &&
-				preloadMetrics &&
-				isContentBottomInPreloadRangeFromMetrics({
-					contentHeight: layout.contentHeight,
-					rootMargin: infiniteScrollRootMargin,
-					...preloadMetrics,
-				})
-			) {
-				chainedInfiniteScrollLoads += 1;
-				scheduleLoadNextPage();
-			}
-		}, sectionRootEl?.ownerDocument.defaultView);
-	};
-
-	function getCurrentPreloadMetrics(): VirtualListStableMeasurementContext | null {
-		const root = measurement.scrollContainerEl;
-		const ownerWindow = getOptionalOwnerWindow(root ?? sectionRootEl);
-		if (!ownerWindow) {
-			return null;
-		}
-
-		return {
-			scrollTop: root
-				? root.scrollTop
-				: ownerWindow.scrollY || ownerWindow.pageYOffset || 0,
-			viewportHeight: root ? root.clientHeight : ownerWindow.innerHeight,
-			sectionTop: measurement.sectionTop,
-			isScrollActive: false,
-		};
-	}
-
-	function maybeScheduleInfiniteScrollLoad(
-		context?: VirtualListStableMeasurementContext,
-	): void {
-		if (!sectionRootEl || !shouldUseInfiniteScroll || !canLoadMore) {
-			return;
-		}
-
-		const preloadMetrics = context ?? getCurrentPreloadMetrics();
-		if (
-			!preloadMetrics ||
-			!isContentBottomInPreloadRangeFromMetrics({
-				contentHeight: layout.contentHeight,
-				rootMargin: infiniteScrollRootMargin,
-				scrollTop: preloadMetrics.scrollTop,
-				viewportHeight: preloadMetrics.viewportHeight,
-				sectionTop: preloadMetrics.sectionTop,
-			})
-		) {
-			return;
-		}
-
-		chainedInfiniteScrollLoads = 0;
-		scheduleLoadNextPage();
-	}
-
 	function handleStableMeasurement(
 		context: VirtualListStableMeasurementContext,
 	): void {
-		if (restorePendingScrollPosition(context)) {
-			return;
-		}
+		if (scrollStateController.restorePending(context)) return;
 
 		if (!context.isScrollActive) {
-			publishScrollState(context);
+			scrollStateController.publishCurrent(context);
 		}
-		maybeScheduleInfiniteScrollLoad(context);
-	}
-
-	function restorePendingScrollPosition(
-		context: VirtualListStableMeasurementContext,
-	): boolean {
-		const restoreState = pendingScrollRestore;
-		if (!restoreState) return false;
-
-		const scrollContainerEl = measurement.scrollContainerEl;
-		const ownerWindow = getOptionalOwnerWindow(scrollContainerEl ?? sectionRootEl);
-		if (!ownerWindow) return false;
-
-		pendingScrollRestore = undefined;
-		const targetScrollTop = Math.max(
-			0,
-			context.sectionTop + restoreState.localScrollTop,
-		);
-		if (scrollContainerEl) {
-			scrollContainerEl.scrollTop = targetScrollTop;
-		} else {
-			ownerWindow.scrollTo({ top: targetScrollTop });
-		}
-
-		const restoredScrollTop = scrollContainerEl
-			? scrollContainerEl.scrollTop
-			: ownerWindow.scrollY || ownerWindow.pageYOffset || 0;
-		if (restoredScrollTop !== context.scrollTop) {
-			virtualList.suppressNextNativeScroll(restoredScrollTop);
-		}
-		virtualList.flushProgrammaticScrollMeasurement({
-			scrollContainerEl,
-			scrollTop: restoredScrollTop,
-			viewportHeight: scrollContainerEl
-				? scrollContainerEl.clientHeight
-				: ownerWindow.innerHeight,
-			sectionTop: context.sectionTop,
-			didScroll: restoredScrollTop !== context.scrollTop,
-		});
-		return true;
-	}
-
-	function publishScrollState(context: VirtualListStableMeasurementContext): void {
-		props.onScrollStateChange?.({
-			localScrollTop: Math.max(0, context.scrollTop - context.sectionTop),
-			visibleCount,
-		});
-	}
-
-	function persistCurrentScrollState(): void {
-		if (pendingScrollRestore || !measurement.hasStableScrollMetrics) return;
-		const context = getCurrentPreloadMetrics();
-		if (context) publishScrollState(context);
+		infiniteScrollController.considerLoading(context);
 	}
 
 	$effect(() => {
@@ -634,7 +437,7 @@ export function useFlatCardGrid<T>(
 		mountedCell: MountedFlatGridCell<T> | null | undefined,
 		scrollContainerEl: HTMLElement | null,
 	): FlatCardGridItemRenderArgs<T> | null => {
-		if (!isCardGridMountedItemCell(mountedCell)) return null;
+		if (!isMountedFlatGridItemCell(mountedCell)) return null;
 		return {
 			item: mountedCell.cell.item,
 			index: mountedCell.cell.itemIndex,

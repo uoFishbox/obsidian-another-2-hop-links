@@ -1,66 +1,75 @@
 # Two-hop virtual-list performance contract
 
-This document is the structural performance baseline for the retained two-hop
-virtual list. Refactors must preserve these identity and workload guarantees.
+This document records the structural performance baseline for the two-hop
+virtual grid. The shared contracts in
+`src/cards/virtualization/PERFORMANCE.md` remain authoritative.
 
 ## Pipeline
 
-The supported data flow is:
-
 ```text
-compile plan -> plan mounted-range transition -> commit physical slots
-             -> publish atomic bindings -> render retained Svelte bodies
+sections + layout -> TwoHopRowModel -> shared range engine
+                  -> mounted two-hop rows -> shared physical slot pool
+                  -> retained Svelte cell bodies
 ```
 
-Compilation may read section descriptors and item collections. The scroll hot
-path must use only the compiled plan and reusable scratch state.
+`TwoHopRowModel` owns section geometry, logical cells, visible-range lookup,
+and navigation. `mountedRows.ts` binds only rows entering the resident window
+to physical slots supplied by the shared allocator. `CardGridSurface` publishes
+those immutable bindings into stable row and cell signals.
 
-## Owners and lifetimes
+Preview and hydration work runs after the mounted snapshot is published.
+`mountedCardBindings.ts` derives foreground/background demand and preview bindings;
+`TwoHopCardHydrator` owns the bounded off-window model cache and async queues.
 
-| State                           | Owner                                              | Lifetime / invalidation                                                |
-| ------------------------------- | -------------------------------------------------- | ---------------------------------------------------------------------- |
-| Section and item identity       | page `twoHopSectionDescriptorIdentityCache`        | page instance; reconciled on input updates                             |
-| Compiled plan                   | virtual-list `twoHopCompiledPlanCache`             | sections, visible counts, or layout change                             |
-| Interaction descriptors         | mounted-surface `twoHopInteractionDescriptorCache` | lazily replaced when item or descriptor revision changes               |
-| Row/cell shells and controllers | `twoHopPhysicalSlotStore`                          | mounted surface; resized only when allocator capacity/topology changes |
+Demand publication rebuilds the foreground/background queues in reused storage
+from current pending keys. Cancelled cells and obsolete priority entries must
+not survive until an idle drain; queued work is bounded by current demand even
+when idle work is withheld across many scroll windows.
 
-These caches intentionally remain separate because their owners and
-invalidation rules differ.
+Layout anchors are captured before geometry changes and restored after the
+committed content height reaches the DOM. Intervening publications share the
+first anchor. Restoration reads the actual scroll delta, respects user scrolling
+and scroller changes, and republishes ranges from the resulting scroll position.
 
-## CI gates
+## Owners and invalidation
 
-The perf-contract suites cover 100, 1,000, and 10,000 cards and the following
-transitions: 300 one-row scroll shifts, unchanged range, distant jump, pool
-growth, sustained under-utilization, same-column resize, and column topology
-change.
+| State                                  | Owner                          | Invalidation                              |
+| -------------------------------------- | ------------------------------ | ----------------------------------------- |
+| Section geometry and logical cells     | `TwoHopRowModel`               | sections or layout change                 |
+| Mounted ranges and immutable snapshots | shared virtualizer engine      | range or row-model change                 |
+| Logical-row to physical-slot mapping   | shared resident row allocator  | range or column topology change           |
+| Reactive row/cell shells               | shared physical grid slot pool | capacity growth or column topology change |
+| Hydrated card models                   | `TwoHopCardHydrator`           | item/revision change or bounded eviction  |
+| Preview bindings and demand priorities | `mountedCardBindings.ts`       | coalesced post-paint range effect         |
 
-- After initial allocation, 300 one-row shifts allocate zero row/cell shells.
-- An unchanged mounted range performs zero row rebinds, cell rebinds, and
-  binding commits.
-- A one-row shift rebinds one row and exactly `columns` cells.
-- A pool epoch change rebinds the complete mounted range; ordinary shifts do
-  not.
-- `renderSlotIndex` and `cellSlotKey` remain below `capacity * columns`.
-- `previewVisible` is clamped inside `mounted`.
-- Scrolling does not call `getItems()`, sort/reconcile items, or compile a plan.
-- DOM nodes and compatible item child components survive physical-slot reuse.
-- Same-column resize retains the surface and item subtree. Column topology
-  changes may reconstruct the keyed surface.
-- Interaction descriptors are created on first interaction, then cache hits
-  reuse the descriptor while the mounted item and revision remain compatible.
+## Required hot-path properties
 
-The checked-in baseline is the contract encoded by the tests rather than a
-machine-specific duration. Before the staged refactor, `bun run check`, the 65
-two-hop unit/DOM tests, and the 14 two-hop perf tests passed on 2026-07-14.
+- An unchanged measurement reuses the complete snapshot and mounted build.
+- A one-row shift resolves and binds only the entering logical row.
+- Retained logical rows keep their row objects and physical slots.
+- Mounted DOM and row/cell shell counts are bounded by the resident range.
+- `previewVisible` remains inside `mounted`.
+- Scrolling does not rebuild section geometry or enumerate all section items.
+- Range scans use direct loops over `rowsInMountedRange`; they do not create a
+  flattened mounted-cell array, iterators, or chained `map`/`filter` results.
+- Visibility-policy objects are memoized by row stride.
+- Scratch storage owned by allocators, schedulers, and slot pools is reused
+  across scroll frames.
+- Published snapshots and mounted builds are immutable. Mutation remains local
+  to allocator, scheduler, cache, and Svelte slot-pool state.
 
-## Common-layer extraction decision
+Refactors may move these responsibilities between files without adding
+per-frame controller objects, callback closures, parameter objects, row/cell
+shells, or intermediate collections.
 
-Phase 8 remains deferred. The generic flat/grid runtimes share the
-allocation-free `createContiguousRowSlotAllocator`, but no other production
-surface currently consumes the two-hop combination of a retained physical
-row/cell store, atomic item-family binding, and descriptor-rich typed-array
-plan. Extracting `RetainedPhysicalSlotStore` or `AtomicCellBinding` now would
-therefore create a one-consumer abstraction without proving compatible
-invalidation and identity requirements. The two-hop plan/range resolver and
-slot store remain feature-local until a second consumer needs the same full
-contract.
+## Verification
+
+The unit, DOM, and performance-contract suites cover bounded residency,
+no-op reuse, sustained one-row shifts, jumps, pool growth, column changes,
+preview demand publication, and retained DOM/component identity. Performance
+tests use structural counters and reference identity rather than wall-clock
+thresholds.
+
+For changes to the scroll hot path, run `bun run check`, the relevant flat and
+two-hop DOM suites, and `bun run test:perf`. Compare production allocation
+profiles when introducing or changing a collection, callback, or cache.

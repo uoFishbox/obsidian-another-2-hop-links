@@ -183,7 +183,6 @@ export function createTwoHopCardHydrator(
 			}
 			pending.cell = demanded.cell;
 			pending.priority = demanded.priority;
-			queueFor(demanded.priority).entries.push(demanded.cell);
 		}
 	}
 
@@ -209,7 +208,6 @@ export function createTwoHopCardHydrator(
 		if (existing) {
 			if (priority === "foreground" && existing.priority !== "foreground") {
 				existing.priority = "foreground";
-				foregroundQueue.entries.push(existing.cell);
 			}
 			return;
 		}
@@ -218,13 +216,19 @@ export function createTwoHopCardHydrator(
 			cell,
 			priority,
 		});
-		queueFor(priority).entries.push(cell);
 	}
 
 	function enqueueDemand(refreshExisting: boolean): void {
 		const revision = params.getRevision();
 		for (const demanded of demandByKey.values()) {
 			enqueueCell(demanded.cell, demanded.priority, refreshExisting, revision);
+		}
+		// Idle work may never drain. Rebuild in reused storage so cancelled cells
+		// and obsolete priority entries cannot accumulate across scroll windows.
+		clearHydrationQueue(foregroundQueue);
+		clearHydrationQueue(backgroundQueue);
+		for (const pending of pendingByKey.values()) {
+			queueFor(pending.priority).entries.push(pending.cell);
 		}
 	}
 

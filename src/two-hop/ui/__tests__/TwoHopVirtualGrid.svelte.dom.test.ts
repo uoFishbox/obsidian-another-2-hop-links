@@ -380,6 +380,93 @@ describe("TwoHopVirtualGrid component", () => {
 		expect(scroller.scrollTop).toBeGreaterThan(scrollTopBeforePublication);
 	});
 
+	it.each(["prepend", "narrow"] as const)(
+		"restores the bottom-of-list anchor after the DOM height changes (%s)",
+		async (change) => {
+			const section = createSection(100);
+			const { root, scroller, publishSection } = await renderSurface({
+				section,
+				resolveItemCardModel: createCardModelResolver(),
+			});
+			const content = root.shadowRoot!.querySelector<HTMLElement>(
+				".twohop-virtual-content",
+			)!;
+			const readHeight = (): number => Number.parseFloat(content.style.height);
+			let width = 320;
+			let scrollTop = readHeight() - scroller.clientHeight - 10;
+			Object.defineProperty(scroller, "scrollHeight", {
+				configurable: true,
+				get: readHeight,
+			});
+			Object.defineProperty(scroller, "scrollTop", {
+				configurable: true,
+				get: () => scrollTop,
+				set: (value: number) => {
+					scrollTop = Math.max(
+						0,
+						Math.min(readHeight() - scroller.clientHeight, value),
+					);
+				},
+			});
+			vi.spyOn(root, "getBoundingClientRect").mockImplementation(
+				() => new DOMRect(0, -scrollTop, width, readHeight()),
+			);
+			await fireEvent.scroll(scroller);
+			for (let index = 0; index < 4; index += 1) await flushFrames();
+			const rowHeight = Number.parseFloat(
+				content.style.getPropertyValue("--ccl-box-height"),
+			);
+			const firstVisibleRow = getRows(root)
+				.filter(
+					(row) =>
+						!row.hidden &&
+						Number.parseFloat(row.style.top) + rowHeight > scrollTop,
+				)
+				.sort(
+					(a, b) =>
+						Number.parseFloat(a.style.top) - Number.parseFloat(b.style.top),
+				)[0]!;
+			const logicalKey = firstVisibleRow.querySelector<HTMLElement>(
+				"[data-ccl-logical-key]",
+			)!.dataset.cclLogicalKey;
+			const offsetBefore =
+				Number.parseFloat(firstVisibleRow.style.top) - scrollTop;
+			const heightBefore = readHeight();
+			if (change === "prepend") {
+				const prepended = section.items.slice(0, 6).map((item, index) => ({
+					...item,
+					key: `prepended:${index}`,
+					interactionId: `prepended:${index}`,
+				}));
+				await publishSection(
+					createTwoHopSectionModel({
+						id: section.id,
+						kind: section.kind,
+						title: section.title,
+						items: [...prepended, ...section.items],
+						totalCount: 106,
+					}),
+				);
+			} else {
+				width = 140;
+				triggerResize(root, width, readHeight());
+			}
+			await vi.waitFor(() => {
+				expect(readHeight()).toBeGreaterThan(heightBefore);
+				const cell = Array.from(
+					root.shadowRoot!.querySelectorAll<HTMLElement>(
+						"[data-ccl-logical-key]",
+					),
+				).find((candidate) => candidate.dataset.cclLogicalKey === logicalKey);
+				expect(cell).toBeDefined();
+				const row = cell!.closest<HTMLElement>(".twohop-virtual-row")!;
+				expect(Number.parseFloat(row.style.top) - scrollTop).toBeCloseTo(
+					offsetBefore,
+				);
+			});
+		},
+	);
+
 	it("renders load-more as a virtual cell and accepts the expanded publication", async () => {
 		const resolver = createCardModelResolver();
 		const loadMoreSection = vi.fn();

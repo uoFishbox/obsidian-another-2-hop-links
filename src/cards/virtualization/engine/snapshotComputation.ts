@@ -20,7 +20,7 @@ export interface VirtualListInput<TCell, TMountedBuild> {
 	rowModel: VirtualRowModel<TCell>;
 	rangesResult: ComputeVirtualRangesResult;
 	previous?: VirtualListSnapshot<TCell, TMountedBuild> | null;
-	buildMountedCells(params: {
+	buildMountedRows(params: {
 		rowModel: VirtualRowModel<TCell>;
 		rowRange: RowRange;
 		ranges: VirtualRanges;
@@ -31,7 +31,7 @@ export interface VirtualListInput<TCell, TMountedBuild> {
 export interface VirtualListRecomputeInput<TCell, TMountedBuild> {
 	rowModel: VirtualRowModel<TCell>;
 	previous: VirtualListSnapshot<TCell, TMountedBuild>;
-	buildMountedCells(params: {
+	buildMountedRows(params: {
 		rowModel: VirtualRowModel<TCell>;
 		rowRange: RowRange;
 		ranges: VirtualRanges;
@@ -68,19 +68,6 @@ const createSnapshot = <TCell, TMountedBuild>(params: {
 		totalHeight: params.totalHeight,
 	});
 };
-
-const didRangesChange = (
-	previous: VirtualRanges | undefined,
-	next: VirtualRanges,
-): boolean =>
-	!previous ||
-	!sameRange(previous.mounted, next.mounted) ||
-	!sameRange(previous.previewVisible, next.previewVisible);
-
-const didMountedRangeChange = (
-	previous: VirtualRanges | undefined,
-	next: VirtualRanges,
-): boolean => !previous || !sameRange(previous.mounted, next.mounted);
 
 const clampVirtualRanges = (ranges: VirtualRanges, rowCount: number): VirtualRanges => {
 	const mounted = clampRange(ranges.mounted, rowCount);
@@ -139,7 +126,7 @@ export function computeVirtualListSnapshot<TCell, TMountedBuild>(
 			const recomputed = recomputeVirtualListSnapshot({
 				rowModel: input.rowModel,
 				previous,
-				buildMountedCells: input.buildMountedCells,
+				buildMountedRows: input.buildMountedRows,
 			});
 			return {
 				snapshot: recomputed.snapshot,
@@ -158,43 +145,41 @@ export function computeVirtualListSnapshot<TCell, TMountedBuild>(
 		};
 	}
 
-	const rangeChanged = didRangesChange(previous?.ranges, rangesResult.ranges);
-	const mountedRangeChanged = didMountedRangeChange(
-		previous?.ranges,
-		rangesResult.ranges,
-	);
 	if (
 		previous &&
 		previous.rowModel === input.rowModel &&
-		!rangeChanged &&
 		previous.totalHeight === input.rowModel.totalHeight &&
 		previous.mountedBuild
 	) {
-		return {
-			snapshot: previous,
-			measurementKind: getMeasurementKind(rangesResult.kind),
-		};
+		const mountedRangeIsUnchanged = sameRange(
+			previous.ranges.mounted,
+			rangesResult.ranges.mounted,
+		);
+		if (mountedRangeIsUnchanged) {
+			const previewRangeIsUnchanged = sameRange(
+				previous.ranges.previewVisible,
+				rangesResult.ranges.previewVisible,
+			);
+			if (previewRangeIsUnchanged) {
+				return {
+					snapshot: previous,
+					measurementKind: getMeasurementKind(rangesResult.kind),
+				};
+			}
+
+			return {
+				snapshot: createSnapshot({
+					rowModel: input.rowModel,
+					ranges: rangesResult.ranges,
+					mountedBuild: previous.mountedBuild,
+					totalHeight: input.rowModel.totalHeight,
+				}),
+				measurementKind: getMeasurementKind(rangesResult.kind),
+			};
+		}
 	}
 
-	if (
-		previous &&
-		previous.rowModel === input.rowModel &&
-		!mountedRangeChanged &&
-		previous.totalHeight === input.rowModel.totalHeight &&
-		previous.mountedBuild
-	) {
-		return {
-			snapshot: createSnapshot({
-				rowModel: input.rowModel,
-				ranges: rangesResult.ranges,
-				mountedBuild: previous.mountedBuild,
-				totalHeight: input.rowModel.totalHeight,
-			}),
-			measurementKind: getMeasurementKind(rangesResult.kind),
-		};
-	}
-
-	const mountedBuild = input.buildMountedCells({
+	const mountedBuild = input.buildMountedRows({
 		rowModel: input.rowModel,
 		rowRange: rangesResult.ranges.mounted,
 		ranges: rangesResult.ranges,
@@ -236,7 +221,7 @@ export function recomputeVirtualListSnapshot<TCell, TMountedBuild>(
 			measurementKind: "stable",
 		};
 	}
-	const mountedBuild = input.buildMountedCells({
+	const mountedBuild = input.buildMountedRows({
 		rowModel: input.rowModel,
 		rowRange: ranges.mounted,
 		ranges,

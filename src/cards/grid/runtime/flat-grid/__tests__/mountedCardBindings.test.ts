@@ -4,8 +4,8 @@ import {
 	createResidentRowSlotAllocator,
 } from "cards/virtualization/public";
 import { createFlatGridCellSource } from "../cellSource";
-import { createCardGridBindingsMemo } from "../mountedCardBindings";
-import { buildMountedFlatGridCells } from "../mountedCells";
+import { createFlatGridCardBindingsMemo } from "../mountedCardBindings";
+import { buildMountedFlatGridRows } from "../mountedRows";
 import { createFlatGridRowModel } from "../rowModel";
 
 interface TestItem {
@@ -33,14 +33,14 @@ function createMountedBuild(items: readonly TestItem[]) {
 	});
 	const rowModel = createFlatGridRowModel({ cellSource, layout });
 
-	return buildMountedFlatGridCells({
+	return buildMountedFlatGridRows({
 		rowModel,
 		rowRange: { start: 0, end: rowModel.rowCount },
 		rowSlotAllocator: createResidentRowSlotAllocator(),
 	});
 }
 
-describe("createCardGridBindingsMemo", () => {
+describe("createFlatGridCardBindingsMemo", () => {
 	it("does not rerun resolvers while only preview visibility changes", () => {
 		const mountedBuild = createMountedBuild([
 			{ id: "item-0" },
@@ -49,7 +49,7 @@ describe("createCardGridBindingsMemo", () => {
 		]);
 		const resolvePreviewRequest = vi.fn(() => null);
 		const resolveInteractionDescriptor = vi.fn(() => null);
-		const resolveBindings = createCardGridBindingsMemo<TestItem>();
+		const resolveBindings = createFlatGridCardBindingsMemo<TestItem>();
 
 		const first = resolveBindings({
 			mountedBuild,
@@ -79,7 +79,7 @@ describe("createCardGridBindingsMemo", () => {
 		const firstPreviewResolver = vi.fn(() => null);
 		const nextPreviewResolver = vi.fn(() => null);
 		const resolveInteractionDescriptor = vi.fn(() => null);
-		const resolveBindings = createCardGridBindingsMemo<TestItem>();
+		const resolveBindings = createFlatGridCardBindingsMemo<TestItem>();
 
 		resolveBindings({
 			mountedBuild,
@@ -111,7 +111,7 @@ describe("createCardGridBindingsMemo", () => {
 		const mountedBuild = createMountedBuild([{ id: "item-0" }]);
 		const resolvePreviewRequest = vi.fn(() => null);
 		const resolveInteractionDescriptor = vi.fn(() => null);
-		const resolveBindings = createCardGridBindingsMemo<TestItem>();
+		const resolveBindings = createFlatGridCardBindingsMemo<TestItem>();
 
 		resolveBindings({
 			mountedBuild,

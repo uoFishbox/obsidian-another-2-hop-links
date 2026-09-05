@@ -42,7 +42,7 @@ export interface UseVirtualizerOptions<
 	hasRenderableContent(): boolean;
 	resolveRowModel(context: TContext): TRowModel;
 	resolveVisibilityPolicy(context: TContext): VirtualVisibilityPolicy;
-	buildMountedCells(params: {
+	buildMountedRows(params: {
 		rowModel: TRowModel;
 		rowRange: RowRange;
 		ranges: VirtualRanges;
@@ -76,7 +76,7 @@ export function useVirtualizer<
 	hasRenderableContent,
 	resolveRowModel,
 	resolveVisibilityPolicy,
-	buildMountedCells,
+	buildMountedRows,
 	onSnapshotUpdated,
 	resolveLayoutMeasurement,
 	onStableMeasurement,
@@ -96,7 +96,7 @@ export function useVirtualizer<
 	const engine = createVirtualizerEngine<TCell, TRowModel, TContext, TMountedBuild>({
 		resolveRowModel,
 		resolveVisibilityPolicy,
-		buildMountedCells,
+		buildMountedRows,
 		onSnapshotUpdated: (nextSnapshot) => {
 			if (mountedBuildState !== nextSnapshot.mountedBuild) {
 				mountedBuildState = nextSnapshot.mountedBuild;

@@ -15,6 +15,8 @@ export function createFlatGridModelMemo<T>() {
 	let slotBindingRevision: unknown;
 
 	let logicalCellSource: FlatGridCellSource<T> | null = null;
+	let contentItems: readonly T[] | undefined;
+	let contentGetItemId: ((item: T, index: number) => string) | undefined;
 	let contentDataRevision: unknown;
 	let contentKeyRevision: unknown;
 	let contentVisibleCount = -1;
@@ -41,23 +43,27 @@ export function createFlatGridModelMemo<T>() {
 			showLoadMore: boolean;
 			sectionId?: string;
 		}): FlatGridCellSource<T> {
-			const dataRevision = params.itemsRevision ?? params.items;
-			const keyRevision = params.itemIdRevision ?? params.getItemId;
+			const dataRevision = params.itemsRevision;
+			const keyRevision = params.itemIdRevision;
+			// Explicit revisions keep slot bodies stable across progressive array
+			// publications. Content invalidation still compares both references below.
+			const nextBindingDataRevision = dataRevision ?? params.items;
+			const nextBindingKeyRevision = keyRevision ?? params.getItemId;
 			if (
 				!hasBindingTopology ||
-				!Object.is(bindingDataRevision, dataRevision) ||
-				!Object.is(bindingKeyRevision, keyRevision) ||
+				!Object.is(bindingDataRevision, nextBindingDataRevision) ||
+				!Object.is(bindingKeyRevision, nextBindingKeyRevision) ||
 				bindingHasHeader !== params.hasHeader ||
 				bindingSectionId !== params.sectionId
 			) {
 				hasBindingTopology = true;
-				bindingDataRevision = dataRevision;
-				bindingKeyRevision = keyRevision;
+				bindingDataRevision = nextBindingDataRevision;
+				bindingKeyRevision = nextBindingKeyRevision;
 				bindingHasHeader = params.hasHeader;
 				bindingSectionId = params.sectionId;
 				slotBindingRevision = {
-					data: dataRevision,
-					key: keyRevision,
+					data: nextBindingDataRevision,
+					key: nextBindingKeyRevision,
 					hasHeader: params.hasHeader,
 					sectionId: params.sectionId,
 				};
@@ -65,6 +71,8 @@ export function createFlatGridModelMemo<T>() {
 
 			if (
 				logicalCellSource &&
+				contentItems === params.items &&
+				contentGetItemId === params.getItemId &&
 				Object.is(contentDataRevision, dataRevision) &&
 				Object.is(contentKeyRevision, keyRevision) &&
 				contentVisibleCount === params.visibleCount &&
@@ -75,6 +83,8 @@ export function createFlatGridModelMemo<T>() {
 				return logicalCellSource;
 			}
 
+			contentItems = params.items;
+			contentGetItemId = params.getItemId;
 			contentDataRevision = dataRevision;
 			contentKeyRevision = keyRevision;
 			contentVisibleCount = params.visibleCount;

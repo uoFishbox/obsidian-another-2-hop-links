@@ -6,12 +6,12 @@ import {
 	createResidentRowSlotAllocator,
 	type ResidentRowSlotAllocator,
 } from "cards/virtualization/public";
-import { buildMountedFlatGridCells, type MountedFlatGridBuild } from "../mountedCells";
+import { buildMountedFlatGridRows, type MountedFlatGridBuild } from "../mountedRows";
 import {
 	expectKeys,
 	expectUniquePhysicalCellSlots,
 	flattenMountedRowBindings,
-} from "./mountedCellsTestHelpers";
+} from "./mountedRowsTestHelpers";
 
 type TestItem = {
 	id: string;
@@ -112,7 +112,7 @@ function buildCells(params: {
 			? rowSlotAllocators.get(params.previousBuild)
 			: undefined) ??
 		createResidentRowSlotAllocator();
-	const build = buildMountedFlatGridCells({
+	const build = buildMountedFlatGridRows({
 		rowModel,
 		rowRange: {
 			start: Math.floor(Math.max(0, visibleWindow.start) / columns),
@@ -148,7 +148,7 @@ function expectSameSlotsForKeys(
 	}
 }
 
-describe("linkListVirtualLayout", () => {
+describe("buildMountedFlatGridRows", () => {
 	it("keeps the peak row-slot capacity when the mounted window repeatedly shrinks", () => {
 		const items = createItems(90);
 		let build = buildCells({
@@ -373,12 +373,12 @@ describe("linkListVirtualLayout", () => {
 			gap: 10,
 		});
 		const rowSlotAllocator = createResidentRowSlotAllocator();
-		const initial = buildMountedFlatGridCells({
+		const initial = buildMountedFlatGridRows({
 			rowModel,
 			rowRange: { start: 0, end: 2 },
 			rowSlotAllocator,
 		});
-		const shifted = buildMountedFlatGridCells({
+		const shifted = buildMountedFlatGridRows({
 			rowModel,
 			rowRange: { start: 1, end: 3 },
 			previousBuild: initial,

@@ -17,6 +17,7 @@ export {
 } from "./engine/mountedGridRows";
 export type { VirtualListSnapshot } from "./engine/snapshotComputation";
 export type {
+	MutableStableScrollTopBand,
 	StableScrollTopBand,
 	VirtualScrollWindowRangeRowModel,
 } from "./engine/scrollWindowResolver";
