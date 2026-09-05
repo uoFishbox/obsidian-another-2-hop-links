@@ -324,6 +324,17 @@ describe("TwoHopVirtualGrid component", () => {
 		});
 
 		await vi.waitFor(() => expect(resolver).toHaveBeenCalled());
+		// Hydration drains asynchronously on real timers, so wait until the
+		// initial demand window stops producing new models before observing
+		// publication effects; otherwise first-time hydrations leak into the
+		// filtered-publication assertions below.
+		let settledCallCount = resolver.mock.calls.length;
+		for (let attempt = 0; attempt < 10; attempt += 1) {
+			for (let index = 0; index < 4; index += 1) await flushFrames();
+			if (resolver.mock.calls.length === settledCallCount) break;
+			settledCallCount = resolver.mock.calls.length;
+		}
+
 		const filteredItems = fullSection.items.slice(0, 5);
 		const createFilteredSection = (items: readonly TwoHopItemModel[]) =>
 			createTwoHopSectionModel({

@@ -83,7 +83,7 @@ describe("ListControls", () => {
 			{ title: "タイトル", icon: "type", checked: false },
 			{ title: "被リンク数", icon: "links-coming-in", checked: false },
 			{ title: "作成日時", icon: "calendar-plus", checked: true },
-			{ title: "更新日時", icon: "clock", checked: false },
+			{ title: "更新日時", icon: "calendar-clock", checked: false },
 			{ title: "ファイルサイズ", icon: "hard-drive", checked: false },
 		]);
 		expect(button).toHaveAttribute("aria-expanded", "true");
@@ -131,7 +131,7 @@ describe("ListControls", () => {
 		["タイトル", "type", "alphabetical", "alphabetical-reverse"],
 		["被リンク数", "links-coming-in", "backlink-count", "backlink-count-reverse"],
 		["作成日時", "calendar-plus", "created-date", "created-date-reverse"],
-		["更新日時", "clock", "modified-date", "modified-date-reverse"],
+		["更新日時", "calendar-clock", "modified-date", "modified-date-reverse"],
 		["ファイルサイズ", "hard-drive", "file-size", "file-size-reverse"],
 	] as const)(
 		"selects %s while preserving the sort direction",

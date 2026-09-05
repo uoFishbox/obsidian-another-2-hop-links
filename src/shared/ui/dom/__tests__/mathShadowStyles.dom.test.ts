@@ -1,6 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import * as obsidian from "obsidian";
-import { ensureCardRenderShadowSurface } from "cards/components/cardRenderShadowSurface";
 import {
 	installMathShadowPatch,
 	queueMathShadowStylesSync,
@@ -157,42 +156,6 @@ describe("mathShadowStyles", () => {
 			return { host, root };
 		}
 
-		test("shares one parsed stylesheet across cards without MathJax or style clones", () => {
-			const replace = vi.spyOn(CSSStyleSheet.prototype, "replaceSync");
-			const first = createSurface();
-			const second = createSurface();
-			const firstSurface = ensureCardRenderShadowSurface(first.host);
-			ensureCardRenderShadowSurface(second.host);
-			ensureCardRenderShadowSurface(first.host);
-			firstSurface.surfaceEl.innerHTML =
-				'<div class="math-rendered"><math xmlns="http://www.w3.org/1998/Math/MathML"><mi>x</mi></math></div>';
-			expect(syncMathStylesForNode(firstSurface.surfaceEl)).toBe(true);
-			expect(first.root.adoptedStyleSheets).toHaveLength(1);
-			expect(first.root.adoptedStyleSheets[0]).toBe(
-				second.root.adoptedStyleSheets[0],
-			);
-			expect(replace).toHaveBeenCalledTimes(1);
-			expect(obsidian.requireApiVersion).toHaveBeenCalledWith("1.14.0");
-			expect(first.root.querySelectorAll("style")).toHaveLength(1);
-			expect(
-				first.root.querySelector("style[data-ccl-mathjax-shadow-style]"),
-			).toBeNull();
-			const css = Array.from(first.root.adoptedStyleSheets[0].cssRules)
-				.map((rule) => rule.cssText)
-				.join("\n");
-			expect(css).toContain('"Latin Modern Math"');
-			expect(css).toContain("math.tml-display");
-			expect(css).toContain(".tml-sml-pad");
-			expect(css).toContain(".tml-cancelto");
-			expect(css).toContain(".chr-med");
-			expect(css).toContain(".wbk-med");
-			expect(css).toContain(".ff-narrow");
-			expect(css).toContain(":host");
-			expect(css).toContain("content: none");
-			expect(css).not.toContain("@font-face");
-			expect(css).not.toContain("public/fonts/");
-		});
-
 		test("creates separate shared sheets for each window's document", () => {
 			const iframe = document.createElement("iframe");
 			document.body.append(iframe);
@@ -214,21 +177,6 @@ describe("mathShadowStyles", () => {
 				third.root.adoptedStyleSheets[0],
 			);
 			iframe.remove();
-		});
-
-		test("disposal removes only its own sheet and allows the surface to be reused", () => {
-			const { host, root } = createSurface();
-			const otherSheet = new CSSStyleSheet();
-			root.adoptedStyleSheets = [otherSheet];
-			const handles = ensureCardRenderShadowSurface(host);
-			const sharedSheet = root.adoptedStyleSheets[1];
-			expect(root.adoptedStyleSheets).toHaveLength(2);
-			handles.dispose();
-			handles.dispose();
-			expect(syncMathStylesForNode(handles.surfaceEl)).toBe(false);
-			expect(root.adoptedStyleSheets).toEqual([otherSheet]);
-			ensureCardRenderShadowSurface(host);
-			expect(root.adoptedStyleSheets).toEqual([otherSheet, sharedSheet]);
 		});
 
 		test("does not patch MathJax or schedule global CSS synchronization", () => {

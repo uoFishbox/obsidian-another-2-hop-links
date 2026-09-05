@@ -44,7 +44,7 @@ export default defineConfig({
 					name: "dom-unit",
 					globals: true,
 					environment: "jsdom",
-					isolate: false,
+					isolate: true,
 					include: ["src/**/__tests__/**/*.dom.test.ts"],
 					exclude: [
 						"**/*.svelte.dom.test.ts",

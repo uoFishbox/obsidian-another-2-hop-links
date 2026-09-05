@@ -14,7 +14,7 @@ vi.mock("search/tag-notes/TagNotesView", () => ({
 	openTagNotesView: vi.fn(),
 }));
 
-vi.mock("hover-preview/mobilePopover", () => ({
+vi.mock("hover-popover/mobilePopover", () => ({
 	triggerHoverPopover: vi.fn(),
 }));
 
